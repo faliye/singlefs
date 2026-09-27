@@ -1,0 +1,79 @@
+warning: unused imports: `NonZeroU64` and `NonZeroUsize`
+ --> crates/singlefs-harness/src/memory_pool.rs:8:16
+  |
+8 | use std::num::{NonZeroU64, NonZeroUsize};
+  |                ^^^^^^^^^^  ^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::ops::Range`
+ --> crates/singlefs-harness/src/memory_pool.rs:9:5
+  |
+9 | use std::ops::Range;
+  |     ^^^^^^^^^^^^^^^
+
+warning: unused imports: `AtomicBool`, `AtomicUsize`, and `Ordering`
+  --> crates/singlefs-harness/src/memory_pool.rs:10:25
+   |
+10 | use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+   |                         ^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^
+
+warning: unused import: `std::sync::mpsc`
+  --> crates/singlefs-harness/src/memory_pool.rs:11:5
+   |
+11 | use std::sync::mpsc;
+   |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `std::time::Instant`
+  --> crates/singlefs-harness/src/memory_pool.rs:12:5
+   |
+12 | use std::time::Instant;
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `InvariantVerdict`
+  --> crates/singlefs-harness/src/memory_pool.rs:14:44
+   |
+14 | use singlefs_checker::image::{ImageReader, InvariantVerdict};
+   |                                            ^^^^^^^^^^^^^^^^
+
+warning: unused imports: `InstanceTableOfRootRecord` and `check_pool_image`
+  --> crates/singlefs-harness/src/memory_pool.rs:15:30
+   |
+15 | use singlefs_checker::walk::{check_pool_image, InstanceTableOfRootRecord};
+   |                              ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `JournalPolicy`, `RecoveryOutcome`, `RecoveryReport`, and `recover`
+  --> crates/singlefs-harness/src/memory_pool.rs:21:5
+   |
+21 |     recover, JournalPolicy, PoolReader, RecoveryOutcome, RecoveryReport,
+   |     ^^^^^^^  ^^^^^^^^^^^^^              ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+
+warning: unused import: `NODE_POINTER_BYTES`
+  --> crates/singlefs-harness/src/memory_pool.rs:25:52
+   |
+25 |     JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, NODE_POINTER_BYTES, SLOT_BYTES,
+   |                                                    ^^^^^^^^^^^^^^^^^^
+
+warning: `singlefs-harness` (lib) generated 9 warnings (run `cargo fix --lib -p singlefs-harness` to apply 9 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running tests/second_transaction_supplement_two_warm_up_counter.rs (target/debug/deps/second_transaction_supplement_two_warm_up_counter-417e12908dfd70bd)
+
+running 2 tests
+test warm_up_after_a_journal_counter_other_than_zero_counts_records_on_from_it_while_txg_stays_one_and_two ... ok
+test c366_when_the_chosen_root_own_record_is_unreadable_the_new_instance_numbers_records_and_tail_from_the_highest_readable_record ... FAILED
+
+failures:
+
+---- c366_when_the_chosen_root_own_record_is_unreadable_the_new_instance_numbers_records_and_tail_from_the_highest_readable_record stdout ----
+
+thread 'c366_when_the_chosen_root_own_record_is_unreadable_the_new_instance_numbers_records_and_tail_from_the_highest_readable_record' (3983950) panicked at crates/singlefs-harness/tests/second_transaction_supplement_two_warm_up_counter.rs:231:63:
+可写挂载: NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }, witness: NewerPublishWitness { witnessed_journal_counter: 4, comparison: Undecidable } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }, witness: NewerPublishWitness { witnessed_journal_counter: 4, comparison: Undecidable } } })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    c366_when_the_chosen_root_own_record_is_unreadable_the_new_instance_numbers_records_and_tail_from_the_highest_readable_record
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.21s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_two_warm_up_counter`

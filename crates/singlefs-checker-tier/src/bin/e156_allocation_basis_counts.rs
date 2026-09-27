@@ -90,14 +90,14 @@ const E156_UNIT_AREA_START_SLOT: u64 = 50176;
 /// `⌊(16384 − 135) ÷ 20⌋`；节点头 135 字节 = 86（固定头）+ 2 × 10（子节点指针，容量算式的一部分）+ 29（其余头字段）。
 const E156_ALLOCATION_RECORD_NODE_HEADER_BYTES: u64 = 86 + 2 * 10 + 29;
 const E156_ALLOCATION_RECORD_BYTES: u64 = 20;
-/// S1(f)：第一个事务之后的分配记录条数（E156 第 3 次重跑登记「七」7.2 K1-2：28 = 2 × 14）。
-const E156_FIRST_TRANSACTION_EXPECTED_RECORD_COUNT: usize = 28;
-/// K1-1（第 3 次重跑登记「七」7.2，第 4 次重跑登记第十三节命令三重跑逐行相同）：第一个事务之后 D0 记账第 1 项 17 槽、第 5 项 1 槽。
-const E156_FIRST_TRANSACTION_ITEM1_SLOTS: u64 = 17;
-const E156_FIRST_TRANSACTION_ITEM5_SLOTS: u64 = 1;
-/// K1-1 的落点表（同一条命令三的输出 `first_txn = [...]`，按 (槽, 跨度) 升序）：数据 2、extent 1、inode 叶 2、inode 根 1、
+/// S1(f)：新池新建文件之后的分配记录条数（E156 第 3 次重跑登记「七」7.2 K1-2：28 = 2 × 14）。
+const E156_NEW_POOL_FILE_CREATION_EXPECTED_RECORD_COUNT: usize = 28;
+/// K1-1（第 3 次重跑登记「七」7.2，第 4 次重跑登记第十三节命令三重跑逐行相同）：新池新建文件之后 D0 记账第 1 项 17 槽、第 5 项 1 槽。
+const E156_NEW_POOL_FILE_CREATION_ITEM1_SLOTS: u64 = 17;
+const E156_NEW_POOL_FILE_CREATION_ITEM5_SLOTS: u64 = 1;
+/// K1-1 的落点表（同一条命令三的输出 `new_pool_file_creation = [...]`，按 (槽, 跨度) 升序）：数据 2、extent 1、inode 叶 2、inode 根 1、
 /// 分配记录树 5 个节点各 1、记账 1、映射 1、树表 1。
-const E156_FIRST_TRANSACTION_PLACEMENTS: [(u64, u64); 12] = [
+const E156_NEW_POOL_FILE_CREATION_PLACEMENTS: [(u64, u64); 12] = [
     (50180, 2),
     (50240, 1),
     (50242, 2),
@@ -1077,14 +1077,14 @@ mod anchor_model {
     const REGION_DEVICE_NUMBERS: [u64; 3] = [0, 1, 0];
     /// 造洞之后隔几次工作负载发布再造下一个（登记表头第 4 行）。
     const WORKLOAD_PUBLISHES_BETWEEN_HOLES: u64 = 2;
-    const FIRST_TRANSACTION_TXG: u64 = 3;
+    const NEW_POOL_FILE_CREATION_TXG: u64 = 3;
     /// 「前」位置第一个洞最早落的 txg（C380 逐字的 txg 5）。
     const FRONT_HOLE_EARLIEST_TXG: u64 = 5;
     const ZERO_UNIT_WARM_UP_TXGS: [u64; 2] = [1, 2];
 
     #[derive(Clone, Copy, PartialEq, Eq, Debug)]
     enum AnchorPublishRole {
-        MakeFilesystemWarmUpOrFirstTransaction,
+        MakeFilesystemWarmUpOrNewPoolFileCreation,
         Workload,
         Crash,
         InstanceRow,
@@ -1132,19 +1132,19 @@ mod anchor_model {
     ) -> (BTreeMap<u64, AnchorPublishRole>, Vec<u64>, Vec<u64>) {
         let ring_length = 3 * slots_per_region;
         let mut roles = BTreeMap::new();
-        for setup_txg in 0..=FIRST_TRANSACTION_TXG {
+        for setup_txg in 0..=NEW_POOL_FILE_CREATION_TXG {
             roles.insert(
                 setup_txg,
-                AnchorPublishRole::MakeFilesystemWarmUpOrFirstTransaction,
+                AnchorPublishRole::MakeFilesystemWarmUpOrNewPoolFileCreation,
             );
         }
         let mut holes: Vec<u64> = Vec::new();
         let mut recovery_ends: Vec<u64> = Vec::new();
-        let mut latest_txg = FIRST_TRANSACTION_TXG;
+        let mut latest_txg = NEW_POOL_FILE_CREATION_TXG;
         let first_hole_at = if front {
             FRONT_HOLE_EARLIEST_TXG
         } else {
-            ring_length + FIRST_TRANSACTION_TXG + 1
+            ring_length + NEW_POOL_FILE_CREATION_TXG + 1
         };
         let mut workload_publishes_since_the_last_hole = 0u64;
         while u64::try_from(holes.len()).expect("洞数落在 u64 内") < hole_count {
@@ -1206,7 +1206,7 @@ mod anchor_model {
             if role != AnchorPublishRole::Crash {
                 ring.insert(txg % ring_length, txg);
             }
-            if role == AnchorPublishRole::Crash || txg < FIRST_TRANSACTION_TXG {
+            if role == AnchorPublishRole::Crash || txg < NEW_POOL_FILE_CREATION_TXG {
                 continue;
             }
             let oldest = *ring.values().min().expect("环里至少有 mkfs 那一条根");
@@ -1275,7 +1275,7 @@ mod anchor_model {
                 live_holes: u64::try_from(live_holes).expect("落在 u64 内"),
                 live_holes_closed_form: u64::try_from(live_closed_form.len()).expect("落在 u64 内"),
                 missing_txgs_closed_form,
-                is_observed: txg == FIRST_TRANSACTION_TXG
+                is_observed: txg == NEW_POOL_FILE_CREATION_TXG
                     || role == AnchorPublishRole::Workload
                     || recovery_ends.contains(&txg),
             });
@@ -1924,7 +1924,7 @@ fn read_hh_state(inputs: &HhStateInputs<'_>) -> HhStateReading {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum ObservationPoint {
-    FirstTransaction,
+    NewPoolFileCreation,
     Workload(WorkloadPublishKind),
     MountReturn,
 }
@@ -1932,7 +1932,7 @@ enum ObservationPoint {
 impl ObservationPoint {
     fn label(self) -> &'static str {
         match self {
-            ObservationPoint::FirstTransaction => "first_transaction",
+            ObservationPoint::NewPoolFileCreation => "new_pool_file_creation",
             ObservationPoint::Workload(kind) => kind.label(),
             ObservationPoint::MountReturn => "mount_return",
         }
@@ -2025,7 +2025,7 @@ struct HhRunOutcome {
     recoveries: Vec<HoleRecovery>,
     genesis_root_in_ring: bool,
     slots_per_region_read_back: u64,
-    first_transaction_matches_the_registered_anchor: bool,
+    new_pool_file_creation_matches_the_registered_anchor: bool,
     ring_wrap_overwrites_checked: u64,
     ring_wrap_overwrite_mismatches: u64,
     tree_table_release_checks: u64,
@@ -2121,7 +2121,7 @@ fn mount_admission_label(admission: &MountSpaceAdmission) -> &'static str {
     }
 }
 
-fn first_transaction_matches_the_registered_anchor(
+fn new_pool_file_creation_matches_the_registered_anchor(
     allocator: &PoolAllocator,
     first: &TransactionOutput,
 ) -> bool {
@@ -2133,10 +2133,10 @@ fn first_transaction_matches_the_registered_anchor(
         .collect();
     placements.sort_unstable();
     first.root.checkpoint_txg.0 == 3
-        && allocated == E156_FIRST_TRANSACTION_ITEM1_SLOTS
-        && deferred == E156_FIRST_TRANSACTION_ITEM5_SLOTS
-        && placements == E156_FIRST_TRANSACTION_PLACEMENTS
-        && allocator.records().len() == E156_FIRST_TRANSACTION_EXPECTED_RECORD_COUNT
+        && allocated == E156_NEW_POOL_FILE_CREATION_ITEM1_SLOTS
+        && deferred == E156_NEW_POOL_FILE_CREATION_ITEM5_SLOTS
+        && placements == E156_NEW_POOL_FILE_CREATION_PLACEMENTS
+        && allocator.records().len() == E156_NEW_POOL_FILE_CREATION_EXPECTED_RECORD_COUNT
 }
 
 fn released_not_reclaimed_slots_on_device_zero(allocator: &PoolAllocator) -> BTreeSet<u64> {
@@ -2363,11 +2363,11 @@ fn emit_observation(
     ));
 }
 
-/// 岔路 1 一格：mkfs（产品路径分配器）→ 取号 → 暖机 → 第一个事务（txg 3）→ 工作负载，在锚点模型给的洞 txg 上造 c2 并可写挂载，
+/// 岔路 1 一格：mkfs（产品路径分配器）→ 取号 → 暖机 → 新池新建文件（txg 3）→ 工作负载，在锚点模型给的洞 txg 上造 c2 并可写挂载，
 /// 跑到锚点模型给的终点。任一次发布或挂载报错即截断（W8）。
 #[allow(
     clippy::too_many_lines,
-    reason = "一格的主历史（mkfs、第一个事务、工作负载、c2 与挂载、逐观测点）连着写才对得上登记 5.3 的骨架逐行"
+    reason = "一格的主历史（mkfs、新池新建文件、工作负载、c2 与挂载、逐观测点）连着写才对得上登记 5.3 的骨架逐行"
 )]
 fn run_hh_history(emitter: &mut Emitter, request: &HhRunRequest<'_>) -> HhRunOutcome {
     let shape = request.shape;
@@ -2384,7 +2384,7 @@ fn run_hh_history(emitter: &mut Emitter, request: &HhRunRequest<'_>) -> HhRunOut
         recoveries: Vec::new(),
         genesis_root_in_ring: false,
         slots_per_region_read_back: 0,
-        first_transaction_matches_the_registered_anchor: false,
+        new_pool_file_creation_matches_the_registered_anchor: false,
         ring_wrap_overwrites_checked: 0,
         ring_wrap_overwrite_mismatches: 0,
         tree_table_release_checks: 0,
@@ -2457,8 +2457,8 @@ fn run_hh_history(emitter: &mut Emitter, request: &HhRunRequest<'_>) -> HhRunOut
         }
     };
     record_release_generations(&mut allocation_generations, &before_first, &allocator);
-    outcome.first_transaction_matches_the_registered_anchor =
-        first_transaction_matches_the_registered_anchor(&allocator, &first);
+    outcome.new_pool_file_creation_matches_the_registered_anchor =
+        new_pool_file_creation_matches_the_registered_anchor(&allocator, &first);
     let mut state = HhRunState {
         parameters,
         devices,
@@ -2482,7 +2482,7 @@ fn run_hh_history(emitter: &mut Emitter, request: &HhRunRequest<'_>) -> HhRunOut
         emitter,
         request,
         &mut outcome,
-        ObservationPoint::FirstTransaction,
+        ObservationPoint::NewPoolFileCreation,
         None,
     );
 
@@ -2758,7 +2758,7 @@ fn set_text(values: &BTreeSet<u64>) -> String {
     format!("[{}]", parts.join(","))
 }
 
-/// 轨迹（登记第八节 8.1）：峰值、环转过第一个事务那一圈之后的峰值、为正的观测点数、期末值。
+/// 轨迹（登记第八节 8.1）：峰值、环转过新池新建文件那一圈之后的峰值、为正的观测点数、期末值。
 fn trajectory_text<Value: Copy + Ord + Default + std::fmt::Display>(
     values: &[(u64, Value)],
     after_the_first_ring_txg: u64,
@@ -2841,7 +2841,7 @@ fn emit_cell_summary(emitter: &mut Emitter, outcome: &HhRunOutcome) {
         .map(|recovery| recovery.last_txg_of_the_mount)
         .collect();
     emitter.emit(&format!(
-        "name=q1_cell family={} {} allocator={:?} cut_point={:?} registered_end={} actual_end={} truncated={truncated} truncation_txg={truncation_txg} truncation_error={truncation_error} observations={} holes_injected={} recovery_ends={} genesis_root_in_ring={} slots_per_region_read_back={} first_transaction_matches_k1_1={} ring_wrap_overwrites_checked={} ring_wrap_overwrite_mismatches={} tree_table_release_checks={} tree_table_release_violations={} mount_schedule_mismatches={} cut_mismatches_restored_image={} w9_roots_compared={} w9_mismatches={} w9_failures={} a11_h_que_mismatches={anchor_missing_txg_mismatches} a11_h_dong_mismatches={anchor_live_hole_mismatches} a14_floor_mismatches={anchor_floor_mismatches} anchor_rows_missing={anchor_rows_missing} a15_real_below_bound={} a15_every_below_bound={} k10_violation_points={} devices_unequal_points={} root_ring_missing_points={} abandoned_root_points={} roots_without_version_facts_points={} admission_refusals={} mount_admission_not_before_acquisition={} mount_floor_raise_sequences={} effective_floor_positive_points={} q1b_real_positive_points={} q1b_every_positive_points={} q1a_plus_real_positive_points={} q1a_plus_every_positive_points={} q1b_plus_positive_points={} a10_lags_real={} a10_lags_every={} i31_red_on_hole_states={} i31_judged_hole_states={}",
+        "name=q1_cell family={} {} allocator={:?} cut_point={:?} registered_end={} actual_end={} truncated={truncated} truncation_txg={truncation_txg} truncation_error={truncation_error} observations={} holes_injected={} recovery_ends={} genesis_root_in_ring={} slots_per_region_read_back={} new_pool_file_creation_matches_k1_1={} ring_wrap_overwrites_checked={} ring_wrap_overwrite_mismatches={} tree_table_release_checks={} tree_table_release_violations={} mount_schedule_mismatches={} cut_mismatches_restored_image={} w9_roots_compared={} w9_mismatches={} w9_failures={} a11_h_que_mismatches={anchor_missing_txg_mismatches} a11_h_dong_mismatches={anchor_live_hole_mismatches} a14_floor_mismatches={anchor_floor_mismatches} anchor_rows_missing={anchor_rows_missing} a15_real_below_bound={} a15_every_below_bound={} k10_violation_points={} devices_unequal_points={} root_ring_missing_points={} abandoned_root_points={} roots_without_version_facts_points={} admission_refusals={} mount_admission_not_before_acquisition={} mount_floor_raise_sequences={} effective_floor_positive_points={} q1b_real_positive_points={} q1b_every_positive_points={} q1a_plus_real_positive_points={} q1a_plus_every_positive_points={} q1b_plus_positive_points={} a10_lags_real={} a10_lags_every={} i31_red_on_hole_states={} i31_judged_hole_states={}",
         outcome.family,
         shape.fields(),
         outcome.allocator_source,
@@ -2853,7 +2853,7 @@ fn emit_cell_summary(emitter: &mut Emitter, outcome: &HhRunOutcome) {
         set_text(&recovery_ends),
         outcome.genesis_root_in_ring,
         outcome.slots_per_region_read_back,
-        outcome.first_transaction_matches_the_registered_anchor,
+        outcome.new_pool_file_creation_matches_the_registered_anchor,
         outcome.ring_wrap_overwrites_checked,
         outcome.ring_wrap_overwrite_mismatches,
         outcome.tree_table_release_checks,
@@ -3093,7 +3093,7 @@ fn run_floor_raise_trace() -> FloorRaiseTrace {
             instance,
             &warm_up_output.last_record_bytes,
         )
-        .expect("PQ2 第一个事务")
+        .expect("PQ2 新池新建文件")
     };
     for step in 1..=8u64 {
         current = publish_one_workload(
@@ -3404,7 +3404,7 @@ fn run_rollback_to_the_oldest_candidate() -> OldestCandidateRollback {
             instance,
             &warm_up_output.last_record_bytes,
         )
-        .expect("U13 第一个事务")
+        .expect("U13 新池新建文件")
     };
     let overwrites = 3 * E156_ROOT_RING_REGIONS * E156_SLOTS_PER_REGION;
     for step in 1..=overwrites {
@@ -3474,7 +3474,7 @@ fn run_rollback_to_the_oldest_candidate() -> OldestCandidateRollback {
     }
 }
 
-/// β0（S = 8、第一个事务之后）与 β_syn（β0 的镜像把 D0 第 1 项 − 1、第 5 项 − 1 成 0、第 2 项 + 1，重封）：U13 (b) 与 [`main`] 共用。
+/// β0（S = 8、新池新建文件之后）与 β_syn（β0 的镜像把 D0 第 1 项 − 1、第 5 项 − 1 成 0、第 2 项 + 1，重封）：U13 (b) 与 [`main`] 共用。
 struct SyntheticBase {
     pool: MemoryPool,
     accounting_slot: u64,
@@ -3507,7 +3507,7 @@ fn synthetic_base_with_zero_deferred() -> SyntheticBase {
             instance,
             &warm_up_output.last_record_bytes,
         )
-        .expect("β0 第一个事务")
+        .expect("β0 新池新建文件")
     };
     let accounting_slot = first.unit(TransactionUnit::AccountingTree).slot.0;
     let tree_table_slot = first.unit(TransactionUnit::TreeTable).slot.0;
@@ -4257,7 +4257,7 @@ fn judge_hole_history_outcome(
                 || device_zero.interval_rule_referenced_but_free > 0
         }),
         device_and_crates_disagreements: u64::from(!outcome.genesis_root_in_ring)
-            + u64::from(!outcome.first_transaction_matches_the_registered_anchor)
+            + u64::from(!outcome.new_pool_file_creation_matches_the_registered_anchor)
             + outcome.ring_wrap_overwrite_mismatches
             + outcome.mount_schedule_mismatches
             + outcome.disk_cross_check_mismatches
@@ -5002,7 +5002,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    //! K1（第一个事务之后的记账三项）、G27（`referenced_slots`）、R8（U7）、R3 的判别力（U8）、R-3 闭式（U10、U12）的最小单测，
+    //! K1（新池新建文件之后的记账三项）、G27（`referenced_slots`）、R8（U7）、R3 的判别力（U8）、R-3 闭式（U10、U12）的最小单测，
     //! 与第 4 次重跑登记第九节的 U11、U13–U18。
     use super::{
         accounting_row_slots, allocated_minus_deferred_matches_referenced,
@@ -5033,7 +5033,7 @@ mod tests {
     use singlefs_harness::memory_pool::SparseBlockDevice;
     use std::collections::{BTreeMap, BTreeSet};
 
-    fn first_transaction_state() -> (
+    fn new_pool_file_creation_state() -> (
         PoolAllocator,
         TransactionOutput,
         Vec<(DeviceIdentity, SparseBlockDevice)>,
@@ -5085,42 +5085,42 @@ mod tests {
                 instance,
                 &warm_up_output.last_record_bytes,
             )
-            .expect("第一个事务")
+            .expect("新池新建文件")
         };
         (allocator, first, devices)
     }
 
-    /// K1-1（E156 第 3 次重跑登记「七」7.2）：分配记录树按位置寻址之后第一个事务的记账第 1 项是 17
+    /// K1-1（E156 第 3 次重跑登记「七」7.2）：分配记录树按位置寻址之后新池新建文件的记账第 1 项是 17
     /// （五个树节点占五条记录，不再是登记第一、二版的单节点 13），第 5 项仍是 1。
     #[test]
-    fn accounting_after_first_transaction_matches_the_registered_anchor() {
-        let (allocator, first, _devices) = first_transaction_state();
+    fn accounting_after_new_pool_file_creation_matches_the_registered_anchor() {
+        let (allocator, first, _devices) = new_pool_file_creation_state();
         assert_eq!(first.root.checkpoint_txg.0, 3);
         let (allocated, _free, deferred) = accounting_row_slots(&allocator, DeviceIdentity(0));
         assert_eq!(allocated, 17, "K1-1 第 1 项");
         assert_eq!(deferred, 1, "K1-1 第 5 项");
     }
 
-    /// K1-3：β0 的最新根走读引用 = 16（实例表 2 槽 + 第一个事务九个角色共 14 槽，五个分配记录树节点
+    /// K1-3：β0 的最新根走读引用 = 16（实例表 2 槽 + 新池新建文件九个角色共 14 槽，五个分配记录树节点
     /// 记在这 14 槽里），不再是登记第一、二版的 12。
     #[test]
     fn referenced_slots_counts_the_carried_instance_table_before_its_first_rewrite() {
-        let (allocator, first, _devices) = first_transaction_state();
+        let (allocator, first, _devices) = new_pool_file_creation_state();
         let referenced = referenced_slots(&first);
         assert_eq!(
             referenced, 16,
-            "实例表 2 槽（未进 units，靠兜底加回）+ 第一个事务九个角色共 14 槽（K1-3）"
+            "实例表 2 槽（未进 units，靠兜底加回）+ 新池新建文件九个角色共 14 槽（K1-3）"
         );
         assert!(
             allocated_minus_deferred_matches_referenced(&allocator, DeviceIdentity(0), referenced),
-            "第一个事务之后 G27 应当成立：17 − 1 == 16（K1-3）"
+            "新池新建文件之后 G27 应当成立：17 − 1 == 16（K1-3）"
         );
     }
 
-    /// U7：第一个事务那一次发布的 R8「自己的释放」= 1 槽（mkfs 的树表单元）。
+    /// U7：新池新建文件那一次发布的 R8「自己的释放」= 1 槽（mkfs 的树表单元）。
     #[test]
-    fn first_transaction_self_release_is_one_slot() {
-        let (allocator, first, _devices) = first_transaction_state();
+    fn new_pool_file_creation_self_release_is_one_slot() {
+        let (allocator, first, _devices) = new_pool_file_creation_state();
         let released = self_release_slots_of_this_publish(
             &allocator,
             DeviceIdentity(0),
@@ -5128,7 +5128,7 @@ mod tests {
         );
         assert_eq!(
             released, 1,
-            "U7：第一个事务自己的释放应为 1 槽（mkfs 的树表单元）"
+            "U7：新池新建文件自己的释放应为 1 槽（mkfs 的树表单元）"
         );
     }
 
@@ -5136,7 +5136,7 @@ mod tests {
     /// `crates/mutations.tsv` 的 M21 把下面这一行的调用换成内存读法的反面，这条测试必须由绿转红。
     #[test]
     fn red_check_reads_the_corrupted_mirror_not_the_live_allocator() {
-        let (allocator, first, devices) = first_transaction_state();
+        let (allocator, first, devices) = new_pool_file_creation_state();
         let referenced = referenced_slots(&first);
         let accounting_slot = first.unit(TransactionUnit::AccountingTree).slot.0;
         let tree_table_slot = first.unit(TransactionUnit::TreeTable).slot.0;
@@ -5172,9 +5172,9 @@ mod tests {
     #[test]
     fn allocation_generation_ledger_recovers_the_pre_release_generation() {
         let parameters = parameters();
-        let (mut allocator, first, mut devices) = first_transaction_state();
+        let (mut allocator, first, mut devices) = new_pool_file_creation_state();
         let before = super::snapshot_allocated_generations(&allocator);
-        assert!(!before.is_empty(), "第一个事务之后应当有「仍分配」的记录");
+        assert!(!before.is_empty(), "新池新建文件之后应当有「仍分配」的记录");
         let instance = singlefs_core::address::InstanceGeneration(1);
         let overwritten = {
             let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
@@ -5240,7 +5240,7 @@ mod tests {
         // `is_released` 仍是 `true`、条目还留在 `records()` 里，直到下一次 `record()` 落在同一个起点槽上才被改写；
         // 但它的槽此刻已经是空闲的（`DeviceFreeMap::is_free`）。岔路 1 的「已释放未回收」按 `is_free` 现查，
         // 这条测试钉住这份读法赖以成立的前提本身。
-        let (mut allocator, first, mut devices) = first_transaction_state();
+        let (mut allocator, first, mut devices) = new_pool_file_creation_state();
         let parameters = parameters();
         let instance = singlefs_core::address::InstanceGeneration(1);
         let overwritten = {
@@ -5373,7 +5373,7 @@ mod tests {
     /// 最小值 14、最大值 ≥ 16——M30（Q7d-1 覆盖写那一组退回字面 10）应当让最小值变成 10。
     #[test]
     fn overwrite_steps_match_the_closed_form_and_cross_a_second_leaf() {
-        let (mut allocator, first, mut devices) = first_transaction_state();
+        let (mut allocator, first, mut devices) = new_pool_file_creation_state();
         let parameters = parameters();
         let instance = InstanceGeneration(1);
         let mut current = first;

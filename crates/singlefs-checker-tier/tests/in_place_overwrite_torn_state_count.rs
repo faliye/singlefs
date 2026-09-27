@@ -1,3 +1,4 @@
+//! checker 档模块：crash
 //! 代码审阅第 4 条（这一批只量、不实现）：层 0 把一次写的撕裂态并进「没持久」，对原地覆写不成立——原地覆写撕裂时，那一处的旧内容
 //! 也没了，而「没持久」留着完整的旧内容。用户 2026-09-27 定「原地覆写补第三态」（新旧都读不出），状态数先量：
 //! 这里按段序列算「原地覆写的写取 3 态（没持久 / 持久 / 新旧都读不出）、其余写取 2 态」时全量与甲二快档的闭式，与今天的并排。
@@ -261,12 +262,12 @@ fn a_tearable_in_place_overwrite_takes_a_third_state_and_every_other_write_two()
     );
 }
 
-/// 量：第一个事务那条流（层 0 从 mkfs 之后枚举的整条流，段序列 `2+2+1+2+2+1+2+24+2+1+2`；C577 之前暖机第二次的轮换与第一个事务的
+/// 量：新池新建文件那条流（层 0 从 mkfs 之后枚举的整条流，段序列 `2+2+1+2+2+1+2+24+2+1+2`；C577 之前暖机第二次的轮换与新池新建文件的
 /// 单元写同段，`2+2+1+2+2+1+26+2+1+2`）补第三态之后的状态数。
 /// 这条流上取 3 态的只有系统配置槽写（8 次，每次都罩住 mkfs 写下的旧槽）；journal 记录都写在 mkfs 清过的环里、没有覆写，
 /// 根槽写一个扇区、单元写 COW，都照旧 2 态。
 #[test]
-fn the_first_transaction_stream_counts_with_the_torn_third_state_as_measured() {
+fn the_new_pool_file_creation_stream_counts_with_the_torn_third_state_as_measured() {
     let pool = common::build_pool("torn-third-state-count");
     let base = pool.memory_pool_after_mkfs();
     let (writes, segments) = writes_and_segments(
@@ -304,7 +305,7 @@ fn the_first_transaction_stream_counts_with_the_torn_third_state_as_measured() {
         &quick_tier_expansion,
     );
     println!(
-        "MEASURE stream=first_transaction writes={} segments={} tearable_by_kind={tearable_writes_by_kind:?} \
+        "MEASURE stream=new_pool_file_creation writes={} segments={} tearable_by_kind={tearable_writes_by_kind:?} \
          today_full={today_full} torn_full={torn_full} today_quick_tier={today_quick_tier} torn_quick_tier={torn_quick_tier}",
         writes.len(),
         segments.len()

@@ -653,7 +653,7 @@ impl DeviceFreeMap {
     }
 
     /// 回收：一个已释放、释放代 ≤ max(F_生效, 环里最旧有效根) 的落点回到空闲（D16（发布语义） 已定项 1 的可再分配谓词）：
-    /// 位图清掉、占着的槽数与 defer 队列各减、空闲加——记账的空闲字节到这一刻才动（里程碑「第二个事务」步 5）。
+    /// 位图清掉、占着的槽数与 defer 队列各减、空闲加——记账的空闲字节到这一刻才动（里程碑「覆盖写、释放、回退与复用」步 5）。
     pub fn mark_reclaimed(&mut self, slot: SlotNumber, span: u64) {
         let start = self.index(slot);
         let end = start + usize::try_from(span).expect("跨度");
@@ -1813,7 +1813,7 @@ mod tests {
     }
 
     #[test]
-    fn first_transaction_placements_follow_the_byte_table() {
+    fn new_pool_file_creation_placements_follow_the_byte_table() {
         let mut pool = pool_after_mkfs();
         assert_eq!(
             pool.devices[0].free_runs(),
@@ -2348,7 +2348,7 @@ mod tests {
 
     /// 增补 2 第 20c 行（代码三方第一轮打中）：回落把开放段置空之后，那一段仍是聚簇段、仍不给用户数据
     /// （D3（空间分配） 已定项 8 第 2 条「聚簇段只给提交内生块」；已定项 10 ② 的量词是「任何开放的聚簇段」）。
-    /// 形态：开段 [50240, 50304) 发第一个事务那七个提交内生块 ⇒ 游标停在 50249；段里游标前方的槽占满、单元区里一个全空段都不剩
+    /// 形态：开段 [50240, 50304) 发新池新建文件那七个提交内生块 ⇒ 游标停在 50249；段里游标前方的槽占满、单元区里一个全空段都不剩
     /// ⇒ 下一个提交内生块回落、`open_segment` 置空；再把段里那个两槽容器释放、回收（游标不回头，bump 够不着它）——
     /// 段里于是有一对空的偶数槽 50242–50243，而且它是全池最低的一对，段里 50244–50248 还躺着活着的内生块。
     /// 这时要一个用户数据落点：它必须落在段外面。

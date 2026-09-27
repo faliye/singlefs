@@ -17,3 +17,7 @@ records/2026-09-07-D14项2第一轮.md  # 同一句 F2FS 原题的引文（「�
 .claude/gate.d/fixtures/90-term-renames.sh/  # 这道门禁自己的判别力样本：red 那一份必须留着旧名才红得出来，green 的登记表旧名列也要写得出旧名。扫了它，红绿两份会被改成一模一样，判别力当场归零（2026-09-21 实测过一次）
 research/results/e160-e152-input-single-2026-09-15.out  # E160 的输入：E152 在 2026-09-15 真设备上跑出的产物原样拷来（改名在 2026-09-20/21 之后），E152 要虚机与真盘才跑得出来、不能随源码重生成；改字节等于改证据，引它的 E160 页那句「整行抄自」也会成假
 research/results/e160-e152-input-mirror-2026-09-15.out  # 同上一行，镜像那一份
+.claude/gate.d/fixtures/14-test-granularity.sh/red/  # 14 号的红样本故意按里程碑起名（second_transaction_step_one_sample.rs），这道检查判的就是它；换成新名样本就不红了
+research/scripts/crash-case-check.py  # 自检里造的按里程碑起名的样本文件名与判它的正则都要写得出旧名，换掉自检就测不到这一条
+.claude/kb/experiments/148-提交固定点按两棵记录树重算.md  # 第 38–56 行整行抄自 E148 的留存产物（已归档进版本库，工作区里没有）：产物里写的是 scale=first_transaction，改了那几行「整行抄自」就成假的（门禁 88 号会红）；这份正文别处照新名写
+records/2026-09-27-验证两档拆分.md  # 「第二批」一节的旧→新对照表记的就是按里程碑起名改成按内容起名这件事本身，旧名那一列换掉就成了新→新；这份记录别处已照新名写

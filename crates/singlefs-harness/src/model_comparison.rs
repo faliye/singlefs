@@ -1,4 +1,4 @@
-//! 理想模型与实现之间那层胶水（里程碑「第二个事务」增补 3 第 2 件）：把实现交回的东西（`singlefs_core` 的类型）换成模型的观测，
+//! 理想模型与实现之间那层胶水（里程碑「覆盖写、释放、回退与复用」增补 3 第 2 件）：把实现交回的东西（`singlefs_core` 的类型）换成模型的观测，
 //! 把实现的错误成员映射到模型的拒绝理由。D13（验证路线） 已定项 5 管的是模型本身（`model.rs` 只 `use singlefs_format`）；
 //! 拿实现结局与模型比的这一层可以用 core 的类型。
 //!
@@ -694,7 +694,9 @@ pub fn refusal_reason_of_rollback_error(error: &RollbackError) -> ObservedRefusa
         }
         | RollbackError::UserVisibleUnitWithoutItsRecordInTheCurrentAccount { .. }
         | RollbackError::UserVisibleUnitStillAllocatedUnderAnotherGeneration { .. }
-        | RollbackError::ResurrectedUnitCopyUnreadableOrMismatched { .. } => {
+        | RollbackError::ResurrectedUnitCopyUnreadableOrMismatched { .. }
+        // 判候选集读根环或算 F_生效 重读一次仍读坏（实审 A3b Q7）：只在读路径上注入故障才有，与 `MountError::Recovery(_)` 同一处置。
+        | RollbackError::CandidateJudgementStillUnreadableAfterOneReread(_) => {
             ObservedRefusalReason::Unexplained
         }
     }
@@ -748,7 +750,11 @@ pub fn refusal_reason_of_mount_error(error: &MountError) -> ObservedRefusalReaso
                 }
                 // 重建分配器时最新那条根的实例表重读仍读不出（代码审阅第 22 条）：读阶段判完、判据为假之后才读它，崩溃恢复抛弃根
                 // 那一步在读阶段就拒了走不到；只在读路径上注入故障、正好落在那一片上才有，模型没有这一条。
-                StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger { .. } => {
+                StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger { .. }
+                // 挂着时抬 F 算 F 生效值读最新那条根的实例表、重算影子账读根环里这个进程知道住着根的槽，重读一次仍读坏（实审 A3b Q4，
+                // 改之前经 `MountError::Recovery` 交出、同样记成没理由）：只在读路径上注入故障才有，模型没有这一条。
+                | StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor { .. }
+                | StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot { .. } => {
                     ObservedRefusalReason::Unexplained
                 }
             }
@@ -1118,6 +1124,7 @@ mod tests {
     /// 四段带挂载的短历史跑下来一条新发现都没有，四样计数都大于 0——胶水从实现的输出里解出了内容与实例表，
     /// 树表 0 条的那几版比过重写的角色集合。
     #[test]
+    #[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
     fn every_published_version_is_compared_by_content_instance_table_and_every_role_both_ways() {
         use crate::history::{
             execute_history_with, generate_history, HistoryDeviceWidth, HistoryEnding,

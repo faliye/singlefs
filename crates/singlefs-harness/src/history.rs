@@ -1,4 +1,4 @@
-//! 随机历史（里程碑「第二个事务」增补 3 第 1 件）：按种子生成一段操作序列，操作只调 `crates/` 今天的公开入口；每一步之后对镜像跑
+//! 随机历史（里程碑「覆盖写、释放、回退与复用」增补 3 第 1 件）：按种子生成一段操作序列，操作只调 `crates/` 今天的公开入口；每一步之后对镜像跑
 //! 池级 checker。入口返回 `Err` 算合法结局；panic 与 checker 违例算失败——撞到「已知红」清单（`KNOWN_RED_FORMS`）里的形态照记、
 //! 这段历史到此为止，清单外的算新发现，收缩到最短复现（`shrink_operations`）。
 //! 第 2 件接上了理想模型（`crate::model`）：每一步调入口之前问模型该成、该拒还是区间里都行，调完拿实现的结局与它比（胶水在
@@ -583,7 +583,7 @@ impl GenerationWeights {
     /// 单元区墙那一格（增补 3 第 2 件代码三方第二轮判决第三节第 2 条）的取样点，配 `HistoryDeviceWidth::UnitAreaOf256Slots` 跑：
     /// 一律从第一个文件起，带文件的版本上绝大多数是覆盖写（每次每盘占 10 槽），夹着少量可写挂载与抬 F 与回退。
     /// 这组比重在 256 槽的小盘上只走得到用户数据那一处（覆盖写的数据单元）的落点拒绝：提交内生块能回落到任一空槽，
-    /// 每块盘上一个空槽都不剩才拒，那一处由写死的用例钉（`second_transaction_supplement_two_commit_generated_fallback.rs`）。
+    /// 每块盘上一个空槽都不剩才拒，那一处由写死的用例钉（`commit_generated_units_fall_back_when_the_segment_runs_out.rs`）。
     pub const TOWARD_THE_UNIT_AREA_WALL: GenerationWeights = GenerationWeights {
         name: "逼近单元区墙（小盘上落点拒绝那一格的取样点）",
         starting_points: &[(HistoryStartingPoint::AfterFirstFile, 1)],
@@ -1618,7 +1618,7 @@ fn raise_after_rollback_leaves_allocated_statistic_above_walked(
             .is_some_and(|mechanism| mechanism.the_floor_dropped_readable_roots())
 }
 
-/// 「已知红」清单。修好一条就删一条，删掉之后那条的复现（`tests/second_transaction_supplement_three_random_history.rs` 里钉着）要转绿。
+/// 「已知红」清单。修好一条就删一条，删掉之后那条的复现（`tests/random_histories.rs` 里钉着）要转绿。
 pub const KNOWN_RED_FORMS: [KnownRedForm; 1] = [
     KnownRedForm {
         closeout_table_row: "增补 2 收口表第 43 行",
@@ -2119,7 +2119,7 @@ pub struct HistoryRun {
     pub tally: HistoryTally,
     /// mkfs 占了录制流开头的几步：崩溃注入（增补 3 第 3 件）的基线与层 0 一样取「mkfs 之后」——
     /// mkfs 不是事务，它写到一半的盘面上没有池，恢复报不出根是对的，不该拿事务的 oracle 去判
-    /// （层 0 那一路同样从 `mkfs_operation_count` 之后起枚举，见 `crates/singlefs-checker-tier/tests/first_transaction_step_seven_layer0.rs`）。
+    /// （层 0 那一路同样从 `mkfs_operation_count` 之后起枚举，见 `crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs`）。
     pub operations_written_by_make_filesystem: usize,
     /// 这段历史停下时模型根环里的每一条根（`IdealModel::committed_versions`）：故障注入（增补 3 第 4 件）拿它当
     /// 「模型认下来的每一版」判重开走到的那一版——失败那一步的根，模型认了就在里面，没认（判定对不上、模型没往前走）就不在。
@@ -2277,12 +2277,6 @@ fn recovery_failure_member(failure: &RecoveryFailure) -> String {
             ..
         } => "RecoveryFailure::RootPublishCarriesMoreThanOneLastRecordFlagWhoseAnchorIsUndecided"
             .to_string(),
-        RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread { .. } => {
-            "RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread".to_string()
-        }
-        RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread { .. } => {
-            "RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread".to_string()
-        }
     }
 }
 
@@ -2403,18 +2397,30 @@ fn mount_error_member(error: &MountError) -> String {
         MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable) => {
             return format!(
                 "MountError::NewerStateStillUnreadableAfterOneReread({})",
-                match **still_unreadable {
-                    StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { .. } => {
-                        "PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion"
-                    }
-                    StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger { .. } => {
-                        "InstanceTableOfTheNewestRootForTheShadowLedger"
-                    }
-                }
+                still_unreadable_after_one_reread_member(still_unreadable)
             )
         }
     };
     format!("MountError::{member}")
+}
+
+fn still_unreadable_after_one_reread_member(
+    still_unreadable: &StillUnreadableAfterOneReread,
+) -> &'static str {
+    match still_unreadable {
+        StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { .. } => {
+            "PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion"
+        }
+        StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger { .. } => {
+            "InstanceTableOfTheNewestRootForTheShadowLedger"
+        }
+        StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor { .. } => {
+            "InstanceTableOfTheNewestRootForTheEffectiveFloor"
+        }
+        StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot { .. } => {
+            "RootRingSlotKnownToHoldARoot"
+        }
+    }
 }
 
 fn rollback_error_member(error: &RollbackError) -> String {
@@ -2456,6 +2462,12 @@ fn rollback_error_member(error: &RollbackError) -> String {
         }
         RollbackError::NextCheckpointTxgPastTheTopOfItsRange { .. } => {
             "NextCheckpointTxgPastTheTopOfItsRange".to_string()
+        }
+        RollbackError::CandidateJudgementStillUnreadableAfterOneReread(still_unreadable) => {
+            format!(
+                "CandidateJudgementStillUnreadableAfterOneReread({})",
+                still_unreadable_after_one_reread_member(still_unreadable)
+            )
         }
     };
     format!("RollbackError::{member}")

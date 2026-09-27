@@ -13,6 +13,8 @@
 # `crates/mutations.tsv`（门禁 59 号的表，六段）的锚点也在这里数：59 号开跑前的预扫查的是同一件事，
 # 而 59 号整道要跑几个钟头，改 `crates/` 的实现员不跑它。2026-09-18 第二波修复改掉 4 行锚点、另有 2 行更早就坏了，
 # 实现员只核了自己追加的 8 行，到崩溃验证员跑 59 号才整表退出（`records/2026-09-16-subagent拆分提案.md` 第三十二节）。
+# 另判两样会让一行变异「跑了却没跑到点名的测试」的写法：点名的测试标了 #[ignore] 而参数里没有 --include-ignored；
+# `--` 之后的筛选词一个都筛不到点名的测试（libtest 比的是完整测试名：模块路径由点名的函数在哪个文件、套在哪几层内联 mod 里算出）。
 #
 # ⚠️ **这条阶段不跑变异**（跑一遍全部表要逐条重编译，量级是小时）。
 # 「表今天还会不会红」由每轮改动实验代码时手跑 `research/scripts/mutate.sh` 证明，
@@ -22,6 +24,8 @@ BIN_DIR=research/e7-index-bench/src/bin
 MUT_DIR=research/mutations
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
+cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 [[ -d "$BIN_DIR" && -d "$MUT_DIR" ]] || { echo "  ! 找不到 $BIN_DIR 或 $MUT_DIR，本阶段跳过"; exit 77; }
 
 missing=(); malformed=()
@@ -92,6 +96,7 @@ anchor_exit_code=$?
 crates_report=""
 if [[ -f crates/mutations.tsv ]]; then
   crates_report="$(python3 - <<'PY'
+import os
 import re
 checked = 0
 first_line_of_change = {}
@@ -99,6 +104,58 @@ first_line_of_name = {}
 def stray_escapes(segment_name, segment):
     """59 号只把 \\n 还原成换行，别的反斜杠按字面写进源码，那条变异编不过、等于没跑（C427）。"""
     return [(segment_name, match.group(0)) for match in re.finditer(r"\\(.)", segment) if match.group(1) != "n"]
+attributes_by_package = {}
+def module_path_of_file(package, path):
+    """crates/<包>/src 下一个 .rs 在 libtest 测试名里的模块前缀：src/lib.rs 与 src/bin/<名>.rs 是空，src/a.rs 与 src/a/mod.rs 是 a，src/a/b.rs 是 a::b；tests/ 下的是空。"""
+    relative = os.path.relpath(path, os.path.join("crates", package))
+    parts = relative.split(os.sep)
+    if parts[0] != "src" or parts[1:2] == ["bin"] or parts[1:] == ["lib.rs"]:
+        return []
+    parts = parts[1:]
+    parts[-1] = parts[-1][:-len(".rs")]
+    if parts[-1] == "mod":
+        parts = parts[:-1]
+    return parts
+def enclosing_inline_modules(text):
+    """(偏移, 那一刻套着的内联 mod 名单) 的有序表：按 `mod 名 {` 与花括号配平；字符串与注释里的花括号不另判。"""
+    events, stack, depth = [], [], 0
+    for token in re.finditer(r"\bmod\s+(\w+)\s*\{|[{}]", text):
+        if token.group(1):
+            depth += 1
+            stack.append((token.group(1), depth))
+        elif token.group(0) == "{":
+            depth += 1
+        else:
+            if stack and stack[-1][1] == depth:
+                stack.pop()
+            depth -= 1
+        events.append((token.end(), [name for name, _ in stack]))
+    return events
+def test_attributes_of_package(package):
+    """包 crates/<包> 的 tests/ 与 src/ 下每个 fn 名 → [(它上面那串属性与注释行, libtest 里的完整测试名)]；每个包只扫一次。"""
+    if package not in attributes_by_package:
+        table = {}
+        for directory_name in ("tests", "src"):
+            for root, _directories, files in os.walk(os.path.join("crates", package, directory_name)):
+                for file_name in sorted(files):
+                    if not file_name.endswith(".rs"):
+                        continue
+                    path = os.path.join(root, file_name)
+                    try:
+                        text = open(path, encoding="utf-8").read()
+                    except (OSError, UnicodeDecodeError):
+                        continue
+                    prefix = module_path_of_file(package, path)
+                    events = enclosing_inline_modules(text)
+                    for found in re.finditer(r"((?:[ \t]*#\[[^\n]*\n|[ \t]*//[^\n]*\n)*)[ \t]*(?:pub\s+)?fn\s+(\w+)\s*\(", text):
+                        modules = []
+                        for offset, stack in events:
+                            if offset > found.start(2):
+                                break
+                            modules = stack
+                        table.setdefault(found.group(2), []).append((found.group(1), "::".join(prefix + modules + [found.group(2)])))
+        attributes_by_package[package] = table
+    return attributes_by_package[package]
 for line_number, line in enumerate(open("crates/mutations.tsv", encoding="utf-8"), 1):
     line = line.rstrip("\n")
     if not line or line.startswith("#"):
@@ -137,6 +194,23 @@ for line_number, line in enumerate(open("crates/mutations.tsv", encoding="utf-8"
     hits = source.count(original)
     if hits != 1:
         print("CRATES_BAD", line_number, name, f"原文在 {path} 里命中 {hits} 次", sep="\t")
+    # 点名的测试标了 #[ignore]（harness 重档、checker 档的全量），cargo test 参数里却没有 --include-ignored / --ignored：
+    # 59 号与 prove-red.sh 照这一行跑，点名的测试被 libtest 跳过，这条变异永远报「没红」，而它守的那一格其实没人看。
+    arguments = fields[4].split()
+    package = arguments[arguments.index("-p") + 1] if "-p" in arguments[:-1] else None
+    test_name = fields[5].split("::")[-1].strip()
+    # cargo test 参数里 `--` 之后的位置参数是 libtest 的筛选词：点名的测试一个都筛不到，那条测试根本不跑，变异永远报没红。
+    libtest_arguments = arguments[arguments.index("--") + 1:] if "--" in arguments else []
+    filters = [word for word in libtest_arguments if not word.startswith("-")]
+    exact = "--exact" in libtest_arguments
+    # libtest 拿筛选词去比完整测试名（模块路径 + 函数名）：完整名从点名的函数在哪个文件、套在哪几层内联 mod 里算出来；找不到那个函数的不判。
+    candidates = [full_name for _attributes, full_name in test_attributes_of_package(package).get(test_name, [])] if package and test_name else []
+    if candidates and filters and not any((full_name == word) if exact else (word in full_name) for word in filters for full_name in candidates):
+        print("CRATES_FILTER", line_number, name, f"筛选词 {' '.join(filters)}{'（--exact）' if exact else ''} 筛不到点名的 {' 或 '.join(candidates)}", sep="\t")
+    if package and test_name and not ({"--include-ignored", "--ignored"} & set(arguments)):
+        found_tests = test_attributes_of_package(package).get(test_name, [])
+        if found_tests and all("#[ignore" in attributes for attributes, _full_name in found_tests):
+            print("CRATES_IGNORED", line_number, name, f"点名的 {test_name} 标了 #[ignore]，cargo test 参数「{fields[4]}」里没有 --include-ignored", sep="\t")
 print("CRATES_CHECKED", checked)
 PY
 )"
@@ -145,6 +219,8 @@ fi
 crates_checked="$(sed -n 's/^CRATES_CHECKED //p' <<<"$crates_report")"
 mapfile -t crates_bad < <(grep '^CRATES_BAD' <<<"$crates_report")
 mapfile -t crates_dup < <(grep '^CRATES_DUP' <<<"$crates_report")
+mapfile -t crates_ignored < <(grep '^CRATES_IGNORED' <<<"$crates_report")
+mapfile -t crates_filter < <(grep '^CRATES_FILTER' <<<"$crates_report")
 anchor_checked="$(sed -n 's/^CHECKED //p' <<<"$anchor_report")"
 mapfile -t anchor_bad < <(grep '^BAD' <<<"$anchor_report")
 mapfile -t stray_rows < <(grep '^STRAY' <<<"$anchor_report")
@@ -160,7 +236,7 @@ if [[ -f crates/mutations.tsv ]] && [[ "${crates_exit_code:-1}" -ne 0 || -z "$cr
   script_failures+=("crates/mutations.tsv 的锚点检查没跑完（python 退出码 ${crates_exit_code:-?}，CRATES_CHECKED 行「${crates_checked}」）")
 fi
 
-if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]} + ${#crates_dup[@]} + ${#stray_rows[@]} + ${#crates_stray[@]} + ${#anchor_unreadable[@]} + ${#script_failures[@]})); then
+if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]} + ${#crates_dup[@]} + ${#crates_ignored[@]} + ${#crates_filter[@]} + ${#stray_rows[@]} + ${#crates_stray[@]} + ${#anchor_unreadable[@]} + ${#script_failures[@]})); then
   if ((${#script_failures[@]})); then
     echo "  ✗ 锚点检查的 python 没跑完，这一段等于没判："
     printf '      %s\n' "${script_failures[@]}"
@@ -218,6 +294,20 @@ if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]} +
     echo "    → 怎么办：这一行本来要守的那一格今天没有守卫。把它换成真正打在那一格上的改法（改完单跑它、证明点名的测试红），"
     echo "      或者确认它多余就整行删掉。⚠️ 同一个改法让**两条不同的测试**变红是合法的，这道检查按「改法 + 点名的测试」四项认，不会拦那一种。"
   fi
+  if ((${#crates_filter[@]})); then
+    echo "  ✗ crates/mutations.tsv 这些行 cargo test 参数里的筛选词筛不到点名的测试（59 号跑它时那条测试不跑，变异永远报没红）："
+    while IFS=$'\t' read -r _ lineno name why; do
+      printf '      crates/mutations.tsv:%s %s：%s\n' "$lineno" "$name" "$why"   # gate-lint:detail
+    done < <(printf '%s\n' "${crates_filter[@]}")
+    echo "    → 怎么办：把 \`--\` 后面的筛选词改成点名测试名的一段（测试改过名、拆过的多半是这个），或者删掉筛选词跑整个测试目标。"
+  fi
+  if ((${#crates_ignored[@]})); then
+    echo "  ✗ crates/mutations.tsv 这些行点名的测试标了 #[ignore]，cargo test 参数里却没有 --include-ignored（59 号跑它时那条测试被跳过，变异永远报没红）："
+    while IFS=$'\t' read -r _ lineno name why; do
+      printf '      crates/mutations.tsv:%s %s：%s\n' "$lineno" "$name" "$why"   # gate-lint:detail
+    done < <(printf '%s\n' "${crates_ignored[@]}")
+    echo "    → 怎么办：在那一行 cargo test 参数的 \`--\` 后面加 --include-ignored（没有 \`--\` 就补 \`-- --include-ignored\`），改完单跑那一行证明点名的测试红。"
+  fi
   if ((${#crates_bad[@]})); then
     echo "  ✗ crates/mutations.tsv 这些行的「原文」在源码里不是恰好命中一次（门禁 59 号预扫会整张表退出，一条都不跑）："
     while IFS=$'\t' read -r _ lineno name why; do
@@ -233,4 +323,4 @@ crates_summary="；没有 crates/mutations.tsv"
 if ((${#tables_without_binary[@]})); then
   crates_summary+="；没有同名实验二进制、锚点不在本阶段射程的表 ${#tables_without_binary[@]} 张：$(printf '%s ' "${tables_without_binary[@]}")"
 fi
-echo "  ✓ $n 个实验二进制都有成形的变异表，${anchor_checked} 条变异的原文各命中源码一次${crates_summary}（本阶段不跑变异，只验装置在、锚点对得上、两段里没有 \n 以外的反斜杠转义、crates 那张表里没有两行重复——重复按「文件 + 原文 + 替换文 + 点名的测试」四项认，变异名另判）"
+echo "  ✓ $n 个实验二进制都有成形的变异表，${anchor_checked} 条变异的原文各命中源码一次${crates_summary}（本阶段不跑变异，只验装置在、锚点对得上、两段里没有 \n 以外的反斜杠转义、crates 那张表里没有两行重复、点名标了 #[ignore] 的测试都带 --include-ignored、筛选词筛得到点名的测试——重复按「文件 + 原文 + 替换文 + 点名的测试」四项认，变异名另判）"

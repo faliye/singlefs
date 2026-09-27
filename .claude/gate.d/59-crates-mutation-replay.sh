@@ -228,7 +228,7 @@ if rows_with_malformed_test_name:
     print("  ✗ 变异表有几行的「必须红的测试名」不是一个用例名（带了正则符号或空白），按字面在测试输出里永远找不到：")
     for item in rows_with_malformed_test_name:
         print(f"      {item}")   # gate-lint:detail
-    print("     → 怎么办：那一列写成用例名本身（例 first_transaction_self_release_is_one_slot，或带模块路径 tests::first_transaction_self_release_is_one_slot），"
+    print("     → 怎么办：那一列写成用例名本身（例 new_pool_file_creation_self_release_is_one_slot，或带模块路径 tests::new_pool_file_creation_self_release_is_one_slot），"
           "去掉 $、^ 这类符号；只写名字时本阶段已经按「在输出里只许对上一个用例」判，不用再靠 $ 锚定。这一轮一个工作进程都没起。")
     sys.exit(1)
 
@@ -571,3 +571,11 @@ print(f"  ✓ crates 变异表复跑：{len(rows)} 条变异各自红在点名�
       f"工作进程动态领活——谁先跑完谁再领下一条，不按条数预先切片；输出按表的行号排序、与进程数无关）")
 print(f"  … 这一轮 {worker_count} 个工作进程，每个 cargo 编译并行度 {cargo_jobs}，每条变异内存上限 {memory_max}、限时 {timeout_seconds} 秒", file=sys.stderr)
 PY
+stage_exit_code=$?
+# 判绿之后写这一道这批输入的全绿标记（git common-dir）：整轮门禁与下一趟按它复用，不再整表跑第二遍（用户 2026-09-27 定：照 54 号写标记、只跑变了的）；写不成只报不红。
+if (( stage_exit_code == 0 )); then
+  if ! python3 "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/admission.py" stage-marker-write "$ROOT" "$(basename "$0")" >/dev/null; then
+    echo "  ! 没写成这一道的全绿标记（admission.py stage-marker-write 没成）：下一趟这一道照跑，不会复用"
+  fi
+fi
+exit "$stage_exit_code"

@@ -1,4 +1,4 @@
-//! 步 6 / 步 7 验收共用的搭建：两个文件镜像上 mkfs → 取号 → 暖机 → 第一个事务，录制流开内容保留。
+//! 步 6 / 步 7 验收共用的搭建：两个文件镜像上 mkfs → 取号 → 暖机 → 新池新建文件，录制流开内容保留。
 #![allow(dead_code, reason = "每个测试文件各自只用到其中一部分")]
 
 use std::path::PathBuf;
@@ -81,8 +81,8 @@ pub struct BuiltPool {
     pub output: TransactionOutput,
     pub allocator: PoolAllocator,
     pub mkfs_operation_count: usize,
-    /// 暖机 `warm_up()` 已调完、`publish_first_file()` 还没调时录制流的长度：暖机与第一个事务的分界，
-    /// 不是从流尾往回数几步（里程碑「第二个事务」收尾批「55 号装置步数」）。
+    /// 暖机 `warm_up()` 已调完、`publish_first_file()` 还没调时录制流的长度：暖机与新池新建文件的分界，
+    /// 不是从流尾往回数几步（里程碑「覆盖写、释放、回退与复用」收尾批「55 号装置步数」）。
     pub warm_up_operation_count: usize,
 }
 
@@ -194,7 +194,7 @@ impl BuiltPool {
     pub fn memory_pool_after_mkfs(&self) -> MemoryPool {
         memory_pool_of(&self.retained_operations()[..self.mkfs_operation_count])
     }
-    /// 重开镜像并继续录进同一条流：进程重开之后的可写挂载与发布都要进层 0 的整条流（里程碑「第二个事务」步 0 / 步 3）。
+    /// 重开镜像并继续录进同一条流：进程重开之后的可写挂载与发布都要进层 0 的整条流（里程碑「覆盖写、释放、回退与复用」步 0 / 步 3）。
     pub fn reopen_recorded(&mut self) -> Vec<(DeviceIdentity, Recorded)> {
         drop(self.devices.take());
         reopen_recorded_images(&self.paths, &self.stream)
@@ -207,7 +207,7 @@ impl BuiltPool {
     }
 }
 
-/// 只做过 mkfs 的池：没取过号、一个文件都没发布（里程碑「第二个事务」步 3：只做过 mkfs 的池也允许可写挂载，2026-09-17 用户定）。
+/// 只做过 mkfs 的池：没取过号、一个文件都没发布（里程碑「覆盖写、释放、回退与复用」步 3：只做过 mkfs 的池也允许可写挂载，2026-09-17 用户定）。
 pub struct FormattedPool {
     pub paths: Vec<PathBuf>,
     /// `take` 出去就是「进程退出、镜像关掉」。
@@ -334,7 +334,7 @@ pub fn disk_snapshot(image: &MemoryPool, stream: &SharedStream) -> DiskSnapshot 
     }
 }
 
-/// 第一个事务之后，在同一个进程里对同一个文件覆盖写一次（发布 B 起的每一次覆盖写走这一条）：
+/// 新池新建文件之后，在同一个进程里对同一个文件覆盖写一次（发布 B 起的每一次覆盖写走这一条）：
 /// 错误原样交回，要不要 `expect` 由调用方定。
 pub fn publish_overwrite_in_process(
     pool: &mut BuiltPool,
@@ -394,8 +394,8 @@ pub fn build_pool(tag: &str) -> BuiltPool {
         let instance = acquire_instance(&mut pool).expect("取号");
         assert_eq!(instance, InstanceGeneration(1));
         let warm_up = warm_up(&mut pool, &genesis.root, instance).expect("暖机");
-        // 暖机已调完、发布还没调：这里就是暖机与第一个事务的分界，不从流尾往回数几步
-        // （里程碑「第二个事务」收尾批「55 号装置步数」）。
+        // 暖机已调完、发布还没调：这里就是暖机与新池新建文件的分界，不从流尾往回数几步
+        // （里程碑「覆盖写、释放、回退与复用」收尾批「55 号装置步数」）。
         warm_up_operation_count = stream.operations().len();
         let output = publish_first_file(
             &mut pool,
@@ -408,7 +408,7 @@ pub fn build_pool(tag: &str) -> BuiltPool {
             instance,
             &warm_up.last_record_bytes,
         )
-        .expect("第一个事务");
+        .expect("新池新建文件");
         (warm_up, output)
     };
     BuiltPool {

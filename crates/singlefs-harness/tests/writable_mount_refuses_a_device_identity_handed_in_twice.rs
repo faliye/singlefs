@@ -12,7 +12,7 @@ use singlefs_core::mount::{mount_writable, MountError, RepeatedDeviceIdentity};
 use singlefs_harness::memory_pool::SparseBlockDevice;
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
-/// 第一个事务写完的池（盘 0 = A、盘 1 = B），再交一块空盘 C、也标成盘 0：可写挂载拒成 `DeviceIdentitiesHandedInMoreThanOnce`，
+/// 新池新建文件写完的池（盘 0 = A、盘 1 = B），再交一块空盘 C、也标成盘 0：可写挂载拒成 `DeviceIdentitiesHandedInMoreThanOnce`，
 /// 报出盘 0 交了两次；录制流一步都没有（没发写、没发屏障），A、B、C 逐字节不变。
 /// 对照：同一个池只交 A、B，可写挂载照常做成。
 #[test]

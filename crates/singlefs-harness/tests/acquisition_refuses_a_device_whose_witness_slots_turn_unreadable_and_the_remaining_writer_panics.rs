@@ -59,6 +59,87 @@ use singlefs_harness::RecordedOperationKind;
 
 // ─── 一、取号那一刻读见证值时读不出的那块盘拒 ───
 
+/// 数屏障调用的包装盘（套在读故障那一层外面）：两块盘共用一个计数。C577（发布返回之前、系统配置轮换之后一道池屏障）之后，
+/// 新池新建文件末尾那道屏障与重开之后取号写之前那一道之间没有写，录制器把后一道并进前一道（录制流里看不出取号那道屏障发没发），
+/// 盘上照收两次 FLUSH；取号写之前那道屏障发没发就在这一层数。
+struct DeviceCountingBarriers<Inner> {
+    inner: Inner,
+    barrier_calls: Rc<RefCell<u64>>,
+}
+
+impl<Inner: BlockDevice> BlockDevice for DeviceCountingBarriers<Inner> {
+    fn read_at(
+        &self,
+        offset: DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        self.inner.read_at(offset, buffer)
+    }
+
+    fn write_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        bytes: &[u8],
+        durability: WriteDurability,
+    ) -> Result<(), BlockDeviceError> {
+        self.inner.write_at(offset, bytes, durability)
+    }
+
+    fn write_zeroes_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<(), BlockDeviceError> {
+        self.inner.write_zeroes_at(offset, length)
+    }
+
+    fn barrier(&mut self) -> Result<(), BlockDeviceError> {
+        *self.barrier_calls.borrow_mut() += 1;
+        self.inner.barrier()
+    }
+
+    fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
+        self.inner.probe_physical_block_size()
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        self.inner.size_in_bytes()
+    }
+}
+
+/// 套上数屏障那一层的一池盘。
+type DevicesCountingBarriers<Inner> = Vec<(DeviceIdentity, DeviceCountingBarriers<Inner>)>;
+
+/// 给每块盘套上数屏障的那一层，交回套好的盘与两块盘共用的计数。
+fn counting_barriers<Inner: BlockDevice>(
+    devices: Vec<(DeviceIdentity, Inner)>,
+) -> (DevicesCountingBarriers<Inner>, Rc<RefCell<u64>>) {
+    let barrier_calls = Rc::new(RefCell::new(0));
+    let counted = devices
+        .into_iter()
+        .map(|(identity, inner)| {
+            (
+                identity,
+                DeviceCountingBarriers {
+                    inner,
+                    barrier_calls: barrier_calls.clone(),
+                },
+            )
+        })
+        .collect();
+    (counted, barrier_calls)
+}
+
+/// 拆掉数屏障的那一层。
+fn without_barrier_counting<Inner: BlockDevice>(
+    devices: DevicesCountingBarriers<Inner>,
+) -> Vec<(DeviceIdentity, Inner)> {
+    devices
+        .into_iter()
+        .map(|(identity, device)| (identity, device.inner))
+        .collect()
+}
+
 const DEVICE_WHOSE_SLOTS_TURN_UNREADABLE: DeviceIdentity = DeviceIdentity(1);
 
 /// 盘 1 两个系统配置槽各一段读故障，两段都按 `failing_reads` 坏（每段各自从 1 数它被读了几次）。
@@ -172,7 +253,7 @@ fn reads_of_device_one_slots_before_the_acquisition_barrier(tag: &str) -> [u64; 
     [counts[0], counts[1]]
 }
 
-/// 第一个事务那一版可写挂载被拒时报的：所选那一版就是它，不带它的只有盘 1、缺的是自证过的系统配置。
+/// 新池新建文件那一版可写挂载被拒时报的：所选那一版就是它，不带它的只有盘 1、缺的是自证过的系统配置。
 fn refused_for_device_one_without_a_self_verified_system_configuration(
     refusal: &Result<singlefs_core::mount::Mounted, MountError>,
     first: &TransactionOutput,
@@ -205,10 +286,11 @@ fn describe(refusal: &Result<singlefs_core::mount::Mounted, MountError>) -> Stri
     }
 }
 
-/// 场景：第一个事务之后重开、可写挂载。盘 1 两个系统配置槽从「取号写之前最后一次读」起每次都读坏
+/// 场景：新池新建文件之后重开、可写挂载。盘 1 两个系统配置槽从「取号写之前最后一次读」起每次都读坏
 /// （次数取另一份相同的池上照常挂载时数到的：择系统配置、取号之前的逐盘核、算号那几遍都读得出）。
 /// 预期：取号拒在第一道屏障之前，报 `WritableMountRefusedByDevicesWithoutTheSelectedVersion`（盘 1、`NoSelfVerifiedSystemConfiguration`），
-/// `DiskSnapshot` 不变（系统配置槽、根环、录制流步数：一个写、一道屏障都没发）。
+/// `DiskSnapshot` 不变（系统配置槽、根环、录制流步数：一个写都没发），盘上一次屏障调用都没收到（录制流看不出取号那道屏障，
+/// 见 [`DeviceCountingBarriers`]）。
 /// 改之前：见证值只取盘 0 的、取号写照做，挂载做成。
 #[test]
 fn a_device_whose_slots_turn_unreadable_before_the_acquisition_barrier_refuses_the_writable_mount_without_a_step(
@@ -225,23 +307,30 @@ fn a_device_whose_slots_turn_unreadable_before_the_acquisition_barrier_refuses_t
         ]),
         UnreadableRangeReadBack::DeviceError,
     );
-    let mut devices = with_unreadable_ranges(pool.reopen_recorded(), &ranges);
+    let (mut devices, barrier_calls) =
+        counting_barriers(with_unreadable_ranges(pool.reopen_recorded(), &ranges));
     let refusal = mount_writable(&common::parameters(), &mut devices);
     assert!(
         refused_for_device_one_without_a_self_verified_system_configuration(&refusal, &first),
         "取号那一刻盘 1 两槽都读不出：拒可写，报盘 1 不带所选那一版；得到 {}",
         describe(&refusal)
     );
-    pool.devices = Some(without_unreadable_ranges(devices));
+    pool.devices = Some(without_unreadable_ranges(without_barrier_counting(devices)));
     assert_eq!(
         disk_snapshot(&pool.memory_pool(), &pool.stream),
         before,
-        "拒在第一道屏障之前：一个写、一道屏障都没发"
+        "拒在第一道屏障之前：一个写都没发"
+    );
+    assert_eq!(
+        *barrier_calls.borrow(),
+        0,
+        "拒在第一道屏障之前：盘上一次屏障调用都没收到"
     );
 }
 
 /// 场景：同上，盘 1 两槽从「取号写之前那道屏障之后的第一次读」起读坏：屏障之前那一核读得出，屏障之后取见证值那一遍读不出。
-/// 预期：不写、报同一个成员；系统配置槽与根环不变，录制流只多那一道屏障。改之前：见证值只取盘 0 的、取号写照做，挂载做成。
+/// 预期：不写、报同一个成员；系统配置槽与根环不变，录制流一个写都不多；那一道屏障两块盘各收到一次（盘上数，录制流里它并进了
+/// 新池新建文件末尾那一道，见 [`DeviceCountingBarriers`]）。改之前：见证值只取盘 0 的、取号写照做，挂载做成。
 #[test]
 fn a_device_whose_slots_turn_unreadable_after_the_acquisition_barrier_refuses_before_any_write() {
     let [slot_zero_reads, slot_one_reads] =
@@ -256,14 +345,15 @@ fn a_device_whose_slots_turn_unreadable_after_the_acquisition_barrier_refuses_be
         ]),
         UnreadableRangeReadBack::DeviceError,
     );
-    let mut devices = with_unreadable_ranges(pool.reopen_recorded(), &ranges);
+    let (mut devices, barrier_calls) =
+        counting_barriers(with_unreadable_ranges(pool.reopen_recorded(), &ranges));
     let refusal = mount_writable(&common::parameters(), &mut devices);
     assert!(
         refused_for_device_one_without_a_self_verified_system_configuration(&refusal, &first),
         "屏障之后取见证值时盘 1 两槽都读不出：不写、拒可写；得到 {}",
         describe(&refusal)
     );
-    pool.devices = Some(without_unreadable_ranges(devices));
+    pool.devices = Some(without_unreadable_ranges(without_barrier_counting(devices)));
     let after = disk_snapshot(&pool.memory_pool(), &pool.stream);
     assert_eq!(
         (&after.system_configuration_slots, &after.readable_roots),
@@ -272,15 +362,19 @@ fn a_device_whose_slots_turn_unreadable_after_the_acquisition_barrier_refuses_be
     );
     let operations_since = &pool.stream.operations()[before.recorded_operations..];
     assert!(
-        !operations_since.is_empty()
-            && operations_since
-                .iter()
-                .all(|operation| operation.kind == RecordedOperationKind::Barrier),
-        "录制流只多取号写之前那一道屏障（每块盘一条屏障记录），没有写：{operations_since:?}"
+        operations_since
+            .iter()
+            .all(|operation| operation.kind == RecordedOperationKind::Barrier),
+        "录制流没有多出写：{operations_since:?}"
+    );
+    assert_eq!(
+        *barrier_calls.borrow(),
+        2,
+        "取号写之前那一道池屏障发了、只发了这一道：两块盘各一次"
     );
 }
 
-/// 场景：第一个事务之后重开，不经可写挂载、直接 `acquire_instance`（前面没有逐盘核）；盘 1 两个系统配置槽每次都读坏。
+/// 场景：新池新建文件之后重开，不经可写挂载、直接 `acquire_instance`（前面没有逐盘核）；盘 1 两个系统配置槽每次都读坏。
 /// 预期：`InstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness`（盘 1），`DiskSnapshot` 不变。
 /// 改之前：见证值只取盘 0 的，两块盘都写了取号写，交出新号 2。
 #[test]

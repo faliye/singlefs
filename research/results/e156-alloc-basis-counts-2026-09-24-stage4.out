@@ -2,7 +2,7 @@ E7RESULT name=anchor_a1 unit_area_slots=211968
 E7RESULT name=anchor_a7 capacity=812
 E7RESULT name=s1g_mkfs_root_in_ring holds=true
 E7RESULT name=anchor_a2 ring_slots=24 mismatches=0
-E7RESULT name=k1_after_first_transaction txg=3 allocated_slots=13 free_slots=211955 deferred_slots=1 registered_item1_slots=13 registered_item5_slots=1 matches_registered=true
+E7RESULT name=k1_after_new_pool_file_creation txg=3 allocated_slots=13 free_slots=211955 deferred_slots=1 registered_item1_slots=13 registered_item5_slots=1 matches_registered=true
 E7RESULT name=k1_placements txg=3 units=50180:2,50240:1,50242:2,50244:1,50245:1,50246:1,50247:1,50248:1
 E7RESULT name=s1f_record_count txg=3 count=20
 E7RESULT name=legal_state family=beta0 kind=first_file txg=3 item1=13 item2=211955 item5=1 referenced=12 check_is_red=false

@@ -1,11 +1,11 @@
-//! 里程碑「第二个事务」收尾批「55 号装置包装次序」：`first_transaction_on_device.rs` 的 `CountedDevice`
+//! 里程碑「覆盖写、释放、回退与复用」收尾批「55 号装置包装次序」：`new_pool_file_creation_on_device.rs` 的 `CountedDevice`
 //! 改回录制器在外、故障注入在里——录制流记的是程序发给这块盘的每一次调用，`FaultInjectingBlockDevice`
 //! 转发给它下面那块真设备的调用另记一份数（`barriers_forwarded` / `barriers_swallowed`）。一道被吞的屏障，
 //! 调用方发过、录制流里有，转发给真设备的那份计数没涨——这就是「录制流记程序发了什么，设备侧记设备
 //! 收到了什么」（D13（验证路线） 已定项 4、D13（验证路线） 已定项 7；`.claude/kb/vm-harness.md`
 //! 「设备侧独立录制：blklogwrites 模式」）在最小可行的两层包装上的形态。
 //!
-//! 这条测试不搭 `CountedDevice`（它是 `first_transaction_on_device.rs` 私有的类型别名，集成测试拿不到）：
+//! 这条测试不搭 `CountedDevice`（它是 `new_pool_file_creation_on_device.rs` 私有的类型别名，集成测试拿不到）：
 //! 直接手搭同样的两层顺序，验的是这层顺序本身的性质，与那个二进制今天用它做什么无关。
 
 use singlefs_core::address::DeviceIdentity;
@@ -21,7 +21,7 @@ use singlefs_harness::{RecordedOperationKind, RecordingBlockDevice, SharedStream
 
 const SPARSE_DEVICE_BYTES: u64 = 4 << 30;
 
-/// 与 `first_transaction_on_device.rs` 里 `swallow_the_next_barrier_on` 同一条计划：只吞这块盘接下来的第一道屏障，
+/// 与 `new_pool_file_creation_on_device.rs` 里 `swallow_the_next_barrier_on` 同一条计划：只吞这块盘接下来的第一道屏障，
 /// 调用方看不出它被吞了（`barrier()` 照样报成功）。
 fn swallow_the_next_barrier_on(device: DeviceIdentity) -> FaultSchedule {
     FaultSchedule {

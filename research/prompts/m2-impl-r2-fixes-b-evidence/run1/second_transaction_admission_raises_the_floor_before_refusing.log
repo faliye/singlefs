@@ -1,0 +1,18 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.23s
+     Running tests/second_transaction_admission_raises_the_floor_before_refusing.rs (target/debug/deps/second_transaction_admission_raises_the_floor_before_refusing-2bb70fb555c30bec)
+
+running 10 tests
+test after_a_file_is_truncated_the_same_size_is_written_back_within_three_user_visible_publishes ... ok
+test known_root_slot_still_bad_after_one_reread_refuses_the_floor_raise_before_any_write ... ok
+test known_root_slot_that_reads_bad_once_is_reread_and_the_ceiling_is_unchanged ... ok
+test an_overwrite_whose_data_unit_has_no_slot_pair_outside_the_cluster_segments_is_refused_by_the_admission_and_published_after_raising_the_floor_in_the_session ... ok
+test root_slot_already_unreadable_at_mount_counts_as_no_root_and_does_not_block_the_floor_raise ... ok
+test the_seeded_history_whose_ceiling_read_of_the_genesis_root_slot_fails_once_refuses_the_raise_above_the_ceiling ... ok
+test writable_mount_on_a_version_without_file_short_of_its_reserve_is_refused_before_acquisition_with_the_disk_unchanged ... ok
+test mount_still_short_after_the_publishes_of_one_admission_is_made_and_its_writes_report_no_space_until_a_normal_unmount ... ok
+test crash_only_remounts_on_a_narrow_pool_push_floor_raises_after_the_row_publish_and_never_get_stuck ... ok
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_admission_raises_the_floor_before_refusing`
+
+Caused by:
+  process didn't exit successfully: `/tmp/claude-1000/impl-r2-fixes-b/work/target/debug/deps/second_transaction_admission_raises_the_floor_before_refusing-2bb70fb555c30bec` (signal: 15, SIGTERM: termination signal)

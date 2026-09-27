@@ -1,0 +1,590 @@
+//! 里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 38 行（实例表第二片）的读路径那一半：一张多于一片的实例表，读者沿链读、
+//! 准入沿链核、checker 沿链判（D18（块里携带什么信息） 已定项 11：根记录直接持有第 0 片，第 k 片末尾的链指针记录
+//! `kind 1 | 有无下一片 1 | 位置指针 86` 指着第 k + 1 片，身份四元组 (0, 4, 片序号, 0)）。
+//!
+//! 这里的两片链是用例手搭的（真写者写出的多片链在 `instance_table_second_page_write.rs`）：
+//! mkfs 之后连着可写挂载几次、不写文件（树表 0 条的那一版上每次写行），把最新那一版的实例表拆成两片——第 0 片原地重写、
+//! 第二片写进一个远离开放段的空槽，指着第 0 片的每一条根补上它的新整单元校验和。第二片的出生序号随手取第 0 片的加一
+//! （读者与 checker 都不看它：实例表单元按 I-1.2（块头写序已发布） 那一行的例外不进出生身份那两格），
+//! 它也不进那一版的分配记录——树表 0 条的那一版没有记账树，I-3.1（已分配统计对得上） 不适用，手搭的第二片不进分配记录不会让它红；
+//! 可写挂载要把整条链换下，这一片不在账里，取号之前的准入就拒（`writable_mount_follows_the_chain_…`）。
+
+mod common;
+
+use common::{disk_snapshot, memory_pool_of_sparse_devices, parameters, DiskSnapshot, IMAGE_BYTES};
+use singlefs_checker::image::InvariantVerdict;
+use singlefs_checker::walk::check_pool_image;
+use singlefs_core::address::{
+    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
+    TreeIdentifier,
+};
+use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+use singlefs_core::bytes::ByteWriter;
+use singlefs_core::instance_table::{InstanceRow, InstanceTablePageIndex, InstanceTableRecords};
+use singlefs_core::make_filesystem::{
+    instance_table_chain_record, location_entries, make_filesystem, INSTANCE_TABLE_SLOT,
+};
+use singlefs_core::mount::{mount_writable, MountError, Mounted};
+use singlefs_core::pointer::{BirthSequence, NodePointer, PointerHead};
+use singlefs_core::recovery::{
+    choose_root, choose_system_configuration, instance_table_chain_of_root, instance_table_of_root,
+    readable_roots, recover, root_is_abandoned_by_the_instance_table,
+    verified_system_configuration_slots, JournalPolicy, PoolReader, RecoveryFailure,
+    RecoveryOutcome,
+};
+use singlefs_core::root_record::RootRecord;
+use singlefs_core::root_ring::{slot_offset, target_for_publish};
+use singlefs_core::transaction::{PublishError, TransactionUnit};
+use singlefs_core::unit::{build_packed_unit, parse_packed_unit};
+use singlefs_format::{DATA_UNIT_BYTES, INSTANCE_ROW_BYTES};
+use singlefs_harness::memory_pool::SparseBlockDevice;
+use singlefs_harness::{RecordingBlockDevice, SharedStream};
+
+const DISKS: [DeviceIdentity; 2] = [DeviceIdentity(0), DeviceIdentity(1)];
+/// 手搭的第二片落在这个槽上：单元区里、32768 对齐（偶数槽），离开放段（50240 起）远，这几次挂载写不到它。
+const SECOND_PAGE_SLOT: SlotNumber = SlotNumber(60_000);
+/// mkfs 之后连着可写挂载几次：最新那一版是实例 4，它那张表里有实例 1、2、3 各一行。
+const WRITABLE_MOUNTS: u32 = 4;
+
+type Devices = Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)>;
+
+/// 两块 4 GiB 内存盘上 mkfs，之后连着可写挂载 `WRITABLE_MOUNTS` 次、不写文件。
+fn pool_without_file_after_writable_mounts() -> (Devices, SharedStream) {
+    let stream = SharedStream::new();
+    let mut devices: Devices = DISKS
+        .iter()
+        .map(|identity| {
+            (
+                *identity,
+                RecordingBlockDevice::with_shared_stream(
+                    *identity,
+                    SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
+                    stream.clone(),
+                ),
+            )
+        })
+        .collect();
+    make_filesystem(&parameters(), &mut devices).expect("mkfs");
+    for mount_number in 1..=WRITABLE_MOUNTS {
+        let mounted = mount_writable(&parameters(), &mut devices)
+            .unwrap_or_else(|error| panic!("第 {mount_number} 次可写挂载要成立：{error:?}"));
+        assert_eq!(mounted.output.instance, InstanceGeneration(mount_number));
+    }
+    (devices, stream)
+}
+
+fn newest_root(devices: &Devices) -> RootRecord {
+    let system_configuration = choose_system_configuration(devices).expect("系统配置");
+    choose_root(devices, &system_configuration).expect("最新根")
+}
+
+fn read_unit(devices: &Devices, slot: SlotNumber) -> Vec<u8> {
+    PoolReader::read(
+        devices,
+        DISKS[0],
+        slot.to_device_offset(),
+        usize::try_from(DATA_UNIT_BYTES).expect("32768"),
+    )
+    .expect("读得到")
+}
+
+/// 两块盘同槽写一个单元（不经录制器：手搭镜像不算挂载发的写）。
+fn write_unit(devices: &mut Devices, slot: SlotNumber, unit: &[u8]) {
+    for (_, device) in devices.iter_mut() {
+        device
+            .wrapped_device_mut()
+            .image
+            .write(slot.to_device_offset(), unit);
+    }
+}
+
+/// 一条链指针记录：`kind 1 | 有无下一片 1 | 位置指针 86`（D18（块里携带什么信息） 已定项 11）。
+fn chain_record(has_next_page: u8, pointer: &NodePointer) -> Vec<u8> {
+    let mut writer = ByteWriter::new(usize::try_from(INSTANCE_ROW_BYTES).expect("88"));
+    writer.put_u8(1);
+    writer.put_u8(has_next_page);
+    pointer.write_to(&mut writer);
+    writer.assert_position(INSTANCE_ROW_BYTES, "链指针记录");
+    writer.into_bytes()
+}
+
+/// 「有无下一片」= 1、位置指针指着下一片的链指针记录（读者与 checker 按字段名读的「有」）。
+fn chain_record_to(next_page: &NodePointer) -> Vec<u8> {
+    chain_record(1, next_page)
+}
+
+/// 指着某个槽上那个单元的指针：位置条目两盘同槽、带那个单元的整单元校验和，头与尾段照 `like` 的（实例表单元的指针同型，
+/// D19（块指针的结构与宽度预算） 已定项 7 / 8）。
+fn pointer_to_unit_at(like: &NodePointer, slot: SlotNumber, unit: &[u8]) -> NodePointer {
+    NodePointer {
+        head: like.head,
+        locations: location_entries(&DISKS, slot, unit),
+        instance: like.instance,
+        birth_sequence: like.birth_sequence,
+    }
+}
+
+/// 手搭好的两片链。
+struct TwoPageChain {
+    first_page_slot: SlotNumber,
+    /// 第 0 片的链指针记录原本该指着的第二片（写在 `SECOND_PAGE_SLOT`）。
+    second_page_pointer: NodePointer,
+}
+
+/// 把最新那一版的实例表换成两片：第 0 片装 `first_page_rows` 加 `first_page_chain_record(第二片的指针)`，原地重写；
+/// 第二片装 `second_page_rows` 加「无下一片」，身份 (0, 4, 1, 0)，写在 `SECOND_PAGE_SLOT`。两片的诞生代号与写序照原来那一片；
+/// 第二片的出生序号取第 0 片的加一（没有条款的那一格，读者与 checker 不看它）。指着原来那一片的每一条根（写行那次发布与之后的暖机空发布）
+/// 换上第 0 片的新整单元校验和、重写根槽。
+fn write_two_page_chain(
+    devices: &mut Devices,
+    first_page_rows: &[InstanceRow],
+    first_page_chain_record: impl Fn(&NodePointer) -> Vec<u8>,
+    second_page_rows: &[InstanceRow],
+) -> TwoPageChain {
+    let system_configuration = choose_system_configuration(&*devices).expect("系统配置");
+    let newest = choose_root(&*devices, &system_configuration).expect("最新根");
+    let original_first_page_pointer = newest.instance_table;
+    let first_page_slot = original_first_page_pointer.locations[0].slot;
+    let original = parse_packed_unit(&read_unit(devices, first_page_slot)).expect("第 0 片解得开");
+    let filesystem_identifier = parameters().filesystem_identifier;
+    let record_width = u16::try_from(INSTANCE_ROW_BYTES).expect("88");
+
+    let second_page_birth_sequence = BirthSequence(original.birth_sequence.0 + 1);
+    let second_page_records: Vec<Vec<u8>> = second_page_rows
+        .iter()
+        .map(InstanceRow::to_bytes)
+        .chain([instance_table_chain_record()])
+        .collect();
+    let second_page = build_packed_unit(
+        InstanceTablePageIndex(1).packed_identity(),
+        record_width,
+        &second_page_records,
+        original.birth_txg,
+        &filesystem_identifier,
+        original.write_order,
+        second_page_birth_sequence,
+    );
+    write_unit(devices, SECOND_PAGE_SLOT, &second_page);
+    let second_page_pointer = NodePointer {
+        head: PointerHead {
+            birth_tree: TreeIdentifier(0),
+            birth_txg: original.birth_txg,
+        },
+        locations: location_entries(&DISKS, SECOND_PAGE_SLOT, &second_page),
+        instance: original.write_order.instance,
+        birth_sequence: second_page_birth_sequence,
+    };
+
+    let first_page_records: Vec<Vec<u8>> = first_page_rows
+        .iter()
+        .map(InstanceRow::to_bytes)
+        .chain([first_page_chain_record(&second_page_pointer)])
+        .collect();
+    let first_page = build_packed_unit(
+        InstanceTablePageIndex::FIRST.packed_identity(),
+        record_width,
+        &first_page_records,
+        original.birth_txg,
+        &filesystem_identifier,
+        original.write_order,
+        original.birth_sequence,
+    );
+    write_unit(devices, first_page_slot, &first_page);
+    let first_page_pointer =
+        pointer_to_unit_at(&original_first_page_pointer, first_page_slot, &first_page);
+
+    let slots_per_region = system_configuration
+        .immutable
+        .sizes
+        .root_ring_slots_per_region;
+    let spacing = parameters().geometry.fixed_structure_slot_spacing;
+    let root_slot_bytes = usize::try_from(parameters().geometry.physical_block_size).expect("512");
+    let roots = readable_roots(
+        &*devices,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
+    );
+    let mut rewritten_roots = 0;
+    for root in roots
+        .iter()
+        .filter(|root| root.instance_table == original_first_page_pointer)
+    {
+        let rewritten = RootRecord {
+            filesystem_identifier: root.filesystem_identifier,
+            unmount_marker: root.unmount_marker,
+            instance: root.instance,
+            checkpoint_txg: root.checkpoint_txg,
+            tree_table: root.tree_table,
+            tree_identifier_watermark: root.tree_identifier_watermark,
+            rollback_floor: root.rollback_floor,
+            instance_table: first_page_pointer,
+            mapping_root: root.mapping_root,
+            allocation_record_tree_root: root.allocation_record_tree_root,
+        };
+        let target = target_for_publish(root.checkpoint_txg, slots_per_region);
+        let device = parameters().region_devices[usize::try_from(target.region).expect("区域号")];
+        let offset: DeviceOffsetInBytes = slot_offset(target, spacing);
+        devices
+            .iter_mut()
+            .find(|(identity, _)| *identity == device)
+            .expect("区域的盘在池里")
+            .1
+            .wrapped_device_mut()
+            .image
+            .write(offset, &rewritten.to_slot(root_slot_bytes));
+        rewritten_roots += 1;
+    }
+    assert!(rewritten_roots >= 1, "至少最新那条根指着原来那一片");
+    TwoPageChain {
+        first_page_slot,
+        second_page_pointer,
+    }
+}
+
+/// 最新那一版原来那张表（一片）里的行：实例 1、2、3 各一行。
+fn rows_of_the_newest_table(devices: &Devices) -> Vec<InstanceRow> {
+    let rows = instance_table_of_root(devices, &newest_root(devices))
+        .expect("实例表读得出")
+        .rows;
+    assert_eq!(
+        rows.iter().map(|row| row.instance).collect::<Vec<_>>(),
+        vec![
+            InstanceGeneration(1),
+            InstanceGeneration(2),
+            InstanceGeneration(3)
+        ],
+        "连着可写挂载 4 次之后最新那张表里是实例 1、2、3 各一行"
+    );
+    rows
+}
+
+/// 合法的两片链：前两行在第 0 片，第三行在第二片。
+fn pool_with_a_valid_two_page_chain() -> (Devices, SharedStream, Vec<InstanceRow>, TwoPageChain) {
+    let (mut devices, stream) = pool_without_file_after_writable_mounts();
+    let rows = rows_of_the_newest_table(&devices);
+    let chain = write_two_page_chain(&mut devices, &rows[..2], chain_record_to, &rows[2..]);
+    (devices, stream, rows, chain)
+}
+
+fn verdicts(devices: &Devices) -> Vec<(&'static str, InvariantVerdict)> {
+    check_pool_image(&memory_pool_of_sparse_devices(devices))
+}
+
+fn violated(verdicts: &[(&'static str, InvariantVerdict)]) -> Vec<&'static str> {
+    verdicts
+        .iter()
+        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
+        .map(|(invariant, _)| *invariant)
+        .collect()
+}
+
+fn verdict_of(verdicts: &[(&'static str, InvariantVerdict)], invariant: &str) -> InvariantVerdict {
+    verdicts
+        .iter()
+        .find(|(identifier, _)| *identifier == invariant)
+        .expect("清单里有")
+        .1
+        .clone()
+}
+
+/// 读者沿链读：整张表是两片的行按链上的次序接起来，指针两条（第 0 片是根记录里那一条、第 1 片是第 0 片链指针记录里那一条）；
+/// 只拿第 0 片的字节解整张表要交 `None`（交回前半张会被当成整张表判）。
+#[test]
+fn the_reader_follows_the_chain_into_the_second_page_and_a_single_page_parse_refuses_a_chained_first_page(
+) {
+    let (devices, _stream, rows, chain) = pool_with_a_valid_two_page_chain();
+    let newest = newest_root(&devices);
+    let read = instance_table_chain_of_root(&devices, &newest).expect("两片都读得出");
+    assert_eq!(read.records.rows, rows, "三行都在，按链上的次序");
+    assert_eq!(
+        read.page_pointers,
+        vec![newest.instance_table, chain.second_page_pointer],
+        "第 0 片是根记录里那一条，第 1 片是第 0 片链指针记录里那一条"
+    );
+    assert_eq!(
+        instance_table_of_root(&devices, &newest)
+            .expect("整张表读得出")
+            .rows,
+        rows
+    );
+    assert_eq!(
+        InstanceTableRecords::parse(&read_unit(&devices, chain.first_page_slot)),
+        None,
+        "第 0 片的链指针说还有下一片：只拿这一片的字节解不出整张表"
+    );
+}
+
+/// 冷启动（只读那一路，`recovery::recover`）沿链读：两片都读得出时照常走完（树表 0 条 ⇒ 没有文件）；
+/// 第二片两份都坏了，整张表就不可读，走读停在第二片（与第 0 片读不出同一个结局）。
+#[test]
+fn cold_start_walks_every_page_of_the_instance_table_and_an_unreadable_second_page_stops_it() {
+    let (mut devices, _stream, _rows, _chain) = pool_with_a_valid_two_page_chain();
+    let newest = newest_root(&devices);
+    let report_with_both_pages_readable = recover(&devices, JournalPolicy::Consult);
+    assert_eq!(
+        report_with_both_pages_readable.outcome,
+        RecoveryOutcome::NoFile {
+            root: (newest.instance, newest.checkpoint_txg)
+        },
+        "两片都读得出：照常走完"
+    );
+
+    let mut second_page = read_unit(&devices, SECOND_PAGE_SLOT);
+    second_page[20_000] ^= 0xff;
+    write_unit(&mut devices, SECOND_PAGE_SLOT, &second_page);
+    let report_with_the_second_page_unreadable = recover(&devices, JournalPolicy::Consult);
+    assert_eq!(
+        report_with_the_second_page_unreadable.outcome,
+        RecoveryOutcome::Failed {
+            root: Some((newest.instance, newest.checkpoint_txg)),
+            failure: RecoveryFailure::UnitUnreadable {
+                slot: SECOND_PAGE_SLOT
+            },
+        },
+        "第二片两份的校验和都对不上：表不可读"
+    );
+}
+
+/// 两块盘四个系统配置槽里自证过的那些槽写着的实例代号，按盘排。
+fn system_configuration_instances(
+    devices: &Devices,
+) -> Vec<(DeviceIdentity, Vec<InstanceGeneration>)> {
+    let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
+    DISKS
+        .iter()
+        .map(|device| {
+            let mut instances: Vec<InstanceGeneration> = verified_system_configuration_slots(
+                devices,
+                *device,
+                spacing,
+                &parameters().filesystem_identifier,
+            )
+            .iter()
+            .map(|system_configuration| system_configuration.quantities.journal_instance)
+            .collect();
+            instances.sort();
+            (*device, instances)
+        })
+        .collect()
+}
+
+fn snapshot(devices: &Devices, stream: &SharedStream) -> DiskSnapshot {
+    disk_snapshot(&memory_pool_of_sparse_devices(devices), stream)
+}
+
+/// 可写挂载沿链读整张表、要把整条链换下：写行那次发布逐片释放旧链，取号之前的准入先按释放判定路径逐片核
+/// （`transaction::instance_table_chain_to_release`）。手搭的第二片不在这一版的分配记录里 ⇒ 在取号之前拒、点名第二片
+/// （只读第 0 片的写法看不到它，取号写完才在发布路径里撞上，号就烧了），盘上逐字节不变、系统配置里的实例代号不变。
+#[test]
+fn writable_mount_follows_the_chain_and_refuses_a_page_missing_from_the_allocation_records_before_acquisition(
+) {
+    let (mut devices, stream, _rows, chain) = pool_with_a_valid_two_page_chain();
+    let before = snapshot(&devices, &stream);
+    let instances_before = system_configuration_instances(&devices);
+    let refused: Result<Mounted, MountError> = mount_writable(&parameters(), &mut devices);
+    match refused {
+        Err(MountError::RowPublishAdmissionRefusedBeforeAcquisition {
+            instance_to_acquire,
+            cause: PublishError::ReleaseTargetNotAllocated { unit, device, slot },
+        }) => {
+            assert_eq!(
+                (instance_to_acquire, unit, device, slot),
+                (
+                    InstanceGeneration(5),
+                    TransactionUnit::InstanceTablePageAfterTheFirst(InstanceTablePageIndex(1)),
+                    DeviceIdentity(0),
+                    chain.second_page_pointer.locations[0].slot
+                ),
+                "要取的号；沿链走到的第二片不在这一版的分配记录里"
+            );
+        }
+        other => panic!(
+            "第二片不在账里：要在取号之前拒绝：{:?}",
+            other.map(|_| "挂上了")
+        ),
+    }
+    assert_eq!(
+        snapshot(&devices, &stream),
+        before,
+        "盘上逐字节不变：系统配置槽、根环里的根、录制流步数（一个写、一道屏障都没发）"
+    );
+    assert_eq!(
+        system_configuration_instances(&devices),
+        instances_before,
+        "系统配置里的实例代号不变：号没烧"
+    );
+}
+
+/// 回退候选集与影子账按实例表判「被抛弃」读的是整张表：实例 3 那一行只在第二片上、它的 T 比实例 3 最后那条根的 txg 小一，
+/// 那条根就在被抛弃的时间线上（只读第 0 片就看不到这一行，它照样有效）。管理员回退改成挂着时的向前发布之后，回退入口要一版带文件的
+/// 现行版本，这张树表 0 条的池上调不到它；判定照同一条路走（`recovery::instance_table_of_root` 读整条链，
+/// `recovery::root_is_abandoned_by_the_instance_table` 按行判），回退入口那一侧的排除由步 4 的候选集用例钉。
+#[test]
+fn abandonment_by_the_instance_table_reads_the_row_that_lives_on_the_second_page() {
+    let (mut devices, _stream) = pool_without_file_after_writable_mounts();
+    let rows = rows_of_the_newest_table(&devices);
+    let system_configuration = choose_system_configuration(&devices).expect("系统配置");
+    let last_root_of_instance_three = readable_roots(
+        &devices,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
+    )
+    .into_iter()
+    .filter(|root| root.instance == InstanceGeneration(3))
+    .max_by_key(|root| root.checkpoint_txg)
+    .expect("实例 3 发布过根");
+    assert_eq!(
+        rows[2].selected_root_txg, last_root_of_instance_three.checkpoint_txg,
+        "写行时实例 3 那一行的 T 就是它最后那条根的 txg"
+    );
+    let table_before =
+        instance_table_of_root(&devices, &newest_root(&devices)).expect("一片的表读得出");
+    assert!(
+        !root_is_abandoned_by_the_instance_table(&last_root_of_instance_three, &table_before),
+        "拆片之前：实例 3 那一行的 T 就是它，不被抛弃"
+    );
+    let row_that_abandons_the_last_root = InstanceRow {
+        instance: InstanceGeneration(3),
+        selected_root_txg: CheckpointTxg(last_root_of_instance_three.checkpoint_txg.0 - 1),
+        applied_transaction_high_water: 0,
+    };
+    write_two_page_chain(
+        &mut devices,
+        &rows[..2],
+        chain_record_to,
+        &[row_that_abandons_the_last_root],
+    );
+    let table =
+        instance_table_of_root(&devices, &newest_root(&devices)).expect("两片的表沿链读得出");
+    assert_eq!(
+        table.rows.last(),
+        Some(&row_that_abandons_the_last_root),
+        "第二片上那一行读进来了"
+    );
+    assert!(
+        root_is_abandoned_by_the_instance_table(&last_root_of_instance_three, &table),
+        "第二片上那一行把实例 3 最后那条根判进被抛弃的时间线"
+    );
+}
+
+/// 合法的两片链上池级 checker 一条都不红：第二片的身份、校验和、位置条目次序、链指针记录都判过（I-1.1、I-2.1、I-2.5、I-3.8
+/// 判成成立，不是「不适用」），两片的行接起来判 I-3.8。
+#[test]
+fn the_pool_checker_walks_both_pages_of_a_valid_chain_and_every_invariant_holds() {
+    let (devices, _stream, _rows, _chain) = pool_with_a_valid_two_page_chain();
+    let verdicts = verdicts(&devices);
+    assert_eq!(violated(&verdicts), Vec::<&str>::new(), "{verdicts:?}");
+    for invariant in ["I-1.1", "I-2.1", "I-2.5", "I-3.8", "I-1.7"] {
+        assert_eq!(
+            verdict_of(&verdicts, invariant),
+            InvariantVerdict::Holds,
+            "{invariant} 在两片链上判成立"
+        );
+    }
+}
+
+/// 第二片的链指针指错（坏镜像）：第 0 片的链指针指到 mkfs 写的那一片实例表（槽 50176，身份 (0, 4, 0, 0)），
+/// 位置条目带的就是那一片的整单元校验和——I-2.1 挡不住，链上第 1 片的身份该是 (0, 4, 1, 0)，I-1.1 红；
+/// 链从这里断了，最新根走不完（I-7.2），它引用的单元对不上（I-4.8、I-7.4 按最新根那一格红）。
+#[test]
+fn chain_pointer_to_another_instance_table_unit_reddens_the_identity_invariant() {
+    let (mut devices, _stream) = pool_without_file_after_writable_mounts();
+    let rows = rows_of_the_newest_table(&devices);
+    let make_filesystem_page = read_unit(&devices, INSTANCE_TABLE_SLOT);
+    let chain = write_two_page_chain(
+        &mut devices,
+        &rows[..2],
+        |second_page_pointer| {
+            chain_record_to(&pointer_to_unit_at(
+                second_page_pointer,
+                INSTANCE_TABLE_SLOT,
+                &make_filesystem_page,
+            ))
+        },
+        &rows[2..],
+    );
+    assert_ne!(chain.first_page_slot, INSTANCE_TABLE_SLOT);
+    let verdicts = verdicts(&devices);
+    assert_eq!(
+        violated(&verdicts),
+        vec!["I-1.1", "I-4.8", "I-7.2", "I-7.4"],
+        "{verdicts:?}"
+    );
+    assert_eq!(
+        verdict_of(&verdicts, "I-2.1"),
+        InvariantVerdict::Holds,
+        "位置条目带的是那一片的真校验和：I-2.1 不先挡"
+    );
+    assert_eq!(
+        instance_table_of_root(&devices, &newest_root(&devices)),
+        None,
+        "读者同样认出链上第 1 片不是它：整张表不可读"
+    );
+}
+
+/// 第二片的链指针校验和不对（坏镜像）：I-2.1 红，两份都读不出，链从这里断了（I-7.2、I-4.8、I-7.4）。
+#[test]
+fn chain_pointer_whose_checksum_does_not_match_the_second_page_reddens_the_checksum_invariant() {
+    let (mut devices, _stream) = pool_without_file_after_writable_mounts();
+    let rows = rows_of_the_newest_table(&devices);
+    write_two_page_chain(
+        &mut devices,
+        &rows[..2],
+        |second_page_pointer| {
+            let mut wrong = *second_page_pointer;
+            for location in &mut wrong.locations {
+                location.unit_checksum ^= 1;
+            }
+            chain_record_to(&wrong)
+        },
+        &rows[2..],
+    );
+    let verdicts = verdicts(&devices);
+    assert_eq!(
+        violated(&verdicts),
+        vec!["I-2.1", "I-4.8", "I-7.2", "I-7.4"],
+        "{verdicts:?}"
+    );
+}
+
+/// 两片上各有一行实例 2（坏镜像）：行按实例代号唯一是对整张表说的，I-3.8 红，别的不红。
+#[test]
+fn the_same_instance_on_both_pages_reddens_only_the_instance_table_invariant() {
+    let (mut devices, _stream) = pool_without_file_after_writable_mounts();
+    let rows = rows_of_the_newest_table(&devices);
+    write_two_page_chain(
+        &mut devices,
+        &rows[..2],
+        chain_record_to,
+        &[rows[1], rows[2]],
+    );
+    let verdicts = verdicts(&devices);
+    assert_eq!(violated(&verdicts), vec!["I-3.8"], "{verdicts:?}");
+}
+
+/// 链指针记录自相矛盾（坏镜像）：「有无下一片」写 0 而位置指针没清零（条款：无下一片时清零占位），
+/// 与「有无下一片」写 2（字段表里只有有、无两个值）。两样都是 I-3.8 那条链指针记录的判定红；
+/// 链在第 0 片就停了，第二片没人引用，别的不红。
+#[test]
+fn contradictory_chain_record_reddens_only_the_instance_table_invariant() {
+    for (has_next_page, what) in [(0u8, "无下一片而指针不全零"), (2u8, "有无下一片写 2")]
+    {
+        let (mut devices, _stream) = pool_without_file_after_writable_mounts();
+        let rows = rows_of_the_newest_table(&devices);
+        write_two_page_chain(
+            &mut devices,
+            &rows[..2],
+            |second_page_pointer| chain_record(has_next_page, second_page_pointer),
+            &rows[2..],
+        );
+        let verdicts = verdicts(&devices);
+        assert_eq!(violated(&verdicts), vec!["I-3.8"], "{what}：{verdicts:?}");
+        assert_eq!(
+            instance_table_of_root(&devices, &newest_root(&devices)),
+            None,
+            "{what}：读者同样拒收这一片"
+        );
+    }
+}

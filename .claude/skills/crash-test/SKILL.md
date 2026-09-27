@@ -20,7 +20,7 @@ description: 跑 singlefs 的验证套件——LKMM 内存序、QEMU/KVM 真设�
 |---|---|---|---|
 | 崩溃点重放 | 每个崩溃点截断、恢复、跑池级 checker 与记录核对器 | `.claude/gate.d/54-layer0-replay.sh`：快档 `cargo test --release -p singlefs-checker-tier --lib --tests` 加逐条核崩溃枚举用例的全绿标记（不作数的报「本次未跑」，不判红）；全量 `--full` 在 HEAD + 暂存区的 worktree 里逐条按输入复用 | `崩溃点重放` |
 | 模型对拍 | 随机历史每一步与只住内存的理想模型比 | `.claude/gate.d/74-model-differential.sh`（轻阶段，整轮门禁里跑） | `模型对拍` |
-| QEMU 真设备 | 两块 virtio 盘上跑固定负载，设备侧录制与程序录制流逐项比 | `.claude/gate.d/55-qemu-first-transaction.sh`（重型） | 不声明覆盖 |
+| QEMU 真设备 | 两块 virtio 盘上跑固定负载，设备侧录制与程序录制流逐项比 | `.claude/gate.d/55-qemu-device-streams.sh`（重型） | 不声明覆盖 |
 | LKMM 内存序 | `litmus/` 下每条 Never 有对照组、绑到代码，herd7 判定与声明相符 | `.claude/gate.d/57-lkmm.sh`，逻辑在 `.claude/scripts/lkmm.sh`（重型；缺 herd7 直接红） | 不声明覆盖 |
 
 阶段头部写 `# gate-covers: <键>`，键只能是 `.claude/gate-not-implemented.tsv` 里登记的（本项目登记了 `崩溃点重放`、`模型对拍`）与共享 `gate.sh` 自带的 `最终判据`、`命名纪律（shell）`，写错一个字判红。

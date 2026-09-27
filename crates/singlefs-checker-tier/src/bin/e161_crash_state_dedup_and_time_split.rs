@@ -9,7 +9,7 @@
 //!
 //! 只读、只驱动、只观测：不改 `crates/singlefs-core`、`crates/singlefs-checker`、harness 已有的文件。
 //! 第一条流经 `#[path]` 引 `tests/common/mod.rs` 的 `build_pool`；第二条流的脚本照抄
-//! `crates/singlefs-checker-tier/tests/second_transaction_step_zero_layer0.rs:217-492`（到 E 再正常卸载那一支）。
+//! `crates/singlefs-checker-tier/tests/crash_enumeration_fixed_script_stream.rs:217-492`（到 E 再正常卸载那一支）。
 //! 决定几何与门槛的数都写成本地常量（值抄自登记第十一节 S1 与第七节），`main` 开头逐条与 crates 的同名常量回比（S1）。
 //! 枚举计划与撕裂镜像表是本文件自己的一份，与 crates 私有的那一份逐状态对拍（S3）。
 //!
@@ -287,7 +287,7 @@ fn fingerprint_of_debug_text(value: &dyn std::fmt::Debug) -> Digest128 {
 /// 哪一条流（登记第一节「读法写死」）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum StreamName {
-    /// 层 0 第一条流：mkfs → 取号 → 暖机两次 → 第一个事务。
+    /// 层 0 第一条流：mkfs → 取号 → 暖机两次 → 新池新建文件。
     First,
     /// 层 0 第二条流：固定脚本到 E 再正常卸载，取段 9–22。
     Second,
@@ -313,7 +313,7 @@ struct PreparedStream {
     root_write_count: usize,
 }
 
-/// 第一条流：照 `tests/first_transaction_step_seven_layer0.rs:457-489` 的 `prepare`（S2 的段长与写数断言照它）。
+/// 第一条流：照 `tests/crash_enumeration_new_pool_file_creation_stream.rs:457-489` 的 `prepare`（S2 的段长与写数断言照它）。
 fn prepare_first_stream() -> PreparedStream {
     let pool = common::build_pool("e161-first");
     let base = pool.memory_pool_after_mkfs();
@@ -359,7 +359,7 @@ fn root_identity_of_root_write(write: &RetainedWrite) -> (InstanceGeneration, Ch
     )
 }
 
-/// 第二条流的内容与脚本照抄 `second_transaction_step_zero_layer0.rs:49-55`、`116-149`、`153-201`。
+/// 第二条流的内容与脚本照抄 `crash_enumeration_fixed_script_stream.rs:49-55`、`116-149`、`153-201`。
 const SECOND_FILE_BYTES: usize = 4100;
 
 fn second_content() -> Vec<u8> {
@@ -462,7 +462,7 @@ fn version(instance: u32, txg: u64, content: Vec<u8>) -> PublishedVersion {
     }
 }
 
-/// 第二条流：`second_transaction_step_zero_layer0.rs:217-492` 的 `prepare`，`Script::ReuseAfterRaisingFloorThenNormalUnmount` 那一支。
+/// 第二条流：`crash_enumeration_fixed_script_stream.rs:217-492` 的 `prepare`，`Script::ReuseAfterRaisingFloorThenNormalUnmount` 那一支。
 /// 脚本里的断言（E 的数据单元落在 50176、卸载两次空发布是 txg 18、19）原样留着，S2 另核段长表、写数与根数。
 fn prepare_second_stream() -> PreparedStream {
     let mut pool = common::build_pool("e161-second");
@@ -564,11 +564,11 @@ fn prepare_second_stream() -> PreparedStream {
     }
 }
 
-/// S2 的锚点：第一条流段长 `[2,2,1,2,2,1,26,2,1,2]`、41 次写（`first_transaction_step_seven_layer0.rs:464-471`）；
-/// 第二条流 64 段的段长表、477 次写、19 条根（`second_transaction_step_zero_layer0.rs:431-483`）。
+/// S2 的锚点：第一条流段长 `[2,2,1,2,2,1,26,2,1,2]`、41 次写（`crash_enumeration_new_pool_file_creation_stream.rs:464-471`）；
+/// 第二条流 64 段的段长表、477 次写、19 条根（`crash_enumeration_fixed_script_stream.rs:431-483`）。
 const FIRST_STREAM_SEGMENT_LENGTHS: [usize; 10] = [2, 2, 1, 2, 2, 1, 26, 2, 1, 2];
 const FIRST_STREAM_WRITES: usize = 41;
-/// 第一条流的根槽写：暖机两次各一条、第一个事务一条（段表里三个 1 写段，收严：登记 S2 没列这一格）。
+/// 第一条流的根槽写：暖机两次各一条、新池新建文件一条（段表里三个 1 写段，收严：登记 S2 没列这一格）。
 const FIRST_STREAM_ROOTS: usize = 3;
 const SECOND_STREAM_SEGMENT_LENGTHS: [usize; 64] = [
     2, 2, 1, 2, 2, 1, 26, 2, 1, 26, 2, 1, 2, 2, 18, 2, 1, 18, 2, 1, 18, 2, 1, 26, 2, 1, 22, 2, 1,

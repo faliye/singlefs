@@ -46,9 +46,9 @@ fn system_configuration_at_mkfs() -> SystemConfiguration {
     }
 }
 
-/// 第一个事务发布之后那一刻的形态（E142（第一个事务的干跑） 的 fsid、世代号 5、tail 3、实例代号 1）；
+/// 新池新建文件发布之后那一刻的形态（E142（新池新建文件的干跑） 的 fsid、世代号 5、tail 3、实例代号 1）；
 /// io_min 取 4096，和上一份错开，免得两个 sha256 只差在运行量那几个字节上。
-fn system_configuration_after_the_first_transaction() -> SystemConfiguration {
+fn system_configuration_after_the_new_pool_file_creation() -> SystemConfiguration {
     SystemConfiguration {
         immutable: SystemImmutableConfiguration {
             filesystem_identifier: [
@@ -83,7 +83,7 @@ fn system_configuration_after_the_first_transaction() -> SystemConfiguration {
 /// F 在这两份样本里是 0，落在原来就是补齐 0 的 [481, 489)，一个字节都没变。
 const SLOT_DIGEST_AT_MKFS: &str =
     "a065c12485a9ff72117d549852461f5cb4529d664ac2384271f6e0f22d0f167f";
-const SLOT_DIGEST_AFTER_THE_FIRST_TRANSACTION: &str =
+const SLOT_DIGEST_AFTER_THE_NEW_POOL_FILE_CREATION: &str =
     "c67464f93c9021cf354d649f37044041e4b5eec252f23d103a7e8c1328796260";
 
 #[test]
@@ -96,15 +96,15 @@ fn splitting_the_system_configuration_into_four_mutability_classes_changes_no_by
         "mkfs 那一刻的槽，分四类前后逐字节相同"
     );
 
-    let after = system_configuration_after_the_first_transaction().to_slot();
+    let after = system_configuration_after_the_new_pool_file_creation().to_slot();
     assert_eq!(after.len(), 4096);
     assert_eq!(
         sha256_hexadecimal(&after),
-        SLOT_DIGEST_AFTER_THE_FIRST_TRANSACTION,
-        "第一个事务发布之后的槽，分四类前后逐字节相同"
+        SLOT_DIGEST_AFTER_THE_NEW_POOL_FILE_CREATION,
+        "新池新建文件发布之后的槽，分四类前后逐字节相同"
     );
     assert_ne!(
-        SLOT_DIGEST_AT_MKFS, SLOT_DIGEST_AFTER_THE_FIRST_TRANSACTION,
+        SLOT_DIGEST_AT_MKFS, SLOT_DIGEST_AFTER_THE_NEW_POOL_FILE_CREATION,
         "两份样本本来就该不同：钉的是两组字节，不是同一组抄了两遍"
     );
 
@@ -129,7 +129,7 @@ fn each_mutability_class_writes_its_own_field_table_budget_389_4_36_60() {
     };
     for system_configuration in [
         system_configuration_at_mkfs(),
-        system_configuration_after_the_first_transaction(),
+        system_configuration_after_the_new_pool_file_creation(),
     ] {
         let (bytes, accounting) = system_configuration.to_slot_with_mutability_accounting();
         assert_eq!(accounting, expected, "四档各自的字节数与字段表不符");

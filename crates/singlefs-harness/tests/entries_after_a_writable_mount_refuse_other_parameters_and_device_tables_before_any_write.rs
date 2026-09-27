@@ -33,7 +33,7 @@ use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 type RecordedSparse = RecordingBlockDevice<SparseBlockDevice>;
 
-/// 第一个事务（txg 3）之后在同一个进程里覆盖写三次（txg 4、5、6）：抬 F 的上限是 3。
+/// 新池新建文件（txg 3）之后在同一个进程里覆盖写三次（txg 4、5、6）：抬 F 的上限是 3。
 fn pool_after_three_overwrites(tag: &str) -> BuiltPool {
     let mut pool = build_pool(tag);
     for seed in 0..3_u8 {

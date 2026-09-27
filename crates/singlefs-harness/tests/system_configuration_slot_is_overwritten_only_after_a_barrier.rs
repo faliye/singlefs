@@ -70,7 +70,7 @@ fn second_content(seed: usize) -> Vec<u8> {
         .collect()
 }
 
-/// 第一个事务（txg 3）之后在同一个进程里覆盖写 `times` 次（txg 4 起）。
+/// 新池新建文件（txg 3）之后在同一个进程里覆盖写 `times` 次（txg 4 起）。
 fn overwrite_times(pool: &mut BuiltPool, times: usize) {
     for seed in 0..times {
         let previous = pool.output.clone();
@@ -106,7 +106,7 @@ fn acquisition_after_a_publish_of_the_previous_process_overwrites_the_older_slot
     );
 }
 
-/// 抬 F 先写系统配置：第一个事务之后覆盖写三次（txg 4–6），抬 F 到 3。txg 6 末尾的轮换与抬 F 先写的那一次系统配置写之间要有一道屏障。
+/// 抬 F 先写系统配置：新池新建文件之后覆盖写三次（txg 4–6），抬 F 到 3。txg 6 末尾的轮换与抬 F 先写的那一次系统配置写之间要有一道屏障。
 /// 改之前两次写同在一段（第二条流里 txg 14 的轮换与抬 F 先写系统配置合成的 4 写一段）。
 #[test]
 fn raising_the_floor_overwrites_the_older_system_configuration_slot_only_behind_a_barrier() {
@@ -143,7 +143,7 @@ fn rolling_back_a_failed_acquisition_overwrites_the_older_slot_only_behind_a_bar
     let mut devices: Vec<(DeviceIdentity, FaultInjectingBlockDevice<Recorded>)> = pool
         .devices
         .take()
-        .expect("第一个事务写完，盘还开着")
+        .expect("新池新建文件写完，盘还开着")
         .into_iter()
         .map(|(identity, inner)| {
             (

@@ -43,7 +43,7 @@ const PACK_SWEEP_PER_CHECKPOINT: usize = 64;
 const PACK_SWEEP_SAMPLES: [usize; 3] = [64, 256, 1024];
 /// 迟滞两档：对象自上次写以来 ≥ K 个 checkpoint 才打包。
 const PACK_HYSTERESIS_SAMPLES: [u64; 2] = [16, 64];
-/// 提交内生块量三档：E93 原样 0、E148 第一个事务规模 4、池规模 9。
+/// 提交内生块量三档：E93 原样 0、E148 新池新建文件规模 4、池规模 9。
 const METADATA_BLOCKS_SAMPLES: [usize; 3] = [0, 4, 9];
 /// 判据 6(a) 的阈值：丙与乙的 runs 中位数之差在 ±5% 以内算打平。
 const ARRIVAL_TIE_PERCENT: u64 = 5;

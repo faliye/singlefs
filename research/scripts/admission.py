@@ -4173,8 +4173,8 @@ cat "$FAKE_CARGO_CONTROL/log.$target"
 exit "$(cat "$FAKE_CARGO_CONTROL/exit.$target" 2>/dev/null || echo 0)"
 '''
 LAYER0_STAGE_CASES = [
-    ("crash-case:stream-a", "first_transaction_step_seven_layer0", "stream_a_full", "count-line=LAYER0 exhaustive=LAYER0 threads=LAYER0 shard=across-machines"),
-    ("crash-case:stream-b", "second_transaction_step_zero_layer0", "stream_b_full", "count-line=LAYER0B exhaustive=LAYER0B threads=LAYER0B"),
+    ("crash-case:stream-a", "crash_enumeration_new_pool_file_creation_stream", "stream_a_full", "count-line=LAYER0 exhaustive=LAYER0 threads=LAYER0 shard=across-machines"),
+    ("crash-case:stream-b", "crash_enumeration_fixed_script_stream", "stream_b_full", "count-line=LAYER0B exhaustive=LAYER0B threads=LAYER0B"),
     ("crash-case:case-c", "case_c", "case_c_full", ""),
 ]
 PASSED_ONE_LINE = "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.01s"
@@ -4232,10 +4232,10 @@ def run_layer0_stage_cells(selftest, module):
         common_directory = os.path.join(work, ".git")
 
         def set_logs(stream_a=None, stream_b=None, case_c=None, exits=None):
-            write_text(os.path.join(control, "log.first_transaction_step_seven_layer0"), stream_a or stream_log("LAYER0") + "CHECKER x=0\n")
-            write_text(os.path.join(control, "log.second_transaction_step_zero_layer0"), stream_b or stream_log("LAYER0B"))
+            write_text(os.path.join(control, "log.crash_enumeration_new_pool_file_creation_stream"), stream_a or stream_log("LAYER0") + "CHECKER x=0\n")
+            write_text(os.path.join(control, "log.crash_enumeration_fixed_script_stream"), stream_b or stream_log("LAYER0B"))
             write_text(os.path.join(control, "log.case_c"), case_c or PASSED_ONE_LINE + "\n")
-            for target in ("first_transaction_step_seven_layer0", "second_transaction_step_zero_layer0", "case_c"):
+            for target in ("crash_enumeration_new_pool_file_creation_stream", "crash_enumeration_fixed_script_stream", "case_c"):
                 exit_path = os.path.join(control, f"exit.{target}")
                 if os.path.exists(exit_path):
                     os.remove(exit_path)
@@ -4324,7 +4324,7 @@ def run_layer0_stage_cells(selftest, module):
         exit_code, output, calls = stage("--full", "--start-over")
         runs = full_runs(calls)
         selftest.expect("54 号 --full --start-over：设 SINGLEFS_LAYER0_START_OVER=1；只剩 1 片要跑、起 1 个线程不误红，写回那一格",
-                        exit_code == 0 and [(call[0], call[5]) for call in runs] == [("second_transaction_step_zero_layer0", "1")]
+                        exit_code == 0 and [(call[0], call[5]) for call in runs] == [("crash_enumeration_fixed_script_stream", "1")]
                         and any(".stream-b." in name for name in markers()), f"退 {exit_code}，跑了 {runs}，输出尾部：{output.strip()[-600:]}")
         for name in [name for name in markers() if ".stream-b." in name]:
             os.remove(os.path.join(common_directory, name))
@@ -4332,7 +4332,7 @@ def run_layer0_stage_cells(selftest, module):
         exit_code, output, messages = run_in_environment(["bash", stage_copy, "--full", work], dict(environment, SINGLEFS_LAYER0_THREADS="7"))
         runs = full_runs(invocations())
         selftest.expect("54 号 --full 显式设 SINGLEFS_LAYER0_THREADS=7：用例看到 7，标记里 configured_worker_threads= 记「显式设的」",
-                        exit_code == 0 and [(call[0], call[8]) for call in runs] == [("second_transaction_step_zero_layer0", "7")]
+                        exit_code == 0 and [(call[0], call[8]) for call in runs] == [("crash_enumeration_fixed_script_stream", "7")]
                         and f"configured_worker_threads=SINGLEFS_LAYER0_THREADS=7（显式设的），本机 {cores} 核" in marker_text("stream-b"),
                         f"退 {exit_code}，跑了 {runs}，输出尾部：{(output + messages).strip()[-600:]}")
         exit_code, output, _calls = run_in_environment(["bash", stage_copy, "--start-over", work], environment)
@@ -4347,7 +4347,7 @@ def run_layer0_stage_cells(selftest, module):
         set_logs(stream_b=stream_log("LAYER0B", worker_threads=1))
         exit_code, output, calls = stage("--full")
         selftest.expect("54 号 --full：这批输入那一格在而不作数就重跑，重跑判红时删掉那一格（先绿后红，前一趟的不再作数）",
-                        bool(stream_b_marker_path) and exit_code == 1 and [call[0] for call in full_runs(calls)] == ["second_transaction_step_zero_layer0"]
+                        bool(stream_b_marker_path) and exit_code == 1 and [call[0] for call in full_runs(calls)] == ["crash_enumeration_fixed_script_stream"]
                         and not os.path.exists(stream_b_marker_path),
                         f"改之前 stream-b 那一格{'在' if stream_b_marker_path else '不在（上一格没写成）'}；退 {exit_code}，跑了 {full_runs(calls)}，标记 {markers()}")
         red_cells = [
@@ -4355,7 +4355,7 @@ def run_layer0_stage_cells(selftest, module):
             ("过滤之后一条用例都没跑（0 passed）",
              {"stream_b": stream_log("LAYER0B", result="test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s")},
              None, "1 passed"),
-            ("cargo test 退非 0", {}, {"second_transaction_step_zero_layer0": 101}, "cargo test 退非 0"),
+            ("cargo test 退非 0", {}, {"crash_enumeration_fixed_script_stream": 101}, "cargo test 退非 0"),
         ]
         for label, logs, exits, phrase in red_cells:
             for name in [name for name in markers() if ".stream-b." in name]:
@@ -4364,11 +4364,11 @@ def run_layer0_stage_cells(selftest, module):
             exit_code, output, calls = stage("--full")
             selftest.expect(f"54 号 --full：stream-b {label} ⇒ 这一条判红、不写标记，退 1",
                             exit_code == 1 and phrase in output and not any(".stream-b." in name for name in markers())
-                            and [call[0] for call in full_runs(calls)] == ["second_transaction_step_zero_layer0"],
+                            and [call[0] for call in full_runs(calls)] == ["crash_enumeration_fixed_script_stream"],
                             f"退 {exit_code}，跑了 {full_runs(calls)}，标记 {markers()}，输出尾部：{output.strip()[-600:]}")
         for name in [name for name in markers() if ".case-c." in name]:
             os.remove(os.path.join(common_directory, name))
-        set_logs(exits={"first_transaction_step_seven_layer0": 101})
+        set_logs(exits={"crash_enumeration_new_pool_file_creation_stream": 101})
         for name in [name for name in markers() if ".stream-a." in name]:
             os.remove(os.path.join(common_directory, name))
         exit_code, output, calls = stage("--full")
@@ -4442,7 +4442,7 @@ FAKE_SHARD_CONFIGURATION_CHECK = "#!/usr/bin/env bash\necho \"样本配置，第
 FAKE_SHARD_DRIVER = r'''#!/usr/bin/env bash
 printf '%s\t%s\n' "$*" "${SINGLEFS_LAYER0_START_OVER-unset}" >> "$FAKE_CARGO_CONTROL/driver-invocations"
 [[ "$1" == --merged-log ]] || exit 9
-cat "$FAKE_CARGO_CONTROL/log.first_transaction_step_seven_layer0" > "$5"
+cat "$FAKE_CARGO_CONTROL/log.crash_enumeration_new_pool_file_creation_stream" > "$5"
 exit "$(cat "$FAKE_CARGO_CONTROL/driver-exit" 2>/dev/null || echo 0)"
 '''
 
@@ -4557,7 +4557,7 @@ def run_layer0_stage_shard_cells(selftest, work, control, stage, full_runs, mark
                         "另两条单机跑；三条都判绿、各写一格",
                         exit_code == 0 and "双机分片：开" in output and len(driver_calls) == 1 and driver_calls[0][0].startswith(expected_arguments)
                         and driver_calls[0][1] == "unset"
-                        and [call[0] for call in full_runs(calls)] == ["second_transaction_step_zero_layer0", "case_c"] and len(markers()) == 3,
+                        and [call[0] for call in full_runs(calls)] == ["crash_enumeration_fixed_script_stream", "case_c"] and len(markers()) == 3,
                         f"退 {exit_code}，驱动脚本被调 {driver_calls}，cargo 跑了 {full_runs(calls)}，标记 {markers()}，输出尾部：{output.strip()[-600:]}")
         for name in [name for name in markers() if ".stream-a." in name]:
             os.remove(os.path.join(common_directory, name))

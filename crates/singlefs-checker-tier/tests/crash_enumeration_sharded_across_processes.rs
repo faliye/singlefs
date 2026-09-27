@@ -1,4 +1,5 @@
-//! 层 0 崩溃重放按双机分片（里程碑三第六项，`.claude/kb/milestone/03-third-txn.md` 第六节）：在第一个事务那条小流上
+//! checker 档模块：crash、layer0_progress
+//! 层 0 崩溃重放按双机分片（里程碑三第六项，`.claude/kb/milestone/03-third-txn.md` 第六节）：在新池新建文件那条小流上
 //! （mkfs → 取号 → 暖机 → A，按甲二展开，原地覆写取三态，46 个状态）拿真的账本核分片与 merge 的每一条。两台机器在这里是同一个进程里顺序跑的几趟，
 //! 各用自己的进度目录；merge 那一趟的目录里只放拷过来的账本。
 //! 名字里不带 layer0：它只跑甲二那几十个状态，平时跑得起。
@@ -29,16 +30,16 @@ use singlefs_harness::memory_pool::{
 };
 use singlefs_harness::segments::StepKind;
 
-/// 第一条流按甲二展开的状态数（`first_transaction_step_seven_layer0.rs` 的 `QUICK_TIER_STATES`）。十一段写数 `2,2,1,2,2,1,2,24,2,1,2`；
+/// 第一条流按甲二展开的状态数（`crash_enumeration_new_pool_file_creation_stream.rs` 的 `QUICK_TIER_STATES`）。十一段写数 `2,2,1,2,2,1,2,24,2,1,2`；
 /// 系统配置槽写是原地覆写、各取三态（实审 B3a-2 第 4 条），其余写取两态：只有两次系统配置槽写的四段（取号、暖机两次发布末尾、
 /// A 之后）各 3² − 1 = 8，A 的 24 次单元写那一段（单元写只取全不落或全落）2 − 1 = 1，三段 journal 记录各 2² − 1 = 3，
 /// 三段根槽写各 1，再加全部持久那一个：4 · 8 + 1 + 3 · 3 + 3 · 1 + 1 = 46（补第三态之前两态口径是 4 · 3 + 1 + 3 · 3 + 3 · 1 + 1 = 26）。
 /// C577（发布返回之前、系统配置轮换之后一道屏障）之前暖机末尾两次系统配置槽写与 A 的单元写同段（26 写，3² · 2 − 1 = 17），共 54（两态 29）。
 const QUICK_TIER_STATES: u64 = 46;
 /// 用例里账本与进度文件的流名。
-const STREAM_NAME: &str = "first_transaction_stream_quick_tier";
+const STREAM_NAME: &str = "new_pool_file_creation_stream_quick_tier";
 /// 驱动脚本 `--selftest` 跑的那条用例的流名。
-const SELFTEST_STREAM_NAME: &str = "sharded_selftest_first_transaction_stream_quick_tier";
+const SELFTEST_STREAM_NAME: &str = "sharded_selftest_new_pool_file_creation_stream_quick_tier";
 /// 驱动脚本 `--selftest` 那条用例每片几个状态：46 个状态切成 12 片，分两片时每片 6 片、各起不止一个工作线程。
 const SELFTEST_STATES_PER_SLICE: u64 = 4;
 
@@ -66,7 +67,7 @@ fn first_stream(tag: &str) -> FirstStream {
     }
 }
 
-/// 第一个事务那一版（实例 1、txg 3）带着给定的内容。
+/// 新池新建文件那一版（实例 1、txg 3）带着给定的内容。
 fn versions_with_content(content: Vec<u8>) -> Vec<PublishedVersion> {
     vec![PublishedVersion {
         instance: InstanceGeneration(1),
@@ -755,7 +756,7 @@ fn run_the_unsharded_enumerations_for_the_golden_comparison(
             Layer0Resume::KeepProgressFile(Layer0ProgressFileSettings {
                 directory: directory.to_path_buf(),
                 input_fingerprint: name_part("fingerprint0"),
-                stream_name: name_part("golden_first_transaction_stream"),
+                stream_name: name_part("golden_new_pool_file_creation_stream"),
                 start: Layer0ResumeStart::ResumeFromTheProgressFile,
                 after_completion: Layer0ProgressFileAfterCompletion::KeptForTheTestThatInspectsIt,
             }),
@@ -828,7 +829,7 @@ fn print_the_unsharded_enumerations_for_the_golden_comparison() {
 /// 进度文件计划哈希 `a1d502a7…`、内容 `798bef3c…`），证的是加分片没改不分片那条路。实审 B3a-2 按设备记屏障、原地覆写补第三态之后
 /// 状态数 29 → 54，撕裂镜像接进枚举用的写表（计划哈希跟着变），实审 B3a-3 在那一版上重取；重取之前与同一棵树上退回 B3a-2 之前的
 /// 四份源码打的行逐行对过：每种行的词项一个不多一个不少，不同的只有随状态数走的计数与计划哈希。从这一版起，这组钉值守的是
-/// 「不分片那条路打的行与留下的进度文件不悄悄变」。层 0 发现日志（里程碑「第二个事务」收尾批）每趟枚举多打一行
+/// 「不分片那条路打的行与留下的进度文件不悄悄变」。层 0 发现日志（里程碑「覆盖写、释放、回退与复用」收尾批）每趟枚举多打一行
 /// `LAYER0_FINDINGS signatures=0 red_states=0 states=54`、进度文件格式号 1 → 2 且每行片行多一个 `findings=none`，在那一版上重取
 /// （同一棵树上加发现日志之前是 65 行 `8e1ca03b…`、进度文件 `6ec51601…`，→ 下面的值）：重取之前逐行对过，打的行只多出那两行
 /// `LAYER0_FINDINGS`，进度文件去掉每行的校验和、`findings=none` 与格式号之后逐字节相同，进度文件名（计划哈希）不变。
@@ -836,7 +837,7 @@ const GOLDEN_PRINTED_LINE_COUNT: usize = 67;
 const GOLDEN_PRINTED_LINES_SHA256: &str =
     "15867e366db44d88e7de85fafe40ab6940310fc9cfe1a75787846c39b1024212";
 /// 同一趟留下的进度文件：名字（带计划哈希）与整份内容的 SHA-256（55 行：文件头 + 54 行片行）。
-const GOLDEN_PROGRESS_FILE_NAME: &str = "layer0-progress-golden_first_transaction_stream-fingerprint0-5026593803c5654d562ab1858215ddd4a5be477116564e882947660016a1eb5e.txt";
+const GOLDEN_PROGRESS_FILE_NAME: &str = "layer0-progress-golden_new_pool_file_creation_stream-fingerprint0-5026593803c5654d562ab1858215ddd4a5be477116564e882947660016a1eb5e.txt";
 const GOLDEN_PROGRESS_FILE_SHA256: &str =
     "6a153e1e268f829997ed67198ce0d125a450d0b12c4cdfbf5e6c1024ad8d5cd8";
 

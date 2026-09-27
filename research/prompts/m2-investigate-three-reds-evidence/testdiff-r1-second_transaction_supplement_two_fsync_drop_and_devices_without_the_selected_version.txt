@@ -1,0 +1,4 @@
+62d61
+< use singlefs_harness::crash::{MemoryPool, SparseBlockDevice, SparseDevice};
+66a66
+> use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice, SparseDevice};

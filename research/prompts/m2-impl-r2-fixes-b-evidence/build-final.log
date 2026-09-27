@@ -1,0 +1,20 @@
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-checker)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+   Compiling singlefs-checker-tier v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-checker-tier)
+warning: unused import: `check_records_against`
+  --> crates/singlefs-checker-tier/tests/second_transaction_supplement_three_crash_injection.rs:13:51
+   |
+13 | use singlefs_checker_tier::crash::{check_records, check_records_against};
+   |                                                   ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `RecordStreamContinuity`
+  --> crates/singlefs-checker-tier/tests/second_transaction_supplement_three_crash_injection.rs:32:5
+   |
+32 |     RecordStreamContinuity, RetainedWrite,
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `singlefs-checker-tier` (test "second_transaction_supplement_three_crash_injection") generated 2 warnings (run `cargo fix --test "second_transaction_supplement_three_crash_injection" -p singlefs-checker-tier` to apply 2 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 15.68s

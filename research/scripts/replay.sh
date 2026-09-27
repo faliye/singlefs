@@ -168,7 +168,7 @@ E136|e136_fork_cost_rows||e136-fork-cost-rows-2026-09-11.out|exact
 E138|e138_per_disk_floor||e138-per-disk-floor-2026-09-11.out|exact
 E139|e139_tightened_floor||e139-tightened-floor-2026-09-12.out|exact
 E141|e141_switch_reserve_mount_admission||e141-switch-reserve-mount-admission-2026-09-14-row-writing.out|exact
-E142|@driver_e142||e142-first-txn-dry-run-2026-09-26-r18-main-2.out|exact
+E142|@driver_e142||e142-new-pool-file-creation-dry-run-2026-09-26-r18-main-2.out|exact
 E143|e143-one-unit-per-txn-journal||e143-one-unit-per-txn-journal-2026-09-13.out|exact
 E145|e145-self-describing-node-header||e145-self-describing-node-header-2026-09-16-tree-table-200.out|exact
 E146|e146-livelist-entry-width||e146-livelist-entry-width-2026-09-16-tree-table-200.out|exact
@@ -209,6 +209,7 @@ E158|@driver_e158_r3_seg1_compare||e158-root-choice-repair-2026-09-27-r3-seg1-co
 E158|@driver_e158_r4_compare||e158-root-choice-repair-2026-09-27-r4-compare.out|exact
 E159|e159-fsync-wait-group-commit|anchors|e159-fsync-wait-group-commit-2026-09-25-h311-replay.out|exact
 E162|@driver_e162_anchors||e162-crash-verdict-block-store-2026-09-27-anchors.out|exact
+E162|@driver_e162_power_cut_selftest||e162-verdict-store-power-cut-2026-09-27-selftest-r2.out|exact
 E161|@driver_e161_feasibility||e161-crash-state-dedup-and-time-split-feasibility-2026-09-27.out|timing
 E163|@driver_e163_r1_merge||e163-gpu-multicard-crc32c-2026-09-27-r1-merge.out|exact
 TSV
@@ -417,9 +418,9 @@ driver_e9() {
 
 # E142 第十五次跑步④（重跑登记 `research/prompts/e142-r15-prereg.md` 第六节）：装置↔crates/ 逐字节比对
 # 要跨两个 cargo workspace（research/ 与仓根的 crates/ workspace，仓根 Cargo.toml 显式 exclude =
-# ["research"]，两边互相看不到对方，不能合并成一次 cargo 调用）。旧的 `first_transaction_region_bytes`
+# ["research"]，两边互相看不到对方，不能合并成一次 cargo 调用）。旧的 `new_pool_file_creation_region_bytes`
 # 读的是改位置寻址之前的旧布局（区域表写死八个单元，见该文件模块注释），已经比不出新写的五个分配记录树节点，
-# 换成只读导出 `e142_first_transaction_write_dump`（不带任何布局知识，逐次写按 (设备, 偏移, 长度, sha256,
+# 换成只读导出 `e142_new_pool_file_creation_write_dump`（不带任何布局知识，逐次写按 (设备, 偏移, 长度, sha256,
 # 整段十六进制) 原样打出来）。装置的第一个命令行参数是这份导出的文件路径（做 Q142.1 真比对），第二个参数是
 # arm O 的历史留存产物（`第十五次跑步④` 起 Q142.8 用它算「哪些区域从旧布局变到了新布局」，
 # 交回报告 `research/prompts/e142-r15-step234-runner-report.md` 里写明这份参照为什么找不到能重新编译的
@@ -430,7 +431,7 @@ driver_e9() {
 # key 取什么）、γ（extent 上段叶 key 区间）三格 5.1 的变体开关整套删除，改成 D8（核心索引结构） 已定项 14
 # 第 395/401 行、D18（块里携带什么信息） 已定项 2 射程写死的唯一写法（稀疏、整个 key 空间、按位置分片区间）；
 # δ（盘上槽数）收口成 `slots_of_device_bytes` 一个 const fn。第二个命令行参数从「第十四次跑 arm O 参照」
-# 改成「这一次步①现编现跑的臂 N15 参照」（`research/results/e142-first-txn-dry-run-2026-09-25-r16-arm-n15.out`），
+# 改成「这一次步①现编现跑的臂 N15 参照」（`research/results/e142-new-pool-file-creation-dry-run-2026-09-25-r16-arm-n15.out`），
 # 按 (设备, 偏移, 长度) 配对出 `name=old_new_region`（Q142.19），不再按名字配对出旧的 `name=old_new_region`
 # 系列。新增 `name=g3_shape`（第八节 G3 五个几何点，不依赖 `crates/`）、`name=positive_control_p2`
 # （四个点，锚点随稀疏改成第 0 条条目）、`name=g4_bytes_equal_summary`（第三个命令行参数给才跑，这一次
@@ -449,9 +450,9 @@ driver_e9() {
 # 存盘文件名从 `-r16-combined.out` 改成 `-r17-main.out`（登记步③给的文件名）。
 driver_e142() {
   local impl_snapshot="$OUT_DIR/e142-crates-write-dump.tmp"
-  local arm_n15_reference="results/e142-first-txn-dry-run-2026-09-25-r16-arm-n15.out"
-  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q -p singlefs-checker-tier --bin e142_first_transaction_write_dump) >"$impl_snapshot" || return 1
-  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./target/release/e142-first-txn-dry-run "$impl_snapshot" "$arm_n15_reference" || return 1
+  local arm_n15_reference="results/e142-new-pool-file-creation-dry-run-2026-09-25-r16-arm-n15.out"
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q -p singlefs-checker-tier --bin e142_new_pool_file_creation_write_dump) >"$impl_snapshot" || return 1
+  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./target/release/e142-new-pool-file-creation-dry-run "$impl_snapshot" "$arm_n15_reference" || return 1
   cat "$impl_snapshot"
 }
 
@@ -679,6 +680,14 @@ driver_e162_anchors() {
   BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I/usr/lib/gcc/x86_64-linux-gnu/13/include}" \
     cargo build -q --release -p e7-index-bench --features e162-block-stores --bin e162-crash-verdict-block-store >/dev/null 2>&1 || return 1
   bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./target/release/e162-crash-verdict-block-store anchors
+}
+
+# E162 第四段 S4 掉电装置：只登记确定性的 selftest（登记 7.2 A1–A6 与补 7 B 系列锚点）。s4-drive 起 QEMU 虚机（重型），
+# 不登记逐字节复跑；它的整条命令写在实验页。同一个特性、同一个 BINDGEN 变量，照上面 E162 的写法。
+driver_e162_power_cut_selftest() {
+  BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I/usr/lib/gcc/x86_64-linux-gnu/13/include}" \
+    cargo build -q --release -p e7-index-bench --features e162-block-stores --bin e162-verdict-store-power-cut >/dev/null 2>&1 || return 1
+  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./target/release/e162-verdict-store-power-cut --role selftest
 }
 
 # E163（GPU多卡算单元校验和）：只登记 R1（单机两张卡）的 merge 输出——它是唯一不含计时字段、

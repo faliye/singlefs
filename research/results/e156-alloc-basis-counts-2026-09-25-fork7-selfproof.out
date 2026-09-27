@@ -4,7 +4,7 @@ E7RESULT name=anchor_a_d8 local_leaf_slots=812 local_internal_fanout=169 local_l
 E7RESULT name=s1g_mkfs_root_in_ring holds=true
 E7RESULT name=anchor_a2 ring_slots=24 mismatches=0
 E7RESULT name=anchor_a_d8_root_level my_root_level=2 real_root_level=2 matches=true
-E7RESULT name=k1_after_first_transaction txg=3 allocated_slots=17 free_slots=211951 deferred_slots=1 registered_item1_slots=17 registered_item5_slots=1 matches_registered=true
+E7RESULT name=k1_after_new_pool_file_creation txg=3 allocated_slots=17 free_slots=211951 deferred_slots=1 registered_item1_slots=17 registered_item5_slots=1 matches_registered=true
 E7RESULT name=k1_placements txg=3 units=50180:2,50240:1,50242:2,50244:1,50245:1,50246:1,50247:1,50248:1,50249:1,50250:1,50251:1,50252:1
 E7RESULT name=s1f_record_count txg=3 count=28
 E7RESULT name=legal_state family=beta0 kind=first_file txg=3 item1=17 item2=211951 item5=1 referenced=16 check_is_red=false

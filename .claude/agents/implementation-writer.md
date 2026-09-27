@@ -13,7 +13,7 @@ required-inputs: 草稿目录, 报告, 条款, 要动的 crates 文件
 开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 派发提示写「交补丁」的在草稿目录的副本里改、交补丁目录（「产出」一节），不碰主工作区；没写的在主工作区改。主 agent 同时派几个实现员时一律交补丁。你做的是 `.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」的第 1 步；第 2 步三方对抗与第 3 步 checker 由主 agent 另派。
-开工先读：`.claude/singlefs-ai-sop/rules/show-me-test.md`「新增的测试必须先证明它会红」；`.claude/singlefs-ai-sop/rules/code-discipline.md` 全篇；`.claude/rules/implementation-first.md`「规矩」；`.claude/rules/fs-design.md`。
+开工先读：`.claude/singlefs-ai-sop/rules/show-me-test.md`「新增的测试必须先证明它会红」；`.claude/singlefs-ai-sop/rules/code-discipline.md` 全篇；`.claude/rules/implementation-first.md`「规矩」；`.claude/rules/fs-design.md`；`.claude/rules/verification.md`「定义与名字」「harness 档里再分轻重」「崩溃枚举用例住哪、怎么登记」（测试文件按测什么起名、一条用例一个场景、checker 档测试文件第一行声明模块、重档由 `research/scripts/harness-test-timing.py` 按耗时表标，不手标）。
 
 ## 输入（主 agent 必须给）
 
@@ -39,7 +39,7 @@ required-inputs: 草稿目录, 报告, 条款, 要动的 crates 文件
    - 在报告里写出「为什么走不到」（哪条构造保证、哪几个调用点）之后，才许写 `todo!` 或 `assert!`。
      条款没写的不是分支（trait 实现、derive、访问器），不加，逐项列进报告；其余照做。
 7. 新加层 0 流或崩溃点重放用例时，报告写明它比已有的流多罩了哪些崩溃状态、多跑了哪一步（重开、挂载、恢复）；与已有流的基线镜像、写表、段序列逐项相同的，不新开全量枚举，只加一条快用例钉住「相同」。
-   7a. 新写的崩溃枚举用例（测试函数直接调 `enumerate_layer0` 一族做全量枚举、不是 `quick_tier` 那几个的）一律写在 `crates/singlefs-checker-tier/tests/` 里、标 `#[ignore]`，共用的搭建模块经 `#[path = "../../singlefs-harness/tests/common/mod.rs"] mod common;` 这类声明指回 harness（`.claude/rules/verification.md`「崩溃枚举用例住哪、怎么登记」），报告里给出要登记进 `.claude/gate.d/stage-inputs.tsv` 的 `crash-case:` 行原文（`test=singlefs-checker-tier:…`），由主 agent 或 tooling-writer 登记；几步的合成流、单跑几秒的，在测试函数上面写一行注释 `// crash-case-check:not-a-crash-case <理由>`。`research/scripts/crash-case-check.py` 判这一条。
+   7a. 新写的崩溃枚举用例（测试函数直接调 `enumerate_layer0` 一族做全量枚举、不是 `quick_tier` 那几个的；或自己逐个造崩溃状态：名字带 `every_crash`、循环里对录制操作取到循环变量为止的前缀去 `apply`、循环里造 `CrashImage`，判法在 `research/scripts/crash-case-check.py`）一律写在 `crates/singlefs-checker-tier/tests/` 里、标 `#[ignore]`，共用的搭建模块经 `#[path = "../../singlefs-harness/tests/common/mod.rs"] mod common;` 这类声明指回 harness（`.claude/rules/verification.md`「崩溃枚举用例住哪、怎么登记」），报告里给出要登记进 `.claude/gate.d/stage-inputs.tsv` 的 `crash-case:` 行原文（`test=singlefs-checker-tier:…`），由主 agent 或 tooling-writer 登记；几步的合成流、单跑几秒的，在测试函数上面写一行注释 `// crash-case-check:not-a-crash-case <理由>`。`research/scripts/crash-case-check.py` 判这一条。
 8. 上下文过 600k：停在最近一个编得过的点，报告写做完的件与没做的件，交回；不硬撑到被自动压缩。
 
 ## 写范围

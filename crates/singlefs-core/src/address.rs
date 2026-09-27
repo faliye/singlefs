@@ -58,7 +58,7 @@ pub struct FileOffsetInBytes(pub u64);
 pub struct DataUnitIndexInFile(pub u64);
 
 impl DataUnitIndexInFile {
-    /// 文件的第一个数据单元。只有一个单元的文件（第一个事务那一档）就是它。
+    /// 文件的第一个数据单元。只有一个单元的文件（新池新建文件那一档）就是它。
     pub const FIRST: Self = Self(0);
 
     /// 这个单元载荷的第一个字节在文件里的偏移：单元序号乘净荷容量（D4（校验和位置） 已定项 5 的除法倒过来）。

@@ -2,7 +2,7 @@
 # E152（按里程碑对比六家文件系统的文件性能）的 initramfs 附加根：fio、六家的格式化与挂载工具连同依赖库、
 # 解压过的内核模块与加载次序、singlefs 的真设备二进制，摆进一个目录，交给 vm-bench.sh 的 VM_EXTRA_ROOT。
 #
-#   e152-stage-root.sh <目标目录> <内核版本> <first_transaction_on_device 的路径>
+#   e152-stage-root.sh <目标目录> <内核版本> <new_pool_file_creation_on_device 的路径>
 #
 # 本机没有 root，也没装 zfsutils-linux / bcachefs-tools：这两家的用户态从 Ubuntu 仓库下 .deb、核过 sha256 再解包，
 # 不装进系统（缓存在 ${TMPDIR:-/tmp}/singlefs-e152-packages）。版本与跑前登记 research/prompts/e152-preregistration.md
@@ -10,15 +10,15 @@
 # 模块的加载次序交给 modprobe --show-depends 从内核自己的 modules.dep 里解（含软依赖），不手写。
 set -uo pipefail
 
-DESTINATION="${1:?用法：e152-stage-root.sh <目标目录> <内核版本> <first_transaction_on_device 的路径>}"
+DESTINATION="${1:?用法：e152-stage-root.sh <目标目录> <内核版本> <new_pool_file_creation_on_device 的路径>}"
 RELEASE="${2:?缺内核版本，例：$(uname -r)}"
-SINGLEFS_BINARY="${3:?缺 first_transaction_on_device 的路径}"
+SINGLEFS_BINARY="${3:?缺 new_pool_file_creation_on_device 的路径}"
 PACKAGES="${E152_PACKAGE_CACHE:-${TMPDIR:-/tmp}/singlefs-e152-packages}"
 
 fail() { echo "  ✗ $1" >&2; echo "    → $2" >&2; exit 1; }
 
 [[ -d "/lib/modules/$RELEASE" ]] || fail "没有 /lib/modules/$RELEASE" "内核版本要与 /lib/modules 下的目录同名：ls /lib/modules"
-[[ -x "$SINGLEFS_BINARY" ]] || fail "$SINGLEFS_BINARY 不可执行" "在仓根跑 cargo build --release --target x86_64-unknown-linux-musl -p singlefs-checker-tier --bin first_transaction_on_device"
+[[ -x "$SINGLEFS_BINARY" ]] || fail "$SINGLEFS_BINARY 不可执行" "在仓根跑 cargo build --release --target x86_64-unknown-linux-musl -p singlefs-checker-tier --bin new_pool_file_creation_on_device"
 for tool in fio mkfs.ext4 mkfs.xfs mkfs.f2fs mkfs.btrfs sfdisk mdadm zstd dpkg-deb curl sha256sum ldd modprobe; do
   command -v "$tool" >/dev/null || fail "缺 $tool" "装上它（fio / e2fsprogs / xfsprogs / f2fs-tools / btrfs-progs / zstd / dpkg / curl / coreutils / libc-bin / kmod）"
 done
@@ -87,7 +87,7 @@ install_binary_with_libraries "$(command -v sfdisk)" /usr/sbin/sfdisk
 install_binary_with_libraries "$(command -v mdadm)" /usr/sbin/mdadm
 install -D -m 0644 /etc/mke2fs.conf "$DESTINATION/etc/mke2fs.conf" || fail "拷不了 /etc/mke2fs.conf" "装 e2fsprogs"
 ln -s /proc/self/mounts "$DESTINATION/etc/mtab"   # libzfs 挂载前要读 /etc/mtab
-install -D -m 0755 "$SINGLEFS_BINARY" "$DESTINATION/usr/bin/first_transaction_on_device" || fail "拷不了 $SINGLEFS_BINARY" "看权限"
+install -D -m 0755 "$SINGLEFS_BINARY" "$DESTINATION/usr/bin/new_pool_file_creation_on_device" || fail "拷不了 $SINGLEFS_BINARY" "看权限"
 
 # ── 三、内核模块：modprobe 从 modules.dep 解出次序（含软依赖），zstd 解压成 .ko，来宾里 busybox insmod 直接吃 ──
 MODULE_DIRECTORY="$DESTINATION/lib/modules/e152"

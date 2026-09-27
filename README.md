@@ -40,10 +40,10 @@ waaagh！
 
 | 验证 | 现状 |
 |---|---|
-| 崩溃点重放（门禁 54 号） | 层 0 两条流：第一个事务；第二个事务的固定脚本（覆盖写、释放、重开写行、暖机、回退、抬 F、复用各一次）。另有 `.claude/gate.d/stage-inputs.tsv` 登记的崩溃枚举用例。固定脚本那条流的层 0 结果还没重核，暂不作数。**门禁全绿只构成第一个事务在模型层的崩溃一致性证据** |
+| 崩溃点重放（门禁 54 号） | 层 0 两条流：新池新建文件；覆盖写、释放、回退与复用的固定脚本（覆盖写、释放、重开写行、暖机、回退、抬 F、复用各一次）。另有 `.claude/gate.d/stage-inputs.tsv` 登记的崩溃枚举用例。固定脚本那条流的层 0 结果还没重核，暂不作数。**门禁全绿只构成新池新建文件在模型层的崩溃一致性证据** |
 | checker | 判 46 条不变量，数法见表后那条命令 |
 | 模型对拍（门禁 74 号） | 随机历史的快档加五个偏向某种历史的取样点，每一步拿实现的结局与只住内存的理想模型比 |
-| QEMU 真设备（门禁 55 号） | 两块 virtio 盘上跑第一个事务、发布 B、第二个实例、发布 D 与抬 F，设备侧独立录下的写与 FLUSH 和程序自己录的流逐项比；只有真实负载，没有崩溃注入 |
+| QEMU 真设备（门禁 55 号） | 两块 virtio 盘上跑新池新建文件、发布 B、第二个实例、发布 D 与抬 F，设备侧独立录下的写与 FLUSH 和程序自己录的流逐项比；只有真实负载，没有崩溃注入 |
 | 内存序（门禁 57 号） | herd7 判 `litmus/` 下每条 Never，每条都配一条去掉屏障的对照 |
 
 数 checker 判了几条：`grep -c '^| I-.*已实现' .claude/kb/invariants.md`。
@@ -125,7 +125,7 @@ cargo test -p singlefs-harness            # harness 档：单元与集成测试�
 SINGLEFS_HEAVY_TESTS=user-request cargo test --release -p singlefs-checker-tier --lib --tests   # checker 档快档：崩溃枚举用例住这个包的 tests/，全量那几条标 ignored；默认只在提交时由门禁 54 号跑
 bash .claude/gate.d/54-layer0-replay.sh   # 单跑 54 号快档（checker 档包不标 ignored 的用例），再逐条核登记的崩溃枚举用例各自那一格全绿标记，不作数的报「本次未跑」
 bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full <worktree>  # 层 0 全量（release）：暂存之后在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑（建法见快档判红时的出路句），逐条崩溃枚举用例按它自己的输入指纹复用或重跑，判绿写那一条的全绿标记
-bash .claude/gate.d/55-qemu-first-transaction.sh  # 单跑 QEMU 两块 virtio 盘上的第一个事务、发布 B、第二个实例、发布 D 与抬 F
+bash .claude/gate.d/55-qemu-device-streams.sh  # 单跑 QEMU 两块 virtio 盘上的新池新建文件、发布 B、第二个实例、发布 D 与抬 F
 bash .claude/scripts/lkmm.sh              # 单跑 LKMM，需要 herd7 与一棵内核树
 bash research/scripts/vm-bench.sh --selftest  # 单跑虚机装置自检（装置归项目）
 ```

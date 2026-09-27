@@ -1,4 +1,4 @@
-//! 一次写请求按切分纪律切成若干事务：一事务一单元（里程碑「第二个事务」并行线一的写路径那一半）。
+//! 一次写请求按切分纪律切成若干事务：一事务一单元（里程碑「覆盖写、释放、回退与复用」并行线一的写路径那一半）。
 //!
 //! 压着它的条款：
 //! - D16（发布语义） 已定项 5 末段逐字「事务切分纪律是一事务一单元」「事务切分纪律把一次写请求按单元切成若干事务各自取号，
@@ -54,7 +54,7 @@ impl OneUnitTransaction {
 }
 
 /// 一次顺序写请求要写几个数据单元：内容长度除净荷容量向上取整，长度为 0 时是 1
-/// （声明长度为 0 的数据单元照样是一个单元，第一个事务那一档的下界）。
+/// （声明长度为 0 的数据单元照样是一个单元，新池新建文件那一档的下界）。
 #[must_use]
 pub fn data_unit_count_of_a_sequential_write(content_length_in_bytes: u64) -> u64 {
     let payload_capacity = payload_capacity_in_bytes();
@@ -88,7 +88,7 @@ pub fn data_unit_count_implied_by_the_file_size(
 }
 
 /// 把一次顺序写请求按切分纪律切成若干一单元事务：第 `unit_index` 个事务写文件字节
-/// `[unit_index × 净荷容量, min(内容长度, (unit_index + 1) × 净荷容量))`，事务号从 `first_transaction_number`
+/// `[unit_index × 净荷容量, min(内容长度, (unit_index + 1) × 净荷容量))`，事务号从 `new_pool_file_creation_number`
 /// 起连号递增。
 ///
 /// **为什么这个次序就是 D16（发布语义） 已定项 5 要的「按 key 升序取号」**：extent key 三段是
@@ -100,7 +100,7 @@ pub fn data_unit_count_implied_by_the_file_size(
 #[must_use]
 pub fn split_sequential_write_into_one_unit_transactions(
     content_length_in_bytes: u64,
-    first_transaction_number: u64,
+    new_pool_file_creation_number: u64,
 ) -> Vec<OneUnitTransaction> {
     let payload_capacity = payload_capacity_in_bytes();
     // 迭代次数的上界就是单元数，循环体只读 unit_index，不跨轮携带状态，也没有提前出口。
@@ -115,7 +115,7 @@ pub fn split_sequential_write_into_one_unit_transactions(
             .expect("单元数由内容长度除净荷容量得出，加回去不超过内容长度加一个单元")
             .min(content_length_in_bytes);
         transactions.push(OneUnitTransaction {
-            transaction_number: first_transaction_number
+            transaction_number: new_pool_file_creation_number
                 .checked_add(unit_index)
                 .expect("事务号按实例计数从 1 起（D23（journal 的角色与格式） 已定项 7），加一次请求的单元数不绕回"),
             unit_index_in_file: DataUnitIndexInFile(unit_index),
@@ -172,7 +172,7 @@ mod tests {
         }
     }
 
-    /// 净荷容量再加一个字节就要两个事务：第二个事务只写那一个字节，事务号接着第一个数
+    /// 净荷容量再加一个字节就要两个事务：覆盖写、释放、回退与复用只写那一个字节，事务号接着第一个数
     /// （D23（journal 的角色与格式） 已定项 7：同一实例内事务号连号）。
     #[test]
     fn one_byte_past_the_payload_capacity_splits_into_two_transactions_with_consecutive_numbers() {
@@ -219,7 +219,7 @@ mod tests {
                 assert_eq!(
                     transactions[0].payload_start,
                     FileOffsetInBytes(0),
-                    "第一个事务从文件开头写起"
+                    "新池新建文件从文件开头写起"
                 );
                 for (previous, next) in transactions.iter().zip(transactions.iter().skip(1)) {
                     assert_eq!(

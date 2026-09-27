@@ -1,4 +1,4 @@
-//! 格式常量：第一个事务要写的每个宽度都在这里。
+//! 格式常量：新池新建文件要写的每个宽度都在这里。
 //!
 //! 每个常量的值来自 `.claude/kb/layout/01-first-txn.md` 与各决策分项；带 `format-const:` 注的常量
 //! 与 kb 里同名的 `<!-- format-const: NAME = N -->` 标记由门禁 27 号绑住，改值要三处一起动。
@@ -162,14 +162,14 @@ pub const EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES: u64 = 113;
 /// extent 树上段一片叶罩几个 inode 号：(16384 − 163) ÷ 113 的整数部分（一个 inode 号至多一条上段叶条目，叶永远装得下）。
 pub const EXTENT_TREE_UPPER_LEAF_INODES: u64 = 143;
 
-/// 第一个事务这次发布写出的记账行数（D5（快照 / 空间记账机制） 已定项 8，2026-09-14 用户定案 15 行）。
-pub const FIRST_TRANSACTION_ACCOUNTING_ROWS: u64 = 15;
+/// 新池新建文件这次发布写出的记账行数（D5（快照 / 空间记账机制） 已定项 8，2026-09-14 用户定案 15 行）。
+pub const NEW_POOL_FILE_CREATION_ACCOUNTING_ROWS: u64 = 15;
 
 /// 树表条目：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 76（D8（核心索引结构） 已定项 8；重排与头 ID 2026-09-14 用户定案，加宽到 200 是 2026-09-16 用户定案）。format-const: TREE_TABLE_ENTRY_BYTES
 pub const TREE_TABLE_ENTRY_BYTES: u64 = 200;
 
-/// 第一个事务写出的树表条目数（extent、inode、分配记录、记账、livelist、稀疏旁表、deadlist）。
-pub const FIRST_TRANSACTION_TREE_TABLE_ENTRIES: u64 = 7;
+/// 新池新建文件写出的树表条目数（extent、inode、分配记录、记账、livelist、稀疏旁表、deadlist）。
+pub const NEW_POOL_FILE_CREATION_TREE_TABLE_ENTRIES: u64 = 7;
 
 /// 树 ID 从 11 起、与树的种类码错开（D8（核心索引结构） 已定项 11）。
 pub const TREE_IDENTIFIER_EXTENT: u64 = 11;
@@ -270,12 +270,12 @@ pub const UNIT_AREA_START_SLOT: u64 = 50176;
 /// 聚簇段 64 槽（D3（空间分配） 已定项 10）。
 pub const CLUSTER_SEGMENT_SLOTS: u64 = 64;
 
-/// 第一个事务的 checkpoint_txg 是 3：两次暖机空发布之后（D16（发布语义） 已定项 6 / 已定项 8）。format-const: FIRST_TRANSACTION_TXG
+/// 新池新建文件的 checkpoint_txg 是 3：两次暖机空发布之后（D16（发布语义） 已定项 6 / 已定项 8）。format-const: NEW_POOL_FILE_CREATION_TXG
 ///
-/// ⚠️ **射程只有 mkfs 同一个进程里那条流**（mkfs → 取号 → 暖机两次 → 第一个事务），**不管任何池的第一个文件版本**
+/// ⚠️ **射程只有 mkfs 同一个进程里那条流**（mkfs → 取号 → 暖机两次 → 新池新建文件），**不管任何池的第一个文件版本**
 /// （2026-09-23 用户定案）：池重开过一次可写挂载之后再写第一个文件时，那一版已经推到别的 txg，
 /// `transaction::publish_first_file` 从它接着算，不取这个常量。
-pub const FIRST_TRANSACTION_TXG: u64 = 3;
+pub const NEW_POOL_FILE_CREATION_TXG: u64 = 3;
 
 /// 第一次可写挂载先推两次空发布（D16（发布语义） 已定项 8）。format-const: WARM_UP_EMPTY_PUBLISHES
 pub const WARM_UP_EMPTY_PUBLISHES: u64 = 2;
@@ -290,7 +290,7 @@ mod tests {
 
     /// 字节表零到七的合计与这里的推导式必须一个数不差；写成加法、不写减法（减法在变异下会编译期溢出）。
     #[test]
-    fn widths_match_the_first_transaction_byte_table() {
+    fn widths_match_the_new_pool_file_creation_byte_table() {
         assert_eq!(
             DATA_UNIT_PAYLOAD_OFFSET, 134,
             "码 1 载荷起点（D18 已定项 16 + 2026-09-14 算法类型）"

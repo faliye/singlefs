@@ -1,8 +1,8 @@
-//! 虚机档 `first_transaction_on_device` 的六个模式，以及第一个事务之后那几步写（发布 B、可写挂载之后的发布 C、
+//! 虚机档 `new_pool_file_creation_on_device` 的六个模式，以及新池新建文件之后那几步写（发布 B、可写挂载之后的发布 C、
 //! `raise-rollback-floor` 在发布 C 之后的发布 D 与抬 F）的写路。
 //!
-//! 虚机里的真设备与宿主上的 `first_transaction_device_log_check` 都跑这一份：模式名、各版的内容与写入时刻、每次发布接在哪一版上、
-//! 抬 F 抬到多少，两边不各抄一份，宿主重跑的才是同参数同字节的那条写路（里程碑「第二个事务」增补 2 收口表第 30 行：宿主那一侧要接着重跑发布 B、
+//! 虚机里的真设备与宿主上的 `new_pool_file_creation_device_log_check` 都跑这一份：模式名、各版的内容与写入时刻、每次发布接在哪一版上、
+//! 抬 F 抬到多少，两边不各抄一份，宿主重跑的才是同参数同字节的那条写路（里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 30 行：宿主那一侧要接着重跑发布 B、
 //! 可写挂载与发布 C，把程序录制流与设备侧日志逐项比；第 58 行：抬 F 那一串发布同样要在真设备上跑、同样逐项比）。设备侧日志与这里不共享一行代码。
 
 use singlefs_core::address::{DeviceIdentity, InstanceGeneration};
@@ -26,19 +26,19 @@ use singlefs_harness::scenario::{first_file_content, FIXED_WRITE_TIME_SECONDS};
 pub enum OnDeviceRunMode {
     Direct,
     PageCache,
-    SkipFirstTransactionBarrier,
-    SecondTransaction,
+    SkipNewPoolFileCreationBarrier,
+    FileOverwrite,
     SecondInstance,
     /// `second-instance` 那条路走完（发布 C 之后），同一次挂载里再覆盖写一次（发布 D，[`publish_the_fourth_version`]），
     /// 接着把 F 抬到上限（[`raise_the_rollback_floor_to_its_ceiling`]）。
     RaiseRollbackFloor,
 }
 
-/// 第一个事务之后，这个模式在同一对盘上还跑哪几步写。
+/// 新池新建文件之后，这个模式在同一对盘上还跑哪几步写。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PublishesAfterTheFirstTransaction {
+pub enum PublishesAfterTheNewPoolFileCreation {
     Nothing,
-    /// 同一个进程里再覆盖写一次（发布 B，里程碑「第二个事务」步 1）。
+    /// 同一个进程里再覆盖写一次（发布 B，里程碑「覆盖写、释放、回退与复用」步 1）。
     SecondVersion,
     /// 发布 B 之后丢掉写的那一套句柄、同一对盘冷重开，走可写挂载（恢复、取号、写行、暖机，步 3），再发布 C。
     SecondVersionThenSecondInstance,
@@ -52,8 +52,8 @@ impl OnDeviceRunMode {
     pub const ALL: [OnDeviceRunMode; 6] = [
         OnDeviceRunMode::Direct,
         OnDeviceRunMode::PageCache,
-        OnDeviceRunMode::SkipFirstTransactionBarrier,
-        OnDeviceRunMode::SecondTransaction,
+        OnDeviceRunMode::SkipNewPoolFileCreationBarrier,
+        OnDeviceRunMode::FileOverwrite,
         OnDeviceRunMode::SecondInstance,
         OnDeviceRunMode::RaiseRollbackFloor,
     ];
@@ -64,8 +64,10 @@ impl OnDeviceRunMode {
         match self {
             OnDeviceRunMode::Direct => "direct",
             OnDeviceRunMode::PageCache => "page-cache",
-            OnDeviceRunMode::SkipFirstTransactionBarrier => "skip-first-transaction-barrier",
-            OnDeviceRunMode::SecondTransaction => "second-transaction",
+            OnDeviceRunMode::SkipNewPoolFileCreationBarrier => {
+                "skip-new-pool-file-creation-barrier"
+            }
+            OnDeviceRunMode::FileOverwrite => "file-overwrite",
             OnDeviceRunMode::SecondInstance => "second-instance",
             OnDeviceRunMode::RaiseRollbackFloor => "raise-rollback-floor",
         }
@@ -90,19 +92,21 @@ impl OnDeviceRunMode {
     }
 
     #[must_use]
-    pub const fn publishes_after_the_first_transaction(self) -> PublishesAfterTheFirstTransaction {
+    pub const fn publishes_after_the_new_pool_file_creation(
+        self,
+    ) -> PublishesAfterTheNewPoolFileCreation {
         match self {
             OnDeviceRunMode::Direct
             | OnDeviceRunMode::PageCache
-            | OnDeviceRunMode::SkipFirstTransactionBarrier => {
-                PublishesAfterTheFirstTransaction::Nothing
+            | OnDeviceRunMode::SkipNewPoolFileCreationBarrier => {
+                PublishesAfterTheNewPoolFileCreation::Nothing
             }
-            OnDeviceRunMode::SecondTransaction => PublishesAfterTheFirstTransaction::SecondVersion,
+            OnDeviceRunMode::FileOverwrite => PublishesAfterTheNewPoolFileCreation::SecondVersion,
             OnDeviceRunMode::SecondInstance => {
-                PublishesAfterTheFirstTransaction::SecondVersionThenSecondInstance
+                PublishesAfterTheNewPoolFileCreation::SecondVersionThenSecondInstance
             }
             OnDeviceRunMode::RaiseRollbackFloor => {
-                PublishesAfterTheFirstTransaction::SecondVersionThenSecondInstanceThenFourthVersionThenRaiseOfTheRollbackFloor
+                PublishesAfterTheNewPoolFileCreation::SecondVersionThenSecondInstanceThenFourthVersionThenRaiseOfTheRollbackFloor
             }
         }
     }
@@ -110,24 +114,24 @@ impl OnDeviceRunMode {
     /// 这个模式最后发布的那一版文件内容：冷重开之后该读回的。抬 F 的空发布不碰 inode 树，`raise-rollback-floor` 读回的是发布 D 写的第四版。
     #[must_use]
     pub fn last_published_content(self) -> Vec<u8> {
-        match self.publishes_after_the_first_transaction() {
-            PublishesAfterTheFirstTransaction::Nothing => first_file_content(),
-            PublishesAfterTheFirstTransaction::SecondVersion => second_file_content(),
-            PublishesAfterTheFirstTransaction::SecondVersionThenSecondInstance => {
+        match self.publishes_after_the_new_pool_file_creation() {
+            PublishesAfterTheNewPoolFileCreation::Nothing => first_file_content(),
+            PublishesAfterTheNewPoolFileCreation::SecondVersion => second_file_content(),
+            PublishesAfterTheNewPoolFileCreation::SecondVersionThenSecondInstance => {
                 third_file_content()
             }
-            PublishesAfterTheFirstTransaction::SecondVersionThenSecondInstanceThenFourthVersionThenRaiseOfTheRollbackFloor => {
+            PublishesAfterTheNewPoolFileCreation::SecondVersionThenSecondInstanceThenFourthVersionThenRaiseOfTheRollbackFloor => {
                 fourth_file_content()
             }
         }
     }
 }
 
-/// 发布 B 的写入时刻：第一个事务之后 60 秒（与 E142 的固定时刻一样不取系统时钟，宿主重跑才同字节）。
+/// 发布 B 的写入时刻：新池新建文件之后 60 秒（与 E142 的固定时刻一样不取系统时钟，宿主重跑才同字节）。
 pub const SECOND_VERSION_WRITE_TIME_SECONDS: u64 = FIXED_WRITE_TIME_SECONDS + 60;
-/// 发布 C 的写入时刻：第一个事务之后 120 秒。
+/// 发布 C 的写入时刻：新池新建文件之后 120 秒。
 pub const THIRD_VERSION_WRITE_TIME_SECONDS: u64 = FIXED_WRITE_TIME_SECONDS + 120;
-/// 发布 D 的写入时刻：第一个事务之后 180 秒。
+/// 发布 D 的写入时刻：新池新建文件之后 180 秒。
 pub const FOURTH_VERSION_WRITE_TIME_SECONDS: u64 = FIXED_WRITE_TIME_SECONDS + 180;
 
 /// 第二版的内容（发布 B）：与第一版不同长度、不同字节，读回时分得开。
@@ -163,7 +167,7 @@ pub struct FailedPublish {
     pub writes_of_failed_publishes: Vec<WritesByStructureKind>,
 }
 
-/// 发布 B 的分配器：从第一个事务的分配记录重建（与可写挂载同一条路）。
+/// 发布 B 的分配器：从新池新建文件的分配记录重建（与可写挂载同一条路）。
 #[must_use]
 pub fn allocator_rebuilt_from_the_records_of<Device: BlockDevice>(
     devices: &[(DeviceIdentity, Device)],
@@ -178,7 +182,7 @@ pub fn allocator_rebuilt_from_the_records_of<Device: BlockDevice>(
     )
 }
 
-/// 发布 B：接在第一个事务那一版上覆盖写第二版，同一个实例。
+/// 发布 B：接在新池新建文件那一版上覆盖写第二版，同一个实例。
 ///
 /// # Errors
 /// 发布的错，连同这次写入口的失败账（[`FailedPublish`]）。
@@ -334,7 +338,7 @@ mod tests {
         assert_eq!(OnDeviceRunMode::from_argument("raise_rollback_floor"), None);
         assert_eq!(
             OnDeviceRunMode::every_argument_for_usage(),
-            "direct | page-cache | skip-first-transaction-barrier | second-transaction | second-instance | raise-rollback-floor"
+            "direct | page-cache | skip-new-pool-file-creation-barrier | file-overwrite | second-instance | raise-rollback-floor"
         );
     }
 
@@ -362,11 +366,11 @@ mod tests {
         assert_eq!(OnDeviceRunMode::Direct.last_published_content(), first);
         assert_eq!(OnDeviceRunMode::PageCache.last_published_content(), first);
         assert_eq!(
-            OnDeviceRunMode::SkipFirstTransactionBarrier.last_published_content(),
+            OnDeviceRunMode::SkipNewPoolFileCreationBarrier.last_published_content(),
             first
         );
         assert_eq!(
-            OnDeviceRunMode::SecondTransaction.last_published_content(),
+            OnDeviceRunMode::FileOverwrite.last_published_content(),
             second
         );
         assert_eq!(

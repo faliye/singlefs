@@ -10,7 +10,7 @@
 为什么要有它：`.claude/kb/checks-owed.md` C316（提交步骤的登记位有四处且互不相同） 收窄之后
 剩两半，第①半是「kb 登记表八与产物 `name=segments` 行之间没有逐字比对（表是人抄的）」——
 `.claude/kb/layout/01-first-txn.md` 「八、根槽写路径的段序列登记表」里每一行的段序列数字串
-（`4+1+1+1+2` 这种）都是人从 E142（第一个事务的干跑） 产物里抄过来的，抄错一位、
+（`4+1+1+1+2` 这种）都是人从 E142（新池新建文件的干跑） 产物里抄过来的，抄错一位、
 或者产物重跑之后表没跟着改，都没有任何东西会报警。这个脚本把「抄的对不对」变成一条会红的检查。
 
 比对哪几行、path 怎么定：
@@ -61,7 +61,7 @@ CRASH_STATE_COUNT_PATTERN = re.compile(r'(\d+)\s*个(?:崩溃)?状态')
 E142_REPLAY_ROW_PATTERN = re.compile(r'^E142\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)$', re.MULTILINE)
 DEVICE_PINNED_NOTE_PATTERN = re.compile(
     r'第二条流的段序列\s*`([0-9]+(?:\+[0-9]+)+)`\s*、\s*(\d+)\s*次写\s*、\s*(\d+)\s*个状态[^\n]*?装置钉住[^\n]*?`(crates/[^`]+\.rs)`'
-)  # 里程碑「第二个事务」的固定脚本没有干跑产物，整条流由 harness 用例里钉的数组守着：数字串、写数、状态数、钉它的用例文件
+)  # 里程碑「覆盖写、释放、回退与复用」的固定脚本没有干跑产物，整条流由 harness 用例里钉的数组守着：数字串、写数、状态数、钉它的用例文件
 PRODUCT_SEGMENT_LINE_PREFIX = 'E7RESULT name=segments '
 PRODUCT_SEGMENT_LINE_REQUIRED_KEYS = ('path', 'operations', 'segments', 'closed_form')
 
@@ -552,7 +552,7 @@ def perform_check(repository_root):
         for mismatch in mismatches:
             lines.append(f'     {mismatch}')
         lines.append('     → 怎么办：表是抄错了，就照产物改 .claude/kb/layout/01-first-txn.md 那一行；')
-        lines.append('       产物是过期了，就重跑 E142（第一个事务的干跑），更新 research/results/ 下的文件，')
+        lines.append('       产物是过期了，就重跑 E142（新池新建文件的干跑），更新 research/results/ 下的文件，')
         lines.append('       再让 research/scripts/replay.sh 里 E142 那一行的入库产物名字跟上。')
         return 1, lines
 

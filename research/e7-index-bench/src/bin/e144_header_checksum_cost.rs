@@ -332,7 +332,7 @@ fn castagnoli_tables() -> &'static [[u32; 256]; 8] {
     })
 }
 
-/// 完整 32 位 CRC32C，slicing-by-8（与 E142（第一个事务的干跑） 同一份写法）。
+/// 完整 32 位 CRC32C，slicing-by-8（与 E142（新池新建文件的干跑） 同一份写法）。
 fn castagnoli_crc32(bytes: &[u8]) -> u32 {
     let tables = castagnoli_tables();
     let mut remainder = !0u32;

@@ -1,7 +1,7 @@
 //! E146：livelist 条目按映射 key 定身份之后的宽度与代价——D6（快照实现模型） 已定项 2 ① 的代价表。
 //!
 //! 只报数不判输赢：几种装法各算成 key / value 宽、码 2 节点的扇出、E132 规模网格上的树高、
-//! 每次 FREE 的预付字节（C260）与第一个事务上 day-1 注册对惰性创建的字节差。
+//! 每次 FREE 的预付字节（C260）与新池新建文件上 day-1 注册对惰性创建的字节差。
 //! 判据与失败条款写在 `research/prompts/e146-preregistration.md`，装置写之前。
 
 use e7_index_bench::Emitter;
@@ -150,8 +150,8 @@ fn unit_share_basis_points(prepaid_bytes: u64) -> u64 {
     prepaid_bytes * BASIS_POINTS / UNIT_BYTES
 }
 
-/// 第一个事务上 day-1 注册 livelist 树要写的字节：空树根指针为零时只多树表条目；实现要求空树也有根节点时再加一个节点、一个点名项、一条映射条目。
-fn first_transaction_day1_bytes(tree_count: u64, empty_tree_needs_root: bool) -> u64 {
+/// 新池新建文件上 day-1 注册 livelist 树要写的字节：空树根指针为零时只多树表条目；实现要求空树也有根节点时再加一个节点、一个点名项、一条映射条目。
+fn new_pool_file_creation_day1_bytes(tree_count: u64, empty_tree_needs_root: bool) -> u64 {
     let per_tree = if empty_tree_needs_root {
         TREE_TABLE_ENTRY_BYTES + NODE_BYTES + JOURNAL_NAMED_ENTRY_BYTES + MAPPING_ENTRY_NODE_BYTES
     } else {
@@ -213,8 +213,8 @@ fn main() {
         ));
         let tree_count = trees.len() as u64;
         emit(&mut emitter, &format!(
-            "name=first_transaction arm={} tree_table_entries={tree_count} day1_null_root_bytes={} day1_root_required_bytes={} lazy_bytes=0 tree_table_fits_first_unit={}",
-            form.name(), first_transaction_day1_bytes(tree_count, false), first_transaction_day1_bytes(tree_count, true), tree_table_fits_in_first_unit(tree_count)
+            "name=new_pool_file_creation arm={} tree_table_entries={tree_count} day1_null_root_bytes={} day1_root_required_bytes={} lazy_bytes=0 tree_table_fits_first_unit={}",
+            form.name(), new_pool_file_creation_day1_bytes(tree_count, false), new_pool_file_creation_day1_bytes(tree_count, true), tree_table_fits_in_first_unit(tree_count)
         ));
     }
     for (pad, legacy) in pad_heights.iter().zip(&legacy_heights) {
@@ -316,12 +316,12 @@ mod tests {
         assert_eq!(unit_share_basis_points(49), 14);
     }
 
-    /// 第一个事务：day-1 注册只多一条树表条目，空树要根时再加一个节点、一个点名项、一条映射条目；两棵树翻倍；都装进第 1 版树表单元。
+    /// 新池新建文件：day-1 注册只多一条树表条目，空树要根时再加一个节点、一个点名项、一条映射条目；两棵树翻倍；都装进第 1 版树表单元。
     #[test]
-    fn first_transaction_bytes_are_pinned() {
-        assert_eq!(first_transaction_day1_bytes(1, false), 200);
-        assert_eq!(first_transaction_day1_bytes(1, true), 200 + 16384 + 56 + 53);
-        assert_eq!(first_transaction_day1_bytes(2, true), 2 * (200 + 16384 + 56 + 53));
+    fn new_pool_file_creation_bytes_are_pinned() {
+        assert_eq!(new_pool_file_creation_day1_bytes(1, false), 200);
+        assert_eq!(new_pool_file_creation_day1_bytes(1, true), 200 + 16384 + 56 + 53);
+        assert_eq!(new_pool_file_creation_day1_bytes(2, true), 2 * (200 + 16384 + 56 + 53));
         assert!(tree_table_fits_in_first_unit(2));
         // 用 saturating_sub 而不是减法：变异把第 1 版条目数改得比每单元容量还大时，减法在常量求值期就溢出，
         // 那一条会被记成「无效变异」而不是被抓（`.claude/rules/mutation-sampling.md`「常量断言写加法，别写减法」）。

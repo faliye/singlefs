@@ -5,7 +5,7 @@
 //! 连同写行与暖机已落盘的写账，实审 A1b Q5），会话返回 `UserChangeRefused::FloorRaiseFailedWhilePushingForSpace`；
 //! 只有预算用完、F 已在上限才走「推满仍不够」。
 //!
-//! 场景照 `second_transaction_admission_raises_the_floor_before_refusing.rs` 的
+//! 场景照 `admission_raises_the_floor_before_refusing.rs` 的
 //! `mount_still_short_after_the_publishes_of_one_admission_is_made_and_its_writes_report_no_space_until_a_normal_unmount`：
 //! 两块单元区 240 槽的小盘，第一个文件之后连着崩了再挂，第 10 次取号之前不够、写行与暖机之后推抬 F；那次挂载的会话里覆盖写一次，
 //! 被空间准入拒、推抬 F。注入的是抬 F 那一串先写系统配置那一步里盘 0 的那次系统配置槽写（块设备错）。

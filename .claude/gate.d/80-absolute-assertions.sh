@@ -27,7 +27,7 @@
 # `assert!(` / `assert_eq!(` 单独一行起，中间的比较式、消息各占一行，`);` 单独一行收尾。
 # 逐行 grep 只在断言仍是单行时管用，拆成多行之后同一条断言在任何一行上都凑不齐
 # 「宏名 + 数字字面量 + 收尾括号」，会被误判成零绝对值断言（实测：
-# `crates/singlefs-checker-tier/src/bin/e142_first_transaction_write_dump.rs` 被 rustfmt 拆行后，
+# `crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs` 被 rustfmt 拆行后，
 # 本阶段判它一条都没有；那份文件里的三条 `assert!(X == 字面量, "…")` 其实都在）。
 # 判据本身不改，只改「怎么认出一条断言」：从 `assert(_eq)?!(` 起用圆括号配平找到语句收尾的那个 `)`，
 # 拼成一条逻辑行再套判据；拼之前先挖掉字符串字面量的内容与行注释，

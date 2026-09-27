@@ -1,0 +1,2 @@
+  ✓ research 里的实验号在 kb 里都有正文（157 个）
+    扫了 research crates/singlefs-checker-tier/src/bin（target/ 不扫）；不在的目录 0 个：（没有）

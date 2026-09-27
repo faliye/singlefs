@@ -219,87 +219,88 @@ fn system_configuration_write_after_make_filesystem_carries_the_rollback_floor_a
 /// 挂载在任何写之前拒成「系统配置的 incompat 位图不认识」（带着盘 0 与那一槽的位图，与「池里没有一份可用的系统配置」那种数据坏了分开），
 /// 录制流不多一步、四个槽一个字节不变；checker 判不认识的 incompat 位。
 #[test]
-fn mounting_a_pool_whose_system_configuration_carries_the_retired_layout_bit_is_refused_before_any_write(
+fn mounting_a_pool_whose_system_configuration_carries_the_retired_layout_bit_is_refused_before_any_write_when_it_carries_only_the_retired_bit_zero(
 ) {
-    for (first_incompat_byte, what) in [
-        (
-            INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT,
-            "只带退役的位 0",
-        ),
-        (
-            INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT
-                | INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT,
-            "位 0 与位 1 都带",
-        ),
-    ] {
-        let mut pool = format_pool("rbf-retired-bit");
-        let mut devices = pool.devices.take().expect("mkfs 之后设备还开着");
-        for device in [DeviceIdentity(0), DeviceIdentity(1)] {
-            for offset in system_configuration_slot_offsets() {
-                let mut slot = read_slot(&devices, device, offset);
-                slot[FIRST_INCOMPAT_BYTE_OFFSET] = first_incompat_byte;
-                reseal_system_configuration_slot(&mut slot);
-                assert_eq!(
-                    singlefs_checker::check_system_configuration_slot(&slot),
-                    Err(singlefs_checker::Verdict::UnknownIncompatBit),
-                    "{what}：checker 判不认识的 incompat 位"
-                );
-                let (_, target) = devices
-                    .iter_mut()
-                    .find(|(identity, _)| *identity == device)
-                    .expect("有这块盘");
-                target
-                    .write_at(offset, &slot, WriteDurability::Plain)
-                    .expect("写回系统配置槽");
-            }
+    mounting_a_pool_whose_system_configuration_carries_the_retired_layout_bit_is_refused_before_any_write(INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT, "只带退役的位 0");
+}
+
+#[test]
+fn mounting_a_pool_whose_system_configuration_carries_the_retired_layout_bit_is_refused_before_any_write_when_it_carries_bit_zero_and_bit_one(
+) {
+    mounting_a_pool_whose_system_configuration_carries_the_retired_layout_bit_is_refused_before_any_write(
+        INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT
+            | INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT,
+        "位 0 与位 1 都带",
+    );
+}
+
+fn mounting_a_pool_whose_system_configuration_carries_the_retired_layout_bit_is_refused_before_any_write(
+    first_incompat_byte: u8,
+    what: &str,
+) {
+    let mut pool = format_pool("rbf-retired-bit");
+    let mut devices = pool.devices.take().expect("mkfs 之后设备还开着");
+    for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+        for offset in system_configuration_slot_offsets() {
+            let mut slot = read_slot(&devices, device, offset);
+            slot[FIRST_INCOMPAT_BYTE_OFFSET] = first_incompat_byte;
+            reseal_system_configuration_slot(&mut slot);
+            assert_eq!(
+                singlefs_checker::check_system_configuration_slot(&slot),
+                Err(singlefs_checker::Verdict::UnknownIncompatBit),
+                "{what}：checker 判不认识的 incompat 位"
+            );
+            let (_, target) = devices
+                .iter_mut()
+                .find(|(identity, _)| *identity == device)
+                .expect("有这块盘");
+            target
+                .write_at(offset, &slot, WriteDurability::Plain)
+                .expect("写回系统配置槽");
         }
-        let slots_before: Vec<Vec<u8>> = [DeviceIdentity(0), DeviceIdentity(1)]
-            .into_iter()
-            .flat_map(|device| {
-                system_configuration_slot_offsets()
-                    .map(|offset| read_slot(&devices, device, offset))
-            })
-            .collect();
-        let recorded_operations_before = pool.stream.operations().len();
-        let refusal = mount_writable(&parameters(), &mut devices);
-        let Err(MountError::Recovery(
-            RecoveryFailure::SystemConfigurationIncompatBitsNotRecognized {
-                first_device_carrying_them,
-                incompat_bitmap,
-            },
-        )) = refusal
-        else {
-            panic!(
-                "{what}：挂载拒成系统配置的 incompat 位图不认识，实际 {:?}",
-                refusal.as_ref().err()
-            )
-        };
-        assert_eq!(
-            (first_device_carrying_them, incompat_bitmap.0[0]),
-            (DeviceIdentity(0), first_incompat_byte),
-            "{what}：点名池里第一块盘、带着它槽里 incompat 位图的第一个字节"
-        );
-        assert!(
-            incompat_bitmap.0[1..].iter().all(|byte| *byte == 0),
-            "{what}：位图其余字节照 mkfs 写的全 0 带出来"
-        );
-        assert_eq!(
-            pool.stream.operations().len(),
-            recorded_operations_before,
-            "{what}：拒之前一个写、一道屏障都没发"
-        );
-        let slots_after: Vec<Vec<u8>> = [DeviceIdentity(0), DeviceIdentity(1)]
-            .into_iter()
-            .flat_map(|device| {
-                system_configuration_slot_offsets()
-                    .map(|offset| read_slot(&devices, device, offset))
-            })
-            .collect();
-        assert_eq!(
-            slots_after, slots_before,
-            "{what}：四个系统配置槽逐字节不变"
-        );
     }
+    let slots_before: Vec<Vec<u8>> = [DeviceIdentity(0), DeviceIdentity(1)]
+        .into_iter()
+        .flat_map(|device| {
+            system_configuration_slot_offsets().map(|offset| read_slot(&devices, device, offset))
+        })
+        .collect();
+    let recorded_operations_before = pool.stream.operations().len();
+    let refusal = mount_writable(&parameters(), &mut devices);
+    let Err(MountError::Recovery(RecoveryFailure::SystemConfigurationIncompatBitsNotRecognized {
+        first_device_carrying_them,
+        incompat_bitmap,
+    })) = refusal
+    else {
+        panic!(
+            "{what}：挂载拒成系统配置的 incompat 位图不认识，实际 {:?}",
+            refusal.as_ref().err()
+        )
+    };
+    assert_eq!(
+        (first_device_carrying_them, incompat_bitmap.0[0]),
+        (DeviceIdentity(0), first_incompat_byte),
+        "{what}：点名池里第一块盘、带着它槽里 incompat 位图的第一个字节"
+    );
+    assert!(
+        incompat_bitmap.0[1..].iter().all(|byte| *byte == 0),
+        "{what}：位图其余字节照 mkfs 写的全 0 带出来"
+    );
+    assert_eq!(
+        pool.stream.operations().len(),
+        recorded_operations_before,
+        "{what}：拒之前一个写、一道屏障都没发"
+    );
+    let slots_after: Vec<Vec<u8>> = [DeviceIdentity(0), DeviceIdentity(1)]
+        .into_iter()
+        .flat_map(|device| {
+            system_configuration_slot_offsets().map(|offset| read_slot(&devices, device, offset))
+        })
+        .collect();
+    assert_eq!(
+        slots_after, slots_before,
+        "{what}：四个系统配置槽逐字节不变"
+    );
 }
 
 /// 布局不认识与数据坏了同时在池里：盘 0 两槽都坏（补齐区改一字节、不重封），盘 1 两槽自证得过、只带退役的位 0。

@@ -474,7 +474,7 @@ impl PoolReader for CrashImage<'_> {
     /// 基镜像那一份，加上这一状态里持久了的每次写在环里罩住的扇区中按记录槽对齐的那几个——与基镜像同一套「写过的扇区 →
     /// 对齐的记录槽」算法（[`record_slot_offsets`]）：一次写罩几个记录槽就给几个，不对齐的偏移一个不给。提示之外的记录槽，开头那一扇区
     /// 要么没写过、要么最后罩住它的是整段清零，读出来是全 0、过不了 journal magic，所以按提示扫与不给提示的全环扫描读出的记录逐条相同
-    /// （用例 `tests/crash_image_journal_hint_matches_the_full_ring_scan.rs` 在同一批镜像上逐项比）。
+    /// （用例 `crates/singlefs-checker-tier/tests/crash_image_journal_hint_matches_the_full_ring_scan.rs` 在同一批镜像上逐项比）。
     fn journal_record_offsets_hint(
         &self,
         device: DeviceIdentity,

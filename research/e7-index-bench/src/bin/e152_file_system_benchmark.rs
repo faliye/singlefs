@@ -21,7 +21,7 @@ const SMALL_FILE_DIRECTORY: &str = "/mnt/small";
 const PERSIST_DIRECTORY: &str = "/mnt/persist";
 const ZFS_POOL_NAME: &str = "bench";
 const MODULE_ORDER_DIRECTORY: &str = "/lib/modules/e152";
-const SINGLEFS_DEVICE_BINARY: &str = "/usr/bin/first_transaction_on_device";
+const SINGLEFS_DEVICE_BINARY: &str = "/usr/bin/new_pool_file_creation_on_device";
 /// 登记第十一节：md 配置的 raid1 阵列。
 const SOFTWARE_RAID_DEVICE: &str = "/dev/md0";
 /// `/sys/block/<名>/stat` 的扇区恒按 512 字节计（内核 `Documentation/block/stat.rst`），与设备的逻辑块大小无关。
@@ -1086,7 +1086,7 @@ fn phase_nanoseconds(later: Option<u128>, earlier: Option<u128>) -> Option<u128>
 }
 
 /// 外层按行到达时刻切的那一段包不包住子进程自己计的那一段（外层 ≥ 里层为真）；缺一个值就判不了。
-/// 子进程先打 `transaction` 行、再开始计时、做发布 B、停表、最后才打 `second_transaction` 行，所以两行到达的间隔物理上不会小于它自己计的数。
+/// 子进程先打 `transaction` 行、再开始计时、做发布 B、停表、最后才打 `file_overwrite` 行，所以两行到达的间隔物理上不会小于它自己计的数。
 fn outer_phase_contains_inner_phase(outer_nanoseconds: Option<u128>, inner_nanoseconds: Option<u128>) -> Option<bool> {
     match (outer_nanoseconds, inner_nanoseconds) {
         (Some(outer_value), Some(inner_value)) => Some(outer_value >= inner_value),
@@ -1094,25 +1094,25 @@ fn outer_phase_contains_inner_phase(outer_nanoseconds: Option<u128>, inner_nanos
     }
 }
 
-/// `singlefs_timing` 行末尾的两个字段：子进程在 `name=second_transaction` 行里自己计的纳秒，与外层那一段包不包住它。
-fn second_transaction_containment_fields(
+/// `singlefs_timing` 行末尾的两个字段：子进程在 `name=file_overwrite` 行里自己计的纳秒，与外层那一段包不包住它。
+fn file_overwrite_containment_fields(
     outer_nanoseconds: Option<u128>,
-    second_transaction_fields: Option<&BTreeMap<String, String>>,
+    file_overwrite_fields: Option<&BTreeMap<String, String>>,
 ) -> String {
     let inner_nanoseconds =
-        second_transaction_fields.and_then(|fields| fields.get("nanoseconds")?.parse::<u128>().ok());
+        file_overwrite_fields.and_then(|fields| fields.get("nanoseconds")?.parse::<u128>().ok());
     let containment = outer_phase_contains_inner_phase(outer_nanoseconds, inner_nanoseconds);
     format!(
-        "second_transaction_inner_nanoseconds={} second_transaction_outer_contains_inner={}",
+        "file_overwrite_inner_nanoseconds={} file_overwrite_outer_contains_inner={}",
         inner_nanoseconds.map_or_else(|| "NA".to_string(), |nanoseconds| nanoseconds.to_string()),
         containment.map_or_else(|| "NA".to_string(), |contains| contains.to_string())
     )
 }
 
-/// 登记第四节 singlefs 那一段（第十二节起模式换成 `second-transaction`）：门禁 55 号那个真设备二进制当子进程跑，
-/// 按结果行到达的时刻切三段挂钟：第一个事务的写路（mkfs + 取号 + 暖机 + 第一个事务）、第二个事务（覆盖写 B）、冷恢复；
+/// 登记第四节 singlefs 那一段（第十二节起模式换成 `file-overwrite`）：门禁 55 号那个真设备二进制当子进程跑，
+/// 按结果行到达的时刻切三段挂钟：新池新建文件的写路（mkfs + 取号 + 暖机 + 新池新建文件）、覆盖写、释放、回退与复用（覆盖写 B）、冷恢复；
 /// B 交给设备的写请求、字节、屏障、FUA 从它自己报的那一行取（程序计数，门禁 55 号已证录制流与设备侧日志逐项相等）。
-/// 子进程的输出先读到 EOF 再转打（`read_lines_with_arrival_times`）；外层第二个事务那一段与子进程自己计的数比一次包含关系，一并报出。
+/// 子进程的输出先读到 EOF 再转打（`read_lines_with_arrival_times`）；外层覆盖写、释放、回退与复用那一段与子进程自己计的数比一次包含关系，一并报出。
 fn run_singlefs(device_paths: &[String], emitter: &mut Emitter) -> Result<(), GuestFailure> {
     let before = device_paths
         .iter()
@@ -1121,7 +1121,7 @@ fn run_singlefs(device_paths: &[String], emitter: &mut Emitter) -> Result<(), Gu
     let started = Instant::now();
     let mut child = Command::new(SINGLEFS_DEVICE_BINARY)
         .args(device_paths)
-        .arg("second-transaction")
+        .arg("file-overwrite")
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|error| GuestFailure::new("singlefs_start", error.to_string()))?;
@@ -1135,8 +1135,8 @@ fn run_singlefs(device_paths: &[String], emitter: &mut Emitter) -> Result<(), Gu
         .collect::<Result<Vec<_>, _>>()?;
     let mut geometry_at = None;
     let mut transaction_at = None;
-    let mut second_transaction_at = None;
-    let mut second_transaction_fields: Option<BTreeMap<String, String>> = None;
+    let mut file_overwrite_at = None;
+    let mut file_overwrite_fields: Option<BTreeMap<String, String>> = None;
     let mut recovery_at = None;
     let mut content_matches = false;
     for arrived_line in &arrived_lines {
@@ -1150,9 +1150,9 @@ fn run_singlefs(device_paths: &[String], emitter: &mut Emitter) -> Result<(), Gu
         if inner_body.starts_with("name=transaction ") {
             transaction_at = Some(at_nanoseconds);
         }
-        if inner_body.starts_with("name=second_transaction ") {
-            second_transaction_at = Some(at_nanoseconds);
-            second_transaction_fields = Some(
+        if inner_body.starts_with("name=file_overwrite ") {
+            file_overwrite_at = Some(at_nanoseconds);
+            file_overwrite_fields = Some(
                 parse_key_values(inner_body)
                     .into_iter()
                     .map(|(key, value)| (key.to_string(), value.to_string()))
@@ -1180,9 +1180,9 @@ fn run_singlefs(device_paths: &[String], emitter: &mut Emitter) -> Result<(), Gu
     let phase = |later: Option<u128>, earlier: Option<u128>| {
         phase_nanoseconds(later, earlier).map_or_else(|| "NA".to_string(), |nanoseconds| nanoseconds.to_string())
     };
-    // B 两盘合计的写请求、字节、屏障与 FUA：从二进制自己报的 `name=second_transaction` 行里逐盘相加；那一行没到就写 NA。
+    // B 两盘合计的写请求、字节、屏障与 FUA：从二进制自己报的 `name=file_overwrite` 行里逐盘相加；那一行没到就写 NA。
     let second_sum = |suffix: &str| -> String {
-        second_transaction_fields
+        file_overwrite_fields
             .as_ref()
             .and_then(|fields| {
                 let first = fields.get(&format!("device_0_{suffix}"))?.parse::<u64>().ok()?;
@@ -1194,19 +1194,19 @@ fn run_singlefs(device_paths: &[String], emitter: &mut Emitter) -> Result<(), Gu
     emitter.emit(
         "singlefs_timing",
         &format!(
-            "write_path_nanoseconds={} second_transaction_nanoseconds={} recovery_nanoseconds={} second_transaction_writes_both_devices={} second_transaction_written_bytes_both_devices={} second_transaction_barriers_both_devices={} second_transaction_force_unit_access_writes_both_devices={} child_exit={} content_matches={content_matches} {} {}",
+            "write_path_nanoseconds={} file_overwrite_nanoseconds={} recovery_nanoseconds={} file_overwrite_writes_both_devices={} file_overwrite_written_bytes_both_devices={} file_overwrite_barriers_both_devices={} file_overwrite_force_unit_access_writes_both_devices={} child_exit={} content_matches={content_matches} {} {}",
             phase(transaction_at, geometry_at),
-            phase(second_transaction_at, transaction_at),
-            phase(recovery_at, second_transaction_at.or(transaction_at)),
+            phase(file_overwrite_at, transaction_at),
+            phase(recovery_at, file_overwrite_at.or(transaction_at)),
             second_sum("writes"),
             second_sum("written_bytes"),
             second_sum("barriers"),
             second_sum("force_unit_access_writes"),
             status.code().map_or_else(|| "signal".to_string(), |code| code.to_string()),
             per_device.join(" "),
-            second_transaction_containment_fields(
-                phase_nanoseconds(second_transaction_at, transaction_at),
-                second_transaction_fields.as_ref()
+            file_overwrite_containment_fields(
+                phase_nanoseconds(file_overwrite_at, transaction_at),
+                file_overwrite_fields.as_ref()
             )
         ),
     );
@@ -1490,8 +1490,8 @@ fn divided(numerator: Result<f64, String>, denominator: Result<f64, String>, sca
     Ok(numerator? / denominator? * scale)
 }
 
-/// 第二个事务的外层挂钟只收包含检查判真的轮：判假、判不了（NA）、这一行没有这个字段，都照排除的格子报出理由，不进中位。
-fn second_transaction_wall_clock_if_contained(
+/// 覆盖写、释放、回退与复用的外层挂钟只收包含检查判真的轮：判假、判不了（NA）、这一行没有这个字段，都照排除的格子报出理由，不进中位。
+fn file_overwrite_wall_clock_if_contained(
     outer_contains_inner: Option<&str>,
     wall_clock_milliseconds: Result<f64, String>,
 ) -> Result<f64, String> {
@@ -1499,8 +1499,8 @@ fn second_transaction_wall_clock_if_contained(
         Some("true") => wall_clock_milliseconds,
         Some("false") => Err("outer_does_not_contain_inner".to_string()),
         Some("NA") => Err("containment_not_available".to_string()),
-        Some(_) => Err("not_a_boolean_second_transaction_outer_contains_inner".to_string()),
-        None => Err("missing_second_transaction_outer_contains_inner".to_string()),
+        Some(_) => Err("not_a_boolean_file_overwrite_outer_contains_inner".to_string()),
+        None => Err("missing_file_overwrite_outer_contains_inner".to_string()),
     }
 }
 
@@ -1551,23 +1551,23 @@ fn metric_readings(fields: &BTreeMap<&str, &str>) -> Vec<MetricReading> {
         Some("singlefs_timing") => vec![
             metric_reading("singlefs_write_path_milliseconds", nanoseconds_as("write_path_nanoseconds", 1e6), false),
             metric_reading(
-                "singlefs_second_transaction_milliseconds",
-                second_transaction_wall_clock_if_contained(
-                    fields.get("second_transaction_outer_contains_inner").copied(),
-                    nanoseconds_as("second_transaction_nanoseconds", 1e6),
+                "singlefs_file_overwrite_milliseconds",
+                file_overwrite_wall_clock_if_contained(
+                    fields.get("file_overwrite_outer_contains_inner").copied(),
+                    nanoseconds_as("file_overwrite_nanoseconds", 1e6),
                 ),
                 false,
             ),
             metric_reading(
-                "singlefs_second_transaction_inner_milliseconds",
-                nanoseconds_as("second_transaction_inner_nanoseconds", 1e6),
+                "singlefs_file_overwrite_inner_milliseconds",
+                nanoseconds_as("file_overwrite_inner_nanoseconds", 1e6),
                 false,
             ),
             metric_reading("singlefs_recovery_milliseconds", nanoseconds_as("recovery_nanoseconds", 1e6), false),
-            metric_reading("singlefs_second_transaction_writes_both_devices", number_field(fields, "second_transaction_writes_both_devices"), false),
-            metric_reading("singlefs_second_transaction_written_bytes_both_devices", number_field(fields, "second_transaction_written_bytes_both_devices"), false),
-            metric_reading("singlefs_second_transaction_barriers_both_devices", number_field(fields, "second_transaction_barriers_both_devices"), false),
-            metric_reading("singlefs_second_transaction_force_unit_access_writes_both_devices", number_field(fields, "second_transaction_force_unit_access_writes_both_devices"), false),
+            metric_reading("singlefs_file_overwrite_writes_both_devices", number_field(fields, "file_overwrite_writes_both_devices"), false),
+            metric_reading("singlefs_file_overwrite_written_bytes_both_devices", number_field(fields, "file_overwrite_written_bytes_both_devices"), false),
+            metric_reading("singlefs_file_overwrite_barriers_both_devices", number_field(fields, "file_overwrite_barriers_both_devices"), false),
+            metric_reading("singlefs_file_overwrite_force_unit_access_writes_both_devices", number_field(fields, "file_overwrite_force_unit_access_writes_both_devices"), false),
             metric_reading(
                 "singlefs_read_bytes_both_devices",
                 number_field(fields, "device_0_read_bytes")
@@ -2025,7 +2025,7 @@ E7RESULT name=done emitted=3\n";
 
     #[test]
     fn arrival_reader_returns_every_child_line_in_order_with_nondecreasing_timestamps() {
-        let child_output = "E7RESULT name=transaction root_txg=3\nnot a result line\nE7RESULT name=second_transaction nanoseconds=6608505\nE7RESULT name=done emitted=3";
+        let child_output = "E7RESULT name=transaction root_txg=3\nnot a result line\nE7RESULT name=file_overwrite nanoseconds=6608505\nE7RESULT name=done emitted=3";
         let started = Instant::now();
         let arrived_lines = read_lines_with_arrival_times(child_output.as_bytes(), started).expect("内存里的输入读不出错");
         let read_finished_nanoseconds = started.elapsed().as_nanos();
@@ -2035,7 +2035,7 @@ E7RESULT name=done emitted=3\n";
             [
                 "E7RESULT name=transaction root_txg=3",
                 "not a result line",
-                "E7RESULT name=second_transaction nanoseconds=6608505",
+                "E7RESULT name=file_overwrite nanoseconds=6608505",
                 "E7RESULT name=done emitted=3"
             ],
             "四行全要、次序不变，不是结果行的也要，末行没有换行也要"
@@ -2070,77 +2070,77 @@ E7RESULT name=done emitted=3\n";
     }
 
     #[test]
-    fn second_transaction_containment_fields_compare_the_arrival_phase_with_the_child_nanoseconds_field() {
+    fn file_overwrite_containment_fields_compare_the_arrival_phase_with_the_child_nanoseconds_field() {
         assert_eq!(phase_nanoseconds(Some(43_231_321), Some(41_239_814)), Some(1_991_507), "两行到达时刻之差");
         assert_eq!(phase_nanoseconds(Some(43_231_321), None), None);
         let child_fields: BTreeMap<String, String> =
-            parse_key_values("name=second_transaction root_txg=4 transaction=2 released=8 nanoseconds=6608505 operations=23")
+            parse_key_values("name=file_overwrite root_txg=4 transaction=2 released=8 nanoseconds=6608505 operations=23")
                 .into_iter()
                 .map(|(key, value)| (key.to_string(), value.to_string()))
                 .collect();
         assert_eq!(
-            second_transaction_containment_fields(Some(1_991_507), Some(&child_fields)),
-            "second_transaction_inner_nanoseconds=6608505 second_transaction_outer_contains_inner=false"
+            file_overwrite_containment_fields(Some(1_991_507), Some(&child_fields)),
+            "file_overwrite_inner_nanoseconds=6608505 file_overwrite_outer_contains_inner=false"
         );
         assert_eq!(
-            second_transaction_containment_fields(Some(16_327_481), Some(&child_fields)),
-            "second_transaction_inner_nanoseconds=6608505 second_transaction_outer_contains_inner=true"
+            file_overwrite_containment_fields(Some(16_327_481), Some(&child_fields)),
+            "file_overwrite_inner_nanoseconds=6608505 file_overwrite_outer_contains_inner=true"
         );
         assert_eq!(
-            second_transaction_containment_fields(None, Some(&child_fields)),
-            "second_transaction_inner_nanoseconds=6608505 second_transaction_outer_contains_inner=NA"
+            file_overwrite_containment_fields(None, Some(&child_fields)),
+            "file_overwrite_inner_nanoseconds=6608505 file_overwrite_outer_contains_inner=NA"
         );
         assert_eq!(
-            second_transaction_containment_fields(Some(1_991_507), None),
-            "second_transaction_inner_nanoseconds=NA second_transaction_outer_contains_inner=NA",
-            "子进程的 second_transaction 行没到"
+            file_overwrite_containment_fields(Some(1_991_507), None),
+            "file_overwrite_inner_nanoseconds=NA file_overwrite_outer_contains_inner=NA",
+            "子进程的 file_overwrite 行没到"
         );
     }
 
     #[test]
-    fn summarize_keeps_second_transaction_wall_clock_only_for_rounds_whose_outer_phase_contains_inner() {
+    fn summarize_keeps_file_overwrite_wall_clock_only_for_rounds_whose_outer_phase_contains_inner() {
         let round_block = |round_number: u32, outer_nanoseconds: u64, inner_nanoseconds: u64, containment_field: &str| {
             format!(
                 "E152RUN configuration=singlefs round={round_number} attempt=1 host_load1=2.0 vm_exit=0\n\
-E7RESULT name=singlefs_timing configuration=singlefs round={round_number} second_transaction_nanoseconds={outer_nanoseconds} second_transaction_inner_nanoseconds={inner_nanoseconds}{containment_field}\n\
+E7RESULT name=singlefs_timing configuration=singlefs round={round_number} file_overwrite_nanoseconds={outer_nanoseconds} file_overwrite_inner_nanoseconds={inner_nanoseconds}{containment_field}\n\
 E7RESULT name=done emitted=2\n"
             )
         };
         let product = [
-            round_block(1, 16_000_000, 6_000_000, " second_transaction_outer_contains_inner=true"),
-            round_block(2, 2_000_000, 6_500_000, " second_transaction_outer_contains_inner=false"),
-            round_block(3, 12_000_000, 6_200_000, " second_transaction_outer_contains_inner=true"),
+            round_block(1, 16_000_000, 6_000_000, " file_overwrite_outer_contains_inner=true"),
+            round_block(2, 2_000_000, 6_500_000, " file_overwrite_outer_contains_inner=false"),
+            round_block(3, 12_000_000, 6_200_000, " file_overwrite_outer_contains_inner=true"),
             round_block(4, 3_000_000, 6_100_000, ""),
-            round_block(5, 14_000_000, 6_400_000, " second_transaction_outer_contains_inner=true"),
+            round_block(5, 14_000_000, 6_400_000, " file_overwrite_outer_contains_inner=true"),
         ]
         .concat();
         let output = summarize_product(&product);
         let wall_clock_lines: Vec<&str> = output
             .iter()
             .map(String::as_str)
-            .filter(|line| line.contains("metric=singlefs_second_transaction_milliseconds "))
+            .filter(|line| line.contains("metric=singlefs_file_overwrite_milliseconds "))
             .collect();
         assert_eq!(
             wall_clock_lines,
             [
-                "E7RESULT name=summary_excluded configuration=singlefs metric=singlefs_second_transaction_milliseconds round=2 reason=outer_does_not_contain_inner",
-                "E7RESULT name=summary_excluded configuration=singlefs metric=singlefs_second_transaction_milliseconds round=4 reason=missing_second_transaction_outer_contains_inner",
-                "E7RESULT name=summary configuration=singlefs metric=singlefs_second_transaction_milliseconds rounds=3 median=14.000 minimum=12.000 maximum=16.000 spread_percent=28.6 stability=unstable values=1:16.000,3:12.000,5:14.000",
+                "E7RESULT name=summary_excluded configuration=singlefs metric=singlefs_file_overwrite_milliseconds round=2 reason=outer_does_not_contain_inner",
+                "E7RESULT name=summary_excluded configuration=singlefs metric=singlefs_file_overwrite_milliseconds round=4 reason=missing_file_overwrite_outer_contains_inner",
+                "E7RESULT name=summary configuration=singlefs metric=singlefs_file_overwrite_milliseconds rounds=3 median=14.000 minimum=12.000 maximum=16.000 spread_percent=28.6 stability=unstable values=1:16.000,3:12.000,5:14.000",
             ],
             "判假与缺字段的两轮照排除的格子报，只有三轮进中位：{output:#?}"
         );
         let inner_lines: Vec<&str> = output
             .iter()
             .map(String::as_str)
-            .filter(|line| line.contains("metric=singlefs_second_transaction_inner_milliseconds "))
+            .filter(|line| line.contains("metric=singlefs_file_overwrite_inner_milliseconds "))
             .collect();
         assert_eq!(
             inner_lines,
-            ["E7RESULT name=summary configuration=singlefs metric=singlefs_second_transaction_inner_milliseconds rounds=5 median=6.200 minimum=6.000 maximum=6.500 spread_percent=8.1 stability=stable values=1:6.000,2:6.500,3:6.200,4:6.100,5:6.400"],
+            ["E7RESULT name=summary configuration=singlefs metric=singlefs_file_overwrite_inner_milliseconds rounds=5 median=6.200 minimum=6.000 maximum=6.500 spread_percent=8.1 stability=stable values=1:6.000,2:6.500,3:6.200,4:6.100,5:6.400"],
             "子进程自己计的数不看包含检查，五轮都进：{output:#?}"
         );
         assert_eq!(
-            second_transaction_wall_clock_if_contained(Some("NA"), Ok(2.0)),
+            file_overwrite_wall_clock_if_contained(Some("NA"), Ok(2.0)),
             Err("containment_not_available".to_string()),
             "判不了的轮也不收"
         );

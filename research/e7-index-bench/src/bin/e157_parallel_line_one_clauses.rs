@@ -129,7 +129,7 @@ fn extent_tree_leaf_count(total_data_units: u64, leaf_capacity: u64) -> u64 {
     total_data_units.max(1).div_ceil(leaf_capacity)
 }
 
-/// 树高（量 1.2b）。`leaf_count <= 1` 时根兼叶，高度 1（与 A5 的第一个事务对拍）。
+/// 树高（量 1.2b）。`leaf_count <= 1` 时根兼叶，高度 1（与 A5 的新池新建文件对拍）。
 fn extent_tree_height(leaf_count: u64, internal_fanout: u64) -> u64 {
     if leaf_count <= 1 {
         return 1;
@@ -537,7 +537,7 @@ mod tests {
     }
 
     #[test]
-    fn 锚点甲五_第一个事务的extent树部分() {
+    fn 锚点甲五_新池新建文件的extent树部分() {
         let leaf_capacity = extent_leaf_capacity(16384);
         let internal_fanout = extent_internal_fanout(16384, 110);
         let leaves = extent_tree_leaf_count(1, leaf_capacity);

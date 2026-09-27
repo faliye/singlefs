@@ -1,0 +1,906 @@
+diff --git a/research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs b/research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs
+index dd3a1887..47002dc0 100644
+--- a/research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs
++++ b/research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs
+@@ -691,3 +691,3 @@ impl RecordedStepKind {
+             RecordedOperation::Write(write) => RecordedStepKind::Write(write.kind),
+-            RecordedOperation::Barrier => RecordedStepKind::Barrier,
++            RecordedOperation::Barrier(_) => RecordedStepKind::Barrier,
+         }
+@@ -700,2 +700,15 @@ impl RecordedStepKind {
+     }
++    /// 种类串的规范序（E142 第十九次跑臂 N19 的 ④）：`zero_fill` 排最前，其余照 `unit_write`、`journal_record`、
++    /// `root_record_fua`、`system_configuration_slot`、`barrier`。依据是 `.claude/kb/layout/01-first-txn.md` 八
++    /// 「mkfs 种根」那一行种类串原文 `[zero_fill×8,unit_write×4,barrier]`。只管种类串怎么排，不动 `StepKind` 的派生序。
++    fn canonical_rank_in_kinds_text(self) -> u8 {
++        match self {
++            RecordedStepKind::Write(StepKind::ZeroFill) => 0,
++            RecordedStepKind::Write(StepKind::UnitWrite) => 1,
++            RecordedStepKind::Write(StepKind::JournalRecord) => 2,
++            RecordedStepKind::Write(StepKind::RootRecordFua) => 3,
++            RecordedStepKind::Write(StepKind::SystemConfigurationSlot) => 4,
++            RecordedStepKind::Barrier => 5,
++        }
++    }
+ }
+@@ -716,2 +729,4 @@ impl WriteRequest {
+ 
++/// 录下来的一步。屏障带设备号（E142 第十九次跑臂 N19 的 ①，D13（验证路线） 已定项 4「一次写只被它自己那块盘上
++/// 之后的屏障（或它那块盘上的 FUA 写）排在之后的写前面」）：一道池屏障按设备号升序每块盘记一步。
+ #[derive(Clone, Debug)]
+@@ -719,3 +734,3 @@ enum RecordedOperation {
+     Write(WriteRequest),
+-    Barrier,
++    Barrier(DeviceIdentity),
+ }
+@@ -741,4 +756,8 @@ impl RecordingPool {
+     }
++    /// 一道池屏障：按设备号升序每块盘记一步，一块盘时恰一步（臂 N19 的 ①）；连着的屏障不合并
++    /// （登记 R40：D13 已定项 4 没有给合并规则）。
+     fn barrier(&mut self) {
+-        self.operations.push(RecordedOperation::Barrier);
++        for device_index in 0..self.pool.devices.len() {
++            self.operations.push(RecordedOperation::Barrier(DeviceIdentity(u32::try_from(device_index).expect("设备数"))));
++        }
+     }
+@@ -2032,3 +2051,3 @@ fn build_instance_table_chain_record() -> Vec<u8> {
+ enum BarrierPolicy {
+-    /// D16 已定项 7：单元 → 屏障 → 记录 → 屏障 → 根槽 FUA。
++    /// D16 已定项 7：单元 → 屏障 → 记录 → 屏障 → 根槽 FUA → 系统配置槽 → 屏障（末一道另由 `TrailingPublishBarrier` 管）。
+     Settled,
+@@ -2038,2 +2057,11 @@ enum BarrierPolicy {
+ 
++/// 发布尾那道屏障（E142 第十九次跑臂 N19C 的 ⑧；D16（发布语义） 已定项 7 定案句「COW 单元 / 节点 → 屏障 →
++/// journal 记录 → 屏障 → 根槽（FUA）→ 系统配置槽 → 屏障」）。只在 `BarrierPolicy::Settled` 时才发，
++/// 与另两道同一条件；`Omitted` 是取样点 G11、G12 那一格（登记 R44：⑧ 关时就是臂 N19）。
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++enum TrailingPublishBarrier {
++    Issued,
++    Omitted,
++}
++
+ #[derive(Clone, Debug)]
+@@ -2044,2 +2072,3 @@ struct PoolParameters {
+     barriers: BarrierPolicy,
++    trailing_publish_barrier: TrailingPublishBarrier,
+     /// 写者开关（E142 第十四次跑，重跑登记第五节 5.1）：臂 F（真实基线，`crates/` 今天的写法）恒 `0x01`；
+@@ -2057,2 +2086,3 @@ impl PoolParameters {
+             barriers: BarrierPolicy::Settled,
++            trailing_publish_barrier: TrailingPublishBarrier::Issued,
+             last_of_publish_flag: 0x01,
+@@ -2060,4 +2090,15 @@ impl PoolParameters {
+     }
++    /// 取样点 G11（登记 R19C-4 ⑩）：主几何，只把发布尾那道屏障关掉，别的字段与 `settled_two_devices` 相同。
++    fn settled_two_devices_without_trailing_publish_barrier() -> Self {
++        Self { trailing_publish_barrier: TrailingPublishBarrier::Omitted, ..Self::settled_two_devices() }
++    }
+     fn control_one_device_no_barriers() -> Self {
+-        Self { fsid: FIXED_FSID, device_count: 1, region_devices: [DeviceIdentity(0), DeviceIdentity(0), DeviceIdentity(0)], barriers: BarrierPolicy::None, last_of_publish_flag: 0x01 }
++        Self {
++            fsid: FIXED_FSID,
++            device_count: 1,
++            region_devices: [DeviceIdentity(0), DeviceIdentity(0), DeviceIdentity(0)],
++            barriers: BarrierPolicy::None,
++            trailing_publish_barrier: TrailingPublishBarrier::Issued,
++            last_of_publish_flag: 0x01,
++        }
+     }
+@@ -2066,3 +2107,17 @@ impl PoolParameters {
+     fn one_device_with_barriers() -> Self {
+-        Self { fsid: FIXED_FSID, device_count: 1, region_devices: [DeviceIdentity(0), DeviceIdentity(0), DeviceIdentity(0)], barriers: BarrierPolicy::Settled, last_of_publish_flag: 0x01 }
++        Self {
++            fsid: FIXED_FSID,
++            device_count: 1,
++            region_devices: [DeviceIdentity(0), DeviceIdentity(0), DeviceIdentity(0)],
++            barriers: BarrierPolicy::Settled,
++            trailing_publish_barrier: TrailingPublishBarrier::Issued,
++            last_of_publish_flag: 0x01,
++        }
++    }
++    /// 发布尾那道屏障发不发（⑧）：两个开关都开才发。
++    fn issues_trailing_publish_barrier(&self) -> bool {
++        match (self.barriers, self.trailing_publish_barrier) {
++            (BarrierPolicy::Settled, TrailingPublishBarrier::Issued) => true,
++            (BarrierPolicy::Settled, TrailingPublishBarrier::Omitted) | (BarrierPolicy::None, TrailingPublishBarrier::Issued | TrailingPublishBarrier::Omitted) => false,
++        }
+     }
+@@ -2654,3 +2709,3 @@ fn system_configuration_write_for_publish(checkpoint_txg: CheckpointTxg) -> (u64
+ 
+-/// 暖机（D16 已定项 8）：每次空发布照 D16 已定项 7 的顺序——屏障 → 空记录 → 屏障 → 根槽 FUA → 系统配置槽轮换；
++/// 暖机（D16 已定项 8）：每次空发布照 D16 已定项 7 的顺序——屏障 → 空记录 → 屏障 → 根槽 FUA → 系统配置槽轮换 → 屏障；
+ /// 空记录不点名任何单元、事务号 0（D23 已定项 19 ①：0 保留给不承载事务的记录）、提交标记 1，
+@@ -2721,2 +2776,6 @@ fn warm_up(pool: &mut RecordingPool, parameters: &PoolParameters, genesis: &Mkfs
+         }
++        // ⑧ 发布尾那道屏障（D16 已定项 7「根槽（FUA）→ 系统配置槽 → 屏障」，登记 R43）：每次空发布各一道。
++        if parameters.issues_trailing_publish_barrier() {
++            pool.barrier();
++        }
+         roots.push(root);
+@@ -3085,2 +3144,6 @@ fn publish_first_file(
+     }
++    // ⑧ 发布尾那道屏障（D16 已定项 7「根槽（FUA）→ 系统配置槽 → 屏障」，登记 R43）。
++    if parameters.issues_trailing_publish_barrier() {
++        pool.barrier();
++    }
+ 
+@@ -3897,23 +3960,53 @@ fn recover(reader: &dyn BlockReader, policy: JournalPolicy, mode: ReaderMode) ->
+ 
+-/// 屏障把写流切成段；FUA 写完成才发下一条，装置把它也当段边界（可关，字节表两种口径都报）。
+-fn split_into_segments(operations: &[RecordedOperation], fua_is_boundary: bool) -> (Vec<WriteRequest>, Vec<Vec<usize>>) {
+-    let mut writes = Vec::new();
+-    let mut segments: Vec<Vec<usize>> = Vec::new();
+-    let mut current: Vec<usize> = Vec::new();
+-    for operation in operations {
++/// 关段规则（E142 第十九次跑臂 N19 的 ②；D13（验证路线） 已定项 4 定案句「当前段里每块有写的盘都被自己的屏障或
++/// FUA 放行时这一段才关上，有一块盘还没放行，这道屏障（或 FUA）不关段、前后的写同段」「带 FUA 的写只放行它自己那块盘」）。
++/// `split_into_segments` 与 `segment_step_kinds` 共用这一条，两处不各写一份。
++/// 写（含整段清零）把它那块盘记成没放行；屏障放行它那块盘；`fua_is_boundary` 时 FUA 写算一个写、并放行它自己那块盘，
++/// 不开时 FUA 写与普通写一样（只给 `layer0_fua_not_boundary` 与 G6 用，沿用那一格的旧口径）。段里有写且没放行的盘为空才关段。
++struct SegmentClosingRule {
++    fua_is_boundary: bool,
++    unreleased_devices: std::collections::BTreeSet<DeviceIdentity>,
++    segment_has_write: bool,
++}
++
++impl SegmentClosingRule {
++    fn new(fua_is_boundary: bool) -> Self {
++        Self { fua_is_boundary, unreleased_devices: std::collections::BTreeSet::new(), segment_has_write: false }
++    }
++    /// 吃下一步，返回这一步之后当前段是不是关上了。
++    fn closes_after(&mut self, operation: &RecordedOperation) -> bool {
+         match operation {
+             RecordedOperation::Write(write) => {
+-                let is_fua = write.is_fua();
+-                writes.push(write.clone());
+-                current.push(writes.len() - 1);
+-                if fua_is_boundary && is_fua {
+-                    segments.push(std::mem::take(&mut current));
++                self.segment_has_write = true;
++                self.unreleased_devices.insert(write.device);
++                if self.fua_is_boundary && write.is_fua() {
++                    self.unreleased_devices.remove(&write.device);
+                 }
+             }
+-            RecordedOperation::Barrier => {
+-                if !current.is_empty() {
+-                    segments.push(std::mem::take(&mut current));
+-                }
++            RecordedOperation::Barrier(device) => {
++                self.unreleased_devices.remove(device);
+             }
+         }
++        let closes = self.segment_has_write && self.unreleased_devices.is_empty();
++        if closes {
++            self.segment_has_write = false;
++        }
++        closes
++    }
++}
++
++/// 按 `SegmentClosingRule` 把写流切成段，交回全部写与每段里写的下标。流尾没放行的写自成最后一段。
++fn split_into_segments(operations: &[RecordedOperation], fua_is_boundary: bool) -> (Vec<WriteRequest>, Vec<Vec<usize>>) {
++    let mut writes = Vec::new();
++    let mut segments: Vec<Vec<usize>> = Vec::new();
++    let mut current: Vec<usize> = Vec::new();
++    let mut rule = SegmentClosingRule::new(fua_is_boundary);
++    for operation in operations {
++        if let RecordedOperation::Write(write) = operation {
++            writes.push(write.clone());
++            current.push(writes.len() - 1);
++        }
++        if rule.closes_after(operation) {
++            segments.push(std::mem::take(&mut current));
++        }
+     }
+@@ -3934,18 +4027,11 @@ fn segment_step_kinds(operations: &[RecordedOperation], fua_is_boundary: bool) -
+     let mut writes_in_current: usize = 0;
++    let mut rule = SegmentClosingRule::new(fua_is_boundary);
+     for operation in operations {
+         current.push(RecordedStepKind::of(operation));
+-        match operation {
+-            RecordedOperation::Write(write) => {
+-                writes_in_current += 1;
+-                if fua_is_boundary && write.is_fua() {
+-                    groups.push(std::mem::take(&mut current));
+-                    writes_in_current = 0;
+-                }
+-            }
+-            RecordedOperation::Barrier => {
+-                if writes_in_current > 0 {
+-                    groups.push(std::mem::take(&mut current));
+-                    writes_in_current = 0;
+-                }
+-            }
++        if let RecordedOperation::Write(_) = operation {
++            writes_in_current += 1;
++        }
++        if rule.closes_after(operation) {
++            groups.push(std::mem::take(&mut current));
++            writes_in_current = 0;
+         }
+@@ -3967,18 +4053,19 @@ fn segment_step_kinds(operations: &[RecordedOperation], fua_is_boundary: bool) -
+ 
+-/// 把每段的步骤种类写成一行可解析的文字：段之间用 `|`，段内按枚举声明序排成规范多重集
+-/// `[种类×次数,…]`，只出现一次的不带次数。规范序是为了让两段只要多重集相同、文字就一模一样。
+-fn format_segment_kinds(groups: &[Vec<RecordedStepKind>]) -> String {
+-    let mut rendered: Vec<String> = Vec::new();
+-    for group in groups {
+-        let mut counts: BTreeMap<RecordedStepKind, usize> = BTreeMap::new();
+-        for kind in group {
+-            *counts.entry(*kind).or_insert(0) += 1;
+-        }
+-        let entries: Vec<String> = counts
+-            .into_iter()
+-            .map(|(kind, count)| if count == 1 { kind.tag().to_string() } else { format!("{}×{count}", kind.tag()) })
+-            .collect();
+-        rendered.push(format!("[{}]", entries.join(",")));
++/// 一组步骤种类写成规范多重集 `[种类×次数,…]`，按 `canonical_rank_in_kinds_text` 排，只出现一次的不带次数。
++fn format_kind_multiset(group: &[RecordedStepKind]) -> String {
++    let mut counts: BTreeMap<(u8, RecordedStepKind), usize> = BTreeMap::new();
++    for kind in group {
++        *counts.entry((kind.canonical_rank_in_kinds_text(), *kind)).or_insert(0) += 1;
+     }
+-    rendered.join("|")
++    let entries: Vec<String> = counts
++        .into_iter()
++        .map(|((_, kind), count)| if count == 1 { kind.tag().to_string() } else { format!("{}×{count}", kind.tag()) })
++        .collect();
++    format!("[{}]", entries.join(","))
++}
++
++/// 把每段的步骤种类写成一行可解析的文字：段之间用 `|`，段内排成规范多重集（`format_kind_multiset`）。
++/// 规范序是为了让两段只要多重集相同、文字就一模一样。
++fn format_segment_kinds(groups: &[Vec<RecordedStepKind>]) -> String {
++    groups.iter().map(|group| format_kind_multiset(group)).collect::<Vec<String>>().join("|")
+ }
+@@ -3990,2 +4077,164 @@ fn closed_form_state_count(segments: &[Vec<usize>]) -> u64 {
+ 
++/// 层 0 的扇区（D13（验证路线） 已定项 4 射程「层 0 的扇区取 512 字节」）：原地覆写要「长于一个扇区」。
++const LAYER0_SECTOR_BYTES: usize = 512;
++
++/// 臂 N19 的 ③：这次写算不算原地覆写（D13 已定项 4「不是单元写、长于一个扇区、罩住的范围里原来有东西的写」，
++/// 登记 R39 的读法：`image` 是录制流里它之前的全部写都落了的那一版，这次写罩住的字节里至少一个非零）。
++fn is_in_place_overwrite(image: &BTreeMap<DeviceIdentity, SparseDevice>, write: &WriteRequest) -> bool {
++    let is_unit_write = match write.kind {
++        StepKind::UnitWrite => true,
++        StepKind::JournalRecord | StepKind::RootRecordFua | StepKind::SystemConfigurationSlot | StepKind::ZeroFill => false,
++    };
++    let is_longer_than_a_sector = write.bytes.len() > LAYER0_SECTOR_BYTES;
++    if is_unit_write || !is_longer_than_a_sector {
++        return false;
++    }
++    image.get(&write.device).is_some_and(|device| device.read(write.offset, write.bytes.len()).iter().any(|byte| *byte != 0))
++}
++
++/// 把一步落进镜像。整段清零在录制器里不带字节（`RecordingPool::record_zero_fill` 的说明），落了也不改镜像：
++/// 这条流上每次整段清零都在那一段第一次被写之前（mkfs 开头），与真写一遍 0 没有分别。
++fn land_operation_in_image(image: &mut BTreeMap<DeviceIdentity, SparseDevice>, operation: &RecordedOperation) {
++    match operation {
++        RecordedOperation::Write(write) => image.entry(write.device).or_default().write(write.offset, &write.bytes),
++        RecordedOperation::Barrier(_) => {}
++    }
++}
++
++/// 一条路径里每一次写是不是原地覆写（次序与 `split_into_segments` 交回的写一一对应）。
++/// `earlier_operations` 是这条路径之前录下的全部步（从 mkfs 第一步起），先全落进镜像；路径里的写逐次先判、再落。
++fn in_place_overwrite_flags(earlier_operations: &[RecordedOperation], path_operations: &[RecordedOperation]) -> Vec<bool> {
++    let mut image: BTreeMap<DeviceIdentity, SparseDevice> = BTreeMap::new();
++    for operation in earlier_operations {
++        land_operation_in_image(&mut image, operation);
++    }
++    let mut flags = Vec::new();
++    for operation in path_operations {
++        if let RecordedOperation::Write(write) = operation {
++            flags.push(is_in_place_overwrite(&image, write));
++        }
++        land_operation_in_image(&mut image, operation);
++    }
++    flags
++}
++
++/// 每段的原地覆写数 m。
++fn in_place_overwrites_per_segment(segments: &[Vec<usize>], in_place_flags: &[bool]) -> Vec<usize> {
++    segments.iter().map(|segment| segment.iter().filter(|index| in_place_flags[**index]).count()).collect()
++}
++
++/// 臂 N19 的 ③ 的闭式：1 + Σ(3^m · 2^(n−m) − 1)，n 是段的写数、m 是段里原地覆写的写数（登记 R32；
++/// 一段各写取几态的全部组合是 3^m · 2^(n−m)，减去「这一段全都没持久」那一个，它与上一段全部持久是同一个状态）。
++fn closed_form_three_state_count(segments: &[Vec<usize>], in_place_flags: &[bool]) -> u64 {
++    let per_segment = in_place_overwrites_per_segment(segments, in_place_flags);
++    1 + segments
++        .iter()
++        .zip(per_segment)
++        .map(|(segment, in_place_count)| {
++            let written = segment.len();
++            let three_state_ways = 3u64.checked_pow(u32::try_from(in_place_count).expect("段内写数")).expect("三态组合数装得进 u64");
++            let two_state_ways = 1u64 << (written - in_place_count);
++            three_state_ways.checked_mul(two_state_ways).expect("组合数装得进 u64") - 1
++        })
++        .sum::<u64>()
++}
++
++/// 一条路径的三态那一行要报的数（`name=segments_three_state` 与 `name=segments_sensitivity` 共用）。
++struct ThreeStateSummary {
++    writes: usize,
++    in_place_overwrites: usize,
++    in_place_per_segment: String,
++    in_place_kinds: String,
++    closed_form_two_state: u64,
++    closed_form_three_state: u64,
++}
++
++fn three_state_summary(earlier_operations: &[RecordedOperation], path_operations: &[RecordedOperation]) -> ThreeStateSummary {
++    let (writes, segments) = split_into_segments(path_operations, true);
++    let in_place_flags = in_place_overwrite_flags(earlier_operations, path_operations);
++    assert_eq!(in_place_flags.len(), writes.len(), "原地覆写的标记与写一一对应");
++    let in_place_kinds: Vec<RecordedStepKind> = writes.iter().zip(&in_place_flags).filter(|(_, is_in_place)| **is_in_place).map(|(write, _)| RecordedStepKind::Write(write.kind)).collect();
++    ThreeStateSummary {
++        writes: writes.len(),
++        in_place_overwrites: in_place_flags.iter().filter(|is_in_place| **is_in_place).count(),
++        in_place_per_segment: in_place_overwrites_per_segment(&segments, &in_place_flags).iter().map(ToString::to_string).collect::<Vec<_>>().join("+"),
++        in_place_kinds: if in_place_kinds.is_empty() { "none".to_string() } else { format_kind_multiset(&in_place_kinds) },
++        closed_form_two_state: closed_form_state_count(&segments),
++        closed_form_three_state: closed_form_three_state_count(&segments, &in_place_flags),
++    }
++}
++
++/// ⑥ 的两个取样点（⑧ 开的主几何）：点名与吞掉哪块盘那一步（登记第八节 8.2：G10a 吞盘 1，不是根所在的盘；G10b 吞盘 0）。
++const SWALLOWED_BARRIER_POINTS_WITH_TRAILING_BARRIER: [(&str, DeviceIdentity); 2] = [("G10a", DeviceIdentity(1)), ("G10b", DeviceIdentity(0))];
++/// ⑩ 的两个取样点（⑧ 关，G11 的流上照 G10 各吞一步，登记 R19C-4 ⑩）。
++const SWALLOWED_BARRIER_POINTS_WITHOUT_TRAILING_BARRIER: [(&str, DeviceIdentity); 2] = [("G12a", DeviceIdentity(1)), ("G12b", DeviceIdentity(0))];
++
++/// 臂 N19 的 ⑥（取样点 G10a / G10b，登记第八节 8.2）：在第一个事务「最后一次 journal 记录写 → 根槽 FUA 写」
++/// 之间那一串屏障里，删掉 `swallowed_device` 那一步，其余不动。那一串里没有这块盘的一步就是装置错。
++fn swallow_one_device_barrier_step_before_the_root(transaction_operations: &[RecordedOperation], swallowed_device: DeviceIdentity) -> Vec<RecordedOperation> {
++    let last_journal_record = transaction_operations
++        .iter()
++        .rposition(|operation| matches!(operation, RecordedOperation::Write(write) if write.kind == StepKind::JournalRecord))
++        .expect("第一个事务里有 journal 记录写");
++    let root_record = transaction_operations
++        .iter()
++        .position(|operation| matches!(operation, RecordedOperation::Write(write) if write.kind == StepKind::RootRecordFua))
++        .expect("第一个事务里有根槽写");
++    let swallowed = (last_journal_record + 1..root_record)
++        .find(|index| matches!(&transaction_operations[*index], RecordedOperation::Barrier(device) if *device == swallowed_device))
++        .expect("记录与根槽之间有这块盘的那一步屏障");
++    transaction_operations.iter().enumerate().filter(|(index, _)| *index != swallowed).map(|(_, operation)| operation.clone()).collect()
++}
++
++/// `name=segments_sensitivity` 一行（⑥ 的 G10a / G10b，⑩ 的 G11 / G12a / G12b）：字段次序照登记 R19C-4 ⑥ ⑩。
++fn segments_sensitivity_line(point_fields: &str, path_name: &str, earlier_operations: &[RecordedOperation], path_operations: &[RecordedOperation]) -> String {
++    let (_, segments) = split_into_segments(path_operations, true);
++    let summary = three_state_summary(earlier_operations, path_operations);
++    format!(
++        "name=segments_sensitivity {point_fields} path={path_name} operations={} segments={} closed_form={} closed_form_three_state={} in_place_per_segment={} kinds={}",
++        path_operations.len(),
++        segments.iter().map(|segment| segment.len().to_string()).collect::<Vec<_>>().join("+"),
++        summary.closed_form_two_state,
++        summary.closed_form_three_state,
++        summary.in_place_per_segment,
++        format_segment_kinds(&segment_step_kinds(path_operations, true)),
++    )
++}
++
++/// 一条 mkfs → 取号 → 暖机两次 → 第一个文件版本的录制流与各路径的切点（取样点 G11 现录用；主几何那一条在 `main()` 里录）。
++struct RecordedFirstTransactionStream {
++    operations: Vec<RecordedOperation>,
++    mkfs_operation_count: usize,
++    acquisition_operation_count: usize,
++    warm_up_operation_count: usize,
++}
++
++fn record_first_transaction_stream(parameters: &PoolParameters, file_bytes: &[u8]) -> RecordedFirstTransactionStream {
++    let (mut recording, genesis) = mkfs(parameters);
++    let mkfs_operation_count = recording.operations.len();
++    let instance = acquire_instance(&mut recording, parameters);
++    let acquisition_operation_count = recording.operations.len();
++    let (_, last_warm_up_record) = warm_up(&mut recording, parameters, &genesis, instance);
++    let warm_up_operation_count = recording.operations.len();
++    publish_first_file(&mut recording, parameters, &genesis, file_bytes, instance, last_warm_up_record.as_deref(), FIRST_TRANSACTION_TXG);
++    RecordedFirstTransactionStream { operations: recording.operations, mkfs_operation_count, acquisition_operation_count, warm_up_operation_count }
++}
++
++/// 五条路径的切法（登记 R31，与 `main()` 里 `name=segments ` 那五行同一取法），每条带「这条路径之前录下的全部步」
++/// （三态认原地覆写要从 mkfs 第一步起的镜像，R39）。
++fn first_transaction_stream_paths(
++    operations: &[RecordedOperation],
++    mkfs_operation_count: usize,
++    acquisition_operation_count: usize,
++    warm_up_operation_count: usize,
++) -> [(&'static str, &[RecordedOperation], &[RecordedOperation]); 5] {
++    [
++        ("mkfs", &operations[..0], &operations[..mkfs_operation_count]),
++        ("instance_acquisition", &operations[..mkfs_operation_count], &operations[mkfs_operation_count..acquisition_operation_count]),
++        ("warm_up", &operations[..acquisition_operation_count], &operations[acquisition_operation_count..warm_up_operation_count]),
++        ("transaction", &operations[..warm_up_operation_count], &operations[warm_up_operation_count..]),
++        ("post_mkfs_stream", &operations[..mkfs_operation_count], &operations[mkfs_operation_count..]),
++    ]
++}
++
+ #[derive(Default, Debug, Clone, PartialEq, Eq)]
+@@ -4553,5 +4802,14 @@ struct Layer0MainArmVerdict {
+ 
++/// 判决行 `write_list_ok`（E142 第十九次跑臂 N19 的 ⑤ 与 N19C 的 ⑨，登记 7.4 D5）：第一个事务一次发布写 29 次、
++/// FUA 1 次，三道池屏障（D16（发布语义） 已定项 7「单元 → 屏障 → 记录 → 屏障 → 根槽 → 系统配置槽 → 屏障」）
++/// 按设备每块盘各记一步。
++fn first_transaction_write_list_matches(write_count: usize, barrier_step_count: usize, fua_count: usize, device_count: usize) -> bool {
++    write_count == 29 && barrier_step_count == 3 * device_count && fua_count == 1
++}
++
+ fn layer0_main_arm_verdict(tally: &Layer0Tally, closed_form: u64, comparison: &PredictionComparison) -> Layer0MainArmVerdict {
+     Layer0MainArmVerdict {
+-        layer0_states_ok: tally.states == closed_form && closed_form == 67_108_885,
++        // ⑪（E142 第十九次跑登记 R19C-4）：发布尾那道屏障把暖机第二次的系统配置槽写与第一个事务的单元写隔开，
++        // 整条流 `2+2+1+2+2+1+2+24+2+1+2`，闭式照登记 7.4 C5 / C12。
++        layer0_states_ok: tally.states == closed_form && closed_form == 16_777_240,
+         layer0_violations: if tally.violations == 0 { "zero" } else { "nonzero" },
+@@ -5301,3 +5559,3 @@ fn structure_sets_match(left: &std::collections::BTreeSet<&str>, right: &std::co
+ // 窗口 = `transaction_operations`（暖机最后一次写之后到发布结束），与比对侧
+-// `crates/singlefs-harness/src/bin/e142_first_transaction_write_dump.rs` 的窗口取法同一个切点（P5）。
++// `crates/singlefs-checker-tier/src/bin/e142_first_transaction_write_dump.rs` 的窗口取法同一个切点（P5）。
+ // 配对键是 (设备, 偏移, 长度)，不按名字配对（R3）；`region=`/`unit=` 只是给人看的标签，来自 `classify_offset`。
+@@ -6038,3 +6296,3 @@ fn main() {
+         warm_up_operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(_))).count(),
+-        warm_up_operations.iter().filter(|operation| matches!(operation, RecordedOperation::Barrier)).count(),
++        warm_up_operations.iter().filter(|operation| matches!(operation, RecordedOperation::Barrier(_))).count(),
+         warm_up_operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(write) if write.is_fua())).count(),
+@@ -6049,3 +6307,3 @@ fn main() {
+             RecordedOperation::Write(write) => Some(write),
+-            RecordedOperation::Barrier => None,
++            RecordedOperation::Barrier(_) => None,
+         })
+@@ -6073,4 +6331,32 @@ fn main() {
+     }
++    // E142 第十九次跑臂 N19 的 ③：五条路径各一行三态（`name=segments ` 那五行的字段集合与次序不动，⑦）。
++    for (path_name, earlier_operations, operations) in first_transaction_stream_paths(&recording.operations, mkfs_operation_count, acquisition_operation_count, warm_up_operation_count) {
++        let summary = three_state_summary(earlier_operations, operations);
++        emit(&mut emitter, &format!(
++            "name=segments_three_state path={path_name} writes={} in_place_overwrites={} in_place_per_segment={} in_place_kinds={} closed_form_two_state={} closed_form_three_state={}",
++            summary.writes, summary.in_place_overwrites, summary.in_place_per_segment, summary.in_place_kinds, summary.closed_form_two_state, summary.closed_form_three_state
++        ));
++    }
++    // ⑥ G10a / G10b：主几何（⑧ 开）的录制流上，第一个事务「最后一次 journal 记录写 → 根槽 FUA 写」之间吞掉一块盘那一步屏障。
++    for (point, swallowed_device) in SWALLOWED_BARRIER_POINTS_WITH_TRAILING_BARRIER {
++        let swallowed_transaction = swallow_one_device_barrier_step_before_the_root(transaction_operations, swallowed_device);
++        let swallowed_post_mkfs: Vec<RecordedOperation> = recording.operations[mkfs_operation_count..warm_up_operation_count].iter().cloned().chain(swallowed_transaction.iter().cloned()).collect();
++        let point_fields = format!("point={point} swallowed_device={}", swallowed_device.0);
++        emit(&mut emitter, &segments_sensitivity_line(&point_fields, "transaction", &recording.operations[..warm_up_operation_count], &swallowed_transaction));
++        emit(&mut emitter, &segments_sensitivity_line(&point_fields, "post_mkfs_stream", &recording.operations[..mkfs_operation_count], &swallowed_post_mkfs));
++    }
++    // ⑩ G11（⑧ 关，就是臂 N19，登记 R44）五条路径，与 G12a / G12b（G11 的流上照 G10 各吞一步屏障）。
++    let g11_stream = record_first_transaction_stream(&PoolParameters::settled_two_devices_without_trailing_publish_barrier(), &file_bytes);
++    for (path_name, earlier_operations, operations) in first_transaction_stream_paths(&g11_stream.operations, g11_stream.mkfs_operation_count, g11_stream.acquisition_operation_count, g11_stream.warm_up_operation_count) {
++        emit(&mut emitter, &segments_sensitivity_line("point=G11 trailing_barrier=off", path_name, earlier_operations, operations));
++    }
++    for (point, swallowed_device) in SWALLOWED_BARRIER_POINTS_WITHOUT_TRAILING_BARRIER {
++        let swallowed_transaction = swallow_one_device_barrier_step_before_the_root(&g11_stream.operations[g11_stream.warm_up_operation_count..], swallowed_device);
++        let swallowed_post_mkfs: Vec<RecordedOperation> = g11_stream.operations[g11_stream.mkfs_operation_count..g11_stream.warm_up_operation_count].iter().cloned().chain(swallowed_transaction.iter().cloned()).collect();
++        let point_fields = format!("point={point} trailing_barrier=off swallowed_device={}", swallowed_device.0);
++        emit(&mut emitter, &segments_sensitivity_line(&point_fields, "transaction", &g11_stream.operations[..g11_stream.warm_up_operation_count], &swallowed_transaction));
++        emit(&mut emitter, &segments_sensitivity_line(&point_fields, "post_mkfs_stream", &g11_stream.operations[..g11_stream.mkfs_operation_count], &swallowed_post_mkfs));
++    }
+     let write_count = transaction_operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(_))).count();
+-    let barrier_count = transaction_operations.iter().filter(|operation| matches!(operation, RecordedOperation::Barrier)).count();
++    let barrier_count = transaction_operations.iter().filter(|operation| matches!(operation, RecordedOperation::Barrier(_))).count();
+     let fua_count = transaction_operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(write) if write.is_fua())).count();
+@@ -6942,3 +7228,3 @@ fn main() {
+         "name=verdict width_mismatches={width_mismatches} write_list_ok={} recover_full_ok={content_matches} layer0_states_ok=not_run layer0_violations=not_run control_states_ok={} control_violations_ok={} control_missed_zero={} control_false_alarm_zero={} control_outcome_matrix_ok={} g6_states_ok={} g6_violations_zero={} g7_states_ok={} g7_violations_zero={} positive_control_main_geometry_ok={} role_label_contradictions_zero={} role_labels_all_defined={} text_number_mismatches_zero={} text_numbers_all_classified={} named_instances_ok={} journal_differing_states=not_run r18_system_configuration_fields_ok={window_system_configuration_clause_fields_ok} r18_root_flags_ok={window_root_record_clause_fields_ok} r18_g8_ok={rollback_floor_sensitivity_ok} r18_g9_ok={unmount_marker_sensitivity_ok}",
+-        write_count == 29 && barrier_count == 2 && fua_count == 1,
++        first_transaction_write_list_matches(write_count, barrier_count, fua_count, parameters.device_count),
+         control_tally.states == control_flow.closed_form && control_flow.closed_form == 8192,
+@@ -7133,5 +7419,5 @@ mod tests {
+     #[test]
+-    /// E142 第十五次跑：29 次写、2 道屏障、1 道 FUA（第七节 B5「window_writes=29 segments=[24,2,1,2]」）——
+-    /// 12 个单元 × 2 盘 = 24（分配记录树从 1 个节点拆成 5 个之后 t1..t12），其余不变。
+-    fn transaction_issues_21_writes_2_barriers_1_fua_in_the_settled_order() {
++    /// 29 次写、三道池屏障各按设备记两步、1 道 FUA（E142 第十九次跑登记 7.4 C11、D5）——
++    /// 12 个单元 × 2 盘 = 24（t1..t12）→ 屏障 → 记录 × 2 → 屏障 → 根槽 FUA → 系统配置槽 × 2 → 屏障（D16 已定项 7）。
++    fn transaction_issues_29_writes_3_pool_barriers_1_fua_in_the_settled_order() {
+         let BuiltPool { recording, output, warm_up_operation_count, .. } = built_pool();
+@@ -7140,8 +7426,10 @@ mod tests {
+         assert_eq!(steps.iter().filter(|tag| **tag != "barrier").count(), 29);
+-        assert_eq!(steps.iter().filter(|tag| **tag == "barrier").count(), 2);
++        assert_eq!(steps.iter().filter(|tag| **tag == "barrier").count(), 6);
+         assert_eq!(steps.iter().filter(|tag| **tag == "root_record_fua").count(), 1);
+         assert_eq!(operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(write) if write.is_fua())).count(), 1, "FUA 只由步骤种类决定，只有根槽那一步是");
+-        assert_eq!(steps[24], "barrier");
+-        assert_eq!(steps[27], "barrier");
+-        assert_eq!(steps[28], "root_record_fua");
++        assert_eq!(&steps[24..26], ["barrier", "barrier"]);
++        assert_eq!(&steps[26..28], ["journal_record", "journal_record"]);
++        assert_eq!(&steps[28..30], ["barrier", "barrier"]);
++        assert_eq!(steps[30], "root_record_fua");
++        assert_eq!(&steps[31..], ["system_configuration_slot", "system_configuration_slot", "barrier", "barrier"]);
+         assert_eq!(output.record.named.len(), 12, "t1..t12（第七节 B6「named=12」）");
+@@ -7366,5 +7654,5 @@ mod tests {
+ 
+-    /// E142 第十五次跑（第七节 B8）：分配记录树从 1 个单元拆成 5 个之后，事务段从 16 涨到 24 次写，
+-    /// 事务段与暖机第二次系统配置槽同段 ⇒ 那一段从 18 涨到 26；段序列与闭式改钉 B8，便宜（纯算术）。
+-    /// 整轮枚举（6710 万个状态）挪到下面 `#[ignore]` 的那条——Q142.9 附带，第一、二行都不消费它，够判后不跑。
++    /// E142 第十九次跑登记 7.4 C5 / C12（臂 N19C）：发布尾那道屏障（⑧）把暖机第二次的系统配置槽写与第一个事务的
++    /// 24 个单元写隔开，整条流 `2+2+1+2+2+1+2+24+2+1+2`、两态 16777240；便宜（纯算术）。
++    /// 整轮枚举挪到下面 `#[ignore]` 的那条（登记 R19C-8 第二段，重型）。
+     #[test]
+@@ -7373,4 +7661,4 @@ mod tests {
+         let (_, segments) = split_into_segments(&recording.operations[mkfs_operation_count..], true);
+-        assert_eq!(segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![2, 2, 1, 2, 2, 1, 26, 2, 1, 2]);
+-        assert_eq!(closed_form_state_count(&segments), 67_108_885, "第七节 B8「layer0_states=67108885」");
++        assert_eq!(segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2]);
++        assert_eq!(closed_form_state_count(&segments), 16_777_240, "登记 7.4 C5 / C12「layer0 closed_form=16777240」");
+     }
+@@ -7378,5 +7666,5 @@ mod tests {
+     #[test]
+-    #[ignore = "整轮枚举 67108885 个状态（第七节 B8），Q142.9 附带、够判后不跑（这一段没有它也够判第 1、2 行）；\
+-                第二段要验时手动 `cargo test -- --ignored layer0_state_count_is_67108885_with_zero_violations`"]
+-    fn layer0_state_count_is_67108885_with_zero_violations() {
++    #[ignore = "整轮枚举 16777240 个状态（登记 7.4 C12），第十九次跑第二段（R19C-8，重型）才跑；\
++                要验时手动 `cargo test -- --ignored layer0_state_count_is_16777240_with_zero_violations`"]
++    fn layer0_state_count_is_16777240_with_zero_violations() {
+         let BuiltPool { recording, mkfs_operation_count, .. } = built_pool();
+@@ -7385,3 +7673,3 @@ mod tests {
+         let tally = enumerate_layer0(&base.pool, &writes, &segments, &sample_file(), ReaderMode::Clause);
+-        assert_eq!(tally.states, 67_108_885);
++        assert_eq!(tally.states, 16_777_240);
+         assert_eq!(tally.violations, 0, "{:?}", tally.first_violation);
+@@ -7389,18 +7677,20 @@ mod tests {
+ 
+-    /// FUA 不当边界（C313 已判掉的另一读法，只钉它给的数不同）：第七节 B9「new_segments=[2,2,3,2,27,2,3]
+-    /// fua_not_boundary_states=134217754」。
++    /// FUA 不当边界（C313 已判掉的另一读法，只钉它给的数不同）：登记 7.4 C13 N19C `2+2+3+2+3+24+2+3`、16777249；
++    /// G11（⑧ 关）`2+2+3+2+27+2+3`、134217754。
+     #[test]
+-    fn fua_not_a_boundary_gives_134217754_states() {
++    fn fua_not_a_boundary_gives_16777249_states_and_134217754_without_the_trailing_barrier() {
+         let BuiltPool { recording, mkfs_operation_count, .. } = built_pool();
+         let (_, segments) = split_into_segments(&recording.operations[mkfs_operation_count..], false);
+-        assert_eq!(segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![2, 2, 3, 2, 27, 2, 3]);
+-        assert_eq!(closed_form_state_count(&segments), 134_217_754);
+-    }
+-
+-    /// 段序列登记表（layout/01-first-txn 八）的五行由这条钉住：mkfs 12+1+1+1+4（21 次操作、4114 个状态，
+-    /// D22（单元原子性怎么合成） 已定项 8 第 3 条 2026-09-23 用户定案改写：根环三个区域与 journal 环都由 mkfs
+-    /// 经写零动作清，每块盘四段各一次调用、两块盘共 8 步，段序列与步数以 `.claude/kb/layout/01-first-txn.md`
+-    /// 八「mkfs 种根」那一行为准——这个值与 `.claude/kb/checks-owed.md` C484（mkfs 不清根环，同 fsid 重来旧根还择得中）/
+-    /// C487（门禁 55 号拿活代码与不跟踪它的模型比） 登记的 `crates/` 真值一致）、取号 2、暖机 2+1+2+2+1+2、
+-    /// 事务 24+2+1+2、整条流 2+2+1+2+2+1+26+2+1+2（E142 第十五次跑，第七节 B5「segments=[24,2,1,2]」）。
++        assert_eq!(segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![2, 2, 3, 2, 3, 24, 2, 3]);
++        assert_eq!(closed_form_state_count(&segments), 16_777_249);
++        let g11_stream = record_first_transaction_stream(&PoolParameters::settled_two_devices_without_trailing_publish_barrier(), &sample_file());
++        let (_, g11_segments) = split_into_segments(&g11_stream.operations[g11_stream.mkfs_operation_count..], false);
++        assert_eq!(g11_segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![2, 2, 3, 2, 27, 2, 3]);
++        assert_eq!(closed_form_state_count(&g11_segments), 134_217_754);
++    }
++
++    /// 段序列的五条路径由这条钉住，绝对值取 E142 第十九次跑登记 7.4 D1–D3（臂 N19C：屏障按设备各记一步、
++    /// 按设备放行切段、每次发布末尾一道屏障、种类串 `zero_fill` 排最前）：mkfs 12+1+1+1+4（23 次操作、4114 个状态）、
++    /// 取号 2（2 次操作）、暖机 2+1+2+2+1+2（22 次操作）、事务 24+2+1+2（35 次操作）、
++    /// 整条流 2+2+1+2+2+1+2+24+2+1+2（59 次操作）。
+     /// 改任何一条路径里屏障或 FUA 的位置都红——mkfs 那一行不进层 0 枚举，这里是它唯一的会红检查。
+@@ -7420,3 +7710,3 @@ mod tests {
+         let post_mkfs_operations = &recording.operations[mkfs_operation_count..];
+-        assert_eq!(mkfs_operations.len(), 21, "mkfs：19 次写（两块盘各清根环三区域与 journal 环共 8、m1/m2 各两盘、三个第 0 代根、两盘各两个系统配置槽）+ 2 道屏障");
++        assert_eq!(mkfs_operations.len(), 23, "mkfs：19 次写（两块盘各清根环三区域与 journal 环共 8、m1/m2 各两盘、三个第 0 代根、两盘各两个系统配置槽）+ 2 道池屏障 × 2 盘（登记 7.4 D2）");
+         assert_eq!(sizes(mkfs_operations), vec![12, 1, 1, 1, 4]);
+@@ -7425,5 +7715,8 @@ mod tests {
+         assert_eq!(sizes(acquisition_operations), vec![2]);
++        assert_eq!(warm_up_operations.len(), 22, "暖机：10 次写 + 每次空发布三道池屏障 × 2 次 × 2 盘（登记 7.4 D2）");
+         assert_eq!(sizes(warm_up_operations), vec![2, 1, 2, 2, 1, 2]);
++        assert_eq!(transaction_operations.len(), 35, "第一个事务：29 次写 + 三道池屏障 × 2 盘（登记 7.4 D2）");
+         assert_eq!(sizes(transaction_operations), vec![24, 2, 1, 2]);
+-        assert_eq!(sizes(post_mkfs_operations), vec![2, 2, 1, 2, 2, 1, 26, 2, 1, 2]);
++        assert_eq!(post_mkfs_operations.len(), 59, "整条流：取号 2 + 暖机 22 + 第一个事务 35（登记 7.4 D2）");
++        assert_eq!(sizes(post_mkfs_operations), vec![2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2]);
+ 
+@@ -7431,3 +7724,3 @@ mod tests {
+             kinds(mkfs_operations),
+-            "[unit_write×4,zero_fill×8,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier]",
++            "[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]",
+             "mkfs：两块盘各清根环三区域与 journal 环（共 8）与 m1/m2 两个单元各两盘同一段、三个第 0 代根各自 FUA 一段、两盘各两个系统配置槽收尾"
+@@ -7437,4 +7730,4 @@ mod tests {
+             kinds(warm_up_operations),
+-            "[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]",
+-            "暖机两次空发布：每次「空记录两盘 → 根 FUA → 系统配置槽两盘」，第一段前面还有那道开场屏障"
++            "[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]",
++            "暖机两次空发布：每次「空记录两盘 → 根 FUA → 系统配置槽两盘 → 屏障」；第一次的发布尾屏障关掉它那一段，第二次开头那道没有写可关，并进下一段"
+         );
+@@ -7442,4 +7735,4 @@ mod tests {
+             kinds(transaction_operations),
+-            "[unit_write×24,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]",
+-            "第一个事务：12 个单元各两盘（分配记录树拆成 5 个节点之后 t1..t12）→ journal 记录两盘 → 根 FUA → 系统配置槽两盘"
++            "[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]",
++            "第一个事务：12 个单元各两盘（t1..t12）→ journal 记录两盘 → 根 FUA → 系统配置槽两盘 → 屏障"
+         );
+@@ -7447,4 +7740,4 @@ mod tests {
+             kinds(post_mkfs_operations),
+-            "[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]",
+-            "整条流：取号那两次系统配置槽写自成一段（收段的是暖机第一次开头那道屏障），暖机第二次的两个系统配置槽与事务的 24 个单元写同一段 26 个写"
++            "[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]",
++            "整条流：取号那两次系统配置槽写自成一段（收段的是暖机第一次开头那道屏障），暖机第二次的发布尾屏障把它的系统配置槽写与事务的 24 个单元写隔开"
+         );
+@@ -7468,2 +7761,190 @@ mod tests {
+ 
++    /// 臂 N19 的 ①（登记 R40）：一道池屏障按设备号升序每块盘记一步，一块盘时恰一步。
++    #[test]
++    fn a_pool_barrier_records_one_step_per_device_in_ascending_order() {
++        for (device_count, expected) in [(2usize, vec![DeviceIdentity(0), DeviceIdentity(1)]), (1, vec![DeviceIdentity(0)])] {
++            let mut pool = RecordingPool { pool: Pool { devices: vec![SparseDevice::default(); device_count] }, operations: Vec::new() };
++            pool.barrier();
++            let recorded: Vec<DeviceIdentity> = pool
++                .operations
++                .iter()
++                .map(|operation| match operation {
++                    RecordedOperation::Barrier(device) => *device,
++                    RecordedOperation::Write(_) => panic!("屏障只记屏障"),
++                })
++                .collect();
++            assert_eq!(recorded, expected);
++        }
++    }
++
++    /// 一条路径的三态那一行的各个量，逐格对登记里的锚点。
++    fn assert_three_state(summary: &ThreeStateSummary, anchor: (usize, &str, &str, u64, u64), label: &str) {
++        let (writes, in_place_per_segment, in_place_kinds, two_state, three_state) = anchor;
++        assert_eq!(summary.writes, writes, "{label} writes");
++        assert_eq!(summary.in_place_per_segment, in_place_per_segment, "{label} in_place_per_segment");
++        assert_eq!(summary.in_place_kinds, in_place_kinds, "{label} in_place_kinds");
++        assert_eq!(summary.closed_form_two_state, two_state, "{label} closed_form_two_state");
++        assert_eq!(summary.closed_form_three_state, three_state, "{label} closed_form_three_state");
++        let in_place_total: usize = in_place_per_segment.split('+').map(|count| count.parse::<usize>().expect("整数")).sum();
++        assert_eq!(summary.in_place_overwrites, in_place_total, "{label} in_place_overwrites");
++    }
++
++    /// 臂 N19C 主几何五条路径的三态（登记 7.4 C1–C5、D4）：取三态的只有系统配置槽写，mkfs 那四次写之前镜像是空的。
++    #[test]
++    fn three_state_rows_match_the_registered_anchors() {
++        let BuiltPool { recording, mkfs_operation_count, acquisition_operation_count, warm_up_operation_count, .. } = built_pool();
++        let anchors: [(usize, &str, &str, u64, u64); 5] = [
++            (19, "0+0+0+0+0", "none", 4114, 4114),
++            (2, "2", "[system_configuration_slot×2]", 4, 9),
++            (10, "0+0+2+0+0+2", "[system_configuration_slot×4]", 15, 25),
++            (29, "0+0+0+2", "[system_configuration_slot×2]", 16_777_223, 16_777_228),
++            (41, "2+0+0+2+0+0+2+0+0+0+2", "[system_configuration_slot×8]", 16_777_240, 16_777_260),
++        ];
++        let paths = first_transaction_stream_paths(&recording.operations, mkfs_operation_count, acquisition_operation_count, warm_up_operation_count);
++        for ((path_name, earlier_operations, operations), anchor) in paths.into_iter().zip(anchors) {
++            assert_three_state(&three_state_summary(earlier_operations, operations), anchor, path_name);
++        }
++    }
++
++    /// 取样点 G11（⑧ 关，就是臂 N19，登记 R44）：五条路径逐格对登记 7.1 A1–A4 与 7.2 B1–B5。
++    #[test]
++    fn g11_rows_match_the_anchors_of_the_stream_without_the_trailing_barrier() {
++        let stream = record_first_transaction_stream(&PoolParameters::settled_two_devices_without_trailing_publish_barrier(), &sample_file());
++        let expected: [(&str, usize, &str, u64, u64, &str, &str); 5] = [
++            ("mkfs", 23, "12+1+1+1+4", 4114, 4114, "0+0+0+0+0", "[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]"),
++            ("instance_acquisition", 2, "2", 4, 9, "2", "[system_configuration_slot×2]"),
++            ("warm_up", 18, "2+1+2+2+1+2", 15, 25, "0+0+2+0+0+2", "[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]"),
++            ("transaction", 33, "24+2+1+2", 16_777_223, 16_777_228, "0+0+0+2", "[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]"),
++            (
++                "post_mkfs_stream",
++                53,
++                "2+2+1+2+2+1+26+2+1+2",
++                67_108_885,
++                150_994_980,
++                "2+0+0+2+0+0+2+0+0+2",
++                "[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]",
++            ),
++        ];
++        let paths = first_transaction_stream_paths(&stream.operations, stream.mkfs_operation_count, stream.acquisition_operation_count, stream.warm_up_operation_count);
++        for ((path_name, earlier_operations, operations), (expected_path, operation_count, sizes, two_state, three_state, in_place, kinds)) in paths.into_iter().zip(expected) {
++            assert_eq!(path_name, expected_path);
++            assert_eq!(
++                segments_sensitivity_line("point=G11 trailing_barrier=off", path_name, earlier_operations, operations),
++                format!("name=segments_sensitivity point=G11 trailing_barrier=off path={path_name} operations={operation_count} segments={sizes} closed_form={two_state} closed_form_three_state={three_state} in_place_per_segment={in_place} kinds={kinds}"),
++            );
++        }
++    }
++
++    /// 取样点 G10a / G10b（⑧ 开的主几何）与 G12a / G12b（⑧ 关）：吞掉第一个事务「记录 → 根槽」之间一块盘那一步屏障。
++    /// 绝对值取登记 7.4 C6–C9、D6（G10）与 7.2 B6–B9、7.1 A6（G12）。
++    #[test]
++    fn swallowed_barrier_points_match_the_registered_anchors() {
++        type Anchor = (&'static str, u32, &'static str, usize, &'static str, u64, u64, &'static str, &'static str);
++        let with_trailing = built_pool();
++        let without_trailing = record_first_transaction_stream(&PoolParameters::settled_two_devices_without_trailing_publish_barrier(), &sample_file());
++        let with_trailing_counts = (with_trailing.mkfs_operation_count, with_trailing.warm_up_operation_count);
++        let without_trailing_counts = (without_trailing.mkfs_operation_count, without_trailing.warm_up_operation_count);
++        let anchors: [(&[RecordedOperation], (usize, usize), Anchor); 8] = [
++            (&with_trailing.recording.operations, with_trailing_counts, ("point=G10a swallowed_device=1", 1, "transaction", 34, "24+5", 16_777_247, 16_777_287, "0+2", "[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,system_configuration_slot×2,barrier×3]")),
++            (&with_trailing.recording.operations, with_trailing_counts, ("point=G10a swallowed_device=1", 1, "post_mkfs_stream", 58, "2+2+1+2+2+1+2+24+5", 16_777_264, 16_777_319, "2+0+0+2+0+0+2+0+2", "[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,system_configuration_slot×2,barrier×3]")),
++            (&with_trailing.recording.operations, with_trailing_counts, ("point=G10b swallowed_device=0", 0, "transaction", 34, "24+3+2", 16_777_226, 16_777_231, "0+0+2", "[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,barrier]|[system_configuration_slot×2,barrier×2]")),
++            (&with_trailing.recording.operations, with_trailing_counts, ("point=G10b swallowed_device=0", 0, "post_mkfs_stream", 58, "2+2+1+2+2+1+2+24+3+2", 16_777_243, 16_777_263, "2+0+0+2+0+0+2+0+0+2", "[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,barrier]|[system_configuration_slot×2,barrier×2]")),
++            (&without_trailing.operations, without_trailing_counts, ("point=G12a trailing_barrier=off swallowed_device=1", 1, "transaction", 32, "24+5", 16_777_247, 16_777_287, "0+2", "[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,system_configuration_slot×2,barrier]")),
++            (&without_trailing.operations, without_trailing_counts, ("point=G12a trailing_barrier=off swallowed_device=1", 1, "post_mkfs_stream", 52, "2+2+1+2+2+1+26+5", 67_108_909, 150_995_039, "2+0+0+2+0+0+2+2", "[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier×2]|[journal_record×2,root_record_fua,system_configuration_slot×2,barrier]")),
++            (&without_trailing.operations, without_trailing_counts, ("point=G12b trailing_barrier=off swallowed_device=0", 0, "transaction", 32, "24+3+2", 16_777_226, 16_777_231, "0+0+2", "[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,barrier]|[system_configuration_slot×2]")),
++            (&without_trailing.operations, without_trailing_counts, ("point=G12b trailing_barrier=off swallowed_device=0", 0, "post_mkfs_stream", 52, "2+2+1+2+2+1+26+3+2", 67_108_888, 150_994_983, "2+0+0+2+0+0+2+0+2", "[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier×2]|[journal_record×2,root_record_fua,barrier]|[system_configuration_slot×2]")),
++        ];
++        for (operations, (mkfs_operation_count, warm_up_operation_count), (point_fields, expected_swallowed_device, path_name, operation_count, sizes, two_state, three_state, in_place, kinds)) in anchors {
++            // 吞哪块盘取 `main()` 用的那两张表（变异 M193、M201 改的就是它们），期望值是登记里的字面。
++            let point_name = point_fields.split_whitespace().next().and_then(|field| field.strip_prefix("point=")).expect("point= 打头");
++            let (_, swallowed_device) = SWALLOWED_BARRIER_POINTS_WITH_TRAILING_BARRIER
++                .iter()
++                .chain(SWALLOWED_BARRIER_POINTS_WITHOUT_TRAILING_BARRIER.iter())
++                .find(|(name, _)| *name == point_name)
++                .copied()
++                .expect("登记过的取样点");
++            assert_eq!(swallowed_device, DeviceIdentity(expected_swallowed_device), "{point_name} 吞的那块盘");
++            let swallowed_transaction = swallow_one_device_barrier_step_before_the_root(&operations[warm_up_operation_count..], swallowed_device);
++            let (earlier_operations, path_operations): (&[RecordedOperation], Vec<RecordedOperation>) = match path_name {
++                "transaction" => (&operations[..warm_up_operation_count], swallowed_transaction),
++                _ => (&operations[..mkfs_operation_count], operations[mkfs_operation_count..warm_up_operation_count].iter().cloned().chain(swallowed_transaction).collect()),
++            };
++            assert_eq!(
++                segments_sensitivity_line(point_fields, path_name, earlier_operations, &path_operations),
++                format!("name=segments_sensitivity {point_fields} path={path_name} operations={operation_count} segments={sizes} closed_form={two_state} closed_form_three_state={three_state} in_place_per_segment={in_place} kinds={kinds}"),
++            );
++        }
++    }
++
++    /// 窗口之前与窗口的计数（登记 7.4 C10、C11、D5）与判决格 `write_list_ok`（⑤ ⑨；变异 M192、M198）。
++    #[test]
++    fn before_window_and_window_counts_match_the_registered_anchors() {
++        let BuiltPool { recording, warm_up_operation_count, .. } = built_pool();
++        let before_window = &recording.operations[..warm_up_operation_count];
++        let window = &recording.operations[warm_up_operation_count..];
++        let count_writes = |operations: &[RecordedOperation]| operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(_))).count();
++        let count_barrier_steps = |operations: &[RecordedOperation]| operations.iter().filter(|operation| matches!(operation, RecordedOperation::Barrier(_))).count();
++        let count_fua = |operations: &[RecordedOperation]| operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(write) if write.is_fua())).count();
++        assert_eq!((before_window.len(), count_writes(before_window)), (47, 31), "C10");
++        assert_eq!((window.len(), count_writes(window), count_barrier_steps(window), count_fua(window)), (35, 29, 6, 1), "C11");
++        assert!(first_transaction_write_list_matches(count_writes(window), count_barrier_steps(window), count_fua(window), 2));
++        assert!(!first_transaction_write_list_matches(29, 4, 1, 2), "C577 之前的两道池屏障（每盘各一步）不算过");
++        assert!(!first_transaction_write_list_matches(29, 2, 1, 2), "按池屏障数（一道一步）不算过");
++        assert!(first_transaction_write_list_matches(29, 3, 1, 1), "一块盘时三道屏障各一步");
++        assert!(!first_transaction_write_list_matches(28, 6, 1, 2) && !first_transaction_write_list_matches(29, 6, 2, 2));
++    }
++
++    /// 臂 N19 的 ③（登记 R39）：原地覆写三条都成立才算；合成的写流上逐条各缺一条（变异 M186、M187、M188 各落一个点）。
++    #[test]
++    fn in_place_overwrite_needs_all_three_conditions_on_synthetic_writes() {
++        let write = |kind: StepKind, offset: u64, length: usize, byte: u8| RecordedOperation::Write(WriteRequest { device: DeviceIdentity(0), offset: DeviceOffset(offset), bytes: vec![byte; length], kind });
++        let operations = vec![
++            write(StepKind::SystemConfigurationSlot, 0, 4096, 0x5a), // 镜像是空的：不是
++            write(StepKind::SystemConfigurationSlot, 0, 4096, 0x5b), // 同一路径里更早的写落过：是（M188）
++            write(StepKind::JournalRecord, 0, 512, 0x5c),             // 只有一个扇区长：不是（M186）
++            write(StepKind::UnitWrite, 0, 32768, 0x5d),               // 单元写：不是（M187）
++            write(StepKind::RootRecordFua, 65536, 4096, 0x5e),        // 罩住的范围原来全是 0：不是
++            write(StepKind::JournalRecord, 65536, 1024, 0x5f),        // 罩住上一次写：是
++            RecordedOperation::Write(WriteRequest { device: DeviceIdentity(1), offset: DeviceOffset(0), bytes: Vec::new(), kind: StepKind::ZeroFill }),
++            RecordedOperation::Write(WriteRequest { device: DeviceIdentity(1), offset: DeviceOffset(0), bytes: vec![0x60; 4096], kind: StepKind::SystemConfigurationSlot }), // 清零过的一段：不是
++        ];
++        assert_eq!(in_place_overwrite_flags(&[], &operations), vec![false, true, false, false, false, true, false, false]);
++        assert_eq!(in_place_overwrite_flags(&operations[..1], &operations[1..2]), vec![true], "路径之前的写也算进镜像");
++        // 八次写（两块盘，没有屏障，FUA 不当边界）同一段，其中两次原地覆写：1 + (3^2 · 2^6 − 1) = 576。
++        let (_, segments) = split_into_segments(&operations, false);
++        assert_eq!(segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![8]);
++        assert_eq!(closed_form_three_state_count(&segments, &in_place_overwrite_flags(&[], &operations)), 576);
++        assert_eq!(closed_form_state_count(&segments), 256);
++    }
++
++    /// 臂 N19 的 ②（D13 已定项 4）：合成写流上逐条看放行规则（变异 M181–M184 各有一处落点）。
++    #[test]
++    fn segment_closing_rule_waits_for_every_device_with_writes() {
++        let write = |device: u32, kind: StepKind| RecordedOperation::Write(WriteRequest { device: DeviceIdentity(device), offset: DeviceOffset(0), bytes: vec![1; 512], kind });
++        let barrier = |device: u32| RecordedOperation::Barrier(DeviceIdentity(device));
++        let sizes = |operations: &[RecordedOperation], fua_is_boundary: bool| split_into_segments(operations, fua_is_boundary).1.iter().map(Vec::len).collect::<Vec<_>>();
++        // 两块盘有写，只放行一块盘不关段；有写的盘都放行了才关。
++        let released_one_by_one = [
++            write(0, StepKind::UnitWrite),
++            write(1, StepKind::UnitWrite),
++            barrier(0),
++            write(0, StepKind::JournalRecord),
++            barrier(1),
++            barrier(0),
++            write(1, StepKind::UnitWrite),
++            barrier(1),
++        ];
++        assert_eq!(sizes(&released_one_by_one, true), vec![3, 1]);
++        // FUA 只放行它自己那块盘：盘 1 还没放行时它不关段；只有它那块盘有写时它关段。
++        let fua_on_one_device = [write(1, StepKind::JournalRecord), write(0, StepKind::RootRecordFua), barrier(1), write(0, StepKind::RootRecordFua), write(0, StepKind::SystemConfigurationSlot)];
++        assert_eq!(sizes(&fua_on_one_device, true), vec![2, 1, 1]);
++        assert_eq!(sizes(&fua_on_one_device, false), vec![4], "FUA 不当边界时与普通写一样，盘 0 一直没放行");
++        // FUA 不放行别的盘：盘 1 的记录要等盘 1 的屏障。
++        let fua_does_not_release_other_devices = [write(1, StepKind::JournalRecord), write(0, StepKind::RootRecordFua), write(0, StepKind::SystemConfigurationSlot), barrier(1), barrier(0)];
++        assert_eq!(sizes(&fua_does_not_release_other_devices, true), vec![3]);
++        // 段里没写时的屏障并进即将开始的一段；流尾只有屏障的一串并进上一段。
++        let kinds = format_segment_kinds(&segment_step_kinds(&[barrier(0), barrier(1), write(0, StepKind::UnitWrite), barrier(0), barrier(1)], true));
++        assert_eq!(kinds, "[unit_write,barrier×4]");
++    }
++
+     /// 暖机（D16 已定项 8）：两次空发布，根落区域 1 与区域 2（分住两块盘），jsn 1、2 不点名任何单元，第一个事务从 txg 3 起。
+@@ -7474,5 +7955,5 @@ mod tests {
+         let writes = operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(_))).count();
+-        let fua_writes: Vec<&WriteRequest> = operations.iter().filter_map(|operation| match operation { RecordedOperation::Write(write) if write.is_fua() => Some(write), RecordedOperation::Write(_) | RecordedOperation::Barrier => None }).collect();
++        let fua_writes: Vec<&WriteRequest> = operations.iter().filter_map(|operation| match operation { RecordedOperation::Write(write) if write.is_fua() => Some(write), RecordedOperation::Write(_) | RecordedOperation::Barrier(_) => None }).collect();
+         assert_eq!(writes, 10, "每次空发布 2 条记录 + 1 个根 + 2 个系统配置槽");
+-        assert_eq!(operations.iter().filter(|operation| matches!(operation, RecordedOperation::Barrier)).count(), 4);
++        assert_eq!(operations.iter().filter(|operation| matches!(operation, RecordedOperation::Barrier(_))).count(), 12, "每次空发布三道池屏障 × 2 盘（登记 7.4 C3 barrier_steps=12）");
+         assert_eq!(fua_writes.len(), 2);
+@@ -8540,3 +9021,3 @@ mod tests {
+     fn sha256_of_the_actual_root_record_bytes_matches_the_crates_side_reference_value() {
+-        // 这个十六进制串与 sha256 都是 2026-09-18 从 `cargo run -p singlefs-harness --bin first_transaction_region_bytes`
++        // 这个十六进制串与 sha256 都是 2026-09-18 从 `cargo run -p singlefs-checker-tier --bin first_transaction_region_bytes`
+         // 的真实产出里摘的一行（`region=root_record device=0`），用来钉住「这份手写 SHA-256 与 crates 侧算的是同一个函数」，
+@@ -8696,4 +9177,4 @@ mod tests {
+ 
+-    /// R13「按发布分组」：主臂那条流的三次根槽 FUA 写各自落在哪个段号——第七节 B19 的段序列
+-    /// `[2, 2, 1, 2, 2, 1, 26, 2, 1, 2]` 里，三个大小为 1 的段（下标 2、5、8）恰好就是三次根槽。
++    /// R13「按发布分组」：主臂那条流的三次根槽 FUA 写各自落在哪个段号——E142 第十九次跑登记 7.4 C5 的段序列
++    /// `[2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2]` 里，三个大小为 1 的段（下标 2、5、9）恰好就是三次根槽。
+     #[test]
+@@ -8702,3 +9183,3 @@ mod tests {
+         let (writes, segments) = split_into_segments(&recording.operations[mkfs_operation_count..], true);
+-        assert_eq!(segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![2, 2, 1, 2, 2, 1, 26, 2, 1, 2], "第七节 A19/B19 的段序列");
++        assert_eq!(segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2], "登记 7.4 C5 的段序列");
+         let root_segment_indices: Vec<usize> = writes
+@@ -8709,5 +9190,5 @@ mod tests {
+             .collect();
+-        assert_eq!(root_segment_indices, vec![2, 5, 8], "三次根槽各自单独一段——取号+暖机1、暖机2、主事务");
++        assert_eq!(root_segment_indices, vec![2, 5, 9], "三次根槽各自单独一段——取号+暖机1、暖机2、主事务");
+         let boundaries = publish_group_boundaries(&writes, &segments);
+-        assert_eq!(boundaries, vec![2, 5, 8]);
++        assert_eq!(boundaries, vec![2, 5, 9]);
+         assert_eq!(publish_group_label(&boundaries, Some(0)), "txg1");
+@@ -8715,4 +9196,4 @@ mod tests {
+         assert_eq!(publish_group_label(&boundaries, Some(3)), "txg2");
+-        assert_eq!(publish_group_label(&boundaries, Some(8)), "txg3");
+-        assert_eq!(publish_group_label(&boundaries, Some(9)), "after_last_root");
++        assert_eq!(publish_group_label(&boundaries, Some(9)), "txg3");
++        assert_eq!(publish_group_label(&boundaries, Some(10)), "after_last_root");
+         assert_eq!(publish_group_label(&boundaries, None), "every_write_persisted");
+@@ -8747,3 +9228,3 @@ mod tests {
+         let closed_form = closed_form_state_count(&segments);
+-        assert_eq!(closed_form, 67_108_885, "第七节 B19");
++        assert_eq!(closed_form, 16_777_240, "登记 7.4 C5 / C12");
+         let root_index = writes.iter().rposition(|write| write.kind == StepKind::RootRecordFua).expect("根槽写");
+@@ -8774,5 +9255,6 @@ mod tests {
+     fn layer0_main_arm_verdict_flags_every_threshold_independently() {
+-        let mut tally = Layer0Tally { states: 67_108_885, violations: 0, root_persisted_states: 4, file_read_states: 7, journal_differing_states: 3, ..Layer0Tally::default() };
++        // ⑪（登记 R19C-4、变异 M200）：states = closed_form = 登记 7.4 C5 的两态 16777240 时 layer0_states_ok 为真。
++        let mut tally = Layer0Tally { states: 16_777_240, violations: 0, root_persisted_states: 4, file_read_states: 7, journal_differing_states: 3, ..Layer0Tally::default() };
+         let comparison = PredictionComparison::default();
+-        let baseline = layer0_main_arm_verdict(&tally, 67_108_885, &comparison);
++        let baseline = layer0_main_arm_verdict(&tally, 16_777_240, &comparison);
+         assert!(baseline.layer0_states_ok && baseline.root_persisted_ok && baseline.file_read_ok && baseline.file_read_wrong_content_zero && baseline.main_outcome_matrix_ok);
+@@ -8781,8 +9263,11 @@ mod tests {
+ 
+-        let wrong_states = layer0_main_arm_verdict(&tally, 67_108_884, &comparison);
++        let wrong_states = layer0_main_arm_verdict(&tally, 16_777_239, &comparison);
+         assert!(!wrong_states.layer0_states_ok);
+         assert!(wrong_states.root_persisted_ok, "只应该翻 layer0_states_ok 这一格");
++        // C577 之前的整条流闭式 67108885（登记 7.2 B5），states 与它相等也不算过。
++        let pre_trailing_barrier_tally = Layer0Tally { states: 67_108_885, ..tally.clone() };
++        assert!(!layer0_main_arm_verdict(&pre_trailing_barrier_tally, 67_108_885, &comparison).layer0_states_ok);
+ 
+         tally.violations = 1;
+-        let with_violation = layer0_main_arm_verdict(&tally, 67_108_885, &comparison);
++        let with_violation = layer0_main_arm_verdict(&tally, 16_777_240, &comparison);
+         assert_eq!(with_violation.layer0_violations, "nonzero");
+@@ -8792,3 +9277,3 @@ mod tests {
+         tally.root_persisted_states = 5;
+-        assert!(!layer0_main_arm_verdict(&tally, 67_108_885, &comparison).root_persisted_ok);
++        assert!(!layer0_main_arm_verdict(&tally, 16_777_240, &comparison).root_persisted_ok);
+         tally.root_persisted_states = 4;
+@@ -8796,3 +9281,3 @@ mod tests {
+         tally.file_read_states = 6;
+-        assert!(!layer0_main_arm_verdict(&tally, 67_108_885, &comparison).file_read_ok);
++        assert!(!layer0_main_arm_verdict(&tally, 16_777_240, &comparison).file_read_ok);
+         tally.file_read_states = 7;
+@@ -8800,3 +9285,3 @@ mod tests {
+         tally.file_read_wrong_content_states = 1;
+-        assert!(!layer0_main_arm_verdict(&tally, 67_108_885, &comparison).file_read_wrong_content_zero);
++        assert!(!layer0_main_arm_verdict(&tally, 16_777_240, &comparison).file_read_wrong_content_zero);
+         tally.file_read_wrong_content_states = 0;
+@@ -8804,5 +9289,5 @@ mod tests {
+         tally.journal_differing_states = 9;
+-        assert_eq!(layer0_main_arm_verdict(&tally, 67_108_885, &comparison).journal_reading, "j_yi");
++        assert_eq!(layer0_main_arm_verdict(&tally, 16_777_240, &comparison).journal_reading, "j_yi");
+         tally.journal_differing_states = 4;
+-        assert_eq!(layer0_main_arm_verdict(&tally, 67_108_885, &comparison).journal_reading, "neither");
++        assert_eq!(layer0_main_arm_verdict(&tally, 16_777_240, &comparison).journal_reading, "neither");
+         tally.journal_differing_states = 3;
+@@ -8811,3 +9296,3 @@ mod tests {
+         dirty_comparison.off_diagonal = 1;
+-        assert!(!layer0_main_arm_verdict(&tally, 67_108_885, &dirty_comparison).main_outcome_matrix_ok);
++        assert!(!layer0_main_arm_verdict(&tally, 16_777_240, &dirty_comparison).main_outcome_matrix_ok);
+     }

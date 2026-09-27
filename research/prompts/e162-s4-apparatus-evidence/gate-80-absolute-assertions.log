@@ -1,0 +1,5 @@
+  ✓ 158 个实验二进制各自至少有一条绝对值断言（research/e7-index-bench/src/bin 下 153 份，别处 src/bin 下以 e<数字>_ 开头的 5 份）
+    没判的 3 份（别处 src/bin 下不以 e<数字>_ 开头，按装置工具算）：
+      crates/singlefs-checker-tier/src/bin/first_transaction_device_log_check.rs
+      crates/singlefs-checker-tier/src/bin/first_transaction_on_device.rs
+      crates/singlefs-checker-tier/src/bin/first_transaction_region_bytes.rs

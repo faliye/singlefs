@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 要 cargo：缺了就在阶段里那一步 cargo test 判红，不交给 gate.sh 预判（用户 2026-09-26 定：项目更严）；此外只要跑门禁本身就要的 bash、git、python3
-# gate-stage: 模型对拍（里程碑「第二个事务」增补 3 第 2 件：随机历史快档与三个取样点，每一步拿实现的结局与只住内存的理想模型比）
+# gate-stage: 模型对拍（里程碑「覆盖写、释放、回退与复用」增补 3 第 2 件：随机历史快档与三个取样点，每一步拿实现的结局与只住内存的理想模型比）
 # gate-covers: 模型对拍
 #
-# 被测的是 `crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs` 里的那几段：快档与几个偏向某种历史的取样点，段名与段数以下面的 SECTIONS 为准（落到墙边的那几段每一步之后也跑池级 checker，已知红第 0 条那一形只记不停）。每段的报告里有一行「模型对拍 N 步：…」（`crates/singlefs-harness/src/history.rs` 的报告渲染），
+# 被测的是 `crates/singlefs-harness/tests/random_histories.rs` 里的那几段：快档与几个偏向某种历史的取样点，段名与段数以下面的 SECTIONS 为准（落到墙边的那几段每一步之后也跑池级 checker，已知红第 0 条那一形只记不停）。每段的报告里有一行「模型对拍 N 步：…」（`crates/singlefs-harness/src/history.rs` 的报告渲染），
 # 模型模块 `crates/singlefs-harness/src/model.rs` 只用 `singlefs_format` 的常量（D13（验证路线） 已定项 5）。
 # 这里在 release 下单跑那一个测试二进制，要求 SECTIONS 里每一段都打出「模型对拍」那一行、步数都大于 0——测试绿而模型一步没判，等于没对拍。
 # 判别力：模型对拍自己会不会红，由 `crates/mutations.tsv` 里点名这个测试二进制的那几条变异（门禁 59 号）证明；这个阶段只判「跑了、判过、没报对不上」。
@@ -29,7 +29,7 @@ stage_run_or_skip "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-m
 stage_run_or_skip "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/change-touches-crates.sh" "这次改动没碰它判的东西" \
   "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；判据与前缀见 research/scripts/change-touches-crates.sh。" -- "$ROOT" crates/
 
-TEST_BINARY="second_transaction_supplement_three_random_history"
+TEST_BINARY="random_histories"
 # 这里的 cargo test 跑编译出来的代码，经 research/scripts/run-with-memory-cap.sh 放进内存上限里跑（.claude/agent-common.md「跑编译出来的代码经内存包装」那一条），
 # 谁跑这一道都一样，外面不再包一层。上限取 GATE_MODEL_DIFFERENTIAL_MEMORY_MAX（派发提示给了上限的，跑这一道的 agent 设进它），
 # 没设取 research/scripts/replay.sh 的 REPLAY_MEMORY_CAP 默认值 8G。包装自己的结局（退出码 250–254）不是测试的判定，单独判红、单独给出路。

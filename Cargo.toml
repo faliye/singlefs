@@ -1,4 +1,4 @@
-# singlefs workspace（里程碑「第一个事务」步 0 的脚手架，2026-09-14）。
+# singlefs workspace（里程碑「新池新建文件」步 0 的脚手架，2026-09-14）。
 # research/ 是实验 workspace，自己有 Cargo.toml，这里显式排除。
 [workspace]
 resolver = "2"

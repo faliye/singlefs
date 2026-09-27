@@ -1,5 +1,5 @@
 //! 取号（D23（journal 的角色与格式） 已定项 16、D18（块里携带什么信息） 已定项 11；C322（取号那一步的屏障怎么放没有条款） 2026-09-14 定案）：
-//! 第二次取号看得见、世代号逐盘 +1、取号之后那道屏障、取号写或屏障报错时回卷成旧代号。每条都从写完第一个事务的镜像出发。
+//! 第二次取号看得见、世代号逐盘 +1、取号之后那道屏障、取号写或屏障报错时回卷成旧代号。每条都从写完新池新建文件的镜像出发。
 
 mod common;
 
@@ -71,7 +71,7 @@ fn wrap(built: &mut BuiltPool) -> WrappedDevices {
     let devices = built
         .devices
         .take()
-        .expect("第一个事务写完，盘还开着")
+        .expect("新池新建文件写完，盘还开着")
         .into_iter()
         .map(|(identity, inner)| {
             (
@@ -138,7 +138,7 @@ fn second_acquisition_writes_generation_six_on_both_disks_and_the_next_acquisiti
         assert_eq!(
             slots_of(&devices, disk),
             vec![(5, InstanceGeneration(1)), (6, InstanceGeneration(2))],
-            "{disk:?}：第一个事务留下世代 5，第二次取号按那块盘自证过的最大世代号 + 1 写世代 6（D22（单元原子性怎么合成） 已定项 16 逐盘计）"
+            "{disk:?}：新池新建文件留下世代 5，第二次取号按那块盘自证过的最大世代号 + 1 写世代 6（D22（单元原子性怎么合成） 已定项 16 逐盘计）"
         );
     }
     assert_eq!(
@@ -183,7 +183,7 @@ fn failed_barrier_after_acquisition_rolls_both_disks_back_and_the_skipped_number
 }
 
 /// 取号写之前那道屏障报错（代码审阅第 19 条加的那一道：取号写覆写较旧那一槽之前，另一槽里上一次轮换写的先持久）：
-/// 一个取号写都没发，取号失败、没有要回卷的（`NothingWritten`），两块盘两槽照旧是第一个事务留下的世代 4、5；屏障好了再取号取到 2。
+/// 一个取号写都没发，取号失败、没有要回卷的（`NothingWritten`），两块盘两槽照旧是新池新建文件留下的世代 4、5；屏障好了再取号取到 2。
 #[test]
 fn failed_barrier_before_the_acquisition_writes_writes_nothing_and_the_number_is_handed_out_later()
 {

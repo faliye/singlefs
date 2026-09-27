@@ -1,5 +1,5 @@
-//! 实五那几条用例共用的搭建（`second_transaction_admission_raises_the_floor_before_refusing.rs` 与
-//! `second_transaction_crash_inside_the_floor_raise_pushed_by_the_session.rs`）：两块内存稀疏盘上 mkfs、取号、暖机、第一个文件，
+//! 实五那几条用例共用的搭建（`admission_raises_the_floor_before_refusing.rs` 与
+//! `crash_enumeration_floor_raise_pushed_by_admission.rs`）：两块内存稀疏盘上 mkfs、取号、暖机、第一个文件，
 //! 之后经挂着的会话（`singlefs_core::mounted_session`）发布、崩了再挂，记下每条根带的文件内容（层 0 的 oracle 按它判读回什么）。
 #![allow(dead_code, reason = "两个测试文件各自只用到其中一部分")]
 

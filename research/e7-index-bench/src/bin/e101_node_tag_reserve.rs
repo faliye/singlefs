@@ -2,8 +2,8 @@
 //!
 //! ## 被引用条款逐字贴在这里
 //!
-//! - **D26 已定项 4 判「是」的逐字依据**：「第一个事务要写索引节点，而这一项**直接改节点布局**
-//!   ⇒ **不定它，第一个事务的节点字节写不出来**」。
+//! - **D26 已定项 4 判「是」的逐字依据**：「新池新建文件要写索引节点，而这一项**直接改节点布局**
+//!   ⇒ **不定它，新池新建文件的节点字节写不出来**」。
 //! - **D26 已定项 4 的 2026-09-03 复核逐字**：三腿判「翻转为否」不成立，**判定维持「是」**。
 //! - **E95 自陈的射程逐字**：「两条格式臂是**候选不是穷举**：别的节点布局形态若被提出，
 //!   **要加臂重跑**」；且「组身份与老化代在真格式里**各占几字节**……**模型不算**」。
@@ -22,7 +22,7 @@
 //!    叶扇出、内部扇出、树高。扇出恰好 `(16384 − 节点头 − 区间字段) / 条目宽`。
 //! 2. **表达力下界**：把 E95 注册的两条臂形式化成「每节点一个标签」，
 //!    **数出各自要多少个互不相同的标签值** ⇒ 标签宽度的下界。**数不出来就报「上界取不到」，不许估。**
-//! 3. **翻转判据**：留位之后，第一个事务写出的节点字节在「将来选任何一条臂」下**是否逐字节相同**——
+//! 3. **翻转判据**：留位之后，新池新建文件写出的节点字节在「将来选任何一条臂」下**是否逐字节相同**——
 //!    相同则依据消解、判定可翻为否；**不同则不许翻**。
 //! 4. **冲突计数**：标签宽度不足时被迫合并的组数；宽度够时必须恰好 0。
 //!
@@ -30,7 +30,7 @@
 //!
 //! - **阳性对照，每条臂都跑**：宽度取 0 时两条臂的冲突数都必须 > 0；取足够宽时都必须恰好 0。
 //! - **阴性对照**：只有一个组时，任何宽度（含 0 位）的冲突数都必须为 0。
-//! - **反向接受条款**：判据 3 判出「第一个事务的字节会随所选臂而变」
+//! - **反向接受条款**：判据 3 判出「新池新建文件的字节会随所选臂而变」
 //!   ⇒ 结论是「**留位翻不了那个判定**，D26 已定项 4 照旧挡在第一行代码前面」，如实写。
 //! - E95 未跑 ⇒ 两条臂的形态取它注册时写下的那一句，**不许自己扩写**。
 //!
@@ -127,10 +127,10 @@ fn forced_merges(groups: Option<u64>, tag_bytes: u64) -> Option<u64> {
     }
 }
 
-/// **判据 3**：第一个事务写出的节点字节，在「将来选任何一条臂」下是否逐字节相同。
+/// **判据 3**：新池新建文件写出的节点字节，在「将来选任何一条臂」下是否逐字节相同。
 /// 只有当**所有臂都装得进同一个已经定死的宽度**时才相同。
 /// 有一条臂的宽度需求取不到 ⇒ 定不出那个宽度 ⇒ 字节写不出来 ⇒ **翻转不成立**。
-fn first_transaction_bytes_stable(tag_bytes: u64) -> bool {
+fn new_pool_file_creation_bytes_stable(tag_bytes: u64) -> bool {
     ARMS.iter().all(|arm| matches!(forced_merges(arm.distinct_values, tag_bytes), Some(0)))
 }
 
@@ -186,9 +186,9 @@ fn main() {
     // 判据 3：翻转
     for &tag_bytes in TAG_WIDTHS.iter() {
         output_lines.push(emitter.emit_raw(&format!(
-            "name=flip tag_bytes={tag_bytes} first_txn_bytes_stable={} verdict_can_flip_to_no={}",
-            u8::from(first_transaction_bytes_stable(tag_bytes)),
-            u8::from(first_transaction_bytes_stable(tag_bytes))
+            "name=flip tag_bytes={tag_bytes} new_pool_file_creation_bytes_stable={} verdict_can_flip_to_no={}",
+            u8::from(new_pool_file_creation_bytes_stable(tag_bytes)),
+            u8::from(new_pool_file_creation_bytes_stable(tag_bytes))
         )));
     }
 
@@ -244,12 +244,12 @@ mod tests {
         }
     }
 
-    /// **判据 3 + 反向接受条款**：没有任何一档宽度能让第一个事务的字节稳定
+    /// **判据 3 + 反向接受条款**：没有任何一档宽度能让新池新建文件的字节稳定
     /// ⇒ **留位翻不了 D26 已定项 4 的「是」**。
     #[test]
     fn criterion3_reserving_cannot_flip_the_blocking_verdict() {
         for &tag_bytes in TAG_WIDTHS.iter() {
-            assert!(!first_transaction_bytes_stable(tag_bytes), "宽度 {tag_bytes} 不该判成稳定");
+            assert!(!new_pool_file_creation_bytes_stable(tag_bytes), "宽度 {tag_bytes} 不该判成稳定");
         }
         // 阳性对照：把两条臂都换成有上界的，翻转就成立——证明这一维真的进了模型
         assert!(matches!(forced_merges(Some(49), 1), Some(0)));

@@ -12,3 +12,6 @@ want=crates/mutations.tsv:3 M_转义写进源码：替换文里的 \&
 want=这些变异表或它的被测源码读不了
 want=research/mutations/e3_latin1.tsv 或 research/e7-index-bench/src/bin/e3_latin1.rs：UnicodeDecodeError
 want=crates/mutations.tsv:4 M_文件列是目录：文件 crates/demo/src 读不了（IsADirectoryError）
+want=crates/mutations.tsv:5 M_点名重档没带开关：点名的 slow_heavy_case 标了 #[ignore]
+want=crates/mutations.tsv:6 M_筛选词对不上：筛选词 some_other_case 筛不到点名的 slow_heavy_case
+want=crates/mutations.tsv:7 M_库里筛选词对不上：筛选词 other_module 筛不到点名的 tests::lib_case

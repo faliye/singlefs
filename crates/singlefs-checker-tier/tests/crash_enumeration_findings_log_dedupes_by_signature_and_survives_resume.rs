@@ -1,4 +1,5 @@
-//! 层 0 放量的发现日志（用户 2026-09-27「崩溃放量日志 只写出错日志或者需要全量和错误双份日志 不然你读不过来了」；里程碑「第二个事务」
+//! checker 档模块：crash、layer0_progress
+//! 层 0 放量的发现日志（用户 2026-09-27「崩溃放量日志 只写出错日志或者需要全量和错误双份日志 不然你读不过来了」；里程碑「覆盖写、释放、回退与复用」
 //! 收尾批「层 0 发现日志」）：在第一条流上（mkfs → 取号 → 暖机 → A，按甲二展开，原地覆写取三态，54 个状态）把版本表故意写错——
 //! 暖机第二次发布（实例 1、txg 2）下面说有文件、A（txg 3）的内容说成别的——落在 txg 2 的状态报「有文件却报没有」，读出 A 的状态报
 //! 「读回的内容不对」，两遍恢复（看 journal、不看 journal）各红几段。今天的计数只留一条 `first_violation`；发现表按签名去重之后
@@ -39,7 +40,7 @@ use singlefs_harness::segments::StepKind;
 /// 第一条流按甲二展开的状态数（`crash_enumeration_sharded_across_processes.rs` 的 `QUICK_TIER_STATES`，那里写了怎么数出来的）。
 const QUICK_TIER_STATES: u64 = 54;
 /// 进度文件、账本与发现日志 begin 行里的流名。
-const STREAM_NAME: &str = "findings_first_transaction_stream";
+const STREAM_NAME: &str = "findings_new_pool_file_creation_stream";
 
 struct FirstStream {
     base: MemoryPool,

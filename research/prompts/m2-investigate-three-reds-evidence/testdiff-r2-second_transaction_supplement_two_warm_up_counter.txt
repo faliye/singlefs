@@ -1,0 +1,4 @@
+28c28
+< use singlefs_harness::crash::SparseBlockDevice;
+---
+> use singlefs_harness::memory_pool::SparseBlockDevice;

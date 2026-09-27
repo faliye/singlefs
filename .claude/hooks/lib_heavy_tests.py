@@ -50,7 +50,7 @@ cargo mutants -d 指到别处的树。
   list-by-presence（见到 --list 这个词就算只列）、strace-drops-env（strace -E / --env 设的变量不带进里面那条命令）、
   launcher-long-options-partial（要值的长选项照补全之前的表、不认前缀）、alias-not-expanded（--config / CARGO_ALIAS_ 定的别名看得到值也不展开）、
   package-specification-literal（-p 的值只按字面名比，不认通配、@版本、pkgid URL）、launcher-drops-property-environment（systemd-run -p Environment= /
-  EnvironmentFile= 设的变量不带进里面那条命令）、list-past-separator（找 --list 时见到 `--` 不停）、configuration-before-subcommand-only（只收子命令之前的 --config）、mutants-configuration-ignored（cargo mutants 不看 --test-package、--test-workspace 与 .cargo/mutants.toml 的 test_workspace）。
+  EnvironmentFile= 设的变量不带进里面那条命令）、list-past-separator（找 --list 时见到 `--` 不停）、configuration-before-subcommand-only（只收子命令之前的 --config）、mutants-configuration-ignored（cargo mutants 不看 --test-package、--test-workspace 与 .cargo/mutants.toml 的 test_workspace）、no-run-counted-as-running（`--no-run` 只编译也按跑了算）。
 """
 import fnmatch, functools, glob, importlib.util, os, re, shlex, shutil, sys, tempfile, tomllib
 from typing import NamedTuple
@@ -447,6 +447,10 @@ def cargo_use(arguments, directory, environment=None):
     if alias_reason:
         return heavy_test("checker-tier-cargo", f"cargo {found.subcommand}：{alias_reason}，跑到哪个包看不见，按 checker 档算")
     invocation, rest = test_invocation(found.subcommand, found.rest, found.directory)
+    # `--no-run`（在 `--` 之前）只编译测试、一条都不跑：编译不是重型，谁都能做（子 agent 交回前也要编）。
+    cargo_options = rest[:rest.index("--")] if "--" in rest else rest
+    if invocation in ("test", "nextest") and "--no-run" in cargo_options and not break_is_set("no-run-counted-as-running"):
+        return None
     directory = found.directory
     packages, test_names, selectors, binaries = [], [], set(), []
     whole_workspace, manifest_argument = False, None
@@ -841,13 +845,13 @@ def build_sample_workspace(work):
     write("crates/singlefs-core/Cargo.toml", '[package]\nname = "singlefs-core"\nversion = "0.0.0"\n')
     write("crates/singlefs-core/tests/core_contract.rs", "")
     write("crates/singlefs-harness/Cargo.toml", '[package]\nname = "singlefs-harness"\nversion = "0.0.0"\n')
-    write("crates/singlefs-harness/tests/second_transaction_step_one_overwrite.rs", "#[test]\nfn a_daily_case() {}\n")
+    write("crates/singlefs-harness/tests/overwrite_in_one_instance.rs", "#[test]\nfn a_daily_case() {}\n")
     write("crates/singlefs-checker/Cargo.toml", '[package]\nname = "singlefs-checker"\nversion = "0.0.0"\n')
     write("crates/singlefs-checker/src/lib.rs", "pub fn check_pool_image() {}\n")
     write("crates/singlefs-checker-tier/Cargo.toml", '[package]\nname = "singlefs-checker-tier"\nversion = "0.1.0"\n')
     write("crates/singlefs-checker-tier/src/lib.rs", "pub fn judge() {}\n")
     write("crates/singlefs-checker-tier/src/bin/e161_sample_device.rs", "fn main() {}\n")
-    write("crates/singlefs-checker-tier/tests/first_transaction_step_seven_layer0.rs",
+    write("crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs",
           '#[test]\nfn quick_case() {}\n#[test]\n#[ignore = "崩溃枚举（样本）：平时不跑"]\nfn the_full_case() {}\n')
     write("crates/singlefs-checker-tier/tests/checker_quick_stream.rs", "#[test]\nfn a_quick_case() {}\n")
     write("alias.env", '# 样本：systemd-run -p EnvironmentFile= 读的\nCARGO_ALIAS_XT="test -p singlefs-checker-tier"\n')
@@ -868,7 +872,7 @@ def selftest():
         build_sample_workspace(work)
         harness = os.path.join(work, "crates", "singlefs-harness")
         tier = os.path.join(work, "crates", "singlefs-checker-tier")
-        tier_binary = "first_transaction_step_seven_layer0-0123456789abcdef"
+        tier_binary = "crash_enumeration_new_pool_file_creation_stream-0123456789abcdef"
         alias_to_tier = "CARGO_ALIAS_XT=test -p singlefs-checker-tier"
         # (说明, 进程的 argv, 进程的 cwd, 该认出的 kind；None 是不重型)
         cargo_cases = [
@@ -885,6 +889,8 @@ def selftest():
             ("bash -c 里进 harness 档裸跑", ["bash", "-c", "cd crates/singlefs-harness && cargo test"], work, None),
             ("harness 档带 --ignored（它的重用例随时跑）", ["cargo", "test", "-p", "singlefs-harness", "--", "--ignored"], work, None),
             ("cargo mutants 整个 harness 档", ["cargo", "mutants", "-p", "singlefs-harness"], work, None),
+            ("checker 档只编不跑（--no-run）", ["cargo", "test", "-p", "singlefs-checker-tier", "--no-run"], work, None),
+            ("checker 档 -- 之后的 --no-run 是测试二进制的参数，照跑", ["cargo", "test", "-p", "singlefs-checker-tier", "--", "--no-run"], work, "checker-tier-cargo"),
             ("cargo mutants 变异 core、--test-package 点名 harness 档", ["cargo", "mutants", "-p", "singlefs-core", "--test-package", "singlefs-harness"], work, None),
             ("cargo mutants 变异 core、--test-package 点名 checker 档", ["cargo", "mutants", "-p", "singlefs-core", "--test-package=singlefs-checker-tier"], work, "checker-tier-cargo"),
             ("cargo mutants --test-workspace=true 测整个工作区", ["cargo", "mutants", "-p", "singlefs-harness", "--test-workspace=true"], work, "full-cargo"),
@@ -900,14 +906,14 @@ def selftest():
             ("cargo llvm-cov report 不起测试", ["cargo", "llvm-cov", "report"], work, None),
             # checker 档：按包判，挑哪个目标都算
             ("checker 档整包", ["cargo", "test", "-p", "singlefs-checker-tier"], work, "checker-tier-cargo"),
-            ("checker 档点名一个集成测试", ["cargo", "test", "--release", "-p", "singlefs-checker-tier", "--test", "first_transaction_step_seven_layer0"], work,
+            ("checker 档点名一个集成测试", ["cargo", "test", "--release", "-p", "singlefs-checker-tier", "--test", "crash_enumeration_new_pool_file_creation_stream"], work,
              "checker-tier-cargo"),
             ("checker 档 --tests", ["cargo", "test", "-p", "singlefs-checker-tier", "--tests"], work, "checker-tier-cargo"),
             ("checker 档 --lib", ["cargo", "test", "-p", "singlefs-checker-tier", "--lib"], work, "checker-tier-cargo"),
             ("checker 档 --doc", ["cargo", "test", "-p", "singlefs-checker-tier", "--doc"], work, "checker-tier-cargo"),
             ("checker 档 --bin 装置的内联单测", ["cargo", "test", "-p", "singlefs-checker-tier", "--bin", "e161_sample_device"], work, "checker-tier-cargo"),
             ("checker 档 --test 通配", ["cargo", "test", "-p", "singlefs-checker-tier", "--test", "*"], work, "checker-tier-cargo"),
-            ("checker 档带 --include-ignored --exact", ["cargo", "test", "-p", "singlefs-checker-tier", "--test", "first_transaction_step_seven_layer0", "--",
+            ("checker 档带 --include-ignored --exact", ["cargo", "test", "-p", "singlefs-checker-tier", "--test", "crash_enumeration_new_pool_file_creation_stream", "--",
                                                      "--include-ignored", "--exact", "the_full_case"], work, "checker-tier-cargo"),
             ("在 checker 档目录里裸跑", ["cargo", "test", "--release"], tier, "checker-tier-cargo"),
             ("-p core 加 -p checker 档", ["cargo", "test", "-p", "singlefs-core", "-p", "singlefs-checker-tier"], work, "checker-tier-cargo"),
@@ -953,7 +959,7 @@ def selftest():
         launcher_cases = [
             ("/usr/bin/time -v 包 checker 档", ["/usr/bin/time", "-v", "cargo", "test", "-p", "singlefs-checker-tier"], work, "checker-tier-cargo"),
             ("time -f 格式 -o 文件包 checker 档的集成测试",
-             ["time", "-f", "%M", "-o", "/tmp/t", "cargo", "test", "--release", "-p", "singlefs-checker-tier", "--test", "first_transaction_step_seven_layer0"],
+             ["time", "-f", "%M", "-o", "/tmp/t", "cargo", "test", "--release", "-p", "singlefs-checker-tier", "--test", "crash_enumeration_new_pool_file_creation_stream"],
              work, "checker-tier-cargo"),
             ("systemd-run --working-directory= 进 checker 档裸跑",
              ["systemd-run", "--user", "--scope", "--working-directory=crates/singlefs-checker-tier", "cargo", "test"], work, "checker-tier-cargo"),
@@ -1025,10 +1031,10 @@ def selftest():
             ("checker 档二进制 --logfile --list（--list 是日志文件名）", [os.path.join(work, "target", "release", "deps", tier_binary), "--logfile", "--list"], work,
              "checker-tier-binary"),
             ("checker 档二进制 --list（只列）", [os.path.join(work, "target", "release", "deps", tier_binary), "--list"], work, None),
-            ("harness 档的测试二进制", [os.path.join(work, "target", "release", "deps", "second_transaction_step_one_overwrite-0123456789abcdef")], work, None),
+            ("harness 档的测试二进制", [os.path.join(work, "target", "release", "deps", "overwrite_in_one_instance-0123456789abcdef")], work, None),
             ("名字带 layer0 而不是 checker 档的二进制（按包判，不按名字）", ["/tmp/target-elsewhere/release/deps/some_layer0_stream-fedcba9876543210"], work, None),
             ("deps 下的 .d 依赖文件不是二进制", [os.path.join(work, "target", "release", "deps", tier_binary + ".d")], work, None),
-            ("哈希不是 16 位", [os.path.join(work, "target", "release", "deps", "first_transaction_step_seven_layer0-0123abcd")], work, None),
+            ("哈希不是 16 位", [os.path.join(work, "target", "release", "deps", "crash_enumeration_new_pool_file_creation_stream-0123abcd")], work, None),
             ("名字只当参数", ["grep", "-c", "x", os.path.join("target", "release", "deps", tier_binary)], work, None),
         ]
         own_repository_targets = sorted(checker_test_targets(HOOK_REPOSITORY))
@@ -1071,10 +1077,10 @@ def selftest():
             ("cargo b 简写是 build", ["cargo", "b"], False),
             ("cargo clippy", ["cargo", "clippy", "--all-targets"], False),
             ("cargo 只带全局选项", ["cargo", "--version"], False),
-            ("直接执行测试二进制", [os.path.join("target", "debug", "deps", "second_transaction_step_one_overwrite-0123456789abcdef")], True),
+            ("直接执行测试二进制", [os.path.join("target", "debug", "deps", "overwrite_in_one_instance-0123456789abcdef")], True),
             ("直接执行 research 里的实验二进制", ["research/target/release/e142_region_diff_independent"], True),
             ("直接执行名字里带 target 的自定编译目录里的二进制", ["/tmp/singlefs-crates-mutation-target/release/tiny"], True),
-            ("带目标三元组的", ["./target/x86_64-unknown-linux-musl/release/first_transaction_on_device"], True),
+            ("带目标三元组的", ["./target/x86_64-unknown-linux-musl/release/new_pool_file_creation_on_device"], True),
             ("deps 下的 .d 依赖文件", [os.path.join("target", "release", "deps", "tiny.d")], False),
             ("名字只当参数", ["ls", "target/release/tiny"], False),
             ("不在 target 底下的程序", ["./prog"], False),

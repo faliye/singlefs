@@ -1,0 +1,891 @@
+diff --git a/crates/singlefs-checker/src/image.rs b/crates/singlefs-checker/src/image.rs
+--- a/crates/singlefs-checker/src/image.rs
++++ b/crates/singlefs-checker/src/image.rs
+@@ -4,9 +4,10 @@
+ use std::collections::BTreeMap;
+ 
+ use singlefs_format::{
+-    FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_SAFETY_FACTOR,
+-    ROOT_RECORD_BYTES, ROOT_RING_SLOTS_PER_REGION_MAXIMUM, ROOT_RING_SLOTS_PER_REGION_MINIMUM,
+-    SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
++    CLUSTER_SEGMENT_SLOTS, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES, JOURNAL_RECORD_BYTES,
++    JOURNAL_RING_START_SLOT, JOURNAL_SAFETY_FACTOR, ROOT_RECORD_BYTES, ROOT_RING_BASE_SLOT,
++    ROOT_RING_SLOTS_PER_REGION_MAXIMUM, ROOT_RING_SLOTS_PER_REGION_MINIMUM, SLOT_BYTES,
++    SYSTEM_CONFIGURATION_SLOT_BYTES,
+ };
+ 
+ use crate::{
+@@ -41,10 +42,20 @@ pub const MAPPING_KEY_MATCHES_THE_UNIT_HEADER: &str = "I-1.11";
+ /// 「自证过的系统配置槽里，池级字段都在这一版读者收的范围里」那一条（实审 A3-checker-2，用户 2026-09-27 定系统配置越界整池拒）：
+ /// 格式版本 = 1、加密类型 = 0（关）、固定结构槽距、`physical_block_size`、journal 环长在各自的上下界里（[`crate::Verdict`] 的
+ /// `FormatVersionNotRecognized` / `EncryptionTypeNotOff` / `FixedStructureSlotSpacingOutsideTheFormatRange` /
+-/// `PhysicalBlockSizeOutsideTheRootSlotBounds` / `JournalRingBytesOutsideTheSupportedRange`）。`invariants.md` 今天没有一条罩得住它，
+-/// **编号是暂立的，待 kb 第六批登记时定**；改号只改这一处。
++/// `PhysicalBlockSizeOutsideTheRootSlotBounds` / `JournalRingBytesOutsideTheSupportedRange`）；journal 环起点（偏移 325）与根环起点
++/// （偏移 371）是第一版的格式常量、单元区起始槽号（偏移 417）是环长现算的那个槽且落在聚簇段边界上
++/// （`JournalRingStartSlotNotTheFirstVersionConstant` / `RootRingBaseSlotNotTheFirstVersionConstant` /
++/// `UnitAreaStartNotTheSlotAfterTheJournalRing` / `UnitAreaStartOffTheClusterSegmentBoundary`；实审 Y4-a，用户 2026-09-27 定
++/// 「读字段，不等于常量就整池拒」，与实现收同一张表）。**编号是暂立的，待 kb 第六批登记时定**；改号只改这一处。
+ pub const SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS: &str = "I-7.13";
+ 
++/// 「每块盘每个自证过的系统配置槽里的本盘设备号，等于这块盘在池里的身份」那一条（实审 Y2-b 越格线索：盘体对调之后的池
++/// 可写挂载因本盘设备号拒，而 checker 读本盘设备号却没有一条不变量拿它比盘的身份，0 违例）。实现那一侧是
++/// `crates/singlefs-core/src/mount.rs` 的 `device_table_disagreeing_with`（`OwnDeviceNumberDiffersFromTheIdentityHandedIn`），
++/// checker 自己按字段表读一份（[`judge_own_device_number_is_the_device_identity`]）。`invariants.md` 今天没有这一行，
++/// **编号是暂立的，照 I-7.13、I-9.16 的先例待 kb 下一批登记时定**；改号只改这一处。
++pub const SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY: &str = "I-7.14";
++
+ /// 第一版 checker 判的不变量，按这个次序报；每次都全部报出来，没评估到的报「不适用」。
+ ///
+ /// I-2.4（头校验和覆盖范围） 的射程从「单元头 29 字节预留位」扩到「单元头与指针头部的加密预留位，加密关着时恒 0」
+@@ -54,7 +65,7 @@ pub const SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS: &str = "I
+ ///
+ /// I-9.16（树表条目按树 ID 严格升序且合发号次序）：实审 A3b Q2 交上来，用户 2026-09-27 JST 17:4x 定「立不变量并同步」；
+ /// `invariants.md` 那一行由 kb 第八批写。池级走读每读一版的树表判一次（`walk` 的 `judge_tree_table_entries_ordering`）。
+-pub const IMPLEMENTED_INVARIANTS: [&str; 48] = [
++pub const IMPLEMENTED_INVARIANTS: [&str; 49] = [
+     "I-1.1",
+     "I-1.2",
+     "I-1.3",
+@@ -88,6 +99,7 @@ pub const IMPLEMENTED_INVARIANTS: [&str; 48] = [
+     "I-7.9",
+     "I-7.12",
+     SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS,
++    SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
+     "I-8.6",
+     "I-8.7",
+     "I-8.8",
+@@ -222,6 +234,10 @@ pub const REGION_DEVICE_FIELDS_IN_THE_SYSTEM_CONFIGURATION: usize = 3;
+ /// `journal_ring_bytes_lie_in_the_supported_range`），越界各报一个成员。这三个成员与 R、S 那两个处置不同：池级读法把它们认成
+ /// 「带这一版读者不收的值」（[`value_refused_by_this_reader`]），报违例、整池不作保（用户 2026-09-27 定系统配置越界整池拒）；
+ /// R、S 越界照旧是这一槽不可择。槽距先判：它是根槽宽的上界。
++///
++/// journal 环起点（325）、根环起点（371）不等于第一版的格式常量，单元区起始槽号（417）不是环长现算的那个槽或不在聚簇段边界上，
++/// 同样各报一个成员、同样认成「带这一版读者不收的值」（实审 Y4-a，用户 2026-09-27 定「读字段，不等于常量就整池拒」）。
++/// 两个起点先于槽距判：槽距的上界按同一槽自述的根环起点算，起点不对时报起点、不报槽距。
+ pub fn geometry_of(
+     slot: &[u8],
+     view: &SystemConfigurationView,
+@@ -243,6 +259,12 @@ pub fn geometry_of(
+     let base_slot = read_u64(slot, 371);
+     let unit_area_start_slot = read_u64(slot, 417);
+     let slot_spacing = read_u32(slot, 429);
++    if journal_ring_start_slot != JOURNAL_RING_START_SLOT {
++        return Err(crate::Verdict::JournalRingStartSlotNotTheFirstVersionConstant);
++    }
++    if base_slot != ROOT_RING_BASE_SLOT {
++        return Err(crate::Verdict::RootRingBaseSlotNotTheFirstVersionConstant);
++    }
+     if !fixed_structure_slot_spacing_lies_in_the_format_range(slot_spacing, base_slot) {
+         return Err(crate::Verdict::FixedStructureSlotSpacingOutsideTheFormatRange);
+     }
+@@ -256,6 +278,16 @@ pub fn geometry_of(
+     ) {
+         return Err(crate::Verdict::JournalRingBytesOutsideTheSupportedRange);
+     }
++    if !unit_area_start_slot_is_the_slot_after_the_journal_ring(
++        journal_ring_start_slot,
++        journal_ring_bytes,
++        unit_area_start_slot,
++    ) {
++        return Err(crate::Verdict::UnitAreaStartNotTheSlotAfterTheJournalRing);
++    }
++    if !unit_area_start_slot.is_multiple_of(CLUSTER_SEGMENT_SLOTS) {
++        return Err(crate::Verdict::UnitAreaStartOffTheClusterSegmentBoundary);
++    }
+     Ok(PoolGeometry {
+         filesystem_identifier: view.filesystem_identifier,
+         physical_block_size: view.declared_physical_block_size,
+@@ -319,6 +351,22 @@ fn journal_ring_bytes_lie_in_the_supported_range(
+         })
+ }
+ 
++/// 单元区起始槽号是 journal 环末尾的下一个槽：同一槽自述的环起点 + 环长向上取整到 16 KiB 槽（D3（空间分配） 已定项 10 ④
++/// 「第一版 = journal 环末尾的下一个槽」；D23（journal 的角色与格式） 已定项 19 ③「单元区起始槽号随环长走」）。
++/// checker 自己按条款算一份，不引实现的 `journal::slot_after_the_journal_ring`（门禁 94 号）。环长是盘上读来的 8 字节：
++/// 槽数不超过 2⁶⁴ ÷ 16384，加环起点溢出时算不相等。
++fn unit_area_start_slot_is_the_slot_after_the_journal_ring(
++    journal_ring_start_slot: u64,
++    journal_ring_bytes: u64,
++    unit_area_start_slot: u64,
++) -> bool {
++    journal_ring_start_slot
++        .checked_add(journal_ring_bytes.div_ceil(SLOT_BYTES))
++        .is_some_and(|slot_after_the_journal_ring| {
++            unit_area_start_slot == slot_after_the_journal_ring
++        })
++}
++
+ /// 一个系统配置槽读下来是什么样。
+ #[derive(Clone, Debug, PartialEq, Eq)]
+ pub enum SystemConfigurationSlotReading {
+@@ -346,7 +394,11 @@ pub const fn value_refused_by_this_reader(verdict: &crate::Verdict) -> bool {
+         | crate::Verdict::EncryptionTypeNotOff
+         | crate::Verdict::FixedStructureSlotSpacingOutsideTheFormatRange
+         | crate::Verdict::PhysicalBlockSizeOutsideTheRootSlotBounds
+-        | crate::Verdict::JournalRingBytesOutsideTheSupportedRange => true,
++        | crate::Verdict::JournalRingBytesOutsideTheSupportedRange
++        | crate::Verdict::JournalRingStartSlotNotTheFirstVersionConstant
++        | crate::Verdict::RootRingBaseSlotNotTheFirstVersionConstant
++        | crate::Verdict::UnitAreaStartNotTheSlotAfterTheJournalRing
++        | crate::Verdict::UnitAreaStartOffTheClusterSegmentBoundary => true,
+         crate::Verdict::Valid
+         | crate::Verdict::BadMagic
+         | crate::Verdict::ChecksumMismatch
+@@ -490,6 +542,30 @@ pub fn judge_system_configuration_values_the_reader_accepts(
+     any_slot_carries_a_refused_value
+ }
+ 
++/// [`SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY`]：每块盘两槽里每个自证过、属于本池（fsid 相同）的系统配置槽，
++/// 自述的本盘设备号等于这块盘在池里的身份（`ImageReader::devices` 给的那个号），每槽判一次。读法与实现可写挂载比盘表时同一个：
++/// 自证过的槽、fsid 与择到的那份相同的槽（`crates/singlefs-core/src/mount.rs` 的 `device_table_disagreeing_with`）；
++/// 别的池的槽归 I-1.4 判，不在这里。盘体对调（身份 0 的位置上装着自述 1 的盘）时两块盘各红一处。
++pub fn judge_own_device_number_is_the_device_identity(
++    verified_system_configurations_of_this_pool: &[(u32, Vec<crate::SystemConfigurationView>)],
++    judgements: &mut Judgements,
++) {
++    for (device_identity, slots) in verified_system_configurations_of_this_pool {
++        for view in slots {
++            judgements.judge(
++                SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
++                view.this_device == *device_identity,
++                || {
++                    format!(
++                        "盘 {device_identity} 上世代 {} 的系统配置槽自述本盘设备号 {}：与这块盘在池里的身份不同",
++                        view.slot_generation, view.this_device
++                    )
++                },
++            );
++        }
++    }
++}
++
+ /// 每盘择一个系统配置：两槽里世代号大的那一份（相等取槽 0）。
+ #[must_use]
+ pub fn chosen_system_configurations(
+diff --git a/crates/singlefs-checker/src/lib.rs b/crates/singlefs-checker/src/lib.rs
+--- a/crates/singlefs-checker/src/lib.rs
++++ b/crates/singlefs-checker/src/lib.rs
+@@ -149,6 +149,19 @@ pub enum Verdict {
+     /// 系统配置自述的 journal 环长装不下 F 条记录（在飞记录数上限 = 环槽数 ÷ F 是 0，D23（journal 的角色与格式） 已定项 18），
+     /// 或环的末端越过同一槽自述的单元区起点（已定项 19 ③：单元区起始槽号随环长走）。
+     JournalRingBytesOutsideTheSupportedRange,
++    /// 系统配置偏移 325 自述的 journal 环起点不是第一版的格式常量 `JOURNAL_RING_START_SLOT`（D23（journal 的角色与格式） 已定项 2：
++    /// 环从槽 1024 起）。实现按这个常量写记录、扫环（实审 Y4，用户 2026-09-27 定「读字段，不等于常量就整池拒」）：
++    /// checker 若按字段扫一个错位的环，判的是另一个环。
++    JournalRingStartSlotNotTheFirstVersionConstant,
++    /// 系统配置偏移 371 自述的根环起点不是第一版的格式常量 `ROOT_RING_BASE_SLOT`（D22（单元原子性怎么合成） 已定项 16 第 1 句：
++    /// 基址 = 该字段 × 16384，第一版取 64）。同一条用户定案：实现按常量写根，checker 若按字段读就读另一个根环。
++    RootRingBaseSlotNotTheFirstVersionConstant,
++    /// 系统配置偏移 417 自述的单元区起始槽号不是 journal 环末尾的下一个槽（同一槽的环起点 + 环长向上取整到槽，
++    /// D3（空间分配） 已定项 10 ④、D23（journal 的角色与格式） 已定项 19 ③「单元区起始槽号随环长走」）。
++    UnitAreaStartNotTheSlotAfterTheJournalRing,
++    /// 系统配置偏移 417 自述的单元区起始槽号不落在聚簇段边界上（不是 `CLUSTER_SEGMENT_SLOTS` 的整数倍，D3（空间分配） 已定项 10 ①）：
++    /// 这样的单元区怎么分段条款没写，第一版不支持。
++    UnitAreaStartOffTheClusterSegmentBoundary,
+ }
+ 
+ /// 系统配置槽解出来的几个要紧字段。
+diff --git a/crates/singlefs-checker/src/walk.rs b/crates/singlefs-checker/src/walk.rs
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ -25,11 +25,11 @@ use crate::position_addressed::{
+ 
+ use crate::image::{
+     chosen_system_configurations, judge_location_entries_order, judge_location_order,
+-    judge_pointer_mac_and_nonce_are_zero, judge_system_configuration_values_the_reader_accepts,
+-    parse_data_pointer, parse_node_pointer, read_referenced_unit, root_slot_positions,
+-    system_configuration_slot_readings, valid_roots, verified_system_configuration_slots,
+-    ImageReader, InvariantVerdict, Judgements, PointerLocation, PointerView, PoolGeometry,
+-    MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
++    judge_own_device_number_is_the_device_identity, judge_pointer_mac_and_nonce_are_zero,
++    judge_system_configuration_values_the_reader_accepts, parse_data_pointer, parse_node_pointer,
++    read_referenced_unit, root_slot_positions, system_configuration_slot_readings, valid_roots,
++    verified_system_configuration_slots, ImageReader, InvariantVerdict, Judgements,
++    PointerLocation, PointerView, PoolGeometry, MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+ };
+ use crate::{
+     back_chain_of_record_header, check_index_node_keys, check_internal_node_separators,
+@@ -5669,7 +5669,8 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
+     // 「系统配置每盘放一份」买的就是这份冗余）。早退会让这种镜像上每一条不变量都报「不适用」，
+     // 而它是一个挂得上的合法镜像——故障注入让一块盘的两个槽先后写失败就造得出它，判定会被静默放过
+     // （.claude/kb/checks-owed.md 的 C461）。⚠️ 「哪块盘的系统配置全废了」今天没有编号报得出来，仍欠在 C461。
+-    // 任一盘任一槽自证过而带这一版读者不收的池级值（格式版本、加密类型、槽距、physical_block_size、环长）：实现整池拒绝挂载
++    // 任一盘任一槽自证过而带这一版读者不收的池级值（格式版本、加密类型、槽距、physical_block_size、环长、journal 环起点、
++    // 根环起点、单元区起始槽号）：实现整池拒绝挂载
+     // （`RecoveryFailure::SystemConfigurationValueRefused`），checker 报违例、别的不变量同「挂不上的镜像」一样不作保
+     // （用户 2026-09-27 定系统配置越界整池拒，实审 A3-checker-2）。只有一部分槽带越界值时不拿别的槽照判下去。
+     let any_system_configuration_slot_carries_a_refused_value =
+@@ -5753,6 +5754,10 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
+             )
+         })
+         .collect();
++    judge_own_device_number_is_the_device_identity(
++        &verified_system_configurations_of_this_pool,
++        &mut root_ring_judgements,
++    );
+     judge_system_configuration_floor_against_the_roots_on_each_device(
+         &verified_system_configurations_of_this_pool,
+         &roots,
+diff --git a/crates/singlefs-harness/tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs b/crates/singlefs-harness/tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/singlefs-harness/tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs
+@@ -0,0 +1,319 @@
++//! C577（系统配置没见证到的最新根，乙罩不到） 结清 ③：零单元发布（`transaction::publish_without_units`）轮换之后那道屏障报错时，
++//! 这次发布不冻结——零单元发布不经分配器，没有「冻结着等原样重发」那一层——整个可写挂载返回错误
++//! （D23（journal 的角色与格式） 已定项 14「这一版的失败处置」：由调用方冻结或整个挂载返回错误，射程写成了选择）。
++//! 这条用例钉住这一支今天的结局，不改行为：挂载返回哪个错误成员、盘上哪几步已落、之后的可写挂载怎么判。
++//!
++//! 历史：只做过 mkfs 的池（树表 0 条、上一个实例是 0）第一次可写挂载：取号 1 → 写行那次发布是零单元发布（txg 1，根落盘 1）
++//! → 盘 1 上它轮换之后那道屏障报错一次。之后换回不报错的设备、重开再可写挂载一次。
++//!
++//! 同一份文件还把 C577 结清 ② 的 litmus 绑到代码：`litmus/publish-returns-after-the-rotation-barrier.litmus` 与它的
++//! `-nofence` 对照，P0 的写与屏障次序就是录制流里发布最后三步的次序（`.claude/scripts/lkmm.sh` 按文件名认这份测试）。
++
++mod common;
++
++use common::{disk_snapshot, format_pool, geometry, parameters};
++use singlefs_core::address::{
++    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
++};
++use singlefs_core::block_device::{
++    BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
++};
++use singlefs_core::mount::{mount_writable, MountError};
++use singlefs_core::transaction::PublishError;
++use singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE;
++use singlefs_harness::fault_injection::injected_block_device_error;
++use singlefs_harness::segments::StepKind;
++
++/// 一块盘从上一道屏障起写过什么：发布的最后三步是根槽 FUA → 系统配置槽轮换 → 屏障（`persist_the_root_then_rotate_the_system_configuration`）。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++enum SinceTheLastBarrier {
++    /// 还没有根槽 FUA 写（取号那两次系统配置槽写之后的那道屏障落在这里，不拦）。
++    NoRootSlotWritten,
++    /// 写过根槽（FUA），还没轮换系统配置。
++    RootSlotWrittenForceUnitAccess,
++    /// 根槽之后轮换了系统配置：下一道屏障就是轮换之后那一道。
++    SystemConfigurationRotatedAfterTheRootSlot,
++}
++
++/// 盘 1 上「根槽 FUA → 系统配置槽写」之后的第一道屏障报块设备错一次（不转给里面的设备、录制流里没有它），之后照转；写、读都照转。
++struct BarrierAfterTheRotationFailsOnce<Inner: BlockDevice> {
++    inner: Inner,
++    is_the_failing_device: bool,
++    since_the_last_barrier: SinceTheLastBarrier,
++    barriers_refused: u64,
++}
++
++impl<Inner: BlockDevice> BlockDevice for BarrierAfterTheRotationFailsOnce<Inner> {
++    fn read_at(
++        &self,
++        offset: DeviceOffsetInBytes,
++        buffer: &mut [u8],
++    ) -> Result<(), BlockDeviceError> {
++        self.inner.read_at(offset, buffer)
++    }
++    fn write_at(
++        &mut self,
++        offset: DeviceOffsetInBytes,
++        bytes: &[u8],
++        durability: WriteDurability,
++    ) -> Result<(), BlockDeviceError> {
++        let system_configuration_end_in_bytes = SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE
++            * u64::from(parameters().geometry.fixed_structure_slot_spacing);
++        let is_a_system_configuration_slot_write = offset.0 < system_configuration_end_in_bytes;
++        self.since_the_last_barrier = match (durability, self.since_the_last_barrier) {
++            (WriteDurability::ForceUnitAccess, _) => {
++                SinceTheLastBarrier::RootSlotWrittenForceUnitAccess
++            }
++            (WriteDurability::Plain, SinceTheLastBarrier::RootSlotWrittenForceUnitAccess)
++                if is_a_system_configuration_slot_write =>
++            {
++                SinceTheLastBarrier::SystemConfigurationRotatedAfterTheRootSlot
++            }
++            (
++                WriteDurability::Plain,
++                unchanged @ (SinceTheLastBarrier::NoRootSlotWritten
++                | SinceTheLastBarrier::RootSlotWrittenForceUnitAccess
++                | SinceTheLastBarrier::SystemConfigurationRotatedAfterTheRootSlot),
++            ) => unchanged,
++        };
++        self.inner.write_at(offset, bytes, durability)
++    }
++    fn write_zeroes_at(
++        &mut self,
++        offset: DeviceOffsetInBytes,
++        length: u64,
++    ) -> Result<(), BlockDeviceError> {
++        self.inner.write_zeroes_at(offset, length)
++    }
++    fn barrier(&mut self) -> Result<(), BlockDeviceError> {
++        if self.is_the_failing_device
++            && self.since_the_last_barrier
++                == SinceTheLastBarrier::SystemConfigurationRotatedAfterTheRootSlot
++            && self.barriers_refused == 0
++        {
++            self.barriers_refused += 1;
++            return Err(injected_block_device_error("刷盘"));
++        }
++        self.since_the_last_barrier = SinceTheLastBarrier::NoRootSlotWritten;
++        self.inner.barrier()
++    }
++    fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
++        self.inner.probe_physical_block_size()
++    }
++    fn size_in_bytes(&self) -> u64 {
++        self.inner.size_in_bytes()
++    }
++}
++
++/// 录制流里 mkfs 之后的每一步：(盘, 步骤种类)。
++fn steps_after_the_mkfs(
++    operations: &[singlefs_harness::RecordedOperation],
++    mkfs_operation_count: usize,
++) -> Vec<(DeviceIdentity, StepKind)> {
++    operations[mkfs_operation_count..]
++        .iter()
++        .map(|operation| (operation.device, geometry().classify(operation)))
++        .collect()
++}
++
++#[test]
++fn a_zero_unit_publish_whose_post_rotation_barrier_fails_is_not_frozen_and_the_whole_mount_returns_the_error(
++) {
++    let mut pool = format_pool("c577-zero-unit-publish-barrier-after-the-rotation-fails");
++    let mut wrapped: Vec<(
++        DeviceIdentity,
++        BarrierAfterTheRotationFailsOnce<common::Recorded>,
++    )> = pool
++        .devices
++        .take()
++        .expect("mkfs 之后盘还开着")
++        .into_iter()
++        .map(|(identity, device)| {
++            (
++                identity,
++                BarrierAfterTheRotationFailsOnce {
++                    inner: device,
++                    is_the_failing_device: identity == DeviceIdentity(1),
++                    since_the_last_barrier: SinceTheLastBarrier::NoRootSlotWritten,
++                    barriers_refused: 0,
++                },
++            )
++        })
++        .collect();
++
++    let failure = match mount_writable(&parameters(), &mut wrapped) {
++        Err(failure) => failure,
++        Ok(mounted) => panic!(
++            "盘 1 上零单元发布轮换之后那道屏障报错：挂载不许做成（今天不冻结、不重发），得到实例 {:?}",
++            mounted.output.instance
++        ),
++    };
++    let MountError::Publish(publish_sequence_failed) = &failure else {
++        panic!("整个挂载返回取号之后那一串发布的失败（MountError::Publish），得到 {failure:?}")
++    };
++    assert!(
++        matches!(publish_sequence_failed.cause, PublishError::BlockDevice(_)),
++        "失败的是块设备错：{:?}",
++        publish_sequence_failed.cause
++    );
++    assert!(
++        publish_sequence_failed
++            .writes_of_persisted_publishes
++            .is_empty(),
++        "报错的是取号之后第一次发布（写行那次零单元发布），之前没有落盘的发布：{:?}",
++        publish_sequence_failed.writes_of_persisted_publishes
++    );
++    assert_eq!(
++        publish_sequence_failed.writes_of_failed_publishes.len(),
++        1,
++        "落盘阶段失败的恰好一次"
++    );
++    let barriers_refused: Vec<u64> = wrapped
++        .iter()
++        .map(|(_, device)| device.barriers_refused)
++        .collect();
++    assert_eq!(barriers_refused, vec![0, 1], "盘 1 拒了恰好一道屏障");
++    pool.devices = Some(
++        wrapped
++            .into_iter()
++            .map(|(identity, device)| (identity, device.inner))
++            .collect(),
++    );
++
++    // 盘上已落的：取号（两盘各一次系统配置槽写 + 屏障），零单元发布的空记录（两盘镜像）+ 屏障、根槽 FUA（txg 1 → 区域 1 → 盘 1）、
++    // 两盘的轮换，再是盘 0 那一道屏障；盘 1 那一道报错、没进录制流。
++    let steps = steps_after_the_mkfs(&pool.stream.operations(), pool.mkfs_operation_count);
++    assert_eq!(
++        steps,
++        vec![
++            (DeviceIdentity(0), StepKind::SystemConfigurationSlot),
++            (DeviceIdentity(1), StepKind::SystemConfigurationSlot),
++            (DeviceIdentity(0), StepKind::Barrier),
++            (DeviceIdentity(1), StepKind::Barrier),
++            (DeviceIdentity(0), StepKind::JournalRecord),
++            (DeviceIdentity(1), StepKind::JournalRecord),
++            (DeviceIdentity(0), StepKind::Barrier),
++            (DeviceIdentity(1), StepKind::Barrier),
++            (DeviceIdentity(1), StepKind::RootRecordFua),
++            (DeviceIdentity(0), StepKind::SystemConfigurationSlot),
++            (DeviceIdentity(1), StepKind::SystemConfigurationSlot),
++            (DeviceIdentity(0), StepKind::Barrier),
++        ],
++        "取号与写行那次零单元发布发到盘上的每一步，止于盘 1 那道报错的屏障之前"
++    );
++    let snapshot_after_the_failure = disk_snapshot(&pool.memory_pool(), &pool.stream);
++    assert!(
++        snapshot_after_the_failure
++            .readable_roots
++            .iter()
++            .any(|root| root.instance == InstanceGeneration(1)
++                && root.checkpoint_txg == CheckpointTxg(1)),
++        "写行那次零单元发布的根（实例 1、txg 1）已落盘：{:?}",
++        snapshot_after_the_failure.readable_roots
++    );
++
++    // 之后的可写挂载：换回不报错的设备、重开。轮换已写进两块盘（盘 1 那一写没等到屏障，文件镜像上照样在），
++    // 系统配置见证到了实例 1 的那条记录，恢复择到实例 1 的根；取号 2。
++    let mut devices = pool.reopen_recorded();
++    let mounted =
++        mount_writable(&parameters(), &mut devices).expect("换回不报错的设备之后可写挂载做得成");
++    assert_eq!(
++        (
++            mounted.output.instance,
++            mounted.output.chosen_root.instance,
++            mounted.output.chosen_root.checkpoint_txg
++        ),
++        (
++            InstanceGeneration(2),
++            InstanceGeneration(1),
++            CheckpointTxg(1)
++        ),
++        "之后的可写挂载取号 2、择到失败那次挂载写行落下的根（实例 1、txg 1）"
++    );
++    pool.devices = Some(devices);
++}
++
++/// litmus 里发布一侧（P0）的写与屏障，按出现的次序认成步骤种类；`returned`（返回的那一刻）不是盘上的一步，不算。
++fn litmus_writer_steps_of(litmus_file_name: &str) -> Vec<StepKind> {
++    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
++        .join("../../litmus")
++        .join(litmus_file_name);
++    let text = std::fs::read_to_string(&path)
++        .unwrap_or_else(|error| panic!("读不了 {}：{error}", path.display()));
++    let writer = text
++        .split("P0(")
++        .nth(1)
++        .expect("litmus 里有 P0")
++        .split("\n}")
++        .next()
++        .expect("P0 有函数体");
++    writer
++        .lines()
++        .filter_map(|line| {
++            let line = line.trim();
++            if line.starts_with("smp_wmb()") {
++                Some(StepKind::Barrier)
++            } else if line.starts_with("WRITE_ONCE(*root") {
++                Some(StepKind::RootRecordFua)
++            } else if line.starts_with("WRITE_ONCE(*configuration") {
++                Some(StepKind::SystemConfigurationSlot)
++            } else {
++                None
++            }
++        })
++        .collect()
++}
++
++/// 录制流里一段步骤不分盘、相邻同类并成一步之后的次序（两块盘各一次轮换写、各一道屏障算一步）。
++fn collapsed_step_kinds(operations: &[singlefs_harness::RecordedOperation]) -> Vec<StepKind> {
++    let mut collapsed: Vec<StepKind> = Vec::new();
++    for operation in operations {
++        let kind = geometry().classify(operation);
++        if collapsed.last() != Some(&kind) {
++            collapsed.push(kind);
++        }
++    }
++    collapsed
++}
++
++/// 发布的最后三步与 litmus 的 P0 逐项相同：只做过 mkfs 的池第一次可写挂载，写行那次零单元发布与之后每次暖机空发布返回的那一刻，
++/// 录制流末尾是「根槽 FUA → 系统配置槽 → 屏障」；Never 那一条的 P0 就是这三步，`-nofence` 对照写的次序相同、少那一道屏障。
++#[test]
++fn the_rotation_barrier_litmus_writer_follows_the_last_three_steps_of_every_recorded_publish() {
++    let mut pool = format_pool("c577-rotation-barrier-litmus-binding");
++    let mounted = {
++        let devices = pool.devices.as_mut().expect("mkfs 之后盘还开着");
++        mount_writable(&parameters(), devices).expect("只做过 mkfs 的池可写挂载")
++    };
++    let publishes_in_the_mount = 1 + mounted.output.warm_up_publishes.len();
++    let operations = pool.stream.operations();
++    let collapsed = collapsed_step_kinds(&operations[pool.mkfs_operation_count..]);
++    let last_three_steps_of_a_publish = vec![
++        StepKind::RootRecordFua,
++        StepKind::SystemConfigurationSlot,
++        StepKind::Barrier,
++    ];
++    let publishes_ending_in_the_last_three_steps = collapsed
++        .windows(last_three_steps_of_a_publish.len())
++        .filter(|window| *window == last_three_steps_of_a_publish.as_slice())
++        .count();
++    assert_eq!(
++        publishes_ending_in_the_last_three_steps, publishes_in_the_mount,
++        "这次挂载的每次发布（写行一次、暖机 {} 次）都以根槽 FUA → 系统配置槽 → 屏障收尾：{collapsed:?}",
++        mounted.output.warm_up_publishes.len()
++    );
++    assert!(
++        collapsed.ends_with(&last_three_steps_of_a_publish),
++        "挂载返回的那一刻录制流以这三步收尾：{collapsed:?}"
++    );
++    assert_eq!(
++        litmus_writer_steps_of("publish-returns-after-the-rotation-barrier.litmus"),
++        last_three_steps_of_a_publish,
++        "publish-returns-after-the-rotation-barrier.litmus 的 P0 要与录制流里发布最后三步逐项相同"
++    );
++    assert_eq!(
++        litmus_writer_steps_of("publish-returns-after-the-rotation-barrier-nofence.litmus"),
++        vec![StepKind::RootRecordFua, StepKind::SystemConfigurationSlot],
++        "对照组写的次序相同、去掉轮换之后那一道屏障"
++    );
++}
+diff --git a/crates/singlefs-harness/tests/checker_judges_reserved_bytes_and_widths_it_used_to_skip.rs b/crates/singlefs-harness/tests/checker_judges_reserved_bytes_and_widths_it_used_to_skip.rs
+--- a/crates/singlefs-harness/tests/checker_judges_reserved_bytes_and_widths_it_used_to_skip.rs
++++ b/crates/singlefs-harness/tests/checker_judges_reserved_bytes_and_widths_it_used_to_skip.rs
+@@ -462,9 +462,11 @@ fn a_journal_ring_that_holds_fewer_than_the_safety_factor_records_or_ends_past_t
+     let image = first_file_version_pool().memory_pool();
+     for (journal_ring_bytes, expected) in [
+         (JOURNAL_RING_BYTES_OF_THE_POOL, Ok(())),
++        // 装得下 F 条记录的最短环过得了环长那一判；单元区起始槽号照旧 50176、不是这个环长现算的槽 1025，
++        // 报的是单元区起点那个成员（实审 Y4-a：checker 与实现收同一张表）。
+         (
+             SMALLEST_JOURNAL_RING_BYTES_HOLDING_THE_SAFETY_FACTOR_RECORDS,
+-            Ok(()),
++            Err(Verdict::UnitAreaStartNotTheSlotAfterTheJournalRing),
+         ),
+         (
+             SMALLEST_JOURNAL_RING_BYTES_HOLDING_THE_SAFETY_FACTOR_RECORDS - 1,
+diff --git a/crates/singlefs-harness/tests/checker_known_bad_images.rs b/crates/singlefs-harness/tests/checker_known_bad_images.rs
+--- a/crates/singlefs-harness/tests/checker_known_bad_images.rs
++++ b/crates/singlefs-harness/tests/checker_known_bad_images.rs
+@@ -11,6 +11,7 @@ use common::{
+ };
+ use singlefs_checker::image::{
+     InvariantVerdict, SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS,
++    SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
+ };
+ use singlefs_checker::walk::check_pool_image;
+ use singlefs_core::address::{
+@@ -416,6 +417,21 @@ const ENCRYPTION_TYPE_THE_FIRST_VERSION_DOES_NOT_READ: u8 = 1;
+ /// I-7.13（系统配置池级字段在读者收的范围里） 那份坏镜像改的那一槽：盘 1 的槽 0。
+ const DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT: u32 = 1;
+ const OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT: u64 = 0;
++/// 系统配置字段表（`.claude/kb/layout/01-first-txn.md` 一）几何段里几个 16 KiB 槽号与环长的偏移：journal 环起点 325、环长 333、
++/// 根环起点 371、单元区起始槽号 417。checker 与实现今天各自按这几个偏移读；这里照字段表各写一份。
++const SYSTEM_CONFIGURATION_JOURNAL_RING_START_SLOT_OFFSET: usize = 325;
++const SYSTEM_CONFIGURATION_JOURNAL_RING_BYTES_OFFSET: usize = 333;
++const SYSTEM_CONFIGURATION_ROOT_RING_BASE_SLOT_OFFSET: usize = 371;
++const SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET: usize = 417;
++/// 系统配置自举头里的本盘设备号（4 字节）：fsid（偏移 102，宽 16）之后 20 字节、再 1 字节之后，偏移 139。
++const SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_OFFSET: usize = 139;
++/// 第一版 mkfs 写进这几格的值（字段表那一列）：journal 环从槽 1024 起、默认环长 768 MiB、根环从槽 64 起、单元区从槽 50176 起。
++const JOURNAL_RING_START_SLOT_OF_THE_POOL: u64 = 1024;
++const JOURNAL_RING_BYTES_OF_THE_POOL: u64 = 805_306_368;
++const ROOT_RING_BASE_SLOT_OF_THE_POOL: u64 = 64;
++const UNIT_AREA_START_SLOT_OF_THE_POOL: u64 = 50176;
++/// 聚簇段 64 槽（D3（空间分配） 已定项 10 ①）：单元区起始槽号要落在它的整数倍上。
++const CLUSTER_SEGMENT_SLOTS_OF_THE_POOL: u64 = 64;
+ 
+ /// 系统配置槽重封：自证校验和在 155，罩整槽 4096。
+ fn mutate_system_configuration_slot(
+@@ -437,6 +453,99 @@ fn set_u64(bytes: &mut [u8], offset: usize, value: u64) {
+ fn set_u16(bytes: &mut [u8], offset: usize, value: u16) {
+     bytes[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
+ }
++fn set_u32(bytes: &mut [u8], offset: usize, value: u32) {
++    bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
++}
++
++/// 两块盘对调盘体：每块盘两个系统配置槽里的本盘设备号改成另一块盘的身份（盘 0 的两槽写 1、盘 1 的两槽写 0），整槽重封，
++/// 别的字节不动。与盘体真对调不同的只有这一格：根环区域、单元都还在原来的盘上，所以别的不变量照判成立。
++fn swap_the_own_device_numbers_of_the_two_devices(image: &mut MemoryPool) {
++    let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
++    for (device, own_device_number_written) in [(0u32, 1u32), (1, 0)] {
++        for slot_offset in [0, spacing] {
++            mutate_system_configuration_slot(image, device, slot_offset, |bytes| {
++                set_u32(
++                    bytes,
++                    SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_OFFSET,
++                    own_device_number_written,
++                );
++            });
++        }
++    }
++}
++
++/// I-7.13（系统配置池级字段在读者收的范围里） 的几何那五格（实审 Y4 的 A、B、C、D、E，用户 2026-09-27 定「读字段，不等于常量就整池拒」）：
++/// 盘 1 槽 0 的一个几何字段改掉、整槽重封，别的三槽照原样。每项带 checker 该报的那个 `Verdict` 成员名（违例说明里带着它）。
++fn known_bad_images_of_the_system_configuration_geometry() -> Vec<(&'static str, Mutation)> {
++    let on_the_refused_slot = |change: fn(&mut Vec<u8>)| -> Mutation {
++        Box::new(move |image: &mut MemoryPool| {
++            mutate_system_configuration_slot(
++                image,
++                DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT,
++                OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT,
++                change,
++            );
++        })
++    };
++    vec![
++        // A：单元区起始槽号往后挪一段（50176 → 50240），环长不动：不是环长现算的那个槽。
++        (
++            "UnitAreaStartNotTheSlotAfterTheJournalRing",
++            on_the_refused_slot(|bytes| {
++                set_u64(
++                    bytes,
++                    SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET,
++                    UNIT_AREA_START_SLOT_OF_THE_POOL + CLUSTER_SEGMENT_SLOTS_OF_THE_POOL,
++                );
++            }),
++        ),
++        // D：环长少一槽（768 MiB − 16 KiB），单元区起始槽号跟着改成它现算的 50175（两者自洽）：不在聚簇段边界上。
++        (
++            "UnitAreaStartOffTheClusterSegmentBoundary",
++            on_the_refused_slot(|bytes| {
++                set_u64(
++                    bytes,
++                    SYSTEM_CONFIGURATION_JOURNAL_RING_BYTES_OFFSET,
++                    JOURNAL_RING_BYTES_OF_THE_POOL - SLOT,
++                );
++                set_u64(
++                    bytes,
++                    SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET,
++                    UNIT_AREA_START_SLOT_OF_THE_POOL - 1,
++                );
++            }),
++        ),
++        // B：journal 环起点写 1023：实现按常量 1024 写记录、扫环，按字段扫的读者判的是错位 16 KiB 的另一个环。
++        (
++            "JournalRingStartSlotNotTheFirstVersionConstant",
++            on_the_refused_slot(|bytes| {
++                set_u64(
++                    bytes,
++                    SYSTEM_CONFIGURATION_JOURNAL_RING_START_SLOT_OFFSET,
++                    JOURNAL_RING_START_SLOT_OF_THE_POOL - 1,
++                );
++            }),
++        ),
++        // C：根环起点写 65：实现按常量 64 写根，按字段读的读者读的是另一个根环。
++        (
++            "RootRingBaseSlotNotTheFirstVersionConstant",
++            on_the_refused_slot(|bytes| {
++                set_u64(
++                    bytes,
++                    SYSTEM_CONFIGURATION_ROOT_RING_BASE_SLOT_OFFSET,
++                    ROOT_RING_BASE_SLOT_OF_THE_POOL + 1,
++                );
++            }),
++        ),
++        // E：根环起点写 0：先于槽距判，报起点、不报「槽 1 不在根环起点之前」。
++        (
++            "RootRingBaseSlotNotTheFirstVersionConstant",
++            on_the_refused_slot(|bytes| {
++                set_u64(bytes, SYSTEM_CONFIGURATION_ROOT_RING_BASE_SLOT_OFFSET, 0);
++            }),
++        ),
++    ]
++}
+ 
+ /// 树表单元里第 index 条条目（条目区从 115 + 2 × 8 = 131 起，每条 200）。
+ fn tree_table_entry_offset(index: usize) -> usize {
+@@ -825,6 +934,11 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
+                 )
+             }),
+         ),
++        // 两块盘四个系统配置槽里的本盘设备号互换、整槽重封（实审 Y2-b 越格线索：盘体对调之后的池可写挂载因本盘设备号拒）。
++        (
++            SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
++            Box::new(swap_the_own_device_numbers_of_the_two_devices),
++        ),
+         // C322（取号那一步的屏障怎么放没有条款） 的撞号镜像：没人引用的槽 50302 上放一份写序实例代号 2 的数据单元（头与载荷
+         // 校验和都过），两盘系统配置都还是实例 1 ⇒ ① 红（旧的「各盘相等且 ≥ 根环」在这里判成立）。
+         (
+@@ -2379,6 +2493,93 @@ fn a_system_configuration_slot_whose_encryption_type_is_on_reddens_only_its_own_
+     }
+ }
+ 
++/// I-7.13（系统配置池级字段在读者收的范围里） 的几何那五格（[`known_bad_images_of_the_system_configuration_geometry`]）各**只**红 I-7.13，
++/// 红在盘 1 偏移 0 那一槽、说明里带该报的那个 `Verdict` 成员；别的每一条都报不适用（实现整池拒绝挂载，checker 不替这个池作保）。
++/// 改之前 checker 不判 417 = 环长现算、不判段边界、按字段读 325 与 371：A、B、C、D 四格 I-7.13 不红（A、D 红的是 I-5.2，
++/// C 红的是 I-7.1），E 格红的是槽距那个成员。
++#[test]
++fn each_system_configuration_geometry_field_the_reader_refuses_reddens_only_its_own_invariant_naming_the_refused_field(
++) {
++    let clean = build_pool("known-bad-refused-system-configuration-geometry").memory_pool();
++    let cases = known_bad_images_of_the_system_configuration_geometry();
++    assert_eq!(cases.len(), 5, "实审 Y4 的 A、B、C、D、E 五格");
++    for (refused_member, mutation) in cases {
++        let mut image = clean.clone();
++        mutation(&mut image);
++        let verdicts = check_pool_image(&image);
++        assert!(
++            verdicts.iter().any(|(judged, _)| *judged
++                == SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS),
++            "I-7.13 在判定清单里：{verdicts:?}"
++        );
++        for (judged, found) in &verdicts {
++            if *judged == SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS {
++                match found {
++                    InvariantVerdict::Violated(detail) => {
++                        assert!(
++                            detail.contains(&format!(
++                                "盘 {DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT} 偏移 {OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT}"
++                            )),
++                            "{refused_member}：违例要点名被改的那一槽：{detail}"
++                        );
++                        assert!(
++                            detail.contains(refused_member),
++                            "{refused_member}：违例说明里要是这个成员：{detail}"
++                        );
++                    }
++                    other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
++                        panic!("{refused_member}：这一槽自证过而带这一版读者不收的值，I-7.13 要判违例，得到 {other:?}")
++                    }
++                }
++            } else {
++                assert!(
++                    matches!(found, InvariantVerdict::NotApplicable(_)),
++                    "{refused_member}：这个池挂不上，{judged} 要报不适用，得到 {found:?}"
++                );
++            }
++        }
++    }
++}
++
++/// I-7.14（本盘设备号等于盘在池里的身份，暂立） 那份坏镜像（两块盘四个系统配置槽的本盘设备号互换）**只**红 I-7.14，
++/// 说明里点名盘 0 上自述 1 的那一槽；别的每一条与干净镜像上的判定逐条相同。改之前 checker 读本盘设备号而不拿它比盘的身份，
++/// 这份镜像上 0 条违例（实审 Y2-b 越格线索）。
++#[test]
++fn devices_whose_own_device_numbers_are_swapped_redden_only_the_own_device_number_invariant() {
++    let clean = build_pool("known-bad-swapped-own-device-numbers").memory_pool();
++    let clean_verdicts = check_pool_image(&clean);
++    let mut image = clean.clone();
++    swap_the_own_device_numbers_of_the_two_devices(&mut image);
++    let verdicts = check_pool_image(&image);
++    assert_eq!(
++        violated_invariants(&verdicts),
++        vec![SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY],
++        "只红 I-7.14：{verdicts:?}"
++    );
++    let detail = match verdict(
++        &image,
++        SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
++    ) {
++        InvariantVerdict::Violated(detail) => detail,
++        other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
++            panic!("本盘设备号互换，I-7.14 要判违例，得到 {other:?}")
++        }
++    };
++    assert!(
++        detail.contains("盘 0 上") && detail.contains("本盘设备号 1"),
++        "第一处违例是盘 0 上自述 1 的那一槽：{detail}"
++    );
++    assert_eq!(
++        verdicts_that_differ_outside(
++            &verdicts,
++            &clean_verdicts,
++            &[SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY]
++        ),
++        Vec::new(),
++        "除 I-7.14 之外每一条与干净镜像上的判定逐条相同"
++    );
++}
++
+ #[test]
+ fn the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target() {
+     let clean = build_pool("known-bad").memory_pool();
+diff --git a/litmus/publish-returns-after-the-rotation-barrier-nofence.litmus b/litmus/publish-returns-after-the-rotation-barrier-nofence.litmus
+new file mode 100644
+--- /dev/null
++++ b/litmus/publish-returns-after-the-rotation-barrier-nofence.litmus
+@@ -0,0 +1,32 @@
++C publish-returns-after-the-rotation-barrier-nofence
++
++(*
++ * publish-returns-after-the-rotation-barrier 的对照组：去掉轮换之后那一道屏障，写的次序不变。
++ *
++ * 它存在的唯一目的是证明原测试有判别力：这一份若也判 Never，说明「返回之后读不到轮换」这个模式本来就撞不上，
++ * 原测试判 Never 就什么都没证明（rules/show-me-test.md：不能证明会红的检查等于没写）。
++ * 它也是 C577（系统配置没见证到的最新根，乙罩不到） 改之前的发布形态：轮换写完就返回。
++ *
++ * singlefs-expect: Sometimes
++ *)
++
++{}
++
++P0(int *root, int *configuration, int *returned)
++{
++	WRITE_ONCE(*root, 1);
++	WRITE_ONCE(*configuration, 1);
++	WRITE_ONCE(*returned, 1);
++}
++
++P1(int *root, int *configuration, int *returned)
++{
++	int r0;
++	int r1;
++
++	r0 = READ_ONCE(*returned);
++	smp_rmb();
++	r1 = READ_ONCE(*configuration);
++}
++
++exists (1:r0=1 /\ 1:r1=0)
+diff --git a/litmus/publish-returns-after-the-rotation-barrier.litmus b/litmus/publish-returns-after-the-rotation-barrier.litmus
+new file mode 100644
+--- /dev/null
++++ b/litmus/publish-returns-after-the-rotation-barrier.litmus
+@@ -0,0 +1,41 @@
++C publish-returns-after-the-rotation-barrier
++
++(*
++ * 发布的最后三步（D16（发布语义） 已定项 7：根槽（FUA）→ 系统配置槽 → 屏障，屏障完成才返回；
++ * 实现在 crates/singlefs-core 的 transaction::persist_the_root_then_rotate_the_system_configuration，三条发布路径与重发共用）。
++ * 坏结果 = 发布已经返回，之后读系统配置槽却看不到这次轮换写的值
++ * （C577（系统配置没见证到的最新根，乙罩不到）：返回那一刻轮换还在写缓存里，崩溃之后系统配置只见证到上一次发布）。
++ *
++ * P0 = 发布：根槽 FUA → 轮换 → 屏障 → 返回（写 returned）。P0 里的写与屏障逐项就是录制流里发布最后三步的次序
++ * （crates/singlefs-harness/tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs 比对）。
++ * 根槽与轮换之间不写屏障：FUA 返回才发轮换，那一段的序不是这条判的（根的序归 first-txn-* 两条）；这条只判轮换之后那道屏障。
++ * P1 = 返回之后的读者（崩溃之后的可写挂载读两槽取见证值）：先看到已经返回，再读系统配置槽。
++ * 屏障写成 smp_wmb，读者一侧的先后写成 smp_rmb：herd7 判的是这条屏障形态在 LKMM 下的序，不是块层的 FLUSH；
++ * 块层那一半在录制流上判（crates/singlefs-harness/tests/a_publish_returns_only_after_the_system_configuration_rotation_is_durable.rs）。
++ *
++ * singlefs-expect: Never
++ * singlefs-models: crates/singlefs-core/src/transaction.rs::persist_the_root_then_rotate_the_system_configuration 写者（P0）
++ * singlefs-models: crates/singlefs-core/src/recovery.rs::verified_system_configuration_slots 读者（P1：返回之后读两槽的见证值）
++ *)
++
++{}
++
++P0(int *root, int *configuration, int *returned)
++{
++	WRITE_ONCE(*root, 1);
++	WRITE_ONCE(*configuration, 1);
++	smp_wmb();
++	WRITE_ONCE(*returned, 1);
++}
++
++P1(int *root, int *configuration, int *returned)
++{
++	int r0;
++	int r1;
++
++	r0 = READ_ONCE(*returned);
++	smp_rmb();
++	r1 = READ_ONCE(*configuration);
++}
++
++exists (1:r0=1 /\ 1:r1=0)

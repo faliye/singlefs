@@ -15,14 +15,16 @@
 
 归类判据：一条测试或一段代码要枚举崩溃状态、要真设备或外部工具、或跑一次以十分钟计，归 checker 档；否则归 harness 档。拿不准的放 checker 档，再由代码三方判要不要挪回。
 依赖只许一个方向：checker 档依赖 harness 档与池级 checker，harness 档不依赖 checker 档（它的依赖闭包里没有 `singlefs-checker-tier`，dev-dependencies 也算；源码里零处引它；门禁 94 号判）。两档都要用的一小段代码，宁可各留一份（例：`crates/singlefs-harness/tests/common_corrupted_allocation_record/mod.rs` 抄自 checker 档的坏盘输入），也不让 harness 依赖 checker 档。
+测试文件按它测什么起名：领域在前、场景在后（`rollback_by_a_forward_publish`、`crash_enumeration_fixed_script_stream`），checker 档的以模块起头（`crash_enumeration_`、`crash_points_`、`crash_injection_`、`bad_disk_input_`、`record_checker_`）；不带里程碑、步号、增补号、并行线号、欠账号（以里程碑序数起头的、`*_step_four_*`、`*_supplement_two_*`、`*_c519_*`），来历写进文件头的文档注释。`research/scripts/crash-case-check.py` 判，门禁 14 号在真仓上跑。
 不许用的叫法：「checker 包」（分不清是池级 checker 还是 checker 档）、「放量用例」「验证档」（说 checker 档）。
 
 ## harness 档里再分轻重
 
 - 轻：每次改完跑，`cargo test -p singlefs-harness` 不带 `--ignored` 跑到的全部。
 - 复测只跑上一趟红的用例：`python3 research/scripts/rerun-failed-tests.py <上一趟的日志> -p <包>` 按测试目标打印只跑它们的命令，经 Bash 起（加内存包装）；上一趟之后代码又改过、或上一趟日志不全（脚本判红）时才整份重跑。
-- 重：随机历史长档、release 下要跑几分钟的用例，标 `#[ignore]`，`#[ignore = "…"]` 的消息写清多久、给谁跑；要跑随时跑，一律经 `research/scripts/run-with-memory-cap.sh`，线程数按派发提示的上限。
-- 调全量崩溃枚举函数（`enumerate_layer0` 一族，快档 `quick_tier` 那几个除外，直接调或经同一文件里的函数调）的测试不是 harness 档的重，它是 checker 档，写进 `crates/singlefs-checker-tier/tests/`；`research/scripts/crash-case-check.py` 判这一条，写在别的包里判红。
+- 重：单线程 debug 下单条跑到 60 秒及以上的用例，标 `#[ignore = "harness 重档：…"]`；要跑随时跑，一律经 `research/scripts/run-with-memory-cap.sh`，线程数按派发提示的上限。轻重由量出来的数定，不由整份全量日志里 libtest 的「has been running for over 60 seconds」定：`python3 research/scripts/harness-test-timing.py measure`（只量变了的目标加 `--targets`）把单条耗时写进 `crates/singlefs-harness/test-timing.tsv`，再 `apply` 按表统一标上或摘掉，表与标记一起提交；不手标、不手摘。门禁 14 号判标记与表对得上。
+- 调全量崩溃枚举函数（`enumerate_layer0` 一族，快档 `quick_tier` 那几个除外）或自己逐个造崩溃状态（名字带 `every_crash`；循环里对录制操作取到循环变量为止的前缀去 `apply`、或造 `CrashImage`），直接这样做或经同一文件里的函数这样做的测试不是 harness 档的重，它是 checker 档，写进 `crates/singlefs-checker-tier/tests/`；`research/scripts/crash-case-check.py` 判这一条，写在别的包里判红。
+- 一条用例一个场景：按参数循环、每一轮新建一个池（`build_pool`、`build_through_*`、`format_pool`、`MemoryPool::with_devices`）的，拆成一个带参数的函数加每个取值一条 `#[test]`，红了只重跑那一条；确是一个场景的（同一个池上按次序做几轮）在用例上面写一行 `// harness-test-granularity:one-scenario <理由>`。`research/scripts/crash-case-check.py` 判，门禁 14 号在真仓上跑它。
 
 ## checker 档自己分快档与全量
 
@@ -34,6 +36,8 @@
 55、57、59、87 号照各自的复用判定跑（`research/scripts/stage-must-run.sh` 文件头）。
 
 ## 崩溃枚举用例住哪、怎么登记
+
+- checker 档每个测试文件第一行写它测哪几个模块：`//! checker 档模块：<模块，按 crash、layer0_progress、crash_injection、bad_disk_input、device_log、on_device_modes 的次序用、隔开>`，与它从 `singlefs_checker_tier::` 导入的模块逐个相同；一个都不导入的写 `无（为什么）`。按模块找用例：`grep -l '^//! checker 档模块：.*crash_injection' crates/singlefs-checker-tier/tests/*.rs`。`research/scripts/crash-case-check.py` 判。
 
 - 写在 `crates/singlefs-checker-tier/tests/<流的名字>.rs`，全量那条标 `#[ignore]`，同文件的快档用例不标。
 - 共用的搭建模块经 `#[path = "../../singlefs-harness/tests/common/mod.rs"] mod common;` 这类声明指回 harness 档的 `tests/common*/mod.rs`，不抄第二份。
@@ -72,6 +76,9 @@
 | 崩溃枚举用例住在 checker 档、标了 `#[ignore]` 的登记了 `crash-case:` | `research/scripts/crash-case-check.py`（47 号跑它的自证） |
 | 函数名与类型名不只由空泛词拼成 | 13 号，词表 `.claude/naming-vague-words`、还没改完的文件 `.claude/naming-vague-exclude` |
 | 池级 checker 库不依赖实现；harness 档不依赖 checker 档 | 94 号 |
+| 用例住对档、一条一个场景、测试文件不按里程碑起名、checker 档测试文件声明模块、harness 重档标记与耗时表对得上 | 14 号（跑 `research/scripts/crash-case-check.py` 与 `research/scripts/harness-test-timing.py check`） |
+| 变异行点名的测试跑得到：标了 `#[ignore]` 的带 `--include-ignored`、`--` 之后的筛选词筛得到点名的测试 | 33 号 |
+| 每道阶段认第一个参数当项目根 | 62 号 |
 | 谁在什么时候跑得了 checker 档 | `.claude/hooks/heavy-test-guard.sh`，判定在 `lib_heavy_tests.py`：跑到 checker 档包 `singlefs-checker-tier` 的测试（库单测、集成测试、装置二进制的内联测试）、55 / 57 / 59 / 87 号、QEMU、herd7、`crates/mutations.tsv` 整表、全量 `cargo test`、整轮门禁、E152 装置算重型 |
 
-**它们管不到的**：harness 里一条重用例该不该标 `#[ignore]`、快档抽的取样点够不够、全量该多久跑一次——这几样靠人与代码三方。
+**它们管不到的**：耗时表是不是最近量的（表头写着量的那次提交）、快档抽的取样点够不够、全量该多久跑一次——这几样靠人与代码三方。

@@ -1,4 +1,4 @@
-//! 理想模型（里程碑「第二个事务」增补 3 第 2 件）：一个只住内存的模型，记每一版提交的内容、每条根属于哪个实例、实例表的行、回退下界 F，
+//! 理想模型（里程碑「覆盖写、释放、回退与复用」增补 3 第 2 件）：一个只住内存的模型，记每一版提交的内容、每条根属于哪个实例、实例表的行、回退下界 F，
 //! 回答「冷启动该读回哪一版」「回退到这条根该不该被拒」「这个错误该不该出现」；第 1 件的每一步拿实现的结局与它比（比的那层胶水在
 //! `model_comparison.rs`，那里可以用 `singlefs_core` 的类型）。
 //!
@@ -1110,7 +1110,7 @@ impl IdealModel {
         let session = self.open_session()?;
         let current = &session.current;
         let mut required_refusals = BTreeSet::new();
-        // 第一个文件版本接在现行那一版后面：txg 与 jsn 各加一，不取 `FIRST_TRANSACTION_TXG`——那个常量只管 mkfs
+        // 第一个文件版本接在现行那一版后面：txg 与 jsn 各加一，不取 `NEW_POOL_FILE_CREATION_TXG`——那个常量只管 mkfs
         // 同一个进程里那条流（2026-09-23 用户定案）。执行器恒拿现行那一版的根与记录，所以
         // `FirstFileVersionDoesNotFollowTheVersionItBuildsOn` 在随机历史里走不到、模型一次都不要求它。
         // 现行那一版已经有过文件版本：这条路径按「树还没建起来」写，再走一次会重新建树、重新发对象出生代，

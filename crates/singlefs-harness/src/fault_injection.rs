@@ -1,4 +1,4 @@
-//! 故障注入（里程碑「第二个事务」增补 3 第 4 件）：一个通用的设备包装，按种子让任意一次写、读、刷盘返回 `BlockDeviceError`，
+//! 故障注入（里程碑「覆盖写、释放、回退与复用」增补 3 第 4 件）：一个通用的设备包装，按种子让任意一次写、读、刷盘返回 `BlockDeviceError`，
 //! 或让一次读返回改坏的字节。被测的性质有两条：注入之后 `singlefs-core` 那一侧**返回错误而不是 panic**，
 //! 出错之后**重开要恢复到模型允许的版本**。
 //!
@@ -6,7 +6,7 @@
 //! * 这一件（历史里的盘，`crate::history::HistoryDevice`）：注入在录制器**外面**（调用方与录制器之间）。报错的写、被吞掉的写与
 //!   被吞掉的屏障都不进录制流，录制流因此恒等于真正落到内存盘上的那一串——注入之后的镜像可以从录制流重建
 //!   （`crate::memory_pool::MemoryPool::apply`），不必把执行器里的两块盘再交出来一份。
-//! * 门禁 55 号的装置（`src/bin/first_transaction_on_device.rs` 的 `CountedDevice`）：录制器在**外面**、注入在里面。录制流记的是
+//! * 门禁 55 号的装置（`src/bin/new_pool_file_creation_on_device.rs` 的 `CountedDevice`）：录制器在**外面**、注入在里面。录制流记的是
 //!   程序发给这块盘的每一次调用，被吞掉的屏障也在里面；真设备收到了什么另看这一层的计数（[`FaultDeviceCounts`] 的
 //!   `barriers_forwarded` / `barriers_swallowed`）——那条栈上录制流不等于落盘的那一串，不能拿它按上一条那样重建镜像。
 //!
@@ -21,7 +21,7 @@
 //! 允许的集合 = 注入那一步之前模型提交过的每一版 ∪ 不注入时那一步会提交的那几版。后一半是刻意放行的：
 //! 「发布在最后一步失败、根已 FUA 落盘，重开之后那一版看得见」正是增补 2 收口表第 40 行（C381）在争的那一格，
 //! 三方三轮判完、改法未定，这里不替它定，只把落在那一格的次数记成一笔（`FaultInjectionTally::reopened_into_the_version_the_failed_step_was_writing`）。
-//! 第 40 行那一格的判别力由写死的那条用例钉（`tests/second_transaction_supplement_three_fault_injection.rs`）。
+//! 第 40 行那一格的判别力由写死的那条用例钉（`tests/fault_injection_fast_tier.rs`）。
 
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};

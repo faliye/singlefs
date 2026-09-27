@@ -11,3 +11,4 @@ want=这些 agent 名在 .claude/agents/ 里没有定义：
 want=第 4 行 20-b.sh：ghost
 want=     100-e.sh
 want=     a-f.sh
+want=这些阶段不认第一个参数当项目根

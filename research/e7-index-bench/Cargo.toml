@@ -374,8 +374,8 @@ name = "e140-header-alignment"
 path = "src/bin/e140_header_alignment.rs"
 
 [[bin]]
-name = "e142-first-txn-dry-run"
-path = "src/bin/e142_first_transaction_dry_run.rs"
+name = "e142-new-pool-file-creation-dry-run"
+path = "src/bin/e142_new_pool_file_creation_dry_run.rs"
 
 [[bin]]
 name = "e143-one-unit-per-txn-journal"
@@ -489,3 +489,21 @@ optional = true
 name = "e163-gpu-multicard-crc32c"
 path = "src/bin/e163_gpu_multicard_crc32c.rs"
 required-features = ["e163-gpu"]
+
+# E162（崩溃放量判定块存储选型）第三段 S3（跑前登记补 5 开头那张表）：送块进程，不带存储依赖（跨机格要编成 musl 静态送去另一台）。
+[[bin]]
+name = "e162-verdict-store-sender"
+path = "src/bin/e162_verdict_store_sender.rs"
+
+# E162（崩溃放量判定块存储选型）第三段 S3：库进程、回环转发、驱动与收尾核。
+# 编这个 bin：cargo build --release -p e7-index-bench --features e162-block-stores --bin e162-verdict-store-network
+[[bin]]
+name = "e162-verdict-store-network"
+path = "src/bin/e162_verdict_store_network.rs"
+required-features = ["e162-block-stores"]
+
+# E162（崩溃放量判定块存储选型）第四段 S4 掉电装置（跑前登记补 5 开头那张表）：来宾里跑 glibc 动态链接的这一份，库由附加根带进去。
+[[bin]]
+name = "e162-verdict-store-power-cut"
+path = "src/bin/e162_verdict_store_power_cut.rs"
+required-features = ["e162-block-stores"]

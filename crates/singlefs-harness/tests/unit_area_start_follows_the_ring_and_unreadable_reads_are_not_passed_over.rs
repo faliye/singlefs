@@ -3,7 +3,7 @@
 //! 一、代码审阅第 15 条（C475（非默认环长下单元区起点取编译期常量））：单元区起点按环长现算、全链路一处来源——mkfs 按环长算起点
 //! （journal 环末尾的下一个槽，D3（空间分配） 已定项 10 ④）、写进系统配置偏移 417 的 8 字节、实例表与树表写在那里；读者择系统配置时
 //! 判那 8 字节就是环长现算的那个；挂载按它建空闲图、判分配记录落点；checker 按那 8 字节读。默认环 768 MiB 下起点仍是 50176，
-//! 第一个事务写出的字节逐字节不变。起点不在 64 槽段边界上 mkfs 在任何写之前拒（实审 A2c 的「第一版不支持」）。
+//! 新池新建文件写出的字节逐字节不变。起点不在 64 槽段边界上 mkfs 在任何写之前拒（实审 A2c 的「第一版不支持」）。
 //!
 //! 二、实审 C11b 顺带看到的第 5 条：环长 ≥ 2³² × 12288 字节时在飞上限装不进系统配置里那 4 字节，mkfs 在任何写之前拒，不在写系统配置那一步 panic；
 //! 读者择系统配置时同样拒这样的环长（不拒的话挂载之后轮换系统配置槽时 panic）。
@@ -13,6 +13,12 @@
 //!
 //! 四、C554 乙报告 Q6（用户 2026-09-26「不能接受 要改」）：两处「读不出就无声放过」照乙的形态收——先重读一次，仍读不出就在任何写之前拒：
 //! 算生效 F 时最新那条根的实例表读不出（改之前「不按表滤」）；挂着时抬 F 重算影子账时根槽读不出（改之前当那一槽没有根）。
+//! 合入后验证一（规格 `/tmp/claude-1000/impl-merge-verify-1/spec.md`，2026-09-27 JST）改了三样：
+//! - 读根环照 D16（发布语义） 已定项 1「根槽这一次读坏」那一行分两类（善后一报告 P1）：挂载那一刻就读坏、这个进程之后没写过的槽当没有根，
+//!   不重读、不拒；这个进程知道住着根的槽读坏重读一次，仍坏才拒；
+//! - 两个拒的成员从 `RecoveryFailure` 挪进乙那一族 `StillUnreadableAfterOneReread`（A3b 报告 Q4）；
+//! - 另两处读不出就无声放过（A3b 报告 Q7）：管理员回退判候选照同一读法拒成 `RollbackError` 的新成员；写系统配置槽之前算 F 生效值
+//!   读不出的重读一次，仍读不出照原来的退路（写入口手里没有根环表，不拒）。
 //!
 //! 盘：两块内存稀疏盘（`SparseBlockDevice`），改盘上字节之后重封每一道校验和；读故障用这个文件自己的包装盘按「这一段第几次读」坏。
 use std::cell::RefCell;
@@ -35,14 +41,21 @@ use singlefs_core::make_filesystem::{
     allocator_after_make_filesystem, make_filesystem, MakeFilesystemError,
     MakeFilesystemParameters, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
 };
-use singlefs_core::mount::{mount_writable, raise_rollback_floor, MountError, ShadowLedger};
+use singlefs_core::mount::{
+    mount_writable, raise_rollback_floor, ring_slots_known_to_hold_a_root_by,
+    roll_back_by_a_forward_publish, MountError, RollbackError, RollbackTarget, ShadowLedger,
+    StillUnreadableAfterOneReread,
+};
 use singlefs_core::records::{TREE_KIND_LIVELIST, TREE_KIND_SPARSE_SIDE_TABLE};
 use singlefs_core::recovery::{
     choose_system_configuration, effective_rollback_floor_rereading_the_newest_instance_table_once,
-    every_root_ring_slot, read_root_ring_slot, readable_roots,
-    readable_roots_rereading_unreadable_root_ring_slots_once, recover, JournalPolicy,
-    RecoveryFailure, RecoveryOutcome, RootRingSlotReading,
-    SystemConfigurationValueOutsideWhatThisReaderAccepts,
+    effective_rollback_floor_rereading_unreadable_reads_once, every_root_ring_slot,
+    read_root_ring_slot, readable_roots,
+    readable_roots_rereading_ring_slots_known_to_hold_a_root_once, readable_roots_with_ring_slots,
+    recover, verified_system_configuration_slots,
+    InstanceTableOfTheNewestRootStillUnreadableAfterOneReread, JournalPolicy, RecoveryFailure,
+    RecoveryOutcome, RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread,
+    RootRingSlotReading, SystemConfigurationValueOutsideWhatThisReaderAccepts,
 };
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::root_ring::{slot_offset, RootRingSlot, RootRingSlotsPerRegion};
@@ -270,14 +283,14 @@ fn crc32_of_the_images(devices: &[(DeviceIdentity, SparseBlockDevice)], device_b
 // ─── 一、单元区起点随环长走 ───
 
 /// 默认环 768 MiB 上 mkfs → 取号 → 暖机 → 第一个文件之后，两块盘整盘镜像的 CRC-32C。钉的是改之前那一份代码写出的字节
-/// （实审 A3b 开工时主工作区的副本上同一段流程现算，`name=a3b_default_ring_first_transaction_images_crc32 value=1783297687`）：
-/// 默认环下单元区起点仍是 50176，第一个事务写出的字节逐字节不变。
-const DEFAULT_RING_FIRST_TRANSACTION_IMAGES_CRC32: u32 = 1_783_297_687;
+/// （实审 A3b 开工时主工作区的副本上同一段流程现算，`name=a3b_default_ring_new_pool_file_creation_images_crc32 value=1783297687`）：
+/// 默认环下单元区起点仍是 50176，新池新建文件写出的字节逐字节不变。
+const DEFAULT_RING_NEW_POOL_FILE_CREATION_IMAGES_CRC32: u32 = 1_783_297_687;
 
 /// 默认环 768 MiB：mkfs 按环长现算的单元区起点就是 50176（`INSTANCE_TABLE_SLOT`），树表第 0 版在 50178（`TREE_TABLE_GENESIS_SLOT`），
 /// 系统配置偏移 417 的 8 字节写 50176；mkfs 到第一个文件写出的两块盘与改之前逐字节相同（整盘 CRC-32C 钉值）。
 #[test]
-fn the_default_journal_ring_keeps_the_unit_area_at_slot_50176_and_the_first_transaction_bytes_unchanged(
+fn the_default_journal_ring_keeps_the_unit_area_at_slot_50176_and_the_new_pool_file_creation_bytes_unchanged(
 ) {
     let pool = pool_after_the_first_file(JOURNAL_RING_DEFAULT_BYTES, FOUR_GIBIBYTES);
     assert_eq!(
@@ -306,7 +319,7 @@ fn the_default_journal_ring_keeps_the_unit_area_at_slot_50176_and_the_first_tran
     }
     assert_eq!(
         crc32_of_the_images(&pool.devices, pool.device_bytes),
-        DEFAULT_RING_FIRST_TRANSACTION_IMAGES_CRC32,
+        DEFAULT_RING_NEW_POOL_FILE_CREATION_IMAGES_CRC32,
         "默认环下 mkfs 到第一个文件写出的两块盘与改之前逐字节相同"
     );
 }
@@ -895,7 +908,8 @@ const INSTANCE_TABLE_BYTES: u64 = 2 * SLOT_BYTES;
 
 /// 抬 F 那一串先读现行那一版的实例表（这一段每块盘的第 1 次读，读盘 0 那一份就够），再算生效 F 时读根环里最新那条根的实例表
 /// （同一片：盘 0 第 2 次、盘 1 第 1 次），重读一次（盘 0 第 3 次、盘 1 第 2 次）。点名这两遍两份都坏：拒成
-/// `InstanceTableOfTheNewestRootStillUnreadableAfterOneReread`，在动分配器与任何写之前——两块盘逐字节不变、分配器与抬 F 之前逐项相同。
+/// `StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor`（经 `MountError::NewerStateStillUnreadableAfterOneReread`，
+/// 与乙那一族同级），在动分配器与任何写之前——两块盘逐字节不变、分配器与抬 F 之前逐项相同。
 /// 改之前「不按表滤」往下走，这一次抬照做。
 #[test]
 fn raising_the_floor_while_the_newest_roots_instance_table_stays_unreadable_is_refused_before_any_write(
@@ -914,12 +928,15 @@ fn raising_the_floor_while_the_newest_roots_instance_table_stays_unreadable_is_r
     );
     assert!(
         matches!(
-            refused,
-            Err(MountError::Recovery(
-                RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
-                    newest_root_on_the_reread: Some((InstanceGeneration(1), CheckpointTxg(6))),
-                }
-            ))
+            &refused,
+            Err(MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable))
+                if **still_unreadable
+                    == StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor {
+                        newest_root_on_the_reread: Some(RollbackTarget {
+                            instance: InstanceGeneration(1),
+                            checkpoint_txg: CheckpointTxg(6),
+                        }),
+                    }
         ),
         "{:?}",
         refused.as_ref().err()
@@ -948,44 +965,44 @@ fn the_newest_roots_instance_table_read_on_the_one_reread_lets_the_floor_be_rais
     assert!(raised.is_ok(), "重读读得出，抬 F 做成：{:?}", raised.err());
 }
 
-/// 根环里一个从没写过的槽（最后一个区域的最后一槽）：抬 F 到 3 的那一串里它的每一次读都坏。重算影子账读根环时这一槽读不出、
-/// 重读一次仍读不出 ⇒ 拒成 `RootRingSlotStillUnreadableAfterOneReread`，在动分配器与任何写之前。改之前当那一槽没有根、这一次抬照做。
+/// 根环里最新那条根住的槽：挂载（这里是 mkfs 同一个进程）之后这个进程写过、FUA 返回过，在这个进程的根环表里。抬 F 到 3 那一串读它：
+/// 第 1 次是算 F 生效值读根环，第 2 次是算上限读根环，都读得出；第 3 次是重算影子账与回收门槛读根环，读坏，重读（第 4 次）仍坏 ⇒
+/// 拒成 `StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot`（经 `MountError::NewerStateStillUnreadableAfterOneReread`），
+/// 在动分配器与任何写之前。改之前（A3b 之前）当那一槽没有根、这一次抬照做。
+/// 合入后验证一改了造法：原来坏的是从没写过的最后一槽，D16（发布语义） 已定项 1「根槽这一次读坏」那一行要它当没有根、不拒
+/// （[`raising_the_floor_while_a_root_ring_slot_never_written_stays_unreadable_counts_it_as_no_root`]）。
 #[test]
-fn raising_the_floor_while_a_root_ring_slot_stays_unreadable_is_refused_before_any_write() {
+fn raising_the_floor_while_a_root_ring_slot_known_to_hold_a_root_stays_unreadable_is_refused_before_any_write(
+) {
     let mut pool = pool_after_three_overwrites();
     let sizes = pool.parameters.geometry;
-    let last_slot = *every_root_ring_slot(&sizes).last().expect("根环至少一槽");
-    let slot_device =
-        pool.parameters.region_devices[usize::try_from(last_slot.region).expect("区域号")];
-    let slot_start = slot_offset(last_slot, sizes.fixed_structure_slot_spacing).0;
-    let readable_before = readable_roots(
-        &pool.devices,
-        &pool.parameters.region_devices,
-        &sizes,
-        &pool.parameters.filesystem_identifier,
-    );
+    let (newest_slot, _) = newest_root_in_the_ring(&pool.devices);
     assert!(
-        readable_before.len() < every_root_ring_slot(&sizes).len(),
-        "根环还没转满一圈，最后一槽没写过"
+        ring_slots_known_to_hold_a_root_by(&pool.allocator).contains(&newest_slot),
+        "最新那条根住的槽在这个进程的根环表里"
     );
+    let slot_device =
+        pool.parameters.region_devices[usize::try_from(newest_slot.region).expect("区域号")];
+    let slot_start = slot_offset(newest_slot, sizes.fixed_structure_slot_spacing).0;
     let images_before = images_of(&pool.devices);
     let allocator_before = format!("{:?}", pool.allocator);
-    let every_read_number: Vec<u64> = (1..=64).collect();
     let refused = raise_the_floor_to_three_through(
         &mut pool,
         vec![chosen_read_faults_of(
             slot_device,
             slot_start,
             u64::from(sizes.physical_block_size),
-            &every_read_number,
+            &[3, 4],
         )],
     );
     assert!(
         matches!(
-            refused,
-            Err(MountError::Recovery(
-                RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread { ring_slot }
-            )) if ring_slot == last_slot
+            &refused,
+            Err(MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable))
+                if **still_unreadable
+                    == StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot {
+                        ring_slot: newest_slot,
+                    }
         ),
         "{:?}",
         refused.as_ref().err()
@@ -998,11 +1015,66 @@ fn raising_the_floor_while_a_root_ring_slot_stays_unreadable_is_refused_before_a
     );
 }
 
-/// 读根环逐槽重读那一段本身：一条根住的槽第一次读坏、重读读得出，交回的根里有它；每一次都坏，报那一槽。
+/// 同一槽只在重算影子账那一遍的第一次读坏（第 3 次），重读（第 4 次）读得出：照读出来的根算，这一次抬照做。
+#[test]
+fn a_root_ring_slot_known_to_hold_a_root_read_on_the_one_reread_lets_the_floor_be_raised() {
+    let mut pool = pool_after_three_overwrites();
+    let sizes = pool.parameters.geometry;
+    let (newest_slot, _) = newest_root_in_the_ring(&pool.devices);
+    let slot_device =
+        pool.parameters.region_devices[usize::try_from(newest_slot.region).expect("区域号")];
+    let slot_start = slot_offset(newest_slot, sizes.fixed_structure_slot_spacing).0;
+    let raised = raise_the_floor_to_three_through(
+        &mut pool,
+        vec![chosen_read_faults_of(
+            slot_device,
+            slot_start,
+            u64::from(sizes.physical_block_size),
+            &[3],
+        )],
+    );
+    assert!(raised.is_ok(), "重读读得出，抬 F 做成：{:?}", raised.err());
+}
+
+/// 根环里一个从没写过的槽（最后一个区域的最后一槽）：挂载那一刻就自证不过、这个进程之后也没写过，不在这个进程的根环表里。
+/// 抬 F 到 3 那一串里它的每一次读都坏：D16（发布语义） 已定项 1「根槽这一次读坏」那一行要它当没有根——不重读、不拒，这一次抬照做
+/// （善后一报告 P1；A3b 那一版对每个读不出的槽都重读、仍读不出就拒）。
+#[test]
+fn raising_the_floor_while_a_root_ring_slot_never_written_stays_unreadable_counts_it_as_no_root() {
+    let mut pool = pool_after_three_overwrites();
+    let sizes = pool.parameters.geometry;
+    let last_slot = *every_root_ring_slot(&sizes).last().expect("根环至少一槽");
+    assert!(
+        !ring_slots_known_to_hold_a_root_by(&pool.allocator).contains(&last_slot),
+        "最后一槽没写过，不在这个进程的根环表里"
+    );
+    let slot_device =
+        pool.parameters.region_devices[usize::try_from(last_slot.region).expect("区域号")];
+    let slot_start = slot_offset(last_slot, sizes.fixed_structure_slot_spacing).0;
+    let every_read_number: Vec<u64> = (1..=64).collect();
+    let raised = raise_the_floor_to_three_through(
+        &mut pool,
+        vec![chosen_read_faults_of(
+            slot_device,
+            slot_start,
+            u64::from(sizes.physical_block_size),
+            &every_read_number,
+        )],
+    );
+    assert!(
+        raised.is_ok(),
+        "从没写过的槽读不出当没有根，抬 F 做成：{:?}",
+        raised.err()
+    );
+}
+
+/// 读根环逐槽重读那一段本身：这个进程知道住着根的槽（最新那条根住的）第一次读坏、重读读得出，交回的根里有它；两次都坏，报那一槽；
+/// 不在这个进程根环表里的槽（从没写过的最后一槽）每一次都坏，当没有根、不报错，交回的根与没有读故障时相同。
 #[test]
 fn a_root_ring_slot_unreadable_once_is_read_on_the_reread_and_one_unreadable_twice_is_named() {
     let pool = pool_after_three_overwrites();
     let sizes = pool.parameters.geometry;
+    let known = ring_slots_known_to_hold_a_root_by(&pool.allocator);
     let (newest_slot, newest) = newest_root_in_the_ring(&pool.devices);
     let slot_device =
         pool.parameters.region_devices[usize::try_from(newest_slot.region).expect("区域号")];
@@ -1017,11 +1089,12 @@ fn a_root_ring_slot_unreadable_once_is_read_on_the_reread_and_one_unreadable_twi
             &[1],
         )],
     );
-    let roots = readable_roots_rereading_unreadable_root_ring_slots_once(
+    let roots = readable_roots_rereading_ring_slots_known_to_hold_a_root_once(
         &read_once_badly,
         &pool.parameters.region_devices,
         &sizes,
         &pool.parameters.filesystem_identifier,
+        &known,
     )
     .expect("重读读得出");
     assert!(roots.contains(&newest), "重读那一遍认出了最新那条根");
@@ -1035,15 +1108,45 @@ fn a_root_ring_slot_unreadable_once_is_read_on_the_reread_and_one_unreadable_twi
         )],
     );
     assert_eq!(
-        readable_roots_rereading_unreadable_root_ring_slots_once(
+        readable_roots_rereading_ring_slots_known_to_hold_a_root_once(
             &read_twice_badly,
             &pool.parameters.region_devices,
             &sizes,
             &pool.parameters.filesystem_identifier,
+            &known,
         ),
-        Err(RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread {
-            ring_slot: newest_slot
+        Err(RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread {
+            ring_slot: newest_slot,
         })
+    );
+    let last_slot = *every_root_ring_slot(&sizes).last().expect("根环至少一槽");
+    assert!(!known.contains(&last_slot), "最后一槽没写过");
+    let last_slot_device =
+        pool.parameters.region_devices[usize::try_from(last_slot.region).expect("区域号")];
+    let never_written_slot_always_bad = with_chosen_read_faults(
+        copy_of_the_devices(&pool.devices),
+        vec![chosen_read_faults_of(
+            last_slot_device,
+            slot_offset(last_slot, sizes.fixed_structure_slot_spacing).0,
+            slot_length,
+            &[1, 2, 3],
+        )],
+    );
+    assert_eq!(
+        readable_roots_rereading_ring_slots_known_to_hold_a_root_once(
+            &never_written_slot_always_bad,
+            &pool.parameters.region_devices,
+            &sizes,
+            &pool.parameters.filesystem_identifier,
+            &known,
+        ),
+        Ok(readable_roots(
+            &pool.devices,
+            &pool.parameters.region_devices,
+            &sizes,
+            &pool.parameters.filesystem_identifier,
+        )),
+        "不在根环表里的槽读不出当没有根"
     );
 }
 
@@ -1080,12 +1183,193 @@ fn the_effective_floor_rereads_the_newest_roots_instance_table_once() {
     );
     assert_eq!(
         floor_of(&both_reads_bad),
-        Err(
-            RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
-                newest_root_on_the_reread: Some((InstanceGeneration(1), CheckpointTxg(6))),
-            }
-        )
+        Err(InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
+            newest_root_on_the_reread: Some((InstanceGeneration(1), CheckpointTxg(6))),
+        })
     );
+}
+
+/// 管理员回退 txg 5 那一版（实例 1）的结局，盘换回里面那几块。目标那条根住的槽在这个进程的根环表里。
+fn roll_back_to_txg_five_through(
+    pool: &mut PoolAfterTheFirstFile,
+    ranges_of_the_target_slot: impl Fn(DeviceIdentity, u64, u64) -> Vec<ChosenReadFaultsOfARange>,
+) -> Result<singlefs_core::mount::RolledBack, RollbackError> {
+    let sizes = pool.parameters.geometry;
+    let target = RollbackTarget {
+        instance: InstanceGeneration(1),
+        checkpoint_txg: CheckpointTxg(5),
+    };
+    let (target_slot, _) = readable_roots_with_ring_slots(
+        &pool.devices,
+        &pool.parameters.region_devices,
+        &sizes,
+        &pool.parameters.filesystem_identifier,
+    )
+    .into_iter()
+    .find(|(_, root)| {
+        root.instance == target.instance && root.checkpoint_txg == target.checkpoint_txg
+    })
+    .expect("txg 5 那条根在环里");
+    assert!(
+        ring_slots_known_to_hold_a_root_by(&pool.allocator).contains(&target_slot),
+        "目标住的槽在这个进程的根环表里"
+    );
+    let slot_device =
+        pool.parameters.region_devices[usize::try_from(target_slot.region).expect("区域号")];
+    let slot_start = slot_offset(target_slot, sizes.fixed_structure_slot_spacing).0;
+    let parameters = pool.parameters.clone();
+    let mut faulty = with_chosen_read_faults(
+        std::mem::take(&mut pool.devices),
+        ranges_of_the_target_slot(
+            slot_device,
+            slot_start,
+            u64::from(sizes.physical_block_size),
+        ),
+    );
+    let mut current = pool.first.clone();
+    let rolled_back = roll_back_by_a_forward_publish(
+        &parameters,
+        &mut faulty,
+        &mut pool.allocator,
+        &mut current,
+        target,
+    );
+    pool.devices = without_chosen_read_faults(faulty);
+    rolled_back
+}
+
+/// 管理员回退判候选（实审 A3b 报告 Q7，合入后验证一）：两处读根环都照 D16（发布语义） 已定项 1「根槽这一次读坏」那一行的读法。
+/// 目标那条根住的槽：判「根环里有它」那一遍读坏（第 1 次）、重读（第 2 次）仍坏；或那一遍读得出、算 F_生效 那一遍读坏（第 2 次）、
+/// 重读（第 3 次）仍坏 ⇒ 都拒成 `RollbackError::CandidateJudgementStillUnreadableAfterOneReread(RootRingSlotKnownToHoldARoot)`，
+/// 在任何写之前：两块盘逐字节不变、分配器不动。改之前第一格当那一槽没有根、报目标不在环里；第二格 F_生效 少算一条根、回退照做。
+/// 只在第一遍读坏（第 1 次）、重读读得出：回退照做。
+#[test]
+fn rolling_back_while_the_targets_root_ring_slot_stays_unreadable_is_refused_before_any_write() {
+    for (failing_read_numbers, what) in [
+        (&[1_u64, 2][..], "判根环里有它那一遍"),
+        (&[2, 3][..], "算 F_生效 那一遍"),
+    ] {
+        let mut pool = pool_after_three_overwrites();
+        let images_before = images_of(&pool.devices);
+        let allocator_before = format!("{:?}", pool.allocator);
+        let refused = roll_back_to_txg_five_through(&mut pool, |device, offset, length| {
+            vec![chosen_read_faults_of(
+                device,
+                offset,
+                length,
+                failing_read_numbers,
+            )]
+        });
+        assert!(
+            matches!(
+                &refused,
+                Err(RollbackError::CandidateJudgementStillUnreadableAfterOneReread(still_unreadable))
+                    if matches!(
+                        **still_unreadable,
+                        StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot { .. }
+                    )
+            ),
+            "{what}：{:?}",
+            refused.as_ref().err()
+        );
+        assert_eq!(
+            images_of(&pool.devices),
+            images_before,
+            "{what}：两块盘逐字节不变"
+        );
+        assert_eq!(
+            format!("{:?}", pool.allocator),
+            allocator_before,
+            "{what}：分配器不动"
+        );
+    }
+    let mut pool = pool_after_three_overwrites();
+    let rolled_back = roll_back_to_txg_five_through(&mut pool, |device, offset, length| {
+        vec![chosen_read_faults_of(device, offset, length, &[1])]
+    });
+    assert!(
+        rolled_back.is_ok(),
+        "重读读得出，回退做成：{:?}",
+        rolled_back.err()
+    );
+}
+
+/// 系统配置槽里回退下界 F 那 8 字节的偏移（`SystemConfiguration::to_slot` 的写法，小端）。
+const ROLLBACK_FLOOR_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT: usize = 481;
+
+/// 写系统配置槽之前算 F 生效值（`transaction::PoolWriter`，实审 A3b 报告 Q7，合入后验证一）：读不出的根槽重读一次。
+/// 造法：抬 F 到 3（那一串的根带 F 3、落满两块盘），再把两块盘四槽系统配置里的 F 改回 0、重封——一份违反 I-7.12（系统配置 F 不低于
+/// 同盘根上的 F） 的改出来的镜像，只为让根上的 F 成为生效值里唯一带 3 的来源。之后取号：先读一遍根环算要取的号（带 F 3 的每条根住的槽
+/// 第 1 次读），再逐盘写一次系统配置槽、每一写之前算一遍生效值读一遍根环。点名那几个槽第 2、4 次读坏：两次都重读（第 3、5 次）读得出，
+/// 两块盘新写的那一槽都带 F 3。改之前（不重读）第一块盘那一写读不到带 F 3 的根，写成 0。
+#[test]
+fn a_system_configuration_write_rereads_an_unreadable_root_ring_slot_once_before_taking_the_effective_floor(
+) {
+    let mut pool = pool_after_three_overwrites();
+    raise_the_floor_to_three_through(&mut pool, Vec::new()).expect("抬 F 到 3");
+    let parameters = pool.parameters.clone();
+    rewrite_every_system_configuration_slot(&mut pool.devices, &parameters, |slot| {
+        slot[ROLLBACK_FLOOR_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT
+            ..ROLLBACK_FLOOR_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT + 8]
+            .copy_from_slice(&0_u64.to_le_bytes());
+    });
+    let sizes = parameters.geometry;
+    let slots_of_the_roots_carrying_three: Vec<RootRingSlot> = readable_roots_with_ring_slots(
+        &pool.devices,
+        &parameters.region_devices,
+        &sizes,
+        &parameters.filesystem_identifier,
+    )
+    .into_iter()
+    .filter(|(_, root)| root.rollback_floor == CheckpointTxg(3))
+    .map(|(ring_slot, _)| ring_slot)
+    .collect();
+    assert!(
+        slots_of_the_roots_carrying_three.len() >= 2,
+        "抬 F 那一串落满两块盘"
+    );
+    assert_eq!(
+        effective_rollback_floor_rereading_unreadable_reads_once(
+            &pool.devices,
+            &parameters.region_devices,
+            &sizes,
+            &parameters.filesystem_identifier,
+        ),
+        CheckpointTxg(3),
+        "没有读故障时生效值只从根上来"
+    );
+    let ranges = slots_of_the_roots_carrying_three
+        .iter()
+        .map(|ring_slot| {
+            chosen_read_faults_of(
+                parameters.region_devices[usize::try_from(ring_slot.region).expect("区域号")],
+                slot_offset(*ring_slot, sizes.fixed_structure_slot_spacing).0,
+                u64::from(sizes.physical_block_size),
+                &[2, 4],
+            )
+        })
+        .collect();
+    let mut faulty = with_chosen_read_faults(std::mem::take(&mut pool.devices), ranges);
+    let mut writer = PoolWriter::new(&parameters, faulty.as_mut_slice());
+    acquire_instance(&mut writer).expect("取号");
+    pool.devices = without_chosen_read_faults(faulty);
+    for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+        let newest_written = verified_system_configuration_slots(
+            &pool.devices,
+            device,
+            u64::from(sizes.fixed_structure_slot_spacing),
+            &parameters.filesystem_identifier,
+        )
+        .into_iter()
+        .max_by_key(|system_configuration| system_configuration.quantities.slot_generation)
+        .expect("这块盘刚写过一槽");
+        assert_eq!(
+            newest_written.quantities.rollback_floor,
+            CheckpointTxg(3),
+            "盘 {} 取号写的那一槽带的 F",
+            device.0
+        );
+    }
 }
 
 /// 一池内存盘的一份拷贝（盘宽与镜像都照抄）：读故障包在拷贝外面，原池不动。

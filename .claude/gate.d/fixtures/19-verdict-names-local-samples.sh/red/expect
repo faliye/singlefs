@@ -1,0 +1,6 @@
+exit=1
+want=新写的判决里 2 份没按路径点名那一轮本地腿的全部样本（共漏 2 份）
+want=research/prompts/demo-r1-main-verification.md 漏 1 份：
+want=        demo-r1-local-attack-output-void1.md
+want=research/prompts/two-r1-main-verification.md 漏 1 份：
+want=        two-r1-local-defense-output-void2.md

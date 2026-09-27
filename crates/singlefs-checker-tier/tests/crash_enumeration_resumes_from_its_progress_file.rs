@@ -1,4 +1,5 @@
-//! 层 0 全量的断点续跑（层 0 规模三轮判决 R1–R5、U1–U3，实六；用户 2026-09-26 定「跑前实现」）：在第一个事务那条小流上
+//! checker 档模块：crash、layer0_progress
+//! 层 0 全量的断点续跑（层 0 规模三轮判决 R1–R5、U1–U3，实六；用户 2026-09-26 定「跑前实现」）：在新池新建文件那条小流上
 //! （mkfs → 取号 → 暖机 → A，按甲二展开，几十个状态）拿真的进度文件核续跑的每一条。
 //! 「跑到一半被杀」这样造：跑完留着进度文件（只供测试的那一档），再把文件截到前几片、末尾留半行。
 //! 名字里不带 layer0：它只跑甲二那几十个状态，平时跑得起。
@@ -88,7 +89,8 @@ fn settings(
     Layer0Resume::KeepProgressFile(Layer0ProgressFileSettings {
         directory: directory.to_path_buf(),
         input_fingerprint: Layer0ProgressFileNamePart::new("fingerprint0").expect("合法"),
-        stream_name: Layer0ProgressFileNamePart::new("first_transaction_stream").expect("合法"),
+        stream_name: Layer0ProgressFileNamePart::new("new_pool_file_creation_stream")
+            .expect("合法"),
         start,
         after_completion,
     })

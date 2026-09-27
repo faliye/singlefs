@@ -1,5 +1,5 @@
 //! checker 的已知坏镜像语料（C13（checker 判定失效））：第一版判的 36 条不变量，每条配一份「改坏了正好触发它」的镜像。
-//! 每份都从一份干净镜像出发（写完第一个事务的，或再覆盖写一次的），改一处；要让被改的那一条之前的判定不先挡住，
+//! 每份都从一份干净镜像出发（写完新池新建文件的，或再覆盖写一次的），改一处；要让被改的那一条之前的判定不先挡住，
 //! 被改的单元重封校验和，再把新的整单元校验和沿引用链一路补到根记录（父节点里的位置条目、中央映射条目、根槽的自证校验和）。
 
 mod common;
@@ -40,7 +40,7 @@ use singlefs_harness::{RetainedOperation, SharedStream};
 
 const SLOT: u64 = 16384;
 const DEVICES: [u32; 2] = [0, 1];
-/// 写完第一个事务之后单元区里的单元：(起点槽, 字节数)。分配记录树按位置寻址（D8（核心索引结构） 已定项 14）：4 GiB 两块盘上根在第 2 层，
+/// 写完新池新建文件之后单元区里的单元：(起点槽, 字节数)。分配记录树按位置寻址（D8（核心索引结构） 已定项 14）：4 GiB 两块盘上根在第 2 层，
 /// A 写出它的五个节点——两块盘各自的叶 61（50245、50246）、两块盘各自的第 1 层节点 0（50247、50248）与根（50249），先叶后根。
 const UNITS: [(u64, usize); 14] = [
     (50176, 32768),
@@ -59,7 +59,7 @@ const UNITS: [(u64, usize); 14] = [
     (50252, 16384),
 ];
 /// 再覆盖写一次（发布 B，txg 4）之后单元区里的单元：A 的十四个槽仍在盘上（根环里 A 的根还引用着它们），加上 B 写出的十二个单元
-/// （落点由 `second_transaction_step_one_overwrite.rs` 的验收钉住）。
+/// （落点由 `overwrite_in_one_instance.rs` 的验收钉住）。
 const UNITS_AFTER_OVERWRITE: [(u64, usize); 26] = [
     (50176, 32768),
     (50178, 16384),
@@ -99,7 +99,7 @@ const DATA_UNIT: u64 = 50180;
 const EXTENT_ROOT: u64 = 50240;
 const INODE_LEAF: u64 = 50242;
 const INODE_ROOT: u64 = 50244;
-/// 第一个事务（A）写出的分配记录树两片叶（盘 0、盘 1 各自的叶 61）：发布 B 之后只有 A 的根还（经 A 的第 1 层节点）指着它们。
+/// 新池新建文件（A）写出的分配记录树两片叶（盘 0、盘 1 各自的叶 61）：发布 B 之后只有 A 的根还（经 A 的第 1 层节点）指着它们。
 const ALLOCATION_LEAVES: [u64; 2] = [50245, 50246];
 const ACCOUNTING_ROOT: u64 = 50250;
 const TREE_TABLE: u64 = 50252;
@@ -175,7 +175,7 @@ fn replace_all(haystack: &mut [u8], needle: &[u8], replacement: &[u8]) -> bool {
 }
 
 /// 一个单元（两盘同槽）的整单元校验和从 old 变成 new：把引用它的位置条目逐个补上，被补的单元重封、再往上补，直到根槽。
-/// `units` 是这份镜像单元区里的单元表：写完第一个事务的是 `UNITS`，再覆盖写一次的是 `UNITS_AFTER_OVERWRITE`。
+/// `units` 是这份镜像单元区里的单元表：写完新池新建文件的是 `UNITS`，再覆盖写一次的是 `UNITS_AFTER_OVERWRITE`。
 fn propagate(pool: &mut MemoryPool, units: &[(u64, usize)], mut changes: Vec<(u64, u32, u32)>) {
     while let Some((slot, old, new)) = changes.pop() {
         if old == new {
@@ -311,7 +311,7 @@ fn mutate_unit_of(
     );
 }
 
-/// 写完第一个事务那份镜像上改一个单元。
+/// 写完新池新建文件那份镜像上改一个单元。
 fn mutate_unit(pool: &mut MemoryPool, slot: u64, change: impl Fn(&mut Vec<u8>), reseal: bool) {
     mutate_unit_of(pool, &UNITS, slot, change, reseal);
 }
@@ -1140,7 +1140,7 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
 
 /// 发布 B（txg 4）之后的干净镜像：A 的十二个单元（十四个槽）在这次发布里改写成已释放、释放代 4，树表是 B 写的那一版，
 /// A 那一版仍被根环里 A 的根指着。I-3.9（释放代落在停止引用它的那一格区间里）与 I-9.14（树表条目的诞生 txg 跨根不变）
-/// 要的跨根比较到这里才有内容：写完第一个事务的那份镜像上只有 A 的根有树表条目（mkfs 种的第 0 版树表是空的、
+/// 要的跨根比较到这里才有内容：写完新池新建文件的那份镜像上只有 A 的根有树表条目（mkfs 种的第 0 版树表是空的、
 /// 两次暖机空发布不写树表），I-9.14 在那份镜像上报「不适用」。
 fn image_after_the_overwrite(tag: &str) -> MemoryPool {
     let mut pool = build_pool(tag);
@@ -1504,14 +1504,14 @@ fn verdicts_that_differ_outside<'verdicts>(
         .collect()
 }
 
-/// 第一个事务那条根（txg 3）的根槽：区域 `3 mod 3` = 0（盘 0）的槽 `(3 div 3) mod 8` = 1（D22（单元原子性怎么合成）
+/// 新池新建文件那条根（txg 3）的根槽：区域 `3 mod 3` = 0（盘 0）的槽 `(3 div 3) mod 8` = 1（D22（单元原子性怎么合成）
 /// 已定项 2 / 已定项 16；区域 0 起点 64 × 16384，槽距 4096）。
-const FIRST_TRANSACTION_ROOT_SLOT: (u32, u64) = (0, 64 * SLOT + 4096);
+const NEW_POOL_FILE_CREATION_ROOT_SLOT: (u32, u64) = (0, 64 * SLOT + 4096);
 
 /// I-7.3（环健康性） 的坏镜像，从 **mkfs 刚写完**那份镜像出发：三个区域槽 0 上那三条第 0 代根的 `checkpoint_txg`
 /// 一起改成 1、各自重封自证校验和——「第一次发布把三个区域全盖了一遍」（轮换键算错，每次发布盖满整个环）在盘上的样子。
 /// S 里代号全是 1 ⇒ 除代号最大者外一条更早代号的记录都没有，而 S 又不全是第 0 代 ⇒ 例外那一支够不着 ⇒ 必须红。
-/// **为什么不建在写完第一个事务那份镜像上**：那一份上要让 S 只剩代号最大的一条，就得把 mkfs 那条第 0 代根也去掉，
+/// **为什么不建在写完新池新建文件那份镜像上**：那一份上要让 S 只剩代号最大的一条，就得把 mkfs 那条第 0 代根也去掉，
 /// 而 mkfs 种的树表单元（50178）只有它还引用着 ⇒ I-3.1（已分配统计对得上） 跟着红（遍历少算 16384），判别力算不到 I-7.3 头上。
 /// 那一份的形态另由 `the_root_ring_health_invariant_reddens_...` 里第二段钉住，连它带的那一处一起钉。
 fn known_bad_images_of_the_root_ring_health() -> Vec<(&'static str, Mutation)> {
@@ -2150,7 +2150,8 @@ fn each_publish_ordinal_bad_image_reddens_only_the_publish_ordinal_invariant_on_
 /// C374 那两条：发布 B 之后的干净镜像上每条不变量都成立，两份坏镜像各自**只**红在自己那一条上
 /// （别的不变量跟着红就说明镜像改宽了，判别力算不到这一条头上）。
 #[test]
-fn each_c374_bad_image_reddens_only_its_own_invariant_after_the_overwrite() {
+fn each_release_generation_and_tree_table_birth_bad_image_reddens_only_its_own_invariant_after_the_overwrite(
+) {
     let clean = image_after_the_overwrite("known-bad-after-overwrite");
     for (invariant, found) in check_pool_image(&clean) {
         assert_eq!(
@@ -2182,7 +2183,7 @@ fn each_c374_bad_image_reddens_only_its_own_invariant_after_the_overwrite() {
 /// ② 代号一起改成 1 之后 S 里没有更早代号的记录、例外又够不着 ⇒ 判红，而且**除 I-7.3 之外每一条的判定与 ① 那一份逐项相同**。
 /// 两份的唯一差别就是那个代号 ⇒ 这一条分得出差别，判别力算得到它头上（`test-discipline.md`「检查本身也可能是错的」）。
 ///
-/// 第二段是写完第一个事务那份镜像上的形态：S 只剩代号最大的那一条（除 txg 3 之外的根槽自证校验和都改坏）。
+/// 第二段是写完新池新建文件那份镜像上的形态：S 只剩代号最大的那一条（除 txg 3 之外的根槽自证校验和都改坏）。
 /// 它同时红 I-3.1（已分配统计对得上）——mkfs 种的树表单元（50178）只有那条第 0 代根还引用着，去掉它遍历就少算 16384，
 /// 两条一起红是这份镜像的结构决定的，照实钉下来。
 #[test]
@@ -2232,17 +2233,17 @@ fn the_root_ring_health_invariant_reddens_when_the_previous_generation_is_gone_b
             "除 {invariant} 之外每一条的判定都该与 mkfs 刚写完那一份相同：{differences:?}"
         );
     }
-    // 写完第一个事务那份镜像上的同一个形态：S 只剩 txg 3 那一条。
-    let after_the_first_transaction = built.memory_pool();
+    // 写完新池新建文件那份镜像上的同一个形态：S 只剩 txg 3 那一条。
+    let after_the_new_pool_file_creation = built.memory_pool();
     assert_eq!(
-        verdict(&after_the_first_transaction, "I-7.3"),
+        verdict(&after_the_new_pool_file_creation, "I-7.3"),
         InvariantVerdict::Holds,
-        "写完第一个事务的干净镜像上 I-7.3 要真被评估过且成立"
+        "写完新池新建文件的干净镜像上 I-7.3 要真被评估过且成立"
     );
-    let mut only_the_newest_root_left = after_the_first_transaction.clone();
+    let mut only_the_newest_root_left = after_the_new_pool_file_creation.clone();
     let mut corrupted_root_slots = 0;
     for (device, offset) in root_slots() {
-        if (device, offset) == FIRST_TRANSACTION_ROOT_SLOT {
+        if (device, offset) == NEW_POOL_FILE_CREATION_ROOT_SLOT {
             continue;
         }
         let mut bytes = read(&only_the_newest_root_left, device, offset, 512);
@@ -2346,7 +2347,7 @@ fn a_system_configuration_slot_whose_encryption_type_is_on_reddens_only_its_own_
     assert_eq!(
         cases.len(),
         1,
-        "写完第一个事务那份镜像上 I-7.13 有一份坏镜像"
+        "写完新池新建文件那份镜像上 I-7.13 有一份坏镜像"
     );
     for (invariant, mutation) in cases {
         let mut image = clean.clone();
@@ -2384,8 +2385,8 @@ fn the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target()
     let clean = build_pool("known-bad").memory_pool();
     for (invariant, found) in check_pool_image(&clean) {
         let expected = match invariant {
-            // 写完第一个事务的镜像上只有 A 的根有树表条目：没有一棵树的条目出现在两个树表单元里，跨根比不出来。
-            // 这一条的坏镜像在发布 B 之后那一份上（`each_c374_bad_image_reddens_only_its_own_invariant_after_the_overwrite`）。
+            // 写完新池新建文件的镜像上只有 A 的根有树表条目：没有一棵树的条目出现在两个树表单元里，跨根比不出来。
+            // 这一条的坏镜像在发布 B 之后那一份上（`each_release_generation_and_tree_table_birth_bad_image_reddens_only_its_own_invariant_after_the_overwrite`）。
             "I-9.14" => InvariantVerdict::NotApplicable(
                 "没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来",
             ),
@@ -2443,14 +2444,14 @@ fn the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target()
     }
 }
 
-/// 分配记录树第 1 层、盘 0 那一格的节点（写完第一个事务那份镜像上：`UNITS` 里 50247，它下面只有盘 0 的叶 61）。
+/// 分配记录树第 1 层、盘 0 那一格的节点（写完新池新建文件那份镜像上：`UNITS` 里 50247，它下面只有盘 0 的叶 61）。
 const ALLOCATION_LEVEL_ONE_NODE_OF_DEVICE_ZERO: u64 = 50247;
-/// 挂空叶用的槽：第一个事务写完之后紧挨着树表（50252）的第一个空槽，与已分配的那一段相连——占掉它，空闲段数与全空聚簇段数都不变。
+/// 挂空叶用的槽：新池新建文件写完之后紧挨着树表（50252）的第一个空槽，与已分配的那一段相连——占掉它，空闲段数与全空聚簇段数都不变。
 const EMPTY_LEAF_SLOT: u64 = 50253;
 /// 空叶的出生序号：这棵树在 txg 3 里发过的号之外的一个。
 const EMPTY_LEAF_BIRTH_SEQUENCE: u32 = 200;
 
-/// 写完第一个事务的镜像上，往分配记录树的根之下挂一个空节点、其余全部照账补齐：
+/// 写完新池新建文件的镜像上，往分配记录树的根之下挂一个空节点、其余全部照账补齐：
 /// 一、空节点那一槽（50253）在每块盘上各记一条已分配记录（分配代 3），记在罩着它的那片叶 61 里；记账的已分配各加一槽、空闲各减一槽；
 /// 二、盘 0 的叶 62（按位置罩 [62 × 812, 63 × 812)，那一段里一条记录都没有）写成一个一条条目都没有的节点，放在 50253，
 ///     挂到第 1 层盘 0 那一格下面；改过的每个单元重封、新的整单元校验和沿引用链补到根槽（`mutate_unit` / `propagate`）。
@@ -2627,7 +2628,7 @@ fn an_empty_leaf_hung_below_the_root_of_the_allocation_record_tree_reddens_only_
 /// inode 记录里 `blocks` 的偏移（D8（核心索引结构） 已定项 6 的偏移表：size 在 40，blocks 在 48）。
 const INODE_RECORD_BLOCKS_OFFSET: usize = 48;
 
-/// I-9.15（inode 记录的 blocks 等于 ⌈size ÷ 512⌉）：第一个事务那条记录 size 3000、blocks 6。三个取样值各改一份：
+/// I-9.15（inode 记录的 blocks 等于 ⌈size ÷ 512⌉）：新池新建文件那条记录 size 3000、blocks 6。三个取样值各改一份：
 /// 64 是按分到一个 32 KiB 单元算的旧占位值，5 是向下取整，7 是多一块；每一份都**只**红 I-9.15，红在「blocks 与 ⌈3000 ÷ 512⌉ = 6 不等」。
 /// 盘上原样的 6 就是干净镜像（`the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target` 判它成立）。
 #[test]
@@ -2666,7 +2667,7 @@ fn inode_record_blocks_other_than_the_logical_length_in_512_byte_blocks_reddens_
 
 /// 树表条目里种类那 2 字节的偏移（树 ID 8 + 条目长度 2 之后，D8（核心索引结构） 已定项 8）。
 const TREE_TABLE_ENTRY_KIND_OFFSET: usize = 10;
-/// 第一个事务那一版树表里七条按发号次序排：livelist 是第 4 条（从 0 数，号 16）、稀疏旁表第 5 条（号 17）。
+/// 新池新建文件那一版树表里七条按发号次序排：livelist 是第 4 条（从 0 数，号 16）、稀疏旁表第 5 条（号 17）。
 const LIVELIST_TREE_TABLE_ENTRY_INDEX: usize = 4;
 const SPARSE_SIDE_TABLE_TREE_TABLE_ENTRY_INDEX: usize = 5;
 const TREE_KIND_LIVELIST: u16 = 6;
@@ -2696,7 +2697,7 @@ fn swap_the_kinds_of_the_livelist_and_sparse_side_table_entries(tree_table: &mut
     }
 }
 
-/// I-9.16（树表条目按树 ID 严格升序且合发号次序）：写完第一个事务那一版树表里 livelist（号 16）与稀疏旁表（号 17）两条互换种类。
+/// I-9.16（树表条目按树 ID 严格升序且合发号次序）：写完新池新建文件那一版树表里 livelist（号 16）与稀疏旁表（号 17）两条互换种类。
 /// 盘上次序仍按树 ID 升序（① 成立，树表的 key 就是树 ID，I-1.1 也不红），按发号次序 livelist 的号 17 大过稀疏旁表的号 16（② 不成立）：
 /// **只**红 I-9.16，第一处违例写明最新那条根（实例 1、txg 3）与发号次序上相邻的那两条。两条的根都是空根，改种类不牵动别的判定。
 /// 两条整条互换位置（只违反 ①）的那一份连 I-1.1 一起红，钉在 `tree_table_ordering_is_judged_by_the_cold_walk_and_the_checker.rs`。
@@ -2732,7 +2733,7 @@ fn a_tree_table_whose_two_entries_swapped_their_kinds_reddens_only_the_tree_tabl
     );
 }
 
-/// 第一个事务写出的中央映射树根（bump 次序：分配记录树五个节点、记账树、映射树、树表）。
+/// 新池新建文件写出的中央映射树根（bump 次序：分配记录树五个节点、记账树、映射树、树表）。
 const MAPPING_ROOT: u64 = 50251;
 /// 根记录里中央映射树根指针的出生树：指针在根记录偏移 256（D22（单元原子性怎么合成） 已定项 7），出生树在指针偏移 34
 /// （D19（块指针的结构与宽度预算） 已定项 11）。
@@ -2764,12 +2765,12 @@ fn central_mapping_root_whose_header_tree_differs_from_its_root_pointer_birth_tr
         );
     });
     let root_pointer_says_another_tree: Mutation = Box::new(|image: &mut MemoryPool| {
-        let (device, offset) = FIRST_TRANSACTION_ROOT_SLOT;
+        let (device, offset) = NEW_POOL_FILE_CREATION_ROOT_SLOT;
         let mut root_slot = read(image, device, offset, 512);
         assert_eq!(
             get_u64(&root_slot, ROOT_RECORD_MAPPING_POINTER_BIRTH_TREE_OFFSET),
             15,
-            "第一个事务那条根的映射树根指针说出生树 15"
+            "新池新建文件那条根的映射树根指针说出生树 15"
         );
         set_u64(
             &mut root_slot,
@@ -2919,7 +2920,7 @@ fn region_count_past_the_region_device_fields_is_refused_by_the_geometry_reader(
     );
 }
 
-/// A (1, 3)、B (1, 4) → 重开取号 2、写行、暖机两次、C (2, 8)，与 `second_transaction_step_four_rollback.rs` 的固定脚本同一段。
+/// A (1, 3)、B (1, 4) → 重开取号 2、写行、暖机两次、C (2, 8)，与 `rollback_by_a_forward_publish.rs` 的固定脚本同一段。
 /// 交回池、A 与 C 那两版。
 fn pool_through_the_third_version(tag: &str) -> (BuiltPool, TransactionOutput, TransactionOutput) {
     let mut pool = build_pool(tag);
@@ -3122,7 +3123,7 @@ fn birth_txg_recorded_differently_only_on_the_timeline_cut_off_by_a_recovery_is_
 }
 
 /// 发布 B 写出的数据单元：它的分配记录在 B 那一版分配记录树的两片叶（`ALLOCATION_LEAVES_AFTER_OVERWRITE`）里，未释放、分配代 4，
-/// 单元头里的诞生代号也是 4（落点由 `second_transaction_step_one_overwrite.rs` 的验收钉住）。
+/// 单元头里的诞生代号也是 4（落点由 `overwrite_in_one_instance.rs` 的验收钉住）。
 const DATA_UNIT_AFTER_OVERWRITE: u64 = 50182;
 
 /// 分配记录树叶里槽号是 `slot`、**未带**已释放标志、分配代等于 `from` 的记录（两盘各一条）改成 `to`；返回改了几条。
@@ -3249,7 +3250,7 @@ fn leak_one_slot_keeping_free_plus_allocated(bytes: &mut [u8], with_inflated_def
 }
 
 /// 增补 2 收口表第 54 行那一轮三方（`research/prompts/m2-placement-falsepositive-r1-main-verification.md` Z3）攻方腿的
-/// 两份纯泄漏坏镜像，建在写完第一个事务那份干净镜像上：Z3-A（只泄漏）与 Z3-B（泄漏 + defer 行跟着抬高）。
+/// 两份纯泄漏坏镜像，建在写完新池新建文件那份干净镜像上：Z3-A（只泄漏）与 Z3-B（泄漏 + defer 行跟着抬高）。
 /// 候选 c（记账 ≥ 遍历）在 Z3-A 上哑、候选 f（记账 − 遍历 ≤ defer 行）在两份上都哑，这一轮的判决就栽在它们上。
 fn known_bad_images_of_a_pure_leak() -> Vec<(&'static str, Mutation)> {
     vec![
@@ -3327,7 +3328,7 @@ fn pure_leak_that_keeps_free_plus_allocated_equal_to_the_unit_area_reddens_only_
 /// 发布 B 写出的记账树（bump 次序：分配记录树五个节点 50257–50261、记账树、映射树、树表 50264）：I-3.11 那几份镜像改的就是它。
 const ACCOUNTING_ROOT_AFTER_OVERWRITE: u64 = 50262;
 /// 发布 B 之后记账里每盘的「已分配」与「defer 待释放」（槽）：mkfs 3 + A 14 + B 14 = 31；A 的 14 槽 + A 换下的 mkfs 树表 1 槽 = 15
-/// （`second_transaction_step_one_overwrite.rs` 的验收钉着同一对数）。最新根（B）走读到的是 31 − 15 = 16 槽：B 的 14 槽 + mkfs 那片实例表 2 槽。
+/// （`overwrite_in_one_instance.rs` 的验收钉着同一对数）。最新根（B）走读到的是 31 − 15 = 16 槽：B 的 14 槽 + mkfs 那片实例表 2 槽。
 const ALLOCATED_SLOTS_AFTER_OVERWRITE: u64 = 31;
 const DEFERRED_SLOTS_AFTER_OVERWRITE: u64 = 15;
 
@@ -3534,7 +3535,7 @@ fn overwrite_and_advance(pool: &mut BuiltPool, content: &[u8], instance: Instanc
 /// 步 5 那段历史走到抬 F 之前：A、B、重开写行、C（实例 2）、挂着的时候回退到 (1, 3)（一次向前发布 D，txg 9，实例仍是 2）、
 /// 实例 2 覆盖写五次（txg 10–14）。没有哪条根被实例表判出局；非空的不同状态按新到旧是 14、13、12、11、……（D 与 A 是同一个状态，
 /// 只算一次），抬 F 的上限 = min(每块盘上最新的 13, 第 4 个不同状态 11) = 11
-/// （`second_transaction_step_five_reuse.rs` 的 `raising_the_floor_above_the_fourth_newest_non_empty_root_is_refused` 钉着同一个上限）。
+/// （`reuse_after_raising_the_floor.rs` 的 `raising_the_floor_above_the_fourth_newest_non_empty_root_is_refused` 钉着同一个上限）。
 fn pool_before_raising_the_floor(tag: &str) -> BuiltPool {
     let mut pool = build_pool(tag);
     overwrite_and_advance(&mut pool, &content_seeded(4100, 3), InstanceGeneration(1));
@@ -3823,7 +3824,7 @@ fn one_device_whose_system_configuration_floor_is_below_a_root_on_it_reddens_onl
     }
 }
 
-/// 正常卸载那段历史：第一个事务之后同一个实例里覆盖写三次（txg 4–6），卸载把 F 抬到 6，推 txg 7（落盘 1）、8（落盘 0）两条带卸载记号的根。
+/// 正常卸载那段历史：新池新建文件之后同一个实例里覆盖写三次（txg 4–6），卸载把 F 抬到 6，推 txg 7（落盘 1）、8（落盘 0）两条带卸载记号的根。
 /// 这段历史上准入抬 F 的上限是 3（第 4 新的非空根是 A 的 3）。
 fn image_after_the_normal_unmount(tag: &str) -> MemoryPool {
     let mut pool = build_pool(tag);
@@ -3953,7 +3954,7 @@ fn content_applied_only_by_its_journal_record() -> Vec<u8> {
 }
 
 /// 一次可写挂载接在「由记录施加出来、根槽从没落盘」的那一版之后的镜像（增补 2 收口表第 54 行那段历史，
-/// 与 `second_transaction_step_zero_layer0.rs` 残留记录那条流里实例 2 的根已落盘的那 12 个状态同形）：
+/// 与 `crash_enumeration_fixed_script_stream.rs` 残留记录那条流里实例 2 的根已落盘的那 12 个状态同形）：
 /// mkfs → 取号 → 暖机 → A → B，实例 1 再发一版（txg 5）而**只落了它的单元与 journal 记录、根槽与系统配置槽一个都没落**；
 /// 可写挂载择 B 的根 (1, 4)、施加那条记录、给实例 1 写行 (1, 5, 3)、写行发布 txg 6 把 (1, 5) 那一版的固定点单元换下放进 defer、
 /// 暖机一次 txg 7。交回挂载前后两份镜像、挂载之后接着发布要用的盘与分配器，以及几个单元的槽（两盘同槽）。
@@ -4164,7 +4165,7 @@ fn version_applied_only_by_its_journal_record_is_walked_so_the_allocated_statist
 /// 候选 b 那一版的第 ① 条（「它被施加过」要看实例表里有没有这个实例的行）：同一段历史**挂载之前**那一刻，
 /// 那一版的单元与记录已在盘上、最新的根还是 B 的 (1, 4)，实例表里没有实例 1 的行——施加要等下一次挂载，这一刻它不算一版。
 /// 这一刻它的单元是孤儿、不在记账里；把它并进遍历就是遍历多算，I-3.1（已分配统计对得上） 红
-/// （`second_transaction_step_zero_layer0.rs` 残留记录那条流里「链接得到残留记录」的 19 个状态就是这一格）。
+/// （`crash_enumeration_fixed_script_stream.rs` 残留记录那条流里「链接得到残留记录」的 19 个状态就是这一格）。
 #[test]
 fn journal_record_that_no_mount_has_applied_yet_is_not_walked_and_every_invariant_holds() {
     let built = image_after_a_writable_mount_over_a_version_applied_only_by_its_journal_record(
@@ -5033,7 +5034,7 @@ fn published_nodes_behind_an_intermediate_row_still_count_against_the_tree_ident
     );
 }
 
-/// 两块 4 GiB 内存盘上第一个事务之后连着 369 次取号之后崩溃，可写挂载一次（取号 371、写 370 行：实例表两片），再挂一次
+/// 两块 4 GiB 内存盘上新池新建文件之后连着 369 次取号之后崩溃，可写挂载一次（取号 371、写 370 行：实例表两片），再挂一次
 /// （取号 372、写 1 行）：第二次写行整条链重写、两片旧链逐片释放（释放代 = 那次写行的 txg）。交回镜像、现行那一版、
 /// 旧链第 1 片的槽、第二次写行的 txg，与两次挂载发出的每一版的单元表（起点槽, 字节数）去重合在一起——分配记录树按位置寻址之后
 /// （D8（核心索引结构） 已定项 14）一片叶可以被好几版照抄，改它要把每一版里指着它的父节点都补上，不只现行那一版的。
@@ -5065,13 +5066,13 @@ fn image_after_rewriting_a_two_page_instance_table_chain() -> (
             )
         })
         .collect();
-    singlefs_harness::scenario::run_first_transaction(
+    singlefs_harness::scenario::run_new_pool_file_creation(
         &parameters(),
         &mut devices,
         &stream,
         |_, _| {},
     )
-    .expect("第一个事务");
+    .expect("新池新建文件");
     {
         let publish_parameters = parameters();
         let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
@@ -5110,7 +5111,7 @@ fn image_after_rewriting_a_two_page_instance_table_chain() -> (
         .flat_map(|version| {
             version
                 .file_version()
-                .expect("第一个事务之后每一版都带文件")
+                .expect("新池新建文件之后每一版都带文件")
                 .units
                 .iter()
                 .map(|unit| {
@@ -5127,7 +5128,7 @@ fn image_after_rewriting_a_two_page_instance_table_chain() -> (
     let current = second
         .current
         .into_file_version()
-        .expect("第一个事务之后的现行版本带文件");
+        .expect("新池新建文件之后的现行版本带文件");
     (
         memory_pool_of_sparse_devices(&devices),
         current,

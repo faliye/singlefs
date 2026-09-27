@@ -1,4 +1,4 @@
-E7RESULT name=k1_after_first_transaction txg=3 allocated_slots=13 free_slots=211955 deferred_slots=1 registered_item1_slots=13 registered_item5_slots=1 matches_registered=true
+E7RESULT name=k1_after_new_pool_file_creation txg=3 allocated_slots=13 free_slots=211955 deferred_slots=1 registered_item1_slots=13 registered_item5_slots=1 matches_registered=true
 E7RESULT name=k1_placements txg=3 units=50180:2,50240:1,50242:2,50244:1,50245:1,50246:1,50247:1,50248:1
 E7RESULT name=geometry ring_length=24 baseline_workload_length=144 hr_prefix_length=72 hr_tail_length=72
 E7RESULT name=baseline_workload_truncated_by_write_failure requested_length=144 actual_length=49 failed_at_step=50 failure=AllocationRecordsExceedOneNode { records: 820, capacity: 812 }

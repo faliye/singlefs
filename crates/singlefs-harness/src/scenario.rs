@@ -1,4 +1,4 @@
-//! 第一个事务的整条路（mkfs → 取号 → 暖机 → 第一个事务），参数照 E142（第一个事务的干跑） 装置取：
+//! 新池新建文件的整条路（mkfs → 取号 → 暖机 → 新池新建文件），参数照 E142（新池新建文件的干跑） 装置取：
 //! 虚机里的真设备、宿主上的内存盘都跑这一份，同参数同字节（mkfs 与发布都不取系统时钟与随机数）。
 
 use singlefs_core::address::{DeviceIdentity, InstanceGeneration};
@@ -54,7 +54,7 @@ pub fn e142_parameters(
     }
 }
 
-pub struct FirstTransactionRun {
+pub struct NewPoolFileCreationRun {
     pub mkfs_operation_count: usize,
     pub warm_up: WarmUpOutput,
     pub output: TransactionOutput,
@@ -66,47 +66,47 @@ pub enum ScenarioPoint {
     AfterMakeFilesystem,
     /// 取号写完、那道屏障做完，暖机还没开始（同一个写入口接着暖机，这里不另发屏障）。
     AfterInstanceAcquisition,
-    /// 暖机之后、第一个事务之前（虚机档在这里给某块盘装上「漏一道屏障」）。
-    BeforeFirstTransaction,
+    /// 暖机之后、新池新建文件之前（虚机档在这里给某块盘装上「漏一道屏障」）。
+    BeforeNewPoolFileCreation,
 }
 
 /// 整条路上的四步，按次序。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FirstTransactionPathStep {
+pub enum NewPoolFileCreationPathStep {
     MakeFilesystem,
     InstanceAcquisition,
     WarmUp,
-    FirstTransaction,
+    NewPoolFileCreation,
 }
 
-impl FirstTransactionPathStep {
+impl NewPoolFileCreationPathStep {
     /// 结果行里的名字，与虚机档分段时间的段名相同。
     #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
-            FirstTransactionPathStep::MakeFilesystem => "mkfs",
-            FirstTransactionPathStep::InstanceAcquisition => "instance_acquisition",
-            FirstTransactionPathStep::WarmUp => "warm_up",
-            FirstTransactionPathStep::FirstTransaction => "first_transaction",
+            NewPoolFileCreationPathStep::MakeFilesystem => "mkfs",
+            NewPoolFileCreationPathStep::InstanceAcquisition => "instance_acquisition",
+            NewPoolFileCreationPathStep::WarmUp => "warm_up",
+            NewPoolFileCreationPathStep::NewPoolFileCreation => "new_pool_file_creation",
         }
     }
 }
 
 /// 整条路没走完：停在哪一步、为什么，以及那一步的写入口交得出的账——落盘阶段失败的发布各自已记的写
 /// （`PoolWriter::writes_of_failed_publishes`），与同一步里失败之前已经落盘的发布各自的写（暖机两次空发布里第二次失败时，第一次的账由
-/// `transaction::WarmUpFailed` 交回）。里程碑「第二个事务」增补 2 收口表第 58 行：失败那次落盘的写不属于任何一次成功发布的账，
+/// `transaction::WarmUpFailed` 交回）。里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 58 行：失败那次落盘的写不属于任何一次成功发布的账，
 /// 同一步里已经落盘的那几次的账又随错一起丢，不交出来，设备一层数到的写就对不上。两样相加就是那一步的写入口记下的全部发布写。
-/// mkfs 与取号不是发布，停在这两步时两样恒空；第一个事务那一步只有一次发布，第二样恒空。
+/// mkfs 与取号不是发布，停在这两步时两样恒空；新池新建文件那一步只有一次发布，第二样恒空。
 #[derive(Debug)]
-pub struct FirstTransactionPathFailure {
-    pub failed_step: FirstTransactionPathStep,
+pub struct NewPoolFileCreationPathFailure {
+    pub failed_step: NewPoolFileCreationPathStep,
     pub cause: String,
     pub writes_of_failed_publishes: Vec<WritesByStructureKind>,
     pub writes_of_persisted_publishes: Vec<WritesByStructureKind>,
 }
 
-impl FirstTransactionPathFailure {
-    fn before_any_publish(failed_step: FirstTransactionPathStep, cause: String) -> Self {
+impl NewPoolFileCreationPathFailure {
+    fn before_any_publish(failed_step: NewPoolFileCreationPathStep, cause: String) -> Self {
         Self {
             failed_step,
             cause,
@@ -126,8 +126,8 @@ impl FirstTransactionPathFailure {
 /// 每一段的写与挂钟就是相邻两处之差。
 ///
 /// # Errors
-/// 哪一步没做成，连同那一步的写入口交出来的失败账（[`FirstTransactionPathFailure`]）。
-pub fn run_first_transaction<
+/// 哪一步没做成，连同那一步的写入口交出来的失败账（[`NewPoolFileCreationPathFailure`]）。
+pub fn run_new_pool_file_creation<
     Device: BlockDevice,
     AtPoint: FnMut(ScenarioPoint, &mut [(DeviceIdentity, Device)]),
 >(
@@ -135,10 +135,10 @@ pub fn run_first_transaction<
     devices: &mut [(DeviceIdentity, Device)],
     stream: &SharedStream,
     mut at_point: AtPoint,
-) -> Result<FirstTransactionRun, FirstTransactionPathFailure> {
+) -> Result<NewPoolFileCreationRun, NewPoolFileCreationPathFailure> {
     let genesis = make_filesystem(parameters, devices).map_err(|error| {
-        FirstTransactionPathFailure::before_any_publish(
-            FirstTransactionPathStep::MakeFilesystem,
+        NewPoolFileCreationPathFailure::before_any_publish(
+            NewPoolFileCreationPathStep::MakeFilesystem,
             format!("{error:?}"),
         )
     })?;
@@ -149,15 +149,15 @@ pub fn run_first_transaction<
     let (instance, warm_up_output) = {
         let mut pool = PoolWriter::new(parameters, &mut *devices);
         let instance = acquire_instance(&mut pool).map_err(|error| {
-            FirstTransactionPathFailure::before_any_publish(
-                FirstTransactionPathStep::InstanceAcquisition,
+            NewPoolFileCreationPathFailure::before_any_publish(
+                NewPoolFileCreationPathStep::InstanceAcquisition,
                 format!("{error:?}"),
             )
         })?;
         at_point(ScenarioPoint::AfterInstanceAcquisition, &mut *pool.devices);
         let warm = warm_up(&mut pool, &genesis.root, instance).map_err(|failed| {
-            FirstTransactionPathFailure {
-                failed_step: FirstTransactionPathStep::WarmUp,
+            NewPoolFileCreationPathFailure {
+                failed_step: NewPoolFileCreationPathStep::WarmUp,
                 cause: format!("{:?}", failed.cause),
                 writes_of_failed_publishes: pool.writes_of_failed_publishes().to_vec(),
                 writes_of_persisted_publishes: failed.writes_of_persisted_publishes,
@@ -166,7 +166,7 @@ pub fn run_first_transaction<
         (instance, warm)
     };
     assert_eq!(instance, InstanceGeneration(1));
-    at_point(ScenarioPoint::BeforeFirstTransaction, devices);
+    at_point(ScenarioPoint::BeforeNewPoolFileCreation, devices);
     let mut pool = PoolWriter::new(parameters, devices);
     let output = publish_first_file(
         &mut pool,
@@ -179,13 +179,13 @@ pub fn run_first_transaction<
         instance,
         &warm_up_output.last_record_bytes,
     )
-    .map_err(|error| FirstTransactionPathFailure {
-        failed_step: FirstTransactionPathStep::FirstTransaction,
+    .map_err(|error| NewPoolFileCreationPathFailure {
+        failed_step: NewPoolFileCreationPathStep::NewPoolFileCreation,
         cause: format!("{error:?}"),
         writes_of_failed_publishes: pool.writes_of_failed_publishes().to_vec(),
         writes_of_persisted_publishes: Vec::new(),
     })?;
-    Ok(FirstTransactionRun {
+    Ok(NewPoolFileCreationRun {
         mkfs_operation_count,
         warm_up: warm_up_output,
         output,

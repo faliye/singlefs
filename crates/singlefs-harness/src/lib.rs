@@ -15,12 +15,12 @@ use singlefs_core::block_device::{
 };
 
 pub mod fault_injection;
-pub mod first_transaction_regions;
 pub mod hexadecimal;
 pub mod history;
 pub mod memory_pool;
 pub mod model;
 pub mod model_comparison;
+pub mod new_pool_file_creation_regions;
 pub mod read_tally;
 pub mod scenario;
 pub mod segments;

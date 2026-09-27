@@ -52,7 +52,7 @@ fn content_of(length: usize, seed: usize) -> Vec<u8> {
 const SECOND_VERSION_BYTES: usize = 4100;
 const NEWEST_VERSION_BYTES: usize = 2500;
 
-/// 第一个事务（A，实例 1，txg 3）之后在同一个进程里覆盖写 B（txg 4）、C（txg 5），每次一条记录：C 的根 FUA 之后系统配置轮换，
+/// 新池新建文件（A，实例 1，txg 3）之后在同一个进程里覆盖写 B（txg 4）、C（txg 5），每次一条记录：C 的根 FUA 之后系统配置轮换，
 /// 写的是 C 那条记录的计数器——系统配置见证了 C。
 struct PoolWithAWitnessedNewestPublish {
     pool: BuiltPool,
@@ -514,7 +514,7 @@ fn the_first_writable_mount_of_a_formatted_pool_has_nothing_witnessed_and_does_n
     );
 }
 
-/// 代码审阅第 22 条那一格用的历史（与 `second_transaction_supplement_two_unreadable_abandoned_root_slot.rs` 同一段脚本）：
+/// 代码审阅第 22 条那一格用的历史（与 `unreadable_abandoned_root_slot.rs` 同一段脚本）：
 /// A、B（实例 1）→ 重开取号 2、写行（txg 5）、暖机（6、7）→ C（txg 8）→ 崩溃恢复抛弃 C（系统配置没见证 C，实例 3 写行 9、暖机 10）。
 /// 交回池、最新那条根（实例 3 暖机 txg 10）指着的实例表那一片的指针。
 fn pool_after_a_recovery_abandoned_the_third_version(tag: &str) -> (BuiltPool, NodePointer) {
@@ -587,7 +587,7 @@ const DEVICE_ZERO_READS_OF_THE_NEWEST_INSTANCE_TABLE_BEFORE_THE_ALLOCATOR_IS_REB
 /// - 持续读不出 ⇒ 拒可写（点名重读那一遍择到的最新根 (3, 10)），取号之前、`DiskSnapshot` 不变；盘 0 那一份在重建分配器里读了两次
 ///   （影子账第一遍、重读；生效 F 判有效根用影子账那张表、不另读），盘 1 那一份跟着两次；
 /// - 撤在重读之前（钩子里撤）⇒ 照常可写挂载，报「实例表在重读那一遍读出来」，影子账照隔离 C 独占的 14 槽（两块盘各 14，
-///   与 `second_transaction_supplement_two_unreadable_abandoned_root_slot.rs` 根槽读得出那一臂钉的同一个数）。
+///   与 `unreadable_abandoned_root_slot.rs` 根槽读得出那一臂钉的同一个数）。
 #[test]
 fn a_newest_instance_table_unreadable_when_the_shadow_ledger_reads_it_is_reread_once_then_refuses_writable_instead_of_turning_the_isolation_off(
 ) {

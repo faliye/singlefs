@@ -95,7 +95,7 @@ fn content_of(length: usize, seed: usize) -> Vec<u8> {
 const SECOND_VERSION_BYTES: usize = 4100;
 const NEWEST_VERSION_BYTES: usize = 2500;
 
-/// 第一个事务（A，实例 1，txg 3，jsn 3）之后在同一个进程里覆盖写 B（txg 4，jsn 4）、C（txg 5，jsn 5）：C 的根 FUA 之后系统配置轮换，
+/// 新池新建文件（A，实例 1，txg 3，jsn 3）之后在同一个进程里覆盖写 B（txg 4，jsn 4）、C（txg 5，jsn 5）：C 的根 FUA 之后系统配置轮换，
 /// 每块盘世代 7 那一槽写的是 C 那条记录的计数器 5——系统配置见证了 C。
 struct PoolWithAWitnessedNewestPublish {
     pool: BuiltPool,
@@ -295,9 +295,9 @@ fn three_crashed_acquisitions_in_a_row_carry_the_witness_from_acquisition_write_
     );
 }
 
-/// mkfs 之后的第一次取号：mkfs 写的两槽 tail 都是 0，见证值就是 0，取号写照旧写 0——第一个事务的字节不变。
+/// mkfs 之后的第一次取号：mkfs 写的两槽 tail 都是 0，见证值就是 0，取号写照旧写 0——新池新建文件的字节不变。
 #[test]
-fn the_first_acquisition_after_mkfs_still_writes_tail_zero_so_the_first_transaction_bytes_do_not_change(
+fn the_first_acquisition_after_mkfs_still_writes_tail_zero_so_the_new_pool_file_creation_bytes_do_not_change(
 ) {
     let mut formatted = format_pool("c554-yi-carry-first-acquisition");
     let pool_parameters = parameters();
@@ -340,22 +340,22 @@ fn the_first_acquisition_after_mkfs_still_writes_tail_zero_so_the_first_transact
     }
 }
 
-/// 第一个事务之后每块盘两槽：世代 4（暖机第二次，tail 2）、世代 5（第一个事务，tail 3）。盘 `damaged_device` 世代 5 那一槽坏掉（清零），
+/// 新池新建文件之后每块盘两槽：世代 4（暖机第二次，tail 2）、世代 5（新池新建文件，tail 3）。盘 `damaged_device` 世代 5 那一槽坏掉（清零），
 /// 池里最大的 tail 3 只在另一块盘上读得出：第二次取号写进每块盘的 tail 都是 3——取整池的最大值，不是各盘自己的，也不是最小的。
 fn a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lost_its_newest_slot(
     tag: &str,
     damaged_device: DeviceIdentity,
 ) {
     let mut pool = build_pool(tag);
-    let first_transaction_counter = pool.output.record.counter;
+    let new_pool_file_creation_counter = pool.output.record.counter;
     assert_eq!(
-        first_transaction_counter, 3,
-        "暖机 jsn 1、2，第一个事务 jsn 3"
+        new_pool_file_creation_counter, 3,
+        "暖机 jsn 1、2，新池新建文件 jsn 3"
     );
     let slot_spacing_in_bytes = u64::from(geometry().fixed_structure_slot_spacing);
     {
         let devices: &mut Vec<(DeviceIdentity, Recorded)> =
-            pool.devices.as_mut().expect("第一个事务写完，盘还开着");
+            pool.devices.as_mut().expect("新池新建文件写完，盘还开着");
         let (_, device) = devices
             .iter_mut()
             .find(|(identity, _)| *identity == damaged_device)
@@ -391,7 +391,7 @@ fn a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lost
                 if disk == damaged_device {
                     (disk, vec![2])
                 } else {
-                    (disk, vec![2, first_transaction_counter])
+                    (disk, vec![2, new_pool_file_creation_counter])
                 }
             })
             .collect::<Vec<_>>(),
@@ -402,7 +402,7 @@ fn a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lost
         .flat_map(|(_, tails)| tails.iter().copied())
         .max()
         .expect("池里有自证过的系统配置");
-    assert_eq!(largest_tail_of_the_pool, first_transaction_counter);
+    assert_eq!(largest_tail_of_the_pool, new_pool_file_creation_counter);
 
     assert_eq!(acquire_once_then_crash(&mut pool), InstanceGeneration(2));
     let after_the_acquisition = pool.memory_pool();
@@ -447,12 +447,12 @@ fn a_rolled_back_acquisition_writes_the_witnessed_tail_back_instead_of_zero() {
     /// 系统配置两槽住在偏移 0 与 4096，都在这个界之下。
     const SYSTEM_CONFIGURATION_SLOTS_END_OFFSET: u64 = 8192;
     let mut built = build_pool("c554-yi-carry-rolled-back");
-    let first_transaction_counter = built.output.record.counter;
+    let new_pool_file_creation_counter = built.output.record.counter;
     let plan = SharedFaultPlan::unarmed(geometry());
     let mut devices: Vec<(DeviceIdentity, FaultInjectingBlockDevice<Recorded>)> = built
         .devices
         .take()
-        .expect("第一个事务写完，盘还开着")
+        .expect("新池新建文件写完，盘还开着")
         .into_iter()
         .map(|(identity, inner)| {
             (
@@ -488,15 +488,15 @@ fn a_rolled_back_acquisition_writes_the_witnessed_tail_back_instead_of_zero() {
             SlotReading {
                 slot_generation: 6,
                 journal_instance: InstanceGeneration(2),
-                journal_tail: first_transaction_counter,
+                journal_tail: new_pool_file_creation_counter,
             },
             SlotReading {
                 slot_generation: 7,
                 journal_instance: InstanceGeneration(1),
-                journal_tail: first_transaction_counter,
+                journal_tail: new_pool_file_creation_counter,
             },
         ],
-        "盘 0：取号写世代 6 带新号 2，回卷写世代 7 带旧号 1；两写的 tail 都是取号前的见证值 {first_transaction_counter}"
+        "盘 0：取号写世代 6 带新号 2，回卷写世代 7 带旧号 1；两写的 tail 都是取号前的见证值 {new_pool_file_creation_counter}"
     );
     assert_eq!(
         slot_readings_of(devices.as_slice(), DeviceIdentity(1)),
@@ -509,7 +509,7 @@ fn a_rolled_back_acquisition_writes_the_witnessed_tail_back_instead_of_zero() {
             SlotReading {
                 slot_generation: 5,
                 journal_instance: InstanceGeneration(1),
-                journal_tail: first_transaction_counter,
+                journal_tail: new_pool_file_creation_counter,
             },
         ],
         "盘 1 一个字节都没写成"

@@ -1,0 +1,4 @@
+exit=1
+want=新写的判决里 1 份没按路径点名那一轮本地腿的全部样本（共漏 1 份）
+want=research/prompts/three-r1-main-verification.md 漏 1 份：
+want=        three-r1-local-attack-output-s2.md

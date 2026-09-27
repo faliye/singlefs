@@ -83,17 +83,17 @@ fn window_admission(capacity_cells: u64, published_used: u64, transaction_count:
 
 /// 臂三：COW 重写事务 A（释放 freed 格）之后，事务 B 要 r_b 格。
 /// `credit_frees` = 把 A 在本窗口的释放也记成可用（违反 D16 新规则 2 的形态）。
-fn credit_frees_arm(published_free: u64, first_transaction_takes: u64, first_transaction_frees: u64, second_transaction_wants: u64, credits_window_frees: bool) -> Tally {
+fn credit_frees_arm(published_free: u64, new_pool_file_creation_takes: u64, new_pool_file_creation_frees: u64, file_overwrite_wants: u64, credits_window_frees: bool) -> Tally {
     let mut tally = Tally::default();
     // A 先过闸（overlay 正确扣）
-    assert!(first_transaction_takes <= published_free);
-    let free_after_first = published_free - first_transaction_takes;
-    let visible_to_second = if credits_window_frees { free_after_first + first_transaction_frees } else { free_after_first };
-    if second_transaction_wants <= visible_to_second {
+    assert!(new_pool_file_creation_takes <= published_free);
+    let free_after_first = published_free - new_pool_file_creation_takes;
+    let visible_to_second = if credits_window_frees { free_after_first + new_pool_file_creation_frees } else { free_after_first };
+    if file_overwrite_wants <= visible_to_second {
         tally.admitted += 1;
         // B 的分配：先吃真空闲，吃不够就吃 A 刚释放的（defer 本该扣住的）
-        let taken_from_true_free = second_transaction_wants.min(free_after_first);
-        tally.premature_reuse = second_transaction_wants - taken_from_true_free;
+        let taken_from_true_free = file_overwrite_wants.min(free_after_first);
+        tally.premature_reuse = file_overwrite_wants - taken_from_true_free;
     } else {
         tally.rejected += 1;
     }
@@ -223,8 +223,8 @@ mod tests {
             let tally = window_admission(capacity_cells, published_used, transaction_count, cells_per_transaction, true);
             assert_eq!(tally.oversold_units, 0, "cap={capacity_cells}");
         }
-        for (published_free, first_transaction_takes, first_transaction_frees, second_transaction_wants) in [(40u64, 30u64, 30u64, 30u64), (100, 50, 50, 60), (10, 5, 5, 6)] {
-            assert_eq!(credit_frees_arm(published_free, first_transaction_takes, first_transaction_frees, second_transaction_wants, false).premature_reuse, 0);
+        for (published_free, new_pool_file_creation_takes, new_pool_file_creation_frees, file_overwrite_wants) in [(40u64, 30u64, 30u64, 30u64), (100, 50, 50, 60), (10, 5, 5, 6)] {
+            assert_eq!(credit_frees_arm(published_free, new_pool_file_creation_takes, new_pool_file_creation_frees, file_overwrite_wants, false).premature_reuse, 0);
         }
         for capacity_cells in [2u64, 100, 999] {
             assert_eq!(tombstone_arm(capacity_cells, true).1.delete_deadlocks, 0, "cap={capacity_cells}");

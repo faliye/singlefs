@@ -71,16 +71,16 @@ GROUPS = [
         ("capacity_available_percent", "可用 %"),
     ]),
     ("singlefs（两块 16 GiB 盘，门禁 55 号的真设备二进制）", [
-        ("singlefs_write_path_milliseconds", "mkfs + 取号 + 暖机 + 第一个事务 ms"),
-        ("singlefs_second_transaction_milliseconds", "第二个事务（覆盖写 B）ms"),
-        ("singlefs_second_transaction_inner_milliseconds", "发布 B（二进制自己计）ms"),
+        ("singlefs_write_path_milliseconds", "mkfs + 取号 + 暖机 + 新池新建文件 ms"),
+        ("singlefs_file_overwrite_milliseconds", "覆盖写、释放、回退与复用（覆盖写 B）ms"),
+        ("singlefs_file_overwrite_inner_milliseconds", "发布 B（二进制自己计）ms"),
         ("singlefs_recovery_milliseconds", "冷恢复 ms"),
         ("singlefs_read_bytes_both_devices", "两盘读字节"),
         ("singlefs_read_requests_both_devices", "两盘读请求"),
-        ("singlefs_second_transaction_writes_both_devices", "B 两盘写请求"),
-        ("singlefs_second_transaction_written_bytes_both_devices", "B 两盘写字节"),
-        ("singlefs_second_transaction_barriers_both_devices", "B 两盘屏障"),
-        ("singlefs_second_transaction_force_unit_access_writes_both_devices", "B 两盘 FUA 写"),
+        ("singlefs_file_overwrite_writes_both_devices", "B 两盘写请求"),
+        ("singlefs_file_overwrite_written_bytes_both_devices", "B 两盘写字节"),
+        ("singlefs_file_overwrite_barriers_both_devices", "B 两盘屏障"),
+        ("singlefs_file_overwrite_force_unit_access_writes_both_devices", "B 两盘 FUA 写"),
     ]),
 ]
 
@@ -212,9 +212,9 @@ def selftest():
         "E7RESULT name=fio configuration=zfs round=2 job=read_random_4k read_kibibytes=4 block_read_bytes=4096 write_kibibytes=0 block_write_bytes=0 verdict=counted",
     ])
     singlefs_sample = "\n".join([
-        "E7RESULT name=summary configuration=singlefs metric=singlefs_second_transaction_milliseconds rounds=3 median=14.000 minimum=12.000 maximum=16.000 spread_percent=28.6 stability=unstable values=1:16.000,3:12.000,5:14.000",
-        "E7RESULT name=summary configuration=singlefs metric=singlefs_second_transaction_inner_milliseconds rounds=5 median=6.412 minimum=6.000 maximum=6.500 spread_percent=7.8 stability=stable values=1:6.000",
-        "E7RESULT name=summary_excluded configuration=singlefs metric=singlefs_second_transaction_milliseconds round=2 reason=outer_does_not_contain_inner",
+        "E7RESULT name=summary configuration=singlefs metric=singlefs_file_overwrite_milliseconds rounds=3 median=14.000 minimum=12.000 maximum=16.000 spread_percent=28.6 stability=unstable values=1:16.000,3:12.000,5:14.000",
+        "E7RESULT name=summary configuration=singlefs metric=singlefs_file_overwrite_inner_milliseconds rounds=5 median=6.412 minimum=6.000 maximum=6.500 spread_percent=7.8 stability=stable values=1:6.000",
+        "E7RESULT name=summary_excluded configuration=singlefs metric=singlefs_file_overwrite_milliseconds round=2 reason=outer_does_not_contain_inner",
     ])
     # 第一次、第二次正式跑的产物里没有二进制自己计的那个指标：那一格照缺值写「—」
     singlefs_without_inner_sample = singlefs_sample.splitlines()[0]
@@ -225,10 +225,10 @@ def selftest():
         "| ext4 | 5 / 5 | 无 | 无 |",
         "| OpenZFS（vdev 是分区） | —（没有对照） | read_sequential_mebibytes_per_second 第 3 轮（cache_substituted） | 2 |",
         "| OpenZFS（vdev 是分区） | — | — | 32.00 | — |",
-        "| 第二个事务（覆盖写 B）ms | 发布 B（二进制自己计）ms | 冷恢复 ms |",
+        "| 覆盖写、释放、回退与复用（覆盖写 B）ms | 发布 B（二进制自己计）ms | 冷恢复 ms |",
         "| singlefs（两盘） | — | 14.0 ⚠29%（3 轮） | 6.41 | — | — | — | — | — | — | — |",
         "| singlefs（两盘） | — | 14.0 ⚠29%（3 轮） | — | — | — | — | — | — | — | — |",
-        "| singlefs（两盘） | —（没有对照） | singlefs_second_transaction_milliseconds 第 2 轮（outer_does_not_contain_inner） | 无 |",
+        "| singlefs（两盘） | —（没有对照） | singlefs_file_overwrite_milliseconds 第 2 轮（outer_does_not_contain_inner） | 无 |",
     ]
     missing = [expectation for expectation in expectations if expectation not in rendered]
     if missing:

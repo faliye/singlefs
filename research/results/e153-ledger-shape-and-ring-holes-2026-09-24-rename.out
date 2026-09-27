@@ -1,11 +1,11 @@
 E7RESULT name=config unit_area_capacity_slots=211968 ring_regions=3 record_width_single=20 record_width_dual=28 records_per_node_single=812 records_per_node_dual=580 model=counting file_ops=0
 E7RESULT name=scope covers=K1,K2,K3,K4,K5,A1,A2,A3,A4,A5,A6,A7,U1..U15,Q1,Q2,Q3,Q4i,Q4ii,Q5,Q6,Q6b(甲/乙两读法),Q7(G27),Q9a(峰值/均值/末值),Q9b(峰值/均值/末值，发布前步/重建步分开),Q10,Q11,Q12,Q13(H1,H2,H3phi0/1/2,H3sq,H4d2,H4dNm2,H5early,H5late,H6,H7,12格),Q8(部分：B1a/B1b/B2/Bk1/Bk2，β1/β2 两基底) missing=Q8(部分：B3a/B3b/B4a/B4b/B4c 未实现，需要重新跑一遍历史（回收步一律不回收）或强制落点碰撞，本段未建），crash_branches(c1/c2/L2/L3，登记估过是千万发布级，本段未建：需要一个与 plain_remount 不同的『施加一条 dangling 记录』恢复路径，语义复杂度与规模都超出本段能安全完成的范围，量级见下） note=第五段新增 Q6b/Q7/Q10 与 Q8 的 B1a/B1b/B2/Bk1/Bk2 五种坏镜像（20 条新单测、10 条新变异，全部先证明会红）；G27、Q10 推法分歧、Q6b 上界不成立三项发现见实验页「产物里的数」。崩溃支线（L2/L3）与 Q8 剩余三种坏镜像（B3a/B3b/B4a/B4b/B4c）留给下一段：前者需要新的恢复函数与千万级发布量的可行性评估（见跑前登记第十二节第五段），后者需要「重跑历史且禁用回收」与「强制落点碰撞」两种新机制
-E7RESULT name=k1_first_transaction_placement s=8 data_unit=50180 extent_root=50240 inode_leaf=50242 inode_root=50244 alloc_tree=50245 acct_tree=50246 central_map_tree=50247 table_unit=50248 slot_50241_free=true
-E7RESULT name=a6_first_transaction_accounting arm=threshold_conservative item1=13 item5=1 item2=211955
-E7RESULT name=a6_first_transaction_accounting arm=threshold_narrow item1=13 item5=1 item2=211955
-E7RESULT name=a6_first_transaction_accounting arm=interval_conservative item1=13 item5=1 item2=211955
-E7RESULT name=a6_first_transaction_accounting arm=interval_narrow item1=13 item5=1 item2=211955
-E7RESULT name=a6_first_transaction_accounting arm=baseline_today item1=13 item5=1 item2=211955
+E7RESULT name=k1_new_pool_file_creation_placement s=8 data_unit=50180 extent_root=50240 inode_leaf=50242 inode_root=50244 alloc_tree=50245 acct_tree=50246 central_map_tree=50247 table_unit=50248 slot_50241_free=true
+E7RESULT name=a6_new_pool_file_creation_accounting arm=threshold_conservative item1=13 item5=1 item2=211955
+E7RESULT name=a6_new_pool_file_creation_accounting arm=threshold_narrow item1=13 item5=1 item2=211955
+E7RESULT name=a6_new_pool_file_creation_accounting arm=interval_conservative item1=13 item5=1 item2=211955
+E7RESULT name=a6_new_pool_file_creation_accounting arm=interval_narrow item1=13 item5=1 item2=211955
+E7RESULT name=a6_new_pool_file_creation_accounting arm=baseline_today item1=13 item5=1 item2=211955
 E7RESULT name=a4_steady_state s=4 placement=Impl period=1 last_overwrite_txg=74 item1=122 item5=110
 E7RESULT name=a4_steady_state s=4 placement=Impl period=4 last_overwrite_txg=71 item1=74 item5=62
 E7RESULT name=a4_steady_state s=4 placement=Low period=1 last_overwrite_txg=74 item1=122 item5=110

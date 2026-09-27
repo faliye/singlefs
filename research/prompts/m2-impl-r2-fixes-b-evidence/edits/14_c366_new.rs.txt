@@ -1,0 +1,109 @@
+/// 所选根 (1, 4) 自己那条记录 jsn 4 两份都读不出时（C366（暖机路径把 txg 写进计数器与 tail） 在可写挂载这一层分得开 txg 与 jsn 的那一格）：
+/// 历史：A（txg 3、jsn 3）→ B（txg 4、jsn 4）→ 进程退出 → 两块盘上 jsn 4 那一格各坏一个字节。
+/// 系统配置见证过 jsn 4（B 那次发布轮换写的 tail），所选那一版 (1, 4) 自己的末条记录读不出、计数器等于见证值的记录也是这一条——
+/// C554 乙判不出，按真处置，重读一次仍判不出：可写挂载拒成 `NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion
+/// { 见证 4、判不出 })`，拒在取号之前、任何写之前：录制流一步都没多、两块盘逐字节不变。只读挂载照常，择的根是 (1, 4)、环里读得出的
+/// 只有 jsn 1–3，一条都不施加（C579（C554 乙「两条都读不出按真」与 C366 定案在这一盘面上冲突）用户 2026-09-27 定：维持乙字面，判不出按真、
+/// 拒可写、只读挂载照常）。
+/// 原来钉的是可写挂载做成之后写行 txg 5 / jsn 4、暖机 txg 6、7 / jsn 5、6、tail 跟着 jsn 走，再干净重开一次落后 1 的差照样留着——
+/// 可写挂载被拒之后那一段不可达，删掉；函数这一层 jsn 与 txg 各走各的由这个文件第一条用例钉着。
+/// 判别力自证：乙把「判不出」按假处置时这一条红（`crates/mutations.tsv`）。
+#[test]
+fn c366_when_the_chosen_root_own_record_is_unreadable_the_writable_mount_is_refused_by_the_undecidable_witness_and_the_read_only_mount_opens_the_chosen_root(
+) {
+    let mut pool = build_pool("c366-chosen-root-record-unreadable");
+    let first_version = pool.output.clone();
+    let second_version = publish_overwrite_in_process(
+        &mut pool,
+        &first_version,
+        &second_version_content(),
+        FIXED_WRITE_TIME_SECONDS + 60,
+        InstanceGeneration(1),
+    )
+    .expect("发布 B");
+    assert_eq!(
+        (
+            second_version.root.checkpoint_txg,
+            second_version.record.counter
+        ),
+        (CheckpointTxg(4), 4),
+        "到 B 为止 txg 与 jsn 还相等"
+    );
+    pool.output = second_version;
+    let mut devices = pool.reopen_recorded();
+    let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
+    let chosen_root_own_record_offset = record_offset(4, JOURNAL_RING_DEFAULT_BYTES);
+    for (_, device) in &mut devices {
+        let mut bytes = vec![0u8; record_bytes];
+        device
+            .read_at(chosen_root_own_record_offset, &mut bytes)
+            .expect("读 jsn 4 那一格");
+        bytes[300] ^= 0xff;
+        device
+            .write_at(
+                chosen_root_own_record_offset,
+                &bytes,
+                WriteDurability::Plain,
+            )
+            .expect("改坏 jsn 4 那一格");
+    }
+    let operations_before_the_mount = pool.stream.operation_count();
+    pool.devices = Some(devices);
+    let before = disk_snapshot(&pool.memory_pool(), &pool.stream);
+    let reopened_devices = pool.devices.as_mut().expect("镜像还开着");
+    let refused = mount_writable(&parameters(), reopened_devices)
+        .expect_err("所选根自己那条记录读不出、见证判不出：可写挂载拒");
+    let reading = SelectedVersionAgainstTheWitness {
+        selected_version: RollbackTarget {
+            instance: InstanceGeneration(1),
+            checkpoint_txg: CheckpointTxg(4),
+        },
+        witness: NewerPublishWitness {
+            witnessed_journal_counter: 4,
+            comparison: WitnessedCounterComparison::Undecidable,
+        },
+    };
+    assert!(
+        matches!(
+            &refused,
+            MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable)
+                if **still_unreadable
+                    == StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion {
+                        first_read: reading,
+                        reread: reading,
+                    }
+        ),
+        "C554 乙判不出按真、重读仍判不出：{refused:?}"
+    );
+    assert_eq!(
+        pool.stream.operation_count(),
+        operations_before_the_mount,
+        "拒在取号之前：录制流一个写、一道屏障都没多"
+    );
+    let read_only = mount_read_only(&*reopened_devices).expect("只读挂载照常");
+    assert_eq!(
+        (
+            read_only.chosen_root.instance,
+            read_only.chosen_root.checkpoint_txg
+        ),
+        (InstanceGeneration(1), CheckpointTxg(4)),
+        "B 的根持久了：只读挂载择的根是 (1, 4)"
+    );
+    assert_eq!(
+        (
+            read_only.journal.valid_records,
+            read_only.journal.prefix_applied
+        ),
+        (3, 0),
+        "环里读得出的只有 jsn 1–3（jsn 4 两份都坏了），一条都不施加"
+    );
+    assert_eq!(
+        read_only.effective_root, read_only.chosen_root,
+        "没有记录要施加"
+    );
+    assert_eq!(
+        disk_snapshot(&pool.memory_pool(), &pool.stream),
+        before,
+        "两块盘逐字节不变"
+    );
+}

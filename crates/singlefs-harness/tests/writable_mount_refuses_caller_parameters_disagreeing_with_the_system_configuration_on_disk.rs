@@ -11,7 +11,7 @@ use singlefs_core::address::{DeviceIdentity, InstanceGeneration};
 use singlefs_core::make_filesystem::MakeFilesystemParameters;
 use singlefs_core::mount::{mount_writable, MakeFilesystemParameterField, MountError};
 
-/// 第一个事务写完、进程退出之后，拿改过的参数可写挂载：交回挂载的错，与挂载前后两份盘面快照（系统配置槽原样字节、根环里自证过的根、
+/// 新池新建文件写完、进程退出之后，拿改过的参数可写挂载：交回挂载的错，与挂载前后两份盘面快照（系统配置槽原样字节、根环里自证过的根、
 /// 录制流步数）。之后拿建池的那一份参数再挂一次，做成、取号 2：盘本身挂得上，被拒只因为参数。
 fn mount_with_changed_parameters(
     tag: &str,

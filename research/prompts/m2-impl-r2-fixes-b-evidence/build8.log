@@ -1,0 +1,35 @@
+   Compiling singlefs-format v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-format)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-core)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+   Compiling singlefs-checker-tier v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-checker-tier)
+warning: unused import: `check_records_against`
+  --> crates/singlefs-checker-tier/tests/second_transaction_supplement_three_crash_injection.rs:13:51
+   |
+13 | use singlefs_checker_tier::crash::{check_records, check_records_against};
+   |                                                   ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `RecordStreamContinuity`
+  --> crates/singlefs-checker-tier/tests/second_transaction_supplement_three_crash_injection.rs:32:5
+   |
+32 |     RecordStreamContinuity, RetainedWrite,
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `singlefs-checker-tier` (test "second_transaction_supplement_three_crash_injection") generated 2 warnings (run `cargo fix --test "second_transaction_supplement_three_crash_injection" -p singlefs-checker-tier` to apply 2 suggestions)
+error[E0063]: missing fields `first_reading` and `reread` in initializer of `StillUnreadableAfterOneReread`
+    --> crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs:1003:24
+     |
+1003 |                     == StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot {
+     |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `first_reading` and `reread`
+
+error[E0063]: missing fields `first_reading` and `reread` in initializer of `RootRingSlotKnownToHoldARootStillBadAfterOneReread`
+    --> crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs:1118:13
+     |
+1118 |         Err(RootRingSlotKnownToHoldARootStillBadAfterOneReread {
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `first_reading` and `reread`
+
+For more information about this error, try `rustc --explain E0063`.
+error: could not compile `singlefs-harness` (test "unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over") due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

@@ -404,7 +404,7 @@ mod tests {
             inode: 1,
             object_birth: CheckpointTxg(3),
             size: 3000,
-            // 第一个事务那条记录的取值：改动计数 = 这次发布的 checkpoint_txg 3（增补 2 第 11 行）。
+            // 新池新建文件那条记录的取值：改动计数 = 这次发布的 checkpoint_txg 3（增补 2 第 11 行）。
             change_count: 3,
             write_time_seconds: 1_788_000_000,
         };

@@ -1,3 +1,4 @@
+//! checker 档模块：crash、layer0_progress
 //! 代码审阅第 1、3 条（用户 2026-09-27 定「A 合并，按设备记屏障」）与第 4 条（用户同日定「原地覆写补第三态，全量也跑」）：
 //! 录制器按设备记屏障；切段时当前段里每块有写的盘都被自己的屏障或 FUA 放行了才关段，FUA 只放行它自己那块盘；
 //! 原地覆写的写取第三态「新旧都读不出」，那一态真生成镜像喂 checker 与记录核对器。
@@ -372,7 +373,7 @@ fn a_barrier_on_every_device_cuts_the_same_segments_as_one_pool_barrier() {
     );
 }
 
-/// 真流上的判别力（第 1 条）：只吞盘 1 在一处的屏障——第一个事务里「journal 记录 → 根槽」那一组里盘 1 那一道，吞在录制器外面。
+/// 真流上的判别力（第 1 条）：只吞盘 1 在一处的屏障——新池新建文件里「journal 记录 → 根槽」那一组里盘 1 那一道，吞在录制器外面。
 /// 盘 1 那份记录没被放行，按 A 那道屏障不关段：记录两份、根槽与之后的两次系统配置槽写并成一段，层 0 小流（只展开 5 个写以内的段）里
 /// 摆得出「根在案而记录一份都不在」，记录核对器报出来；每盘都发屏障的同一条流报 0。合并屏障的录制器把盘 0 那一道记成整个池的，
 /// 两条流逐步相同，报不出来。
@@ -380,19 +381,19 @@ fn a_barrier_on_every_device_cuts_the_same_segments_as_one_pool_barrier() {
 // crash-case-check:not-a-crash-case 第一条流只展开 5 个写以内的段、24 写那一段不展开，一百来个状态，单跑几秒
 fn one_device_missing_its_barrier_before_the_root_slot_is_reported_by_the_record_checker() {
     let (every_device_barriers, stream_lengths_at_barrier_calls_on_device_one) =
-        first_transaction_stream(None);
+        new_pool_file_creation_stream(None);
     let root_position = every_device_barriers
         .operations
         .iter()
         .rposition(|retained| geometry().classify(&retained.operation) == StepKind::RootRecordFua)
-        .expect("流里有第一个事务的根槽写");
+        .expect("流里有新池新建文件的根槽写");
     let barrier_call_before_the_root = stream_lengths_at_barrier_calls_on_device_one
         .iter()
         .rposition(|stream_length| *stream_length < root_position)
         .expect("盘 1 在根槽写之前发过屏障");
     let (device_one_misses_one_barrier, _) =
-        first_transaction_stream(Some(barrier_call_before_the_root));
-    let record_checker_reports = |recorded: &RecordedFirstTransactionStream| {
+        new_pool_file_creation_stream(Some(barrier_call_before_the_root));
+    let record_checker_reports = |recorded: &RecordedNewPoolFileCreationStream| {
         let (writes, segments) = writes_and_segments(
             &recorded.operations[recorded.mkfs_operation_count..],
             &geometry(),
@@ -437,17 +438,17 @@ fn one_device_missing_its_barrier_before_the_root_slot_is_reported_by_the_record
     );
 }
 
-struct RecordedFirstTransactionStream {
+struct RecordedNewPoolFileCreationStream {
     operations: Vec<RetainedOperation>,
     mkfs_operation_count: usize,
     base: MemoryPool,
 }
 
-/// 两块内存盘上 mkfs → 取号 → 暖机 → 第一个事务（与 `common::build_pool` 同一串调用），盘 1 外面可以吞掉第几次屏障；
+/// 两块内存盘上 mkfs → 取号 → 暖机 → 新池新建文件（与 `common::build_pool` 同一串调用），盘 1 外面可以吞掉第几次屏障；
 /// 交回录制流、mkfs 占了几步、mkfs 之后的基镜像，与盘 1 每次屏障调用那一刻录制流有几步。
-fn first_transaction_stream(
+fn new_pool_file_creation_stream(
     swallowed_barrier_call_on_device_one: Option<usize>,
-) -> (RecordedFirstTransactionStream, Vec<usize>) {
+) -> (RecordedNewPoolFileCreationStream, Vec<usize>) {
     let parameters = parameters();
     let (stream, mut devices) = two_recorded_devices(swallowed_barrier_call_on_device_one);
     let genesis = make_filesystem(&parameters, &mut devices).expect("mkfs");
@@ -482,7 +483,7 @@ fn first_transaction_stream(
             instance,
             &warmed_up.last_record_bytes,
         )
-        .expect("第一个事务");
+        .expect("新池新建文件");
     }
     let operations = stream.retained_operations();
     let mut base = MemoryPool::with_devices(&[DeviceIdentity(0), DeviceIdentity(1)], IMAGE_BYTES);
@@ -490,7 +491,7 @@ fn first_transaction_stream(
     let stream_lengths_at_barrier_calls_on_device_one =
         devices[1].1.stream_lengths_at_each_barrier_call.clone();
     (
-        RecordedFirstTransactionStream {
+        RecordedNewPoolFileCreationStream {
             operations,
             mkfs_operation_count,
             base,
@@ -606,11 +607,11 @@ fn in_place_overwrites_take_three_states_and_every_other_write_two() {
     );
 }
 
-/// 第一个事务那条流（层 0 从 mkfs 之后枚举的整条流）：每盘都发屏障，段序列与补第三态之前的闭式与今天逐字相同；
+/// 新池新建文件那条流（层 0 从 mkfs 之后枚举的整条流）：每盘都发屏障，段序列与补第三态之前的闭式与今天逐字相同；
 /// 取三态的只有系统配置槽写（8 次，每次都罩住更早写下的旧槽），全量 16777260、甲二 46 个状态（C577 之前暖机第二次的轮换与 A 的
 /// 单元写同段，150994980、54）。
 #[test]
-fn the_first_transaction_stream_keeps_its_segments_and_takes_the_third_state_on_its_system_configuration_writes(
+fn the_new_pool_file_creation_stream_keeps_its_segments_and_takes_the_third_state_on_its_system_configuration_writes(
 ) {
     let pool = common::build_pool("torn-third-state-first-stream");
     let base = pool.memory_pool_after_mkfs();

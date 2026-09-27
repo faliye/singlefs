@@ -8,8 +8,8 @@
 //!
 //! 2026-09-13 加暖机那一半（D16（发布语义） 已定项 8 + D28（挂载期承诺量） 已定项 3 的连带）：一次切换还要加
 //! 「至多 R = 3 次空发布 × 现算的 c_max」，c_max 按 D28（挂载期承诺量） 已定项 4 每次发布现算、装置把它当输入扫两档
-//! （E148（提交固定点按两棵记录树重算）：第一个事务规模 4 块、池规模 9 块）。第一个可运行目标两块盘互为镜像
-//! （E142（第一个事务的干跑） 每个单元写到每块盘），所以空发布的 c_max 块每块盘各占一份，份额按设备加。
+//! （E148（提交固定点按两棵记录树重算）：新池新建文件规模 4 块、池规模 9 块）。第一个可运行目标两块盘互为镜像
+//! （E142（新池新建文件的干跑） 每个单元写到每块盘），所以空发布的 c_max 块每块盘各占一份，份额按设备加。
 //!
 //! 2026-09-14 预留多一份（C329（写行那次发布之前推抬 F 的空发布没有检查） 三轮三方后用户定案）：每次可写挂载都写行，
 //! 写行那次是新实例的第一次发布、不推抬 F 的空发布，它的元数据走切换预留 ⇒ 份数 = N_switch + 1，链重写与暖机两半都乘这个份数；
@@ -33,7 +33,7 @@ const ROW_WRITING_PUBLISH_SHARES: u64 = 1;
 const RESERVED_SHARES_PER_MOUNT: u64 = SWITCHES_PER_MOUNT + ROW_WRITING_PUBLISH_SHARES;
 /// 每次切换至多推几次空发布（暖机，D16（发布语义） 已定项 8：第一版几何至多 R = 3）。
 const EMPTY_PUBLISHES_PER_SWITCH: u64 = 3;
-/// c_max 的两档取样：E148（提交固定点按两棵记录树重算） 第一个事务规模 4 块、池规模 9 块；它是现算的量，装置当输入扫。
+/// c_max 的两档取样：E148（提交固定点按两棵记录树重算） 新池新建文件规模 4 块、池规模 9 块；它是现算的量，装置当输入扫。
 const CHECKPOINT_COST_SAMPLES: [u64; 2] = [4, 9];
 /// 暖机份额的手算表（跑前写死；2026-09-14 第三次跑之前按 N_switch + 1 份重算）：(c_max, 每块盘的暖机块数 = (N_switch + 1) × R × c_max)。
 const HAND_COMPUTED_WARM_UP_SHARE_BLOCKS: [(u64, u64); 2] = [(4, 48), (9, 108)];
@@ -385,7 +385,7 @@ mod tests {
     }
 
     #[test]
-    fn first_transaction_geometry_chain_rewrite_is_sixteen_blocks_eight_per_device() {
+    fn new_pool_file_creation_geometry_chain_rewrite_is_sixteen_blocks_eight_per_device() {
         assert_eq!(chain_rewrite_total_blocks(0, 64), 16, "(3 + 1) × 2 × 32768 字节 = 16 个 16 KiB 块");
         assert_eq!(chain_rewrite_share_per_device_blocks(0, 64), 8);
     }
@@ -398,7 +398,7 @@ mod tests {
         for (checkpoint_cost_blocks, expected_share) in HAND_COMPUTED_WARM_UP_SHARE_BLOCKS {
             assert_eq!(warm_up_share_per_device_blocks(checkpoint_cost_blocks), expected_share);
         }
-        assert_eq!(reserve_share_per_device_blocks(0, 88, 9), 8 + 108, "第一个事务几何、池规模 c_max：每块盘 116 块");
+        assert_eq!(reserve_share_per_device_blocks(0, 88, 9), 8 + 108, "新池新建文件几何、池规模 c_max：每块盘 116 块");
         assert_eq!(reserve_total_blocks(0, 88, 9), 232);
     }
 

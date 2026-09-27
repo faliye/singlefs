@@ -1,4 +1,4 @@
-//! 坏盘输入（里程碑「第二个事务」增补 3 第 5 件）：拿第 1 件生成的合法镜像按种子坏掉，喂给恢复、可写挂载与池级 checker。
+//! 坏盘输入（里程碑「覆盖写、释放、回退与复用」增补 3 第 5 件）：拿第 1 件生成的合法镜像按种子坏掉，喂给恢复、可写挂载与池级 checker。
 //! 三者都不许 panic；恢复读回的内容要么是理想模型提交过的某一版，要么报错——**不许读回一版从没提交过的内容**。
 //!
 //! 坏法分两族，都由 [`DamageKind`] 逐个写明（封闭集合，`match` 不写通配臂）：
@@ -398,7 +398,7 @@ pub struct KnownPanicSite {
 /// 三个读者一次都没 panic。**表空着不许删掉：它现在判的是「一条都不许回来」——任何一处 panic 都落进
 /// 「清单外的新发现」那一格、当场判红。
 ///
-/// 两条规矩（2026-09-22 用户定，`tests/second_transaction_supplement_three_bad_disk_input.rs` 逐条判）：
+/// 两条规矩（2026-09-22 用户定，`tests/bad_disk_input_campaign.rs` 逐条判）：
 /// 1. **每条带期望次数，次数涨了判红**（[`KnownPanicSite::expected_hits_in_the_fast_tier`]）。
 ///    只按「文件 + 消息片段」认的话，同一个文件里同形的新 panic 会被现成的行静默接走；带上次数，
 ///    多出来的那几次就红在这里。次数只许往下走。
@@ -411,7 +411,7 @@ pub struct KnownPanicSite {
 /// 在边界上各验一次，返回错误成员或判红一条不变量（`code-discipline.md`「错误」：盘上读来的值不是不变量）。
 /// 第三批删的三条是 `transaction.rs` 两处（普查 R11 的 inode 号水位、R5 的释放判定）与 `mount.rs` 一处
 /// （R5 的 `format_time_allocator`），各自钉住「拿到的是哪一个错误成员」的用例在
-/// `tests/second_transaction_supplement_three_bad_disk_input.rs`。
+/// `tests/bad_disk_input_campaign.rs`。
 pub const KNOWN_PANIC_SITES: [KnownPanicSite; 0] = [];
 
 /// 一份坏掉的镜像：坏之前是哪一步的合法镜像、坏成了什么样。

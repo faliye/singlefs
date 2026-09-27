@@ -9,7 +9,7 @@
 ^\.claude/kb/experiments(/|\.md$)	75-decision-experiment-links.sh 34-experiment-index-sync.sh 85-repro-command.sh	# 实验页的「影响的决策」↔ 决策分项的依据、实验索引 ↔ 实验页、点名了产物的有复跑命令
 ^\.claude/kb/invariants\.md$	36-invariant-count-cross-file.sh 97-invariant-field-anchors.sh	# 不变量条数在别处的抄写、新写的不变量点名字段落点
 ^\.claude/kb/checks-owed\.md$	43-owed-table-shape.sh 67-milestone-closeout-owed.sh 78-owed-cited-tests.sh 53-format-const-placeholders.sh	# 欠账表行形状、收口表收全开着的账、已还清行点名的测试还在、格式常量占位指得到欠账
-^\.claude/kb/layout/	27-format-constants.sh 39-field-table-sum.sh 42-first-txn-trio.sh 52-segment-registry.sh 76-second-txn-hooks.sh 92-layout-checker-sync.sh	# 字节布局表 ↔ 格式常量、字段表合计、里程碑挂钩、段序列登记、布局常量变了 checker 跟没跟
-^\.claude/kb/milestone/	42-first-txn-trio.sh 67-milestone-closeout-owed.sh 76-second-txn-hooks.sh	# 里程碑 ↔ 字节表、收口表收全开着的账
+^\.claude/kb/layout/	27-format-constants.sh 39-field-table-sum.sh 42-new-pool-file-creation-trio.sh 52-segment-registry.sh 76-overwrite-release-rollback-reuse-hooks.sh 92-layout-checker-sync.sh	# 字节布局表 ↔ 格式常量、字段表合计、里程碑挂钩、段序列登记、布局常量变了 checker 跟没跟
+^\.claude/kb/milestone/	42-new-pool-file-creation-trio.sh 67-milestone-closeout-owed.sh 76-overwrite-release-rollback-reuse-hooks.sh	# 里程碑 ↔ 字节表、收口表收全开着的账
 ^\.claude/kb/feature-bits\.md$	93-feature-bits.sh	# feature bit 记账表 ↔ D15（格式冻结政策） 登记表与代码
 ^\.claude/kb/	98-kb-registry.sh	# kb 新增的文件在 CLAUDE.md「项目本地事实」表里有行

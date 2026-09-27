@@ -2240,8 +2240,8 @@ def selftest_heavy_tests(work, failures, probed_processes, watch_runs):
     后台起、开着一个子 agent 后台任务输出文件的，归属报出那个子 agent。返回起了几个假进程。"""
     deps = os.path.join(work, "heavy", "target", "release", "deps")
     os.makedirs(deps, exist_ok=True)
-    fake_binary = os.path.join(deps, "first_transaction_step_seven_layer0-0123456789abcdef")   # python 顶着这个 argv[0] 睡，不用真的编
-    fake_script = os.path.join(deps, "second_transaction_step_zero_layer0-fedcba9876543210")                    # sh 脚本：timeout、bash -c 要真的 exec 它
+    fake_binary = os.path.join(deps, "crash_enumeration_new_pool_file_creation_stream-0123456789abcdef")   # python 顶着这个 argv[0] 睡，不用真的编
+    fake_script = os.path.join(deps, "crash_enumeration_fixed_script_stream-fedcba9876543210")                    # sh 脚本：timeout、bash -c 要真的 exec 它
     with open(fake_script, "w") as handle:
         handle.write("#!/bin/sh\nsleep 60\nexit 0\n")
     os.chmod(fake_script, 0o755)

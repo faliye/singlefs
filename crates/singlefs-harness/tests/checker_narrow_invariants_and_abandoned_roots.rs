@@ -962,7 +962,7 @@ fn container_numbers_going_backwards_along_the_leaf_order_redden_only_the_contai
 
 /// 两块内存盘上 mkfs → 可写挂载（取号 1、不写行、零单元发布 txg 1、暖机 txg 2）→ 进程退出 → 再可写挂载（取号 2、写行 (1, 2, 0)：
 /// 写行那次发布 txg 3 重写实例表，被换下的 mkfs 实例表记在根记录直接持有的那棵分配记录树里、带已释放标志、释放代 3；暖机 txg 4）。
-/// 与 `second_transaction_step_three_formatted_pool.rs` 那条零故障历史的前两次挂载同一段。
+/// 与 `writable_mount_of_a_formatted_pool.rs` 那条零故障历史的前两次挂载同一段。
 fn image_after_the_row_publish_of_a_version_without_file() -> MemoryPool {
     let stream = SharedStream::new();
     let mut devices: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> = [0u32, 1]
@@ -1133,7 +1133,7 @@ fn overlapping_records_in_the_allocation_record_tree_the_root_record_holds_redde
 
 // ─── ⑦ I-7.7（系统配置实例代号不低于根环） 一个槽读不出时 ① ② 分开报 ───
 
-/// 写完第一个事务的镜像上放一份写序实例代号 2 的孤儿数据单元（没人引用的槽 50302，头与载荷校验和都过）；`raise_disk_zero` 为真时
+/// 写完新池新建文件的镜像上放一份写序实例代号 2 的孤儿数据单元（没人引用的槽 50302，头与载荷校验和都过）；`raise_disk_zero` 为真时
 /// 盘 0 较新那个系统配置槽的实例代号改成 2（各盘最大号 [2, 1] 不等）。与 `checker_known_bad_images.rs` 那两份 I-7.7 坏镜像同形。
 fn image_with_an_orphan_of_instance_two(raise_disk_zero: bool) -> MemoryPool {
     const ORPHAN_SLOT: u64 = 50_302;

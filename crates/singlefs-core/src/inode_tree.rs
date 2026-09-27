@@ -1,4 +1,4 @@
-//! inode 树的叶容器：一容器 233 条 140 字节记录，满了就在末尾分裂（里程碑「第二个事务」并行线三的写路径）。
+//! inode 树的叶容器：一容器 233 条 140 字节记录，满了就在末尾分裂（里程碑「覆盖写、释放、回退与复用」并行线三的写路径）。
 //!
 //! 压着它的条款是 D8（核心索引结构） 已定项 6 的三条写路径纪律，逐字：
 //! - 「inode 号在每一条时间线上单调（回退回到 R_old 的树与它的水位，之后发的号仍大于那棵树里每一个 key）⇒
@@ -31,7 +31,7 @@ use crate::unit::{index_node_entry_capacity, PackedIdentity, PACKED_TYPE_INODE};
 pub struct InodeLeafContainerIndexInTree(pub u32);
 
 impl InodeLeafContainerIndexInTree {
-    /// 最左那一片。树只有一片叶时就是它（第一个事务那一档）。
+    /// 最左那一片。树只有一片叶时就是它（新池新建文件那一档）。
     pub const LEFTMOST: Self = Self(0);
 
     /// 当下标用：一棵树的容器数不会超过一个码 2 根装得下的条目数（135），`usize` 一定装得下。
@@ -137,7 +137,7 @@ pub enum InodeTreeWriteRefusal {
     ///
     /// D8（核心索引结构） 已定项 6 只写了「内部节点同样在右端溢出、末尾分裂，右半是码 2、没有容器身份」，
     /// 没写树长高那一步——新的根从哪来、它的 key 区间与出生序号怎么取、两层内部节点的条目怎么指
-    /// （类型段 0 那一支今天盘上一条都没有）。里程碑「第二个事务」并行线三把
+    /// （类型段 0 那一支今天盘上一条都没有）。里程碑「覆盖写、释放、回退与复用」并行线三把
     /// 「内部节点条目 120、扇出 135 ⇒ 十万个文件约 430 片叶、树高 2」整句标成**预想**。
     MoreLeafContainersThanOneRootNodeHolds { containers: usize, capacity: usize },
     /// 同一次写里的记录没有按 inode 号严格升序排。
@@ -159,7 +159,7 @@ pub enum InodeTreeWriteRefusal {
 ///   左半（原来那片）一条记录都不动、身份不动、**不进重写清单**，右半是一片新容器，容器号 = 这条新记录的 inode 号、
 ///   出生代 = 这次发布的 checkpoint_txg、出生树 = `inode_tree`。
 ///
-/// 树是空的（第一个事务那一档）时第一条记录建第一片容器，容器号 = 它自己的 inode 号。
+/// 树是空的（新池新建文件那一档）时第一条记录建第一片容器，容器号 = 它自己的 inode 号。
 ///
 /// # Errors
 /// [`InodeTreeWriteRefusal`] 的三格：中间插入、容器数超过一个根装得下的、给的记录不按 inode 号严格升序。
@@ -297,7 +297,7 @@ mod tests {
     use singlefs_format::TREE_IDENTIFIER_INODE;
 
     const INODE_TREE: TreeIdentifier = TreeIdentifier(TREE_IDENTIFIER_INODE);
-    /// 第一个事务把树建起来那次发布的 checkpoint_txg（字节表四：容器 1、出生代 3）。
+    /// 新池新建文件把树建起来那次发布的 checkpoint_txg（字节表四：容器 1、出生代 3）。
     const TREE_BIRTH_TXG: CheckpointTxg = CheckpointTxg(3);
 
     fn record(inode: u64, size: u64, change_count: u64) -> InodeRecord {
@@ -310,7 +310,7 @@ mod tests {
         }
     }
 
-    /// 第一个事务那一档：树是空的，第一条记录建第一片容器，容器号 = 它自己的 inode 号、出生代 = 这次发布的 txg。
+    /// 新池新建文件那一档：树是空的，第一条记录建第一片容器，容器号 = 它自己的 inode 号、出生代 = 这次发布的 txg。
     #[test]
     fn the_first_record_creates_the_first_container_numbered_after_itself() {
         let after = write_records_into_leaf_containers(

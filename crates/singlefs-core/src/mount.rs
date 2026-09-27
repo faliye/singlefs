@@ -1,4 +1,4 @@
-//! 可写挂载（里程碑「第二个事务」步 3）：进程重开镜像之后先走一次恢复，从盘上重建可写态——所选根、施加前缀之后的根、
+//! 可写挂载（里程碑「覆盖写、释放、回退与复用」步 3）：进程重开镜像之后先走一次恢复，从盘上重建可写态——所选根、施加前缀之后的根、
 //! 上一版全部角色的单元与指针、分配器、下一条 jsn——再取实例代号、给上一个实例写行（D18（块里携带什么信息） 已定项 11）、
 //! 推空发布直到本实例的根覆盖每块盘（D16（发布语义） 已定项 8 戊），之后本实例的发布才接在后面。
 //! 第一版没有干净关闭标记，重开一律走恢复。
@@ -39,17 +39,20 @@ use crate::recovery::{
 use crate::recovery::{
     allocation_records_of_version_without_file_in_the_unit_area_starting_at,
     allocation_records_under_root_in_the_unit_area_starting_at, choose_root,
-    choose_system_configuration, effective_rollback_floor,
+    choose_system_configuration,
+    effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instance_table_once,
     effective_rollback_floor_rereading_the_newest_instance_table_once,
     effective_rollback_floor_under_the_newest_roots_table, highest_root_txg,
     highest_tree_identifier_watermark_in_the_ring, instance_table_chain_of_root,
     instance_table_of_root, instance_table_page_pointers_as_far_as_readable, readable_roots,
-    readable_roots_rereading_unreadable_root_ring_slots_once, readable_roots_with_ring_slots,
+    readable_roots_rereading_ring_slots_known_to_hold_a_root_once, readable_roots_with_ring_slots,
     rebuild_version_in_the_unit_area_starting_at, replay_journal,
     root_is_abandoned_by_the_instance_table, scan_journal, tree_table_has_no_entries,
     user_visible_tree_root_pointers, verified_system_configuration_slots, BadRootRingSlotReading,
-    InstanceTableChain, JournalScanReport, PoolReader, RebuildVersionFailure, RebuiltVersion,
-    RecoveryFailure, UserVisibleTreeRootPointers,
+    EffectiveFloorReadingStillUnreadableAfterOneReread, InstanceTableChain,
+    InstanceTableOfTheNewestRootStillUnreadableAfterOneReread, JournalScanReport, PoolReader,
+    RebuildVersionFailure, RebuiltVersion, RecoveryFailure,
+    RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread, UserVisibleTreeRootPointers,
 };
 use crate::recovery::{every_root_ring_slot, read_root_ring_slot, RootRingSlotReading};
 use crate::root_record::{RootRecord, UnmountMarker};
@@ -208,7 +211,7 @@ pub enum MountError {
     /// （C363（现算保留池时树高从哪读没有条款）），D28（挂载期承诺量） 已定项 1 那条式子另一边的「需求」怎么摊到每块盘也没有
     /// （C370（需求、可用与 df 没有共同单位））。第一版不算那条式子，只把「这一串自己的落点取不到」挪到取号之前：在任何写之前返回，
     /// 盘上逐字节不变、两块盘系统配置里的实例代号不动。改之前取号写完、写行或暖机才被落点拒绝（`Publish`），实例代号一去不回
-    /// （里程碑「第二个事务」增补 2 收口表第 39 行那一族：单元区 240 槽的小盘上走得到）。
+    /// （里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 39 行那一族：单元区 240 槽的小盘上走得到）。
     PlacementRefusedBeforeAcquisitionMountAdmissionUndecided {
         instance_to_acquire: InstanceGeneration,
         publish_index: usize,
@@ -276,6 +279,10 @@ pub enum MountError {
     /// 可写挂载读到的样子里有一样更新的东西读不出，重读一次（D16（发布语义） 已定项 1「根槽这一次读坏」那一行的「重读一次」）仍读不出——
     /// 不按读得出的那一版往下走，不把读不出的那一版当成被抛弃，拒可写挂载。是哪一样读不出见 [`StillUnreadableAfterOneReread`]。
     /// 在取号之前返回：一个写都没发，盘上逐字节不变。只读挂载不走这一判，照常（`mounted_read`、`recovery::recover`）。
+    /// 挂着时抬 F 那一串（准入与卸载共用）算 F 生效值、重算影子账读根环重读一次仍读坏，同样报这一条
+    /// （[`StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor`]、
+    /// [`StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot`]，实审 A3b 报告 Q4）：在动分配器与任何写之前拒这一次抬，
+    /// 盘上逐字节不变、分配器与调用方的现行版本不动。
     /// 装箱：不装箱 `MountError` 就大过 clippy `result_large_err` 的 128 字节。
     NewerStateStillUnreadableAfterOneReread(Box<StillUnreadableAfterOneReread>),
 }
@@ -296,6 +303,59 @@ pub enum StillUnreadableAfterOneReread {
         /// 重读那一遍择到的最新那条根；根环那一遍一条自证过的根都没读到时 `None`。
         newest_root_on_the_reread: Option<RollbackTarget>,
     },
+    /// 挂着时抬 F 算 F 生效值（`recovery::effective_rollback_floor_rereading_the_newest_instance_table_once`）或管理员回退判候选算
+    /// F_生效（`recovery::effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instance_table_once`）：根环里最新那条根
+    /// 指着的实例表（按它判哪几条根被抛弃）读不出、解不开，或一条自证过的根都择不到，连根环一起重读一次仍是这样（C554 乙报告 Q6）。
+    /// 不按「不按表滤」往下走（那样被抛弃时间线上的根带的 F 也算进生效值）。实审 A3b 报告 Q4：与乙那一族同级，改之前是
+    /// `RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread`。
+    InstanceTableOfTheNewestRootForTheEffectiveFloor {
+        /// 重读那一遍择到的最新那条根；一条自证过的根都没读到时 `None`。
+        newest_root_on_the_reread: Option<RollbackTarget>,
+    },
+    /// 挂着时抬 F 重算影子账与回收门槛读根环（`recovery::readable_roots_rereading_ring_slots_known_to_hold_a_root_once`）或管理员回退
+    /// 判候选、算 F_生效 读根环：`ring_slot` 是这个进程知道住着一条根的槽（挂载那一刻读得出、或这个进程写过且 FUA 返回过），这一次读不出，
+    /// 重读一次仍读不出——那一槽里的根在不在判不了，不按有根或没根猜（D16（发布语义） 已定项 1「根槽这一次读坏」那一行的分法，
+    /// 用户 2026-09-26 定）。挂载那一刻就读坏、之后没写过的槽不走这一条，当没有根。
+    /// 实审 A3b 报告 Q4：与乙那一族同级，改之前是 `RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread`（那时不分槽知不知道住着根）。
+    RootRingSlotKnownToHoldARoot { ring_slot: RootRingSlot },
+}
+
+impl From<RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread>
+    for StillUnreadableAfterOneReread
+{
+    fn from(still_unreadable: RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread) -> Self {
+        Self::RootRingSlotKnownToHoldARoot {
+            ring_slot: still_unreadable.ring_slot,
+        }
+    }
+}
+
+impl From<InstanceTableOfTheNewestRootStillUnreadableAfterOneReread>
+    for StillUnreadableAfterOneReread
+{
+    fn from(still_unreadable: InstanceTableOfTheNewestRootStillUnreadableAfterOneReread) -> Self {
+        Self::InstanceTableOfTheNewestRootForTheEffectiveFloor {
+            newest_root_on_the_reread: still_unreadable.newest_root_on_the_reread.map(
+                |(instance, checkpoint_txg)| RollbackTarget {
+                    instance,
+                    checkpoint_txg,
+                },
+            ),
+        }
+    }
+}
+
+impl From<EffectiveFloorReadingStillUnreadableAfterOneReread> for StillUnreadableAfterOneReread {
+    fn from(still_unreadable: EffectiveFloorReadingStillUnreadableAfterOneReread) -> Self {
+        match still_unreadable {
+            EffectiveFloorReadingStillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot(
+                slot,
+            ) => slot.into(),
+            EffectiveFloorReadingStillUnreadableAfterOneReread::InstanceTableOfTheNewestRoot(
+                table,
+            ) => table.into(),
+        }
+    }
 }
 
 /// 读阶段交出的所选那一版（`effective_root`）与判据 N-配置 的读数：「系统配置见证过比它新的发布」判不判得真。
@@ -1436,7 +1496,7 @@ fn allocator_of_version_without_file<Device: BlockDevice>(
 }
 
 /// mkfs 写出的那一版（或照抄它的暖机根）的账：盘上没有分配记录树，这一版的全部落点就是根记录直接指着的实例表与树表两个单元
-/// ——mkfs 写在单元区里的那两个（字节表五里它们两盘各一条、分配代 0）。与 mkfs 同一个进程里第一个事务用的分配器同一个起点
+/// ——mkfs 写在单元区里的那两个（字节表五里它们两盘各一条、分配代 0）。与 mkfs 同一个进程里新池新建文件用的分配器同一个起点
 /// （`PoolAllocator::mark_format_time_units`），第一个文件版本换下 mkfs 那片树表时照样把它释放。
 ///
 /// # Errors
@@ -2176,7 +2236,9 @@ fn raise_the_floor_through<Device: BlockDevice>(
         &system_configuration.immutable.sizes,
         &system_configuration.immutable.filesystem_identifier,
     )
-    .map_err(MountError::Recovery)?;
+    .map_err(|still_unreadable| {
+        MountError::NewerStateStillUnreadableAfterOneReread(Box::new(still_unreadable.into()))
+    })?;
     if new_floor < effective_floor {
         return Err(
             MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided {
@@ -2223,15 +2285,19 @@ fn raise_the_floor_through<Device: BlockDevice>(
     // 取候选集的并集，释放代 ≤ F 的落点不在并集里，记账的「已分配」也不能再算它们。但回收的槽在生效（每块盘都有带新 F 的根）之前
     // 不许发出去：带新 F 的空发布自己就在分配固定点，开放段满了会开到刚回收空的那一段（alloc-basis 第二轮云端攻方腿打中），所以先扣住、
     // 落满每块盘之后再放开。记账按写那条根的那一刻的 F 算还是按它持久之后的 F_生效 算，口径交 alloc-basis 那一轮（预想）。
-    // 回收门槛与影子账读的这一遍根环：一个根槽读不出就重读那一槽一次，仍读不出就拒这一次抬（C554 乙报告 Q6：按「没有根」往下走，
-    // 那一槽里的被抛弃根引用的槽不隔离、也不计数）。在动分配器（影子账重算、回收）之前返回，分配器与盘都不动。
-    let roots = readable_roots_rereading_unreadable_root_ring_slots_once(
+    // 回收门槛与影子账读的这一遍根环，照 D16（发布语义） 已定项 1「根槽这一次读坏」那一行分两类（与算上限那一遍同一个分法）：
+    // 这个进程知道住着根的槽读坏就重读那一槽一次，仍坏就拒这一次抬（C554 乙报告 Q6：按「没有根」往下走，那一槽里的被抛弃根引用的槽
+    // 不隔离、也不计数）；挂载那一刻就读坏、之后没写过的槽当没有根。在动分配器（影子账重算、回收）之前返回，分配器与盘都不动。
+    let roots = readable_roots_rereading_ring_slots_known_to_hold_a_root_once(
         &**devices,
         &system_configuration.immutable.region_devices,
         &system_configuration.immutable.sizes,
         &system_configuration.immutable.filesystem_identifier,
+        &ring_slots_known_to_hold_a_root_by(allocator),
     )
-    .map_err(MountError::Recovery)?;
+    .map_err(|still_unreadable| {
+        MountError::NewerStateStillUnreadableAfterOneReread(Box::new(still_unreadable.into()))
+    })?;
     let oldest_valid_root = roots
         .iter()
         .filter(|root| !abandoned_by_table(root, &table))
@@ -3515,7 +3581,7 @@ fn establish_instance<Device: BlockDevice>(
             );
             published.map(PoolVersion::WithFile)
         }
-        // 树表 0 条的一版：要写的行为空（上一个实例是 0，第一次可写挂载）就走零单元发布，第一个事务的字节不变
+        // 树表 0 条的一版：要写的行为空（上一个实例是 0，第一次可写挂载）就走零单元发布，新池新建文件的字节不变
         // （D16（发布语义） 已定项 9「树表 0 条 ⇒ 零单元」；layout/01-first-txn.md 八「第一次之后的可写挂载（写行）」那一行 2026-09-14 的改名注）；
         // 要写的行不为空就只重写实例表那一个单元——这一版没有记账树，已定项 9 的那五样一样都不写，而 D18（块里携带什么信息） 已定项 11
         // 要求每次可写挂载都写行。
@@ -4227,6 +4293,11 @@ pub enum RollbackError {
     /// 释放现行那一版不再被引用的用户可见单元时，释放判定路径报错（映射里查不到、条目切不动、两条位置条目不同槽、这块盘的记录
     /// 不在册 / 已释放 / 跨度不对、位置项指池外的盘或两条指同一块盘）：`cause` 原样是发布路径的那一种。
     CurrentVersionUnitNotReleasable { cause: PublishError },
+    /// 判候选集时读根环或算 F_生效 重读一次仍读坏（[`rollback_candidate`]；D16（发布语义） 已定项 1「根槽这一次读坏」那一行的读法，
+    /// 实审 A3b 报告 Q7）：只有 [`StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot`] 与
+    /// [`StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor`] 两个成员走得到。目标在不在候选集里判不了，
+    /// 不按有根或没根猜。在任何写之前、动分配器之前拒，盘上逐字节不变。
+    CandidateJudgementStillUnreadableAfterOneReread(Box<StillUnreadableAfterOneReread>),
     /// 回退那次发布没发成，连同这次回退开的写入口交得出的写账（[`PublishSequenceFailed`]：之前没有别的写、已落盘的发布一次都没有）。
     /// 落盘之前被拒（`cause` 是落点、释放判定这一类）：分配器换回回退之前那一份，盘上逐字节不变。落盘途中失败（`cause` 是块设备错）：
     /// 这次发布冻结在分配器上等原样重发（`transaction::resend_the_frozen_publish`），重发成功就是回退做成。
@@ -4311,31 +4382,45 @@ fn user_visible_units_through_the_mapping(
 
 /// 回退候选集那一判（D23（journal 的角色与格式） 已定项 14「候选集」）：根环里有它 ∧ txg ≥ F_生效 ∧ 按现行那一版的实例表判仍然有效
 /// ∧ 带文件。按 [`RollbackCandidateExclusion`] 成员的次序判。交回根环里读出来的那条根。
+/// 「根环里有它」与 F_生效 两处读根环都照抬 F 同一个读法（D16（发布语义） 已定项 1「根槽这一次读坏」那一行，实审 A3b 报告 Q7）：
+/// `ring_slots_known_to_hold_a_root`（这个进程分配器上那张根环表，[`ring_slots_known_to_hold_a_root_by`]）里没有的槽读坏当没有根；
+/// 有的重读一次，仍坏就拒——不按没有根往下走（那样目标可以被判成不在环里，F_生效 可以算低、低于真 F 的目标被当成候选）。
+/// F_生效 那一半最新那条根的实例表读不出同样重读一次，仍读不出就拒。
 ///
 /// # Errors
-/// `TargetNotACandidate`；目标那一版的树表读不出 ⇒ `TargetVersionUnreadable`。
+/// `TargetNotACandidate`；目标那一版的树表读不出 ⇒ `TargetVersionUnreadable`；知道住着根的槽或最新那条根的实例表重读仍读坏 ⇒
+/// `CandidateJudgementStillUnreadableAfterOneReread`（在任何写之前、动分配器之前）。
 fn rollback_candidate<Reader: PoolReader>(
     reader: &Reader,
     system_configuration: &crate::system_configuration::SystemConfiguration,
     current_table: &InstanceTableRecords,
+    ring_slots_known_to_hold_a_root: &BTreeSet<RootRingSlot>,
     target: RollbackTarget,
 ) -> Result<RootRecord, RollbackError> {
     let not_a_candidate = |exclusion| RollbackError::TargetNotACandidate { target, exclusion };
-    let target_root = readable_roots(
+    let still_unreadable = |still_unreadable: StillUnreadableAfterOneReread| {
+        RollbackError::CandidateJudgementStillUnreadableAfterOneReread(Box::new(still_unreadable))
+    };
+    let target_root = readable_roots_rereading_ring_slots_known_to_hold_a_root_once(
         reader,
         &system_configuration.immutable.region_devices,
         &system_configuration.immutable.sizes,
         &system_configuration.immutable.filesystem_identifier,
+        ring_slots_known_to_hold_a_root,
     )
+    .map_err(|reading| still_unreadable(reading.into()))?
     .into_iter()
     .find(|root| root.instance == target.instance && root.checkpoint_txg == target.checkpoint_txg)
     .ok_or_else(|| not_a_candidate(RollbackCandidateExclusion::NotInRing))?;
-    let effective_floor = effective_rollback_floor(
-        reader,
-        &system_configuration.immutable.region_devices,
-        &system_configuration.immutable.sizes,
-        &system_configuration.immutable.filesystem_identifier,
-    );
+    let effective_floor =
+        effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instance_table_once(
+            reader,
+            &system_configuration.immutable.region_devices,
+            &system_configuration.immutable.sizes,
+            &system_configuration.immutable.filesystem_identifier,
+            ring_slots_known_to_hold_a_root,
+        )
+        .map_err(|reading| still_unreadable(reading.into()))?;
     if target.checkpoint_txg < effective_floor {
         return Err(not_a_candidate(
             RollbackCandidateExclusion::BelowEffectiveFloor,
@@ -4681,7 +4766,13 @@ pub fn roll_back_by_a_forward_publish<Device: BlockDevice>(
     let current_table = instance_table_chain_of_root(&*devices, &current.root)
         .map_err(|_unreadable_or_malformed| RollbackError::CurrentInstanceTableMalformed)?
         .records;
-    let target_root = rollback_candidate(&*devices, &system_configuration, &current_table, target)?;
+    let target_root = rollback_candidate(
+        &*devices,
+        &system_configuration,
+        &current_table,
+        &ring_slots_known_to_hold_a_root_by(allocator),
+        target,
+    )?;
     let unit_area_start = unit_area_start_of_the_chosen_system_configuration(&system_configuration);
     // R_old 那一版整个从盘上重建（它的账、它的三棵用户可见树、记账树、中央映射树都读回来）：有一个节点读不出就拒。
     // 顶着的记录只给重建填字段，这里只用那一版的用户可见一半与它的账。

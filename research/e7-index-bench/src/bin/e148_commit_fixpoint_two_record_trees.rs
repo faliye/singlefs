@@ -18,8 +18,8 @@ const UNITS_IN_POOL: u64 = ALLOCATION_LEAF_COUNT * ALLOCATION_RECORDS_PER_LEAF;
 const ACCOUNTING_NODES_PER_PUBLISH: u64 = 2;
 const ROUNDS_UPPER_LIMIT: usize = 100_000;
 const USER_BLOCK_COUNTS: [u64; 5] = [0, 1, 12, 128, 1024];
-/// 第一个事务规模两棵树各只有一个叶（512 / 296 个 key），不建分裂 ⇒ 待分配的块数要装得进半个叶，1024 那一档跑不了。
-const USER_BLOCK_COUNTS_FIRST_TRANSACTION: [u64; 4] = [0, 1, 12, 128];
+/// 新池新建文件规模两棵树各只有一个叶（512 / 296 个 key），不建分裂 ⇒ 待分配的块数要装得进半个叶，1024 那一档跑不了。
+const USER_BLOCK_COUNTS_NEW_POOL_FILE_CREATION: [u64; 4] = [0, 1, 12, 128];
 const SEEDS: [u64; 5] = [11, 22, 33, 44, 55];
 /// 目标负载一次 fsync 的用户块数（E81 的口径）。
 const TARGET_LOAD_USER_BLOCKS: u64 = 12;
@@ -77,23 +77,23 @@ const ARMS: [Arm; 3] = [Arm::Clustered, Arm::Scattered, Arm::MetadataClustered];
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Scale {
     PoolOneTebibyte,
-    FirstTransaction,
+    NewPoolFileCreation,
 }
 impl Scale {
     fn tag(self) -> &'static str {
         match self {
             Scale::PoolOneTebibyte => "pool_1tib",
-            Scale::FirstTransaction => "first_transaction",
+            Scale::NewPoolFileCreation => "new_pool_file_creation",
         }
     }
     fn user_block_counts(self) -> &'static [u64] {
         match self {
             Scale::PoolOneTebibyte => &USER_BLOCK_COUNTS,
-            Scale::FirstTransaction => &USER_BLOCK_COUNTS_FIRST_TRANSACTION,
+            Scale::NewPoolFileCreation => &USER_BLOCK_COUNTS_NEW_POOL_FILE_CREATION,
         }
     }
 }
-const SCALES: [Scale; 2] = [Scale::PoolOneTebibyte, Scale::FirstTransaction];
+const SCALES: [Scale; 2] = [Scale::PoolOneTebibyte, Scale::NewPoolFileCreation];
 
 /// 一棵记录树的几何：levels[0] = 叶层节点数。
 #[derive(Clone, Debug)]
@@ -121,7 +121,7 @@ impl RecordTree {
 fn record_trees(scale: Scale, tree_count: usize) -> Vec<RecordTree> {
     let (allocation_leaves, mapping_leaves) = match scale {
         Scale::PoolOneTebibyte => (ALLOCATION_LEAF_COUNT, UNITS_IN_POOL.div_ceil(MAPPING_RECORDS_PER_LEAF)),
-        Scale::FirstTransaction => (1, 1),
+        Scale::NewPoolFileCreation => (1, 1),
     };
     let mut trees = vec![RecordTree::new("allocation", ALLOCATION_RECORDS_PER_LEAF, ALLOCATION_FANOUT, allocation_leaves)];
     if tree_count == 2 {
@@ -322,10 +322,10 @@ mod tests {
         assert_eq!((empty.rounds, empty.metadata_blocks), (2, 9));
     }
 
-    /// 第一个事务规模：两棵树各一个叶，空发布与目标负载都是 1 + 1 + 2 = 4 块。
+    /// 新池新建文件规模：两棵树各一个叶，空发布与目标负载都是 1 + 1 + 2 = 4 块。
     #[test]
-    fn first_transaction_scale_is_pinned() {
-        let trees = record_trees(Scale::FirstTransaction, 2);
+    fn new_pool_file_creation_scale_is_pinned() {
+        let trees = record_trees(Scale::NewPoolFileCreation, 2);
         assert!(trees.iter().all(|tree| tree.levels.len() == 1));
         for user_block_count in [0u64, 12] {
             let outcome = publish(&trees, Arm::Clustered, user_block_count, ACCOUNTING_NODES_PER_PUBLISH, 11);

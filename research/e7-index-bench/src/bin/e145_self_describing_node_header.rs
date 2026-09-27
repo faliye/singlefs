@@ -7,7 +7,7 @@ use e7_index_bench::Emitter;
 
 const NODE_BYTES: u64 = 16384;
 const NONCE_MAC_RESERVED_BYTES: u64 = 28;
-/// E142（第一个事务的干跑）：码 2 头 = 81 + 2 × key 宽（共同前缀 42 + 树 ID 8 + 层级 1 + 诞生代号 8 + fsid 8 + 写序 4 + 出生序号 4 + 载荷 CRC 4 + 预留 2）。
+/// E142（新池新建文件的干跑）：码 2 头 = 81 + 2 × key 宽（共同前缀 42 + 树 ID 8 + 层级 1 + 诞生代号 8 + fsid 8 + 写序 4 + 出生序号 4 + 载荷 CRC 4 + 预留 2）。
 const HEADER_WITHOUT_KEY_RANGE: u64 = 81;
 /// A 臂载荷内部的条目数 u16 + 条目宽 u16（E142 的预想）。
 const PAYLOAD_INTERNAL_COUNT_BYTES: u64 = 4;
@@ -38,7 +38,7 @@ struct Tree {
     leaf_entries_in_pool: u64,
 }
 
-/// 五棵登记树：key 宽与叶条目宽照 E142（第一个事务的干跑）。
+/// 五棵登记树：key 宽与叶条目宽照 E142（新池新建文件的干跑）。
 const TREES: [Tree; 5] = [
     Tree { name: "inode", key_width: 8, leaf_entry_bytes: 117, leaf_entries_in_pool: DATA_UNITS_IN_POOL / NODES_PER_DATA_UNITS },
     Tree { name: "allocation", key_width: 12, leaf_entry_bytes: 20, leaf_entries_in_pool: DATA_UNITS_IN_POOL },

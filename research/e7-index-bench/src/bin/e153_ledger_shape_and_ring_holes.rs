@@ -898,7 +898,7 @@ impl ArmExecutor {
 
     /// 开放段 = 单元区内最低的、64 槽对齐、段内无任何占用的段；游标只在段内单调前进，被挡（或按
     /// 对齐跳过）的槽从此不再回填——下一次调用从上一次留下的游标位置接着扫，不重新从段首扫
-    /// （登记 M0.16「游标 bump」；实测第一个事务锚点 K1 证明了这一点：槽 50241 被 inode 叶容器的
+    /// （登记 M0.16「游标 bump」；实测新池新建文件锚点 K1 证明了这一点：槽 50241 被 inode 叶容器的
     /// 偶数对齐跳过之后，inode 根落在 50244 而不是回填 50241）。
     /// 数据单元以外的跨度 2 单元按 32768 字节（= 2 槽）对齐取，即起点必须是偶数（M0.16）。
     fn bump_from_open_segment(&mut self, span: u64, start_must_be_even: bool) -> u64 {
@@ -2098,8 +2098,8 @@ impl World {
     }
 }
 
-/// 首次挂载暖机 + 第一个事务（txg 3）：产出五条臂的执行器，供 K1/A6 现算用。
-fn first_transaction(cell: GeometryCell) -> World {
+/// 首次挂载暖机 + 新池新建文件（txg 3）：产出五条臂的执行器，供 K1/A6 现算用。
+fn new_pool_file_creation(cell: GeometryCell) -> World {
     let mut world = World::mkfs(cell);
     for _ in world.first_mount_warmup() {}
     world.publish(PublishKind::Overwrite);
@@ -2143,15 +2143,15 @@ fn main() {
         )
     );
 
-    // K1 / A6：第一个事务（P-impl，S=8，六格里报 S=8 一格；六格数值相同，K1 的单测覆盖了另外五格）。
-    let first_transaction_cell = BASE_GEOMETRY;
-    let world = first_transaction(first_transaction_cell);
+    // K1 / A6：新池新建文件（P-impl，S=8，六格里报 S=8 一格；六格数值相同，K1 的单测覆盖了另外五格）。
+    let new_pool_file_creation_cell = BASE_GEOMETRY;
+    let world = new_pool_file_creation(new_pool_file_creation_cell);
     let arm = &world.arms[World::arm_index(Arm::ThresholdConservative)];
     println!(
         "{}",
         emitter.emit_raw(&format!(
-            "name=k1_first_transaction_placement s={} data_unit={} extent_root={} inode_leaf={} inode_root={} alloc_tree={} acct_tree={} central_map_tree={} table_unit={} slot_50241_free={}",
-            first_transaction_cell.slots_per_region,
+            "name=k1_new_pool_file_creation_placement s={} data_unit={} extent_root={} inode_leaf={} inode_root={} alloc_tree={} acct_tree={} central_map_tree={} table_unit={} slot_50241_free={}",
+            new_pool_file_creation_cell.slots_per_region,
             arm.refs[&Role::DataUnit],
             arm.refs[&Role::ExtentRoot],
             arm.refs[&Role::InodeLeaf],
@@ -2168,7 +2168,7 @@ fn main() {
         println!(
             "{}",
             emitter.emit_raw(&format!(
-                "name=a6_first_transaction_accounting arm={} item1={} item5={} item2={}",
+                "name=a6_new_pool_file_creation_accounting arm={} item1={} item5={} item2={}",
                 arm.arm.tag(),
                 row.item1_occupied_slots,
                 row.item5_deferred_slots,
@@ -2527,7 +2527,7 @@ fn main() {
 mod tests {
     use super::*;
 
-    fn first_transaction_world(geometry: GeometryCell) -> World {
+    fn new_pool_file_creation_world(geometry: GeometryCell) -> World {
         let mut world = World::mkfs(geometry);
         for _ in world.first_mount_warmup() {
         }
@@ -2537,11 +2537,11 @@ mod tests {
 
     /// K1：P-impl 的落点几何（三档 S 共 6 格，S 不影响单元区落点）。
     #[test]
-    fn first_transaction_placements_match_registered_layout() {
+    fn new_pool_file_creation_placements_match_registered_layout() {
         for slots_per_region in [4u64, 8, 16] {
             for workload_period in [1u64, 4] {
                 let geometry = GeometryCell { slots_per_region, placement: PlacementPolicy::Impl, workload_period };
-                let world = first_transaction_world(geometry);
+                let world = new_pool_file_creation_world(geometry);
                 let arm = &world.arms[World::arm_index(Arm::ThresholdConservative)];
                 assert_eq!(arm.refs[&Role::DataUnit], 50180, "S={slots_per_region} rho_period={workload_period}");
                 assert_eq!(arm.refs[&Role::ExtentRoot], 50240);
@@ -2560,7 +2560,7 @@ mod tests {
     #[test]
     fn txg_three_accounting_row_matches_every_arm_and_cell() {
         for cell in all_geometry_cells() {
-            let world = first_transaction_world(cell);
+            let world = new_pool_file_creation_world(cell);
             for arm in &world.arms {
                 let row = arm.accounting_row();
                 assert_eq!(row.item1_occupied_slots, 13, "{:?} cell={:?}", arm.arm, cell);
@@ -2576,17 +2576,17 @@ mod tests {
         assert_eq!(UNIT_AREA_CAPACITY_SLOTS, 211968);
     }
 
-    /// Q7/G27（第五段）：第一个事务这一格，第 1 项 13 − 第 5 项 1 == 最新根走读引用 12（A6 已经钉过
+    /// Q7/G27（第五段）：新池新建文件这一格，第 1 项 13 − 第 5 项 1 == 最新根走读引用 12（A6 已经钉过
     /// 13/1，这里补上 G27 自己的算式，五条臂、全部 12 格都要成立——U11 的锚点正是这一行）。
     #[test]
-    fn allocated_minus_deferred_matches_reference_on_first_transaction_for_every_arm_and_cell() {
+    fn allocated_minus_deferred_matches_reference_on_new_pool_file_creation_for_every_arm_and_cell() {
         for cell in all_geometry_cells() {
-            let world = first_transaction_world(cell);
+            let world = new_pool_file_creation_world(cell);
             let snapshot = world.invariant_snapshot();
             for (index, arm) in world.arms.iter().enumerate() {
                 let row = arm.accounting_row();
                 assert_eq!(row.item1_occupied_slots - row.item5_deferred_slots, 12, "{:?} cell={:?}", arm.arm, cell);
-                assert!(!snapshot.allocated_minus_deferred_reference_mismatch[index], "G27 不该在第一个事务这一格误红：{:?} cell={:?}", arm.arm, cell);
+                assert!(!snapshot.allocated_minus_deferred_reference_mismatch[index], "G27 不该在新池新建文件这一格误红：{:?} cell={:?}", arm.arm, cell);
             }
         }
     }
@@ -2594,8 +2594,8 @@ mod tests {
     /// U11（登记第九节 M19）：G27 不减第 5 项时，txg=3 这一行会误报——手写谓词核对变异表要抓的形状，
     /// 不依赖 `invariant_snapshot` 里已经写好的算式（那条算式本身就是被测对象）。
     #[test]
-    fn without_subtracting_deferred_the_check_would_misreport_at_first_transaction() {
-        let world = first_transaction_world(BASE_GEOMETRY);
+    fn without_subtracting_deferred_the_check_would_misreport_at_new_pool_file_creation() {
+        let world = new_pool_file_creation_world(BASE_GEOMETRY);
         let arm = &world.arms[World::arm_index(Arm::ThresholdConservative)];
         let row = arm.accounting_row();
         let newest_reference_size = account_from_refs(&arm.refs).expanded_slots().count() as u64;
@@ -2816,11 +2816,11 @@ mod tests {
         assert_eq!(allocation_record_bytes_and_leaf_nodes(1160, 28, 580), (32480, 2));
     }
 
-    /// Q9a：txg 3（第一个事务）之后，五条臂的分配记录条目数（`ledger.len()`）都是 10——
+    /// Q9a：txg 3（新池新建文件）之后，五条臂的分配记录条目数（`ledger.len()`）都是 10——
     /// mkfs 两个角色（实例表单元、树表单元）各留一条（树表单元那条在 txg 3 被覆盖释放但条目不删，
     /// D3 已定项 7），加上 txg 3 这次覆盖写新分配的 8 个角色，1+1+8=10；不随 S / 落点政策 / period 变。
     #[test]
-    fn allocation_record_entries_after_first_transaction_is_ten_on_every_cell_and_arm() {
+    fn allocation_record_entries_after_new_pool_file_creation_is_ten_on_every_cell_and_arm() {
         for cell in all_geometry_cells() {
             let mut world = World::mkfs(cell);
             for _ in world.first_mount_warmup() {
@@ -2888,8 +2888,8 @@ mod tests {
         assert_eq!(root_ring_region(3), 0);
         assert_eq!(root_ring_device(3), Device::Disk0);
         assert_eq!(root_ring_slot_in_region(3, 8), 1);
-        let world = first_transaction_world(BASE_GEOMETRY);
-        assert_eq!(world.pool.current_txg, 3, "首次挂载暖机恰 2 次（txg 1、2），第一个事务 txg 3");
+        let world = new_pool_file_creation_world(BASE_GEOMETRY);
+        assert_eq!(world.pool.current_txg, 3, "首次挂载暖机恰 2 次（txg 1、2），新池新建文件 txg 3");
     }
 
     fn run_continuous_overwrite_history(cell: GeometryCell) -> (World, Vec<PublishOutcome>) {
@@ -3087,7 +3087,7 @@ mod tests {
 
     /// S1(b)（登记第十一节停机条款 S1，`plain_remount` 补的驱动）：A(txg3,inst1)、B(txg4,inst1，实例内覆盖写)、
     /// 普通挂载取号 2（写行 txg5、暖机 txg6-7）、C(txg8,inst2)、回退到 A 的根 (1,3)。
-    /// 对拍目标（`crates/singlefs-harness/tests/second_transaction_step_four_rollback.rs` 已断言过的真实值，
+    /// 对拍目标（`crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs` 已断言过的真实值，
     /// 逐字段见该文件 `rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_row_and_cold_start_reads_the_first_content`
     /// 190-198 行与 `rolling_back_keeps_the_abandoned_records_in_the_ring_and_a_plain_remount_keeps_the_isolation`
     /// 223-235 行）：回退发布（D）落 txg 9、实例 3；写的行 = [(1,3),(2,0)]（回退行 + 中间实例，(instance,T) 分量）；
@@ -3134,7 +3134,7 @@ mod tests {
 
     /// 对拍段落后半（登记第十一节停机条款 S1）：在上一个对拍测试的回退之后再覆盖写四次（实例 3），
     /// 抬 F 到第一次释放代（=第一次覆盖写的 txg），比对回收的落点集合与之后一次复用的落点。
-    /// 对拍目标（`crates/singlefs-harness/tests/second_transaction_step_five_reuse.rs`
+    /// 对拍目标（`crates/singlefs-harness/tests/reuse_after_raising_the_floor.rs`
     /// `raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it`
     /// 144-192 行）：抬 F 上限 = 第一次覆盖写的 txg；两次带新 F 的空发布；复用发布落在最低可再分配的偶数槽对。
     #[test]
@@ -3149,7 +3149,7 @@ mod tests {
         let _third_overwrite = world.publish(PublishKind::Overwrite); // txg 8
         let _rollback = world.rollback_to(3); // txg 9-10，实例 3
         let baseline_index = World::arm_index(Arm::Baseline);
-        // 「每次发布的记账三项」（S1(c) 条件文本）：与真实实现 `second_transaction_step_five_reuse.rs`
+        // 「每次发布的记账三项」（S1(c) 条件文本）：与真实实现 `reuse_after_raising_the_floor.rs`
         // 重跑打印的 E153S1 tag=c_overwrite/c_after_raise/c_reuse 逐字节一致（第三段 S1 对拍，草稿目录
         // `/tmp/claude-1000/e153-runner-stage3/repo-copy/`，探针 `e153_s1_pairing_probe.rs` 段 c）。
         let expected_after_txg: [(u64, u64, u64, u64); 4] = [(11, 33, 211935, 21), (12, 43, 211925, 31), (13, 53, 211915, 41), (14, 63, 211905, 51)];
@@ -3181,7 +3181,7 @@ mod tests {
         assert_eq!(
             reused_slot, 50178,
             "复用发布把数据单元落回 50178：mkfs 树表那 1 槽回收了、50179 从没分配过；mkfs 实例表那片 50176 也回收了但 B 的根还引用它、\
-             影子账隔离着（真实实现 `second_transaction_step_five_reuse.rs` 文件头注释第 3 行同为 50178；\
+             影子账隔离着（真实实现 `reuse_after_raising_the_floor.rs` 文件头注释第 3 行同为 50178；\
              2026-09-17 第三段发现并修：raise_floor() 此前没有重算影子账，模型曾给出 50176，见跑前登记第十二节）"
         );
         let isolated = world.arms[baseline_index].isolated.contains(&50176);

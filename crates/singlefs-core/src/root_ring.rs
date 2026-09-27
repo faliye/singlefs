@@ -157,7 +157,7 @@ mod tests {
         assert_eq!(
             target_for_publish(CheckpointTxg(3), RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM),
             RootRingSlot { region: 0, slot: 1 },
-            "第一个事务 txg 3 = 区域 0 槽 1"
+            "新池新建文件 txg 3 = 区域 0 槽 1"
         );
         assert_eq!(
             target_for_publish(CheckpointTxg(1), RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM),

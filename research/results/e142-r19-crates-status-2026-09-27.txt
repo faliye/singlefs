@@ -1,0 +1,37 @@
+# E142 第十九次跑 步 ⓪ 第 5 条：git status --short crates/ 与 git diff --stat -- crates/（2026-09-27 11:43:44 UTC，HEAD 61b40787）
+$ git status --short crates/
+ M crates/mutations.tsv
+ M crates/singlefs-checker/Cargo.toml
+RM crates/singlefs-harness/tests/new_pool_file_creation_step_seven_layer0.rs -> crates/singlefs-checker/tests/new_pool_file_creation_step_seven_layer0.rs
+RM crates/singlefs-harness/tests/record_checker_judges_absence_by_the_persisted_set.rs -> crates/singlefs-checker/tests/record_checker_judges_absence_by_the_persisted_set.rs
+RM crates/singlefs-harness/tests/file_overwrite_crash_inside_the_floor_raise_pushed_by_the_session.rs -> crates/singlefs-checker/tests/file_overwrite_crash_inside_the_floor_raise_pushed_by_the_session.rs
+RM crates/singlefs-harness/tests/file_overwrite_parallel_line_one_layer0.rs -> crates/singlefs-checker/tests/file_overwrite_parallel_line_one_layer0.rs
+RM crates/singlefs-harness/tests/file_overwrite_parallel_line_three_spill_over_layer0.rs -> crates/singlefs-checker/tests/file_overwrite_parallel_line_three_spill_over_layer0.rs
+RM crates/singlefs-harness/tests/file_overwrite_position_addressed_trees_layer0.rs -> crates/singlefs-checker/tests/file_overwrite_position_addressed_trees_layer0.rs
+RM crates/singlefs-harness/tests/file_overwrite_step_three_acquisition_barrier_layer0.rs -> crates/singlefs-checker/tests/file_overwrite_step_three_acquisition_barrier_layer0.rs
+RM crates/singlefs-harness/tests/file_overwrite_step_three_formatted_pool_layer0.rs -> crates/singlefs-checker/tests/file_overwrite_step_three_formatted_pool_layer0.rs
+RM crates/singlefs-harness/tests/file_overwrite_step_zero_layer0.rs -> crates/singlefs-checker/tests/file_overwrite_step_zero_layer0.rs
+R  crates/singlefs-harness/tests/file_overwrite_supplement_three_crash_injection.rs -> crates/singlefs-checker/tests/file_overwrite_supplement_three_crash_injection.rs
+RM crates/singlefs-harness/tests/file_overwrite_supplement_two_tree_split_layer0.rs -> crates/singlefs-checker/tests/file_overwrite_supplement_two_tree_split_layer0.rs
+ M crates/singlefs-harness/Cargo.toml
+ M crates/singlefs-harness/src/bin/e158_root_choice_repair.rs
+ M crates/singlefs-harness/src/bin/e161_crash_state_dedup_and_time_split.rs
+ M crates/singlefs-harness/tests/crash_enumeration_resumes_from_its_progress_file.rs
+$ git diff --stat -- crates/
+ crates/mutations.tsv                               | 130 ++++++++++-----------
+ crates/singlefs-checker/Cargo.toml                 |   8 +-
+ .../tests/new_pool_file_creation_step_seven_layer0.rs   |   1 +
+ ..._checker_judges_absence_by_the_persisted_set.rs |   1 +
+ ...inside_the_floor_raise_pushed_by_the_session.rs |   1 +
+ .../file_overwrite_parallel_line_one_layer0.rs |   1 +
+ ...action_parallel_line_three_spill_over_layer0.rs |   1 +
+ ..._transaction_position_addressed_trees_layer0.rs |   2 +
+ ...action_step_three_acquisition_barrier_layer0.rs |   1 +
+ ...transaction_step_three_formatted_pool_layer0.rs |   1 +
+ .../tests/file_overwrite_step_zero_layer0.rs   |   1 +
+ ...transaction_supplement_two_tree_split_layer0.rs |   2 +
+ crates/singlefs-harness/Cargo.toml                 |   2 +-
+ .../src/bin/e158_root_choice_repair.rs             |   6 +-
+ .../bin/e161_crash_state_dedup_and_time_split.rs   |   2 +-
+ ...h_enumeration_resumes_from_its_progress_file.rs |   1 +
+ 16 files changed, 90 insertions(+), 71 deletions(-)

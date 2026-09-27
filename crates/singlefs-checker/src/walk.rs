@@ -3250,7 +3250,7 @@ struct TreeTableEntrySighting {
 /// 跳过不判，全是这一类时整条报不适用——三处都照 `.claude/kb/invariants.md` I-3.9 那一行。
 ///
 /// 为什么是区间：根环里的 txg 可以有洞——一次发布的根槽从没写过、而它的 journal 记录在挂载时被施加（D23（journal 的角色与格式）：
-/// 记录自带新根段），那次发布做的释放就写着一个环里没有根的 txg。`second_transaction_step_zero_layer0.rs` 的残留记录那条流
+/// 记录自带新根段），那次发布做的释放就写着一个环里没有根的 txg。`crash_enumeration_fixed_script_stream.rs` 的残留记录那条流
 /// 正是这个形状（txg 5 的根槽从没写过、jsn 5 被施加、释放代 5、环里最早不再引用那个落点的根是 txg 6），按「等于 T」判，
 /// 那条流上 12 个合法状态判红。L 与 T 之间没有洞时 `(L, T]` 只有 T 一个值，就是「等于最早不再引用它的那条根的 txg」；
 /// C374（释放代与树表诞生 txg 只有验收断言盯着） 点名的判别力（发布 B 那次的释放代从 4 写成 3）照样红。
@@ -3337,7 +3337,7 @@ fn judge_release_generations(
 /// **为什么必须收窄**：崩溃恢复落到一条没有文件的根之后（它之后带文件的根读不出），这个池只剩「再发一次第一个文件版本」这一条路，
 /// 那一次重新建树，诞生 txg 必然与旧线记的不同。不收窄就要在这一格判红，而那是一条正当历史。
 /// 管理员回退是挂着时的一次向前发布（D23（journal 的角色与格式） 已定项 14），不切时间线、树表条目照抄，不走到这一格。
-/// 没有被抛弃时间线的那一格由 `each_c374_bad_image_reddens_only_its_own_invariant_after_the_overwrite` 盯着。
+/// 没有被抛弃时间线的那一格由 `each_release_generation_and_tree_table_birth_bad_image_reddens_only_its_own_invariant_after_the_overwrite` 盯着。
 fn judge_tree_table_birth_txg(scanned: &[ScannedCandidateRoot], judgements: &mut Judgements) {
     let mut by_tree: BTreeMap<u64, Vec<TreeTableEntrySighting>> = BTreeMap::new();
     for root in scanned {
@@ -4006,7 +4006,7 @@ fn rollback_floor_ceiling_before_the_raise(
 }
 
 /// I-7.9（回退下界 F 不高于抬 F 的上限）：只判**抬 F 的那一条根**，拿它之前的根算上限（用户 2026-09-24 定，
-/// 里程碑「第二个事务」收口表第 26 行；定义是实二报告 `impl-m2-checker2` 第八节那一种）。
+/// 里程碑「覆盖写、释放、回退与复用」收口表第 26 行；定义是实二报告 `impl-m2-checker2` 第八节那一种）。
 ///
 /// 抬 F 的根：同一实例里 txg 比它小的最新那条根（它的前一条）带的 F 比它带的低。回退那次与新实例的第一条根没有同实例的前一条，
 /// 不算抬——它带的是恢复算出来的 F_生效，而按它自己的实例表，当初撑起那个 F 的非空根已在被抛弃的时间线上，拿它算上限会在合法的
@@ -4537,7 +4537,7 @@ enum TotalOrderKey {
     /// 写序只在同 txg 跨事务改同 key 时顺带定序」。按前者判，同一实例的两版在盘上能撞出写序逐字节相同——
     /// I-1.8（归并后版本全序） 那一行自己的括注逐字写着「同一实例连着两个 checkpoint 都不分配新事务号时两版写序逐字节相同」，
     /// 而码 3 用「诞生代号打头」解决了同一个问题、码 1 没有；按后者判它们由诞生代号分得开。
-    /// ⚠️ 不要拿 `second_transaction_step_five_reuse.rs` 那条脚本当证据：2026-09-21 之前它上面确实有一对，
+    /// ⚠️ 不要拿 `reuse_after_raising_the_floor.rs` 那条脚本当证据：2026-09-21 之前它上面确实有一对，
     /// 那是事务号重号（空发布把按实例的计数拉回去）造出来的，重号修掉之后那条脚本上八个写序互不相同。
     /// 哪一个作数要定案，定之前码 1 不进 ② 这一半；① 那一半（同一组的成员载荷相同）码 1 照判。
     UndecidedForDataUnit,

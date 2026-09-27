@@ -18,7 +18,7 @@
 .claude/agents/mutation-triage.md	# 验证两档拆分：指向的规则小节改名
 .claude/gate.d/13-vague-names.sh	# 验证两档拆分：新立，函数名与类型名不许只由空泛词拼成（用户 2026-09-27「run_cell 这种命名判违规」）
 .claude/gate.d/54-layer0-replay.sh	# 验证两档拆分：快档改跑 cargo test -p singlefs-checker-tier，标记不作数报本次未跑不判红
-.claude/gate.d/55-qemu-first-transaction.sh	# 验证两档拆分：真设备二进制搬进 checker 档包，cargo build -p 改名（这一份另有 singlefs-99 的全绿标记改动，不归这一批）
+.claude/gate.d/55-qemu-device-streams.sh	# 验证两档拆分：真设备二进制搬进 checker 档包，cargo build -p 改名（这一份另有 singlefs-99 的全绿标记改动，不归这一批）
 .claude/gate.d/stage-inputs.tsv	# 验证两档拆分：crash-case 行改包名 singlefs-checker-tier，补登记位置寻址那条全量用例
 .claude/hooks/heavy-test-guard.sh	# 验证两档拆分：checker 档两个 kind 放行给崩溃验证员，规矩句改
 .claude/hooks/lib_heavy_tests.py	# 验证两档拆分：checker 档按包判；-p 认通配、@版本、pkgid URL；看得到值的别名展开再判
@@ -40,14 +40,14 @@ crates/singlefs-checker-tier/src/bad_disk_input.rs	# 验证两档拆分：从 ha
 crates/singlefs-checker-tier/src/layer0_progress.rs	# 验证两档拆分：从 harness 整份搬来
 crates/singlefs-checker-tier/src/device_log.rs	# 验证两档拆分：从 harness 整份搬来
 crates/singlefs-checker-tier/src/on_device_modes.rs	# 验证两档拆分：从 harness 整份搬来
-crates/singlefs-checker-tier/src/bin/e142_first_transaction_write_dump.rs	# 验证两档拆分：装置二进制搬进 checker 档包
-crates/singlefs-checker-tier/src/bin/e142_first_transaction_write_dump_one_device.rs	# 验证两档拆分：装置二进制搬进 checker 档包
+crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs	# 验证两档拆分：装置二进制搬进 checker 档包
+crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump_one_device.rs	# 验证两档拆分：装置二进制搬进 checker 档包
 crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs	# 验证两档拆分：装置二进制搬进 checker 档包，run / run_cell / check_cell 改名
-crates/singlefs-checker-tier/src/bin/first_transaction_device_log_check.rs	# 验证两档拆分：真设备装置搬进 checker 档包
-crates/singlefs-checker-tier/src/bin/first_transaction_region_bytes.rs	# 验证两档拆分：装置二进制搬进 checker 档包
+crates/singlefs-checker-tier/src/bin/new_pool_file_creation_device_log_check.rs	# 验证两档拆分：真设备装置搬进 checker 档包
+crates/singlefs-checker-tier/src/bin/new_pool_file_creation_region_bytes.rs	# 验证两档拆分：装置二进制搬进 checker 档包
 crates/singlefs-harness/src/lib.rs	# 验证两档拆分：模块表去掉搬走的，加 memory_pool；inner 改名 wrapped_device
 crates/singlefs-harness/src/memory_pool.rs	# 验证两档拆分：原 crash.rs 的内存池、保留写、崩溃镜像那一半
-crates/singlefs-harness/src/first_transaction_regions.rs	# 验证两档拆分：导入改到 memory_pool
+crates/singlefs-harness/src/new_pool_file_creation_regions.rs	# 验证两档拆分：导入改到 memory_pool
 crates/singlefs-core/src/admission.rs	# 验证两档拆分：空泛名 get 改名 replicas
 crates/singlefs-core/src/transaction.rs	# 验证两档拆分：空泛名 perform 改名 perform_commit_step
 crates/singlefs-core/src/system_configuration.rs	# 验证两档拆分：注释里的测试文件路径改到 checker 档包
@@ -66,7 +66,7 @@ research/scripts/layer0-shard-run-selftest.sh	# 验证两档拆分：里面的�
 .claude/rules/implementation-first.md	# 验证两档拆分：crate 数改成五个，指向 verification.md
 .claude/rules/path-moves.md	# 验证两档拆分：「怎么做」加第 7 步，自检样本与用例跟着搬
 crates/singlefs-checker/src/walk.rs	# 验证两档拆分：空泛名 value 改名 birth_identity_tail_number
-crates/singlefs-checker-tier/src/bin/first_transaction_on_device.rs	# 验证两档拆分：真设备装置搬进 checker 档包
+crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs	# 验证两档拆分：真设备装置搬进 checker 档包
 crates/singlefs-harness/src/fault_injection.rs	# 验证两档拆分：导入改到 memory_pool
 crates/singlefs-harness/src/history.rs	# 验证两档拆分：导入改到 memory_pool，种子基从 crash_injection 挪来
 research/scripts/agent-watch.py	# 验证两档拆分：重型进程告警说明与假进程改成按包判

@@ -1,7 +1,8 @@
+//! checker 档模块：crash_injection
 //! 代码审阅第 2 条（用户 2026-09-27 定案「崩溃注入层补可写挂载」）：崩溃注入在每个崩溃状态上，只读恢复与判定照旧之后，
 //! 在同一份崩溃后镜像上真的起一次可写挂载（取号、写行、暖机）、再发一次布、跑池级 checker；挂载途中再崩一次（二次崩溃），
 //! 取号、写行、暖机三段各摆一个，每个二次崩溃状态上只读恢复、问模型、池级 checker、记录核对器。
-//! 实现在 `singlefs_checker_tier::crash_injection`；随机崩溃注入的快档与大档（`second_transaction_supplement_three_crash_injection.rs`）
+//! 实现在 `singlefs_checker_tier::crash_injection`；随机崩溃注入的快档与大档（`crash_injection_campaign.rs`）
 //! 走的是同一个入口，这里用两段短历史钉「每一截都跑到了、三段都摆到了、一条新发现都没有」。
 
 use singlefs_checker_tier::crash_injection::{

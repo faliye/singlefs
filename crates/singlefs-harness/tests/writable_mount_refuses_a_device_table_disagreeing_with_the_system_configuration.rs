@@ -74,7 +74,7 @@ fn device_table_disagreements_of(refusal: MountError) -> Vec<DeviceTableDisagree
     disagreeing_device_table
 }
 
-/// 第一个事务写完的池（devs = 2），盘表交三块：盘 0、盘 1，与一块标成盘 2 的盘 1 的拷贝（它的系统配置里本盘设备号是 1）。
+/// 新池新建文件写完的池（devs = 2），盘表交三块：盘 0、盘 1，与一块标成盘 2 的盘 1 的拷贝（它的系统配置里本盘设备号是 1）。
 /// 三块盘都自证得过同一份系统配置（fsid 与 devs 相同）；改之前拒在更后面、报的是写行那次发布的预演（盘 2 的账里没有要换下的记账树单元，
 /// `RowPublishAdmissionRefusedBeforeAcquisition`）——对不上的是盘表，报错却指向账。现在在选系统配置之后就拒：盘数 3 与 devs 2 不同、
 /// 盘 2 的本盘设备号是 1。对照：同一个池只交盘 0、盘 1，照常做成。

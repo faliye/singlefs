@@ -1000,6 +1000,27 @@ ANCHOR point=G11_merge_reading path=before_window operations=43 writes=31 barrie
 6. 第二段（R19C-8）是重型，要跑时由主 agent 问用户；第一段不等它。
 7. 这一段改了登记本身（准入输入之一），在任何产物之前；`stage-inputs.tsv` 第 34 行已含这份登记，不用再改。
 
+### 执行员补登（experiment-runner，2026-09-27 JST 20:4x，即 UTC 11:4x；步 ⓪，这一次任何产物之前、模型改一行之前）
+
+#### R19E-1 执行员补登：kb 第八批之后的现值（S19-clause 与新开跑条件第 8 条的基线）
+
+依据是派发提示原句：「第 8 条：主 agent 的 kb 第八批（2026-09-27 10:2x UTC）改了 D16 已定项 7 的依据行与索引行（加「→ 屏障」、「实现已合入」），R19C-3(b) 记的 sha256 会对不上——这不是 S19-open：C577 的 kb 写回已经定下来了；你在任何产物之前照 R19C-3(b) 的七个取法重抄一遍、把新 sha256 追加进第十二节（写明「执行员补登：kb 第八批之后的现值」与时点），再开跑。」
+
+- 重抄（UTC 11:41）：`nice -n 19 python3 research/scripts/quote-kb.py <草稿目录>/step0/baseline-clauses-step0.md <第十三节命令二的六个取法> '.claude/kb/decisions/16-发布语义.md@#### 已定项 7：发布的持久顺序'`，「✓ 7 段整抄进 …，回读逐字节一致」，189 行，**sha256 `e1bda65b8b3c333efc4cba03cf88dfbce7ca43d7a22ae837e7a49d5ba8cf49ce`**（其中 D16 那一段第 168–189 行 sha256 `1702a15a3dbfa61a498283b2825d50dd65284a73d38dd514a736835119ed411f`）。步 ② 开工前与步 ③(1) 的重抄都比这一个值。
+- 与 UTC 08:58 那一版（第二节原文按 R19C-3(b) 的 diff 还原、接上 R19C-2 抄的 D16 那一段）逐行比，不同的有三类，逐条判：
+  1. D13 已定项 4 的出处行 `:69-83` → `:70-84`：同文件上方多了一行，条款正文一字没变。
+  2. `layout/01` 第八节表格第 6–9 行（写行、后续暖机、抬 F、只做过 mkfs 的池）与表后「第二条流」一段里的用例路径 `crates/singlefs-harness/tests/second_transaction_…` → `crates/singlefs-checker/tests/second_transaction_…`（派发提示说的「被 singlefs-8b 挪进 `crates/singlefs-checker/tests/` 的 11 份测试」），段序列、写数、种类串、闭式一个字没变。**这一类派发提示那句没点名**，照实记在这里、报告里交主 agent。
+  3. D16 已定项 7 依据第二条「实现待派（排在实审 A3c 之后），代价另登记小实验量」→「实现已合入（`crates/singlefs-core/src/transaction.rs` 的 `persist_the_root_then_rotate_the_system_configuration`，实 C577（系统配置没见证到的最新根，乙罩不到） 报告 `research/prompts/m2-impl-c577-barrier-implementer-report.md`），代价仍另登记小实验量」：派发提示点名的那一处。D16 第 15 行索引表那一格不在七个取法里，今天是「…→ 根槽（FUA）→ 系统配置槽 → 屏障；…」。
+- 臂 N18、N19、N19C 的「怎么做」与第六、七节的门槛没有一处引这三类改动的字句 ⇒ 臂与判据不改；比对仍逐字节，基线换成上面这个值（与 R19C-3(b) 同一种收严）。
+
+#### R19E-2 步 ② 冻结（experiment-runner，2026-09-27 JST 21:58–22:00，即 UTC 12:58–13:00；主产物之前，臂与判据不改）
+
+- 步 ② 开工前按 S19-clause 重抄（UTC 11:47）：sha256 `e1bda65b8b3c333efc4cba03cf88dfbce7ca43d7a22ae837e7a49d5ba8cf49ce`，= R19E-1 的基线。
+- 模型照 N19C 的 ①–⑪ 改完；单测 `cargo test --release -p e7-index-bench --bin e142-first-txn-dry-run` 原样末行「test result: ok. 94 passed; 0 failed; 1 ignored」。7.1、7.2（在 G11、G12 上）与 7.4 C1–C13、D1–D6 的锚点各由单测钉住（`registered_segment_sequences_match_every_recorded_path`、`three_state_rows_match_the_registered_anchors`、`g11_rows_match_the_anchors_of_the_stream_without_the_trailing_barrier`、`swallowed_barrier_points_match_the_registered_anchors`、`before_window_and_window_counts_match_the_registered_anchors`、`layer0_segment_sizes_and_closed_form_match_the_new_layout`、`fua_not_a_boundary_gives_16777249_states_and_134217754_without_the_trailing_barrier`、`layer0_main_arm_verdict_flags_every_threshold_independently`），绝对值一律取自第七节与 7.4，不取任何产物。
+- 变异表重锚三条（第九节「已有 158 条对改后的源码整张重跑」那一段，第七类）：`M2_drop_second_barrier` 的替换 `pool.operations.pop()` 改成删掉第二道池屏障的全部步（按盘数截断），仍在 `before_window_and_window_counts_match_the_registered_anchors` 等处红；`M13_fua_never_a_boundary` 的原文改到 `SegmentClosingRule::closes_after` 里的 `if self.fua_is_boundary && write.is_fua() {`；`M154_fua_write_isolates_its_own_segment` 的原文改到 `split_into_segments` 里推写下标那一段（FUA 写之前先关段、之后再关段），替换文的意思不变。加 M180–M201 共 22 条（第九节 M180–M193，R19C-7 M194–M201）；M186、M187、M188 落在合成取样点上，由 `in_place_overwrite_needs_all_three_conditions_on_synthetic_writes` 钉住；M200 由直接调 `layer0_main_arm_verdict` 的单测钉住。整张 180 条第二次跑（`MUTATE_JOBS=2`，经 `capped.sh 2`）：抓到 180、无效 0、没红 0，「计数：内存撞顶 0 条（上限 16G）、超时 0 条」「已还原，基线仍全绿」，退出码 0。第一次跑（同样 180/180 抓到）退 5：UTC 12:22:25 别的会话把模型两行注释里的 `singlefs-harness` 改成 `singlefs-checker-tier`（crate 拆分），不算数，已重跑。
+- **冻结**：模型 `research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs` 9319 行，sha256 `41ef20b50ffc32adece04054d6ffdffce1d0f6ca8d127ad8680953b37e4b9dd1`（含上面那两行别人改的注释）；变异表 `research/mutations/e142_first_transaction_dry_run.tsv` 180 行，sha256 `15a4fe6da352e15236f267b38e6735295d7d0c7659900de6dedd80867d2e9c77`。
+- ⚠️ 这一段停在冻结之后，步 ③ 没开：快照 A（UTC 11:44）之后 `crates/` 被拆出新 crate `crates/singlefs-checker-tier`（导出 bin 也挪进去），`crates/singlefs-core/src/` 的 `mount.rs`、`recovery.rs`、`system_configuration.rs`、`transaction.rs` 与 `crates/singlefs-format/src/lib.rs` 的 sha256 都变了，`research/scripts/replay.sh` 的 `driver_e142` 也被别的会话改成 `-p singlefs-checker-tier`；照原文跑步 ③ 会触发 V19c。续不续、怎么续由主 agent 定。
+
 ## 十三、读过的文件与跑过的命令
 
 没有读 `research/results/` 下任何产物的内容（只 `ls` 过 E142 第十八次那几份的文件名与大小）；没有读 `.claude/kb/experiments/142-第一个事务的干跑.md` 与实验索引、实验变更史；没有读 `research/prompts/e142-r17-prereg.md`、`e142-r16-prereg.md`。

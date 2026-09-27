@@ -637,7 +637,7 @@ OLD_HEAVY_TEST_REFUSALS = [
     "**抓到的实例**：实现员把「库单测 → 动到的测试二进制 → 新层 0 七条流全量 → 变异」写进 `/tmp/claude-1000/impl-m2-treesplit/run-chain.sh`，再用后台 Bash 起它",
     "理由照实写：59 号是重型阶段，抽成共用库之后没法在提交之外跑它来证明没改坏",
     "理由照实写：59 号属于只在提交时才执行的重型阶段，改它的实现在提交之前没有办法证明没改坏，所以两边各留一份",
-    "还有一处旧判法要一起看：实二四的报告 `research/prompts/m2-vm-raise-floor-implementer-report.md`「要你定的」第 3 条说，55 号还按「宿主只重跑第一个事务」判 `second-tr",
+    "还有一处旧判法要一起看：实二四的报告 `research/prompts/m2-vm-raise-floor-implementer-report.md`「要你定的」第 3 条说，55 号还按「宿主只重跑新池新建文件」判 `second-tr",
     "1. 「理由照实写：59 号属于只在提交时才执行的重型阶段，改它的实现在提交之前没有办法证明没改坏，所以两边各留一份」——这是在写一行说明的理由，没有要谁去跑",
     "- `diff <(bash .claude/scripts/check.sh) x`：括号里真在执行重型测试，对 implementation-writer 照拒",
     "跑门禁 59 号样本、73（gate-lint / shell-lint）、doc-lint、62、63，逐道报原样判定行",
@@ -800,7 +800,8 @@ def selftest(hook_dir):
         cases.append(session_case("实现员:第一件交回之后不再撞", "implementation-writer", "要动的 crates 文件：crates/a/src/two.rs\n", 0, "registry"))
         cases.append(session_case("实现员:没写要动的文件", "implementation-writer", "改挂载准入。", 2, "registry"))
         cases.append(session_case("实现员:文件多也不拒（份数不设上限）", "implementation-writer", "要动的 crates 文件：" + " ".join(f"crates/b/src/f{n}.rs" for n in range(12)) + "\n", 0, "registry"))
-        cases.append(session_case("实现员:mutations.tsv 与在跑的重叠不算撞", "implementation-writer", "要动的 crates 文件：crates/mutations.tsv crates/a/src/four.rs\n", 0, "registry"))
+        cases.append(session_case("实现员:带 mutations.tsv 的一件登记下来", "implementation-writer", "要动的 crates 文件：crates/mutations.tsv crates/a/src/five.rs\n", 0, "registry"))
+        cases.append(session_case("实现员:mutations.tsv 与在跑的重叠不算撞", "implementation-writer", "要动的 crates 文件：crates/mutations.tsv crates/a/src/six.rs\n", 0, "registry"))
         # opus 并发：4 个在跑（1 个交回、1 个失败的不算）；限额窗口：失败通知写着还没到的 resets 时刻
         write_session("busy", [launch(f"a000000000000b{n:02d}", "claude-opus-5-5[1m]", f"活 {n}") for n in range(OPUS_CONCURRENCY_LIMIT + 2)]
                       + [handed_back("a000000000000b00"), notification("a000000000000b01", "failed")])

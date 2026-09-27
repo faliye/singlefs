@@ -1,0 +1,64 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-a/copy/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.38s
+     Running tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs (/tmp/claude-1000/impl-r2-fixes-a/target/debug/deps/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error-b68cc66380e8aa36)
+
+running 2 tests
+test the_rotation_barrier_litmus_writer_follows_the_last_three_steps_of_every_recorded_publish ... ok
+test a_zero_unit_publish_whose_post_rotation_barrier_fails_is_not_frozen_and_the_whole_mount_returns_the_error ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.42s
+
+     Running tests/second_transaction_step_three_formatted_pool.rs (/tmp/claude-1000/impl-r2-fixes-a/target/debug/deps/second_transaction_step_three_formatted_pool-16308d5197d08beb)
+
+running 14 tests
+test a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_it_back_cold ... ok
+test first_file_version_that_cannot_judge_or_issue_its_trees_is_refused_before_any_write ... ok
+test first_file_version_whose_root_and_previous_record_disagree_is_refused_before_any_write ... ok
+test a_third_writable_mount_on_a_version_whose_rows_were_written_is_refused_before_touching_the_allocator ... ok
+test crash_recovery_abandoning_the_unwitnessed_row_publish_of_the_version_without_file_keeps_its_tree_table_and_allocation_record_tree_root_isolated_once_the_floor_passes_them ... ok
+test root_record_of_a_file_version_leaves_the_allocation_record_tree_pointer_zero ... ok
+test formatted_pool_mount_starting_after_a_leftover_record_publishes_from_the_next_txg ... ok
+test transient_system_configuration_read_errors_between_the_refusal_and_the_acquisition_refuse_before_any_write ... ok
+test the_first_file_version_after_a_recovery_dropped_an_earlier_one_issues_its_trees_above_the_ring_watermark_and_reads_back ... ok
+test crash_recovery_that_cannot_read_the_witnessed_row_publish_of_the_version_without_file_refuses_writable_after_the_one_reread_and_chooses_it_when_the_reread_reads_it has been running for over 60 seconds
+test writable_mount_after_a_crash_between_warm_up_and_the_first_file_writes_the_row_for_the_previous_instance ... ok
+test the_third_writable_mount_keeps_the_instance_table_that_the_row_publish_swapped_out_out_of_the_free_pool ... ok
+test writable_mount_after_a_crash_right_after_acquiring_an_instance_writes_a_row_for_the_burnt_instance ... ok
+test crash_recovery_that_cannot_read_the_witnessed_row_publish_of_the_version_without_file_refuses_writable_after_the_one_reread_and_chooses_it_when_the_reread_reads_it ... ok
+test writable_mount_of_a_formatted_pool_takes_instance_one_publishes_two_zero_unit_roots_and_the_first_file_version_reads_back_cold ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 72.88s
+
+     Running tests/system_configuration_per_device_redundancy.rs (/tmp/claude-1000/impl-r2-fixes-a/target/debug/deps/system_configuration_per_device_redundancy-537e6576de9e983a)
+
+running 6 tests
+test both_system_configuration_slots_unreadable_on_device_zero_still_read_the_file_back ... ok
+test no_valid_system_configuration_slot_on_any_device_fails_and_names_the_first_device ... ok
+test both_system_configuration_slots_corrupted_on_device_zero_still_read_the_file_back ... ok
+test both_system_configuration_slots_unreadable_on_device_one_still_read_the_file_back ... ok
+test one_unreadable_system_configuration_slot_still_reads_the_file_back ... ok
+test the_pool_checker_still_judges_every_invariant_when_one_device_has_no_valid_system_configuration ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.93s
+
+     Running tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs (/tmp/claude-1000/impl-r2-fixes-a/target/debug/deps/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over-60a19ccfceac8944)
+
+running 14 tests
+test a_journal_ring_whose_next_slot_is_off_the_cluster_segment_boundary_is_refused_by_mkfs_before_any_write ... ok
+test a_journal_ring_whose_in_flight_limit_overflows_four_bytes_is_refused_by_mkfs_before_any_write ... ok
+test a_system_configuration_recording_a_unit_area_start_other_than_the_slot_after_the_ring_is_refused_before_any_write ... ok
+test a_system_configuration_whose_in_flight_limit_overflows_its_four_bytes_is_refused_by_the_reader ... ok
+test a_root_ring_slot_unreadable_once_is_read_on_the_reread_and_one_unreadable_twice_is_named ... ok
+test a_128_mebibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker ... ok
+test raising_the_floor_while_a_root_ring_slot_stays_unreadable_is_refused_before_any_write ... ok
+test raising_the_floor_while_the_newest_roots_instance_table_stays_unreadable_is_refused_before_any_write ... ok
+test the_default_journal_ring_keeps_the_unit_area_at_slot_50176_and_the_first_transaction_bytes_unchanged ... ok
+test the_effective_floor_rereads_the_newest_roots_instance_table_once ... ok
+test the_newest_roots_instance_table_read_on_the_one_reread_lets_the_floor_be_raised ... ok
+test a_tree_table_whose_two_entries_carry_the_same_tree_identifier_is_refused_by_the_writable_mount_before_any_write ... ok
+test a_tree_table_whose_two_entries_swapped_their_kinds_is_refused_by_the_writable_mount_before_any_write ... ok
+test a_one_gibibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.32s
+
+exit=0

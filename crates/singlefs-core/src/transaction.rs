@@ -2,8 +2,8 @@
 //! （D17（实现分层与第三方管道） 已定项 2；`.claude/rules/fs-design.md`「一个事务层，所有结构共用」）。
 //! 三条路径都从同一个枚举走：取号 = 逐盘一次系统配置槽写 + 一道屏障（D23（journal 的角色与格式） 已定项 16，C322（取号那一步的屏障怎么放没有条款） 2026-09-14 定案）；
 //! 暖机（D16（发布语义） 已定项 8）= 屏障 → 空记录 → 屏障 → 根槽 FUA → 系统配置槽轮换 → 屏障；
-//! 第一个事务（D16（发布语义） 已定项 7）= 单元写 × 8 → 屏障 → journal 记录 → 屏障 → 根槽 FUA → 系统配置槽轮换 → 屏障。
-//! 覆盖写（里程碑「第二个事务」步 1 / 步 2）走同一条骨架：新数据单元 COW 到新落点、六个提交内生块与树表 COW 出新版本，
+//! 新池新建文件（D16（发布语义） 已定项 7）= 单元写 × 8 → 屏障 → journal 记录 → 屏障 → 根槽 FUA → 系统配置槽轮换 → 屏障。
+//! 覆盖写（里程碑「覆盖写、释放、回退与复用」步 1 / 步 2）走同一条骨架：新数据单元 COW 到新落点、六个提交内生块与树表 COW 出新版本，
 //! 被换下的八个单元在同一次发布里释放（分配记录改写成已释放 + 释放代，条目不删，D3（空间分配） 已定项 7）。
 //! 每一步都经过块设备接口，录制器挂在那层（D17（实现分层与第三方管道） 已定项 5）。
 
@@ -85,8 +85,8 @@ use crate::records::{
     TREE_KIND_EXTENT, TREE_KIND_INODE, TREE_KIND_LIVELIST, TREE_KIND_SPARSE_SIDE_TABLE,
 };
 use crate::recovery::{
-    effective_rollback_floor, highest_root_instance, tree_table_entry_count,
-    verified_system_configuration_slots, PoolReader, RecoveryFailure,
+    effective_rollback_floor_rereading_unreadable_reads_once, highest_root_instance,
+    tree_table_entry_count, verified_system_configuration_slots, PoolReader, RecoveryFailure,
 };
 use crate::root_record::{RootRecord, UnmountMarker};
 use crate::root_ring::{slot_offset, target_for_publish};
@@ -106,8 +106,8 @@ use crate::write_request_split::{
 
 /// 第一个文件的 inode 号（里程碑步 3 预想）。
 pub const FIRST_INODE_NUMBER: u64 = 1;
-/// 第一个事务的事务号；0 保留给不承载事务的记录（D23（journal 的角色与格式） 已定项 19 ①）。
-pub const FIRST_TRANSACTION_NUMBER: u64 = 1;
+/// 新池新建文件的事务号；0 保留给不承载事务的记录（D23（journal 的角色与格式） 已定项 19 ①）。
+pub const NEW_POOL_FILE_CREATION_NUMBER: u64 = 1;
 /// 无归属的树 ID（树表单元自己、mkfs 的固定单元）。
 pub const TREE_IDENTIFIER_NONE: u64 = 0;
 
@@ -365,7 +365,12 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
             + 1;
         // 这一写带的 F 在写之前按盘上现状现算整池的生效值（D16（发布语义） 已定项 1「生效」）：非抬 F 的写就带它，
         // 抬 F 先写系统配置那一步带新 F 与它的大者——F 的生效值只增不减（「抬 F 那一串」那一行）。
-        let pool_effective_floor = effective_rollback_floor(
+        // 读不出的根槽与最新那条根读不出的实例表各重读一次（实审 A3b 报告 Q7），仍读不出照原来的退路（当没有根、不按表滤），不拒：
+        // 这个写入口手里没有分配器上那张根环表，分不出哪个槽是这个进程知道住着根的（D16（发布语义） 已定项 1「根槽这一次读坏」那一行
+        // 要按它分两类），而这一写是发布末尾的轮换、取号或先写 F，报错的去处只有块设备错。退路不让 F 回落：生效值取系统配置里读得出的
+        // F 与根上带的 F 的大者，要被覆写的那一槽在这里先读进来，根上的 F 不高于它那块盘系统配置里的（I-7.12（系统配置 F 不低于同盘根上的 F）），
+        // 只剩「那块盘两槽系统配置与带最高 F 的根同时读不出」这一种叠加故障算得低（推的，没造过）。
+        let pool_effective_floor = effective_rollback_floor_rereading_unreadable_reads_once(
             &*self.devices,
             &self.parameters.region_devices,
             &self.parameters.geometry,
@@ -510,7 +515,7 @@ pub struct AcquisitionFailed {
 }
 
 /// 一次系统配置写带哪一个回退下界 F（D16（发布语义） 已定项 1「生效」与「抬 F 那一串」）。
-/// 两个成员都在写之前按盘上现状现算整池的生效值（`recovery::effective_rollback_floor`）：一块盘两槽都读不出之后的那一次写，
+/// 两个成员都在写之前按盘上现状现算整池的生效值（`recovery::effective_rollback_floor_rereading_unreadable_reads_once`）：一块盘两槽都读不出之后的那一次写，
 /// 带的仍是整池的，不是这块盘自己读得出的（那样会把它写回 0，让它两槽里的最大值低于它上面的根，I-7.12（系统配置 F 不低于同盘根上的 F） 红）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RollbackFloorOfASystemConfigurationWrite {
@@ -833,7 +838,7 @@ fn write_acquired_instance<Device: BlockDevice>(
     // 发布轮换，两槽都换成了取号写，写 0 就把上一次轮换见证的那次发布抹掉，下一次可写挂载的 N-配置 判不出、会抛弃暂时读不出的最新根。
     // 第一道屏障之后、第一个取号写之前另读每块盘两槽一次（E158 第 4 次跑登记第 413 行）；逐盘取号写与回卷写都用这一次读到的。
     // 屏障前那一核与这一次读之间又有一块盘读不出，就不写（判定与写读同一份输入：写之前重算、对不上不写）。
-    // mkfs 写的 tail 是 0，mkfs 之后第一次取号读到的就是 0：第一个事务的字节不变。
+    // mkfs 写的 tail 是 0，mkfs 之后第一次取号读到的就是 0：新池新建文件的字节不变。
     let witnessed_journal_tail =
         highest_journal_tail_of(&self_verified_system_configurations_of_every_device(pool)?);
     for index in 0..pool.devices.len() {
@@ -1211,7 +1216,7 @@ fn persist_the_root_then_rotate_the_system_configuration<Device: BlockDevice>(
 /// 零单元发布（D16（发布语义） 已定项 9「树表 0 条 ⇒ 零单元」）：屏障 → 空记录 → 屏障 → 根槽 FUA → 系统配置槽轮换 → 屏障；
 /// 空记录不点名任何单元、事务号 0、提交标记 1，新根段照上一版的根，根记录照上一版的根、只换 checkpoint_txg、实例代号、回退下界
 /// 与树 ID 水位（取计划里给的，D8（核心索引结构） 已定项 8 ②）。
-/// 第一次可写挂载的暖机与「只做过 mkfs 的池」上的可写挂载都走它（第一个事务的字节不变）。
+/// 第一次可写挂载的暖机与「只做过 mkfs 的池」上的可写挂载都走它（新池新建文件的字节不变）。
 ///
 /// # Errors
 /// 这次发布的记录条数（恒一条）多于 [`journal_record_limit_of_one_publish`]（在飞上限为 0 的环）⇒
@@ -1987,13 +1992,13 @@ impl PoolVersion {
     }
 }
 
-/// 第一个事务写出的八个单元，声明序 = D3（空间分配） 已定项 10 ⑤ 的 bump 次序（按树 ID 升序、树内先叶后根、映射树倒数第二、树表最末），
+/// 新池新建文件写出的八个单元，声明序 = D3（空间分配） 已定项 10 ⑤ 的 bump 次序（按树 ID 升序、树内先叶后根、映射树倒数第二、树表最末），
 /// 也是出生序号的发号次序（D19（块指针的结构与宽度预算） 已定项 9）与字节表七的 t1..t8。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TransactionUnit {
-    /// 文件的一个数据单元（码 1）。带的是它在文件里的单元序号：一个文件跨多个单元时（里程碑「第二个事务」并行线一）
+    /// 文件的一个数据单元（码 1）。带的是它在文件里的单元序号：一个文件跨多个单元时（里程碑「覆盖写、释放、回退与复用」并行线一）
     /// 每个单元一个角色，落点、映射 key、点名项与按结构种类记的账都按角色走，共用一个角色就分不开两个单元。
-    /// 只有一个单元的文件（第一个事务那一档）就是 [`DataUnitIndexInFile::FIRST`]。
+    /// 只有一个单元的文件（新池新建文件那一档）就是 [`DataUnitIndexInFile::FIRST`]。
     Data(DataUnitIndexInFile),
     /// 第一个文件那一棵 extent 树下段里的一个节点（D8（核心索引结构） 已定项 14：下段一个文件一棵、按数据单元号按位置寻址），
     /// 带它在下段里的位置（层级、同层序号）；下段的根也是这一族（最高那一层的第 0 个）。只有一个数据单元的文件不建下段（内联），没有这一族。
@@ -2025,7 +2030,7 @@ pub enum TransactionUnit {
     MappingTree,
     TreeTable,
     /// 实例表单元（码 3 打包记录类型 4）：mkfs 种下第一片，之后每次可写挂载写行时重写（D18（块里携带什么信息） 已定项 11）；
-    /// 不在第一个事务的八个角色里，第二个事务起才进发布路径。它是链上第 0 片——根记录直接持有的那一片；
+    /// 不在新池新建文件的八个角色里，覆盖写、释放、回退与复用起才进发布路径。它是链上第 0 片——根记录直接持有的那一片；
     /// 多于一片时第 1 片起是 [`TransactionUnit::InstanceTablePageAfterTheFirst`]。
     InstanceTable,
     /// 实例表链上第 1 片起的一片（码 3 打包记录类型 4，身份 (0, 4, 片序号, 0)，D18（块里携带什么信息） 已定项 11）：它的指针不在根记录里，
@@ -2175,7 +2180,7 @@ impl TransactionUnit {
         }
     }
 
-    /// 字节表七的步号。字节表七只登记了一片叶容器那一档的 `t3`（第一个事务的 inode 树只有一片叶）；
+    /// 字节表七的步号。字节表七只登记了一片叶容器那一档的 `t3`（新池新建文件的 inode 树只有一片叶）；
     /// 第二片起写成 `t3+叶序`，那是这一版给多容器起的名字，只出现在报错与用例消息里，不进字节表、不进段序列登记表。
     /// 数据单元同一个写法：第一个单元是字节表的 `t1`，第二个起写成 `t1+单元序号`。
     #[must_use]
@@ -2336,7 +2341,7 @@ pub enum PlacementRule {
 /// （[`FileVersionTreeIdentifiers::issued_from_watermark`]）；之后每一版照抄，再不发号。
 /// mkfs 那条流上那一版的水位是 mkfs 种下的 11，发出来就是已定项 11 登记的 11..18；回退到树表 0 条的一版之后再发，
 /// 那一版的水位带着回退之前根环里的 max（D8（核心索引结构） 已定项 8 ②），发出来的号高于此前发过的每一个——号永不重发
-/// （里程碑「第二个事务」增补 2 收口表第 ④ 行；C511（回退到无文件那一版之后诞生代怎么接））。
+/// （里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 ④ 行；C511（回退到无文件那一版之后诞生代怎么接））。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FileVersionTreeIdentifiers {
     pub extent: TreeIdentifier,
@@ -2448,7 +2453,7 @@ pub struct WrittenJournalRecord {
     pub bytes: Vec<u8>,
 }
 
-/// 第一个事务写出的东西，留给验收与探针用。
+/// 新池新建文件写出的东西，留给验收与探针用。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TransactionOutput {
     pub root: RootRecord,
@@ -2492,7 +2497,7 @@ pub struct TransactionOutput {
     /// 进映射的单元各自的映射 key（每个数据单元、extent 根、每片 inode 叶容器、inode 根、分配记录树、记账树；映射树与树表豁免）；
     /// 下一次覆盖写按它经映射取落点释放（D19（块指针的结构与宽度预算） 已定项 5 第 1 条）。
     pub mapped_units: Vec<(TransactionUnit, Vec<u8>)>,
-    /// 这次发布释放的落点（覆盖写换下的上一版八个单元；第一个事务为空）：逻辑上释放了的都在，
+    /// 这次发布释放的落点（覆盖写换下的上一版八个单元；新池新建文件为空）：逻辑上释放了的都在，
     /// 其中有一份核出对不上、那块盘上的记录留在已分配的也在（那几份另列在下一个字段）。
     pub released: Vec<Placement>,
     /// 这次发布释放的落点里，释放之前读盘核校验和核出对不上（读不出也算）、隔离了的那几份（D19（块指针的结构与宽度预算） 已定项 5
@@ -2500,7 +2505,7 @@ pub struct TransactionOutput {
     /// 落盘即跨重挂。从盘上重建的版本不是这个进程发布的，是空的。
     pub quarantined_after_release_checksum_mismatch:
         Vec<CopyQuarantinedAfterReleaseChecksumMismatch>,
-    /// C319（请求内单元按 key 升序发出没有条款也没有检查）的运行时计数：同一请求内取号序与 key 序不一致的次数，第一个事务恒 0。
+    /// C319（请求内单元按 key 升序发出没有条款也没有检查）的运行时计数：同一请求内取号序与 key 序不一致的次数，新池新建文件恒 0。
     pub key_order_mismatches: u64,
     /// 这次发布交给设备的写，按结构种类（增补 1）；从盘上重建的版本不是这个进程写出的，是空账。
     pub writes: WritesByStructureKind,
@@ -3286,7 +3291,7 @@ pub enum PublishError {
     /// 记账树或中央映射树这次之后的形状算不出来（`code_two_tree::plan_the_tree_after_this_publish`）：要长到 257 层、
     /// 码 2 头的层级 1 字节写不下（多层之后映射树容量准入剩下的唯一一条，D19（块指针的结构与宽度预算） 已定项 5），
     /// 或上一版（从盘上重建的）树按分隔 key 走不到它自己叶里的一把 key。在动分配器、发任何一个写之前返回，盘上逐字节不变。
-    /// 两棵树装不下一个节点时不再报错、照 D8（核心索引结构） 已定项 11 分裂（里程碑「第二个事务」增补 2 收口表第 28 行）。
+    /// 两棵树装不下一个节点时不再报错、照 D8（核心索引结构） 已定项 11 分裂（里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 28 行）。
     MultiLevelCodeTwoTreeRefused {
         tree: MultiLevelCodeTwoTree,
         refusal: CodeTwoTreeRefusal,
@@ -3532,7 +3537,7 @@ pub fn instance_table_page_roles_in_bump_order(pages: usize) -> Vec<TransactionU
         .collect()
 }
 
-/// 一次发布的全部参数：哪些角色重写、身份字段取什么。第一个事务、覆盖写、写行、暖机都是它的一种取值，走同一条发布路径
+/// 一次发布的全部参数：哪些角色重写、身份字段取什么。新池新建文件、覆盖写、写行、暖机都是它的一种取值，走同一条发布路径
 /// （`.claude/rules/fs-design.md`「一个事务层，所有结构共用」）。
 #[derive(Clone, Debug)]
 pub struct PublishPlan<'content> {
@@ -3540,7 +3545,7 @@ pub struct PublishPlan<'content> {
     /// 这次发布第一条记录的 jsn 计数器（记录落在环里的槽位），全池接着走、换实例不归零（D23（journal 的角色与格式） 已定项 14 第 3 条）。
     /// 一次发布切成 N 条记录时（文件版本有 N 个数据单元）它们连号：`counter .. counter + N`。
     pub counter: u64,
-    /// 这次发布第一个事务的事务号，按实例计数从 1 起，空发布写 0（D23（journal 的角色与格式） 已定项 7 / 已定项 19 ①）。
+    /// 这次发布新池新建文件的事务号，按实例计数从 1 起，空发布写 0（D23（journal 的角色与格式） 已定项 7 / 已定项 19 ①）。
     /// 文件版本有 N 个数据单元时这次发布是 N 个事务（切分纪律一事务一单元），事务号 `transaction .. transaction + N` 连号，
     /// 一条记录一个事务（C310（事务切分纪律与记录数口径打架） 2026-09-16 用户定案）。
     pub transaction: u64,
@@ -3555,7 +3560,7 @@ pub struct PublishPlan<'content> {
     /// 反向链：上一条记录头的 CRC；本实例的第一条恒 0（D23（journal 的角色与格式） 已定项 19 ②）。
     pub back_chain: u32,
     pub file: Option<FileVersionPlan<'content>>,
-    /// 这次发布往 inode 树里新建的 inode，按 inode 号严格升序（建 N 个文件那一路，里程碑「第二个事务」并行线三）。
+    /// 这次发布往 inode 树里新建的 inode，按 inode 号严格升序（建 N 个文件那一路，里程碑「覆盖写、释放、回退与复用」并行线三）。
     /// 号由调用方按记账里的水位发（D5（快照 / 空间记账机制） 已定项 4 第 12 项），落在哪一片叶、要不要在末尾分裂
     /// 由 `crate::inode_tree` 在任何落盘动作之前算。别的发布给空的：文件版本那次只换它自己那条记录，写行与暖机不碰 inode 树。
     pub new_inode_records: &'content [InodeRecord],
@@ -3585,7 +3590,7 @@ pub struct PublishShape {
 }
 
 impl PublishShape {
-    /// 写行那次发布、实例表链这次之后只有一片时的形状（行数不超过 369，第一个事务之后的多数挂载都是它）：
+    /// 写行那次发布、实例表链这次之后只有一片时的形状（行数不超过 369，新池新建文件之后的多数挂载都是它）：
     /// 多于一片的见 [`PublishShape::row_publish_rewriting_instance_table_pages`]。
     pub const ROW_PUBLISH: PublishShape =
         PublishShape::row_publish_rewriting_instance_table_pages(1);
@@ -4591,7 +4596,7 @@ fn inode_record_of_file_version(file: &FileVersionPlan<'_>) -> InodeRecord {
 /// 建在树表 0 条的那一版上（`version_to_build_on`）：照抄它的实例表指针、换下它指着的那片 mkfs 树表。
 ///
 /// txg 与 jsn 都从它接着算——txg = 那一版的 txg + 1、jsn = 上一条记录的 jsn + 1，**不写死 3**：
-/// `FIRST_TRANSACTION_TXG` 只管 mkfs 同一个进程里那条流（mkfs → 取号 → 暖机两次 → 第一个事务），不管任何池的第一个文件版本
+/// `NEW_POOL_FILE_CREATION_TXG` 只管 mkfs 同一个进程里那条流（mkfs → 取号 → 暖机两次 → 新池新建文件），不管任何池的第一个文件版本
 /// （2026-09-23 用户定案）。只做过 mkfs 的池重开一次可写挂载之后再写文件时，那一版已经推到 txg 4，这里接着写 txg 5。
 ///
 /// 这一版的八棵树从 `version_to_build_on` 的树 ID 水位起连号发（[`FileVersionTreeIdentifiers::issued_from_watermark`]），
@@ -4662,8 +4667,8 @@ pub fn publish_first_file<Device: BlockDevice>(
         PublishPlan {
             txg: first_file_version_txg,
             counter: previous_counter + 1,
-            transaction: FIRST_TRANSACTION_NUMBER,
-            // 这个实例的第一个事务：在它之前只有暖机与写行那几次发布，事务号都是 0。
+            transaction: NEW_POOL_FILE_CREATION_NUMBER,
+            // 这个实例的新池新建文件：在它之前只有暖机与写行那几次发布，事务号都是 0。
             highest_transaction_number_before_this_publish: 0,
             instance,
             back_chain: back_chain_of(previous_record_bytes),
@@ -4673,11 +4678,11 @@ pub fn publish_first_file<Device: BlockDevice>(
                 inode_object_birth: first_file_version_txg,
                 // 改动计数 = 最后一次改动所在发布的 checkpoint_txg（D8（核心索引结构） 已定项 6 偏移 88 的字段表定义）：
                 // 就是这次发布的 txg（mkfs 同一个进程里那条流上是 3）。写 1 是 2026-09-18 之前的老样子
-                // （暖机把第一个事务从 txg 1 推到 3 时这一格没跟着改，增补 2 第 11 行）。
+                // （暖机把新池新建文件从 txg 1 推到 3 时这一格没跟着改，增补 2 第 11 行）。
                 // 这里不写 `txg.0`：`crates/mutations.tsv` 第 22 行按那串字面锚在 `publish_overwrite` 上，同一份文件里出现两次它就腐化。
                 change_count: first_file_version_txg.0,
             }),
-            // 第一个事务只建第一个文件那一个 inode：树是空的，这条记录建第一片容器（D8（核心索引结构） 已定项 6）。
+            // 新池新建文件只建第一个文件那一个 inode：树是空的，这条记录建第一片容器（D8（核心索引结构） 已定项 6）。
             new_inode_records: &[],
             instance_table: InstanceTablePlan::Carry(version_to_build_on.instance_table),
             tree_birth_txg: first_file_version_txg,
@@ -4695,7 +4700,7 @@ pub fn publish_first_file<Device: BlockDevice>(
     )
 }
 
-/// 覆盖写（里程碑「第二个事务」步 1 / 步 2）：同一个实例里接在上一次发布之后再发布一版同一个文件——txg、jsn、事务号各加一，
+/// 覆盖写（里程碑「覆盖写、释放、回退与复用」步 1 / 步 2）：同一个实例里接在上一次发布之后再发布一版同一个文件——txg、jsn、事务号各加一，
 /// 对象出生代与容器身份不改，改动计数取这次的 txg；上一版的八个落点经映射释放（进 defer 队列）。
 /// 契约是一个数据单元：多个数据单元的内容走 `publish_sequential_write`。
 ///
@@ -4740,7 +4745,7 @@ pub fn publish_overwrite<Device: BlockDevice>(
     )
 }
 
-/// 顺序写一次写请求（里程碑「第二个事务」并行线一）：从文件偏移 0 写整份内容，按切分纪律切成 N 个一单元事务
+/// 顺序写一次写请求（里程碑「覆盖写、释放、回退与复用」并行线一）：从文件偏移 0 写整份内容，按切分纪律切成 N 个一单元事务
 /// （`crate::write_request_split`：D16（发布语义） 已定项 5 末段 + D23（journal 的角色与格式） 已定项 7 +
 /// C310（事务切分纪律与记录数口径打架） 2026-09-16 用户定案），N 个事务在同一次发布里写出 N 个数据单元、N 条记录：
 /// 前 N − 1 条各只点名自己那个数据单元，这次发布共享的提交内生块只在最后一条点名（D23（journal 的角色与格式） 已定项 17，
@@ -4764,11 +4769,11 @@ pub fn publish_sequential_write<Device: BlockDevice>(
     instance: InstanceGeneration,
 ) -> Result<TransactionOutput, PublishError> {
     let txg = checkpoint_txg_of_the_publish_after(previous.root.checkpoint_txg)?;
-    // 改动计数与第一个事务号先取成局部量、字段也换了次序：`crates/mutations.tsv` 有几条变异按 `publish_overwrite` 里
+    // 改动计数与新池新建文件号先取成局部量、字段也换了次序：`crates/mutations.tsv` 有几条变异按 `publish_overwrite` 里
     // `change_count: txg.0,`、`transaction: previous.highest_transaction_number_in_this_instance + 1,` 与那几行字段的原样
     // 锚着，同一份文件里再出现一次它们就腐化（门禁 59 号；`publish_new_inodes` 里那句注释是同一件事）。
     let change_count = txg.0;
-    let first_transaction_of_this_request =
+    let new_pool_file_creation_of_this_request =
         previous.highest_transaction_number_in_this_instance + 1;
     publish_version(
         pool,
@@ -4776,7 +4781,7 @@ pub fn publish_sequential_write<Device: BlockDevice>(
         PublishPlan {
             txg,
             counter: previous.record.counter + 1,
-            transaction: first_transaction_of_this_request,
+            transaction: new_pool_file_creation_of_this_request,
             highest_transaction_number_before_this_publish: previous
                 .highest_transaction_number_in_this_instance,
             instance,
@@ -4800,7 +4805,7 @@ pub fn publish_sequential_write<Device: BlockDevice>(
     )
 }
 
-/// 建 N 个 inode（里程碑「第二个事务」并行线三：多个文件、元数据按「个」量、没有目录）：一次发布把 N 条 inode 记录
+/// 建 N 个 inode（里程碑「覆盖写、释放、回退与复用」并行线三：多个文件、元数据按「个」量、没有目录）：一次发布把 N 条 inode 记录
 /// 写进 inode 树——号从记账里的 inode 号水位起连着发（D5（快照 / 空间记账机制） 已定项 4 第 12 项），
 /// 落在最右那片叶、满 233 条就在末尾分裂（D8（核心索引结构） 已定项 6，`crate::inode_tree`），
 /// 这次发布之后水位加 N；数据单元与 extent 树不动（新建的 inode 长度 0，`blocks` = ⌈0 ÷ 512⌉ = 0）。
@@ -5319,7 +5324,7 @@ pub const ALLOCATION_RECORD_TREE_SETTLING_ROUNDS_LIMIT: usize = 64;
 /// 2026-09-23 定）：这次写了 N 个数据单元（N ≥ 2）⇒ N 个事务（C310（事务切分纪律与记录数口径打架） 2026-09-16 用户定案），
 /// 第 k 个事务（k < N − 1）一条记录、只点名文件第 k 个数据单元；这次发布共享的提交内生块（数据单元之外的每个重写角色）
 /// **只在最后一个事务的记录里点名**，与第 N − 1 个数据单元一起，前面几条不重复点名它们。写了一个数据单元或一个都没写 ⇒
-/// 一个事务点名全部重写角色（第一个事务今天的形态）。
+/// 一个事务点名全部重写角色（新池新建文件今天的形态）。
 ///
 /// 最后一个事务要点名的项多于一条记录装得下的 67 项（[`JOURNAL_NAMED_ENTRIES_PER_RECORD`]）时**末条再跨记录**
 /// （已定项 17，用户 2026-09-24 定）：按 bump 次序装满一条再开下一条，这些记录都属于最后一个事务
@@ -6252,7 +6257,7 @@ fn publish_admitted<Device: BlockDevice>(
         u64::try_from(plan.new_inode_records.len()).expect("这次新建的 inode 数");
     let inode_number_watermark = match previous {
         Some(previous_version) => previous_version.inode_number_watermark(),
-        // 第一个事务：树里只有 inode 1，下一个可用号是 2（字节表六那一行）。
+        // 新池新建文件：树里只有 inode 1，下一个可用号是 2（字节表六那一行）。
         None => FIRST_INODE_NUMBER + 1,
     } + new_inodes_of_this_publish;
     let device_identities_of_the_accounting_rows: Vec<DeviceIdentity> = allocator
@@ -7004,7 +7009,7 @@ fn build_multi_level_tree(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use singlefs_format::{FIRST_TRANSACTION_TXG, INODE_LEAF_RECORDS};
+    use singlefs_format::{INODE_LEAF_RECORDS, NEW_POOL_FILE_CREATION_TXG};
 
     #[test]
     fn reversing_eight_extent_keys_counts_seven_mismatches_and_one_key_counts_zero() {
@@ -7026,7 +7031,7 @@ mod tests {
         assert_eq!(
             count_key_order_mismatches(&ascending[..1]),
             0,
-            "第一个事务只有一个数据单元"
+            "新池新建文件只有一个数据单元"
         );
         assert_eq!(
             count_key_order_mismatches(&[key(256 << 8), key(1)]),
@@ -7066,11 +7071,11 @@ mod tests {
 
     /// 出生序号的作用域是一次 checkpoint（D19（块指针的结构与宽度预算） 已定项 9）：同一个 checkpoint 里连着装两个文件对象
     /// 与一棵两片叶的 inode 树，后装的接着先装的序号数，写进单元头里的也是接着数的号，映射 key 不撞；
-    /// 发号器挪回「每次装对象都重建」时第二个对象从 0 重数，这条用例红（里程碑「第二个事务」增补 2 第 19 行）。
+    /// 发号器挪回「每次装对象都重建」时第二个对象从 0 重数，这条用例红（里程碑「覆盖写、释放、回退与复用」增补 2 第 19 行）。
     #[test]
     fn second_file_object_in_the_same_checkpoint_continues_birth_sequences_instead_of_restarting_at_zero(
     ) {
-        let txg = CheckpointTxg(FIRST_TRANSACTION_TXG);
+        let txg = CheckpointTxg(NEW_POOL_FILE_CREATION_TXG);
         let instance = InstanceGeneration(1);
         let filesystem_identifier = [0x5a; 16];
         let device_identities = [DeviceIdentity(0), DeviceIdentity(1)];
@@ -7078,7 +7083,7 @@ mod tests {
             txg,
             write_order: WriteOrder {
                 instance,
-                transaction: FIRST_TRANSACTION_NUMBER,
+                transaction: NEW_POOL_FILE_CREATION_NUMBER,
             },
             trees: FileVersionTreeIdentifiers::issued_from_watermark(
                 TREE_IDENTIFIER_WATERMARK_AT_MKFS,
@@ -7093,13 +7098,13 @@ mod tests {
             content: &content,
             write_time_seconds: 1_788_000_000,
             inode_object_birth: txg,
-            // 第一个事务那次发布的取值：改动计数 = 这次发布的 checkpoint_txg（增补 2 第 11 行）。
-            change_count: FIRST_TRANSACTION_TXG,
+            // 新池新建文件那次发布的取值：改动计数 = 这次发布的 checkpoint_txg（增补 2 第 11 行）。
+            change_count: NEW_POOL_FILE_CREATION_TXG,
         };
         let mut checkpoint_sequences = BirthSequenceAllocator::default();
         let one_unit_transactions = split_sequential_write_into_one_unit_transactions(
             u64::try_from(content.len()).expect("内容长度"),
-            FIRST_TRANSACTION_NUMBER,
+            NEW_POOL_FILE_CREATION_NUMBER,
         );
         let context = MultiLevelTreeBuildContext {
             txg,

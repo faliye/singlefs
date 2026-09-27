@@ -1,3 +1,4 @@
+//! checker 档模块：crash
 //! 回退改形态的第二批（2026-09-26 用户定案 SysPre 与 B1）落到 `crates/` 上：
 //! - F 的生效值 = max(根上带的 F, 系统配置里读得出的 F)（D16（发布语义） 已定项 1「生效」）；
 //! - 抬 F 那一串（准入与卸载共用）第一次发布之前先把新 F 写进每块盘的系统配置、过一道屏障，先写那一步任何一块盘失败就一条根都不发、
@@ -62,7 +63,7 @@ fn content_of(length: usize, seed: usize) -> Vec<u8> {
         .collect()
 }
 
-/// 第一个事务（txg 3）之后在同一个进程里覆盖写 `times` 次（txg 4 起），现行版本跟着往前推。
+/// 新池新建文件（txg 3）之后在同一个进程里覆盖写 `times` 次（txg 4 起），现行版本跟着往前推。
 fn overwrite_times(pool: &mut BuiltPool, times: usize) {
     for seed in 0..times {
         let previous = pool.output.clone();
@@ -226,7 +227,7 @@ fn verdict_of(verdicts: &[(&'static str, InvariantVerdict)], invariant: &str) ->
         .expect("checker 每条都报")
 }
 
-/// SysPre（D16（发布语义） 已定项 1「抬 F 那一串」、已定项 7）：第一个事务之后覆盖写三次（txg 4–6），抬 F 到上限 3——
+/// SysPre（D16（发布语义） 已定项 1「抬 F 那一串」、已定项 7）：新池新建文件之后覆盖写三次（txg 4–6），抬 F 到上限 3——
 /// txg 6 末尾轮换写的那一槽先持久（代码审阅第 19 条）：C577 之后由 txg 6 那次发布返回之前那道池屏障兑现，它是抬 F 之前录制流的最后两步；
 /// 这一串自己开头那道屏障前面没有写，录制器把它与前一道并成一道（设备上照收 FLUSH），录制流里这一串从系统配置写起。
 /// 接着两块盘各一次系统配置槽写、带新 F 3（tail 与实例代号照现行那一版末次轮换写的），再一道池屏障，第一次根槽 FUA 写在它之后；
@@ -987,7 +988,7 @@ fn cutting_a_stream_with_an_unmount_marker_outside_any_recorded_unmount_entry_pa
 
 /// C556（checker 与层 0 不读系统配置里的 F） 的层 0 那一半：记录核对器的复用豁免判「那次复用过不过得了回收谓词」时，
 /// F 生效值的界把系统配置槽写带的 F 也算进去（生效值取根上带的与系统配置里的最大值）。
-/// 造法同 `second_transaction_supplement_two_record_checker_reuse_legality.rs`：复用窗口置 0，txg 5 的数据单元落回 txg 4 的那一对槽 50178，
+/// 造法同 `record_checker_reuse_exemption_legality.rs`：复用窗口置 0，txg 5 的数据单元落回 txg 4 的那一对槽 50178，
 /// 崩在 txg 5 的单元写全部落盘、记录与根槽都没落盘那一刻——只按根上的 F（0）界，这次复用过不了回收谓词、记录核对器判红；
 /// 把写表里 txg 5 单元写之前那两次系统配置槽写换成带 F 5 的（整槽重封），界抬到 5，那次复用过得了、记录核对器开脱。
 #[test]

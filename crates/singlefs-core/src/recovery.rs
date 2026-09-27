@@ -243,18 +243,34 @@ pub enum RecoveryFailure {
         checkpoint_txg: CheckpointTxg,
         counters: Vec<u64>,
     },
-    /// 算生效的回退下界 F 时（[`effective_rollback_floor_rereading_the_newest_instance_table_once`]），根环里最新那条根指着的实例表
-    /// （按它判哪几条根被抛弃）读不出、解不开，或一条自证过的根都择不到；重读一次（C554 乙的形态，R = 1：立即重读根环与那张表）仍是这样。
-    /// 不按「不按表滤」往下走（那样被抛弃时间线上的根带的 F 也算进生效值，C554 乙报告 Q6）。挂着时抬 F 在动分配器与任何写之前拒这一次抬，
-    /// 盘上逐字节不变。`newest_root_on_the_reread` 是重读那一遍择到的最新那条根（实例代号, checkpoint_txg），一条都没择到时 `None`。
-    InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
-        newest_root_on_the_reread: Option<(InstanceGeneration, CheckpointTxg)>,
-    },
-    /// 读根环时一个根槽读不出（`PoolReader::read` 交回空：设备报错、越界），立即重读一次仍读不出
-    /// （[`readable_roots_rereading_unreadable_root_ring_slots_once`]，C554 乙的形态，R = 1）：那一槽里有没有一条被抛弃的根判不了，
-    /// 不按「没有根」往下走（那样它引用的槽不隔离、也不计进读不出账的被抛弃根，C554 乙报告 Q6）。挂着时抬 F 重算影子账在动分配器与
-    /// 任何写之前拒这一次抬，盘上逐字节不变。读得出、自证不过的槽（从没写过的全 0 槽、校验和不过）不走这一条，照旧当没有根。
-    RootRingSlotStillUnreadableAfterOneReread { ring_slot: RootRingSlot },
+}
+
+/// 读根环时，这个进程知道住着一条根的一个槽（挂载那一刻读得出、或这个进程写过且 FUA 返回过，
+/// `allocator::RootRingOccupancy::ring_slots_known_to_hold_a_root`）这一次读不出（[`BadRootRingSlotReading::Unreadable`]），
+/// 重读一次仍读不出（[`readable_roots_rereading_ring_slots_known_to_hold_a_root_once`]；D16（发布语义） 已定项 1「根槽这一次读坏」那一行的
+/// 两类分法，用户 2026-09-26 定）：那一槽里的根在不在判不了，不按有根或没根猜。挂着时抬 F 与管理员回退拒这一次，经
+/// `mount::StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot` 交出。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread {
+    pub ring_slot: RootRingSlot,
+}
+
+/// 算生效的回退下界 F 时（[`effective_rollback_floor_rereading_the_newest_instance_table_once`]），根环里最新那条根指着的实例表
+/// （按它判哪几条根被抛弃）读不出、解不开，或一条自证过的根都择不到；重读一次（C554 乙的形态，R = 1：立即重读根环与那张表）仍是这样。
+/// 不按「不按表滤」往下走（那样被抛弃时间线上的根带的 F 也算进生效值，C554 乙报告 Q6）。挂着时抬 F 与管理员回退拒这一次，经
+/// `mount::StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor` 交出。
+/// `newest_root_on_the_reread` 是重读那一遍择到的最新那条根（实例代号, checkpoint_txg），一条都没择到时 `None`。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
+    pub newest_root_on_the_reread: Option<(InstanceGeneration, CheckpointTxg)>,
+}
+
+/// 管理员回退算 F 生效值（[`effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instance_table_once`]）时
+/// 重读一次仍读坏的是哪一样。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EffectiveFloorReadingStillUnreadableAfterOneReread {
+    RootRingSlotKnownToHoldARoot(RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread),
+    InstanceTableOfTheNewestRoot(InstanceTableOfTheNewestRootStillUnreadableAfterOneReread),
 }
 
 /// 恢复的结果：择到的根下面没有文件（第 0 代）、读回文件、或走不下去。`root` 恒是**所选**的那条根。
@@ -1171,19 +1187,32 @@ pub fn readable_roots<Reader: PoolReader + ?Sized>(
     roots
 }
 
-/// 同 [`readable_roots`]，而一个根槽读不出（[`BadRootRingSlotReading::Unreadable`]：设备报错、越界）时立即重读那一槽一次
-/// （C554 乙的形态，R = 1；D16（发布语义） 已定项 1「根槽这一次读坏」那一行的「重读一次」），重读读得出就照它算；读得出、自证不过的槽
-/// 照旧当没有根。挂着时抬 F 重算影子账与回收门槛用它（C554 乙报告 Q6：`readable_roots` 把读不出的槽当没有根，那一槽里的被抛弃根
-/// 引用的槽不隔离、也不计进读不出账的被抛弃根）。
+/// 读根环，读不出的槽按这个进程知不知道那里住着一条根分两类（D16（发布语义） 已定项 1「根槽这一次读坏」那一行的分法，用户 2026-09-26 定；
+/// 与 `mount::rollback_floor_ceiling` 读根环同一个分法）：每个槽读一次；读不出（[`BadRootRingSlotReading::Unreadable`]：设备报错、越界）的槽
+/// 不在 `ring_slots_known_to_hold_a_root` 里（挂载那一刻就读不出或自证不过、这个进程之后也没写过）的当没有根、不重读；在里面的
+/// （挂载那一刻读得出、或这个进程写过且 FUA 返回过，`allocator::RootRingOccupancy::ring_slots_known_to_hold_a_root`）立即重读一次
+/// （C554 乙的形态，R = 1），重读读得出就照它算，仍读不出就报错，不按有根或没根猜。读得出、自证不过的槽（第一遍或重读那一遍）照旧当没有根，
+/// 不分类、不重读：合入后验证一的规格只要「读不出」这一支（D16 那一行另写的「或自证不过」没接进这两处读，带 F 的根被改坏、F 由系统配置撑着的
+/// 那一形——`reuse_after_raising_the_floor.rs` 的 `floor_carried_by_only_one_device_root_and_the_system_configuration_…`——
+/// 管理员回退照旧判到「低于 F_生效」）。交回读得出的每一条根连同它的槽，按根环槽的次序。
+/// 挂着时抬 F 重算影子账与回收门槛、管理员回退判候选与算 F 生效值用它（C554 乙报告 Q6：`readable_roots` 把读不出的槽一律当没有根，
+/// 那一槽里的被抛弃根引用的槽不隔离、也不计进读不出账的被抛弃根）。
 ///
 /// # Errors
-/// 某一槽重读仍读不出 ⇒ [`RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread`]（按 [`every_root_ring_slot`] 的次序第一个）。只读盘。
-pub fn readable_roots_rereading_unreadable_root_ring_slots_once<Reader: PoolReader + ?Sized>(
+/// 知道住着根的槽重读仍读不出 ⇒ [`RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread`]（按 [`every_root_ring_slot`] 的次序第一个）。
+/// 只读盘。
+pub fn readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_once<
+    Reader: PoolReader + ?Sized,
+>(
     reader: &Reader,
     region_devices: &[DeviceIdentity; 3],
     immutable_sizes: &SystemImmutableSizes,
     filesystem_identifier: &[u8; 16],
-) -> Result<Vec<RootRecord>, RecoveryFailure> {
+    ring_slots_known_to_hold_a_root: &BTreeSet<RootRingSlot>,
+) -> Result<
+    Vec<(RootRingSlot, RootRecord)>,
+    RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread,
+> {
     let read_the_slot = |ring_slot| {
         read_root_ring_slot(
             reader,
@@ -1194,7 +1223,83 @@ pub fn readable_roots_rereading_unreadable_root_ring_slots_once<Reader: PoolRead
         )
     };
     let mut roots = Vec::new();
-    // 迭代次数的上界是根环槽数 R × S；跨轮只带已认出的根。提前出口只有「重读仍读不出」一个。
+    // 迭代次数的上界是根环槽数 R × S；跨轮只带已认出的根。提前出口只有「知道住着根的槽重读仍读不出」一个。
+    for ring_slot in every_root_ring_slot(immutable_sizes) {
+        match read_the_slot(ring_slot) {
+            RootRingSlotReading::SelfVerified(root) => {
+                roots.push((ring_slot, root));
+                continue;
+            }
+            RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified) => continue,
+            RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => {}
+        }
+        if !ring_slots_known_to_hold_a_root.contains(&ring_slot) {
+            continue;
+        }
+        match read_the_slot(ring_slot) {
+            RootRingSlotReading::SelfVerified(root) => roots.push((ring_slot, root)),
+            RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified) => {}
+            RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => {
+                return Err(RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread {
+                    ring_slot,
+                });
+            }
+        }
+    }
+    Ok(roots)
+}
+
+/// 同 [`readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_once`]，只交回根（不带槽）。
+///
+/// # Errors
+/// 同那一份。
+pub fn readable_roots_rereading_ring_slots_known_to_hold_a_root_once<
+    Reader: PoolReader + ?Sized,
+>(
+    reader: &Reader,
+    region_devices: &[DeviceIdentity; 3],
+    immutable_sizes: &SystemImmutableSizes,
+    filesystem_identifier: &[u8; 16],
+    ring_slots_known_to_hold_a_root: &BTreeSet<RootRingSlot>,
+) -> Result<Vec<RootRecord>, RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread> {
+    readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_once(
+        reader,
+        region_devices,
+        immutable_sizes,
+        filesystem_identifier,
+        ring_slots_known_to_hold_a_root,
+    )
+    .map(|roots_with_ring_slots| {
+        roots_with_ring_slots
+            .into_iter()
+            .map(|(_, root)| root)
+            .collect()
+    })
+}
+
+/// 同 [`readable_roots_with_ring_slots`]，而一个根槽读不出（[`BadRootRingSlotReading::Unreadable`]：设备报错、越界）时立即重读那一槽一次，
+/// 重读读得出就照它算，仍读不出当没有根；读得出、自证不过的槽不重读（从没写过的全 0 槽都是这一类）。给手里没有这个进程根环表、
+/// 分不出哪几个槽住着根的读者用（`transaction::PoolWriter` 写系统配置之前算 F 生效值，[`effective_rollback_floor_rereading_unreadable_reads_once`]）。
+#[must_use]
+pub fn readable_roots_with_ring_slots_rereading_unreadable_slots_once<
+    Reader: PoolReader + ?Sized,
+>(
+    reader: &Reader,
+    region_devices: &[DeviceIdentity; 3],
+    immutable_sizes: &SystemImmutableSizes,
+    filesystem_identifier: &[u8; 16],
+) -> Vec<(RootRingSlot, RootRecord)> {
+    let read_the_slot = |ring_slot| {
+        read_root_ring_slot(
+            reader,
+            region_devices,
+            immutable_sizes,
+            filesystem_identifier,
+            ring_slot,
+        )
+    };
+    let mut roots = Vec::new();
+    // 迭代次数的上界是根环槽数 R × S；跨轮只带已认出的根；没有提前出口。
     for ring_slot in every_root_ring_slot(immutable_sizes) {
         let reading = match read_the_slot(ring_slot) {
             RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => {
@@ -1204,16 +1309,13 @@ pub fn readable_roots_rereading_unreadable_root_ring_slots_once<Reader: PoolRead
             | RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified)) => first_reading,
         };
         match reading {
-            RootRingSlotReading::SelfVerified(root) => roots.push(root),
-            RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified) => {}
-            RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => {
-                return Err(RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread {
-                    ring_slot,
-                });
-            }
+            RootRingSlotReading::SelfVerified(root) => roots.push((ring_slot, root)),
+            RootRingSlotReading::Bad(
+                BadRootRingSlotReading::NotSelfVerified | BadRootRingSlotReading::Unreadable,
+            ) => {}
         }
     }
-    Ok(roots)
+    roots
 }
 
 /// 同 `readable_roots`，每条根带着它读出来的那个根环槽（挂载与抬 F 给分配器建根环那张表用，`allocator::RootRingOccupancy`）。
@@ -1261,8 +1363,11 @@ pub fn root_is_abandoned_by_the_instance_table(
 ///
 /// 两处一条都读不出时 0（mkfs 写的就是 0）。
 ///
-/// ⚠️ 那张表读不出时「不按表滤」是无声放过（C554 乙报告 Q6）：可写挂载与挂着时抬 F 不走这一份——可写挂载按重读过的那张表算
-/// （[`effective_rollback_floor_under_the_newest_roots_table`]），抬 F 走 [`effective_rollback_floor_rereading_the_newest_instance_table_once`]。
+/// ⚠️ 读不出的根槽当没有根、那张表读不出时「不按表滤」是无声放过（C554 乙报告 Q6，实审 A3b 报告 Q7）：产品路径都不走这一份——
+/// 可写挂载按重读过的那张表算（[`effective_rollback_floor_under_the_newest_roots_table`]），抬 F 走
+/// [`effective_rollback_floor_rereading_the_newest_instance_table_once`]，管理员回退走
+/// [`effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instance_table_once`]，写系统配置槽走
+/// [`effective_rollback_floor_rereading_unreadable_reads_once`]。留给单外的实验装置与用例。
 #[must_use]
 pub fn effective_rollback_floor<Reader: PoolReader + ?Sized>(
     reader: &Reader,
@@ -1320,7 +1425,7 @@ pub fn effective_rollback_floor_under_the_newest_roots_table<Reader: PoolReader 
 /// 立即重读一次根环与那张表（C554 乙的形态，R = 1；D16（发布语义） 已定项 1「重读一次」），仍是这样就报错，不按「不按表滤」往下走。
 ///
 /// # Errors
-/// 重读仍读不出 ⇒ [`RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread`]。只读盘、不写盘。
+/// 重读仍读不出 ⇒ [`InstanceTableOfTheNewestRootStillUnreadableAfterOneReread`]。只读盘、不写盘。
 pub fn effective_rollback_floor_rereading_the_newest_instance_table_once<
     Reader: PoolReader + ?Sized,
 >(
@@ -1328,44 +1433,193 @@ pub fn effective_rollback_floor_rereading_the_newest_instance_table_once<
     region_devices: &[DeviceIdentity; 3],
     immutable_sizes: &SystemImmutableSizes,
     filesystem_identifier: &[u8; 16],
-) -> Result<CheckpointTxg, RecoveryFailure> {
-    // 读一遍根环、择最新那条根、沿链读它的实例表：第一次读与重读一次走同一段。
-    let read_the_ring_and_the_newest_roots_table = || {
-        let roots_with_ring_slots = readable_roots_with_ring_slots(
+) -> Result<CheckpointTxg, InstanceTableOfTheNewestRootStillUnreadableAfterOneReread> {
+    let read_the_ring = || {
+        Ok::<_, std::convert::Infallible>(readable_roots_with_ring_slots(
             reader,
             region_devices,
             immutable_sizes,
             filesystem_identifier,
-        );
+        ))
+    };
+    let Ok(floor) = effective_rollback_floor_rereading_the_newest_instance_table_once_over(
+        reader,
+        region_devices,
+        immutable_sizes,
+        filesystem_identifier,
+        read_the_ring,
+    );
+    match floor {
+        EffectiveFloorAfterAtMostOneReread::UnderTheNewestRootsTable(floor) => Ok(floor),
+        EffectiveFloorAfterAtMostOneReread::NewestRootsTableStillUnreadable {
+            newest_root_on_the_reread,
+            ..
+        } => Err(InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
+            newest_root_on_the_reread,
+        }),
+    }
+}
+
+/// 生效的回退下界 F（[`effective_rollback_floor`] 同一个算法），管理员回退判候选用：读根环照
+/// [`readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_once`]（这个进程知道住着根的槽读不出就重读一次，
+/// 别的读不出的槽当没有根，D16（发布语义） 已定项 1「根槽这一次读坏」那一行的分法），根环里最新那条根的实例表照
+/// [`effective_rollback_floor_rereading_the_newest_instance_table_once`] 读不出就连根环一起重读一次。
+/// 不按原 [`effective_rollback_floor`] 那样把读不出的槽当没有根、把读不出的表当不按表滤（实审 A3b 报告 Q7：
+/// 那样 F 生效值可以算低，低于真 F 的目标被当成候选）。
+///
+/// # Errors
+/// 知道住着根的槽重读仍读不出 ⇒ [`EffectiveFloorReadingStillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot`]；
+/// 最新那条根的实例表重读仍读不出 ⇒ [`EffectiveFloorReadingStillUnreadableAfterOneReread::InstanceTableOfTheNewestRoot`]。只读盘、不写盘。
+pub fn effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instance_table_once<
+    Reader: PoolReader + ?Sized,
+>(
+    reader: &Reader,
+    region_devices: &[DeviceIdentity; 3],
+    immutable_sizes: &SystemImmutableSizes,
+    filesystem_identifier: &[u8; 16],
+    ring_slots_known_to_hold_a_root: &BTreeSet<RootRingSlot>,
+) -> Result<CheckpointTxg, EffectiveFloorReadingStillUnreadableAfterOneReread> {
+    let read_the_ring = || {
+        readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_once(
+            reader,
+            region_devices,
+            immutable_sizes,
+            filesystem_identifier,
+            ring_slots_known_to_hold_a_root,
+        )
+    };
+    match effective_rollback_floor_rereading_the_newest_instance_table_once_over(
+        reader,
+        region_devices,
+        immutable_sizes,
+        filesystem_identifier,
+        read_the_ring,
+    )
+    .map_err(EffectiveFloorReadingStillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot)?
+    {
+        EffectiveFloorAfterAtMostOneReread::UnderTheNewestRootsTable(floor) => Ok(floor),
+        EffectiveFloorAfterAtMostOneReread::NewestRootsTableStillUnreadable {
+            newest_root_on_the_reread,
+            ..
+        } => Err(
+            EffectiveFloorReadingStillUnreadableAfterOneReread::InstanceTableOfTheNewestRoot(
+                InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
+                    newest_root_on_the_reread,
+                },
+            ),
+        ),
+    }
+}
+
+/// 生效的回退下界 F（[`effective_rollback_floor`] 同一个算法），给手里没有这个进程根环表、也没有错误可报的写者用
+/// （`transaction::PoolWriter` 每次写系统配置槽之前算要写的 F，实审 A3b 报告 Q7）：读根环照
+/// [`readable_roots_with_ring_slots_rereading_unreadable_slots_once`]（读不出的槽重读一次，仍读不出当没有根），根环里最新那条根的实例表
+/// 读不出就连根环一起重读一次，仍读不出不按表滤（与原 [`effective_rollback_floor`] 同一个退路）。
+/// 为什么这一处不拒：见 `transaction::PoolWriter::write_system_configuration_slot` 里那一段注释。只读盘、不写盘。
+#[must_use]
+pub fn effective_rollback_floor_rereading_unreadable_reads_once<Reader: PoolReader + ?Sized>(
+    reader: &Reader,
+    region_devices: &[DeviceIdentity; 3],
+    immutable_sizes: &SystemImmutableSizes,
+    filesystem_identifier: &[u8; 16],
+) -> CheckpointTxg {
+    let read_the_ring = || {
+        Ok::<_, std::convert::Infallible>(
+            readable_roots_with_ring_slots_rereading_unreadable_slots_once(
+                reader,
+                region_devices,
+                immutable_sizes,
+                filesystem_identifier,
+            ),
+        )
+    };
+    let Ok(floor) = effective_rollback_floor_rereading_the_newest_instance_table_once_over(
+        reader,
+        region_devices,
+        immutable_sizes,
+        filesystem_identifier,
+        read_the_ring,
+    );
+    match floor {
+        EffectiveFloorAfterAtMostOneReread::UnderTheNewestRootsTable(floor) => floor,
+        EffectiveFloorAfterAtMostOneReread::NewestRootsTableStillUnreadable {
+            roots_with_ring_slots_on_the_reread,
+            ..
+        } => effective_rollback_floor_of_the_roots_read(
+            reader,
+            region_devices,
+            immutable_sizes,
+            filesystem_identifier,
+            &roots_with_ring_slots_on_the_reread,
+            None,
+        ),
+    }
+}
+
+/// 算 F 生效值时读根环、择最新那条根、读它的实例表，至多重读一次之后的结局
+/// （[`effective_rollback_floor_rereading_the_newest_instance_table_once_over`]）。
+enum EffectiveFloorAfterAtMostOneReread {
+    /// 第一遍或重读那一遍读出了最新那条根的实例表，按它算出的 F 生效值。
+    UnderTheNewestRootsTable(CheckpointTxg),
+    /// 重读那一遍仍没有表（表读不出、解不开，或一条自证过的根都择不到）：交回重读那一遍读到的根环与择到的最新那条根，
+    /// 调用方定拒还是不按表滤。
+    NewestRootsTableStillUnreadable {
+        roots_with_ring_slots_on_the_reread: Vec<(RootRingSlot, RootRecord)>,
+        /// 重读那一遍择到的最新那条根（实例代号, checkpoint_txg）；一条都没择到时 `None`。
+        newest_root_on_the_reread: Option<(InstanceGeneration, CheckpointTxg)>,
+    },
+}
+
+/// 读一遍根环（`read_the_ring`：怎么读、读坏的槽怎么办由调用方定）、择最新那条根、沿链读它的实例表；表读不出、解不开或一条根都择不到时
+/// 立即把根环与表一起重读一次（C554 乙的形态，R = 1；D16（发布语义） 已定项 1「重读一次」），读出表就按它算 F 生效值。
+/// 第一次读与重读一次走同一段。
+///
+/// # Errors
+/// `read_the_ring` 的错原样交回（那一遍之后不再读）。
+fn effective_rollback_floor_rereading_the_newest_instance_table_once_over<
+    Reader: PoolReader + ?Sized,
+    RingReadingFailure,
+>(
+    reader: &Reader,
+    region_devices: &[DeviceIdentity; 3],
+    immutable_sizes: &SystemImmutableSizes,
+    filesystem_identifier: &[u8; 16],
+    read_the_ring: impl Fn() -> Result<Vec<(RootRingSlot, RootRecord)>, RingReadingFailure>,
+) -> Result<EffectiveFloorAfterAtMostOneReread, RingReadingFailure> {
+    let read_the_ring_and_the_newest_roots_table = || {
+        let roots_with_ring_slots = read_the_ring()?;
         let newest = newest_root_among(&roots_with_ring_slots);
         let newest_roots_table = newest
             .and_then(|newest| instance_table_chain_of_root(reader, &newest).ok())
             .map(|chain| chain.records);
-        (roots_with_ring_slots, newest, newest_roots_table)
+        Ok((roots_with_ring_slots, newest, newest_roots_table))
     };
     let floor_under = |roots_with_ring_slots: &[(RootRingSlot, RootRecord)],
                        table: &InstanceTableRecords| {
-        effective_rollback_floor_of_the_roots_read(
-            reader,
-            region_devices,
-            immutable_sizes,
-            filesystem_identifier,
-            roots_with_ring_slots,
-            Some(table),
+        EffectiveFloorAfterAtMostOneReread::UnderTheNewestRootsTable(
+            effective_rollback_floor_of_the_roots_read(
+                reader,
+                region_devices,
+                immutable_sizes,
+                filesystem_identifier,
+                roots_with_ring_slots,
+                Some(table),
+            ),
         )
     };
-    if let (roots_with_ring_slots, _, Some(table)) = read_the_ring_and_the_newest_roots_table() {
+    if let (roots_with_ring_slots, _, Some(table)) = read_the_ring_and_the_newest_roots_table()? {
         return Ok(floor_under(&roots_with_ring_slots, &table));
     }
-    match read_the_ring_and_the_newest_roots_table() {
-        (roots_with_ring_slots, _, Some(table)) => Ok(floor_under(&roots_with_ring_slots, &table)),
-        (_, newest_on_the_reread, None) => Err(
-            RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
+    Ok(match read_the_ring_and_the_newest_roots_table()? {
+        (roots_with_ring_slots, _, Some(table)) => floor_under(&roots_with_ring_slots, &table),
+        (roots_with_ring_slots_on_the_reread, newest_on_the_reread, None) => {
+            EffectiveFloorAfterAtMostOneReread::NewestRootsTableStillUnreadable {
+                roots_with_ring_slots_on_the_reread,
                 newest_root_on_the_reread: newest_on_the_reread
                     .map(|root| (root.instance, root.checkpoint_txg)),
-            },
-        ),
-    }
+            }
+        }
+    })
 }
 
 /// 读出来的根里 (checkpoint_txg, 实例代号) 最大的那一条（与 [`choose_root`] 同一个择法）；一条都没有时 `None`。
@@ -2769,7 +3023,7 @@ pub fn replay_journal(
     // 取那次发布 jsn 最小那条时，一次发布切成多条记录的那一版上链首落在那次发布自己的第二条（它不在水位之上），
     // 水位之上的第一条对不上号、一条都不施加（三方第一轮 K3：零故障少施加）。
     // 带标志的那条读不出（两份都撕了）时不知道它的 jsn，链首只能是水位之上第一条可读记录，前提是它的 checkpoint_txg = 根的 txg + 1、
-    // 本次发布内序号为 1（已定项 14 注 1 / 已定项 4）。txg 更大 ⇒ 中间少了一次发布，断号即止（里程碑「第二个事务」步 3
+    // 本次发布内序号为 1（已定项 14 注 1 / 已定项 4）。txg 更大 ⇒ 中间少了一次发布，断号即止（里程碑「覆盖写、释放、回退与复用」步 3
     // 三方第一轮攻方腿打中：无锚点时无条件接上会跳过撕掉的一条）；序号不是 1 ⇒ 下一次发布的开头缺了，同样断号即止——
     // 只看 txg 时，下一次发布的第一条也读不出、第二条读得出，链首就接在第二条上，缺了第一条的那次发布照样整体施加
     // （三方第一轮 K4-b：多接）。
@@ -3102,7 +3356,7 @@ pub(crate) fn extents_of_the_first_file(
 }
 
 /// 分配记录「每个落点每盘各一条」（两盘同槽、同一批字段）：同一块盘上一个槽只许一条记录，每块盘各自的（槽, 跨度, 代, 已释放）集合相同，
-/// 每盘不少于 10 个落点（mkfs 2 + 第一个事务 8）。同盘同槽两条记录（代不同）在集合里是两个元素、两盘对称就过——第二轮攻方腿打中，
+/// 每盘不少于 10 个落点（mkfs 2 + 新池新建文件 8）。同盘同槽两条记录（代不同）在集合里是两个元素、两盘对称就过——第二轮攻方腿打中，
 /// 走读自己不判 key 严格递增，这里逐盘核槽号不重复。
 #[must_use]
 pub fn allocation_records_are_one_per_device(
@@ -3139,12 +3393,12 @@ pub fn allocation_records_are_one_per_device(
     }
     let mut placement_sets = placements_per_device.values();
     let first_device_placements = placement_sets.next().expect("上面核过每块盘都有记录");
-    first_device_placements.len() >= FIRST_TRANSACTION_PLACEMENTS_PER_DEVICE
+    first_device_placements.len() >= NEW_POOL_FILE_CREATION_PLACEMENTS_PER_DEVICE
         && placement_sets.all(|placements| placements == first_device_placements)
 }
 
-/// mkfs 写在单元区里的 2 个落点加第一个事务的 8 个落点（字节表五：20 条记录，每盘 10 条），之后每次发布只多不少。
-const FIRST_TRANSACTION_PLACEMENTS_PER_DEVICE: usize = 10;
+/// mkfs 写在单元区里的 2 个落点加新池新建文件的 8 个落点（字节表五：20 条记录，每盘 10 条），之后每次发布只多不少。
+const NEW_POOL_FILE_CREATION_PLACEMENTS_PER_DEVICE: usize = 10;
 
 /// 冷走读里的中央映射树（自举豁免，只按父指针里的位置条目读）：到第一次有树根的提示读不出、要经映射回退时，
 /// 或走到 `TreeRoots` 那一步时才读，读过一次就留着。不提前读：提示都读得出的镜像上，走读的读序与判红次序照旧。
@@ -3227,7 +3481,7 @@ fn tree_identifier_of_the_entry_is_below_the_watermark(
     Ok(())
 }
 
-/// 每个落点每盘一条（两盘同槽）：第一个事务 10 × 盘数，每次覆盖写再加 8 × 盘数（换下的那些改写、不删）。
+/// 每个落点每盘一条（两盘同槽）：新池新建文件 10 × 盘数，每次覆盖写再加 8 × 盘数（换下的那些改写、不删）。
 /// 只核总数是盘数的整数倍拦不住「一盘多一条、另一盘少一条」——发布 B 三方第一轮正推腿打中，改成逐盘核同一批（槽, 跨度）
 /// （[`allocation_records_are_one_per_device`]）。
 fn allocation_records_are_one_placement_per_device_on_every_device(
@@ -3984,7 +4238,9 @@ pub fn recover(reader: &dyn PoolReader, policy: JournalPolicy) -> RecoveryReport
 
 #[cfg(test)]
 mod allocation_records_per_device_tests {
-    use super::{allocation_records_are_one_per_device, FIRST_TRANSACTION_PLACEMENTS_PER_DEVICE};
+    use super::{
+        allocation_records_are_one_per_device, NEW_POOL_FILE_CREATION_PLACEMENTS_PER_DEVICE,
+    };
     use crate::address::{CheckpointTxg, DeviceIdentity, SlotNumber};
     use crate::allocator::AllocationRecord;
 
@@ -4000,10 +4256,10 @@ mod allocation_records_per_device_tests {
         }
     }
 
-    /// 第一个事务的形状：每盘 10 个落点、同一批槽号；已释放的记录照样算一个落点。
-    fn first_transaction_shape() -> Vec<AllocationRecord> {
+    /// 新池新建文件的形状：每盘 10 个落点、同一批槽号；已释放的记录照样算一个落点。
+    fn new_pool_file_creation_shape() -> Vec<AllocationRecord> {
         let mut records = Vec::new();
-        for placement_index in 0..FIRST_TRANSACTION_PLACEMENTS_PER_DEVICE {
+        for placement_index in 0..NEW_POOL_FILE_CREATION_PLACEMENTS_PER_DEVICE {
             let slot = 50176 + 2 * u64::try_from(placement_index).expect("落点序号");
             for device in BOTH_DEVICES {
                 records.push(record(device, slot, placement_index == 0));
@@ -4013,9 +4269,9 @@ mod allocation_records_per_device_tests {
     }
 
     #[test]
-    fn first_transaction_shape_is_one_record_per_placement_per_device() {
+    fn new_pool_file_creation_shape_is_one_record_per_placement_per_device() {
         assert!(allocation_records_are_one_per_device(
-            &first_transaction_shape(),
+            &new_pool_file_creation_shape(),
             &BOTH_DEVICES
         ));
     }
@@ -4023,14 +4279,17 @@ mod allocation_records_per_device_tests {
     #[test]
     fn placement_recorded_on_one_device_only_is_rejected_even_when_the_total_is_even() {
         // 盘 0 多一条、盘 1 少一条：总数仍是 20，旧的「总数是盘数的整数倍」判定放过它。
-        let mut records = first_transaction_shape();
+        let mut records = new_pool_file_creation_shape();
         let moved = records
             .iter()
             .position(|record| record.device == DeviceIdentity(1))
             .expect("有盘 1 的记录");
         records[moved].device = DeviceIdentity(0);
         records[moved].slot = SlotNumber(50300);
-        assert_eq!(records.len(), 2 * FIRST_TRANSACTION_PLACEMENTS_PER_DEVICE);
+        assert_eq!(
+            records.len(),
+            2 * NEW_POOL_FILE_CREATION_PLACEMENTS_PER_DEVICE
+        );
         assert!(!allocation_records_are_one_per_device(
             &records,
             &BOTH_DEVICES
@@ -4039,13 +4298,13 @@ mod allocation_records_per_device_tests {
 
     #[test]
     fn unknown_device_or_missing_device_is_rejected() {
-        let mut records = first_transaction_shape();
+        let mut records = new_pool_file_creation_shape();
         records.push(record(DeviceIdentity(2), 50176, false));
         assert!(!allocation_records_are_one_per_device(
             &records,
             &BOTH_DEVICES
         ));
-        let only_device_zero: Vec<AllocationRecord> = first_transaction_shape()
+        let only_device_zero: Vec<AllocationRecord> = new_pool_file_creation_shape()
             .into_iter()
             .filter(|record| record.device == DeviceIdentity(0))
             .collect();
@@ -4058,7 +4317,7 @@ mod allocation_records_per_device_tests {
     /// 两盘同一个落点、一盘改写成已释放而另一盘没有：槽号集合相同，字段不同，同样拒。
     #[test]
     fn release_rewritten_on_one_device_only_is_rejected() {
-        let mut records = first_transaction_shape();
+        let mut records = new_pool_file_creation_shape();
         let released_on_device_one = records
             .iter()
             .position(|record| record.device == DeviceIdentity(1) && record.is_released)
@@ -4073,7 +4332,7 @@ mod allocation_records_per_device_tests {
     /// 同一块盘上同一个槽两条记录（代不同、两盘对称）：槽号集合相同、字段集合也相同，靠「同盘槽号唯一」拦。
     #[test]
     fn two_records_for_the_same_slot_on_the_same_device_are_rejected() {
-        let mut records = first_transaction_shape();
+        let mut records = new_pool_file_creation_shape();
         for device in BOTH_DEVICES {
             let mut second_record_for_first_slot = record(device, 50176, false);
             second_record_for_first_slot.generation = CheckpointTxg(9);
@@ -4086,8 +4345,8 @@ mod allocation_records_per_device_tests {
     }
 
     #[test]
-    fn fewer_than_the_first_transaction_placements_is_rejected() {
-        let records: Vec<AllocationRecord> = first_transaction_shape()
+    fn fewer_than_the_new_pool_file_creation_placements_is_rejected() {
+        let records: Vec<AllocationRecord> = new_pool_file_creation_shape()
             .into_iter()
             .filter(|record| record.slot != SlotNumber(50176))
             .collect();

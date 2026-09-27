@@ -5045,12 +5045,12 @@ const SLOT_BYTES_LOCAL: u64 = 16384;
 /// 开跑时回比）；实七报告「交主 agent 的」第 1 条点名的两段历史都从它数（`research/prompts/m2-impl7-implementer-report.md`）。
 const SEED_BASE_OF_THIS_TEST_CYCLE_LOCAL: u64 = 7_463_871_032_432_355_113;
 /// 故障注入大档那一段：种子基 + 110、每段 30 步、注入 6 次（大档默认规模，
-/// `crates/singlefs-harness/tests/second_transaction_supplement_three_fault_injection.rs` 大档用例的缺省值）。
+/// `crates/singlefs-harness/tests/fault_injection_fast_tier.rs` 大档用例的缺省值）。
 const SEVENTH_BATCH_FAULT_REPRODUCTION_SEED_OFFSET: u64 = 110;
 const SEVENTH_BATCH_FAULT_REPRODUCTION_OPERATIONS: usize = 30;
 const SEVENTH_BATCH_FAULT_REPRODUCTION_FAULTS: usize = 6;
 /// 崩溃注入快档那一段：种子基 + 16、每段 24 步、每段抽 4 个崩溃状态（快档规模，
-/// `crates/singlefs-checker-tier/tests/second_transaction_supplement_three_crash_injection.rs` 的 `FAST_TIER_*`）。
+/// `crates/singlefs-checker-tier/tests/crash_injection_campaign.rs` 的 `FAST_TIER_*`）。
 const SEVENTH_BATCH_CRASH_REPRODUCTION_SEED_OFFSET: u64 = 16;
 const SEVENTH_BATCH_CRASH_REPRODUCTION_OPERATIONS: usize = 24;
 const SEVENTH_BATCH_CRASH_REPRODUCTION_CRASH_POINTS: usize = 4;
@@ -17483,7 +17483,7 @@ mod fourth_run_segment_two {
     /// 产物里这一段各族的几何名：几何是被复现的那段历史的一部分（登记 5.3：快档的 4 GiB 盘与 harness 的几何），S6 对这几族不适用。
     const HARNESS_GEOMETRY_NAME: &str = "harness-4gib";
 
-    /// 随机历史快档的段数与每段步数（登记 5.6：抄自 `crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs`
+    /// 随机历史快档的段数与每段步数（登记 5.6：抄自 `crates/singlefs-harness/tests/random_histories.rs`
     /// 第 43、44 行 `FAST_TIER_SEEDS`、`FAST_TIER_OPERATIONS_PER_HISTORY`；私有常量引不到，开跑时按那份源码的文本回比，现查的值记在第十二节）。
     const FAST_TIER_SEEDS_LOCAL: u64 = 96;
     const FAST_TIER_OPERATIONS_PER_HISTORY_LOCAL: usize = 30;
@@ -17500,7 +17500,7 @@ mod fourth_run_segment_two {
     const RANDOM_HISTORY_SEGMENTS_REGISTERED: usize = 30;
 
     /// 实八：崩溃注入种子基 + 2、24 步、4 个崩溃状态（r3 登记第 373–391 行那张表「实八」一行；
-    /// 步数与抽法同崩溃注入快档 `crates/singlefs-checker-tier/tests/second_transaction_supplement_three_crash_injection.rs` 第 39、41 行）。
+    /// 步数与抽法同崩溃注入快档 `crates/singlefs-checker-tier/tests/crash_injection_campaign.rs` 第 39、41 行）。
     const EIGHTH_BATCH_CRASH_REPRODUCTION_SEED_OFFSET: u64 = 2;
     const EIGHTH_BATCH_CRASH_REPRODUCTION_OPERATIONS: usize = 24;
     const EIGHTH_BATCH_CRASH_REPRODUCTION_CRASH_POINTS: usize = 4;
@@ -17741,10 +17741,9 @@ mod fourth_run_segment_two {
     /// 调查员报告里种子那一行与最短复现那几行（登记 5.6：第 61 行、第 298–301 行）。
     const INVESTIGATOR_REPORT_SEED_LINE: usize = 61;
     const INVESTIGATOR_REPORT_SHORTEST_FIRST_LINE: usize = 298;
-    const RANDOM_HISTORY_TEST_SOURCE: &str =
-        "crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs";
+    const RANDOM_HISTORY_TEST_SOURCE: &str = "crates/singlefs-harness/tests/random_histories.rs";
     const CRASH_INJECTION_TEST_SOURCE: &str =
-        "crates/singlefs-checker-tier/tests/second_transaction_supplement_three_crash_injection.rs";
+        "crates/singlefs-checker-tier/tests/crash_injection_campaign.rs";
 
     fn investigator_report_text() -> Result<String, String> {
         let path = env::var(INVESTIGATOR_REPORT_ENVIRONMENT_VARIABLE)

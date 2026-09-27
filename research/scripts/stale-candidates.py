@@ -19,7 +19,7 @@
 
 事实表（制表符分隔，首行是表头）：
     编号	旧事实	新事实	检索词	出处
-    F1	层 0 的负载只有第一个事务	层 0 两条流：……	层 0|崩溃点重放|录制流	H3;H17;提交 cae5092
+    F1	层 0 的负载只有新池新建文件	层 0 两条流：……	层 0|崩溃点重放|录制流	H3;H17;提交 cae5092
   检索词是 Python 正则，写这件事实涉及的概念名词（「层 0」「录制流」「多次挂载」），新旧两种说法都会提到的那种；
   不写状态词，不照抄新说法的原句（「按整条流切段」只搜得到改好了的句子）；宁宽勿窄。
   几个词要同时出现就用 && 连（「E142&&改动计数」）；一行事实的检索词在结束那一版命中不许超过 500 行（MAXIMUM_CANDIDATE_LINES_PER_FACT），超了就是太宽，用 && 收窄。
@@ -517,7 +517,7 @@ def selftest():
         git('init', '-q')
         git('config', 'user.email', 'selftest@example.invalid')
         git('config', 'user.name', 'selftest')
-        write('CLAUDE.md', '# 项目\n\n层 0 的负载还只有第一个事务。\n')
+        write('CLAUDE.md', '# 项目\n\n层 0 的负载还只有新池新建文件。\n')
         write('.claude/kb/checks-owed.md', '| C1（某检查） | 前置：层 0 只有一次挂载 |\n\n## 历史版本\n\n'
               '### 2026-09-01：旧条目\n\n层 0 只有一次挂载\n')
         write('.claude/kb/table-before-move.md', '# 字节表\n\n' + '字段一行。\n' * 20 + '\n## 历史版本\n\n### 2026-08-30：搬家之前就有的条目\n')
@@ -538,19 +538,19 @@ def selftest():
         if [heading for _, _, heading in entries] != ['### 2026-09-02：层 0 扩成两条流']:
             failures.append(f'新增变更记录没认对（改名的文件要按旧路径比）：{entries}')
         segments = changed_segments(read_version(directory, 'HEAD~1', 'CLAUDE.md'), read_version(directory, 'HEAD', 'CLAUDE.md'))
-        if not any('只有第一个事务' in old for old, _ in segments):
-            failures.append('差异片段里没有被改掉的「只有第一个事务」')
+        if not any('只有新池新建文件' in old for old, _ in segments):
+            failures.append('差异片段里没有被改掉的「只有新池新建文件」')
         header = '\t'.join(FACT_TABLE_COLUMNS) + '\n'
-        good_row = 'F1\t层 0 只有第一个事务\t层 0 两条流\t层 0\tH1\n'
+        good_row = 'F1\t层 0 只有新池新建文件\t层 0 两条流\t层 0\tH1\n'
         red_tables = {
-            'facts-uncovered.tsv': (header + 'F1\t层 0 只有第一个事务\t层 0 两条流\t层 0\t提交 abc\n', '漏了 H1'),
-            'facts-empty.tsv': (header + 'F1\t层 0 只有第一个事务\t层 0 两条流\t不存在的词\tH1\n', '检索词零命中'),
-            'facts-new-wording.tsv': (header + 'F1\t层 0 只有第一个事务\t层 0 两条流\t两条流\tH1\n', '检索词照抄新说法（基准零命中）'),
-            'facts-gone.tsv': (header + 'F1\t层 0 只有第一个事务\t层 0 两条流\t负载还只有\tH1\n', '检索词照抄被改掉的旧句（结束零命中）'),
+            'facts-uncovered.tsv': (header + 'F1\t层 0 只有新池新建文件\t层 0 两条流\t层 0\t提交 abc\n', '漏了 H1'),
+            'facts-empty.tsv': (header + 'F1\t层 0 只有新池新建文件\t层 0 两条流\t不存在的词\tH1\n', '检索词零命中'),
+            'facts-new-wording.tsv': (header + 'F1\t层 0 只有新池新建文件\t层 0 两条流\t两条流\tH1\n', '检索词照抄新说法（基准零命中）'),
+            'facts-gone.tsv': (header + 'F1\t层 0 只有新池新建文件\t层 0 两条流\t负载还只有\tH1\n', '检索词照抄被改掉的旧句（结束零命中）'),
             'facts-fake-new.tsv': (header + good_row + 'F2\t新立：层 0\t层 0 两条流\t层 0\tH1\n', '冒充新立（基准有命中）'),
             'facts-fake-new-words.tsv': (header + good_row + 'F2\t新立：两条流\t层 0 两条流落地\t两条流\tH1\n', '冒充新立（新事实写着落地）'),
             'facts-fake-rewording.tsv': (header + good_row + 'F2\t只改措辞\t只改措辞\t层 0\tH1\n', '冒充只改措辞（变更标题看不出改措辞）'),
-            'facts-needless-and.tsv': (header + 'F1\t层 0 只有第一个事务\t层 0 两条流\t层 0&&一次挂载\tH1\n', '第一个词不宽却用了 &&'),
+            'facts-needless-and.tsv': (header + 'F1\t层 0 只有新池新建文件\t层 0 两条流\t层 0&&一次挂载\tH1\n', '第一个词不宽却用了 &&'),
         }
         write('facts-good.tsv', header + good_row)
         if quietly(check_facts, directory, 'HEAD~1', 'HEAD', os.path.join(directory, 'facts-good.tsv')) != 0:
@@ -568,12 +568,12 @@ def selftest():
         globals()['WIDE_TERM_SPOT_CHECK_LINES'] = 0
         if quietly(check_facts, directory, 'HEAD~1', 'HEAD', os.path.join(directory, 'facts-good.tsv')) != 6:
             failures.append('命中超过抽查门槛、出处列没写「宽词已抽查」的事实表没被判红')
-        write('facts-wide-checked.tsv', header + 'F1\t层 0 只有第一个事务\t层 0 两条流\t层 0\tH1；宽词已抽查：抽 10 行、相干 9 行\n')
+        write('facts-wide-checked.tsv', header + 'F1\t层 0 只有新池新建文件\t层 0 两条流\t层 0\tH1；宽词已抽查：抽 10 行、相干 9 行\n')
         if quietly(check_facts, directory, 'HEAD~1', 'HEAD', os.path.join(directory, 'facts-wide-checked.tsv')) != 0:
             failures.append('写了「宽词已抽查」的宽检索词被判红')
         globals()['WIDE_TERM_SPOT_CHECK_LINES'] = saved_wide
         write('facts-build.tsv', header + good_row + 'F2\t只改措辞\t只改措辞\t层 0\tH1\n'
-              'F3\t层 0 只有第一个事务\t层 0 两条流\t一次挂载\tH1\n')
+              'F3\t层 0 只有新池新建文件\t层 0 两条流\t一次挂载\tH1\n')
         candidates = build_candidates(directory, 'HEAD', read_fact_table(os.path.join(directory, 'facts-build.tsv')))
         table_path = os.path.join(directory, 'candidates.tsv')
         with open(table_path, 'w', encoding='utf-8') as handle:

@@ -332,7 +332,7 @@ fn reuse_is_not_proven_illegal_by_the_reclaim_predicate(
     release_generation_at_least <= reclaim_threshold_at_most.0
 }
 
-/// 层 0 的一个崩溃状态按发布归到哪一格（里程碑「第二个事务」步 6 验收第 1 条「每次发布各多少」）。
+/// 层 0 的一个崩溃状态按发布归到哪一格（里程碑「覆盖写、释放、回退与复用」步 6 验收第 1 条「每次发布各多少」）。
 /// 归法按段：状态所在的那一段往后数，第一次根槽 FUA 写所在的那一段写出的根，就是这个状态归的那次发布——
 /// 上一次发布的根槽写之后、这一次发布的根槽写为止，崩在中间的状态都归这一次。上一次发布的系统配置槽轮换与这一次的单元写
 /// 之间没有屏障、并在同一段时，那一段整段归这一次：段是枚举的最小单位，一个状态落在哪一段是确定的，落在哪一次写上不是。
@@ -767,7 +767,7 @@ pub struct Layer0Tally {
     pub checker_violated_states: BTreeMap<&'static str, u64>,
     pub checker_first_violation: BTreeMap<&'static str, String>,
     /// checker 报「不适用」（这条不变量判的代码在这个状态上没跑到）的状态数：与评估过的状态数分开报，阴性结果不与「没跑到」混在一起
-    /// （里程碑「第二个事务」步 6 验收第 3 条）；每条不变量的评估过 + 不适用 = `states`。
+    /// （里程碑「覆盖写、释放、回退与复用」步 6 验收第 3 条）；每条不变量的评估过 + 不适用 = `states`。
     pub checker_not_applicable_states: BTreeMap<&'static str, u64>,
     /// 观察者看过的状态数（没有观察者时是 0）：续跑接上的片不再给观察者看，靠进度文件里记的这个数与 `observer_counts` 接上累计；
     /// 有观察者时整条流跑完它必须等于 `states`（层 0 规模第三轮判决 U3）。
@@ -926,7 +926,7 @@ impl Layer0Tally {
 }
 
 /// oracle（E77（发布的持久顺序） 判据 1）：读回的内容要对；根槽已持久就不许恢复到旧态；走读不许失败。
-/// 单版本形态：整条流只有一次带文件的发布（第一个事务）。
+/// 单版本形态：整条流只有一次带文件的发布（新池新建文件）。
 #[must_use]
 pub fn oracle_violation(
     outcome: &RecoveryOutcome,
