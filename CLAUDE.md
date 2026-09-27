@@ -38,12 +38,13 @@ subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案
 @.claude/singlefs-ai-sop/rules/pushback-discipline.md
 @.claude/singlefs-ai-sop/rules/command-safety.md
 @.claude/singlefs-ai-sop/rules/session-wrapup.md
+@.claude/singlefs-ai-sop/rules/preflight-discipline.md
 
 ## 规范从哪来
 
 | 项 | 值 |
 |---|---|
-| 上游仓 | `singlefs-ai-sop`，本机在兄弟目录 `../singlefs-ai-sop-zh`。同一份规范有多语言版本，**对外以 `-en` 为准**；本项目只接其中一份，不需要知道别的 |
+| 上游仓 | `singlefs-ai-sop`，在本机兄弟目录 `../singlefs-ai-sop-zh`。同一份规范有多语言版本，**对外以 `-en` 为准**；本项目只接其中一份，不需要知道别的 |
 | 项目里的副本 | `.claude/singlefs-ai-sop/`（[README](.claude/singlefs-ai-sop/README.md)），是**拷贝，不是符号链接**；与上游同步靠重新拷贝一份：`rsync -a --exclude '.git' ../singlefs-ai-sop-zh/ .claude/singlefs-ai-sop/`，拷完 `diff -rq --exclude=.git ../singlefs-ai-sop-zh .claude/singlefs-ai-sop` 确认一致再刷版本戳（`cp -r` 会把上游的 `.git` 一起拷进副本，第二次同步时那些只读 object 报一屏 Permission denied） |
 | 版本戳 | `.singlefs-ai-sop-version`。门禁第一阶段拿它跟副本的 `VERSION` 比，对不上就红——那是在提醒「规矩变过了，先读再跑」 |
 | 怎么改 | 共享规则只能在**上游**改。从本仓的会话改上游**只往文件里填内容**（规则正文、脚本逻辑、三语译文那几行）：不跑 `bump.sh`、不动 `VERSION`、不改 MANIFEST / SOURCE-MANIFEST 与译文首行的溯源哈希、不写带版本号的 CHANGELOG 条目、不提交，这些归做发版的会话；填之前先看上游三语仓 `git status`，有人在发版就等它提交完，填完告诉发版会话填了哪些文件哪几段。发版之后同步副本、跑 `bash .claude/singlefs-ai-sop/install.sh` 刷版本戳。**不许在 `.claude/singlefs-ai-sop/` 里就地改**——下次同步就没了，而且改它们等于改所有项目。上游的改动应当罕见：经常变说明规范本身没设计好；**作业在本仓，不在上游仓** |
@@ -105,4 +106,4 @@ subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案
 
 - 先定决策，再写代码——未定项还开着就写下去的实现多半要返工。
 - 从事务开始，不从功能开始；第一个可运行目标是「正确提交一个事务」（`.claude/rules/fs-design.md`「从事务开始，不从功能开始」）。
-- 门禁全绿**只构成第一个事务与里程碑「第二个事务」步 0 那条固定脚本（覆盖写、释放、重开写行、暖机、回退、抬 F、复用都至少走一次，次数见 `.claude/kb/milestone/02-second-txn.md` 步 0 现状）在模型层的崩溃一致性证据**——层 0 崩溃点重放（门禁 54 号）的负载是两条流：第一个事务，以及固定脚本到 E；checker 判 46 条不变量（数它的命令：`grep -c '^| I-.*已实现' .claude/kb/invariants.md`；逐条名单以 `.claude/kb/invariants.md` 开头那段条数说明为准，每条按哪个根集合判写在那一条自己的陈述里；候选集的下界取最新根自己带的 F 而不是 F_生效，一块盘的载体根坏掉之后会漏判，见里程碑步 6 现状）。
+- 门禁全绿**只构成第一个事务在模型层的崩溃一致性证据**；里程碑「第二个事务」步 0 那条固定脚本（覆盖写、释放、重开写行、暖机、回退、抬 F、复用各一次）在管理员回退改成挂着时的向前发布之后，层 0 用例只改到编得过、下游钉的值没有重核，重写与重跑归层 0 规模那一轮与实六，这之前它的层 0 结果不作数（`records/2026-09-24-里程碑二收尾调度.md` 第三节「实三交回」那一行）——层 0 崩溃点重放（门禁 54 号）的负载是两条流：第一个事务，以及固定脚本到 E；checker 判 46 条不变量（数它的命令：`grep -c '^| I-.*已实现' .claude/kb/invariants.md`；第一版 23 条加 I-3.8（实例表行唯一且低于挂载根）、I-7.4（近 K 代块未被复用）、I-4.8（近 K 代根校验和自洽）、I-3.9（释放代落在停止引用它的那一格区间里）、I-9.14（树表条目的诞生 txg 跨根不变）、I-5.4（分配记录罩住的槽互不相交）、I-1.8（归并后版本全序）、I-7.3（环健康性） 与 I-8.6（反向链算法） 与 I-8.7（实例内事务号不重号）、I-8.8（前缀里的事务不被切开）、I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号）、I-7.9（回退下界 F 不高于抬 F 的上限）、I-9.15（inode 记录的 blocks 等于 ⌈size ÷ 512⌉）、I-3.11（已分配减 defer 等于最新根走读）、I-8.9（一次发布的记录序号连续且只有末条带标志） 、I-7.12（系统配置 F 不低于同盘根上的 F） 与 I-1.11（映射 key 与单元头相符）；I-3.1（已分配统计对得上）、I-2.1（校验和与内容匹配） 与后加的六条里除 I-3.8（实例表行唯一且低于挂载根） 之外的五条按回退候选集判，候选集的下界取 F_生效（各幸存盘最新持久有效根带的 F 与系统配置里的 F 取大）；I-3.1（已分配统计对得上） 在最新根带的 F 低于 F_生效 时报不适用）。
