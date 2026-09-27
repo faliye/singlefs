@@ -1,76 +1,60 @@
 #!/usr/bin/env bash
-# PreToolUse hook（Agent）：派 experiment-runner 时，派发提示必须说清这一段为哪几行岔路而跑。另两条：派发提示要子 agent 跑重型测试的拒绝；
-# 派 kb-scribe、implementation-writer 时，它要改的文件在一轮还没判完的三方开工快照里的拒绝。
+# PreToolUse hook（Agent）：派发那一刻查派发提示齐不齐、写得对不对，缺一样当场拒（退出 2，stderr 写原因与出路）。
+# hook-events: PreToolUse:Agent PreToolUse:Task
+# admission: always Claude Code 在主 agent 每次派发之前调它，判的是这一次的派发提示与此刻会话里在跑的子 agent
+# run-condition: command python3
 #
-# 为什么：2026-09-17 两个计数实验派了十一次执行员，每次交回主 agent 只问「还缺什么」就接着派；
-# 岔路 1、3、4、7 能判的数在开跑四个多小时时已经齐了，之后两个多小时的数不改变任何选择
-# （records/2026-09-17-已分配口径三方与两个实验.md 第六节）。规则写在 .claude/rules/three-way-inference.md
-# 「交岔路时写岔路单，派实验时带上它」；这道闸让「续派之前先对着岔路单判够不够」跳不过去。
-#
-# 判法：不是派 experiment-runner 的放行；派发提示写着「只修锚点」的放行（那种活没有登记与岔路）。
-#   ① 派发提示里没有「这一段回答的岔路：<非空>」一行，拒绝；
-#   ② 登记对应的实验已经有实验页（.claude/kb/experiments/<号>-*.md，第一段交回才会有）算续做：
-#      没有「上一段岔路表里还差：<非空>」一行、或写的是「无 / 没有」，拒绝——一行都不差就该交岔路表，不续派。
-# 实验号从派发提示里的 research/prompts/e<号>-preregistration.md 或 e<号>-r<n>-prereg.md 取。
-#
-# 另一条，管派任何 agent：派发提示里有一句要它跑重型测试的，拒绝。用户 2026-09-24 定「subagent任务派发的门禁里面写上 禁止跑0层测试等这种重测试
-# 就跑自己相关的测试就好了」「项目内 全量崩溃 qemu herd7 等重型的测试任务 禁止平时调用 仅仅在每次代码提交时候跑 或者要求时候再跑」，
-# 更正「崩溃验证员和门禁分诊员 跑各自的部分就好了」；执行时的闸是 heavy-test-guard.sh，这一条让派发那一刻就说不出口。
-#   只在「动词的宾语就是重型阶段」时才算要它跑。判法逐行、逐句、逐分句，全是字面规则，不用模型（每条规则的词表是下面同名的常量）：
-#   ① 引用不判：一行里被「」『』“”‘’或 ASCII 双引号括起来的片段先换成 □；反引号里的代码不看引号（那里的引号是命令的一部分），
-#      一行里没闭合的开引号不算，原样留着判。
-#   ② 按。！？；!?; 切句；句子里出现转述的开头（REPORTED_SPEECH_OPENER：「……说，」「……说：」「报告里写 / 报告说」「报告：」「报告……」「原句」「原话」「转述」），
-#      从那里到句末不判。
-#   ③ 切分句：全角括号里的每一段单独成一个分句，括号外的前后两半拼回去；都再按，与「, 」切。
-#   ④ 分句里有否定词（NEGATION：不、别、禁止、严禁、没法、没有办法、无法、不能、不许、勿，「没 / 没有」只在紧挨动词时算；「不变量」「不同」「别人」「判别」
-#      这类复合词、「别忘了」「不要漏」与「有没有」「是不是」这类正反问不算），或分句开头是别人（THIRD_PARTY_SUBJECT_AT_CLAUSE_START：主 agent、别的会话、用户、另外两个验证员）
-#      而分句里没有「你」，整个分句不判。
-#   ⑤ 动词（RUN_VERB）：跑、复跑、重跑、执行、运行、bash、起。「跑前」「实验复跑」「可复跑命令」「执行员」「运行时」「一起」「起来」「从……起」不算；
-#      动词后面紧跟「的」是定语（「只在提交时才执行的重型阶段」「跑出的标记」），前面紧挨「正在 / 在 / 在后台」是在说正在发生的事，都不算。
-#   ⑥ 宾语在动词后面：到下一个动词为止，重型阶段的名字前面至多 OBJECT_LEAD_LIMIT 个非 ASCII 字、没有 OBJECT_LEAD_BREAK（看、确认、证明、时、前、后、再……），
-#      不是 > / >> 的重定向目标；名字后面紧跟 EXCLUDED_AFTER_NAME（之外、时、里、「的」加判定段这类别的东西）的，宾语是别的东西，不算。
-#   ⑦ 宾语在动词前面（跑、复跑、重跑、执行、运行；「QEMU 跑一遍」「`check.sh` 交回前跑一次」「把 54 号跑一遍」）：两者之间至多 TOPIC_GAP_LIMIT 个字、
-#      没有 TOPIC_GAP_BREAK（只在、才、由、归、是、被、把、改、看……）；名字前面紧挨「被」（施事）或「照 / 按 / 依」（介词宾语）、动词后面紧跟代词宾语（「跑它」）的不算。
-#   ⑧ `cargo test --all` / `--workspace` 这种命令字面本身就是要跑，不要动词。
-#   重型阶段的名字：层 0（层 0 / 0 层 / layer0 / 54 号）、QEMU（qemu / vm-bench / 55 号）、herd7（herd7 / lkmm / 57 号）、crates 变异整表
-#   （crates/mutations.tsv / 变异整表 / 59 号）、全量测试（check.sh / 全量测试）、整轮门禁（gate.sh / gate-staged.sh / 整轮门禁）、全部实验复跑（87 号）、E152 装置。
-#   `.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，提示里要它跑不拦。
-#   crash-verifier 放行 QEMU、herd7、crates 变异整表那几句（层 0 不归它：快档在整轮门禁里，全量由主 agent 跑），gate-triage 放行整轮门禁与全部实验复跑那几句（它们各自那一份，执行时还要带
-#   SINGLEFS_HEAVY_TESTS=commit / user-request，由 heavy-test-guard.sh 判）；其余一律拒。
-#   会误拒：名字在前、动词在后、中间没有 TOPIC_GAP_BREAK 的说明句（「54 号在提交时跑全量」「54 号跑全量要四十分钟」），改写成「只在……才跑」或用「」括起来；
-#   否定词在括号外、重型阶段的名字在括号里的（「不跑重型测试（check.sh、`cargo test --workspace`）」）：按 ③ 括号里单独成分句，否定词不在那个分句里，照拒；
-#   要放行就把否定词与名字写进同一个分句（「不跑 check.sh、`cargo test --workspace`」），或只指清单出处、不列名字。
-#   会漏：同一分句里另有否定词的指令（「不改代码直接跑 54 号」）、宾语是代词的（「跑它」）、名字离动词太远的、没有动词的清单行（「验证负载：……层 0 各流快档」）；
-#   这些执行时 heavy-test-guard.sh 照拒。
-#
-# 第三条，管派 kb-scribe 与 implementation-writer：它要改的文件落在一轮还没判完的三方开工快照里，拒绝。规矩是 .claude/rules/implementation-workflow.md
-# 「代码轮派腿之前记一份开工快照」：腿跑着的时候主 agent 不改这些文件，要改的等判决时一起改。为什么：2026-09-25 m2-safety-r1 的腿还在跑时派了书记员，
-# 规格改的两份 kb 都在那一轮的快照里，这条之前只靠主 agent 记得（records/2026-09-16-subagent拆分提案.md 第四十节第 27 行）。
-#   ① 开着的轮：research/prompts/<轮>-snapshot/ 在、research/prompts/_<轮>-body.md 在、research/prompts/<轮>-main-verification.md 不在；
-#      有快照、没有正文的（普查一类，不是三方轮）不算。
-#   ② 快照清单：快照目录里文件名含 sha256 的每一份，按「<哈希>  <路径>」逐行读（哈希是 64 位十六进制，路径前的 * 去掉）；路径从第一段 .claude/ 或 crates/ 起取，
-#      ./.claude/…、tree/crates/…、defs/.claude/… 都归一成仓库根相对路径。不是这个形状的行、路径里没有 .claude/ 或 crates/ 的行跳过，不判红。
-#   ③ 要改的文件：派发提示原文，加上提示里点名的 /tmp/claude-<uid>/ 下的规格文件（是文件就读进来；不在的、是目录的跳过）。快照清单里的哪条路径在这些文字里
-#      出现（前后不连着别的路径字符；项目根起的绝对路径与 ./ 前缀先去掉），就算要改它。
-#   ④ 有交集就拒绝（退出码 2，stderr 列出哪一轮、哪几个文件、各出现在提示还是哪份规格里）。放行口：派发提示里有一行以「快照冲突已判：<轮名> <理由>」开头，
-#      轮名就是撞上的那一轮、理由非空；撞了几轮就要几行。
-#   ⑤ 这一条自己出错（快照清单或规格读不了、别的异常）不拒绝：放行，错误写进 stderr。hook 的 JSON 解析不了同样放行、写 stderr。
-#   会误拒：只为读、不为改而点名的快照文件也算（实现员提示里「压着的条款」列的 kb 路径、「别的会话在改、你不碰」的 crates 路径），用放行行写明。
-#   会漏：只写目录或只写文件名、不写到仓库根相对路径的；规格放在 /tmp/claude-<uid>/ 之外的；规格文件里再指到的下一层文件。
+# 判法，按次序，第一条不成立就拒：
+#   ① 重型测试一行：派 crash-verifier、gate-triage 之外的任何类型，提示里要有一行「重型测试：不跑」（行首可带 - * > 与粗体）。
+#      提示正文里提到重型阶段的句子不再逐句判；执行时 heavy-test-guard.sh 与看门狗的进程一层照旧兜底。
+#   ② 不读共用约束的类型（general-purpose，或不给 subagent_type）：提示里要有「开工先读」与 `.claude/agent-common.md`。
+#   ③ 输入齐不齐：`.claude/agents/<类型>.md` 的 frontmatter 有 `required-inputs:` 的，逐组查——组之间逗号分隔，组内 `|` 分隔的同义词在提示里出现一个就算；
+#      定义不在、没写这一行的不查。
+#   ④ 写范围：类型在 `.claude/hooks/agent-write-scope.tsv` 里的，提示里「报告路径 / 报告写进 / 写进 / 写到 / 更新」后面紧跟的路径
+#      （/tmp/claude-<uid>/、research/、.claude/、crates/、litmus/、records/ 起头）逐个按它那几行模式判，不在里面就拒；前面六个字以内有否定词的不判。
+#   ⑤ 实现员：要有一行「要动的 crates 文件：…」，里面的 crates/ 路径不超过 IMPLEMENTATION_WRITER_FILE_LIMIT 个（8，推的；拆不开的交用户定，放行行「文件上限已判：<理由>」）；
+#      与本会话还在跑的实现员登记的文件有交集就拒。登记在 <DISPATCH_GUARD_STATE_ROOT>/<会话 id>/implementation-writers.tsv，一行一次派发
+#      （时刻、提示的 sha256、文件）；每次判之前先删掉已结束的：主会话记录里那次派发（toolUseResult 的 prompt 同 sha256）的 agent
+#      交回了（`<agent-message from="<id>">` 后跟 `[Subagent hand-back]`）、任务通知是 failed / killed / stopped、或被 TaskStop 停了；
+#      派发之后 10 分钟主会话记录里还没有它的，按没派出去删。
+#   ⑥ 快照冲突：派 kb-scribe、implementation-writer 时要改的文件在还没判完的三方轮开工快照里，拒（判法见 snapshot_conflict_verdict 上面那段）。
+#   ⑦ 模型：新派的是 opus（tool_input.model，没给取定义的 model；inherit、没有定义的按 opus 算，推的）时，本会话还在跑的 opus 子 agent
+#      （主会话记录里 resolvedModel 含 opus、没结束、会话记录 3 小时内动过或 3 小时内派的）已有 OPUS_CONCURRENCY_LIMIT 个（8，用户 2026-09-27 定）就拒；
+#      放行行「opus 并发已判：<理由>」。另外，主会话记录里 8 天内有 failed 任务通知写着「resets <时刻> (UTC)」、它的
+#      「model sent to the API」与新派的同一族（opus / sonnet / haiku），而现在还没到那个时刻，拒；那次失败之后同一族又派出去、没再撞限额的
+#      算窗口已解开（换了账号或提前恢复），不拒；放行行「限额窗口已判：<理由>」。
+#   ⑧ 书记员：提示里点名的 /tmp/claude-<uid>/ 下规格文件逐份交给 research/scripts/kb-spec-check.py，红了拒；一份认得出的规格都没有也拒
+#      （规格写在提示正文里的，把提示正文当规格判）；放行行「规格检查已判：<理由>」。
+#   ⑨ 设计员写重跑登记（提示里有 research/prompts/e<号>-r<n>-prereg.md）：`research/scripts/admission.py experiment <根> E<号>` 退 77
+#      （输入自上次产物以来没变）就拒；没登记的实验（退 2）放行；放行行「准入已判：<理由>」。
+#   ⑩ 变异分诊员：提示里要有 `research/mutations/…tsv` 或 `crates/mutations.tsv`——不接没有表的广谱活动。
+#   ⑪ 执行员：提示里写着「只修锚点」或「只补落产物」的放行这一条；否则要有「这一段回答的岔路：<非空>」；登记对应的实验已经有实验页的算续做，
+#      还要有「上一段岔路表里还差：<非空>」，写「无 / 没有」的拒（一行都不差就该交岔路表，不续派）。
+# 放行行都写在行首（可带 - * > 与粗体），冒号后面是理由，理由不能空、不能是占位（<理由>）。
+# 这一道自己出错（读不了表、主会话记录、规格，JSON 解析不了、脚本跑不起来）不拒：放行，错误写进 stderr。
 #
 #   runner-dispatch-guard.sh             # 从 stdin 读 hook 的 JSON
-#   runner-dispatch-guard.sh --selftest  # 在临时目录里走一遍放行与拒绝；RUNNER_DISPATCH_GUARD_DISABLE_CHECK=1（三条都关）、
-#                                        # RUNNER_DISPATCH_GUARD_DISABLE_HEAVY_TEST=1（只关重型测试那一条）或 RUNNER_DISPATCH_GUARD_DISABLE_SNAPSHOT=1
-#                                        # （只关快照那一条）时自检必须判红；RUNNER_DISPATCH_GUARD_BREAK=snapshot-no-normalize / snapshot-spec-unread /
+#   runner-dispatch-guard.sh --selftest  # 在临时目录里走一遍放行与拒绝；RUNNER_DISPATCH_GUARD_DISABLE_CHECK=1（全关）、
+#                                        # RUNNER_DISPATCH_GUARD_DISABLE_HEAVY_TEST=1（只关重型测试一行）或 RUNNER_DISPATCH_GUARD_DISABLE_SNAPSHOT=1（只关快照）时
+#                                        # 自检必须判红；RUNNER_DISPATCH_GUARD_BREAK=snapshot-no-normalize / snapshot-spec-unread /
 #                                        # snapshot-closed-round-open / snapshot-body-optional / snapshot-valve-ignored / snapshot-valve-loose /
 #                                        # snapshot-any-agent / snapshot-loose-lines / snapshot-no-edges / snapshot-unreadable-denies /
-#                                        # snapshot-unreadable-aborts / snapshot-missing-spec-denies / json-error-silent / json-error-denies
-#                                        # 各自也必须让它红
+#                                        # snapshot-unreadable-aborts / snapshot-missing-spec-denies / json-error-silent / json-error-denies /
+#                                        # inputs-ignored / general-purpose-free / scope-ignored / scope-negation-ignored / crates-no-limit /
+#                                        # registry-ignored / registry-no-prune / opus-no-limit / window-ignored / spec-check-skipped /
+#                                        # admission-ignored / mutation-table-free / runner-backfill-refused / valve-loose-all / window-never-lifted 各自也必须让它红
+# gate-similar: heavy-test-guard.sh 管同一条「子 agent 不跑重型测试」，但挂 Bash、在执行那一刻判真要跑的命令与它执行的脚本；这里只在派发那一刻查一行结构化声明，判法没有能共用的
+# gate-similar: continuation-guard.sh 同样读会话记录认子 agent 交回没有，但它挂 SendMessage、按子 agent 自己的会话记录判收件人；这里挂 Agent|Task、按主会话记录里的派发回执、交回消息、任务通知与 TaskStop 判在跑的实现员与 opus 数，读的记录种类不同
+# gate-similar: ask-user-claim-guard.sh 也判一段给人看的中文，但挂 AskUserQuestion、判断言词加出处；这里判的是固定标签行与路径，不逐句理解
+# gate-similar: write-guard.sh 读同一张写范围表，但在写的那一刻判目标路径；这里在派发那一刻判提示里点名的路径，模式匹配两边各一份写法（它逐字符拼正则，这里按 ** 与 * 切段）
 set -uo pipefail
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$HOOK_DIR/../singlefs-ai-sop/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 # python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON（与 agent-write-scope.sh 同一个坑）。
 python3 /dev/fd/3 "$HOOK_DIR" "$@" 3<<'PY'
-import glob, json, os, re, shutil, subprocess, sys, tempfile
+import glob, hashlib, json, os, re, shutil, subprocess, sys, tempfile, time
+from datetime import datetime, timedelta, timezone
 
 NONE_WORDS = {"", "无", "没有", "无。", "-", "—", "空", "none"}
 
@@ -78,173 +62,327 @@ def labelled_value(prompt, label):
     match = re.search(label + r"[：:]\s*(.*)", prompt)
     return None if match is None else match.group(1).strip()
 
-SENTENCE_BOUNDARY = re.compile(r"[。！？；!?;]+")
-# 分句：逗号切；全角括号里的一段单独成一个分句，括号外的前后两半拼回一句
-CLAUSE_BOUNDARY = re.compile(r"[，（）]|,\s")
-FULL_WIDTH_PARENTHETICAL = re.compile(r"（[^（）]*）")
-# 引号：开 → 关。ASCII 双引号开关同字；ASCII 单引号不算（英文撇号与 shell 引号都用它）
-QUOTE_CLOSING = {"「": "」", "『": "』", "“": "”", "‘": "’", '"': '"'}
-QUOTED_FRAGMENT_PLACEHOLDER = "□"
-# 转述的开头：从这里到句末是别人的话，不判
-REPORTED_SPEECH_OPENER = re.compile(
-    r"(?<![如是话再来])说\s*[，：,:]"
-    r"|(?:报告|记录|判决|交回|原文)(?:里|中|上)?(?:说|称|提到|写着|写(?![进到入成回清明]))"
-    r"|报告\s*(?:[：:]|…)"
-    r"|原句|原话|转述")
-RUN_VERB = re.compile(r"(?<!实验)(?<!可)复跑(?!命令|登记)|重跑|(?<![复重])跑(?!前)|执行(?!员)|运行(?!时)|(?<![\w./-])bash(?![\w-])"
-                      r"|(?<![一看想说对引提发谈兴升崛])起(?![来码点初因见草名作])")
-# 名字在前、动词在后时认的动词（bash 与「起」的宾语只在后面）
-TOPIC_VERBS = {"复跑", "重跑", "跑", "执行", "运行"}
-FROM_TIME_BEFORE_QI = re.compile(r"从[^，：；。]{0,20}$")
-ATTRIBUTIVE_AFTER_VERB = re.compile(r"(?:完|好|过|了|出|到)?的")
-# 否定：分句里有这些词就整句不判。「不变量」「不同」「别人」「判别」这类复合词与「别忘了」「不要漏」不算，「有没有」「是不是」这类正反问先换掉
-NEGATION = re.compile(r"没有办法|没法|无法|不能|不许|禁止|严禁|勿"
-                      r"|不(?!变|同|止|少|仅|但|管|论|过|断|久|然|得不|要忘|要漏)"
-                      r"|(?<![分区特级类个识告差性派辨鉴判甄离送道])别(?![人的处家名称忘漏])"
-                      r"|没有?(?=\s*(?:复跑|重跑|跑|执行|运行))")
-A_NOT_A_QUESTION = re.compile(r"([\u4e00-\u9fff])([不没])\1")
-# 动词前紧挨着「正在 / 在 / 在后台」是在说正在发生的事（「54 号正在跑层 0 全量」「有一个层 0 全量在后台跑」），不是要它跑；「现在」不算
-PROGRESSIVE_BEFORE_VERB = re.compile(r"(?:正在|(?<!现)在)(?:\s*后台)?(?:\s|`[^`]*`)*$")
-# 名字在前、动词在后：两者之间至多这么多个字，而且没有 TOPIC_GAP_BREAK 里那些另起一件事、换了施事或说「只在……才」的词
-TOPIC_GAP_LIMIT = 20
-TOPIC_GAP_BREAK = re.compile(r"只在|才|看|确认|证明|检查|核对|核实|对照|贴|写|读|改|交给|报告|然后|由|归(?!属)|属于"
-                             r"|(?<![但于就总还凡要若正倒硬])是|被|让|叫|把|等|负责|用来")
-# 动词后面紧跟代词宾语（「都要跑它」）：前面的名字不是它的宾语
-PRONOUN_OBJECT_AFTER_VERB = re.compile(r"\s*(?:它|他|这|那|自己)")
-# 名字前面紧挨「照 / 按 / 依」：名字是介词的宾语（「照门禁 59 号那一套判据跑」），不是要跑的东西
-PREPOSITION_BEFORE_NAME = re.compile(r"(?:照|按|依|像)(?:照)?\s*(?:门禁\s*)?$")
-OBJECT_LEAD_LIMIT = 6
-OBJECT_LEAD_BREAK = re.compile(r"时|之后|以后|后|前|看|确认|证明|检查|核对|核实|对照|贴|写进|写到|读|改|交回|报告|然后|再|除")
-# 名字后面接这些，它就不是宾语本身：「54 号之外的阶段」「跑整轮门禁时」「crates/mutations.tsv 里的两行」「54 号的判定段」（「的」后面是全量、快档、用例这类仍算）
-EXCLUDED_AFTER_NAME = re.compile(r"[`\s]*(?:之外|以外|时|的时候|里|中|的(?!\s*(?:全量|快档|整表|变异表|快用例|用例|测试|装置|全部|所有)))")
-# 名字前面紧挨 > / >>：那是 shell 重定向的目标（往 crates/mutations.tsv 追加一行），不是要跑的东西
-REDIRECTION_BEFORE_NAME = re.compile(r">{1,2}\s*$")
-# 名字在前、动词在后，名字前面紧挨「被」：名字是施事（「变异会被门禁 59 号复跑」），不是宾语
-PASSIVE_BEFORE_NAME = re.compile(r"被\s*(?:门禁\s*)?$")
-# 分句开头是别人（主 agent、别的会话、用户、另外两个验证员），分句里又没有「你」：在说别人做什么，不是要它跑
-THIRD_PARTY_SUBJECT_AT_CLAUSE_START = re.compile(r"^[\s*_#>\-\d.、]*(?:主\s*agent|另一个会话|别的会话|其他会话|用户|崩溃验证员|crash-verifier|门禁分诊员?|gate-triage)")
-# (类, 认的名字)
-HEAVY_TEST_NAMES = [
-    ("层 0", re.compile(r"层\s*0(?!\d)|(?<![\d.])0\s*层|layer\s*0(?!\d)|(?<!\d)54\s*号|54-layer0", re.I)),
-    ("QEMU", re.compile(r"qemu|vm-bench|(?<!\d)55\s*号|55-qemu", re.I)),
-    ("herd7", re.compile(r"herd7|lkmm|(?<!\d)57\s*号|57-lkmm", re.I)),
-    ("crates 变异整表", re.compile(r"crates/mutations\.tsv|变异整表|(?<!\d)59\s*号|59-crates")),
-    ("全量测试", re.compile(r"(?<![\w-])check\.sh|全量测试")),
-    ("整轮门禁", re.compile(r"(?<![\w-])gate\.sh|gate-staged\.sh|整轮门禁")),
-    ("全部实验复跑", re.compile(r"(?<!\d)87\s*号|87-replay")),
-    ("E152 装置", re.compile(r"e152(?!-tables|-stage-root)", re.I)),
-]
-FULL_TEST_COMMAND = re.compile(r"cargo\s+test\b[^\n]*?--(?:all|workspace)(?![\w-])")
-DISPATCH_HEAVY_OWN_SHARE = {
-    "crash-verifier": {"QEMU", "herd7", "crates 变异整表"},
-    "gate-triage": {"整轮门禁", "全部实验复跑"},
-}
 
-def remove_quoted_fragments(line):
-    """一行里引号括起来的片段换成 □。反引号里的代码不看引号；没闭合的开引号不算，原样留着。"""
-    kept = []
-    open_quotes = []  # [(该用哪个字关, 这段引号在 kept 里的起点)]
-    inside_code = False
-    for character in line:
-        if inside_code:
-            kept.append(character)
-            inside_code = character != "`"
-            continue
-        if character == "`":
-            inside_code = True
-            kept.append(character)
-            continue
-        closing_depth = next((depth for depth in range(len(open_quotes) - 1, -1, -1) if open_quotes[depth][0] == character), None)
-        if closing_depth is not None:
-            fragment_start = open_quotes[closing_depth][1]
-            del open_quotes[closing_depth:]
-            kept.append(character)
-            if not open_quotes:
-                del kept[fragment_start:]
-                kept.append(QUOTED_FRAGMENT_PLACEHOLDER)
-            continue
-        if character in QUOTE_CLOSING:
-            open_quotes.append((QUOTE_CLOSING[character], len(kept)))
-        kept.append(character)
-    return "".join(kept)
+HEAVY_TEST_OWNERS = {"crash-verifier", "gate-triage"}
+LINE_START = r"^[ \t>*_\-]*"
+HEAVY_TEST_LINE = re.compile(LINE_START + r"重型测试[* \t]*[：:][* \t]*不跑", re.M)
+COMMON_CONSTRAINTS_READ = re.compile(r"开工先读[^\n]*\.claude/agent-common\.md")
+IMPLEMENTATION_WRITER_FILE_LIMIT = 8        # 推的，没量过：965k 那几次实现员各动了 8 个以上 crates 文件，倒推的上限
+OPUS_CONCURRENCY_LIMIT = 8                  # 用户 2026-09-27 JST 02:2x 定（弹窗原话「8」）
+INHERITED_MODEL_FAMILY = "opus"             # inherit 与没有定义的类型按主 agent 的模型算；这个项目的主 agent 跑 opus（推的）
+RUNNING_RECENT_SECONDS = 3 * 3600
+UNLAUNCHED_GRACE_SECONDS = 600
+LIMIT_WINDOW_LOOKBACK_SECONDS = 8 * 86400
+CRATES_FILES_LINE = re.compile(LINE_START + r"要动的\s*crates\s*文件[* \t]*[：:](.*)$", re.M)
+CRATES_PATH = re.compile(r"crates/[^\s`'\"，。；：、（）()「」,;]+")
+SCOPE_MENTION = re.compile(r"(?:报告路径|报告写进|报告写到|写进|写到|更新)[*\s]*[：:]?[*\s]*`?(?P<path>(?:/tmp/claude-\d+/|research/|\.claude/|crates/|litmus/|records/)[^\s`'\"，。；：、（）()「」,;]*)")
+SCOPE_NEGATION = re.compile(r"不|别|禁止|勿")
+MUTATION_TABLE_MENTION = re.compile(r"research/mutations/[^\s`'\"]+\.tsv|crates/mutations\.tsv")
+RERUN_REGISTRATION = re.compile(r"research/prompts/e(\d+)-r\d+-prereg\.md")
+RESETS = re.compile(r"resets (?:(?P<month>[A-Z][a-z]{2}) (?P<day>\d{1,2}),? )?(?P<hour>\d{1,2})(?::(?P<minute>\d{2}))?(?P<half>am|pm) \(UTC\)")
+MODEL_SENT = re.compile(r"model sent to the API: ([\w.\-\[\]]+)")
+HANDBACK_FROM = re.compile(r'agent-message from=\\?"(a[0-9a-f]{6,})\\?">(?:\\n|\s)*\[Subagent hand-back\]')
+NOTIFICATION_BLOCK = re.compile(r"<task-notification>(.*?)</task-notification>", re.S)
+MONTHS = {name: index for index, name in enumerate(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], 1)}
 
-def is_topic_gap(gap):
-    """名字在前、动词在后时两者之间这一段：不长于 TOPIC_GAP_LIMIT，没有 TOPIC_GAP_BREAK。"""
-    return len(gap) <= TOPIC_GAP_LIMIT and TOPIC_GAP_BREAK.search(gap) is None
 
-def is_counted_verb(clause, verb):
-    """RUN_VERB 的一处命中是不是要它跑的动词：「从……起」不是；后面紧跟「的」的是定语；前面紧挨「正在 / 在」的是在说正在发生的事。"""
-    if verb.group() == "起" and FROM_TIME_BEFORE_QI.search(clause[:verb.start()]):
-        return False
-    if PROGRESSIVE_BEFORE_VERB.search(clause[:verb.start()]):
-        return False
-    return ATTRIBUTIVE_AFTER_VERB.match(clause, verb.end()) is None
+def valve_reason(prompt, label):
+    """行首「<label>：<理由>」的理由；没有、空、占位都返回 None。"""
+    match = re.search(LINE_START + re.escape(label) + r"[* \t]*[：:][* \t]*(.*?)[ \t]*$", prompt, re.M)
+    if match is None or break_switch_is("valve-loose-all"):
+        return None
+    reason = match.group(1).strip()
+    return None if not reason or reason.startswith("<") or reason in NONE_WORDS else reason
 
-def heavy_names_in(text):
-    """text 里每一处重型阶段的名字：[(起点, 终点, 类)]，按起点排。"""
-    return sorted((match.start(), match.end(), category) for category, names in HEAVY_TEST_NAMES for match in names.finditer(text))
 
-def heavy_objects_after_verb(object_span):
-    """动词后面那一段里，算得上宾语的重型阶段的类：名字前面至多 OBJECT_LEAD_LIMIT 个非 ASCII 字、没有 OBJECT_LEAD_BREAK、不是重定向目标，
-    名字后面不是 EXCLUDED_AFTER_NAME。"""
-    categories = []
-    for start, end, category in heavy_names_in(object_span):
-        lead = object_span[:start]
-        if OBJECT_LEAD_BREAK.search(lead) or sum(1 for character in lead if ord(character) > 127 and not character.isspace()) > OBJECT_LEAD_LIMIT:
-            break
-        if EXCLUDED_AFTER_NAME.match(object_span, end) is None and REDIRECTION_BEFORE_NAME.search(lead) is None:
-            categories.append(category)
-    return categories
+def agent_definition_fields(project_root, subagent_type):
+    """定义的 frontmatter → {键: 值}（值去掉行尾 # 注释）；定义不在返回 None。"""
+    path = os.path.join(project_root, ".claude", "agents", f"{subagent_type}.md")
+    try:
+        text = open(path, encoding="utf-8").read()
+    except OSError:
+        return None
+    fields = {}
+    if text.startswith("---"):
+        for line in text.split("\n---", 1)[0].splitlines()[1:]:
+            if ":" in line:
+                key, value = line.split(":", 1)
+                fields[key.strip()] = value.split("#", 1)[0].strip()
+    return fields
 
-def clause_heavy_requests(clause):
-    """一个分句里真要跑的重型阶段的类，按出现的次序。分句里有否定词、或开头是别人在做的，整句不判。"""
-    clause = A_NOT_A_QUESTION.sub(lambda match: match.group(1) + QUOTED_FRAGMENT_PLACEHOLDER + match.group(1), clause)
-    if NEGATION.search(clause):
+
+def missing_required_inputs(fields, prompt):
+    if break_switch_is("inputs-ignored"):
         return []
-    if THIRD_PARTY_SUBJECT_AT_CLAUSE_START.search(clause) and "你" not in clause:
+    groups = [group.strip() for group in (fields.get("required-inputs") or "").split(",") if group.strip()]
+    return [group for group in groups if not any(alternative.strip() and alternative.strip() in prompt for alternative in group.split("|"))]
+
+
+def scope_pattern_regex(pattern):
+    pieces = re.split(r"(\*\*|\*)", pattern)
+    return re.compile("".join(".*" if piece == "**" else "[^/]*" if piece == "*" else re.escape(piece) for piece in pieces) + r"\Z")
+
+
+def scope_patterns(project_root, subagent_type):
+    patterns = []
+    table_path = os.path.join(project_root, ".claude", "hooks", "agent-write-scope.tsv")
+    if not os.path.isfile(table_path):
+        return patterns
+    try:
+        for line in open(table_path, encoding="utf-8"):
+            fields = line.rstrip("\n").split("\t")
+            if not line.startswith("#") and len(fields) >= 2 and fields[0].strip() == subagent_type:
+                patterns.append(fields[1].strip())
+    except OSError as error:
+        print(f"! 派发闸读不了写范围表，写范围这一条没判：{error}", file=sys.stderr)
+    return patterns
+
+
+def out_of_scope_mentions(project_root, subagent_type, prompt):
+    patterns = scope_patterns(project_root, subagent_type)
+    if not patterns or break_switch_is("scope-ignored"):
         return []
-    verbs = [verb for verb in RUN_VERB.finditer(clause) if is_counted_verb(clause, verb)]
-    names_in_clause = heavy_names_in(clause)
-    categories = []
-    for index, verb in enumerate(verbs):
-        object_end = verbs[index + 1].start() if index + 1 < len(verbs) else len(clause)
-        categories += heavy_objects_after_verb(clause[verb.end():object_end])
-        if verb.group() in TOPIC_VERBS and PRONOUN_OBJECT_AFTER_VERB.match(clause, verb.end()) is None:
-            categories += [category for start, end, category in names_in_clause
-                           if end <= verb.start() and is_topic_gap(clause[end:verb.start()])
-                           and EXCLUDED_AFTER_NAME.match(clause, end) is None
-                           and PASSIVE_BEFORE_NAME.search(clause[:start]) is None
-                           and PREPOSITION_BEFORE_NAME.search(clause[:start]) is None]
-    if FULL_TEST_COMMAND.search(clause):
-        categories.append("全量测试")
-    return categories
+    outside = []
+    for match in SCOPE_MENTION.finditer(prompt):
+        before = prompt[max(0, match.start() - 6):match.start()]
+        if SCOPE_NEGATION.search(before) and not break_switch_is("scope-negation-ignored"):
+            continue
+        path = match.group("path").rstrip("/.")
+        root_prefix = os.path.normpath(project_root) + "/"
+        relative = path[len(root_prefix):] if path.startswith(root_prefix) else path
+        if not any(scope_pattern_regex(pattern).match(relative) for pattern in patterns) and relative not in outside:
+            outside.append(relative)
+    return outside
 
-def clauses_of(sentence):
-    """一句切成分句：全角括号里的每一段单独成句（由内往外剥），括号外剩下的前后拼回去，再都按逗号切。"""
-    parentheticals = []
-    outer = sentence
-    match = FULL_WIDTH_PARENTHETICAL.search(outer)
-    while match is not None:
-        parentheticals.append(match.group()[1:-1])
-        outer = outer[:match.start()] + " " + outer[match.end():]
-        match = FULL_WIDTH_PARENTHETICAL.search(outer)
-    return [clause for text in [outer] + parentheticals for clause in CLAUSE_BOUNDARY.split(text)]
 
-def heavy_test_requests(prompt, subagent_type):
-    """派发提示里要这个 agent 跑、而不是它自己那一份的重型测试：[(类, 句子)]。句子里引号括起来的片段已换成 □。"""
-    own_share = DISPATCH_HEAVY_OWN_SHARE.get(subagent_type, set())
-    found = []
-    for line in prompt.split("\n"):
-        for sentence in SENTENCE_BOUNDARY.split(remove_quoted_fragments(line)):
-            opener = REPORTED_SPEECH_OPENER.search(sentence)
-            judged = sentence if opener is None else sentence[:opener.start()]
-            outside = [category for clause in clauses_of(judged)
-                       for category in clause_heavy_requests(clause) if category not in own_share]
-            if outside:
-                found.append((outside[0], sentence.strip()))
-    return found
+def model_family(model_text):
+    lowered = (model_text or "").lower()
+    for family in ("opus", "sonnet", "haiku", "fable"):
+        if family in lowered:
+            return family
+    return INHERITED_MODEL_FAMILY if lowered in ("", "inherit") else lowered
 
-# 第三条：派这两类 agent 时，它要改的文件不许落在一轮还没判完的三方开工快照里
+
+def parse_moment(text):
+    return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
+
+
+def session_dispatch_events(transcript_path):
+    """主会话记录 → (launches{agent 号: (派发时刻, 模型, 提示 sha256)}, ended{agent 号: 最晚结束时刻}, windows[(到期时刻, 模型族, 原句)])。
+    先用 grep 挑出带这几种记号的行，免得逐行解析上百兆的记录；读不了返回三个空的。"""
+    launches, ended, windows = {}, {}, []
+    if not transcript_path or not os.path.isfile(transcript_path):
+        return launches, ended, windows
+    needles = ['"async_launched"', "[Subagent hand-back]", "<task-notification>", "Successfully stopped task"]
+    try:
+        grep = subprocess.run(["grep", "-F", *sum((["-e", needle] for needle in needles), []), transcript_path],
+                              capture_output=True, text=True, timeout=50)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        print(f"! 派发闸读不了主会话记录，按会话判的几条没判：{error}", file=sys.stderr)
+        return launches, ended, windows
+    now = time.time()
+    for line in grep.stdout.splitlines():
+        try:
+            record = json.loads(line)
+            moment = parse_moment(record.get("timestamp") or "")
+        except (ValueError, TypeError):
+            continue
+        result = record.get("toolUseResult")
+        if isinstance(result, dict) and result.get("status") == "async_launched" and result.get("agentId"):
+            digest = hashlib.sha256(str(result.get("prompt") or "").encode("utf-8")).hexdigest()
+            launches[result["agentId"]] = (moment, result.get("resolvedModel") or "", digest)
+        if isinstance(result, dict) and "Successfully stopped task" in str(result.get("message", "")) and result.get("task_id"):
+            ended[result["task_id"]] = max(moment, ended.get(result["task_id"], 0))
+        for agent_id in HANDBACK_FROM.findall(line):
+            ended[agent_id] = max(moment, ended.get(agent_id, 0))
+        for block in NOTIFICATION_BLOCK.findall(line.replace("\\n", "\n").replace('\\"', '"')):
+            status = re.search(r"<status>(\w+)</status>", block)
+            for agent_id in re.findall(r"<task-id>(\w+)</task-id>", block):
+                if status and status.group(1) in ("failed", "killed", "stopped"):
+                    ended[agent_id] = max(moment, ended.get(agent_id, 0))
+            resets, sent = RESETS.search(block), MODEL_SENT.search(block)
+            if status and status.group(1) == "failed" and resets and now - moment <= LIMIT_WINDOW_LOOKBACK_SECONDS:
+                windows.append((reset_moment(resets, moment), model_family(sent.group(1) if sent else ""), resets.group(0), moment,
+                                re.findall(r"<task-id>(\w+)</task-id>", block)))
+    return launches, ended, windows
+
+
+def reset_moment(match, notified_at):
+    """「resets 3am (UTC)」→ 通知之后第一次到那个时刻；写了日期的取那一天（早于通知就算明年）。"""
+    hour = int(match.group("hour")) % 12 + (12 if match.group("half") == "pm" else 0)
+    minute = int(match.group("minute") or 0)
+    base = datetime.fromtimestamp(notified_at, timezone.utc)
+    if match.group("month"):
+        candidate = base.replace(month=MONTHS.get(match.group("month"), base.month), day=int(match.group("day")), hour=hour, minute=minute, second=0, microsecond=0)
+        if candidate.timestamp() < notified_at:
+            candidate = candidate.replace(year=candidate.year + 1)
+        return candidate.timestamp()
+    candidate = base.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if candidate.timestamp() <= notified_at:
+        candidate = datetime.fromtimestamp(candidate.timestamp() + 86400, timezone.utc)
+    return candidate.timestamp()
+
+
+def is_running(agent_id, launches, ended, transcript_path):
+    launched_at = launches[agent_id][0]
+    if ended.get(agent_id, 0) >= launched_at:
+        return False
+    own = os.path.join(transcript_path[: -len(".jsonl")], "subagents", f"agent-{agent_id}.jsonl") if transcript_path.endswith(".jsonl") else ""
+    last_seen = max(launched_at, os.path.getmtime(own) if own and os.path.isfile(own) else 0)
+    return time.time() - last_seen <= RUNNING_RECENT_SECONDS
+
+
+def registry_path(hook_input):
+    root = os.environ.get("DISPATCH_GUARD_STATE_ROOT") or f"/tmp/claude-{os.getuid()}/dispatch-guard-state"
+    session = re.sub(r"[^\w.-]", "_", str(hook_input.get("session_id") or "unknown-session"))
+    return os.path.join(root, session, "implementation-writers.tsv")
+
+
+def live_registry_rows(hook_input, launches, ended):
+    """登记里还在跑的那几行（顺手把结束了的、派发之后没出现的删掉）。→ [(时刻, 提示 sha256, [文件])]。"""
+    path = registry_path(hook_input)
+    try:
+        rows = [line.rstrip("\n").split("\t") for line in open(path, encoding="utf-8") if line.strip()]
+    except OSError:
+        return []
+    by_digest = {digest: agent_id for agent_id, (_, _, digest) in launches.items()}
+    transcript_path = hook_input.get("transcript_path") or ""
+    live = []
+    for row in rows:
+        if len(row) != 3:
+            continue
+        registered_at, digest, files = float(row[0]), row[1], row[2].split()
+        agent_id = by_digest.get(digest)
+        if not break_switch_is("registry-no-prune"):
+            if agent_id is None and time.time() - registered_at > UNLAUNCHED_GRACE_SECONDS:
+                continue
+            if agent_id is not None and not is_running(agent_id, launches, ended, transcript_path):
+                continue
+        live.append((registered_at, digest, files))
+    rewrite_registry(path, live)
+    return live
+
+
+def rewrite_registry(path, rows):
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        temporary = f"{path}.{os.getpid()}.tmp"
+        with open(temporary, "w", encoding="utf-8") as handle:
+            for registered_at, digest, files in rows:
+                handle.write(f"{registered_at}\t{digest}\t{' '.join(files)}\n")
+        os.replace(temporary, path)
+    except OSError as error:
+        print(f"! 派发闸写不了实现员登记 {path}：{error}", file=sys.stderr)
+
+
+def register_implementation_writer(hook_input, prompt, files, live_rows):
+    digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    rewrite_registry(registry_path(hook_input), live_rows + [(time.time(), digest, files)])
+
+
+def implementation_writer_verdict(hook_input, prompt, launches, ended):
+    """→ (拒绝说明或 None, 要登记的文件, 还在跑的登记行)。"""
+    line = CRATES_FILES_LINE.search(prompt)
+    if line is None:
+        return ("✗ 派 implementation-writer 的提示里没有「要动的 crates 文件：…」一行。\n"
+                "→ 怎么办：把这一件要动的 crates/ 文件逐个写进这一行（路径从仓根起）；说不全要动哪些文件，这件活还没切小，先切。"), [], []
+    files = sorted(set(CRATES_PATH.findall(line.group(1))))
+    if (len(files) > IMPLEMENTATION_WRITER_FILE_LIMIT and not break_switch_is("crates-no-limit")
+            and valve_reason(prompt, "文件上限已判") is None):
+        return (f"✗ 这一件要动 {len(files)} 个 crates 文件，超过 {IMPLEMENTATION_WRITER_FILE_LIMIT} 个（推的上限）。\n"
+                "→ 怎么办：拆成几件分开派，一件不超过上限；拆不开的交用户定，定了在提示里写一行「文件上限已判：<用户怎么定的>」。"), files, []
+    live = live_registry_rows(hook_input, launches, ended)
+    if break_switch_is("registry-ignored"):
+        return None, files, live
+    overlapping = sorted({path for _, _, registered in live for path in registered} & set(files))
+    if overlapping:
+        return (f"✗ 这一件要动的文件与还在跑的实现员撞了：{'、'.join(overlapping)}。\n"
+                "→ 怎么办：排在那个实现员交回之后再派，或把两件并给同一个实现员（.claude/main-agent.md「一轮怎么开、怎么收」第 4 条）。"), files, live
+    return None, files, live
+
+
+def model_verdict(hook_input, prompt, subagent_type, fields, launches, ended, windows):
+    requested = (hook_input.get("tool_input") or {}).get("model") or (fields or {}).get("model") or ""
+    family = model_family(requested)
+    transcript_path = hook_input.get("transcript_path") or ""
+    now = time.time()
+    limit_failed = {agent_id for window in windows for agent_id in window[4]}
+    for until, window_family, original, notified_at, _ in windows:
+        # 撞限额之后同一族又派出去、而且没再撞限额的：窗口已经解开了（换了账号或限额提前恢复）
+        lifted = any(model_family(model) == window_family and launched_at > notified_at and agent_id not in limit_failed
+                     for agent_id, (launched_at, model, _) in launches.items()) and not break_switch_is("window-never-lifted")
+        if (window_family == family and now < until and not lifted and not break_switch_is("window-ignored")
+                and valve_reason(prompt, "限额窗口已判") is None):
+            tokyo = datetime.fromtimestamp(until, timezone(timedelta(hours=9))).strftime("%m-%d %H:%M")
+            return (f"✗ {family} 这一族撞过限额（「{original}」），到 {tokyo} JST 之前不派同一族的 agent。\n"
+                    f"→ 怎么办：等到 {tokyo} JST，或换模型（派发参数 model 写别的一族）——换不换交用户定；用户定了照派，提示里写一行「限额窗口已判：<用户怎么定的>」。")
+    if family != "opus" or break_switch_is("opus-no-limit") or valve_reason(prompt, "opus 并发已判") is not None:
+        return None
+    running = [agent_id for agent_id in launches if model_family(launches[agent_id][1]) == "opus" and is_running(agent_id, launches, ended, transcript_path)]
+    if len(running) >= OPUS_CONCURRENCY_LIMIT:
+        return (f"✗ 本会话已有 {len(running)} 个 opus 子 agent 在跑（{'、'.join(running[:10])}），上限 {OPUS_CONCURRENCY_LIMIT}（用户 2026-09-27 定）。\n"
+                "→ 怎么办：等其中一个交回再派，或这一件换 sonnet（派发参数 model）；确要超过就交用户定，定了在提示里写一行「opus 并发已判：<用户怎么定的>」。")
+    return None
+
+
+def kb_scribe_spec_verdict(prompt, project_root, hook_dir):
+    if valve_reason(prompt, "规格检查已判") is not None or break_switch_is("spec-check-skipped"):
+        return None
+    checker = os.path.join(os.path.dirname(os.path.dirname(hook_dir)), "research", "scripts", "kb-spec-check.py")
+    candidates = []
+    for mention in sorted(set(SCRATCH_FILE_MENTION.findall(prompt))):
+        path = mention.rstrip("。，；：、.")
+        if os.path.isfile(path) and path.endswith((".json", ".md", ".txt")):
+            candidates.append(path)
+    inline = None
+    if not candidates:
+        inline = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8")
+        inline.write(prompt)
+        inline.close()
+        candidates = [inline.name]
+    try:
+        recognized, problems = 0, []
+        for path in candidates:
+            try:
+                result = subprocess.run([sys.executable, checker, path, "--root", project_root], capture_output=True, text=True, timeout=50)
+            except (OSError, subprocess.TimeoutExpired) as error:
+                print(f"! 派发闸跑不了 kb-spec-check.py，规格这一条没判：{error}", file=sys.stderr)
+                return None
+            if result.returncode in (0, 1):
+                recognized += 1
+            if result.returncode == 1:
+                problems += [line.strip() for line in result.stdout.splitlines() if line.strip().startswith("✗")]
+            elif result.returncode not in (0, 2):
+                print(f"! kb-spec-check.py 退出码 {result.returncode}，规格这一条没判：{result.stdout[-200:]}{result.stderr[-200:]}", file=sys.stderr)
+                return None
+        if problems:
+            return ("✗ 给书记员的规格会让门禁红（research/scripts/kb-spec-check.py）：\n" + "\n".join(f"  {line}" for line in problems[:20]) +
+                    "\n→ 怎么办：改规格原文再派；判断不了的交用户；要 kb-spec-drafter 起草就先派它。确要照这份派，提示里写一行「规格检查已判：<理由>」。")
+        if recognized == 0:
+            return ("✗ 派 kb-scribe 的提示里认不出一份规格（提示正文与点名的 /tmp/claude-<uid>/ 下文件都不是 kb-spec-check.py 认的写法）。\n"
+                    "→ 怎么办：照 research/scripts/kb-spec-check.py 文件头「规格的两种写法」写，或派 kb-spec-drafter 起草；确要照原样派，提示里写一行「规格检查已判：<理由>」。")
+        return None
+    finally:
+        if inline is not None:
+            os.unlink(inline.name)
+
+
+def designer_admission_verdict(prompt, project_root, hook_dir):
+    match = RERUN_REGISTRATION.search(prompt)
+    if match is None or break_switch_is("admission-ignored") or valve_reason(prompt, "准入已判") is not None:
+        return None
+    admission = (os.environ.get("RUNNER_DISPATCH_GUARD_ADMISSION_SCRIPT")
+                 or os.path.join(os.path.dirname(os.path.dirname(hook_dir)), "research", "scripts", "admission.py"))
+    try:
+        result = subprocess.run([sys.executable, admission, "experiment", project_root, f"E{int(match.group(1))}"], capture_output=True, text=True, timeout=50)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        print(f"! 派发闸跑不了 admission.py，准入这一条没判：{error}", file=sys.stderr)
+        return None
+    if result.returncode == 77:
+        return (f"✗ E{int(match.group(1))} 的输入自上次产物以来没变（research/scripts/admission.py experiment 退 77），不写它的重跑登记。\n"
+                "→ 怎么办：沿用上次产物与结论；要为别的原因重跑（换臂、换判据），在提示里写一行「准入已判：<哪一样变了>」。")
+    return None
+
 SNAPSHOT_GUARDED_AGENTS = {"kb-scribe", "implementation-writer"}
 SNAPSHOT_DIRECTORY_SUFFIX = "-snapshot"
 SNAPSHOT_LIST_NAME_MARK = "sha256"
@@ -420,38 +558,69 @@ def snapshot_conflict_verdict(subagent_type, prompt, project_root):
                f"在派发提示里单起一行写{valve_lines}（理由不许空）。"
                + ("\n" + "\n".join(notes) if notes else ""))
 
-def decide(hook_input, project_root):
+def decide(hook_input, project_root, hook_dir=None):
     """返回 (0, None 或给 stderr 的提醒) 放行；(2, 说明) 拒绝。"""
     if os.environ.get("RUNNER_DISPATCH_GUARD_DISABLE_CHECK") == "1":
         return 0, None
+    hook_dir = hook_dir or os.path.join(project_root, ".claude", "hooks")
     tool_input = hook_input.get("tool_input") or {}
     subagent_type = tool_input.get("subagent_type") or "general-purpose"
     prompt = tool_input.get("prompt") or ""
-    requests = [] if os.environ.get("RUNNER_DISPATCH_GUARD_DISABLE_HEAVY_TEST") == "1" else heavy_test_requests(prompt, subagent_type)
-    if requests:
-        category, sentence = requests[0]
-        more = f"（另有 {len(requests) - 1} 句）" if len(requests) > 1 else ""
-        placeholder_note = f"（{QUOTED_FRAGMENT_PLACEHOLDER} 是引号里、已按引用不判的片段）" if QUOTED_FRAGMENT_PLACEHOLDER in sentence else ""
-        return 2, (f"✗ 派 {subagent_type} 的提示要它跑「{category}」：「{sentence[:120]}」{placeholder_note}{more}\n"
-                   "→ 判法：句子里「跑 / 执行 / 复跑 / 重跑 / 运行 / bash / 起」的宾语是重型阶段，或写了「`cargo test --all`」这种命令字面；"
-                   "否定句、引号里的、「……说，」「报告里写」「原句」之后的转述、重型阶段只是同句另一个名词的，都不拦（判法细节在这个 hook 的文件头）。\n"
-                   "→ 规矩：重型测试（层 0、QEMU、herd7、crates 变异整表、全量测试、整轮门禁、全部实验复跑、E152 装置）只在提交代码时、或用户要求时跑；"
-                   "子 agent 只跑自己动到的测试二进制、fmt / clippy / build 与 54、55、57、59、87 之外的门禁阶段；crash-verifier 只跑 55、57、59 号那几道，"
-                   "gate-triage 只跑整轮门禁（research/scripts/gate-staged.sh）与 87 号（执行时 .claude/hooks/heavy-test-guard.sh 也拒）。\n"
-                   "→ 怎么办：真要它跑就删掉这一句；不是要它跑的，写成否定句（「不跑层 0」），否定词与名字放在同一个分句里（名字别放进否定词后面的全角括号，括号里单独成分句），转述别人的原话用「」括起来；提交时 QEMU、herd7、crates 变异整表派 crash-verifier，层 0 全量由主 agent 自己跑，整轮门禁派 gate-triage；"
-                   "提交之外任务确实要跑，先弹窗问用户，用户同意了由主 agent 带 SINGLEFS_HEAVY_TESTS=user-request 跑。")
+    if (subagent_type not in HEAVY_TEST_OWNERS and os.environ.get("RUNNER_DISPATCH_GUARD_DISABLE_HEAVY_TEST") != "1"
+            and not HEAVY_TEST_LINE.search(prompt)):
+        return 2, (f"✗ 派 {subagent_type} 的提示里没有「重型测试：不跑」一行。\n"
+                   "→ 规矩：重型测试（层 0、QEMU、herd7、crates 变异整表、全量测试、整轮门禁、全部实验复跑、E152 装置）只在提交代码时、或用户要求时跑，"
+                   "只由 crash-verifier（54、55、57、59 号）与 gate-triage（gate.sh 整轮与 87 号）跑；执行时 .claude/hooks/heavy-test-guard.sh 也拒。\n"
+                   "→ 怎么办：提示里单独写一行「重型测试：不跑」；提交时的重阶段派 crash-verifier、整轮门禁派 gate-triage；提交之外确实要跑，先弹窗问用户，"
+                   "用户同意了由主 agent 带 SINGLEFS_HEAVY_TESTS=user-request 跑。")
+    fields = agent_definition_fields(project_root, subagent_type)
+    if fields is None and not COMMON_CONSTRAINTS_READ.search(prompt) and not break_switch_is("general-purpose-free"):
+        return 2, (f"✗ {subagent_type} 不是项目定义的 agent，不读共用约束，提示里却没写「开工先读 `.claude/agent-common.md`」。\n"
+                   "→ 怎么办：先看 .claude/main-agent.md「什么时候派哪个 agent」那张表有没有对应的定义（改门禁、钩子、脚本、定义派 tooling-writer，"
+                   "查真假与机理派 investigator）；确要派它，提示里写一行「开工先读 `.claude/agent-common.md`」，长活照那份的「长活可以等」写。")
+    missing = missing_required_inputs(fields or {}, prompt)
+    if missing:
+        return 2, (f"✗ 派 {subagent_type} 的提示缺它定义要的输入：{'、'.join(missing)}（.claude/agents/{subagent_type}.md 的 required-inputs）。\n"
+                   f"→ 怎么办：照那份定义「输入（主 agent 必须给）」一节补齐，每一样写出它的名字（同义词用 | 分隔，写一个就算）。")
+    outside = out_of_scope_mentions(project_root, subagent_type, prompt)
+    if outside:
+        return 2, (f"✗ 提示要 {subagent_type} 写进它写范围之外的路径：{'、'.join(outside)}（.claude/hooks/agent-write-scope.tsv）。\n"
+                   "→ 怎么办：改成它写范围里的路径（报告与草稿放 /tmp/claude-<uid>/ 下）；范围外的改动交该写的 agent 或主 agent 自己改。")
     snapshot_code, snapshot_message = snapshot_conflict_verdict(subagent_type, prompt, project_root)
     if snapshot_code:
         return snapshot_code, snapshot_message
+    transcript_path = hook_input.get("transcript_path") or ""
+    launches, ended, windows = session_dispatch_events(transcript_path)
+    model_message = model_verdict(hook_input, prompt, subagent_type, fields, launches, ended, windows)
+    if model_message:
+        return 2, model_message
+    if subagent_type == "kb-scribe":
+        spec_message = kb_scribe_spec_verdict(prompt, project_root, hook_dir)
+        if spec_message:
+            return 2, spec_message
+    if subagent_type == "experiment-designer":
+        admission_message = designer_admission_verdict(prompt, project_root, hook_dir)
+        if admission_message:
+            return 2, admission_message
+    if subagent_type == "mutation-triage" and not MUTATION_TABLE_MENTION.search(prompt) and not break_switch_is("mutation-table-free"):
+        return 2, ("✗ 派 mutation-triage 的提示里没有变异表（research/mutations/<名>.tsv 或 crates/mutations.tsv 的条目名）。\n"
+                   "→ 怎么办：给它表名与条目；没有表的广谱变异是实验，照 .claude/main-agent.md 那一行走 experiment-designer 登记。")
+    if subagent_type == "implementation-writer":
+        writer_message, files, live_rows = implementation_writer_verdict(hook_input, prompt, launches, ended)
+        if writer_message:
+            return 2, writer_message
+        register_implementation_writer(hook_input, prompt, files, live_rows)
+        return 0, snapshot_message
     if subagent_type != "experiment-runner":
         return 0, snapshot_message
-    if "只修锚点" in prompt:
+    if "只修锚点" in prompt or ("只补落产物" in prompt and not break_switch_is("runner-backfill-refused")):
         return 0, None
     answered = labelled_value(prompt, "这一段回答的岔路")
     if answered is None or answered in NONE_WORDS:
         return 2, ("✗ 派 experiment-runner 的提示里没写「这一段回答的岔路：…」。\n"
                    "→ 怎么办：对着岔路单（research/prompts/<轮>-forks.md）写明这一段的量让哪几行够判；"
-                   "说不出是哪一行，这一段就不该派（.claude/rules/three-way-inference.md「交岔路时写岔路单，派实验时带上它」）。")
+                   "说不出是哪一行，这一段就不该派（.claude/rules/three-way-inference.md「交岔路时写岔路单，派实验时带上它」）；"
+                   "只补落产物、没有岔路可答的，写「只补落产物」。")
     number_match = re.search(r"research/prompts/e(\d+)-(?:preregistration|r\d+-prereg)\.md", prompt)
     if number_match is None:
         return 0, None
@@ -467,44 +636,51 @@ def decide(hook_input, project_root):
                    "→ 怎么办：按岔路单交岔路表给用户；剩下的量在实验页标「够判后未跑」，状态写「已跑（够判）」。")
     return 0, None
 
-# 2026-09-25 主 agent 派「修派发闸」时写的说明（第 3–25 行逐字）：引了三句误拦原句与四句该拦例句，旧判法把它整条拦下
-DISPATCH_SPECIFICATION_EXCERPT = """还 `records/2026-09-16-subagent拆分提案.md` 第四十节第 18 行后半那笔欠账：派发闸只要看到提示里点了重型阶段、又不是否定句就拦，连转述别人报告、写「为什么不」的句子也拦。
+# 2026-09-24 至 09-26 派发闸按旧的逐句判法拒掉的 14 句原句（主会话记录里拒绝消息引的那一句，逐字；截断处照原样）：有了「重型测试：不跑」一行都该放行
+OLD_HEAVY_TEST_REFUSALS = [
+    "**抓到的实例**：实现员把「库单测 → 动到的测试二进制 → 新层 0 七条流全量 → 变异」写进 `/tmp/claude-1000/impl-m2-treesplit/run-chain.sh`，再用后台 Bash 起它",
+    "理由照实写：59 号是重型阶段，抽成共用库之后没法在提交之外跑它来证明没改坏",
+    "理由照实写：59 号属于只在提交时才执行的重型阶段，改它的实现在提交之前没有办法证明没改坏，所以两边各留一份",
+    "还有一处旧判法要一起看：实二四的报告 `research/prompts/m2-vm-raise-floor-implementer-report.md`「要你定的」第 3 条说，55 号还按「宿主只重跑第一个事务」判 `second-tr",
+    "1. 「理由照实写：59 号属于只在提交时才执行的重型阶段，改它的实现在提交之前没有办法证明没改坏，所以两边各留一份」——这是在写一行说明的理由，没有要谁去跑",
+    "- `diff <(bash .claude/scripts/check.sh) x`：括号里真在执行重型测试，对 implementation-writer 照拒",
+    "跑门禁 59 号样本、73（gate-lint / shell-lint）、doc-lint、62、63，逐道报原样判定行",
+    "前任有一次想在副本上跑全量测试被重型测试闸拒了——你只跑自己写的那几个测试二进制",
+    "- **不许跑重型测试**：54 的 `--full`、55（QEMU）、57（herd7 真跑）、59（crates 变异表）、`gate.sh`、`cargo test --workspace` 都不许跑，钩子会拒",
+    "- 59 号的红绿样本：重型测试闸按文件名拒绝子 agent 跑 59 号",
+    "- **禁跑**：名字带 `layer0` 的测试目标、54 号",
+    "- 撤回 F9：门禁分诊员定义里□那几处删掉，恢复直接起 `gate.sh`",
+    "第二轮你这一侧的探针与复跑在 `research/prompts/m2-layer0-scale-r2-opus-model/`，可以接着用",
+    "只在临时拷贝上跑 `admission.py`、54 号与 hook 的自证",
+]
 
-## 2026-09-25 被误拦的原句（逐字，都该放行）
-
-1. 「理由照实写：59 号属于只在提交时才执行的重型阶段，改它的实现在提交之前没有办法证明没改坏，所以两边各留一份」——在写一行说明的理由，没有要谁去跑。
-2. 「还有一处旧判法要一起看：实二四的报告……第 3 条说，55 号还按「宿主只重跑第一个事务」判 `second-transaction` 和 `second-instance`」——「重跑」的宾语是「第一个事务」，而且在转述别人报告里的判法。
-3. 「理由照实写：59 号是重型阶段，抽成共用库之后没法在提交之外跑它来证明没改坏」——「没法……跑」是否定。
-4. 这份说明本身：主 agent 派发「修派发闸」时，提示里引了上面三句与下面的该拦例句，被整条拦下。
-
-## 要做的
-
-只在「跑 / 执行 / 复跑 / 重跑 / 起」这一类动词的宾语就是重型阶段时才判。重型阶段：层 0、QEMU、herd7、crates 变异整表、全量测试、整轮门禁、87 号、E152 装置，以及 54、55、57、59、87 号。下面几种不判：
-- 否定：不、别、禁止、没法、没有办法、无法、不能、不许；
-- 转述或引用：「……说」「……报告」「原句」、被「」或引号括起来的片段；
-- 宾语是别的东西，重型阶段只是同一句里的另一个名词。
-
-判法要写得出来、可复核：按句切（句号、分号、换行），在句内找动词与宾语的相对位置；不许用模型判。
-
-收窄之后该拦的照拦。该拦例句：
-- 「跑 54 号层 0 全量」
-- 「提交前起 QEMU 跑一遍」
-- 「执行 gate.sh」
-- 「复跑 crates 变异整表」"""
+FOOTER_WITHOUT_HEAVY_LINE = "开工先读 `.claude/agent-common.md`\n规格检查已判：自检样本不带规格\n"
+FOOTER = "重型测试：不跑\n" + FOOTER_WITHOUT_HEAVY_LINE
 
 def selftest(hook_dir):
     work = tempfile.mkdtemp()
     other_directories = []  # 快照那一条另起的临时目录，finally 里一起删
+    state_root = tempfile.mkdtemp()  # 实现员登记放自检自己的状态目录，不碰真会话的
+    other_directories.append(state_root)
+    os.environ["DISPATCH_GUARD_STATE_ROOT"] = state_root
     try:
         os.makedirs(os.path.join(work, ".claude", "kb", "experiments"))
         open(os.path.join(work, ".claude", "kb", "experiments", "153-样本.md"), "w").write("## E153 样本 —— 部分已跑\n")
         first = "跑前登记：research/prompts/e160-preregistration.md\n"
         again = "跑前登记：research/prompts/e153-preregistration.md\n"
-        def case_in(project_root, label, subagent_type, prompt, want):
-            hook_input = {"tool_name": "Agent", "tool_input": {"subagent_type": subagent_type, "prompt": prompt}}
-            return (label, want, decide(hook_input, project_root)[0])
-        def case(label, subagent_type, prompt, want):
-            return case_in(work, label, subagent_type, prompt, want)
+        # 默认给每个样本提示补上「重型测试：不跑」、开工先读共用约束与规格检查放行行，实现员再补一行各不相同的要动文件：
+        # 这样各条样本只判它自己要判的那一条；要判那几条本身的样本用 footer 换掉或关掉
+        writer_case_counter = [0]
+        def case_in(project_root, label, subagent_type, prompt, want, footer=True):
+            footer_text = FOOTER if footer is True else (footer or "")
+            text = prompt + ("\n" + footer_text if footer_text else "")
+            if subagent_type == "implementation-writer" and footer_text and "要动的 crates 文件" not in text:
+                writer_case_counter[0] += 1
+                text += f"要动的 crates 文件：crates/selftest/src/case{writer_case_counter[0]}.rs\n"
+            hook_input = {"tool_name": "Agent", "tool_input": {"subagent_type": subagent_type, "prompt": text}}
+            return (label, want, decide(hook_input, project_root, hook_dir)[0])
+        def case(label, subagent_type, prompt, want, footer=True):
+            return case_in(work, label, subagent_type, prompt, want, footer)
         # 快照那一条的样本仓：r-open 开着（有正文、没判决）；r-closed 已判完；r-nobody 有快照没正文（普查一类）；r-odd 开着，清单里全是认不出的行
         def write_sample(project_root, relative_path, content):
             path = os.path.join(project_root, relative_path)
@@ -538,8 +714,8 @@ def selftest(hook_dir):
         specification_path = os.path.join(specification_directory, "spec.md")
         write_sample(specification_directory, "spec.md", "1. 文件：.claude/kb/checks-owed.md\n   旧串：| C120 | …\n   新串：| C120 | …\n")
         missing_specification_path = os.path.join(specification_directory, "missing-spec.md")
-        collided = "规格：改 `.claude/kb/checks-owed.md` 里 C120 那一行。\n"
-        forwarded_refusal = decide({"tool_input": {"subagent_type": "kb-scribe", "prompt": collided}}, work)[1] or ""
+        collided = "规格：改 `.claude/kb/checks-owed.md` 里 C120 那一行。\n" + FOOTER
+        forwarded_refusal = decide({"tool_input": {"subagent_type": "kb-scribe", "prompt": collided}}, work, hook_dir)[1] or ""
         cases = [
             case("不是执行员", "experiment-designer", "随便", 0),
             case("只修锚点", "experiment-runner", "只修锚点：表 e153", 0),
@@ -550,88 +726,138 @@ def selftest(hook_dir):
             case("续做没写还差", "experiment-runner", again + "这一段回答的岔路：岔路 1\n", 2),
             case("续做还差写无", "experiment-runner", again + "这一段回答的岔路：岔路 1\n上一段岔路表里还差：无\n", 2),
             case("重跑登记也算续做", "experiment-runner", "research/prompts/e153-r2-prereg.md\n这一段回答的岔路：岔路 3\n", 2),
-            # 重型测试：肯定句拒、否定句放；crash-verifier / gate-triage 只放自己那一份
-            case("重型:实现员跑层 0 快档", "implementation-writer", "改完交回前跑层 0 快档一次。", 2),
-            case("重型:实现员跑 cargo test --all", "implementation-writer", "交回前 `cargo test --all` 贴末尾。", 2),
-            case("重型:实现员 bash check.sh", "implementation-writer", "最后 bash .claude/scripts/check.sh 贴末尾原样输出。", 2),
-            case("重型:通用 agent 跑 layer0", None, "跑 first_transaction_step_seven_layer0 的全量", 2),
-            case("重型:执行员跑 gate.sh", "experiment-runner", first + "这一段回答的岔路：岔路 1\n收尾跑 gate.sh --staged。\n", 2),
-            case("重型:书记员跑 QEMU", "kb-scribe", "写完跑 55 号 QEMU。", 2),
-            case("重型:实现员跑 herd7", "implementation-writer", "改完跑 herd7 看 litmus。", 2),
-            case("重型:实现员复跑 crates 变异整表", "implementation-writer", "复跑 crates/mutations.tsv 整表。", 2),
-            case("重型:崩溃验证员跑整轮门禁", "crash-verifier", "跑层 0 全量，再跑 gate.sh --staged。", 2),
-            case("重型:门禁分诊跑层 0", "gate-triage", "直接跑 54 号 --full。", 2),
-            case("重型:通用 agent 跑 E152", "general-purpose", "跑 E152 八家对比。", 2),
-            case("重型:否定句「不跑层 0」", "implementation-writer", "不跑层 0，只跑动到的测试二进制。", 0),
-            case("重型:否定句「别跑」", "implementation-writer", "别跑 `cargo test --all`。", 0),
-            case("重型:否定句「禁止」", "implementation-writer", "禁止跑 check.sh。", 0),
-            case("重型:否定句「不用」", "implementation-writer", "层 0 全量不用跑，提交时统一跑。", 0),
-            case("重型:只提到、没要它跑", "implementation-writer", "层 0 全量归主 agent；check.sh 那一套 lint 下的 clippy 要过。", 0),
-            case("重型:--all-targets 不是 --all", "implementation-writer", "跑 `cargo build --offline --all-targets`。", 0),
-            case("重型:轻阶段谁都能跑", "experiment-runner", first + "这一段回答的岔路：岔路 1\n跑完再跑 bash .claude/gate.d/12-no-prime-marks.sh。\n", 0),
-            case("重型:崩溃验证员跑自己那几道", "crash-verifier", "提交流程里跑 55 号 QEMU、57 号 herd7、59 号变异整表，命令带 SINGLEFS_HEAVY_TESTS=commit。", 0),
-            case("重型:崩溃验证员跑层 0 不归它", "crash-verifier", "提交流程里跑 54 号 --full，命令带 SINGLEFS_HEAVY_TESTS=commit。", 2),
-            case("重型:门禁分诊跑整轮", "gate-triage", "带 SINGLEFS_HEAVY_TESTS=commit 跑 gate.sh --staged。", 0),
-            # 收窄：只在动词的宾语就是重型阶段时才拦。2026-09-25 被误拦的原句逐字，都该放行
-            case("收窄:原句一「只在提交时才执行的」是定语", "general-purpose",
-                 "理由照实写：59 号属于只在提交时才执行的重型阶段，改它的实现在提交之前没有办法证明没改坏，所以两边各留一份", 0),
-            case("收窄:原句二 转述报告、「重跑」的宾语是第一个事务", "general-purpose",
-                 "还有一处旧判法要一起看：实二四的报告……第 3 条说，55 号还按「宿主只重跑第一个事务」判 `second-transaction` 和 `second-instance`", 0),
-            case("收窄:原句三「没法……跑它」", "general-purpose", "理由照实写：59 号是重型阶段，抽成共用库之后没法在提交之外跑它来证明没改坏", 0),
-            case("收窄:派发说明本身（引了上面三句与该拦例句）", "general-purpose", DISPATCH_SPECIFICATION_EXCERPT, 0),
-            # 该拦例句照拦
-            case("收窄:拦「跑 54 号层 0 全量」", "implementation-writer", "跑 54 号层 0 全量", 2),
-            case("收窄:拦「提交前起 QEMU 跑一遍」", "implementation-writer", "提交前起 QEMU 跑一遍", 2),
-            case("收窄:拦「执行 gate.sh」", "implementation-writer", "执行 gate.sh", 2),
-            case("收窄:拦「复跑 crates 变异整表」", "implementation-writer", "复跑 crates 变异整表", 2),
-            # 各一句否定形态：放行
-            case("收窄:否定「不许跑 54 号」", "implementation-writer", "不许跑 54 号层 0 全量", 0),
-            case("收窄:否定「别起 QEMU 跑一遍」连着两个动词", "implementation-writer", "提交前别起 QEMU 跑一遍", 0),
-            case("收窄:否定「不能执行 gate.sh」", "implementation-writer", "不能执行 gate.sh", 0),
-            case("收窄:否定「没法在提交之外复跑」", "implementation-writer", "没法在提交之外复跑 crates 变异整表", 0),
-            # 各一句引号形态：放行
-            case("收窄:引号「」", "implementation-writer", "该拦例句「跑 54 号层 0 全量」", 0),
-            case("收窄:引号“”", "implementation-writer", "旧提示里那句“提交前起 QEMU 跑一遍”已删", 0),
-            case("收窄:ASCII 双引号", "implementation-writer", '例句 "执行 gate.sh" 照拦', 0),
-            case("收窄:引号『』", "implementation-writer", "例句『复跑 crates 变异整表』", 0),
-            # 每条收窄规则各自的边：转述、别的宾语、定语放行；否定只管紧跟的动词，照拦
-            case("收窄:转述「报告说，」之后", "implementation-writer", "实二四报告说，要复跑 crates 变异整表", 0),
-            case("收窄:转述之前的那半照判", "implementation-writer", "跑 54 号层 0 全量，报告里写退出码", 2),
-            case("收窄:宾语是单测，54 号只是同句另一个名词", "implementation-writer", "跑一遍自己的单测确认 54 号层 0 没被改坏", 0),
-            case("收窄:宾语是 54 号之外的阶段", "implementation-writer", "跑 54 号之外的门禁阶段", 0),
-            case("收窄:「只在提交时才跑」是说明", "implementation-writer", "54 号只在提交时才跑全量", 0),
-            case("收窄:「check.sh 交回前跑一次」照拦", "implementation-writer", "验证负载：只跑动到的测试二进制，`check.sh` 交回前跑一次", 2),
-            case("收窄:定语「才跑的那一道」", "implementation-writer", "59 号是只在提交时才跑的那一道", 0),
-            case("收窄:命令字面在前、否定在后", "implementation-writer", "`cargo test --all` 不用跑", 0),
-            case("收窄:否定只管它那个分句", "implementation-writer", "不跑 12 号，跑 54 号层 0 全量", 2),
-            case("收窄:「正在跑」是在说正在发生的事", "implementation-writer", "宿主上门禁 54 号正在跑层 0 全量，你的复跑一律 nice -n 19", 0),
-            case("收窄:「在后台跑」是在说正在发生的事", "implementation-writer", "此刻有一个层 0 全量（门禁 54 号）在后台跑，`nice` 起", 0),
-            case("收窄:拒绝信息原样转给别人不再被拦", "general-purpose", decide({"tool_input": {"subagent_type": "implementation-writer", "prompt": "跑 54 号层 0 全量"}}, work)[1], 0),
-            case("收窄:「现在跑」照拦", "implementation-writer", "现在跑 54 号层 0 全量", 2),
-            case("收窄:「……时」是时间状语", "implementation-writer", "12 号只在收尾跑整轮门禁时判", 0),
-            case("收窄:宾语是「54 号的判定段」", "three-way-attack", "在仓的副本里真跑 54 号的判定段，用合成日志与假 cargo", 0),
-            case("收窄:「54 号的全量」照拦", "implementation-writer", "跑 54 号的全量", 2),
-            case("收窄:重定向目标不是要跑的", "implementation-writer", "追加那张表只许用单条 bash `printf '…\\n' >> crates/mutations.tsv`", 0),
-            case("收窄:被动句里名字是施事", "general-purpose", "变异会不会被门禁 59 号复跑", 0),
-            case("收窄:分句开头是主 agent", "three-way-attack", "主 agent 收尾跑 54 号 `--full`、整轮门禁只核全绿标记", 0),
-            case("收窄:主 agent 要你跑照拦", "implementation-writer", "主 agent 要你跑 54 号层 0 全量", 2),
-            case("收窄:「跑出的标记」是定语", "three-way-attack", "收尾在工作区上跑出的标记在 `gate.sh --staged` 的临时 worktree 里对得上", 0),
-            case("收窄:名字在前隔着并列与地点，照拦", "implementation-writer", "`check.sh` 与登记给你的阶段在副本上跑", 2),
-            case("收窄:括号拆开之后前后两半照判", "implementation-writer", "`check.sh` 与阶段归属表登记给你的阶段（33、53、74 号）都要跑，贴末行", 2),
-            case("收窄:括号里的否定只管括号里", "implementation-writer", "跑 `nice -n 19 bash .claude/scripts/check.sh`（别抢主工作区 target 锁），原样抄判定行", 2),
-            case("收窄:名字在前隔着「由」是别人跑", "implementation-writer", "gate.sh 由 gate-triage 跑", 0),
-            case("收窄:「照 59 号那一套判据」是介词宾语", "mutation-triage", "照门禁 59 号那一套判据跑", 0),
-            case("收窄:「把层 0 重放改成多线程跑」宾语是改", "implementation-writer", "把层 0 崩溃点重放改成多线程跑", 0),
-            case("收窄:e152-tables.py 不是 E152 装置", "general-purpose", "跑完再跑 `python3 research/scripts/e152-tables.py --selftest`", 0),
-            case("收窄:「层 0 每个崩溃状态都要跑它」宾语是它", "implementation-writer", "层 0 每个崩溃状态都要跑它", 0),
-            case("收窄:「变异表里两行」不是整表", "three-way-forward", "在副本上把 `crates/mutations.tsv` 里新加的两行各跑一遍", 0),
-            case("收窄:gate-reuse-check.sh 不是 check.sh", "implementation-writer", "单跑一次 `bash .claude/singlefs-ai-sop/scripts/claude-hooks/gate-reuse-check.sh`", 0),
-            case("收窄:「别忘了跑」不是否定", "implementation-writer", "别忘了跑 gate.sh", 2),
-            case("收窄:「别人」不是否定", "implementation-writer", "交给别人之前跑 54 号层 0 全量", 2),
-            case("收窄:「不变量」不是否定、名字在前", "implementation-writer", "改了 checker 不变量就连层 0 快档一起跑", 2),
-            case("收窄:把字句", "implementation-writer", "把 54 号跑一遍", 2),
-            case("收窄:没闭合的引号照判", "implementation-writer", "「跑 54 号层 0 全量", 2),
-            case("收窄:反引号里的引号是命令", "implementation-writer", '执行 `bash "$ROOT/.claude/gate.d/54-layer0-replay.sh" --full`', 2),
+        ]
+        # ── 派发提示的结构：重型测试一行、共用约束、定义要的输入、写范围、实现员文件与登记、模型并发与限额窗口、书记员规格、设计员准入、变异表 ──
+        defs_work = tempfile.mkdtemp()
+        other_directories.append(defs_work)
+        write_sample(defs_work, ".claude/agents/three-way-local-attack.md", "---\nname: three-way-local-attack\nmodel: sonnet\nrequired-inputs: 禁读清单, 草稿目录, 提示文件\n---\n")
+        write_sample(defs_work, ".claude/agents/three-way-verifier.md", "---\nname: three-way-verifier\nmodel: sonnet  # 注释\nrequired-inputs: 快照, 草稿目录, 报告路径|-verifier-output.md\n---\n")
+        write_sample(defs_work, ".claude/agents/experiment-runner.md", "---\nname: experiment-runner\nmodel: opus\nrequired-inputs: 草稿目录\n---\n")
+        write_sample(defs_work, ".claude/agents/implementation-writer.md", "---\nname: implementation-writer\nmodel: opus\n---\n")
+        write_sample(defs_work, ".claude/agents/mutation-triage.md", "---\nname: mutation-triage\nmodel: sonnet\n---\n")
+        write_sample(defs_work, ".claude/hooks/agent-write-scope.tsv",
+                     "# 样本\nexperiment-runner\tresearch/results/**\t样本\nexperiment-runner\tresearch/prompts/e*-r*-prereg.md\t样本\nexperiment-runner\t/tmp/claude-1000/**\t样本\n"
+                     "implementation-writer\tcrates/**\t样本\nimplementation-writer\t/tmp/claude-1000/**\t样本\n")
+        heavy_line = "重型测试：不跑\n"
+        defs_case = lambda label, subagent_type, prompt, want: case_in(defs_work, label, subagent_type, heavy_line + prompt, want, footer=False)
+        for index, sentence in enumerate(OLD_HEAVY_TEST_REFUSALS, 1):
+            cases.append(case(f"重型:旧判法误拦的原句 {index} 带上那一行就放行", "general-purpose", sentence, 0))
+        cases += [
+            case("重型:没写那一行（实现员）", "implementation-writer", "改完交回。", 2, footer=FOOTER_WITHOUT_HEAVY_LINE),
+            case("重型:没写那一行（通用 agent）", "general-purpose", "查一个文件。", 2, footer=FOOTER_WITHOUT_HEAVY_LINE),
+            case("重型:崩溃验证员不要那一行", "crash-verifier", "提交流程里跑 54 号 --full。", 0, footer=FOOTER_WITHOUT_HEAVY_LINE),
+            case("重型:门禁分诊员不要那一行", "gate-triage", "带 SINGLEFS_HEAVY_TESTS=commit 跑 gate.sh --staged。", 0, footer=FOOTER_WITHOUT_HEAVY_LINE),
+            case("重型:那一行带粗体与列表记号也认", "implementation-writer", "改完交回。\n- **重型测试**：不跑\n", 0, footer=FOOTER_WITHOUT_HEAVY_LINE),
+            case("重型:写在句子中间不算那一行", "implementation-writer", "这一件的重型测试：不跑也行吧", 2, footer=FOOTER_WITHOUT_HEAVY_LINE),
+            case_in(defs_work, "共用约束:通用 agent 没写开工先读", "general-purpose", heavy_line + "查一个文件。", 2, footer=False),
+            case_in(defs_work, "共用约束:通用 agent 写了开工先读", "general-purpose", heavy_line + "开工先读 `.claude/agent-common.md`。查一个文件。", 0, footer=False),
+            defs_case("输入:本地攻方缺禁读清单（09-23 12:48 那一次）", "three-way-local-attack", "提示文件 research/prompts/r-local-attack.md，草稿目录 /tmp/claude-1000/r/", 2),
+            defs_case("输入:本地攻方齐了", "three-way-local-attack", "提示文件 research/prompts/r-local-attack.md，草稿目录 /tmp/claude-1000/r/，禁读清单：别的腿的产出", 0),
+            defs_case("输入:核查员缺草稿目录（09-24 23:44 那一次）", "three-way-verifier", "快照 research/prompts/r-snapshot/，报告路径 research/prompts/r-verifier-output.md", 2),
+            defs_case("输入:核查员缺快照（09-25 02:53 那一次）", "three-way-verifier", "草稿目录 /tmp/claude-1000/v/，报告 research/prompts/r-verifier-output.md", 2),
+            defs_case("输入:核查员同义词认得", "three-way-verifier", "快照 x，草稿目录 /tmp/claude-1000/v/，写 research/prompts/r-verifier-output.md", 0),
+            defs_case("写范围:执行员报告写进 research/prompts（09-26 那一次）", "experiment-runner",
+                      "草稿目录 /tmp/claude-1000/e/\n报告路径：research/prompts/e142-r15-runner-report.md\n这一段回答的岔路：岔路 1\n", 2),
+            defs_case("写范围:执行员去更新问题单", "experiment-runner",
+                      "草稿目录 /tmp/claude-1000/e/\n更新 research/prompts/m2-rbf1-e142-questions.md 的状态\n这一段回答的岔路：岔路 1\n", 2),
+            defs_case("写范围:实现员写进 invariants.md", "implementation-writer",
+                      "要动的 crates 文件：crates/a/src/one.rs\n顺手写进 .claude/kb/invariants.md 的状态列\n", 2),
+            defs_case("写范围:报告写进草稿目录放行", "experiment-runner",
+                      "草稿目录 /tmp/claude-1000/e/\n报告写进 /tmp/claude-1000/e/report.md\n这一段回答的岔路：岔路 1\n", 0),
+            defs_case("写范围:否定句里的路径不判", "experiment-runner",
+                      "草稿目录 /tmp/claude-1000/e/\n不要写进 research/prompts/x-report.md\n这一段回答的岔路：岔路 1\n", 0),
+            defs_case("变异分诊:没给表", "mutation-triage", "跑 2697 条广谱变异。", 2),
+            defs_case("变异分诊:给了表", "mutation-triage", "跑 crates/mutations.tsv 里 m2-rollback 那几条。", 0),
+            defs_case("执行员:只补落产物放行", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物：E142 那份。", 0),
+        ]
+        # 实现员：要动的 crates 文件一行、件数上限、与在跑的实现员撞文件（登记在自检自己的状态目录里）
+        state_root = tempfile.mkdtemp()
+        other_directories.append(state_root)
+        os.environ["DISPATCH_GUARD_STATE_ROOT"] = state_root
+        session_work = tempfile.mkdtemp()
+        other_directories.append(session_work)
+        def session_case(label, subagent_type, prompt, want, transcript_name, model=None, project_root=defs_work):
+            tool_input = {"subagent_type": subagent_type, "prompt": heavy_line + prompt}
+            if model:
+                tool_input["model"] = model
+            hook_input = {"tool_name": "Agent", "tool_input": tool_input, "session_id": transcript_name,
+                          "transcript_path": os.path.join(session_work, transcript_name + ".jsonl")}
+            return (label, want, decide(hook_input, project_root)[0])
+        def write_session(transcript_name, records):
+            with open(os.path.join(session_work, transcript_name + ".jsonl"), "a", encoding="utf-8") as handle:
+                for record in records:
+                    handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        def stamp(seconds_ago):
+            return datetime.fromtimestamp(time.time() - seconds_ago, timezone.utc).isoformat().replace("+00:00", "Z")
+        def launch(agent_id, model, prompt, seconds_ago=600):
+            return {"timestamp": stamp(seconds_ago), "toolUseResult": {"status": "async_launched", "agentId": agent_id, "resolvedModel": model, "prompt": prompt}}
+        def handed_back(agent_id, seconds_ago=60):
+            return {"timestamp": stamp(seconds_ago), "content": f'<agent-message from="{agent_id}">\n[Subagent hand-back] 报告'}
+        def notification(agent_id, status, summary="", seconds_ago=60):
+            return {"timestamp": stamp(seconds_ago), "content": f"<task-notification>\n<task-id>{agent_id}</task-id>\n<status>{status}</status>\n<summary>{summary}</summary>\n</task-notification>"}
+        writer_one = "要动的 crates 文件：crates/a/src/one.rs crates/a/src/two.rs\n"
+        write_session("registry", [])
+        cases.append(session_case("实现员:第一件登记下来", "implementation-writer", writer_one, 0, "registry"))
+        cases.append(session_case("实现员:第二件撞了在跑的那件", "implementation-writer", "要动的 crates 文件：crates/a/src/two.rs、crates/a/src/three.rs\n", 2, "registry"))
+        cases.append(session_case("实现员:第三件不撞", "implementation-writer", "要动的 crates 文件：crates/a/src/three.rs\n", 0, "registry"))
+        write_session("registry", [launch("a00000000000000a1", "claude-opus-5", heavy_line + writer_one), handed_back("a00000000000000a1")])
+        cases.append(session_case("实现员:第一件交回之后不再撞", "implementation-writer", "要动的 crates 文件：crates/a/src/two.rs\n", 0, "registry"))
+        cases.append(session_case("实现员:没写要动的文件", "implementation-writer", "改挂载准入。", 2, "registry"))
+        cases.append(session_case("实现员:文件超过上限", "implementation-writer", "要动的 crates 文件：" + " ".join(f"crates/b/src/f{n}.rs" for n in range(IMPLEMENTATION_WRITER_FILE_LIMIT + 1)) + "\n", 2, "registry"))
+        cases.append(session_case("实现员:文件超过上限、用户定了放宽", "implementation-writer", "要动的 crates 文件：" + " ".join(f"crates/c/src/f{n}.rs" for n in range(IMPLEMENTATION_WRITER_FILE_LIMIT + 1)) + "\n文件上限已判：用户定这一件放宽到 12\n", 0, "registry"))
+        cases.append(session_case("实现员:文件超过上限、放行行理由空", "implementation-writer", "要动的 crates 文件：" + " ".join(f"crates/d/src/f{n}.rs" for n in range(IMPLEMENTATION_WRITER_FILE_LIMIT + 1)) + "\n文件上限已判：\n", 2, "registry"))
+        # opus 并发：4 个在跑（1 个交回、1 个失败的不算）；限额窗口：失败通知写着还没到的 resets 时刻
+        write_session("busy", [launch(f"a000000000000b{n:02d}", "claude-opus-5-5[1m]", f"活 {n}") for n in range(OPUS_CONCURRENCY_LIMIT + 2)]
+                      + [handed_back("a000000000000b00"), notification("a000000000000b01", "failed")])
+        write_session("light", [launch(f"a000000000000c{n:02d}", "claude-opus-5", f"活 {n}") for n in range(OPUS_CONCURRENCY_LIMIT - 1)]
+                      + [launch("a000000000000c99", "claude-sonnet-5", "别的")])
+        future = datetime.fromtimestamp(time.time() + 7200, timezone.utc)
+        future_text = f"{future.hour % 12 or 12}{'pm' if future.hour >= 12 else 'am'}"
+        write_session("window", [launch("a0000000000000d1", "claude-opus-5", "撞限额的", 1200),
+                                 notification("a0000000000000d1", "failed", f"You've hit your session limit · resets {future_text} (UTC) (error type rate_limit, model sent to the API: claude-opus-5)", 600)])
+        write_session("windowlifted", [launch("a0000000000000f1", "claude-opus-5", "撞限额的", 1200),
+                                       notification("a0000000000000f1", "failed", f"resets {future_text} (UTC) (model sent to the API: claude-opus-5)", 900),
+                                       launch("a0000000000000f2", "claude-opus-5-5[1m]", "换号之后派的", 300)])
+        past = datetime.fromtimestamp(time.time() - 30 * 3600, timezone.utc)
+        past_reset = datetime.fromtimestamp(time.time() - 29 * 3600, timezone.utc)
+        write_session("windowpast", [notification("a0000000000000e1", "failed", f"resets {past_reset.hour % 12 or 12}{'pm' if past_reset.hour >= 12 else 'am'} (UTC) (model sent to the API: claude-opus-5)", 30 * 3600)])
+        cases += [
+            session_case(f"opus:已有 {OPUS_CONCURRENCY_LIMIT} 个在跑再派 opus", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 2, "busy"),
+            session_case("opus:用户定了超上限", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物\nopus 并发已判：用户 23:10 定这一件照派", 0, "busy"),
+            session_case("opus:派 sonnet 不算", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 0, "busy", model="sonnet"),
+            session_case(f"opus:{OPUS_CONCURRENCY_LIMIT - 1} 个在跑放行", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 0, "light"),
+            session_case("opus:没有定义的类型按 opus 算", "general-purpose", "开工先读 `.claude/agent-common.md`。", 2, "busy"),
+            session_case("窗口:还没到 resets 时刻不派同一族", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 2, "window"),
+            session_case("窗口:换一族放行", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 0, "window", model="sonnet"),
+            session_case("窗口:用户定了照派", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物\n限额窗口已判：用户说换号了", 0, "window"),
+            session_case("窗口:resets 时刻已过", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 0, "windowpast"),
+            session_case("窗口:撞限额之后同一族又派出去没再撞，已解开", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 0, "windowlifted"),
+        ]
+        # 书记员的规格：点名的规格文件交给 kb-spec-check.py（仓根是样本仓 work）
+        write_sample(work, ".claude/kb/tooling.md", "# 工具\n\n| 甲 | 旧值 |\n\n## 历史版本\n")
+        good_spec = os.path.join(specification_directory, "good-spec.json")
+        write_sample(specification_directory, "good-spec.json", json.dumps([{"file": ".claude/kb/tooling.md", "old": "| 甲 | 旧值 |", "new": "| 甲 | 新值 |", "basis": "样本"}], ensure_ascii=False))
+        bad_spec = os.path.join(specification_directory, "bad-spec.json")
+        write_sample(specification_directory, "bad-spec.json", json.dumps([{"file": ".claude/kb/tooling.md", "old": "| 乙 | 不在的行 |", "new": "| 乙 | 新 |", "basis": "样本"}], ensure_ascii=False))
+        no_valve = heavy_line + "开工先读 `.claude/agent-common.md`\n"
+        cases += [
+            case("规格:点名的规格检查过了", "kb-scribe", f"逐条规格在 {good_spec}，照写。", 0, footer=no_valve),
+            case("规格:点名的规格旧串不在", "kb-scribe", f"逐条规格在 {bad_spec}，照写。", 2, footer=no_valve),
+            case("规格:一份认得出的规格都没有", "kb-scribe", "照判决写回 C120。", 2, footer=no_valve),
+            case("规格:写了放行行", "kb-scribe", "照判决写回 C120。\n规格检查已判：用户口述的定案，没有规格文件\n", 0, footer=no_valve),
+        ]
+        # 设计员的重跑登记：准入判输入没变（假的 admission.py 退 77）就拒
+        for name, code in (("admission-unchanged.py", 77), ("admission-changed.py", 0)):
+            write_sample(work, name, f"import sys\nsys.exit({code})\n")
+        os.environ["RUNNER_DISPATCH_GUARD_ADMISSION_SCRIPT"] = os.path.join(work, "admission-unchanged.py")
+        cases += [
+            case("准入:输入没变不写重跑登记", "experiment-designer", "写重跑登记 research/prompts/e142-r19-prereg.md。", 2),
+            case("准入:写了放行行", "experiment-designer", "写重跑登记 research/prompts/e142-r19-prereg.md。\n准入已判：换了一条臂\n", 0),
+            case("准入:不是重跑登记不判", "experiment-designer", "写跑前登记 research/prompts/e170-preregistration.md。", 0),
+        ]
+        os.environ["RUNNER_DISPATCH_GUARD_ADMISSION_SCRIPT"] = os.path.join(work, "admission-changed.py")
+        cases.append(case("准入:输入变了放行", "experiment-designer", "写重跑登记 research/prompts/e142-r19-prereg.md。", 0))
+        cases += [
             # 快照：派书记员 / 实现员时要改的文件落在还没判完的三方轮的开工快照里，拒绝
             case("快照:书记员撞开着的轮（清单写 ./.claude/）", "kb-scribe", collided, 2),
             case("快照:实现员撞开着的轮（清单写 tree/crates/）", "implementation-writer", "改 crates/singlefs-core/src/mount.rs 的挂载准入，带测试。", 2),
@@ -664,21 +890,22 @@ def selftest(hook_dir):
         broken_json = run_hook(work, "{不是 JSON")
         cases.append(("stdin:JSON 解析不了放行", 0, broken_json.returncode))
         cases.append(("stdin:JSON 解析不了时 stderr 写了错误", 1, int("JSON" in broken_json.stderr)))
-        unreadable_list = run_hook(unreadable_work, json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": "kb-scribe", "prompt": "规格：改 `.claude/kb/pitfalls.md`。"}}))
+        unreadable_list = run_hook(unreadable_work, json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": "kb-scribe", "prompt": "规格：改 `.claude/kb/pitfalls.md`。\n" + FOOTER}}))
         cases.append(("stdin:快照清单读不了放行", 0, unreadable_list.returncode))
         cases.append(("stdin:快照清单读不了时 stderr 写了是哪一份", 1, int("读不了快照清单" in unreadable_list.stderr and "gone-sha256.txt" in unreadable_list.stderr)))
         for label, prompt, want in (("stdin:续做没写还差", again + "这一段回答的岔路：岔路 1\n", 2),
                                     ("stdin:第一段点名了岔路", first + "这一段回答的岔路：岔路 1\n", 0)):
             completed = subprocess.run(["bash", script],
-                                       input=json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": "experiment-runner", "prompt": prompt}}),
+                                       input=json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": "experiment-runner", "prompt": prompt + FOOTER}}),
                                        capture_output=True, text=True, env=dict(os.environ, CLAUDE_PROJECT_DIR=work))
             cases.append((label, want, completed.returncode))
-        heavy = subprocess.run(["bash", script],
-                               input=json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": "implementation-writer", "prompt": "交回前跑层 0 快档。"}}),
-                               capture_output=True, text=True, env=dict(os.environ, CLAUDE_PROJECT_DIR=work))
-        cases.append(("stdin:派实现员跑层 0 拒绝（退出码 2）", 2, heavy.returncode))
+        heavy = run_hook(work, json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": "implementation-writer",
+                                                                            "prompt": "改完交回。\n" + FOOTER_WITHOUT_HEAVY_LINE}}))
+        cases.append(("stdin:派实现员没写重型测试一行拒绝（退出码 2）", 2, heavy.returncode))
         cases.append(("stdin:拒绝时 stderr 写了出路", 1, int("→ 怎么办" in heavy.stderr and "弹窗" in heavy.stderr)))
     finally:
+        os.environ.pop("DISPATCH_GUARD_STATE_ROOT", None)
+        os.environ.pop("RUNNER_DISPATCH_GUARD_ADMISSION_SCRIPT", None)
         shutil.rmtree(work)
         for directory in other_directories:
             shutil.rmtree(directory, ignore_errors=True)
@@ -686,12 +913,16 @@ def selftest(hook_dir):
     for label, want, got in failures:
         print(f"  ✗ 自检：{label} 应当返回 {want}，实际 {got}")  # gate-lint:detail
     if failures:
-        print("    → 看 decide()、heavy_test_requests() 与 snapshot_conflict_verdict() 的判法；RUNNER_DISPATCH_GUARD_DISABLE_CHECK、_DISABLE_HEAVY_TEST、"
+        print("    → 看 decide() 与它调的各条判法（重型测试一行、agent_definition_fields、out_of_scope_mentions、implementation_writer_verdict、model_verdict、"
+              "kb_scribe_spec_verdict、designer_admission_verdict、snapshot_conflict_verdict）；RUNNER_DISPATCH_GUARD_DISABLE_CHECK、_DISABLE_HEAVY_TEST、"
               "_DISABLE_SNAPSHOT 或 _BREAK 设着的话这里本来就该红")
         return 1
-    print(f"  ✓ 自检通过（查了 {len(cases)} 种）：非执行员与只修锚点放行，没点名岔路、续做没写还差或还差写无的拒绝；派发提示里动词的宾语是越出自己那一份的重型阶段就拒，"
-          "否定句、引号里的、转述、宾语是别的东西、定语、轻阶段、crash-verifier 与 gate-triage 各自那一份放行；派书记员或实现员时要改的文件在没判完的三方快照里就拒，"
-          "已判完的轮、没正文的快照、写了放行行的、派别的 agent 的、认不出的清单行、不在的规格与读不了的清单放行")
+    print(f"  ✓ 自检通过（查了 {len(cases)} 种）：没写「重型测试：不跑」一行的拒（崩溃验证员、门禁分诊员不要，旧判法误拦的 {len(OLD_HEAVY_TEST_REFUSALS)} 句原句带上那一行放行）；"
+          "通用 agent 没写开工先读共用约束的拒；定义 required-inputs 缺一组的拒、同义词认得；提示点名写范围外的路径拒、否定句里的不判；"
+          "实现员没写要动的 crates 文件、超上限、与在跑的实现员撞文件的拒，交回之后不再撞；opus 在跑满上限的拒、sonnet 与用户放行行放行，"
+          "限额窗口没到的同一族拒、换一族或时刻已过放行；书记员规格检查红或一份规格都认不出的拒；设计员重跑登记准入判输入没变的拒；"
+          "变异分诊员没给表的拒；执行员没点名岔路、续做没写还差或还差写无的拒，只修锚点与只补落产物放行；"
+          "派书记员或实现员时要改的文件在没判完的三方快照里就拒，已判完的轮、没正文的快照、写了放行行的、派别的 agent 的、认不出的清单行、不在的规格与读不了的清单放行")
     return 0
 
 def main():

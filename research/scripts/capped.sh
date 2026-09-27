@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 只是给一条命令套上线程上限再 exec 它，除了 bash 之外没有环境要求
 # 给一条命令定线程上限：把编译、测试与各装置的并行度环境变量一次设成同一个数，再执行那条命令。
 #
 # 为什么：几个 agent 同时在一台机器上跑时，各按整机核数起线程会把机器超卖——测试变慢、变异撞超时、
@@ -14,6 +16,8 @@
 # SINGLEFS_BAD_DISK_INPUT_WORKER_THREADS、SINGLEFS_RANDOM_HISTORY_THREADS，以及通用的 SINGLEFS_THREAD_CAP
 # （实验装置自己的线程变量没登记在这里的，照派发提示另设，或让装置读 SINGLEFS_THREAD_CAP）。
 set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 
 variable_names=(
     CARGO_BUILD_JOBS

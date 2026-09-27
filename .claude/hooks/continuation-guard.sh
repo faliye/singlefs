@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always Claude Code 每一次触发都要现判这一次调用，上一次的结论不替这一次作保
+# run-condition: command python3
 # PreToolUse hook（SendMessage）：给一个已经交回过、或被中断过（撞限额、被停、报错）的子 agent 发消息之前拦一道。
 #
 # 为什么：交回之后不续做，新活一律新派。用户 2026-09-24 问「启动subagent的时候 为什么会复用 id呢 很奇怪 这个能禁止复用吗」，
@@ -9,7 +11,8 @@
 #
 # 判法：收件人在本会话的 subagents 目录里有会话记录（`<会话目录>/subagents/agent-<id>.jsonl`，按 agent id 找）才判；
 # 找不到会话记录的收件人（别的会话、团队成员、名字而不是 id）放行。有会话记录的，下面两条任一成立就拒绝：
-#   ① 交回过：会话记录逐行按 JSON 解析，至少有一条 assistant 消息的 content 块 type 为 tool_use、name 为 SubagentHandback，
+#   ① 交回过：主会话记录里已经有它的交回消息（`<agent-message from="<id>">` 后跟 `[Subagent hand-back]`，交回结果落进它自己的会话记录之前先到的那一侧），
+#      或者它自己的会话记录逐行按 JSON 解析，至少有一条 assistant 消息的 content 块 type 为 tool_use、name 为 SubagentHandback，
 #      并且后面有 tool_use_id 与它相同的 tool_result，不是错误（is_error 不为真，内容也不是 {"success":false,…} 那种没送出）。
 #      不按字符串搜：每份会话记录开头的工具清单里都写着这个工具名，搜字符串会把没交回的也判成交回。
 #   ② 中断过：本会话记录里它最近一次任务通知是 failed 或 killed。中断过的不留「只差收尾」的口子（用户 2026-09-19：
@@ -23,8 +26,13 @@
 #
 #   continuation-guard.sh             # 从 stdin 读 hook 的 JSON
 #   continuation-guard.sh --selftest  # 在临时目录里走一遍放行与拒绝；CONTINUATION_GUARD_DISABLE_CHECK=1 时自检必须判红，
-#                                     # CONTINUATION_GUARD_BREAK=anyrecord / handback-grep / handback-anyresult 各自也必须让它红
+#                                     # CONTINUATION_GUARD_BREAK=anyrecord / handback-grep / handback-anyresult / ignore-main-handback 各自也必须让它红
+# hook-events: PreToolUse:SendMessage
+# gate-similar: runner-dispatch-guard.sh 同样读主会话记录里的交回消息（<agent-message from=…> [Subagent hand-back]），但它挂 Agent|Task、判在跑的实现员与 opus 数；这里挂 SendMessage、判收件人交回过没有，只按一个 agent 号找一种记号，两行正则，不值得抽共用
+# gate-similar: handback-guard.sh 挂 SubagentHandback、在交回那一刻判交回正文；这里在交回之后判能不能再给它发消息
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 # python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON（与 runner-dispatch-guard.sh 同一个写法）。
 python3 /dev/fd/3 "$HOOK_DIR" "$@" 3<<'PY'
@@ -125,6 +133,17 @@ def handback_delivered(path):
                 return True
     return False
 
+def handback_in_session_transcript(session_transcript, recipient):
+    """主会话记录里有没有它的交回消息（<agent-message from="<id>"> 后跟 [Subagent hand-back]）：交回的结果要过一会儿才落进子 agent 自己的
+    会话记录，主会话那一侧先到——只看子 agent 那一份，交回之后几秒内发的消息会被放行。"""
+    if not session_transcript or not os.path.isfile(session_transcript) or os.environ.get("CONTINUATION_GUARD_BREAK") == "ignore-main-handback":
+        return False
+    marker = re.compile(r'agent-message from=\\?"' + re.escape(recipient) + r'\\?">(?:\\n|\s)*\[Subagent hand-back\]')
+    for line in open(session_transcript, encoding="utf-8", errors="replace"):
+        if recipient in line and "[Subagent hand-back]" in line and marker.search(line):
+            return True
+    return False
+
 def decide(hook_input):
     """返回 (0, None) 放行；(2, 说明) 拒绝。"""
     if os.environ.get("CONTINUATION_GUARD_DISABLE_CHECK") == "1":
@@ -137,7 +156,7 @@ def decide(hook_input):
     last_context, continuations = context_and_continuations(path)
     status = latest_task_status(hook_input.get("transcript_path"), recipient)
     if status not in ("failed", "killed"):
-        if not handback_delivered(path):
+        if not handback_delivered(path) and not handback_in_session_transcript(hook_input.get("transcript_path"), recipient):
             return 0, None
         return 2, (f"✗ 子 agent {recipient} 已经交回过（它的会话记录里有一次送达的 SubagentHandback），交回之后不续做，新活一律新派。\n"
                    "→ 怎么办：不给它发消息。派一个新的同类 agent，派发提示指到它交回的报告与留下的产物；要它会话里的进度，跑 "
@@ -211,10 +230,15 @@ def selftest(hook_dir):
                                      notification("iiii9999jjjj0000", "failed"), notification("iiii9999jjjj0000", "completed"),
                                      notification("kkkk1212llll3434", "killed"), notification("mmmm1313nnnn1414", "completed"),
                                      notification("uuuu2121vvvv2222", "completed"), fake_command]) + "\n")
+        # 主会话那一侧已经收到交回消息、子 agent 自己的会话记录里还没落下交回结果（2026-09-26 那一次：交回 14:00:10、续做 14:00:15）
+        write_agent("wwww3131xxxx3232", 1000, 0)
+        with open(session_transcript, "a") as handle:
+            handle.write(json.dumps({"type": "user", "content": '<agent-message from="wwww3131xxxx3232">\n[Subagent hand-back] 报告'}) + "\n")
         def case(label, recipient, message, want):
             hook_input = {"tool_name": "SendMessage", "transcript_path": session_transcript, "tool_input": {"to": recipient, "message": message}}
             return (label, want, decide(hook_input)[0])
         cases = [
+            case("主会话已有交回消息、子 agent 记录里还没有：拒", "wwww3131xxxx3232", "再补一格", 2),
             case("上下文小的续做", "aaaa1111bbbb2222", "接着做第二段", 0),
             case("上下文大的续做放行：大小不是理由", "cccc3333dddd4444", "接着做第二段", 0),
             case("收件人没有会话记录", "eeee5555ffff6666", "接着做", 0),

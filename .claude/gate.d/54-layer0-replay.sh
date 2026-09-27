@@ -1,77 +1,99 @@
 #!/usr/bin/env bash
-# gate-stage: 层 0 崩溃点重放（整轮门禁跑快档：两条流不标 ignored 的用例，再核对层 0 全量的全绿标记与这批输入的内容哈希相等；全量由主 agent 暂存之后在 HEAD + 暂存区的 worktree 里跑 --full，全绿标记按输入哈希分格：两条流的全部崩溃状态在 release 下逐个跑恢复，第一个事务与 E142 产物逐字比对，里程碑「第二个事务」固定脚本到 E 与用例的闭式比对；只做过 mkfs 的池可写挂载再发第一个文件版本那条流与第一个事务逐项相同，由 cargo test 里的快用例钉住，不另枚举）
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 research/scripts/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判（用户 2026-09-26 定：项目更严）
+# gate-stage: 层 0 崩溃点重放与登记的崩溃枚举用例（整轮门禁跑快档：两条流不标 ignored 的用例，再逐条核 stage-inputs.tsv 里 crash-case: 那几条用例各自那一格全绿标记与它这批输入的指纹相等；全量由主 agent 暂存之后在 HEAD + 暂存区的 worktree 里跑 --full，逐条用例照复用判定跑：那一格全绿标记在就复用，不在才在 release 下跑它、判绿写那一格；两条流的层 0 全量带断点续跑，第一个事务与 E142 产物逐字比对、里程碑「第二个事务」固定脚本到 E 与用例的闭式比对由用例自己断言；只做过 mkfs 的池可写挂载再发第一个文件版本那条流与第一个事务逐项相同，由 cargo test 里的快用例钉住，不另枚举）
 # gate-covers: 崩溃点重放
 #
-# 分两档（用户 2026-09-19 定，原话「每次主 agent 执行完任务后统一执行」，records/2026-09-19-里程碑二遗留收拢.md「五之二」第 8 问）：
+# 分两档（用户 2026-09-19 定，原话「每次主 agent 执行完任务后统一执行」，records/2026-09-19-里程碑二遗留收拢.md「五之二」第 8 问；
+# 用户 2026-09-26 定逐条用例复用，原话「下次肯定要接入提交时崩溃验证员， 并且以后跑也不能全量这么跑，改了只跑改了的部分。」，
+# records/2026-09-24-里程碑二收尾调度.md 第三节「崩溃枚举的跑法」那一行）：
 #
-#   bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full <worktree>    主 agent 暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑一次
-#     两条流的全量枚举（「全量」「多线程」两段说的就是它），不问复用、不问改动范围，照跑。worktree 的建法与 `gate.sh --staged` 相同，命令在快档的出路句里。
-#     开跑与跑完各算一次输入的内容哈希，对不上（跑的过程中输入被改了）判红。全绿标记按输入哈希分格：
-#     `$(git rev-parse --git-common-dir)/singlefs-layer0-full-green.<输入哈希>`，不进工作树；放 common-dir，各 worktree 读写的是同一组。
-#     开跑一格都不删：同一批输入（连同判它的 54 号与工具链，见「输入」一段）的结果是确定的，前一趟写下的那一格在这一趟跑的过程中照样算数。
-#     这一趟没写成标记就退出（判红、被 TERM / INT / HUP 打断）时，退出前删这批输入那一格；「跑的过程中输入变了」那一支判红不删：
-#     两条流读到的不一定是开跑那一批，它说不出那一批的好坏。被 SIGKILL 杀掉来不及删，前一趟那一格留着。别的格不动；全绿才写这一格。
-#     标记里有输入哈希、逐文件的「sha256  路径」、开跑与跑完的 UTC 时刻、工作线程数、两条流的计数行与 CHECKER 行原样。
+#   bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full [--start-over] <worktree>
+#     主 agent 暂存之后（提交时由崩溃验证员），在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑。worktree 的建法与 `gate.sh --staged` 相同，命令在快档的出路句里。
+#     逐条崩溃枚举用例（.claude/gate.d/stage-inputs.tsv 里键是 crash-case: 的那几行，照登记表的次序）：先算这条用例这批输入的指纹
+#     （research/scripts/admission.py crash-case-manifest：登记路径下的文件减去用例读不到的文件，加准入模块 admission.py 里崩溃枚举用例的判法摘要、
+#     工具链、构建环境与这条用例的登记行；这一份 54 号不进指纹）；那一格全绿标记在、作数就复用，不跑；不在才照 admission.py crash-case-command
+#     交出的命令与环境跑（`cargo test --release -p <包> --test <测试目标> -- --include-ignored --exact <用例函数> --nocapture`，续跑的变量与线程数也由它定，
+#     那一段在判法摘要里），按登记行第三列判日志（crash-case-judge），开跑与跑完各算一次指纹，相同才写那一格（crash-case-record）。
+#     全绿标记在 git common-dir：`singlefs-crash-case-green.<用例名>.<输入指纹>`，不进工作树，各 worktree 读写同一组；别的格不动。
+#     一条判红删它这批输入那一格（先绿后红，前一趟那一格不再作数），接着跑下一条；「跑的过程中输入变了」那一支判红不删：它说不出开跑那一批的好坏。
+#     两趟 --full 同时跑同一条用例、同一个指纹时这里不加锁：后跑完的那一趟判红会删掉先跑完的那一趟刚写的绿标记，只会假红、不会假绿
+#     （崩溃验证员的定义里「另有 --full 在跑时不起」挡着这一种）。
+#     断点续跑（crash-case-command 设）：跑用例时设 SINGLEFS_LAYER0_PROGRESS_DIRECTORY=<common-dir>/singlefs-layer0-progress/<这条用例的输入指纹>
+#     （不随 worktree 删掉）、SINGLEFS_LAYER0_INPUT_FINGERPRINT=<这条用例的输入指纹>；--start-over 设 SINGLEFS_LAYER0_START_OVER=1（丢掉进度文件、从头跑），
+#     不带它时从调用方的环境里清掉这个变量。续跑的判法（片方案、校验和、观察者计数、判红删进度文件）在 crates/singlefs-harness/src/layer0_progress.rs。
+#     双机分片（里程碑三第六项，用户 2026-09-27 定默认不分片）：本地配置（${SINGLEFS_LAYER0_SHARD_CONFIG:-<主工作树的根>/layer0-shard.env}，
+#     模板是仓根 layer0-shard.env.example）在、research/scripts/layer0-shard-configuration-check.sh 判得过（键齐、第二台 ssh 连得上、它上面有 cargo）
+#     才开；开着时登记了 shard=across-machines 的用例（admission.py crash-case-shardable）交给 research/scripts/layer0-shard-run.sh --merged-log
+#     （本机 0/2、第二台 1/2、本机 merge/2；驱动脚本与配置判法按内容进这几条用例的指纹），它交回的 merge 那一趟日志照单机的判法判、写同一格标记；
+#     别的用例、配置不在或判不过时，照 crash-case-command 单机跑。开没开、为什么，开跑时打一行。
+#     这一份 54 号不进指纹：改它（出路句、快档、次序）不废旧标记。它里面还定着结论的只剩流程的次序（开跑与跑完各算一次指纹、先判日志再写标记、
+#     判红删那一格），由 admission.py --selftest 的「54 号」那几格核；改它时快档照样核标记（范围那一问不摘掉它）。
 #   bash .claude/gate.d/54-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
 #     快档先核登记的每一条路径 git 至少列得出一个文件（git ls-files -co --exclude-standard -- <那一条>），有一条列不出判红，之后才问复用与改动范围。
-#     两条流的测试二进制在 release 下只跑不标 ignored 的用例，一条都没通过判红；再按这批输入的哈希找那一格：
-#     有、里面记的哈希相同、LAYER0 / CHECKER / LAYER0B 三种计数行各恰好一行、LAYER0 与 LAYER0B 两行各自带 exhaustive=true，才判绿，
-#     成功句报快档计数、原样带出那一格的全量计数行与时刻。
-#     没有那一格判红（列出 common-dir 里最近写的一格与这一次不同的文件；不带哈希的旧名字 singlefs-layer0-full-green 不再认），
-#     哈希不同、计数行不对、缺 exhaustive=true 都判红。快档本身红照旧红。
+#     两条流的测试二进制在 release 下只跑不标 ignored 的用例，一条都没通过判红；再逐条崩溃枚举用例算它这批输入的指纹、核那一格
+#     （admission.py crash-case-marker-check：在、记的指纹与用例相同、test result 是 1 passed、登记的计数行各恰好一行、要 exhaustive=true 的带着），
+#     全部作数才判绿，成功句逐条原样带出那一格的计数行与时刻；有一条不作数判红，逐条列原因（没有那一格时比最近写的一格与这一次的清单），出路是跑 --full。
+#     按整批输入分格的旧标记（singlefs-layer0-full-green.*）不再认。
 #
-# 输入：`.claude/gate.d/stage-inputs.tsv` 里登记给本阶段的路径（唯一登记位，复用判定读的也是它），外加判这一格的 54 号与工具链。
-# 文件集是 git 眼里这些路径下磁盘上真有的文件（已跟踪的加没被忽略的未跟踪的）；逐个按内容算 sha256，「sha256  路径」按路径排序；
-# 清单末尾再加两行：跑的这一份 54 号的 sha256（名字 `<判它的 54 号：54-layer0-replay.sh>`）、`cargo -V` 与 `rustc -V` 原样输出的 sha256
-# （名字 `<工具链：…>`）；整张再算一次 sha256。报的文件数只数登记路径下的文件。这两行只进哈希，不进复用与改动范围那两问：
-# 同一份 crates/ 换了判它的 54 号或工具链，前一趟那一格就不再作数。
-# 按内容算、不按 git 对象算：工作区跑的全量与 `--staged` 临时 worktree 里的同一份内容算出同一个数。
-# 主工作区里跑的 --full 读的是工作区（连同别的会话没暂存的改动、工作区那一份 54 号），罩不到这一批暂存内容；所以 --full 在 HEAD + 暂存区的 worktree 里跑。
+# 输入：整道阶段的复用判定与改动范围按 stage-inputs.tsv 里本阶段那一行（唯一登记位）；每条崩溃枚举用例的输入按它自己那一行，
+# 由 admission.py 按内容算（主工作区跑的与 `--staged` 临时 worktree 里的同一份内容算出同一个数）。
+# 主工作区里跑的 --full 读的是工作区（连同别的会话没暂存的改动），罩不到这一批暂存内容；所以 --full 在 HEAD + 暂存区的 worktree 里跑。
 #
-# 全量（里程碑「第一个事务」步 7）：拿步 5 的录制流按 D13（验证路线） 已定项 4 枚举崩溃状态，每个状态跑三件事：步 6 的恢复与 oracle、
-# 池级 checker（23 条不变量）、记录核对器（根在案而记录缺席、恢复自称新态而单元缺席）；三者的计数都由用例钉死。
-# 全量 262165 个状态在 debug 下要几分钟，所以平时 `cargo test` 里那条用例标 ignored；--full 在 release 下带 --include-ignored 跑它，
-# 把用例打印的 `LAYER0 …` 计数行与逐条不变量的 `CHECKER …` 行报出来。exhaustive=true 才算全量，不是全量判红——层 0 全量是里程碑出口。
-# 判别力：用例自己对着产物的十个计数断言（states / violations / root_persisted … 逐字），oracle 的判别力由同文件的靶向阳性对照证明
-# （根槽已持久而某个单元两份都没持久 ⇒ 8 个单元逐个都判红）。本阶段没有 fixtures 样本：判红要 cargo 真跑，装不进 fixtures 目录。
+# 全量（里程碑「第一个事务」步 7）：拿步 5 的录制流按 D13（验证路线） 已定项 4 枚举崩溃状态，每个状态跑恢复与 oracle、池级 checker、记录核对器，
+# 计数由用例钉死。全量要跑很久，平时 `cargo test` 里那几条标 ignored；--full 在 release 下带 --include-ignored --exact 逐条跑。
+# 用例的判别力在用例自己：对着产物与闭式的计数断言，oracle 的判别力由同文件的靶向阳性对照证明。
 #
 # 多线程（增补 2 收口表第 41 行；2026-09-18 用户定：测试与崩溃检测优先多线程）：crash.rs 按状态序号区间切片、多线程跑，
-# 线程数由 SINGLEFS_LAYER0_THREADS 传进去——没设就取本机核数（nproc）。每跑完一片，用例打一行 `LAYER0_PROGRESS`（片号、序号区间、段号、
-# 已跑完的状态数），这里边跑边转到本阶段的输出里，不删；成功行里报实际起了几个工作线程。
-# --full 里没显式把 SINGLEFS_LAYER0_THREADS 设成 1、而本机多于 1 核却只起了 1 个工作线程：判红（多半是线程数没传进去）。
-# --full 里 LAYER0 行的下一行不是 CHECKER 逐条不变量行：判红（不然成功句里「逐条不变量」打出来是空串，整道照样绿）。
-# 这两支判红都只拿合成日志核过：把判定段抽进临时脚本，喂一份缺那一行的日志。
-# 标记那一半（相等判绿、改一个输入字节判红、没有标记判红、--full 判红不写标记、分格互不删、同一批输入两趟 --full 撞车不误红、同一批输入先绿后红删掉那一格、只改 Cargo.lock 判红、标记里 exhaustive=false 判红、标记里 LAYER0 抄两遍而没有 LAYER0B 判红、
-# 登记的路径列不出文件判红）拿临时仓加一个打合成日志的假 cargo 核过，同样不在 fixtures 里；判它的 54 号换了、工具链换了判红，
-# 跑的过程中输入变了不删开跑那一格，拿 research/prompts/defs-gate54-tiering-r2-opus-model/fix-arms.sh 的那几段历史核过。
+# 线程数由 SINGLEFS_LAYER0_THREADS 传进去——调用方没设就取本机核数（nproc），取法在 admission.py 的 crash_case_worker_threads。
+# 每跑完一片，用例打一行 `LAYER0_PROGRESS`，这里边跑边转到本阶段的输出里。
+# 全绿标记里线程分两格记：configured_worker_threads= 是配的（SINGLEFS_LAYER0_THREADS 与它怎么来的、本机几核），started_worker_threads= 是
+# 登记了 threads= 的用例从 LAYER0_PARALLEL_FINISHED 读到的起了几个；没登记 threads= 的记「读不到」。
+# 登记了 threads=<前缀> 的用例：按那一行计数的状态数找 `LAYER0_PARALLEL_FINISHED`，这一趟真跑了至少两片、却只起了 1 个工作线程、本机多于 1 核、
+# SINGLEFS_LAYER0_THREADS 没显式设成 1，判红（多半是线程数没传进去）；全部片从进度文件读回（起 0 个线程）、只剩 1 片要跑（最多起 1 个）都不判红。
+#
+# 判别力：日志与标记怎么判、输入指纹怎么算，由 research/scripts/admission.py --selftest 的「崩溃枚举用例」那几格拿合成日志与临时仓核；
+# 这一份脚本的流程（逐条复用、只重跑输入变了的那一条、续跑的三个环境变量、--start-over、快档缺一格判红、跑的过程中输入变了不写标记）
+# 由同一份自证的「54 号」那几格核：把这一份拷进临时仓（不放在 .claude/gate.d/ 下）、拿打合成日志的假 cargo 跑。本阶段没有 fixtures 样本。
 set -uo pipefail
-# 参数：`--full` 与项目根，顺序不限；gate.sh 只传项目根，于是整轮门禁走快档。
+# 参数：`--full`、`--start-over` 与项目根，顺序不限；gate.sh 只传项目根，于是整轮门禁走快档。
 layer0_tier="quick"
+layer0_start_over=0
 root_argument=""
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 for stage_argument in "$@"; do
   case "$stage_argument" in
     --full) layer0_tier="full" ;;
+    --start-over) layer0_start_over=1 ;;
     -*)
       echo "  ✗ 认不出的参数：$stage_argument"
-      echo "     → 怎么办：只认 --full 与项目根，顺序不限：bash .claude/gate.d/54-layer0-replay.sh [--full] [项目根]"
+      echo "     → 怎么办：只认 --full、--start-over 与项目根，顺序不限：bash .claude/gate.d/54-layer0-replay.sh [--full [--start-over]] [项目根]"
       exit 2 ;;
     *) root_argument="$stage_argument" ;;
   esac
 done
+if [[ "$layer0_start_over" == 1 && "$layer0_tier" != full ]]; then
+  echo "  ✗ --start-over 只跟 --full 一起用：快档不跑全量，没有进度文件可丢"
+  echo "     → 怎么办：要丢掉进度文件、从头跑全量，写成 bash .claude/gate.d/54-layer0-replay.sh --full --start-over <根>。"
+  exit 2
+fi
 ROOT="${root_argument:-$(cd "$(dirname "$0")/../.." && pwd)}"
-# 跑的这一份 54 号进输入清单（write_layer0_input_manifest）；相对的 $0 在 cd 之后会指错，所以在 cd 之前取成绝对路径
+# 跑的这一份 54 号进每条用例的输入清单；相对的 $0 在 cd 之后会指错，所以在 cd 之前取成绝对路径
 layer0_stage_script_path="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+# 门禁与实验共用的准入模块：读登记表、算输入清单、判前提、判日志与读写全绿标记都经它（research/scripts/admission.py，文件头写全了各子命令）
+layer0_stage_repository="$(cd "$(dirname "$0")/../.." && pwd)"
+layer0_admission_module="$layer0_stage_repository/research/scripts/admission.py"
 cd "$ROOT" 2>/dev/null || exit 2
 
-# 这一道读的路径：`.claude/gate.d/stage-inputs.tsv` 里登记给本阶段的那几条（唯一登记位）。快档的改动范围与两档的输入哈希都按它算。
+# 这一道读的路径：`.claude/gate.d/stage-inputs.tsv` 里登记给本阶段的那几条（唯一登记位），经准入模块的 paths 读。
+# 快档的复用判定与改动范围按它算；每条崩溃枚举用例的输入另按它自己那一行算。
 layer0_stage_file_name="$(basename "$0")"
 layer0_input_table="$ROOT/.claude/gate.d/stage-inputs.tsv"
 layer0_registered_input_paths=()
-if [[ -f "$layer0_input_table" ]]; then
-  while IFS= read -r registered_row; do
-    read -r -a row_paths <<< "$registered_row"
-    layer0_registered_input_paths+=("${row_paths[@]}")
-  done < <(awk -F'\t' -v stage="$layer0_stage_file_name" '$1 == stage { print $2 }' "$layer0_input_table")
+if layer0_registered_paths_text="$(python3 "$layer0_admission_module" paths "$ROOT" "$layer0_stage_file_name" 2>/dev/null)" \
+   && [[ -n "$layer0_registered_paths_text" ]]; then
+  mapfile -t layer0_registered_input_paths <<< "$layer0_registered_paths_text"
 fi
 if (( ${#layer0_registered_input_paths[@]} == 0 )); then
   echo "  ✗ $layer0_input_table 里没有 $layer0_stage_file_name 这一行（或读不到这份表）：判不出这一道读哪些路径"
@@ -81,16 +103,19 @@ fi
 layer0_input_paths_text="${layer0_registered_input_paths[*]}"
 
 # 快档先问两件事，任一答「可跳过」就退 77（本次未跑），不退 0——`exit 0` 的跳过在汇总里与「判过了」
-# 一模一样（`.claude/singlefs-ai-sop/rules/show-me-test.md`）。--full 是收尾时点名要跑的，这两问都不问。
+# 一模一样（`.claude/singlefs-ai-sop/rules/show-me-test.md`）。--full 是收尾时点名要跑的，这两问都不问（逐条用例的复用另判）。
 # 一问能不能复用上一次整轮全绿的判定：这一道读的那几条路径（`.claude/gate.d/stage-inputs.tsv`）
 # 在 `refs/sop/staged-green` 那棵树与这一次的暂存树之间变没变。为什么用树、为什么只一条 ref、
 # 为什么不看工作区，写在 research/scripts/stage-must-run.sh 的文件头。
-# 二问这次改动碰没碰登记给本阶段的那几条路径。这是 C8（范围判定）的粗粒度前身：它只摘得掉「零行输入的改动」，摘不出别的，C8 照旧欠着。
+# 二问这次改动碰没碰登记给本阶段的那几条路径，再加登记表本身、跑的这一份 54 号与准入模块：登记行与准入模块的判法摘要进每条崩溃枚举用例的指纹，
+# 54 号定着流程的次序，只改它们的改动（新登记一条用例、改一条的第三列、改判法、改流程）同样要核标记，不能在这一问被摘掉；
+# 核下来标记照样作数（只改了准入模块判法之外的部分、只改了 54 号）就判绿。
+# 这是 C8（范围判定）的粗粒度前身：它只摘得掉「零行输入的改动」，摘不出别的，C8 照旧欠着。
 # 两问之前先核登记的每一条路径 git 至少列得出一个文件：写错的路径两问都拿它答「没碰」，这一道就一直退 77、一次都不跑。
 if [[ "$layer0_tier" == quick ]]; then
   layer0_unlisted_input_paths=()
   for registered_input_path in "${layer0_registered_input_paths[@]}"; do
-    registered_input_listing="$(git -C "$ROOT" ls-files -co --exclude-standard -- "$registered_input_path" 2>/dev/null)"
+    registered_input_listing="$(git -c core.quotepath=false -C "$ROOT" ls-files -co --exclude-standard -- "$registered_input_path" 2>/dev/null)"
     if [[ -z "$registered_input_listing" ]]; then layer0_unlisted_input_paths+=("$registered_input_path"); fi
   done
   if (( ${#layer0_unlisted_input_paths[@]} > 0 )); then
@@ -99,111 +124,123 @@ if [[ "$layer0_tier" == quick ]]; then
     echo "                在项目根跑 git ls-files -co --exclude-standard -- <那一条>，改到列得出文件为止。全部列不出时先看这里是不是 git 工作树。"
     exit 1
   fi
-  reuse_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-must-run.sh" "$ROOT" "$(basename "$0")")"
-  reuse_rc=$?
-  if [[ "$reuse_rc" != 0 ]]; then
-    echo "  ! 本阶段跳过（复用上一次整轮全绿的判定）：$reuse_reason"
-    echo "     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径见 .claude/gate.d/stage-inputs.tsv。"
-    exit 77
-  fi
-  scope_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/change-touches-crates.sh" "$ROOT" "${layer0_registered_input_paths[@]}")"
-  scope_rc=$?
-  if [[ "$scope_rc" != 0 ]]; then
-    echo "  ! 本阶段跳过（这次改动没碰它判的东西）：$scope_reason"
-    echo "     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 ${layer0_input_paths_text}，判据见 research/scripts/change-touches-crates.sh。"
-    exit 77
-  fi
+  source "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-run-or-skip.sh" || { echo "  ✗ source 不进 research/scripts/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
+  stage_run_or_skip "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-must-run.sh" "复用上一次整轮全绿的判定" \
+    "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径见 .claude/gate.d/stage-inputs.tsv。" -- "$ROOT" "$(basename "$0")"
+  layer0_judge_paths=(.claude/gate.d/stage-inputs.tsv "$(realpath -m --relative-to="$ROOT" "$layer0_stage_script_path")" "$(realpath -m --relative-to="$ROOT" "$layer0_admission_module")")
+  stage_run_or_skip "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/change-touches-crates.sh" "这次改动没碰它判的东西" \
+    "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 ${layer0_input_paths_text}，加 ${layer0_judge_paths[*]}，判据见 research/scripts/change-touches-crates.sh。" \
+    -- "$ROOT" "${layer0_registered_input_paths[@]}" "${layer0_judge_paths[@]}"
 fi
 [[ -f Cargo.toml && -d crates/singlefs-harness ]] || { echo "  ! 没有 crates/singlefs-harness，本阶段跳过（步 0 之前没有装置）"; exit 77; }
+# 前提（cargo、rustc）登记在 stage-inputs.tsv 本阶段那一行第三列，经准入模块判，没齐判红（不退 77）
+python3 "$layer0_admission_module" gate-preconditions "$layer0_stage_repository" "$layer0_stage_file_name" || exit 1
 
-# 全绿标记放 git 的 common-dir：不进工作树，主工作树与 `gate.sh --staged` 的临时 worktree 读写的是同一份。
+# 全绿标记与续跑的进度文件放 git 的 common-dir：不进工作树，主工作树与 `gate.sh --staged` 的临时 worktree 读写的是同一份。
 if ! git_common_directory="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || [[ -z "$git_common_directory" ]]; then
-  echo "  ✗ $ROOT 不是 git 工作树（取不到 git common-dir）：层 0 全量的全绿标记没处放、也没处读"
-  echo "     → 怎么办：在这个项目的 git 仓里跑，或把仓库根作为参数传进来；标记在 \$(git rev-parse --git-common-dir)/singlefs-layer0-full-green.<输入哈希>。"
+  echo "  ✗ $ROOT 不是 git 工作树（取不到 git common-dir）：崩溃枚举用例的全绿标记与续跑的进度文件没处放、也没处读"
+  echo "     → 怎么办：在这个项目的 git 仓里跑，或把仓库根作为参数传进来；标记在 \$(git rev-parse --git-common-dir)/singlefs-crash-case-green.<用例名>.<输入指纹>。"
   exit 1
 fi
-# 全绿标记按输入哈希分格：一格一个文件，文件名是这个前缀加「.<输入哈希>」。
-full_green_marker_prefix="$git_common_directory/singlefs-layer0-full-green"
+layer0_progress_root="$git_common_directory/singlefs-layer0-progress"
 layer0_scratch_directory="$(mktemp -d)"
 trap 'rm -rf -- "${layer0_scratch_directory:?}"' EXIT
 
-machine_cores="$(nproc)"
-if [[ -n "${SINGLEFS_LAYER0_THREADS:-}" ]]; then
-  threads_origin="显式设的"
-else
-  SINGLEFS_LAYER0_THREADS="$machine_cores"
-  threads_origin="没设，取本机核数"
+# 登记的崩溃枚举用例，一条一行「键、包、测试目标、用例函数」（制表符分隔），照登记表的次序；登记有错判红。
+if ! crash_case_listing="$(python3 "$layer0_admission_module" crash-cases "$ROOT")"; then
+  printf '%s\n' "$crash_case_listing" | sed 's/^/       /'
+  echo "  ✗ .claude/gate.d/stage-inputs.tsv 里 crash-case: 那几行登记有错（上面逐条列出）：判不出要跑、要核哪几条崩溃枚举用例"
+  echo "     → 怎么办：照 research/scripts/admission.py 文件头「崩溃枚举用例行」改那几行（test=<包>:<测试目标>:<用例函数> 恰好一条，用例函数在测试目标里找得到）；"
+  echo "                单跑 python3 research/scripts/admission.py crash-cases <项目根>，改到它退 0 为止。"
+  exit 1
 fi
-export SINGLEFS_LAYER0_THREADS
+crash_case_rows=()
+if [[ -n "$crash_case_listing" ]]; then mapfile -t crash_case_rows <<< "$crash_case_listing"; fi
+if (( ${#crash_case_rows[@]} == 0 )); then
+  echo "  ✗ .claude/gate.d/stage-inputs.tsv 里一条崩溃枚举用例（键是 crash-case: 的行）都没登记：层 0 全量没有东西可跑、可核"
+  echo "     → 怎么办：两条流的层 0 全量至少各登记一行，写法见 research/scripts/admission.py 文件头「崩溃枚举用例行」。"
+  exit 1
+fi
 
-# run_layer0_test_binary <测试二进制> <日志>：cargo 的整段输出进日志；`LAYER0_PROGRESS` 行边跑边转到本阶段的输出（跑全量时这里一直在涨）。
-# --full 带 --include-ignored（全量用例在平时 cargo test 里标 ignored）；快档不带，只跑不标 ignored 的那几条。
+# write_crash_case_manifest <键> <清单文件>：这条用例这批输入的逐文件清单写进清单文件，指纹、文件数、减去的文件数放进
+# case_fingerprint / case_file_count / case_excluded_count。算不出返回 1，原因放进 case_manifest_problem。
+write_crash_case_manifest() {
+  local manifest_summary
+  if ! manifest_summary="$(python3 "$layer0_admission_module" crash-case-manifest "$ROOT" "$1" "$2" \
+      --judging-digest --toolchain --build-environment)"; then
+    case_manifest_problem="$manifest_summary"
+    return 1
+  fi
+  read -r case_fingerprint case_file_count case_excluded_count <<< "$manifest_summary"
+  if [[ ! "$case_fingerprint" =~ ^[0-9a-f]{64}$ || ! "$case_file_count" =~ ^[1-9][0-9]*$ || ! "$case_excluded_count" =~ ^[0-9]+$ ]]; then
+    case_manifest_problem="准入模块打的不是「<指纹> <文件数> <减去的文件数>」：$manifest_summary"
+    return 1
+  fi
+  return 0
+}
+
+# delete_crash_case_marker <键> <指纹>：这条用例这批输入那一格全绿标记删掉（判红时；前一趟那一格不再作数）。
+delete_crash_case_marker() {
+  local marker_path
+  marker_path="$(python3 "$layer0_admission_module" crash-case-marker-path "$ROOT" "$1" "$2")" || return 0
+  if [[ -n "$marker_path" ]]; then rm -f -- "${marker_path:?}"; fi
+  return 0
+}
+
+# run_layer0_test_binary <测试二进制> <日志>：快档跑一条流不标 ignored 的用例；cargo 的整段输出进日志。
 run_layer0_test_binary() {
-  local -a libtest_selection=()
-  if [[ "$layer0_tier" == full ]]; then libtest_selection=(--include-ignored); fi
-  cargo test --release -p singlefs-harness --test "$1" -- "${libtest_selection[@]}" --nocapture 2>&1 \
+  cargo test --release -p singlefs-harness --test "$1" -- --nocapture 2>&1 \
     | tee "$2" \
     | { grep --line-buffered '^LAYER0_PROGRESS ' || true; } \
     | sed -u 's/^/    /'
   return "${PIPESTATUS[0]}"
 }
 
-# worker_threads_of_full_run <日志> <计数行>：计数行里的状态数对上的那一行 `LAYER0_PARALLEL_FINISHED`，取实际起的工作线程数。
-worker_threads_of_full_run() {
-  local states
-  states="$(sed -n 's/^[A-Z0-9]* states=\([0-9]*\) .*/\1/p' <<<"$2")"
-  grep "^LAYER0_PARALLEL_FINISHED states=$states " "$1" | head -1 | sed -n 's/.* worker_threads=\([0-9]*\) .*/\1/p'
-}
-
-# 没显式设成 1、本机多于 1 核却只起了 1 个工作线程（或根本没打收尾行）：判红。返回 0 表示线程数没问题。
-worker_threads_are_acceptable() { # <流的名字> <实际起的工作线程数>
-  if [[ -z "$2" ]]; then
-    echo "  ✗ $1：全量用例跑过了，却没打印状态数对得上的 LAYER0_PARALLEL_FINISHED 行，判不出起了几个工作线程"
-    echo "     → 怎么办：全量那条用例要经 crates/singlefs-harness/src/crash.rs 的 enumerate_layer0_in_state_slices 跑（它开跑与跑完各打一行 LAYER0_PARALLEL_*）；"
-    echo "                绕开它自己逐个跑状态的写法退回了单线程，改回去。"
+# read_crash_case_command <键> <输入指纹>：准入模块 crash-case-command 交出的这一条的命令与环境（以 NUL 分隔）读进 case_machine_cores、
+# case_threads、case_threads_origin、case_progress_directory 与数组 case_command。交不出、写法不对返回 1，原因放进 case_command_problem。
+read_crash_case_command() {
+  local command_file="$layer0_scratch_directory/command.${1#crash-case:}" command_output
+  local -a start_over_option=()
+  if [[ "$layer0_start_over" == 1 ]]; then start_over_option=(--start-over); fi
+  if ! python3 "$layer0_admission_module" crash-case-command "$ROOT" "$1" "$2" "${start_over_option[@]}" > "$command_file"; then
+    case_command_problem="$(tr '\0' ' ' < "$command_file")"
     return 1
   fi
-  if [[ "$2" == 1 && "$machine_cores" -gt 1 && ! ( "$threads_origin" == "显式设的" && "$SINGLEFS_LAYER0_THREADS" == 1 ) ]]; then
-    echo "  ✗ $1：本机 $machine_cores 核、SINGLEFS_LAYER0_THREADS=$SINGLEFS_LAYER0_THREADS（$threads_origin），全量枚举却只起了 1 个工作线程"
-    echo "     → 怎么办：看 crash.rs 的 Layer0Parallelism::from_environment 读没读到 SINGLEFS_LAYER0_THREADS、state_slices 切出来的片数够不够分给每个线程；"
-    echo "                真要单线程跑（比对单进程读数），显式写 SINGLEFS_LAYER0_THREADS=1 bash .claude/gate.d/54-layer0-replay.sh。"
+  local -a command_words=()
+  mapfile -d '' -t command_words < "$command_file"
+  if (( ${#command_words[@]} < 5 )) || [[ ! "${command_words[0]}" =~ ^[1-9][0-9]*$ || ! "${command_words[1]}" =~ ^[1-9][0-9]*$ \
+      || ! "${command_words[2]}" =~ ^(explicit|default)$ ]]; then
+    command_output="$(tr '\0' ' ' < "$command_file")"
+    case_command_problem="准入模块交的不是「核数、线程数、explicit|default、进度目录、命令…」：${command_output}"
     return 1
   fi
+  case_machine_cores="${command_words[0]}"
+  case_threads="${command_words[1]}"
+  case_threads_origin="${command_words[2]}"
+  case_progress_directory="${command_words[3]}"
+  case_command=("${command_words[@]:4}")
   return 0
 }
 
-# write_layer0_input_manifest <清单文件>：这一道输入的逐文件清单（「sha256  路径」，按路径排序）写进清单文件，末尾再加两行：
-# 跑的这一份 54 号的 sha256、`cargo -V` 与 `rustc -V` 原样输出的 sha256（名字用尖括号括起，与路径分开）。
-# 整张清单的 sha256 与文件数（只数登记路径下的文件）放进 layer0_input_hash / layer0_input_file_count。路径取 layer0_registered_input_paths。
-# 返回非 0：git 列不出文件、一个文件都没有、读文件出错、或 cargo -V / rustc -V 跑不出来——四种都判不出哈希。
-write_layer0_input_manifest() {
-  local manifest_file="$1" listed_file stage_script_hash toolchain_versions toolchain_versions_hash
-  local -a existing_files=()
-  git -C "$ROOT" ls-files -z --cached --others --exclude-standard -- "${layer0_registered_input_paths[@]}" > "$manifest_file.listing" || return 1
-  # 工作区里删了、删除还没暂存的文件不算：跑的是磁盘上这一份，--staged 的临时 worktree 里它还在，两边照样对不上
-  while IFS= read -r -d '' listed_file; do
-    if [[ -f "$ROOT/$listed_file" ]]; then existing_files+=("$listed_file"); fi
-  done < <(LC_ALL=C sort -zu "$manifest_file.listing")
-  (( ${#existing_files[@]} > 0 )) || return 1
-  ( cd "$ROOT" && sha256sum -- "${existing_files[@]}" ) > "$manifest_file" || return 1
-  # 判这一格的 54 号与工具链也进键：同一份 crates/ 换了判据或编译器，前一趟的结论就不再作数
-  stage_script_hash="$(sha256sum < "$layer0_stage_script_path" | cut -d' ' -f1)" || return 1
-  toolchain_versions="$(cd "$ROOT" && cargo -V && rustc -V)" || return 1
-  [[ -n "$toolchain_versions" ]] || return 1
-  toolchain_versions_hash="$(printf '%s\n' "$toolchain_versions" | sha256sum | cut -d' ' -f1)" || return 1
-  printf '%s  %s\n' "$stage_script_hash" "<判它的 54 号：$layer0_stage_file_name>" >> "$manifest_file" || return 1
-  printf '%s  %s\n' "$toolchain_versions_hash" "<工具链：${toolchain_versions//$'\n'/；}>" >> "$manifest_file" || return 1
-  layer0_input_hash="$(sha256sum < "$manifest_file" | cut -d' ' -f1)"
-  layer0_input_file_count="${#existing_files[@]}"
-  return 0
+# run_crash_case <日志> <命令的词…>：--full 照准入模块交的命令跑一条崩溃枚举用例；
+# 整段输出进日志，`LAYER0_PROGRESS` 行边跑边转到本阶段的输出（跑全量时这里一直在涨）。
+run_crash_case() {
+  local log_file="$1"
+  shift
+  "$@" 2>&1 \
+    | tee "$log_file" \
+    | { grep --line-buffered '^LAYER0_PROGRESS ' || true; } \
+    | sed -u 's/^/    /'
+  return "${PIPESTATUS[0]}"
 }
 
-fail_without_input_manifest() {
-  echo "  ✗ 算不出这一道输入的内容哈希：git 在登记的路径（${layer0_input_paths_text}）下一个文件都列不出来、读文件出错，或 cargo -V / rustc -V 跑不出来"
-  echo "     → 怎么办：在项目根跑 git ls-files -co --exclude-standard -- ${layer0_input_paths_text}，看列不列得出文件；"
-  echo "                列得出就逐个 sha256sum 一遍，找读不了的那一个。登记的路径写错了，改 .claude/gate.d/stage-inputs.tsv。"
-  echo "                文件都读得了，就在项目根跑 cargo -V && rustc -V：跑不出来是工具链没装好，bash .claude/scripts/env.sh 看缺什么。"
-  exit 1
+# run_crash_case_in_two_shards <键> <日志> <输入指纹>：双机分片跑一条（layer0-shard-run.sh --merged-log），merge 那一趟的整段输出进日志；
+# 两片各自的 LAYER0_PROGRESS 由驱动脚本边跑边转出来。--start-over 照样交给两片（merge 那一趟驱动脚本自己不带）。
+run_crash_case_in_two_shards() {
+  local -a start_over_setting=(-u SINGLEFS_LAYER0_START_OVER)
+  if [[ "$layer0_start_over" == 1 ]]; then start_over_setting=(SINGLEFS_LAYER0_START_OVER=1); fi
+  env "${start_over_setting[@]}" bash "$layer0_shard_driver" --merged-log "$1" "$ROOT" "$3" "$2" 2>&1 | sed -u 's/^/    /'
+  return "${PIPESTATUS[0]}"
 }
 
 # report_manifest_differences <前一份清单> <后一份清单> <前一份的叫法> <后一份的叫法>：逐个列出两份清单里不同的文件，最多 20 个，另报总数。
@@ -230,25 +267,7 @@ print_staged_worktree_full_commands() {
   echo '                在项目根、暂存之后，把下面三行命令放进同一次 Bash 调用（三行共用 layer0_full_base 这个变量，分开跑它就是空的；这次调用的退出码是经内存包装的那条 --full 命令的，250–254 是包装自己的结局）：'
   echo '                layer0_tree_ready=; layer0_full_base="$(mktemp -d)"; git diff --cached --binary > "$layer0_full_base/staged.patch"'
   echo '                git worktree add --detach "$layer0_full_base/tree" HEAD && { [ ! -s "$layer0_full_base/staged.patch" ] || git -C "$layer0_full_base/tree" apply --index "$layer0_full_base/staged.patch"; } && layer0_tree_ready=1'
-  echo '                if [ "$layer0_tree_ready" = 1 ]; then SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash "$layer0_full_base/tree/.claude/gate.d/54-layer0-replay.sh" --full "$layer0_full_base/tree"; layer0_full_rc=$?; else echo "worktree 没建好或暂存区的 diff 套不上，--full 没跑"; layer0_full_rc=1; fi; git worktree remove --force "$layer0_full_base/tree" 2>/dev/null; rm -rf "${layer0_full_base:?}"; ( exit "$layer0_full_rc" )'
-}
-
-# report_newest_other_marker <这一次的清单>：这批输入没有自己那一格时，拿 common-dir 里最近写的一格与这一次比，列出不同的文件；
-# 不带哈希的旧名字标记是分格之前写的，不再认，有就点名。
-report_newest_other_marker() {
-  local newest_marker newest_marker_manifest
-  newest_marker="$(find "$git_common_directory" -maxdepth 1 -type f -name 'singlefs-layer0-full-green.*' ! -name '*.partial.*' -printf '%T@\t%p\n' 2>/dev/null | sort -rn | head -1 | cut -f2-)"
-  if [[ -n "$newest_marker" ]]; then
-    echo "       common-dir 里最近写的一格是 $(basename "$newest_marker")（跑完于 $(sed -n 's/^finished_utc=//p' "$newest_marker" | head -1)），与这一次的输入比："
-    newest_marker_manifest="$layer0_scratch_directory/newest-marker-manifest"
-    sed -n 's/^input_file //p' "$newest_marker" > "$newest_marker_manifest"
-    report_manifest_differences "$newest_marker_manifest" "$1" "那一格" "这一次"
-  else
-    echo "       common-dir 里一格全绿标记都没有。"
-  fi
-  if [[ -f "$full_green_marker_prefix" ]]; then
-    echo "       不带哈希的旧名字标记（$full_green_marker_prefix）是按输入哈希分格之前写的，不再认：它罩不到任何一批，可以删掉。"
-  fi
+  echo '                if [ "$layer0_tree_ready" = 1 ]; then SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash "${layer0_full_base:?}/tree/.claude/gate.d/54-layer0-replay.sh" --full "${layer0_full_base:?}/tree"; layer0_full_rc=$?; else echo "worktree 没建好或暂存区的 diff 套不上，--full 没跑"; layer0_full_rc=1; fi; git worktree remove --force "${layer0_full_base:?}/tree" 2>/dev/null; rm -rf "${layer0_full_base:?}"; ( exit "$layer0_full_rc" )'
 }
 
 # run_quick_tier_of_stream <测试二进制> <流的名字>：快档跑一条流。判红打出路、返回 1；判绿把这条流的计数接到 quick_tier_report 后面。
@@ -274,166 +293,180 @@ run_quick_tier_of_stream() {
   return 0
 }
 
-# ── 快档：两条流不标 ignored 的用例，再核对全绿标记 ─────────
+# ── 快档：两条流不标 ignored 的用例，再逐条核崩溃枚举用例这批输入那一格全绿标记 ─────────
 if [[ "$layer0_tier" == quick ]]; then
-  quick_manifest="$layer0_scratch_directory/quick-manifest"
-  write_layer0_input_manifest "$quick_manifest" || fail_without_input_manifest
-  full_green_marker_path="$full_green_marker_prefix.$layer0_input_hash"
   quick_tier_report=""
   run_quick_tier_of_stream first_transaction_step_seven_layer0 "第一个事务那条流" || exit 1
   run_quick_tier_of_stream second_transaction_step_zero_layer0 "两次发布那条流" || exit 1
-  if [[ ! -f "$full_green_marker_path" ]]; then
-    echo "  ✗ 快档绿了（${quick_tier_report}），但这批输入（哈希 ${layer0_input_hash:0:16}…，${layer0_input_file_count} 个文件）没有层 0 全量的全绿标记（$full_green_marker_path）"
-    report_newest_other_marker "$quick_manifest"
-    echo "     → 怎么办：这批输入的层 0 全量没在收尾跑过。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>（与 gate.sh --staged 同一建法）："
+  present_report="$layer0_scratch_directory/present-report"
+  missing_report="$layer0_scratch_directory/missing-report"
+  : > "$present_report"
+  : > "$missing_report"
+  missing_cases=()
+  for crash_case_row in "${crash_case_rows[@]}"; do
+    IFS=$'\t' read -r case_key _case_package _case_target _case_function <<< "$crash_case_row"
+    case_manifest="$layer0_scratch_directory/quick-manifest.${case_key#crash-case:}"
+    if ! write_crash_case_manifest "$case_key" "$case_manifest"; then
+      missing_cases+=("$case_key")
+      echo "       $case_key：算不出这批输入的指纹：$case_manifest_problem" >> "$missing_report"
+      continue
+    fi
+    if marker_check_output="$(python3 "$layer0_admission_module" crash-case-marker-check "$ROOT" "$case_key" "$case_fingerprint" "$case_manifest")"; then
+      read -r _ok_word _marker_path marker_finished_utc <<< "$(head -1 <<< "$marker_check_output")"
+      {
+        echo "    $case_key：那一格跑完于 ${marker_finished_utc}（这批输入的指纹 ${case_fingerprint:0:16}…，${case_file_count} 个文件，减去用例读不到的 ${case_excluded_count} 个）"
+        tail -n +2 <<< "$marker_check_output" | sed 's/^/      /'
+      } >> "$present_report"
+    else
+      missing_cases+=("$case_key")
+      {
+        echo "       $case_key（这批输入的指纹 ${case_fingerprint:0:16}…，${case_file_count} 个文件，减去用例读不到的 ${case_excluded_count} 个）："
+        sed 's/^/         /' <<< "$marker_check_output"
+      } >> "$missing_report"
+    fi
+  done
+  if (( ${#missing_cases[@]} > 0 )); then
+    echo "  ✗ 快档绿了（${quick_tier_report}），但 ${#missing_cases[@]} 条崩溃枚举用例没有作数的全绿标记：${missing_cases[*]}"
+    cat "$missing_report"
+    legacy_marker_total="$(find "$git_common_directory" -maxdepth 1 -type f -name 'singlefs-layer0-full-green*' 2>/dev/null | grep -c .)"
+    if [[ "$legacy_marker_total" -gt 0 ]]; then
+      echo "       common-dir 里还有 ${legacy_marker_total} 格按整批输入分格的旧标记（singlefs-layer0-full-green*）：分成逐条用例之后不再认，可以删掉。"
+    fi
+    echo "     → 怎么办：这几条的输入自上一次判绿以来变了（或从来没跑过）。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>"
+    echo "                （与 gate.sh --staged 同一建法；它只跑没有作数标记的那几条，别的复用）："
     print_staged_worktree_full_commands
     exit 1
   fi
-  marker_input_hash="$(sed -n 's/^input_hash=//p' "$full_green_marker_path" | head -1)"
-  if [[ "$marker_input_hash" != "$layer0_input_hash" ]]; then
-    echo "  ✗ 快档绿了（${quick_tier_report}），但这批输入那一格全绿标记里记的输入哈希（${marker_input_hash:-标记里读不到}）与这一次的（${layer0_input_hash}，${layer0_input_file_count} 个文件）不同：那一格被改过或拷错了"
-    marker_manifest="$layer0_scratch_directory/marker-manifest"
-    sed -n 's/^input_file //p' "$full_green_marker_path" > "$marker_manifest"
-    report_manifest_differences "$marker_manifest" "$quick_manifest" "那一格" "这一次"
-    echo "     → 怎么办：这批输入的层 0 全量没在收尾跑过。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>（与 gate.sh --staged 同一建法）："
-    print_staged_worktree_full_commands
-    exit 1
-  fi
-  marker_count_lines="$(grep -E '^(LAYER0|CHECKER|LAYER0B) ' "$full_green_marker_path")"
-  # 三种开头各数各的：只数总数时，LAYER0 那一行抄两遍、LAYER0B 一行都没有也凑得出三行
-  marker_layer0_line_total="$(grep -c '^LAYER0 ' <<< "$marker_count_lines")"
-  marker_checker_line_total="$(grep -c '^CHECKER ' <<< "$marker_count_lines")"
-  marker_layer0b_line_total="$(grep -c '^LAYER0B ' <<< "$marker_count_lines")"
-  if [[ "$marker_layer0_line_total" != 1 || "$marker_checker_line_total" != 1 || "$marker_layer0b_line_total" != 1 ]]; then
-    echo "  ✗ 这批输入那一格全绿标记的哈希对得上，计数行却不是 LAYER0 / CHECKER / LAYER0B 各恰好一行（LAYER0 ${marker_layer0_line_total} 行、CHECKER ${marker_checker_line_total} 行、LAYER0B ${marker_layer0b_line_total} 行）：标记不是 --full 写的，或被改过"
-    echo "     → 怎么办：这批输入的层 0 全量没在收尾跑过。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>（与 gate.sh --staged 同一建法）："
-    print_staged_worktree_full_commands
-    exit 1
-  fi
-  # 写这一格的 --full 本该把「不是全量」判红、不写标记；标记里仍有 exhaustive 不是 true 的，说明跑的那一份 54 号的判定被改过
-  marker_layer0_line="$(grep '^LAYER0 ' <<< "$marker_count_lines")"
-  marker_layer0b_line="$(grep '^LAYER0B ' <<< "$marker_count_lines")"
-  marker_streams_not_exhaustive=()
-  if ! grep -qE '^LAYER0 (.* )?exhaustive=true( |$)' <<< "$marker_layer0_line"; then marker_streams_not_exhaustive+=("LAYER0（第一个事务那条流）"); fi
-  if ! grep -qE '^LAYER0B (.* )?exhaustive=true( |$)' <<< "$marker_layer0b_line"; then marker_streams_not_exhaustive+=("LAYER0B（两次发布那条流）"); fi
-  if (( ${#marker_streams_not_exhaustive[@]} > 0 )); then
-    echo "  ✗ 这批输入那一格全绿标记里，${marker_streams_not_exhaustive[*]} 那一行不带 exhaustive=true：写它的那一趟 --full 没把「不是全量」判红"
-    printf '%s\n%s\n' "$marker_layer0_line" "$marker_layer0b_line" | sed 's/^/         /'
-    echo "     → 怎么办：这批输入的层 0 全量没在收尾跑过。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>（与 gate.sh --staged 同一建法）："
-    print_staged_worktree_full_commands
-    echo "                那一趟判「层 0 不是全量」就是这一批让枚举退化了，去 crash.rs 的 enumerate_layer0 看。"
-    exit 1
-  fi
-  marker_finished_utc="$(sed -n 's/^finished_utc=//p' "$full_green_marker_path" | head -1)"
-  echo "  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：${quick_tier_report}"
-  echo "  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（${layer0_input_hash:0:16}…，${layer0_input_file_count} 个文件，登记路径 ${layer0_input_paths_text}），两条流都是 exhaustive=true：层 0 全量跑完于 ${marker_finished_utc}，标记里的计数行原样："
-  sed 's/^/      /' <<< "$marker_count_lines"
+  echo "  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量留给 --full）：${quick_tier_report}"
+  echo "  ✓ ${#crash_case_rows[@]} 条崩溃枚举用例的全绿标记都与各自这批输入的指纹相同（登记路径 ${layer0_input_paths_text}，逐条减去用例读不到的文件），标记里的计数行原样："
+  cat "$present_report"
   exit 0
 fi
 
-# ── --full：记下开跑时的输入清单，跑完对一遍；开跑一格都不删，这一趟没写成标记就退出时才删这批输入那一格 ─────────
+# ── --full：逐条崩溃枚举用例照复用判定跑；那一格在就复用，不在才跑，判绿写那一格 ─────────
 full_started_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-manifest_at_start="$layer0_scratch_directory/manifest-at-start"
-write_layer0_input_manifest "$manifest_at_start" || fail_without_input_manifest
-input_hash_at_start="$layer0_input_hash"
-full_green_marker_path="$full_green_marker_prefix.$input_hash_at_start"
-# 这一趟判红（任何一处 exit）或被打断：同一批输入先绿后红，前一趟那一格不再作数，退出前删掉它；写成了就留着。
-# 例外是「跑的过程中输入变了」那一支：两条流读到的不一定是开跑那一批，这一趟说不出开跑那一批的好坏，不删那一格
-full_marker_written=0
-full_input_changed_during_run=0
-trap 'if [[ "$full_marker_written" != 1 && "$full_input_changed_during_run" != 1 ]]; then rm -f -- "${full_green_marker_path:?}"; fi; rm -rf -- "${layer0_scratch_directory:?}"' EXIT
-echo "  · --full 开跑（${full_started_utc}）：不删任何一格，这一趟判红才删这批输入那一格（跑的过程中输入变了的那一种红不删）；这一道的输入哈希 ${input_hash_at_start:0:16}…（${layer0_input_file_count} 个文件，登记路径 ${layer0_input_paths_text}，连同判它的 54 号与工具链）"
-
-log="$(mktemp)"
-if ! run_layer0_test_binary first_transaction_step_seven_layer0 "$log"; then
-  tail -40 "$log"
-  echo "  ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）"
-  echo "     → 怎么办：单跑看细节：cargo test --release -p singlefs-harness --test first_transaction_step_seven_layer0 -- --include-ignored --nocapture"
-  echo "                oracle 报的第一条违例在断言消息里。改代码还是改断言先想清楚是哪一种——直接改断言等于把测试关掉。"
-  rm -f "$log"
-  exit 1
+start_over_note="不带 --start-over：有进度文件就接着跑"
+if [[ "$layer0_start_over" == 1 ]]; then start_over_note="带 --start-over：进度文件整份丢掉、从头跑"; fi
+echo "  · --full 开跑（${full_started_utc}）：${#crash_case_rows[@]} 条崩溃枚举用例逐条照复用判定跑（这批输入那一格全绿标记在就复用）；续跑的进度文件在 ${layer0_progress_root}/<输入指纹>/，${start_over_note}"
+# 双机分片开不开：本地配置在、判得过才开（判法在 layer0-shard-configuration-check.sh，与驱动脚本的运行条件同一份）
+layer0_shard_driver="$ROOT/research/scripts/layer0-shard-run.sh"
+if layer0_shard_configuration_note="$(bash "$ROOT/research/scripts/layer0-shard-configuration-check.sh" "$ROOT" 2>&1)"; then
+  layer0_sharded=1
+  echo "  · 双机分片：开（${layer0_shard_configuration_note//$'\n'/；}）；登记了 shard=across-machines 的用例两台各跑一片、本机 merge，别的单机跑"
+else
+  layer0_sharded=0
+  echo "  · 双机分片：关（${layer0_shard_configuration_note//$'\n'/；}）；每条用例单机跑"
 fi
-line="$(grep '^LAYER0 ' "$log" | head -1)"
-checker_line="$(grep -A1 '^LAYER0 ' "$log" | grep '^CHECKER ' | head -1)"
-worker_threads="$(worker_threads_of_full_run "$log" "$line")"
-rm -f "$log"
-if [[ -z "$line" ]]; then
-  echo "  ✗ 用例跑过了，却没打印 LAYER0 计数行"
-  echo "     → 怎么办：first_transaction_step_seven_layer0.rs 里全量那条用例要 println! 一行以 LAYER0 开头的计数（字段见该用例的文档注释）。"
-  exit 1
-fi
-if [[ -z "$checker_line" ]]; then
-  echo "  ✗ 用例跑过了，LAYER0 计数行的下一行却不是以 CHECKER 开头的逐条不变量行：成功句里「逐条不变量」那一句会是空话"
-  echo "     → 怎么办：first_transaction_step_seven_layer0.rs 里全量那条用例打完 LAYER0 行要紧跟着 println! checker_line(&tally) 那一行；"
-  echo "                两行之间插进了别的输出，就把 CHECKER 那一行挪回 LAYER0 行的正下方。"
-  exit 1
-fi
-if [[ "$line" != *"exhaustive=true"* ]]; then
-  echo "  ✗ 层 0 不是全量：$line"
-  echo "     → 怎么办：枚举到的状态数要等于闭式 1 + Σ(2^|段| − 1)；少了说明某一段没展开子集，去 crash.rs 的 enumerate_layer0 看。"
-  exit 1
-fi
-worker_threads_are_acceptable "第一个事务那条流" "$worker_threads" || exit 1
-echo "  ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；${worker_threads} 个工作线程，SINGLEFS_LAYER0_THREADS=${SINGLEFS_LAYER0_THREADS}（${threads_origin}），本机 ${machine_cores} 核）：${line#LAYER0 }"
-echo "  ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：${checker_line#CHECKER }"
-# 第二个事务（发布 B）：取号 → 暖机 → A → B 整条流，多版本 oracle（里程碑「第二个事务」步 0 / 步 6 在 B 上的那一半）。
-log_b="$(mktemp)"
-if ! run_layer0_test_binary second_transaction_step_zero_layer0 "$log_b"; then
-  tail -40 "$log_b"
-  echo "  ✗ 两次发布那条流的层 0 用例判红（上面是 cargo test 的尾部）"
-  echo "     → 怎么办：单跑看细节：cargo test --release -p singlefs-harness --test second_transaction_step_zero_layer0 -- --include-ignored --nocapture"
-  echo "                多版本 oracle 报的第一条违例在断言消息里：实际走的根是哪一代就得读出那一代的内容。"
-  rm -f "$log_b"
-  exit 1
-fi
-line_b="$(grep '^LAYER0B ' "$log_b" | head -1)"
-worker_threads_b="$(worker_threads_of_full_run "$log_b" "$line_b")"
-rm -f "$log_b"
-if [[ -z "$line_b" ]]; then
-  echo "  ✗ 两次发布那条流的用例跑过了，却没打印 LAYER0B 计数行"
-  echo "     → 怎么办：second_transaction_step_zero_layer0.rs 里全量那条用例要 println! 一行以 LAYER0B 开头的计数。"
-  exit 1
-fi
-if [[ "$line_b" != *"exhaustive=true"* ]]; then
-  echo "  ✗ 两次发布那条流的层 0 不是全量：$line_b"
-  echo "     → 怎么办：枚举到的状态数要等于闭式 1 + Σ(2^|段| − 1)；少了说明某一段没展开子集，去 crash.rs 的 enumerate_layer0_selecting_versions 看。"
-  exit 1
-fi
-worker_threads_are_acceptable "两次发布那条流" "$worker_threads_b" || exit 1
-echo "  ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；${worker_threads_b} 个工作线程，SINGLEFS_LAYER0_THREADS=${SINGLEFS_LAYER0_THREADS}（${threads_origin}），本机 ${machine_cores} 核）：${line_b#LAYER0B }"
-
-# ── --full 判绿：跑完再算一次输入，与开跑时相同才写全绿标记 ─────────
-manifest_at_finish="$layer0_scratch_directory/manifest-at-finish"
-write_layer0_input_manifest "$manifest_at_finish" || fail_without_input_manifest
-if [[ "$layer0_input_hash" != "$input_hash_at_start" ]]; then
-  full_input_changed_during_run=1
-  echo "  ✗ 全量跑的过程中这一道的输入变了（开跑 ${input_hash_at_start:0:16}…，跑完 ${layer0_input_hash:0:16}…）：两条流读到的不一定是同一版，不写全绿标记；开跑那一批已有的那一格不删"
-  report_manifest_differences "$manifest_at_start" "$manifest_at_finish" "开跑时" "跑完时"
-  echo "     → 怎么办：别在有人改这些路径的树里跑。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>（与 gate.sh --staged 同一建法）："
-  print_staged_worktree_full_commands
-  exit 1
-fi
+red_cases=()
+green_cases=()
+reused_cases=()
+for crash_case_row in "${crash_case_rows[@]}"; do
+  IFS=$'\t' read -r case_key case_package case_target case_function <<< "$crash_case_row"
+  case_label="${case_key#crash-case:}"
+  manifest_at_start="$layer0_scratch_directory/manifest-at-start.$case_label"
+  if ! write_crash_case_manifest "$case_key" "$manifest_at_start"; then
+    echo "  ✗ $case_key：算不出这批输入的指纹：$case_manifest_problem"
+    echo "     → 怎么办：在项目根跑 git ls-files -co --exclude-standard -- ${layer0_input_paths_text} 看列不列得出文件，再跑 cargo -V && rustc -V；"
+    echo "                单跑 python3 research/scripts/admission.py crash-case-manifest <根> $case_key <清单文件> --judging-digest --toolchain --build-environment 看它报什么。"
+    red_cases+=("$case_key")
+    continue
+  fi
+  fingerprint_at_start="$case_fingerprint"
+  file_count_at_start="$case_file_count"
+  excluded_count_at_start="$case_excluded_count"
+  if marker_check_output="$(python3 "$layer0_admission_module" crash-case-marker-check "$ROOT" "$case_key" "$fingerprint_at_start" "$manifest_at_start")"; then
+    read -r _ok_word reused_marker_path reused_finished_utc <<< "$(head -1 <<< "$marker_check_output")"
+    echo "  · $case_key 复用：这批输入（指纹 ${fingerprint_at_start:0:16}…）那一格全绿标记跑完于 ${reused_finished_utc}，这一趟不跑；要重跑就删掉 ${reused_marker_path}"
+    reused_cases+=("$case_key")
+    continue
+  fi
+  if ! read_crash_case_command "$case_key" "$fingerprint_at_start"; then
+    echo "  ✗ $case_key：准入模块交不出起用例的命令：$case_command_problem"
+    echo "     → 怎么办：单跑 python3 research/scripts/admission.py crash-case-command <根> $case_key <指纹> 看它报什么（取不到 git common-dir、"
+    echo "                nproc 起不来、SINGLEFS_LAYER0_THREADS 不是正整数都在这里报）；修好之后重跑 --full。"
+    red_cases+=("$case_key")
+    continue
+  fi
+  case_started_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  case_log="$layer0_scratch_directory/log.$case_label"
+  case_threads_origin_text="没设，取本机核数"
+  if [[ "$case_threads_origin" == explicit ]]; then case_threads_origin_text="显式设的"; fi
+  case_threads_note="SINGLEFS_LAYER0_THREADS=${case_threads}（${case_threads_origin_text}），本机 ${case_machine_cores} 核"
+  case_sharded=0
+  if [[ "$layer0_sharded" == 1 ]] && python3 "$layer0_admission_module" crash-case-shardable "$ROOT" "$case_key" >/dev/null; then case_sharded=1; fi
+  case_way="单机跑：${case_command[*]}"
+  if [[ "$case_sharded" == 1 ]]; then
+    case_way="双机分片跑（本机 0/2、第二台 1/2，本机 merge/2；bash research/scripts/layer0-shard-run.sh --merged-log $case_key <树根> <指纹> <日志>）"
+    case_threads_note="本机那一片 ${case_threads_note}，第二台那一片取第二台的核数（逐片的数在 merge 那一行 LAYER0_PARALLEL_FINISHED 的 shard_…= 里）"
+  fi
+  echo "  · $case_key 开跑（${case_started_utc}；${case_way}；${case_threads_note}；这批输入的指纹 ${fingerprint_at_start:0:16}…，${file_count_at_start} 个文件，减去用例读不到的 ${excluded_count_at_start} 个）："
+  sed 's/^/      /' <<< "$marker_check_output"
+  if [[ "$case_sharded" == 1 ]]; then
+    run_crash_case_in_two_shards "$case_key" "$case_log" "$fingerprint_at_start"
+  else
+    run_crash_case "$case_log" "${case_command[@]}"
+  fi
+  case_run_exit=$?
+  if [[ "$case_run_exit" != 0 ]]; then
+    [[ -f "$case_log" ]] && tail -40 "$case_log"
+    delete_crash_case_marker "$case_key" "$fingerprint_at_start"
+    if [[ "$case_sharded" == 1 ]]; then
+      echo "  ✗ $case_key 判红：双机分片那一趟退 $case_run_exit（上面是驱动脚本的输出与 merge 那一趟日志的尾部）"
+      echo "     → 怎么办：驱动脚本输出里判红的那一句说清卡在哪一步（工具链、指纹、某一片、账本、merge）；要单机复核，挪开本地配置 layer0-shard.env 再跑 --full"
+      red_cases+=("$case_key")
+      continue
+    fi
+    echo "  ✗ $case_key 判红：cargo test 退非 0（上面是它的尾部）"
+    echo "     → 怎么办：单跑看细节：cargo test --release -p $case_package --test $case_target -- --include-ignored --exact $case_function --nocapture"
+    echo "                断言消息里是第一处对不上的计数或违例。改代码还是改断言先想清楚是哪一种——直接改断言等于把测试关掉。"
+    red_cases+=("$case_key")
+    continue
+  fi
+  judged_lines_file="$layer0_scratch_directory/judged.$case_label"
+  if ! judge_output="$(python3 "$layer0_admission_module" crash-case-judge "$ROOT" "$case_key" "$case_log" "$judged_lines_file" \
+      --machine-cores "$case_machine_cores" --threads "$case_threads" --threads-origin "$case_threads_origin")"; then
+    delete_crash_case_marker "$case_key" "$fingerprint_at_start"
+    printf '%s\n' "$judge_output" | sed 's/^/       /'
+    echo "  ✗ $case_key 的用例跑过了，日志却判不绿（上面逐条列出）"
+    echo "     → 怎么办：计数行不是恰好一行、过滤之后没跑到恰好一条用例，对一对 stage-inputs.tsv 里 $case_key 那一行第三列与用例打印的行；"
+    echo "                不是全量去 crates/singlefs-harness/src/crash.rs 的 enumerate_layer0 看；只起了 1 个线程看 Layer0Parallelism::from_environment 读没读到 SINGLEFS_LAYER0_THREADS，"
+    echo "                真要单线程跑（比对单进程读数），显式写 SINGLEFS_LAYER0_THREADS=1 bash .claude/gate.d/54-layer0-replay.sh --full <根>。"
+    red_cases+=("$case_key")
+    continue
+  fi
+  manifest_at_finish="$layer0_scratch_directory/manifest-at-finish.$case_label"
+  if ! write_crash_case_manifest "$case_key" "$manifest_at_finish"; then
+    echo "  ✗ $case_key 跑完之后算不出这批输入的指纹：$case_manifest_problem；不写全绿标记"
+    echo "     → 怎么办：多半是跑的过程中有人删了登记路径下的文件或工具链坏了；等改动停下，在 HEAD + 暂存区的 worktree 里重跑 --full。"
+    red_cases+=("$case_key")
+    continue
+  fi
+  if [[ "$case_fingerprint" != "$fingerprint_at_start" ]]; then
+    echo "  ✗ $case_key 跑的过程中它的输入变了（开跑 ${fingerprint_at_start:0:16}…，跑完 ${case_fingerprint:0:16}…）：读到的不一定是同一版，不写全绿标记；开跑那一批已有的那一格不删"
+    report_manifest_differences "$manifest_at_start" "$manifest_at_finish" "开跑时" "跑完时"
+    echo "     → 怎么办：别在有人改这些路径的树里跑。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>（与 gate.sh --staged 同一建法）："
+    print_staged_worktree_full_commands
+    red_cases+=("$case_key")
+    continue
+  fi
+  threads_text="${judge_output//$'\n'/；}${judge_output:+；}${case_threads_note}"
+  if ! record_output="$(python3 "$layer0_admission_module" crash-case-record "$ROOT" "$case_key" "$fingerprint_at_start" "$manifest_at_start" "$judged_lines_file" \
+      --files "$file_count_at_start" --excluded "$excluded_count_at_start" --started "$case_started_utc" --judged-root "$ROOT" \
+      --machine-cores "$case_machine_cores" --threads "$case_threads" --threads-origin "$case_threads_origin")"; then
+    echo "  ✗ $case_key 判绿，全绿标记却没写成：$record_output"
+    echo "     → 怎么办：看 $git_common_directory 可不可写、盘满没满，修好之后重跑 --full（没有标记，整轮门禁的快档会一直红）。"
+    red_cases+=("$case_key")
+    continue
+  fi
+  rmdir -- "$case_progress_directory" 2>/dev/null
+  echo "  ✓ $case_key 判绿（${threads_text}）：全绿标记写进 ${record_output}，记下的行原样："
+  sed 's/^/      /' "$judged_lines_file"
+  green_cases+=("$case_key")
+done
 full_finished_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-marker_being_written="$full_green_marker_path.partial.$$"
-if ! {
-  echo "# 层 0 全量全绿标记：.claude/gate.d/54-layer0-replay.sh --full 判绿之后写，按输入哈希分格，整轮门禁的快档按这批输入的哈希读这一格。不进工作树，别手改。"
-  echo "input_hash=$layer0_input_hash"
-  echo "input_file_count=$layer0_input_file_count"
-  echo "input_paths=$layer0_input_paths_text"
-  echo "started_utc=$full_started_utc"
-  echo "finished_utc=$full_finished_utc"
-  echo "judged_root=$ROOT"
-  echo "worker_threads=第一个事务那条流 ${worker_threads}、两次发布那条流 ${worker_threads_b}；SINGLEFS_LAYER0_THREADS=${SINGLEFS_LAYER0_THREADS}（${threads_origin}），本机 ${machine_cores} 核"
-  echo "$line"
-  echo "$checker_line"
-  echo "$line_b"
-  sed 's/^/input_file /' "$manifest_at_finish"
-} > "$marker_being_written" || ! mv -f -- "$marker_being_written" "$full_green_marker_path"; then
-  rm -f -- "${marker_being_written:?}"
-  echo "  ✗ 全量全绿，全绿标记却没写成（$full_green_marker_path）"
-  echo "     → 怎么办：看 $git_common_directory 可不可写、盘满没满，修好之后重跑 --full（没有标记，整轮门禁的快档会一直红）。"
+if (( ${#red_cases[@]} > 0 )); then
+  echo "  ✗ --full 有 ${#red_cases[@]} 条崩溃枚举用例判红：${red_cases[*]}（这一趟判绿 ${#green_cases[@]} 条、复用 ${#reused_cases[@]} 条；开跑 ${full_started_utc}，跑完 ${full_finished_utc}）"
+  echo "     → 怎么办：逐条照它自己那一句「→ 怎么办」改；改完暂存，再在 HEAD + 暂存区的 worktree 里跑 --full（这一趟判绿的与复用的那几条下一趟照样复用）。"
   exit 1
 fi
-full_marker_written=1
-marker_slot_total="$(find "$git_common_directory" -maxdepth 1 -type f -name 'singlefs-layer0-full-green.*' ! -name '*.partial.*' | grep -c .)"
-echo "  ✓ 全绿标记写进 $full_green_marker_path（输入哈希 ${layer0_input_hash:0:16}…，${layer0_input_file_count} 个文件；开跑 ${full_started_utc}，跑完 ${full_finished_utc}；common-dir 里现有 ${marker_slot_total} 格）"
+echo "  ✓ --full 跑完（开跑 ${full_started_utc}，跑完 ${full_finished_utc}）：${#crash_case_rows[@]} 条崩溃枚举用例，这一趟跑了判绿 ${#green_cases[@]} 条（${green_cases[*]:-无}），复用 ${#reused_cases[@]} 条（${reused_cases[*]:-无}）"

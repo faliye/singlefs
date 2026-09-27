@@ -21,3 +21,13 @@ experiment-runner	.claude/kb/experiments.md	实验索引行
 experiment-runner	.claude/kb/experiments-history.md	重跑已有实验时这个实验的历史条目（agent-defs-r1 判决 D2）
 experiment-runner	research/prompts/e*-r*-prereg.md	重跑已有实验的重跑登记（agent-defs-r1 判决 D2）
 experiment-runner	/tmp/claude-1000/**	报告文件与草稿目录
+tooling-writer	.claude/hooks/**	tooling-writer.md「写范围」：钩子与它们的表
+tooling-writer	.claude/gate.d/**	tooling-writer.md「写范围」：门禁阶段、样本与 stage-*.tsv
+tooling-writer	.claude/scripts/**	tooling-writer.md「写范围」
+tooling-writer	research/scripts/**	tooling-writer.md「写范围」：研究脚本与看门狗
+tooling-writer	.claude/settings.json	tooling-writer.md「写范围」：只改 hooks 一节，注册新钩子
+tooling-writer	.claude/agents/*.md	tooling-writer.md「写范围」第二种活：照判决改定义
+tooling-writer	.claude/agent-common.md	tooling-writer.md「写范围」第二种活
+tooling-writer	.claude/main-agent.md	tooling-writer.md「写范围」第二种活
+tooling-writer	.claude/rules/*.md	tooling-writer.md「写范围」第二种活
+tooling-writer	/tmp/claude-1000/**	报告文件与草稿目录
