@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 只读会话记录与 /proc，除了 bash 与 python3 之外没有环境要求
 # 子 agent 等长活时的缓存计时器：用 Bash 的 run_in_background 起它，默认 230 秒后退出，
 # harness 的完成通知把子 agent 叫醒，那一次模型调用就把提示缓存续上了。
 #
@@ -15,6 +17,8 @@ set -uo pipefail
 
 HINT="缓存计时器到点。看一眼你等的后台任务跑完没有：没跑完就再用 run_in_background 起一次本脚本、结束本轮接着等；跑完了就接着干，不用再起。自己已经交回或被停的，不用管。"
 
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 if [[ "${1:-}" == "--selftest" ]]; then
   output="$(bash "$0" 1 2>&1)"; rc=$?
   failures=0

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: command git
 """只暂存这一轮的改动：几个会话共写同一批文件时，把工作区里「我的」那几块挑进暂存区，别人的留在工作区。
 
 用法：
@@ -30,6 +32,11 @@ import re
 import subprocess
 import sys
 import tempfile
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 DEFAULT_SPLIT = r'^(#{1,6} |\||E[0-9]+\|)'
 MOVE_HEAD_CHARACTERS = 12
@@ -254,4 +261,5 @@ def main():
 
 
 if __name__ == '__main__':
+    preflight(__file__)
     main()

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: command git
 """阶段同步的候选表：这一阶段哪些事实变了，仓里还有哪些现状句在说旧的。回扫员照表逐行判，不自己挑关键词、不整组放行。
 
 用法（按次序）：
@@ -47,6 +49,11 @@ import re
 import subprocess
 import sys
 import tempfile
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 CARRIER_PATTERNS = [
     r'^CLAUDE\.md$',
@@ -73,6 +80,10 @@ NEWLY_ADDED_OLD_FACT_PREFIX = '新立：'
 NOT_NEWLY_ADDED_WORDS = re.compile(r'落地|实现|已有|跑完|还清|有了')
 REWORDING_ONLY_OLD_FACT_PREFIX = '只改措辞'
 MAXIMUM_CANDIDATE_LINES_PER_FACT = 500
+# 命中超过这么多行的检索词要先抽查精度：「出处」列里写一句「宽词已抽查：抽 N 行、相干 M 行」（推的门槛，没量过；
+# 那一次「冻结」两组各 163 行逐行判下来全是不相干）
+WIDE_TERM_SPOT_CHECK_LINES = 100
+WIDE_TERM_SPOT_CHECK_NOTE = re.compile(r'宽词已抽查[：:][^\t]*\d')
 REWORDING_HEADING_WORDS = re.compile(r'措辞|指代|写法|改名|搬|路径|一个字(不|没)改|错字|拼写|简称|格式对齐')
 MINIMUM_QUOTED_CHARACTERS = 4
 TERM_CONJUNCTION = '&&'
@@ -299,7 +310,7 @@ def check_facts(repository_root, base, target, fact_path):
     base_corpus = current_state_corpus(repository_root, base)
     target_corpus = current_state_corpus(repository_root, target)
     heading_by_id = {entry_id: heading for entry_id, _, heading in entries}
-    broken, empty, too_broad, not_new, fake_rewording, needless_conjunction, gone = [], [], [], [], [], [], []
+    broken, empty, too_broad, not_new, fake_rewording, needless_conjunction, gone, wide_unchecked = [], [], [], [], [], [], [], []
     for fact in facts:
         try:
             compiled_parts = compile_search_term(fact['检索词'])
@@ -322,13 +333,16 @@ def check_facts(repository_root, base, target, fact_path):
             too_broad.append(f'{fact["编号"]}（{target_hits} 行）')
         if target_hits == 0:
             gone.append(fact['编号'])
+        if (WIDE_TERM_SPOT_CHECK_LINES < target_hits <= MAXIMUM_CANDIDATE_LINES_PER_FACT and not WIDE_TERM_SPOT_CHECK_NOTE.search(fact['出处'])
+                and os.environ.get('STALE_CANDIDATES_BREAK') != 'wide-unchecked'):
+            wide_unchecked.append(f'{fact["编号"]}（{target_hits} 行）')
         if len(compiled_parts) > 1:
             first_part_hits = sum(1 for lines in target_corpus.values() for _, line in lines if compiled_parts[0].search(line))
             if first_part_hits <= MAXIMUM_CANDIDATE_LINES_PER_FACT:
                 needless_conjunction.append(f'{fact["编号"]}（第一个词只命中 {first_part_hits} 行）')
         if not any(search_term_matches(compiled_parts, line) for lines in base_corpus.values() for _, line in lines):
             empty.append(fact['编号'])
-    if uncovered or broken or empty or too_broad or not_new or fake_rewording or needless_conjunction or gone:
+    if uncovered or broken or empty or too_broad or not_new or fake_rewording or needless_conjunction or gone or wide_unchecked:
         for entry_id, path, heading in uncovered[:40]:
             print(f'  ✗ {entry_id} 没有任何一行事实罩着：{path} {heading[4:80]}')  # gate-lint:detail
         if broken:
@@ -346,12 +360,16 @@ def check_facts(repository_root, base, target, fact_path):
             print(f'  ✗ 检索词在结束那一版一处都没命中（照抄了被这一阶段改掉的旧句）：{"、".join(gone)}')  # gate-lint:detail
         if too_broad:
             print(f'  ✗ 检索词太宽，结束那一版命中超过 {MAXIMUM_CANDIDATE_LINES_PER_FACT} 行：{"、".join(too_broad)}')  # gate-lint:detail
+        if wide_unchecked:
+            print(f'  ✗ 检索词命中超过 {WIDE_TERM_SPOT_CHECK_LINES} 行，「出处」列里没写「宽词已抽查：抽 N 行、相干 M 行」：{"、".join(wide_unchecked)}')  # gate-lint:detail
         print(f'  ✗ 事实表没罩全：{len(uncovered)} 条变更记录没罩、{len(broken)} 行正则坏了、'  # gate-lint:summary
               f'{len(empty)} 行检索词在基准零命中、{len(gone)} 行在结束零命中、{len(too_broad)} 行检索词太宽、'
-              f'{len(needless_conjunction)} 行多余的 &&、{len(not_new)} 行冒充新立、{len(fake_rewording)} 行冒充只改措辞')
+              f'{len(needless_conjunction)} 行多余的 &&、{len(not_new)} 行冒充新立、{len(fake_rewording)} 行冒充只改措辞、'
+              f'{len(wide_unchecked)} 行宽词没抽查')
         print('     → 怎么办：读 --changes 给的变更清单，每条 H 编号写进它说的那件事实的「出处」列（只改措辞的也写一行，旧新事实写「只改措辞」）；'
               '检索词写新旧说法都会提到的概念名词，基准与结束两版都要命中；太宽（超过上限）才用 && 并上第二个概念名词收窄；'
-              '事实真变了的不许写成只改措辞或新立')
+              '事实真变了的不许写成只改措辞或新立；命中超过 ' + str(WIDE_TERM_SPOT_CHECK_LINES) + ' 行的先抽 10 行自判相干不相干，'
+              '精度低就改窄，精度够就在「出处」列写「宽词已抽查：抽 10 行、相干 N 行」')
         return 6
     print(f'  ✓ 事实表罩全了：{len(entries)} 条变更记录都有出处，{len(facts)} 行事实的检索词都在基准那一版的现状句里命中（新立事项除外、它们在基准零命中）')
     return 0
@@ -546,6 +564,14 @@ def selftest():
         if quietly(check_facts, directory, 'HEAD~1', 'HEAD', os.path.join(directory, 'facts-good.tsv')) != 6:
             failures.append('命中行数超上限的事实表没被判红')
         globals()['MAXIMUM_CANDIDATE_LINES_PER_FACT'] = saved_limit
+        saved_wide = globals()['WIDE_TERM_SPOT_CHECK_LINES']
+        globals()['WIDE_TERM_SPOT_CHECK_LINES'] = 0
+        if quietly(check_facts, directory, 'HEAD~1', 'HEAD', os.path.join(directory, 'facts-good.tsv')) != 6:
+            failures.append('命中超过抽查门槛、出处列没写「宽词已抽查」的事实表没被判红')
+        write('facts-wide-checked.tsv', header + 'F1\t层 0 只有第一个事务\t层 0 两条流\t层 0\tH1；宽词已抽查：抽 10 行、相干 9 行\n')
+        if quietly(check_facts, directory, 'HEAD~1', 'HEAD', os.path.join(directory, 'facts-wide-checked.tsv')) != 0:
+            failures.append('写了「宽词已抽查」的宽检索词被判红')
+        globals()['WIDE_TERM_SPOT_CHECK_LINES'] = saved_wide
         write('facts-build.tsv', header + good_row + 'F2\t只改措辞\t只改措辞\t层 0\tH1\n'
               'F3\t层 0 只有第一个事务\t层 0 两条流\t一次挂载\tH1\n')
         candidates = build_candidates(directory, 'HEAD', read_fact_table(os.path.join(directory, 'facts-build.tsv')))
@@ -667,4 +693,5 @@ def main():
 
 
 if __name__ == '__main__':
+    preflight(__file__)
     sys.exit(main())

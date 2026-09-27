@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: command git
 # 这次改动碰没碰 `crates/`：碰了退出 0，没碰退出 1，判不出来退出 0。
 #
 #   change-touches-crates.sh [项目根] [输入前缀…]   判一次，把判据与依据打到 stdout（前缀不给按 `crates/`）
@@ -28,6 +30,8 @@
 set -uo pipefail
 
 # 基取哪一个：显式的 GATE_BASE > 与上游的 merge-base > HEAD。与 .claude/gate.d/75-decision-experiment-links.sh 同一套取法。
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 base_of() {
   local repository="$1"
   # 基准恒取 HEAD，**不取 `GATE_BASE`**——两者回答的不是同一个问题，混用会让这道判定失效：
@@ -82,11 +86,11 @@ judge() {
   fi
   local base; base="$(base_of "$root")"
   local committed uncommitted
-  if ! committed="$(git -C "$root" diff --name-only "$base" 2>/dev/null)"; then
+  if ! committed="$(git -C "$root" -c core.quotepath=false diff --name-only "$base" 2>/dev/null)"; then
     echo "碰了（保守）：拿不到与基 $base 的 diff"
     return 0
   fi
-  if ! uncommitted="$(git -C "$root" status --porcelain 2>/dev/null)"; then
+  if ! uncommitted="$(git -C "$root" -c core.quotepath=false status --porcelain 2>/dev/null)"; then
     echo "碰了（保守）：拿不到工作区状态"
     return 0
   fi

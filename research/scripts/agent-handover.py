@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本（与它点名的会话记录），除了 python3 之外没有环境要求
 """从一个子 agent 的会话记录里机械地抽交接摘要，交给接手它的新 agent。
 
 为什么：一个子 agent 撞了限额、被停或报错，就该换一个新的接着做（用户 2026-09-19 定；上下文大小本身不是换的理由，见
@@ -11,7 +13,7 @@
 用法：
     agent-handover.py --agent <agent id> --out <交接摘要.md>   # 在 ~/.claude/projects/*/*/subagents/ 里按 id 找会话记录
     agent-handover.py --transcript <会话记录.jsonl> --out <交接摘要.md>
-    agent-handover.py --selftest                              # 造一份假会话记录走一遍；AGENT_HANDOVER_BREAK=<项> 时必须判红
+    agent-handover.py --selftest                              # 造一份假会话记录走一遍，临时目录用完即删（判红、抛异常也删）；AGENT_HANDOVER_BREAK=<项> 时必须判红
 
 退出码：0 写成；2 参数或找不到会话记录；1 自检不过。
 """
@@ -21,10 +23,21 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 BROKEN = os.environ.get("AGENT_HANDOVER_BREAK", "")
+SELFTEST_DIRECTORY_PREFIX = "agent-handover-selftest-"
+# 自检拉起自己的子进程时给的角色：red 走判红那条路，crash 在写完文件之后抛异常（scratch_cleanup_problems 用）
+SELFTEST_ROLE = os.environ.get("AGENT_HANDOVER_SELFTEST_ROLE", "")
+SELFTEST_RED_LABEL = "子进程按 AGENT_HANDOVER_SELFTEST_ROLE=red 判红"
+SELFTEST_CRASH_MARKER = "agent-handover 自检按 AGENT_HANDOVER_SELFTEST_ROLE=crash 故意抛的异常"
 WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 WRITING_COMMAND = re.compile(r"(^|[\s;|&])(>>?|tee|cp|mv|rsync|sed\s+-i|cargo\s+(test|run|build)|bash\s+research/scripts/replay\.sh|python3\s+research/scripts/[\w./-]+\.py)")
 LAST_TEXT_BLOCKS = 12
@@ -190,7 +203,54 @@ def write_handover(transcript, out_path):
 
 
 def selftest():
-    work = tempfile.mkdtemp(prefix="agent-handover-selftest-")
+    """造一份假会话记录走一遍。临时目录用完即删，判红、抛异常也删：门禁每轮给阶段一个私有 TMPDIR，跑完里面还剩东西就判红。
+    弄坏开关 AGENT_HANDOVER_BREAK=keepscratch 走回 mkdtemp 不删的旧毛病，「临时目录」那三格必须判红。"""
+    if BROKEN == "keepscratch":
+        work = tempfile.mkdtemp(prefix=SELFTEST_DIRECTORY_PREFIX)
+        checks = extraction_checks_in(work)
+    else:
+        with tempfile.TemporaryDirectory(prefix=SELFTEST_DIRECTORY_PREFIX) as work:
+            checks = extraction_checks_in(work)
+    problems = [f"交接摘要里没有「{label}」" for label, ok in checks if not ok]
+    # 子进程只走它那一条路，不再往下拉子进程
+    cleanup_problems = [] if SELFTEST_ROLE else scratch_cleanup_problems(work)
+    for problem in problems + cleanup_problems:
+        print(f"  ✗ 自检：{problem}")  # gate-lint:detail
+    if problems or cleanup_problems:
+        print("    → 看 read_transcript() 与 render()；临时目录那几格看 selftest() 里的 TemporaryDirectory；AGENT_HANDOVER_BREAK 设着的话这里本来就该红")
+        return 1
+    print(f"  ✓ agent-handover 自检通过：派发提示、续做消息、写过的文件与现状、跑过的命令与输出、最后说的话、上下文都抽得出；"
+          f"自检的临时目录在通过、判红、抛异常三条路上都删掉了（查了 {len(checks) + SCRATCH_CLEANUP_CELLS} 项）")
+    return 0
+
+
+SCRATCH_CLEANUP_CELLS = 3   # scratch_cleanup_problems 判的格数：通过的这一次、判红的子进程、抛异常的子进程
+
+
+def scratch_cleanup_problems(own_directory):
+    """自检的临时目录用完即删，三格：通过的这一次（own_directory 已经不在）、判红那条路、抛异常那条路。
+    后两条路拉起自己的子进程去走，TMPDIR 指进一个探查目录；子进程退出之后那里必须是空的。"""
+    problems = []
+    if os.path.exists(own_directory):
+        problems.append(f"通过的这一次，临时目录用完没删：{own_directory}")
+    with tempfile.TemporaryDirectory(prefix="agent-handover-cleanup-probe-") as probe:
+        for role, expected_text in (("red", SELFTEST_RED_LABEL), ("crash", SELFTEST_CRASH_MARKER)):
+            child_temporary_directory = os.path.join(probe, role)
+            os.mkdir(child_temporary_directory)
+            child = subprocess.run([sys.executable, os.path.abspath(__file__), "--selftest"],
+                                   env=dict(os.environ, AGENT_HANDOVER_SELFTEST_ROLE=role, TMPDIR=child_temporary_directory),
+                                   capture_output=True, text=True)
+            child_output = child.stdout + child.stderr
+            left_behind = sorted(os.listdir(child_temporary_directory))
+            if child.returncode == 0 or expected_text not in child_output:
+                problems.append(f"{role} 那条路没走到（子进程退出码 {child.returncode}，输出里没有「{expected_text}」）：{child_output[-400:]}")
+            elif left_behind:
+                problems.append(f"{role} 那条路上临时目录没删：{child_temporary_directory} 里留下 {'、'.join(left_behind)}")
+    return problems
+
+
+def extraction_checks_in(work):
+    """在 work 里造假会话记录、抽交接摘要，回 [(这一格叫什么, 过没过)]。"""
     transcript = os.path.join(work, "agent-feedbeef12345678.jsonl")
     written_file = os.path.join(work, "device.rs")
     open(written_file, "w").write("fn main() {}\n")
@@ -218,14 +278,11 @@ def selftest():
         ("最后说的话", "接着改 replay.sh" in text),
         ("最后一次上下文", "95.0 万" in text),
     ]
-    failures = [label for label, ok in checks if not ok]
-    for label in failures:
-        print(f"  ✗ 自检：交接摘要里没有「{label}」")  # gate-lint:detail
-    if failures:
-        print("    → 看 read_transcript() 与 render()；AGENT_HANDOVER_BREAK 设着的话这里本来就该红")
-        return 1
-    print(f"  ✓ agent-handover 自检通过：派发提示、续做消息、写过的文件与现状、跑过的命令与输出、最后说的话、上下文都抽得出（查了 {len(checks)} 项）")
-    return 0
+    if SELFTEST_ROLE == "crash":
+        raise RuntimeError(SELFTEST_CRASH_MARKER)
+    if SELFTEST_ROLE == "red":
+        checks.append((SELFTEST_RED_LABEL, False))
+    return checks
 
 
 def main():
@@ -249,4 +306,5 @@ def main():
 
 
 if __name__ == "__main__":
+    preflight(__file__)
     sys.exit(main())

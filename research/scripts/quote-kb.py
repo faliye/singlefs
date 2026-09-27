@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本（与它点名的会话记录），除了 python3 之外没有环境要求
 """把 kb 里的条款整段抄进一份背景材料，抄完自己回读比对。
 
 `.claude/rules/three-way-inference.md` 要求「引 kb 里的条目要整行抄，不许摘句」，
@@ -20,7 +22,8 @@
 
 自证会红：`quote-kb.py --selftest` 走一遍三种取法，再用 QUOTE_KB_CORRUPT=1
 强制进入「抄漏一行」那条分支，确认回读比对判红（`.claude/rules/fs-design.md` 硬要求 2：
-每条分支必须能被测试强制进入）。
+每条分支必须能被测试强制进入）。自证的临时目录由 `.claude/hooks/lib_selftest_scratch.py` 建，通过、判红、抛异常
+三条路上都删，这三格也由它判；QUOTE_KB_BREAK=keepscratch 走回 mkdtemp 不删，那三格必须判红。
 
 退出码：
     3   回读比对不一致（抄出来的与源文件不一致）
@@ -28,9 +31,17 @@
     5   --cited 缺清单：正文提到的某个 kb 文件，清单里没给它做一张小节清单
     6   清单标了「不抄」的小节，其实整段被 --extra 之类的行区间连带抄进了附录（反向核对，C320）
 """
-import glob, os, re, sys, tempfile
+import glob, importlib.util, os, re, sys
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 FENCE = '```'
+SELFTEST_ROLE_VARIABLE = 'QUOTE_KB_SELFTEST_ROLE'   # 自证拉起自己的子进程走判红、抛异常那两条路时设的角色
+SELFTEST_SCRATCH_LIBRARY = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                                        '.claude', 'hooks', 'lib_selftest_scratch.py')
 
 
 def fence_for(body):
@@ -270,7 +281,25 @@ def check_cited(checklist, cited_text, root):
 
 
 def selftest():
-    src = os.path.join(tempfile.mkdtemp(), 'sample.md')
+    """主体在 selftest_in；临时目录由共用库建（通过、判红、抛异常都删），那三格也由它判。"""
+    try:
+        spec = importlib.util.spec_from_file_location('lib_selftest_scratch', SELFTEST_SCRATCH_LIBRARY)
+        scratch = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(scratch)
+    except Exception as error:   # 文件不在、语法错、导入时抛的都算读不到
+        print(f"  ✗ 自检：读不到共用的临时目录库 {SELFTEST_SCRATCH_LIBRARY}（{error!r}）")
+        print("     → 怎么办：恢复 .claude/hooks/lib_selftest_scratch.py（自证临时目录的建法与三格探查只有那一份），再跑 --selftest。")
+        return 1
+    exit_code, problems = scratch.run_with_scratch(
+        selftest_in, 'quote-kb-selftest-', os.environ.get('QUOTE_KB_BREAK') == 'keepscratch',
+        SELFTEST_ROLE_VARIABLE, [sys.executable, os.path.abspath(__file__), '--selftest'])
+    return scratch.merged_exit_code(exit_code, problems, 'research/scripts/quote-kb.py 的 selftest()', 'QUOTE_KB_BREAK=keepscratch')
+
+
+def selftest_in(work):
+    sample_directory = os.path.join(work, 'sample')
+    os.mkdir(sample_directory)
+    src = os.path.join(sample_directory, 'sample.md')
     with open(src, 'w', encoding='utf-8') as f:
         f.write('# 头\n\n#### 已定项 5\n\n一\n二\n\n#### 已定项 6\n\n三\n\n'
                 '#### 带代码块的\n\n```\n判定(ptr):\n    birth = ptr.birth\n```\n'
@@ -344,7 +373,7 @@ def selftest():
         print("     → 怎么办：pick() 把代码栅栏内的 `#` 行误判成了标题行，去查它判断「是否在代码块内」的状态机。")
         return 1
     print("  ✓ 自检：代码栅栏里的 `#` 行不被当成标题，整节取全")
-    cited_root = tempfile.mkdtemp()
+    cited_root = os.path.join(work, 'cited')
     os.makedirs(os.path.join(cited_root, '.claude/kb/decisions'))
     with open(os.path.join(cited_root, '.claude/kb/decisions/99-样本.md'), 'w', encoding='utf-8') as f:
         f.write('## D99 样本 —— 已定\n')
@@ -427,4 +456,5 @@ def main(argv):
 
 
 if __name__ == '__main__':
+    preflight(__file__)
     sys.exit(main(sys.argv[1:]))

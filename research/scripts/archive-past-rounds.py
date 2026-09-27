@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: command git
 """上一轮及更早的实验记录归档进版本库：删掉工作区里的那批，保留本轮的。
 
 规则见 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「原样保存的证据不许事后改」之下那三段：
@@ -12,17 +14,23 @@
 
 判据（机械，不靠人记）：
   删 —— `research/results/` 与 `research/prompts/` 下，**在 HEAD 里有、且这一轮没碰过**的文件；
-        「这一轮」的起点取 `GATE_BASE`（与门禁 68 号同一个基准，见 base_of 的说明），没给就取 HEAD。
+        「这一轮」的起点与门禁 68 号同一个基准：`research/scripts/changed-paths.sh` 的 `gate_diff_base gate`
+        （`GATE_BASE`，否则 `@{upstream}` 的 merge-base，都没有就 HEAD），见 base_of 的说明。
         没改过 = 它是上一次提交固化下来的，属于上一轮及更早。
   留 —— 工作区里新加或改过的（本轮在产生的）、三方判决 `*-main-verification.md`（kb 的依据指着它）、
-        `abandoned-rounds.tsv`（登记表，门禁 66 号的输入）。
+        `abandoned-rounds.tsv`（登记表，门禁 66 号的输入）、还被代码当输入的产物（still_an_input）。
   ⚠️ 删文件会让别处指向它的链接指空，所以 --apply 同时把那些引用**只留文件名、去掉路径**，
-     不留一个指空的路径——共享 `gate.sh` 的「链接指向」阶段判的就是这个。「找不到就去 git 历史里看」写在 `.claude/agent-common.md`，不逐处重复。
+     不留一个指空的路径——共享门禁的「链接指向」阶段判的就是这个。「找不到就去 git 历史里看」写在 `.claude/agent-common.md`，不逐处重复。
 """
 import os
 import re
 import subprocess
 import sys
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 DIRS = ("research/results", "research/prompts")
 KEEP = re.compile(r"-main-verification\.md$|abandoned-rounds\.tsv$")
@@ -39,9 +47,16 @@ def git(*args, root="."):
                           capture_output=True, text=True, check=True).stdout
 
 
+class BaseUnavailable(Exception):
+    """取不到「这一轮」的起点：判不了哪些是上一轮的，不许当成「全是这一轮的」或「全是上一轮的」。"""
+
+
 def base_of(root="."):
     """「这一轮」的起点。与门禁 68 号（改了规则、agent、hook、门禁、脚本或实现之后有没有写阶段同步记录）
-    取同一个基准——两道对同一批文件判相反的事，基准必须是同一个。
+    取同一个基准——两道对同一批文件判相反的事，基准必须是同一个。取法不在这里另写一份，
+    直接调 68 号用的那一份：`research/scripts/changed-paths.sh` 的 `gate_diff_base gate`
+    （GATE_BASE，否则 @{upstream} 的 merge-base，都没有就 HEAD）。只认「GATE_BASE，否则 HEAD」时，
+    没设 GATE_BASE 又有没推的提交，两道的窗口就不一样（C450 那一形）。
 
     ⚠️ **基准不一致会让两道直接打架**（C450 实测 2026-09-21，同一天撞了两次）：
     68 号的改动范围取 `GATE_BASE`（门禁跑时给的是 `diff_base`，`refs/sop/gate-ok` 不存在时退回 `HEAD~1`），
@@ -50,13 +65,13 @@ def base_of(root="."):
     不是偶发。实测那天两份 sync 记录点名的触发文件相对 `HEAD~1` 分别还有 14 个和 7 个在范围里。
     取同一个基准之后，上一轮的记录能正常退场。
     """
-    base = os.environ.get("GATE_BASE", "")
-    if base:
-        r = subprocess.run(['git', '-C', root, 'rev-parse', '--verify', '-q', base + '^{commit}'],
-                           capture_output=True, text=True)
-        if r.returncode == 0:
-            return base
-    return "HEAD"
+    library = os.path.join(os.path.dirname(os.path.abspath(__file__)), "changed-paths.sh")
+    shown = subprocess.run(["bash", "-c", 'source "$1" && gate_diff_base gate', "base-of", library],
+                           cwd=root, capture_output=True, text=True)
+    base = shown.stdout.strip()
+    if shown.returncode != 0 or not base:
+        raise BaseUnavailable(f"{library} 的 gate_diff_base gate 退 {shown.returncode}：{shown.stderr.strip()[:200]}")
+    return base
 
 
 def past_round_files(root="."):
@@ -209,7 +224,12 @@ def run(root, apply_changes):
         print("               基准要与门禁跑的时候一样（`gate.sh` 开头打的那一行「diff 基准 <sha>」就是它）。")
         print("               真要按 HEAD 算（只有手里一个提交都没暂存时才成立），显式写 GATE_BASE=HEAD。")
         return 2
-    doomed = past_round_files(root)
+    try:
+        doomed = past_round_files(root)
+    except BaseUnavailable as error:
+        print(f"  ✗ 取不到「这一轮」的起点（{error}），分不出哪些实验记录是上一轮的")
+        print("     → 怎么办：在仓根跑、确认 research/scripts/changed-paths.sh 在；基准取法与门禁 68 号是同一份，那一份坏了两道一起坏。")
+        return 1
     inputs = still_an_input(root, doomed)
     doomed = [p for p in doomed if p not in inputs]
     if inputs:
@@ -220,8 +240,10 @@ def run(root, apply_changes):
         # 数磁盘上真有的，不数 git 索引：删过还没提交时索引里仍跟踪着那些文件，
         # 拿索引数报「现有多少份」会报出一个磁盘上不成立的数。
         kept = sum(len(names) for base in DIRS for _, _, names in os.walk(os.path.join(root, base)))
-        print("  ✓ 没有上一轮留下的实验记录（%s 下磁盘上现有 %d 份，都是本轮的或按规则保留的）" % ("、".join(DIRS), kept))
-        print("     保留的两类：三方判决 *-main-verification.md（kb 的依据指着它）、abandoned-rounds.tsv（门禁 66 号的输入）")
+        print("  ✓ 没有上一轮留下的实验记录（%s 下磁盘上现有 %d 份，都是本轮的或按规则保留的；「这一轮」的起点 %s，取法同门禁 68 号：changed-paths.sh 的 gate_diff_base gate）"
+              % ("、".join(DIRS), kept, base_of(root)))
+        print("     保留的三类：三方判决 *-main-verification.md（kb 的依据指着它）、abandoned-rounds.tsv（门禁 66 号的输入）、"
+              "还被代码当输入的产物（这一次 %d 份，逐个列在上面）" % len(inputs))
         return 0
     if not apply_changes:
         by_dir = {}
@@ -259,7 +281,7 @@ def run(root, apply_changes):
         for entry in stale:                                        # gate-lint:detail
             print("      %s" % entry)
         print("     → 怎么办：把它们从各自的排除表里删掉——排除只缩不涨，指不到的排除会让人以为那批文件已经被绕开了。")
-    print("     → 下一步：在仓库根单跑共享「链接指向」那一道 `python3 .claude/singlefs-ai-sop/scripts/link-targets.py` 确认没有指空的链接，再跑一次本脚本 --check 判绿。")
+    print("     → 下一步：跑共享门禁的「链接指向」阶段确认没有指空的链接，再跑一次本脚本 --check 判绿。")
     return 0
 
 
@@ -387,9 +409,23 @@ def selftest_in_temporary_directory():
             print("     → 怎么办：看 base_of —— 它要取 GATE_BASE（与门禁 68 号同一个基准），")
             print("               写死 HEAD 会让两道对同一份记录判相反的事。")
             return 1
+        # ── 没设 GATE_BASE、有没推的提交：基准取 @{upstream} 的 merge-base（changed-paths.sh 的 gate 取法，与 68 号同一份）──
+        # 只认「GATE_BASE，否则 HEAD」时，没推的那次提交里写的记录会被当成上一轮的删掉，而 68 号按 merge-base 判它还要着。
+        pushed_tip = git("rev-parse", "HEAD", root=work).strip()
+        subprocess.run(["git", "branch", "upstream-sample", pushed_tip], cwd=work, check=True)
+        subprocess.run(["git", "branch", "-q", "--set-upstream-to=upstream-sample"], cwd=work, check=True)
+        open(os.path.join(work, "research/prompts/r2-sync.md"), "w").write("<!-- knowledge-sync -->\n没推的那次提交里写的记录\n")
+        git("add", "-A", root=work)
+        subprocess.run(["git", "commit", "-qm", "没推的一次提交"], cwd=work, check=True)
+        if any(name.endswith("r2-sync.md") for name in past_round_files(work)):
+            print("  ✗ 自检失败：没设 GATE_BASE、有没推的提交时，那次提交里写的记录被判成上一轮的")
+            print("     → 怎么办：看 base_of —— 它要调 research/scripts/changed-paths.sh 的 gate_diff_base gate（与门禁 68 号同一份），")
+            print("               那一份没设 GATE_BASE 时取 @{upstream} 的 merge-base；只认「GATE_BASE，否则 HEAD」就会在这里判错。")
+            return 1
 
     print("  ✓ 自检：不给 GATE_BASE 的 --apply 当场拒绝且一个文件没删、有旧记录判红、删完判绿、判决与本轮新产物不被删、装置 include_str! 读的产物不被删且链接不被改、"
-          "指向被删文件的引用改成不带路径的说法、include 指空的产物报得出来、注释里的 include 与产物都在时不误报")
+          "指向被删文件的引用改成不带路径的说法、include 指空的产物报得出来、注释里的 include 与产物都在时不误报、"
+          "没设 GATE_BASE 时基准取上游的 merge-base（与门禁 68 号同一份取法）")
     return 0
 
 
@@ -403,4 +439,5 @@ def main(argv):
 
 
 if __name__ == "__main__":
+    preflight(__file__)
     sys.exit(main(sys.argv[1:]))

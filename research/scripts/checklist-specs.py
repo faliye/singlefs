@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本（与它点名的会话记录），除了 python3 之外没有环境要求
 """从三方论证材料的小节清单生成 quote-kb.py 的取法，并直接交给 quote-kb.py 抽附录。
 
 用法：
@@ -24,6 +26,11 @@ import re
 import subprocess
 import sys
 import tempfile
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -43,7 +50,7 @@ def read_rows(checklist_path):
     return rows
 
 
-def specs_from_checklist(checklist_path):
+def specs_from_checklist(checklist_path, extra_specs=()):
     rows = read_rows(checklist_path)
     specs = []
     merged_preamble = set()
@@ -64,9 +71,46 @@ def specs_from_checklist(checklist_path):
             if line_range is None:
                 sys.exit(f'✗ 清单里「{title}」标了抄，却既不是标题也没有「第 a-b 行」\n  → 改清单那一行，或者用 --extra 按行补抄')
             specs.append(f'{path}:{line_range.group(1)}-{line_range.group(2)}')
+    uncarried = uncarried_follow_rows(rows, {re.split(r'[:@]', spec, 1)[0] for spec in extra_specs})
+    if uncarried and os.environ.get('CHECKLIST_SPECS_BREAK') != 'trust-follow':
+        copied = sum(1 for row in rows if row[2] == '抄')
+        sys.exit(f'✗ 清单标「抄」{copied} 行 ≠ 生成的取法 {len(specs)} 条 + 并进开篇的 {len(merged_preamble)} 行 + 真被父节带到的「随」行 '
+                 f'{copied - len(specs) - len(merged_preamble) - len(uncarried)} 行：这几行理由以「随」起头，父节却没被取到——'
+                 + '；'.join(f'{path} {title}' for path, title in uncarried)
+                 + '\n  → 父节改成「抄」，或把这几行的理由改成不以「随」起头（它们就会按自己的标题或行区间取）')
     if os.environ.get('CHECKLIST_SPECS_SPLIT_ON_SPACE') == '1':
         specs = [piece for spec in specs for piece in spec.split(' ')]
     return specs
+
+
+def heading_level(title):
+    return len(re.match(r'#*', title).group(0)) if title.startswith('#') else 99
+
+
+def uncarried_follow_rows(rows, extra_paths=frozenset()):
+    """标「抄」、理由以「随」起头的行：同一份文件有 --extra 取法的算带到；否则往上找同一份文件里最近一个级别更高的标题行，
+    它要标「抄」而且自己被取到（不是随行，或是被带到的随行）。→ 找不到这样的父节的那几行 [(路径, 标题)]。"""
+    fetched = []
+    uncarried = []
+    for index, (path, title, mark, reason) in enumerate(rows):
+        is_follow = mark == '抄' and reason.startswith('随')
+        if mark != '抄':
+            fetched.append(False)
+            continue
+        if not is_follow:
+            fetched.append(True)
+            continue
+        if path in extra_paths:
+            fetched.append(True)
+            continue
+        level = heading_level(title)
+        parent = next((position for position in range(index - 1, -1, -1)
+                       if rows[position][0] == path and heading_level(rows[position][1]) < level), None)
+        carried = parent is not None and fetched[parent]
+        fetched.append(carried)
+        if not carried:
+            uncarried.append((path, title))
+    return uncarried
 
 
 def selftest():
@@ -84,7 +128,17 @@ def selftest():
             print(f'  ✗ 自检：取法 {specs} ≠ 期望 {expected}')
             print('    → 带空格的标题必须是一整条取法；看 specs_from_checklist 有没有按空格拆')
             return 1
-    print('  ✓ 自检通过：顶部标题与引言合成一个行区间，带空格的标题是一整条取法（查了 2 条）')
+        orphan = os.path.join(directory, 'orphan.md')
+        open(orphan, 'w', encoding='utf-8').write(
+            f'### 小节清单：`{kb}`\n\n| 小节 | 抄 / 不抄 | 理由 |\n|---|---|---|\n'
+            '| ## 样本 —— 已定 | 不抄 | 顶上不要 |\n| ### 已定项 1（带空格 的标题） | 抄 | 随父节带出 |\n')
+        child = subprocess.run([sys.executable, os.path.abspath(__file__), orphan], capture_output=True, text=True,
+                               env={**os.environ, 'CHECKLIST_SPECS_SELFTEST_CHILD': '1'})
+        if child.returncode == 0 or '父节却没被取到' not in child.stderr:
+            print(f'  ✗ 自检：父节标「不抄」、子节标「抄 / 随」的清单应当判红，实际退出码 {child.returncode}：{child.stderr[-200:]}')
+            print('    → 看 uncarried_follow_rows()；CHECKLIST_SPECS_BREAK=trust-follow 设着的话这里本来就该红')
+            return 1
+    print('  ✓ 自检通过：顶部标题与引言合成一个行区间，带空格的标题是一整条取法，父节没取到的「随」行判红（查了 3 条）')
     return 0
 
 
@@ -107,7 +161,7 @@ def main():
             extras.append(arguments.pop(0))
         else:
             sys.exit(f'✗ 不认识的参数 {flag}\n  → 只认 --cited、--out、--extra')
-    specs = specs_from_checklist(checklist) + extras
+    specs = specs_from_checklist(checklist, extras) + extras
     if out is None:
         print('\n'.join(specs))
         return 0
@@ -120,4 +174,5 @@ def main():
 
 
 if __name__ == '__main__':
+    preflight(__file__)
     sys.exit(main())

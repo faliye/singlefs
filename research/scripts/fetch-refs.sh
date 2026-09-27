@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 带 --check 只查本机已有的几份、不用 curl；下载时缺 curl 在那一步逐份判红
 # 把被当作证据引用的外部文献重新固定到本机，并留下取得方式与 sha256。
 #
 #   bash research/scripts/fetch-refs.sh [--check]
@@ -8,6 +10,8 @@
 # --check 只查在不在、hash 对不对，不下载。
 set -uo pipefail
 DEST="${FS_REFS:-/home/fy5090/code/fs-refs}/docs"
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 mkdir -p "$DEST"
 LOG="$DEST/../fetch-docs.log"
 
@@ -62,3 +66,4 @@ if [[ $miss -ne 0 ]]; then
        "本机没有的那几份先跑 'bash research/scripts/fetch-refs.sh'（不带 --check）去下载。"
   exit 1
 fi
+echo "  ✓ 承重文献在本机 $ok 份，一份不缺"

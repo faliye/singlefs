@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 只读会话记录与 /proc，除了 bash 与 python3 之外没有环境要求
 # 看门狗的调用入口：主 agent 每次派发（含续做）之后照 .claude/main-agent.md「派出去之后」起它，调用时只填要盯的 agent 号，
 # 会话目录由 agent-watch.py 按 agent 号自己找，阈值从 research/scripts/watch.conf 读——不在命令行上手敲。
 #
 # 一律放进 Bash 工具的 run_in_background；这里不再自己放后台（放了之后跑完的那个叫不醒主 agent）。
-#   bash research/scripts/watch.sh <agent 号>[,<agent 号>…] [<agent 号> …]   盯这几个子 agent 与它们起的长进程
+#   bash research/scripts/watch.sh                                       一个会话一个看门狗：从 CLAUDE_CODE_SESSION_ID 找会话目录，每次检查自己找还没结束的子 agent
+#                                                                        （新派的自动接上，不用停旧的起新的）；已有一个在盯就退 5；--ack 记进这个会话的状态目录，下一次起读回
+#   bash research/scripts/watch.sh <agent 号>[,<agent 号>…] [<agent 号> …]   只盯这几个子 agent 与它们起的长进程（--ack 只在这一次有效）
 #   bash research/scripts/watch.sh --processes                           只盯这个 Claude 实例底下已经在跑的长进程（主 agent 自己起的长命令）；
 #                                                                        找得到当前会话（CLAUDE_CODE_SESSION_ID）就同时查交回之后后台还在跑
 #   bash research/scripts/watch.sh --report                              当前会话的全部子 agent 现在是什么样，报一次就退
@@ -12,6 +16,8 @@
 #   bash research/scripts/watch.sh --selftest
 set -uo pipefail
 
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 here="$(cd "$(dirname "$0")" && pwd)"
 root="$(cd "$here/../.." && pwd)"
 conf="${WATCH_CONF:-$here/watch.conf}"
@@ -21,7 +27,7 @@ die() { echo "  ✗ $1" >&2; echo "     → 怎么办：$2" >&2; exit 2; }
 
 # 配置转成选项；不认识的 key、不是整数的值都拒绝，免得一个拼错的 key 被安静地丢掉
 config_options() {
-  local line key value known=" interval-seconds max-minutes tool-minutes wait-loop-minutes idle-minutes repeat-count context-tokens process-report-minutes process-stale-minutes process-max-minutes not-started-minutes active-minutes detection-poll-seconds leftover-background-grace-minutes ask-every-minutes process-rss-gibibytes "
+  local line key value known=" interval-seconds max-minutes tool-minutes wait-loop-minutes idle-minutes repeat-count context-tokens process-report-minutes process-stale-minutes process-max-minutes not-started-minutes active-minutes detection-poll-seconds leftover-background-grace-minutes ask-every-minutes process-rss-gibibytes progress-stale-minutes "
   [[ -f "$conf" ]] || return 0
   while IFS= read -r line || [[ -n "$line" ]]; do
     line="${line%%#*}"
@@ -89,12 +95,20 @@ selftest() {
   [[ "$out" == *"--agents a0000000000000001 "* && "$out" == *"--ack 进程:4242 --ack a0000000000000001:书记员攒下的没跟上检出"* ]] \
     || { echo "  ✗ 自检⑦：重型测试告警（--ack 进程:<pid>）或书记员汇总告警（--ack <agent 号>:书记员攒下的没跟上检出）的确认没原样转过去：$out"; fail=1; }   # gate-lint:detail
   checked=$((checked + 1))
+  # ⑧ 不给 agent 号：找得到当前会话就走 --discover（一个会话一个看门狗）；找不到会话就拒绝
+  out="$(HOME="$scratch/home" CLAUDE_CODE_SESSION_ID=selftest-session WATCH_CONF="$scratch/ok.conf" bash "$0" --dry-run --ack a0000000000000001:该交接 2>&1)"
+  [[ "$out" == *"watch --discover --session-dir $scratch/home/.claude/projects/${root//\//-}/selftest-session "* && "$out" == *"--ack a0000000000000001:该交接"* ]] \
+    || { echo "  ✗ 自检⑧：不给 agent 号、找得到会话时没走 --discover 或没带上会话目录与 --ack：$out"; fail=1; }   # gate-lint:detail
+  if env -u CLAUDE_CODE_SESSION_ID WATCH_CONF="$scratch/ok.conf" bash "$0" --dry-run >/dev/null 2>&1; then
+    echo "  ✗ 自检⑧：不给 agent 号、又找不到会话时没被拒绝"; fail=1   # gate-lint:detail
+  fi
+  checked=$((checked + 1))
   rm -rf "${scratch:?}"
   if ((fail)); then
     echo "  → 怎么办：按上面那一条改 research/scripts/watch.sh 里对应的那段"
     exit 1
   fi
-  echo "  ✓ watch.sh 自检通过：配置转选项、拼错的 key 拒绝、不像 agent 号的参数拒绝、--processes 只盯进程（找得到当前会话就带上会话目录）、--ack 原样转过去且形态不对就拒绝、重型测试与书记员汇总两类告警的 --ack 照旧转过去（判了 $checked 条）"
+  echo "  ✓ watch.sh 自检通过：配置转选项、拼错的 key 拒绝、不像 agent 号的参数拒绝、--processes 只盯进程（找得到当前会话就带上会话目录）、--ack 原样转过去且形态不对就拒绝、重型测试与书记员汇总两类告警的 --ack 照旧转过去、不给 agent 号找得到会话就走 --discover 找不到就拒绝（判了 $checked 条）"
   exit 0
 }
 
@@ -134,7 +148,14 @@ config_options >/dev/null || exit 2
 
 case "$mode" in
   agents)
-    ((${#agents[@]})) || die "没给要盯的 agent 号" "bash research/scripts/watch.sh <agent 号>[,<agent 号>…]；只盯主 agent 自己的长进程用 --processes"
+    if ((${#agents[@]} == 0)); then
+      # 不给 agent 号：一个会话一个看门狗，自己找还没结束的子 agent
+      [[ -n "${CLAUDE_CODE_SESSION_ID:-}" ]] || die "没给 agent 号，环境里也没有 CLAUDE_CODE_SESSION_ID，找不到当前会话" "在 Claude Code 的会话里起它；或者给要盯的 agent 号"
+      session_dir="$HOME/.claude/projects/${root//\//-}/$CLAUDE_CODE_SESSION_ID"
+      [[ -d "$session_dir" ]] || die "会话目录不存在：$session_dir" "核一下 CLAUDE_CODE_SESSION_ID 与项目路径；或者给要盯的 agent 号"
+      run_or_print python3 "$watchdog" watch --discover --session-dir "$session_dir" "${options[@]}" "${acks[@]}"
+      exit 0
+    fi
     joined="$(IFS=,; echo "${agents[*]}")"
     run_or_print python3 "$watchdog" watch --agents "$joined" "${options[@]}" "${acks[@]}"
     ;;

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: command git
 # 跑 `gate.sh --staged`，整轮全绿才把 `refs/sop/staged-green` 前移到这一次被判的那棵暂存树。
 #
 #   gate-staged.sh [项目根] [传给 gate.sh 的别的参数…]
@@ -14,6 +16,8 @@
 # ref 是覆盖语义，永远只有一条，不累积、不落盘第二份状态。
 set -uo pipefail
 
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 [[ "${1:-}" != "--selftest" ]] || exec bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gate-staged-selftest.sh"
 shift 2>/dev/null || true

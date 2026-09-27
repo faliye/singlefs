@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本（与它点名的会话记录），除了 python3 之外没有环境要求
 """生成三方论证材料要带的那张小节清单——**含第一个标题之前的引言段**。
 
 `.claude/rules/three-way-inference.md` 要求材料带一张小节清单，逐节标「抄 / 不抄 /
@@ -30,6 +32,11 @@
 断言清单里有那一行；再用 KB_SECTIONS_NO_PREAMBLE=1 强制走回旧行为，确认判红。
 """
 import io, os, re, sys, tempfile
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 HEAD = re.compile(r'^(#{1,6}) .*$')
 HEAD_NO_H1 = re.compile(r'^(#{2,6}) .*$')
@@ -124,6 +131,7 @@ def selftest():
 
 
 if __name__ == '__main__':
+    preflight(__file__)
     args = sys.argv[1:]
     if not args:
         print(__doc__); sys.exit(2)

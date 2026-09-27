@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本（与它点名的会话记录），除了 python3 之外没有环境要求
 """按 Rust 项名整段抽代码（三方论证代码轮的 diff 附录用），每段前写文件名与行区间，抽完回读逐字节比对。
 
 用法：
@@ -17,6 +19,11 @@ import pathlib
 import re
 import sys
 import tempfile
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 ITEM_KINDS = r"(?:pub(?:\([^)]*\))?\s+)?(?:async\s+|const\s+|unsafe\s+)*(?:fn|struct|enum|trait|mod|type|union)"
 
@@ -191,4 +198,5 @@ def main(argv) -> int:
 
 
 if __name__ == "__main__":
+    preflight(__file__)
     sys.exit(main(sys.argv))

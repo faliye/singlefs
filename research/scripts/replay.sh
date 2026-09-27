@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: command cargo git
 # 复跑已入库的实验，把今天的输出和 research/results/ 里那份逐字节比对。
 #
 #   bash research/scripts/replay.sh [实验号...]      # 不给参数就全跑
@@ -11,7 +13,19 @@
 #   2. 收尾行必须是 `name=done emitted=N`，且 N 必须等于本轮实际 E7RESULT 行数
 #      （口径：emitted 把 config 行与 done 行自己都算进去，2026-08-29 对 8 份入库产物逐份核过）；
 #   3. 退出码非 0 一律判红，不许当成「跑过了」。
+#
+# 准入（门禁与实验共用 research/scripts/admission.py，登记表 .claude/gate.d/stage-inputs.tsv）：登记了准入的实验，
+# 每一行开跑之前先问一次，输入自上次产物以来没变就记「输入没变」、不跑也不判红；产物头的 `E7INPUT` 行比对前删掉。
+#   bash research/scripts/replay.sh --admission-only [实验号...]   只问准入，不编、不跑、不比
 set -uo pipefail
+# 每个驱动跑的都是编译出来的代码（cargo run 或直接执行 release 二进制），子 agent 经它跑要经
+# research/scripts/run-with-memory-cap.sh（.claude/hooks/heavy-test-guard.sh 执行前拒不经它的直接执行/cargo run；
+# records/2026-09-16-subagent拆分提案.md 第四十节第 35 行，来历见第 30 行）。上限没有按驱动分别量过，
+# 给一个统一默认值（run-with-memory-cap.sh 文件头「默认值由调用方定，写在调用方的脚本头」），
+# REPLAY_MEMORY_CAP 环境变量能覆盖。
+REPLAY_MEMORY_CAP="${REPLAY_MEMORY_CAP:-8G}"
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 cd "$(dirname "$0")/.."
 OUT_DIR="${REPLAY_OUT:-${TMPDIR:-/tmp}/singlefs-replay-$$}"
 mkdir -p "$OUT_DIR"
@@ -154,7 +168,7 @@ E136|e136_fork_cost_rows||e136-fork-cost-rows-2026-09-11.out|exact
 E138|e138_per_disk_floor||e138-per-disk-floor-2026-09-11.out|exact
 E139|e139_tightened_floor||e139-tightened-floor-2026-09-12.out|exact
 E141|e141_switch_reserve_mount_admission||e141-switch-reserve-mount-admission-2026-09-14-row-writing.out|exact
-E142|@driver_e142||e142-first-txn-dry-run-2026-09-25-r16-combined.out|exact
+E142|@driver_e142||e142-first-txn-dry-run-2026-09-26-r18-main-2.out|exact
 E143|e143-one-unit-per-txn-journal||e143-one-unit-per-txn-journal-2026-09-13.out|exact
 E145|e145-self-describing-node-header||e145-self-describing-node-header-2026-09-16-tree-table-200.out|exact
 E146|e146-livelist-entry-width||e146-livelist-entry-width-2026-09-16-tree-table-200.out|exact
@@ -172,7 +186,7 @@ E155|e155-fsync-write-volume||e155-fsync-write-volume-2026-09-25-h311-replay.out
 E155R2|e155-second-run-fsync-write-volume||e155-second-run-fsync-write-volume-2026-09-25-h311-replay.out|exact
 E155R3|e155-third-run-release-cascade||e155-third-run-release-cascade-2026-09-25-h311-replay.out|exact
 E155R4|e155-fourth-run-group-commit-concurrency||e155-fourth-run-group-commit-concurrency-2026-09-25-h311-replay.out|exact
-E156|@driver_e156||e156-alloc-basis-counts-2026-09-25-fork7-selfproof.out|exact
+E156|@driver_e156||e156-alloc-basis-counts-2026-09-26-r2.out|exact
 E157|e157-parallel-line-one-clauses||e157-parallel-line-one-clauses-2026-09-25-h311-replay.out|exact
 E160|e160-random-small-read-share||e160-random-small-read-share-segment1-2026-09-24-realweight.out|exact
 E158|@driver_e158||e158-root-choice-repair-2026-09-25-segment1-rerun.out|exact
@@ -189,6 +203,9 @@ E158|@driver_e158_q1_s16||e158-root-choice-repair-2026-09-25-q1-s16.out|exact
 E158|@driver_e158_q1_s4||e158-root-choice-repair-2026-09-25-q1-s4.out|exact
 E158|@driver_e158_q2_1_hc1||e158-root-choice-repair-2026-09-24-q2-1-hc1.out|exact
 E158|@driver_e158_q2_1_hc1_lower_bound||e158-root-choice-repair-2026-09-24-q2-1-hc1-lower-bound.out|exact
+E158|@driver_e158_r2_all||e158-root-choice-repair-2026-09-27-r2-all-today.out|exact
+E158|@driver_e158_r3_seg1_today||e158-root-choice-repair-2026-09-27-r3-seg1-today.out|exact
+E158|@driver_e158_r3_seg1_compare||e158-root-choice-repair-2026-09-27-r3-seg1-compare.out|exact
 E159|e159-fsync-wait-group-commit|anchors|e159-fsync-wait-group-commit-2026-09-25-h311-replay.out|exact
 TSV
 )
@@ -197,6 +214,12 @@ TSV
 # 字段整个消失属于结构变化，仍然会被抓。
 # ⚠️ **判决字段一律不抹**：E128 那几行里 `verdict=` 与 `rounds_jia_slower=` 是结论不是计时，
 # 留着逐字比 ⇒ 结论翻向会被这一步当场抓住，不用等下面的区间断言。
+# 准入写在产物最前面的几行（`E7INPUT` 开头：输入指纹、强制重跑的理由）只说「这一趟是按什么输入跑的」，不是结果：
+# 每次输入一变它就变，老产物还没有它。逐字节比对之前两边都删掉；闸 2 只数 E7RESULT 行，本来就不数它们。
+strip_admission_header() {
+  sed '/^E7INPUT /d'
+}
+
 strip_timing() {
   sed -E 's/(per_sec_milli|median_per_sec_milli|spread_bp|min|max|ratio_bp|years_at_sync1|years_at_sync8|sync1_per_sec_milli|nosync_per_sec_milli|elapsed_ns|verify_ns|ns_per_op|ns_per_lookup|lookups_per_s|ns_small|ns_big|bing_median|jia_median|ratio_median|ratio_min|ratio_max|e128_median|deviation|ratio|one_shot_ns|two_phase_ns|two_phase_plus_5ms_ns|injected_recovered_ns|spread_one_shot|spread_two_phase|per_round_ns|best_ns|t1_ns|t16_ns|mibs|mib_per_s|entries_per_s|gbps|peak_gbps|speedup|threads16_speedup|dev|secs|copy_ns|r_rand_qd1|r_seq|random_ns_per_byte_padded|random_ns_per_byte_h133|seq_ns_per_byte_padded|seq_ns_per_byte_h133|crossover_random_share)=[^ ]*/\1=X/g'
 }
@@ -376,13 +399,16 @@ check_claims() {
 
 # E9 的入库产物是 25 次运行拼起来的（5 种子 × 5 改名档），而这个循环从没被写进 kb。
 # 2026-08-29 审计时按产物里的 config 行反推出来，重建结果与入库产物**逐字节一致**。
+# 25 次调用整条包一层（不是每次调用各包一层）：省掉 24 次多余的 systemd scope 建立。
 driver_e9() {
-  local r s
-  for r in 0 500 2000 5000 20000; do
-    for s in 3 7 11 13 17; do
-      ./target/release/e9-keylayout "$REPLAY_DEV" "$s" interleave 8 "$r" || return 1
+  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" bash -c '
+    device="$1"
+    for r in 0 500 2000 5000 20000; do
+      for s in 3 7 11 13 17; do
+        ./target/release/e9-keylayout "$device" "$s" interleave 8 "$r" || exit 1
+      done
     done
-  done
+  ' _ "$REPLAY_DEV" || return 1
 }
 
 # E142 第十五次跑步④（重跑登记 `research/prompts/e142-r15-prereg.md` 第六节）：装置↔crates/ 逐字节比对
@@ -408,11 +434,20 @@ driver_e9() {
 # `skipped=true`）。`code2_field_rows` 从「非空格与第一个空格」改成「每条都列 + 补齐区一行」。
 # Q142.11（原 Q142.1）这一次判「全等」：29 个区域全部配上、29 个相等、0 个不等（三格上模型与 `crates/`
 # 逐字节相同，只说明 kb 转写与 `crates/` 一致，不说明条款本身对，见第十二节修订与第 5.4 节）。
+#
+# E142 第十七次跑第一段（重跑登记 `research/prompts/e142-r17-prereg.md`；交回报告
+# `/tmp/claude-1000/e142-r17-s1/report.md`）：问题单第 6、8 行——阳性对照的期望违例数三档改成从
+# 写清单现算（R10），不再写死 `− 8`；加逐态预言器、结果类矩阵、G6/G7 两个几何敏感性取样点、PC2
+# （主臂几何逐单元靶向对照）、角色名自检（Q142.27）、文本数字自检（Q142.28）、Q142.29 两处点名的
+# 直接比较；`journal_record_name_for_offset` 的第三条记录角色名从写死 `"t9"` 改成写清单现算的
+# 动态标签；G22 空白清单条目从字面改成绑定这份产物自己的记账数。这一段没有改动主臂写字节的路径
+# （S7：改动前后 29 行 `name=device_region_bytes` 逐字节相同），`driver_e142` 本身不用改；
+# 存盘文件名从 `-r16-combined.out` 改成 `-r17-main.out`（登记步③给的文件名）。
 driver_e142() {
   local impl_snapshot="$OUT_DIR/e142-crates-write-dump.tmp"
   local arm_n15_reference="results/e142-first-txn-dry-run-2026-09-25-r16-arm-n15.out"
-  (cd .. && cargo run -q -p singlefs-harness --bin e142_first_transaction_write_dump) >"$impl_snapshot" || return 1
-  ./target/release/e142-first-txn-dry-run "$impl_snapshot" "$arm_n15_reference" || return 1
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q -p singlefs-harness --bin e142_first_transaction_write_dump) >"$impl_snapshot" || return 1
+  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./target/release/e142-first-txn-dry-run "$impl_snapshot" "$arm_n15_reference" || return 1
   cat "$impl_snapshot"
 }
 
@@ -449,11 +484,15 @@ driver_e142() {
 # `q7c2_flip_seen` 字面不变（β_syn 已经让它们是 true）。在 r3.out 原有的 1076 行共有格式上逐字节相同，
 # 只在旧的 `q7a_summary`/`integrity` 两行与新增 9 行（`basis_snapshot`/`q7a` ×3/`q7c1`/`q7c2`/
 # `pc_check` ×3）上不同。
+# 2026-09-26.out（第 4 次重跑登记 `research/prompts/e156-r4-prereg.md`，第十二节修订 2）整个换了装置：回退改成挂着时的一次向前发布、
+# 挂载内回收、准入改式之后，岔路 3、7 与 H0/HR/HK/HF/HX/HY 不再跑，二进制只跑第一段（PQ1-前/后、PC-c2、PQ2、U11、U13 两半、G-adm）
+# 与第二段（Hh(k, 位置, S, ρ) 38 条排得下的历史 × 「实」「每」两个回收时点、Q1c/Q1c-洞/Q1c-前/Q1c-后/Q1d、PC-多扣/洞/分配器/判定器）；
+# 第一段任一停机条款触发就只出第一段（`name=stage_two_not_run`）。不是在 fork7-selfproof.out 上追加，两份没有共同格式。
 # 整个装置就活在 crates/singlefs-harness 里，没有 research/e7-index-bench 侧的配对二进制，先例同 E142（第 371 行注释）——
 # 两个 cargo workspace 互相看不到对方，不能合并成一次调用。确定性：同一个二进制跑两遍逐字节一致（2026-09-25 现查：
 # 这一段的产物两次跑出 `cmp` 逐字节一致）。
 driver_e156() {
-  (cd .. && cargo run -q -p singlefs-harness --bin e156_allocation_basis_counts)
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q -p singlefs-harness --bin e156_allocation_basis_counts)
 }
 
 # E158（第一段，入库装置，跑前登记「装置写在哪」写死第 5 行）：同 E156 的先例，两个 cargo workspace
@@ -473,7 +512,7 @@ driver_e156() {
 # `driver_e158`/`pc3` 这条路径），是不是要等 `crates/` 落定后再复核一遍交主 agent 定，详见跑前
 # 登记「十二、修订」session s10 条目第 6 条与交回报告。
 driver_e158() {
-  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- all)
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- all)
 }
 
 # E158 第二段 Q3-1（岔路 3 候选 3 那一半，2026-09-24）：`q3-1-g0` 模式只跑 G0 几何上的
@@ -491,18 +530,18 @@ driver_e158() {
 # 重出的产物按日期另存 `e158-root-choice-repair-2026-09-25-{q3-1-g0,q3-1-s16,q3-1-small-ring,
 # q3-1-s4}.out`，`…-09-24-…` 原样留着，登记表已改指向新文件。
 driver_e158_q3_1_g0() {
-  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q3-1-g0)
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q3-1-g0)
 }
 # 第八节敏感性（行 3）三个取样点：S16、小环（环长现算，产物里的 `small_ring_search` 那行同时钉住取到的环长）、
 # S4（`sigma_length_limit=4`，比其余三点多穷举一层，代价数量级最大，real 约 18 分钟，2026-09-24 现查）。
 driver_e158_q3_1_s16() {
-  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q3-1-s16)
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q3-1-s16)
 }
 driver_e158_q3_1_small_ring() {
-  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q3-1-small-ring)
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q3-1-small-ring)
 }
 driver_e158_q3_1_s4() {
-  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q3-1-s4)
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q3-1-s4)
 }
 # E158 岔路单第 1 行（C393）：`q1-g0` 模式在今天的 `crates/`（候选 (c)）上跑 H1 家族 + Φ1 故障注入 +
 # PC1-a/PC1-b，只跑 G0 几何（2026-09-24 session s3，见实验页）。候选 (a)（A1 副本）的同一份数只存产物
@@ -522,7 +561,7 @@ driver_e158_q3_1_s4() {
 # 改动无关，是现查到的既有漂移（与 session s9 报告的方向一致）。今天重出的产物按日期另存
 # `e158-root-choice-repair-2026-09-25-{q1-g0-today,q1-s16,q1-s4}.out`，`…-09-24-…` 原样留着。
 driver_e158_q1_g0() {
-  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q1-g0)
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q1-g0)
 }
 # E158 岔路单第 2 行 ①（C331 修法，session s4，2026-09-24 session s5 起废弃，见下）：`q2-1-g0` 在
 # 今天的 `crates/`（丙 = 甲-jsn）上跑 H2 主族（op2=`mount_writable`，只 n1∈{0,1,2,3}、n2=1）的穷举
@@ -532,7 +571,7 @@ driver_e158_q1_g0() {
 # 这条产物与它对应的 `driver_e158_q2_1_g0` 不能再当「今天/丙 0 命中」的依据引用，只留着当「bug 修前
 # 长什么样」的历史对照。承重的是下面 `driver_e158_q2_1_g0_session_s5`。
 driver_e158_q2_1_g0() {
-  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-1-g0)
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-1-g0)
 }
 # E158 岔路单第 2 行 ②（每条修法每次发布多写几字节，session s4）：`q2-2a-g0` 在今天的 `crates/` 上跑
 # 固定脚本，按结构种类报每次发布写的字节。甲-txg 臂的同一份数只存产物，同上不登记在这张表里。
@@ -542,14 +581,14 @@ driver_e158_q2_1_g0() {
 # （`allocator.rs`/`allocation_record_tree.rs`，另一条并行线，非本轮 e158 装置改动）。今天重出的
 # 产物按日期另存 `e158-root-choice-repair-2026-09-25-q2-2a-g0-today.out`，`…-09-24-…` 原样留着。
 driver_e158_q2_2a_g0() {
-  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-2a-g0)
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-2a-g0)
 }
 # E158 岔路单第 2 行 PC2（阳性对照，session s5）：复现判决 K2 的两个具体构造（甲-txg 4 个瞬时根槽
 # 读失败、乙-只配置 0 个注入故障 + 1 个崩溃点），不靠穷举——见跑前登记「十二、修订」session s5。
 # 乙-只配置候选的同一份数只存产物（副本上的数，副本没有 `published_txg` 字段就编不过，不登记在这张
 # 表里，复跑步骤见实验页与 `research/mutations/e158_arms.tsv`）。
 driver_e158_q2_1_pc2() {
-  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-1-pc2)
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-1-pc2)
 }
 # E158 岔路单第 2 行 ①（C331 修法，2026-09-24 session s5，承重）：修好故障装配 bug 之后，`q2-1-g0`
 # 在今天的 `crates/`（丙 = 甲-jsn）上重跑 H2 主族，n1 范围从 {0,1,2,3} 补齐到跑前登记 5.1 要求的
@@ -564,24 +603,24 @@ driver_e158_q2_1_pc2() {
 # 路径，H2 主族的穷举下界搜索走的是 `first_txg_of_new_instance`/`next_counter`/根环读取，不经过
 # 那几处改动），行 2「够判」的结论不受这一刻 crates/ 波动影响。
 driver_e158_q2_1_g0_session_s5() {
-  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-1-g0)
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-1-g0)
 }
 # 第八节几何敏感性（行 1，2026-09-24 session s6）：岔路单第 1 行判决格 = Q1-1a 的 N_trig，S16（根环
 # 大一倍）与 S4（根环小一半）两个方向相反的取样点，复用 H1 装置代码（`run_ledger_fault_family` 本身
 # 就是几何参数化的）。两点都与 G0 逐字节等值（N_trig=798），判定不翻面，判别力自证「两点同值，自证
 # 不适用」。
 driver_e158_q1_s16() {
-  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q1-s16)
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q1-s16)
 }
 driver_e158_q1_s4() {
-  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q1-s4)
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q1-s4)
 }
 # H-C1 直接构造（2026-09-24 session s6，岔路单第 2 行 ①，丙的具体历史）：判决 K2 说丙需要 12 个
 # 故障（4 根槽 + 4 条记录各两块盘）才打得中；`run_rootback_tolerance_family` 的穷举在 n1∈{4,5,6}
 # 会撞 `SUBSET_ENUMERATION_CAP`，这里不靠穷举，直接按这个具体构造跑一次（hit=true, weight=12），
 # 附一个只挡 4 条根槽、不挡记录的负对照（hit=false，证明「只挡根环挡不住丙」）。
 driver_e158_q2_1_hc1() {
-  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-1-hc1)
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-1-hc1)
 }
 # H-C1 下界探针（2026-09-24 session s6；session s9 改参数为 weight_ceiling）：在同一个 n1=4 节点
 # 上，穷举权重 0..11 的全部组合（`subsets_tried=22558`，`full_space_subset_count=32768`，没有撞
@@ -590,10 +629,36 @@ driver_e158_q2_1_hc1() {
 # 空间只有 2^15=32768，在 `FEASIBLE_FULL_SEARCH_SUBSET_BUDGET`=100000 预算内，`None` 就等于穷举到
 # 完整空间的顶，与 session s6 当年手动调高到 60000 效果相同（60000 > 这段历史任何可能的权重值）。
 driver_e158_q2_1_hc1_lower_bound() {
-  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-1-hc1-lower-bound)
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-1-hc1-lower-bound)
+}
+# E158 第 2 次跑第一段（重跑登记 `research/prompts/e158-r2-prereg.md`，2026-09-26）：`r2-all` 在工作树的 `crates/`（今天那一臂）上
+# 跑第 2 次跑的开跑检查、H1d、Q1-0、PC1-a/b/c 与实七两段复现历史。另外七臂（A1、甲-txg、乙F-留环、乙 / 丁四臂）的产物
+# `e158-root-choice-repair-2026-09-26-r2-all-<臂>.out` 要在 `research/mutations/e158_arms.tsv` 套出来的副本上重编才跑得出来，
+# 不登记在这张表里（同第一次跑 A1 产物的先例）；`…-r2-all-today-snapshot.out` 是同一装置在那几份副本共用的快照上跑的今天那一臂，
+# 与这一行的产物只在实七崩溃注入那一段不同（快照之后 harness 的记录核对器改过，实验页写明）。
+driver_e158_r2_all() {
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- r2-all)
+}
+# E158 第 3 次跑第一段（重跑登记 `research/prompts/e158-r3-prereg.md`，2026-09-27）：`r2-all` 那一行 2026-09-27 01:21 JST 在
+# 开工快照上重出（工作树的 `crates/` 那一刻与快照逐字节相同，登记 S8），改指 `…-2026-09-27-r2-all-today.out`，旧产物原样留着。
+# `r3-seg1` 在九份臂副本上各跑一遍，这里只登记今天那一臂（工作树的 `crates/` 就是它）；另外八臂的产物
+# `e158-root-choice-repair-2026-09-27-r3-seg1-<臂>.out` 要在 `research/mutations/e158_arms.tsv` 的 r3 行套出来的副本上重编才跑得出来，
+# 不登记（同第 2 次跑的先例）。`r3-compare` 只读 `research/results/` 下九份产物、不碰 `crates/`，复跑逐字节可比。
+# 产物头的 `E7INPUT name=crates_snapshot` 那一行是开工快照的汇总 sha256，比对前删掉。工作树的 `crates/` 在快照之后又被改过，
+# 这两行里读 `crates/` 的那一行（r3-seg1 今天、r2-all）会随之漂，不归这一次（登记第一节「上一次执行员交来的两件」）。
+driver_e158_r3_seg1_today() {
+  (cd .. && SINGLEFS_E158_ARM=today bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- r3-seg1)
+}
+driver_e158_r3_seg1_compare() {
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- r3-compare research/results/e158-root-choice-repair-2026-09-27-r3-seg1)
 }
 
-ONLY=("$@")
+# --admission-only：只问准入（research/scripts/admission.py，登记表 .claude/gate.d/stage-inputs.tsv），不编、不跑、不比。
+ADMISSION_ONLY=0
+ONLY=()
+for replay_argument in "$@"; do
+  if [[ "$replay_argument" == "--admission-only" ]]; then ADMISSION_ONLY=1; else ONLY+=("$replay_argument"); fi
+done
 # 替换表按 E103 这种带 E 的形态登记；裸数字会匹配 0 条并报全零（2026-09-05 在 E103 上踩过两次）。
 for wanted in ${ONLY[@]+"${ONLY[@]}"}; do
   if [[ "$wanted" =~ ^[0-9]+$ ]]; then
@@ -616,9 +681,64 @@ if [[ -n "$bad_rows" ]]; then
   exit 2
 fi
 
+# ── 准入（门禁与实验共用的 research/scripts/admission.py，登记表 .claude/gate.d/stage-inputs.tsv）──────────
+# 登记了准入的实验，每一行开跑之前先问一次（driver_e142 这类驱动在装置之前还要编、要跑 crates 的导出，先问省掉这一截）；
+# 装置入口自己还会再问一次，并把输入指纹打在产物最前面（`E7INPUT` 开头，比对前删掉，`name=done` 的条数不数它们）。
+# 退 77（输入自上次产物以来没变）记「输入没变」，不跑、不判红，沿用留存产物的结论；别的非 0 记「跑不了」。
+# 登记了准入的实验在这张表里只许一行：几行各比各的产物，准入键就得按调用方式分（E142/layer0 那样），还没接。
+ADMISSION_MODULE="scripts/admission.py"
+if ! admission_keys_text="$(python3 "$ADMISSION_MODULE" keys ..)"; then
+  echo "  ✗ 读不出准入登记表里的实验键（python3 $ADMISSION_MODULE keys ..）" >&2
+  echo "     → 怎么办：单跑那条命令看 stderr，修 .claude/gate.d/stage-inputs.tsv 或准入模块；不知道哪几行要先问准入，就不开跑" >&2
+  exit 2
+fi
+declare -A ADMISSION_REGISTERED=()
+while IFS= read -r admission_key; do
+  [[ -n "$admission_key" ]] && ADMISSION_REGISTERED["$admission_key"]=1
+done <<<"$admission_keys_text"
+admission_registered_rows_of() { printf '%s\n' "$TABLE" | awk -F'|' -v wanted_experiment="$1" '$1 == wanted_experiment { rows++ } END { print rows + 0 }'; }
+for admission_key in "${!ADMISSION_REGISTERED[@]}"; do
+  [[ "$admission_key" == */* ]] && continue
+  rows_for_key="$(admission_registered_rows_of "$admission_key")"
+  if [[ ! "$rows_for_key" =~ ^[0-9]+$ ]]; then
+    echo "  ✗ 数不出复跑表里 $admission_key 有几行（得到「$rows_for_key」）" >&2
+    echo "     → 怎么办：看上面 awk 的报错修 admission_registered_rows_of；数不出就不知道准入按哪一行比，不开跑" >&2
+    exit 2
+  fi
+  if (( rows_for_key > 1 )); then
+    echo "  ✗ $admission_key 登记了准入，而这张复跑表里它有 $rows_for_key 行：准入只按实验号比产物，分不清哪一行对哪一份" >&2
+    echo "     → 怎么办：给每一行起一个带方式的准入键（照 .claude/gate.d/stage-inputs.tsv 的 E142/layer0 写），在准入模块里按行认键之后再登记" >&2
+    exit 2
+  fi
+done
+
+if (( ADMISSION_ONLY )); then
+  admission_judged=0; admission_unregistered=0; admission_errors=0
+  while IFS='|' read -r exp bin _arguments stored _kind; do
+    [[ -z "$exp" ]] && continue
+    want "$exp" || continue
+    admission_judged=$((admission_judged+1))
+    if [[ -z "${ADMISSION_REGISTERED[$exp]:-}" ]]; then
+      admission_unregistered=$((admission_unregistered+1))
+      printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 没接准入 "准入登记表里没有 $exp，照跑（留存产物 $stored）"
+      continue
+    fi
+    if admission_messages="$(python3 "$ADMISSION_MODULE" experiment .. "$exp" 2>&1 >/dev/null)"; then admission_exit_code=0; else admission_exit_code=$?; fi
+    case "$admission_exit_code" in
+      0) admission_verdict=放行 ;; 77) admission_verdict=输入没变 ;; 3) admission_verdict=前提没齐 ;;
+      *) admission_verdict=登记有错; admission_errors=$((admission_errors+1)) ;;
+    esac
+    printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" "$admission_verdict" "准入退 $admission_exit_code，留存产物 $stored"
+    printf '%s\n' "$admission_messages" | sed 's/^/      /'   # gate-lint:detail
+  done <<<"$TABLE"
+  echo "只判准入、没编没跑：判了 $admission_judged 行（其中 $admission_unregistered 行没接准入，照跑），准入模块报登记有错 $admission_errors 行"
+  (( admission_errors == 0 )) || exit 1
+  exit 0
+fi
+
 cargo build --release --manifest-path e7-index-bench/Cargo.toml >/dev/null 2>&1 || { echo "replay: 构建失败" >&2; exit 2; }
 
-pass=0; drift=0; timing_only=0; broken=0; claim_bad=0; archived=0
+pass=0; drift=0; timing_only=0; broken=0; claim_bad=0; archived=0; unchanged=0; UNCHANGED_ROWS=()
 CLAIM_QUEUE=()
 
 printf '%-5s %-24s %-10s %s\n' 实验 二进制 判定 说明
@@ -633,11 +753,22 @@ replay_one() {
   tag="$exp.$seq"
   fresh="$OUT_DIR/$tag.out"
   rm -f "$fresh"                                    # 闸 1：不许跨轮复用
+  local admission_exit_code=0
+  if [[ -n "${ADMISSION_REGISTERED[$exp]:-}" ]]; then
+    if python3 "$ADMISSION_MODULE" experiment .. "$exp" >/dev/null 2>"$OUT_DIR/$tag.admission"; then admission_exit_code=0; else admission_exit_code=$?; fi
+    if [[ $admission_exit_code -eq 77 ]]; then
+      printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 输入没变 "输入与留存产物头上的指纹相同，本次没跑，沿用 $stored 的结论（见 $OUT_DIR/$tag.admission）" >"$OUT_DIR/$tag.line"
+      echo unchanged >"$OUT_DIR/$tag.verdict"; echo "$exp|results/$stored" >"$OUT_DIR/$tag.claim"; return
+    fi
+    if [[ $admission_exit_code -ne 0 ]]; then
+      printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 跑不了 "准入没放行（退 $admission_exit_code），见 $OUT_DIR/$tag.admission" >"$OUT_DIR/$tag.line"; echo broken >"$OUT_DIR/$tag.verdict"; return
+    fi
+  fi
   if [[ "$bin" == @* ]]; then
     "${bin#@}" >"$fresh" 2>"$OUT_DIR/$tag.err"
   else
     # shellcheck disable=SC2086
-    ./target/release/"$bin" $args >"$fresh" 2>"$OUT_DIR/$tag.err"
+    bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./target/release/"$bin" $args >"$fresh" 2>"$OUT_DIR/$tag.err"
   fi
   rc=$?
   if [[ $rc -ne 0 ]]; then                          # 闸 3
@@ -656,6 +787,12 @@ replay_one() {
   if [[ -n "$gate2" ]]; then
     printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 跑不了 "$gate2" >"$OUT_DIR/$tag.line"; echo broken >"$OUT_DIR/$tag.verdict"; return
   fi
+  # 登记了准入的实验，装置入口要把输入指纹打在产物最前面；没有这一行，下一次准入永远判不了「输入没变」
+  local fresh_head
+  fresh_head="$(head -n 20 "$fresh")"
+  if [[ -n "${ADMISSION_REGISTERED[$exp]:-}" ]] && ! grep -q "^E7INPUT name=input_fingerprint key=$exp " <<<"$fresh_head"; then
+    printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 跑不了 "登记了准入，产物头却没有 key=$exp 的输入指纹行：装置 main 没调 e7_index_bench::admit_experiment_run_or_exit" >"$OUT_DIR/$tag.line"; echo broken >"$OUT_DIR/$tag.verdict"; return
+  fi
   # 留存产物已按「每次提交删上一次的实验记录」归档进版本库时，这一档不比对。
   # 不报成「对不上」：那与「装置真的改坏了、复跑出不同字节」长得一模一样，读的人会以为实验坏了
   # （`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）。
@@ -663,11 +800,11 @@ replay_one() {
     printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 产物已归档 "$stored 不在树里；本次跑得出来，逐字节这一档不比对" >"$OUT_DIR/$tag.line"
     echo archived >"$OUT_DIR/$tag.verdict"; echo "$exp|$fresh" >"$OUT_DIR/$tag.claim"; return
   fi
-  if diff -q "$fresh" "results/$stored" >/dev/null 2>&1; then
+  if diff -q <(strip_admission_header <"$fresh") <(strip_admission_header <"results/$stored") >/dev/null 2>&1; then
     printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 字节一致 "$stored" >"$OUT_DIR/$tag.line"; echo pass >"$OUT_DIR/$tag.verdict"
     echo "$exp|$fresh" >"$OUT_DIR/$tag.claim"; return
   fi
-  if diff -q <(strip_timing <"$fresh") <(strip_timing <"results/$stored") >/dev/null 2>&1; then
+  if diff -q <(strip_admission_header <"$fresh" | strip_timing) <(strip_admission_header <"results/$stored" | strip_timing) >/dev/null 2>&1; then
     if [[ "$kind" == timing ]]; then
       printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 仅计时不同 "$stored（结构一致，符合声明）" >"$OUT_DIR/$tag.line"; echo timing_only >"$OUT_DIR/$tag.verdict"
       echo "$exp|$fresh" >"$OUT_DIR/$tag.claim"
@@ -676,7 +813,7 @@ replay_one() {
     fi
     return
   fi
-  n=$(diff <(strip_timing <"$fresh") <(strip_timing <"results/$stored") | grep -c '^[<>]')
+  n=$(diff <(strip_admission_header <"$fresh" | strip_timing) <(strip_admission_header <"results/$stored" | strip_timing) | grep -c '^[<>]')
   printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 对不上 "$stored，$n 行不同 → diff $fresh results/$stored" >"$OUT_DIR/$tag.line"
   echo drift >"$OUT_DIR/$tag.verdict"
 }
@@ -724,6 +861,7 @@ for tag in ${REPLAY_ORDER[@]+"${REPLAY_ORDER[@]}"}; do
     case "$(cat "$OUT_DIR/$tag.verdict")" in
       pass) pass=$((pass+1)) ;; timing_only) timing_only=$((timing_only+1)) ;;
       drift) drift=$((drift+1)) ;; broken) broken=$((broken+1)) ;; archived) archived=$((archived+1)) ;;
+      unchanged) unchanged=$((unchanged+1)); UNCHANGED_ROWS+=("${tag%.*}") ;;
     esac
   fi
   [[ -f "$OUT_DIR/$tag.claim" ]] && CLAIM_QUEUE+=("$(cat "$OUT_DIR/$tag.claim")")
@@ -735,8 +873,13 @@ for q in "${CLAIM_QUEUE[@]}"; do
   check_claims "${q%%|*}" "${q#*|}" || claim_bad=$((claim_bad+1))
 done
 printf '%s\n' "-------------------------------------------------------------------------"
-echo "字节一致 $pass ／ 仅计时不同 $timing_only ／ 对不上 $drift ／ 跑不了 $broken ／ 结论断言不中 $claim_bad ／ 产物已归档 $archived"
+echo "字节一致 $pass ／ 仅计时不同 $timing_only ／ 对不上 $drift ／ 跑不了 $broken ／ 结论断言不中 $claim_bad ／ 产物已归档 $archived ／ 输入没变没跑 $unchanged"
 echo "本轮输出：$OUT_DIR"
+if [[ $unchanged -ne 0 ]]; then
+  echo "  ! 「输入没变」$unchanged 行没跑：${UNCHANGED_ROWS[*]}。输入（.claude/gate.d/stage-inputs.tsv 登记的路径、登记行、工具链）"
+  echo "     与留存产物头上的指纹相同，准入（research/scripts/admission.py）拒绝重跑，结论沿用留存产物；结论区间断言照常对留存产物判。"
+  echo "     这不是判绿也不是判红。确要重跑：SINGLEFS_EXPERIMENT_RERUN_REASON=<理由> bash research/scripts/replay.sh <实验号>，理由写进新产物头。"
+fi
 if [[ $archived -ne 0 ]]; then
   echo "  ! 「产物已归档」$archived 行：留存产物按「每次提交删上一次的实验记录」归档进了版本库，逐字节这一档没有对照物。"
   echo "     这不是判红——这几行本次都跑得出来，结论区间断言照常判。要看当时的产物："
@@ -753,6 +896,7 @@ fi
 if [[ $drift -eq 0 && $broken -eq 0 && $claim_bad -eq 0 ]]; then
   # 全绿且用的是自动分配的临时目录 ⇒ 收拾掉。有一条不绿就留着，上面的提示指着它。
   [[ -z "${REPLAY_OUT:-}" ]] && rm -rf "$OUT_DIR"
+  echo "  ✓ 复跑判过的 $((pass + timing_only)) 行都对得上（字节一致 $pass、仅计时不同 $timing_only），结论断言全中"
   exit 0
 fi
 exit 1

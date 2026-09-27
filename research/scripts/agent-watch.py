@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本（与它点名的会话记录），除了 python3 之外没有环境要求
 """子 agent 与它们起的进程的定时监控：卡死、空转、永久等待当场报出来。
 
 为什么：2026-09-17 一个实验执行员把 `echo "exit=$?"` 打到标准输出、却在日志里 `until grep -q "^exit="`，
@@ -87,6 +89,7 @@ import importlib.util
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -94,6 +97,11 @@ import tempfile
 import time
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 PROJECTS_ROOT = os.path.expanduser("~/.claude/projects")
 DEFAULT_DETECTIONS = "/tmp/claude-1000/agent-hook-detections.jsonl"
@@ -153,6 +161,9 @@ MAIN_AGENT_MESSAGE_RESUMED = "resumedAgentId"
 # 「重型测试没带前缀」：判定与执行前的闸 heavy-test-guard.sh 同一份，从 research/scripts/ 往上两级是仓根
 HEAVY_TESTS_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
                                         ".claude", "hooks", "lib_heavy_tests.py")
+# 自证的临时目录由同一处的共用库建（通过、判红、抛异常三条路上都删），那三格也由它判
+SELFTEST_SCRATCH_LIBRARY_PATH = os.path.join(os.path.dirname(HEAVY_TESTS_LIBRARY_PATH), "lib_selftest_scratch.py")
+SELFTEST_ROLE_VARIABLE = "AGENT_WATCH_SELFTEST_ROLE"   # 自证拉起自己的子进程走判红、抛异常那两条路时设的角色
 HEAVY_TEST_VARIABLE = "SINGLEFS_HEAVY_TESTS"
 HEAVY_TEST_OCCASIONS = ("commit", "user-request")
 HEAVY_TEST_ALERT = "重型测试没带前缀"
@@ -166,6 +177,19 @@ SCRIBE_AGENT_TYPE = "kb-scribe"
 SCRIBE_FOLLOWUP_FINDING_PREFIX = "书记官写入之后相关记录没跟上"
 SCRIBE_FOLLOWUP_ALERT = "书记员攒下的没跟上检出"
 SCRIBE_FOLLOWUP_FILES_SHOWN = 8
+# 「该交接」：只对这两类报、到 --context-tokens（默认 70 万，推的）报一次；别的类型上下文多大都不叫醒（主 agent 的规矩是上下文大小不是停它的理由）
+HANDOVER_AGENT_TYPES = {"implementation-writer", "experiment-runner"}
+HANDOVER_ALERT = "该交接"
+HANDOVER_TOP_OUTPUTS_SHOWN = 3
+# 「进度文件不涨」：结束本轮在等自己后台任务的子 agent，派发提示里草稿目录下的 progress.md 超过 --progress-stale-minutes 没改就报，不等整点
+PROGRESS_FILE_NAME = "progress.md"
+PROGRESS_STALE_ALERT = "进度文件不涨"
+PROGRESS_TAIL_LINES = 3
+SCRATCH_PATH_MENTION = re.compile(r"/tmp/claude-\d+/[^\s`'\"，。；：、（）()「」<>]+")
+# 一个会话一个看门狗（--discover）：锁、确认过的告警与见过没结束的子 agent 都放在这个会话的状态目录里
+STATE_ROOT = os.environ.get("AGENT_WATCH_STATE_ROOT") or f"/tmp/claude-{os.getuid()}/watch-state"
+SINGLE_INSTANCE_EXIT = 5
+EVENT_ALERT_NAMES = {"hook 检出", SCRIBE_FOLLOWUP_ALERT}   # 事件类告警：确认之后到那个子 agent 结束都不再叫醒；别的是条件类，条件消失就作废
 SCRIBE_FOLLOWUP_NEXT_STEP = ("主 agent 对着它的交回报告核这几道门禁它最后跑没跑、判没判绿：报告里写了绿的，自己再跑一次那几道核实（都是轻阶段，谁都能跑）；"
                              "报告里没写或写了红的，派 kb-scribe 补，或者自己补")
 
@@ -315,6 +339,7 @@ class AgentTranscript:
         self.task_stopped_timestamp = None   # 按主会话记录里的 TaskStop 判成被停时，那次停的时刻
         self.main_agent_message_delivered_timestamp = None   # 它会话记录里主 agent 的消息最晚一次送达的时刻（origin coordinator）
         self.state = "思考中"
+        self.dispatch_prompt = ""            # 会话记录里第一条 user 文字：派发提示（找草稿目录里的 progress.md 用）
         self._read()
         parent_path = parent_session_transcript(transcript_path)
         self.parent_transcript_missing = not os.path.isfile(parent_path)
@@ -412,6 +437,9 @@ class AgentTranscript:
                             if last_kind == "end_turn":
                                 self.last_turn_end_timestamp = timestamp
             elif role == "user":
+                if not self.dispatch_prompt:
+                    self.dispatch_prompt = content if isinstance(content, str) else " ".join(
+                        block.get("text", "") for block in (content or []) if isinstance(block, dict) and block.get("type") == "text")
                 if isinstance(content, list):
                     for block in content:
                         if block.get("type") == "tool_result":
@@ -742,6 +770,34 @@ def elapsed_mark_label(mark_minutes):
     return f"{mark_minutes:g} 分钟"
 
 
+def progress_file_of(transcript):
+    """派发提示里点名的 /tmp/claude-<uid>/ 路径：是 progress.md 就是它，是目录取目录下的 progress.md，是文件取同目录的；取改得最晚的那一份，没有返回 None。"""
+    candidates = set()
+    for mention in SCRATCH_PATH_MENTION.findall(transcript.dispatch_prompt or ""):
+        path = mention.rstrip("/.")
+        if os.path.basename(path) == PROGRESS_FILE_NAME:
+            candidates.add(path)
+        elif os.path.isdir(path):
+            candidates.add(os.path.join(path, PROGRESS_FILE_NAME))
+        else:
+            candidates.add(os.path.join(os.path.dirname(path), PROGRESS_FILE_NAME))
+    existing = [path for path in candidates if os.path.isfile(path)]
+    return max(existing, key=os.path.getmtime) if existing else None
+
+
+def progress_note(transcript, now):
+    """告警里附的一句：progress.md 的末几行与修改时刻；找不到就写找不到。"""
+    if BROKEN_DETECTION == "progressnote":
+        return ""
+    path = progress_file_of(transcript)
+    if path is None:
+        return "；派发提示点名的草稿目录下没有 progress.md"
+    modified = datetime.fromtimestamp(os.path.getmtime(path), timezone.utc)
+    lines = [line.strip() for line in open(path, encoding="utf-8", errors="replace").read().splitlines() if line.strip()][-PROGRESS_TAIL_LINES:]
+    return (f"；{path} 改于 {modified.astimezone(ZoneInfo('Asia/Tokyo')).strftime('%H:%M')} JST（{format_duration((now - modified).total_seconds())} 前），"
+            f"末 {len(lines)} 行：{' ｜ '.join(line[:120] for line in lines) or '（空）'}")
+
+
 def routine_inquiry_alert(transcript, now, thresholds):
     """「跑满 N 小时要主 agent 问一次」（判法见文件头）：返回 (告警名, 说明, 下一步)，不报返回 None。ask-every-minutes 写 0 就不报。"""
     if BROKEN_DETECTION == "inquiry" or transcript.first_timestamp is None or thresholds.ask_every_minutes <= 0:
@@ -766,7 +822,8 @@ def routine_inquiry_alert(transcript, now, thresholds):
     return (f"{ROUTINE_INQUIRY_ALERT_PREFIX}{label}{ROUTINE_INQUIRY_ALERT_SUFFIX}",
             f"从派发（{transcript.first_timestamp.astimezone(tokyo).strftime('%H:%M')} JST）起已跑 "
             f"{format_duration((now - transcript.first_timestamp).total_seconds())}，{mark_reached_at.astimezone(tokyo).strftime('%H:%M')} JST 跑满 {label}；"
-            f"{message_text}（只是慢、这一格不问就 --ack '{transcript.agent_id}:{ROUTINE_INQUIRY_ALERT_PREFIX}{label}'，只确认这一格）",
+            f"{message_text}（只是慢、这一格不问就 --ack '{transcript.agent_id}:{ROUTINE_INQUIRY_ALERT_PREFIX}{label}'，只确认这一格）"
+            f"{progress_note(transcript, now)}",
             ROUTINE_INQUIRY_NEXT_STEP)
 
 
@@ -801,11 +858,22 @@ def agent_alerts(transcript, now, thresholds):
     # 2026-09-19 实测：同一个执行员被续派三次（第一段、补判、第二段），上下文涨到 95 万，平均每次调用 62.6 万、累计读缓存 2.36 亿，
     # 真正的输出只有 2.9 万——没有任何告警，是用户问起才看见的。
     # 这条只叫主 agent 来看，不是停的理由（用户同日：「不应该限制 280K……应该告诉主 agent 看看任务是不是异常，如果不是就继续跑」）。
-    if BROKEN_DETECTION != "context" and transcript.last_context_tokens >= thresholds.context_tokens:
-        alerts.append(("上下文过大", f"最后一次调用的上下文 {transcript.last_context_tokens / 10000:.1f} 万（线在 {thresholds.context_tokens / 10000:.0f} 万），"
-                       f"已调用 {transcript.model_calls} 次",
-                       "主 agent 看任务是不是异常：在不在原地打转（同一批文件反复读、同一条命令反复跑、产物不涨）、是不是在做派发之外的事；"
-                       "不异常就用 --ack 确认这条告警、让它接着跑，上下文大小本身不是停它的理由；异常再决定发消息让它改、还是停掉新开"))
+    # 只对实现员与执行员报「该交接」：它们的定义要求上下文过 60 万就停在能交接的点交回，到这条线还没交回就是没照做；别的类型不报
+    if (BROKEN_DETECTION != "context" and transcript.last_context_tokens >= thresholds.context_tokens
+            and (transcript.agent_type in HANDOVER_AGENT_TYPES or BROKEN_DETECTION == "handoveranytype")):
+        heaviest = sorted(transcript.tool_result_characters.items(), key=lambda item: item[1][1], reverse=True)[:HANDOVER_TOP_OUTPUTS_SHOWN]
+        heaviest_text = "、".join(f"{category} {count} 次共 {characters // 1000}k 字" for category, (count, characters) in heaviest) or "没数到工具结果"
+        alerts.append((HANDOVER_ALERT, f"{transcript.agent_type} 最后一次调用的上下文 {transcript.last_context_tokens / 10000:.1f} 万（线在 {thresholds.context_tokens / 10000:.0f} 万），"
+                       f"已调用 {transcript.model_calls} 次；吃上下文最多的工具输出：{heaviest_text}",
+                       "主 agent 发消息让它停在最近一个编得过（或自证全绿）的点、把做完的与没做的写进报告交回，再新派一个同类 agent 接着做"
+                       "（研究脚本 agent-handover.py 抽交接摘要）；看过、判定这一件马上就完的，--ack <agent 号>:该交接"))
+    if (BROKEN_DETECTION != "progressstale" and transcript.waiting_on_its_own_background_tasks()
+            and getattr(thresholds, "progress_stale_minutes", 0) > 0):
+        progress_path = progress_file_of(transcript)
+        if progress_path is not None and (now.timestamp() - os.path.getmtime(progress_path)) >= thresholds.progress_stale_minutes * 60:
+            alerts.append((PROGRESS_STALE_ALERT, f"结束本轮在等自己的后台任务，{PROGRESS_FILE_NAME} 超过 {thresholds.progress_stale_minutes:g} 分钟没改"
+                           f"{progress_note(transcript, now)}",
+                           "主 agent 看它等的后台任务还在不在动（本报告的进程一节）：在动就 --ack <agent 号>:进度文件不涨 接着盯；不动再决定发消息还是停掉"))
     routine_inquiry = routine_inquiry_alert(transcript, now, thresholds)
     if routine_inquiry is not None:
         alerts.append(routine_inquiry)
@@ -1459,7 +1527,8 @@ def run_processes_only(arguments, process_root_pid, excluded_pids):
 def build_report(agent_ids, session_dir, thresholds, watch_started, excluded_pids, process_root_pid):
     now = datetime.now(timezone.utc)
     lines, alerts, done_flags, active_ids, unstarted_ids = [], [], [], [], []
-    if agent_ids:
+    # --discover 找出来一个没结束的都没有时就是没有要盯的，不退回「会话里最近动过的全部子 agent」
+    if agent_ids or (getattr(thresholds, "discover", False) and BROKEN_DETECTION != "discoverfallback"):
         targets = [(agent_id, find_transcript(agent_id, session_dir)) for agent_id in agent_ids]
     else:
         paths = glob.glob(os.path.join(session_dir, "subagents", "agent-*.jsonl"))
@@ -1575,8 +1644,10 @@ def read_detections(detections_path, start_offset, session_ids, watched_agent_id
                 # 按模式找进程由上游钩子在执行前拒绝，不写检出记录，这里读不到它。
                 notes.append(f"主 agent 自己的命令被 hook 拒了（不叫醒，拒绝信息在它的工具结果里）：{(entry.get('command') or '')[:120]}")
                 continue
-            alerts.append((entry.get("agent_type") or "?", "hook 检出",
-                           f"{'、'.join(entry.get('findings') or [])}：{(entry.get('command') or '')[:160]}",
+            # 主体写 agent 号（有的话）：--ack <agent 号>:hook 检出 只压这一个子 agent 的检出；类型写进说明
+            subject = (entry.get("agent_id") if BROKEN_DETECTION != "detectiontype" else None) or entry.get("agent_type") or "?"
+            alerts.append((subject, "hook 检出",
+                           f"{entry.get('agent_type') or '?'}：{'、'.join(entry.get('findings') or [])}：{(entry.get('command') or '')[:160]}",
                            ("这次写被 hook 拒了、没写进去；主 agent 判断是不是该写的，再决定发消息让它改、自己改、还是派该写的 agent"
                             if any(str(finding).startswith("写被拒") for finding in (entry.get("findings") or []))
                             else "检出 hook 只记不拦，命令照常在跑；主 agent 判断它会不会出问题，再决定接着盯、发消息让它改、还是处理")))
@@ -1720,6 +1791,102 @@ def split_acknowledged(alerts, acknowledgements):
     return remaining, acknowledged
 
 
+def session_state_directory(session_dir):
+    return os.path.join(STATE_ROOT, os.path.basename(os.path.normpath(session_dir)))
+
+
+def acquire_single_instance(state_dir):
+    """拿这个会话的看门狗锁（flock，进程退出就放）：拿到返回打开着的锁文件，已有一个在盯返回 (None, 那一个的 pid 与起的时刻)。"""
+    import fcntl
+    os.makedirs(state_dir, exist_ok=True)
+    handle = open(os.path.join(state_dir, "watch.lock"), "a+", encoding="utf-8")
+    try:
+        if BROKEN_DETECTION != "nosingleinstance":
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.seek(0)
+        holder = handle.read().strip()
+        handle.close()
+        return None, holder
+    handle.seek(0)
+    handle.truncate()
+    handle.write(f"pid {os.getpid()} 起于 {datetime.now(ZoneInfo('Asia/Tokyo')).strftime('%m-%d %H:%M:%S')} JST")
+    handle.flush()
+    return handle, None
+
+
+def read_acks(state_dir):
+    path = os.path.join(state_dir, "watch-acks.tsv")
+    if BROKEN_DETECTION == "acksnotpersisted" or not os.path.isfile(path):
+        return set()
+    return {line.rstrip("\n").split("\t", 1)[0] for line in open(path, encoding="utf-8") if line.strip()}
+
+
+def write_acks(state_dir, acks):
+    os.makedirs(state_dir, exist_ok=True)
+    path = os.path.join(state_dir, "watch-acks.tsv")
+    temporary = f"{path}.{os.getpid()}.tmp"
+    with open(temporary, "w", encoding="utf-8") as handle:
+        for key in sorted(acks):
+            handle.write(f"{key}\t{datetime.now(timezone.utc).isoformat()}\n")
+    os.replace(temporary, path)
+
+
+def alert_keys(alert):
+    """一条告警能被哪些 --ack 键确认（与 split_acknowledged 认的同一套）。"""
+    subject, name, explanation, _ = alert
+    keys = {f"{subject}:{name}"}
+    process_id = re.match(r"进程 (\d+) ", explanation)
+    if process_id and (subject == "进程" or name == LEFTOVER_BACKGROUND_ALERT):
+        keys.add(f"进程:{process_id.group(1)}")
+    if name.startswith(ROUTINE_INQUIRY_ALERT_PREFIX) and name.endswith(ROUTINE_INQUIRY_ALERT_SUFFIX):
+        keys.add(f"{subject}:{name[:-len(ROUTINE_INQUIRY_ALERT_SUFFIX)]}")
+    return keys
+
+
+def pruned_acks(acks, alerts, unfinished_agent_ids):
+    """条件类告警的确认在条件消失（这一次整查没有它）时作废；事件类（hook 检出、书记员汇总）的确认到那个子 agent 结束才作废。"""
+    present = set().union(*(alert_keys(alert) for alert in alerts)) if alerts else set()
+    kept = set()
+    for key in acks:
+        subject, _, name = key.partition(":")
+        is_event = any(name.startswith(event) for event in EVENT_ALERT_NAMES)
+        if (is_event and subject in unfinished_agent_ids) or (not is_event and key in present) or BROKEN_DETECTION == "acksneverpruned":
+            kept.add(key)
+    return kept
+
+
+def discovered_agent_ids(session_dir, state_dir, cache, thresholds):
+    """这个会话里还没交回、没被停、没失败的子 agent：会话记录 --active-minutes 以内动过的，加上此前的看门狗见过、还没结束的
+    （记在状态目录的 watch-agents.tsv，等后台任务等得久、会话记录好久没动的也接得上）。cache：路径 → (大小, 修改时刻, 结束了没有)。"""
+    if BROKEN_DETECTION == "discovernone":
+        return []
+    agents_path = os.path.join(state_dir, "watch-agents.tsv")
+    remembered = {line.strip() for line in open(agents_path, encoding="utf-8")} if os.path.isfile(agents_path) else set()
+    notifications = session_task_events(os.path.normpath(session_dir) + ".jsonl")[1]
+    unfinished = []
+    for path in sorted(glob.glob(os.path.join(session_dir, "subagents", "agent-*.jsonl"))):
+        agent_id = os.path.basename(path)[len("agent-"):-len(".jsonl")]
+        status = os.stat(path)
+        key = (status.st_size, status.st_mtime)
+        known = cache.get(path)
+        if known is not None and known[:2] == key and known[2]:
+            continue
+        if known is None and agent_id not in remembered and time.time() - status.st_mtime > thresholds.active_minutes * 60:
+            continue
+        transcript = AgentTranscript(agent_id, path)
+        ended = transcript.is_done() or transcript.ended(notifications) is not None
+        cache[path] = (key[0], key[1], ended)
+        if not ended:
+            unfinished.append(agent_id)
+    os.makedirs(state_dir, exist_ok=True)
+    temporary = f"{agents_path}.{os.getpid()}.tmp"
+    with open(temporary, "w", encoding="utf-8") as handle:
+        handle.write("".join(f"{agent_id}\n" for agent_id in unfinished))
+    os.replace(temporary, agents_path)
+    return unfinished
+
+
 def run(arguments):
     if arguments.processes_only and (arguments.agents or arguments.mode == "cost" or arguments.process_root_pid == 0):
         print("✗ --processes-only 只盯进程，不和 --agents、cost、--process-root-pid 0 一起用\n"
@@ -1731,7 +1898,22 @@ def run(arguments):
         print("✗ 要给 --agents 或 --session-dir\n→ 怎么办：派发返回的 agent id 用逗号连起来传 --agents；只盯主 agent 自己放后台的长命令用 --processes-only",
               file=sys.stderr)
         return 2
+    if getattr(arguments, "discover", False) and (not arguments.session_dir or arguments.agents or arguments.processes_only or arguments.mode != "watch"):
+        print("✗ --discover 只和 watch、--session-dir 一起用，不给 --agents、--processes-only\n"
+              "→ 怎么办：bash research/scripts/watch.sh 不带 agent 号（它从 CLAUDE_CODE_SESSION_ID 找会话目录）", file=sys.stderr)
+        return 2
     agent_ids = [item for item in (arguments.agents or "").split(",") if item]
+    discover = bool(getattr(arguments, "discover", False))
+    state_dir = session_state_directory(arguments.session_dir) if discover else None
+    if discover:
+        lock_handle, holder = acquire_single_instance(state_dir)
+        if lock_handle is None:
+            write_acks(state_dir, read_acks(state_dir) | set(arguments.ack or []))
+            print(f"已有一个看门狗在盯这个会话（{holder}），这一次不另起"
+                  f"{'；--ack 已记进 ' + os.path.join(state_dir, 'watch-acks.tsv') + '，在盯的那一个下一次检查时读到' if arguments.ack else ''}。")
+            return SINGLE_INSTANCE_EXIT
+        write_acks(state_dir, read_acks(state_dir) | set(arguments.ack or []))
+    discovery_cache = {}
     table = process_table()
     if arguments.process_root_pid == 0:
         process_root_pid = None
@@ -1758,7 +1940,11 @@ def run(arguments):
     scribe_followups = {}   # (会话 id, 书记员 agent 号或 None) → 攒着的「书记官写入之后相关记录没跟上」检出
     # 第一次读检出记录时，被看的书记员此前的这一类检出从文件开头重读（上一个看门狗退出时还没报的接得上）；只给 --session-dir 时不重读，免得把早已交回的书记员翻出来再报
     history_start = 0 if (agent_ids and BROKEN_DETECTION != "scriberescan") else detections_offset
+    def acknowledgements():
+        return set(arguments.ack or []) | (read_acks(state_dir) if discover else set())
     while True:
+        if discover:
+            agent_ids = discovered_agent_ids(arguments.session_dir, state_dir, discovery_cache, arguments)
         lines, alerts, all_done, active_lists, leftover_pending_until = build_report(
             agent_ids, arguments.session_dir, arguments, watch_started, excluded_pids, process_root_pid)
         watched_transcripts = [path for path in (find_transcript(agent_id, arguments.session_dir) for agent_id in agent_ids) if path]
@@ -1779,7 +1965,9 @@ def run(arguments):
         scribe_lines, scribe_alerts = scribe_followup_report(scribe_followups, known_session_dirs)
         lines += detection_notes + scribe_lines
         alerts += detection_alerts + scribe_alerts
-        alerts, acknowledged = split_acknowledged(alerts, set(arguments.ack or []))
+        if discover:
+            write_acks(state_dir, pruned_acks(acknowledgements(), alerts, set(agent_ids)))
+        alerts, acknowledged = split_acknowledged(alerts, acknowledgements())
         for subject, name, explanation, _ in acknowledged:
             lines.append(f"已确认接着盯（--ack {subject}:{name}）：{explanation}")
         if arguments.mode == "report":
@@ -1815,7 +2003,7 @@ def run(arguments):
                 lines, alerts, _, active_lists, _ = build_report(agent_ids, arguments.session_dir, arguments, watch_started, excluded_pids, process_root_pid)
                 # 这一次退出之后攒着的就没人接了（书记员已交回的不在下一个看门狗的名单里）：交回了的这里一起报，还在写的写进报告
                 scribe_lines, scribe_alerts = scribe_followup_report(scribe_followups, known_session_dirs)
-                alerts, acknowledged = split_acknowledged(alerts + detection_alerts + scribe_alerts, set(arguments.ack or []))
+                alerts, acknowledged = split_acknowledged(alerts + detection_alerts + scribe_alerts, acknowledgements())
                 if alerts:
                     lines = lines + detection_notes + scribe_lines + [f"已确认接着盯（--ack {subject}:{name}）：{explanation}"
                                                                       for subject, name, explanation, _ in acknowledged]
@@ -2354,12 +2542,131 @@ def selftest_scribe_followups(work, failures, watch_runs):
     return 3
 
 
+def selftest_session_watch(work, thresholds, failures, watch_runs):
+    """这一轮加的几样：「该交接」只报两类、「进度文件不涨」、整点询问附进度、hook 检出主体是 agent 号、--discover 单例与确认落文件。返回查了几格。"""
+    session = os.path.join(work, "session-discover")
+    # 草稿目录要在 /tmp/claude-<uid>/ 下，派发提示里的路径才认得出（SCRATCH_PATH_MENTION）；它在自检的 TMPDIR 之外，自己删
+    scratch_parent = f"/tmp/claude-{os.getuid()}"
+    os.makedirs(scratch_parent, exist_ok=True)
+    scratch = tempfile.mkdtemp(prefix="agent-watch-selftest-scratch-", dir=scratch_parent)
+    try:
+        return selftest_session_watch_in(work, session, scratch, thresholds, failures, watch_runs)
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+
+
+def selftest_session_watch_in(work, session, scratch, thresholds, failures, watch_runs):
+    checks = 0
+    progress_path = os.path.join(scratch, PROGRESS_FILE_NAME)
+    open(progress_path, "w", encoding="utf-8").write("第一格跑完\n第二格跑完\n第三格在跑，预计 40 分钟\n")
+    stale_moment = time.time() - 45 * 60
+    os.utime(progress_path, (stale_moment, stale_moment))
+    prompt = record_at(20, "user", f"跑前登记 x。报告写 {scratch}/report.md，草稿目录 {scratch}/")
+    old_prompt = record_at(65, "user", f"跑前登记 x。报告写 {scratch}/report.md，草稿目录 {scratch}/")
+    waiting_tail = [bash_use(10, "t1", "cargo run --release", "m1"),
+                    record_at(9.9, "user", [{"type": "tool_result", "tool_use_id": "t1", "content": "Command running in background with ID: bq1."}]),
+                    record_at(9.8, "assistant", [{"type": "text", "text": "等后台任务"}], stop_reason="end_turn", message_id="m2")]
+    write_transcript(session, "progressstale", [prompt, *waiting_tail], {"agentType": "experiment-runner", "description": "等后台任务、进度 45 分钟没改"})
+    write_transcript(session, "attackhuge", [record_at(0.5, "assistant", [{"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": "ls"}}],
+                                                       stop_reason="tool_use", message_id="m1", usage={"input_tokens": 10, "cache_read_input_tokens": 800_000})],
+                     {"agentType": "three-way-attack", "description": "攻方上下文 80 万"})
+    write_transcript(session, "inquiryprogress", [old_prompt, bash_use(64.9, "t1", "ls", "m1"), bash_result(64.8, "t1"), bash_use(0.5, "t2", "cargo build", "m2")],
+                     {"agentType": "experiment-runner", "description": "跑了 65 分钟、草稿目录里有进度文件"})
+    open(session + ".jsonl", "a").close()
+    now = datetime.now(timezone.utc)
+    for agent_id, wanted in (("progressstale", {PROGRESS_STALE_ALERT}), ("attackhuge", set())):
+        got = {name for name, _, _ in agent_alerts(AgentTranscript(agent_id, find_transcript(agent_id, session)), now, thresholds)}
+        checks += 1
+        if got != wanted:
+            failures.append(f"子 agent {agent_id}：应当告警 {sorted(wanted) or '无'}，实际 {sorted(got) or '无'}")
+    inquiry = routine_inquiry_alert(AgentTranscript("inquiryprogress", find_transcript("inquiryprogress", session)), now, thresholds)
+    checks += 1
+    if inquiry is None or "第三格在跑，预计 40 分钟" not in inquiry[1]:
+        failures.append(f"整点询问应当附上 progress.md 的末几行，实际 {inquiry}")
+    detections = os.path.join(work, "detections-subject.jsonl")
+    open(detections, "w", encoding="utf-8").write(json.dumps({"session_id": "s1", "agent_type": "implementation-writer", "agent_id": "a1",
+                                                              "command": "until x; do sleep 1; done", "findings": ["写被拒"]}, ensure_ascii=False) + "\n")
+    _, detection_alerts, _, _ = read_detections(detections, 0, {"s1"}, set())
+    checks += 1
+    if [alert[0] for alert in detection_alerts] != ["a1"]:
+        failures.append(f"hook 检出的主体应当是 agent 号 a1（--ack a1:hook 检出 只压它），实际 {[alert[0] for alert in detection_alerts]}")
+    # --discover：状态目录放自检自己的；一个会话一个看门狗，--ack 落文件下一次读回，条件消失的确认作废
+    state_root = os.path.join(work, "watch-state")
+    environment = dict(os.environ, AGENT_WATCH_STATE_ROOT=state_root)
+    write_transcript(session, "discoveredlong", [prompt, bash_use(19, "t1", "cargo test --release", "m1")],
+                     {"agentType": "implementation-writer", "description": "工具调用 20 分钟"})
+    write_transcript(session, "discovereddone", [bash_use(20, "t1", "ls", "m1"), bash_result(19, "t1"), *handback_records(18, "h1", "m2")],
+                     {"agentType": "sweep", "description": "交回了"})
+    def discover_watch(extra, timeout=90):
+        watch_runs.append(["--discover", *extra])
+        return subprocess.run([sys.executable, os.path.abspath(__file__), "watch", "--discover", "--session-dir", session, "--process-root-pid", "0",
+                               "--interval-seconds", "1", "--detections-file", os.path.join(work, "no-detections.jsonl"), *extra],
+                              capture_output=True, text=True, timeout=timeout, env=environment)
+    acknowledged_keys = ["discoveredlong:工具调用过长", "progressstale:进度文件不涨", "inquiryprogress:跑满 1 小时", "progressstale:跑满 1 小时",
+                         "attackhuge:该交接", "inquiryprogress:该交接"]
+    first = discover_watch([*sum((["--ack", key] for key in acknowledged_keys), []), "--max-minutes", "0.03"])
+    checks += 1
+    if first.returncode != 4 or "discoveredlong" not in first.stdout or "还没交回、没被停的子 agent" not in first.stdout:
+        failures.append(f"--discover 应当自己找出没结束的 discoveredlong、确认过的不叫醒、到点退 4，实际 {first.returncode}：{first.stdout[-500:]}")
+    second = discover_watch(["--max-minutes", "0.03"])
+    checks += 1
+    if second.returncode != 4 or "已确认接着盯（--ack discoveredlong:工具调用过长）" not in second.stdout:
+        failures.append(f"--ack 应当落进状态目录、下一次起不带 --ack 也读回，实际 {second.returncode}：{second.stdout[-400:]}")
+    holder = subprocess.Popen([sys.executable, os.path.abspath(__file__), "watch", "--discover", "--session-dir", session, "--process-root-pid", "0",
+                               "--interval-seconds", "1", "--max-minutes", "0.15", "--detections-file", os.path.join(work, "no-detections.jsonl")],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=environment)
+    try:
+        time.sleep(2)
+        duplicate = discover_watch(["--ack", "attackhuge:hook 检出", "--max-minutes", "0.03"])
+        checks += 1
+        if duplicate.returncode != SINGLE_INSTANCE_EXIT or "已有一个看门狗在盯" not in duplicate.stdout:
+            failures.append(f"同一个会话已有一个看门狗在盯时应当退 {SINGLE_INSTANCE_EXIT} 并写明，实际 {duplicate.returncode}：{duplicate.stdout[-300:]}")
+        checks += 1
+        if "attackhuge:hook 检出" not in read_acks(os.path.join(state_root, os.path.basename(session))):
+            failures.append("已有一个在盯时给的 --ack 应当记进状态目录，好让在盯的那一个读到")
+    finally:
+        holder.communicate(timeout=60)
+    # 会话里的子 agent 都交回了：--discover 没有要盯的，接着盯到点（新派的会接上），不退回「会话里最近动过的全部」、不报「全部交回」
+    quiet_session = os.path.join(work, "session-all-done")
+    write_transcript(quiet_session, "onlydone", [bash_use(20, "t1", "ls", "m1"), bash_result(19, "t1"), *handback_records(18, "h1", "m2")],
+                     {"agentType": "sweep", "description": "交回了"})
+    open(quiet_session + ".jsonl", "a").close()
+    watch_runs.append(["--discover", "all-done"])
+    quiet = subprocess.run([sys.executable, os.path.abspath(__file__), "watch", "--discover", "--session-dir", quiet_session, "--process-root-pid", "0",
+                            "--interval-seconds", "1", "--max-minutes", "0.03", "--detections-file", os.path.join(work, "no-detections.jsonl")],
+                           capture_output=True, text=True, timeout=90, env=environment)
+    checks += 1
+    if quiet.returncode != 4 or "全部交回" in quiet.stdout:
+        failures.append(f"--discover 时会话里的子 agent 都交回了应当接着盯到点退 4、不报全部交回，实际 {quiet.returncode}：{quiet.stdout[-300:]}")
+    state_acks = read_acks(os.path.join(state_root, os.path.basename(session)))   # 子进程的 STATE_ROOT 是环境变量给的这一个，自检进程自己的不是
+    checks += 1
+    if "inquiryprogress:该交接" in state_acks or "discoveredlong:工具调用过长" not in state_acks:
+        failures.append(f"条件类告警的确认：条件不在（inquiryprogress 没到线）的应当作废，还在的（discoveredlong 工具过长）应当留着，实际 {sorted(state_acks)}")
+    return checks
+
+
 def selftest():
-    work = tempfile.mkdtemp(prefix="agent-watch-selftest-")
+    """主体在 selftest_in；临时目录由共用库建（通过、判红、抛异常都删），那三格也由它判。
+    弄坏开关 AGENT_WATCH_BREAK=keepscratch 走回 mkdtemp 不删，那三格必须判红。"""
+    try:
+        spec = importlib.util.spec_from_file_location("lib_selftest_scratch", SELFTEST_SCRATCH_LIBRARY_PATH)
+        scratch = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(scratch)
+    except Exception as error:   # 文件不在、语法错、导入时抛的都算读不到
+        print(f"  ✗ 自检：读不到共用的临时目录库 {SELFTEST_SCRATCH_LIBRARY_PATH}（{error!r}）")
+        print("    → 恢复 .claude/hooks/lib_selftest_scratch.py（自证临时目录的建法与三格探查只有那一份），再跑 --selftest")
+        return 1
+    exit_code, problems = scratch.run_with_scratch(
+        selftest_in, "agent-watch-selftest-", BROKEN_DETECTION == "keepscratch",
+        SELFTEST_ROLE_VARIABLE, [sys.executable, os.path.abspath(__file__), "--selftest"])
+    return scratch.merged_exit_code(exit_code, problems, "research/scripts/agent-watch.py 的 selftest()", "AGENT_WATCH_BREAK=keepscratch")
+
+
+def selftest_in(work):
     thresholds = argparse.Namespace(tool_minutes=8, wait_loop_minutes=3, idle_minutes=10, repeat_count=3, interval_seconds=240,
                                     process_report_minutes=0.02, process_stale_minutes=0.05, process_max_minutes=600,
                                     not_started_minutes=5, active_minutes=600, context_tokens=600_000, leftover_background_grace_minutes=2,
-                                    ask_every_minutes=60, process_rss_gibibytes=8)
+                                    ask_every_minutes=60, process_rss_gibibytes=8, progress_stale_minutes=30)
     session = os.path.join(work, "session")
     failures = []
     write_transcript(session, "finished", [bash_use(20, "t1", "ls", "m1"), bash_result(19, "t1"), *handback_records(18.5, "h1", "m2"),
@@ -2572,7 +2879,7 @@ def selftest():
         "finished": set(), "healthy": set(), "boundedloop": set(), "interrupted": set(), "repeatchanging": set(), "waiting": set(), "continued": set(),
         "stoppedidle": set(), "stoppedcontinued": set(), "stoppedtwice": set(), "wokenup": set(), "resumedafterturnend": set(), "nowake": {"结束本轮却不会醒"}, "waitinglong": set(), "orphantask": {"结束本轮却不会醒"}, "heldtask": set(), "textsettled": set(), "stopsequence": set(), "textstreaming": set(),
         "toolafterhandback": set(), "movedbackground": set(), "queuedresume": {"结束本轮却不会醒"},
-        "hugecontext": {"上下文过大"}, "waitloop": {"等待循环"}, "longtool": {"工具调用过长"}, "stalepending": set(), "repeat": {"同一命令反复且输出不变"}, "banned": {"禁用命令"}, "bannedrefused": set(), "bannedold": set(), "bannedheredoc": set(), "bannedafterheredoc": {"禁用命令"}, "idle": {"无动静"},
+        "hugecontext": {HANDOVER_ALERT}, "waitloop": {"等待循环"}, "longtool": {"工具调用过长"}, "stalepending": set(), "repeat": {"同一命令反复且输出不变"}, "banned": {"禁用命令"}, "bannedrefused": set(), "bannedold": set(), "bannedheredoc": set(), "bannedafterheredoc": {"禁用命令"}, "idle": {"无动静"},
         "inquiry61": {"跑满 1 小时要主 agent 问一次"}, "inquiry125": {"跑满 2 小时要主 agent 问一次"}, "inquiryhandedback": set(),
         "inquirymessagebefore": {"跑满 1 小时要主 agent 问一次"}, "inquirydeliveredafter": set(), "inquiryqueuedafter": set(),
         "inquirysentafter": {"工具调用过长"}, "inquiryfailed": {"结束本轮却不会醒"},
@@ -2743,6 +3050,7 @@ def selftest():
     heavy_processes_started = selftest_heavy_tests(work, failures, probed_processes, watch_runs)
     memory_processes_started = selftest_memory(work, failures, probed_processes, watch_runs)
     scribes_checked = selftest_scribe_followups(work, failures, watch_runs)
+    session_watch_checks = selftest_session_watch(work, thresholds, failures, watch_runs)
     for mixed in (["watch", "--processes-only", "--agents", "healthy"], ["cost", "--processes-only"]):
         mixed_run = subprocess.run([sys.executable, os.path.abspath(__file__), *mixed], capture_output=True, text=True, timeout=30)
         if mixed_run.returncode != 2:
@@ -2753,7 +3061,6 @@ def selftest():
             ("sleep 60", "sleep 60")):
         if command_for_display(wrapped_command) != wanted_display:
             failures.append(f"Bash 工具包着的命令在报告里应当显示成「{wanted_display}」，实际「{command_for_display(wrapped_command)}」")
-    subprocess.run(["rm", "-rf", work])
     for failure in failures:
         print(f"  ✗ 自检：{failure}")  # gate-lint:detail
     if failures:
@@ -2777,6 +3084,8 @@ def selftest():
           f"只睡的小进程不报，阈值 0 不查），两条路整查都报、--ack 进程:<pid> 不叫醒，看门狗起了之后才过线的由两次整查之间的单查几秒内叫醒（{memory_processes_started} 个进程）；"
           f"书记员还在写时「{SCRIBE_FOLLOWUP_FINDING_PREFIX}」不叫醒、交回时报一条汇总，"
           f"看门狗起之前攒下的起的时候重读出来，书记员别的类别照旧立刻叫醒，认不出是哪个书记员的等会话里书记员都不在跑了再报"
+          f"；上下文过线只对实现员与执行员报「该交接」并列出吃上下文最多的工具输出，等后台任务时 progress.md 久没改报「进度文件不涨」、整点询问附 progress.md 末几行，"
+          f"hook 检出的主体是 agent 号；--discover 一个会话一个看门狗（自己找没结束的子 agent、已有一个在盯就退 5）、--ack 落文件下一次读回、条件消失的确认作废（{session_watch_checks} 格）"
           f"（查了 {len(expectations) + 1 + leftover_cases_checked + 1 + scribes_checked} 个子 agent、{len(probed_processes)} 个进程"
           f"（其中假的重型进程 {heavy_processes_started} 个）、{len(watch_runs)} 次看门狗）")
     return 0
@@ -2795,7 +3104,13 @@ def main():
     parser.add_argument("--wait-loop-minutes", type=float, default=3, help="没有超时的等待循环跑过这么久告警，默认 3 分钟")
     parser.add_argument("--idle-minutes", type=float, default=10, help="没有工具在跑、记录这么久没动告警，默认 10 分钟")
     parser.add_argument("--repeat-count", type=int, default=3, help="最近 10 次命令里同一条出现这么多次告警，默认 3")
-    parser.add_argument("--context-tokens", type=int, default=600_000, help="子 agent 最后一次调用的上下文到这么多 token 告警，默认 60 万")
+    parser.add_argument("--context-tokens", type=int, default=700_000,
+                        help="implementation-writer / experiment-runner 最后一次调用的上下文到这么多 token 报「该交接」，默认 70 万（推的）；别的类型不报")
+    parser.add_argument("--progress-stale-minutes", type=float, default=30,
+                        help="结束本轮在等后台任务的子 agent，草稿目录里的 progress.md 这么久没改就报「进度文件不涨」，默认 30 分钟；写 0 不报")
+    parser.add_argument("--discover", action="store_true",
+                        help="一个会话一个看门狗：自己从 --session-dir 找还没结束的子 agent（每次检查重找，新派的自动接上），已有一个在盯就退 5；"
+                             "--ack 记进这个会话的状态目录，下一次起的时候读回，条件类告警的确认在条件消失时作废，事件类到那个子 agent 结束才作废")
     parser.add_argument("--process-report-minutes", type=float, default=5, help="进程跑过这么久才列出来，默认 5 分钟")
     parser.add_argument("--process-stale-minutes", type=float, default=20, help="进程写着的文件这么久没动告警，默认 20 分钟")
     parser.add_argument("--process-max-minutes", type=float, default=120, help="进程跑过这么久告警，默认 120 分钟")
@@ -2816,7 +3131,7 @@ def main():
                              "快过任何复检间隔，那一类只有内存上限（research/scripts/run-with-memory-cap.sh）挡得住")
     parser.add_argument("--ack", action="append", default=[],
                         help="主 agent 看过、判定只是慢接着盯的告警：子agent id:告警名，进程告警写 进程:PID，"
-                             "「跑满 N 小时要主 agent 问一次」可写 子agent id:跑满 N 小时（只确认那一格）；可给多次，只在这一次看门狗里有效")
+                             "「跑满 N 小时要主 agent 问一次」可写 子agent id:跑满 N 小时（只确认那一格）；可给多次；不带 --discover 时只在这一次看门狗里有效")
     parser.add_argument("--process-root-pid", type=int, help="进程一半从哪个 pid 往下看；默认是跑这个脚本的 Claude 实例，0 表示不看进程")
     parser.add_argument("--processes-only", action="store_true",
                         help="不看子 agent，只盯这个 Claude 实例底下起的时候就在跑的进程，它们都退出了就退 0；主 agent 自己放后台的长命令用它盯；"
@@ -2826,4 +3141,5 @@ def main():
 
 
 if __name__ == "__main__":
+    preflight(__file__)
     sys.exit(main())

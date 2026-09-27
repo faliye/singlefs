@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: command git
 """回扫一条规则时核对判据有没有被误删：原文的每个片段，今天还在不在正文里。
 
 规则正文只写怎么做，实测与论证从正文删掉（.claude/singlefs-ai-sop/rules/rules-discipline.md）。
@@ -16,6 +18,11 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 DECORATION = re.compile(r"[\s*`>_~|—·…]|⚠️|⚠")
 SPLIT = re.compile(r"[。；\n]")
@@ -91,4 +98,5 @@ def main(argv):
 
 
 if __name__ == "__main__":
+    preflight(__file__)
     sys.exit(main(sys.argv[1:]))

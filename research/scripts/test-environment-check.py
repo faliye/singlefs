@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 它读宿主的内核日志、SMART 这类信息，读不到的那一类自己记「没查成」，不交给调用方预判
 """里程碑开工时清一次、完结时查一次：测试环境有没有上一轮的残留，宿主盘有没有异常。
 
 用法：
@@ -40,6 +42,11 @@ import subprocess
 import sys
 import tempfile
 import time
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 REPOSITORY_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 SCRIPT_RELATIVE_PATH = 'research/scripts/test-environment-check.py'
@@ -1407,7 +1414,9 @@ def make_fake_command_runner(environment, recorded_commands):
 def check_devices_and_clean(recorder, environment, holders, fake_temporary, outside_directory, expectations):
     emulator_with_image = start_holder_process(
         os.path.join(fake_temporary, 'singlefs-e72.XyZ789', 'd0.img'), argument_zero='qemu-system-x86_64')
-    emulator_plain = start_holder_process(os.path.join(outside_directory, 'plain.img'),
+    # 不带 singlefs 的那一台：参数给相对路径、工作目录设成 outside，命令行里就只剩 plain.img。
+    # 工作区的绝对路径随 TMPDIR 变，TMPDIR 里带 singlefs 字样时（本机会话与门禁的临时目录常是这样）它会被误抓成残留。
+    emulator_plain = start_holder_process('plain.img', working_directory=outside_directory,
                                           argument_zero='qemu-system-x86_64')
     holders += [emulator_with_image, emulator_plain]
     environment.process_identifier_filter = {emulator_with_image.pid, emulator_plain.pid}
@@ -1643,4 +1652,5 @@ def main(argument_list):
 
 
 if __name__ == '__main__':
+    preflight(__file__)
     sys.exit(main(sys.argv[1:]))

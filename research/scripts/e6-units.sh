@@ -104,4 +104,4 @@ done
   cat "$TMP/ni.res"; cat "$TMP/soft.res"; } >"$OUT"
 echo "── 产物：$OUT"
 [[ $bad -eq 0 ]] || { echo "✗ 有判据没过，上面那份产物不许引用"; echo "   → 怎么办：往上翻，逐条看是哪个 ✗（自带对照 / 失败条款 / 阴性对照）没过，按那一条各自的出路修好再重跑，不要引用 $OUT。"; exit 1; }
-echo "✓ 三条跨档判据全过"
+echo "✓ 三条跨档判据全过（产物 $(grep -vc '^#' "$OUT") 行）"

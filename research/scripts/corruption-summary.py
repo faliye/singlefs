@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本（与它点名的会话记录），除了 python3 之外没有环境要求
 """把 corruption/*.raw.json 汇成一张按条件分组的表。
 
 直接读原始响应，而不是解析日志——原始响应里有 `reasoning` 字段，
@@ -8,6 +10,11 @@
 会打印成 nan 或 0，被读成「英文更干净」——而真相是**这一列根本没测英文**。
 """
 import json, glob, os, re, sys, collections
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 CJK = re.compile(r'[一-鿿]')
 WORD = re.compile(r"[A-Za-z][A-Za-z'-]*")
@@ -53,4 +60,5 @@ def main(d):
         print(f"{tag:<16}{len(rows):>3}{cj:>9}{cb:>9}{rate:>8}{wd:>9}{wb:>9}{rj:>9}{rb:>9}{ff:>9}")
 
 if __name__ == '__main__':
+    preflight(__file__)
     main(sys.argv[1] if len(sys.argv) > 1 else 'research/results/corruption')

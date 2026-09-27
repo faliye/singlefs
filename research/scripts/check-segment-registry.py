@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本（与它点名的会话记录），除了 python3 之外没有环境要求
 """比对「八、根槽写路径的段序列登记表」与 E142 产物的 `name=segments` 行，逐字核对。
 
 用法：
@@ -36,6 +38,11 @@ import re
 import shutil
 import sys
 import tempfile
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 LAYOUT_RELATIVE_PATH = pathlib.Path('.claude/kb/layout/01-first-txn.md')
 REPLAY_SCRIPT_RELATIVE_PATH = pathlib.Path('research/scripts/replay.sh')
@@ -357,9 +364,14 @@ def check_device_pinned_notes(section_text, repository_root):
         array_count = len(array_pattern.findall(normalized_test_text))
         if array_count == 0:
             mismatches.append(f'{label}：用例文件 {test_file_relative_path} 里没有钉这个数组 `{array_text}`')
-        if str(claimed_crash_state_count) not in normalized_test_text:
+        # Rust 的长整数字面量带下划线分组（clippy unreadable_literal 要求，例 `6_649_413_746`），比状态数之前把数字之间的下划线去掉
+        digits_joined_test_text = re.sub(r'(?<=\d)_(?=\d)', '', normalized_test_text)
+        if str(claimed_crash_state_count) not in digits_joined_test_text:
             mismatches.append(f'{label}：用例文件 {test_file_relative_path} 里没有钉状态数 {claimed_crash_state_count}')
         checked_descriptions.append(f'{label}（{claimed_operation_count} 次写、{claimed_crash_state_count} 个状态，数组在 {test_file_relative_path} 里出现 {array_count} 次）')
+    if not checked_descriptions:
+        # 一句都认不出时不许当成「没有要核的」放过：那句登记被改了形状，这一格就再没人核（扫到 0 项不是通过）
+        mismatches.append('八节里一句「第二条流的段序列 `…`、N 次写、M 个状态 … 装置钉住 … `crates/….rs`」的登记都认不出：登记句的形状改了，第二条流就没人核')
     return mismatches, checked_descriptions
 
 
@@ -690,4 +702,5 @@ def main():
 
 
 if __name__ == '__main__':
+    preflight(__file__)
     main()

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 判不出来它自己按「要跑」回 0，拒绝反而会让门禁阶段按红记
 # 这一道阶段能不能复用上一次的判定：**要跑退 0，可跳过退 1，判不出来退 0**（与 change-touches-crates.sh 同极性）。
 #
 #   stage-must-run.sh <项目根> <阶段文件名>    判一次，把判据与依据打到 stdout
@@ -6,6 +8,10 @@
 #
 # 名字说的是哪一边为真：**要不要跑**。退 0 = 要跑（输入变了、判不出来、或不许复用），退 1 = 可跳过。
 # 与 change-touches-crates.sh 同极性（那边 0 = 碰了 = 要跑），接法也一样，阶段里照抄那四行就行。
+#
+# 判法住在门禁与实验共用的准入模块里：research/scripts/admission.py 的 gate-reuse（登记表同一份，
+# .claude/gate.d/stage-inputs.tsv）。这一份只做两件事：把模块的「可跳过」（退 10）翻成这里的 1，
+# 以及**模块自己出错一律按要跑处理**——python 起不来、抛异常退 1，都不许被读成「可跳过」，那等于把这道门禁关掉。
 #
 # 判据只有一句：**这一道读的那几条路径，在 `refs/sop/staged-green` 那棵树与这一次的暂存树之间，git 说变没变。**
 # 路径清单在 `.claude/gate.d/stage-inputs.tsv`，那是唯一登记位；清单自己也进比对（清单变了必定重跑）。
@@ -30,58 +36,18 @@
 #   `Cargo.lock` 在各阶段的清单里，依赖变化看得见；工具链升级看不见，靠上限兜。
 #   `SINGLEFS_GATE_FULL=1` 强制当成要跑。
 set -uo pipefail
-
-REUSE_REF="refs/sop/staged-green"
-INPUT_TABLE=".claude/gate.d/stage-inputs.tsv"
-
-say_run() { printf '%s\n' "$1"; exit 0; }   # 要跑
-say_skip() { printf '%s\n' "$1"; exit 1; }  # 可跳过
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ "${1:-}" == "--selftest" ]]; then
-  exec bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/stage-must-run-selftest.sh"
+  exec bash "$HERE/stage-must-run-selftest.sh"
 fi
 
-ROOT="${1:-}"
-STAGE="${2:-}"
-[[ -n "$ROOT" && -n "$STAGE" ]] || { echo "  ✗ 用法：stage-must-run.sh <项目根> <阶段文件名>"; echo "     → 怎么办：阶段名照 .claude/gate.d/ 下的文件名写，例 59-crates-mutation-replay.sh。"; exit 0; }
-
-[[ "${SINGLEFS_GATE_FULL:-}" != "1" ]] || say_run "强制全跑（SINGLEFS_GATE_FULL=1）"
-git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || say_run "判不出来：$ROOT 不是 git 工作树，按要跑处理"
-
-staged_tree="${SINGLEFS_STAGED_TREE:-}"
-[[ -n "$staged_tree" ]] || say_run "这一趟不是 gate-staged.sh 起的（没有 SINGLEFS_STAGED_TREE），被判的可能是工作区，不许复用"
-git -C "$ROOT" rev-parse -q --verify "${staged_tree}^{tree}" >/dev/null 2>&1 || say_run "判不出来：SINGLEFS_STAGED_TREE=${staged_tree} 不是这个仓里的树对象"
-
-green="$(git -C "$ROOT" rev-parse -q --verify "${REUSE_REF}^{commit}" 2>/dev/null || true)"
-[[ -n "$green" ]] || say_run "还没有过整轮全绿的暂存树（$REUSE_REF 不存在）"
-
-[[ -f "$ROOT/$INPUT_TABLE" ]] || say_run "读不到路径清单 $INPUT_TABLE，按要跑处理"
-inputs="$(awk -F'\t' -v stage="$STAGE" '$1 == stage { print $2 }' "$ROOT/$INPUT_TABLE")"
-[[ -n "$inputs" ]] || say_run "$INPUT_TABLE 里没有 $STAGE 这一行，按要跑处理"
-
-# 清单里这道阶段的每一行都进比对（`read -a` 只读第一行，同一道阶段写两行时第二行会被静默丢掉）；
-# 清单自己进比对：少写一条输入，那条输入就永远不会让这道阶段重跑；
-# 阶段脚本自己进比对：判据本身变了，上一次的判定就不再作数。
-input_paths=()
-while IFS= read -r input_row; do
-  read -r -a row_paths <<< "$input_row"
-  input_paths+=("${row_paths[@]}")
-done <<< "$inputs"
-input_paths+=("$INPUT_TABLE" ".claude/gate.d/$STAGE")
-
-hours="${SINGLEFS_REUSE_HOURS:-24}"
-# 时刻读那个提交对象自己的。ref 指的是「包着那棵暂存树的提交」而不是裸树，正是为了这个：
-# `git update-ref` 对 refs/heads/ 之外的 ref 默认不写 reflog，而裸树 `git log -g` 也读不了
-# ——2026-09-22 实测，第一版靠 reflog 取时刻，上限那一条**一次都没触发过**。
-green_epoch="$(git -C "$ROOT" log -1 --format=%ct "$green" 2>/dev/null || true)"
-[[ "$green_epoch" =~ ^[0-9]+$ ]] || say_run "取不到 $REUSE_REF 的时刻（它不是包着暂存树的提交？），判不出复用上限，按要跑处理"
-age_hours=$(( ( $(date +%s) - green_epoch ) / 3600 ))
-if (( age_hours >= hours )); then
-  say_run "上次整轮全绿在 ${age_hours} 小时前，到了复用上限 ${hours} 小时：内容没变不代表环境没变（工具链升级这一格比对看不见），强制跑一趟"
-fi
-
-if git -C "$ROOT" diff --quiet "$green" "$staged_tree" -- "${input_paths[@]}"; then
-  say_skip "与上次整轮全绿那棵树（${green:0:12}）在这几条路径上逐字相同：${input_paths[*]}"
-fi
-changed="$(git -C "$ROOT" diff --name-only "$green" "$staged_tree" -- "${input_paths[@]}" | head -5 | tr '\n' ' ')"
-say_run "这几条路径与上次整轮全绿那棵树不同：${changed}"
+if reuse_reason="$(python3 "$HERE/admission.py" gate-reuse "$@")"; then reuse_rc=0; else reuse_rc=$?; fi
+case "$reuse_rc" in
+  0)  printf '%s\n' "$reuse_reason"; exit 0 ;;   # 要跑
+  10) printf '%s\n' "$reuse_reason"; exit 1 ;;   # 可跳过
+  *)  printf '%s\n' "判不出来：准入模块 research/scripts/admission.py 退 ${reuse_rc}（python 起不来或出了异常，stderr 里有原因），按要跑处理"
+      exit 0 ;;
+esac

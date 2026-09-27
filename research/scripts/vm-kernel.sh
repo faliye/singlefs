@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 找不到可读的内核镜像时它自己判红并打印怎么设 SINGLEFS_KERNEL
 # 给 QEMU harness 找一个**可读的**内核镜像，找不到就从 /boot 复制一份出来。
 #
 #   vm-kernel.sh            打印可用内核的路径（必要时先复制）
@@ -14,6 +16,8 @@
 #   - 目标路径固定在本会话 scratchpad 或 TMPDIR，不落仓库。
 set -uo pipefail
 
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEST_DIR="${SINGLEFS_KERNEL_DIR:-${TMPDIR:-/tmp}}"
 DEST="$DEST_DIR/singlefs-vmlinuz"

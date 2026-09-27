@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: command git
 """决策瘦身之后核「内容没丢」：旧正文里的每个数、代码片段、编号引用，要在新正文、这次新加的变更史行、
 或新正文引到的实验页里找得到。规则见 .claude/rules/format-evolution.md「决策正文只写现状，依据写成指针；决策与实验双向登记」。
 
@@ -22,6 +24,11 @@ import re
 import subprocess
 import sys
 import tempfile
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 E_REF = re.compile(r'(?<![A-Za-z0-9])E(\d+)（')
 
@@ -211,4 +218,5 @@ def main(argv):
 
 
 if __name__ == '__main__':
+    preflight(__file__)
     sys.exit(main(sys.argv))

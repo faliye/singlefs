@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: command git
 # 取实验号并当场占住：查号与建第一个文件在同一步里做，建文件用排他方式（noclobber）。
 #
 #   bash research/scripts/claim-experiment.sh --next              # 打印下一个没人用的实验号
@@ -15,6 +17,8 @@
 # 再用 CLAIM_SKIP_USED_CHECK=1 关掉查号，已有源码的号被占成功、selftest 判红。
 set -uo pipefail
 
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 used_numbers() {
   local root="$1"
   {

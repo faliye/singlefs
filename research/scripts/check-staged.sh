@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: command git
 # 只拿「HEAD + 暂存区」跑门禁阶段：几个会话共写一个仓时，工作区里混着别人没收尾的改动与未跟踪文件，
 # 门禁在工作区上判的红分不清是谁的。这里在临时 worktree 上套 `git diff --cached`，别人的东西一样都不进来。
 #
@@ -12,6 +14,8 @@
 # CHECK_STAGED_NO_TRAP=1 关掉打断时的清理，确认 selftest 判红（临时 worktree 留在仓里）；
 # CHECK_STAGED_77_IS_RED=1 把退出码 77（无对象可判）照旧算红，确认 selftest 判红。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 
 DEFAULT_STAGES=(doc 10 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 42 43 44 45 50 60 61 85 86)
 

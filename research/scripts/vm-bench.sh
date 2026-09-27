@@ -206,11 +206,27 @@ if [[ "${1:-}" == "--selftest" ]]; then
   say "  分辨不出失败的那个，说明这个 harness 会把失败当成成功。"
   say ""
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-vmself.XXXXXX")"
+  # 读不到退出标记时 die 直接退出，走不到下面那句 rm：桩程序目录挂进 EXIT 的 trap，哪条路退都删。
+  # VM_BENCH_BREAK=keepselftestscratch 拿掉这一步（只给证红用），下面「读不到退出标记那条路」那一格必须判红。
+  [[ "${VM_BENCH_BREAK:-}" == keepselftestscratch ]] || trap 'rm -rf "${tmp:?}"; cleanup_work' EXIT
   # 用 busybox sh 当「二进制」：它在 initramfs 里一定跑得起来
   printf '#!/bin/sh\nexit 0\n'  > "$tmp/ok";   chmod +x "$tmp/ok"
   printf '#!/bin/sh\nexit 7\n'  > "$tmp/bad";  chmod +x "$tmp/bad"
   printf '#!/bin/sh\n[ -b "$1" ] || exit 9\nsz=$(/bin/busybox blockdev --getsize64 "$1" 2>/dev/null)\necho "VMBENCH_DISK_BYTES=$sz"\n[ "$sz" -gt 0 ] || exit 10\nexit 0\n' > "$tmp/disk"; chmod +x "$tmp/disk"
   fail=0
+  # 读不到退出标记那条路：拉起自己的子进程，建好桩程序目录就照那条路 die，不起虚机；TMPDIR 指进探查目录，子进程退出之后那里必须是空的
+  [[ "${VM_BENCH_SELFTEST_ROLE:-}" == die ]] && die "自证角色 die：照「读不到退出标记」那条路退出" "这是自证拉起的子进程故意走的那条路，看的是它退出之后临时目录删没删，不是 harness 坏了"
+  probe="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-vmself-probe.XXXXXX")"
+  probe_output="$(VM_BENCH_SELFTEST_ROLE=die TMPDIR="$probe" bash "$0" --selftest 2>&1)"; probe_status=$?
+  probe_left="$(ls -A "$probe")"
+  rm -rf "${probe:?}"
+  if [[ $probe_status -ne 0 && "$probe_output" == *"自证角色 die"* && -z "$probe_left" ]]; then
+    ok "读不到退出标记那条路（die）退出之后，TMPDIR 里的桩程序目录与日志指针都删了"
+  else
+    printf '  ✗ 读不到退出标记那条路（die）没走到或临时目录没删：子进程退出码 %s，TMPDIR 里留下「%s」\n' "$probe_status" "$probe_left"
+    printf '     → 怎么办：看建桩程序目录之后那句 trap（EXIT 时删它再调 cleanup_work）还在不在；VM_BENCH_BREAK=keepselftestscratch 设着的话这里本来就该红。\n'
+    fail=1
+  fi
   g_ok="$(run_one "$tmp/ok" "$KERNEL")"    || { die "成功用例：读不到退出标记" "虚机可能没跑起来；去 \$VM_LOGPTR 指的日志文件里看控制台尾部，确认内核与 busybox 能正常启动。"; }
   [[ "$g_ok" == 0 ]] && ok "成功用例 → 0" || { printf '  ✗ 成功用例 → %s，期望 0\n' "$g_ok"; printf '     → 怎么办：run_one 抓取退出码的路径可能坏了，去看控制台日志确认来宾真的执行了 /tmp/ok 并 exit 0。\n'; fail=1; }
   g_bad="$(run_one "$tmp/bad" "$KERNEL")"  || { die "失败用例：读不到退出标记" "虚机可能没跑起来；去 \$VM_LOGPTR 指的日志文件里看控制台尾部，确认内核与 busybox 能正常启动。"; }

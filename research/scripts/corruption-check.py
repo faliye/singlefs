@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判这一份输出，上一次的结论不替这一次作保
+# run-condition: none 只读被点名的那一份输出与本地词表，除了 python3 之外没有环境要求
 """本地腿输出的字词损坏检测器。
 
 **它必须先证明有判别力**：对已知损坏的样本判红、对已知干净的样本判绿。
@@ -19,6 +21,11 @@
 对任何中文文本都判红，那就没有判别力了。
 """
 import sys, re, unicodedata
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 CJK = re.compile(r'[一-鿿]')
 
@@ -90,7 +97,43 @@ def splice_marks(text):
         'glue': len(re.findall(r"(?<![A-Za-z0-9])[:;,]\w", text)),
     }
 
-def check(text):
+PROMPT_CODE_FRAGMENT = re.compile(r"`[^`\n]+`|\b\w+(?:::\w+)+\b")
+SUBSTITUTION_WORD = re.compile(r"[A-Za-z]{5,}")
+SUBSTITUTION_MINIMUM_COUNT = 5
+BROKEN = __import__('os').environ.get('CORRUPTION_CHECK_BREAK', '')
+
+
+def without_prompt_code(text, prompt):
+    """提示原文里出现过的代码片段（反引号里的、Rust 路径 a::b）从输出里去掉再判拼接：输出照抄提示里的 `::` 不是丢字。"""
+    if not prompt or BROKEN == 'keep-prompt-code':
+        return text
+    for fragment in sorted(set(PROMPT_CODE_FRAGMENT.findall(prompt)), key=len, reverse=True):
+        text = text.replace(fragment, ' ')
+    return text
+
+
+def letter_substitutions(text, prompt):
+    """同一个不在提示里的词出现至少 5 次、且与提示里某个同长的词只差一个字母（UNTESFED 对 UNTESTED）：系统性的单字母替换。"""
+    if not prompt:
+        return []
+    prompt_words = {word.lower() for word in SUBSTITUTION_WORD.findall(prompt)}
+    counts = {}
+    for word in SUBSTITUTION_WORD.findall(text):
+        counts[word.lower()] = counts.get(word.lower(), 0) + 1
+    found = []
+    for word, count in counts.items():
+        if count < SUBSTITUTION_MINIMUM_COUNT or word in prompt_words:
+            continue
+        near = [candidate for candidate in prompt_words if len(candidate) == len(word)
+                and sum(1 for left, right in zip(candidate, word) if left != right) == 1]
+        if near and BROKEN != 'no-substitution':
+            found.append(f"{word}×{count}（提示里是 {near[0]}）")
+    return found
+
+
+def check(text, prompt=None):
+    substitutions = letter_substitutions(text, prompt)
+    text = without_prompt_code(text, prompt)
     fffd = text.count('�')
     c = cjk_count(text)
     bi = ngram_repeats(text, 2)
@@ -108,7 +151,33 @@ def check(text):
         'wbigram_samples': wbi[:6],
         'longdup_samples': ldup[:6],
         'acrodup_samples': adup[:6],
+        'subst': len(substitutions), 'subst_samples': substitutions[:6],
     }
+
+
+def selftest():
+    """UNTESFED 形态（单字母系统性替换）判红、照抄提示里 Rust 路径的判绿、真的粘连照红、干净的判绿；CORRUPTION_CHECK_BREAK=<项> 时必须判红。"""
+    filler = ' '.join(['the result of the check is recorded in the table'] * 12)
+    prompt = 'Mark every cell UNTESTED when the model did not run it. Paths like `Pool::user_publish` and mount::establish_instance stay as written.'
+    cases = [
+        ('单字母替换', filler + ' UNTESFED' * 5, prompt, True),
+        ('照抄提示里的 Rust 路径', filler + ' see `Pool::user_publish` and mount::establish_instance here.', prompt, False),
+        ('真的粘连', filler + ' the verdict **Attack P1**:it impossible to say', prompt, True),
+        ('干净', filler + ' UNTESTED ' * 5, prompt, False),
+    ]
+    failures = []
+    for label, text, prompt_text, want in cases:
+        result = check(text, prompt_text)
+        red = result['subst'] > 0 or result['odd_tick'] or result['odd_bold'] or result['glue'] > 0
+        if red != want:
+            failures.append(f"{label}：应当{'判红' if want else '判绿'}，实际 {result}")
+    for failure in failures:
+        print(f"  ✗ 自检：{failure}")  # gate-lint:detail
+    if failures:
+        print("  → 看 letter_substitutions() / without_prompt_code() / splice_marks() 的判法；CORRUPTION_CHECK_BREAK 设着的话这里本来就该红")
+        return EXIT_RED
+    print(f"  ✓ corruption-check 自检通过：单字母系统性替换判红、照抄提示里的代码片段不算粘连、真的粘连照红、干净的判绿（查了 {len(cases)} 种）")
+    return EXIT_CLEAN
 
 # 退出码：0 干净 / 1 判红 / 2 **检测器自己出错**。
 # 三者必须分开——把「自己崩了」也报成 1，调用方就会把一个装不上的检测器
@@ -116,17 +185,29 @@ def check(text):
 EXIT_CLEAN, EXIT_RED, EXIT_BROKEN = 0, 1, 2
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        sys.stderr.write("用法: corruption-check.py <文件>...\n"); sys.exit(EXIT_BROKEN)
+    preflight(__file__)
+    # 用法：corruption-check.py <输出> [<提示>]——只判输出；给了提示就拿它认代码片段与单字母替换（ask-local.sh 一向这样传两个参数）
+    if len(sys.argv) == 2 and sys.argv[1] == '--selftest':
+        sys.exit(selftest())
+    if len(sys.argv) not in (2, 3):
+        sys.stderr.write("用法: corruption-check.py <输出> [<提示>]；corruption-check.py --selftest\n"); sys.exit(EXIT_BROKEN)
     bad = 0
-    for path in sys.argv[1:]:
+    prompt_text = None
+    if len(sys.argv) == 3:
+        try:
+            with open(sys.argv[2], encoding='utf-8', errors='replace') as f:
+                prompt_text = f.read()
+        except OSError as e:
+            sys.stderr.write("corruption-check: 读不了提示 %s: %s\n" % (sys.argv[2], e))
+            sys.exit(EXIT_BROKEN)
+    for path in sys.argv[1:2]:
         try:
             with open(path, encoding='utf-8', errors='replace') as f:
                 text = f.read()
         except OSError as e:
             sys.stderr.write("corruption-check: 读不了 %s: %s\n" % (path, e))
             sys.exit(EXIT_BROKEN)
-        r = check(text)
+        r = check(text, prompt_text)
         # 判红门槛：任何 U+FFFD，或 CJK 每千字 bigram 复读 > 1.0
         # **语料量太小就报「测不了」，不报绿。** 读不到 ≠ 读到 0。
         if r['cjk'] < 100 and r['words'] < 100:
@@ -143,12 +224,14 @@ if __name__ == '__main__':
         spliced = r['odd_tick'] or r['odd_bold'] or r['glue'] > 0
         red = (r['fffd'] > 0 or (r['bigram'] >= 2 and rate > 1.0)
                or (r['wbigram'] >= 2 and wrate > 1.0) or spliced
-               or r['longdup'] > 0 or r['acrodup'] > 0)
+               or r['longdup'] > 0 or r['acrodup'] > 0 or r['subst'] > 0)
         bad |= red
         print(f"{'红' if red else '绿'} {path}  cjk={r['cjk']} words={r['words']} fffd={r['fffd']} "
               f"汉字复读={r['bigram']}({rate:.2f}/千) 英文复读={r['wbigram']}({wrate:.2f}/千) "
               f"反引号落单={r['odd_tick']} 星号落单={r['odd_bold']} 粘连={r['glue']} "
-              f"实词自复读={r['longdup']} 缩写自粘={r['acrodup']}")
+              f"实词自复读={r['longdup']} 缩写自粘={r['acrodup']} 单字母替换={r['subst']}")
+        if r['subst_samples']:
+            print(f"     单字母替换: {' | '.join(r['subst_samples'])}")
         if r['bigram_samples']:
             print(f"     汉字复读样本: {' '.join(r['bigram_samples'])}")
         if r['wbigram_samples']:

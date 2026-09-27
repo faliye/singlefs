@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都是对此刻那份文件做一次定点替换，上一次的结论不替这一次作保
+# run-condition: none 只读写被点名的那一份文件，除了 python3 之外没有环境要求
 """定点替换：旧串在文件里必须恰好命中一次，0 次或多次都拒绝、一个字节不写。
 
 用法：
@@ -20,6 +22,11 @@ import sys
 import tempfile
 
 from lib_atomic_replace import ReplaceRefused, problems_with_replacement_by_rename, replace_file_contents_by_rename
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 
 def replace_once(path, old_text, new_text):
@@ -109,4 +116,5 @@ def main(arguments):
 
 
 if __name__ == '__main__':
+    preflight(__file__)
     sys.exit(main(sys.argv[1:]))

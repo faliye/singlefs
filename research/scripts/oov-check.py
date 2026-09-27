@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本（与它点名的会话记录），除了 python3 之外没有环境要求
 """本地腿输出的**拼接类**损坏检测：查生词，再判它是不是两个词粘死的。
 
 ⚠️ **这是第三类损坏，前两类查不到。** 复读查「多吐了」，成对标记奇偶查「整段掉了」，
@@ -23,6 +25,11 @@
 排掉常见构词前缀，否则 `mis+represents` 这类正常派生词会被误判。
 """
 import sys, re, os
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORDS_PATH = os.path.join(HERE, '..', 'data', 'en-words.txt')
@@ -231,6 +238,7 @@ def selftest(words):
     return EXIT_CLEAN
 
 if __name__ == '__main__':
+    preflight(__file__)
     if len(sys.argv) >= 2 and sys.argv[1] == '--selftest':
         sys.exit(selftest(load_words()))
     if len(sys.argv) < 2:

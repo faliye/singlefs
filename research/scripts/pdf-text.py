@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 它自己查要的抽取器，缺了逐份报出来，不交给调用方预判
 """把 PDF 的文字抽出来，供逐字复核外部文献引用。
 
     python3 research/scripts/pdf-text.py <pdf> [> out.txt]
@@ -12,6 +14,11 @@
 判据在 --selftest：抽不出预期锚点句就判红。
 """
 import re, sys, zlib
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 def tokenize_objects(data):
     for m in re.finditer(rb'(\d+)\s+(\d+)\s+obj\b', data):
@@ -142,6 +149,7 @@ SELFTEST = [
 ]
 
 if __name__ == '__main__':
+    preflight(__file__)
     if len(sys.argv) > 1 and sys.argv[1] == '--selftest':
         import os
         d = sys.argv[2] if len(sys.argv) > 2 else '/home/fy5090/code/fs-refs/docs'

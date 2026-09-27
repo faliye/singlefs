@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 它自己用假的网关回话自证 ask-local.sh 的判法，不连本地模型，除了 bash 与 python3 之外没有环境要求
 # ask-local.sh 的自检：判红那条分支会不会红，以及红了之后证据留没留下。
 #
 # 为什么要有它：判红分支此前进不去（要靠本地模型恰好吐出损坏输出才走得到），
 # 于是「作废轮的原样输出被留下来」这件事没有任何东西验得了 ——
 # 而 2026-09-07 实测就丢了一份。fs-design.md 硬要求 2：每条分支必须能被测试强制进入。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 cd "$(dirname "$0")/../.."
 D="$(mktemp -d)"; trap 'rm -rf "${D:?}"' EXIT
 # 被测脚本可换：自证这份自检会红时，指向一份改回旧写法的副本（ASK_LOCAL_SCRIPT=副本路径）。

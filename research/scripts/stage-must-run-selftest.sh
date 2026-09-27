@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: command git
 # `stage-must-run.sh` 的自证：在一个临时小仓里造几种局面，逐格核它判「要跑」还是「可跳过」；格数由成功行现算。
 # 判别力靠的是**同一个仓、同一道阶段，只换一样东西**，两次判定必须不同；只证明会红不够，
 # 还要证明它分得出差别（`.claude/singlefs-ai-sop/rules/test-discipline.md`「检查本身也可能是错的」）。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PREDICATE="$HERE/stage-must-run.sh"
 work="$(mktemp -d)"

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: command git
 # `gate-staged.sh` 的自证：在临时小仓里用一个假 gate.sh 造三种局面，逐格核 refs/sop/staged-green 前不前移；格数由成功行现算。
 #
 #   gate-staged-selftest.sh [被测的 gate-staged.sh]    不给就测同目录那一份
@@ -15,6 +17,8 @@
 set -uo pipefail
 # 门禁要是在 git 钩子里跑，这几个变量会指着本仓的索引与对象库；不清掉，临时仓的 git 命令会写到本仓头上。
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_PREFIX GIT_NAMESPACE
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 export GIT_AUTHOR_NAME=selftest GIT_AUTHOR_EMAIL=selftest@example.invalid GIT_COMMITTER_NAME=selftest GIT_COMMITTER_EMAIL=selftest@example.invalid
 # 用户自己的全局配置（签名提交、默认分支名、钩子路径）不许影响临时仓里的判定
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -141,11 +145,16 @@ failures=0
 for mutation_index in "${!MUTATION_NAMES[@]}"; do
   name="${MUTATION_NAMES[$mutation_index]}"; cell="${MUTATION_CELLS[$mutation_index]}"
   scratch="$work/mutation-$mutation_index"; mkdir -p "$scratch"
-  if ! occurrences="$(apply_mutation "$TARGET" "$scratch/gate-staged.sh" "${MUTATION_ORIGINALS[$mutation_index]}" "${MUTATION_REPLACEMENTS[$mutation_index]}")"; then
+  # 副本摆在与原件相同的相对位置（research/scripts/ 底下，旁边链上 .claude/scripts 与规范副本）：原件按相对路径 source .claude/scripts/preflight.sh，
+  # 摆在别处的话 source 落空、preflight 一步没判还把参数清掉，副本就因为这个而不是因为改坏的那一处出结果
+  mkdir -p "$scratch/research/scripts" "$scratch/.claude"
+  ln -s "$(cd "$(dirname "$TARGET")/../.." && pwd)/.claude/singlefs-ai-sop" "$scratch/.claude/singlefs-ai-sop"
+  ln -s "$(cd "$(dirname "$TARGET")/../.." && pwd)/.claude/scripts" "$scratch/.claude/scripts"
+  if ! occurrences="$(apply_mutation "$TARGET" "$scratch/research/scripts/gate-staged.sh" "${MUTATION_ORIGINALS[$mutation_index]}" "${MUTATION_REPLACEMENTS[$mutation_index]}")"; then
     echo "  ✗ 改坏「$name」没施加上：原文在 $TARGET 里命中 ${occurrences:-?} 次（要恰好 1 次），这一格的判别力没证"   # gate-lint:detail
     failures=$((failures + 1)); continue
   fi
-  run_cells "$scratch/gate-staged.sh" "$scratch/results.tsv" "$scratch"
+  run_cells "$scratch/research/scripts/gate-staged.sh" "$scratch/results.tsv" "$scratch"
   if ! grep -qF "FAIL	$cell	" "$scratch/results.tsv"; then
     echo "  ✗ 改坏「$name」之后，「$cell」那一格照样过——这一格分不出好坏"   # gate-lint:detail
     failures=$((failures + 1))

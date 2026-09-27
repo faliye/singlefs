@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本（与它点名的会话记录），除了 python3 之外没有环境要求
 """全仓术语改名：把一个概念的旧名换成新名，源码、文档、冻结提示与留存产物一起换。
 
 用法：
@@ -25,6 +27,11 @@ import sys
 import re
 
 from lib_atomic_replace import ReplaceRefused, problems_with_replacement_by_rename, replace_file_contents_by_rename
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 SKIP_DIRS = {".git", "target", "node_modules"}
 EXEMPT_FILE = ".claude/term-rename-exempt"
@@ -297,4 +304,5 @@ def main(argv):
 
 
 if __name__ == "__main__":
+    preflight(__file__)
     sys.exit(main(sys.argv[1:]))

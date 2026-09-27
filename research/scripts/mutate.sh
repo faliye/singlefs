@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: command cargo git
 # 证明「这些测试会红」：逐条注入一个已知的破坏，跑测试，记下红了哪几个，然后还原。
 #
 #   mutate.sh <bin 名> <源文件> <变异表>
@@ -40,6 +42,8 @@
 #   sharedcopy 所有工作进程挤在第 1 份副本与第 1 个编译目录上（并行之前要防的那种并发改同一份源码）；
 #   RUN_WITH_MEMORY_CAP_BREAK=nocap 原样传给 run-with-memory-cap.sh，就是改前那种不设上限的跑法。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 SELF_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 MEMORY_CAP_RUNNER="$(dirname "$SELF_PATH")/run-with-memory-cap.sh"
 MEMORY_CAP_HIT_EXIT=250          # run-with-memory-cap.sh：撞了上限

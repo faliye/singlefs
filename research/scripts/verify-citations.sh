@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: command git
 # 把 kb 里承重的外部逐行引用做成可重跑的检查。
 #
 # **它要拦的是「证据蒸发」**：kb 里一批引用曾标着「本机核实」，
@@ -24,6 +26,8 @@
 # 自证：bash research/scripts/verify-citations.sh --selftest（合成两棵假树，不碰本机的真树）
 # 源码固定点由环境变量覆盖：FS_REFS=/path bash research/scripts/verify-citations.sh
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 REFS="${FS_REFS:-/home/fy5090/code/fs-refs}"
 KERN="${KERNEL_TREE:-/home/fy5090/kbuild/linux-om}"
@@ -147,7 +151,9 @@ ckn() { # ckn <决策> <树名> <说的是什么> <期望数> <实测命令，�
 # 取回方式 research/scripts/fetch-refs.sh（含 URL 与 sha256），抽取器 research/scripts/pdf-text.py。
 # ⚠️ 抽取器只解 FlateDecode + 单字节字体。抽出乱码要当**抽取失败**处理，不许当成「原文没这句」——
 #    ZFS On-Disk Specification 就是这种（CID 字体），所以它不在那张表里，见 fetch-refs.sh 的说明。
-PDFTXT_CACHE="${TMPDIR:-/tmp}/singlefs-pdftext-$(id -u)"
+# 抽出的文本是跨轮复用的缓存，放 GATE_CROSS_RUN_TMPDIR：门禁每轮给阶段一个私有 TMPDIR，跑完里面剩下的判红并删掉
+# （.claude/singlefs-ai-sop/rules/command-safety.md「测试镜像一律放临时目录」）。门禁之外单跑时落回平常的临时目录。
+PDFTXT_CACHE="${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-pdftext-$(id -u)"
 mkdir -p "$PDFTXT_CACHE"
 pdftxt() { # pdftxt <树名> <文献名> —— 抽一次缓存一次，打印缓存路径；抽不出就打印空
   local tree="$1" name="$2" pdf="" out="" partial=""
@@ -332,7 +338,7 @@ st_case() { # st_case <这一格叫什么> <要的结局：绿 或 红> <实际�
 }
 st_run() { # st_run <合成树目录> <断言表文件> [额外的环境赋值…] —— 打印整份输出，退出码转手
   local work="$1" assertions="$2"; shift 2
-  env FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS="$assertions" "$@" bash "$SELF" 2>&1
+  env GATE_CROSS_RUN_TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS="$assertions" "$@" bash "$SELF" 2>&1
 }
 selftest() {
   local work="" out="" rc=0 leftovers=0
@@ -396,7 +402,7 @@ NOROOT_EOF
   st_case "命令一棵树都没读判红" 红 "$rc" "$out" '命令没读标着的那棵树'
   # ⑫ ⑬ ⑭ 抽取到一半失败：这一次判红，下一次也不许拿留下的半截文本当原文匹配，缓存目录里不许留半截文件。
   # 抽取器换成一个假的：先吐出半截（要找的那句正好在里面），再退 1。抽取器按本脚本所在的目录找，
-  # 所以把本脚本拷一份、旁边放假抽取器，跑那一份；TMPDIR 指进临时目录，碰不到本机真的文本缓存。
+  # 所以把本脚本拷一份、旁边放假抽取器，跑那一份；GATE_CROSS_RUN_TMPDIR 与 TMPDIR 都指进临时目录，碰不到本机真的文本缓存。
   mkdir -p "$work/bin" "$work/tmp"
   cp "$SELF" "$work/bin/verify-citations.sh"
   cat >"$work/bin/pdf-text.py" <<'HALF_EXTRACTOR_EOF'
@@ -409,20 +415,37 @@ HALF_EXTRACTOR_EOF
   cat >"$work/half-extraction.sh" <<'HALF_EOF'
 ckdoc D9 refs-docs "合成：抽取到一半失败的文献" half.pdf '合成的半截原文'
 HALF_EOF
-  out="$(env TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS="$work/half-extraction.sh" bash "$work/bin/verify-citations.sh" 2>&1)"; rc=$?
+  out="$(env TMPDIR="$work/tmp" GATE_CROSS_RUN_TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS="$work/half-extraction.sh" bash "$work/bin/verify-citations.sh" 2>&1)"; rc=$?
   st_case "抽取到一半失败判红" 红 "$rc" "$out" '抽取失败'
-  out="$(env TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS="$work/half-extraction.sh" bash "$work/bin/verify-citations.sh" 2>&1)"; rc=$?
+  out="$(env TMPDIR="$work/tmp" GATE_CROSS_RUN_TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS="$work/half-extraction.sh" bash "$work/bin/verify-citations.sh" 2>&1)"; rc=$?
   st_case "抽取失败之后再跑，不拿半截文本当原文" 红 "$rc" "$out" '抽取失败'
   leftovers="$(find "$work/tmp" -name 'half.txt*' -type f | wc -l)"
   st_case "抽取失败不在缓存目录里留半截文件" 绿 "$(( leftovers == 0 ? 0 : 1 ))" "缓存目录里留下的半截文件：$leftovers 个" '半截文件：0 个'
+  # ⑮ 抽出的文本缓存落在 GATE_CROSS_RUN_TMPDIR 底下，TMPDIR 里一项都不留：门禁每轮给阶段的私有 TMPDIR 跑完剩下的判红并删掉。
+  # 抽取器换成一个整篇吐完、退 0 的假的，同样拷一份本脚本放在它旁边跑。
+  mkdir -p "$work/bin-whole" "$work/private-tmp" "$work/cross-run-tmp"
+  cp "$SELF" "$work/bin-whole/verify-citations.sh"
+  cat >"$work/bin-whole/pdf-text.py" <<'WHOLE_EXTRACTOR_EOF'
+import sys
+sys.stdout.write('the whole text: 合成的整篇原文\n')
+WHOLE_EXTRACTOR_EOF
+  printf '%%PDF-1.4 synthetic\n' >"$work/refs/docs/whole.pdf"
+  cat >"$work/whole-extraction.sh" <<'WHOLE_EOF'
+ckdoc D9 refs-docs "合成：抽得出的文献" whole.pdf '合成的整篇原文'
+WHOLE_EOF
+  out="$(env TMPDIR="$work/private-tmp" GATE_CROSS_RUN_TMPDIR="$work/cross-run-tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS="$work/whole-extraction.sh" bash "$work/bin-whole/verify-citations.sh" 2>&1)"; rc=$?
+  private_leftovers="$(find "$work/private-tmp" -mindepth 1 | wc -l)"
+  cross_run_cached="$(find "$work/cross-run-tmp" -name 'whole.txt' -type f | wc -l)"
+  st_case "文本缓存落在 GATE_CROSS_RUN_TMPDIR、TMPDIR 里不留" 绿 "$(( rc == 0 && private_leftovers == 0 && cross_run_cached == 1 ? 0 : 1 ))" \
+    "退出码 $rc；TMPDIR 里留下 $private_leftovers 项，GATE_CROSS_RUN_TMPDIR 里的缓存 $cross_run_cached 份；输出：$out" 'TMPDIR 里留下 0 项，GATE_CROSS_RUN_TMPDIR 里的缓存 1 份'
 
   rm -rf "${work:?}"
   if (( st_failed )); then
     echo "    → 怎么办：上面逐格列出了要什么、实测什么。分组报数那几格看本脚本末尾那道"
-    echo "      「分组报数与被扫集合对不上」；树来源那几格看 mark_tree 与 cmd_in_tree。"
+    echo "      「分组报数与被扫集合对不上」；树来源那几格看 mark_tree 与 cmd_in_tree；文本缓存那一格看 PDFTXT_CACHE 那一行。"
     exit 1
   fi
-  echo "  ✓ 引文复核自证通过（查了 $st_checked 格：分组报数三格、缺树来源标注三格、分组报数算错、源码不在、模式没命中、命令跨树、命令没读标着的树、抽取到一半失败三格）"
+  echo "  ✓ 引文复核自证通过（查了 $st_checked 格：分组报数三格、缺树来源标注三格、分组报数算错、源码不在、模式没命中、命令跨树、命令没读标着的树、抽取到一半失败三格、文本缓存落在 GATE_CROSS_RUN_TMPDIR）"
   exit 0
 }
 if [[ "${1:-}" == "--selftest" ]]; then selftest; fi

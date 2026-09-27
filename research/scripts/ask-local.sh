@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
+# run-condition: command curl
 # 三方论证的「本地 LLM」那一腿。
 #
 #   ask-local.sh <prompt 文件>        提示从文件读，答案打到 stdout
@@ -19,6 +21,8 @@ URL="${AI_CENTER_URL:-http://127.0.0.1:8200/v1/chat/completions}"
 TIMEOUT="${ASK_LOCAL_TIMEOUT:-900}"
 
 KEY="$(sed -n 's/^AI_CENTER_KEY_VSCODE_CHAT=//p' "$CENTER/.env.tenants" 2>/dev/null)"
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 [[ -n "$KEY" ]] || { echo "ask-local: 取不到 AI_CENTER_KEY_VSCODE_CHAT（$CENTER/.env.tenants）" >&2; exit 2; }
 
 PROMPT_PATH="${1:-}"
