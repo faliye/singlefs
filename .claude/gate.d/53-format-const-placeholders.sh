@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 格式常量文件里的占位（每个占位都指得到一条真实存在的分项或欠账）
 #
 # 里程碑「第一个事务」步 0 要求：一个格式常量文件，第一个事务要写的每个宽度都在里面，
@@ -6,10 +8,13 @@
 # 占位的写法（crates/singlefs-format/src/*.rs）：常量前一行
 #   // placeholder: D22（单元原子性怎么合成） 已定项 2 —— 为什么还是预想
 #   // placeholder: C323（镜像大小全仓没有条款） —— 为什么还是预想
+# 文档注释写法（`/// placeholder:`、`//! placeholder:`）一样认作占位，一样要指得到。
 # 判据：编号带简称；D<n> 的分项号在 .claude/kb/decisions/<n>-*.md 的「### 已定项 / ### 未定项」两张表里能找到那一行，
 # C<n> 在 .claude/kb/checks-owed.md 里有登记行；简称与登记位一致由 doc-lint 管，这里只核编号与分项号。
-# 成功那句报出检查了多少个占位（rules/show-me-test.md：扫到 0 项也不是通过——0 个占位要明说）。
+# 成功那句报出检查了多少个占位；一个占位都没有时退 77（本次无对象可判），不报绿（rules/show-me-test.md：扫到 0 项也不是通过）。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 [[ -d crates/singlefs-format/src ]] || { echo "  ! 没有 crates/singlefs-format/src，本阶段跳过（步 0 之前没有常量文件）"; exit 77; }
@@ -20,7 +25,7 @@ bad = []
 placeholders = []
 for path in sorted(glob.glob('crates/singlefs-format/src/**/*.rs', recursive=True)):
     for number, line in enumerate(open(path, encoding='utf-8'), 1):
-        m = re.match(r'\s*//\s*placeholder:\s*(.*)$', line)
+        m = re.match(r'\s*//[/!]?\s*placeholder:\s*(.*)$', line)
         if not m:
             continue
         text = m.group(1).strip()
@@ -54,5 +59,8 @@ if bad:
     print('     → 怎么办：占位那一行写成「// placeholder: D<n>（简称） 已定项 k —— 为什么还是预想」或「// placeholder: C<n>（简称） —— …」，')
     print('       编号要在 .claude/kb/decisions/ 的索引表或 .claude/kb/checks-owed.md 里真的有那一行；分项定了就把占位行删掉。')
     sys.exit(1)
+if not placeholders:
+    print('  ! 本次无对象可判：crates/singlefs-format/src 下一个 `// placeholder:` 占位都没有，没有编号可核')
+    sys.exit(77)
 print(f'  ✓ 格式常量文件里的占位都指得到分项或欠账（{len(placeholders)} 个占位：' + '；'.join(t.split(' —— ')[0] for _, _, t in placeholders) + '）')
 PY

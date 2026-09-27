@@ -2,7 +2,8 @@
 # 本该判红，一份样本放十三种坏法，各有一条 want 钉住：没有表；关系不认得；正文提到的决策没有行；指不到的分项；
 # 页内历史比回看新；experiments-history 比回看新；支撑而依据没引；依据引了而实验页那一行不是支撑；
 # 待回填清单新加一行；正文改了没回看；产物变了没回看；新判决没有回看决策；写了改了而决策文件没动；
-# 实验改成已跑、欠账块里等它的决策没回看（表里只回看了别的决策那一行）。
+# 实验改成已跑、欠账块里等它的决策没回看（表里只回看了别的决策那一行）；
+# 另加三种：实验页与决策文件的标题认不出（编号后跟冒号）、基准里没有待回填清单（整张算新加）、某一页的 git diff 失败。
 set -e
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 git init -q -b master .
@@ -117,7 +118,36 @@ cat > .claude/kb/experiments-history.md <<'EOF'
 ### 2026-09-15：E7（样本实验七） 重跑
 - 样本
 EOF
-printf 'E6  # 样本：基准里没有这一行也不该有\n' > .claude/decision-links-pending
+# 认不出标题的两份：实验页编号后面跟冒号、决策文件编号后面跟冒号——它们不许被静默跳过
+cat > .claude/kb/experiments/13-样本13.md <<'EOF13'
+## E13：冒号写法的样本 —— 已跑
+
+提到 D2（乙）。
+
+## 历史版本
+EOF13
+cat > .claude/kb/decisions/04-丁.md <<'EOF4'
+## D4：冒号写法的决策 —— 已定
+
+## 历史版本
+EOF4
+# E14 的页被 .gitattributes 挂上一个必然失败的 textconv：这一页的 git diff 取不到新增行，⑤ 不许当成「没改」
+cat > .claude/kb/experiments/14-样本14.md <<'EOF14'
+## E14 样本实验十四 —— 已跑
+
+提到 D2（乙）。
+
+### 影响的决策
+
+| 决策分项 | 关系 | 回看 |
+|---|---|---|
+| D2（乙） | 备料 | 2026-09-19 不受影响：样本理由 |
+
+## 历史版本
+EOF14
+printf '.claude/kb/experiments/14-样本14.md diff=broken\n' > .gitattributes
+git config diff.broken.textconv false
+# 待回填清单不进基准：这次改动新建了它，整张都算新加（E6、E9 两行都该报）
 git add -A && git commit -qm base
 # 这次改动
 printf 'E6  # 样本：基准里没有这一行也不该有\nE9  # 新加的一行，清单只减不增\n' > .claude/decision-links-pending
@@ -132,3 +162,4 @@ sed -i -e 's/^## E10 样本实验十 —— 待跑$/## E10 样本实验十 —�
 sed -i -e 's/^## E11 样本实验十一 —— 待跑$/## E11 样本实验十一 —— 已跑/' \
        -e 's/^| D2（乙） | 备料 | 2026-09-19 不受影响：样本理由 |$/| D2（乙） | 备料 | 2026-09-24 不受影响：结论不碰乙 |/' .claude/kb/experiments/11-样本11.md
 sed -i 's/^\*\*射程\*\*：只管样本。$/**射程**：只管样本页。/' .claude/kb/decisions/03-丙.md
+sed -i 's/^提到 D2（乙）。$/提到 D2（乙），这次改了一句。/' .claude/kb/experiments/14-样本14.md

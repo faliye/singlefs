@@ -4,3 +4,5 @@ name = "singlefs-core"
 [dependencies]
 singlefs-format = { path = "../singlefs-format" }
 sample-shared-helper = "1"
+sample-dotted-helper = { path = "../sample-dotted-helper" }
+sample-target-helper = "1"

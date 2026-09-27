@@ -3,3 +3,4 @@
 unset GATE_BASE GATE_STAGED_FROM
 git merge-base --is-ancestor "$recorded_commit" HEAD || exit 1
 if added="$(gate_added_lines "$base" .claude/kb)"; then :; fi
+tree="$(git rev-parse HEAD^{tree})" || exit 1

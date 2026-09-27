@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 它调的上游 gate-lint.sh、shell-lint.sh 要 gawk，缺了由它们自己拒绝（退 78），本阶段按红记，不交给 gate.sh 预判
 # gate-stage: research/scripts/、.claude/hooks/ 与 .claude/scripts/ 里每一条拒绝都带出路、守 shell 纪律；前两个目录的执行位不丢；连同 .claude/gate.d/，终止进程只许点名一个
 #
-# 共享门禁的「门禁自检」只把 SOP 自己的脚本与 .claude/gate.d/ 交给 gate-lint（.claude/singlefs-ai-sop/scripts/gate.sh 第 211–212 行），
+# 共享门禁的「门禁自检」只把 SOP 自己的脚本与 .claude/gate.d/ 交给 gate-lint（.claude/singlefs-ai-sop/scripts/gate.sh 里 run_stage "门禁自检" 那一行与它前面给 LINT_EXTRA 赋值的那一行），
 # 研究脚本与 hook 不在射程里。2026-09-18 单跑整仓 gate-lint 红 90 处，84 处在这两个目录，没有任何一笔账记着（C382（研究脚本与 hook 的拒绝不在门禁自检的射程里））。
 # research/prompts/ 下的脚本是冻结证据，不扫（同 .claude/doc-lint-exclude 那一行的理由）。
 # shell-lint 同一批目录一起跑（上游 show-me-test.md「射程只到 .claude/gate.d/」：只接 gate-lint 等于只补了一半，
@@ -17,6 +19,8 @@
 # 与 .claude/gate.d/50-stop-group.sh（按 cgroup.procs 批量发、没核 scope 也没标；只有 .claude/gate.d/ 进了射程才报得出来）逐处按行号报；
 # green 的 research/scripts/stop-own.sh 只停点名的一个、按 cgroup 批量发的那一段核过 singlefs-memory-cap-*.scope 又标了 own-scope，必须判绿。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 LINT="$(cd "$(dirname "$0")/../.." && pwd)/.claude/singlefs-ai-sop/scripts/gate-lint.sh"
 SHELL_LINT="$(dirname "$LINT")/shell-lint.sh"
@@ -25,8 +29,9 @@ for script in "$LINT" "$SHELL_LINT"; do
 done
 TARGETS=()
 MODE_TARGETS=()
+ABSENT=()
 for directory in "$ROOT/research/scripts" "$ROOT/.claude/hooks" "$ROOT/.claude/scripts"; do
-  [[ -d "$directory" ]] || continue
+  [[ -d "$directory" ]] || { ABSENT+=("${directory#"$ROOT"/}"); continue; }
   TARGETS+=("$directory")
   [[ "$directory" == "$ROOT/.claude/scripts" ]] || MODE_TARGETS+=("$directory")
 done
@@ -41,13 +46,26 @@ fi
 # 执行位也一起：共享门禁的「脚本执行位」阶段只扫 .claude/gate.d 与 .claude/scripts，
 # research/scripts 与 .claude/hooks 不在它的射程里（同 gate-lint / shell-lint 那两条的理由）；.claude/scripts 已在那一道里，不重复扫。
 MODES="$(dirname "$LINT")/script-modes.sh"
-if [[ -f "$MODES" ]] && ((${#MODE_TARGETS[@]})); then
+modes_note=""
+if [[ ! -f "$MODES" ]]; then
+  echo "  ✗ 找不到共享脚本 $MODES，research/scripts/ 与 .claude/hooks/ 的执行位这一项没判"
+  echo "     → 怎么办：规范副本缺了这一份，把 singlefs-ai-sop-<语言> 仓重新拷进 .claude/singlefs-ai-sop/ 再跑它的 install.sh；别让这一项静默不判"
+  failed=1
+  modes_note="执行位：没判（找不到 script-modes.sh，上面已判红）"
+elif ((${#MODE_TARGETS[@]} == 0)); then
+  modes_note="执行位：本次无对象可判（射程里没有 research/scripts/ 也没有 .claude/hooks/）"
+else
   modes_rc=0
   bash "$MODES" "${MODE_TARGETS[@]}" || modes_rc=$?
-  if (( modes_rc != 0 && modes_rc != 77 )); then
+  if (( modes_rc == 77 )); then
+    modes_note="执行位：本次未判（script-modes.sh 退 77，原因见它上面那一句）"
+  elif (( modes_rc != 0 )); then
     echo "  ✗ research/scripts/ 或 .claude/hooks/ 里的脚本执行位在暂存区里不对（上面逐处列出）"
     echo "     → 怎么办：用 git update-index --chmod=+x <路径>（或 -x）改暂存区里的模式，让它与工作区一致"
     failed=1
+    modes_note="执行位：判红"
+  else
+    modes_note="执行位：判过（${#MODE_TARGETS[@]} 个目录）"
   fi
 fi
 # 进程安全：同一份判定（bash-command-detector.sh --scan-scripts），连 .claude/gate.d/ 一起扫；待改清单是被判仓的 .claude/process-safety-pending
@@ -71,4 +89,10 @@ for directory in "${TARGETS[@]}"; do
     failed=1
   fi
 done
+if ((failed == 0)); then
+  scanned_names=()
+  for directory in "${SAFETY_TARGETS[@]}"; do scanned_names+=("${directory#"$ROOT"/}"); done
+  echo "  ✓ 研究脚本、hook 与 .claude/scripts 的门禁纪律：扫了 ${#TARGETS[@]} 个目录（${scanned_names[*]:0:${#TARGETS[@]}}），拒绝都带出路、shell 纪律守住；进程安全连 .claude/gate.d/ 共扫 ${#SAFETY_TARGETS[@]} 个目录；${modes_note}"
+  echo "    没扫的目录 ${#ABSENT[@]} 个（不在）：${ABSENT[*]:-（没有）}"
+fi
 exit "$failed"

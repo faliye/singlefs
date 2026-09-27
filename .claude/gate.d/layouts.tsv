@@ -4,4 +4,4 @@
 #   ③ 格式定义路径，逗号分隔：写出这套布局盘上字节宽度与取值的地方
 #   ④ checker 判定路径，逗号分隔：这套布局的 checker 判它的地方
 # 门禁 92 号读它。加一套布局线时同时追加这里一行与已定项 4 登记表一行。
-第一条纯 SSD 布局线	0	crates/singlefs-format/src/lib.rs,.claude/kb/layout/01-first-txn.md,.claude/kb/layout/02-second-txn.md	crates/singlefs-checker/src/lib.rs,crates/singlefs-checker/src/walk.rs,crates/singlefs-checker/src/image.rs
+第一条纯 SSD 布局线（系统配置带回退下界 F、根记录带卸载记号、没有回退见证与回退行）	1	crates/singlefs-format/src/lib.rs,.claude/kb/layout/01-first-txn.md,.claude/kb/layout/02-second-txn.md	crates/singlefs-checker/src/lib.rs,crates/singlefs-checker/src/walk.rs,crates/singlefs-checker/src/image.rs

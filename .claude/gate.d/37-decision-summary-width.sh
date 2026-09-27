@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 决策索引结论列的宽度
 #
 # `decisions.md` 的索引表是检索这批决策的入口，「结论」列只写那条决策**定了什么**。
@@ -12,6 +14,8 @@
 #
 #   bash .claude/gate.d/37-decision-summary-width.sh
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 IDX=.claude/kb/decisions.md
@@ -35,7 +39,8 @@ rows, bad = [], []
 for line in text.splitlines():
     if not re.match(r"^\|\s*D\d+（", line):
         continue
-    cells = [c.strip() for c in line.strip().strip("|").split("|")]
+    # 按没转义的竖线切格：结论里写的 `\|` 是格子里的字，不是格界（与 16 号同一种切法）
+    cells = [c.strip() for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
     if len(cells) < 4:
         continue
     name = cells[0]

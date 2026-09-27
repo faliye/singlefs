@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: kb 目录里的每一份都要在 CLAUDE.md 的「项目本地事实」表里有一行
 #
 # 判据：三条，任一条不成立判红。
@@ -13,17 +15,24 @@
 # ⚠️ **这条是实测出来的**（2026-09-21）：建 `.claude/kb/feature-bits.md` 时漏了登记，一查那张表还同时漏着
 # `INDEX.md`、`term-renames.md`、`tooling.md` 三份——四份文件没有任何东西说得出它们是什么。
 #
+# 「登记」只认那张表里一行的**第一格**写的路径（逐字相等）：表外散文里提到的反引号路径不算，
+# 一行 `.claude/kb/` 也不替它下面的每一份登记。带月份占位的形态（`.claude/kb/decisions-history/<年-月>.md`，
+# 写在表里任一格都算）替它所在的那个子目录登记。「指得到东西」那一条照旧对那一节里点到的每个 `.claude/kb/…` 路径判。
+#
 # ⚠️ 射程：判的是「登记了没有」，判不了那一行写得对不对——后者要人看。
 # `decisions-history/` 这类由别的阶段管形状的子目录同样要有一行，表里写它与谁同进退。
 #
 # 双向比对用共用库 lib-manifest.py，与 50、62、63 号同一份代码。
 #
-# 判别力：fixtures/98-kb-registry.sh/red 放一份没登记的 kb 文件与一行指向空处的登记，必须判红；green 两边对齐。
+# 判别力：fixtures/98-kb-registry.sh/red 放一份没登记的 kb 文件与一行指向空处的登记，必须判红；
+# 它的表里另有一行只写 `.claude/kb/`、散文里另提一份文件，这两处都不许替那两份没登记的文件登记；green 两边对齐。
 #
 #   bash .claude/gate.d/98-kb-registry.sh [项目根]
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
-cd "$ROOT" 2>/dev/null || exit 2
+cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 python3 - "$(cd "$(dirname "$0")" && pwd)/lib-manifest.py" <<'PY'
 import glob, importlib.util, os, re, sys
 
@@ -61,6 +70,15 @@ if start < 0:
 end = text.find("\n## ", start + len(SECTION))
 section = text[start:end if end > 0 else len(text)]
 registered = set(re.findall(r"`(\.claude/kb/[^`]*)`", section))
+# 登记只认表里一行的第一格；带占位（<年-月>）的形态写在表里任一格都替它所在的子目录登记
+table_lines = [line for line in section.split("\n") if line.strip().startswith("|")]
+first_cells = set()
+placeholder_directories = set()
+for line in table_lines:
+    cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+    first_cells |= set(re.findall(r"`(\.claude/kb/[^`]*)`", cells[0])) if cells else set()
+    for entry in re.findall(r"`(\.claude/kb/[^`]*<[^`]*)`", line):
+        placeholder_directories.add(entry[:entry.index("<")].rsplit("/", 1)[0] + "/")
 if not registered:
     fail(f"「{SECTION}」那一节里一个 `.claude/kb/…` 路径都没点到", [
         "怎么办：扫到 0 项而报绿，与判过了一模一样。那一节的表每行第一格写路径，用反引号包起来。",
@@ -75,10 +93,11 @@ for entry in sorted(os.listdir(KB)):
         on_disk.add(full + "/")
 
 def is_registered(path):
-    if path in registered:
+    # 逐字等于表里某一行的第一格才算登记；前缀不算——一行 `.claude/kb/` 会让每一项都满足前缀
+    if path in first_cells:
         return True
-    # 表里写成带月份占位的形态（`.claude/kb/decisions-history/<年-月>.md`）时，按目录前缀认
-    return any(entry.startswith(path) or path.startswith(entry.rstrip("/") + "/") for entry in registered if entry != path)
+    # 表里写成带月份占位的形态（`.claude/kb/decisions-history/<年-月>.md`）时，替它所在的那个子目录登记
+    return path in placeholder_directories
 
 def points_at_something(entry):
     # 带占位的形态（`<年-月>`）不是一个具体路径，不判它指不指得到

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 状态一致性：定了新东西之后有没有回头看同文件的未定项
 #
 # 还 checks-owed.md C36（未定项检查的三个盲区）的前两条。
@@ -9,8 +11,8 @@
 #       而同一个文件里还开着的未定项**这次一个都没碰**。
 #
 # ⚠️ **为什么必须看 diff 而不是看历史**：按历史判会在每个「有已定小节又有未定项」的
-# 决策上恒红（本仓 D9 / D12 / D14 都是这个形状），而 decisions.md D13 自己写过
-# 「不可复现的红训练人忽略红灯」——一个恒红的检查比没有检查更坏。
+# 决策上恒红，而 D13（验证路线） 已定项 9（.claude/kb/decisions/13-验证路线.md）写过
+# 「一个不可复现的夜间失败价值接近 0，甚至为负，它训练人忽略红灯」——一个恒红的检查比没有检查更坏。
 # 看 diff 则只在**真正发生了定案的那一次提交**上说话，其余时候安静。
 #
 # **它抓的两个实测形态**（2026-08-29 审计轮，一轮之内各撞一次）：
@@ -23,10 +25,17 @@
 # 而本仓**每一个决策文件名都是中文** ⇒ 拿转义后的串再去 `git diff -- "$f"` 匹配不到任何文件
 # ⇒ **检查恒绿**。必须带 `-c core.quotepath=false`。
 # 这个 bug 在合成仓的双向验里当场暴露，是「新增的检查必须先证明它会红」抓到的第二个。
+# 「碰没碰」按条目块判：表格行一行就是一条分项，列表式条目从首行到下一条分项或下一个标题之前（与 lib-open-item-review.py 同一个口径）；
+# 索引页的「待议」按那一节判（从 `## 待议` 到下一个 `## ` 之前），整份 decisions.md 别处动过不算碰了它。
+# 这份文件跟踪没有，按 `git ls-files --error-unmatch` 的退出码判：1 是未跟踪（整份算碰过），别的非 0 是 git 自己出错，判红。
+# 新增了已定小节的那几份里一条未定项都没有、索引页也没有待议节时，什么都没查，退 77。
+# 样本：fixtures/61-settled-same-file.sh/red 另放一份两行表格的决策（只改了第 2 行，第 1 行要报）与一节没动的待议（同一次只改了索引表那一行）。
 set -uo pipefail
 DEC=.claude/kb/decisions
 IDX=.claude/kb/decisions.md
 # 无对象可判退 77，门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 [[ -d "$DEC" ]] || { echo "  ! 没有 $DEC，本阶段无对象可判"; exit 77; }
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "  ! 不在 git 仓库里，本阶段跳过"; exit 77; }
 
@@ -74,24 +83,39 @@ if ((${#settled_files[@]} == 0)); then
   exit 77
 fi
 
+# 这次改动碰过的行号（新文件侧），一行一个。未跟踪的新文件整份都是这次写的，每一行都算碰过。
+# 跟踪没有按 ls-files --error-unmatch 的退出码判：0 跟踪、1 未跟踪，别的码是 git 自己出错——返回 2，调用方判红，
+# 不当「未跟踪」（那样整份每行都算碰过，这一份一条都不报）。
+touched_lines_of() {
+  local file="$1" tracked_rc=0
+  git -c core.quotepath=false ls-files --error-unmatch -- "$file" >/dev/null 2>&1 || tracked_rc=$?
+  case "$tracked_rc" in
+    0) git diff --no-color --no-ext-diff -U0 "$BASE" -- "$file" \
+         | awk 'match($0,/^@@ .* \+([0-9]+)(,([0-9]+))? @@/,m){s=m[1]; n=(m[3]==""?1:m[3]); for(i=0;i<n;i++) print s+i}' ;;
+    1) seq 1 "$(wc -l < "$file")" ;;
+    *)
+      echo "  判不了 $file 跟踪没有：git 退出码 $tracked_rc" >&2
+      return 2 ;;
+  esac
+}
+
 flagged=0
 open_checked=0      # 查过的未定项条数（新增了已定小节的那几份里）
 pending_checked=0   # 查过的索引页「待议」节数
 
 # ── ① 同文件里还开着、而本次一个都没碰的未定项 ──────────────────
 for f in "${settled_files[@]}"; do
-  # 本次 diff 在这个文件里碰过的行号（新文件侧）
-  # 未跟踪的新文件整份都是这次写的：每一行都算碰过
-  if git -c core.quotepath=false ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
-    touched="$(git diff --no-color --no-ext-diff -U0 "$BASE" -- "$f" \
-              | awk 'match($0,/^@@ .* \+([0-9]+)(,([0-9]+))? @@/,m){s=m[1]; n=(m[3]==""?1:m[3]); for(i=0;i<n;i++) print s+i}')"
-  else
-    touched="$(seq 1 "$(wc -l < "$f")")"
-  fi
+  # 本次 diff 在这个文件里碰过的行号（新文件侧）；未跟踪的新文件整份都算碰过
+  touched="$(touched_lines_of "$f")" || {
+    echo "  ✗ 判不了 $f 有没有被 git 跟踪（上面是 git 的退出码），这一份的未定项这一轮没比"
+    echo "     → 怎么办：按 git 的报错修好仓库状态（索引坏了就 git status 看、必要时重建索引）再跑；判不了不是「未跟踪、整份都碰过」。"
+    exit 1
+  }
   while IFS=: read -r ln text; do
     [[ -n "$ln" ]] || continue
     open_checked=$((open_checked + 1))
-    end=$(awk -v s="$ln" 'NR>s && (/^[[:space:]]*[0-9]+\. /||/^### /||/^## /){print NR-1; exit}' "$f")
+    # 条目块：表格行一行就是一条，列表项到下一条分项（编号列表项或「| k |」表格行）或任一级标题之前（与 lib-open-item-review.py 同一个口径）
+    end=$(awk -v s="$ln" 'NR>s && (/^[[:space:]]*[0-9]+\. /||/^\|[[:space:]]*[0-9]+[[:space:]]*\|/||/^##+ /){print NR-1; exit}' "$f")
     [[ -n "$end" ]] || end=$((ln+20))
     # 这个条目块里有没有任何一行在本次 diff 里被碰过
     hit=0
@@ -114,14 +138,24 @@ done
 
 # ── ② 索引页里还悬着、而本次一个都没碰的「待议」节 ──────────────
 if [[ -f "$IDX" ]]; then
-  idx_touched=0
-  # 同上：`grep -q .` 在第一行就退出，前段 SIGPIPE 会让「动过」被读成「没动过」。
-  grep -qxF "$IDX" <<<"$all_changed" && idx_touched=1
+  # 按这一节判「动没动」：索引页别处（索引表的一行）改了不算回头看过这一节待议
+  idx_touched_lines=""
+  if grep -qxF "$IDX" <<<"$all_changed"; then
+    idx_touched_lines="$(touched_lines_of "$IDX")" || {
+      echo "  ✗ 判不了 $IDX 有没有被 git 跟踪（上面是 git 的退出码），索引页的待议节这一轮没比"
+      echo "     → 怎么办：按 git 的报错修好仓库状态再跑；判不了不是「整份都碰过」。"
+      exit 1
+    }
+  fi
   while IFS=: read -r ln text; do
     [[ -n "$ln" ]] || continue
     grep -qE '已回收|已收摊|已并入' <<<"$text" && continue
     pending_checked=$((pending_checked + 1))
-    (( idx_touched )) && continue
+    section_end=$(awk -v s="$ln" 'NR>s && /^## /{print NR-1; exit}' "$IDX")
+    [[ -n "$section_end" ]] || section_end=$(wc -l < "$IDX")
+    section_touched=0
+    for t in $idx_touched_lines; do (( t>=ln && t<=section_end )) && { section_touched=1; break; }; done
+    (( section_touched )) && continue
     echo "  ✗ $(basename "$IDX"):$ln 本次有决策定案，而这一节「待议」一个字都没动"
     echo "     ⇒ 复核它是不是被这次定案实质回答/否决了。原文：${text:0:60}"
     flagged=1
@@ -133,5 +167,9 @@ if ((flagged)); then
   echo "               仍然开着的就在条目里补一行「YYYY-MM-DD 复核过，仍然开着，因为 …」。"
   echo "               后一种做法本身就是这条检查要的东西——它要的是一次回头看，不是一次沉默。"
   exit 1
+fi
+if ((open_checked == 0 && pending_checked == 0)); then
+  echo "  ! 本次无对象可判：新增了已定小节的 ${#settled_files[@]} 份决策里没有一条未定项，索引页也没有悬着的待议节，什么都没查"
+  exit 77
 fi
 echo "  ✓ 本次定案之后，同文件的未定项与索引页的待议节都被回头看过（新增已定小节的决策 ${#settled_files[@]} 份，查了 $open_checked 条未定项、$pending_checked 节待议）"

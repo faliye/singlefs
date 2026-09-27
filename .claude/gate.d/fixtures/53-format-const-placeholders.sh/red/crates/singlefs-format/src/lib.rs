@@ -3,3 +3,5 @@
 pub const A: u64 = 512;
 // placeholder: 还没定
 pub const B: u64 = 4;
+/// placeholder: D99（样本不存在的决策） 未定项 1 —— 样本：文档注释写法的占位也要核
+pub const C: u64 = 8;

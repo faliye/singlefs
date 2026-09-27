@@ -10,3 +10,6 @@ want=引用改成指那一份：在引用它的文件里把 /tmp 路径逐处换
 want=research/e7-index-bench/src/bin/e907_comment_and_code.rs（装置源码，改于 2026-09-05 00:00）：最新的 E907 产物 research/results/e907-comment-and-code-2026-09-01.out 还是 2026-09-01 00:00 那份
 want=research/e7-index-bench/src/bin/e908_on_request_no_note.rs（装置源码，改于 2026-09-05 00:00）：E908 按要求才跑，实验页没写明装置改过之后没有正式跑
 want=→ 怎么办：不用跑（research/on-request-experiments.tsv 里的实验只在用户说跑时才跑）；
+want=research/e7-index-bench/src/bin/e910_fingerprint_stale.rs（装置源码，改于 2026-09-05 00:00）：E910 的输入与产物头的指纹对不上，最新带指纹的产物 research/results/e910-fingerprint-stale-2026-09-06.out 记的是 000000000000
+want=登记了准入的实验（.claude/gate.d/stage-inputs.tsv 有 E<号> 那一行）按产物头的输入指纹判
+want=research/e7-index-bench/src/bin/e911_on_request_old_note.rs（装置源码，改于 2026-09-05 00:00）：E911 按要求才跑，实验页没写明装置改过之后没有正式跑

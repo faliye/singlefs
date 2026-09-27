@@ -53,6 +53,15 @@
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ask-user-claim-guard.sh"
           }
         ]
+      },
+      {
+        "matcher": "SubagentHandback",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/handback-guard.sh"
+          }
+        ]
       }
     ],
     "SessionStart": [

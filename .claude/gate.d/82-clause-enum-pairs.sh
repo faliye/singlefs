@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 条文列出来的封闭集合，与代码里兑现它的那个枚举逐个成员对上
 # gate-similar: 67-milestone-closeout-owed.sh 它判里程碑收口表收全开着的欠账号、行号只许顺序号，只读 kb；这一道拿登记表把决策分项正文里的名字与 crates 源码里 Rust 枚举的变体逐个配对，任一边多一个或少一个都红
 # gate-similar: 81-audit-contradictions.sh 它判总审核记录第五节每行有去向，只读 records/ 与 kb；这一道要读 crates 源码里的枚举，判条文与代码的集合对不对得上
@@ -14,12 +16,18 @@
 # 这道阶段拿 .claude/gate.d/82-clause-enum-pairs.tsv 逐对判三样：
 #   ① 枚举里每个变体都在表里有一行（代码加了成员而没登记 ⇒ 红）；
 #   ② 表里每一行的变体在枚举里真的存在（代码删了成员而表没跟 ⇒ 红）；
-#   ③ 表里每一行的「条文里对应的名字」在那条分项的正文里找得到（条文没跟上 ⇒ 红）。
+#   ③ 表里每一行的「条文里对应的名字」是那条分项正文里用「 / 」列举的一项，逐字、不按子串认（条文没跟上 ⇒ 红）；
+#   ④ 反过来，那条分项正文里那串「 / 」列举的每一项都在表里有一行（条文加了成员、枚举与表都没动 ⇒ 红）。
+#      那串列举取正文里与表中名字重合最多的一串「甲 / 乙 / 丙」（项里不含括号、逗号、句号、分号与 `*`），
+#      末项后面紧跟的「六种」这类计数词不算进项名。
+#   表里一行登记都没有（只剩注释），本次无对象可判，退 77。
 #
 # ⚠️ 它判的是**名字对得上**，不判「这个成员的语义是不是条文说的那个」。后者是语义判断，靠 review。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
-cd "$ROOT" 2>/dev/null || exit 2
+cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 
 TABLE=".claude/gate.d/82-clause-enum-pairs.tsv"
 if [[ ! -f "$TABLE" ]]; then
@@ -69,6 +77,22 @@ def enum_variants(where):
     body = re.sub(r"#\[[^\]]*\]", "", body)
     return re.findall(r"^\s*([A-Z][A-Za-z0-9]*)\s*(?:\{|\(|,|$)", body, re.M), None
 
+LIST_RUN = re.compile(r"[^/（）()，,。；;\n*]+(?:\s*/\s*[^/（）()，,。；;\n*]+)+")
+COUNT_WORD = re.compile(r"[一二三四五六七八九十两0-9]+\s*种$")
+
+def enumerated_items(section, names):
+    """分项正文里与 names 重合最多的那一串「甲 / 乙 / 丙」列举：返回项的列表；一串都没有返回 None。"""
+    best, best_overlap = None, 0
+    for run in LIST_RUN.finditer(section):
+        items = [COUNT_WORD.sub("", item.strip()).strip() for item in run.group(0).split("/")]
+        overlap = len(set(items) & set(names))
+        if overlap > best_overlap:
+            best, best_overlap = items, overlap
+    return best
+
+if not rows:
+    print("EMPTY", sep="\t")
+
 clauses, enums = {}, {}
 checked = 0
 for number, item, where, variant, chinese, _why in rows:
@@ -91,6 +115,27 @@ for number, item, where, variant, chinese, _why in rows:
     if chinese not in section:
         print("BAD", f"{os.environ['TABLE']}:{number}",
               f"{item} 的正文里找不到「{chinese}」（条文没跟上代码，或者名字改了而表没跟）", sep="\t")
+
+# ③ 的逐字那一半与 ④：按（分项，枚举）成组，取正文里那串列举，两边集合逐项比。
+groups = {}
+for number, item, where, variant, chinese, _why in rows:
+    if clauses.get(item, (None, "x"))[1] or enums.get(where, (None, "x"))[1]:
+        continue
+    groups.setdefault((item, where), []).append((number, chinese))
+for (item, where), members in sorted(groups.items()):
+    names = [chinese for _number, chinese in members]
+    items = enumerated_items(clauses[item][0], names)
+    if items is None:
+        print("BAD", f"{item}", f"正文里找不到一串用「 / 」分隔、含表中名字的列举，{where} 那张表逐项对不了", sep="\t")
+        continue
+    for number, chinese in members:
+        if chinese in clauses[item][0] and chinese not in items:
+            print("BAD", f"{os.environ['TABLE']}:{number}",
+                  f"表里的「{chinese}」不是 {item} 正文那串列举里的一项（列举是：{' / '.join(items)}；按子串对上的不算）", sep="\t")
+    for extra in items:
+        if extra not in names:
+            print("BAD", f"{item}",
+                  f"条文列了「{extra}」，而 {os.environ['TABLE']} 里 {where} 没有它那一行（条文加了成员而枚举与表都没跟）", sep="\t")
 
 # 反过来：枚举里有、表里没有的变体。
 for where, (variants, why) in enums.items():
@@ -132,6 +177,10 @@ if ((${#bad[@]})); then
   exit 1
 fi
 
+if grep -q '^EMPTY' <<<"$report"; then
+  echo "  ⊘ 本次无对象可判：$TABLE 里一行登记都没有（只剩注释与空行）"
+  exit 77
+fi
 read -r _ checked enum_count clause_count < <(grep '^COUNT' <<<"$report")
-echo "  ✓ 条文列的集合与代码里的枚举逐个对得上（${checked} 对成员、${enum_count} 个枚举、${clause_count} 条分项）"
+echo "  ✓ 条文列的集合与代码里的枚举逐个对得上（${checked} 对成员、${enum_count} 个枚举、${clause_count} 条分项；两个方向都逐项比过：表里的名字都是正文列举的一项，正文列举的每一项都在表里）"
 exit 0

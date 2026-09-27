@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 决策与实验双向登记，实验或结论变了之后回看过决策
 #
 # 规则在 .claude/rules/format-evolution.md「决策正文只写现状，依据写成指针；决策与实验双向登记」。判据：
@@ -18,7 +20,9 @@
 #      决策正文（历史版本之前）引了它的每条决策（`E<号>（`，粗体、反引号、空格、半角括号的写法也认）都要回看：
 #      这次改动在那份决策里新增或改写的行点到了它，或者表里那条决策的一行改过。搬了家的页按实验号找基准那一版的标题。
 #   ⑥ 待回填清单 .claude/decision-links-pending：一行一个 E<号> 或 D<号>，# 后写理由；指到的要存在；
-#      只减不增——比基准那一版多出来的行判红。
+#      只减不增——比基准那一版多出来的行判红；基准里还没有这张清单时整张都算新加，git 取不到基准那一版判红。
+#   认不出标题的实验页（首个二级标题不是「## E<号> 」）与决策文件（不是「## D<号> 」）判红，不静默跳过；
+#   ⑤ 取某一页的新增行时 git diff 失败，判红，不当成那一页没改。
 #   ⑦ 瘦身形态（待回填清单之外的决策）：首行 `## D<号> 简称 —— 状态` 后面不带括注；分项标题不带日期；
 #      每个已定项有「**定案**：」「**射程**：」「**依据**：」「**欠**：」四块；索引表的定案格不带日期、不超过 100 字。
 #   ⑧ 有实验才有决策（用户 2026-09-19）：已定项的依据段至少引一个实验，或写「无实验：理由」（理由至少八个字）；
@@ -35,8 +39,10 @@
 #
 #   bash .claude/gate.d/75-decision-experiment-links.sh [项目根]
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
-cd "$ROOT" 2>/dev/null || exit 2
+cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 if [[ ! -d .claude/kb/experiments || ! -d .claude/kb/decisions ]]; then
   echo "  ✗ 找不到 .claude/kb/experiments 或 .claude/kb/decisions"
   echo "  → 怎么办：kb 挪了位置就同步改这个阶段里的路径。"
@@ -136,7 +142,8 @@ problems = []   # (类别, 说明)
 
 
 def bad(kind, text):
-    problems.append((kind, text))
+    if (kind, text) not in problems:   # 同一份文件被几处调到时（git 失败那一类）只报一次
+        problems.append((kind, text))
 
 
 # ── 决策：分项与各分项的依据段 ──
@@ -146,6 +153,8 @@ for path in sorted(glob.glob(os.path.join(kb, 'decisions', '*.md'))):
     body = lines[:history_start(lines)]
     head = next((re.match(r'^## D(\d+) ', line) for line in body if re.match(r'^## D(\d+) ', line)), None)
     if not head:
+        # 认不出标题的决策文件不许静默跳过：跳过就不计数、不列名，这份决策的分项与依据一条都没判
+        bad('认不出标题', f'{os.path.relpath(path, root)}：「## 历史版本」之前没有一行写成「## D<号> 简称 —— 状态」，这份决策一条都没判')
         continue
     number = int(head.group(1))
     items, basis, shapes, index_cells = set(), {}, [], []
@@ -205,15 +214,26 @@ for number, line in enumerate(pending_lines, 1):
         continue
     pending.add((entry.group(1), int(entry.group(2))))
 if in_git and os.path.exists(pending_path):
-    previous = git('show', f'{base}:{pending_rel}')
-    if previous.returncode == 0:
-        before = set()
-        for line in previous.stdout.split('\n'):
-            entry = re.match(r'^(E|D)(\d+)\s', line.strip())
-            if entry:
-                before.add((entry.group(1), int(entry.group(2))))
+    # 「基准里还没有这张清单」与「git 取不到基准」要分开：前者整张都算新加，后者判不了只减不增，两种都不许静默放过
+    listed = git('ls-tree', '--name-only', base, '--', pending_rel)
+    before, base_note = None, ''
+    if listed.returncode != 0:
+        bad('待回填', f'取不到基准 {base} 里的 {pending_rel}（git ls-tree 退 {listed.returncode}：{listed.stderr.strip()[:80]}），「只减不增」这一条没判')
+    elif not listed.stdout.strip():
+        before, base_note = set(), f'（基准 {base} 里还没有这张清单，这次改动新建了它，整张都算新加）'
+    else:
+        previous = git('show', f'{base}:{pending_rel}')
+        if previous.returncode != 0:
+            bad('待回填', f'读不出基准 {base} 里的 {pending_rel}（git show 退 {previous.returncode}：{previous.stderr.strip()[:80]}），「只减不增」这一条没判')
+        else:
+            before = set()
+            for line in previous.stdout.split('\n'):
+                entry = re.match(r'^(E|D)(\d+)\s', line.strip())
+                if entry:
+                    before.add((entry.group(1), int(entry.group(2))))
+    if before is not None:
         for kind, number in sorted(pending - before):
-            bad('待回填', f'{pending_rel} 新加了 {kind}{number}：清单只减不增，新写的实验页与决策当场登记，不进清单')
+            bad('待回填', f'{pending_rel} 新加了 {kind}{number}：清单只减不增，新写的实验页与决策当场登记，不进清单{base_note}')
 
 # ── 瘦身形态与「有实验才有决策」（待回填清单之外的决策） ──
 DATE = re.compile(r'20\d\d-\d\d-\d\d')
@@ -285,6 +305,8 @@ for path in sorted(glob.glob(os.path.join(kb, 'experiments', '*.md'))):
     lines = read(path).split('\n')
     head_line = next((line for line in lines if re.match(r'^## E(\d+) ', line)), None)
     if not head_line:
+        # 认不出标题的实验页不许静默跳过：跳过就不计数、不列名，它的影响的决策表一行都没判
+        bad('认不出标题', f'{rel}：没有一行写成「## E<号> 简称 —— 状态」（编号后面要跟空格），这一页一条都没判')
         continue
     number = int(re.match(r'^## E(\d+) ', head_line).group(1))
     # 只认「结论……作废 / 退役」：标题里别处出现这两个词（「上界 A 作废」「容器退役记录」）的实验结论照样成立，照判（第三轮三方 T1-f）
@@ -369,7 +391,12 @@ def added_lines(rel):
     """这次改动里 rel 新加的行：[(新文件里的行号, 内容)]；未跟踪的文件整份都算。"""
     if git('ls-files', '--error-unmatch', rel).returncode != 0:
         return [(index, line) for index, line in enumerate(read(os.path.join(root, rel)).split('\n'))]
-    diff = git('diff', '--no-renames', '--no-color', '--no-ext-diff', '-U0', base, '--', rel).stdout
+    shown = git('diff', '--no-renames', '--no-color', '--no-ext-diff', '-U0', base, '--', rel)
+    if shown.returncode != 0:
+        # git 失败时取不到新增行：当成「一行没改」就会把 ⑤ 整条放过去
+        bad('取不到改动', f'{rel}：git diff 相对基准 {base} 失败（退 {shown.returncode}：{shown.stderr.strip()[:80]}），这一页新增了哪些行判不了，⑤ 对它没判')
+        return []
+    diff = shown.stdout
     result, new_line, in_header = [], 0, True
     for line in diff.split('\n'):
         hunk = re.match(r'^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@', line)
@@ -500,5 +527,5 @@ if problems:
     print('            实验出了新结论、换了产物，就逐行回看它影响的决策，回看格写当天日期与「改了」或「不受影响：理由」；')
     print('            支撑 / 推翻的那条分项在「**依据**」段引回这个实验；待回填清单只能删行，新实验页当场写全这张表。')
     sys.exit(1)
-print(f'  ✓ 决策与实验双向登记对得上、回看不过期（{summary}）')
+print(f'  ✓ 决策与实验双向登记对得上、回看不过期（查了实验页 {len(experiments)} 个、决策 {len(decisions)} 条；{summary}）')
 PY

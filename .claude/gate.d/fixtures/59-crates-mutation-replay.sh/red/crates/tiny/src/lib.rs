@@ -17,6 +17,27 @@ pub fn position_after_walking_to(limit: u32) -> u32 {
     position
 }
 
+/// 两个模块里各有一个同名用例：变异表只写名字、不写模块路径时，59 号分不出红的是哪一个，要判没判成，不许按「有一个红了」算抓到
+pub fn double(value: u32) -> u32 {
+    value * 2
+}
+
+#[cfg(test)]
+mod doubling_seen_from_one_side {
+    #[test]
+    fn doubles_three_to_six() {
+        assert_eq!(super::double(3), 6);
+    }
+}
+
+#[cfg(test)]
+mod doubling_seen_from_the_other_side {
+    #[test]
+    fn doubles_three_to_six() {
+        assert_eq!(super::double(3), 3 + 3);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -29,8 +50,14 @@ mod tests {
         assert_eq!(super::buffer_of(1).len(), 1024 * 1024);
     }
 
+    /// 先往 TMPDIR 写的那个文件多大：被限时杀掉的测试自己删不了它，59 号要在那一条结束时连同它的 TMPDIR 一起删
+    const LEFT_BEHIND_FILE_SIZE_IN_BYTES: usize = 4096;
+
     #[test]
     fn walking_to_ten_ends_at_ten() {
+        let left_behind_file = std::env::temp_dir().join("written-before-walking-and-left-behind-when-killed");
+        std::fs::write(&left_behind_file, [0_u8; LEFT_BEHIND_FILE_SIZE_IN_BYTES])
+            .expect("TMPDIR 是 59 号给这一条变异单建的，应当可写");
         assert_eq!(super::position_after_walking_to(10), 10);
     }
 }

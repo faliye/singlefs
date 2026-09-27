@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 跑出来的产物与引来的依据都要落在仓里，不许只留在 /tmp
 #
 # 实测（2026-09-18 核出）：E142（第一个事务的干跑） 第十一次跑改了装置与变异表、跑了一个半小时，
@@ -14,10 +16,14 @@
 #   research/e7-index-bench/src/bin/e<号>_*.rs 或 research/mutations/e<号>_*.tsv，
 #   research/results/ 下（含子目录）要有一份这个实验号的产物——文件名形如 e<号> 后面跟非数字或到头（e142-…、e142_…、e12.1.out）——
 #   而且它的 mtime 不早于那份源码。一个这样的产物都没有、或最新的那份比源码旧 ⇒ 红。
+#   登记了准入的实验（.claude/gate.d/stage-inputs.tsv 有 E<号> 那一行）先按输入指纹判（research/scripts/admission.py 的 stored_product_status，
+#   与装置入口、replay.sh 同一份算法）：research/results/ 里有一份产物头上记着 E<号> 的指纹、与今天的输入算出来的相同 ⇒ 绿，mtime 再旧也算；
+#   带指纹的产物都对不上 ⇒ 红；一份带指纹的都没有 ⇒ 照上面按 mtime 判。mtime 会被 git checkout / stash pop 刷新，指纹不会。
 #   只改了 // 注释的装置源码（与基准比，增删的每一行都是 // 注释或空行）不判、在成功行里逐个列名：
 #   path-moves.md 要求全仓改路径，注释里的路径改了碰不到产物（2026-09-18 实测六份装置因此误判）。
 #   按要求才跑的实验（research/on-request-experiments.tsv 登记的实验号，例：E152 按里程碑、用户说跑才跑）不要求新产物：
-#   装置改了、产物旧时改查它的实验页（.claude/kb/experiments/<号>-*.md）写没写「没有正式跑」或「未正式跑」，写了就在成功行列名，没写 ⇒ 红。
+#   装置改了、产物旧时改查它的实验页（.claude/kb/experiments/<号>-*.md）这一轮新加的行（与基准比，按 gate_added_lines 取；未跟踪的整份算新加）
+#   里写没写「没有正式跑」或「未正式跑」，写了就在成功行列名，没写 ⇒ 红。页里早先那句说的是上一次改装置，不给这一次作证。
 #   用户 2026-09-19 定：E152 本质上是用户要跑才跑的里程碑性能对比，每次改装置都跑没有意义。
 # 判据二「证据指向仓外」：下面这些文件里，把 /tmp 路径当依据引用 ⇒ 红。认的形态是
 #   「依据 / 证据 / 出处 / 产物 / 报告 / 原件 / 结论 / 存档 / 留档 / 留存 / 记录 / 落点 / 见 / 详见 / 参见」
@@ -31,7 +37,8 @@
 #
 # 不判的，成功行现算着列：这次改动没碰实验装置与变异表时判据一没有对象；
 # research/prompts/ 下这一轮没新写的 .md（数目现算）；判据二只扫 .md，模型目录里的 .py 不扫。
-# 在 --staged 的临时 worktree 里整道退 77 不记通过：那里全部文件是同一刻检出的，mtime 分不出装置与产物谁新。
+# 在链接 worktree 里（git rev-parse --git-dir 落在 .git/worktrees/ 下；--staged 的临时 worktree 就是这种）整道退 77 不记通过：
+# 那里全部文件是检出那一刻写的，mtime 分不出装置与产物谁新。
 #
 # ⚠️ 管不到的：产物对不对得上源码（那是 87-replay.sh 的逐字节复跑，本阶段只看有没有、新不新，
 # 而变异表的重跑日志 87 号一行都不看）；replay.sh 的登记行指没指到最新那份（只写在出路里，不判）；
@@ -43,14 +50,18 @@
 # 一份 kb 里写「依据：/tmp/…」、一份这一轮新写的 prompts 里写「报告 `/tmp/…`」，必须判红；
 # green 放一个产物比源码新的装置、一个不在改动范围里的旧装置、kb 里三种说做法的 /tmp 写法、
 # 一份改过但不是新写的 prompts 里的「依据：/tmp/…」，必须判绿并报对数。
+# 指纹那一半：red 放一个登记了准入、产物比源码新而产物头的指纹对不上的装置（E910，按 mtime 会判绿）；
+# green 放一个登记了准入、产物比源码旧而产物头的指纹与今天的输入相同的装置（E909，按 mtime 会判红），指纹由 setup.sh 用 sha256sum 另算。
 #
 #   bash .claude/gate.d/69-evidence-in-repo.sh [项目根]
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "  ! $ROOT 不是 git 仓，本阶段跳过"; exit 77; }
 if [[ "$(git rev-parse --git-dir 2>/dev/null)" == */worktrees/* ]]; then
-  echo "  ! $ROOT 是 --staged 的临时 worktree，文件的时间戳全是这一刻检出的，分不出装置与产物谁新，本阶段未跑（不记通过）"
+  echo "  ! $ROOT 是链接 worktree（--staged 的临时 worktree 就是这种），文件的时间戳全是检出那一刻写的，分不出装置与产物谁新，本阶段未跑（不记通过）"
   echo "    不带 --staged 在工作区里跑一遍 bash .claude/scripts/gate.sh 才判得了这一道。"
   exit 77
 fi
@@ -68,12 +79,26 @@ added="$(gate_changed_paths "$base" untracked A)" || {
   echo "     → 怎么办：按上面 git 的报错修好仓库状态（基准要存在、索引没坏）再跑；取不到改动范围时这一阶段什么都没比，不是通过。"
   exit 1
 }
-# 两份清单经进程替换当文件传：当成命令行参数传时，单个参数超过 128 KiB 就起不来（Linux 的 MAX_ARG_STRLEN）。
-python3 - "$base" <(printf '%s\n' "$changed") <(printf '%s\n' "$added") <<'PY'
+# 实验页这一轮新加的行：按要求才跑的实验只认这一轮写进实验页的「没有正式跑」，页里早先那句说的是上一次改装置
+added_experiment_page_lines="$(gate_added_lines "$base" .claude/kb/experiments)" || {
+  echo "  ✗ 取不到实验页这一轮新加了哪些行（基准 $base）"
+  echo "     → 怎么办：按上面 git 的报错修好仓库状态再跑；取不到时按要求才跑的实验判不了，不是通过。"
+  exit 1
+}
+# 几份清单经进程替换当文件传：当成命令行参数传时，单个参数超过 128 KiB 就起不来（Linux 的 MAX_ARG_STRLEN）。
+python3 - "$base" <(printf '%s\n' "$changed") <(printf '%s\n' "$added") "$(dirname "$LIB_CHANGED_PATHS")" <(printf '%s\n' "$added_experiment_page_lines") <<'PY'
 import os, re, subprocess, sys
 from datetime import datetime, timezone
 
 base = sys.argv[1]
+# 准入模块（门禁与实验共用，research/scripts/admission.py）：登记了准入的实验按产物头的输入指纹判，不按修改时刻判。
+sys.path.insert(0, sys.argv[4])
+try:
+    import admission
+except Exception as error:
+    print(f"  ✗ 读不到准入模块 {sys.argv[4]}/admission.py：{error}")
+    print("     → 怎么办：恢复 research/scripts/admission.py（判「产物跟不跟得上输入」的指纹只有那一份算法），再跑本阶段。")
+    sys.exit(1)
 
 def read_list(path):
     with open(path, encoding="utf-8", errors="replace") as handle:
@@ -100,18 +125,19 @@ if os.path.isfile(on_request_list):
             if cells[0].strip():
                 on_request_numbers.add(cells[0].strip().lstrip("Ee"))
 not_run_note = re.compile(r"没有正式跑|未正式跑")
+# 实验页这一轮新加的行（gate_added_lines 的「路径<TAB>行文」）
+added_experiment_page_lines = []
+with open(sys.argv[5], encoding="utf-8", errors="replace") as handle:
+    for added in handle.read().split("\n"):
+        if "\t" in added:
+            added_experiment_page_lines.append(tuple(added.split("\t", 1)))
 
 def experiment_page_says_not_run(number):
-    """按要求才跑的实验，实验页里有没有写明「装置改过、之后没有正式跑」。"""
-    directory = os.path.join(kb_dir, "experiments")
-    if not os.path.isdir(directory):
-        return False
-    for file_name in os.listdir(directory):
-        if re.match(rf"^{number}-", file_name):
-            with open(os.path.join(directory, file_name), encoding="utf-8", errors="replace") as handle:
-                if not_run_note.search(handle.read()):
-                    return True
-    return False
+    """按要求才跑的实验，这一轮有没有在实验页新写一句「装置改过、之后没有正式跑」。
+    只认这一轮新加的行：页里早先那句说的是上一次改装置（门禁说明里提到这个词的那种句子也在其中），不给这一次作证。"""
+    page_prefix = os.path.join(kb_dir, "experiments", f"{number}-")
+    return any(page_path.startswith(page_prefix) and not_run_note.search(page_line)
+               for page_path, page_line in added_experiment_page_lines)
 
 # ── 判据一：改动范围里的实验装置与变异表，要有一份不比它旧的产物 ───────────
 changed_sources = []
@@ -158,17 +184,37 @@ unstored_runs = []
 comment_only_sources = []
 on_request_not_run = []
 on_request_missing_note = []
+fingerprint_matched = []
+fingerprint_absent = []
+fingerprint_errors = []
 for path, number, kind in changed_sources:
     if kind == "装置源码" and changes_only_comments(path):
         comment_only_sources.append(path)
         continue
     source_modified_at = os.path.getmtime(path)
     newest = newest_product_by_number.get(number)
-    if number in on_request_numbers and (newest is None or newest[1] < source_modified_at):
+    # 先按指纹判：登记了准入（.claude/gate.d/stage-inputs.tsv 有 E<号> 那一行）、research/results/ 里有带这个键指纹的产物时，
+    # 指纹相同就是产物按今天的输入跑的（修改时刻再旧也算），不同就是跟不上；没登记或没有一份带指纹的，照旧按修改时刻判。
+    try:
+        fingerprint_status, fingerprint_detail = admission.stored_product_status(".", f"E{number}")
+    except (admission.InputManifestError, admission.RegistrationError) as error:
+        fingerprint_errors.append(f"{path}（{kind}）：E{number} 登记了准入，却算不出输入指纹：{error}")
+        continue
+    if fingerprint_status == "matched":
+        fingerprint_matched.append(f"E{number}（{path}；{fingerprint_detail}）")
+        continue
+    if fingerprint_status == "unfingerprinted":
+        fingerprint_absent.append(f"E{number}")
+    fingerprint_stale = fingerprint_status == "stale"
+    if number in on_request_numbers and (fingerprint_stale or newest is None or newest[1] < source_modified_at):
         if experiment_page_says_not_run(number):
             on_request_not_run.append(f"E{number}（{path}）")
         else:
-            on_request_missing_note.append(f"{path}（{kind}，改于 {moment(source_modified_at)}）：E{number} 按要求才跑，实验页没写明装置改过之后没有正式跑")
+            on_request_missing_note.append(f"{path}（{kind}，改于 {moment(source_modified_at)}）：E{number} 按要求才跑，实验页没写明装置改过之后没有正式跑"
+                                           "（只认这一轮新加进实验页的那一句）")
+        continue
+    if fingerprint_stale:
+        unstored_runs.append(f"{path}（{kind}，改于 {moment(source_modified_at)}）：E{number} 的输入与产物头的指纹对不上，{fingerprint_detail}")
         continue
     if newest is None:
         unstored_runs.append(f"{path}（{kind}，改于 {moment(source_modified_at)}）：{results_dir} 下一份 E{number} 的产物都没有")
@@ -227,13 +273,22 @@ if unstored_runs:
     print(f"     → 怎么办：跑一次把产物存进 {results_dir}/，并在 research/scripts/replay.sh 把这个实验的登记行指到它。")
     print("               这一跑已经跑过、产物还在 /tmp 的草稿目录里，就现在拷进来（会话一重启那个目录就没了）；")
     print("               只改了 // 注释的装置本阶段不判；改了字符串里的路径，照 .claude/rules/path-moves.md 第 4 条连同留存产物一起改，复跑仍逐字相同。")
+    print("               登记了准入的实验（.claude/gate.d/stage-inputs.tsv 有 E<号> 那一行）按产物头的输入指纹判：指纹对不上就是产物跟不上今天的输入，")
+    print("               重跑一次（装置入口放行并把新指纹打在产物头），修改时刻新旧不作数。")
+if fingerprint_errors:
+    failed = True
+    print("  ✗ 这些实验登记了准入，却算不出输入指纹，判不了产物跟不跟得上：")  # gate-lint:summary
+    for entry in fingerprint_errors:
+        print(f"     {entry}")  # gate-lint:detail
+    print("     → 怎么办：单跑 python3 research/scripts/admission.py experiment . E<号> 看它报什么；多半是 .claude/gate.d/stage-inputs.tsv 那一行的路径写错，")
+    print("               或 cargo -V / rustc -V 跑不出来（bash .claude/scripts/env.sh 报缺什么）。")
 if on_request_missing_note:
     failed = True
     print("  ✗ 这些按要求才跑的实验装置改了、没有新产物，实验页也没写明之后没有正式跑：")  # gate-lint:summary
     for entry in on_request_missing_note:
         print(f"     {entry}")  # gate-lint:detail
     print("     → 怎么办：不用跑（research/on-request-experiments.tsv 里的实验只在用户说跑时才跑）；")
-    print("               在实验页写一句「装置某日改过（改了什么），之后没有正式跑」，要数的时候等用户说跑。")
+    print("               这一轮在实验页新写一句「装置某日改过（改了什么），之后没有正式跑」，要数的时候等用户说跑；页里早先那句说的是上一次改装置，不算。")
 if outside_citations:
     failed = True
     print("  ✗ 这些地方把 /tmp 下的东西当依据引用了——那是会话自己的草稿目录，一重启就没了，三个月后没人核得动：")  # gate-lint:summary
@@ -253,4 +308,8 @@ if comment_only_sources:
     print(f"    没判 {len(comment_only_sources)} 份只改了 // 注释的装置源码（碰不到产物，不要求重跑）：{'、'.join(comment_only_sources)}")
 if on_request_not_run:
     print(f"    没要求重跑 {len(on_request_not_run)} 份按要求才跑的实验（装置比产物新，实验页写明了没有正式跑）：{'、'.join(on_request_not_run)}")
+if fingerprint_matched:
+    print(f"    按指纹判 {len(fingerprint_matched)} 份（登记了准入，产物头的输入指纹与今天的输入相同，修改时刻不作数）：{'、'.join(fingerprint_matched)}")
+if fingerprint_absent:
+    print(f"    按修改时刻判 {len(fingerprint_absent)} 份登记了准入、research/results/ 里却还没有一份带指纹产物的：{'、'.join(fingerprint_absent)}")
 PY

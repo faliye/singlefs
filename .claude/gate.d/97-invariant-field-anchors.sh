@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 新写的不变量要点名它判的字段住在哪条已定分项
 #
 # 判据：这次改动在 `.claude/kb/invariants.md` 里新增或改写的每一行不变量（`| I-x.y | …`），
@@ -18,15 +20,18 @@
 # 改动范围与 56 号同一条：GATE_BASE 给了就与它比，否则与 @{upstream} 的 merge-base 比，都没有就与 HEAD 比；
 # 工作区、暂存区与未跟踪文件都算（基准用共用库 research/scripts/changed-paths.sh 的 gate 取法，与 56、68、69 号同一份代码）。
 # 这次改动里 invariants.md 是新增的（相对基准新增、暂存新增或未跟踪），整份的每一行都算新写；
-# 否则取「基准到工作区」与「HEAD 到暂存区」两份 diff 的 + 行，同一行两份都有只算一次。
+# 否则取「基准到工作区」与「HEAD 到暂存区」两份 diff 的 + 行，同一行两份都有只算一次；两份 diff 任一份 git 失败判红，
+# 不当成「一行没改」。这次改动没有新写或改写任何不变量行，本次无对象可判，退 77（存量条数照样报出来）。
 #
 # 判别力：fixtures/97-invariant-field-anchors.sh/red 是一个 invariants.md 还未跟踪的小仓，两行里一行没带分项引用，
 # 必须判红且只报那一行；green 是已跟踪文件新增一行带分项引用、改完又 git add，必须判绿且报 1 行（不是 2 行）。
 #
 #   bash .claude/gate.d/97-invariant-field-anchors.sh [项目根]
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
-cd "$ROOT" 2>/dev/null || exit 2
+cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "  ! $ROOT 不是 git 仓，本阶段跳过"; exit 77; }
 [[ -f .claude/kb/invariants.md ]] || { echo "  ! 没有 .claude/kb/invariants.md，本阶段无对象可判"; exit 77; }
 LIB_CHANGED_PATHS="$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/changed-paths.sh"
@@ -62,8 +67,16 @@ if file_is_new:
     candidate_lines = open(path, encoding="utf-8").read().split("\n")
 else:
     git_diff = ["git", "-c", "core.quotepath=false", "diff", "-U0"]
-    diff = subprocess.run([*git_diff, base, "--", path], capture_output=True, text=True).stdout
-    staged = subprocess.run([*git_diff, "--cached", "--", path], capture_output=True, text=True).stdout
+    diffs = []
+    for arguments in ([base, "--", path], ["--cached", "--", path]):
+        shown = subprocess.run([*git_diff, *arguments], capture_output=True, text=True)
+        if shown.returncode != 0:
+            # git 失败时 + 行是空的：当成「这次没改不变量」就会走到无对象可判，把新写的行整批放过去
+            print(f"  ✗ 取不到 {path} 这次改动的 diff（git diff {' '.join(arguments[:-2]) or '基准'} 退 {shown.returncode}：{shown.stderr.strip()[:120]}）")
+            print("     → 怎么办：按上面 git 的报错修好仓库状态（基准要存在、对象库与索引没坏）再跑；取不到 diff 时这一阶段什么都没比，不是通过。")
+            sys.exit(1)
+        diffs.append(shown.stdout)
+    diff, staged = diffs
     candidate_lines = [line[1:] for chunk in (diff, staged) for line in chunk.split("\n")
                        if line.startswith("+") and not line.startswith("+++")]
 for body in candidate_lines:
@@ -91,8 +104,8 @@ if missing:
     sys.exit(1)
 
 if not touched:
-    print(f"  ✓ 这次改动没有新写或改写不变量行（基准 {base}）；存量 {total} 行里 {unanchored_all} 行还点不出已定分项，那笔账记在 C69（已定不变量没有字段可判）")
-else:
-    print(f"  ✓ 这次改动新写或改写的 {len(touched)} 行不变量都点名了已定分项（基准 {base}）；"
-          f"存量 {total} 行里 {unanchored_all} 行还点不出，那笔账记在 C69（已定不变量没有字段可判）")
+    print(f"  ⊘ 本次无对象可判：这次改动没有新写或改写不变量行（基准 {base}）；存量 {total} 行里 {unanchored_all} 行还点不出已定分项，那笔账记在 C69（已定不变量没有字段可判）")
+    sys.exit(77)
+print(f"  ✓ 这次改动新写或改写的 {len(touched)} 行不变量都点名了已定分项（基准 {base}）；"
+      f"存量 {total} 行里 {unanchored_all} 行还点不出，那笔账记在 C69（已定不变量没有字段可判）")
 PY

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 每个未定项有没有判过改不改第一个事务的字节
 #
 # 还 checks-owed.md C50（阻塞标记没人维护）的**覆盖性**那一半。
@@ -21,7 +23,7 @@
 #
 # 三个合法取值：**是** / **否** / **无对象**（前置已被推翻，这一项没有对象了）。
 #
-# **那把尺的可执行形式**（不是新发明，是 decisions-history.md 2026-08-29 其十八 逐字用过的那个）：
+# **那把尺的可执行形式**（不是新发明，是 decisions-history/2026-08.md「2026-08-29（其十八）」逐字用过的那个）：
 # 那一轮的依据写作「攻方逐条给出**第一个事务写不出的是哪些字节**」⇒ 尺子问的不是
 # 「两个答案会不会给出不同的字节」，而是——
 #
@@ -42,7 +44,7 @@
 # 那个词被同时用作两个意思：①「不改第一个事务写出的字节」（D21 未定项 1：共享单元数为 0
 # ⇒ 两个答案逐字节相同）；②「改，但已定案接受先写后改」（D5 未定项 1、D18 未定项 7）。
 # **两者在盘上的后果完全不同**：① 不返工，② 要重写记账树 / 重排块头。
-# 一个词罩住两件事，正是 decisions-history.md 2026-08-29 其十八 记下的那次
+# 一个词罩住两件事，正是 decisions-history/2026-08.md「2026-08-29（其十八）」记下的那次
 # 「判据用得不一致」的病因。⇒ **标记只回答那把尺**（改不改字节），
 # **挡不挡开工是处置，写在依据里**。
 # 日期不许省——判定会因为别处定案而过期，没有日期就没法判它是哪一轮的产物
@@ -53,9 +55,12 @@
 #
 # ⚠️ **「哪些是未定项」不自己解析**：调 `.claude/scripts/gen-decision-items.py`，
 # 与 21 阶段同一个权威解析器。本阶段自己定位登记行，所以另加一道**条数比对**——
-# 两侧对不上就说明定位漏了或多了，判红而不是安静地少查几条。
+# 两侧对不上就说明定位漏了或多了，判红而不是安静地少查几条。「多了」＝「### 未定项」索引里定位到、
+# 而生成器不认它是未定项的行（例：表格行缺了收尾的竖线，生成器不收）。对不上与缺判定各报各的，都红。
 set -uo pipefail
 # 阶段自己的位置在 cd 之前取：用相对路径调本阶段、又另给项目根时，cd 之后 $(dirname "$0") 就解析不到了
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 REPOSITORY="$(cd "$(dirname "$0")/../.." && pwd)"
 # cd 失败就退 2：老写法 `cd … 2>/dev/null || true` 在参数指错时留在调用方的 cwd 里，判的是调用方所在的那个仓，还报绿
 cd "${1:-$REPOSITORY}" || exit 2
@@ -105,7 +110,7 @@ RULERS = [
      "写了「动不动格式」的判定"),
 ]
 
-seen, bad = set(), {}
+seen, located, bad = set(), set(), {}
 for f in sorted(glob.glob(os.path.join(dec, '*.md'))):
     s = open(f, encoding='utf-8').read()
     mm = re.match(r'## (D\d+) ', s.split('\n', 1)[0])
@@ -128,8 +133,9 @@ for f in sorted(glob.glob(os.path.join(dec, '*.md'))):
     for i, (pos, num) in enumerate(marks):
         end = marks[i + 1][0] if i + 1 < len(marks) else len(top)
         block = top[pos:end]
+        located.add((dnum, num))
         if (dnum, num) not in want:
-            continue          # 已定项不在这一节，理论上不会到这里；到了就是解析漂了
+            continue          # 生成器不认它是未定项：解析漂了，下面按「多定位出」报
         seen.add((dnum, num))
         for name, pattern, _ in RULERS:
             if not pattern.search(block):
@@ -137,15 +143,15 @@ for f in sorted(glob.glob(os.path.join(dec, '*.md'))):
                 bad.setdefault(name, []).append((os.path.basename(f), dnum, num, first[:70]))
 
 missed = want - seen
-extra = seen - want
+# seen 只收 want 里的，seen - want 恒为空；多出来的要拿「定位到的」去比
+extra = located - want
 if missed or extra:
     print("  ✗ 登记行定位与生成器对不上，本阶段这一轮查的不是全部未定项")
     for d, n in sorted(missed):
         print(f"     定位不到：{d} 未定项 {n}")
     for d, n in sorted(extra):
-        print(f"     多定位出：{d} 未定项 {n}")
-    print("     → 「### 未定项」一节要有索引表（`| # | 分项 | 状态 |`）或顶格编号列表，每条分项一行")
-    sys.exit(1)
+        print(f"     多定位出：{d} 未定项 {n}（生成器不认它是未定项）")
+    print("     → 「### 未定项」一节要有索引表（`| # | 分项 | 状态 |`，每行要有收尾的竖线）或顶格编号列表，每条分项一行")
 
 if bad:
     total = sum(len(v) for v in bad.values())
@@ -159,7 +165,7 @@ if bad:
         print("               在该分项的登记行里写：改第一个事务的字节：否（YYYY-MM-DD，依据：…）")
         print("               三个合法取值：是 / 否 / 无对象。**两侧要用同一把尺**——")
         print("               判「不阻塞」用这把尺、判「阻塞」换一把，量出来的集合不是包含关系")
-        print("               （decisions-history.md 2026-08-29 其十八 实测）。")
+        print("               （decisions-history/2026-08.md「2026-08-29（其十八）」实测）。")
     if "动不动格式" in bad:
         print("     → 缺「动不动格式」怎么办：按 D15（格式冻结政策） 已定项 1 的尺判一次——它的答案")
         print("               会不会改动任何盘上字节，或改动已有字节的解释口径（宽度不变而含义变了）；")
@@ -167,6 +173,7 @@ if bad:
         print("               三个合法取值：动 / 不动 / 界不定（视同动）。⚠️ 别拿上面那把尺的结论来填：")
         print("               那把量「这一版写不写出不同字节」，这把量「将来动不动格式」，")
         print("               两把量的不是一个集合。")
+if bad or missed or extra:
     sys.exit(1)
 
 if not seen:

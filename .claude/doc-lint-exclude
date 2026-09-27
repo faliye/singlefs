@@ -14,3 +14,4 @@ research/prompts/  # 当时原样发给模型的提示，与 research/results/ �
 .claude/gate.d/fixtures/40-results-cited.sh/  # 门禁阶段「实验产物有没有写回」的判别力样本：造了带登记标题的 E98 样本实验页，与真表同号不同名，扫它只会报登记冲突
 .claude/gate.d/fixtures/52-segment-registry.sh/  # 门禁阶段「段序列登记表与 E142 产物逐字比对」的判别力样本：合成的最小 layout 表只有「八、」一节，没有历史节，扫它只会报 kb 形状
 .claude/gate.d/fixtures/12-no-prime-marks.sh/  # 门禁阶段「全仓不许用撇号当角标」的判别力样本：造的最小 kb 文件只为让 12 号有东西可扫，没有历史节，扫它只会报 kb 形状
+.claude/gate.d/fixtures/84-verdict-false-named.sh/  # 门禁阶段「实验产物判决行里的 false 字段有没有被实验页点名」的判别力样本：red 与 green 各造了一份带登记标题的 E9001 样本实验页，与真表同号不同名，扫它只会报登记冲突

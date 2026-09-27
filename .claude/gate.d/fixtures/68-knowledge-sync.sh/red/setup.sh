@@ -25,7 +25,25 @@ cat > .claude/gate.d/knowledge-sync-triggers.tsv <<'TRIGGERS'
 ^crates/[^/]+/src/	# 实现
 ^CLAUDE\.md$	# 项目说明
 TRIGGERS
+# 一份早先已经提交的同步记录：它那一行「改了」点名的载体是更早一轮改的，不判；这一轮往它末尾追加的「补了」那一行要判（载体没动）
+cat > research/prompts/old-sync.md <<'OLD'
+<!-- knowledge-sync -->
+# old 阶段同步
+
+触发文件：.claude/agents/demo.md
+
+## 搜索
+
+grep -rn "没用过" . → 1
+
+## 命中处置
+
+| 载体 | 原句 | 处置 |
+|---|---|---|
+| records/untouched.md:1 | 没动的记录 | 改了：那一轮改的，载体今天不在改动范围里 |
+OLD
 git add -A && git commit -qm base
+printf '| records/untouched.md:1 | 没动的记录 | 补了：这一轮追加的一行，载体一字没动 |\n' >> research/prompts/old-sync.md
 printf '# demo\n\n用过了。\n' > .claude/agents/demo.md
 printf '#!/usr/bin/env bash\nexit 1\n' > .claude/hooks/demo.sh
 printf 'pub fn publish() -> u32 { 2 }\n' > crates/demo/src/lib.rs

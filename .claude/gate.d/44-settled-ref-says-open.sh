@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 状态一致性：引用写着「已定项」，紧跟着却说它没定
 #
 # 一条分项从未定翻成已定之后，全仓的引用要从「未定项 k」改写成「已定项 k」（22 号阶段逼的）；
@@ -9,8 +11,10 @@
 #
 # 判据：归属按 22 号的规则（同一份库 `lib-item-ref-status.py`，不另抄）；归属到的那一条是已定、引用处也写着「已定项」，
 # 而它后面紧跟着「未定 / 没定 / 定不下 / 待定 / 空着」（中间只许有一段括注、标点与「今天 / 仍 / 还」这类词）⇒ 判红。
-# 两份变更史与 records/ 不扫：它们写的是当时的状态，按「今天的编号」改写之后本来就会读成这样。
+# 两份变更史与 records/ 不扫：它们写的是当时的状态，按「今天的编号」改写之后本来就会读成这样。成功行报没扫的份数并逐个列名（现算）。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 LIB="$(cd "$(dirname "$0")" && pwd)/lib-item-ref-status.py"
 cd "${1:-$(dirname "$0")/../..}" || exit 2
 exec python3 - "$LIB" <<'PY'
@@ -20,9 +24,12 @@ lib = importlib.util.module_from_spec(spec); spec.loader.exec_module(lib)
 heads, unreadable = lib.decision_heads(strict=False)
 item_map, names = lib.load_map(heads)
 self_map = lib.self_decisions(heads)
-files = [f for f in lib.scanned_files()
-         if not f.endswith(('decisions-history.md', 'experiments-history.md')) and '/decisions-history/' not in f
-         and not f.startswith('records/')]
+def written_as_of_then(f):
+    return (f.endswith(('decisions-history.md', 'experiments-history.md')) or '/decisions-history/' in f
+            or f.startswith('records/'))
+candidates = lib.scanned_files()
+files = [f for f in candidates if not written_as_of_then(f)]
+skipped = [f for f in candidates if written_as_of_then(f)]
 bad = []; seen = 0
 for path in files:
     for ln, line, m, want, owner, missing, _ in lib.references(path, item_map, self_map):
@@ -46,4 +53,5 @@ if seen == 0:
     print(f"  ! 扫了 {len(files)} 个文件，没有一处归属到已定分项的「已定项」引用，本阶段无对象可判")
     sys.exit(77)
 print(f"  ✓ 扫了 {len(files)} 个文件、{seen} 处已定项引用，没有一处紧跟着说它没定")
+print(f"    没扫 {len(skipped)} 个（两份变更史与 records/ 写的是当时的状态）" + ('：' + '、'.join(skipped) if skipped else ''))
 PY

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 状态一致性：分项引用的状态与正文相符
 #
 # 每一处「D<n>（简称） 已定项 k / 未定项 k」的前缀都在**断言那条分项的状态**。
@@ -11,6 +13,8 @@
 #
 #   bash .claude/gate.d/22-item-ref-status.sh
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 LIB="$(cd "$(dirname "$0")" && pwd)/lib-item-ref-status.py"
 cd "${1:-$(dirname "$0")/../..}" || exit 2
 exec python3 "$LIB"

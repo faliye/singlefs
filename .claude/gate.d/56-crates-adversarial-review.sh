@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: crates 里的实现改动有没有走过三方正反对抗推理
 #
 # 本工程的实现流程是三步：写代码 → 多 agent 正反对抗推理（.claude/rules/three-way-inference.md）→ checker / 层 0 / 变异证明会红
@@ -13,7 +15,10 @@
 # 没有 crates 改动 ⇒ 无对象可判，退 77（show-me-test.md：本次未跑，不记通过）。
 #
 #   bash .claude/gate.d/56-crates-adversarial-review.sh [项目根]
+# gate-overlap:copy-kept 68-knowledge-sync.sh 开头这几行是每个用改动范围的阶段都照写的固定写法：preflight 那两行规范要求逐字写在脚本里（preflight-lint 按字面认），取改动范围的逻辑已经抽成 research/scripts/changed-paths.sh，剩下的只是 cd 进仓、判是不是 git 仓与 source 它，再抽一层只会多一个要 source 的文件
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "  ! $ROOT 不是 git 仓，本阶段跳过"; exit 77; }

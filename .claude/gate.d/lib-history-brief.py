@@ -20,8 +20,11 @@ ENTRY_START = re.compile(r'(?m)^(?=### 20\d\d-\d\d-\d\d)')
 HEADING = re.compile(r'### (20\d\d-\d\d-\d\d(?:（其[^）]*）)?)[：: ]*(.*)')
 QUICK = re.compile(r'(?m)^> 快查·(改了什么|改前|改后)：(.*)$')
 MENTION = re.compile(r'(?<![\w-])D(\d+)（')
-# 快查里的数与编号必须在那一条原文里找得到：分项标签、D / E / C / I 编号、数字，按这个先后认
-TOKEN = re.compile(r'(?:已定项|未定项)\s*\d+|[DECI]-?\d+(?:\.\d+)*|\d+(?:\.\d+)?')
+# 快查里的数与编号必须在那一条原文里找得到：日期、分项标签、D / E / C / I 编号、数字，按这个先后认。
+# 日期与编号按整个记号比（「D1」不算在「D16」里找到）；裸数字只在原文去掉日期之后的部分里找（「13」不算在标题日期「2026-09-13」里找到）。
+TOKEN = re.compile(r'20\d\d-\d\d-\d\d|(?:已定项|未定项)\s*\d+|[DECI]-?\d+(?:\.\d+)*|\d+(?:\.\d+)?')
+DATE = re.compile(r'20\d\d-\d\d-\d\d')
+BARE_NUMBER = re.compile(r'\d+(?:\.\d+)?')
 
 
 def month_files():
@@ -186,8 +189,25 @@ def report_lost(lost):
 
 
 def foreign_tokens(summary, source):
+    """快查里原文没有的记号。原文先去掉空白（「CRC 4」与「CRC4」同样认）：
+    日期按整个日期比（标题上那个也算原文，快查照抄条目自己的日期不红）；分项标签与编号按整个记号比；
+    裸数字在原文**去掉全部日期之后**的部分里按子串找——日期里的「13」「09」不给快查里的数作证。"""
     squeezed_source = re.sub(r'\s+', '', source)
-    return [token for token in TOKEN.findall(summary) if re.sub(r'\s+', '', token) not in squeezed_source]
+    source_dates = set(DATE.findall(squeezed_source))
+    without_dates = DATE.sub('|', squeezed_source)
+    source_labels = {token for token in TOKEN.findall(without_dates) if not BARE_NUMBER.fullmatch(token)}
+    foreign = []
+    for token in TOKEN.findall(summary):
+        squeezed_token = re.sub(r'\s+', '', token)
+        if DATE.fullmatch(squeezed_token):
+            found = squeezed_token in source_dates
+        elif BARE_NUMBER.fullmatch(squeezed_token):
+            found = squeezed_token in without_dates
+        else:
+            found = squeezed_token in source_labels
+        if not found:
+            foreign.append(token)
+    return foreign
 
 
 def split_main():
@@ -285,6 +305,10 @@ def check():
         failed = True
     if failed:
         return 1
+    if not entries:
+        # 一条条目都没读到：快查一格都没比，生成块也只是空渲染对空渲染，退 77 不报绿（show-me-test.md「扫到 0 项也不是通过」）
+        print(f'  ! 本次无对象可判：{MONTH_DIR}/ 下 {len(month_files())} 份按月的变更史里一条 `### 日期` 条目都没有，快查一格都没比')
+        return 77
     print(f'  ✓ 决策变更史的快查与原文同步：查了 {len(entries)} 条条目、{checked} 格快查，decisions-history.md 与原文一致')
     return 0
 

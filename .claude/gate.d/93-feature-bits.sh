@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: feature bit 位号：记账表与 D15 登记表逐行一致、不跳号，代码引用的位都在记账表里
 #
 # 还 C11（feature bit 跳号）。D15（格式冻结政策） 已定项 10 逐字写着记账落在 `.claude/kb/feature-bits.md`，
@@ -15,15 +17,17 @@
 #
 # 射程：③ 只认**写在一行里、值是位掩码字面量**的常量声明。值由别的常量合成的（`SUPPORTED_INCOMPAT_BITS`）、
 # 声明跨行的，解不出位号，逐个列进成功那句的「没判位号的」名单——那份名单与被扫集合出自同一次扫描，现算。
-# 不带 feature bit 常量名的裸字面量（`crates/singlefs-checker/src/lib.rs` 判 incompat 时的 `0x01`）不在射程里，靠 review。
+# 不带 feature bit 常量名的裸字面量（判 incompat 时直接写 `0x01` 这一类，不经具名常量）不在射程里，靠 review。
 #
 # 判别力：fixtures/93-feature-bits.sh/red 的记账表跳号、同一位登记两行不同语义、多出一位登记表里没有，
 # 代码样本又引用了表里没有的一位，②③④ 与 ① 都必须报出来；green 只有位 0 一行、语义与登记表对得上，必须判绿。
 #
 #   bash .claude/gate.d/93-feature-bits.sh [项目根]
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
-cd "$ROOT" 2>/dev/null || exit 2
+cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 [[ -f .claude/kb/feature-bits.md ]] || { echo "  ! 没有 .claude/kb/feature-bits.md，本阶段无对象可判"; exit 77; }
 
 python3 - <<'PY'

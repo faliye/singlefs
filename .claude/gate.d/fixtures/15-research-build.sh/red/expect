@@ -1,0 +1,3 @@
+exit=1
+want=research 的构建或单测没过（cargo test 退出码 101）
+want=adds_two_and_two_to_five

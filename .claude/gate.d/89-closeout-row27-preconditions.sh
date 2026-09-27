@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 收口表第 27 行那几笔欠账的前置有没有进来（进来了就得补会红的用例）
 # gate-similar: 67-milestone-closeout-owed.sh 它读收口表本身，判开着的欠账号收全了、行号只许顺序号；这一道不读收口表，读 crates 源码，按写死的探针判第 27 行那几笔的前置动没动，全对上退 77 而不是报绿
 # gate-similar: 79-tree-table-reserve.sh 它对决策正文里的认购表求和、比预留；这一道对 crates 源码做逐字探针计数，红的条件是命中次数与登记值不等
@@ -14,11 +16,17 @@
 # 探针盯的是「这一笔的描述今天还成不成立」，所以重构那几处也会红：那时候要做的同样是回去重核，
 # 不是把探针的期望值改成新数（改成新数等于把这一笔的描述悄悄换掉）。
 #
-# 成功那句报出查了几条探针、覆盖几笔，以及**没做成探针的是哪几笔**（逐个列名，现算不手抄；
-# rules/show-me-test.md：扫到 0 项不是通过，报了「查了多少」还要说「没查的是哪些」）。
+# 成功那句报出查了几条探针、覆盖几笔，以及**没做成探针的是哪几笔**（逐个列名；rules/show-me-test.md：
+# 扫到 0 项不是通过，报了「查了多少」还要说「没查的是哪些」）。没做成探针的那张 UNPROBED 表是**手写的**：
+# 收口表第 27 行只写「alloc-basis 第三轮转来的四条」、没有逐条列（四条的出处在 alloc-basis 第三轮判决第五节第 4 条），
+# 现算不出来。能现算的那一半每轮现算：读收口表第 27 行第二格，按「、」「；」切成几笔，逐笔对探针与 UNPROBED 的笔名，
+# 两边都没有的逐个列名；「alloc-basis 第三轮转来的 N 条」这一笔，拿 N 与这里名字以「alloc-basis 第三轮」起头的笔数比。
+# 这一段只报不判：对不上的是这张表手写得不全，要人回去补，不是前置进来了。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
-cd "$ROOT" 2>/dev/null || exit 2
+cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 
 # 四段：笔名、文件、原文（逐字）、今天的命中次数。同一笔可以有几条探针。
 PROBES="$(cat <<'TSV'
@@ -89,10 +97,54 @@ if ((${#bad[@]})); then
 fi
 
 unprobed_count="$(grep -c . <<<"$UNPROBED")"
+# 现算的那一半：收口表第 27 行点名的几笔里，探针与 UNPROBED 两边都没有的，逐个列名（只报不判）
+row27_report="$(PROBES="$PROBES" UNPROBED="$UNPROBED" python3 - 2>&1 <<'PY'
+import os, re
+path = ".claude/kb/milestone/02-second-txn.md"
+names = [line.split("\t")[0] for key in ("PROBES", "UNPROBED") for line in os.environ[key].split("\n") if line.strip()]
+if not os.path.isfile(path):
+    print(f"读不到 {path}，第 27 行现算对照没做")
+    raise SystemExit(0)
+row = next((line for line in open(path, encoding="utf-8") if re.match(r"^\|\s*27\s*\|", line)), None)
+if row is None:
+    print(f"{path} 里找不到收口表第 27 行，现算对照没做")
+    raise SystemExit(0)
+cell = row.strip().strip("|").split("|")[1].strip()
+cell = re.sub(r"^[^：]*：", "", cell, count=1)
+items, depth, current = [], 0, ""
+for character in cell:   # 只在括号外按「、」「；」切：括注里的「步 3、步 4」不是两笔
+    depth += character in "（("
+    depth -= character in "）)" and depth > 0
+    if character in "、；" and depth == 0:
+        items.append(current.strip()); current = ""
+    else:
+        current += character
+items = [item for item in items + [current.strip()] if item]
+declared_alloc_basis = None
+uncovered = []
+for item in items:
+    counted = re.match(r"^alloc-basis 第三轮转来的([一二三四五六七八九十0-9]+)条$", item)
+    if counted:
+        digits = "一二三四五六七八九十"
+        text = counted.group(1)
+        declared_alloc_basis = int(text) if text.isdigit() else digits.index(text) + 1 if len(text) == 1 else None
+        continue
+    if not any(item.startswith(name.split("：")[0]) or name.startswith(item) for name in names):
+        uncovered.append(item)
+listed_alloc_basis = len({name.split("：")[0] for name in names if name.startswith("alloc-basis 第三轮")})
+print(f"收口表第 27 行现算 {len(items)} 笔；探针与没做成探针的清单两边都没有的 {len(uncovered)} 笔：{'、'.join(uncovered) or '（没有）'}")
+if declared_alloc_basis is not None:
+    print(f"「alloc-basis 第三轮转来的」那一笔第 27 行写 {declared_alloc_basis} 条，这里探针与清单合计 {listed_alloc_basis} 条"
+          + ("" if declared_alloc_basis == listed_alloc_basis else "，对不上：清单是手写的，回去按那一轮判决补齐"))
+PY
+)"
 echo "  ⊘ 本次未跑：收口表第 27 行那几笔的前置一个都没进来，今天无对象可判（${probe_count} 条逐字探针、覆盖 ${item_count} 笔，逐条对上今天的值）"
 echo "    没做成探针的 ${unprobed_count} 笔："
 while IFS=$'\t' read -r name why; do
   [[ -z "$name" ]] && continue
   printf '      %s：%s\n' "$name" "$why"
 done <<<"$UNPROBED"
+while IFS= read -r line; do
+  [[ -n "$line" ]] && printf '    %s\n' "$line"
+done <<<"$row27_report"
 exit 77

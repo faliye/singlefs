@@ -1,3 +1,5 @@
 exit=1
 want=orphan.md
 want=等于没写
+want=     .claude/rules/incode.md
+want=     .claude/rules/infence.md

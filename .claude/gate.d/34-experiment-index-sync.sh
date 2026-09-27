@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 实验索引行与正文标题说的是不是同一件事
 #
 # `experiments.md` 的索引表是检索这批实验的入口，而编号的登记位在各正文的
@@ -12,10 +14,11 @@
 # E45（事务跨多条记录的环占用）与 E61（反向链 hash 算法的均匀性）的索引行都带了作废标记，
 # 只有那一行没带 —— 一处漏改，五天没人看得出来。
 #
-# 查三样：
+# 查四样：
 #   1. 正文标题带「结论作废 / 结论整体作废」的，索引行里必须也出现「作废」
 #   2. 正文标题的状态词是「未跑」「部分已跑」或「已跑（够判）」的，索引状态列必须跟着说
-#   3. 索引结论列里的数，正文里要找得到（千位分隔的空格先归一）
+#   3. 索引结论列里的数，正文里要找得到（千位分隔的空格先归一；按整个数找，「10」不许靠「100」里的子串算找到，
+#      带小数的许正文多几位小数）
 #   4. 两边一一对应：正文有而索引无 = 入了正文没进索引，索引有而正文无 = 指到空处
 #
 # ⚠️ **它抓不到的那一半要说清楚**：一个旧值只要还以历史叙述的形态留在正文里
@@ -25,6 +28,8 @@
 #
 #   bash .claude/gate.d/34-experiment-index-sync.sh
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 IDX=.claude/kb/experiments.md
@@ -88,7 +93,10 @@ for n, st, concl, raw in rows:
         prev = c[max(0, mm.start() - 3):mm.start()]
         if re.search(r"[EDCIK\-]$", prev) or re.match(r"^20\d\d$", v) or len(v) <= 1:
             continue
-        if v not in text:
+        # 左边不许紧挨数字或小数点，整数右边不许紧挨数字：按子串比时「10 ms」会在「100 ms」里算找到。
+        # 带小数的许正文多几位小数（索引写「10.6」、正文写「10.63」是索引按位截短，不算找不到）
+        right_boundary = "" if "." in v else r"(?!\d)"
+        if not re.search(r"(?<![\d.])" + re.escape(v) + right_boundary, text):
             bad.append(f"E{n} 索引结论列的「{v}」在 {fname} 正文里找不到")
 
 if bad:
@@ -101,5 +109,8 @@ if bad:
     print("    正文有而索引无的那一类：把它登记进 experiments.md 的索引表（编号、状态、一句话结论、正文链接）。")
     sys.exit(1)
 
+if not rows and not bodies:
+    print(f"  ! 本次无对象可判：{idx_path} 里一行 `| E<n>` 索引都没有，{exp_dir}/ 下也没有正文")
+    sys.exit(77)
 print(f"  ✓ 实验索引行与正文标题一致（索引 {len(rows)} 行、正文 {len(bodies)} 份）")
 PY

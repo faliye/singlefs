@@ -4,6 +4,7 @@
 |---|---|---|---|---|---|
 | 样本形态甲 | 发布 B | 样本 | 样本 | 步 1 | `sample_step_one.rs` `sample_function_that_was_renamed` |
 | 样本形态乙 | 发布 C | 样本 | 样本 | 步 1 | `sample_step_missing.rs` |
+| 丙号残行 | 发布 D | 样本 | 步 1 |
 
 ## 历史版本
 

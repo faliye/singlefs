@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 状态一致性：已定分项的正文说它自己、或同一条决策里另一条已定分项还没定
 #
 # **判据**：在一条决策的「已定项」小节（含各 `#### 已定项 N` 论证）里，
 # 凡出现「X 仍未定 / X 还没定 / X 尚未定」这样的断言，就查 X 是谁：
-#   a. X 是**自指**（取值 / 本项 / 该项 / 本分项）⇒ 这条分项标着已定却说自己没定，判红；
+#   a. X 是**自指**（取值 / 本项 / 该项 / 本分项；「`T_time` 的取值」这类打头是「的」的，去掉「的」再比）⇒ 这条分项标着已定却说自己没定，判红；
 #   b. X 落在**同一个决策里另一条已定分项的标题**上 ⇒ 说一个已经定了的东西没定，判红。
+#   同一行有几处断言就逐处看，直到判出一处为止。没有一份决策有已定项区段 ⇒ 无对象可判，退 77。
 #
 # ⚠️ **这一类只发生在同一个文件内部，而门禁此前对它整个是盲的。**
 # `20-kb-shape` 比的是索引行与标题行的状态，`22-item-ref-status` 比的是引用处
@@ -24,6 +27,8 @@
 # 说「校验算法选哪个仍未定」，而已定项 1 的标题就是它（b 支），也必须红，两支各有一条 want；
 # green 里同一句挪进未定项小节，必须绿。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-.}"
 DEC="$ROOT/.claude/kb/decisions"
 # 无对象可判退 77，门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
@@ -39,6 +44,7 @@ OPEN = re.compile(r'(仍然未定|仍未定|尚未定(?!案)|还没定|均未定
 PHRASE = re.compile(r'([^\s。，、；：（）()「」|*`＊>#⚠️⇒—]{2,12})$')
 
 bad = []
+files_with_settled_region, settled_region_lines = 0, 0
 decision_files = sorted(dec.glob("*.md"))
 if not decision_files:
     print(f"  ! {dec} 下没有决策正文，本阶段无对象可判")
@@ -61,6 +67,8 @@ for f in decision_files:
 
     if not region:
         continue
+    files_with_settled_region += 1
+    settled_region_lines += len(region)
     settled_text = "\n".join(settled_lines)
 
     for i, line in region:
@@ -72,8 +80,10 @@ for f in decision_files:
             x = pm.group(1).strip('*` ')
             if len(x) < 2:
                 continue
+            # 「`T_time` 的取值仍未定」：短语停在反引号与空格上，取到的是「的取值」；去掉打头的「的」再比自指词
+            x_core = x[1:] if x.startswith('的') else x
             why = None
-            if x in SELF:
+            if x_core in SELF:
                 why = "自指——这条分项标着已定，正文却说它自己没定"
             else:
                 # 同一文件里另一条已定分项的标题含 X？（排除本行自己）
@@ -83,9 +93,10 @@ for f in decision_files:
                     if re.match(r'^\s*(\|\s*)?\d+[.\s|]', other) and x in other and '已定' in other:
                         why = f"「{x}」在同一条决策的另一条**已定**分项里已经定了"
                         break
+            # 一行只报一处；这一处没判出问题就接着看同一行后面的断言（「子问题仍未定，取值仍未定」）
             if why:
                 bad.append((f.name, i, x, why, line.strip()[:110]))
-            break
+                break
 
 if bad:
     for fn, ln, x, why, text in bad:
@@ -94,5 +105,10 @@ if bad:
     print("     → 怎么办：这是定案之后没清理的推导过程。把这句改写成定案后的现状；")
     print("               若那个子问题真的还开着，把它升成一条独立的未定项，别留在已定项正文里。")
     sys.exit(1)
-print(f"  ✓ 已定项的正文没有把已经定了的东西说成未定（扫 {len(decision_files)} 条决策）")
+# 每份决策都没有已定项区段：一行都没判，退 77，不记通过
+if files_with_settled_region == 0:
+    print(f"  ! 本次无对象可判：{len(decision_files)} 份决策正文里没有一份有已定项区段（### 已定项 / #### 已定项 N）")
+    sys.exit(77)
+print(f"  ✓ 已定项的正文没有把已经定了的东西说成未定（扫 {len(decision_files)} 条决策，"
+      f"其中 {files_with_settled_region} 条有已定项区段、共 {settled_region_lines} 行）")
 PY

@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 research/scripts/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判（用户 2026-09-26 定：项目更严）
 # gate-stage: crates 变异表复跑（每条改坏一处、点名的测试必须红）
 #
 # 判据：`crates/mutations.tsv` 里每一条变异（文件、原文、替换文、cargo test 参数、必须红的测试名），
-# 原文在文件里恰好命中一次，文件落在每片拷的范围之内（COPIED_INTO_EACH_SHARD，派活之前判）；
+# 原文在文件里恰好命中一次，文件落在每片拷的范围之内（就是 stage-inputs.tsv 本阶段那一行登记的路径，派活之前判）；
 # 把仓拷到临时目录、改坏那一处、跑点名的测试，那条测试必须判红；跑完还原再下一条。
 # 一条锚点腐化、一条指到拷贝范围之外、一条没红，整道红。
 #
@@ -11,7 +13,7 @@
 # 改法本身没有任何东西守着。这张表让每一处三方打中之后的改法都留一条「改回去它就红」的变异，撤回时这里先响。
 #
 # 分片并发跑（command-safety.md「一个脚本里的检测项，能并行就并行」）：每条变异都要起 cargo 编译 + 跑测试，
-# 彼此不依赖，而串行时一条约 8 秒、191 条约 25 分钟。并发的障碍是同一篇里写着的「共用一份可写状态」——
+# 彼此不依赖，而串行时一条约 8 秒，整张表的挂钟按条数乘上去（条数现数：grep -cvE '^(#|$)' crates/mutations.tsv）。并发的障碍是同一篇里写着的「共用一份可写状态」——
 # 所有变异改同一份源码副本、共用一个 CARGO_TARGET_DIR（cargo 的文件锁会把它们重新串行化）。
 # 所以每个分片各给一份源码副本与一个编译目录。分片按 crate 切：改 singlefs-core 要重编译它自己加全部下游，
 # 改 singlefs-harness 只重编译它自己，同一分片里连着改同一个 crate，增量编译的命中率才稳。
@@ -29,8 +31,14 @@
 # 这一条是并发化之后重新证明它还红得出来的那一半（command-safety.md「改成并行之后要重新证明它红得出来」）。
 # 进度实时打到 stderr，不进 stdout，不参与那条比对。
 #
-# 编译产物放 ${GATE_MUTATION_TARGET_DIR:-${TMPDIR:-/tmp}/singlefs-crates-mutation-target}（跨轮复用，第一次要整编一遍）；
-# 分片各自的编译目录是它加 -w<片号>，第一次从它拷一份种子，省掉每片各冷编译一遍。
+# 编译产物放 ${GATE_MUTATION_TARGET_DIR:-${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-crates-mutation-target}（跨轮复用，第一次要整编一遍）；
+# 分片各自的编译目录是它加 -w<片号>，各自冷编译一次（不从它拷种子，见 prepare_shard）。放 GATE_CROSS_RUN_TMPDIR 不放 TMPDIR：
+# 门禁每轮给阶段一个私有 TMPDIR，跑完剩下的判红并删掉（command-safety.md「测试镜像一律放临时目录」），放进去每轮都要从头编 16 份。
+#
+# 每条变异一个它自己的 TMPDIR（建在这一轮源码副本的总目录底下），传给那一条的 cargo 与测试进程；那一条结束时不论退出码是几
+# （含限时、撞顶被杀）都整个删掉，删之前数下里面有几个文件、占盘多少，合计报在「临时目录」那一行，被杀的那几条另报在各自的判定里。
+# 被杀的测试 Drop 守卫不跑，它建的镜像留在 TMPDIR 里：只靠收尾时删，一轮下来能堆几百 G（records/2026-09-16-subagent拆分提案.md 第四十节第 42 行）。
+# 全部判完再把总目录底下列一遍，还剩哪一条的目录就整道判红。弄坏开关 GATE_MUTATION_BREAK=keepmutationtmp（只给证红用）拿掉删除那一步。
 #
 # 每条变异的 cargo test 放进内存上限里跑（research/scripts/run-with-memory-cap.sh：systemd 的临时 scope，MemoryMax=<上限>、MemorySwapMax=0），
 # 撞上限只杀这一条的进程，不把整机拖进 OOM（2026-09-25 一条无界分配的变异两次把整机拖进 OOM，records/2026-09-16-subagent拆分提案.md 第四十节第 28 行）。
@@ -57,24 +65,25 @@
 #
 # 判别力：fixtures/59-crates-mutation-replay.sh/red 的变异表把上限压到 512M、限时压到 20 秒：加一条把 1 MiB 的缓冲改成 1536 MiB 的变异，必须报「内存撞顶」；
 #   加一条把步长 1 改成 0、循环永远走不到上界的变异，必须报「超时」；计数行里没红、无效、内存撞顶、超时各数各的。
+#   那一条点名的测试先往 TMPDIR 写一个 4 KiB 的文件再走：被限时杀掉之后，它的判定里必须报「临时目录已整个删掉（删前留有 1 个文件」，
+#   0 个文件说明 TMPDIR 没传到测试进程；「临时目录」那一行必须报 4 条都删掉了。
+#   GATE_MUTATION_BREAK=keepmutationtmp 拿掉删除那一步，red 与 green 两份样本都必须判错。
 # green 同样压到 512M，留着一行撤掉了的「# 给整机留的内存余量：1T」：头一行必须报开 2 个（两条、核数的一半多于 2）、卡在「表里的条数」那一项，
-#   不许再按内存收进程数（按内存收的那一版在这份样本上只开 1 个）；两条正常变异必须照旧红在点名的测试上。
+#   不许再按内存收进程数（按内存收的那一版在这份样本上只开 1 个）；两条正常变异必须照旧红在点名的测试上，「临时目录」那一行必须报 2 条都删掉了。
 #
 #   bash .claude/gate.d/59-crates-mutation-replay.sh [项目根]
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 # 先问能不能复用上一次整轮全绿的判定：这一道读的那几条路径（`.claude/gate.d/stage-inputs.tsv`）
 # 在 `refs/sop/staged-green` 那棵树与这一次的暂存树之间变没变。为什么用树、为什么只一条 ref、
 # 为什么不看工作区，写在 research/scripts/stage-must-run.sh 的文件头。
 # 这一道原先没有任何范围判定，每趟跑满：2026-09-22 实测，一批 27 个路径里 crates/ 零个，它照跑不误。
-reuse_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-must-run.sh" "$ROOT" "$(basename "$0")")"
-reuse_rc=$?
-if [[ "$reuse_rc" != 0 ]]; then
-  echo "  ! 本阶段跳过（复用上一次整轮全绿的判定）：$reuse_reason"
-  echo "     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径见 .claude/gate.d/stage-inputs.tsv。"
-  exit 77
-fi
+source "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-run-or-skip.sh" || { echo "  ✗ source 不进 research/scripts/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
+stage_run_or_skip "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-must-run.sh" "复用上一次整轮全绿的判定" \
+  "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径见 .claude/gate.d/stage-inputs.tsv。" -- "$ROOT" "$(basename "$0")"
 
 TABLE="crates/mutations.tsv"
 if [[ ! -f "$TABLE" ]]; then
@@ -82,12 +91,22 @@ if [[ ! -f "$TABLE" ]]; then
   echo "     → 怎么办：建一张六段制表符分隔的表（变异名、文件、原文、替换文、cargo test 参数、必须红的测试名），每一处三方打中之后的改法留一条。"
   exit 1
 fi
-if ! command -v cargo >/dev/null 2>&1; then
-  echo "  ✗ 没有 cargo，变异复跑不了"
-  echo "     → 怎么办：装 Rust 工具链（scripts/env.sh 会报），再跑这一道。"
+# 前提（cargo）登记在 .claude/gate.d/stage-inputs.tsv 本阶段那一行第三列，经门禁与实验共用的准入模块判，没齐判红（不退 77）。
+# 读的是本阶段所在那一份仓的登记表：判别力样本的目录里没有登记表，前提照样按真表判。
+python3 "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/admission.py" gate-preconditions "$(cd "$(dirname "$0")/../.." && pwd)" "$(basename "$0")" || exit 1
+# 每片拷哪些路径：就是登记表本阶段那一行登记的输入（admission.py paths），不另抄一份。
+# 拷进分片的与复用判定读的是同一批：一条输入没登记，它变了这一道不会重跑，它也拷不进分片，点名的测试读它时当场红给人看。
+shard_registry_repository="$(cd "$(dirname "$0")/../.." && pwd)"
+shard_registered_paths=""
+if ! shard_registered_paths="$(python3 "$shard_registry_repository/research/scripts/admission.py" paths "$shard_registry_repository" "$(basename "$0")")" \
+   || [[ -z "$shard_registered_paths" ]]; then
+  echo "  ✗ 读不到 .claude/gate.d/stage-inputs.tsv 里 $(basename "$0") 那一行登记的路径：判不出每片的源码副本该拷哪些"
+  echo "     → 怎么办：单独执行 python3 research/scripts/admission.py paths \"$shard_registry_repository\" $(basename "$0") 看它报什么；那一行不在就照别的行给本阶段登记它读的路径。"
   exit 1
 fi
-export GATE_MUTATION_TARGET_DIR="${GATE_MUTATION_TARGET_DIR:-${TMPDIR:-/tmp}/singlefs-crates-mutation-target}"
+GATE_MUTATION_SHARD_PATHS="$shard_registered_paths"
+export GATE_MUTATION_SHARD_PATHS
+export GATE_MUTATION_TARGET_DIR="${GATE_MUTATION_TARGET_DIR:-${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-crates-mutation-target}"
 # 带内存上限跑一条命令的包装在这份阶段所在的仓里（样本仓里没有 research/）
 GATE_MUTATION_MEMORY_CAP_RUNNER="$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/run-with-memory-cap.sh"
 export GATE_MUTATION_MEMORY_CAP_RUNNER
@@ -116,6 +135,11 @@ MEMORY_MAX_DIRECTIVE = re.compile(r"^#\s*每条变异的内存上限[：:]\s*(\S
 DEFAULT_TIMEOUT_SECONDS_PER_MUTATION = "1800"   # 依据见文件头
 TIMEOUT_DIRECTIVE = re.compile(r"^#\s*每条变异的超时秒数[：:]\s*(\S+)\s*$")
 TIMEOUT_KILL_GRACE_SECONDS = 30          # 到点发 TERM 之后再等这么久，还不退就发 KILL（交给包装的 RUN_WITH_MEMORY_CAP_KILL_GRACE）
+# 每条变异自己的 TMPDIR 都建在源码副本总目录底下的这个子目录里（文件头「每条变异一个它自己的 TMPDIR」那一段）
+PER_MUTATION_TEMPORARY_DIRECTORY_NAME = "per-mutation-tmp"
+# 包装停掉或杀掉了 scope 里进程的几档：测试的 Drop 守卫不跑，它建的东西留在 TMPDIR 里，判定里报删前留下多少
+VERDICTS_KILLED_BY_WRAPPER = ("timeout", "memory", "squeezed")
+BROKEN_JUDGEMENT = os.environ.get("GATE_MUTATION_BREAK", "")   # 弄坏开关，只给证红用：keepmutationtmp 不删每条变异的 TMPDIR
 
 
 def unescape(text):
@@ -147,9 +171,9 @@ if not rows:
     print("     → 怎么办：至少一条：三方打中之后的每一处改法，留一条「改回去它就红」的变异。")
     sys.exit(1)
 memory_max = memory_max_from_table or os.environ.get("GATE_MUTATION_MEMORY_MAX", "").strip() or DEFAULT_MEMORY_MAX_PER_MUTATION
-if not re.fullmatch(r"[1-9][0-9]*[KMGT]?", memory_max):
+if not re.fullmatch(r"[1-9][0-9]*[KMGT]", memory_max):
     print(f"  ✗ 每条变异的内存上限写成了「{memory_max}」，不是 systemd 的写法")
-    print("     → 怎么办：写成 正整数[K|M|G|T]，例 4G、512M（表头那一行「# 每条变异的内存上限：…」或 GATE_MUTATION_MEMORY_MAX）。")
+    print("     → 怎么办：写成正整数加 K / M / G / T，单位必写（不带单位的数 systemd 当字节数），例 4G、512M（表头那一行「# 每条变异的内存上限：…」或 GATE_MUTATION_MEMORY_MAX）。")
     sys.exit(1)
 timeout_seconds_text = timeout_seconds_from_table or os.environ.get("GATE_MUTATION_TIMEOUT", "").strip() or DEFAULT_TIMEOUT_SECONDS_PER_MUTATION
 if not re.fullmatch(r"[1-9][0-9]*", timeout_seconds_text):
@@ -173,7 +197,8 @@ if stale:
     print("     → 怎么办：改代码时把变异表里的原文一起改到今天的写法（锚点腐化的那条变异等于没跑过，mutation-sampling.md 第七类）。")
     sys.exit(1)
 
-COPIED_INTO_EACH_SHARD = ["crates", "Cargo.toml", "Cargo.lock", "litmus", "research/results"]
+# 登记表本阶段那一行的路径（bash 那一段经 admission.py paths 取来）；目录在表里带斜杠，这里去掉
+COPIED_INTO_EACH_SHARD = [line.strip().rstrip("/") for line in os.environ["GATE_MUTATION_SHARD_PATHS"].split("\n") if line.strip()]
 # 拷目录时跳过的名字（各 crate 自己的编译目录）。拷贝范围由这两样一起定：prepare_shard 照它们拷，下面那道路径检查照它们判。
 IGNORED_WHEN_COPYING_INTO_EACH_SHARD = ["target"]
 shared_target_directory = os.environ["GATE_MUTATION_TARGET_DIR"]
@@ -194,6 +219,19 @@ def is_copied_into_each_shard(path):
     return False
 
 
+# 「必须红的测试名」那一列只许写 libtest 结果行里的用例名（可带模块路径），不许写正则：`$`、`^` 之类在下面按字面找，
+# 一条都对不上，那一行永远判「没跑到」。派活之前先挑出来判红，出路直接说改表。
+rows_with_malformed_test_name = [f"{table}:{line_number} {name}：「{expected}」"
+                                 for line_number, name, _path, _old, _new, _args, expected in rows
+                                 if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(::[A-Za-z_][A-Za-z0-9_]*)*", expected)]
+if rows_with_malformed_test_name:
+    print("  ✗ 变异表有几行的「必须红的测试名」不是一个用例名（带了正则符号或空白），按字面在测试输出里永远找不到：")
+    for item in rows_with_malformed_test_name:
+        print(f"      {item}")   # gate-lint:detail
+    print("     → 怎么办：那一列写成用例名本身（例 first_transaction_self_release_is_one_slot，或带模块路径 tests::first_transaction_self_release_is_one_slot），"
+          "去掉 $、^ 这类符号；只写名字时本阶段已经按「在输出里只许对上一个用例」判，不用再靠 $ 锚定。这一轮一个工作进程都没起。")
+    sys.exit(1)
+
 # 锚点只在真仓上核过：文件落在拷贝范围之外时，工作进程在自己那份副本里打不开它，要到派活之后才炸成一个没有出路的 traceback。
 # 所以派活之前先判，有一行在外面就一个工作进程都不起。
 rows_outside_shard_copy = [f"{table}:{line_number} {name}：{path}"
@@ -202,7 +240,7 @@ if rows_outside_shard_copy:
     print("  ✗ 变异表有几行的文件不在每片拷的范围里（锚点在真仓上核得过，工作进程在自己的源码副本里却打不开它）：")
     for item in rows_outside_shard_copy:
         print(f"      {item}")   # gate-lint:detail
-    print(f"     → 怎么办：把那个路径（或它所在的目录）加进本阶段的 COPIED_INTO_EACH_SHARD（现在是 {'、'.join(COPIED_INTO_EACH_SHARD)}），"
+    print(f"     → 怎么办：把那个路径（或它所在的目录）登记进 .claude/gate.d/stage-inputs.tsv 本阶段那一行（现在是 {'、'.join(COPIED_INTO_EACH_SHARD)}），"
           "或者把这条变异改到拷贝范围之内的文件上；这一轮一个工作进程都没起。")
     sys.exit(1)
 
@@ -278,13 +316,14 @@ def init_worker(sequence_counter, shard_root):
     environment = dict(os.environ)
     environment["CARGO_TARGET_DIR"] = target_directory
     WORKER_STATE["environment"] = environment
+    WORKER_STATE["per_mutation_temporary_root"] = os.path.join(shard_root, PER_MUTATION_TEMPORARY_DIRECTORY_NAME)
     # 源码副本建在父进程的 shard_root 底下、由父进程收尾时整个删；编译目录留着跨轮复用。
     # 不在这里挂 atexit：进程池的工作进程走 os._exit 退出，atexit 在这里一次都不跑（实测 /tmp 里堆了 131 个没删的副本）。
 
 
 def judge_row(row):
-    """进程池里的一格活：一条变异。副本与编译目录是这个工作进程独有的。"""
-    return judge_one(WORKER_STATE["work"], WORKER_STATE["environment"], row)
+    """进程池里的一格活：一条变异。副本与编译目录是这个工作进程独有的，TMPDIR 是这一条独有的。"""
+    return judge_one(WORKER_STATE["work"], WORKER_STATE["environment"], WORKER_STATE["per_mutation_temporary_root"], row)
 
 
 def prepare_shard(worker_sequence, shard_root):
@@ -308,20 +347,66 @@ def prepare_shard(worker_sequence, shard_root):
     return work, target_directory
 
 
-def judge_one(work, environment, row):
-    """一条变异的判定：改坏那一处、跑点名的测试、还原。回的是 (行号, 档, 那一条要打印的话)。"""
+BYTES_PER_STAT_BLOCK = 512   # os.stat 的 st_blocks 按 512 字节一块数（POSIX）
+
+
+def measure_and_remove_mutation_temporary_directory(directory):
+    """数下一条变异的 TMPDIR 里有几个文件（目录本身不算）、占盘与表观各多少字节，再整个删掉。
+    回 (文件数, 占盘字节, 表观字节, 删完之后它还在不在)。占盘按 st_blocks 算：测试建的稀疏镜像表观远大于占盘。"""
+    file_count = 0
+    allocated_bytes = 0
+    apparent_bytes = 0
+    for current_directory, _subdirectory_names, file_names in os.walk(directory):
+        for file_name in file_names:
+            try:
+                file_status = os.lstat(os.path.join(current_directory, file_name))
+            except OSError:
+                continue   # 数的时候已经没了（还没退干净的进程在收尾），不算
+            file_count += 1
+            allocated_bytes += file_status.st_blocks * BYTES_PER_STAT_BLOCK
+            apparent_bytes += file_status.st_size
+    if BROKEN_JUDGEMENT != "keepmutationtmp":
+        shutil.rmtree(directory, ignore_errors=True)
+    return file_count, allocated_bytes, apparent_bytes, os.path.lexists(directory)
+
+
+def temporary_directory_note(removal):
+    """被包装停掉或杀掉的那几档判定，第一行末尾接的那一句：这一条的 TMPDIR 删掉没有、删前留下多少。"""
+    file_count, allocated_bytes, _apparent_bytes, is_still_there = removal
+    state = "没删掉" if is_still_there else "已整个删掉"
+    return f"；它的临时目录{state}（删前留有 {file_count} 个文件、占盘 {allocated_bytes} 字节）"
+
+
+def judge_one(work, environment, per_mutation_temporary_root, row):
+    """一条变异：建它自己的 TMPDIR、改坏那一处、跑点名的测试、还原、删掉那个 TMPDIR。
+    回的是 (行号, 档, 那一条要打印的话, measure_and_remove_mutation_temporary_directory 的返回)。"""
     line_number, name, path, old, new, args, expected = row
     full = os.path.join(work, path)
     pristine = open(full, encoding="utf-8").read()
     assert pristine.count(old) == 1, (path, name)
+    mutation_temporary_directory = tempfile.mkdtemp(prefix=f"line-{line_number}-", dir=per_mutation_temporary_root)
     open(full, "w", encoding="utf-8").write(pristine.replace(old, new))
-    # 限时交给包装（RuntimeMaxSec，从起跑算，不算排队）：不在外面套 timeout，排队的时间不算进限时
-    run_environment = dict(environment, RUN_WITH_MEMORY_CAP_TIME_LIMIT=str(timeout_seconds), RUN_WITH_MEMORY_CAP_KILL_GRACE=str(TIMEOUT_KILL_GRACE_SECONDS))
+    # 限时交给包装（RuntimeMaxSec，从起跑算，不算排队）：不在外面套 timeout，排队的时间不算进限时。
+    # TMPDIR 换成这一条自己的：cargo、rustc 与测试进程建的临时文件、镜像都落在那里
+    run_environment = dict(environment, TMPDIR=mutation_temporary_directory,
+                           RUN_WITH_MEMORY_CAP_TIME_LIMIT=str(timeout_seconds), RUN_WITH_MEMORY_CAP_KILL_GRACE=str(TIMEOUT_KILL_GRACE_SECONDS))
     try:
         run = subprocess.run(["bash", memory_cap_runner, memory_max, "cargo", "test", "--offline"] + args.split(),
                              cwd=work, env=run_environment, capture_output=True, text=True)
     finally:
         open(full, "w", encoding="utf-8").write(pristine)
+        # 不论退出码是几都删（含限时、撞顶被杀）：被杀的测试 Drop 守卫不跑，它建的镜像只有这里删得掉
+        removal = measure_and_remove_mutation_temporary_directory(mutation_temporary_directory)
+    line_number, verdict, text = verdict_of_run(row, run)
+    if verdict in VERDICTS_KILLED_BY_WRAPPER:
+        first_line, line_break, rest = text.partition("\n")
+        text = first_line + temporary_directory_note(removal) + line_break + rest
+    return line_number, verdict, text, removal
+
+
+def verdict_of_run(row, run):
+    """一条变异跑完之后判哪一档。回的是 (行号, 档, 那一条要打印的话)。"""
+    line_number, name, _path, _old, _new, _args, expected = row
     output = run.stdout + run.stderr
     tail = "\n".join(output.splitlines()[-8:])
     # 包装报的几种结局先判：被停、被杀的测试二进制可能已经打出了半截输出，不许拿它判抓到或没红
@@ -335,11 +420,19 @@ def judge_one(work, environment, row):
         return line_number, "refused", f"{table}:{line_number} {name}：内存不够排不上（包装等满了等待上限），这一条没跑\n{tail}"
     if run.returncode == MEMORY_CAP_UNAVAILABLE_EXIT:
         return line_number, "unavailable", f"{table}:{line_number} {name}：带内存上限的 scope 起不来，这一条没跑\n{tail}"
-    red_pattern = re.compile(r"^test (\S+::)?" + re.escape(expected) + r" \.\.\. FAILED$", re.M)
-    ran_pattern = re.compile(r"^test (\S+::)?" + re.escape(expected) + r" \.\.\. ", re.M)
-    if run.returncode != 0 and red_pattern.search(output):
+    # libtest 的结果行是 `test <模块路径>::<名字> ... ok|FAILED|ignored`；#[should_panic] 的用例在名字与 ` ... ` 之间
+    # 多一段 ` - should panic`。点名可以只写名字、省掉模块路径，但省掉之后在输出里只许对上一个用例：
+    # 对上两个就分不出红的是不是点名的那一个，按没判成记，不按「有一个红了」算抓到。
+    result_line_pattern = re.compile(r"^test ((?:\S+::)?" + re.escape(expected) + r")(?: - should panic)? \.\.\. (\S+)", re.M)
+    results_by_test = {}
+    for result_line in result_line_pattern.finditer(output):
+        results_by_test.setdefault(result_line.group(1), []).append(result_line.group(2))
+    if len(results_by_test) > 1:
+        return line_number, "failure", (f"{table}:{line_number} {name}：点名的测试 {expected} 在输出里对上了 {len(results_by_test)} 个不同的用例"
+                                        f"（{'、'.join(sorted(results_by_test))}），判不出红的是哪一个；把点名写全到模块路径\n{tail}")
+    if run.returncode != 0 and any("FAILED" in results for results in results_by_test.values()):
         return line_number, "caught", f"  ✓ {name}：{expected} 红了"
-    if ran_pattern.search(output):
+    if results_by_test:
         return line_number, "failure", f"{table}:{line_number} {name}：{expected} 没红（退出码 {run.returncode}）\n{tail}"
     if re.search(r"^error(\[E\d+\])?: ", output, re.M) or "could not compile" in output:
         # 替换文写进源码之后编不过：既不算被抓也不算没红，是一条无效变异，
@@ -366,6 +459,9 @@ sequence_counter = multiprocessing.Value("i", 0)
 # 各工作进程的源码副本都建在这个总目录底下，父进程退出时整个删掉（父进程正常退出与 sys.exit 都走 atexit）。
 shard_root = tempfile.mkdtemp(prefix="singlefs-mutation-replay-")
 atexit.register(shutil.rmtree, shard_root, ignore_errors=True)
+# 每条变异自己的 TMPDIR 建在这里（judge_one 建、那一条结束就删）；全部判完列一遍这里，还剩的就是没删掉的
+per_mutation_temporary_root = os.path.join(shard_root, PER_MUTATION_TEMPORARY_DIRECTORY_NAME)
+os.mkdir(per_mutation_temporary_root)
 with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count,
                                             initializer=init_worker,
                                             initargs=(sequence_counter, shard_root)) as pool:
@@ -393,19 +489,28 @@ if len(judgements) != len(rows):
 
 # 按变异表的行号排序再打印：输出与分片数无关，GATE_MUTATION_WORKERS=1 与 =8 逐字相同
 judgements.sort(key=lambda judgement: judgement[0])
-invalid = [text for _, verdict, text in judgements if verdict == "invalid"]
-failures = [text for _, verdict, text in judgements if verdict == "failure"]
-memory_hits = [text for _, verdict, text in judgements if verdict == "memory"]
-timeouts = [text for _, verdict, text in judgements if verdict == "timeout"]
-unavailable = [text for _, verdict, text in judgements if verdict == "unavailable"]
-squeezed = [text for _, verdict, text in judgements if verdict == "squeezed"]
-refused = [text for _, verdict, text in judgements if verdict == "refused"]
-caught = [text for _, verdict, text in judgements if verdict == "caught"]
+invalid = [text for _, verdict, text, _removal in judgements if verdict == "invalid"]
+failures = [text for _, verdict, text, _removal in judgements if verdict == "failure"]
+memory_hits = [text for _, verdict, text, _removal in judgements if verdict == "memory"]
+timeouts = [text for _, verdict, text, _removal in judgements if verdict == "timeout"]
+unavailable = [text for _, verdict, text, _removal in judgements if verdict == "unavailable"]
+squeezed = [text for _, verdict, text, _removal in judgements if verdict == "squeezed"]
+refused = [text for _, verdict, text, _removal in judgements if verdict == "refused"]
+caught = [text for _, verdict, text, _removal in judgements if verdict == "caught"]
 for text in caught:
     print(text)
 # 各栏各数各的：超时、内存撞顶、被总上限挤掉、排不上既不算抓到也不算没红，与无效一样单列；这一行与进程数无关，进 stdout
 print(f"  计数：抓到 {len(caught)} 条、没红 {len(failures)} 条、无效 {len(invalid)} 条、内存撞顶 {len(memory_hits)} 条、超时 {len(timeouts)} 条、"
       f"被总上限挤掉 {len(squeezed)} 条、排不上没跑 {len(refused)} 条、scope 起不来没跑 {len(unavailable)} 条（共 {len(rows)} 条）")
+# 每条变异自己的 TMPDIR：删前合计多少（被包装停掉或杀掉的那几档另算一份）；删没删掉不信各条自报，全部判完把总目录底下现列一遍
+removals = [removal for _, _verdict, _text, removal in judgements]
+killed_removals = [removal for _, verdict, _text, removal in judgements if verdict in VERDICTS_KILLED_BY_WRAPPER]
+left_behind = sorted(os.listdir(per_mutation_temporary_root))
+removal_state = "每条结束时不论退出码都整个删掉了" if not left_behind else f"跑完有 {len(left_behind)} 条没删掉"
+print(f"  临时目录：{len(rows)} 条变异各一个自己的 TMPDIR，{removal_state}；删前合计 {sum(removal[0] for removal in removals)} 个文件、"
+      f"占盘 {sum(removal[1] for removal in removals)} 字节（表观 {sum(removal[2] for removal in removals)} 字节），"
+      f"其中被包装停掉或杀掉的 {len(killed_removals)} 条（超时、内存撞顶、被总上限挤掉）留下 {sum(removal[0] for removal in killed_removals)} 个文件、"
+      f"占盘 {sum(removal[1] for removal in killed_removals)} 字节")
 if invalid:
     print(f"  ✗ 有变异无效（无效 {len(invalid)} 条；替换文写进源码之后编不过，那条行为今天零变异覆盖）：")
     for item in invalid:
@@ -448,13 +553,21 @@ if unavailable:
     for item in unavailable:
         print(f"      {item}")   # gate-lint:detail
     print("     → 怎么办：修好用户级 systemd / D-Bus（systemctl --user status）整道重跑；不许拿掉上限去跑。")
-if invalid or failures or memory_hits or timeouts or squeezed or refused or unavailable:
+if left_behind:
+    print(f"  ✗ 有 {len(left_behind)} 条变异的临时目录跑完没删掉（{per_mutation_temporary_root} 底下还剩这几个；目录名里的 line-<行号> 是 {table} 的行号）：")
+    for directory_name in left_behind:
+        left_behind_path = os.path.join(per_mutation_temporary_root, directory_name)
+        contents = sorted(os.listdir(left_behind_path)) if os.path.isdir(left_behind_path) else ["（不是目录）"]
+        print(f"      {directory_name}：里面 {len(contents)} 项，前几项 {'、'.join(contents[:5]) or '（空）'}")   # gate-lint:detail
+    print("     → 怎么办：看 judge_one 末尾 measure_and_remove_mutation_temporary_directory 那一步跑到没有、删不删得掉（只读的目录、没退干净的进程又把它建回来）；")
+    print("       这一道收尾时连同源码副本一起删掉，现场只剩上面列的名字。别拿掉这一步：被杀的测试 Drop 守卫不跑，它建的镜像全堆在这一轮的 TMPDIR 里，一轮能堆几百 G。")
+if invalid or failures or memory_hits or timeouts or squeezed or refused or unavailable or left_behind:
     sys.exit(1)
 # ⚠️ 进程数与 cargo 编译并行度**不写进 stdout**：它们是两次跑唯一不同的输入，写进成功行就让
 # 「GATE_MUTATION_WORKERS=1 与 =16 的 stdout 逐字相同」这句话当场为假（独立复核实测：191 行判定行逐字相同，
 # 只有这一行收尾不同）。要看用了几个进程、为什么，看 stderr 的头一行。
 print(f"  ✓ crates 变异表复跑：{len(rows)} 条变异各自红在点名的测试上（原文都恰好命中一次；每条在内存上限 {memory_max} 里跑、内存撞顶 0 条，"
-      f"每条经 run-with-memory-cap.sh 排队、被总上限挤掉与排不上 0 条，每条限时 {timeout_seconds} 秒、超时 0 条；"
+      f"每条经 run-with-memory-cap.sh 排队、被总上限挤掉与排不上 0 条，每条限时 {timeout_seconds} 秒、超时 0 条，每条一个自己的 TMPDIR、结束时都删掉了；"
       f"工作进程动态领活——谁先跑完谁再领下一条，不按条数预先切片；输出按表的行号排序、与进程数无关）")
 print(f"  … 这一轮 {worker_count} 个工作进程，每个 cargo 编译并行度 {cargo_jobs}，每条变异内存上限 {memory_max}、限时 {timeout_seconds} 秒", file=sys.stderr)
 PY

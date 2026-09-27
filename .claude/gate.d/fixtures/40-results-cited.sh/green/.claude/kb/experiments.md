@@ -1,5 +1,9 @@
 # 待做实验
 
+## E99 孤儿样本 —— 已跑
+
 产物 `research/results/e99-orphan-2026-08-29.out` 已点名。
+
+产物 `research/results/e95-sample.r2.out` 是 replay.sh 登记的（名字像逐轮中间件），已点名。
 
 ## 历史版本

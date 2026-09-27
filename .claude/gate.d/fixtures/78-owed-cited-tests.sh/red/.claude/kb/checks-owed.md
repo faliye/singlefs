@@ -14,5 +14,7 @@
 |---|---|---|---|
 | C902 | 样本已还清 | 单测 `the_sample_test_that_was_renamed_away` 钉住它 | 2026-09-20 |
 | C903 | 没点名测试的样本行 | 这一行没有至少三段的 snake_case 标识符，应当进「没查的」那一串 | 2026-09-20 |
+| C904 | 只剩在注释里的样本 | 单测 `the_sample_test_left_only_in_a_comment` 钉住它 | 2026-09-20 |
+| C905 | 改了名带后缀的样本 | 单测 `the_sample_test_renamed_with_suffix` 钉住它 | 2026-09-20 |
 
 ## 历史版本

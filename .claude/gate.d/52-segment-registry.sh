@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 段序列登记表与 E142 产物逐字比对
 #
 # 判据（C316（提交步骤的登记位有四处且互不相同） 欠账的第①半）：
@@ -26,6 +28,8 @@
 #   bash .claude/gate.d/52-segment-registry.sh [仓根]
 set -uo pipefail
 # 阶段自己的位置在 cd 之前取：用相对路径调本阶段、又另给项目根时，cd 之后 $(dirname "$0") 就解析不到了
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 REPOSITORY="$(cd "$(dirname "$0")/../.." && pwd)"
 ROOT="${1:-$REPOSITORY}"
 cd "$ROOT" 2>/dev/null || exit 2

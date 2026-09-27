@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 动了用户定案的条款有没有记一笔未还的账
 #
 # 判据（`.claude/singlefs-ai-sop/skills/decide/SKILL.md` 硬要求第 6 条）：
@@ -9,10 +11,13 @@
 # 保证它会被看到——唯一提到它的那笔账（C113）当天就标了「已还」。
 # 拍板的人不知道自己的定案变了，而门禁全绿。
 #
+# 账点名决策按整个号认（D1 不算点名了 D16）。粒度是决策：一份决策正文里标了几处，都只要一笔未还的账点名这条决策。
 # 判「未还」看账那一行有没有带日期的还清标记（`已还（2026-…`、`已还一半（…`）：
 # 已还的账不会再被回看，等于没有账。要留着盯，就单立一笔。
 # 不按「已还」两字判——那两个字出现在描述里就会把整笔账误判成还清（写这条时实测）。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 KB="$ROOT/.claude/kb"
 OWED="$KB/checks-owed.md"
@@ -22,16 +27,18 @@ MARK='待用户复核\|等用户复核'
 [[ -f "$OWED" ]] || { echo "  ✗ 缺 $OWED"
   echo "     → 怎么办： 待复核的条款要有账本盯着。先建 checks-owed.md，再把这一笔记进去。"; exit 1; }
 
-fail=0; checked=0
+fail=0; checked=0; marked_lines=0
 while IFS= read -r f; do
   grep -q "$MARK" "$f" || continue
+  marked_lines=$((marked_lines + $(grep -c "$MARK" "$f")))
   # 决策号取自文件名：`16-发布语义.md` → D16
   d="D$(basename "$f" | sed 's/^0*//; s/-.*//')"
   checked=$((checked+1))
   # 未还的账：同一行里点名了这条决策、带着复核标记，且没标「已还」
   # 末段不许是 `grep -q`：pipefail 下它一命中就退出，前段吃 SIGPIPE ⇒ 命中被读成没命中
-  # （门禁阶段 41 判这一条）。先落到变量再判。
-  hits=$(grep "$MARK" "$OWED" | grep -F "$d" || true)
+  # （shell-lint 的 S7 判这一条：.claude/singlefs-ai-sop/scripts/shell-lint.sh）。先落到变量再判。
+  # 决策号按整个号认：D1 不许靠子串命中 D10–D19 的账
+  hits=$(grep "$MARK" "$OWED" | grep -E "${d}([^0-9]|\$)" || true)
   if [[ -n "$hits" ]] && grep -qv "已还[^ |]*（20" <<<"$hits"; then continue; fi
   echo "  ✗ $d 的正文标着待用户复核，checks-owed.md 里却没有一笔**未还**的账点名它"
   echo "        正文：$(basename "$f")"
@@ -43,7 +50,7 @@ while IFS= read -r f; do
 done < <(find "$KB/decisions" -name '*.md' | sort)
 
 if [[ $fail -gt 0 ]]; then
-  echo "  ✗ $fail 处待用户复核没有未还的账（共查 $checked 处）"
+  echo "  ✗ $fail 份决策正文标着待用户复核、却没有未还的账（共查 $checked 份）"
   echo "     → 怎么办：每一处「待用户复核」都要在 kb/checks-owed.md 里有一条未还的账盯着，"
   echo "               否则那句「待复核」没有任何人会回头看。补上那条账，或者"
   echo "               这一条已经复核完了就把「待用户复核」改成结论。"
@@ -55,4 +62,4 @@ if [[ $checked -eq 0 ]]; then
   echo "  ! 决策正文里没有一处标着待用户复核，本阶段无对象可判"
   exit 77
 fi
-echo "  ✓ 待用户复核的条款都有未还的账盯着（共 $checked 处）"
+echo "  ✓ 待用户复核的条款都有未还的账盯着（$checked 份决策正文、$marked_lines 行标着待用户复核；按决策判，一份决策有一笔未还的账点名它就算有）"

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 决策分项清单与正文同步
 #
 # `decisions.md` 里的「分项清单」和索引表的「状态」列，都是各决策正文的**投影**，
@@ -21,6 +23,8 @@
 set -uo pipefail
 # 生成器按**脚本自身的位置**取，不按 cwd（与 31 号同一个理由）：判别力样本把 cwd 换成只放着样本 kb 的临时目录，
 # 那里没有 `.claude/scripts/`，按 cwd 取会「找不到生成器 ⇒ 跳过」，红样本安静地退 77。生成器自己 glob 的是 cwd 下的 kb，正合样本所需。
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 GEN="$(cd "$(dirname "$0")/../.." && pwd)/.claude/scripts/gen-decision-items.py"
 # 先认 --write，再按第一个参数 cd：cd 失败就退 2（老写法 `cd … 2>/dev/null || true` 在参数指错时
 # 留在调用方的 cwd 里，判的是调用方所在的那个仓，还报绿）。
@@ -41,6 +45,8 @@ grep -qF "$S" "$IDX" || { echo "  ✗ $IDX 里没有生成块标记 $S"; echo " 
 
 gen_err="$(mktemp)"
 cells_f="$(mktemp)"
+# 各分支手写的 rm 管不到半路被打断的那一次：退出时一律删
+trap 'rm -f "${gen_err:?}" "${cells_f:?}"' EXIT
 # 生成器自己会说清哪一节取不到编号项、下一步怎么办 —— 吞掉 stderr 等于把那条 howto 扔了
 want="$(python3 "$GEN" 2>"$gen_err")" || {
   echo "  ✗ 生成器跑不起来"
@@ -126,6 +132,12 @@ fi
 
 if [[ "$want" == "$got" ]]; then
   n=$(printf '%s\n' "$want" | grep -c '^  - ' || true)
+  decision_lines=$(printf '%s\n' "$want" | grep -c '^- ' || true)
+  # 生成器一条决策都没产出、生成块也是空的：两个空串相等，什么都没比过，不记通过
+  if [[ "$decision_lines" -eq 0 && "$fail" -eq 0 ]]; then
+    echo "  ! 本次无对象可判：生成器一条决策都没产出（decisions/ 下没有读得出的决策正文），生成块也是空的"
+    exit 77
+  fi
   echo "  ✓ 决策分项清单与正文同步（$n 个分项）"
   exit $fail
 fi

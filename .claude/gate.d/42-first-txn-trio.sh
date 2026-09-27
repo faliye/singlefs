@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 第一个事务的三份文件互相挂钩（字节表 / 里程碑 / 决策索引）
 #
 # 三份文件说的是同一件事的三面：
@@ -14,16 +16,20 @@
 #   1. 判「是」且仍未定的每一条 `D<n> 未定项 <k>`，字节表与里程碑各至少引一次。
 #   2. 字节表「还剩几处空白」表里引到的未定项，必须都在第 1 条那个集合里（定了就要从表里拿走）。
 #   3. 字节表每一节（历史版本与空白表除外）标题下紧跟一行 `**里程碑**：… 步 N`，N 是里程碑里存在的 `## 步 N`。
-#   4. 里程碑每个 `## 步 N` 有一行 `**写出的字节**：`，要么写「无」，要么点名字节表里存在的节标题（「…」引起来的那段）；
-#      被字节表某节标成归属的步，不许写「无」。
+#   4. 里程碑每个 `## 步 N` 有一行 `**写出的字节**：`，要么写「无」，要么点名字节表里存在的节标题（「…」引起来的那段）：
+#      引起来的那段要与某一节的标题逐字相同，只许省掉标题末尾那一段全角括注（「七、发布」认「七、发布（根记录与根槽）」）；
+#      只是标题的一截（「根」「发布」）不算点名。被字节表某节标成归属的步，不许写「无」。
 #
 # 射程（`.claude/singlefs-ai-sop/rules/show-me-test.md`「没实现的要明说」）：
 #   只认「改第一个事务的字节：**是**（日期…」这一种写法（31 阶段定的规范形态，括号是判据的一部分）；
 #   判定写在未定项小节之外的散文抓不到，转述别的分项判过「是」的引号句不算。
+#   判「是」的未定项、字节表的节、里程碑的步三样一个都没有时，什么都没比，退 77（本次无对象可判），不报绿。
 #   引用形态只认 `D<n>（简称） 未定项 <k>`，与 32 阶段同一形态。不判引用处说的内容对不对。
 #
 #   bash .claude/gate.d/42-first-txn-trio.sh
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 FTL=.claude/kb/layout/01-first-txn.md
@@ -119,8 +125,9 @@ for idx, (i, n) in enumerate(step_lines):
         bad.append(f"{ms_path}:{i + 1} 步 {n} 的「写出的字节」既不是「无」，也没点名 layout/01-first-txn.md 里的节")
         continue
     for q in quoted:
-        if not any(q in h for h in headings):
-            bad.append(f"{ms_path}:{i + 1} 步 {n} 点名「{q}」，而 {ftl_path} 没有这一节")
+        # 逐字等于某一节的标题，或只省掉了标题末尾的全角括注；标题的一截（「根」之于「七、发布（根记录与根槽）」）不算
+        if not any(h == q or (h.startswith(q) and h[len(q):].startswith("（") and h.endswith("）")) for h in headings):
+            bad.append(f"{ms_path}:{i + 1} 步 {n} 点名「{q}」，而 {ftl_path} 没有标题是它的节（只许省掉标题末尾的全角括注）")
 
 if bad:
     print(f"  ✗ 第一个事务的三份文件对不上 {len(bad)} 处：")                    # gate-lint:summary
@@ -130,5 +137,8 @@ if bad:
     print("    定了案的就从空白表里拿走；字节表每节标题下写「**里程碑**：… 步 N」，里程碑每步写「**写出的字节**：无」或点名字节表的节标题。")
     sys.exit(1)
 
+if not blocking and not sections and not steps and not gap_refs:
+    print(f"  ! 本次无对象可判：{dec_dir} 里没有判「是」的未定项，{ftl_path} 没有节，{ms_path} 没有步，三样一样都没比")
+    sys.exit(77)
 print(f"  ✓ 第一个事务的三份文件互相挂钩（判「是」的未定项 {len(blocking)} 条、字节表 {sections} 节、里程碑 {len(steps)} 步）")
 PY

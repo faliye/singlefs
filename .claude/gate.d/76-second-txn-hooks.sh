@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 第二个事务的三处互相挂钩（layout/02 登记表 / 里程碑各步「写出的字节」/ layout/01 段序列登记表）
 #
 # 里程碑「第二个事务」的字节登记在三处：`layout/02-second-txn.md` 那张表登记第一次出现的盘上形态，
@@ -7,9 +9,11 @@
 # 42 号只管第一个事务那三份，这三处没有任何阶段同时看两份（里程碑「第二个事务」增补 2 收口表第 31 行）。
 #
 # 判据（每条都报绝对数）：
-#   1. layout/02 表每一行「里程碑那一步」点名的步 N 在里程碑里存在，且步 N 的「写出的字节」行用「」点名了这一行的形态（前缀即可）。
-#   2. 里程碑里每一行「写出的字节」用「」点名的东西，要么是 layout/01 的节标题（子串即可），要么是 layout/02 表某一行形态的前缀；
-#      点名 layout/02 某一行的步 N，那一行的「里程碑那一步」里要有步 N。
+#   0. layout/02 表每一行都要六格（形态 / 第一次出现在哪次发布 / 写成什么 / 决策分项 / 里程碑那一步 / 钉住它的用例），少一格判红，不静默丢掉。
+#   1. layout/02 表每一行「里程碑那一步」点名的步 N 在里程碑里存在，且步 N 的「写出的字节」行用「」点名了这一行的形态
+#      （前缀即可，但这个前缀只许对得上一行：同时是几行形态的前缀，就指不出点的是哪一行，不算点名，判红）。
+#   2. 里程碑里每一行「写出的字节」用「」点名的东西，要么是 layout/01 的节标题（子串即可），要么是 layout/02 表某一行形态的前缀
+#      （同样只许对得上一行）；点名 layout/02 某一行的步 N，那一行的「里程碑那一步」里要有步 N。
 #   3. layout/02 表「钉住它的用例」里反引号的 `*.rs` 在 `crates/*/tests/` 下存在，反引号的函数名在同一格点名的文件里有 `fn 名字`。
 #   4. 步 N 的「写出的字节」点名了 layout/01 的「八、」那一节，当且仅当「八、」那张表有一行写「里程碑「第二个事务」步 N」。
 #
@@ -17,8 +21,10 @@
 #
 #   bash .claude/gate.d/76-second-txn-hooks.sh
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
-cd "$ROOT" 2>/dev/null || exit 2
+cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 L1=.claude/kb/layout/01-first-txn.md
 L2=.claude/kb/layout/02-second-txn.md
 MS=.claude/kb/milestone/02-second-txn.md
@@ -49,7 +55,10 @@ for line in l2.splitlines():
 bad = []
 if not rows:
     bad.append(f"{l2_path} 里找不到表头是「| 形态 |」的登记表，或表里一行都没有")
-rows = [row for row in rows if len(row) >= 6] if rows else rows
+short_rows = [row for row in rows if len(row) < 6]
+for row in short_rows:
+    bad.append(f"{l2_path}「{row[0][:30]}」这一行只有 {len(row)} 格，登记表每行要 6 格（形态 / 第一次出现在哪次发布 / 写成什么 / 决策分项 / 里程碑那一步 / 钉住它的用例）")
+rows = [row for row in rows if len(row) >= 6]
 
 ms_lines = ms.splitlines()
 step_starts = [(index, int(match.group(1))) for index, line in enumerate(ms_lines) if (match := re.match(r"^## 步 (\d+)", line))]
@@ -59,7 +68,13 @@ for position, (start, number) in enumerate(step_starts):
     step_bytes_line[number] = next((line for line in ms_lines[start:end] if line.startswith("**写出的字节**：")), "")
 
 def rows_named_by(quote):
-    return [row for row in rows if plain(row[0]).startswith(plain(quote))]
+    """「」里的串点名 layout/02 的哪一行：它是那一行形态的前缀，而且只对得上这一行。同时是几行的前缀就指不出是哪一行，不算点名。"""
+    matched = [row for row in rows if plain(row[0]).startswith(plain(quote))]
+    return matched if len(matched) == 1 else []
+
+def ambiguous_prefix(quote):
+    matched = [row for row in rows if plain(row[0]).startswith(plain(quote))]
+    return matched if len(matched) > 1 else []
 
 # 1. 登记表一行 → 里程碑那一步
 row_links = 0
@@ -82,6 +97,11 @@ for index, line in enumerate(ms_lines):
     for quote in re.findall(r"「([^」]+)」", line):
         quotes_checked += 1
         named_rows = rows_named_by(quote)
+        shared_prefix = ambiguous_prefix(quote)
+        if shared_prefix:
+            bad.append(f"{ms_path}:{index + 1} 点名「{quote[:40]}」，而它是 {l2_path} 里 {len(shared_prefix)} 行形态的共同前缀"
+                       f"（{'、'.join(row[0][:20] for row in shared_prefix)}），指不出点的是哪一行，不算点名")
+            continue
         if not named_rows and not any(quote in heading for heading in headings):
             bad.append(f"{ms_path}:{index + 1} 点名「{quote[:40]}」，而 {l1_path} 没有这一节、{l2_path} 表里也没有这一行")
             continue

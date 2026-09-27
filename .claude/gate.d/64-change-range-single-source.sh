@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 改动范围只许一份取法：阶段不自己算 diff 基准，列路径的 git 调用都带 core.quotepath=false
 #
 # 判据（射程是 `.claude/gate.d/` 顶层的 *.sh 与 *.py，本阶段自己除外）。三条，任一条不成立判红：
 #   ① 算 diff 基准只许在 research/scripts/changed-paths.sh 里：代码行里出现 merge-base（`--is-ancestor` 核祖先除外）、
 #      @{upstream} 或 @{u}、gate-ok、读 GATE_BASE 或 GATE_DIFF_BASE（`$GATE_BASE`、`${GATE_BASE`、environ）的，
-#      以及跑 git 的那一行上写死 HEAD~N、用三点号（A...B 就是取 merge-base）的，判红。`unset GATE_BASE` 这类不读它的不算。
+#      以及跑 git 的那一行上写死 HEAD~N、HEAD^（HEAD^{tree} 这类剥类型的不算）、用三点号（A...B 就是取 merge-base）的，判红。`unset GATE_BASE` 这类不读它的不算。
 #      阶段要改动范围就 source 那份共用脚本、调 gate_diff_base。
 #   ② 列路径的 git 调用（--name-only、--name-status、ls-files）要带 -c core.quotepath=false（键不分大小写，值必须是 false）：
 #      同一行写了它；或者这一行用的变量 / 列表在同一个文件里带着它定义（例 `GIT = ["git", "-c", "core.quotepath=false"]`）；
@@ -15,19 +17,23 @@
 #   ③ 调共用取法（gate_changed_paths、gate_added_lines）要判退出码：同一行带 `||`，或放在 if / while 里。
 #      git 失败时共用脚本退非 0、什么都不交，不判就会把「没取到」读成「这次什么都没改」。
 #   「代码行」：去掉前导空白后不以 #、echo、printf、print(、bad、howto、die、引号开头的行，或者以这些开头、但这一行里
-#   跑了 `$(git …)` 或带引号括起的列路径参数的——出路文字与注释里提到这些词不算。
+#   跑了 `$(git …)`、带引号括起的列路径参数、或带引号括起的取基准参数（"merge-base"、"@{upstream}"、"HEAD~1"、"HEAD^"）的——
+#   出路文字与注释里提到这些词不算；参数列表换了行、续行以引号开头的，① 与 ② 一样判。
 #
 # 为什么：改动范围的取法收成共用脚本之前有六份以上拷贝，已经分叉过（一半漏了 quotepath；61 号的基准在默认分支上
 # 就是 HEAD，定案分两次提交、第一次没推，它就退 77 不判）。收完之后没有东西拦下一份拷贝。
 # 三方判决：research/prompts/gate-fix-forks-r1-main-verification.md 的 T5；判据按第二轮攻方打中的写法收严（gate-fix-forks-r2）。
 #
 # 没扫的：research/scripts/、.claude/scripts/、.claude/hooks/ 下的脚本不是门禁阶段，成功行把其中碰到这两条的逐个列名，清单现算。
-# 样本：fixtures/64-change-range-single-source.sh/red 把三条判据该抓的写法各放几种（自己取 merge-base、@{u}...、HEAD~1、
+# 样本：fixtures/64-change-range-single-source.sh/red 把三条判据该抓的写法各放几种（自己取 merge-base、@{u}...、HEAD~1、HEAD^、
+# 换了行的参数列表续行里的 "merge-base"、
 # 不带或带 =true 的 quotepath、包装函数名叫 git 而这一行没调它、test 的 -z、printf "$(git …)"、换行的参数列表、
-# 不判退出码的共用取法），逐条点名判红；green 放五种合法写法与 unset GATE_BASE、merge-base --is-ancestor、判了退出码的调用，判绿。
+# 不判退出码的共用取法），逐条点名判红；green 放五种合法写法与 unset GATE_BASE、merge-base --is-ancestor、HEAD^{tree}、判了退出码的调用，判绿。
 #
 #   bash .claude/gate.d/64-change-range-single-source.sh [项目根]
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 [[ -d .claude/gate.d ]] || { echo "  ! 没有 .claude/gate.d，本阶段无对象可判"; exit 77; }
@@ -37,11 +43,13 @@ import glob, os, re, sys
 own_name = sys.argv[1]
 BASE_PATTERN = re.compile(r'merge-base|@\{u(pstream)?\}|gate-ok|\$\{?GATE_(DIFF_)?BASE\b|environ[^\n]*GATE_(DIFF_)?BASE')
 # 写死的基准（HEAD~N）与三点号（A...B 就是取 merge-base）只在跑 git 的那一行上算：文档字符串里的「...」不算
-BASE_IN_GIT_PATTERN = re.compile(r'\bHEAD~\d|\S\.\.\.(\s|$|[^.])')
+BASE_IN_GIT_PATTERN = re.compile(r'\bHEAD(~\d|\^(?!\{))|\S\.\.\.(\s|$|[^.])')
 RUNS_GIT_ANYWHERE = re.compile(r'\bgit\b|\bGIT\b')
-BASE_ALLOWED = re.compile(r'merge-base\s+--is-ancestor')
+BASE_ALLOWED = re.compile(r'merge-base["\']?[\s,]+["\']?--is-ancestor')
 LIST_PATTERN = re.compile(r'--name-only|--name-status|\bls-files\b')
 QUOTED_LIST_FLAG = re.compile(r"""["'](--name-only|--name-status|ls-files)["']""")
+# 以引号开头的续行里，取基准的参数单独成一个带引号的参数（python 参数列表换了行）：这种行是代码，不是出路文字
+QUOTED_BASE_ARGUMENT = re.compile(r"""["'](merge-base|@\{u(pstream)?\}|HEAD(~\d+|\^(?!\{)[^"']*)|[^"'\s]+\.\.\.[^"'\s]*)["']""")
 TEXT_PREFIX = re.compile(r"""^(#|echo\b|printf\b|print\(|bad\b|howto\b|die\b|["'])""")
 RUNS_GIT = re.compile(r'\$\(\s*git\b')
 QUOTEPATH_FALSE = re.compile(r'quotepath=false', re.I)
@@ -56,7 +64,8 @@ CONTINUATION = re.compile(r"""^\s*["'\[]""")
 
 def is_text(stripped):
     """出路文字与注释：以这些开头、而且这一行不跑 git、不带引号括起的列路径参数的。"""
-    return bool(TEXT_PREFIX.match(stripped)) and not RUNS_GIT.search(stripped) and not QUOTED_LIST_FLAG.search(stripped)
+    return (bool(TEXT_PREFIX.match(stripped)) and not RUNS_GIT.search(stripped) and not QUOTED_LIST_FLAG.search(stripped)
+            and not QUOTED_BASE_ARGUMENT.search(stripped))
 
 def quoting_names(all_lines):
     """同一个文件里带着 quotepath=false 定义的变量 / 列表，与带着它的包装函数：(变量名集合, 函数名集合)。"""
@@ -96,7 +105,8 @@ def judge(path):
         if not stripped or is_text(stripped):
             continue
         number = index + 1
-        if (BASE_PATTERN.search(line) or BASE_IN_GIT_PATTERN.search(line) and RUNS_GIT_ANYWHERE.search(line)) \
+        runs_git_here = RUNS_GIT_ANYWHERE.search(line) or (CONTINUATION.match(line) and QUOTED_BASE_ARGUMENT.search(line))
+        if (BASE_PATTERN.search(line) or BASE_IN_GIT_PATTERN.search(line) and runs_git_here) \
                 and not BASE_ALLOWED.search(line):
             base_hits.append((number, stripped))
         if LIST_PATTERN.search(line) and not uses_quoting(line, variables, wrappers):

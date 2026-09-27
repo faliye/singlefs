@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 决策里定的字段有没有漏投影进第一个事务的表
 #
 # `32-first-txn-fields.sh` 查的是**正向**：[layout/01-first-txn.md] 表里每个字段都指得到一条真实分项。
@@ -15,9 +17,13 @@
 #      理由：不是每条分项都属于第一个事务（口径见 [layout/01-first-txn.md] 开头：不含快照、加密、目录树），
 #      对没被投影的分项要求投影会假红。**代价是：一条从头到尾就没进过投影表的分项，本阶段一个字也不说。**
 #   3. 字段名按子串比对，只判「在不在」，不判宽度值对不对（宽度归 27-format-constants 与 C94）。
+#      比对范围是投影表里引用了这条分项的那几节（按 `## ` 标题切）里的表格行：字段名只在别的节、或只在正文段落里出现，不算投影了。
+#   一张被投影的字段表都没核到：无对象可判，退 77（不记通过）。
 #
 #   bash .claude/gate.d/38-field-table-projection.sh
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 FTL=.claude/kb/layout/01-first-txn.md
@@ -30,7 +36,19 @@ ftl_path = sys.argv[1]
 ftl = open(ftl_path, encoding="utf-8").read().split("\n## 历史版本")[0]
 
 # 投影表引用过哪些分项：D<n>（任意简称） 已定项 <k>
-refs = {(int(a), int(b)) for a, b in re.findall(r"D(\d+)（[^）]*）\s*已定项\s*(\d+)", ftl)}
+REFERENCE = r"D(\d+)（[^）]*）\s*已定项\s*(\d+)"
+refs = {(int(a), int(b)) for a, b in re.findall(REFERENCE, ftl)}
+
+# 按 `## ` 切节：每节记下它引用了哪些分项、它的表格行。字段名要落在引用了那条分项的节的表格行里，
+# 在整份文件里按子串找会让别的节的正文顶替（「树 ID 水位」在别处提过一句，那一节的表里却没有这一行）
+sections = []
+for chunk in re.split(r"(?m)^(?=## )", ftl):
+    chunk_refs = {(int(a), int(b)) for a, b in re.findall(REFERENCE, chunk)}
+    table_rows = "\n".join(line for line in chunk.splitlines() if line.startswith("|"))
+    sections.append((chunk_refs, table_rows))
+
+def projected_table_rows(decision_item):
+    return "\n".join(rows for chunk_refs, rows in sections if decision_item in chunk_refs)
 
 checked_tables, checked_rows, bad = 0, 0, []
 for p in sorted(glob.glob(".claude/kb/decisions/*.md")):
@@ -56,9 +74,9 @@ for p in sorted(glob.glob(".claude/kb/decisions/*.md")):
             if not name:
                 continue
             checked_rows += 1
-            if name not in ftl:
+            if name not in projected_table_rows((dnum, item)):
                 bad.append(f"{p}:{i}  D{dnum} 已定项 {item} 的字段表有「{name}」（宽 {c[1]}），"
-                           f"而 {ftl_path} 里找不到它")
+                           f"而 {ftl_path} 里引用了这条分项的那几节的表格行里找不到它")
 
 if bad:
     print(f"  ✗ 分项定了的字段没投影进第一个事务的表 {len(bad)} 处：")     # gate-lint:summary
@@ -70,6 +88,9 @@ if bad:
     print("    那就把它从这条分项的字段表里挪走，或把该分项从投影表的引用里去掉——两处口径必须一致。")
     sys.exit(1)
 
+if checked_tables == 0:
+    print(f"  ! 本次无对象可判：投影表引用了 {len(refs)} 条分项，其中没有一条的正文里有「| 字段 | 宽 |」字段表")
+    sys.exit(77)
 print(f"  ✓ 被投影的分项，字段表都投影全了（{checked_tables} 张字段表、{checked_rows} 行；"
       f"投影表引用了 {len(refs)} 条分项）")
 PY

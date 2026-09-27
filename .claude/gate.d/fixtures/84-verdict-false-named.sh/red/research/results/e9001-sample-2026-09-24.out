@@ -1,0 +1,3 @@
+E7RESULT name=config n=1
+E7RESULT name=verdict foo_ok=true bar_ok=false baz_ok=false qux_ok=false
+E7RESULT name=done emitted=2

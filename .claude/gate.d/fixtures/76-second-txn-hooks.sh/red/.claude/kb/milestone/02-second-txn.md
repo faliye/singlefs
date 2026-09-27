@@ -12,6 +12,10 @@
 
 **写出的字节**：[layout/01-first-txn.md](../layout/01-first-txn.md)「八、根槽写路径的段序列登记表」；[layout/02-second-txn.md](../layout/02-second-txn.md)「样本形态甲」那一行。
 
+## 步 4　点名写成共同前缀的样本步
+
+**写出的字节**：[layout/02-second-txn.md](../layout/02-second-txn.md)「样本形态」那几行。
+
 ## 历史版本
 
 ### 2026-09-19

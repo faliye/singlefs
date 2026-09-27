@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 最近一次总审核登记的文档级矛盾，每一行都要有去向
 # gate-similar: 79-tree-table-reserve.sh 它对决策正文里的认购表求和、比预留，读 decisions/；这一道读 records/ 最近一次总审核第五节，判每行处置列有去向，没有算术
 # gate-similar: 67-milestone-closeout-owed.sh 它判里程碑文件点名的开着欠账号都进了收口表或豁免，对象是里程碑文件；这一道的对象是总审核记录第五节的矛盾行，要求处置列写「已改」并带能在点名的 kb 文件里找到的引文，或点名一个开着的欠账号
@@ -21,22 +23,32 @@
 # 引号后面紧跟「0 命中」「不在」「没有了」的是在说那句话已经删掉，不算指向正文的引文；
 # 这类「已经不在」的说法本阶段**不核**（「0 命中」在哪个范围里 0 命中，处置列写不清，按整份文件判会误红）。
 # 只判引文找不找得到，不判引文说的是不是那一行的矛盾——后者要人看。
+# 引文里去掉编号（D / E / C / I- 号连同简称括注）与 .md 文件名之后，至少要剩两个字：只引一个编号（「D8」）
+# 或一个字，在点名的那份文件里总找得到，指不出今天正文里的任何一句话。
+#
+# 第五节的标题认「## 五」后面跟标点、空白或行尾的写法（「## 五、」「## 五.」「## 五 文档级矛盾」都认）；
+# 最近一次总审核里认不出第五节标题判红，认出了而表里一行矛盾都没有，本次无对象可判，退 77。
+# 欠账表开着与已还清的切法用共用读法 lib-owed.py（「已还清」整行标题为界，认不出标题判红），不在这里按子串切。
 #
 # 挂账表 .claude/audit-rows-pending 2026-09-23 已清空并关闭：立闸那天挂着的 26 行逐行现查过，
 # 全部给了去向。表里再出现任何一行非注释内容就判红——新的矛盾行一律当场给去向，不许挂账。
 #
 # 判别力：fixtures/81-audit-contradictions.sh/red 放一行「未改」且不给欠账号、一行只点名已还清的号、
 # 一行挂进已关闭的挂账表、一行「已改」却不引原文、两行「已改」引的原文在点名的文件里找不到而只在别的文件里有
-# （一行按 D 编号点名、一行按文件名点名）、一行引的原文哪里都没有，必须判红；green 放按 D 编号与按文件名点名、
-# 原文都在点名的文件里各一行，一行没点名文件而原文在 kb 别处，一行带「「旧说法」0 命中」而 kb 里没有「旧说法」，必须判绿。
+# （一行按 D 编号点名、一行按文件名点名）、一行引的原文哪里都没有、一行只引了一个编号「D9」，第五节标题写成
+# 「## 五 文档级矛盾」（不带顿号），必须判红；green 放按 D 编号与按文件名点名、
+# 原文都在点名的文件里各一行，一行没点名文件而原文在 kb 别处，一行带「「旧说法」0 命中」而 kb 里没有「旧说法」，
+# 欠账表开着的那张里有一行正文提到「### 已还清」这几个字（按子串切会把它后面开着的账算成还清），必须判绿。
 #
 # 内嵌 python 崩了不许走绿：它的退出码要取，而且必须报出 COUNT 那一行，缺一样判红
 # （2026-09-23 门禁审计那一轮查出：不取退出码时，python 崩了成功句照印、只是数变空白）。
 #
 #   bash .claude/gate.d/81-audit-contradictions.sh [仓根]
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
-cd "$ROOT" 2>/dev/null || exit 2
+cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 
 PENDING=".claude/audit-rows-pending"
 
@@ -46,11 +58,15 @@ if [[ -z "$latest" ]]; then
   exit 77
 fi
 
-if ! report="$(LATEST="$latest" PENDING="$PENDING" python3 - 2>&1 <<'PY'
-import glob, os, re
+OWED_LIBRARY="$(cd "$(dirname "$0")" && pwd)/lib-owed.py"
+if ! report="$(LATEST="$latest" PENDING="$PENDING" OWED_LIBRARY="$OWED_LIBRARY" python3 - 2>&1 <<'PY'
+import glob, importlib.util, os, re
 
 latest = os.environ["LATEST"]
 pending_path = os.environ["PENDING"]
+owed_library_spec = importlib.util.spec_from_file_location("owed", os.environ["OWED_LIBRARY"])
+owed_library = importlib.util.module_from_spec(owed_library_spec)
+owed_library_spec.loader.exec_module(owed_library)
 
 # 挂账表已关闭：任何一行非注释内容都是新挂的账。
 if os.path.exists(pending_path):
@@ -60,18 +76,24 @@ if os.path.exists(pending_path):
             print("BAD", f"{pending_path}:{number}",
                   "挂账表 2026-09-23 已清空并关闭，不许再加行；这一行的矛盾要当场给去向", sep="\t")
 
-# 只认开着那张表：「### 已还清」之后的号是还清了的，点名它们不算去向。
-owed_text = open(".claude/kb/checks-owed.md", encoding="utf-8").read()
-open_owed = set(re.findall(r"^\|\s*(C\d+)\s*\|", owed_text.split("### 已还清")[0], re.M))
-repaid_owed = set(re.findall(r"^\|\s*(C\d+)\s*\|", owed_text.split("### 已还清", 1)[1].split("## 历史版本", 1)[0], re.M)) \
-    if "### 已还清" in owed_text else set()   # 只到「## 历史版本」为止：历史节里的表行不是已还清
+# 只认开着那张表：「已还清」整行标题之后的号是还清了的，点名它们不算去向。切法用共用读法 lib-owed.py：
+# 按子串「### 已还清」切，开着的那张表里有一行正文提到这几个字，它后面开着的账就全被算成还清。
+owed_table = owed_library.read_owed_table(".claude/kb/checks-owed.md")
+if not owed_table.file_found:
+    print("BAD", ".claude/kb/checks-owed.md", "欠账表不在，分不出哪些欠账号还开着", sep="\t")
+elif not owed_table.paid_heading_found:
+    print("BAD", ".claude/kb/checks-owed.md", "认不出「已还清」那一行整行标题，分不出哪些欠账号还开着（不对着一张认不出的表判）", sep="\t")
+open_owed = set(owed_table.open_names) if owed_table.paid_heading_found else set()
+repaid_owed = set(owed_table.paid_names)
 
 lines = open(latest, encoding="utf-8").read().split("\n")
 in_section = False
+section_heading = None
 rows = []
 for number, line in enumerate(lines, 1):
-    if re.match(r"^##\s*五[、.]", line):
+    if section_heading is None and re.match(r"^##\s*五(?:[、.．:：\s]|$)", line):
         in_section = True
+        section_heading = (number, line.strip())
         continue
     if in_section and re.match(r"^##\s", line):
         break
@@ -81,6 +103,8 @@ for number, line in enumerate(lines, 1):
 # 表头与分隔行不是矛盾行。
 rows = [(number, line) for number, line in rows
         if not line.startswith("|---") and not re.match(r"^\|\s*#\s*\|", line)]
+if section_heading is None:
+    print("BAD", latest, "认不出第五节的标题（要写成「## 五」后面跟标点、空白或行尾），一行矛盾都没判", sep="\t")
 
 # 「已改」要指得到今天的正文：处置列用「」引的原文，按空白与 ** ` 归一之后，要在今天的 kb 正文
 # （「## 历史版本」之前，不含变更史）里找得到，而且要在这一行点名的文件里找得到（D / E 编号、C 号 → checks-owed.md、
@@ -92,6 +116,12 @@ NEGATED_AFTER = re.compile(r"^\s*(?:字样|都|也|已经)?\s*(?:0\s*命中|不�
 
 def normalized(text):
     return re.sub(r"\s+", " ", re.sub(r"[*`]", "", text)).strip()
+
+REFERENCE = re.compile(r"(?<![A-Za-z0-9_])(?:[DEC]\d+|I-\d+(?:\.\d+)*)(?:（[^）]*）)?|[\w\-]+\.md")
+
+def anchor_text(quote):
+    """引文里去掉编号（连同简称括注）与 .md 文件名、标点与空白之后剩下的字：少于两个就指不出正文里的一句话。"""
+    return re.sub(r"[\s\W_]+", "", REFERENCE.sub("", normalized(quote)))
 
 kb_body_by_path = {}
 for path in sorted(glob.glob(".claude/kb/**/*.md", recursive=True)):
@@ -138,6 +168,11 @@ for number, line in rows:
         for quote in affirmed_quotes:
             quote_count += 1
             wanted = normalized(quote)
+            if len(anchor_text(quote)) < 2:
+                print("BAD", f"{latest}:{number}",
+                      f"第 {cells[0]} 行处置列写「已改」，引的「{quote[:40]}」只是编号或文件名（去掉之后不足两个字），"
+                      "在点名的那份文件里总找得到，指不出今天正文里的一句话", sep="\t")
+                continue
             if any(wanted in kb_body_by_path[path] for path in searched_paths):
                 continue
             elsewhere = sorted(os.path.relpath(path, ".claude/kb") for path, text in kb_body_by_path.items()
@@ -165,7 +200,9 @@ for number, line in rows:
           f"第 {cells[0]} 行处置列写「{disposition[:40]}」，既不是「已改」、也没点名一个还开着的欠账号",
           sep="\t")
 
-print("COUNT", latest, checked, len(rows), fixed_rows, quote_count, unnamed_rows, sep="\t")
+print("COUNT", latest, checked, len(rows), fixed_rows, quote_count, unnamed_rows,
+      len(open_owed), len(repaid_owed), section_heading[0] if section_heading else 0,
+      section_heading[1] if section_heading else "认不出", sep="\t")
 PY
 )"; then
   echo "  ✗ 扫描没跑完：内嵌 python 自己出错了，一行都没判"
@@ -183,9 +220,10 @@ if ! grep -q '^COUNT' <<<"$report"; then
 fi
 
 mapfile -t bad < <(grep -E '^BAD' <<<"$report")
+IFS=$'\t' read -r _ where checked total fixed quotes unnamed open_count repaid_count heading_line heading_text < <(grep '^COUNT' <<<"$report")
 
 if ((${#bad[@]})); then
-  echo "  ✗ 最近一次总审核第五节有行没有去向："
+  echo "  ✗ 最近一次总审核第五节有行没有去向（第五节标题：${heading_text}）："
   while IFS=$'\t' read -r _ where why; do
     printf '      %s：%s\n' "$where" "$why"   # gate-lint:detail
   done < <(printf '%s\n' "${bad[@]}")
@@ -197,6 +235,10 @@ if ((${#bad[@]})); then
   exit 1
 fi
 
-read -r _ where checked total fixed quotes unnamed < <(grep '^COUNT' <<<"$report")
+if [[ "$total" == 0 ]]; then
+  echo "  ⊘ 本次无对象可判：$where 第五节（第 ${heading_line} 行的标题）下面的表里一行矛盾都没有"
+  exit 77
+fi
 echo "  ✓ 最近一次总审核第五节每一行都有去向（$where：第五节 ${total} 行，判了 ${checked} 行；写「已改」的 ${fixed} 行引了 ${quotes} 句原文，都在那一行点名的文件的今天正文里找得到；其中 ${unnamed} 行没点名 kb 文件，按 kb 全部正文找）"
+echo "    欠账表按共用读法 lib-owed.py 切：开着 ${open_count} 笔、已还清 ${repaid_count} 笔；第五节标题在第 ${heading_line} 行"
 exit 0

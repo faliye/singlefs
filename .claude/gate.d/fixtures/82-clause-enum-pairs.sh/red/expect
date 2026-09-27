@@ -2,3 +2,5 @@ exit=1
 want=条文列的集合与代码里的枚举对不上
 want=枚举里有变体 `Bing`
 want=代码加了成员而没登记
+want=表里的「乙」不是 D99 已定项 1 正文那串列举里的一项
+want=条文列了「丙种」，而 .claude/gate.d/82-clause-enum-pairs.tsv 里 src/sample.rs:SampleKind 没有它那一行

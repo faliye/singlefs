@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 状态一致性：说某条决策未定，而它已经定了
 #
 # **判据**：kb 正文里凡是紧贴着「D<n>（简称）」写下「未定」的句子，
-# 拿它与那条决策**状态行**上的实际状态比对；实际不是「待定」就判红。
+# 拿它与那条决策**状态行**上的实际状态比对；实际不是「待定」（含「待定（…）」带括注的写法）就判红。
+# 历史节只认整行的「## 历史版本」：「### 历史版本对照」这类标题不是文末历史节，它后面的正文照判。
 #
 # ⚠️ **它与「未定项有没有被别处定了」（`60-stale-open-items.sh`）不是一条。**
 # 那个阶段只扫**未定项小节**，且靠「谁比谁新」这个时间判据；
@@ -27,6 +30,8 @@
 # 判别力：样本 red 里「D101 未定」而 D101 标着已定，必须红；
 # green 里同一句话而 D101 标着待定，必须绿。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-.}"
 KB="$ROOT/.claude/kb"
 # 无对象可判退 77，门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
@@ -66,16 +71,21 @@ ref_re = re.compile(r'D\d+(?:（[^）]*）)?')
 tight_re = re.compile(r'^[\s，,、（(]*(?:取值|状态)?[\s：:]*(?:仍然|仍|尚|都|均)?未定(?!项)')
 
 bad, in_hist = [], False
+scanned_files, history_files, history_section_lines, quoted_references = 0, [], 0, 0
 for f in sorted(kb.rglob("*.md")):
     rel = f.relative_to(kb.parent.parent)
     # 决策变更史整份都是历史：原文住 decisions-history/，快查表 decisions-history.md 的「改前 / 改后」写的是当时的状态
     if f.name == "decisions-history.md" or f.parent.name == "decisions-history":
+        history_files.append(str(rel))
         continue
+    scanned_files += 1
     in_hist = False
     for i, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
-        if re.match(r'^#+\s*历史版本', line):
+        # 只认整行的「## 历史版本」（kb 文件文末那一节）：前缀匹配会让「### 历史版本对照」把后半份文件整段跳过
+        if re.match(r'^##\s*历史版本\s*$', line):
             in_hist = True          # 文末历史节按定义写的是旧状态，不判
         if in_hist:
+            history_section_lines += 1
             continue
         for m in ref_re.finditer(line):
             d = re.match(r'D\d+', m.group(0)).group(0)
@@ -87,8 +97,10 @@ for f in sorted(kb.rglob("*.md")):
             # 「」引文里的是被当作历史陈述引用的原话，不判
             head = line[:m.end()]
             if head.count('「') > head.count('」'):
+                quoted_references += 1
                 continue
-            if status[d] == '待定':
+            # 标题可以写成「待定（两项未定）」：逐字比「待定」会把合法的「D<n> 未定」判红
+            if re.match(r'\*{0,2}待定', status[d]):
                 continue
             bad.append((str(rel), i, d, status[d], line.strip()[:110]))
             break
@@ -100,5 +112,9 @@ if bad:
     print("     → 怎么办：读那条决策现在定了什么，把这句改写成它的现状；")
     print("               若指的是它下面某个还开着的分项，写成「D<n>（简称） 未定项 k」。")
     sys.exit(1)
-print(f"  ✓ 没有把已定的决策说成未定（扫 {len(status)} 条决策）")
+print(f"  ✓ 没有把已定的决策说成未定（扫 {scanned_files} 份 kb 文件，比对 {len(status)} 条决策的状态行）")
+print(f"     没查的：决策变更史 {len(history_files)} 份（整份是历史）；各文件「## 历史版本」一节里 {history_section_lines} 行；"
+      f"「」引文里紧贴决策号的 {quoted_references} 处（被引用的原话）")
+for history_file in history_files:
+    print(f"       变更史：{history_file}")
 PY

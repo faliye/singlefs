@@ -9,3 +9,6 @@ want=这些变异条目的原文或替换文里有 \n 以外的反斜杠转义
 want=research/mutations/e1_sample.tsv:2 M2_转义写进源码：替换文里的 \&
 want=crates/mutations.tsv 这些行的原文或替换文里有 \n 以外的反斜杠转义
 want=crates/mutations.tsv:3 M_转义写进源码：替换文里的 \&
+want=这些变异表或它的被测源码读不了
+want=research/mutations/e3_latin1.tsv 或 research/e7-index-bench/src/bin/e3_latin1.rs：UnicodeDecodeError
+want=crates/mutations.tsv:4 M_文件列是目录：文件 crates/demo/src 读不了（IsADirectoryError）

@@ -1,4 +1,8 @@
 exit=1
 want=没被 experiments.md 点名
+want=research/results/e97-sample.r2.out
 want=E98 点名 e98-nowhere-2026-09-24.out —— 树里没有，git 历史里也没有
 want=1 份被点名的产物既不在 research/results 下、也不在版本库历史里
+want=     research/results/e97-extra.txt
+want=这些实验标着已跑，却既没点名原始输出、也没说明产物为什么没留
+want=     E96

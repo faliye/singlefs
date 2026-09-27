@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 已还清的欠账行里点名的测试名，仓里还在不在
 #
 # 判据：`.claude/kb/checks-owed.md` 的「### 已还清」那张表里，反引号括起来的 snake_case 标识符
-# （形如 `a_b_c`，至少三段）必须在仓里的 `.rs` / `.py` / `.sh` 里找得到；找不到就红。
+# （形如 `a_b_c`，至少三段）必须在仓里的 `.rs` / `.py` / `.sh` 的代码里按整词找得到；找不到就红。
+# 按整词（`a_b_c_v2` 不算 `a_b_c` 还在）、只认注释之外（`.rs` 的 `//` 之后、`.py` / `.sh` 的 `#` 之后不算：
+# 旧名只剩在一句注释里，那个测试其实已经没了）。已还清表一行都没有、或行里一个这样的标识符都没有，本次无对象可判，退 77。
 # 一条已还清的行说「某某单测钉着这件事」，那个单测正是这条定案**唯一的记录位**——它被改名或删掉时，
 # 今天没有任何东西会说话。
 #
@@ -23,8 +27,10 @@
 #
 #   bash .claude/gate.d/78-owed-cited-tests.sh [项目根]
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
-cd "$ROOT" 2>/dev/null || exit 2
+cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 
 OWED=".claude/kb/checks-owed.md"
 if [[ ! -f "$OWED" ]]; then
@@ -74,13 +80,38 @@ for row in rows:
     else:
         skipped.append(number)
 
+if not rows:
+    print("  ⊘ 本次无对象可判：「### 已还清」那张表里一行首格是 C<编号> 的登记行都没有")
+    raise SystemExit(77)
+if not cited:
+    print(f"  ⊘ 本次无对象可判：已还清的 {len(rows)} 行里没有一个至少三段的 snake_case 标识符："
+          + "、".join(skipped))
+    raise SystemExit(77)
+
+def code_part(line, suffix):
+    """去掉注释之后的那一截：.rs 砍掉 `//` 之后，.py / .sh 砍掉行首或空白之后的 `#` 之后。"""
+    if suffix == ".rs":
+        return line.split("//", 1)[0]
+    return re.split(r"(?:^|\s)#", line, maxsplit=1)[0]
+
 def is_in_the_repository(name):
+    # grep 只用来缩小候选（按字面、按整词）；注释里的命中在下面逐行剔掉
     found = subprocess.run(
-        ["grep", "-rl", "--include=*.rs", "--include=*.py", "--include=*.sh",
+        ["grep", "-rnwF", "--include=*.rs", "--include=*.py", "--include=*.sh",
          "--exclude-dir=prompts", "--exclude-dir=target", "--exclude-dir=.git",
-         "--exclude-dir=gate.d", name, "."],
+         "--exclude-dir=gate.d", "--", name, "."],
         capture_output=True, text=True)
-    return found.returncode == 0
+    if found.returncode not in (0, 1):
+        print(f"  ✗ grep 找 `{name}` 时出错（退 {found.returncode}）：{found.stderr.strip()[:120]}")
+        print("     → 怎么办：按 grep 的报错修好（读不了的目录、权限），再跑；找的时候出错不等于没找到，也不等于找到了。")
+        raise SystemExit(1)
+    word = re.compile(r"(?<![A-Za-z0-9_])" + re.escape(name) + r"(?![A-Za-z0-9_])")
+    for hit in found.stdout.splitlines():
+        path, _, rest = hit.partition(":")
+        _, _, text = rest.partition(":")
+        if word.search(code_part(text, pathlib.Path(path).suffix)):
+            return True
+    return False
 
 missing = [(number, name) for number, name in cited if not is_in_the_repository(name)]
 

@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 改过名的术语，全仓不再出现旧名（排除表见 .claude/term-rename-exempt，没扫的逐项列在成功行里）
 #
 # 规则见 .claude/kb/term-renames.md：每改一个全仓术语，往那张登记表加一行「旧 新 匹配」，这道阶段从此替你盯着。
-# 实测（2026-09-21）：「系统配置 → 系统配置」第一批只扫了现状类 96 份 1273 处，而全仓真实残余是 1137 份 22741 处——
-# 中文旧名 10947 处、下划线与连字符变体、以及 `system_configuration` 系缩写（`system_configuration_mac`、`tail_system_configuration`）一处都没动，当时没有任何检查报得出来。
+# 实测（2026-09-21）：登记表 .claude/kb/term-renames.md 第一行那次中文术语改名（改成「系统配置」；旧名只写在那张表里，
+# 这里不写：写了就要把这份脚本登记进豁免表，而改名工具当年正是把这一句换成了「新名 → 新名」这种假话）
+# 第一批只扫了现状类 96 份 1273 处，而全仓真实残余是 1137 份 22741 处——
+# 中文旧名 10947 处、下划线与连字符变体、以及旧名的两字母缩写系（带前缀、带后缀两种写法，见那张表末三行）一处都没动，当时没有任何检查报得出来。
 # 同一天还查出：一类名字活在字符串与表格里（字段表标签、臂名、步骤种类串），naming-lint 的射程罩不到（C430）。
 # 判别力：fixtures/90-term-renames.sh/red 放一份带旧名的文件，必须判红；green 只有新名，必须判绿。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 SCRIPT="$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/sweep-term.py"
 [[ -f "$ROOT/.claude/kb/term-renames.md" ]] || { echo "  ! 没有 .claude/kb/term-renames.md，本阶段无对象可判"; exit 77; }

@@ -34,7 +34,7 @@
 51-admission-terms-covered.sh	kb-scribe	准入不等式各项有人维护
 52-segment-registry.sh	kb-scribe,experiment-runner	字节表段序列登记与 E142 产物两边
 53-format-const-placeholders.sh	implementation-writer,kb-scribe	crates 常量文件的占位与 kb 分项两边
-54-layer0-replay.sh	gate-triage	层 0 崩溃点重放（快档在 gate.sh --staged 里跑；全量由主 agent 在 HEAD + 暂存区的 worktree 里跑）
+54-layer0-replay.sh	crash-verifier	层 0 崩溃点重放与 stage-inputs.tsv 里登记的崩溃枚举用例（crash-case: 行，逐条按输入复用、只重跑输入变了的）：提交时在 HEAD + 暂存区的 worktree 里跑 --full
 55-qemu-first-transaction.sh	crash-verifier	QEMU 真设备
 56-crates-adversarial-review.sh	gate-triage	判决文件由主 agent 写，提交前核点名
 57-lkmm.sh	crash-verifier	herd7 内存序
@@ -45,6 +45,7 @@
 62-stage-owners.sh	gate-triage	本表与门禁目录、agent 定义
 70-citations.sh	kb-scribe,prior-art	外部引用还核得动；写进 kb 的是书记员，查源码树的是调研员
 80-absolute-assertions.sh	experiment-runner	实验钉绝对值的断言
+84-verdict-false-named.sh	experiment-runner	实验产物判决行里的 false 字段要被实验页点名：判决行由执行员交回之前逐行读、实验页由它写，写完就跑
 85-repro-command.sh	experiment-runner	实验复跑命令
 86-experiment-orphans.sh	experiment-runner	实验号在 kb 里有正文
 87-replay.sh	gate-triage	入库实验复现（全部实验复跑十几分钟，2026-09-17 从 experiment-runner 挪到收尾，理由同 15 号；执行员只跑自己那一个实验的 replay.sh）

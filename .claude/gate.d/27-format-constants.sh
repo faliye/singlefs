@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 格式常量在 kb 与实验源码之间同步
 #
 # **实测出来的，不是想出来的**（2026-08-31）：D23（journal 的角色与格式）已定项 9 在
 # 2026-08-30 把记录头从 84 抬到 86，kb 的两个下游数跟着改成 426 / 4010 并写明「产物不改」。
-# 而 `research/e7-index-bench/src/bin/e43_ext_budget.rs` 里
+# 而 `research/e7-index-bench/src/bin/e43_extension_point_budget.rs` 里
 # `const JOURNAL_HDR: u64 = 84`、单测 `assert_eq!(..., 428)`、产物 `hdr=84 room=428`
 # **三处都停在旧值**，`grep -rn JOURNAL_HDR .claude/gate.d/ .claude/scripts/` 零命中
 # ⇒ 没有任何东西把实验源码里的格式常量绑到 kb 的现行值上。
@@ -16,7 +18,7 @@
 #     <!-- format-const: JOURNAL_HEADER_BYTES = 86 stale=hdr=84|room=428 -->
 #
 # `stale=` 列的是**旧值的字面串**（`|` 分隔，可省）。它们不许再出现在 kb 正文与
-# 实验源码/产物里——但**允许出现在「## 历史版本」之后与 *-history.md 里**，
+# 实验源码里（`research/results/` 的产物不扫，理由见第 3 段）——但**允许出现在「## 历史版本」之后与 *-history.md 里**，
 # 那正是 `.claude/singlefs-ai-sop/rules/writing-discipline.md`「正文只写现状，历史进文末」
 # 给旧值留的位置。
 #
@@ -33,6 +35,8 @@
 # 一条多写了键的标记、一个同一份文件里登记两次的名字，以及值跨行写、带 pub(crate) 的两处落后声明，必须判红；
 # green 另放一张与格式常量同名的扫描表（数组类型），必须判绿。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 LIB="$(cd "$(dirname "$0")" && pwd)/lib-format-const.py"
 cd "$ROOT" 2>/dev/null || exit 2
@@ -100,7 +104,8 @@ for f in srcs:
             bad.append(f'{f}:{declaration.line_number}  const {name} = {declaration.value}，而 {kbf} 定的现行值是 {want}')
 
 # ---- 3. 旧值的字面串不许留在正文与源码里 ----
-# ⚠️ `research/results/` **不在扫描范围**，理由与阶段 26 排除 `research/prompts/` 同一条：
+# ⚠️ `research/results/` **不在扫描范围**，理由与 doc-lint 排除 `research/prompts/` 同一条
+# （`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「原样保存的证据不许事后改」，登记在 `.claude/doc-lint-exclude`）：
 # 产物是**那一轮的原始输出**，改它等于产物不再对应它的输入，证据链当场断掉。
 # 「源码改了而产物没重跑」由 `87-replay.sh` 逐字节比对抓——改了源码它就会红，直到重跑。
 scan = [(f, format_const.strip_marks(body_of(open(f, encoding='utf-8').read()))) for f in kb_files]

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 多条路径互证的实验，路径与共用项要登记且指得到
 #
 # 还 checks-owed.md C48（多条校验路径共用同一个前提）可机检的那一半。
@@ -8,8 +10,12 @@
 #      `| # | 路径 | 怎么算 | 源码落点 | 读了哪些共用项 |`，每行五格；
 #   ② 源码落点指得到：写成 `路径:行号` 的，那个文件要在仓里现存；只活在正文里的写
 #      「无实现：理由」，理由不许空；
-#   ③ 共用项那一格不许空，也不许只写「无」——多条路径逐格相等不构成证据，当它们共用
+#   ③ 共用项那一格不许空，也不许只写「无」（去掉括号、标点与「共用项」这类字眼之后只剩「无」「没有」「N/A」「none」
+#      这一类的都算只写了「无」）——多条路径逐格相等不构成证据，当它们共用
 #      同一个错误前提时，而那一列正是唯一能让人看出「共用了什么」的地方；
+#   表头下面要有分隔行；数据行按「不是分隔行」认，不按位置跳过前两行（少了分隔行时第一条数据行照判）。
+#   没有一页写了登记节、滞后表也一行都没有，本次无对象可判，退 77。基准里还没有滞后表（只缩不涨没法比）
+#   与 git 取不到基准那一版分开：后者判红。给的项目根进不去判红，不静默留在当前目录判别的树。
 #   ④ 还没写登记节的实验页登记在 `.claude/gate.d/multipath-registry-lag.tsv`，这张表每一行：
 #      两列（页面路径、普查判定的依据）用制表符分隔、都不许空；路径形如
 #      `.claude/kb/experiments/<编号>-….md` 且文件在仓里现存；那一页确实还没有登记节——补上了就判过期，删行；
@@ -25,11 +31,15 @@
 # 真结构在页面别处。那一半的欠账在 C48（多条校验路径共用同一个前提）。
 #
 # 判别力：fixtures/99-multipath-registry.sh/{red,green}/ 各一份实验页，
-# red 那份三行里一行共用项写「无」、一行源码落点指不到文件，另带一张滞后表：一行指向不存在的页、
+# red 那份四行里一行共用项写「无」、一行写「N/A」、一行源码落点指不到文件，另一份页的表缺分隔行、第一条数据行共用项写「无」，
+# 另带一张滞后表：一行指向不存在的页、
 # 一行指向已经写了登记节的页、一行少了依据那一列、一行的实验编号基准里没有，必须判红；
 # green 的滞后表只有一行、指向一份还没写登记节的页、与基准相同，必须判绿。
 set -uo pipefail
-cd "${1:-$(dirname "$0")/../..}" 2>/dev/null || true
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+ROOT="${1:-$(dirname "$0")/../..}"
+cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；进不去时留在当前目录判的是另一棵树。"; exit 2; }
 EXPERIMENTS=.claude/kb/experiments
 LAG=.claude/gate.d/multipath-registry-lag.tsv
 [[ -d "$EXPERIMENTS" ]] || { echo "  ! 没有 $EXPERIMENTS，本阶段无对象可判"; exit 77; }
@@ -52,6 +62,14 @@ LAG_PAGE = re.compile(r'\.claude/kb/experiments/(?P<number>[0-9]+)-[^/]+\.md')
 
 def has_registration(text):
     return HEADING in text
+
+SAYS_NOTHING = ('', '无', '没有', '没', 'na', 'none', 'nil', '不适用')
+
+def says_nothing(shared):
+    """共用项那一格去掉括号、标点、空白与「共用项 / 共用 / 共享」这类字眼之后，只剩「无」这一类：等于没写。"""
+    core = re.sub(r'[\s（）()\[\]【】「」`*。．.，,、;；:：/\\\-—–_]+', '', shared).lower()
+    core = re.sub(r'共用项|共用|共享', '', core)
+    return core in SAYS_NOTHING
 
 def lag_rows(text):
     """滞后表的内容行：[(行号, 各列)]，注释与空行不算。"""
@@ -78,7 +96,11 @@ for path in sorted(glob.glob(os.path.join(experiments, '*.md'))):
     if rows[0].strip() != WANTED:
         problems.append(f"{path}：表头不是 {WANTED}，实际是 {rows[0].strip()[:60]}")
         continue
-    for row in rows[2:]:
+    if len(rows) < 2 or not re.fullmatch(r'\|(\s*:?-+:?\s*\|)+', rows[1].strip()):
+        problems.append(f"{path}：表头下面没有分隔行（|---|---|…|），表格渲染不出来；下面的数据行照判")
+    for row in rows[1:]:
+        if re.fullmatch(r'\|(\s*:?-+:?\s*\|)+', row.strip()):
+            continue
         cells = [cell.strip() for cell in row.strip().strip('|').split('|')]
         if len(cells) != 5:
             problems.append(f"{path}：这一行不是五格：{row.strip()[:60]}")
@@ -92,7 +114,7 @@ for path in sorted(glob.glob(os.path.join(experiments, '*.md'))):
             problems.append(f"{path}：第 {number} 行「{name}」的源码落点既不是 路径:行号，也不是「无实现：理由」：{where[:40]}")
         if where.startswith('无实现：') and not where[len('无实现：'):].strip():
             problems.append(f"{path}：第 {number} 行「{name}」写了「无实现：」而理由是空的")
-        if not shared or shared in ('无', '—', '-', '无。'):
+        if says_nothing(shared):
             problems.append(f"{path}：第 {number} 行「{name}」的共用项那一格是空的或只写了「{shared}」")
 
 # ④ 滞后表：形状、路径、过期、只缩不涨
@@ -119,9 +141,19 @@ if os.path.isfile(lag_path):
 
 baseline_numbers = None
 if base:
-    shown = subprocess.run(['git', '-c', 'core.quotepath=false', 'show', f'{base}:{lag_path}'],
-                           capture_output=True, text=True)
-    if shown.returncode == 0:
+    # 「基准里还没有这张表」与「git 取不到基准那一版」分开：后者当成没有基线，只缩不涨就静默不比了
+    listed = subprocess.run(['git', '-c', 'core.quotepath=false', 'ls-tree', '--name-only', base, '--', lag_path],
+                            capture_output=True, text=True)
+    shown = None
+    if listed.returncode != 0:
+        lag_problems.append(f"取不到基准 {base} 里的 {lag_path}（git ls-tree 退 {listed.returncode}：{listed.stderr.strip()[:80]}），只缩不涨没比")
+    elif listed.stdout.strip():
+        shown = subprocess.run(['git', '-c', 'core.quotepath=false', 'show', f'{base}:{lag_path}'],
+                               capture_output=True, text=True)
+        if shown.returncode != 0:
+            lag_problems.append(f"读不出基准 {base} 里的 {lag_path}（git show 退 {shown.returncode}：{shown.stderr.strip()[:80]}），只缩不涨没比")
+            shown = None
+    if shown is not None:
         baseline_numbers = set()
         for _line_number, fields in lag_rows(shown.stdout):
             page_shape = LAG_PAGE.fullmatch(fields[0].strip())
@@ -153,6 +185,9 @@ if grown:
 if problems or lag_problems or grown:
     sys.exit(1)
 
+if checked_pages == 0 and not lagging and not lag_pages_by_number:
+    print(f"  ⊘ 本次无对象可判：没有一页实验写了「{HEADING}」，{os.path.basename(lag_path)} 里也一行都没有")
+    sys.exit(77)
 compared = f"与基准 {base} 比没涨" if baseline_numbers is not None else "基准里还没有这张表（或不是 git 仓），只缩不涨这一条没比"
 print(f"  ✓ 登记了路径与共用项的实验页判过了（{checked_pages} 份、{checked_rows} 条路径）；"
       f"还没写登记节的 {len(lagging)} 份在 {os.path.basename(lag_path)} 里、每一份都现存且确实还没写，{compared}；逐份补齐后删行")

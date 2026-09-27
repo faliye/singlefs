@@ -1,0 +1,3 @@
+exit=1
+want=这些 research 脚本声称有 --selftest，却没有任何门禁阶段在跑它：
+want=      research/scripts/mentioned.py

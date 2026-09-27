@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 发过腿的三方轮次，要么有判决，要么登记撂下
 #
 # 实测（2026-09-17 核出）：c245-r3 与 c355-c363-r3 两轮 2026-09-16 18:04–18:13 UTC 发了云端腿提示、本地腿交了样本，
@@ -27,11 +29,15 @@
 #
 # ⚠️ 管不到的：判决写得对不对、登记的理由真不真（靠人）；② 的第二种只认「同一小节里既点名又有 **判决」，
 # 一段写着「**判决**：没判」的小节也算判过；新轮若既不写正文、腿提示又用了上面五种之外的名字，它落进不判的那一列而不红。
+# 归档进版本库的腿文件由 git log 取：不在 git 仓里跑（样本目录）时只看树；在 git 仓里而 git log 失败（对象缺了、仓坏了）判红，
+# 不退回只看树——那样归档的轮次整批消失，既没判决也没登记的归档轮不再红。
 # 判别力：fixtures/66-abandoned-rounds.sh/red 放一轮发了腿没判决没登记、一轮只在 kb 里被提到而没有判决、
-# 写坏与说反话的登记（认不出的轮、有判决的轮、日期写坏、少一列、同一轮两行），必须判红；green 放判决文件、kb 小节判决、登记撂下各一轮与三个旧形态前缀，必须判绿并报对数。
+# 写坏与说反话的登记（认不出的轮、有判决的轮、日期写坏、少一列、同一轮两行），另由 setup.sh 建一个缺了旧树对象的 git 仓（git log 读不到），必须判红；green 放判决文件、kb 小节判决、登记撂下各一轮与三个旧形态前缀，必须判绿并报对数。
 #
 #   bash .claude/gate.d/66-abandoned-rounds.sh [项目根]
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 python3 - <<'PY'
@@ -60,15 +66,20 @@ legacy_leg_form = re.compile(r"^(?P<prefix>[^_].*?)(?:(?:-(?:forward|reverse|att
 # 少了后一半，一轮的腿文件一被归档，撂下登记表里那一行就报「认不出它发过腿」——
 # 而登记表本身是归档规则明令保留的（门禁 66 号的输入），两边对不上不是登记错了，是这道检查只看了树。
 archived_names = set()
-try:
+archive_log_error = None                     # 在 git 仓里而 git log 失败：归档的轮次读不到，收尾判红
+inside_repository = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
+                                   capture_output=True, text=True).returncode == 0
+if inside_repository:
     log = subprocess.run(["git", "-c", "core.quotepath=false", "log", "--all", "--diff-filter=D", "--format=", "--name-only",
-                          "--", prompts_dir], capture_output=True, text=True, check=True).stdout
-    for entry in log.split("\n"):
-        entry = entry.strip()
-        if entry.startswith(prompts_dir + "/"):
-            archived_names.add(os.path.basename(entry))
-except (subprocess.CalledProcessError, OSError):
-    pass                                     # 不在版本库里跑（样本目录）时退回只看树，判据不变宽
+                          "--", prompts_dir], capture_output=True, text=True)
+    if log.returncode != 0:
+        archive_log_error = f"git log 退出码 {log.returncode}：{(log.stderr.strip().splitlines() or ['（git 没说原因）'])[-1]}"
+    else:
+        for entry in log.stdout.split("\n"):
+            entry = entry.strip()
+            if entry.startswith(prompts_dir + "/"):
+                archived_names.add(os.path.basename(entry))
+# 不在 git 仓里（样本目录）时只看树：那里没有归档可读，判据不变宽
 prompt_files = sorted(set(name for name in os.listdir(prompts_dir)
                           if os.path.isfile(os.path.join(prompts_dir, name))) | archived_names)
 dispatch_files_by_round = {}
@@ -168,6 +179,10 @@ unjudged_unregistered_rounds = [name for name in rounds_without_any_verdict if n
 abandoned_rounds = [name for name in rounds_without_any_verdict if name in registered_line_numbers]
 
 failed = False
+if archive_log_error:
+    failed = True
+    print(f"  ✗ 归档进版本库的腿文件读不到（{archive_log_error}）：只按树判，已归档、既没判决也没登记的轮次这一轮没判")
+    print("     → 怎么办：按 git 的报错修好仓库（git fsck 看缺了哪些对象，从远端或备份找回）再跑；读不到归档不是「没有归档」。")
 if unjudged_unregistered_rounds:
     failed = True
     print("  ✗ 这些三方轮次发过腿，却没有判决、也不在撂下登记表里：")  # gate-lint:summary

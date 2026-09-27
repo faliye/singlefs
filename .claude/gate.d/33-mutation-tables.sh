@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 每个实验二进制都要有变异表
 #
 # 判据：`research/e7-index-bench/src/bin/` 下每个 `*.rs` 在 `research/mutations/`
@@ -18,6 +20,8 @@
 set -uo pipefail
 BIN_DIR=research/e7-index-bench/src/bin
 MUT_DIR=research/mutations
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 [[ -d "$BIN_DIR" && -d "$MUT_DIR" ]] || { echo "  ! 找不到 $BIN_DIR 或 $MUT_DIR，本阶段跳过"; exit 77; }
 
 missing=(); malformed=()
@@ -40,18 +44,25 @@ done
 anchor_report="$(BIN_DIR="$BIN_DIR" MUT_DIR="$MUT_DIR" python3 - <<'PY'
 import os, glob, re
 bin_dir = os.environ["BIN_DIR"]; mut_dir = os.environ["MUT_DIR"]
-bad = []; stray = []; checked = 0
+bad = []; stray = []; unreadable = []; checked = 0
 def stray_escapes(segment_name, segment):
     """mutate.sh 与 59 号只把 \\n 还原成换行，别的反斜杠按字面写进源码（C427）。"""
     return [(segment_name, match.group(0)) for match in re.finditer(r"\\(.)", segment) if match.group(1) != "n"]
 for tsv in sorted(glob.glob(os.path.join(mut_dir, "*.tsv"))):
     stem = os.path.basename(tsv)[:-4]
     src_path = os.path.join(bin_dir, stem + ".rs")
-    # 没有同名二进制的表（shell 探针的变异表）不在本检查射程：它们的被测对象不是 .rs
+    # 没有同名二进制的表（shell 探针的变异表）不在本检查射程：它们的被测对象不是 .rs；成功行逐个列名
     if not os.path.exists(src_path):
+        print("NO_BINARY", tsv, sep="\t")
         continue
-    src = open(src_path, encoding="utf-8").read()
-    for lineno, line in enumerate(open(tsv, encoding="utf-8"), 1):
+    # 读不了（不是 UTF-8、是个目录、没权限）的一份判红、接着判下一份：崩在这里会让整段报告一行不剩
+    try:
+        src = open(src_path, encoding="utf-8").read()
+        table_lines = open(tsv, encoding="utf-8").read().split("\n")
+    except (OSError, UnicodeDecodeError) as error:
+        unreadable.append((stem, f"{type(error).__name__}: {error}"))
+        continue
+    for lineno, line in enumerate(table_lines, 1):
         if not line.strip() or line.startswith("#"):
             continue
         parts = line.rstrip("\n").split("\t")
@@ -71,8 +82,11 @@ for b in bad:
     print("BAD", *b, sep="\t")
 for s in stray:
     print("STRAY", *s, sep="\t")
+for u in unreadable:
+    print("UNREADABLE", *u, sep="\t")
 PY
 )"
+anchor_exit_code=$?
 # ── crates/mutations.tsv 的锚点（六段：变异名、文件、原文、替换文、cargo test 参数、必须红的测试名）──
 # 口径与 59 号的预扫一致：原文里的 \n 还原成换行，在「文件」那一段指的源码里恰好命中一次；文件不在也算腐化。
 crates_report=""
@@ -116,12 +130,17 @@ for line_number, line in enumerate(open("crates/mutations.tsv", encoding="utf-8"
     except FileNotFoundError:
         print("CRATES_BAD", line_number, name, f"文件 {path} 不存在", sep="\t")
         continue
+    except (OSError, UnicodeDecodeError) as error:
+        # 指向一个目录、没权限、不是 UTF-8：只接 FileNotFoundError 时这里一崩，整张表没判就报绿
+        print("CRATES_BAD", line_number, name, f"文件 {path} 读不了（{type(error).__name__}）", sep="\t")
+        continue
     hits = source.count(original)
     if hits != 1:
         print("CRATES_BAD", line_number, name, f"原文在 {path} 里命中 {hits} 次", sep="\t")
 print("CRATES_CHECKED", checked)
 PY
 )"
+  crates_exit_code=$?
 fi
 crates_checked="$(sed -n 's/^CRATES_CHECKED //p' <<<"$crates_report")"
 mapfile -t crates_bad < <(grep '^CRATES_BAD' <<<"$crates_report")
@@ -130,8 +149,30 @@ anchor_checked="$(sed -n 's/^CHECKED //p' <<<"$anchor_report")"
 mapfile -t anchor_bad < <(grep '^BAD' <<<"$anchor_report")
 mapfile -t stray_rows < <(grep '^STRAY' <<<"$anchor_report")
 mapfile -t crates_stray < <(grep '^CRATES_STRAY' <<<"$crates_report")
+mapfile -t anchor_unreadable < <(grep '^UNREADABLE' <<<"$anchor_report")
+mapfile -t tables_without_binary < <(sed -n 's/^NO_BINARY\t//p' <<<"$anchor_report")
+# 两段 python 自己崩了（退出码非 0、或没报出 CHECKED 那一行）：它们没判完，不许读成「没有 BAD 行」
+script_failures=()
+if [[ "${anchor_exit_code:-1}" -ne 0 || -z "$anchor_checked" ]]; then
+  script_failures+=("research 变异表的锚点检查没跑完（python 退出码 ${anchor_exit_code:-?}，CHECKED 行「${anchor_checked}」）")
+fi
+if [[ -f crates/mutations.tsv ]] && [[ "${crates_exit_code:-1}" -ne 0 || -z "$crates_checked" ]]; then
+  script_failures+=("crates/mutations.tsv 的锚点检查没跑完（python 退出码 ${crates_exit_code:-?}，CRATES_CHECKED 行「${crates_checked}」）")
+fi
 
-if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]} + ${#crates_dup[@]} + ${#stray_rows[@]} + ${#crates_stray[@]})); then
+if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]} + ${#crates_dup[@]} + ${#stray_rows[@]} + ${#crates_stray[@]} + ${#anchor_unreadable[@]} + ${#script_failures[@]})); then
+  if ((${#script_failures[@]})); then
+    echo "  ✗ 锚点检查的 python 没跑完，这一段等于没判："
+    printf '      %s\n' "${script_failures[@]}"
+    echo "    → 怎么办：看上面 python 打出的报错（多半是某份文件读不了），修好再跑；没跑完不许当成锚点都对得上。"
+  fi
+  if ((${#anchor_unreadable[@]})); then
+    echo "  ✗ 这些变异表或它的被测源码读不了（不是 UTF-8、是目录、没权限），表里的条目一条都没判："
+    while IFS=$'\t' read -r _ stem why; do
+      printf '      %s 或 %s：%s\n' "$MUT_DIR/$stem.tsv" "$BIN_DIR/$stem.rs" "$why"   # gate-lint:detail
+    done < <(printf '%s\n' "${anchor_unreadable[@]}")
+    echo "    → 怎么办：转成 UTF-8 文本（或把放错的目录挪走），再跑；mutate.sh 读它时同样会失败。"
+  fi
   if ((${#missing[@]})); then
     echo "  ✗ 这些实验二进制没有同名变异表："   # gate-lint:detail
     printf '      %s\n' "${missing[@]}"
@@ -189,4 +230,7 @@ fi
 n=$(ls "$BIN_DIR"/*.rs | wc -l)
 crates_summary="；没有 crates/mutations.tsv"
 [[ -f crates/mutations.tsv ]] && crates_summary="；crates/mutations.tsv ${crates_checked} 条的原文各命中源码一次"
+if ((${#tables_without_binary[@]})); then
+  crates_summary+="；没有同名实验二进制、锚点不在本阶段射程的表 ${#tables_without_binary[@]} 张：$(printf '%s ' "${tables_without_binary[@]}")"
+fi
 echo "  ✓ $n 个实验二进制都有成形的变异表，${anchor_checked} 条变异的原文各命中源码一次${crates_summary}（本阶段不跑变异，只验装置在、锚点对得上、两段里没有 \n 以外的反斜杠转义、crates 那张表里没有两行重复——重复按「文件 + 原文 + 替换文 + 点名的测试」四项认，变异名另判）"

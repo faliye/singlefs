@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 里程碑收口表收全了文件里点名、还开着的欠账号，行号只许是顺序号
 #
 # 实测（2026-09-17 核出）：.claude/kb/milestone/02-second-txn.md「增补 2」的收口表立表时 13 行，
@@ -28,6 +30,8 @@
 #
 #   bash .claude/gate.d/67-milestone-closeout-owed.sh [项目根]
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 OWED_LIBRARY="$(cd "$(dirname "$0")" && pwd)/lib-owed.py"
 cd "$ROOT" 2>/dev/null || exit 2

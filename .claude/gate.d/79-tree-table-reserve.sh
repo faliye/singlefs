@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 树表条目预留字节的认购合计（认购不许超过预留，每条要指得到一个编号）
 # gate-similar: 67-milestone-closeout-owed.sh 它判里程碑收口表收全了开着的欠账号、行号只许顺序号，读 .claude/kb/milestone/ 的收口表；这一道读决策正文里 gate:tree-table-reserve 标记下的认购表，红在宽度之和超过 total
 # gate-similar: 37-decision-summary-width.sh 它判 decisions.md 索引表结论列的字数不超上限，逐格数字数；这一道对一张认购表的宽度列求和、与标记里的预留比大小，还要每行出处带编号
@@ -19,10 +21,14 @@
 #   | … | 头条目 | 8 | C271（…） |
 # 判据三条：① 宽度列全是正整数；② 合计不超过标记里的 total；③ 每行「出处」要带一个编号
 #（C<n> 在 .claude/kb/checks-owed.md 有登记行，D<n> 在 .claude/kb/decisions/<n>-*.md 存在）。
+# 认购行不足四格（少了宽度或出处）判红，不静默丢掉；标记下面一条认购都没有，本次无对象可判，退 77。
+# 内嵌 python 的退出码要取，而且必须报出 CHECKED 那一行：它崩了（例如读不到 checks-owed.md）时不许走绿。
 # 成功那句报出检查了几条认购、合计多少、余多少（rules/show-me-test.md：扫到 0 项也不是通过）。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
-cd "$ROOT" 2>/dev/null || exit 2
+cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 
 report="$(python3 - <<'PY'
 import glob, re, sys
@@ -50,8 +56,12 @@ for line in lines[index + 1:]:
             break
         continue
     cells = [cell.strip() for cell in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
-    if len(cells) >= 4 and cells[0] not in ("认购者",) and not cells[0].startswith("---"):
-        rows.append(cells)
+    if cells[0] in ("认购者",) or cells[0].startswith("---"):
+        continue
+    if len(cells) < 4:
+        print("BAD", f"「{cells[0]}」这一行只有 {len(cells)} 格，认购表每行要四格（认购者 / 住哪条条目 / 宽度 / 出处），它的宽度没进合计", sep="\t")
+        continue
+    rows.append(cells)
 
 owed = open(".claude/kb/checks-owed.md", encoding="utf-8").read()
 subtotal = 0
@@ -78,6 +88,14 @@ if subtotal > total:
 print("CHECKED", len(rows), subtotal, total, sep="\t")
 PY
 )"
+python_rc=$?
+if ((python_rc != 0)) || ! grep -q '^CHECKED' <<<"$report"; then
+  printf '%s\n' "$report" | tail -5 | sed 's/^/      /'   # gate-lint:detail
+  echo "  ✗ 认购表没算完：内嵌 python 退出码 $python_rc，$(grep -q '^CHECKED' <<<"$report" && echo '报了' || echo '没报出') CHECKED 那一行"
+  echo "    → 怎么办：单独跑一遍这道阶段看 python 的报错（多半是 .claude/kb/checks-owed.md 或决策文件读不到）；"
+  echo "      没算完就是什么都没查，成功句里的数会是空的，而它看着与判过了一模一样。"
+  exit 1
+fi
 
 mapfile -t bad < <(grep '^BAD' <<<"$report")
 read -r _ rows subtotal total < <(grep '^CHECKED' <<<"$report")
@@ -91,5 +109,9 @@ if ((${#bad[@]})); then
   echo "      合计超了就先去掉一个认购者（或把那一段的宽度压小），别直接改 total——预留多少由那条已定项定；"
   echo "      出处指不到编号的，补一个还开着的欠账号或一条已定分项，编号要带简称。"
   exit 1
+fi
+if [[ "$rows" == 0 ]]; then
+  echo "  ⊘ 本次无对象可判：gate:tree-table-reserve 标记下面一条认购都没有（预留 ${total}）"
+  exit 77
 fi
 echo "  ✓ 树表条目预留的认购表对得上（${rows} 条认购，合计 ${subtotal} 字节、预留 ${total}、余 $((total - subtotal))；每条的出处都指得到一个编号）"

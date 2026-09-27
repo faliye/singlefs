@@ -68,34 +68,57 @@ def load_map(heads=None):
     return m, name
 
 
-def scanned_files():
-    files = sorted(set(sum([glob.glob(p, recursive=True) for p in
+def candidate_files():
+    """扫描射程里的全部文件，含下面要排除的 research/prompts/。"""
+    return sorted(set(sum([glob.glob(p, recursive=True) for p in
         ('.claude/kb/**/*.md', 'records/**/*.md', 'research/**/*.md',
          'research/**/*.rs', 'crates/**/*.rs', '.claude/rules/*.md')], [])))
-    # research/prompts/ 显式排除，理由与 26 号门禁相同：那是原样发给模型的提示与模型的原样输出，
+
+
+def is_excluded_prompt_file(path):
+    # research/prompts/ 显式排除，理由是 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「原样保存的证据不许事后改」
+    # （`.claude/doc-lint-exclude` 排除它也是这一条）：那是原样发给模型的提示与模型的原样输出，
     # 与 research/results/ 里的产物一一对应，事后改它等于让产物对不上输入。
     # 实测（2026-09-03）：反推腿的输出里有一条复现命令 `grep -n "已定项 8" …`，
     # 没有决策号可归属，按正文规则判红，而那一行按证据链不许改。
-    return [f for f in files if '/prompts/' not in f]
+    return '/prompts/' in path
+
+
+def scanned_files(candidates=None):
+    return [f for f in (candidates if candidates is not None else candidate_files()) if not is_excluded_prompt_file(f)]
 
 
 def self_decisions(heads=None):
     return {f: d for f, (d, _) in (heads if heads is not None else decision_heads()[0]).items()}
 
 
-def references(path, item_map, self_map):
-    """逐处给出一个分项引用：(行号, 行, 匹配, 写的状态, 归属或 None, 指名却没有第 k 条的那条决策或 None, 紧挨着指名的决策或 None)。"""
+# 紧挨着分项引用的「D<n>（简称）」：简称里许套一层括号（「D14（双轨（大小文件 / 持久临时））」），
+# 不许的话指名认不出来，引用就落回文件自身的决策上判（门禁审核 2026-09-26 那一格）。
+ADJACENT_NAMED_DECISION = re.compile(r'D(\d+)\s*(?:（(?:[^（）]|（[^（）]*）)*）)?\s*[*`]*\s*$')
+
+
+def references(path, item_map, self_map, skipped_fenced_lines=None):
+    """逐处给出一个分项引用：(行号, 行, 匹配, 写的状态, 归属或 None, 指名却没有第 k 条的那条决策或 None, 紧挨着指名的决策或 None)。
+
+    skipped_fenced_lines 给一个 list 时，代码围栏里跳过没判的行号逐个追加进去（成功行报「没查的」用）。
+    """
     self_d = self_map.get(path); last = None; hist = None; in_fence = False
-    for ln, line in enumerate(open(path, encoding='utf-8').read().split('\n'), 1):
+    lines = open(path, encoding='utf-8').read().split('\n')
+    fence_line_numbers = [ln for ln, line in enumerate(lines, 1) if line.lstrip().startswith('```')]
+    # 围栏行是奇数个：最后一个没闭合，不当围栏——按开关切的话，它之后的半份文件整段不判。
+    unclosed_fence_line_number = fence_line_numbers[-1] if len(fence_line_numbers) % 2 else None
+    for ln, line in enumerate(lines, 1):
         # 代码围栏里是逐字照抄的东西——变更史的「改前」原行、实验的产物行、源码片段。
         # 按今天的状态判它们，等于要求「原样保存的证据」跟着现状改
         # （`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「原样保存的证据不许事后改」）。
         # 实测（2026-09-20）：第三批瘦身把 D17（实现分层与第三方管道） 的旧正文抄进变更史围栏之后，
         # 围栏里两处「未定项 6」当场判红——那两行说的是抄下来那天的状态，而立项让第 6 条变成了已定。
-        if line.lstrip().startswith('```'):
+        if line.lstrip().startswith('```') and ln != unclosed_fence_line_number:
             in_fence = not in_fence
             continue
         if in_fence:
+            if skipped_fenced_lines is not None:
+                skipped_fenced_lines.append(ln)
             continue
         if (path.endswith('decisions-history.md') or '/decisions-history/' in path) and line.startswith('### '):
             mm = re.search(r'D(\d+)', line); hist = 'D' + mm.group(1) if mm else None
@@ -105,7 +128,7 @@ def references(path, item_map, self_map):
             # ⚠️ 只有**紧挨着**分项引用的那个编号才算「指名」（仓里规范的引用形态是
             # `D6（快照实现模型） 已定项 2`）。行内更早提到的编号不算：同一行里裸写的
             # 「已定项 k」按文件自身的决策号解析，那是下面三级回退存在的理由。
-            adj = re.search(r'D(\d+)\s*(?:（[^）]*）)?\s*[*`]*\s*$', pre)
+            adj = ADJACENT_NAMED_DECISION.search(pre)
             named = ('D' + adj.group(1)) if adj else None
             # 指名道姓的那条决策，正文里没有第 k 条 ⇒ 当场判红，不许往下落到别的决策。
             # 少了这一句，一个不存在的分项号会被静默改判到「刚好有第 k 条」的另一条决策
@@ -126,7 +149,8 @@ def references(path, item_map, self_map):
 # 「D2 已定项 6 还没定判据」会被误判——那里的「没定」修饰后面的名词，说的是「那条定了、但没定到这一样」
 # （实测：第一版在实验源码的注释里报了这两处）。两头都认 markdown 的 `**` 与反引号：「**D27 已定项 5 未定**」第一版就漏了。
 # 44 号阶段判红用它，relabel-item.py 列「要人看的句子」也用它。
-OPEN_AFTER = re.compile(r'^(?:（[^）]*）)?[\s、，,：:*`]*(?:今天|目前|仍然|仍|尚|还|都|均)?\s*(?:未定(?!项)|没定|定不下|待定|空着)'
+# 「这类词」可以连着几个（「今天仍未定」「目前都还没定」），每个后面许跟空白与顿号逗号。
+OPEN_AFTER = re.compile(r'^(?:（[^）]*）)?[\s、，,：:*`]*(?:(?:今天|目前|仍然|仍|尚|还|都|均)[\s、，,]*)*(?:未定(?!项)|没定|定不下|待定|空着)'
                         r'(?=$|[\s。，、；：:;,.)）」』（(！？!?*`])')
 
 
@@ -138,9 +162,13 @@ def main():
     heads, unreadable = decision_heads(strict=False)
     item_map, names = load_map(heads)
     self_map = self_decisions(heads)
-    bad = []; files = scanned_files(); refs = 0
+    candidates = candidate_files()
+    files = scanned_files(candidates)
+    excluded_prompt_files = [f for f in candidates if is_excluded_prompt_file(f)]
+    bad = []; refs = 0; skipped_fenced_lines_by_file = {}
     for path in files:
-        for ln, line, m, want, owner, missing, _ in references(path, item_map, self_map):
+        skipped_fenced_lines = []
+        for ln, line, m, want, owner, missing, _ in references(path, item_map, self_map, skipped_fenced_lines):
             refs += 1
             k = int(m.group(2))
             if missing:
@@ -151,6 +179,8 @@ def main():
             elif item_map[owner][k] != want:
                 bad.append(f"{path}:{ln} 「{m.group(0)}」写的是{want}定，而 {owner}"
                            f"（{names[owner]}） 正文里第 {k} 条是{item_map[owner][k]}定：{line.strip()[:60]}")
+        if skipped_fenced_lines:
+            skipped_fenced_lines_by_file[path] = len(skipped_fenced_lines)
     if unreadable:
         report_unreadable(unreadable)
     if bad:
@@ -168,6 +198,10 @@ def main():
         print(f"  ! 扫了 {len(files)} 个文件，一处分项引用都没有（{len(item_map)} 条决策、{n} 个分项），本阶段无对象可判")
         sys.exit(77)
     print(f"  ✓ 分项引用与正文状态一致（{len(item_map)} 条决策、{n} 个分项；扫了 {len(files)} 个文件、{refs} 处分项引用）")
+    print(f"     没查的：research/prompts/ 下 {len(excluded_prompt_files)} 个文件（原样保存的证据，整目录排除）；"
+          f"代码围栏里 {sum(skipped_fenced_lines_by_file.values())} 行（逐字照抄的原样），在 {len(skipped_fenced_lines_by_file)} 个文件里：")
+    for path, count in sorted(skipped_fenced_lines_by_file.items()):
+        print(f"       {path}：围栏里 {count} 行")
 
 
 if __name__ == '__main__':

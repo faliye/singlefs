@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 冻结层归属登记表：每层每个结构都有行、写「退出」的必是派生态、依据指得到已定分项
 #
 # 还 checks-owed.md C45（四层图里每个结构的态别没有登记）可机检的那一半。
@@ -33,6 +35,8 @@
 #   bash .claude/gate.d/16-freeze-layer-membership.sh [项目根]
 set -uo pipefail
 # LIB 要在 cd 之前算：$0 多半是相对路径，cd 进项目根之后就指不到了（样本在临时目录里跑时当场 FileNotFoundError）。
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 LIB="$(cd "$(dirname "$0")" && pwd)/lib-item-ref-status.py"
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
@@ -324,7 +328,7 @@ done
 read -r _ row_count layer_count component_count tree_count unit_count basis_count skipped_count state_only_count < <(grep '^COUNT' <<<"$report")
 mapfile -t skipped < <(awk -F'\t' '$1 == "SKIP" { print $2 }' <<<"$report")
 mapfile -t state_only < <(awk -F'\t' '$1 == "STATEONLY" { print $2 }' <<<"$report")
-echo "  ✓ 冻结层归属登记表判过了（${row_count} 行：D15 已定项 7 的 ${layer_count} 层与 ${component_count} 个组件、lib.rs 的 ${tree_count} 棵树、D18 已定项 11 的 ${unit_count} 个单元类都有行；依据点名的 ${basis_count} 处分项都在且已定）"
+echo "  ✓ 冻结层归属登记表判过了（$((row_count)) 行：D15 已定项 7 的 ${layer_count} 层与 ${component_count} 个组件、lib.rs 的 ${tree_count} 棵树、D18 已定项 11 的 ${unit_count} 个单元类都有行；依据点名的 ${basis_count} 处分项都在且已定）"
 if ((skipped_count)); then
   echo "    ② 没判的 ${skipped_count} 行（退不退出冻结写「判不动」）：$(IFS='；'; echo "${skipped[*]}")"
 else

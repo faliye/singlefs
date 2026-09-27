@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 实验源码的两条读数纪律——种子不许折叠，读数不许恒为字面量 0
 #
-# 判据：扫 `research/e7-index-bench/src/bin/*.rs`，两条各自成段、两条都判完再退出（一次把问题说全）。
+# 判据：扫 `research/e7-index-bench/src/bin/*.rs` 与住在 crates 下的实验装置 `crates/singlefs-harness/src/bin/e<号>*.rs`
+# （与门禁 80 号同规矩：住在 crates 下的实验照样是实验），两条各自成段、两条都判完再退出（一次把问题说全）。
 #   ① C59（种子折叠成同一个状态）：名字里带 `seed` 的标识符后面直接跟 `| 1` 或 `& !1`，判红。
 #      `seed | 1` 把 2 与 3、4 与 5 折成同一个状态：命令行给五个种子，实际只有三个访问模式，
 #      轮间变异系统性偏小——而那个变异正是「这个数稳不稳」的唯一依据。
@@ -26,7 +29,8 @@
 # 表对它们的三条闸：编号要在欠账表欠着那一张里找得到（按 `lib-owed.py` 读，67、92 号用的是同一份：
 # 「### 已还清」整行标题之前的是开着的；认不出那个标题就判红，不对着一张认不出的表判）；每一行都要对得上这一轮真扫出来的一处违规
 # （对不上就是已经改好了或者行号挪了，删掉或改掉这一行）；**只缩不涨**——
-# 与基准提交比，同一个文件的登记行数不许变多，基准里没有的文件不许出现。
+# 与基准提交比，同一个文件的登记行数不许变多，基准里没有的文件不许出现。基准里还没有这张表（初次登记）与
+# git 取不到基准那一版是两回事：前者没有基线可比、成功行照实报，后者判红，不许当成初次登记放过去。
 # 少了最后这一条，「新写的实验不在豁免表里判红」一行 tsv 就能绕过去。
 #
 # ⚠️ 射程，以及罩不到的是什么：
@@ -43,14 +47,17 @@
 #   两张豁免表的「只缩不涨」按**每个文件的登记行数**比，不按逐行比：行号会随无关改动漂。
 #   代价是同一个文件里删一行再加一行它看不出来。
 #
-# 判别力：fixtures/96-experiment-source-discipline.sh/red 是一个同时犯两条的小仓，另带一张挂在认不出的欠账表上的豁免表，必须判红；
+# 判别力：fixtures/96-experiment-source-discipline.sh/red 是一个同时犯两条的小仓，另带一张挂在认不出的欠账表上的豁免表、
+# 一份住在 crates/singlefs-harness/src/bin/ 下同样折叠了种子的装置，豁免表基准那一版的 blob 被 setup.sh 从对象库里删掉，必须判红；
 # green 是同一份源码加上两张对得上的豁免表，必须判绿。
 #
 #   bash .claude/gate.d/96-experiment-source-discipline.sh [项目根]
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 OWED_LIBRARY="$(cd "$(dirname "$0")" && pwd)/lib-owed.py"
-cd "$ROOT" 2>/dev/null || exit 2
+cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 base=""
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   # 基准取法与 56、68、69、75、97 号同一份：research/scripts/changed-paths.sh 的 gate 取法
@@ -66,7 +73,8 @@ base = sys.argv[1]
 owed_library_spec = importlib.util.spec_from_file_location("owed", sys.argv[2])
 owed_library = importlib.util.module_from_spec(owed_library_spec)
 owed_library_spec.loader.exec_module(owed_library)
-BIN_GLOB = "research/e7-index-bench/src/bin/*.rs"
+BIN_GLOBS = ("research/e7-index-bench/src/bin/*.rs", "crates/singlefs-harness/src/bin/e[0-9]*.rs")
+BIN_GLOB = " 与 ".join(BIN_GLOBS)
 OWED_PATH = ".claude/kb/checks-owed.md"
 SEED_LAG = ".claude/gate.d/experiment-seed-fold-lag.tsv"
 READING_LAG = ".claude/gate.d/experiment-constant-reading-lag.tsv"
@@ -112,7 +120,7 @@ def blank_out(text):
     return "".join(out)
 
 # ── 被扫集合：一次扫描，两条判据与「没查的是哪些」都从它现算 ───────────────
-paths = sorted(glob.glob(BIN_GLOB))
+paths = sorted(path for pattern in BIN_GLOBS for path in glob.glob(pattern))
 if not paths:
     print(f"  ✗ {BIN_GLOB} 一个文件都没扫到")
     print("     → 怎么办：实验 bin 目录搬了家就同步改这个阶段里的 BIN_GLOB（.claude/rules/path-moves.md）；")
@@ -208,8 +216,21 @@ def baseline_counts(path):
     """基准提交里这张表每个文件登记了几行；表在基准里不存在时返回 None（这次是初次登记）。"""
     if not base:
         return None
+    # 「基准里没有这张表」与「git 取不到基准那一版」分开判：后者当成初次登记，只缩不涨就静默不比了
+    listed = subprocess.run(["git", "-c", "core.quotepath=false", "ls-tree", "--name-only", base, "--", path],
+                            capture_output=True, text=True)
+    if listed.returncode != 0:
+        reject(f"取不到基准 {base} 里的 {path}（git ls-tree 退 {listed.returncode}），「只缩不涨」这一条没比：",
+               [listed.stderr.strip()[:200]],
+               ["怎么办：按上面 git 的报错修好仓库状态（基准要存在、对象库没坏）再跑；取不到基线不是「初次登记」。"])
+        return None
+    if not listed.stdout.strip():
+        return None
     result = subprocess.run(["git", "show", f"{base}:{path}"], capture_output=True, text=True)
     if result.returncode != 0:
+        reject(f"读不出基准 {base} 里的 {path}（git show 退 {result.returncode}），「只缩不涨」这一条没比：",
+               [result.stderr.strip()[:200]],
+               ["怎么办：按上面 git 的报错修好仓库状态（多半是对象库缺了那一份）再跑；读不出基线不是「初次登记」。"])
         return None
     counts = {}
     for line in result.stdout.split("\n"):

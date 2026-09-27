@@ -3,3 +3,4 @@
 # 给整机留的内存余量：1T
 add-becomes-sub	crates/tiny/src/lib.rs	left + right	left - right	-p tiny --lib -- adds_two_and_three_to_five	adds_two_and_three_to_five
 add-becomes-multiply	crates/tiny/src/lib.rs	left + right	left * right	-p tiny --lib -- adds_two_and_three_to_five	adds_two_and_three_to_five
+divide-no-longer-panics	crates/tiny/src/lib.rs	dividend / divisor	dividend.checked_div(divisor).unwrap_or(0)	-p tiny --lib -- dividing_by_zero_panics	dividing_by_zero_panics

@@ -13,10 +13,17 @@ D19（块指针的结构与宽度预算） 未定项 6 那一格因 D16 的状�
 
 用法：lib-open-item-review.py <文件> <工作区里条目首行的行号> <Dn:状态变动时间>…
 打印没复核过的那几个 Dn，一行一个。
+
+条目块的历史取不到（git log -L 退非 0，或一个提交都没交出来）退 3、原因打到 stderr：
+取不到历史不是「复核过了」，调用方（60 号）按「判据没跑成」判红。
 """
 import re
 import subprocess
 import sys
+
+
+class BlockHistoryUnavailable(Exception):
+    """git log -L 没交出条目块的历史：对象缺了、行范围超出了文件、仓坏了。"""
 
 ITEM_BOUNDARY = re.compile(r'^\s*\d+\.\s|^#{2,6} |^\|\s*\d+\s*\|')
 
@@ -54,8 +61,13 @@ def head_start_index(head_lines, work_first_line):
 
 def history_of_block(path, first_line_number, last_line_number):
     """条目块的历史（HEAD 里第 first..last 行，从 1 数）：[(提交时间, 改前, 改后)]，新的在前。"""
-    log = subprocess.run(['git', 'log', '-L', f'{first_line_number},{last_line_number}:{path}', '--format=%x00%ct'],
-                         capture_output=True, text=True).stdout
+    result = subprocess.run(['git', 'log', '-L', f'{first_line_number},{last_line_number}:{path}', '--format=%x00%ct'],
+                            capture_output=True, text=True)
+    if result.returncode != 0:
+        # 失败时 stdout 可能是空的，也可能是半截（-L 边走边打）：两种都不能当成历史用
+        reason = (result.stderr.strip().splitlines() or ['（git 没说原因）'])[-1]
+        raise BlockHistoryUnavailable(f'git log -L {first_line_number},{last_line_number}:{path} 退出码 {result.returncode}：{reason}')
+    log = result.stdout
     history = []
     for chunk in log.split('\x00')[1:]:
         lines = chunk.split('\n')
@@ -98,9 +110,15 @@ def main():
     work_end = block_end(work_lines, work_start)
     head_block = '\n'.join(head_lines[head_start:head_end + 1])
     work_block = '\n'.join(work_lines[work_start:work_end + 1])
-    history = history_of_block(path, head_start + 1, head_end + 1)
+    try:
+        history = history_of_block(path, head_start + 1, head_end + 1)
+    except BlockHistoryUnavailable as error:
+        print(f'  取不到条目块的历史，这一条没比：{error}', file=sys.stderr)
+        sys.exit(3)
     if not history:
-        return   # 取不到历史：判不了，不报（与改前同口径）
+        # 退 0 却一个提交都没交出来：条目块在 HEAD 里，就一定有引入它的那次提交；什么都没有是判不了，不是「复核过了」
+        print(f'  git log -L 对 {path} 第 {head_start + 1}–{head_end + 1} 行一个提交都没交出来，这一条没比', file=sys.stderr)
+        sys.exit(3)
     for decision, changed_at in dependencies:
         if mention_count(decision, work_block) > mention_count(decision, head_block):
             continue   # 工作区里刚补了一句点名它的复核

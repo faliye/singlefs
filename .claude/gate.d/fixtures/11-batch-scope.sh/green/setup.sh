@@ -14,6 +14,8 @@ cat > .claude/gate.d/knowledge-sync-triggers.tsv <<'EOF'
 EOF
 printf '# demo\n\n第一版\n' > .claude/agents/demo.md
 printf '# 旧记录\n' > records/2026-09-16-拆分提案.md
+# 68 号照真仓那样在代码里读触发文件清单（注释里也提到它，不影响）；随基准一起提交，不算这一批的改动
+printf '#!/usr/bin/env bash\n# 触发文件的清单读 knowledge-sync-triggers.tsv\nTRIGGER_TABLE=".claude/gate.d/knowledge-sync-triggers.tsv"\n' > .claude/gate.d/68-knowledge-sync.sh
 git add -A && git commit -qm base
 printf '# demo\n\n第二版\n' > .claude/agents/demo.md
 printf 'print("demo")\n' > research/scripts/demo.py

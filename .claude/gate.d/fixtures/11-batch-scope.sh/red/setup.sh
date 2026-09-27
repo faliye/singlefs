@@ -4,7 +4,8 @@
 #   ② 登记了 .claude/agents/gone.md，而这一批根本没碰它（上一批提交完没清表，下一批就白放行）；
 #   ③ 一行登记只写路径、# 后面空着，没写为什么这一批非碰它不可；
 #   ④ 一行登记写成 ./ 开头，不是从仓库根起；
-#   ⑤ 造一份不再读触发文件清单的 68 号（清单被人抄回脚本里的那种），两道就会对「什么算触发文件」各说各话。
+#   ⑤ 造一份不再读触发文件清单的 68 号（清单被人抄回脚本里的那种），两道就会对「什么算触发文件」各说各话；
+#      文件名只留在一行注释里——按全文子串判会放过它。
 # 另外正常登记了一个真碰了的触发文件，证明它不是整表判红。
 set -e
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
@@ -22,7 +23,7 @@ printf '# demo\n\n第二版\n' > .claude/agents/demo.md
 printf 'print("new")\n' > research/scripts/kept.py
 printf 'print("sneak")\n' > research/scripts/sneak.py
 # ⑤：68 号被改成不读那份清单了（清单抄回了脚本里）
-printf '#!/usr/bin/env bash\n# 把清单抄回脚本里的那一版\nexit 0\n' > .claude/gate.d/68-knowledge-sync.sh
+printf '#!/usr/bin/env bash\n# 把清单抄回脚本里的那一版；原先读 knowledge-sync-triggers.tsv，这行注释是剩下的\nexit 0\n' > .claude/gate.d/68-knowledge-sync.sh
 cat > .claude/batch-scope <<'EOF'
 # 这一批要碰的触发文件
 

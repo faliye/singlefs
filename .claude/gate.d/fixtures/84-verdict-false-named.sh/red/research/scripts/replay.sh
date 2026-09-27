@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# 门禁 84 号自检样本：只留判读表格所需的最小骨架，不是真的 replay.sh。
+set -uo pipefail
+TABLE=$(cat <<'TSV'
+E9001|e9001-sample||e9001-sample-2026-09-24.out|exact
+TSV
+)
+echo "$TABLE"

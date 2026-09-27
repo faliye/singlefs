@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 这一批要碰的触发文件有没有登记进范围
 #
 # 为什么：门禁 68 号的阶段同步按**触发文件**算范围——每多碰一个触发文件，事实表就多一行、候选表多几十到
@@ -23,7 +25,8 @@
 #      （上一批留下的登记会让下一批白放行，判据同 .claude/naming-lint-exclude 的「排除只缩不涨」）。
 #   ④ 登记行要写理由：路径之后 # 起，# 后面非空；空理由 ⇒ 红。
 #   ⑤ 登记的路径要从仓库根起写（不以 / ./ ../ 开头、不含 /../）；写歪了 ⇒ 红。
-#   ⑥ 68 号的正文里要还有这份清单的文件名——它与这一道算的是同一个量，清单只许有一份；找不到 ⇒ 红。
+#   ⑥ 68 号要还在读这份清单：它的非注释行里要有这份清单的文件名——它与这一道算的是同一个量，清单只许有一份；
+#      68 号文件不在、文件名一处都找不到、或只出现在注释行里 ⇒ 红。
 #   改动范围一个文件都没有 ⇒ 无对象可判，退 77（不记通过）。
 #
 # .claude/batch-scope 的格式：一行一条 <从仓库根起的路径><制表符或空格>#<为什么这一批要碰它>；
@@ -40,7 +43,11 @@
 # 必须判绿并报对数。
 #
 #   bash .claude/gate.d/11-batch-scope.sh [项目根]
+# gate-overlap:copy-kept 56-crates-adversarial-review.sh 开头这几行是每个用改动范围的阶段都照写的固定写法：preflight 那两行规范要求逐字写在脚本里（preflight-lint 按字面认），取改动范围的逻辑已经抽成 research/scripts/changed-paths.sh，剩下的只是 cd 进仓、判是不是 git 仓与 source 它，再抽一层只会多一个要 source 的文件
+# gate-overlap:copy-kept 68-knowledge-sync.sh 开头这几行是每个用改动范围的阶段都照写的固定写法：preflight 那两行规范要求逐字写在脚本里（preflight-lint 按字面认），取改动范围的逻辑已经抽成 research/scripts/changed-paths.sh，剩下的只是 cd 进仓、判是不是 git 仓与 source 它，再抽一层只会多一个要 source 的文件
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "  ! $ROOT 不是 git 仓，本阶段跳过"; exit 77; }
@@ -137,12 +144,28 @@ if bad_path:
 # 而「两道各自存一份清单」这件事一旦发生，两边都不会红——一道说要回扫、另一道说不用登记，
 # 谁都说不清该信哪个（`show-me-test.md`「两套装置算同一个量，就要有一条检查逼它们落到同一个数」）。
 # 拦法是查 68 号的正文里还有没有这份表的路径：把清单抄回脚本里的人，多半同时把读表那几行删掉。
+# 只认非注释行：清单抄回脚本之后，文件名常常还留在一行注释里（「清单见 …tsv」），按全文子串判就放过去了。
 SYNC_STAGE = ".claude/gate.d/68-knowledge-sync.sh"
-if os.path.isfile(SYNC_STAGE) and os.path.basename(TRIGGER_TABLE) not in open(SYNC_STAGE, encoding="utf-8").read():
-    print(f"  ✗ {SYNC_STAGE} 里找不到 {os.path.basename(TRIGGER_TABLE)}：它不再读这份清单了")
-    print(f"     → 怎么办：两道门禁算的是同一个量（什么算触发文件），清单只许有一份。"
-          f"把 68 号改回从 {TRIGGER_TABLE} 读，别在脚本里另存一份。")
+TRIGGER_TABLE_NAME = os.path.basename(TRIGGER_TABLE)
+if not os.path.isfile(SYNC_STAGE):
+    print(f"  ✗ 找不到 {SYNC_STAGE}：判不了它还读不读 {TRIGGER_TABLE_NAME}")
+    print(f"     → 怎么办：68 号搬了家或改了名，就把这里的 SYNC_STAGE 一起改（.claude/rules/path-moves.md）；"
+          f"它被删了，这一道的 ⑥ 也跟着删，别让它静默跳过。")
     failed = True
+else:
+    sync_stage_lines = open(SYNC_STAGE, encoding="utf-8").read().split("\n")
+    mentioning_lines = [line for line in sync_stage_lines if TRIGGER_TABLE_NAME in line]
+    code_lines_reading_table = [line for line in mentioning_lines if not line.lstrip().startswith("#")]
+    if not mentioning_lines:
+        print(f"  ✗ {SYNC_STAGE} 里找不到 {TRIGGER_TABLE_NAME}：它不再读这份清单了")
+        print(f"     → 怎么办：两道门禁算的是同一个量（什么算触发文件），清单只许有一份。"
+              f"把 68 号改回从 {TRIGGER_TABLE} 读，别在脚本里另存一份。")
+        failed = True
+    elif not code_lines_reading_table:
+        print(f"  ✗ {SYNC_STAGE} 里 {TRIGGER_TABLE_NAME} 只出现在 {len(mentioning_lines)} 行注释里，没有一行代码读它")
+        print(f"     → 怎么办：注释里留着文件名不等于还在读它；把 68 号改回从 {TRIGGER_TABLE} 读，"
+              f"别在脚本里另存一份清单。")
+        failed = True
 if failed:
     sys.exit(1)
 

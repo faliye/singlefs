@@ -9,3 +9,5 @@ want=表里登记了这些阶段，门禁目录里没有这个文件——多半
 want=     40-gone.sh
 want=这些 agent 名在 .claude/agents/ 里没有定义：
 want=第 4 行 20-b.sh：ghost
+want=     100-e.sh
+want=     a-f.sh

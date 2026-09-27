@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 状态一致性：未定项有没有被别处定了
 #
 # 还 checks-owed.md C31（未定项被别处定了却没回收）。
 #
 # **判据**：一个还开着的未定项，如果它的正文点名了另一个决策，
 # 而那个决策的**状态行**在它最后一次被改动之后又变过 —— 就要求复核。
+# 「它的正文」是整个条目块：首行加它下面的续行，到下一条分项（编号列表项或「| k |」表格行）或下一个标题之前、至多 20 行，
+# 与 lib-open-item-review.py 的条目块同一个口径——列表式条目常把「依赖 Dn」写在续行里，只看首行就漏了。
 #
 # ⚠️ **纯文本的依赖图抓不到这一类**：实测 D22 的三个陈旧未定项里，
 # 两个根本没有「前置是某某」这种标记（一个是「本事务内释放的块不得重用」
@@ -15,15 +19,21 @@
 # 两侧的时间戳都塌到拆分那一次提交。**它管的是今后**。
 # 判别力在一次性合成仓里双向证过：D2 后定而 D22 的项没动 ⇒ rc=1；
 # 把那条项改写成「已定」之后 ⇒ rc=0。
+# git 取不到时间（对象缺了、仓坏了）判红，不当「这条决策从没定过」：那样点名它的未定项一条都不比，照样报绿。
+# 样本：fixtures/60-stale-open-items.sh/red 另造一个缺了旧版本对象的仓：一份决策的 git log -G 读不到，
+# 一份未定项的条目块 git log -L 读不到，两处都要报出来。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 REVIEW_LIB="$(cd "$(dirname "$0")" && pwd)/lib-open-item-review.py"
 DEC=.claude/kb/decisions
 # 无对象可判退 77，门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
 [[ -d "$DEC" ]] || { echo "  ! 没有 $DEC，本阶段无对象可判"; exit 77; }
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "  ! 不在 git 仓库里，本阶段跳过"; exit 77; }
 
-# 每个决策状态行最后一次变动的提交时间
+# 每个决策状态行最后一次变动的提交时间；取不到（git 失败）记 -1，点名它的未定项逐条报「没比过」
 declare -A st_time
+time_unavailable=()
 for f in "$DEC"/*.md; do
   n=$(grep -m1 -oE '^## (D[0-9]+)' "$f" | awk '{print $2}') || continue
   [[ -n "$n" ]] || continue
@@ -34,7 +44,13 @@ for f in "$DEC"/*.md; do
   # 用 -S'—— 已定' 时，正文里一句「D21 已定索引是派生态」也会命中，
   # 于是任何一次给决策补实验结论都会把引用它的未定项全报一遍（实测三处假阳性）。
   # -G 加行首锚定只认 `## …—— 已定` / `### …—— 已定` 这种标题行。
-  t=$(git log -1 --format=%ct -G'^#{2,4} .*—— 已定' -- "$f" 2>/dev/null | head -1)
+  # git 自己的退出码先判，再取第一行：写成「git log … | head -1」时管道只交 head 的退出码，git 失败被读成「从没定过」
+  if ! t_out="$(git log -1 --format=%ct -G'^#{2,4} .*—— 已定' -- "$f")"; then
+    st_time[$n]=-1
+    time_unavailable+=("$n（$(basename "$f")）")
+    continue
+  fi
+  t="$(head -n 1 <<<"$t_out")"
   # ⚠️ **没有兜底。** 第一版取不到时退化成「文件最后修改时间」，
   # 于是任何一次给决策补内容都会把引用它的未定项全报一遍。
   # 从没加过「—— 已定」小节标题 = 它没定过任何东西 = 不该触发任何复核。
@@ -43,6 +59,11 @@ for f in "$DEC"/*.md; do
 done
 
 flagged=0
+if ((${#time_unavailable[@]})); then
+  flagged=1
+  echo "  ✗ 这些决策的「—— 已定」小节最近一次变动时间取不到（git log 失败），点名它们的未定项这一轮没法比：${time_unavailable[*]}"
+  echo "     → 怎么办：按上面 git 的报错修好仓库（git fsck 看缺了哪些对象，从远端或备份找回）再跑；取不到时间不是「这条决策从没定过」，不是通过。"
+fi
 open_items=0     # 扫到的未定项条数
 judged_items=0   # 其中点名了「定过东西的别的决策」、真拿去比过复核时间的条数
 for f in "$DEC"/*.md; do
@@ -68,11 +89,18 @@ for f in "$DEC"/*.md; do
     #   （条目诞生那次也算）；工作区里条目块比 HEAD 多点了它一次，算刚复核过。
     #   复核写一句「（YYYY-MM-DD 复核 Dn：……）」就满足；改别的地方不算。判据住在 lib-open-item-review.py。
     deps=()
+    # 点名按整个条目块认（首行加续行，到下一条分项或下一个标题之前、至多 20 行），与 lib-open-item-review.py 的 block_end 同一个口径
+    block_text="$(awk -v s="$ln" 'NR == s { print; next }
+        NR > s && NR <= s + 20 { if (/^[[:space:]]*[0-9]+\. / || /^##+ / || /^\|[[:space:]]*[0-9]+[[:space:]]*\|/) exit; print }' "$f")"
     # ⚠️ D 编号前面要是非字母数字：「RAID5」里的「D5」不是在点名 D5（实测：D2 未定项 15 因此被报成依赖 D5，
     # 改判据之前那一红被任何一次改动顺手消掉，改判据之后永远复核不掉）。
-    for d in $(grep -oE '(^|[^A-Za-z0-9])D[0-9]+' <<<"$text" | grep -oE 'D[0-9]+' | sort -u); do
+    for d in $(grep -oE '(^|[^A-Za-z0-9])D[0-9]+' <<<"$block_text" | grep -oE 'D[0-9]+' | sort -u); do
       [[ "$d" == "$self" ]] && continue
       dt=${st_time[$d]:-0}
+      if (( dt < 0 )); then
+        echo "  ✗ $(basename "$f"):$ln 的未定项点名了 $d，而 $d 的变动时间取不到，这一条对 $d 没比过"   # gate-lint:detail
+        continue
+      fi
       (( dt > 0 )) && deps+=("$d:$dt")
     done
     (( ${#deps[@]} > 0 )) || continue

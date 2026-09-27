@@ -15,3 +15,4 @@ want=research/prompts/evidence-header-sync.md:12：「## 原始证据」的表�
 want=research/prompts/evidence-empty-sync.md:12：「## 原始证据」的表一行都没有
 want=research/prompts/evidence-missing-sync.md:14：research/prompts/demo-gone-candidates.tsv 不在仓里
 want=research/prompts/evidence-count-sync.md:14：行数写 138，research/prompts/demo-candidates.tsv 实际 3（wc -l）
+want=research/prompts/old-sync.md:15：处置写「补了」，载体 records/untouched.md 不在改动范围里

@@ -5,3 +5,5 @@ want=指名 D92（样本乙），而它正文里没有第 7 条
 want=decisions/ 下有 2 份首行读不出
 want=213-漏破折号样本.md：首行是
 want=README.md：首行是
+want=.claude/kb/引用方丙.md:6 「已定项 2」写的是已定
+want=「已定项 1」指名 D214（双轨（大小文件）），而它正文里没有第 1 条

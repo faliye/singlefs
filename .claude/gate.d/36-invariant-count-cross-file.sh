@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 不变量条数在 invariants.md 之外也要对
 #
 # `10-kb-rot.sh` 已经查 `invariants.md` 自己那句「现共 N 条在用」与表里实际条数对不对，
@@ -11,7 +13,8 @@
 # 坑在**跨文件的口径层**，不在某一段代码里
 # （`.claude/singlefs-ai-sop/rules/show-me-test.md`「先问这个坑在哪一层」）。
 #
-# 查的是：`invariants.md` 之外的 kb 文件，正文里写「N 条在用」的地方，N 必须等于实际在用条数。
+# 查的是：`invariants.md` 之外的 kb 文件，正文里写「N 条在用」或「N 条不变量在用」的地方，N 必须等于实际在用条数。
+# 一处这样的声明都没有：无对象可判，退 77（不记通过）。
 #
 # ⚠️ **抓不到的那一半要说清楚**：
 #   1. 不带「在用」二字的写法（「66 条不变量」）抓不到 —— 那种句子多半在复述某一轮普查
@@ -21,6 +24,8 @@
 #
 #   bash .claude/gate.d/36-invariant-count-cross-file.sh
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 KB=.claude/kb
@@ -43,12 +48,13 @@ for p in sorted(glob.glob(os.path.join(kb, "**", "*.md"), recursive=True)):
         continue
     scanned += 1
     body = open(p, encoding="utf-8").read().split("\n## 历史版本")[0]
-    for m in re.finditer(r"(\d+)\s*条在用", body):
+    # 「条」与「在用」之间许夹「不变量」三个字（「现有 26 条不变量在用」）；别的名词不认，免得把别的量读成不变量条数
+    for m in re.finditer(r"(\d+)\s*条(?:不变量)?\s*在用", body):
         n = int(m.group(1))
         hits.append((p, n))
         if n != live:
             line = body[:m.start()].count("\n") + 1
-            bad.append(f"{p}:{line} 写「{n} 条在用」，而 invariants.md 实际在用 {live} 条")
+            bad.append(f"{p}:{line} 写「{m.group(0)}」，而 invariants.md 实际在用 {live} 条")
 
 if bad:
     print(f"  ✗ 不变量条数跨文件对不上 {len(bad)} 处：")      # gate-lint:summary
@@ -59,5 +65,8 @@ if bad:
     print("    否则下一个检索到它的人会拿一个旧数当现状。")
     sys.exit(1)
 
+if not hits:
+    print(f"  ! 本次无对象可判：扫了 {scanned} 份 kb 文件（invariants.md 与变更史之外），没有一处写「N 条在用」的声明")
+    sys.exit(77)
 print(f"  ✓ 不变量条数跨文件一致：实际在用 {live} 条，扫了 {scanned} 份 kb 文件、命中 {len(hits)} 处声明")
 PY

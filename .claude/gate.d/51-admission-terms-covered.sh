@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 准入不等式的每一项都有人维护（统计量，或写明的例外）
 #
 # 判据（2026-09-13 用户定案，登记在 D5（快照 / 空间记账机制） 已定项 4）：
@@ -11,7 +13,9 @@
 #   3. 两边的项必须逐一相等——式子加了一项而对照表没加、或对照表多出一项，都判红。
 #   4. 对照表每一行的右列要么是「第 N 项（名字）」，N 在同一文件那张 `| # | 统计量 |` 表里、名字逐字相等、且不是已撤回的编号；
 #      要么以 `**例外**：` 开头并写出理由（不少于 8 个字）。
-#   5. `decisions/` 下凡是写着 `可用 = Σ设备` 的地方（索引行、挪走后留的指针），去掉空白与反引号之后必须与权威那一行逐字相等。
+#   5. `decisions/` 下凡是写着 `可用 = Σ设备` 的地方（索引行、挪走后留的指针），去掉空白与反引号之后必须与权威那一行逐字相等：
+#      副本在反引号里的，取到收尾那个反引号；在表格行里、没有反引号的，取到那一格的竖线；都不是的取到行尾（末尾的句号、分号不算）。
+#      多出一项、少一项都判红，不是只比开头。
 #
 # ⚠️ **这条是实测出来的**：2026-09-13 立 D28（挂载期承诺量） 时往式子里加了第五项「挂载期承诺量」，
 # 而 D5（快照 / 空间记账机制） 已定项 4 的完备性口径逐字是「式子里出现的每一项都必须是被维护的统计量」——
@@ -23,6 +27,8 @@
 #
 #   bash .claude/gate.d/51-admission-terms-covered.sh [仓根]
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 [[ -d .claude/kb/decisions ]] || { echo "  ! 找不到 .claude/kb/decisions/，本阶段跳过"; exit 77; }
@@ -152,9 +158,13 @@ for path, text in texts.items():
             continue
         copies += 1
         fragment = line[position:]
-        fragment = fragment.split('`')[0] if '`' in line[:position] else fragment
-        fragment = re.sub(r'[\s`]', '', fragment)
-        if not fragment.startswith(canonical):
+        if '`' in line[:position]:
+            fragment = fragment.split('`')[0]
+        elif line.lstrip().startswith('|'):
+            fragment = fragment.split('|')[0]
+        fragment = re.sub(r'[\s`]', '', fragment).rstrip('。；;，,')
+        # 逐字相等，不是只比开头：副本在权威那一行后面多写一项（「… − 多一项」）也要红
+        if fragment != canonical:
             problems.append(f'{path}:{number} 的式子副本与权威那一行（{formula_path}）对不上')
 
 if problems:

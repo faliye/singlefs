@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: kb 形状（1 未定项 / 已定项只许一种叫法；3 kb 文件不许链回自己；4 上游规则路径带 .claude/；5 决策标题连号带状态、分项两节不串味不重号、标题未定条数与列表相符；7 索引页状态列的分项计数与正文相符）
 #
 # kb 形状检查：查「同一件事在 kb 里有两种写法」。
@@ -16,6 +18,10 @@
 # 第 7 段「一条决策的索引行都没核到」与「状态列的分项计数与正文不符」互斥（后者要先核到一行），
 # 红样本里放的是后者。
 set -uo pipefail
+# lib 的路径要在 cd 之前算：$0 是相对路径时，cd 进项目根之后就指不到了
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+LIB_INDEX_VS_BODY="$(cd "$(dirname "$0")" && pwd)/lib-index-vs-body.py"
 cd "${1:-$(dirname "$0")/../..}" || exit 2
 KB=.claude/kb
 fail=0
@@ -23,21 +29,58 @@ bad() { printf '  ✗ %s\n' "$*"; fail=1; }
 ok()  { printf '  ✓ %s\n' "$*"; }
 howto() { printf '     → %s\n' "$*"; }
 
+# 扫的文件装进数组，不靠 $(find …) 的分词：文件名里有空格时会被切成两个不存在的路径，
+# 而 grep 打不开它们的报错原先丢进 /dev/null——那一份里写了什么都判不到。
+kb_md_files=()
+while IFS= read -r -d '' found_file; do kb_md_files+=("$found_file"); done \
+  < <(find "$KB" -name '*.md' -print0 2>/dev/null)
+shopt -s nullglob
+rule_md_files=(.claude/rules/*.md)
+kb_top_md_files=("$KB"/*.md "$KB"/decisions/*.md)
+shopt -u nullglob
+kb_and_rule_md_files=(${kb_md_files[@]+"${kb_md_files[@]}"} ${rule_md_files[@]+"${rule_md_files[@]}"})
+grep_error_file="$(mktemp)"
+trap 'rm -f "${grep_error_file:?}"' EXIT
+# 用法：grep_files <这一段叫什么> <grep 参数…> -- <文件…>；命中写进 $grep_hits。
+# 退 0：都读到了。退 1：一份要扫的文件都没有（判红）。退 2：有文件读不了（判红；读到的那些照样交命中）——
+# 出错的那几份里写了什么都没判，不能读成「没命中」，所以调用方只在退 0 时报绿。
+grep_files() {
+  local stage_label="$1" grep_exit_code=0; shift
+  local -a grep_options=()
+  while [[ $# -gt 0 && "$1" != "--" ]]; do grep_options+=("$1"); shift; done
+  shift
+  grep_hits=""
+  if [[ $# -eq 0 ]]; then
+    bad "$stage_label：一份要扫的文件都没有，这一段没判"
+    howto "确认门禁是在仓库根上跑的、$KB 目录在；扫到 0 份不是通过（.claude/singlefs-ai-sop/rules/show-me-test.md「扫到 0 项也不是通过」）。"
+    return 1
+  fi
+  grep_hits="$(grep -Hn "${grep_options[@]}" -- "$@" 2>"$grep_error_file")" || grep_exit_code=$?
+  if [[ "$grep_exit_code" -ge 2 ]]; then
+    bad "$stage_label：有文件读不了（grep 退 $grep_exit_code），那几份没判："; sed 's/^/     /' "$grep_error_file"
+    howto "按上面 grep 的原话修：悬空的符号链接删掉或指回真文件，没有读权限的补上读权限；读不了的那几份不能当成没命中。"
+    return 2
+  fi
+  return 0
+}
+
 echo "══ kb 形状检查 ══"
 echo
 
 echo "── 1. 同一概念只许一个名字 ──"
-hit=$(grep -rn '未答项\|已答项' $(find "$KB" -name "*.md") .claude/rules/*.md 2>/dev/null || true)
-if [[ -n "$hit" ]]; then
-  bad "kb 里出现「未答项 / 已答项」"; printf '%s\n' "$hit" | sed 's/^/     /'
+grep_status=0
+grep_files "「未答项 / 已答项」" -e '未答项' -e '已答项' -- ${kb_and_rule_md_files[@]+"${kb_and_rule_md_files[@]}"} || grep_status=$?
+if [[ -n "$grep_hits" ]]; then
+  bad "kb 里出现「未答项 / 已答项」"; printf '%s\n' "$grep_hits" | sed 's/^/     /'
   howto "统一写「未定项 / 已定项」。records/ 是当时的会话记录，不在本检查范围。"
-else ok "未定项 / 已定项 用词统一"; fi
+elif [[ "$grep_status" -eq 0 ]]; then ok "未定项 / 已定项 用词统一（扫 ${#kb_md_files[@]} 份 kb 文件、${#rule_md_files[@]} 份规则）"; fi
 
-hit=$(grep -rn '^### 未定$\|^### 已定$' $KB/*.md $KB/decisions/*.md 2>/dev/null || true)
-if [[ -n "$hit" ]]; then
-  bad "小节标题写作「### 未定」/「### 已定」"; printf '%s\n' "$hit" | sed 's/^/     /'
+grep_status=0
+grep_files "「### 未定」/「### 已定」小节标题" -e '^### 未定$' -e '^### 已定$' -- ${kb_top_md_files[@]+"${kb_top_md_files[@]}"} || grep_status=$?
+if [[ -n "$grep_hits" ]]; then
+  bad "小节标题写作「### 未定」/「### 已定」"; printf '%s\n' "$grep_hits" | sed 's/^/     /'
   howto "统一写「### 未定项」/「### 已定项」——按标题检索时两种写法只能命中一种。"
-else ok "已定项 / 未定项 小节标题统一"; fi
+elif [[ "$grep_status" -eq 0 ]]; then ok "已定项 / 未定项 小节标题统一（扫 $KB 顶层与 decisions/ 下 ${#kb_top_md_files[@]} 份）"; fi
 
 echo
 echo "── 3. 文件内自指链接 ──"
@@ -80,26 +123,31 @@ else ok "没有文件内自指链接（扫 $self_link_scanned 份 kb 文件，�
 
 echo
 echo "── 4. 上游规则的路径写法 ──"
-# 裸 singlefs-ai-sop/rules/… 从仓库根解析不到，副本在 .claude/ 下。
-hit=$(grep -rn '[^/.]singlefs-ai-sop/rules/' $(find "$KB" -name "*.md") .claude/rules/*.md 2>/dev/null \
-        | grep -v '\.claude/singlefs-ai-sop/rules/' || true)
+# 裸 singlefs-ai-sop/rules/… 从仓库根解析不到，副本在 .claude/ 下。行首的裸路径也算（前面没有字符可配）。
+grep_status=0
+grep_files "上游规则的裸路径" -E -e '(^|[^/.])singlefs-ai-sop/rules/' -- ${kb_and_rule_md_files[@]+"${kb_and_rule_md_files[@]}"} || grep_status=$?
+hit=""
+[[ -n "$grep_hits" ]] && hit="$(grep -v '\.claude/singlefs-ai-sop/rules/' <<<"$grep_hits")"
 if [[ -n "$hit" ]]; then
   bad "上游规则写成了裸路径"; printf '%s\n' "$hit" | sed 's/^/     /'
   howto "统一写 .claude/singlefs-ai-sop/rules/<文件>.md ——裸路径从仓库根打不开。"
-else ok "上游规则路径统一"; fi
+elif [[ "$grep_status" -eq 0 ]]; then ok "上游规则路径统一（扫 ${#kb_md_files[@]} 份 kb 文件、${#rule_md_files[@]} 份规则）"; fi
 
 echo
 echo "── 5. 决策标题：编号连续、带状态；分项两节严格分开、未定条数与列表相符 ──"
 # ⚠️ 2026-08-29：此前这一段只读 decisions.md，而决策正文早已拆到 decisions/ 下，
 # decisions.md 里一个 `## D<n>` 标题都没有 ⇒ **整段恒绿**，标题声明的未定项条数从没被核过。
 # 现在逐个读 decisions/*.md。
-python3 - $KB/decisions/*.md <<'PY'
-import re, sys
+LIB_INDEX_VS_BODY="$LIB_INDEX_VS_BODY" python3 - $KB/decisions/*.md <<'PY'
+import importlib.util, os, re, sys
+# 标题里未定条数的读法与第 7 段同一份（lib-index-vs-body.py 的 declared_open_count），不各抄一份
+spec = importlib.util.spec_from_file_location("lib_index_vs_body", os.environ["LIB_INDEX_VS_BODY"])
+lib_index_vs_body = importlib.util.module_from_spec(spec); spec.loader.exec_module(lib_index_vs_body)
 body = ""
 for p in sys.argv[1:]:
     body += open(p, encoding="utf-8").read().split("\n## 历史版本", 1)[0] + "\n"
-CN = {"一":1,"二":2,"两":2,"三":3,"四":4,"五":5,"六":6,"七":7,"八":8,"九":9,"十":10}
 fail = 0
+index_rows_checked = 0
 def bad(m, how=""):
     """每一条拒绝都要给下一步——`.claude/singlefs-ai-sop/scripts/gate-lint.sh` 管的是
     上游脚本里的 `bad "..."`，够不着这里的 python，所以这条纪律在本文件里只能自己守。"""
@@ -121,6 +169,7 @@ elif nums != list(range(1, len(nums) + 1)):
 # 切成每条决策
 starts = [m.start() for m in re.finditer(r'^## D\d+ ', body, flags=re.M)]
 starts.append(len(body))
+decision_count = len(starts) - 1
 for a, b in zip(starts, starts[1:]):
     blk = body[a:b]
     title = blk.split("\n", 1)[0]
@@ -157,6 +206,7 @@ for a, b in zip(starts, starts[1:]):
         if not seg:
             continue
         for row in re.findall(r'^(?:\|\s*\d+\s*\||\d+\.\s).*$', seg, flags=re.M):
+            index_rows_checked += 1
             marks = re.findall(r'状态：\s*\*{0,2}(已定|未定)', row)
             if not marks:
                 bad(f"{title.split()[1]} {head}里有一条分项没写「状态：已定/未定」这个规范标记，"
@@ -211,13 +261,18 @@ for a, b in zip(starts, starts[1:]):
             bad(f"{title.split()[1]} 分项编号不是从 1 连到 {len(nums)}：{sorted(nums)}",
                 "断号说明有分项被删了却没交代。要么补回那一条，要么在变更史里写明它去哪了。")
     # ⑤ 标题声明的未定条数与「### 未定项」小节的分项数相符
-    m = re.search(r'([0-9]+|[一二两三四五六七八九十])\s*[项条]未定', title)
-    if not m:
+    #    中文数字按 1–99 读（「十一项未定」是 11，不是 1），读法在 lib-index-vs-body.py
+    declared = lib_index_vs_body.declared_open_count(title)
+    if declared is None:
         continue
-    want = int(m.group(1)) if m.group(1).isdigit() else CN[m.group(1)]
+    want, declared_phrase = declared
+    if want is None:
+        bad(f"{title.split()[1]} 标题写「{declared_phrase}」，里面的数认不出来",
+            "条数写阿拉伯数字，或 1–99 的中文数字（「十一项未定」「两项未定」）。")
+        continue
     t = index_of("未定项")
     if t is None:
-        bad(f"标题声明了「{m.group(0)}」却没有「### 未定项」小节：{title[:40]}",
+        bad(f"标题声明了「{declared_phrase}」却没有「### 未定项」小节：{title[:40]}",
                 "补一个「### 未定项」小节，或把标题里的未定条数改成 0 并去掉那句。")
         continue
     got = len(re.findall(r'^\|\s*\d+\s*\|', t, flags=re.M)) or \
@@ -230,10 +285,10 @@ for a, b in zip(starts, starts[1:]):
                 "分项要写成带编号的表格行或编号列表，生成器与门禁都按这两种形状抽。")
             continue
     if got != want:
-        bad(f"{title.split()[1]} 标题写「{m.group(0)}」，「### 未定项」小节里实际 {got} 项",
+        bad(f"{title.split()[1]} 标题写「{declared_phrase}」，「### 未定项」小节里实际 {got} 项",
                 "改正文标题里的条数，并同步 decisions.md 索引行；改完跑 .claude/gate.d/21-decision-items-sync.sh --write")
 if not fail:
-    print("  ✓ 决策标题与未定项列表相符，且两节没有互相串味")
+    print(f"  ✓ 决策标题与未定项列表相符，且两节没有互相串味（{decision_count} 条决策、核 {index_rows_checked} 行分项索引）")
 sys.exit(1 if fail else 0)
 PY
 [[ $? -ne 0 ]] && fail=1
@@ -245,8 +300,8 @@ echo "── 7. 决策索引表的状态列（分项计数）vs 正文实际分�
 # 索引页在它的视野之外 ⇒ 这类不一致此前无人拦。
 # ⚠️ 本段**自己数正文**，不经过 gen-decision-items.py：写回索引页的是那个生成器，
 # 21 阶段拿它的输出与索引页逐字比对 ⇒ 生成器数错时两边一起错，只有本段会红。
-if python3 "$(dirname "$0")/lib-index-vs-body.py" "$KB/decisions.md" $KB/decisions/*.md; then :; else fail=1; fi
+if python3 "$LIB_INDEX_VS_BODY" "$KB/decisions.md" $KB/decisions/*.md; then :; else fail=1; fi
 
 echo
-if [[ $fail -eq 0 ]]; then echo "  ✓ kb 形状检查通过"; else echo "  ✗ kb 形状检查未通过"; fi   # gate-lint:summary
+if [[ $fail -eq 0 ]]; then echo "  ✓ kb 形状检查通过（kb 文件 ${#kb_md_files[@]} 份、规则 ${#rule_md_files[@]} 份）"; else echo "  ✗ kb 形状检查未通过"; fi   # gate-lint:summary
 exit $fail

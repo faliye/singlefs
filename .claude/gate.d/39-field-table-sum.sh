@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 字段表加出来的数（表后合计、表前说明句、format-const 标记）与字节布局表里结构总宽的登记
 #
 # C94（登记的格式常量与后来的定案对不上）逐字要的两条：
@@ -20,7 +22,8 @@
 #   3. 只判总宽与各行之和、标记与分项之和、布局里的总宽有没有登记；各行宽度本身对不对不判。
 #   4. 第二段检查：一条「已定项 N」里**恰好一个** `format-const` 标记时，标记值要等于该分项下
 #      全部字段表之和（`DATA_UNIT_HEADER_BYTES = 105` 对着 D18 已定项 7 那两张表 42 + 63）。一个分项里
-#      有多个标记时无从对应，跳过并报出——**跳过的那些本阶段一个字也没验**。
+#      有多个标记时无从对应，跳过并报出——**跳过的那些本阶段一个字也没验**。只有一个标记、而这一节的字段表
+#      有宽度不是数的行或根本加不出和的，同样进跳过清单点名，不静默放过。
 #   5. 扫两处的正文（「## 历史版本」之前）：`.claude/kb/decisions/*.md` 与 `.claude/kb/layout/*.md`。
 #      字节布局表里的字段表与决策正文里的一样会写「合计 N 字节」，只扫决策时它们一张都没人核。
 #   6. 标记按 `lib-format-const.py` 读（27、92 号用的是同一份）：以 `<!-- format-const` 开头而按文法读不出来的、
@@ -38,7 +41,8 @@
 #      登记 = 同一行（①还可以是它那张表的说明句）里有值等于 N 的 `<!-- format-const: 名字 = N -->`，
 #      或有「`format-const: 名字`」引用、而那个名字在 kb 正文里登记的值等于 N。缺即判红。
 #      ⚠️ 认不出的写法（不加粗的总宽、「107 + 29」这种算式格、各字段自己的宽度）本阶段**一个字也不说**；
-#      成功那句报出认出了几处，认出 0 处不是「都登记了」。
+#      成功那句报出认出了几处，认出 0 处不是「都登记了」。表后合计、表前说明句、标记、结构总宽四样一处都没认出：
+#      无对象可判，退 77（不记通过）。表前表后都没写认得出的总宽的表，成功行下面逐个列表头行。
 #
 # 判别力：fixtures/39-field-table-sum.sh/red 放一张合计写错的决策字段表、一个与表和对不上的标记、
 # 一张合计写错的布局字段表、一条多写了键的标记与一个同一份文件里登记两次的名字；C94（登记的格式常量与后来的定案对不上） 要的「登记 78 而正文写着
@@ -49,6 +53,8 @@
 #
 #   bash .claude/gate.d/39-field-table-sum.sh
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 LIB="$(cd "$(dirname "$0")" && pwd)/lib-format-const.py"
 cd "$ROOT" 2>/dev/null || exit 2
@@ -170,7 +176,7 @@ def registrations_in(scope_text):
     return found
 
 
-checked, skipped, tables_without_total, bad = 0, [], 0, []
+checked, skipped, tables_without_total, bad = 0, [], [], []
 caption_checked = 0
 mark_checked, mark_skipped = 0, []
 marker_problems = []
@@ -201,11 +207,18 @@ for kb_path in decision_paths + layout_paths:
 
     def close_item():
         global item, item_sum, item_marks, item_ok, item_head, mark_checked
-        if item is not None and item_marks and item_sum:
+        # 分项里有标记而没比成的，一律进跳过清单点名：宽度不是数、或这一节没有字段表，都不许静默放过
+        if item is not None and item_marks:
             if len(item_marks) != 1:
                 mark_skipped.append(f"{os.path.basename(kb_path)} 已定项 {item} 里有 "
                                     f"{len(item_marks)} 个 format-const 标记，对不上哪张表")
-            elif item_ok:
+            elif not item_ok:
+                mark_skipped.append(f"{os.path.basename(kb_path)} 已定项 {item} 的 format-const 标记 {item_marks[0][0]} 没核："
+                                    f"这一节有宽度不是数的字段表，加不出确定的和")
+            elif not item_sum:
+                mark_skipped.append(f"{os.path.basename(kb_path)} 已定项 {item} 的 format-const 标记 {item_marks[0][0]} 没核："
+                                    f"这一节没有加得出和的字段表")
+            else:
                 name, value_registered = item_marks[0]
                 mark_checked += 1
                 if value_registered != item_sum:
@@ -318,7 +331,7 @@ for kb_path in decision_paths + layout_paths:
                 break
         if not sum_match_after:
             if not caption_judged:
-                tables_without_total += 1
+                tables_without_total.append(f"{os.path.basename(kb_path)}:{header_line_number}")
             continue
         if unreadable_width:
             if unreadable_width not in skipped:
@@ -367,14 +380,22 @@ if layout_unregistered:
 if bad or marker_problems or layout_unregistered:
     sys.exit(1)
 
+# 四样一样都没核到：什么都没比过，不记通过（头部第 41 行：认出 0 处不是「都登记了」）
+if checked + caption_checked + mark_checked + layout_widths_checked == 0:
+    print(f"  ! 本次无对象可判：扫了 {len(decision_paths)} 份决策、{len(layout_paths)} 份字节布局表，"
+          f"表后合计、表前说明句、format-const 标记、结构总宽一处都没认出来")
+    sys.exit(77)
+
 message = (f"  ✓ 字段表加出来的数都对得上（扫了 {len(decision_paths)} 份决策、{len(layout_paths)} 份字节布局表；"
            f"表后合计 {checked} 张，表前说明句 {caption_checked} 张，format-const 标记 {mark_checked} 个；"
            f"字节布局表里的结构总宽 {layout_widths_checked} 处都有登记）")
 if skipped:
     message += f"，跳过 {len(skipped)} 处（有非数字宽度）"
 if tables_without_total:
-    message += f"，另有 {tables_without_total} 张表前表后都没写认得出的总宽、本阶段没验它们"
+    message += f"，另有 {len(tables_without_total)} 张表前表后都没写认得出的总宽、本阶段没验它们（表头行逐个列在下面）"
 print(message)
 for entry in skipped + mark_skipped:
     print(f"     ! 跳过：{entry}")
+for entry in tables_without_total:
+    print(f"     没验：{entry} 那张字段表，表前表后都没写认得出的总宽")
 PY

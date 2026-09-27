@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 research/scripts/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判（用户 2026-09-26 定：项目更严）
 # gate-stage: QEMU 真设备上的第一个事务、发布 B、第二个实例、发布 D 与抬 F（两块 virtio 盘、设备侧独立录制、漏一道屏障与走页缓存两个对照必须判红）
 # 不声明 gate-covers：共享清单 2026-09-16 起没有「QEMU 真实负载」这一项（QEMU 移交给本工程），而「最终判据」要的是真实负载 + 崩溃注入 + checker 全绿，
 # 这一道今天只有真实负载与设备侧录制、没有崩溃注入，不冒充覆盖它。
@@ -19,12 +21,21 @@
 # 设备侧比对每一档都逐项比到这一档最后那次发布：`first_transaction_device_log_check` 的第一个参数是模式，宿主照模式重跑
 # 发布 B / 可写挂载与发布 C / 发布 D 与抬 F（`name=host_rerun` 行列出重跑了哪几段）。所以后三档照 direct 判：退出码 0、两块盘都没有分歧。
 #
-# 判别力样本 fixtures/55-qemu-first-transaction.sh/{red,green}（89 号跑）拿预录输出喂：样本目录里放一个 `.qemu-prerecorded` 标记文件，再按 `<模式>/out.txt`、`vm-exit`、
+# 判别力样本 fixtures/55-qemu-first-transaction.sh/{red,green}（共享门禁的 .claude/singlefs-ai-sop/scripts/stage-selftest.sh 跑）拿预录输出喂：样本目录里放一个 `.qemu-prerecorded` 标记文件，再按 `<模式>/out.txt`、`vm-exit`、
 # `check.txt`、`check-exit` 摆好某一轮真跑留下来的原样输出，本阶段就不起虚机、不编译，只拿同一段判定代码判它们
 # （`.claude/rules/fs-design.md` 五条硬要求第 2 条：只供测试的开关）。预录档判全过退 3，不退 0——
 # 退 0 会和真起过虚机的那一档在汇总里长得一模一样（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）。
+#
+# 准入（门禁与实验共用 research/scripts/admission.py，登记表 .claude/gate.d/stage-inputs.tsv 里本阶段那一行）：
+#   这一道读的路径只登记在那一行：复用判定（stage-must-run.sh）与改动范围（change-touches-crates.sh 的前缀）都从它取，
+#   前缀另加本阶段脚本自己（判定代码改了要重跑）；那一行不在就判红。
+#   QEMU、/dev/kvm、内核镜像三个前置写在那一行第三列，开跑前经 admission.py gate-preconditions 判，没齐判红（不退 77）。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
+STAGE_REPOSITORY="$(cd "$(dirname "$0")/../.." && pwd)"
+ADMISSION_MODULE="$STAGE_REPOSITORY/research/scripts/admission.py"
 cd "$ROOT" 2>/dev/null || exit 2
 
 fail() { echo "  ✗ $1"; echo "     → 怎么办：$2"; exit 1; }
@@ -128,25 +139,25 @@ if ((prerecorded == 0)); then
   # 先问能不能复用上一次整轮全绿的判定：这一道读的那几条路径（`.claude/gate.d/stage-inputs.tsv`）
   # 在 `refs/sop/staged-green` 那棵树与这一次的暂存树之间变没变。为什么用树、为什么只一条 ref、
   # 为什么不看工作区，写在 research/scripts/stage-must-run.sh 的文件头。
-  reuse_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-must-run.sh" "$ROOT" "$(basename "$0")")"
-  reuse_rc=$?
-  if [[ "$reuse_rc" != 0 ]]; then
-    echo "  ! 本阶段跳过（复用上一次整轮全绿的判定）：$reuse_reason"
-    echo "     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径见 .claude/gate.d/stage-inputs.tsv。"
-    exit 77
+  source "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-run-or-skip.sh" || { echo "  ✗ source 不进 research/scripts/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
+  stage_run_or_skip "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-must-run.sh" "复用上一次整轮全绿的判定" \
+    "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径见 .claude/gate.d/stage-inputs.tsv。" -- "$ROOT" "$(basename "$0")"
+  # 改动范围的前缀：登记表本阶段那一行的路径（admission.py paths，不另抄一份），加本阶段脚本自己
+  qemu_registered_input_paths=()
+  if registered_paths_text="$(python3 "$ADMISSION_MODULE" paths "$ROOT" "$(basename "$0")" 2>/dev/null)"; then
+    mapfile -t qemu_registered_input_paths <<< "$registered_paths_text"
   fi
-  scope_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/change-touches-crates.sh" "$ROOT" crates/ research/scripts/vm-bench.sh .claude/gate.d/55-qemu-first-transaction.sh)"
-  scope_rc=$?
-  if [[ "$scope_rc" != 0 ]]; then
-    echo "  ! 本阶段跳过（这次改动没碰它判的东西）：$scope_reason"
-    echo "     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；判据与前缀见 research/scripts/change-touches-crates.sh。"
-    exit 77
+  if [[ ${#qemu_registered_input_paths[@]} -eq 0 || -z "${qemu_registered_input_paths[0]}" ]]; then
+    fail "$ROOT/.claude/gate.d/stage-inputs.tsv 里没有 $(basename "$0") 这一行（或读不到这份表）：判不出这一道读哪些路径" \
+         "在 .claude/gate.d/stage-inputs.tsv 里给本阶段登记它读的路径（制表符分隔，照别的行写）。"
   fi
+  stage_run_or_skip "$STAGE_REPOSITORY/research/scripts/change-touches-crates.sh" "这次改动没碰它判的东西" \
+    "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 ${qemu_registered_input_paths[*]} 加本阶段脚本，判据见 research/scripts/change-touches-crates.sh。" \
+    -- "$ROOT" "${qemu_registered_input_paths[@]}" ".claude/gate.d/$(basename "$0")"
   [[ -f Cargo.toml && -d crates/singlefs-harness ]] || { echo "  ! 没有 crates/singlefs-harness，本阶段跳过（步 0 之前没有装置）"; exit 77; }
 
-  command -v qemu-system-x86_64 >/dev/null || fail "qemu-system-x86_64 缺失" "装 QEMU（qemu-system-x86），见 .claude/kb/vm-harness.md「三个前置」。"
-  [[ -r /dev/kvm && -w /dev/kvm ]] || fail "/dev/kvm 不可读写" "按 .claude/kb/vm-harness.md「三个前置」查 kvm 组成员身份；不许用 setfacl 补。"
-  bash research/scripts/vm-kernel.sh --check >/dev/null 2>&1 || fail "找不到可读的内核镜像" "跑 bash research/scripts/vm-kernel.sh，按它打印的路径设 SINGLEFS_KERNEL。"
+  # 三个前置（QEMU、/dev/kvm、内核镜像）登记在 stage-inputs.tsv 本阶段那一行第三列，没齐判红
+  python3 "$ADMISSION_MODULE" gate-preconditions "$STAGE_REPOSITORY" "$(basename "$0")" || exit 1
 
   if ! cargo build --release --target x86_64-unknown-linux-musl -p singlefs-harness --bin first_transaction_on_device >/dev/null 2>&1; then
     fail "虚机二进制（musl 静态）编不过" "单跑 cargo build --release --target x86_64-unknown-linux-musl -p singlefs-harness --bin first_transaction_on_device 看报错。"
@@ -226,8 +237,11 @@ for mode in "${MODES[@]}"; do
     grep -aq "$pattern" "$out" && fail "虚机跑 $mode 的输出里出现了不该有的「$pattern」" "这一档不该跑那次发布：确认送进虚机的模式参数就是 $mode，别的模式的负载跑进来了这一档的判据就全落空。"
     checks=$((checks + 1))
   done < <(forbidden_lines_of "$mode")
-  # 来宾块层的 FLUSH 数 = 程序真正交给设备的屏障 + FUA 写（来宾内核是第三条独立的路）
+  # 来宾块层的 FLUSH 数 = 程序真正交给设备的屏障 + FUA 写（来宾内核是第三条独立的路）。
+  # 一行 device_calls 都没有时循环一圈不转，这一条判据就没判：按红记，不按「没有对不上的」放过。
+  device_calls_lines=0
   while IFS= read -r line; do
+    device_calls_lines=$((device_calls_lines + 1))
     barriers="$(sed -n 's/.* barriers=\([0-9]*\) .*/\1/p' <<<"$line")"
     fua="$(sed -n 's/.* force_unit_access_writes=\([0-9]*\) .*/\1/p' <<<"$line")"
     flushes="$(sed -n 's/.* flush_ios=\([0-9NA]*\).*/\1/p' <<<"$line")"
@@ -235,6 +249,8 @@ for mode in "${MODES[@]}"; do
       || fail "虚机跑 $mode 的来宾块层 FLUSH 数（$flushes）不等于屏障 + FUA 写（$barriers + $fua）" "看 name=device_calls 行；读不到（NA）也算红——读不到不等于读到 0。"
     checks=$((checks + 1))
   done < <(grep -ao 'E7RESULT name=device_calls .*' "$out" | tr -d '\r')
+  ((device_calls_lines > 0)) \
+    || fail "虚机跑 $mode 的输出里一行 name=device_calls 都没有：来宾块层的 FLUSH 数没法与屏障 + FUA 写对账" "看 $mode 的 out.txt：虚机二进制没打这一行、或者行名改了；读不到不等于对得上。"
   if ((prerecorded == 0)); then
     geometry="$(grep -ao 'E7RESULT name=geometry .*' "$out" | tr -d '\r' | head -1)"
     bytes="$(sed -n 's/.*device_bytes=\([0-9]*\).*/\1/p' <<<"$geometry")"
@@ -249,6 +265,7 @@ done
 
 verdict() { cat "$work/$1/check-exit"; }
 judged_device_logs=0
+matched_device_log_modes=(); control_modes=()
 for mode in "${MODES[@]}"; do
   case "$mode" in
     direct)
@@ -257,6 +274,7 @@ for mode in "${MODES[@]}"; do
       grep -q 'name=host_recover outcome=file_read root=1:3 content_matches=true' "$work/direct/check.txt" \
         || fail "direct：宿主从虚机写出的盘镜像上读不回文件" "看 $work/direct/check.txt 的 name=host_recover 行。"
       checks=$((checks + 2))
+      matched_device_log_modes+=("$mode")
       ;;
     skip-first-transaction-barrier)
       [[ "$(verdict skip-first-transaction-barrier)" == 1 ]] && grep -q 'name=device_log device=0 .*divergence=at=' "$work/skip-first-transaction-barrier/check.txt" \
@@ -264,12 +282,14 @@ for mode in "${MODES[@]}"; do
         || { sed 's/^/        /' "$work/skip-first-transaction-barrier/check.txt"
              fail "对照 skip-first-transaction-barrier 没有红在盘 0：这道比对分不出漏了一道屏障" "比对失去判别力，之前所有「对得上」作废；看 device_log.rs 的 expected_device_events 与解析。"; }
       checks=$((checks + 3))
+      control_modes+=("$mode")
       ;;
     page-cache)
       [[ "$(verdict page-cache)" == 1 ]] \
         || { sed 's/^/        /' "$work/page-cache/check.txt"
              fail "对照 page-cache 没有判红：走页缓存的回写与 O_DIRECT 的逐个写在这道比对里分不出来" "比对失去判别力；看设备侧日志里写的条数与长度。"; }
       checks=$((checks + 1))
+      control_modes+=("$mode")
       ;;
     second-transaction|second-instance|raise-rollback-floor)
       # 宿主检查照模式重跑到这一档最后那次发布，这几段与第一个事务一样逐项比，照 direct 判：退出码 0、两块盘都没有分歧，
@@ -289,6 +309,7 @@ for mode in "${MODES[@]}"; do
         || { sed 's/^/        /' "$work/$mode/check.txt"
              fail "$mode：宿主检查重跑的段不是 $host_rerun_windows" "看 check.txt 的 name=host_rerun 行；段名单对不上，先查送给 first_transaction_device_log_check 的第一个参数是不是 $mode。"; }
       checks=$((checks + 1))
+      matched_device_log_modes+=("$mode")
       ;;
     *) fail "模式 $mode 没有登记设备侧日志的判据" "在这个 case 里给它补一支；不补就等于这一档的设备侧比对一个字都不判。" ;;
   esac
@@ -302,5 +323,5 @@ if ((prerecorded)); then
   echo "     → 这一档不算真跑过 QEMU：真跑要在仓顶层不带 .qemu-prerecorded 跑一遍本阶段。"
   exit 3
 fi
-echo "  ✓ QEMU 真设备：${#MODES[@]} 次虚机跑（${MODES[*]}）、$checks 项检查全过；direct、second-transaction、second-instance、raise-rollback-floor 设备侧逐项对得上（宿主照模式重跑到这一档最后那次发布），两个对照都红在该红的地方"
+echo "  ✓ QEMU 真设备：${#MODES[@]} 次虚机跑（${MODES[*]}）、$checks 项检查全过；${matched_device_log_modes[*]} 设备侧逐项对得上（宿主照模式重跑到这一档最后那次发布），${#control_modes[@]} 个对照（${control_modes[*]}）都红在该红的地方"
 echo "     ! 这一道没罩到：$uncovered"

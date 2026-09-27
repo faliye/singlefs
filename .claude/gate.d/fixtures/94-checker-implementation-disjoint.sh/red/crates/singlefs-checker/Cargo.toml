@@ -4,3 +4,10 @@ name = "singlefs-checker"
 [dependencies]
 singlefs-format = { path = "../singlefs-format" }
 sample-shared-helper = "1"
+implementation = { package = "singlefs-core", path = "../singlefs-core" }
+
+[dependencies.sample-dotted-helper]
+path = "../sample-dotted-helper"
+
+[target.'cfg(unix)'.dependencies]
+sample-target-helper.workspace = true

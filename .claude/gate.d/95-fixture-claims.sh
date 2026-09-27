@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 阶段头部声称的判别力样本必须真的存在；全仓文件名与样本目录里的日期不许是编的
 #
-# 判据：三条，任一条不成立判红。
+# 判据：四条，任一条不成立判红。
 #   ① 一个阶段的头部注释里写了 `fixtures/<它自己的文件名>`，那个样本目录就必须存在；
 #   ② `.claude/gate.d/fixtures/` 下的每个目录都要对应一个存在的阶段文件——孤儿样本目录没有任何东西会跑它，
 #      而目录摆在那里看着就像验过了；
@@ -23,7 +25,7 @@
 # 「本仓的事不可能早于本仓第一个提交」，这只对说本仓自己事的日期成立。实测扫全仓正文得 52 处越界，
 # 其中 20 处在 prior-art.md（别家项目的真实日期）、decisions-history（RFC 演进史 2015–2017）与
 # checks-owed.md（C510（编造的日期没人拦） 引 2026-01-01 当例子）里，全部合法——射程放到真 kb 正文就是误判。
-# 文件名那一维没有这个反例（现查 90 条带日期路径全部说的是本仓自己的事），所以扫全仓。
+# 文件名那一维没有这个反例（带日期的路径说的都是本仓自己的事；有几条由成功行现报），所以扫全仓。
 #
 # 为什么：上游的判别力自检（`.claude/singlefs-ai-sop/scripts/stage-selftest.sh`）把没有样本的阶段
 # 列成「未自检」，这很好——但它只看目录在不在，不看**阶段自己怎么说**。一个阶段的头部逐字写着
@@ -42,10 +44,16 @@
 # （C441（全仓清扫工具会吃掉自己的判别力样本））。setup.sh 里要 git init 再提交一个真实日期的提交，
 # 否则 project_start_date 取不到值、下界那一支根本走不到，红样本就只证了上界。
 #
+# 不是 git 仓时第 ④ 条列不出要扫的文件、整条没判：前三条都过也不报绿，退 77（本次未跑）。
+# 第 ④ 条的下界取本仓第一个提交；取不到时退回上游的 SOP_START_DATE，成功行写明下界取自哪一个。
+# 读不了的样本正文（grep 出错）不计进「查了几份」，逐个列进没扫的清单；二进制样本按文本读，里面的日期照判。
+#
 #   bash .claude/gate.d/95-fixture-claims.sh [项目根]
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
-cd "$ROOT" 2>/dev/null || exit 2
+cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 LIB="$(cd "$(dirname "$0")/../.." && pwd)/.claude/singlefs-ai-sop/scripts/lib.sh"
 python_rc=0
 python3 - <<'PY' || python_rc=$?
@@ -122,12 +130,18 @@ PY
 # lib.sh 自带 set -euo pipefail，所以整段关在子 shell 里，判定经文件带出来
 # （command-safety.md：子 shell 里的赋值传不回父进程）。
 date_report="$(mktemp)"
+trap 'rm -f "$date_report"' EXIT
 date_rc=0
+date_skipped=0
 (
   source "$LIB"
   require_date_arithmetic
   git rev-parse --show-toplevel >/dev/null 2>&1 || { printf 'SKIP\t不是 git 仓，列不出要扫的文件\n'; exit 0; }
-  start_date="$(project_start_date "$(pwd)" || true)"; start_date="${start_date:-$SOP_START_DATE}"
+  if start_date="$(project_start_date "$(pwd)")" && [[ -n "$start_date" ]]; then
+    start_source="本仓第一个提交"
+  else
+    start_date="$SOP_START_DATE"; start_source="取不到本仓第一个提交，退回上游的 SOP_START_DATE"
+  fi
   # 阳性对照：判据先对一个确知越界的日期跑一次，报不出越界就说明它已经失效。
   # 少了这一句，上游把 date_out_of_range 改名或删掉之后，这一条会**静默报绿**——
   # 调用落在 `if` 条件位置，command not found 的 127 被读成「没越界」，COUNT 照样打印。
@@ -141,7 +155,7 @@ date_rc=0
   # 说的就是清扫工具会吃掉自己的样本）。**不静默挖空**——跳过几份现算着报进成功句，
   # 读的人看得见排除了什么（show-me-test.md：排除的每一份都要登记，跳过清单要与被扫集合出自同一份数据）。
   own_fixture=".claude/gate.d/fixtures/95-fixture-claims.sh/"
-  scanned=0; dated=0; bodies=0; body_dates=0; skipped_own=0
+  scanned=0; dated=0; bodies=0; body_dates=0; skipped_own=0; unreadable_bodies=()
   # 路径走 NUL：git 默认把非 ASCII 路径整条引起来并转义成八进制，报出来的那一行既搜不到也对不上 want
   while IFS= read -r -d '' path; do
     # --cached 列的是**索引**不是磁盘：git mv 过又被别的会话 `git reset` 掉暂存时，
@@ -176,6 +190,10 @@ date_rc=0
   while IFS= read -r -d '' body; do
     [[ -e "$body" ]] || continue
     if [[ "$body" == "$own_fixture"* ]]; then skipped_own=$((skipped_own + 1)); continue; fi
+    # grep 出错（读不了）与「没有日期」不是一回事：读不了的不计进 bodies，逐个列进没扫的清单；-a 让二进制样本按文本读
+    # lib.sh 开着 set -e：grep 没命中（退 1）不许把子 shell 带走，退出码在 if 里取
+    if hits="$(grep -a -noE "$date_re" "$body" 2>/dev/null)"; then grep_rc=0; else grep_rc=$?; fi
+    if ((grep_rc == 2)); then unreadable_bodies+=("$body"); continue; fi
     bodies=$((bodies + 1))
     while IFS= read -r hit; do
       [[ -n "$hit" ]] || continue
@@ -186,9 +204,9 @@ date_rc=0
       fi
       # 整行去重，不拿行号当唯一键：`sort -u -t: -k1,1n` 按行号去重，
       # 一行上的第二个日期会被丢掉（实测：`实测（2026-09-20）…已定（2026-01-01）` 判绿）
-    done < <(grep -noE "$date_re" "$body" 2>/dev/null | sort -u)
+    done < <(sort -u <<<"$hits")
   done < <(git ls-files -z --cached --others --exclude-standard '.claude/gate.d/fixtures/' | sort -z -u)
-  printf 'COUNT\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$scanned" "$dated" "$bodies" "$body_dates" "$start_date" "$skipped_own" "$own_fixture"
+  printf 'COUNT\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$scanned" "$dated" "$bodies" "$body_dates" "$start_date" "$skipped_own" "$own_fixture" "$start_source" "${unreadable_bodies[*]:-（没有）}"
 ) > "$date_report" 2>&1 || date_rc=$?
 
 if grep -qE '^BAD(NAME|BODY)' "$date_report"; then
@@ -220,13 +238,14 @@ elif grep -q '^BROKEN' "$date_report"; then
   echo "       上游真改了名，改这一条去跟上新名字，别在本仓另抄一份判据——两套装置算同一个量就会分叉。"
 elif grep -q '^SKIP' "$date_report"; then
   printf '  ⊘ 日期这一条未跑：%s\n' "$(grep '^SKIP' "$date_report" | cut -f2)"
+  date_skipped=1
 elif ! grep -q '^COUNT' "$date_report"; then
   date_rc=1
   echo "  ✗ 日期这一条没跑完，报告里没有计数行："
   sed 's/^/      /' "$date_report"   # gate-lint:detail
   echo "     → 怎么办：上面是子 shell 的原样输出；多半是 lib.sh 取不到或 git 列不出文件，按它说的修。"
 else
-  read -r _ scanned dated bodies body_dates start_date skipped_own own_fixture < <(grep '^COUNT' "$date_report")
+  IFS=$'\t' read -r _ scanned dated bodies body_dates start_date skipped_own own_fixture start_source unreadable_list < <(grep '^COUNT' "$date_report")
   # 计数缺一个就判红：成功句是给人看的唯一结论，它报着空数照样绿，比没有这一条更糟
   # （2026-09-23 变异实测：砍掉「没有 COUNT 就判红」那一支，屏幕上出现「%s 个文件里  条带日期」四个数全空）。
   if ! [[ "$scanned" =~ ^[0-9]+$ && "$dated" =~ ^[0-9]+$ && "$bodies" =~ ^[0-9]+$ && "$body_dates" =~ ^[0-9]+$ && "$skipped_own" =~ ^[0-9]+$ ]]; then
@@ -236,15 +255,18 @@ else
     echo "     → 怎么办：子 shell 多半在数完之前就退出了，上面那行是它吐出的原样；"
     echo "       扫到 0 项也不是通过，报着空数的成功句与判过了一模一样（show-me-test.md）。"
   else
-    printf '  ✓ 日期都可能是真的（文件名：%s 个文件里 %s 条带日期；样本正文：%s 份文件里 %s 个日期；下界 %s 往前宽 7 天）\n' \
-      "$scanned" "$dated" "$bodies" "$body_dates" "$start_date"
+    printf '  ✓ 日期都可能是真的（文件名：%s 个文件里 %s 条带日期；样本正文：%s 份文件里 %s 个日期；下界 %s 往前宽 7 天，下界取自%s）\n' \
+      "$scanned" "$dated" "$bodies" "$body_dates" "$start_date" "$start_source"
     printf '    没扫的 %s 份：%s 下的文件——这一条自己的红样本，里面的越界日期就是它的判别力（C441（全仓清扫工具会吃掉自己的判别力样本））\n' \
       "$skipped_own" "$own_fixture"
+    printf '    读不了、没扫的样本正文：%s\n' "$unreadable_list"
   fi
 fi
-rm -f "$date_report"
-
 if [[ "$python_rc" -ne 0 || "$date_rc" -ne 0 ]]; then
   exit 1
+fi
+if ((date_skipped)); then
+  echo "  ⊘ 本次无对象可判（第 ④ 条）：前三条判过了，第 ④ 条整条没跑，这一道不报通过"
+  exit 77
 fi
 exit 0

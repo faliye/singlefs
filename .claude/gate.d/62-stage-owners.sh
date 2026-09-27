@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 门禁阶段归属表与门禁目录、agent 定义一致
 #
 # 判据：`.claude/gate.d/stage-owners.tsv` 登记每个项目本地阶段先由哪个 agent 在干完自己的活之后跑
 # （提交前的整轮门禁照旧跑全部阶段）。四条，任一条不成立判红：
-#   ① `.claude/gate.d/` 下每个 `NN-*.sh` 在表里恰好一行；
+#   ① `.claude/gate.d/` 顶层每个 `*.sh`（普通文件）在表里恰好一行——共享 gate.sh 当本地阶段跑的就是这一批
+#      （`find .claude/gate.d -maxdepth 1 -name '*.sh' -type f`），名字不是两位数开头的（`100-x.sh`、`a-x.sh`）一样要登记；
 #   ② 表里每一行的阶段文件都存在；
 #   ③ 第二列每个 agent 名都有 `.claude/agents/<名字>.md`；
 #   ④ 每一行三列齐全、第二列与第三列不为空。
@@ -15,6 +18,8 @@
 #
 #   bash .claude/gate.d/62-stage-owners.sh [项目根]
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 python3 - "$(cd "$(dirname "$0")" && pwd)/lib-manifest.py" <<'PY'
@@ -32,7 +37,8 @@ if not os.path.isfile(table_path):
     print(f"  ✗ 没有 {table_path}")
     print("     → 怎么办：建这张表，三列用制表符分隔：阶段文件名、先跑它的 agent 名（逗号分隔）、为什么归它；# 开头的行是注释。")
     sys.exit(1)
-stage_files = sorted(os.path.basename(path) for path in glob.glob(".claude/gate.d/[0-9][0-9]-*.sh"))
+# 与共享 gate.sh 认的本地阶段同一批：.claude/gate.d/ 顶层每个 *.sh 普通文件（它用 find -maxdepth 1 -name '*.sh' -type f）
+stage_files = sorted(os.path.basename(path) for path in glob.glob(".claude/gate.d/*.sh") if os.path.isfile(path))
 rows_by_stage = {}
 malformed_rows = []
 unknown_owner_rows = []

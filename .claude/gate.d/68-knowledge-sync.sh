@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 改了规则、agent、hook、门禁、脚本或实现之后，有没有写阶段同步记录
 #
 # 为什么：2026-09-17 一批改动做完后没人回头同步知识——records/2026-09-16-subagent拆分提案.md 与 .claude/agent-common.md
@@ -20,6 +22,8 @@
 #      载体格是「路径:行号」，路径从仓库根起（可包一层反引号），在仓里存在或在改动范围里；
 #      处置格以「改了」「补了」「不改：」之一开头，「不改：」后面要写理由；
 #      处置是「改了」「补了」的，载体路径要在改动范围里（记录说改了而文件没动）。任一不合 ⇒ 红。表可以 0 行。
+#      这一条判这一轮新写的处置行：新写的记录里每一行，加上基准里就有的旧记录这一轮新加的行（按 gate_added_lines 取的新增行逐字认）；
+#      旧记录里早先写下的行点名的是更早一轮改的载体，不判。
 #   ⑤ 这一次提交要带上的每份同步记录（**还没进 HEAD** 的那几份，基准与 ①–④ 的 GATE_BASE 不同，理由写在 uncommitted_records 那一段）有「## 原始证据」小节，小节里恰好一张表，表头 | 材料 | 路径 | 行数 |，**至少一行**。
 #      逐行：材料格非空；路径格是仓库根起的路径、在仓里现存；行数格是十进制整数，与那份文件的 `wc -l` 逐字相等。任一不合 ⇒ 红。
 #      拦的是 C468（判错的原始证据不落盘）：阶段同步判错一行之后，事实表、候选表与逐行判定报告都留在 /tmp，
@@ -63,6 +67,8 @@
 #
 #   bash .claude/gate.d/68-knowledge-sync.sh [项目根]
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "  ! $ROOT 不是 git 仓，本阶段跳过"; exit 77; }
@@ -75,14 +81,27 @@ changed="$(gate_changed_paths "$base" untracked)" || {
   echo "     → 怎么办：按上面 git 的报错修好仓库状态（基准要存在、索引没坏）再跑；取不到改动范围时这一阶段什么都没比，不是通过。"
   exit 1
 }
+# 同步记录这一轮新增的行（未跟踪的整份算新增）：旧记录里这一轮新加的「改了 / 补了」行也要判载体在不在改动范围里
+added_record_lines="$(gate_added_lines "$base" 'research/prompts/*-sync.md')" || {
+  echo "  ✗ 取不到同步记录这一轮新增了哪些行（基准 $base）"
+  echo "     → 怎么办：按上面 git 的报错修好仓库状态再跑；取不到新增行时旧记录里新加的处置行没法判，不是通过。"
+  exit 1
+}
 # 改动清单经进程替换当文件传：当成一个命令行参数传时，单个参数超过 128 KiB 就起不来（Linux 的 MAX_ARG_STRLEN）。
-python3 - "$base" <(printf '%s\n' "$changed") <<'PY'
+python3 - "$base" <(printf '%s\n' "$changed") <(printf '%s\n' "$added_record_lines") <<'PY'
 import os, re, subprocess, sys
 
 base = sys.argv[1]
 with open(sys.argv[2], encoding="utf-8", errors="replace") as handle:
     changed_files = sorted({path for path in handle.read().split("\n") if path})
 changed_set = set(changed_files)
+# 同步记录这一轮新增的行：{记录路径: {整行}}（gate_added_lines 的「路径<TAB>行文」）
+added_lines_by_record = {}
+with open(sys.argv[3], encoding="utf-8", errors="replace") as handle:
+    for added in handle.read().split("\n"):
+        if "\t" in added:
+            added_path, added_text = added.split("\t", 1)
+            added_lines_by_record.setdefault(added_path, set()).add(added_text)
 
 # 触发文件的清单读 .claude/gate.d/knowledge-sync-triggers.tsv，不在这里再存一份：
 # 门禁 11 号（这一批的触发文件有没有登记进范围）拿同一份清单算它那个范围，两道判得不一样谁都说不清该信哪个
@@ -326,7 +345,9 @@ for record_path, text in records:
                 carrier_path = candidate_path
         if disposition.startswith("改了") or disposition.startswith("补了"):
             disposition_counts[disposition[:2]] += 1
-            if (record_path in fresh_records
+            # 这一轮写的处置行才判：新写的记录整份都是；旧记录只判这一轮新加的那几行（早先的行点名的是更早一轮改的载体）
+            written_this_round = record_path in fresh_records or row_line in added_lines_by_record.get(record_path, set())
+            if (written_this_round
                     and carrier_path is not None and carrier_path not in changed_set):
                 out_of_range_problems.append(f"{location}：处置写「{disposition[:2]}」，载体 {carrier_path} 不在改动范围里")
         elif disposition.startswith("不改："):

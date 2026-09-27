@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 决策变更史的条目住在它日期所在月的那一份
 #
 # 2026-09-12 起决策变更史按月拆档：条目原文住 `.claude/kb/decisions-history/<年-月>.md`，
@@ -12,7 +14,12 @@
 # 实测（2026-09-14）：D28（挂载期承诺量） 新立时在自己文末写了一条 `### 2026-09-13`，与 2026-09 那一份的（其一）
 # 说的是同一件事；decisions.md 首段当时写「把依据写进文末『历史版本』」，照着写出来的正是这个形态。
 # 只查文末：D26（后台整理与放置回收） 正文里有「### 2026-09-08 三轮对抗论证」这类带日期的小节标题，那是论证，不是条目。
+# 按月的文件放错地方：.claude/kb/ 下（含子目录）除 decisions-history.md 与 decisions-history/ 顶层那几份之外，
+# 文件名里带 decisions-history 的 .md、或名字就是 <年-月>.md 的，都算放错（decisions-history-2026-10.md、kb 根下的 2026-10.md、
+# decisions-history/ 底下再套一层目录的都在内）。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 cd "${1:-$(dirname "$0")/../..}" || exit 2
 bad() { printf '  ✗ %s\n' "$*"; }
 ok()  { printf '  ✓ %s\n' "$*"; }
@@ -21,8 +28,15 @@ howto() { printf '     → %s\n' "$*"; }
 main_file=.claude/kb/decisions-history.md
 shopt -s nullglob
 month_files=(.claude/kb/decisions-history/*.md)
-stray_files=(.claude/kb/*-decisions-history.md)
 shopt -u nullglob
+# 放错地方的按月文件：名字带 decisions-history、或就是 <年-月>.md，而不是 decisions-history.md 本身、也不在 decisions-history/ 顶层
+stray_files=()
+if [[ -d .claude/kb ]]; then
+  while IFS= read -r -d '' stray_file; do
+    stray_files+=("$stray_file")
+  done < <(find .claude/kb -type f -name '*.md' \( -name '*decisions-history*' -o -regex '.*/[0-9][0-9][0-9][0-9]-[0-9][0-9]\.md' \) \
+             ! -path "$main_file" ! -regex '\.claude/kb/decisions-history/[^/]*\.md' -print0 | sort -z)
+fi
 files=()
 [[ -f "$main_file" ]] && files+=("$main_file")
 files+=("${month_files[@]}")

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# gate-stage: kb 腐化（1–2 实验号与决策号的引用都有定义；3 不变量声明条数与表对得上、欠账表数得出条数；4 治理文档里的门禁号、路径与「小节」指得到）
-# gate-similar: link-targets.py 它只解析 ](相对路径) 链接与「第 N 节」，不看反引号里的路径、「门禁 N 号」与「小节」名；这三类与 1–2 段同是「引用了不存在的东西」，并在这里
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
+# gate-stage: kb 腐化（1–2 实验号与决策号的引用都有定义；3 不变量声明条数与表对得上、欠账表数得出条数）
 #
 # kb 腐化审计：查「一处改了、引用它的地方没跟着改」。
 #
@@ -8,7 +9,7 @@
 # 单独跑也可以： bash .claude/gate.d/10-kb-rot.sh
 #
 # 这类腐化对模型比对人更危险——检索会把陈旧的那一条**单独**端出来，
-# 既没有上下文也没有对照（singlefs-ai-sop/rules/kb-discipline.md 第 7 条）。
+# 既没有上下文也没有对照（singlefs-ai-sop/rules/kb-discipline.md 第 8 条「正文只写现状，历史放文末的「历史版本」」）。
 #
 # 四段，都是机械可判的：
 #   1–2. 引用了不存在的实验号 / 决策号（doc-lint 已覆盖一部分，这里补实验号）
@@ -25,7 +26,9 @@
 # 判别力：fixtures/10-kb-rot.sh/red 必须判红（悬空的实验号、invariants.md 丢了登记标记、欠账表一行都数不出、第 4 段的悬空门禁号、路径与小节）；
 # green 必须判绿。
 set -uo pipefail
-# 门禁调用时把项目根作为 $1 传进来；单独跑时从脚本位置推。共用库按脚本自己的目录找，在 cd 之前取成绝对路径。
+# 门禁调用时把项目根作为 $1 传进来；单独跑时从脚本位置推。
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 GATE_DIRECTORY="$(cd "$(dirname "$0")" && pwd)"
 cd "${1:-$GATE_DIRECTORY/../..}" || exit 2
 KB=.claude/kb
@@ -49,15 +52,32 @@ rule_md_files=(.claude/rules/*.md)
 shopt -u nullglob
 scanned_md_files=("${kb_md_files[@]}" "${rule_md_files[@]}")
 scanned_note="扫 ${#kb_md_files[@]} 份 kb 文件、${#rule_md_files[@]} 份规则"
+# 引用抽取用 grep 一次读全部文件；某一份读不了（悬空的符号链接、没有读权限）时 grep 退 2，
+# 那一份里的引用就从判据里静默消失，其余照判照绿。所以 grep 的错误不丢进 /dev/null：退 2 判红并列出它的原话。
+grep_error_file="$(mktemp)"
+trap 'rm -f "${grep_error_file:?}"' EXIT
+# 用法：extract_numbered_references <字母> <数组名>；抽出全部不同的「字母+1–3 位数字」引用，读文件出错判红
+extract_numbered_references() {
+  local letter="$1" raw_matches grep_exit_code=0
+  local -n extracted_references="$2"
+  extracted_references=()
+  [[ ${#scanned_md_files[@]} -gt 0 ]] || return 0
+  raw_matches="$(grep -ohE "(^|[^A-Za-z0-9/-])${letter}[0-9]{1,3}([^A-Za-z0-9-]|\$)" "${scanned_md_files[@]}" 2>"$grep_error_file")" \
+    || grep_exit_code=$?
+  if [[ "$grep_exit_code" -ge 2 ]]; then
+    bad "抽 ${letter} 号引用时有文件读不了（grep 退 $grep_exit_code），那几份里的引用没进判据："
+    sed 's/^/      /' "$grep_error_file"
+    howto "按上面 grep 的原话修：悬空的符号链接删掉或指回真文件，没有读权限的补上读权限；" \
+          "读不了的文件里的引用一条都没判，不能当成都有定义。"
+  fi
+  mapfile -t extracted_references < <(printf '%s\n' "$raw_matches" | grep -oE "${letter}[0-9]{1,3}" | sort -u)
+}
 
 echo "── 1. 实验号引用是否都有定义 ──"
 missing=0
 experiment_refs=()
 # ⚠️ 不能用 \bE[0-9]+\b —— 它会把 URL 里的 E19253-01 当成实验号（实测踩过）。
-if [[ ${#scanned_md_files[@]} -gt 0 ]]; then
-  mapfile -t experiment_refs < <(grep -ohE '(^|[^A-Za-z0-9/-])E[0-9]{1,3}([^A-Za-z0-9-]|$)' "${scanned_md_files[@]}" 2>/dev/null \
-                                   | grep -oE 'E[0-9]{1,3}' | sort -u)
-fi
+extract_numbered_references E experiment_refs
 for e in "${experiment_refs[@]}"; do
   grep -rqE "^## $e " "$KB/experiments" 2>/dev/null || { bad "$e 被引用但 experiments/ 下没有它"
     howto "要么在 experiments/ 下给它建正文（\`## $e <简称>\` 起头），" \
@@ -76,10 +96,7 @@ echo
 echo "── 2. 决策号引用是否都有定义 ──"
 missing=0
 decision_refs=()
-if [[ ${#scanned_md_files[@]} -gt 0 ]]; then
-  mapfile -t decision_refs < <(grep -ohE '(^|[^A-Za-z0-9/-])D[0-9]{1,3}([^A-Za-z0-9-]|$)' "${scanned_md_files[@]}" 2>/dev/null \
-                                 | grep -oE 'D[0-9]{1,3}' | sort -u)
-fi
+extract_numbered_references D decision_refs
 for d in "${decision_refs[@]}"; do
   grep -rqE "^## $d " "$KB/decisions" 2>/dev/null || { bad "$d 被引用但 decisions/ 下没有它"
     howto "要么在 decisions/ 下给它建正文（\`## $d <简称>\` 起头），" \
@@ -191,4 +208,4 @@ if [[ $fail -ne 0 ]]; then
   echo "               放着不动会让下一轮再审一遍同样的东西。"
   exit 1
 fi
-echo "  ✓ kb 腐化审计通过"
+echo "  ✓ kb 腐化审计通过（扫了 ${#scanned_md_files[@]} 份 kb 与规则文件）"

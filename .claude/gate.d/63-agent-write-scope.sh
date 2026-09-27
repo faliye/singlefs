@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: PreToolUse 七个钩子、SessionStart 的压缩后提示与启动时的 OOM 报告、PostToolUse 的书记官写入后核对注册着、八个项目 hook 自证通过、写范围表与定义双向一致、每个定义带 omitClaudeMd 与「开工先读：」、共用切词模块的函数不在别的 hook 里另写一份
+# gate-similar: 62-stage-owners.sh 也读 .claude/agents/ 与一张 tsv 表，但判的是阶段归属表与门禁目录；这里判钩子注册、钩子自证、写范围表与定义的 frontmatter
+# gate-similar: 47-research-script-selftests.sh 跑 research/scripts/ 下脚本的自证；这里跑 .claude/hooks/ 下钩子的自证
 #
 # 判据，任一条不成立判红：
 #   ① `.claude/settings.json` 的 PreToolUse 里有一条 matcher 同时覆盖 Write 与 Edit、命令指向 `write-guard.sh` 的 hook（写范围与整份覆盖未跟踪文件两道合在里面）；
@@ -7,7 +11,7 @@
 #   ③ `.claude/agents/` 里 tools 含 Write 或 Edit 的每个定义，在 `.claude/hooks/agent-write-scope.tsv` 里至少有一条路径模式；
 #   ④ 表里每个 agent 名都有定义，每行至少两列；
 #   ⑤ PreToolUse 里有一条 matcher 覆盖 Bash、命令指向 `bash-command-detector.sh` 的 hook，且它的 `--selftest` 通过（没超时的等待循环、run_in_background 里又自己放后台记进检出记录、放行：在跑的命令结不结束由主 agent 判断；起看门狗的错误写法——不用 run_in_background、带 `&` / nohup / setsid / disown、输出丢进 /dev/null——执行前拒绝）；
-#   ⑥ PreToolUse 里有一条 matcher 覆盖 Agent、命令指向 `runner-dispatch-guard.sh` 的 hook，且它的 `--selftest` 通过（派执行员没点名岔路、续做没写还差的行会被拒；派发提示要子 agent 跑重型测试会被拒；派 kb-scribe、implementation-writer 时要改的文件落在还没判完的三方轮开工快照里会被拒）；
+#   ⑥ PreToolUse 里有一条 matcher 覆盖 Agent、命令指向 `runner-dispatch-guard.sh` 的 hook，且它的 `--selftest` 通过（派执行员没点名岔路、续做没写还差的行会被拒；派 crash-verifier、gate-triage 之外的类型没写「重型测试：不跑」一行、缺定义要的输入、写范围之外的路径、实现员撞文件、opus 满上限会被拒；派 kb-scribe、implementation-writer 时要改的文件落在还没判完的三方轮开工快照里会被拒）；
 #   ⑦ PreToolUse 里有一条 matcher 覆盖 SendMessage、命令指向 `continuation-guard.sh` 的 hook，且它的 `--selftest` 通过（给最近一次任务通知是 failed 或 killed 的、或已经交回过的子 agent 续做会被拒，上下文多大不拦）；
 #   ⑧ `.claude/agents/` 里每个定义的 frontmatter 有 `omitClaudeMd: true`，正文有一行以「开工先读：」开头（不继承 CLAUDE.md 之后，要读的规则全靠这一行点名）；
 #   ⑨ PreToolUse 里有一条 matcher 覆盖 Bash、命令指向上游 SOP 的 `claude-hooks/pattern-process-guard.sh` 的 hook，且那个文件在
@@ -21,24 +25,32 @@
 #     重型测试判定模块 `.claude/hooks/lib_heavy_tests.py`（heavy-test-guard.sh 与看门狗 research/scripts/agent-watch.py 共用 classify、classify_process、
 #     judged_by_name 这些判定，手抄一份就是执行前的闸与进程这一层判得不一样）；名字从模块现读，读不到或一个函数都没有也判红。
 #     不算的名字登记在 NOT_SHARED_JUDGMENT（每个 hook 都有自己的 selftest 入口，导入样板 load_sibling_module），登记了而模块里没有这个函数也判红。
+#   ⑮ `.claude/agents/*.md` 的 frontmatter 里 `model:` 只许 opus、sonnet、haiku、inherit（行尾可带 YAML 注释）；AGENT_WRITE_SCOPE_BREAK=any-model 关掉这一条，判别力样本必须转红为绿。
+#   ⑯ PreToolUse 里有一条 matcher 覆盖 SubagentHandback、命令指向 `handback-guard.sh` 的 hook，且它的 `--selftest` 通过（项目子 agent 交回正文超长、三方腿与核查员引文对不上、
+#     书记员与执行员绿行没报数都拒）。
 #   ⑭ PreToolUse 里有一条 matcher 覆盖 AskUserQuestion、命令指向 `ask-user-claim-guard.sh` 的 hook，且它的 `--selftest` 通过（弹窗问句与选项说明里
 #     带断言词——不可能、造不出、从来不、一定、恒为这类——的句子，同一句里既没有出处也没写「推的，没量过」就拒；自证里有走真实 stdin 入口的情形）。
+# 「命令指向某个 hook」按 shell 切词认：命令的第一个词（或 bash / sh / python3 / env 后面那个词）就是那个脚本，路径按结尾认；
+#   只在注释、echo 的参数或别的词里提到它（`true # write-guard.sh`）不算注册。
+# 「tools 含 Write 或 Edit」：frontmatter 没写 tools 的定义继承全部工具，算；`tools: [A, B]` 与 YAML 列表（下面几行 `- A`）照样认。
 # ③ ④ 的双向比对与读表用共用库 lib-manifest.py，与 50、62、98 号同一份代码。
 # 判别力：fixtures/63-agent-write-scope.sh/red 的 .claude/hooks/ 里放一份手抄 shell_tokens 的 hook 与一份手抄 classify_process 的 hook，必须各报出文件与行号；
 # green 的 .claude/hooks/ 里放两份从共用模块导入、只写自己判定的 hook（连同被判仓自己那两份模块），必须判绿，成功行数进去的别的文件数要对。
 # 自证跑的是这份脚本旁边 ../hooks/ 下的 hook（取自 $0 的目录，不取项目根）：样本仓里放坏的 hook 碰不到它。
 #
 # 为什么：执行类 agent 越界写，靠定义里一句「只写写范围」拦不住；hook 被删、自证坏了、新加一个能写文件的定义忘了登记，
-# 这道闸都会静默消失或静默放行——只有门禁会在它消失时说话（与 46 号同一个道理）。
+# 这道闸都会静默消失或静默放行——只有门禁会在它消失时说话。
 # 2026-09-17 写 hook 时实测撞过一次静默放行：程序从标准输入读，hook 的 JSON 读不到，判定一律放行，而直接调判定函数的自证全绿。
 #
 #   bash .claude/gate.d/63-agent-write-scope.sh [项目根]
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 HOOK="$(cd "$(dirname "$0")/../hooks" && pwd)/write-guard.sh"
 cd "$ROOT" 2>/dev/null || exit 2
 table_output="$(python3 - "$(cd "$(dirname "$0")" && pwd)/lib-manifest.py" "$(dirname "$HOOK")/lib_shell_words.py" "$(dirname "$HOOK")/lib_heavy_tests.py" <<'PY'
-import ast, glob, importlib.util, json, os, re, sys
+import ast, glob, importlib.util, json, os, re, shlex, sys
 try:
     spec = importlib.util.spec_from_file_location("lib_manifest", sys.argv[1])
     manifest = importlib.util.module_from_spec(spec)
@@ -49,6 +61,20 @@ except OSError as error:
     sys.exit(1)
 failed = False
 settings_path = ".claude/settings.json"
+def command_invokes(command, script):
+    """这条 hook 命令真的去跑 script：按 shell 切词（# 起的注释去掉），第一个词是它，或第一个词是 bash / sh / python3 / env、
+    第二个词是它；路径按结尾认（…/.claude/hooks/write-guard.sh）。只在注释、echo 的参数、别的词里提到它的不算。"""
+    try:
+        words = shlex.split(command or "", comments=True)
+    except ValueError:
+        return False
+    if len(words) > 1 and os.path.basename(words[0]) in ("bash", "sh", "python3", "env"):
+        words = words[1:]
+    return bool(words) and (words[0] == script or words[0].endswith("/" + script))
+def mention_only_commands(entries, script):
+    """提到了 script、却没有跑它的命令：出路里点名，免得读的人以为那一条已经注册着。"""
+    return [hook.get("command") or "" for entry in entries for hook in entry.get("hooks") or []
+            if script in (hook.get("command") or "") and not command_invokes(hook.get("command"), script)]
 def matcher_covers(matcher, tool):
     if matcher in ("*", ""):
         return True
@@ -68,42 +94,51 @@ except Exception as error:
 if entries is not None:
     registered = [entry for entry in entries
                   if matcher_covers(entry.get("matcher", ""), "Write") and matcher_covers(entry.get("matcher", ""), "Edit")
-                  and any("write-guard.sh" in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
+                  and any(command_invokes(hook.get("command"), "write-guard.sh") for hook in entry.get("hooks") or [])]
     if not registered:
         failed = True
         print(f"  ✗ {settings_path} 没注册写范围闸：PreToolUse 里没有 matcher 同时覆盖 Write 与 Edit、命令指向 write-guard.sh 的一条")
+        for command in mention_only_commands(entries, "write-guard.sh"):
+            print(f"     这一条只是提到 write-guard.sh、没有跑它，不算注册：{command}")  # gate-lint:detail
         print('     → 怎么办：在 hooks.PreToolUse 里加一条 matcher "Write|Edit"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/write-guard.sh"。')
     guard_registered = [entry for entry in entries
                         if matcher_covers(entry.get("matcher", ""), "Bash")
-                        and any("bash-command-detector.sh" in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
+                        and any(command_invokes(hook.get("command"), "bash-command-detector.sh") for hook in entry.get("hooks") or [])]
     if not guard_registered:
         failed = True
         print(f"  ✗ {settings_path} 没注册 Bash 检出 hook：PreToolUse 里没有 matcher 覆盖 Bash、命令指向 bash-command-detector.sh 的一条")
         print('     → 怎么办：在 hooks.PreToolUse 里加一条 matcher "Bash"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/bash-command-detector.sh"。')
     heavy_registered = [entry for entry in entries
                         if matcher_covers(entry.get("matcher", ""), "Bash")
-                        and any("heavy-test-guard.sh" in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
+                        and any(command_invokes(hook.get("command"), "heavy-test-guard.sh") for hook in entry.get("hooks") or [])]
     if not heavy_registered:
         failed = True
         print(f"  ✗ {settings_path} 没注册重型测试闸：PreToolUse 里没有 matcher 覆盖 Bash、命令指向 heavy-test-guard.sh 的一条")
         print('     → 怎么办：在 hooks.PreToolUse 的 Bash 那一条里加 command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/heavy-test-guard.sh"。')
     dispatch_registered = [entry for entry in entries
                            if matcher_covers(entry.get("matcher", ""), "Agent")
-                           and any("runner-dispatch-guard.sh" in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
+                           and any(command_invokes(hook.get("command"), "runner-dispatch-guard.sh") for hook in entry.get("hooks") or [])]
     if not dispatch_registered:
         failed = True
         print(f"  ✗ {settings_path} 没注册续派闸：PreToolUse 里没有 matcher 覆盖 Agent、命令指向 runner-dispatch-guard.sh 的一条")
         print('     → 怎么办：在 hooks.PreToolUse 里加一条 matcher "Agent|Task"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/runner-dispatch-guard.sh"。')
     continuation_registered = [entry for entry in entries
                                if matcher_covers(entry.get("matcher", ""), "SendMessage")
-                               and any("continuation-guard.sh" in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
+                               and any(command_invokes(hook.get("command"), "continuation-guard.sh") for hook in entry.get("hooks") or [])]
     if not continuation_registered:
         failed = True
         print(f"  ✗ {settings_path} 没注册续做闸：PreToolUse 里没有 matcher 覆盖 SendMessage、命令指向 continuation-guard.sh 的一条")
         print('     → 怎么办：在 hooks.PreToolUse 里加一条 matcher "SendMessage"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/continuation-guard.sh"。')
+    handback_guard_registered = [entry for entry in entries
+                                 if matcher_covers(entry.get("matcher", ""), "SubagentHandback")
+                                 and any(command_invokes(hook.get("command"), "handback-guard.sh") for hook in entry.get("hooks") or [])]
+    if not handback_guard_registered:
+        failed = True
+        print(f"  ✗ {settings_path} 没注册交回闸：PreToolUse 里没有 matcher 覆盖 SubagentHandback、命令指向 handback-guard.sh 的一条")
+        print('     → 怎么办：在 hooks.PreToolUse 的 SubagentHandback 那一条里加 command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/handback-guard.sh"。')
     claim_guard_registered = [entry for entry in entries
                               if matcher_covers(entry.get("matcher", ""), "AskUserQuestion")
-                              and any("ask-user-claim-guard.sh" in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
+                              and any(command_invokes(hook.get("command"), "ask-user-claim-guard.sh") for hook in entry.get("hooks") or [])]
     if not claim_guard_registered:
         failed = True
         print(f"  ✗ {settings_path} 没注册弹窗断言闸：PreToolUse 里没有 matcher 覆盖 AskUserQuestion、命令指向 ask-user-claim-guard.sh 的一条")
@@ -111,7 +146,7 @@ if entries is not None:
     pattern_guard = "singlefs-ai-sop/scripts/claude-hooks/pattern-process-guard.sh"
     pattern_guard_registered = [entry for entry in entries
                                 if matcher_covers(entry.get("matcher", ""), "Bash")
-                                and any(pattern_guard in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
+                                and any(command_invokes(hook.get("command"), pattern_guard) for hook in entry.get("hooks") or [])]
     if not pattern_guard_registered:
         failed = True
         print(f"  ✗ {settings_path} 没注册按模式找进程的钩子：PreToolUse 里没有 matcher 覆盖 Bash、命令指向 {pattern_guard} 的一条")
@@ -127,14 +162,14 @@ except Exception:
 if session_entries is not None:
     compact_reminder_registered = [entry for entry in session_entries
                                    if matcher_covers(entry.get("matcher", ""), "compact")
-                                   and any("session-start.sh" in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
+                                   and any(command_invokes(hook.get("command"), "session-start.sh") for hook in entry.get("hooks") or [])]
     if not compact_reminder_registered:
         failed = True
         print(f"  ✗ {settings_path} 没注册压缩后提示 hook：SessionStart 里没有 matcher 覆盖 compact、命令指向 session-start.sh 的一条")
         print('     → 怎么办：在 hooks.SessionStart 里加一条 matcher "startup|resume|compact"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/session-start.sh"。')
     oom_report_registered = [entry for entry in session_entries
                              if matcher_covers(entry.get("matcher", ""), "startup") and matcher_covers(entry.get("matcher", ""), "resume")
-                             and any("session-start.sh" in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
+                             and any(command_invokes(hook.get("command"), "session-start.sh") for hook in entry.get("hooks") or [])]
     if not oom_report_registered:
         failed = True
         print(f"  ✗ {settings_path} 没注册启动时的 OOM 报告 hook：SessionStart 里没有 matcher 同时覆盖 startup 与 resume、命令指向 session-start.sh 的一条")
@@ -146,7 +181,7 @@ except Exception:
 if post_entries is not None:
     followup_registered = [entry for entry in post_entries
                            if all(matcher_covers(entry.get("matcher", ""), tool) for tool in ("Write", "Edit", "Bash"))
-                           and any("kb-scribe-followup.sh" in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
+                           and any(command_invokes(hook.get("command"), "kb-scribe-followup.sh") for hook in entry.get("hooks") or [])]
     if not followup_registered:
         failed = True
         print(f"  ✗ {settings_path} 没注册书记官写入后的核对 hook：PostToolUse 里没有 matcher 同时覆盖 Write、Edit、Bash、命令指向 kb-scribe-followup.sh 的一条")
@@ -164,17 +199,37 @@ else:
     print(f"  ✗ 没有 {table_path}")
     print("     → 怎么办：建这张表：agent 名、路径模式、出处三列，用制表符分隔，按每个能写文件的定义的「写范围」一节转写。")
 writers = []
-missing_omit, missing_basis = [], []
+missing_omit, missing_basis, bad_models = [], [], []
+inherits_all_tools = set()   # 没写 tools 行、继承全部工具的定义
+# ⑮ frontmatter 的 model 只许这几个取值（行尾可带 YAML 注释）：写成别的，换账号或换环境之后派发报 model_not_found、那一类 agent 全部起不来
+ALLOWED_MODELS = {"opus", "sonnet", "haiku", "inherit"}
 for path in sorted(glob.glob(".claude/agents/*.md")):
     whole = open(path, encoding="utf-8").read()
     head = whole.split("\n---", 1)[0]
+    model_line = next((line for line in head.split("\n") if line.startswith("model:")), None)
+    if model_line is not None:
+        model_value = model_line[len("model:"):].split("#", 1)[0].strip().strip("'\"")
+        if model_value not in ALLOWED_MODELS and os.environ.get("AGENT_WRITE_SCOPE_BREAK") != "any-model":
+            bad_models.append(f"{os.path.basename(path)[:-3]}：{model_line.strip()}")
     if not any(line.strip() == "omitClaudeMd: true" for line in head.split("\n")):
         missing_omit.append(os.path.basename(path)[:-3])
     if not any(line.startswith("开工先读：") for line in whole.split("\n")):
         missing_basis.append(os.path.basename(path)[:-3])
-    tools_line = next((line for line in head.split("\n") if line.startswith("tools:")), "")
-    tools = {tool.strip() for tool in tools_line[len("tools:"):].split(",")}
-    if tools & {"Write", "Edit"}:
+    # tools：没写这一行就继承全部工具（含 Write、Edit）；`tools: A, B`、`tools: [A, B]` 与 YAML 列表（下面几行 `- A`）都认
+    head_lines = head.split("\n")
+    tools_index = next((index for index, line in enumerate(head_lines) if line.startswith("tools:")), None)
+    if tools_index is None:
+        writers.append(os.path.basename(path)[:-3])
+        inherits_all_tools.add(os.path.basename(path)[:-3])
+        continue
+    inline_value = head_lines[tools_index][len("tools:"):].strip().strip("[]")
+    tools = {tool.strip().strip("'\"") for tool in inline_value.split(",") if tool.strip()}
+    for line in head_lines[tools_index + 1:]:
+        list_item = re.match(r"^\s*-\s*(\S+)", line)
+        if not list_item:
+            break
+        tools.add(list_item.group(1).strip("'\""))
+    if tools & {"Write", "Edit", "*"}:
         writers.append(os.path.basename(path)[:-3])
 if malformed:
     failed = True
@@ -189,7 +244,7 @@ if unscoped:
     failed = True
     print("  ✗ 这些定义的 tools 里有 Write 或 Edit，写范围表里却没有登记——hook 会把它们的每次写都拒掉：")  # gate-lint:summary
     for name in unscoped:
-        print(f"     {name}")  # gate-lint:detail
+        print(f"     {name}（没写 tools，继承全部工具）" if name in inherits_all_tools else f"     {name}")  # gate-lint:detail
     print(f"     → 怎么办：照它定义里「写范围」一节，在 {table_path} 给它加路径模式。")
 if ghosts:
     failed = True
@@ -197,6 +252,12 @@ if ghosts:
     for name in ghosts:
         print(f"     {name}")  # gate-lint:detail
     print("     → 怎么办：改成现在的定义名，或删掉这几行。")
+if bad_models:
+    failed = True
+    print("  ✗ 这些定义的 frontmatter 里 model 不是 opus、sonnet、haiku、inherit 之一——派发时报 model_not_found，这一类 agent 起不来：")  # gate-lint:summary
+    for line in bad_models:
+        print(f"     {line}")  # gate-lint:detail
+    print("     → 怎么办：改成 opus、sonnet、haiku 或 inherit（行尾可以带 # 注释）；要用本地模型的腿照定义走 research/scripts/ask-local.sh，不写进 model。")
 if missing_omit:
     failed = True
     print("  ✗ 这些定义的 frontmatter 没有 omitClaudeMd: true——每次派发都白带约 10 万 token 的 CLAUDE.md 与规则：")  # gate-lint:summary
@@ -340,4 +401,11 @@ if [[ $claim_guard_rc -ne 0 ]]; then
   echo "     → 怎么办：修 .claude/hooks/ask-user-claim-guard.sh 的 sentences_of() / without_code_and_quotations() / assertion_spans() / has_provenance() 或入口，再跑 --selftest 看它转绿。"
   exit 1
 fi
-echo "  ✓ 写范围闸、Bash 检出 hook、重型测试闸、续派闸、续做闸与弹窗断言闸注册着、自证通过，按模式找进程的上游钩子注册着、文件在，会话开始 hook（压缩后提示与启动时的 OOM 报告）注册着、自证通过，书记官写入后的核对 hook 注册着、自证通过，表与定义一致（${writer_count} 个有 Write 或 Edit 的定义、${pattern_count} 条路径模式），共用切词模块的 ${shared_function_count} 个函数只在 lib_shell_words.py 里定义（查了 .claude/hooks/ 下另外 ${scanned_hook_file_count} 个文件），共用重型测试判定模块的 ${heavy_function_count} 个函数只在 lib_heavy_tests.py 里定义（查了 .claude/hooks/ 下另外 ${heavy_scanned_file_count} 个文件；${not_shared_judgment_names} 不算，见 NOT_SHARED_JUDGMENT）"
+handback_guard_output="$(bash "$(dirname "$HOOK")/handback-guard.sh" --selftest 2>&1)"; handback_guard_rc=$?
+if [[ $handback_guard_rc -ne 0 ]]; then
+  echo "  ✗ handback-guard.sh 的自证没过："
+  printf '%s\n' "$handback_guard_output" | sed 's/^/    /'   # gate-lint:detail
+  echo "     → 怎么办：修 .claude/hooks/handback-guard.sh 的 decide() / citation_problems() / green_count_problems() 或入口，再跑 --selftest 看它转绿。"
+  exit 1
+fi
+echo "  ✓ 写范围闸、Bash 检出 hook、重型测试闸、续派闸、续做闸、交回闸与弹窗断言闸注册着、自证通过，定义的 model 取值认得，按模式找进程的上游钩子注册着、文件在，会话开始 hook（压缩后提示与启动时的 OOM 报告）注册着、自证通过，书记官写入后的核对 hook 注册着、自证通过，表与定义一致（${writer_count} 个有 Write 或 Edit 的定义、${pattern_count} 条路径模式），共用切词模块的 ${shared_function_count} 个函数只在 lib_shell_words.py 里定义（查了 .claude/hooks/ 下另外 ${scanned_hook_file_count} 个文件），共用重型测试判定模块的 ${heavy_function_count} 个函数只在 lib_heavy_tests.py 里定义（查了 .claude/hooks/ 下另外 ${heavy_scanned_file_count} 个文件；${not_shared_judgment_names} 不算，见 NOT_SHARED_JUDGMENT）"

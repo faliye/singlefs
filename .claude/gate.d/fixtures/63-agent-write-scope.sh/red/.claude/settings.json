@@ -2,6 +2,15 @@
   "hooks": {
     "PreToolUse": [
       {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "true # write-guard.sh"
+          }
+        ]
+      },
+      {
         "matcher": "Write",
         "hooks": [
           {

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# 建一个最小的 git 仓：先提交一份决策正文与一份空变更史，再按样本意图改动。
+# 建一个最小的 git 仓：先提交一份决策正文与一份空变更史，推到本地的上游，再按样本意图改动。
+# 改动只把首行的状态从「已定」翻成「半定（一项未定）」：增删合计 2 行，不超过小改动的 4 行，
+# 但碰了状态行，不许按小改动放行；而且这一笔已经提交、还没推出去——基准取 HEAD 就看不见它。
 set -e
 git init -q .
 git config user.email t@example.com; git config user.name t
@@ -17,6 +19,8 @@ X
 printf '# 决策变更史\n\n## 历史版本\n' > .claude/kb/decisions-history.md
 printf '# 设计决策记录\n\n## 历史版本\n' > .claude/kb/decisions.md
 git add -A && git commit -qm base
-# 改决策正文 —— 超过「小改动」的 4 行阈值
-sed -i 's/^第一行。/第一行（改过）。\n新增一行。\n再新增一行。/' .claude/kb/decisions/01-样本决策.md
-sed -i 's/^第三行。/第三行（也改过）。\n又一行。/' .claude/kb/decisions/01-样本决策.md
+git init -q --bare "$PWD/.git/fixture-upstream.git"
+git remote add origin "$PWD/.git/fixture-upstream.git"
+git push -q -u origin HEAD
+sed -i 's/^## D1 样本决策 —— 已定$/## D1 样本决策 —— 半定（一项未定）/' .claude/kb/decisions/01-样本决策.md
+git commit -qam '翻了状态，没写变更史，也还没推出去'

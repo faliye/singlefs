@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
+# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: research/scripts/ 里声称有 --selftest 的脚本，自证都有阶段在跑、而且还会红
+# gate-similar: 73-research-gate-lint.sh 同样扫 research/scripts/，但它判拒绝带不带出路与 shell 纪律，不跑任何脚本的自证
+# gate-similar: 63-agent-write-scope.sh 跑的是 .claude/hooks/ 下钩子的自证，这里跑 research/scripts/ 下脚本的自证，两边的被测对象不重叠
 #
 # 判据：下面 runner 表里的每一条自证都要通过；research/scripts/ 里出现 `--selftest` 的脚本，要么有阶段在调用它
 # （本阶段的 runner 表，或 15 号那种先赋给变量再调的写法），要么登记进 NOT_RUN_HERE 并写明为什么。份数不在注释里写死，成功行现算。
@@ -11,9 +15,22 @@
 # check-segment-registry.py 不是三方论证脚本，但同一个道理成立：52 号阶段（段序列登记表与 E142 产物逐字比对）的
 # 判别力样本只放三样合成输入，钉活代码的那几句与真产物的解析靠它自己的 --selftest 拿真文件测；
 # 那份 --selftest 同样要有人在门禁里替它复跑，不然只在写它的那天跑过一次。
+#
+# 「有阶段在跑它」只认代码：注释行不算，出路文字也不算——echo / printf / howto / bad / die / say / print( 后面带引号的那几段
+# 先去掉再认，一句「单跑 python3 research/scripts/foo.py --selftest 看它报什么」不是在跑它。
+# 样本：fixtures/47-research-script-selftests.sh/red 放一份只在某个阶段的 echo 出路里被提到的 --selftest 脚本，必须报它没人跑；
+# green 放一份真被阶段调用的与一份登记在 NOT_RUN_HERE 的，判绿并报对数。样本目录里放一个 .selftest-coverage-only 标记，
+# 本阶段就不跑 runner 表（那几十份自证要真仓里的脚本，装不进样本），只判覆盖那一半；标记只在被判的仓不是本阶段所在的仓时认，
+# 真仓与 --staged 的临时 worktree 里放了它也照跑 runner 表。
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
+STAGE_REPOSITORY="$(cd "$(dirname "$0")/../.." && pwd -P)"
 cd "$ROOT" || exit 1
+# 判别力样本只判覆盖那一半：样本目录里有标记、而且被判的不是本阶段所在的仓时，不跑 runner 表
+coverage_only=0
+if [[ -f .selftest-coverage-only && "$(pwd -P)" != "$STAGE_REPOSITORY" ]]; then coverage_only=1; fi
 
 failed=0
 checked=0
@@ -33,8 +50,15 @@ for runner in "bash research/scripts/ask-local-selftest.sh" "python3 research/sc
               "python3 research/scripts/agent-handover.py --selftest" "python3 research/scripts/decision-slim-check.py --selftest" \
               "python3 research/scripts/pdf-text.py --selftest" "python3 research/scripts/rules-sweep-audit.py --selftest" \
               "bash research/scripts/stage-must-run.sh --selftest" "bash research/scripts/changed-paths.sh --selftest" "bash research/scripts/gate-staged.sh --selftest" \
-              "bash research/scripts/capped.sh --selftest" \
-              "bash research/scripts/run-with-memory-cap.sh --selftest" "bash research/scripts/mutate.sh --selftest"; do
+              "python3 research/scripts/admission.py --selftest" \
+              "bash research/scripts/capped.sh --selftest" "bash research/scripts/stage-run-or-skip.sh --selftest" \
+              "bash research/scripts/layer0-shard-run.sh --selftest" \
+              "bash research/scripts/run-with-memory-cap.sh --selftest" "bash research/scripts/mutate.sh --selftest" \
+              "python3 research/scripts/cite-check.py --selftest" "python3 research/scripts/kb-spec-check.py --selftest" \
+              "python3 research/scripts/crash-case-check.py --selftest" "bash research/scripts/prove-red.sh --selftest" \
+              "python3 research/scripts/apply-writer-patch.py --selftest" "python3 research/scripts/closeout-status.py --selftest" \
+              "python3 research/scripts/corruption-check.py --selftest"; do
+  ((coverage_only)) && continue
   checked=$((checked + 1))
   output="$($runner 2>&1)"; rc=$?
   if [[ $rc -ne 0 ]]; then
@@ -55,11 +79,14 @@ NOT_RUN_HERE=(
 coverage="$(python3 - "${NOT_RUN_HERE[@]}" <<'PY_COVERAGE'
 import glob, os, re, sys
 exempt = dict(row.split("\t", 1) for row in sys.argv[1:])
+# 出路文字：echo / printf / howto / bad / die / say / print( 后面带引号的参数（可以连着几段）。里面提到的「x.py --selftest」不是在跑它
+OUTPUT_TEXT = re.compile(r'''(?:\b(?:echo|printf|howto|bad|die|say)\b(?:\s+-\w+)*|\bprint\()(?:\s*f?(?:"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'))+''')
 claimed = sorted(path for path in glob.glob("research/scripts/*")
                  if os.path.isfile(path) and "--selftest" in open(path, encoding="utf-8", errors="replace").read())
 run = set()
 for stage in sorted(glob.glob(".claude/gate.d/[0-9][0-9]-*.sh")):
     code = "\n".join(line for line in open(stage, encoding="utf-8").read().splitlines() if not line.lstrip().startswith("#"))
+    code = OUTPUT_TEXT.sub(" ", code)
     variables = dict(re.findall(r'^\s*(\w+)="[^"\n]*?([\w.-]+\.(?:py|sh))"', code, re.M))
     for script in claimed:
         base = os.path.basename(script)
@@ -93,5 +120,8 @@ if grep -q '^STALE' <<<"$coverage"; then
 fi
 read -r _ claimed_count _ run_count < <(grep '^CLAIMED' <<<"$coverage")
 echo "  ✓ research 脚本的自证都通过（本阶段跑了 $checked 条；research/scripts/ 里声称有 --selftest 的 $claimed_count 份中 $run_count 份有门禁阶段在跑）"
+if ((coverage_only)); then
+  echo "    runner 表没跑：$ROOT 是判别力样本（有 .selftest-coverage-only 标记、不是本阶段所在的仓），只判覆盖那一半"
+fi
 echo "    没跑的 $(grep -c '^EXEMPT' <<<"$coverage") 份（登记在本阶段的 NOT_RUN_HERE）："
 grep '^EXEMPT' <<<"$coverage" | cut -f2,3 | sed 's/\t/：/; s/^/      /'
