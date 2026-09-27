@@ -1,0 +1,6 @@
+E1 fg lone & (definition forbids, hook?)	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+E2 write prompt heredoc w/ scary text	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+E3 append audit heredoc w/ original step-3 text	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+E4 step-5b python compare heredoc	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+E5 echo with unescaped backticks (leg's own slip)	three-way-local-attack	bg=False	pattern=0 detector=2[✗ 把活放出了追踪（认出的写法：setsid -f、disown）：进程移出 shell 的作业表或另起会话，随后的 wait 立刻返回、完成通知当场发出，它跑完不会叫醒任何人，成了没人追踪的孤儿] heavy=0	detections+=0
+E6 runlog heredoc append	three-way-local-attack	bg=True	pattern=0 detector=0 heavy=0	detections+=0

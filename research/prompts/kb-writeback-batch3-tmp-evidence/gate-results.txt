@@ -1,0 +1,436 @@
+== 10-kb-rot.sh ==
+══ kb 腐化审计 ══
+
+── 1. 实验号引用是否都有定义 ──
+  ✓ 实验号引用全部有定义：159 个不同的实验号（扫 209 份 kb 文件、7 份规则）
+
+── 2. 决策号引用是否都有定义 ──
+  ✓ 决策号引用全部有定义：28 个不同的决策号（扫 209 份 kb 文件、7 份规则）
+
+── 3. 正文写死的条数 vs 实际条数 ──
+  ✓ 不变量条数一致：正文声称 79 条在用，表里在用 79 条（总行 85，退役 6）
+  ✓ 欠检查 471 条、已还清 81 条（checks-owed.md）
+── 4. 治理文档里的指向 ──
+  没判的：.claude/agents/experiment-designer.md:66: evidence-discipline.md「臂的定义也在「跑前写死」 的文件在四个解析基准下都找不到，小节没判
+  没判的：.claude/agents/experiment-runner.md:36: gate.sh「转发计时」 的文件在四个解析基准下都找不到，小节没判
+  没判的：.claude/agents/sweep.md:36: evidence-discipline.md「撤回一个数或一条结论，同样要当场回扫谁在引它」 的文件在四个解析基准下都找不到，小节没判
+  没判的：.claude/agents/sweep.md:37: evidence-discipline.md「新立一条判据，当场拿它回扫已有的条目」 的文件在四个解析基准下都找不到，小节没判
+  没判的：.claude/agents/tooling-writer.md:34: `RULES_LINT_DIR=.claude/rules` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/agents/tooling-writer.md:34: `.claude/main-agent.md"` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/agents/tooling-writer.md:34: `GATE_LINT_DIR=.claude/gate.d` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/agents/tooling-writer.md:34: `SHELL_LINT_DIR=.claude/gate.d` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/rules/format-evolution.md:24: `.claude/kb/decisions/NN-简称.md` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/rules/implementation-workflow.md:22: show-me-test.md「新增的测试必须先证明它会红」 的文件在四个解析基准下都找不到，小节没判
+  没判的：.claude/rules/path-moves.md:10: gate.sh「链接指向」 的文件在四个解析基准下都找不到，小节没判
+  没判的：.claude/rules/path-moves.md:29: gate.sh「编号与简称」 的文件在四个解析基准下都找不到，小节没判
+  没判的：.claude/rules/path-moves.md:31: gate.sh「链接指向」 的文件在四个解析基准下都找不到，小节没判
+  没判的：.claude/skills/decide/SKILL.md:12: `.claude/kb/decisions/NN-简称.md` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  扫 32 份治理文档：门禁号 218 处、路径 413 处、小节 117 处；没判 14 处；跳过 219 处（被 .gitignore 挡着 91、不像仓内路径 1、仓外或带占位 127）
+  ✓ 治理文档里的门禁号、路径与「小节」都指得到
+
+  ✓ kb 腐化审计通过（扫了 216 份 kb 与规则文件）
+EXIT=0
+== 16-freeze-layer-membership.sh ==
+  ✓ 冻结层归属登记表判过了（33 行：D15 已定项 7 的 4 层与 3 个组件、lib.rs 的 8 棵树、D18 已定项 11 的 6 个单元类都有行；依据点名的 26 处分项都在且已定）
+    ② 没判的 7 行（退不退出冻结写「判不动」）：livelist 共享树（树 ID 16）的 key 编码；稀疏旁表树（树 ID 17）的 key 编码；deadlist 树（树 ID 18）的 key 编码；livelist 共享树（树 ID 16）的码 2 节点内部布局；稀疏旁表树（树 ID 17）的码 2 节点内部布局；deadlist 树（树 ID 18）的码 2 节点内部布局；容器索引
+    另有 2 行态别写「判不动」而退不退出冻结已定（括号里是退出列）：系统配置槽（不退出）；journal 记录格式（不退出）
+EXIT=0
+== 20-kb-shape.sh ==
+══ kb 形状检查 ══
+
+── 1. 同一概念只许一个名字 ──
+  ✓ 未定项 / 已定项 用词统一（扫 209 份 kb 文件、7 份规则）
+  ✓ 已定项 / 未定项 小节标题统一（扫 .claude/kb 顶层与 decisions/ 下 43 份）
+
+── 3. 文件内自指链接 ──
+  ✓ 没有文件内自指链接（扫 205 份 kb 文件，历史类文件除外）
+
+── 4. 上游规则的路径写法 ──
+  ✓ 上游规则路径统一（扫 209 份 kb 文件、7 份规则）
+
+── 5. 决策标题：编号连续、带状态；分项两节严格分开、未定条数与列表相符 ──
+  ✓ 决策标题与未定项列表相符，且两节没有互相串味（28 条决策、核 350 行分项索引）
+
+── 7. 决策索引表的状态列（分项计数）vs 正文实际分项数 ──
+  ✓ 决策索引表的状态列与正文相符（28 条决策，分项数是本段自己数的）
+
+  ✓ kb 形状检查通过（kb 文件 209 份、规则 7 份）
+EXIT=0
+== 21-decision-items-sync.sh ==
+  ✓ 决策索引表状态列与正文同步（28 条决策）
+  ✓ 决策分项清单与正文同步（350 个分项）
+EXIT=0
+== 22-item-ref-status.sh ==
+  ✓ 分项引用与正文状态一致（28 条决策、350 个分项；扫了 588 个文件、17247 处分项引用）
+     没查的：research/prompts/ 下 1010 个文件（原样保存的证据，整目录排除）；代码围栏里 9001 行（逐字照抄的原样），在 79 个文件里：
+       .claude/kb/checks-owed.md：围栏里 10 行
+       .claude/kb/decisions-history/2026-09.md：围栏里 7062 行
+       .claude/kb/decisions.md：围栏里 3 行
+       .claude/kb/decisions/03-空间分配.md：围栏里 1 行
+       .claude/kb/decisions/05-快照-空间记账机制.md：围栏里 7 行
+       .claude/kb/decisions/09-加密.md：围栏里 1 行
+       .claude/kb/decisions/15-格式冻结政策.md：围栏里 7 行
+       .claude/kb/decisions/20-承重面单元的原子性与自包含.md：围栏里 2 行
+       .claude/kb/decisions/27-小数据打包容器.md：围栏里 6 行
+       .claude/kb/decisions/28-挂载期承诺量.md：围栏里 1 行
+       .claude/kb/experiments/09-key编码对遍历局部性的影响.md：围栏里 6 行
+       .claude/kb/experiments/106-条带成员表的载体.md：围栏里 3 行
+       .claude/kb/experiments/107-条带表对主负载的写放大.md：围栏里 1 行
+       .claude/kb/experiments/108-明文层的代价交叉点.md：围栏里 3 行
+       .claude/kb/experiments/109-位置权威三臂的运行时代价.md：围栏里 1 行
+       .claude/kb/experiments/110-条带表在连续发布下的期望写放大.md：围栏里 1 行
+       .claude/kb/experiments/111-条带表的key与它的几何.md：围栏里 1 行
+       .claude/kb/experiments/114-小数据打包容器的总账.md：围栏里 1 行
+       .claude/kb/experiments/115-系统配置字段表的完备性与字节预算.md：围栏里 1 行
+       .claude/kb/experiments/117-预留位算进去之后的头宽与几何.md：围栏里 1 行
+       .claude/kb/experiments/118-单盘自恢复的三条臂.md：围栏里 1 行
+       .claude/kb/experiments/12-攒批的顺序追加vs不攒批的随机页读改写.md：围栏里 3 行
+       .claude/kb/experiments/122-按目录聚在一起买到什么.md：围栏里 3 行
+       .claude/kb/experiments/123-K与回退深度的二选一各要付什么.md：围栏里 1 行
+       .claude/kb/experiments/124-系统配置字段表按已定项14重算.md：围栏里 9 行
+       .claude/kb/experiments/125-顺序区写指针之上读到什么.md：围栏里 6 行
+       .claude/kb/experiments/127-分裂合并之下组身份要不要存.md：围栏里 12 行
+       .claude/kb/experiments/128-指针带出生树txg之后的点查代价.md：围栏里 8 行
+       .claude/kb/experiments/129-小于iomin的写在真设备上怎么出事.md：围栏里 13 行
+       .claude/kb/experiments/130-每头一份livelist过不过有界销毁.md：围栏里 3 行
+       .claude/kb/experiments/131-livelist的两条载体数值与代价.md：围栏里 3 行
+       .claude/kb/experiments/132-livelist载体按真实树数与内部扇出重算.md：围栏里 3 行
+       .claude/kb/experiments/133-映射key各候选的格式代价.md：围栏里 54 行
+       .claude/kb/experiments/134-映射key格式代价槽基线与两条新臂.md：围栏里 29 行
+       .claude/kb/experiments/135-动态回退下界.md：围栏里 12 行
+       .claude/kb/experiments/136-映射key岔路的代价行.md：围栏里 34 行
+       .claude/kb/experiments/137-映射key形态的性能差距.md：围栏里 40 行
+       .claude/kb/experiments/138-按盘回退下界与推空的空间要求.md：围栏里 27 行
+       .claude/kb/experiments/139-按盘回退下界的收严形态.md：围栏里 32 行
+       .claude/kb/experiments/140-单元含头逼出的跨单元页与读侧拷贝.md：围栏里 21 行
+       .claude/kb/experiments/141-切换预留的挂载准入自证.md：围栏里 19 行
+       .claude/kb/experiments/142-第一个事务的干跑.md：围栏里 75 行
+       .claude/kb/experiments/143-一事务一单元下的journal账.md：围栏里 16 行
+       .claude/kb/experiments/144-头校验和算法的代价与判别力.md：围栏里 18 行
+       .claude/kb/experiments/145-码2自描述头与映射树key宽的代价.md：围栏里 21 行
+       .claude/kb/experiments/146-livelist条目按映射key定身份之后的宽度与代价.md：围栏里 19 行
+       .claude/kb/experiments/147-系统配置字段表按第一个事务字节表重算.md：围栏里 16 行
+       .claude/kb/experiments/148-提交固定点按两棵记录树重算.md：围栏里 25 行
+       .claude/kb/experiments/149-打包容器坏了靠什么补的三条补法各付什么.md：围栏里 20 行
+       .claude/kb/experiments/150-回退复用被抛弃的根引用的单元.md：围栏里 17 行
+       .claude/kb/experiments/151-用户数据落点的到达序与容器臂.md：围栏里 54 行
+       .claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md：围栏里 78 行
+       .claude/kb/experiments/153-账本形态与环上有洞的代价.md：围栏里 20 行
+       .claude/kb/experiments/154-两道闸串-重判与回收时点的代价.md：围栏里 39 行
+       .claude/kb/experiments/155-每次持久化的写量三种fsync形态与反事实上界.md：围栏里 3 行
+       .claude/kb/experiments/156-alloc-basis四条岔路的代价数.md：围栏里 145 行
+       .claude/kb/experiments/157-并行线一两条条款的计数模型.md：围栏里 22 行
+       .claude/kb/experiments/158-择根与修复四岔路.md：围栏里 108 行
+       .claude/kb/experiments/159-fsync等待时间随并发数组提交与wal两臂.md：围栏里 13 行
+       .claude/kb/experiments/160-随机小读在负载里占多少三个来源与两条重开判据的合成.md：围栏里 25 行
+       .claude/kb/experiments/49-反向链宽度32还是64.md：围栏里 11 行
+       .claude/kb/experiments/53-丢一整块盘之后根环还挂不挂得上.md：围栏里 4 行
+       .claude/kb/experiments/58-校验和粒度的端到端代价.md：围栏里 6 行
+       .claude/kb/experiments/65-校验和粒度的写侧代价.md：围栏里 4 行
+       .claude/kb/experiments/66-补齐之后小文件怎么落.md：围栏里 4 行
+       .claude/kb/experiments/92-最坏块重用延迟需求.md：围栏里 1 行
+       .claude/kb/experiments/95-老化的节点布局臂.md：围栏里 9 行
+       .claude/kb/prior-art.md：围栏里 9 行
+       .claude/kb/tooling.md：围栏里 6 行
+       .claude/kb/verification-build.md：围栏里 3 行
+       .claude/kb/vm-harness.md：围栏里 8 行
+       .claude/rules/fs-design.md：围栏里 21 行
+       records/2026-08-29-复跑复核轮.md：围栏里 11 行
+       records/2026-09-09-D14项2第二轮.md：围栏里 2 行
+       records/2026-09-10-D19项6与D2项15两轮.md：围栏里 3 行
+       records/2026-09-17-已分配口径三方与两个实验.md：围栏里 1 行
+       records/2026-09-21-增补3第4件与checker补三条.md：围栏里 3 行
+       records/2026-09-27-同步远端冲突块.md：围栏里 707 行
+       research/perf-by-milestone.md：围栏里 2 行
+EXIT=0
+== 24-status-redundancy.sh ==
+  ✓ 状态只说一遍，且分项都在对的节里（扫 254 份、核 350 条分项索引行）
+EXIT=0
+== 27-format-constants.sh ==
+  ✗ 格式常量在 kb 与实验源码之间对不上：
+     research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:106  const JOURNAL_NEW_ROOT_SEGMENT_BYTES 的值写成了「2 * NODE_POINTER_BYTES + 8 + 8」，门禁读不出它等于几 → 写成整数字面量（可带 _ 分隔）
+     research/e7-index-bench/src/bin/e157_parallel_line_one_clauses.rs:74  const JOURNAL_NAMED_ENTRIES_PER_RECORD 的值写成了「(JOURNAL_RECORD_BYTES - JOURNAL_HEADER_BYTES) / JOURNAL_NAMED_ENTRY_BYTES」，门禁读不出它等于几 → 写成整数字面量（可带 _ 分隔）
+     → 权威是 kb 里的 format-const 标记。改常量要三处一起动：
+       ① kb 标记与正文 ② 实验源码的 const 与钉死它的单测 ③ 重跑实验并更新 research/results/ 的产物
+     → 旧值只许留在「## 历史版本」之后与 *-history.md 里。
+EXIT=1
+== 28-cross-decision-status.sh ==
+  ✓ 没有把已定的决策说成未定（扫 206 份 kb 文件，比对 28 条决策的状态行）
+     没查的：决策变更史 3 份（整份是历史）；各文件「## 历史版本」一节里 6298 行；「」引文里紧贴决策号的 1 处（被引用的原话）
+       变更史：.claude/kb/decisions-history/2026-08.md
+       变更史：.claude/kb/decisions-history/2026-09.md
+       变更史：.claude/kb/decisions-history.md
+EXIT=0
+== 29-settled-item-self-open.sh ==
+  ✓ 已定项的正文没有把已经定了的东西说成未定（扫 28 条决策，其中 28 条有已定项区段、共 6856 行）
+EXIT=0
+== 30-decision-history.sh ==
+  ✓ 决策正文改了 19 行，变更史新增 4 条条目
+EXIT=0
+== 31-blocking-verdict.sh ==
+  ✓ 5 条未定项两把尺都判过：改第一个事务的字节、动不动格式
+EXIT=0
+== 32-first-txn-fields.sh ==
+  ✓ 第一个事务的字段表指向都成立（查了 399 处引用）
+EXIT=0
+== 33-mutation-tables.sh ==
+  ✓ 148 个实验二进制都有成形的变异表，1690 条变异的原文各命中源码一次；crates/mutations.tsv 1153 条的原文各命中源码一次；没有同名实验二进制、锚点不在本阶段射程的表 7 张：research/mutations/e125_zoned_wp.tsv research/mutations/e129_tear_injector.tsv research/mutations/e129_thin_neighbour.tsv research/mutations/e129_thin_rmw.tsv research/mutations/e158_arms.tsv research/mutations/e158_r3_arm_mutations.tsv research/mutations/e158_r4_arm_mutations.tsv （本阶段不跑变异，只验装置在、锚点对得上、两段里没有 \n 以外的反斜杠转义、crates 那张表里没有两行重复——重复按「文件 + 原文 + 替换文 + 点名的测试」四项认，变异名另判）
+EXIT=0
+== 35-user-verdict-owed.sh ==
+  ! 决策正文里没有一处标着待用户复核，本阶段无对象可判
+EXIT=77
+== 36-invariant-count-cross-file.sh ==
+  ! 本次无对象可判：扫了 204 份 kb 文件（invariants.md 与变更史之外），没有一处写「N 条在用」的声明
+EXIT=77
+== 37-decision-summary-width.sh ==
+  ✓ 决策索引结论列都不超 200 字（共 28 行）
+EXIT=0
+== 38-field-table-projection.sh ==
+  ✓ 被投影的分项，字段表都投影全了（3 张字段表、25 行；投影表引用了 108 条分项）
+EXIT=0
+== 39-field-table-sum.sh ==
+  ✓ 字段表加出来的数都对得上（扫了 28 份决策、2 份字节布局表；表后合计 2 张，表前说明句 4 张，format-const 标记 2 个；字节布局表里的结构总宽 15 处都有登记），另有 9 张表前表后都没写认得出的总宽、本阶段没验它们（表头行逐个列在下面）
+     ! 跳过：04-校验和位置.md 已定项 1 的 format-const 标记 DATA_UNIT_BYTES 没核：这一节没有加得出和的字段表
+     ! 跳过：08-核心索引结构.md 已定项 2 的 format-const 标记 NODE_BYTES 没核：这一节没有加得出和的字段表
+     ! 跳过：08-核心索引结构.md 已定项 6 里有 3 个 format-const 标记，对不上哪张表
+     ! 跳过：08-核心索引结构.md 已定项 11 里有 2 个 format-const 标记，对不上哪张表
+     ! 跳过：08-核心索引结构.md 已定项 14 里有 8 个 format-const 标记，对不上哪张表
+     ! 跳过：18-块里携带什么信息.md 已定项 11 里有 4 个 format-const 标记，对不上哪张表
+     ! 跳过：18-块里携带什么信息.md 已定项 18 里有 2 个 format-const 标记，对不上哪张表
+     ! 跳过：19-块指针的结构与宽度预算.md 已定项 4 的 format-const 标记 LOC_ENTRY 没核：这一节没有加得出和的字段表
+     ! 跳过：23-journal的角色与格式.md 已定项 4 里有 2 个 format-const 标记，对不上哪张表
+     ! 跳过：23-journal的角色与格式.md 已定项 12 的 format-const 标记 JOURNAL_NAMED_ENTRIES_PER_RECORD 没核：这一节没有加得出和的字段表
+     ! 跳过：23-journal的角色与格式.md 已定项 15 的 format-const 标记 JOURNAL_NEW_ROOT_SEGMENT_BYTES 没核：这一节没有加得出和的字段表
+     ! 跳过：23-journal的角色与格式.md 已定项 17 的 format-const 标记 JOURNAL_NAMED_ENTRY_BYTES 没核：这一节没有加得出和的字段表
+     没验：22-单元原子性怎么合成.md:132 那张字段表，表前表后都没写认得出的总宽
+     没验：01-first-txn.md:93 那张字段表，表前表后都没写认得出的总宽
+     没验：01-first-txn.md:168 那张字段表，表前表后都没写认得出的总宽
+     没验：01-first-txn.md:220 那张字段表，表前表后都没写认得出的总宽
+     没验：01-first-txn.md:248 那张字段表，表前表后都没写认得出的总宽
+     没验：01-first-txn.md:274 那张字段表，表前表后都没写认得出的总宽
+     没验：01-first-txn.md:287 那张字段表，表前表后都没写认得出的总宽
+     没验：01-first-txn.md:311 那张字段表，表前表后都没写认得出的总宽
+     没验：01-first-txn.md:359 那张字段表，表前表后都没写认得出的总宽
+EXIT=0
+== 42-first-txn-trio.sh ==
+  ✓ 第一个事务的三份文件互相挂钩（判「是」的未定项 0 条、字节表 11 节、里程碑 8 步）
+EXIT=0
+== 43-owed-table-shape.sh ==
+  ✓ 欠账表两张登记表的行形状都对，欠着的那张里没有写着已还的行（检查了 552 行，2 张表）
+    没判 2 张带编号行的表（没有紧挨着的 doc-lint:registry 标记）：「2026-09-20：C23（无密钥 scrub 分不出活槽与陈旧槽）、C32（无密钥的一侧写不写得出字节没有闸）、C33（scrub 检出之后做什么没有条款）、C134（scrub 水位自己没有落点与保护）、C136（无密钥能验哪几条不变量没人标过） 五笔按无密钥 scrub 侧的形态改写」下表头在第 628 行、4 行；「2026-09-19（其九）：C34（明文映射层的态别三处打架）、C129（锁盘期的明文映射层没有任何一方认证过）、C137（搬运的源与目的在盘上分不开）、C150（让渡区的成员身份在盘上没有落点）、C151（无密钥搬运必然要写一张加密的权威表） 五行挪进已还清；门禁 43 号从此认「作废」这个词」下表头在第 644 行、4 行
+EXIT=0
+== 44-settled-ref-says-open.sh ==
+  ✓ 扫了 517 个文件、11021 处已定项引用，没有一处紧跟着说它没定
+    没扫 71 个（两份变更史与 records/ 写的是当时的状态）：.claude/kb/decisions-history.md、.claude/kb/decisions-history/2026-08.md、.claude/kb/decisions-history/2026-09.md、.claude/kb/experiments-history.md、records/2026-08-25-立项.md、records/2026-08-26-文献扫描与第一次实测.md、records/2026-08-27-介质分支定案.md、records/2026-08-28-原子性与日志定案.md、records/2026-08-29-加密与日志定案.md、records/2026-08-29-复跑复核轮.md、records/2026-08-29-审计轮-外部引用复核与阻塞集.md、records/2026-08-29-组合对攻轮.md、records/2026-08-30-三轮攻击轮.md、records/2026-08-30-实验回填与两轮攻击.md、records/2026-09-02-SOP修订轮.md、records/2026-09-03-验证三件套落地调研.md、records/2026-09-04-单元类登记表定案.md、records/2026-09-05-C113定案.md、records/2026-09-05-SOP剥离轮.md、records/2026-09-05-inode树定案.md、records/2026-09-06-C103容器索引收口轮.md、records/2026-09-06-D1六条评审.md、records/2026-09-06-D1回扫重判.md、records/2026-09-06-D2项12三轮对抗.md、records/2026-09-06-D8项8第三轮对抗.md、records/2026-09-06-D8项8第二轮对抗.md、records/2026-09-06-D9项9三轮对抗.md、records/2026-09-06-树ID水位臂比较重做.md、records/2026-09-07-D14项2第一轮.md、records/2026-09-07-D18项13第二轮.md、records/2026-09-07-D18项14第一轮.md、records/2026-09-07-D18项3重开第一轮.md、records/2026-09-07-冻结预留第一轮.md、records/2026-09-08-D26项5三轮对抗.md、records/2026-09-09-D14项2第二轮.md、records/2026-09-09-D15两格定案.md、records/2026-09-09-D22项6项9尝试定案.md、records/2026-09-10-D19项6与D2项15两轮.md、records/2026-09-10-D19项7第一轮.md、records/2026-09-10-D26项4项5定案推演.md、records/2026-09-10-D3项8第一轮.md、records/2026-09-10-D6项2三轮对抗.md、records/2026-09-10-D6项2与E130.md、records/2026-09-10-真设备验证第一轮.md、records/2026-09-11-D19项6对抗第一轮.md、records/2026-09-11-D19项6对抗第三轮.md、records/2026-09-11-D19项6对抗第二轮.md、records/2026-09-11-D19项6第三轮.md、records/2026-09-11-D19项6第二轮.md、records/2026-09-13-D14项2第三轮.md、records/2026-09-13-D3项8第二轮.md、records/2026-09-13-总审核.md、records/2026-09-13-未定项总清单与待用户定案.md、records/2026-09-16-subagent拆分提案.md、records/2026-09-16-不拆仓与中文唯一源.md、records/2026-09-16-总审核回扫核查.md、records/2026-09-17-CLAUDE.md去冗余.md、records/2026-09-17-已分配口径三方与两个实验.md、records/2026-09-17-自包含元数据下的索引探索.md、records/2026-09-18-回扫员可靠性.md、records/2026-09-19-决策瘦身与双向登记.md、records/2026-09-19-里程碑二遗留收拢.md、records/2026-09-20-rules只写怎么做.md、records/2026-09-21-增补3第4件与checker补三条.md、records/2026-09-22-panic面普查-走得到的那些.md、records/2026-09-22-panic面普查清单.md、records/2026-09-22-并行线二三四与捶打.md、records/2026-09-23-三轮三方与四类没东西会红.md、records/2026-09-24-里程碑二收尾调度.md、records/2026-09-27-代码审阅38条去向.md、records/2026-09-27-同步远端冲突块.md
+EXIT=0
+== 48-history-month-file.sh ==
+  ✓ 查了 3 份决策变更史、565 条条目，都住在日期对得上的那一份；29 份决策正文的文末没写条目
+EXIT=0
+== 49-history-brief.sh ==
+  ✓ 决策变更史的快查与原文同步：查了 565 条条目、1190 格快查，decisions-history.md 与原文一致
+EXIT=0
+== 51-admission-terms-covered.sh ==
+  ✓ 准入不等式 8 项逐项有归属：统计量 4 项，写明的例外 4 项（容量、挂载期承诺量、被抛弃根独占量、checkpoint 保留池）；式子副本 2 处与权威一致
+EXIT=0
+== 52-segment-registry.sh ==
+  ✗ 段序列登记表与 E142 产物的 name=segments 行（或第二条流与钉它的用例）对不上，共 2 处：
+     mkfs 种根（钉住活代码的用例 recorded_stream_matches_the_registered_mkfs_segment_sequence）：kb 写的种类串与用例里写死的对不上
+     第二条流 `2+2+1+2+2+1+26+2+1+26+2+1+4+18+2+1+18+2+1+18+2+1+26+2+1+22+2+1+30+2+1+30+2+1+30+2+1+30+2+1+30+2+1+4+16+2+1+18+2+1+30+2+1+4+16+2+1+18+2+1+2`：用例文件 crates/singlefs-harness/tests/second_transaction_step_zero_layer0.rs 里没有钉这个数组 `[2, 2, 1, 2, 2, 1, 26, 2, 1, 26, 2, 1, 4, 18, 2, 1, 18, 2, 1, 18, 2, 1, 26, 2, 1, 22, 2, 1, 30, 2, 1, 30, 2, 1, 30, 2, 1, 30, 2, 1, 30, 2, 1, 4, 16, 2, 1, 18, 2, 1, 30, 2, 1, 4, 16, 2, 1, 18, 2, 1, 2]`
+     → 怎么办：表是抄错了，就照产物改 .claude/kb/layout/01-first-txn.md 那一行；
+       产物是过期了，就重跑 E142（第一个事务的干跑），更新 research/results/ 下的文件，
+       再让 research/scripts/replay.sh 里 E142 那一行的入库产物名字跟上。
+EXIT=1
+== 53-format-const-placeholders.sh ==
+  ✓ 格式常量文件里的占位都指得到分项或欠账（4 个占位：D23（journal 的角色与格式） 已定项 19；C506（每区槽数 S 写成编译期常量，条文说它住系统配置）；D22（单元原子性怎么合成） 已定项 1；C323（镜像大小全仓没有条款））
+EXIT=0
+== 60-stale-open-items.sh ==
+  ✓ 没有未定项被别处的更新甩在后面（查了 5 条未定项，其中 1 条点名了定过东西的别的决策、逐条比过复核时间）
+EXIT=0
+== 61-settled-same-file.sh ==
+  ! 本次 diff 没有新增「已定」小节，本阶段无对象可判
+EXIT=77
+== 70-citations.sh ==
+══ 外部引用复核 ══
+  refs-linux（固定点）根：/home/fy5090/code/fs-refs/linux-6.17
+  refs-zfs（固定点）根：/home/fy5090/code/fs-refs/zfs
+  refs-docs（固定点）根：/home/fy5090/code/fs-refs/docs
+  host-kernel（非固定点）根：/home/fy5090/kbuild/linux-om
+
+── bcachefs（Linux 6.17）──
+  ✓ D8     btree 树数（21）
+  ✓ D19    bch_extent_ptr 是 offset:44/dev:8/gen:8
+  ✓ D19    crc128 的 offset 是 13 位
+  ✓ D9     crc64 的 80 位由 csum_hi:16 + csum_lo 拼出
+  ✓ D9     对 crypto_aead/setauthsize 零命中（0）
+  ✓ D9     MAC 截断靠 memcpy bch_crc_bytes
+  ✓ D9     元数据加密时恒用 128 位
+  ✓ D11    accounting 树格式级绑 write buffer
+  ✓ D11    记账更新是 delta
+  ✓ D11    运行时与 GC 重建共用同一行
+  ✓ D11    btree_gc 自陈重建侧不幂等
+  ✓ D18    BTREE_NODE_SEQ 判谁覆盖谁
+  ✓ D22    btree 指针不带校验和
+  ✓ D12    bucket 寻址显式带设备
+  ✓ D1     BUCKET_GC_GEN_MAX 是 96
+
+── OpenZFS master ──
+  ✓ D4     blkptr_t 是 128 字节
+  ✓ D18    预留区是 blk_prop2 + blk_pad
+  ✓ D18    BP_GET_REWRITE 用 blk_prop2 最高位
+  ✓ D9     密文校验和不论密钥在不在都能查损坏
+  ✓ D4     加密块最多 2 副本
+  ✓ D9     ZIO_DATA_MAC_LEN 是 16
+  ✓ D5     deadlist 并到更新的那一侧
+  ✓ D5     分叉点快照不许销毁
+  ✓ D16    TXG_DEFER_SIZE 是 2
+  ✓ D17    vdev 后端签名里带 txg
+  ✓ D20    ZFS 自陈设备不做单扇区原子覆写
+  ✓ D20    ZFS 的 4 个 label
+  ✓ D20    ZFS 的 128 KiB uberblock 环
+  ✓ D20    ZFS 槽号 = txg % 槽数（轮换）
+  ✓ D23    ZIL 有 zh_claim_txg
+
+── btrfs（Linux 6.17）──
+  ✓ D17    btrfs_is_zoned 的文件数（22）
+  ✓ D17    btrfs_is_zoned 的总处数（93）
+  ✓ D17    其中落在事务日志路径的（5）
+  ✓ D17    其中落在 ENOSPC 准入的（6）
+
+── 外部文献（已重新固定的）──
+  ✓ D9     RFC 8439 的 Tag truncation MUST NOT
+  ✓ D9     RFC 8439 的 2\^128 possible tags
+
+── 本机内核树（7.2）──
+  ✓ D2     io_min 取 phys_bs，与 physical_block_size 不同
+  ✓ D2     physical_block_size 取 min(phys_bs, atomic_bs)
+  ✓ D20    原子宽度要 ATOMICS 位且 nawupf 非零
+  ✓ D9     MaxInvalids 全内核零命中（0）
+  ✓ D9     dm-integrity 的 number_of_mismatches 只自增不比阈值
+  ✓ D9     dm-integrity 的 recalc_sector 可被清零
+  ✓ D9     fscrypt 明写不防离线篡改
+  ✓ D17    dm-verity 的信任锚
+  ✓ D22    dm-flakey 造不出撕裂
+  ✓ D23    XFS_MIN_LOG_FACTOR 存在
+  ✓ D23    XLOG_MAX_ICLOGS 存在
+  ✓ D23    XFS 的 h_prev_block 是 32 位块号
+  ✓ D23    XFS 用 h_cycle 分辨圈次
+  ✓ D23    XFS 每个基本块带 cycle 戳
+  ✓ D23    XFS 恢复靠 cycle 跃变找头
+  ✓ D23    jbd2 恢复后号跳过断点
+  ✓ D23    XFS 的事务可跨多条记录
+  ✓ D23    XFS 用 END_TRANS 标事务末条
+  ✓ D23    XFS 自陈单个 region 装不下就拆
+  ✓ D23    jbd2 的事务由多块拼成
+  ✓ D23    XFS 的 CRC 覆盖载荷
+  ✓ D23    jbd2 每个数据块自带校验和
+  ✓ D23    XFS 默认 iclog 32 KiB
+  ✓ D23    jbd2 描述块塞满 tag 为止
+  ✓ D23    bcachefs 的 csum 是 jset 首字段
+  ✓ D22    XFS 日志下限 10 MiB / 512 块
+  ✓ D22    XFS 日志上限 2 GiB
+  ✓ D22    jbd2 日志下限 1024 块
+  ✓ D12    btrfs 的 zoned incompat 位
+  ✓ D12    XFS 的 zoned incompat 位
+  ✓ D12    md/raid0 的布局 feature bit
+  ✓ D14    erofs 无条件只读
+  ✓ D14    btrfs 的默认内联上限
+  ✓ D18    btrfs 用 transid 抓丢写/错向写
+  ✓ D18    f2fs 把 checkpoint CRC 塞进 cp_ver
+  ✓ D18    ocfs2 的 metaecc
+  ✓ D19    btrfs 的 sys_chunk_array 定长
+  ✓ D9     ext4 把 uuid 折进 s_csum_seed
+  ✓ D13    iomap 契约里没有事务概念
+
+══ 外部文献逐字 ══
+  ✓ D18    OSTEP §45.6：身份校验抓不到丢失写
+  ✓ D18    NetApp FAST.20：lost write 占 13.54%
+  ✓ D18    NetApp FAST.20：靠 WAFL 块签名发现
+  ✓ D9     NaCl §9：一次伪造即可解出 r
+  ✓ D9     SP 800-38D §5.2.1.2 的五个 t 取值
+  ✓ D9     SP 800-38D 的 shall not（七选一）
+  ✓ D9     MaxInvalids 属 38B 不属 38D（38B 侧）（2 次）
+  ✓ D9     MaxInvalids 属 38B 不属 38D（38D 侧）（0 次）
+  ✓ D8     FAST18：全路径索引的 Achilles heel
+  ✓ D8     FAST18：改名代价从子树大小降到深度
+  ✓ D8     FAST18 全文无 checksum（0 次）
+  ✓ D10    FAST18：git 负载把 ext4 scan 退化 15 倍
+  ✓ D10    FAST17：老化用连续 git checkout 内核树
+  ✓ D10    FAST17：老化的 BetrFS 胜过别家未老化
+
+══ 按每条引用依赖的那棵树分组 ══
+  refs-linux（固定点） 20 条：命中 20，未命中 0  根：/home/fy5090/code/fs-refs/linux-6.17
+  refs-zfs（固定点） 15 条：命中 15，未命中 0  根：/home/fy5090/code/fs-refs/zfs
+  refs-docs（固定点） 16 条：命中 16，未命中 0  根：/home/fy5090/code/fs-refs/docs
+  host-kernel（非固定点） 38 条：命中 38，未命中 0  根：/home/fy5090/kbuild/linux-om
+  没标树来源：0 条
+  ⚠️ host-kernel 上的 38 条核的不是固定点：/home/fy5090/kbuild/linux-om 不在 fetch-refs.sh 的固定点里，
+     随时会被升级、改动或删掉 ⇒ 这一批的「已核实」只在这台机器的今天成立。
+
+══ 结果：89 条命中，0 条未命中；分组合计 89 条，与断言总数一致 ══
+  ✓ 全部命中（89 条，按树分组： refs-linux 20 refs-zfs 15 refs-docs 16 host-kernel 38）
+EXIT=0
+== 67-milestone-closeout-owed.sh ==
+  ✓ 里程碑收口表收全了文件里点名、还开着的欠账号（判了 1 份；02-second-txn.md：全文点名 117 个 C 编号，其中还开着 91 个：表里 80 个、豁免 11 个；收口表 62 行的行号都是顺序号或圆圈号）
+    没判 2 份（没有收口表标记）：01-first-txn.md、03-third-txn.md
+EXIT=0
+== 69-evidence-in-repo.sh ==
+  ✗ 这些地方把 /tmp 下的东西当依据引用了——那是会话自己的草稿目录，一重启就没了，三个月后没人核得动：
+     research/prompts/m2-kb-writeback-batch2-scribe-report.md:7：…- 起草员报告：`/tmp/claude-1000/kb-writeback-batch2/report.md
+     research/prompts/m2-kb-writeback-batch2-scribe-report.md:45：…aude/gate.d/<文件>`，原样末行汇总见 `/tmp/claude-1000/kb-writeback-batch2/scribe/gate-summary.txt
+     → 怎么办：把 /tmp 下那份东西拷进仓里该在的位置（报告、提示与判决进 research/prompts/，跑出来的数进 research/results/），
+               引用改成指那一份：在引用它的文件里把 /tmp 路径逐处换成仓内路径。
+               原件已经没了，就写明它没了、把还核得动的那部分落进仓里；只是在说做法（草稿放在哪），把句子里的依据词去掉。
+EXIT=1
+== 75-decision-experiment-links.sh ==
+  ✗ 决策与实验的登记有 7 处问题（没回看 1、行形状 6）；实验页 159 个（待回填 0）、决策 28 条（待回填 0）、已瘦身决策的已定项 345 个（其中写「无实验」的 147 个）、表行 794 行、这次改动触发回看 5 处、改成已跑而引了它的决策 0 条：
+      [没回看] .claude/kb/experiments/156-alloc-basis四条岔路的代价数.md：这次改动里 E156 正文改了，影响的决策表一行都没回看
+      [行形状] research/prompts/m2-closeout-code-r1-main-verification.md:52：回看决策表一行写成 | D<号>（简称） [已定项 k] | 关系 | YYYY-MM-DD 改了 / 不受影响：理由 |
+      [行形状] research/prompts/m2-closeout-code-r1-main-verification.md:53：回看决策表一行写成 | D<号>（简称） [已定项 k] | 关系 | YYYY-MM-DD 改了 / 不受影响：理由 |
+      [行形状] research/prompts/m2-closeout-code-r1-main-verification.md:54：回看决策表一行写成 | D<号>（简称） [已定项 k] | 关系 | YYYY-MM-DD 改了 / 不受影响：理由 |
+      [行形状] research/prompts/m2-closeout-code-r1-main-verification.md:55：回看决策表一行写成 | D<号>（简称） [已定项 k] | 关系 | YYYY-MM-DD 改了 / 不受影响：理由 |
+      [行形状] research/prompts/m2-closeout-code-r1-main-verification.md:56：回看决策表一行写成 | D<号>（简称） [已定项 k] | 关系 | YYYY-MM-DD 改了 / 不受影响：理由 |
+      [行形状] research/prompts/m2-closeout-code-r1-main-verification.md:57：回看决策表一行写成 | D<号>（简称） [已定项 k] | 关系 | YYYY-MM-DD 改了 / 不受影响：理由 |
+  → 怎么办：格式与判据见 .claude/rules/format-evolution.md「决策正文只写现状，依据写成指针；决策与实验双向登记」。
+            实验出了新结论、换了产物，就逐行回看它影响的决策，回看格写当天日期与「改了」或「不受影响：理由」；
+            支撑 / 推翻的那条分项在「**依据**」段引回这个实验；待回填清单只能删行，新实验页当场写全这张表。
+EXIT=1
+== 76-second-txn-hooks.sh ==
+  ✓ 第二个事务的三处互相挂钩（登记表 9 行、行到步 8 处、「写出的字节」点名 34 处、用例 22 个、段序列登记表标到的步 3 个）
+EXIT=0
+== 78-owed-cited-tests.sh ==
+  ✗ C283 引的 `an_admitted_overwrite_whose_data_unit_finds_no_slot_raises_the_floor_and_is_published_in_the_session` 在仓里的 .rs / .py / .sh 里一处都找不到
+  ✗ 已还清的行里有 1 个点名的标识符已经不在仓里了
+     → 怎么办：那条欠账是靠这个测试还清的。先 grep 它今天叫什么（多半是改了名），
+               用 research/scripts/replace-once.py 把行里的旧名字定点换成现在的名字；
+               它要是被删掉了，那这条欠账并没有还清，把整行挪回欠着的那张表。
+EXIT=1
+== 92-layout-checker-sync.sh ==
+  ✓ 布局清单 1 套布局、6 条路径都在，位号都对得上 D15（格式冻结政策） 已定项 4 的登记表；这次改动比 faf255e235300d129ede6d6f85af31d686a88519，111 个格式常量里变了 0 个（checker 在同一次改动里跟了 0 个，按滞后表放行 0 个），都不欠 checker 跟进；另有 5 个是第一次登记标记，源里的值这次没变，不算这次的变动
+    这 5 个是首次登记，不是这次改动引入的变化：
+      首次登记：DATA_UNIT_PAYLOAD_OFFSET = 134（.claude/kb/layout/01-first-txn.md，同一套布局里别的格式定义路径这次没变、原值就是这个）
+      首次登记：JOURNAL_RING_DEFAULT_BYTES = 805306368（.claude/kb/layout/01-first-txn.md，同一套布局里别的格式定义路径这次没变、原值就是这个）
+      首次登记：NONCE_MAC_ALGORITHM_RESERVED_BYTES = 29（.claude/kb/layout/01-first-txn.md，同一套布局里别的格式定义路径这次没变、原值就是这个）
+      首次登记：PACKED_UNIT_RECORDS_OFFSET = 136（.claude/kb/layout/01-first-txn.md，同一套布局里别的格式定义路径这次没变、原值就是这个）
+      首次登记：ROOT_RING_CHUNK_BYTES = 1048576（.claude/kb/layout/01-first-txn.md，同一套布局里别的格式定义路径这次没变、原值就是这个）
+    没抽到常量的格式定义路径 1 条（第 ④ 条对它们没有对象可判，只受第 ②③ 条管）：
+      第一条纯 SSD 布局线（系统配置带回退下界 F、根记录带卸载记号、没有回退见证与回退行）：.claude/kb/layout/02-second-txn.md
+EXIT=0
+== 97-invariant-field-anchors.sh ==
+  ✓ 这次改动新写或改写的 1 行不变量都点名了已定分项（基准 faf255e235300d129ede6d6f85af31d686a88519）；存量 79 行里 34 行还点不出，那笔账记在 C69（已定不变量没有字段可判）
+EXIT=0
+== 98-kb-registry.sh ==
+  ✓ kb 里 20 项（15 份 .md、5 个子目录）都在 CLAUDE.md 的「## 项目本地事实」表里登记着，表里 20 个路径也都指得到东西
+EXIT=0
+== 93-feature-bits.sh ==
+  ✓ feature bit 位号在记账表、D15（格式冻结政策） 已定项 4 与代码三处一致（记账表 2 位、登记表分出去 2 位；扫了 56 个 .rs，认出 4 处 feature bit 常量、解出位号 3 处；没判位号的 1 处：SUPPORTED_INCOMPAT_BITS（crates/singlefs-core/src/system_configuration.rs:31，常量声明没写在一行里，解不出值））
+EXIT=0
+== 79-tree-table-reserve.sh ==
+  ✓ 树表条目预留的认购表对得上（5 条认购，合计 48 字节、预留 76、余 28；每条的出处都指得到一个编号）
+EXIT=0
+== 81-audit-contradictions.sh ==
+  ✓ 最近一次总审核第五节每一行都有去向（records/2026-09-13-总审核.md：第五节 29 行，判了 29 行；写「已改」的 24 行引了 28 句原文，都在那一行点名的文件的今天正文里找得到；其中 0 行没点名 kb 文件，按 kb 全部正文找）
+    欠账表按共用读法 lib-owed.py 切：开着 471 笔、已还清 81 笔；第五节标题在第 154 行
+EXIT=0
+== 82-clause-enum-pairs.sh ==
+  ✓ 条文列的集合与代码里的枚举逐个对得上（6 对成员、1 个枚举、1 条分项；两个方向都逐项比过：表里的名字都是正文列举的一项，正文列举的每一项都在表里）
+EXIT=0

@@ -1,0 +1,5 @@
+cc4a4d55536f18f541e4733a78d92178d50d28cde3da3749156dd1327b57ef16  .claude/agents/experiment-runner.md
+c56a6161972d9e4340d959273c187d3da3f11714a4cd47cda7e72e5db8685651  .claude/hooks/write-guard.sh
+1756a78e63e60259002180c5564510dc370f58db460da5f44507c8c2d6450dae  .claude/hooks/bash-command-detector.sh
+d880a0f4acc87f467c2bde7abc83c2ed17ec1ecc9bc1528d6d51176fb672e385  research/scripts/compile-then-swap.py
+d78e8e67f9951a5c30464f84d034337f0f284462afbca7b4736e350c1921b450  .claude/agent-common.md

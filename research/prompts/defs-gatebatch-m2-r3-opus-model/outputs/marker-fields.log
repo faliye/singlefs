@@ -1,0 +1,8 @@
+INFO	crash-case-command 退 0；前四个 ['32', '32', 'default']；命令：env -u SINGLEFS_LAYER0_SHARD -u SINGLEFS_LAYER0_START_OVER SINGLEFS_LAYER0_PROGRESS_DIRECTORY=<仓>/.git/singlefs-layer0-progress/0000000000000000000000000000000000000000000000000000000000000000 SINGLEFS_LAYER0_INPUT_FINGERPRINT=0000000000000000000000000000000000000000000000000000000000000000 SINGLEFS_LAYER0_THREADS=32 cargo test --release -p singlefs-harness --test second_transaction_supplement_three_crash_injection -- --include-ignored --exact crash_injection_fast_tier_recovers_only_into_versions_the_model_committed --nocapture
+ATTACK	BROKEN	① 调用方设着 SINGLEFS_CRASH_INJECTION_THREADS=1，照 crash-case-command 的命令起的这条用例 ⇒ 不应当看到 1（该清掉或设成配的线程数）	起的进程看到「SINGLEFS_LAYER0_THREADS=32 SINGLEFS_CRASH_INJECTION_THREADS=1」（退 0）
+MARKER	configured_worker_threads=SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核
+MARKER	CRASH_INJECTION_FINISHED seeds=[7,31) slices=24 worker_threads=1 elapsed_seconds=900.0
+MARKER	started_worker_threads=读不到：这条用例没登记 threads=，门禁不读它起了几个工作线程（配的线程数在 configured_worker_threads=，不是起了几个；日志里有 LAYER0_PARALLEL_FINISHED 的另原样记在 parallel_finished=）
+ATTACK	BROKEN	② 判 1 个线程跑完的日志、写标记 ⇒ configured_worker_threads= 不应当写一个这条用例不读的变量	judge 退 0、record 退 0；线程那几行见上面 MARKER
+ATTACK	BROKEN	③ 调用方环境里 OMP_NUM_THREADS=1（没设 SINGLEFS_LAYER0_THREADS）⇒ crash-case-command 交的核数应当是本机的核数、64 片只起 1 个线程的日志应当判红	nproc --all 报 32；crash-case-command 交「核数 1、线程 1、default」；照它判 64 片 1 线程的日志退 0（LAYER0：1 个工作线程跑了 64 片、从进度文件读回 0 片（共 64 片））
+SUMMARY 标记字段与线程来源: cells=3 attack_cells_broken=3 control_cells_broken=0

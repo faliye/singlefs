@@ -1,0 +1,2 @@
+1. Row 1: The request limit of 900 seconds exceeds the foreground limit of 600 seconds, so the leg must use the background form. What would refute it: a lower configured timeout.
+2. Row 2: The inference rule and the definition agree once the switching condition holds, which it does by default. What would refute it: a sentence that narrows either rule.

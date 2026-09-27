@@ -1,0 +1,11 @@
+CONTROL	holds	M4r include_str!(concat!(…拆开写的 mutations.tsv…))（P7 修的那一格） ⇒ 改 crates/mutations.tsv 指纹应当变	改前 40c03309ca566943… 改后 8c501f1fe3cff334…（文件数 / 减去数 改前 7/0 改后 7/0）
+ATTACK	BROKEN	N1 use core::include_str as grab; grab!(concat!(…拆开写的 mutations.tsv…)) ⇒ 改 crates/mutations.tsv 指纹应当变	改前 14aacffa15134d61… 改后 14aacffa15134d61…（文件数 / 减去数 改前 4/3 改后 4/3）
+CONTROL	holds	M5r include_str!(concat!(…拆开写的 src/bin/tool.rs…)) ⇒ 改 crates/pkg/src/bin/tool.rs 指纹应当变	改前 8ce3383145999490… 改后 444ff5d1bc51d80d…（文件数 / 减去数 改前 7/0 改后 7/0）
+ATTACK	BROKEN	N2 改名的 grab!(concat!(…拆开写的 src/bin/tool.rs…)) ⇒ 改 crates/pkg/src/bin/tool.rs 指纹应当变	改前 374813ee55c6809b… 改后 374813ee55c6809b…（文件数 / 减去数 改前 4/3 改后 4/3）
+CONTROL	holds	M1r include_str!(concat!(…拆开写的 tests/other.rs…))（这个包的测试文件一份都不减） ⇒ 改 crates/pkg/tests/other.rs 指纹应当变	改前 60afa3078cc0df8f… 改后 58a079689239e10b…（文件数 / 减去数 改前 7/0 改后 7/0）
+ATTACK	BROKEN	N3 改名的 grab!(concat!(…拆开写的 tests/other.rs…)) ⇒ 改 crates/pkg/tests/other.rs 指纹应当变	改前 aa91cc3e71e953a3… 改后 aa91cc3e71e953a3…（文件数 / 减去数 改前 4/3 改后 4/3）
+CONTROL	holds	G1a runner = "sh <仓的绝对路径>/tools/r.sh" ⇒ 改 tools/r.sh 指纹应当变	改前 9dd3366e7e4cd51a… 改后 0e3cb7c0bf69f818…
+CONTROL	holds	G1b runner = "sh tools/r.sh"（从 .cargo 那一层解；照 SEM-P9，cargo 在 crates/pkg 起它，这种写法跑不起来） ⇒ 改 tools/r.sh 指纹应当变	改前 15dcf03e3471a194… 改后 d839169e7e714b6e…（文件数 / 减去数 改前 4/3 改后 4/3）
+ATTACK	BROKEN	P9a runner = "sh ../../tools/r.sh"（从包目录起，cargo 真能跑的写法） ⇒ 改 tools/r.sh 指纹应当变	改前 9d74e0c3104db913… 改后 9d74e0c3104db913…（文件数 / 减去数 改前 4/3 改后 4/3）
+ATTACK	BROKEN	P9b 环境变量 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="sh ../../tools/r.sh" ⇒ 改 tools/r.sh 指纹应当变	改前 b2988232c88cd188… 改后 b2988232c88cd188…（文件数 / 减去数 改前 4/3 改后 4/3）
+SUMMARY L1 P6 P7 P9：清单与指纹: cells=10 attack_cells_broken=5 control_cells_broken=0

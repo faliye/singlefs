@@ -1,0 +1,70 @@
+Z5 raise_to_ceiling ok=true
+Z5 rollback ok=true err=None
+Z5 unmount ok=true
+Z5 stream operations=799 writes=675 segments=92 tearable_by_kind={"system_configuration_slot": 62}
+Z5 tearable write=19 kind=system_configuration_slot device=0 offset=0 length=4096 differing_span=147..=477 differing_bytes=6
+Z5 tearable write=20 kind=system_configuration_slot device=1 offset=0 length=4096 differing_span=147..=477 differing_bytes=6
+Z5 tearable write=24 kind=system_configuration_slot device=0 offset=4096 length=4096 differing_span=147..=477 differing_bytes=7
+Z5 tearable write=25 kind=system_configuration_slot device=1 offset=4096 length=4096 differing_span=147..=477 differing_bytes=7
+Z5 tearable write=29 kind=system_configuration_slot device=0 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=30 kind=system_configuration_slot device=1 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=58 kind=system_configuration_slot device=0 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=59 kind=system_configuration_slot device=1 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=87 kind=system_configuration_slot device=0 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=88 kind=system_configuration_slot device=1 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=116 kind=system_configuration_slot device=0 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=117 kind=system_configuration_slot device=1 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=145 kind=system_configuration_slot device=0 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=146 kind=system_configuration_slot device=1 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=174 kind=system_configuration_slot device=0 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=175 kind=system_configuration_slot device=1 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=176 kind=system_configuration_slot device=0 offset=0 length=4096 differing_span=147..=477 differing_bytes=7
+Z5 tearable write=177 kind=system_configuration_slot device=1 offset=0 length=4096 differing_span=147..=477 differing_bytes=7
+Z5 tearable write=199 kind=system_configuration_slot device=0 offset=4096 length=4096 differing_span=147..=477 differing_bytes=7
+Z5 tearable write=200 kind=system_configuration_slot device=1 offset=4096 length=4096 differing_span=147..=477 differing_bytes=7
+Z5 tearable write=220 kind=system_configuration_slot device=0 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=221 kind=system_configuration_slot device=1 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=241 kind=system_configuration_slot device=0 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=242 kind=system_configuration_slot device=1 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=270 kind=system_configuration_slot device=0 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=271 kind=system_configuration_slot device=1 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=303 kind=system_configuration_slot device=0 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=304 kind=system_configuration_slot device=1 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=336 kind=system_configuration_slot device=0 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=337 kind=system_configuration_slot device=1 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=369 kind=system_configuration_slot device=0 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=370 kind=system_configuration_slot device=1 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=402 kind=system_configuration_slot device=0 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=403 kind=system_configuration_slot device=1 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=404 kind=system_configuration_slot device=0 offset=4096 length=4096 differing_span=147..=481 differing_bytes=7
+Z5 tearable write=405 kind=system_configuration_slot device=1 offset=4096 length=4096 differing_span=147..=481 differing_bytes=7
+Z5 tearable write=425 kind=system_configuration_slot device=0 offset=0 length=4096 differing_span=147..=481 differing_bytes=7
+Z5 tearable write=426 kind=system_configuration_slot device=1 offset=0 length=4096 differing_span=147..=481 differing_bytes=7
+Z5 tearable write=446 kind=system_configuration_slot device=0 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=447 kind=system_configuration_slot device=1 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=467 kind=system_configuration_slot device=0 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=468 kind=system_configuration_slot device=1 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=500 kind=system_configuration_slot device=0 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=501 kind=system_configuration_slot device=1 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=502 kind=system_configuration_slot device=0 offset=0 length=4096 differing_span=147..=481 differing_bytes=6
+Z5 tearable write=503 kind=system_configuration_slot device=1 offset=0 length=4096 differing_span=147..=481 differing_bytes=6
+Z5 tearable write=527 kind=system_configuration_slot device=0 offset=4096 length=4096 differing_span=147..=481 differing_bytes=7
+Z5 tearable write=528 kind=system_configuration_slot device=1 offset=4096 length=4096 differing_span=147..=481 differing_bytes=7
+Z5 tearable write=548 kind=system_configuration_slot device=0 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=549 kind=system_configuration_slot device=1 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=569 kind=system_configuration_slot device=0 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=570 kind=system_configuration_slot device=1 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=571 kind=system_configuration_slot device=0 offset=0 length=4096 differing_span=147..=477 differing_bytes=7
+Z5 tearable write=572 kind=system_configuration_slot device=1 offset=0 length=4096 differing_span=147..=477 differing_bytes=7
+Z5 tearable write=598 kind=system_configuration_slot device=0 offset=4096 length=4096 differing_span=147..=477 differing_bytes=7
+Z5 tearable write=599 kind=system_configuration_slot device=1 offset=4096 length=4096 differing_span=147..=477 differing_bytes=7
+Z5 tearable write=619 kind=system_configuration_slot device=0 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=620 kind=system_configuration_slot device=1 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=640 kind=system_configuration_slot device=0 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=641 kind=system_configuration_slot device=1 offset=4096 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=673 kind=system_configuration_slot device=0 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 tearable write=674 kind=system_configuration_slot device=1 offset=0 length=4096 differing_span=147..=469 differing_bytes=6
+Z5 split_points_tried=40312 self_verifying_other_than_old_and_new=0 midpoint_self_verifying=0
+Z5 fua_total=29 fua_with_unflushed_plain_writes_on_its_device=0
+test torn_split_points_and_fua_release_on_a_recorded_multi_mount_stream ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.86s

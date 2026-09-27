@@ -1,0 +1,23 @@
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/impl-i713-bad-image/work/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-i713-bad-image/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.81s
+     Running tests/checker_known_bad_images.rs (target/debug/deps/checker_known_bad_images-89a29090b0bda30e)
+
+running 1 test
+test a_system_configuration_slot_whose_encryption_type_is_on_reddens_only_its_own_invariant_and_every_other_is_not_applicable ... FAILED
+
+failures:
+
+---- a_system_configuration_slot_whose_encryption_type_is_on_reddens_only_its_own_invariant_and_every_other_is_not_applicable stdout ----
+
+thread 'a_system_configuration_slot_whose_encryption_type_is_on_reddens_only_its_own_invariant_and_every_other_is_not_applicable' (948475) panicked at crates/singlefs-harness/tests/checker_known_bad_images.rs:2361:17:
+这个池挂不上，I-1.1 要报不适用，得到 Holds
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_system_configuration_slot_whose_encryption_type_is_on_reddens_only_its_own_invariant_and_every_other_is_not_applicable
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 39 filtered out; finished in 2.54s
+
+error: test failed, to rerun pass `-p singlefs-harness --test checker_known_bad_images`

@@ -1,0 +1,11 @@
+CONTROL	holds	V0 #[test] #[ignore] fn the_case（一份，标了）：闸（cargo test --release，不带 --ignored） ⇒ 应当放行	闸退 0
+CONTROL	holds	V0 #[test] #[ignore] fn the_case（一份，标了）：crash-cases 自查 ⇒ 应当退 0	自查退 0：crash-case:own	pkg	own_case	the_case
+CONTROL	holds	V3 同名 cfg 二选一、release 那一份不标（第二轮 V3，P4 修的那一格）：闸（cargo test --release，不带 --ignored） ⇒ 应当拒	闸退 2
+CONTROL	holds	V3 同名 cfg 二选一、release 那一份不标（第二轮 V3，P4 修的那一格）：crash-cases 自查 ⇒ 应当退 2	自查退 2：.claude/gate.d/stage-inputs.tsv 第 1 行：崩溃枚举用例 crash-case:own 的用例函数 the_case 有 1 处定义没标 #[ignore]（crates/pkg/tests/own_case.rs；共 2 处，cfg 二选一的、子
+ATTACK	BROKEN	I1 debug 下标 ignore；release 下 include!("common/release_case.rs") 进来一份不标的同名用例：闸（cargo test --release，不带 --ignored） ⇒ 应当拒	闸退 0
+ATTACK	BROKEN	I1 debug 下标 ignore；release 下 include!("common/release_case.rs") 进来一份不标的同名用例：crash-cases 自查 ⇒ 应当退 2	自查退 0：crash-case:own	pkg	own_case	the_case
+ATTACK	BROKEN	I2 同 I1，include! 的参数换成 concat!("common/", "release_case.rs")：闸（cargo test --release，不带 --ignored） ⇒ 应当拒	闸退 0
+ATTACK	BROKEN	I2 同 I1，include! 的参数换成 concat!("common/", "release_case.rs")：crash-cases 自查 ⇒ 应当退 2	自查退 0：crash-case:own	pkg	own_case	the_case
+CONTROL	holds	I3 只有 include! 进来的一份（测试目标里没有字面的 fn the_case(）：判不出，按没标算（P5）：闸（cargo test --release，不带 --ignored） ⇒ 应当拒	闸退 2
+CONTROL	holds	I3 只有 include! 进来的一份（测试目标里没有字面的 fn the_case(）：判不出，按没标算（P5）：crash-cases 自查 ⇒ 应当退 2	自查退 2：.claude/gate.d/stage-inputs.tsv 第 1 行：崩溃枚举用例 crash-case:own 的用例函数 the_case 在 crates/pkg/tests/own_case.rs 里找不到字面的 fn the_case(：改了名？宏生成的用例判不出
+SUMMARY L1 P4：include! 进来的同名定义: cells=10 attack_cells_broken=4 control_cells_broken=0

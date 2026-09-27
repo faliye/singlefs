@@ -1,0 +1,10 @@
+32f3f941f8fabfc293043a57859002dfb2a099c9efc4b7818116264b4c8b8e42  .claude/agents/three-way-local-attack.md
+dc3e00d3fbf95043ed907450c333b7b1f925bf98d4e7cac368364c81f780819f  .claude/agents/three-way-local-defense.md
+d78e8e67f9951a5c30464f84d034337f0f284462afbca7b4736e350c1921b450  .claude/agent-common.md
+e259d0654520a7ea360b6fd68de07f3b9426962e5b1c0eeee998f1ddf740e0bd  .claude/rules/three-way-inference.md
+d508030ac4a86f11cb0216a29a5d639e59df76fb500cd3c0961902f5246f9a0b  research/scripts/ask-local.sh
+6b4d03062635df6684631e7f6926f76a70183df9ca5987303aa4b6a0bbb3b62f  research/scripts/oov-check.py
+7dddab50fda792a13921a90b0c9a01bdc46cc9f53e80503bbcc4b1ad4b922b80  research/scripts/corruption-check.py
+b979911fe8590ebe0691e58faf68cdd94fe182deeb3adafc191fa7ded436331b  .claude/hooks/bash-command-detector.sh
+da452ec46b547c39faadb19fafec7c9abd8edf7774e316cff0ba294364c9bd98  .claude/hooks/heavy-test-guard.sh
+9b8ed6999b58c2c7c846d66195b6fa51f1ab3f03a959543fc5bca74107e9c6de  .claude/main-agent.md

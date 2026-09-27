@@ -1,0 +1,7 @@
+case 1 rc1=0 rc2=0 bytes=1084
+--- oov-check (step 5 command):
+绿 c1-s1.md  生词=0 拼接=0
+oov rc=0
+--- corruption-check:
+绿 c1-s1.md  cjk=0 words=168 fffd=0 汉字复读=0(0.00/千) 英文复读=0(0.00/千) 反引号落单=0 星号落单=0 粘连=0 实词自复读=0 缩写自粘=0 单字母替换=0
+corruption rc=0

@@ -1,0 +1,12 @@
+l1-hook rc=1 SUMMARY L1 闸：P1 P2 P3 P10: cells=17 attack_cells_broken=10 control_cells_broken=0
+l1-p5 rc=1 SUMMARY L1 P5：准入模块坏了时闸往哪边偏: cells=5 attack_cells_broken=2 control_cells_broken=0
+l1-attrs rc=1 SUMMARY L1 P4：include! 进来的同名定义: cells=10 attack_cells_broken=4 control_cells_broken=0
+l1-manifest rc=1 SUMMARY L1 P6 P7 P9：清单与指纹: cells=10 attack_cells_broken=5 control_cells_broken=0
+d2-trace rc=1 SUMMARY D2 判法摘要的闭包: cells=6 attack_cells_broken=5 control_cells_broken=0
+marker-fields rc=1 SUMMARY 标记字段与线程来源: cells=3 attack_cells_broken=3 control_cells_broken=0
+semantics rc=0 9 行 SEM
+systemd-run rc=0 2 行 SEM
+fix-l1-hook rc=2 SUMMARY L1 闸：P1 P2 P3 P10: cells=17 attack_cells_broken=0 control_cells_broken=1
+fix-l1-p5 rc=0 SUMMARY L1 P5：准入模块坏了时闸往哪边偏: cells=5 attack_cells_broken=0 control_cells_broken=0
+fix-guard-selftest rc=0   ✓ 自检通过（查了 661 种，其中该拒 122 种�
+rerun rc=0

@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/checker_known_bad_images.rs (target/debug/deps/checker_known_bad_images-89a29090b0bda30e)
+
+running 1 test
+test the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 39 filtered out; finished in 9.18s
+

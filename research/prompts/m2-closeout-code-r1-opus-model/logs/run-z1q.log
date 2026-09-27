@@ -1,0 +1,8 @@
+Z1Q-B target_txg=4 rollback_txg=6 quarantined_slot=50180 record_before=Some((false, 3)) record_after=Some((false, 3)) released_user_visible_units=4
+test rollback_to_a_version_not_referencing_a_quarantined_unit_leaves_it_allocated ... ok
+Z1Q-A checker_violations_before_rollback=3 first=Some("I-2.1: 数据单元 在盘 1 槽 50180 的那一份与位置条目里的校验和对不上")
+Z1Q-A quarantined_copies_at_overwrite=2 record_before_rollback=Some((false, 3))
+Z1Q-A rollback_to_txg3 accepted=true err=None resurrected=Some(6)
+Z1Q-A checker_violations_after=3 first=Some("I-2.1: 数据单元 在盘 1 槽 50180 的那一份与位置条目里的校验和对不上")
+test rollback_to_a_version_referencing_a_quarantined_unit_is_accepted_without_checking_its_copies ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s

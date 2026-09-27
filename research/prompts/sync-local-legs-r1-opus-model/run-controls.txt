@@ -1,0 +1,7 @@
+K1 control bg lone &	three-way-local-attack	bg=True	pattern=0 detector=2[✗ run_in_background 里又把活放到了后台（以单独的 & 收尾、之后同一条命令里没有 wait 的作业：bash research/scripts/ask-local.sh p.md）：外层 shell 起完它就退出，完成通知当场发出，真跑完的那个进程不会叫醒任何] heavy=0	detections+=0
+K2 control fg until sleep	three-way-local-attack	bg=False	pattern=0 detector=2[✗ 前台的等待循环没有超时（认出的循环：until test -s s1.md）：等的条件不成立就一直不返回，这一次调用卡在这里期间，发给你的消息也送不到] heavy=0	detections+=0
+K3 control bg until sleep (detect only)	three-way-local-attack	bg=True	pattern=0 detector=0 heavy=0	detections+=1
+K4 control setsid -f	three-way-local-attack	bg=False	pattern=0 detector=2[✗ 把活放出了追踪（认出的写法：setsid -f）：进程移出 shell 的作业表或另起会话，随后的 wait 立刻返回、完成通知当场发出，它跑完不会叫醒任何人，成了没人追踪的孤儿] heavy=0	detections+=0
+K5 control heavy gate.sh	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=2[✗ 重型测试被拒：gate.sh（整轮门禁）：three-way-local-attack 不跑「整轮门禁」]	detections+=1
+K6 control pgrep -f	three-way-local-attack	bg=False	pattern=2[✗ 这条命令里有按模式找进程的写法（pgrep 或 pkill 带 -f / --full，或 killall），执行前拒绝。共 1 处，第一处：pgrep -f ask-local] detector=0 heavy=0	detections+=0
+K7 control >| existing script	three-way-local-attack	bg=False	pattern=0 detector=2[✗ 要在同一个 inode 上改一个已经存在的脚本（认出的写法与目标：>| research/scripts/ask-local.sh）：正在跑它的 bash 按文件偏移往下读，改完会从新内容的同一偏移接着读，读到的是别的东西] heavy=0	detections+=0

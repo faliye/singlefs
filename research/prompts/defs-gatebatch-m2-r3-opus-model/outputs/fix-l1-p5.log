@@ -1,0 +1,6 @@
+CONTROL	holds	A 准入模块原样；用例函数没标 ignore、不带 --ignored ⇒ 应当拒	闸退 2，检出记了 1 条；stderr：✗ 重型测试被拒：cargo test --test own_case 不带 --ignored，而登记的用例函数 the_case 没标 #[ignore]，照样跑到全量（own_case）（崩溃枚举用例）：implementation-writer 不跑「崩溃枚举用例」 ｜ → 规矩：重型测试（
+CONTROL	holds	B 导入不了（文件尾加一行语法错）；用例函数没标 ignore、不带 --ignored ⇒ 应当拒	闸退 2，检出记了 1 条；stderr：✗ 重型测试被拒：cargo test --test own_case 不带 --ignored，而登记的用例函数 the_case 没标 #[ignore]，照样跑到全量（own_case）（崩溃枚举用例）：implementation-writer 不跑「崩溃枚举用例」 ｜ → 规矩：重型测试（
+ATTACK	holds	C 导入得了、判的那一刻抛 NameError（definitions_marked_ignored 改名，调它的一处没跟上）；用例函数没标 ignore、不带 --ignored ⇒ 应当拒	闸退 2，检出记了 1 条；stderr：✗ 重型测试被拒：cargo test --test own_case 不带 --ignored，而登记的用例函数 the_case 没标 #[ignore]，照样跑到全量（own_case）（崩溃枚举用例）：implementation-writer 不跑「崩溃枚举用例」 ｜ → 规矩：重型测试（
+ATTACK	holds	D 导入得了、闸调的 test_function_is_marked_ignored 改了名（AttributeError）；用例函数没标 ignore、不带 --ignored ⇒ 应当拒	闸退 2，检出记了 1 条；stderr：✗ 重型测试被拒：cargo test --test own_case 不带 --ignored，而登记的用例函数 the_case 没标 #[ignore]，照样跑到全量（own_case）（崩溃枚举用例）：implementation-writer 不跑「崩溃枚举用例」 ｜ → 规矩：重型测试（
+CONTROL	holds	C 那种坏法下带 --include-ignored ⇒ 应当拒（不经准入模块）	闸退 2；stderr：✗ 重型测试被拒：cargo test --test own_case 带 --include-ignored，跑到登记的崩溃枚举用例（own_case）（崩溃枚举用例）：implementation-writer 不跑「崩溃枚举用例」 ｜
+SUMMARY L1 P5：准入模块坏了时闸往哪边偏: cells=5 attack_cells_broken=0 control_cells_broken=0

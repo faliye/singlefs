@@ -1,0 +1,6 @@
+S1 bg start, end turn, waiting 5 min	state=本轮结束、没交回	started=['bAAA1']	finished=[]	alerts=[]
+S2 fg moved at 240s, end turn, waiting 5 min	state=本轮结束、没交回	started=['bAAA2']	finished=[]	alerts=[]
+S3 bg exit5 failed -> wake -> stat -> >| rerun bg -> end turn	state=本轮结束、没交回	started=['bAAA3', 'bAAA4']	finished=['bAAA3']	alerts=[]
+S4 fg pending 9 min (timeout 600000 path)	state=执行工具中	started=[]	finished=[]	alerts=['工具调用过长']
+S5 fg moved, leg relaunches same cmd in bg, first finishes	state=本轮结束、没交回	started=['bAAA5', 'bAAA6']	finished=['bAAA5']	alerts=[]
+S6 control: fast exit3 notice queued mid-turn, leg ends turn claiming wait	state=本轮结束、没交回	started=['bAAA7']	finished=['bAAA7']	alerts=['结束本轮却不会醒']

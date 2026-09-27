@@ -1,0 +1,60 @@
+C1 step3 plain >	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C2 step4 >| rerun	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C3 size-check && >|	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C4 nice -n 19	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C5 cd abs	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C6 var n	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C7 cmdsubst n	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C8 ASK_LOCAL_TIMEOUT env	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C9 stderr to draft	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C10 noclobber >	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C11 ls	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C12 oov-check	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C13 stat size	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C14 echo rc	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C15 timeout wrapper	three-way-local-attack	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C1 step3 plain >	three-way-local-attack	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C2 step4 >| rerun	three-way-local-attack	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C3 size-check && >|	three-way-local-attack	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C4 nice -n 19	three-way-local-attack	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C5 cd abs	three-way-local-attack	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C6 var n	three-way-local-attack	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C7 cmdsubst n	three-way-local-attack	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C8 ASK_LOCAL_TIMEOUT env	three-way-local-attack	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C9 stderr to draft	three-way-local-attack	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C10 noclobber >	three-way-local-attack	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C11 ls	three-way-local-attack	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C12 oov-check	three-way-local-attack	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C13 stat size	three-way-local-attack	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C14 echo rc	three-way-local-attack	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C15 timeout wrapper	three-way-local-attack	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C1 step3 plain >	three-way-local-defense	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C2 step4 >| rerun	three-way-local-defense	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C3 size-check && >|	three-way-local-defense	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C4 nice -n 19	three-way-local-defense	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C5 cd abs	three-way-local-defense	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C6 var n	three-way-local-defense	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C7 cmdsubst n	three-way-local-defense	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C8 ASK_LOCAL_TIMEOUT env	three-way-local-defense	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C9 stderr to draft	three-way-local-defense	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C10 noclobber >	three-way-local-defense	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C11 ls	three-way-local-defense	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C12 oov-check	three-way-local-defense	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C13 stat size	three-way-local-defense	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C14 echo rc	three-way-local-defense	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C15 timeout wrapper	three-way-local-defense	bg=False	pattern=0 detector=0 heavy=0	detections+=0
+C1 step3 plain >	three-way-local-defense	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C2 step4 >| rerun	three-way-local-defense	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C3 size-check && >|	three-way-local-defense	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C4 nice -n 19	three-way-local-defense	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C5 cd abs	three-way-local-defense	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C6 var n	three-way-local-defense	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C7 cmdsubst n	three-way-local-defense	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C8 ASK_LOCAL_TIMEOUT env	three-way-local-defense	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C9 stderr to draft	three-way-local-defense	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C10 noclobber >	three-way-local-defense	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C11 ls	three-way-local-defense	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C12 oov-check	three-way-local-defense	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C13 stat size	three-way-local-defense	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C14 echo rc	three-way-local-defense	bg=True	pattern=0 detector=0 heavy=0	detections+=0
+C15 timeout wrapper	three-way-local-defense	bg=True	pattern=0 detector=0 heavy=0	detections+=0

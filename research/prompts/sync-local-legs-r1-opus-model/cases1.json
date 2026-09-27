@@ -1,0 +1,362 @@
+[
+[
+"C1 step3 plain >",
+"three-way-local-attack",
+false,
+"bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s1.md"
+],
+[
+"C2 step4 >| rerun",
+"three-way-local-attack",
+false,
+"bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md >| research/prompts/zz-probe-r1-local-attack-output-s1.md"
+],
+[
+"C3 size-check && >|",
+"three-way-local-attack",
+false,
+"test ! -s research/prompts/zz-probe-r1-local-attack-output-s1.md && bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md >| research/prompts/zz-probe-r1-local-attack-output-s1.md"
+],
+[
+"C4 nice -n 19",
+"three-way-local-attack",
+false,
+"nice -n 19 bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s2.md"
+],
+[
+"C5 cd abs",
+"three-way-local-attack",
+false,
+"cd /home/fy5090/code/singlefs && nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/ask-local.sh /home/fy5090/code/singlefs/research/prompts/zz-probe-r1-local-attack.md > /home/fy5090/code/singlefs/research/prompts/zz-probe-r1-local-attack-output-s3.md"
+],
+[
+"C6 var n",
+"three-way-local-attack",
+false,
+"n=4; bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s$n.md; echo rc=$?"
+],
+[
+"C7 cmdsubst n",
+"three-way-local-attack",
+false,
+"n=$(( $(ls research/prompts/zz-probe-r1-local-attack-output-s*.md 2>/dev/null | wc -l) + 1 )); bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > \"research/prompts/zz-probe-r1-local-attack-output-s$n.md\""
+],
+[
+"C8 ASK_LOCAL_TIMEOUT env",
+"three-way-local-attack",
+false,
+"ASK_LOCAL_TIMEOUT=1800 bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s5.md"
+],
+[
+"C9 stderr to draft",
+"three-way-local-attack",
+false,
+"bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s6.md 2> /tmp/claude-1000/zz/err-s6.log"
+],
+[
+"C10 noclobber >",
+"three-way-local-attack",
+false,
+"set -o noclobber; bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s7.md"
+],
+[
+"C11 ls",
+"three-way-local-attack",
+false,
+"ls -l research/prompts/zz-probe-r1-local-attack-output-s*.md"
+],
+[
+"C12 oov-check",
+"three-way-local-attack",
+false,
+"python3 research/scripts/oov-check.py research/prompts/zz-probe-r1-local-attack-output-s1.md research/prompts/zz-probe-r1-local-attack.md"
+],
+[
+"C13 stat size",
+"three-way-local-attack",
+false,
+"stat -c %s research/prompts/zz-probe-r1-local-attack-output-s1.md; wc -c < research/prompts/zz-probe-r1-local-attack-output-s1.md"
+],
+[
+"C14 echo rc",
+"three-way-local-attack",
+false,
+"bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s8.md; echo \"exit=$?\""
+],
+[
+"C15 timeout wrapper",
+"three-way-local-attack",
+false,
+"timeout 950 bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s9.md"
+],
+[
+"C1 step3 plain >",
+"three-way-local-attack",
+true,
+"bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s1.md"
+],
+[
+"C2 step4 >| rerun",
+"three-way-local-attack",
+true,
+"bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md >| research/prompts/zz-probe-r1-local-attack-output-s1.md"
+],
+[
+"C3 size-check && >|",
+"three-way-local-attack",
+true,
+"test ! -s research/prompts/zz-probe-r1-local-attack-output-s1.md && bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md >| research/prompts/zz-probe-r1-local-attack-output-s1.md"
+],
+[
+"C4 nice -n 19",
+"three-way-local-attack",
+true,
+"nice -n 19 bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s2.md"
+],
+[
+"C5 cd abs",
+"three-way-local-attack",
+true,
+"cd /home/fy5090/code/singlefs && nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/ask-local.sh /home/fy5090/code/singlefs/research/prompts/zz-probe-r1-local-attack.md > /home/fy5090/code/singlefs/research/prompts/zz-probe-r1-local-attack-output-s3.md"
+],
+[
+"C6 var n",
+"three-way-local-attack",
+true,
+"n=4; bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s$n.md; echo rc=$?"
+],
+[
+"C7 cmdsubst n",
+"three-way-local-attack",
+true,
+"n=$(( $(ls research/prompts/zz-probe-r1-local-attack-output-s*.md 2>/dev/null | wc -l) + 1 )); bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > \"research/prompts/zz-probe-r1-local-attack-output-s$n.md\""
+],
+[
+"C8 ASK_LOCAL_TIMEOUT env",
+"three-way-local-attack",
+true,
+"ASK_LOCAL_TIMEOUT=1800 bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s5.md"
+],
+[
+"C9 stderr to draft",
+"three-way-local-attack",
+true,
+"bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s6.md 2> /tmp/claude-1000/zz/err-s6.log"
+],
+[
+"C10 noclobber >",
+"three-way-local-attack",
+true,
+"set -o noclobber; bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s7.md"
+],
+[
+"C11 ls",
+"three-way-local-attack",
+true,
+"ls -l research/prompts/zz-probe-r1-local-attack-output-s*.md"
+],
+[
+"C12 oov-check",
+"three-way-local-attack",
+true,
+"python3 research/scripts/oov-check.py research/prompts/zz-probe-r1-local-attack-output-s1.md research/prompts/zz-probe-r1-local-attack.md"
+],
+[
+"C13 stat size",
+"three-way-local-attack",
+true,
+"stat -c %s research/prompts/zz-probe-r1-local-attack-output-s1.md; wc -c < research/prompts/zz-probe-r1-local-attack-output-s1.md"
+],
+[
+"C14 echo rc",
+"three-way-local-attack",
+true,
+"bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s8.md; echo \"exit=$?\""
+],
+[
+"C15 timeout wrapper",
+"three-way-local-attack",
+true,
+"timeout 950 bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s9.md"
+],
+[
+"C1 step3 plain >",
+"three-way-local-defense",
+false,
+"bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s1.md"
+],
+[
+"C2 step4 >| rerun",
+"three-way-local-defense",
+false,
+"bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md >| research/prompts/zz-probe-r1-local-defense-output-s1.md"
+],
+[
+"C3 size-check && >|",
+"three-way-local-defense",
+false,
+"test ! -s research/prompts/zz-probe-r1-local-defense-output-s1.md && bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md >| research/prompts/zz-probe-r1-local-defense-output-s1.md"
+],
+[
+"C4 nice -n 19",
+"three-way-local-defense",
+false,
+"nice -n 19 bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s2.md"
+],
+[
+"C5 cd abs",
+"three-way-local-defense",
+false,
+"cd /home/fy5090/code/singlefs && nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/ask-local.sh /home/fy5090/code/singlefs/research/prompts/zz-probe-r1-local-defense.md > /home/fy5090/code/singlefs/research/prompts/zz-probe-r1-local-defense-output-s3.md"
+],
+[
+"C6 var n",
+"three-way-local-defense",
+false,
+"n=4; bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s$n.md; echo rc=$?"
+],
+[
+"C7 cmdsubst n",
+"three-way-local-defense",
+false,
+"n=$(( $(ls research/prompts/zz-probe-r1-local-defense-output-s*.md 2>/dev/null | wc -l) + 1 )); bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > \"research/prompts/zz-probe-r1-local-defense-output-s$n.md\""
+],
+[
+"C8 ASK_LOCAL_TIMEOUT env",
+"three-way-local-defense",
+false,
+"ASK_LOCAL_TIMEOUT=1800 bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s5.md"
+],
+[
+"C9 stderr to draft",
+"three-way-local-defense",
+false,
+"bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s6.md 2> /tmp/claude-1000/zz/err-s6.log"
+],
+[
+"C10 noclobber >",
+"three-way-local-defense",
+false,
+"set -o noclobber; bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s7.md"
+],
+[
+"C11 ls",
+"three-way-local-defense",
+false,
+"ls -l research/prompts/zz-probe-r1-local-defense-output-s*.md"
+],
+[
+"C12 oov-check",
+"three-way-local-defense",
+false,
+"python3 research/scripts/oov-check.py research/prompts/zz-probe-r1-local-defense-output-s1.md research/prompts/zz-probe-r1-local-defense.md"
+],
+[
+"C13 stat size",
+"three-way-local-defense",
+false,
+"stat -c %s research/prompts/zz-probe-r1-local-defense-output-s1.md; wc -c < research/prompts/zz-probe-r1-local-defense-output-s1.md"
+],
+[
+"C14 echo rc",
+"three-way-local-defense",
+false,
+"bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s8.md; echo \"exit=$?\""
+],
+[
+"C15 timeout wrapper",
+"three-way-local-defense",
+false,
+"timeout 950 bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s9.md"
+],
+[
+"C1 step3 plain >",
+"three-way-local-defense",
+true,
+"bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s1.md"
+],
+[
+"C2 step4 >| rerun",
+"three-way-local-defense",
+true,
+"bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md >| research/prompts/zz-probe-r1-local-defense-output-s1.md"
+],
+[
+"C3 size-check && >|",
+"three-way-local-defense",
+true,
+"test ! -s research/prompts/zz-probe-r1-local-defense-output-s1.md && bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md >| research/prompts/zz-probe-r1-local-defense-output-s1.md"
+],
+[
+"C4 nice -n 19",
+"three-way-local-defense",
+true,
+"nice -n 19 bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s2.md"
+],
+[
+"C5 cd abs",
+"three-way-local-defense",
+true,
+"cd /home/fy5090/code/singlefs && nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/ask-local.sh /home/fy5090/code/singlefs/research/prompts/zz-probe-r1-local-defense.md > /home/fy5090/code/singlefs/research/prompts/zz-probe-r1-local-defense-output-s3.md"
+],
+[
+"C6 var n",
+"three-way-local-defense",
+true,
+"n=4; bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s$n.md; echo rc=$?"
+],
+[
+"C7 cmdsubst n",
+"three-way-local-defense",
+true,
+"n=$(( $(ls research/prompts/zz-probe-r1-local-defense-output-s*.md 2>/dev/null | wc -l) + 1 )); bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > \"research/prompts/zz-probe-r1-local-defense-output-s$n.md\""
+],
+[
+"C8 ASK_LOCAL_TIMEOUT env",
+"three-way-local-defense",
+true,
+"ASK_LOCAL_TIMEOUT=1800 bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s5.md"
+],
+[
+"C9 stderr to draft",
+"three-way-local-defense",
+true,
+"bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s6.md 2> /tmp/claude-1000/zz/err-s6.log"
+],
+[
+"C10 noclobber >",
+"three-way-local-defense",
+true,
+"set -o noclobber; bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s7.md"
+],
+[
+"C11 ls",
+"three-way-local-defense",
+true,
+"ls -l research/prompts/zz-probe-r1-local-defense-output-s*.md"
+],
+[
+"C12 oov-check",
+"three-way-local-defense",
+true,
+"python3 research/scripts/oov-check.py research/prompts/zz-probe-r1-local-defense-output-s1.md research/prompts/zz-probe-r1-local-defense.md"
+],
+[
+"C13 stat size",
+"three-way-local-defense",
+true,
+"stat -c %s research/prompts/zz-probe-r1-local-defense-output-s1.md; wc -c < research/prompts/zz-probe-r1-local-defense-output-s1.md"
+],
+[
+"C14 echo rc",
+"three-way-local-defense",
+true,
+"bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s8.md; echo \"exit=$?\""
+],
+[
+"C15 timeout wrapper",
+"three-way-local-defense",
+true,
+"timeout 950 bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s9.md"
+]
+]

@@ -1,0 +1,16 @@
+4c8e903522117188292457df910311b1089dadd03d57f05c393baa773317f3dd  research/prompts/_m2-closeout-code-r2-body.md
+cb07ec8e855bd73034665406f89d2d3f0a19909a7e302ebeaa5902f416cbbbae  .claude/kb/invariants.md
+da5f27bb8d8865131e2744f4aad57518627c28fb31f29c6e29b0f61ab62f21fe  .claude/kb/checks-owed.md
+987fcc777595c55d560c3fcee185fc21616556813d31d2bc2e914349f72c6f17  .claude/kb/decisions/02-RAID条带策略.md
+f19942d876af98f3fbe4d69d58623ecda3368cc202608728219c33b75810fc7e  .claude/kb/decisions/03-空间分配.md
+62f0815146d72ec03093a2ae7d84307b881e48b384a70e0253ee6e16fefb2ec2  .claude/kb/decisions/08-核心索引结构.md
+5e4c7f54630f6444b5d498c71c259dc6f347aa1f3008958650b19b1bdebe68bc  .claude/kb/decisions/09-加密.md
+927a40579caabb519a080a7eb2b0c9a4831696d1477c050a23136522b5d1ff93  .claude/kb/decisions/13-验证路线.md
+73d736c175a1d6a0464096bf8e977c3d25d8378a6085462771f5bfa8fb44d442  .claude/kb/decisions/15-格式冻结政策.md
+aafe1790681f87e4a73a6d457a57187c05a644d16629da4f48e62da3529d969e  .claude/kb/decisions/16-发布语义.md
+9175579c6773e9c6b84dec1b8b437793e54d70e78b7322245d696e32e925ddc8  .claude/kb/decisions/18-块里携带什么信息.md
+0febebf6f32ad2fe9c99eea0acb05ced1ef908b088d6b15049612620dd6559e2  .claude/kb/decisions/19-块指针的结构与宽度预算.md
+e8ae46bb065b8dce8b3874e5fc7475affb01c45f7b336eed55d7dd8ad56ac2ff  .claude/kb/decisions/22-单元原子性怎么合成.md
+609f1a2e5d437759392cbd244910fbe7a8d61acea849de96965944f3e3007028  .claude/kb/decisions/23-journal的角色与格式.md
+5b2f486eded720b1121e04814f451cd28774ab600e685a1b979045ab08cbe062  .claude/kb/decisions/28-挂载期承诺量.md
+ec5bc0c0c31050b547d32127cc80dfa56bd1fba6461fd42248aec3019561b1ef  research/prompts/c554-fix-forks.md

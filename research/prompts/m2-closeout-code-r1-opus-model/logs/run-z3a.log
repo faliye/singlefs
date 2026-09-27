@@ -1,0 +1,13 @@
+test raising_the_floor_and_rolling_back_with_device_one_replaced_by_a_blank_disk ... Z3A raise_blank ok=false err=Some(RollbackFloorCeilingRootRingSlotStillBadAfterOneReread { ring_slot: RootRingSlot { region: 1, slot: 0 }, first_reading: NotSelfVerified, reread: NotSelfVerified }) writes_blank_dev1=0
+Z3A rollback_blank_to_txg3 ok=false err=Some(ResurrectedUnitCopyUnreadableOrMismatched { unit: Data(DataUnitIndexInFile(0)), device: DeviceIdentity(1), slot: SlotNumber(50180) }) writes_blank_dev1=0
+Z3A rollback_blank_to_current ok=true err=None writes_blank_dev1=12
+test the_session_publishes_with_device_one_replaced_by_a_blank_disk ... Z3A session_blank ok=true err=None blank_written=true
+test unmount_with_device_one_replaced_by_a_blank_disk ... Z3A unmount_blank accepted=true outcome_is_err=false writes_dev0=28 writes_blank_dev1=28
+Z3A unmount_blank read_only_after chosen=(1,6) effective=(1,6) floor=5
+Z3A unmount_blank checker_violations_after=4 first=Some("I-2.1: 树表单元 在盘 1 槽 50284 的那一份与位置条目里的校验和对不上")
+Z3A unmount_blank writable_after err=WritableMountRefusedByDevicesWithoutTheSelectedVersion { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(6) }, selected_version_journal_position: JournalSequenceNumber { instance_generation: InstanceGeneration(1), counter: 6 }, devices: [DeviceWithoutTheSelectedVersion { device: DeviceIdentity(1), lacking: BehindTheSelectedVersionAndMissingItsUnits { newest_system_configuration_journal_tail: JournalSequenceNumber { instance_generation: InstanceGeneration(1), counter: 5 }, units_missing: [(AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 0, device: DeviceIdentity(0), index_in_device: 61 }), SlotNumber(50277)), (AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 0, device: DeviceIdentity(1), index_in_device: 61 }), SlotNumber(50278)), (AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 1, device: DeviceIdentity(0), index_in_device: 0 }), SlotNumber(50279)), (AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 1, device: DeviceIdentity(1), index_in_device: 0 }), SlotNumber(50280)), (AllocationTree, SlotNumber(50281)), (AccountingTree, SlotNumber(50282)), (MappingTree, SlotNumber(50283)), (TreeTable, SlotNumber(50284))] } }] }
+test unmount_with_device_one_replaced_by_device_one_of_another_pool ... Z3A unmount_foreign err=Recovery(SystemConfigurationsDisagree)
+Z3A unmount_foreign accepted=false writes_dev0=0 writes_foreign_dev1=0
+Z3A unmount_foreign other_pool_writable_after ok instance=1
+Z3A unmount_foreign other_pool_writable_before ok=true
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s

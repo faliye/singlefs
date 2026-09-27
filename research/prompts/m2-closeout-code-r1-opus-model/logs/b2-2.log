@@ -1,0 +1,18 @@
+test rollback_walk_with_multi_unit_files_inodes_and_unmount has been running for over 60 seconds
+Z1W width=UnitAreaOf384Slots seeds=201..401 steps=60 elapsed_ms=419187
+Z1W steps_total=12000 rollbacks_done=2065 multi_unit_rollbacks=592 checker_red_steps=0 read_back_wrong=0
+Z1W first_checker_red=None
+Z1W first_read_back_wrong=None
+Z1W outcome mount ok = 1519
+Z1W outcome new_inode ok = 991
+Z1W outcome overwrite ok = 2693
+Z1W outcome process_exit = 710
+Z1W outcome raise at-ceiling = 414
+Z1W outcome raise ok = 405
+Z1W outcome rollback not-candidate BelowEffectiveFloor = 433
+Z1W outcome rollback not-candidate VersionWithoutFile = 190
+Z1W outcome rollback ok = 2065
+Z1W outcome sequential_write ok = 1742
+Z1W outcome unmount ok = 838
+test rollback_walk_with_multi_unit_files_inodes_and_unmount ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 419.19s
