@@ -71,11 +71,13 @@ fn operation_bytes(retained: &RetainedOperation) -> Option<Vec<u8>> {
         RecordedOperationKind::Write | RecordedOperationKind::WriteForceUnitAccess => {
             retained.contents.clone()
         }
-        RecordedOperationKind::WriteZeroes => Some(vec![
-            0u8;
-            usize::try_from(retained.operation.length)
-                .expect("窗口里的写清零长度装得进 usize")
-        ]),
+        RecordedOperationKind::WriteZeroes => {
+            Some(vec![
+                0u8;
+                usize::try_from(retained.operation.length)
+                    .expect("窗口里的写清零长度装得进 usize")
+            ])
+        }
         RecordedOperationKind::Barrier => None,
     }
 }
@@ -94,8 +96,14 @@ fn main() {
             TEST_IMAGE_DEFAULT_BYTES == 4_294_967_296,
             "跑前登记第一节写死两块 4 GiB 盘；singlefs_format::TEST_IMAGE_DEFAULT_BYTES 变了这一格要重登记"
         );
-        assert!(FIRST_FILE_BYTES == 3000, "第一个文件字节数与跑前登记第一节抄的模型同名常量回比");
-        assert!(EXPECTED_FILE_BYTES == 3000, "本地常量与上面这条断言钉的是同一个数");
+        assert!(
+            FIRST_FILE_BYTES == 3000,
+            "第一个文件字节数与跑前登记第一节抄的模型同名常量回比"
+        );
+        assert!(
+            EXPECTED_FILE_BYTES == 3000,
+            "本地常量与上面这条断言钉的是同一个数"
+        );
     };
 
     let parameters = e142_parameters(PHYSICAL_BLOCK_SIZE_IN_BYTES, MINIMUM_INPUT_OUTPUT_BYTES);
@@ -121,15 +129,19 @@ fn main() {
     // 窗口的起点：`ScenarioPoint::BeforeFirstTransaction` 那一次回调时录制流的长度
     // （与 `first_transaction_region_bytes.rs:94-101` 同一个取法，跑前登记第一节「装置写在哪」第 2 条末句）。
     let mut steps_before_first_transaction: Option<usize> = None;
-    let run = run_first_transaction(&parameters, &mut devices, &stream, |point, _devices| {
-        match point {
-            ScenarioPoint::AfterMakeFilesystem | ScenarioPoint::AfterInstanceAcquisition => {}
-            ScenarioPoint::BeforeFirstTransaction => {
-                steps_before_first_transaction = Some(stream.operation_count());
-            }
-        }
-    })
-    .expect("整条路（mkfs → 取号 → 暖机 → 第一个事务）在内存盘上跑得通");
+    let run =
+        run_first_transaction(
+            &parameters,
+            &mut devices,
+            &stream,
+            |point, _devices| match point {
+                ScenarioPoint::AfterMakeFilesystem | ScenarioPoint::AfterInstanceAcquisition => {}
+                ScenarioPoint::BeforeFirstTransaction => {
+                    steps_before_first_transaction = Some(stream.operation_count());
+                }
+            },
+        )
+        .expect("整条路（mkfs → 取号 → 暖机 → 第一个事务）在内存盘上跑得通");
     let steps_before_first_transaction = steps_before_first_transaction
         .expect("run_first_transaction 一定走过 BeforeFirstTransaction");
 
@@ -193,8 +205,8 @@ fn main() {
             continue;
         }
         write_count += 1;
-        let bytes = operation_bytes(retained)
-            .expect("write / write_fua / write_zeroes 都能重建出完整字节");
+        let bytes =
+            operation_bytes(retained).expect("write / write_fua / write_zeroes 都能重建出完整字节");
         emitter.emit(&format!(
             "name=device_region_bytes step={step_index} device={} offset={} length={} kind={} sha256={} hexadecimal={}",
             operation.device.0,
@@ -221,12 +233,22 @@ mod tests {
     #[test]
     fn kind_name_covers_every_recorded_operation_kind_without_a_wildcard_arm() {
         assert_eq!(kind_name(RecordedOperationKind::Write), "write");
-        assert_eq!(kind_name(RecordedOperationKind::WriteForceUnitAccess), "write_fua");
-        assert_eq!(kind_name(RecordedOperationKind::WriteZeroes), "write_zeroes");
+        assert_eq!(
+            kind_name(RecordedOperationKind::WriteForceUnitAccess),
+            "write_fua"
+        );
+        assert_eq!(
+            kind_name(RecordedOperationKind::WriteZeroes),
+            "write_zeroes"
+        );
         assert_eq!(kind_name(RecordedOperationKind::Barrier), "barrier");
     }
 
-    fn retained(kind: RecordedOperationKind, length: u64, contents: Option<Vec<u8>>) -> RetainedOperation {
+    fn retained(
+        kind: RecordedOperationKind,
+        length: u64,
+        contents: Option<Vec<u8>>,
+    ) -> RetainedOperation {
         RetainedOperation {
             operation: RecordedOperation {
                 device: DeviceIdentity(0),
@@ -247,12 +269,17 @@ mod tests {
 
     #[test]
     fn operation_bytes_returns_the_retained_content_for_a_force_unit_access_write() {
-        let write = retained(RecordedOperationKind::WriteForceUnitAccess, 2, Some(vec![9, 9]));
+        let write = retained(
+            RecordedOperationKind::WriteForceUnitAccess,
+            2,
+            Some(vec![9, 9]),
+        );
         assert_eq!(operation_bytes(&write), Some(vec![9, 9]));
     }
 
     #[test]
-    fn operation_bytes_rebuilds_an_all_zero_buffer_for_write_zeroes_even_without_retained_content() {
+    fn operation_bytes_rebuilds_an_all_zero_buffer_for_write_zeroes_even_without_retained_content()
+    {
         let write_zeroes = retained(RecordedOperationKind::WriteZeroes, 4, None);
         assert_eq!(operation_bytes(&write_zeroes), Some(vec![0, 0, 0, 0]));
     }

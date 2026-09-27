@@ -79,7 +79,7 @@ fn operations_since(pool: &BuiltPool, first_operation: usize) -> Vec<RetainedOpe
 /// 只要一个数据单元的顺序写，与同内容的覆盖写写出的字节一个不差：同一条发布路径
 /// （`.claude/rules/fs-design.md`「一个事务层，所有结构共用」——并行线一不许另开一条发布路径）。
 #[test]
-fn a_sequential_write_of_one_data_unit_writes_the_same_bytes_as_an_overwrite_of_the_same_content() {
+fn sequential_write_of_one_data_unit_writes_the_same_bytes_as_an_overwrite_of_the_same_content() {
     let content = content_of(4100);
     assert_eq!(data_units_for(content.len()), 1);
 
@@ -121,7 +121,7 @@ fn a_sequential_write_of_one_data_unit_writes_the_same_bytes_as_an_overwrite_of_
 /// 末条再加共享的提交内生块。144（一片 extent 叶装满）也走得通；145 起 extent 树下段长成两层（D8（核心索引结构） 已定项 14），
 /// 同样走得通（下段的形状钉在 `second_transaction_parallel_line_one_multi_unit_file.rs`）。
 #[test]
-fn a_sequential_write_publishes_one_record_per_data_unit_across_the_sixty_seven_threshold_up_to_a_full_extent_leaf(
+fn sequential_write_publishes_one_record_per_data_unit_across_the_sixty_seven_threshold_up_to_the_full_extent_leaf(
 ) {
     let payload_capacity = data_unit_payload_capacity();
     for expected_data_units in [2usize, 67, 68, 144, 145] {

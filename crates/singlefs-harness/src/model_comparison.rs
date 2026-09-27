@@ -6,22 +6,30 @@
 //! I/O、盘坏、走读失败、第一版不支持的池形状（小盘写满、各盘落点不一致）这类模型里没有的一律 `Unexplained`（不建崩溃与设备错、
 //! 两块等大盘的历史里它们都不该出现）。
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use singlefs_core::address::{CheckpointTxg, DataUnitIndexInFile, InstanceGeneration};
-use singlefs_core::allocator::PlacementRefusal;
+use singlefs_core::allocator::{AllocationRecord, PlacementRefusal};
 use singlefs_core::block_device::BlockDeviceError;
 use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
+use singlefs_core::instance_table::{
+    InstanceTableChainRecord, InstanceTablePage, InstanceTablePageIndex,
+};
 use singlefs_core::mount::{
-    InstanceRow, MountError, Mounted, PublishSequenceFailed, RollbackCandidateExclusion,
+    InstanceRow, MountError, Mounted, RollbackCandidateExclusion, RollbackError,
 };
 use singlefs_core::recovery::{RecoveryOutcome, RecoveryReport};
+use singlefs_core::root_ring::RootRingSlot;
 use singlefs_core::transaction::{
     PoolVersion, PublishError, TransactionOutput, TransactionUnit, VersionWithoutFilePublishOutput,
 };
+use singlefs_core::unit::{data_unit_payload, parse_data_unit};
 
 use crate::model::{
     ModelCheckpointTxg, ModelDeviceIdentity, ModelInstanceGeneration, ModelInstanceRow,
-    ModelJournalCounter, ModelRefusalReason, ModelRootKey, ModelUnitRole, ObservedAllocationRecord,
-    ObservedEffect, ObservedReadBack, ObservedRefusalReason, ObservedRoot,
+    ModelJournalCounter, ModelRefusalReason, ModelRingPosition, ModelRootKey, ModelUnitRole,
+    ObservedAllocationRecord, ObservedEffect, ObservedFile, ObservedInstanceTable,
+    ObservedReadBack, ObservedRefusalReason, ObservedRoot, ObservedUnitAllocationRecords,
 };
 
 #[must_use]
@@ -106,14 +114,125 @@ pub fn model_instance_row(row: &InstanceRow) -> ModelInstanceRow {
         instance: model_instance(row.instance),
         selected_root_txg: model_txg(row.selected_root_txg),
         applied_transaction_high_water: row.applied_transaction_high_water,
-        is_rollback: row.is_rollback,
     }
 }
 
-/// 带文件的一版：根的身份、jsn、F，和这一版每个单元（`units` 里的角色）在这一版分配记录里的那几条（按槽号找，每块盘一条）。
+/// 带文件的一版：根的身份、jsn、F，这一版的文件内容与整张实例表（从 `units` 里那几个单元的字节解出来），
+/// 和这一版每个角色的单元在这一版分配记录里的那几条（按槽号找，每块盘一条）。
 #[must_use]
 pub fn observed_root_of_file_version(output: &TransactionOutput) -> ObservedRoot {
-    let unit_allocation_records = output
+    ObservedRoot {
+        key: model_root_key(output.root.instance, output.root.checkpoint_txg),
+        journal_counter: ModelJournalCounter(output.record.counter),
+        rollback_floor: model_txg(output.root.rollback_floor),
+        file: observed_file_of_file_version(output),
+        instance_table: observed_instance_table_of_file_version(output),
+        unit_allocation_records: ObservedUnitAllocationRecords::EveryRoleOfTheVersion(
+            allocation_records_of_every_role_of_file_version(output),
+        ),
+    }
+}
+
+/// 这一版的文件内容：文件第 0 个数据单元（模型只罩一个数据单元的文件）的载荷，按单元头里的声明长度取。
+#[must_use]
+pub fn observed_file_of_file_version(output: &TransactionOutput) -> ObservedFile {
+    let Some(data_unit) = output
+        .units
+        .iter()
+        .find(|unit| unit.identity == TransactionUnit::Data(DataUnitIndexInFile::FIRST))
+    else {
+        return ObservedFile::Undecodable {
+            what: "这一版的 units 里没有文件第 0 个数据单元".to_string(),
+        };
+    };
+    match parse_data_unit(&data_unit.bytes)
+        .and_then(|header| data_unit_payload(&data_unit.bytes, header.declared_length))
+    {
+        Ok(payload) => ObservedFile::Decoded(payload.to_vec()),
+        Err(error) => ObservedFile::Undecodable {
+            what: format!("文件第 0 个数据单元解不开：{error:?}"),
+        },
+    }
+}
+
+/// 实例表链上一片的角色是第几片。
+fn instance_table_page_of_role(identity: TransactionUnit) -> Option<InstanceTablePageIndex> {
+    match identity {
+        TransactionUnit::InstanceTable => Some(InstanceTablePageIndex::FIRST),
+        TransactionUnit::InstanceTablePageAfterTheFirst(page) => Some(page),
+        TransactionUnit::Data(_)
+        | TransactionUnit::ExtentLowerNode(_)
+        | TransactionUnit::ExtentUpperNodeBelowTheRoot(_)
+        | TransactionUnit::ExtentRoot
+        | TransactionUnit::InodeLeafContainer(_)
+        | TransactionUnit::InodeRoot
+        | TransactionUnit::AllocationTreeNodeBelowTheRoot(_)
+        | TransactionUnit::AllocationTree
+        | TransactionUnit::AccountingTreeNodeBelowTheRoot(_)
+        | TransactionUnit::AccountingTree
+        | TransactionUnit::MappingTreeNodeBelowTheRoot(_)
+        | TransactionUnit::MappingTree
+        | TransactionUnit::TreeTable => None,
+    }
+}
+
+/// 这一版的整张实例表：`units` 里实例表链的各片，从第 0 片起按每片末尾的链指针记录往下接，接到「无下一片」为止。
+/// `units` 里一片都没有（mkfs 之后第一次重写之前，实例表还是 mkfs 那一片、`units` 不带它），或链指着的下一片不在 `units` 里
+/// （从盘上重建的一版只带第 0 片），交回 [`ObservedInstanceTable::NotInTheOutput`]：比不了，不当成空表。
+///
+/// 迭代上界是 `units` 里实例表的片数；跨轮带的是已接起来的行与下一片的片序号；提前出口是链断在 `units` 之外、一片解不开。
+#[must_use]
+pub fn observed_instance_table_of_file_version(
+    output: &TransactionOutput,
+) -> ObservedInstanceTable {
+    let pages: BTreeMap<InstanceTablePageIndex, &[u8]> = output
+        .units
+        .iter()
+        .filter_map(|unit| {
+            instance_table_page_of_role(unit.identity).map(|page| (page, unit.bytes.as_slice()))
+        })
+        .collect();
+    if pages.is_empty() {
+        return ObservedInstanceTable::NotInTheOutput {
+            why: "这一版的 units 里没有实例表（mkfs 之后第一次重写之前实例表还是 mkfs 那一片，输出不带它）",
+        };
+    }
+    let mut rows = Vec::new();
+    let mut page_index = InstanceTablePageIndex::FIRST;
+    for _ in 0..pages.len() {
+        let Some(bytes) = pages.get(&page_index) else {
+            return ObservedInstanceTable::NotInTheOutput {
+                why: "实例表链指着的那一片不在这一版的 units 里（从盘上重建的一版只带第 0 片）",
+            };
+        };
+        let Some(page) = InstanceTablePage::parse(bytes, page_index) else {
+            return ObservedInstanceTable::Undecodable {
+                what: format!("实例表第 {} 片解不开", page_index.0),
+            };
+        };
+        rows.extend(page.rows.iter().map(model_instance_row));
+        match page.chain {
+            InstanceTableChainRecord::LastPage => return ObservedInstanceTable::Rows(rows),
+            InstanceTableChainRecord::NextPage(_) => page_index = page_index.next(),
+        }
+    }
+    ObservedInstanceTable::NotInTheOutput {
+        why: "实例表链指着的那一片不在这一版的 units 里（从盘上重建的一版只带第 0 片）",
+    }
+}
+
+/// 这一版每个角色的单元在这一版分配记录里的那几条：`units` 里的每个角色按单元的槽号找；`units` 里没有实例表时
+/// （mkfs 之后第一次重写之前），实例表那个角色按根记录里那条实例表指针的两条位置条目找——这一版仍然有这个角色，
+/// 模型那一侧照样问它（代码审阅第 12 条：两个方向都比，漏交的角色也报）。
+fn allocation_records_of_every_role_of_file_version(
+    output: &TransactionOutput,
+) -> Vec<(ModelUnitRole, Vec<ObservedAllocationRecord>)> {
+    let observed_record = |record: &AllocationRecord| ObservedAllocationRecord {
+        device: ModelDeviceIdentity(record.device.0),
+        generation: model_txg(record.generation),
+        is_released: record.is_released,
+    };
+    let mut records_of_roles: Vec<(ModelUnitRole, Vec<ObservedAllocationRecord>)> = output
         .units
         .iter()
         .filter_map(|unit| {
@@ -122,25 +241,41 @@ pub fn observed_root_of_file_version(output: &TransactionOutput) -> ObservedRoot
                 .allocation_records
                 .iter()
                 .filter(|record| record.slot == unit.slot)
-                .map(|record| ObservedAllocationRecord {
-                    device: ModelDeviceIdentity(record.device.0),
-                    generation: model_txg(record.generation),
-                    is_released: record.is_released,
-                })
+                .map(observed_record)
                 .collect();
             Some((role, records))
         })
         .collect();
-    ObservedRoot {
-        key: model_root_key(output.root.instance, output.root.checkpoint_txg),
-        journal_counter: ModelJournalCounter(output.record.counter),
-        rollback_floor: model_txg(output.root.rollback_floor),
-        has_file: true,
-        unit_allocation_records,
+    if !records_of_roles
+        .iter()
+        .any(|(role, _)| *role == ModelUnitRole::InstanceTable)
+    {
+        let pointed = output.root.instance_table.locations;
+        let records = output
+            .allocation_records
+            .iter()
+            .filter(|record| {
+                pointed.iter().any(|location| {
+                    location.device == record.device && location.slot == record.slot
+                })
+            })
+            .map(observed_record)
+            .collect();
+        records_of_roles.push((ModelUnitRole::InstanceTable, records));
     }
+    records_of_roles
 }
 
-/// 树表 0 条的一版（零单元发布）：没有单元、没有分配记录。
+/// 一次发布重写的角色（实现交回的 `rewritten`），换成模型的角色；分配记录树根之下的节点不对应角色，不进。
+#[must_use]
+pub fn rewritten_model_roles(rewritten: &[TransactionUnit]) -> BTreeSet<ModelUnitRole> {
+    rewritten
+        .iter()
+        .filter_map(|unit| model_unit_role(*unit))
+        .collect()
+}
+
+/// 树表 0 条的一版（零单元发布、树表 0 条上写行）：没有文件；输出不带实例表单元的字节与分配记录，只带这次重写了哪几个角色。
 #[must_use]
 pub fn observed_root_of_version_without_file(
     output: &VersionWithoutFilePublishOutput,
@@ -149,8 +284,13 @@ pub fn observed_root_of_version_without_file(
         key: model_root_key(output.root.instance, output.root.checkpoint_txg),
         journal_counter: ModelJournalCounter(output.record.counter),
         rollback_floor: model_txg(output.root.rollback_floor),
-        has_file: false,
-        unit_allocation_records: Vec::new(),
+        file: ObservedFile::NoFile,
+        instance_table: ObservedInstanceTable::NotInTheOutput {
+            why: "树表 0 条的一版的输出（VersionWithoutFilePublishOutput）不带实例表单元的字节",
+        },
+        unit_allocation_records: ObservedUnitAllocationRecords::RewrittenRolesOnly(
+            rewritten_model_roles(&output.rewritten),
+        ),
     }
 }
 
@@ -226,6 +366,10 @@ pub fn refusal_reason_of_publish_error(error: &PublishError) -> ObservedRefusalR
         | PublishError::TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees(_)
         // 冻结着一次没重发的发布：随机历史里一次发布失败就整段停下、不接着发，健康的内存盘上不该出现。
         | PublishError::PublishFrozenAfterAWriteFailureIsNotResentYet { .. }
+        // 一次发布切出来的记录多于在飞上限（随机历史每次最多写几个数据单元，远在上限之下）、要接的那一版 txg 已是 u64::MAX（坏镜像才有）：
+        // 模型里没有它们的理由。
+        | PublishError::JournalRecordsOfThePublishExceedTheLimit { .. }
+        | PublishError::NextCheckpointTxgPastTheTopOfItsRange { .. }
         | PublishError::BlockDevice(_) => ObservedRefusalReason::Unexplained,
     }
 }
@@ -246,8 +390,7 @@ pub fn refusal_reason_of_placement_refusal(refusal: &PlacementRefusal) -> Observ
 }
 
 /// 回退目标不在候选集里的那一条说的是哪条理由：按字段一对一映射，不看给人看的文字（增补 3 第 2 件代码三方第一轮判决第三节第 2 条）。
-/// 「树表 0 条」不在这里：候选集只有这三条（D23（journal 的角色与格式） 已定项 14），目标那一版树表 0 条不是排除项
-/// （C493（回退候选集条文与实现说反话） 还清）；环里还留着带文件版本的根时照常回退（C511（回退到无文件那一版之后诞生代怎么接） 第 3 步）。
+/// 候选集四条（D23（journal 的角色与格式） 已定项 14：根环里、txg ≥ F_生效、按现行那一版的实例表判仍然有效、带文件），各映射到自己那一条。
 #[must_use]
 pub fn refusal_reason_of_rollback_candidate_exclusion(
     exclusion: RollbackCandidateExclusion,
@@ -260,7 +403,41 @@ pub fn refusal_reason_of_rollback_candidate_exclusion(
         RollbackCandidateExclusion::OnAbandonedTimeline => {
             ModelRefusalReason::RollbackTargetOnAbandonedTimeline
         }
+        RollbackCandidateExclusion::VersionWithoutFile => {
+            ModelRefusalReason::RollbackTargetWithoutFile
+        }
     })
+}
+
+/// 管理员回退（挂着时的一次向前发布）的错误成员说的是哪条理由：候选集那四条按字段映射；回退那次发布自己的错照发布路径映射；
+/// 账读不出、账对不上、单元读不出、冻结着没重发、实例表或系统配置读不出、两版树的号不同：健康的内存盘上都不该出现。
+#[must_use]
+pub fn refusal_reason_of_rollback_error(error: &RollbackError) -> ObservedRefusalReason {
+    match error {
+        RollbackError::TargetNotACandidate { exclusion, .. } => {
+            refusal_reason_of_rollback_candidate_exclusion(*exclusion)
+        }
+        RollbackError::Publish(failed) => refusal_reason_of_publish_error(&failed.cause),
+        RollbackError::CurrentVersionUnitNotReleasable { cause } => {
+            refusal_reason_of_publish_error(cause)
+        }
+        RollbackError::PublishFrozenAfterAWriteFailureIsNotResentYet { .. }
+        | RollbackError::Recovery(_)
+        // 调用方的参数或盘表与盘上不一致（随机历史每次都交整池两块盘、用建池的那一份参数）、现行那一版 txg 已是 u64::MAX（坏镜像才有）。
+        | RollbackError::CallerInputsDisagreeWithTheDisk(_)
+        | RollbackError::NextCheckpointTxgPastTheTopOfItsRange { .. }
+        | RollbackError::CurrentInstanceTableMalformed
+        | RollbackError::TargetVersionUnreadable { .. }
+        | RollbackError::CurrentAccountUnreadable { .. }
+        | RollbackError::TargetTreeIdentifiersDifferFromTheCurrentVersionWhoseHandlingIsUndecided {
+            ..
+        }
+        | RollbackError::UserVisibleUnitWithoutItsRecordInTheCurrentAccount { .. }
+        | RollbackError::UserVisibleUnitStillAllocatedUnderAnotherGeneration { .. }
+        | RollbackError::ResurrectedUnitCopyUnreadableOrMismatched { .. } => {
+            ObservedRefusalReason::Unexplained
+        }
+    }
 }
 
 /// 零单元发布只会报块设备错：内存盘不报错，模型里没有它的理由。
@@ -269,19 +446,21 @@ pub fn refusal_reason_of_block_device_error(_error: &BlockDeviceError) -> Observ
     ObservedRefusalReason::Unexplained
 }
 
-/// 挂载、回退、抬 F 的错误成员说的是哪条理由。
+/// 挂载、抬 F 的错误成员说的是哪条理由。
 #[must_use]
 pub fn refusal_reason_of_mount_error(error: &MountError) -> ObservedRefusalReason {
     match error {
-        MountError::Publish(PublishSequenceFailed { cause, .. })
-        | MountError::RaiseFloorSequencePublishFailed(PublishSequenceFailed { cause, .. })
-        | MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { cause, .. }
+        MountError::Publish(failed) | MountError::RaiseFloorSequencePublishFailed(failed) => {
+            refusal_reason_of_publish_error(&failed.cause)
+        }
+        MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { cause, .. }
         | MountError::RowPublishAdmissionRefusedBeforeAcquisition { cause, .. }
         | MountError::WarmUpAdmissionRefusedBeforeAcquisition { cause, .. } => {
             refusal_reason_of_publish_error(cause)
         }
-        MountError::RollbackTargetNotACandidate { exclusion, .. } => {
-            refusal_reason_of_rollback_candidate_exclusion(*exclusion)
+        // 可写挂载写行与暖机之后推抬 F、抬 F 自己报错（实审 A1b Q5）：理由就是抬 F 那个错的理由（改之前挂载原样交回它）。
+        MountError::FloorRaiseFailedAfterTheMountsPublishes(failed) => {
+            refusal_reason_of_mount_error(&failed.cause)
         }
         MountError::RollbackFloorAboveCeiling { .. } => {
             explained(ModelRefusalReason::FloorAboveCeiling)
@@ -299,26 +478,52 @@ pub fn refusal_reason_of_mount_error(error: &MountError) -> ObservedRefusalReaso
             explained(ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem)
         }
         // 恢复失败、记录读不出、表解不开、取号失败、坏盘上才有的根、判定与取号之间号变了、有盘不带所选那一版（空盘、停在旧状态）、
-        // 交进来的盘少于 w 的下限（随机历史每次都交整池两块盘）：健康的内存盘上都不该出现。
+        // 交进来的盘少于 w 的下限（随机历史每次都交整池两块盘）、抬 F 先写系统配置那一步的块设备错、要抬到的 F 低于盘上的生效值
+        // （同一个进程里上一次先写系统配置只写进一部分盘才有）、算抬 F 上限时一个知道住着根的根环槽读坏又重读仍坏（读路径上注入故障才有）：
+        // 健康的内存盘上都不该出现。
         MountError::Recovery(_)
         | MountError::FileVersionWithoutAnyJournalRecord
         | MountError::InstanceTableMalformed
         | MountError::Acquisition(_)
         | MountError::FormatTimeUnitLocationsOnDifferentSlots { .. }
         | MountError::RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { .. }
+        | MountError::RollbackFloorCeilingRootRingSlotStillBadAfterOneReread { .. }
         | MountError::InstanceGenerationChangedBeforeAcquisition { .. }
         | MountError::WritableMountRefusedByDevicesWithoutTheSelectedVersion { .. }
-        | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. } => {
-            ObservedRefusalReason::Unexplained
-        }
+        | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. }
+        | MountError::RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot(_)
+        | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided { .. }
+        // 盘表里同一个身份交了几次、调用方参数与盘上系统配置不一致：随机历史每次都交整池两块盘、用建池的那一份参数，走不到。
+        | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
+        | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
+        // 盘上的实例代号或 txg 已到顶：坏镜像才有。
+        | MountError::SequenceNumberPastTheTopOfItsRange(_) => ObservedRefusalReason::Unexplained,
     }
 }
 
-/// 抬 F 被上限拒时实现报的上限。
+/// 实现的根环槽 (区域, 槽) 换成模型的同一个槽。
 #[must_use]
-pub fn reported_ceiling_of_mount_error(error: &MountError) -> Option<ModelCheckpointTxg> {
+pub fn model_ring_position(ring_slot: RootRingSlot) -> ModelRingPosition {
+    ModelRingPosition {
+        region: ring_slot.region,
+        slot_in_region: ring_slot.slot,
+    }
+}
+
+/// 算抬 F 的上限时一个知道住着根的根环槽读坏、重读仍坏（`MountError::RollbackFloorCeilingRootRingSlotStillBadAfterOneReread`）
+/// 时实现点名的那个槽；别的成员 None。
+#[must_use]
+pub fn root_ring_slot_still_bad_after_one_reread_of_mount_error(
+    error: &MountError,
+) -> Option<ModelRingPosition> {
     match error {
-        MountError::RollbackFloorAboveCeiling { ceiling, .. } => Some(model_txg(*ceiling)),
+        MountError::RollbackFloorCeilingRootRingSlotStillBadAfterOneReread {
+            ring_slot, ..
+        } => Some(model_ring_position(*ring_slot)),
+        // 可写挂载推的抬 F 报的错装在里面（实审 A1b Q5）：点名的槽照抬 F 那个错取。
+        MountError::FloorRaiseFailedAfterTheMountsPublishes(failed) => {
+            root_ring_slot_still_bad_after_one_reread_of_mount_error(&failed.cause)
+        }
         MountError::Recovery(_)
         | MountError::FileVersionWithoutAnyJournalRecord
         | MountError::InstanceTableMalformed
@@ -326,7 +531,7 @@ pub fn reported_ceiling_of_mount_error(error: &MountError) -> Option<ModelCheckp
         | MountError::Publish(_)
         | MountError::RaiseFloorSequencePublishFailed(_)
         | MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { .. }
-        | MountError::RollbackTargetNotACandidate { .. }
+        | MountError::RollbackFloorAboveCeiling { .. }
         | MountError::VersionWithoutFileNotWrittenByMakeFilesystem { .. }
         | MountError::FormatTimeUnitLocationsOnDifferentSlots { .. }
         | MountError::RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { .. }
@@ -336,7 +541,47 @@ pub fn reported_ceiling_of_mount_error(error: &MountError) -> Option<ModelCheckp
         | MountError::WarmUpAdmissionRefusedBeforeAcquisition { .. }
         | MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided { .. }
         | MountError::WritableMountRefusedByDevicesWithoutTheSelectedVersion { .. }
-        | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. } => None,
+        | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. }
+        | MountError::RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot(_)
+        | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided { .. }
+        | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
+        | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
+        | MountError::SequenceNumberPastTheTopOfItsRange(_) => None,
+    }
+}
+
+/// 抬 F 被上限拒时实现报的上限。
+#[must_use]
+pub fn reported_ceiling_of_mount_error(error: &MountError) -> Option<ModelCheckpointTxg> {
+    match error {
+        MountError::RollbackFloorAboveCeiling { ceiling, .. } => Some(model_txg(*ceiling)),
+        // 可写挂载推的抬 F 报的错装在里面（实审 A1b Q5）：上限照抬 F 那个错取。
+        MountError::FloorRaiseFailedAfterTheMountsPublishes(failed) => {
+            reported_ceiling_of_mount_error(&failed.cause)
+        }
+        MountError::Recovery(_)
+        | MountError::FileVersionWithoutAnyJournalRecord
+        | MountError::InstanceTableMalformed
+        | MountError::Acquisition(_)
+        | MountError::Publish(_)
+        | MountError::RaiseFloorSequencePublishFailed(_)
+        | MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { .. }
+        | MountError::VersionWithoutFileNotWrittenByMakeFilesystem { .. }
+        | MountError::FormatTimeUnitLocationsOnDifferentSlots { .. }
+        | MountError::RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { .. }
+        | MountError::RollbackFloorCeilingRootRingSlotStillBadAfterOneReread { .. }
+        | MountError::InstanceGenerationChangedBeforeAcquisition { .. }
+        | MountError::SpaceAdmissionRefusedBeforeAcquisition { .. }
+        | MountError::RowPublishAdmissionRefusedBeforeAcquisition { .. }
+        | MountError::WarmUpAdmissionRefusedBeforeAcquisition { .. }
+        | MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided { .. }
+        | MountError::WritableMountRefusedByDevicesWithoutTheSelectedVersion { .. }
+        | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. }
+        | MountError::RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot(_)
+        | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided { .. }
+        | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
+        | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
+        | MountError::SequenceNumberPastTheTopOfItsRange(_) => None,
     }
 }
 
@@ -451,6 +696,7 @@ mod tests {
                 publishes_completed: 0,
                 wrote_anything: false,
                 reported_ceiling: None,
+                reported_root_ring_slot_still_bad_after_one_reread: None,
             };
             let judged = model
                 .clone()
@@ -469,8 +715,48 @@ mod tests {
         }
     }
 
-    /// 回退候选集的三条排除各映射到自己那一条理由、互不相同（此前「不在候选集里」映射成「低于 F、被抛弃」两条之一）；
-    /// 「目标那一版树表 0 条」**不在**这三条里——它不是候选排除，回退到它照常做（C493（回退候选集条文与实现说反话） 还清）。
+    /// 可写挂载写行与暖机之后推的抬 F 报错时，挂载交回的成员装着抬 F 的错（实审 A1b Q5）：理由、报的上限与点名的根环槽都照里面那个错取，
+    /// 与改之前挂载原样交回它时相同。
+    #[test]
+    fn a_floor_raise_failure_after_the_mounts_publishes_is_judged_by_the_floor_raise_error_inside()
+    {
+        use singlefs_core::mount::FloorRaiseFailedAfterTheMountsPublishes;
+        use singlefs_core::recovery::BadRootRingSlotReading;
+        let wrapped = |cause: MountError| {
+            MountError::FloorRaiseFailedAfterTheMountsPublishes(Box::new(
+                FloorRaiseFailedAfterTheMountsPublishes {
+                    cause,
+                    writes_of_persisted_publishes: Vec::new(),
+                    floor_raises: Vec::new(),
+                },
+            ))
+        };
+        let above_the_ceiling = || MountError::RollbackFloorAboveCeiling {
+            requested: CheckpointTxg(9),
+            ceiling: CheckpointTxg(7),
+        };
+        assert_eq!(
+            refusal_reason_of_mount_error(&wrapped(above_the_ceiling())),
+            ObservedRefusalReason::Explained(ModelRefusalReason::FloorAboveCeiling)
+        );
+        assert_eq!(
+            reported_ceiling_of_mount_error(&wrapped(above_the_ceiling())),
+            Some(model_txg(CheckpointTxg(7)))
+        );
+        let ring_slot = RootRingSlot { region: 1, slot: 2 };
+        let still_bad = MountError::RollbackFloorCeilingRootRingSlotStillBadAfterOneReread {
+            ring_slot,
+            first_reading: BadRootRingSlotReading::Unreadable,
+            reread: BadRootRingSlotReading::Unreadable,
+        };
+        assert_eq!(
+            root_ring_slot_still_bad_after_one_reread_of_mount_error(&wrapped(still_bad)),
+            Some(model_ring_position(ring_slot))
+        );
+    }
+
+    /// 回退候选集的四条排除各映射到自己那一条理由、互不相同（此前「不在候选集里」映射成「低于 F、被抛弃」两条之一）；
+    /// 「目标那一版树表 0 条」是第四条（D23（journal 的角色与格式） 已定项 14：候选集只收带文件的根）。
     #[test]
     fn each_rollback_candidate_exclusion_maps_to_its_own_reason() {
         let target = RollbackTarget {
@@ -481,10 +767,11 @@ mod tests {
             RollbackCandidateExclusion::NotInRing,
             RollbackCandidateExclusion::BelowEffectiveFloor,
             RollbackCandidateExclusion::OnAbandonedTimeline,
+            RollbackCandidateExclusion::VersionWithoutFile,
         ]
         .into_iter()
-        .map(|exclusion| MountError::RollbackTargetNotACandidate { target, exclusion })
-        .map(|error| refusal_reason_of_mount_error(&error))
+        .map(|exclusion| RollbackError::TargetNotACandidate { target, exclusion })
+        .map(|error| refusal_reason_of_rollback_error(&error))
         .collect();
         assert_eq!(
             mapped,
@@ -496,8 +783,44 @@ mod tests {
                 ObservedRefusalReason::Explained(
                     ModelRefusalReason::RollbackTargetOnAbandonedTimeline
                 ),
+                ObservedRefusalReason::Explained(ModelRefusalReason::RollbackTargetWithoutFile),
             ]
         );
+    }
+
+    /// 每一版的文件内容、整张实例表、全部角色的分配代都真的拿实现交回的东西比过（代码审阅第 12 条），不只在形状上对：
+    /// 四段带挂载的短历史跑下来一条新发现都没有，四样计数都大于 0——胶水从实现的输出里解出了内容与实例表，
+    /// 树表 0 条的那几版比过重写的角色集合。
+    #[test]
+    fn every_published_version_is_compared_by_content_instance_table_and_every_role_both_ways() {
+        use crate::history::{
+            execute_history_with, generate_history, HistoryDeviceWidth, HistoryEnding,
+            HistoryExecution, HistorySeed, PerStepChecker,
+        };
+        use singlefs_core::admission::SpaceAdmission;
+        let mut counts = crate::model::ModelJudgementCounts::default();
+        for seed in 0_u64..4 {
+            let run = execute_history_with(
+                &generate_history(HistorySeed(seed), 16),
+                HistoryExecution {
+                    per_step_checker: PerStepChecker::Skipped,
+                    device_width: HistoryDeviceWidth::FourGibibytes,
+                    space_admission: SpaceAdmission::JudgedByTheFormula,
+                },
+                &crate::SharedStream::new(),
+                &mut |_| {},
+            );
+            assert!(
+                !matches!(run.ending, HistoryEnding::NewFinding { .. }),
+                "种子 {seed}：{:?}",
+                run.ending
+            );
+            counts.add(&run.tally.model_counts);
+        }
+        assert!(counts.file_contents_compared >= 1, "{counts:?}");
+        assert!(counts.instance_tables_compared >= 1, "{counts:?}");
+        assert!(counts.rewritten_role_sets_compared >= 1, "{counts:?}");
+        assert!(counts.allocation_records_compared >= 1, "{counts:?}");
     }
 
     /// 模型模块只用格式常量那一个 crate（D13（验证路线） 已定项 5）：`model.rs` 里注释之外的每一行都不提 `singlefs_core`、`singlefs_checker`，

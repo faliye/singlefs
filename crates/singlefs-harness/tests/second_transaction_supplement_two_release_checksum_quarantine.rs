@@ -137,7 +137,7 @@ fn data_slot_of_the_first_version(pool: &BuiltPool) -> SlotNumber {
 /// 复用窗口置 0（只供测试的开关）让被换下的落点在 `release` 返回时就回到空闲池，「那个槽回没回空闲池」在这一次发布里就看得见：
 /// 同一次释放的 A 的 extent 根那一槽当场回到空闲池，只有核出对不上的数据单元那一对槽回不去——它两盘的分配记录都留在已分配。
 #[test]
-fn a_released_unit_whose_copies_fail_the_checksum_in_its_mapping_entry_is_quarantined_instead_of_returning_to_the_free_pool(
+fn released_unit_whose_copies_fail_the_checksum_in_its_mapping_entry_is_quarantined_instead_of_returning_to_the_free_pool(
 ) {
     let mut pool = build_pool("release-checksum-both-copies");
     let first = pool.output.clone();
@@ -251,7 +251,7 @@ fn a_released_unit_whose_copies_fail_the_checksum_in_its_mapping_entry_is_quaran
 /// 下一次覆盖写不被拒（用户数据落点各盘一致）。改之前在任何写之前返回「不对称的账第一版不支持」的成员，这个文件覆盖写不成；
 /// 只留坏的那一份时，冷启动走读判整池失败、下一次覆盖写被「各盘落点不一致」拒掉。
 #[test]
-fn a_checksum_failure_on_only_one_copy_keeps_both_records_allocated_and_the_pool_stays_writable_and_readable(
+fn checksum_failure_on_only_one_copy_keeps_both_records_allocated_and_the_pool_stays_writable_and_readable(
 ) {
     let mut pool = build_pool("release-checksum-one-copy");
     let first = pool.output.clone();
@@ -540,8 +540,7 @@ fn overwrite_with_the_first_reads_of_the_data_copies_failing(
 /// 用例 4：盘 0 上那一份的第一读报块设备错（瞬时读错），重读读得出、校验和对得上 ⇒ 不隔离，两盘都照常释放。
 /// 这是用户 2026-09-24 定「先重读一次」要挡的那一格（判决 N1 的 F1）：不重读就把好槽当成对不上隔离掉。
 #[test]
-fn a_release_checksum_read_that_fails_once_is_read_again_and_the_intact_copy_is_released_as_usual()
-{
+fn release_checksum_read_that_fails_once_is_read_again_and_the_intact_copy_is_released_as_usual() {
     let mut pool = build_pool("release-checksum-read-fails-once");
     let data_slot = data_slot_of_the_first_version(&pool);
     let (result, reads_seen) =
@@ -570,7 +569,7 @@ fn a_release_checksum_read_that_fails_once_is_read_again_and_the_intact_copy_is_
 /// 用例 5：两盘那一份都一直读不到：各先重读一次（恰好一次，不多次重试），还读不出就按对不上处置——
 /// 两盘那条记录都留在已分配，发布照成（只一块盘读不出时两块盘的账会不对称，停在用例 2 那一格）。
 #[test]
-fn a_release_checksum_read_that_keeps_failing_is_read_once_more_and_then_handled_as_a_mismatch() {
+fn release_checksum_read_that_keeps_failing_is_read_once_more_and_then_handled_as_the_mismatch() {
     let mut pool = build_pool("release-checksum-read-keeps-failing");
     let data_slot = data_slot_of_the_first_version(&pool);
     let (result, reads_seen) =
@@ -618,7 +617,7 @@ fn a_release_checksum_read_that_keeps_failing_is_read_once_more_and_then_handled
 /// 主 agent 2026-09-25 定——一次瞬时坏读不许让单元永久隔离）。只在读不出时重读的实现在这里把好的那一对槽隔离掉：
 /// 盘 0 那一份读一次、核出对不上，两块盘的记录一起留在已分配。
 #[test]
-fn a_release_checksum_read_that_returns_corrupted_bytes_once_is_read_again_and_the_intact_copy_is_released_as_usual(
+fn release_checksum_read_that_returns_corrupted_bytes_once_is_read_again_and_the_intact_copy_is_released_as_usual(
 ) {
     let mut pool = build_pool("release-checksum-read-corrupted-once");
     let data_slot = data_slot_of_the_first_version(&pool);
@@ -652,7 +651,7 @@ fn a_release_checksum_read_that_returns_corrupted_bytes_once_is_read_again_and_t
 /// 两次都对不上才按对不上处置——两块盘的记录一起留在已分配，盘 0 那一份报「重读之后仍对不上」、盘 1 那一份报「对得上而一起留」。
 /// 这一格是故障注入里「每次读都给坏字节」的形态：隔离的是一对好槽，那是「两次都对不上才隔离」这条规则认下的代价，不是实现的错。
 #[test]
-fn a_release_checksum_read_that_keeps_returning_corrupted_bytes_is_read_once_more_and_then_quarantined(
+fn release_checksum_read_that_keeps_returning_corrupted_bytes_is_read_once_more_and_then_quarantined(
 ) {
     let mut pool = build_pool("release-checksum-read-keeps-corrupting");
     let data_slot = data_slot_of_the_first_version(&pool);
@@ -715,7 +714,7 @@ fn remount_and_reclaim_everything_reclaimable(pool: &mut BuiltPool) {
 /// 接连要几个用户数据落点都不会拿到它。改之前隔离只住内存：重开之后那条记录读回来是「已释放、释放代 4」，
 /// F 抬过去就回收、再发出去（判决 N3：写者错指到照抄着的活叶那一格，重挂之后活叶被覆写）。
 #[test]
-fn a_quarantined_copy_stays_allocated_across_a_remount_and_is_never_handed_out_again() {
+fn quarantined_copy_stays_allocated_across_the_remount_and_is_never_handed_out_again() {
     let mut pool = build_pool("release-checksum-across-remount");
     let first = pool.output.clone();
     let data_slot = data_slot_of_the_first_version(&pool);
@@ -781,7 +780,7 @@ fn a_quarantined_copy_stays_allocated_across_a_remount_and_is_never_handed_out_a
 /// 只一个池在覆盖写之前把 A 的数据单元两盘那一份都改坏：那个池的两盘那条记录留在已分配，另一个池的照常释放、回收回空闲——
 /// 准入读数里两块盘的「已分配」都恰好多那一份的两槽、可用都恰好少两槽；式子里没有为它另开的一项，「被抛弃根独占量」那一项都是 0。
 #[test]
-fn a_quarantined_copy_counts_as_allocated_in_the_admission_reading_and_adds_no_term_of_its_own() {
+fn quarantined_copy_counts_as_allocated_in_the_admission_reading_and_adds_no_term_of_its_own() {
     let reading_after = |tag: &str, corrupt_both_copies: bool| {
         let mut pool = build_pool(tag);
         let first = pool.output.clone();
@@ -907,7 +906,7 @@ fn overwrite_on_a_mapping_entry_whose_second_location_names(
 /// D19（块指针的结构与宽度预算） 已定项 5（用户 2026-09-25 定）：位置项指向一块不在池里的盘，当映射条目损坏，在任何写之前拒绝、盘上不变——
 /// 盘上逐字节不变（两盘四个系统配置槽、根环里全部自证过的根、录制流步数），分配器一条记录都没改写。
 #[test]
-fn a_mapping_location_on_a_device_outside_the_pool_is_refused_as_a_damaged_mapping_entry_before_anything_is_written(
+fn mapping_location_on_the_device_outside_the_pool_is_refused_as_the_damaged_mapping_entry_before_anything_is_written(
 ) {
     let mut pool = build_pool("release-checksum-foreign-device");
     let data_slot = data_slot_of_the_first_version(&pool);
@@ -973,6 +972,20 @@ fn pool_whose_quarantined_records_no_root_references(
     tag: &str,
     corrupted_devices: &[DeviceIdentity],
 ) -> (BuiltPool, SlotNumber) {
+    let (pool, data_slot, _) =
+        pool_whose_quarantined_records_no_root_references_with_the_newest_data_slot(
+            tag,
+            corrupted_devices,
+        );
+    (pool, data_slot)
+}
+
+/// 同 [`pool_whose_quarantined_records_no_root_references`]，再交回最新那一版（抬 F 那一串的最后一次空发布，数据单元照抄 E 的）
+/// 数据单元的起点槽。
+fn pool_whose_quarantined_records_no_root_references_with_the_newest_data_slot(
+    tag: &str,
+    corrupted_devices: &[DeviceIdentity],
+) -> (BuiltPool, SlotNumber, SlotNumber) {
     let mut pool = build_pool(tag);
     let first = pool.output.clone();
     let data_slot = data_slot_of_the_first_version(&pool);
@@ -1020,7 +1033,8 @@ fn pool_whose_quarantined_records_no_root_references(
         .expect("抬 F 到 4：A 的根（txg 3）掉出候选集")
     };
     assert!(!raised.publishes.is_empty(), "抬 F 发了空发布");
-    (pool, data_slot)
+    let newest_data_slot = current.data_pointers[0].locations[0].slot;
+    (pool, data_slot, newest_data_slot)
 }
 
 /// 用例 10：I-3.1（已分配统计对得上） 与 I-3.11（已分配减 defer 等于最新根走读） 怎么认隔离的记录（用户 2026-09-25 定，
@@ -1029,7 +1043,7 @@ fn pool_whose_quarantined_records_no_root_references(
 /// 1. 两盘那一份都改坏：两条记录豁免，I-3.1、I-3.11 都成立（改之前 checker 不认隔离，两条都红）；
 /// 2. 把那两份改回对得上（再翻一次同一个字节）：同样两条记录不再豁免，I-3.1、I-3.11 照红。
 #[test]
-fn a_quarantined_record_is_exempted_from_the_allocated_statistics_only_while_its_copy_fails_the_checker_read(
+fn quarantined_record_is_exempted_from_the_allocated_statistics_only_while_its_copy_fails_the_checker_read(
 ) {
     let (mut pool, data_slot) = pool_whose_quarantined_records_no_root_references(
         "release-checksum-checker-exemption",
@@ -1065,7 +1079,7 @@ fn a_quarantined_record_is_exempted_from_the_allocated_statistics_only_while_its
 /// 盘 1 那一份对得上。那个单元有一份坏，两块盘上的两条记录都豁免：I-3.1、I-3.11 都成立（按份判的话盘 1 那条恒红）。
 /// 把盘 0 那一份改回对得上：单元两份都好，两条记录照红。
 #[test]
-fn a_unit_with_one_failing_copy_exempts_its_records_on_every_device_and_two_intact_copies_do_not() {
+fn unit_with_one_failing_copy_exempts_its_records_on_every_device_and_two_intact_copies_do_not() {
     let (mut pool, data_slot) = pool_whose_quarantined_records_no_root_references(
         "release-checksum-checker-exemption-one-copy",
         &[DeviceIdentity(0)],
@@ -1091,6 +1105,54 @@ fn a_unit_with_one_failing_copy_exempts_its_records_on_every_device_and_two_inta
                 InvariantVerdict::Violated(_)
             ),
             "{invariant}：单元两份都好 ⇒ 不豁免、照红"
+        );
+    }
+}
+
+/// 用例 14（实七；实四丙交回 ⑤ 那一形）：隔离的记录罩住的那一份是一个**完整的别的单元**——magic、头校验和、载荷 CRC 都过得去（自证过），
+/// 与指着它的位置项里的单元校验和对不上。丢一次写落在复用过的槽上时就是这样：槽里留着上一个单元，写者释放之前读盘核按位置项核出对不上、
+/// 隔离（D19（块指针的结构与宽度预算） 已定项 5 硬规则 1）。checker 的豁免与写者同一个判据（对位置项里的校验和）：两条记录豁免，
+/// I-3.1、I-3.11 都成立；按自证判（改之前的读法）两份都过得去、不豁免，两条都红。
+/// 指着那一份的位置项只在 A 的根（txg 3）里，而 F 已抬到 4、A 不在候选集里：checker 要把根环里没走过的根也走一遍才收得到它。
+#[test]
+fn quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_against_the_checksum_in_its_location_entry(
+) {
+    let (mut pool, data_slot, newest_data_slot) =
+        pool_whose_quarantined_records_no_root_references_with_the_newest_data_slot(
+            "release-checksum-checker-location-entry",
+            &[DeviceIdentity(0), DeviceIdentity(1)],
+        );
+    {
+        let devices = pool.devices.as_mut().expect("镜像还开着");
+        let data_unit_bytes = usize::try_from(singlefs_format::DATA_UNIT_BYTES).expect("32768");
+        for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+            let (_, block_device) = devices
+                .iter_mut()
+                .find(|(identity, _)| *identity == device)
+                .expect("池里有这块盘");
+            let mut other_unit = vec![0u8; data_unit_bytes];
+            block_device
+                .read_at(newest_data_slot.to_device_offset(), &mut other_unit)
+                .expect("读最新那一版的数据单元");
+            assert!(
+                singlefs_checker::check_unit(&other_unit).is_ok(),
+                "搬过去的是一个自证过得去的完整单元"
+            );
+            block_device
+                .write_at(
+                    data_slot.to_device_offset(),
+                    &other_unit,
+                    WriteDurability::Plain,
+                )
+                .expect("整份写进 A 的数据单元那一槽");
+        }
+    }
+    let image = pool.memory_pool();
+    for invariant in ["I-3.1", "I-3.11"] {
+        assert_eq!(
+            verdict_of(&image, invariant),
+            InvariantVerdict::Holds,
+            "{invariant}：隔离的那两份自证过得去、与 A 的根里的位置项对不上 ⇒ 按位置项判、豁免"
         );
     }
 }

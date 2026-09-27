@@ -138,7 +138,7 @@ fn turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_relea
 /// 再在它上面发第一个文件版本（txg 4）：`publish_first_file` 先把 txg 3 那条根补记进分配器的根环表
 /// （`PoolAllocator::record_zero_unit_roots_leading_to`），表照旧跟得上；不补记，记到 txg 4 时表判出跳号、断言失败。
 #[test]
-fn a_zero_unit_publish_the_caller_issued_before_the_first_file_version_is_recorded_into_the_root_ring(
+fn zero_unit_publish_the_caller_issued_before_the_first_file_version_is_recorded_into_the_root_ring(
 ) {
     let mut formatted = format_pool("root-ring-records-a-caller-zero-unit-publish");
     let mut devices = formatted.reopen_recorded();

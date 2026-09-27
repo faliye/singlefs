@@ -4,17 +4,18 @@
 //! 口径：择系统配置 = 校验和过且世代号大的那个槽、各盘 fsid 与设备数要对得上（D22（单元原子性怎么合成） 已定项 16）；
 //! 择根 = 三个区域全部槽里自证过、`(checkpoint_txg, 实例代号)` 最大的（D22（单元原子性怎么合成） 已定项 7）；
 //! journal 全环扫描、不先信 tail（D23（journal 的角色与格式） 已定项 3），两份镜像任一份自证过即算在（D23（journal 的角色与格式） 已定项 14）；
-//! 前缀 = `(实例代号, checkpoint_txg)` 严格大于所选根、jsn 严格连续、提交标记齐全、在飞上限之内、点名单元逐项验过，
+//! 前缀 = `(实例代号, checkpoint_txg)` 严格大于所选根、jsn 严格连续、反向链等于本实例内逻辑前一条的头算出来的链值
+//! （I-8.6（反向链算法），前一条不在盘上不判）、提交标记齐全、在飞上限之内、点名单元逐项验过，
 //! 施加一条记录 = 把所选根的四个字段换成记录新根段里的（D23（journal 的角色与格式） 已定项 15）。
 
 use std::cell::OnceCell;
 use std::collections::{BTreeMap, BTreeSet};
 
 use singlefs_format::{
-    journal_in_flight_record_limit, ACCOUNTING_ENTRY_BYTES, DATA_UNIT_BYTES,
-    FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES, INODE_INTERNAL_ENTRY, INODE_RECORD_BYTES,
-    JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, MAPPING_ENTRY_BYTES, NODE_BYTES,
-    ROOT_RING_REGIONS, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
+    ACCOUNTING_ENTRY_BYTES, DATA_UNIT_BYTES, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
+    INODE_INTERNAL_ENTRY, INODE_RECORD_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT,
+    MAPPING_ENTRY_BYTES, NODE_BYTES, ROOT_RING_REGIONS, SLOT_BYTES,
+    SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
 };
 
 use crate::address::{
@@ -42,7 +43,8 @@ use crate::instance_table::{
     InstanceTableChainRecord, InstanceTablePage, InstanceTablePageIndex, InstanceTableRecords,
 };
 use crate::journal::{
-    JournalRecord, JournalRecordOrdinalWithinPublish, JournalRecordPlaceInPublish,
+    back_chain_of, record_offset, JournalRecord, JournalRecordOrdinalWithinPublish,
+    JournalRecordPlaceInPublish, FIRST_JOURNAL_COUNTER,
 };
 use crate::make_filesystem::TREE_TABLE_KEY_WIDTH;
 use crate::pointer::{DataPointer, LocationEntry, NodePointer};
@@ -52,12 +54,11 @@ use crate::records::{
     TREE_KIND_ALLOCATION, TREE_KIND_DEADLIST, TREE_KIND_EXTENT, TREE_KIND_INODE,
     TREE_KIND_LIVELIST, TREE_KIND_SPARSE_SIDE_TABLE,
 };
-use crate::rollback_witness::RollbackWitness;
-use crate::root_record::RootRecord;
-use crate::root_ring::target_for_publish;
-use crate::root_ring::{slot_offset, RootRingSlot, RootRingSlotsPerRegionOutOfRange};
+use crate::root_record::{RootRecord, UnmountMarker};
+use crate::root_ring::{region_start, slot_offset, RootRingSlot, RootRingSlotsPerRegionOutOfRange};
 use crate::system_configuration::{
-    SystemConfiguration, SystemConfigurationSlotRefusal, SystemImmutableSizes,
+    journal_in_flight_record_limit, IncompatBitmap, SystemConfiguration,
+    SystemConfigurationSlotRefusal, SystemImmutableSizes,
 };
 use crate::transaction::{
     role_of_allocation_record_tree_node, role_of_extent_upper_node, FileVersionTreeIdentifiers,
@@ -161,6 +162,16 @@ pub enum RecoveryFailure {
     NoValidSystemConfiguration {
         first_device_with_no_valid_system_configuration_slot: DeviceIdentity,
     },
+    /// 池里没有一份可择的系统配置，而至少一槽 magic 与整槽校验和都过、只是 incompat 位图这个读者不认识
+    /// （[`SystemConfigurationSlotRefusal::IncompatBitsNotRecognized`]：退役的位 0 那一版旧镜像，或更新的实现写的，
+    /// D15（格式冻结政策） 已定项 4）。这不是数据坏了，是布局不认识：报它、不报 [`Self::NoValidSystemConfiguration`]，
+    /// 调用方要做的决定不同（换一个认得这一版布局的实现，不是修盘）。别的盘上的槽同时自证不过也报它：
+    /// 认得出的那一槽说明这个池是一个完整的、这个读者不认识的布局。带的是 [`PoolReader::device_identities`] 次序里
+    /// 第一块带着这种槽的盘与它先读到的那一槽的位图。在读系统配置那一步就返回，盘上逐字节不变。
+    SystemConfigurationIncompatBitsNotRecognized {
+        first_device_carrying_them: DeviceIdentity,
+        incompat_bitmap: IncompatBitmap,
+    },
     /// 各盘的系统配置 fsid 或设备数对不上。
     SystemConfigurationsDisagree,
     /// 系统配置自述的每区槽数 S 落在格式承诺的区间之外（D22（单元原子性怎么合成） 已定项 1 的字段表：
@@ -214,11 +225,6 @@ pub enum RecoveryFailure {
         checkpoint_txg: CheckpointTxg,
         counters: Vec<u64>,
     },
-    /// 可写挂载或回退要写的回退见证表装不下：删除规则删过之后（回退时再加上这一次那一条）条目数 `entries` 越过这个池的上限
-    /// `capacity`（根环槽数减 1，D23（journal 的角色与格式） 已定项 14「回退见证」）。条款说表写不满，那是按「根环每个槽都读得出」推的；
-    /// 删除规则把读不出的槽按「可能住着被抛弃的根」算，有槽持续读不出时条目删不掉、表就写得满——那时怎么办条款没写 ⇒ 第一版不支持：
-    /// 挂载在取号之前返回，盘上逐字节不变。
-    RollbackWitnessTableFullWhoseHandlingIsUndecided { entries: usize, capacity: usize },
 }
 
 /// 恢复的结果：择到的根下面没有文件（第 0 代）、读回文件、或走不下去。`root` 恒是**所选**的那条根。
@@ -256,7 +262,7 @@ pub struct JournalScanReport {
 pub struct RecoveryReport {
     pub outcome: RecoveryOutcome,
     /// 施加 journal 之后实际走的那条根（所选根，或由记录重建的根）；择不到根、或恢复在施加任何记录之前停下
-    /// （`RootPublishCarriesMoreThanOneLastRecordFlagWhoseAnchorIsUndecided`）时是 None。记录核对器拿它判「恢复自称的状态」。
+    /// （`RootPublishCarriesMoreThanOneLastRecordFlagWhoseAnchorIsUndecided`、所选根的 txg 加一溢出）时是 None。记录核对器拿它判「恢复自称的状态」。
     pub effective_root: Option<(InstanceGeneration, CheckpointTxg)>,
     pub journal: JournalScanReport,
     /// 位置提示读不到、转去查映射的次数。
@@ -520,21 +526,67 @@ impl<'reader> CentralMappingTreeWithBytesReadOnFirstUse<'reader> {
     }
 }
 
-/// 一个槽读回来之后分三路：读不到 / 自证不过 ⇒ `None`（这一槽不可择，换一槽换一盘还可以试）；
-/// 自述的每区槽数 S 越界 ⇒ 整池拒绝挂载，把点名的成员交回去；三关都过 ⇒ `Some`。
+/// 一个系统配置槽读回来之后可择不可择（[`choose_system_configuration`] 按它分流）。封闭集合，`match` 不写通配臂。
+enum SystemConfigurationSlotReading {
+    /// 三关都过、S 在区间里：这一槽可择。
+    Mountable(SystemConfiguration),
+    /// 读不到，或 magic / 整槽校验和不过：这一槽不可择，换一槽换一盘还可以试。
+    NotSelfDescribing,
+    /// magic 与整槽校验和都过、incompat 位图不认识：这一槽同样不可择，记下它，池里一份可择的都没有时报布局不认识。
+    IncompatBitsNotRecognized(IncompatBitmap),
+}
+
+impl SystemConfigurationSlotReading {
+    fn into_mountable(self) -> Option<SystemConfiguration> {
+        match self {
+            Self::Mountable(system_configuration) => Some(system_configuration),
+            Self::NotSelfDescribing | Self::IncompatBitsNotRecognized(_) => None,
+        }
+    }
+
+    fn incompat_bitmap_not_recognized(&self) -> Option<IncompatBitmap> {
+        match self {
+            Self::IncompatBitsNotRecognized(incompat_bitmap) => Some(*incompat_bitmap),
+            Self::Mountable(_) | Self::NotSelfDescribing => None,
+        }
+    }
+
+    /// 可择的这一槽记的固定结构槽距；自证不过或布局不认识的槽里记的不能信。
+    fn recorded_fixed_structure_slot_spacing(&self) -> Option<u64> {
+        match self {
+            Self::Mountable(system_configuration) => Some(u64::from(
+                system_configuration
+                    .immutable
+                    .sizes
+                    .fixed_structure_slot_spacing,
+            )),
+            Self::NotSelfDescribing | Self::IncompatBitsNotRecognized(_) => None,
+        }
+    }
+}
+
+/// 一个槽读回来之后分四路：读不到 / 自证不过 ⇒ 不可择（换一槽换一盘还可以试）；自证得过、incompat 位图不认识 ⇒ 同样不可择、
+/// 另记一笔；自述的每区槽数 S 越界 ⇒ 整池拒绝挂载，把点名的成员交回去；三关都过 ⇒ 可择。
 ///
 /// 单拎成一个函数是因为 [`choose_system_configuration`] 每块盘要做两次（槽 0、槽 1），
 /// 而两次的分流必须一模一样：其中一次把越界悄悄当成「这一槽不可择」，越界的池就会靠另一槽挂上去。
 fn mountable_slot_or_refusal(
     device: DeviceIdentity,
     bytes: Option<Vec<u8>>,
-) -> Result<Option<SystemConfiguration>, RecoveryFailure> {
+) -> Result<SystemConfigurationSlotReading, RecoveryFailure> {
     let Some(bytes) = bytes else {
-        return Ok(None);
+        return Ok(SystemConfigurationSlotReading::NotSelfDescribing);
     };
     match SystemConfiguration::parse_slot(&bytes) {
-        Ok(system_configuration) => Ok(Some(system_configuration)),
-        Err(SystemConfigurationSlotRefusal::NotSelfDescribing) => Ok(None),
+        Ok(system_configuration) => Ok(SystemConfigurationSlotReading::Mountable(
+            system_configuration,
+        )),
+        Err(SystemConfigurationSlotRefusal::NotSelfDescribing) => {
+            Ok(SystemConfigurationSlotReading::NotSelfDescribing)
+        }
+        Err(SystemConfigurationSlotRefusal::IncompatBitsNotRecognized { incompat_bitmap }) => Ok(
+            SystemConfigurationSlotReading::IncompatBitsNotRecognized(incompat_bitmap),
+        ),
         Err(SystemConfigurationSlotRefusal::RootRingSlotsPerRegionOutOfRange(out_of_range)) => {
             Err(RecoveryFailure::RootRingSlotsPerRegionOutOfRange {
                 device,
@@ -544,12 +596,96 @@ fn mountable_slot_or_refusal(
     }
 }
 
-/// 每盘两槽：槽 0 在偏移 0；槽 1 的偏移按槽 0 里记的槽距，槽 0 无效时按最小槽距 4096 试。
+/// 逐档找槽 1 时相邻两档槽距之差：槽距 = 4096 向上取整到 io_min 的整数倍（D2（RAID 条带策略） 已定项 19），
+/// io_min 是逻辑块宽的整数倍、逻辑块宽最小 512 字节（Linux 块层的扇区），所以格式允许的槽距都是 512 的整数倍。
+const SLOT_SPACING_SEARCH_STEP_BYTES: u64 = 512;
+
+/// 全池没有一个槽 0 可择时找一块盘的槽 1：槽距无处可读，在格式允许的每一档槽距上各读一槽，
+/// 只收可择、且自己记的固定结构槽距正好等于它所在偏移的那一槽；几档都收得到时取世代号最大的
+/// （D22（单元原子性怎么合成） 已定项 16「择槽取校验和过且世代号最大的」，逐盘计），世代号相同取偏移小的。
+/// 各盘择到的之间 fsid 与设备数要对得上，由 [`choose_system_configuration`] 照常判。
+///
+/// 格式允许的槽距：不小于 4096（[`FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES`]）、[`SLOT_SPACING_SEARCH_STEP_BYTES`] 的整数倍，
+/// 槽 1 整槽落在根环基址（[`region_start`] 的区域 0，1 MiB）之前——mkfs 判固定结构两两不重叠（`make_filesystem::check_geometry`）。
+/// 上下界之间 (1 MiB − 4096 − 4096) ÷ 512 + 1 = 2033 档，每档读一次。
+///
+/// 风险：同一块盘上更早一次 mkfs 用别的槽距写下的槽 1，这一次 mkfs 不清（它只写本次的两槽），它自证得过、记的槽距也等于它所在的偏移，
+/// 与本池的槽 1 分不出。它的世代号更大时择到的就是它：fsid 不同时各盘择到的对不上、整池报 [`RecoveryFailure::SystemConfigurationsDisagree`]；
+/// fsid 相同（调用方拿同一个 fsid 重做 mkfs）时按旧池的几何挂。只按最小槽距 4096 试一档时，旧池槽距是 4096 那一格上同一个风险也在。
+///
+/// 一档读回来的分流与槽 0、槽 1 同一个（[`mountable_slot_or_refusal`]）。一槽可择的都没有时，交回试到的第一个 incompat 位图不认识的槽
+/// （按偏移升序；它的槽距记在哪一格读不出来，不核偏移），再没有就是自证不过。
+///
+/// # Errors
+/// 试到的某一槽自证得过、每区槽数 S 越界 ⇒ [`RecoveryFailure::RootRingSlotsPerRegionOutOfRange`]，整池拒，与槽 0、槽 1 同一个判法。
+fn slot_one_found_by_trying_every_slot_spacing_the_format_allows(
+    reader: &dyn PoolReader,
+    device: DeviceIdentity,
+) -> Result<SystemConfigurationSlotReading, RecoveryFailure> {
+    let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+    let largest_spacing = region_start(0).0 - SYSTEM_CONFIGURATION_SLOT_BYTES;
+    let mut highest_generation_found: Option<SystemConfiguration> = None;
+    let mut first_slot_with_incompat_bits_not_recognized: Option<IncompatBitmap> = None;
+    // 迭代次数的上界是档数（2033）；跨轮带着的是至今世代号最大的那一槽与第一个 incompat 位图，都只换不删。
+    // 这一档槽距下槽 1 的偏移就是槽距本身（槽 i 在 i × 槽距）。
+    for candidate_spacing in (FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES..=largest_spacing)
+        .step_by(usize::try_from(SLOT_SPACING_SEARCH_STEP_BYTES).expect("512"))
+    {
+        match mountable_slot_or_refusal(
+            device,
+            reader.read(device, DeviceOffsetInBytes(candidate_spacing), slot_bytes),
+        )? {
+            SystemConfigurationSlotReading::Mountable(system_configuration) => {
+                let recorded_spacing = u64::from(
+                    system_configuration
+                        .immutable
+                        .sizes
+                        .fixed_structure_slot_spacing,
+                );
+                if recorded_spacing != candidate_spacing {
+                    continue;
+                }
+                if highest_generation_found.is_none_or(|found| {
+                    system_configuration.quantities.slot_generation
+                        > found.quantities.slot_generation
+                }) {
+                    highest_generation_found = Some(system_configuration);
+                }
+            }
+            SystemConfigurationSlotReading::NotSelfDescribing => {}
+            SystemConfigurationSlotReading::IncompatBitsNotRecognized(incompat_bitmap) => {
+                first_slot_with_incompat_bits_not_recognized =
+                    first_slot_with_incompat_bits_not_recognized.or(Some(incompat_bitmap));
+            }
+        }
+    }
+    Ok(
+        match (
+            highest_generation_found,
+            first_slot_with_incompat_bits_not_recognized,
+        ) {
+            (Some(system_configuration), _) => {
+                SystemConfigurationSlotReading::Mountable(system_configuration)
+            }
+            (None, Some(incompat_bitmap)) => {
+                SystemConfigurationSlotReading::IncompatBitsNotRecognized(incompat_bitmap)
+            }
+            (None, None) => SystemConfigurationSlotReading::NotSelfDescribing,
+        },
+    )
+}
+
+/// 每盘两槽：槽 0 在偏移 0；槽 1 在固定结构槽距处（D22（单元原子性怎么合成） 已定项 16）。槽距是池级字段（两盘四槽同值）：
+/// 先读遍每块盘的槽 0，一块盘的槽 0 可择就按它自己记的槽距找它的槽 1；自己的槽 0 不可择，按池里第一块槽 0 可择的盘记的槽距找；
+/// 全池没有一个槽 0 可择时槽距无处可读，在格式允许的每一档槽距上试（[`slot_one_found_by_trying_every_slot_spacing_the_format_allows`]，
+/// 那里写着它的风险：更早一次 mkfs 留下的槽 1 分不出来）。
 /// 一块盘两个槽都无效时**跳过这块盘**，接着看别的盘：系统配置每盘放一份买的就是这份冗余
 /// （D22（单元原子性怎么合成） 已定项 8 第 1 条；E87 的 8 种失效组合里「掉了那块盘」这一格要可挂）。
 ///
 /// # Errors
 /// 池里每块盘的两个槽都无效（[`RecoveryFailure::NoValidSystemConfiguration`]）；
+/// 池里一槽可择的都没有、而至少一槽自证得过只是 incompat 位图不认识（[`RecoveryFailure::SystemConfigurationIncompatBitsNotRecognized`]，
+/// 先于上一条判）；
 /// 交得出系统配置的几块盘之间 fsid 或设备数对不上、或者池里一块盘都没有（[`RecoveryFailure::SystemConfigurationsDisagree`]）；
 /// 某一槽自证得过、而自述的每区槽数 S 越界（[`RecoveryFailure::RootRingSlotsPerRegionOutOfRange`]）——
 /// **这一条是挂载时的区间判**：S 越界的池在这里就拒，后面一步不走、盘上一个字节不动。
@@ -559,27 +695,40 @@ pub fn choose_system_configuration(
     let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
     let mut chosen: Option<SystemConfiguration> = None;
     let mut first_device_with_no_valid_system_configuration_slot: Option<DeviceIdentity> = None;
+    let mut first_slot_with_incompat_bits_not_recognized: Option<(DeviceIdentity, IncompatBitmap)> =
+        None;
+    let mut slot_zero_of_each_device: Vec<(DeviceIdentity, SystemConfigurationSlotReading)> =
+        Vec::new();
     for device in reader.device_identities() {
         let slot_zero = mountable_slot_or_refusal(
             device,
             reader.read(device, DeviceOffsetInBytes(0), slot_bytes),
         )?;
-        let spacing = slot_zero.as_ref().map_or(
-            FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
-            |system_configuration| {
-                u64::from(
-                    system_configuration
-                        .immutable
-                        .sizes
-                        .fixed_structure_slot_spacing,
-                )
-            },
-        );
-        let slot_one = mountable_slot_or_refusal(
-            device,
-            reader.read(device, DeviceOffsetInBytes(spacing), slot_bytes),
-        )?;
-        let best_on_device = match (slot_zero, slot_one) {
+        slot_zero_of_each_device.push((device, slot_zero));
+    }
+    let slot_spacing_recorded_by_the_first_mountable_slot_zero = slot_zero_of_each_device
+        .iter()
+        .find_map(|(_, slot_zero)| slot_zero.recorded_fixed_structure_slot_spacing());
+    for (device, slot_zero) in slot_zero_of_each_device {
+        // 自己的槽 0 不可择时它记的槽距不能信，用池里别的盘槽 0 记的；全池一个都没有时逐档试——按 D2（RAID 条带策略） 已定项 19
+        // 的式子拿挂载时探得的 io_min 算，要 `PoolReader` 交得出探测值，今天交不出。
+        let slot_one = match slot_zero
+            .recorded_fixed_structure_slot_spacing()
+            .or(slot_spacing_recorded_by_the_first_mountable_slot_zero)
+        {
+            Some(spacing) => mountable_slot_or_refusal(
+                device,
+                reader.read(device, DeviceOffsetInBytes(spacing), slot_bytes),
+            )?,
+            None => slot_one_found_by_trying_every_slot_spacing_the_format_allows(reader, device)?,
+        };
+        if first_slot_with_incompat_bits_not_recognized.is_none() {
+            first_slot_with_incompat_bits_not_recognized = slot_zero
+                .incompat_bitmap_not_recognized()
+                .or_else(|| slot_one.incompat_bitmap_not_recognized())
+                .map(|incompat_bitmap| (device, incompat_bitmap));
+        }
+        let best_on_device = match (slot_zero.into_mountable(), slot_one.into_mountable()) {
             (None, None) => {
                 // 这块盘上的两份都废了，但别的盘各自还带着一份完整的系统配置：跳过它，别让整池挂不上。
                 if first_device_with_no_valid_system_configuration_slot.is_none() {
@@ -611,12 +760,22 @@ pub fn choose_system_configuration(
     if let Some(system_configuration) = chosen {
         return Ok(system_configuration);
     }
-    match first_device_with_no_valid_system_configuration_slot {
-        Some(device) => Err(RecoveryFailure::NoValidSystemConfiguration {
+    // 一份可择的都没有：有一槽自证得过、只是布局不认识，就报布局不认识（不是数据坏了）；否则才是每块盘两槽都坏。
+    match (
+        first_slot_with_incompat_bits_not_recognized,
+        first_device_with_no_valid_system_configuration_slot,
+    ) {
+        (Some((device, incompat_bitmap)), _) => Err(
+            RecoveryFailure::SystemConfigurationIncompatBitsNotRecognized {
+                first_device_carrying_them: device,
+                incompat_bitmap,
+            },
+        ),
+        (None, Some(device)) => Err(RecoveryFailure::NoValidSystemConfiguration {
             first_device_with_no_valid_system_configuration_slot: device,
         }),
         // 池里一块盘都没有：没有哪一块盘点得出名，保持这个函数原先对空池的判定不变（见报告里的设计问题）。
-        None => Err(RecoveryFailure::SystemConfigurationsDisagree),
+        (None, None) => Err(RecoveryFailure::SystemConfigurationsDisagree),
     }
 }
 
@@ -638,7 +797,7 @@ fn visit_valid_roots<Reader: PoolReader + ?Sized>(
 }
 
 /// 同 `visit_valid_roots`，连它读出来的那个根环槽一起交出去：分配器要知道每条根住哪个槽，
-/// 才认得出之后哪一次发布盖掉了它（`allocator::RootRingOccupancy`）。
+/// 才认得出之后哪一次发布盖掉了它（`allocator::RootRingOccupancy`）。读不出、自证不过的槽跳过。
 fn visit_valid_roots_with_ring_slots<Reader: PoolReader + ?Sized>(
     reader: &Reader,
     region_devices: &[DeviceIdentity; 3],
@@ -646,31 +805,79 @@ fn visit_valid_roots_with_ring_slots<Reader: PoolReader + ?Sized>(
     filesystem_identifier: &[u8; 16],
     mut visit: impl FnMut(RootRingSlot, RootRecord),
 ) {
-    let root_slot_bytes = usize::try_from(immutable_sizes.physical_block_size).expect("根槽宽");
-    for region in 0..ROOT_RING_REGIONS {
-        let device = region_devices[usize::try_from(region).expect("区域号")];
-        for slot in 0..immutable_sizes.root_ring_slots_per_region.count() {
-            let ring_slot = RootRingSlot { region, slot };
-            let offset = slot_offset(ring_slot, immutable_sizes.fixed_structure_slot_spacing);
-            let Some(bytes) = reader.read(device, offset, root_slot_bytes) else {
-                continue;
-            };
-            if let Some(root) = RootRecord::parse_slot(&bytes, filesystem_identifier) {
-                visit(ring_slot, root);
-            }
+    for ring_slot in every_root_ring_slot(immutable_sizes) {
+        match read_root_ring_slot(
+            reader,
+            region_devices,
+            immutable_sizes,
+            filesystem_identifier,
+            ring_slot,
+        ) {
+            RootRingSlotReading::SelfVerified(root) => visit(ring_slot, root),
+            RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => continue,
+            RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified) => {}
         }
     }
 }
 
-/// 三个区域全部槽逐个验自证校验和，先跳过被回退见证表抛弃的根（D23（journal 的角色与格式） 已定项 14「回退见证」：
-/// 择根先跳过被任一条目抛弃的根，再照 D22（单元原子性怎么合成） 已定项 7 择新），再取 `(checkpoint_txg, 实例代号)` 最大的。
-/// 见证表从盘上现读（[`rollback_witness_of_the_pool`]）：各盘择到的那一槽里的表取并集。
+/// 根环三个区域的全部槽，区域号升序、区域内槽号升序（读根环的每一处都按这个次序走）。
+#[must_use]
+pub fn every_root_ring_slot(immutable_sizes: &SystemImmutableSizes) -> Vec<RootRingSlot> {
+    (0..ROOT_RING_REGIONS)
+        .flat_map(|region| {
+            (0..immutable_sizes.root_ring_slots_per_region.count())
+                .map(move |slot| RootRingSlot { region, slot })
+        })
+        .collect()
+}
+
+/// 读一个根环槽读坏了是哪一种。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BadRootRingSlotReading {
+    /// 读不出：设备报错、越界、那块盘不在读者里（`PoolReader::read` 交回空）。
+    Unreadable,
+    /// 读得出、自证不过：校验和不过、fsid 不是本池的、从没写过的全 0 槽（`RootRecord::parse_slot` 交回空）。
+    NotSelfVerified,
+}
+
+/// 读一个根环槽的结局。
+#[allow(
+    clippy::large_enum_variant,
+    reason = "一次读一个槽、按值交回马上拆开，装箱只多一次分配"
+)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RootRingSlotReading {
+    SelfVerified(RootRecord),
+    Bad(BadRootRingSlotReading),
+}
+
+/// 读一个根环槽（区域归属表给出它在哪块盘、槽距给出偏移），验自证校验和与 fsid。只读一次，不重试。
+#[must_use]
+pub fn read_root_ring_slot<Reader: PoolReader + ?Sized>(
+    reader: &Reader,
+    region_devices: &[DeviceIdentity; 3],
+    immutable_sizes: &SystemImmutableSizes,
+    filesystem_identifier: &[u8; 16],
+    ring_slot: RootRingSlot,
+) -> RootRingSlotReading {
+    let root_slot_bytes = usize::try_from(immutable_sizes.physical_block_size).expect("根槽宽");
+    let device = region_devices[usize::try_from(ring_slot.region).expect("区域号")];
+    let offset = slot_offset(ring_slot, immutable_sizes.fixed_structure_slot_spacing);
+    let Some(bytes) = reader.read(device, offset, root_slot_bytes) else {
+        return RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable);
+    };
+    match RootRecord::parse_slot(&bytes, filesystem_identifier) {
+        Some(root) => RootRingSlotReading::SelfVerified(root),
+        None => RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified),
+    }
+}
+
+/// 三个区域全部槽逐个验自证校验和，取 `(checkpoint_txg, 实例代号)` 最大的（D22（单元原子性怎么合成） 已定项 7 择新）。
 #[must_use]
 pub fn choose_root(
     reader: &dyn PoolReader,
     system_configuration: &SystemConfiguration,
 ) -> Option<RootRecord> {
-    let rollback_witness = rollback_witness_of_the_pool(reader, system_configuration);
     let mut best: Option<RootRecord> = None;
     visit_valid_roots(
         reader,
@@ -678,9 +885,6 @@ pub fn choose_root(
         &system_configuration.immutable.sizes,
         &system_configuration.immutable.filesystem_identifier,
         |candidate| {
-            if rollback_witness.abandons(candidate.instance, candidate.checkpoint_txg) {
-                return;
-            }
             let candidate_key = (candidate.checkpoint_txg, candidate.instance);
             if best.is_none_or(|current| candidate_key > (current.checkpoint_txg, current.instance))
             {
@@ -689,69 +893,6 @@ pub fn choose_root(
         },
     );
     best
-}
-
-/// 一个池此刻的回退见证（D23（journal 的角色与格式） 已定项 14「回退见证」）：每块盘两槽里自证过（fsid 与本池相同）、
-/// 世代号最大的那一槽里的见证表，各盘取并集（`RollbackWitness`）。一块盘两槽都读不出就不算它；一槽都读不出时是空的——
-/// 那时系统配置本身就择不出来，挂载在择系统配置那一步已经报错（见证表读不出就是系统配置槽读不出）。
-#[must_use]
-pub fn rollback_witness_of_the_pool<Reader: PoolReader + ?Sized>(
-    reader: &Reader,
-    system_configuration: &SystemConfiguration,
-) -> RollbackWitness {
-    let spacing = u64::from(
-        system_configuration
-            .immutable
-            .sizes
-            .fixed_structure_slot_spacing,
-    );
-    let chosen_on_each_device: Vec<SystemConfiguration> = reader
-        .device_identities()
-        .into_iter()
-        .filter_map(|device| {
-            verified_system_configuration_slots(
-                reader,
-                device,
-                spacing,
-                &system_configuration.immutable.filesystem_identifier,
-            )
-            .into_iter()
-            .max_by_key(|slot| slot.quantities.slot_generation)
-        })
-        .collect();
-    RollbackWitness::of_tables(
-        chosen_on_each_device
-            .iter()
-            .map(|chosen| &chosen.rollback_witness),
-    )
-}
-
-/// 根环每一个槽都读得出、都自证过（是这个池的一条根）时交回全部根，按区域、槽的次序；有一个槽读不出或自证不过就是 `None`。
-/// 回退见证的删除规则要它（`mount`）：读不出的槽按「可能有被抛弃的根」算，与 D18（块里携带什么信息） 已定项 11 行回收的根环条件同一个读法。
-#[must_use]
-pub fn every_root_ring_slot_holds_a_root<Reader: PoolReader + ?Sized>(
-    reader: &Reader,
-    system_configuration: &SystemConfiguration,
-) -> Option<Vec<RootRecord>> {
-    let sizes = &system_configuration.immutable.sizes;
-    let root_slot_bytes = usize::try_from(sizes.physical_block_size).expect("根槽宽");
-    let mut roots = Vec::new();
-    for region in 0..ROOT_RING_REGIONS {
-        let device =
-            system_configuration.immutable.region_devices[usize::try_from(region).expect("区域号")];
-        for slot in 0..sizes.root_ring_slots_per_region.count() {
-            let offset = slot_offset(
-                RootRingSlot { region, slot },
-                sizes.fixed_structure_slot_spacing,
-            );
-            let bytes = reader.read(device, offset, root_slot_bytes)?;
-            roots.push(RootRecord::parse_slot(
-                &bytes,
-                &system_configuration.immutable.filesystem_identifier,
-            )?);
-        }
-    }
-    Some(roots)
 }
 
 /// 根环全部自证过的根里最大的 checkpoint_txg：新实例的第一次发布取 max(它, 环里全部自证通过的记录的 checkpoint_txg) + 1
@@ -850,8 +991,31 @@ pub fn readable_roots_with_ring_slots<Reader: PoolReader + ?Sized>(
     roots
 }
 
-/// 生效的回退下界 F（D16（发布语义） 已定项 1「生效」那一行：恢复后生效值 = 各幸存盘所带 F 最大值的最小值）；
-/// 一块盘上一条根都没有就不算它，一条根都没有时 0。根落在哪块盘按它的 txg 算区域（与写者同一条公式）。
+/// 一条根按一张实例表判是不是被抛弃的：表里有它那个实例的行 (i, Ti, Wi) 且它的 txg > Ti（D23（journal 的角色与格式） 已定项 14
+/// 候选集那一格「(i, T) 可选 ⟺ 表里无 i 的行，或有行 (i, Ti, Wi) 且 T ≤ Ti」反过来）。回退候选集、影子账、抬 F 的上限与
+/// F 生效值里「有效根」那一半都按它判，一处定义。
+#[must_use]
+pub fn root_is_abandoned_by_the_instance_table(
+    root: &RootRecord,
+    table: &InstanceTableRecords,
+) -> bool {
+    table
+        .rows
+        .iter()
+        .any(|row| row.instance == root.instance && root.checkpoint_txg > row.selected_root_txg)
+}
+
+/// 生效的回退下界 F（D16（发布语义） 已定项 1「生效」那一行，SysPre）：F_生效 = max(各幸存盘最新持久有效根所带 F 的最大值,
+/// 系统配置里读得出的 F 的最大值)。
+///
+/// - 根那一半：根环里自证过的根，按根环落点公式归到它那块盘（区域归属表），每块盘取按实例表判仍然有效（[`root_is_abandoned_by_the_instance_table`]
+///   判不是被抛弃的）的根里 (txg, 实例代号) 最大的那一条，取它带的 F；各盘取最大。判有效用的实例表是根环里 (txg, 实例代号) 最大那条根指着的
+///   那一张（恢复择的就是它，`choose_root`）；那张表读不出、解不开时不按表滤，每块盘取读得出的根里最新的那条。
+///   被抛弃时间线上的根带的 F 算不算进 F_生效，D16（发布语义） 已定项 1「「生效」取 SysPre」那一段写着仍开着；这里照「有效根」的字面，不算。
+/// - 系统配置那一半：池里每块盘两槽里全部自证过（整槽校验和过且 fsid 与本池相同，与取号同一读法，D18（块里携带什么信息） 已定项 11）
+///   的槽带的 F 的最大值。
+///
+/// 两处一条都读不出时 0（mkfs 写的就是 0）。
 #[must_use]
 pub fn effective_rollback_floor<Reader: PoolReader + ?Sized>(
     reader: &Reader,
@@ -859,30 +1023,60 @@ pub fn effective_rollback_floor<Reader: PoolReader + ?Sized>(
     immutable_sizes: &SystemImmutableSizes,
     filesystem_identifier: &[u8; 16],
 ) -> CheckpointTxg {
-    let mut highest_per_device: BTreeMap<DeviceIdentity, CheckpointTxg> = BTreeMap::new();
-    for root in readable_roots(
+    let roots_with_ring_slots = readable_roots_with_ring_slots(
         reader,
         region_devices,
         immutable_sizes,
         filesystem_identifier,
-    ) {
-        let device = region_devices[usize::try_from(
-            target_for_publish(
-                root.checkpoint_txg,
-                immutable_sizes.root_ring_slots_per_region,
-            )
-            .region,
-        )
-        .expect("区域号")];
-        let highest = highest_per_device
+    );
+    let newest_roots_table = roots_with_ring_slots
+        .iter()
+        .map(|(_, root)| root)
+        .max_by_key(|root| (root.checkpoint_txg, root.instance))
+        .and_then(|newest| instance_table_chain_of_root(reader, newest).ok())
+        .map(|chain| chain.records);
+    let mut newest_valid_root_on_each_device: BTreeMap<DeviceIdentity, RootRecord> =
+        BTreeMap::new();
+    for (ring_slot, root) in &roots_with_ring_slots {
+        if newest_roots_table
+            .as_ref()
+            .is_some_and(|table| root_is_abandoned_by_the_instance_table(root, table))
+        {
+            continue;
+        }
+        let device = region_devices[usize::try_from(ring_slot.region).expect("区域号")];
+        let newest_on_this_device = newest_valid_root_on_each_device
             .entry(device)
-            .or_insert(root.rollback_floor);
-        *highest = (*highest).max(root.rollback_floor);
+            .or_insert(*root);
+        if (root.checkpoint_txg, root.instance)
+            > (
+                newest_on_this_device.checkpoint_txg,
+                newest_on_this_device.instance,
+            )
+        {
+            *newest_on_this_device = *root;
+        }
     }
-    highest_per_device
+    let highest_on_the_roots = newest_valid_root_on_each_device
         .values()
-        .copied()
-        .min()
+        .map(|root| root.rollback_floor)
+        .max();
+    let slot_spacing_in_bytes = u64::from(immutable_sizes.fixed_structure_slot_spacing);
+    let highest_in_the_system_configurations = reader
+        .device_identities()
+        .into_iter()
+        .flat_map(|device| {
+            verified_system_configuration_slots(
+                reader,
+                device,
+                slot_spacing_in_bytes,
+                filesystem_identifier,
+            )
+        })
+        .map(|system_configuration| system_configuration.quantities.rollback_floor)
+        .max();
+    highest_on_the_roots
+        .max(highest_in_the_system_configurations)
         .unwrap_or(CheckpointTxg(0))
 }
 
@@ -942,7 +1136,8 @@ fn allocation_records_fit_the_pool_geometry(
 /// 回退的次数这里不交出去：调用方（影子账、重建分配器）今天没有接多跳观测点的口子。
 ///
 /// # Errors
-/// 树表读不到、解不开；分配记录树根提示读不出且映射里没有它（`MappingMiss`）、映射落点也读不出（`MappingStillUnreadable`）、
+/// 树表读不到、解不开，同一种树有两条（[`TREE_TABLE_CARRIES_ONE_KIND_OF_TREE_TWICE`]）；
+/// 分配记录树根提示读不出且映射里没有它（`MappingMiss`）、映射落点也读不出（`MappingStillUnreadable`）、
 /// 映射树根读不出或解不开、分配记录树根解不开；条目宽或结构值判红（见 [`allocation_records_of_node`]）。
 pub fn allocation_records_under_root(
     reader: &dyn PoolReader,
@@ -954,16 +1149,11 @@ pub fn allocation_records_under_root(
         parse_index_node(&tree_table_bytes).map_err(|_error| RecoveryFailure::UnitMalformed {
             what: "树表单元",
         })?;
-    let mut allocation_entry = None;
-    for bytes in &tree_table.entries {
-        let entry = TreeTableEntry::parse(bytes).ok_or(RecoveryFailure::UnitMalformed {
-            what: "树表条目",
-        })?;
-        if entry.kind == TREE_KIND_ALLOCATION {
-            allocation_entry = Some(entry);
-        }
-    }
-    let Some(allocation_entry) = allocation_entry else {
+    let tree_table_entries = tree_table_entries_each_kind_at_most_once(&tree_table.entries)?;
+    let Some(allocation_entry) = tree_table_entries
+        .iter()
+        .find(|entry| entry.kind == TREE_KIND_ALLOCATION)
+    else {
         return Ok(Vec::new());
     };
     let central_mapping_root = CentralMappingTreeWithBytesReadOnFirstUse::new(reader, root);
@@ -1155,15 +1345,52 @@ pub fn tree_table_entry_count<Reader: PoolReader + ?Sized>(
     Ok(tree_table.entries.len())
 }
 
-/// 所选根的实例在它自己指着的实例表里有回退行时，回退行的 W（D23（journal 的角色与格式） 已定项 14 前缀第五条：
-/// 该实例的记录只施加到 W 为止）；没有回退行、实例表读不出或解不开都是 `None`。
-#[must_use]
-pub fn rollback_high_water_of_root(reader: &dyn PoolReader, root: &RootRecord) -> Option<u64> {
-    instance_table_of_root(reader, root)?
-        .rows
-        .iter()
-        .find(|row| row.instance == root.instance && row.is_rollback)
-        .map(|row| row.applied_transaction_high_water)
+/// 树表里同一种树出现两条时，读树表的每一处都报 [`RecoveryFailure::UnitMalformed`]，`what` 取这一句。
+pub const TREE_TABLE_CARRIES_ONE_KIND_OF_TREE_TWICE: &str = "树表里同一种树有两条";
+
+/// 树表的条目读不下去是哪一种（[`tree_table_entries_each_kind_at_most_once`] 交回）。封闭集合，`match` 不写通配臂。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum TreeTableEntriesRefusal {
+    /// 一条条目解不开（条目长度、flags 未知位、预留 76 非零，`TreeTableEntry::parse`）。
+    EntryMalformed,
+    /// 同一种树有两条。
+    OneKindOfTreeAppearsTwice,
+}
+
+impl From<TreeTableEntriesRefusal> for RecoveryFailure {
+    fn from(refusal: TreeTableEntriesRefusal) -> Self {
+        match refusal {
+            TreeTableEntriesRefusal::EntryMalformed => RecoveryFailure::UnitMalformed {
+                what: "树表条目",
+            },
+            TreeTableEntriesRefusal::OneKindOfTreeAppearsTwice => RecoveryFailure::UnitMalformed {
+                what: TREE_TABLE_CARRIES_ONE_KIND_OF_TREE_TWICE,
+            },
+        }
+    }
+}
+
+/// 树表单元的条目逐条解开，并判每一种树至多一条（审阅第 27 条）。写者每种树只写一条；同一种出现两条时取哪一条条款没有写，
+/// 取首条、取末条、取首条非空各有一个读者照着读过，同一张树表在几处读出不同的树 ⇒ 判损坏，一条都不取。
+/// 读树表取条目的每一处都经这一处：[`rebuild_version`]、[`allocation_records_under_root`]、[`walk_to_file`]、
+/// [`user_visible_tree_root_pointers`]、`mounted_read::open_pool_for_read`。
+///
+/// # Errors
+/// 按条目次序第一处读不下去的：解不开 ⇒ `EntryMalformed`；它的种类前面已经有一条 ⇒ `OneKindOfTreeAppearsTwice`。
+pub(crate) fn tree_table_entries_each_kind_at_most_once(
+    entry_bytes_of_the_tree_table: &[Vec<u8>],
+) -> Result<Vec<TreeTableEntry>, TreeTableEntriesRefusal> {
+    let mut kinds_seen: BTreeSet<u16> = BTreeSet::new();
+    let mut entries = Vec::with_capacity(entry_bytes_of_the_tree_table.len());
+    for entry_bytes in entry_bytes_of_the_tree_table {
+        let entry =
+            TreeTableEntry::parse(entry_bytes).ok_or(TreeTableEntriesRefusal::EntryMalformed)?;
+        if !kinds_seen.insert(entry.kind) {
+            return Err(TreeTableEntriesRefusal::OneKindOfTreeAppearsTwice);
+        }
+        entries.push(entry);
+    }
+    Ok(entries)
 }
 
 /// 从盘上按所选根重建出来的上一版。
@@ -1201,7 +1428,8 @@ impl From<RecoveryFailure> for RebuildVersionFailure {
 /// 提示与映射都读不出的**数据单元**不算失败：照抄它的位置项、不读内容，那一项的字节是空的（D19 已定项 5，用户 2026-09-24 定 N2）。
 ///
 /// # Errors
-/// 树表不是 0 条而 `record_standing_for_root` 是 `None` ⇒ `NoRecordStandingForFileVersion`；实例表、树表、映射树根读不到，
+/// 树表不是 0 条而 `record_standing_for_root` 是 `None` ⇒ `NoRecordStandingForFileVersion`；树表里同一种树有两条
+/// （[`TREE_TABLE_CARRIES_ONE_KIND_OF_TREE_TWICE`]）；实例表、树表、映射树根读不到，
 /// 树根或 inode 叶容器提示读不出且经映射也读不回（`MappingMiss` / `MappingStillUnreadable`），单元解不开 ⇒ 走读同款的错；
 /// 记账行里没有 inode 号水位那一行 ⇒ `InodeNumberWatermarkRowMissingFromTheAccountingTree`。
 pub fn rebuild_version(
@@ -1224,14 +1452,8 @@ pub fn rebuild_version(
     let record =
         record_standing_for_root.ok_or(RebuildVersionFailure::NoRecordStandingForFileVersion)?;
     let record_bytes = record.to_bytes();
-    let mut tree_table_entries = Vec::with_capacity(tree_table.entries.len());
-    for bytes in &tree_table.entries {
-        tree_table_entries.push(TreeTableEntry::parse(bytes).ok_or(
-            RecoveryFailure::UnitMalformed {
-                what: "树表条目"
-            },
-        )?);
-    }
+    let tree_table_entries = tree_table_entries_each_kind_at_most_once(&tree_table.entries)
+        .map_err(RecoveryFailure::from)?;
     let pointer_of = |kind: u16| {
         tree_table_entries
             .iter()
@@ -1653,7 +1875,7 @@ impl UserVisibleTreeRootPointers {
 /// 读一条根的树表，取 inode 树与 extent 树的根指针盘上字节。
 ///
 /// # Errors
-/// 树表单元读不到、解不开；树表条目解不开、种类没登记，或同一种树出现两条。
+/// 树表单元读不到、解不开；树表条目解不开、同一种树出现两条（[`TREE_TABLE_CARRIES_ONE_KIND_OF_TREE_TWICE`]，先于下一条判），或种类没登记。
 pub fn user_visible_tree_root_pointers(
     reader: &dyn PoolReader,
     root: &RootRecord,
@@ -1664,11 +1886,10 @@ pub fn user_visible_tree_root_pointers(
         parse_index_node(&tree_table_bytes).map_err(|_error| RecoveryFailure::UnitMalformed {
             what: "树表单元",
         })?;
+    let tree_table_entries = tree_table_entries_each_kind_at_most_once(&tree_table.entries)?;
     let mut pointers = UserVisibleTreeRootPointers::ABSENT;
-    for entry_bytes in &tree_table.entries {
-        let entry = TreeTableEntry::parse(entry_bytes).ok_or(RecoveryFailure::UnitMalformed {
-            what: "树表条目",
-        })?;
+    // 两串逐条对应：`tree_table_entries` 是 `tree_table.entries` 按次序逐条解出来的，条数相同。
+    for (entry, entry_bytes) in tree_table_entries.iter().zip(&tree_table.entries) {
         let slot_for_this_tree = match entry.kind {
             TREE_KIND_INODE => &mut pointers.inode_tree,
             TREE_KIND_EXTENT => &mut pointers.extent_tree,
@@ -1683,14 +1904,8 @@ pub fn user_visible_tree_root_pointers(
                 })
             }
         };
-        if slot_for_this_tree
-            .replace(TreeTableEntry::root_pointer_bytes(entry_bytes).to_vec())
-            .is_some()
-        {
-            return Err(RecoveryFailure::UnitMalformed {
-                what: "树表里同一种树有两条",
-            });
-        }
+        // 同一种树至多一条，上面判过：这一格在这一趟里只填一次。
+        *slot_for_this_tree = Some(TreeTableEntry::root_pointer_bytes(entry_bytes).to_vec());
     }
     Ok(pointers)
 }
@@ -1775,7 +1990,7 @@ pub fn scan_journal(
     records
 }
 
-/// 一条记录是不是它那次发布的末条：记录标志位 0（D23（journal 的角色与格式） 已定项 14 第六条「发布边界按记录标志位 0 认」、
+/// 一条记录是不是它那次发布的末条：记录标志位 0（D23（journal 的角色与格式） 已定项 14 第五条「发布边界按记录标志位 0 认」、
 /// 已定项 17：只有真正的最后一条带「本次发布末条」标志，每次只有一条记录的发布——含空发布记录——那一条也带）。
 fn record_ends_its_publish(record: &JournalRecord) -> bool {
     match record.place_in_publish {
@@ -1786,7 +2001,7 @@ fn record_ends_its_publish(record: &JournalRecord) -> bool {
 
 /// 同一 (实例代号, checkpoint_txg) 里 `record` 之后（计数器更大）还有没有读得出的记录。同一实例里计数器与 checkpoint_txg 一起往上走，
 /// 所以从下一个计数器起按计数器升序看到 txg 越过这一条的就停。
-fn a_readable_record_of_the_same_publish_follows(
+fn readable_record_of_the_same_publish_follows(
     record: &JournalRecord,
     records: &BTreeMap<(InstanceGeneration, u64), JournalRecord>,
 ) -> bool {
@@ -1834,30 +2049,81 @@ fn counter_of_the_last_record_the_root_covers(
     Ok(counters_carrying_the_last_record_flag.first().copied())
 }
 
+/// 一条记录的反向链对不对得上本实例内逻辑前一条（I-8.6（反向链算法））。封闭集合，`match` 不写通配臂。
+enum BackChainJudgement {
+    /// 前一条在盘上，它的头算出来的链值等于这一条的反向链。
+    Holds,
+    /// 前一条在盘上，链值不等：这一条不进重放前缀（I-8.6「不等的记录不进重放前缀」）。
+    Broken,
+    /// 本实例内逻辑前一条不在盘上（扫环时没读到，或重读那一槽时每一份都解不出它）：判不了，不拿它断前缀。
+    PreviousRecordNotOnDisk,
+}
+
+/// 判一条记录的反向链（I-8.6（反向链算法）；D23（journal 的角色与格式） 已定项 8 / 已定项 10 / 已定项 19 ②）：
+/// 本实例内逻辑前一条 = 同一实例、计数器小 1 的那一条；链值 = CRC-32C(它在盘上那一份的 311 字节头，`header_csum` 按 0 参与)。
+/// 按盘上的原样字节算、不按解出来的字段重写（重写会把头里读者不看的字节抹成 0），与池级 checker 判 I-8.6 同一个输入；
+/// 取的是 [`PoolReader::device_identities`] 次序里第一份解得出、且与扫环时收下的那一条相同的镜像——扫环按同一次序收记录。
+/// 前一条不在盘上不判：链是按实例的，跨实例边界本来不比，前缀里的记录都接在所选根覆盖的那一条之后，
+/// 读不出那一条时链首另有「本次发布内序号为 1」一关（D23（journal 的角色与格式） 已定项 14 注 1）。
+fn judge_back_chain_against_the_previous_record_on_disk(
+    reader: &dyn PoolReader,
+    record: &JournalRecord,
+    ring_bytes: u64,
+    records: &BTreeMap<(InstanceGeneration, u64), JournalRecord>,
+) -> BackChainJudgement {
+    let Some(previous_counter) = record
+        .counter
+        .checked_sub(1)
+        .filter(|previous_counter| *previous_counter >= FIRST_JOURNAL_COUNTER)
+    else {
+        return BackChainJudgement::PreviousRecordNotOnDisk;
+    };
+    let Some(previous) = records.get(&(record.instance, previous_counter)) else {
+        return BackChainJudgement::PreviousRecordNotOnDisk;
+    };
+    let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
+    let offset = record_offset(previous_counter, ring_bytes);
+    // 迭代次数的上界是池里的盘数；第一份解得出、与扫到的那一条相同的镜像就是出口。
+    for device in reader.device_identities() {
+        let Some(bytes) = reader.read(device, offset, record_bytes) else {
+            continue;
+        };
+        if JournalRecord::parse(&bytes, previous.filesystem_identifier).as_ref() == Some(previous) {
+            return if back_chain_of(&bytes) == record.back_chain {
+                BackChainJudgement::Holds
+            } else {
+                BackChainJudgement::Broken
+            };
+        }
+    }
+    BackChainJudgement::PreviousRecordNotOnDisk
+}
+
+/// 所选根的 checkpoint_txg 是 u64 的最大值时 [`replay_journal`] 报 [`RecoveryFailure::UnitMalformed`]，`what` 取这一句。
+pub const CHOSEN_ROOT_CHECKPOINT_TXG_HAS_NO_SUCCESSOR: &str =
+    "所选根的 checkpoint_txg 是 u64 的最大值：接在它后面的那次发布取不到 txg";
+
 /// 取前缀并施加（D23（journal 的角色与格式） 已定项 14 / 已定项 15）；返回扫描报告与施加之后的根。
 ///
 /// 链首锚在所选根覆盖的最后一条：所选根那次发布里带「本次发布末条」标志的那一条（已定项 14 注 1，读法乙，
 /// [`counter_of_the_last_record_the_root_covers`]）。
-/// 施加的单位是一次发布（第六条）：前五条判出来的前缀里，一次发布的记录要一直走到带末条标志的那一条（[`record_ends_its_publish`]）
-/// 才整体施加；前缀停在一次发布中间（末条没到、断号、校验不过、回退行的 W 截在中间、下一条换了 txg、一次发布之内跳号、
+/// 施加的单位是一次发布（第五条）：前四条判出来的前缀里，一次发布的记录要一直走到带末条标志的那一条（[`record_ends_its_publish`]）
+/// 才整体施加；前缀停在一次发布中间（末条没到、断号、校验不过、下一条换了 txg、一次发布之内跳号、
 /// 一个事务的提交标记没出现）⇒ 那次发布整体不施加。读者规则另外两格（D23（journal 的角色与格式） 已定项 4）同样断链、那次发布不施加：
 /// 一次发布的首条序号不是 1（断在这一条）；带末条标志的那一条之后同一 (实例代号, checkpoint_txg) 里还有读得出的记录（断在带标志的那一条）。
 ///
 /// # Errors
 /// 所选根那次发布读得出的记录里带末条标志的多于一条（锚点认哪一条条款没写）⇒
-/// `RootPublishCarriesMoreThanOneLastRecordFlagWhoseAnchorIsUndecided`，一条记录都没施加。
+/// `RootPublishCarriesMoreThanOneLastRecordFlagWhoseAnchorIsUndecided`，一条记录都没施加；
+/// 所选根的 checkpoint_txg 是 u64 的最大值（接在它后面的发布没有 txg 可取）⇒ `UnitMalformed`
+/// （[`CHOSEN_ROOT_CHECKPOINT_TXG_HAS_NO_SUCCESSOR`]），一条记录都没施加。
 pub fn replay_journal(
     reader: &dyn PoolReader,
     root: &RootRecord,
     ring_bytes: u64,
     records: &BTreeMap<(InstanceGeneration, u64), JournalRecord>,
     verify_named_units: bool,
-    rollback_high_water: Option<u64>,
 ) -> Result<(JournalScanReport, RootRecord), RecoveryFailure> {
-    // 被回退见证表抛弃的记录不施加（D23（journal 的角色与格式） 已定项 14「回退见证」随实现：见证表同时管择根与重放；
-    // 前缀第五条读见证的这一读法交代码三方）。见证表住系统配置槽里，读不出就是系统配置读不出，恢复报错、不按空表施加。
-    let system_configuration = choose_system_configuration(reader)?;
-    let rollback_witness = rollback_witness_of_the_pool(reader, &system_configuration);
     let mut report = JournalScanReport {
         valid_records: records.len(),
         above_water: 0,
@@ -1891,8 +2157,17 @@ pub fn replay_journal(
     let root_own_record_counter = counter_of_the_last_record_the_root_covers(root, records)?;
     let mut expected_next: Option<(InstanceGeneration, u64)> =
         root_own_record_counter.map(|counter| (root.instance, counter + 1));
-    let chain_start_txg_without_anchor = CheckpointTxg(root.checkpoint_txg.0 + 1);
-    // 这次发布已经过了前五条、还没走到末条的记录（第六条：末条到了才整体施加）。
+    // 所选根的 checkpoint_txg 是盘上读来的 8 字节，可以是 u64 的最大值而自证校验和照样对得上：加一溢出报损坏、不 panic
+    // （审阅第 36 条）。在循环之前算：txg 最大值的根后面接不上任何一次发布，锚点读不读得出都一样。
+    let chain_start_txg_without_anchor = root
+        .checkpoint_txg
+        .0
+        .checked_add(1)
+        .map(CheckpointTxg)
+        .ok_or(RecoveryFailure::UnitMalformed {
+            what: CHOSEN_ROOT_CHECKPOINT_TXG_HAS_NO_SUCCESSOR,
+        })?;
+    // 这次发布已经过了前四条、还没走到末条的记录（第五条：末条到了才整体施加）。
     let mut records_of_the_open_publish: Vec<&JournalRecord> = Vec::new();
     for record in above.into_iter().take(in_flight_limit) {
         if let Some(expected_key) = expected_next {
@@ -1904,11 +2179,13 @@ pub fn replay_journal(
         {
             break;
         }
-        // 被回退见证表抛弃的记录（所选根那个实例里 txg 越过回退目标的那一段）：它之后同一实例的记录只会更靠后，断在这里。
-        // 所选根被见证表抛弃的不会被择中（`choose_root`），所以这一判拦的是「所选根是 R_old 或更早、它之后的被抛弃记录还在环里」
-        // 那一格（C332（回退实例两个根都读不出时回退被撤销） 里落到 R_old 的那一支）。
-        if rollback_witness.abandons(record.instance, record.checkpoint_txg) {
-            break;
+        // 反向链（D23（journal 的角色与格式） 已定项 7「jsn 严格连续 + 校验和 + 反向链」；I-8.6（反向链算法））：
+        // 校验和自洽、jsn 恰好接得上而链值不等的记录（上一条时间线的残留、改过的镜像）断在这一条，它所在的这次发布整体不施加。
+        match judge_back_chain_against_the_previous_record_on_disk(
+            reader, record, ring_bytes, records,
+        ) {
+            BackChainJudgement::Holds | BackChainJudgement::PreviousRecordNotOnDisk => {}
+            BackChainJudgement::Broken => break,
         }
         // 一次发布的第一条序号是 1（D23（journal 的角色与格式） 已定项 4 读者规则：锚点读得出时，下一次发布的首条序号不是 1，
         // 当那条记录损坏、断在这一条，那次发布整体不施加；C539（锚点读得出时下一次发布的首条序号不是 1））。锚点读不出那一支上面已经判过；
@@ -1917,13 +2194,6 @@ pub fn replay_journal(
             && record.ordinal_within_publish != JournalRecordOrdinalWithinPublish::FIRST
         {
             break;
-        }
-        // 前缀第五条：所选根的实例有回退行时只施加到回退行的 W 为止——W = 0 就是「之后的一个都不算」，
-        // 空发布（事务号 0）也不许把根推过 T_old。
-        if let Some(high_water) = rollback_high_water {
-            if high_water == 0 || record.transaction > high_water {
-                break;
-            }
         }
         if let Some(previous_record_of_the_open_publish) = records_of_the_open_publish.last() {
             // 一次发布的记录共享一个 checkpoint_txg（D16（发布语义） 已定项 6）：末条还没到、下一条已经换了 txg
@@ -1941,7 +2211,7 @@ pub fn replay_journal(
             // 提交标记（D23（journal 的角色与格式） 已定项 7）：一个事务可以跨多条记录，只有它的最后一条带提交标记
             // （最后一个事务装不下一条记录时末条再跨记录，已定项 17）。上一条没带提交标记而这一条换了事务号 ⇒
             // 那个事务的提交标记没出现，它被丢掉（已定项 7「丢掉提交标记还没出现的那个事务的全部记录」），
-            // 它所在的这次发布因此不完整、整体不施加（第六条）。
+            // 它所在的这次发布因此不完整、整体不施加（第五条）。
             if !previous_record_of_the_open_publish.is_commit
                 && record.transaction != previous_record_of_the_open_publish.transaction
             {
@@ -1959,7 +2229,7 @@ pub fn replay_journal(
         // 合法历史里一次发布只有真正的最后一条带标志（已定项 17），失败的那次原样重发（已定项 14「这一版的失败处置」），走到这里要一条记录坏了而
         // 校验和恰好仍对得上，或者镜像是改出来的。
         if record_ends_its_publish(record)
-            && a_readable_record_of_the_same_publish_follows(record, records)
+            && readable_record_of_the_same_publish_follows(record, records)
         {
             break;
         }
@@ -1989,7 +2259,7 @@ pub fn replay_journal(
             report.verification_passed += 1;
         }
         records_of_the_open_publish.push(record);
-        // 第六条：末条没到就接着往下走，这次发布先不施加。
+        // 第五条：末条没到就接着往下走，这次发布先不施加。
         if !record_ends_its_publish(record) {
             continue;
         }
@@ -2002,6 +2272,10 @@ pub fn replay_journal(
         // 每条记录都带整次发布的新根段（已定项 15），施加末条那一份。
         rebuilt = RootRecord {
             filesystem_identifier: rebuilt.filesystem_identifier,
+            // 新根段（D23（journal 的角色与格式） 已定项 15）里没有 flags：由记录施加出来的这一版没有一条根槽写过它，
+            // 不是卸载那一串写下的根（D22（单元原子性怎么合成） 已定项 7「其余根写 0」）。它只当下一次发布接在后面的那一版，
+            // 发布照自己的计划写记号、不照抄这一项。
+            unmount_marker: UnmountMarker::NotWrittenByTheUnmountSequence,
             instance: record.instance,
             checkpoint_txg: record.checkpoint_txg,
             tree_table: record.new_tree_table,
@@ -2371,14 +2645,8 @@ pub fn walk_to_file(
     if tree_table.entries.is_empty() {
         return Ok(None);
     }
-    let mut entries = Vec::with_capacity(tree_table.entries.len());
-    for bytes in &tree_table.entries {
-        entries.push(
-            TreeTableEntry::parse(bytes).ok_or(RecoveryFailure::UnitMalformed {
-                what: "树表条目",
-            })?,
-        );
-    }
+    // 同一种树至多一条（审阅第 27 条）：下面按种类各读一棵，不会有第二条把前一条覆盖掉。
+    let entries = tree_table_entries_each_kind_at_most_once(&tree_table.entries)?;
     let central_mapping_tree = CentralMappingTreeReadOnFirstUse {
         reader,
         root,
@@ -2760,12 +3028,11 @@ pub fn recover(reader: &dyn PoolReader, policy: JournalPolicy) -> RecoveryReport
                 system_configuration.immutable.sizes.journal_ring_bytes,
                 &records,
                 policy == JournalPolicy::Consult,
-                rollback_high_water_of_root(reader, &root),
             )
         }
         JournalPolicy::Ignore => Ok((JournalScanReport::default(), root)),
     };
-    // 恢复在施加任何一条记录之前停下（锚点认哪一条条款没写）：没有「实际走的那条根」可报。
+    // 恢复在施加任何一条记录之前停下（锚点认哪一条条款没写、所选根的 txg 加一溢出）：没有「实际走的那条根」可报。
     let (journal, effective_root) = match replayed {
         Ok(replayed) => replayed,
         Err(failure) => {
@@ -2998,7 +3265,7 @@ mod allocation_record_pool_geometry_tests {
     }
 
     #[test]
-    fn a_record_on_a_device_outside_the_pool_is_refused() {
+    fn record_on_the_device_outside_the_pool_is_refused() {
         assert_eq!(
             judge(&[record(7, UNIT_AREA_START_SLOT, 2)]),
             outside_the_geometry("分配记录的设备身份不在池里"),
@@ -3007,7 +3274,7 @@ mod allocation_record_pool_geometry_tests {
     }
 
     #[test]
-    fn a_record_whose_slot_is_below_the_unit_area_is_refused() {
+    fn record_whose_slot_is_below_the_unit_area_is_refused() {
         assert_eq!(
             judge(&[record(0, UNIT_AREA_START_SLOT - 1, 2)]),
             outside_the_geometry("分配记录的槽号落在单元区起点之下"),
@@ -3016,7 +3283,7 @@ mod allocation_record_pool_geometry_tests {
     }
 
     #[test]
-    fn a_record_whose_span_runs_past_the_end_of_the_unit_area_is_refused() {
+    fn record_whose_span_runs_past_the_end_of_the_unit_area_is_refused() {
         assert_eq!(
             judge(&[record(0, UNIT_AREA_END_SLOT - 1, 2)]),
             outside_the_geometry("分配记录的跨度越过单元区末尾"),

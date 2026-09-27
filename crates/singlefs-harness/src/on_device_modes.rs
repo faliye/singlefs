@@ -10,7 +10,8 @@ use singlefs_core::allocator::{DeviceFreeMap, PoolAllocator};
 use singlefs_core::block_device::BlockDevice;
 use singlefs_core::make_filesystem::MakeFilesystemParameters;
 use singlefs_core::mount::{
-    raise_rollback_floor, rollback_floor_ceiling, MountError, RaisedFloor, ShadowLedger,
+    raise_rollback_floor, ring_slots_known_to_hold_a_root_by, rollback_floor_ceiling, MountError,
+    RaisedFloor, ShadowLedger,
 };
 use singlefs_core::recovery::{choose_system_configuration, instance_table_chain_of_root};
 use singlefs_core::transaction::{
@@ -276,6 +277,7 @@ pub fn raise_the_rollback_floor_to_its_ceiling<Device: BlockDevice>(
         &system_configuration,
         current_version.root.rollback_floor,
         &instance_table,
+        &ring_slots_known_to_hold_a_root_by(allocator),
     )?;
     raise_rollback_floor(
         parameters,

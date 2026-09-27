@@ -8,7 +8,9 @@ use singlefs_format::{
     WIDE_CHECKSUM_BYTES,
 };
 
-use crate::address::{CheckpointTxg, DeviceOffsetInBytes, InstanceGeneration, TreeIdentifier};
+use crate::address::{
+    CheckpointTxg, DeviceOffsetInBytes, InstanceGeneration, SlotNumber, TreeIdentifier,
+};
 use crate::bytes::{ByteReader, ByteWriter};
 use crate::checksum::{
     crc32_castagnoli, wide_checksum_field_holds, wide_checksum_with_field_zeroed,
@@ -76,14 +78,13 @@ impl JournalRecordOrdinalWithinPublish {
     /// 一次发布里从 0 数第 `record_offset_in_this_publish` 条记录的序号：偏移 + 1。
     ///
     /// # Panics
-    /// 偏移 + 1 装不进 32 位：一次发布的记录条数 = 数据单元数（C310（事务切分纪律与记录数口径打架） 2026-09-16 用户定案），
-    /// 写者在任何落盘动作之前按一片 extent 叶的容量拒掉装不下的写，条数远在 2³² 之下。
+    /// 偏移 + 1 装不进 32 位：各条发布路径在任何落盘动作之前按上限拒掉切出来的记录多于上限的发布
+    /// （`transaction::journal_record_limit_of_one_publish`：在飞记录数上限与 2³² − 1 取小，代码审阅第 26 条），偏移 + 1 不超过它。
     #[must_use]
     pub fn of_record_at_offset(record_offset_in_this_publish: usize) -> Self {
-        Self(
-            u32::try_from(record_offset_in_this_publish + 1)
-                .expect("一次发布的记录条数在落盘之前按 extent 叶容量截过，序号装得进 32 位"),
-        )
+        Self(u32::try_from(record_offset_in_this_publish + 1).expect(
+            "一次发布切出来的记录条数在落盘之前按 transaction::journal_record_limit_of_one_publish（≤ 2³² − 1）拒过，序号装得进 32 位",
+        ))
     }
 }
 
@@ -173,13 +174,30 @@ pub fn back_chain_of(previous_record_bytes: &[u8]) -> u32 {
     crc32_castagnoli(&header)
 }
 
+/// jsn 计数器从 1 起、全池接着走（D23（journal 的角色与格式） 已定项 9 / 已定项 19）：计数器 0 没有记录。
+pub const FIRST_JOURNAL_COUNTER: u64 = 1;
+
+/// journal 环末尾的下一个 16 KiB 槽：环从 [`JOURNAL_RING_START_SLOT`] 起、长 `journal_ring_bytes`，末尾不落在槽边界上时取下一个整槽
+/// （D3（空间分配） 已定项 10 ④「单元区起始槽号……第一版 = journal 环末尾的下一个槽」；D23（journal 的角色与格式） 已定项 19 ③
+/// 「单元区起始槽号随环长走，默认环下是 784 MiB（槽 50176）」）。单元区起点由环长算只有这一处（`allocator::UnitAreaStart`）。
+/// 环长是盘上读来的 8 字节时也不溢出：槽数 ≤ 2⁶⁴ ÷ 16384，加 1024 装得下。
+#[must_use]
+pub fn slot_after_the_journal_ring(journal_ring_bytes: u64) -> SlotNumber {
+    SlotNumber(JOURNAL_RING_START_SLOT + journal_ring_bytes.div_ceil(SLOT_BYTES))
+}
+
 /// 记录 n 落在环内偏移 `(计数器 − 1) mod 槽数 × 4096`（D23（journal 的角色与格式） 已定项 18）。
+///
+/// # Panics
+/// 环短于一条记录（环槽数 0）：mkfs 拒这种环长（`make_filesystem` 的 `JournalRingShorterThanOneRecord`）；
+/// 发布写记录那一步拿的环长是 `PoolWriter` 的参数，与 mkfs 判过、写进系统配置的是同一个值。
 #[must_use]
 pub fn record_offset(counter: u64, ring_bytes: u64) -> DeviceOffsetInBytes {
     let ring_slots = ring_bytes / JOURNAL_RECORD_BYTES;
-    DeviceOffsetInBytes(
-        JOURNAL_RING_START_SLOT * SLOT_BYTES + ((counter - 1) % ring_slots) * JOURNAL_RECORD_BYTES,
-    )
+    let slot_in_ring = (counter - 1).checked_rem(ring_slots).expect(
+        "环至少装得下一条记录：mkfs 的 check_geometry 拒短于一条记录的环（JournalRingShorterThanOneRecord）",
+    );
+    DeviceOffsetInBytes(JOURNAL_RING_START_SLOT * SLOT_BYTES + slot_in_ring * JOURNAL_RECORD_BYTES)
 }
 
 impl JournalRecord {
@@ -439,7 +457,7 @@ mod tests {
     /// 记录标志位 0 之外有位为 1 的记录，读者当损坏（D23（journal 的角色与格式） 已定项 4「其余位写 0，读到非 0 当损坏」）：
     /// 位 0 本身是不是 1 都一样拒。头部校验和按改过的字节重封过，拦住它的只有记录标志那一判。
     #[test]
-    fn a_record_whose_flags_byte_sets_any_bit_other_than_bit_zero_is_refused_by_the_parser() {
+    fn record_whose_flags_byte_sets_any_bit_other_than_bit_zero_is_refused_by_the_parser() {
         for record_flags_byte in [0b0000_0010u8, 0b0000_0011, 0b1000_0001, 0xff] {
             let mut bytes = empty_record(4).to_bytes();
             bytes[7] = record_flags_byte;
@@ -455,7 +473,7 @@ mod tests {
     /// 本次发布内序号为 0 的记录，读者当损坏（D23（journal 的角色与格式） 已定项 4：序号从 1 起，读到 0 当那条记录损坏、断链即止）。
     /// 头部校验和按改过的字节重封过，拦住它的只有序号那一判。
     #[test]
-    fn a_record_whose_ordinal_within_publish_is_zero_is_refused_by_the_parser() {
+    fn record_whose_ordinal_within_publish_is_zero_is_refused_by_the_parser() {
         let mut bytes = empty_record(5).to_bytes();
         bytes[87..91].copy_from_slice(&0u32.to_le_bytes());
         reseal_header_checksum(&mut bytes);
@@ -468,7 +486,7 @@ mod tests {
 
     /// 一次发布里从 0 数第 k 条记录的序号是 k + 1：第一条是 1（D23（journal 的角色与格式） 已定项 4「从 1 起」）。
     #[test]
-    fn the_ordinal_of_the_record_at_offset_k_of_a_publish_is_k_plus_one() {
+    fn the_ordinal_of_the_record_at_each_offset_of_the_publish_is_that_offset_plus_one() {
         assert_eq!(
             JournalRecordOrdinalWithinPublish::of_record_at_offset(0),
             JournalRecordOrdinalWithinPublish::FIRST
@@ -484,8 +502,8 @@ mod tests {
     /// （点名项区越过记录末尾）读者拒收，不按自述的项数切到 4096 之外（里程碑「第二个事务」并行线一验收第 4 条第三个变异：
     /// 点名项超过 67 仍塞进一条记录 ⇒ 记录解析拒收）。头校验和按改过的字节重算过，拦住它的只有项数那一判。
     #[test]
-    fn a_record_whose_header_claims_more_named_units_than_one_record_holds_is_refused_by_the_parser(
-    ) {
+    fn record_whose_header_claims_more_named_units_than_one_record_holds_is_refused_by_the_parser()
+    {
         use singlefs_format::JOURNAL_NAMED_ENTRIES_PER_RECORD;
         let named_unit = NamedUnit {
             locations: [

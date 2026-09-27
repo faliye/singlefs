@@ -8,11 +8,12 @@
 //! 整段清零按**动作**归类、不看落点：它在块层就是另一个命令（真设备上映射成 WRITE ZEROES），
 //! 不是「写在某处」的一次写。今天唯一的清零是 mkfs 清 journal 环。
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use singlefs_format::{JOURNAL_RING_START_SLOT, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE};
 
 use crate::{RecordedOperation, RecordedOperationKind};
+use singlefs_core::address::DeviceIdentity;
 use singlefs_core::root_ring::{region_start, ring_end, RootRingSlotsPerRegion};
 
 /// 提交步骤的封闭枚举，`match` 不写通配臂；声明序就是种类串的规范序。
@@ -86,10 +87,74 @@ impl FixedGeometry {
     }
 }
 
-/// 切段（与 E142（第一个事务的干跑） 的切法同一条规则，产物 `name=segments` 就是按它切的）：
-/// 屏障关掉它之前那一段（屏障算在被关掉的那一段里）；段里还一个写都没有时（流首那道屏障）它并进即将开始的那一段；
-/// FUA 写关掉自己所在的那一段（FUA 不替前面的普通写做持久，所以它们同段、任意子集）；
-/// 流尾只有屏障没有写的那一串并进上一段——录到的每一步都恰好落在一个段里。
+/// 录制流里一步之后，当前段关不关。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SegmentAfterOperation {
+    /// 这一步之后当前段关上（这一步算在被关上的那一段里）。
+    Closes,
+    /// 当前段还开着。
+    StaysOpen,
+}
+
+/// 切段时「当前段关不关」的判定（D13（验证路线） 已定项 4；代码审阅第 1、3 条，用户 2026-09-27 定「A 合并，按设备记屏障」）：
+/// 一次写只被它自己那块盘上之后的屏障（或它那块盘上的 FUA 写）排在之后的写前面。当前段里每块有写的盘都被自己的屏障或 FUA
+/// 放行了，这一段才关；有一块盘还没放行，这道屏障（或 FUA）不关段，前后的写同段。这样不漏可达的崩溃状态，多出不可达的
+/// （已放行那块盘的写没落、之后的写落了）；每块盘都发屏障时与把那几道并成一道池屏障切出的段逐段相同。
+/// FUA 写只放行它自己那块盘：它与那块盘上前面没被屏障隔开的写一起被放行，别的盘上的写不因它持久。
+/// 两份切段（[`split_into_segments`] 出种类、`crash::writes_and_segments_with_stream_indexes_and_entries` 出写表下标）都经它判，
+/// 规则只有这一份。
+#[derive(Clone, Debug, Default)]
+pub struct SegmentClosingRule {
+    /// 当前段里有写、还没被自己的屏障或 FUA 放行的盘。
+    devices_with_unreleased_writes: BTreeSet<DeviceIdentity>,
+    /// 当前段里的写数（整段清零算一个写）。
+    writes_in_current_segment: usize,
+}
+
+impl SegmentClosingRule {
+    /// 录制流里的下一步：记进当前段，交回这一步之后当前段关不关。关上时规则回到「新的一段、一个写都没有」。
+    /// 当前段一个写都没有时屏障不关段（流首那道屏障、刚关过段之后别的盘补发的那一道），它并进即将开始的那一段。
+    pub fn after(&mut self, operation: &RecordedOperation) -> SegmentAfterOperation {
+        match operation.kind {
+            // 清零是普通写那一档：不做持久、不放行，段里多算一个写。
+            RecordedOperationKind::Write | RecordedOperationKind::WriteZeroes => {
+                self.writes_in_current_segment += 1;
+                self.devices_with_unreleased_writes.insert(operation.device);
+                SegmentAfterOperation::StaysOpen
+            }
+            RecordedOperationKind::WriteForceUnitAccess => {
+                self.writes_in_current_segment += 1;
+                self.devices_with_unreleased_writes
+                    .remove(&operation.device);
+                self.close_once_every_device_is_released()
+            }
+            RecordedOperationKind::Barrier => {
+                self.devices_with_unreleased_writes
+                    .remove(&operation.device);
+                self.close_once_every_device_is_released()
+            }
+        }
+    }
+
+    /// 当前段里还有没有写：流尾只有屏障、没有写的那一串要并进上一段，由调用方按它判。
+    #[must_use]
+    pub fn current_segment_has_writes(&self) -> bool {
+        self.writes_in_current_segment > 0
+    }
+
+    fn close_once_every_device_is_released(&mut self) -> SegmentAfterOperation {
+        if self.writes_in_current_segment > 0 && self.devices_with_unreleased_writes.is_empty() {
+            self.writes_in_current_segment = 0;
+            SegmentAfterOperation::Closes
+        } else {
+            SegmentAfterOperation::StaysOpen
+        }
+    }
+}
+
+/// 切段（段怎么关见 [`SegmentClosingRule`]；每块盘都发屏障时与 E142（第一个事务的干跑） 的切法切出的段相同，产物 `name=segments`
+/// 就是按那一版切的）：关段的那道屏障或 FUA 写算在被关掉的那一段里；段里还一个写都没有时的屏障并进即将开始的那一段；
+/// FUA 不替它那块盘上前面的普通写做持久，所以它们同段、任意子集；流尾只有屏障没有写的那一串并进上一段——录到的每一步都恰好落在一个段里。
 #[must_use]
 pub fn split_into_segments(
     operations: &[RecordedOperation],
@@ -97,30 +162,21 @@ pub fn split_into_segments(
 ) -> Vec<Vec<StepKind>> {
     let mut segments: Vec<Vec<StepKind>> = Vec::new();
     let mut current: Vec<StepKind> = Vec::new();
-    let mut writes_in_current: usize = 0;
+    let mut closing_rule = SegmentClosingRule::default();
     for operation in operations {
         current.push(geometry.classify(operation));
-        match operation.kind {
-            RecordedOperationKind::Barrier => {
-                if writes_in_current > 0 {
-                    segments.push(std::mem::take(&mut current));
-                    writes_in_current = 0;
-                }
-            }
-            RecordedOperationKind::WriteForceUnitAccess => {
-                segments.push(std::mem::take(&mut current));
-                writes_in_current = 0;
-            }
-            // 清零是普通写那一档：不做持久、不关段，段里多算一个写。
-            RecordedOperationKind::Write | RecordedOperationKind::WriteZeroes => {
-                writes_in_current += 1;
-            }
+        match closing_rule.after(operation) {
+            SegmentAfterOperation::Closes => segments.push(std::mem::take(&mut current)),
+            SegmentAfterOperation::StaysOpen => {}
         }
     }
     if !current.is_empty() {
-        match (writes_in_current, segments.last_mut()) {
-            (0, Some(last_segment)) => last_segment.append(&mut current),
-            (_, _) => segments.push(current),
+        match (
+            closing_rule.current_segment_has_writes(),
+            segments.last_mut(),
+        ) {
+            (false, Some(last_segment)) => last_segment.append(&mut current),
+            (true, _) | (false, None) => segments.push(current),
         }
     }
     segments
@@ -234,7 +290,7 @@ mod tests {
     /// 整段清零按动作归类，不按落点：同一个落点（journal 环里）普通写是 `journal_record`、清零是 `zero_fill`；
     /// 清零是普通写那一档，不关段、段里算一个写。
     #[test]
-    fn a_zero_fill_is_its_own_kind_and_counts_as_one_plain_write_in_its_segment() {
+    fn zero_fill_is_its_own_kind_and_counts_as_one_plain_write_in_its_segment() {
         let geometry = FixedGeometry {
             fixed_structure_slot_spacing: 4096,
             journal_ring_bytes: 768 << 20,

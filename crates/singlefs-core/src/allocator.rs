@@ -11,7 +11,7 @@
 //! 全空聚簇段数逐设备——全部在分配那一刻增量维护，运行时不扫盘（`.claude/rules/fs-design.md` 第一格）。
 
 use singlefs_format::{
-    ALLOCATION_RECORD_BYTES, CLUSTER_SEGMENT_SLOTS, SLOT_BYTES, UNIT_AREA_START_SLOT,
+    ALLOCATION_RECORD_BYTES, CLUSTER_SEGMENT_SLOTS, JOURNAL_RING_DEFAULT_BYTES, SLOT_BYTES,
 };
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -19,6 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::address::{CheckpointTxg, DeviceIdentity, SlotNumber};
 use crate::admission::SpaceAdmission;
 use crate::bytes::ByteWriter;
+use crate::journal::slot_after_the_journal_ring;
 use crate::root_ring::{target_for_publish, RootRingSlot, RootRingSlotsPerRegion};
 use crate::transaction::FrozenPublish;
 
@@ -184,13 +185,67 @@ fn agreement_across_devices<Answer: Copy + PartialEq>(
     }
 }
 
+/// 一块盘的单元区从哪个 16 KiB 槽起：journal 环末尾的下一个槽，随环长走（D23（journal 的角色与格式） 已定项 19 ③
+/// 「单元区起始槽号随环长走，默认环下是 784 MiB（槽 50176）」；D3（空间分配） 已定项 10 ④「第一版 = journal 环末尾的下一个槽」；
+/// 由环长算的只有 `journal::slot_after_the_journal_ring` 一处）。
+///
+/// **不变量：起点落在聚簇段边界上**（槽号是 [`CLUSTER_SEGMENT_SLOTS`] 的整数倍），只从 [`UnitAreaStart::following_the_journal_ring`] 进来。
+/// 数据单元起点 32768 对齐（D3（空间分配） 已定项 10 ③：偶数槽）与聚簇段「64 槽对齐」（已定项 10 ①）说的都是设备内的槽号，
+/// 而分配器从起点起按 2 槽、64 槽步进；起点在段边界上时两种对齐才都成立。起点不在段边界上时聚簇段按槽号对齐还是按单元区对齐、
+/// 起点到下一个段边界那几槽算不算一段（「全空聚簇段数」那一行记账跟着变），条款没写 ⇒ 第一版不支持
+/// （[`UnitAreaStartOffTheClusterSegmentBoundaryUnsupported`]）。默认环（768 MiB）与环长是 1 MiB 整数倍的环都落在段边界上。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UnitAreaStart(SlotNumber);
+
+/// 环长算出的单元区起点不落在聚簇段边界上（[`UnitAreaStart`] 的不变量）：条款没写这样的单元区怎么分段，第一版不支持。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UnitAreaStartOffTheClusterSegmentBoundaryUnsupported {
+    pub journal_ring_bytes: u64,
+    pub slot_after_the_journal_ring: SlotNumber,
+}
+
+impl UnitAreaStart {
+    /// 环长 `journal_ring_bytes` 下的单元区起点：journal 环末尾的下一个槽（`journal::slot_after_the_journal_ring`）。
+    ///
+    /// # Errors
+    /// 那个槽不落在聚簇段边界上 ⇒ [`UnitAreaStartOffTheClusterSegmentBoundaryUnsupported`]。
+    pub fn following_the_journal_ring(
+        journal_ring_bytes: u64,
+    ) -> Result<Self, UnitAreaStartOffTheClusterSegmentBoundaryUnsupported> {
+        let slot = slot_after_the_journal_ring(journal_ring_bytes);
+        if !slot.0.is_multiple_of(CLUSTER_SEGMENT_SLOTS) {
+            return Err(UnitAreaStartOffTheClusterSegmentBoundaryUnsupported {
+                journal_ring_bytes,
+                slot_after_the_journal_ring: slot,
+            });
+        }
+        Ok(Self(slot))
+    }
+
+    /// 默认环长（`JOURNAL_RING_DEFAULT_BYTES`，768 MiB）下的单元区起点：槽 50176（784 MiB），与格式常量 `UNIT_AREA_START_SLOT` 同一个数
+    /// （实审 A2c 的用例钉住）。
+    #[must_use]
+    pub fn of_the_default_journal_ring() -> Self {
+        Self::following_the_journal_ring(JOURNAL_RING_DEFAULT_BYTES).expect(
+            "默认环 768 MiB 从槽 1024 起、占 49152 槽，下一个槽 50176 = 784 × 64 落在聚簇段边界上",
+        )
+    }
+
+    #[must_use]
+    pub fn slot(self) -> SlotNumber {
+        self.0
+    }
+}
+
 /// 一块设备的空闲图与它的记账增量。
 #[derive(Clone, Debug)]
 pub struct DeviceFreeMap {
     pub device: DeviceIdentity,
-    /// 建这张空闲图时这块盘的字节数：单元区槽数由它算（[`unit_area_slots_of_device`]），分配记录树写侧的几何也由它算
+    /// 建这张空闲图时这块盘的字节数：单元区槽数由它算（[`unit_area_slots_of_device_starting_at`]），分配记录树写侧的几何也由它算
     /// （`AllocationRecordTreeGeometry::of_allocator`，与读侧按读者报的字节数走同一个函数）。
     device_size_in_bytes: u64,
+    /// 单元区从哪个槽起：位图下标 0 对着它，三种落点（用户数据、开段、提交内生块的回落）都从它起扫。
+    unit_area_start: UnitAreaStart,
     unit_area_slots: u64,
     /// 每个 16 KiB 槽一位：true = 已分配。
     allocated: Vec<bool>,
@@ -228,23 +283,63 @@ pub fn absolute_slot_count_of_device(device_bytes: u64) -> u64 {
     device_bytes / SLOT_BYTES
 }
 
-/// 一块盘的单元区有几个 16 KiB 槽：从 [`UNIT_AREA_START_SLOT`] 起到设备末尾（[`absolute_slot_count_of_device`]）。
-/// **这是这个量唯一的一处定义**：[`DeviceFreeMap::new`] 与恢复那一侧「分配记录的跨度在不在单元区内」
-/// 那一道判（`recovery::allocation_records_fit_the_pool_geometry`）都读它，两处手抄会分叉。
+/// 一块盘的单元区有几个 16 KiB 槽：从 `unit_area_start` 起到设备末尾（[`absolute_slot_count_of_device`]）。
+/// **这是这个量唯一的一处定义**：[`DeviceFreeMap::with_unit_area_start`] 与恢复那一侧「分配记录的跨度在不在单元区内」
+/// 那一道判（`recovery::allocation_records_fit_the_pool_geometry`，经 [`unit_area_slots_of_device`]）都读它，两处手抄会分叉。
+///
+/// # Panics
+/// 设备末尾在单元区起点之前（减法下溢，`overflow-checks = true`）：mkfs 拒单元区在盘外的几何（`UnitAreaBeyondDevice`）；
+/// 恢复那一侧读盘上报的盘容量之前没有这一道守卫（代码审阅第 35 条，不在实审 A2c 里）。
+#[must_use]
+pub fn unit_area_slots_of_device_starting_at(
+    device_bytes: u64,
+    unit_area_start: UnitAreaStart,
+) -> u64 {
+    absolute_slot_count_of_device(device_bytes) - unit_area_start.slot().0
+}
+
+/// 默认环长下（[`UnitAreaStart::of_the_default_journal_ring`]，槽 50176 起）一块盘的单元区槽数：
+/// [`unit_area_slots_of_device_starting_at`] 取默认环的起点。
+///
+/// # Panics
+/// 同 [`unit_area_slots_of_device_starting_at`]。
 #[must_use]
 pub fn unit_area_slots_of_device(device_bytes: u64) -> u64 {
-    absolute_slot_count_of_device(device_bytes) - UNIT_AREA_START_SLOT
+    unit_area_slots_of_device_starting_at(
+        device_bytes,
+        UnitAreaStart::of_the_default_journal_ring(),
+    )
 }
 
 impl DeviceFreeMap {
-    /// 单元区从 50176 起到设备末尾；mkfs 占的槽由调用方标上。
+    /// 单元区从默认环长下的起点（[`UnitAreaStart::of_the_default_journal_ring`]，槽 50176）起到设备末尾；mkfs 占的槽由调用方标上。
+    /// 实例表、树表的落点（`make_filesystem::INSTANCE_TABLE_SLOT`）、恢复判分配记录落点、系统配置里写的单元区起点今天都还按这个数，
+    /// 挂载与 mkfs 建空闲图都走这里（C475（非默认环长下单元区起点取编译期常量） 那一半还开着）。
     #[must_use]
     pub fn new(device: DeviceIdentity, device_bytes: u64) -> Self {
-        let unit_area_slots = unit_area_slots_of_device(device_bytes);
+        Self::with_unit_area_start(
+            device,
+            device_bytes,
+            UnitAreaStart::of_the_default_journal_ring(),
+        )
+    }
+
+    /// 单元区从 `unit_area_start` 起到设备末尾的空闲图；mkfs 占的槽由调用方标上。
+    ///
+    /// # Panics
+    /// 同 [`unit_area_slots_of_device_starting_at`]。
+    #[must_use]
+    pub fn with_unit_area_start(
+        device: DeviceIdentity,
+        device_bytes: u64,
+        unit_area_start: UnitAreaStart,
+    ) -> Self {
+        let unit_area_slots = unit_area_slots_of_device_starting_at(device_bytes, unit_area_start);
         let segments = unit_area_slots.div_ceil(CLUSTER_SEGMENT_SLOTS);
         Self {
             device,
             device_size_in_bytes: device_bytes,
+            unit_area_start,
             unit_area_slots,
             allocated: vec![false; usize::try_from(unit_area_slots).expect("单元区槽数")],
             used_per_segment: vec![0; usize::try_from(segments).expect("段数")],
@@ -265,27 +360,36 @@ impl DeviceFreeMap {
     }
 
     /// 槽号 → 位图下标。**槽号在单元区内是这里的前置条件，不是这里判的东西**：
-    /// 落点由分配器自己发（`lowest_user_data_slot` / `lowest_empty_segment` / bump 都从 `UNIT_AREA_START_SLOT` 起），
+    /// 落点由分配器自己发（`lowest_user_data_slot` / `lowest_empty_segment` / bump 都从这张图的单元区起点起），
     /// 从盘上读来的分配记录在进分配器之前由 `recovery::allocation_records_fit_the_pool_geometry` 判过
     /// （槽号 ≥ 单元区起点、跨度不越过单元区末尾、设备身份在池里、同一块盘上两条不罩同一个槽）。
     /// 写成 `checked_sub(...).expect(...)` 而不是直接减：`Cargo.toml` 的 `overflow-checks = true` 下直接减也会炸，
     /// 但炸出来的是一句 `attempt to subtract with overflow`，说不出是哪条前置条件没守住。
-    fn index(slot: SlotNumber) -> usize {
-        let offset_in_slots = slot.0.checked_sub(UNIT_AREA_START_SLOT).expect(
-            "槽号在单元区内：盘上读来的分配记录在 recovery::allocation_records_fit_the_pool_geometry 判过，分配器自己发的落点都从 UNIT_AREA_START_SLOT 起",
+    fn index(&self, slot: SlotNumber) -> usize {
+        let offset_in_slots = slot.0.checked_sub(self.unit_area_start.slot().0).expect(
+            "槽号在单元区内：盘上读来的分配记录在 recovery::allocation_records_fit_the_pool_geometry 判过，分配器自己发的落点都从单元区起点起",
         );
         usize::try_from(offset_in_slots).expect("单元区内的槽号装得进 usize")
     }
 
-    #[must_use]
-    pub fn is_free(&self, slot: SlotNumber) -> bool {
-        slot.0 >= UNIT_AREA_START_SLOT
-            && slot.0 < UNIT_AREA_START_SLOT + self.unit_area_slots
-            && !self.allocated[Self::index(slot)]
-            && !self.isolated[Self::index(slot)]
-            && !self.held_until_floor_takes_effect[Self::index(slot)]
+    /// 单元区末尾（不含）的槽号：起点加单元区槽数。
+    fn unit_area_end_slot(&self) -> u64 {
+        self.unit_area_start.slot().0 + self.unit_area_slots
     }
 
+    #[must_use]
+    pub fn is_free(&self, slot: SlotNumber) -> bool {
+        slot.0 >= self.unit_area_start.slot().0
+            && slot.0 < self.unit_area_end_slot()
+            && !self.allocated[self.index(slot)]
+            && !self.isolated[self.index(slot)]
+            && !self.held_until_floor_takes_effect[self.index(slot)]
+    }
+
+    #[must_use]
+    pub fn unit_area_start(&self) -> UnitAreaStart {
+        self.unit_area_start
+    }
     #[must_use]
     pub fn unit_area_slots(&self) -> u64 {
         self.unit_area_slots
@@ -310,7 +414,7 @@ impl DeviceFreeMap {
 
     /// 把一个仍分配的落点放进 defer 队列：槽仍占着（分配器不许再发它），只是记账上从「仍分配」挪到「待释放」。
     pub fn mark_released(&mut self, slot: SlotNumber, span: u64) {
-        let start = Self::index(slot);
+        let start = self.index(slot);
         let end = start + usize::try_from(span).expect("跨度");
         assert!(
             self.allocated[start..end].iter().all(|taken| *taken),
@@ -318,11 +422,26 @@ impl DeviceFreeMap {
         );
         self.deferred_slots += span;
     }
+    /// 管理员回退复活一个还在 defer 队列里的落点（`PoolAllocator::resurrect_released_record`）：槽本来就占着，
+    /// 记账上从「待释放」挪回「仍分配」——[`Self::mark_released`] 反过来。
+    pub fn mark_resurrected_out_of_the_defer_queue(&mut self, slot: SlotNumber, span: u64) {
+        let start = self.index(slot);
+        let end = start + usize::try_from(span).expect("跨度");
+        assert!(
+            self.allocated[start..end].iter().all(|taken| *taken),
+            "复活的跨度里有没分配的槽：还在 defer 里的落点位图上恒占着"
+        );
+        self.deferred_slots = self
+            .deferred_slots
+            .checked_sub(span)
+            .expect("复活的落点在 defer 里，defer 槽数不小于它的跨度");
+    }
+
     /// 隔离一个只被被抛弃根引用的落点：不进已分配、不进 defer、不动空闲计数，只让分配器绕开它（用户数据落点与开放段都不落在它上面）。
     /// 隔离位独立于分配位：一个槽在当前账里已分配、后来被释放、再被回收，隔离位照样让它发不出去——抬 F 之后候选集缩小，
     /// 一个此前靠候选根豁免的槽会在回收之前被补隔离（`mount::raise_rollback_floor`）。同一个槽隔离两次不重复计数。
     pub fn isolate(&mut self, slot: SlotNumber, span: u64) {
-        let start = Self::index(slot);
+        let start = self.index(slot);
         let end = start + usize::try_from(span).expect("跨度");
         assert!(end <= self.allocated.len(), "跨度越过单元区末尾");
         for index in start..end {
@@ -344,7 +463,7 @@ impl DeviceFreeMap {
     /// 清掉一个槽的影子账隔离位（`isolate` 置的那一套，D28（挂载期承诺量） 已定项 1 第九项「被抛弃的根被轮转覆写时清零」）：
     /// 只动这一位与它的两个计数，分配位与抬 F 扣住那一位照旧——清完之后它发不发得出去看别的位。这一位没置着就什么都不动。
     pub fn clear_isolation_of_slot(&mut self, slot: SlotNumber) {
-        let index = Self::index(slot);
+        let index = self.index(slot);
         if self.isolated[index] {
             self.isolated[index] = false;
             let segment = index / usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
@@ -355,7 +474,7 @@ impl DeviceFreeMap {
 
     /// 抬 F 回收的落点先扣住：空闲计数照加，位图照清，但 `is_free` 与开段都绕开它，直到 `release_holds`。
     pub fn hold_until_floor_takes_effect(&mut self, slot: SlotNumber, span: u64) {
-        let start = Self::index(slot);
+        let start = self.index(slot);
         let end = start + usize::try_from(span).expect("跨度");
         assert!(end <= self.allocated.len(), "跨度越过单元区末尾");
         for index in start..end {
@@ -373,7 +492,7 @@ impl DeviceFreeMap {
     /// 用户 2026-09-24 定案），落在「已分配」那一位上。
     #[must_use]
     pub fn is_blocked_for_commit_generated(&self, slot: SlotNumber) -> bool {
-        let index = Self::index(slot);
+        let index = self.index(slot);
         self.allocated[index] || self.isolated[index] || self.held_until_floor_takes_effect[index]
     }
 
@@ -386,7 +505,7 @@ impl DeviceFreeMap {
     /// 回收：一个已释放、释放代 ≤ max(F_生效, 环里最旧有效根) 的落点回到空闲（D16（发布语义） 已定项 1 的可再分配谓词）：
     /// 位图清掉、占着的槽数与 defer 队列各减、空闲加——记账的空闲字节到这一刻才动（里程碑「第二个事务」步 5）。
     pub fn mark_reclaimed(&mut self, slot: SlotNumber, span: u64) {
-        let start = Self::index(slot);
+        let start = self.index(slot);
         let end = start + usize::try_from(span).expect("跨度");
         assert!(
             self.allocated[start..end].iter().all(|taken| *taken),
@@ -433,7 +552,7 @@ impl DeviceFreeMap {
     /// `recovery::allocation_records_fit_the_pool_geometry` 判过跨度在单元区内、同一块盘上两条记录不罩同一个槽
     /// （I-5.4（分配记录罩住的槽互不相交） 的读路径形态）；分配器自己发的落点由落点政策保证两槽都空。
     pub fn mark_allocated(&mut self, slot: SlotNumber, span: u64) {
-        let start = Self::index(slot);
+        let start = self.index(slot);
         let end = start + usize::try_from(span).expect("跨度");
         assert!(
             end <= self.allocated.len(),
@@ -464,8 +583,9 @@ impl DeviceFreeMap {
         &self,
         cluster_segments: &BTreeSet<SlotNumber>,
     ) -> Option<SlotNumber> {
-        let mut candidate = UNIT_AREA_START_SLOT;
-        let end = UNIT_AREA_START_SLOT + self.unit_area_slots;
+        // 起点在聚簇段边界上（`UnitAreaStart` 的不变量）⇒ 是偶数槽，按 2 槽步进的候选都 32768 对齐。
+        let mut candidate = self.unit_area_start.slot().0;
+        let end = self.unit_area_end_slot();
         while candidate + 1 < end {
             let inside_cluster_segment = cluster_segments.iter().any(|segment| {
                 candidate >= segment.0 && candidate < segment.0 + CLUSTER_SEGMENT_SLOTS
@@ -494,7 +614,7 @@ impl DeviceFreeMap {
             })
             .map(|segment| {
                 SlotNumber(
-                    UNIT_AREA_START_SLOT
+                    self.unit_area_start.slot().0
                         + u64::try_from(segment).expect("段号") * CLUSTER_SEGMENT_SLOTS,
                 )
             })
@@ -508,8 +628,8 @@ impl DeviceFreeMap {
         &self,
         footprint: UnitFootprint,
     ) -> Option<SlotNumber> {
-        let unit_area_end = UNIT_AREA_START_SLOT + self.unit_area_slots;
-        let mut candidate = UNIT_AREA_START_SLOT;
+        let unit_area_end = self.unit_area_end_slot();
+        let mut candidate = self.unit_area_start.slot().0;
         while candidate + footprint.slots() <= unit_area_end {
             let is_whole_span_unblocked = (candidate..candidate + footprint.slots())
                 .all(|slot| !self.is_blocked_for_commit_generated(SlotNumber(slot)));
@@ -716,6 +836,14 @@ impl RootRingOccupancy {
         }
     }
 
+    /// 这个进程知道住着一条根的根环槽（D16（发布语义） 已定项 1「根槽这一次读坏」那一行）：挂载那一刻读得出、自证过的槽
+    /// （有效的与被抛弃的都算），与这个进程之后写过、FUA 返回过的槽——发布在落盘之前或落盘途中失败时分配器整个换回发布之前那一份，
+    /// 这张表随之退回，记着的只剩根落盘做成的那几次。挂载那一刻读不出或自证不过、之后又没写过的槽不在其内。
+    #[must_use]
+    pub fn ring_slots_known_to_hold_a_root(&self) -> BTreeSet<RootRingSlot> {
+        self.occupants.keys().copied().collect()
+    }
+
     /// 环里最旧有效根的 txg；一条有效根都没有时 `None`。
     fn oldest_valid_root(&self) -> Option<CheckpointTxg> {
         self.occupants
@@ -780,7 +908,7 @@ pub struct PoolAllocator {
     /// 只有 `transaction::resend_the_frozen_publish` 清得掉它。只住内存：重开之后走恢复、换实例代号，冻结的那一次不带过去。
     frozen_publish: Option<Box<FrozenPublish>>,
     /// 这次挂载的 rows0（D28（挂载期承诺量） 已定项 3）：挂载时读到的实例表行数加写行那次要写的行数，挂载期承诺量里实例切换预留
-    /// 那一项按它算（`admission::admission_reading_before_a_publish`）。挂载期间常量、只住内存、每次挂载重算：
+    /// 那一项按它算（`admission::admission_reading_with_the_switch_reserve_of`：可写挂载自己判时按它，发布路径按它加一）。挂载期间常量、只住内存、每次挂载重算：
     /// 可写挂载在取号之前记上（`mount::establish_instance`），`new` 与 `rebuild_from_records` 起步是 0——mkfs 同一个进程里
     /// mkfs 的实例表一行都没有、取号 1 不写行（D18（块里携带什么信息） 已定项 11），rows0 本来就是 0。
     instance_rows_after_this_mounts_row_publish: u64,
@@ -1018,15 +1146,15 @@ impl PoolAllocator {
                 .records
                 .iter_mut()
                 .find(|record| record.device == device.device && record.slot == placement.slot)
-                .expect("每块盘上都有这个落点的分配记录：盘上读来的两棵账对不对称由 transaction::placements_to_release_via_mapping 逐盘判过（panic 面普查 R10）");
+                .expect("每块盘上都有这个落点的分配记录：盘上读来的两棵账对不对称由 transaction::placement_registered_unreleased_on_every_device 逐盘判过（panic 面普查 R10；经映射与第一个文件版本换下 mkfs 那几片两条路都走它）");
             assert!(
                 !record.is_released,
-                "同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mapping 逐盘判过"
+                "同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placement_registered_unreleased_on_every_device 逐盘判过"
             );
             assert_eq!(
                 u64::from(record.span_slots),
                 placement.span,
-                "释放的跨度与分配记录不符：这块盘的记录跨度由 transaction::placements_to_release_via_mapping 逐盘判过"
+                "释放的跨度与分配记录不符：这块盘的记录跨度由 transaction::placement_registered_unreleased_on_every_device 逐盘判过"
             );
             record.is_released = true;
             record.generation = release_generation;
@@ -1042,6 +1170,47 @@ impl PoolAllocator {
                 self.placements_reclaimed_on_release_by_the_forced_zero_reuse_window +=
                     u64::try_from(reclaimed_now.len()).expect("一次回收的落点数装得进 u64");
             }
+        }
+    }
+
+    /// 管理员回退的复活（D23（journal 的角色与格式） 已定项 14「复活」）：`device` 上起点是这个落点的那条已释放记录改回已分配，
+    /// 分配代写回 `allocation_generation`（回退目标那一版账里的分配代）。按盘改：回退逐盘判哪几块盘上的记录是已释放的。
+    /// 那一槽还在 defer 窗口里的，从 defer 挪回仍分配；已回收、还没被复用（位图上空着、记录照旧写着已释放）的，重新在位图上标占。
+    ///
+    /// # Panics
+    /// 这块盘上没有起点是这个槽的记录、它不是已释放的、或跨度对不上：调用方在任何写之前逐盘判过
+    /// （`mount::roll_back_by_a_forward_publish`）。
+    pub fn resurrect_released_record(
+        &mut self,
+        device: DeviceIdentity,
+        placement: Placement,
+        allocation_generation: CheckpointTxg,
+    ) {
+        let record = self
+            .records
+            .iter_mut()
+            .find(|record| record.device == device && record.slot == placement.slot)
+            .expect("复活的落点在这块盘上有记录：回退在任何写之前逐盘判过");
+        assert!(
+            record.is_released,
+            "复活的是已释放的记录：回退在任何写之前逐盘判过"
+        );
+        assert_eq!(
+            u64::from(record.span_slots),
+            placement.span,
+            "复活的跨度与记录相同：回退在任何写之前逐盘判过"
+        );
+        record.is_released = false;
+        record.generation = allocation_generation;
+        let device_map = self
+            .devices
+            .iter_mut()
+            .find(|device_map| device_map.device == device)
+            .expect("复活的记录的盘在池里");
+        if self.reclaimed.remove(&(device, placement.slot)) {
+            device_map.mark_allocated(placement.slot, placement.span);
+        } else {
+            device_map.mark_resurrected_out_of_the_defer_queue(placement.slot, placement.span);
         }
     }
 
@@ -1434,6 +1603,7 @@ impl PoolAllocator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use singlefs_format::UNIT_AREA_START_SLOT;
 
     /// 开段之后才隔离的槽（抬 F 重算影子账落在活分配器上）bump 游标要绕开：先开段发一个单槽单元，再把游标前方的 50180 隔离，
     /// 之后连发四个单槽单元一个都不落在 50180 上。
@@ -1679,6 +1849,68 @@ mod tests {
                     )
             })
             .collect()
+    }
+
+    /// 管理员回退的复活（D23（journal 的角色与格式） 已定项 14「复活」）：还在 defer 里的已释放记录改回已分配、分配代写回给的那一个，
+    /// defer 槽数减掉它、已分配槽数不动（槽本来就占着）；已回收、还没被复用的那一条改回已分配时位图重新标占、空闲槽数减掉它。
+    #[test]
+    fn resurrecting_a_released_record_moves_it_out_of_the_defer_queue_or_back_onto_the_bitmap() {
+        let mut pool = rebuilt_pool(records_on_both_devices(&[
+            (50_176, 2, 5, true),
+            (50_178, 2, 6, true),
+        ]));
+        pool.reclaim_released_up_to(CheckpointTxg(5), ReclaimedReuse::Immediately);
+        let device = DeviceIdentity(0);
+        let map_of = |allocator: &PoolAllocator| {
+            let map = &allocator.devices[0];
+            (
+                map.allocated_slots(),
+                map.deferred_slots(),
+                map.free_slots(),
+            )
+        };
+        let (allocated_before, deferred_before, free_before) = map_of(&pool);
+        assert_eq!(
+            deferred_before, 2,
+            "释放代 6 的那一条还在 defer 里，释放代 5 的回收了"
+        );
+        pool.resurrect_released_record(
+            device,
+            Placement {
+                slot: SlotNumber(50_178),
+                span: 2,
+            },
+            CheckpointTxg(3),
+        );
+        assert_eq!(
+            map_of(&pool),
+            (allocated_before, 0, free_before),
+            "defer 里那一条复活：defer 减 2，已分配与空闲不动"
+        );
+        pool.resurrect_released_record(
+            device,
+            Placement {
+                slot: SlotNumber(50_176),
+                span: 2,
+            },
+            CheckpointTxg(2),
+        );
+        assert_eq!(
+            map_of(&pool),
+            (allocated_before + 2, 0, free_before - 2),
+            "回收过的那一条复活：位图重新标占"
+        );
+        assert!(!pool.devices[0].is_free(SlotNumber(50_176)));
+        assert_eq!(
+            records_on_device(&pool, device),
+            vec![(50_176, 2, 2, false), (50_178, 2, 3, false)],
+            "两条都改回已分配、分配代写回给的那一个"
+        );
+        assert_eq!(
+            records_on_device(&pool, DeviceIdentity(1)),
+            vec![(50_176, 2, 5, true), (50_178, 2, 6, true)],
+            "按盘改：另一块盘上的记录不动"
+        );
     }
 
     fn rebuilt_pool(records: Vec<AllocationRecord>) -> PoolAllocator {
@@ -1965,7 +2197,7 @@ mod tests {
     /// C518（一次挂载之内环转过一圈之后不回收） 那张根环表：不跳地记下 txg 24（盖掉 txg 0 的根），环里最旧有效根变成 1，
     /// 释放代 1 的落点当场回收。
     #[test]
-    fn a_root_ring_occupancy_that_follows_every_root_reclaims_as_the_ring_turns() {
+    fn root_ring_occupancy_that_follows_every_root_reclaims_as_the_ring_turns() {
         let mut following = pool_whose_root_ring_holds_txg_0_through_23();
         following.record_root_written_by_this_process(CheckpointTxg(24));
         for device_map in &following.devices {
@@ -1981,7 +2213,7 @@ mod tests {
     /// 记到的根 txg 跳了一格（txg 24 那条根没经分配器写出去）：这张表说的环已经不是盘上的环，断言失败，不按猜的环接着回收。
     #[test]
     #[should_panic(expected = "装了根环表的进程写的根 txg 逐个加一")]
-    fn a_root_ring_occupancy_that_missed_a_root_panics_instead_of_reclaiming_by_a_guessed_ring() {
+    fn root_ring_occupancy_that_missed_the_root_panics_instead_of_reclaiming_by_the_guessed_ring() {
         let mut stopped = pool_whose_root_ring_holds_txg_0_through_23();
         stopped.record_root_written_by_this_process(CheckpointTxg(25));
     }

@@ -20,10 +20,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
 use singlefs_format::{
-    index_node_header_bytes, ACCOUNTING_ENTRY_BYTES, ACCOUNTING_KEY_BYTES,
-    ALLOCATION_RECORD_TREE_INTERNAL_FANOUT, ALLOCATION_RECORD_TREE_LEAF_SLOTS,
-    CLUSTER_SEGMENT_SLOTS, DATA_UNIT_BYTES, DATA_UNIT_PAYLOAD_OFFSET, INSTANCE_TABLE_PAGE_RECORDS,
-    NODE_BYTES, ROOT_RING_REGIONS, ROOT_RING_REGION_DEVICES,
+    ACCOUNTING_ENTRY_BYTES, ACCOUNTING_KEY_BYTES, ALLOCATION_RECORD_TREE_INTERNAL_FANOUT,
+    ALLOCATION_RECORD_TREE_LEAF_SLOTS, CLUSTER_SEGMENT_SLOTS, DATA_UNIT_BYTES,
+    DATA_UNIT_PAYLOAD_OFFSET, INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE,
+    INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT, INSTANCE_TABLE_PAGE_RECORDS, NODE_BYTES,
+    NONCE_MAC_ALGORITHM_RESERVED_BYTES, ROOT_RING_REGIONS, ROOT_RING_REGION_DEVICES,
     ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM, SLOT_BYTES, UNIT_AREA_START_SLOT,
 };
 
@@ -181,13 +182,12 @@ pub struct ModelFileVersion {
     pub content: Rc<[u8]>,
 }
 
-/// 实例表的一行 (i, T, W) 与回退标志（D18（块里携带什么信息） 已定项 11；D23（journal 的角色与格式） 已定项 14）。
+/// 实例表的一行 (i, T, W)（D18（块里携带什么信息） 已定项 11）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ModelInstanceRow {
     pub instance: ModelInstanceGeneration,
     pub selected_root_txg: ModelCheckpointTxg,
     pub applied_transaction_high_water: u64,
-    pub is_rollback: bool,
 }
 
 /// 一条已提交的根与它指着的那一版。
@@ -204,6 +204,14 @@ pub struct ModelRoot {
     pub role_written_at: BTreeMap<ModelUnitRole, ModelCheckpointTxg>,
     /// 每盘已占槽数的上界：沿来路每次发布写出的单元的槽数之和，释放与回收一概不扣（分配记录树每次重写的节点数取按位置寻址现算的上界）。
     pub occupied_slots_upper_bound_per_device: u64,
+    /// 写出这条根的那次发布的记录里最大的事务号：只有写文件内容的发布（第一个文件、覆盖写）承载用户事务，内容装在一个数据单元里
+    /// （模型拒装不下的，`ContentExceedsDataUnitPayload`），一事务一单元（D16（发布语义） 已定项 5）⇒ 恰好一个事务、取实例内计数的下一个号；
+    /// 空发布、写行、暖机、抬 F、回退的记录事务号 0（D23（journal 的角色与格式） 已定项 19 ①），这里记 0。
+    /// 恢复施加这次发布的记录时，W 按它取（D23（journal 的角色与格式） 已定项 14 第 4 条；空发布的 0 不进 max）。
+    pub highest_transaction_number_of_its_publish: u64,
+    /// 这个实例到这条根为止发过的最大事务号：事务号按实例计数、从 1 起（D23（journal 的角色与格式） 已定项 7），
+    /// 换了实例（写行那次发布）从 0 重新数。
+    pub highest_transaction_number_in_its_instance: u64,
 }
 
 impl ModelRoot {
@@ -221,10 +229,12 @@ pub struct ModelPoolGeometry {
 }
 
 /// 根环里的一个槽：第 n 次发布写区域 `n mod R` 的槽 `(n div R) mod S`（D22（单元原子性怎么合成） 已定项 2 / 已定项 16）。
+/// 公开是为了让对拍拿实现报的那个槽（`MountError::RollbackFloorCeilingRootRingSlotStillBadAfterOneReread`）与它比：
+/// 两边各自声明（D13（验证路线） 已定项 5），胶水在 `model_comparison.rs` 里换过来。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct ModelRingPosition {
-    region: u64,
-    slot_in_region: u64,
+pub struct ModelRingPosition {
+    pub region: u64,
+    pub slot_in_region: u64,
 }
 
 /// S 取 mkfs 那一档：模型只建 mkfs 默认参数的池，从不改 S（改 S 的池由
@@ -245,6 +255,18 @@ fn ring_position_of(checkpoint_txg: ModelCheckpointTxg) -> ModelRingPosition {
 fn device_holding_the_root_of(checkpoint_txg: ModelCheckpointTxg) -> ModelDeviceIdentity {
     let region = usize::try_from(checkpoint_txg.0 % ROOT_RING_REGIONS).expect("区域号小于 3");
     ModelDeviceIdentity(ROOT_RING_REGION_DEVICES[region])
+}
+
+/// 码 2 索引节点含 key 区间与预留位的头宽：key 区间之外的 86、key 区间两个 key、预留位 29 三段相加
+/// （D8（核心索引结构） 已定项 11；D18（块里携带什么信息） 已定项 16 / 已定项 18）。
+///
+/// 模型自己的一份式子，不调实现、也不调 checker 的那一份（D13（验证路线） 已定项 5：`singlefs-format` 只放标量；
+/// 2026-09-27 用户定案「三方各算一份 + 交叉断言」）；三份在 key 宽的全部取值上连起来比的是
+/// `crates/singlefs-harness/tests/index_node_header_width_computed_three_ways_agrees_for_every_key_width.rs`。
+#[must_use]
+pub fn index_node_header_bytes(key_width_in_bytes: u64) -> u64 {
+    let key_range_bytes = key_width_in_bytes * INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT;
+    INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE + key_range_bytes + NONCE_MAC_ALGORITHM_RESERVED_BYTES
 }
 
 /// 一个索引节点装几条定宽条目：(节点 − 头) ÷ 条目宽（D8（核心索引结构） 已定项 2 / 已定项 11）。
@@ -278,6 +300,8 @@ pub enum ModelRefusalReason {
     RollbackTargetBelowEffectiveFloor,
     /// 回退目标在被抛弃的时间线上（D23（journal 的角色与格式） 已定项 14：有行 (i, Ti, Wi) 且 T > Ti）。
     RollbackTargetOnAbandonedTimeline,
+    /// 回退目标那一版树表 0 条（D23（journal 的角色与格式） 已定项 14：候选集只收带文件的根）。
+    RollbackTargetWithoutFile,
     /// 要建立新实例的那一版树表 0 条、而它的实例表已经不是 mkfs 那一片（上一次挂载在这一版上写过行）：
     /// 被换下的那一片记在哪没有条款——树表 0 条 ⇒ 这一版没有分配记录树，那次释放只住内存，重开之后账取不回来，
     /// 而根环里更旧的候选根还指着它。第一版不支持（设计空白，交主 agent）。
@@ -301,6 +325,7 @@ impl ModelRefusalReason {
             ModelRefusalReason::RollbackTargetNotInRing => "回退目标不在根环里",
             ModelRefusalReason::RollbackTargetBelowEffectiveFloor => "回退目标低于 F_生效",
             ModelRefusalReason::RollbackTargetOnAbandonedTimeline => "回退目标在被抛弃的时间线上",
+            ModelRefusalReason::RollbackTargetWithoutFile => "回退目标那一版没有文件",
             ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem => {
                 "树表 0 条、而实例表已经不是 mkfs 那一片（条款没写被换下的那一片记在哪）"
             }
@@ -318,6 +343,7 @@ impl ModelRefusalReason {
             | ModelRefusalReason::RollbackTargetNotInRing
             | ModelRefusalReason::RollbackTargetBelowEffectiveFloor
             | ModelRefusalReason::RollbackTargetOnAbandonedTimeline
+            | ModelRefusalReason::RollbackTargetWithoutFile
             | ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem
             | ModelRefusalReason::FloorAboveCeiling => false,
         }
@@ -343,7 +369,7 @@ pub enum ModelOperationKind {
     PublishOverwrite,
     PublishWithoutUnits,
     MountWritable,
-    MountRollback,
+    RollbackWhileMounted,
     RaiseRollbackFloor,
     ColdStartRecover,
 }
@@ -370,6 +396,8 @@ pub struct ModelAnswer {
     pub expected_read_back: Option<ModelReadBack>,
     /// 抬 F 时模型算的上限（D16（发布语义） 已定项 1），拒与成都要与实现报的相等。
     pub rollback_floor_ceiling: Option<ModelCheckpointTxg>,
+    /// 管理员回退的目标（只有回退那一步有）：做成时数「回退到 F_生效 那一代」的次数要它。
+    pub rollback_target: Option<ModelRootKey>,
     planned_publish_upper_bounds: Vec<PlannedPublishUpperBounds>,
     /// 容量墙在第一次写之前一串判完（可写挂载、回退、抬 F——实现在任何写之前把那一串整串预演一遍）还是逐次发布判（发布）。
     walls_are_judged_before_the_first_write: bool,
@@ -386,15 +414,58 @@ enum ModelSessionAfterSuccess {
     Closed,
 }
 
-/// 实现写出的一条根，胶水从实现交回的东西里取。
+/// 实现写出的一条根，胶水从实现交回的东西里取。每一版都拿它的文件、实例表与分配记录跟模型那一版比（代码审阅第 12 条：
+/// 此前只比有没有文件、只遍历实现交回的角色，内容只在冷启动那一步比）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ObservedRoot {
     pub key: ModelRootKey,
     pub journal_counter: ModelJournalCounter,
     pub rollback_floor: ModelCheckpointTxg,
-    pub has_file: bool,
-    /// 这一版每个单元（实现交回的那几个角色）的分配记录，每块盘各一条。树表 0 条的一版为空。
-    pub unit_allocation_records: Vec<(ModelUnitRole, Vec<ObservedAllocationRecord>)>,
+    pub file: ObservedFile,
+    pub instance_table: ObservedInstanceTable,
+    pub unit_allocation_records: ObservedUnitAllocationRecords,
+}
+
+/// 实现交回的这一版的文件。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ObservedFile {
+    /// 树表 0 条：这一版没有文件。
+    NoFile,
+    /// 从这一版的数据单元解出来的内容（整份，不取摘要：模型只用 std 与格式常量，没有与胶水共用的哈希；一版至多一个数据单元）。
+    Decoded(Vec<u8>),
+    /// 这一版带文件，而胶水从实现交回的单元里解不出它的内容（数据单元不在、解不开）。
+    Undecodable { what: String },
+}
+
+impl ObservedFile {
+    #[must_use]
+    pub fn has_file(&self) -> bool {
+        match self {
+            ObservedFile::NoFile => false,
+            ObservedFile::Decoded(_) | ObservedFile::Undecodable { .. } => true,
+        }
+    }
+}
+
+/// 实现交回的这一版的实例表。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ObservedInstanceTable {
+    /// 从这一版的实例表单元解出来的整张表，各片的行按链上的次序接起来。
+    Rows(Vec<ModelInstanceRow>),
+    /// 实现交回的东西里没有这一版整条实例表链的字节，比不了（`why` 写是哪一种；模型照计数，不判）。
+    NotInTheOutput { why: &'static str },
+    /// 字节在，解不开。
+    Undecodable { what: String },
+}
+
+/// 实现交回的这一版的分配记录。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ObservedUnitAllocationRecords {
+    /// 这一版每个角色的单元在这一版分配记录里的那几条，每块盘各一条：实现交回的这一版的全部角色（带文件的一版）。
+    EveryRoleOfTheVersion(Vec<(ModelUnitRole, Vec<ObservedAllocationRecord>)>),
+    /// 实现的输出不带这一版的分配记录（树表 0 条的一版：`VersionWithoutFilePublishOutput` 只带根记录、记录与这次重写了哪几个角色），
+    /// 只交回这次发布重写了哪几个角色。
+    RewrittenRolesOnly(BTreeSet<ModelUnitRole>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -459,6 +530,9 @@ pub enum ObservedOutcome {
         wrote_anything: bool,
         /// 实现报的上限（抬 F 被上限拒时）。
         reported_ceiling: Option<ModelCheckpointTxg>,
+        /// 实现报「算抬 F 的上限时这个知道住着根的根环槽读坏、重读仍坏」时点名的那个槽
+        /// （D16（发布语义） 已定项 1「根槽这一次读坏」那一行）；别的拒绝都是 None。
+        reported_root_ring_slot_still_bad_after_one_reread: Option<ModelRingPosition>,
     },
 }
 
@@ -475,6 +549,8 @@ pub enum ModelDisagreementAspect {
     JournalCounter,
     RollbackFloor,
     FilePresence,
+    FileContent,
+    InstanceTableOfTheVersion,
     AllocationGeneration,
     InstanceGeneration,
     InstanceRows,
@@ -497,6 +573,8 @@ impl ModelDisagreementAspect {
             ModelDisagreementAspect::JournalCounter => "jsn",
             ModelDisagreementAspect::RollbackFloor => "根带的 F",
             ModelDisagreementAspect::FilePresence => "这一版有没有文件",
+            ModelDisagreementAspect::FileContent => "这一版的文件内容",
+            ModelDisagreementAspect::InstanceTableOfTheVersion => "这一版的实例表",
             ModelDisagreementAspect::AllocationGeneration => "单元的分配代",
             ModelDisagreementAspect::InstanceGeneration => "取到的实例代号",
             ModelDisagreementAspect::InstanceRows => "写的实例表行",
@@ -513,10 +591,22 @@ pub struct ModelDisagreement {
     pub aspect: ModelDisagreementAspect,
     pub model_answer: String,
     pub implementation_answer: String,
+    /// 对不上的是抬 F 的上限（[`ModelDisagreementAspect::RollbackFloorCeiling`]）时实现报的那个数；别的格都是 None。
+    /// 故障注入按它比「模型去掉被吞的根之后重算的上限」（实七，主 agent 2026-09-26 定的按注入点认）。
+    pub implementation_reported_ceiling: Option<ModelCheckpointTxg>,
+    /// 对不上的是「模型说该成、实现拒了」或「拒绝的理由」，而实现拒的是「根环槽读坏、重读仍坏」时它点名的那个槽；别的格都是 None。
+    /// 故障注入按它比「被吞的根槽写落在哪个槽」（实八，D16（发布语义） 已定项 1「根槽这一次读坏」那一行）。
+    pub implementation_reported_root_ring_slot_still_bad_after_one_reread:
+        Option<ModelRingPosition>,
+    /// 对不上的是「写的实例表行」（[`ModelDisagreementAspect::InstanceRows`]）时实现写的那几行；别的格都是 None。
+    /// 故障注入按它比「被吞根槽的那几条根由记录重建之后模型重算的行」（实八，D23（journal 的角色与格式） 已定项 14 第 4 条）。
+    pub implementation_rows_written: Option<Vec<ModelInstanceRow>>,
 }
 
 impl ModelDisagreement {
-    fn new(
+    /// 只带哪一格与两边的话，实现报的上限、读坏的根环槽、写的行都是 None。
+    #[must_use]
+    pub fn new(
         aspect: ModelDisagreementAspect,
         model_answer: String,
         implementation_answer: String,
@@ -525,6 +615,9 @@ impl ModelDisagreement {
             aspect,
             model_answer,
             implementation_answer,
+            implementation_reported_ceiling: None,
+            implementation_reported_root_ring_slot_still_bad_after_one_reread: None,
+            implementation_rows_written: None,
         }
     }
 }
@@ -537,6 +630,14 @@ pub struct ModelJudgementCounts {
     pub successes_matched: u64,
     pub roots_compared: u64,
     pub allocation_records_compared: u64,
+    /// 树表 0 条的一版比过「这次重写了哪几个角色」的次数（它的输出不带分配记录）。
+    pub rewritten_role_sets_compared: u64,
+    /// 每一版比过文件内容的次数（带文件、胶水解得出内容的那几版）。
+    pub file_contents_compared: u64,
+    /// 每一版比过整张实例表的次数。
+    pub instance_tables_compared: u64,
+    /// 实现交回的东西里没有这一版整条实例表链的字节、比不了的次数（[`ObservedInstanceTable::NotInTheOutput`]）。
+    pub instance_tables_not_in_the_output: u64,
     pub cold_start_contents_compared: u64,
     pub ceilings_compared: u64,
     /// 回退做成、目标的 txg 正好等于 F_生效且 F_生效 > 0（B2 那一格跑到了）。
@@ -546,19 +647,36 @@ pub struct ModelJudgementCounts {
 }
 
 impl ModelJudgementCounts {
-    /// 把另一份逐项加进来。
+    /// 把另一份逐项加进来：按字段拆开写全，新加一个字段而这里没加，编译不过。
     pub fn add(&mut self, other: &ModelJudgementCounts) {
-        self.required_refusals_matched += other.required_refusals_matched;
-        self.permitted_refusals_taken += other.permitted_refusals_taken;
-        self.successes_matched += other.successes_matched;
-        self.roots_compared += other.roots_compared;
-        self.allocation_records_compared += other.allocation_records_compared;
-        self.cold_start_contents_compared += other.cold_start_contents_compared;
-        self.ceilings_compared += other.ceilings_compared;
-        self.rollbacks_accepted_at_the_effective_floor +=
-            other.rollbacks_accepted_at_the_effective_floor;
-        self.unit_area_wall_refusals_in_the_interval +=
-            other.unit_area_wall_refusals_in_the_interval;
+        let ModelJudgementCounts {
+            required_refusals_matched,
+            permitted_refusals_taken,
+            successes_matched,
+            roots_compared,
+            allocation_records_compared,
+            rewritten_role_sets_compared,
+            file_contents_compared,
+            instance_tables_compared,
+            instance_tables_not_in_the_output,
+            cold_start_contents_compared,
+            ceilings_compared,
+            rollbacks_accepted_at_the_effective_floor,
+            unit_area_wall_refusals_in_the_interval,
+        } = other;
+        self.required_refusals_matched += required_refusals_matched;
+        self.permitted_refusals_taken += permitted_refusals_taken;
+        self.successes_matched += successes_matched;
+        self.roots_compared += roots_compared;
+        self.allocation_records_compared += allocation_records_compared;
+        self.rewritten_role_sets_compared += rewritten_role_sets_compared;
+        self.file_contents_compared += file_contents_compared;
+        self.instance_tables_compared += instance_tables_compared;
+        self.instance_tables_not_in_the_output += instance_tables_not_in_the_output;
+        self.cold_start_contents_compared += cold_start_contents_compared;
+        self.ceilings_compared += ceilings_compared;
+        self.rollbacks_accepted_at_the_effective_floor += rollbacks_accepted_at_the_effective_floor;
+        self.unit_area_wall_refusals_in_the_interval += unit_area_wall_refusals_in_the_interval;
     }
 }
 
@@ -602,6 +720,8 @@ impl IdealModel {
             ]),
             occupied_slots_upper_bound_per_device: ModelUnitRole::InstanceTable.span_in_slots()
                 + ModelUnitRole::TreeTable.span_in_slots(),
+            highest_transaction_number_of_its_publish: 0,
+            highest_transaction_number_in_its_instance: 0,
         };
         let mut ring = BTreeMap::new();
         ring.insert(ring_position_of(MAKE_FILESYSTEM_TXG), genesis);
@@ -676,22 +796,30 @@ impl IdealModel {
         self.ring.values().find(|root| root.key == key)
     }
 
-    /// F_生效 = 各幸存盘所带 F 最大值的最小值；一块盘上一条根都没有就不算它，一条根都没有时 0。
-    /// 预想，跟收口表第 ② 行（「生效」那一行 2026-09-17 打回重议，定案之前照字面；被抛弃时间线上的根带的 F 也算，照字面「持久根」）。
+    /// F_生效 = 各幸存盘最新持久有效根所带 F 的最大值（D16（发布语义） 已定项 1「生效」根那一半）：有效 = 按最新那条根指着的实例表
+    /// 不被抛弃；每块盘取落在它上面的有效根里 (txg, 实例) 最大的那一条。一条根都没有时 0。
+    /// 系统配置里的那一份 F（SysPre）模型不建：不建故障时抬 F 那一串要么在任何写之前被拒、要么推到每块盘，系统配置里的 F 与
+    /// 那一串的根带的相同，两半取大不改答案。被抛弃时间线上的根带的 F 算不算，D16 写着仍开着；这里照「有效根」的字面，不算。
     #[must_use]
     pub fn effective_rollback_floor(&self) -> ModelCheckpointTxg {
-        let mut highest_floor_per_device: BTreeMap<ModelDeviceIdentity, ModelCheckpointTxg> =
+        let newest_table = Rc::clone(&self.newest_root().instance_table_rows);
+        let mut newest_valid_root_per_device: BTreeMap<ModelDeviceIdentity, &ModelRoot> =
             BTreeMap::new();
         for root in self.ring.values() {
-            let highest = highest_floor_per_device
+            if Self::is_abandoned_by(root, &newest_table) {
+                continue;
+            }
+            let newest = newest_valid_root_per_device
                 .entry(device_holding_the_root_of(root.key.checkpoint_txg))
-                .or_insert(root.rollback_floor);
-            *highest = (*highest).max(root.rollback_floor);
+                .or_insert(root);
+            if root.key > newest.key {
+                *newest = root;
+            }
         }
-        highest_floor_per_device
+        newest_valid_root_per_device
             .values()
-            .copied()
-            .min()
+            .map(|root| root.rollback_floor)
+            .max()
             .unwrap_or(ModelCheckpointTxg(0))
     }
 
@@ -730,21 +858,48 @@ impl IdealModel {
             *newest = (*newest).max(root.key.checkpoint_txg);
         }
         let newest_on_every_device = newest_valid_per_device.values().copied().min()?;
-        let mut non_empty_txgs: Vec<ModelCheckpointTxg> = Vec::new();
+        let mut non_empty: Vec<(ModelRootKey, Option<ModelRootKey>)> = Vec::new();
         let mut previous_trees_written_by: Option<ModelRootKey> = None;
         for root in &valid {
             let trees_written_by = root.user_visible_trees_written_by();
             if trees_written_by != previous_trees_written_by {
-                non_empty_txgs.push(root.key.checkpoint_txg);
+                non_empty.push((root.key, trees_written_by));
             }
             previous_trees_written_by = trees_written_by;
         }
-        non_empty_txgs.sort_unstable_by(|left, right| right.cmp(left));
-        let fourth_newest_non_empty = match non_empty_txgs.get(3) {
+        // 「4 个不同状态」去重（「非空」从盘上怎么认那一段末尾）：从新到旧数，状态（两棵用户可见树是哪次发布写的）与比它新、
+        // 已计入的根相同的不计入——管理员回退发出的根状态同回退目标。去重之后不足 4 个取最旧的有效根（根环容量边界）。
+        non_empty.sort_unstable_by_key(|(key, _)| std::cmp::Reverse(*key));
+        let mut counted_states: Vec<Option<ModelRootKey>> = Vec::new();
+        let mut distinct_newest_first: Vec<ModelCheckpointTxg> = Vec::new();
+        for (key, state) in non_empty {
+            if !counted_states.contains(&state) {
+                counted_states.push(state);
+                distinct_newest_first.push(key.checkpoint_txg);
+            }
+        }
+        let fourth_newest_non_empty = match distinct_newest_first.get(3) {
             Some(fourth) => *fourth,
             None => valid.first()?.key.checkpoint_txg,
         };
         Some(newest_on_every_device.min(fourth_newest_non_empty))
+    }
+
+    /// 把 `removed` 那几条根从根环里拿掉之后算的抬 F 的上限（[`IdealModel::rollback_floor_ceiling`] 同一个算法）：说谎的设备吞掉了
+    /// 那几条根的根槽写，实现从盘上现读根环看不见它们（故障注入按注入点认「抬 F 的上限」那一格，实七）。
+    #[must_use]
+    pub fn rollback_floor_ceiling_without_the_roots(
+        &self,
+        removed: &[ModelRootKey],
+    ) -> Option<ModelCheckpointTxg> {
+        let mut view_without_the_roots = self.clone();
+        view_without_the_roots
+            .ring
+            .retain(|_, root| !removed.contains(&root.key));
+        if view_without_the_roots.ring.is_empty() {
+            return None;
+        }
+        view_without_the_roots.rollback_floor_ceiling()
     }
 
     /// 分配记录树一次发布至多重写几个节点（每个节点每盘占一个槽）。
@@ -865,6 +1020,15 @@ impl IdealModel {
             }),
             None => previous.file.clone(),
         };
+        let highest_transaction_number_before_this_publish = if previous.key.instance == instance {
+            previous.highest_transaction_number_in_its_instance
+        } else {
+            0
+        };
+        let highest_transaction_number_of_its_publish = match new_file_content {
+            Some(_) => highest_transaction_number_before_this_publish + 1,
+            None => 0,
+        };
         ModelRoot {
             key,
             journal_counter,
@@ -874,6 +1038,10 @@ impl IdealModel {
             role_written_at,
             occupied_slots_upper_bound_per_device: previous.occupied_slots_upper_bound_per_device
                 + slots_written,
+            highest_transaction_number_of_its_publish,
+            highest_transaction_number_in_its_instance:
+                highest_transaction_number_before_this_publish
+                    .max(highest_transaction_number_of_its_publish),
         }
     }
 
@@ -1037,6 +1205,7 @@ impl IdealModel {
             expected_mount: None,
             expected_read_back: None,
             rollback_floor_ceiling: None,
+            rollback_target: None,
             walls_are_judged_before_the_first_write: false,
             session_after_success: ModelSessionAfterSuccess::StaysOpen,
         }
@@ -1051,7 +1220,6 @@ impl IdealModel {
             selected_root_txg: chosen.key.checkpoint_txg,
             // W = 这次恢复施加的记录里最大的事务号（D23（journal 的角色与格式） 已定项 14 第 4 条）：不建崩溃，一条都不施加。
             applied_transaction_high_water: 0,
-            is_rollback: false,
         };
         self.answer_establishing_an_instance(
             ModelOperationKind::MountWritable,
@@ -1060,50 +1228,174 @@ impl IdealModel {
         )
     }
 
-    /// 管理员回退（`mount::mount_rollback`，D23（journal 的角色与格式） 已定项 14 的显式例外）。调之前先 `close_session`。
-    #[must_use]
-    pub fn answer_mount_rollback(&self, target: ModelRootKey) -> ModelAnswer {
-        let refused = |reasons: BTreeSet<ModelRefusalReason>| ModelAnswer {
-            operation: ModelOperationKind::MountRollback,
-            required_refusals: reasons,
-            permitted_refusals: BTreeSet::new(),
-            expected_roots: Vec::new(),
-            expected_mount: None,
-            expected_read_back: None,
-            rollback_floor_ceiling: None,
-            planned_publish_upper_bounds: Vec::new(),
-            walls_are_judged_before_the_first_write: true,
-            session_after_success: ModelSessionAfterSuccess::Closed,
-        };
-        let Some(target_root) = self.root_with_key(target) else {
-            return refused(BTreeSet::from([
-                ModelRefusalReason::RollbackTargetNotInRing,
-            ]));
-        };
-        let mut reasons = BTreeSet::new();
-        if target.checkpoint_txg < self.effective_rollback_floor() {
-            reasons.insert(ModelRefusalReason::RollbackTargetBelowEffectiveFloor);
+    /// 崩溃恢复抛弃根（执行器的 `HistoryOperation::CrashRecoveryAbandoningTheNewestRoot`）：挂载期间环里最新那条根的根槽与它那次发布
+    /// 点名的单元读不出，择根落到除它之外 (txg, 实例) 最大的那一条；它的记录验点名单元不过、一条都不施加（W = 0）。它那条记录照样读得出，
+    /// 新实例的第一次发布的 txg 与 jsn 照旧接在全部根与全部记录的最大值后面（D23（journal 的角色与格式） 已定项 14 第 3 条）。
+    /// 新实例写的行把它判成被抛弃的（行 (i, 所选根的 txg) 或中间实例的 (i, 0, 0)）。F 生效值、抬 F 的上限在这次挂载里都按看不见它算。
+    /// 调之前先 `close_session`。
+    ///
+    /// # Errors
+    /// 环里只有一条根：择根没有前一条可落。
+    pub fn answer_mount_writable_with_the_newest_root_unreadable(
+        &self,
+    ) -> Result<ModelAnswer, ModelDisagreement> {
+        let newest = self.newest_root().key;
+        let mut view_without_the_newest = self.clone();
+        view_without_the_newest
+            .ring
+            .remove(&ring_position_of(newest.checkpoint_txg));
+        if view_without_the_newest.ring.is_empty() {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::NotModeled,
+                format!("模型根环里只有 {newest:?} 一条根，崩溃恢复没有前一条根可落"),
+                "执行器按盘上的根环调了崩溃恢复抛弃根".to_string(),
+            ));
         }
-        if Self::is_abandoned_by(target_root, &self.newest_root().instance_table_rows) {
-            reasons.insert(ModelRefusalReason::RollbackTargetOnAbandonedTimeline);
+        let chosen = view_without_the_newest.newest_root().clone();
+        let previous_row = ModelInstanceRow {
+            instance: chosen.key.instance,
+            selected_root_txg: chosen.key.checkpoint_txg,
+            applied_transaction_high_water: 0,
+        };
+        Ok(view_without_the_newest.answer_establishing_an_instance(
+            ModelOperationKind::MountWritable,
+            &chosen,
+            Some(previous_row),
+        ))
+    }
+
+    /// 可写挂载，而 `roots_whose_root_slot_is_missing` 那几条根的根槽写没落盘（说谎的设备吞了；它们的记录与单元都落了）：
+    /// 择根落到除它们之外 (txg, 实例) 最大的那一条（所选根），恢复再施加 (实例代号, checkpoint_txg) 严格大于所选根、与所选根同实例的
+    /// 那几次发布的记录（前缀不跨实例边界，D23（journal 的角色与格式） 已定项 14 注 1），由记录重建出它们；上一个实例那一行的 T 取
+    /// 实际走到的那条根，W 取施加的那几次发布的记录里最大的事务号（已定项 14 第 4 条；空发布的事务号 0 不进 max，已定项 19 ①）。
+    /// 名单里的根不在模型的根环里、或比所选根旧的，不改答案。调之前先 `close_session`。
+    /// 故障注入拿它认「写的实例表行」那一形（实八）：实现照条款写 W，[`IdealModel::answer_mount_writable`] 不建崩溃、答 W = 0。
+    ///
+    /// # Errors
+    /// 名单把根环里的根拿光了：择根没有一条可落。
+    pub fn answer_mount_writable_with_the_roots_rebuilt_from_their_records(
+        &self,
+        roots_whose_root_slot_is_missing: &[ModelRootKey],
+    ) -> Result<ModelAnswer, ModelDisagreement> {
+        let mut view_without_the_missing_roots = self.clone();
+        view_without_the_missing_roots
+            .ring
+            .retain(|_, root| !roots_whose_root_slot_is_missing.contains(&root.key));
+        if view_without_the_missing_roots.ring.is_empty() {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::NotModeled,
+                format!(
+                    "模型根环里的根全在根槽没落盘的名单里（{roots_whose_root_slot_is_missing:?}），择根没有一条可落"
+                ),
+                "执行器调了可写挂载".to_string(),
+            ));
         }
-        // 候选集只有上面那三条（D23（journal 的角色与格式） 已定项 14）：目标那一版树表 0 条不是排除项，
-        // 环里还留着带文件版本的根时也照常回退（C511（回退到无文件那一版之后诞生代怎么接） 第 3 步：回退那一版带环里的树 ID 水位 max，
-        // 再发第一个文件版本从它往上发号；I-9.14 只比同一条时间线上的根）。
-        if !reasons.is_empty() {
-            return refused(reasons);
+        let selected = view_without_the_missing_roots.newest_root().clone();
+        let mut newer_than_the_selected: Vec<&ModelRoot> = self
+            .ring
+            .values()
+            .filter(|root| root.key > selected.key)
+            .collect();
+        newer_than_the_selected.sort_by_key(|root| root.key);
+        // 迭代上界是根环的槽数；跨轮带的是走到的那条根与 W；提前出口只有「下一条换了实例」（前缀不跨实例边界）。
+        let mut effective = &selected;
+        let mut applied_transaction_high_water = 0;
+        for rebuilt in newer_than_the_selected {
+            if rebuilt.key.instance != selected.key.instance {
+                break;
+            }
+            applied_transaction_high_water = applied_transaction_high_water
+                .max(rebuilt.highest_transaction_number_of_its_publish);
+            effective = rebuilt;
         }
         let previous_row = ModelInstanceRow {
-            instance: target.instance,
-            selected_root_txg: target.checkpoint_txg,
-            applied_transaction_high_water: 0,
-            is_rollback: true,
+            instance: effective.key.instance,
+            selected_root_txg: effective.key.checkpoint_txg,
+            applied_transaction_high_water,
         };
-        self.answer_establishing_an_instance(
-            ModelOperationKind::MountRollback,
-            &target_root.clone(),
+        Ok(self.answer_establishing_an_instance(
+            ModelOperationKind::MountWritable,
+            effective,
             Some(previous_row),
-        )
+        ))
+    }
+
+    /// 管理员回退（`mount::roll_back_by_a_forward_publish`，D23（journal 的角色与格式） 已定项 14）：挂着时的一次向前发布。
+    /// 候选集 = 根环里按现行那一版的实例表判仍然有效 ∧ txg ≥ F_生效 ∧ 带文件；做成时写一条根——txg 与 jsn 接着现行那一版，
+    /// 实例、实例表、F 照现行那一版的，文件与用户可见的几个角色（数据、extent 根、inode 叶与根）的分配代取回退目标那一版的，
+    /// 固定点单元（分配记录树、记账树、映射树、树表）这次重写。模型不建坏盘，「在任何写之前拒」的账与单元那几格走不到。
+    ///
+    /// # Errors
+    /// 模型里没有可写会话，或现行版本没有文件（执行器只在带文件时调）。
+    pub fn answer_rollback_while_mounted(
+        &self,
+        target: ModelRootKey,
+    ) -> Result<ModelAnswer, ModelDisagreement> {
+        let session = self.open_session()?;
+        let current = &session.current;
+        if current.file.is_none() {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::NotModeled,
+                format!("模型里现行版本 {:?} 没有文件", current.key),
+                "实现的现行版本带文件（执行器调了回退）".to_string(),
+            ));
+        }
+        let mut required_refusals = BTreeSet::new();
+        let target_root = self.root_with_key(target);
+        match target_root {
+            None => {
+                required_refusals.insert(ModelRefusalReason::RollbackTargetNotInRing);
+            }
+            Some(target_root) => {
+                if target.checkpoint_txg < self.effective_rollback_floor() {
+                    required_refusals.insert(ModelRefusalReason::RollbackTargetBelowEffectiveFloor);
+                }
+                if Self::is_abandoned_by(target_root, &current.instance_table_rows) {
+                    required_refusals.insert(ModelRefusalReason::RollbackTargetOnAbandonedTimeline);
+                }
+                if target_root.file.is_none() {
+                    required_refusals.insert(ModelRefusalReason::RollbackTargetWithoutFile);
+                }
+            }
+        }
+        let roots = match (target_root, required_refusals.is_empty()) {
+            (Some(target_root), true) => {
+                let rollback_txg = ModelCheckpointTxg(current.key.checkpoint_txg.0 + 1);
+                let mut rollback_root = self.next_root(
+                    current,
+                    session.instance,
+                    rollback_txg,
+                    ModelJournalCounter(self.highest_journal_counter.0 + 1),
+                    ModelPublishKind::EmptyOnFileVersion,
+                    current.rollback_floor,
+                    None,
+                    Rc::clone(&current.instance_table_rows),
+                );
+                rollback_root.file.clone_from(&target_root.file);
+                for role in [
+                    ModelUnitRole::Data,
+                    ModelUnitRole::ExtentRoot,
+                    ModelUnitRole::InodeLeaf,
+                    ModelUnitRole::InodeRoot,
+                ] {
+                    if let Some(written_at) = target_root.role_written_at.get(&role) {
+                        rollback_root.role_written_at.insert(role, *written_at);
+                    }
+                }
+                vec![rollback_root]
+            }
+            (Some(_) | None, _) => Vec::new(),
+        };
+        let mut answer = self.answer_for_publishes(
+            ModelOperationKind::RollbackWhileMounted,
+            required_refusals,
+            BTreeSet::new(),
+            roots,
+        );
+        answer.rollback_target = Some(target);
+        // 回退那一步在任何写之前判完它的拒（候选集、账、单元），做成就是一次发布。
+        answer.walls_are_judged_before_the_first_write = true;
+        Ok(answer)
     }
 
     /// 可写挂载与回退共用的后半段：取号、写行那次发布、暖机到本实例的根覆盖每块盘（D16（发布语义） 已定项 8 戊，至多 R 次）。
@@ -1115,7 +1407,7 @@ impl IdealModel {
         previous_row: Option<ModelInstanceRow>,
     ) -> ModelAnswer {
         let instance = ModelInstanceGeneration(self.highest_acquired_instance.0 + 1);
-        // 行：给 [max(上一个实例, 1), 新实例) 里每个实例一行——上一个实例（或被退回的实例）那一行，中间实例 (i, 0, 0)；实例 0 不写行
+        // 行：给 [max(上一个实例, 1), 新实例) 里每个实例一行——上一个实例那一行，中间实例 (i, 0, 0)；实例 0 不写行
         // （D18（块里携带什么信息） 已定项 11；D23（journal 的角色与格式） 已定项 14）。
         let rows_to_write: Vec<ModelInstanceRow> = match previous_row {
             None => Vec::new(),
@@ -1128,14 +1420,12 @@ impl IdealModel {
                             instance: ModelInstanceGeneration(row_instance),
                             selected_root_txg: ModelCheckpointTxg(0),
                             applied_transaction_high_water: 0,
-                            is_rollback: false,
                         }
                     }
                 })
                 .collect(),
         };
         // 新实例的第一次发布的 txg 与 jsn：环里全部根与全部记录里的最大值 + 1（D23（journal 的角色与格式） 已定项 14 第 3 条）。
-        // 回退的 jsn 接在环里最大的 jsn 之后（C340 取 P2）：预想，跟收口表第 ① 行。
         let first_txg = ModelCheckpointTxg(self.highest_published_txg.0 + 1);
         let first_journal_counter = ModelJournalCounter(self.highest_journal_counter.0 + 1);
         // 新实例的根带的 F = 恢复后生效的 F（D16（发布语义） 已定项 1「生效」）：预想，跟收口表第 ② 行。
@@ -1316,6 +1606,7 @@ impl IdealModel {
             expected_mount: None,
             expected_read_back: Some(read_back),
             rollback_floor_ceiling: None,
+            rollback_target: None,
             planned_publish_upper_bounds: Vec::new(),
             walls_are_judged_before_the_first_write: true,
             session_after_success: ModelSessionAfterSuccess::Closed,
@@ -1354,6 +1645,7 @@ impl IdealModel {
             | ModelRefusalReason::RollbackTargetNotInRing
             | ModelRefusalReason::RollbackTargetBelowEffectiveFloor
             | ModelRefusalReason::RollbackTargetOnAbandonedTimeline
+            | ModelRefusalReason::RollbackTargetWithoutFile
             | ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem
             | ModelRefusalReason::FloorAboveCeiling => false,
         }
@@ -1376,6 +1668,7 @@ impl IdealModel {
                 publishes_completed,
                 wrote_anything,
                 reported_ceiling,
+                reported_root_ring_slot_still_bad_after_one_reread,
             } => {
                 self.judge_reported_ceiling(answer, *reported_ceiling, &mut counts)?;
                 let accepted = match reason {
@@ -1399,11 +1692,19 @@ impl IdealModel {
                     } else {
                         ModelDisagreementAspect::RefusalReason
                     };
-                    return Err(ModelDisagreement::new(
+                    // 实现报的读坏的根环槽只在「拒之前一个写都没发、一次发布都没做」时带出去（mount.rs 那个成员的契约：
+                    // 在回收、影子账与任何写之前返回）；拒之前写了盘的，故障注入不许拿这个槽去认。
+                    let refused_before_any_write = !*wrote_anything && *publishes_completed == 0;
+                    let mut disagreement = ModelDisagreement::new(
                         aspect,
                         describe_answer(answer),
                         format!("拒了：{member}"),
-                    ));
+                    );
+                    disagreement
+                        .implementation_reported_root_ring_slot_still_bad_after_one_reread =
+                        reported_root_ring_slot_still_bad_after_one_reread
+                            .filter(|_| refused_before_any_write);
+                    return Err(disagreement);
                 };
                 let partial_publishes_allowed = !answer.walls_are_judged_before_the_first_write
                     && accepted_reason.is_capacity_wall_with_an_interval();
@@ -1473,14 +1774,17 @@ impl IdealModel {
         if answer.rollback_floor_ceiling == Some(reported) {
             Ok(())
         } else {
-            Err(ModelDisagreement::new(
-                ModelDisagreementAspect::RollbackFloorCeiling,
-                format!(
+            Err(ModelDisagreement {
+                aspect: ModelDisagreementAspect::RollbackFloorCeiling,
+                model_answer: format!(
                     "上限 {:?}（D16（发布语义） 已定项 1）",
                     answer.rollback_floor_ceiling.map(|ceiling| ceiling.0)
                 ),
-                format!("实现报上限 {}", reported.0),
-            ))
+                implementation_answer: format!("实现报上限 {}", reported.0),
+                implementation_reported_ceiling: Some(reported),
+                implementation_reported_root_ring_slot_still_bad_after_one_reread: None,
+                implementation_rows_written: None,
+            })
         }
     }
 
@@ -1505,6 +1809,12 @@ impl IdealModel {
                         "胶水没交上限".to_string(),
                     ));
                 }
+                if let Some(target) = answer.rollback_target {
+                    let floor = self.effective_rollback_floor();
+                    if floor.0 > 0 && target.checkpoint_txg == floor {
+                        counts.rollbacks_accepted_at_the_effective_floor += 1;
+                    }
+                }
                 self.judge_roots(&answer.expected_roots, roots, counts)
             }
             ObservedEffect::Mount {
@@ -1527,21 +1837,13 @@ impl IdealModel {
                     ));
                 }
                 if rows_written != expected_rows {
-                    return Err(ModelDisagreement::new(
+                    let mut disagreement = ModelDisagreement::new(
                         ModelDisagreementAspect::InstanceRows,
                         format!("写行 {expected_rows:?}"),
                         format!("写行 {rows_written:?}"),
-                    ));
-                }
-                if answer.operation == ModelOperationKind::MountRollback {
-                    let base_txg = expected_rows
-                        .iter()
-                        .find(|row| row.is_rollback)
-                        .map(|row| row.selected_root_txg);
-                    let floor = self.effective_rollback_floor();
-                    if floor.0 > 0 && base_txg == Some(floor) {
-                        counts.rollbacks_accepted_at_the_effective_floor += 1;
-                    }
+                    );
+                    disagreement.implementation_rows_written = Some(rows_written.clone());
+                    return Err(disagreement);
                 }
                 self.judge_roots(&answer.expected_roots, roots, counts)
             }
@@ -1640,26 +1942,154 @@ impl IdealModel {
                     format!("带 F {}", observed.rollback_floor.0),
                 ));
             }
-            if expected.file.is_some() != observed.has_file {
+            if expected.file.is_some() != observed.file.has_file() {
                 return Err(ModelDisagreement::new(
                     ModelDisagreementAspect::FilePresence,
                     format!("{:?} 有文件：{}", expected.key, expected.file.is_some()),
-                    format!("有文件：{}", observed.has_file),
+                    format!("有文件：{}", observed.file.has_file()),
                 ));
             }
+            Self::judge_file_content(expected, &observed.file, counts)?;
+            Self::judge_instance_table(expected, &observed.instance_table, counts)?;
             self.judge_allocation_generations(expected, observed, counts)?;
         }
         Ok(())
     }
 
+    /// 这一版的文件内容与模型记的逐字节相同（有没有文件已经比过）。
+    fn judge_file_content(
+        expected: &ModelRoot,
+        observed: &ObservedFile,
+        counts: &mut ModelJudgementCounts,
+    ) -> Result<(), ModelDisagreement> {
+        match (&expected.file, observed) {
+            (None, ObservedFile::NoFile) => Ok(()),
+            (Some(file), ObservedFile::Decoded(content)) => {
+                counts.file_contents_compared += 1;
+                if file.content.as_ref() == content.as_slice() {
+                    Ok(())
+                } else {
+                    Err(ModelDisagreement::new(
+                        ModelDisagreementAspect::FileContent,
+                        format!(
+                            "{:?} 的文件是 {:?} 写的 {} 字节（末字节 {:?}）",
+                            expected.key,
+                            file.written_by,
+                            file.content.len(),
+                            file.content.last()
+                        ),
+                        format!("{} 字节（末字节 {:?}）", content.len(), content.last()),
+                    ))
+                }
+            }
+            (Some(file), ObservedFile::Undecodable { what }) => Err(ModelDisagreement::new(
+                ModelDisagreementAspect::FileContent,
+                format!(
+                    "{:?} 的文件是 {:?} 写的 {} 字节",
+                    expected.key,
+                    file.written_by,
+                    file.content.len()
+                ),
+                format!("交回的单元里解不出内容：{what}"),
+            )),
+            (None, ObservedFile::Decoded(_) | ObservedFile::Undecodable { .. })
+            | (Some(_), ObservedFile::NoFile) => Err(ModelDisagreement::new(
+                ModelDisagreementAspect::FilePresence,
+                format!("{:?} 有文件：{}", expected.key, expected.file.is_some()),
+                format!("有文件：{}", observed.has_file()),
+            )),
+        }
+    }
+
+    /// 这一版的整张实例表与模型记的逐行相同；实现交回的东西里没有这一版整条链的字节时只计数。
+    fn judge_instance_table(
+        expected: &ModelRoot,
+        observed: &ObservedInstanceTable,
+        counts: &mut ModelJudgementCounts,
+    ) -> Result<(), ModelDisagreement> {
+        match observed {
+            ObservedInstanceTable::Rows(rows) => {
+                counts.instance_tables_compared += 1;
+                if expected.instance_table_rows.as_slice() == rows.as_slice() {
+                    Ok(())
+                } else {
+                    Err(ModelDisagreement::new(
+                        ModelDisagreementAspect::InstanceTableOfTheVersion,
+                        format!(
+                            "{:?} 的实例表 {:?}",
+                            expected.key,
+                            expected.instance_table_rows.as_slice()
+                        ),
+                        format!("{rows:?}"),
+                    ))
+                }
+            }
+            ObservedInstanceTable::NotInTheOutput { .. } => {
+                counts.instance_tables_not_in_the_output += 1;
+                Ok(())
+            }
+            ObservedInstanceTable::Undecodable { what } => Err(ModelDisagreement::new(
+                ModelDisagreementAspect::InstanceTableOfTheVersion,
+                format!(
+                    "{:?} 的实例表 {:?}",
+                    expected.key,
+                    expected.instance_table_rows.as_slice()
+                ),
+                format!("交回的实例表单元解不开：{what}"),
+            )),
+        }
+    }
+
     /// 这一版每个单元的分配记录：每块盘各一条、仍分配着、分配代等于写它的那次发布的 txg（D3（空间分配） 已定项 3 / 7）。
+    /// 两个方向都比（代码审阅第 12 条）：实现交回的每个角色这一版都要有，模型这一版的每个角色实现都要交回。
+    /// 树表 0 条的一版输出不带分配记录，比的是这次发布重写了哪几个角色：模型那一侧是分配代等于这次 txg 的那几个。
     fn judge_allocation_generations(
         &self,
         expected: &ModelRoot,
         observed: &ObservedRoot,
         counts: &mut ModelJudgementCounts,
     ) -> Result<(), ModelDisagreement> {
-        for (role, records) in &observed.unit_allocation_records {
+        let observed_records = match &observed.unit_allocation_records {
+            ObservedUnitAllocationRecords::EveryRoleOfTheVersion(records) => records,
+            ObservedUnitAllocationRecords::RewrittenRolesOnly(rewritten) => {
+                let rewritten_in_the_model: BTreeSet<ModelUnitRole> = expected
+                    .role_written_at
+                    .iter()
+                    .filter(|(_, written_at)| **written_at == expected.key.checkpoint_txg)
+                    .map(|(role, _)| *role)
+                    .collect();
+                counts.rewritten_role_sets_compared += 1;
+                if rewritten_in_the_model == *rewritten {
+                    return Ok(());
+                }
+                return Err(ModelDisagreement::new(
+                    ModelDisagreementAspect::AllocationGeneration,
+                    format!(
+                        "{:?} 这次重写（分配代等于这次 txg）的角色 {rewritten_in_the_model:?}",
+                        expected.key
+                    ),
+                    format!("重写了 {rewritten:?}"),
+                ));
+            }
+        };
+        let handed_in: BTreeSet<ModelUnitRole> =
+            observed_records.iter().map(|(role, _)| *role).collect();
+        if let Some(role) = expected
+            .role_written_at
+            .keys()
+            .find(|role| !handed_in.contains(role))
+        {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::AllocationGeneration,
+                format!(
+                    "{:?} 这一版有 {role:?}（{:?} 写的），实现要交回它的分配记录",
+                    expected.key,
+                    expected.role_written_at.get(role)
+                ),
+                format!("只交回了 {handed_in:?}"),
+            ));
+        }
+        for (role, records) in observed_records {
             let Some(written_at) = expected.role_written_at.get(role) else {
                 return Err(ModelDisagreement::new(
                     ModelDisagreementAspect::AllocationGeneration,
@@ -1919,7 +2349,7 @@ mod tests {
     /// 下一次可写挂载取 371、写 [1, 371) 共 370 行 ⇒ 两片：写行那次发布占 2 × 2 + 3（记账树、映射树、树表）槽，
     /// 加分配记录树这次至多重写的节点数。
     #[test]
-    fn a_mount_that_writes_more_rows_than_one_page_holds_counts_every_page_of_the_instance_table_chain(
+    fn mount_that_writes_more_rows_than_one_page_holds_counts_every_page_of_the_instance_table_chain(
     ) {
         let mut model = two_device_model();
         model.acquire_and_warm_up_in_the_make_filesystem_process();
@@ -2031,56 +2461,99 @@ mod tests {
         );
     }
 
-    /// 抬 F 到 6 之后 F_生效 = 6：回退到 txg 6 的根是候选（txg ≥ F_生效，D16（发布语义） 已定项 1「回退候选集」），txg 5 的必须拒；
-    /// 回退到 (6, 2) 之后实例 2 的 7–11 被抛弃（写了回退行 (2, 6, 0)），再回退到 (9, 2) 必须拒；冷启动读回回退那一版（txg 6 写的内容）。
+    /// 抬 F 到 6 之后 F_生效 = 6：回退到 txg 6 的根是候选（txg ≥ F_生效，D16（发布语义） 已定项 1「回退候选集」），txg 5 的必须拒。
+    /// 回退是挂着时的一次向前发布（D23（journal 的角色与格式） 已定项 14）：写一条根 (12, 2)，实例、F 照现行那一版，文件是 txg 6 写的那一版、
+    /// 数据单元的分配代写回 6；实例 2 的 7–11 不被抛弃，之后再回退到 (9, 2) 照样是候选。冷启动读回最新那条根——回退写的那一版。
     #[test]
-    fn rollback_to_the_effective_floor_is_accepted_and_abandons_the_newer_roots_of_that_instance() {
+    fn the_forward_rollback_to_the_effective_floor_publishes_one_root_and_leaves_the_newer_roots_candidates(
+    ) {
         let mut model = model_after_four_overwrites_in_a_second_instance();
         let raise = model
             .answer_raise_rollback_floor(ModelCheckpointTxg(6))
             .expect("会话开着");
         succeed(&mut model, &raise);
         assert_eq!(model.effective_rollback_floor(), ModelCheckpointTxg(6));
-        model.close_session();
         assert_eq!(
-            model.answer_mount_rollback(key(5, 2)).required_refusals,
+            model
+                .answer_rollback_while_mounted(key(5, 2))
+                .expect("会话开着、现行版本带文件")
+                .required_refusals,
             BTreeSet::from([ModelRefusalReason::RollbackTargetBelowEffectiveFloor])
         );
-        let rollback = model.answer_mount_rollback(key(6, 2));
         assert_eq!(
-            rollback.expected_mount,
-            Some((
-                ModelInstanceGeneration(3),
-                vec![ModelInstanceRow {
-                    instance: ModelInstanceGeneration(2),
-                    selected_root_txg: ModelCheckpointTxg(6),
-                    applied_transaction_high_water: 0,
-                    is_rollback: true,
-                }]
-            ))
+            model
+                .answer_rollback_while_mounted(key(2, 1))
+                .expect("会话开着、现行版本带文件")
+                .required_refusals,
+            BTreeSet::from([
+                ModelRefusalReason::RollbackTargetBelowEffectiveFloor,
+                ModelRefusalReason::RollbackTargetWithoutFile
+            ]),
+            "暖机根 (2, 1) 在 F 之下、也没有文件"
+        );
+        let rollback = model
+            .answer_rollback_while_mounted(key(6, 2))
+            .expect("会话开着、现行版本带文件");
+        assert_eq!(
+            rollback
+                .expected_roots
+                .iter()
+                .map(|root| root.key)
+                .collect::<Vec<_>>(),
+            vec![key(12, 2)],
+            "一次发布，接着现行那一版（txg 11）、实例照旧"
+        );
+        let rollback_root = &rollback.expected_roots[0];
+        assert_eq!(rollback_root.rollback_floor, ModelCheckpointTxg(6));
+        assert_eq!(
+            rollback_root.file.as_ref().map(|file| file.written_by),
+            Some(key(6, 2))
+        );
+        assert_eq!(
+            rollback_root.role_written_at.get(&ModelUnitRole::Data),
+            Some(&ModelCheckpointTxg(6)),
+            "复活的数据单元分配代写回目标那一版账里的"
+        );
+        assert_eq!(
+            rollback_root.role_written_at.get(&ModelUnitRole::TreeTable),
+            Some(&ModelCheckpointTxg(12)),
+            "固定点单元这次重写"
         );
         succeed(&mut model, &rollback);
-        model.close_session();
-        assert_eq!(
-            model.answer_mount_rollback(key(9, 2)).required_refusals,
-            BTreeSet::from([ModelRefusalReason::RollbackTargetOnAbandonedTimeline])
+        assert!(
+            model
+                .answer_rollback_while_mounted(key(9, 2))
+                .expect("会话开着、现行版本带文件")
+                .required_refusals
+                .is_empty(),
+            "向前发布不抛弃 (9, 2)"
         );
+        model.close_session();
         let cold_start = model.answer_cold_start_recover();
         let Some(ModelReadBack::FileRead { root, content }) = cold_start.expected_read_back else {
             panic!("回退那一版带文件：{cold_start:?}");
         };
-        assert_eq!(
-            root,
-            key(13, 3),
-            "回退写行 txg 12（盘 0）、暖机 txg 13（盘 1）"
-        );
+        assert_eq!(root, key(12, 2));
         assert_eq!(content.as_ref(), &[6]);
     }
 
-    /// F_生效 = 各盘所带 F 最大值的最小值：只有一块盘上有带新 F 的根时不生效（D16（发布语义） 已定项 1「生效」）。抬 F 半路停在第一次
-    /// （txg 10 落盘 1），盘 0 上最大的 F 仍是 0。
+    /// 「4 个不同状态」去重（D16（发布语义） 已定项 1「「非空」从盘上怎么认」末段）：实例 2 覆盖写到 txg 9（各一个状态）之后回退到 (7, 2)，
+    /// 回退写的 (10, 2) 状态同 txg 7。从新到旧计入 10、9、8，7 与 10 同一个状态不计，第 4 个是 6；每块盘上最新的有效根取小是 9
+    /// （盘 0 最新 9、盘 1 最新 10）⇒ 上限 6。不去重时第 4 个是 7。
     #[test]
-    fn raised_floor_carried_by_one_device_only_does_not_take_effect() {
+    fn after_a_forward_rollback_the_ceiling_counts_the_repeated_state_once() {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        let rollback = model
+            .answer_rollback_while_mounted(key(7, 2))
+            .expect("会话开着、现行版本带文件");
+        succeed(&mut model, &rollback);
+        assert_eq!(model.rollback_floor_ceiling(), Some(ModelCheckpointTxg(6)));
+    }
+
+    /// F_生效 = 各幸存盘最新持久有效根所带 F 的最大值（D16（发布语义） 已定项 1「生效」）：抬 F 半路停在第一次（txg 10 落盘 1）时，
+    /// 盘 1 上最新的有效根就带着 6，F_生效 已是 6。
+    #[test]
+    fn raised_floor_carried_by_the_newest_root_of_one_device_takes_effect() {
         let mut model = model_after_four_overwrites_in_a_second_instance();
         let raise = model
             .answer_raise_rollback_floor(ModelCheckpointTxg(6))
@@ -2089,7 +2562,7 @@ mod tests {
         for root in first_publish_only {
             model.write_root(root);
         }
-        assert_eq!(model.effective_rollback_floor(), ModelCheckpointTxg(0));
+        assert_eq!(model.effective_rollback_floor(), ModelCheckpointTxg(6));
     }
 
     /// 单元的分配代是写它的那次发布的 txg（D3（空间分配） 已定项 3 / 7）：写行那次（txg 4）照抄的数据单元分配代 3，写成 4 就对不上；
@@ -2117,21 +2590,253 @@ mod tests {
             key: row_publish.key,
             journal_counter: row_publish.journal_counter,
             rollback_floor: row_publish.rollback_floor,
-            has_file: true,
-            unit_allocation_records: vec![
-                (ModelUnitRole::Data, records(data_generation)),
-                (ModelUnitRole::InstanceTable, records(4)),
-            ],
+            file: ObservedFile::Decoded(vec![3]),
+            instance_table: ObservedInstanceTable::Rows(
+                row_publish.instance_table_rows.as_ref().clone(),
+            ),
+            unit_allocation_records: ObservedUnitAllocationRecords::EveryRoleOfTheVersion(
+                row_publish
+                    .role_written_at
+                    .iter()
+                    .map(|(role, written_at)| {
+                        let generation = if *role == ModelUnitRole::Data {
+                            data_generation
+                        } else {
+                            written_at.0
+                        };
+                        (*role, records(generation))
+                    })
+                    .collect(),
+            ),
         };
         let mut counts = ModelJudgementCounts::default();
         assert_eq!(
             model.judge_allocation_generations(row_publish, &observed(3), &mut counts),
             Ok(())
         );
-        assert_eq!(counts.allocation_records_compared, 4);
+        assert_eq!(
+            counts.allocation_records_compared,
+            2 * 9,
+            "写行那一版九个角色，每个角色每块盘一条"
+        );
         let wrong = model
             .judge_allocation_generations(row_publish, &observed(4), &mut counts)
             .expect_err("照抄的数据单元分配代写成了这次的 txg");
         assert_eq!(wrong.aspect, ModelDisagreementAspect::AllocationGeneration);
+    }
+
+    /// 实现对这一版的交回原样照模型那一版写：文件内容、整张实例表、每个角色每块盘一条仍分配、代是写它的那次发布。
+    fn observed_exactly_as_the_model_wrote(root: &ModelRoot) -> ObservedRoot {
+        let records = |generation: ModelCheckpointTxg| {
+            [ModelDeviceIdentity(0), ModelDeviceIdentity(1)]
+                .into_iter()
+                .map(|device| ObservedAllocationRecord {
+                    device,
+                    generation,
+                    is_released: false,
+                })
+                .collect::<Vec<_>>()
+        };
+        ObservedRoot {
+            key: root.key,
+            journal_counter: root.journal_counter,
+            rollback_floor: root.rollback_floor,
+            file: match &root.file {
+                Some(file) => ObservedFile::Decoded(file.content.to_vec()),
+                None => ObservedFile::NoFile,
+            },
+            instance_table: ObservedInstanceTable::Rows(root.instance_table_rows.as_ref().clone()),
+            unit_allocation_records: ObservedUnitAllocationRecords::EveryRoleOfTheVersion(
+                root.role_written_at
+                    .iter()
+                    .map(|(role, written_at)| (*role, records(*written_at)))
+                    .collect(),
+            ),
+        }
+    }
+
+    /// 可写挂载写行那一版（txg 4）：第一个文件（txg 3，内容 [3]）之后关掉、再挂一次。
+    fn row_publish_of_a_mount_after_the_first_file() -> (IdealModel, ModelRoot) {
+        let mut model = two_device_model();
+        model.acquire_and_warm_up_in_the_make_filesystem_process();
+        let first = model.answer_publish_first_file(&[3]).expect("会话开着");
+        succeed(&mut model, &first);
+        model.close_session();
+        let mount = model.answer_mount_writable();
+        let row_publish = mount.expected_roots[0].clone();
+        (model, row_publish)
+    }
+
+    /// 分配代对拍两个方向都比（代码审阅第 12 条）：模型这一版有、实现没交回的角色也报——此前只遍历实现交回的角色，
+    /// 写行那一版九个角色只交两个也判对得上。
+    #[test]
+    fn a_role_of_the_version_that_the_implementation_did_not_hand_in_is_reported() {
+        let (model, row_publish) = row_publish_of_a_mount_after_the_first_file();
+        let mut observed = observed_exactly_as_the_model_wrote(&row_publish);
+        let mut counts = ModelJudgementCounts::default();
+        assert_eq!(
+            model.judge_roots(
+                std::slice::from_ref(&row_publish),
+                std::slice::from_ref(&observed),
+                &mut counts
+            ),
+            Ok(()),
+            "原样交回九个角色对得上"
+        );
+        let ObservedUnitAllocationRecords::EveryRoleOfTheVersion(records) =
+            &mut observed.unit_allocation_records
+        else {
+            panic!("照模型写的是带文件的那一版的全部角色");
+        };
+        records.retain(|(role, _)| *role != ModelUnitRole::InodeRoot);
+        let missing = model
+            .judge_roots(
+                std::slice::from_ref(&row_publish),
+                std::slice::from_ref(&observed),
+                &mut counts,
+            )
+            .expect_err("inode 根这一版有，实现没交");
+        assert_eq!(
+            missing.aspect,
+            ModelDisagreementAspect::AllocationGeneration
+        );
+        assert!(
+            missing.model_answer.contains("InodeRoot"),
+            "点名漏交的那个角色：{missing:?}"
+        );
+    }
+
+    /// 树表 0 条的一版（写行那次只重写实例表与这一版自己的分配记录树）：输出不带分配记录，
+    /// 两边比「这次重写了哪几个角色」，少一个、多一个都报。
+    #[test]
+    fn a_version_without_file_compares_the_rewritten_roles_both_ways() {
+        let mut model = two_device_model();
+        model.acquire_and_warm_up_in_the_make_filesystem_process();
+        model.close_session();
+        let mount = model.answer_mount_writable();
+        let row_publish = mount.expected_roots[0].clone();
+        assert!(row_publish.file.is_none(), "起点那一版树表 0 条");
+        let observed_with = |roles: &[ModelUnitRole]| ObservedRoot {
+            key: row_publish.key,
+            journal_counter: row_publish.journal_counter,
+            rollback_floor: row_publish.rollback_floor,
+            file: ObservedFile::NoFile,
+            instance_table: ObservedInstanceTable::NotInTheOutput { why: "用例" },
+            unit_allocation_records: ObservedUnitAllocationRecords::RewrittenRolesOnly(
+                roles.iter().copied().collect(),
+            ),
+        };
+        let mut counts = ModelJudgementCounts::default();
+        assert_eq!(
+            model.judge_roots(
+                std::slice::from_ref(&row_publish),
+                &[observed_with(&[
+                    ModelUnitRole::InstanceTable,
+                    ModelUnitRole::AllocationTree
+                ])],
+                &mut counts
+            ),
+            Ok(())
+        );
+        assert_eq!(counts.rewritten_role_sets_compared, 1);
+        assert_eq!(counts.instance_tables_not_in_the_output, 1);
+        for wrong in [
+            vec![ModelUnitRole::InstanceTable],
+            vec![
+                ModelUnitRole::InstanceTable,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::TreeTable,
+            ],
+        ] {
+            let disagreement = model
+                .judge_roots(
+                    std::slice::from_ref(&row_publish),
+                    &[observed_with(&wrong)],
+                    &mut counts,
+                )
+                .expect_err("重写的角色少一个或多一个");
+            assert_eq!(
+                disagreement.aspect,
+                ModelDisagreementAspect::AllocationGeneration,
+                "{wrong:?}"
+            );
+        }
+    }
+
+    /// 每一版都比文件内容（代码审阅第 12 条：此前内容只在冷启动那一步比）：写行那一版照抄第一个文件的内容 [3]。
+    #[test]
+    fn each_version_compares_its_file_content() {
+        let (model, row_publish) = row_publish_of_a_mount_after_the_first_file();
+        let mut counts = ModelJudgementCounts::default();
+        let mut observed = observed_exactly_as_the_model_wrote(&row_publish);
+        assert_eq!(
+            model.judge_roots(
+                std::slice::from_ref(&row_publish),
+                std::slice::from_ref(&observed),
+                &mut counts
+            ),
+            Ok(())
+        );
+        assert_eq!(counts.file_contents_compared, 1);
+        for wrong in [
+            ObservedFile::Decoded(vec![4]),
+            ObservedFile::Undecodable {
+                what: "用例".to_string(),
+            },
+        ] {
+            observed.file = wrong.clone();
+            let disagreement = model
+                .judge_roots(
+                    std::slice::from_ref(&row_publish),
+                    std::slice::from_ref(&observed),
+                    &mut counts,
+                )
+                .expect_err("内容不是 [3]");
+            assert_eq!(
+                disagreement.aspect,
+                ModelDisagreementAspect::FileContent,
+                "{wrong:?}"
+            );
+        }
+    }
+
+    /// 每一版都比整张实例表：写行那一版有实例 1 那一行；少了它报，输出里没有实例表字节的只计数不判。
+    #[test]
+    fn each_version_compares_its_instance_table() {
+        let (model, row_publish) = row_publish_of_a_mount_after_the_first_file();
+        assert_eq!(row_publish.instance_table_rows.len(), 1, "实例 1 那一行");
+        let mut counts = ModelJudgementCounts::default();
+        let mut observed = observed_exactly_as_the_model_wrote(&row_publish);
+        assert_eq!(
+            model.judge_roots(
+                std::slice::from_ref(&row_publish),
+                std::slice::from_ref(&observed),
+                &mut counts
+            ),
+            Ok(())
+        );
+        assert_eq!(counts.instance_tables_compared, 1);
+        observed.instance_table = ObservedInstanceTable::Rows(Vec::new());
+        let disagreement = model
+            .judge_roots(
+                std::slice::from_ref(&row_publish),
+                std::slice::from_ref(&observed),
+                &mut counts,
+            )
+            .expect_err("实例表丢了那一行");
+        assert_eq!(
+            disagreement.aspect,
+            ModelDisagreementAspect::InstanceTableOfTheVersion
+        );
+        observed.instance_table = ObservedInstanceTable::NotInTheOutput { why: "用例" };
+        assert_eq!(
+            model.judge_roots(
+                std::slice::from_ref(&row_publish),
+                std::slice::from_ref(&observed),
+                &mut counts
+            ),
+            Ok(())
+        );
+        assert_eq!(counts.instance_tables_not_in_the_output, 1);
     }
 }

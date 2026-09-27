@@ -24,15 +24,13 @@ use singlefs_core::instance_table::{InstanceRow, InstanceTablePageIndex, Instanc
 use singlefs_core::make_filesystem::{
     instance_table_chain_record, location_entries, make_filesystem, INSTANCE_TABLE_SLOT,
 };
-use singlefs_core::mount::{
-    mount_rollback, mount_writable, MountError, Mounted, RollbackCandidateExclusion,
-    RollbackTarget, ShadowLedger,
-};
+use singlefs_core::mount::{mount_writable, MountError, Mounted};
 use singlefs_core::pointer::{BirthSequence, NodePointer, PointerHead};
 use singlefs_core::recovery::{
     choose_root, choose_system_configuration, instance_table_chain_of_root, instance_table_of_root,
-    readable_roots, recover, verified_system_configuration_slots, JournalPolicy, PoolReader,
-    RecoveryFailure, RecoveryOutcome,
+    readable_roots, recover, root_is_abandoned_by_the_instance_table,
+    verified_system_configuration_slots, JournalPolicy, PoolReader, RecoveryFailure,
+    RecoveryOutcome,
 };
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
@@ -214,6 +212,7 @@ fn write_two_page_chain(
     {
         let rewritten = RootRecord {
             filesystem_identifier: root.filesystem_identifier,
+            unmount_marker: root.unmount_marker,
             instance: root.instance,
             checkpoint_txg: root.checkpoint_txg,
             tree_table: root.tree_table,
@@ -417,11 +416,13 @@ fn writable_mount_follows_the_chain_and_refuses_a_page_missing_from_the_allocati
     );
 }
 
-/// 回退候选集读的是整张表：实例 3 那一行只在第二片上、它的 T 比实例 3 最后那条根的 txg 小一，
-/// 那条根就在被抛弃的时间线上，回退到它在任何写之前被拒（只读第 0 片就看不到这一行，回退会照做）。
+/// 回退候选集与影子账按实例表判「被抛弃」读的是整张表：实例 3 那一行只在第二片上、它的 T 比实例 3 最后那条根的 txg 小一，
+/// 那条根就在被抛弃的时间线上（只读第 0 片就看不到这一行，它照样有效）。管理员回退改成挂着时的向前发布之后，回退入口要一版带文件的
+/// 现行版本，这张树表 0 条的池上调不到它；判定照同一条路走（`recovery::instance_table_of_root` 读整条链，
+/// `recovery::root_is_abandoned_by_the_instance_table` 按行判），回退入口那一侧的排除由步 4 的候选集用例钉。
 #[test]
-fn rollback_candidate_set_reads_the_row_that_lives_on_the_second_page() {
-    let (mut devices, stream) = pool_without_file_after_writable_mounts();
+fn abandonment_by_the_instance_table_reads_the_row_that_lives_on_the_second_page() {
+    let (mut devices, _stream) = pool_without_file_after_writable_mounts();
     let rows = rows_of_the_newest_table(&devices);
     let system_configuration = choose_system_configuration(&devices).expect("系统配置");
     let last_root_of_instance_three = readable_roots(
@@ -438,11 +439,16 @@ fn rollback_candidate_set_reads_the_row_that_lives_on_the_second_page() {
         rows[2].selected_root_txg, last_root_of_instance_three.checkpoint_txg,
         "写行时实例 3 那一行的 T 就是它最后那条根的 txg"
     );
+    let table_before =
+        instance_table_of_root(&devices, &newest_root(&devices)).expect("一片的表读得出");
+    assert!(
+        !root_is_abandoned_by_the_instance_table(&last_root_of_instance_three, &table_before),
+        "拆片之前：实例 3 那一行的 T 就是它，不被抛弃"
+    );
     let row_that_abandons_the_last_root = InstanceRow {
         instance: InstanceGeneration(3),
         selected_root_txg: CheckpointTxg(last_root_of_instance_three.checkpoint_txg.0 - 1),
         applied_transaction_high_water: 0,
-        is_rollback: false,
     };
     write_two_page_chain(
         &mut devices,
@@ -450,29 +456,17 @@ fn rollback_candidate_set_reads_the_row_that_lives_on_the_second_page() {
         chain_record_to,
         &[row_that_abandons_the_last_root],
     );
-    let before = snapshot(&devices, &stream);
-    let target = RollbackTarget {
-        instance: last_root_of_instance_three.instance,
-        checkpoint_txg: last_root_of_instance_three.checkpoint_txg,
-    };
-    match mount_rollback(&parameters(), &mut devices, target, ShadowLedger::On) {
-        Err(MountError::RollbackTargetNotACandidate {
-            target: refused_target,
-            exclusion,
-        }) => {
-            assert_eq!(refused_target, target);
-            assert_eq!(
-                exclusion,
-                RollbackCandidateExclusion::OnAbandonedTimeline,
-                "第二片上那一行把实例 3 最后那条根判进被抛弃的时间线"
-            );
-        }
-        other => panic!(
-            "第二片上那一行把目标判出候选集：要拒绝：{:?}",
-            other.map(|_| "回退做了")
-        ),
-    }
-    assert_eq!(snapshot(&devices, &stream), before, "在任何写之前拒绝");
+    let table =
+        instance_table_of_root(&devices, &newest_root(&devices)).expect("两片的表沿链读得出");
+    assert_eq!(
+        table.rows.last(),
+        Some(&row_that_abandons_the_last_root),
+        "第二片上那一行读进来了"
+    );
+    assert!(
+        root_is_abandoned_by_the_instance_table(&last_root_of_instance_three, &table),
+        "第二片上那一行把实例 3 最后那条根判进被抛弃的时间线"
+    );
 }
 
 /// 合法的两片链上池级 checker 一条都不红：第二片的身份、校验和、位置条目次序、链指针记录都判过（I-1.1、I-2.1、I-2.5、I-3.8
@@ -593,42 +587,4 @@ fn contradictory_chain_record_reddens_only_the_instance_table_invariant() {
             "{what}：读者同样拒收这一片"
         );
     }
-}
-
-/// 影子账隔离被抛弃根引用的整条链（D23（journal 的角色与格式） 已定项 14「被抛弃时间线的根离开根环之前，它们引用的单元不许重新分配」）：
-/// 回退到实例 3 最后那条根，实例 4 的根全被抛弃；它们指着的两片实例表都只被被抛弃根引用，两片都隔离——每块盘 2 + 2 槽，
-/// 再加实例 4 写行那一版自己那棵分配记录树的七个节点 7 槽（根指针住根记录那一项，同样只被被抛弃根引用；按位置寻址，
-/// D8（核心索引结构） 已定项 14：4 GiB 两块盘上根在第 2 层，账里的记录落在两块盘各自的叶 61 与第二片所在的叶 73 里，
-/// 四片叶、两块盘各自的第 1 层节点 0 与根）。
-/// 只认根记录里那一条实例表指针的话第二片那 2 槽不隔离，回退之后当空闲槽发得出去。
-#[test]
-fn rollback_isolates_every_page_of_the_instance_table_chain_that_only_abandoned_roots_reference() {
-    let (mut devices, _stream, _rows, _chain) = pool_with_a_valid_two_page_chain();
-    let system_configuration = choose_system_configuration(&devices).expect("系统配置");
-    let last_root_of_instance_three = readable_roots(
-        &devices,
-        &system_configuration.immutable.region_devices,
-        &system_configuration.immutable.sizes,
-        &system_configuration.immutable.filesystem_identifier,
-    )
-    .into_iter()
-    .filter(|root| root.instance == InstanceGeneration(3))
-    .max_by_key(|root| root.checkpoint_txg)
-    .expect("实例 3 发布过根");
-    let rolled_back = mount_rollback(
-        &parameters(),
-        &mut devices,
-        RollbackTarget {
-            instance: last_root_of_instance_three.instance,
-            checkpoint_txg: last_root_of_instance_three.checkpoint_txg,
-        },
-        ShadowLedger::On,
-    )
-    .expect("实例 3 最后那条根在候选集里（第二片上实例 3 那一行的 T 就是它的 txg），回退那一版的表只有一片");
-    assert_eq!(
-        rolled_back.output.isolated_slots_per_device,
-        vec![(DeviceIdentity(0), 11), (DeviceIdentity(1), 11)],
-        "实例 4 那张表的第 0 片 2 槽、第二片 2 槽、实例 4 那棵分配记录树七个节点 7 槽，逐盘"
-    );
-    assert_eq!(rolled_back.output.abandoned_roots_unreadable, 0);
 }

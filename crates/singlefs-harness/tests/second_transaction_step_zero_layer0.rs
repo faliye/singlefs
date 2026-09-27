@@ -1,8 +1,10 @@
 //! 里程碑「第二个事务」步 0 在发布 B 上的那一半：把「取号 → 暖机 → A → B」整条录制流按 D13（验证路线） 已定项 4 枚举全部崩溃状态，
 //! 与第一个事务同一种切法（上一次发布的系统配置槽写与下一次发布的单元写落在同一段，登记表八末尾那条 ⚠️），
 //! 每个状态跑恢复 + 多版本 oracle（实际走的根是哪一代就得读出那一代的内容）、池级 checker、记录核对器。
-//! 平时 `cargo test` 跳过两个 18 写的段；全量那条标 ignored，54 号门禁在 release 下跑它。再加四组靶向的阳性对照。
-//! 另有两条只展开小段的流：基镜像里预置一条残留记录（步 0 预想的细节第三条的正例），与到 E 之后再复用一次、改坏 tail（步 6 必红「陈旧 tail + 已复用的块」）。
+//! 平时 `cargo test` 跑甲二快档（每段原地写各取它的几态、任意组合 × 单元写全不落或全落，`crash::Layer0SegmentExpansion`，用户 2026-09-26 定；
+//! 系统配置槽写是原地覆写、多一态「新旧都读不出」，代码审阅第 4 条，用户 2026-09-27 定）；
+//! 全量那条标 ignored，54 号门禁在 release 下跑它（带断点续跑）。再加四组靶向的阳性对照。
+//! 另有两条只展开小段的流：基镜像里预置一条残留记录（步 0 预想的细节第三条的正例），与到 E 之后再复用两次、改坏 tail（步 6 必红「陈旧 tail + 已复用的块」）。
 
 mod common;
 
@@ -13,25 +15,32 @@ use singlefs_core::address::{CheckpointTxg, InstanceGeneration, SlotNumber};
 use singlefs_core::block_device::{BlockDevice, WriteDurability};
 use singlefs_core::checksum::crc32_castagnoli;
 use singlefs_core::mount::{
-    mount_rollback, mount_writable, raise_rollback_floor, InstanceRow, RollbackTarget, ShadowLedger,
+    mount_writable, raise_rollback_floor, roll_back_by_a_forward_publish, unmount, InstanceRow,
+    RollbackTarget, ShadowLedger, UnmountRaisedTheFloor, Unmounted,
 };
 use singlefs_core::recovery::{
     choose_system_configuration, recover, scan_journal, JournalPolicy, PoolReader, RecoveryOutcome,
     RecoveryReport,
 };
 use singlefs_core::system_configuration::SystemConfiguration;
-use singlefs_core::transaction::{publish_overwrite, FirstFile, PoolWriter, TransactionOutput};
+use singlefs_core::transaction::{
+    publish_overwrite, FirstFile, PoolVersion, PoolWriter, TransactionOutput,
+};
 use singlefs_core::unit::{UNIT_CLASS_DATA, UNIT_CLASS_INDEX_NODE, UNIT_CLASS_PACKED};
 use singlefs_format::{DATA_UNIT_BYTES, NODE_BYTES};
 use singlefs_harness::crash::{
-    closed_form_state_count, enumerate_layer0_in_state_slices, enumerate_layer0_selecting_versions,
-    enumerate_layer0_selecting_versions_observing_each_state, enumerate_layer0_versions,
-    evaluate_state_for_versions, writes_and_segments, CrashImage, Layer0Parallelism,
-    Layer0SliceLength, Layer0Tally, Layer0WorkerThreadsSource, MemoryPool, PublishedVersion,
-    RetainedWrite, WrittenContents,
+    closed_form_state_count, enumerate_layer0_in_state_slices,
+    enumerate_layer0_in_state_slices_or_one_shard, enumerate_layer0_quick_tier_versions,
+    enumerate_layer0_selecting_versions_observing_each_state, evaluate_state_for_versions,
+    full_expansion, layer0_state_count, layer0_state_count_with_torn_in_place_overwrites,
+    quick_tier_expansion, writes_and_segments, writes_and_segments_with_stream_indexes_and_entries,
+    CrashImage, Layer0EnumerationOutcome, Layer0ObserverCounts, Layer0Parallelism,
+    Layer0SegmentExpansion, Layer0SliceLength, Layer0Tally, Layer0WorkerThreadsSource, MemoryPool,
+    PublishedVersion, RetainedWrite, WrittenContents,
 };
+use singlefs_harness::layer0_progress::Layer0Resume;
 use singlefs_harness::segments::StepKind;
-use singlefs_harness::RetainedOperation;
+use singlefs_harness::{RecordedEntrySpan, RecordedPublishEntry, RetainedOperation};
 
 const SECOND_FILE_BYTES: usize = 4100;
 
@@ -52,21 +61,57 @@ struct Prepared {
     versions: Vec<PublishedVersion>,
 }
 
-/// 固定脚本跑到哪一步（里程碑「第二个事务」步 0）：到 B 为止是靶向对照用的两次发布流；到 C 为止多了进程重开、可写挂载
-/// （取号、写行、暖机两次）与发布 C，是层 0 全量跑的那条流。
+/// 固定脚本跑到哪一步（里程碑「第二个事务」步 0）：到 B 为止是靶向对照用的两次发布流；到 E 再正常卸载是层 0 全量跑的那条流。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Script {
     SecondVersionOnly,
+    /// 到 C 为止：B 之后进程重开、可写挂载（取号、写行、暖机两次），再发布 C。
     ThirdVersion,
-    /// 到 D 为止：C 之后进程再退出、重开走管理员回退到 A 的根 (1, 3)——取号 3、写回退行与中间实例行的发布 D（txg 9）、暖机一次（txg 10）。
+    /// 到 D 为止：C 之后在同一个会话里挂着的时候回退到 A 的根 (1, 3)——一次向前发布 D（txg 9，实例仍是 2，
+    /// D23（journal 的角色与格式） 已定项 14），不取号、不写行、不暖机。
     RollbackToFirstVersion,
-    /// 到 E 为止：回退之后再覆盖写四次（txg 11–14，第一次释放 A 的数据单元、释放代 11），抬 F 到 11（两次空发布 txg 15、16），
-    /// 再发布 E（txg 17）——数据单元落回 50178。
-    ReuseAfterRaisingFloor,
-    /// 到 E 之后再覆盖写一次（txg 18）：数据单元落回 A 的数据单元那一对槽 50180，A 那条记录（jsn 3）点名的单元从此校验和对不上——
-    /// 环里第一条点名块被合法复用的记录（到 E 为止环里 17 条记录点名的单元都还对得上）。
+    /// 到 E 为止再正常卸载：回退之后再覆盖写五次（txg 10–14，第一次释放 D 复活的 A 的数据单元、释放代 10），抬 F 到 11
+    /// （两次空发布 txg 15、16），再发布 E（txg 17）——数据单元落回 mkfs 实例表那两槽 50176；最后正常卸载（B1，D16（发布语义）
+    /// 已定项 1「正常卸载」）：先把 F = 17 写进每块盘的系统配置、过一道屏障，再推带卸载记号的空发布直到每块盘上都有一条（txg 18、19）。
+    /// 这是层 0 全量跑的那条流。卸载放在最后：它把 F 抬到现行 txg，排在回退之前的话回退候选集里就没有 A 了（D16（发布语义）
+    /// 已定项 1 的候选集要 txg ≥ F_生效，与「抬 F 排在回退之后」同一个理由）。
+    ReuseAfterRaisingFloorThenNormalUnmount,
+    /// 到 E 之后（不卸载）再覆盖写两次：txg 18 的数据单元落回 50178–50179（mkfs 那片第 0 版树表那一槽起，没有哪条记录点名它），
+    /// txg 19 的数据单元落回 A 的数据单元那一对槽 50180——环里第一条点名块被合法复用的记录是 A 那一条。
     ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish,
 }
+
+/// 全量那条流在进度文件名里的名字（断点续跑按「输入指纹 + 流名 + 计划哈希」分格）。
+const FULL_ENUMERATION_STREAM_NAME: &str = "second_transaction_fixed_script_through_e_then_unmount";
+/// 到 E 再正常卸载那条流：每次写只取两态时的全量闭式 1 + Σ(2^|段| − 1)（64 段；六个 30 写段各 2^30 − 1 占 97%）。代码审阅第 19 条之后
+/// 取号、抬 F、卸载先写系统配置之前各多一道屏障，把上一次轮换那 2 写与它们的 2 写拆成两段：三处各 15 → 3 + 3，比改之前的 6649413746 少 27。
+const FULL_STATES_WITH_TWO_STATES_PER_WRITE_THROUGH_THE_UNMOUNT: u64 = 6_649_413_719;
+/// 全量枚举的状态数（代码审阅第 4 条，用户 2026-09-27 定「原地覆写补第三态、全量也跑」）：这条流上取三态的只有 46 次系统配置槽写，
+/// 每段 3^m · 2^(n−m) − 1（m 是段里系统配置槽写的个数），再加全部持久那一个；约为两态时的 2.25 倍（30 写段 3² · 2²⁸ − 1）。
+const FULL_STATES_THROUGH_THE_UNMOUNT: u64 = 14_960_689_284;
+/// 全量的状态按发布分：每段的状态归它后面最近的那次根槽写，再加全部持久那一个。
+const FULL_STATES_BY_PUBLISH_THROUGH_THE_UNMOUNT: &str = "instance1_txg1=12 instance1_txg2=12 \
+     instance1_txg3=150994947 instance1_txg4=150994947 instance2_txg5=262163 instance2_txg6=589827 \
+     instance2_txg7=589827 instance2_txg8=150994947 instance2_txg9=9437187 instance2_txg10=2415919107 \
+     instance2_txg11=2415919107 instance2_txg12=2415919107 instance2_txg13=2415919107 \
+     instance2_txg14=2415919107 instance2_txg15=65555 instance2_txg16=589827 instance2_txg17=2415919107 \
+     instance2_txg18=65555 instance2_txg19=589827 after_the_last_root=8 every_write_persisted=1";
+/// 甲二快档的状态数（`crash::layer0_state_count_with_torn_in_place_overwrites` 按甲二的闭式；每次写只取两态时 205）。
+const QUICK_TIER_STATES_THROUGH_THE_UNMOUNT: u64 = 390;
+/// 甲二快档的状态按发布分：一次普通发布 21（单元写与上一次轮换那一段 2 原地写各三态 × 单元写全不落或全落 17 + 记录段 3 + 根槽段 1），
+/// 暖机 txg 1、2 各 12（2 原地写的那一段 3² − 1 = 8、记录段 3、根槽段 1），写行 txg 5、抬 F 的 txg 15、卸载的 txg 18 各 21（上一次轮换那 2 原地写一段 8、
+/// 取号或先写新 F 那 2 原地写一段 8——代码审阅第 19 条之后两者之间有屏障——只有单元写的那一段 1、记录段 3、根槽段 1）；
+/// 最后一次根槽写之后是 txg 19 的轮换那一段 8，再加全部持久那一个。
+const QUICK_TIER_STATES_BY_PUBLISH_THROUGH_THE_UNMOUNT: &str = "instance1_txg1=12 instance1_txg2=12 \
+     instance1_txg3=21 instance1_txg4=21 instance2_txg5=21 instance2_txg6=21 instance2_txg7=21 \
+     instance2_txg8=21 instance2_txg9=21 instance2_txg10=21 instance2_txg11=21 instance2_txg12=21 \
+     instance2_txg13=21 instance2_txg14=21 instance2_txg15=21 instance2_txg16=21 instance2_txg17=21 \
+     instance2_txg18=21 instance2_txg19=21 after_the_last_root=8 every_write_persisted=1";
+
+/// 到 E 之后再覆盖写一次（txg 18）那一版的数据单元落点。
+const TXG_18_DATA_UNIT_SLOT: u64 = 50178;
+/// A（txg 3）的数据单元那一对槽：到 E 之后第二次覆盖写（txg 19）复用它。
+const FIRST_DATA_UNIT_SLOT: u64 = 50180;
 
 const THIRD_FILE_BYTES: usize = 2500;
 
@@ -101,6 +146,58 @@ fn overwrite(
         instance,
     )
     .expect("覆盖写")
+}
+
+/// 正常卸载（影子账开着），录制流上把这一段记成卸载入口发的（C557（卸载记号只由卸载入口打没有检查））：带文件的一版上卸载必抬 F，
+/// 交回那一串；现行版本换成那一串最后落盘的那一次。
+fn unmount_recorded(pool: &mut BuiltPool) -> UnmountRaisedTheFloor {
+    let mut current = PoolVersion::WithFile(pool.output.clone());
+    let stream = pool.stream.clone();
+    let devices = pool.devices.as_mut().expect("镜像还开着");
+    let allocator = &mut pool.allocator;
+    let unmounted = stream
+        .record_entry(RecordedPublishEntry::Unmount, || {
+            unmount(
+                &parameters(),
+                devices,
+                allocator,
+                &mut current,
+                ShadowLedger::On,
+            )
+        })
+        .expect("正常卸载");
+    pool.output = current
+        .into_file_version()
+        .expect("带文件的一版卸载之后仍带文件");
+    match unmounted {
+        Unmounted::FloorRaisedToTheCurrentVersion(raised) => raised,
+        Unmounted::NothingWrittenOnAVersionWithoutFile {
+            current: reported_version,
+        } => {
+            panic!("带文件的一版上卸载报成「树表 0 条、一个字节都不写」：{reported_version:?}")
+        }
+    }
+}
+
+/// mkfs 之后那一段录制流切成写表与段：入口段（卸载入口发的那几段）一起交给切段，带卸载记号的根槽写只许落在卸载入口里（C557）。
+fn writes_and_segments_after_mkfs(pool: &BuiltPool) -> (Vec<RetainedWrite>, Vec<Vec<usize>>) {
+    let operations = pool.retained_operations();
+    let entry_spans: Vec<RecordedEntrySpan> = pool
+        .stream
+        .entry_spans()
+        .into_iter()
+        .map(|span| RecordedEntrySpan {
+            entry: span.entry,
+            operations: span.operations.start - pool.mkfs_operation_count
+                ..span.operations.end - pool.mkfs_operation_count,
+        })
+        .collect();
+    let (writes, segments, _stream_indexes) = writes_and_segments_with_stream_indexes_and_entries(
+        &operations[pool.mkfs_operation_count..],
+        &entry_spans,
+        &geometry(),
+    );
+    (writes, segments)
 }
 
 fn prepare(tag: &str, script: Script) -> Prepared {
@@ -144,43 +241,38 @@ fn prepare(tag: &str, script: Script) -> Prepared {
         });
         if script != Script::ThirdVersion {
             pool.output = third;
-            // 进程再退出、重开走回退到 A 的根：取号 3、发布 D（txg 9 落盘 0）写回退行 (1, 3, 0) 与中间实例行 (2, 0, 0)、
-            // 暖机一次（txg 10 落盘 1）；文件回到第一次的内容。
-            let mut reopened_for_rollback = pool.reopen_recorded();
-            let rolled_back = mount_rollback(
-                &parameters(),
-                &mut reopened_for_rollback,
-                RollbackTarget {
-                    instance: InstanceGeneration(1),
-                    checkpoint_txg: CheckpointTxg(3),
-                },
-                ShadowLedger::On,
-            )
-            .expect("回退");
-            pool.devices = Some(reopened_for_rollback);
-            pool.allocator = rolled_back.allocator;
-            pool.output = rolled_back
-                .current
-                .into_file_version()
-                .expect("回退到 A，现行那一版带文件");
-            for txg in 9..=10 {
-                versions.push(PublishedVersion {
-                    instance: InstanceGeneration(3),
-                    checkpoint_txg: CheckpointTxg(txg),
-                    content: file_content(),
-                });
+            // 同一个会话里挂着的时候回退到 A 的根：一次向前发布 D（txg 9 落盘 0），文件回到第一次的内容。
+            {
+                let rollback_parameters = parameters();
+                let open_devices = pool.devices.as_mut().expect("镜像还开着");
+                roll_back_by_a_forward_publish(
+                    &rollback_parameters,
+                    open_devices,
+                    &mut pool.allocator,
+                    &mut pool.output,
+                    RollbackTarget {
+                        instance: InstanceGeneration(1),
+                        checkpoint_txg: CheckpointTxg(3),
+                    },
+                )
+                .expect("挂着的时候回退到 A");
             }
+            versions.push(PublishedVersion {
+                instance: InstanceGeneration(2),
+                checkpoint_txg: CheckpointTxg(9),
+                content: file_content(),
+            });
             if matches!(
                 script,
-                Script::ReuseAfterRaisingFloor
+                Script::ReuseAfterRaisingFloorThenNormalUnmount
                     | Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish
             ) {
                 let mut latest = Vec::new();
-                for (txg, seed) in [(11u64, 17usize), (12, 19), (13, 23), (14, 29)] {
+                for (txg, seed) in [(10u64, 13usize), (11, 17), (12, 19), (13, 23), (14, 29)] {
                     latest = later_content(seed);
-                    pool.output = overwrite(&mut pool, &latest, InstanceGeneration(3));
+                    pool.output = overwrite(&mut pool, &latest, InstanceGeneration(2));
                     versions.push(PublishedVersion {
-                        instance: InstanceGeneration(3),
+                        instance: InstanceGeneration(2),
                         checkpoint_txg: CheckpointTxg(txg),
                         content: latest.clone(),
                     });
@@ -200,117 +292,161 @@ fn prepare(tag: &str, script: Script) -> Prepared {
                 pool.output = current;
                 for txg in 15..=16 {
                     versions.push(PublishedVersion {
-                        instance: InstanceGeneration(3),
+                        instance: InstanceGeneration(2),
                         checkpoint_txg: CheckpointTxg(txg),
                         content: latest.clone(),
                     });
                 }
-                let reuse = overwrite(&mut pool, &later_content(31), InstanceGeneration(3));
+                let reuse = overwrite(&mut pool, &later_content(31), InstanceGeneration(2));
                 assert_eq!(
                     reuse.data_pointers[0].locations[0].slot.0,
-                    50178,
-                    "E 的数据单元落回最低的可再分配偶数槽对（mkfs 树表那 1 槽回收了、50179 从没分配过）"
+                    50176,
+                    "E 的数据单元落回最低的可再分配偶数槽对：mkfs 实例表那两槽（释放代 5，抬 F 到 11 回收了）"
                 );
                 versions.push(PublishedVersion {
-                    instance: InstanceGeneration(3),
+                    instance: InstanceGeneration(2),
                     checkpoint_txg: CheckpointTxg(17),
                     content: later_content(31),
                 });
-                if script == Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish {
-                    pool.output = reuse;
-                    let first_data_unit_slot_reused =
-                        overwrite(&mut pool, &later_content(37), InstanceGeneration(3));
-                    assert_eq!(
-                        first_data_unit_slot_reused.data_pointers[0].locations[0].slot.0,
-                        50180,
-                        "txg 18 的数据单元落回 A 的数据单元那一对槽（抬 F 回收了、E 用掉的是更低的 50178）"
-                    );
-                    versions.push(PublishedVersion {
-                        instance: InstanceGeneration(3),
-                        checkpoint_txg: CheckpointTxg(18),
-                        content: later_content(37),
-                    });
+                pool.output = reuse;
+                match script {
+                    Script::ReuseAfterRaisingFloorThenNormalUnmount => {
+                        let unmounted = unmount_recorded(&mut pool);
+                        assert_eq!(
+                            unmounted
+                                .publishes
+                                .iter()
+                                .map(|publish| publish.root.checkpoint_txg)
+                                .collect::<Vec<_>>(),
+                            vec![CheckpointTxg(18), CheckpointTxg(19)],
+                            "卸载推两次空发布：txg 18 落盘 0、txg 19 落盘 1（17 除以 3 余 2）"
+                        );
+                        for txg in 18..=19 {
+                            versions.push(PublishedVersion {
+                                instance: InstanceGeneration(2),
+                                checkpoint_txg: CheckpointTxg(txg),
+                                content: later_content(31),
+                            });
+                        }
+                    }
+                    Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish => {
+                        for (txg, seed, data_unit_slot, why) in [
+                            (
+                                18u64,
+                                37usize,
+                                TXG_18_DATA_UNIT_SLOT,
+                                "txg 18 的数据单元落回下一对可再分配的槽（抬 F 回收了、E 用掉的是更低的 50176）",
+                            ),
+                            (
+                                19,
+                                41,
+                                FIRST_DATA_UNIT_SLOT,
+                                "txg 19 的数据单元落回 A 的数据单元那一对槽（释放代 10，抬 F 到 11 回收了）",
+                            ),
+                        ] {
+                            let later = overwrite(&mut pool, &later_content(seed), InstanceGeneration(2));
+                            assert_eq!(
+                                later.data_pointers[0].locations[0].slot.0,
+                                data_unit_slot,
+                                "{why}"
+                            );
+                            versions.push(PublishedVersion {
+                                instance: InstanceGeneration(2),
+                                checkpoint_txg: CheckpointTxg(txg),
+                                content: later_content(seed),
+                            });
+                            pool.output = later;
+                        }
+                    }
+                    Script::SecondVersionOnly
+                    | Script::ThirdVersion
+                    | Script::RollbackToFirstVersion => {
+                        unreachable!("外面那一层只放行到 E 的两个脚本")
+                    }
                 }
             }
         }
     }
     let base = pool.memory_pool_after_mkfs();
-    let operations = pool.retained_operations();
-    let (writes, segments) =
-        writes_and_segments(&operations[pool.mkfs_operation_count..], &geometry());
+    let (writes, segments) = writes_and_segments_after_mkfs(&pool);
     let sizes: Vec<usize> = segments.iter().map(Vec::len).collect();
+    // 每次发布：它的单元写、两份 journal 记录、一条根槽写、之后两块盘各一次系统配置槽轮换，共「单元写数 + 5」次写；
+    // 上一次发布的系统配置槽轮换与这一次的单元写之间没有屏障、并成一段（登记表八末尾那条 ⚠️）。单元写数：暖机 0、A 与 B 与 C 各 24、
+    // 写行发布 18、写行之后的暖机各 16、回退 D 20、覆盖写与 E 各 28、抬 F 与卸载推的空发布各 16。取号、抬 F 与卸载那一串开头各多
+    // 两块盘一次系统配置写（取号写实例代号，抬 F 与卸载先写新 F，D16（发布语义） 已定项 1「抬 F 那一串」），它们之前各一道屏障
+    // （代码审阅第 19 条：覆写较旧那一槽之前，上一次轮换写的那一槽先持久），与上一次的轮换各自成段（2、2；改之前并成 4 写一段）。
     match script {
         Script::SecondVersionOnly => {
             assert_eq!(
                 sizes,
-                vec![2, 2, 1, 2, 2, 1, 18, 2, 1, 18, 2, 1, 2],
-                "A 的两个系统配置槽写与 B 的 16 个单元写合成一段：整条流按屏障切，不按发布切"
+                vec![2, 2, 1, 2, 2, 1, 26, 2, 1, 26, 2, 1, 2],
+                "A 的两个系统配置槽写与 B 的 24 个单元写合成一段：整条流按屏障切，不按发布切"
             );
-            assert_eq!(writes.len(), 54, "取号 2 + 暖机 10 + A 21 + B 21 次写");
+            assert_eq!(writes.len(), 70, "取号 2 + 暖机 5 × 2 + A 29 + B 29 次写");
         }
         Script::ThirdVersion => {
-            // B 的两个系统配置槽写与取号的两个合成一段（4）；写行发布 10 个单元写（实例表 + 四个固定点单元，各两盘）；
-            // 每次暖机 8 个单元写与上一次发布的两个系统配置槽写合成一段（10）；C 的 16 个单元写与 txg 7 的系统配置槽写合成 18。
+            // B 的两个系统配置槽写自成一段、取号的两个自成一段（2、2：取号写之前有屏障）；写行发布 18 个单元写自成一段（取号那两次系统配置写之后有屏障）；
+            // 暖机两次各 16 个单元写与上一次发布的两个系统配置槽写合成一段（18）；C 的 24 个单元写与 txg 7 的系统配置槽写合成 26。
             assert_eq!(
                 sizes,
                 vec![
-                    2, 2, 1, 2, 2, 1, 18, 2, 1, 18, 2, 1, 4, 10, 2, 1, 10, 2, 1, 10, 2, 1, 18, 2,
-                    1, 2
+                    2, 2, 1, 2, 2, 1, 26, 2, 1, 26, 2, 1, 2, 2, 18, 2, 1, 18, 2, 1, 18, 2, 1, 26,
+                    2, 1, 2
                 ],
                 "固定脚本到 C 为止的段序列"
             );
             assert_eq!(
                 writes.len(),
-                54 + 2 + 15 + 13 + 13 + 21,
-                "取号 2 + 写行 15 + 暖机 13 × 2 + C 21"
+                70 + 2 + 23 + 21 + 21 + 29,
+                "到 B 70 + 取号 2 + 写行 23 + 暖机 21 × 2 + C 29"
             );
         }
         Script::RollbackToFirstVersion => {
-            // C 的两个系统配置槽写与回退取号的两个合成一段（4）；D 是写回退行的发布：10 个单元写（实例表 + 四个固定点单元，各两盘）；
-            // 暖机一次 8 个单元写与 D 的两个系统配置槽写合成一段（10）。
+            // 挂着时的向前回退 D：20 个单元写与 C 的两个系统配置槽写合成一段（22），不取号、不写行、不暖机。
             assert_eq!(
                 sizes,
                 vec![
-                    2, 2, 1, 2, 2, 1, 18, 2, 1, 18, 2, 1, 4, 10, 2, 1, 10, 2, 1, 10, 2, 1, 18, 2,
-                    1, 4, 10, 2, 1, 10, 2, 1, 2
+                    2, 2, 1, 2, 2, 1, 26, 2, 1, 26, 2, 1, 2, 2, 18, 2, 1, 18, 2, 1, 18, 2, 1, 26,
+                    2, 1, 22, 2, 1, 2
                 ],
                 "固定脚本到 D 为止的段序列"
             );
-            assert_eq!(
-                writes.len(),
-                118 + 2 + 15 + 13,
-                "到 C 118 + 取号 2 + D 15 + 暖机 13"
-            );
+            assert_eq!(writes.len(), 166 + 25, "到 C 166 + D 25");
         }
-        Script::ReuseAfterRaisingFloor => {
-            // 四次覆盖写各 16 个单元写并上一次的两个系统配置槽写（18）；抬 F 的两次空发布各 8 个单元写并上两个系统配置槽写（10）；E 同覆盖写。
+        Script::ReuseAfterRaisingFloorThenNormalUnmount => {
+            // 五次覆盖写各 28 个单元写并上一次的两个系统配置槽写（30）；txg 14 的轮换自成一段、抬 F 先写系统配置自成一段（2、2），
+            // 两次空发布各 16 个单元写（第一次自成一段、第二次并上轮换成 18）；E 同覆盖写（30）；卸载同抬 F（2、2、16、18），末尾是 txg 19 的轮换。
             assert_eq!(
                 sizes,
                 vec![
-                    2, 2, 1, 2, 2, 1, 18, 2, 1, 18, 2, 1, 4, 10, 2, 1, 10, 2, 1, 10, 2, 1, 18, 2,
-                    1, 4, 10, 2, 1, 10, 2, 1, 18, 2, 1, 18, 2, 1, 18, 2, 1, 18, 2, 1, 10, 2, 1, 10,
-                    2, 1, 18, 2, 1, 2
+                    2, 2, 1, 2, 2, 1, 26, 2, 1, 26, 2, 1, 2, 2, 18, 2, 1, 18, 2, 1, 18, 2, 1, 26,
+                    2, 1, 22, 2, 1, 30, 2, 1, 30, 2, 1, 30, 2, 1, 30, 2, 1, 30, 2, 1, 2, 2, 16, 2,
+                    1, 18, 2, 1, 30, 2, 1, 2, 2, 16, 2, 1, 18, 2, 1, 2
                 ],
-                "固定脚本到 E 为止的段序列"
+                "固定脚本到 E 再正常卸载的段序列"
             );
             assert_eq!(
                 writes.len(),
-                148 + 4 * 21 + 2 * 13 + 21,
-                "到 D 148 + 四次覆盖写 84 + 抬 F 两次 26 + E 21"
+                191 + 5 * 33 + (2 + 2 * 21) + 33 + (2 + 2 * 21),
+                "到 D 191 + 五次覆盖写 165 + 抬 F 44 + E 33 + 卸载 44"
             );
         }
         Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish => {
-            // 到 E 的段序列末尾那段（E 的两个系统配置槽写）并进 txg 18 的 16 个单元写（18），再接记录、根槽、系统配置槽。
+            // 到 E 的段序列末尾那段（E 的两个系统配置槽写）并进 txg 18 的 28 个单元写（30），txg 19 同形。
             assert_eq!(
                 sizes,
                 vec![
-                    2, 2, 1, 2, 2, 1, 18, 2, 1, 18, 2, 1, 4, 10, 2, 1, 10, 2, 1, 10, 2, 1, 18, 2,
-                    1, 4, 10, 2, 1, 10, 2, 1, 18, 2, 1, 18, 2, 1, 18, 2, 1, 18, 2, 1, 10, 2, 1, 10,
-                    2, 1, 18, 2, 1, 18, 2, 1, 2
+                    2, 2, 1, 2, 2, 1, 26, 2, 1, 26, 2, 1, 2, 2, 18, 2, 1, 18, 2, 1, 18, 2, 1, 26,
+                    2, 1, 22, 2, 1, 30, 2, 1, 30, 2, 1, 30, 2, 1, 30, 2, 1, 30, 2, 1, 2, 2, 16, 2,
+                    1, 18, 2, 1, 30, 2, 1, 30, 2, 1, 30, 2, 1, 2
                 ],
-                "固定脚本到 E 之后再覆盖写一次的段序列"
+                "固定脚本到 E 之后再覆盖写两次的段序列"
             );
-            assert_eq!(writes.len(), 279 + 21, "到 E 279 + txg 18 的覆盖写 21");
+            assert_eq!(
+                writes.len(),
+                191 + 5 * 33 + 44 + 33 + 2 * 33,
+                "到 E 433 + txg 18、19 的覆盖写各 33"
+            );
         }
     }
     let root_indexes: Vec<usize> = writes
@@ -322,9 +458,9 @@ fn prepare(tag: &str, script: Script) -> Prepared {
     let expected_roots = match script {
         Script::SecondVersionOnly => 4,
         Script::ThirdVersion => 8,
-        Script::RollbackToFirstVersion => 10,
-        Script::ReuseAfterRaisingFloor => 17,
-        Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish => 18,
+        Script::RollbackToFirstVersion => 9,
+        Script::ReuseAfterRaisingFloorThenNormalUnmount
+        | Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish => 19,
     };
     assert_eq!(root_indexes.len(), expected_roots, "每次发布一条根槽写");
     Prepared {
@@ -418,7 +554,7 @@ fn assert_checker_and_record_checker_counts(
     }
 }
 
-/// 抬过 F 的两个脚本（`Script::ReuseAfterRaisingFloor` 与 `Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish`，E 之前把 F 抬到 11）：
+/// 抬过 F 的两个脚本（`Script::ReuseAfterRaisingFloorThenNormalUnmount` 与 `Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish`，E 之前把 F 抬到 11）：
 /// I-7.9（回退下界 F 不高于抬 F 的上限，收口表第 26 行）在抬 F 的根（txg 15）落盘之后的状态上真被评估过——阴性结果要与「代码没跑到」分开。
 /// 没抬过 F 的状态（txg 15 的根还没落盘）上它报不适用，共用的那一道已钉住「评估过的 + 不适用的 = 状态数」。
 fn assert_the_rollback_floor_raise_was_judged(tally: &Layer0Tally) {
@@ -434,49 +570,100 @@ fn assert_the_rollback_floor_raise_was_judged(tally: &Layer0Tally) {
     );
 }
 
-/// 到 C 为止的固定脚本：段序列登记表（layout/01-first-txn.md 八）「装置钉住」的那条数组由 `prepare` 里的断言钉住；层 0 全量与快的那条都在到 D 的脚本上跑。
+/// 到 C 为止的固定脚本：段序列登记表（layout/01-first-txn.md 八）「装置钉住」的那条数组由 `prepare` 里的断言钉住；
+/// 层 0 全量与甲二快档都在到 E 再卸载的脚本上跑。27 段、每次写只取两态时闭式 202113066、甲二 84（代码审阅第 19 条之后取号写之前多一道屏障，
+/// B 的轮换与取号那 4 写一段拆成 2、2：闭式与甲二各少 15 − 3 − 3 = 9，改之前 26 段、202113075、93）；
+/// 系统配置槽写补第三态（代码审阅第 4 条）之后层 0 枚举的是全量 454426691、甲二 159。
 #[test]
 fn the_fixed_script_through_the_third_publish_keeps_its_registered_segment_sequence() {
     let prepared = prepare("layer0-c-registered", Script::ThirdVersion);
-    assert_eq!(prepared.segments.len(), 26);
-    assert_eq!(closed_form_state_count(&prepared.segments), 789_555);
+    assert_eq!(prepared.segments.len(), 27);
+    assert_eq!(closed_form_state_count(&prepared.segments), 202_113_066);
+    assert_eq!(
+        layer0_state_count(&prepared.writes, &prepared.segments, &quick_tier_expansion),
+        84
+    );
+    assert_eq!(
+        (
+            layer0_state_count_with_torn_in_place_overwrites(
+                &prepared.base,
+                &prepared.writes,
+                &prepared.segments,
+                &full_expansion
+            ),
+            layer0_state_count_with_torn_in_place_overwrites(
+                &prepared.base,
+                &prepared.writes,
+                &prepared.segments,
+                &quick_tier_expansion
+            )
+        ),
+        (454_426_691, 159)
+    );
 }
 
-/// 到 D 为止的固定脚本：同上，33 段、闭式 791624。
+/// 到 D 为止的固定脚本：同上，30 段、每次写只取两态时闭式 206307373、甲二 95（改之前 29 段、206307382、104）；补第三态之后全量 463863878、甲二 180。
 #[test]
 fn the_fixed_script_through_the_rollback_publish_keeps_its_registered_segment_sequence() {
     let prepared = prepare("layer0-d-registered", Script::RollbackToFirstVersion);
-    assert_eq!(prepared.segments.len(), 33);
-    assert_eq!(closed_form_state_count(&prepared.segments), 791_624);
+    assert_eq!(prepared.segments.len(), 30);
+    assert_eq!(closed_form_state_count(&prepared.segments), 206_307_373);
+    assert_eq!(
+        layer0_state_count(&prepared.writes, &prepared.segments, &quick_tier_expansion),
+        95
+    );
+    assert_eq!(
+        (
+            layer0_state_count_with_torn_in_place_overwrites(
+                &prepared.base,
+                &prepared.writes,
+                &prepared.segments,
+                &full_expansion
+            ),
+            layer0_state_count_with_torn_in_place_overwrites(
+                &prepared.base,
+                &prepared.writes,
+                &prepared.segments,
+                &quick_tier_expansion
+            )
+        ),
+        (463_863_878, 180)
+    );
 }
 
-/// 平时跑的那一份：三个 18 写的段与三个 10 写的段不展开（只以整段持久进入后面的状态），其余每段任意子集。
+/// 平时跑的那一份（甲二快档）：每段原地写取任意子集 × 单元写全不落或全落（`crash::Layer0SegmentExpansion::InPlaceSubsetsWithCopyOnWriteNoneOrAll`）。
+/// 单元写只落一部分才显出来的那一类它看不见，那一类归全量（下面标 ignored 的那条，54 号门禁提交时跑）。
 #[test]
-fn every_crash_state_outside_the_two_unit_segments_recovers_to_the_version_its_root_claims() {
-    let prepared = prepare("layer0-e-fast", Script::ReuseAfterRaisingFloor);
-    let expand = |_segment_index: usize, segment: &[usize]| segment.len() < 10;
-    let tally = enumerate_layer0_selecting_versions(
+fn every_crash_state_of_the_quick_tier_recovers_to_the_version_its_root_claims() {
+    let prepared = prepare(
+        "layer0-e-fast",
+        Script::ReuseAfterRaisingFloorThenNormalUnmount,
+    );
+    let tally = enumerate_layer0_quick_tier_versions(
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         prepared.judged_root_index,
         &prepared.versions,
-        &expand,
     );
-    let expanded: Vec<Vec<usize>> = prepared
-        .segments
-        .iter()
-        .filter(|segment| segment.len() < 10)
-        .cloned()
-        .collect();
     assert_eq!(
         tally.states,
-        closed_form_state_count(&expanded),
-        "展开的段按闭式数"
+        layer0_state_count_with_torn_in_place_overwrites(
+            &prepared.base,
+            &prepared.writes,
+            &prepared.segments,
+            &quick_tier_expansion
+        ),
+        "甲二按闭式数（系统配置槽写三态）"
     );
     assert_eq!(
-        tally.states, 108,
-        "1 + 二十个 2 写段各 3 + 两个 4 写段各 15 + 十七个 1 写段各 1"
+        tally.states, QUICK_TIER_STATES_THROUGH_THE_UNMOUNT,
+        "甲二的状态数"
+    );
+    assert_eq!(
+        layer0_state_count(&prepared.writes, &prepared.segments, &quick_tier_expansion),
+        205,
+        "每次写只取两态时甲二的闭式（补第三态之前的数）"
     );
     println!(
         "LAYER0B_FAST states={} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
@@ -485,17 +672,10 @@ fn every_crash_state_outside_the_two_unit_segments_recovers_to_the_version_its_r
         tally.checker_counts_by_invariant()
     );
     // 步 6 验收第 1 条「每次发布各多少」：按段归到后面最近的那次根槽写（`crash::Layer0PublishOfState`）。
-    // 每次发布记录段 2 写（3）+ 根槽段 1 写（1）= 4；暖机 txg 1、2 各多一段 2 写（取号那段、上一次的系统配置槽轮换）= 7；
-    // 写行 txg 5 与回退 txg 9 各多一段 4 写（上一次的轮换并上取号，15）= 19；18 写与 10 写的段不展开；
-    // 最后一次根槽写之后是 E 的轮换那一段 2 写（3），再加全部持久那一个。
     assert_eq!(
         tally.states_by_publish_text(),
-        "instance1_txg1=7 instance1_txg2=7 instance1_txg3=4 instance1_txg4=4 \
-         instance2_txg5=19 instance2_txg6=4 instance2_txg7=4 instance2_txg8=4 \
-         instance3_txg9=19 instance3_txg10=4 instance3_txg11=4 instance3_txg12=4 instance3_txg13=4 \
-         instance3_txg14=4 instance3_txg15=4 instance3_txg16=4 instance3_txg17=4 \
-         after_the_last_root=3 every_write_persisted=1",
-        "平时跑的那 108 个状态按发布分"
+        QUICK_TIER_STATES_BY_PUBLISH_THROUGH_THE_UNMOUNT,
+        "甲二的状态按发布分"
     );
     assert_eq!(
         tally.states_by_publish.values().sum::<u64>(),
@@ -517,13 +697,16 @@ fn every_crash_state_outside_the_two_unit_segments_recovers_to_the_version_its_r
     assert_the_rollback_floor_raise_was_judged(&tally);
 }
 
-/// 层 0 按状态序号区间切片、多线程跑（2026-09-18 用户定：测试与崩溃检测优先多线程）：到 E 的固定脚本、平时跑的那 108 个状态，
+/// 层 0 按状态序号区间切片、多线程跑（2026-09-18 用户定：测试与崩溃检测优先多线程）：到 E 再卸载的固定脚本、甲二快档那些状态，
 /// 切成每片 1 个状态、8 个线程抢着跑，与整条流 1 片、1 个线程逐个跑相比，计数逐项相同、「第一处违例」是序号最小的那一处、
 /// 观察者按同一个次序看到同一串持久集合。版本表故意把 B（实例 1 第 4 代）的内容换成 C 的，让违例散在很多个状态上，「第一处」才有得选。
 #[test]
 fn one_state_slices_on_eight_threads_merge_into_the_same_tally_and_observation_order_as_one_slice_on_one_thread(
 ) {
-    let prepared = prepare("layer0-slices-merge", Script::ReuseAfterRaisingFloor);
+    let prepared = prepare(
+        "layer0-slices-merge",
+        Script::ReuseAfterRaisingFloorThenNormalUnmount,
+    );
     let mut versions_with_the_wrong_second_content = prepared.versions.clone();
     versions_with_the_wrong_second_content
         .iter_mut()
@@ -532,7 +715,6 @@ fn one_state_slices_on_eight_threads_merge_into_the_same_tally_and_observation_o
         })
         .expect("版本表里有 B 那一版")
         .content = third_content();
-    let expand = |_segment_index: usize, segment: &[usize]| segment.len() < 10;
     let run = |parallelism: Layer0Parallelism| {
         let mut observed_persisted_sets: Vec<Vec<bool>> = Vec::new();
         let tally = enumerate_layer0_in_state_slices(
@@ -541,13 +723,14 @@ fn one_state_slices_on_eight_threads_merge_into_the_same_tally_and_observation_o
             &prepared.segments,
             prepared.judged_root_index,
             &versions_with_the_wrong_second_content,
-            &expand,
+            &quick_tier_expansion,
             parallelism,
-            Some(
-                &mut |crash_image: &CrashImage<'_>, _consulted_report: &RecoveryReport| {
-                    observed_persisted_sets.push(crash_image.persisted.clone());
-                },
-            ),
+            Some(&mut |crash_image: &CrashImage<'_>,
+                       _consulted_report: &RecoveryReport,
+                       _counts: &mut Layer0ObserverCounts| {
+                observed_persisted_sets.push(crash_image.persisted.clone());
+            }),
+            &Layer0Resume::NoProgressFile,
         );
         (tally, observed_persisted_sets)
     };
@@ -561,7 +744,10 @@ fn one_state_slices_on_eight_threads_merge_into_the_same_tally_and_observation_o
         worker_threads_source: Layer0WorkerThreadsSource::GivenByCaller,
         slice_length: Layer0SliceLength::StatesPerSlice(NonZeroU64::MIN),
     });
-    assert_eq!(one_slice_tally.states, 108, "平时跑的那 108 个状态");
+    assert_eq!(
+        one_slice_tally.states, QUICK_TIER_STATES_THROUGH_THE_UNMOUNT,
+        "甲二快档那些状态"
+    );
     assert!(
         one_slice_tally.violations >= 2 && one_slice_tally.ignored_violations >= 2,
         "B 的内容换掉之后违例散在多个状态上：{} 个、不看 journal 那一遍 {} 个",
@@ -578,21 +764,47 @@ fn one_state_slices_on_eight_threads_merge_into_the_same_tally_and_observation_o
     );
 }
 
-/// 全量：固定脚本到 E 为止 54 段、闭式 2 104 413 个状态（八个 18 写段各 262143、七个 10 写段各 1023、两个 4 写段各 15，其余 2 写段各 3、1 写段各 1）。
-/// 54 号门禁在 release 下跑它，认下面打印的 `LAYER0B` 行里 `exhaustive=true`。
+/// 全量：固定脚本到 E 再正常卸载，闭式 [`FULL_STATES_THROUGH_THE_UNMOUNT`] 个状态（段序列由 `prepare` 钉住）。
+/// 54 号门禁在 release 下跑它，认下面打印的 `LAYER0B` 行里 `exhaustive=true`。带断点续跑（`singlefs_harness::layer0_progress`）：
+/// 进度目录、输入指纹与强制从头跑的开关都从环境变量取，没设进度目录就不留进度文件。双机分片（`SINGLEFS_LAYER0_SHARD`，
+/// `research/scripts/layer0-shard-run.sh`）：跑一片时只写账本、不打计数行、不判；merge 那一趟拿并齐的计数照下面逐项判、逐字打同样的行。
 #[test]
-#[ignore = "全量 2104413 个状态、每个两遍恢复 + checker，debug 下半小时以上；门禁 54 号在 release 下跑"]
+#[ignore = "全量五十多亿个状态、每个两遍恢复 + checker；门禁 54 号在 release 下跑，带断点续跑"]
 fn full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean() {
-    let prepared = prepare("layer0-e-full", Script::ReuseAfterRaisingFloor);
-    let closed_form = closed_form_state_count(&prepared.segments);
-    assert_eq!(closed_form, 2_104_413, "闭式：1 + Σ(2^|段| − 1)，五十四段");
-    let tally = enumerate_layer0_versions(
+    let prepared = prepare(
+        "layer0-e-full",
+        Script::ReuseAfterRaisingFloorThenNormalUnmount,
+    );
+    assert_eq!(
+        closed_form_state_count(&prepared.segments),
+        FULL_STATES_WITH_TWO_STATES_PER_WRITE_THROUGH_THE_UNMOUNT,
+        "每次写只取两态时的闭式：1 + Σ(2^|段| − 1)"
+    );
+    // 计数行的 closed_form 报枚举域的闭式（系统配置槽写三态），54 号认 exhaustive=true 就是枚举到的恰好这么多。
+    let closed_form = layer0_state_count_with_torn_in_place_overwrites(
+        &prepared.base,
+        &prepared.writes,
+        &prepared.segments,
+        &full_expansion,
+    );
+    assert_eq!(
+        closed_form, FULL_STATES_THROUGH_THE_UNMOUNT,
+        "闭式：每段 3^m · 2^(n−m) − 1 之和再加 1"
+    );
+    let tally = match enumerate_layer0_in_state_slices_or_one_shard(
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         prepared.judged_root_index,
         &prepared.versions,
-    );
+        &full_expansion,
+        Layer0Parallelism::from_environment(),
+        None,
+        &Layer0Resume::from_environment(FULL_ENUMERATION_STREAM_NAME),
+    ) {
+        Layer0EnumerationOutcome::WholeStream(tally) => tally,
+        Layer0EnumerationOutcome::OneShardWrittenToItsLedger(_written) => return,
+    };
     let checker_violations: u64 = tally.checker_violated_states.values().sum();
     // 每条不变量报成 `I-x.y=评估过/判违例/不适用` 夹在 checker_violations 与 first_violation 之间（步 6 验收第 3 条：阴性结果与「代码没跑到」分开）；
     // 54 号门禁只认行首 `LAYER0B ` 与 `exhaustive=true`，整行原样报出来。按发布分的状态数（步 6 验收第 1 条）夹在
@@ -616,16 +828,10 @@ fn full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean() {
         tally.first_violation.as_deref().unwrap_or("none")
     );
     assert_eq!(tally.states, closed_form, "枚举到的状态数要等于闭式");
-    // 每次发布：18 写段 262143 或 10 写段 1023，加记录段 3、根槽段 1；写行 txg 5 与回退 txg 9 多一段 4 写（15）；
-    // 暖机 txg 1、2 是 2 写段 + 记录段 + 根槽段（7）。
     assert_eq!(
         tally.states_by_publish_text(),
-        "instance1_txg1=7 instance1_txg2=7 instance1_txg3=262147 instance1_txg4=262147 \
-         instance2_txg5=1042 instance2_txg6=1027 instance2_txg7=1027 instance2_txg8=262147 \
-         instance3_txg9=1042 instance3_txg10=1027 instance3_txg11=262147 instance3_txg12=262147 \
-         instance3_txg13=262147 instance3_txg14=262147 instance3_txg15=1027 instance3_txg16=1027 \
-         instance3_txg17=262147 after_the_last_root=3 every_write_persisted=1",
-        "全量 2104413 个状态按发布分"
+        FULL_STATES_BY_PUBLISH_THROUGH_THE_UNMOUNT,
+        "全量的状态按发布分（每段的状态归它后面最近的那次根槽写）"
     );
     assert_eq!(tally.states_by_publish.values().sum::<u64>(), tally.states);
     assert_eq!(
@@ -662,7 +868,7 @@ fn targeted_controls_on_the_second_publish_go_red_where_they_should() {
     let second_publish_records = kinds_of_second_publish(StepKind::JournalRecord);
     assert_eq!(
         (second_publish_units.len(), second_publish_records.len()),
-        (16, 2)
+        (24, 2)
     );
     let evaluate = |persisted: Vec<bool>| {
         let mut tally = Layer0Tally::default();
@@ -689,7 +895,7 @@ fn targeted_controls_on_the_second_publish_go_red_where_they_should() {
     ));
     assert_eq!(all_persisted_tally.violations, 0);
 
-    // ② B 的根槽已持久、B 的十六个单元写一份都没持久：oracle 必须红（走读失败），记录核对器判「自称新态而单元缺席」。
+    // ② B 的根槽已持久、B 的二十四个单元写一份都没持久：oracle 必须红（走读失败），记录核对器判「自称新态而单元缺席」。
     let mut root_without_units = all.clone();
     for index in &second_publish_units {
         root_without_units[*index] = false;
@@ -779,8 +985,8 @@ fn residual_record_and_its_named_units(
             residual.record.is_commit,
             residual.record.named.len()
         ),
-        (RESIDUAL_RECORD_ROOT.0, RESIDUAL_RECORD_ROOT.1, 5, 3, true, 8),
-        "残留记录：实例 1、txg 5、jsn 5（接在 B 的 jsn 4 之后）、事务号 3、带提交标记、点名八个单元"
+        (RESIDUAL_RECORD_ROOT.0, RESIDUAL_RECORD_ROOT.1, 5, 3, true, 12),
+        "残留记录：实例 1、txg 5、jsn 5（接在 B 的 jsn 4 之后）、事务号 3、带提交标记、点名十二个单元"
     );
     let seed: Vec<RetainedOperation> = scratch.retained_operations()[history.len()..]
         .iter()
@@ -793,7 +999,7 @@ fn residual_record_and_its_named_units(
         })
         .cloned()
         .collect();
-    assert_eq!(seed.len(), 16 + 2, "八个单元各两盘、记录两份");
+    assert_eq!(seed.len(), 24 + 2, "十二个单元各两盘、记录两份");
     (seed, history)
 }
 
@@ -842,7 +1048,6 @@ fn prepare_with_residual_record_seeded(tag: &str) -> Prepared {
             instance: InstanceGeneration(1),
             selected_root_txg: CheckpointTxg(5),
             applied_transaction_high_water: 3,
-            is_rollback: false,
         }]
     );
     assert_eq!(
@@ -898,10 +1103,14 @@ fn prepare_with_residual_record_seeded(tag: &str) -> Prepared {
     // 与到 C 的固定脚本同型，只少一次暖机（写行发布落在 txg 6 的盘 0 上，txg 7 就到盘 1）。
     assert_eq!(
         segments.iter().map(Vec::len).collect::<Vec<usize>>(),
-        vec![2, 2, 1, 2, 2, 1, 18, 2, 1, 18, 2, 1, 4, 10, 2, 1, 10, 2, 1, 18, 2, 1, 2],
+        vec![2, 2, 1, 2, 2, 1, 26, 2, 1, 26, 2, 1, 2, 2, 18, 2, 1, 18, 2, 1, 26, 2, 1, 2],
         "预置残留记录那条流的段序列"
     );
-    assert_eq!(writes.len(), 54 + 2 + 15 + 13 + 21);
+    assert_eq!(
+        writes.len(),
+        70 + 2 + 23 + 21 + 29,
+        "到 B 70 + 取号 2 + 写行 23 + 暖机 21 + C 29"
+    );
     let root_indexes: Vec<usize> = writes
         .iter()
         .enumerate()
@@ -1012,13 +1221,18 @@ fn residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_wh
             }
         },
     );
-    let expanded: Vec<Vec<usize>> = prepared
-        .segments
-        .iter()
-        .enumerate()
-        .filter(|(segment_index, segment)| expand(*segment_index, segment))
-        .map(|(_, segment)| segment.clone())
-        .collect();
+    let states_of_the_expanded_segments = layer0_state_count_with_torn_in_place_overwrites(
+        &prepared.base,
+        &prepared.writes,
+        &prepared.segments,
+        &|segment_index, segment| {
+            if expand(segment_index, segment) {
+                Layer0SegmentExpansion::EveryProperSubset
+            } else {
+                Layer0SegmentExpansion::NotExpanded
+            }
+        },
+    );
     println!(
         "RESIDUAL_RECORD states={} states_whose_chain_reaches_the_residual_record={} violations={} checker_by_invariant(evaluated/violated/not_applicable) {}",
         tally.states,
@@ -1030,11 +1244,12 @@ fn residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_wh
         states_contradicting_the_predicate.is_empty(),
         "该施加残留记录与恢复实际落在 (1, 5) 对不上的状态：{states_contradicting_the_predicate:?}"
     );
-    assert_eq!(tally.states, closed_form_state_count(&expanded));
+    assert_eq!(tally.states, states_of_the_expanded_segments);
     assert_eq!(
         (tally.states, states_whose_chain_reaches_the_residual_record),
-        (31, 19),
-        "跑到的：B 与取号的系统配置槽段 15 + 写行发布的记录段 3 + 写行发布的根槽段 1；跑不到的 12 个是实例 2 的某条根已持久"
+        (37, 20),
+        "跑到的：B 的轮换那一段 8 + 取号那一段 8（系统配置槽写各三态，3² − 1；代码审阅第 19 条之后两段之间有屏障，改之前并成一段）\
+         + 写行发布的记录段 3 + 写行发布的根槽段 1；跑不到的 17 个是实例 2 的某条根已持久（C 的轮换那一段 8 在内）"
     );
     assert_eq!(
         tally.violations, 0,
@@ -1055,7 +1270,7 @@ fn residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_wh
     assert_checker_and_record_checker_counts(&tally, &[]);
 }
 
-/// 改坏 tail 的 tail 值：窗口 [3, 18] 里有 A 那条记录（jsn 3），它点名的 50180 在 txg 18 被合法复用。
+/// 改坏 tail 的 tail 值：窗口 [3, 19] 里有 A 那条记录（jsn 3），它点名的 50180 在 txg 19 被合法复用。
 const STALE_JOURNAL_TAIL: u64 = 2;
 
 /// 改坏 tail：录制流里每一次系统配置槽写都换成 tail = `stale_tail` 的那一份（按字段重写、校验和重算，其余字段原样）。
@@ -1122,8 +1337,8 @@ fn records_after_tail_naming_a_mismatched_unit(
 }
 
 /// 步 6 必红「陈旧 tail + 已复用的块」（verification-build.md 崩溃点重放第一版必红用例表；C77（重放起点未定义）；D23（journal 的角色与格式） 已定项 3
-/// 那条 ⚠️ 与已定项 14）：固定脚本到 E 之后再覆盖写一次（txg 18 的数据单元落回 50180，A 那条记录点名的单元被合法复用），录制流里每次系统配置槽写的
-/// tail 都改成 2。txg 18 的 16 个单元写全持久之后的每个崩溃状态：恢复必须完成、终态与 tail 没改坏的同一个状态逐项相等、施加前验证一次都不失败；
+/// 那条 ⚠️ 与已定项 14）：固定脚本到 E 之后再覆盖写两次（txg 19 的数据单元落回 50180，A 那条记录点名的单元被合法复用），录制流里每次系统配置槽写的
+/// tail 都改成 2。txg 19 的 28 个单元写全持久之后的每个崩溃状态：恢复必须完成、终态与 tail 没改坏的同一个状态逐项相等、施加前验证一次都不失败；
 /// 从陈旧 tail 起逐条验证、失配即中止的恢复在这些状态上中止，红在逐项相等那条。再注入一次真撕裂：施加前验证恰判失败一次（陈旧失配不进这个计数器）。
 #[test]
 fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_to_the_same_end_state(
@@ -1140,13 +1355,13 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
         .filter(|(_, write)| write.kind == StepKind::RootRecordFua)
         .map(|(index, _)| index)
         .collect();
-    let publish_after_raising_floor_root_index = root_indexes[16];
+    let root_index_before_the_reuse = root_indexes[17];
     let reuse_units_segment_index = prepared
         .segments
         .iter()
-        .position(|segment| segment.contains(&(publish_after_raising_floor_root_index + 1)))
-        .expect("E 的系统配置槽写与 txg 18 的单元写同段");
-    assert_eq!(prepared.segments[reuse_units_segment_index].len(), 18);
+        .position(|segment| segment.contains(&(root_index_before_the_reuse + 1)))
+        .expect("txg 18 的系统配置槽写与 txg 19 的单元写同段");
+    assert_eq!(prepared.segments[reuse_units_segment_index].len(), 30);
     let expand = |segment_index: usize, segment: &[usize]| {
         segment_index > reuse_units_segment_index && segment.len() < 10
     };
@@ -1175,9 +1390,17 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
                 states_with_a_reused_named_unit_after_the_stale_tail += 1;
                 records_with_a_reused_named_unit = mismatched;
             }
+            // 枚举用的写表在录制流里的写后面接着撕裂镜像（系统配置槽写的第三态，代码审阅第 4 条）：tail 没改坏的那一份镜像照样接上，
+            // 撕裂的那一槽同样新旧都读不出，持久集合逐条对得上。
+            let true_tail_writes: Vec<RetainedWrite> = prepared
+                .writes
+                .iter()
+                .chain(&stale_tail_image.writes[prepared.writes.len()..])
+                .cloned()
+                .collect();
             let true_tail_image = CrashImage {
                 base: &prepared.base,
-                writes: &prepared.writes,
+                writes: &true_tail_writes,
                 persisted: stale_tail_image.persisted.clone(),
             };
             let true_tail_report = recover(&true_tail_image, JournalPolicy::Consult);
@@ -1206,16 +1429,16 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
         "改坏 tail 之后恢复的终态与 tail 没改坏的同一个状态不同：{states_differing_from_the_true_tail:?}"
     );
     assert_eq!(
-        tally.states, 8,
-        "txg 18 的记录段 3 + 根槽段 1 + 系统配置槽段 3 + 全部持久 1"
+        tally.states, 13,
+        "txg 19 的记录段 3 + 根槽段 1 + 系统配置槽段 3² − 1（两次系统配置槽写各三态）+ 全部持久 1"
     );
     assert_eq!(
         (
             states_with_a_reused_named_unit_after_the_stale_tail,
             records_with_a_reused_named_unit
         ),
-        (8, vec![3]),
-        "8 个状态里 txg 18 的单元写都已持久：陈旧 tail 之后 A 那条记录（jsn 3）点名的 50180 两份都已被复用"
+        (13, vec![3]),
+        "13 个状态里 txg 19 的单元写都已持久：陈旧 tail 之后 A 那条记录（jsn 3）点名的 50180 两份都已被复用"
     );
     assert_eq!(
         tally.violations, 0,
@@ -1228,23 +1451,23 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
         "陈旧失配不进施加前验证的计数器：水位之下的记录不验"
     );
     assert_eq!(tally.ignored_violations, 0);
-    // 记录核对器第二条判据（恢复自称的 txg ≥ 某次发布、那次发布的某个单元两份都不在）在这 8 个状态上判绿：
-    // A（txg 3）的数据单元两份被 txg 18 合法复用了，而「被流里更晚的、**已经持久**的写盖过的那一份不算缺席」——
+    // 记录核对器第二条判据（恢复自称的 txg ≥ 某次发布、那次发布的某个单元两份都不在）在这 13 个状态上判绿：
+    // A（txg 3）的数据单元两份被 txg 19 合法复用了，而「被流里更晚的、**已经持久**的、过了回收谓词的写盖过的那几个扇区不算缺席」——
     // 2026-09-17 写这条用例时这一格口径未定、钉的是当时的 8，2026-09-20 按崩溃注入（增补 3 第 3 件）落地时定成前一种：
     // 位置让给了后来的写，旧字节本来就不该还在，那不是崩溃摆出来的洞。
-    // 这 8 个状态里 txg 18 的单元写都已持久（上面那条断言钉着），所以 C507（记录核对器的复用豁免比登记的候选宽，把真洞变哑）
-    // 把豁免收严成「更晚那次写也已持久」之后，这 8 个仍然判绿。豁免整个撤回、或者把那个持久判定取反，这条用例就红
+    // 这 13 个状态里 txg 19 的单元写都已持久（上面那条断言钉着），所以 C507（记录核对器的复用豁免比登记的候选宽，把真洞变哑）
+    // 把豁免收严成「更晚那次写在持久集合里」之后，这 13 个仍然判绿（2026-09-17 写这条用例时是 8 个，补第三态之后系统配置槽段 3 → 8）。豁免整个撤回、或者把那个持久判定取反，这条用例就红
     //（`crates/mutations.tsv`）。
     assert_checker_and_record_checker_counts(&tally, &[]);
     assert_the_rollback_floor_raise_was_judged(&tally);
 
-    // 撕裂注入：txg 18 的记录已持久、根槽与系统配置槽没持久，再把它点名的数据单元两份都改坏——施加前验证判失败、恢复停在 E (3, 17)、
+    // 撕裂注入：txg 19 的记录已持久、根槽与系统配置槽没持久，再把它点名的数据单元两份都改坏——施加前验证判失败、恢复停在 txg 18、
     // 验证失败恰为 1 次：陈旧 tail 之后那条点名块已被复用的记录（jsn 3）不进这个计数器，真撕裂与陈旧失配分得开。
     let mut torn_writes = stale_writes.clone();
-    let reused_data_unit_offset = SlotNumber(50180).to_device_offset();
+    let reused_data_unit_offset = SlotNumber(FIRST_DATA_UNIT_SLOT).to_device_offset();
     let mut torn_copies = 0;
     for (write_index, write) in torn_writes.iter_mut().enumerate() {
-        if write_index > publish_after_raising_floor_root_index
+        if write_index > root_index_before_the_reuse
             && write.kind == StepKind::UnitWrite
             && write.offset == reused_data_unit_offset
         {
@@ -1255,7 +1478,7 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
             torn_copies += 1;
         }
     }
-    assert_eq!(torn_copies, 2, "txg 18 的数据单元两盘各一份");
+    assert_eq!(torn_copies, 2, "txg 19 的数据单元两盘各一份");
     let persisted_before_the_reuse_root: Vec<bool> = (0..torn_writes.len())
         .map(|write_index| write_index < prepared.judged_root_index)
         .collect();
@@ -1274,24 +1497,24 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
             torn_report.journal.verification_failed,
             torn_report.journal.prefix_applied
         ),
-        (Some((InstanceGeneration(3), CheckpointTxg(17))), 1, 0),
+        (Some((InstanceGeneration(2), CheckpointTxg(18))), 1, 0),
         "撕裂的那条被旗标、不施加：{:?}",
         torn_report.journal
     );
     assert_eq!(
         torn_tally.violations, 0,
-        "停在 E、读出 E 的内容：{:?}",
+        "停在 txg 18、读出 txg 18 的内容：{:?}",
         torn_tally.first_violation
     );
 }
 
 /// C507（记录核对器的复用豁免比登记的候选宽，把真洞变哑） 收严之后要买到的那一半：**更晚那次同槽的写没落盘**的崩溃状态里，
 /// 早先那个单元是真的缺席。手搭的状态（层 0 段枚举产生不出它：段是按屏障切的，一次发布的单元写与它的根槽写永远不同段）：
-/// 固定脚本到 txg 18 为止，txg 18 那次复用 50180 的写连同它的记录、根槽一个字节没落盘；它之前的写全部持久，
+/// 固定脚本到 txg 19 为止，txg 19 那次复用 50180 的写连同它的记录、根槽一个字节没落盘；它之前的写全部持久，
 /// 只把 A（txg 3）那两份落在 50180 的数据单元写摘成不持久——A 的记录与根槽照样在盘上。
-/// 恢复走 E (3, 17)，oracle 看不出问题（E 自己完好、读得出它的内容）；而 A 的数据单元两份都不在盘上、
-/// 唯一盖住它的那次写又没落盘，记录核对器第二条判据必须报 1。
-/// 只看「流里有没有更晚的写」、不看那次写持没持久的那一版在这里报 0（`crates/mutations.tsv` 里那条把 `in_place` 摘掉的变异）。
+/// 恢复走 (2, 18)，oracle 看不出问题（txg 18 那一版自己完好、读得出它的内容）；而 A 的数据单元两份都不在盘上、
+/// 唯一盖住它的那次写又没落盘（不在持久集合里），记录核对器第二条判据必须报 1。
+/// 不看那次后写在不在持久集合里的那一版在这里报 0（`crates/mutations.tsv` 里那条把持久判定摘掉的变异）。
 #[test]
 fn a_unit_whose_only_later_write_to_the_same_slot_never_landed_is_reported_missing_by_the_record_checker(
 ) {
@@ -1299,7 +1522,7 @@ fn a_unit_whose_only_later_write_to_the_same_slot_never_landed_is_reported_missi
         "layer0-reuse-that-never-landed",
         Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish,
     );
-    let first_data_unit_offset = SlotNumber(50180).to_device_offset();
+    let first_data_unit_offset = SlotNumber(FIRST_DATA_UNIT_SLOT).to_device_offset();
     let writes_to_the_first_data_unit_slot: Vec<usize> = prepared
         .writes
         .iter()
@@ -1312,7 +1535,7 @@ fn a_unit_whose_only_later_write_to_the_same_slot_never_landed_is_reported_missi
     assert_eq!(
         writes_to_the_first_data_unit_slot.len(),
         4,
-        "这条流上 50180 只被写过两次：A（txg 3）的数据单元与 txg 18 复用它的那次，各两盘一份"
+        "这条流上 50180 只被写过两次：A（txg 3）的数据单元与 txg 19 复用它的那次，各两盘一份"
     );
     let (first_publish_copies, reusing_publish_copies) =
         writes_to_the_first_data_unit_slot.split_at(2);
@@ -1323,16 +1546,16 @@ fn a_unit_whose_only_later_write_to_the_same_slot_never_landed_is_reported_missi
         .filter(|(_, write)| write.kind == StepKind::RootRecordFua)
         .map(|(index, _)| index)
         .collect();
-    let publish_after_raising_floor_root_index = root_indexes[16];
+    let root_index_before_the_reuse = root_indexes[17];
     let first_write_of_the_reusing_publish = prepared
         .writes
         .iter()
         .enumerate()
         .find(|(index, write)| {
-            *index > publish_after_raising_floor_root_index && write.kind == StepKind::UnitWrite
+            *index > root_index_before_the_reuse && write.kind == StepKind::UnitWrite
         })
         .map(|(index, _)| index)
-        .expect("E 的根槽写之后还有 txg 18 那次覆盖写的单元写");
+        .expect("txg 18 的根槽写之后还有 txg 19 那次覆盖写的单元写");
     let mut persisted: Vec<bool> = (0..prepared.writes.len())
         .map(|write_index| write_index < first_write_of_the_reusing_publish)
         .collect();
@@ -1343,13 +1566,13 @@ fn a_unit_whose_only_later_write_to_the_same_slot_never_landed_is_reported_missi
         reusing_publish_copies
             .iter()
             .all(|copy| !persisted[*copy] && *copy >= first_write_of_the_reusing_publish),
-        "txg 18 复用 50180 的那两份写一个字节都没落盘"
+        "txg 19 复用 50180 的那两份写一个字节都没落盘"
     );
     assert!(
         first_publish_copies
             .iter()
-            .all(|copy| *copy < publish_after_raising_floor_root_index),
-        "A 的那两份写在 E 的根槽写之前"
+            .all(|copy| *copy < prepared.first_root_index),
+        "A 的那两份写在 A 的根槽写之前"
     );
     assert!(
         persisted[prepared.first_root_index],
@@ -1390,16 +1613,16 @@ fn a_unit_whose_only_later_write_to_the_same_slot_never_landed_is_reported_missi
     );
     assert_eq!(
         report.effective_root,
-        Some((InstanceGeneration(3), CheckpointTxg(17))),
-        "txg 18 一个字节都没落盘，恢复走 E"
+        Some((InstanceGeneration(2), CheckpointTxg(18))),
+        "txg 19 一个字节都没落盘，恢复走 txg 18"
     );
     assert_eq!(
         report.outcome,
         RecoveryOutcome::FileRead {
-            root: (InstanceGeneration(3), CheckpointTxg(17)),
-            content: later_content(31)
+            root: (InstanceGeneration(2), CheckpointTxg(18)),
+            content: later_content(37)
         },
-        "E 自己完好：读得出它的内容"
+        "txg 18 那一版自己完好：读得出它的内容"
     );
     assert_eq!(
         tally.violations, 0,
@@ -1412,6 +1635,6 @@ fn a_unit_whose_only_later_write_to_the_same_slot_never_landed_is_reported_missi
             tally.record_claimed_state_missing_unit
         ),
         (0, 1),
-        "记录核对器第二条判据报这个洞：恢复自称到了 (3, 17) ≥ A 的 txg 3，而 A 的数据单元两份都不在盘上"
+        "记录核对器第二条判据报这个洞：恢复自称到了 (2, 18) ≥ A 的 txg 3，而 A 的数据单元两份都不在盘上"
     );
 }

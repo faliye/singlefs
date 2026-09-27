@@ -6,7 +6,8 @@
 //!
 //! 2026-09-23 用户定案「走到底，让那条零故障历史真跑通」之后这一份还罩着挂载不止一次的那几格：
 //! 树表 0 条的一版上**写实例表行**（只重写实例表一个单元）、第一个文件版本从现行那一版接着算 txg 与 jsn、
-//! 写过行的那一版上再挂载一次被拒（被换下的那片实例表记在哪没有条款）、环里没有带文件的根时回退到树表 0 条的根照常做。
+//! 写过行的那一版上再挂载一次被拒（被换下的那片实例表记在哪没有条款）。回退到树表 0 条的根那两格随回退改成挂着时的向前发布删掉
+//! （向前回退的候选要带文件，D23（journal 的角色与格式） 已定项 14；树表 0 条的根拒成 `VersionWithoutFile`，由步 4 的候选集用例钉）。
 //! 端到端那一条是 `a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_it_back_cold`。
 
 mod common;
@@ -15,7 +16,9 @@ use common::{
     build_pool, crash_state_devices, disk_snapshot, file_content, format_pool, geometry,
     memory_pool_of_sparse_devices, parameters, FormattedPool, FIXED_WRITE_TIME_SECONDS,
 };
-use singlefs_checker::image::{parse_node_pointer, InvariantVerdict};
+use singlefs_checker::image::{
+    parse_node_pointer, InvariantVerdict, MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+};
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
@@ -28,9 +31,7 @@ use singlefs_core::journal::{
     back_chain_of, JournalRecordOrdinalWithinPublish, JournalRecordPlaceInPublish,
 };
 use singlefs_core::make_filesystem::{INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT};
-use singlefs_core::mount::{
-    mount_rollback, mount_writable, InstanceRow, MountError, RollbackTarget, ShadowLedger,
-};
+use singlefs_core::mount::{mount_writable, InstanceRow, MountError, RollbackTarget};
 use singlefs_core::recovery::{
     choose_root, choose_system_configuration, recover, JournalPolicy, PoolReader, RecoveryFailure,
     RecoveryOutcome,
@@ -65,15 +66,15 @@ fn fail_the_nth_read_of_system_configuration_slot_zero_on_each_device(
 }
 
 /// 一次可写挂载里每块盘上第几次读系统配置槽 0 是取号之前的判定那一读（`transaction::instance_generation_to_acquire`）。
-/// 判定之前每块盘各读槽 0 六次：`mount_writable` 择系统配置一次（`recovery::choose_system_configuration`）、择根读回退见证一次
-/// （`recovery::choose_root` → `rollback_witness_of_the_pool`）；重放里择系统配置、读回退见证各一次（`recovery::replay_journal`）；
-/// 重建分配器时择根读一次、影子账再读一次回退见证（`mount::rebuilt_allocator`）。判定之后还有两读：写回退见证表之前读一次
-/// （`mount::rollback_witness_tables_of_this_mount`）、取号写之前重算一次。数法：给读槽 0 的地方各打一行，照这一次挂载的次序数出来的；
+/// 判定之前每块盘各读槽 0 三次：`mount_writable` 择系统配置一次（`recovery::choose_system_configuration`）、核盘表里这块盘的本盘设备号
+/// 一次（`mount::device_table_disagreeing_with` 读两槽，实审 A1b Q4）、重放里择系统配置一次（`recovery::replay_journal`）。
+/// 判定之后取号写之前重算一次。回退见证删掉之前是 7（择根、重放、影子账各读一次见证，判定之后写见证表之前
+/// 再读一次）；核本盘设备号之前是 3。数法：注入点从 1 挨个试到 8，只有判定那一读让判定与重算分叉成「判定号 1、重算号 2」（实三草稿里量的）；
 /// 读法变了（多读或少读一次），这个数跟着改，注入点就还是判定那一读。
-const DECISION_READ_OF_SYSTEM_CONFIGURATION_SLOT_ZERO_IN_A_WRITABLE_MOUNT: u64 = 7;
+const DECISION_READ_OF_SYSTEM_CONFIGURATION_SLOT_ZERO_IN_A_WRITABLE_MOUNT: u64 = 4;
 
 /// 取号之前判定算出的号与取号写之前重算的号不同，取号不写、报错（m2-emptypool-nonempty-r1 云端攻方腿 Z2）：mkfs 之后第一次可写挂载崩在
-/// 取号两写之后（同一个进程里取号就停、镜像关掉；两盘系统配置槽 0 已是号 1），重开时两块盘在判定那一读上（第 7 次读系统配置槽 0，
+/// 取号两写之后（同一个进程里取号就停、镜像关掉；两盘系统配置槽 0 已是号 1），重开时两块盘在判定那一读上（第 4 次读系统配置槽 0，
 /// `DECISION_READ_OF_SYSTEM_CONFIGURATION_SLOT_ZERO_IN_A_WRITABLE_MOUNT`）各报一次瞬时读错——
 /// 判定那一遍只看到 mkfs 的槽 1（号 0）、算出号 1、要写的行区间为空放行；取号重算读到号 1、算出号 2 ⇒ 返回
 /// `InstanceGenerationChangedBeforeAcquisition { expected: 1, recomputed: 2 }`，`DiskSnapshot` 不变。
@@ -157,7 +158,6 @@ fn writable_mount_after_a_crash_right_after_acquiring_an_instance_writes_a_row_f
             instance: InstanceGeneration(1),
             selected_root_txg: CheckpointTxg(0),
             applied_transaction_high_water: 0,
-            is_rollback: false,
         }],
         "号 1 被烧掉、什么都没发布过：中间实例行 (1, 0, 0)"
     );
@@ -514,8 +514,9 @@ fn region_device(txg: u64) -> DeviceIdentity {
     parameters().region_devices[usize::try_from(target.region).expect("区域号")]
 }
 
-/// 最新的根下面还没有记账树、inode 树与分配记录树时（mkfs 之后、零单元发布之后）checker 报不适用的那 20 条；
-/// 其余 24 条要真被评估过且成立。I-3.11（已分配减 defer 等于最新根走读） 与 I-3.1（已分配统计对得上） 同一个理由：最新根下面没有记账树。I-9.14（树表条目的诞生 txg 跨根不变） 在这里报不适用是因为 mkfs 种的第 0 版树表是空的：
+/// 最新的根下面还没有记账树、inode 树与分配记录树时（mkfs 之后、零单元发布之后）checker 报不适用的那 21 条；
+/// 其余 25 条要真被评估过且成立。映射 key 与单元头相符（`MAPPING_KEY_MATCHES_THE_UNIT_HEADER`）报不适用是因为中央映射树的根指针全零，
+/// 一条映射条目都没有。I-3.11（已分配减 defer 等于最新根走读） 与 I-3.1（已分配统计对得上） 同一个理由：最新根下面没有记账树。I-9.14（树表条目的诞生 txg 跨根不变） 在这里报不适用是因为 mkfs 种的第 0 版树表是空的：
 /// 一棵树的条目都没有，跨根比不出来（有了文件版本之后也只有一条根有条目，见 `NOT_APPLICABLE_WITH_ONE_FILE_VERSION`）；
 /// I-5.4（分配记录罩住的槽互不相交） 同一个理由：第 0 版树表里没有分配记录树，候选集里一条根的记录都走不到；
 /// I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号） 也是这个理由。
@@ -524,18 +525,57 @@ fn region_device(txg: u64) -> DeviceIdentity {
 /// （D23（journal 的角色与格式） 已定项 19 ①）。I-8.8（前缀里的事务不被切开） 是因为没有哪个非 0 事务号落了两条记录、
 /// 也没有哪一组一条提交标记都没有。I-9.15（inode 记录的 blocks 等于 ⌈size ÷ 512⌉） 与 I-9.7 同一个理由：一条 inode 记录都没有。
 /// I-7.9（回退下界 F 不高于抬 F 的上限） 是因为没抬过 F：每条根带的 F 都是 0（这个文件里哪一步都不抬，下面四张表都有它）。
-const NOT_APPLICABLE_WITHOUT_FILE: [&str; 20] = [
-    "I-1.10", "I-3.1", "I-3.9", "I-3.10", "I-3.11", "I-5.2", "I-5.4", "I-7.9", "I-8.7", "I-8.8",
-    "I-9.1", "I-9.2", "I-9.4", "I-9.6", "I-9.7", "I-9.10", "I-9.12", "I-9.13", "I-9.14", "I-9.15",
+const NOT_APPLICABLE_WITHOUT_FILE: [&str; 21] = [
+    "I-1.10",
+    "I-3.1",
+    "I-3.9",
+    "I-3.10",
+    "I-3.11",
+    "I-5.2",
+    "I-5.4",
+    "I-7.9",
+    "I-8.7",
+    "I-8.8",
+    "I-9.1",
+    "I-9.2",
+    "I-9.4",
+    "I-9.6",
+    "I-9.7",
+    "I-9.10",
+    "I-9.12",
+    "I-9.13",
+    "I-9.14",
+    "I-9.15",
+    MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
 ];
 
 /// mkfs 刚写完那一份要多报两条不适用：journal 环整段是 0，一条自证过的记录都没有 ⇒ I-8.6（反向链算法） 与
 /// I-8.9（一次发布的记录序号连续且只有末条带标志） 都没有判的对象。
 /// 可写挂载之后环里有记录（写行 / 暖机的空发布），它们就真被评估过了——所以这两条只在 mkfs 之后那一格。
-const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 22] = [
-    "I-1.10", "I-3.1", "I-3.9", "I-3.10", "I-3.11", "I-5.2", "I-5.4", "I-7.9", "I-8.6", "I-8.7",
-    "I-8.8", "I-8.9", "I-9.1", "I-9.2", "I-9.4", "I-9.6", "I-9.7", "I-9.10", "I-9.12", "I-9.13",
-    "I-9.14", "I-9.15",
+const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 23] = [
+    "I-1.10",
+    "I-3.1",
+    "I-3.9",
+    "I-3.10",
+    "I-3.11",
+    "I-5.2",
+    "I-5.4",
+    "I-7.9",
+    "I-8.6",
+    "I-8.7",
+    "I-8.8",
+    "I-8.9",
+    "I-9.1",
+    "I-9.2",
+    "I-9.4",
+    "I-9.6",
+    "I-9.7",
+    "I-9.10",
+    "I-9.12",
+    "I-9.13",
+    "I-9.14",
+    "I-9.15",
+    MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
 ];
 
 /// 写完第一个文件版本之后仍报不适用的那四条：
@@ -549,15 +589,31 @@ const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 22] = [
 /// B 之后再接一事务两条记录的阳性对照与坏镜像）。
 const NOT_APPLICABLE_WITH_ONE_FILE_VERSION: [&str; 4] = ["I-7.9", "I-8.7", "I-8.8", "I-9.14"];
 
-/// 树表 0 条的一版上写行那次发布之后：比 `NOT_APPLICABLE_WITHOUT_FILE` 少 I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号）
-/// 与 I-1.10（码 2 条目宽等于字段表宽）两条。写行那次发布写了一棵分配记录树、根指针住根记录（C512（树表 0 条的一版上被换下的单元记在哪），
-/// D16（发布语义） 已定项 9），里面未释放的那几条记录（被换下的 mkfs 那片实例表已带释放标志，归 I-3.9）起点槽上都读得出单元头，
+/// 树表 0 条的一版上写行那次发布之后：比 `NOT_APPLICABLE_WITHOUT_FILE` 少 I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号）、
+/// I-1.10（码 2 条目宽等于字段表宽）、I-3.9（释放代落在停止引用它的那一格区间里） 与 I-5.4（分配记录罩住的槽互不相交） 四条。
+/// 写行那次发布写了一棵分配记录树、根指针住根记录（C512（树表 0 条的一版上被换下的单元记在哪），
+/// D16（发布语义） 已定项 9），里面未释放的那几条记录起点槽上都读得出单元头，
 /// I-3.10 在这一格真被评估过；这棵树按位置寻址（D8（核心索引结构） 已定项 14），checker 从根记录那一项按位置走下去、每个节点判条目宽，
-/// I-1.10 也真被评估过。
-/// I-5.4（分配记录罩住的槽互不相交） 仍报不适用：它只从树表条目找分配记录树，不读根记录直接持有的那一棵。
-const NOT_APPLICABLE_AFTER_THE_ROW_PUBLISH_WITHOUT_FILE: [&str; 18] = [
-    "I-3.1", "I-3.9", "I-3.11", "I-5.2", "I-5.4", "I-7.9", "I-8.7", "I-8.8", "I-9.1", "I-9.2",
-    "I-9.4", "I-9.6", "I-9.7", "I-9.10", "I-9.12", "I-9.13", "I-9.14", "I-9.15",
+/// I-1.10 也真被评估过。checker 把根记录直接持有的那一棵并进候选根的分配记录（实审 B2）：被换下的 mkfs 那片实例表带释放标志，
+/// I-3.9 判它的释放代；I-5.4 判这棵树里的记录两两不相交——两条都真被评估过且成立。
+const NOT_APPLICABLE_AFTER_THE_ROW_PUBLISH_WITHOUT_FILE: [&str; 17] = [
+    "I-3.1",
+    "I-3.11",
+    "I-5.2",
+    "I-7.9",
+    "I-8.7",
+    "I-8.8",
+    "I-9.1",
+    "I-9.2",
+    "I-9.4",
+    "I-9.6",
+    "I-9.7",
+    "I-9.10",
+    "I-9.12",
+    "I-9.13",
+    "I-9.14",
+    "I-9.15",
+    MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
 ];
 
 /// 这一步的镜像上 checker 的每一条判决逐条核：`not_applicable` 里的报不适用，其余每一条都真被评估过且成立（一条违例都没有）。
@@ -621,7 +677,6 @@ fn writable_mount_after_a_crash_between_warm_up_and_the_first_file_writes_the_ro
             instance: InstanceGeneration(1),
             selected_root_txg: CheckpointTxg(2),
             applied_transaction_high_water: 0,
-            is_rollback: false,
         }],
         "上一个实例 1 那一行：选的根 txg 2、W = 0"
     );
@@ -934,8 +989,8 @@ fn plant_a_root_without_its_allocation_record_tree(
 /// 验收：取号 1、不写行；写行那次发布 (1, 1)、jsn 1、事务号 0、反向链 0、零单元、落盘 1；暖机一次 (1, 2)、jsn 2、反向链接 jsn 1、落盘 0；
 /// 分配器只有 mkfs 的两个单元（每盘 3 槽）；第一个文件版本 (1, 3)、jsn 3、事务号 1，数据单元落 50180、换下 mkfs 那片树表；
 /// mkfs 之后的录制流与第一个事务那条逐字节相同、写出的那一版也相同；冷启动读回文件；checker 一条违例都没有——mkfs 之后
-/// 22 条成立（环是空的，I-8.6 也报不适用）、挂载之后 23 条成立，没有记账树 / inode 树 / 分配记录树的那几条报不适用，
-/// 第一个文件版本之后 36 条成立、I-9.14、I-8.7 与 I-8.8 仍报不适用（树表条目只出现在这一条根的树表里；同一实例只有一条非 0 事务号的记录；
+/// 23 条成立（环是空的，I-8.6 也报不适用）、挂载之后 25 条成立，没有记账树 / inode 树 / 分配记录树 / 映射条目的那几条报不适用，
+/// 第一个文件版本之后 42 条成立、I-7.9、I-9.14、I-8.7 与 I-8.8 仍报不适用（树表条目只出现在这一条根的树表里；同一实例只有一条非 0 事务号的记录；
 /// 没有哪个事务号落了两条记录、每条都带提交标记）。
 #[test]
 fn writable_mount_of_a_formatted_pool_takes_instance_one_publishes_two_zero_unit_roots_and_the_first_file_version_reads_back_cold(
@@ -1160,7 +1215,6 @@ fn a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_i
             instance: InstanceGeneration(1),
             selected_root_txg: CheckpointTxg(2),
             applied_transaction_high_water: 0,
-            is_rollback: false,
         }],
         "上一个实例 1 那一行：选的根 txg 2、W = 0"
     );
@@ -1305,7 +1359,6 @@ fn a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_i
             instance: InstanceGeneration(1),
             selected_root_txg: CheckpointTxg(2),
             applied_transaction_high_water: 0,
-            is_rollback: false,
         }],
         "写行那一条还在：第一个文件版本照抄的是写行之后那一版的指针"
     );
@@ -1316,189 +1369,450 @@ fn a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_i
     );
 }
 
-/// 环里一条带文件版本的根都没有时，回退到树表 0 条的根照常做（R2 那一道：候选集只有三条，「树表 0 条」不在其内，
-/// C493（回退候选集条文与实现说反话） 还清）：建池 → 可写挂载（不写文件，txg 1、2）→ 退出 → 再可写挂载（写行，txg 3、4）→ 退出 →
-/// 回退到 (1, 2)。取号 3、写两行——被退回的实例 1 那一条回退行 (1, 2, 0)（flags bit0 = 1）与中间实例 (2, 0, 0)；
-/// 回退行那次发布只重写实例表一个单元、txg 5 jsn 5，暖机到本实例的根覆盖每块盘；冷启动择新根读回「没有文件」；
-/// 盘上那片新实例表里就是这两行；池级 checker 一条违例都没有。
-///
-/// 这一格同时钉住影子账认得树表 0 条的被抛弃根：第二次挂载写出去的那片实例表只被 (2, 3)、(2, 4) 引用，
-/// 这次回退把它们抛弃，而它们没有分配记录树——影子账要按根记录那两条指针把它隔离，不然回退这次的新实例表就发在它上面
-/// （2026-09-23 崩溃注入打中的那一格）。
-/// 影子账罩着被抛弃根那片分配记录树节点（D23（journal 的角色与格式） 已定项 14：被抛弃时间线的根离开根环之前，它们引用的单元
-/// 不许重新分配）。同一段历史：第二次可写挂载在树表 0 条的一版上写行（实例 2，txg 3 重写实例表与分配记录树、txg 4 暖机照抄），
-/// 再回退到 (1, 2)——实例 2 那两条根被抛弃，它们引用的那片实例表（2 槽）与那棵分配记录树的五个节点（按位置寻址，D8（核心索引结构）
-/// 已定项 14：4 GiB 两块盘上根在第 2 层，两块盘各一片叶、各一个第 1 层节点、根；根指针住根记录那一项）
-/// 都只被被抛弃根引用，每块盘隔离 7 槽，那几个节点的槽回退之后不空闲；回退那次发布写的实例表与分配记录树一片都不落在它们上面。
-/// 只认根记录里实例表与树表两条指针时那五个节点每盘少隔离 5 槽，回退之后它们是空闲槽。
+/// D8（核心索引结构） 已定项 8 ②「号永不重发」在崩溃恢复那一形上（原先由回退到暖机根之后再发第一个文件版本那几条用例护，
+/// 回退改成挂着时的向前发布之后那一形没有了，D23（journal 的角色与格式） 已定项 14）：只做过 mkfs 的池可写挂载（实例 1，暖机），
+/// 再挂一次（实例 2）发第一个文件版本（八棵树 11..18）；进程退出之后实例 2 的每一条根的根槽都读不出（清零），可写挂载一次——
+/// 择根落到实例 1 的暖机根（树表 0 条、根上水位 11），前缀规则不跨实例、实例 2 的记录一条都不施加；新实例 3 的水位按根环与环里记录取
+/// max = 19。实例 3 接着发第一个文件版本：
+/// - 八棵树从 19 发 19..26、新水位 27，不从那一版根上的 11 重发（照 mkfs 水位发就与盘上实例 2 的节点撞号）；
+/// - 「树建没建」按树表条数判（0 条），不按水位是不是 11（水位 19、树表 0 条照样发得出第一个文件版本）；
+/// - 只读挂载沿新根读回这一版的内容：中央映射树是 23，按根记录里映射根指针的出生树认，不写死 15。
 #[test]
-fn rolling_back_before_any_file_version_isolates_the_allocation_record_node_only_the_abandoned_roots_reference(
+fn the_first_file_version_after_a_recovery_dropped_an_earlier_one_issues_its_trees_above_the_ring_watermark_and_reads_back(
 ) {
-    let mut formatted = format_pool("step-three-formatted-rollback-isolates-the-node");
+    let mut formatted = format_pool("first-file-after-a-recovery-dropped-an-earlier-one");
     let mut first = formatted.reopen_recorded();
-    mount_writable(&parameters(), &mut first).expect("第一次可写挂载：不写行");
-    formatted.devices = Some(first);
-    let mut second = formatted.reopen_recorded();
-    let row_written = mount_writable(&parameters(), &mut second).expect("第二次可写挂载：写行");
-    formatted.devices = Some(second);
-    assert_ne!(
-        row_written.current.root().allocation_record_tree_root,
-        NodePointer::empty_root(),
-        "写行那次发布把分配记录树的根写进了根记录"
-    );
-    // 分配记录树按位置寻址（D8（核心索引结构） 已定项 14）：4 GiB 两块盘上根在第 2 层，写行那次写出五个节点（两块盘各自的叶 61、
-    // 各自的第 1 层节点 0 与根），都点名在那次发布的记录里；实例表那一项之外就是它们。
-    let abandoned_instance_table_slot = row_written.current.root().instance_table.locations[0].slot;
-    let abandoned_node_slots: Vec<SlotNumber> = row_written
-        .output
-        .row_publish
-        .record()
-        .named
-        .iter()
-        .map(|named| {
-            assert_eq!(named.locations[1].slot, named.locations[0].slot, "两盘同槽");
-            named.locations[0].slot
-        })
-        .filter(|slot| *slot != abandoned_instance_table_slot)
-        .collect();
-    assert_eq!(
-        abandoned_node_slots.len(),
-        5,
-        "写行那次发布写的分配记录树节点：两块盘各一片叶、各一个第 1 层节点、根"
-    );
-
-    let mut devices = formatted.reopen_recorded();
-    let rolled_back = mount_rollback(
-        &parameters(),
-        &mut devices,
-        RollbackTarget {
-            instance: InstanceGeneration(1),
-            checkpoint_txg: CheckpointTxg(2),
-        },
-        ShadowLedger::On,
-    )
-    .expect("环里没有带文件的根：回退照常做");
-    formatted.devices = Some(devices);
-    assert_eq!(
-        rolled_back.output.isolated_slots_per_device,
-        vec![(DeviceIdentity(0), 7), (DeviceIdentity(1), 7)],
-        "实例 2 那片实例表 2 槽加那五个分配记录树节点 5 槽，逐盘"
-    );
-    assert_eq!(rolled_back.output.abandoned_roots_unreadable, 0);
-    for device_map in &rolled_back.allocator.devices {
-        for abandoned_node_slot in &abandoned_node_slots {
-            assert!(
-                !device_map.is_free(*abandoned_node_slot),
-                "盘 {:?}：被抛弃根那棵分配记录树的节点（槽 {abandoned_node_slot:?}）回退之后不空闲",
-                device_map.device
-            );
-        }
-    }
-    let PoolVersion::WithoutFile(row) = &rolled_back.output.row_publish else {
-        panic!("树表 0 条：回退行那次发布仍是「没有文件版本」的一版")
+    let first_instance = mount_writable(&parameters(), &mut first).expect("第一次可写挂载");
+    assert_eq!(first_instance.output.instance, InstanceGeneration(1));
+    drop(first_instance);
+    let second_instance = mount_writable(&parameters(), &mut first).expect("第二次可写挂载");
+    assert_eq!(second_instance.output.instance, InstanceGeneration(2));
+    let PoolVersion::WithoutFile(version_of_the_second_instance) = &second_instance.current else {
+        panic!("只做过 mkfs 的池上现行那一版树表 0 条")
     };
-    let instance_table_slot = row.root.instance_table.locations[0].slot;
-    let written_by_the_rollback: Vec<SlotNumber> = row
-        .record
-        .named
-        .iter()
-        .map(|named| named.locations[0].slot)
-        .chain([SlotNumber(instance_table_slot.0 + 1)])
-        .collect();
-    assert!(
-        written_by_the_rollback.contains(&instance_table_slot)
-            && written_by_the_rollback
-                .contains(&row.root.allocation_record_tree_root.locations[0].slot),
-        "回退那次发布点名了它写的实例表与分配记录树的根：{written_by_the_rollback:?}"
-    );
-    for abandoned_node_slot in &abandoned_node_slots {
-        assert!(
-            !written_by_the_rollback.contains(abandoned_node_slot),
-            "回退那次发布写的实例表与分配记录树（槽 {written_by_the_rollback:?}）不落在被抛弃根那棵树的节点（槽 {abandoned_node_slot:?}）上"
-        );
-    }
-}
-
-#[test]
-fn rolling_back_to_a_warm_up_root_before_any_file_version_rewrites_only_the_instance_table() {
-    let mut formatted = format_pool("step-three-formatted-rollback-before-any-file");
-    let mut first = formatted.reopen_recorded();
-    mount_writable(&parameters(), &mut first).expect("第一次可写挂载：不写行");
-    formatted.devices = Some(first);
-    let mut second = formatted.reopen_recorded();
-    let row_written = mount_writable(&parameters(), &mut second).expect("第二次可写挂载：写行");
-    let instance_table_written_by_the_row_publish =
-        row_written.current.root().instance_table.locations[0].slot;
-    formatted.devices = Some(second);
-
-    let warm_up_root = RollbackTarget {
-        instance: InstanceGeneration(1),
-        checkpoint_txg: CheckpointTxg(2),
+    let mut allocator_of_the_second_instance = second_instance.allocator.clone();
+    let dropped_first_file = {
+        let publish_parameters = parameters();
+        let mut writer = PoolWriter::new(&publish_parameters, first.as_mut_slice());
+        publish_first_file(
+            &mut writer,
+            &mut allocator_of_the_second_instance,
+            &version_of_the_second_instance.root,
+            FirstFile {
+                content: &file_content(),
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60,
+            },
+            second_instance.output.instance,
+            &version_of_the_second_instance.record_bytes,
+        )
+        .expect("实例 2 发第一个文件版本")
     };
-    let mut devices = formatted.reopen_recorded();
-    let rolled_back = mount_rollback(&parameters(), &mut devices, warm_up_root, ShadowLedger::On)
-        .expect("环里没有带文件的根：回退照常做");
-    formatted.devices = Some(devices);
-    assert_eq!(rolled_back.output.instance, InstanceGeneration(3));
     assert_eq!(
-        rolled_back.output.rows_written,
-        vec![
-            InstanceRow {
-                instance: InstanceGeneration(1),
-                selected_root_txg: CheckpointTxg(2),
-                applied_transaction_high_water: 0,
-                is_rollback: true,
-            },
-            InstanceRow {
-                instance: InstanceGeneration(2),
-                selected_root_txg: CheckpointTxg(0),
-                applied_transaction_high_water: 0,
-                is_rollback: false,
-            },
-        ],
-        "被退回的实例 1 那一条回退行，加中间实例 (2, 0, 0)"
+        dropped_first_file.tree_identifiers.highest().0,
+        18,
+        "实例 2 从 mkfs 的水位 11 发 11..18"
     );
-    let PoolVersion::WithoutFile(row) = &rolled_back.output.row_publish else {
-        panic!("树表 0 条：回退行那次发布仍是「没有文件版本」的一版")
+    let mut roots_of_the_second_instance: Vec<CheckpointTxg> =
+        vec![second_instance.output.row_publish.root().checkpoint_txg];
+    roots_of_the_second_instance.extend(
+        second_instance
+            .output
+            .warm_up_publishes
+            .iter()
+            .map(|warm_up| warm_up.root().checkpoint_txg),
+    );
+    roots_of_the_second_instance.push(dropped_first_file.root.checkpoint_txg);
+    formatted.devices = Some(first);
+    let mut reopened = formatted.reopen_recorded();
+    let root_slot_bytes =
+        usize::try_from(parameters().geometry.physical_block_size).expect("根槽宽");
+    for txg in &roots_of_the_second_instance {
+        let target = target_for_publish(*txg, geometry().root_ring_slots_per_region);
+        let offset = slot_offset(target, geometry().fixed_structure_slot_spacing);
+        let device = parameters().region_devices[usize::try_from(target.region).expect("区域号")];
+        let (_, recorded) = reopened
+            .iter_mut()
+            .find(|(identity, _)| *identity == device)
+            .expect("根槽所在的盘");
+        recorded
+            .write_at(offset, &vec![0u8; root_slot_bytes], WriteDurability::Plain)
+            .expect("清零实例 2 的根槽");
+    }
+    let third_instance = mount_writable(&parameters(), &mut reopened)
+        .expect("实例 2 的根都读不出：择根落到实例 1 的暖机根，照常可写挂载");
+    assert_eq!(
+        (
+            third_instance.output.instance,
+            third_instance.output.effective_root.instance
+        ),
+        (InstanceGeneration(3), InstanceGeneration(1)),
+        "实例 3 接在实例 1 的暖机根上"
+    );
+    let PoolVersion::WithoutFile(version_of_the_third_instance) = &third_instance.current else {
+        panic!("落到实例 1 的暖机根：现行那一版树表 0 条")
+    };
+    assert_eq!(
+        version_of_the_third_instance.root.tree_identifier_watermark, 19,
+        "实例 3 那一版带根环与环里记录的水位 max：实例 2 的记录带的 19"
+    );
+    let mut allocator_of_the_third_instance = third_instance.allocator.clone();
+    let content = (0..3300usize)
+        .map(|index| u8::try_from((index * 7 + 17) % 253).expect("小于 256"))
+        .collect::<Vec<u8>>();
+    let first_file_of_the_third_instance = {
+        let publish_parameters = parameters();
+        let mut writer = PoolWriter::new(&publish_parameters, reopened.as_mut_slice());
+        publish_first_file(
+            &mut writer,
+            &mut allocator_of_the_third_instance,
+            &version_of_the_third_instance.root,
+            FirstFile {
+                content: &content,
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 120,
+            },
+            third_instance.output.instance,
+            &version_of_the_third_instance.record_bytes,
+        )
+        .expect("水位 19、树表 0 条：照样发得出第一个文件版本")
     };
     assert_eq!(
         (
-            row.root.instance,
-            row.root.checkpoint_txg,
-            row.record.counter,
-            row.record.named.len()
+            first_file_of_the_third_instance
+                .tree_identifiers
+                .highest()
+                .0,
+            first_file_of_the_third_instance
+                .root
+                .tree_identifier_watermark,
+            first_file_of_the_third_instance
+                .root
+                .mapping_root
+                .head
+                .birth_tree
+                .0
         ),
-        (InstanceGeneration(3), CheckpointTxg(5), 5, 6),
-        "txg = 环里最大 4 + 1；jsn 接在环里最大的 4 之后；点名实例表与分配记录树五个节点（按位置寻址，D8（核心索引结构） 已定项 14）"
+        (26, 27, 23),
+        "实例 3 从 19 发 19..26、新水位 27，中央映射树是 23"
     );
-    assert_ne!(
-        row.root.instance_table.locations[0].slot, instance_table_written_by_the_row_publish,
-        "影子账把第二次挂载写出去的那片实例表隔离了：回退这次没发在它上面"
-    );
-    let reopened = formatted.memory_pool();
-    let system_configuration = choose_system_configuration(&reopened).expect("择系统配置");
-    let newest = choose_root(&reopened, &system_configuration).expect("择根");
-    assert_eq!(newest.instance, InstanceGeneration(3));
-    let table = singlefs_core::recovery::instance_table_of_root(&reopened, &newest)
-        .expect("盘上那片实例表解得开");
-    assert_eq!(
-        table.rows, rolled_back.output.rows_written,
-        "盘上写着这两行"
-    );
-    assert_eq!(
-        recover(&reopened, JournalPolicy::Consult).outcome,
-        RecoveryOutcome::NoFile {
-            root: (newest.instance, newest.checkpoint_txg)
-        },
-        "回退到的那一版树表 0 条：冷启动读不到文件"
-    );
-    let violated: Vec<&str> = check_pool_image(&reopened)
-        .into_iter()
-        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
-        .map(|(invariant, _)| invariant)
+    formatted.devices = Some(reopened);
+    let image = formatted.memory_pool();
+    let mounted = singlefs_core::mounted_read::mount_read_only(&image).expect("只读挂载");
+    let file = mounted
+        .mounted
+        .open_file(
+            &image,
+            singlefs_core::address::InodeNumber(singlefs_core::transaction::FIRST_INODE_NUMBER),
+        )
+        .expect("打开文件");
+    let read_back = file
+        .read_at(
+            &image,
+            singlefs_core::address::FileOffsetInBytes(0),
+            u64::try_from(content.len()).expect("3300"),
+        )
+        .expect("只读挂载读得回这一版");
+    assert_eq!(read_back.bytes, content, "读回实例 3 那一版的内容");
+}
+
+/// 一次发布写到的单元落点（两盘同槽，取第一条位置条目的槽）：带文件的一版按这次重写的角色，树表 0 条的一版按那条记录的点名项。
+fn slots_written_by(version: &PoolVersion) -> Vec<SlotNumber> {
+    match version {
+        PoolVersion::WithFile(output) => output
+            .rewritten
+            .iter()
+            .map(|role| output.unit(*role).slot)
+            .collect(),
+        PoolVersion::WithoutFile(without_file) => without_file
+            .record
+            .named
+            .iter()
+            .map(|named| named.locations[0].slot)
+            .collect(),
+    }
+}
+
+/// 影子账里树表 0 条的被抛弃根那一支（`mount.rs` 的 `placements_referenced_by_root` 树表 0 条那一臂）在向前回退下的造法
+/// （实三交回 Q3，调度记录 2026-09-24 第三节实三交回那一行「实四造得出就补」）：崩溃恢复抛弃一条写过行的树表 0 条根，
+/// 之后第一个文件与正常卸载把 F 抬过它引用的槽。
+///
+/// 历史：mkfs → 可写挂载 M1（实例 1，零单元 txg 1、2）→ 退出 → M2（实例 2，写行 txg 3 点名实例表 50240 与分配记录树五个节点
+/// 50242..50246，暖机 txg 4）→ 退出 → M3 之前 txg 3、4 的根槽读不出（清零）、写行那条记录点名的实例表盘 0 那一份也读不出
+/// ⇒ 择根落到 (1, 2)、那条记录施加前验不过，M3 取号 3、写行 txg 5（点名的六个单元与 M2 那次**逐槽相同**：两次写行接在同一版、
+/// 同一份账上，落点同一条规则）、暖机 6、7 ⇒ M3 看不见 txg 3、4，隔离 0；再把两个根槽原样写回，它们按实例 3 的表判被抛弃。
+/// 同一个进程里实例 3 发第一个文件（txg 8：换下 mkfs 树表 50178 与那五个分配记录树节点，释放代 8）→ 正常卸载把 F 抬到 8
+/// （txg 9、10）⇒ 这一串回收释放代 ≤ 8 的槽，其中 50178（被抛弃根 txg 3 的树表）与 50246（它的分配记录树根，内容已被 M3 盖成实例 3 的，
+/// 走不下去，只认根指针自己那一片）仍被环里的被抛弃根引用 ⇒ 影子账每盘隔离这 2 槽，卸载那一串与下一次挂载 M4 都不写它们；
+/// M4 重算影子账，照样每盘 2 槽，没有一条被抛弃根算成「账读不出」。两处池级 checker 都只红 I-7.4：M3 看不见被抛弃根 (2, 3)，
+/// 把它引用的实例表与分配记录树根逐槽再发了一遍（C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 那一形，照实红）。
+///
+/// 判别力：那一臂交回 `None`（树表 0 条的被抛弃根当成账读不出），卸载与 M4 都隔离 0、M4 报 2 条账读不出（`crates/mutations.tsv`）；
+/// 那一臂漏掉分配记录树的节点，每盘只隔离 50178 那 1 槽。
+#[test]
+fn crash_recovery_abandoning_the_row_publish_of_the_version_without_file_keeps_its_tree_table_and_allocation_record_tree_root_isolated_once_the_floor_passes_them(
+) {
+    let publish_parameters = parameters();
+    let mut formatted = format_pool("step-three-formatted-abandoned-row-publish");
+    let mut first = formatted.reopen_recorded();
+    mount_writable(&publish_parameters, &mut first).expect("M1：实例 1，零单元");
+    formatted.devices = Some(first);
+    let mut second = formatted.reopen_recorded();
+    let second_mount = mount_writable(&publish_parameters, &mut second).expect("M2：实例 2，写行");
+    formatted.devices = Some(second);
+    let PoolVersion::WithoutFile(abandoned_row_publish) = &second_mount.output.row_publish else {
+        panic!("M2 的写行接在树表 0 条的一版上，仍是树表 0 条")
+    };
+    let abandoned_root = abandoned_row_publish.root;
+    let instance_two_txgs: Vec<CheckpointTxg> = std::iter::once(abandoned_root.checkpoint_txg)
+        .chain(
+            second_mount
+                .output
+                .warm_up_publishes
+                .iter()
+                .map(|publish| publish.root().checkpoint_txg),
+        )
         .collect();
+    assert_eq!(
+        instance_two_txgs,
+        vec![CheckpointTxg(3), CheckpointTxg(4)],
+        "实例 2：写行 txg 3、暖机 txg 4"
+    );
+    let abandoned_tree_table_slot = abandoned_root.tree_table.locations[0].slot;
+    let abandoned_allocation_record_tree_root_slot =
+        abandoned_root.allocation_record_tree_root.locations[0].slot;
+    assert_eq!(
+        (
+            abandoned_tree_table_slot,
+            abandoned_allocation_record_tree_root_slot
+        ),
+        (TREE_TABLE_GENESIS_SLOT, SlotNumber(50246)),
+        "被抛弃的那条根：树表照 mkfs 那一片，分配记录树根是写行那次五个节点里最后取落点的那个（先叶后根）"
+    );
+    let second_row_publish_slots = slots_written_by(&second_mount.output.row_publish);
+
+    let mut third = formatted.reopen_recorded();
+    let device_index = |devices: &[(DeviceIdentity, common::Recorded)],
+                        identity: DeviceIdentity| {
+        devices
+            .iter()
+            .position(|(candidate, _)| *candidate == identity)
+            .expect("池里有这块盘")
+    };
+    let mut hidden_root_slots = Vec::new();
+    for txg in &instance_two_txgs {
+        let target = target_for_publish(*txg, geometry().root_ring_slots_per_region);
+        let device =
+            publish_parameters.region_devices[usize::try_from(target.region).expect("区域号")];
+        let offset = slot_offset(target, geometry().fixed_structure_slot_spacing);
+        let index = device_index(&third, device);
+        let mut bytes = vec![0u8; 512];
+        third[index]
+            .1
+            .read_at(offset, &mut bytes)
+            .expect("暂存根槽");
+        third[index]
+            .1
+            .write_at(offset, &[0u8; 512], WriteDurability::Plain)
+            .expect("根槽清零");
+        hidden_root_slots.push((index, offset, bytes));
+    }
+    let instance_table_location = abandoned_row_publish.record.named[0].locations[0];
+    let instance_table_index = device_index(&third, instance_table_location.device);
+    third[instance_table_index]
+        .1
+        .write_at(
+            instance_table_location.slot.to_device_offset(),
+            &[0u8; 32768],
+            WriteDurability::Plain,
+        )
+        .expect("写行那条记录点名的实例表，盘 0 那一份清零");
+    let third_mount = mount_writable(&publish_parameters, &mut third)
+        .expect("M3：写行那条根读不出、那条记录验不过，择根落到 (1, 2)，照常可写挂载");
+    assert_eq!(
+        (
+            third_mount.output.instance,
+            third_mount.output.effective_root.instance,
+            third_mount.output.effective_root.checkpoint_txg,
+            third_mount.output.row_publish.root().checkpoint_txg
+        ),
+        (
+            InstanceGeneration(3),
+            InstanceGeneration(1),
+            CheckpointTxg(2),
+            CheckpointTxg(5)
+        ),
+        "M3：实例 3 接在 (1, 2) 后面，写行 txg 5"
+    );
+    assert_eq!(
+        slots_written_by(&third_mount.output.row_publish),
+        second_row_publish_slots,
+        "M3 的写行与 M2 的写行逐槽相同：M3 这时看不见被抛弃的根，隔离不到它，只能靠之后的挂载与抬 F"
+    );
     assert!(
-        violated.is_empty(),
-        "池级 checker 一条违例都没有：{violated:?}"
+        third_mount
+            .allocator
+            .devices
+            .iter()
+            .all(|device_map| device_map.isolated_slots() == 0),
+        "M3 看不见 txg 3、4：一槽都没隔离"
+    );
+    for (index, offset, bytes) in &hidden_root_slots {
+        third[*index]
+            .1
+            .write_at(*offset, bytes, WriteDurability::Plain)
+            .expect("两个根槽原样写回");
+    }
+
+    let mut allocator = third_mount.allocator;
+    let content = file_content();
+    let first_file = {
+        let mut writer = PoolWriter::new(&publish_parameters, third.as_mut_slice());
+        publish_first_file(
+            &mut writer,
+            &mut allocator,
+            third_mount.current.root(),
+            FirstFile {
+                content: &content,
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS,
+            },
+            third_mount.output.instance,
+            third_mount.current.record_bytes(),
+        )
+        .expect("实例 3 的第一个文件版本")
+    };
+    assert_eq!(first_file.root.checkpoint_txg, CheckpointTxg(8));
+    for slot in [
+        abandoned_tree_table_slot,
+        abandoned_allocation_record_tree_root_slot,
+    ] {
+        assert!(
+            first_file
+                .allocation_records
+                .iter()
+                .filter(|record| record.slot == slot)
+                .all(|record| record.is_released && record.generation == CheckpointTxg(8)),
+            "第一个文件版本换下槽 {slot:?}，两盘各一条已释放、释放代 8"
+        );
+    }
+    let mut current = PoolVersion::WithFile(first_file);
+    let unmounted = singlefs_core::mount::unmount(
+        &publish_parameters,
+        &mut third,
+        &mut allocator,
+        &mut current,
+        singlefs_core::mount::ShadowLedger::On,
+    )
+    .expect("正常卸载");
+    let singlefs_core::mount::Unmounted::FloorRaisedToTheCurrentVersion(raised) = unmounted else {
+        panic!("现行那一版带文件：卸载把 F 抬到它")
+    };
+    assert_eq!(raised.rollback_floor, CheckpointTxg(8));
+    assert_eq!(
+        raised.abandoned_roots_unreadable, 0,
+        "被抛弃的两条根都认得出它们引用的落点"
+    );
+    for slot in [
+        abandoned_tree_table_slot,
+        abandoned_allocation_record_tree_root_slot,
+    ] {
+        assert!(
+            raised
+                .reclaimed
+                .iter()
+                .any(|placement| placement.slot == slot),
+            "F 抬到 8：释放代 8 的槽 {slot:?} 回收了"
+        );
+        assert!(
+            raised.publishes.iter().all(|publish| publish
+                .rewritten
+                .iter()
+                .all(|role| publish.unit(*role).slot != slot)),
+            "卸载那一串没把槽 {slot:?} 发出去"
+        );
+        for device_map in &allocator.devices {
+            assert!(
+                !device_map.is_free(slot),
+                "盘 {}：槽 {slot:?} 仍被环里的被抛弃根引用，回收之后隔离着",
+                device_map.device.0
+            );
+        }
+    }
+    assert!(
+        allocator
+            .devices
+            .iter()
+            .all(|device_map| device_map.isolated_slots() == 2),
+        "每盘隔离的正好是被抛弃根的树表与分配记录树根这 2 槽：{:?}",
+        allocator
+            .devices
+            .iter()
+            .map(|device_map| device_map.isolated_slots())
+            .collect::<Vec<_>>()
+    );
+    formatted.devices = Some(third);
+    assert_only_the_abandoned_root_the_blind_mount_reused_reddens_the_reuse_invariant(
+        &formatted,
+        "卸载之后",
+    );
+
+    let mut fourth = formatted.reopen_recorded();
+    let fourth_mount = mount_writable(&publish_parameters, &mut fourth).expect("M4");
+    formatted.devices = Some(fourth);
+    assert_eq!(
+        (
+            fourth_mount.output.isolated_slots_per_device.clone(),
+            fourth_mount.output.abandoned_roots_unreadable
+        ),
+        (vec![(DeviceIdentity(0), 2), (DeviceIdentity(1), 2)], 0),
+        "M4 重算影子账：每盘照样隔离那 2 槽，没有一条被抛弃根算成账读不出"
+    );
+    let slots_written_by_the_fourth_mount: Vec<SlotNumber> =
+        std::iter::once(&fourth_mount.output.row_publish)
+            .chain(&fourth_mount.output.warm_up_publishes)
+            .flat_map(slots_written_by)
+            .collect();
+    assert!(
+        !slots_written_by_the_fourth_mount.contains(&abandoned_tree_table_slot)
+            && !slots_written_by_the_fourth_mount
+                .contains(&abandoned_allocation_record_tree_root_slot),
+        "M4 的写行与暖机没写被抛弃根引用的那两槽：{slots_written_by_the_fourth_mount:?}"
+    );
+    assert_only_the_abandoned_root_the_blind_mount_reused_reddens_the_reuse_invariant(
+        &formatted,
+        "M4 之后",
+    );
+}
+
+/// 这段历史里 M3 看不见被抛弃的两条根（根槽清零），把写行那次点名的单元逐槽再发了一遍：被抛弃根 (2, 3) 引用的实例表与分配记录树根
+/// 在它离开根环之前被重新分配，池级 checker 的 I-7.4（近 K 代块未被复用） 被抛弃根那一半照实红——C554（崩溃恢复抛弃的根暂时读不出时
+/// 影子账算不到） 那一形（实审 B2 补上被抛弃根那一半，主 agent 2026-09-27 定照实红）。别的不变量一条都不红（判不了的照报不适用：
+/// 这段历史里实例 3 只写过一条非 0 事务号的记录，I-8.7 / I-8.8 这类凑不出判的对象）。
+fn assert_only_the_abandoned_root_the_blind_mount_reused_reddens_the_reuse_invariant(
+    pool: &FormattedPool,
+    step: &str,
+) {
+    let verdicts = check_pool_image(&pool.memory_pool());
+    assert_eq!(
+        verdicts.len(),
+        singlefs_checker::image::IMPLEMENTED_INVARIANTS.len()
+    );
+    let violated: Vec<(&str, &String)> = verdicts
+        .iter()
+        .filter_map(|(invariant, verdict)| match verdict {
+            InvariantVerdict::Violated(detail) => Some((*invariant, detail)),
+            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+        })
+        .collect();
+    assert_eq!(
+        violated
+            .iter()
+            .map(|(invariant, _)| *invariant)
+            .collect::<Vec<&str>>(),
+        ["I-7.4"],
+        "{step}：只该红 I-7.4：{violated:?}"
+    );
+    assert!(
+        violated[0].1.contains("被抛弃的根（实例 2、txg 3）"),
+        "{step}：红在 M3 看不见的被抛弃根 (2, 3) 上：{}",
+        violated[0].1
     );
 }

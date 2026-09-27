@@ -98,7 +98,7 @@ const ROW_PUBLISH_UNITS: u64 = 6;
 /// 恢复择写行那次的根（实例 2、txg 1），锚点按末条标志认在 jsn 6，施加 txg 2 那一条；池级 checker 在崩溃镜像与整条流上都一条不红；
 /// 再可写挂载照常（从写行那次写下的分配记录树重建账）。
 #[test]
-fn a_row_publish_whose_named_units_do_not_fit_one_record_spills_over_and_recovery_and_the_checker_accept_it(
+fn row_publish_whose_named_units_do_not_fit_one_record_spills_over_and_recovery_and_the_checker_accept_it(
 ) {
     let stream = SharedStream::retaining_contents();
     let mut devices = sparse_devices(&stream);
@@ -136,7 +136,6 @@ fn a_row_publish_whose_named_units_do_not_fit_one_record_spills_over_and_recover
                 instance: InstanceGeneration(1),
                 selected_root_txg: CheckpointTxg(0),
                 applied_transaction_high_water: 0,
-                is_rollback: false,
             }],
             replaced_chain: vec![genesis.root.instance_table],
         };
@@ -269,7 +268,7 @@ fn a_row_publish_whose_named_units_do_not_fit_one_record_spills_over_and_recover
 /// 把第一条的提交标记字节改成 2（重封头部校验和，两盘各一份）：读者当它损坏、断链即止，那次发布一条都不施加，读回 A；
 /// 把 2 读成「不带」的读者（改之前）照样接上、整次施加。池级 checker 的 I-8.8 在同一份镜像上判「提交标记字节」违例。
 #[test]
-fn a_commit_marker_other_than_zero_or_one_counts_as_torn_and_breaks_the_chain_and_the_checker_reddens(
+fn commit_marker_other_than_zero_or_one_counts_as_torn_and_breaks_the_chain_and_the_checker_reddens(
 ) {
     let mut pool = build_pool("multi-record-transaction-zero-commit-marker");
     let first = pool.output.clone();

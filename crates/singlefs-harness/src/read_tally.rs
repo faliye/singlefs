@@ -145,7 +145,7 @@ mod tests {
 
     /// 默认几何下整扫一遍环是 196 608 次读：并行线二验收第 1 条不许读计数落进这一档。
     #[test]
-    fn a_full_journal_ring_scan_is_one_hundred_ninety_six_thousand_six_hundred_eight_reads() {
+    fn full_journal_ring_scan_is_one_hundred_ninety_six_thousand_six_hundred_eight_reads() {
         let ring = JournalRingRegion::starting_at_the_standard_slot(JOURNAL_RING_DEFAULT_BYTES);
         assert_eq!(ring.full_scan_reads_per_device(), 196_608);
         assert_eq!(ring.start, DeviceOffsetInBytes(1024 * 16384));

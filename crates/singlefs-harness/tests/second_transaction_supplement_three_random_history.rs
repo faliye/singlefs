@@ -15,16 +15,20 @@ use singlefs_core::mount::{mount_writable_with_space_admission, MountError};
 use singlefs_core::transaction::TransactionUnit;
 use singlefs_harness::crash::{MemoryPool, RecordCheck, SparseBlockDevice};
 use singlefs_harness::crash_injection::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
+use singlefs_harness::fault_injection::{
+    FaultCounting, FaultDeviceSelector, FaultOccurrence, FaultPlacement, FaultSchedule,
+    InjectedFault, SharedFaultPlan,
+};
 use singlefs_harness::history::{
-    allocated_and_walked_bytes, allocation_records_on_the_image_under, classify_failure,
-    execute_history, execute_history_observing, execute_history_with, generate_history,
+    allocation_records_on_the_image_under, classify_failure, execute_history,
+    execute_history_observing, execute_history_with, execute_history_with_faults, generate_history,
     generate_history_with_weights, raised_floor_lands_only_on_abandoned_roots,
-    run_history_campaign, shrink_to_reproduction, AppliedEffect, ContentChoice, ContentLength,
-    FailureObservation, FailureSignature, FindingShrinking, FloorTargetChoice, GeneratedHistory,
-    GenerationWeights, HistoryDeviceWidth, HistoryEnding, HistoryExecution, HistoryOperation,
-    HistoryOperationKind, HistoryRun, HistorySeed, HistoryStartingPoint, HistoryTally,
-    MountAllocationComparison, NewFindingReport, PerStepChecker, RecordReuse, RollbackTargetChoice,
-    StepOutcome, StepPosition, KNOWN_RED_FORMS,
+    run_history_campaign, shrink_to_reproduction, AppliedEffect, ColdStartReadBack, ContentChoice,
+    ContentLength, FailureObservation, FailureSignature, FindingShrinking, FloorTargetChoice,
+    GeneratedHistory, GenerationWeights, HistoryDeviceWidth, HistoryEnding, HistoryExecution,
+    HistoryOperation, HistoryOperationKind, HistoryRun, HistorySeed, HistoryStartingPoint,
+    HistoryTally, MountAllocationComparison, MountSpaceAdmissionOutcome, NewFindingReport,
+    PerStepChecker, RollbackTargetChoice, StepOutcome, StepPosition,
 };
 use singlefs_harness::model::{ModelCheckpointTxg, ModelInstanceGeneration, ModelRootKey};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
@@ -114,7 +118,7 @@ fn assert_every_path_was_exercised(tally: &HistoryTally) {
     let refusals = &tally.refusals_by_member;
     for member in [
         "MountError::RollbackFloorAboveCeiling",
-        "MountError::RollbackTargetNotACandidate(NotInRing)",
+        "RollbackError::TargetNotACandidate(NotInRing)",
         "PublishError::ContentExceedsDataUnit",
         "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile",
     ] {
@@ -123,12 +127,18 @@ fn assert_every_path_was_exercised(tally: &HistoryTally) {
     assert!(
         count_of(
             refusals,
-            "MountError::RollbackTargetNotACandidate(BelowEffectiveFloor)"
-        ) + count_of(
-            refusals,
-            "MountError::RollbackTargetNotACandidate(OnAbandonedTimeline)"
+            "RollbackError::TargetNotACandidate(BelowEffectiveFloor)"
         ) >= 1,
-        "回退的目标没落到过被抛弃的根或 F 之下的根"
+        "回退的目标没落到过 F 之下的根"
+    );
+    // 被抛弃的根只由崩溃恢复造出（D23（journal 的角色与格式） 已定项 14）：生成器里的「崩溃恢复抛弃根」（实七加）造出来之后，
+    // 回退的目标要落到过它上面、被按被抛弃的时间线拒过。
+    assert!(
+        count_of(
+            refusals,
+            "RollbackError::TargetNotACandidate(OnAbandonedTimeline)"
+        ) >= 1,
+        "回退的目标没落到过崩溃恢复抛弃的根"
     );
     assert!(tally.raises_that_reclaimed >= 1, "抬 F 一次都没回收到落点");
     assert!(
@@ -396,14 +406,17 @@ fn unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_e
         report.new_findings.is_empty(),
         "新发现（checker 的判红、模型、执行器的判定与 panic）：\n{rendered}"
     );
-    let refused_on_every_device = |member_prefix: &str| {
-        count_of(
-            &report.tally.refusals_by_member,
-            &format!("{member_prefix}PlacementRefused(NoFreeSlotOnAnyDevice)"),
-        )
-    };
+    // 第一个文件直接调发布路径；覆盖写经挂着的会话（实七）：落点拒绝是「空间不够」的一种，会话先推抬 F、推满仍拒才交回，
+    // 成员包在 `UserChangeRefused::NoSpaceAfterRaisingTheFloor` 里。
+    let refused_on_every_device = count_of(
+        &report.tally.refusals_by_member,
+        "PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)",
+    ) + count_of(
+        &report.tally.refusals_by_member,
+        "UserChangeRefused::NoSpaceAfterRaisingTheFloor(PublishError::PlacementRefused(NoFreeSlotOnAnyDevice))",
+    );
     assert!(
-        refused_on_every_device("PublishError::") >= 1,
+        refused_on_every_device >= 1,
         "覆盖写、第一个文件一次都没被「每块盘上都没有」拒过（用户数据那一处没跑到）"
     );
     assert!(
@@ -421,10 +434,13 @@ fn unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_e
 }
 
 /// 同一段取样（两块单元区 256 槽的小盘、逼近单元区墙的比重、同一批种子与步数），空间准入判着（产品路径）：
-/// D28（挂载期承诺量） 已定项 1 的式子接进发布与可写挂载之后（C363 (b) 判决第四节第 2 条），这几块小盘上墙由式子先拒——
-/// 覆盖写被 `PublishError::SpaceAdmissionRefused` 拒、可写挂载在取号之前被 `MountError::SpaceAdmissionRefusedBeforeAcquisition` 拒，
-/// 胶水把两者都映射成模型的单元区墙，模型全在允许拒绝的区间里放行（没有新发现：拒之前一个字节都没写、拒的都在区间里）。
-/// 先判没有新发现，再核这一路真的跑到了：发布与挂载各被式子拒过、模型在区间里放行过；落点那一道一次都没走到（式子先拒）。
+/// D28（挂载期承诺量） 已定项 1 的式子接进发布与可写挂载之后（C363 (b) 判决第四节第 2 条），这几块小盘上墙由式子先拒。
+/// 覆盖写经挂着的会话发布之后（实七），式子一拒会话先推一串抬 F 再重判（D16（发布语义） 已定项 1「准入」那一行，C283）：
+/// 这一批种子上推过之后每一次都发成了（2026-09-26 量：推了 470 串、发成 470 次，最后被拒的 0 次），模型逐串比过推的每一串抬 F。
+/// 推满仍不够时交回的 `UserChangeRefused::NoSpaceAfterRaisingTheFloor` 在这里一次都没出现，式子那一拒模型区间里放行的那一格
+/// 在这批种子上看不到了（实七报告）。可写挂载准入不够时写行与暖机之后推抬 F 的空发布、再判，执行器把推的每一串照模型的抬 F 逐串比。
+/// 先判没有新发现，再核这一路真的跑到了：覆盖写经会话推过抬 F 再发成、可写挂载写行之后推过抬 F、推的每一串模型都比过上限；
+/// 落点那一道一次都没走到（式子先拒）。
 #[test]
 fn unit_area_wall_sampling_on_small_devices_with_the_space_admission_judged_is_refused_by_the_formula_inside_the_model_interval(
 ) {
@@ -452,34 +468,41 @@ fn unit_area_wall_sampling_on_small_devices_with_the_space_admission_judged_is_r
         "新发现（checker 的判红、模型、执行器的判定与 panic）：\n{rendered}"
     );
     assert!(
-        count_of(
-            &report.tally.refusals_by_member,
-            "PublishError::SpaceAdmissionRefused"
-        ) >= 1,
-        "覆盖写一次都没被空间准入拒过（发布路径那一处没跑到）"
+        report
+            .tally
+            .user_changes_published_after_the_session_raised_the_floor
+            >= 1,
+        "覆盖写一次都没经会话推过抬 F 再发成（发布路径那一处的推没跑到）"
     );
     assert!(
-        count_of(
-            &report.tally.refusals_by_member,
-            "MountError::SpaceAdmissionRefusedBeforeAcquisition"
-        ) >= 1,
-        "可写挂载一次都没在取号之前被空间准入拒过（可写挂载那一处没跑到）"
+        report.tally.model_counts.ceilings_compared
+            >= report
+                .tally
+                .floor_raises_pushed_by_the_session_before_a_published_change
+                + report.tally.floor_raises_pushed_by_mounts,
+        "会话与挂载推的每一串抬 F 模型都要比过上限"
+    );
+    assert!(
+        report
+            .tally
+            .mounts_by_space_admission
+            .get(MountSpaceAdmissionOutcome::AdmittedAfterTheFloorRaises { floor_raises: 0 }.name())
+            .copied()
+            .unwrap_or(0)
+            >= 1
+            && report.tally.floor_raises_pushed_by_mounts >= 1,
+        "可写挂载一次都没在写行之后推过抬 F 再判够（可写挂载那一处没跑到）"
     );
     assert_eq!(
         count_of(
             &report.tally.refusals_by_member,
             "PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)"
+        ) + count_of(
+            &report.tally.refusals_by_member,
+            "UserChangeRefused::NoSpaceAfterRaisingTheFloor(PublishError::PlacementRefused(NoFreeSlotOnAnyDevice))"
         ),
         0,
         "准入判着时式子先拒，落点那一道走不到"
-    );
-    assert!(
-        report
-            .tally
-            .model_counts
-            .unit_area_wall_refusals_in_the_interval
-            >= 1,
-        "模型一次都没在单元区墙的区间里放行过（准入拒绝那一格没判过）"
     );
     assert!(
         report.tally.checker_runs > 0,
@@ -574,7 +597,7 @@ const EMPTY_CONTENT_OVERWRITE: HistoryOperation =
 /// 空间准入关掉（只供测试的开关 `SpaceAdmission::SkippedByTheTestOnlySwitch`，执行器与直接调挂载两处都关）：判着准入时 240 槽的盘上
 /// 覆盖写没到 16 次就被式子拒、挂载在取号之前被式子拒，走不到预演取不到落点那一道——这里测的是准入放行之后那一条兜底拒绝。
 #[test]
-fn a_writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquisition_with_the_disk_unchanged(
+fn writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquisition_with_the_disk_unchanged(
 ) {
     const OVERWRITES: usize = 16;
     let history = GeneratedHistory {
@@ -689,19 +712,13 @@ fn a_writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acqu
     }
 }
 
-/// 取号之前在分配器的拷贝上预演那一串（`mount::dry_run_of_the_publishes_after_acquisition`，走的是发布路径落盘之前那一段）要连写行换下的
-/// 落点一起释放：两块单元区 384 槽的小盘，第一个文件之后可写挂载（实例 2），再覆盖写 24 次，此时根环 24 槽正好是回退目标之后连着的
-/// 23 条根加它自己；回退到环里最旧的那条根（实例 3），其余 23 条全被抛弃。写行那次的根正好盖掉回退目标那一槽，环里再没有比它旧的有效根，
-/// 按可再分配谓词当场回收写行换下的那几片，暖机复用它们（真发起来改写了 8 条已回收的记录）。
-/// 拷贝上不释放那几片的话，预演与真发取到的落点分叉——挂载自己的断言判出，或这一串在取号之前就被判「取不到落点」。
-/// 今天回退做成、每一步之后池级 checker 判绿；拷贝上取的与真发的逐次相同由挂载自己断言。
-/// 分配记录树按位置寻址之后（D8（核心索引结构） 已定项 14）每次发布多写几个节点，原先那一档（240 槽、覆盖写 21 次）在回退那一步被落点拒；
-/// 这一档是在草稿副本上重扫（盘宽 240 / 256 / 384、覆盖写 18–35 次、回退目标取环里第 22 / 23 新）挑出来的：240 槽上回退一概被拒，
-/// 256 槽上回退到最旧的根一概被拒；384 槽上回退到最旧的根都做成，覆盖写 24 次那一档暖机改写了 8 条已回收的记录（与原先那一档同一个数）。
+/// 挂着的时候回退到环里最旧的那条根，在单元区 384 槽的小盘上做成、之后照常覆盖写（C558（回退目标是环里最旧的根时回退那次发布会写坏它）
+/// 那一格在随机历史执行器上的对照：回退那次发布的根槽就是回退目标住的那一槽）：第一个文件之后可写挂载（实例 2），覆盖写 24 次，
+/// 此时根环 24 槽里最旧的那条是挂载之后第二次暖机的根；回退到它（一次向前发布）、再覆盖写一次，每一步之后池级 checker 判绿、模型逐步比。
 /// 空间准入关掉（只供测试的开关 `SpaceAdmission::SkippedByTheTestOnlySwitch`）：判着准入时 384 槽的盘上挂载之后第 11 次覆盖写就被式子拒，
-/// 根环凑不满这 24 条根，这一格（预演与真发在根环转满时逐次相同）就造不出来。
+/// 根环凑不满。旧形态（挂载时回退）下这一格护的是「取号之前的预演连写行换下的落点一起释放」；向前回退不取号、不预演，那一半不再有对象。
 #[test]
-fn rolling_back_to_the_oldest_ring_root_reuses_what_the_row_publish_released_and_is_not_refused_before_acquisition(
+fn rolling_back_while_mounted_to_the_oldest_ring_root_on_a_small_device_and_overwriting_again_all_succeed(
 ) {
     let history = GeneratedHistory {
         seed: HistorySeed(0),
@@ -709,7 +726,7 @@ fn rolling_back_to_the_oldest_ring_root_reuses_what_the_row_publish_released_and
         operations: std::iter::once(HistoryOperation::CloseAndMountWritable)
             .chain(std::iter::repeat_n(EMPTY_CONTENT_OVERWRITE, 24))
             .chain([
-                HistoryOperation::CloseAndMountRollback(RollbackTargetChoice::RingRoot {
+                HistoryOperation::RollBackWhileMounted(RollbackTargetChoice::RingRoot {
                     index_from_newest: 23,
                 }),
                 EMPTY_CONTENT_OVERWRITE,
@@ -727,20 +744,18 @@ fn rolling_back_to_the_oldest_ring_root_reuses_what_the_row_publish_released_and
         &mut |_| {},
     );
     assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
-    assert_eq!(
-        run.outcomes[25],
-        StepOutcome::Applied(AppliedEffect::Mounted {
-            instance: InstanceGeneration(3),
-            publishes: 2,
-            allocation_records_compared: MountAllocationComparison::Compared { publishes: 2 },
-            reuse: RecordReuse {
-                rewritten_from_released: 8,
-                rewritten_with_changed_span: 2,
-                released_records_removed: 0,
-                released_records_covered: 0,
-            },
-        }),
-        "回退做成：写行与一次暖机，暖机复用写行当场回收的那几片"
+    assert!(
+        matches!(
+            run.outcomes[25],
+            StepOutcome::Applied(AppliedEffect::RolledBack { .. })
+        ),
+        "回退到环里最旧的根做成：{:?}",
+        run.outcomes[25]
+    );
+    assert!(
+        matches!(run.outcomes[26], StepOutcome::Applied(_)),
+        "回退之后覆盖写做成：{:?}",
+        run.outcomes[26]
     );
 }
 
@@ -768,7 +783,8 @@ fn wall_prefix(mounts: usize) -> impl Iterator<Item = HistoryOperation> {
 
 /// 原先分配记录墙那三格（覆盖写正好到 812 条、抬 F 的第二次空发布正好到 812 条、回退的第二次暖机正好到 812 条；增补 3 第 2 件
 /// 代码三方第一轮判决第三节第 1 条、第二轮判决第三节第 4 条）拆墙之后（D8（核心索引结构） 已定项 14，用户 2026-09-24 定 K1）并成这一条：
-/// 同样的前缀（`wall_prefix`，挂载 9 次）之后覆盖写 46 次、抬到现行的 F、回退到最新那条根、再覆盖写 5 次，一步都不拒，
+/// 同样的前缀（`wall_prefix`，挂载 9 次）之后覆盖写 46 次、抬到现行的 F、挂着的时候回退到最新那条根（一次向前发布；旧形态是
+/// 挂载时回退，它的第二次暖机正好到 812 条）、再覆盖写 5 次，一步都不拒，
 /// 镜像上按 checker 的解析数的分配记录条数越过 812；每一步之后跑池级 checker、模型逐步比（跑完即都对得上）。
 /// 一段历史每一步接着上一步的盘面，次序本身就是被测对象，不切片并行。
 #[test]
@@ -779,7 +795,7 @@ fn overwrites_raising_the_floor_and_rolling_back_past_812_allocation_records_all
         operations: wall_prefix(9)
             .chain(std::iter::repeat_n(WALL_OVERWRITE, 46))
             .chain(std::iter::once(RAISE_TO_THE_CURRENT_FLOOR))
-            .chain(std::iter::once(HistoryOperation::CloseAndMountRollback(
+            .chain(std::iter::once(HistoryOperation::RollBackWhileMounted(
                 RollbackTargetChoice::RingRoot {
                     index_from_newest: 0,
                 },
@@ -826,60 +842,10 @@ fn run_counting_allocation_records_after_each_step(
     (run, counted_after_each_step)
 }
 
-/// 回退到被抛弃时间线上的根（F 还是 0，不低于 F）要拒，理由是「被抛弃」；模型按判别字段比理由（增补 3 第 2 件代码三方第一轮判决
-/// 第三节第 2 条：攻方变异 R1——被抛弃的根报成「txg 低于 F」、只换理由——此前三组套件三段全绿）。第一个文件（实例 1，txg 3）之后
-/// 可写挂载（实例 2：写行 txg 4、暖机 5）、覆盖写两次（6、7）、回退到根环从新到旧第 2 条 (5, 2)（实例 3：写行 txg 8、暖机 9、10）、
-/// 再回退到从新到旧第 3 条 (7, 2)：最新根的实例表里有回退行 (2, 5)，7 > 5 ⇒ 被抛弃。今天的代码上这段跑完、最后一步报
-/// `OnAbandonedTimeline`；R1 下模型判「拒绝的理由」对不上。
-#[test]
-fn rolling_back_onto_an_abandoned_root_above_the_floor_is_refused_for_being_abandoned() {
-    let overwrite = |fill_seed: u64| {
-        HistoryOperation::PublishOverwrite(ContentChoice {
-            length: ContentLength::InsideOneDataUnit { selector: 2999 },
-            fill_seed,
-        })
-    };
-    let history = GeneratedHistory {
-        seed: HistorySeed(0),
-        starting_point: HistoryStartingPoint::AfterFirstFile,
-        operations: vec![
-            HistoryOperation::CloseAndMountWritable,
-            overwrite(6),
-            overwrite(7),
-            HistoryOperation::CloseAndMountRollback(RollbackTargetChoice::RingRoot {
-                index_from_newest: 2,
-            }),
-            HistoryOperation::CloseAndMountRollback(RollbackTargetChoice::RingRoot {
-                index_from_newest: 3,
-            }),
-        ],
-    };
-    let run = execute_history(&history);
-    assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
-    assert!(
-        matches!(
-            run.outcomes[3],
-            StepOutcome::Applied(AppliedEffect::Mounted { .. })
-        ),
-        "回退到 (5, 2) 要做成：{:?}",
-        run.outcomes[3]
-    );
-    assert_eq!(
-        run.outcomes[4],
-        StepOutcome::Refused {
-            member: "MountError::RollbackTargetNotACandidate(OnAbandonedTimeline)".to_string()
-        }
-    );
-    assert_eq!(
-        run.tally.model_counts.required_refusals_matched, 1,
-        "模型要求拒、理由对上了"
-    );
-}
-
 /// 回退到 txg 低于 F_生效 的根要拒，理由是「低于 F」（D16（发布语义） 已定项 1「回退候选集」：txg ≥ F_生效）；它是候选排除，不是
 /// 「树表 0 条、第一版不支持」（增补 3 第 2 件代码三方第二轮判决第三节第 1 条：两者互报的变异里，「低于 F」报成「树表 0 条」那一条在门禁
 /// 五段里各只红 1 段，这一条把它钉死）。第一个文件（txg 3）之后可写挂载（实例 2：txg 4、5）、覆盖写四次（6–9）、抬 F（选择子 6 ⇒ F = 6，
-/// 推 txg 10、11）、回退到根环从新到旧第 6 条 (5, 2)：它带文件、实例 2 还没有行（不是被抛弃的），只因 5 < 6 被挡。今天的代码上这段跑完、
+/// 推 txg 10、11）、挂着的时候回退到根环从新到旧第 6 条 (5, 2)：它带文件、没有被抛弃，只因 5 < 6 被挡。今天的代码上这段跑完、
 /// 最后一步报 `BelowEffectiveFloor`，模型要求拒、理由对上。一段历史每一步接着上一步的盘面，不切片并行。
 #[test]
 fn rolling_back_below_the_effective_floor_is_refused_for_being_below_the_floor() {
@@ -901,7 +867,7 @@ fn rolling_back_below_the_effective_floor_is_refused_for_being_below_the_floor()
             HistoryOperation::RaiseRollbackFloor(FloorTargetChoice {
                 steps_above_current_floor: 6,
             }),
-            HistoryOperation::CloseAndMountRollback(RollbackTargetChoice::RingRoot {
+            HistoryOperation::RollBackWhileMounted(RollbackTargetChoice::RingRoot {
                 index_from_newest: 6,
             }),
         ],
@@ -922,7 +888,7 @@ fn rolling_back_below_the_effective_floor_is_refused_for_being_below_the_floor()
     assert_eq!(
         run.outcomes[6],
         StepOutcome::Refused {
-            member: "MountError::RollbackTargetNotACandidate(BelowEffectiveFloor)".to_string()
+            member: "RollbackError::TargetNotACandidate(BelowEffectiveFloor)".to_string()
         }
     );
     assert_eq!(
@@ -933,8 +899,8 @@ fn rolling_back_below_the_effective_floor_is_refused_for_being_below_the_floor()
 
 /// 回退到 txg = F_生效 的根要做成（D16（发布语义） 已定项 1「回退候选集」：txg ≥ F_生效），模型按 B2 那一格判（攻方变异「回退到
 /// txg = F_生效 的根也拒」）。第一个文件（txg 3）之后可写挂载（实例 2：txg 4、5）、覆盖写四次（6–9）、抬 F（选择子 6 ⇒ F = 6：上限是
-/// 第 4 新的非空根 6 与盘 1 上最新的有效根 7 取小，推 txg 10、11 两次）、回退到候选集的下沿 (6, 2)（实例 3：txg 12、13）、冷启动读回。
-/// 今天的代码上这段跑完：回退做成一次、落在 F 上，冷启动读回的是 txg 6 那次覆盖写的内容（模型比过）。取样点里这一格 48 个种子一窗只有
+/// 第 4 新的非空根 6 与盘 1 上最新的有效根 7 取小，推 txg 10、11 两次）、挂着的时候回退到候选集的下沿 (6, 2)（一次向前发布 txg 12）、
+/// 冷启动读回。今天的代码上这段跑完：回退做成一次、落在 F 上，冷启动读回的是 txg 6 那次覆盖写的内容（模型比过）。取样点里这一格 48 个种子一窗只有
 /// 0–5 段（2026-09-19 在 [0, 960) 上逐窗数），这一条把它钉死。
 #[test]
 fn rolling_back_to_the_root_at_the_effective_floor_is_accepted_and_reads_back_that_version() {
@@ -956,7 +922,7 @@ fn rolling_back_to_the_root_at_the_effective_floor_is_accepted_and_reads_back_th
             HistoryOperation::RaiseRollbackFloor(FloorTargetChoice {
                 steps_above_current_floor: 6,
             }),
-            HistoryOperation::CloseAndMountRollback(RollbackTargetChoice::RingRootAtTheNewestFloor),
+            HistoryOperation::RollBackWhileMounted(RollbackTargetChoice::RingRootAtTheNewestFloor),
             HistoryOperation::ColdStartRecover,
         ],
     };
@@ -977,7 +943,7 @@ fn rolling_back_to_the_root_at_the_effective_floor_is_accepted_and_reads_back_th
     assert!(
         matches!(
             run.outcomes[6],
-            StepOutcome::Applied(AppliedEffect::Mounted { .. })
+            StepOutcome::Applied(AppliedEffect::RolledBack { .. })
         ),
         "回退到 (6, 2) 要做成：{:?}",
         run.outcomes[6]
@@ -1051,15 +1017,13 @@ fn turning_the_root_ring_with_overwrites_in_the_make_filesystem_process_runs_to_
     );
 }
 
-/// 「已知红」清单那一条（增补 2 收口表第 43 行）的复现，2026-09-18 在快档种子 80 上撞到、收缩出来的那一段（种子号随生成器的比重变，
-/// 这一段不随）：可写挂载（实例 2，txg 4、5）、覆盖写两次（6、7）、回退到 (2, 7)（实例 3，txg 8–10）、再回退到 (2, 7)（实例 4，
-/// txg 11–13：实例 3 的三条根被抛弃）、覆盖写（14）、可写挂载（实例 5，txg 15、16）、覆盖写三次（17–19）、抬 F 到 8（txg 20–22）。
-/// F = 8 那个 txg 上的根被抛弃了，(2, 7) 落到 F 之下出了候选集，而它写行那次换下的实例表与固定点单元（实例表 2 槽，记账树、映射树、
-/// 树表各 1 槽，加分配记录树按位置寻址那一次重写的几个节点，D8（核心索引结构） 已定项 14；合 12 槽）在 txg 11 才释放、释放代 11 > 8
-/// 不回收 ⇒ 记账比遍历多 12 × 16384 字节，I-3.1 红。这一条修好之后本用例要红——那时把清单里这一条删掉、这里改成「跑完」。
+/// 「已知红」清单那一条（增补 2 收口表第 43 行）原先的复现（2026-09-18 快档种子 80 收缩出来的那一段）换成向前回退之后跑完：
+/// 可写挂载（实例 2，txg 4、5）、覆盖写两次（6、7）、挂着的时候回退到最新那条根 (2, 7)（txg 8）、再回退到从新到旧第 4 条 (2, 5)（txg 9）、
+/// 覆盖写（10）、可写挂载（实例 3，txg 11、12）、覆盖写三次（13–15）、抬 F（选择子 8）。旧形态下两次回退各开一个实例、抛弃前一段，
+/// F = 8 落进回退留下的空档，I-3.1 记账多算 12 槽；向前回退不抛弃任何根，这一段没有空档，每一步之后 checker 判绿、跑完。
+/// 清单那一条的形态今天只剩崩溃恢复抛弃的时间线造得出（实四乙第 7 件），生成器实七加了「崩溃恢复抛弃根」，复现在下面那条用例里。
 #[test]
-fn raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_known_red_form_of_closeout_row_43()
-{
+fn the_history_that_raised_the_floor_into_a_rollback_gap_completes_under_the_forward_rollback() {
     let empty = ContentChoice {
         length: ContentLength::Empty,
         fill_seed: 0,
@@ -1071,10 +1035,10 @@ fn raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_known_red_form_
             HistoryOperation::CloseAndMountWritable,
             HistoryOperation::PublishOverwrite(empty),
             HistoryOperation::PublishOverwrite(empty),
-            HistoryOperation::CloseAndMountRollback(RollbackTargetChoice::RingRoot {
+            HistoryOperation::RollBackWhileMounted(RollbackTargetChoice::RingRoot {
                 index_from_newest: 0,
             }),
-            HistoryOperation::CloseAndMountRollback(RollbackTargetChoice::RingRoot {
+            HistoryOperation::RollBackWhileMounted(RollbackTargetChoice::RingRoot {
                 index_from_newest: 3,
             }),
             HistoryOperation::PublishOverwrite(empty),
@@ -1088,26 +1052,173 @@ fn raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_known_red_form_
         ],
     };
     let run = execute_history(&history);
-    let HistoryEnding::KnownRed { form, observation } = &run.ending else {
-        panic!("要以已知红收尾：{:?}", run.ending);
-    };
-    assert_eq!(*form, 0, "{}", KNOWN_RED_FORMS[*form].shape);
-    assert_eq!(observation.position, StepPosition::Operation(10));
-    assert_eq!(
-        run.outcomes[10],
-        StepOutcome::Applied(AppliedEffect::RaisedFloor {
-            new_floor: CheckpointTxg(8),
-            publishes: 3,
-            reclaimed_placements: 42,
-            reuse: RecordReuse::default(),
-        })
+    assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
+    assert!(
+        matches!(
+            (&run.outcomes[3], &run.outcomes[4]),
+            (
+                StepOutcome::Applied(AppliedEffect::RolledBack { .. }),
+                StepOutcome::Applied(AppliedEffect::RolledBack { .. })
+            )
+        ),
+        "两次回退都做成：{:?}",
+        &run.outcomes[3..5]
     );
-    let (allocated, walked) = allocated_and_walked_bytes(&observation.violations[0].1)
-        .expect("I-3.1 的违例文字带记账与遍历两个数");
+    assert!(
+        matches!(
+            run.outcomes[10],
+            StepOutcome::Applied(AppliedEffect::RaisedFloor { .. })
+        ),
+        "抬 F 做成：{:?}",
+        run.outcomes[10]
+    );
+}
+
+/// 生成器的「崩溃恢复抛弃根」一步（实七）照 `tests/common` 的 `abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before`
+/// 那一形走：第一个文件 A（txg 3）之后覆盖写 B（4）、C（5），崩溃恢复抛弃 C——择根落到 B，实例 2 写行 6、暖机 7；再覆盖写四次（8–11），
+/// 抬 F（选择子 5 ⇒ F = 5，上限 8）。F 落在被抛弃的 C 那个 txg 上，历史以「已知红」第 0 条（增补 2 收口表第 43 行）收尾——
+/// 实四乙第 7 件在写死的用例里造出、随机历史里一直复现不了的那一形（`second_transaction_step_five_reuse.rs` 那一条同形）。
+#[test]
+fn crash_recovery_abandoning_the_newest_root_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43(
+) {
+    let empty = ContentChoice {
+        length: ContentLength::Empty,
+        fill_seed: 0,
+    };
+    let history = GeneratedHistory {
+        seed: HistorySeed(0),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations: vec![
+            HistoryOperation::PublishOverwrite(empty),
+            HistoryOperation::PublishOverwrite(empty),
+            HistoryOperation::CrashRecoveryAbandoningTheNewestRoot,
+            HistoryOperation::PublishOverwrite(empty),
+            HistoryOperation::PublishOverwrite(empty),
+            HistoryOperation::PublishOverwrite(empty),
+            HistoryOperation::PublishOverwrite(empty),
+            HistoryOperation::RaiseRollbackFloor(FloorTargetChoice {
+                steps_above_current_floor: 5,
+            }),
+        ],
+    };
+    let run = execute_history(&history);
+    assert!(
+        matches!(
+            run.outcomes[2],
+            StepOutcome::Applied(AppliedEffect::Mounted {
+                instance: InstanceGeneration(2),
+                ..
+            })
+        ),
+        "崩溃恢复抛弃根那一步是一次做成的可写挂载、取号 2：{:?}",
+        run.outcomes[2]
+    );
+    match &run.ending {
+        HistoryEnding::KnownRed { form, observation } => {
+            assert_eq!(*form, 0, "收口表第 43 行那一条");
+            assert_eq!(observation.position, StepPosition::Operation(7));
+            assert_eq!(
+                observation.raised_floor_lands_only_on_abandoned_roots,
+                Some(true),
+                "F = 5 只落在被抛弃的 C 上"
+            );
+        }
+        other @ (HistoryEnding::Completed | HistoryEnding::NewFinding { .. }) => {
+            panic!("要以「已知红」第 0 条收尾：{other:?}")
+        }
+    }
+}
+
+/// 崩溃恢复抛弃的那条根不在回退的候选集里：同上造出被抛弃的 C（实例 1、txg 5），回退的目标取根环从新到旧第 3 条
+/// （实例 2 的 7、6 之后就是它），被拒成「在被抛弃的时间线上」，模型也要求拒，历史跑完。
+#[test]
+fn rolling_back_to_the_root_abandoned_by_the_crash_recovery_step_is_refused_on_the_abandoned_timeline(
+) {
+    let empty = ContentChoice {
+        length: ContentLength::Empty,
+        fill_seed: 0,
+    };
+    let history = GeneratedHistory {
+        seed: HistorySeed(0),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations: vec![
+            HistoryOperation::PublishOverwrite(empty),
+            HistoryOperation::PublishOverwrite(empty),
+            HistoryOperation::CrashRecoveryAbandoningTheNewestRoot,
+            HistoryOperation::RollBackWhileMounted(RollbackTargetChoice::RingRoot {
+                index_from_newest: 2,
+            }),
+        ],
+    };
+    let run = execute_history(&history);
+    assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
     assert_eq!(
-        allocated - walked,
-        12 * 16384,
-        "(2, 7) 的实例表 2 槽、记账树·映射树·树表各 1 槽、分配记录树那一次重写的节点，合 12 槽"
+        run.outcomes[3],
+        StepOutcome::Refused {
+            member: "RollbackError::TargetNotACandidate(OnAbandonedTimeline)".to_string()
+        }
+    );
+}
+
+/// 冷启动读回报的根取施加 journal 之后实际走的那条（实四丙交回 ④ offset 330，实七）：第一个文件之后覆盖写一次（txg 4），
+/// 它的根槽 FUA 写被说谎的设备吞掉——journal 记录与单元都落了盘，根槽没落；接着冷启动。恢复择到 txg 3、施加 txg 4 的记录、
+/// 读回 txg 4 那一版的内容，模型要的也是 txg 4。按施加之前所选的根报（`observed_read_back`），对拍报「冷启动读回」对不上。
+#[test]
+fn cold_start_after_a_swallowed_root_slot_write_reads_back_the_version_its_applied_record_rebuilt_and_the_model_agrees(
+) {
+    let execution = HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES;
+    let parameters = execution.device_width.parameters();
+    let root_slot_of_the_overwrite = singlefs_core::root_ring::target_for_publish(
+        CheckpointTxg(4),
+        parameters.geometry.root_ring_slots_per_region,
+    );
+    let plan = SharedFaultPlan::armed(
+        execution.device_width.fixed_geometry(),
+        FaultSchedule {
+            fault: InjectedFault::WriteIsSwallowed,
+            device: FaultDeviceSelector::OnlyDevice(
+                parameters.region_devices
+                    [usize::try_from(root_slot_of_the_overwrite.region).expect("区域号小于 3")],
+            ),
+            placement: FaultPlacement::OffsetExactly(singlefs_core::root_ring::slot_offset(
+                root_slot_of_the_overwrite,
+                parameters.geometry.fixed_structure_slot_spacing,
+            )),
+            counting: FaultCounting::AcrossThePool,
+            occurrence: FaultOccurrence::TheNthMatchingCall(1),
+        },
+    );
+    let history = GeneratedHistory {
+        seed: HistorySeed(0),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations: vec![
+            HistoryOperation::PublishOverwrite(ContentChoice {
+                length: ContentLength::InsideOneDataUnit { selector: 2999 },
+                fill_seed: 7,
+            }),
+            HistoryOperation::ColdStartRecover,
+        ],
+    };
+    let run = execute_history_with_faults(
+        &history,
+        execution,
+        &SharedStream::new(),
+        &plan,
+        &mut |_| {},
+    );
+    let fired = plan.fired();
+    assert_eq!(fired.len(), 1, "只吞掉覆盖写那一次根槽 FUA 写：{fired:?}");
+    assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
+    assert!(
+        matches!(
+            &run.outcomes[1],
+            StepOutcome::Applied(AppliedEffect::Recovered {
+                read_back: ColdStartReadBack::FileRead,
+                ..
+            })
+        ),
+        "冷启动读回文件：{:?}",
+        run.outcomes[1]
     );
 }
 
@@ -1274,9 +1385,10 @@ fn the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice() {
 /// 代码三方 `research/prompts/m2-final-code-r3-main-verification.md` 第三节「越格线索」的两个种子（攻方
 /// `research/prompts/m2-final-code-r3-opus-model/rerun.sh` 里 `z13_one_seed` 那一格：比重 `REUSE_AFTER_RAISING_THE_FLOOR`、60 步、
 /// 两块单元区 240 槽的小盘、每一步之后跑池级 checker），空间准入关掉（判着准入时这几块小盘上式子先拒，走不到抬 F 那一串撞墙）。
-/// 两段历史都在一次回退之后把 F 抬进回退留下的空档：种子 4000000045 第 27 步抬到 7（回退目标 (1, 5) 在 F 之下，它那一版被
-/// txg 8 换下的单元释放代 8 > 7 不回收），种子 4000000204 第 31 步抬到 20（回退目标 (3, 18) 在 F 之下，释放代 22 > 20）。
-/// 这一串要推 `publishes_in_the_sequence` 次空发布（种子 4000000045 那一步两次、4000000204 那一步三次），第二次取不到落点。
+/// 旧形态（挂载时回退）下两段历史都在一次回退之后把 F 抬进回退留下的空档：种子 4000000045 第 27 步抬到 7，种子 4000000204 第 31 步
+/// 抬到 20。回退改成挂着时的一次向前发布之后，比重表里「关着时回退」并进了可写挂载，同一个种子生成的历史跟着变了，没有空档；
+/// 抬 F 那一步照样在同一步、第二次照样取不到落点。这一串要推 `publishes_in_the_sequence` 次空发布（两个种子那一步都是三次；
+/// 种子 4000000045 旧形态下是两次）。
 /// 改之前逐次发：第一次（带新 F 的根）已经落盘、第二次才被拒，那条落了盘的新 F 让 checker 在那一步判 I-3.1 红、记账比遍历多
 /// 8 × 16384（收口表第 43 行那一形，但这一步不是做成的抬 F，已知红清单不接，判成新发现，历史停在那一步）；
 /// 扣住的槽也留在进程里（C546（抬 F 被拒时扣住的槽不退回） 第二次起那一半）。
@@ -1328,17 +1440,17 @@ fn the_raise_refused_part_way_by_the_rehearsal_writes_nothing_and_the_history_ru
 }
 
 #[test]
-fn seed_4000000045_raising_the_floor_into_a_rollback_gap_on_narrow_devices_is_refused_before_any_write_instead_of_leaving_the_new_floor_on_one_device(
+fn seed_4000000045_raising_the_floor_on_narrow_devices_is_refused_before_any_write_instead_of_leaving_the_new_floor_on_one_device(
 ) {
     the_raise_refused_part_way_by_the_rehearsal_writes_nothing_and_the_history_runs_to_the_end(
         4_000_000_045,
         27,
-        2,
+        3,
     );
 }
 
 #[test]
-fn seed_4000000204_raising_the_floor_into_a_rollback_gap_on_narrow_devices_is_refused_before_any_write_instead_of_leaving_the_new_floor_on_one_device(
+fn seed_4000000204_raising_the_floor_on_narrow_devices_is_refused_before_any_write_instead_of_leaving_the_new_floor_on_one_device(
 ) {
     the_raise_refused_part_way_by_the_rehearsal_writes_nothing_and_the_history_runs_to_the_end(
         4_000_000_204,

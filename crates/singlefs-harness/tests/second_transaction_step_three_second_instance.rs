@@ -129,7 +129,6 @@ fn remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes
             instance: InstanceGeneration(1),
             selected_root_txg: CheckpointTxg(4),
             applied_transaction_high_water: 0,
-            is_rollback: false,
         }],
         "实例 1 那一行 (1, 4, 0)；实例 0 不写行"
     );
@@ -395,7 +394,7 @@ fn damaging_every_instance_two_root_on_one_device_still_leaves_a_root_on_the_oth
 }
 
 /// 验收第三条：预置一条实例 1 的记录（jsn 5、txg 5、事务号 3，点名的单元也在盘上），把它的根槽改坏 ⇒ 重开那一刻所选根是 B 的根、
-/// 同一个实例、没有回退行 ⇒ 恢复必须施加它，行写 (1, 5, 3)，写行发布的 txg 从 6 起。
+/// 同一个实例 ⇒ 恢复必须施加它，行写 (1, 5, 3)，写行发布的 txg 从 6 起。
 #[test]
 fn stray_record_of_the_previous_instance_is_applied_on_remount_and_its_transaction_lands_in_the_row(
 ) {
@@ -449,7 +448,6 @@ fn stray_record_of_the_previous_instance_is_applied_on_remount_and_its_transacti
             instance: InstanceGeneration(1),
             selected_root_txg: CheckpointTxg(5),
             applied_transaction_high_water: 3,
-            is_rollback: false,
         }]
     );
     assert_eq!(
@@ -489,7 +487,6 @@ fn checker_rejects_an_instance_table_row_whose_instance_is_not_below_the_mount_r
         instance: InstanceGeneration(2),
         selected_root_txg: CheckpointTxg(7),
         applied_transaction_high_water: 0,
-        is_rollback: false,
     });
     let publish_parameters = parameters();
     let devices = pool.devices.as_mut().expect("镜像还开着");

@@ -11,12 +11,10 @@ pub mod position_addressed;
 pub mod walk;
 
 use singlefs_format::{
-    index_node_header_bytes, DATA_UNIT_BYTES, DATA_UNIT_HEADER_BYTES, JOURNAL_HEADER_BYTES,
-    JOURNAL_NAMED_ENTRY_BYTES, JOURNAL_RECORD_BYTES, NODE_BYTES,
-    NONCE_MAC_ALGORITHM_RESERVED_BYTES, PACKED_UNIT_HEADER_BYTES, ROLLBACK_WITNESS_COUNT_BYTES,
-    ROLLBACK_WITNESS_ENTRIES_MAXIMUM, ROLLBACK_WITNESS_ENTRY_BYTES,
-    ROLLBACK_WITNESS_TABLE_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT, ROOT_RECORD_BYTES,
-    SYSTEM_CONFIGURATION_SLOT_BYTES, WIDE_CHECKSUM_BYTES,
+    DATA_UNIT_BYTES, DATA_UNIT_HEADER_BYTES, INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE,
+    INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT, JOURNAL_HEADER_BYTES, JOURNAL_NAMED_ENTRY_BYTES,
+    JOURNAL_RECORD_BYTES, NODE_BYTES, NONCE_MAC_ALGORITHM_RESERVED_BYTES, PACKED_UNIT_HEADER_BYTES,
+    ROOT_RECORD_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES, WIDE_CHECKSUM_BYTES,
 };
 
 /// checker 自己解析出来的判定宽度：探测到的，或系统配置声明的（探不到时报「声明值，未探测」，不许当成探到的）。
@@ -129,69 +127,6 @@ pub enum Verdict {
     RootRingSlotsPerRegionOutsideTheFormatInterval,
 }
 
-/// 回退见证表的一个条目（D23（journal 的角色与格式） 已定项 14「回退见证」）：新实例代号 4 + 回退目标 R_old 的实例代号 4 + txg 8，小端。
-/// 偏移与宽度只从 `singlefs-format` 取，解析在 checker 这边另写一份。
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct RollbackWitnessEntryView {
-    pub new_instance: u32,
-    pub rollback_target_instance: u32,
-    pub rollback_target_txg: u64,
-}
-
-impl RollbackWitnessEntryView {
-    /// (实例代号, txg) 这一处被这次回退抛弃：(r_old, T_old) < (i, T)（实例代号为主比）且 i < N。
-    #[must_use]
-    pub fn abandons(&self, instance: u32, checkpoint_txg: u64) -> bool {
-        (self.rollback_target_instance, self.rollback_target_txg) < (instance, checkpoint_txg)
-            && instance < self.new_instance
-    }
-}
-
-/// 一个自证过的系统配置槽里的回退见证表：槽内偏移 481 起，条数 1 字节 + 47 个 16 字节的条目位。`capacity` 是这个池的条数上限
-/// （R × S − 1，R、S 读自同一槽）。条数不超过上限、条目按 (N, r_old, T_old) 严格升序、每一条 r_old < N、条数之后的条目位全 0，
-/// 四样都满足才交回条目；不满足交回哪一样不满足（I-7.10（回退见证表各槽自洽、各盘一致） 的违例说明要它）。
-///
-/// # Errors
-/// 上面四样里第一样不满足的，一句话。
-pub fn rollback_witness_of_system_configuration_slot(
-    slot: &[u8],
-    capacity: u64,
-) -> Result<Vec<RollbackWitnessEntryView>, &'static str> {
-    let start = usize::try_from(ROLLBACK_WITNESS_TABLE_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT)
-        .expect("481");
-    let count_bytes = usize::try_from(ROLLBACK_WITNESS_COUNT_BYTES).expect("1");
-    let entry_bytes = usize::try_from(ROLLBACK_WITNESS_ENTRY_BYTES).expect("16");
-    let positions = usize::try_from(ROLLBACK_WITNESS_ENTRIES_MAXIMUM).expect("47");
-    if slot.len() < start + count_bytes + positions * entry_bytes {
-        return Err("槽比见证表的末尾短");
-    }
-    let count = u64::from(slot[start]);
-    if count > capacity.min(ROLLBACK_WITNESS_ENTRIES_MAXIMUM) {
-        return Err("条数超过这个池的上限 R × S − 1");
-    }
-    let mut entries: Vec<RollbackWitnessEntryView> = Vec::new();
-    for position in 0..positions {
-        let base = start + count_bytes + position * entry_bytes;
-        let entry = RollbackWitnessEntryView {
-            new_instance: read_u32(slot, base),
-            rollback_target_instance: read_u32(slot, base + 4),
-            rollback_target_txg: read_u64(slot, base + 8),
-        };
-        if u64::try_from(position).expect("47 以内") < count {
-            if entry.rollback_target_instance >= entry.new_instance {
-                return Err("有一条的回退目标实例代号不小于新实例代号");
-            }
-            if entries.last().is_some_and(|previous| *previous >= entry) {
-                return Err("条目不按 (新实例, 目标实例, 目标 txg) 严格升序");
-            }
-            entries.push(entry);
-        } else if slot[base..base + entry_bytes].iter().any(|byte| *byte != 0) {
-            return Err("条数之后的条目位不全是 0");
-        }
-    }
-    Ok(entries)
-}
-
 /// 系统配置槽解出来的几个要紧字段。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SystemConfigurationView {
@@ -202,6 +137,19 @@ pub struct SystemConfigurationView {
     pub declared_physical_block_size: u32,
     pub journal_tail: u64,
     pub journal_instance: u32,
+    /// 系统配置里另记的那一份回退下界 F（D22（单元原子性怎么合成） 已定项 9 字段表最后一行；D16（发布语义） 已定项 1「生效」取
+    /// max(根上带的, 系统配置里读得出的)）。C556（checker 与层 0 不读系统配置里的 F） 那一半读它。
+    pub rollback_floor: u64,
+}
+
+/// 根记录 flags 位 0 的卸载记号（D22（单元原子性怎么合成） 已定项 7）照实读出来：池级 checker 按它给
+/// I-7.9（回退下界 F 不高于抬 F 的上限） 分两支。checker 自己写一份，不从 `singlefs-core` 引。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnmountMarkerView {
+    /// 位 0 = 1：正常卸载那一串写的根。
+    WrittenByTheUnmountSequence,
+    /// 位 0 = 0：别的根。
+    NotWrittenByTheUnmountSequence,
 }
 
 const SYSTEM_CONFIGURATION_MAGIC: &[u8; 4] = b"SFSB";
@@ -213,7 +161,18 @@ const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 155;
 const SYSTEM_CONFIGURATION_PHYSICAL_BLOCK_SIZE_OFFSET: usize =
     155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
 const SYSTEM_CONFIGURATION_TAIL_OFFSET: usize = 469;
+/// 系统配置里回退下界 F 那 8 字节：字段表里 journal tail 8、journal 实例代号 4 之后的那一行（D22（单元原子性怎么合成） 已定项 9）。
+/// 按 checker 自己走字段表的读法从 tail 那一行推出来，不借实现那边的偏移。
+const SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET: usize = SYSTEM_CONFIGURATION_TAIL_OFFSET + 8 + 4;
+/// incompat 位 1 = 第一条纯 SSD 布局线（系统配置带回退下界 F、根记录带卸载记号的那一版）；位 0 退役，见到按不认识的位判
+/// （D15（格式冻结政策） 已定项 4，用户 2026-09-26）。位 n 住第 n div 8 个字节的第 n mod 8 低位（D22（单元原子性怎么合成） 已定项 13）。
+/// checker 自己写一份，不从 `singlefs-core` 引。
+const INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT: u8 = 0x02;
 const ROOT_CHECKSUM_OFFSET: usize = 138;
+/// 根记录 flags 那 4 字节的偏移：magic 4 + fsid 16。
+const ROOT_FLAGS_OFFSET: usize = 20;
+/// 根记录 flags 位 0 = 卸载记号（D22（单元原子性怎么合成） 已定项 7）；其余位第一版恒 0、非 0 拒收（已定项 17）。
+const ROOT_FLAG_UNMOUNT_MARKER: u32 = 1 << 0;
 const UNIT_HEADER_CHECKSUM_OFFSET: usize = 10;
 
 pub(crate) fn read_u16(bytes: &[u8], offset: usize) -> u16 {
@@ -245,9 +204,9 @@ pub fn check_system_configuration_slot(slot: &[u8]) -> Result<SystemConfiguratio
     }
     let incompat = &slot
         [SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 32];
-    if incompat[0] & !0x01 != 0
+    if incompat[0] & !INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT != 0
         || incompat[1..].iter().any(|byte| *byte != 0)
-        || incompat[0] & 0x01 == 0
+        || incompat[0] & INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT == 0
     {
         return Err(Verdict::UnknownIncompatBit);
     }
@@ -265,6 +224,7 @@ pub fn check_system_configuration_slot(slot: &[u8]) -> Result<SystemConfiguratio
         ),
         journal_tail: read_u64(slot, SYSTEM_CONFIGURATION_TAIL_OFFSET),
         journal_instance: read_u32(slot, SYSTEM_CONFIGURATION_TAIL_OFFSET + 8),
+        rollback_floor: read_u64(slot, SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET),
     })
 }
 
@@ -289,6 +249,7 @@ pub struct RootView {
     pub checkpoint_txg: u64,
     pub tree_identifier_watermark: u64,
     pub rollback_floor: u64,
+    pub unmount_marker: UnmountMarkerView,
     /// 457 字节记录本身（含校验和字段），三个区域比对用。
     pub record_bytes: Vec<u8>,
 }
@@ -311,16 +272,41 @@ pub fn check_root_slot(
     if &slot[4..20] != expected_filesystem_identifier {
         return Err(Verdict::FilesystemIdentifierMismatch);
     }
-    if read_u32(slot, 20) != 0 {
+    let flags = read_u32(slot, ROOT_FLAGS_OFFSET);
+    if flags & !ROOT_FLAG_UNMOUNT_MARKER != 0 {
         return Err(Verdict::NonZeroFlags);
     }
+    let unmount_marker = if flags & ROOT_FLAG_UNMOUNT_MARKER == 0 {
+        UnmountMarkerView::NotWrittenByTheUnmountSequence
+    } else {
+        UnmountMarkerView::WrittenByTheUnmountSequence
+    };
     Ok(RootView {
         instance: read_u32(slot, 24),
         checkpoint_txg: read_u64(slot, 28),
         tree_identifier_watermark: read_u64(slot, 36 + 86),
         rollback_floor: read_u64(slot, 36 + 86 + 8),
+        unmount_marker,
         record_bytes: slot[..record_bytes].to_vec(),
     })
+}
+
+/// 码 2 索引节点含 key 区间与预留位的头宽，也是条目区的起点：`86 + 2 × key 宽 + 29`，key 宽取盘上偏移 51 那 1 字节原样
+/// （D8（核心索引结构） 已定项 11；D18（块里携带什么信息） 已定项 16 / 已定项 18）。
+///
+/// checker 自己的一份式子，不调实现、也不调理想模型的那一份（D13（验证路线） 已定项 5：`singlefs-format` 只放标量；
+/// 2026-09-27 用户定案「三方各算一份 + 交叉断言」）；三份在 key 宽字段全部 256 个取值上连起来比的是
+/// `crates/singlefs-harness/tests/index_node_header_width_computed_three_ways_agrees_for_every_key_width.rs`。
+#[must_use]
+pub fn index_node_header_bytes(key_width_byte_at_offset_51: u8) -> usize {
+    let key_range_bytes =
+        INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT * u64::from(key_width_byte_at_offset_51);
+    usize::try_from(
+        INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE
+            + key_range_bytes
+            + NONCE_MAC_ALGORITHM_RESERVED_BYTES,
+    )
+    .expect("key 宽至多 255，头宽至多 86 + 2 × 255 + 29 = 625，装得进 usize")
 }
 
 /// 判一个单元的头：magic、flags、类标签合法（1 / 2 / 3）、头校验和、载荷 CRC；返回类标签。
@@ -342,10 +328,8 @@ pub fn check_unit(unit: &[u8]) -> Result<u8, Verdict> {
             101,
         ),
         2 => {
-            let header_end = usize::try_from(
-                index_node_header_bytes(u64::from(unit[51])) - NONCE_MAC_ALGORITHM_RESERVED_BYTES,
-            )
-            .expect("头宽");
+            let header_end = index_node_header_bytes(unit[51])
+                - usize::try_from(NONCE_MAC_ALGORITHM_RESERVED_BYTES).expect("29");
             (header_end, NODE_BYTES, header_end - 10)
         }
         3 => (

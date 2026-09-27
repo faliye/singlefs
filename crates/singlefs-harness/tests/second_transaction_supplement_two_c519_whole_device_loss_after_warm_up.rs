@@ -13,8 +13,10 @@
 //! 与盘 0 换成一块从没写过的盘（三方攻方腿的模型：每一处读回全 0、自证全不过）。两种形态结局逐项相同。
 //!
 //! D16（发布语义） 已定项 8 的暖机买的正是「根所在的盘掉了之后退到本实例的另一条根、靠重放追上」；
-//! D23（journal 的角色与格式） 已定项 14「施加前逐项验证点名单元」字面没说一个单元的两份要都过还是任一份过。
-//! 那一条期望「那一版还在」的用例标 `#[ignore]` 留在这里，等用户定。
+//! D23（journal 的角色与格式） 已定项 14「施加前逐项验证点名单元」字面没说一个单元的两份要都过还是任一份过；
+//! 用户 2026-09-25 定「两份都验过才施加」、认下丢一整块盘时丢掉刚确认的那一版（C519 挪进已还清，写进已定项 14 前缀第四条）。
+//! 原先那条期望「那一版还在」、标 `#[ignore]` 等用户定的用例随定案删了：它要的结局与定案相反，护的那件事（挡住 txg 6 的只有
+//! 「一个单元两条位置条目都要验过」）由下面那条已知丢失的用例与 `crates/mutations.tsv` 里把 `all` 改成 `any` 的那一行护着。
 
 mod common;
 
@@ -282,29 +284,6 @@ fn c519_known_loss_after_the_warm_up_covers_both_devices_losing_the_acknowledged
                 2
             ),
             "{loss:?}：同一个盘面上关掉点名验证就读回 txg 6——挡住它的只有点名单元那一步"
-        );
-    }
-}
-
-/// D16（发布语义） 已定项 8 期望的结局：暖机覆盖两块盘之后确认的那一版，在一块盘整块掉了之后还在。
-/// 今天红（见上一条）；「点名单元两份都验」还是「任一份验过」由用户定，定成后者之后这一条转绿、上一条转红。
-#[test]
-#[ignore = "C519：点名单元两份都验还是任一份验过，待用户定"]
-fn c519_after_the_warm_up_covers_both_devices_the_acknowledged_version_survives_losing_the_device_holding_its_root(
-) {
-    let mut history = build_acknowledged_version_after_warm_up("c519-expected");
-    for loss in BOTH_LOSS_FORMS {
-        let report = recover_on_the_surviving_device(&mut history, loss, JournalPolicy::Consult);
-        assert_eq!(
-            (report.outcome, report.effective_root),
-            (
-                RecoveryOutcome::FileRead {
-                    root: (InstanceGeneration(2), CheckpointTxg(4)),
-                    content: acknowledged_version_content()
-                },
-                Some((InstanceGeneration(2), CheckpointTxg(6)))
-            ),
-            "{loss:?}：确认过的 txg 6 那一版要读得回来"
         );
     }
 }

@@ -1,16 +1,25 @@
-//! 里程碑「第二个事务」并行线一的层 0 小负载（验收第 3 条）：一次发布的单元数不超过 10，多条记录的发布边界就在小单元数上造出来——
-//! 「取号 → 暖机 × 2 → A（第一个文件，一个数据单元）→ B（顺序写两个数据单元：9 个单元、两条记录）
-//! → C（顺序写三个数据单元：10 个单元、三条记录）」整条录制流按 D13（验证路线） 已定项 4 枚举崩溃状态，
+//! 里程碑「第二个事务」并行线一的层 0 小负载（验收第 3 条）：多条记录的发布边界在小单元数上造出来——
+//! 「取号 → 暖机 × 2 → A（第一个文件，一个数据单元：12 个单元）→ B（顺序写两个数据单元：14 个单元、两条记录）
+//! → C（顺序写三个数据单元：15 个单元、三条记录）」整条录制流按 D13（验证路线） 已定项 4 枚举崩溃状态，
 //! 与第一个事务同一种切法（上一次发布的系统配置槽写与下一次发布的单元写落在同一段）。每个状态跑恢复 + 多版本 oracle、
 //! 池级 checker、记录核对器；另逐状态核发布边界（D23（journal 的角色与格式） 已定项 14 第六条）：
 //! 一次发布的第一条记录落了而末条一份都没落 ⇒ 那次发布整体不施加，读回上一版、文件是旧长度（I-4.3（提交原子））。
 //!
+//! **流按今天的形状钉：B 14 个单元、C 15 个，验收第 3 条写的「一次发布的单元数不超过 10」这条流做不到。**
+//! 分配记录树按位置寻址（D8（核心索引结构） 已定项 14），4 GiB × 2 的池上一次发布带着它的五个节点（两盘各叶 61、两盘各第 1 层、根），
+//! 加上 extent 根、inode 叶容器与根、记账树、中央映射树、树表，数据单元之外的固定开销是 11 个单元，两个数据单元起 extent
+//! 多一片下段节点、12 个。一次发布的记录条数等于它的数据单元数，要两条记录就至少两个数据单元：B 最少 14 个、C（三条记录）最少 15 个，
+//! 挑内容大小压不下来（按内容大小逐档量的数在 `research/prompts/m2-rev-b3a3c-implementer-report.md` 第五节）。全量照这个形状跑。
+//!
 //! **比已有的流多罩了什么**：已有的流上每次发布恰一条记录，记录段恒是 2 写；这里 B、C 的记录段是 4 写与 6 写，
 //! 崩在一次发布的记录之间的状态（B 3 个、C 12 个）第一次被枚举到；一次发布写两个、三个数据单元，
-//! extent 根兼叶装两条、三条记录，中央映射里两条、三条码 1 条目。多跑的一步只有恢复本身（这条流上没有重开、挂载）。
+//! extent 下段一片根兼叶装两条、三条记录（上段那条条目换成下段根指针，D8（核心索引结构） 已定项 14），
+//! 中央映射里两条、三条码 1 条目。多跑的一步只有恢复本身（这条流上没有重开、挂载）。
 //!
-//! 快的那条只展开写数小于 10 的段（B、C 两个单元段 20 写与 22 写不展开，只以整段持久进入后面的状态）；
-//! 全量标 ignored（闭式 5505123 个状态，B、C 两个单元段占 524 万），不在本轮跑。
+//! 快的那条只展开写数小于 10 的段（A、B、C 三个单元段 26 写、30 写与 32 写不展开，只以整段持久进入后面的状态）；
+//! 全量标 ignored（层 0 的枚举域 12230590578 个状态，B、C 两个单元段占 12079595518；每次写只取两态时的闭式 5435818083、
+//! 两段占 5368709118），登记成崩溃枚举用例，门禁 54 号 --full 在 release 下跑，带断点续跑、可双机分片（与第一、第二条流同一个入口）。
+//! 系统配置槽写是原地覆写，取三态（`crash::TearableInPlaceOverwrites`），其余写取两态。
 
 mod common;
 
@@ -24,11 +33,17 @@ use singlefs_core::transaction::{
 use singlefs_core::unit::data_unit_payload_capacity;
 use singlefs_format::JOURNAL_RING_DEFAULT_BYTES;
 use singlefs_harness::crash::{
-    closed_form_state_count, enumerate_layer0_selecting_versions_observing_each_state,
-    enumerate_layer0_versions, writes_and_segments, CrashImage, Layer0Tally, MemoryPool,
+    closed_form_state_count, enumerate_layer0_in_state_slices_or_one_shard,
+    enumerate_layer0_selecting_versions_observing_each_state, full_expansion,
+    layer0_state_count_with_torn_in_place_overwrites, writes_and_segments, CrashImage,
+    Layer0EnumerationOutcome, Layer0Parallelism, Layer0SegmentExpansion, Layer0Tally, MemoryPool,
     PublishedVersion, RetainedWrite,
 };
+use singlefs_harness::layer0_progress::Layer0Resume;
 use singlefs_harness::segments::StepKind;
+
+/// 全量那一趟的流名：进断点续跑的进度文件名与双机分片的账本名（`singlefs_harness::layer0_progress`）。
+const FULL_ENUMERATION_STREAM_NAME: &str = "second_transaction_parallel_line_one";
 
 /// 恰好要 `data_units` 个数据单元的内容：最后一个单元装一半。
 fn content_needing(data_units: usize, seed: usize) -> Vec<u8> {
@@ -134,7 +149,13 @@ fn prepare(tag: &str) -> Prepared {
         2,
         "B：两个数据单元两条记录"
     );
-    assert_eq!(second.rewritten.len(), 9, "B：9 个单元（≤ 10）");
+    assert_eq!(
+        second.rewritten.len(),
+        2 + 2 + 2 + 5 + 3,
+        "B：两个数据单元 + extent 下段根兼叶与上段根 + inode 叶容器与根 + 分配记录树五个节点 + 记账树、中央映射树、树表 = 14 个单元\
+         （验收第 3 条的「≤ 10」今天不成立，见文件头）：{:?}",
+        second.rewritten
+    );
     let third_content = content_needing(3, 2);
     let third = sequential_write(&mut pool, &third_content);
     assert_eq!(
@@ -142,7 +163,12 @@ fn prepare(tag: &str) -> Prepared {
         3,
         "C：三个数据单元三条记录"
     );
-    assert_eq!(third.rewritten.len(), 10, "C：10 个单元（≤ 10）");
+    assert_eq!(
+        third.rewritten.len(),
+        3 + 2 + 2 + 5 + 3,
+        "C：三个数据单元 + 与 B 同样的 12 个单元 = 15 个单元（「≤ 10」今天不成立，见文件头）：{:?}",
+        third.rewritten
+    );
 
     let base = pool.memory_pool_after_mkfs();
     let operations = pool.retained_operations();
@@ -151,9 +177,9 @@ fn prepare(tag: &str) -> Prepared {
     let sizes: Vec<usize> = segments.iter().map(Vec::len).collect();
     assert_eq!(
         sizes,
-        vec![2, 2, 1, 2, 2, 1, 18, 2, 1, 20, 4, 1, 22, 6, 1, 2],
-        "取号 2、暖机两次、A 的 16 个单元写并上一次的系统配置槽写 18；B 的 18 个单元写并 A 的轮换 20、两条记录 4 写；\
-         C 的 20 个单元写并 B 的轮换 22、三条记录 6 写"
+        vec![2, 2, 1, 2, 2, 1, 26, 2, 1, 30, 4, 1, 32, 6, 1, 2],
+        "取号 2、暖机两次、A 的 24 个单元写并上一次的系统配置槽写 26；B 的 28 个单元写并 A 的轮换 30、两条记录 4 写；\
+         C 的 30 个单元写并 B 的轮换 32、三条记录 6 写"
     );
     let root_indexes: Vec<usize> = writes
         .iter()
@@ -255,7 +281,7 @@ fn assert_clean(tally: &Layer0Tally) {
     }
 }
 
-/// 平时跑的那一份：B、C 两个单元段（20 写、22 写）与 A 那一段（18 写）不展开，其余每段任意子集——B 的两条记录段（4 写）、
+/// 平时跑的那一份：B、C 两个单元段（30 写、32 写）与 A 那一段（26 写）不展开，其余每段任意子集——B 的两条记录段（4 写）、
 /// C 的三条记录段（6 写）全展开，崩在一次发布的记录之间的每个状态都跑到。
 #[test]
 fn every_crash_state_between_the_records_of_a_multi_record_publish_keeps_the_version_before_it() {
@@ -280,13 +306,30 @@ fn every_crash_state_between_the_records_of_a_multi_record_publish_keeps_the_ver
         .cloned()
         .collect();
     assert_eq!(
-        tally.states,
         closed_form_state_count(&expanded),
-        "展开的段按闭式数"
+        102,
+        "每次写只取两态时展开的段按闭式数（补第三态之前的口径）：1 + 六个 2 写段各 3 + 五个 1 写段各 1 + 4 写段 15 + 6 写段 63"
     );
     assert_eq!(
-        tally.states, 102,
-        "1 + 六个 2 写段各 3 + 五个 1 写段各 1 + 4 写段 15 + 6 写段 63"
+        tally.states,
+        layer0_state_count_with_torn_in_place_overwrites(
+            &prepared.base,
+            &prepared.writes,
+            &prepared.segments,
+            &|segment_index, segment| {
+                if expand(segment_index, segment) {
+                    Layer0SegmentExpansion::EveryProperSubset
+                } else {
+                    Layer0SegmentExpansion::NotExpanded
+                }
+            },
+        ),
+        "展开的段按层 0 的枚举域数（原地覆写取三态）"
+    );
+    assert_eq!(
+        tally.states,
+        1 + 3 * (3 * 3 - 1) + 3 * 3 + 5 + 15 + 63,
+        "1 + 三个系统配置槽 2 写段各 3² − 1 + 三个记录 2 写段各 3 + 五个 1 写段各 1 + 4 写段 15 + 6 写段 63（每次写只取两态时 102）"
     );
     // B：记录段 4 写里第一条落了（至少一份）、第二条一份没落 ⇒ 3 × 1 = 3 个状态。
     // C：记录段 6 写里第一条落了、第三条一份没落 ⇒ 第一条 3 种 × 第二条 4 种 = 12 个状态。
@@ -304,25 +347,56 @@ fn every_crash_state_between_the_records_of_a_multi_record_publish_keeps_the_ver
     assert_clean(&tally);
 }
 
-/// 全量：16 段、闭式见下。B、C 两个单元段各 2^20 − 1 与 2^22 − 1 个状态，每个状态两遍恢复 + checker。
+/// 全量：16 段、闭式见下。B、C 两个单元段（各带上一次发布的两次系统配置槽轮换，取三态）各 3² · 2^28 − 1 与 3² · 2^30 − 1 个状态，
+/// 每个状态两遍恢复 + checker。登记成崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv`），54 号认下面打印的
+/// `LAYER0_PARALLEL_LINE_ONE` 行里 `exhaustive=true`。带断点续跑：进度目录、输入指纹与强制从头跑的开关从环境变量取，
+/// 没设进度目录就不留进度文件。双机分片（`SINGLEFS_LAYER0_SHARD`，`research/scripts/layer0-shard-run.sh`）：
+/// 跑一片时只写账本、不打计数行、不判；merge 那一趟拿并齐的计数照下面逐项判、逐字打同样的行。
 #[test]
-#[ignore = "全量 5505123 个状态、每个两遍恢复 + checker，debug 下数小时；交 crash-verifier 在 release 下跑"]
+#[ignore = "全量 12230590578 个状态（一百二十多亿）、每个两遍恢复 + checker；门禁 54 号 --full 在 release 下跑，带断点续跑、可双机分片"]
 fn full_enumeration_of_the_parallel_line_one_stream_is_exhaustive_and_clean() {
     let prepared = prepare("parallel-line-one-layer0-full");
-    let closed_form = closed_form_state_count(&prepared.segments);
+    let closed_form_with_two_states_per_write = closed_form_state_count(&prepared.segments);
+    assert_eq!(
+        closed_form_with_two_states_per_write,
+        1 + 6 * 3 + 5 + ((1 << 26) - 1) + ((1 << 30) - 1) + 15 + ((1 << 32) - 1) + 63,
+        "每次写只取两态时的闭式：1 + Σ(2^|段| − 1)，十六段"
+    );
+    assert_eq!(closed_form_with_two_states_per_write, 5_435_818_083);
+    // 计数行的 closed_form 报枚举域的闭式（原地覆写三态）：六段各带两次系统配置槽写，每段 3^m · 2^(n−m) − 1。
+    let closed_form = layer0_state_count_with_torn_in_place_overwrites(
+        &prepared.base,
+        &prepared.writes,
+        &prepared.segments,
+        &full_expansion,
+    );
     assert_eq!(
         closed_form,
-        1 + 6 * 3 + 5 + ((1 << 18) - 1) + ((1 << 20) - 1) + 15 + ((1 << 22) - 1) + 63,
-        "闭式：1 + Σ(2^|段| − 1)，十六段"
+        1 + 3 * (3 * 3 - 1)
+            + 3 * 3
+            + 5
+            + (9 * (1 << 24) - 1)
+            + (9 * (1 << 28) - 1)
+            + 15
+            + (9 * (1 << 30) - 1)
+            + 63,
+        "枚举域的闭式：三个只有系统配置槽写的 2 写段各 3² − 1、三个记录 2 写段各 3、五个 1 写段、A / B / C 的单元段各 3² · 2^(n−2) − 1、4 写段 15、6 写段 63"
     );
-    assert_eq!(closed_form, 5_505_123);
-    let tally = enumerate_layer0_versions(
+    assert_eq!(closed_form, 12_230_590_578);
+    let tally = match enumerate_layer0_in_state_slices_or_one_shard(
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         prepared.judged_root_index,
         &prepared.versions,
-    );
+        &full_expansion,
+        Layer0Parallelism::from_environment(),
+        None,
+        &Layer0Resume::from_environment(FULL_ENUMERATION_STREAM_NAME),
+    ) {
+        Layer0EnumerationOutcome::WholeStream(tally) => tally,
+        Layer0EnumerationOutcome::OneShardWrittenToItsLedger(_written) => return,
+    };
     println!(
         "LAYER0_PARALLEL_LINE_ONE states={} closed_form={closed_form} exhaustive={} violations={} states_by_publish=[{}] checker {} first_violation={}",
         tally.states,

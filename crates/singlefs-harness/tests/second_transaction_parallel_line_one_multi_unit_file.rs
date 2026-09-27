@@ -447,7 +447,7 @@ fn shrinking_a_multi_unit_file_checks_the_released_tail_against_its_mapping_chec
 /// 进程重开：可写挂载从盘上重建上一版（extent 根兼叶里的每条记录、每个数据单元都读回来），写行与暖机照抄三个数据单元；
 /// 之后再顺序写两个单元，上一版的三个数据单元按重建出来的映射 key 经映射释放。冷启动读回两个单元的那一版。
 #[test]
-fn a_reopened_writable_mount_carries_every_data_unit_and_the_next_write_releases_them_through_the_mapping(
+fn reopened_writable_mount_carries_every_data_unit_and_the_next_write_releases_them_through_the_mapping(
 ) {
     let mut pool = build_pool("parallel-line-one-reopen");
     let three_units = content_needing(3, 5);
@@ -539,7 +539,7 @@ fn the_chain_head_anchors_on_the_last_record_of_the_chosen_roots_publish() {
 /// 第一条两份都落了，第二条一份都没落、根也没落 ⇒ 前五条判出来的前缀里 B 的末条没到，B 整体不施加，文件是 A 的旧长度（I-4.3（提交原子））。
 /// 同一个 B 两条都落了、根没落 ⇒ 末条到了，整次施加、读回 B（这一格证明它不是一律不施加）。
 #[test]
-fn a_crash_before_the_second_record_of_a_two_record_publish_keeps_the_old_file() {
+fn crash_before_the_second_record_of_the_two_record_publish_keeps_the_old_file() {
     let mut pool = build_pool("parallel-line-one-publish-boundary");
     let first_version = pool.output.clone();
     let two_units = content_needing(2, 9);

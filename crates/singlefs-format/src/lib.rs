@@ -6,6 +6,8 @@
 //! 门禁「格式常量文件里的占位」数它们、并核每个占位都指到一条真实存在的分项或欠账。
 //!
 //! checker 与实现只共享这一个模块（D13（验证路线） 已定项 5），别的都各写一份。
+//! 这里只放标量：`pub const` 的值写成整数字面量，不写算式，也不放函数（D13（验证路线） 已定项 5「判据是发射物里有没有分支与算术」）；
+//! 由几段加起来的量，原来的算式留在本 crate 的单测里，与字面量比一个数不差。
 #![forbid(unsafe_code)]
 
 /// 落点粒度：一个 16 KiB 槽（D3（空间分配） 已定项 7；D19（块指针的结构与宽度预算） 已定项 4 的物理偏移就是槽号）。
@@ -26,32 +28,32 @@ pub const WIDE_CHECKSUM_BYTES: u64 = 32;
 /// 校验和字段里真正承载 CRC-32C 的那 4 字节。
 pub const CHECKSUM_CRC32_CASTAGNOLI_BYTES: u64 = 4;
 
-/// 单元明文头末尾之后的预留位：nonce 12 + MAC 16 + 算法类型 1（D18（块里携带什么信息） 已定项 14 / 已定项 16；算法类型 2026-09-14 用户定案）。
+/// 单元明文头末尾之后的预留位：nonce 12 + MAC 16 + 算法类型 1（D18（块里携带什么信息） 已定项 14 / 已定项 16；算法类型 2026-09-14 用户定案）。format-const: NONCE_MAC_ALGORITHM_RESERVED_BYTES
 pub const NONCE_MAC_ALGORITHM_RESERVED_BYTES: u64 = 29;
 
 /// 码 1 数据单元的类身份段末尾，也是头校验和的端点（D18（块里携带什么信息） 已定项 7 / 已定项 18）。format-const: DATA_UNIT_HEADER_BYTES
 pub const DATA_UNIT_HEADER_BYTES: u64 = 105;
 
-/// 码 1 数据单元含预留位的头：载荷从这里起（D18（块里携带什么信息） 已定项 16）。
-pub const DATA_UNIT_PAYLOAD_OFFSET: u64 =
-    DATA_UNIT_HEADER_BYTES + NONCE_MAC_ALGORITHM_RESERVED_BYTES;
+/// 码 1 数据单元含预留位的头：类身份段 105 + 预留位 29，载荷从这里起（D18（块里携带什么信息） 已定项 16）。format-const: DATA_UNIT_PAYLOAD_OFFSET
+pub const DATA_UNIT_PAYLOAD_OFFSET: u64 = 134;
 
 /// 码 3 打包记录单元的类身份段末尾（D18（块里携带什么信息） 已定项 11）。format-const: PACKED_UNIT_HEADER_BYTES
 pub const PACKED_UNIT_HEADER_BYTES: u64 = 107;
 
-/// 码 3 含预留位的头：记录区从这里起（D18（块里携带什么信息） 已定项 16）。
-pub const PACKED_UNIT_RECORDS_OFFSET: u64 =
-    PACKED_UNIT_HEADER_BYTES + NONCE_MAC_ALGORITHM_RESERVED_BYTES;
+/// 码 3 含预留位的头：类身份段 107 + 预留位 29，记录区从这里起（D18（块里携带什么信息） 已定项 16）。format-const: PACKED_UNIT_RECORDS_OFFSET
+pub const PACKED_UNIT_RECORDS_OFFSET: u64 = 136;
 
-/// 码 2 索引节点头里不含 key 区间的部分：共同前缀 42 + 树 ID 8 + 层级 1 + key 宽 1 + 诞生代号 8 + fsid 8 + 写序 4 + 出生序号 4 + 载荷 CRC 4 + 预留 2 + 条目数 2 + 条目宽 2（D8（核心索引结构） 已定项 11；D18（块里携带什么信息） 已定项 18；key 宽的位置 2026-09-14 用户定案）。
+/// 码 2 索引节点头里不含 key 区间的部分：共同前缀 42 + 树 ID 8 + 层级 1 + key 宽 1 + 诞生代号 8 + fsid 8 + 写序 4 + 出生序号 4 + 载荷 CRC 4 + 预留 2 + 条目数 2 + 条目宽 2（D8（核心索引结构） 已定项 11；D18（块里携带什么信息） 已定项 18；key 宽的位置 2026-09-14 用户定案）。format-const: INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE
 pub const INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE: u64 = 86;
 
-/// 码 2 索引节点含 key 区间与预留位的头宽：`86 + 2 × key 宽 + 29`（D8（核心索引结构） 已定项 11；D18（块里携带什么信息） 已定项 16 / 已定项 18）。
-pub const fn index_node_header_bytes(key_width_in_bytes: u64) -> u64 {
-    INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE
-        + 2 * key_width_in_bytes
-        + NONCE_MAC_ALGORITHM_RESERVED_BYTES
-}
+/// 码 2 索引节点头里的 key 区间装几个 key：最小 key 与最大 key 各一个，所以 key 区间占 `2 × key 宽` 字节
+/// （D8（核心索引结构） 已定项 11；D18（块里携带什么信息） 已定项 18 的偏移表「52 key 区间 2k」）。format-const: INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT
+///
+/// 含 key 区间与预留位的头宽 `86 + 2 × key 宽 + 29` 这条式子**不在这里**：这里只放标量，core（`singlefs_core::unit::index_node_header_bytes`）、
+/// checker（`singlefs_checker::index_node_header_bytes`）、理想模型（`singlefs_harness::model::index_node_header_bytes`）各写一份、互不调用
+/// （D13（验证路线） 已定项 5：发射物里不许有算术；2026-09-27 用户定案「三方各算一份 + 交叉断言」），
+/// 三份在 key 宽的全部取值上连起来比的是 `crates/singlefs-harness/tests/index_node_header_width_computed_three_ways_agrees_for_every_key_width.rs`。
+pub const INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT: u64 = 2;
 
 /// inode 树根（码 2）的节点头：`86 + 2 × 8 + 29`，key 宽 8，条目区从这里起（D8（核心索引结构） 已定项 6 / 已定项 11；D18（块里携带什么信息） 已定项 16 / 已定项 18）。format-const: INODE_TREE_ROOT_INDEX_NODE_HEADER_BYTES
 pub const INODE_TREE_ROOT_INDEX_NODE_HEADER_BYTES: u64 = 131;
@@ -191,36 +193,36 @@ pub const JOURNAL_RECORD_BYTES: u64 = 4096;
 /// journal 记录头的十个基础字段（D23（journal 的角色与格式） 已定项 4）。format-const: JOURNAL_HEADER_TEN_FIELD_BYTES
 pub const JOURNAL_HEADER_TEN_FIELD_BYTES: u64 = 78;
 
-/// journal 记录头的新根段：树表指针 86 + 中央映射树根指针 86 + 树 ID 水位 8 + 回退下界 F 8（D23（journal 的角色与格式） 已定项 15）。
-pub const JOURNAL_NEW_ROOT_SEGMENT_BYTES: u64 = NODE_POINTER_BYTES + NODE_POINTER_BYTES + 8 + 8;
+/// journal 记录头的新根段：树表指针 86 + 中央映射树根指针 86 + 树 ID 水位 8 + 回退下界 F 8（D23（journal 的角色与格式） 已定项 15）。format-const: JOURNAL_NEW_ROOT_SEGMENT_BYTES
+pub const JOURNAL_NEW_ROOT_SEGMENT_BYTES: u64 = 188;
 
 /// journal 记录头：78 + 事务号 8 + 提交标记 1 + 本次发布内序号 4 + 反向链 4 + 载荷校验和 4 + 新根段 188 + fsid 8 + MAC 16（D23（journal 的角色与格式） 已定项 4 / 已定项 7 / 已定项 8 / 已定项 13 / 已定项 14 注 1 / 已定项 15；fsid 与 MAC 2026-09-14 用户定案；本次发布内序号 2026-09-23 用户定案，随并行线一落地）。format-const: JOURNAL_HEADER_BYTES
 pub const JOURNAL_HEADER_BYTES: u64 = 311;
 
-/// journal 点名项：位置条目 14 × 2 + 类标签 1 + 出生树 8 + 出生 txg 8 + key 尾段 10 + flags 1（D23（journal 的角色与格式） 已定项 17）。
-pub const JOURNAL_NAMED_ENTRY_BYTES: u64 =
-    LOC_ENTRY * LOCATION_ENTRIES_PER_POINTER + 1 + 8 + 8 + 10 + 1;
+/// journal 点名项：位置条目 14 × 2 + 类标签 1 + 出生树 8 + 出生 txg 8 + key 尾段 10 + flags 1（D23（journal 的角色与格式） 已定项 17）。format-const: JOURNAL_NAMED_ENTRY_BYTES
+pub const JOURNAL_NAMED_ENTRY_BYTES: u64 = 56;
 
-/// 一条 4 KiB 记录装几个点名项。
-pub const JOURNAL_NAMED_ENTRIES_PER_RECORD: u64 =
-    (JOURNAL_RECORD_BYTES - JOURNAL_HEADER_BYTES) / JOURNAL_NAMED_ENTRY_BYTES;
+/// 一条 4 KiB 记录装几个点名项：(4096 − 311) ÷ 56 的整数部分（D23（journal 的角色与格式） 已定项 4 / 已定项 17）。format-const: JOURNAL_NAMED_ENTRIES_PER_RECORD
+pub const JOURNAL_NAMED_ENTRIES_PER_RECORD: u64 = 67;
 
 /// journal 环从槽 1024（16 MiB）起（D23（journal 的角色与格式） 已定项 2）。
 pub const JOURNAL_RING_START_SLOT: u64 = 1024;
 
+/// journal 环长的 mkfs 默认值 768 MiB = 805306368 字节（D23（journal 的角色与格式） 已定项 19 ③）。format-const: JOURNAL_RING_DEFAULT_BYTES
 // placeholder: D23（journal 的角色与格式） 已定项 19 —— 环长是 mkfs 参数，默认 768 MiB，约束 环 ≤ 设备容量 / 4；第一版代码先按默认值
-pub const JOURNAL_RING_DEFAULT_BYTES: u64 = 768 * 1024 * 1024;
+pub const JOURNAL_RING_DEFAULT_BYTES: u64 = 805_306_368;
 
 /// 环几何的安全系数 F（I-8.1）。
+///
+/// 在飞记录数上限 `环槽数 ÷ F`（D23（journal 的角色与格式） 已定项 18）这条式子**不在这里**：这里只放标量。
+/// core 的 `singlefs_core::system_configuration::journal_in_flight_record_limit` 与实验装置 E158（择根与修复四岔路）
+/// （`crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`）各写一份、互不调用；checker 不算在飞上限（它不判重放前缀取几条），
+/// 不另造一份。两份在环长上的交叉断言在那个装置的 `journal_in_flight_record_limit_cross_check_tests` 模块里。
 pub const JOURNAL_SAFETY_FACTOR: u64 = 3;
 
-/// 在飞记录数上限 = 环槽数 ÷ F，语义是重放前缀最多这么多条（D23（journal 的角色与格式） 已定项 18，2026-09-14 用户定案）。
-pub const fn journal_in_flight_record_limit(ring_bytes: u64) -> u64 {
-    ring_bytes / JOURNAL_RECORD_BYTES / JOURNAL_SAFETY_FACTOR
-}
-
-/// 系统配置字段表合计（D22（单元原子性怎么合成） 已定项 9 / 已定项 15；2026-09-14 用户定案加四个字段）。format-const: SYSTEM_CONFIGURATION_BYTES
-pub const SYSTEM_CONFIGURATION_BYTES: u64 = 481;
+/// 系统配置字段表合计（D22（单元原子性怎么合成） 已定项 9 / 已定项 15；2026-09-14 用户定案加四个字段；
+/// 2026-09-26 用户定案在系统运行量末尾加回退下界 F 8 字节，偏移 481 起，481 → 489）。format-const: SYSTEM_CONFIGURATION_BYTES
+pub const SYSTEM_CONFIGURATION_BYTES: u64 = 489;
 
 /// 系统配置每盘恒 2 个槽、槽 = 世代号 mod 2（D22（单元原子性怎么合成） 已定项 16）。
 pub const SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE: u64 = 2;
@@ -254,28 +256,9 @@ pub const ROOT_RING_SLOTS_PER_REGION_MAXIMUM: u64 = 16;
 pub const ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM: u64 = 8;
 
 pub const ROOT_RING_PRIME_STEP: u64 = 3;
-pub const ROOT_RING_CHUNK_BYTES: u64 = 1024 * 1024;
+/// 根环 chunk 1 MiB = 1048576 字节（D22（单元原子性怎么合成） 已定项 2）。format-const: ROOT_RING_CHUNK_BYTES
+pub const ROOT_RING_CHUNK_BYTES: u64 = 1_048_576;
 
-/// 回退见证表（D23（journal 的角色与格式） 已定项 14「回退见证」，用户 2026-09-24 定）住系统配置槽里、紧接着字段表之后：
-/// 从槽内偏移 481（`SYSTEM_CONFIGURATION_BYTES`）起，罩在系统配置的整槽校验和里、越过 512 字节。落点随实现取在这里，
-/// 写回 D22（单元原子性怎么合成） 已定项 9 的字段表归书记员。
-pub const ROLLBACK_WITNESS_TABLE_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT: u64 =
-    SYSTEM_CONFIGURATION_BYTES;
-
-/// 见证表头：条数 1 字节（上限 47 装得下）。
-pub const ROLLBACK_WITNESS_COUNT_BYTES: u64 = 1;
-
-/// 一个见证条目：新实例代号 4 + 回退目标 R_old 的实例代号 4 + R_old 的 txg 8（已定项 14「回退见证」）。
-pub const ROLLBACK_WITNESS_ENTRY_BYTES: u64 = 16;
-
-/// 见证表按 S 的上界定宽：条数上限 = 根环槽数减 1（R × S − 1，只由根环几何定），S 取格式承诺区间的上界 16 时是 47 条。
-/// 一个池自己的上限按它系统配置里的 S 算（`R × S − 1`），多出来的条目位写 0。
-pub const ROLLBACK_WITNESS_ENTRIES_MAXIMUM: u64 =
-    ROOT_RING_REGIONS * ROOT_RING_SLOTS_PER_REGION_MAXIMUM - 1;
-
-/// 见证表的定宽：1 + 47 × 16 = 753 字节，占槽内 [481, 1234)。
-pub const ROLLBACK_WITNESS_TABLE_BYTES: u64 =
-    ROLLBACK_WITNESS_COUNT_BYTES + ROLLBACK_WITNESS_ENTRIES_MAXIMUM * ROLLBACK_WITNESS_ENTRY_BYTES;
 /// 根环起点是 16 KiB 槽号（1 MiB）。
 pub const ROOT_RING_BASE_SLOT: u64 = 64;
 /// 根环区域归属第一版写死 0 / 1 / 0（D2（RAID 条带策略） 已定项 7，2026-09-14 用户定案）。
@@ -297,8 +280,9 @@ pub const FIRST_TRANSACTION_TXG: u64 = 3;
 /// 第一次可写挂载先推两次空发布（D16（发布语义） 已定项 8）。format-const: WARM_UP_EMPTY_PUBLISHES
 pub const WARM_UP_EMPTY_PUBLISHES: u64 = 2;
 
+/// 测试镜像默认 4 GiB = 4294967296 字节（`.claude/kb/layout/01-first-txn.md` 的预想镜像；没有条款，欠账在 C323（镜像大小全仓没有条款））。format-const: TEST_IMAGE_DEFAULT_BYTES
 // placeholder: C323（镜像大小全仓没有条款） —— 测试镜像 4 GiB 是里程碑步 0 的预想（由 环 ≤ 容量 / 4 逼出），用户说虚拟盘可扩到 200–500 GB
-pub const TEST_IMAGE_DEFAULT_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+pub const TEST_IMAGE_DEFAULT_BYTES: u64 = 4_294_967_296;
 
 #[cfg(test)]
 mod tests {
@@ -421,9 +405,9 @@ mod tests {
         assert_eq!(JOURNAL_NAMED_ENTRY_BYTES, 56, "journal 点名项");
         assert_eq!(JOURNAL_NAMED_ENTRIES_PER_RECORD, 67, "一条记录装几个点名项");
         assert_eq!(
-            journal_in_flight_record_limit(JOURNAL_RING_DEFAULT_BYTES),
+            JOURNAL_RING_DEFAULT_BYTES / JOURNAL_RECORD_BYTES / JOURNAL_SAFETY_FACTOR,
             65536,
-            "在飞记录数上限 = 196608 ÷ 3"
+            "默认环下的在飞记录数上限 = 196608 ÷ 3（D23 已定项 18；式子本身 core 与 E158 各写一份）"
         );
         assert_eq!(
             UNIT_AREA_START_SLOT,
@@ -478,7 +462,57 @@ mod tests {
         );
     }
 
-    /// 每棵树的码 2 节点头宽写成整数字面量（门禁 27 号要核），与 `index_node_header_bytes` 在那棵树的 key 宽上算出来的一个数不差；
+    /// 这八个量的值原来写成算式；D13（验证路线） 已定项 5「判据是发射物里有没有分支与算术」不许，改成整数字面量
+    /// （门禁 27 号也只认字面量）。原来的算式原样留在这里，与字面量一个数不差。
+    #[test]
+    fn arithmetic_initializer_literals_equal_the_expressions_they_replaced() {
+        assert_eq!(
+            DATA_UNIT_PAYLOAD_OFFSET,
+            DATA_UNIT_HEADER_BYTES + NONCE_MAC_ALGORITHM_RESERVED_BYTES,
+            "码 1 载荷起点 = 类身份段末尾 + 预留位"
+        );
+        assert_eq!(
+            PACKED_UNIT_RECORDS_OFFSET,
+            PACKED_UNIT_HEADER_BYTES + NONCE_MAC_ALGORITHM_RESERVED_BYTES,
+            "码 3 记录区起点 = 类身份段末尾 + 预留位"
+        );
+        assert_eq!(
+            JOURNAL_NEW_ROOT_SEGMENT_BYTES,
+            NODE_POINTER_BYTES + NODE_POINTER_BYTES + 8 + 8,
+            "新根段 = 树表指针 + 中央映射树根指针 + 树 ID 水位 8 + 回退下界 F 8"
+        );
+        assert_eq!(
+            JOURNAL_NAMED_ENTRY_BYTES,
+            LOC_ENTRY * LOCATION_ENTRIES_PER_POINTER + 1 + 8 + 8 + 10 + 1,
+            "点名项 = 位置条目 × 2 + 类标签 1 + 出生树 8 + 出生 txg 8 + key 尾段 10 + flags 1"
+        );
+        assert_eq!(
+            JOURNAL_NAMED_ENTRIES_PER_RECORD,
+            (JOURNAL_RECORD_BYTES - JOURNAL_HEADER_BYTES) / JOURNAL_NAMED_ENTRY_BYTES,
+            "一条记录装的点名项 = (记录 − 记录头) ÷ 点名项 的整数部分"
+        );
+        assert_eq!(
+            JOURNAL_RING_DEFAULT_BYTES,
+            768 * 1024 * 1024,
+            "journal 环默认 768 MiB"
+        );
+        assert_eq!(ROOT_RING_CHUNK_BYTES, 1024 * 1024, "根环 chunk 1 MiB");
+        assert_eq!(
+            TEST_IMAGE_DEFAULT_BYTES,
+            4 * 1024 * 1024 * 1024,
+            "测试镜像默认 4 GiB"
+        );
+    }
+
+    /// 码 2 头宽按字段表的三段加起来：只在这份单测里用，核下面那几个字面量；core、checker、模型各自的那一份不调它
+    /// （三份的交叉断言在 `crates/singlefs-harness/tests/index_node_header_width_computed_three_ways_agrees_for_every_key_width.rs`）。
+    fn index_node_header_bytes(key_width_in_bytes: u64) -> u64 {
+        INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE
+            + INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT * key_width_in_bytes
+            + NONCE_MAC_ALGORITHM_RESERVED_BYTES
+    }
+
+    /// 每棵树的码 2 节点头宽写成整数字面量（门禁 27 号要核），与字段表三段在那棵树的 key 宽上加起来的一个数不差；
     /// 哪棵树取哪个 key 宽照 `.claude/kb/layout/01-first-txn.md` 那几行：inode 树根与树表单元都是 8，两者各有各的名字。
     #[test]
     fn tree_index_node_header_literals_equal_the_header_formula_at_each_tree_key_width() {
@@ -514,39 +548,16 @@ mod tests {
         );
     }
 
-    /// 回退见证表紧接着字段表、越过 512、装在 4096 的槽里（D23 已定项 14「回退见证」：放在字段表之后、越过 512，靠整槽校验和认撕裂）。
-    #[test]
-    fn the_rollback_witness_table_follows_the_field_table_crosses_512_and_fits_in_the_slot() {
-        let table_end = std::hint::black_box(
-            ROLLBACK_WITNESS_TABLE_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT
-                + ROLLBACK_WITNESS_TABLE_BYTES,
-        );
-        assert_eq!(
-            ROLLBACK_WITNESS_TABLE_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT,
-            481
-        );
-        assert_eq!(
-            ROLLBACK_WITNESS_ENTRIES_MAXIMUM, 47,
-            "R × S 上界 − 1 = 3 × 16 − 1"
-        );
-        assert_eq!(ROLLBACK_WITNESS_TABLE_BYTES, 753);
-        assert_eq!(table_end, 1234);
-        assert!(table_end > 512, "越过 512");
-        assert!(
-            table_end <= SYSTEM_CONFIGURATION_SLOT_BYTES,
-            "装在 4096 的槽里"
-        );
-    }
-
-    /// 系统配置的 481 与它所在的槽：槽宽预想 4096 时余 3615，装得下下一条 86 字节指针；按此前的 512 槽算只余 31、塞不进（D22 已定项 2 重开的理由之一）。
+    /// 系统配置的 489 与它所在的槽：槽宽 4096 时余 3607（D22 已定项 9「槽内余 3607」），装得下下一条 86 字节指针；
+    /// 按此前的 512 槽算只余 23、塞不进（D22 已定项 2 重开的理由之一）。
     #[test]
     fn system_configuration_fits_in_the_slot_with_room_for_one_more_pointer() {
         let slot_bytes = std::hint::black_box(SYSTEM_CONFIGURATION_SLOT_BYTES);
         assert!(SYSTEM_CONFIGURATION_BYTES <= slot_bytes);
         assert_eq!(
             slot_bytes,
-            SYSTEM_CONFIGURATION_BYTES + 3615,
-            "4096 槽余 3615"
+            SYSTEM_CONFIGURATION_BYTES + 3607,
+            "4096 槽余 3607"
         );
         assert!(
             SYSTEM_CONFIGURATION_BYTES + NODE_POINTER_BYTES <= slot_bytes,

@@ -4,9 +4,10 @@
 //! 盘是内存里的（`SparseBlockDevice`），不建文件镜像：内容与文件镜像同一份字节，「进程退出、重开」就是按此刻的盘面重新包一层录制器。
 #![allow(dead_code, reason = "两份用例各自只用到其中一部分")]
 
-use singlefs_core::address::{CheckpointTxg, DeviceIdentity};
+use singlefs_core::address::{CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes};
 use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
 use singlefs_core::code_two_tree::{
     CodeTwoTreeNodeCapacity, CodeTwoTreeNodeContents, CodeTwoTreeVersion,
 };
@@ -19,6 +20,7 @@ use singlefs_core::transaction::{
     CodeTwoTreeNodeCapacities, FirstFile, InstanceTablePlan, MultiLevelCodeTwoTree, PoolWriter,
     PublishPlan, TransactionOutput,
 };
+use singlefs_format::SLOT_BYTES;
 use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::{RecordingBlockDevice, RetainedOperation, SharedStream};
 
@@ -75,6 +77,140 @@ pub fn leaf_count(tree: &CodeTwoTreeVersion) -> usize {
         .iter()
         .filter(|node| node.position.level == 0)
         .count()
+}
+
+/// 一个单元（槽号 `slot`）在一块盘上的字节。
+#[must_use]
+pub fn read_unit_on_device(image: &MemoryPool, device: u32, slot: u64, length: usize) -> Vec<u8> {
+    image
+        .devices
+        .get(&DeviceIdentity(device))
+        .expect("盘")
+        .read(DeviceOffsetInBytes(slot * SLOT_BYTES), length)
+}
+
+/// 两块盘同一个槽写同一份字节（这几份镜像上一个单元两份落点同槽）。
+pub fn write_unit_to_the_same_slot_on_both_devices(
+    image: &mut MemoryPool,
+    slot: u64,
+    bytes: &[u8],
+) {
+    for device in [0u32, 1] {
+        image
+            .devices
+            .get_mut(&DeviceIdentity(device))
+            .expect("盘")
+            .write(DeviceOffsetInBytes(slot * SLOT_BYTES), bytes);
+    }
+}
+
+fn replace_every(haystack: &mut [u8], needle: &[u8], replacement: &[u8]) -> bool {
+    let mut changed = false;
+    let mut index = 0;
+    while index + needle.len() <= haystack.len() {
+        if haystack[index..index + needle.len()] == *needle {
+            haystack[index..index + needle.len()].copy_from_slice(replacement);
+            changed = true;
+            index += needle.len();
+        } else {
+            index += 1;
+        }
+    }
+    changed
+}
+
+/// 按类重封：先算载荷 CRC，再算头校验和（码 1：头 105、CRC 在 101；码 3：头 107、CRC 在 89；码 2：头 86 + 2k、CRC 在 76 + 2k）。
+pub fn reseal_unit_by_its_class(bytes: &mut [u8]) {
+    let (header_end, payload_crc_offset) = match bytes[6] {
+        1 => (105usize, 101usize),
+        3 => (107, 89),
+        _index_node_class => (
+            86 + 2 * usize::from(bytes[51]),
+            76 + 2 * usize::from(bytes[51]),
+        ),
+    };
+    let payload_crc = crc32_castagnoli(&bytes[header_end..]);
+    bytes[payload_crc_offset..payload_crc_offset + 4].copy_from_slice(&payload_crc.to_le_bytes());
+    singlefs_core::unit::seal_header_checksum(bytes, header_end);
+}
+
+/// 根环全部槽：(盘, 偏移)。区域 r 在盘 [0, 1, 0][r] 上，起点 64 × 16384 + r × 3 MiB，槽距 4096（`common::parameters` 的几何）。
+#[must_use]
+pub fn root_ring_slot_offsets() -> Vec<(u32, u64)> {
+    (0..3u64)
+        .flat_map(|region| {
+            (0..8u64).map(move |slot| {
+                (
+                    [0u32, 1, 0][usize::try_from(region).expect("区域")],
+                    64 * SLOT_BYTES + region * 3 * (1 << 20) + slot * 4096,
+                )
+            })
+        })
+        .collect()
+}
+
+/// checker 的已知坏镜像要的：把一个单元的新整单元校验和沿引用链补到根槽（父节点里的位置条目、中央映射条目、根槽的自证校验和）。
+/// 位置条目按 (设备 4, 槽 6, 校验和 4) 逐字节找、逐个换，被换的单元按类重封再往上补。`units` 是这份镜像里被引用的单元（槽, 字节数）。
+pub fn propagate_the_new_checksum(
+    image: &mut MemoryPool,
+    units: &[(u64, usize)],
+    changed: (u64, u32, u32),
+) {
+    let mut pending = vec![changed];
+    while let Some((slot, old, new)) = pending.pop() {
+        let pattern = |device: u32, checksum: u32| -> Vec<u8> {
+            [
+                device.to_le_bytes().to_vec(),
+                slot.to_le_bytes()[..6].to_vec(),
+                checksum.to_le_bytes().to_vec(),
+            ]
+            .concat()
+        };
+        for (container, length) in units.iter().copied() {
+            if container == slot {
+                continue;
+            }
+            let before = read_unit_on_device(image, 0, container, length);
+            let mut bytes = before.clone();
+            let mut touched = false;
+            for device in [0u32, 1] {
+                touched |= replace_every(&mut bytes, &pattern(device, old), &pattern(device, new));
+            }
+            if touched {
+                reseal_unit_by_its_class(&mut bytes);
+                write_unit_to_the_same_slot_on_both_devices(image, container, &bytes);
+                pending.push((
+                    container,
+                    crc32_castagnoli(&before),
+                    crc32_castagnoli(&bytes),
+                ));
+            }
+        }
+        for (device, offset) in root_ring_slot_offsets() {
+            let mut bytes = image
+                .devices
+                .get(&DeviceIdentity(device))
+                .expect("盘")
+                .read(DeviceOffsetInBytes(offset), 512);
+            let mut touched = false;
+            for location_device in [0u32, 1] {
+                touched |= replace_every(
+                    &mut bytes,
+                    &pattern(location_device, old),
+                    &pattern(location_device, new),
+                );
+            }
+            if touched {
+                let digest = wide_checksum_with_field_zeroed(&bytes, 512, 138);
+                bytes[138..170].copy_from_slice(&digest);
+                image
+                    .devices
+                    .get_mut(&DeviceIdentity(device))
+                    .expect("盘")
+                    .write(DeviceOffsetInBytes(offset), &bytes);
+            }
+        }
+    }
 }
 
 fn memory_devices(stream: &SharedStream) -> Vec<(DeviceIdentity, RecordedMemoryDevice)> {

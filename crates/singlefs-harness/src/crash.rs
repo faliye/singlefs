@@ -1,5 +1,6 @@
-//! 层 0 崩溃点重放（里程碑步 7，D13（验证路线） 已定项 4）：拿录制流在内存里重建镜像，屏障与 FUA 切段、段内任意整写子集、
-//! 撕裂态并进「没持久」、没持久的位置放旧字节、两盘各算；每个状态跑一遍步 6 的恢复，拿 oracle（E77（发布的持久顺序） 判据 1）判。
+//! 层 0 崩溃点重放（里程碑步 7，D13（验证路线） 已定项 4）：拿录制流在内存里重建镜像，屏障与 FUA 按设备切段（[`SegmentClosingRule`]）、
+//! 段内每次写各取它的几态、任意组合：原地覆写的写多一态「新旧都读不出」（[`TearableInPlaceOverwrites`]，镜像真生成出来），
+//! 其余写的撕裂态并进「没持久」；没持久的位置放旧字节、两盘各算；每个状态跑一遍步 6 的恢复，拿 oracle（E77（发布的持久顺序） 判据 1）判。
 //! 恢复只通过 [`PoolReader`] 读盘，所以崩溃镜像不落文件：基线是稀疏的扇区图，其上叠一层「这一状态里持久了的写」。
 
 use std::collections::BTreeMap;
@@ -12,10 +13,11 @@ use std::sync::mpsc;
 use std::time::Instant;
 
 use singlefs_checker::image::{ImageReader, InvariantVerdict};
-use singlefs_checker::walk::check_pool_image;
+use singlefs_checker::walk::{check_pool_image, InstanceTableOfRootRecord};
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
 };
+use singlefs_core::block_device::{BlockDeviceError, PhysicalBlockSizeInBytes};
 use singlefs_core::recovery::{
     recover, JournalPolicy, PoolReader, RecoveryOutcome, RecoveryReport,
 };
@@ -24,8 +26,16 @@ use singlefs_format::{
     SLOT_BYTES, UNIT_AREA_START_SLOT,
 };
 
-use crate::segments::{FixedGeometry, StepKind};
-use crate::{RecordedOperationKind, RetainedOperation};
+use crate::layer0_progress::{
+    read_shard_ledgers_for_merge, shard_ledger_path, write_shard_ledger,
+    DeleteTheProgressFileWhenPanicking, Layer0ProgressFile, Layer0ProgressFileAfterCompletion,
+    Layer0ProgressPlan, Layer0Resume, Layer0ShardMerge, Layer0ShardOfShards,
+    Layer0ShardWorkerThreads,
+};
+use crate::segments::{FixedGeometry, SegmentAfterOperation, SegmentClosingRule, StepKind};
+use crate::{RecordedEntrySpan, RecordedOperationKind, RecordedPublishEntry, RetainedOperation};
+use singlefs_core::root_record::{UnmountMarker, ROOT_RECORD_FLAG_UNMOUNT_MARKER};
+use singlefs_core::system_configuration::SystemConfiguration;
 
 /// 稀疏设备的扇区宽：第一版测试镜像的 physical_block_size。
 pub const SECTOR_BYTES: u64 = 512;
@@ -107,24 +117,72 @@ impl SparseDevice {
     }
 }
 
+/// 一次块设备请求合不合设备的契约：偏移与长度按物理块对齐、`offset + length` 不越过设备末尾（加法溢出也算越过）；
+/// 不合时交回的错误成员与字段和文件后端的一样（`OutOfRange` / `Unaligned`）。
+///
+/// 判据照 core `block_device.rs` 的 `check_aligned_and_in_range` 写（那一份是私有的，harness 拿不到）；两边对同一组请求判得一样，
+/// 由用例 `tests/sparse_devices_refuse_requests_outside_the_device_like_the_file_backend.rs` 拿文件后端逐个请求对拍钉住。
+fn check_request_against_the_device_contract(
+    offset: DeviceOffsetInBytes,
+    length_in_bytes: u64,
+    physical_block_size: PhysicalBlockSizeInBytes,
+    device_size_in_bytes: u64,
+) -> Result<(), BlockDeviceError> {
+    let physical_block_bytes = u64::from(physical_block_size.0);
+    if !offset.0.is_multiple_of(physical_block_bytes)
+        || !length_in_bytes.is_multiple_of(physical_block_bytes)
+    {
+        return Err(BlockDeviceError::Unaligned {
+            offset,
+            length: length_in_bytes,
+            physical_block_size: physical_block_size.0,
+        });
+    }
+    match offset.0.checked_add(length_in_bytes) {
+        Some(end) if end <= device_size_in_bytes => Ok(()),
+        Some(_) | None => Err(BlockDeviceError::OutOfRange {
+            offset,
+            length: length_in_bytes,
+            device_size: device_size_in_bytes,
+        }),
+    }
+}
+
+/// 内存镜像的物理块宽：稀疏设备按扇区存，扇区就是它的物理块。
+fn sector_as_the_physical_block_size() -> PhysicalBlockSizeInBytes {
+    PhysicalBlockSizeInBytes(u32::try_from(SECTOR_BYTES).expect("扇区宽 512 装得进 u32"))
+}
+
 /// 稀疏设备当一块盘用：宿主上重跑整条路（与虚机里同参数同字节）时的被测设备。没写过的读出全 0；屏障什么都不做（内存里没有缓存）。
+/// 读、写、清零都先按与文件后端同一条判据核请求（[`check_request_against_the_device_contract`]）：越界、没对齐就交回与真盘同一种错误、
+/// 盘上一个字节不动，不静默照收。
 pub struct SparseBlockDevice {
     pub image: SparseDevice,
     size_in_bytes: u64,
-    physical_block_size: singlefs_core::block_device::PhysicalBlockSizeInBytes,
+    physical_block_size: PhysicalBlockSizeInBytes,
 }
 
 impl SparseBlockDevice {
     #[must_use]
-    pub fn new(
-        size_in_bytes: u64,
-        physical_block_size: singlefs_core::block_device::PhysicalBlockSizeInBytes,
-    ) -> Self {
+    pub fn new(size_in_bytes: u64, physical_block_size: PhysicalBlockSizeInBytes) -> Self {
         Self {
             image: SparseDevice::default(),
             size_in_bytes,
             physical_block_size,
         }
+    }
+
+    fn check_request(
+        &self,
+        offset: DeviceOffsetInBytes,
+        length_in_bytes: u64,
+    ) -> Result<(), BlockDeviceError> {
+        check_request_against_the_device_contract(
+            offset,
+            length_in_bytes,
+            self.physical_block_size,
+            self.size_in_bytes,
+        )
     }
 }
 
@@ -133,7 +191,8 @@ impl singlefs_core::block_device::BlockDevice for SparseBlockDevice {
         &self,
         offset: DeviceOffsetInBytes,
         buffer: &mut [u8],
-    ) -> Result<(), singlefs_core::block_device::BlockDeviceError> {
+    ) -> Result<(), BlockDeviceError> {
+        self.check_request(offset, u64::try_from(buffer.len()).expect("读长装得进 u64"))?;
         self.image.read_into(offset, buffer);
         Ok(())
     }
@@ -142,7 +201,8 @@ impl singlefs_core::block_device::BlockDevice for SparseBlockDevice {
         offset: DeviceOffsetInBytes,
         bytes: &[u8],
         _durability: singlefs_core::block_device::WriteDurability,
-    ) -> Result<(), singlefs_core::block_device::BlockDeviceError> {
+    ) -> Result<(), BlockDeviceError> {
+        self.check_request(offset, u64::try_from(bytes.len()).expect("写长装得进 u64"))?;
         self.image.write(offset, bytes);
         Ok(())
     }
@@ -150,7 +210,8 @@ impl singlefs_core::block_device::BlockDevice for SparseBlockDevice {
         &mut self,
         offset: DeviceOffsetInBytes,
         length: u64,
-    ) -> Result<(), singlefs_core::block_device::BlockDeviceError> {
+    ) -> Result<(), BlockDeviceError> {
+        self.check_request(offset, length)?;
         self.image.zero_fill(offset, length);
         Ok(())
     }
@@ -219,6 +280,14 @@ impl WrittenContents {
     pub fn still_on_disk(&self, read_back: &[u8]) -> bool {
         match self {
             WrittenContents::Bytes(bytes) => read_back == bytes.as_slice(),
+            WrittenContents::Zeros { .. } => read_back.iter().all(|byte| *byte == 0),
+        }
+    }
+    /// 盘上 `read_back` 那一段是不是还是这次写在 `[start, start + read_back.len())` 上写下的内容（`start` 是这次写内部的偏移）。
+    #[must_use]
+    pub fn range_still_on_disk(&self, start: usize, read_back: &[u8]) -> bool {
+        match self {
+            WrittenContents::Bytes(bytes) => read_back == &bytes[start..start + read_back.len()],
             WrittenContents::Zeros { .. } => read_back.iter().all(|byte| *byte == 0),
         }
     }
@@ -331,15 +400,23 @@ impl PoolReader for MemoryPool {
             .contains_key(&device)
             .then_some(self.device_size_in_bytes)
     }
+    /// 读不到（池里没有这块盘、越界、没按扇区对齐）返回 None，与一池真盘那一份（`[(DeviceIdentity, 块设备)]` 的 `PoolReader`：
+    /// 块设备按同一条判据报错、它交回 None）同一个契约；判据是 [`check_request_against_the_device_contract`]。
     fn read(
         &self,
         device: DeviceIdentity,
         offset: DeviceOffsetInBytes,
         length: usize,
     ) -> Option<Vec<u8>> {
-        self.devices
-            .get(&device)
-            .map(|device_image| device_image.read(offset, length))
+        let device_image = self.devices.get(&device)?;
+        check_request_against_the_device_contract(
+            offset,
+            u64::try_from(length).expect("读长装得进 u64"),
+            sector_as_the_physical_block_size(),
+            self.device_size_in_bytes,
+        )
+        .ok()?;
+        Some(device_image.read(offset, length))
     }
     fn journal_record_offsets_hint(
         &self,
@@ -357,7 +434,9 @@ impl PoolReader for MemoryPool {
     }
 }
 
-/// 层 0 枚举出的一个崩溃状态：基线 + 这一状态里持久了的写。
+/// 层 0 枚举出的一个崩溃状态：基线 + 这一状态里持久了的写（按 `writes` 的次序叠）。
+/// 枚举器交给观察者的那一份，`writes` 是枚举用的写表：录制流里的写原样在前（下标不变），原地覆写的撕裂镜像与它之后的重放接在后面
+/// （[`TearableInPlaceOverwrites`]），`persisted` 与它逐条对应——撕裂那一态是「原来那次写没持久、它的撕裂镜像持久」。
 pub struct CrashImage<'base> {
     pub base: &'base MemoryPool,
     pub writes: &'base [RetainedWrite],
@@ -401,6 +480,10 @@ impl PoolReader for CrashImage<'_> {
         }
         Some(out)
     }
+    /// 基镜像那一份，加上这一状态里持久了的每次写在环里罩住的扇区中按记录槽对齐的那几个——与基镜像同一套「写过的扇区 →
+    /// 对齐的记录槽」算法（[`record_slot_offsets`]）：一次写罩几个记录槽就给几个，不对齐的偏移一个不给。提示之外的记录槽，开头那一扇区
+    /// 要么没写过、要么最后罩住它的是整段清零，读出来是全 0、过不了 journal magic，所以按提示扫与不给提示的全环扫描读出的记录逐条相同
+    /// （用例 `tests/crash_image_journal_hint_matches_the_full_ring_scan.rs` 在同一批镜像上逐项比）。
     fn journal_record_offsets_hint(
         &self,
         device: DeviceIdentity,
@@ -410,11 +493,26 @@ impl PoolReader for CrashImage<'_> {
         let mut offsets = self
             .base
             .journal_record_offsets_hint(device, ring_start, ring_bytes)?;
+        let ring_end = ring_start.0 + ring_bytes;
         for (write, is_persisted) in self.writes.iter().zip(&self.persisted) {
-            if !is_persisted || write.device != device || write.kind != StepKind::JournalRecord {
+            if !is_persisted || write.device != device {
                 continue;
             }
-            offsets.push(write.offset);
+            match write.contents {
+                // 整段清零之后那一段全是 0，记录槽开头过不了 journal magic：不进提示。
+                WrittenContents::Zeros { .. } => continue,
+                WrittenContents::Bytes(_) => {}
+            }
+            let written_start_in_the_ring = write.offset.0.max(ring_start.0);
+            let written_end_in_the_ring = (write.offset.0 + write.length_in_bytes()).min(ring_end);
+            if written_start_in_the_ring >= written_end_in_the_ring {
+                continue;
+            }
+            offsets.extend(record_slot_offsets(
+                written_start_in_the_ring / SECTOR_BYTES
+                    ..written_end_in_the_ring.div_ceil(SECTOR_BYTES),
+                ring_start,
+            ));
         }
         offsets.sort_unstable();
         offsets.dedup();
@@ -422,7 +520,8 @@ impl PoolReader for CrashImage<'_> {
     }
 }
 
-/// 把一段录制流拆成「写表」与「段（写表下标）」，切法与 [`crate::segments::split_into_segments`] 同一条规则。
+/// 把一段录制流拆成「写表」与「段（写表下标）」，切法与 [`crate::segments::split_into_segments`] 同一条规则
+/// （[`SegmentClosingRule`]：当前段里每块有写的盘都被自己的屏障或 FUA 放行了才关段）。
 #[must_use]
 pub fn writes_and_segments(
     operations: &[RetainedOperation],
@@ -435,22 +534,44 @@ pub fn writes_and_segments(
 
 /// 同上，再交回写表每一项在录制流里的下标：崩溃注入（增补 3 第 3 件）按它把一个崩溃状态落回历史的哪一步。
 /// 切段只有这一份实现，两个调用方不各切一遍。
+///
+/// 这条流没记入口（[`writes_and_segments_with_stream_indexes_and_entries`] 交空的入口段）：流里一条带卸载记号的根槽写都不许有。
+///
+/// # Panics
+/// 流里有带卸载记号的根槽写（C557（卸载记号只由卸载入口打没有检查））；写不带内容（流没开内容保留）。
 #[must_use]
 pub fn writes_and_segments_with_stream_indexes(
     operations: &[RetainedOperation],
     geometry: &FixedGeometry,
 ) -> (Vec<RetainedWrite>, Vec<Vec<usize>>, Vec<usize>) {
+    writes_and_segments_with_stream_indexes_and_entries(operations, &[], geometry)
+}
+
+/// 同上，这条流记了入口（`entry_spans`，下标与 `operations` 同一套、从 0 数）：切段之前先核 C557（卸载记号只由卸载入口打没有检查）——
+/// 带卸载记号的根槽写只许落在卸载入口发的那几段里（[`unmount_markers_outside_the_unmount_entry`]）。
+///
+/// # Panics
+/// 有带卸载记号的根槽写落在卸载入口之外；写不带内容（流没开内容保留）。
+#[must_use]
+pub fn writes_and_segments_with_stream_indexes_and_entries(
+    operations: &[RetainedOperation],
+    entry_spans: &[RecordedEntrySpan],
+    geometry: &FixedGeometry,
+) -> (Vec<RetainedWrite>, Vec<Vec<usize>>, Vec<usize>) {
+    let stray_markers =
+        unmount_markers_outside_the_unmount_entry(operations, entry_spans, geometry);
+    assert!(
+        stray_markers.is_empty(),
+        "C557（卸载记号只由卸载入口打没有检查）：录制流里有带卸载记号的根槽写不在卸载入口发的那一段里：{stray_markers:?}"
+    );
     let mut writes: Vec<RetainedWrite> = Vec::new();
     let mut stream_indexes: Vec<usize> = Vec::new();
     let mut segments: Vec<Vec<usize>> = Vec::new();
     let mut current: Vec<usize> = Vec::new();
+    let mut closing_rule = SegmentClosingRule::default();
     for (stream_index, retained) in operations.iter().enumerate() {
         match retained.operation.kind {
-            RecordedOperationKind::Barrier => {
-                if !current.is_empty() {
-                    segments.push(std::mem::take(&mut current));
-                }
-            }
+            RecordedOperationKind::Barrier => {}
             RecordedOperationKind::WriteZeroes => {
                 writes.push(RetainedWrite {
                     device: retained.operation.device,
@@ -480,10 +601,11 @@ pub fn writes_and_segments_with_stream_indexes(
                 });
                 stream_indexes.push(stream_index);
                 current.push(writes.len() - 1);
-                if retained.operation.kind == RecordedOperationKind::WriteForceUnitAccess {
-                    segments.push(std::mem::take(&mut current));
-                }
             }
+        }
+        match closing_rule.after(&retained.operation) {
+            SegmentAfterOperation::Closes => segments.push(std::mem::take(&mut current)),
+            SegmentAfterOperation::StaysOpen => {}
         }
     }
     if !current.is_empty() {
@@ -492,7 +614,8 @@ pub fn writes_and_segments_with_stream_indexes(
     (writes, segments, stream_indexes)
 }
 
-/// E77（发布的持久顺序） 的闭式：1 + Σ(2^|段| − 1)。
+/// E77（发布的持久顺序） 的闭式：1 + Σ(2^|段| − 1)，每次写只取两态（没持久 / 持久）时的全量。
+/// 写表里有原地覆写的写时层 0 全量枚举出来的比它多（第三态），数见 [`layer0_state_count_with_torn_in_place_overwrites`]。
 #[must_use]
 pub fn closed_form_state_count(segments: &[Vec<usize>]) -> u64 {
     1 + segments
@@ -506,8 +629,9 @@ impl ImageReader for MemoryPool {
     fn devices(&self) -> Vec<u32> {
         self.devices.keys().map(|identity| identity.0).collect()
     }
-    fn device_bytes(&self, _device: u32) -> Option<u64> {
-        Some(self.device_size_in_bytes)
+    /// 池里没有这块盘就 `None`（与 [`PoolReader::device_size_in_bytes`] 同一个答案）。
+    fn device_bytes(&self, device: u32) -> Option<u64> {
+        PoolReader::device_size_in_bytes(self, DeviceIdentity(device))
     }
     fn read(&self, device: u32, offset: u64, length: usize) -> Option<Vec<u8>> {
         PoolReader::read(
@@ -626,65 +750,76 @@ fn publishes_in(writes: &[RetainedWrite]) -> Vec<PublishWrites> {
     publishes
 }
 
-/// 记录核对器（D13（验证路线） 已定项 7，故意不给它编号；入参 (崩溃前镜像, 记录流, 崩溃后镜像)）：崩溃前镜像是 `image.base`、
-/// 记录流是 `image.writes`、崩溃后镜像是 `image` 本身。一处写「在盘上」= 崩溃后镜像那个位置上的字节与记录流里写下的逐字节相同；
+/// 记录核对器（D13（验证路线） 已定项 7，故意不给它编号；入参 (崩溃前镜像, 记录流, 崩溃后镜像, 持久集合)）：崩溃前镜像是 `image.base`、
+/// 记录流是 `image.writes`、崩溃后镜像是 `image` 本身、持久集合是 `image.persisted`（枚举器给的这个崩溃状态里哪些写落了盘，
+/// 与 `image.writes` 逐条对应——四样都从同一个崩溃状态里取，对不上的组合写不出来）。第一条判据里一处写「在盘上」= 崩溃后镜像
+/// 那个位置上的字节与记录流里写下的逐字节相同；第二条判据按扇区、拿持久集合判一份单元副本缺不缺席（[`check_records_against`]）。
 /// 不经恢复代码、不解析树。`effective_root` 取恢复报出来的实际走的那条根。
 #[must_use]
 pub fn check_records(
     image: &CrashImage<'_>,
     effective_root: Option<(InstanceGeneration, CheckpointTxg)>,
 ) -> RecordCheck {
-    check_records_against(image, image.writes, effective_root)
+    check_records_against(image, image.writes, &image.persisted, effective_root)
 }
 
-/// 同一条判据，读盘的口子与被核的记录流分开给：崩溃注入（增补 3 第 3 件）读的是「更早的段整段持久 + 当前段一个子集」
-/// 那份镜像（`reader`），而要核的记录流是到当前段为止的整条前缀（`writes`）——两者的写表不是同一张，层 0 那一路两张是同一张。
+/// 同一条判据，读盘的口子、被核的记录流与它的持久集合分开给（`persisted` 与 `writes` 逐条对应）。装置里三处调用各交什么
+/// （用例另有直接调它的）：
+/// - 层 0（[`check_records`]）：两张是同一张，枚举用的写表（录制流里的写在前，原地覆写的撕裂镜像与重放接在后面，见 [`CrashImage`]）。
+/// - 崩溃注入第一截（增补 3 第 3 件，`crash_injection.rs`）：读的是「更早的段整段持久 + 当前段一个子集」那份镜像（`reader`），
+///   核的是这段历史的整条录制流（`writes`）——`persisted` 里更早的段整段持久、当前段按这个崩溃点的子集、更晚的段一个都没持久；
+///   恢复落到由记录重建的一版时，那一版的根槽写在更晚的段里，也在这张表里。
+/// - 崩溃注入第三截（挂载途中的二次崩溃）：读的是二次崩溃镜像，核的只是这次挂载自己的写表到当前段为止的前缀
+///   （更早的段整段持久、当前段按子集），历史那几次发布与当前段之后的写都不在表里。
 ///
-/// 两处只在随机历史上才遇得到的限定（固定脚本上逐状态相同，层 0 的计数不变）：
-/// 一次发布一条 journal 记录都没写过时不判「根在而记录一条都不在」（记录流本来就是空的，不是有洞）；
-/// 一份单元副本在这条记录流后面又被别的**已经持久**的写盖过时，它不在盘上算不得缺席（那是合法的复用：位置让给了
-/// 后来的写，旧字节本来就不该还在）——一次发布的某个单元要全部副本都「不在而且没被已持久的写盖过」，才算「两份都不在」。
-/// 更晚那次写没落盘的那一格不开脱（C507（记录核对器的复用豁免比登记的候选宽，把真洞变哑））；那次复用证得出违反回收谓词的也不开脱
-/// （C513（复用豁免不判那次复用合不合法），判据与剩下的盲点写在 `reuse_is_not_proven_illegal_by_the_reclaim_predicate` 上）。
+/// 第一条判据只在随机历史上才遇得到的限定：一次发布一条 journal 记录都没写过时不判「根在而记录一条都不在」（记录流本来就是空的，不是有洞）。
+///
+/// 第二条判据（恢复自称的 txg ≥ 某次发布、那次发布的某个单元全部副本都缺席）按 C561（记录核对器的复用豁免在复用只落一半时假红）
+/// 的定案判一份副本缺席：**它区间里有一个扇区在持久集合下不是它的字节，且这个扇区上没有一次更晚、在持久集合里、过了回收谓词的写**
+/// （层 0 规模第三轮攻方的 `SecPers513`，`research/prompts/m2-layer0-scale-r3-main-verification.md` 第四节用户定的乙）。
+/// 「在持久集合下不是它的字节」是崩溃后镜像那个扇区上的字节与这份副本写下的不同（崩溃后镜像就是基线加持久集合里的写）；
+/// 「解释」那个扇区的只认持久集合里的写，不认盘上字节恰好相同的写——只看盘上字节分不开「写没落、而那里恰好是零」与「写落了、
+/// 露在外面的是它的零尾」（C561 那一行的状态 Y 与假红状态崩溃镜像逐字节相同）。
+/// - 按扇区，不按整份：跨度不对齐的两代复用（两个 16K 节点 → 一个 32K 数据单元 → 两个 16K 节点）只落一半时，先一代副本的每个扇区
+///   要么还是它的、要么被一次落了的后写合法盖住，这份副本不算缺席（C561 的假红）；整份在位的后写只盖住它一半、另一半不是它的
+///   而又没有落了的写解释时算缺席（按整份开脱的那一版在这里假绿）。
+/// - 更晚那次写没落盘时不解释（C507（记录核对器的复用豁免比登记的候选宽，把真洞变哑））；那次复用证得出违反回收谓词的也不解释
+///   （C513（复用豁免不判那次复用合不合法），判据与剩下的盲点写在 `reuse_is_not_proven_illegal_by_the_reclaim_predicate` 上）。
+///
+/// 第二条判据不罩被抛弃时间线上的发布（实八，实七报告 (c)）：一次发布 (i, T) 按恢复落到的那一版的实例表判为被抛弃
+/// （有行 (i, Ti, Wi) 且 T > Ti，D23（journal 的角色与格式） 已定项 14 回退段的候选集规则）时，它写出的单元不算「该在」——
+/// 那条时间线被切掉之后，它的单元可以被合法复用。恢复落到的那一版的实例表按 [`instance_table_of_the_effective_root`] 读；
+/// 读不出时一次发布都不算被抛弃（判据不放宽）。
+///
+/// # Panics
+/// `persisted` 与 `writes` 不一样长；单元副本的长度不是整扇区。
 #[must_use]
-pub fn check_records_against(
-    reader: &dyn PoolReader,
+pub fn check_records_against<Reader: PoolReader + ImageReader>(
+    reader: &Reader,
     writes: &[RetainedWrite],
+    persisted: &[bool],
     effective_root: Option<(InstanceGeneration, CheckpointTxg)>,
 ) -> RecordCheck {
+    assert_eq!(
+        persisted.len(),
+        writes.len(),
+        "持久集合与记录流逐条对应：第 k 项说的是记录流里第 k 次写落没落盘"
+    );
     let in_place = |index: usize| {
         let write = &writes[index];
         let length = usize::try_from(write.length_in_bytes()).expect("写长装得进 usize");
-        reader
-            .read(write.device, write.offset, length)
+        PoolReader::read(reader, write.device, write.offset, length)
             .is_some_and(|bytes| write.contents.still_on_disk(&bytes))
     };
-    // 这份写在这条记录流后面被**已经持久**的写盖过（同设备、区间相交）：位置真让给了后来的写，旧字节本来就不该还在。
-    // 更晚那次写自己一个字节都没落盘时不算盖过——那一格里早先这份单元是真的缺席，是崩溃摆出来的洞
-    // （C507（记录核对器的复用豁免比登记的候选宽，把真洞变哑）：只看「流里有没有更晚的写」的那一版在这里失声）。
-    // 更晚那次写已经落盘、而那次复用证得出违反 D16（发布语义） 已定项 1 的回收谓词时也不算盖过（C513（复用豁免不判那次复用合不合法）：
-    // C22（刚释放的块立即重分配） 那一类，块刚释放就在同一个可回退窗口里重新分出去，位置让出去了、但让得不合规范）。
-    let written_over_later = |index: usize| {
-        let write = &writes[index];
-        let start = write.offset.0;
-        let end = start + write.length_in_bytes();
-        let earlier_publish_txg = checkpoint_txg_of_the_publish_that_made_the_write(writes, index);
-        (index + 1..writes.len()).any(|later_index| {
-            let later = &writes[later_index];
-            let later_start = later.offset.0;
-            let later_end = later_start + later.length_in_bytes();
-            later.device == write.device
-                && later_start < end
-                && start < later_end
-                && in_place(later_index)
-                && reuse_is_not_proven_illegal_by_the_reclaim_predicate(
-                    writes,
-                    earlier_publish_txg,
-                    later_index,
-                )
-        })
+    let copy_is_missing =
+        |copy: usize| unit_copy_is_missing_under_the_persisted_set(reader, writes, persisted, copy);
+    let instance_table_of_the_landed_version =
+        instance_table_of_the_effective_root(reader, writes, effective_root);
+    let abandoned_by_the_landed_version = |publish: &PublishWrites| {
+        instance_table_of_the_landed_version
+            .as_ref()
+            .is_some_and(|table| table.abandons(publish.instance, publish.checkpoint_txg))
     };
-    let copy_is_missing = |copy: usize| !in_place(copy) && !written_over_later(copy);
     let mut check = RecordCheck::default();
     for publish in publishes_in(writes) {
         if !publish.records.is_empty()
@@ -693,7 +828,9 @@ pub fn check_records_against(
         {
             check.root_without_record = true;
         }
-        if effective_root.is_some_and(|(_, txg)| txg.0 >= publish.checkpoint_txg) {
+        if effective_root.is_some_and(|(_, txg)| txg.0 >= publish.checkpoint_txg)
+            && !abandoned_by_the_landed_version(&publish)
+        {
             let mut copies_by_offset: BTreeMap<u64, Vec<usize>> = BTreeMap::new();
             for unit in &publish.units {
                 copies_by_offset
@@ -710,6 +847,86 @@ pub fn check_records_against(
         }
     }
     check
+}
+
+/// 恢复落到的那一版（`effective_root`）的实例表，从 `reader`（崩溃后镜像）上沿链读：那一版的根记录取记录流里写出这个根身份的
+/// 最后一次根槽写的字节（同一实例里实例表不重写，重建的根的实例表指针照所选根，D23（journal 的角色与格式） 已定项 15，
+/// 与这次根槽写带的是同一个）。根槽没落盘、由记录重建的那一版，它的根槽写在不在记录流里看调用方交的写表：层 0 与崩溃注入第一截
+/// 交整条流，在；崩溃注入第三截只交挂载那一段到当前段为止的前缀，那次根槽写落在更晚的段里时不在（见 [`check_records_against`]）。
+/// 记录流里没有这个根身份（基镜像里的根，如 mkfs 的第 0 代根，实例表一行都没有；前缀里还没写到的那次根槽写）、恢复没落到任何一版、
+/// 链读不出，都是 None。
+fn instance_table_of_the_effective_root<Reader: PoolReader + ImageReader>(
+    reader: &Reader,
+    writes: &[RetainedWrite],
+    effective_root: Option<(InstanceGeneration, CheckpointTxg)>,
+) -> Option<InstanceTableOfRootRecord> {
+    let effective_root = effective_root?;
+    let root_record = writes
+        .iter()
+        .rev()
+        .filter(|write| write.kind == StepKind::RootRecordFua)
+        .find(|write| root_identity_of_write(write) == effective_root)?
+        .bytes()
+        .expect("根槽 FUA 写是普通写，带着字节");
+    InstanceTableOfRootRecord::read(reader, root_record)
+}
+
+/// 记录核对器第二条判据的缺席判定（判据见 [`check_records_against`]）：写表下标 `copy` 那份单元副本，在 `reader`（崩溃后镜像）与
+/// `persisted`（持久集合）下缺不缺席。逐扇区看：扇区上还是它的字节就过；不是的，要有一次更晚、在持久集合里、落在这个扇区上、
+/// 过了回收谓词的写解释它，一个扇区解释不了就是缺席。读不出这块盘（池里没有它）按每个扇区都不是它的字节算。
+fn unit_copy_is_missing_under_the_persisted_set(
+    reader: &dyn PoolReader,
+    writes: &[RetainedWrite],
+    persisted: &[bool],
+    copy: usize,
+) -> bool {
+    let copy_write = &writes[copy];
+    let length = usize::try_from(copy_write.length_in_bytes()).expect("写长装得进 usize");
+    let sector_bytes = usize::try_from(SECTOR_BYTES).expect("512");
+    assert!(
+        length.is_multiple_of(sector_bytes),
+        "单元副本是整扇区的写（写表下标 {copy}，{length} 字节）"
+    );
+    let on_disk = reader.read(copy_write.device, copy_write.offset, length);
+    let earlier_publish_txg = checkpoint_txg_of_the_publish_that_made_the_write(writes, copy);
+    // 每次更晚的写过不过回收谓词只算一次：谓词只看这次后写之前的写表与这份副本的发布，与扇区无关。
+    let mut reuse_verdict_by_later_write: BTreeMap<usize, bool> = BTreeMap::new();
+    for sector_start in (0..length).step_by(sector_bytes) {
+        let sector_still_holds_the_copy = on_disk.as_ref().is_some_and(|bytes| {
+            copy_write.contents.range_still_on_disk(
+                sector_start,
+                &bytes[sector_start..sector_start + sector_bytes],
+            )
+        });
+        if sector_still_holds_the_copy {
+            continue;
+        }
+        let sector_offset =
+            copy_write.offset.0 + u64::try_from(sector_start).expect("扇区偏移装得进 u64");
+        let explained_by_a_persisted_legal_later_write =
+            (copy + 1..writes.len()).any(|later_index| {
+                let later = &writes[later_index];
+                let later_start = later.offset.0;
+                let later_end = later_start + later.length_in_bytes();
+                persisted[later_index]
+                    && later.device == copy_write.device
+                    && later_start < sector_offset + SECTOR_BYTES
+                    && sector_offset < later_end
+                    && *reuse_verdict_by_later_write
+                        .entry(later_index)
+                        .or_insert_with(|| {
+                            reuse_is_not_proven_illegal_by_the_reclaim_predicate(
+                                writes,
+                                earlier_publish_txg,
+                                later_index,
+                            )
+                        })
+            });
+        if !explained_by_a_persisted_legal_later_write {
+            return true;
+        }
+    }
+    false
 }
 
 /// 写表下标 `index` 那次写属于哪次发布：它后面第一条根槽 FUA 写写出的那条根的 checkpoint_txg（与 `publishes_in` 的归法相同）。
@@ -745,9 +962,11 @@ fn rollback_floor_written_by(bytes: &[u8]) -> CheckpointTxg {
 /// 记录核对器不解析树，谓词里的三个量各取一个往「过得了」那边偏的界，都从写表里这次写之前的那一段取
 /// （写这次单元的那一刻，发布是一次接一次做完的，更早的写在实现看来都已落下）：
 /// - 释放代 ≥ `earlier_publish_txg + 1`：换下那份单元的发布以写下它的那次发布为祖先，txg 严格更大；从没释放过的比任何界都大。
-/// - F_生效 ≤ 这次写之前写表里全部根槽写带的 F 的最大值（生效值取各盘所带 F 的最大值再取最小，大不过全部根的最大值）。
+/// - F_生效 ≤ 这次写之前写表里全部根槽写与系统配置槽写带的 F 的最大值（生效值取根上带的与系统配置里读得出的最大值，
+///   D16（发布语义） 已定项 1「生效」，大不过这些写带的全部 F 的最大值；C556（checker 与层 0 不读系统配置里的 F） 的层 0 那一半：
+///   抬 F 先写系统配置那一步落了、带新 F 的根一条都没落时，下一次挂载按系统配置里的新 F 回收，写行那次发布就可能复用）。
 /// - 环里最旧有效根 ≤ 这次写之前写到根环、还没被更晚的根槽写盖掉的那些根里最小的 txg。这里不按实例表剔被抛弃的根：
-///   被抛弃的根的 txg 夹在回退目标与回退之后的第一条根之间，它比全部有效根都旧时，有效时间线上被复用的单元要么比它还旧
+///   被抛弃的根的 txg 夹在恢复的所选根与恢复之后的第一条根之间，它比全部有效根都旧时，有效时间线上被复用的单元要么比它还旧
 ///   （下界过得了它）、要么比它新而它自己的根还在环里（本来就不许复用）。
 ///
 /// 按这三个界判，合法的复用不会被判成过不了；漏的是释放代比 `earlier_publish_txg + 1` 晚得多、又晚过门槛的那一类。
@@ -774,10 +993,17 @@ fn reuse_is_not_proven_illegal_by_the_reclaim_predicate(
                 highest_rollback_floor =
                     highest_rollback_floor.max(rollback_floor_written_by(bytes));
             }
+            // 系统配置槽写是整槽 4096 字节：解得开就取它带的 F；解不开的（写的不是一份自证得过的槽）不抬这个界。
+            StepKind::SystemConfigurationSlot => {
+                let bytes = write.bytes().expect("系统配置槽写是普通写，带着字节");
+                if let Ok(system_configuration) = SystemConfiguration::parse_slot(bytes) {
+                    highest_rollback_floor =
+                        highest_rollback_floor.max(system_configuration.quantities.rollback_floor);
+                }
+            }
             StepKind::ZeroFill
             | StepKind::UnitWrite
             | StepKind::JournalRecord
-            | StepKind::SystemConfigurationSlot
             | StepKind::Barrier => {}
         }
     }
@@ -881,6 +1107,56 @@ pub struct Layer0Tally {
     /// checker 报「不适用」（这条不变量判的代码在这个状态上没跑到）的状态数：与评估过的状态数分开报，阴性结果不与「没跑到」混在一起
     /// （里程碑「第二个事务」步 6 验收第 3 条）；每条不变量的评估过 + 不适用 = `states`。
     pub checker_not_applicable_states: BTreeMap<&'static str, u64>,
+    /// 观察者看过的状态数（没有观察者时是 0）：续跑接上的片不再给观察者看，靠进度文件里记的这个数与 `observer_counts` 接上累计；
+    /// 有观察者时整条流跑完它必须等于 `states`（层 0 规模第三轮判决 U3）。
+    pub observed_states: u64,
+    /// 观察者按名字累计的数（[`Layer0ObserverCounts`]），随片进进度文件。
+    pub observer_counts: Layer0ObserverCounts,
+}
+
+/// 观察者在状态上记的数，按名字累计（名字只许小写字母、数字、`_`：它原样进进度文件）。续跑时已跑完的片不再给观察者看，
+/// 观察者要接着用的累计都得记在这里，记在观察者自己的变量里的续跑之后就少了那几片。
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Layer0ObserverCounts(BTreeMap<String, u64>);
+
+impl Layer0ObserverCounts {
+    /// 名字能不能当观察者计数的名字：非空，只有小写字母、数字、`_`。
+    #[must_use]
+    pub fn is_counter_name(name: &str) -> bool {
+        !name.is_empty()
+            && name
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+    }
+
+    /// 给名字为 `name` 的计数加 `amount`。
+    ///
+    /// # Panics
+    /// 名字不合 [`Self::is_counter_name`]。
+    pub fn add(&mut self, name: &str, amount: u64) {
+        assert!(
+            Self::is_counter_name(name),
+            "观察者计数的名字只许小写字母、数字、_：{name:?}"
+        );
+        *self.0.entry(name.to_string()).or_insert(0) += amount;
+    }
+
+    /// 名字为 `name` 的计数，没记过是 0。
+    #[must_use]
+    pub fn get(&self, name: &str) -> u64 {
+        self.0.get(name).copied().unwrap_or(0)
+    }
+
+    /// 按名字排好的全部计数。
+    pub fn iter(&self) -> impl Iterator<Item = (&str, u64)> {
+        self.0.iter().map(|(name, count)| (name.as_str(), *count))
+    }
+
+    fn absorb(&mut self, following: Layer0ObserverCounts) {
+        for (name, count) in following.0 {
+            *self.0.entry(name).or_insert(0) += count;
+        }
+    }
 }
 
 impl Layer0Tally {
@@ -937,8 +1213,12 @@ impl Layer0Tally {
             checker_violated_states,
             checker_first_violation,
             checker_not_applicable_states,
+            observed_states,
+            observer_counts,
         } = following_slice;
         self.states += states;
+        self.observed_states += observed_states;
+        self.observer_counts.absorb(observer_counts);
         for (publish, publish_states) in states_by_publish {
             *self.states_by_publish.entry(publish).or_insert(0) += publish_states;
         }
@@ -1124,6 +1404,75 @@ pub fn root_identity_written_by(bytes: &[u8]) -> (InstanceGeneration, Checkpoint
                 .expect("根记录的 checkpoint_txg 在偏移 28"),
         )),
     )
+}
+
+/// 一次落在根环里的写写下的卸载记号：根记录 flags 在偏移 20（4 字节），位 0（D22（单元原子性怎么合成） 已定项 7）。
+/// 与 [`root_identity_written_by`] 同一个读法：只按偏移取字节，不验自证校验和。
+///
+/// # Panics
+/// 这次写短于 24 字节：落在根环里的写都是整条根记录，短了说明调用方分错了种类。
+#[must_use]
+pub fn unmount_marker_written_by(bytes: &[u8]) -> UnmountMarker {
+    let flags = u32::from_le_bytes(bytes[20..24].try_into().expect("根记录的 flags 在偏移 20"));
+    if flags & ROOT_RECORD_FLAG_UNMOUNT_MARKER == 0 {
+        UnmountMarker::NotWrittenByTheUnmountSequence
+    } else {
+        UnmountMarker::WrittenByTheUnmountSequence
+    }
+}
+
+/// 录制流里一条带卸载记号的根槽写落在卸载入口发的那几段之外（C557（卸载记号只由卸载入口打没有检查））。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UnmountMarkerOutsideTheUnmountEntry {
+    /// 这次根槽写在录制流里的下标（与传进来的 `operations` 同一套）。
+    pub stream_index: usize,
+    pub instance: InstanceGeneration,
+    pub checkpoint_txg: CheckpointTxg,
+}
+
+/// C557（卸载记号只由卸载入口打没有检查）：录制流上逐条核「带卸载记号的根只出现在卸载入口发的那一串里」。
+/// 记号盘上没有别的东西核它：准入入口误打了记号、F 又抬过头，池级 checker 按带记号那一支放过（D22（单元原子性怎么合成） 已定项 7
+/// 与 I-7.9（回退下界 F 不高于抬 F 的上限） 按记号分两支），所以这一格归录制流——它知道每一段是哪个入口发的
+/// （[`crate::SharedStream::record_entry`]）。逐条看落在根环里的写（`FixedGeometry::classify` 认成根槽写的），
+/// 带记号的要落在某一段 [`RecordedPublishEntry::Unmount`] 里；不在的按录制流的次序全列出来。
+///
+/// # Panics
+/// 根槽写不带内容（流没开内容保留）。
+#[must_use]
+pub fn unmount_markers_outside_the_unmount_entry(
+    operations: &[RetainedOperation],
+    entry_spans: &[RecordedEntrySpan],
+    geometry: &FixedGeometry,
+) -> Vec<UnmountMarkerOutsideTheUnmountEntry> {
+    let inside_the_unmount_entry = |stream_index: usize| {
+        entry_spans.iter().any(|span| match span.entry {
+            RecordedPublishEntry::Unmount => span.operations.contains(&stream_index),
+        })
+    };
+    let mut stray_markers = Vec::new();
+    for (stream_index, retained) in operations.iter().enumerate() {
+        if geometry.classify(&retained.operation) != StepKind::RootRecordFua {
+            continue;
+        }
+        let bytes = retained
+            .contents
+            .as_deref()
+            .expect("核卸载记号要开了内容保留的录制流：根槽写要带着字节");
+        match unmount_marker_written_by(bytes) {
+            UnmountMarker::NotWrittenByTheUnmountSequence => {}
+            UnmountMarker::WrittenByTheUnmountSequence => {
+                if !inside_the_unmount_entry(stream_index) {
+                    let (instance, checkpoint_txg) = root_identity_written_by(bytes);
+                    stray_markers.push(UnmountMarkerOutsideTheUnmountEntry {
+                        stream_index,
+                        instance,
+                        checkpoint_txg,
+                    });
+                }
+            }
+        }
+    }
+    stray_markers
 }
 
 /// 单版本形态：被判的那次根槽写出的那一代就是唯一带文件的版本。
@@ -1364,43 +1713,511 @@ impl Layer0Parallelism {
     }
 }
 
-/// 枚举次序里每个状态的序号怎么落到「第几段、段内哪个子集」：次序与单线程逐段逐个子集走相同——
-/// 前面的段全持久 + 当前段任意真子集（子集掩码从 0 数到 2^|段| − 2），最后再加全部持久那一个状态。
-struct Layer0StatePlan<'segments> {
-    segments: &'segments [Vec<usize>],
+/// 一段怎么展开成崩溃状态（前面的段全持久、这一段落一部分、后面的段全不落）。
+/// 段里每次写各取几态见 [`TearableInPlaceOverwrites`]：原地覆写的写取三态（没持久 / 新旧都读不出 / 持久），其余取两态。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Layer0SegmentExpansion {
+    /// 不展开：只以整段持久进入后面的状态。
+    NotExpanded,
+    /// 段内每次写各取它的几态、任意组合，去掉整段全持久那一个（D13（验证路线） 已定项 4 的全量）：
+    /// n 个写里 m 个是原地覆写时 3^m · 2^(n−m) − 1 个；m = 0 时就是任意真子集 2^n − 1 个。
+    EveryProperSubset,
+    /// 甲二（层 0 规模三轮判完、用户 2026-09-26 定的平时快档）：段内原地写（单元写之外的写）各取它的几态、任意组合 × 单元写（COW）只取
+    /// 全不落或全落，去掉整段全落那一个。原地写 k 个（其中 m 个是原地覆写）、单元写 c 个：3^m · 2^(k−m) ·（c > 0 时 2，否则 1）− 1 个，
+    /// m = 0 时 c > 0 是 2^(k+1) − 1、c = 0 是 2^k − 1（与全量相同）。
+    /// 它看不见「单元写只落一部分」才显出来的那一类（C561 那一形就是），替不了全量：提交时照旧全量。
+    InPlaceSubsetsWithCopyOnWriteNoneOrAll,
+}
+
+impl Layer0SegmentExpansion {
+    /// 这一段按这种展开出几个状态；`tearable` 里的写取三态，其余取两态。
+    ///
+    /// # Panics
+    /// 一段的状态数装不进 u64（段里的写太多：2 态的写六十几个就到了）。
+    #[must_use]
+    pub fn state_count(
+        self,
+        writes: &[RetainedWrite],
+        segment: &[usize],
+        tearable: &TearableInPlaceOverwrites,
+    ) -> u64 {
+        match self {
+            Self::NotExpanded => 0,
+            Self::EveryProperSubset => tearable.landing_combinations_of(segment) - 1,
+            Self::InPlaceSubsetsWithCopyOnWriteNoneOrAll => {
+                let (in_place_writes, copy_on_write_writes) =
+                    in_place_and_copy_on_write_writes_of(writes, segment);
+                let copy_on_write_choices: u64 = if copy_on_write_writes.is_empty() {
+                    1
+                } else {
+                    2
+                };
+                tearable
+                    .landing_combinations_of(&in_place_writes)
+                    .checked_mul(copy_on_write_choices)
+                    .expect("一段的状态数装得进 u64")
+                    - 1
+            }
+        }
+    }
+}
+
+/// 一次写在一个崩溃状态里怎么落（D13（验证路线） 已定项 4；第三态是代码审阅第 4 条，用户 2026-09-27 定「原地覆写补第三态、全量也跑」）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WriteLandingInCrashState {
+    /// 没持久：那个位置上是崩溃前的旧字节。
+    NotPersisted,
+    /// 新旧都读不出：只有原地覆写的写取这一态，镜像里那一段是 [`torn_image_of_in_place_overwrite`] 的字节。
+    Torn,
+    /// 整次写都持久了。
+    Persisted,
+}
+
+/// 一次写在崩溃状态里能取哪几态。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WriteLandingChoices {
+    NotPersistedOrPersisted,
+    NotPersistedTornOrPersisted,
+}
+
+impl WriteLandingChoices {
+    fn count(self) -> u64 {
+        match self {
+            Self::NotPersistedOrPersisted => 2,
+            Self::NotPersistedTornOrPersisted => 3,
+        }
+    }
+
+    /// 混合进制里这一位上的数字是哪一态。最大的那个数字是「持久」：一段里每个写都取最大时就是整段全持久（展开时去掉的那一个，
+    /// 它排在这一段序号的最后），只取两态的写上数字就是今天子集掩码的那一位（0 没持久、1 持久），次序与补第三态之前逐个相同。
+    fn landing_of_digit(self, digit: u64) -> WriteLandingInCrashState {
+        match self {
+            Self::NotPersistedOrPersisted => match digit {
+                0 => WriteLandingInCrashState::NotPersisted,
+                1 => WriteLandingInCrashState::Persisted,
+                out_of_range => unreachable!("两态的写上数字只有 0、1：拿到 {out_of_range}"),
+            },
+            Self::NotPersistedTornOrPersisted => match digit {
+                0 => WriteLandingInCrashState::NotPersisted,
+                1 => WriteLandingInCrashState::Torn,
+                2 => WriteLandingInCrashState::Persisted,
+                out_of_range => unreachable!("三态的写上数字只有 0、1、2：拿到 {out_of_range}"),
+            },
+        }
+    }
+}
+
+/// 写表里哪几次写是原地覆写、撕裂时出第三态「新旧都读不出」（代码审阅第 4 条，用户 2026-09-27 定「原地覆写补第三态、全量也跑」；
+/// 认法照 `research/prompts/m2-rev-b3a-implementer-report.md` 第四节），三条都成立才算：
+/// 1. 不是单元写：单元写是 COW，落在分配器交出来的槽上，那一槽的旧内容没有谁还要（回收谓词管着），撕裂与没持久一样，照旧两态；
+/// 2. 长于一个扇区：层 0 的撕裂粒度是 [`SECTOR_BYTES`]，一个扇区的写撕不开（根槽写是一个物理块，照旧两态）；
+/// 3. 它罩住的范围里原来有东西：基镜像那一段有非零字节，或写表里更早有一次同一块盘上、带字节（不是整段清零）的写与它重叠。
+///
+/// 撕裂态原来并进「没持久」（D13（验证路线） 已定项 4 原句）；对原地覆写不成立——撕裂时那一处的旧内容也没了，「没持久」留着完整的旧内容。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TearableInPlaceOverwrites {
+    is_tearable_by_write: Vec<bool>,
+}
+
+impl TearableInPlaceOverwrites {
+    /// 按上面三条逐次认。
+    ///
+    /// # Panics
+    /// 一次根槽写长于一个扇区又罩住了旧内容：第一版不支持根槽写的第三态（它的撕裂镜像接在枚举用的写表末尾，会被择根与记录核对器
+    /// 当成又一条根槽写）。根槽写是一个物理块，层 0 的池都按 512 字节的物理块建，走不到。
+    #[must_use]
+    pub fn of(base: &MemoryPool, writes: &[RetainedWrite]) -> Self {
+        let is_tearable_by_write: Vec<bool> = (0..writes.len())
+            .map(|write_index| is_tearable_in_place_overwrite(base, writes, write_index))
+            .collect();
+        for (write, is_tearable) in writes.iter().zip(&is_tearable_by_write) {
+            assert!(
+                !(*is_tearable && write.kind == StepKind::RootRecordFua),
+                "根槽写（盘 {} 偏移 {}、{} 字节）长于一个扇区又罩住旧内容：第一版不支持根槽写的第三态",
+                write.device.0,
+                write.offset.0,
+                write.length_in_bytes()
+            );
+        }
+        Self {
+            is_tearable_by_write,
+        }
+    }
+
+    /// 每次写都只取两态（补第三态之前的口径）。
+    #[must_use]
+    pub fn none(write_count: usize) -> Self {
+        Self {
+            is_tearable_by_write: vec![false; write_count],
+        }
+    }
+
+    /// 写表下标 `write_index` 那次写是不是原地覆写。
+    #[must_use]
+    pub fn contains(&self, write_index: usize) -> bool {
+        self.is_tearable_by_write[write_index]
+    }
+
+    /// 原地覆写的写，按写表下标从小到大。
+    #[must_use]
+    pub fn write_indexes(&self) -> Vec<usize> {
+        self.is_tearable_by_write
+            .iter()
+            .enumerate()
+            .filter(|(_, is_tearable)| **is_tearable)
+            .map(|(write_index, _)| write_index)
+            .collect()
+    }
+
+    fn landing_choices_of(&self, write_index: usize) -> WriteLandingChoices {
+        if self.is_tearable_by_write[write_index] {
+            WriteLandingChoices::NotPersistedTornOrPersisted
+        } else {
+            WriteLandingChoices::NotPersistedOrPersisted
+        }
+    }
+
+    /// 这几次写各取它的几态、全部组合的个数。
+    fn landing_combinations_of(&self, write_indexes: &[usize]) -> u64 {
+        write_indexes
+            .iter()
+            .try_fold(1u64, |combinations, write_index| {
+                combinations.checked_mul(self.landing_choices_of(*write_index).count())
+            })
+            .expect("一段的状态数装得进 u64")
+    }
+}
+
+/// [`TearableInPlaceOverwrites`] 的三条判据，逐次判。
+fn is_tearable_in_place_overwrite(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    write_index: usize,
+) -> bool {
+    let write = &writes[write_index];
+    let is_copy_on_write = match write.kind {
+        StepKind::UnitWrite => true,
+        StepKind::ZeroFill
+        | StepKind::JournalRecord
+        | StepKind::RootRecordFua
+        | StepKind::SystemConfigurationSlot
+        | StepKind::Barrier => false,
+    };
+    if is_copy_on_write || write.length_in_bytes() <= SECTOR_BYTES {
+        return false;
+    }
+    let write_end = write.offset.0 + write.length_in_bytes();
+    let base_holds_nonzero_bytes_there = base.devices.get(&write.device).is_some_and(|device| {
+        device
+            .sectors
+            .range(write.offset.0 / SECTOR_BYTES..write_end.div_ceil(SECTOR_BYTES))
+            .any(|(_, bytes)| bytes.iter().any(|byte| *byte != 0))
+    });
+    let an_earlier_write_with_bytes_overlaps = writes[..write_index].iter().any(|earlier| {
+        let earlier_has_bytes = match earlier.contents {
+            WrittenContents::Bytes(_) => true,
+            WrittenContents::Zeros { .. } => false,
+        };
+        earlier_has_bytes
+            && earlier.device == write.device
+            && earlier.offset.0 < write_end
+            && write.offset.0 < earlier.offset.0 + earlier.length_in_bytes()
+    });
+    base_holds_nonzero_bytes_there || an_earlier_write_with_bytes_overlaps
+}
+
+/// 一次原地覆写撕裂时那一段的字节，「新旧都读不出」：新旧不同的那一截（第一个不同的字节到最后一个不同的字节）前一半是新的、
+/// 后一半还是旧的，这一截之外新旧本来就相同。第一个不同的字节是新的、最后一个是旧的，所以新旧有两个以上的字节不同时它与新、旧都不同；
+/// 整段校验和罩着的写（系统配置槽、journal 记录）新旧两份校验和都对不上（校验和碰撞不在模型里，D13（验证路线） 已定项 4 射程）。
+/// 新旧只差一个字节时撕不出第三种内容，交回旧的；完全相同时交回新的（也就是旧的）——这一态的镜像与另外两态之一逐字节相同。
+///
+/// # Panics
+/// `old` 与这次写不一样长。
+#[must_use]
+pub fn torn_image_of_in_place_overwrite(old: &[u8], new: &WrittenContents) -> Vec<u8> {
+    let length = usize::try_from(new.length_in_bytes()).expect("写长装得进 usize");
+    assert_eq!(old.len(), length, "旧字节与这次写一样长");
+    let mut new_bytes = vec![0u8; length];
+    new.copy_range_into(0, &mut new_bytes);
+    let differs = |index: &usize| old[*index] != new_bytes[*index];
+    let Some(first_differing_byte) = (0..length).find(differs) else {
+        return new_bytes;
+    };
+    let last_differing_byte = (0..length)
+        .rev()
+        .find(differs)
+        .expect("有第一个不同的字节就有最后一个");
+    let differing_span_in_bytes = last_differing_byte - first_differing_byte + 1;
+    let first_old_byte = first_differing_byte + differing_span_in_bytes / 2;
+    let mut torn = new_bytes;
+    torn[first_old_byte..].copy_from_slice(&old[first_old_byte..]);
+    torn
+}
+
+/// 枚举用的写表：录制流里的写原样在前（下标不变），其后每个原地覆写的写接一条撕裂镜像（罩住那次写整个范围、字节是
+/// [`torn_image_of_in_place_overwrite`] 按「这次写之前的写全落了」时的旧字节算的），再接同一段里在它之后、同一块盘上与它重叠的写
+/// 各一份重放——那几次写落了时要盖在撕裂镜像上面，与录制流里的先后一致（[`CrashImage`] 按写表次序叠）。
+/// 一个状态的持久集合按这张表给：撕裂那一态是「原来那次写没持久、它的撕裂镜像持久」，重放跟着被重放的那次写落不落。
+struct WritesWithTornImages {
+    writes: Vec<RetainedWrite>,
+    /// 原地覆写的写（写表下标）→ 它的撕裂镜像与之后那几份重放在 `writes` 里的位置。
+    torn_image_by_write: BTreeMap<usize, TornImageOfOneWrite>,
+}
+
+struct TornImageOfOneWrite {
+    torn_image_index: usize,
+    /// （重放在 `writes` 里的下标，重放的是写表里哪一次写）。
+    replays: Vec<(usize, usize)>,
+}
+
+impl WritesWithTornImages {
+    fn of(
+        base: &MemoryPool,
+        writes: &[RetainedWrite],
+        segments: &[Vec<usize>],
+        tearable: &TearableInPlaceOverwrites,
+    ) -> Self {
+        let mut segment_of_write: BTreeMap<usize, usize> = BTreeMap::new();
+        for (segment_index, segment) in segments.iter().enumerate() {
+            for write_index in segment {
+                segment_of_write.insert(*write_index, segment_index);
+            }
+        }
+        let mut writes_with_torn_images = writes.to_vec();
+        let mut torn_image_by_write = BTreeMap::new();
+        let tearable_write_indexes = tearable.write_indexes();
+        if tearable_write_indexes.is_empty() {
+            return Self {
+                writes: writes_with_torn_images,
+                torn_image_by_write,
+            };
+        }
+        // 每次写之前的镜像：基镜像上按次序叠写表里更早的写（这次写之前的写全落了）。
+        let mut image_before_the_write = base.clone();
+        let mut next_write_to_apply = 0usize;
+        for write_index in tearable_write_indexes {
+            image_before_the_write.apply_writes(&writes[next_write_to_apply..write_index]);
+            next_write_to_apply = write_index;
+            let write = &writes[write_index];
+            let old = PoolReader::read(
+                &image_before_the_write,
+                write.device,
+                write.offset,
+                usize::try_from(write.length_in_bytes()).expect("写长装得进 usize"),
+            )
+            .expect("录到的写落在池里的盘上、在盘内、按扇区对齐");
+            let torn_image_index = writes_with_torn_images.len();
+            writes_with_torn_images.push(RetainedWrite {
+                device: write.device,
+                kind: write.kind,
+                is_force_unit_access: write.is_force_unit_access,
+                offset: write.offset,
+                contents: WrittenContents::Bytes(torn_image_of_in_place_overwrite(
+                    &old,
+                    &write.contents,
+                )),
+            });
+            let write_end = write.offset.0 + write.length_in_bytes();
+            let later_overlapping_writes_in_the_segment: Vec<usize> = segment_of_write
+                .get(&write_index)
+                .map(|segment_index| {
+                    segments[*segment_index]
+                        .iter()
+                        .copied()
+                        .filter(|later_index| {
+                            let later = &writes[*later_index];
+                            *later_index > write_index
+                                && later.device == write.device
+                                && later.offset.0 < write_end
+                                && write.offset.0 < later.offset.0 + later.length_in_bytes()
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            let replays = later_overlapping_writes_in_the_segment
+                .into_iter()
+                .map(|replayed_write_index| {
+                    writes_with_torn_images.push(writes[replayed_write_index].clone());
+                    (writes_with_torn_images.len() - 1, replayed_write_index)
+                })
+                .collect();
+            torn_image_by_write.insert(
+                write_index,
+                TornImageOfOneWrite {
+                    torn_image_index,
+                    replays,
+                },
+            );
+        }
+        Self {
+            writes: writes_with_torn_images,
+            torn_image_by_write,
+        }
+    }
+}
+
+/// 一段里的原地写与单元写（COW），各按段内次序：单元写落在新分出来的槽上，其余（系统配置槽、journal 记录、根槽、清零）都是原地覆盖。
+fn in_place_and_copy_on_write_writes_of(
+    writes: &[RetainedWrite],
+    segment: &[usize],
+) -> (Vec<usize>, Vec<usize>) {
+    segment
+        .iter()
+        .copied()
+        .partition(|write_index| match writes[*write_index].kind {
+            StepKind::UnitWrite => false,
+            StepKind::ZeroFill
+            | StepKind::SystemConfigurationSlot
+            | StepKind::JournalRecord
+            | StepKind::RootRecordFua
+            | StepKind::Barrier => true,
+        })
+}
+
+/// 按 `expansion` 展开、每次写只取两态（没持久 / 持久，补第三态之前的口径）时的状态数：各段展开出来的，再加全部持久那一个
+/// （全量时就是 [`closed_form_state_count`] 的闭式）。层 0 枚举出来的状态数是
+/// [`layer0_state_count_with_torn_in_place_overwrites`]：写表里没有原地覆写的写时两者相等。
+#[must_use]
+pub fn layer0_state_count(
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+) -> u64 {
+    state_count_of_the_segments(
+        writes,
+        segments,
+        expansion,
+        &TearableInPlaceOverwrites::none(writes.len()),
+    )
+}
+
+/// 层 0 按 `expansion` 枚举出来的状态数（`enumerate_layer0` 一族的 `states`）：原地覆写的写（[`TearableInPlaceOverwrites`]，要看基镜像）
+/// 取三态、其余取两态，各段展开出来的，再加全部持久那一个。
+#[must_use]
+pub fn layer0_state_count_with_torn_in_place_overwrites(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+) -> u64 {
+    state_count_of_the_segments(
+        writes,
+        segments,
+        expansion,
+        &TearableInPlaceOverwrites::of(base, writes),
+    )
+}
+
+fn state_count_of_the_segments(
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+    tearable: &TearableInPlaceOverwrites,
+) -> u64 {
+    segments
+        .iter()
+        .enumerate()
+        .map(|(segment_index, segment)| {
+            expansion(segment_index, segment).state_count(writes, segment, tearable)
+        })
+        .try_fold(1u64, u64::checked_add)
+        .expect("整条流的状态数装得进 u64")
+}
+
+/// 每一段都按甲二展开（平时快档）。
+#[must_use]
+pub fn quick_tier_expansion(_segment_index: usize, _segment: &[usize]) -> Layer0SegmentExpansion {
+    Layer0SegmentExpansion::InPlaceSubsetsWithCopyOnWriteNoneOrAll
+}
+
+/// 每一段都展开任意真子集（全量）。
+#[must_use]
+pub fn full_expansion(_segment_index: usize, _segment: &[usize]) -> Layer0SegmentExpansion {
+    Layer0SegmentExpansion::EveryProperSubset
+}
+
+/// 枚举次序里每个状态的序号怎么落到「第几段、段内每次写怎么落」：次序与单线程逐段逐个组合走相同——
+/// 前面的段全持久 + 当前段的一个组合（全量时段内序号按混合进制拆成每次写的一态，数到组合数 − 2；甲二时见
+/// [`Self::persisted_writes_of_state`]），最后再加全部持久那一个状态。
+struct Layer0StatePlan<'plan> {
+    segments: &'plan [Vec<usize>],
+    /// 每一段怎么展开，与 `segments` 同序。
+    expansion_by_segment: Vec<Layer0SegmentExpansion>,
     /// 每一段展开出来的状态的序号区间，首尾相接、随段号递增；不展开的段是空区间。
     state_ranges_by_segment: Vec<Range<u64>>,
     /// 状态总数：各段展开出来的，再加最后全部持久那一个。
     state_count: u64,
     /// 每一段归哪次发布（[`publish_of_each_segment`]），与 `segments` 同序。
     publish_of_segment: Vec<Layer0PublishOfState>,
+    /// 每一段的原地写与单元写（[`in_place_and_copy_on_write_writes_of`]），与 `segments` 同序。
+    in_place_and_copy_on_write_by_segment: Vec<(Vec<usize>, Vec<usize>)>,
+    /// 哪几次写取三态（[`TearableInPlaceOverwrites`]）。
+    tearable: &'plan TearableInPlaceOverwrites,
+    /// 枚举用的写表（录制流里的写在前，撕裂镜像与重放接在后面）：持久集合按它给。
+    writes_with_torn_images: &'plan WritesWithTornImages,
 }
 
-impl<'segments> Layer0StatePlan<'segments> {
-    /// `expand` 只在调用线程上逐段问一次，所以它不必能跨线程。
+impl<'plan> Layer0StatePlan<'plan> {
+    /// `expansion` 只在调用线程上逐段问一次，所以它不必能跨线程。`writes` 是录制流里的写（不带撕裂镜像）。
     fn new(
         writes: &[RetainedWrite],
-        segments: &'segments [Vec<usize>],
-        expand: &dyn Fn(usize, &[usize]) -> bool,
+        segments: &'plan [Vec<usize>],
+        expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+        tearable: &'plan TearableInPlaceOverwrites,
+        writes_with_torn_images: &'plan WritesWithTornImages,
     ) -> Self {
+        let expansion_by_segment: Vec<Layer0SegmentExpansion> = segments
+            .iter()
+            .enumerate()
+            .map(|(segment_index, segment)| expansion(segment_index, segment))
+            .collect();
         let mut next_ordinal = 0u64;
         let state_ranges_by_segment = segments
             .iter()
-            .enumerate()
-            .map(|(segment_index, segment)| {
+            .zip(&expansion_by_segment)
+            .map(|(segment, segment_expansion)| {
                 let first_ordinal = next_ordinal;
-                if expand(segment_index, segment) {
-                    next_ordinal += (1u64 << segment.len()) - 1;
-                }
+                next_ordinal = next_ordinal
+                    .checked_add(segment_expansion.state_count(writes, segment, tearable))
+                    .expect("整条流的状态数装得进 u64");
                 first_ordinal..next_ordinal
             })
             .collect();
         Self {
             segments,
+            expansion_by_segment,
             state_ranges_by_segment,
             state_count: next_ordinal + 1,
             publish_of_segment: publish_of_each_segment(writes, segments),
+            in_place_and_copy_on_write_by_segment: segments
+                .iter()
+                .map(|segment| in_place_and_copy_on_write_writes_of(writes, segment))
+                .collect(),
+            tearable,
+            writes_with_torn_images,
         }
+    }
+
+    /// 段内序号 `ordinal_within` 按混合进制拆到 `write_indexes` 这几次写上（第一次写是最低位，每位的进制是它能取几态）。
+    ///
+    /// # Panics
+    /// 序号超出这几次写的组合数（计划算错了）。
+    fn assign_landings(
+        &self,
+        landings: &mut [WriteLandingInCrashState],
+        ordinal_within: u64,
+        write_indexes: &[usize],
+    ) {
+        let mut remaining = ordinal_within;
+        for write_index in write_indexes {
+            let choices = self.tearable.landing_choices_of(*write_index);
+            landings[*write_index] = choices.landing_of_digit(remaining % choices.count());
+            remaining /= choices.count();
+        }
+        assert_eq!(
+            remaining, 0,
+            "段内序号 {ordinal_within} 超出这几次写（{write_indexes:?}）的组合数"
+        );
     }
 
     /// 序号落在哪一段；等于段数说明是最后全部持久那一个状态。
@@ -1417,21 +2234,77 @@ impl<'segments> Layer0StatePlan<'segments> {
             .unwrap_or(Layer0PublishOfState::EveryWritePersisted)
     }
 
-    /// 这个状态里持久了的写：所在的段之前每一段整段持久（展不展开都一样），所在的段按段内子集掩码（第 k 位对应段里第 k 个写）。
-    fn persisted_writes_of_state(&self, ordinal: u64, write_count: usize) -> Vec<bool> {
+    /// 这个状态的持久集合，按枚举用的写表（[`WritesWithTornImages`]）给：所在的段之前每一段整段持久（展不展开都一样），
+    /// 所在的段按段内序号 r（序号减去这一段的起点）拆到段里每次写上（[`Self::assign_landings`]，原地覆写的写三态、其余两态）：
+    /// 全量时 r 拆到段里全部的写上；甲二时单元写一个都没有就同全量（只拆到原地写上），有单元写时 r / 2 拆到原地写上、
+    /// r 除以 2 的余数是「单元写全落」——次序是原地写的每个组合先单元写全不落、再全落，整段全落那一个取不到。
+    /// 每次写都只取两态时 r 就是补第三态之前的子集掩码，次序逐个相同。撕裂那一态记成「原来那次写没持久、它的撕裂镜像持久」，
+    /// 撕裂镜像之后的重放跟着被重放的那次写落不落。
+    fn persisted_writes_of_state(&self, ordinal: u64) -> Vec<bool> {
         let segment_of_state = self.segment_of_state(ordinal);
-        let mut persisted = vec![false; write_count];
+        let recorded_write_count = self.tearable.is_tearable_by_write.len();
+        let mut landings = vec![WriteLandingInCrashState::NotPersisted; recorded_write_count];
         for segment in &self.segments[..segment_of_state] {
             for write_index in segment {
-                persisted[*write_index] = true;
+                landings[*write_index] = WriteLandingInCrashState::Persisted;
             }
         }
         if let Some(segment) = self.segments.get(segment_of_state) {
-            let subset_mask = ordinal - self.state_ranges_by_segment[segment_of_state].start;
-            for (bit, write_index) in segment.iter().enumerate() {
-                if subset_mask & (1 << bit) != 0 {
-                    persisted[*write_index] = true;
+            let ordinal_within_the_segment =
+                ordinal - self.state_ranges_by_segment[segment_of_state].start;
+            match self.expansion_by_segment[segment_of_state] {
+                Layer0SegmentExpansion::NotExpanded => {
+                    unreachable!(
+                        "不展开的段序号区间是空的，没有状态落在它里面（段 {segment_of_state}）"
+                    )
                 }
+                Layer0SegmentExpansion::EveryProperSubset => {
+                    self.assign_landings(&mut landings, ordinal_within_the_segment, segment);
+                }
+                Layer0SegmentExpansion::InPlaceSubsetsWithCopyOnWriteNoneOrAll => {
+                    let (in_place_writes, copy_on_write_writes) =
+                        &self.in_place_and_copy_on_write_by_segment[segment_of_state];
+                    if copy_on_write_writes.is_empty() {
+                        self.assign_landings(
+                            &mut landings,
+                            ordinal_within_the_segment,
+                            in_place_writes,
+                        );
+                    } else {
+                        self.assign_landings(
+                            &mut landings,
+                            ordinal_within_the_segment / 2,
+                            in_place_writes,
+                        );
+                        if ordinal_within_the_segment % 2 == 1 {
+                            for write_index in copy_on_write_writes {
+                                landings[*write_index] = WriteLandingInCrashState::Persisted;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let mut persisted = vec![false; self.writes_with_torn_images.writes.len()];
+        for (write_index, landing) in landings.iter().enumerate() {
+            persisted[write_index] = match landing {
+                WriteLandingInCrashState::Persisted => true,
+                WriteLandingInCrashState::NotPersisted | WriteLandingInCrashState::Torn => false,
+            };
+        }
+        for (write_index, torn_image) in &self.writes_with_torn_images.torn_image_by_write {
+            match landings[*write_index] {
+                WriteLandingInCrashState::Torn => {
+                    persisted[torn_image.torn_image_index] = true;
+                    for (replay_index, replayed_write_index) in &torn_image.replays {
+                        persisted[*replay_index] = match landings[*replayed_write_index] {
+                            WriteLandingInCrashState::Persisted => true,
+                            WriteLandingInCrashState::NotPersisted
+                            | WriteLandingInCrashState::Torn => false,
+                        };
+                    }
+                }
+                WriteLandingInCrashState::NotPersisted | WriteLandingInCrashState::Persisted => {}
             }
         }
         persisted
@@ -1472,9 +2345,68 @@ fn state_slices(state_count: u64, parallelism: &Layer0Parallelism) -> Vec<Range<
         .collect()
 }
 
-/// 逐状态的观察者：拿到崩溃镜像与看 journal 那一遍恢复的报告。
+/// 续跑时的切法不随线程数变（层 0 规模第一轮判决 R2）：片数取这么多，每片至少 [`LAYER0_MINIMUM_STATES_PER_SLICE`] 个状态。
+/// 第二条流全量五十多亿个状态时每片约八万五千个（32 线程每秒约两万多个时一片一分钟上下，推的），被杀时最多丢每个线程手上那一片。
+const LAYER0_RESUMABLE_SLICE_COUNT: u64 = 65_536;
+
+/// 续跑时每片几个状态：只看状态数，不看线程数——换了线程数续跑，片方案照旧对得上。
+fn states_per_slice_independent_of_worker_threads(state_count: u64) -> NonZeroU64 {
+    NonZeroU64::new(
+        state_count
+            .div_ceil(LAYER0_RESUMABLE_SLICE_COUNT)
+            .max(LAYER0_MINIMUM_STATES_PER_SLICE),
+    )
+    .expect("每片至少 16 个状态，不是 0")
+}
+
+/// 这一趟按什么切片：续跑、分片跑一片、merge 时给的是「按线程数定片长」就改按状态数定（R2：换了线程数续跑，片方案照旧对得上；
+/// 分片时 n 台线程数各不相同，切法也要逐片相同，merge 核 n 份账本的切法相同）；调用方给了固定片长、或不续跑，照给的切。
+fn slicing_of_the_run(
+    parallelism: &Layer0Parallelism,
+    resume: &Layer0Resume,
+    state_count: u64,
+) -> Layer0Parallelism {
+    let slicing_rule = match resume {
+        Layer0Resume::KeepProgressFile(_)
+        | Layer0Resume::RunOneShardKeepingProgressFile(_)
+        | Layer0Resume::MergeShardLedgers(_) => SlicingRule::IndependentOfWorkerThreads,
+        Layer0Resume::NoProgressFile => SlicingRule::AsGiven,
+    };
+    Layer0Parallelism {
+        worker_threads: parallelism.worker_threads,
+        worker_threads_source: parallelism.worker_threads_source,
+        slice_length: match (slicing_rule, parallelism.slice_length) {
+            (SlicingRule::IndependentOfWorkerThreads, Layer0SliceLength::ScaledToWorkerThreads) => {
+                Layer0SliceLength::StatesPerSlice(states_per_slice_independent_of_worker_threads(
+                    state_count,
+                ))
+            }
+            (
+                SlicingRule::IndependentOfWorkerThreads,
+                Layer0SliceLength::StatesPerSlice(states_per_slice),
+            )
+            | (SlicingRule::AsGiven, Layer0SliceLength::StatesPerSlice(states_per_slice)) => {
+                Layer0SliceLength::StatesPerSlice(states_per_slice)
+            }
+            (SlicingRule::AsGiven, Layer0SliceLength::ScaledToWorkerThreads) => {
+                Layer0SliceLength::ScaledToWorkerThreads
+            }
+        },
+    }
+}
+
+/// 片长按线程数定的那一档要不要换成按状态数定。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SlicingRule {
+    /// 续跑、分片跑一片、merge：片方案不随线程数变。
+    IndependentOfWorkerThreads,
+    /// 不续跑：照给的切。
+    AsGiven,
+}
+
+/// 逐状态的观察者：拿到崩溃镜像、看 journal 那一遍恢复的报告，与这一片的观察者计数（要随进度文件续跑的累计记在这里）。
 pub type Layer0StateObserver<'observer> =
-    &'observer mut dyn FnMut(&CrashImage<'_>, &RecoveryReport);
+    &'observer mut dyn FnMut(&CrashImage<'_>, &RecoveryReport, &mut Layer0ObserverCounts);
 
 /// 工作线程评状态时 panic，就把旗子立起来：别的工作线程看到旗子不再领新片，调用线程不必等整条流跑完才知道红了。
 struct RaiseFlagWhenPanicking<'flag>(&'flag AtomicBool);
@@ -1505,6 +2437,7 @@ struct FinishedSlice {
 }
 
 /// 在工作线程上跑一片：每个状态自己建崩溃镜像、自己记进这一片的计数；基线与写表只读、各线程共用。
+/// `writes` 是枚举用的写表（[`WritesWithTornImages`]：录制流里的写在前，撕裂镜像与重放接在后面），与计划给的持久集合逐条对应。
 #[allow(
     clippy::too_many_arguments,
     reason = "每个参数各是一样东西：基线、写表、状态计划、这一片的区间、被判的根、版本表、要不要带回报告"
@@ -1526,7 +2459,7 @@ fn evaluate_state_slice(
             .states_by_publish
             .entry(plan.publish_of_state(ordinal))
             .or_insert(0) += 1;
-        let persisted = plan.persisted_writes_of_state(ordinal, writes.len());
+        let persisted = plan.persisted_writes_of_state(ordinal);
         match retention {
             StateReportRetention::HandEachStateToObserver => {
                 let consulted_report = evaluate_state_for_versions(
@@ -1558,7 +2491,8 @@ fn evaluate_state_slice(
     }
 }
 
-/// 枚举：前面的段全持久 + 当前段任意真子集，最后再加全部持久那一个状态；`expand` 决定哪一段展开子集
+/// 枚举：前面的段全持久 + 当前段每次写各取它的几态的任意组合（去掉整段全持久；原地覆写的写三态，[`TearableInPlaceOverwrites`]），
+/// 最后再加全部持久那一个状态；`expand` 决定哪一段展开
 /// （不展开的段只以整段持久进入后面的状态，平时 `cargo test` 里跳过 18 个写那一段就靠它）。`judged_root_index` 是被判的那次根槽 FUA 写。
 /// 按状态序号区间切片、多线程跑，线程数见 [`Layer0Parallelism::from_environment`]。
 #[must_use]
@@ -1576,15 +2510,48 @@ pub fn enumerate_layer0_selecting_versions(
         segments,
         judged_root_index,
         versions,
-        expand,
+        &|segment_index, segment| expansion_of_the_yes_or_no_choice(expand(segment_index, segment)),
         Layer0Parallelism::from_environment(),
         None,
+        &Layer0Resume::NoProgressFile,
     )
 }
 
-/// 同上，每个状态评完之后把这个崩溃镜像与看 journal 那一遍恢复的报告交给 `observe_state`：
+/// 「展不展开」这一种选法换成 [`Layer0SegmentExpansion`]：展开就是任意真子集。
+fn expansion_of_the_yes_or_no_choice(is_expanded: bool) -> Layer0SegmentExpansion {
+    if is_expanded {
+        Layer0SegmentExpansion::EveryProperSubset
+    } else {
+        Layer0SegmentExpansion::NotExpanded
+    }
+}
+
+/// 平时快档（甲二，[`Layer0SegmentExpansion::InPlaceSubsetsWithCopyOnWriteNoneOrAll`]）：每一段都按甲二展开、多版本，不留进度文件。
+#[must_use]
+pub fn enumerate_layer0_quick_tier_versions(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    judged_root_index: usize,
+    versions: &[PublishedVersion],
+) -> Layer0Tally {
+    enumerate_layer0_in_state_slices(
+        base,
+        writes,
+        segments,
+        judged_root_index,
+        versions,
+        &quick_tier_expansion,
+        Layer0Parallelism::from_environment(),
+        None,
+        &Layer0Resume::NoProgressFile,
+    )
+}
+
+/// 同 [`enumerate_layer0_selecting_versions`]，每个状态评完之后把这个崩溃镜像与看 journal 那一遍恢复的报告交给 `observe_state`：
 /// 用例按自己独立算的谓词逐状态核恢复（预置的残留记录该不该施加、改坏 tail 之后终态与没改坏的是否逐项相等）。
-/// 观察者在调用线程上、按状态序号从小到大调用，次序与单线程逐个跑相同，所以它不必能跨线程。
+/// 观察者在调用线程上、按状态序号从小到大调用，次序与单线程逐个跑相同，所以它不必能跨线程。不留进度文件：
+/// 这个观察者的累计记在它自己的变量里，续跑接不上（要续跑的用 [`enumerate_layer0_in_state_slices`]，累计记进观察者计数）。
 #[must_use]
 pub fn enumerate_layer0_selecting_versions_observing_each_state(
     base: &MemoryPool,
@@ -1595,29 +2562,153 @@ pub fn enumerate_layer0_selecting_versions_observing_each_state(
     expand: &dyn Fn(usize, &[usize]) -> bool,
     observe_state: &mut dyn FnMut(&CrashImage<'_>, &RecoveryReport),
 ) -> Layer0Tally {
+    let mut observe_without_counting =
+        |image: &CrashImage<'_>, report: &RecoveryReport, _counts: &mut Layer0ObserverCounts| {
+            observe_state(image, report);
+        };
     enumerate_layer0_in_state_slices(
         base,
         writes,
         segments,
         judged_root_index,
         versions,
-        expand,
+        &|segment_index, segment| expansion_of_the_yes_or_no_choice(expand(segment_index, segment)),
         Layer0Parallelism::from_environment(),
-        Some(observe_state),
+        Some(&mut observe_without_counting),
+        &Layer0Resume::NoProgressFile,
     )
+}
+
+/// 一段展开方式在计划哈希里的名字。
+fn expansion_name(expansion: Layer0SegmentExpansion) -> &'static str {
+    match expansion {
+        Layer0SegmentExpansion::NotExpanded => "not_expanded",
+        Layer0SegmentExpansion::EveryProperSubset => "every_proper_subset",
+        Layer0SegmentExpansion::InPlaceSubsetsWithCopyOnWriteNoneOrAll => {
+            "in_place_subsets_with_copy_on_write_none_or_all"
+        }
+    }
+}
+
+/// 往计划哈希的消息里追加一段：先写长度再写字节，两段之间不会串。
+fn append_length_prefixed(message: &mut Vec<u8>, bytes: &[u8]) {
+    message.extend_from_slice(
+        &u64::try_from(bytes.len())
+            .expect("长度装得进 u64")
+            .to_le_bytes(),
+    );
+    message.extend_from_slice(bytes);
+}
+
+/// 枚举计划哈希（进度文件分格的第三样，层 0 规模第三轮判决 U1）：基线的每个扇区、写表（盘、种类、FUA、偏移、内容；枚举用的那一张，
+/// 撕裂镜像与重放在内：补第三态之后同一条流的计划哈希变了，旧进度文件不再相认）、段与每段怎么展开、
+/// 被判的根、版本表（实例、txg、内容）、状态数、片方案、有没有观察者，逐项长度前缀拼起来取 SHA-256。
+/// 同一条流、同一组状态只换了版本表（或换了展开方式、切法）就是另一个哈希，两次枚举的进度互不相认。
+/// 分片跑一片时末尾另拼 `shard <i>/<n>`：分片的进度文件与单机的、与别的片的互不相认；不分片时不拼，单机的哈希与分片之前的相同。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "每个参数各是计划里的一样：基线、写表、段计划、被判的根、版本表、片方案、有没有观察者、第几片"
+)]
+fn layer0_plan_hash(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    plan: &Layer0StatePlan<'_>,
+    judged_root_index: usize,
+    versions: &[PublishedVersion],
+    slices: &[Range<u64>],
+    has_observer: bool,
+    shard: Option<Layer0ShardOfShards>,
+) -> String {
+    let mut message: Vec<u8> = Vec::new();
+    append_length_prefixed(&mut message, b"singlefs layer0 enumeration plan 1");
+    message.extend_from_slice(&base.device_size_in_bytes.to_le_bytes());
+    for (device, sparse_device) in &base.devices {
+        message.extend_from_slice(&device.0.to_le_bytes());
+        message.extend_from_slice(
+            &u64::try_from(sparse_device.sectors.len())
+                .expect("扇区数装得进 u64")
+                .to_le_bytes(),
+        );
+        for (sector, bytes) in &sparse_device.sectors {
+            message.extend_from_slice(&sector.to_le_bytes());
+            append_length_prefixed(&mut message, bytes);
+        }
+    }
+    for write in writes {
+        message.extend_from_slice(&write.device.0.to_le_bytes());
+        append_length_prefixed(&mut message, write.kind.name().as_bytes());
+        message.push(u8::from(write.is_force_unit_access));
+        message.extend_from_slice(&write.offset.0.to_le_bytes());
+        match &write.contents {
+            WrittenContents::Bytes(bytes) => {
+                message.push(0);
+                append_length_prefixed(&mut message, bytes);
+            }
+            WrittenContents::Zeros { length } => {
+                message.push(1);
+                message.extend_from_slice(&length.to_le_bytes());
+            }
+        }
+    }
+    for (segment, expansion) in plan.segments.iter().zip(&plan.expansion_by_segment) {
+        append_length_prefixed(&mut message, expansion_name(*expansion).as_bytes());
+        message.extend_from_slice(&u64::try_from(segment.len()).expect("段长").to_le_bytes());
+        for write_index in segment {
+            message.extend_from_slice(&u64::try_from(*write_index).expect("下标").to_le_bytes());
+        }
+    }
+    message.extend_from_slice(
+        &u64::try_from(judged_root_index)
+            .expect("下标")
+            .to_le_bytes(),
+    );
+    for version in versions {
+        message.extend_from_slice(&version.instance.0.to_le_bytes());
+        message.extend_from_slice(&version.checkpoint_txg.0.to_le_bytes());
+        append_length_prefixed(&mut message, &version.content);
+    }
+    message.extend_from_slice(&plan.state_count.to_le_bytes());
+    for slice in slices {
+        message.extend_from_slice(&slice.start.to_le_bytes());
+        message.extend_from_slice(&slice.end.to_le_bytes());
+    }
+    message.push(u8::from(has_observer));
+    if let Some(shard) = shard {
+        append_length_prefixed(&mut message, format!("shard {}", shard.text()).as_bytes());
+    }
+    crate::sha256::sha256_hexadecimal(&message)
+}
+
+/// 调用线程上等着按片号次序并进来的一片：这一趟跑完的，或从进度文件读回来的。
+enum SliceWaitingToBeMerged {
+    FreshlyRun(FinishedSlice),
+    RestoredFromTheProgressFile(Layer0Tally),
 }
 
 /// 层 0 枚举的本体：把 [0, 状态数) 按 `parallelism` 切成首尾相接的序号区间，工作线程按片号从小到大领片、各自跑完交回；
 /// 调用线程收到一片就打一行 `LAYER0_PROGRESS`（片号、序号区间、段号、已跑完的片数与状态数），再按片号从小到大并计数、调观察者。
 /// 计数按片的次序相加，「第一处违例」取序号最小的那一处（`Layer0Tally` 的并片），结果与线程数、切法无关。
-/// 开跑与跑完各打一行 `LAYER0_PARALLEL_START` / `LAYER0_PARALLEL_FINISHED`（状态数、片数、实际起的工作线程数、线程数从哪来、耗时）。
+/// 开跑与跑完各打一行 `LAYER0_PARALLEL_START` / `LAYER0_PARALLEL_FINISHED`（状态数、片数、实际起的工作线程数、线程数从哪来、
+/// 续跑接上的片数与这一趟跑的片数、耗时）。`expansion` 决定每一段怎么展开（全量、甲二、不展开）。
+///
+/// 续跑（`resume` 是 [`Layer0Resume::KeepProgressFile`]，层 0 规模三轮判决 R1–R5、U1–U3）：
+/// - 切法不随线程数变（`parallelism` 给的是按线程数定片长时，改按状态数定，[`states_per_slice_independent_of_worker_threads`]）；
+/// - 进度文件按输入指纹、流名与计划哈希（[`layer0_plan_hash`]）分格，开跑时读回核过的片不再跑（打一行 `LAYER0_RESUME`）；
+/// - 一片在观察者看完、没 panic 之后才写进进度文件，观察者在这一片上的计数随片行一起写；按片号次序写；
+/// - 这一趟有工作线程或观察者 panic（判红），删掉进度文件；
+/// - 并完之后核「读回的片 + 这一趟跑的片 = 总片数」，有观察者时核它看过的状态数（连读回那几片记的）等于状态数；
+/// - 整条流跑完删掉进度文件（只供测试强制进入的那一档留着）。
+///
+/// 双机分片（`resume` 是 [`Layer0Resume::RunOneShardKeepingProgressFile`] 或 [`Layer0Resume::MergeShardLedgers`]，里程碑三第六项）见
+/// [`enumerate_layer0_in_state_slices_or_one_shard`]；这个入口要整条流的计数，分片跑一片的 `resume` 不收。
 ///
 /// # Panics
 /// 某个工作线程在评状态时 panic（恢复或 checker 里的断言：别的线程不再领新片，手上那一片跑完就退）；观察者 panic；
-/// 有一片领了却没交回（不变量被破坏）。
+/// 有一片领了却没交回、读回的片加跑的片不等于总片数、观察者看过的状态数不等于状态数（不变量被破坏）；进度文件读写失败；
+/// `resume` 是分片跑一片（这个入口交不出整条流的计数：分片跑的用例调 [`enumerate_layer0_in_state_slices_or_one_shard`]）；merge 的账本核不齐。
 #[allow(
     clippy::too_many_arguments,
-    reason = "前六个与单线程时的枚举相同，多出来的是切法与观察者"
+    reason = "前六个与单线程时的枚举相同，多出来的是切法、观察者与续跑"
 )]
 #[must_use]
 pub fn enumerate_layer0_in_state_slices(
@@ -1626,36 +2717,228 @@ pub fn enumerate_layer0_in_state_slices(
     segments: &[Vec<usize>],
     judged_root_index: usize,
     versions: &[PublishedVersion],
-    expand: &dyn Fn(usize, &[usize]) -> bool,
+    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+    parallelism: Layer0Parallelism,
+    observe_state: Option<Layer0StateObserver<'_>>,
+    resume: &Layer0Resume,
+) -> Layer0Tally {
+    match resume {
+        Layer0Resume::RunOneShardKeepingProgressFile(shard_run) => panic!(
+            "分片跑一片（第 {} 片）交不出整条流的计数：这条用例要分片跑，改调 enumerate_layer0_in_state_slices_or_one_shard、拿到 OneShardWrittenToItsLedger 就收工",
+            shard_run.shard.text()
+        ),
+        Layer0Resume::NoProgressFile
+        | Layer0Resume::KeepProgressFile(_)
+        | Layer0Resume::MergeShardLedgers(_) => {}
+    }
+    match enumerate_layer0_in_state_slices_or_one_shard(
+        base,
+        writes,
+        segments,
+        judged_root_index,
+        versions,
+        expansion,
+        parallelism,
+        observe_state,
+        resume,
+    ) {
+        Layer0EnumerationOutcome::WholeStream(tally) => tally,
+        Layer0EnumerationOutcome::OneShardWrittenToItsLedger(written) => unreachable!(
+            "开头已经挡掉分片跑一片的 resume，这里只会交回整条流的计数：{:?}",
+            written.shard
+        ),
+    }
+}
+
+/// 一趟层 0 枚举的结局。
+#[derive(Debug)]
+pub enum Layer0EnumerationOutcome {
+    /// 整条流的计数：不分片跑完全部切片，或 merge 把 n 份账本核齐、按切片序号并完。
+    WholeStream(Layer0Tally),
+    /// 只跑了分给这一片的切片、计数写进了这一片的账本（`SINGLEFS_LAYER0_SHARD=<i>/<n>`）：整条流的计数要等 merge，
+    /// 用例拿到它就收工，不拿它判用例钉死的数。
+    OneShardWrittenToItsLedger(Layer0ShardLedgerWritten),
+}
+
+/// 分片跑完的一片：第几片、账本在哪、这一片的切片按序号并起来的计数（不是整条流的）。
+#[derive(Debug)]
+pub struct Layer0ShardLedgerWritten {
+    pub shard: Layer0ShardOfShards,
+    pub ledger_path: std::path::PathBuf,
+    pub tally_of_this_shard: Layer0Tally,
+}
+
+/// 同 [`enumerate_layer0_in_state_slices`]，另收双机分片的两种 `resume`（里程碑三第六项，`.claude/kb/milestone/03-third-txn.md` 第六节）：
+/// - [`Layer0Resume::RunOneShardKeepingProgressFile`]：只跑切片序号 `slice_index % n == i` 的切片（片方案不随线程数变，
+///   [`slicing_of_the_run`]），进度文件照续跑走（名字、文件头、计划哈希另带这一片）；这一片全部切片并完之后写账本
+///   （`layer0_progress::write_shard_ledger`），再删进度文件，交回 [`Layer0EnumerationOutcome::OneShardWrittenToItsLedger`]。
+///   开跑打一行 `LAYER0_SHARD mode=run`；`LAYER0_PARALLEL_START` / `FINISHED` 两行的 `states=` / `slices=` 是这一片的，另带 `shard=`。
+/// - [`Layer0Resume::MergeShardLedgers`]：不枚举、不调观察者；读 n 份账本、核齐（`layer0_progress::read_shard_ledgers_for_merge`），
+///   按切片序号从小到大并（与单机并片的次序相同，「第一处」取序号最小的），交回整条流的计数。打一行 `LAYER0_SHARD mode=merge`，
+///   `LAYER0_PARALLEL_START` / `FINISHED` 两行报 n 片的工作线程之和与逐片的数（`shard_worker_threads=` 等，逗号分隔、按第几片排）。
+///
+/// # Panics
+/// 同 [`enumerate_layer0_in_state_slices`]；另有账本写失败，merge 时缺账本、账本文件头与这一趟不同（输入指纹、切片方案、工具链……）、
+/// 两份账本同一片、账本里的切片不归它或缺切片（逐条说清是第几片、哪一处）。
+#[allow(
+    clippy::too_many_arguments,
+    clippy::too_many_lines,
+    reason = "前六个与单线程时的枚举相同，多出来的是切法、观察者与续跑；续跑的读回、并片、落盘、收尾是同一件事的几步，拆开要把可变状态来回传"
+)]
+#[must_use]
+pub fn enumerate_layer0_in_state_slices_or_one_shard(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    judged_root_index: usize,
+    versions: &[PublishedVersion],
+    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
     parallelism: Layer0Parallelism,
     mut observe_state: Option<Layer0StateObserver<'_>>,
-) -> Layer0Tally {
-    let plan = Layer0StatePlan::new(writes, segments, expand);
-    let slices = state_slices(plan.state_count, &parallelism);
-    let spawned_worker_threads = parallelism.worker_threads.get().min(slices.len());
+    resume: &Layer0Resume,
+) -> Layer0EnumerationOutcome {
+    let tearable = TearableInPlaceOverwrites::of(base, writes);
+    let writes_with_torn_images = WritesWithTornImages::of(base, writes, segments, &tearable);
+    let plan = Layer0StatePlan::new(
+        writes,
+        segments,
+        expansion,
+        &tearable,
+        &writes_with_torn_images,
+    );
+    // 从这里往下，评状态、交给观察者的崩溃镜像、计划哈希用的都是枚举用的写表：录制流里的写下标不变，撕裂镜像与重放接在后面。
+    let enumerated_writes = writes_with_torn_images.writes.as_slice();
+    let slices = state_slices(
+        plan.state_count,
+        &slicing_of_the_run(&parallelism, resume, plan.state_count),
+    );
+    let has_observer = observe_state.is_some();
+    let (progress_settings, shard_run) = match resume {
+        Layer0Resume::NoProgressFile => (None, None),
+        Layer0Resume::KeepProgressFile(settings) => (Some(settings), None),
+        Layer0Resume::RunOneShardKeepingProgressFile(shard_run) => {
+            (Some(&shard_run.progress), Some(shard_run))
+        }
+        Layer0Resume::MergeShardLedgers(merge) => {
+            let whole_plan = Layer0ProgressPlan {
+                plan_hash: layer0_plan_hash(
+                    base,
+                    enumerated_writes,
+                    &plan,
+                    judged_root_index,
+                    versions,
+                    &slices,
+                    has_observer,
+                    None,
+                ),
+                state_count: plan.state_count,
+                slices: slices.clone(),
+                has_observer,
+                shard: None,
+            };
+            return Layer0EnumerationOutcome::WholeStream(merge_the_shard_ledgers(
+                &whole_plan,
+                merge,
+            ));
+        }
+    };
+    let shard = shard_run.map(|run| run.shard);
+    // 这一趟负责的切片：不分片是全部，分片跑一片是序号模 n 等于 i 的那些（交错分）。
+    let slices_of_this_run: Vec<usize> = (0..slices.len())
+        .filter(|slice_index| shard.is_none_or(|shard| shard.owns_slice(*slice_index)))
+        .collect();
+    let states_of_this_run: u64 = slices_of_this_run
+        .iter()
+        .map(|slice_index| slices[*slice_index].end - slices[*slice_index].start)
+        .sum();
+    if let Some(run) = shard_run {
+        println!(
+            "LAYER0_SHARD mode=run shard={} owned_slices={} all_slices={} states={states_of_this_run} all_states={} ledger={}",
+            run.shard.text(),
+            slices_of_this_run.len(),
+            slices.len(),
+            plan.state_count,
+            shard_ledger_path(&run.progress.directory, &run.progress.stream_name, run.shard)
+                .display()
+        );
+    }
+    let (mut progress_file, restored_slices) = match progress_settings {
+        None => (None, BTreeMap::new()),
+        Some(settings) => {
+            let progress_plan = Layer0ProgressPlan {
+                plan_hash: layer0_plan_hash(
+                    base,
+                    enumerated_writes,
+                    &plan,
+                    judged_root_index,
+                    versions,
+                    &slices,
+                    has_observer,
+                    shard,
+                ),
+                state_count: plan.state_count,
+                slices: slices.clone(),
+                has_observer,
+                shard,
+            };
+            let opened = Layer0ProgressFile::open(settings, &progress_plan);
+            println!(
+                "LAYER0_RESUME progress_file={} restored_slices={}/{} half_lines_dropped={} discarded_because={}",
+                opened.file.path().display(),
+                opened.restored_slices.len(),
+                slices.len(),
+                opened.half_lines_dropped,
+                opened.discarded_because.as_deref().unwrap_or("none")
+            );
+            (Some(opened.file), opened.restored_slices)
+        }
+    };
+    let _delete_the_progress_file_if_this_run_goes_red =
+        progress_file
+            .as_ref()
+            .map(|file| DeleteTheProgressFileWhenPanicking {
+                path: file.path().to_path_buf(),
+            });
+    let slices_to_run: Vec<usize> = slices_of_this_run
+        .iter()
+        .copied()
+        .filter(|slice_index| !restored_slices.contains_key(slice_index))
+        .collect();
+    let restored_slice_count = restored_slices.len();
+    let spawned_worker_threads = parallelism.worker_threads.get().min(slices_to_run.len());
     let retention = match observe_state {
         Some(_) => StateReportRetention::HandEachStateToObserver,
         None => StateReportRetention::CountOnly,
     };
+    // 分片跑一片时两行 LAYER0_PARALLEL_* 的 states= / slices= 是这一片的，另带整条流的数；不分片时什么都不加，与分片之前逐字相同。
+    let shard_fields = shard.map_or_else(String::new, |shard| {
+        format!(
+            " shard={} all_states={} all_slices={}",
+            shard.text(),
+            plan.state_count,
+            slices.len()
+        )
+    });
     let started = Instant::now();
     println!(
-        "LAYER0_PARALLEL_START states={} slices={} states_per_slice={} worker_threads={spawned_worker_threads} configured_worker_threads={} worker_threads_source={}",
-        plan.state_count,
-        slices.len(),
+        "LAYER0_PARALLEL_START states={states_of_this_run} slices={} states_per_slice={} worker_threads={spawned_worker_threads} configured_worker_threads={} worker_threads_source={} resumed_slices={restored_slice_count} freshly_run_slices={}{shard_fields}",
+        slices_of_this_run.len(),
         slices.first().map_or(0, |slice| slice.end - slice.start),
         parallelism.worker_threads,
-        parallelism.worker_threads_source.name()
+        parallelism.worker_threads_source.name(),
+        slices_to_run.len()
     );
-    let next_slice_index = AtomicUsize::new(0);
+    let next_position_in_slices_to_run = AtomicUsize::new(0);
     let some_worker_thread_panicked = AtomicBool::new(false);
-    let (tally, merged_slice_count) = std::thread::scope(|scope| {
+    let merged_slices_of_this_run = std::thread::scope(|scope| {
         // 收发两端都建在这个闭包里：观察者 panic 时接收端随闭包一起丢掉，工作线程下一次交片就发不出去、随即退出。
         let (finished_slice_sender, finished_slice_receiver) = mpsc::channel::<FinishedSlice>();
         for _ in 0..spawned_worker_threads {
             let finished_slice_sender = finished_slice_sender.clone();
             let plan = &plan;
             let slices = &slices;
-            let next_slice_index = &next_slice_index;
+            let slices_to_run = &slices_to_run;
+            let next_position_in_slices_to_run = &next_position_in_slices_to_run;
             let some_worker_thread_panicked = &some_worker_thread_panicked;
             scope.spawn(move || loop {
                 let _raise_the_flag_if_this_thread_panics =
@@ -1663,16 +2946,16 @@ pub fn enumerate_layer0_in_state_slices(
                 if some_worker_thread_panicked.load(Ordering::Relaxed) {
                     break;
                 }
-                let slice_index = next_slice_index.fetch_add(1, Ordering::Relaxed);
-                let Some(slice) = slices.get(slice_index) else {
+                let position = next_position_in_slices_to_run.fetch_add(1, Ordering::Relaxed);
+                let Some(slice_index) = slices_to_run.get(position).copied() else {
                     break;
                 };
                 let finished = evaluate_state_slice(
                     base,
-                    writes,
+                    enumerated_writes,
                     plan,
                     slice_index,
-                    slice.clone(),
+                    slices[slice_index].clone(),
                     judged_root_index,
                     versions,
                     retention,
@@ -1686,14 +2969,84 @@ pub fn enumerate_layer0_in_state_slices(
         // 只留工作线程手里的发送端：它们都退出之后，下面的接收循环才结束。
         drop(finished_slice_sender);
         let mut merged = Layer0Tally::default();
-        let mut waiting_for_earlier_slices: BTreeMap<usize, FinishedSlice> = BTreeMap::new();
-        let mut next_slice_to_merge = 0usize;
+        let mut waiting_for_earlier_slices: BTreeMap<usize, SliceWaitingToBeMerged> =
+            restored_slices
+                .into_iter()
+                .map(|(slice_index, tally)| {
+                    (
+                        slice_index,
+                        SliceWaitingToBeMerged::RestoredFromTheProgressFile(tally),
+                    )
+                })
+                .collect();
+        // 这一趟负责的切片里下一个该并的是第几个（不分片时就是片号）。
+        let mut next_position_in_slices_of_this_run = 0usize;
+        let mut merged_fresh_slice_count = 0usize;
+        // 分片跑一片时每片的计数另留一份，全部并完之后写进账本；不分片时不留。
+        let mut slice_tallies_for_the_ledger: BTreeMap<usize, Layer0Tally> = BTreeMap::new();
+        let mut keep_for_the_ledger = |slice_index: usize, slice_tally: &Layer0Tally| {
+            if shard.is_some() {
+                slice_tallies_for_the_ledger.insert(slice_index, slice_tally.clone());
+            }
+        };
+        // 收下一片（`None` 是开跑前只并读回的片），再按片号次序并：读回的片直接并；这一趟跑的片先给观察者看、
+        // 把它的计数记进这一片，再写进进度文件，再并。
+        let mut take_and_merge_the_slices_now_in_order =
+            |arrived: Option<(usize, SliceWaitingToBeMerged)>| {
+                if let Some((slice_index, slice_waiting)) = arrived {
+                    waiting_for_earlier_slices.insert(slice_index, slice_waiting);
+                }
+                while let Some((slice_index, in_order)) = slices_of_this_run
+                    .get(next_position_in_slices_of_this_run)
+                    .and_then(|slice_index| {
+                        waiting_for_earlier_slices
+                            .remove(slice_index)
+                            .map(|in_order| (*slice_index, in_order))
+                    })
+                {
+                    match in_order {
+                        SliceWaitingToBeMerged::RestoredFromTheProgressFile(restored_tally) => {
+                            keep_for_the_ledger(slice_index, &restored_tally);
+                            merged.absorb_following_slice(restored_tally);
+                        }
+                        SliceWaitingToBeMerged::FreshlyRun(finished) => {
+                            let mut slice_tally = finished.tally;
+                            if let Some(observe) = observe_state.as_mut() {
+                                for (persisted, consulted_report) in finished.observed_states {
+                                    observe(
+                                        &CrashImage {
+                                            base,
+                                            writes: enumerated_writes,
+                                            persisted,
+                                        },
+                                        &consulted_report,
+                                        &mut slice_tally.observer_counts,
+                                    );
+                                    slice_tally.observed_states += 1;
+                                }
+                            }
+                            if let Some(file) = progress_file.as_mut() {
+                                file.append_finished_slice(
+                                    finished.slice_index,
+                                    &slices[finished.slice_index],
+                                    &slice_tally,
+                                );
+                            }
+                            keep_for_the_ledger(slice_index, &slice_tally);
+                            merged.absorb_following_slice(slice_tally);
+                            merged_fresh_slice_count += 1;
+                        }
+                    }
+                    next_position_in_slices_of_this_run += 1;
+                }
+            };
+        take_and_merge_the_slices_now_in_order(None);
         let mut finished_states = 0u64;
         for (finished_slice_count, finished) in finished_slice_receiver.iter().enumerate() {
             let slice = &slices[finished.slice_index];
             finished_states += slice.end - slice.start;
             println!(
-                "LAYER0_PROGRESS slice={}/{} states=[{},{}) segments={}..={} finished_slices={}/{} finished_states={finished_states}/{} elapsed_seconds={:.1}",
+                "LAYER0_PROGRESS slice={}/{} states=[{},{}) segments={}..={} finished_slices={}/{} finished_states={finished_states}/{} resumed_slices={restored_slice_count} elapsed_seconds={:.1}",
                 finished.slice_index + 1,
                 slices.len(),
                 slice.start,
@@ -1701,41 +3054,204 @@ pub fn enumerate_layer0_in_state_slices(
                 plan.segment_label(plan.segment_of_state(slice.start)),
                 plan.segment_label(plan.segment_of_state(slice.end - 1)),
                 finished_slice_count + 1,
-                slices.len(),
-                plan.state_count,
+                slices_to_run.len(),
+                states_of_this_run,
                 started.elapsed().as_secs_f64()
             );
-            waiting_for_earlier_slices.insert(finished.slice_index, finished);
-            while let Some(in_order) = waiting_for_earlier_slices.remove(&next_slice_to_merge) {
-                if let Some(observe) = observe_state.as_mut() {
-                    for (persisted, consulted_report) in in_order.observed_states {
-                        observe(
-                            &CrashImage {
-                                base,
-                                writes,
-                                persisted,
-                            },
-                            &consulted_report,
-                        );
-                    }
-                }
-                merged.absorb_following_slice(in_order.tally);
-                next_slice_to_merge += 1;
-            }
+            take_and_merge_the_slices_now_in_order(Some((
+                finished.slice_index,
+                SliceWaitingToBeMerged::FreshlyRun(finished),
+            )));
         }
-        (merged, next_slice_to_merge)
+        MergedSlicesOfThisRun {
+            tally: merged,
+            merged_slice_count: next_position_in_slices_of_this_run,
+            merged_fresh_slice_count,
+            slice_tallies_for_the_ledger,
+        }
     });
+    let MergedSlicesOfThisRun {
+        tally,
+        merged_slice_count,
+        merged_fresh_slice_count,
+        slice_tallies_for_the_ledger,
+    } = merged_slices_of_this_run;
     assert_eq!(
         merged_slice_count,
-        slices.len(),
+        slices_of_this_run.len(),
         "每一片都按次序并进来了：少了说明有工作线程领了片却没交回"
     );
+    assert_eq!(
+        restored_slice_count + merged_fresh_slice_count,
+        slices_of_this_run.len(),
+        "读回的片 + 这一趟跑的片 = 这一趟负责的片数（层 0 规模第二轮判决 R3；分片时是归这一片的片数）"
+    );
+    if has_observer {
+        assert_eq!(
+            tally.observed_states, states_of_this_run,
+            "观察者看过的状态数（连续跑接上的片记的）等于这一趟负责的状态数（层 0 规模第三轮判决 U3）"
+        );
+    }
+    let ledger_written = shard_run.map(|run| {
+        let whole_plan = Layer0ProgressPlan {
+            plan_hash: layer0_plan_hash(
+                base,
+                enumerated_writes,
+                &plan,
+                judged_root_index,
+                versions,
+                &slices,
+                has_observer,
+                None,
+            ),
+            state_count: plan.state_count,
+            slices: slices.clone(),
+            has_observer,
+            shard: None,
+        };
+        // 账本写在删进度文件之前：两步之间被杀，下一趟从进度文件读回全部片、重写同一份账本。
+        let ledger_path = write_shard_ledger(
+            run,
+            &whole_plan,
+            &Layer0ShardWorkerThreads {
+                spawned_worker_threads,
+                configured_worker_threads: parallelism.worker_threads.get(),
+                worker_threads_source: parallelism.worker_threads_source.name().to_string(),
+                available_parallelism: std::thread::available_parallelism()
+                    .map_or(0, NonZeroUsize::get),
+                resumed_slices: restored_slice_count,
+                freshly_run_slices: merged_fresh_slice_count,
+                elapsed_milliseconds: u64::try_from(started.elapsed().as_millis())
+                    .unwrap_or(u64::MAX),
+            },
+            &slice_tallies_for_the_ledger,
+        );
+        (run.shard, ledger_path)
+    });
+    let progress_file_after_completion = progress_file.map(Layer0ProgressFile::finish);
     println!(
-        "LAYER0_PARALLEL_FINISHED states={} slices={} worker_threads={spawned_worker_threads} configured_worker_threads={} worker_threads_source={} elapsed_seconds={:.1}",
-        plan.state_count,
-        slices.len(),
+        "LAYER0_PARALLEL_FINISHED states={states_of_this_run} slices={} worker_threads={spawned_worker_threads} configured_worker_threads={} worker_threads_source={} resumed_slices={restored_slice_count} freshly_run_slices={merged_fresh_slice_count} progress_file_after_completion={} elapsed_seconds={:.1}{shard_fields}",
+        slices_of_this_run.len(),
         parallelism.worker_threads,
         parallelism.worker_threads_source.name(),
+        match progress_file_after_completion {
+            None => "none",
+            Some(Layer0ProgressFileAfterCompletion::Deleted) => "deleted",
+            Some(Layer0ProgressFileAfterCompletion::KeptForTheTestThatInspectsIt) => "kept",
+        },
+        started.elapsed().as_secs_f64()
+    );
+    match ledger_written {
+        Some((written_shard, ledger_path)) => {
+            Layer0EnumerationOutcome::OneShardWrittenToItsLedger(Layer0ShardLedgerWritten {
+                shard: written_shard,
+                ledger_path,
+                tally_of_this_shard: tally,
+            })
+        }
+        None => Layer0EnumerationOutcome::WholeStream(tally),
+    }
+}
+
+/// 调用线程并完这一趟负责的切片之后交回的东西。
+struct MergedSlicesOfThisRun {
+    tally: Layer0Tally,
+    /// 按次序并进来的片数（读回的 + 这一趟跑的）。
+    merged_slice_count: usize,
+    merged_fresh_slice_count: usize,
+    /// 分片跑一片时每片的计数（按片号）；不分片时是空的。
+    slice_tallies_for_the_ledger: BTreeMap<usize, Layer0Tally>,
+}
+
+/// 逐片报的一样数：`shard_<名>=a,b,…`，按第几片排。
+fn per_shard_field(
+    name: &str,
+    worker_threads_by_shard: &[Layer0ShardWorkerThreads],
+    value_of: impl Fn(&Layer0ShardWorkerThreads) -> String,
+) -> String {
+    let values: Vec<String> = worker_threads_by_shard.iter().map(value_of).collect();
+    format!("shard_{name}={}", values.join(","))
+}
+
+/// merge：读 n 份账本、核齐，按切片序号从小到大并（「第一处」取序号最小的，与单机并片同一个次序）。打一行 `LAYER0_SHARD mode=merge`
+/// 与两行 `LAYER0_PARALLEL_*`：工作线程、读回与跑过的片是 n 片之和（读回 + 跑过 = 总片数，与单机的判法对得上），另逐片报出来。
+///
+/// # Panics
+/// 账本核不齐（缺哪一片、哪一片的哪一处不同）；并完之后状态数、观察者看过的状态数对不上（不变量被破坏）。
+fn merge_the_shard_ledgers(
+    whole_plan: &Layer0ProgressPlan,
+    merge: &Layer0ShardMerge,
+) -> Layer0Tally {
+    let started = Instant::now();
+    let ledgers = read_shard_ledgers_for_merge(merge, whole_plan)
+        .unwrap_or_else(|problem| panic!("merge {} 片的账本：{problem}", merge.shard_count));
+    println!(
+        "LAYER0_SHARD mode=merge shards={} ledgers={}",
+        merge.shard_count,
+        ledgers
+            .ledger_paths
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect::<Vec<String>>()
+            .join(",")
+    );
+    let by_shard = &ledgers.worker_threads_by_shard;
+    let sum_of = |value_of: fn(&Layer0ShardWorkerThreads) -> usize| -> usize {
+        by_shard.iter().map(value_of).sum()
+    };
+    let spawned_worker_threads = sum_of(|threads| threads.spawned_worker_threads);
+    let configured_worker_threads = sum_of(|threads| threads.configured_worker_threads);
+    let resumed_slices = sum_of(|threads| threads.resumed_slices);
+    let freshly_run_slices = sum_of(|threads| threads.freshly_run_slices);
+    let shard_fields = [
+        format!("shards={}", merge.shard_count),
+        per_shard_field("worker_threads", by_shard, |threads| {
+            threads.spawned_worker_threads.to_string()
+        }),
+        per_shard_field("configured_worker_threads", by_shard, |threads| {
+            threads.configured_worker_threads.to_string()
+        }),
+        per_shard_field("worker_threads_sources", by_shard, |threads| {
+            threads.worker_threads_source.clone()
+        }),
+        per_shard_field("available_parallelism", by_shard, |threads| {
+            threads.available_parallelism.to_string()
+        }),
+        per_shard_field("resumed_slices", by_shard, |threads| {
+            threads.resumed_slices.to_string()
+        }),
+        per_shard_field("freshly_run_slices", by_shard, |threads| {
+            threads.freshly_run_slices.to_string()
+        }),
+        per_shard_field("elapsed_milliseconds", by_shard, |threads| {
+            threads.elapsed_milliseconds.to_string()
+        }),
+    ]
+    .join(" ");
+    println!(
+        "LAYER0_PARALLEL_START states={} slices={} states_per_slice={} worker_threads={spawned_worker_threads} configured_worker_threads={configured_worker_threads} worker_threads_source=shard_ledgers resumed_slices={resumed_slices} freshly_run_slices={freshly_run_slices} {shard_fields}",
+        whole_plan.state_count,
+        whole_plan.slices.len(),
+        whole_plan.slices.first().map_or(0, |slice| slice.end - slice.start),
+    );
+    let mut tally = Layer0Tally::default();
+    for (_slice_index, slice_tally) in ledgers.slice_tallies {
+        tally.absorb_following_slice(slice_tally);
+    }
+    assert_eq!(
+        tally.states, whole_plan.state_count,
+        "n 份账本并起来的状态数等于整条流的状态数"
+    );
+    if whole_plan.has_observer {
+        assert_eq!(
+            tally.observed_states, whole_plan.state_count,
+            "n 片的观察者合起来看过每一个状态（层 0 规模第三轮判决 U3）"
+        );
+    }
+    println!(
+        "LAYER0_PARALLEL_FINISHED states={} slices={} worker_threads={spawned_worker_threads} configured_worker_threads={configured_worker_threads} worker_threads_source=shard_ledgers resumed_slices={resumed_slices} freshly_run_slices={freshly_run_slices} progress_file_after_completion=none elapsed_seconds={:.1} {shard_fields}",
+        whole_plan.state_count,
+        whole_plan.slices.len(),
         started.elapsed().as_secs_f64()
     );
     tally
@@ -1856,23 +3372,360 @@ mod tests {
         };
         let only_the_four_write_segment =
             |_segment_index: usize, segment: &[usize]| segment.len() == 4;
+        // 这条只核序号与持久集合的对应，写表里没有根槽写：每一段都归「最后一次根槽写之后」。
+        let writes = writes_of_kinds(&[StepKind::UnitWrite; 13]);
+        let tearable = TearableInPlaceOverwrites::none(writes.len());
+        let writes_with_torn_images =
+            WritesWithTornImages::of(&MemoryPool::default(), &writes, &segments, &tearable);
         let assert_plan_matches_the_walk = |expand: &dyn Fn(usize, &[usize]) -> bool| {
             let walked = persisted_sets_walking_segment_by_segment(&segments, write_count, expand);
-            // 这条只核序号与持久集合的对应，不带写表：每一段都归「最后一次根槽写之后」。
-            let plan = Layer0StatePlan::new(&[], &segments, expand);
+            let plan = Layer0StatePlan::new(
+                &writes,
+                &segments,
+                &|segment_index, segment| {
+                    expansion_of_the_yes_or_no_choice(expand(segment_index, segment))
+                },
+                &tearable,
+                &writes_with_torn_images,
+            );
             assert_eq!(
                 plan.state_count,
                 u64::try_from(walked.len()).expect("状态数"),
                 "状态数与逐段走的相同"
             );
             let by_ordinal: Vec<Vec<bool>> = (0..plan.state_count)
-                .map(|ordinal| plan.persisted_writes_of_state(ordinal, write_count))
+                .map(|ordinal| plan.persisted_writes_of_state(ordinal))
                 .collect();
             assert_eq!(by_ordinal, walked, "第 k 个状态就是逐段走到的第 k 个");
         };
         assert_plan_matches_the_walk(&every_segment);
         assert_plan_matches_the_walk(&skip_three_write_segment_and_the_ends);
         assert_plan_matches_the_walk(&only_the_four_write_segment);
+    }
+
+    /// 写表里一串按次序摆的写，种类照给的：盘 0、每次一个扇区、内容全 0（只核计划的用例不读内容）。
+    fn writes_of_kinds(kinds: &[StepKind]) -> Vec<RetainedWrite> {
+        kinds
+            .iter()
+            .enumerate()
+            .map(|(index, kind)| RetainedWrite {
+                device: DeviceIdentity(0),
+                kind: *kind,
+                is_force_unit_access: false,
+                offset: DeviceOffsetInBytes(
+                    u64::try_from(index).expect("下标装得进 u64") * SECTOR_BYTES,
+                ),
+                contents: WrittenContents::Bytes(vec![0u8; 512]),
+            })
+            .collect()
+    }
+
+    /// 甲二那一串持久集合的参照走法（与计划分开写）：逐段，段内先按原地写的子集掩码从 0 数到 2^k − 1，每个掩码先「单元写全不落」、
+    /// 有单元写时再「单元写全落」，去掉整段全落那一个；每段走完整段持久。
+    fn persisted_sets_walking_the_quick_tier(
+        writes: &[RetainedWrite],
+        segments: &[Vec<usize>],
+    ) -> Vec<Vec<bool>> {
+        let mut persisted_sets = Vec::new();
+        let mut persisted_before = vec![false; writes.len()];
+        for segment in segments {
+            let in_place: Vec<usize> = segment
+                .iter()
+                .copied()
+                .filter(|write_index| writes[*write_index].kind != StepKind::UnitWrite)
+                .collect();
+            let copy_on_write: Vec<usize> = segment
+                .iter()
+                .copied()
+                .filter(|write_index| writes[*write_index].kind == StepKind::UnitWrite)
+                .collect();
+            for in_place_mask in 0..1u64 << in_place.len() {
+                let mut with_in_place_subset = persisted_before.clone();
+                for (bit, write_index) in in_place.iter().enumerate() {
+                    if in_place_mask & (1 << bit) != 0 {
+                        with_in_place_subset[*write_index] = true;
+                    }
+                }
+                let every_in_place_write = in_place_mask == (1 << in_place.len()) - 1;
+                if !(copy_on_write.is_empty() && every_in_place_write) {
+                    persisted_sets.push(with_in_place_subset.clone());
+                }
+                if !copy_on_write.is_empty() && !every_in_place_write {
+                    let mut with_every_copy_on_write = with_in_place_subset;
+                    for write_index in &copy_on_write {
+                        with_every_copy_on_write[*write_index] = true;
+                    }
+                    persisted_sets.push(with_every_copy_on_write);
+                }
+            }
+            for write_index in segment {
+                persisted_before[*write_index] = true;
+            }
+        }
+        persisted_sets.push(persisted_before);
+        persisted_sets
+    }
+
+    /// 甲二：计划按序号给出的持久集合与参照走法逐个相同，状态数等于闭式（有单元写的段 2^(k+1) − 1、没有的 2^k − 1，再加 1）；
+    /// 全是单元写的段只有「全不落」一个状态，全是原地写的段同全量。
+    #[test]
+    fn the_quick_tier_plan_takes_every_in_place_subset_with_the_copy_on_write_writes_none_or_all() {
+        let kinds = [
+            StepKind::SystemConfigurationSlot,
+            StepKind::SystemConfigurationSlot,
+            StepKind::UnitWrite,
+            StepKind::UnitWrite,
+            StepKind::UnitWrite,
+            StepKind::JournalRecord,
+            StepKind::JournalRecord,
+            StepKind::RootRecordFua,
+            StepKind::UnitWrite,
+            StepKind::UnitWrite,
+            StepKind::SystemConfigurationSlot,
+            StepKind::UnitWrite,
+        ];
+        let writes = writes_of_kinds(&kinds);
+        let segments = vec![
+            vec![0, 1, 2, 3, 4],
+            vec![5, 6],
+            vec![7],
+            vec![8, 9],
+            vec![10, 11],
+        ];
+        let walked = persisted_sets_walking_the_quick_tier(&writes, &segments);
+        let tearable = TearableInPlaceOverwrites::none(writes.len());
+        let writes_with_torn_images =
+            WritesWithTornImages::of(&MemoryPool::default(), &writes, &segments, &tearable);
+        let plan = Layer0StatePlan::new(
+            &writes,
+            &segments,
+            &quick_tier_expansion,
+            &tearable,
+            &writes_with_torn_images,
+        );
+        // [2 原地 + 3 单元] 7、[2 原地] 3、[1 原地] 1、[2 单元] 1、[1 原地 + 1 单元] 3，再加全部持久那一个。
+        assert_eq!(plan.state_count, 7 + 3 + 1 + 1 + 3 + 1);
+        assert_eq!(
+            layer0_state_count(&writes, &segments, &quick_tier_expansion),
+            plan.state_count
+        );
+        assert_eq!(
+            plan.state_count,
+            u64::try_from(walked.len()).expect("状态数"),
+            "状态数与参照走法的相同"
+        );
+        let by_ordinal: Vec<Vec<bool>> = (0..plan.state_count)
+            .map(|ordinal| plan.persisted_writes_of_state(ordinal))
+            .collect();
+        assert_eq!(by_ordinal, walked, "第 k 个状态就是参照走法的第 k 个");
+        assert_eq!(
+            layer0_state_count(&writes, &segments, &full_expansion),
+            closed_form_state_count(&segments),
+            "全量的状态数就是闭式"
+        );
+    }
+
+    /// 一次手摆的写：`length_in_bytes` 个 `fill` 字节。
+    fn write_filled_with(
+        device: u32,
+        kind: StepKind,
+        offset: u64,
+        length_in_bytes: usize,
+        fill: u8,
+    ) -> RetainedWrite {
+        RetainedWrite {
+            device: DeviceIdentity(device),
+            kind,
+            is_force_unit_access: false,
+            offset: DeviceOffsetInBytes(offset),
+            contents: WrittenContents::Bytes(vec![fill; length_in_bytes]),
+        }
+    }
+
+    /// 撕裂镜像的字节：新旧不同的那一截前一半新、后一半旧，与新、旧都不同；只差一个字节时撕不出第三种、交回旧的；完全相同交回新的；
+    /// 整段清零照同一条算（新的是全 0）。
+    #[test]
+    fn the_torn_image_keeps_the_first_half_of_the_differing_bytes_new_and_the_rest_old() {
+        let old = [1u8, 1, 1, 1, 1, 1, 1, 1];
+        let new = WrittenContents::Bytes(vec![1, 2, 2, 2, 2, 2, 2, 1]);
+        let torn = torn_image_of_in_place_overwrite(&old, &new);
+        assert_eq!(torn, vec![1, 2, 2, 2, 1, 1, 1, 1]);
+        assert_ne!(torn.as_slice(), old.as_slice(), "与旧的不同");
+        assert_ne!(Some(torn.as_slice()), new.as_bytes(), "与新的不同");
+        assert_eq!(
+            torn_image_of_in_place_overwrite(
+                &old,
+                &WrittenContents::Bytes(vec![1, 1, 1, 9, 1, 1, 1, 1])
+            ),
+            old.to_vec(),
+            "只差一个字节：撕不出第三种内容，交回旧的"
+        );
+        assert_eq!(
+            torn_image_of_in_place_overwrite(&old, &WrittenContents::Bytes(old.to_vec())),
+            old.to_vec(),
+            "完全相同"
+        );
+        assert_eq!(
+            torn_image_of_in_place_overwrite(&old, &WrittenContents::Zeros { length: 8 }),
+            vec![0, 0, 0, 0, 1, 1, 1, 1],
+            "整段清零：前一半清了、后一半还是旧的"
+        );
+    }
+
+    /// 补第三态之后计划给出的持久集合：一段里原地覆写的写三态、其余两态，按混合进制（第一次写是最低位，没持久 0、撕裂 1、持久 2）
+    /// 逐个组合各出一次、整段全持久那一个不出；撕裂那一态是「原来那次写没持久、它的撕裂镜像持久」，同一段里在它之后、与它重叠的写
+    /// 落了时它的重放也持久（盖在撕裂镜像上面）。参照走法是三层循环，与计划的算法分开写。
+    #[test]
+    fn the_state_plan_with_torn_in_place_overwrites_hands_out_every_landing_combination_once() {
+        const SYSTEM_CONFIGURATION_SLOT: u64 = 4096;
+        const JOURNAL_SLOT: u64 = 16 << 20;
+        const UNIT_SLOT: u64 = 784 << 20;
+        let mut base = MemoryPool::with_devices(&[DeviceIdentity(0)], 1 << 30);
+        base.devices
+            .get_mut(&DeviceIdentity(0))
+            .expect("盘 0")
+            .write(
+                DeviceOffsetInBytes(SYSTEM_CONFIGURATION_SLOT),
+                &[0x5Au8; 4096],
+            );
+        let writes = vec![
+            write_filled_with(
+                0,
+                StepKind::SystemConfigurationSlot,
+                SYSTEM_CONFIGURATION_SLOT,
+                4096,
+                1,
+            ),
+            write_filled_with(0, StepKind::UnitWrite, UNIT_SLOT, 512, 2),
+            write_filled_with(0, StepKind::JournalRecord, JOURNAL_SLOT, 4096, 3),
+            write_filled_with(
+                0,
+                StepKind::SystemConfigurationSlot,
+                SYSTEM_CONFIGURATION_SLOT,
+                4096,
+                4,
+            ),
+            write_filled_with(0, StepKind::JournalRecord, JOURNAL_SLOT, 4096, 5),
+        ];
+        // 写 0（基镜像那一槽有旧内容）、写 3（与更早的写 0 重叠）、写 4（与更早的写 2 重叠）是原地覆写；写 3 与写 0 同段、在它之后。
+        let segments = vec![vec![0, 1, 3], vec![2], vec![4]];
+        let tearable = TearableInPlaceOverwrites::of(&base, &writes);
+        assert_eq!(tearable.write_indexes(), vec![0, 3, 4]);
+        let writes_with_torn_images =
+            WritesWithTornImages::of(&base, &writes, &segments, &tearable);
+        // 写表后面接：写 0 的撕裂镜像（5）、写 3 的重放（6）、写 3 的撕裂镜像（7）、写 4 的撕裂镜像（8）。
+        assert_eq!(writes_with_torn_images.writes.len(), 9);
+        assert_eq!(
+            writes_with_torn_images.writes[5].contents,
+            WrittenContents::Bytes(torn_image_of_in_place_overwrite(
+                &[0x5Au8; 4096],
+                &writes[0].contents
+            )),
+            "写 0 的撕裂镜像按基镜像上的旧字节算"
+        );
+        assert_eq!(writes_with_torn_images.writes[6], writes[3], "写 3 的重放");
+        assert_eq!(
+            writes_with_torn_images.writes[7].contents,
+            WrittenContents::Bytes(torn_image_of_in_place_overwrite(
+                &[1u8; 4096],
+                &writes[3].contents
+            )),
+            "写 3 的撕裂镜像按「写 0 已落」时的旧字节算"
+        );
+        let plan = Layer0StatePlan::new(
+            &writes,
+            &segments,
+            &full_expansion,
+            &tearable,
+            &writes_with_torn_images,
+        );
+        // 第一段 3 · 2 · 3 − 1、第二段 2 − 1、第三段 3 − 1，再加全部持久那一个。
+        assert_eq!(plan.state_count, 17 + 1 + 2 + 1);
+        assert_eq!(
+            layer0_state_count_with_torn_in_place_overwrites(
+                &base,
+                &writes,
+                &segments,
+                &full_expansion
+            ),
+            plan.state_count
+        );
+        use WriteLandingInCrashState::{NotPersisted, Persisted, Torn};
+        let torn_image_index_of = |write_index: usize| match write_index {
+            0 => Some(5),
+            3 => Some(7),
+            4 => Some(8),
+            _ => None,
+        };
+        let landing_of = |persisted: &[bool], write_index: usize| {
+            if persisted[write_index] {
+                Persisted
+            } else if torn_image_index_of(write_index).is_some_and(|index| persisted[index]) {
+                Torn
+            } else {
+                NotPersisted
+            }
+        };
+        let mut expected: Vec<[WriteLandingInCrashState; 5]> = Vec::new();
+        for landing_of_write_three in [NotPersisted, Torn, Persisted] {
+            for landing_of_write_one in [NotPersisted, Persisted] {
+                for landing_of_write_zero in [NotPersisted, Torn, Persisted] {
+                    expected.push([
+                        landing_of_write_zero,
+                        landing_of_write_one,
+                        NotPersisted,
+                        landing_of_write_three,
+                        NotPersisted,
+                    ]);
+                }
+            }
+        }
+        expected.pop();
+        expected.push([Persisted, Persisted, NotPersisted, Persisted, NotPersisted]);
+        expected.push([Persisted, Persisted, Persisted, Persisted, NotPersisted]);
+        expected.push([Persisted, Persisted, Persisted, Persisted, Torn]);
+        expected.push([Persisted; 5]);
+        let mut by_ordinal: Vec<[WriteLandingInCrashState; 5]> = Vec::new();
+        for ordinal in 0..plan.state_count {
+            let persisted = plan.persisted_writes_of_state(ordinal);
+            assert_eq!(persisted.len(), 9, "持久集合与枚举用的写表逐条对应");
+            let landings = [0, 1, 2, 3, 4].map(|write_index| landing_of(&persisted, write_index));
+            assert_eq!(
+                persisted[6],
+                landings[0] == Torn && landings[3] == Persisted,
+                "写 3 的重放只在写 0 撕裂、写 3 落了时持久（第 {ordinal} 个状态）"
+            );
+            by_ordinal.push(landings);
+        }
+        assert_eq!(by_ordinal, expected, "第 k 个状态就是参照走法的第 k 个");
+        // 写 0 撕裂、写 3 落了：那一槽读出来是写 3 的字节（重放盖在撕裂镜像上面）；写 3 没落：读出来是写 0 的撕裂镜像。
+        let slot_in_state = |landing_of_write_three: WriteLandingInCrashState| {
+            let ordinal = by_ordinal
+                .iter()
+                .position(|landings| {
+                    landings[0] == Torn
+                        && landings[1] == NotPersisted
+                        && landings[3] == landing_of_write_three
+                })
+                .expect("有这个状态");
+            let image = CrashImage {
+                base: &base,
+                writes: &writes_with_torn_images.writes,
+                persisted: plan.persisted_writes_of_state(u64::try_from(ordinal).expect("序号")),
+            };
+            PoolReader::read(
+                &image,
+                DeviceIdentity(0),
+                DeviceOffsetInBytes(SYSTEM_CONFIGURATION_SLOT),
+                4096,
+            )
+            .expect("读得出")
+        };
+        assert_eq!(slot_in_state(Persisted), vec![4u8; 4096]);
+        assert_eq!(
+            Some(slot_in_state(NotPersisted).as_slice()),
+            writes_with_torn_images.writes[5].contents.as_bytes()
+        );
     }
 
     /// 切片首尾相接、从 0 起、到状态数止、一片都不空：丢一片或两片重叠，这里与用例里「状态数等于闭式」的断言都红。
@@ -1927,6 +3780,116 @@ mod tests {
                         slices.len()
                     );
                 }
+            }
+        }
+    }
+
+    /// 续跑的片方案不随线程数变（R2）：第二条流全量那么多个状态，1、8、32 个线程按「线程数定片长」给进来，续跑时切出来的片逐个相同、
+    /// 片数不超过 [`LAYER0_RESUMABLE_SLICE_COUNT`]；不续跑时照旧按线程数切（1 个与 32 个线程切得不同）。
+    #[test]
+    fn a_resumable_run_slices_independently_of_the_worker_threads() {
+        let state_count = 6_649_413_746u64;
+        let resume =
+            Layer0Resume::KeepProgressFile(crate::layer0_progress::Layer0ProgressFileSettings {
+                directory: std::path::PathBuf::from("/nonexistent"),
+                input_fingerprint: crate::layer0_progress::Layer0ProgressFileNamePart::new(
+                    "fingerprint0",
+                )
+                .expect("合法"),
+                stream_name: crate::layer0_progress::Layer0ProgressFileNamePart::new("stream_a")
+                    .expect("合法"),
+                start: crate::layer0_progress::Layer0ResumeStart::ResumeFromTheProgressFile,
+                after_completion: Layer0ProgressFileAfterCompletion::Deleted,
+            });
+        let scaled_to = |worker_threads: usize| Layer0Parallelism {
+            worker_threads: NonZeroUsize::new(worker_threads).expect("不是 0"),
+            worker_threads_source: Layer0WorkerThreadsSource::GivenByCaller,
+            slice_length: Layer0SliceLength::ScaledToWorkerThreads,
+        };
+        let resumable_slices = |worker_threads: usize| {
+            state_slices(
+                state_count,
+                &slicing_of_the_run(&scaled_to(worker_threads), &resume, state_count),
+            )
+        };
+        let on_one_thread = resumable_slices(1);
+        assert_eq!(on_one_thread, resumable_slices(8));
+        assert_eq!(on_one_thread, resumable_slices(32));
+        assert!(
+            u64::try_from(on_one_thread.len()).expect("片数") <= LAYER0_RESUMABLE_SLICE_COUNT,
+            "片数 {}",
+            on_one_thread.len()
+        );
+        let without_resume = |worker_threads: usize| {
+            state_slices(
+                state_count,
+                &slicing_of_the_run(
+                    &scaled_to(worker_threads),
+                    &Layer0Resume::NoProgressFile,
+                    state_count,
+                ),
+            )
+            .len()
+        };
+        assert_ne!(without_resume(1), without_resume(32), "不续跑时按线程数切");
+    }
+
+    /// 双机分片的片方案不随线程数变：第二条流全量那么多个状态，分片跑一片与 merge 按「线程数定片长」给进来，1、8、32 个线程切出来的
+    /// 片逐个相同，也与单机续跑的相同（两台线程数不同，账本的切法照样对得上）。
+    #[test]
+    fn a_shard_run_and_a_merge_slice_independently_of_the_worker_threads() {
+        use crate::layer0_progress::{
+            Layer0ProgressFileNamePart, Layer0ProgressFileSettings, Layer0ResumeStart,
+            Layer0ShardMerge, Layer0ShardRun, Layer0ToolchainIdentity,
+        };
+        let state_count = 6_649_413_746u64;
+        let progress = Layer0ProgressFileSettings {
+            directory: std::path::PathBuf::from("/nonexistent"),
+            input_fingerprint: Layer0ProgressFileNamePart::new("fingerprint0").expect("合法"),
+            stream_name: Layer0ProgressFileNamePart::new("stream_a").expect("合法"),
+            start: Layer0ResumeStart::ResumeFromTheProgressFile,
+            after_completion: Layer0ProgressFileAfterCompletion::Deleted,
+        };
+        let toolchain = Layer0ToolchainIdentity {
+            rustc_version_lines: "rustc".to_string(),
+            cargo_version: "cargo".to_string(),
+            target_triple: "target".to_string(),
+        };
+        let shard_count = std::num::NonZeroU32::new(2).expect("不是 0");
+        let shard_run = Layer0Resume::RunOneShardKeepingProgressFile(Layer0ShardRun {
+            progress: progress.clone(),
+            shard: Layer0ShardOfShards::new(1, shard_count).expect("1 < 2"),
+            toolchain: toolchain.clone(),
+        });
+        let merge = Layer0Resume::MergeShardLedgers(Layer0ShardMerge {
+            directory: progress.directory.clone(),
+            input_fingerprint: progress.input_fingerprint.clone(),
+            stream_name: progress.stream_name.clone(),
+            shard_count,
+            toolchain,
+        });
+        let single_machine = Layer0Resume::KeepProgressFile(progress);
+        let slices_on = |resume: &Layer0Resume, worker_threads: usize| {
+            state_slices(
+                state_count,
+                &slicing_of_the_run(
+                    &Layer0Parallelism {
+                        worker_threads: NonZeroUsize::new(worker_threads).expect("不是 0"),
+                        worker_threads_source: Layer0WorkerThreadsSource::GivenByCaller,
+                        slice_length: Layer0SliceLength::ScaledToWorkerThreads,
+                    },
+                    resume,
+                    state_count,
+                ),
+            )
+        };
+        let single_machine_slices = slices_on(&single_machine, 1);
+        for resume in [&shard_run, &merge] {
+            for worker_threads in [1, 8, 32] {
+                assert!(
+                    slices_on(resume, worker_threads) == single_machine_slices,
+                    "{resume:?} 在 {worker_threads} 个线程上的片方案与单机续跑的相同"
+                );
             }
         }
     }
@@ -2021,6 +3984,8 @@ mod tests {
             checker_violated_states: BTreeMap::from([("I-1.1", 1)]),
             checker_first_violation: BTreeMap::from([("I-1.1", "前面那一片的 I-1.1".to_string())]),
             checker_not_applicable_states: BTreeMap::from([("I-3.1", 3)]),
+            observed_states: 3,
+            observer_counts: observer_counts_of(&[("read_through_the_record", 2)]),
         };
         let following = Layer0Tally {
             states: 5,
@@ -2049,8 +4014,21 @@ mod tests {
                 ("I-3.1", "后面那一片的 I-3.1".to_string()),
             ]),
             checker_not_applicable_states: BTreeMap::new(),
+            observed_states: 5,
+            observer_counts: observer_counts_of(&[
+                ("read_through_the_record", 1),
+                ("read_through_the_root", 4),
+            ]),
         };
         earlier.absorb_following_slice(following);
+        assert_eq!(
+            (earlier.observed_states, earlier.observer_counts.clone()),
+            (
+                8,
+                observer_counts_of(&[("read_through_the_record", 3), ("read_through_the_root", 4)])
+            ),
+            "观察者看过的状态数与按名字的计数逐项相加（续跑接上的片靠它们接累计）"
+        );
         assert_eq!(
             (
                 earlier.states,
@@ -2130,7 +4108,17 @@ mod tests {
             checker_violated_states: BTreeMap::new(),
             checker_first_violation: BTreeMap::new(),
             checker_not_applicable_states: BTreeMap::new(),
+            observed_states: 0,
+            observer_counts: Layer0ObserverCounts::default(),
         }
+    }
+
+    fn observer_counts_of(entries: &[(&str, u64)]) -> Layer0ObserverCounts {
+        let mut counts = Layer0ObserverCounts::default();
+        for (name, amount) in entries {
+            counts.add(name, *amount);
+        }
+        counts
     }
 
     /// 并片：两片都带「不看 journal 那一遍的第一处违例」时取前面那一片的，再并第三片也不换（代码三方第一轮 Y5m2：
@@ -2157,6 +4145,33 @@ mod tests {
             "再并一片也不换"
         );
         assert_eq!(merged.first_violation, None, "看 journal 那一遍没有违例");
+    }
+
+    /// 并片：「走读失败」与「journal 验证失败」两项也逐项相加（代码审阅第 14 条：上面那条用例里两片这两项都是 0，
+    /// 删掉相加照样绿，层 0 用例 `failed_states == 0` 的断言对第二片以后的失败状态就没了判别力）。两片各取不同的非 0 值，
+    /// 相加的和与任一片单独的值都不同。
+    #[test]
+    fn absorbing_a_following_slice_adds_the_failed_and_the_verification_failed_states_of_both_slices(
+    ) {
+        let mut earlier = slice_with_only_ignored_violations(6, 0, "前面那一片的 Ignore");
+        earlier.failed_states = 2;
+        earlier.verification_ran_states = 4;
+        earlier.verification_failed_states = 3;
+        let mut following = slice_with_only_ignored_violations(9, 0, "后面那一片的 Ignore");
+        following.failed_states = 5;
+        following.verification_ran_states = 8;
+        following.verification_failed_states = 7;
+        earlier.absorb_following_slice(following);
+        assert_eq!(
+            (
+                earlier.states,
+                earlier.failed_states,
+                earlier.verification_ran_states,
+                earlier.verification_failed_states
+            ),
+            (15, 7, 12, 10),
+            "走读失败 2 + 5、验证跑过 4 + 8、验证失败 3 + 7：两片逐项相加"
+        );
     }
 }
 

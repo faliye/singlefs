@@ -30,7 +30,9 @@ use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::make_filesystem::MakeFilesystemParameters;
 use singlefs_core::root_ring::RootRingSlotsPerRegion;
 use singlefs_core::system_configuration::SystemImmutableSizes;
-use singlefs_format::{FIRST_TRANSACTION_TXG, JOURNAL_RING_DEFAULT_BYTES, TEST_IMAGE_DEFAULT_BYTES};
+use singlefs_format::{
+    FIRST_TRANSACTION_TXG, JOURNAL_RING_DEFAULT_BYTES, TEST_IMAGE_DEFAULT_BYTES,
+};
 use singlefs_harness::crash::SparseBlockDevice;
 use singlefs_harness::hexadecimal::hexadecimal_text;
 use singlefs_harness::scenario::{
@@ -81,11 +83,13 @@ fn operation_bytes(retained: &RetainedOperation) -> Option<Vec<u8>> {
         RecordedOperationKind::Write | RecordedOperationKind::WriteForceUnitAccess => {
             retained.contents.clone()
         }
-        RecordedOperationKind::WriteZeroes => Some(vec![
-            0u8;
-            usize::try_from(retained.operation.length)
-                .expect("窗口里的写清零长度装得进 usize")
-        ]),
+        RecordedOperationKind::WriteZeroes => {
+            Some(vec![
+                0u8;
+                usize::try_from(retained.operation.length)
+                    .expect("窗口里的写清零长度装得进 usize")
+            ])
+        }
         RecordedOperationKind::Barrier => None,
     }
 }
@@ -93,14 +97,19 @@ fn operation_bytes(retained: &RetainedOperation) -> Option<Vec<u8>> {
 /// 一盘对照的 mkfs 参数：`region_devices` 三个区域全指盘 0（D2 已定项 6 明知违反、只作对照臂），
 /// 其余字段与 `scenario::e142_parameters` 同一份构造（那个函数把 `region_devices` 写死成两盘，
 /// 这里不能借它，直接构造同一个结构体）。
-fn one_device_parameters(physical_block_size: u32, minimum_input_output_bytes: u32) -> MakeFilesystemParameters {
+fn one_device_parameters(
+    physical_block_size: u32,
+    minimum_input_output_bytes: u32,
+) -> MakeFilesystemParameters {
     MakeFilesystemParameters {
         filesystem_identifier: E142_FILESYSTEM_IDENTIFIER,
         region_devices: [DeviceIdentity(0), DeviceIdentity(0), DeviceIdentity(0)],
         geometry: SystemImmutableSizes {
             physical_block_size,
             minimum_input_output_bytes,
-            fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(minimum_input_output_bytes),
+            fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(
+                minimum_input_output_bytes,
+            ),
             journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
             root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
         },
@@ -119,20 +128,31 @@ fn main() {
             TEST_IMAGE_DEFAULT_BYTES == 4_294_967_296,
             "跑前登记第一节写死 4 GiB 一档；singlefs_format::TEST_IMAGE_DEFAULT_BYTES 变了这一格要重登记"
         );
-        assert!(FIRST_FILE_BYTES == 3000, "第一个文件字节数与跑前登记第一节抄的模型同名常量回比");
-        assert!(EXPECTED_FILE_BYTES == 3000, "本地常量与上面这条断言钉的是同一个数");
+        assert!(
+            FIRST_FILE_BYTES == 3000,
+            "第一个文件字节数与跑前登记第一节抄的模型同名常量回比"
+        );
+        assert!(
+            EXPECTED_FILE_BYTES == 3000,
+            "本地常量与上面这条断言钉的是同一个数"
+        );
     };
 
-    let parameters = one_device_parameters(PHYSICAL_BLOCK_SIZE_IN_BYTES, MINIMUM_INPUT_OUTPUT_BYTES);
+    let parameters =
+        one_device_parameters(PHYSICAL_BLOCK_SIZE_IN_BYTES, MINIMUM_INPUT_OUTPUT_BYTES);
     let stream = SharedStream::retaining_contents();
-    let mut devices: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> = (0..DEVICE_COUNT)
+    let mut devices: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> = (0
+        ..DEVICE_COUNT)
         .map(|device_number| {
             let identity = DeviceIdentity(device_number);
             (
                 identity,
                 RecordingBlockDevice::with_shared_stream(
                     identity,
-                    SparseBlockDevice::new(TEST_IMAGE_DEFAULT_BYTES, PhysicalBlockSizeInBytes(PHYSICAL_BLOCK_SIZE_IN_BYTES)),
+                    SparseBlockDevice::new(
+                        TEST_IMAGE_DEFAULT_BYTES,
+                        PhysicalBlockSizeInBytes(PHYSICAL_BLOCK_SIZE_IN_BYTES),
+                    ),
                     stream.clone(),
                 ),
             )
@@ -140,12 +160,18 @@ fn main() {
         .collect();
 
     let mut steps_before_first_transaction: Option<usize> = None;
-    let run = run_first_transaction(&parameters, &mut devices, &stream, |point, _devices| match point {
-        ScenarioPoint::AfterMakeFilesystem | ScenarioPoint::AfterInstanceAcquisition => {}
-        ScenarioPoint::BeforeFirstTransaction => {
-            steps_before_first_transaction = Some(stream.operation_count());
-        }
-    });
+    let run =
+        run_first_transaction(
+            &parameters,
+            &mut devices,
+            &stream,
+            |point, _devices| match point {
+                ScenarioPoint::AfterMakeFilesystem | ScenarioPoint::AfterInstanceAcquisition => {}
+                ScenarioPoint::BeforeFirstTransaction => {
+                    steps_before_first_transaction = Some(stream.operation_count());
+                }
+            },
+        );
     let run = match run {
         Ok(run) => run,
         Err(error) => {
@@ -155,8 +181,8 @@ fn main() {
             return;
         }
     };
-    let steps_before_first_transaction =
-        steps_before_first_transaction.expect("run_first_transaction 一定走过 BeforeFirstTransaction");
+    let steps_before_first_transaction = steps_before_first_transaction
+        .expect("run_first_transaction 一定走过 BeforeFirstTransaction");
 
     let all_operations = stream.retained_operations();
     let before_window = &all_operations[..steps_before_first_transaction];
@@ -182,7 +208,12 @@ fn main() {
         .iter()
         .rev()
         .take(5)
-        .map(|retained| format!("device{}@{}+{}", retained.operation.device.0, retained.operation.offset.0, retained.operation.length))
+        .map(|retained| {
+            format!(
+                "device{}@{}+{}",
+                retained.operation.device.0, retained.operation.offset.0, retained.operation.length
+            )
+        })
         .collect::<Vec<_>>()
         .into_iter()
         .rev()
@@ -191,7 +222,11 @@ fn main() {
         "name=before_window_summary operations={} writes={} last_five={}",
         before_window.len(),
         before_window_writes.len(),
-        if last_five.is_empty() { "none".to_string() } else { last_five.join(",") }
+        if last_five.is_empty() {
+            "none".to_string()
+        } else {
+            last_five.join(",")
+        }
     ));
 
     let mut write_count = 0u64;
@@ -200,11 +235,15 @@ fn main() {
         let operation = &retained.operation;
         if operation.kind == RecordedOperationKind::Barrier {
             barrier_count += 1;
-            emitter.emit(&format!("name=window_barrier step={step_index} device={}", operation.device.0));
+            emitter.emit(&format!(
+                "name=window_barrier step={step_index} device={}",
+                operation.device.0
+            ));
             continue;
         }
         write_count += 1;
-        let bytes = operation_bytes(retained).expect("write / write_fua / write_zeroes 都能重建出完整字节");
+        let bytes =
+            operation_bytes(retained).expect("write / write_fua / write_zeroes 都能重建出完整字节");
         emitter.emit(&format!(
             "name=device_region_bytes step={step_index} device={} offset={} length={} kind={} sha256={} hexadecimal={}",
             operation.device.0,
@@ -228,14 +267,30 @@ mod tests {
     #[test]
     fn kind_name_covers_every_recorded_operation_kind_without_a_wildcard_arm() {
         assert_eq!(kind_name(RecordedOperationKind::Write), "write");
-        assert_eq!(kind_name(RecordedOperationKind::WriteForceUnitAccess), "write_fua");
-        assert_eq!(kind_name(RecordedOperationKind::WriteZeroes), "write_zeroes");
+        assert_eq!(
+            kind_name(RecordedOperationKind::WriteForceUnitAccess),
+            "write_fua"
+        );
+        assert_eq!(
+            kind_name(RecordedOperationKind::WriteZeroes),
+            "write_zeroes"
+        );
         assert_eq!(kind_name(RecordedOperationKind::Barrier), "barrier");
     }
 
-    fn retained(kind: RecordedOperationKind, length: u64, contents: Option<Vec<u8>>) -> RetainedOperation {
+    fn retained(
+        kind: RecordedOperationKind,
+        length: u64,
+        contents: Option<Vec<u8>>,
+    ) -> RetainedOperation {
         RetainedOperation {
-            operation: RecordedOperation { device: DeviceIdentity(0), kind, offset: DeviceOffsetInBytes(0), length, content_hash: 0 },
+            operation: RecordedOperation {
+                device: DeviceIdentity(0),
+                kind,
+                offset: DeviceOffsetInBytes(0),
+                length,
+                content_hash: 0,
+            },
             contents,
         }
     }
@@ -247,7 +302,8 @@ mod tests {
     }
 
     #[test]
-    fn operation_bytes_rebuilds_an_all_zero_buffer_for_write_zeroes_even_without_retained_content() {
+    fn operation_bytes_rebuilds_an_all_zero_buffer_for_write_zeroes_even_without_retained_content()
+    {
         let write_zeroes = retained(RecordedOperationKind::WriteZeroes, 4, None);
         assert_eq!(operation_bytes(&write_zeroes), Some(vec![0, 0, 0, 0]));
     }
@@ -261,6 +317,9 @@ mod tests {
     #[test]
     fn one_device_parameters_puts_every_region_on_device_zero() {
         let parameters = one_device_parameters(512, 512);
-        assert_eq!(parameters.region_devices, [DeviceIdentity(0), DeviceIdentity(0), DeviceIdentity(0)]);
+        assert_eq!(
+            parameters.region_devices,
+            [DeviceIdentity(0), DeviceIdentity(0), DeviceIdentity(0)]
+        );
     }
 }

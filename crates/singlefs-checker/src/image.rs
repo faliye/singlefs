@@ -33,22 +33,68 @@ pub enum InvariantVerdict {
     NotApplicable(&'static str),
 }
 
+/// 「中央映射条目的 key 与它指的单元头相符」那一条（用户 2026-09-27 定新立，实审 B2），
+/// 编号 I-1.11（映射 key 与单元头相符），登记在 `.claude/kb/invariants.md`。
+pub const MAPPING_KEY_MATCHES_THE_UNIT_HEADER: &str = "I-1.11";
+
 /// 第一版 checker 判的不变量，按这个次序报；每次都全部报出来，没评估到的报「不适用」。
 pub const IMPLEMENTED_INVARIANTS: [&str; 46] = [
-    "I-1.1", "I-1.2", "I-1.3", "I-1.4", "I-1.6", "I-1.7", "I-1.8", "I-1.10", "I-2.1", "I-2.3",
-    "I-2.4", "I-2.5", "I-3.1", "I-3.8", "I-3.9", "I-3.10", "I-3.11", "I-4.2", "I-4.8", "I-5.1",
-    "I-5.2", "I-5.4", "I-7.1", "I-7.2", "I-7.3", "I-7.4", "I-7.6", "I-7.7", "I-7.8", "I-7.9",
-    "I-7.10", "I-7.11", "I-8.6", "I-8.7", "I-8.8", "I-8.9", "I-9.1", "I-9.2", "I-9.4", "I-9.6",
-    "I-9.7", "I-9.10", "I-9.12", "I-9.13", "I-9.14", "I-9.15",
+    "I-1.1",
+    "I-1.2",
+    "I-1.3",
+    "I-1.4",
+    "I-1.6",
+    "I-1.7",
+    "I-1.8",
+    "I-1.10",
+    MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+    "I-2.1",
+    "I-2.3",
+    "I-2.4",
+    "I-2.5",
+    "I-3.1",
+    "I-3.8",
+    "I-3.9",
+    "I-3.10",
+    "I-3.11",
+    "I-4.2",
+    "I-4.8",
+    "I-5.1",
+    "I-5.2",
+    "I-5.4",
+    "I-7.1",
+    "I-7.2",
+    "I-7.3",
+    "I-7.4",
+    "I-7.6",
+    "I-7.7",
+    "I-7.8",
+    "I-7.9",
+    "I-7.12",
+    "I-8.6",
+    "I-8.7",
+    "I-8.8",
+    "I-8.9",
+    "I-9.1",
+    "I-9.2",
+    "I-9.4",
+    "I-9.6",
+    "I-9.7",
+    "I-9.10",
+    "I-9.12",
+    "I-9.13",
+    "I-9.14",
+    "I-9.15",
 ];
 
-/// 判定累加器：每条不变量记评估了几次、第一处违例、以及整条不适用的理由。
+/// 判定累加器：每条不变量记评估了几次、第一处违例、整条不适用的理由，以及射程里有一部分判不了的理由。
 #[derive(Default)]
 pub struct Judgements {
     evaluated: BTreeMap<&'static str, u64>,
     violations: BTreeMap<&'static str, u64>,
     first_violation: BTreeMap<&'static str, String>,
     not_applicable: BTreeMap<&'static str, &'static str>,
+    part_of_the_range_not_judged: BTreeMap<&'static str, &'static str>,
 }
 
 impl Judgements {
@@ -78,6 +124,22 @@ impl Judgements {
         );
         self.not_applicable.entry(invariant).or_insert(reason);
     }
+    /// 这条不变量射程里有一部分在这个镜像上判不了（例如 I-7.4（近 K 代块未被复用） 被抛弃根那一半：根环有读不出的槽）：
+    /// 判了的那一部分成立不等于整条成立，没有违例时整条报「不适用」带这个理由、不报成立；判出了违例照报违例。
+    pub fn part_of_the_range_not_judged(&mut self, invariant: &'static str, reason: &'static str) {
+        assert!(
+            IMPLEMENTED_INVARIANTS.contains(&invariant),
+            "{invariant} 不在第一版 checker 的清单里"
+        );
+        self.part_of_the_range_not_judged
+            .entry(invariant)
+            .or_insert(reason);
+    }
+    /// 这条不变量到此为止的第一处违例说明：一次走读前后各看一眼，走读里第一处对不上的是什么（I-7.4 被抛弃根那一半报它）。
+    #[must_use]
+    pub fn first_violation_of(&self, invariant: &'static str) -> Option<&str> {
+        self.first_violation.get(invariant).map(String::as_str)
+    }
     #[must_use]
     pub fn into_report(self) -> Vec<(&'static str, InvariantVerdict)> {
         IMPLEMENTED_INVARIANTS
@@ -85,6 +147,8 @@ impl Judgements {
             .map(|invariant| {
                 let verdict = if let Some(detail) = self.first_violation.get(invariant) {
                     InvariantVerdict::Violated(detail.clone())
+                } else if let Some(reason) = self.part_of_the_range_not_judged.get(invariant) {
+                    InvariantVerdict::NotApplicable(reason)
                 } else if self.evaluated.get(invariant).copied().unwrap_or(0) > 0 {
                     InvariantVerdict::Holds
                 } else {
@@ -178,25 +242,43 @@ fn parse_system_configuration_slot(
     Some((view, geometry))
 }
 
-/// 每盘两槽里自证过的系统配置：槽 0 在偏移 0；槽 1 的偏移按槽 0 记的槽距，槽 0 无效时按最小槽距 4096（2026-09-14 用户收尾弹窗定甲）。
+/// 每盘两槽里自证过的系统配置：槽 0 在偏移 0；槽 1 的偏移按这块盘槽 0 记的槽距，这块盘的槽 0 无效时按池里（`reader.devices()` 的次序）
+/// 第一块槽 0 有效的盘记的槽距，全池的槽 0 都无效时才按最小槽距 4096（2026-09-14 用户收尾弹窗定甲；借别的盘那一档与恢复
+/// `crates/singlefs-core/src/recovery.rs` 的 `choose_system_configuration` 同一个读法，实审 A2a 第 37 条改的，这里跟着对齐）。
 /// I-7.7（系统配置实例代号不低于根环） 按这个读法取每盘的实例代号（2026-09-14 用户定案，C322（取号那一步的屏障怎么放没有条款） 三轮三方）。
 #[must_use]
 pub fn verified_system_configuration_slots(
     reader: &dyn ImageReader,
 ) -> Vec<(u32, Vec<(SystemConfigurationView, PoolGeometry)>)> {
     let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
-    reader
-        .devices()
+    let slot_zero_of_each_device: Vec<(u32, Option<(SystemConfigurationView, PoolGeometry)>)> =
+        reader
+            .devices()
+            .into_iter()
+            .map(|device| {
+                (
+                    device,
+                    reader
+                        .read(device, 0, slot_bytes)
+                        .as_deref()
+                        .and_then(parse_system_configuration_slot),
+                )
+            })
+            .collect();
+    let spacing_recorded_by_the_first_valid_slot_zero =
+        slot_zero_of_each_device.iter().find_map(|(_, slot_zero)| {
+            slot_zero
+                .as_ref()
+                .map(|(_, geometry)| geometry.slot_spacing)
+        });
+    slot_zero_of_each_device
         .into_iter()
-        .map(|device| {
-            let slot_zero = reader
-                .read(device, 0, slot_bytes)
-                .as_deref()
-                .and_then(parse_system_configuration_slot);
-            let spacing = slot_zero.as_ref().map_or(
-                FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
-                |(_, geometry)| geometry.slot_spacing,
-            );
+        .map(|(device, slot_zero)| {
+            let spacing = slot_zero
+                .as_ref()
+                .map(|(_, geometry)| geometry.slot_spacing)
+                .or(spacing_recorded_by_the_first_valid_slot_zero)
+                .unwrap_or(FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES);
             let slot_one = reader
                 .read(device, spacing, slot_bytes)
                 .as_deref()
@@ -204,77 +286,6 @@ pub fn verified_system_configuration_slots(
             (device, slot_zero.into_iter().chain(slot_one).collect())
         })
         .collect()
-}
-
-/// 一个自证过的系统配置槽里的回退见证表（D23（journal 的角色与格式） 已定项 14「回退见证」）：哪块盘、槽世代号、解出来的条目或解不开的那一样。
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct RollbackWitnessOfASlot {
-    pub device: u32,
-    pub slot_generation: u64,
-    pub witness: Result<Vec<crate::RollbackWitnessEntryView>, &'static str>,
-}
-
-/// 每盘两槽里自证过的系统配置槽各自的回退见证表（读法与 `verified_system_configuration_slots` 相同：槽 1 按槽 0 记的槽距找）。
-/// 条数上限按那一槽自述的 R、S 算（R × S − 1）。
-#[must_use]
-pub fn rollback_witness_of_every_verified_slot(
-    reader: &dyn ImageReader,
-) -> Vec<RollbackWitnessOfASlot> {
-    let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
-    let mut witnesses = Vec::new();
-    for device in reader.devices() {
-        let slot_zero = reader.read(device, 0, slot_bytes);
-        let spacing = slot_zero
-            .as_deref()
-            .and_then(parse_system_configuration_slot)
-            .map_or(
-                FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
-                |(_, geometry)| geometry.slot_spacing,
-            );
-        let slot_one = reader.read(device, spacing, slot_bytes);
-        for bytes in [slot_zero, slot_one].into_iter().flatten() {
-            let Some((view, geometry)) = parse_system_configuration_slot(&bytes) else {
-                continue;
-            };
-            witnesses.push(RollbackWitnessOfASlot {
-                device,
-                slot_generation: view.slot_generation,
-                witness: crate::rollback_witness_of_system_configuration_slot(
-                    &bytes,
-                    (geometry.regions * geometry.slots_per_region).saturating_sub(1),
-                ),
-            });
-        }
-    }
-    witnesses
-}
-
-/// 一个池此刻的回退见证：每块盘上见证表解得开的槽里世代号最大的那一槽的条目，各盘取并集（与实现同一个读法：解不开见证表的槽
-/// 在实现那边就是读不出的槽，不参与择槽）。
-#[must_use]
-pub fn rollback_witness_of_the_pool(
-    slots: &[RollbackWitnessOfASlot],
-) -> Vec<crate::RollbackWitnessEntryView> {
-    let mut chosen_per_device: BTreeMap<u32, (u64, &Vec<crate::RollbackWitnessEntryView>)> =
-        BTreeMap::new();
-    for slot in slots {
-        let Ok(entries) = &slot.witness else {
-            continue;
-        };
-        let is_newer = chosen_per_device
-            .get(&slot.device)
-            .is_none_or(|(generation, _)| slot.slot_generation > *generation);
-        if is_newer {
-            chosen_per_device.insert(slot.device, (slot.slot_generation, entries));
-        }
-    }
-    let mut union: Vec<crate::RollbackWitnessEntryView> = chosen_per_device
-        .values()
-        .flat_map(|(_, entries)| entries.iter().copied())
-        .collect();
-    union.sort_unstable();
-    union.dedup();
-    union
 }
 
 /// 每盘择一个系统配置：两槽里世代号大的那一份（相等取槽 0）。
@@ -393,16 +404,23 @@ pub fn judge_location_order(judgements: &mut Judgements, pointer: &PointerView, 
     if pointer.all_zero {
         return;
     }
-    judgements.judge(
-        "I-2.5",
-        pointer.locations[0].device < pointer.locations[1].device,
-        || {
-            format!(
-                "{what} 的位置条目设备身份 {} / {} 不是严格升序",
-                pointer.locations[0].device, pointer.locations[1].device
-            )
-        },
-    );
+    judge_location_entries_order(judgements, &pointer.locations, what);
+}
+
+/// I-2.5 对一个位置条目数组判一次（D19（块指针的结构与宽度预算） 已定项 11、D23（journal 的角色与格式） 已定项 17）：
+/// 设备身份严格升序，相同或逆序判损坏。不带「整条全零」的豁免——那一条射程只写给 86 字节全零的指针（「注册了但还没有根」），
+/// journal 点名项点的是这次发布写出的单元，没有「还没有」的形态。
+pub fn judge_location_entries_order(
+    judgements: &mut Judgements,
+    locations: &[PointerLocation; 2],
+    what: &str,
+) {
+    judgements.judge("I-2.5", locations[0].device < locations[1].device, || {
+        format!(
+            "{what} 的位置条目设备身份 {} / {} 不是严格升序",
+            locations[0].device, locations[1].device
+        )
+    });
 }
 
 /// 按位置条目读一个被引用的单元：每条位置条目都读、都判 I-2.1（校验和与内容匹配），返回第一份对得上的。

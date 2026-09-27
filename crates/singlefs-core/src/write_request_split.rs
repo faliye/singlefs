@@ -61,6 +61,32 @@ pub fn data_unit_count_of_a_sequential_write(content_length_in_bytes: u64) -> u6
     content_length_in_bytes.div_ceil(payload_capacity).max(1)
 }
 
+/// 读侧看一个 inode 在 extent 树上段叶里的那一条（D8（核心索引结构） 已定项 14）：指没指着数据单元。封闭集合，`match` 不写通配臂。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DataUnitsOfTheInode {
+    /// 上段叶里没有它的条目，或条目标签 0：建出来之后一次都没写过内容（`transaction::publish_new_inodes` 建的 inode
+    /// 长度 0、数据单元与 extent 树都不动）。
+    NoneWritten,
+    /// 条目指着下段根或一个内联的数据指针：写过内容。
+    SomeWritten,
+}
+
+/// 读侧按 inode 的文件大小该看到几条 extent 记录。写过内容的与写侧同一条除法（[`data_unit_count_of_a_sequential_write`]，
+/// 长度 0 的内容也写了一个声明长度 0 的单元）；一次都没写过的长度 0 ⇒ 0 条。一次都没写过而长度不是 0 的照除法给数，
+/// 与它的 0 条记录对不上，读侧报不一致。
+#[must_use]
+pub fn data_unit_count_implied_by_the_file_size(
+    file_size_in_bytes: u64,
+    data_units_of_the_inode: DataUnitsOfTheInode,
+) -> u64 {
+    match data_units_of_the_inode {
+        DataUnitsOfTheInode::NoneWritten if file_size_in_bytes == 0 => 0,
+        DataUnitsOfTheInode::NoneWritten | DataUnitsOfTheInode::SomeWritten => {
+            data_unit_count_of_a_sequential_write(file_size_in_bytes)
+        }
+    }
+}
+
 /// 把一次顺序写请求按切分纪律切成若干一单元事务：第 `unit_index` 个事务写文件字节
 /// `[unit_index × 净荷容量, min(内容长度, (unit_index + 1) × 净荷容量))`，事务号从 `first_transaction_number`
 /// 起连号递增。
@@ -125,7 +151,7 @@ mod tests {
     }
 
     #[test]
-    fn a_write_no_longer_than_one_payload_splits_into_one_transaction_covering_the_whole_content() {
+    fn write_no_longer_than_one_payload_splits_into_one_transaction_covering_the_whole_content() {
         for content_length_in_bytes in [0, 1, 3000, 4100, 32_633, 32_634] {
             let transactions =
                 split_sequential_write_into_one_unit_transactions(content_length_in_bytes, 7);
@@ -243,5 +269,28 @@ mod tests {
             .flat_map(|transaction| transaction.payload_of(&content).to_vec())
             .collect();
         assert_eq!(rejoined, content);
+    }
+
+    /// 读侧的单元数：一次都没写过的 inode 长度 0 ⇒ 0 条；写过的长度 0 ⇒ 1 条（写侧的下界）；长度不是 0 的两种都按除法。
+    #[test]
+    fn a_never_written_inode_of_length_zero_implies_no_data_unit_and_a_written_one_implies_one() {
+        assert_eq!(
+            data_unit_count_implied_by_the_file_size(0, DataUnitsOfTheInode::NoneWritten),
+            0
+        );
+        assert_eq!(
+            data_unit_count_implied_by_the_file_size(0, DataUnitsOfTheInode::SomeWritten),
+            1
+        );
+        for data_units_of_the_inode in [
+            DataUnitsOfTheInode::NoneWritten,
+            DataUnitsOfTheInode::SomeWritten,
+        ] {
+            assert_eq!(
+                data_unit_count_implied_by_the_file_size(32_635, data_units_of_the_inode),
+                2,
+                "{data_units_of_the_inode:?}：净荷容量加一个字节是两个单元"
+            );
+        }
     }
 }

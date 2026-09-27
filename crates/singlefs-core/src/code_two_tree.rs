@@ -1247,7 +1247,7 @@ mod tests {
     }
 
     #[test]
-    fn a_key_below_the_leftmost_separator_lowers_it_and_leaves_the_right_leaf_carried() {
+    fn key_below_the_leftmost_separator_lowers_it_and_leaves_the_right_leaf_carried() {
         let before = plan_the_tree_after_this_publish(
             &CodeTwoTreeShape::default(),
             &keys([10, 20, 30, 40, 50]),
@@ -1325,7 +1325,7 @@ mod tests {
     }
 
     #[test]
-    fn a_leaf_split_that_overflows_a_full_root_splits_the_root_too_and_the_tree_grows_to_three_levels(
+    fn leaf_split_that_overflows_the_full_root_splits_the_root_too_and_the_tree_grows_to_three_levels(
     ) {
         let before = plan_the_tree_after_this_publish(
             &CodeTwoTreeShape::default(),

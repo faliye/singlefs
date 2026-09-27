@@ -163,7 +163,7 @@ fn verdict_of(verdicts: &[(&'static str, InvariantVerdict)], invariant: &str) ->
 ///   （落点、整单元校验和、出生序号都对得上），第 1 片的是「无下一片」；
 /// - 点名项按同一个次序：第 1 片、第 0 片在最前；两片的分配记录都是这次发布的 txg、已分配。
 #[test]
-fn a_row_publish_past_one_page_writes_the_tail_page_first_and_the_first_page_chains_to_it() {
+fn row_publish_past_one_page_writes_the_tail_page_first_and_the_first_page_chains_to_it() {
     let (devices, mounted) = pool_whose_row_publish_opened_the_second_page();
     let row_publish = mounted
         .output
@@ -371,7 +371,7 @@ fn the_next_mount_rewrites_the_whole_two_page_chain_and_releases_both_old_pages(
 /// 第一次可写挂载取号 371、给 [1, 371) 写 370 行。落点与出生序号照同一个次序——第 1 片、第 0 片、分配记录树那一片；
 /// 分配记录树那一片的账里两片都在、已分配。再挂一次（写 1 行）：两片旧链与旧的分配记录树节点一起释放，池级 checker 全绿。
 #[test]
-fn a_version_without_file_past_one_page_writes_two_pages_and_the_next_mount_releases_both() {
+fn version_without_file_past_one_page_writes_two_pages_and_the_next_mount_releases_both() {
     let mut devices = formatted_pool();
     crash_right_after_acquisition(&mut devices, 370);
     let mounted = mount_writable(&parameters(), &mut devices).expect("树表 0 条的一版上写两片");

@@ -38,7 +38,7 @@ const DISKS: [DeviceIdentity; 2] = [DeviceIdentity(0), DeviceIdentity(1)];
 /// 取号之前的预演核到它，返回 `RowPublishAdmissionRefusedBeforeAcquisition`（原因 `MappingEntryLocationOnADeviceOutsideThePool`），
 /// 要取的号不变、盘上逐字节不变（两盘四个系统配置槽、根环、录制流步数）。改之前预演把它交给发布路径、照样取号，号烧掉。
 #[test]
-fn a_row_publish_release_check_that_fails_on_a_damaged_mapping_entry_refuses_the_mount_before_acquisition(
+fn row_publish_release_check_that_fails_on_the_damaged_mapping_entry_refuses_the_mount_before_acquisition(
 ) {
     let mut pool = build_pool("row-publish-release-check-before-acquisition");
     let output = pool.output.clone();

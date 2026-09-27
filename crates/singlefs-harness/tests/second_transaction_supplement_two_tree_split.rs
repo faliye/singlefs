@@ -16,7 +16,10 @@ mod common;
 mod common_tree_split;
 
 use common::{disk_snapshot, file_content, parameters, FILE_BYTES};
-use common_tree_split::{capacities, shape_text, TreeSplitPool};
+use common_tree_split::{
+    capacities, propagate_the_new_checksum, shape_text,
+    write_unit_to_the_same_slot_on_both_devices, TreeSplitPool,
+};
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{FileOffsetInBytes, InodeNumber};
@@ -26,7 +29,7 @@ use singlefs_core::allocation_record_tree::{
 use singlefs_core::allocator::Placement;
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::bytes::ByteReader;
-use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
+use singlefs_core::checksum::crc32_castagnoli;
 use singlefs_core::code_two_tree::CodeTwoTreeRefusal;
 use singlefs_core::code_two_tree::{CodeTwoTreeNodeContents, CodeTwoTreeNodeOrigin};
 use singlefs_core::mount::{mount_writable, MountError};
@@ -344,7 +347,7 @@ fn an_empty_publish_rewrites_only_the_changed_mapping_path_carries_the_rest_and_
 /// ③ 多层之后进程退出、重开可写挂载：从盘上重建两棵树（形状与每个节点的落点），写行与暖机按产品容量接着发——
 /// 记账树整批换代、按产品容量重新长成一个节点；中央映射树只改变了的那条路径。挂载之后冷走读读回文件、池级 checker 全绿。
 #[test]
-fn a_pool_with_multi_level_trees_mounts_writable_and_the_row_and_warm_up_publishes_carry_on() {
+fn pool_with_multi_level_trees_mounts_writable_and_the_row_and_warm_up_publishes_carry_on() {
     let small = capacities(SMALL_ACCOUNTING, SMALL_CENTRAL_MAPPING);
     let mut pool = TreeSplitPool::with_the_first_file_version_under(small);
     pool.empty_publish(small);
@@ -383,7 +386,7 @@ fn a_pool_with_multi_level_trees_mounts_writable_and_the_row_and_warm_up_publish
 /// 判别力：规划删不掉 key 时照常往下走（`delete_at_the_root` 里那一判交回成立），挂载照常取号写行——`crates/mutations.tsv` 里
 /// 以「树分裂 规划删不掉上一版的 key 也照常往下走」开头的那一行。
 #[test]
-fn a_rebuilt_central_mapping_root_whose_separator_hides_a_key_is_refused_before_the_instance_generation_is_acquired(
+fn rebuilt_central_mapping_root_whose_separator_hides_the_key_is_refused_before_the_instance_generation_is_acquired(
 ) {
     let pool = TreeSplitPool::with_the_first_file_version_under(capacities(
         common_tree_split::ACCOUNTING_OF_THE_NODE_FORMAT,
@@ -440,7 +443,7 @@ fn a_rebuilt_central_mapping_root_whose_separator_hides_a_key_is_refused_before_
         &entries,
     );
     let mut image = pool.memory_pool();
-    write_both(&mut image, root_unit.slot.0, &damaged_root);
+    write_unit_to_the_same_slot_on_both_devices(&mut image, root_unit.slot.0, &damaged_root);
     let units: Vec<(u64, usize)> = output
         .units
         .iter()
@@ -497,138 +500,6 @@ fn a_rebuilt_central_mapping_root_whose_separator_hides_a_key_is_refused_before_
         before,
         "两盘系统配置槽逐字节不变、根环没有新根、录制流一步都没多"
     );
-}
-
-/// checker 的已知坏镜像要的：把一个单元的新整单元校验和沿引用链补到根槽（父节点里的位置条目、中央映射条目、根槽的自证校验和）。
-/// 位置条目按 (设备 4, 槽 6, 校验和 4) 逐字节找、逐个换，被换的单元按类重封再往上补。`units` 是这份镜像里被引用的单元（槽, 字节数）。
-fn propagate_the_new_checksum(
-    image: &mut MemoryPool,
-    units: &[(u64, usize)],
-    changed: (u64, u32, u32),
-) {
-    let mut pending = vec![changed];
-    while let Some((slot, old, new)) = pending.pop() {
-        let pattern = |device: u32, checksum: u32| -> Vec<u8> {
-            [
-                device.to_le_bytes().to_vec(),
-                slot.to_le_bytes()[..6].to_vec(),
-                checksum.to_le_bytes().to_vec(),
-            ]
-            .concat()
-        };
-        for (container, length) in units.iter().copied() {
-            if container == slot {
-                continue;
-            }
-            let before = read(image, 0, container, length);
-            let mut bytes = before.clone();
-            let mut touched = false;
-            for device in [0u32, 1] {
-                touched |= replace_every(&mut bytes, &pattern(device, old), &pattern(device, new));
-            }
-            if touched {
-                reseal(&mut bytes);
-                write_both(image, container, &bytes);
-                pending.push((
-                    container,
-                    crc32_castagnoli(&before),
-                    crc32_castagnoli(&bytes),
-                ));
-            }
-        }
-        for (device, offset) in root_ring_slot_offsets() {
-            let mut bytes = image
-                .devices
-                .get(&singlefs_core::address::DeviceIdentity(device))
-                .expect("盘")
-                .read(singlefs_core::address::DeviceOffsetInBytes(offset), 512);
-            let mut touched = false;
-            for location_device in [0u32, 1] {
-                touched |= replace_every(
-                    &mut bytes,
-                    &pattern(location_device, old),
-                    &pattern(location_device, new),
-                );
-            }
-            if touched {
-                let digest = wide_checksum_with_field_zeroed(&bytes, 512, 138);
-                bytes[138..170].copy_from_slice(&digest);
-                image
-                    .devices
-                    .get_mut(&singlefs_core::address::DeviceIdentity(device))
-                    .expect("盘")
-                    .write(singlefs_core::address::DeviceOffsetInBytes(offset), &bytes);
-            }
-        }
-    }
-}
-
-fn read(image: &MemoryPool, device: u32, slot: u64, length: usize) -> Vec<u8> {
-    image
-        .devices
-        .get(&singlefs_core::address::DeviceIdentity(device))
-        .expect("盘")
-        .read(
-            singlefs_core::address::DeviceOffsetInBytes(slot * 16384),
-            length,
-        )
-}
-
-fn write_both(image: &mut MemoryPool, slot: u64, bytes: &[u8]) {
-    for device in [0u32, 1] {
-        image
-            .devices
-            .get_mut(&singlefs_core::address::DeviceIdentity(device))
-            .expect("盘")
-            .write(
-                singlefs_core::address::DeviceOffsetInBytes(slot * 16384),
-                bytes,
-            );
-    }
-}
-
-fn replace_every(haystack: &mut [u8], needle: &[u8], replacement: &[u8]) -> bool {
-    let mut changed = false;
-    let mut index = 0;
-    while index + needle.len() <= haystack.len() {
-        if haystack[index..index + needle.len()] == *needle {
-            haystack[index..index + needle.len()].copy_from_slice(replacement);
-            changed = true;
-            index += needle.len();
-        } else {
-            index += 1;
-        }
-    }
-    changed
-}
-
-/// 按类重封：先算载荷 CRC，再算头校验和（码 1：头 105、CRC 在 101；码 3：头 107、CRC 在 89；码 2：头 86 + 2k、CRC 在 76 + 2k）。
-fn reseal(bytes: &mut [u8]) {
-    let (header_end, payload_crc_offset) = match bytes[6] {
-        1 => (105usize, 101usize),
-        3 => (107, 89),
-        _ => (
-            86 + 2 * usize::from(bytes[51]),
-            76 + 2 * usize::from(bytes[51]),
-        ),
-    };
-    let payload_crc = crc32_castagnoli(&bytes[header_end..]);
-    bytes[payload_crc_offset..payload_crc_offset + 4].copy_from_slice(&payload_crc.to_le_bytes());
-    singlefs_core::unit::seal_header_checksum(bytes, header_end);
-}
-
-/// 根环全部槽：(盘, 偏移)。区域 r 在盘 [0, 1, 0][r] 上，起点 64 × 16384 + r × 3 MiB，槽距 4096（`common::parameters` 的几何）。
-fn root_ring_slot_offsets() -> Vec<(u32, u64)> {
-    (0..3u64)
-        .flat_map(|region| {
-            (0..8u64).map(move |slot| {
-                (
-                    [0u32, 1, 0][usize::try_from(region).expect("区域")],
-                    64 * 16384 + region * 3 * (1 << 20) + slot * 4096,
-                )
-            })
-        })
-        .collect()
 }
 
 /// 已知坏镜像的改法：只改记账树或中央映射树的根，把根的新字节写回原槽，再把新校验和补到根槽。
@@ -717,7 +588,7 @@ fn image_with_the_root_damaged(
         u16::try_from(entry_width).expect("条目宽"),
         &entries,
     );
-    write_both(&mut image, root_unit.slot.0, &damaged_root);
+    write_unit_to_the_same_slot_on_both_devices(&mut image, root_unit.slot.0, &damaged_root);
     let units: Vec<(u64, usize)> = output
         .units
         .iter()

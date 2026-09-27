@@ -1,10 +1,13 @@
-//! 第一个事务写到的那 21 个区域，以及把它们的字节打成结果行的只读导出口。
+//! 第一个事务写到的那 29 个区域，以及把它们的字节打成结果行的只读导出口。
 //!
-//! 这张表是 E142（第一个事务的干跑） 第十一次跑的跑前登记（`research/prompts/e142-r11-prereg.md` 第一节第 3 条）
-//! 写死的那份区域清单，逐行抄自 `.claude/kb/layout/01-first-txn.md` 零那一节的写清单：
-//! 第一个事务写到的 8 个单元的落点（t1..t8，两盘各一份 = 16 行）、jsn (1, 3) 那条 journal 记录的两个落点（t9）、
-//! 这次发布的根槽（t10，区域 0 槽 1，只落在根环区域 0 那块盘）、这次发布写的系统配置槽（t11，两盘各一份）
-//! ⇒ 16 + 2 + 1 + 2 = **21**，与那一节「⇒ 写请求数 … 21 条」逐项对得上。
+//! 这张表起于 E142（第一个事务的干跑） 第十一次跑的跑前登记（`research/prompts/e142-r11-prereg.md` 第一节第 3 条）
+//! 写死的那份区域清单，逐行抄自 `.claude/kb/layout/01-first-txn.md` 零那一节的写清单（2026-09-25 按位置寻址改写之后那一版）：
+//! 第一个事务写到的 12 个单元的落点（t1..t12，两盘各一份 = 24 行）、jsn (1, 3) 那条 journal 记录的两个落点（t13）、
+//! 这次发布的根槽（t14，区域 0 槽 1，只落在根环区域 0 那块盘）、这次发布写的系统配置槽（t15，两盘各一份）
+//! ⇒ 24 + 2 + 1 + 2 = **29**，与那一节「⇒ 写请求数 … 29 条」逐项对得上。
+//! 分配记录树按位置寻址（D8（核心索引结构） 已定项 14）之前这张表是 8 个单元、21 行；E142 第十五次跑起装置那一侧改比
+//! `e142_first_transaction_write_dump` 的逐次写导出（`research/scripts/replay.sh` 那一段的注释），这张表不再进 E142 的比对，
+//! 由 `tests/first_transaction_region_bytes.rs` 钉住它与第一个事务真发出的写逐条配得上。区域名照 E142 装置 `descriptive_tag()` 的取名。
 //!
 //! 这张表只对 E142 那套几何成立（两盘、`physical_block_size` = 512、io_min = 512 ⇒ 固定结构槽距 4096、根槽宽 512），
 //! 换几何要连表一起改：`region_table_against_writes` 就是把它钉在实装身上的那道检查。
@@ -26,8 +29,8 @@ use crate::hexadecimal::hexadecimal_text;
 use crate::sha256::sha256_hexadecimal;
 use crate::{RecordedOperation, RecordedOperationKind};
 
-/// 区域清单的行数：登记第一节第 3 条写死的 21 行。
-pub const FIRST_TRANSACTION_REGION_COUNT: usize = 21;
+/// 区域清单的行数：零那一节写清单的 29 条写请求，一条一行。
+pub const FIRST_TRANSACTION_REGION_COUNT: usize = 29;
 
 /// 长度大的区域只打前后各这么多字节的十六进制（整段太长，逐字节比对靠 sha256）。
 pub const HEAD_AND_TAIL_BYTES: usize = 32;
@@ -36,9 +39,9 @@ pub const HEAD_AND_TAIL_BYTES: usize = 32;
 const E142_FIXED_STRUCTURE_SLOT_SPACING_BYTES: u64 = 4096;
 /// E142 几何的根槽宽 = 探到的 `physical_block_size` = 512（字节表零那一节的 m3「371 / 512 槽」）。
 const E142_ROOT_SLOT_BYTES: u64 = 512;
-/// 这次发布写的系统配置槽是槽 1（t11：世代号 5、tail = 3，根槽之后再更新）。
+/// 这次发布写的系统配置槽是槽 1（t15：世代号 5、tail = 3，根槽之后再更新）。
 const FIRST_TRANSACTION_SYSTEM_CONFIGURATION_SLOT_INDEX: u64 = 1;
-/// 这次发布的根槽：区域 `3 mod 3` = 0 的槽 `(3 div 3) mod 8` = 1（t10）。
+/// 这次发布的根槽：区域 `3 mod 3` = 0 的槽 `(3 div 3) mod 8` = 1（t14）。
 const FIRST_TRANSACTION_ROOT_RING_REGION: u64 = 0;
 const FIRST_TRANSACTION_ROOT_RING_SLOT_INDEX: u64 = 1;
 /// 根环区域 0 落在哪块盘：mkfs 的 `region_devices` 第一项（E142 取 `[0, 1, 0]`）。
@@ -46,22 +49,27 @@ const FIRST_TRANSACTION_ROOT_RING_REGION_DEVICE: u32 = 0;
 /// jsn (1, 3) 那条记录在环内的偏移：两次暖机各占一条 4096（w1 在 0、w4 在 4096）⇒ 第一个事务这条在 8192。
 const FIRST_TRANSACTION_JOURNAL_RECORD_RING_OFFSET: u64 = 2 * JOURNAL_RECORD_BYTES;
 
-/// t1..t8 的落点槽号（字节表零那一节的写清单）。
+/// t1..t12 的落点槽号（字节表零那一节的写清单）。分配记录树两块 4 GiB 盘时树高 3：两片叶（每盘一片）、两个层级 1 节点、层级 2 的根，
+/// 树内先叶后根、同层按 key 升序（D3（空间分配） 已定项 10 ⑤）。
 const DATA_UNIT_SLOT: u64 = 50180;
 const EXTENT_ROOT_SLOT: u64 = 50240;
 const INODE_LEAF_SLOT: u64 = 50242;
 const INODE_ROOT_SLOT: u64 = 50244;
-const ALLOCATION_ROOT_SLOT: u64 = 50245;
-const ACCOUNTING_ROOT_SLOT: u64 = 50246;
-const MAPPING_ROOT_SLOT: u64 = 50247;
-const TREE_TABLE_SLOT: u64 = 50248;
+const ALLOCATION_LEAF_OF_DEVICE_ZERO_SLOT: u64 = 50245;
+const ALLOCATION_LEAF_OF_DEVICE_ONE_SLOT: u64 = 50246;
+const ALLOCATION_INTERNAL_OF_DEVICE_ZERO_SLOT: u64 = 50247;
+const ALLOCATION_INTERNAL_OF_DEVICE_ONE_SLOT: u64 = 50248;
+const ALLOCATION_ROOT_SLOT: u64 = 50249;
+const ACCOUNTING_ROOT_SLOT: u64 = 50250;
+const MAPPING_ROOT_SLOT: u64 = 50251;
+const TREE_TABLE_SLOT: u64 = 50252;
 
 /// 十六进制打多少：整段照打，还是只打前后各 [`HEAD_AND_TAIL_BYTES`] 字节。封闭集合，`match` 不写通配臂。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HexadecimalExtent {
     /// 整段十六进制照打（固定结构那 5 行：根槽 512、journal 记录 4096 两份、系统配置槽 4096 两份）。
     WholeRegion,
-    /// 只打 sha256 与前后各 32 字节（16 KiB / 32 KiB 的单元那 16 行）。
+    /// 只打 sha256 与前后各 32 字节（16 KiB / 32 KiB 的单元那 24 行）。
     HeadAndTail,
 }
 
@@ -127,8 +135,8 @@ const FIRST_TRANSACTION_JOURNAL_RECORD_OFFSET: u64 =
 const FIRST_TRANSACTION_SYSTEM_CONFIGURATION_SLOT_OFFSET: u64 =
     FIRST_TRANSACTION_SYSTEM_CONFIGURATION_SLOT_INDEX * E142_FIXED_STRUCTURE_SLOT_SPACING_BYTES;
 
-/// 登记里那 21 行，顺序就是结果行的顺序：8 个单元各两盘（t1..t8）、根记录（t10）、journal 记录两盘（t9）、系统配置槽两盘（t11）。
-/// 前 16 行是 16 KiB / 32 KiB 的单元，只打 sha256 与前后 32 字节；后 5 行（根槽、journal 记录两份、系统配置槽两份）整段十六进制照打。
+/// 写清单那 29 行，顺序就是结果行的顺序：12 个单元各两盘（t1..t12）、根记录（t14）、journal 记录两盘（t13）、系统配置槽两盘（t15）。
+/// 前 24 行是 16 KiB / 32 KiB 的单元，只打 sha256 与前后 32 字节；后 5 行（根槽、journal 记录两份、系统配置槽两份）整段十六进制照打。
 pub const FIRST_TRANSACTION_REGIONS: [FirstTransactionRegion; FIRST_TRANSACTION_REGION_COUNT] = [
     unit_region("data_unit", 0, DATA_UNIT_SLOT, 2),
     unit_region("data_unit", 1, DATA_UNIT_SLOT, 2),
@@ -138,6 +146,54 @@ pub const FIRST_TRANSACTION_REGIONS: [FirstTransactionRegion; FIRST_TRANSACTION_
     unit_region("inode_leaf", 1, INODE_LEAF_SLOT, 2),
     unit_region("inode_root", 0, INODE_ROOT_SLOT, 1),
     unit_region("inode_root", 1, INODE_ROOT_SLOT, 1),
+    unit_region(
+        "allocation_leaf_of_device_0",
+        0,
+        ALLOCATION_LEAF_OF_DEVICE_ZERO_SLOT,
+        1,
+    ),
+    unit_region(
+        "allocation_leaf_of_device_0",
+        1,
+        ALLOCATION_LEAF_OF_DEVICE_ZERO_SLOT,
+        1,
+    ),
+    unit_region(
+        "allocation_leaf_of_device_1",
+        0,
+        ALLOCATION_LEAF_OF_DEVICE_ONE_SLOT,
+        1,
+    ),
+    unit_region(
+        "allocation_leaf_of_device_1",
+        1,
+        ALLOCATION_LEAF_OF_DEVICE_ONE_SLOT,
+        1,
+    ),
+    unit_region(
+        "allocation_internal_of_device_0",
+        0,
+        ALLOCATION_INTERNAL_OF_DEVICE_ZERO_SLOT,
+        1,
+    ),
+    unit_region(
+        "allocation_internal_of_device_0",
+        1,
+        ALLOCATION_INTERNAL_OF_DEVICE_ZERO_SLOT,
+        1,
+    ),
+    unit_region(
+        "allocation_internal_of_device_1",
+        0,
+        ALLOCATION_INTERNAL_OF_DEVICE_ONE_SLOT,
+        1,
+    ),
+    unit_region(
+        "allocation_internal_of_device_1",
+        1,
+        ALLOCATION_INTERNAL_OF_DEVICE_ONE_SLOT,
+        1,
+    ),
     unit_region("allocation_root", 0, ALLOCATION_ROOT_SLOT, 1),
     unit_region("allocation_root", 1, ALLOCATION_ROOT_SLOT, 1),
     unit_region("accounting_root", 0, ACCOUNTING_ROOT_SLOT, 1),

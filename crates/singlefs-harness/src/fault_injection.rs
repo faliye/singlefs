@@ -41,7 +41,10 @@ use singlefs_core::recovery::{
 use singlefs_core::root_ring::{slot_offset, RootRingSlot, RootRingSlotsPerRegion};
 use singlefs_format::{ROOT_RING_REGIONS, ROOT_RING_SLOTS_PER_REGION_MAXIMUM};
 
-use crate::crash::{newest_persisted_root, writes_and_segments, MemoryPool, RecordCheck};
+use crate::crash::{
+    newest_persisted_root, root_identity_written_by, writes_and_segments_with_stream_indexes,
+    MemoryPool, RecordCheck,
+};
 use crate::history::{
     classify_failure, execute_history_with_faults, generate_history_with_weights,
     newest_ring_root_and_slot_count, raised_floor_lands_only_on_abandoned_roots, AppliedEffect,
@@ -49,8 +52,13 @@ use crate::history::{
     HarnessJudgement, HistoryEnding, HistoryExecution, HistoryOperation, HistoryOperationKind,
     HistoryRun, HistorySeed, PerStepChecker, SeededRandomSource, StepOutcome, StepPosition,
 };
-use crate::model::{crash_recovery_disagreement, ModelRootKey, ObservedReadBack};
-use crate::model_comparison::{model_root_key, observed_read_back_after_a_crash};
+use crate::model::{
+    crash_recovery_disagreement, ModelCheckpointTxg, ModelDisagreementAspect, ModelInstanceRow,
+    ModelRingPosition, ModelRootKey, ObservedReadBack,
+};
+use crate::model_comparison::{
+    model_ring_position, model_root_key, observed_read_back_after_a_crash,
+};
 use crate::segments::{FixedGeometry, StepKind};
 use crate::{RecordedOperation, RecordedOperationKind, SharedStream};
 
@@ -626,6 +634,62 @@ impl FiredFault {
     }
 }
 
+/// 被吞掉的那一次写本该写下什么。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SwallowedContents {
+    Bytes(Vec<u8>),
+    /// 写零（`BlockDevice::write_zeroes_at`）：整段全 0。
+    Zeroes {
+        length: u64,
+    },
+}
+
+/// 说谎的设备吞掉的那一次写（[`InjectedFault::WriteIsSwallowed`]）：落在哪、本该写下什么、它之前整池交下去了几次写（含写零）。
+/// 按写数、不按「写与屏障」数：录制器在注入层里面，交下去的每一次写它记且只记一步，屏障却会把紧挨着的几道并成一步
+/// （`SharedStream` 的 `push`）。屏障不改镜像，插回去时只要排在第这么多次写之后。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SwallowedWrite {
+    pub device: DeviceIdentity,
+    pub offset: DeviceOffsetInBytes,
+    pub contents: SwallowedContents,
+    pub durability: WriteDurability,
+    pub writes_recorded_before: usize,
+}
+
+impl SwallowedWrite {
+    /// 它要是落了盘，录制流里会多出的那一步。
+    #[must_use]
+    pub fn as_retained_operation(&self) -> crate::RetainedOperation {
+        match &self.contents {
+            SwallowedContents::Bytes(bytes) => crate::RetainedOperation {
+                operation: RecordedOperation {
+                    device: self.device,
+                    kind: match self.durability {
+                        WriteDurability::Plain => RecordedOperationKind::Write,
+                        WriteDurability::ForceUnitAccess => {
+                            RecordedOperationKind::WriteForceUnitAccess
+                        }
+                    },
+                    offset: self.offset,
+                    length: u64::try_from(bytes.len()).expect("一次写的长度装得进 u64"),
+                    content_hash: crate::fnv1a_64(bytes),
+                },
+                contents: Some(bytes.clone()),
+            },
+            SwallowedContents::Zeroes { length } => crate::RetainedOperation {
+                operation: RecordedOperation {
+                    device: self.device,
+                    kind: RecordedOperationKind::WriteZeroes,
+                    offset: self.offset,
+                    length: *length,
+                    content_hash: crate::fnv1a_64_of_zeros(*length),
+                },
+                contents: None,
+            },
+        }
+    }
+}
+
 struct FaultPlanState {
     geometry: FixedGeometry,
     schedule: Option<FaultSchedule>,
@@ -633,9 +697,14 @@ struct FaultPlanState {
     matching_calls_across_the_pool: u64,
     matching_calls_per_device: BTreeMap<DeviceIdentity, u64>,
     per_device_counts: BTreeMap<DeviceIdentity, FaultDeviceCounts>,
-    /// 每块盘收到第一道屏障那一刻这块盘的计数（屏障本身不算进去）：真设备那一路按它切「挂载」那一段窗口。
-    counts_when_the_first_barrier_arrived: BTreeMap<DeviceIdentity, FaultDeviceCounts>,
+    /// 每块盘在收到过至少一次写之后收到的第一道屏障，那一刻这块盘的计数（屏障本身不算进去）：真设备那一路按它切「挂载」那一段窗口
+    /// （可写挂载里那是取号写之后那一道；取号写之前那一道前面没有写，不算，代码审阅第 19 条加了它）。
+    counts_when_the_first_barrier_after_a_write_arrived:
+        BTreeMap<DeviceIdentity, FaultDeviceCounts>,
     fired: Vec<FiredFault>,
+    /// 整个池上交给里面那块盘的写（含写零）一共几次：被吞的写在录制流里本该排在第几次写之后，按它数。
+    writes_forwarded_across_the_pool: usize,
+    swallowed_writes: Vec<SwallowedWrite>,
 }
 
 /// 一个池里几块设备共用的注入计划：数调用、按计划注入、记下注入真的发生在哪一次。
@@ -654,9 +723,35 @@ impl SharedFaultPlan {
             matching_calls_across_the_pool: 0,
             matching_calls_per_device: BTreeMap::new(),
             per_device_counts: BTreeMap::new(),
-            counts_when_the_first_barrier_arrived: BTreeMap::new(),
+            counts_when_the_first_barrier_after_a_write_arrived: BTreeMap::new(),
             fired: Vec::new(),
+            writes_forwarded_across_the_pool: 0,
+            swallowed_writes: Vec::new(),
         })))
+    }
+
+    /// 说谎的设备吞掉的那几次写，按发生次序。
+    #[must_use]
+    pub fn swallowed_writes(&self) -> Vec<SwallowedWrite> {
+        self.0.borrow().swallowed_writes.clone()
+    }
+
+    fn note_swallowed_write(
+        &self,
+        device: DeviceIdentity,
+        offset: DeviceOffsetInBytes,
+        contents: SwallowedContents,
+        durability: WriteDurability,
+    ) {
+        let mut state = self.0.borrow_mut();
+        let writes_recorded_before = state.writes_forwarded_across_the_pool;
+        state.swallowed_writes.push(SwallowedWrite {
+            device,
+            offset,
+            contents,
+            durability,
+            writes_recorded_before,
+        });
     }
 
     /// 开着一条计划起步。
@@ -695,15 +790,15 @@ impl SharedFaultPlan {
             .unwrap_or_default()
     }
 
-    /// 这块盘收到第一道屏障那一刻的计数；一道屏障都没收到过时 None。
+    /// 这块盘收到过至少一次写之后收到的第一道屏障，那一刻的计数；写之后一道屏障都没收到过时 None。
     #[must_use]
-    pub fn counts_when_the_first_barrier_arrived_at(
+    pub fn counts_when_the_first_barrier_after_a_write_arrived_at(
         &self,
         device: DeviceIdentity,
     ) -> Option<FaultDeviceCounts> {
         self.0
             .borrow()
-            .counts_when_the_first_barrier_arrived
+            .counts_when_the_first_barrier_after_a_write_arrived
             .get(&device)
             .copied()
     }
@@ -785,6 +880,7 @@ impl SharedFaultPlan {
         durability: WriteDurability,
     ) {
         let mut state = self.0.borrow_mut();
+        state.writes_forwarded_across_the_pool += 1;
         let counts = state.per_device_counts.entry(device).or_default();
         counts.writes += 1;
         counts.written_bytes += bytes;
@@ -794,14 +890,16 @@ impl SharedFaultPlan {
         }
     }
 
-    /// 屏障进来了：先给这块盘拍第一道屏障的快照（屏障本身不算进去），再记下它是发下去了还是被吞了。
+    /// 屏障进来了：这块盘收到过写、还没拍过快照的，先拍（屏障本身不算进去），再记下它是发下去了还是被吞了。
     fn note_barrier_arrived(&self, device: DeviceIdentity) {
         let mut state = self.0.borrow_mut();
         let counts = *state.per_device_counts.entry(device).or_default();
-        state
-            .counts_when_the_first_barrier_arrived
-            .entry(device)
-            .or_insert(counts);
+        if counts.writes > 0 {
+            state
+                .counts_when_the_first_barrier_after_a_write_arrived
+                .entry(device)
+                .or_insert(counts);
+        }
     }
 
     fn note_forwarded_barrier(&self, device: DeviceIdentity) {
@@ -912,8 +1010,16 @@ impl<Inner: BlockDevice> BlockDevice for FaultInjectingBlockDevice<Inner> {
             .decide(FaultCallKind::Write, self.device, offset, length)
         {
             Some(InjectedFault::WriteFails) => return Err(injected_block_device_error("写")),
-            // 吞掉：报成功，一个字节都不落盘，也不记进这块盘的计数（真的没写）。
-            Some(InjectedFault::WriteIsSwallowed) => return Ok(()),
+            // 吞掉：报成功，一个字节都不落盘，也不记进这块盘的计数（真的没写）；本该写下什么另记一笔，判说谎的设备留下了什么时用。
+            Some(InjectedFault::WriteIsSwallowed) => {
+                self.plan.note_swallowed_write(
+                    self.device,
+                    offset,
+                    SwallowedContents::Bytes(bytes.to_vec()),
+                    durability,
+                );
+                return Ok(());
+            }
             Some(
                 InjectedFault::ReadFails
                 | InjectedFault::ReadReturnsCorruptedBytes { .. }
@@ -942,6 +1048,12 @@ impl<Inner: BlockDevice> BlockDevice for FaultInjectingBlockDevice<Inner> {
             Some(InjectedFault::WriteFails) => return Err(injected_block_device_error("写零")),
             Some(InjectedFault::WriteIsSwallowed) => {
                 // 吞掉：报成功，一个字节都不清零，也不记进这块盘的计数（真的没写）。
+                self.plan.note_swallowed_write(
+                    self.device,
+                    offset,
+                    SwallowedContents::Zeroes { length },
+                    WriteDurability::Plain,
+                );
                 return Ok(());
             }
             Some(
@@ -1165,7 +1277,7 @@ pub enum ReopenedVersion {
     TheVersionTheFaultedStepWasWriting,
     /// 两样都不是：`crash_recovery_disagreement` 判出对不上。
     OutsideEverythingTheModelAllows,
-    /// 重开走读失败，而这一次注入之后盘上本来就没有一版立得住（`a_failed_reopen_is_the_right_answer`）：
+    /// 重开走读失败，而这一次注入之后盘上本来就没有一版立得住（`failed_reopen_is_the_right_answer`）：
     /// 走读失败正是要的结果，只记不判。悄悄读回一版模型从没提交过的内容照样判红。
     NothingWasLeftToRecoverAndTheReopenSaidSo,
 }
@@ -1256,9 +1368,9 @@ pub struct FaultInjectionTally {
     pub faults_by_injection_point: BTreeMap<String, u64>,
     /// 注入之后整段历史里 `singlefs-core` panic 的次数：这是被测的性质，一次都不许有。
     pub faults_that_panicked: u64,
-    /// 说谎的设备（[`InjectedFault::the_device_lies`]）丢掉一份内容之后盘面不一致、而且落在白名单
-    /// （[`INCONSISTENCIES_A_LYING_DEVICE_MAY_LEAVE`]）里的次数：不算新发现，按签名列进报告。
-    /// 白名单之外的不进这一格，照报成新发现。一次都没有说明说谎那两种注得进去却什么也没碰着，判别力要重新量。
+    /// 说谎的设备（[`InjectedFault::the_device_lies`]）吞掉写之后留下的失败、按注入点认得出是它留下的次数
+    /// （[`left_by_the_lying_device`]）：不算新发现，按签名列进报告。认不出的不进这一格，照报成新发现。
+    /// 一次都没有说明说谎那两种注得进去却什么也没碰着，判别力要重新量。
     pub faults_where_a_lying_device_left_the_image_inconsistent: u64,
     /// 上一格逐条的签名：判红的是哪几条不变量 / 哪一处模型对不上。
     pub lying_device_signatures: BTreeMap<String, u64>,
@@ -1278,7 +1390,7 @@ pub struct FaultInjectionTally {
     /// 重开走到了失败那一步正在写、模型没提交的那一版（收口表第 40 行那一格；只记不判）。
     pub reopened_into_the_version_the_faulted_step_was_writing: u64,
     pub reopens_outside_everything_the_model_allows: u64,
-    /// 重开走读失败，而盘上本来就没有一版立得住（`a_failed_reopen_is_the_right_answer`）：只记不判。
+    /// 重开走读失败，而盘上本来就没有一版立得住（`failed_reopen_is_the_right_answer`）：只记不判。
     pub reopens_that_correctly_found_nothing_to_recover: u64,
     pub checker_runs_on_the_image_after_the_fault: u64,
     pub invariant_holds: BTreeMap<&'static str, u64>,
@@ -1536,8 +1648,9 @@ pub struct HistoryFaultInjection {
     pub acquired_instances_left: Vec<AcquiredInstanceLeft>,
 }
 
-/// 注入那一步是不是一次挂载（起点段里有取号与暖机、可写挂载、回退挂载），是就交回这一步之前盘上系统配置的实例代号。
-/// 起点段之前是 mkfs 写的 0；别的步取测量跑里上一步跑完时的那个。不是挂载的几类操作不取号，交回 `None`。
+/// 注入那一步是不是一次挂载（起点段里有取号与暖机、可写挂载），是就交回这一步之前盘上系统配置的实例代号。
+/// 起点段之前是 mkfs 写的 0；别的步取测量跑里上一步跑完时的那个。不是挂载的几类操作不取号，交回 `None`
+/// （管理员回退是挂着时的一次向前发布，不取号）。
 fn system_configuration_instance_before_a_mount_step(
     marks: &[StepMark],
     segment: FaultedSegment,
@@ -1545,8 +1658,9 @@ fn system_configuration_instance_before_a_mount_step(
     match segment {
         FaultedSegment::TheStartingPoint => Some(MKFS_INSTANCE_GENERATION),
         FaultedSegment::Operation { operation_kind, .. } => match operation_kind {
+            // 崩溃恢复抛弃根也是一次可写挂载：取号、写行、暖机。
             HistoryOperationKind::CloseAndMountWritable
-            | HistoryOperationKind::CloseAndMountRollback => {
+            | HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot => {
                 let index = marks
                     .iter()
                     .position(|mark| mark.position == segment.position())?;
@@ -1555,6 +1669,7 @@ fn system_configuration_instance_before_a_mount_step(
             HistoryOperationKind::PublishFirstFile
             | HistoryOperationKind::PublishOverwrite
             | HistoryOperationKind::PublishWithoutUnits
+            | HistoryOperationKind::RollBackWhileMounted
             | HistoryOperationKind::RaiseRollbackFloor
             | HistoryOperationKind::ColdStartRecover => None,
         },
@@ -1892,39 +2007,140 @@ fn the_fault_surfaced_as_an_error(
         Some(StepOutcome::Applied(
             AppliedEffect::Published { .. }
             | AppliedEffect::Mounted { .. }
-            | AppliedEffect::RaisedFloor { .. },
+            | AppliedEffect::RaisedFloor { .. }
+            | AppliedEffect::RolledBack { .. },
         ))
         | Some(StepOutcome::NotApplicable(_))
         | None => false,
     }
 }
 
-/// 说谎的设备丢掉一份内容之后，盘面**只许**留下这两组违例。每一组都是「那一份内容没落盘」的直接投影：
+/// 说谎的设备吞掉了几次写之后，拿来判「这条失败是不是它留下的」的两样东西（按注入点认，主 agent 2026-09-26 定，实七）：
 ///
-/// - `["I-2.1", "I-4.8", "I-7.4"]`：那一份没落盘的单元读出来是旧内容（或是全零），单元头里的校验和跟树上记的对不上
-///   ⇒ 单元自证不过（I-2.1）、树指着的那一份取不回来（I-4.8）、最新那条根走不完（I-7.4）。丢一份内容必然长这样。
-/// - `["I-3.1"]`：丢掉的是记账树那一份，盘上记的「已分配」与遍历全部有效根得到的对不上。丢一份记账内容必然长这样。
-///
-/// **白名单之外的签名照报成新发现**（用户 2026-09-21 定的收严）：别的签名（I-3.9、I-5.4、I-9.14 这一类）意味着
-/// 丢一份内容之外还发生了别的事，那一格不默认豁免——那才可能是实现的缺口。
-/// 白名单少一组，被它罩住的那几次当场变成新发现。快档那 24 段里说谎的设备留下的不一致全落在前一组，`["I-3.1"]` 那一组一次都没有；
-/// 那一组的取样点是故障注入那个二进制里的 `a_swallowed_write_after_which_the_checker_flags_only_i_3_1_is_excused_as_what_a_lying_device_may_leave`
-/// （`crates/mutations.tsv` 里钉着把那一组去掉的变异）。
-const INCONSISTENCIES_A_LYING_DEVICE_MAY_LEAVE: &[&[&str]] =
-    &[&["I-2.1", "I-4.8", "I-7.4"], &["I-3.1"]];
+/// - `invariants_still_violated_if_the_swallowed_writes_had_landed`：录制流里把被吞的那几次写按原位插回去、重建镜像
+///   （实现以为自己写下的那一份），在它上面 checker 判红的那几条。违例点名的（盘, 槽）是被吞那次写的、或红在被吞的根槽里留下的旧根上，
+///   那几次写一落盘它就消失；插回去仍红的那一条不是注入点造成的。
+/// - `ceiling_without_the_swallowed_roots`：被吞的写里有根槽写时，拿历史停下那一步之前的模型、去掉那几条根重算的抬 F 的上限
+///   （实现从盘上现读根环，看不见那几条根）；没有被吞的根槽写、或没有那一步之前的模型时 None。
+/// - `root_ring_slots_of_the_swallowed_root_slot_writes`：被吞的根槽写各落在根环的哪个槽（实八）。同一个进程写过、FUA 返回过的槽，
+///   算抬 F 的上限时读坏就重读一次、仍坏就拒（D16（发布语义） 已定项 1「根槽这一次读坏」那一行）；读坏的正是被吞那次写的槽，
+///   这个拒绝就是条款要的结局，是说谎的设备的投影。
+/// - `instance_rows_with_the_swallowed_roots_rebuilt_from_their_records`：被吞的写里有根槽写时，拿历史停下那一步之前的模型答
+///   「那几条根的根槽没落、记录与单元落了」时可写挂载写的行（实八，[`crate::model::IdealModel::answer_mount_writable_with_the_roots_rebuilt_from_their_records`]：
+///   恢复施加它们的记录、W 取施加的记录的事务号，D23（journal 的角色与格式） 已定项 14 第 4 条）；没有被吞的根槽写、没有那一步之前的模型、
+///   或模型答不了时 None。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WhatTheSwallowedWritesExplain {
+    pub invariants_still_violated_if_the_swallowed_writes_had_landed: BTreeSet<&'static str>,
+    pub ceiling_without_the_swallowed_roots: Option<Option<ModelCheckpointTxg>>,
+    pub root_ring_slots_of_the_swallowed_root_slot_writes: BTreeSet<ModelRingPosition>,
+    pub instance_rows_with_the_swallowed_roots_rebuilt_from_their_records:
+        Option<Vec<ModelInstanceRow>>,
+}
 
-/// 这条签名在不在 [`INCONSISTENCIES_A_LYING_DEVICE_MAY_LEAVE`] 里。
-/// checker 的违例之外一概不在：panic、执行器判出的、模型对不上、记录核对器判红都不是「丢一份内容」的投影。
-fn a_lying_device_may_leave(signature: &FailureSignature) -> bool {
-    match signature {
-        FailureSignature::CheckerViolations { invariants } => {
-            INCONSISTENCIES_A_LYING_DEVICE_MAY_LEAVE.contains(&invariants.as_slice())
-        }
-        FailureSignature::Panic { .. }
-        | FailureSignature::HarnessJudgement { .. }
-        | FailureSignature::ModelDisagreement { .. }
-        | FailureSignature::RecordCheck { .. } => false,
+/// 这条失败是不是说谎的设备留下的：没有 panic、没有执行器判出的、记录核对器没判红；checker 判红的每一条在「被吞的写都落了盘」的
+/// 镜像上都不红；模型对不上的只许是这三格之一：
+/// - 抬 F 的上限，而且实现报的上限等于去掉被吞的根之后模型重算的那一个；
+/// - 「模型说该成、实现拒了」或「拒绝的理由」，而实现拒的是「算抬 F 的上限时一个根环槽读坏、重读仍坏」、拒之前一个写都没发、
+///   点名的那个槽正是一次被吞的根槽写的槽（实八：同一个进程里根槽写被吞之后再抬 F，D16（发布语义） 已定项 1「根槽这一次读坏」那一行
+///   要的就是这个拒绝，模型不知道根槽没落、要它成或按上限拒）；
+/// - 写的实例表行，而且实现写的行等于模型按「被吞根槽的那几条根由记录重建」重算的行（实八：W 取施加的那条记录的事务号，
+///   D23（journal 的角色与格式） 已定项 14 第 4 条；模型不知道根槽没落、答 W = 0）。
+///
+/// 一条不是注入点造成的违例（插回去仍红）、一次读坏的槽不是被吞那次写的、一行与重算的对不上，照报新发现——这是判别力那一半。
+///
+/// 它替下的是按签名写死两组的白名单（主 agent 2026-09-21 定的收严，`records/2026-09-21-增补3第4件与checker补三条.md:27`）：
+/// 白名单早于 I-3.10 的实现，大档撞出的六组里有四组（I-3.10、I-9.1、旧根复活连带的五条、抬 F 的上限）都是说谎的设备丢一份内容的投影、
+/// 却不在名单里（实四丙交回第二节）。
+#[must_use]
+pub fn left_by_the_lying_device(
+    observation: &FailureObservation,
+    explained: &WhatTheSwallowedWritesExplain,
+) -> bool {
+    if observation.panic.is_some()
+        || observation.harness_judgement.is_some()
+        || !crate::history::record_check_aspects(&observation.record_check).is_empty()
+    {
+        return false;
     }
+    let every_violation_is_explained = observation.violations.iter().all(|(invariant, _)| {
+        !explained
+            .invariants_still_violated_if_the_swallowed_writes_had_landed
+            .contains(invariant)
+    });
+    let disagreement_is_explained = match &observation.model_disagreement {
+        None => true,
+        Some(disagreement) => match disagreement.aspect {
+            ModelDisagreementAspect::RollbackFloorCeiling => matches!(
+                (
+                    disagreement.implementation_reported_ceiling,
+                    explained.ceiling_without_the_swallowed_roots
+                ),
+                (Some(reported), Some(Some(recomputed))) if reported == recomputed
+            ),
+            ModelDisagreementAspect::RefusedWhenModelRequiresSuccess
+            | ModelDisagreementAspect::RefusalReason => disagreement
+                .implementation_reported_root_ring_slot_still_bad_after_one_reread
+                .is_some_and(|ring_slot| {
+                    explained
+                        .root_ring_slots_of_the_swallowed_root_slot_writes
+                        .contains(&ring_slot)
+                }),
+            ModelDisagreementAspect::InstanceRows => matches!(
+                (
+                    &disagreement.implementation_rows_written,
+                    &explained.instance_rows_with_the_swallowed_roots_rebuilt_from_their_records
+                ),
+                (Some(written), Some(recomputed)) if written == recomputed
+            ),
+            ModelDisagreementAspect::SessionState
+            | ModelDisagreementAspect::SucceededWhenModelRequiresRefusal
+            | ModelDisagreementAspect::WroteBeforeRefusing
+            | ModelDisagreementAspect::PublishCount
+            | ModelDisagreementAspect::RootIdentity
+            | ModelDisagreementAspect::JournalCounter
+            | ModelDisagreementAspect::RollbackFloor
+            | ModelDisagreementAspect::FilePresence
+            | ModelDisagreementAspect::FileContent
+            | ModelDisagreementAspect::InstanceTableOfTheVersion
+            | ModelDisagreementAspect::AllocationGeneration
+            | ModelDisagreementAspect::InstanceGeneration
+            | ModelDisagreementAspect::ColdStartReadBack
+            | ModelDisagreementAspect::NotModeled => false,
+        },
+    };
+    every_violation_is_explained && disagreement_is_explained
+}
+
+/// 被吞的那几次写要是都落了盘，录制流该是哪一串：各自插在录制流里第 `writes_recorded_before` 次写之后（屏障不改镜像，
+/// 排在那几道屏障前后都一样）。从写数最大的那一次往前插：插进去的写只挪它后面的，排在前面的那几次的位置不变。
+fn operations_with_the_swallowed_writes_landed(
+    operations: &[crate::RetainedOperation],
+    swallowed: &[SwallowedWrite],
+) -> Vec<crate::RetainedOperation> {
+    let mut landed = operations.to_vec();
+    let mut by_position: Vec<&SwallowedWrite> = swallowed.iter().collect();
+    by_position.sort_by_key(|write| write.writes_recorded_before);
+    for write in by_position.into_iter().rev() {
+        let stream_index = if write.writes_recorded_before == 0 {
+            0
+        } else {
+            operations
+                .iter()
+                .enumerate()
+                .filter(|(_, retained)| retained.operation.kind != RecordedOperationKind::Barrier)
+                .nth(write.writes_recorded_before - 1)
+                .map(|(index, _)| index + 1)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "被吞的写之前记着 {} 次写，录制流里的写不够这么多：注入层与录制器数的写对不上",
+                        write.writes_recorded_before
+                    )
+                })
+        };
+        landed.insert(stream_index, write.as_retained_operation());
+    }
+    landed
 }
 
 /// 「重开走读失败」是不是这一次注入的正确答案：盘上本来就没有一版立得住。两种：
@@ -1935,7 +2151,7 @@ fn a_lying_device_may_leave(signature: &FailureSignature) -> bool {
 ///   重开走到任何一版才是缺口。
 ///
 /// 别的一律照判：报错的设备不改盘上已有的字节，重开该走到之前某一条根上，走读失败就是缺口。
-fn a_failed_reopen_is_the_right_answer(
+fn failed_reopen_is_the_right_answer(
     fault: InjectedFault,
     ending_observation: Option<&FailureObservation>,
 ) -> bool {
@@ -1945,7 +2161,7 @@ fn a_failed_reopen_is_the_right_answer(
     matches!(
         ending_observation.and_then(|observation| observation.harness_judgement.as_ref()),
         Some(HarnessJudgement::TheStartingPointReturnedAnError { step, .. })
-            if !step.a_finished_filesystem_is_on_the_devices()
+            if !step.finished_filesystem_is_on_the_devices()
     )
 }
 
@@ -1964,10 +2180,15 @@ fn inject_one_fault(
     );
     let stream = SharedStream::retaining_contents();
     let mut committed_by_the_armed_run: BTreeMap<ModelRootKey, Option<Rc<[u8]>>> = BTreeMap::new();
+    // 最后一次观察那一刻的模型与录制流长度：历史停下的那一步不调观察者，它之前那一步的这两样就是「停下那一步开始时」的。
+    let mut model_at_the_last_observation: Option<crate::model::IdealModel> = None;
+    let mut stream_length_at_the_last_observation = 0usize;
     let run = execute_history_with_faults(history, execution, &stream, &plan, &mut |observation| {
         for (key, file) in observation.model.committed_versions() {
             committed_by_the_armed_run.insert(key, file);
         }
+        model_at_the_last_observation = Some(observation.model.clone());
+        stream_length_at_the_last_observation = stream.operation_count();
     });
     let fired = plan.fired();
     accumulator.tally.faults += 1;
@@ -2040,7 +2261,8 @@ fn inject_one_fault(
         execution.device_width.device_bytes(),
     );
     image.apply(&operations);
-    let (writes, _segments) = writes_and_segments(&operations, &geometry);
+    let (writes, _segments, stream_indexes) =
+        writes_and_segments_with_stream_indexes(&operations, &geometry);
     let all_persisted = vec![true; writes.len()];
     let newest_persisted = newest_persisted_root(&writes, &all_persisted)
         .map(|(checkpoint_txg, instance)| model_root_key(instance, checkpoint_txg));
@@ -2071,8 +2293,55 @@ fn inject_one_fault(
             allowed.insert(*key, file.clone());
         }
     }
+    // 再放行一样（主 agent 2026-09-26 定，实七）：历史停下的那一步里实现已经写出的根——最后一次观察之后录制流里落盘的根槽写
+    // （说谎的设备让历史停在注入之后的另一步时，那一步写出的根不在上面两份里；实四丙交回 ④ offset 284）。
+    // 那条根的内容不另信实现：读回的正是它、而且读回的内容是模型认过的某一版，或停下那一步这次发布自己的内容，才放行。
+    let roots_written_by_the_stopping_step: BTreeSet<ModelRootKey> = writes
+        .iter()
+        .zip(&stream_indexes)
+        .filter(|(write, stream_index)| {
+            write.kind == StepKind::RootRecordFua
+                && **stream_index >= stream_length_at_the_last_observation
+        })
+        .filter_map(|(write, _)| write.bytes().map(root_identity_written_by))
+        .map(|(instance, checkpoint_txg)| model_root_key(instance, checkpoint_txg))
+        .collect();
+    let content_published_by_the_stopping_step: Option<Vec<u8>> = ending_observation
+        .and_then(|observation| match observation.position {
+            StepPosition::Operation(step_index) => history.operations.get(step_index),
+            StepPosition::StartingPoint => None,
+        })
+        .and_then(|operation| match operation {
+            HistoryOperation::PublishFirstFile(content)
+            | HistoryOperation::PublishOverwrite(content) => Some(content.bytes()),
+            HistoryOperation::PublishWithoutUnits
+            | HistoryOperation::CloseAndMountWritable
+            | HistoryOperation::RollBackWhileMounted(_)
+            | HistoryOperation::RaiseRollbackFloor(_)
+            | HistoryOperation::ColdStartRecover
+            | HistoryOperation::CrashRecoveryAbandoningTheNewestRoot => None,
+        });
+    let (read_back_root, read_back_content): (Option<ModelRootKey>, Option<&[u8]>) =
+        match &read_back {
+            ObservedReadBack::FileRead { root, content } => (Some(*root), Some(content.as_slice())),
+            ObservedReadBack::NoFile { root } => (Some(*root), None),
+            ObservedReadBack::Failed { .. } => (None, None),
+        };
+    if let Some(root) = read_back_root {
+        let content_is_one_the_model_knows = allowed
+            .values()
+            .any(|file| file.as_deref() == read_back_content)
+            || (read_back_content.is_some()
+                && read_back_content == content_published_by_the_stopping_step.as_deref());
+        if roots_written_by_the_stopping_step.contains(&root)
+            && !allowed.contains_key(&root)
+            && content_is_one_the_model_knows
+        {
+            allowed.insert(root, read_back_content.map(Rc::from));
+        }
+    }
     let nothing_was_left_to_recover = matches!(read_back, ObservedReadBack::Failed { .. })
-        && a_failed_reopen_is_the_right_answer(drawn.fault, ending_observation);
+        && failed_reopen_is_the_right_answer(drawn.fault, ending_observation);
     let disagreement = if nothing_was_left_to_recover {
         None
     } else {
@@ -2115,6 +2384,84 @@ fn inject_one_fault(
             accumulator.acquired_instances_left.push(left);
         }
     }
+
+    // 说谎的设备吞掉的写（只有 `WriteIsSwallowed` 有）要是都落了盘，盘面与抬 F 的上限该是什么样：判「这条失败是不是它留下的」要的两样。
+    let swallowed_writes = plan.swallowed_writes();
+    let what_the_swallowed_writes_explain = (!swallowed_writes.is_empty()).then(|| {
+        let mut image_with_the_swallowed_writes_landed = MemoryPool::with_devices(
+            &[DeviceIdentity(0), DeviceIdentity(1)],
+            execution.device_width.device_bytes(),
+        );
+        image_with_the_swallowed_writes_landed.apply(&operations_with_the_swallowed_writes_landed(
+            &operations,
+            &swallowed_writes,
+        ));
+        let invariants_still_violated_if_the_swallowed_writes_had_landed =
+            check_pool_image(&image_with_the_swallowed_writes_landed)
+                .into_iter()
+                .filter_map(|(invariant, verdict)| match verdict {
+                    InvariantVerdict::Violated(_) => Some(invariant),
+                    InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+                })
+                .collect();
+        let swallowed_root_slot_writes: Vec<&SwallowedWrite> = swallowed_writes
+            .iter()
+            .filter(|write| {
+                geometry.classify(&write.as_retained_operation().operation)
+                    == StepKind::RootRecordFua
+            })
+            .collect();
+        let swallowed_roots: Vec<ModelRootKey> = swallowed_root_slot_writes
+            .iter()
+            .filter_map(|write| match &write.contents {
+                SwallowedContents::Bytes(bytes) => Some(root_identity_written_by(bytes)),
+                SwallowedContents::Zeroes { .. } => None,
+            })
+            .map(|(instance, checkpoint_txg)| model_root_key(instance, checkpoint_txg))
+            .collect();
+        let ceiling_without_the_swallowed_roots = if swallowed_roots.is_empty() {
+            None
+        } else {
+            model_at_the_last_observation
+                .as_ref()
+                .map(|model| model.rollback_floor_ceiling_without_the_roots(&swallowed_roots))
+        };
+        let parameters = execution.device_width.parameters();
+        let every_slot_of_the_ring = RootRingSlotTarget {
+            named_slots: NamedRootRingSlots::every_slot_in_the_ring(
+                parameters.geometry.root_ring_slots_per_region,
+            ),
+            region_devices: parameters.region_devices,
+            fixed_structure_slot_spacing: parameters.geometry.fixed_structure_slot_spacing,
+        };
+        let root_ring_slots_of_the_swallowed_root_slot_writes = swallowed_root_slot_writes
+            .iter()
+            .filter_map(|write| every_slot_of_the_ring.slot_covering(write.device, write.offset))
+            .map(model_ring_position)
+            .collect();
+        let instance_rows_with_the_swallowed_roots_rebuilt_from_their_records =
+            if swallowed_roots.is_empty() {
+                None
+            } else {
+                model_at_the_last_observation
+                    .as_ref()
+                    .and_then(|model| {
+                        model
+                            .answer_mount_writable_with_the_roots_rebuilt_from_their_records(
+                                &swallowed_roots,
+                            )
+                            .ok()
+                    })
+                    .and_then(|answer| answer.expected_mount)
+                    .map(|(_, rows)| rows)
+            };
+        WhatTheSwallowedWritesExplain {
+            invariants_still_violated_if_the_swallowed_writes_had_landed,
+            ceiling_without_the_swallowed_roots,
+            root_ring_slots_of_the_swallowed_root_slot_writes,
+            instance_rows_with_the_swallowed_roots_rebuilt_from_their_records,
+        }
+    });
 
     // 三、判：注入那一步返回错误的那一格不算失败；别的失败（panic、checker 判红、重开走到模型不允许的版本）逐条分类。
     let mut failures: Vec<FailureObservation> = Vec::new();
@@ -2163,12 +2510,14 @@ fn inject_one_fault(
                 signature,
                 observation,
             } => {
-                // 说谎的设备丢掉一份内容之后盘面不一致：设备丢的，不是实现的缺口（`InjectedFault::the_device_lies`）。
-                // 豁免只给白名单里那两种投影（`a_lying_device_may_leave`），白名单之外的照报成新发现。
+                // 说谎的设备吞掉写之后盘面不一致：设备丢的，不是实现的缺口（`InjectedFault::the_device_lies`）。
+                // 按注入点认（`left_by_the_lying_device`，主 agent 2026-09-26 定，实七）：被吞的写插回去就消失的违例、
+                // 去掉被吞的根之后模型重算对得上的上限才豁免，别的照报成新发现。
                 // panic 不走这一格——说谎的设备也不许把实现打 panic，那一条照样报成新发现。
-                if observation.panic.is_none()
-                    && drawn.fault.the_device_lies()
-                    && a_lying_device_may_leave(&signature)
+                if drawn.fault.the_device_lies()
+                    && what_the_swallowed_writes_explain
+                        .as_ref()
+                        .is_some_and(|explained| left_by_the_lying_device(&observation, explained))
                 {
                     accumulator
                         .tally
@@ -2499,7 +2848,8 @@ fn seed_slices(seed_count: u64, worker_threads: usize) -> Vec<std::ops::Range<u6
 mod tests {
     use super::*;
     use crate::crash::SparseBlockDevice;
-    use crate::history::StartingPointStep;
+    use crate::history::{CapturedPanic, StartingPointStep};
+    use crate::model::ModelDisagreement;
 
     /// 用例里的几何：与 E142 装置相同（物理块 512、io_min 512 ⇒ 固定结构槽距 4096），journal 环取默认的 768 MiB。
     const TEST_GEOMETRY: FixedGeometry = FixedGeometry {
@@ -2635,7 +2985,7 @@ mod tests {
 
     /// 读回改坏的字节：报成功、缓冲区里那一位被翻掉，盘上那一份一个字节都没变。
     #[test]
-    fn a_corrupted_read_flips_one_bit_in_the_buffer_and_leaves_the_device_alone() {
+    fn corrupted_read_flips_one_bit_in_the_buffer_and_leaves_the_device_alone() {
         let plan = SharedFaultPlan::unarmed(TEST_GEOMETRY);
         let mut devices = two_devices(&plan);
         write(&mut devices[0].1, UNIT_AREA_OFFSET.0, 0b0000_0001).expect("写");
@@ -2661,7 +3011,7 @@ mod tests {
 
     /// 吞掉一次写：报成功，盘上一个字节都没变（设备说谎那一形）。
     #[test]
-    fn a_swallowed_write_reports_success_and_changes_nothing_on_the_device() {
+    fn swallowed_write_reports_success_and_changes_nothing_on_the_device() {
         let plan = SharedFaultPlan::armed(
             TEST_GEOMETRY,
             FaultSchedule::the_nth_call_across_the_pool(InjectedFault::WriteIsSwallowed, 1),
@@ -2682,7 +3032,7 @@ mod tests {
 
     /// 吞掉一道屏障：报成功，里面那块盘没收到；数进 `barriers_swallowed`。
     #[test]
-    fn a_swallowed_barrier_reports_success_and_is_counted_apart() {
+    fn swallowed_barrier_reports_success_and_is_counted_apart() {
         let plan = SharedFaultPlan::armed(
             TEST_GEOMETRY,
             FaultSchedule::the_nth_call_across_the_pool(InjectedFault::BarrierIsSwallowed, 1),
@@ -2695,31 +3045,36 @@ mod tests {
         assert_eq!(counts.barriers_forwarded, 1);
     }
 
-    /// 每块盘收到第一道屏障那一刻的计数：屏障本身不算进去，之后的调用也不算。
+    /// 每块盘收到过写之后的第一道屏障那一刻的计数：屏障本身不算进去，之后的调用也不算；写之前收到的屏障（可写挂载里取号写之前那一道）
+    /// 不拍快照。
     #[test]
-    fn the_counts_when_the_first_barrier_arrived_are_frozen_at_that_moment() {
+    fn the_counts_when_the_first_barrier_after_a_write_arrived_are_frozen_at_that_moment() {
         let plan = SharedFaultPlan::unarmed(TEST_GEOMETRY);
         let mut devices = two_devices(&plan);
+        devices[0].1.barrier().expect("写之前的一道屏障");
         assert_eq!(
-            plan.counts_when_the_first_barrier_arrived_at(DeviceIdentity(0)),
+            plan.counts_when_the_first_barrier_after_a_write_arrived_at(DeviceIdentity(0)),
             None,
-            "一道屏障都没收到过"
+            "写之前的屏障不拍快照"
         );
         write(&mut devices[0].1, UNIT_AREA_OFFSET.0, 1).expect("写");
-        devices[0].1.barrier().expect("第一道屏障");
+        devices[0].1.barrier().expect("写之后第一道屏障");
         write(&mut devices[0].1, UNIT_AREA_OFFSET.0 + 512, 2).expect("写");
-        devices[0].1.barrier().expect("第二道屏障");
+        devices[0].1.barrier().expect("写之后第二道屏障");
         let frozen = plan
-            .counts_when_the_first_barrier_arrived_at(DeviceIdentity(0))
-            .expect("收到过屏障");
+            .counts_when_the_first_barrier_after_a_write_arrived_at(DeviceIdentity(0))
+            .expect("写之后收到过屏障");
         assert_eq!(frozen.writes, 1);
-        assert_eq!(frozen.barriers_forwarded, 0, "屏障本身不算进去");
+        assert_eq!(
+            frozen.barriers_forwarded, 1,
+            "写之前那一道算进去，这一道本身不算进去"
+        );
         assert_eq!(plan.counts_of_device(DeviceIdentity(0)).writes, 2);
     }
 
     /// 屏障报错：交回块设备错，里面那块盘没收到。
     #[test]
-    fn a_failing_barrier_returns_a_block_device_error() {
+    fn failing_barrier_returns_the_block_device_error() {
         let plan = SharedFaultPlan::armed(
             TEST_GEOMETRY,
             FaultSchedule::every_call_across_the_pool(InjectedFault::BarrierFails),
@@ -2735,7 +3090,7 @@ mod tests {
 
     /// 读报错：交回块设备错，缓冲区不动。
     #[test]
-    fn a_failing_read_returns_a_block_device_error_and_leaves_the_buffer_alone() {
+    fn failing_read_returns_the_block_device_error_and_leaves_the_buffer_alone() {
         let plan = SharedFaultPlan::armed(
             TEST_GEOMETRY,
             FaultSchedule::the_nth_call_across_the_pool(InjectedFault::ReadFails, 1),
@@ -2794,50 +3149,215 @@ mod tests {
         );
     }
 
-    /// 说谎的设备许可留下的盘面不一致是一张白名单：名单里那两组豁免，名单外的（多一条不变量、少一条不变量、
-    /// 换一条不变量、以及 checker 违例之外的那几类签名）一概照报成新发现
-    /// （用户 2026-09-21 定的收严；`a_lying_device_may_leave`）。
+    /// 按注入点认说谎的设备留下的失败（`left_by_the_lying_device`，主 agent 2026-09-26 定，实七）：被吞的写插回去就消失的违例、
+    /// 去掉被吞的根之后模型重算对得上的上限才认；插回去仍红的违例、重算对不上的上限、别的模型格、panic、执行器判出的一概照报。
     #[test]
-    fn only_the_two_whitelisted_projections_of_a_lost_write_are_excused() {
-        let checker_violations =
-            |invariants: &[&'static str]| FailureSignature::CheckerViolations {
-                invariants: invariants.to_vec(),
+    fn only_failures_that_the_swallowed_writes_explain_are_left_by_the_lying_device() {
+        let observation =
+            |violations: &[&'static str],
+             disagreement: Option<ModelDisagreement>,
+             panic: Option<CapturedPanic>| FailureObservation {
+                position: StepPosition::Operation(4),
+                operation_kind: Some(HistoryOperationKind::PublishOverwrite),
+                violations: violations
+                    .iter()
+                    .map(|invariant| (*invariant, "盘 0 槽 50180".to_string()))
+                    .collect(),
+                panic,
+                newest_ring_root_txg: None,
+                root_ring_slot_count: None,
+                harness_judgement: None,
+                model_disagreement: disagreement,
+                raised_floor_lands_only_on_abandoned_roots: None,
+                record_check: RecordCheck::default(),
             };
-        for allowed in [
-            checker_violations(&["I-2.1", "I-4.8", "I-7.4"]),
-            checker_violations(&["I-3.1"]),
+        let ceiling_disagreement = |reported: u64| ModelDisagreement {
+            aspect: ModelDisagreementAspect::RollbackFloorCeiling,
+            model_answer: "上限 Some(3)".to_string(),
+            implementation_answer: format!("实现报上限 {reported}"),
+            implementation_reported_ceiling: Some(ModelCheckpointTxg(reported)),
+            implementation_reported_root_ring_slot_still_bad_after_one_reread: None,
+            implementation_rows_written: None,
+        };
+        let explained = |still_violated: &[&'static str], ceiling: Option<Option<u64>>| {
+            WhatTheSwallowedWritesExplain {
+                invariants_still_violated_if_the_swallowed_writes_had_landed: still_violated
+                    .iter()
+                    .copied()
+                    .collect(),
+                ceiling_without_the_swallowed_roots: ceiling
+                    .map(|recomputed| recomputed.map(ModelCheckpointTxg)),
+                root_ring_slots_of_the_swallowed_root_slot_writes: BTreeSet::new(),
+                instance_rows_with_the_swallowed_roots_rebuilt_from_their_records: None,
+            }
+        };
+        let lost_unit = ["I-2.1", "I-3.10", "I-4.8", "I-7.4"];
+        assert!(left_by_the_lying_device(
+            &observation(&lost_unit, None, None),
+            &explained(&[], None)
+        ));
+        assert!(
+            !left_by_the_lying_device(
+                &observation(&lost_unit, None, None),
+                &explained(&["I-3.10"], None)
+            ),
+            "被吞的写插回去 I-3.10 仍红：不是注入点造成的"
+        );
+        assert!(left_by_the_lying_device(
+            &observation(&[], Some(ceiling_disagreement(0)), None),
+            &explained(&[], Some(Some(0)))
+        ));
+        for (recomputed, why) in [
+            (Some(Some(1)), "去掉被吞的根之后重算的上限不等于实现报的"),
+            (Some(None), "去掉被吞的根之后模型算不出上限"),
+            (None, "被吞的写里没有根槽写，或没有停下那一步之前的模型"),
         ] {
             assert!(
-                a_lying_device_may_leave(&allowed),
-                "白名单里这一组该豁免：{allowed:?}"
+                !left_by_the_lying_device(
+                    &observation(&[], Some(ceiling_disagreement(0)), None),
+                    &explained(&[], recomputed)
+                ),
+                "{why}"
             );
         }
-        for refused in [
-            // 多一条：丢一份内容之外还发生了别的事。
-            checker_violations(&["I-2.1", "I-4.8", "I-7.4", "I-5.4"]),
-            checker_violations(&["I-3.1", "I-3.9"]),
-            // 少一条、换一条：不是那一组投影。
-            checker_violations(&["I-2.1", "I-4.8"]),
-            checker_violations(&["I-9.14"]),
-            // 次序不同不算同一组（签名按 checker 报出来的次序排，翻了次序就是另一回事）。
-            checker_violations(&["I-7.4", "I-4.8", "I-2.1"]),
-            // checker 违例之外的四类签名一概不豁免。
-            FailureSignature::Panic {
-                location: "crates/singlefs-core/src/transaction.rs:1".to_string(),
-            },
-            FailureSignature::HarnessJudgement {
-                judgement: "checker 判绿的镜像上冷启动恢复报错",
-            },
-            FailureSignature::ModelDisagreement {
-                aspect: "冷启动读回",
-            },
-            FailureSignature::RecordCheck {
-                aspects: vec!["root_without_record"],
-            },
+        let read_back_disagreement = ModelDisagreement {
+            aspect: ModelDisagreementAspect::ColdStartReadBack,
+            model_answer: "读回 (5,19)".to_string(),
+            implementation_answer: "读回 (5,18)".to_string(),
+            implementation_reported_ceiling: None,
+            implementation_reported_root_ring_slot_still_bad_after_one_reread: None,
+            implementation_rows_written: None,
+        };
+        assert!(
+            !left_by_the_lying_device(
+                &observation(&[], Some(read_back_disagreement), None),
+                &explained(&[], Some(Some(0)))
+            ),
+            "上限之外的模型格不认"
+        );
+        assert!(
+            !left_by_the_lying_device(
+                &observation(
+                    &lost_unit,
+                    None,
+                    Some(CapturedPanic {
+                        location: "crates/singlefs-core/src/transaction.rs:1".to_string(),
+                        message: "断言".to_string(),
+                    })
+                ),
+                &explained(&[], None)
+            ),
+            "说谎的设备也不许把实现打 panic"
+        );
+    }
+
+    /// 按注入点认的另两格（实八）：实现拒抬 F、报读坏重读仍坏的那个根环槽正是被吞的根槽写的槽，才认——不管模型要它成还是按上限拒；
+    /// 槽对不上、实现没报槽（别的拒绝，或拒之前写了盘）一概照报。实现写的实例表行等于「被吞的根由记录重建」时模型重算的行，才认；
+    /// 行对不上、模型重算不出，照报。
+    #[test]
+    fn a_refused_floor_raise_and_the_rows_written_are_left_by_the_lying_device_only_when_the_swallowed_root_slot_write_explains_them(
+    ) {
+        let observation = |disagreement: ModelDisagreement| FailureObservation {
+            position: StepPosition::Operation(5),
+            operation_kind: Some(HistoryOperationKind::RaiseRollbackFloor),
+            violations: Vec::new(),
+            panic: None,
+            newest_ring_root_txg: None,
+            root_ring_slot_count: None,
+            harness_judgement: None,
+            model_disagreement: Some(disagreement),
+            raised_floor_lands_only_on_abandoned_roots: None,
+            record_check: RecordCheck::default(),
+        };
+        let swallowed_slot = ModelRingPosition {
+            region: 1,
+            slot_in_region: 1,
+        };
+        let another_slot = ModelRingPosition {
+            region: 2,
+            slot_in_region: 1,
+        };
+        let refusal = |aspect: ModelDisagreementAspect, reported: Option<ModelRingPosition>| {
+            ModelDisagreement {
+                aspect,
+                model_answer: "RaiseRollbackFloor 该成".to_string(),
+                implementation_answer:
+                    "拒了：MountError::RollbackFloorCeilingRootRingSlotStillBadAfterOneReread"
+                        .to_string(),
+                implementation_reported_ceiling: None,
+                implementation_reported_root_ring_slot_still_bad_after_one_reread: reported,
+                implementation_rows_written: None,
+            }
+        };
+        let row = |applied_transaction_high_water: u64| ModelInstanceRow {
+            instance: crate::model::ModelInstanceGeneration(1),
+            selected_root_txg: ModelCheckpointTxg(4),
+            applied_transaction_high_water,
+        };
+        let rows_disagreement = |written: Option<Vec<ModelInstanceRow>>| ModelDisagreement {
+            aspect: ModelDisagreementAspect::InstanceRows,
+            model_answer: "写行 [(1, 4, 0)]".to_string(),
+            implementation_answer: "写行 [(1, 4, 2)]".to_string(),
+            implementation_reported_ceiling: None,
+            implementation_reported_root_ring_slot_still_bad_after_one_reread: None,
+            implementation_rows_written: written,
+        };
+        let explained = |slots: &[ModelRingPosition], rows: Option<Vec<ModelInstanceRow>>| {
+            WhatTheSwallowedWritesExplain {
+                invariants_still_violated_if_the_swallowed_writes_had_landed: BTreeSet::new(),
+                ceiling_without_the_swallowed_roots: None,
+                root_ring_slots_of_the_swallowed_root_slot_writes: slots.iter().copied().collect(),
+                instance_rows_with_the_swallowed_roots_rebuilt_from_their_records: rows,
+            }
+        };
+        for aspect in [
+            ModelDisagreementAspect::RefusedWhenModelRequiresSuccess,
+            ModelDisagreementAspect::RefusalReason,
         ] {
             assert!(
-                !a_lying_device_may_leave(&refused),
-                "白名单外这一组不许豁免：{refused:?}"
+                left_by_the_lying_device(
+                    &observation(refusal(aspect, Some(swallowed_slot))),
+                    &explained(&[swallowed_slot], None)
+                ),
+                "{aspect:?}：读坏的正是被吞那次写的槽"
+            );
+            assert!(
+                !left_by_the_lying_device(
+                    &observation(refusal(aspect, Some(another_slot))),
+                    &explained(&[swallowed_slot], None)
+                ),
+                "{aspect:?}：读坏的槽不是被吞那次写的"
+            );
+            assert!(
+                !left_by_the_lying_device(
+                    &observation(refusal(aspect, None)),
+                    &explained(&[swallowed_slot], None)
+                ),
+                "{aspect:?}：实现没报读坏的槽（别的拒绝，或拒之前写了盘）"
+            );
+        }
+        assert!(
+            left_by_the_lying_device(
+                &observation(rows_disagreement(Some(vec![row(2)]))),
+                &explained(&[], Some(vec![row(2)]))
+            ),
+            "实现写的行等于被吞的根由记录重建之后重算的行"
+        );
+        for (written, recomputed, why) in [
+            (
+                Some(vec![row(2)]),
+                Some(vec![row(0)]),
+                "重算的行与实现写的不同",
+            ),
+            (Some(vec![row(2)]), None, "模型重算不出"),
+            (None, Some(vec![row(2)]), "对不上的那一格没带实现写的行"),
+        ] {
+            assert!(
+                !left_by_the_lying_device(
+                    &observation(rows_disagreement(written)),
+                    &explained(&[], recomputed)
+                ),
+                "{why}"
             );
         }
     }
@@ -2845,7 +3365,7 @@ mod tests {
     /// 「重开走读失败」什么时候是正确答案：说谎的那两种一律是；报错的那四种只有在 mkfs 自己就报错
     /// （盘上还没有文件系统）时才是。这道豁免放宽一格，报错的设备之后的走读失败就没人看了。
     #[test]
-    fn a_failed_reopen_is_excused_only_by_a_lying_device_or_by_a_failed_make_filesystem() {
+    fn failed_reopen_is_excused_only_by_the_lying_device_or_by_the_failed_make_filesystem() {
         let stopped_at = |step| FailureObservation {
             position: StepPosition::StartingPoint,
             operation_kind: None,
@@ -2868,27 +3388,24 @@ mod tests {
             InjectedFault::BarrierIsSwallowed,
         ] {
             assert!(
-                a_failed_reopen_is_the_right_answer(lying, None),
+                failed_reopen_is_the_right_answer(lying, None),
                 "{} 之后走读失败是对的",
                 lying.name()
             );
         }
         assert!(
-            !a_failed_reopen_is_the_right_answer(InjectedFault::WriteFails, None),
+            !failed_reopen_is_the_right_answer(InjectedFault::WriteFails, None),
             "写报错之后走读失败是缺口，不许豁免"
         );
         assert!(
-            a_failed_reopen_is_the_right_answer(
+            failed_reopen_is_the_right_answer(
                 InjectedFault::WriteFails,
                 Some(&failed_make_filesystem)
             ),
             "mkfs 自己就报错时盘上没有文件系统，走读失败是对的"
         );
         assert!(
-            !a_failed_reopen_is_the_right_answer(
-                InjectedFault::WriteFails,
-                Some(&failed_first_file)
-            ),
+            !failed_reopen_is_the_right_answer(InjectedFault::WriteFails, Some(&failed_first_file)),
             "mkfs 做完了，第一个文件那一步报错之后重开该走到创世根上"
         );
     }

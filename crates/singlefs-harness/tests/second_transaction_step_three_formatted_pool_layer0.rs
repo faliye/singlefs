@@ -1,6 +1,6 @@
 //! 只做过 mkfs 的池上的可写挂载（里程碑「第二个事务」步 3 的另一格，2026-09-17 用户定）在层 0 的证据：mkfs → 进程退出、重开走可写挂载
 //! （取号 1、零单元的写行发布 txg 1 与暖机 txg 2）→ 同一个进程里发布第一个文件版本（txg 3），把 mkfs 之后的整条录制流按 D13（验证路线） 已定项 4
-//! 取崩溃状态，快的那条（18 写的那一段不展开）跑恢复 + 多版本 oracle、池级 checker、记录核对器。
+//! 取崩溃状态，快的那条（26 写的那一段不展开）跑恢复 + 多版本 oracle、池级 checker、记录核对器。
 //! 这条流的基线、写表（带内容）、段序列与 mkfs 同一个进程里跑第一个事务那条流逐项相同（用例钉住），全量枚举就是第一个事务那条流的全量，不另跑。
 
 mod common;
@@ -12,8 +12,9 @@ use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::mount::mount_writable;
 use singlefs_core::transaction::{publish_first_file, FirstFile, PoolWriter};
 use singlefs_harness::crash::{
-    closed_form_state_count, enumerate_layer0_selecting_versions, writes_and_segments, Layer0Tally,
-    MemoryPool, PublishedVersion, RetainedWrite,
+    closed_form_state_count, enumerate_layer0_selecting_versions,
+    layer0_state_count_with_torn_in_place_overwrites, writes_and_segments, Layer0SegmentExpansion,
+    Layer0Tally, MemoryPool, PublishedVersion, RetainedWrite,
 };
 use singlefs_harness::segments::StepKind;
 
@@ -55,13 +56,14 @@ fn prepare(tag: &str) -> Prepared {
         writes_and_segments(&operations[formatted.mkfs_operation_count..], &geometry());
     assert_eq!(
         segments.iter().map(Vec::len).collect::<Vec<_>>(),
-        vec![2, 2, 1, 2, 2, 1, 18, 2, 1, 2],
-        "取号两写 | 写行发布的记录两写 | 根 | 系统配置两写 | 暖机的记录两写 | 根 | 系统配置两写与第一个文件版本的十六个单元写 | 记录两写 | 根 | 系统配置两写"
+        vec![2, 2, 1, 2, 2, 1, 26, 2, 1, 2],
+        "取号两写 | 写行发布的记录两写 | 根 | 系统配置两写 | 暖机的记录两写 | 根 | 系统配置两写与第一个文件版本的二十四个单元写 \
+         （十二个单元各两盘：七个角色加分配记录树五个节点，D8（核心索引结构） 已定项 14）| 记录两写 | 根 | 系统配置两写"
     );
     assert_eq!(
         writes.len(),
-        33,
-        "取号 2 + 两次零单元发布各 5 + 文件版本 21"
+        2 + 2 * 5 + (24 + 2 + 1 + 2),
+        "取号 2 + 两次零单元发布各 5 + 文件版本 29（24 个单元写、两份记录、根槽、两块盘的系统配置槽轮换）"
     );
     let root_indexes: Vec<usize> = writes
         .iter()
@@ -121,15 +123,22 @@ fn assert_checker_and_record_checker_clean(tally: &Layer0Tally) {
     }
 }
 
-/// 段序列：十段、闭式 262165（1 + 六个 2 写段各 3 + 三个 1 写段各 1 + 一个 18 写段 262143），与 mkfs 同一个进程里跑第一个事务那条流相同。
+/// 段序列：十段、每次写只取两态时的闭式 67108885（1 + 六个 2 写段各 3 + 三个 1 写段各 1 + 一个 26 写段 2^26 − 1 = 67108863），
+/// 与 mkfs 同一个进程里跑第一个事务那条流相同（`first_transaction_step_seven_layer0.rs` 的 `FULL_STATES_WITH_TWO_STATES_PER_WRITE`）。
 #[test]
 fn the_formatted_pool_mount_and_first_file_stream_keeps_the_first_transaction_segment_sequence() {
     let prepared = prepare("formatted-layer0-registered");
     assert_eq!(prepared.segments.len(), 10);
-    assert_eq!(closed_form_state_count(&prepared.segments), 262_165);
+    assert_eq!(
+        closed_form_state_count(&prepared.segments),
+        1 + 6 * 3 + 3 + ((1 << 26) - 1),
+        "1 + 六个 2 写段各 3 + 三个 1 写段各 1 + 26 写段 2^26 − 1"
+    );
+    assert_eq!(closed_form_state_count(&prepared.segments), 67_108_885);
 }
 
-/// 平时跑的那一份：18 写的那一段不展开（只以整段持久进入后面的状态），其余每段任意子集。
+/// 平时跑的那一份：26 写的那一段不展开（只以整段持久进入后面的状态），其余每段每次写各取它的几态、任意组合
+/// （系统配置槽写是原地覆写，取三态，`crash::TearableInPlaceOverwrites`）。
 #[test]
 fn every_crash_state_outside_the_unit_segment_of_the_formatted_pool_mount_recovers_to_the_version_its_root_claims(
 ) {
@@ -150,11 +159,31 @@ fn every_crash_state_outside_the_unit_segment_of_the_formatted_pool_mount_recove
         .cloned()
         .collect();
     assert_eq!(
-        tally.states,
         closed_form_state_count(&expanded),
-        "展开的段按闭式数"
+        22,
+        "每次写只取两态时展开的段按闭式数（补第三态之前的口径）：1 + 六个 2 写段各 3 + 三个 1 写段各 1"
     );
-    assert_eq!(tally.states, 22, "1 + 六个 2 写段各 3 + 三个 1 写段各 1");
+    assert_eq!(
+        tally.states,
+        layer0_state_count_with_torn_in_place_overwrites(
+            &prepared.base,
+            &prepared.writes,
+            &prepared.segments,
+            &|segment_index, segment| {
+                if expand(segment_index, segment) {
+                    Layer0SegmentExpansion::EveryProperSubset
+                } else {
+                    Layer0SegmentExpansion::NotExpanded
+                }
+            },
+        ),
+        "展开的段按层 0 的枚举域数（原地覆写取三态）"
+    );
+    assert_eq!(
+        tally.states,
+        1 + 3 * (3 * 3 - 1) + 3 * 3 + 3,
+        "1 + 三个系统配置槽 2 写段各 3² − 1 + 三个记录 2 写段各 3 + 三个根槽 1 写段各 1（每次写只取两态时 22）"
+    );
     assert_eq!(
         tally.violations, 0,
         "第一处违例：{:?}",

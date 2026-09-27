@@ -2,16 +2,17 @@
 //! I-7.7（系统配置实例代号不低于根环） 那一族判红」要红在的那一条层 0 用例。
 //!
 //! 流：mkfs → 取号 1 → 暖机 → A → B（同一个进程）→ 进程退出、重开可写挂载（取号 2 → 写行 → 暖机）。
-//! 取号那两次系统配置槽写与 B 的两次系统配置槽轮换同一段（进程退出与重开之间没有屏障，登记表八那条 ⚠️），
-//! 取号那道屏障把它们与写行那次发布的单元写隔开（D23（journal 的角色与格式） 已定项 16「取号那一步的屏障」）。
-//! 平时展开的只有这两段：取号所在的那一段、取号之后第一个带单元写的那一段——少了取号那道屏障，两段并成一段，
+//! 取号写之前一道屏障把取号那两次系统配置槽写与 B 的两次系统配置槽轮换隔开（代码审阅第 19 条；改之前两者同一段，
+//! 进程退出与重开之间没有屏障，登记表八那条 ⚠️），取号之后那道屏障把它们与写行那次发布的单元写隔开
+//! （D23（journal 的角色与格式） 已定项 16「取号那一步的屏障」）。
+//! 平时展开的只有这两段：取号所在的那一段、取号之后第一个带单元写的那一段——少了取号之后那道屏障，两段并成一段，
 //! 枚举就摆得出「实例 2 的单元已持久、两块盘的系统配置还都是 1」的状态。
 //! 展开哪几段按写在录制流里的位置挑（重开之后的第一个写起），不按段的写数挑：并段之后段变长，按写数挑会把并出来的那一段漏掉。
 //!
-//! 这条流的段序列就是第二条流（`second_transaction_step_zero_layer0.rs`）发 C 之前那一截：前 22 段逐段相同，
-//! 末段是暖机第二次的系统配置槽轮换（第二条流里它与 C 的单元写并成 18 写一段）。展开的这两段在第二条流里是第 13、14 段，
+//! 这条流的段序列就是第二条流（`second_transaction_step_zero_layer0.rs`）发 C 之前那一截：前 23 段逐段相同，
+//! 末段是暖机第二次的系统配置槽轮换（第二条流里它与 C 的单元写并成 26 写一段）。展开的这两段在第二条流里是第 14、15 段，
 //! 全量（门禁 54 号 `--full`）已经罩着；这一条不多罩崩溃状态，多的是在平时的 `cargo test` 里展开它们、按 I-7.7 判——
-//! 第二条流的快用例只展开写数小于 10 的段，写行那一段（10 写）与并段之后的 14 写一段都不展开。
+//! 第二条流的快用例按甲二展开，写行那一段（18 个单元写）只取全不落或全落。
 
 mod common;
 
@@ -23,7 +24,8 @@ use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::mount::mount_writable;
 use singlefs_harness::crash::{
     closed_form_state_count, enumerate_layer0_selecting_versions,
-    writes_and_segments_with_stream_indexes, PublishedVersion,
+    layer0_state_count_with_torn_in_place_overwrites, writes_and_segments_with_stream_indexes,
+    Layer0SegmentExpansion, PublishedVersion,
 };
 use singlefs_harness::segments::StepKind;
 
@@ -181,27 +183,48 @@ fn no_unit_of_the_new_instance_persists_before_the_acquired_instance_in_any_cras
         tally.checker_first_violation
     );
 
-    // 状态数钉绝对值：取号那一段是 B 的两次系统配置槽轮换并上取号两次（4 写，15 个真子集），
-    // 写行那次发布的单元写一段（实例表 + 四个固定点单元，各两盘：10 写，1023 个），再加全部持久那一个。
+    // 状态数钉绝对值：取号那一段只有取号两次系统配置槽写（2 写，原地覆写各取三态，3² − 1 个；B 的两次轮换在它前面、
+    // 隔着取号写之前那道屏障，代码审阅第 19 条），写行那次发布的单元写一段（18 个单元写，各取两态，2^18 − 1 个），
+    // 再加全部持久那一个。
     assert_ne!(
         acquisition_segment, first_unit_segment,
         "取号那一段与写行的第一段之间隔着一道屏障"
     );
     assert_eq!(
         expanded.iter().map(Vec::len).collect::<Vec<usize>>(),
-        vec![4, 10]
+        vec![2, 18]
     );
-    assert_eq!(tally.states, closed_form_state_count(&expanded));
-    assert_eq!(tally.states, 1 + 15 + 1023);
-    // 与第二条流发 C 之前那一截逐段相同（门禁 52 号核的那个数组的前 22 段），末段 2 写是暖机第二次的系统配置槽轮换。
+    assert_eq!(
+        closed_form_state_count(&expanded),
+        1 + 3 + 262_143,
+        "每次写只取两态时的闭式（补第三态之前的数）"
+    );
+    assert_eq!(
+        tally.states,
+        layer0_state_count_with_torn_in_place_overwrites(
+            &base,
+            &writes,
+            &segments,
+            &|segment_index, segment| {
+                if expand(segment_index, segment) {
+                    Layer0SegmentExpansion::EveryProperSubset
+                } else {
+                    Layer0SegmentExpansion::NotExpanded
+                }
+            },
+        ),
+        "展开的段按层 0 的枚举域数（原地覆写取三态）"
+    );
+    assert_eq!(tally.states, 1 + (3 * 3 - 1) + 262_143);
+    // 与第二条流发 C 之前那一截逐段相同（门禁 52 号核的那个数组的前 23 段），末段 2 写是暖机第二次的系统配置槽轮换。
     assert_eq!(
         segments.iter().map(Vec::len).collect::<Vec<usize>>(),
-        vec![2, 2, 1, 2, 2, 1, 18, 2, 1, 18, 2, 1, 4, 10, 2, 1, 10, 2, 1, 10, 2, 1, 2],
+        vec![2, 2, 1, 2, 2, 1, 26, 2, 1, 26, 2, 1, 2, 2, 18, 2, 1, 18, 2, 1, 18, 2, 1, 2],
         "段序列是第二条流发 C 之前那一截"
     );
     assert_eq!(
         (acquisition_segment, first_unit_segment),
-        (12, 13),
-        "展开的是第二条流的第 13、14 段（从 1 数）"
+        (13, 14),
+        "展开的是第二条流的第 14、15 段（从 1 数）"
     );
 }

@@ -30,8 +30,8 @@ use singlefs_core::journal::{record_offset, JournalRecord};
 use singlefs_core::mount::{mount_writable, InstanceRow};
 use singlefs_core::pointer::NodePointer;
 use singlefs_core::recovery::{
-    choose_root, choose_system_configuration, recover, replay_journal, rollback_high_water_of_root,
-    scan_journal, JournalPolicy, PoolReader, RecoveryOutcome,
+    choose_root, choose_system_configuration, recover, replay_journal, scan_journal, JournalPolicy,
+    PoolReader, RecoveryOutcome,
 };
 use singlefs_core::transaction::PoolVersion;
 use singlefs_core::unit::{unit_filesystem_identifier, UNIT_CLASS_INDEX_NODE, UNIT_CLASS_PACKED};
@@ -206,7 +206,6 @@ fn c533_row_publish_record_persisted_without_its_root_on_a_formatted_pool_is_nev
         system_configuration.immutable.sizes.journal_ring_bytes,
         &records,
         true,
-        rollback_high_water_of_root(&crash_image, &chosen_root),
     )
     .expect("所选根那次发布只有一条记录带末条标志：锚点认得出");
     assert_eq!(rebuilt_root, chosen_root, "重建出来的根就是所选根本身");
@@ -248,13 +247,11 @@ fn c533_row_publish_record_persisted_without_its_root_on_a_formatted_pool_is_nev
                 instance: InstanceGeneration(1),
                 selected_root_txg: CheckpointTxg(2),
                 applied_transaction_high_water: 0,
-                is_rollback: false,
             },
             InstanceRow {
                 instance: InstanceGeneration(2),
                 selected_root_txg: CheckpointTxg(0),
                 applied_transaction_high_water: 0,
-                is_rollback: false,
             },
         ],
         "实例 1 那一行 (1, 2, 0)；烧掉的实例 2 按中间实例写 (2, 0, 0)"

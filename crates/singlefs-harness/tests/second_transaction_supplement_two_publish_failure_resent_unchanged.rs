@@ -158,7 +158,7 @@ fn overwrite(
 /// 3. 之后的发布照常：C 接在重发的 B 上，txg 5；
 /// 4. 冷启动恢复读回 C，不撞「所选根那次发布带两个末条标志」；池级 checker 的 I-8.9 成立。
 #[test]
-fn a_publish_that_fails_midway_is_frozen_and_resent_byte_for_byte_before_the_next_publish() {
+fn publish_that_fails_midway_is_frozen_and_resent_byte_for_byte_before_the_next_publish() {
     let mut pool = build_pool("publish-failure-resent-unchanged");
     let first = pool.output.clone();
     let second_content = content_needing(2, 1);

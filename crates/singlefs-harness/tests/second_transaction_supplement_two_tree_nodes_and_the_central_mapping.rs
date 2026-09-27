@@ -874,8 +874,8 @@ fn central_mapping_grown_into_two_levels_is_read_whole_into_the_mount_state_and_
 /// 对不上就拒（I-1.1：索引节点的身份是树 ID + 层级 + key 区间，D18（块里携带什么信息） 已定项 2），挂载态与冷走读同一个成员。
 /// 判别力：`code_two_tree` 读树时不核内部节点的覆盖区间，这份镜像就照常打开——由红转绿。
 #[test]
-fn a_two_level_central_mapping_whose_root_header_does_not_cover_its_leaf_is_refused_by_both_readers(
-) {
+fn two_level_central_mapping_whose_root_header_does_not_cover_its_leaf_is_refused_by_both_readers()
+{
     let mut built = first_transaction_image("c483-two-level-mapping-not-covering");
     grow_the_central_mapping_into_two_levels(
         &mut built,
@@ -1008,7 +1008,7 @@ fn opening_a_file_whose_lower_extent_segment_has_two_levels_reports_as_many_node
 /// 挂载态打开文件经映射多跳一次读回那个节点，读得回全部 145 个单元；冷走读同一条回退，读回同一份内容。
 /// 自报的节点数照旧 4；块层数到 4 + 2 × 1 = 6——自报数每个节点算一次，多跳那一个节点另有两次白试的提示读
 /// （[`WASTED_HINT_READS_PER_STALE_HOP`]）。
-fn a_lower_extent_segment_node_whose_location_hint_is_stale_reads_back_through_the_central_mapping(
+fn lower_extent_segment_node_whose_location_hint_is_stale_reads_back_through_the_central_mapping(
     position: ExtentLowerNodePosition,
     tag: &str,
 ) {
@@ -1069,7 +1069,7 @@ fn a_lower_extent_segment_node_whose_location_hint_is_stale_reads_back_through_t
 #[test]
 fn the_root_of_a_two_level_lower_extent_segment_with_a_stale_location_hint_reads_back_every_data_unit_through_the_central_mapping(
 ) {
-    a_lower_extent_segment_node_whose_location_hint_is_stale_reads_back_through_the_central_mapping(
+    lower_extent_segment_node_whose_location_hint_is_stale_reads_back_through_the_central_mapping(
         LOWER_SEGMENT_ROOT,
         "z15-stale-lower-root",
     );
@@ -1078,7 +1078,7 @@ fn the_root_of_a_two_level_lower_extent_segment_with_a_stale_location_hint_reads
 #[test]
 fn a_leaf_of_a_two_level_lower_extent_segment_with_a_stale_location_hint_reads_back_every_data_unit_through_the_central_mapping(
 ) {
-    a_lower_extent_segment_node_whose_location_hint_is_stale_reads_back_through_the_central_mapping(
+    lower_extent_segment_node_whose_location_hint_is_stale_reads_back_through_the_central_mapping(
         SECOND_LOWER_SEGMENT_LEAF,
         "z15-stale-lower-leaf",
     );

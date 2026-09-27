@@ -1129,7 +1129,7 @@ mod tests {
 
     /// 下段：两个单元就要建下段（根兼叶），144 个还是一片叶，145 个长出层级 1（两片叶加一个根）。
     #[test]
-    fn a_lower_segment_grows_a_level_past_one_hundred_and_forty_four_data_units() {
+    fn lower_segment_grows_the_level_past_one_hundred_and_forty_four_data_units() {
         assert!(lower_segment_nodes_of_a_file_without_holes(1).is_empty());
         assert_eq!(
             lower_segment_nodes_of_a_file_without_holes(2),

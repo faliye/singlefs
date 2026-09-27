@@ -1,31 +1,35 @@
-//! 系统配置（D22（单元原子性怎么合成） 已定项 9 / 已定项 15 / 已定项 16 / 已定项 26）：481 字节住 4096 字节的槽，
+//! 系统配置（D22（单元原子性怎么合成） 已定项 9 / 已定项 15 / 已定项 16 / 已定项 26）：489 字节住 4096 字节的槽，
 //! 每盘两槽轮换，整槽校验和罩 4096 含补齐、自身按 0 参与。字段顺序照 `layout/01-first-txn.md` 一那一节的字段表。
 //!
 //! 内存里按 D22（单元原子性怎么合成） 已定项 26 的可改性分四类装：系统不可变配置 389 + 系统可变配置 4 +
-//! 系统运行配置 36 + 系统运行量 52 = 481。**分类只管内存表示，盘上的序列化顺序照旧按字段表来**：
+//! 系统运行配置 36 + 系统运行量 60 = 489。**分类只管内存表示，盘上的序列化顺序照旧按字段表来**：
 //! 四类在槽里是交错的——槽世代号与整槽校验和这两条系统运行量夹在自举头中间，节点大小这条系统可变配置
 //! 夹在几何段开头。[`SystemConfiguration::to_slot`] 每写一段都报自己属于哪一档，写完比对四档的字节数。
 
 use singlefs_format::{
-    journal_in_flight_record_limit, DATA_UNIT_BYTES, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
-    JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, JOURNAL_SAFETY_FACTOR, LOC_ENTRY, NODE_BYTES,
-    ROLLBACK_WITNESS_TABLE_BYTES, ROLLBACK_WITNESS_TABLE_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT,
-    ROOT_RING_BASE_SLOT, ROOT_RING_CHUNK_BYTES, ROOT_RING_PRIME_STEP, ROOT_RING_REGIONS,
-    SLOT_BYTES, SYSTEM_CONFIGURATION_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
+    DATA_UNIT_BYTES, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES, JOURNAL_RECORD_BYTES,
+    JOURNAL_RING_START_SLOT, JOURNAL_SAFETY_FACTOR, LOC_ENTRY, NODE_BYTES, ROOT_RING_BASE_SLOT,
+    ROOT_RING_CHUNK_BYTES, ROOT_RING_PRIME_STEP, ROOT_RING_REGIONS, SLOT_BYTES,
+    SYSTEM_CONFIGURATION_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
     WIDE_CHECKSUM_BYTES,
 };
 
-use crate::address::{DeviceIdentity, InstanceGeneration};
+use crate::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use crate::bytes::{ByteReader, ByteWriter};
 use crate::checksum::{wide_checksum_field_holds, wide_checksum_with_field_zeroed};
-use crate::rollback_witness::{rollback_witness_capacity, RollbackWitnessTable};
 use crate::root_ring::{RootRingSlotsPerRegion, RootRingSlotsPerRegionOutOfRange};
 
 pub const SYSTEM_CONFIGURATION_MAGIC: [u8; 4] = *b"SFSB";
 pub const FORMAT_VERSION: u16 = 1;
-/// incompat 位 0 = 第一条纯 SSD 布局线（D15（格式冻结政策） 已定项 4）；位 n 住第 n div 8 个字节的第 n mod 8 低位。
-pub const INCOMPAT_FIRST_SSD_LINE_BIT: u8 = 0x01;
-pub const SUPPORTED_INCOMPAT_BITS: u8 = INCOMPAT_FIRST_SSD_LINE_BIT;
+/// incompat 位 1 = 第一条纯 SSD 布局线，系统配置带回退下界 F、根记录带卸载记号的那一版（D15（格式冻结政策） 已定项 4，
+/// 用户 2026-09-26 定「换 incompat 位，挂不上」）；mkfs 起就置上。位 n 住第 n div 8 个字节的第 n mod 8 低位
+/// （D22（单元原子性怎么合成） 已定项 13），位 1 是第一个字节从最低位数起的第 2 位。
+pub const INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT: u8 = 0x02;
+/// incompat 位 0 退役：带回退见证、系统配置不带 F 的那一版（D15（格式冻结政策） 已定项 4，用户 2026-09-26）。
+/// 位一旦用过不许回收（`.claude/kb/feature-bits.md`）；它不在 [`SUPPORTED_INCOMPAT_BITS`] 里，读者见到它按不认识的位拒。
+pub const INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT: u8 = 0x01;
+pub const SUPPORTED_INCOMPAT_BITS: u8 =
+    INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT;
 const FEATURE_BITS_OFFSET: usize = 4 + 2;
 const FEATURE_BITMAP_BYTES: usize = 32;
 /// 写入者身份：实现标识 16 字节 ASCII 零补齐 + 版本 4（D17（实现分层与第三方管道） 债 3、I-1.5）。
@@ -42,6 +46,11 @@ const FSID_OFFSET: usize = 4 + 2 + 96;
 const ROOT_RING_SLOTS_PER_REGION_OFFSET: u64 = 362;
 const REGION_DEVICES_OFFSET: u64 = 379;
 const TAIL_OFFSET: u64 = 469;
+/// 回退下界 F 那一行的宽：checkpoint_txg 小端 8 字节（D22（单元原子性怎么合成） 已定项 9 的字段表）。
+const ROLLBACK_FLOOR_FIELD_BYTES: u64 = 8;
+/// 回退下界 F 住字段表最后一行、journal 实例代号之后（D22（单元原子性怎么合成） 已定项 9）：偏移 = 字段表合计减它自己的宽，
+/// 从格式常量 [`SYSTEM_CONFIGURATION_BYTES`] 推出来，不另写一个数。写侧写它之前断言位置、读侧按它切。
+const ROLLBACK_FLOOR_OFFSET: u64 = SYSTEM_CONFIGURATION_BYTES - ROLLBACK_FLOOR_FIELD_BYTES;
 /// D2（RAID 条带策略） 已定项 18：第一版 w_max 与 g 都写 4。
 const MAXIMUM_STRIPE_WIDTH: u8 = 4;
 const GROUP_SIZE: u8 = 4;
@@ -52,6 +61,18 @@ const DIRTY_THRESHOLD_BYTES: u64 = 2 << 30;
 const COMPACTION_WATERMARK_COUNT: usize = 3;
 /// 三条水位第一版恒 0，0 的含义是「用内置默认」（D22（单元原子性怎么合成） 已定项 15 ④）。
 const COMPACTION_WATERMARK_BUILT_IN_DEFAULT: u64 = 0;
+
+/// 在飞记录数上限 = 环槽数 ÷ F，语义是一次恢复重放的前缀最多这么多条（D23（journal 的角色与格式） 已定项 18，
+/// 2026-09-14 用户定案）。环槽数 = 环长 ÷ [`JOURNAL_RECORD_BYTES`]，F = [`JOURNAL_SAFETY_FACTOR`]（I-8.1（环几何够大）），两次都取整数部分。
+/// core 里写系统配置那一格、mkfs 判环够不够、恢复取前缀、一次发布最多切几条记录，都调这一份。
+///
+/// 式子住 core 自己这里：`singlefs-format` 只放标量（D13（验证路线） 已定项 5；2026-09-27 用户定案「三方各算一份 + 交叉断言」）。
+/// 实验装置 E158（择根与修复四岔路） 自写一份、不调它；checker 不算在飞上限，不另造。两份在环长上的交叉断言在
+/// `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs` 的 `journal_in_flight_record_limit_cross_check_tests` 模块。
+#[must_use]
+pub fn journal_in_flight_record_limit(journal_ring_bytes: u64) -> u64 {
+    journal_ring_bytes / JOURNAL_RECORD_BYTES / JOURNAL_SAFETY_FACTOR
+}
 
 /// 系统配置槽里一个字段属于哪一档可改性（D22（单元原子性怎么合成） 已定项 26）。
 /// 封闭集合：四类之外没有第五类，`match` 不写通配臂。
@@ -178,34 +199,35 @@ impl SystemRuntimeConfiguration {
     }
 }
 
-/// 系统运行量：52 字节。**不是配置**——用户从来不能设，文件系统自己维护，值每次发布都在变
+/// 系统运行量：60 字节。**不是配置**——用户从来不能设，文件系统自己维护，值随发布或抬 F 在变
 /// （D22（单元原子性怎么合成） 已定项 26 表下那一行）。
 ///
-/// 字段表里归这一类的 4 行：自举头的「槽世代号 8」「整槽校验和 32」+ 运行时段的「journal tail 8」
-/// 「journal 实例代号 4」。整槽校验和不在内存里存着：它罩着整槽 4096（自身按 0 参与），
+/// 字段表里归这一类的 5 行：自举头的「槽世代号 8」「整槽校验和 32」+ 运行时段的「journal tail 8」
+/// 「journal 实例代号 4」「回退下界 F 8」。整槽校验和不在内存里存着：它罩着整槽 4096（自身按 0 参与），
 /// 由 [`SystemConfiguration::to_slot`] 在别的字节都写完之后算出来填进去。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SystemRuntimeQuantities {
     pub slot_generation: u64,
     pub journal_tail: u64,
     pub journal_instance: InstanceGeneration,
+    /// 回退下界 F 另记在系统配置里的那一份（D16（发布语义） 已定项 1「生效」：F 先写进每块盘的系统配置再抬；
+    /// D22（单元原子性怎么合成） 已定项 9）。与根记录里的 F 同一个量、同一个名字，住的地方不同。
+    /// 读出来之后怎么用（恢复时生效值取两处读得出的最大值）不在这个模块。
+    pub rollback_floor: CheckpointTxg,
 }
 
 impl SystemRuntimeQuantities {
-    /// 这一类在字段表里占的字节数：8 + 32 + 8 + 4。
-    pub const FIELD_TABLE_BYTES: u64 = 52;
+    /// 这一类在字段表里占的字节数：8 + 32 + 8 + 4 + 8。
+    pub const FIELD_TABLE_BYTES: u64 = 60;
 }
 
-/// 一个系统配置槽的内容，按 D22（单元原子性怎么合成） 已定项 26 的可改性分四类装，另加字段表之后的回退见证表。
+/// 一个系统配置槽的内容，按 D22（单元原子性怎么合成） 已定项 26 的可改性分四类装。字段表之后到槽末是补齐，写 0。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SystemConfiguration {
     pub immutable: SystemImmutableConfiguration,
     pub mutable: SystemMutableConfiguration,
     pub runtime: SystemRuntimeConfiguration,
     pub quantities: SystemRuntimeQuantities,
-    /// 回退见证表（D23（journal 的角色与格式） 已定项 14「回退见证」）：住字段表之后、槽内偏移 481 起的 753 字节，
-    /// 不在 481 字节的字段表与四档可改性里——它不是配置，是文件系统自己维护的、随每一次系统配置写整张带着的表。
-    pub rollback_witness: RollbackWitnessTable,
 }
 
 fn slot_bytes() -> usize {
@@ -263,7 +285,7 @@ impl MutabilityTaggedSlotWriter {
         *self.counter_for(mutability) += written;
     }
 
-    /// 每一档写出的字节数必须等于字段表给这一档的预算，四档之和必须是 481；
+    /// 每一档写出的字节数必须等于字段表给这一档的预算，四档之和必须是 489；
     /// 对不上就是某个字段被分错了档或写漏了，当场断言（`code-discipline.md`：不变量写成断言）。
     fn finish(self) -> (Vec<u8>, SlotBytesByMutability) {
         self.writer
@@ -306,14 +328,14 @@ impl SystemConfiguration {
     }
 
     /// 写出槽，连带报每一档写出了多少字节：每一段写之前报自己属于哪一档，
-    /// [`MutabilityTaggedSlotWriter::finish`] 收尾时比对四档的字节数与字段表的 389 / 4 / 36 / 52。
+    /// [`MutabilityTaggedSlotWriter::finish`] 收尾时比对四档的字节数与字段表的 389 / 4 / 36 / 60。
     #[must_use]
     pub fn to_slot_with_mutability_accounting(&self) -> (Vec<u8>, SlotBytesByMutability) {
         let mut slot = MutabilityTaggedSlotWriter::new(slot_bytes());
         slot.write(SlotFieldMutability::ImmutableConfiguration, |writer| {
             writer.put(&SYSTEM_CONFIGURATION_MAGIC);
             writer.put_u16(FORMAT_VERSION);
-            writer.put_u8(INCOMPAT_FIRST_SSD_LINE_BIT);
+            writer.put_u8(INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT);
             writer.skip(95);
             writer.assert_position(
                 u64::try_from(FSID_OFFSET).expect("fsid 偏移"),
@@ -392,15 +414,10 @@ impl SystemConfiguration {
             writer.assert_position(TAIL_OFFSET, "journal tail");
             writer.put_u64(self.quantities.journal_tail);
             writer.put_u32(self.quantities.journal_instance.0);
+            writer.assert_position(ROLLBACK_FLOOR_OFFSET, "系统配置里的回退下界 F");
+            writer.put_u64(self.quantities.rollback_floor.0);
         });
         let (mut bytes, accounting) = slot.finish();
-        // 回退见证表紧接字段表（D23（journal 的角色与格式） 已定项 14「回退见证」）：越过 512、罩在下面那个整槽校验和里。
-        let witness_start =
-            usize::try_from(ROLLBACK_WITNESS_TABLE_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT)
-                .expect("481");
-        let witness_end =
-            witness_start + usize::try_from(ROLLBACK_WITNESS_TABLE_BYTES).expect("753");
-        bytes[witness_start..witness_end].copy_from_slice(&self.rollback_witness.to_bytes());
         let digest = wide_checksum_with_field_zeroed(
             &bytes,
             slot_bytes(),
@@ -411,13 +428,14 @@ impl SystemConfiguration {
         (bytes, accounting)
     }
 
-    /// 读者：magic、整槽校验和、incompat 位三关都过才解，三关任一不过是
-    /// [`SystemConfigurationSlotRefusal::NotSelfDescribing`]（这一槽不可择）；解开之后按 D22 已定项 1
-    /// 的字段表判每区槽数 S 的区间，越界是
+    /// 读者：magic、整槽校验和、incompat 位三关都过才解。magic 或整槽校验和不过是
+    /// [`SystemConfigurationSlotRefusal::NotSelfDescribing`]（这一槽不可择）；这两关都过、incompat 位图不认识是
+    /// [`SystemConfigurationSlotRefusal::IncompatBitsNotRecognized`]（这一槽同样不可择，但它是一份完整的系统配置，布局不认识）；
+    /// 解开之后按 D22 已定项 1 的字段表判每区槽数 S 的区间，越界是
     /// [`SystemConfigurationSlotRefusal::RootRingSlotsPerRegionOutOfRange`]（整池拒绝挂载）。
     ///
     /// # Errors
-    /// 见两个成员各自的说明。
+    /// 见三个成员各自的说明。
     pub fn parse_slot(bytes: &[u8]) -> Result<Self, SystemConfigurationSlotRefusal> {
         if bytes.len() < slot_bytes() || bytes[..4] != SYSTEM_CONFIGURATION_MAGIC {
             return Err(SystemConfigurationSlotRefusal::NotSelfDescribing);
@@ -426,21 +444,14 @@ impl SystemConfiguration {
             return Err(SystemConfigurationSlotRefusal::NotSelfDescribing);
         }
         if !incompat_bits_are_mountable(bytes) {
-            return Err(SystemConfigurationSlotRefusal::NotSelfDescribing);
+            return Err(SystemConfigurationSlotRefusal::IncompatBitsNotRecognized {
+                incompat_bitmap: incompat_bitmap_of(bytes),
+            });
         }
         let root_ring_slots_per_region = RootRingSlotsPerRegion::from_system_configuration_field(
             u64::from(bytes[usize::try_from(ROOT_RING_SLOTS_PER_REGION_OFFSET).expect("362")]),
         )
         .map_err(SystemConfigurationSlotRefusal::RootRingSlotsPerRegionOutOfRange)?;
-        // 见证表读不出就是这一槽读不出（D23（journal 的角色与格式） 已定项 14「回退见证」）：条数上限按这一槽自述的 S 算。
-        let witness_start =
-            usize::try_from(ROLLBACK_WITNESS_TABLE_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT)
-                .expect("481");
-        let rollback_witness = RollbackWitnessTable::parse(
-            &bytes[witness_start..],
-            rollback_witness_capacity(root_ring_slots_per_region),
-        )
-        .ok_or(SystemConfigurationSlotRefusal::NotSelfDescribing)?;
         let mut reader = ByteReader::at(bytes, FSID_OFFSET);
         let filesystem_identifier: [u8; 16] = reader.take(16).try_into().expect("切了 16 字节");
         reader.skip(16 + 4 + 1);
@@ -464,6 +475,11 @@ impl SystemConfiguration {
         let mut tail_reader = ByteReader::at(bytes, usize::try_from(TAIL_OFFSET).expect("469"));
         let journal_tail = tail_reader.get_u64();
         let journal_instance = InstanceGeneration(tail_reader.get_u32());
+        let mut rollback_floor_reader = ByteReader::at(
+            bytes,
+            usize::try_from(ROLLBACK_FLOOR_OFFSET).expect("字段表里的偏移装得进 usize"),
+        );
+        let rollback_floor = CheckpointTxg(rollback_floor_reader.get_u64());
         Ok(Self {
             immutable: SystemImmutableConfiguration {
                 filesystem_identifier,
@@ -488,8 +504,8 @@ impl SystemConfiguration {
                 slot_generation,
                 journal_tail,
                 journal_instance,
+                rollback_floor,
             },
-            rollback_witness,
         })
     }
 }
@@ -498,23 +514,44 @@ impl SystemConfiguration {
 /// 错误成员按调用方要做的决定分）。封闭集合，`match` 不写通配臂。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SystemConfigurationSlotRefusal {
-    /// magic、整槽校验和、incompat 位三关里有一关不过，或字段表之后的回退见证表读不出（D23（journal 的角色与格式） 已定项 14
-    /// 「回退见证」：见证表读不出就是系统配置槽读不出）⇒ **这一槽不可择**：换一槽、换一盘还可以试，
+    /// magic、整槽校验和两关里有一关不过 ⇒ **这一槽不可择**：换一槽、换一盘还可以试，
     /// 系统配置每盘两槽、池里每盘一份买的就是这份冗余（D22（单元原子性怎么合成） 已定项 8 第 1 条）。
     NotSelfDescribing,
+    /// magic 与整槽校验和两关都过、incompat 位图里有这个读者不认识的位或缺布局身份位（`incompat_bits_are_mountable` 不过）
+    /// ⇒ **这一槽同样不可择**（incompat 档「不认识不许挂」，`.claude/rules/fs-design.md`），但它不是坏槽：是一份完整的系统配置，
+    /// 布局不是这个读者认得的那一版（退役的位 0 那一版旧镜像，或更新的实现写的，D15（格式冻结政策） 已定项 4）。
+    /// 与 [`Self::NotSelfDescribing`] 分开报，调用方据此把「布局不认识」与「数据坏了」分开。带着那一槽的 incompat 位图原样。
+    IncompatBitsNotRecognized { incompat_bitmap: IncompatBitmap },
     /// 自述的每区槽数 S 落在格式承诺的区间之外 ⇒ **整池拒绝挂载**，不换一槽再试：S 是池级字段，
     /// 两盘四槽写的是同一个值，换一槽读到的还是它（D22（单元原子性怎么合成） 已定项 9 的射程：
     /// 字段表里只有本盘设备号是盘级的）。
     RootRingSlotsPerRegionOutOfRange(RootRingSlotsPerRegionOutOfRange),
 }
 
+/// 一个系统配置槽里的 incompat 位图（feature bits 的第一段 32 字节，D22（单元原子性怎么合成） 已定项 13）。
+/// 读者不认识它时原样带出来（[`SystemConfigurationSlotRefusal::IncompatBitsNotRecognized`]），调用方拿它说是哪一版布局。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct IncompatBitmap(pub [u8; FEATURE_BITMAP_BYTES]);
+
+/// 槽里的 incompat 位图原样拷出来。槽比位图的末端短是调用方的 bug：[`SystemConfiguration::parse_slot`] 先判过槽宽才走到这里。
+fn incompat_bitmap_of(slot: &[u8]) -> IncompatBitmap {
+    IncompatBitmap(
+        slot[FEATURE_BITS_OFFSET..FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES]
+            .try_into()
+            .expect("切的正好是位图那 32 字节"),
+    )
+}
+
 /// incompat 位图里不认识的位 ⇒ 挂不上（`.claude/rules/fs-design.md`）；且必须带布局身份位。
+/// 退役的位 0（系统配置不带 F 的旧镜像）不在 [`SUPPORTED_INCOMPAT_BITS`] 里，按不认识的位拒，
+/// 与新的布局身份位同时置上也拒（D15（格式冻结政策） 已定项 4）。
 #[must_use]
 pub fn incompat_bits_are_mountable(slot: &[u8]) -> bool {
     let incompat = &slot[FEATURE_BITS_OFFSET..FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES];
     let unknown_in_first_byte = incompat[0] & !SUPPORTED_INCOMPAT_BITS;
     let unknown_in_rest = incompat[1..].iter().any(|byte| *byte != 0);
-    let has_layout_identity = incompat[0] & INCOMPAT_FIRST_SSD_LINE_BIT != 0;
+    let has_layout_identity =
+        incompat[0] & INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT != 0;
     unknown_in_first_byte == 0 && !unknown_in_rest && has_layout_identity
 }
 
@@ -544,68 +581,37 @@ mod tests {
                 slot_generation: 1,
                 journal_tail: 0,
                 journal_instance: InstanceGeneration(0),
+                rollback_floor: CheckpointTxg(0),
             },
-            rollback_witness: RollbackWitnessTable::EMPTY,
         }
     }
 
-    /// 回退见证表住字段表之后（偏移 481 起）、越过 512，跟着系统配置来回一趟不变；见证表读不出（条数超过这个池的上限 R × S − 1，
-    /// 整槽校验和照样重封过）就是这一槽读不出（D23（journal 的角色与格式） 已定项 14「回退见证」）。
-    #[test]
-    fn the_rollback_witness_rides_after_the_field_table_past_512_and_an_unreadable_one_makes_the_slot_unreadable(
-    ) {
-        use crate::address::CheckpointTxg;
-        use crate::rollback_witness::RollbackWitnessEntry;
-        let mut with_witness = sample();
-        with_witness.rollback_witness = RollbackWitnessTable::of_entries(
-            [
-                RollbackWitnessEntry {
-                    new_instance: InstanceGeneration(4),
-                    rollback_target_instance: InstanceGeneration(1),
-                    rollback_target_txg: CheckpointTxg(3),
-                },
-                RollbackWitnessEntry {
-                    new_instance: InstanceGeneration(6),
-                    rollback_target_instance: InstanceGeneration(4),
-                    rollback_target_txg: CheckpointTxg(9),
-                },
-            ],
-            23,
-        )
-        .expect("两条装得下");
-        let slot = with_witness.to_slot();
-        assert_eq!(slot[481], 2, "条数紧接字段表");
-        assert_eq!(
-            u64::from_le_bytes(slot[506..514].try_into().expect("8 字节")),
-            9,
-            "第二条占 [498, 514)，它的 txg 那 8 字节落在 [506, 514)：越过 512"
-        );
-        assert_eq!(SystemConfiguration::parse_slot(&slot), Ok(with_witness));
-        let mut unreadable = slot;
-        unreadable[481] = 24;
+    /// 把槽里 incompat 位图第一个字节改成 `first_incompat_byte`，整槽校验和重封：magic 与校验和两关照样过，拒它的只能是 incompat 判。
+    fn slot_with_first_incompat_byte(first_incompat_byte: u8) -> Vec<u8> {
+        let mut slot = sample().to_slot();
+        slot[FEATURE_BITS_OFFSET] = first_incompat_byte;
         let digest = wide_checksum_with_field_zeroed(
-            &unreadable,
-            4096,
+            &slot,
+            slot_bytes(),
             SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
         );
-        unreadable[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32]
+        slot[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32]
             .copy_from_slice(&digest);
-        assert_eq!(
-            SystemConfiguration::parse_slot(&unreadable),
-            Err(SystemConfigurationSlotRefusal::NotSelfDescribing),
-            "S = 8 的池条数上限 23：见证表读不出，这一槽读不出"
-        );
+        slot
     }
 
     #[test]
-    fn system_configuration_is_481_bytes_in_a_4096_slot_and_round_trips() {
+    fn system_configuration_is_489_bytes_in_a_4096_slot_and_round_trips() {
         let slot = sample().to_slot();
         assert_eq!(slot.len(), 4096);
         assert!(
-            slot[481..].iter().all(|byte| *byte == 0),
-            "481 之后全是补齐 0"
+            slot[489..].iter().all(|byte| *byte == 0),
+            "489 之后全是补齐 0：字段表之后不装别的东西"
         );
-        assert_eq!(slot[6], 0x01, "incompat 位 0");
+        assert_eq!(
+            slot[6], 0x02,
+            "incompat 只有位 1（新的布局身份），退役的位 0 不置"
+        );
         assert_eq!(
             &slot[FSID_OFFSET + 16..FSID_OFFSET + 16 + 11],
             b"singlefs-rs"
@@ -623,6 +629,7 @@ mod tests {
         ));
     }
 
+    /// 坏槽与不认识的 incompat 位都挂不上，但报的成员不同：前者是这一槽自证不过（数据坏了），后者自证得过、只是布局不认识。
     #[test]
     fn corrupted_slot_and_unknown_incompat_bit_are_both_unmountable() {
         let mut slot = sample().to_slot();
@@ -633,14 +640,96 @@ mod tests {
             "补齐区改一字节也失配：整槽校验和罩 4096"
         );
         let mut unknown = sample().to_slot();
-        unknown[6] |= 0x02;
+        unknown[6] |= 0x04;
         assert!(!incompat_bits_are_mountable(&unknown));
+        let resealed_unknown = slot_with_first_incompat_byte(
+            INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT | 0x04,
+        );
+        let mut expected_bitmap = [0u8; FEATURE_BITMAP_BYTES];
+        expected_bitmap[0] =
+            INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT | 0x04;
+        assert_eq!(
+            SystemConfiguration::parse_slot(&resealed_unknown),
+            Err(SystemConfigurationSlotRefusal::IncompatBitsNotRecognized {
+                incompat_bitmap: IncompatBitmap(expected_bitmap),
+            }),
+            "位 2 不认识、整槽重封过：报布局不认识、带着位图，不报自证不过"
+        );
+    }
+
+    /// 位 0 退役（D15（格式冻结政策） 已定项 4，用户 2026-09-26）：只带位 0 的旧镜像、位 0 与位 1 都带的、一个布局身份位都不带的，
+    /// 三样都按 incompat 判拒成「这一槽不可择」、报的是布局不认识（带着那一槽的位图），不是自证不过；只带位 1 的收。
+    /// 四份槽都重封过整槽校验和，拒它们的只能是 incompat 判。
+    #[test]
+    fn slot_carrying_the_retired_layout_bit_zero_is_refused_like_an_unknown_incompat_bit() {
+        for (first_incompat_byte, what) in [
+            (
+                INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT,
+                "只带退役的位 0：带回退见证、系统配置不带 F 的旧镜像",
+            ),
+            (
+                INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT
+                    | INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT,
+                "位 0 与位 1 都带",
+            ),
+            (0, "一个布局身份位都不带"),
+        ] {
+            let slot = slot_with_first_incompat_byte(first_incompat_byte);
+            assert!(
+                wide_checksum_field_holds(&slot, 4096, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET),
+                "{what}：这一槽自证得过"
+            );
+            assert!(!incompat_bits_are_mountable(&slot), "{what}：挂不上");
+            let mut expected_bitmap = [0u8; FEATURE_BITMAP_BYTES];
+            expected_bitmap[0] = first_incompat_byte;
+            assert_eq!(
+                SystemConfiguration::parse_slot(&slot),
+                Err(SystemConfigurationSlotRefusal::IncompatBitsNotRecognized {
+                    incompat_bitmap: IncompatBitmap(expected_bitmap),
+                }),
+                "{what}：读者拒成这一槽不可择，报布局不认识"
+            );
+        }
+        let new_layout_only = slot_with_first_incompat_byte(
+            INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT,
+        );
+        assert_eq!(
+            SystemConfiguration::parse_slot(&new_layout_only),
+            Ok(sample()),
+            "只带位 1 的收"
+        );
+    }
+
+    /// 系统配置里的回退下界 F（D22（单元原子性怎么合成） 已定项 9）：写在 [481, 489)、小端，读者从同一处读回来；
+    /// 取一个每个字节都不同的值，写错位置、读错位置、读成 0 都对不上。
+    #[test]
+    fn the_rollback_floor_is_written_little_endian_at_481_and_read_back_from_the_slot() {
+        let mut with_floor = sample();
+        with_floor.quantities.rollback_floor = CheckpointTxg(0x0807_0605_0403_0201);
+        let slot = with_floor.to_slot();
+        assert_eq!(
+            slot[481..489],
+            [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08],
+            "F 住字段表末尾 [481, 489)、小端"
+        );
+        assert_eq!(
+            u32::from_le_bytes(slot[477..481].try_into().expect("4 字节")),
+            0,
+            "F 之前那 4 字节还是 journal 实例代号，没被 F 盖掉"
+        );
+        let parsed = SystemConfiguration::parse_slot(&slot).expect("自证得过");
+        assert_eq!(
+            parsed.quantities.rollback_floor,
+            CheckpointTxg(0x0807_0605_0403_0201),
+            "读者交回的 F 就是槽里那 8 字节"
+        );
+        assert_eq!(parsed, with_floor, "整份来回一趟不变");
     }
 
     /// 把槽里那一字节的 S 改成区间外的值（校验和重算，三关照样过），读者必须报得出拒的是什么：
     /// 不是「这一槽不可择」，而是点名的越界成员，带着盘上读到的值与两条边。
     #[test]
-    fn a_self_describing_slot_declaring_an_out_of_range_slots_per_region_is_refused_by_name() {
+    fn self_describing_slot_declaring_an_out_of_range_slots_per_region_is_refused_by_name() {
         for (declared, expected) in [(3u64, 3u64), (17, 17), (0, 0), (255, 255)] {
             let mut slot = sample().to_slot();
             slot[usize::try_from(ROOT_RING_SLOTS_PER_REGION_OFFSET).expect("362")] =
@@ -701,11 +790,11 @@ mod tests {
         assert_eq!(SystemImmutableSizes::slot_spacing_for(65536), 65536);
     }
 
-    /// D22（单元原子性怎么合成） 已定项 26 的四类字节预算：389 + 4 + 36 + 52 = 481，
+    /// D22（单元原子性怎么合成） 已定项 26 的四类字节预算：389 + 4 + 36 + 60 = 489（已定项 9 的分段表），
     /// 与字段表的合计（格式常量 `SYSTEM_CONFIGURATION_BYTES`）逐项对上。
     /// 每一档的数另一头由 [`MutabilityTaggedSlotWriter::finish`] 按 `to_slot` 真写出的字节数钉着。
     #[test]
-    fn the_four_mutability_classes_budget_389_4_36_52_and_add_up_to_the_field_table_total() {
+    fn the_four_mutability_classes_budget_389_4_36_60_and_add_up_to_the_field_table_total() {
         assert_eq!(
             SystemImmutableConfiguration::FIELD_TABLE_BYTES,
             389,
@@ -723,8 +812,8 @@ mod tests {
         );
         assert_eq!(
             SystemRuntimeQuantities::FIELD_TABLE_BYTES,
-            52,
-            "系统运行量：槽世代号 8 + 整槽校验和 32 + journal tail 8 + 实例代号 4"
+            60,
+            "系统运行量：槽世代号 8 + 整槽校验和 32 + journal tail 8 + 实例代号 4 + 回退下界 F 8"
         );
         assert_eq!(
             SystemImmutableConfiguration::FIELD_TABLE_BYTES
@@ -732,7 +821,7 @@ mod tests {
                 + SystemRuntimeConfiguration::FIELD_TABLE_BYTES
                 + SystemRuntimeQuantities::FIELD_TABLE_BYTES,
             SYSTEM_CONFIGURATION_BYTES,
-            "四类合计 = 字段表 45 行的 481 字节"
+            "四类合计 = 字段表 46 行的 489 字节"
         );
     }
 
@@ -748,7 +837,7 @@ mod tests {
                 immutable_configuration_bytes: 389,
                 mutable_configuration_bytes: 4,
                 runtime_configuration_bytes: 36,
-                runtime_quantity_bytes: 52,
+                runtime_quantity_bytes: 60,
             },
             "字段分档改了、或者某一段写漏写多，这一条先红"
         );

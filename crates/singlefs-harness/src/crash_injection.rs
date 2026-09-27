@@ -11,6 +11,11 @@
 //! 每段历史自己怎么跑由 `HistoryExecution` 定；崩溃状态摆在起点那一段起、最后一个跑完的操作为止的那几段上——
 //! 起点（mkfs 与起点那次发布）也算（代码三方 m2-supp3-item3-code-r1 判决 K1-d，用户 2026-09-20 定案第 4 条），
 //! 失败那一步的写不摆（模型还没判过它写出的根，目录里没有那一版）。
+//!
+//! 每个崩溃状态判三截（[`CrashStateStage`]；代码审阅第 2 条，用户 2026-09-27 定案「崩溃注入层补可写挂载」）：
+//! 崩溃镜像本身（只读恢复、模型、checker、记录核对器）；在那份崩溃后镜像上真的起一次可写挂载（取号、写行、暖机）再发一次布之后的池
+//! （checker，挂载或那次发布被拒也判）；挂载途中再崩一次的镜像（二次崩溃，取号、写行、暖机三段各摆一个；只读恢复、模型、checker、
+//! 记录核对器）。层 0 不跑可写挂载，这两截只在这里有。
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
@@ -20,17 +25,23 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::time::Instant;
 
-use singlefs_checker::image::InvariantVerdict;
+use singlefs_checker::image::{ImageReader, InvariantVerdict};
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
+use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+use singlefs_core::make_filesystem::MakeFilesystemParameters;
+use singlefs_core::mount::mount_writable_with_space_admission;
 use singlefs_core::recovery::{
     choose_root, choose_system_configuration, recover, JournalPolicy, PoolReader, RecoveryOutcome,
 };
+use singlefs_core::transaction::{
+    publish_first_file, publish_overwrite, FirstFile, PoolVersion, PoolWriter,
+};
 
 use crate::crash::{
-    check_records_against, newest_persisted_root, some_publish_persisted_without_its_root,
-    writes_and_segments_with_stream_indexes, CrashImage, MemoryPool, RecordCheck, RetainedWrite,
-    SECTOR_BYTES,
+    check_records_against, newest_persisted_root, root_identity_written_by,
+    some_publish_persisted_without_its_root, writes_and_segments_with_stream_indexes, CrashImage,
+    MemoryPool, RecordCheck, RetainedWrite, SparseBlockDevice, SECTOR_BYTES,
 };
 use crate::history::{
     classify_failure, execute_history_with, generate_history_with_weights,
@@ -40,11 +51,16 @@ use crate::history::{
     HistorySeed, SeededRandomSource, StepPosition, KNOWN_RED_FORMS,
 };
 use crate::model::{
-    crash_recovery_disagreement, ModelDisagreement, ModelRootKey, ObservedReadBack,
+    crash_recovery_disagreement, ModelDisagreement, ModelDisagreementAspect, ModelRefusalReason,
+    ModelRootKey, ObservedReadBack, ObservedRefusalReason,
 };
-use crate::model_comparison::{model_root_key, observed_read_back_after_a_crash};
+use crate::model_comparison::{
+    model_root_key, observed_read_back_after_a_crash, refusal_reason_of_mount_error,
+    refusal_reason_of_publish_error,
+};
+use crate::scenario::FIXED_WRITE_TIME_SECONDS;
 use crate::segments::{FixedGeometry, StepKind};
-use crate::SharedStream;
+use crate::{RecordingBlockDevice, RetainedOperation, SharedStream};
 
 /// 崩溃注入的工作线程数从这个环境变量取（十进制正整数）；没设就取 [`std::thread::available_parallelism`]。
 pub const CRASH_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE: &str =
@@ -71,6 +87,9 @@ pub const SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE: u64 = 7_463_871_032_432_355_113;
 
 /// 摆崩溃状态的随机源与生成历史那一路岔开：同一个种子，历史怎么生成不受它影响，反过来也一样。
 const CRASH_POINT_SEED_SALT: u64 = 0x63_72_61_73_68_70_74_00;
+
+/// 摆挂载途中的二次崩溃的随机源，与上面两路再岔开（再按第一次崩溃的段号岔开：同一段历史上各个崩溃状态抽的不是同一串）。
+const SECOND_CRASH_POINT_SEED_SALT: u64 = 0x73_65_63_6f_6e_64_63_72;
 
 /// 每个工作线程摊到的片数：各段历史的长短差得远（一步就被拒的与连发四十次的），片切得比线程多，先跑完的线程接着领下一片。
 const SLICES_PER_WORKER_THREAD: usize = 4;
@@ -241,12 +260,70 @@ impl CrashPoint {
     }
 }
 
+/// 可写挂载的三段（D23（journal 的角色与格式） 已定项 16 取号、D18（块里携带什么信息） 已定项 11 写行、D16（发布语义） 已定项 8 暖机）：
+/// 挂载那一段录制流里的一次写落在哪一段。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum WritableMountPhase {
+    /// 取号：写行那次发布的第一个单元写或 journal 记录写之前的那几次系统配置槽写。
+    Acquisition,
+    /// 写行那次发布：到它的根槽写、连同紧跟着的系统配置槽轮换为止。
+    RowPublish,
+    /// 写行那次之后的暖机空发布（与挂载在暖机之后推的抬 F）。
+    WarmUp,
+}
+
+impl WritableMountPhase {
+    pub const ALL: [WritableMountPhase; 3] = [
+        WritableMountPhase::Acquisition,
+        WritableMountPhase::RowPublish,
+        WritableMountPhase::WarmUp,
+    ];
+
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            WritableMountPhase::Acquisition => "acquisition",
+            WritableMountPhase::RowPublish => "row_publish",
+            WritableMountPhase::WarmUp => "warm_up",
+        }
+    }
+}
+
+/// 一个崩溃状态上的判定落在哪一截（代码审阅第 2 条，用户 2026-09-27 定案「崩溃注入层补可写挂载」）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum CrashStateStage {
+    /// 崩溃镜像本身：只读恢复（看 journal）、问模型、池级 checker、记录核对器。
+    CrashImage,
+    /// 在那份崩溃后镜像上可写挂载（取号、写行、暖机）再发一次布之后的池：池级 checker；挂载或那次发布被拒（单元区墙之外）也记在这一截。
+    AfterTheWritableMountAndOnePublish,
+    /// 可写挂载途中再崩一次（二次崩溃），崩在挂载的这一段里：只读恢复、问模型、池级 checker、记录核对器（只核挂载自己写出的那几次发布）。
+    SecondCrashInsideTheWritableMount(WritableMountPhase),
+}
+
+impl CrashStateStage {
+    /// 报告与镜像目录里的名字。
+    #[must_use]
+    pub fn name(self) -> String {
+        match self {
+            CrashStateStage::CrashImage => "crash_image".to_string(),
+            CrashStateStage::AfterTheWritableMountAndOnePublish => {
+                "after_the_writable_mount_and_one_publish".to_string()
+            }
+            CrashStateStage::SecondCrashInsideTheWritableMount(phase) => {
+                format!("second_crash_inside_{}", phase.name())
+            }
+        }
+    }
+}
+
 /// 一段历史上一类崩溃状态失败。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CrashPointFinding {
     pub signature: FailureSignature,
     pub seed: HistorySeed,
     pub crash_point: CrashPoint,
+    /// 判红的是哪一截（崩溃镜像本身、之后的可写挂载与一次发布、挂载途中的二次崩溃）。
+    pub stage: CrashStateStage,
     pub observation: FailureObservation,
     /// 恢复读回了什么（给人看）。
     pub read_back: String,
@@ -260,8 +337,9 @@ impl CrashPointFinding {
         let mut text = String::new();
         let _ = writeln!(
             text,
-            "崩溃状态上的新发现 {:?}：种子 {}，{}，落在 {:?}／{:?}",
+            "崩溃状态上的新发现 {:?}（{}）：种子 {}，{}，落在 {:?}／{:?}",
             self.signature,
+            self.stage.name(),
             self.seed.0,
             self.crash_point.render(),
             self.crash_point.step,
@@ -298,12 +376,13 @@ impl CrashPointFinding {
     }
 }
 
-/// 崩溃状态上以「已知红」收尾的一次：种子、清单第几条、哪个崩溃状态。
+/// 崩溃状态上以「已知红」收尾的一次：种子、清单第几条、哪个崩溃状态、哪一截。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KnownRedAtACrashPoint {
     pub seed: HistorySeed,
     pub form: usize,
     pub crash_point: CrashPoint,
+    pub stage: CrashStateStage,
 }
 
 /// 跑过的崩溃状态的计数：绝对数，证明各条路径真的跑到了（`test-discipline.md`「阴性结果要能和「代码没跑到」分开」）。
@@ -349,6 +428,28 @@ pub struct CrashInjectionTally {
     pub model_versions_without_a_file_matched: u64,
     /// 攒到的「模型提交过的每一版」目录里，最大的一段有几版。
     pub most_committed_versions_in_one_history: usize,
+    /// 在崩溃后镜像上起的可写挂载（每个崩溃状态一次）：做成的、在单元区墙上被拒的、被别的理由拒的（后者判红）。
+    pub writable_mounts_after_the_crash: u64,
+    pub writable_mounts_after_the_crash_succeeded: u64,
+    pub writable_mounts_after_the_crash_refused_at_the_unit_area_wall: u64,
+    pub writable_mounts_after_the_crash_refused: u64,
+    /// 挂载做成之后的那一次发布（带文件的一版上覆盖写、树表 0 条的一版上发第一个文件）：做成的、单元区墙、别的理由（判红）。
+    pub publishes_after_the_writable_mount: u64,
+    pub publishes_after_the_writable_mount_refused_at_the_unit_area_wall: u64,
+    pub publishes_after_the_writable_mount_refused: u64,
+    /// 挂载与那次发布之后的池上跑的池级 checker。
+    pub checker_runs_after_the_writable_mount: u64,
+    /// 挂载途中的二次崩溃：摆了几个、按崩在挂载的哪一段分。
+    pub second_crash_points: u64,
+    pub second_crash_points_by_phase: BTreeMap<WritableMountPhase, u64>,
+    /// 二次崩溃状态上：恢复的三种结局、问模型的次数、池级 checker 与记录核对器跑的次数。
+    pub second_crash_recoveries_reading_a_file: u64,
+    pub second_crash_recoveries_without_a_file: u64,
+    pub second_crash_recoveries_failed: u64,
+    pub second_crash_model_judgements: u64,
+    pub second_crash_checker_runs: u64,
+    pub second_crash_record_checks: u64,
+    /// 每一截（崩溃镜像本身、挂载与一次发布之后、二次崩溃）判到已知红与新发现的状态数之和。
     pub crash_states_ending_known_red: BTreeMap<usize, u64>,
     pub crash_states_ending_new_finding: u64,
 }
@@ -383,6 +484,22 @@ impl CrashInjectionTally {
             model_contents_compared,
             model_versions_without_a_file_matched,
             most_committed_versions_in_one_history,
+            writable_mounts_after_the_crash,
+            writable_mounts_after_the_crash_succeeded,
+            writable_mounts_after_the_crash_refused_at_the_unit_area_wall,
+            writable_mounts_after_the_crash_refused,
+            publishes_after_the_writable_mount,
+            publishes_after_the_writable_mount_refused_at_the_unit_area_wall,
+            publishes_after_the_writable_mount_refused,
+            checker_runs_after_the_writable_mount,
+            second_crash_points,
+            second_crash_points_by_phase,
+            second_crash_recoveries_reading_a_file,
+            second_crash_recoveries_without_a_file,
+            second_crash_recoveries_failed,
+            second_crash_model_judgements,
+            second_crash_checker_runs,
+            second_crash_record_checks,
             crash_states_ending_known_red,
             crash_states_ending_new_finding,
         } = following;
@@ -432,6 +549,27 @@ impl CrashInjectionTally {
         self.most_committed_versions_in_one_history = self
             .most_committed_versions_in_one_history
             .max(*most_committed_versions_in_one_history);
+        self.writable_mounts_after_the_crash += writable_mounts_after_the_crash;
+        self.writable_mounts_after_the_crash_succeeded += writable_mounts_after_the_crash_succeeded;
+        self.writable_mounts_after_the_crash_refused_at_the_unit_area_wall +=
+            writable_mounts_after_the_crash_refused_at_the_unit_area_wall;
+        self.writable_mounts_after_the_crash_refused += writable_mounts_after_the_crash_refused;
+        self.publishes_after_the_writable_mount += publishes_after_the_writable_mount;
+        self.publishes_after_the_writable_mount_refused_at_the_unit_area_wall +=
+            publishes_after_the_writable_mount_refused_at_the_unit_area_wall;
+        self.publishes_after_the_writable_mount_refused +=
+            publishes_after_the_writable_mount_refused;
+        self.checker_runs_after_the_writable_mount += checker_runs_after_the_writable_mount;
+        self.second_crash_points += second_crash_points;
+        for (phase, count) in second_crash_points_by_phase {
+            *self.second_crash_points_by_phase.entry(*phase).or_insert(0) += count;
+        }
+        self.second_crash_recoveries_reading_a_file += second_crash_recoveries_reading_a_file;
+        self.second_crash_recoveries_without_a_file += second_crash_recoveries_without_a_file;
+        self.second_crash_recoveries_failed += second_crash_recoveries_failed;
+        self.second_crash_model_judgements += second_crash_model_judgements;
+        self.second_crash_checker_runs += second_crash_checker_runs;
+        self.second_crash_record_checks += second_crash_record_checks;
         for (form, count) in crash_states_ending_known_red {
             *self.crash_states_ending_known_red.entry(*form).or_insert(0) += count;
         }
@@ -499,6 +637,40 @@ impl CrashInjectionTally {
         );
         let _ = writeln!(
             text,
+            "崩溃后镜像上的可写挂载 {} 次：做成 {}、单元区墙上被拒 {}、别的理由被拒 {}；之后的一次发布做成 {}、单元区墙上被拒 {}、别的理由被拒 {}；之后的池上 checker 跑了 {} 次",
+            self.writable_mounts_after_the_crash,
+            self.writable_mounts_after_the_crash_succeeded,
+            self.writable_mounts_after_the_crash_refused_at_the_unit_area_wall,
+            self.writable_mounts_after_the_crash_refused,
+            self.publishes_after_the_writable_mount,
+            self.publishes_after_the_writable_mount_refused_at_the_unit_area_wall,
+            self.publishes_after_the_writable_mount_refused,
+            self.checker_runs_after_the_writable_mount
+        );
+        let _ = writeln!(
+            text,
+            "挂载途中的二次崩溃 {} 个：恢复读回文件 {} 次、没有文件 {} 次、失败 {} 次；问模型 {} 次、checker {} 次、记录核对器 {} 次",
+            self.second_crash_points,
+            self.second_crash_recoveries_reading_a_file,
+            self.second_crash_recoveries_without_a_file,
+            self.second_crash_recoveries_failed,
+            self.second_crash_model_judgements,
+            self.second_crash_checker_runs,
+            self.second_crash_record_checks
+        );
+        for phase in WritableMountPhase::ALL {
+            let _ = writeln!(
+                text,
+                "  二次崩溃崩在挂载的 {}：{} 个",
+                phase.name(),
+                self.second_crash_points_by_phase
+                    .get(&phase)
+                    .copied()
+                    .unwrap_or(0)
+            );
+        }
+        let _ = writeln!(
+            text,
             "崩溃状态：以已知红收尾 {:?}、新发现 {}",
             self.crash_states_ending_known_red, self.crash_states_ending_new_finding
         );
@@ -550,8 +722,9 @@ impl StreamMarks {
     }
 }
 
-/// 跑一段历史，按 `draw` 在它的录制流上摆崩溃状态，逐个重建镜像、跑恢复、池级 checker 与记录核对器、问模型。
-/// `image_directory` 给了就把判红的那几个崩溃状态落成镜像文件放进去（留现场）。
+/// 跑一段历史，按 `draw` 在它的录制流上摆崩溃状态，逐个重建镜像、跑恢复、池级 checker 与记录核对器、问模型；
+/// 再在同一份崩溃后镜像上起可写挂载、发一次布、跑 checker，挂载途中摆二次崩溃（[`CrashStateStage`] 的后两截）。
+/// `image_directory` 给了就把判红的那几个崩溃状态（哪一截判红就落哪一截的镜像）落成镜像文件放进去（留现场）。
 ///
 /// # Panics
 /// 录制流没开内容保留（重建镜像要字节）——这里自己建流，走不到。
@@ -626,8 +799,10 @@ pub fn inject_crashes_into_history(
         execution.device_width.device_bytes(),
     );
     let mut writes_applied_to_the_base = 0usize;
-    let mut known_red_hits = Vec::new();
-    let mut new_findings: Vec<CrashPointFinding> = Vec::new();
+    let mut findings = FindingsOfOneHistory {
+        known_red_hits: Vec::new(),
+        new_findings: Vec::new(),
+    };
     for crash_point in &crash_points {
         let segment = &segments[crash_point.segment_index];
         let first_write_of_the_segment = segment[0];
@@ -635,8 +810,6 @@ pub fn inject_crashes_into_history(
         // 段号从小到大，基线只往前叠：更早的段整段持久，按写表整段施加，不为每个崩溃状态从头重建。
         base.apply_writes(&writes[writes_applied_to_the_base..first_write_of_the_segment]);
         writes_applied_to_the_base = first_write_of_the_segment;
-        let writes_up_to_this_segment =
-            &writes[..first_write_of_the_segment + writes_in_the_segment];
         let mut persisted = vec![false; writes.len()];
         persisted[..first_write_of_the_segment].fill(true);
         for (within_the_segment, is_persisted) in
@@ -702,10 +875,12 @@ pub fn inject_crashes_into_history(
                 ObservedReadBack::Failed { .. } => {}
             }
         }
-        // 记录核对器（层 0 那一路同一份判据）：读的是这份崩溃镜像，核的是到这一段为止的整条记录流——
-        // 更早的段里发出的单元写与 journal 记录写也要算进一次发布里，只给当前段就核不出跨段的那几次发布。
+        // 记录核对器（层 0 那一路同一份判据、同一种交法）：读的是这份崩溃镜像，核的是这段历史的整条记录流——
+        // 更早的段里发出的单元写与 journal 记录写要算进一次发布里；恢复落到由 journal 记录重建的一版时，那一版的根槽写在更晚的段里，
+        // 只给到这一段为止的前缀就找不到它、读不出它的实例表，被它抛弃的发布的豁免整条落空（D23（journal 的角色与格式） 已定项 15）。
+        // 持久集合与整条流逐条对应：更早的段整段持久、当前段按这个崩溃点的子集、更晚的段一个都没持久（D13（验证路线） 已定项 7 的第四样入参）。
         let record_check =
-            check_records_against(&image, writes_up_to_this_segment, report.effective_root);
+            check_records_against(&image, &writes, &persisted, report.effective_root);
         tally.record_checks += 1;
         if record_check.root_without_record {
             tally.record_root_without_record += 1;
@@ -714,25 +889,120 @@ pub fn inject_crashes_into_history(
             tally.record_claimed_state_missing_unit += 1;
         }
         let violations = checker_violations_on(&image, &mut tally);
-        if violations.is_empty() && disagreement.is_none() && record_check == RecordCheck::default()
+        if !(violations.is_empty()
+            && disagreement.is_none()
+            && record_check == RecordCheck::default())
         {
-            continue;
+            let observation = crash_state_observation(
+                &image,
+                crash_point,
+                violations,
+                disagreement.clone(),
+                record_check,
+            );
+            findings.settle(
+                &mut tally,
+                FailureAtAStage {
+                    seed: history.seed,
+                    crash_point,
+                    stage: CrashStateStage::CrashImage,
+                    observation,
+                    read_back: format!("{read_back:?}"),
+                    image: &image,
+                },
+                image_directory,
+            );
         }
-        let observation = crash_state_observation(
-            &image,
+
+        // 第二截与第三截（代码审阅第 2 条）：只读恢复只读盘，取号、写行、暖机在崩溃状态上从没跑过；在同一份崩溃后镜像上
+        // 真的起一次可写挂载、再发一次布、跑 checker，挂载途中再崩一次。
+        let crash_image_materialized = materialized_crash_image(&image);
+        let content_read_back_after_the_crash = match &read_back {
+            ObservedReadBack::FileRead { content, .. } => Some(Some(Rc::from(content.as_slice()))),
+            ObservedReadBack::NoFile { .. } => Some(None),
+            ObservedReadBack::Failed { .. } => None,
+        };
+        let mount_run = mount_and_publish_once_on_the_crash_image(
+            &crash_image_materialized,
+            &parameters,
+            execution,
+            history.seed,
             crash_point,
-            violations,
-            disagreement.clone(),
-            record_check,
         );
+        judge_the_writable_mount_on_the_crash_image(
+            &mut tally,
+            &mut findings,
+            &mount_run,
+            history.seed,
+            crash_point,
+            image_directory,
+        );
+        judge_second_crashes_inside_the_writable_mount(
+            &mut tally,
+            &mut findings,
+            SecondCrashInputs {
+                crash_image_materialized: &crash_image_materialized,
+                mount_operations: &mount_run.mount_operations,
+                geometry: &geometry,
+                committed_versions: &committed_versions,
+                content_read_back_after_the_crash,
+                newest_persisted_before_the_mount: newest_persisted,
+            },
+            history.seed,
+            crash_point,
+            image_directory,
+        );
+    }
+    HistoryCrashInjection {
+        seed: history.seed,
+        crash_points,
+        tally,
+        known_red_hits: findings.known_red_hits,
+        new_findings: findings.new_findings,
+    }
+}
+
+/// 一段历史上攒下的已知红与新发现。同一段历史里同一截同一个签名的新发现只留第一个（按段号从小到大）。
+struct FindingsOfOneHistory {
+    known_red_hits: Vec<KnownRedAtACrashPoint>,
+    new_findings: Vec<CrashPointFinding>,
+}
+
+/// 一截上判红的一次：哪段历史、哪个崩溃状态、哪一截、失败观察、恢复读回了什么、判红的那份镜像（留现场用）。
+struct FailureAtAStage<'judged> {
+    seed: HistorySeed,
+    crash_point: &'judged CrashPoint,
+    stage: CrashStateStage,
+    observation: FailureObservation,
+    read_back: String,
+    image: &'judged CrashImage<'judged>,
+}
+
+impl FindingsOfOneHistory {
+    /// 对「已知红」清单（与历史那一路同一张）：清单里的照记，清单外的是新发现。
+    fn settle(
+        &mut self,
+        tally: &mut CrashInjectionTally,
+        failure: FailureAtAStage<'_>,
+        image_directory: Option<&Path>,
+    ) {
+        let FailureAtAStage {
+            seed,
+            crash_point,
+            stage,
+            observation,
+            read_back,
+            image,
+        } = failure;
         match classify_failure(observation) {
             HistoryEnding::Completed => {}
             HistoryEnding::KnownRed { form, .. } => {
                 *tally.crash_states_ending_known_red.entry(form).or_insert(0) += 1;
-                known_red_hits.push(KnownRedAtACrashPoint {
-                    seed: history.seed,
+                self.known_red_hits.push(KnownRedAtACrashPoint {
+                    seed,
                     form,
                     crash_point: crash_point.clone(),
+                    stage,
                 });
             }
             HistoryEnding::NewFinding {
@@ -740,31 +1010,475 @@ pub fn inject_crashes_into_history(
                 observation,
             } => {
                 tally.crash_states_ending_new_finding += 1;
-                if !new_findings
+                if !self
+                    .new_findings
                     .iter()
-                    .any(|finding| finding.signature == signature)
+                    .any(|finding| finding.stage == stage && finding.signature == signature)
                 {
                     let image_files = image_directory.and_then(|directory| {
-                        write_crash_image_files(&image, directory, history.seed, crash_point)
+                        write_crash_image_files(image, directory, seed, crash_point, stage)
                     });
-                    new_findings.push(CrashPointFinding {
+                    self.new_findings.push(CrashPointFinding {
                         signature,
-                        seed: history.seed,
+                        seed,
                         crash_point: crash_point.clone(),
+                        stage,
                         observation,
-                        read_back: format!("{read_back:?}"),
+                        read_back,
                         image_files,
                     });
                 }
             }
         }
     }
-    HistoryCrashInjection {
-        seed: history.seed,
-        crash_points,
+}
+
+/// 把一份崩溃镜像（基线 + 这一段里持久了的写）落成一个池：之后的可写挂载在它的副本上写。
+fn materialized_crash_image(image: &CrashImage<'_>) -> MemoryPool {
+    let mut pool = image.base.clone();
+    for (write, is_persisted) in image.writes.iter().zip(&image.persisted) {
+        if *is_persisted {
+            pool.apply_writes(std::slice::from_ref(write));
+        }
+    }
+    pool
+}
+
+/// 崩溃后镜像上那次可写挂载与之后那一次发布的结局。
+#[derive(Debug)]
+enum WritableMountOutcome {
+    /// 挂载被拒：成员与它说的理由。
+    MountRefused {
+        member: String,
+        reason: ObservedRefusalReason,
+    },
+    /// 挂载做成、之后那一次发布被拒。
+    PublishRefused {
+        member: String,
+        reason: ObservedRefusalReason,
+    },
+    /// 挂载与那一次发布都做成了。
+    Published,
+}
+
+/// 在一份崩溃后镜像上跑一次可写挂载加一次发布：交回结局、挂载那一段录制流（取号、写行、暖机与挂载推的抬 F；被拒时是拒之前写出的）、
+/// 挂载与发布之后的池。
+struct WritableMountOnTheCrashImage {
+    outcome: WritableMountOutcome,
+    mount_operations: Vec<RetainedOperation>,
+    pool_after: MemoryPool,
+}
+
+/// 挂载之后那一次发布写的内容：随种子与崩溃状态变，装得进一个数据单元（模型只罩一个数据单元的文件）。
+fn content_of_the_publish_after_the_crash(seed: HistorySeed, crash_point: &CrashPoint) -> Vec<u8> {
+    let length = 97 + crash_point.segment_index % 64;
+    let fill = seed.0.to_le_bytes()[0];
+    (0..length)
+        .map(|index| fill ^ u8::try_from(index % 251).expect("小于 251"))
+        .collect()
+}
+
+/// 在 `crash_image_materialized` 的副本上起可写挂载（建池那一份参数、那一段历史的空间准入开关），做成了就接着发一次布：
+/// 挂载交回的现行版本带文件时覆盖写，树表 0 条时发第一个文件（与随机历史里这两个入口同一种调法）。
+fn mount_and_publish_once_on_the_crash_image(
+    crash_image_materialized: &MemoryPool,
+    parameters: &MakeFilesystemParameters,
+    execution: HistoryExecution,
+    seed: HistorySeed,
+    crash_point: &CrashPoint,
+) -> WritableMountOnTheCrashImage {
+    let stream = SharedStream::retaining_contents();
+    let mut devices: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> =
+        crash_image_materialized
+            .devices
+            .iter()
+            .map(|(identity, sectors)| {
+                let mut device = SparseBlockDevice::new(
+                    crash_image_materialized.device_size_in_bytes,
+                    PhysicalBlockSizeInBytes(parameters.geometry.physical_block_size),
+                );
+                device.image = sectors.clone();
+                (
+                    *identity,
+                    RecordingBlockDevice::with_shared_stream(*identity, device, stream.clone()),
+                )
+            })
+            .collect();
+    let mounted =
+        mount_writable_with_space_admission(parameters, &mut devices, execution.space_admission);
+    let mount_operation_count = stream.operation_count();
+    let outcome = match mounted {
+        Err(error) => WritableMountOutcome::MountRefused {
+            member: format!("{error:?}"),
+            reason: refusal_reason_of_mount_error(&error),
+        },
+        Ok(mounted) => {
+            let content = content_of_the_publish_after_the_crash(seed, crash_point);
+            let file = FirstFile {
+                content: &content,
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS,
+            };
+            let mut allocator = mounted.allocator;
+            let mut writer = PoolWriter::new(parameters, devices.as_mut_slice());
+            let published = match &mounted.current {
+                PoolVersion::WithFile(current) => publish_overwrite(
+                    &mut writer,
+                    &mut allocator,
+                    current,
+                    file,
+                    mounted.output.instance,
+                )
+                .map(|_| ()),
+                PoolVersion::WithoutFile(current) => publish_first_file(
+                    &mut writer,
+                    &mut allocator,
+                    &current.root,
+                    file,
+                    mounted.output.instance,
+                    &current.record_bytes,
+                )
+                .map(|_| ()),
+            };
+            match published {
+                Ok(()) => WritableMountOutcome::Published,
+                Err(error) => WritableMountOutcome::PublishRefused {
+                    member: format!("{error:?}"),
+                    reason: refusal_reason_of_publish_error(&error),
+                },
+            }
+        }
+    };
+    let mount_operations = stream
+        .retained_operations()
+        .into_iter()
+        .take(mount_operation_count)
+        .collect();
+    let pool_after = MemoryPool {
+        devices: devices
+            .into_iter()
+            .map(|(identity, device)| (identity, device.into_inner_and_operations().0.image))
+            .collect(),
+        device_size_in_bytes: crash_image_materialized.device_size_in_bytes,
+    };
+    WritableMountOnTheCrashImage {
+        outcome,
+        mount_operations,
+        pool_after,
+    }
+}
+
+/// 第二截：挂载或那次发布被拒（单元区墙只计数，模型在单元区墙上只答允许拒绝的区间、而这里没有崩溃点上的模型状态可判区间），
+/// 做没做成都在之后的池上跑池级 checker。别的理由被拒按「模型说该成、实现拒了」报：模型对可写挂载与覆盖写、第一个文件从不要求拒，
+/// 容量墙之外也不许拒（`IdealModel::answer_mount_writable`）。
+fn judge_the_writable_mount_on_the_crash_image(
+    tally: &mut CrashInjectionTally,
+    findings: &mut FindingsOfOneHistory,
+    mount_run: &WritableMountOnTheCrashImage,
+    seed: HistorySeed,
+    crash_point: &CrashPoint,
+    image_directory: Option<&Path>,
+) {
+    tally.writable_mounts_after_the_crash += 1;
+    let refusal = match &mount_run.outcome {
+        WritableMountOutcome::MountRefused { member, reason } => {
+            if *reason == ObservedRefusalReason::Explained(ModelRefusalReason::UnitAreaWall) {
+                tally.writable_mounts_after_the_crash_refused_at_the_unit_area_wall += 1;
+                None
+            } else {
+                tally.writable_mounts_after_the_crash_refused += 1;
+                Some(format!("崩溃后镜像上的可写挂载拒了：{member}"))
+            }
+        }
+        WritableMountOutcome::PublishRefused { member, reason } => {
+            tally.writable_mounts_after_the_crash_succeeded += 1;
+            if *reason == ObservedRefusalReason::Explained(ModelRefusalReason::UnitAreaWall) {
+                tally.publishes_after_the_writable_mount_refused_at_the_unit_area_wall += 1;
+                None
+            } else {
+                tally.publishes_after_the_writable_mount_refused += 1;
+                Some(format!("崩溃后可写挂载之后的那一次发布拒了：{member}"))
+            }
+        }
+        WritableMountOutcome::Published => {
+            tally.writable_mounts_after_the_crash_succeeded += 1;
+            tally.publishes_after_the_writable_mount += 1;
+            None
+        }
+    };
+    tally.checker_runs_after_the_writable_mount += 1;
+    let violations = checker_violations_of(&mount_run.pool_after);
+    if violations.is_empty() && refusal.is_none() {
+        return;
+    }
+    let model_disagreement = refusal.map(|implementation_answer| {
+        ModelDisagreement::new(
+            ModelDisagreementAspect::RefusedWhenModelRequiresSuccess,
+            "崩溃之后恢复到一版上，可写挂载（取号、写行、暖机）与之后的覆盖写或第一个文件都该成（单元区墙之外模型不许拒）"
+                .to_string(),
+            implementation_answer,
+        )
+    });
+    let image = CrashImage {
+        base: &mount_run.pool_after,
+        writes: &[],
+        persisted: Vec::new(),
+    };
+    let observation = crash_state_observation(
+        &image,
+        crash_point,
+        violations,
+        model_disagreement,
+        RecordCheck::default(),
+    );
+    findings.settle(
         tally,
-        known_red_hits,
-        new_findings,
+        FailureAtAStage {
+            seed,
+            crash_point,
+            stage: CrashStateStage::AfterTheWritableMountAndOnePublish,
+            observation,
+            read_back: format!("{:?}", mount_run.outcome),
+            image: &image,
+        },
+        image_directory,
+    );
+}
+
+/// 挂载那一段录制流里每一次写落在挂载的哪一段：先是取号的系统配置槽写，第一个别的写起是写行那次发布，
+/// 它的根槽写与紧跟着的系统配置槽轮换之后的第一个别的写起是暖机。
+fn writable_mount_phase_of_each_write(writes: &[RetainedWrite]) -> Vec<WritableMountPhase> {
+    let mut phase = WritableMountPhase::Acquisition;
+    let mut row_publish_root_written = false;
+    writes
+        .iter()
+        .map(|write| {
+            phase = match (phase, write.kind) {
+                (WritableMountPhase::Acquisition, StepKind::SystemConfigurationSlot) => {
+                    WritableMountPhase::Acquisition
+                }
+                (
+                    WritableMountPhase::Acquisition,
+                    StepKind::UnitWrite
+                    | StepKind::JournalRecord
+                    | StepKind::RootRecordFua
+                    | StepKind::ZeroFill
+                    | StepKind::Barrier,
+                ) => WritableMountPhase::RowPublish,
+                (WritableMountPhase::RowPublish, StepKind::SystemConfigurationSlot) => {
+                    WritableMountPhase::RowPublish
+                }
+                (
+                    WritableMountPhase::RowPublish,
+                    StepKind::UnitWrite
+                    | StepKind::JournalRecord
+                    | StepKind::RootRecordFua
+                    | StepKind::ZeroFill
+                    | StepKind::Barrier,
+                ) => {
+                    if row_publish_root_written {
+                        WritableMountPhase::WarmUp
+                    } else {
+                        WritableMountPhase::RowPublish
+                    }
+                }
+                (
+                    WritableMountPhase::WarmUp,
+                    StepKind::SystemConfigurationSlot
+                    | StepKind::UnitWrite
+                    | StepKind::JournalRecord
+                    | StepKind::RootRecordFua
+                    | StepKind::ZeroFill
+                    | StepKind::Barrier,
+                ) => WritableMountPhase::WarmUp,
+            };
+            if phase == WritableMountPhase::RowPublish && write.kind == StepKind::RootRecordFua {
+                row_publish_root_written = true;
+            }
+            phase
+        })
+        .collect()
+}
+
+/// 挂载途中的一次二次崩溃：挂载那一段的第几段、段内哪几个写持久了、崩在挂载的哪一段。
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct SecondCrashPoint {
+    segment_index: usize,
+    persisted_within_the_segment: Vec<bool>,
+    phase: WritableMountPhase,
+}
+
+/// 挂载的每一段各摆一个二次崩溃：在那一段的写里按种子挑一个 w，崩在 w 上——w 所在那一段里 w 之前的写都落了、w 没落、
+/// w 之后的写各按种子抽；更早的段整段持久，更晚的段一个都没持久（与第一次崩溃同一个枚举域）。挂载没写出某一段的写就不摆那一段。
+fn draw_second_crash_points(
+    seed: HistorySeed,
+    crash_point: &CrashPoint,
+    segments: &[Vec<usize>],
+    phase_of_each_write: &[WritableMountPhase],
+) -> Vec<SecondCrashPoint> {
+    let mut source = SeededRandomSource::from_seed(
+        seed.0
+            ^ SECOND_CRASH_POINT_SEED_SALT
+            ^ u64::try_from(crash_point.segment_index).expect("段号装得进 u64"),
+    );
+    let mut chosen: BTreeSet<SecondCrashPoint> = BTreeSet::new();
+    for phase in WritableMountPhase::ALL {
+        let writes_of_the_phase: Vec<(usize, usize)> = segments
+            .iter()
+            .enumerate()
+            .flat_map(|(segment_index, segment)| {
+                segment
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, write_index)| phase_of_each_write[**write_index] == phase)
+                    .map(move |(within_the_segment, _)| (segment_index, within_the_segment))
+            })
+            .collect();
+        if writes_of_the_phase.is_empty() {
+            continue;
+        }
+        let picked = usize::try_from(
+            source.below(u64::try_from(writes_of_the_phase.len()).expect("写数装得进 u64")),
+        )
+        .expect("下标装得进 usize");
+        let (segment_index, withheld) = writes_of_the_phase[picked];
+        let persisted_within_the_segment: Vec<bool> = (0..segments[segment_index].len())
+            .map(
+                |within_the_segment| match within_the_segment.cmp(&withheld) {
+                    std::cmp::Ordering::Less => true,
+                    std::cmp::Ordering::Equal => false,
+                    std::cmp::Ordering::Greater => source.below(2) == 1,
+                },
+            )
+            .collect();
+        chosen.insert(SecondCrashPoint {
+            segment_index,
+            persisted_within_the_segment,
+            phase,
+        });
+    }
+    chosen.into_iter().collect()
+}
+
+/// 摆二次崩溃要的东西：第一次崩溃之后那份镜像、挂载那一段录制流与切段的几何、模型提交过的每一版、第一次崩溃之后读回的内容
+/// （恢复失败时 None）、第一次崩溃的盘上已持久的最新根槽。
+struct SecondCrashInputs<'history> {
+    crash_image_materialized: &'history MemoryPool,
+    mount_operations: &'history [RetainedOperation],
+    geometry: &'history FixedGeometry,
+    committed_versions: &'history BTreeMap<ModelRootKey, Option<Rc<[u8]>>>,
+    content_read_back_after_the_crash: Option<Option<Rc<[u8]>>>,
+    newest_persisted_before_the_mount: Option<ModelRootKey>,
+}
+
+/// 第三截：挂载途中的二次崩溃。每个二次崩溃状态上：只读恢复（看 journal）、问模型——允许的版本是模型提交过的每一版，加上这次挂载写出的根
+/// （写行那次与暖机照抄第一次崩溃之后恢复到的那一版的文件，所以内容取那一次读回的；那一次恢复失败时一条都不加）；
+/// 盘上已持久的最新根槽取第一次崩溃与挂载写表两边里更新的那条——、池级 checker、记录核对器。
+/// 记录核对器只核挂载自己写出的那几次发布（写表只给挂载那一段）：历史那几次发布在第一截上核过；把历史写表接在前面，
+/// 第一次崩溃截在一次发布中间时那次发布没落根的单元写会被归进写行那次发布（`crash::publishes_in` 按根槽写分），核出假红。
+fn judge_second_crashes_inside_the_writable_mount(
+    tally: &mut CrashInjectionTally,
+    findings: &mut FindingsOfOneHistory,
+    inputs: SecondCrashInputs<'_>,
+    seed: HistorySeed,
+    crash_point: &CrashPoint,
+    image_directory: Option<&Path>,
+) {
+    let SecondCrashInputs {
+        crash_image_materialized,
+        mount_operations,
+        geometry,
+        committed_versions,
+        content_read_back_after_the_crash,
+        newest_persisted_before_the_mount,
+    } = inputs;
+    let (mount_writes, mount_segments, _stream_indexes) =
+        writes_and_segments_with_stream_indexes(mount_operations, geometry);
+    let phase_of_each_write = writable_mount_phase_of_each_write(&mount_writes);
+    let second_crash_points =
+        draw_second_crash_points(seed, crash_point, &mount_segments, &phase_of_each_write);
+    let mut versions_allowed = committed_versions.clone();
+    if let Some(content) = &content_read_back_after_the_crash {
+        for write in &mount_writes {
+            if write.kind != StepKind::RootRecordFua {
+                continue;
+            }
+            let (instance, checkpoint_txg) =
+                root_identity_written_by(write.bytes().expect("根槽 FUA 写是普通写，带着字节"));
+            versions_allowed.insert(model_root_key(instance, checkpoint_txg), content.clone());
+        }
+    }
+    let mut second_base = crash_image_materialized.clone();
+    let mut writes_applied_to_the_second_base = 0usize;
+    let mut ordered = second_crash_points;
+    ordered.sort_by_key(|second| second.segment_index);
+    for second in &ordered {
+        let segment = &mount_segments[second.segment_index];
+        let first_write_of_the_segment = segment[0];
+        let writes_in_the_segment = second.persisted_within_the_segment.len();
+        second_base.apply_writes(
+            &mount_writes[writes_applied_to_the_second_base..first_write_of_the_segment],
+        );
+        writes_applied_to_the_second_base = first_write_of_the_segment;
+        let writes_up_to_this_segment =
+            &mount_writes[..first_write_of_the_segment + writes_in_the_segment];
+        let mut persisted = vec![true; writes_up_to_this_segment.len()];
+        persisted[first_write_of_the_segment..]
+            .copy_from_slice(&second.persisted_within_the_segment);
+        let image = CrashImage {
+            base: &second_base,
+            writes: &mount_writes
+                [first_write_of_the_segment..first_write_of_the_segment + writes_in_the_segment],
+            persisted: second.persisted_within_the_segment.clone(),
+        };
+        tally.second_crash_points += 1;
+        *tally
+            .second_crash_points_by_phase
+            .entry(second.phase)
+            .or_insert(0) += 1;
+        let report = recover(&image, JournalPolicy::Consult);
+        match &report.outcome {
+            RecoveryOutcome::FileRead { .. } => tally.second_crash_recoveries_reading_a_file += 1,
+            RecoveryOutcome::NoFile { .. } => tally.second_crash_recoveries_without_a_file += 1,
+            RecoveryOutcome::Failed { .. } => tally.second_crash_recoveries_failed += 1,
+        }
+        let read_back_after_the_second_crash = observed_read_back_after_a_crash(&report);
+        let newest_persisted_by_the_mount =
+            newest_persisted_root(writes_up_to_this_segment, &persisted)
+                .map(|(checkpoint_txg, instance)| model_root_key(instance, checkpoint_txg));
+        let newest_persisted = newest_persisted_before_the_mount.max(newest_persisted_by_the_mount);
+        tally.second_crash_model_judgements += 1;
+        let disagreement = crash_recovery_disagreement(
+            &versions_allowed,
+            newest_persisted,
+            &read_back_after_the_second_crash,
+        );
+        tally.second_crash_record_checks += 1;
+        let record_check = check_records_against(
+            &image,
+            writes_up_to_this_segment,
+            &persisted,
+            report.effective_root,
+        );
+        tally.second_crash_checker_runs += 1;
+        let violations = checker_violations_of(&image);
+        if violations.is_empty() && disagreement.is_none() && record_check == RecordCheck::default()
+        {
+            continue;
+        }
+        let observation =
+            crash_state_observation(&image, crash_point, violations, disagreement, record_check);
+        findings.settle(
+            tally,
+            FailureAtAStage {
+                seed,
+                crash_point,
+                stage: CrashStateStage::SecondCrashInsideTheWritableMount(second.phase),
+                observation,
+                read_back: format!("{read_back_after_the_second_crash:?}"),
+                image: &image,
+            },
+            image_directory,
+        );
     }
 }
 
@@ -911,6 +1625,18 @@ fn checker_violations_on(
     violations
 }
 
+/// 对挂载之后的池、二次崩溃的镜像跑池级 checker，交回判红的那几条（判绿、不适用的计数只记第一截那一份：
+/// 那两截的 checker 次数另记在 `checker_runs_after_the_writable_mount` 与 `second_crash_checker_runs`）。
+fn checker_violations_of(image: &dyn ImageReader) -> Vec<(&'static str, String)> {
+    check_pool_image(image)
+        .into_iter()
+        .filter_map(|(invariant, verdict)| match verdict {
+            InvariantVerdict::Violated(detail) => Some((invariant, detail)),
+            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+        })
+        .collect()
+}
+
 /// 这个崩溃镜像上，最新那条根带的回退下界 F 落不落在回退留下的空档里（F 那个 txg 上的根全属于被抛弃的实例）。
 /// 与活盘面那一路（抬 F 之前的镜像 + 新 F）是同一个谓词、同一份实现，读的盘面不同：这里读崩溃镜像自己，
 /// F 从镜像里最新那条根上取——抬 F 之后的任何一个崩溃状态都摆得出同一机理的盘面，不限于抬 F 那一步
@@ -954,11 +1680,14 @@ fn write_crash_image_files(
     directory: &Path,
     seed: HistorySeed,
     crash_point: &CrashPoint,
+    stage: CrashStateStage,
 ) -> Option<PathBuf> {
     use std::os::unix::fs::FileExt as _;
     let here = directory.join(format!(
-        "seed-{}-segment-{}",
-        seed.0, crash_point.segment_index
+        "seed-{}-segment-{}-{}",
+        seed.0,
+        crash_point.segment_index,
+        stage.name()
     ));
     std::fs::create_dir_all(&here).ok()?;
     let sector_length = usize::try_from(SECTOR_BYTES).expect("512");
@@ -1001,7 +1730,7 @@ pub struct CrashInjectionReport {
     pub execution: HistoryExecution,
     pub tally: CrashInjectionTally,
     pub known_red_hits: Vec<KnownRedAtACrashPoint>,
-    /// 按种子从小到大排；同一个签名只留第一个种子。
+    /// 按种子从小到大排；同一截同一个签名只留第一个种子。
     pub new_findings: Vec<CrashPointFinding>,
     /// 这一批判红的崩溃镜像留在哪；跑完删掉的那一档是 None。
     pub image_directory: Option<PathBuf>,
@@ -1041,15 +1770,15 @@ impl CrashInjectionReport {
         }
         text.push_str(&self.tally.render());
         for (form_index, form) in KNOWN_RED_FORMS.iter().enumerate() {
-            let hits: Vec<(u64, usize)> = self
+            let hits: Vec<(u64, usize, String)> = self
                 .known_red_hits
                 .iter()
                 .filter(|hit| hit.form == form_index)
-                .map(|hit| (hit.seed.0, hit.crash_point.segment_index))
+                .map(|hit| (hit.seed.0, hit.crash_point.segment_index, hit.stage.name()))
                 .collect();
             let _ = writeln!(
                 text,
-                "崩溃状态上的已知红第 {form_index} 条（{}）：{} 个崩溃状态；前几个 (种子, 段号) {:?}",
+                "崩溃状态上的已知红第 {form_index} 条（{}）：{} 个崩溃状态；前几个 (种子, 段号, 哪一截) {:?}",
                 form.closeout_table_row,
                 hits.len(),
                 hits.iter().take(8).collect::<Vec<_>>()
@@ -1184,12 +1913,12 @@ pub fn run_crash_injection_campaign(campaign: &CrashInjectionCampaign) -> CrashI
     let mut tally = CrashInjectionTally::default();
     let mut known_red_hits = Vec::new();
     let mut new_findings: Vec<CrashPointFinding> = Vec::new();
-    let mut signatures_seen: BTreeSet<FailureSignature> = BTreeSet::new();
+    let mut signatures_seen: BTreeSet<(CrashStateStage, FailureSignature)> = BTreeSet::new();
     for injection in &finished_slices {
         tally.absorb(&injection.tally);
         known_red_hits.extend(injection.known_red_hits.iter().cloned());
         for finding in &injection.new_findings {
-            if signatures_seen.insert(finding.signature.clone()) {
+            if signatures_seen.insert((finding.stage, finding.signature.clone())) {
                 new_findings.push(finding.clone());
             }
         }

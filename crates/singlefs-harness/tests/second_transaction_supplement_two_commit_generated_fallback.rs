@@ -229,11 +229,11 @@ fn build_six_overwrites_after_a_writable_remount(tag: &str) -> BuiltPool {
     pool
 }
 
-/// 一串发布失败时交出的账（已落盘的那几次加失败账）合起来的写调用数与字节数。
+/// 一串发布失败时交出的账（第一次发布之前、不属于任何一次发布的写——抬 F 那一串先写系统配置那一步——，已落盘的那几次，加失败账）
+/// 合起来的写调用数与字节数。
 fn sum_of_accounts(failed: &PublishSequenceFailed) -> WriteCallsAndBytes {
-    failed
-        .writes_of_persisted_publishes
-        .iter()
+    std::iter::once(&failed.writes_before_the_first_publish)
+        .chain(&failed.writes_of_persisted_publishes)
         .chain(&failed.writes_of_failed_publishes)
         .fold(WriteCallsAndBytes::NONE, |sum, writes| {
             sum.plus(writes.total())
@@ -353,7 +353,8 @@ fn raise_the_floor_to_four(
 /// C516（抬 F 那一串发布被拒时前面几次已落盘）在预演之后还走得到的那一格：落点、准入这些落盘之前的错在预演里就报了（一次都不发），
 /// 真发时还报得出错的是落盘途中失败。第一次空发布（txg 9）落盘之后，第二次（txg 10）的第一个写报块设备错：
 /// 报出这一串已经落盘了 1 次、连同那一次的写账（增补 2 收口表第 58 行：抬 F 的写入口随错丢掉，账要随错交出），
-/// 两样相加与录制器数到的写逐项相等；调用方的现行版本已经是落盘的那一次。第一次有几个写由同一块池不注入先抬一遍数出来。
+/// 与第一次发布之前先把新 F 写进两块盘系统配置那两次写（D16（发布语义） 已定项 1「抬 F 那一串」）三样相加与录制器数到的写逐项相等；
+/// 调用方的现行版本已经是落盘的那一次。先写系统配置那一步与第一次各有几个写由同一块池不注入先抬一遍数出来。
 #[test]
 fn a_raise_whose_second_empty_publish_fails_on_a_write_reports_that_one_publish_of_the_sequence_persisted(
 ) {
@@ -369,13 +370,21 @@ fn a_raise_whose_second_empty_publish_fails_on_a_write_reports_that_one_publish_
         "这一串两次空发布"
     );
     let write_calls_of_the_first_empty_publish = raised.publishes[0].writes.total().write_calls;
+    let write_calls_before_the_first_publish = raised
+        .system_configuration_writes_before_the_first_publish
+        .total()
+        .write_calls;
+    assert_eq!(
+        write_calls_before_the_first_publish, 2,
+        "第一次发布之前先把新 F 写进两块盘的系统配置：每块盘一次"
+    );
 
     let mut pool = five_overwrites_on_fault_injected_devices();
     let recorded_before_the_raise = pool.stream.operation_count();
     pool.fault_plan
         .arm(FaultSchedule::the_nth_call_across_the_pool(
             InjectedFault::WriteFails,
-            write_calls_of_the_first_empty_publish + 1,
+            write_calls_before_the_first_publish + write_calls_of_the_first_empty_publish + 1,
         ));
     let refused = raise_the_floor_to_four(&mut pool);
     let Err(MountError::RaiseFloorSequencePublishFailed(failed)) = refused else {
@@ -403,6 +412,11 @@ fn a_raise_whose_second_empty_publish_fails_on_a_write_reports_that_one_publish_
         failed.writes_of_persisted_publishes,
         vec![pool.output.writes.clone()],
         "已落盘那一次的账就是 txg 9 那次发布自己记的账"
+    );
+    assert_eq!(
+        failed.writes_before_the_first_publish.total().write_calls,
+        write_calls_before_the_first_publish,
+        "先写系统配置那两次写随错交回"
     );
     assert_eq!(
         sum_of_accounts(&failed),

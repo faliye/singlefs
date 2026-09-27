@@ -315,7 +315,7 @@ mod tests {
 
     /// 一条跨过叶末槽的记录（起在叶的末槽、跨 2）不落在叶里；起在偶数槽的两槽记录落得进。
     #[test]
-    fn a_record_crossing_the_last_slot_of_its_leaf_does_not_fit() {
+    fn record_crossing_the_last_slot_of_its_leaf_does_not_fit() {
         let leaf = AllocationRecordTreeCell::BelowTheRoot {
             level: 0,
             device: 0,

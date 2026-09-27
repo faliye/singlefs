@@ -308,7 +308,7 @@ fn naming_a_root_ring_slot_makes_the_recovery_choose_a_different_root_and_naming
 /// 「第一版没有根环槽的重定位 ⇒ 一个根槽持续读不出时它永远读不通」上）：同一个读者上把择根跑三遍，
 /// 拦下的读数一遍比一遍多、结论三遍逐项相同。
 #[test]
-fn a_named_root_ring_slot_keeps_failing_every_read_not_just_the_first_one() {
+fn named_root_ring_slot_keeps_failing_every_read_not_just_the_first_one() {
     let mut pool = build_pool("switch-root-slot-read-keeps-failing");
     overwrite_in_process(&mut pool, &content_of(3100, 3), InstanceGeneration(1));
     let image = pool.memory_pool();

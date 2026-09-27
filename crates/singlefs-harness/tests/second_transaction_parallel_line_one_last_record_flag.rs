@@ -309,7 +309,7 @@ fn an_ordinal_that_skips_within_a_publish_breaks_the_chain_and_the_publish_is_no
 /// 已定项 4：序号 0 当那条记录损坏；记录标志位 0 之外有位为 1 当那条记录损坏。两样都与校验和不过同一个结局：
 /// C 的第二条（jsn 7）不算在，jsn 断号即止，C 走不到末条、整体不施加，读回 B。头部校验和按改过的字节重封过。
 #[test]
-fn a_record_whose_ordinal_is_zero_or_whose_flags_set_another_bit_counts_as_torn_and_its_publish_is_not_applied(
+fn record_whose_ordinal_is_zero_or_whose_flags_set_another_bit_counts_as_torn_and_its_publish_is_not_applied(
 ) {
     let history = crash_before_the_third_root("last-flag-ordinal-zero-or-other-flag-bits");
     for (offset, value, what) in [
@@ -332,7 +332,7 @@ fn a_record_whose_ordinal_is_zero_or_whose_flags_set_another_bit_counts_as_torn_
 /// 施加的单位是一次发布（第六条）。C 的第一条（jsn 6，事务号 4）的提交标记改成 0，下一条（jsn 7）换成了事务号 5 ⇒
 /// 事务 4 的提交标记没出现，它所在的 C 整体不施加，读回 B。只看末条标志的读者会把缺了提交标记的事务 4 连着 C 一起施加。
 #[test]
-fn a_transaction_whose_commit_marker_never_appears_before_the_next_transaction_keeps_its_publish_unapplied(
+fn transaction_whose_commit_marker_never_appears_before_the_next_transaction_keeps_its_publish_unapplied(
 ) {
     let history = crash_before_the_third_root("last-flag-commit-marker-missing-mid-publish");
     let mut image = history.image.clone();
@@ -352,7 +352,7 @@ fn a_transaction_whose_commit_marker_never_appears_before_the_next_transaction_k
 /// C 的末条（jsn 8）提交标记改成 0 ⇒ 读回 B。末条之外不带提交标记的记录要接着往下走（一个事务跨多条记录），
 /// 只在「是末条」这一格停；不判这一格的读者把没提交的最后一个事务连着 C 一起施加。
 #[test]
-fn a_last_record_of_a_publish_without_a_commit_marker_keeps_its_publish_unapplied() {
+fn last_record_of_the_publish_without_the_commit_marker_keeps_its_publish_unapplied() {
     let history = crash_before_the_third_root("last-flag-last-record-without-commit-marker");
     let mut image = history.image.clone();
     rewrite_record(&mut image, history.third_counters[2], |record| {
@@ -412,7 +412,7 @@ fn with_a_readable_anchor_a_next_publish_whose_first_ordinal_is_not_one_is_not_a
 /// jsn 6 之后同一个 txg 5 还有 jsn 7、8 ⇒ 断在 jsn 6，C 一条都不施加、读回 B。照字面按标志认边界的读者（改之前）把 {jsn 6}
 /// 当一次发布施加（它带着 C 的整个新根段），读回 C。只挪不添，checker 这一格判的就是「末条之后还有记录」、不是「多于一条末条」。
 #[test]
-fn a_last_record_flag_followed_by_a_record_of_the_same_publish_breaks_the_chain_at_the_flag_and_the_checker_reddens(
+fn last_record_flag_followed_by_the_record_of_the_same_publish_breaks_the_chain_at_the_flag_and_the_checker_reddens(
 ) {
     let history = crash_before_the_third_root("last-flag-followed-within-its-publish");
     let mut image = history.image.clone();

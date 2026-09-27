@@ -1,6 +1,6 @@
 //! E142（第一个事务的干跑） 量 5 的实装一侧：在两块内存盘上跑 `scenario::run_first_transaction`
 //! （与虚机档、与 E142 装置同参数：同 fsid、同写入时刻、同 3000 字节内容、两盘 4 GiB），
-//! 把第一个事务写到的那 21 个区域的字节打成一行一个区域的结果行。
+//! 把第一个事务写到的那 29 个区域的字节打成一行一个区域的结果行。
 //!
 //!   first_transaction_region_bytes
 //!
@@ -8,7 +8,7 @@
 //! 结果行形态照 `first_transaction_on_device`：`E7RESULT name=… `，末行报条数。
 //! 区域清单与它的来历见 `singlefs_harness::first_transaction_regions` 的模块注释。
 //!
-//! 退出码：0 = 区域表与这一趟真正发出的 21 条写逐条对得上；1 = 对不上（表与实装分叉了，两边都要查）
+//! 退出码：0 = 区域表与这一趟真正发出的 29 条写逐条对得上；1 = 对不上（表与实装分叉了，两边都要查）
 //! 或者命令行给了参数。
 
 use singlefs_core::address::DeviceIdentity;

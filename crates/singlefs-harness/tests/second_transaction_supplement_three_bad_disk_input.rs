@@ -340,10 +340,12 @@ fn every_fixed_panic_site_reports_its_own_error_member_instead_of_panicking() {
     // 位置条目那份上恢复**读回了文件**（那条指针指的实例表不在读路径上，两条位置条目的第一条又还是好的）——
     // 这一条钉的正是「改法没有把读路径也一起拒掉」。
     //
-    // ⚠️ 这段写死的历史第 4 步是「回退到环里第 3 新的根」，那是一条暖机根、而环里还留着带文件的根：C511（回退到无文件那一版之后诞生代怎么接）
-    // 第 3 步之前那一步在写之前被拒、之后几步没有会话；拿掉那道拒绝之后它照常回退，后面接着再发第一个文件版本、覆盖写、重开（实例 3），
-    // 盘面跟着变：实例表那个落点从槽 50304 挪到 50368，恢复择到的根从 (2, 9) 变成 (3, 13)。下面几处槽号与根照今天的盘面写，
-    // 钉的错误成员一个没变。
+    // ⚠️ 这段写死的历史（种子基 + 4、16 步）第 3 步（从 0 数）是「挂着时回退到环里第 3 新的根」，那是一条暖机根（树表 0 条）：
+    // 管理员回退改成挂着时的向前发布之后（实三），回退的候选集要带文件（D23（journal 的角色与格式） 已定项 14），它在写之前被拒
+    // （`TargetNotACandidate(VersionWithoutFile)`）；之后第 11 步可写挂载取到实例 2。盘面因此是：实例表那个落点在槽 50304、
+    // 恢复择到的根是 (2, 9)（实四丙交回第三节逐条对过）。下面几处槽号与根照这一版盘面写，钉的错误成员一个没变。
+    // 这段历史的 16 步里没有「崩溃恢复抛弃根」（实七加的那一种操作从可写挂载那一格切份数，这个种子一次都没抽到），
+    // 生成器加这一种之后操作序列逐项不变。
     //
     // ⚠️ 「跨度越过单元区末尾」那条坏法在**两块 4 GiB 的盘**上够不着它名字里说的那一格：跨度写成 0x7FFF = 32767 槽，
     // 从 50176 起到 82943，而单元区末尾是槽 262144（4 GiB ÷ 16 KiB）。分配记录树按位置寻址之后，它先撞上的是叶判
@@ -405,7 +407,7 @@ fn every_fixed_panic_site_reports_its_own_error_member_instead_of_panicking() {
             DamageKind::AllocationRecordReleasedOnTheSecondDeviceOnly,
             "InvariantViolated { invariant: \"E142 走读同款\", detail: \"分配记录不是每个落点每盘各一条",
             "ReleaseTargetAlreadyReleased { unit: InstanceTable, device: DeviceIdentity(1), \
-             slot: SlotNumber(50368) }",
+             slot: SlotNumber(50304) }",
         ),
         (
             DamageKind::RelabelledInodeWatermarkAccountingRow,
@@ -414,10 +416,10 @@ fn every_fixed_panic_site_reports_its_own_error_member_instead_of_panicking() {
         ),
         (
             DamageKind::TwoLocationEntriesOfOnePointerDisagreeingOnTheSlot,
-            "FileRead（实例 3 第 13 代根",
+            "FileRead（实例 2 第 9 代根",
             "ReleaseTargetLocationsOnDifferentSlots { unit: InstanceTable, disagreement: \
              LocationEntriesOnDifferentSlots { devices: [DeviceIdentity(0), DeviceIdentity(1)], \
-             slots: [SlotNumber(50368), SlotNumber(50369)] } }",
+             slots: [SlotNumber(50304), SlotNumber(50305)] } }",
         ),
         // 第十三条是 C504（树表条目宽在走读里无守卫，今天没坏法打得到）：坏的是**树表单元自己**，不是它指着的某棵树的根。
         // 两个读者都走 `TreeTableEntry::parse`（它先判「这条条目正好 200 字节」），所以两侧同一个成员；
@@ -487,7 +489,7 @@ fn every_fixed_panic_site_reports_its_own_error_member_instead_of_panicking() {
 /// 槽号 +1、整槽自证校验和重算。判两样——交回的是 `FormatTimeUnitLocationsOnDifferentSlots`（不是别的成员、更不是 panic），
 /// 以及**盘上逐字节不变**：判定在动分配器与取号之前，这次挂载一个字节都不许写。
 #[test]
-fn a_format_time_pointer_with_two_location_entries_on_different_slots_refuses_the_writable_mount_without_writing_a_byte(
+fn format_time_pointer_with_two_location_entries_on_different_slots_refuses_the_writable_mount_without_writing_the_byte(
 ) {
     let base = image_of_a_pool_that_has_only_been_made();
     let mut random = SeededRandomSource::from_seed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE);
@@ -580,9 +582,9 @@ fn memory_pool_of(devices: &[(DeviceIdentity, SparseBlockDevice)]) -> MemoryPool
 /// 系统配置自述的区域数越过字段表那三个逐区域设备身份字段（普查 R12）时，池级 checker 不许 panic、也不许把它夹成 3
 /// 往下走：`geometry_of` 交回 `Verdict::RegionCountPastTheRegionDeviceFields`、这一槽不可择，于是整片报不适用。
 /// 「不夹成 3」那一半单钉在 `checker_known_bad_images.rs`
-/// （`a_region_count_past_the_region_device_fields_is_refused_by_the_geometry_reader`）。
+/// （`region_count_past_the_region_device_fields_is_refused_by_the_geometry_reader`）。
 #[test]
-fn a_region_count_past_the_three_region_array_leaves_the_checker_standing() {
+fn region_count_past_the_three_region_array_leaves_the_checker_standing() {
     let base = base_image_for(HistorySeed(
         SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE.wrapping_add(SEED_OFFSET_OF_THE_FIXED_HISTORY),
     ));
@@ -622,7 +624,7 @@ fn a_region_count_past_the_three_region_array_leaves_the_checker_standing() {
 ///
 /// 坏法写死、盘面写死（种子基 + [`SEED_OFFSET_OF_THE_FIXED_HISTORY`] 那一段历史），重跑逐字相同。
 #[test]
-fn a_tree_table_narrower_than_a_registered_entry_breaks_the_walk_instead_of_panicking_or_judging_the_entry_width(
+fn tree_table_narrower_than_the_registered_entry_breaks_the_walk_instead_of_panicking_or_judging_the_entry_width(
 ) {
     let base = base_image_for(HistorySeed(
         SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE.wrapping_add(SEED_OFFSET_OF_THE_FIXED_HISTORY),

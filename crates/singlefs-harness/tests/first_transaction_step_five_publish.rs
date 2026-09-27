@@ -181,8 +181,8 @@ fn build_pool(tag: &str) -> BuiltPool {
         let acquisition_operation_count = stream.operations().len();
         assert_eq!(
             acquisition_operation_count,
-            mkfs_operation_count + 3,
-            "取号两写 + 取号之后那道屏障（C322（取号那一步的屏障怎么放没有条款） 2026-09-14 定案；暖机开场那道因此不再发）"
+            mkfs_operation_count + 4,
+            "取号两写 + 取号之后那道屏障，两块盘各记一步（录制器按设备记屏障，代码审阅第 1 条；C322（取号那一步的屏障怎么放没有条款） 2026-09-14 定案；暖机开场那道因此不再发）"
         );
         let warm_up = warm_up(&mut pool, &genesis.root, instance).expect("暖机");
         warm_up_operation_count = stream.operations().len();
@@ -318,17 +318,19 @@ fn recorded_paths_match_the_registered_segment_sequences() {
     let post_mkfs_operations = &operations[pool.mkfs_operation_count..];
     // 产物第 31–35 行逐字（operations= / segments= / closed_form= / kinds=）；mkfs 那一行 2026-09-22 起
     // 与产物**不同**：清 journal 环与清根环都是这之后加的，E142 干跑的产物还没重跑（重跑之前门禁 55 号红着）。
+    // 录制器按设备记屏障（代码审阅第 1 条，用户 2026-09-27 定）之后，每道池屏障两块盘各记一步：操作数与种类串里的屏障数
+    // 与产物不同（mkfs 21 → 23、暖机 14 → 18、第一个事务 31 → 33、mkfs 之后整条 47 → 53），段序列与闭式不变；产物要重出。
     assert_eq!(
         (
             mkfs_operations.len(),
             sizes(mkfs_operations),
             closed_form(mkfs_operations)
         ),
-        (21, "12+1+1+1+4".to_string(), 4114)
+        (23, "12+1+1+1+4".to_string(), 4114)
     );
     assert_eq!(
         kinds(mkfs_operations),
-        "[zero_fill×8,unit_write×4,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier]"
+        "[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]"
     );
     assert_eq!(
         (
@@ -348,11 +350,11 @@ fn recorded_paths_match_the_registered_segment_sequences() {
             sizes(warm_up_operations),
             closed_form(warm_up_operations)
         ),
-        (14, "2+1+2+2+1+2".to_string(), 15)
+        (18, "2+1+2+2+1+2".to_string(), 15)
     );
     assert_eq!(
         kinds(warm_up_operations),
-        "[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]"
+        "[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]"
     );
     assert_eq!(
         (
@@ -360,11 +362,11 @@ fn recorded_paths_match_the_registered_segment_sequences() {
             sizes(transaction_operations),
             closed_form(transaction_operations)
         ),
-        (31, "24+2+1+2".to_string(), 16_777_223)
+        (33, "24+2+1+2".to_string(), 16_777_223)
     );
     assert_eq!(
         kinds(transaction_operations),
-        "[unit_write×24,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]"
+        "[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]"
     );
     assert_eq!(
         (
@@ -372,11 +374,11 @@ fn recorded_paths_match_the_registered_segment_sequences() {
             sizes(post_mkfs_operations),
             closed_form(post_mkfs_operations)
         ),
-        (47, "2+2+1+2+2+1+26+2+1+2".to_string(), 67_108_885)
+        (53, "2+2+1+2+2+1+26+2+1+2".to_string(), 67_108_885)
     );
     assert_eq!(
         kinds(post_mkfs_operations),
-        "[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]"
+        "[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]"
     );
     // 每一步恰好落在一个段里。
     for slice in [

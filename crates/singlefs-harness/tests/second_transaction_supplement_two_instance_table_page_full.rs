@@ -5,8 +5,8 @@
 //! `pristine_instance_table_rows_overflow_after_acquisition`，日志 `pristine-run.log`）。
 //! 用户 2026-09-19 定第二片进里程碑二（增补 2 收口表第 38 行），2026-09-24 定两条写法：行一片写满 369 行再开下一片、
 //! 多于一片时在 bump 次序里尾片先。所以一片写满之后的那一次挂载不再拒，写第二片（真写者写出的两片怎么排、checker 怎么判见
-//! `second_transaction_supplement_two_instance_table_second_page_write.rs`）；回退走同一个 `establish_instance`，
-//! 行数按 R_old 那一版表与 [max(r_old, 1), 新实例) 自己算。
+//! `second_transaction_supplement_two_instance_table_second_page_write.rs`）。管理员回退改成挂着时的一次向前发布之后不写行、
+//! 实例表照现行那一版的（D23（journal 的角色与格式） 已定项 14），「回退按 R_old 那一版表算行数」那一格没有对象，删了。
 //!
 //! 「取号之后崩溃」（取号写完、写行那次发布之前掉电）是今天就走得到的历史：下一次挂载要给中间那些实例各补一行 (i, 0, 0)，
 //! 一次挂载就能写很多行。本文件用它把表快速填到边上（`acquire_instance` 连取 k 次号 = 连着 k 次取号之后崩溃）。
@@ -16,10 +16,10 @@ mod common;
 use common::{memory_pool_of_sparse_devices, parameters, IMAGE_BYTES};
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
-use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
+use singlefs_core::address::{DeviceIdentity, InstanceGeneration};
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::instance_table::{InstanceTablePage, InstanceTablePageIndex};
-use singlefs_core::mount::{mount_rollback, mount_writable, Mounted, RollbackTarget, ShadowLedger};
+use singlefs_core::mount::{mount_writable, Mounted};
 use singlefs_core::recovery::{instance_table_chain_of_root, PoolReader};
 use singlefs_core::transaction::{acquire_instance, PoolWriter};
 use singlefs_harness::crash::SparseBlockDevice;
@@ -159,74 +159,5 @@ fn mount_after_crashes_right_after_acquisition_fills_the_page_and_one_more_row_o
     assert_eq!(
         rows_of_each_page_of_the_row_publish(&one_row_more, &mounted_past_one_page),
         vec![ROWS_PER_PAGE, 1]
-    );
-}
-
-/// 回退按自己那一版算：连着 367 次取号之后崩溃、再可写挂载一次（取 369，表 368 行），之后回退到 A（实例 1、txg 3，它指着的表 0 行）
-/// 要写 [1, 370) 共 369 行——正好写满一片；拿最新那张表的 368 行去算就会多算出一片。
-/// 连着 368 次取号之后崩溃、再挂一次（取 370，表 369 行）之后回退到 A 要写 370 行——A 那张表是一片，这次写成两片（369 + 1），
-/// 第一行是 A 那个实例的回退行。
-#[test]
-fn rollback_counts_the_rows_of_the_table_it_rolls_back_to() {
-    let target = RollbackTarget {
-        instance: InstanceGeneration(1),
-        checkpoint_txg: CheckpointTxg(3),
-    };
-
-    let (mut fits, _) = pool_after_the_first_transaction();
-    crash_right_after_acquisition(&mut fits, 367);
-    let mounted_one_row_short =
-        mount_writable(&parameters(), &mut fits).expect("368 行，可写挂载放行");
-    assert_eq!(
-        rows_of_each_page_of_the_row_publish(&fits, &mounted_one_row_short),
-        vec![ROWS_PER_PAGE - 1]
-    );
-    let rolled_back = mount_rollback(&parameters(), &mut fits, target, ShadowLedger::On)
-        .unwrap_or_else(|error| panic!("回退到 A 要写 369 行，正好写满一片：{error:?}"));
-    assert_eq!(rolled_back.output.instance, InstanceGeneration(370));
-    assert_eq!(rolled_back.output.rows_written.len(), ROWS_PER_PAGE);
-    assert!(
-        rolled_back.output.rows_written[0].is_rollback,
-        "第一行是 A 那个实例的回退行"
-    );
-    assert_eq!(
-        rows_of_each_page_of_the_row_publish(&fits, &rolled_back),
-        vec![ROWS_PER_PAGE]
-    );
-
-    let (mut past_one_page, _) = pool_after_the_first_transaction();
-    crash_right_after_acquisition(&mut past_one_page, 368);
-    let mounted_full_page =
-        mount_writable(&parameters(), &mut past_one_page).expect("369 行，可写挂载放行");
-    assert_eq!(
-        rows_of_each_page_of_the_row_publish(&past_one_page, &mounted_full_page),
-        vec![ROWS_PER_PAGE]
-    );
-    let rolled_back_past_one_page =
-        mount_rollback(&parameters(), &mut past_one_page, target, ShadowLedger::On)
-            .unwrap_or_else(|error| panic!("回退到 A 要写 370 行，写成两片：{error:?}"));
-    assert_eq!(
-        rolled_back_past_one_page.output.instance,
-        InstanceGeneration(371)
-    );
-    assert_eq!(
-        rolled_back_past_one_page.output.rows_written.len(),
-        ROWS_PER_PAGE + 1
-    );
-    assert!(rolled_back_past_one_page.output.rows_written[0].is_rollback);
-    assert_eq!(
-        rows_of_each_page_of_the_row_publish(&past_one_page, &rolled_back_past_one_page),
-        vec![ROWS_PER_PAGE, 1]
-    );
-    let verdicts = check_pool_image(&memory_pool_of_sparse_devices(&past_one_page));
-    let violated: Vec<&str> = verdicts
-        .iter()
-        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
-        .map(|(invariant, _)| *invariant)
-        .collect();
-    assert_eq!(
-        violated,
-        Vec::<&str>::new(),
-        "回退写出的两片上 checker 全绿：{verdicts:?}"
     );
 }

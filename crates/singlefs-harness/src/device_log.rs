@@ -145,7 +145,8 @@ pub fn parse_device_log(bytes: &[u8]) -> Result<DeviceLog, DeviceLogError> {
 }
 
 /// 程序的信念投到一块盘上：这块盘上的每个写照录制流原样，FUA 写之后跟一个 FLUSH，
-/// 每道池屏障在每块盘上各是一个 FLUSH（`PoolWriter` 与 mkfs 的屏障都是逐盘发的，录制器把连续几道并成一道）。
+/// 这块盘自己的每道屏障是一个 FLUSH（录制器按设备记屏障，代码审阅第 1 条；`PoolWriter` 与 mkfs 的池屏障逐盘发，每块盘各记一步，
+/// 别的盘的屏障不投到这块盘上）。
 #[must_use]
 pub fn expected_device_events(
     operations: &[RetainedOperation],
@@ -155,7 +156,12 @@ pub fn expected_device_events(
     for retained in operations {
         let operation = &retained.operation;
         match operation.kind {
-            RecordedOperationKind::Barrier => events.push(DeviceEvent::Flush),
+            RecordedOperationKind::Barrier => {
+                if operation.device != device {
+                    continue;
+                }
+                events.push(DeviceEvent::Flush);
+            }
             // 整段清零：程序发的是一个动作，期望侧就摆一件事——整段一次写，内容是那么多个 0。
             // 盘上收到几条由块层怎么拆决定（后端按 `ZERO_FILL_CHUNK_BYTES` 拆，来宾内核还会按
             // `max_sectors_kb` 再拆），所以比之前先把盘上那一段折回一件事（[`fold_declared_zero_fills`]）。
@@ -398,9 +404,9 @@ mod tests {
             },
             contents: None,
         };
-        let barrier = RetainedOperation {
+        let barrier = |device: u32| RetainedOperation {
             operation: RecordedOperation {
-                device: DeviceIdentity(0),
+                device: DeviceIdentity(device),
                 kind: RecordedOperationKind::Barrier,
                 offset: DeviceOffsetInBytes(0),
                 length: 0,
@@ -411,19 +417,35 @@ mod tests {
         let stream = vec![
             write(0, 0, RecordedOperationKind::Write),
             write(1, 0, RecordedOperationKind::Write),
-            barrier,
+            barrier(0),
+            barrier(1),
             write(0, 512, RecordedOperationKind::WriteForceUnitAccess),
         ];
         let on_device_zero = expected_device_events(&stream, DeviceIdentity(0));
         assert_eq!(
             on_device_zero.len(),
             4,
-            "写、屏障的 FLUSH、FUA 写、FUA 之后的 FLUSH"
+            "写、它自己那道屏障的 FLUSH、FUA 写、FUA 之后的 FLUSH"
         );
         assert_eq!(
             expected_device_events(&stream, DeviceIdentity(1)).len(),
             2,
-            "另一块盘：它的写与那道池屏障"
+            "另一块盘：它的写与它自己那道屏障"
+        );
+        // 录制器按设备记屏障：盘 1 那道没录（没发）时，盘 1 上就不期望 FLUSH，盘 0 那道不投到盘 1 上。
+        let device_one_missing_its_barrier = vec![
+            write(0, 0, RecordedOperationKind::Write),
+            write(1, 0, RecordedOperationKind::Write),
+            barrier(0),
+        ];
+        assert_eq!(
+            expected_device_events(&device_one_missing_its_barrier, DeviceIdentity(1)),
+            vec![DeviceEvent::Write {
+                offset: DeviceOffsetInBytes(0),
+                length: 512,
+                content_hash: 5,
+            }],
+            "盘 1：只有它的写，没有别的盘那道屏障的 FLUSH"
         );
         assert_eq!(first_divergence(&on_device_zero, &on_device_zero), None);
         let mut observed = on_device_zero.clone();
@@ -468,7 +490,7 @@ mod tests {
     /// 拆法换了（4 MiB → 512 KiB）判定不变，这正是块层怎么拆不该影响比对的那一条。
     /// 少一块、中间夹一条不是全 0 的写、越过段尾，都折不起来 ⇒ 逐项比对判红。
     #[test]
-    fn a_zero_fill_folds_back_into_one_event_however_the_block_layer_split_it() {
+    fn zero_fill_folds_back_into_one_event_however_the_block_layer_split_it() {
         let ring_start = 1024 * 16384u64;
         let ring_bytes = 32 * 1024 * 1024u64;
         let zero_fill = RetainedOperation {

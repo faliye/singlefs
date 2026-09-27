@@ -2,8 +2,9 @@
 //! （三方判决 `research/prompts/m2-presumed-clauses-r1-main-verification.md` 第七节；P6 归并行线一，不在这里）。
 //!
 //! - C497（实例表在 bump 次序里排第几没有条款）：D3（空间分配） 已定项 10 ⑤「一次发布重写实例表单元时（写行、暖机、回退那几次），
-//!   实例表单元最前」——写行那次发布（带文件的一版上、树表 0 条的一版上）与回退那次发布里，实例表的落点在这次全部提交内生块之前，
-//!   树 0 里的出生序号也排在它们之前。
+//!   实例表单元最前」——写行那次发布（带文件的一版上、树表 0 条的一版上）里，实例表的落点在这次全部提交内生块之前，
+//!   树 0 里的出生序号也排在它们之前。管理员回退改成挂着时的一次向前发布之后，回退那次发布照带现行那一版的实例表、不重写它
+//!   （D23（journal 的角色与格式） 已定项 14），那一格没有对象。
 //! - C498（后续挂载与回退之后的暖机次数没有条款）：D16（发布语义） 已定项 8「后续挂载、回退之后与挂载中途崩了再挂」——
 //!   写行 txg 取 max(根环里全部根记录的 txg, 环里全部自证通过的记录的 checkpoint_txg) + 1，之后每次空发布加一，
 //!   按根环落点看落哪块盘，推到本实例的根覆盖每块盘为止，至多 R 次（写行 txg ≡ 2 (mod 3) 时白推一次，认下）。
@@ -20,7 +21,9 @@ use common::{
 };
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
 use singlefs_core::block_device::BlockDevice;
-use singlefs_core::mount::{mount_rollback, mount_writable, Mounted, RollbackTarget, ShadowLedger};
+use singlefs_core::mount::{
+    mount_writable, roll_back_by_a_forward_publish, Mounted, RollbackTarget,
+};
 use singlefs_core::recovery::{recover, JournalPolicy, RecoveryOutcome};
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
 use singlefs_core::transaction::{
@@ -99,9 +102,9 @@ fn assert_the_instance_table_is_bumped_first_in_a_file_version_publish(
     );
 }
 
-/// C497：D3（空间分配） 已定项 10 ⑤ 的「实例表单元最前」，三个重写实例表的场合各核一遍——
+/// C497：D3（空间分配） 已定项 10 ⑤ 的「实例表单元最前」，两个重写实例表的场合各核一遍——
 /// ① 带文件的一版上写行（第一个文件之后重开可写挂载，写行 txg 4）；② 树表 0 条的一版上写行（只做过 mkfs 的池第二次可写挂载，
-/// 这次只写实例表与一片分配记录节点）；③ 回退（① 之后退回 (1, 3)，回退行那次发布）。
+/// 这次只写实例表与一片分配记录节点）。旧形态的 ③（挂载时回退那次写回退行的发布）随回退改成向前发布删掉：向前回退不重写实例表。
 /// 判别力自证：把实例表挪到树表单元之后取落点（带文件的一版那条路）、把两个落点的先后对调（树表 0 条那条路），各自红（`crates/mutations.tsv`）。
 #[test]
 fn c497_every_publish_that_rewrites_the_instance_table_bumps_it_before_every_other_commit_generated_block(
@@ -119,33 +122,6 @@ fn c497_every_publish_that_rewrites_the_instance_table_bumps_it_before_every_oth
         row_publish,
         "带文件的一版上写行",
     );
-
-    let mut rollback_devices = pool.reopen_recorded();
-    let rolled_back = mount_rollback(
-        &parameters(),
-        &mut rollback_devices,
-        RollbackTarget {
-            instance: InstanceGeneration(1),
-            checkpoint_txg: CheckpointTxg(3),
-        },
-        ShadowLedger::On,
-    )
-    .expect("回退到 (1, 3)");
-    pool.devices = Some(rollback_devices);
-    assert!(
-        rolled_back
-            .output
-            .rows_written
-            .iter()
-            .any(|row| row.is_rollback),
-        "这次写的是回退行"
-    );
-    let rollback_publish = rolled_back
-        .output
-        .row_publish
-        .file_version()
-        .expect("回退到带文件的一版：回退行那次发布是带文件的一版");
-    assert_the_instance_table_is_bumped_first_in_a_file_version_publish(rollback_publish, "回退");
 
     let mut formatted = format_pool("c497-instance-table-first-without-file");
     let mut first = formatted.reopen_recorded();
@@ -243,10 +219,11 @@ fn reopen_and_mount(pool: &mut BuiltPool) -> Mounted {
 }
 
 /// C498：D16（发布语义） 已定项 8 的「后续挂载、回退之后与挂载中途崩了再挂：次数现算」，一条历史串起来——
-/// 第一个文件（txg 3）之后三次关闭再挂载（写行 txg 4、6、8：暖机 1、1、2 次，txg 8 ≡ 2 那次白推一次）→ 发一版数据（txg 11）→
-/// 回退到 (1, 3)（写行 txg 12：暖机 1 次）→ 回退之后关闭再挂载（txg 14：2 次）→ 再挂载一次、崩在第一次暖机的根槽写上
-/// （写行 txg 17 已落盘，暖机 txg 18 的记录落盘、根没落）→ 再挂载（施加 txg 18 那条记录，写行 txg 19：1 次）。
-/// 每一次的写行 txg 与暖机 txg 与条款现算的逐个相等。
+/// 第一个文件（txg 3）之后三次关闭再挂载（写行 txg 4、6、8：暖机 1、1、2 次，txg 8 ≡ 2 那次白推一次）→ 同一个会话里发一版数据（txg 11）→
+/// 挂着的时候回退到 (1, 3)（一次向前发布 txg 12，不写行、不暖机）→ 回退之后关闭再挂载（写行 txg 13：暖机 1 次）→ 再挂载一次、
+/// 崩在第一次暖机的根槽写上（写行 txg 15 已落盘，暖机 txg 16 的记录落盘、根没落）→ 再挂载（施加 txg 16 那条记录，写行 txg 17：
+/// 暖机 2 次，txg 17 ≡ 2 那次白推一次）。每一次的写行 txg 与暖机 txg 与条款现算的逐个相等。
+/// 旧形态（挂载时回退：回退那次挂载写行 txg 12、暖机 1 次）下回退之后的几次挂载 txg 不同，见实三报告的钉死值表。
 /// 判别力自证：把暖机次数改成恒按 R 次推，第一次挂载就红（`crates/mutations.tsv`）。
 #[test]
 fn c498_warm_up_publishes_after_remounts_rollback_and_a_crash_in_the_middle_of_a_mount_are_counted_by_the_clause(
@@ -266,7 +243,7 @@ fn c498_warm_up_publishes_after_remounts_rollback_and_a_crash_in_the_middle_of_a
         "第三次关闭再挂载（txg 9 落在已覆盖的盘 0 上，白推一次）",
     );
 
-    // 同一个会话里发一版数据（txg 11），让回退那次的写行 txg 落到 ≡ 0 的一格。
+    // 同一个会话里发一版数据（txg 11），再在同一个会话里回退。
     let current = third_remount
         .current
         .file_version()
@@ -289,26 +266,33 @@ fn c498_warm_up_publishes_after_remounts_rollback_and_a_crash_in_the_middle_of_a
         .expect("发一版数据")
     };
     assert_eq!(data_version.root.checkpoint_txg, CheckpointTxg(11));
-
-    let mut devices = pool.reopen_recorded();
-    let rolled_back = mount_rollback(
-        &parameters(),
-        &mut devices,
-        RollbackTarget {
-            instance: InstanceGeneration(1),
-            checkpoint_txg: CheckpointTxg(3),
-        },
-        ShadowLedger::On,
-    )
-    .expect("回退到 (1, 3)");
-    pool.devices = Some(devices);
-    assert_warm_up_follows_the_clause(&rolled_back, CheckpointTxg(12), 1, "回退");
+    let mut current_after_the_data_version = data_version;
+    {
+        let rollback_parameters = parameters();
+        let devices = pool.devices.as_mut().expect("镜像还开着");
+        roll_back_by_a_forward_publish(
+            &rollback_parameters,
+            devices,
+            &mut third_remount.allocator,
+            &mut current_after_the_data_version,
+            RollbackTarget {
+                instance: InstanceGeneration(1),
+                checkpoint_txg: CheckpointTxg(3),
+            },
+        )
+        .expect("挂着的时候回退到 (1, 3)");
+    }
+    assert_eq!(
+        current_after_the_data_version.root.checkpoint_txg,
+        CheckpointTxg(12),
+        "回退是一次向前发布：txg 12，不写行、不暖机"
+    );
     let after_rollback = reopen_and_mount(&mut pool);
-    assert_warm_up_follows_the_clause(&after_rollback, CheckpointTxg(14), 2, "回退之后关闭再挂载");
+    assert_warm_up_follows_the_clause(&after_rollback, CheckpointTxg(13), 1, "回退之后关闭再挂载");
 
-    // 挂载中途崩了：写行 txg 17 整次落盘，第一次暖机（txg 18）的根槽写失败——那次的记录已经落盘（记录之后那道屏障已完成），
+    // 挂载中途崩了：写行 txg 15 整次落盘，第一次暖机（txg 16）的根槽写失败——那次的记录已经落盘（记录之后那道屏障已完成），
     // 根槽与系统配置槽都没有。挂载报错、进程退出。
-    let crashed_warm_up_txg = CheckpointTxg(18);
+    let crashed_warm_up_txg = CheckpointTxg(16);
     let crashed_root_target = target_for_publish(
         crashed_warm_up_txg,
         parameters().geometry.root_ring_slots_per_region,
@@ -340,7 +324,7 @@ fn c498_warm_up_publishes_after_remounts_rollback_and_a_crash_in_the_middle_of_a
         .collect();
     let crashed = mount_writable(&parameters(), &mut failing_devices);
     assert!(crashed.is_err(), "第一次暖机的根槽写失败，这次挂载没做成");
-    assert_eq!(plan.fired_count(), 1, "注入只打在 txg 18 那个根槽写上");
+    assert_eq!(plan.fired_count(), 1, "注入只打在 txg 16 那个根槽写上");
     drop(failing_devices);
     let after_the_crash = reopen_and_mount(&mut pool);
     assert_eq!(
@@ -349,10 +333,15 @@ fn c498_warm_up_publishes_after_remounts_rollback_and_a_crash_in_the_middle_of_a
             after_the_crash.output.effective_root.checkpoint_txg,
             after_the_crash.output.journal.prefix_applied
         ),
-        (CheckpointTxg(17), CheckpointTxg(18), 1),
-        "挂载中途崩了再挂：所选根是写行 txg 17，txg 18 那条暖机记录被施加"
+        (CheckpointTxg(15), CheckpointTxg(16), 1),
+        "挂载中途崩了再挂：所选根是写行 txg 15，txg 16 那条暖机记录被施加"
     );
-    assert_warm_up_follows_the_clause(&after_the_crash, CheckpointTxg(19), 1, "挂载中途崩了再挂");
+    assert_warm_up_follows_the_clause(
+        &after_the_crash,
+        CheckpointTxg(17),
+        2,
+        "挂载中途崩了再挂（txg 18 落在已覆盖的盘 0 上，白推一次）",
+    );
 }
 
 // ---------------------------------------------------------------------------------------------

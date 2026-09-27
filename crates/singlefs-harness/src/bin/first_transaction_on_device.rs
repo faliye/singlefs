@@ -200,15 +200,34 @@ fn publish_writes_against_device(
     publishes: &[&WritesByStructureKind],
     device: WriteCallsAndBytes,
 ) -> (String, bool) {
+    publish_writes_and_writes_outside_any_publish_against_device(window, publishes, None, device)
+}
+
+/// 同 [`publish_writes_against_device`]，窗口里另有一份不属于任何一次发布的写时（抬 F 那一串第一次发布之前先把新 F 写进每块盘系统配置那一步，
+/// D16（发布语义） 已定项 1「抬 F 那一串」）把它并进按种类的合计，结果行在 `publishes=` 之后多一段 `writes_outside_any_publish_write_calls=`；
+/// `publishes=` 仍只数发布。`None` 时结果行与 [`publish_writes_against_device`] 逐字相同。
+fn publish_writes_and_writes_outside_any_publish_against_device(
+    window: &str,
+    publishes: &[&WritesByStructureKind],
+    writes_outside_any_publish: Option<&WritesByStructureKind>,
+    device: WriteCallsAndBytes,
+) -> (String, bool) {
     let by_kind = publishes
         .iter()
+        .chain(writes_outside_any_publish.iter())
         .fold(WriteCallsAndBytes::NONE, |sum, writes| {
             sum.plus(writes.total())
         });
     let matches = by_kind == device;
+    let outside_field = writes_outside_any_publish.map_or(String::new(), |writes| {
+        format!(
+            " writes_outside_any_publish_write_calls={}",
+            writes.total().write_calls
+        )
+    });
     (
         format!(
-            "name=publish_writes_against_device window={window} publishes={} by_kind_write_calls={} by_kind_written_bytes={} device_write_calls={} device_written_bytes={} matches={matches}",
+            "name=publish_writes_against_device window={window} publishes={}{outside_field} by_kind_write_calls={} by_kind_written_bytes={} device_write_calls={} device_written_bytes={} matches={matches}",
             publishes.len(),
             by_kind.write_calls,
             by_kind.written_bytes,
@@ -230,17 +249,48 @@ fn describe_failed_window(
     writes_of_failed_publishes: &[WritesByStructureKind],
     device: WriteCallsAndBytes,
 ) -> (Vec<String>, bool) {
-    let mut lines: Vec<String> = writes_of_persisted_publishes
+    describe_failed_window_after_writes_outside_any_publish(
+        window,
+        cause,
+        None,
+        writes_of_persisted_publishes,
+        writes_of_failed_publishes,
+        device,
+    )
+}
+
+/// 同 [`describe_failed_window`]，窗口里第一次发布之前另有一份不属于任何一次发布的写时（抬 F 那一串先写系统配置那一步）：
+/// 它先打一行 `name=writes_outside_any_publish`，再并进比的那一行（[`publish_writes_and_writes_outside_any_publish_against_device`]）。
+/// `None` 时打出的行与 [`describe_failed_window`] 逐字相同。
+fn describe_failed_window_after_writes_outside_any_publish(
+    window: &str,
+    cause: &str,
+    writes_outside_any_publish: Option<&WritesByStructureKind>,
+    writes_of_persisted_publishes: &[WritesByStructureKind],
+    writes_of_failed_publishes: &[WritesByStructureKind],
+    device: WriteCallsAndBytes,
+) -> (Vec<String>, bool) {
+    let mut lines: Vec<String> = writes_outside_any_publish
         .iter()
-        .enumerate()
-        .map(|(index, writes)| {
+        .map(|writes| {
             format!(
-                "name=persisted_publish_writes window={window} publish={} {}",
-                index + 1,
+                "name=writes_outside_any_publish window={window} {}",
                 describe_writes_by_kind(writes)
             )
         })
         .collect();
+    lines.extend(
+        writes_of_persisted_publishes
+            .iter()
+            .enumerate()
+            .map(|(index, writes)| {
+                format!(
+                    "name=persisted_publish_writes window={window} publish={} {}",
+                    index + 1,
+                    describe_writes_by_kind(writes)
+                )
+            }),
+    );
     lines.extend(
         writes_of_failed_publishes
             .iter()
@@ -258,9 +308,10 @@ fn describe_failed_window(
         .iter()
         .chain(failed_publishes)
         .collect();
-    let (line, matches) = publish_writes_against_device(
+    let (line, matches) = publish_writes_and_writes_outside_any_publish_against_device(
         &format!("{window}_failed"),
         &publishes_in_the_window,
+        writes_outside_any_publish,
         device,
     );
     lines.push(line);
@@ -663,8 +714,8 @@ where
     publish_the_third_version_and_describe(parameters, mounted, stream, geometry, clock)
 }
 
-/// 可写挂载里每块盘收到第一道屏障（取号那一道）那一刻的计数：挂载窗口（成功与失败两条路）从这里算起。
-/// 某块盘一道屏障都没收到（取号那道屏障没发）：交回停下的那一行与原因。
+/// 可写挂载里每块盘收到过写之后的第一道屏障（取号写之后那一道；取号写之前那一道前面没有写，不算，代码审阅第 19 条）那一刻的计数：
+/// 挂载窗口（成功与失败两条路）从这里算起。某块盘写之后一道屏障都没收到（取号那道屏障没发）：交回停下的那一行与原因。
 fn counts_when_the_acquisition_barrier_arrived<Inner: BlockDevice>(
     devices: &[(DeviceIdentity, CountedDevice<Inner>)],
     plan: &SharedFaultPlan,
@@ -672,7 +723,7 @@ fn counts_when_the_acquisition_barrier_arrived<Inner: BlockDevice>(
     devices
         .iter()
         .map(|(identity, _)| {
-            plan.counts_when_the_first_barrier_arrived_at(*identity)
+            plan.counts_when_the_first_barrier_after_a_write_arrived_at(*identity)
                 .map(DeviceCallCounts::of)
                 .ok_or_else(|| {
                     format!(
@@ -688,7 +739,7 @@ fn counts_when_the_acquisition_barrier_arrived<Inner: BlockDevice>(
         })
 }
 
-/// 冷重开、可写挂载。挂载那一段窗口从每块盘收到第一道屏障（取号那一道）算起、到挂载返回为止，按种类的合计是写行与每次暖机之和：
+/// 冷重开、可写挂载。挂载那一段窗口从每块盘收到过写之后的第一道屏障（取号写之后那一道）算起、到挂载返回为止，按种类的合计是写行与每次暖机之和：
 /// 取号的系统配置槽写不是发布、不进按种类的账，与第一个事务那条路上暖机窗口从取号之后算起同一个口径。
 ///
 /// # Errors
@@ -757,18 +808,31 @@ where
                 | MountError::Acquisition(_)
                 | MountError::RaiseFloorSequencePublishFailed(_)
                 | MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { .. }
-                | MountError::RollbackTargetNotACandidate { .. }
                 | MountError::RollbackFloorAboveCeiling { .. }
                 | MountError::VersionWithoutFileNotWrittenByMakeFilesystem { .. }
                 | MountError::FormatTimeUnitLocationsOnDifferentSlots { .. }
                 | MountError::RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { .. }
+                | MountError::RollbackFloorCeilingRootRingSlotStillBadAfterOneReread { .. }
                 | MountError::InstanceGenerationChangedBeforeAcquisition { .. }
                 | MountError::SpaceAdmissionRefusedBeforeAcquisition { .. }
                 | MountError::RowPublishAdmissionRefusedBeforeAcquisition { .. }
                 | MountError::WarmUpAdmissionRefusedBeforeAcquisition { .. }
                 | MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided { .. }
                 | MountError::WritableMountRefusedByDevicesWithoutTheSelectedVersion { .. }
-                | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. } => {
+                | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. }
+                | MountError::RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot(_)
+                | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided {
+                    ..
+                }
+                | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
+                | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration {
+                    ..
+                }
+                // 盘上的实例代号或 txg 到顶：取号之前拒，一个写都没发。
+                | MountError::SequenceNumberPastTheTopOfItsRange(_)
+                // 写行与暖机之后推的抬 F 报错（实审 A1b Q5，账在错里）：这个二进制每次都在新建的池上挂，取号之前的准入不会不够、走不到推抬 F；
+                // 走到了也只报原样的错，窗口的账不比（推的，没在真设备上造过这一格）。
+                | MountError::FloorRaiseFailedAfterTheMountsPublishes(_) => {
                     vec![describe_run_failure("reopen_and_writable_mount", &cause)]
                 }
             };
@@ -1064,7 +1128,7 @@ fn publish_the_fourth_version_and_raise_the_rollback_floor<Inner: BlockDevice>(
 
 /// `raise-rollback-floor` 模式冷重开之后打的那一行：所选根从盘上读回的回退下界 F（代码轮第二轮判决 Z10，
 /// `research/prompts/m2-final-code-r2-main-verification.md` 第四节第 5 条）。所选根照恢复择根的同一套规则现读
-/// （`choose_system_configuration` + `choose_root`：先跳过被回退见证抛弃的根，再按 (txg, 实例) 择新），F 取那条根记录自己的字段——
+/// （`choose_system_configuration` + `choose_root`：按 (txg, 实例) 择新），F 取那条根记录自己的字段——
 /// 不取 `name=raise_rollback_floor` 那一行里内存那一版的 `requested_floor`。择不出系统配置或根时两段都写 `none`。
 fn rollback_floor_read_back_from_the_chosen_root_line(reader: &dyn PoolReader) -> String {
     let chosen_root = choose_system_configuration(reader)
@@ -1120,41 +1184,66 @@ fn raise_the_rollback_floor_and_describe<Inner: BlockDevice>(
         Err(failure) => {
             let cause = format!("{failure:?}");
             let failure_lines = match &failure {
-                // 抬 F 的写入口随错丢掉，这一串的账随错交回（已经落盘的那几次空发布、失败那一次已记的写）。
-                MountError::RaiseFloorSequencePublishFailed(PublishSequenceFailed {
-                    cause: _,
-                    writes_of_persisted_publishes,
-                    writes_of_failed_publishes,
-                }) => {
-                    describe_failed_window(
+                // 抬 F 的写入口随错丢掉，这一串的账随错交回（先写系统配置那一步、已经落盘的那几次空发布、失败那一次已记的写）。
+                MountError::RaiseFloorSequencePublishFailed(failed) => {
+                    let PublishSequenceFailed {
+                        cause: _,
+                        writes_before_the_first_publish,
+                        writes_of_persisted_publishes,
+                        writes_of_failed_publishes,
+                    } = &**failed;
+                    describe_failed_window_after_writes_outside_any_publish(
                         "raise_rollback_floor",
                         &cause,
+                        Some(writes_before_the_first_publish),
                         writes_of_persisted_publishes,
                         writes_of_failed_publishes,
                         pool_writes_between(&counts_before_raise, &counts_after_raise),
                     )
                     .0
                 }
+                // 先写系统配置那一步报错：一次发布都没开始，那一步已记的写随错交回。
+                MountError::RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot(failed) => {
+                    describe_failed_window_after_writes_outside_any_publish(
+                        "raise_rollback_floor",
+                        &cause,
+                        Some(&failed.writes),
+                        &[],
+                        &[],
+                        pool_writes_between(&counts_before_raise, &counts_after_raise),
+                    )
+                    .0
+                }
                 // 在第一次空发布之前就停下的：选系统配置、读实例表、算上限、超上限、整串预演里有一次报错，这一段没有发布的账可比。
-                // 可写挂载与回退那几条（取号、写行、暖机、回退目标）抬 F 走不到，照样列全，不写通配臂。
+                // 可写挂载那几条（取号、写行、暖机）抬 F 走不到，照样列全，不写通配臂。
                 MountError::Recovery(_)
                 | MountError::FileVersionWithoutAnyJournalRecord
                 | MountError::InstanceTableMalformed
                 | MountError::Acquisition(_)
                 | MountError::Publish(_)
                 | MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { .. }
-                | MountError::RollbackTargetNotACandidate { .. }
                 | MountError::RollbackFloorAboveCeiling { .. }
                 | MountError::VersionWithoutFileNotWrittenByMakeFilesystem { .. }
                 | MountError::FormatTimeUnitLocationsOnDifferentSlots { .. }
                 | MountError::RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { .. }
+                | MountError::RollbackFloorCeilingRootRingSlotStillBadAfterOneReread { .. }
                 | MountError::InstanceGenerationChangedBeforeAcquisition { .. }
                 | MountError::SpaceAdmissionRefusedBeforeAcquisition { .. }
                 | MountError::RowPublishAdmissionRefusedBeforeAcquisition { .. }
                 | MountError::WarmUpAdmissionRefusedBeforeAcquisition { .. }
                 | MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided { .. }
                 | MountError::WritableMountRefusedByDevicesWithoutTheSelectedVersion { .. }
-                | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. } => {
+                | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. }
+                | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided {
+                    ..
+                }
+                | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
+                | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration {
+                    ..
+                }
+                // 现行那一版 txg 到顶：算这一串的 txg 时拒，一个写都没发；可写挂载那一处的抬 F 报错成员抬 F 自己报不出来。
+                | MountError::SequenceNumberPastTheTopOfItsRange(_)
+                | MountError::FloorRaiseFailedAfterTheMountsPublishes(_) => {
                     vec![describe_run_failure("raise_rollback_floor", &cause)]
                 }
             };
@@ -1201,11 +1290,19 @@ fn raise_the_rollback_floor_and_describe<Inner: BlockDevice>(
         ));
         raise_publishes.push(&raise_publish.writes);
     }
-    let (raise_window_line, raise_window_matches) = publish_writes_against_device(
-        "raise_rollback_floor",
-        &raise_publishes,
-        pool_writes_between(&counts_before_raise, &counts_after_raise),
-    );
+    // 第一次发布之前先把新 F 写进每块盘系统配置那一步不属于任何一次发布（D16（发布语义） 已定项 1「抬 F 那一串」）：
+    // 它单打一行，再并进窗口的合计与设备一层比。
+    lines.push(format!(
+        "name=writes_outside_any_publish window=raise_rollback_floor {}",
+        describe_writes_by_kind(&raised.system_configuration_writes_before_the_first_publish)
+    ));
+    let (raise_window_line, raise_window_matches) =
+        publish_writes_and_writes_outside_any_publish_against_device(
+            "raise_rollback_floor",
+            &raise_publishes,
+            Some(&raised.system_configuration_writes_before_the_first_publish),
+            pool_writes_between(&counts_before_raise, &counts_after_raise),
+        );
     lines.push(raise_window_line);
     lines.push(clock.mark("raise_rollback_floor"));
 
@@ -1773,9 +1870,12 @@ mod tests {
             Some("1"),
             "事务号按实例从 1 起"
         );
+        // 单元写那一段 28 = 数据单元、extent 根、inode 叶容器、inode 根、记账根、映射根、树表各两盘（14），
+        // 加分配记录树按位置寻址（D8（核心索引结构） 已定项 14）这一次重写的节点两盘共 14 次写（`publish_writes` 那一行的
+        // `allocation_record_tree_node_write_calls`）；按位置寻址之前那棵树只有一个节点，这一段是 16。
         assert_eq!(
             field(third_lines[0], "segments"),
-            Some("16+2+1+2"),
+            Some("28+2+1+2"),
             "发布 C 与发布 B 同型"
         );
 
@@ -2365,14 +2465,17 @@ mod tests {
     /// 可写挂载失败（增补 2 收口表第 58 行）：挂载把这次写入口的账随 `MountError::Publish` 交回，窗口从取号那道屏障算起，
     /// 与设备一层逐项相等。发布 B 之后冷重开，注入摆在重开之后整池第 N 次写（取号那两次系统配置槽写是第 1、2 次）：
     /// 第 3 次是写行那次发布的第一个写——没有已经落盘的发布、失败账 0 次写、窗口 0 次；
-    /// 第 33 次是第二次暖机的第 3 个写——写行 15 次与第一次暖机 13 次已经落盘、失败账 2 次写、窗口 30 次。
+    /// 第 53 次是第二次暖机的第 3 个写——写行 27 次与第一次暖机 21 次已经落盘、失败账 2 次写、窗口 50 次。
+    /// 写行 27 = 实例表两盘 2、分配记录树 14、记账 / 映射 / 树表各两盘 6、记录两盘 2、根槽 1、系统配置轮换 2；
+    /// 暖机 21 = 分配记录树 10、记账 / 映射 / 树表 6、记录 2、根槽 1、系统配置 2（分配记录树按位置寻址之后每次重写几个节点，
+    /// D8（核心索引结构） 已定项 14；之前那棵树只有一个节点，写行 15、暖机 13、这一格摆在第 33 次）。
     #[test]
     fn failed_writable_mount_reports_every_publish_it_wrote_and_they_equal_the_device_layer_count()
     {
         let parameters = e142_parameters(512, 512);
         let geometry = geometry_of(&parameters);
         for (failing_write, persisted_write_calls, failed_write_calls, window_write_calls) in
-            [(3, &[][..], "0", "0"), (33, &["15", "13"][..], "2", "30")]
+            [(3, &[][..], "0", "0"), (53, &["27", "21"][..], "2", "50")]
         {
             let stream = SharedStream::new();
             let plan = SharedFaultPlan::unarmed(geometry);
@@ -2523,8 +2626,8 @@ mod tests {
         );
         assert_eq!(
             field(fourth_lines[0], "segments"),
-            Some("16+2+1+2"),
-            "发布 D 与发布 C 同型"
+            Some("28+2+1+2"),
+            "发布 D 与发布 C 同型（单元写那一段怎么数见 second-instance 那条用例）"
         );
 
         let publish_lines: Vec<(Option<&str>, Option<&str>)> =
@@ -2767,8 +2870,10 @@ mod tests {
     /// 已经落盘的那几次空发布与失败那一次已记的写随 `MountError::RaiseFloorSequencePublishFailed` 交回；`raise-rollback-floor`
     /// 模式走的那个函数（`raise_the_rollback_floor_and_describe`）照可写挂载那一段的判法打失败账、与设备一层逐项比。
     /// `raise-rollback-floor` 那条路走到发布 D（txg 9），装上注入，把 F 抬到上限（3）——推空发布直到两块盘上都有一条带这个 F 的根。
-    /// 注入摆在之后整池第 16 次写：第一次空发布（txg 10）13 次写已经落盘（四个固定点单元与 journal 记录每盘一份、根槽一次、系统配置每盘一次），
-    /// 第二次的第 3 个写报错 ⇒ 失败账 2 次写，两样相加 15 次与设备一层逐项相等。前面几段的结果行照打在失败那几行前面，成功那一行不打。
+    /// 注入摆在之后整池第 26 次写：先写系统配置那一步（SysPre，D16（发布语义） 已定项 1）两盘各一次、不属于任何一次发布，
+    /// 第一次空发布（txg 10）21 次写已经落盘（分配记录树按位置寻址重写的节点两盘 10 次、记账 / 映射 / 树表与 journal 记录每盘一份、
+    /// 根槽一次、系统配置每盘一次），第二次的第 3 个写报错 ⇒ 失败账 2 次写；窗口按种类的合计 2 + 21 + 2 = 25 次与设备一层逐项相等。
+    /// 前面几段的结果行照打在失败那几行前面，成功那一行不打。（SysPre 之前、分配记录树只有一个节点时这一格摆在第 16 次：空发布 13 次写。）
     #[test]
     fn failed_raise_of_the_rollback_floor_reports_every_publish_it_wrote_and_they_equal_the_device_layer_count(
     ) {
@@ -2796,7 +2901,7 @@ mod tests {
             .plan
             .arm(FaultSchedule::the_nth_call_across_the_pool(
                 InjectedFault::WriteFails,
-                16,
+                26,
             ));
         let failed = failed_run_of(
             raise_the_rollback_floor_and_describe(
@@ -2819,9 +2924,9 @@ mod tests {
         assert_the_failed_window_is_reconciled(
             &failed.lines,
             "raise_rollback_floor",
-            &["13"],
+            &["21"],
             "2",
-            "15",
+            "25",
         );
         assert!(
             lines_named(&failed.lines, "raise_rollback_floor").is_empty(),

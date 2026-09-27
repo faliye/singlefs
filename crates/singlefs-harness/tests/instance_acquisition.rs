@@ -30,6 +30,29 @@ fn fail_every_barrier() -> FaultSchedule {
     FaultSchedule::every_call_across_the_pool(InjectedFault::BarrierFails)
 }
 
+/// 取号写之后那道池屏障在盘 0 上报错，只这一次：取号写之前那道池屏障是全池第 1、2 次屏障调用（盘 0、盘 1），
+/// 写之后那道从全池第 3 次（盘 0）起（代码审阅第 19 条加了写之前那一道）。
+fn fail_the_barrier_after_the_acquisition_writes_once() -> FaultSchedule {
+    FaultSchedule {
+        fault: InjectedFault::BarrierFails,
+        device: FaultDeviceSelector::EveryDevice,
+        placement: FaultPlacement::AnyOffset,
+        counting: FaultCounting::AcrossThePool,
+        occurrence: FaultOccurrence::TheNthMatchingCall(3),
+    }
+}
+
+/// 取号写之后那道池屏障起每一道都报错（全池第 3 次屏障调用起）：回卷写之前那道同样报错。
+fn fail_every_barrier_from_the_one_after_the_acquisition_writes() -> FaultSchedule {
+    FaultSchedule {
+        fault: InjectedFault::BarrierFails,
+        device: FaultDeviceSelector::EveryDevice,
+        placement: FaultPlacement::AnyOffset,
+        counting: FaultCounting::AcrossThePool,
+        occurrence: FaultOccurrence::EveryMatchingCallFromTheNthOnward(3),
+    }
+}
+
 /// 这块盘上每一次系统配置槽写都报错（两槽住在偏移 0 起的 `SYSTEM_CONFIGURATION_SLOTS_END_OFFSET` 之内）。
 fn fail_every_system_configuration_write_on(device: DeviceIdentity) -> FaultSchedule {
     FaultSchedule {
@@ -130,12 +153,12 @@ fn failed_barrier_after_acquisition_rolls_both_disks_back_and_the_skipped_number
 ) {
     let mut built = build_pool("acquire-barrier-error");
     let WrappedDevices { plan, mut devices } = wrap(&mut built);
-    plan.arm(fail_every_barrier());
+    plan.arm(fail_the_barrier_after_the_acquisition_writes_once());
     let failure =
         acquire(&mut devices).expect_err("取号之后那道屏障报错，取号必须失败、不交出新号");
     assert!(
         matches!(failure.rollback, AcquisitionRollback::RolledBack),
-        "两份取号写都报过 Ok，都要回卷：{failure:?}"
+        "两份取号写都报过 Ok，都要回卷（回卷写之前那道屏障这一次不报错）：{failure:?}"
     );
     for disk in DISKS {
         assert_eq!(
@@ -149,6 +172,63 @@ fn failed_barrier_after_acquisition_rolls_both_disks_back_and_the_skipped_number
         acquire(&mut devices).expect("屏障好了再取号"),
         InstanceGeneration(3),
         "全部自证过的槽里还躺着号 2：跳过它；只读择到的那一份（世代 7、号 1）就会再发一次 2"
+    );
+}
+
+/// 取号写之前那道屏障报错（代码审阅第 19 条加的那一道：取号写覆写较旧那一槽之前，另一槽里上一次轮换写的先持久）：
+/// 一个取号写都没发，取号失败、没有要回卷的（`NothingWritten`），两块盘两槽照旧是第一个事务留下的世代 4、5；屏障好了再取号取到 2。
+#[test]
+fn failed_barrier_before_the_acquisition_writes_writes_nothing_and_the_number_is_handed_out_later()
+{
+    let mut built = build_pool("acquire-barrier-before-error");
+    let WrappedDevices { plan, mut devices } = wrap(&mut built);
+    plan.arm(fail_every_barrier());
+    let failure = acquire(&mut devices).expect_err("取号写之前那道屏障报错，取号必须失败");
+    assert!(
+        matches!(failure.rollback, AcquisitionRollback::NothingWritten),
+        "一个取号写都没发：{failure:?}"
+    );
+    for disk in DISKS {
+        assert_eq!(
+            slots_of(&devices, disk),
+            vec![(4, InstanceGeneration(1)), (5, InstanceGeneration(1))],
+            "{disk:?}：两槽不动"
+        );
+    }
+    plan.disarm();
+    assert_eq!(
+        acquire(&mut devices).expect("屏障好了再取号"),
+        InstanceGeneration(2),
+        "上一次一个字节没写，号 2 没被烧掉"
+    );
+}
+
+/// 取号写之后那道屏障起每一道都报错：回卷写之前那道屏障（代码审阅第 19 条加的：回卷写覆写取号之前最新的那一槽之前，刚写的取号写先持久）
+/// 同样报错，回卷不写（`RollbackFailed`，D18（块里携带什么信息） 已定项 11「回卷不成才只读挂载」）。两块盘上留着带新号 2 的世代 6，
+/// 世代 5 那一槽没被覆写；屏障好了再取号跳过 2、取 3。
+#[test]
+fn barrier_failing_again_before_the_rollback_writes_leaves_the_new_number_and_it_is_never_handed_out_again(
+) {
+    let mut built = build_pool("acquire-barrier-rollback-error");
+    let WrappedDevices { plan, mut devices } = wrap(&mut built);
+    plan.arm(fail_every_barrier_from_the_one_after_the_acquisition_writes());
+    let failure = acquire(&mut devices).expect_err("取号之后那道屏障报错，取号必须失败");
+    assert!(
+        matches!(failure.rollback, AcquisitionRollback::RollbackFailed(_)),
+        "回卷写之前那道屏障也报错，回卷不写：{failure:?}"
+    );
+    for disk in DISKS {
+        assert_eq!(
+            slots_of(&devices, disk),
+            vec![(5, InstanceGeneration(1)), (6, InstanceGeneration(2))],
+            "{disk:?}：取号写世代 6 带新号 2 留着，世代 5 那一槽没被回卷写覆写"
+        );
+    }
+    plan.disarm();
+    assert_eq!(
+        acquire(&mut devices).expect("屏障好了再取号"),
+        InstanceGeneration(3),
+        "两槽里躺着号 2：跳过它"
     );
 }
 
@@ -187,8 +267,9 @@ fn barrier_right_after_the_acquisition_barrier_is_not_sent_to_the_devices() {
     for (identity, _) in &devices {
         assert_eq!(
             plan.counts_of_device(*identity).barriers_forwarded,
-            1,
-            "{identity:?}：取号之后那道屏障发一次；紧跟着的那道前面没有写，不再发——首次挂载路径上暖机开场那道就这样并掉，设备收到的 FLUSH 数不变"
+            2,
+            "{identity:?}：取号写之前一道（新开的写入口按「发过写」起步，代码审阅第 19 条）、取号写之后一道；紧跟着的那道前面没有写，不再发——\
+             首次挂载路径上暖机开场那道就这样并掉"
         );
     }
 }

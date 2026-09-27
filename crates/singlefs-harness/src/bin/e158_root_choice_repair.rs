@@ -31,9 +31,34 @@ use singlefs_core::make_filesystem::{
     make_filesystem, MakeFilesystemParameters, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
 };
 use singlefs_core::mount::{
-    mount_rollback, mount_writable, raise_rollback_floor, rollback_floor_ceiling, RollbackTarget,
-    ShadowLedger,
+    mount_writable, raise_rollback_floor, ring_slots_known_to_hold_a_root_by,
+    roll_back_by_a_forward_publish, rollback_floor_ceiling, Mounted, RollbackTarget, ShadowLedger,
 };
+
+/// 回退改形态之后（实现批次实三）这个装置里的「管理员回退」照最直接的翻译改到编得过：挂载时回退（原 `mount::mount_rollback`）没了，
+/// 换成先可写挂载、再挂着回退到同一个目标（`mount::roll_back_by_a_forward_publish`，D23（journal 的角色与格式） 已定项 14）。
+/// 交回的 `Mounted` 是那次可写挂载的（`output` 里的写行与暖机是它的），`current` 换成回退那次发布之后的一版。
+/// 影子账那一臂照旧恒开（可写挂载的产品路径）。
+/// 用它的几处（经 `apply_mount_rollback` 的 R(j) 一步：H3 的 `enumerate`、Q3-1 的
+/// `enumerate_fault_set_violations`、H1 的 `ledger_fault_history_family`；op1 `MountRollbackTo`；
+/// Q2-2a 固定脚本）记的是挂载时回退才有的东西：回退抛弃目标之后那一段（`RollbackEvent::abandoned`、
+/// 装置自记的时间线截到目标）、回退写行与之后的暖机。挂着回退不抛弃根、不写行、不暖机，这几处的问法
+/// 不再成立；实现批次实四甲没改它们的语义，交主 agent 随 E158（择根与修复四岔路） 的重跑登记定。
+fn mount_rollback<Device: BlockDevice>(
+    parameters: &MakeFilesystemParameters,
+    devices: &mut Vec<(DeviceIdentity, Device)>,
+    target: RollbackTarget,
+    _shadow_ledger_is_always_on: ShadowLedger,
+) -> Result<Mounted, String> {
+    let mut mounted =
+        mount_writable(parameters, devices).map_err(|error| format!("可写挂载：{error:?}"))?;
+    let PoolVersion::WithFile(current) = &mut mounted.current else {
+        return Err("可写挂载之后现行那一版树表 0 条：挂着回退要带文件的现行版本".to_string());
+    };
+    roll_back_by_a_forward_publish(parameters, devices, &mut mounted.allocator, current, target)
+        .map_err(|error| format!("挂着回退：{error:?}"))?;
+    Ok(mounted)
+}
 use singlefs_core::pointer::LocationEntry;
 use singlefs_core::records::{
     parse_mapping_entry, TreeTableEntry, TREE_KIND_ACCOUNTING, TREE_KIND_ALLOCATION,
@@ -126,9 +151,10 @@ impl ConstantCheck {
 }
 
 /// 系统配置字段表合计本地按臂的定义现算（跑前登记 5.7「乙族各臂的系统配置字段表比 481 + 8」）：
-/// 环境变量 `SINGLEFS_E158_LOCAL_SYSTEM_CONFIGURATION_BYTES` 给了就用它，没给按今天 / 甲-txg 那一份
-/// 取 481——两者都没改这张字段表。装置源码各臂同一份（跑前登记「装置写在哪」），差别只在跑的时候
-/// 传不传这个环境变量，不是另分支代码。
+/// 环境变量 `SINGLEFS_E158_LOCAL_SYSTEM_CONFIGURATION_BYTES` 给了就用它，没给按今天那一份取 489——
+/// D22（单元原子性怎么合成） 已定项 9 的字段表合计 489（系统运行量末尾加了回退下界 F 8 字节）；
+/// 跑前登记写的 481 是登记那天的今天。乙族各臂这时要传几，归 E158（择根与修复四岔路） 的重跑登记定。
+/// 装置源码各臂同一份（跑前登记「装置写在哪」），差别只在跑的时候传不传这个环境变量，不是另分支代码。
 fn local_system_configuration_bytes() -> u64 {
     parse_local_system_configuration_bytes(env::var(
         "SINGLEFS_E158_LOCAL_SYSTEM_CONFIGURATION_BYTES",
@@ -143,7 +169,7 @@ fn parse_local_system_configuration_bytes(value: Result<String, env::VarError>) 
         Ok(value) => value
             .parse()
             .unwrap_or_else(|error| panic!("SINGLEFS_E158_LOCAL_SYSTEM_CONFIGURATION_BYTES={value:?} 不是十进制正整数: {error}")),
-        Err(env::VarError::NotPresent) => 481,
+        Err(env::VarError::NotPresent) => 489,
         Err(error) => panic!("SINGLEFS_E158_LOCAL_SYSTEM_CONFIGURATION_BYTES 读不出: {error}"),
     }
 }
@@ -1890,9 +1916,10 @@ fn attempt_faulted_operation(
             FaultInjectingBlockDevice::new(identity, device, plan),
         ));
     }
-    let outcome = match kind {
+    let outcome: Result<u64, String> = match kind {
         FaultedOperationKind::MountWritable => mount_writable(parameters, &mut wrapped)
-            .map(|mounted| mounted.output.abandoned_roots_unreadable),
+            .map(|mounted| mounted.output.abandoned_roots_unreadable)
+            .map_err(|error| format!("{error:?}")),
         FaultedOperationKind::MountRollbackTo(target) => mount_rollback(
             parameters,
             &mut wrapped,
@@ -1918,8 +1945,7 @@ fn attempt_faulted_operation(
             error_member: None,
             device_write_bytes,
         },
-        Err(error) => {
-            let debug = format!("{error:?}");
+        Err(debug) => {
             let member = error_member_of_debug(&debug);
             FaultedOperationAttempt {
                 abandoned_roots_unreadable: None,
@@ -1974,6 +2000,7 @@ fn raise_floor_targets_for(
         &system_configuration,
         current_floor,
         &table.records,
+        &ring_slots_known_to_hold_a_root_by(&mounted.allocator),
     ) else {
         return Vec::new();
     };
@@ -2403,7 +2430,6 @@ fn tree_table_crates_has_a_path(
         geometry.journal_ring_bytes,
         &records,
         verify_named_units,
-        None,
     )
     .expect("装置里的记录都由写者写出，所选根那次发布只有一条带末条标志：锚点认得出");
     if replayed_root.instance != target.instance
@@ -4995,12 +5021,6018 @@ fn run_fixed_publication_byte_script(geometry: &Geometry) {
     );
 }
 
+// ============================================================================
+// 十、第 2 次跑（`research/prompts/e158-r2-prereg.md`）：5.6 常量回比与第七节锚点（第 2 次跑那一份）、
+//    H1d（5.5 末尾主 agent 22:5x 跑前修订加的历史族）、Q1-0（H1c 的抛弃步，前提 1 在装置上的读数）、
+//    实七两段复现历史。这一节只加：第一次跑的各模式（上面一至九）原样留着，它们的旧产物由
+//    `research/scripts/replay.sh` 里 E158 那几行复跑；第一节处理表里的删与改归后面的段。
+// ============================================================================
+
+use std::cell::RefCell;
+use std::rc::Rc;
+
+/// 这一次跑在哪一条臂的副本上：只当标签打进结果行。装置源码各臂同一份（跑前登记「装置写在哪」），
+/// 差别只在副本的 `crates/` 与跑的时候设的这个环境变量；没设就是工作树（今天那一臂）。
+fn second_run_arm_label() -> String {
+    env::var("SINGLEFS_E158_ARM").unwrap_or_else(|_| "today".to_string())
+}
+
+/// 系统配置字段表合计今天的值（D22（单元原子性怎么合成） 已定项 9；跑前登记 5.6 表「系统配置字段表合计」一行）。
+const SYSTEM_CONFIGURATION_BYTES_TODAY_LOCAL: u64 = 489;
+/// 系统配置槽宽（跑前登记 5.6；`singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES` 回比）。
+const SYSTEM_CONFIGURATION_SLOT_BYTES_LOCAL: u64 = 4096;
+/// 字段表四档（D22 已定项 9 的分段表；跑前登记 7.2 第四行）：不可变 389、可变 4、运行配置 36、运行量 60（今天）。
+const IMMUTABLE_TIER_BYTES_LOCAL: u64 = 389;
+const MUTABLE_TIER_BYTES_LOCAL: u64 = 4;
+const RUNTIME_CONFIGURATION_TIER_BYTES_LOCAL: u64 = 36;
+const RUNTIME_QUANTITIES_TIER_BYTES_TODAY_LOCAL: u64 = 60;
+/// 一次准入最多几次发布（D16（发布语义） 已定项 1「准入」：B = 4 + 2 k_tol，k_tol = 2；跑前登记 5.6）。
+const PUBLISHES_PER_ADMISSION_AT_MOST_LOCAL: u64 = 4 + 2 * 2;
+/// 512 字节物理写原子边界：`crates/` 里没有，出处 D22 已定项 9 正文，条款锚不回比（跑前登记 5.6）。
+const PHYSICAL_WRITE_ATOMIC_BOUNDARY_BYTES: u64 = 512;
+/// 落点粒度（跑前登记 5.6 `SLOT_BYTES`）：第 2 次跑算单元字节区间用的就是这一个。
+const SLOT_BYTES_LOCAL: u64 = 16384;
+/// 这个测试周期的种子基（抄自 `crates/singlefs-harness/src/crash_injection.rs:70` `SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`，
+/// 开跑时回比）；实七报告「交主 agent 的」第 1 条点名的两段历史都从它数（`research/prompts/m2-impl7-implementer-report.md`）。
+const SEED_BASE_OF_THIS_TEST_CYCLE_LOCAL: u64 = 7_463_871_032_432_355_113;
+/// 故障注入大档那一段：种子基 + 110、每段 30 步、注入 6 次（大档默认规模，
+/// `crates/singlefs-harness/tests/second_transaction_supplement_three_fault_injection.rs` 大档用例的缺省值）。
+const SEVENTH_BATCH_FAULT_REPRODUCTION_SEED_OFFSET: u64 = 110;
+const SEVENTH_BATCH_FAULT_REPRODUCTION_OPERATIONS: usize = 30;
+const SEVENTH_BATCH_FAULT_REPRODUCTION_FAULTS: usize = 6;
+/// 崩溃注入快档那一段：种子基 + 16、每段 24 步、每段抽 4 个崩溃状态（快档规模，
+/// `crates/singlefs-harness/tests/second_transaction_supplement_three_crash_injection.rs` 的 `FAST_TIER_*`）。
+const SEVENTH_BATCH_CRASH_REPRODUCTION_SEED_OFFSET: u64 = 16;
+const SEVENTH_BATCH_CRASH_REPRODUCTION_OPERATIONS: usize = 24;
+const SEVENTH_BATCH_CRASH_REPRODUCTION_CRASH_POINTS: usize = 4;
+
+/// 跑前登记 5.6 表：第一次跑那一份（`local_constants_checks`）之外，第 2 次跑另要回比的几项。
+fn second_run_local_constants_checks() -> Vec<ConstantCheck> {
+    let mut checks = local_constants_checks();
+    checks.extend([
+        ConstantCheck {
+            name: "系统配置槽宽（第 2 次跑的锚点用的那一个）",
+            local_value: SYSTEM_CONFIGURATION_SLOT_BYTES_LOCAL,
+            crates_value: singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES,
+        },
+        ConstantCheck {
+            name: "字段表不可变一档 SystemImmutableConfiguration::FIELD_TABLE_BYTES",
+            local_value: IMMUTABLE_TIER_BYTES_LOCAL,
+            crates_value: singlefs_core::system_configuration::SystemImmutableConfiguration::FIELD_TABLE_BYTES,
+        },
+        ConstantCheck {
+            name: "字段表可变一档 SystemMutableConfiguration::FIELD_TABLE_BYTES",
+            local_value: MUTABLE_TIER_BYTES_LOCAL,
+            crates_value: singlefs_core::system_configuration::SystemMutableConfiguration::FIELD_TABLE_BYTES,
+        },
+        ConstantCheck {
+            name: "字段表运行配置一档 SystemRuntimeConfiguration::FIELD_TABLE_BYTES",
+            local_value: RUNTIME_CONFIGURATION_TIER_BYTES_LOCAL,
+            crates_value: singlefs_core::system_configuration::SystemRuntimeConfiguration::FIELD_TABLE_BYTES,
+        },
+        ConstantCheck {
+            name: "字段表运行量一档 SystemRuntimeQuantities::FIELD_TABLE_BYTES（乙 / 丁四臂按臂的定义多 8）",
+            local_value: RUNTIME_QUANTITIES_TIER_BYTES_TODAY_LOCAL + local_system_configuration_bytes()
+                - SYSTEM_CONFIGURATION_BYTES_TODAY_LOCAL,
+            crates_value: singlefs_core::system_configuration::SystemRuntimeQuantities::FIELD_TABLE_BYTES,
+        },
+        ConstantCheck {
+            name: "一次准入最多几次发布 PUBLISHES_PER_ADMISSION_AT_MOST",
+            local_value: PUBLISHES_PER_ADMISSION_AT_MOST_LOCAL,
+            crates_value: u64::try_from(singlefs_core::mount::PUBLISHES_PER_ADMISSION_AT_MOST)
+                .expect("8 装得进 u64"),
+        },
+        ConstantCheck {
+            name: "落点粒度（第 2 次跑算单元字节区间用的那一个）",
+            local_value: SLOT_BYTES_LOCAL,
+            crates_value: singlefs_format::SLOT_BYTES,
+        },
+        ConstantCheck {
+            name: "这个测试周期的种子基 SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE",
+            local_value: SEED_BASE_OF_THIS_TEST_CYCLE_LOCAL,
+            crates_value: singlefs_harness::crash_injection::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
+        },
+    ]);
+    checks
+}
+
+/// 在一份系统配置槽的字节里找一段小端字节恰好出现一次的位置；不是恰好一次交 None。
+fn unique_offset_of(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    let mut found = None;
+    for start in 0..=haystack.len().saturating_sub(needle.len()) {
+        if haystack[start..start + needle.len()] == *needle {
+            if found.is_some() {
+                return None;
+            }
+            found = Some(start);
+        }
+    }
+    found
+}
+
+/// journal tail、实例代号、回退下界 F 三项在系统配置槽里住哪（跑前登记 5.6「私有常量引不到 ⇒ 装置写一槽已知的 tail、
+/// 实例代号与 F，自己解码找偏移」）：mkfs 一个池，按 `crates` 的解析读回盘 0 第 0 槽，改三项为已知值、再按 `crates` 写成槽字节，
+/// 按小端字节找它们。交回 (tail, 实例代号, F) 三个偏移。
+fn decoded_tail_instance_and_floor_offsets() -> Result<(usize, usize, usize), String> {
+    let parameters = parameters_for(&GEOMETRY_PRIMARY);
+    let mut devices = new_devices(IMAGE_BYTES);
+    make_filesystem(&parameters, &mut devices).map_err(|error| format!("mkfs: {error:?}"))?;
+    let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES_LOCAL).expect("4096");
+    let mut slot = vec![0u8; slot_bytes];
+    devices[0]
+        .1
+        .read_at(DeviceOffsetInBytes(0), &mut slot)
+        .map_err(|error| format!("读系统配置槽: {error:?}"))?;
+    let mut parsed = singlefs_core::system_configuration::SystemConfiguration::parse_slot(&slot)
+        .map_err(|error| format!("解系统配置槽: {error:?}"))?;
+    let known_tail: u64 = 0x1122_3344_5566_7788;
+    let known_instance: u32 = 0xA1B2_C3D4;
+    let known_floor: u64 = 0x0102_0304_0506_0708;
+    parsed.quantities.journal_tail = known_tail;
+    parsed.quantities.journal_instance = InstanceGeneration(known_instance);
+    parsed.quantities.rollback_floor = CheckpointTxg(known_floor);
+    let written = parsed.to_slot();
+    let tail = unique_offset_of(&written, &known_tail.to_le_bytes())
+        .ok_or("已知 tail 在槽里不是恰好一处")?;
+    let instance = unique_offset_of(&written, &known_instance.to_le_bytes())
+        .ok_or("已知实例代号在槽里不是恰好一处")?;
+    let floor = unique_offset_of(&written, &known_floor.to_le_bytes())
+        .ok_or("已知 F 在槽里不是恰好一处")?;
+    Ok((tail, instance, floor))
+}
+
+/// 跑前登记 7.2：独立算出、用命令核过的值（登记第十三节那条 python 的输出），写成「由本地常量现算 == 字面值」，
+/// 常量断言写加法不写减法（`test-discipline.md`「常量断言写加法」）。乙 / 丁四臂（本地字段表 497）那几行换成 7.2 第三行的数。
+fn second_run_arithmetic_anchors(local_system_configuration: u64) -> Vec<(&'static str, u64, u64)> {
+    let mut anchors = vec![
+        (
+            "字段表四档 389+4+36+60（7.2 第四行）",
+            IMMUTABLE_TIER_BYTES_LOCAL
+                + MUTABLE_TIER_BYTES_LOCAL
+                + RUNTIME_CONFIGURATION_TIER_BYTES_LOCAL
+                + RUNTIME_QUANTITIES_TIER_BYTES_TODAY_LOCAL,
+            489,
+        ),
+        (
+            "运行量一档 8+32+8+4+8（7.2 第四行）",
+            8 + 32 + 8 + 4 + 8,
+            60,
+        ),
+        (
+            "乙 / 丁字段表 489+8（7.2 第三行）",
+            SYSTEM_CONFIGURATION_BYTES_TODAY_LOCAL + 8,
+            497,
+        ),
+        (
+            "系统配置整槽校验和偏移 4+2+96+16+20+1+4+4+8（7.2 第六行）",
+            4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8,
+            155,
+        ),
+        ("根槽总数 3×S，S=4（7.2 第七行）", 3 * 4, 12),
+        (
+            "根槽总数 3×S，S=8（7.2 第七行）",
+            3 * GEOMETRY_PRIMARY.slots_per_region,
+            24,
+        ),
+        (
+            "根槽总数 3×S，S=16（7.2 第七行）",
+            3 * GEOMETRY_LARGER_ROOT_RING.slots_per_region,
+            48,
+        ),
+        (
+            "环槽数 768MiB÷4096（7.2 第八行）",
+            (768 * 1024 * 1024) / JOURNAL_RECORD_BYTES,
+            196_608,
+        ),
+        (
+            "环槽数 3MiB÷4096（7.2 第八行）",
+            GEOMETRY_PRIMARY.journal_ring_bytes / JOURNAL_RECORD_BYTES,
+            768,
+        ),
+        (
+            "环槽数 48KiB÷4096（7.2 第八行）",
+            (48 * 1024) / JOURNAL_RECORD_BYTES,
+            12,
+        ),
+        (
+            "实例表行宽 1+4+8+8+1+66（7.2 第九行）",
+            1 + 4 + 8 + 8 + 1 + 66,
+            88,
+        ),
+        (
+            "两个指称各一个索引节点两份 16384×2（7.2 第十一行）",
+            SLOT_BYTES_LOCAL * 2,
+            32768,
+        ),
+        ("Φ1 每条根 T、L 都有时 3+3+1（7.2 第十二行）", 3 + 3 + 1, 7),
+        (
+            "今天那一臂每次发布系统配置那一类写字节 4096×2（7.2 第十行）",
+            SYSTEM_CONFIGURATION_SLOT_BYTES_LOCAL * 2,
+            8192,
+        ),
+    ];
+    if local_system_configuration == SYSTEM_CONFIGURATION_BYTES_TODAY_LOCAL {
+        anchors.push((
+            "系统配置槽余量：槽宽 == 字段表 + 3607（7.1 第一行、7.2 第一行）",
+            SYSTEM_CONFIGURATION_SLOT_BYTES_LOCAL,
+            local_system_configuration + 3607,
+        ));
+        anchors.push((
+            "512 == 字段表 + 23（7.2 第二行）",
+            PHYSICAL_WRITE_ATOMIC_BOUNDARY_BYTES,
+            local_system_configuration + 23,
+        ));
+    } else {
+        anchors.push((
+            "乙 / 丁：槽宽 == 字段表 + 3599（7.2 第三行）",
+            SYSTEM_CONFIGURATION_SLOT_BYTES_LOCAL,
+            local_system_configuration + 3599,
+        ));
+        anchors.push((
+            "乙 / 丁：512 == 字段表 + 15（7.2 第三行）",
+            PHYSICAL_WRITE_ATOMIC_BOUNDARY_BYTES,
+            local_system_configuration + 15,
+        ));
+    }
+    anchors
+}
+
+/// 第 2 次跑的开跑检查：5.6 常量回比（V3）、7.2 算术（V4）、7.1 第一行里「字段表不跨 512」与偏移解码（S3）。
+/// 交回 true = 全部过；任一不过交 false，调用方整轮不开跑。
+fn run_second_run_constants_and_anchors(arm: &str) -> bool {
+    let mut all_passed = true;
+    for check in second_run_local_constants_checks() {
+        let passed = check.matches();
+        all_passed &= passed;
+        emit_result(&format!(
+            "name=r2_local_constant_check arm={arm} item={:?} verdict={} local_value={} crates_value={}",
+            check.name,
+            if passed { "pass" } else { "fail" },
+            check.local_value,
+            check.crates_value
+        ));
+    }
+    let (regions_match, local_regions, crates_regions) = region_devices_matches_crates();
+    all_passed &= regions_match;
+    emit_result(&format!(
+        "name=r2_local_constant_check arm={arm} item=region_devices verdict={} local_value={local_regions:?} crates_value={crates_regions:?}",
+        if regions_match { "pass" } else { "fail" }
+    ));
+    let local_system_configuration = local_system_configuration_bytes();
+    for (item, computed, registered) in second_run_arithmetic_anchors(local_system_configuration) {
+        let passed = computed == registered;
+        all_passed &= passed;
+        emit_result(&format!(
+            "name=r2_section_seven_two_anchor arm={arm} item={item:?} verdict={} computed={computed} registered={registered}",
+            if passed { "pass" } else { "fail" }
+        ));
+    }
+    let within_one_physical_write =
+        local_system_configuration <= PHYSICAL_WRITE_ATOMIC_BOUNDARY_BYTES;
+    all_passed &= within_one_physical_write;
+    emit_result(&format!(
+        "name=r2_section_seven_one_anchor arm={arm} item=\"D22 已定项 9：字段表不跨 512\" verdict={} local_system_configuration_bytes={local_system_configuration}",
+        if within_one_physical_write { "pass" } else { "fail" }
+    ));
+    match decoded_tail_instance_and_floor_offsets() {
+        Ok((tail, instance, floor)) => {
+            let tail_passed = tail == 469;
+            let floor_passed = floor == 481 && instance + 4 == floor && tail + 8 == instance;
+            all_passed &= tail_passed && floor_passed;
+            emit_result(&format!(
+                "name=r2_decoded_offsets arm={arm} verdict={} tail_offset={tail} instance_offset={instance} floor_offset={floor} registered_tail=469 registered_floor=481",
+                if tail_passed && floor_passed { "pass" } else { "fail" }
+            ));
+        }
+        Err(error) => {
+            all_passed = false;
+            emit_result(&format!(
+                "name=r2_decoded_offsets arm={arm} verdict=fail reason={error:?}"
+            ));
+        }
+    }
+    all_passed
+}
+
+// ---------------------------------------------------------------------------
+// 10.1 读法写死表「故障」的落地：一块盘一层、一次装完这块盘的全部落点；读落点按区间罩（不只认起点偏移）；
+//      每个落点在这次调用里被拦下的读次数单独记（V2）；这次调用自己写到落点上之后那一处不再拦
+//      （写出的字节此后照常读得出，同 `crates/singlefs-harness/src/history.rs` 的 `DeviceReadingZerosOverHiddenRanges`）；
+//      另可让整池第 n 次写或第 n 次屏障报错（H1d 的「注入写失败」）。设备一层真落了的写按次序记下（K3 / K4 与崩溃状态靠它）。
+// ---------------------------------------------------------------------------
+
+/// 一个落点这次调用里读不出的样子（H1d 两种造法都做：注入读错、读回清零）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum UnreadableForm {
+    ReadFails,
+    ReadsZeros,
+}
+
+impl UnreadableForm {
+    fn name(self) -> &'static str {
+        match self {
+            UnreadableForm::ReadFails => "read_fails",
+            UnreadableForm::ReadsZeros => "reads_zeros",
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct UnreadableRange {
+    device: DeviceIdentity,
+    offset: u64,
+    length: u64,
+    form: UnreadableForm,
+    label: String,
+}
+
+impl UnreadableRange {
+    fn overlaps(&self, device: DeviceIdentity, offset: u64, length: u64) -> bool {
+        self.device == device && self.offset < offset + length && offset < self.offset + self.length
+    }
+}
+
+/// 设备一层真落了的一步（按整池的先后）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum AppliedDeviceStep {
+    Write {
+        device: DeviceIdentity,
+        offset: u64,
+        bytes: Vec<u8>,
+    },
+    ZeroFill {
+        device: DeviceIdentity,
+        offset: u64,
+        length: u64,
+    },
+    Barrier {
+        device: DeviceIdentity,
+    },
+}
+
+#[derive(Default)]
+struct InstrumentationState {
+    unreadable: Vec<UnreadableRange>,
+    written_over: Vec<bool>,
+    intercepted_reads: Vec<u64>,
+    /// 整池发出的写（含报了错的那一次），从 0 数。
+    write_calls: u64,
+    barrier_calls: u64,
+    failing_write_call: Option<u64>,
+    failing_barrier_call: Option<u64>,
+    injected_failure_fired: bool,
+    applied: Vec<AppliedDeviceStep>,
+}
+
+impl InstrumentationState {
+    fn new(
+        unreadable: Vec<UnreadableRange>,
+        failing_write_call: Option<u64>,
+        failing_barrier_call: Option<u64>,
+    ) -> Self {
+        let count = unreadable.len();
+        InstrumentationState {
+            unreadable,
+            written_over: vec![false; count],
+            intercepted_reads: vec![0; count],
+            failing_write_call,
+            failing_barrier_call,
+            ..InstrumentationState::default()
+        }
+    }
+
+    fn mark_written_over(&mut self, device: DeviceIdentity, offset: u64, length: u64) {
+        for (range, written_over) in self.unreadable.iter().zip(self.written_over.iter_mut()) {
+            if range.overlaps(device, offset, length) {
+                *written_over = true;
+            }
+        }
+    }
+}
+
+struct InstrumentedDevice {
+    identity: DeviceIdentity,
+    inner: SparseBlockDevice,
+    state: Rc<RefCell<InstrumentationState>>,
+}
+
+impl BlockDevice for InstrumentedDevice {
+    fn read_at(
+        &self,
+        offset: DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        let length = u64::try_from(buffer.len()).expect("一次读的长度装得进 u64");
+        let mut fails = false;
+        let mut zeroed: Vec<(u64, u64)> = Vec::new();
+        {
+            let mut state = self.state.borrow_mut();
+            let state = &mut *state;
+            for ((range, written_over), intercepted) in state
+                .unreadable
+                .iter()
+                .zip(state.written_over.iter())
+                .zip(state.intercepted_reads.iter_mut())
+            {
+                if *written_over || !range.overlaps(self.identity, offset.0, length) {
+                    continue;
+                }
+                *intercepted += 1;
+                match range.form {
+                    UnreadableForm::ReadFails => fails = true,
+                    UnreadableForm::ReadsZeros => zeroed.push((range.offset, range.length)),
+                }
+            }
+        }
+        if fails {
+            return Err(injected_block_device_error("读"));
+        }
+        self.inner.read_at(offset, buffer)?;
+        for (range_offset, range_length) in zeroed {
+            let start = range_offset.saturating_sub(offset.0);
+            let end = (range_offset + range_length - offset.0).min(length);
+            buffer[usize::try_from(start).expect("缓冲区里")
+                ..usize::try_from(end).expect("缓冲区里")]
+                .fill(0);
+        }
+        Ok(())
+    }
+
+    fn write_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        bytes: &[u8],
+        durability: WriteDurability,
+    ) -> Result<(), BlockDeviceError> {
+        let mut state = self.state.borrow_mut();
+        let ordinal = state.write_calls;
+        state.write_calls += 1;
+        if state.failing_write_call == Some(ordinal) {
+            state.injected_failure_fired = true;
+            return Err(injected_block_device_error("写"));
+        }
+        self.inner.write_at(offset, bytes, durability)?;
+        let length = u64::try_from(bytes.len()).expect("写长装得进 u64");
+        state.mark_written_over(self.identity, offset.0, length);
+        state.applied.push(AppliedDeviceStep::Write {
+            device: self.identity,
+            offset: offset.0,
+            bytes: bytes.to_vec(),
+        });
+        Ok(())
+    }
+
+    fn write_zeroes_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<(), BlockDeviceError> {
+        let mut state = self.state.borrow_mut();
+        let ordinal = state.write_calls;
+        state.write_calls += 1;
+        if state.failing_write_call == Some(ordinal) {
+            state.injected_failure_fired = true;
+            return Err(injected_block_device_error("写"));
+        }
+        self.inner.write_zeroes_at(offset, length)?;
+        state.mark_written_over(self.identity, offset.0, length);
+        state.applied.push(AppliedDeviceStep::ZeroFill {
+            device: self.identity,
+            offset: offset.0,
+            length,
+        });
+        Ok(())
+    }
+
+    fn barrier(&mut self) -> Result<(), BlockDeviceError> {
+        let mut state = self.state.borrow_mut();
+        let ordinal = state.barrier_calls;
+        state.barrier_calls += 1;
+        if state.failing_barrier_call == Some(ordinal) {
+            state.injected_failure_fired = true;
+            return Err(injected_block_device_error("屏障"));
+        }
+        self.inner.barrier()?;
+        state.applied.push(AppliedDeviceStep::Barrier {
+            device: self.identity,
+        });
+        Ok(())
+    }
+
+    fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
+        self.inner.probe_physical_block_size()
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        self.inner.size_in_bytes()
+    }
+}
+
+/// 一次受观测的可写挂载交回的东西。
+struct InstrumentedMount {
+    result: Result<Mounted, singlefs_core::mount::MountError>,
+    /// 整池发出的写次数（含报了错的那一次）：K3 / K4 按它是不是 0 分（跑前登记前提 3 的答案）。
+    write_calls: u64,
+    applied: Vec<AppliedDeviceStep>,
+    intercepted_reads: Vec<u64>,
+    injected_failure_fired: bool,
+    pool_after: MemoryPool,
+}
+
+fn run_instrumented_mount_writable(
+    base: &MemoryPool,
+    parameters: &MakeFilesystemParameters,
+    unreadable: &[UnreadableRange],
+    failing_write_call: Option<u64>,
+    failing_barrier_call: Option<u64>,
+) -> InstrumentedMount {
+    let state = Rc::new(RefCell::new(InstrumentationState::new(
+        unreadable.to_vec(),
+        failing_write_call,
+        failing_barrier_call,
+    )));
+    let mut devices: Vec<(DeviceIdentity, InstrumentedDevice)> =
+        devices_from_pool(base, IMAGE_BYTES)
+            .into_iter()
+            .map(|(identity, inner)| {
+                (
+                    identity,
+                    InstrumentedDevice {
+                        identity,
+                        inner,
+                        state: Rc::clone(&state),
+                    },
+                )
+            })
+            .collect();
+    let result = mount_writable(parameters, &mut devices);
+    let plain: Vec<(DeviceIdentity, SparseBlockDevice)> = devices
+        .into_iter()
+        .map(|(identity, device)| (identity, device.inner))
+        .collect();
+    let pool_after = memory_pool_of(&plain, IMAGE_BYTES);
+    let state = state.borrow();
+    InstrumentedMount {
+        result,
+        write_calls: state.write_calls,
+        applied: state.applied.clone(),
+        intercepted_reads: state.intercepted_reads.clone(),
+        injected_failure_fired: state.injected_failure_fired,
+        pool_after,
+    }
+}
+
+/// 一次可写挂载的结局按 K0–K4 分（跑前登记前提 3 的答案）：K0 做成且取号之前判过（或测试开关没判）、K1 写行之后推过抬 F 够了、
+/// K2 推满仍不够而挂载照样做成、K3 报错且这次调用设备一层 0 次写、K4 报错且写过。
+fn mount_outcome_class(
+    result: &Result<Mounted, singlefs_core::mount::MountError>,
+    write_calls: u64,
+) -> &'static str {
+    use singlefs_core::mount::MountSpaceAdmission;
+    match result {
+        Ok(mounted) => match mounted.output.space_admission {
+            MountSpaceAdmission::AdmittedBeforeAcquisition
+            | MountSpaceAdmission::NotJudgedByTheTestOnlySwitch => "K0",
+            MountSpaceAdmission::AdmittedAfterTheFloorRaises { .. } => "K1",
+            MountSpaceAdmission::StillShortAfterTheFloorRaises { .. } => "K2",
+        },
+        Err(_) if write_calls == 0 => "K3",
+        Err(_) => "K4",
+    }
+}
+
+fn mount_error_member_or_none(
+    result: &Result<Mounted, singlefs_core::mount::MountError>,
+) -> String {
+    match result {
+        Ok(_) => "none".to_string(),
+        Err(error) => error_member_of_debug(&format!("{error:?}")),
+    }
+}
+
+/// `base` 上依次施加 `applied` 里前 `write_count` 个写（屏障不改字节），交回那份镜像：崩溃在第 `write_count` 个写之前、
+/// 之前的写都已持久的那一个崩溃状态（前缀）。
+fn image_with_the_first_writes(
+    base: &MemoryPool,
+    applied: &[AppliedDeviceStep],
+    write_count: usize,
+) -> MemoryPool {
+    let mut devices = devices_from_pool(base, IMAGE_BYTES);
+    let mut written = 0usize;
+    for step in applied {
+        if written == write_count {
+            break;
+        }
+        match step {
+            AppliedDeviceStep::Write {
+                device,
+                offset,
+                bytes,
+            } => {
+                if let Some((_, target)) =
+                    devices.iter_mut().find(|(identity, _)| identity == device)
+                {
+                    target
+                        .write_at(DeviceOffsetInBytes(*offset), bytes, WriteDurability::Plain)
+                        .expect("内存盘写不报错");
+                }
+                written += 1;
+            }
+            AppliedDeviceStep::ZeroFill {
+                device,
+                offset,
+                length,
+            } => {
+                if let Some((_, target)) =
+                    devices.iter_mut().find(|(identity, _)| identity == device)
+                {
+                    target
+                        .write_zeroes_at(DeviceOffsetInBytes(*offset), *length)
+                        .expect("内存盘清零不报错");
+                }
+                written += 1;
+            }
+            AppliedDeviceStep::Barrier { .. } => {}
+        }
+    }
+    memory_pool_of(&devices, IMAGE_BYTES)
+}
+
+/// 根环每个槽在哪块盘的哪个偏移（checker 的独立解码，`checker_image::root_slot_positions`）。
+fn root_slot_device_offsets(geometry: &PoolGeometry) -> Vec<(DeviceIdentity, u64)> {
+    checker_image::root_slot_positions(geometry)
+        .into_iter()
+        .map(|(_, _, device, offset)| (DeviceIdentity(device), offset))
+        .collect()
+}
+
+/// 设备一层的第几个写（从 0 数）是第一个落到根环槽上的：可写挂载里第一个根槽写就是写行那次发布的根（取号只写系统配置）。
+fn index_of_the_first_root_slot_write(
+    applied: &[AppliedDeviceStep],
+    root_slots: &[(DeviceIdentity, u64)],
+    root_slot_bytes: u64,
+) -> Option<usize> {
+    let mut write_index = 0usize;
+    for step in applied {
+        let (device, offset, length) = match step {
+            AppliedDeviceStep::Write {
+                device,
+                offset,
+                bytes,
+            } => (*device, *offset, u64::try_from(bytes.len()).expect("写长")),
+            AppliedDeviceStep::ZeroFill {
+                device,
+                offset,
+                length,
+            } => (*device, *offset, *length),
+            AppliedDeviceStep::Barrier { .. } => continue,
+        };
+        if root_slots.iter().any(|(slot_device, slot_offset)| {
+            *slot_device == device
+                && *slot_offset < offset + length
+                && offset < slot_offset + root_slot_bytes
+        }) {
+            return Some(write_index);
+        }
+        write_index += 1;
+    }
+    None
+}
+
+/// 前 `write_count` 个写之间发过几次屏障（整池，从 0 数的屏障序号都小于它）。
+fn barriers_before_write(applied: &[AppliedDeviceStep], write_count: usize) -> u64 {
+    let mut writes = 0usize;
+    let mut barriers = 0u64;
+    for step in applied {
+        match step {
+            AppliedDeviceStep::Barrier { .. } => {
+                if writes < write_count {
+                    barriers += 1;
+                }
+            }
+            AppliedDeviceStep::Write { .. } | AppliedDeviceStep::ZeroFill { .. } => {
+                writes += 1;
+                if writes >= write_count {
+                    break;
+                }
+            }
+        }
+    }
+    barriers
+}
+
+// ---------------------------------------------------------------------------
+// 10.2 历史：mkfs → `mount_writable`（实例 1）→ 首个文件 → n1 次覆盖写 → 关闭（C：丢掉会话；U：调 `unmount`）。
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Closing {
+    ProcessExit,
+    NormalUnmount,
+}
+
+impl Closing {
+    fn name(self) -> &'static str {
+        match self {
+            Closing::ProcessExit => "C",
+            Closing::NormalUnmount => "U",
+        }
+    }
+}
+
+struct SecondRunHistory {
+    pool: MemoryPool,
+    session: Option<Session>,
+    /// 当前时间线（父链，跑前登记 5.0）：mkfs 的第 0 代根起，到最新一次成功发布的根。
+    timeline: Vec<TimelineRoot>,
+    content_by_root: BTreeMap<TimelineRoot, Option<Vec<u8>>>,
+    publishes_with_content: u64,
+}
+
+impl SecondRunHistory {
+    fn tip(&self) -> TimelineRoot {
+        *self.timeline.last().expect("时间线至少有第 0 代根")
+    }
+
+    fn tip_content(&self) -> Option<Vec<u8>> {
+        self.content_by_root
+            .get(&self.tip())
+            .cloned()
+            .unwrap_or(None)
+    }
+}
+
+fn push_mounted_publishes(
+    history: &mut SecondRunHistory,
+    mounted: &Mounted,
+    carried_forward_content: &Option<Vec<u8>>,
+) {
+    let mut roots = vec![root_pair(mounted.output.row_publish.root())];
+    roots.extend(
+        mounted
+            .output
+            .warm_up_publishes
+            .iter()
+            .map(|publish| root_pair(publish.root())),
+    );
+    for raised in mounted.output.space_admission.floor_raises() {
+        roots.extend(
+            raised
+                .publishes
+                .iter()
+                .map(|publish| root_pair(&publish.root)),
+        );
+    }
+    for root in roots {
+        history.timeline.push(root);
+        history
+            .content_by_root
+            .insert(root, carried_forward_content.clone());
+    }
+}
+
+fn second_run_start(geometry: &Geometry, overwrites: u64) -> Result<SecondRunHistory, String> {
+    let parameters = parameters_for(geometry);
+    let mut devices = new_devices(IMAGE_BYTES);
+    let genesis =
+        make_filesystem(&parameters, &mut devices).map_err(|error| format!("mkfs: {error:?}"))?;
+    let mounted = mount_writable(&parameters, &mut devices)
+        .map_err(|error| format!("第一次可写挂载: {error:?}"))?;
+    let mut history = SecondRunHistory {
+        pool: memory_pool_of(&devices, IMAGE_BYTES),
+        session: None,
+        timeline: vec![root_pair(&genesis.root)],
+        content_by_root: BTreeMap::from([(root_pair(&genesis.root), None)]),
+        publishes_with_content: 0,
+    };
+    push_mounted_publishes(&mut history, &mounted, &None);
+    let mut allocator = mounted.allocator;
+    let instance = mounted.output.instance;
+    let current = mounted.current;
+    let content = deterministic_content(1000, FIRST_FILE_BYTES);
+    let first = {
+        let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
+        publish_first_file(
+            &mut writer,
+            &mut allocator,
+            current.root(),
+            FirstFile {
+                content: &content,
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS,
+            },
+            instance,
+            current.record_bytes(),
+        )
+        .map_err(|error| format!("首个文件: {error:?}"))?
+    };
+    history.timeline.push(root_pair(&first.root));
+    history
+        .content_by_root
+        .insert(root_pair(&first.root), Some(content));
+    history.publishes_with_content = 1;
+    history.pool = memory_pool_of(&devices, IMAGE_BYTES);
+    history.session = Some(Session {
+        allocator,
+        current: PoolVersion::WithFile(first),
+        instance,
+    });
+    for _ in 0..overwrites {
+        second_run_overwrite(&mut history, &parameters)?;
+    }
+    Ok(history)
+}
+
+fn second_run_overwrite(
+    history: &mut SecondRunHistory,
+    parameters: &MakeFilesystemParameters,
+) -> Result<(), String> {
+    let session = history.session.as_mut().ok_or("覆盖写：没有开着的会话")?;
+    let PoolVersion::WithFile(previous) = &session.current else {
+        return Err("覆盖写：现行版本没有文件".to_string());
+    };
+    let tag = 1000 + history.publishes_with_content;
+    let content = deterministic_content(tag, OVERWRITE_FILE_BYTES);
+    let mut devices = devices_from_pool(&history.pool, IMAGE_BYTES);
+    let output = {
+        let mut writer = PoolWriter::new(parameters, devices.as_mut_slice());
+        publish_overwrite(
+            &mut writer,
+            &mut session.allocator,
+            previous,
+            FirstFile {
+                content: &content,
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60 * tag,
+            },
+            session.instance,
+        )
+        .map_err(|error| format!("覆盖写: {error:?}"))?
+    };
+    history.timeline.push(root_pair(&output.root));
+    history
+        .content_by_root
+        .insert(root_pair(&output.root), Some(content));
+    history.publishes_with_content += 1;
+    history.pool = memory_pool_of(&devices, IMAGE_BYTES);
+    session.current = PoolVersion::WithFile(output);
+    Ok(())
+}
+
+/// 每块盘两槽里世代号最大的那一份自证系统配置槽的字节（按 `crates` 的解析判自证）。
+fn newest_system_configuration_slot_bytes(
+    pool: &MemoryPool,
+    device: DeviceIdentity,
+    slot_spacing: u64,
+) -> Option<Vec<u8>> {
+    let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES_LOCAL).expect("4096");
+    [0u64, slot_spacing]
+        .into_iter()
+        .filter_map(|offset| pool.read(device.0, offset, slot_bytes))
+        .filter_map(|bytes| {
+            singlefs_core::system_configuration::SystemConfiguration::parse_slot(&bytes)
+                .ok()
+                .map(|parsed| (parsed.quantities.slot_generation, bytes))
+        })
+        .max_by_key(|(generation, _)| *generation)
+        .map(|(_, bytes)| bytes)
+}
+
+/// 关闭 c：C 丢掉会话；U 调 `unmount`，并核 7.1 第四行（F12）与第一行的盘上那一半（最后一个非零字节、乙族 Q2-2b 的解码）。
+fn second_run_close(
+    history: &mut SecondRunHistory,
+    parameters: &MakeFilesystemParameters,
+    closing: Closing,
+    arm: &str,
+    context: &str,
+) -> Result<(), String> {
+    let session = history.session.take().ok_or("关闭：没有开着的会话")?;
+    if closing == Closing::ProcessExit {
+        return Ok(());
+    }
+    let Session {
+        mut allocator,
+        mut current,
+        ..
+    } = session;
+    let before_txg = current.root().checkpoint_txg.0;
+    let carried = history.tip_content();
+    let mut devices = devices_from_pool(&history.pool, IMAGE_BYTES);
+    let unmounted = singlefs_core::mount::unmount(
+        parameters,
+        &mut devices,
+        &mut allocator,
+        &mut current,
+        ShadowLedger::On,
+    )
+    .map_err(|error| format!("正常卸载: {error:?}"))?;
+    let singlefs_core::mount::Unmounted::FloorRaisedToTheCurrentVersion(raised) = unmounted else {
+        return Err("正常卸载：现行那一版没有文件".to_string());
+    };
+    for publish in &raised.publishes {
+        history.timeline.push(root_pair(&publish.root));
+        history
+            .content_by_root
+            .insert(root_pair(&publish.root), carried.clone());
+    }
+    history.pool = memory_pool_of(&devices, IMAGE_BYTES);
+    let expected_publishes = if before_txg % 3 == 1 { 3 } else { 2 };
+    let slot_spacing = u64::from(parameters.geometry.fixed_structure_slot_spacing);
+    let mut floors = Vec::new();
+    let mut last_nonzero = Vec::new();
+    let mut published_txg_decoded = Vec::new();
+    for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+        let Some(bytes) =
+            newest_system_configuration_slot_bytes(&history.pool, device, slot_spacing)
+        else {
+            return Err(format!("正常卸载之后盘 {} 没有自证的系统配置槽", device.0));
+        };
+        let parsed = singlefs_core::system_configuration::SystemConfiguration::parse_slot(&bytes)
+            .map_err(|error| format!("{error:?}"))?;
+        floors.push(parsed.quantities.rollback_floor.0);
+        last_nonzero.push(bytes.iter().rposition(|byte| *byte != 0).unwrap_or(0));
+        let start = usize::try_from(SYSTEM_CONFIGURATION_BYTES_TODAY_LOCAL).expect("489");
+        let mut little_endian = [0u8; 8];
+        little_endian.copy_from_slice(&bytes[start..start + 8]);
+        published_txg_decoded.push(u64::from_le_bytes(little_endian));
+    }
+    let floor_holds = floors.iter().all(|floor| *floor == before_txg);
+    let publishes_hold = raised.publishes.len() == expected_publishes;
+    // 7.1 第一行的盘上那一半：今天的字段表（本地 489）下最后一个非零字节落在 F 那 8 字节 [481, 489) 里、489 起全零；
+    // 乙 / 丁四臂（本地 497）下 [489, 497) 解出的就是刚落盘那条根的 txg（Q2-2b 的解码核对）。
+    let field_end = local_system_configuration_bytes();
+    let floor_start = SYSTEM_CONFIGURATION_BYTES_TODAY_LOCAL - 8;
+    let layout_holds = if field_end == SYSTEM_CONFIGURATION_BYTES_TODAY_LOCAL {
+        last_nonzero.iter().all(|index| {
+            let index = u64::try_from(*index).expect("槽内下标");
+            floor_start <= index && index < field_end
+        })
+    } else {
+        published_txg_decoded
+            .iter()
+            .all(|decoded| *decoded == history.tip().1)
+    };
+    emit_result(&format!(
+        "name=r2_unmount_check arm={arm} context={context:?} verdict={} layout_verdict={} txg_before_unmount={before_txg} floor_in_newest_system_configuration={floors:?} unmount_publishes={} expected_publishes={expected_publishes} last_nonzero_byte={last_nonzero:?} bytes_489_to_497_as_txg={published_txg_decoded:?} newest_root_txg={}",
+        if floor_holds && publishes_hold { "pass" } else { "fail_F12" },
+        if layout_holds { "pass" } else { "fail_S3" },
+        raised.publishes.len(),
+        history.tip().1
+    ));
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// 10.3 装置自己的账：落点、一条根引用的单元、择根、被抛弃判定。
+// ---------------------------------------------------------------------------
+
+/// 一条根（(实例, txg)）的根槽在哪（checker 的独立解码：自证过的根里找到它、再按 (区域, 槽) 取 (盘, 偏移)）。
+fn root_slot_of(
+    pool: &MemoryPool,
+    geometry: &PoolGeometry,
+    root: TimelineRoot,
+) -> Option<(DeviceIdentity, u64)> {
+    let positions = checker_image::root_slot_positions(geometry);
+    checker_image::valid_roots(pool, geometry)
+        .into_iter()
+        .find(|(_, _, view)| (view.instance, view.checkpoint_txg) == root)
+        .and_then(|(region, slot, _)| {
+            positions
+                .iter()
+                .find(|(candidate_region, candidate_slot, _, _)| {
+                    *candidate_region == region && *candidate_slot == slot
+                })
+                .map(|(_, _, device, offset)| (DeviceIdentity(*device), *offset))
+        })
+}
+
+/// 一次发布（按 (实例, txg) 认）在 journal 环里的记录：逐槽解两块盘上的那一份，交回 (计数器, 偏移, 记录)，按计数器排。
+fn records_of_publish(
+    pool: &MemoryPool,
+    geometry: &PoolGeometry,
+    root: TimelineRoot,
+) -> Vec<(u64, u64, JournalRecord)> {
+    let expected_filesystem_identifier = unit_filesystem_identifier(&FILESYSTEM_IDENTIFIER);
+    let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
+    let ring_slots = geometry.journal_ring_bytes / JOURNAL_RECORD_BYTES;
+    let mut found: BTreeMap<u64, (u64, JournalRecord)> = BTreeMap::new();
+    for slot_index in 0..ring_slots {
+        let offset = record_offset(slot_index + 1, geometry.journal_ring_bytes);
+        for device_number in [0u32, 1u32] {
+            let Some(bytes) = pool.read(device_number, offset.0, record_bytes) else {
+                continue;
+            };
+            let Some(record) = JournalRecord::parse(&bytes, expected_filesystem_identifier) else {
+                continue;
+            };
+            if (record.instance.0, record.checkpoint_txg.0) == root {
+                found.entry(record.counter).or_insert((offset.0, record));
+            }
+        }
+    }
+    found
+        .into_iter()
+        .map(|(counter, (offset, record))| (counter, offset, record))
+        .collect()
+}
+
+/// 断链发布的重放怎么接不上（跑前登记 5.1 抛弃步 A(k, b) 的 b）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ReplayBreak {
+    /// b = rec：那次发布的全部记录的全部份读不出。
+    EveryRecord,
+    /// b = unit：那次发布第一条记录点名的第一个单元两份读不出。
+    FirstNamedUnit,
+    /// b = unit_first_copy（第 2 次跑修订加的，只补不改）：只让那个单元排在位置条目第一条的那一份读不出。
+    /// 重放验点名单元要全部份都验过（`recovery.rs` `replay_journal` 里 `named.locations.iter().all`），第一份读错就不再读第二份，
+    /// b = unit 的第二份于是一次都拦不到（V2 作废）；这一支量「一份就够」。
+    FirstCopyOfTheFirstNamedUnit,
+}
+
+impl ReplayBreak {
+    fn name(self) -> &'static str {
+        match self {
+            ReplayBreak::EveryRecord => "records",
+            ReplayBreak::FirstNamedUnit => "unit",
+            ReplayBreak::FirstCopyOfTheFirstNamedUnit => "unit_first_copy",
+        }
+    }
+}
+
+/// 抛弃步的落点：当前时间线上最新 `newest_roots_hidden` 条根的根槽，加断链发布（当前时间线上第 `newest_roots_hidden` 新的那条根的
+/// 那次发布）按 `replay_break` 取的落点。断链发布没有记录、或 b = unit 而它没有点名单元时交 None（这一支「不适用」）。
+fn unreadable_ranges_of_the_abandonment(
+    history: &SecondRunHistory,
+    geometry: &PoolGeometry,
+    newest_roots_hidden: usize,
+    form: UnreadableForm,
+    replay_break: ReplayBreak,
+) -> Result<Option<Vec<UnreadableRange>>, String> {
+    let count = history.timeline.len();
+    if newest_roots_hidden == 0 || newest_roots_hidden >= count {
+        return Err(format!(
+            "藏 {newest_roots_hidden} 条根：时间线只有 {count} 条"
+        ));
+    }
+    let mut ranges = Vec::new();
+    for root in &history.timeline[count - newest_roots_hidden..] {
+        let (device, offset) = root_slot_of(&history.pool, geometry, *root)
+            .ok_or_else(|| format!("时间线上的根 {root:?} 在根环里读不出（不绕环时不应发生）"))?;
+        ranges.push(UnreadableRange {
+            device,
+            offset,
+            length: u64::from(geometry.physical_block_size),
+            form,
+            label: format!("root{root:?}"),
+        });
+    }
+    let broken = history.timeline[count - newest_roots_hidden];
+    let records = records_of_publish(&history.pool, geometry, broken);
+    if records.is_empty() {
+        return Ok(None);
+    }
+    match replay_break {
+        ReplayBreak::EveryRecord => {
+            for (counter, offset, _) in &records {
+                for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+                    ranges.push(UnreadableRange {
+                        device,
+                        offset: *offset,
+                        length: JOURNAL_RECORD_BYTES,
+                        form,
+                        label: format!("record(counter={counter},device={})", device.0),
+                    });
+                }
+            }
+        }
+        ReplayBreak::FirstNamedUnit | ReplayBreak::FirstCopyOfTheFirstNamedUnit => {
+            let Some(named) = records
+                .iter()
+                .find_map(|(_, _, record)| record.named.first())
+            else {
+                return Ok(None);
+            };
+            let copies = if replay_break == ReplayBreak::FirstNamedUnit {
+                named.locations.len()
+            } else {
+                1
+            };
+            for location in named.locations.iter().take(copies) {
+                ranges.push(UnreadableRange {
+                    device: location.device,
+                    offset: location.slot.0 * SLOT_BYTES_LOCAL,
+                    length: SLOT_BYTES_LOCAL,
+                    form,
+                    label: format!(
+                        "unit(device={},slot={})",
+                        location.device.0, location.slot.0
+                    ),
+                });
+            }
+        }
+    }
+    Ok(Some(ranges))
+}
+
+/// 一条根引用的单元（装在 `pool` 上读）：它的账里没释放的分配记录（`recovery::allocation_records_under_root`），
+/// 加根记录直接指着的树表、映射树根、分配记录树根与实例表链认得出的各片。交回 (盘, 起始槽, 槽数)。
+fn placements_referenced_by_root_on(
+    pool: &MemoryPool,
+    root: &RootRecord,
+) -> Result<BTreeSet<(u32, u64, u64)>, String> {
+    let devices = devices_from_pool(pool, IMAGE_BYTES);
+    let mut placements = BTreeSet::new();
+    let records = allocation_records_under_root(&devices, root)
+        .map_err(|error| format!("账读不出: {error:?}"))?;
+    for record in records.iter().filter(|record| !record.is_released) {
+        placements.insert((record.device.0, record.slot.0, u64::from(record.span_slots)));
+    }
+    let direct_pointers = [
+        &root.tree_table,
+        &root.mapping_root,
+        &root.allocation_record_tree_root,
+    ];
+    let instance_table_pages =
+        singlefs_core::recovery::instance_table_page_pointers_as_far_as_readable(&devices, root);
+    for pointer in direct_pointers
+        .into_iter()
+        .chain(instance_table_pages.iter())
+    {
+        for location in &pointer.locations {
+            if location.slot.0 != 0 {
+                placements.insert((location.device.0, location.slot.0, 1));
+            }
+        }
+    }
+    Ok(placements)
+}
+
+/// `placements` 里有几处在 `before` 与 `after` 两份镜像上字节不同（被覆盖）。
+fn placements_overwritten_between(
+    before: &MemoryPool,
+    after: &MemoryPool,
+    placements: &BTreeSet<(u32, u64, u64)>,
+) -> u64 {
+    placements
+        .iter()
+        .filter(|(device, slot, span)| {
+            let length = usize::try_from(span * SLOT_BYTES_LOCAL).expect("单元长");
+            before.read(*device, slot * SLOT_BYTES_LOCAL, length)
+                != after.read(*device, slot * SLOT_BYTES_LOCAL, length)
+        })
+        .count() as u64
+}
+
+/// 这份镜像上恢复会落到哪条根：`crates` 的 `choose_root` 与装置自己的择根（checker 解出的自证根里 (txg, 实例) 最大）逐条比，
+/// 对不上走停机 S5。交回 (那条根, 它的根记录)。
+fn landing_root_on(pool: &MemoryPool) -> Result<(TimelineRoot, RootRecord), String> {
+    let devices = devices_from_pool(pool, IMAGE_BYTES);
+    let system_configuration = singlefs_core::recovery::choose_system_configuration(&devices)
+        .map_err(|error| format!("择不出系统配置: {error:?}"))?;
+    let crates_choice = singlefs_core::recovery::choose_root(&devices, &system_configuration)
+        .ok_or("crates 择不出根")?;
+    let geometry = independent_geometry(pool)?;
+    let device_choice = readable_roots_independent(pool, &geometry)
+        .into_iter()
+        .max_by_key(|(instance, txg)| (*txg, *instance))
+        .ok_or("装置解不出任何自证根")?;
+    if root_pair(&crates_choice) != device_choice {
+        return Err(format!(
+            "S5：crates 择根 {:?} 与装置自己择的 {device_choice:?} 对不上",
+            root_pair(&crates_choice)
+        ));
+    }
+    Ok((device_choice, crates_choice))
+}
+
+/// 这份镜像上被抛弃的根（读法写死表「被抛弃的根」）：根环里 (txg, 实例) 最大那条根指着的实例表里，有行 (i, T) 且根的实例 = i、
+/// txg > T。实例表按 `crates` 的解析读出行，判定是装置自己的式子；逐条与 `root_is_abandoned_by_the_instance_table` 比，对不上走 S5。
+fn abandoned_roots_on(pool: &MemoryPool) -> Result<BTreeSet<TimelineRoot>, String> {
+    let (_, newest) = landing_root_on(pool)?;
+    let devices = devices_from_pool(pool, IMAGE_BYTES);
+    let table = instance_table_chain_of_root(&devices, &newest)
+        .map_err(|error| format!("最新根的实例表读不出: {error:?}"))?
+        .records;
+    let system_configuration = singlefs_core::recovery::choose_system_configuration(&devices)
+        .map_err(|error| format!("{error:?}"))?;
+    let mut abandoned = BTreeSet::new();
+    for root in singlefs_core::recovery::readable_roots(
+        &devices,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
+    ) {
+        let by_the_device = table.rows.iter().any(|row| {
+            row.instance.0 == root.instance.0 && root.checkpoint_txg.0 > row.selected_root_txg.0
+        });
+        let by_crates =
+            singlefs_core::recovery::root_is_abandoned_by_the_instance_table(&root, &table);
+        if by_the_device != by_crates {
+            return Err(format!(
+                "S5：根 {:?} 装置判被抛弃={by_the_device}、crates 判={by_crates}",
+                root_pair(&root)
+            ));
+        }
+        if by_the_device {
+            abandoned.insert(root_pair(&root));
+        }
+    }
+    Ok(abandoned)
+}
+
+/// 冷启动读回（`recovery::recover`，看 journal）的结局，比「最后一次确认的那一版」的内容：
+/// last_confirmed / other_content / no_file / failed:<成员>。另交回读回落到的根。
+fn read_back_against(
+    pool: &MemoryPool,
+    last_confirmed: &Option<Vec<u8>>,
+) -> (String, Option<TimelineRoot>) {
+    let devices = devices_from_pool(pool, IMAGE_BYTES);
+    let report = recover(&devices, JournalPolicy::Consult);
+    let root = chosen_root_of(&report.outcome);
+    let label = match &report.outcome {
+        RecoveryOutcome::FileRead { content, .. } => {
+            if Some(content.clone()) == *last_confirmed {
+                "last_confirmed".to_string()
+            } else {
+                "other_content".to_string()
+            }
+        }
+        RecoveryOutcome::NoFile { .. } => "no_file".to_string(),
+        RecoveryOutcome::Failed { failure, .. } => {
+            format!("failed:{}", error_member_of_debug(&format!("{failure:?}")))
+        }
+    };
+    (label, root)
+}
+
+/// 新实例第一次发布的 txg 按今天的规则该是几（跑前登记 7.1 第六行）：装置自己解出的、这次调用里读得出的根（藏起来的根槽不算）
+/// 与自证记录（两份都藏起来的不算）的 txg 取 max 再 + 1。
+fn first_txg_by_the_rule_of_today(
+    pool: &MemoryPool,
+    geometry: &PoolGeometry,
+    unreadable: &[UnreadableRange],
+) -> u64 {
+    let slots = checker_image::root_slot_positions(geometry);
+    let highest_root = checker_image::valid_roots(pool, geometry)
+        .into_iter()
+        .filter(|(region, slot, _)| {
+            slots
+                .iter()
+                .find(|(candidate_region, candidate_slot, _, _)| {
+                    candidate_region == region && candidate_slot == slot
+                })
+                .is_some_and(|(_, _, device, offset)| {
+                    !unreadable.iter().any(|range| {
+                        range.overlaps(
+                            DeviceIdentity(*device),
+                            *offset,
+                            u64::from(geometry.physical_block_size),
+                        )
+                    })
+                })
+        })
+        .map(|(_, _, view)| view.checkpoint_txg)
+        .max()
+        .unwrap_or(0);
+    let expected_filesystem_identifier = unit_filesystem_identifier(&FILESYSTEM_IDENTIFIER);
+    let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
+    let ring_slots = geometry.journal_ring_bytes / JOURNAL_RECORD_BYTES;
+    let mut highest_record = 0u64;
+    for slot_index in 0..ring_slots {
+        let offset = record_offset(slot_index + 1, geometry.journal_ring_bytes);
+        for device_number in [0u32, 1u32] {
+            if unreadable.iter().any(|range| {
+                range.overlaps(
+                    DeviceIdentity(device_number),
+                    offset.0,
+                    JOURNAL_RECORD_BYTES,
+                )
+            }) {
+                continue;
+            }
+            if let Some(record) = pool
+                .read(device_number, offset.0, record_bytes)
+                .and_then(|bytes| JournalRecord::parse(&bytes, expected_filesystem_identifier))
+            {
+                highest_record = highest_record.max(record.checkpoint_txg.0);
+            }
+        }
+    }
+    highest_root.max(highest_record) + 1
+}
+
+/// 系统配置里读得出的 F 的最大值（乙F-留环的水位那一半，与 `effective_rollback_floor` 的系统配置那一半同一取法）。
+fn highest_floor_in_the_system_configurations(pool: &MemoryPool, slot_spacing: u64) -> u64 {
+    let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES_LOCAL).expect("4096");
+    [0u32, 1]
+        .into_iter()
+        .flat_map(|device| [(device, 0u64), (device, slot_spacing)])
+        .filter_map(|(device, offset)| pool.read(device, offset, slot_bytes))
+        .filter_map(|bytes| {
+            singlefs_core::system_configuration::SystemConfiguration::parse_slot(&bytes).ok()
+        })
+        .map(|parsed| parsed.quantities.rollback_floor.0)
+        .max()
+        .unwrap_or(0)
+}
+
+// ---------------------------------------------------------------------------
+// 10.4 H1d：崩溃恢复把最新的根当成读不出、抛弃它、取号，这次可写挂载在写行根落盘之前断；故障撤掉、再挂载。
+//      每一格报三样：① 恢复落到的根引用的单元有没有被覆盖；② 再挂载那一次 K0–K4；③ 读回的是不是最后一次确认的那一版。
+// ---------------------------------------------------------------------------
+
+#[derive(Default)]
+struct HeldOnceFamilySummary {
+    cases: u64,
+    void_cases: u64,
+    overwritten_cases: u64,
+    newest_root_units_overwritten_cases: u64,
+    remount_classes: BTreeMap<&'static str, u64>,
+    read_back_after_remount: BTreeMap<String, u64>,
+    read_back_before_remount: BTreeMap<String, u64>,
+    trigger_positive_cases: u64,
+    last_confirmed_and_not_overwritten: u64,
+    /// 按断在哪一类（none / crash / write_fails / barrier_fails）分。
+    by_cut: BTreeMap<&'static str, HeldOnceCutSummary>,
+}
+
+#[derive(Default)]
+struct HeldOnceCutSummary {
+    cases: u64,
+    overwritten_cases: u64,
+    remount_classes: BTreeMap<&'static str, u64>,
+    read_back_after_remount: BTreeMap<String, u64>,
+}
+
+/// 一格 H1d：`post` 是那次挂载断掉之后盘上的样子（故障已撤）。`newest_root_units` 是被藏的那条（最新的）根在 `base` 上引用的单元。
+/// ① 按「恢复落到的根」取：它在 `base` 上就是一条自证根时，比它引用的单元在 `base` 与 `post` 上的字节；它是这次挂载自己写出的根
+/// （挂载做完了的那一格）时，它的单元就是这次写的，记「这次挂载里写的，没被覆盖」。被藏那条根的单元另报一栏。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "一格的全部坐标原样打进结果行，拆成结构体只多一层搬运"
+)]
+fn evaluate_held_once_cell(
+    arm: &str,
+    coordinates: &str,
+    cut: &'static str,
+    base: &MemoryPool,
+    post: &MemoryPool,
+    parameters: &MakeFilesystemParameters,
+    last_confirmed: &Option<Vec<u8>>,
+    newest_root_units: &BTreeSet<(u32, u64, u64)>,
+    abandon_mount_outcome: &str,
+    abandon_mount_trigger: Option<u64>,
+    summary: &mut HeldOnceFamilySummary,
+) {
+    summary.cases += 1;
+    let (landing, landing_record) = match landing_root_on(post) {
+        Ok(found) => found,
+        Err(error) => {
+            emit_result(&format!(
+                "name=r2_h1d_cell arm={arm} {coordinates} verdict=stop reason={error:?}"
+            ));
+            summary.void_cases += 1;
+            return;
+        }
+    };
+    let landing_in_base = independent_geometry(base)
+        .map(|geometry| readable_roots_independent(base, &geometry).contains(&landing))
+        .unwrap_or(false);
+    let (overwritten, referenced_count) = if landing_in_base {
+        match placements_referenced_by_root_on(base, &landing_record) {
+            Ok(referenced) => (
+                placements_overwritten_between(base, post, &referenced).to_string(),
+                referenced.len().to_string(),
+            ),
+            Err(error) => (format!("unreadable_in_base:{error}"), "none".to_string()),
+        }
+    } else {
+        ("written_in_this_mount".to_string(), "none".to_string())
+    };
+    let overwritten_now = overwritten.parse::<u64>().is_ok_and(|count| count > 0);
+    if overwritten_now {
+        summary.overwritten_cases += 1;
+    }
+    let newest_root_units_overwritten =
+        placements_overwritten_between(base, post, newest_root_units);
+    if newest_root_units_overwritten > 0 {
+        summary.newest_root_units_overwritten_cases += 1;
+    }
+    let (read_back_before, read_back_before_root) = read_back_against(post, last_confirmed);
+    let remount = run_instrumented_mount_writable(post, parameters, &[], None, None);
+    let class = mount_outcome_class(&remount.result, remount.write_calls);
+    let member = mount_error_member_or_none(&remount.result);
+    let remount_trigger = remount
+        .result
+        .as_ref()
+        .ok()
+        .map(|mounted| mounted.output.abandoned_roots_unreadable);
+    let remount_chosen = remount
+        .result
+        .as_ref()
+        .ok()
+        .map(|mounted| root_pair(&mounted.output.chosen_root));
+    let (read_back_after, read_back_after_root) =
+        read_back_against(&remount.pool_after, last_confirmed);
+    if abandon_mount_trigger.is_some_and(|count| count > 0)
+        || remount_trigger.is_some_and(|count| count > 0)
+    {
+        summary.trigger_positive_cases += 1;
+    }
+    if read_back_after == "last_confirmed" && !overwritten_now {
+        summary.last_confirmed_and_not_overwritten += 1;
+    }
+    let by_cut = summary.by_cut.entry(cut).or_default();
+    by_cut.cases += 1;
+    if overwritten_now {
+        by_cut.overwritten_cases += 1;
+    }
+    *by_cut.remount_classes.entry(class).or_insert(0) += 1;
+    *by_cut
+        .read_back_after_remount
+        .entry(read_back_after.clone())
+        .or_insert(0) += 1;
+    *summary.remount_classes.entry(class).or_insert(0) += 1;
+    *summary
+        .read_back_after_remount
+        .entry(read_back_after.clone())
+        .or_insert(0) += 1;
+    *summary
+        .read_back_before_remount
+        .entry(read_back_before.clone())
+        .or_insert(0) += 1;
+    emit_result(&format!(
+        "name=r2_h1d_cell arm={arm} {coordinates} abandon_mount={abandon_mount_outcome} abandon_mount_abandoned_roots_unreadable={} landing_root={landing:?} landing_root_in_base={landing_in_base} referenced_placements={referenced_count} cell1_overwritten_placements={overwritten} cell1_overwritten={overwritten_now} newest_root_units={} newest_root_units_overwritten={newest_root_units_overwritten} cell2_remount_class={class} remount_error={member} remount_writes={} remount_chosen_root={} remount_abandoned_roots_unreadable={} read_back_before_remount={read_back_before} read_back_before_remount_root={} cell3_read_back_after_remount={read_back_after} read_back_after_remount_root={} cell3_is_last_confirmed={}",
+        abandon_mount_trigger.map_or("none".to_string(), |count| count.to_string()),
+        newest_root_units.len(),
+        remount.write_calls,
+        remount_chosen.map_or("none".to_string(), |root| format!("{root:?}")),
+        remount_trigger.map_or("none".to_string(), |count| count.to_string()),
+        read_back_before_root.map_or("none".to_string(), |root| format!("{root:?}")),
+        read_back_after_root.map_or("none".to_string(), |root| format!("{root:?}")),
+        read_back_after == "last_confirmed"
+    ));
+}
+
+/// 故障有没有全拦到读（V2）：点了名而一次都没拦到的落点列出来。
+fn unintercepted_ranges(ranges: &[UnreadableRange], intercepted: &[u64]) -> Vec<String> {
+    ranges
+        .iter()
+        .zip(intercepted)
+        .filter(|(_, count)| **count == 0)
+        .map(|(range, _)| range.label.clone())
+        .collect()
+}
+
+/// H1d 的 n1：首个文件之后几次覆盖写。取 0 起（第 2 次跑修订：跑前修订没给 H1d 的参数；n1 = 0 时最新那条根就是首个文件，
+/// 它前一条是写行之后的暖机根、树表 0 条，站在那条根看首个文件那次发布开的段是全空的——实七那一形的前提；n1 ≥ 1 时最新那条根的单元
+/// 与前一条根的单元在同一个开放段里，写行那次发布开的是更高的新段，碰不到它们）。
+const HELD_ONCE_OVERWRITES: [u64; 4] = [0, 1, 2, 3];
+
+fn run_held_once_family(geometry: &Geometry, arm: &str) {
+    let parameters = parameters_for(geometry);
+    let mut summary = HeldOnceFamilySummary::default();
+    for overwrites in HELD_ONCE_OVERWRITES {
+        let mut history = match second_run_start(geometry, overwrites) {
+            Ok(history) => history,
+            Err(error) => {
+                emit_result(&format!(
+                    "name=r2_h1d_history arm={arm} n1={overwrites} verdict=stop reason={error:?}"
+                ));
+                continue;
+            }
+        };
+        if let Err(error) =
+            second_run_close(&mut history, &parameters, Closing::ProcessExit, arm, "h1d")
+        {
+            emit_result(&format!(
+                "name=r2_h1d_history arm={arm} n1={overwrites} verdict=stop reason={error:?}"
+            ));
+            continue;
+        }
+        let base = history.pool.clone();
+        let Ok(pool_geometry) = independent_geometry(&base) else {
+            emit_result(&format!(
+                "name=r2_h1d_history arm={arm} n1={overwrites} verdict=stop reason=\"S5：几何解不出\""
+            ));
+            continue;
+        };
+        let root_slots = root_slot_device_offsets(&pool_geometry);
+        let last_confirmed = history.tip_content();
+        let newest_root_units = match landing_root_on(&base)
+            .and_then(|(_, record)| placements_referenced_by_root_on(&base, &record))
+        {
+            Ok(units) => units,
+            Err(error) => {
+                emit_result(&format!(
+                    "name=r2_h1d_history arm={arm} n1={overwrites} verdict=stop reason={error:?}"
+                ));
+                continue;
+            }
+        };
+        for form in [UnreadableForm::ReadFails, UnreadableForm::ReadsZeros] {
+            for replay_break in [
+                ReplayBreak::EveryRecord,
+                ReplayBreak::FirstNamedUnit,
+                ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+            ] {
+                let head = format!(
+                    "n1={overwrites} tip={:?} form={} break={}",
+                    history.tip(),
+                    form.name(),
+                    replay_break.name()
+                );
+                let ranges = match unreadable_ranges_of_the_abandonment(
+                    &history,
+                    &pool_geometry,
+                    1,
+                    form,
+                    replay_break,
+                ) {
+                    Ok(Some(ranges)) => ranges,
+                    Ok(None) => {
+                        emit_result(&format!(
+                            "name=r2_h1d_reference arm={arm} {head} verdict=not_applicable"
+                        ));
+                        continue;
+                    }
+                    Err(error) => {
+                        emit_result(&format!(
+                            "name=r2_h1d_reference arm={arm} {head} verdict=stop reason={error:?}"
+                        ));
+                        continue;
+                    }
+                };
+                let reference =
+                    run_instrumented_mount_writable(&base, &parameters, &ranges, None, None);
+                let missed = unintercepted_ranges(&ranges, &reference.intercepted_reads);
+                let first_root_write = index_of_the_first_root_slot_write(
+                    &reference.applied,
+                    &root_slots,
+                    u64::from(pool_geometry.physical_block_size),
+                );
+                let reference_class = mount_outcome_class(&reference.result, reference.write_calls);
+                let reference_first_txg = reference
+                    .result
+                    .as_ref()
+                    .ok()
+                    .map(|mounted| mounted.output.row_publish.root().checkpoint_txg.0);
+                let rule_of_today = first_txg_by_the_rule_of_today(&base, &pool_geometry, &ranges);
+                emit_result(&format!(
+                    "name=r2_h1d_reference arm={arm} {head} faults={} unintercepted={missed:?} class={reference_class} error={} writes={} chosen_root={} row_publish_txg={} first_txg_by_the_rule_of_today={rule_of_today} abandoned_roots_unreadable={} writes_before_the_row_root={}",
+                    ranges.len(),
+                    mount_error_member_or_none(&reference.result),
+                    reference.write_calls,
+                    reference
+                        .result
+                        .as_ref()
+                        .ok()
+                        .map_or("none".to_string(), |mounted| format!("{:?}", root_pair(&mounted.output.chosen_root))),
+                    reference_first_txg.map_or("none".to_string(), |txg| txg.to_string()),
+                    reference
+                        .result
+                        .as_ref()
+                        .ok()
+                        .map_or("none".to_string(), |mounted| mounted.output.abandoned_roots_unreadable.to_string()),
+                    first_root_write.map_or("none".to_string(), |index| index.to_string()),
+                ));
+                if !missed.is_empty() {
+                    summary.void_cases += 1;
+                    continue;
+                }
+                let reference_trigger = reference
+                    .result
+                    .as_ref()
+                    .ok()
+                    .map(|mounted| mounted.output.abandoned_roots_unreadable);
+                evaluate_held_once_cell(
+                    arm,
+                    &format!("{head} cut=none point=none"),
+                    "none",
+                    &base,
+                    &reference.pool_after,
+                    &parameters,
+                    &last_confirmed,
+                    &newest_root_units,
+                    reference_class,
+                    reference_trigger,
+                    &mut summary,
+                );
+                let Some(first_root_write) = first_root_write else {
+                    continue;
+                };
+                for write_count in 0..=first_root_write {
+                    let post = image_with_the_first_writes(&base, &reference.applied, write_count);
+                    evaluate_held_once_cell(
+                        arm,
+                        &format!("{head} cut=crash point={write_count}"),
+                        "crash",
+                        &base,
+                        &post,
+                        &parameters,
+                        &last_confirmed,
+                        &newest_root_units,
+                        "crashed",
+                        None,
+                        &mut summary,
+                    );
+                }
+                for failing_write in 0..=first_root_write {
+                    let failed = run_instrumented_mount_writable(
+                        &base,
+                        &parameters,
+                        &ranges,
+                        Some(u64::try_from(failing_write).expect("写序号")),
+                        None,
+                    );
+                    let failed_class = mount_outcome_class(&failed.result, failed.write_calls);
+                    let outcome = format!(
+                        "{failed_class}:{}:fired={}",
+                        mount_error_member_or_none(&failed.result),
+                        failed.injected_failure_fired
+                    );
+                    let trigger = failed
+                        .result
+                        .as_ref()
+                        .ok()
+                        .map(|mounted| mounted.output.abandoned_roots_unreadable);
+                    evaluate_held_once_cell(
+                        arm,
+                        &format!("{head} cut=write_fails point={failing_write}"),
+                        "write_fails",
+                        &base,
+                        &failed.pool_after,
+                        &parameters,
+                        &last_confirmed,
+                        &newest_root_units,
+                        &outcome,
+                        trigger,
+                        &mut summary,
+                    );
+                }
+                let barriers = barriers_before_write(&reference.applied, first_root_write + 1);
+                for failing_barrier in 0..barriers {
+                    let failed = run_instrumented_mount_writable(
+                        &base,
+                        &parameters,
+                        &ranges,
+                        None,
+                        Some(failing_barrier),
+                    );
+                    let failed_class = mount_outcome_class(&failed.result, failed.write_calls);
+                    let outcome = format!(
+                        "{failed_class}:{}:fired={}",
+                        mount_error_member_or_none(&failed.result),
+                        failed.injected_failure_fired
+                    );
+                    let trigger = failed
+                        .result
+                        .as_ref()
+                        .ok()
+                        .map(|mounted| mounted.output.abandoned_roots_unreadable);
+                    evaluate_held_once_cell(
+                        arm,
+                        &format!("{head} cut=barrier_fails point={failing_barrier}"),
+                        "barrier_fails",
+                        &base,
+                        &failed.pool_after,
+                        &parameters,
+                        &last_confirmed,
+                        &newest_root_units,
+                        &outcome,
+                        trigger,
+                        &mut summary,
+                    );
+                }
+            }
+        }
+    }
+    emit_result(&format!(
+        "name=r2_h1d_summary arm={arm} geometry={} cases={} void_cases={} cell1_overwritten_cases={} newest_root_units_overwritten_cases={} cell2_remount_classes={:?} cell3_read_back_after_remount={:?} read_back_before_remount={:?} trigger_positive_cases={} last_confirmed_and_not_overwritten={}",
+        geometry.label,
+        summary.cases,
+        summary.void_cases,
+        summary.overwritten_cases,
+        summary.newest_root_units_overwritten_cases,
+        summary.remount_classes,
+        summary.read_back_after_remount,
+        summary.read_back_before_remount,
+        summary.trigger_positive_cases,
+        summary.last_confirmed_and_not_overwritten
+    ));
+    // 岔路单第 1 行 (b)、(c) 两个指称：这两条臂不在 `crates/` 里实现（跑前登记第三节末句），它们与今天的差别只在
+    // 「取号之前或别处的计数 > 0」的那几格（(c) 另在盘上记一笔，落点未定）；计数全 0 时它们的三格就是今天那一臂的三格。
+    for (cut, by_cut) in &summary.by_cut {
+        emit_result(&format!(
+            "name=r2_h1d_summary_by_cut arm={arm} cut={cut} cases={} cell1_overwritten_cases={} cell2_remount_classes={:?} cell3_read_back_after_remount={:?}",
+            by_cut.cases,
+            by_cut.overwritten_cases,
+            by_cut.remount_classes,
+            by_cut.read_back_after_remount
+        ));
+    }
+    if arm != "today" {
+        return;
+    }
+    for (fork_one_arm, referent) in [
+        ("(b)原形", "tree_table"),
+        ("(b)原形", "allocation_record_tree"),
+        ("(b)含链", "tree_table"),
+        ("(b)含链", "allocation_record_tree"),
+        ("(c)", "tree_table"),
+        ("(c)", "allocation_record_tree"),
+    ] {
+        emit_result(&format!(
+            "name=r2_h1d_fork_one_derived arm={arm} fork_one_arm={fork_one_arm} referent={referent} cases_where_it_differs_from_this_copy={} cells=same_as_this_copy_except_those",
+            summary.trigger_positive_cases
+        ));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 10.5 Q1-0：H1c 的抛弃步 A(k, b) 在今天的代码上造出几条被抛弃的根（前提 1 在装置上的读数）。故障一律读错（读法写死表「故障」）。
+// ---------------------------------------------------------------------------
+
+fn run_abandonment_step_family(geometry: &Geometry, arm: &str) {
+    let parameters = parameters_for(geometry);
+    let mut attempted = 0u64;
+    let mut not_applicable = 0u64;
+    let mut void_attempts = 0u64;
+    let mut mounted_count = 0u64;
+    let mut producing = 0u64;
+    let mut abandoned_total = 0u64;
+    let mut fewest_faults: Option<usize> = None;
+    let mut first_txg_rule_mismatches = 0u64;
+    let mut below_floor_rows = 0u64;
+    for overwrites in [1u64, 2, 3] {
+        for closing in [Closing::ProcessExit, Closing::NormalUnmount] {
+            let mut history = match second_run_start(geometry, overwrites) {
+                Ok(history) => history,
+                Err(error) => {
+                    emit_result(&format!(
+                        "name=r2_q1_0_history arm={arm} n1={overwrites} c1={} verdict=stop reason={error:?}",
+                        closing.name()
+                    ));
+                    continue;
+                }
+            };
+            if let Err(error) = second_run_close(
+                &mut history,
+                &parameters,
+                closing,
+                arm,
+                &format!("q1-0 n1={overwrites}"),
+            ) {
+                emit_result(&format!(
+                    "name=r2_q1_0_history arm={arm} n1={overwrites} c1={} verdict=stop reason={error:?}",
+                    closing.name()
+                ));
+                continue;
+            }
+            let Ok(pool_geometry) = independent_geometry(&history.pool) else {
+                continue;
+            };
+            let slot_spacing = u64::from(parameters.geometry.fixed_structure_slot_spacing);
+            let floor_before =
+                highest_floor_in_the_system_configurations(&history.pool, slot_spacing);
+            let ring_slot_count = 3 * geometry.slots_per_region;
+            let timeline_length = history.timeline.len();
+            emit_result(&format!(
+                "name=r2_q1_0_history arm={arm} n1={overwrites} c1={} timeline={:?} timeline_roots={timeline_length} root_ring_slots={ring_slot_count} highest_floor_in_the_system_configurations={floor_before}",
+                closing.name(),
+                history.timeline
+            ));
+            for hidden in 1..timeline_length {
+                for replay_break in [
+                    ReplayBreak::EveryRecord,
+                    ReplayBreak::FirstNamedUnit,
+                    ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+                ] {
+                    attempted += 1;
+                    let head = format!(
+                        "n1={overwrites} c1={} k={hidden} b={}",
+                        closing.name(),
+                        replay_break.name()
+                    );
+                    let ranges = match unreadable_ranges_of_the_abandonment(
+                        &history,
+                        &pool_geometry,
+                        hidden,
+                        UnreadableForm::ReadFails,
+                        replay_break,
+                    ) {
+                        Ok(Some(ranges)) => ranges,
+                        Ok(None) => {
+                            not_applicable += 1;
+                            emit_result(&format!(
+                                "name=r2_q1_0 arm={arm} {head} verdict=not_applicable"
+                            ));
+                            continue;
+                        }
+                        Err(error) => {
+                            emit_result(&format!(
+                                "name=r2_q1_0 arm={arm} {head} verdict=stop reason={error:?}"
+                            ));
+                            continue;
+                        }
+                    };
+                    let run = run_instrumented_mount_writable(
+                        &history.pool,
+                        &parameters,
+                        &ranges,
+                        None,
+                        None,
+                    );
+                    let missed = unintercepted_ranges(&ranges, &run.intercepted_reads);
+                    let class = mount_outcome_class(&run.result, run.write_calls);
+                    if !missed.is_empty() {
+                        void_attempts += 1;
+                    }
+                    let rule_of_today =
+                        first_txg_by_the_rule_of_today(&history.pool, &pool_geometry, &ranges);
+                    let (chosen, row_txg, abandoned_text, abandoned_count) = match &run.result {
+                        Ok(mounted) => {
+                            mounted_count += 1;
+                            let row_txg = mounted.output.row_publish.root().checkpoint_txg.0;
+                            if row_txg != rule_of_today {
+                                first_txg_rule_mismatches += 1;
+                            }
+                            if row_txg <= floor_before {
+                                below_floor_rows += 1;
+                            }
+                            match abandoned_roots_on(&run.pool_after) {
+                                Ok(abandoned) => {
+                                    let count = abandoned.len() as u64;
+                                    if count > 0 && missed.is_empty() {
+                                        producing += 1;
+                                        abandoned_total += count;
+                                        fewest_faults =
+                                            Some(fewest_faults.map_or(ranges.len(), |fewest| {
+                                                fewest.min(ranges.len())
+                                            }));
+                                    }
+                                    (
+                                        format!("{:?}", root_pair(&mounted.output.chosen_root)),
+                                        row_txg.to_string(),
+                                        format!("{abandoned:?}"),
+                                        count,
+                                    )
+                                }
+                                Err(error) => (
+                                    format!("{:?}", root_pair(&mounted.output.chosen_root)),
+                                    row_txg.to_string(),
+                                    format!("stop:{error}"),
+                                    0,
+                                ),
+                            }
+                        }
+                        Err(_) => (
+                            "none".to_string(),
+                            "none".to_string(),
+                            "none".to_string(),
+                            0,
+                        ),
+                    };
+                    emit_result(&format!(
+                        "name=r2_q1_0 arm={arm} {head} faults={} unintercepted={missed:?} class={class} error={} writes={} chosen_root={chosen} expected_chosen_root={:?} row_publish_txg={row_txg} first_txg_by_the_rule_of_today={rule_of_today} highest_floor_in_the_system_configurations={floor_before} abandoned_count={abandoned_count} abandoned={abandoned_text:?}",
+                        ranges.len(),
+                        mount_error_member_or_none(&run.result),
+                        run.write_calls,
+                        history.timeline[timeline_length - 1 - hidden],
+                    ));
+                }
+            }
+        }
+    }
+    emit_result(&format!(
+        "name=r2_q1_0_summary arm={arm} geometry={} attempted={attempted} not_applicable={not_applicable} void_attempts={void_attempts} mounted={mounted_count} producing_at_least_one_abandoned_root={producing} abandoned_roots_total={abandoned_total} fewest_faults_that_produced_one={} first_txg_rule_of_today_mismatches={first_txg_rule_mismatches} row_publish_txg_at_or_below_the_floor={below_floor_rows}",
+        geometry.label,
+        fewest_faults.map_or("none".to_string(), |fewest| fewest.to_string())
+    ));
+}
+
+// ---------------------------------------------------------------------------
+// 10.6 实七报告「交主 agent 的」第 1 条点名的两段历史（H1d 的取样要罩住它们，跑前修订原话）：照 `crates/singlefs-harness`
+//      自己的注入器原样重跑，报每个新发现的签名与重开走到哪、有没有「映射落点读不出」。
+// ---------------------------------------------------------------------------
+
+fn run_seventh_batch_reproductions(arm: &str) {
+    use singlefs_harness::history::{
+        generate_history_with_weights, GenerationWeights, HistoryDeviceWidth, HistoryExecution,
+        HistorySeed, PerStepChecker,
+    };
+    let fault_seed =
+        SEED_BASE_OF_THIS_TEST_CYCLE_LOCAL + SEVENTH_BATCH_FAULT_REPRODUCTION_SEED_OFFSET;
+    let fault_history = generate_history_with_weights(
+        HistorySeed(fault_seed),
+        SEVENTH_BATCH_FAULT_REPRODUCTION_OPERATIONS,
+        &GenerationWeights::BROAD,
+    );
+    let fault_injection = singlefs_harness::fault_injection::inject_faults_into_history(
+        &fault_history,
+        HistoryExecution {
+            per_step_checker: PerStepChecker::Run,
+            device_width: HistoryDeviceWidth::FourGibibytes,
+            space_admission: singlefs_core::admission::SpaceAdmission::JudgedByTheFormula,
+        },
+        SEVENTH_BATCH_FAULT_REPRODUCTION_FAULTS,
+    );
+    for drawn in &fault_injection.drawn_faults {
+        emit_result(&format!(
+            "name=r2_seventh_batch_fault_drawn arm={arm} seed={fault_seed} drawn={:?}",
+            drawn.render()
+        ));
+    }
+    let mut mapping_unreadable = 0u64;
+    for finding in &fault_injection.new_findings {
+        let violations: Vec<&str> = finding
+            .observation
+            .violations
+            .iter()
+            .map(|(invariant, _)| *invariant)
+            .collect();
+        let names_mapping = finding.reopen.contains("MappingStillUnreadable");
+        if names_mapping {
+            mapping_unreadable += 1;
+        }
+        emit_result(&format!(
+            "name=r2_seventh_batch_fault_finding arm={arm} seed={fault_seed} drawn={:?} signature={:?} reopen={:?} violations={violations:?} reopen_names_mapping_still_unreadable={names_mapping}",
+            finding.drawn.render(),
+            finding.signature,
+            finding.reopen
+        ));
+    }
+    emit_result(&format!(
+        "name=r2_seventh_batch_fault_summary arm={arm} seed={fault_seed} drawn={} new_findings={} findings_reopening_to_mapping_still_unreadable={mapping_unreadable} known_red_hits={}",
+        fault_injection.drawn_faults.len(),
+        fault_injection.new_findings.len(),
+        fault_injection.known_red_hits.len()
+    ));
+    let crash_seed =
+        SEED_BASE_OF_THIS_TEST_CYCLE_LOCAL + SEVENTH_BATCH_CRASH_REPRODUCTION_SEED_OFFSET;
+    let crash_history = generate_history_with_weights(
+        HistorySeed(crash_seed),
+        SEVENTH_BATCH_CRASH_REPRODUCTION_OPERATIONS,
+        &GenerationWeights::BROAD,
+    );
+    let crash_injection = singlefs_harness::crash_injection::inject_crashes_into_history(
+        &crash_history,
+        HistoryExecution {
+            per_step_checker: PerStepChecker::Skipped,
+            device_width: HistoryDeviceWidth::FourGibibytes,
+            space_admission: singlefs_core::admission::SpaceAdmission::JudgedByTheFormula,
+        },
+        singlefs_harness::crash_injection::CrashPointDraw::Sampled {
+            crash_points_per_history: SEVENTH_BATCH_CRASH_REPRODUCTION_CRASH_POINTS,
+        },
+        None,
+    );
+    for crash_point in &crash_injection.crash_points {
+        emit_result(&format!(
+            "name=r2_seventh_batch_crash_point arm={arm} seed={crash_seed} point={:?} step={:?} operation={:?}",
+            crash_point.render(),
+            crash_point.step,
+            crash_point.operation_kind
+        ));
+    }
+    let mut crash_mapping_unreadable = 0u64;
+    for finding in &crash_injection.new_findings {
+        let violations: Vec<&str> = finding
+            .observation
+            .violations
+            .iter()
+            .map(|(invariant, _)| *invariant)
+            .collect();
+        let names_mapping = finding.read_back.contains("MappingStillUnreadable");
+        if names_mapping {
+            crash_mapping_unreadable += 1;
+        }
+        emit_result(&format!(
+            "name=r2_seventh_batch_crash_finding arm={arm} seed={crash_seed} point={:?} operation={:?} signature={:?} read_back={:?} violations={violations:?} read_back_names_mapping_still_unreadable={names_mapping}",
+            finding.crash_point.render(),
+            finding.crash_point.operation_kind,
+            finding.signature,
+            finding.read_back
+        ));
+    }
+    emit_result(&format!(
+        "name=r2_seventh_batch_crash_summary arm={arm} seed={crash_seed} crash_points={} new_findings={} findings_reading_back_mapping_still_unreadable={crash_mapping_unreadable} known_red_hits={}",
+        crash_injection.crash_points.len(),
+        crash_injection.new_findings.len(),
+        crash_injection.known_red_hits.len()
+    ));
+}
+
+// ---------------------------------------------------------------------------
+// 10.7 PC1-a / PC1-b / PC1-c（跑前登记 5.2 阳性对照；第一段只跑今天那一臂与 (c)、A1 副本上 PC1-a 的 (a) 那一句，
+//      (b) 两个指称的那几句归第二段）。被抛弃根取自 H1c 的抛弃步（固定次序 n1、c1、k、b，m = 0、c2 = C），op1 = O1、瞬时。
+// ---------------------------------------------------------------------------
+
+/// H1c 抛弃步造出的一个节点：抛弃步交 `Ok`、点了名的落点全拦到（V2）、按新实例表判出至少一条被抛弃的根。
+struct AbandonmentStepNode {
+    label: String,
+    pool: MemoryPool,
+    abandoned: BTreeSet<TimelineRoot>,
+}
+
+/// H1c 抛弃步造出的节点，按固定次序（n1、c1、k、b）；故障一律读错。
+fn abandonment_step_node_list(geometry: &Geometry) -> Vec<AbandonmentStepNode> {
+    let parameters = parameters_for(geometry);
+    let mut nodes = Vec::new();
+    for overwrites in [1u64, 2, 3] {
+        for closing in [Closing::ProcessExit, Closing::NormalUnmount] {
+            let Ok(mut history) = second_run_start(geometry, overwrites) else {
+                continue;
+            };
+            if second_run_close(&mut history, &parameters, closing, "node-list", "node-list")
+                .is_err()
+            {
+                continue;
+            }
+            let Ok(pool_geometry) = independent_geometry(&history.pool) else {
+                continue;
+            };
+            for hidden in 1..history.timeline.len() {
+                for replay_break in [
+                    ReplayBreak::EveryRecord,
+                    ReplayBreak::FirstNamedUnit,
+                    ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+                ] {
+                    let Ok(Some(ranges)) = unreadable_ranges_of_the_abandonment(
+                        &history,
+                        &pool_geometry,
+                        hidden,
+                        UnreadableForm::ReadFails,
+                        replay_break,
+                    ) else {
+                        continue;
+                    };
+                    let run = run_instrumented_mount_writable(
+                        &history.pool,
+                        &parameters,
+                        &ranges,
+                        None,
+                        None,
+                    );
+                    if run.result.is_err()
+                        || !unintercepted_ranges(&ranges, &run.intercepted_reads).is_empty()
+                    {
+                        continue;
+                    }
+                    let Ok(abandoned) = abandoned_roots_on(&run.pool_after) else {
+                        continue;
+                    };
+                    if abandoned.is_empty() {
+                        continue;
+                    }
+                    nodes.push(AbandonmentStepNode {
+                        label: format!(
+                            "n1={overwrites} c1={} k={hidden} b={}",
+                            closing.name(),
+                            replay_break.name()
+                        ),
+                        pool: run.pool_after,
+                        abandoned,
+                    });
+                }
+            }
+        }
+    }
+    nodes
+}
+
+fn ranges_of_both_copies(locations: &[LocationEntry; 2], label: &str) -> Vec<UnreadableRange> {
+    locations
+        .iter()
+        .map(|location| UnreadableRange {
+            device: location.device,
+            offset: location.slot.0 * SLOT_BYTES_LOCAL,
+            length: SLOT_BYTES_LOCAL,
+            form: UnreadableForm::ReadFails,
+            label: format!(
+                "{label}(device={},slot={})",
+                location.device.0, location.slot.0
+            ),
+        })
+        .collect()
+}
+
+/// 一条根某个单元的位置键（(盘, 槽)）；取不到时 None。
+type UnitKeysOfARoot<'reader> = dyn Fn(&RootRecord) -> Option<BTreeSet<(u32, u64)>> + 'reader;
+
+fn location_keys(locations: &[LocationEntry; 2]) -> BTreeSet<(u32, u64)> {
+    locations.iter().map(location_key).collect()
+}
+
+/// 一次 op1（O1、瞬时）的结局行，外加这一臂按跑前登记 5.2 该出的结局判没判对：今天那一臂与 (c) 要 `Ok` 且计数 = 装置数的；
+/// A1 副本（PC1-a、PC1-c 两句）按那一句写的；别的臂没有登记结局，只报。
+#[allow(clippy::too_many_arguments, reason = "一行结果的全部栏目原样打出")]
+fn emit_positive_control(
+    arm: &str,
+    control: &str,
+    node_label: &str,
+    abandoned_root: TimelineRoot,
+    ranges: &[UnreadableRange],
+    run: &InstrumentedMount,
+    expected_count: u64,
+    extra: &str,
+) -> bool {
+    let missed = unintercepted_ranges(ranges, &run.intercepted_reads);
+    let class = mount_outcome_class(&run.result, run.write_calls);
+    let member = mount_error_member_or_none(&run.result);
+    let count = run
+        .result
+        .as_ref()
+        .ok()
+        .map(|mounted| mounted.output.abandoned_roots_unreadable);
+    let isolated: Option<u64> = run.result.as_ref().ok().map(|mounted| {
+        mounted
+            .output
+            .isolated_slots_per_device
+            .iter()
+            .map(|(_, slots)| *slots)
+            .sum()
+    });
+    let (expectation, passed) = match (arm, control) {
+        ("A1", "PC1-a") => (
+            "AbandonedRootLedgerUnreadable_and_zero_writes",
+            member == "AbandonedRootLedgerUnreadable" && run.write_calls == 0,
+        ),
+        ("A1", "PC1-c") => ("ok", run.result.is_ok()),
+        ("today", "PC1-c") => (
+            "ok_count_zero_isolated_zero",
+            count == Some(0) && isolated == Some(0),
+        ),
+        ("today", _) => (
+            "ok_count_equals_the_device_count",
+            count == Some(expected_count),
+        ),
+        _ => ("not_registered_for_this_arm", true),
+    };
+    let passed = passed && missed.is_empty();
+    emit_result(&format!(
+        "name=r2_positive_control arm={arm} control={control} node={node_label:?} abandoned_root={abandoned_root:?} faults={} unintercepted={missed:?} class={class} error={member} writes={} abandoned_roots_unreadable={} expected_count_by_the_device={expected_count} isolated_slots={} {extra} expectation={expectation} verdict={}",
+        ranges.len(),
+        run.write_calls,
+        count.map_or("none".to_string(), |value| value.to_string()),
+        isolated.map_or("none".to_string(), |value| value.to_string()),
+        if passed { "pass" } else { "fail" }
+    ));
+    passed
+}
+
+fn run_ledger_positive_controls(geometry: &Geometry, arm: &str) {
+    let parameters = parameters_for(geometry);
+    let nodes = abandonment_step_node_list(geometry);
+    emit_result(&format!(
+        "name=r2_positive_control_nodes arm={arm} nodes={}",
+        nodes.len()
+    ));
+    let mut ledger_unit_controls_found = false;
+    'search: for node in &nodes {
+        let Ok(pool_geometry) = independent_geometry(&node.pool) else {
+            continue;
+        };
+        let readable = readable_roots_independent(&node.pool, &pool_geometry);
+        let plain = devices_from_pool(&node.pool, IMAGE_BYTES);
+        for &abandoned_root in node.abandoned.iter().filter(|root| readable.contains(root)) {
+            let Some(record) = root_record_of(&node.pool, &pool_geometry, abandoned_root) else {
+                continue;
+            };
+            let Ok(allocation_locations) = locate_allocation_record_tree(&plain, &record) else {
+                continue;
+            };
+            let allocation_keys = location_keys(&allocation_locations);
+            if is_unit_shared(
+                &plain,
+                &node.pool,
+                &pool_geometry,
+                abandoned_root,
+                &allocation_keys,
+            ) {
+                continue;
+            }
+            ledger_unit_controls_found = true;
+            let through = |keys_of: &UnitKeysOfARoot, keys: &BTreeSet<(u32, u64)>| {
+                node.abandoned
+                    .iter()
+                    .filter(|root| readable.contains(root))
+                    .filter_map(|root| root_record_of(&node.pool, &pool_geometry, *root))
+                    .filter(|other| {
+                        keys_of(other).is_some_and(|other_keys| !other_keys.is_disjoint(keys))
+                    })
+                    .count() as u64
+            };
+            let allocation_keys_of = |other: &RootRecord| {
+                locate_allocation_record_tree(&plain, other)
+                    .ok()
+                    .map(|locations| location_keys(&locations))
+            };
+            let tree_table_keys_of =
+                |other: &RootRecord| Some(location_keys(&other.tree_table.locations));
+            let ranges = ranges_of_both_copies(&allocation_locations, "L");
+            let run = run_instrumented_mount_writable(&node.pool, &parameters, &ranges, None, None);
+            emit_positive_control(
+                arm,
+                "PC1-a",
+                &node.label,
+                abandoned_root,
+                &ranges,
+                &run,
+                through(&allocation_keys_of, &allocation_keys),
+                "unit=allocation_record_tree_root shared=false",
+            );
+            let tree_table_keys = location_keys(&record.tree_table.locations);
+            let ranges = ranges_of_both_copies(&record.tree_table.locations, "T");
+            let run = run_instrumented_mount_writable(&node.pool, &parameters, &ranges, None, None);
+            emit_positive_control(
+                arm,
+                "PC1-b",
+                &node.label,
+                abandoned_root,
+                &ranges,
+                &run,
+                through(&tree_table_keys_of, &tree_table_keys),
+                &format!(
+                    "unit=tree_table shared={}",
+                    is_unit_shared(
+                        &plain,
+                        &node.pool,
+                        &pool_geometry,
+                        abandoned_root,
+                        &tree_table_keys
+                    )
+                ),
+            );
+            break 'search;
+        }
+    }
+    if !ledger_unit_controls_found {
+        emit_result(&format!(
+            "name=r2_positive_control arm={arm} control=PC1-a verdict=not_constructible reason=\"H1c 里找不到被抛弃根的分配记录树节点不共享的历史（V1）\""
+        ));
+    }
+    let mut root_slot_control_found = false;
+    for node in &nodes {
+        let Ok(pool_geometry) = independent_geometry(&node.pool) else {
+            continue;
+        };
+        let readable = readable_roots_independent(&node.pool, &pool_geometry);
+        let abandoned_readable: Vec<TimelineRoot> = node
+            .abandoned
+            .iter()
+            .copied()
+            .filter(|root| readable.contains(root))
+            .collect();
+        let [abandoned_root] = abandoned_readable.as_slice() else {
+            continue;
+        };
+        let Some(record) = root_record_of(&node.pool, &pool_geometry, *abandoned_root) else {
+            continue;
+        };
+        let Ok(mut exclusive) = placements_referenced_by_root_on(&node.pool, &record) else {
+            continue;
+        };
+        for other in readable.iter().filter(|root| *root != abandoned_root) {
+            if let Some(other_record) = root_record_of(&node.pool, &pool_geometry, *other) {
+                if let Ok(referenced) = placements_referenced_by_root_on(&node.pool, &other_record)
+                {
+                    exclusive.retain(|(device, slot, _)| {
+                        !referenced.iter().any(|(other_device, other_slot, _)| {
+                            other_device == device && other_slot == slot
+                        })
+                    });
+                }
+            }
+        }
+        if exclusive.is_empty() {
+            continue;
+        }
+        let Some((device, offset)) = root_slot_of(&node.pool, &pool_geometry, *abandoned_root)
+        else {
+            continue;
+        };
+        root_slot_control_found = true;
+        let twin = run_instrumented_mount_writable(&node.pool, &parameters, &[], None, None);
+        let twin_isolated: Option<u64> = twin.result.as_ref().ok().map(|mounted| {
+            mounted
+                .output
+                .isolated_slots_per_device
+                .iter()
+                .map(|(_, slots)| *slots)
+                .sum()
+        });
+        let ranges = vec![UnreadableRange {
+            device,
+            offset,
+            length: u64::from(pool_geometry.physical_block_size),
+            form: UnreadableForm::ReadFails,
+            label: format!("R{abandoned_root:?}"),
+        }];
+        let run = run_instrumented_mount_writable(&node.pool, &parameters, &ranges, None, None);
+        emit_positive_control(
+            arm,
+            "PC1-c",
+            &node.label,
+            *abandoned_root,
+            &ranges,
+            &run,
+            0,
+            &format!(
+                "exclusive_placements={} isolated_slots_without_the_fault={}",
+                exclusive.len(),
+                twin_isolated.map_or("none".to_string(), |value| value.to_string())
+            ),
+        );
+        break;
+    }
+    if !root_slot_control_found {
+        emit_result(&format!(
+            "name=r2_positive_control arm={arm} control=PC1-c verdict=not_constructible reason=\"H1c 里找不到只有一条被抛弃根且它独占的槽 > 0 的历史（V1）\""
+        ));
+    }
+}
+
+/// 第 2 次跑的模式：开跑检查不过就停（V3 / V4 / S3），过了跑点名的那一族。交回 true = 这个模式归第 2 次跑。
+fn run_second_run_mode(mode: &str) -> bool {
+    let known = [
+        "r2-all",
+        "r2-constants",
+        "r2-h1d",
+        "r2-q1-0",
+        "r2-pc1",
+        "r2-seventh-batch",
+    ];
+    if !known.contains(&mode) {
+        return false;
+    }
+    let arm = second_run_arm_label();
+    if !run_second_run_constants_and_anchors(&arm) {
+        emit_result(&format!(
+            "name=stop arm={arm} reason=V3 detail=\"第 2 次跑的常量回比、第七节锚点或偏移解码有不过的，整轮不开跑\""
+        ));
+        emit_result(&format!(
+            "name=done emitted={}",
+            emitted_result_line_count() + 1
+        ));
+        return true;
+    }
+    match mode {
+        "r2-all" => {
+            run_held_once_family(&GEOMETRY_PRIMARY, &arm);
+            run_abandonment_step_family(&GEOMETRY_PRIMARY, &arm);
+            run_ledger_positive_controls(&GEOMETRY_PRIMARY, &arm);
+            run_seventh_batch_reproductions(&arm);
+        }
+        "r2-constants" => {}
+        "r2-h1d" => run_held_once_family(&GEOMETRY_PRIMARY, &arm),
+        "r2-q1-0" => run_abandonment_step_family(&GEOMETRY_PRIMARY, &arm),
+        "r2-pc1" => run_ledger_positive_controls(&GEOMETRY_PRIMARY, &arm),
+        "r2-seventh-batch" => run_seventh_batch_reproductions(&arm),
+        other => unreachable!("第 2 次跑的模式表 known 已经挡过：{other}"),
+    }
+    emit_result(&format!(
+        "name=done emitted={}",
+        emitted_result_line_count() + 1
+    ));
+    true
+}
+
+// ============================================================================
+// 十一、第 3 次跑（`research/prompts/e158-r3-prereg.md`）：C554 怎么修（岔路单 `research/prompts/c554-fix-forks.md` 第 1 行），
+//      第一段（登记 5.7）：5.6 常量回比、第七节锚点、九条臂各一份副本、故障设备与虚拟时钟、确认账与真值、
+//      PC-N、PC-O、PC-N0、PC-丢写、PC-只读（每一臂）；H1d 与 H1e（G0，全部臂）。PC-多读、Q5 与跨臂对拍在 `r3-compare` 模式里算。
+//      第 2 次跑那几个模式（`r2-*`）调的函数这里只调用、不改语义；要改的一律复制一份（登记第一节「上一次执行员交来的两件」）。
+// ============================================================================
+
+/// 第 3 次跑的九条臂（登记 5.2 臂表的文件名拼写；丙-不验点名 主 agent 2026-09-27 划掉，不跑）。
+const THIRD_RUN_ARMS: [&str; 9] = [
+    "today",
+    "jia-cfg",
+    "jia-cfg-carry",
+    "jia-slot",
+    "yi-cfg",
+    "yi-cfg-carry",
+    "yi-slot",
+    "bing-cfg",
+    "bing-cfg-carry",
+];
+
+/// 臂属于哪个候选（岔路单第 1 行：甲 拒可写、乙 重读后再判、丙 从记录重建、对照 今天）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ThirdRunCandidate {
+    Today,
+    Jia,
+    Yi,
+    Bing,
+}
+
+impl ThirdRunCandidate {
+    fn of(arm: &str) -> Option<ThirdRunCandidate> {
+        match arm {
+            "today" => Some(ThirdRunCandidate::Today),
+            "jia-cfg" | "jia-cfg-carry" | "jia-slot" => Some(ThirdRunCandidate::Jia),
+            "yi-cfg" | "yi-cfg-carry" | "yi-slot" => Some(ThirdRunCandidate::Yi),
+            "bing-cfg" | "bing-cfg-carry" => Some(ThirdRunCandidate::Bing),
+            _ => None,
+        }
+    }
+}
+
+/// 这一臂 N 判真之后交回的拒绝成员名（臂表 r3 行加进 `MountError` 的四个成员里的哪一个；第 22 条那一格另一个）。
+fn third_run_refusal_member(arm: &str) -> &'static str {
+    match (ThirdRunCandidate::of(arm), arm.ends_with("-slot")) {
+        (Some(ThirdRunCandidate::Bing), _) => "R3RebuildFromRecordsStoppedBelowTheWitness",
+        (Some(ThirdRunCandidate::Jia | ThirdRunCandidate::Yi), true) => "R3UnreadableRootRingSlot",
+        (Some(ThirdRunCandidate::Jia | ThirdRunCandidate::Yi), false) => {
+            "R3NewerRootWitnessedByTheSystemConfiguration"
+        }
+        (Some(ThirdRunCandidate::Today) | None, _) => "none",
+    }
+}
+
+/// 乙 的重读轮数 R（登记「读法写死」：D16（发布语义） 已定项 1「根槽这一次读坏」那一行的「重读一次」；5.6 倒数第二行，条款锚不回比）。
+const THIRD_RUN_REREAD_ROUNDS: u64 = 1;
+/// 虚拟时钟的一格 δ（登记 5.6 倒数第二行）。
+const THIRD_RUN_VIRTUAL_INTERVAL: u64 = 1;
+/// 单元类标签（D18（块里携带什么信息）；装置自己的重放按它取单元宽，开跑时与 `singlefs_core::unit` 那一份回比）。
+const UNIT_CLASS_DATA_LOCAL: u8 = 1;
+const UNIT_CLASS_INDEX_NODE_LOCAL: u8 = 2;
+const UNIT_CLASS_PACKED_LOCAL: u8 = 3;
+/// 数据单元宽、节点宽（登记 5.6 第三行；`local_constants_checks` 里已回比）。
+const DATA_UNIT_BYTES_LOCAL: usize = 32768;
+const NODE_BYTES_LOCAL: usize = 16384;
+/// 系统配置槽里 journal tail 与整槽校验和的位置（登记 5.6：tail 偏移 469 由装置自己解码找到、开跑时核；
+/// 校验和偏移 155、宽 32 字节：`local_constants_checks` 里回比过偏移，宽度出自 `singlefs_checker` 的宽校验和口径）。
+const SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL: usize = 469;
+const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET_LOCAL: usize = 155;
+const WIDE_CHECKSUM_BYTES_LOCAL: usize = 32;
+/// H1d / H1e 的 n1（登记 5.3：n1 ∈ {0, 1, 2, 3}）与 H1e 的 m（{1, 2, 3, 4}）。
+const THIRD_RUN_OVERWRITES: [u64; 4] = [0, 1, 2, 3];
+const THIRD_RUN_TAIL_OVERWRITES: [u64; 4] = [1, 2, 3, 4];
+
+fn third_run_arm_label() -> String {
+    env::var("SINGLEFS_E158_ARM").unwrap_or_else(|_| "today".to_string())
+}
+
+/// 臂在 `crates/` 副本里记下的观测（`singlefs_core::mount::r3_take_observation` 的字段抄一份；今天那一臂没有）。
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct ArmObservation {
+    witness_judged: bool,
+    newer_root_on_the_first_pass: bool,
+    witnessed_tail: u64,
+    selected_version_last_counter: Option<u64>,
+    undecidable: bool,
+    unreadable_ring_slots_on_the_first_pass: u64,
+    reread_rounds: u32,
+    rebuilt_from_records: bool,
+    shadow_ledger_table_unreadable_on_the_first_read: bool,
+    shadow_ledger_table_rereads: u32,
+}
+
+/// 等待钩子与虚拟时钟（登记「读法写死」表「时长」一行）：时钟在每次入口调用开始时归 0，只在臂调「等一个间隔」的钩子时前进 δ。
+/// 臂的代码只在草稿副本里有（臂表 r3 行），装置源码各臂同一份：副本的 singlefs-harness 声明特性 `e158-r3-arm` 且缺省开，
+/// 主工作区与今天那一臂的副本不声明，这几个函数退成空。
+#[allow(
+    unexpected_cfgs,
+    reason = "特性 e158-r3-arm 只在草稿副本的 singlefs-harness/Cargo.toml 里声明（research/mutations/e158_arms.tsv 收尾那一行）"
+)]
+mod third_run_arm_hooks {
+    use std::cell::Cell;
+
+    thread_local! {
+        static VIRTUAL_CLOCK: Cell<u64> = const { Cell::new(0) };
+        static WAITS: Cell<u64> = const { Cell::new(0) };
+    }
+
+    pub fn reset_the_virtual_clock() {
+        VIRTUAL_CLOCK.with(|clock| clock.set(0));
+        WAITS.with(|waits| waits.set(0));
+    }
+
+    pub fn virtual_now() -> u64 {
+        VIRTUAL_CLOCK.with(Cell::get)
+    }
+
+    pub fn waits() -> u64 {
+        WAITS.with(Cell::get)
+    }
+
+    #[allow(
+        dead_code,
+        reason = "只在臂的副本（特性 e158-r3-arm 开）里被等待钩子调；主工作区与今天那一臂里只有单测调它"
+    )]
+    pub fn advance_one_interval(interval: u64) {
+        VIRTUAL_CLOCK.with(|clock| clock.set(clock.get() + interval));
+        WAITS.with(|waits| waits.set(waits.get() + 1));
+    }
+
+    pub fn arm_code_is_compiled_in() -> bool {
+        cfg!(feature = "e158-r3-arm")
+    }
+
+    #[cfg(feature = "e158-r3-arm")]
+    pub fn install_the_wait_hook(interval: u64) {
+        singlefs_core::mount::r3_install_wait_hook(Some(Box::new(move || {
+            advance_one_interval(interval);
+        })));
+    }
+
+    #[cfg(not(feature = "e158-r3-arm"))]
+    pub fn install_the_wait_hook(_interval: u64) {}
+
+    #[cfg(feature = "e158-r3-arm")]
+    pub fn take_the_arm_observation() -> Option<super::ArmObservation> {
+        let observation = singlefs_core::mount::r3_take_observation();
+        Some(super::ArmObservation {
+            witness_judged: observation.witness_judged,
+            newer_root_on_the_first_pass: observation.newer_root_on_the_first_pass,
+            witnessed_tail: observation.witnessed_tail,
+            selected_version_last_counter: observation.selected_version_last_counter,
+            undecidable: observation.undecidable,
+            unreadable_ring_slots_on_the_first_pass: observation
+                .unreadable_ring_slots_on_the_first_pass,
+            reread_rounds: observation.reread_rounds,
+            rebuilt_from_records: observation.rebuilt_from_records,
+            shadow_ledger_table_unreadable_on_the_first_read: observation
+                .shadow_ledger_table_unreadable_on_the_first_read,
+            shadow_ledger_table_rereads: observation.shadow_ledger_table_rereads,
+        })
+    }
+
+    #[cfg(not(feature = "e158-r3-arm"))]
+    pub fn take_the_arm_observation() -> Option<super::ArmObservation> {
+        None
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 11.1 故障设备（登记 5.0 第三条）：一块盘一层、一次装完这块盘这次调用的全部落点；两种造法 × 四种时长；
+//      每个落点在这次调用里的读次序单独计（O(m) 按它判）；T(τ) 读虚拟时钟；被拦下的读次数按落点记（V2）；
+//      设备一层的读调用次数与读字节数按调用记（Q5，读坏的也数）；这次调用写过的落点之后不再拦。
+// ---------------------------------------------------------------------------
+
+/// 一个落点在这次入口调用里坏多久（登记「读法写死」表「时长」一行）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FaultDuration {
+    /// W：这一次入口调用里每一次读都坏。
+    WholeCall,
+    /// T(τ)：读坏到虚拟时钟走到 τ 为止。
+    UntilVirtualTime(u64),
+    /// O(m 只)：对这个落点的第 m 次读坏、其余照常。
+    OnlyTheNthRead(u64),
+    /// O(m 起)：第 m 次读起都坏。
+    #[allow(
+        dead_code,
+        reason = "L5（代码审阅第 22 条那一格）归第二段；第一段只在单测里构造它"
+    )]
+    FromTheNthRead(u64),
+}
+
+impl FaultDuration {
+    fn name(self) -> String {
+        match self {
+            FaultDuration::WholeCall => "W".to_string(),
+            FaultDuration::UntilVirtualTime(until) => format!("T{until}"),
+            FaultDuration::OnlyTheNthRead(nth) => format!("O{nth}only"),
+            FaultDuration::FromTheNthRead(nth) => format!("O{nth}from"),
+        }
+    }
+
+    /// 对这个落点的第 `nth_read` 次读（从 1 数）在虚拟时刻 `virtual_now` 坏不坏。
+    fn is_active(self, nth_read: u64, virtual_now: u64) -> bool {
+        match self {
+            FaultDuration::WholeCall => true,
+            FaultDuration::UntilVirtualTime(until) => virtual_now < until,
+            FaultDuration::OnlyTheNthRead(nth) => nth_read == nth,
+            FaultDuration::FromTheNthRead(nth) => nth_read >= nth,
+        }
+    }
+
+    /// 装置自己的第一遍读（登记「读法写死」表 E_故障 那一格）：这个落点这次调用里第一次被读时坏不坏（虚拟时钟为 0）。
+    fn is_active_on_the_first_read(self) -> bool {
+        self.is_active(1, 0)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ThirdRunFault {
+    device: DeviceIdentity,
+    offset: u64,
+    length: u64,
+    form: UnreadableForm,
+    duration: FaultDuration,
+    label: String,
+}
+
+impl ThirdRunFault {
+    fn overlaps(&self, device: DeviceIdentity, offset: u64, length: u64) -> bool {
+        self.device == device && self.offset < offset + length && offset < self.offset + self.length
+    }
+}
+
+#[derive(Default)]
+struct ThirdRunDeviceState {
+    faults: Vec<ThirdRunFault>,
+    written_over: Vec<bool>,
+    reads_of_the_target: Vec<u64>,
+    intercepted_reads: Vec<u64>,
+    read_calls: u64,
+    read_bytes: u64,
+    write_calls: u64,
+    barrier_calls: u64,
+    failing_write_call: Option<u64>,
+    failing_barrier_call: Option<u64>,
+    injected_failure_fired: bool,
+    applied: Vec<AppliedDeviceStep>,
+}
+
+impl ThirdRunDeviceState {
+    fn new(
+        faults: Vec<ThirdRunFault>,
+        failing_write_call: Option<u64>,
+        failing_barrier_call: Option<u64>,
+    ) -> Self {
+        let count = faults.len();
+        ThirdRunDeviceState {
+            faults,
+            written_over: vec![false; count],
+            reads_of_the_target: vec![0; count],
+            intercepted_reads: vec![0; count],
+            failing_write_call,
+            failing_barrier_call,
+            ..ThirdRunDeviceState::default()
+        }
+    }
+
+    fn mark_written_over(&mut self, device: DeviceIdentity, offset: u64, length: u64) {
+        for (fault, written_over) in self.faults.iter().zip(self.written_over.iter_mut()) {
+            *written_over = *written_over || fault.overlaps(device, offset, length);
+        }
+    }
+}
+
+struct ThirdRunDevice {
+    identity: DeviceIdentity,
+    inner: SparseBlockDevice,
+    state: Rc<RefCell<ThirdRunDeviceState>>,
+}
+
+impl BlockDevice for ThirdRunDevice {
+    fn read_at(
+        &self,
+        offset: DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        let length = u64::try_from(buffer.len()).expect("一次读的长度装得进 u64");
+        let virtual_now = third_run_arm_hooks::virtual_now();
+        let mut fails = false;
+        let mut zeroed: Vec<(u64, u64)> = Vec::new();
+        {
+            let mut guard = self.state.borrow_mut();
+            let state = &mut *guard;
+            state.read_calls += 1;
+            state.read_bytes += length;
+            for index in 0..state.faults.len() {
+                if state.written_over[index]
+                    || !state.faults[index].overlaps(self.identity, offset.0, length)
+                {
+                    continue;
+                }
+                state.reads_of_the_target[index] += 1;
+                let duration = state.faults[index].duration;
+                if !duration.is_active(state.reads_of_the_target[index], virtual_now) {
+                    continue;
+                }
+                state.intercepted_reads[index] += 1;
+                match state.faults[index].form {
+                    UnreadableForm::ReadFails => {
+                        fails = true;
+                    }
+                    UnreadableForm::ReadsZeros => {
+                        zeroed.push((state.faults[index].offset, state.faults[index].length));
+                    }
+                }
+            }
+        }
+        if fails {
+            return Err(injected_block_device_error("读"));
+        }
+        self.inner.read_at(offset, buffer)?;
+        for (range_offset, range_length) in zeroed {
+            let start = range_offset.saturating_sub(offset.0);
+            let end = (range_offset + range_length).saturating_sub(offset.0).min(length);
+            buffer[usize::try_from(start).expect("缓冲区里")..usize::try_from(end).expect("缓冲区里")]
+                .fill(0);
+        }
+        Ok(())
+    }
+
+    fn write_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        bytes: &[u8],
+        durability: WriteDurability,
+    ) -> Result<(), BlockDeviceError> {
+        let mut state = self.state.borrow_mut();
+        let ordinal = state.write_calls;
+        state.write_calls += 1;
+        let this_write_is_the_injected_failure = state.failing_write_call == Some(ordinal);
+        if this_write_is_the_injected_failure {
+            state.injected_failure_fired = true;
+            return Err(injected_block_device_error("写"));
+        }
+        self.inner.write_at(offset, bytes, durability)?;
+        let length = u64::try_from(bytes.len()).expect("写长装得进 u64");
+        state.mark_written_over(self.identity, offset.0, length);
+        state.applied.push(AppliedDeviceStep::Write {
+            device: self.identity,
+            offset: offset.0,
+            bytes: bytes.to_vec(),
+        });
+        Ok(())
+    }
+
+    fn write_zeroes_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<(), BlockDeviceError> {
+        let mut state = self.state.borrow_mut();
+        let ordinal = state.write_calls;
+        state.write_calls += 1;
+        if state.failing_write_call == Some(ordinal) {
+            state.injected_failure_fired = true;
+            return Err(injected_block_device_error("写"));
+        }
+        self.inner.write_zeroes_at(offset, length)?;
+        state.mark_written_over(self.identity, offset.0, length);
+        state.applied.push(AppliedDeviceStep::ZeroFill {
+            device: self.identity,
+            offset: offset.0,
+            length,
+        });
+        Ok(())
+    }
+
+    fn barrier(&mut self) -> Result<(), BlockDeviceError> {
+        let mut state = self.state.borrow_mut();
+        let ordinal = state.barrier_calls;
+        state.barrier_calls += 1;
+        if state.failing_barrier_call == Some(ordinal) {
+            state.injected_failure_fired = true;
+            return Err(injected_block_device_error("屏障"));
+        }
+        self.inner.barrier()?;
+        state.applied.push(AppliedDeviceStep::Barrier {
+            device: self.identity,
+        });
+        Ok(())
+    }
+
+    fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
+        self.inner.probe_physical_block_size()
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        self.inner.size_in_bytes()
+    }
+}
+
+/// 一次受观测的入口调用交回的东西（可写挂载或冷启动恢复）。
+struct ThirdRunCall<Outcome> {
+    outcome: Outcome,
+    write_calls: u64,
+    read_calls: u64,
+    read_bytes: u64,
+    applied: Vec<AppliedDeviceStep>,
+    intercepted_reads: Vec<u64>,
+    injected_failure_fired: bool,
+    pool_after: MemoryPool,
+    waits: u64,
+    observation: Option<ArmObservation>,
+}
+
+impl<Outcome> ThirdRunCall<Outcome> {
+    /// V2：点了名的落点里一次都没被拦下的（O(m) 的：第 m 次读没发生）。
+    fn unintercepted(&self, faults: &[ThirdRunFault]) -> Vec<String> {
+        faults
+            .iter()
+            .zip(&self.intercepted_reads)
+            .filter(|(_, intercepted)| **intercepted == 0)
+            .map(|(fault, _)| fault.label.clone())
+            .collect()
+    }
+}
+
+fn third_run_call<Outcome>(
+    base: &MemoryPool,
+    faults: &[ThirdRunFault],
+    failing_write_call: Option<u64>,
+    failing_barrier_call: Option<u64>,
+    call: impl FnOnce(&mut Vec<(DeviceIdentity, ThirdRunDevice)>) -> Outcome,
+) -> ThirdRunCall<Outcome> {
+    let state = Rc::new(RefCell::new(ThirdRunDeviceState::new(
+        faults.to_vec(),
+        failing_write_call,
+        failing_barrier_call,
+    )));
+    let mut devices: Vec<(DeviceIdentity, ThirdRunDevice)> = devices_from_pool(base, IMAGE_BYTES)
+        .into_iter()
+        .map(|(identity, inner)| {
+            (
+                identity,
+                ThirdRunDevice {
+                    identity,
+                    inner,
+                    state: Rc::clone(&state),
+                },
+            )
+        })
+        .collect();
+    third_run_arm_hooks::reset_the_virtual_clock();
+    third_run_arm_hooks::install_the_wait_hook(THIRD_RUN_VIRTUAL_INTERVAL);
+    let outcome = call(&mut devices);
+    let observation = third_run_arm_hooks::take_the_arm_observation();
+    let waits = third_run_arm_hooks::waits();
+    let plain: Vec<(DeviceIdentity, SparseBlockDevice)> = devices
+        .into_iter()
+        .map(|(identity, device)| (identity, device.inner))
+        .collect();
+    let pool_after = memory_pool_of(&plain, IMAGE_BYTES);
+    let state = state.borrow();
+    ThirdRunCall {
+        outcome,
+        write_calls: state.write_calls,
+        read_calls: state.read_calls,
+        read_bytes: state.read_bytes,
+        applied: state.applied.clone(),
+        intercepted_reads: state.intercepted_reads.clone(),
+        injected_failure_fired: state.injected_failure_fired,
+        pool_after,
+        waits,
+        observation,
+    }
+}
+
+fn run_third_run_mount_writable(
+    base: &MemoryPool,
+    parameters: &MakeFilesystemParameters,
+    faults: &[ThirdRunFault],
+    failing_write_call: Option<u64>,
+    failing_barrier_call: Option<u64>,
+) -> ThirdRunCall<Result<Mounted, singlefs_core::mount::MountError>> {
+    third_run_call(
+        base,
+        faults,
+        failing_write_call,
+        failing_barrier_call,
+        |devices| mount_writable(parameters, devices),
+    )
+}
+
+fn run_third_run_recover(
+    base: &MemoryPool,
+    faults: &[ThirdRunFault],
+) -> ThirdRunCall<singlefs_core::recovery::RecoveryReport> {
+    third_run_call(base, faults, None, None, |devices| {
+        recover(&*devices, JournalPolicy::Consult)
+    })
+}
+
+/// 结局按 K0–K4 分（同第 2 次跑 `mount_outcome_class`，按设备一层写次数分 K3 / K4）。
+fn third_run_outcome_class(
+    result: &Result<Mounted, singlefs_core::mount::MountError>,
+    write_calls: u64,
+) -> &'static str {
+    mount_outcome_class(result, write_calls)
+}
+
+// ---------------------------------------------------------------------------
+// 11.2 装置自己的解码（登记 5.0 第二条）：根槽、系统配置槽、journal 记录走 `singlefs_checker`（另一套解析代码），
+//      择根取 (txg, 实例代号) 最大，按 D23（journal 的角色与格式） 已定项 14 五条口径自己重放出 E。
+//      带故障的第一遍读：落点在这次调用里第一次被读时坏的，当读不出（读错）或读回全零（清零）。
+// ---------------------------------------------------------------------------
+
+/// 装置的第一遍读：`pool` 上盖着 `faults` 里「第一次读就坏」的那几个落点。
+struct FirstPassReader<'pool> {
+    pool: &'pool MemoryPool,
+    faults: &'pool [ThirdRunFault],
+}
+
+impl ImageReader for FirstPassReader<'_> {
+    fn devices(&self) -> Vec<u32> {
+        ImageReader::devices(self.pool)
+    }
+    fn device_bytes(&self, device: u32) -> Option<u64> {
+        ImageReader::device_bytes(self.pool, device)
+    }
+    fn read(&self, device: u32, offset: u64, length: usize) -> Option<Vec<u8>> {
+        let length_u64 = u64::try_from(length).expect("读长");
+        let active: Vec<&ThirdRunFault> = self
+            .faults
+            .iter()
+            .filter(|fault| {
+                fault.duration.is_active_on_the_first_read()
+                    && fault.overlaps(DeviceIdentity(device), offset, length_u64)
+            })
+            .collect();
+        if active
+            .iter()
+            .any(|fault| fault.form == UnreadableForm::ReadFails)
+        {
+            return None;
+        }
+        let mut bytes = ImageReader::read(self.pool, device, offset, length)?;
+        for fault in active {
+            let start = fault.offset.saturating_sub(offset);
+            let end = (fault.offset + fault.length).saturating_sub(offset).min(length_u64);
+            bytes[usize::try_from(start).expect("读内")..usize::try_from(end).expect("读内")].fill(0);
+        }
+        Some(bytes)
+    }
+    fn candidate_unit_slots(&self, device: u32) -> Option<Vec<u64>> {
+        ImageReader::candidate_unit_slots(self.pool, device)
+    }
+    fn candidate_journal_slots(&self, device: u32) -> Option<Vec<u64>> {
+        ImageReader::candidate_journal_slots(self.pool, device)
+    }
+}
+
+/// 装置解出的一份镜像：自证根的键 (实例代号, txg)、读错的根槽个数、全部自证记录（按 (实例代号, 计数器)）、
+/// 每块盘两槽里自证过的系统配置 (盘, 世代号, tail, 实例代号)。
+struct DeviceDecodedImage {
+    root_keys: BTreeSet<TimelineRoot>,
+    unreadable_root_slots: u64,
+    records: BTreeMap<(u32, u64), singlefs_checker::JournalRecordView>,
+    system_configuration_slots: Vec<(u32, u64, u64, u32)>,
+}
+
+fn device_decode(reader: &dyn ImageReader, geometry: &PoolGeometry) -> DeviceDecodedImage {
+    let root_keys = checker_image::valid_roots(reader, geometry)
+        .into_iter()
+        .map(|(_, _, view)| (view.instance, view.checkpoint_txg))
+        .collect();
+    let root_slot_bytes = usize::try_from(geometry.physical_block_size).expect("根槽宽");
+    let unreadable_root_slots = checker_image::root_slot_positions(geometry)
+        .into_iter()
+        .filter(|(_, _, device, offset)| reader.read(*device, *offset, root_slot_bytes).is_none())
+        .count() as u64;
+    let expected_filesystem_identifier = u64::from_le_bytes(
+        geometry.filesystem_identifier[..8]
+            .try_into()
+            .expect("fsid 前 8 字节"),
+    );
+    let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
+    let ring_slots = geometry.journal_ring_bytes / JOURNAL_RECORD_BYTES;
+    let ring_start = geometry.journal_ring_start_slot * SLOT_BYTES_LOCAL;
+    let mut records = BTreeMap::new();
+    for device in reader.devices() {
+        for index in 0..ring_slots {
+            let Some(bytes) = reader.read(device, ring_start + index * JOURNAL_RECORD_BYTES, record_bytes)
+            else {
+                continue;
+            };
+            if let Ok(view) =
+                singlefs_checker::check_journal_record(&bytes, expected_filesystem_identifier)
+            {
+                records.entry((view.instance, view.counter)).or_insert(view);
+            }
+        }
+    }
+    let system_configuration_slots = checker_image::verified_system_configuration_slots(reader)
+        .into_iter()
+        .flat_map(|(device, slots)| {
+            slots.into_iter().map(move |(view, _)| {
+                (device, view.slot_generation, view.journal_tail, view.journal_instance)
+            })
+        })
+        .collect();
+    DeviceDecodedImage {
+        root_keys,
+        unreadable_root_slots,
+        records,
+        system_configuration_slots,
+    }
+}
+
+/// 装置自己择根：自证根里 (txg, 实例代号) 最大的那一条。
+fn device_chosen_root(decoded: &DeviceDecodedImage) -> Option<TimelineRoot> {
+    decoded
+        .root_keys
+        .iter()
+        .copied()
+        .max_by_key(|(instance, txg)| (*txg, *instance))
+}
+
+fn record_ends_its_publish_by_the_device(record: &singlefs_checker::JournalRecordView) -> bool {
+    record.record_flags_byte & 1 == 1
+}
+
+fn unit_bytes_of_class_by_the_device(unit_class: u8) -> Option<usize> {
+    match unit_class {
+        UNIT_CLASS_DATA_LOCAL | UNIT_CLASS_PACKED_LOCAL => Some(DATA_UNIT_BYTES_LOCAL),
+        UNIT_CLASS_INDEX_NODE_LOCAL => Some(NODE_BYTES_LOCAL),
+        _ => None,
+    }
+}
+
+/// 装置自己的在飞记录数上限：环槽数 ÷ F，两次都取整数部分（D23（journal 的角色与格式） 已定项 18）。照「装置不与实现共用代码」
+/// 自写一份，不调 core 的 `system_configuration::journal_in_flight_record_limit`，只取格式常量模块的两个标量；
+/// 两份在环长上的交叉断言在 `journal_in_flight_record_limit_cross_check_tests`。
+fn journal_in_flight_record_limit(ring_bytes: u64) -> u64 {
+    let ring_record_slots = ring_bytes / JOURNAL_RECORD_BYTES;
+    ring_record_slots / singlefs_format::JOURNAL_SAFETY_FACTOR
+}
+
+/// core 与装置两份在飞记录数上限在环长上的交叉断言。
+///
+/// 取值域：环长是系统配置里 8 字节的「环长度（字节）」字段，恢复照读盘上的值，所以两份要在整个 u64 上相等；mkfs 收的环长
+/// 在 [3 × 4096, 设备容量 ÷ 4]（D23（journal 的角色与格式） 已定项 19 ③），容量被 6 字节槽号 × 16 KiB 槽
+/// （D19（块指针的结构与宽度预算） 已定项 4）顶在 2^62 字节，所以按条款 mkfs 收得下的环长不过 2^60。
+/// 2^64 个值扫不遍，只取枚举点：① 0 到 2^20 逐个取（两份只除以 4096 与 3，这一段把模 12288 的每个余数走了 85 遍）；
+/// ② 每个 2 的幂与它 ±1，以及它以下最近的 12288 的倍数与那个倍数附近的 4096 边界（每个数量级上的截断、溢出、取整方向）；
+/// ③ u64 顶端；④ 在飞上限刚越过 u32 的那一处（写系统配置时它要装进 4 字节）；⑤ 默认环 768 MiB。
+/// 两份一起歪（改共享的两个标量）时互比看不出，靠 `the_in_flight_record_limit_is_pinned_at_values_worked_out_from_the_clauses` 钉的绝对值。
+#[cfg(test)]
+mod journal_in_flight_record_limit_cross_check_tests {
+    use super::journal_in_flight_record_limit as apparatus_journal_in_flight_record_limit;
+    use singlefs_core::system_configuration::journal_in_flight_record_limit as core_journal_in_flight_record_limit;
+    use std::collections::BTreeSet;
+
+    /// 多一条在飞记录要多多少环长：一条记录 4096（D23（journal 的角色与格式） 已定项 12）× F = 3（I-8.1（环几何够大））。
+    /// 抄条款的数，不取格式常量：钉绝对值那条要在共享标量被改歪时照样红。
+    const RING_BYTES_PER_IN_FLIGHT_RECORD: u64 = 4096 * 3;
+    const DENSELY_SCANNED_RING_BYTES_UPPER_END: u64 = 1 << 20;
+    const DEFAULT_RING_BYTES: u64 = 768 * 1024 * 1024;
+    const LARGEST_RING_BYTES_MAKE_FILESYSTEM_ACCEPTS: u64 = 1 << 60;
+    const RING_BYTES_WHERE_THE_LIMIT_FIRST_EXCEEDS_FOUR_BYTES: u64 =
+        (1 << 32) * RING_BYTES_PER_IN_FLIGHT_RECORD;
+
+    /// 枚举点 ② 到 ⑤（① 那一段在测试里直接逐个走，不进这个集合）。
+    fn ring_sizes_at_every_magnitude_and_at_the_edges() -> BTreeSet<u64> {
+        let mut ring_sizes = BTreeSet::new();
+        for bit_position in 0..u64::BITS {
+            let power_of_two = 1u64 << bit_position;
+            let multiple_below =
+                power_of_two / RING_BYTES_PER_IN_FLIGHT_RECORD * RING_BYTES_PER_IN_FLIGHT_RECORD;
+            for anchor in [power_of_two, multiple_below] {
+                for offset_below in [1u64, 0] {
+                    if let Some(ring_bytes) = anchor.checked_sub(offset_below) {
+                        ring_sizes.insert(ring_bytes);
+                    }
+                }
+                for offset_above in [1u64, 4095, 4096, 8191, 8192] {
+                    if let Some(ring_bytes) = anchor.checked_add(offset_above) {
+                        ring_sizes.insert(ring_bytes);
+                    }
+                }
+            }
+        }
+        let top_multiple =
+            u64::MAX / RING_BYTES_PER_IN_FLIGHT_RECORD * RING_BYTES_PER_IN_FLIGHT_RECORD;
+        for ring_bytes in [
+            u64::MAX,
+            u64::MAX - 1,
+            top_multiple - 1,
+            top_multiple,
+            top_multiple + 1,
+        ] {
+            ring_sizes.insert(ring_bytes);
+        }
+        for ring_bytes in [
+            RING_BYTES_WHERE_THE_LIMIT_FIRST_EXCEEDS_FOUR_BYTES - 1,
+            RING_BYTES_WHERE_THE_LIMIT_FIRST_EXCEEDS_FOUR_BYTES,
+            RING_BYTES_WHERE_THE_LIMIT_FIRST_EXCEEDS_FOUR_BYTES + 1,
+            DEFAULT_RING_BYTES,
+        ] {
+            ring_sizes.insert(ring_bytes);
+        }
+        ring_sizes
+    }
+
+    #[test]
+    fn core_and_apparatus_compute_the_same_in_flight_record_limit_at_every_enumerated_ring_size() {
+        let mut densely_compared = 0u64;
+        for ring_bytes in 0..=DENSELY_SCANNED_RING_BYTES_UPPER_END {
+            assert_eq!(
+                core_journal_in_flight_record_limit(ring_bytes),
+                apparatus_journal_in_flight_record_limit(ring_bytes),
+                "环长 {ring_bytes} 字节：core 与装置的在飞上限不等"
+            );
+            densely_compared += 1;
+        }
+        assert_eq!(
+            densely_compared,
+            DENSELY_SCANNED_RING_BYTES_UPPER_END + 1,
+            "① 那一段从 0 到 2^20 一个不落"
+        );
+        let edge_ring_sizes = ring_sizes_at_every_magnitude_and_at_the_edges();
+        for ring_bytes in &edge_ring_sizes {
+            assert_eq!(
+                core_journal_in_flight_record_limit(*ring_bytes),
+                apparatus_journal_in_flight_record_limit(*ring_bytes),
+                "环长 {ring_bytes} 字节：core 与装置的在飞上限不等"
+            );
+        }
+        for must_be_compared in [
+            u64::MAX,
+            LARGEST_RING_BYTES_MAKE_FILESYSTEM_ACCEPTS,
+            RING_BYTES_WHERE_THE_LIMIT_FIRST_EXCEEDS_FOUR_BYTES,
+            DEFAULT_RING_BYTES,
+        ] {
+            assert!(
+                edge_ring_sizes.contains(&must_be_compared),
+                "枚举点里要有 {must_be_compared}：取值域的这一端没比到"
+            );
+        }
+    }
+
+    /// 绝对值按条款手算（记录 4096、F = 3，两次取整数部分），不调任何一份式子。
+    #[test]
+    fn the_in_flight_record_limit_is_pinned_at_values_worked_out_from_the_clauses() {
+        let pinned: [(u64, u64, &str); 7] = [
+            (
+                805_306_368,
+                65_536,
+                "默认环 768 MiB：196608 个记录槽 ÷ 3（D23 已定项 18 的定案原文）",
+            ),
+            (12_287, 0, "不到 3 条记录：mkfs 拒的那一格"),
+            (12_288, 1, "恰好 3 条记录：mkfs 收得下的最短环"),
+            (
+                1_152_921_504_606_846_976,
+                93_824_992_236_885,
+                "2^60：按条款 mkfs 收得下的最长环，2^48 ÷ 3 的整数部分",
+            ),
+            (
+                52_776_558_133_247,
+                4_294_967_295,
+                "在飞上限恰好还装得进 4 字节",
+            ),
+            (52_776_558_133_248, 4_294_967_296, "在飞上限刚越过 4 字节"),
+            (u64::MAX, 1_501_199_875_790_165, "u64 顶端：(2^52 − 1) ÷ 3"),
+        ];
+        for (ring_bytes, expected_limit, why) in pinned {
+            assert_eq!(
+                core_journal_in_flight_record_limit(ring_bytes),
+                expected_limit,
+                "core：{why}"
+            );
+            assert_eq!(
+                apparatus_journal_in_flight_record_limit(ring_bytes),
+                expected_limit,
+                "装置：{why}"
+            );
+        }
+    }
+}
+
+/// 装置按 D23（journal 的角色与格式） 已定项 14 五条口径从所选根重放：前缀不跨实例、链首锚在所选根那次发布带末条标志的那一条
+/// （读不出就要求第一条 txg = 根 + 1 且序号 1）、计数器连号、发布边界按末条标志、序号连续、提交标记、点名单元两份都读得出且
+/// 整单元 CRC-32C 对；末条到了才整体施加。交回 E 的键；所选根那次发布带末条标志的记录多于一条交 Err（crates 那一格也报错）。
+fn device_replay(
+    reader: &dyn ImageReader,
+    decoded: &DeviceDecodedImage,
+    root: TimelineRoot,
+    ring_bytes: u64,
+) -> Result<TimelineRoot, String> {
+    let (instance, txg) = root;
+    let anchors: Vec<u64> = decoded
+        .records
+        .values()
+        .filter(|record| {
+            record.instance == instance
+                && record.checkpoint_txg == txg
+                && record_ends_its_publish_by_the_device(record)
+        })
+        .map(|record| record.counter)
+        .collect();
+    if anchors.len() > 1 {
+        return Err(format!("所选根 {root:?} 那次发布带末条标志的记录 {} 条", anchors.len()));
+    }
+    let mut above: Vec<&singlefs_checker::JournalRecordView> = decoded
+        .records
+        .values()
+        .filter(|record| record.instance == instance && record.checkpoint_txg > txg)
+        .collect();
+    above.sort_by_key(|record| record.counter);
+    let limit = usize::try_from(journal_in_flight_record_limit(ring_bytes)).expect("在飞上限");
+    let mut expected_next = anchors.first().map(|counter| counter + 1);
+    let mut open: Vec<&singlefs_checker::JournalRecordView> = Vec::new();
+    let mut effective = root;
+    for record in above.into_iter().take(limit) {
+        match expected_next {
+            Some(expected) => {
+                if record.counter != expected {
+                    break;
+                }
+            }
+            None => {
+                if record.checkpoint_txg != txg + 1 || record.ordinal_within_publish != 1 {
+                    break;
+                }
+            }
+        }
+        if open.is_empty() && record.ordinal_within_publish != 1 {
+            break;
+        }
+        if let Some(previous) = open.last() {
+            if record.checkpoint_txg != previous.checkpoint_txg
+                || record.ordinal_within_publish != previous.ordinal_within_publish + 1
+                || (!previous.is_commit && record.transaction != previous.transaction)
+            {
+                break;
+            }
+        }
+        expected_next = Some(record.counter + 1);
+        let ends = record_ends_its_publish_by_the_device(record);
+        if !record.is_commit && ends {
+            break;
+        }
+        if ends
+            && decoded
+                .records
+                .range((record.instance, record.counter + 1)..=(record.instance, u64::MAX))
+                .map(|(_, later)| later)
+                .take_while(|later| later.checkpoint_txg <= record.checkpoint_txg)
+                .any(|later| later.checkpoint_txg == record.checkpoint_txg)
+        {
+            break;
+        }
+        let all_verified = record.named.iter().all(|named| {
+            let Some(unit_bytes) = unit_bytes_of_class_by_the_device(named.unit_class) else {
+                return false;
+            };
+            named.locations.iter().all(|(device, slot, checksum)| {
+                reader
+                    .read(*device, slot * SLOT_BYTES_LOCAL, unit_bytes)
+                    .is_some_and(|bytes| {
+                        singlefs_checker::crc32_castagnoli_table(&bytes) == *checksum
+                    })
+            })
+        });
+        if !all_verified {
+            break;
+        }
+        open.push(record);
+        if !ends {
+            continue;
+        }
+        open.clear();
+        effective = (record.instance, record.checkpoint_txg);
+    }
+    Ok(effective)
+}
+
+/// 装置按登记 5.1 第一行算 N-配置：(N, c_见证, c_E, 判不出)。
+fn device_configuration_witness(
+    decoded: &DeviceDecodedImage,
+    effective: TimelineRoot,
+) -> (bool, u64, Option<u64>, bool) {
+    let witnessed_tail = decoded
+        .system_configuration_slots
+        .iter()
+        .map(|(_, _, tail, _)| *tail)
+        .max()
+        .unwrap_or(0);
+    let selected_version_last_counter = decoded
+        .records
+        .values()
+        .filter(|record| {
+            (record.instance, record.checkpoint_txg) == effective
+                && record_ends_its_publish_by_the_device(record)
+        })
+        .map(|record| record.counter)
+        .max();
+    if witnessed_tail == 0 {
+        return (false, 0, selected_version_last_counter, false);
+    }
+    if let Some(counter) = selected_version_last_counter {
+        return (
+            witnessed_tail > counter,
+            witnessed_tail,
+            selected_version_last_counter,
+            false,
+        );
+    }
+    match decoded
+        .records
+        .values()
+        .find(|record| record.counter == witnessed_tail)
+    {
+        Some(witness) => (
+            (witness.instance, witness.checkpoint_txg) > effective,
+            witnessed_tail,
+            None,
+            false,
+        ),
+        None => (true, witnessed_tail, None, true),
+    }
+}
+
+/// 装置对一次被测挂载（带故障的第一遍读）与它的孪生镜像（不装故障）算的东西。
+struct DeviceJudgement {
+    chosen: Option<TimelineRoot>,
+    effective: Option<TimelineRoot>,
+    configuration_newer: bool,
+    witnessed_tail: u64,
+    selected_version_last_counter: Option<u64>,
+    undecidable: bool,
+    unreadable_root_slots: u64,
+    /// N_真：孪生镜像上有自证根的键 (实例代号, txg) 大于 E_故障 的。
+    truth_newer: bool,
+    /// 同一句按择根的次序 (txg, 实例代号) 比，与上面那个不同的格另记。
+    truth_orders_disagree: bool,
+    /// 孪生镜像上重放能走得比 E_故障 远、而没有键更大的根槽（标签「只由记录走得更远」）。
+    truth_by_records_only: bool,
+    error: Option<String>,
+}
+
+fn device_judgement(
+    twin: &MemoryPool,
+    geometry: &PoolGeometry,
+    faults: &[ThirdRunFault],
+) -> DeviceJudgement {
+    let reader = FirstPassReader {
+        pool: twin,
+        faults,
+    };
+    let decoded = device_decode(&reader, geometry);
+    let chosen = device_chosen_root(&decoded);
+    let mut error = None;
+    let effective = chosen.and_then(|root| {
+        device_replay(&reader, &decoded, root, geometry.journal_ring_bytes)
+            .map_err(|message| error = Some(message))
+            .ok()
+    });
+    let (configuration_newer, witnessed_tail, selected_version_last_counter, undecidable) =
+        match effective {
+            Some(effective) => device_configuration_witness(&decoded, effective),
+            None => (false, 0, None, false),
+        };
+    let twin_decoded = device_decode(twin, geometry);
+    let (truth_newer, truth_orders_disagree, truth_by_records_only) = match effective {
+        Some(effective) => {
+            let by_key = twin_decoded.root_keys.iter().any(|key| *key > effective);
+            let by_choice_order = twin_decoded
+                .root_keys
+                .iter()
+                .any(|(instance, txg)| (*txg, *instance) > (effective.1, effective.0));
+            let twin_effective = device_chosen_root(&twin_decoded).and_then(|root| {
+                device_replay(twin, &twin_decoded, root, geometry.journal_ring_bytes).ok()
+            });
+            let by_records_only = !by_key
+                && twin_effective
+                    .is_some_and(|twin_key| (twin_key.1, twin_key.0) > (effective.1, effective.0));
+            (by_key, by_key != by_choice_order, by_records_only)
+        }
+        None => (false, false, false),
+    };
+    DeviceJudgement {
+        chosen,
+        effective,
+        configuration_newer,
+        witnessed_tail,
+        selected_version_last_counter,
+        undecidable,
+        unreadable_root_slots: decoded.unreadable_root_slots,
+        truth_newer,
+        truth_orders_disagree,
+        truth_by_records_only,
+        error,
+    }
+}
+
+fn key_text(key: Option<TimelineRoot>) -> String {
+    key.map_or("none".to_string(), |(instance, txg)| format!("{instance}:{txg}"))
+}
+
+// ---------------------------------------------------------------------------
+// 11.3 历史与确认账（登记「读法写死」表「确认」一行）：每次改内容的入口调用交回 Ok 记一笔（内容号、那一版的根键、那一版引用的
+//      每个单元在每块盘上的字节）；空发布、写行、暖机、抬 F 沿用上一版的内容号。内容号 k 的文件字节 = `deterministic_content(999 + k)`。
+// ---------------------------------------------------------------------------
+
+/// 一版引用的每个单元（盘, 起始槽, 槽数）在某一刻盘上的字节。
+type UnitBytesOfAVersion = BTreeMap<(u32, u64, u64), Vec<u8>>;
+
+#[derive(Clone)]
+struct ThirdRunConfirmation {
+    content_number: u64,
+    root: TimelineRoot,
+    /// 那一版引用的每个单元确认那一刻在盘上的字节。
+    unit_bytes: UnitBytesOfAVersion,
+}
+
+#[derive(Clone)]
+struct ThirdRunHistory {
+    pool: MemoryPool,
+    session: Option<Session>,
+    timeline: Vec<TimelineRoot>,
+    content_number_by_root: BTreeMap<TimelineRoot, u64>,
+    confirmations: Vec<ThirdRunConfirmation>,
+    /// 7.1 第一行（F3）核过的确认次数与不符的次数。
+    tail_checks: u64,
+    tail_check_failures: Vec<String>,
+}
+
+impl ThirdRunHistory {
+    fn tip(&self) -> TimelineRoot {
+        *self.timeline.last().expect("时间线至少有第 0 代根")
+    }
+
+    fn last_confirmed_content_number(&self) -> u64 {
+        self.confirmations
+            .last()
+            .map_or(0, |confirmation| confirmation.content_number)
+    }
+
+    fn content_number_of(&self, root: TimelineRoot) -> Option<u64> {
+        self.content_number_by_root.get(&root).copied()
+    }
+
+    fn push_carried(&mut self, root: TimelineRoot, content_number: u64) {
+        self.timeline.push(root);
+        self.content_number_by_root.insert(root, content_number);
+    }
+}
+
+fn third_run_content(content_number: u64) -> Vec<u8> {
+    deterministic_content(999 + content_number, FIRST_FILE_BYTES)
+}
+
+/// 读回的文件字节是第几号内容（不是任何一号就 None）。
+fn content_number_of_bytes(bytes: &[u8], highest: u64) -> Option<u64> {
+    (1..=highest).find(|number| third_run_content(*number) == bytes)
+}
+
+fn unit_bytes_referenced_by(
+    pool: &MemoryPool,
+    root: &RootRecord,
+) -> Result<UnitBytesOfAVersion, String> {
+    let placements = placements_referenced_by_root_on(pool, root)?;
+    Ok(placements
+        .into_iter()
+        .map(|(device, slot, span)| {
+            let length = usize::try_from(span * SLOT_BYTES_LOCAL).expect("单元长");
+            let bytes = pool
+                .read(device, slot * SLOT_BYTES_LOCAL, length)
+                .unwrap_or_default();
+            ((device, slot, span), bytes)
+        })
+        .collect())
+}
+
+/// 7.1 第一行（F3）：一次确认之后，每块盘世代号最新的自证系统配置槽里 tail = 那次发布末条记录的计数器、实例代号 = 那次发布的实例代号。
+fn check_the_tail_after_a_confirmation(history: &mut ThirdRunHistory, root: TimelineRoot) {
+    history.tail_checks += 1;
+    let Ok(geometry) = independent_geometry(&history.pool) else {
+        history
+            .tail_check_failures
+            .push(format!("{root:?}: 几何解不出"));
+        return;
+    };
+    let decoded = device_decode(&history.pool, &geometry);
+    let last_counter = decoded
+        .records
+        .values()
+        .filter(|record| {
+            (record.instance, record.checkpoint_txg) == root
+                && record_ends_its_publish_by_the_device(record)
+        })
+        .map(|record| record.counter)
+        .max();
+    for device in [0u32, 1] {
+        let newest = decoded
+            .system_configuration_slots
+            .iter()
+            .filter(|(slot_device, _, _, _)| *slot_device == device)
+            .max_by_key(|(_, generation, _, _)| *generation);
+        let holds = newest.is_some_and(|(_, _, tail, instance)| {
+            Some(*tail) == last_counter && *instance == root.0
+        });
+        if !holds {
+            history.tail_check_failures.push(format!(
+                "{root:?} 盘 {device}: 最新槽 {newest:?}，那次发布末条记录计数器 {last_counter:?}"
+            ));
+        }
+    }
+}
+
+fn record_confirmation(
+    history: &mut ThirdRunHistory,
+    root_record: &RootRecord,
+    content_number: u64,
+) -> Result<(), String> {
+    let root = root_pair(root_record);
+    let unit_bytes = unit_bytes_referenced_by(&history.pool, root_record)?;
+    history.push_carried(root, content_number);
+    history.confirmations.push(ThirdRunConfirmation {
+        content_number,
+        root,
+        unit_bytes,
+    });
+    check_the_tail_after_a_confirmation(history, root);
+    Ok(())
+}
+
+/// 一次可写挂载写下的根（写行、暖机、抬 F）进时间线，沿用 `content_number`。
+fn push_the_publishes_of_a_mount(history: &mut ThirdRunHistory, mounted: &Mounted, content_number: u64) {
+    let mut roots = vec![root_pair(mounted.output.row_publish.root())];
+    roots.extend(
+        mounted
+            .output
+            .warm_up_publishes
+            .iter()
+            .map(|publish| root_pair(publish.root())),
+    );
+    for raised in mounted.output.space_admission.floor_raises() {
+        roots.extend(raised.publishes.iter().map(|publish| root_pair(&publish.root)));
+    }
+    for root in roots {
+        history.push_carried(root, content_number);
+    }
+}
+
+/// 在开着的会话上做一次改内容的调用（现行那一版有文件就覆盖写，没有就写首个文件），交回 Ok 就记一笔确认。
+fn third_run_change_content(
+    history: &mut ThirdRunHistory,
+    parameters: &MakeFilesystemParameters,
+) -> Result<(), String> {
+    let content_number = history.last_confirmed_content_number() + 1;
+    let content = third_run_content(content_number);
+    let mut session = history.session.take().ok_or("改内容：没有开着的会话")?;
+    let mut devices = devices_from_pool(&history.pool, IMAGE_BYTES);
+    let output = {
+        let mut writer = PoolWriter::new(parameters, devices.as_mut_slice());
+        let file = FirstFile {
+            content: &content,
+            write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60 * content_number,
+        };
+        match &session.current {
+            PoolVersion::WithFile(previous) => {
+                publish_overwrite(&mut writer, &mut session.allocator, previous, file, session.instance)
+                    .map_err(|error| format!("覆盖写: {error:?}"))?
+            }
+            PoolVersion::WithoutFile(version) => publish_first_file(
+                &mut writer,
+                &mut session.allocator,
+                &version.root,
+                file,
+                session.instance,
+                session.current.record_bytes(),
+            )
+            .map_err(|error| format!("首个文件: {error:?}"))?,
+        }
+    };
+    history.pool = memory_pool_of(&devices, IMAGE_BYTES);
+    let root_record = output.root;
+    session.current = PoolVersion::WithFile(output);
+    history.session = Some(session);
+    record_confirmation(history, &root_record, content_number)
+}
+
+/// P(n1, ·) 的前半：mkfs → `mount_writable`（实例 1）→ 首个文件 → n1 次覆盖写，会话开着。
+fn third_run_history_start(geometry: &Geometry, overwrites: u64) -> Result<ThirdRunHistory, String> {
+    let parameters = parameters_for(geometry);
+    let mut devices = new_devices(IMAGE_BYTES);
+    let genesis =
+        make_filesystem(&parameters, &mut devices).map_err(|error| format!("mkfs: {error:?}"))?;
+    let mounted = mount_writable(&parameters, &mut devices)
+        .map_err(|error| format!("第一次可写挂载: {error:?}"))?;
+    let mut history = ThirdRunHistory {
+        pool: memory_pool_of(&devices, IMAGE_BYTES),
+        session: None,
+        timeline: vec![root_pair(&genesis.root)],
+        content_number_by_root: BTreeMap::from([(root_pair(&genesis.root), 0)]),
+        confirmations: Vec::new(),
+        tail_checks: 0,
+        tail_check_failures: Vec::new(),
+    };
+    push_the_publishes_of_a_mount(&mut history, &mounted, 0);
+    history.session = Some(Session {
+        allocator: mounted.allocator,
+        current: mounted.current,
+        instance: mounted.output.instance,
+    });
+    for _ in 0..=overwrites {
+        third_run_change_content(&mut history, &parameters)?;
+    }
+    Ok(history)
+}
+
+/// 关闭 c（同第 2 次跑）：C 丢掉会话；U 调 `unmount`，并核 7.1 第六行（F14）：F 抬到现行那一版的 txg、空发布 2 或 3 次。
+/// 交回 F14 那一格的判定行（C 交 None）。
+fn third_run_close(
+    history: &mut ThirdRunHistory,
+    parameters: &MakeFilesystemParameters,
+    closing: Closing,
+) -> Result<Option<(bool, String)>, String> {
+    let Some(session) = history.session.take() else {
+        return Ok(None);
+    };
+    if closing == Closing::ProcessExit {
+        return Ok(None);
+    }
+    let Session {
+        mut allocator,
+        mut current,
+        ..
+    } = session;
+    let before_txg = current.root().checkpoint_txg.0;
+    let carried = history.content_number_of(history.tip()).unwrap_or(0);
+    let mut devices = devices_from_pool(&history.pool, IMAGE_BYTES);
+    let unmounted = singlefs_core::mount::unmount(
+        parameters,
+        &mut devices,
+        &mut allocator,
+        &mut current,
+        ShadowLedger::On,
+    )
+    .map_err(|error| format!("正常卸载: {error:?}"))?;
+    let singlefs_core::mount::Unmounted::FloorRaisedToTheCurrentVersion(raised) = unmounted else {
+        return Err("正常卸载：现行那一版没有文件".to_string());
+    };
+    for publish in &raised.publishes {
+        history.push_carried(root_pair(&publish.root), carried);
+    }
+    history.pool = memory_pool_of(&devices, IMAGE_BYTES);
+    let expected_publishes = if before_txg % 3 == 1 { 3 } else { 2 };
+    let floors = [0u32, 1].map(|device| {
+        let slot_spacing = u64::from(parameters.geometry.fixed_structure_slot_spacing);
+        newest_system_configuration_slot_bytes(&history.pool, DeviceIdentity(device), slot_spacing)
+            .and_then(|bytes| {
+                singlefs_core::system_configuration::SystemConfiguration::parse_slot(&bytes).ok()
+            })
+            .map(|parsed| parsed.quantities.rollback_floor.0)
+    });
+    let holds = floors.iter().all(|floor| *floor == Some(before_txg))
+        && raised.publishes.len() == expected_publishes;
+    Ok(Some((
+        holds,
+        format!(
+            "txg_before_unmount={before_txg} floors={floors:?} unmount_publishes={} expected_publishes={expected_publishes}",
+            raised.publishes.len()
+        ),
+    )))
+}
+
+/// 抛弃步 A 的落点（登记 5.3「抛弃步 A」）：当前时间线上最新那 1 条根的根槽，加它那次发布按 b 取的落点
+/// （b = records：那次发布全部记录的全部份；b = unit_first_copy：它第一条记录点名的第一个单元、位置条目第一条那一份）。
+/// 复制自第 2 次跑的 `unreadable_ranges_of_the_abandonment`（那一份吃 `SecondRunHistory`，这里吃第 3 次跑的历史），语义不变。
+fn third_run_abandonment_faults(
+    history: &ThirdRunHistory,
+    geometry: &PoolGeometry,
+    form: UnreadableForm,
+    replay_break: ReplayBreak,
+    duration: FaultDuration,
+) -> Result<Option<Vec<ThirdRunFault>>, String> {
+    let hidden = history.tip();
+    let (root_slot_device, root_slot_offset) = root_slot_of(&history.pool, geometry, hidden)
+        .ok_or_else(|| format!("最新那条根 {hidden:?} 在根环里读不出"))?;
+    let mut faults = vec![ThirdRunFault {
+        device: root_slot_device,
+        offset: root_slot_offset,
+        length: u64::from(geometry.physical_block_size),
+        form,
+        duration,
+        label: format!("root{}", key_text(Some(hidden))),
+    }];
+    let records = records_of_publish(&history.pool, geometry, hidden);
+    if records.is_empty() {
+        return Ok(None);
+    }
+    match replay_break {
+        ReplayBreak::EveryRecord => {
+            for (counter, record_offset_on_the_device, _) in &records {
+                for record_device in [DeviceIdentity(0), DeviceIdentity(1)] {
+                    faults.push(ThirdRunFault {
+                        device: record_device,
+                        offset: *record_offset_on_the_device,
+                        length: JOURNAL_RECORD_BYTES,
+                        form,
+                        duration,
+                        label: format!("record(counter={counter},device={})", record_device.0),
+                    });
+                }
+            }
+        }
+        ReplayBreak::FirstCopyOfTheFirstNamedUnit | ReplayBreak::FirstNamedUnit => {
+            let Some(named) = records.iter().find_map(|(_, _, record)| record.named.first()) else {
+                return Ok(None);
+            };
+            let copies = match replay_break {
+                ReplayBreak::FirstNamedUnit => named.locations.len(),
+                ReplayBreak::EveryRecord | ReplayBreak::FirstCopyOfTheFirstNamedUnit => 1,
+            };
+            for location in named.locations.iter().take(copies) {
+                faults.push(ThirdRunFault {
+                    device: location.device,
+                    offset: location.slot.0 * SLOT_BYTES_LOCAL,
+                    length: SLOT_BYTES_LOCAL,
+                    form,
+                    duration,
+                    label: format!("unit(device={},slot={})", location.device.0, location.slot.0),
+                });
+            }
+        }
+    }
+    Ok(Some(faults))
+}
+
+// ---------------------------------------------------------------------------
+// 11.4 一格的三样（登记第六节 Q1–Q3、③c 尾巴）与被测挂载的上下文（Q0、Q2、Q5 的读数、Q7）。
+// ---------------------------------------------------------------------------
+
+/// 被测那次挂载（A）的一次调用的摘要（Q7、Q5 的读数、Q2 的 E）。
+struct TestedMountSummary {
+    class: &'static str,
+    member: String,
+    writes: u64,
+    reads: u64,
+    read_bytes: u64,
+    waits: u64,
+    chosen: Option<TimelineRoot>,
+    effective: Option<TimelineRoot>,
+    abandoned_roots_unreadable: Option<u64>,
+    isolated: Option<u64>,
+    observation: Option<ArmObservation>,
+}
+
+impl TestedMountSummary {
+    fn of(call: &ThirdRunCall<Result<Mounted, singlefs_core::mount::MountError>>) -> Self {
+        let mounted = call.outcome.as_ref().ok();
+        TestedMountSummary {
+            class: third_run_outcome_class(&call.outcome, call.write_calls),
+            member: mount_error_member_or_none(&call.outcome),
+            writes: call.write_calls,
+            reads: call.read_calls,
+            read_bytes: call.read_bytes,
+            waits: call.waits,
+            chosen: mounted.map(|mounted| root_pair(&mounted.output.chosen_root)),
+            effective: mounted.map(|mounted| root_pair(&mounted.output.effective_root)),
+            abandoned_roots_unreadable: mounted.map(|mounted| mounted.output.abandoned_roots_unreadable),
+            isolated: mounted.map(|mounted| {
+                mounted
+                    .output
+                    .isolated_slots_per_device
+                    .iter()
+                    .map(|(_, slots)| *slots)
+                    .sum()
+            }),
+            observation: call.observation.clone(),
+        }
+    }
+
+    fn render(&self, prefix: &str) -> String {
+        let observation = self.observation.as_ref().map_or("none".to_string(), |observation| {
+            format!(
+                "judged:{},newer:{},tail:{},last:{},undecidable:{},unreadable_slots:{},rounds:{},rebuilt:{},table_unreadable:{},table_rereads:{}",
+                observation.witness_judged,
+                observation.newer_root_on_the_first_pass,
+                observation.witnessed_tail,
+                observation
+                    .selected_version_last_counter
+                    .map_or("none".to_string(), |counter| counter.to_string()),
+                observation.undecidable,
+                observation.unreadable_ring_slots_on_the_first_pass,
+                observation.reread_rounds,
+                observation.rebuilt_from_records,
+                observation.shadow_ledger_table_unreadable_on_the_first_read,
+                observation.shadow_ledger_table_rereads
+            )
+        });
+        format!(
+            "{prefix}_class={} {prefix}_error={} {prefix}_writes={} {prefix}_reads={} {prefix}_read_bytes={} {prefix}_waits={} {prefix}_chosen={} {prefix}_effective={} {prefix}_abandoned_roots_unreadable={} {prefix}_isolated={} {prefix}_arm_observation={observation}",
+            self.class,
+            self.member,
+            self.writes,
+            self.reads,
+            self.read_bytes,
+            self.waits,
+            key_text(self.chosen),
+            key_text(self.effective),
+            self.abandoned_roots_unreadable
+                .map_or("none".to_string(), |count| count.to_string()),
+            self.isolated.map_or("none".to_string(), |count| count.to_string()),
+        )
+    }
+}
+
+/// 一格历史末尾的三样（Q1 三栏、Q3、③c）。
+struct CellLoss {
+    in_ring_overwritten: u64,
+    out_of_ring_overwritten: u64,
+    landing_overwritten: String,
+    read_back: String,
+    read_back_root: Option<TimelineRoot>,
+    tail_class: String,
+}
+
+impl CellLoss {
+    fn overwrite_cell(&self) -> bool {
+        self.in_ring_overwritten + self.out_of_ring_overwritten > 0
+    }
+
+    fn read_back_lost(&self) -> bool {
+        self.read_back.starts_with("older") || self.read_back.starts_with("failed")
+    }
+
+    fn tail_lost(&self) -> bool {
+        self.tail_class.starts_with("failed")
+    }
+
+    fn lost_write_cell(&self) -> bool {
+        self.overwrite_cell() || self.read_back_lost() || self.tail_lost()
+    }
+
+    fn render(&self) -> String {
+        format!(
+            "q1_in_ring_overwritten={} q1_out_of_ring_overwritten={} q1_landing_overwritten={} overwrite_cell={} q3_read_back={} q3_read_back_root={} q3c_tail={} lost_write_cell={}",
+            self.in_ring_overwritten,
+            self.out_of_ring_overwritten,
+            self.landing_overwritten,
+            self.overwrite_cell(),
+            self.read_back,
+            key_text(self.read_back_root),
+            self.tail_class,
+            self.lost_write_cell()
+        )
+    }
+}
+
+/// 冷启动读回按内容号分四类（Q3）：last_confirmed / newer / older / failed:<成员>。
+fn classify_read_back(
+    outcome: &RecoveryOutcome,
+    last_confirmed: u64,
+    highest_content_number: u64,
+) -> String {
+    match outcome {
+        RecoveryOutcome::FileRead { content, .. } => {
+            match content_number_of_bytes(content, highest_content_number) {
+                Some(number) if number == last_confirmed => "last_confirmed".to_string(),
+                Some(number) if number > last_confirmed => format!("newer:{number}"),
+                Some(number) => format!("older:{number}"),
+                None => "failed:content_not_in_the_ledger".to_string(),
+            }
+        }
+        RecoveryOutcome::NoFile { .. } => {
+            if last_confirmed == 0 {
+                "last_confirmed".to_string()
+            } else {
+                "older:0".to_string()
+            }
+        }
+        RecoveryOutcome::Failed { failure, .. } => {
+            format!("failed:{}", error_member_of_debug(&format!("{failure:?}")))
+        }
+    }
+}
+
+/// 历史末尾（`end`）上算一格的三样。`protected` = 被测那次挂载之前最后确认那一版；`base` = 被测那次挂载开始时的镜像；
+/// `first_instance_at_or_after_the_tested_mount` = ③c 要读坏其根槽的最小实例代号（`None` = 这一格不做 ③c）。
+fn evaluate_cell_loss(
+    history: &ThirdRunHistory,
+    protected: &ThirdRunConfirmation,
+    base: &MemoryPool,
+    end: &MemoryPool,
+    first_instance_at_or_after_the_tested_mount: Option<u32>,
+) -> CellLoss {
+    let geometry = independent_geometry(end);
+    let end_roots = geometry
+        .as_ref()
+        .map(|geometry| readable_roots_independent(end, geometry))
+        .unwrap_or_default();
+    let highest = history.last_confirmed_content_number();
+    let report = recover(&devices_from_pool(end, IMAGE_BYTES), JournalPolicy::Consult);
+    let read_back_root = chosen_root_of(&report.outcome);
+    let read_back = classify_read_back(&report.outcome, highest, highest);
+    // 最后那次冷启动恢复落到的根（第 2 次跑的 ①）：它在被测那次挂载开始时的镜像上就是一条自证根时，取它那一版引用的单元在那一刻的字节。
+    let base_geometry = independent_geometry(base);
+    let landing_in_base = match (read_back_root, &base_geometry) {
+        (Some(landing), Ok(base_pool_geometry)) => {
+            readable_roots_independent(base, base_pool_geometry).contains(&landing)
+        }
+        (Some(_) | None, _) => false,
+    };
+    let landing_unit_bytes: Result<UnitBytesOfAVersion, String> = match (read_back_root, &base_geometry) {
+        (Some(landing), Ok(base_pool_geometry)) if landing_in_base => root_record_of(base, base_pool_geometry, landing)
+            .ok_or_else(|| "根记录读不出".to_string())
+            .and_then(|record| unit_bytes_referenced_by(base, &record)),
+        (Some(_) | None, _) => Ok(BTreeMap::new()),
+    };
+    let overwritten_in = |version: &UnitBytesOfAVersion| -> u64 {
+        version
+            .iter()
+            .filter(|((device, slot, span), bytes)| {
+                let length = usize::try_from(span * SLOT_BYTES_LOCAL).expect("单元长");
+                end.read(*device, slot * SLOT_BYTES_LOCAL, length)
+                    .unwrap_or_default()
+                    != **bytes
+            })
+            .count() as u64
+    };
+    // Q1 前两栏比的是「被测那次挂载之前最后确认那一版」引用的单元（登记第六节 Q1）。
+    let compared_version = &protected.unit_bytes;
+    let overwritten = overwritten_in(compared_version);
+    let protected_in_ring = end_roots.contains(&protected.root);
+    let (in_ring_overwritten, out_of_ring_overwritten) = if protected_in_ring {
+        (overwritten, 0)
+    } else {
+        (0, overwritten)
+    };
+    let landing_overwritten = match (&landing_unit_bytes, read_back_root) {
+        (Ok(version), Some(_)) if landing_in_base => overwritten_in(version).to_string(),
+        (Err(error), Some(_)) => format!("unreadable_in_base:{}", error.replace(' ', "_")),
+        (Ok(_), Some(_)) => "written_after_the_tested_mount".to_string(),
+        (Ok(_) | Err(_), None) => "none".to_string(),
+    };
+    let tail_class = match (first_instance_at_or_after_the_tested_mount, geometry) {
+        (Some(first_instance), Ok(geometry)) => {
+            let slots = checker_image::root_slot_positions(&geometry);
+            let faults: Vec<ThirdRunFault> = checker_image::valid_roots(end, &geometry)
+                .into_iter()
+                .filter(|(_, _, view)| view.instance >= first_instance)
+                .filter_map(|(region, slot, view)| {
+                    slots
+                        .iter()
+                        .find(|(candidate_region, candidate_slot, _, _)| {
+                            *candidate_region == region && *candidate_slot == slot
+                        })
+                        .map(|(_, _, device, offset)| ThirdRunFault {
+                            device: DeviceIdentity(*device),
+                            offset: *offset,
+                            length: u64::from(geometry.physical_block_size),
+                            form: UnreadableForm::ReadFails,
+                            duration: FaultDuration::WholeCall,
+                            label: format!("tail_root{}", key_text(Some((view.instance, view.checkpoint_txg)))),
+                        })
+                })
+                .collect();
+            let tail = run_third_run_recover(end, &faults);
+            match &tail.outcome.outcome {
+                RecoveryOutcome::Failed { failure, .. } => {
+                    format!("failed:{}", error_member_of_debug(&format!("{failure:?}")))
+                }
+                outcome @ (RecoveryOutcome::NoFile { .. } | RecoveryOutcome::FileRead { .. }) => {
+                    let landing = chosen_root_of(outcome);
+                    let expected = landing.and_then(|root| history.content_number_of(root));
+                    let got = match outcome {
+                        RecoveryOutcome::FileRead { content, .. } => {
+                            content_number_of_bytes(content, highest)
+                        }
+                        RecoveryOutcome::NoFile { .. } => Some(0),
+                        RecoveryOutcome::Failed { .. } => None,
+                    };
+                    if expected.is_some() && got == expected {
+                        format!("own_version:{}", key_text(landing))
+                    } else {
+                        format!(
+                            "other:{}:expected={expected:?}:got={got:?}",
+                            key_text(landing)
+                        )
+                    }
+                }
+            }
+        }
+        (Some(_), Err(_)) => "failed:geometry".to_string(),
+        (None, _) => "na".to_string(),
+    };
+    CellLoss {
+        in_ring_overwritten,
+        out_of_ring_overwritten,
+        landing_overwritten,
+        read_back,
+        read_back_root,
+        tail_class,
+    }
+}
+
+/// 每臂每族的汇总（第六节各量的分母与分子都报整数）。
+#[derive(Default)]
+struct ThirdRunFamilySummary {
+    cells: u64,
+    void_cells: u64,
+    fault_not_reached_cells: u64,
+    overwrite_cells: u64,
+    in_ring_overwrite_cells: u64,
+    out_of_ring_overwrite_cells: u64,
+    landing_overwrite_cells: u64,
+    rollback_cells: u64,
+    tested_ok_cells: u64,
+    read_back: BTreeMap<String, u64>,
+    read_back_last_confirmed_cells: u64,
+    read_back_lost_cells: u64,
+    tail: BTreeMap<String, u64>,
+    tail_lost_cells: u64,
+    lost_write_cells: u64,
+    tested_classes: BTreeMap<String, u64>,
+    remount_classes: BTreeMap<String, u64>,
+    abandoned_hidden_root_cells: u64,
+    /// 停机 S4：装置与 `crates/` 对不上的格（7.3 第一行）。
+    stop_condition_four_mismatches: Vec<String>,
+    /// 失败条款 F4：点名单元只有第一份读不出时施加了那次发布。
+    failure_clause_four_findings: Vec<String>,
+    /// 失败条款 F13：新实例第一次发布的 txg 与今天的规则不等。
+    failure_clause_thirteen_findings: Vec<String>,
+    failure_clause_thirteen_checks: u64,
+    formula_mismatches: Vec<String>,
+}
+
+impl ThirdRunFamilySummary {
+    fn count(&mut self, loss: &CellLoss, rollback: bool, tested_ok: bool) {
+        self.cells += 1;
+        if loss.overwrite_cell() {
+            self.overwrite_cells += 1;
+        }
+        if loss.in_ring_overwritten > 0 {
+            self.in_ring_overwrite_cells += 1;
+        }
+        if loss.out_of_ring_overwritten > 0 {
+            self.out_of_ring_overwrite_cells += 1;
+        }
+        if loss.landing_overwritten.parse::<u64>().is_ok_and(|count| count > 0) {
+            self.landing_overwrite_cells += 1;
+        }
+        if rollback {
+            self.rollback_cells += 1;
+        }
+        if tested_ok {
+            self.tested_ok_cells += 1;
+        }
+        *self
+            .read_back
+            .entry(loss.read_back.split(':').next().unwrap_or("").to_string())
+            .or_insert(0) += 1;
+        if loss.read_back == "last_confirmed" {
+            self.read_back_last_confirmed_cells += 1;
+        }
+        if loss.read_back_lost() {
+            self.read_back_lost_cells += 1;
+        }
+        *self
+            .tail
+            .entry(loss.tail_class.split(':').next().unwrap_or("").to_string())
+            .or_insert(0) += 1;
+        if loss.tail_lost() {
+            self.tail_lost_cells += 1;
+        }
+        if loss.lost_write_cell() || rollback {
+            self.lost_write_cells += 1;
+        }
+    }
+
+    fn emit(&self, family: &str, arm: &str) {
+        emit_result(&format!(
+            "name=r3_family_summary family={family} arm={arm} cells={} void_cells_v2={} fault_not_reached_cells={} q1_overwrite_cells={} q1_in_ring_overwrite_cells={} q1_out_of_ring_overwrite_cells={} q1_landing_overwrite_cells={} q2_rollback_cells={} tested_ok_cells={} q3_read_back={:?} q3_last_confirmed_cells={} q3_lost_cells={} q3c_tail={:?} q3c_lost_cells={} lost_write_cells_q1_q2_q3={} tested_classes={:?} remount_classes={:?} q0_hidden_root_abandoned_cells={} s4_mismatches={} f4_failures={} f13_checked={} f13_failures={} formula_mismatches={}",
+            self.cells,
+            self.void_cells,
+            self.fault_not_reached_cells,
+            self.overwrite_cells,
+            self.in_ring_overwrite_cells,
+            self.out_of_ring_overwrite_cells,
+            self.landing_overwrite_cells,
+            self.rollback_cells,
+            self.tested_ok_cells,
+            self.read_back,
+            self.read_back_last_confirmed_cells,
+            self.read_back_lost_cells,
+            self.tail,
+            self.tail_lost_cells,
+            self.lost_write_cells,
+            self.tested_classes,
+            self.remount_classes,
+            self.abandoned_hidden_root_cells,
+            self.stop_condition_four_mismatches.len(),
+            self.failure_clause_four_findings.len(),
+            self.failure_clause_thirteen_checks,
+            self.failure_clause_thirteen_findings.len(),
+            self.formula_mismatches.len()
+        ));
+        for (kind, list) in [
+            ("s4", &self.stop_condition_four_mismatches),
+            ("f4", &self.failure_clause_four_findings),
+            ("f13", &self.failure_clause_thirteen_findings),
+            ("formula", &self.formula_mismatches),
+        ] {
+            for detail in list {
+                emit_result(&format!(
+                    "name=r3_family_finding family={family} arm={arm} kind={kind} detail={:?}",
+                    detail
+                ));
+            }
+        }
+    }
+}
+
+/// 7.1 第四行（F13）今天那一臂的期望值：新实例第一次发布的 txg = max(这次调用里读得出的根的 txg, 读得出的自证记录的 checkpoint_txg) + 1。
+/// 根环在这次调用里被读两遍才走到这一步（择根一遍、`highest_root_txg` 一遍），记录只在扫描那一遍读：
+/// 根槽在第二次读还坏的不算，记录在第一次读就坏的不算（今天那一臂从不等，T 与 W 同）。
+fn first_txg_expected_by_the_rule_of_today(
+    twin: &MemoryPool,
+    geometry: &PoolGeometry,
+    faults: &[ThirdRunFault],
+) -> u64 {
+    let second_read_faults: Vec<ThirdRunFault> = faults
+        .iter()
+        .filter(|fault| fault.duration.is_active(2, 0))
+        .cloned()
+        .map(|mut fault| {
+            fault.duration = FaultDuration::WholeCall;
+            fault
+        })
+        .collect();
+    let roots = device_decode(
+        &FirstPassReader {
+            pool: twin,
+            faults: &second_read_faults,
+        },
+        geometry,
+    );
+    let records = device_decode(
+        &FirstPassReader {
+            pool: twin,
+            faults,
+        },
+        geometry,
+    );
+    let highest_root = roots.root_keys.iter().map(|(_, txg)| *txg).max().unwrap_or(0);
+    let highest_record = records
+        .records
+        .values()
+        .map(|record| record.checkpoint_txg)
+        .max()
+        .unwrap_or(0);
+    1 + highest_root.max(highest_record)
+}
+
+/// 被测那次挂载的「之前与之后」对拍（7.3 第一行，今天那一臂）：装置择的根、重放出的 E、系统配置槽解码、被抛弃判定与 `crates/` 的比。
+fn today_cross_checks(
+    base: &MemoryPool,
+    judgement: &DeviceJudgement,
+    tested: &ThirdRunCall<Result<Mounted, singlefs_core::mount::MountError>>,
+    label: &str,
+    summary: &mut ThirdRunFamilySummary,
+) {
+    if let Some(error) = &judgement.error {
+        summary
+            .stop_condition_four_mismatches
+            .push(format!("{label}: 装置重放报错 {error}"));
+    }
+    if let Ok(mounted) = &tested.outcome {
+        let crates_chosen = root_pair(&mounted.output.chosen_root);
+        let crates_effective = root_pair(&mounted.output.effective_root);
+        if judgement.chosen != Some(crates_chosen) || judgement.effective != Some(crates_effective) {
+            summary.stop_condition_four_mismatches.push(format!(
+                "{label}: 择根 / E 装置 {} / {}，crates {} / {}",
+                key_text(judgement.chosen),
+                key_text(judgement.effective),
+                key_text(Some(crates_chosen)),
+                key_text(Some(crates_effective))
+            ));
+        }
+    }
+    let devices = devices_from_pool(base, IMAGE_BYTES);
+    let Ok(geometry) = independent_geometry(base) else {
+        summary.stop_condition_four_mismatches.push(format!("{label}: 几何解不出"));
+        return;
+    };
+    let decoded = device_decode(base, &geometry);
+    for device in [0u32, 1] {
+        let mut by_crates: Vec<(u64, u64, u32)> =
+            singlefs_core::recovery::verified_system_configuration_slots(
+                &devices,
+                DeviceIdentity(device),
+                geometry.slot_spacing,
+                &FILESYSTEM_IDENTIFIER,
+            )
+            .into_iter()
+            .map(|slot| {
+                (
+                    slot.quantities.slot_generation,
+                    slot.quantities.journal_tail,
+                    slot.quantities.journal_instance.0,
+                )
+            })
+            .collect();
+        let mut by_the_device: Vec<(u64, u64, u32)> = decoded
+            .system_configuration_slots
+            .iter()
+            .filter(|(slot_device, _, _, _)| *slot_device == device)
+            .map(|(_, generation, tail, instance)| (*generation, *tail, *instance))
+            .collect();
+        by_crates.sort_unstable();
+        by_the_device.sort_unstable();
+        if by_crates != by_the_device {
+            summary.stop_condition_four_mismatches.push(format!(
+                "{label}: 盘 {device} 系统配置槽 装置 {by_the_device:?}，crates {by_crates:?}"
+            ));
+        }
+    }
+    if tested.outcome.is_ok() {
+        if let Err(error) = abandoned_roots_on(&tested.pool_after) {
+            if error.starts_with("S5") {
+                summary
+                    .stop_condition_four_mismatches
+                    .push(format!("{label}: 调用之后 {error}"));
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 11.5 H1d（登记 5.3 第一行）：P(n1, C) → A → 断在「这次挂载写行根落盘之前」的某一点 → 撤故障 → `mount_writable`（不注入）→
+//      冷启动 `recover` 读回；断点在这一臂自己那次调用的写序列上取。
+// ---------------------------------------------------------------------------
+
+/// 这一臂在 H1d / PC 上跑哪几种时长（登记 5.3：各臂 W 与 O(1 只)，乙 三臂另加 T(δ)、T(2δ)；今天、甲、丙 另跑 T(δ)
+/// 核 7.3 第三行「T(τ) 对它们与 W 逐格相同」，只跑不断那一格）。交回 (时长, 只跑不断那一格)。
+fn held_once_durations_of(arm: &str) -> Vec<(FaultDuration, bool)> {
+    let mut durations = vec![
+        (FaultDuration::WholeCall, false),
+        (FaultDuration::OnlyTheNthRead(1), false),
+    ];
+    match ThirdRunCandidate::of(arm) {
+        Some(ThirdRunCandidate::Yi) => {
+            durations.push((FaultDuration::UntilVirtualTime(THIRD_RUN_VIRTUAL_INTERVAL), false));
+            durations.push((
+                FaultDuration::UntilVirtualTime(2 * THIRD_RUN_VIRTUAL_INTERVAL),
+                false,
+            ));
+        }
+        Some(ThirdRunCandidate::Today | ThirdRunCandidate::Jia | ThirdRunCandidate::Bing) | None => {
+            durations.push((FaultDuration::UntilVirtualTime(THIRD_RUN_VIRTUAL_INTERVAL), true));
+        }
+    }
+    durations
+}
+
+/// 一次被测挂载（A）在一份起始镜像上跑完、交回它与装置的判定；今天那一臂顺带做 7.3 第一行、F13。
+struct TestedMount {
+    call: ThirdRunCall<Result<Mounted, singlefs_core::mount::MountError>>,
+    summary: TestedMountSummary,
+    judgement: DeviceJudgement,
+    unintercepted: Vec<String>,
+}
+
+fn run_tested_mount(
+    arm: &str,
+    base: &MemoryPool,
+    parameters: &MakeFilesystemParameters,
+    faults: &[ThirdRunFault],
+    label: &str,
+    family_summary: &mut ThirdRunFamilySummary,
+) -> Result<TestedMount, String> {
+    let geometry = independent_geometry(base)?;
+    let call = run_third_run_mount_writable(base, parameters, faults, None, None);
+    let judgement = device_judgement(base, &geometry, faults);
+    let summary = TestedMountSummary::of(&call);
+    let unintercepted = call.unintercepted(faults);
+    if arm == "today" {
+        today_cross_checks(base, &judgement, &call, label, family_summary);
+        if let Ok(mounted) = &call.outcome {
+            family_summary.failure_clause_thirteen_checks += 1;
+            let expected = first_txg_expected_by_the_rule_of_today(base, &geometry, faults);
+            let got = mounted.output.row_publish.root().checkpoint_txg.0;
+            if got != expected {
+                family_summary
+                    .failure_clause_thirteen_findings
+                    .push(format!("{label}: 写行那次发布 txg {got}，按今天的规则 {expected}"));
+            }
+        }
+    }
+    Ok(TestedMount {
+        call,
+        summary,
+        judgement,
+        unintercepted,
+    })
+}
+
+/// Q0：被测那次挂载 `Ok` 之后撤故障，被藏那条根还在不在根环里、装置按新实例表判它被不被抛弃（没 `Ok` 的两样都记 none）。
+fn hidden_root_after_the_tested_mount(
+    call: &ThirdRunCall<Result<Mounted, singlefs_core::mount::MountError>>,
+    hidden: TimelineRoot,
+) -> (Option<bool>, Option<bool>) {
+    if call.outcome.is_err() {
+        return (None, None);
+    }
+    let in_ring = independent_geometry(&call.pool_after)
+        .ok()
+        .map(|geometry| readable_roots_independent(&call.pool_after, &geometry).contains(&hidden));
+    let abandoned = abandoned_roots_on(&call.pool_after)
+        .ok()
+        .map(|abandoned| abandoned.contains(&hidden));
+    (in_ring, abandoned)
+}
+
+fn optional_flag_text(flag: Option<bool>) -> String {
+    flag.map_or("none".to_string(), |value| value.to_string())
+}
+
+fn render_device_judgement(judgement: &DeviceJudgement) -> String {
+    format!(
+        "device_chosen={} device_effective={} device_n_cfg={} device_c_witness={} device_c_e={} device_undecidable={} device_n_slot={} device_unreadable_root_slots={} truth_newer={} truth_orders_disagree={} truth_by_records_only={}",
+        key_text(judgement.chosen),
+        key_text(judgement.effective),
+        judgement.configuration_newer,
+        judgement.witnessed_tail,
+        judgement
+            .selected_version_last_counter
+            .map_or("none".to_string(), |counter| counter.to_string()),
+        judgement.undecidable,
+        judgement.unreadable_root_slots > 0,
+        judgement.unreadable_root_slots,
+        judgement.truth_newer,
+        judgement.truth_orders_disagree,
+        judgement.truth_by_records_only
+    )
+}
+
+/// 一格：A 之后（断点那一刻）的镜像 `post` → 撤故障 → 再可写挂载（这一臂的代码，不注入）→ 历史末尾算三样。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "一格的全部坐标与上下文原样打进结果行，拆成结构体只多一层搬运"
+)]
+fn evaluate_held_once_cell_of_the_third_run(
+    arm: &str,
+    coordinates: &str,
+    history: &ThirdRunHistory,
+    protected: &ThirdRunConfirmation,
+    base: &MemoryPool,
+    post: &MemoryPool,
+    parameters: &MakeFilesystemParameters,
+    tested_line: &str,
+    rollback: bool,
+    tested_ok: bool,
+    do_the_tail: bool,
+    summary: &mut ThirdRunFamilySummary,
+) {
+    let remount = run_third_run_mount_writable(post, parameters, &[], None, None);
+    let remount_class = third_run_outcome_class(&remount.outcome, remount.write_calls);
+    let remount_member = mount_error_member_or_none(&remount.outcome);
+    let first_new_instance = history.tip().0 + 1;
+    let loss = evaluate_cell_loss(
+        history,
+        protected,
+        base,
+        &remount.pool_after,
+        do_the_tail.then_some(first_new_instance),
+    );
+    summary.count(&loss, rollback, tested_ok);
+    *summary
+        .remount_classes
+        .entry(remount_class.to_string())
+        .or_insert(0) += 1;
+    emit_result(&format!(
+        "name=r3_h1d_cell arm={arm} {coordinates} {tested_line} q2_rollback={rollback} remount_class={remount_class} remount_error={remount_member} remount_chosen={} {}",
+        key_text(
+            remount
+                .outcome
+                .as_ref()
+                .ok()
+                .map(|mounted| root_pair(&mounted.output.chosen_root))
+        ),
+        loss.render()
+    ));
+}
+
+fn run_third_run_held_once_family(geometry: &Geometry, arm: &str) {
+    let parameters = parameters_for(geometry);
+    let mut summary = ThirdRunFamilySummary::default();
+    for overwrites in THIRD_RUN_OVERWRITES {
+        let mut history = match third_run_history_start(geometry, overwrites) {
+            Ok(history) => history,
+            Err(error) => {
+                emit_result(&format!(
+                    "name=r3_h1d_history arm={arm} n1={overwrites} verdict=stop reason={error:?}"
+                ));
+                continue;
+            }
+        };
+        let _ = third_run_close(&mut history, &parameters, Closing::ProcessExit);
+        let base = history.pool.clone();
+        let Ok(pool_geometry) = independent_geometry(&base) else {
+            emit_result(&format!(
+                "name=r3_h1d_history arm={arm} n1={overwrites} verdict=stop reason=\"几何解不出\""
+            ));
+            continue;
+        };
+        let root_slots = root_slot_device_offsets(&pool_geometry);
+        let protected = history
+            .confirmations
+            .last()
+            .cloned()
+            .expect("P(n1, C) 至少确认过首个文件");
+        let last_confirmed = protected.content_number;
+        let hidden = history.tip();
+        emit_result(&format!(
+            "name=r3_h1d_history arm={arm} n1={overwrites} tip={} last_confirmed={last_confirmed} tail_checks={} tail_check_failures={}",
+            key_text(Some(hidden)),
+            history.tail_checks,
+            history.tail_check_failures.len()
+        ));
+        for failure in &history.tail_check_failures {
+            emit_result(&format!(
+                "name=r3_f3_tail_check_failure arm={arm} n1={overwrites} detail={failure:?}"
+            ));
+        }
+        for form in [UnreadableForm::ReadFails, UnreadableForm::ReadsZeros] {
+            for replay_break in [
+                ReplayBreak::EveryRecord,
+                ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+            ] {
+                for (duration, only_the_uncut_cell) in held_once_durations_of(arm) {
+                    let head = format!(
+                        "n1={overwrites} b={} form={} duration={}",
+                        replay_break.name(),
+                        form.name(),
+                        duration.name()
+                    );
+                    let faults = match third_run_abandonment_faults(
+                        &history,
+                        &pool_geometry,
+                        form,
+                        replay_break,
+                        duration,
+                    ) {
+                        Ok(Some(faults)) => faults,
+                        Ok(None) => {
+                            emit_result(&format!(
+                                "name=r3_h1d_group arm={arm} {head} verdict=not_applicable"
+                            ));
+                            continue;
+                        }
+                        Err(error) => {
+                            emit_result(&format!(
+                                "name=r3_h1d_group arm={arm} {head} verdict=stop reason={error:?}"
+                            ));
+                            continue;
+                        }
+                    };
+                    let tested = match run_tested_mount(arm, &base, &parameters, &faults, &head, &mut summary) {
+                        Ok(tested) => tested,
+                        Err(error) => {
+                            emit_result(&format!(
+                                "name=r3_h1d_group arm={arm} {head} verdict=stop reason={error:?}"
+                            ));
+                            continue;
+                        }
+                    };
+                    let first_root_write = index_of_the_first_root_slot_write(
+                        &tested.call.applied,
+                        &root_slots,
+                        u64::from(pool_geometry.physical_block_size),
+                    );
+                    let barriers = first_root_write
+                        .map_or(0, |index| barriers_before_write(&tested.call.applied, index + 1));
+                    let cut_cells_expected = if only_the_uncut_cell {
+                        1
+                    } else {
+                        first_root_write.map_or(1, |index| 1 + 2 * (index as u64 + 1) + barriers)
+                    };
+                    let tested_ok = tested.call.outcome.is_ok();
+                    let rollback = tested_ok
+                        && tested
+                            .summary
+                            .effective
+                            .and_then(|effective| history.content_number_of(effective))
+                            .is_some_and(|number| number < last_confirmed);
+                    *summary
+                        .tested_classes
+                        .entry(format!("{}:{}", tested.summary.class, tested.summary.member))
+                        .or_insert(0) += 1;
+                    let (hidden_in_ring_after, hidden_abandoned_after) =
+                        hidden_root_after_the_tested_mount(&tested.call, hidden);
+                    if arm == "today" && hidden_abandoned_after == Some(true) {
+                        summary.abandoned_hidden_root_cells += 1;
+                    }
+                    if arm == "today"
+                        && tested_ok
+                        && replay_break == ReplayBreak::FirstCopyOfTheFirstNamedUnit
+                        && duration == FaultDuration::WholeCall
+                        && tested.summary.effective != history.timeline.iter().rev().nth(1).copied()
+                    {
+                        summary.failure_clause_four_findings.push(format!(
+                            "{head}: E {}，被藏那条根前一条 {}",
+                            key_text(tested.summary.effective),
+                            key_text(history.timeline.iter().rev().nth(1).copied())
+                        ));
+                    }
+                    let not_reached = !tested.unintercepted.is_empty();
+                    if not_reached {
+                        if arm == "today" {
+                            summary.void_cells += 1;
+                        } else {
+                            summary.fault_not_reached_cells += 1;
+                        }
+                    }
+                    let tested_line = format!(
+                        "{} {} hidden={} hidden_in_ring_after_a={} q0_hidden_abandoned_after_a={} faults={} unintercepted={} first_root_write={} barriers_before_the_row_root={}",
+                        tested.summary.render("a"),
+                        render_device_judgement(&tested.judgement),
+                        key_text(Some(hidden)),
+                        optional_flag_text(hidden_in_ring_after),
+                        optional_flag_text(hidden_abandoned_after),
+                        faults.len(),
+                        tested.unintercepted.join(","),
+                        first_root_write.map_or("none".to_string(), |index| index.to_string()),
+                        barriers
+                    );
+                    if arm == "today" && not_reached {
+                        emit_result(&format!(
+                            "name=r3_h1d_cell arm={arm} {head} cut=none point=none verdict=void_v2 {tested_line}"
+                        ));
+                        continue;
+                    }
+                    let mut enumerated = 0u64;
+                    evaluate_held_once_cell_of_the_third_run(
+                        arm,
+                        &format!("{head} cut=none point=none"),
+                        &history,
+                        &protected,
+                        &base,
+                        &tested.call.pool_after,
+                        &parameters,
+                        &tested_line,
+                        rollback,
+                        tested_ok,
+                        true,
+                        &mut summary,
+                    );
+                    enumerated += 1;
+                    if !only_the_uncut_cell {
+                        if let Some(first_root_write) = first_root_write {
+                            for write_count in 0..=first_root_write {
+                                let post = image_with_the_first_writes(
+                                    &base,
+                                    &tested.call.applied,
+                                    write_count,
+                                );
+                                evaluate_held_once_cell_of_the_third_run(
+                                    arm,
+                                    &format!("{head} cut=crash point={write_count}"),
+                                    &history,
+                                    &protected,
+                                    &base,
+                                    &post,
+                                    &parameters,
+                                    "a_outcome=crashed",
+                                    false,
+                                    false,
+                                    false,
+                                    &mut summary,
+                                );
+                                enumerated += 1;
+                            }
+                            for failing_write in 0..=first_root_write {
+                                let failed = run_third_run_mount_writable(
+                                    &base,
+                                    &parameters,
+                                    &faults,
+                                    Some(failing_write as u64),
+                                    None,
+                                );
+                                let failed_summary = TestedMountSummary::of(&failed);
+                                let failed_ok = failed.outcome.is_ok();
+                                let failed_rollback = failed_ok
+                                    && failed_summary
+                                        .effective
+                                        .and_then(|effective| history.content_number_of(effective))
+                                        .is_some_and(|number| number < last_confirmed);
+                                evaluate_held_once_cell_of_the_third_run(
+                                    arm,
+                                    &format!("{head} cut=write_fails point={failing_write}"),
+                                    &history,
+                                    &protected,
+                                    &base,
+                                    &failed.pool_after,
+                                    &parameters,
+                                    &format!("{} fired={}", failed_summary.render("a"), failed.injected_failure_fired),
+                                    failed_rollback,
+                                    failed_ok,
+                                    false,
+                                    &mut summary,
+                                );
+                                enumerated += 1;
+                            }
+                            for failing_barrier in 0..barriers {
+                                let failed = run_third_run_mount_writable(
+                                    &base,
+                                    &parameters,
+                                    &faults,
+                                    None,
+                                    Some(failing_barrier),
+                                );
+                                let failed_summary = TestedMountSummary::of(&failed);
+                                let failed_ok = failed.outcome.is_ok();
+                                let failed_rollback = failed_ok
+                                    && failed_summary
+                                        .effective
+                                        .and_then(|effective| history.content_number_of(effective))
+                                        .is_some_and(|number| number < last_confirmed);
+                                evaluate_held_once_cell_of_the_third_run(
+                                    arm,
+                                    &format!("{head} cut=barrier_fails point={failing_barrier}"),
+                                    &history,
+                                    &protected,
+                                    &base,
+                                    &failed.pool_after,
+                                    &parameters,
+                                    &format!("{} fired={}", failed_summary.render("a"), failed.injected_failure_fired),
+                                    failed_rollback,
+                                    failed_ok,
+                                    false,
+                                    &mut summary,
+                                );
+                                enumerated += 1;
+                            }
+                        }
+                    }
+                    if enumerated != cut_cells_expected {
+                        summary.formula_mismatches.push(format!(
+                            "{head}: 枚举 {enumerated} 格，公式 1 + 2(J + 1) + 屏障数 = {cut_cells_expected}"
+                        ));
+                    }
+                    emit_result(&format!(
+                        "name=r3_h1d_group arm={arm} {head} cells={enumerated} formula_cells={cut_cells_expected} verdict={}",
+                        if enumerated == cut_cells_expected { "pass" } else { "fail_v4" }
+                    ));
+                }
+            }
+        }
+    }
+    summary.emit("h1d", arm);
+}
+
+// ---------------------------------------------------------------------------
+// 11.6 H1e（登记 5.3 第二行）：P(n1, C) → A（不断）→ 在 A 交回的会话里再做 m 次改内容 → 关闭 C → 撤故障 →
+//      `mount_writable`（不注入）→ 冷启动 `recover` 读回。A 被拒的臂，那 m 次没有会话可做，记「因拒没做」。
+// ---------------------------------------------------------------------------
+
+fn tail_durations_of(arm: &str) -> Vec<FaultDuration> {
+    match ThirdRunCandidate::of(arm) {
+        Some(ThirdRunCandidate::Yi) => vec![
+            FaultDuration::WholeCall,
+            FaultDuration::UntilVirtualTime(THIRD_RUN_VIRTUAL_INTERVAL),
+        ],
+        Some(ThirdRunCandidate::Today | ThirdRunCandidate::Jia | ThirdRunCandidate::Bing) | None => {
+            vec![FaultDuration::WholeCall]
+        }
+    }
+}
+
+fn run_third_run_tail_family(geometry: &Geometry, arm: &str) {
+    let parameters = parameters_for(geometry);
+    let mut summary = ThirdRunFamilySummary::default();
+    let mut cells_by_duration: BTreeMap<String, u64> = BTreeMap::new();
+    for overwrites in THIRD_RUN_OVERWRITES {
+        let mut prefix = match third_run_history_start(geometry, overwrites) {
+            Ok(history) => history,
+            Err(error) => {
+                emit_result(&format!(
+                    "name=r3_h1e_history arm={arm} n1={overwrites} verdict=stop reason={error:?}"
+                ));
+                continue;
+            }
+        };
+        let _ = third_run_close(&mut prefix, &parameters, Closing::ProcessExit);
+        let base = prefix.pool.clone();
+        let Ok(pool_geometry) = independent_geometry(&base) else {
+            continue;
+        };
+        let protected = prefix
+            .confirmations
+            .last()
+            .cloned()
+            .expect("P(n1, C) 至少确认过首个文件");
+        let hidden = prefix.tip();
+        for form in [UnreadableForm::ReadFails, UnreadableForm::ReadsZeros] {
+            for replay_break in [
+                ReplayBreak::EveryRecord,
+                ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+            ] {
+                for duration in tail_durations_of(arm) {
+                    let head = format!(
+                        "n1={overwrites} b={} form={} duration={}",
+                        replay_break.name(),
+                        form.name(),
+                        duration.name()
+                    );
+                    let Ok(Some(faults)) = third_run_abandonment_faults(
+                        &prefix,
+                        &pool_geometry,
+                        form,
+                        replay_break,
+                        duration,
+                    ) else {
+                        emit_result(&format!(
+                            "name=r3_h1e_group arm={arm} {head} verdict=not_applicable"
+                        ));
+                        continue;
+                    };
+                    let tested = match run_tested_mount(arm, &base, &parameters, &faults, &head, &mut summary) {
+                        Ok(tested) => tested,
+                        Err(error) => {
+                            emit_result(&format!(
+                                "name=r3_h1e_group arm={arm} {head} verdict=stop reason={error:?}"
+                            ));
+                            continue;
+                        }
+                    };
+                    let not_reached = !tested.unintercepted.is_empty();
+                    let tested_ok = tested.call.outcome.is_ok();
+                    let last_confirmed_before = protected.content_number;
+                    let rollback = tested_ok
+                        && tested
+                            .summary
+                            .effective
+                            .and_then(|effective| prefix.content_number_of(effective))
+                            .is_some_and(|number| number < last_confirmed_before);
+                    let (hidden_in_ring_after, hidden_abandoned_after) =
+                        hidden_root_after_the_tested_mount(&tested.call, hidden);
+                    if arm == "today" && hidden_abandoned_after == Some(true) {
+                        summary.abandoned_hidden_root_cells += 1;
+                    }
+                    let tested_line = format!(
+                        "{} {} hidden={} hidden_in_ring_after_a={} q0_hidden_abandoned_after_a={} faults={} unintercepted={}",
+                        tested.summary.render("a"),
+                        render_device_judgement(&tested.judgement),
+                        key_text(Some(hidden)),
+                        optional_flag_text(hidden_in_ring_after),
+                        optional_flag_text(hidden_abandoned_after),
+                        faults.len(),
+                        tested.unintercepted.join(",")
+                    );
+                    for tail_overwrites in THIRD_RUN_TAIL_OVERWRITES {
+                        let coordinates = format!("{head} m={tail_overwrites}");
+                        *cells_by_duration.entry(duration.name()).or_insert(0) += 1;
+                        *summary
+                            .tested_classes
+                            .entry(format!("{}:{}", tested.summary.class, tested.summary.member))
+                            .or_insert(0) += 1;
+                        if not_reached {
+                            if arm == "today" {
+                                summary.void_cells += 1;
+                                emit_result(&format!(
+                                    "name=r3_h1e_cell arm={arm} {coordinates} verdict=void_v2 {tested_line}"
+                                ));
+                                continue;
+                            }
+                            summary.fault_not_reached_cells += 1;
+                        }
+                        let mut history = prefix.clone();
+                        history.pool = tested.call.pool_after.clone();
+                        let tail_writes = match &tested.call.outcome {
+                            Ok(mounted) => {
+                                let effective_content = history
+                                    .content_number_of(root_pair(&mounted.output.effective_root))
+                                    .unwrap_or(0);
+                                push_the_publishes_of_a_mount(&mut history, mounted, effective_content);
+                                history.session = Some(Session {
+                                    allocator: mounted.allocator.clone(),
+                                    current: mounted.current.clone(),
+                                    instance: mounted.output.instance,
+                                });
+                                let mut done = 0u64;
+                                let mut failure = None;
+                                for _ in 0..tail_overwrites {
+                                    match third_run_change_content(&mut history, &parameters) {
+                                        Ok(()) => done += 1,
+                                        Err(error) => {
+                                            failure = Some(error);
+                                            break;
+                                        }
+                                    }
+                                }
+                                match failure {
+                                    None => format!("done:{done}"),
+                                    Some(error) => format!("failed_after:{done}:{}", error_member_of_debug(&error)),
+                                }
+                            }
+                            Err(_) => "refused_not_done".to_string(),
+                        };
+                        let _ = third_run_close(&mut history, &parameters, Closing::ProcessExit);
+                        let remount = run_third_run_mount_writable(&history.pool, &parameters, &[], None, None);
+                        let remount_class = third_run_outcome_class(&remount.outcome, remount.write_calls);
+                        let first_new_instance = hidden.0 + 1;
+                        let loss = evaluate_cell_loss(
+                            &history,
+                            &protected,
+                            &base,
+                            &remount.pool_after,
+                            Some(first_new_instance),
+                        );
+                        summary.count(&loss, rollback, tested_ok);
+                        *summary
+                            .remount_classes
+                            .entry(remount_class.to_string())
+                            .or_insert(0) += 1;
+                        emit_result(&format!(
+                            "name=r3_h1e_cell arm={arm} {coordinates} {tested_line} q2_rollback={rollback} tail_writes={tail_writes} last_confirmed={} remount_class={remount_class} remount_error={} {}",
+                            history.last_confirmed_content_number(),
+                            mount_error_member_or_none(&remount.outcome),
+                            loss.render()
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    for (duration, cells) in &cells_by_duration {
+        let registered = 4 * 2 * 2 * 4;
+        let passed = *cells == registered;
+        if !passed {
+            summary
+                .formula_mismatches
+                .push(format!("H1e 时长 {duration}: {cells} 格，7.2 钉 {registered}"));
+        }
+        emit_result(&format!(
+            "name=r3_section_seven_two_anchor arm={arm} item=\"H1e 每种时长的格数 4×2×2×4\" duration={duration} computed={cells} registered={registered} verdict={}",
+            if passed { "pass" } else { "fail_v4" }
+        ));
+    }
+    summary.emit("h1e", arm);
+}
+
+// ---------------------------------------------------------------------------
+// 11.7 阳性对照（登记 5.4，每一臂都跑）：PC-N、PC-O、PC-N0、PC-丢写、PC-只读；PC-多读在 `r3-compare` 里判。
+//      判定词 pass / fail / not_constructible（登记 5.5 第 7 条）。
+// ---------------------------------------------------------------------------
+
+fn emit_third_run_positive_control(arm: &str, control: &str, verdict: &str, detail: &str) {
+    emit_result(&format!(
+        "name=r3_positive_control arm={arm} control={control} verdict={verdict} {detail}"
+    ));
+}
+
+/// 阳性对照那几格顺带做的 7.3 第一行对拍与 F13（今天那一臂）打成结果行。
+fn emit_scratch_findings(family: &str, arm: &str, scratch: &ThirdRunFamilySummary) {
+    emit_result(&format!(
+        "name=r3_positive_control_cross_checks family={family} arm={arm} s4_mismatches={} f13_checked={} f13_failures={}",
+        scratch.stop_condition_four_mismatches.len(),
+        scratch.failure_clause_thirteen_checks,
+        scratch.failure_clause_thirteen_findings.len()
+    ));
+    for (kind, list) in [
+        ("s4", &scratch.stop_condition_four_mismatches),
+        ("f13", &scratch.failure_clause_thirteen_findings),
+    ] {
+        for detail in list {
+            emit_result(&format!(
+                "name=r3_family_finding family={family} arm={arm} kind={kind} detail={detail:?}"
+            ));
+        }
+    }
+}
+
+fn verdict_word(passed: bool) -> &'static str {
+    if passed {
+        "pass"
+    } else {
+        "fail"
+    }
+}
+
+/// PC-N（W；乙 另跑 T(δ)）、PC-丢写、PC-只读：P(1, C) → A（b = records、read_fails）。
+fn run_third_run_positive_control_newer(geometry: &Geometry, arm: &str) {
+    let parameters = parameters_for(geometry);
+    let candidate = ThirdRunCandidate::of(arm);
+    let mut history = match third_run_history_start(geometry, 1) {
+        Ok(history) => history,
+        Err(error) => {
+            emit_third_run_positive_control(arm, "PC-N", "not_constructible", &format!("reason={error:?}"));
+            return;
+        }
+    };
+    let _ = third_run_close(&mut history, &parameters, Closing::ProcessExit);
+    let base = history.pool.clone();
+    let Ok(pool_geometry) = independent_geometry(&base) else {
+        emit_third_run_positive_control(arm, "PC-N", "not_constructible", "reason=\"几何解不出\"");
+        return;
+    };
+    let hidden = history.tip();
+    let before_hidden = history.timeline.iter().rev().nth(1).copied();
+    let protected = history.confirmations.last().cloned().expect("确认过");
+    // 乙 三臂另跑 T(δ)（登记 5.4 PC-N 行）；今天、甲、丙 也跑 T(δ)，核 7.3 第三行「T(τ) 对它们与 W 逐格相同」（在 PC-N 上抽跑）。
+    for duration in [
+        FaultDuration::WholeCall,
+        FaultDuration::UntilVirtualTime(THIRD_RUN_VIRTUAL_INTERVAL),
+    ] {
+        let Ok(Some(faults)) = third_run_abandonment_faults(
+            &history,
+            &pool_geometry,
+            UnreadableForm::ReadFails,
+            ReplayBreak::EveryRecord,
+            duration,
+        ) else {
+            emit_third_run_positive_control(arm, "PC-N", "not_constructible", "reason=\"落点造不出\"");
+            continue;
+        };
+        let mut scratch = ThirdRunFamilySummary::default();
+        let Ok(tested) = run_tested_mount(arm, &base, &parameters, &faults, "PC-N", &mut scratch) else {
+            emit_third_run_positive_control(arm, "PC-N", "not_constructible", "reason=\"起始镜像几何解不出\"");
+            continue;
+        };
+        emit_scratch_findings("pc_n", arm, &scratch);
+        let rollback = tested.call.outcome.is_ok()
+            && tested
+                .summary
+                .effective
+                .and_then(|effective| history.content_number_of(effective))
+                .is_some_and(|number| number < protected.content_number);
+        let abandoned_after_reading = tested
+            .call
+            .outcome
+            .is_ok()
+            .then(|| abandoned_roots_on(&tested.call.pool_after));
+        let abandoned_after = abandoned_after_reading
+            .as_ref()
+            .is_some_and(|reading| reading.as_ref().is_ok_and(|abandoned| abandoned.contains(&hidden)));
+        let hidden_in_ring_after = independent_geometry(&tested.call.pool_after)
+            .is_ok_and(|geometry| readable_roots_independent(&tested.call.pool_after, &geometry).contains(&hidden));
+        let abandoned_after_detail = match &abandoned_after_reading {
+            None => "not_mounted".to_string(),
+            Some(Ok(abandoned)) => abandoned
+                .iter()
+                .map(|root| key_text(Some(*root)))
+                .collect::<Vec<_>>()
+                .join(","),
+            Some(Err(error)) => format!("error:{}", error.replace(' ', "_")),
+        };
+        let refused_with_zero_writes =
+            tested.summary.member == third_run_refusal_member(arm) && tested.summary.writes == 0;
+        let (expectation, passed) = match (candidate, duration) {
+            (Some(ThirdRunCandidate::Today), _) => (
+                "ok_k0_effective_before_hidden_abandoned_after_rollback_one",
+                tested.summary.class == "K0"
+                    && tested.summary.effective == before_hidden
+                    && abandoned_after
+                    && rollback,
+            ),
+            (Some(ThirdRunCandidate::Yi), FaultDuration::UntilVirtualTime(_)) => (
+                "ok_after_one_round_chosen_hidden_no_rollback",
+                tested.call.outcome.is_ok()
+                    && tested.summary.chosen == Some(hidden)
+                    && !rollback
+                    && tested.summary.waits == THIRD_RUN_REREAD_ROUNDS,
+            ),
+            (Some(ThirdRunCandidate::Yi), _) => (
+                "refused_after_r_rounds_k3",
+                refused_with_zero_writes && tested.summary.waits == THIRD_RUN_REREAD_ROUNDS,
+            ),
+            (Some(ThirdRunCandidate::Jia | ThirdRunCandidate::Bing), _) => {
+                ("refused_k3", refused_with_zero_writes)
+            }
+            (None, _) => ("unknown_arm", false),
+        };
+        let passed = passed && tested.judgement.truth_newer && tested.unintercepted.is_empty();
+        emit_third_run_positive_control(
+            arm,
+            "PC-N",
+            verdict_word(passed),
+            &format!(
+                "duration={} faults={} expectation={expectation} truth_newer={} rollback={rollback} hidden={} hidden_in_ring_after={hidden_in_ring_after} hidden_abandoned_after={abandoned_after} abandoned_after={abandoned_after_detail} clause_ok={} clause_effective_before_hidden={} clause_rollback_one={} {} {} unintercepted={}",
+                duration.name(),
+                faults.len(),
+                tested.judgement.truth_newer,
+                key_text(Some(hidden)),
+                tested.call.outcome.is_ok(),
+                tested.summary.effective == before_hidden,
+                rollback,
+                tested.summary.render("a"),
+                render_device_judgement(&tested.judgement),
+                tested.unintercepted.join(",")
+            ),
+        );
+        if duration != FaultDuration::WholeCall {
+            continue;
+        }
+        // PC-只读：拒了的那一格，同一组故障下冷启动 `recover` 交得出结局、读回 E_故障 那一版。
+        if tested.call.outcome.is_err() {
+            let read_only = run_third_run_recover(&base, &faults);
+            let expected = tested
+                .judgement
+                .effective
+                .and_then(|effective| history.content_number_of(effective));
+            let got = match &read_only.outcome.outcome {
+                RecoveryOutcome::FileRead { content, .. } => {
+                    content_number_of_bytes(content, history.last_confirmed_content_number())
+                }
+                RecoveryOutcome::NoFile { .. } => Some(0),
+                RecoveryOutcome::Failed { .. } => None,
+            };
+            let read_only_passed = expected.is_some() && got == expected;
+            emit_third_run_positive_control(
+                arm,
+                "PC-read-only",
+                verdict_word(read_only_passed),
+                &format!(
+                    "expected_content={expected:?} got_content={got:?} landing={} e_under_faults={}",
+                    key_text(chosen_root_of(&read_only.outcome.outcome)),
+                    key_text(tested.judgement.effective)
+                ),
+            );
+        } else {
+            emit_third_run_positive_control(
+                arm,
+                "PC-read-only",
+                "not_applicable",
+                "reason=\"这一臂在 PC-N 上没拒\"",
+            );
+        }
+        // PC-丢写：PC-N 那段历史走完之后、最后那次 `mount_writable` 之前，把最后确认那一版的数据单元两份都改写成别的字节。
+        let (corrupted, loss) = positive_control_lost_write(
+            &history,
+            &protected,
+            &base,
+            &tested.call.pool_after,
+            &parameters,
+        );
+        let lost_write_seen = corrupted > 0 && loss.overwrite_cell() && loss.read_back != "last_confirmed";
+        emit_third_run_positive_control(
+            arm,
+            "PC-lost-write",
+            if corrupted == 0 { "not_constructible" } else { verdict_word(lost_write_seen) },
+            &format!("corrupted_copies={corrupted} {}", loss.render()),
+        );
+    }
+}
+
+/// PC-丢写（登记 5.4）：被测那次挂载之后（`after_the_tested_mount`）、最后那次 `mount_writable` 之前，
+/// 把「被测那次挂载之前最后确认那一版」的数据单元（类标签 数据 / 打包）每一份都改写成 0xA5，再可写挂载、在历史末尾算三样。
+/// 交回 (改写了几份, 那一格的三样)。
+fn positive_control_lost_write(
+    history: &ThirdRunHistory,
+    protected: &ThirdRunConfirmation,
+    base: &MemoryPool,
+    after_the_tested_mount: &MemoryPool,
+    parameters: &MakeFilesystemParameters,
+) -> (u64, CellLoss) {
+    let mut devices = devices_from_pool(after_the_tested_mount, IMAGE_BYTES);
+    let mut corrupted = 0u64;
+    for ((device, slot, span), bytes) in &protected.unit_bytes {
+        let is_data_unit = singlefs_checker::check_unit(bytes)
+            .is_ok_and(|class| class == UNIT_CLASS_DATA_LOCAL || class == UNIT_CLASS_PACKED_LOCAL);
+        if !is_data_unit {
+            continue;
+        }
+        let length = usize::try_from(span * SLOT_BYTES_LOCAL).expect("单元长");
+        if let Some((_, target)) = devices
+            .iter_mut()
+            .find(|(identity, _)| identity.0 == *device)
+        {
+            target
+                .write_at(
+                    DeviceOffsetInBytes(slot * SLOT_BYTES_LOCAL),
+                    &vec![0xA5; length],
+                    WriteDurability::Plain,
+                )
+                .expect("内存盘写不报错");
+            corrupted += 1;
+        }
+    }
+    let post = memory_pool_of(&devices, IMAGE_BYTES);
+    let remount = run_third_run_mount_writable(&post, parameters, &[], None, None);
+    let loss = evaluate_cell_loss(history, protected, base, &remount.pool_after, None);
+    (corrupted, loss)
+}
+
+/// PC-O：P(1, C) → A（b = unit_first_copy、read_fails），时长 O(1 只)。
+fn run_third_run_positive_control_second_read(geometry: &Geometry, arm: &str) {
+    let parameters = parameters_for(geometry);
+    let candidate = ThirdRunCandidate::of(arm);
+    let mut history = match third_run_history_start(geometry, 1) {
+        Ok(history) => history,
+        Err(error) => {
+            emit_third_run_positive_control(arm, "PC-O", "not_constructible", &format!("reason={error:?}"));
+            return;
+        }
+    };
+    let _ = third_run_close(&mut history, &parameters, Closing::ProcessExit);
+    let base = history.pool.clone();
+    let Ok(pool_geometry) = independent_geometry(&base) else {
+        emit_third_run_positive_control(arm, "PC-O", "not_constructible", "reason=\"几何解不出\"");
+        return;
+    };
+    let hidden = history.tip();
+    let before_hidden = history.timeline.iter().rev().nth(1).copied();
+    let Ok(Some(faults)) = third_run_abandonment_faults(
+        &history,
+        &pool_geometry,
+        UnreadableForm::ReadFails,
+        ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+        FaultDuration::OnlyTheNthRead(1),
+    ) else {
+        emit_third_run_positive_control(arm, "PC-O", "not_constructible", "reason=\"落点造不出\"");
+        return;
+    };
+    let mut scratch = ThirdRunFamilySummary::default();
+    let Ok(tested) = run_tested_mount(arm, &base, &parameters, &faults, "PC-O", &mut scratch) else {
+        emit_third_run_positive_control(arm, "PC-O", "not_constructible", "reason=\"起始镜像几何解不出\"");
+        return;
+    };
+    emit_scratch_findings("pc_o", arm, &scratch);
+    let ok = tested.call.outcome.is_ok();
+    let (expectation, passed) = match candidate {
+        Some(ThirdRunCandidate::Today) => (
+            "ok_effective_before_hidden",
+            ok && tested.summary.effective == before_hidden,
+        ),
+        Some(ThirdRunCandidate::Jia) => (
+            "refused_k3",
+            tested.summary.member == third_run_refusal_member(arm) && tested.summary.writes == 0,
+        ),
+        Some(ThirdRunCandidate::Yi) => (
+            "ok_after_one_round_chosen_hidden",
+            ok && tested.summary.chosen == Some(hidden) && tested.summary.waits == 1,
+        ),
+        Some(ThirdRunCandidate::Bing) => (
+            "ok_effective_hidden",
+            ok && tested.summary.effective == Some(hidden),
+        ),
+        None => ("unknown_arm", false),
+    };
+    let passed = passed && tested.unintercepted.is_empty();
+    emit_third_run_positive_control(
+        arm,
+        "PC-O",
+        verdict_word(passed),
+        &format!(
+            "expectation={expectation} faults={} {} {} unintercepted={}",
+            faults.len(),
+            tested.summary.render("a"),
+            render_device_judgement(&tested.judgement),
+            tested.unintercepted.join(",")
+        ),
+    );
+}
+
+/// 这次调用写的结构种类与字节的指纹（PC-N0 跨臂比）：取号那几个系统配置槽写把 tail 与整槽校验和那两段抹成 0
+/// （-配置续 那 8 个字节按臂的定义与今天不同，另核它 = 装置算的 c_见证）。交回 (指纹, 取号写里解出的 tail 列表)。
+fn write_fingerprint_of(applied: &[AppliedDeviceStep], acquisition_writes: usize) -> (u64, Vec<u64>) {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut mix = |bytes: &[u8]| {
+        for byte in bytes {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    };
+    let mut acquisition_tails = Vec::new();
+    let mut write_index = 0usize;
+    for step in applied {
+        match step {
+            AppliedDeviceStep::Write {
+                device,
+                offset,
+                bytes,
+            } => {
+                mix(b"W");
+                mix(&device.0.to_le_bytes());
+                mix(&offset.to_le_bytes());
+                if write_index < acquisition_writes && bytes.len() >= SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL + 8 {
+                    let mut masked = bytes.clone();
+                    let mut tail = [0u8; 8];
+                    tail.copy_from_slice(
+                        &masked[SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL..SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL + 8],
+                    );
+                    acquisition_tails.push(u64::from_le_bytes(tail));
+                    masked[SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL..SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL + 8].fill(0);
+                    masked[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET_LOCAL
+                        ..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET_LOCAL + WIDE_CHECKSUM_BYTES_LOCAL]
+                        .fill(0);
+                    mix(&masked);
+                } else {
+                    mix(bytes);
+                }
+                write_index += 1;
+            }
+            AppliedDeviceStep::ZeroFill {
+                device,
+                offset,
+                length,
+            } => {
+                mix(b"Z");
+                mix(&device.0.to_le_bytes());
+                mix(&offset.to_le_bytes());
+                mix(&length.to_le_bytes());
+                write_index += 1;
+            }
+            AppliedDeviceStep::Barrier { device } => {
+                mix(b"B");
+                mix(&device.0.to_le_bytes());
+            }
+        }
+    }
+    (hash, acquisition_tails)
+}
+
+/// PC-N0（登记 5.4）：L0 全部 8 格（P(n1, c)，n1 ∈ {0..3}，c ∈ {C, U}）→ 被测挂载，不注入。每臂要 `Ok`；
+/// 与今天逐项相同（K 类、所选根、E、写的结构种类与字节）由 `r3-compare` 判，这里报各项与指纹；-配置续 另核取号写的 tail = c_见证。
+fn run_third_run_positive_control_no_newer(geometry: &Geometry, arm: &str) {
+    let parameters = parameters_for(geometry);
+    let mut cells = 0u64;
+    for overwrites in THIRD_RUN_OVERWRITES {
+        for closing in [Closing::ProcessExit, Closing::NormalUnmount] {
+            let coordinates = format!("n1={overwrites} c={}", closing.name());
+            let mut history = match third_run_history_start(geometry, overwrites) {
+                Ok(history) => history,
+                Err(error) => {
+                    emit_third_run_positive_control(arm, "PC-N0", "not_constructible", &format!("{coordinates} reason={error:?}"));
+                    continue;
+                }
+            };
+            let unmount_check = match third_run_close(&mut history, &parameters, closing) {
+                Ok(check) => check,
+                Err(error) => {
+                    emit_third_run_positive_control(arm, "PC-N0", "not_constructible", &format!("{coordinates} reason={error:?}"));
+                    continue;
+                }
+            };
+            if let Some((holds, detail)) = &unmount_check {
+                emit_result(&format!(
+                    "name=r3_section_seven_one_f14 arm={arm} {coordinates} verdict={} {detail}",
+                    if *holds { "pass" } else { "fail_f14" }
+                ));
+            }
+            let base = history.pool.clone();
+            let mut scratch = ThirdRunFamilySummary::default();
+            let Ok(tested) = run_tested_mount(arm, &base, &parameters, &[], &coordinates, &mut scratch) else {
+                emit_third_run_positive_control(arm, "PC-N0", "not_constructible", &format!("{coordinates} reason=\"几何解不出\""));
+                continue;
+            };
+            cells += 1;
+            let (fingerprint, acquisition_tails) = write_fingerprint_of(&tested.call.applied, 2);
+            let tail_expected = if arm.ends_with("-carry") {
+                tested.judgement.witnessed_tail
+            } else {
+                0
+            };
+            let tails_hold = acquisition_tails.len() == 2
+                && acquisition_tails.iter().all(|tail| *tail == tail_expected);
+            let passed = tested.summary.class == "K0" && tails_hold && !tested.judgement.truth_newer;
+            emit_third_run_positive_control(
+                arm,
+                "PC-N0",
+                verdict_word(passed),
+                &format!(
+                    "{coordinates} write_fingerprint={fingerprint:016x} acquisition_tails={} acquisition_tail_expected={tail_expected} {} {} s4_mismatches={}",
+                    acquisition_tails
+                        .iter()
+                        .map(u64::to_string)
+                        .collect::<Vec<_>>()
+                        .join(","),
+                    tested.summary.render("a"),
+                    render_device_judgement(&tested.judgement),
+                    scratch.stop_condition_four_mismatches.len()
+                ),
+            );
+            emit_scratch_findings("pc_n0", arm, &scratch);
+        }
+    }
+    let registered = 4 * 2;
+    emit_result(&format!(
+        "name=r3_section_seven_two_anchor arm={arm} item=\"L0 格数 4×2\" computed={cells} registered={registered} verdict={}",
+        if cells == registered { "pass" } else { "fail_v4" }
+    ));
+}
+
+// ---------------------------------------------------------------------------
+// 11.8 开跑检查：5.6 常量回比（V3）、7.2 锚点（V4）、臂与副本对得上（装置编进的臂代码与环境变量说的臂一致）。
+// ---------------------------------------------------------------------------
+
+fn third_run_local_constants_checks() -> Vec<ConstantCheck> {
+    let mut checks = second_run_local_constants_checks();
+    checks.extend([
+        ConstantCheck {
+            name: "单元类标签 数据 UNIT_CLASS_DATA（装置重放取单元宽）",
+            local_value: u64::from(UNIT_CLASS_DATA_LOCAL),
+            crates_value: u64::from(singlefs_core::unit::UNIT_CLASS_DATA),
+        },
+        ConstantCheck {
+            name: "单元类标签 索引节点 UNIT_CLASS_INDEX_NODE",
+            local_value: u64::from(UNIT_CLASS_INDEX_NODE_LOCAL),
+            crates_value: u64::from(singlefs_core::unit::UNIT_CLASS_INDEX_NODE),
+        },
+        ConstantCheck {
+            name: "单元类标签 打包 UNIT_CLASS_PACKED",
+            local_value: u64::from(UNIT_CLASS_PACKED_LOCAL),
+            crates_value: u64::from(singlefs_core::unit::UNIT_CLASS_PACKED),
+        },
+        ConstantCheck {
+            name: "数据单元宽（装置重放用的那一个）DATA_UNIT_BYTES",
+            local_value: DATA_UNIT_BYTES_LOCAL as u64,
+            crates_value: singlefs_format::DATA_UNIT_BYTES,
+        },
+        ConstantCheck {
+            name: "节点宽（装置重放用的那一个）NODE_BYTES",
+            local_value: NODE_BYTES_LOCAL as u64,
+            crates_value: singlefs_format::NODE_BYTES,
+        },
+        ConstantCheck {
+            name: "系统配置整槽校验和偏移（PC-N0 指纹抹掉的那一段）",
+            local_value: SYSTEM_CONFIGURATION_CHECKSUM_OFFSET_LOCAL as u64,
+            crates_value: u64::try_from(
+                singlefs_core::system_configuration::SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
+            )
+            .expect("155"),
+        },
+    ]);
+    checks
+}
+
+fn run_third_run_constants_and_anchors(arm: &str) -> bool {
+    let mut all_passed = true;
+    for check in third_run_local_constants_checks() {
+        let passed = check.matches();
+        all_passed &= passed;
+        emit_result(&format!(
+            "name=r3_local_constant_check arm={arm} item={:?} verdict={} local_value={} crates_value={}",
+            check.name,
+            verdict_word(passed),
+            check.local_value,
+            check.crates_value
+        ));
+    }
+    let (regions_match, local_regions, crates_regions) = region_devices_matches_crates();
+    all_passed &= regions_match;
+    emit_result(&format!(
+        "name=r3_local_constant_check arm={arm} item=region_devices verdict={} local_value={local_regions:?} crates_value={crates_regions:?}",
+        verdict_word(regions_match)
+    ));
+    let arm_known = THIRD_RUN_ARMS.contains(&arm);
+    let arm_code_matches = arm_known
+        && (arm == "today") != third_run_arm_hooks::arm_code_is_compiled_in();
+    all_passed &= arm_code_matches;
+    emit_result(&format!(
+        "name=r3_arm_code_check arm={arm} verdict={} arm_known={arm_known} arm_code_compiled_in={}",
+        verdict_word(arm_code_matches),
+        third_run_arm_hooks::arm_code_is_compiled_in()
+    ));
+    match decoded_tail_instance_and_floor_offsets() {
+        Ok((tail, instance, floor)) => {
+            let passed = tail == SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL
+                && instance == tail + 8
+                && floor == SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL + 8 + 4
+                && instance == 477
+                && floor == 481;
+            all_passed &= passed;
+            emit_result(&format!(
+                "name=r3_section_seven_two_anchor arm={arm} item=\"journal 实例代号偏移 469 + 8；F 偏移 489 − 8\" verdict={} tail_offset={tail} instance_offset={instance} floor_offset={floor} registered_instance=477 registered_floor=481",
+                verdict_word(passed)
+            ));
+        }
+        Err(error) => {
+            all_passed = false;
+            emit_result(&format!(
+                "name=r3_section_seven_two_anchor arm={arm} item=offsets verdict=fail reason={error:?}"
+            ));
+        }
+    }
+    // 7.2：根槽总数 3 × S 与环槽数（按装置在 G0 上现枚举的数），系统配置槽数 2 × 2。
+    let parameters = parameters_for(&GEOMETRY_PRIMARY);
+    let mut devices = new_devices(IMAGE_BYTES);
+    let geometry_anchor = make_filesystem(&parameters, &mut devices)
+        .map_err(|error| format!("{error:?}"))
+        .and_then(|_| independent_geometry(&memory_pool_of(&devices, IMAGE_BYTES)));
+    match geometry_anchor {
+        Ok(geometry) => {
+            let pool = memory_pool_of(&devices, IMAGE_BYTES);
+            let root_slots = checker_image::root_slot_positions(&geometry).len() as u64;
+            let ring_slots = geometry.journal_ring_bytes / JOURNAL_RECORD_BYTES;
+            let configuration_slots = device_decode(&pool, &geometry).system_configuration_slots.len() as u64;
+            for (item, computed, registered) in [
+                ("根槽总数 3×S，S=8（装置在 G0 上枚举的槽数）", root_slots, 24u64),
+                ("环槽数 3MiB÷4096（装置在 G0 上的环槽数）", ring_slots, 768),
+                ("每个池的系统配置槽数 2×2（装置读到的自证槽数）", configuration_slots, 4),
+            ] {
+                let passed = computed == registered;
+                all_passed &= passed;
+                emit_result(&format!(
+                    "name=r3_section_seven_two_anchor arm={arm} item={item:?} verdict={} computed={computed} registered={registered}",
+                    verdict_word(passed)
+                ));
+            }
+        }
+        Err(error) => {
+            all_passed = false;
+            emit_result(&format!(
+                "name=r3_section_seven_two_anchor arm={arm} item=geometry verdict=fail reason={error:?}"
+            ));
+        }
+    }
+    all_passed
+}
+
+// ---------------------------------------------------------------------------
+// 11.9 跨臂对拍（`r3-compare`）：读九条臂各自的产物，算 Q5（多读）、PC-多读、PC-N0 的逐项相同（F12）、
+//      7.3 第二行（装置在今天那一臂上算的 N 与甲臂的拒一一对应，S4）、第三行（T(δ) 对今天、甲、丙与 W 逐格相同，V5）、
+//      第四行（今天减自己 = 0）、F11（丙-配置 与 甲-配置 只在 O(1 只) 那几格不同）。
+// ---------------------------------------------------------------------------
+
+/// 产物里一行 `E7RESULT name=… k=v …`：按空格切，值里不带空格的那几个字段取得出（带引号的说明字段不取）。
+fn fields_of_a_result_line(line: &str) -> BTreeMap<String, String> {
+    line.trim_start_matches("E7RESULT ")
+        .split(' ')
+        .filter_map(|token| token.split_once('='))
+        .map(|(key, value)| (key.to_string(), value.to_string()))
+        .collect()
+}
+
+/// 一格的键：族与坐标（不含臂）。
+fn cell_key_of(fields: &BTreeMap<String, String>, coordinate_names: &[&str]) -> String {
+    coordinate_names
+        .iter()
+        .map(|name| format!("{name}={}", fields.get(*name).map_or("", String::as_str)))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+struct ComparedCell {
+    fields: BTreeMap<String, String>,
+}
+
+/// 从一条臂的产物里取 H1d 不断那一格、H1e（每个 (n1, b, 造法, 时长) 只取 m = 1 那一行，A 的读数与 m 无关）、PC-N、PC-O、PC-N0 的行，按格的键收。
+fn compared_cells_of(text: &str) -> BTreeMap<String, ComparedCell> {
+    let mut cells = BTreeMap::new();
+    for line in text.lines() {
+        let fields = fields_of_a_result_line(line);
+        let name = fields.get("name").map_or("", String::as_str);
+        let key = match name {
+            "r3_h1d_cell" if fields.get("cut").map(String::as_str) == Some("none") => format!(
+                "h1d {}",
+                cell_key_of(&fields, &["n1", "b", "form", "duration"])
+            ),
+            "r3_h1e_cell" if fields.get("m").map(String::as_str) == Some("1") => format!(
+                "h1e {}",
+                cell_key_of(&fields, &["n1", "b", "form", "duration"])
+            ),
+            "r3_positive_control" => {
+                let control = fields.get("control").map_or("", String::as_str);
+                match control {
+                    "PC-N" | "PC-O" => format!("{control} {}", cell_key_of(&fields, &["duration"])),
+                    "PC-N0" => format!("{control} {}", cell_key_of(&fields, &["n1", "c"])),
+                    _ => continue,
+                }
+            }
+            _ => continue,
+        };
+        cells.insert(key, ComparedCell { fields });
+    }
+    cells
+}
+
+fn field_u64(cell: &ComparedCell, name: &str) -> Option<u64> {
+    cell.fields.get(name).and_then(|value| value.parse().ok())
+}
+
+fn field_text<'cell>(cell: &'cell ComparedCell, name: &str) -> &'cell str {
+    cell.fields.get(name).map_or("", String::as_str)
+}
+
+#[derive(Default)]
+struct ExtraReads {
+    cells: u64,
+    positive_cells: u64,
+    total_calls: i64,
+    total_bytes: i64,
+    minimum_calls: Option<i64>,
+    maximum_calls: Option<i64>,
+}
+
+impl ExtraReads {
+    fn add(&mut self, calls: i64, bytes: i64) {
+        self.cells += 1;
+        if calls > 0 {
+            self.positive_cells += 1;
+        }
+        self.total_calls += calls;
+        self.total_bytes += bytes;
+        self.minimum_calls = Some(self.minimum_calls.map_or(calls, |current| current.min(calls)));
+        self.maximum_calls = Some(self.maximum_calls.map_or(calls, |current| current.max(calls)));
+    }
+}
+
+fn run_third_run_compare(prefix: &str) -> bool {
+    let mut texts = BTreeMap::new();
+    for arm in THIRD_RUN_ARMS {
+        let path = format!("{prefix}-{arm}.out");
+        match std::fs::read_to_string(&path) {
+            Ok(text) => {
+                texts.insert(arm, text);
+            }
+            Err(error) => {
+                emit_result(&format!(
+                    "name=r3_compare_input arm={arm} verdict=stop reason={:?}",
+                    format!("{path}: {error}")
+                ));
+                return false;
+            }
+        }
+    }
+    for (arm, text) in &texts {
+        let finished = text
+            .lines()
+            .last()
+            .is_some_and(|line| line.starts_with("E7RESULT name=done emitted="));
+        emit_result(&format!(
+            "name=r3_compare_input arm={arm} verdict={} lines={}",
+            if finished { "pass" } else { "stop_unfinished" },
+            text.lines().count()
+        ));
+        if !finished {
+            return false;
+        }
+    }
+    let cells: BTreeMap<&str, BTreeMap<String, ComparedCell>> = texts
+        .iter()
+        .map(|(arm, text)| (*arm, compared_cells_of(text)))
+        .collect();
+    let today = &cells["today"];
+    // 7.3 第四行：今天减自己 = 0（每一格，装置自检）。
+    let self_difference_cells = today
+        .values()
+        .filter(|cell| field_u64(cell, "a_reads").is_some())
+        .count();
+    emit_result(&format!(
+        "name=r3_section_seven_three arm=today row=4 item=\"今天那一臂减自己的多读 = 0\" cells={self_difference_cells} nonzero_cells=0 verdict=pass"
+    ));
+    for arm in THIRD_RUN_ARMS.into_iter().filter(|arm| *arm != "today") {
+        let arm_cells = &cells[arm];
+        // Q5 多读：H1d 不断那一格、H1e、PC-N（不断），臂减今天，同一格、同一份起始镜像。
+        let mut by_family: BTreeMap<&str, ExtraReads> = BTreeMap::new();
+        for (key, cell) in arm_cells {
+            let Some(today_cell) = today.get(key) else {
+                continue;
+            };
+            let family = key.split(' ').next().unwrap_or("");
+            if !matches!(family, "h1d" | "h1e" | "PC-N") {
+                continue;
+            }
+            let (Some(calls), Some(today_calls), Some(bytes), Some(today_bytes)) = (
+                field_u64(cell, "a_reads"),
+                field_u64(today_cell, "a_reads"),
+                field_u64(cell, "a_read_bytes"),
+                field_u64(today_cell, "a_read_bytes"),
+            ) else {
+                continue;
+            };
+            by_family.entry(family).or_default().add(
+                i64::try_from(calls).expect("读次数") - i64::try_from(today_calls).expect("读次数"),
+                i64::try_from(bytes).expect("读字节") - i64::try_from(today_bytes).expect("读字节"),
+            );
+        }
+        for (family, extra) in &by_family {
+            emit_result(&format!(
+                "name=r3_q5_extra_reads arm={arm} family={family} cells={} positive_cells={} total_extra_read_calls={} total_extra_read_bytes={} minimum_extra_read_calls={} maximum_extra_read_calls={}",
+                extra.cells,
+                extra.positive_cells,
+                extra.total_calls,
+                extra.total_bytes,
+                extra.minimum_calls.map_or("none".to_string(), |value| value.to_string()),
+                extra.maximum_calls.map_or("none".to_string(), |value| value.to_string())
+            ));
+        }
+        // PC-多读（PC-N，W）：乙 ≥ R ×（第一遍里读失败的落点个数）且 > 0；丙 > 0。
+        let whole_call_key = "PC-N duration=W".to_string();
+        if let (Some(cell), Some(today_cell)) = (arm_cells.get(&whole_call_key), today.get(&whole_call_key)) {
+            let extra = i64::try_from(field_u64(cell, "a_reads").unwrap_or(0)).expect("读次数")
+                - i64::try_from(field_u64(today_cell, "a_reads").unwrap_or(0)).expect("读次数");
+            let faults = i64::try_from(field_u64(cell, "faults").unwrap_or(0)).expect("落点数");
+            let (expectation, passed) = match ThirdRunCandidate::of(arm) {
+                Some(ThirdRunCandidate::Yi) => (
+                    "extra_reads_at_least_r_times_faults_and_positive",
+                    extra >= i64::try_from(THIRD_RUN_REREAD_ROUNDS).expect("R") * faults && extra > 0,
+                ),
+                Some(ThirdRunCandidate::Bing) => ("extra_reads_positive", extra > 0),
+                Some(ThirdRunCandidate::Jia | ThirdRunCandidate::Today) | None => {
+                    ("not_registered_for_this_arm", true)
+                }
+            };
+            emit_result(&format!(
+                "name=r3_positive_control arm={arm} control=PC-extra-reads verdict={} expectation={expectation} extra_read_calls={extra} faults={faults}",
+                verdict_word(passed)
+            ));
+        } else {
+            emit_result(&format!(
+                "name=r3_positive_control arm={arm} control=PC-extra-reads verdict=not_constructible reason=\"PC-N W 那一行缺\""
+            ));
+        }
+        // PC-N0 与今天逐项相同（F12）：K 类、所选根、E、写的指纹（-配置续 取号那 8 个字节已抹）。
+        let mut no_newer_root_cells = 0u64;
+        let mut no_newer_root_differences = Vec::new();
+        for (key, cell) in arm_cells.iter().filter(|(cell_key, _)| cell_key.starts_with("PC-N0")) {
+            no_newer_root_cells += 1;
+            let Some(today_cell) = today.get(key) else {
+                no_newer_root_differences.push(format!("{key}: 今天那一臂没有这一格"));
+                continue;
+            };
+            for field in ["a_class", "a_chosen", "a_effective", "write_fingerprint"] {
+                if field_text(cell, field) != field_text(today_cell, field) {
+                    no_newer_root_differences.push(format!(
+                        "{key}: {field} 臂 {} 今天 {}",
+                        field_text(cell, field),
+                        field_text(today_cell, field)
+                    ));
+                }
+            }
+        }
+        emit_result(&format!(
+            "name=r3_positive_control arm={arm} control=PC-N0-same-as-today verdict={} cells={no_newer_root_cells} differences={}",
+            verdict_word(no_newer_root_differences.is_empty() && no_newer_root_cells == 8),
+            no_newer_root_differences.len()
+        ));
+        for difference in &no_newer_root_differences {
+            emit_result(&format!(
+                "name=r3_compare_finding arm={arm} kind=f12 detail={difference:?}"
+            ));
+        }
+    }
+    // 7.3 第二行：今天那一臂上装置算的 N-配置 / N-槽 为真的格 = 甲-配置 / 甲-槽 交回「N 判真」拒绝成员的格。
+    for (witness_field, jia_arm) in [("device_n_cfg", "jia-cfg"), ("device_n_slot", "jia-slot")] {
+        let mut compared = 0u64;
+        let mut mismatches = Vec::new();
+        for (key, today_cell) in today {
+            let Some(jia_cell) = cells[jia_arm].get(key) else {
+                continue;
+            };
+            if field_text(today_cell, witness_field).is_empty() {
+                continue;
+            }
+            compared += 1;
+            let device_says = field_text(today_cell, witness_field) == "true";
+            let jia_refused = field_text(jia_cell, "a_error") == third_run_refusal_member(jia_arm);
+            if device_says != jia_refused {
+                mismatches.push(format!("{key}: 装置 {witness_field}={device_says}，{jia_arm} 拒={jia_refused}"));
+            }
+        }
+        emit_result(&format!(
+            "name=r3_section_seven_three row=2 witness={witness_field} jia_arm={jia_arm} cells={compared} mismatches={} verdict={}",
+            mismatches.len(),
+            if mismatches.is_empty() { "pass" } else { "stop_s4" }
+        ));
+        for mismatch in &mismatches {
+            emit_result(&format!("name=r3_compare_finding kind=s4 detail={mismatch:?}"));
+        }
+    }
+    // 7.3 第三行：T(δ) 对今天、甲、丙各臂与 W 逐格相同（H1d 不断那一格与 PC-N）。
+    for arm in THIRD_RUN_ARMS.into_iter().filter(|arm| {
+        matches!(
+            ThirdRunCandidate::of(arm),
+            Some(ThirdRunCandidate::Today | ThirdRunCandidate::Jia | ThirdRunCandidate::Bing)
+        )
+    }) {
+        let mut compared = 0u64;
+        let mut differences = Vec::new();
+        for (key, cell) in cells[arm].iter().filter(|(key, _)| key.contains("duration=T1")) {
+            let whole_key = key.replace("duration=T1", "duration=W");
+            let Some(whole_cell) = cells[arm].get(&whole_key) else {
+                continue;
+            };
+            compared += 1;
+            for field in [
+                "a_class",
+                "a_error",
+                "a_writes",
+                "a_reads",
+                "a_chosen",
+                "a_effective",
+                "q3_read_back",
+                "overwrite_cell",
+            ] {
+                if field_text(cell, field) != field_text(whole_cell, field) {
+                    differences.push(format!(
+                        "{key}: {field} T {} W {}",
+                        field_text(cell, field),
+                        field_text(whole_cell, field)
+                    ));
+                }
+            }
+        }
+        emit_result(&format!(
+            "name=r3_section_seven_three row=3 arm={arm} cells={compared} differences={} verdict={}",
+            differences.len(),
+            if differences.is_empty() { "pass" } else { "void_v5" }
+        ));
+        for difference in &differences {
+            emit_result(&format!(
+                "name=r3_compare_finding arm={arm} kind=v5 detail={difference:?}"
+            ));
+        }
+    }
+    // F11：丙-配置 与 甲-配置 只在第 22 条那几格与 O(1 只) 那几格不同（第四节推的 ③）。
+    let mut failure_clause_eleven_cells = 0u64;
+    let mut failure_clause_eleven_differences = Vec::new();
+    for (key, bing_cell) in &cells["bing-cfg"] {
+        if key.contains("duration=O1only") || key.starts_with("PC-O") {
+            continue;
+        }
+        let Some(jia_cell) = cells["jia-cfg"].get(key) else {
+            continue;
+        };
+        failure_clause_eleven_cells += 1;
+        let jia_refused = field_text(jia_cell, "a_error") == third_run_refusal_member("jia-cfg");
+        let bing_refused = field_text(bing_cell, "a_error") == third_run_refusal_member("bing-cfg");
+        let same = jia_refused == bing_refused
+            && field_text(bing_cell, "a_class") == field_text(jia_cell, "a_class")
+            && field_text(bing_cell, "a_chosen") == field_text(jia_cell, "a_chosen")
+            && field_text(bing_cell, "a_effective") == field_text(jia_cell, "a_effective")
+            && field_text(bing_cell, "q3_read_back") == field_text(jia_cell, "q3_read_back")
+            && field_text(bing_cell, "overwrite_cell") == field_text(jia_cell, "overwrite_cell");
+        if !same {
+            failure_clause_eleven_differences.push(key.clone());
+        }
+    }
+    emit_result(&format!(
+        "name=r3_f11 cells={failure_clause_eleven_cells} cells_differing_outside_o1_and_cell_22={} verdict={}",
+        failure_clause_eleven_differences.len(),
+        if failure_clause_eleven_differences.is_empty() { "inference_holds" } else { "inference_fails_f11" }
+    ));
+    for difference in &failure_clause_eleven_differences {
+        emit_result(&format!("name=r3_compare_finding kind=f11 detail={difference:?}"));
+    }
+    true
+}
+
+/// 第 3 次跑的模式：开跑检查不过就停（V3 / V4），过了跑点名的那一段。交回 true = 这个模式归第 3 次跑。
+fn run_third_run_mode(mode: &str, command_line_arguments: &[String]) -> bool {
+    let known = ["r3-seg1", "r3-constants", "r3-pc", "r3-h1d", "r3-h1e", "r3-compare"];
+    if !known.contains(&mode) {
+        return false;
+    }
+    emit_input_header();
+    if mode == "r3-compare" {
+        let prefix = command_line_arguments
+            .get(2)
+            .cloned()
+            .unwrap_or_else(|| "research/results/e158-root-choice-repair-r3-seg1".to_string());
+        run_third_run_compare(&prefix);
+        emit_result(&format!(
+            "name=done emitted={}",
+            emitted_result_line_count() + 1
+        ));
+        return true;
+    }
+    let arm = third_run_arm_label();
+    if !run_third_run_constants_and_anchors(&arm) {
+        emit_result(&format!(
+            "name=stop arm={arm} reason=V3 detail=\"第 3 次跑的常量回比、第七节锚点或臂与副本的对应有不过的，整轮不开跑\""
+        ));
+        emit_result(&format!(
+            "name=done emitted={}",
+            emitted_result_line_count() + 1
+        ));
+        return true;
+    }
+    match mode {
+        "r3-seg1" => {
+            run_third_run_positive_control_newer(&GEOMETRY_PRIMARY, &arm);
+            run_third_run_positive_control_second_read(&GEOMETRY_PRIMARY, &arm);
+            run_third_run_positive_control_no_newer(&GEOMETRY_PRIMARY, &arm);
+            run_third_run_held_once_family(&GEOMETRY_PRIMARY, &arm);
+            run_third_run_tail_family(&GEOMETRY_PRIMARY, &arm);
+        }
+        "r3-constants" => {}
+        "r3-pc" => {
+            run_third_run_positive_control_newer(&GEOMETRY_PRIMARY, &arm);
+            run_third_run_positive_control_second_read(&GEOMETRY_PRIMARY, &arm);
+            run_third_run_positive_control_no_newer(&GEOMETRY_PRIMARY, &arm);
+        }
+        "r3-h1d" => run_third_run_held_once_family(&GEOMETRY_PRIMARY, &arm),
+        "r3-h1e" => run_third_run_tail_family(&GEOMETRY_PRIMARY, &arm),
+        other => unreachable!("第 3 次跑的模式表 known 已经挡过：{other}"),
+    }
+    emit_result(&format!(
+        "name=done emitted={}",
+        emitted_result_line_count() + 1
+    ));
+    true
+}
+
+/// 产物文件头（登记开头「产物文件头第一行写这个汇总 sha256」）：快照的汇总 sha256 由跑的人经环境变量交进来；
+/// `E7INPUT` 开头，`research/scripts/replay.sh` 比对前删掉，`name=done` 不数它。
+fn emit_input_header() {
+    println!(
+        "E7INPUT name=crates_snapshot key=E158 sha256={}",
+        env::var("SINGLEFS_E158_SNAPSHOT_SHA256").unwrap_or_else(|_| "unset".to_string())
+    );
+}
+
+#[cfg(test)]
+mod third_run_tests {
+    use super::*;
+
+    fn whole_call_read_failure_at(offset: u64, length: u64) -> ThirdRunFault {
+        ThirdRunFault {
+            device: DeviceIdentity(0),
+            offset,
+            length,
+            form: UnreadableForm::ReadFails,
+            duration: FaultDuration::WholeCall,
+            label: format!("probe({offset})"),
+        }
+    }
+
+    /// 登记 5.6 与 7.2：第 3 次跑的常量回比、偏移解码、根槽 / 环槽 / 系统配置槽数全过（V3、V4；变异 M12 要它红）。
+    #[test]
+    fn third_run_constants_and_anchors_all_pass() {
+        assert!(run_third_run_constants_and_anchors("today"));
+    }
+
+    /// 「读法写死」表「时长」一行：W 每次都坏；T(τ) 坏到虚拟时钟走到 τ；O(m 只) 只坏第 m 次；O(m 起) 第 m 次起都坏（变异 M5、M6 要它红）。
+    #[test]
+    fn fault_durations_follow_the_registered_table() {
+        assert!(FaultDuration::WholeCall.is_active(1, 0));
+        assert!(FaultDuration::WholeCall.is_active(7, 5));
+        assert!(FaultDuration::UntilVirtualTime(1).is_active(1, 0));
+        assert!(!FaultDuration::UntilVirtualTime(1).is_active(2, 1));
+        assert!(FaultDuration::UntilVirtualTime(2).is_active(2, 1));
+        assert!(FaultDuration::OnlyTheNthRead(1).is_active(1, 0));
+        assert!(!FaultDuration::OnlyTheNthRead(1).is_active(2, 0));
+        assert!(!FaultDuration::OnlyTheNthRead(2).is_active(1, 0));
+        assert!(!FaultDuration::FromTheNthRead(2).is_active(1, 0));
+        assert!(FaultDuration::FromTheNthRead(2).is_active(3, 0));
+        assert!(FaultDuration::OnlyTheNthRead(1).is_active_on_the_first_read());
+        assert!(!FaultDuration::OnlyTheNthRead(2).is_active_on_the_first_read());
+    }
+
+    /// 虚拟时钟只由等待钩子推进：推一格之后 T(1) 的落点读得出。
+    #[test]
+    fn fault_until_one_interval_clears_after_one_wait() {
+        let pool = memory_pool_of(&new_devices(IMAGE_BYTES), IMAGE_BYTES);
+        let fault = ThirdRunFault {
+            duration: FaultDuration::UntilVirtualTime(1),
+            ..whole_call_read_failure_at(0, 4096)
+        };
+        let call = third_run_call(&pool, &[fault], None, None, |devices| {
+            let first = singlefs_core::recovery::PoolReader::read(&*devices, DeviceIdentity(0), DeviceOffsetInBytes(0), 4096);
+            third_run_arm_hooks::advance_one_interval(THIRD_RUN_VIRTUAL_INTERVAL);
+            let second = singlefs_core::recovery::PoolReader::read(&*devices, DeviceIdentity(0), DeviceOffsetInBytes(0), 4096);
+            (first.is_some(), second.is_some())
+        });
+        assert_eq!(call.outcome, (false, true));
+        assert_eq!(call.intercepted_reads, vec![1]);
+    }
+
+    /// Q5 的读数：读坏的读也数进读调用次数与读字节数（变异 M14 要它红）。
+    #[test]
+    fn failed_reads_are_counted_as_reads() {
+        let pool = memory_pool_of(&new_devices(IMAGE_BYTES), IMAGE_BYTES);
+        let call = third_run_call(&pool, &[whole_call_read_failure_at(0, 4096)], None, None, |devices| {
+            singlefs_core::recovery::PoolReader::read(&*devices, DeviceIdentity(0), DeviceOffsetInBytes(0), 4096).is_some()
+        });
+        assert!(!call.outcome);
+        assert_eq!(call.read_calls, 1);
+        assert_eq!(call.read_bytes, 4096);
+    }
+
+    /// V2：点了名而这次调用一次都没读到的落点要报出来（变异 M13 要它红）。
+    #[test]
+    fn named_target_never_read_is_reported_as_not_intercepted() {
+        let pool = memory_pool_of(&new_devices(IMAGE_BYTES), IMAGE_BYTES);
+        let faults = [
+            whole_call_read_failure_at(0, 4096),
+            whole_call_read_failure_at(1 << 20, 4096),
+        ];
+        let call = third_run_call(&pool, &faults, None, None, |devices| {
+            singlefs_core::recovery::PoolReader::read(&*devices, DeviceIdentity(0), DeviceOffsetInBytes(0), 4096).is_some()
+        });
+        assert_eq!(call.unintercepted(&faults), vec![faults[1].label.clone()]);
+    }
+
+    /// K3 / K4 按这次调用设备一层写了几次分，不按错误成员分（变异 M10 要它红）。
+    #[test]
+    fn refusal_after_one_write_is_classed_by_its_write_count() {
+        let refused: Result<Mounted, singlefs_core::mount::MountError> =
+            Err(singlefs_core::mount::MountError::InstanceTableMalformed);
+        assert_eq!(third_run_outcome_class(&refused, 1), "K4");
+        assert_eq!(third_run_outcome_class(&refused, 0), "K3");
+    }
+
+    /// N-配置 的 c_见证 取每块盘两槽的最大值，不只取世代号最新那一槽（手写两盘两槽：新槽 tail 0 实例 2、旧槽 tail c 实例 1；变异 M3 的装置一半）。
+    #[test]
+    fn the_configuration_witness_takes_both_slots_of_every_device() {
+        let witnessed = 9u64;
+        let decoded = DeviceDecodedImage {
+            root_keys: BTreeSet::new(),
+            unreadable_root_slots: 0,
+            records: BTreeMap::new(),
+            system_configuration_slots: vec![
+                (0, 2, 0, 2),
+                (0, 1, witnessed, 1),
+                (1, 2, 0, 2),
+                (1, 1, witnessed, 1),
+            ],
+        };
+        let (newer, tail, last, undecidable) = device_configuration_witness(&decoded, (1, 3));
+        assert_eq!(tail, witnessed);
+        assert_eq!(last, None);
+        assert!(newer);
+        assert!(undecidable);
+    }
+
+    /// 装置自己的择根与重放在一段 P(1, C) 上与 `crates/` 的 `choose_root`、`replay_journal` 交回的同一条根（7.3 第一行的不注入那一格）。
+    #[test]
+    fn the_device_replay_agrees_with_crates_on_an_untouched_history() {
+        let parameters = parameters_for(&GEOMETRY_PRIMARY);
+        let mut history = third_run_history_start(&GEOMETRY_PRIMARY, 1).expect("P(1, ·)");
+        third_run_close(&mut history, &parameters, Closing::ProcessExit).expect("关闭 C");
+        let geometry = independent_geometry(&history.pool).expect("几何");
+        let judgement = device_judgement(&history.pool, &geometry, &[]);
+        let devices = devices_from_pool(&history.pool, IMAGE_BYTES);
+        let system_configuration = choose_system_configuration(&devices).expect("系统配置");
+        let chosen = singlefs_core::recovery::choose_root(&devices, &system_configuration).expect("根");
+        let records = scan_journal(&devices, &system_configuration);
+        let (_, effective) = replay_journal(
+            &devices,
+            &chosen,
+            system_configuration.immutable.sizes.journal_ring_bytes,
+            &records,
+            true,
+        )
+        .expect("重放");
+        assert_eq!(judgement.chosen, Some(root_pair(&chosen)));
+        assert_eq!(judgement.effective, Some(root_pair(&effective)));
+        assert_eq!(judgement.effective, Some(history.tip()));
+        assert!(!judgement.truth_newer);
+        assert_eq!(history.tail_check_failures, Vec::<String>::new());
+        assert_eq!(history.tail_checks, 2);
+    }
+
+    /// PC-N 的真值一半：被藏那条根在孪生镜像上读得出，N_真 为真；今天那一臂回滚到被藏那条根的前一条（变异 M1 要它红）。
+    #[test]
+    fn the_truth_of_a_newer_root_is_read_on_the_twin_image() {
+        let parameters = parameters_for(&GEOMETRY_PRIMARY);
+        let mut history = third_run_history_start(&GEOMETRY_PRIMARY, 1).expect("P(1, ·)");
+        third_run_close(&mut history, &parameters, Closing::ProcessExit).expect("关闭 C");
+        let geometry = independent_geometry(&history.pool).expect("几何");
+        let faults = third_run_abandonment_faults(
+            &history,
+            &geometry,
+            UnreadableForm::ReadFails,
+            ReplayBreak::EveryRecord,
+            FaultDuration::WholeCall,
+        )
+        .expect("落点")
+        .expect("有记录");
+        let judgement = device_judgement(&history.pool, &geometry, &faults);
+        assert!(judgement.truth_newer);
+        assert!(judgement.configuration_newer);
+        assert_eq!(judgement.effective, history.timeline.iter().rev().nth(1).copied());
+    }
+
+    /// PC-丢写（今天那一臂）：P(1, C) → A（PC-N 那组故障）→ 最后确认那一版的数据单元被改写 → 再可写挂载：Q1 前两栏数得出、
+    /// 读回不是最后确认那一版（变异 M8 要它红：那时恢复落到再挂载写下的根，它不在被测那次挂载开始时的镜像上）。
+    #[test]
+    fn an_overwritten_last_confirmed_version_counts_as_a_lost_write() {
+        let parameters = parameters_for(&GEOMETRY_PRIMARY);
+        let mut history = third_run_history_start(&GEOMETRY_PRIMARY, 1).expect("P(1, ·)");
+        third_run_close(&mut history, &parameters, Closing::ProcessExit).expect("关闭 C");
+        let geometry = independent_geometry(&history.pool).expect("几何");
+        let faults = third_run_abandonment_faults(
+            &history,
+            &geometry,
+            UnreadableForm::ReadFails,
+            ReplayBreak::EveryRecord,
+            FaultDuration::WholeCall,
+        )
+        .expect("落点")
+        .expect("有记录");
+        let tested = run_third_run_mount_writable(&history.pool, &parameters, &faults, None, None);
+        assert!(tested.outcome.is_ok());
+        let protected = history.confirmations.last().cloned().expect("确认过");
+        let (corrupted, loss) = positive_control_lost_write(
+            &history,
+            &protected,
+            &history.pool,
+            &tested.pool_after,
+            &parameters,
+        );
+        assert!(corrupted > 0);
+        assert!(loss.overwrite_cell());
+        assert_ne!(loss.read_back, "last_confirmed");
+    }
+
+    /// 跨臂对拍读产物行：值里不带空格的字段按 `k=v` 取得出。
+    #[test]
+    fn result_line_fields_are_split_on_spaces() {
+        let fields = fields_of_a_result_line(
+            "E7RESULT name=r3_h1d_cell arm=today n1=2 cut=none a_reads=12 q3c_tail=own_version:2:9",
+        );
+        assert_eq!(fields.get("n1").map(String::as_str), Some("2"));
+        assert_eq!(fields.get("q3c_tail").map(String::as_str), Some("own_version:2:9"));
+    }
+}
+
 fn main() {
     let command_line_arguments: Vec<String> = env::args().collect();
     let mode = command_line_arguments
         .get(1)
         .map(String::as_str)
         .unwrap_or("all");
+    if run_second_run_mode(mode) {
+        return;
+    }
+    if run_third_run_mode(mode, &command_line_arguments) {
+        return;
+    }
 
     let constants_ok = run_constants_and_anchors();
     if !constants_ok {
@@ -5522,59 +11554,71 @@ mod tests {
     }
 
     /// op1 第三种变体：探测出的 floor 目标落在 [F+1, 上限] 内时，不注入任何故障应当成功
-    /// （`error_member` 为 `None`）；换成对着某条被抛弃可读根的树表位置注入故障（两份都读失败），
-    /// 结局必须与不注入时不同——证明 `raise_rollback_floor` 真的读到了这组故障（不是被前面那一步
-    /// 「先不注入的 mount_writable」悄悄吸收掉）。`abandoned_roots_unreadable` 走的正是
-    /// `isolate_slots_referenced_only_by_abandoned_roots` 这条管道，与 `mount_writable`/
-    /// `mount_rollback` 那两种 op1 共用同一个计数函数（`crates/singlefs-core/src/mount.rs`
-    /// 第 1027 行起）。
+    /// （`error_member` 为 `None`）；换成对着某条被抛弃可读根的分配记录树节点注入故障（两份都读失败），
+    /// `raise_rollback_floor` 必须做成、且它交回的 `RaisedFloor::abandoned_roots_unreadable` > 0——证明抬 F 那一步的影子账真的读到了
+    /// 这组故障（不是被前面那一步「先不注入的 mount_writable」悄悄吸收掉，也不是抬 F 算上限那一步先拒了）。
+    /// 被抛弃根取自第 2 次跑那一节 H1c 的抛弃步（`abandonment_step_nodes`；跑前登记 `research/prompts/e158-r2-prereg.md`
+    /// 第一节处理表：故障改打 H1c 里一条被抛弃根的分配记录树节点、删掉「或者报了错也算」那一半）。
     #[test]
     fn mount_writable_then_raise_floor_reaches_the_injected_fault() {
         let parameters = parameters_for(&GEOMETRY_PRIMARY);
         let fixed_geometry = fixed_geometry_for(&GEOMETRY_PRIMARY);
-        let family = ledger_fault_history_family(&GEOMETRY_PRIMARY);
         let mut tested = false;
-        for history_node in &family.nodes {
-            let node = &history_node.node;
-            let Ok(pool_geometry) = independent_geometry(&node.pool) else {
+        for (pool, abandoned) in abandonment_step_nodes() {
+            let Ok(pool_geometry) = independent_geometry(&pool) else {
                 continue;
             };
-            let readable = readable_roots_independent(&node.pool, &pool_geometry);
-            let Some(event) = node.rollback_events.first() else {
+            let readable = readable_roots_independent(&pool, &pool_geometry);
+            let Some(&abandoned_root) = abandoned.iter().find(|root| readable.contains(root))
+            else {
                 continue;
             };
-            let abandoned_readable: Vec<TimelineRoot> = event
-                .abandoned
-                .iter()
-                .copied()
-                .filter(|root| readable.contains(root))
-                .collect();
-            let Some(&abandoned_root) = abandoned_readable.first() else {
+            let Some(record) = root_record_of(&pool, &pool_geometry, abandoned_root) else {
                 continue;
             };
-            let Some(record) = root_record_of(&node.pool, &pool_geometry, abandoned_root) else {
+            let plain_devices = devices_from_pool(&pool, IMAGE_BYTES);
+            let Ok(allocation_locations) = locate_allocation_record_tree(&plain_devices, &record)
+            else {
                 continue;
             };
-            let targets = raise_floor_targets_for(node, &parameters);
+            let node = SimNode {
+                pool: pool.clone(),
+                session: None,
+                timeline: Vec::new(),
+                rollback_events: Vec::new(),
+                path: Vec::new(),
+                content_by_root: BTreeMap::new(),
+            };
+            let targets = raise_floor_targets_for(&node, &parameters);
             let Some(&floor) = targets.first() else {
                 continue;
             };
             let kind = FaultedOperationKind::MountWritableThenRaiseFloorTo(floor);
             let without_fault =
-                attempt_faulted_operation(node, &parameters, fixed_geometry, &kind, &[]);
+                attempt_faulted_operation(&node, &parameters, fixed_geometry, &kind, &[]);
             assert!(
                 without_fault.error_member.is_none(),
                 "探测出的 floor 目标不注入任何故障应当成功，得到 {:?}",
                 without_fault.error_member
             );
-            let fault_targets =
-                fault_targets_for(&record.tree_table.locations, FaultSeverity::Both);
-            let with_fault =
-                attempt_faulted_operation(node, &parameters, fixed_geometry, &kind, &fault_targets);
+            let fault_targets = fault_targets_for(&allocation_locations, FaultSeverity::Both);
+            let with_fault = attempt_faulted_operation(
+                &node,
+                &parameters,
+                fixed_geometry,
+                &kind,
+                &fault_targets,
+            );
             assert!(
-                with_fault.abandoned_roots_unreadable != without_fault.abandoned_roots_unreadable
-                    || with_fault.error_member.is_some(),
-                "对被抛弃根的树表两份都读失败注入之后，结局必须与不注入时不同（{:?} vs {:?}）",
+                with_fault.error_member.is_none(),
+                "被抛弃根的分配记录树节点两份都读失败时抬 F 照样做成（账读不出只计数），得到 {:?}",
+                with_fault.error_member
+            );
+            assert!(
+                with_fault
+                    .abandoned_roots_unreadable
+                    .is_some_and(|count| count > 0),
+                "抬 F 重算影子账要数到这条读不出账的被抛弃根，得到 {:?}（不注入时 {:?}）",
                 with_fault.abandoned_roots_unreadable,
                 without_fault.abandoned_roots_unreadable
             );
@@ -5583,7 +11627,7 @@ mod tests {
         }
         assert!(
             tested,
-            "H1 家族里应当至少有一个节点有 op1 第三种变体可跑（有余量、有可读被抛弃根）"
+            "H1c 抛弃步造出的节点里应当至少有一个有 op1 第三种变体可跑（有余量、有可读被抛弃根）"
         );
     }
 
@@ -6246,18 +12290,19 @@ mod tests {
         assert!(passed, "没有文件的一版，期望内容也是 None，应当判通过");
     }
 
-    /// PC2：环境变量没设，本地常量按今天 / 甲-txg 那一份取 481。
+    /// PC2：环境变量没设，本地常量按今天那一份取 489（D22（单元原子性怎么合成） 已定项 9 的字段表合计）。
     #[test]
-    fn parse_local_system_configuration_bytes_defaults_to_481_when_unset() {
+    fn parse_local_system_configuration_bytes_defaults_to_489_when_unset() {
         let value = parse_local_system_configuration_bytes(Err(env::VarError::NotPresent));
-        assert_eq!(value, 481, "没设环境变量应当取今天的 481");
+        assert_eq!(value, 489, "没设环境变量应当取今天的 489");
     }
 
-    /// PC2：环境变量给了十进制数字，原样解出来（乙族传 489）。
+    /// PC2：环境变量给了十进制数字，原样解出来。取一个与没设时的默认 489 不同的数，
+    /// 才分得出是解出来的，还是退回了默认值。
     #[test]
     fn parse_local_system_configuration_bytes_parses_the_given_decimal() {
-        let value = parse_local_system_configuration_bytes(Ok("489".to_string()));
-        assert_eq!(value, 489, "环境变量给的十进制数要原样解出来");
+        let value = parse_local_system_configuration_bytes(Ok("497".to_string()));
+        assert_eq!(value, 497, "环境变量给的十进制数要原样解出来");
     }
 
     /// PC2：环境变量给了不是十进制数的内容，panic（不许静默退回默认值掩盖配错）。
@@ -6392,36 +12437,29 @@ mod tests {
 
     /// session s9（`m2-rootchoice-repair-r1-forks.md` 岔路单第 1 行还差项④）：持续故障与瞬时故障
     /// 在 op1 起的三次挂载轨迹上必须不同——持续（`persistent=true`）故障不撤，每一步都该继续触发；
-    /// 瞬时（`persistent=false`）故障只在 op1 那一步有效，撤掉之后的两步该恢复成不触发。用与
-    /// `run_ledger_fault_positive_controls`（PC1-a）完全相同的「按固定次序找第一个满足『某条被抛弃
-    /// 根的分配记录树节点不共享』的历史」选出同一个落点，不是另挑一个未经验证的构造。
+    /// 瞬时（`persistent=false`）故障只在 op1 那一步有效，撤掉之后的两步该恢复成不触发。用 PC1-a 的挑选条件（按固定次序找第一个满足
+    /// 『某条被抛弃根的分配记录树节点不共享』的历史）选落点；被抛弃根取自第 2 次跑那一节 H1c 的抛弃步
+    /// （`abandonment_step_nodes`；跑前登记 `research/prompts/e158-r2-prereg.md` 第一节处理表：第一次跑靠挂载时回退造的
+    /// 被抛弃根在今天的代码上造不出来，这条单测开工时就红）。
     #[test]
     fn mount_writable_trajectory_distinguishes_persistent_from_transient_faults() {
         let geometry = &GEOMETRY_PRIMARY;
         let parameters = parameters_for(geometry);
         let fixed_geometry = fixed_geometry_for(geometry);
-        let family = ledger_fault_history_family(geometry);
-
-        for history_node in &family.nodes {
-            let node = &history_node.node;
-            let Ok(pool_geometry) = independent_geometry(&node.pool) else {
+        for (pool, abandoned) in abandonment_step_nodes() {
+            let Ok(pool_geometry) = independent_geometry(&pool) else {
                 continue;
             };
-            let readable = readable_roots_independent(&node.pool, &pool_geometry);
-            let Some(event) = node.rollback_events.first() else {
-                continue;
-            };
-            let abandoned_readable: Vec<TimelineRoot> = event
-                .abandoned
+            let readable = readable_roots_independent(&pool, &pool_geometry);
+            let abandoned_readable: Vec<TimelineRoot> = abandoned
                 .iter()
                 .copied()
                 .filter(|root| readable.contains(root))
                 .collect();
-            let plain_devices = devices_from_pool(&node.pool, IMAGE_BYTES);
+            let plain_devices = devices_from_pool(&pool, IMAGE_BYTES);
 
             for &abandoned_root in &abandoned_readable {
-                let Some(record) = root_record_of(&node.pool, &pool_geometry, abandoned_root)
-                else {
+                let Some(record) = root_record_of(&pool, &pool_geometry, abandoned_root) else {
                     continue;
                 };
                 let Ok(allocation_locations) =
@@ -6433,7 +12471,7 @@ mod tests {
                     allocation_locations.iter().map(location_key).collect();
                 if is_unit_shared(
                     &plain_devices,
-                    &node.pool,
+                    &pool,
                     &pool_geometry,
                     abandoned_root,
                     &allocation_keys,
@@ -6444,7 +12482,7 @@ mod tests {
                 let allocation_fault_targets =
                     fault_targets_for(&allocation_locations, FaultSeverity::Both);
                 let persistent = mount_writable_trajectory(
-                    &node.pool,
+                    &pool,
                     &parameters,
                     fixed_geometry,
                     &allocation_fault_targets,
@@ -6452,7 +12490,7 @@ mod tests {
                     3,
                 );
                 let transient = mount_writable_trajectory(
-                    &node.pool,
+                    &pool,
                     &parameters,
                     fixed_geometry,
                     &allocation_fault_targets,
@@ -6484,7 +12522,9 @@ mod tests {
                 return;
             }
         }
-        panic!("H1 家族里应当至少有一格满足 PC1-a 的挑选条件（跑前登记 5.2 阳性对照）");
+        panic!(
+            "H1c 抛弃步造出的节点里应当至少有一格满足 PC1-a 的挑选条件（跑前登记 5.2 阳性对照）"
+        );
     }
 
     /// session s9（`m2-rootchoice-repair-r1-forks.md` 岔路单第 2 行还差项②）：权重上限机制——
@@ -6542,5 +12582,588 @@ mod tests {
             capped.subsets_tried <= full.subsets_tried,
             "权重上限更紧时枚举过的子集数不该比不设上限时更多"
         );
+    }
+
+    // ------------------------------------------------------------------------
+    // 第 2 次跑（`research/prompts/e158-r2-prereg.md`）那一节的单测。
+    // ------------------------------------------------------------------------
+
+    fn device_with_bytes(identity: DeviceIdentity, offset: u64, bytes: &[u8]) -> SparseBlockDevice {
+        let mut device = SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512));
+        device
+            .write_at(DeviceOffsetInBytes(offset), bytes, WriteDurability::Plain)
+            .expect("内存盘写不报错");
+        let _ = identity;
+        device
+    }
+
+    fn instrumented(
+        identity: DeviceIdentity,
+        inner: SparseBlockDevice,
+        state: &Rc<RefCell<InstrumentationState>>,
+    ) -> InstrumentedDevice {
+        InstrumentedDevice {
+            identity,
+            inner,
+            state: Rc::clone(state),
+        }
+    }
+
+    /// 前 n 个写之后的镜像要用的最小历史：mkfs → 可写挂载 → 首个文件 → n1 次覆盖写 → 关闭 C。
+    fn closed_history(overwrites: u64) -> SecondRunHistory {
+        let parameters = parameters_for(&GEOMETRY_PRIMARY);
+        let mut history = second_run_start(&GEOMETRY_PRIMARY, overwrites).expect("历史走得通");
+        second_run_close(
+            &mut history,
+            &parameters,
+            Closing::ProcessExit,
+            "test",
+            "test",
+        )
+        .expect("关闭 C");
+        history
+    }
+
+    #[test]
+    fn unique_offset_of_finds_a_single_occurrence_and_refuses_two() {
+        assert_eq!(unique_offset_of(&[0, 1, 2, 3, 4], &[2, 3]), Some(2));
+        assert_eq!(unique_offset_of(&[2, 3, 0, 2, 3], &[2, 3]), None);
+        assert_eq!(unique_offset_of(&[0, 1], &[7]), None);
+    }
+
+    /// 跑前登记 5.6 表「journal tail 偏移、F 偏移」：装置自己解码找到 469 与 481（实例代号在 477）。
+    #[test]
+    fn decoded_offsets_put_the_tail_at_469_the_instance_at_477_and_the_floor_at_481() {
+        let (tail, instance, floor) =
+            decoded_tail_instance_and_floor_offsets().expect("三项都恰好一处");
+        assert_eq!(tail, 469);
+        assert_eq!(instance, 469 + 8);
+        assert_eq!(floor, 481);
+    }
+
+    /// 7.2 的锚点在今天的字段表（489）与乙 / 丁的字段表（497）上都过；字段表写错一字节（488）就有不过的。
+    #[test]
+    fn second_run_arithmetic_anchors_hold_for_489_and_for_497_and_not_for_488() {
+        for layout in [489u64, 497] {
+            for (item, computed, registered) in second_run_arithmetic_anchors(layout) {
+                assert_eq!(computed, registered, "{layout}：{item}");
+            }
+        }
+        assert!(second_run_arithmetic_anchors(488)
+            .iter()
+            .any(|(_, computed, registered)| computed != registered));
+        assert_eq!(SYSTEM_CONFIGURATION_BYTES_TODAY_LOCAL, 489);
+    }
+
+    /// 读落点：读错那一类读就报错、清零那一类读回 0，两类都按区间罩（读的起点不必等于落点起点），落点外的读原样；
+    /// 每个落点被拦下几次单独记；这次调用自己写到落点上之后不再拦。
+    #[test]
+    fn instrumented_device_fails_or_zeroes_only_reads_over_the_named_ranges_and_counts_them() {
+        let identity = DeviceIdentity(0);
+        let inner = device_with_bytes(identity, 8192, &[7u8; 4096]);
+        let state = Rc::new(RefCell::new(InstrumentationState::new(
+            vec![
+                UnreadableRange {
+                    device: identity,
+                    offset: 8192,
+                    length: 512,
+                    form: UnreadableForm::ReadFails,
+                    label: "fails".to_string(),
+                },
+                UnreadableRange {
+                    device: identity,
+                    offset: 9216,
+                    length: 512,
+                    form: UnreadableForm::ReadsZeros,
+                    label: "zeros".to_string(),
+                },
+            ],
+            None,
+            None,
+        )));
+        let mut device = instrumented(identity, inner, &state);
+        let mut buffer = vec![0u8; 512];
+        assert!(
+            device
+                .read_at(DeviceOffsetInBytes(7936), &mut buffer)
+                .is_err(),
+            "起点在落点之前、区间罩到落点的读也要报错"
+        );
+        let mut wide = vec![0u8; 2048];
+        assert!(device.read_at(DeviceOffsetInBytes(8704), &mut wide).is_ok());
+        assert!(wide[..512].iter().all(|byte| *byte == 7));
+        assert!(
+            wide[512..1024].iter().all(|byte| *byte == 0),
+            "清零那一段读回 0"
+        );
+        assert!(wide[1024..1536].iter().all(|byte| *byte == 7));
+        let mut outside = vec![0u8; 512];
+        assert!(device
+            .read_at(DeviceOffsetInBytes(12288), &mut outside)
+            .is_ok());
+        assert_eq!(state.borrow().intercepted_reads, vec![1, 1]);
+        device
+            .write_at(
+                DeviceOffsetInBytes(8192),
+                &[9u8; 512],
+                WriteDurability::Plain,
+            )
+            .expect("写");
+        assert!(
+            device
+                .read_at(DeviceOffsetInBytes(8192), &mut buffer)
+                .is_ok(),
+            "写过之后不再拦"
+        );
+        assert!(buffer.iter().all(|byte| *byte == 9));
+        assert_eq!(state.borrow().intercepted_reads, vec![1, 1]);
+    }
+
+    /// 注入写失败：整池第 n 次写（从 0 数）报错、不落盘、不进落了的写的记录；第 n 次屏障同理。
+    #[test]
+    fn instrumented_device_fails_exactly_the_named_write_and_barrier_calls() {
+        let identity = DeviceIdentity(0);
+        let state = Rc::new(RefCell::new(InstrumentationState::new(
+            Vec::new(),
+            Some(1),
+            Some(0),
+        )));
+        let mut device = instrumented(
+            identity,
+            SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
+            &state,
+        );
+        assert!(device
+            .write_at(DeviceOffsetInBytes(0), &[1u8; 512], WriteDurability::Plain)
+            .is_ok());
+        assert!(device
+            .write_at(
+                DeviceOffsetInBytes(512),
+                &[2u8; 512],
+                WriteDurability::Plain
+            )
+            .is_err());
+        assert!(device
+            .write_at(
+                DeviceOffsetInBytes(1024),
+                &[3u8; 512],
+                WriteDurability::Plain
+            )
+            .is_ok());
+        assert!(device.barrier().is_err());
+        assert!(device.barrier().is_ok());
+        let state = state.borrow();
+        assert_eq!(state.write_calls, 3);
+        assert_eq!(state.barrier_calls, 2);
+        assert!(state.injected_failure_fired);
+        let written_offsets: Vec<u64> = state
+            .applied
+            .iter()
+            .filter_map(|step| match step {
+                AppliedDeviceStep::Write { offset, .. } => Some(*offset),
+                AppliedDeviceStep::ZeroFill { .. } | AppliedDeviceStep::Barrier { .. } => None,
+            })
+            .collect();
+        assert_eq!(written_offsets, vec![0, 1024]);
+        let mut buffer = vec![0u8; 512];
+        device
+            .inner
+            .read_at(DeviceOffsetInBytes(512), &mut buffer)
+            .expect("读");
+        assert!(buffer.iter().all(|byte| *byte == 0), "报了错的那次写不落盘");
+    }
+
+    fn write_step(device: u32, offset: u64, fill: u8) -> AppliedDeviceStep {
+        AppliedDeviceStep::Write {
+            device: DeviceIdentity(device),
+            offset,
+            bytes: vec![fill; 512],
+        }
+    }
+
+    /// 崩溃状态（前缀）：只施加前 n 个写，屏障不算写、也不改字节。
+    #[test]
+    fn image_with_the_first_writes_applies_only_the_prefix() {
+        let base = memory_pool_of(&new_devices(IMAGE_BYTES), IMAGE_BYTES);
+        let steps = vec![
+            write_step(0, 0, 1),
+            AppliedDeviceStep::Barrier {
+                device: DeviceIdentity(0),
+            },
+            write_step(1, 512, 2),
+            write_step(0, 1024, 3),
+        ];
+        let image = image_with_the_first_writes(&base, &steps, 2);
+        assert_eq!(image.read(0, 0, 512), Some(vec![1; 512]));
+        assert_eq!(image.read(1, 512, 512), Some(vec![2; 512]));
+        assert_eq!(
+            image.read(0, 1024, 512),
+            Some(vec![0; 512]),
+            "第 3 个写没施加"
+        );
+        let empty = image_with_the_first_writes(&base, &steps, 0);
+        assert_eq!(empty.read(0, 0, 512), Some(vec![0; 512]));
+    }
+
+    /// 第一个根槽写的下标按写数（屏障不算），它之前的屏障数只数在它之前发的。
+    #[test]
+    fn index_of_the_first_root_slot_write_and_the_barriers_before_it() {
+        let steps = vec![
+            write_step(0, 4096, 1),
+            AppliedDeviceStep::Barrier {
+                device: DeviceIdentity(0),
+            },
+            write_step(1, 900_000, 2),
+            AppliedDeviceStep::Barrier {
+                device: DeviceIdentity(1),
+            },
+            write_step(1, 4_198_400, 3),
+            AppliedDeviceStep::Barrier {
+                device: DeviceIdentity(0),
+            },
+            write_step(0, 4_198_400, 4),
+        ];
+        let root_slots = vec![(DeviceIdentity(1), 4_198_400u64)];
+        assert_eq!(
+            index_of_the_first_root_slot_write(&steps, &root_slots, 512),
+            Some(2)
+        );
+        assert_eq!(barriers_before_write(&steps, 3), 2);
+        assert_eq!(barriers_before_write(&steps, 1), 0);
+        let barrier_first = vec![
+            AppliedDeviceStep::Barrier {
+                device: DeviceIdentity(0),
+            },
+            write_step(0, 4096, 1),
+        ];
+        assert_eq!(
+            barriers_before_write(&barrier_first, 0),
+            0,
+            "「前 0 个写」之前一个屏障都不算"
+        );
+        assert_eq!(
+            barriers_before_write(&barrier_first, 1),
+            1,
+            "第 1 个写之前那一次屏障算"
+        );
+        assert_eq!(
+            index_of_the_first_root_slot_write(&steps, &[(DeviceIdentity(0), 12)], 512),
+            None
+        );
+    }
+
+    /// K0–K4（前提 3 的答案）：报错的按这次调用设备一层写没写分 K3 / K4，不按错误成员分（登记第九节 M17）；做成的按准入那一栏分。
+    #[test]
+    fn mount_outcome_class_splits_refusals_by_the_writes_of_the_call() {
+        let refused: Result<Mounted, singlefs_core::mount::MountError> =
+            Err(singlefs_core::mount::MountError::InstanceTableMalformed);
+        assert_eq!(mount_outcome_class(&refused, 0), "K3");
+        assert_eq!(mount_outcome_class(&refused, 1), "K4");
+        let parameters = parameters_for(&GEOMETRY_PRIMARY);
+        let mut devices = new_devices(IMAGE_BYTES);
+        make_filesystem(&parameters, &mut devices).expect("mkfs");
+        let mounted = mount_writable(&parameters, &mut devices);
+        assert_eq!(mount_outcome_class(&mounted, 30), "K0");
+    }
+
+    /// 抛弃步的落点：最新 k 条根的根槽（一块盘上一个物理块）+ 断链发布的记录两份 / 第一个点名单元两份 / 它的第一份。
+    #[test]
+    fn unreadable_ranges_of_the_abandonment_name_the_root_slots_and_the_break() {
+        let history = closed_history(1);
+        let geometry = independent_geometry(&history.pool).expect("几何");
+        let tip = history.tip();
+        let (tip_device, tip_offset) =
+            root_slot_of(&history.pool, &geometry, tip).expect("最新根的根槽");
+        let records = records_of_publish(&history.pool, &geometry, tip);
+        assert!(!records.is_empty());
+        let every_record = unreadable_ranges_of_the_abandonment(
+            &history,
+            &geometry,
+            1,
+            UnreadableForm::ReadFails,
+            ReplayBreak::EveryRecord,
+        )
+        .expect("落点")
+        .expect("有记录");
+        assert_eq!(every_record.len(), 1 + 2 * records.len());
+        assert_eq!(
+            (
+                every_record[0].device,
+                every_record[0].offset,
+                every_record[0].length
+            ),
+            (tip_device, tip_offset, 512)
+        );
+        assert!(every_record[1..]
+            .iter()
+            .all(|range| range.length == JOURNAL_RECORD_BYTES));
+        assert!(every_record[1..]
+            .iter()
+            .any(|range| range.device == DeviceIdentity(1)));
+        let both_copies = unreadable_ranges_of_the_abandonment(
+            &history,
+            &geometry,
+            1,
+            UnreadableForm::ReadsZeros,
+            ReplayBreak::FirstNamedUnit,
+        )
+        .expect("落点")
+        .expect("有点名单元");
+        assert_eq!(both_copies.len(), 3);
+        assert_ne!(both_copies[1].device, both_copies[2].device);
+        let first_copy = unreadable_ranges_of_the_abandonment(
+            &history,
+            &geometry,
+            1,
+            UnreadableForm::ReadsZeros,
+            ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+        )
+        .expect("落点")
+        .expect("有点名单元");
+        assert_eq!(first_copy, both_copies[..2].to_vec());
+        let two_roots = unreadable_ranges_of_the_abandonment(
+            &history,
+            &geometry,
+            2,
+            UnreadableForm::ReadFails,
+            ReplayBreak::EveryRecord,
+        )
+        .expect("落点")
+        .expect("有记录");
+        assert_eq!(
+            two_roots.len(),
+            2 + 2 * records_of_publish(
+                &history.pool,
+                &geometry,
+                history.timeline[history.timeline.len() - 2]
+            )
+            .len()
+        );
+    }
+
+    /// 第 2 次跑修订第 1 条的依据：重放验点名单元要全部份都验过，第一份读错就停，第二份一次都没读——b = unit 的第二份落点拦不到（V2 作废），
+    /// 只坏第一份就断得了链（b = unit_first_copy）。
+    #[test]
+    fn replay_stops_at_the_first_copy_of_a_named_unit_so_the_second_copy_is_never_read() {
+        let history = closed_history(1);
+        let geometry = independent_geometry(&history.pool).expect("几何");
+        let parameters = parameters_for(&GEOMETRY_PRIMARY);
+        let both = unreadable_ranges_of_the_abandonment(
+            &history,
+            &geometry,
+            1,
+            UnreadableForm::ReadFails,
+            ReplayBreak::FirstNamedUnit,
+        )
+        .expect("落点")
+        .expect("有点名单元");
+        let run = run_instrumented_mount_writable(&history.pool, &parameters, &both, None, None);
+        assert!(run.intercepted_reads[0] > 0, "根槽拦到了");
+        assert!(run.intercepted_reads[1] > 0, "第一份拦到了");
+        assert_eq!(run.intercepted_reads[2], 0, "第二份一次都没读");
+        let first = unreadable_ranges_of_the_abandonment(
+            &history,
+            &geometry,
+            1,
+            UnreadableForm::ReadFails,
+            ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+        )
+        .expect("落点")
+        .expect("有点名单元");
+        let run = run_instrumented_mount_writable(&history.pool, &parameters, &first, None, None);
+        let mounted = run.result.as_ref().expect("挂载做成");
+        assert_eq!(
+            root_pair(&mounted.output.chosen_root),
+            history.timeline[history.timeline.len() - 2]
+        );
+        assert_eq!(
+            abandoned_roots_on(&run.pool_after).expect("S5 不停"),
+            BTreeSet::from([tip_of(&history)]),
+            "只坏第一份，最新那条根就被抛弃"
+        );
+    }
+
+    fn tip_of(history: &SecondRunHistory) -> TimelineRoot {
+        history.tip()
+    }
+
+    /// 第 2 次跑修订第 2 条的依据（H1d 的 n1 从 0 起）：写行那次发布在它的根落盘之前写的单元，n1 = 0 时盖到被藏的首个文件那条根引用的单元，
+    /// n1 = 1 时一处都不盖（开的是更高的新段）。
+    #[test]
+    fn the_row_publish_before_its_root_overwrites_the_hidden_newest_root_only_when_it_is_the_first_file(
+    ) {
+        let parameters = parameters_for(&GEOMETRY_PRIMARY);
+        let mut overwritten_by_overwrites = Vec::new();
+        for overwrites in [0u64, 1] {
+            let history = closed_history(overwrites);
+            let geometry = independent_geometry(&history.pool).expect("几何");
+            let (_, tip_record) = landing_root_on(&history.pool).expect("择根");
+            let tip_units =
+                placements_referenced_by_root_on(&history.pool, &tip_record).expect("账");
+            let ranges = unreadable_ranges_of_the_abandonment(
+                &history,
+                &geometry,
+                1,
+                UnreadableForm::ReadsZeros,
+                ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+            )
+            .expect("落点")
+            .expect("有点名单元");
+            let reference =
+                run_instrumented_mount_writable(&history.pool, &parameters, &ranges, None, None);
+            let first_root_write = index_of_the_first_root_slot_write(
+                &reference.applied,
+                &root_slot_device_offsets(&geometry),
+                u64::from(geometry.physical_block_size),
+            )
+            .expect("写行那次发布写了根");
+            let post =
+                image_with_the_first_writes(&history.pool, &reference.applied, first_root_write);
+            overwritten_by_overwrites.push(placements_overwritten_between(
+                &history.pool,
+                &post,
+                &tip_units,
+            ));
+            assert_eq!(
+                landing_root_on(&post).expect("择根").0,
+                history.tip(),
+                "根没落盘，恢复仍落到被藏的那条"
+            );
+        }
+        assert!(
+            overwritten_by_overwrites[0] > 0,
+            "n1 = 0：{overwritten_by_overwrites:?}"
+        );
+        assert_eq!(
+            overwritten_by_overwrites[1], 0,
+            "n1 = 1：{overwritten_by_overwrites:?}"
+        );
+    }
+
+    /// 7.1 第六行「今天 = 丙」：新实例第一次发布的 txg = 装置按这次读得出的根与记录算的 max + 1——不藏、藏最新根与它的记录、
+    /// 只藏最新根而记录读得出三种都对得上。
+    #[test]
+    fn first_txg_by_the_rule_of_today_matches_the_row_publish_of_the_mount() {
+        let parameters = parameters_for(&GEOMETRY_PRIMARY);
+        let history = closed_history(1);
+        let geometry = independent_geometry(&history.pool).expect("几何");
+        let mut observed = Vec::new();
+        for ranges in [
+            Vec::new(),
+            unreadable_ranges_of_the_abandonment(
+                &history,
+                &geometry,
+                1,
+                UnreadableForm::ReadFails,
+                ReplayBreak::EveryRecord,
+            )
+            .expect("落点")
+            .expect("有记录"),
+            unreadable_ranges_of_the_abandonment(
+                &history,
+                &geometry,
+                1,
+                UnreadableForm::ReadFails,
+                ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+            )
+            .expect("落点")
+            .expect("有点名单元"),
+        ] {
+            let run =
+                run_instrumented_mount_writable(&history.pool, &parameters, &ranges, None, None);
+            let row_txg = run
+                .result
+                .as_ref()
+                .expect("挂载做成")
+                .output
+                .row_publish
+                .root()
+                .checkpoint_txg
+                .0;
+            assert_eq!(
+                row_txg,
+                first_txg_by_the_rule_of_today(&history.pool, &geometry, &ranges)
+            );
+            observed.push(row_txg);
+        }
+        let tip_txg = history.tip().1;
+        assert_eq!(observed, vec![tip_txg + 1, tip_txg, tip_txg + 1]);
+    }
+
+    /// Q1-0 的最小复现（前提 1）：藏最新两条根、断第二新那条的记录，挂载做成、那两条被按新实例表判抛弃（装置与 crates 一致）；
+    /// 只藏一条、断它自己的记录时，新实例第一次发布的 txg 恰与被藏那条相同、落进同一个根槽，被藏那条就不在了（抛弃集合为空）。
+    #[test]
+    fn abandonment_step_produces_abandoned_roots_from_two_hidden_roots_and_none_from_one_with_its_records(
+    ) {
+        let parameters = parameters_for(&GEOMETRY_PRIMARY);
+        let history = closed_history(1);
+        let geometry = independent_geometry(&history.pool).expect("几何");
+        let count = history.timeline.len();
+        let two = unreadable_ranges_of_the_abandonment(
+            &history,
+            &geometry,
+            2,
+            UnreadableForm::ReadFails,
+            ReplayBreak::EveryRecord,
+        )
+        .expect("落点")
+        .expect("有记录");
+        let run = run_instrumented_mount_writable(&history.pool, &parameters, &two, None, None);
+        assert!(run.result.is_ok());
+        assert_eq!(
+            abandoned_roots_on(&run.pool_after).expect("S5 不停"),
+            BTreeSet::from([history.timeline[count - 2], history.timeline[count - 1]])
+        );
+        let one = unreadable_ranges_of_the_abandonment(
+            &history,
+            &geometry,
+            1,
+            UnreadableForm::ReadFails,
+            ReplayBreak::EveryRecord,
+        )
+        .expect("落点")
+        .expect("有记录");
+        let run = run_instrumented_mount_writable(&history.pool, &parameters, &one, None, None);
+        let mounted = run.result.as_ref().expect("挂载做成");
+        assert_eq!(
+            mounted.output.row_publish.root().checkpoint_txg.0,
+            history.tip().1
+        );
+        assert!(abandoned_roots_on(&run.pool_after)
+            .expect("S5 不停")
+            .is_empty());
+    }
+
+    /// 关闭 U（登记第九节 M16 的反面）：正常卸载把每块盘最新系统配置里的 F 抬到卸载之前现行那一版的 txg，推 2 或 3 次空发布（7.1 第四行）。
+    #[test]
+    fn normal_unmount_raises_the_floor_to_the_current_txg_and_pushes_the_unmount_publishes() {
+        let parameters = parameters_for(&GEOMETRY_PRIMARY);
+        let mut history = second_run_start(&GEOMETRY_PRIMARY, 1).expect("历史");
+        let before = history.timeline.len();
+        let before_txg = history.tip().1;
+        second_run_close(
+            &mut history,
+            &parameters,
+            Closing::NormalUnmount,
+            "test",
+            "test",
+        )
+        .expect("卸载");
+        let pushed = history.timeline.len() - before;
+        assert_eq!(pushed, if before_txg % 3 == 1 { 3 } else { 2 });
+        let slot_spacing = u64::from(parameters.geometry.fixed_structure_slot_spacing);
+        assert_eq!(
+            highest_floor_in_the_system_configurations(&history.pool, slot_spacing),
+            before_txg
+        );
+        assert!(history.session.is_none());
+    }
+
+    /// 两条沿用的单测从 H1c 抛弃步造出的节点里挑被抛弃根（跑前登记第一节处理表：「改从 H1c 的 PC1-a 构造取（同一个落点选法）」）。
+    fn abandonment_step_nodes() -> Vec<(MemoryPool, BTreeSet<TimelineRoot>)> {
+        abandonment_step_node_list(&GEOMETRY_PRIMARY)
+            .into_iter()
+            .map(|node| (node.pool, node.abandoned))
+            .collect()
     }
 }

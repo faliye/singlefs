@@ -331,35 +331,6 @@ pub fn disk_snapshot(image: &MemoryPool, stream: &SharedStream) -> DiskSnapshot 
     }
 }
 
-/// 把 `device` 那块盘上两个系统配置槽里的回退见证表换成 `table`（整槽校验和重封；写进内存镜像，不经写者）：
-/// 造见证表的坏镜像用（`second_transaction_supplement_two_rollback_witness.rs`、`checker_known_bad_images.rs`）。
-pub fn replace_the_witness_on_one_device(
-    image: &mut MemoryPool,
-    device: DeviceIdentity,
-    table: singlefs_core::rollback_witness::RollbackWitnessTable,
-) {
-    let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
-    let slot_bytes =
-        usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
-    for offset in [0, spacing] {
-        let bytes = singlefs_core::recovery::PoolReader::read(
-            &*image,
-            device,
-            singlefs_core::address::DeviceOffsetInBytes(offset),
-            slot_bytes,
-        )
-        .expect("系统配置槽读得到");
-        let mut system_configuration =
-            singlefs_core::system_configuration::SystemConfiguration::parse_slot(&bytes)
-                .expect("自证过");
-        system_configuration.rollback_witness = table;
-        image.devices.get_mut(&device).expect("有这块盘").write(
-            singlefs_core::address::DeviceOffsetInBytes(offset),
-            &system_configuration.to_slot(),
-        );
-    }
-}
-
 /// 第一个事务之后，在同一个进程里对同一个文件覆盖写一次（发布 B 起的每一次覆盖写走这一条）：
 /// 错误原样交回，要不要 `expect` 由调用方定。
 pub fn publish_overwrite_in_process(
@@ -443,4 +414,83 @@ pub fn build_pool(tag: &str) -> BuiltPool {
         allocator,
         mkfs_operation_count,
     }
+}
+
+/// 崩溃恢复造出一条被抛弃的根（第一轮判决 H6 那一形；D23（journal 的角色与格式） 已定项 14 射程：影子账与按实例表判抛弃留着，
+/// 理由是崩溃恢复）：进程退出之后，`newest`（根环里最新的那条根那一版）的根槽与它的数据单元（两份）暂时读不出（暂存、清零），
+/// 重开可写挂载——择根落到它前一条根，它那条记录施加前验点名单元失败、不施加；新实例写行与暖机。再把暂存的字节原样写回：
+/// `newest` 的根又读得出，按新实例的实例表判是被抛弃的。池换成那次挂载交回的分配器与现行版本（要带文件），交回那次挂载——
+/// 它看不见 `newest`，影子账隔离 0；之后的挂载才看得见。
+pub fn abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(
+    pool: &mut BuiltPool,
+    newest: &TransactionOutput,
+) -> singlefs_core::mount::Mounted {
+    use singlefs_core::block_device::{BlockDevice, WriteDurability};
+    let publish_parameters = parameters();
+    let target = singlefs_core::root_ring::target_for_publish(
+        newest.root.checkpoint_txg,
+        publish_parameters.geometry.root_ring_slots_per_region,
+    );
+    let root_slot_device =
+        publish_parameters.region_devices[usize::try_from(target.region).expect("区域号")];
+    let root_slot_offset = singlefs_core::root_ring::slot_offset(
+        target,
+        publish_parameters.geometry.fixed_structure_slot_spacing,
+    );
+    let root_slot_bytes =
+        usize::try_from(publish_parameters.geometry.physical_block_size).expect("根槽宽");
+    let data_unit_bytes = usize::try_from(singlefs_format::DATA_UNIT_BYTES).expect("32768");
+    fn index_of_device(devices: &[(DeviceIdentity, Recorded)], identity: DeviceIdentity) -> usize {
+        devices
+            .iter()
+            .position(|(candidate, _)| *candidate == identity)
+            .expect("池里有这块盘")
+    }
+    let mut devices = pool.reopen_recorded();
+    let places_to_hide = std::iter::once((root_slot_device, root_slot_offset, root_slot_bytes))
+        .chain(
+            newest
+                .data_pointers
+                .iter()
+                .flat_map(|pointer| pointer.locations)
+                .map(|location| {
+                    (
+                        location.device,
+                        location.slot.to_device_offset(),
+                        data_unit_bytes,
+                    )
+                }),
+        );
+    let mut saved: Vec<(
+        DeviceIdentity,
+        singlefs_core::address::DeviceOffsetInBytes,
+        Vec<u8>,
+    )> = Vec::new();
+    for (identity, offset, length) in places_to_hide {
+        let index = index_of_device(&devices, identity);
+        let mut bytes = vec![0u8; length];
+        devices[index].1.read_at(offset, &mut bytes).expect("暂存");
+        devices[index]
+            .1
+            .write_at(offset, &vec![0u8; length], WriteDurability::Plain)
+            .expect("清零");
+        saved.push((identity, offset, bytes));
+    }
+    let mounted = singlefs_core::mount::mount_writable(&publish_parameters, &mut devices)
+        .expect("最新那条根与它的数据单元读不出：择根落到前一条根，照常可写挂载");
+    for (identity, offset, bytes) in &saved {
+        let index = index_of_device(&devices, *identity);
+        devices[index]
+            .1
+            .write_at(*offset, bytes, WriteDurability::Plain)
+            .expect("原样写回");
+    }
+    pool.devices = Some(devices);
+    pool.allocator = mounted.allocator.clone();
+    pool.output = mounted
+        .current
+        .file_version()
+        .expect("落到的那一版带文件")
+        .clone();
+    mounted
 }

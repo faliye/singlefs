@@ -37,12 +37,13 @@ use crate::extent_tree::{
 use crate::pointer::{DataPointer, LocationEntry, NodePointer};
 use crate::records::{
     mapping_key_for_data, parse_inode_internal_entry, parse_mapping_entry, InodeRecord,
-    TreeTableEntry, TREE_KIND_EXTENT, TREE_KIND_INODE,
+    TREE_KIND_EXTENT, TREE_KIND_INODE,
 };
 use crate::recovery::{
     choose_root, choose_system_configuration, read_mapped_tree_node_via_hint_then_central_mapping,
-    read_mapped_tree_root, read_unit_via_locations, replay_journal, rollback_high_water_of_root,
-    scan_journal, JournalScanReport, MappedTreeNodeClass, PoolReader, RecoveryFailure,
+    read_mapped_tree_root, read_unit_via_locations, replay_journal, scan_journal,
+    tree_table_entries_each_kind_at_most_once, JournalScanReport, MappedTreeNodeClass, PoolReader,
+    RecoveryFailure, TreeTableEntriesRefusal,
 };
 use crate::root_record::RootRecord;
 use crate::transaction::MultiLevelCodeTwoTree;
@@ -50,7 +51,7 @@ use crate::unit::{
     data_unit_payload, data_unit_payload_capacity, parse_data_unit, parse_index_node,
     parse_packed_unit, unit_filesystem_identifier, DataUnitHeader, UnitError, PACKED_TYPE_INODE,
 };
-use crate::write_request_split::data_unit_count_of_a_sequential_write;
+use crate::write_request_split::{data_unit_count_implied_by_the_file_size, DataUnitsOfTheInode};
 
 /// extent 叶记录 key 三段各 8 字节里 inode 那一段的起点（D8（核心索引结构） 已定项 3 的 (locality_id, inode, offset)）。
 const EXTENT_KEY_INODE_SEGMENT_OFFSET_IN_BYTES: usize = 8;
@@ -185,6 +186,7 @@ struct CentralMappingEntryInMountState {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OpenPoolForReadFailure {
     /// 沿根记录读树表、树根、inode 叶容器时判红的那一条：与冷启动走读（`recovery::walk_to_file`）同一套口径。
+    /// 树表里同一种树有两条也报在这里（`recovery::TREE_TABLE_CARRIES_ONE_KIND_OF_TREE_TWICE`），与读树表的别的几处报同一条。
     Walk(RecoveryFailure),
     /// 树表 0 条：这一版还没发布过文件版本，一个文件都打不开（不是坏盘）。
     TreeTableHasNoEntries,
@@ -396,13 +398,16 @@ pub fn open_pool_for_read(
     if tree_table.entries.is_empty() {
         return Err(OpenPoolForReadFailure::TreeTableHasNoEntries);
     }
-    let mut tree_table_entries = Vec::with_capacity(tree_table.entries.len());
-    for entry_bytes in &tree_table.entries {
-        tree_table_entries.push(
-            TreeTableEntry::parse(entry_bytes)
-                .ok_or(OpenPoolForReadFailure::TreeTableEntryMalformed)?,
-        );
-    }
+    // 同一种树有两条判损坏，与冷启动走读、重建上一版同一处判定（审阅第 27 条）：不取首条非空的那一条。
+    let tree_table_entries = tree_table_entries_each_kind_at_most_once(&tree_table.entries)
+        .map_err(|refusal| match refusal {
+            TreeTableEntriesRefusal::EntryMalformed => {
+                OpenPoolForReadFailure::TreeTableEntryMalformed
+            }
+            TreeTableEntriesRefusal::OneKindOfTreeAppearsTwice => {
+                OpenPoolForReadFailure::Walk(RecoveryFailure::from(refusal))
+            }
+        })?;
     let entry_of_kind = |kind: u16| {
         tree_table_entries
             .iter()
@@ -557,7 +562,6 @@ pub fn mount_read_only(reader: &dyn PoolReader) -> Result<MountedReadOnly, Mount
         system_configuration.immutable.sizes.journal_ring_bytes,
         &records,
         true,
-        rollback_high_water_of_root(reader, &chosen_root),
     )
     .map_err(MountReadOnlyFailure::Recovery)?;
     let mounted =
@@ -646,6 +650,13 @@ impl MountedPoolForRead {
                 .map_err(OpenFileFailure::ExtentTreeWalk)?;
         // 上段每一层读一个节点（叶那一片在内），所以上段的高就是这一路读的上段节点数。
         let upper_height = upper_nodes_read;
+        let data_units_of_the_inode = match entry.map(|found| found.target) {
+            None | Some(ExtentUpperLeafTarget::NoDataUnit) => DataUnitsOfTheInode::NoneWritten,
+            Some(
+                ExtentUpperLeafTarget::InlineDataUnit(_)
+                | ExtentUpperLeafTarget::LowerSegmentRoot(_),
+            ) => DataUnitsOfTheInode::SomeWritten,
+        };
         let (data_pointers, lower_height, lower_leaves): (Vec<(u64, DataPointer)>, u64, u64) =
             match entry.map(|found| found.target) {
                 None | Some(ExtentUpperLeafTarget::NoDataUnit) => (Vec::new(), 0, 0),
@@ -710,10 +721,10 @@ impl MountedPoolForRead {
                 );
             }
         }
-        // 文件没有洞、尾巴上也没有多出来的记录：读侧与写侧用同一条除法算单元数，
-        // 不在这里另写一个（`write_request_split::data_unit_count_of_a_sequential_write`）。
+        // 文件没有洞、尾巴上也没有多出来的记录：写过内容的与写侧用同一条除法算单元数，一次都没写过的长度 0 就是 0 个
+        // （`write_request_split::data_unit_count_implied_by_the_file_size`），不在这里另写一个。
         let data_units_implied_by_the_file_size =
-            data_unit_count_of_a_sequential_write(inode_record.size);
+            data_unit_count_implied_by_the_file_size(inode_record.size, data_units_of_the_inode);
         let extent_records = u64::try_from(data_unit_records.len()).expect("记录条数");
         if extent_records != data_units_implied_by_the_file_size {
             return Err(OpenFileFailure::ExtentRecordCountDoesNotMatchTheFileSize {
@@ -1092,7 +1103,7 @@ mod tests {
 
     /// 一个字节的读只碰一个单元，边界上那个字节归后一个单元（净荷容量是第一个单元的末字节之后）。
     #[test]
-    fn a_single_byte_read_covers_exactly_one_unit_and_the_boundary_byte_belongs_to_the_next_unit() {
+    fn single_byte_read_covers_exactly_one_unit_and_the_boundary_byte_belongs_to_the_next_unit() {
         let single_byte = |file_byte: u64| {
             data_unit_span_covering(FileOffsetInBytes(file_byte), FileOffsetInBytes(file_byte))
         };

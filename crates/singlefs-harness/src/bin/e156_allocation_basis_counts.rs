@@ -1,17 +1,19 @@
-//! E156 重跑（第 2 次）：alloc-basis 四条岔路的代价数。第一段（岔路 7、defer 的检查）与它前置的 S1/锚点，
-//! 登记在 `research/prompts/e156-r2-prereg.md`「五、5.7」第一段。第二段（岔路 3、两个 F 的口径）与第三段
-//! （岔路 1、记账第 1 项与洞）仍是**缩小范围版**：第二段（HF）只在 S = 8（mkfs 默认）、ρ = 1 一个几何取样点
-//! 上跑一条代表性历史，不是登记「五、5.2」HF 的 18 格全扫；第三段（Hh）在 ρ = 1、回收时点「实」、洞位置
-//! 「后」固定的前提下，S 这一维跑了 S = 8（mkfs 默认）与 S = 4（下界，方向相反）两个取样点、k ∈ {0, 1, 2}，
-//! 不是 S ∈ {4, 8, 16} × ρ ∈ {1, 1/4} × (k, 位置) 的全部取样点组合——
-//! 缩小范围的理由与还差什么写在 `research/prompts/e156-r2-prereg.md` 的「修订」与交回报告里，不在这里重复。
-//! 只读驱动 `singlefs-core` / `singlefs-checker` 的公开入口（mkfs、暖机、第一个事务、覆盖写、空发布、
-//! 可写挂载、管理员回退、抬回退下界），不改这两个 crate 的生产代码；产物按 `E7RESULT` 行打印，复跑登记在
-//! `research/scripts/replay.sh`。
+//! E156（alloc-basis 四条岔路的代价数） 第 4 次重跑（登记 `research/prompts/e156-r4-prereg.md`）：回退改成挂着时的一次向前发布、
+//! 挂载内回收、准入改式之后，岔路单第 1 行（记账第 1 项与 I-3.1（已分配统计对得上） 的形态，环上有洞怎么办）的代价数，
+//! 连同问题单第一节三个前提在这个装置上的最小复现。
 //!
-//! R3（G27 改读镜像）：这一版 G27 的判定统一由 [`allocated_minus_deferred_mismatches_referenced`] 给出，只解析**镜像字节**（记账树叶里的
-//! 统计量行），不读内存里的 `PoolAllocator`；`allocated_minus_deferred_matches_referenced` 保留成内存读法，
-//! 只给 U8 的变异反面用（`crates/mutations.tsv` M21）。
+//! - 第一段（登记第五节 5.5）：PQ1-前 / PQ1-后（前提 1：记录已持久、根槽没持久的崩溃之后可写挂载，环上出洞）与 PC-c2、
+//!   PQ2（前提 2：抬 F 那一串里 F_生效 什么时候取到新值）、G-adm（前提 3 的间接影响）、U11 与 U13 的新形态（管理员回退是挂着时的
+//!   一次向前发布）。第一段的停机条款（SP1、S1、S12）任一触发，第二段不跑。
+//! - 第二段：Hh(k, 位置, S, ρ) 38 条排得下的历史，每条在「实」（真实分配器）与「每」（每次发布之前按谓词现算）两个回收时点上
+//!   量甲-T1 与 G12 两条臂的多扣（Q1a、Q1b）与它们的差 Δ，按洞的计数分组判（Q1c、Q1c-洞、Q1c-前、Q1c-后、Q1d）。
+//!
+//! 只读驱动 `singlefs-core` / `singlefs-checker` 的公开入口，不改这两个 crate 的生产代码；产物按 `E7RESULT` 行打印，复跑登记在
+//! `research/scripts/replay.sh`。洞的 txg、挂载做完的 txg、终点 txg 从本地 S 与装置里的锚点模型（[`anchor_model`]，登记第七节 7.2
+//! 命令四 `anchors_e156_r4.py` 的逐行移植）算，不从 `crates/` 算；装置跑的时候从盘上现量，两边比。
+//!
+//! 判定写在装置里（[`judge_peak_against_threshold`] 那一组函数，单测 U18），不另写 Python 判定脚本：执行员的写范围不含
+//! `research/scripts/` 与门禁 47 号，理由与改动记在登记第十二节。
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -20,22 +22,25 @@ use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
 };
-use singlefs_core::allocator::{
-    DeviceFreeMap, Placement, PoolAllocator, ReclaimedReuse, ReuseWindow,
-};
+use singlefs_core::allocator::{AllocationRecord, DeviceFreeMap, Placement, PoolAllocator};
 use singlefs_core::block_device::{BlockDevice, PhysicalBlockSizeInBytes};
 use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
 use singlefs_core::journal::back_chain_of;
 use singlefs_core::make_filesystem::{
-    make_filesystem, MakeFilesystemParameters, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
+    allocator_after_make_filesystem, make_filesystem, MakeFilesystemOutput,
+    MakeFilesystemParameters,
 };
 use singlefs_core::mount::{
-    mount_rollback, mount_writable, raise_rollback_floor, reclaim_floor, MountError,
-    RollbackTarget, ShadowLedger,
+    mount_writable, raise_rollback_floor_to_the_admission_ceiling, roll_back_by_a_forward_publish,
+    MountSpaceAdmission, RaiseToTheAdmissionCeiling, RollbackTarget, ShadowLedger,
 };
 use singlefs_core::recovery::{
-    choose_system_configuration, effective_rollback_floor, readable_roots, scan_journal, PoolReader,
+    allocation_records_under_root, choose_system_configuration, effective_rollback_floor,
+    instance_table_chain_of_root, read_root_ring_slot, readable_roots,
+    readable_roots_with_ring_slots, root_is_abandoned_by_the_instance_table, PoolReader,
+    RootRingSlotReading,
 };
+use singlefs_core::root_record::RootRecord;
 use singlefs_core::root_ring::{
     slot_offset, target_for_publish, RootRingSlot, RootRingSlotsPerRegion,
 };
@@ -45,10 +50,11 @@ use singlefs_core::transaction::{
     InstanceTablePlan, PoolWriter, PublishError, PublishPlan, TransactionOutput, TransactionUnit,
 };
 use singlefs_format::{
-    CLUSTER_SEGMENT_SLOTS, JOURNAL_RING_DEFAULT_BYTES, ROOT_RING_REGIONS, SLOT_BYTES,
-    UNIT_AREA_START_SLOT,
+    JOURNAL_RING_DEFAULT_BYTES, ROOT_RING_REGIONS, SLOT_BYTES, UNIT_AREA_START_SLOT,
 };
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
+use singlefs_harness::crash::{MemoryPool, SparseBlockDevice, SECTOR_BYTES};
+use singlefs_harness::segments::{FixedGeometry, StepKind};
+use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 /// E156 装置的固定 fsid：与别的 `eNNN` 装置各自独立取一份，登记在这里方便复跑时核对。
 const E156_FILESYSTEM_IDENTIFIER: [u8; 16] = [
@@ -58,26 +64,60 @@ const FIXED_WRITE_TIME_SECONDS: u64 = 1_788_000_000;
 const IMAGE_BYTES: u64 = 4 << 30;
 /// 一个单元的槽数（跨度 2 的数据单元 / inode 叶容器 / 实例表单元，登记「一」读法写死）。
 const INSTANCE_TABLE_SPAN_SLOTS: u64 = 2;
-/// 这个装置建的池的每区槽数 S：**本地常量**，值抄自 `.claude/kb/layout/01-first-txn.md` 一「系统配置字段表」
-/// 的「每区槽数 S」那一行（`| 几何 | 每区槽数 S | 1 | 8 |`）。
-///
-/// 不从 `crates/` 引它（`.claude/agents/experiment-runner.md` 入库装置第 ① 条）：装置的工作负载长度与实现的环长
-/// 是同一个 S 的两个下游，[`main`] 开头那条断言把它与实现侧现在真用的那个值（读自系统配置）回比。
+/// β0、U11、U13 那几段历史的每区槽数 S：**本地常量**，值抄自 `.claude/kb/layout/01-first-txn.md:138`「每区槽数 S」那一行
+/// （`| 几何 | 每区槽数 S | 1 | 8 |`）。[`main`] 开头那条断言把它与实现侧 mkfs 默认回比。
 const E156_SLOTS_PER_REGION: u64 = 8;
+/// 岔路 1 的 S 三个取样点（第 4 次重跑登记表头第 1 行，全部都跑）：值抄自 `.claude/kb/decisions/22-单元原子性怎么合成.md:58`
+/// 「每区槽数 S」那一行（下界 4、上界 16，「4..16 之间取值」）与 `.claude/kb/layout/01-first-txn.md:138`（mkfs 写 8）。
+/// [`main`] 开头回比实现侧的上下界与 mkfs 默认；每格另核「系统配置里读回来的 S = 本地值」（K8）。
+const E156_SLOTS_PER_REGION_SAMPLING_POINTS: [u64; 3] = [4, 8, 16];
+const E156_SLOTS_PER_REGION_MINIMUM: u64 = 4;
+const E156_SLOTS_PER_REGION_MAXIMUM: u64 = 16;
+/// 区域设备（登记表头第 2 行，D22（单元原子性怎么合成） 已定项 1 的区域归属 [0, 1, 0]）；[`main`] 开头与 mkfs 参数回比。
+const E156_REGION_DEVICE_NUMBERS: [u32; 3] = [0, 1, 0];
+/// 区域数 R（登记表头第 2 行；`.claude/kb/decisions/22-单元原子性怎么合成.md:55`「区域数 R | 3」）：根环 3S 槽、U13 (a) 的 3N 次覆盖写都从它算；
+/// [`main`] 开头与 `singlefs_format::ROOT_RING_REGIONS` 回比。
+const E156_ROOT_RING_REGIONS: u64 = 3;
+/// 判据门槛（登记表头第 3 行）：一个跨度 2 的单元 2 槽、跨度 1 的单元 1 槽（原登记「一」读法写死「一个单元的槽数」行；
+/// D3（空间分配） 已定项 7 落点粒度一个 16 KiB 槽、跨度 1 或 2）。只住装置，没有实现侧的对应物，不回比。
+const E156_THRESHOLD_ONE_SPAN_TWO_UNIT_SLOTS: i64 = 2;
+const E156_THRESHOLD_ONE_SPAN_ONE_UNIT_SLOTS: i64 = 1;
 /// A1：单元区起点槽号。抄自 D3（空间分配） 已定项 7 依据表「落点」行（`.claude/kb/decisions/03-空间分配.md`；
-/// D18（块里携带什么信息） 已定项 9 逼出的粒度）与 `crates/singlefs-format` 的同名常量——下面第一条断言把它与
+/// D18（块里携带什么信息） 已定项 9 逼出的粒度）与 `crates/singlefs-format` 的同名常量——[`main`] 第一条断言把它与
 /// `UNIT_AREA_START_SLOT` 回比。
 const E156_UNIT_AREA_START_SLOT: u64 = 50176;
 /// A7：分配记录节点容量。抄自 `research/prompts/e156-r2-prereg.md` 表头「分配记录节点容量」行的算式
 /// `⌊(16384 − 135) ÷ 20⌋`；节点头 135 字节 = 86（固定头）+ 2 × 10（子节点指针，容量算式的一部分）+ 29（其余头字段）。
 const E156_ALLOCATION_RECORD_NODE_HEADER_BYTES: u64 = 86 + 2 * 10 + 29;
 const E156_ALLOCATION_RECORD_BYTES: u64 = 20;
-/// S1(f)：第一个事务之后的分配记录条数。E156 第 3 次重跑登记「七」7.2 K1-2（分配记录树按位置寻址之后，
-/// 五个树节点各占一条记录，28 = 2 × 14）；不再是登记第一、二版的 20（那时树只占 1 条记录）。
+/// S1(f)：第一个事务之后的分配记录条数（E156 第 3 次重跑登记「七」7.2 K1-2：28 = 2 × 14）。
 const E156_FIRST_TRANSACTION_EXPECTED_RECORD_COUNT: usize = 28;
-/// R-3 本地常量①：分配记录树叶宽 W。**本地常量，值抄自 kb，不从 `crates/` 引**（`.claude/agents/
-/// experiment-runner.md` 入库装置第 ① 条）：抄自 `.claude/kb/decisions/08-核心索引结构.md:251`
-/// `<!-- format-const: ALLOCATION_RECORD_TREE_LEAF_SLOTS = 812 -->`。下面 `anchor_a_d8` 那一行把它
+/// K1-1（第 3 次重跑登记「七」7.2，第 4 次重跑登记第十三节命令三重跑逐行相同）：第一个事务之后 D0 记账第 1 项 17 槽、第 5 项 1 槽。
+const E156_FIRST_TRANSACTION_ITEM1_SLOTS: u64 = 17;
+const E156_FIRST_TRANSACTION_ITEM5_SLOTS: u64 = 1;
+/// K1-1 的落点表（同一条命令三的输出 `first_txn = [...]`，按 (槽, 跨度) 升序）：数据 2、extent 1、inode 叶 2、inode 根 1、
+/// 分配记录树 5 个节点各 1、记账 1、映射 1、树表 1。
+const E156_FIRST_TRANSACTION_PLACEMENTS: [(u64, u64); 12] = [
+    (50180, 2),
+    (50240, 1),
+    (50242, 2),
+    (50244, 1),
+    (50245, 1),
+    (50246, 1),
+    (50247, 1),
+    (50248, 1),
+    (50249, 1),
+    (50250, 1),
+    (50251, 1),
+    (50252, 1),
+];
+/// R-4（第 3 次重跑登记「七」7.2，命令三重跑逐行相同）：Hh(0, —, S = 8, ρ = 1) 前 4 次覆盖写（环还没转过）每次 D0 释放 14 槽、
+/// D0 + D1 记录 + 24。
+const E156_OVERWRITES_CHECKED_BEFORE_THE_RING_WRAPS: u64 = 4;
+const E156_OVERWRITE_RELEASED_SLOTS_BEFORE_THE_RING_WRAPS: u64 = 14;
+const E156_OVERWRITE_RECORD_DELTA_BEFORE_THE_RING_WRAPS: u64 = 24;
+/// R-3 本地常量①：分配记录树叶宽 W。**本地常量，值抄自 kb，不从 `crates/` 引**：抄自 `.claude/kb/decisions/08-核心索引结构.md:251`
+/// `<!-- format-const: ALLOCATION_RECORD_TREE_LEAF_SLOTS = 812 -->`。[`main`] 里 `anchor_a_d8` 那一行把它
 /// 与 `singlefs_format::ALLOCATION_RECORD_TREE_LEAF_SLOTS` 回比（只观测，F21：对不上不作废、不停机）。
 const E156_ALLOCATION_RECORD_TREE_LEAF_SLOTS: u64 = 812;
 /// R-3 本地常量②：分配记录树内部扇出 F。抄自 `.claude/kb/decisions/08-核心索引结构.md:254`
@@ -85,12 +125,16 @@ const E156_ALLOCATION_RECORD_TREE_LEAF_SLOTS: u64 = 812;
 const E156_ALLOCATION_RECORD_TREE_INTERNAL_FANOUT: u64 = 169;
 /// R-3：一次覆盖写里，非分配记录树自身的「其余单元」在 D0 上的释放槽数（E156 第 3 次重跑登记「七」7.2
 /// R-3：数据 2 + extent 1 + inode 叶 2 + inode 根 1 + 记账 1 + 映射 1 + 树表 1 = 9）。
+/// R-3 这一族闭式与它们的函数只剩单测 U10、U12 与 PC-闭式在用（第 4 次重跑的 `main` 不跑 H0），编成只在测试里有。
+#[cfg(test)]
 const E156_OVERWRITE_OTHER_UNITS_RELEASED_SLOTS: u64 = 9;
 /// R-3：同一批「其余单元」里会产生新分配记录条目的槽数（不含数据：数据槽被 `data_slot()` 复用同一个
 /// 已有的记录条目，不产生新条目，登记「七」7.2 R-4 的算术）。
+#[cfg(test)]
 const E156_OVERWRITE_OTHER_UNITS_NEW_RECORD_SLOTS: u64 = 7;
 /// R-3：一次空发布里，非分配记录树自身的「其余单元」（记账 1 + 映射 1 + 树表 1 = 3，三者都走 bump、
 /// 每次都是新槽，释放与新增同值，登记「七」7.2 R-5）。
+#[cfg(test)]
 const E156_EMPTY_PUBLISH_OTHER_UNITS_SLOTS: u64 = 3;
 
 fn parameters() -> MakeFilesystemParameters {
@@ -107,9 +151,7 @@ fn parameters() -> MakeFilesystemParameters {
     }
 }
 
-/// 「五、5.6」几何敏感性第六类：**S** 这一维的另一个取样点（方向与 mkfs 默认 8 相反，取下界 4）。
-/// 除 `root_ring_slots_per_region` 外与 [`parameters`] 逐字段相同——S 走 mkfs 参数（登记「三」I10），
-/// 不必在仓副本里改常量重编。
+/// 岔路 1 的 S 这一维：除 `root_ring_slots_per_region` 外与 [`parameters`] 逐字段相同——S 走 mkfs 参数，不必在仓副本里改常量重编。
 fn parameters_with_slots_per_region(count: u64) -> MakeFilesystemParameters {
     let slots_per_region = RootRingSlotsPerRegion::from_system_configuration_field(count)
         .expect("S 落在 4..16 闭区间");
@@ -126,6 +168,17 @@ fn parameters_with_slots_per_region(count: u64) -> MakeFilesystemParameters {
     }
 }
 
+fn new_pool_devices() -> Vec<(DeviceIdentity, SparseBlockDevice)> {
+    (0..2u32)
+        .map(|number| {
+            (
+                DeviceIdentity(number),
+                SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
+            )
+        })
+        .collect()
+}
+
 // ============================================================================================
 // R-3（E156 第 3 次重跑登记「七」7.2）：分配记录树按位置寻址之后，节点数不再是常数，只能从「这次发布
 // 实际改动的记录的槽号」现算。这一段只用 [`E156_ALLOCATION_RECORD_TREE_LEAF_SLOTS`] /
@@ -135,17 +188,20 @@ fn parameters_with_slots_per_region(count: u64) -> MakeFilesystemParameters {
 // ============================================================================================
 
 /// 一个槽所在的分配记录树叶位置 ⌊s ÷ W⌋（本地常量 W）。
+#[cfg(test)]
 fn e156_leaf_position_of_slot(slot: u64) -> u64 {
     slot / E156_ALLOCATION_RECORD_TREE_LEAF_SLOTS
 }
 
 /// 一个叶位置所在的层级 1 位置 ⌊k ÷ F⌋（本地常量 F）。
+#[cfg(test)]
 fn e156_level1_position_of_leaf(leaf: u64) -> u64 {
     leaf / E156_ALLOCATION_RECORD_TREE_INTERNAL_FANOUT
 }
 
 /// R-3：一次发布里分配记录树自身新写的节点数 = `devices × 叶数 + devices × 层级 1 数 + 1`（根只有一份，
 /// 两块盘共享；叶与层级 1 逐盘各一份，登记「七」7.2 R-3 逐字）。
+#[cfg(test)]
 fn e156_allocation_record_tree_new_node_count(touched_leaves: &BTreeSet<u64>, devices: u64) -> u64 {
     let touched_level1: BTreeSet<u64> = touched_leaves
         .iter()
@@ -158,6 +214,7 @@ fn e156_allocation_record_tree_new_node_count(touched_leaves: &BTreeSet<u64>, de
 
 /// R-3：这次发布里被换下（COW 释放）的分配记录树旧节点数——只有这次触达、且这个位置在这次发布之前
 /// 已经有节点（叶位置 ∈ `existing_leaves`，或它的层级 1 位置 ∈ 现有层级 1 集合）的那些才会释放旧版本。
+#[cfg(test)]
 fn e156_allocation_record_tree_replaced_node_count(
     touched_leaves: &BTreeSet<u64>,
     existing_leaves: &BTreeSet<u64>,
@@ -180,7 +237,11 @@ fn e156_allocation_record_tree_replaced_node_count(
 
 /// R-3：D0 上这次发布之前，全部分配记录（不论已释放还是仍分配）所在的叶位置集合——「这个位置本来
 /// 有没有节点」的判据（D8（核心索引结构） 已定项 14「没有记录的一段 = 全空闲：那片叶不写」）。
-fn e156_existing_leaf_positions(allocator: &PoolAllocator, device: DeviceIdentity) -> BTreeSet<u64> {
+#[cfg(test)]
+fn e156_existing_leaf_positions(
+    allocator: &PoolAllocator,
+    device: DeviceIdentity,
+) -> BTreeSet<u64> {
     allocator
         .records()
         .iter()
@@ -192,6 +253,7 @@ fn e156_existing_leaf_positions(allocator: &PoolAllocator, device: DeviceIdentit
 /// R-3：D0 上这次发布翻成已释放或新加的全部记录所在的叶位置集合——真实记录的 `generation` 字段
 /// 在被触达的那一刻（无论新分配还是刚被释放）都改写成这次的 txg（D3（空间分配） 已定项 7 逐字），
 /// 用它筛出「这次改动的记录」不需要另外做前后快照 diff。
+#[cfg(test)]
 fn e156_touched_leaf_positions(
     allocator: &PoolAllocator,
     device: DeviceIdentity,
@@ -208,6 +270,7 @@ fn e156_touched_leaf_positions(
 /// R-3：一次发布（覆盖写或空发布）D0 释放槽数与 D0+D1 记录增量的闭式期望值。
 /// `existing_leaves`：这次发布之前 D0 上已有记录的叶位置集合；`touched_leaves`：这次发布之后
 /// D0 上 `generation == 本次 txg` 的记录所在的叶位置集合。
+#[cfg(test)]
 fn e156_closed_form_expected(
     existing_leaves: &BTreeSet<u64>,
     touched_leaves: &BTreeSet<u64>,
@@ -233,13 +296,6 @@ fn e156_closed_form_expected(
     )
 }
 
-/// R-7：一次推空发布（只改一片叶时）自己的固定点槽数——单设备的「新增记录」那一半，不乘 2（登记
-/// 「七」7.2 R-5「一次推空发布只改一片叶时的固定点 8 槽」，与 D0+D1 合计的记录增量相差一个 devices 因子）。
-fn e156_empty_publish_fixed_point_slots(existing_leaves: &BTreeSet<u64>) -> u64 {
-    E156_EMPTY_PUBLISH_OTHER_UNITS_SLOTS
-        + e156_allocation_record_tree_new_node_count(existing_leaves, 2)
-}
-
 /// R-3 本地常量③：根层级规则——最小的 R ≥ 1 使 Σ_盘 ⌈盘上槽数 ÷ (W × F^(R−1))⌉ ≤ F（D8（核心索引结构）
 /// 已定项 14「根罩整个 key 空间、按盘分流」那一行）。只用来与实装的 `AllocationRecordTreeGeometry`
 /// 回比（A-D8，只观测，F21：对不上不作废、不停机），不供 R-3 的节点数闭式使用。
@@ -256,28 +312,13 @@ fn e156_root_level_for_symmetric_devices(unit_area_slots_per_device: u64, device
     }
 }
 
-/// Q7d-1（R2 ⑤）：一组「这次发布自己的释放」样本的 (最小值, 最大值)——main() 与 U12 单测共用同一个
-/// 函数，M30（Q7d-1 覆盖写那一组退回字面 10）改这里，两处才会一起红。
+/// Q7d-1（R2 ⑤）：一组「这次发布自己的释放」样本的 (最小值, 最大值)——U12 单测用它，M30（Q7d-1 覆盖写那一组退回字面 10）改这里。
+#[cfg(test)]
 fn e156_minimum_and_maximum(samples: &[u64]) -> (u64, u64) {
     (
         samples.iter().min().copied().unwrap_or(0),
         samples.iter().max().copied().unwrap_or(0),
     )
-}
-
-/// R-7：一块盘开放聚簇段里当前的空闲槽数（登记「五」5.1 HY「e ≥ max(8, f)」的 e）。
-fn e156_open_segment_free_slots(allocator: &PoolAllocator, device: DeviceIdentity) -> u64 {
-    let Some(open_segment_start) = allocator.open_segment() else {
-        return 0;
-    };
-    let device_map = allocator
-        .devices
-        .iter()
-        .find(|map| map.device == device)
-        .expect("这块盘在池里");
-    (0..CLUSTER_SEGMENT_SLOTS)
-        .filter(|offset| device_map.is_free(SlotNumber(open_segment_start.0 + offset)))
-        .count() as u64
 }
 
 /// 覆盖写第 `step` 次的文件内容：定长 3000 字节，字节序列随 `step` 变，保证每次覆盖写都改变用户可见状态（骨架发布 的 O）。
@@ -302,8 +343,7 @@ impl Emitter {
     }
 }
 
-/// 一块盘的记账第 1/2/5 项，槽数：直接读真实 `PoolAllocator`。只给 S1/Q7d-1 的「这一刻分配器自己的账」用，
-/// **不给 G27 用**（G27 一律读镜像，见 [`allocated_minus_deferred_mismatches_referenced`]）。
+/// 一块盘的记账第 1/2/5 项，槽数：直接读真实 `PoolAllocator`（K1-1 与单测用）。
 fn accounting_row_slots(allocator: &PoolAllocator, device: DeviceIdentity) -> (u64, u64, u64) {
     let map = allocator
         .devices
@@ -337,6 +377,7 @@ fn referenced_slots(current: &TransactionOutput) -> u64 {
 
 /// 内存读法（R3 的反面）：只给 `crates/mutations.tsv` 的 M21 当反面用（U8 的调用点被换成它），
 /// 正式判定路径谁都不叫它。
+#[cfg(test)]
 fn allocated_minus_deferred_matches_referenced(
     allocator: &PoolAllocator,
     device: DeviceIdentity,
@@ -382,7 +423,7 @@ fn read_accounting_entry_bytes_from_mirror(
     panic!("记账树里没有 (统计量 {statistic}, 设备 0) 这一行");
 }
 
-/// R3：G27、Q7b、Q7d 一律读镜像上的记账行（第 1/2/5 项），单位槽。记账单元是镜像对（w = 2），
+/// R3：G27 一律读镜像上的记账行（第 1/2/5 项），单位槽。记账单元是镜像对（w = 2），
 /// `corrupt_device_zero_accounting` 只改盘 0 那一份，这里也只读盘 0，两处同一个读法。
 fn mirror_accounting_row_slots(pool: &MemoryPool, accounting_slot: u64) -> (u64, u64, u64) {
     (
@@ -393,6 +434,8 @@ fn mirror_accounting_row_slots(pool: &MemoryPool, accounting_slot: u64) -> (u64,
 }
 
 /// G27 正式判定（R3）：逐盘（只判盘 0，两盘镜像同值）`第 1 项 − 第 5 项 == 最新根走读引用`，一律读镜像字节。
+/// 第 4 次重跑的 `main` 不量岔路 7（用户已定），只剩单测 U8 在用。
+#[cfg(test)]
 fn allocated_minus_deferred_mismatches_referenced(
     pool: &MemoryPool,
     accounting_slot: u64,
@@ -461,9 +504,9 @@ fn replace_all(haystack: &mut [u8], needle: &[u8], replacement: &[u8]) -> bool {
     changed
 }
 
-/// 根环全部槽的 (设备, 偏移)：按公开的 `root_ring` 几何现算，不写死字节偏移。
+/// 根环全部槽的 (设备, 偏移)：按公开的 `root_ring` 几何现算，不写死字节偏移（β0 与 β_syn 那一段的 S = 8 池）。
 fn root_ring_slots(region_devices: &[DeviceIdentity; 3], spacing: u32) -> Vec<(u32, u64)> {
-    (0..ROOT_RING_REGIONS)
+    (0..E156_ROOT_RING_REGIONS)
         .flat_map(|region| {
             let device = region_devices[usize::try_from(region).expect("区域号落在 3 以内")].0;
             (0..E156_SLOTS_PER_REGION).map(move |slot| {
@@ -478,7 +521,7 @@ fn root_ring_slots(region_devices: &[DeviceIdentity; 3], spacing: u32) -> Vec<(u
 
 /// 只改盘 0 那一份记账节点：重封盘 0 那一份的两道校验和，把新的整单元校验和补进盘 0 自己那份树表与根槽——
 /// 盘 1 一个字节都不碰（`checker_known_bad_images.rs` 的 `mutate_one_device_copy_of_unit` 同一条改法，这里独立实现）。
-/// Bd(k) 与 Bk1/Bk2 都走这一条：`entries` 是这次要同时改的 (统计量, delta 字节) 列表。
+/// `entries` 是这次要同时改的 (统计量, delta 字节) 列表。
 fn corrupt_device_zero_accounting(
     base: &MemoryPool,
     accounting_slot: u64,
@@ -557,7 +600,7 @@ fn memory_pool_snapshot(devices: &[(DeviceIdentity, SparseBlockDevice)]) -> Memo
     }
 }
 
-/// 反方向：从一份镜像重建出可写的设备 Vec（c2 崩溃恢复、S1(c) 重开都要这一条）。
+/// 反方向：从一份镜像重建出可写的设备 Vec（c2 崩溃之后在切出来的镜像上可写挂载要这一条）。
 fn devices_from_memory_pool(pool: &MemoryPool) -> Vec<(DeviceIdentity, SparseBlockDevice)> {
     pool.devices
         .iter()
@@ -570,6 +613,72 @@ fn devices_from_memory_pool(pool: &MemoryPool) -> Vec<(DeviceIdentity, SparseBlo
         .collect()
 }
 
+/// 同一份镜像的一套可写副本，每块盘外面包一层共用 `stream` 的录制器（W6 录写切段、PQ2 录抬 F 那一串）。
+fn recording_copies_of(
+    image: &MemoryPool,
+    stream: &SharedStream,
+) -> Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> {
+    devices_from_memory_pool(image)
+        .into_iter()
+        .map(|(identity, device)| {
+            (
+                identity,
+                RecordingBlockDevice::with_shared_stream(identity, device, stream.clone()),
+            )
+        })
+        .collect()
+}
+
+/// 两份镜像读回来不同的扇区：(盘, 扇区起点的字节偏移)，按盘、偏移升序。
+fn sectors_read_back_differently(first: &MemoryPool, second: &MemoryPool) -> Vec<(u32, u64)> {
+    let sector_bytes = usize::try_from(SECTOR_BYTES).expect("512");
+    let mut differing = Vec::new();
+    for (identity, first_device) in &first.devices {
+        let Some(second_device) = second.devices.get(identity) else {
+            continue;
+        };
+        let written_sectors: BTreeSet<u64> = first_device
+            .written_sectors_in(DeviceOffsetInBytes(0), first.device_size_in_bytes)
+            .into_iter()
+            .chain(
+                second_device
+                    .written_sectors_in(DeviceOffsetInBytes(0), second.device_size_in_bytes),
+            )
+            .collect();
+        for sector in written_sectors {
+            let offset = DeviceOffsetInBytes(sector * SECTOR_BYTES);
+            if first_device.read(offset, sector_bytes) != second_device.read(offset, sector_bytes) {
+                differing.push((identity.0, offset.0));
+            }
+        }
+    }
+    differing
+}
+
+/// 两份镜像读回来的字节是不是逐字节相同：两边写过的扇区取并，逐扇区读回比（稀疏盘上「写过一扇区全 0」与「没写过」读回相同，
+/// 按读回的字节比，不按内部表示比）。
+fn memory_pools_read_back_identically(first: &MemoryPool, second: &MemoryPool) -> bool {
+    if !first.devices.keys().eq(second.devices.keys()) {
+        return false;
+    }
+    first.devices.iter().all(|(identity, first_device)| {
+        let second_device = &second.devices[identity];
+        let written_sectors: BTreeSet<u64> = first_device
+            .written_sectors_in(DeviceOffsetInBytes(0), first.device_size_in_bytes)
+            .into_iter()
+            .chain(
+                second_device
+                    .written_sectors_in(DeviceOffsetInBytes(0), second.device_size_in_bytes),
+            )
+            .collect();
+        let sector_bytes = usize::try_from(SECTOR_BYTES).expect("512");
+        written_sectors.iter().all(|sector| {
+            let offset = DeviceOffsetInBytes(sector * SECTOR_BYTES);
+            first_device.read(offset, sector_bytes) == second_device.read(offset, sector_bytes)
+        })
+    })
+}
+
 fn verdict(pool: &MemoryPool, invariant: &str) -> InvariantVerdict {
     check_pool_image(pool)
         .into_iter()
@@ -579,6 +688,13 @@ fn verdict(pool: &MemoryPool, invariant: &str) -> InvariantVerdict {
 }
 fn is_red(verdict: &InvariantVerdict) -> bool {
     matches!(verdict, InvariantVerdict::Violated(_))
+}
+fn verdict_label(verdict: &InvariantVerdict) -> &'static str {
+    match verdict {
+        InvariantVerdict::Holds => "holds",
+        InvariantVerdict::Violated(_) => "violated",
+        InvariantVerdict::NotApplicable(_) => "not_applicable",
+    }
 }
 
 /// 一次发布落在根环上的 (设备, 偏移)：`target_for_publish` + `slot_offset` 都是公开的几何函数，
@@ -627,6 +743,53 @@ fn publish_empty<Device: BlockDevice>(
     )
 }
 
+/// 工作负载的一次发布是哪一种（骨架负载：段内第 k 次是 O ⟺ `k mod m == 0`，ρ = 1 ⇒ m = 1，ρ = 1/4 ⇒ m = 4，其余是 E）。
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum WorkloadPublishKind {
+    Overwrite,
+    EmptyPublish,
+}
+
+impl WorkloadPublishKind {
+    fn label(self) -> &'static str {
+        match self {
+            WorkloadPublishKind::Overwrite => "overwrite",
+            WorkloadPublishKind::EmptyPublish => "empty_publish",
+        }
+    }
+}
+
+/// 工作负载的一次发布：O 走 `publish_overwrite`，E 走 [`publish_empty`]。`content_salt` 同时定内容与写入时刻，逐次不同。
+fn publish_one_workload<Device: BlockDevice>(
+    parameters: &MakeFilesystemParameters,
+    devices: &mut [(DeviceIdentity, Device)],
+    allocator: &mut PoolAllocator,
+    previous: &TransactionOutput,
+    instance: InstanceGeneration,
+    kind: WorkloadPublishKind,
+    content_salt: u64,
+) -> Result<TransactionOutput, PublishError> {
+    match kind {
+        WorkloadPublishKind::Overwrite => {
+            let content = overwrite_content(content_salt);
+            let mut pool = PoolWriter::new(parameters, devices);
+            publish_overwrite(
+                &mut pool,
+                allocator,
+                previous,
+                FirstFile {
+                    content: &content,
+                    write_time_seconds: FIXED_WRITE_TIME_SECONDS + content_salt,
+                },
+                instance,
+            )
+        }
+        WorkloadPublishKind::EmptyPublish => {
+            publish_empty(parameters, devices, allocator, previous, instance)
+        }
+    }
+}
+
 /// R8「这次发布自己的释放」：D0 上 `is_released` 且 `generation == txg` 的记录，跨度求和，单位槽（登记「六」R8 字面）。
 fn self_release_slots_of_this_publish(
     allocator: &PoolAllocator,
@@ -641,241 +804,200 @@ fn self_release_slots_of_this_publish(
         .sum()
 }
 
-/// c2 崩溃（记录已持久、根槽没持久）：正常发一次真实覆盖写（record + root 都写），再把**这次的根槽**（512 字节，
-/// 单设备不镜像）改回发布之前的旧内容——效果与在这次发布的写序列里、根槽那一步之前截断逐字节相同（两者只是
-/// 写序列真正落盘的先后不同，最终镜像字节一样），比重新实现一整套录制/分段机制更直接、也更贴 C380 的措辞
-/// 「一个根槽从没写过的 txg」。
+/// 发完再改回的两份对照镜像（第 4 次重跑登记 W6：只留作对照）。
+struct RestoredAfterPublishing {
+    /// 只把这次的根槽（512 字节，单设备不镜像）改回发布之前的旧内容：装置原有的造法。它自称与「在根槽那一次写之前截断」
+    /// 逐字节相同，前提是根槽是那次发布最后一笔写；第 4 次重跑第一段量到这个前提不成立——实现在根槽 FUA 之后还轮换每块盘的
+    /// 系统配置槽（`transaction.rs` 的 `persist_the_root_then_rotate_the_system_configuration`，D16（发布语义） 已定项 7 的持久顺序）。
+    root_slot_only: MemoryPool,
+    /// 根槽与每块盘的系统配置两槽都改回发布之前（登记第十二节修订 2）：按实现的持久顺序根槽之后只有系统配置槽轮换，
+    /// W6 录写切段镜像与它逐字节比（停机 S1(i)）——比的是「根槽之前的写，录写切段与真发一字不差，根槽之后除系统配置轮换外没有别的写」。
+    root_slot_and_system_configuration: MemoryPool,
+}
+
+/// 系统配置每块盘几槽（`.claude/kb/decisions/22-单元原子性怎么合成.md:26`「系统配置每盘 2 槽按世代号 mod 2 轮换」）、一槽几字节
+/// （同一文件第 60 行「系统配置槽宽 = 格式常量 4096」）：本地常量，[`emit_static_anchors`] 与 `singlefs_format` 同名常量回比。
+const E156_SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE: u64 = 2;
+const E156_SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096;
+
+/// 真发一次，再按 [`RestoredAfterPublishing`] 的两种办法改回。
 #[allow(
     clippy::too_many_arguments,
-    reason = "c2 崩溃要凑齐设备、分配器、上一版、内容、时间、实例、几何六类各自独立的参数"
+    reason = "c2 崩溃要凑齐设备、分配器、上一版、发布种类、内容、实例、几何七类各自独立的参数"
 )]
 fn crash_before_root_persists(
     parameters: &MakeFilesystemParameters,
     devices: &mut Vec<(DeviceIdentity, SparseBlockDevice)>,
     allocator: &mut PoolAllocator,
     previous: &TransactionOutput,
-    content: &[u8],
-    write_time_seconds: u64,
+    kind: WorkloadPublishKind,
+    content_salt: u64,
     instance: InstanceGeneration,
-    region_devices: &[DeviceIdentity; 3],
-    spacing: u32,
     slots_per_region: RootRingSlotsPerRegion,
-) -> MemoryPool {
+) -> Result<RestoredAfterPublishing, PublishError> {
     let before = memory_pool_snapshot(devices);
-    let published = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        publish_overwrite(
-            &mut pool,
-            allocator,
-            previous,
-            FirstFile {
-                content,
-                write_time_seconds,
-            },
-            instance,
-        )
-        .expect("HK c2 崩溃之前的覆盖写（记录会持久，根槽本函数之后手动撤回）")
-    };
+    let published = publish_one_workload(
+        parameters,
+        devices.as_mut_slice(),
+        allocator,
+        previous,
+        instance,
+        kind,
+        content_salt,
+    )?;
     let (root_device, root_offset) = root_slot_location(
         published.root.checkpoint_txg,
-        region_devices,
-        spacing,
+        &parameters.region_devices,
+        parameters.geometry.fixed_structure_slot_spacing,
         slots_per_region,
     );
     let old_root_bytes = mp_read(&before, root_device, root_offset, 512);
-    let mut c2_pool = memory_pool_snapshot(devices);
-    mp_write(&mut c2_pool, root_device, root_offset, &old_root_bytes);
-    c2_pool
-}
-
-/// 一条合法状态（登记「五」骨架逐行「逐发布一行」+ Q7b/Q7d 要的那几个量），G27 一律读镜像（R3）。
-#[derive(Clone)]
-struct LegalState {
-    family: String,
-    kind: &'static str,
-    txg: u64,
-    item1: u64,
-    item2: u64,
-    item5: u64,
-    referenced: u64,
-    check_is_red: bool,
-}
-
-/// 一个「基底」：Q7a/Q7c/PC-检查/Q7f 共用的快照（镜像 + 它的记账/树表单元槽号 + 走读引用）。
-#[derive(Clone)]
-struct BasisSnapshot {
-    label: String,
-    pool: MemoryPool,
-    accounting_slot: u64,
-    tree_table_slot: u64,
-    referenced: u64,
-    /// 这个基底是不是「可达」（登记 R7）：只由产品路径、真实发布走出来。β_syn、β_F0 记 `false`。
-    reachable: bool,
-}
-
-fn basis_of(
-    label: &str,
-    pool: &MemoryPool,
-    current: &TransactionOutput,
-    reachable: bool,
-) -> BasisSnapshot {
-    BasisSnapshot {
-        label: label.to_string(),
-        pool: pool.clone(),
-        accounting_slot: current.unit(TransactionUnit::AccountingTree).slot.0,
-        tree_table_slot: current.unit(TransactionUnit::TreeTable).slot.0,
-        referenced: referenced_slots(current),
-        reachable,
+    let mut root_slot_only = memory_pool_snapshot(devices);
+    mp_write(
+        &mut root_slot_only,
+        root_device,
+        root_offset,
+        &old_root_bytes,
+    );
+    let mut root_slot_and_system_configuration = root_slot_only.clone();
+    let slot_bytes = usize::try_from(E156_SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+    for device in before
+        .devices
+        .keys()
+        .map(|identity| identity.0)
+        .collect::<Vec<u32>>()
+    {
+        for slot_index in 0..E156_SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE {
+            let offset = slot_index * u64::from(parameters.geometry.fixed_structure_slot_spacing);
+            let old_bytes = mp_read(&before, device, offset, slot_bytes);
+            mp_write(
+                &mut root_slot_and_system_configuration,
+                device,
+                offset,
+                &old_bytes,
+            );
+        }
     }
+    Ok(RestoredAfterPublishing {
+        root_slot_only,
+        root_slot_and_system_configuration,
+    })
 }
 
-/// 记一条合法状态：推进共享列表、顺带打一行 `E7RESULT`（Q7b 的红数能被一条命令从产物里数出来）。
-fn record_legal_state(
-    emitter: &mut Emitter,
-    legal_states: &mut Vec<LegalState>,
-    family: &str,
-    kind: &'static str,
-    current: &TransactionOutput,
-    pool: &MemoryPool,
-) -> LegalState {
-    let accounting_slot = current.unit(TransactionUnit::AccountingTree).slot.0;
-    let referenced = referenced_slots(current);
-    let (item1, item2, item5) = mirror_accounting_row_slots(pool, accounting_slot);
-    let check_is_red = item1 != item5 + referenced;
-    let state = LegalState {
-        family: family.to_string(),
+/// W6 切段点：根槽那一次写之前（登记写死），或 PC-c2 把根槽那一次写也留下。
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum CrashCutPoint {
+    BeforeTheRootSlotWrite,
+    AfterTheRootSlotWritePositiveControl,
+}
+
+/// 一次 c2 崩溃的两份镜像与这次发布的输出。
+struct CrashedPublish {
+    cut_image: MemoryPool,
+    /// W6 的录写切段镜像与「发完把根槽与每块盘的系统配置两槽改回」的镜像读回来逐字节相同（停机 S1(i) 的对拍项，登记第十二节修订 2；
+    /// PC-c2 那一格按构造不同）。
+    cut_matches_the_restored_image: bool,
+    /// 录写切段镜像与装置原有的「只改回根槽」镜像读回来不同的 (盘, 扇区起点字节偏移)：S1(i) 两边查时量出来的那一格，照报。
+    sectors_differing_from_the_root_slot_only_image: Vec<(u32, u64)>,
+    /// 写日志里根槽那一次写之后还有的步（`StepKind::name`）：「发完改回根槽」那一造法的前提是它为空。
+    steps_after_the_root_slot_write: Vec<&'static str>,
+    root_slot_writes_in_the_publish: usize,
+    crashed_output: TransactionOutput,
+    allocator_after_the_crashed_publish: PoolAllocator,
+}
+
+/// W6：录下那次发布的设备写，切在根槽那一次写之前（`crash.rs` 的写日志，`FixedGeometry::classify` 认根槽写），
+/// 切出来的镜像就是「记录已持久、根槽没持久」的 c2 崩溃镜像。同一次发布另按 [`crash_before_root_persists`] 造一份对照镜像。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "c2 崩溃要凑齐设备、分配器、上一版、发布种类、内容、实例、切段点七类各自独立的参数"
+)]
+fn crash_publish_before_its_root_persists(
+    parameters: &MakeFilesystemParameters,
+    devices: &[(DeviceIdentity, SparseBlockDevice)],
+    allocator: &PoolAllocator,
+    previous: &TransactionOutput,
+    instance: InstanceGeneration,
+    kind: WorkloadPublishKind,
+    content_salt: u64,
+    cut_point: CrashCutPoint,
+) -> Result<CrashedPublish, PublishError> {
+    let before = memory_pool_snapshot(devices);
+    let stream = SharedStream::retaining_contents();
+    let mut recording_devices = recording_copies_of(&before, &stream);
+    let mut recording_allocator = allocator.clone();
+    let crashed_output = publish_one_workload(
+        parameters,
+        recording_devices.as_mut_slice(),
+        &mut recording_allocator,
+        previous,
+        instance,
         kind,
-        txg: current.root.checkpoint_txg.0,
-        item1,
-        item2,
-        item5,
-        referenced,
-        check_is_red,
+        content_salt,
+    )?;
+    let operations = stream.retained_operations();
+    let geometry = FixedGeometry {
+        fixed_structure_slot_spacing: parameters.geometry.fixed_structure_slot_spacing,
+        journal_ring_bytes: parameters.geometry.journal_ring_bytes,
+        root_ring_slots_per_region: parameters.geometry.root_ring_slots_per_region,
     };
-    emitter.emit(&format!(
-        "name=legal_state family={} kind={} txg={} item1={} item2={} item5={} referenced={} check_is_red={}",
-        state.family, state.kind, state.txg, state.item1, state.item2, state.item5, state.referenced, state.check_is_red
-    ));
-    legal_states.push(state.clone());
-    state
+    let root_slot_write_indexes: Vec<usize> = operations
+        .iter()
+        .enumerate()
+        .filter(|(_, retained)| {
+            matches!(
+                geometry.classify(&retained.operation),
+                StepKind::RootRecordFua
+            )
+        })
+        .map(|(index, _)| index)
+        .collect();
+    let root_slot_writes_in_the_publish = root_slot_write_indexes.len();
+    let root_slot_write_index = *root_slot_write_indexes
+        .first()
+        .expect("一次发布恰有一次根槽写（单设备不镜像）");
+    let kept_operations = match cut_point {
+        CrashCutPoint::BeforeTheRootSlotWrite => root_slot_write_index,
+        CrashCutPoint::AfterTheRootSlotWritePositiveControl => root_slot_write_index + 1,
+    };
+    let mut restore_devices = devices_from_memory_pool(&before);
+    let mut cut_image = before;
+    cut_image.apply(&operations[..kept_operations]);
+
+    let mut restore_allocator = allocator.clone();
+    let restored_image = crash_before_root_persists(
+        parameters,
+        &mut restore_devices,
+        &mut restore_allocator,
+        previous,
+        kind,
+        content_salt,
+        instance,
+        parameters.geometry.root_ring_slots_per_region,
+    )?;
+    let steps_after_the_root_slot_write: Vec<&'static str> = operations
+        [root_slot_write_index + 1..]
+        .iter()
+        .map(|retained| geometry.classify(&retained.operation).name())
+        .collect();
+    Ok(CrashedPublish {
+        cut_matches_the_restored_image: memory_pools_read_back_identically(
+            &cut_image,
+            &restored_image.root_slot_and_system_configuration,
+        ),
+        sectors_differing_from_the_root_slot_only_image: sectors_read_back_differently(
+            &cut_image,
+            &restored_image.root_slot_only,
+        ),
+        steps_after_the_root_slot_write,
+        cut_image,
+        root_slot_writes_in_the_publish,
+        crashed_output,
+        allocator_after_the_crashed_publish: recording_allocator,
+    })
 }
 
-/// Q7a 一格：造坏镜像 Bd(delta_slots)，报基底与坏镜像各自的 G27、今天两条检查。
-/// 返回 (坏镜像上 G27 判红, 今天两条检查是不是都仍是绿的)，供 q7a_summary 用。
-#[allow(
-    clippy::too_many_arguments,
-    reason = "凑齐基底、几何、delta 三类各自独立的参数"
-)]
-fn run_q7a_cell(
-    emitter: &mut Emitter,
-    basis: &str,
-    delta_label: &str,
-    base_pool: &MemoryPool,
-    accounting_slot: u64,
-    tree_table_slot: u64,
-    region_devices: &[DeviceIdentity; 3],
-    spacing: u32,
-    referenced: u64,
-    delta_slots: i64,
-) -> (bool, bool) {
-    let corrupted_pool = corrupt_device_zero_accounting(
-        base_pool,
-        accounting_slot,
-        tree_table_slot,
-        region_devices,
-        spacing,
-        &[(
-            5u16,
-            delta_slots * i64::try_from(SLOT_BYTES).expect("16384 落在 i64 里"),
-        )],
-    );
-    let base_red =
-        allocated_minus_deferred_mismatches_referenced(base_pool, accounting_slot, referenced);
-    let corrupted_red = allocated_minus_deferred_mismatches_referenced(
-        &corrupted_pool,
-        accounting_slot,
-        referenced,
-    );
-    let base_allocated_statistic_is_red = is_red(&verdict(base_pool, "I-3.1"));
-    let base_free_statistic_is_red = is_red(&verdict(base_pool, "I-5.2"));
-    let corrupted_allocated_statistic_is_red = is_red(&verdict(&corrupted_pool, "I-3.1"));
-    let corrupted_free_statistic_is_red = is_red(&verdict(&corrupted_pool, "I-5.2"));
-    emitter.emit(&format!(
-        "name=q7a basis={basis} defer_delta={delta_label} base_check_is_red={base_red} base_i31_red={base_allocated_statistic_is_red} base_i52_red={base_free_statistic_is_red} corrupted_check_is_red={corrupted_red} corrupted_i31_red={corrupted_allocated_statistic_is_red} corrupted_i52_red={corrupted_free_statistic_is_red}"
-    ));
-    (
-        corrupted_red,
-        !corrupted_allocated_statistic_is_red && !corrupted_free_statistic_is_red,
-    )
-}
-
-/// PC-检查-Bk1/Bk2/Bk3：三种坏镜像各判一次（原登记 5.5 字面）。
-#[allow(
-    clippy::too_many_arguments,
-    reason = "凑齐基底与几何两类各自独立的参数"
-)]
-fn run_pc_check(
-    emitter: &mut Emitter,
-    basis: &str,
-    base_pool: &MemoryPool,
-    accounting_slot: u64,
-    tree_table_slot: u64,
-    region_devices: &[DeviceIdentity; 3],
-    spacing: u32,
-    referenced: u64,
-) {
-    let bk1_pool = corrupt_device_zero_accounting(
-        base_pool,
-        accounting_slot,
-        tree_table_slot,
-        region_devices,
-        spacing,
-        &[
-            (1u16, i64::try_from(SLOT_BYTES).expect("16384")),
-            (2u16, -i64::try_from(SLOT_BYTES).expect("16384")),
-        ],
-    );
-    emitter.emit(&format!(
-        "name=pc_check_bk1 basis={basis} check_is_red={} i31_red={} i52_red={}",
-        allocated_minus_deferred_mismatches_referenced(&bk1_pool, accounting_slot, referenced),
-        is_red(&verdict(&bk1_pool, "I-3.1")),
-        is_red(&verdict(&bk1_pool, "I-5.2")),
-    ));
-    let bk2_pool = corrupt_device_zero_accounting(
-        base_pool,
-        accounting_slot,
-        tree_table_slot,
-        region_devices,
-        spacing,
-        &[(2u16, -i64::try_from(SLOT_BYTES).expect("16384"))],
-    );
-    emitter.emit(&format!(
-        "name=pc_check_bk2 basis={basis} check_is_red={} i31_red={} i52_red={}",
-        allocated_minus_deferred_mismatches_referenced(&bk2_pool, accounting_slot, referenced),
-        is_red(&verdict(&bk2_pool, "I-3.1")),
-        is_red(&verdict(&bk2_pool, "I-5.2")),
-    ));
-    // Bk3 就是 Bd(+1)：单独再造一次镜像，字段名与 q7a 的 corrupted_* 对齐，方便并排读。
-    let bk3_pool = corrupt_device_zero_accounting(
-        base_pool,
-        accounting_slot,
-        tree_table_slot,
-        region_devices,
-        spacing,
-        &[(5u16, i64::try_from(SLOT_BYTES).expect("16384"))],
-    );
-    emitter.emit(&format!(
-        "name=pc_check_bk3_is_bd_plus_one basis={basis} check_is_red={} i31_red={} i52_red={}",
-        allocated_minus_deferred_mismatches_referenced(&bk3_pool, accounting_slot, referenced),
-        is_red(&verdict(&bk3_pool, "I-3.1")),
-        is_red(&verdict(&bk3_pool, "I-5.2")),
-    ));
-}
-
-/// Q7c①②：判别力自证。②在 `deferred == 0` 的基底上（β_syn、β_F0，以及第 10 个基底 `beta_hr_rollback_row`，
-/// 见「十二」修订 4）无从执行（Bd(−1) 会把 item5 减成负数，这是写装置时读出的一种真正的未定义输入，不是两种
-/// 读法的分歧——见「十二」修订，这里记 `not_applicable=true`，不算进任何门槛）。①在 `beta_hr_rollback_row`
-/// 上第一次在**可达**基底上转色（此前 β0/β1/β2/βK-w/r/f/l2 七个可达基底 `deferred` 都 ≥ 1，①恒不转色）。
+/// Q7c①②：判别力自证。②在 `deferred == 0` 的基底上（β_syn）无从执行（Bd(−1) 会把 item5 减成负数），记 `not_applicable=true`。
 fn q7c_self_test(
     emitter: &mut Emitter,
     basis: &str,
@@ -911,1503 +1033,6 @@ fn q7c_self_test(
     (flip1, flip2)
 }
 
-/// HK / HK-F0 共用的四个观测点快照 + S1(e) 的 E 释放槽数。
-struct HkOutcome {
-    beta_first: BasisSnapshot,
-    beta_after_reopen: BasisSnapshot,
-    beta_after_rollback: BasisSnapshot,
-    beta_after_raise_floor: BasisSnapshot,
-    beta_after_crash_recovery: BasisSnapshot,
-    empty_publish_release_slots: u64,
-}
-
-/// HK / HK-F0：登记「五、5.2」的固定脚本，`reuse_window` 是唯一的差别（HK-F0 每个分配器都先
-/// `set_reuse_window(ForcedToZero)`）。每一种发布（骨架发布）至少出现一次，每次发布之后的状态都推进 `legal_states`
-/// （HK 推进外部共享的 `legal_states`；HK-F0 调用方传一个只给它自己用的空列表，不混进「可达」的 Q7b/Q7d 统计）。
-#[allow(
-    clippy::too_many_lines,
-    clippy::too_many_arguments,
-    reason = "登记「五、5.2」要求 HK/HK-F0 是同一串真实操作，拆开反而难对拍"
-)]
-fn run_hk_family(
-    parameters: &MakeFilesystemParameters,
-    region_devices: &[DeviceIdentity; 3],
-    spacing: u32,
-    slots_per_region: RootRingSlotsPerRegion,
-    label: &str,
-    reuse_window: ReuseWindow,
-    reachable: bool,
-    emitter: &mut Emitter,
-    legal_states: &mut Vec<LegalState>,
-) -> HkOutcome {
-    let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = (0..2u32)
-        .map(|number| {
-            (
-                DeviceIdentity(number),
-                SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
-            )
-        })
-        .collect();
-    let genesis = make_filesystem(parameters, &mut devices).expect("HK mkfs");
-    let mut allocator = PoolAllocator::new(
-        devices
-            .iter()
-            .map(|(identity, device)| DeviceFreeMap::new(*identity, device.size_in_bytes()))
-            .collect(),
-    );
-    allocator.mark_format_time_units(
-        Placement {
-            slot: INSTANCE_TABLE_SLOT,
-            span: 2,
-        },
-        Placement {
-            slot: TREE_TABLE_GENESIS_SLOT,
-            span: 1,
-        },
-    );
-    allocator.set_reuse_window(reuse_window);
-    let mut instance = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        acquire_instance(&mut pool).expect("HK 取号")
-    };
-    let warm_up_output = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        warm_up(&mut pool, &genesis.root, instance).expect("HK 暖机")
-    };
-    let mut current: TransactionOutput = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        publish_first_file(
-            &mut pool,
-            &mut allocator,
-            warm_up_output.roots.last().expect("暖机两代根"),
-            FirstFile {
-                content: &overwrite_content(0),
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS,
-            },
-            instance,
-            &warm_up_output.last_record_bytes,
-        )
-        .expect("HK 第一个事务")
-    };
-    record_legal_state(
-        emitter,
-        legal_states,
-        label,
-        "first_file",
-        &current,
-        &memory_pool_snapshot(&devices),
-    );
-    let beta_first = basis_of(
-        &format!("{label}_first"),
-        &memory_pool_snapshot(&devices),
-        &current,
-        reachable,
-    );
-
-    // O
-    current = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        publish_overwrite(
-            &mut pool,
-            &mut allocator,
-            &current,
-            FirstFile {
-                content: &overwrite_content(1),
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 61,
-            },
-            instance,
-        )
-        .expect("HK 第一次 O")
-    };
-    record_legal_state(
-        emitter,
-        legal_states,
-        label,
-        "O",
-        &current,
-        &memory_pool_snapshot(&devices),
-    );
-
-    // E（空发布）
-    let existing_leaves_before_empty_publish =
-        e156_existing_leaf_positions(&allocator, DeviceIdentity(0));
-    let records_before_empty_publish = allocator.records().len();
-    current = publish_empty(
-        parameters,
-        devices.as_mut_slice(),
-        &mut allocator,
-        &current,
-        instance,
-    )
-    .expect("HK 空发布 E");
-    let empty_publish_release_slots = self_release_slots_of_this_publish(
-        &allocator,
-        DeviceIdentity(0),
-        current.root.checkpoint_txg,
-    );
-    // R-5（第七节 7.2）：HK 那一次空发布 D0 释放槽数与记录增量的闭式核对，只在 `label == "HK"`（真实、
-    // 可达的那一臂）上钉硬断言；HK-F0 只观测，不 panic（它的可达性本来就不参与 Q7b/Q7d 的统计）。
-    let touched_leaves_empty_publish = e156_touched_leaf_positions(
-        &allocator,
-        DeviceIdentity(0),
-        current.root.checkpoint_txg,
-    );
-    let (expected_empty_publish_released, expected_empty_publish_record_delta) =
-        e156_closed_form_expected(
-            &existing_leaves_before_empty_publish,
-            &touched_leaves_empty_publish,
-            false,
-        );
-    let empty_publish_record_delta = u64::try_from(
-        allocator.records().len() - records_before_empty_publish,
-    )
-    .expect("空发布的记录增量落在 u64 内");
-    emitter.emit(&format!(
-        "name=r5_empty_publish_closed_form label={label} released_d0={empty_publish_release_slots} expected_released_d0={expected_empty_publish_released} record_delta={empty_publish_record_delta} expected_record_delta={expected_empty_publish_record_delta} fixed_point_slots_one_leaf={}",
-        e156_empty_publish_fixed_point_slots(&existing_leaves_before_empty_publish),
-    ));
-    if label == "HK" {
-        assert_eq!(
-            empty_publish_release_slots, expected_empty_publish_released,
-            "R-5：HK 空发布 D0 释放槽数应等于闭式"
-        );
-        assert_eq!(
-            empty_publish_record_delta, expected_empty_publish_record_delta,
-            "R-5：HK 空发布记录增量应等于闭式"
-        );
-    }
-    record_legal_state(
-        emitter,
-        legal_states,
-        label,
-        "E",
-        &current,
-        &memory_pool_snapshot(&devices),
-    );
-
-    // 无崩溃重开（W，暖机）
-    let mounted = mount_writable(parameters, &mut devices).expect("HK 无崩溃重开");
-    allocator = mounted.allocator;
-    // `mount_writable` 内部按 `rebuilt_allocator` 重建分配器，复用窗口恒回落到产品默认
-    // `GatedByTheRollbackFloor`（`allocator.rs` I14「产品路径恒 GatedByTheRollbackFloor」）——
-    // 每次挂载/回退之后都要重新设一次，不是设一次就一直生效。
-    allocator.set_reuse_window(reuse_window);
-    instance = mounted.output.instance;
-    record_legal_state(
-        emitter,
-        legal_states,
-        label,
-        "W_row",
-        mounted
-            .output
-            .row_publish
-            .file_version()
-            .expect("写行那一版带文件"),
-        &memory_pool_snapshot(&devices),
-    );
-    for warm in &mounted.output.warm_up_publishes {
-        record_legal_state(
-            emitter,
-            legal_states,
-            label,
-            "warmup",
-            warm.file_version().expect("暖机那一版带文件"),
-            &memory_pool_snapshot(&devices),
-        );
-    }
-    current = mounted
-        .current
-        .into_file_version()
-        .expect("重开后现行版本带文件");
-    let beta_after_reopen = basis_of(
-        &format!("{label}_w"),
-        &memory_pool_snapshot(&devices),
-        &current,
-        reachable,
-    );
-
-    // O × 4
-    for step in 0..4u64 {
-        current = {
-            let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-            publish_overwrite(
-                &mut pool,
-                &mut allocator,
-                &current,
-                FirstFile {
-                    content: &overwrite_content(10 + step),
-                    write_time_seconds: FIXED_WRITE_TIME_SECONDS + 70 + step,
-                },
-                instance,
-            )
-            .expect("HK O×4")
-        };
-        record_legal_state(
-            emitter,
-            legal_states,
-            label,
-            "O",
-            &current,
-            &memory_pool_snapshot(&devices),
-        );
-    }
-
-    // 抬 F 到上限（R5：先探上限，再抬到那里）。S9（停机，登记「十一」）：ForcedToZero 下前面几步已经把
-    // genesis 的树表单元回收挪作他用（每次 `release()` 会把释放代 ≤ 这次 txg 的全部已释放记录一并回收，
-    // 见 `allocator.rs` `ReuseWindow::ForcedToZero` 分支），`rollback_floor_ceiling` 判非空要读候选根的树表，
-    // 读不到就报错——这正是 I-7.4（近 K 代块未被复用） 要挡的那类复用，HK-F0 故意不可达，撞上了就停这一格，
-    // 不当结果、不作废（S9 原文：「那一格停，记错误原文；全部格都拒 ⇒ 交主 agent」）。
-    let probe_result = raise_rollback_floor(
-        parameters,
-        &mut devices,
-        &mut allocator,
-        &mut current,
-        CheckpointTxg(u64::MAX),
-        ShadowLedger::On,
-    );
-    let probe_ceiling = match probe_result {
-        Err(MountError::RollbackFloorAboveCeiling { ceiling, .. }) => ceiling,
-        Err(other) => {
-            emitter.emit(&format!("name=s9_raise_floor_refused family={label} error={other:?}"));
-            return HkOutcome {
-                beta_first: beta_first.clone(),
-                beta_after_reopen: beta_first.clone(),
-                beta_after_rollback: beta_first.clone(),
-                beta_after_raise_floor: beta_first.clone(),
-                beta_after_crash_recovery: beta_first,
-                empty_publish_release_slots,
-            };
-        }
-        Ok(_) => panic!("HK 抬 F 探测上限期望 RollbackFloorAboveCeiling，用 u64::MAX 探测却成功了（S4：写装置时读出的分歧，交主 agent）"),
-    };
-    let raised = raise_rollback_floor(
-        parameters,
-        &mut devices,
-        &mut allocator,
-        &mut current,
-        probe_ceiling,
-        ShadowLedger::On,
-    )
-    .expect("HK 抬 F 到上限");
-    for publish in &raised.publishes {
-        record_legal_state(
-            emitter,
-            legal_states,
-            label,
-            "raise_floor_pump",
-            publish,
-            &memory_pool_snapshot(&devices),
-        );
-    }
-    let beta_after_raise_floor = basis_of(
-        &format!("{label}_f"),
-        &memory_pool_snapshot(&devices),
-        &current,
-        reachable,
-    );
-
-    // O
-    current = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        publish_overwrite(
-            &mut pool,
-            &mut allocator,
-            &current,
-            FirstFile {
-                content: &overwrite_content(20),
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 80,
-            },
-            instance,
-        )
-        .expect("HK 抬 F 之后的 O")
-    };
-    record_legal_state(
-        emitter,
-        legal_states,
-        label,
-        "O",
-        &current,
-        &memory_pool_snapshot(&devices),
-    );
-
-    // mount_rollback 到候选集里 txg 最小的根（回退那次发布、暖机）
-    // 回退候选集 = 按实例表判仍然有效 ∧ txg ≥ F_生效（D16（发布语义） 已定项 1；HK 已抬过 F，`readable_roots`
-    // 不做这层过滤，直接拿它的最小 txg 会选到早已被 F 挡在外面的 genesis 根，「三」S1 的 R7 候选集读法要求这里过滤）。
-    let hk_effective_floor = effective_rollback_floor(
-        &devices,
-        region_devices,
-        &parameters.geometry,
-        &parameters.filesystem_identifier,
-    );
-    let candidates = readable_roots(
-        &devices,
-        region_devices,
-        &parameters.geometry,
-        &parameters.filesystem_identifier,
-    );
-    let oldest = *candidates
-        .iter()
-        .filter(|root| root.checkpoint_txg.0 >= hk_effective_floor.0)
-        .min_by_key(|root| root.checkpoint_txg.0)
-        .expect("HK 回退候选集至少一个根");
-    let rollback_target = RollbackTarget {
-        instance: oldest.instance,
-        checkpoint_txg: oldest.checkpoint_txg,
-    };
-    let rollback_mounted =
-        mount_rollback(parameters, &mut devices, rollback_target, ShadowLedger::On)
-            .expect("HK 回退");
-    allocator = rollback_mounted.allocator;
-    allocator.set_reuse_window(reuse_window);
-    instance = rollback_mounted.output.instance;
-    record_legal_state(
-        emitter,
-        legal_states,
-        label,
-        "rollback_row",
-        rollback_mounted
-            .output
-            .row_publish
-            .file_version()
-            .expect("回退写行那一版带文件"),
-        &memory_pool_snapshot(&devices),
-    );
-    for warm in &rollback_mounted.output.warm_up_publishes {
-        record_legal_state(
-            emitter,
-            legal_states,
-            label,
-            "warmup",
-            warm.file_version().expect("暖机那一版带文件"),
-            &memory_pool_snapshot(&devices),
-        );
-    }
-    current = rollback_mounted
-        .current
-        .into_file_version()
-        .expect("回退后现行版本带文件");
-    let beta_after_rollback = basis_of(
-        &format!("{label}_r"),
-        &memory_pool_snapshot(&devices),
-        &current,
-        reachable,
-    );
-
-    // O
-    current = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        publish_overwrite(
-            &mut pool,
-            &mut allocator,
-            &current,
-            FirstFile {
-                content: &overwrite_content(21),
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 90,
-            },
-            instance,
-        )
-        .expect("HK 回退之后的 O")
-    };
-    record_legal_state(
-        emitter,
-        legal_states,
-        label,
-        "O",
-        &current,
-        &memory_pool_snapshot(&devices),
-    );
-
-    // 在下一次 O 上 c2 崩溃并恢复（W，暖机，L2）
-    let c2_pool = crash_before_root_persists(
-        parameters,
-        &mut devices,
-        &mut allocator,
-        &current,
-        &overwrite_content(30),
-        FIXED_WRITE_TIME_SECONDS + 100,
-        instance,
-        region_devices,
-        spacing,
-        slots_per_region,
-    );
-    let mut recovered_devices = devices_from_memory_pool(&c2_pool);
-    let recovered = mount_writable(parameters, &mut recovered_devices).expect("HK c2 恢复");
-    devices = recovered_devices;
-    allocator = recovered.allocator;
-    allocator.set_reuse_window(reuse_window);
-    instance = recovered.output.instance;
-    record_legal_state(
-        emitter,
-        legal_states,
-        label,
-        "W_row_after_c2",
-        recovered
-            .output
-            .row_publish
-            .file_version()
-            .expect("c2 恢复写行那一版带文件"),
-        &memory_pool_snapshot(&devices),
-    );
-    for warm in &recovered.output.warm_up_publishes {
-        record_legal_state(
-            emitter,
-            legal_states,
-            label,
-            "warmup",
-            warm.file_version().expect("暖机那一版带文件"),
-            &memory_pool_snapshot(&devices),
-        );
-    }
-    current = recovered
-        .current
-        .into_file_version()
-        .expect("c2 恢复后现行版本带文件");
-    let beta_after_crash_recovery = basis_of(
-        &format!("{label}_l2"),
-        &memory_pool_snapshot(&devices),
-        &current,
-        reachable,
-    );
-
-    // O（L2 之后再来一次，确认恢复之后照常能发布）
-    current = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        publish_overwrite(
-            &mut pool,
-            &mut allocator,
-            &current,
-            FirstFile {
-                content: &overwrite_content(31),
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 110,
-            },
-            instance,
-        )
-        .expect("HK c2 恢复之后的 O")
-    };
-    record_legal_state(
-        emitter,
-        legal_states,
-        label,
-        "O",
-        &current,
-        &memory_pool_snapshot(&devices),
-    );
-
-    HkOutcome {
-        beta_first,
-        beta_after_reopen,
-        beta_after_rollback,
-        beta_after_raise_floor,
-        beta_after_crash_recovery,
-        empty_publish_release_slots,
-    }
-}
-
-/// S1(c)：重放 `second_transaction_step_four_rollback.rs` 的
-/// `rolling_back_keeps_the_abandoned_records_in_the_ring_and_a_plain_remount_keeps_the_isolation`
-/// 场景（长度用它的常量 4100 / 2500 字节，本装置自己的内容生成器——数值锚点只挂在「几个单元、几槽」上，
-/// 不挂在字节内容上，见「三」I7「一个文件对象恒一个数据单元」）：A → B（实例 1）→ 重开取号 2、写行、暖机
-/// → C（实例 2）→ 回退到 A → 普通重开，核 jsn 9、五条记录还在环里、`isolated_slots_per_device == [(0,34),(1,34)]`、
-/// `instance == 4`、`abandoned_roots_unreadable == 0`。
-fn run_s1c_rollback_isolation_scenario(
-    emitter: &mut Emitter,
-    parameters: &MakeFilesystemParameters,
-) {
-    let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = (0..2u32)
-        .map(|number| {
-            (
-                DeviceIdentity(number),
-                SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
-            )
-        })
-        .collect();
-    let genesis = make_filesystem(parameters, &mut devices).expect("S1c mkfs");
-    let mut allocator = PoolAllocator::new(
-        devices
-            .iter()
-            .map(|(identity, device)| DeviceFreeMap::new(*identity, device.size_in_bytes()))
-            .collect(),
-    );
-    allocator.mark_format_time_units(
-        Placement {
-            slot: INSTANCE_TABLE_SLOT,
-            span: 2,
-        },
-        Placement {
-            slot: TREE_TABLE_GENESIS_SLOT,
-            span: 1,
-        },
-    );
-    let instance1 = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        acquire_instance(&mut pool).expect("S1c 取号")
-    };
-    let warm_up_output = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        warm_up(&mut pool, &genesis.root, instance1).expect("S1c 暖机")
-    };
-    let mut current = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        publish_first_file(
-            &mut pool,
-            &mut allocator,
-            warm_up_output.roots.last().expect("暖机两代根"),
-            FirstFile {
-                content: &overwrite_content(0),
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS,
-            },
-            instance1,
-            &warm_up_output.last_record_bytes,
-        )
-        .expect("S1c A")
-    };
-    // B：4100 字节（这次发布之后 `current` 不再被读，重开直接从 `devices` 的真实字节重建，B 的返回值只留作旁证）。
-    let _second_overwrite_result = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        publish_overwrite(
-            &mut pool,
-            &mut allocator,
-            &current,
-            FirstFile {
-                content: &vec![0u8; 4100],
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60,
-            },
-            instance1,
-        )
-        .expect("S1c B")
-    };
-    // 重开取号 2、写行、暖机。
-    let mounted = mount_writable(parameters, &mut devices).expect("S1c 重开取号 2");
-    allocator = mounted.allocator;
-    let instance2 = mounted.output.instance;
-    assert_eq!(
-        instance2,
-        InstanceGeneration(2),
-        "S1c：B 之后重开应当取到实例 2"
-    );
-    current = mounted
-        .current
-        .into_file_version()
-        .expect("S1c 重开之后现行版本带文件");
-    // C：2500 字节，实例 2。
-    current = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        publish_overwrite(
-            &mut pool,
-            &mut allocator,
-            &current,
-            FirstFile {
-                content: &vec![0u8; 2500],
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 120,
-            },
-            instance2,
-        )
-        .expect("S1c C")
-    };
-    let third_overwrite_counter = current.record.counter;
-
-    // 回退到 A（实例 1，txg 3）。
-    let rolled_back = mount_rollback(
-        parameters,
-        &mut devices,
-        RollbackTarget {
-            instance: InstanceGeneration(1),
-            checkpoint_txg: CheckpointTxg(3),
-        },
-        ShadowLedger::On,
-    )
-    .expect("S1c 回退到 A");
-    let rollback_row_publish_counter = rolled_back.output.row_publish.record().counter;
-    emitter.emit(&format!("name=s1c_rollback_row_counter c_counter={third_overwrite_counter} d_counter={rollback_row_publish_counter}"));
-    assert_eq!(
-        rollback_row_publish_counter, 9,
-        "S1c：D 的 jsn 应当接在 C 的 8 之后"
-    );
-
-    let pool_after_rollback = memory_pool_snapshot(&devices);
-    let system_configuration =
-        choose_system_configuration(&pool_after_rollback).expect("S1c 系统配置");
-    let records = scan_journal(&pool_after_rollback, &system_configuration);
-    let expected_jsn: [(u32, u64); 5] = [(1, 4), (2, 5), (2, 8), (3, 9), (3, 10)];
-    for (instance, counter) in expected_jsn {
-        let present = records.contains_key(&(InstanceGeneration(instance), counter));
-        emitter.emit(&format!(
-            "name=s1c_record_present instance={instance} counter={counter} present={present}"
-        ));
-        assert!(
-            present,
-            "S1c：记录 ({instance}, jsn {counter}) 该原样在环里"
-        );
-    }
-
-    // 普通重开。
-    let remounted = mount_writable(parameters, &mut devices).expect("S1c 回退之后普通重开");
-    emitter.emit(&format!(
-        "name=s1c_remount instance={} isolated=[(0,{}),(1,{})] abandoned_roots_unreadable={}",
-        remounted.output.instance.0,
-        remounted
-            .output
-            .isolated_slots_per_device
-            .iter()
-            .find(|(identity, _)| *identity == DeviceIdentity(0))
-            .map_or(0, |(_, slots)| *slots),
-        remounted
-            .output
-            .isolated_slots_per_device
-            .iter()
-            .find(|(identity, _)| *identity == DeviceIdentity(1))
-            .map_or(0, |(_, slots)| *slots),
-        remounted.output.abandoned_roots_unreadable,
-    ));
-    assert_eq!(
-        remounted.output.instance,
-        InstanceGeneration(4),
-        "S1c：回退之后普通重开应当取到实例 4"
-    );
-    assert_eq!(
-        remounted.output.isolated_slots_per_device,
-        vec![(DeviceIdentity(0), 54), (DeviceIdentity(1), 54)],
-        "S1c：按 D 那一版实例表判被抛弃的根引用的槽，普通重开照样隔离（R-6，第七节 7.2：分配记录树\
-         按位置寻址之后每盘 54 槽，不再是原登记的 34）"
-    );
-    assert_eq!(
-        remounted.output.abandoned_roots_unreadable, 0,
-        "S1c：这条历史里没有读不出的被抛弃根"
-    );
-}
-
-// ============================================================================================
-// 岔路 3（第 11 行）：HF、G7 的公开入口重组、D_rel。缩小范围：只跑 S = 8、ρ = 1 一个几何取样点
-// （登记「五、5.2」HF 的 18 格全扫未做，见交回报告岔路表）。
-// ============================================================================================
-
-/// 一次抬 F 处置里，某个口径的推空发布序列（R4：G7 用公开入口重组，F-扣 用真实 `raise_rollback_floor`）。
-struct RaiseFloorPumpOutcome {
-    /// 每一次推空发布持久之后的 txg，按发生顺序。
-    publish_txgs: Vec<u64>,
-}
-
-/// G7（登记 R4）：与真实 `raise_rollback_floor`（F-扣）在抬 F 之前逐字节相同的历史上，用公开入口重组
-/// 「回收等 F 真生效」这条臂——先推带新 F 的空发布到每块盘都盖到，**之后**才
-/// `reclaim_released_up_to(max(新 F, 环里最旧有效根), ReclaimedReuse::Immediately)`，不扣住。
-/// 不改真实分配器的回收判定本身，只换调用顺序与「立刻可发」（R4 逐字）。
-fn raise_rollback_floor_by_reconstructing_reclaim_after_floor_takes_effect(
-    parameters: &MakeFilesystemParameters,
-    devices: &mut Vec<(DeviceIdentity, SparseBlockDevice)>,
-    allocator: &mut PoolAllocator,
-    current: &mut TransactionOutput,
-    new_floor: CheckpointTxg,
-) -> RaiseFloorPumpOutcome {
-    let all_devices: Vec<DeviceIdentity> = devices.iter().map(|(identity, _)| *identity).collect();
-    let mut covered: Vec<DeviceIdentity> = Vec::new();
-    let mut publish_txgs = Vec::new();
-    while all_devices
-        .iter()
-        .any(|identity| !covered.contains(identity))
-        && u64::try_from(publish_txgs.len()).expect("次数") < ROOT_RING_REGIONS
-    {
-        let next = {
-            let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-            publish_version(
-                &mut pool,
-                allocator,
-                PublishPlan {
-                    txg: CheckpointTxg(current.root.checkpoint_txg.0 + 1),
-                    counter: current.record.counter + 1,
-                    transaction: 0,
-                    highest_transaction_number_before_this_publish: current
-                        .highest_transaction_number_in_this_instance,
-                    instance: current.root.instance,
-                    back_chain: back_chain_of(&current.record_bytes),
-                    file: None,
-                    new_inode_records: &[],
-                    instance_table: InstanceTablePlan::Carry(current.root.instance_table),
-                    tree_birth_txg: current.tree_birth_txg(),
-                    tree_identifier_watermark: current.root.tree_identifier_watermark,
-                    rollback_floor: new_floor,
-                },
-                Some(&*current),
-            )
-            .expect("G7 重组抬 F 的推空发布")
-        };
-        let target = target_for_publish(
-            next.root.checkpoint_txg,
-            parameters.geometry.root_ring_slots_per_region,
-        );
-        let device = parameters.region_devices[usize::try_from(target.region).expect("区域号")];
-        if !covered.contains(&device) {
-            covered.push(device);
-        }
-        publish_txgs.push(next.root.checkpoint_txg.0);
-        *current = next;
-    }
-    // G7：F_生效之后才回收（这一刻每块盘都已经落了带新 F 的根），且不扣住（R4：真实分配器判定不改，只换顺序）。
-    let region_devices = parameters.region_devices;
-    let oldest_valid_root = readable_roots(
-        &*devices,
-        &region_devices,
-        &parameters.geometry,
-        &parameters.filesystem_identifier,
-    )
-    .into_iter()
-    .map(|root| root.checkpoint_txg)
-    .min();
-    allocator.reclaim_released_up_to(
-        reclaim_floor(new_floor, oldest_valid_root),
-        ReclaimedReuse::Immediately,
-    );
-    RaiseFloorPumpOutcome { publish_txgs }
-}
-
-/// 岔路 3：在同一条历史（β0 → 无崩溃重开 → 8 次非空覆盖写）上，克隆出两条完全相同的抬 F 前状态，
-/// 分别按 F-扣（真实 `raise_rollback_floor`）与 G7（上面的公开入口重组）抬到同一个上限，报 D_rel（登记「六」Q3a/Q3b/Q3c）
-/// 与 K9（新批次 D_rel_非空 应为 3）。只跑 S = 8、ρ = 1 一个几何取样点，一次处置。
-fn run_hf_single_cell(parameters: &MakeFilesystemParameters, emitter: &mut Emitter) {
-    // ---- 共用前缀：β0 → 无崩溃重开 → 8 次非空覆盖写（骨架发布 O，ρ = 1） ----
-    let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = (0..2u32)
-        .map(|number| {
-            (
-                DeviceIdentity(number),
-                SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
-            )
-        })
-        .collect();
-    let genesis = make_filesystem(parameters, &mut devices).expect("HF mkfs");
-    let mut allocator = PoolAllocator::new(
-        devices
-            .iter()
-            .map(|(identity, device)| DeviceFreeMap::new(*identity, device.size_in_bytes()))
-            .collect(),
-    );
-    allocator.mark_format_time_units(
-        Placement {
-            slot: INSTANCE_TABLE_SLOT,
-            span: 2,
-        },
-        Placement {
-            slot: TREE_TABLE_GENESIS_SLOT,
-            span: 1,
-        },
-    );
-    let mut instance = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        acquire_instance(&mut pool).expect("HF 取号")
-    };
-    let warm_up_output = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        warm_up(&mut pool, &genesis.root, instance).expect("HF 暖机")
-    };
-    let first_file_txg = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        publish_first_file(
-            &mut pool,
-            &mut allocator,
-            warm_up_output.roots.last().expect("暖机两代根"),
-            FirstFile {
-                content: &overwrite_content(0),
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS,
-            },
-            instance,
-            &warm_up_output.last_record_bytes,
-        )
-        .expect("HF 第一个事务")
-        .root
-        .checkpoint_txg
-        .0
-    };
-    // 无崩溃重开：给「现行版本里有重写过的实例表单元」（I4 的前提）。
-    let mounted = mount_writable(parameters, &mut devices).expect("HF 无崩溃重开");
-    allocator = mounted.allocator;
-    instance = mounted.output.instance;
-    let mut current = mounted
-        .current
-        .into_file_version()
-        .expect("HF 重开后现行版本带文件");
-    // 8 次非空覆盖写（每次释放上一次的落点，release 的 generation = 这次发布的 txg）。
-    for step in 0..8u64 {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        current = publish_overwrite(
-            &mut pool,
-            &mut allocator,
-            &current,
-            FirstFile {
-                content: &overwrite_content(500 + step),
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 500 + step,
-            },
-            instance,
-        )
-        .expect("HF 前缀的 8 次覆盖写");
-    }
-
-    // K9 的前提（登记「七」，任务这一段第 3 条要核的那一句）：抬 F 那一刻环里非空有效根数 ≥ 4。
-    // 这段历史里「非空」的来源只有两处（其余都是 mkfs / 暖机 / 写行这类不改变用户可见内容的发布）：
-    // first_file 那一次、与 8 次覆盖写各一次（`overwrite_content` 逐次换盐，内容逐次不同）。在抬 F
-    // 之前（三条分支各自重建之前）现读一次 `readable_roots`，数这些 txg 里还留在环上、按实例表判仍然
-    // 有效的有几条——不是照抄「五、5.2」HF 那句「8 次非空覆盖写」当结论，是真的从环上数一遍。
-    let known_non_empty_txgs: std::collections::HashSet<u64> = std::iter::once(first_file_txg)
-        .chain((current.root.checkpoint_txg.0 - 7)..=current.root.checkpoint_txg.0)
-        .collect();
-    let ring_roots_before_raise = readable_roots(
-        &devices,
-        &parameters.region_devices,
-        &parameters.geometry,
-        &parameters.filesystem_identifier,
-    );
-    let non_empty_valid_root_count_before_raise = ring_roots_before_raise
-        .iter()
-        .filter(|root| known_non_empty_txgs.contains(&root.checkpoint_txg.0))
-        .count();
-    emitter.emit(&format!(
-        "name=k9_precondition non_empty_valid_root_count={non_empty_valid_root_count_before_raise} threshold=4 holds={} valid_root_count={} known_non_empty_txgs_defined={}",
-        non_empty_valid_root_count_before_raise >= 4,
-        ring_roots_before_raise.len(),
-        known_non_empty_txgs.len(),
-    ));
-
-    // ---- 三条分支（探上限、F-扣、G7）各从同一份快照重建，抬 F 之前逐字节相同（V13 的自证）----
-    let pre_raise_snapshot = memory_pool_snapshot(&devices);
-    // 「释放代 = 新 F 的那一批（最年轻的一批）」（K9）：抬 F 之前，D0 上已释放记录里最大的那个 generation。
-    let newest_released_generation_before_raise = allocator
-        .records()
-        .iter()
-        .filter(|record| record.device == DeviceIdentity(0) && record.is_released)
-        .map(|record| record.generation.0)
-        .max()
-        .expect("HF 前缀应当已经产生至少一次释放");
-
-    // `SparseBlockDevice` 没有 `Clone`，三条分支各自从同一份 `pre_raise_snapshot` 重建（`devices_from_memory_pool`，
-    // 与全文件其余地方克隆一条历史用的是同一条路）；重建之后、抬 F 之前先各拍一次快照核 V13，再各自去抬 F。
-    let mut probe_devices = devices_from_memory_pool(&pre_raise_snapshot);
-    let mut real_raise_devices = devices_from_memory_pool(&pre_raise_snapshot);
-    let mut reconstructed_raise_devices = devices_from_memory_pool(&pre_raise_snapshot);
-    let prefix_identical_before_raising_the_floor = memory_pool_snapshot(&probe_devices).devices
-        == pre_raise_snapshot.devices
-        && memory_pool_snapshot(&real_raise_devices).devices == pre_raise_snapshot.devices
-        && memory_pool_snapshot(&reconstructed_raise_devices).devices == pre_raise_snapshot.devices;
-    emitter.emit(&format!(
-        "name=v13_hf_prefix_identical holds={prefix_identical_before_raising_the_floor}"
-    ));
-    assert!(
-        prefix_identical_before_raising_the_floor,
-        "V13：G7 与 F-扣 两条历史在抬 F 之前的设备字节应当相同"
-    );
-
-    // 探上限：两条口径共用同一个 new_floor（R5：都用 rollback_floor_ceiling 给的上限）。
-    let mut probe_allocator = allocator.clone();
-    let mut probe_current = current.clone();
-    let probe_result = raise_rollback_floor(
-        parameters,
-        &mut probe_devices,
-        &mut probe_allocator,
-        &mut probe_current,
-        CheckpointTxg(u64::MAX),
-        ShadowLedger::On,
-    );
-    let ceiling = match probe_result {
-        Err(MountError::RollbackFloorAboveCeiling { ceiling, .. }) => ceiling,
-        Err(other) => panic!("HF 探上限期望 RollbackFloorAboveCeiling，得到别的错误 {other:?}"),
-        Ok(_) => panic!("HF 探上限用 u64::MAX 探测却成功了（S4：写装置时读出的分歧，交主 agent）"),
-    };
-
-    // F-扣（真实 raise_rollback_floor）
-    let mut real_raise_allocator = allocator.clone();
-    let mut real_raise_current = current.clone();
-    let real_raise_outcome = raise_rollback_floor(
-        parameters,
-        &mut real_raise_devices,
-        &mut real_raise_allocator,
-        &mut real_raise_current,
-        ceiling,
-        ShadowLedger::On,
-    )
-    .expect("HF F-扣 抬 F 到上限");
-    let real_raise_dispensable_txg = real_raise_outcome
-        .publishes
-        .last()
-        .map(|publish| publish.root.checkpoint_txg.0)
-        .unwrap_or(current.root.checkpoint_txg.0);
-
-    // G7（公开入口重组）
-    let mut reconstructed_raise_allocator = allocator.clone();
-    let mut reconstructed_raise_current = current.clone();
-    let reconstructed_raise_outcome =
-        raise_rollback_floor_by_reconstructing_reclaim_after_floor_takes_effect(
-            parameters,
-            &mut reconstructed_raise_devices,
-            &mut reconstructed_raise_allocator,
-            &mut reconstructed_raise_current,
-            ceiling,
-        );
-    let reconstructed_raise_dispensable_txg = reconstructed_raise_outcome
-        .publish_txgs
-        .last()
-        .copied()
-        .unwrap_or(current.root.checkpoint_txg.0);
-
-    // D_rel：release_generation = 释放它的那次发布的 txg，dispensable_txg = 该口径最后一次覆盖到的推空发布的 txg
-    // （登记「六」Q3a/Q3b）。
-    let release_generation = newest_released_generation_before_raise;
-    // 前缀 8 次覆盖写各自的 txg：从 warm-up 之后开始连续 8 个 txg（无崩溃重开只有一次写行 + 暖机，不产生分叉）。
-    // 重开的写行/暖机与第一个事务都不改变用户可见的文件内容（暖机只重放同一个文件版本），不算「非空」（登记
-    // 「非空」口径：树表里 inode/extent 树根指针与前一条有效根不同）；8 次覆盖写每次都改变内容，逐次都算非空。
-    let overwrite_txg_start = current.root.checkpoint_txg.0 - 7; // 8 次连续覆盖写的第一个 txg
-    let overwrite_txgs: Vec<u64> = (overwrite_txg_start..=current.root.checkpoint_txg.0).collect();
-    let count_non_empty_between = |from_generation: u64, dispensable_txg: u64| -> u64 {
-        overwrite_txgs
-            .iter()
-            .filter(|&&txg| txg > from_generation && txg < dispensable_txg)
-            .count() as u64
-    };
-    let count_all_between = |from_generation: u64, dispensable_txg: u64| -> u64 {
-        if dispensable_txg > from_generation + 1 {
-            dispensable_txg - from_generation - 1
-        } else {
-            0
-        }
-    };
-
-    let released_to_dispensable_non_empty_publishes_reconstructed =
-        count_non_empty_between(release_generation, reconstructed_raise_dispensable_txg);
-    let released_to_dispensable_all_publishes_reconstructed =
-        count_all_between(release_generation, reconstructed_raise_dispensable_txg);
-    let released_to_dispensable_non_empty_publishes_real =
-        count_non_empty_between(release_generation, real_raise_dispensable_txg);
-    let released_to_dispensable_all_publishes_real =
-        count_all_between(release_generation, real_raise_dispensable_txg);
-    let maximum_difference = released_to_dispensable_non_empty_publishes_real
-        .abs_diff(released_to_dispensable_non_empty_publishes_reconstructed);
-
-    emitter.emit(&format!(
-        "name=q3a_d_rel_g7 release_generation={release_generation} dispensable_txg={reconstructed_raise_dispensable_txg} d_rel_non_empty={released_to_dispensable_non_empty_publishes_reconstructed} d_rel_all={released_to_dispensable_all_publishes_reconstructed} pump_publishes={}",
-        reconstructed_raise_outcome.publish_txgs.len()
-    ));
-    emitter.emit(&format!(
-        "name=q3b_d_rel_f_kou release_generation={release_generation} dispensable_txg={real_raise_dispensable_txg} d_rel_non_empty={released_to_dispensable_non_empty_publishes_real} d_rel_all={released_to_dispensable_all_publishes_real} pump_publishes={}",
-        real_raise_outcome.publishes.len()
-    ));
-    emitter.emit(&format!(
-        "name=q3c_diff max_diff={maximum_difference} threshold=3 verdict={}",
-        if maximum_difference <= 3 {
-            "difference_not_large"
-        } else {
-            "difference_matters"
-        }
-    ));
-    // K9（新，released 记录唯一的一批）：前提「抬 F 那一刻环里非空有效根数 ≥ 4」由上面的
-    // `name=k9_precondition` 现算现核（S = 8、ρ = 1 这一格量出 9 ≥ 4），不是照抄预估。
-    // 只报数，不因为不等于 3 就作废——F3 的处置交主 agent（见「四」P21(e) 已经预估这一格可能不是 3；
-    // 这一格量出 0：release_generation 与 dispensable_txg 之间的 3 次持久发布恰好都是抬 F 自己的
-    // 推空发布，本来就不算非空，与 P21(e)「越早释放等得越久」是同一个方向上的现象，不是矛盾）。
-    emitter.emit(&format!(
-        "name=k9_newest_batch_d_rel_non_empty g7={released_to_dispensable_non_empty_publishes_reconstructed} f_kou={released_to_dispensable_non_empty_publishes_real} expected=3 note=see_p21e_prediction"
-    ));
-
-    // Q3d（主 agent 续派第 2 条「Q3d 一并做」；口径与限定见 `q3d_derived` 的文档注释）。
-    let (
-        accounting_free_index_real_raise,
-        allocator_dispensable_index_real_raise,
-        accounting_free_index_reconstructed_raise,
-        allocator_dispensable_index_reconstructed_raise,
-    ) = q3d_derived(
-        u64::try_from(real_raise_outcome.publishes.len()).unwrap_or(0),
-        u64::try_from(reconstructed_raise_outcome.publish_txgs.len()).unwrap_or(0),
-    );
-    emitter.emit(&format!(
-        "name=q3d_d_acct_d_alloc d_acct_f_kou={accounting_free_index_real_raise} d_alloc_f_kou={allocator_dispensable_index_real_raise} d_acct_g7={accounting_free_index_reconstructed_raise} d_alloc_g7={allocator_dispensable_index_reconstructed_raise} method=derived_from_documented_call_order_not_per_push_measured"
-    ));
-
-    // Q3e（X8-A）：另在独立的小池上跑（`run_small_pool_cell`，主 agent 续派第 2 条），不复用这一格的历史——
-    // X8-A 要的是 P5 那个 128 槽两段小池几何，与这里 4 GiB 主几何是两个不同的池。
-}
-
-/// Q3d（E154 登记「六」Q4 口径，P7/P8）：以第一条带新 F 的持久根为第 0 次，`D_acct` = 第一条记账行把
-/// 这批槽算空闲的持久根序号，`D_alloc` = 分配器第一次能发这批槽之前最后那条持久根的序号。**这是从
-/// `mount.rs`/这个装置 R4 重组函数的已读代码顺序推出来的，不是逐次持久根现读记账行量出来的**（据实
-/// 标注，不假装比实际做到的更精）：
-/// - F-扣（真实 `raise_rollback_floor`）：回收并扣住发生在**第一次推空发布之前**（`mount.rs` 812–855
-///   行一带，reclaim 调用先于 `PoolWriter`/推空循环），记账行第一次把这批槽算空闲就是第 0 次persistent
-///   根本身 ⇒ `D_acct = 0`；`release_reclaim_holds` 在推空循环**全部**成功之后才调，分配器真正能发是
-///   最后一次推空之后 ⇒ `D_alloc = pump_publishes − 1`。
-/// - G7（这个装置 R4 重组）：`reclaim_released_up_to(..., Immediately)` 在推空循环**全部**结束之后才调，
-///   记账与「能发」在同一次调用里一起生效 ⇒ `D_acct = D_alloc = pump_publishes − 1`。
-fn q3d_derived(
-    pump_publishes_real: u64,
-    pump_publishes_reconstructed: u64,
-) -> (i64, i64, i64, i64) {
-    let accounting_free_index_real_raise = 0i64;
-    let allocator_dispensable_index_real_raise =
-        i64::try_from(pump_publishes_real).unwrap_or(i64::MAX) - 1;
-    let accounting_free_index_reconstructed_raise =
-        i64::try_from(pump_publishes_reconstructed).unwrap_or(i64::MAX) - 1;
-    let allocator_dispensable_index_reconstructed_raise = accounting_free_index_reconstructed_raise;
-    (
-        accounting_free_index_real_raise,
-        allocator_dispensable_index_real_raise,
-        accounting_free_index_reconstructed_raise,
-        allocator_dispensable_index_reconstructed_raise,
-    )
-}
-
-// ============================================================================================
-// 岔路 3（第 11 行）续派第 2 条：Q3e（X8-A）。P5 的小池几何（128 槽两段）：设备字节 =
-// (`UNIT_AREA_START_SLOT` + 128) × `SLOT_BYTES`，journal 环调小到 mkfs 收得下（登记「五、5.2」HX 逐字）。
-// 两个口径各自走公开入口（F-扣：真实 `raise_rollback_floor`；G7：下面这个可失败版本的重组），报「六」
-// Q3e 的七样：①③④直接量（`x8a_held_measure`）、①⑤从真实调用的返回值读、⑥⑦另发布/另挂载现测。
-// ============================================================================================
-
-/// 小池的单元区槽数（P5「128 槽两段」逐字）；两段 = 128 / `CLUSTER_SEGMENT_SLOTS`(64) = 2。
-const SMALL_POOL_UNIT_AREA_SLOTS: u64 = 128;
-/// 设备字节：单元区起点（`UNIT_AREA_START_SLOT`）+ 128 槽（登记「五、5.2」HX 逐字）。
-const SMALL_POOL_IMAGE_BYTES: u64 =
-    (UNIT_AREA_START_SLOT + SMALL_POOL_UNIT_AREA_SLOTS) * SLOT_BYTES;
-/// journal 环调小到 mkfs 收得下：`check_geometry` 要求 `journal_ring_bytes ≤ 设备字节 ÷ 4`
-/// （`SMALL_POOL_IMAGE_BYTES` 约 786 MiB，上限约 196 MiB），4 MiB 远小于上限，`journal_in_flight_record_limit`
-/// 也给得出一个正常的正数（不是 0）。
-const SMALL_POOL_JOURNAL_RING_BYTES: u64 = 4 * 1024 * 1024;
-
-fn small_pool_parameters() -> MakeFilesystemParameters {
-    MakeFilesystemParameters {
-        filesystem_identifier: E156_FILESYSTEM_IDENTIFIER,
-        region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
-        geometry: SystemImmutableSizes {
-            physical_block_size: 512,
-            minimum_input_output_bytes: 512,
-            fixed_structure_slot_spacing: 4096,
-            journal_ring_bytes: SMALL_POOL_JOURNAL_RING_BYTES,
-            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
-        },
-    }
-}
-
-/// G7 的 X8A 专用版本：算法与 `raise_rollback_floor_by_reconstructing_reclaim_after_floor_takes_effect`
-/// 逐字相同（先推空到每块盘都盖到，之后才 `Immediately` 回收，不扣住），只把 `.expect(...)` 换成 `?`——
-/// X8A 要看的正是「推空发布本身分配不到固定点会怎样」，不能让这一格 panic。
-fn raise_rollback_floor_by_reconstructing_fallible(
-    parameters: &MakeFilesystemParameters,
-    devices: &mut Vec<(DeviceIdentity, SparseBlockDevice)>,
-    allocator: &mut PoolAllocator,
-    current: &mut TransactionOutput,
-    new_floor: CheckpointTxg,
-) -> Result<RaiseFloorPumpOutcome, PublishError> {
-    let all_devices: Vec<DeviceIdentity> = devices.iter().map(|(identity, _)| *identity).collect();
-    let mut covered: Vec<DeviceIdentity> = Vec::new();
-    let mut publish_txgs = Vec::new();
-    while all_devices
-        .iter()
-        .any(|identity| !covered.contains(identity))
-        && u64::try_from(publish_txgs.len()).expect("次数") < ROOT_RING_REGIONS
-    {
-        let next = {
-            let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-            publish_version(
-                &mut pool,
-                allocator,
-                PublishPlan {
-                    txg: CheckpointTxg(current.root.checkpoint_txg.0 + 1),
-                    counter: current.record.counter + 1,
-                    transaction: 0,
-                    highest_transaction_number_before_this_publish: current
-                        .highest_transaction_number_in_this_instance,
-                    instance: current.root.instance,
-                    back_chain: back_chain_of(&current.record_bytes),
-                    file: None,
-                    new_inode_records: &[],
-                    instance_table: InstanceTablePlan::Carry(current.root.instance_table),
-                    tree_birth_txg: current.tree_birth_txg(),
-                    tree_identifier_watermark: current.root.tree_identifier_watermark,
-                    rollback_floor: new_floor,
-                },
-                Some(&*current),
-            )?
-        };
-        let target = target_for_publish(
-            next.root.checkpoint_txg,
-            parameters.geometry.root_ring_slots_per_region,
-        );
-        let device = parameters.region_devices[usize::try_from(target.region).expect("区域号")];
-        if !covered.contains(&device) {
-            covered.push(device);
-        }
-        publish_txgs.push(next.root.checkpoint_txg.0);
-        *current = next;
-    }
-    let region_devices = parameters.region_devices;
-    let oldest_valid_root = readable_roots(
-        &*devices,
-        &region_devices,
-        &parameters.geometry,
-        &parameters.filesystem_identifier,
-    )
-    .into_iter()
-    .map(|root| root.checkpoint_txg)
-    .min();
-    allocator.reclaim_released_up_to(
-        reclaim_floor(new_floor, oldest_valid_root),
-        ReclaimedReuse::Immediately,
-    );
-    Ok(RaiseFloorPumpOutcome { publish_txgs })
-}
-
-/// 把 P5 的小池填到「装不下下一次覆盖写」为止：mkfs → 取号 → 暖机 → 第一个事务 → 无崩溃重开 → 反复
-/// 覆盖写直到 `publish_overwrite` 第一次报错，停在最后一次成功的状态（拒绝时分配器不动，「三」I 系列
-/// 同一条纪律：`try_allocate_*` 与发布路径的准入闸都是「一样都没动」）。`maximum_overwrites`：`None` 时
-/// 跑到真耗尽（HX，登记 P5 的几何）；`Some(cap)` 时只跑 `cap` 次就停，即便还能继续（HY，登记「五、5.2」
-/// 「抬 F 那一刻开放段里还有 ≥ 8 个空槽」那个对照——不追求刚好 8 个，只要足够宽松让两个口径都推得动）。
-fn build_small_pool_prefix(
-    parameters: &MakeFilesystemParameters,
-    maximum_overwrites: Option<u64>,
-) -> (
-    Vec<(DeviceIdentity, SparseBlockDevice)>,
-    PoolAllocator,
-    InstanceGeneration,
-    TransactionOutput,
-    u64,
-    String,
-) {
-    let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = (0..2u32)
-        .map(|number| {
-            (
-                DeviceIdentity(number),
-                SparseBlockDevice::new(SMALL_POOL_IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
-            )
-        })
-        .collect();
-    let genesis = make_filesystem(parameters, &mut devices).expect("X8A mkfs");
-    let mut allocator = PoolAllocator::new(
-        devices
-            .iter()
-            .map(|(identity, device)| DeviceFreeMap::new(*identity, device.size_in_bytes()))
-            .collect(),
-    );
-    allocator.mark_format_time_units(
-        Placement {
-            slot: INSTANCE_TABLE_SLOT,
-            span: 2,
-        },
-        Placement {
-            slot: TREE_TABLE_GENESIS_SLOT,
-            span: 1,
-        },
-    );
-    let mut instance = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        acquire_instance(&mut pool).expect("X8A 取号")
-    };
-    let warm_up_output = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        warm_up(&mut pool, &genesis.root, instance).expect("X8A 暖机")
-    };
-    {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-        publish_first_file(
-            &mut pool,
-            &mut allocator,
-            warm_up_output.roots.last().expect("暖机两代根"),
-            FirstFile {
-                content: &overwrite_content(0),
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS,
-            },
-            instance,
-            &warm_up_output.last_record_bytes,
-        )
-        .expect("X8A 第一个事务");
-    }
-    // 无崩溃重开：给「现行版本里有重写过的实例表单元」（I4 的前提，与 HF 单格同一处理由）。
-    let mounted = mount_writable(parameters, &mut devices).expect("X8A 无崩溃重开");
-    allocator = mounted.allocator;
-    instance = mounted.output.instance;
-    let mut current = mounted
-        .current
-        .into_file_version()
-        .expect("X8A 重开后现行版本带文件");
-    let mut overwrite_count = 0u64;
-    let stop_reason;
-    loop {
-        if let Some(cap) = maximum_overwrites {
-            if overwrite_count >= cap {
-                stop_reason = format!("stopped_at_cap_{cap}_by_request");
-                break;
-            }
-        }
-        let attempt = {
-            let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-            publish_overwrite(
-                &mut pool,
-                &mut allocator,
-                &current,
-                FirstFile {
-                    content: &overwrite_content(700 + overwrite_count),
-                    write_time_seconds: FIXED_WRITE_TIME_SECONDS + 700 + overwrite_count,
-                },
-                instance,
-            )
-        };
-        match attempt {
-            Ok(next) => {
-                current = next;
-                overwrite_count += 1;
-            }
-            Err(error) => {
-                stop_reason = format!("{error:?}");
-                break;
-            }
-        }
-        if overwrite_count > 40 {
-            stop_reason = "safety_cap_40_reached_without_exhaustion".to_string();
-            break;
-        }
-    }
-    (
-        devices,
-        allocator,
-        instance,
-        current,
-        overwrite_count,
-        stop_reason,
-    )
-}
-
-/// 在**不受任何抬 F 尝试影响**的原始前缀上，接着试 4 次覆盖写，各自成不成（P5「连发 4 次」逐字）。
-/// `content_salt_base` 避开与前缀历史、与另一个口径的探测用过的盐重合。
-fn probe_four_more_overwrites(
-    parameters: &MakeFilesystemParameters,
-    devices: &[(DeviceIdentity, SparseBlockDevice)],
-    allocator: &PoolAllocator,
-    current: &TransactionOutput,
-    instance: InstanceGeneration,
-    content_salt_base: u64,
-) -> Vec<String> {
-    let mut probe_devices = devices_from_memory_pool(&memory_pool_snapshot(devices));
-    let mut probe_allocator = allocator.clone();
-    let mut probe_current = current.clone();
-    (0..4u64)
-        .map(|attempt| {
-            let mut pool = PoolWriter::new(parameters, probe_devices.as_mut_slice());
-            let result = publish_overwrite(
-                &mut pool,
-                &mut probe_allocator,
-                &probe_current,
-                FirstFile {
-                    content: &overwrite_content(content_salt_base + attempt),
-                    write_time_seconds: FIXED_WRITE_TIME_SECONDS + content_salt_base + attempt,
-                },
-                instance,
-            );
-            match result {
-                Ok(next) => {
-                    probe_current = next;
-                    "ok".to_string()
-                }
-                Err(error) => format!("failed:{error:?}"),
-            }
-        })
-        .collect()
-}
-
-/// 岔路 3：Q3e（X8-A / X8-B 对照）。`pool_label`：`"hx"`（P5 的几何，`maximum_overwrites=None` 填到耗尽）
-/// 或 `"hy"`（同一个小池几何，`maximum_overwrites=Some(cap)` 提前停手，抬 F 那一刻还留着空间，登记「五、5.2」
-/// HY 的定义——两个口径在 HY 上都不该卡，当 HX 的阳性对照）。两个口径各自抬 F 到同一个上限，报「六」
-/// Q3e 的七样，每一行都带 `pool={pool_label}`。
-fn run_small_pool_cell(emitter: &mut Emitter, pool_label: &str, maximum_overwrites: Option<u64>) {
-    let parameters = small_pool_parameters();
-    let (devices, allocator, instance, current, overwrite_count, stop_reason) =
-        build_small_pool_prefix(&parameters, maximum_overwrites);
-    let (allocated, free, deferred) = accounting_row_slots(&allocator, DeviceIdentity(0));
-    emitter.emit(&format!(
-        "name=x8a_prefix pool={pool_label} overwrite_count={overwrite_count} stop_reason={stop_reason} allocated={allocated} free={free} deferred={deferred}"
-    ));
-    // R-7（第七节 7.2）：HY 的定义改成 e ≥ max(8, f)——e 是这一刻开放段里的空槽数，f 是一次推空发布
-    // （只改一片叶时）自己的固定点槽数，两者都现算，不再是「≥ 8」这句原文的字面。HX 上同样报这一行，
-    // 只作观测（HX 的定义是填到耗尽，这一条件在 HX 上多半不成立，不构成对照失败）。
-    let open_segment_free_slots = e156_open_segment_free_slots(&allocator, DeviceIdentity(0));
-    let existing_leaves_at_raise = e156_existing_leaf_positions(&allocator, DeviceIdentity(0));
-    let fixed_point_slots = e156_empty_publish_fixed_point_slots(&existing_leaves_at_raise);
-    let hy_threshold = fixed_point_slots.max(8);
-    emitter.emit(&format!(
-        "name=r7_hy_condition pool={pool_label} open_segment_free_slots={open_segment_free_slots} fixed_point_slots={fixed_point_slots} threshold={hy_threshold} holds={}",
-        open_segment_free_slots >= hy_threshold
-    ));
-
-    // 探上限：与 HF 单格同一个办法。
-    let mut probe_devices = devices_from_memory_pool(&memory_pool_snapshot(&devices));
-    let mut probe_allocator = allocator.clone();
-    let mut probe_current = current.clone();
-    let probe_result = raise_rollback_floor(
-        &parameters,
-        &mut probe_devices,
-        &mut probe_allocator,
-        &mut probe_current,
-        CheckpointTxg(u64::MAX),
-        ShadowLedger::On,
-    );
-    let ceiling = match probe_result {
-        Err(MountError::RollbackFloorAboveCeiling { ceiling, .. }) => ceiling,
-        Err(other) => {
-            emitter.emit(&format!(
-                "name=q3e_x8a pool={pool_label} status=not_done reason=probe_ceiling_unexpected_error error={other:?}"
-            ));
-            return;
-        }
-        Ok(_) => {
-            emitter.emit(&format!(
-                "name=q3e_x8a pool={pool_label} status=not_done reason=probe_ceiling_succeeded_with_u64_max"
-            ));
-            return;
-        }
-    };
-
-    // 续派第 2 条②③④：单独在一份克隆上重放「回收并扣住」这一步（与 `raise_rollback_floor` 内部的算式
-    // 逐字相同：`reclaim_floor(new_floor, oldest_valid_root)`，`oldest_valid_root` 不过滤被抛弃根——
-    // 这段历史没有回退，过滤恒真，R4 的射程），拿公开的 `DeviceFreeMap` 读数直接量，不用猜。
-    let mut held_measure_allocator = allocator.clone();
-    let region_devices = parameters.region_devices;
-    let oldest_valid_root_for_hold = readable_roots(
-        &devices,
-        &region_devices,
-        &parameters.geometry,
-        &parameters.filesystem_identifier,
-    )
-    .into_iter()
-    .map(|root| root.checkpoint_txg)
-    .min();
-    let reclaimed_and_held = held_measure_allocator.reclaim_released_up_to(
-        reclaim_floor(ceiling, oldest_valid_root_for_hold),
-        ReclaimedReuse::HeldUntilFloorTakesEffect,
-    );
-    let held_span_sum: u64 = reclaimed_and_held
-        .iter()
-        .map(|placement| placement.span)
-        .sum();
-    let (allocated_after_hold, free_after_hold, deferred_after_hold) =
-        accounting_row_slots(&held_measure_allocator, DeviceIdentity(0));
-    let lowest_empty_segment_after_hold = held_measure_allocator
-        .devices
-        .iter()
-        .find(|map| map.device == DeviceIdentity(0))
-        .and_then(DeviceFreeMap::lowest_empty_segment)
-        .map_or("none".to_string(), |slot| slot.0.to_string());
-    emitter.emit(&format!(
-        "name=x8a_held_measure pool={pool_label} ceiling={} reclaimed_and_held_records={} reclaimed_and_held_span={held_span_sum} allocated_after_hold={allocated_after_hold} free_after_hold={free_after_hold} deferred_after_hold={deferred_after_hold} lowest_empty_segment_after_hold={lowest_empty_segment_after_hold}",
-        ceiling.0, reclaimed_and_held.len(),
-    ));
-
-    // F-扣（真实 raise_rollback_floor）
-    let mut real_devices = devices_from_memory_pool(&memory_pool_snapshot(&devices));
-    let mut real_allocator = allocator.clone();
-    let mut real_current = current.clone();
-    let real_result = raise_rollback_floor(
-        &parameters,
-        &mut real_devices,
-        &mut real_allocator,
-        &mut real_current,
-        ceiling,
-        ShadowLedger::On,
-    );
-    let (real_first_push_result, real_holds_released) = match &real_result {
-        Ok(_) => ("succeeded".to_string(), true),
-        Err(MountError::Publish(publish_error)) => {
-            (format!("failed_placement_refused:{publish_error:?}"), false)
-        }
-        Err(other) => (format!("failed_other:{other:?}"), false),
-    };
-    emitter.emit(&format!(
-        "name=q3e_f_kou pool={pool_label} first_push_result={real_first_push_result} release_reclaim_holds_reached={real_holds_released}"
-    ));
-
-    // 失败之后接着在**同一份未受影响的前缀**（`devices`/`allocator`/`current`，抬 F 失败按纪律不改
-    // 分配器、不落盘）上试着再发 4 次覆盖写，看是不是「此后每次发布都分配不到固定点」（P5 逐字）。
-    let real_stuck = real_result.is_err();
-    let real_four_more = if real_stuck {
-        probe_four_more_overwrites(&parameters, &devices, &allocator, &current, instance, 8000)
-    } else {
-        vec!["not_applicable_raise_succeeded".to_string(); 4]
-    };
-    emitter.emit(&format!(
-        "name=q3e_f_kou_four_more pool={pool_label} results={}",
-        real_four_more.join(",")
-    ));
-    let real_remount = {
-        let mut remount_devices = devices_from_memory_pool(&memory_pool_snapshot(&devices));
-        match mount_writable(&parameters, &mut remount_devices) {
-            Ok(_) => "remounted_ok".to_string(),
-            Err(error) => format!("remount_failed:{error:?}"),
-        }
-    };
-    emitter.emit(&format!(
-        "name=q3e_f_kou_remount pool={pool_label} result={real_remount}"
-    ));
-
-    // G7（公开入口重组，可失败版本）
-    let mut reconstructed_raise_devices = devices_from_memory_pool(&memory_pool_snapshot(&devices));
-    let mut reconstructed_raise_allocator = allocator.clone();
-    let mut reconstructed_raise_current = current.clone();
-    let reconstructed_raise_result = raise_rollback_floor_by_reconstructing_fallible(
-        &parameters,
-        &mut reconstructed_raise_devices,
-        &mut reconstructed_raise_allocator,
-        &mut reconstructed_raise_current,
-        ceiling,
-    );
-    let reconstructed_raise_first_push_result = match &reconstructed_raise_result {
-        Ok(_) => "succeeded".to_string(),
-        Err(publish_error) => format!("failed_placement_refused:{publish_error:?}"),
-    };
-    // G7 的重组函数里回收永远是 `Immediately`、从不 `HeldUntilFloorTakesEffect`：这个口径没有
-    // 「扣住」这个状态，`release_reclaim_holds` 这个函数它根本不调——不是「有没有走到」，是「不适用」。
-    emitter.emit(&format!(
-        "name=q3e_g7 pool={pool_label} first_push_result={reconstructed_raise_first_push_result} release_reclaim_holds_reached=not_applicable_g7_never_holds"
-    ));
-    let reconstructed_raise_stuck = reconstructed_raise_result.is_err();
-    let reconstructed_raise_four_more = if reconstructed_raise_stuck {
-        probe_four_more_overwrites(&parameters, &devices, &allocator, &current, instance, 9000)
-    } else {
-        vec!["not_applicable_raise_succeeded".to_string(); 4]
-    };
-    emitter.emit(&format!(
-        "name=q3e_g7_four_more pool={pool_label} results={}",
-        reconstructed_raise_four_more.join(",")
-    ));
-    let reconstructed_raise_remount = {
-        let mut remount_devices = devices_from_memory_pool(&memory_pool_snapshot(&devices));
-        match mount_writable(&parameters, &mut remount_devices) {
-            Ok(_) => "remounted_ok".to_string(),
-            Err(error) => format!("remount_failed:{error:?}"),
-        }
-    };
-    emitter.emit(&format!(
-        "name=q3e_g7_remount pool={pool_label} result={reconstructed_raise_remount}"
-    ));
-
-    emitter.emit(&format!(
-        "name=q3e_x8a pool={pool_label} status=done f_kou_stuck={real_stuck} reconstructed_raise_stuck={reconstructed_raise_stuck} both_stuck_at_same_step={} note=see_x8a_held_measure_and_f_kou_g7_lines",
-        real_stuck == reconstructed_raise_stuck,
-    ));
-}
-
-/// R-7（第一节 R1、第七节 7.2）：HY 原来靠「只跑 3 次覆盖写」留出空间，`e ≥ 8` 从没被装置核过；
-/// 这一次改成 `e ≥ max(8, f)` 现核——3 次不满足就减少覆盖写次数直到满足（登记「五」5.1 逐字）。
-/// 只建前缀、量 `e`/`f`，不跑 `run_small_pool_cell` 的其余部分（避免为找 cap 打印一堆用不上的行）。
-fn e156_find_hy_cap_satisfying_open_segment_condition(parameters: &MakeFilesystemParameters) -> u64 {
-    for cap in (0..=3u64).rev() {
-        let (_devices, allocator, _instance, _current, _overwrite_count, _stop_reason) =
-            build_small_pool_prefix(parameters, Some(cap));
-        let open_segment_free_slots = e156_open_segment_free_slots(&allocator, DeviceIdentity(0));
-        let existing_leaves = e156_existing_leaf_positions(&allocator, DeviceIdentity(0));
-        let fixed_point_slots = e156_empty_publish_fixed_point_slots(&existing_leaves);
-        if open_segment_free_slots >= fixed_point_slots.max(8) {
-            return cap;
-        }
-    }
-    0
-}
-
-// ============================================================================================
-// 岔路 1（第 9 行）：Hh(k)，甲-T1（真实基线）与 G12（旁路评估）多扣的差随洞数怎么长。缩小范围：
-// ρ = 1、回收时点固定「实」、洞位置固定「后」；S 这一维跑 S = 8（mkfs 默认）与 S = 4（下界，方向相反，
-// 「八」第六类）两个取样点，各自 k ∈ {0, 1, 2}（登记「五、5.2」Hh(k, 位置, S, ρ) 的 S = 16、ρ = 1/4、
-// 回收时点「每」、洞位置「前」、k = 4 这几维未扫，见交回报告岔路表）。
-// ============================================================================================
-
 /// D0 上「仍分配」记录的 (槽 → 分配代)：只给岔路 1 的分配代账本用（G12 需要一个真实记录里没有的分配代字段，
 /// 登记「三」N2；装置自己维护一份影子表，见登记 M6）。
 fn snapshot_allocated_generations(allocator: &PoolAllocator) -> HashMap<u64, u64> {
@@ -2421,8 +1046,7 @@ fn snapshot_allocated_generations(allocator: &PoolAllocator) -> HashMap<u64, u64
 
 /// 把这次发布新产生的释放记进分配代账本：`before` 是这次发布之前 D0 全部「仍分配」记录的 (槽 → 分配代)，
 /// `allocator` 是这次发布之后的状态。真实记录的 `generation` 字段在释放那一刻被改写成释放代（登记「三」I1），
-/// 分配代因此只能从 `before` 里找；账本里查不到的（mkfs 格式期分配、从没被本函数追踪过）按 0（genesis）记，
-/// 这是保守默认，不是量出来的数（写进交回报告）。
+/// 分配代因此只能从 `before` 里找；账本里查不到的按 0（genesis）记，这是保守默认，不是量出来的数（产物逐格报查不到的条数）。
 fn record_release_generations(
     ledger: &mut HashMap<u64, u64>,
     before: &HashMap<u64, u64>,
@@ -2439,59 +1063,361 @@ fn record_release_generations(
     }
 }
 
-/// 一格 Hh(k) 的读数：Q1a（甲-T1 多扣）、Q1b（G12 多扣）、Δ、h_缺。只在最后一次无崩溃重开（「实」读法的
-/// 回收点）之后测一次，ρ = 1，位置固定「后」（洞造在环转过一圈之后）；`slots_per_region` 这一维按「五、5.6」
-/// 第六类取 S = 8（mkfs 默认）与 S = 4（下界，方向相反）两个取样点，见交回报告岔路表：ρ、回收时点「每」、
-/// 洞位置「前」、S = 16 这几维这一段仍未扫。
-struct HhCell {
-    slots_per_region: u64,
-    holes: u64,
-    /// 主 agent 续派第 1 条：步数对齐的对照组用这个字段标「这一格是 k=0，但工作负载发布次数补到与
-    /// holes=`matched_to_holes` 那格相同」；真实的 Hh(k) 格这个字段是 0（不是对照）。
-    matched_to_holes: u64,
-    txg: u64,
-    q1a_over_withheld: u64,
-    q1b_over_withheld: u64,
-    delta: u64,
-    missing_txg_count: u64,
+// ============================================================================================
+// 锚点模型：第 4 次重跑登记第十三节命令四 `anchors_e156_r4.py`（第三版）的逐行移植。不 import 装置别的部分、不读 `crates/`，
+// 只用脚本头那几句条款：根环 txg u 落槽 u mod 3S；可再分配 = 已释放 ∧ 释放代 ≤ 环里最旧有效根（Hh 里 F_生效 = 0）；
+// 每一次发布（连空发布）都重写树表单元，mkfs 之后两次暖机是零单元发布；暖机直到两块盘上各有一条本实例的根；
+// c2 之后新实例第一个 txg = max(环里最高, 记录最高) + 1。产物里 `name=anchor_dump` 那几行去掉前缀之后与 Python 脚本
+// `--dump` 的 `DUMP` 行逐行比（报告里的命令）。
+// ============================================================================================
+mod anchor_model {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    /// 区域设备 [0, 1, 0]（D22（单元原子性怎么合成） 已定项 1）。
+    const REGION_DEVICE_NUMBERS: [u64; 3] = [0, 1, 0];
+    /// 造洞之后隔几次工作负载发布再造下一个（登记表头第 4 行）。
+    const WORKLOAD_PUBLISHES_BETWEEN_HOLES: u64 = 2;
+    const FIRST_TRANSACTION_TXG: u64 = 3;
+    /// 「前」位置第一个洞最早落的 txg（C380 逐字的 txg 5）。
+    const FRONT_HOLE_EARLIEST_TXG: u64 = 5;
+    const ZERO_UNIT_WARM_UP_TXGS: [u64; 2] = [1, 2];
+
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    enum AnchorPublishRole {
+        MakeFilesystemWarmUpOrFirstTransaction,
+        Workload,
+        Crash,
+        InstanceRow,
+        WarmUpAfterRecovery,
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    pub struct AnchorRow {
+        pub txg: u64,
+        pub floor: u64,
+        pub tree_table_lower_bound: u64,
+        pub interval_rule_tree_table_over_withheld: u64,
+        pub missing_txgs: u64,
+        pub live_holes: u64,
+        pub live_holes_closed_form: u64,
+        pub missing_txgs_closed_form: u64,
+        pub is_observed: bool,
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct AnchorCell {
+        pub rows: Vec<AnchorRow>,
+        pub holes: Vec<u64>,
+        pub recovery_ends: Vec<u64>,
+        pub fits: bool,
+        pub end: u64,
+    }
+
+    impl AnchorCell {
+        pub fn observed_row(&self, txg: u64) -> Option<&AnchorRow> {
+            self.rows
+                .iter()
+                .find(|row| row.txg == txg && row.is_observed)
+        }
+    }
+
+    fn device_of_txg(txg: u64) -> u64 {
+        REGION_DEVICE_NUMBERS[usize::try_from(txg % 3).expect("对 3 取模落在 usize 里")]
+    }
+
+    fn build_history(
+        slots_per_region: u64,
+        hole_count: u64,
+        front: bool,
+    ) -> (BTreeMap<u64, AnchorPublishRole>, Vec<u64>, Vec<u64>) {
+        let ring_length = 3 * slots_per_region;
+        let mut roles = BTreeMap::new();
+        for setup_txg in 0..=FIRST_TRANSACTION_TXG {
+            roles.insert(
+                setup_txg,
+                AnchorPublishRole::MakeFilesystemWarmUpOrFirstTransaction,
+            );
+        }
+        let mut holes: Vec<u64> = Vec::new();
+        let mut recovery_ends: Vec<u64> = Vec::new();
+        let mut latest_txg = FIRST_TRANSACTION_TXG;
+        let first_hole_at = if front {
+            FRONT_HOLE_EARLIEST_TXG
+        } else {
+            ring_length + FIRST_TRANSACTION_TXG + 1
+        };
+        let mut workload_publishes_since_the_last_hole = 0u64;
+        while u64::try_from(holes.len()).expect("洞数落在 u64 内") < hole_count {
+            let gap_is_long_enough = holes.is_empty()
+                || workload_publishes_since_the_last_hole >= WORKLOAD_PUBLISHES_BETWEEN_HOLES;
+            if latest_txg + 1 >= first_hole_at && gap_is_long_enough {
+                latest_txg += 1;
+                roles.insert(latest_txg, AnchorPublishRole::Crash);
+                holes.push(latest_txg);
+                latest_txg += 1;
+                roles.insert(latest_txg, AnchorPublishRole::InstanceRow);
+                let mut covered_devices = BTreeSet::from([device_of_txg(latest_txg)]);
+                while covered_devices.len() < 2 {
+                    latest_txg += 1;
+                    roles.insert(latest_txg, AnchorPublishRole::WarmUpAfterRecovery);
+                    covered_devices.insert(device_of_txg(latest_txg));
+                }
+                recovery_ends.push(latest_txg);
+                workload_publishes_since_the_last_hole = 0;
+            } else {
+                latest_txg += 1;
+                roles.insert(latest_txg, AnchorPublishRole::Workload);
+                workload_publishes_since_the_last_hole = if holes.is_empty() {
+                    0
+                } else {
+                    workload_publishes_since_the_last_hole + 1
+                };
+            }
+        }
+        (roles, holes, recovery_ends)
+    }
+
+    /// 脚本的 `run(S, k, pos, end)`：`end_override` 给了就跑到它，没给就跑到最后一个洞 + 3S + 2。
+    pub fn run(
+        slots_per_region: u64,
+        hole_count: u64,
+        front: bool,
+        end_override: Option<u64>,
+    ) -> AnchorCell {
+        let ring_length = 3 * slots_per_region;
+        let (mut roles, holes, recovery_ends) = build_history(slots_per_region, hole_count, front);
+        let last_txg = *roles.keys().next_back().expect("至少有 mkfs 那一条");
+        let end = end_override
+            .unwrap_or_else(|| holes.last().expect("没给终点的格至少有一个洞") + ring_length + 2);
+        for padding_txg in last_txg + 1..=end {
+            roles.insert(padding_txg, AnchorPublishRole::Workload);
+        }
+        let mut ring: BTreeMap<u64, u64> = BTreeMap::new();
+        let mut tree_tables: BTreeMap<u64, Option<u64>> = BTreeMap::from([(0, None)]);
+        let mut live_tree_table = 0u64;
+        let mut rows = Vec::new();
+        for txg in 0..=end {
+            let role = roles[&txg];
+            if !ZERO_UNIT_WARM_UP_TXGS.contains(&txg) && txg > 0 {
+                tree_tables.insert(live_tree_table, Some(txg));
+                tree_tables.insert(txg, None);
+                live_tree_table = txg;
+            }
+            if role != AnchorPublishRole::Crash {
+                ring.insert(txg % ring_length, txg);
+            }
+            if role == AnchorPublishRole::Crash || txg < FIRST_TRANSACTION_TXG {
+                continue;
+            }
+            let oldest = *ring.values().min().expect("环里至少有 mkfs 那一条根");
+            let floor = oldest;
+            let roots: BTreeSet<u64> = ring.values().copied().collect();
+            let is_referenced = |allocation: u64, release: Option<u64>| match release {
+                None => true,
+                Some(release) => roots
+                    .iter()
+                    .any(|root| allocation <= *root && *root < release),
+            };
+            let withheld: BTreeSet<u64> = tree_tables
+                .iter()
+                .filter(|(_, release)| match release {
+                    None => true,
+                    Some(release) => *release > floor,
+                })
+                .map(|(allocation, _)| *allocation)
+                .collect();
+            let referenced: BTreeSet<u64> = tree_tables
+                .iter()
+                .filter(|(allocation, release)| is_referenced(**allocation, **release))
+                .map(|(allocation, _)| *allocation)
+                .collect();
+            let interval_rule_withheld = referenced.clone();
+            let missing_txgs = (oldest..=txg)
+                .filter(|candidate| !roots.contains(candidate))
+                .count();
+            let live_holes = holes
+                .iter()
+                .filter(|hole| {
+                    oldest <= **hole
+                        && **hole <= txg
+                        && !roots.contains(hole)
+                        && ring
+                            .get(&(**hole % ring_length))
+                            .is_none_or(|occupant| *occupant < **hole)
+                })
+                .count();
+            let live_closed_form: Vec<u64> = holes
+                .iter()
+                .copied()
+                .filter(|hole| {
+                    *hole <= txg && txg < hole + ring_length - u64::from(*hole < ring_length)
+                })
+                .collect();
+            let first_live_hole_after_one_ring = live_closed_form
+                .iter()
+                .copied()
+                .filter(|hole| *hole >= ring_length)
+                .min();
+            let missing_txgs_closed_form = match first_live_hole_after_one_ring {
+                Some(hole) => txg - hole + 1,
+                None => u64::try_from(live_closed_form.len()).expect("洞数落在 u64 内"),
+            };
+            rows.push(AnchorRow {
+                txg,
+                floor,
+                tree_table_lower_bound: u64::try_from(withheld.difference(&referenced).count())
+                    .expect("落在 u64 内"),
+                interval_rule_tree_table_over_withheld: u64::try_from(
+                    interval_rule_withheld.difference(&referenced).count(),
+                )
+                .expect("落在 u64 内"),
+                missing_txgs: u64::try_from(missing_txgs).expect("落在 u64 内"),
+                live_holes: u64::try_from(live_holes).expect("落在 u64 内"),
+                live_holes_closed_form: u64::try_from(live_closed_form.len()).expect("落在 u64 内"),
+                missing_txgs_closed_form,
+                is_observed: txg == FIRST_TRANSACTION_TXG
+                    || role == AnchorPublishRole::Workload
+                    || recovery_ends.contains(&txg),
+            });
+        }
+        let pairs_do_not_collide = holes.iter().enumerate().all(|(index, first)| {
+            holes[index + 1..].iter().all(|second| {
+                !(first % ring_length == second % ring_length
+                    && first.abs_diff(*second) < ring_length)
+            })
+        });
+        let no_hole_one_ring_before_another = holes
+            .iter()
+            .filter(|hole| **hole >= ring_length)
+            .all(|hole| !holes.contains(&(hole - ring_length)));
+        AnchorCell {
+            rows,
+            holes,
+            recovery_ends,
+            fits: pairs_do_not_collide && no_hole_one_ring_before_another,
+            end,
+        }
+    }
+
+    /// k = 0 的终点：同一 S 下 k ∈ {1, 2, 4} × {前, 后} 各族终点的最大值（脚本的 `k0_end`，排不下的格也算进去）。
+    pub fn without_holes_end(slots_per_region: u64) -> u64 {
+        [false, true]
+            .iter()
+            .flat_map(|front| {
+                [1u64, 2, 4].map(|hole_count| run(slots_per_region, hole_count, *front, None).end)
+            })
+            .max()
+            .expect("六个格")
+    }
+
+    /// 脚本的 `a10`：每个树表单元第一次能被分配的那次发布的 txg − 它的释放 txg。
+    pub fn tree_table_reclaim_lags(slots_per_region: u64, end: u64) -> BTreeSet<u64> {
+        let ring_length = 3 * slots_per_region;
+        let mut lags = BTreeSet::new();
+        let mut ring: BTreeMap<u64, u64> = BTreeMap::new();
+        let mut released: BTreeMap<u64, u64> = BTreeMap::new();
+        let mut live_tree_table = 0u64;
+        let mut seen: BTreeSet<(u64, u64)> = BTreeSet::new();
+        for txg in 0..=end {
+            if !ZERO_UNIT_WARM_UP_TXGS.contains(&txg) && txg > 0 {
+                released.insert(live_tree_table, txg);
+                live_tree_table = txg;
+            }
+            ring.insert(txg % ring_length, txg);
+            let floor = *ring.values().min().expect("环里有根");
+            for (allocation, release) in &released {
+                if *release <= floor && seen.insert((*allocation, *release)) {
+                    lags.insert(txg + 1 - release);
+                }
+            }
+        }
+        lags
+    }
+
+    /// 脚本 `--dump` 的那几行（`DUMP` 换成调用方加的前缀），格序照脚本：先按位置标签（`-` < `back` < `front`）、再按 k。
+    pub fn dump_lines(slots_per_region: u64) -> Vec<String> {
+        let without_holes = run(
+            slots_per_region,
+            0,
+            false,
+            Some(without_holes_end(slots_per_region)),
+        );
+        let mut cells: Vec<(u64, &'static str, AnchorCell)> = vec![(0, "-", without_holes)];
+        for (front, label) in [(false, "back"), (true, "front")] {
+            for hole_count in [1u64, 2, 4] {
+                cells.push((
+                    hole_count,
+                    label,
+                    run(slots_per_region, hole_count, front, None),
+                ));
+            }
+        }
+        let mut lines = Vec::new();
+        for (hole_count, label, cell) in &cells {
+            let fits_label = if cell.fits { "True" } else { "False" };
+            for row in cell.rows.iter().filter(|row| row.is_observed) {
+                lines.push(format!(
+                    "S={slots_per_region} k={hole_count} pos={label} fits={fits_label} txg={} floor={} h_que={} h_dong={} q1a_tree_table_lower_bound={}",
+                    row.txg, row.floor, row.missing_txgs, row.live_holes, row.tree_table_lower_bound
+                ));
+            }
+        }
+        lines
+    }
 }
 
-/// 一次「造洞」（c2 崩溃 + 恢复 + 2 次间隔发布）固定消耗的 txg 数——2026-09-24 现测（`research/results/
-/// e156-alloc-basis-counts-2026-09-24-stage3.out` 的 `q1_hh` 行）：S = 8 与 S = 4 上 holes=1 相对
-/// holes=0（环转门槛那一刻）都恰好多 6 个 txg，holes=2 恰好多 12 个（与 S 无关——「造洞」本身不受环深
-/// 影响，环深只决定「环转过一圈」门槛与洞的计数）。步数对齐对照（主 agent 续派第 1 条）靠这个常数换算。
-const HOLE_TXG_COST: u64 = 6;
+// ============================================================================================
+// 岔路 1 的族 Hh(k, 位置, S, ρ)：第 4 次重跑登记第五节 5.3、第一节 1.3 W1–W9。
+// ============================================================================================
 
-/// 岔路 1 的一格：造 `holes` 个洞（C380 逐字：c2 崩溃 + 一次可写挂载恢复），每个洞之间隔 2 次工作负载发布，
-/// 最后再无崩溃重开一次（甲-T1「实」读法的回收点），在那一刻测 Q1a/Q1b/Δ/h_缺。
-///
-/// `matched_to_holes`（主 agent 续派第 1 条，步数对齐对照）：非零时这一格**不造任何洞**（`holes` 必须为
-/// 0），但把「环转过一圈」的门槛多加 `matched_to_holes * HOLE_TXG_COST` 步工作负载，让总发布步数与
-/// `holes = matched_to_holes` 那一格对齐（两格都只在最后无崩溃重开一次）——用来把「Δ 随洞数长」与
-/// 「Δ 随步数长」这两件事分开。真实的 Hh(k) 格传 0。
-fn run_hh_cell(
-    parameters: &MakeFilesystemParameters,
-    region_devices: &[DeviceIdentity; 3],
-    spacing: u32,
-    slots_per_region: RootRingSlotsPerRegion,
-    holes: u64,
-    matched_to_holes: u64,
-    emitter: &mut Emitter,
-) -> HhCell {
-    assert!(
-        holes == 0 || matched_to_holes == 0,
-        "步数对齐对照只对 holes=0 这一格定义，真实的 Hh(k) 格不许再对齐"
-    );
-    let extra_ring_fill_steps = matched_to_holes * HOLE_TXG_COST;
-    let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = (0..2u32)
-        .map(|number| {
-            (
-                DeviceIdentity(number),
-                SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
-            )
-        })
-        .collect();
-    let genesis = make_filesystem(parameters, &mut devices).expect("Hh mkfs");
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum HolePosition {
+    Front,
+    Back,
+}
+
+impl HolePosition {
+    fn label(self) -> &'static str {
+        match self {
+            HolePosition::Front => "front",
+            HolePosition::Back => "back",
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum WorkloadDensity {
+    EveryPublishOverwrites,
+    OneOverwriteInFourPublishes,
+}
+
+impl WorkloadDensity {
+    fn label(self) -> &'static str {
+        match self {
+            WorkloadDensity::EveryPublishOverwrites => "1",
+            WorkloadDensity::OneOverwriteInFourPublishes => "1/4",
+        }
+    }
+    fn publishes_per_overwrite(self) -> u64 {
+        match self {
+            WorkloadDensity::EveryPublishOverwrites => 1,
+            WorkloadDensity::OneOverwriteInFourPublishes => 4,
+        }
+    }
+}
+
+/// W7：分配器从哪来。产品路径（mkfs 同一个进程里装根环表，之后用每次可写挂载交回的）；PC-分配器换回不装根环表的那一种。
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum HhAllocatorSource {
+    ProductPathWithRootRing,
+    WithoutRootRingPositiveControl,
+}
+
+/// 不装根环表的分配器（PC-分配器）：`PoolAllocator::new` 加 mkfs 那两个单元，与装置原有的做法相同。
+fn allocator_without_the_root_ring(
+    devices: &[(DeviceIdentity, SparseBlockDevice)],
+    genesis: &MakeFilesystemOutput,
+) -> PoolAllocator {
     let mut allocator = PoolAllocator::new(
         devices
             .iter()
@@ -2500,24 +1426,1014 @@ fn run_hh_cell(
     );
     allocator.mark_format_time_units(
         Placement {
-            slot: INSTANCE_TABLE_SLOT,
-            span: 2,
+            slot: genesis_slot_on_device_zero(&genesis.root.instance_table.locations),
+            span: INSTANCE_TABLE_SPAN_SLOTS,
         },
         Placement {
-            slot: TREE_TABLE_GENESIS_SLOT,
-            span: 1,
+            slot: genesis_slot_on_device_zero(&genesis.root.tree_table.locations),
+            span: TransactionUnit::TreeTable.span_slots(),
         },
     );
-    let mut instance = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
+    allocator
+}
+
+fn genesis_slot_on_device_zero(
+    locations: &[singlefs_core::pointer::LocationEntry; 2],
+) -> SlotNumber {
+    locations
+        .iter()
+        .find(|location| location.device == DeviceIdentity(0))
+        .map(|location| location.slot)
+        .expect("两份位置条目里有一份在盘 0")
+}
+
+fn allocator_for_hh(
+    source: HhAllocatorSource,
+    parameters: &MakeFilesystemParameters,
+    devices: &[(DeviceIdentity, SparseBlockDevice)],
+    genesis: &MakeFilesystemOutput,
+) -> PoolAllocator {
+    match source {
+        HhAllocatorSource::ProductPathWithRootRing => {
+            allocator_after_make_filesystem(parameters, devices, genesis)
+        }
+        HhAllocatorSource::WithoutRootRingPositiveControl => {
+            allocator_without_the_root_ring(devices, genesis)
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct HhCellShape {
+    slots_per_region: u64,
+    density: WorkloadDensity,
+    hole_count: u64,
+    position: Option<HolePosition>,
+}
+
+impl HhCellShape {
+    fn position_label(&self) -> &'static str {
+        self.position.map_or("-", HolePosition::label)
+    }
+    fn fields(&self) -> String {
+        format!(
+            "s={} rho={} k={} position={}",
+            self.slots_per_region,
+            self.density.label(),
+            self.hole_count,
+            self.position_label()
+        )
+    }
+}
+
+/// 一个 txg 的那一版在装置这边留下的事实（W9 的独立路径「装置自己为那个 txg 留的发布输出」）：它引用的槽（两盘同槽）与树表落点。
+#[derive(Clone, Debug)]
+struct PublishedVersionFacts {
+    referenced_slots: BTreeSet<u64>,
+    tree_table_slot: u64,
+}
+
+fn facts_of_published_version(output: &TransactionOutput) -> PublishedVersionFacts {
+    let mut referenced_slots = BTreeSet::new();
+    let mut has_instance_table = false;
+    for unit in &output.units {
+        if matches!(unit.identity, TransactionUnit::InstanceTable) {
+            has_instance_table = true;
+        }
+        for slot in unit.slot.0..unit.slot.0 + unit.identity.span_slots() {
+            referenced_slots.insert(slot);
+        }
+    }
+    if !has_instance_table {
+        let instance_table_slot =
+            genesis_slot_on_device_zero(&output.root.instance_table.locations).0;
+        for slot in instance_table_slot..instance_table_slot + INSTANCE_TABLE_SPAN_SLOTS {
+            referenced_slots.insert(slot);
+        }
+    }
+    PublishedVersionFacts {
+        referenced_slots,
+        tree_table_slot: output.unit(TransactionUnit::TreeTable).slot.0,
+    }
+}
+
+/// 零单元那几版（mkfs 的第 0 代与之后两次暖机）：引用的是根记录两条指针直接指着的实例表与第 0 版树表。
+fn facts_of_zero_unit_version(root: &RootRecord) -> PublishedVersionFacts {
+    let tree_table_slot = genesis_slot_on_device_zero(&root.tree_table.locations).0;
+    let instance_table_slot = genesis_slot_on_device_zero(&root.instance_table.locations).0;
+    let mut referenced_slots: BTreeSet<u64> =
+        (instance_table_slot..instance_table_slot + INSTANCE_TABLE_SPAN_SLOTS).collect();
+    for slot in tree_table_slot..tree_table_slot + TransactionUnit::TreeTable.span_slots() {
+        referenced_slots.insert(slot);
+    }
+    PublishedVersionFacts {
+        referenced_slots,
+        tree_table_slot,
+    }
+}
+
+/// W9 的盘上路径：同一条根，按 `recovery::allocation_records_under_root` 读出的仍分配记录，展开成这块盘上的槽。
+/// 没有分配记录树的那几版（`allocation_records_under_root` 对第 0 代树表给空）按根记录里实例表与树表两条指针的这块盘那一份算。
+#[allow(
+    clippy::ptr_arg,
+    reason = "`allocation_records_under_root` 收 `&dyn PoolReader`，切片没有大小不能转成它，要传 Vec 本身"
+)]
+fn referenced_slots_read_from_disk(
+    devices: &Vec<(DeviceIdentity, SparseBlockDevice)>,
+    root: &RootRecord,
+    device: DeviceIdentity,
+) -> Result<BTreeSet<u64>, String> {
+    let records =
+        allocation_records_under_root(devices, root).map_err(|failure| format!("{failure:?}"))?;
+    if records.is_empty() {
+        let mut slots = BTreeSet::new();
+        for (locations, span) in [
+            (&root.instance_table.locations, INSTANCE_TABLE_SPAN_SLOTS),
+            (
+                &root.tree_table.locations,
+                TransactionUnit::TreeTable.span_slots(),
+            ),
+        ] {
+            for location in locations
+                .iter()
+                .filter(|location| location.device == device)
+            {
+                slots.extend(location.slot.0..location.slot.0 + span);
+            }
+        }
+        return Ok(slots);
+    }
+    Ok(records
+        .iter()
+        .filter(|record| record.device == device && !record.is_released)
+        .flat_map(|record| record.slot.0..record.slot.0 + u64::from(record.span_slots))
+        .collect())
+}
+
+/// 回收门槛 `max(F_生效, 环里最旧有效根)`，从镜像的根环读（D16（发布语义） 已定项 1「可再分配」「环里最旧有效根」两行）。
+/// 一条有效根都没有时按 0 算（Hh 里不出现）。
+fn reclaim_threshold_read_from_the_ring_image(
+    effective_floor: u64,
+    valid_root_txgs: &BTreeSet<u64>,
+) -> u64 {
+    valid_root_txgs
+        .iter()
+        .min()
+        .copied()
+        .unwrap_or(0)
+        .max(effective_floor)
+}
+
+/// h_缺：[环里最旧有效根.txg, 最新持久根.txg] 里环里没有自证合法根的 txg 个数（原登记「一」第 2 行字面）。
+fn missing_txg_count(
+    oldest_valid_root_txg: u64,
+    newest_root_txg: u64,
+    root_txgs: &BTreeSet<u64>,
+) -> u64 {
+    let missing = (oldest_valid_root_txg..=newest_root_txg)
+        .filter(|candidate| !root_txgs.contains(candidate))
+        .count();
+    u64::try_from(missing).expect("落在 u64 内")
+}
+
+/// h_洞（r2 R2 第二读法）：注入过的洞里，落在 [环里最旧有效根, 最新根] 之间、环里没有它的根、且它的根环槽还没被更新的根盖掉的个数。
+fn live_hole_count(
+    injected_holes: &[u64],
+    oldest_valid_root_txg: u64,
+    newest_root_txg: u64,
+    root_txgs: &BTreeSet<u64>,
+    slot_occupant_txg: impl Fn(u64) -> Option<u64>,
+) -> u64 {
+    let live = injected_holes
+        .iter()
+        .copied()
+        .filter(|hole| {
+            let slot_not_overwritten_by_a_newer_root =
+                slot_occupant_txg(*hole).is_none_or(|occupant| occupant < *hole);
+            oldest_valid_root_txg <= *hole
+                && *hole <= newest_root_txg
+                && !root_txgs.contains(hole)
+                && slot_not_overwritten_by_a_newer_root
+        })
+        .count();
+    u64::try_from(live).expect("落在 u64 内")
+}
+
+/// G12 的谓词（原登记 5.3 第一张表）：已释放的记录只要环里有一条算数的根的 txg 落在它的寿命 [分配代, 释放代) 里就扣住。
+fn lifetime_interval_rule_withholds(
+    allocation_generation: u64,
+    release_generation: u64,
+    counted_root_txgs: &BTreeSet<u64>,
+) -> bool {
+    counted_root_txgs
+        .iter()
+        .any(|root_txg| *root_txg >= allocation_generation && *root_txg < release_generation)
+}
+
+fn expanded_slots<'records>(
+    records: impl Iterator<Item = &'records AllocationRecord>,
+) -> BTreeSet<u64> {
+    records
+        .flat_map(|record| record.slot.0..record.slot.0 + u64::from(record.span_slots))
+        .collect()
+}
+
+fn size_of_difference(first: &BTreeSet<u64>, second: &BTreeSet<u64>) -> u64 {
+    u64::try_from(first.difference(second).count()).expect("落在 u64 内")
+}
+
+/// 一块盘上两条臂、两个回收时点的「不发」与多扣（Q1a、Q1b 与 Q1a⁺、Q1b⁺；登记第六节 6.2，r2 Q1a / Q1b 字面）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct DeviceOverWithheld {
+    floor_rule_real: u64,
+    floor_rule_every_publish: u64,
+    interval_rule_real: u64,
+    interval_rule_every_publish: u64,
+    floor_rule_real_referenced_but_free: u64,
+    floor_rule_every_publish_referenced_but_free: u64,
+    interval_rule_referenced_but_free: u64,
+    no_reclaim_floor_rule_real: u64,
+    no_reclaim_floor_rule_every_publish: u64,
+    no_reclaim_interval_rule_real: u64,
+    no_reclaim_interval_rule_every_publish: u64,
+    reclaim_rule_violations: u64,
+    released_records_without_allocation_generation: u64,
+}
+
+struct DeviceOverWithheldInputs<'context> {
+    allocator: &'context PoolAllocator,
+    device: DeviceIdentity,
+    referenced: &'context BTreeSet<u64>,
+    ring_threshold: u64,
+    every_publish_floor: u64,
+    interval_rule_root_txgs: &'context BTreeSet<u64>,
+    allocation_generations: &'context HashMap<u64, u64>,
+}
+
+fn over_withheld_on_device(inputs: &DeviceOverWithheldInputs<'_>) -> DeviceOverWithheld {
+    let free_map = inputs
+        .allocator
+        .devices
+        .iter()
+        .find(|map| map.device == inputs.device)
+        .expect("这块盘在池里");
+    let records: Vec<&AllocationRecord> = inputs
+        .allocator
+        .records()
+        .iter()
+        .filter(|record| record.device == inputs.device)
+        .collect();
+    let still_allocated =
+        expanded_slots(records.iter().copied().filter(|record| !record.is_released));
+    let released_not_reclaimed = expanded_slots(
+        records
+            .iter()
+            .copied()
+            .filter(|record| record.is_released && !free_map.is_free(record.slot)),
+    );
+    let every_publish_withheld_released =
+        expanded_slots(records.iter().copied().filter(|record| {
+            record.is_released && record.generation.0 > inputs.every_publish_floor
+        }));
+    let allocation_generation_of =
+        |record: &AllocationRecord| inputs.allocation_generations.get(&record.slot.0).copied();
+    let interval_rule_withheld_released =
+        expanded_slots(records.iter().copied().filter(|record| {
+            record.is_released
+                && lifetime_interval_rule_withholds(
+                    allocation_generation_of(record).unwrap_or(0),
+                    record.generation.0,
+                    inputs.interval_rule_root_txgs,
+                )
+        }));
+    let every_released =
+        expanded_slots(records.iter().copied().filter(|record| record.is_released));
+    let union = |extra: &BTreeSet<u64>| -> BTreeSet<u64> {
+        still_allocated.union(extra).copied().collect()
+    };
+    let floor_rule_real_withheld = union(&released_not_reclaimed);
+    let floor_rule_every_publish_withheld = union(&every_publish_withheld_released);
+    let interval_rule_withheld = union(&interval_rule_withheld_released);
+    let no_reclaim_withheld = union(&every_released);
+    let reclaim_rule_violations = records
+        .iter()
+        .filter(|record| record.is_released)
+        .filter(|record| {
+            let reclaimed = free_map.is_free(record.slot);
+            (reclaimed && record.generation.0 > inputs.ring_threshold)
+                || (!reclaimed && record.generation.0 <= inputs.ring_threshold)
+        })
+        .count();
+    let released_records_without_allocation_generation = records
+        .iter()
+        .filter(|record| record.is_released && allocation_generation_of(record).is_none())
+        .count();
+    DeviceOverWithheld {
+        floor_rule_real: size_of_difference(&floor_rule_real_withheld, inputs.referenced),
+        floor_rule_every_publish: size_of_difference(
+            &floor_rule_every_publish_withheld,
+            inputs.referenced,
+        ),
+        interval_rule_real: size_of_difference(&interval_rule_withheld, inputs.referenced),
+        interval_rule_every_publish: size_of_difference(&interval_rule_withheld, inputs.referenced),
+        floor_rule_real_referenced_but_free: size_of_difference(
+            inputs.referenced,
+            &floor_rule_real_withheld,
+        ),
+        floor_rule_every_publish_referenced_but_free: size_of_difference(
+            inputs.referenced,
+            &floor_rule_every_publish_withheld,
+        ),
+        interval_rule_referenced_but_free: size_of_difference(
+            inputs.referenced,
+            &interval_rule_withheld,
+        ),
+        no_reclaim_floor_rule_real: size_of_difference(&no_reclaim_withheld, inputs.referenced),
+        no_reclaim_floor_rule_every_publish: size_of_difference(
+            &no_reclaim_withheld,
+            inputs.referenced,
+        ),
+        no_reclaim_interval_rule_real: size_of_difference(&no_reclaim_withheld, inputs.referenced),
+        no_reclaim_interval_rule_every_publish: size_of_difference(
+            &no_reclaim_withheld,
+            inputs.referenced,
+        ),
+        reclaim_rule_violations: u64::try_from(reclaim_rule_violations).expect("落在 u64 内"),
+        released_records_without_allocation_generation: u64::try_from(
+            released_records_without_allocation_generation,
+        )
+        .expect("落在 u64 内"),
+    }
+}
+
+/// 一个观测点上从镜像与分配器读到的全部量（登记第五节 5.3「逐发布一行的列」）。
+#[derive(Clone, Debug)]
+struct HhStateReading {
+    newest_root_txg: u64,
+    missing_txgs: u64,
+    live_holes: u64,
+    ring_threshold: u64,
+    every_publish_floor: u64,
+    effective_floor: u64,
+    abandoned_roots: u64,
+    roots_without_version_facts: u64,
+    device_zero: DeviceOverWithheld,
+    devices_equal: bool,
+    allocated_slots: u64,
+    deferred_slots: u64,
+    isolated_slots: u64,
+    not_free_beyond_allocated: u64,
+    root_ring_installed: bool,
+}
+
+struct HhStateInputs<'context> {
+    parameters: &'context MakeFilesystemParameters,
+    devices: &'context [(DeviceIdentity, SparseBlockDevice)],
+    allocator: &'context PoolAllocator,
+    versions: &'context BTreeMap<u64, PublishedVersionFacts>,
+    allocation_generations: &'context HashMap<u64, u64>,
+    injected_holes: &'context [u64],
+}
+
+fn read_hh_state(inputs: &HhStateInputs<'_>) -> HhStateReading {
+    let geometry = &inputs.parameters.geometry;
+    let region_devices = &inputs.parameters.region_devices;
+    let filesystem_identifier = &inputs.parameters.filesystem_identifier;
+    let ring = readable_roots_with_ring_slots(
+        inputs.devices,
+        region_devices,
+        geometry,
+        filesystem_identifier,
+    );
+    let ring_root_txgs: BTreeSet<u64> =
+        ring.iter().map(|(_, root)| root.checkpoint_txg.0).collect();
+    let newest_root = ring
+        .iter()
+        .map(|(_, root)| *root)
+        .max_by_key(|root| (root.checkpoint_txg, root.instance))
+        .expect("环里至少有一条根");
+    let newest_root_table = instance_table_chain_of_root(inputs.devices, &newest_root)
+        .ok()
+        .map(|chain| chain.records);
+    let abandoned_root_txgs: BTreeSet<u64> = ring
+        .iter()
+        .filter(|(_, root)| {
+            newest_root_table
+                .as_ref()
+                .is_some_and(|table| root_is_abandoned_by_the_instance_table(root, table))
+        })
+        .map(|(_, root)| root.checkpoint_txg.0)
+        .collect();
+    let valid_root_txgs: BTreeSet<u64> = ring_root_txgs
+        .difference(&abandoned_root_txgs)
+        .copied()
+        .collect();
+    let effective_floor = effective_rollback_floor(
+        inputs.devices,
+        region_devices,
+        geometry,
+        filesystem_identifier,
+    )
+    .0;
+    let newest_root_txg = newest_root.checkpoint_txg.0;
+    let slots_per_region = geometry.root_ring_slots_per_region;
+    let ring_threshold =
+        reclaim_threshold_read_from_the_ring_image(effective_floor, &valid_root_txgs);
+    let oldest_valid_root_txg = valid_root_txgs.iter().min().copied().unwrap_or(0);
+    let missing_txgs = missing_txg_count(oldest_valid_root_txg, newest_root_txg, &ring_root_txgs);
+    let occupant_by_ring_slot: BTreeMap<RootRingSlot, u64> = ring
+        .iter()
+        .map(|(ring_slot, root)| (*ring_slot, root.checkpoint_txg.0))
+        .collect();
+    let live_holes = live_hole_count(
+        inputs.injected_holes,
+        oldest_valid_root_txg,
+        newest_root_txg,
+        &ring_root_txgs,
+        |hole| {
+            occupant_by_ring_slot
+                .get(&target_for_publish(CheckpointTxg(hole), slots_per_region))
+                .copied()
+        },
+    );
+    let every_publish_floor = ring_threshold;
+    let interval_rule_root_txgs: BTreeSet<u64> = ring_root_txgs
+        .iter()
+        .copied()
+        .filter(|txg| abandoned_root_txgs.contains(txg) || *txg >= effective_floor)
+        .collect();
+    let mut referenced = BTreeSet::new();
+    let mut roots_without_version_facts = 0u64;
+    for txg in &ring_root_txgs {
+        match inputs.versions.get(txg) {
+            Some(facts) => referenced.extend(facts.referenced_slots.iter().copied()),
+            None => roots_without_version_facts += 1,
+        }
+    }
+    let reading_on = |device: DeviceIdentity| {
+        over_withheld_on_device(&DeviceOverWithheldInputs {
+            allocator: inputs.allocator,
+            device,
+            referenced: &referenced,
+            ring_threshold,
+            every_publish_floor,
+            interval_rule_root_txgs: &interval_rule_root_txgs,
+            allocation_generations: inputs.allocation_generations,
+        })
+    };
+    let device_zero = reading_on(DeviceIdentity(0));
+    let device_one = reading_on(DeviceIdentity(1));
+    let free_map_zero = inputs
+        .allocator
+        .devices
+        .iter()
+        .find(|map| map.device == DeviceIdentity(0))
+        .expect("盘 0 在池里");
+    let not_free_record_slots = expanded_slots(
+        inputs
+            .allocator
+            .records()
+            .iter()
+            .filter(|record| record.device == DeviceIdentity(0)),
+    )
+    .into_iter()
+    .filter(|slot| !free_map_zero.is_free(SlotNumber(*slot)))
+    .count();
+    HhStateReading {
+        newest_root_txg,
+        missing_txgs,
+        live_holes,
+        ring_threshold,
+        every_publish_floor,
+        effective_floor,
+        abandoned_roots: u64::try_from(abandoned_root_txgs.len()).expect("落在 u64 内"),
+        roots_without_version_facts,
+        device_zero,
+        devices_equal: device_zero == device_one,
+        allocated_slots: free_map_zero.allocated_slots(),
+        deferred_slots: free_map_zero.deferred_slots(),
+        isolated_slots: free_map_zero.isolated_slots(),
+        not_free_beyond_allocated: u64::try_from(not_free_record_slots)
+            .expect("落在 u64 内")
+            .saturating_sub(free_map_zero.allocated_slots()),
+        root_ring_installed: inputs.allocator.root_ring_occupancy().is_some(),
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum ObservationPoint {
+    FirstTransaction,
+    Workload(WorkloadPublishKind),
+    MountReturn,
+}
+
+impl ObservationPoint {
+    fn label(self) -> &'static str {
+        match self {
+            ObservationPoint::FirstTransaction => "first_transaction",
+            ObservationPoint::Workload(kind) => kind.label(),
+            ObservationPoint::MountReturn => "mount_return",
+        }
+    }
+}
+
+/// 逐观测点一行（产物 `name=q1_observation`）。
+#[derive(Clone, Debug)]
+struct HhObservation {
+    txg: u64,
+    point: ObservationPoint,
+    workload_publishes: u64,
+    holes_injected: u64,
+    reading: HhStateReading,
+    self_reclaimed_real: Option<u64>,
+    anchor: Option<anchor_model::AnchorRow>,
+}
+
+impl HhObservation {
+    fn over_withheld(&self, arm: Arm, timing: ReclaimTiming) -> u64 {
+        let device_zero = &self.reading.device_zero;
+        match (arm, timing) {
+            (Arm::FloorRule, ReclaimTiming::Real) => device_zero.floor_rule_real,
+            (Arm::FloorRule, ReclaimTiming::EveryPublish) => device_zero.floor_rule_every_publish,
+            (Arm::LifetimeIntervalRule, ReclaimTiming::Real) => device_zero.interval_rule_real,
+            (Arm::LifetimeIntervalRule, ReclaimTiming::EveryPublish) => {
+                device_zero.interval_rule_every_publish
+            }
+        }
+    }
+    fn delta(&self, timing: ReclaimTiming) -> i64 {
+        i64::try_from(self.over_withheld(Arm::FloorRule, timing)).expect("落在 i64 内")
+            - i64::try_from(self.over_withheld(Arm::LifetimeIntervalRule, timing))
+                .expect("落在 i64 内")
+    }
+}
+
+/// 两条臂：甲-T1（回收按门槛 max(F_生效, 环里最旧有效根)，今天的实现）与 G12（按寿命区间）。
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Arm {
+    FloorRule,
+    LifetimeIntervalRule,
+}
+
+/// 两个回收时点（W1、W2）。
+#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord)]
+enum ReclaimTiming {
+    Real,
+    EveryPublish,
+}
+
+impl ReclaimTiming {
+    fn label(self) -> &'static str {
+        match self {
+            ReclaimTiming::Real => "real",
+            ReclaimTiming::EveryPublish => "every_publish",
+        }
+    }
+}
+
+/// 一次 c2 之后那一次可写挂载的报告（PQ1 的 ①–④、K14 / S1(k)、G-adm）。
+#[derive(Clone, Debug)]
+struct HoleRecovery {
+    hole_txg: u64,
+    crashed_publish_kind: WorkloadPublishKind,
+    prefix_applied: usize,
+    first_txg_of_the_new_instance: u64,
+    last_txg_of_the_mount: u64,
+    publishes_in_the_mount: u64,
+    ring_has_a_root_at_the_hole_txg: bool,
+    hole_slot_content: String,
+    cut_matches_the_restored_image: bool,
+    sectors_differing_from_the_root_slot_only_image: Vec<(u32, u64)>,
+    steps_after_the_root_slot_write: Vec<&'static str>,
+    root_slot_writes_in_the_crashed_publish: usize,
+    mount_admission: &'static str,
+    mount_floor_raise_sequences: u64,
+}
+
+#[derive(Clone, Debug)]
+struct HhRunOutcome {
+    family: &'static str,
+    shape: HhCellShape,
+    allocator_source: HhAllocatorSource,
+    cut_point: CrashCutPoint,
+    registered_end: u64,
+    actual_end: u64,
+    truncation: Option<(u64, String)>,
+    observations: Vec<HhObservation>,
+    recoveries: Vec<HoleRecovery>,
+    genesis_root_in_ring: bool,
+    slots_per_region_read_back: u64,
+    first_transaction_matches_the_registered_anchor: bool,
+    ring_wrap_overwrites_checked: u64,
+    ring_wrap_overwrite_mismatches: u64,
+    tree_table_release_checks: u64,
+    tree_table_release_violations: u64,
+    mount_schedule_mismatches: u64,
+    disk_cross_checked_roots: u64,
+    disk_cross_check_mismatches: u64,
+    disk_cross_check_failures: Vec<String>,
+    admission_refusals: u64,
+    tree_table_lags_real: BTreeSet<u64>,
+    tree_table_lags_every_publish: BTreeSet<u64>,
+    checker_red_on_hole_states: u64,
+    checker_judged_hole_states: u64,
+}
+
+/// 一格要怎么跑（第 4 次重跑登记第五节 5.3、5.4）。
+struct HhRunRequest<'anchor> {
+    family: &'static str,
+    shape: HhCellShape,
+    allocator_source: HhAllocatorSource,
+    cut_point: CrashCutPoint,
+    anchor: &'anchor anchor_model::AnchorCell,
+    check_overwrites_before_the_ring_wraps: bool,
+    judge_checker_on_hole_states: bool,
+    emit_positive_control_no_reclaim: bool,
+}
+
+/// 这一格挂在第 4 次重跑登记第十一节停机 S1(k) 的 K13：每一版换下上一版的树表单元，释放代 = 这一版的 txg。
+struct TreeTableLineage {
+    previous_tree_table_slot: u64,
+    pending_release_checks: Vec<(u64, u64)>,
+    releases: Vec<(u64, u64)>,
+}
+
+impl TreeTableLineage {
+    fn note_version(
+        &mut self,
+        versions: &mut BTreeMap<u64, PublishedVersionFacts>,
+        output: &TransactionOutput,
+    ) {
+        let facts = facts_of_published_version(output);
+        let txg = output.root.checkpoint_txg.0;
+        self.pending_release_checks
+            .push((self.previous_tree_table_slot, txg));
+        self.releases.push((self.previous_tree_table_slot, txg));
+        self.previous_tree_table_slot = facts.tree_table_slot;
+        versions.insert(txg, facts);
+    }
+}
+
+fn describe_the_root_ring_slot_of_txg(
+    devices: &[(DeviceIdentity, SparseBlockDevice)],
+    parameters: &MakeFilesystemParameters,
+    txg: u64,
+) -> String {
+    let ring_slot = target_for_publish(
+        CheckpointTxg(txg),
+        parameters.geometry.root_ring_slots_per_region,
+    );
+    match read_root_ring_slot(
+        devices,
+        &parameters.region_devices,
+        &parameters.geometry,
+        &parameters.filesystem_identifier,
+        ring_slot,
+    ) {
+        RootRingSlotReading::SelfVerified(root) => format!("root_txg_{}", root.checkpoint_txg.0),
+        RootRingSlotReading::Bad(_) => {
+            let device = parameters.region_devices
+                [usize::try_from(ring_slot.region).expect("区域号落在 3 以内")];
+            let offset = slot_offset(ring_slot, parameters.geometry.fixed_structure_slot_spacing);
+            let root_slot_bytes =
+                usize::try_from(parameters.geometry.physical_block_size).expect("根槽宽");
+            match PoolReader::read(devices, device, offset, root_slot_bytes) {
+                Some(bytes) if bytes.iter().all(|byte| *byte == 0) => "never_written".to_string(),
+                Some(_) => "not_self_verified".to_string(),
+                None => "unreadable".to_string(),
+            }
+        }
+    }
+}
+
+fn mount_admission_label(admission: &MountSpaceAdmission) -> &'static str {
+    match admission {
+        MountSpaceAdmission::AdmittedBeforeAcquisition => "admitted_before_acquisition",
+        MountSpaceAdmission::AdmittedAfterTheFloorRaises { .. } => {
+            "admitted_after_the_floor_raises"
+        }
+        MountSpaceAdmission::StillShortAfterTheFloorRaises { .. } => {
+            "still_short_after_the_floor_raises"
+        }
+        MountSpaceAdmission::NotJudgedByTheTestOnlySwitch => "not_judged_by_the_test_only_switch",
+    }
+}
+
+fn first_transaction_matches_the_registered_anchor(
+    allocator: &PoolAllocator,
+    first: &TransactionOutput,
+) -> bool {
+    let (allocated, _free, deferred) = accounting_row_slots(allocator, DeviceIdentity(0));
+    let mut placements: Vec<(u64, u64)> = first
+        .units
+        .iter()
+        .map(|unit| (unit.slot.0, unit.identity.span_slots()))
+        .collect();
+    placements.sort_unstable();
+    first.root.checkpoint_txg.0 == 3
+        && allocated == E156_FIRST_TRANSACTION_ITEM1_SLOTS
+        && deferred == E156_FIRST_TRANSACTION_ITEM5_SLOTS
+        && placements == E156_FIRST_TRANSACTION_PLACEMENTS
+        && allocator.records().len() == E156_FIRST_TRANSACTION_EXPECTED_RECORD_COUNT
+}
+
+fn released_not_reclaimed_slots_on_device_zero(allocator: &PoolAllocator) -> BTreeSet<u64> {
+    let free_map = allocator
+        .devices
+        .iter()
+        .find(|map| map.device == DeviceIdentity(0))
+        .expect("盘 0 在池里");
+    expanded_slots(allocator.records().iter().filter(|record| {
+        record.device == DeviceIdentity(0) && record.is_released && !free_map.is_free(record.slot)
+    }))
+}
+
+/// 一格跑完之前的状态：设备、分配器、现行那一版与各本账。只给 [`run_hh_history`] 用。
+struct HhRunState {
+    parameters: MakeFilesystemParameters,
+    devices: Vec<(DeviceIdentity, SparseBlockDevice)>,
+    allocator: PoolAllocator,
+    current: TransactionOutput,
+    instance: InstanceGeneration,
+    versions: BTreeMap<u64, PublishedVersionFacts>,
+    allocation_generations: HashMap<u64, u64>,
+    lineage: TreeTableLineage,
+    injected_holes: Vec<u64>,
+    workload_publishes: u64,
+    tree_table_lag_seen_real: BTreeSet<(u64, u64)>,
+    tree_table_lag_seen_every_publish: BTreeSet<(u64, u64)>,
+}
+
+impl HhRunState {
+    /// 观测：读镜像与分配器、K13 与 A10 的记账、Q1e、与锚点那一行并排，打一行 `name=q1_observation`。
+    fn observe(
+        &mut self,
+        emitter: &mut Emitter,
+        request: &HhRunRequest<'_>,
+        outcome: &mut HhRunOutcome,
+        point: ObservationPoint,
+        self_reclaimed_real: Option<u64>,
+    ) {
+        let reading = read_hh_state(&HhStateInputs {
+            parameters: &self.parameters,
+            devices: &self.devices,
+            allocator: &self.allocator,
+            versions: &self.versions,
+            allocation_generations: &self.allocation_generations,
+            injected_holes: &self.injected_holes,
+        });
+        let txg = self.current.root.checkpoint_txg.0;
+        let free_map_zero = self
+            .allocator
+            .devices
+            .iter()
+            .find(|map| map.device == DeviceIdentity(0))
+            .expect("盘 0 在池里");
+        for (slot, expected_release) in std::mem::take(&mut self.lineage.pending_release_checks) {
+            outcome.tree_table_release_checks += 1;
+            let released_as_expected = self.allocator.records().iter().any(|record| {
+                record.device == DeviceIdentity(0)
+                    && record.slot.0 == slot
+                    && record.is_released
+                    && record.generation.0 == expected_release
+            });
+            if !released_as_expected {
+                outcome.tree_table_release_violations += 1;
+            }
+        }
+        for (slot, release) in self.lineage.releases.iter().copied() {
+            if release > txg {
+                continue;
+            }
+            if !self.tree_table_lag_seen_real.contains(&(slot, release))
+                && free_map_zero.is_free(SlotNumber(slot))
+            {
+                self.tree_table_lag_seen_real.insert((slot, release));
+                outcome.tree_table_lags_real.insert(txg + 1 - release);
+            }
+            if !self
+                .tree_table_lag_seen_every_publish
+                .contains(&(slot, release))
+                && release <= reading.every_publish_floor
+            {
+                self.tree_table_lag_seen_every_publish
+                    .insert((slot, release));
+                outcome
+                    .tree_table_lags_every_publish
+                    .insert(txg + 1 - release);
+            }
+        }
+        let checker_on_hole = if request.judge_checker_on_hole_states && reading.missing_txgs > 0 {
+            let red = is_red(&verdict(&memory_pool_snapshot(&self.devices), "I-3.1"));
+            outcome.checker_judged_hole_states += 1;
+            if red {
+                outcome.checker_red_on_hole_states += 1;
+            }
+            if red {
+                "red"
+            } else {
+                "green"
+            }
+        } else {
+            "not_judged"
+        };
+        let anchor = request.anchor.observed_row(txg).copied();
+        let observation = HhObservation {
+            txg,
+            point,
+            workload_publishes: self.workload_publishes,
+            holes_injected: u64::try_from(self.injected_holes.len()).expect("落在 u64 内"),
+            reading,
+            self_reclaimed_real,
+            anchor,
+        };
+        emit_observation(emitter, request, &observation, checker_on_hole);
+        outcome.observations.push(observation);
+    }
+
+    /// W9：每条环里的根，装置自己那一份引用与盘上 `allocation_records_under_root` 读出的仍分配记录逐条比（两块盘各比一次）。
+    fn cross_check_references_against_the_disk(&self, outcome: &mut HhRunOutcome) {
+        let ring = readable_roots(
+            &self.devices,
+            &self.parameters.region_devices,
+            &self.parameters.geometry,
+            &self.parameters.filesystem_identifier,
+        );
+        for root in &ring {
+            outcome.disk_cross_checked_roots += 1;
+            let Some(facts) = self.versions.get(&root.checkpoint_txg.0) else {
+                outcome.disk_cross_check_mismatches += 1;
+                outcome
+                    .disk_cross_check_failures
+                    .push(format!("txg{}:no_version_facts", root.checkpoint_txg.0));
+                continue;
+            };
+            for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+                match referenced_slots_read_from_disk(&self.devices, root, device) {
+                    Ok(slots) if slots == facts.referenced_slots => {}
+                    Ok(slots) => {
+                        outcome.disk_cross_check_mismatches += 1;
+                        outcome.disk_cross_check_failures.push(format!(
+                            "txg{}:device{}:disk_only={}:device_only={}",
+                            root.checkpoint_txg.0,
+                            device.0,
+                            slots.difference(&facts.referenced_slots).count(),
+                            facts.referenced_slots.difference(&slots).count()
+                        ));
+                    }
+                    Err(failure) => {
+                        outcome.disk_cross_check_mismatches += 1;
+                        outcome.disk_cross_check_failures.push(format!(
+                            "txg{}:device{}:unreadable:{}",
+                            root.checkpoint_txg.0,
+                            device.0,
+                            failure.replace(' ', "_")
+                        ));
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn emit_observation(
+    emitter: &mut Emitter,
+    request: &HhRunRequest<'_>,
+    observation: &HhObservation,
+    checker_on_hole: &str,
+) {
+    let reading = &observation.reading;
+    let device_zero = &reading.device_zero;
+    let anchor_fields = observation.anchor.map_or_else(
+        || "anchor_row=missing".to_string(),
+        |row| {
+            format!(
+                "anchor_floor={} anchor_h_que={} anchor_h_dong={} tree_table_lower_bound={}",
+                row.floor, row.missing_txgs, row.live_holes, row.tree_table_lower_bound
+            )
+        },
+    );
+    let positive_control_fields = if request.emit_positive_control_no_reclaim {
+        format!(
+            " pc_no_reclaim_q1a_real={} pc_no_reclaim_q1a_every={} pc_no_reclaim_q1b_real={} pc_no_reclaim_q1b_every={}",
+            device_zero.no_reclaim_floor_rule_real,
+            device_zero.no_reclaim_floor_rule_every_publish,
+            device_zero.no_reclaim_interval_rule_real,
+            device_zero.no_reclaim_interval_rule_every_publish
+        )
+    } else {
+        String::new()
+    };
+    emitter.emit(&format!(
+        "name=q1_observation family={} {} txg={} point={} workload_publishes={} holes_injected={} h_que={} h_dong={} floor={} f_effective={} q1a_real={} q1a_every={} q1b_real={} q1b_every={} delta_real={} delta_every={} q1a_plus_real={} q1a_plus_every={} q1b_plus={} self_reclaimed_real={} allocated={} deferred={} isolated={} not_free_beyond_allocated={} devices_equal={} root_ring_installed={} k10_violations={} abandoned_roots={} roots_without_version_facts={} released_without_allocation_generation={} i31_on_hole={checker_on_hole} {anchor_fields}{positive_control_fields}",
+        request.family,
+        request.shape.fields(),
+        observation.txg,
+        observation.point.label(),
+        observation.workload_publishes,
+        observation.holes_injected,
+        reading.missing_txgs,
+        reading.live_holes,
+        reading.ring_threshold,
+        reading.effective_floor,
+        device_zero.floor_rule_real,
+        device_zero.floor_rule_every_publish,
+        device_zero.interval_rule_real,
+        device_zero.interval_rule_every_publish,
+        observation.delta(ReclaimTiming::Real),
+        observation.delta(ReclaimTiming::EveryPublish),
+        device_zero.floor_rule_real_referenced_but_free,
+        device_zero.floor_rule_every_publish_referenced_but_free,
+        device_zero.interval_rule_referenced_but_free,
+        observation
+            .self_reclaimed_real
+            .map_or_else(|| "not_a_publish".to_string(), |count| count.to_string()),
+        reading.allocated_slots,
+        reading.deferred_slots,
+        reading.isolated_slots,
+        reading.not_free_beyond_allocated,
+        reading.devices_equal,
+        reading.root_ring_installed,
+        device_zero.reclaim_rule_violations,
+        reading.abandoned_roots,
+        reading.roots_without_version_facts,
+        device_zero.released_records_without_allocation_generation,
+    ));
+}
+
+/// 岔路 1 一格：mkfs（产品路径分配器）→ 取号 → 暖机 → 第一个事务（txg 3）→ 工作负载，在锚点模型给的洞 txg 上造 c2 并可写挂载，
+/// 跑到锚点模型给的终点。任一次发布或挂载报错即截断（W8）。
+#[allow(
+    clippy::too_many_lines,
+    reason = "一格的主历史（mkfs、第一个事务、工作负载、c2 与挂载、逐观测点）连着写才对得上登记 5.3 的骨架逐行"
+)]
+fn run_hh_history(emitter: &mut Emitter, request: &HhRunRequest<'_>) -> HhRunOutcome {
+    let shape = request.shape;
+    let parameters = parameters_with_slots_per_region(shape.slots_per_region);
+    let mut outcome = HhRunOutcome {
+        family: request.family,
+        shape,
+        allocator_source: request.allocator_source,
+        cut_point: request.cut_point,
+        registered_end: request.anchor.end,
+        actual_end: 0,
+        truncation: None,
+        observations: Vec::new(),
+        recoveries: Vec::new(),
+        genesis_root_in_ring: false,
+        slots_per_region_read_back: 0,
+        first_transaction_matches_the_registered_anchor: false,
+        ring_wrap_overwrites_checked: 0,
+        ring_wrap_overwrite_mismatches: 0,
+        tree_table_release_checks: 0,
+        tree_table_release_violations: 0,
+        mount_schedule_mismatches: 0,
+        disk_cross_checked_roots: 0,
+        disk_cross_check_mismatches: 0,
+        disk_cross_check_failures: Vec::new(),
+        admission_refusals: 0,
+        tree_table_lags_real: BTreeSet::new(),
+        tree_table_lags_every_publish: BTreeSet::new(),
+        checker_red_on_hole_states: 0,
+        checker_judged_hole_states: 0,
+    };
+    let mut devices = new_pool_devices();
+    let genesis = make_filesystem(&parameters, &mut devices).expect("Hh mkfs");
+    outcome.genesis_root_in_ring = readable_roots(
+        &devices,
+        &parameters.region_devices,
+        &parameters.geometry,
+        &parameters.filesystem_identifier,
+    )
+    .iter()
+    .any(|root| root.checkpoint_txg.0 == 0);
+    outcome.slots_per_region_read_back = choose_system_configuration(&devices)
+        .map(|configuration| {
+            configuration
+                .immutable
+                .sizes
+                .root_ring_slots_per_region
+                .count()
+        })
+        .unwrap_or(0);
+    let mut allocator = allocator_for_hh(request.allocator_source, &parameters, &devices, &genesis);
+    let genesis_facts = facts_of_zero_unit_version(&genesis.root);
+    let mut versions: BTreeMap<u64, PublishedVersionFacts> = BTreeMap::new();
+    for zero_unit_txg in 0..=2u64 {
+        versions.insert(zero_unit_txg, genesis_facts.clone());
+    }
+    let instance = {
+        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
         acquire_instance(&mut pool).expect("Hh 取号")
     };
     let warm_up_output = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
+        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
         warm_up(&mut pool, &genesis.root, instance).expect("Hh 暖机")
     };
-    let mut current: TransactionOutput = {
-        let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
+    let mut allocation_generations: HashMap<u64, u64> = HashMap::new();
+    let before_first = snapshot_allocated_generations(&allocator);
+    let first = {
+        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
         publish_first_file(
             &mut pool,
             &mut allocator,
@@ -2529,233 +2445,1556 @@ fn run_hh_cell(
             instance,
             &warm_up_output.last_record_bytes,
         )
-        .expect("Hh 第一个事务")
     };
+    let first = match first {
+        Ok(first) => first,
+        Err(error) => {
+            outcome.truncation = Some((3, format!("{error:?}")));
+            emit_cell_summary(emitter, &outcome);
+            return outcome;
+        }
+    };
+    record_release_generations(&mut allocation_generations, &before_first, &allocator);
+    outcome.first_transaction_matches_the_registered_anchor =
+        first_transaction_matches_the_registered_anchor(&allocator, &first);
+    let mut state = HhRunState {
+        parameters,
+        devices,
+        allocator,
+        current: first.clone(),
+        instance,
+        versions,
+        allocation_generations,
+        lineage: TreeTableLineage {
+            previous_tree_table_slot: genesis_facts.tree_table_slot,
+            pending_release_checks: Vec::new(),
+            releases: Vec::new(),
+        },
+        injected_holes: Vec::new(),
+        workload_publishes: 0,
+        tree_table_lag_seen_real: BTreeSet::new(),
+        tree_table_lag_seen_every_publish: BTreeSet::new(),
+    };
+    state.lineage.note_version(&mut state.versions, &first);
+    state.observe(
+        emitter,
+        request,
+        &mut outcome,
+        ObservationPoint::FirstTransaction,
+        None,
+    );
 
-    let mut ledger: HashMap<u64, u64> = HashMap::new();
-    let slots_per_region_count = slots_per_region.count();
-    let ring_length = 3 * slots_per_region_count;
-
-    // 工作负载直到环转过一圈（位置 = 后：最新持久根 txg ≥ 3S + 3 之后才许造洞，登记「五」5.2 Hh 字面）；
-    // `extra_ring_fill_steps` > 0 时（步数对齐对照）多跑这些步，不影响门槛本身的定义，只是把这一格的
-    // 工作负载段拉长到与某个 holes=k 格总步数相同。
-    let mut step = 0u64;
-    while current.root.checkpoint_txg.0 < ring_length + 3 + extra_ring_fill_steps {
-        let before_ring_fill = snapshot_allocated_generations(&allocator);
-        current = {
-            let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-            publish_overwrite(
-                &mut pool,
-                &mut allocator,
-                &current,
-                FirstFile {
-                    content: &overwrite_content(1000 + step),
-                    write_time_seconds: FIXED_WRITE_TIME_SECONDS + 1000 + step,
-                },
-                instance,
-            )
-            .expect("Hh 环转前的工作负载")
+    let publishes_per_overwrite = shape.density.publishes_per_overwrite();
+    let mut workload_index_in_segment = 0u64;
+    let mut content_salt = 0u64;
+    let mut overwrites_before_the_ring_wraps = 0u64;
+    while state.current.root.checkpoint_txg.0 < request.anchor.end {
+        let next_txg = state.current.root.checkpoint_txg.0 + 1;
+        let kind = if workload_index_in_segment.is_multiple_of(publishes_per_overwrite) {
+            WorkloadPublishKind::Overwrite
+        } else {
+            WorkloadPublishKind::EmptyPublish
         };
-        record_release_generations(&mut ledger, &before_ring_fill, &allocator);
-        step += 1;
-    }
-
-    // 造 `holes` 个洞：c2 崩溃 + 一次可写挂载恢复，每个洞之间隔 2 次工作负载发布（读法写死「洞」：C380 逐字）。
-    let mut holes_made = 0u64;
-    while holes_made < holes {
-        let before_hole = snapshot_allocated_generations(&allocator);
-        let c2_pool = crash_before_root_persists(
-            parameters,
-            &mut devices,
-            &mut allocator,
-            &current,
-            &overwrite_content(2000 + holes_made),
-            FIXED_WRITE_TIME_SECONDS + 2000 + holes_made,
-            instance,
-            region_devices,
-            spacing,
-            slots_per_region,
-        );
-        record_release_generations(&mut ledger, &before_hole, &allocator);
-        let mut recovered_devices = devices_from_memory_pool(&c2_pool);
-        let recovered = mount_writable(parameters, &mut recovered_devices).expect("Hh c2 恢复");
-        devices = recovered_devices;
-        allocator = recovered.allocator;
-        instance = recovered.output.instance;
-        current = recovered
-            .current
-            .into_file_version()
-            .expect("Hh c2 恢复后现行版本带文件");
-        holes_made += 1;
-        for gap in 0..2u64 {
-            let before_gap = snapshot_allocated_generations(&allocator);
-            current = {
-                let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
-                publish_overwrite(
-                    &mut pool,
-                    &mut allocator,
-                    &current,
-                    FirstFile {
-                        content: &overwrite_content(3000 + holes_made * 10 + gap),
-                        write_time_seconds: FIXED_WRITE_TIME_SECONDS + 3000 + holes_made * 10 + gap,
-                    },
-                    instance,
-                )
-                .expect("Hh 两个洞之间的工作负载")
+        content_salt += 1;
+        if request.anchor.holes.contains(&next_txg) {
+            let before_crash = snapshot_allocated_generations(&state.allocator);
+            let crashed = match crash_publish_before_its_root_persists(
+                &state.parameters,
+                &state.devices,
+                &state.allocator,
+                &state.current,
+                state.instance,
+                kind,
+                content_salt,
+                request.cut_point,
+            ) {
+                Ok(crashed) => crashed,
+                Err(error) => {
+                    if matches!(error, PublishError::SpaceAdmissionRefused(_)) {
+                        outcome.admission_refusals += 1;
+                    }
+                    outcome.truncation = Some((next_txg, format!("{error:?}")));
+                    break;
+                }
             };
-            record_release_generations(&mut ledger, &before_gap, &allocator);
+            record_release_generations(
+                &mut state.allocation_generations,
+                &before_crash,
+                &crashed.allocator_after_the_crashed_publish,
+            );
+            state
+                .lineage
+                .note_version(&mut state.versions, &crashed.crashed_output);
+            state.injected_holes.push(next_txg);
+            let mut recovered_devices = devices_from_memory_pool(&crashed.cut_image);
+            let mounted = match mount_writable(&state.parameters, &mut recovered_devices) {
+                Ok(mounted) => mounted,
+                Err(error) => {
+                    outcome.truncation = Some((next_txg, format!("{error:?}")));
+                    break;
+                }
+            };
+            state.devices = recovered_devices;
+            let mut mount_versions: Vec<TransactionOutput> = Vec::new();
+            if let Some(row) = mounted.output.row_publish.file_version() {
+                mount_versions.push(row.clone());
+            }
+            for warm in &mounted.output.warm_up_publishes {
+                if let Some(version) = warm.file_version() {
+                    mount_versions.push(version.clone());
+                }
+            }
+            let floor_raise_sequences = mounted.output.space_admission.floor_raises();
+            for raised in floor_raise_sequences {
+                mount_versions.extend(raised.publishes.iter().cloned());
+            }
+            let mut before_mount =
+                snapshot_allocated_generations(&crashed.allocator_after_the_crashed_publish);
+            for version in &mount_versions {
+                for record in version
+                    .allocation_records
+                    .iter()
+                    .filter(|record| !record.is_released && record.device == DeviceIdentity(0))
+                {
+                    before_mount.insert(record.slot.0, record.generation.0);
+                }
+            }
+            record_release_generations(
+                &mut state.allocation_generations,
+                &before_mount,
+                &mounted.allocator,
+            );
+            for version in &mount_versions {
+                state.lineage.note_version(&mut state.versions, version);
+            }
+            let first_txg_of_the_new_instance = mounted.output.row_publish.root().checkpoint_txg.0;
+            let publishes_in_the_mount = 1
+                + u64::try_from(mounted.output.warm_up_publishes.len()).expect("落在 u64 内")
+                + floor_raise_sequences
+                    .iter()
+                    .map(|raised| u64::try_from(raised.publishes.len()).expect("落在 u64 内"))
+                    .sum::<u64>();
+            let mount_admission = mount_admission_label(&mounted.output.space_admission);
+            let mount_floor_raise_sequences =
+                u64::try_from(floor_raise_sequences.len()).expect("落在 u64 内");
+            let prefix_applied = mounted.output.journal.prefix_applied;
+            state.allocator = mounted.allocator;
+            state.instance = mounted.output.instance;
+            state.current = mounted
+                .current
+                .into_file_version()
+                .expect("Hh c2 恢复之后现行版本带文件");
+            let last_txg_of_the_mount = state.current.root.checkpoint_txg.0;
+            let hole_index = state.injected_holes.len() - 1;
+            let planned_end = request.anchor.recovery_ends.get(hole_index).copied();
+            if first_txg_of_the_new_instance != next_txg + 1
+                || planned_end != Some(last_txg_of_the_mount)
+                || planned_end.map(|end| end - next_txg) != Some(publishes_in_the_mount)
+            {
+                outcome.mount_schedule_mismatches += 1;
+            }
+            let ring_has_a_root_at_the_hole_txg = readable_roots(
+                &state.devices,
+                &state.parameters.region_devices,
+                &state.parameters.geometry,
+                &state.parameters.filesystem_identifier,
+            )
+            .iter()
+            .any(|root| root.checkpoint_txg.0 == next_txg);
+            let recovery = HoleRecovery {
+                hole_txg: next_txg,
+                crashed_publish_kind: kind,
+                prefix_applied,
+                first_txg_of_the_new_instance,
+                last_txg_of_the_mount,
+                publishes_in_the_mount,
+                ring_has_a_root_at_the_hole_txg,
+                hole_slot_content: describe_the_root_ring_slot_of_txg(
+                    &state.devices,
+                    &state.parameters,
+                    next_txg,
+                ),
+                cut_matches_the_restored_image: crashed.cut_matches_the_restored_image,
+                sectors_differing_from_the_root_slot_only_image: crashed
+                    .sectors_differing_from_the_root_slot_only_image
+                    .clone(),
+                steps_after_the_root_slot_write: crashed.steps_after_the_root_slot_write.clone(),
+                root_slot_writes_in_the_crashed_publish: crashed.root_slot_writes_in_the_publish,
+                mount_admission,
+                mount_floor_raise_sequences,
+            };
+            emitter.emit(&format!(
+                "name=hole_recovery family={} {} hole_txg={} crashed_publish={} prefix_applied={} first_txg_of_new_instance={} last_txg_of_mount={} publishes_in_mount={} planned_last_txg_of_mount={} ring_has_root_at_hole_txg={} hole_slot_content={} cut_point={:?} cut_matches_root_and_system_configuration_restored_image={} sectors_differing_from_root_slot_only_restored_image={} steps_after_root_slot_write={} root_slot_writes_in_crashed_publish={} mount_admission={} mount_floor_raise_sequences={}",
+                request.family,
+                shape.fields(),
+                recovery.hole_txg,
+                recovery.crashed_publish_kind.label(),
+                recovery.prefix_applied,
+                recovery.first_txg_of_the_new_instance,
+                recovery.last_txg_of_the_mount,
+                recovery.publishes_in_the_mount,
+                planned_end.map_or_else(|| "none".to_string(), |end| end.to_string()),
+                recovery.ring_has_a_root_at_the_hole_txg,
+                recovery.hole_slot_content,
+                request.cut_point,
+                recovery.cut_matches_the_restored_image,
+                if recovery.sectors_differing_from_the_root_slot_only_image.is_empty() {
+                    "none".to_string()
+                } else {
+                    recovery
+                        .sectors_differing_from_the_root_slot_only_image
+                        .iter()
+                        .map(|(device, offset)| format!("d{device}@{offset}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                },
+                if recovery.steps_after_the_root_slot_write.is_empty() {
+                    "none".to_string()
+                } else {
+                    recovery.steps_after_the_root_slot_write.join(",")
+                },
+                recovery.root_slot_writes_in_the_crashed_publish,
+                recovery.mount_admission,
+                recovery.mount_floor_raise_sequences,
+            ));
+            outcome.recoveries.push(recovery);
+            workload_index_in_segment = 0;
+            state.cross_check_references_against_the_disk(&mut outcome);
+            state.observe(
+                emitter,
+                request,
+                &mut outcome,
+                ObservationPoint::MountReturn,
+                None,
+            );
+        } else {
+            let before_publish = snapshot_allocated_generations(&state.allocator);
+            let released_not_reclaimed_before =
+                released_not_reclaimed_slots_on_device_zero(&state.allocator);
+            let records_before = state.allocator.records().len();
+            let published = publish_one_workload(
+                &state.parameters,
+                state.devices.as_mut_slice(),
+                &mut state.allocator,
+                &state.current,
+                state.instance,
+                kind,
+                content_salt,
+            );
+            let published = match published {
+                Ok(published) => published,
+                Err(error) => {
+                    if matches!(error, PublishError::SpaceAdmissionRefused(_)) {
+                        outcome.admission_refusals += 1;
+                    }
+                    outcome.truncation = Some((next_txg, format!("{error:?}")));
+                    break;
+                }
+            };
+            state.current = published;
+            record_release_generations(
+                &mut state.allocation_generations,
+                &before_publish,
+                &state.allocator,
+            );
+            let current = state.current.clone();
+            state.lineage.note_version(&mut state.versions, &current);
+            workload_index_in_segment += 1;
+            state.workload_publishes += 1;
+            if request.check_overwrites_before_the_ring_wraps
+                && kind == WorkloadPublishKind::Overwrite
+                && overwrites_before_the_ring_wraps < E156_OVERWRITES_CHECKED_BEFORE_THE_RING_WRAPS
+            {
+                overwrites_before_the_ring_wraps += 1;
+                outcome.ring_wrap_overwrites_checked += 1;
+                let released = self_release_slots_of_this_publish(
+                    &state.allocator,
+                    DeviceIdentity(0),
+                    state.current.root.checkpoint_txg,
+                );
+                let record_delta = u64::try_from(state.allocator.records().len() - records_before)
+                    .expect("这一步的记录增量落在 u64 内");
+                if released != E156_OVERWRITE_RELEASED_SLOTS_BEFORE_THE_RING_WRAPS
+                    || record_delta != E156_OVERWRITE_RECORD_DELTA_BEFORE_THE_RING_WRAPS
+                {
+                    outcome.ring_wrap_overwrite_mismatches += 1;
+                }
+                emitter.emit(&format!(
+                    "name=ring_wrap_overwrite_check family={} {} txg={} released_d0={released} record_delta={record_delta} registered_released_d0={E156_OVERWRITE_RELEASED_SLOTS_BEFORE_THE_RING_WRAPS} registered_record_delta={E156_OVERWRITE_RECORD_DELTA_BEFORE_THE_RING_WRAPS}",
+                    request.family,
+                    shape.fields(),
+                    state.current.root.checkpoint_txg.0
+                ));
+            }
+            let free_map_zero = state
+                .allocator
+                .devices
+                .iter()
+                .find(|map| map.device == DeviceIdentity(0))
+                .expect("盘 0 在池里");
+            let self_reclaimed = released_not_reclaimed_before
+                .iter()
+                .filter(|slot| free_map_zero.is_free(SlotNumber(**slot)))
+                .count();
+            state.observe(
+                emitter,
+                request,
+                &mut outcome,
+                ObservationPoint::Workload(kind),
+                Some(u64::try_from(self_reclaimed).expect("落在 u64 内")),
+            );
         }
     }
+    outcome.actual_end = state.current.root.checkpoint_txg.0;
+    state.cross_check_references_against_the_disk(&mut outcome);
+    emit_cell_summary(emitter, &outcome);
+    outcome
+}
 
-    // 最后无崩溃重开一次：甲-T1「实」读法的回收点。
-    let mounted = mount_writable(parameters, &mut devices).expect("Hh 最终无崩溃重开");
-    allocator = mounted.allocator;
-    current = mounted
-        .current
-        .into_file_version()
-        .expect("Hh 重开后现行版本带文件");
+fn set_text(values: &BTreeSet<u64>) -> String {
+    let parts: Vec<String> = values.iter().map(ToString::to_string).collect();
+    format!("[{}]", parts.join(","))
+}
 
-    // Q1a（甲-T1 多扣）：占着（item1）− 这一刻走读引用 == 已释放未回收（item5，健康状态下）。
-    let referenced = referenced_slots(&current);
-    let (allocated, _free, deferred) = accounting_row_slots(&allocator, DeviceIdentity(0));
-    let q1a_over_withheld = allocated.saturating_sub(referenced);
+/// 轨迹（登记第八节 8.1）：峰值、环转过第一个事务那一圈之后的峰值、为正的观测点数、期末值。
+fn trajectory_text<Value: Copy + Ord + Default + std::fmt::Display>(
+    values: &[(u64, Value)],
+    after_the_first_ring_txg: u64,
+) -> String {
+    let zero = Value::default();
+    let peak = values.iter().map(|(_, value)| *value).max().unwrap_or(zero);
+    let peak_after_ring = values
+        .iter()
+        .filter(|(txg, _)| *txg >= after_the_first_ring_txg)
+        .map(|(_, value)| *value)
+        .max();
+    let positive = values.iter().filter(|(_, value)| *value > zero).count();
+    let final_value = values.last().map(|(_, value)| *value);
+    format!(
+        "peak={peak} peak_after_first_ring={} positive_points={positive} final={}",
+        peak_after_ring.map_or_else(|| "none".to_string(), |value| value.to_string()),
+        final_value.map_or_else(|| "none".to_string(), |value| value.to_string())
+    )
+}
 
-    // Q1b（G12 多扣）：遍历 D0 上「已释放」的记录，按 G12 的区间谓词判断这一刻还扣不扣住；
-    // Hh 没有回退、没有抬 F ⇒「被抛弃 ∨ txg ≥ F_生效」恒真（F_生效 恒 0），谓词退化成「环里有没有一条根的
-    // txg 落进 [分配代, 释放代)」。
-    let ring_roots = readable_roots(
-        &devices,
-        region_devices,
+fn emit_cell_summary(emitter: &mut Emitter, outcome: &HhRunOutcome) {
+    let shape = outcome.shape;
+    let observations = &outcome.observations;
+    let anchor_missing_txg_mismatches = observations
+        .iter()
+        .filter(|observation| {
+            observation
+                .anchor
+                .is_some_and(|row| row.missing_txgs != observation.reading.missing_txgs)
+        })
+        .count();
+    let anchor_live_hole_mismatches = observations
+        .iter()
+        .filter(|observation| {
+            observation
+                .anchor
+                .is_some_and(|row| row.live_holes != observation.reading.live_holes)
+        })
+        .count();
+    let anchor_floor_mismatches = observations
+        .iter()
+        .filter(|observation| {
+            observation
+                .anchor
+                .is_some_and(|row| row.floor != observation.reading.ring_threshold)
+        })
+        .count();
+    let anchor_rows_missing = observations
+        .iter()
+        .filter(|observation| observation.anchor.is_none())
+        .count();
+    let below_bound = |timing: ReclaimTiming| {
+        observations
+            .iter()
+            .filter(|observation| {
+                observation.anchor.is_some_and(|row| {
+                    observation.over_withheld(Arm::FloorRule, timing) < row.tree_table_lower_bound
+                })
+            })
+            .count()
+    };
+    let positive = |pick: &dyn Fn(&HhObservation) -> u64| {
+        observations
+            .iter()
+            .filter(|observation| pick(observation) > 0)
+            .count()
+    };
+    let (truncated, truncation_txg, truncation_error) = match &outcome.truncation {
+        Some((txg, error)) => (true, txg.to_string(), error.replace(' ', "_")),
+        None => (false, "none".to_string(), "none".to_string()),
+    };
+    let holes: BTreeSet<u64> = outcome
+        .recoveries
+        .iter()
+        .map(|recovery| recovery.hole_txg)
+        .collect();
+    let recovery_ends: BTreeSet<u64> = outcome
+        .recoveries
+        .iter()
+        .map(|recovery| recovery.last_txg_of_the_mount)
+        .collect();
+    emitter.emit(&format!(
+        "name=q1_cell family={} {} allocator={:?} cut_point={:?} registered_end={} actual_end={} truncated={truncated} truncation_txg={truncation_txg} truncation_error={truncation_error} observations={} holes_injected={} recovery_ends={} genesis_root_in_ring={} slots_per_region_read_back={} first_transaction_matches_k1_1={} ring_wrap_overwrites_checked={} ring_wrap_overwrite_mismatches={} tree_table_release_checks={} tree_table_release_violations={} mount_schedule_mismatches={} cut_mismatches_restored_image={} w9_roots_compared={} w9_mismatches={} w9_failures={} a11_h_que_mismatches={anchor_missing_txg_mismatches} a11_h_dong_mismatches={anchor_live_hole_mismatches} a14_floor_mismatches={anchor_floor_mismatches} anchor_rows_missing={anchor_rows_missing} a15_real_below_bound={} a15_every_below_bound={} k10_violation_points={} devices_unequal_points={} root_ring_missing_points={} abandoned_root_points={} roots_without_version_facts_points={} admission_refusals={} mount_admission_not_before_acquisition={} mount_floor_raise_sequences={} effective_floor_positive_points={} q1b_real_positive_points={} q1b_every_positive_points={} q1a_plus_real_positive_points={} q1a_plus_every_positive_points={} q1b_plus_positive_points={} a10_lags_real={} a10_lags_every={} i31_red_on_hole_states={} i31_judged_hole_states={}",
+        outcome.family,
+        shape.fields(),
+        outcome.allocator_source,
+        outcome.cut_point,
+        outcome.registered_end,
+        outcome.actual_end,
+        observations.len(),
+        set_text(&holes),
+        set_text(&recovery_ends),
+        outcome.genesis_root_in_ring,
+        outcome.slots_per_region_read_back,
+        outcome.first_transaction_matches_the_registered_anchor,
+        outcome.ring_wrap_overwrites_checked,
+        outcome.ring_wrap_overwrite_mismatches,
+        outcome.tree_table_release_checks,
+        outcome.tree_table_release_violations,
+        outcome.mount_schedule_mismatches,
+        outcome
+            .recoveries
+            .iter()
+            .filter(|recovery| !recovery.cut_matches_the_restored_image)
+            .count(),
+        outcome.disk_cross_checked_roots,
+        outcome.disk_cross_check_mismatches,
+        if outcome.disk_cross_check_failures.is_empty() {
+            "none".to_string()
+        } else {
+            outcome.disk_cross_check_failures.join(",")
+        },
+        below_bound(ReclaimTiming::Real),
+        below_bound(ReclaimTiming::EveryPublish),
+        positive(&|observation| observation.reading.device_zero.reclaim_rule_violations),
+        observations
+            .iter()
+            .filter(|observation| !observation.reading.devices_equal)
+            .count(),
+        observations
+            .iter()
+            .filter(|observation| !observation.reading.root_ring_installed)
+            .count(),
+        positive(&|observation| observation.reading.abandoned_roots),
+        positive(&|observation| observation.reading.roots_without_version_facts),
+        outcome.admission_refusals,
+        outcome
+            .recoveries
+            .iter()
+            .filter(|recovery| recovery.mount_admission != "admitted_before_acquisition")
+            .count(),
+        outcome
+            .recoveries
+            .iter()
+            .map(|recovery| recovery.mount_floor_raise_sequences)
+            .sum::<u64>(),
+        positive(&|observation| observation.reading.effective_floor),
+        positive(&|observation| observation.reading.device_zero.interval_rule_real),
+        positive(&|observation| observation.reading.device_zero.interval_rule_every_publish),
+        positive(&|observation| observation.reading.device_zero.floor_rule_real_referenced_but_free),
+        positive(&|observation| {
+            observation
+                .reading
+                .device_zero
+                .floor_rule_every_publish_referenced_but_free
+        }),
+        positive(&|observation| observation.reading.device_zero.interval_rule_referenced_but_free),
+        set_text(&outcome.tree_table_lags_real),
+        set_text(&outcome.tree_table_lags_every_publish),
+        outcome.checker_red_on_hole_states,
+        outcome.checker_judged_hole_states,
+    ));
+    let after_the_first_ring_txg = E156_ROOT_RING_REGIONS * shape.slots_per_region + 3;
+    let series_u64 = |pick: &dyn Fn(&HhObservation) -> u64| -> Vec<(u64, u64)> {
+        observations
+            .iter()
+            .map(|observation| (observation.txg, pick(observation)))
+            .collect()
+    };
+    let series_i64 = |timing: ReclaimTiming| -> Vec<(u64, i64)> {
+        observations
+            .iter()
+            .map(|observation| (observation.txg, observation.delta(timing)))
+            .collect()
+    };
+    let trajectories: [(&str, String); 10] = [
+        (
+            "q1a_real",
+            trajectory_text(
+                &series_u64(&|observation| {
+                    observation.over_withheld(Arm::FloorRule, ReclaimTiming::Real)
+                }),
+                after_the_first_ring_txg,
+            ),
+        ),
+        (
+            "q1a_every",
+            trajectory_text(
+                &series_u64(&|observation| {
+                    observation.over_withheld(Arm::FloorRule, ReclaimTiming::EveryPublish)
+                }),
+                after_the_first_ring_txg,
+            ),
+        ),
+        (
+            "q1b_real",
+            trajectory_text(
+                &series_u64(&|observation| {
+                    observation.over_withheld(Arm::LifetimeIntervalRule, ReclaimTiming::Real)
+                }),
+                after_the_first_ring_txg,
+            ),
+        ),
+        (
+            "q1b_every",
+            trajectory_text(
+                &series_u64(&|observation| {
+                    observation
+                        .over_withheld(Arm::LifetimeIntervalRule, ReclaimTiming::EveryPublish)
+                }),
+                after_the_first_ring_txg,
+            ),
+        ),
+        (
+            "delta_real",
+            trajectory_text(&series_i64(ReclaimTiming::Real), after_the_first_ring_txg),
+        ),
+        (
+            "delta_every",
+            trajectory_text(
+                &series_i64(ReclaimTiming::EveryPublish),
+                after_the_first_ring_txg,
+            ),
+        ),
+        (
+            "threshold_lag",
+            trajectory_text(
+                &series_u64(&|observation| {
+                    observation.reading.newest_root_txg - observation.reading.ring_threshold
+                }),
+                after_the_first_ring_txg,
+            ),
+        ),
+        (
+            "h_que",
+            trajectory_text(
+                &series_u64(&|observation| observation.reading.missing_txgs),
+                after_the_first_ring_txg,
+            ),
+        ),
+        (
+            "h_dong",
+            trajectory_text(
+                &series_u64(&|observation| observation.reading.live_holes),
+                after_the_first_ring_txg,
+            ),
+        ),
+        (
+            "self_reclaimed_real",
+            trajectory_text(
+                &observations
+                    .iter()
+                    .filter_map(|observation| {
+                        observation
+                            .self_reclaimed_real
+                            .map(|count| (observation.txg, count))
+                    })
+                    .collect::<Vec<_>>(),
+                after_the_first_ring_txg,
+            ),
+        ),
+    ];
+    for (quantity, text) in trajectories {
+        emitter.emit(&format!(
+            "name=q1_trajectory family={} {} quantity={quantity} {text}",
+            outcome.family,
+            shape.fields()
+        ));
+    }
+    let ring_length = E156_ROOT_RING_REGIONS * shape.slots_per_region;
+    let lag_at_least_ring = observations
+        .iter()
+        .filter(|observation| {
+            observation.reading.newest_root_txg - observation.reading.ring_threshold >= ring_length
+        })
+        .count();
+    let self_reclaimed_zero = observations
+        .iter()
+        .filter(|observation| observation.self_reclaimed_real == Some(0))
+        .count();
+    emitter.emit(&format!(
+        "name=q1_trajectory_extra family={} {} threshold_lag_at_least_3s_points={lag_at_least_ring} self_reclaimed_real_zero_points={self_reclaimed_zero}",
+        outcome.family,
+        shape.fields()
+    ));
+}
+
+// ============================================================================================
+// PQ2（前提 2）：抬 F 那一串的设备写，切在系统配置写完之后、每条推空根落盘之后，读 F_生效。
+// ============================================================================================
+
+struct FloorRaiseTrace {
+    raised: bool,
+    floor_before: u64,
+    new_floor: u64,
+    effective_floor_before_any_write: u64,
+    system_configuration_writes: usize,
+    effective_floor_after_the_last_system_configuration_write: Option<u64>,
+    system_configuration_writes_after_the_first_root: usize,
+    pushed_roots: Vec<(u64, u64, u64)>,
+    publishes: usize,
+    reclaimed_placements: usize,
+}
+
+impl FloorRaiseTrace {
+    /// 前提 2 的判定（登记第六节 6.1 PQ2 那一行）：① = 新 F 且 ② 每一条两数相等（= 新 F）⇒「两个口径合成一个」。
+    fn the_two_readings_merge(&self) -> bool {
+        self.raised
+            && self.effective_floor_after_the_last_system_configuration_write
+                == Some(self.new_floor)
+            && !self.pushed_roots.is_empty()
+            && self.pushed_roots.iter().all(|(_, root_floor, effective)| {
+                *root_floor == self.new_floor && *effective == self.new_floor
+            })
+    }
+}
+
+/// PQ2：S = 8、ρ = 1，β0 → 覆盖写 8 次 → 走产品入口 `raise_rollback_floor_to_the_admission_ceiling` 抬 F，录下这一串的设备写。
+fn run_floor_raise_trace() -> FloorRaiseTrace {
+    let parameters = parameters_with_slots_per_region(E156_SLOTS_PER_REGION);
+    let mut devices = new_pool_devices();
+    let genesis = make_filesystem(&parameters, &mut devices).expect("PQ2 mkfs");
+    let mut allocator = allocator_after_make_filesystem(&parameters, &devices, &genesis);
+    let instance = {
+        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
+        acquire_instance(&mut pool).expect("PQ2 取号")
+    };
+    let warm_up_output = {
+        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
+        warm_up(&mut pool, &genesis.root, instance).expect("PQ2 暖机")
+    };
+    let mut current = {
+        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
+        publish_first_file(
+            &mut pool,
+            &mut allocator,
+            warm_up_output.roots.last().expect("暖机两代根"),
+            FirstFile {
+                content: &overwrite_content(0),
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS,
+            },
+            instance,
+            &warm_up_output.last_record_bytes,
+        )
+        .expect("PQ2 第一个事务")
+    };
+    for step in 1..=8u64 {
+        current = publish_one_workload(
+            &parameters,
+            devices.as_mut_slice(),
+            &mut allocator,
+            &current,
+            instance,
+            WorkloadPublishKind::Overwrite,
+            step,
+        )
+        .expect("PQ2 覆盖写");
+    }
+    let floor_before = current.root.rollback_floor.0;
+    let before_image = memory_pool_snapshot(&devices);
+    let effective_floor_before_any_write = effective_rollback_floor(
+        &before_image,
+        &parameters.region_devices,
+        &parameters.geometry,
+        &parameters.filesystem_identifier,
+    )
+    .0;
+    let stream = SharedStream::retaining_contents();
+    let mut recording_devices = recording_copies_of(&before_image, &stream);
+    let raised = raise_rollback_floor_to_the_admission_ceiling(
+        &parameters,
+        &mut recording_devices,
+        &mut allocator,
+        &mut current,
+        ShadowLedger::On,
+    )
+    .expect("PQ2 抬 F");
+    let (was_raised, new_floor, publishes, reclaimed_placements) = match &raised {
+        RaiseToTheAdmissionCeiling::Raised(raised) => (
+            true,
+            raised.ceiling.0,
+            raised.publishes.len(),
+            raised.reclaimed.len(),
+        ),
+        RaiseToTheAdmissionCeiling::FloorAlreadyAtTheCeiling { ceiling, .. } => {
+            (false, ceiling.0, 0, 0)
+        }
+    };
+    let operations = stream.retained_operations();
+    let geometry = FixedGeometry {
+        fixed_structure_slot_spacing: parameters.geometry.fixed_structure_slot_spacing,
+        journal_ring_bytes: parameters.geometry.journal_ring_bytes,
+        root_ring_slots_per_region: parameters.geometry.root_ring_slots_per_region,
+    };
+    let kinds: Vec<StepKind> = operations
+        .iter()
+        .map(|retained| geometry.classify(&retained.operation))
+        .collect();
+    let first_root_write = kinds
+        .iter()
+        .position(|kind| matches!(kind, StepKind::RootRecordFua));
+    let system_configuration_indexes: Vec<usize> = kinds
+        .iter()
+        .enumerate()
+        .filter(|(_, kind)| matches!(kind, StepKind::SystemConfigurationSlot))
+        .map(|(index, _)| index)
+        .collect();
+    let last_system_configuration_before_the_first_root = system_configuration_indexes
+        .iter()
+        .copied()
+        .filter(|index| first_root_write.is_none_or(|first| *index < first))
+        .max();
+    let system_configuration_writes_after_the_first_root = system_configuration_indexes
+        .iter()
+        .filter(|index| first_root_write.is_some_and(|first| **index > first))
+        .count();
+    let image_up_to = |last_index: usize| {
+        let mut image = before_image.clone();
+        image.apply(&operations[..=last_index]);
+        image
+    };
+    let effective_after = |image: &MemoryPool| {
+        effective_rollback_floor(
+            image,
+            &parameters.region_devices,
+            &parameters.geometry,
+            &parameters.filesystem_identifier,
+        )
+        .0
+    };
+    let effective_floor_after_the_last_system_configuration_write =
+        last_system_configuration_before_the_first_root
+            .map(|index| effective_after(&image_up_to(index)));
+    let pushed_roots: Vec<(u64, u64, u64)> = kinds
+        .iter()
+        .enumerate()
+        .filter(|(_, kind)| matches!(kind, StepKind::RootRecordFua))
+        .map(|(index, _)| {
+            let bytes = operations[index]
+                .contents
+                .as_ref()
+                .expect("开了内容保留的流");
+            let root = RootRecord::parse_slot(bytes, &parameters.filesystem_identifier)
+                .expect("推空那条根自证过");
+            (
+                root.checkpoint_txg.0,
+                root.rollback_floor.0,
+                effective_after(&image_up_to(index)),
+            )
+        })
+        .collect();
+    FloorRaiseTrace {
+        raised: was_raised,
+        floor_before,
+        new_floor,
+        effective_floor_before_any_write,
+        system_configuration_writes: system_configuration_indexes.len(),
+        effective_floor_after_the_last_system_configuration_write,
+        system_configuration_writes_after_the_first_root,
+        pushed_roots,
+        publishes,
+        reclaimed_placements,
+    }
+}
+
+// ============================================================================================
+// U11、U13 的新形态（第 4 次重跑登记第一节 1.2）：管理员回退是挂着时的一次向前发布（D23（journal 的角色与格式） 已定项 14）。
+// ============================================================================================
+
+struct ForwardRollbackScenario {
+    txg_before_the_rollback: u64,
+    txg_of_the_rollback_publish: u64,
+    instance_before: u32,
+    instance_after: u32,
+    instance_table_rows_before: usize,
+    instance_table_rows_after: usize,
+    remount_instance: u32,
+    isolated_after_the_plain_remount: Vec<(DeviceIdentity, u64)>,
+    abandoned_roots_after_the_plain_remount: usize,
+}
+
+fn instance_table_row_count(
+    devices: &[(DeviceIdentity, SparseBlockDevice)],
+    root: &RootRecord,
+) -> usize {
+    instance_table_chain_of_root(devices, root)
+        .expect("现行那一版的实例表读得出")
+        .records
+        .rows
+        .len()
+}
+
+fn abandoned_root_count(
+    devices: &[(DeviceIdentity, SparseBlockDevice)],
+    parameters: &MakeFilesystemParameters,
+) -> usize {
+    let roots = readable_roots(
+        devices,
+        &parameters.region_devices,
         &parameters.geometry,
         &parameters.filesystem_identifier,
     );
-    let mut q1b_over_withheld = 0u64;
-    let mut unblocked_span_sum = 0u64;
-    let mut unblocked_record_count = 0u64;
-    let mut blocked_record_count = 0u64;
-    let mut total_released_record_count = 0u64;
-    let mut ledger_miss_span_sum = 0u64;
-    let mut stale_reclaimed_record_count = 0u64;
-    let mut stale_reclaimed_span_sum = 0u64;
-    let oldest_ring_txg = ring_roots
+    let newest = roots
         .iter()
-        .map(|root| root.checkpoint_txg.0)
-        .min()
-        .unwrap_or(0);
-    let newest_ring_txg = ring_roots
+        .max_by_key(|root| (root.checkpoint_txg, root.instance))
+        .copied()
+        .expect("环里有根");
+    let table = instance_table_chain_of_root(devices, &newest)
+        .expect("最新根的实例表读得出")
+        .records;
+    roots
         .iter()
-        .map(|root| root.checkpoint_txg.0)
-        .max()
-        .unwrap_or(0);
-    // 派发第 1 条查出的来源：`PoolAllocator::reclaim_released_up_to` 回收之后**不删记录**（把回收过的
-    // (device, slot) 记进它私有的 `reclaimed` 集合，位图与 `deferred_slots` 计数器都已经改成「空闲」），
-    // 记录本身要等下一次 `record()` 落在同一个起点槽上才被改写（I8 字面）。这个装置的诊断循环原来直接
-    // 按 `is_released` 过全部记录，把「已经被真实分配器回收、只是记录条目还没被覆盖」的槽也算成「还扣着」，
-    // 于是 Q1b（以及这条 delta 诊断）比 `deferred_slots()`（真实分配器自己的计数器）多算了这些槽。
-    // `reclaimed` 集合不是 `pub`，这里改用公开的 `DeviceFreeMap::is_free` 现查：已经被回收又没被再分配的槽
-    // 此刻是空闲的（没有扣住、没有隔离），据此把它们从「还扣着」的集合里去掉——不改变量的定义，只补上
-    // 诊断代码自己漏掉的这道过滤。
-    let device_free_map_for_device_zero = allocator
-        .devices
-        .iter()
-        .find(|map| map.device == DeviceIdentity(0))
-        .expect("D0 在池里");
-    for record in allocator
-        .records()
-        .iter()
-        .filter(|record| record.device == DeviceIdentity(0) && record.is_released)
-    {
-        if device_free_map_for_device_zero.is_free(record.slot) {
-            // 已经被真实分配器回收（位图已清、`deferred_slots` 已扣掉），只是记录条目还没被下一次
-            // `record()` 覆盖：这个槽此刻既不占着甲-T1 的账、也不占着 G12 的账，两条臂都不该数它。
-            stale_reclaimed_record_count += 1;
-            stale_reclaimed_span_sum += u64::from(record.span_slots);
-            continue;
-        }
-        total_released_record_count += 1;
-        let release_generation = record.generation.0;
-        let ledger_hit = ledger.contains_key(&record.slot.0);
-        let allocation_generation = ledger.get(&record.slot.0).copied().unwrap_or(0);
-        let blocked = ring_roots.iter().any(|root| {
-            let txg = root.checkpoint_txg.0;
-            txg >= allocation_generation && txg < release_generation
-        });
-        if blocked {
-            q1b_over_withheld += u64::from(record.span_slots);
-            blocked_record_count += 1;
-        } else {
-            unblocked_span_sum += u64::from(record.span_slots);
-            unblocked_record_count += 1;
-            if !ledger_hit {
-                ledger_miss_span_sum += u64::from(record.span_slots);
-            }
-            // 任务这一段第 1 条：逐槽列出 G12 判「不再扣住」、甲-T1 仍算在第 1 项里的那些槽
-            // （只在这一格逐记录报，不进 Q1a/Q1b 的判据本身，只给主 agent 核 delta 的来源用）。
-            emitter.emit(&format!(
-                "name=q1_delta_record s={slots_per_region_count} holes={holes} matched_to_holes={matched_to_holes} slot={} span={} allocation_generation={allocation_generation} ledger_hit={ledger_hit} release_generation={release_generation} oldest_ring_txg={oldest_ring_txg} newest_ring_txg={newest_ring_txg}",
-                record.slot.0, record.span_slots,
-            ));
-        }
-    }
-    // 派发第 1 条的溯源诊断：q1a_over_withheld（deferred 计数）与「records() 里 is_released 的记录」
-    // 这两条独立路径是否一致；ledger_miss_span_sum 单独拆出「影子分配代账本找不到分配代」这一种来源
-    // （不进任何判据，只给「装置的错 / 影子账的错 / 口径没对齐」这个分类用）。
-    emitter.emit(&format!(
-        "name=q1_delta_debug s={slots_per_region_count} holes={holes} matched_to_holes={matched_to_holes} deferred={deferred} q1b_blocked_span={q1b_over_withheld} unblocked_span={unblocked_span_sum} blocked_record_count={blocked_record_count} unblocked_record_count={unblocked_record_count} total_released_record_count={total_released_record_count} ledger_miss_span_sum={ledger_miss_span_sum} stale_reclaimed_record_count={stale_reclaimed_record_count} stale_reclaimed_span_sum={stale_reclaimed_span_sum} deferred_minus_q1b={} unblocked_minus_deferred_minus_q1b={}",
-        deferred.saturating_sub(q1b_over_withheld),
-        unblocked_span_sum.cast_signed() - (deferred.cast_signed() - q1b_over_withheld.cast_signed())
-    ));
+        .filter(|root| root_is_abandoned_by_the_instance_table(root, &table))
+        .count()
+}
 
-    // h_缺：[环里最旧有效根.txg, 最新持久根.txg] 里没有自证合法根的 txg 个数（读法写死「洞」逐字）。
-    let root_txgs: std::collections::HashSet<u64> = ring_roots
-        .iter()
-        .map(|root| root.checkpoint_txg.0)
-        .collect();
-    let oldest_txg = ring_roots
-        .iter()
-        .map(|root| root.checkpoint_txg.0)
-        .min()
-        .unwrap_or(0);
-    let newest_txg = current.root.checkpoint_txg.0;
-    let missing_txg_count = if newest_txg >= oldest_txg {
-        (oldest_txg..=newest_txg)
-            .filter(|txg| !root_txgs.contains(txg))
-            .count() as u64
-    } else {
-        0
+/// U11 的新形态（登记第一节 1.2 第二行）：A → B → 干净重开 → C → 同一次挂载里挂着回退到 A → 普通重开。
+fn run_forward_rollback_scenario() -> ForwardRollbackScenario {
+    let parameters = parameters();
+    let mut devices = new_pool_devices();
+    let genesis = make_filesystem(&parameters, &mut devices).expect("U11 mkfs");
+    let mut allocator = allocator_after_make_filesystem(&parameters, &devices, &genesis);
+    let instance = {
+        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
+        acquire_instance(&mut pool).expect("U11 取号")
     };
-
-    let delta = q1a_over_withheld.saturating_sub(q1b_over_withheld);
-    emitter.emit(&format!(
-        "name=q1_hh s={slots_per_region_count} holes={holes} matched_to_holes={matched_to_holes} txg={newest_txg} allocated={allocated} deferred={deferred} referenced={referenced} q1a_t1_over_withheld={q1a_over_withheld} q1b_g12_over_withheld={q1b_over_withheld} delta={delta} h_missing={missing_txg_count}"
-    ));
-    HhCell {
-        slots_per_region: slots_per_region_count,
-        holes,
-        matched_to_holes,
-        txg: newest_txg,
-        q1a_over_withheld,
-        q1b_over_withheld,
-        delta,
-        missing_txg_count,
+    let warm_up_output = {
+        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
+        warm_up(&mut pool, &genesis.root, instance).expect("U11 暖机")
+    };
+    let first = {
+        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
+        publish_first_file(
+            &mut pool,
+            &mut allocator,
+            warm_up_output.roots.last().expect("暖机两代根"),
+            FirstFile {
+                content: &overwrite_content(0),
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS,
+            },
+            instance,
+            &warm_up_output.last_record_bytes,
+        )
+        .expect("U11 A")
+    };
+    let first_txg = first.root.checkpoint_txg;
+    let first_instance = first.root.instance;
+    {
+        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
+        publish_overwrite(
+            &mut pool,
+            &mut allocator,
+            &first,
+            FirstFile {
+                content: &vec![0u8; 4100],
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60,
+            },
+            instance,
+        )
+        .expect("U11 B");
     }
+    let mounted = mount_writable(&parameters, &mut devices).expect("U11 干净重开");
+    let mut allocator = mounted.allocator;
+    let reopened_instance = mounted.output.instance;
+    let reopened = mounted
+        .current
+        .into_file_version()
+        .expect("U11 重开之后现行版本带文件");
+    let mut current = {
+        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
+        publish_overwrite(
+            &mut pool,
+            &mut allocator,
+            &reopened,
+            FirstFile {
+                content: &vec![0u8; 2500],
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 120,
+            },
+            reopened_instance,
+        )
+        .expect("U11 C")
+    };
+    let txg_before_the_rollback = current.root.checkpoint_txg.0;
+    let instance_before = current.root.instance.0;
+    let instance_table_rows_before = instance_table_row_count(&devices, &current.root);
+    roll_back_by_a_forward_publish(
+        &parameters,
+        &mut devices,
+        &mut allocator,
+        &mut current,
+        RollbackTarget {
+            instance: first_instance,
+            checkpoint_txg: first_txg,
+        },
+    )
+    .expect("U11 挂着回退到 A");
+    let txg_of_the_rollback_publish = current.root.checkpoint_txg.0;
+    let instance_after = current.root.instance.0;
+    let instance_table_rows_after = instance_table_row_count(&devices, &current.root);
+    let remounted = mount_writable(&parameters, &mut devices).expect("U11 回退之后普通重开");
+    ForwardRollbackScenario {
+        txg_before_the_rollback,
+        txg_of_the_rollback_publish,
+        instance_before,
+        instance_after,
+        instance_table_rows_before,
+        instance_table_rows_after,
+        remount_instance: remounted.output.instance.0,
+        isolated_after_the_plain_remount: remounted.output.isolated_slots_per_device,
+        abandoned_roots_after_the_plain_remount: abandoned_root_count(&devices, &parameters),
+    }
+}
+
+struct OldestCandidateRollback {
+    overwrites: u64,
+    target_txg: u64,
+    txg_before: u64,
+    txg_after: u64,
+    instance_before: u32,
+    instance_after: u32,
+    instance_table_rows_before: usize,
+    instance_table_rows_after: usize,
+    item1_slots: u64,
+    item5_slots: u64,
+    allocated_minus_deferred_verdict: InvariantVerdict,
+}
+
+/// U13 (a)（登记第一节 1.2 第一行）：mkfs 同一个进程、产品路径分配器、S = 8，覆盖写 3N = 72 次（N = 3S）→ 同一个进程里挂着回退到
+/// 候选集里 txg 最小的根。第 5 项只报数（附带，不进判据）。
+fn run_rollback_to_the_oldest_candidate() -> OldestCandidateRollback {
+    let parameters = parameters();
+    let mut devices = new_pool_devices();
+    let genesis = make_filesystem(&parameters, &mut devices).expect("U13 mkfs");
+    let mut allocator = allocator_after_make_filesystem(&parameters, &devices, &genesis);
+    let instance = {
+        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
+        acquire_instance(&mut pool).expect("U13 取号")
+    };
+    let warm_up_output = {
+        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
+        warm_up(&mut pool, &genesis.root, instance).expect("U13 暖机")
+    };
+    let mut current = {
+        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
+        publish_first_file(
+            &mut pool,
+            &mut allocator,
+            warm_up_output.roots.last().expect("暖机两代根"),
+            FirstFile {
+                content: &overwrite_content(0),
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS,
+            },
+            instance,
+            &warm_up_output.last_record_bytes,
+        )
+        .expect("U13 第一个事务")
+    };
+    let overwrites = 3 * E156_ROOT_RING_REGIONS * E156_SLOTS_PER_REGION;
+    for step in 1..=overwrites {
+        current = publish_one_workload(
+            &parameters,
+            devices.as_mut_slice(),
+            &mut allocator,
+            &current,
+            instance,
+            WorkloadPublishKind::Overwrite,
+            step,
+        )
+        .expect("U13 前缀覆盖写");
+    }
+    let effective_floor = effective_rollback_floor(
+        &devices,
+        &parameters.region_devices,
+        &parameters.geometry,
+        &parameters.filesystem_identifier,
+    );
+    let current_table = instance_table_chain_of_root(&devices, &current.root)
+        .expect("现行那一版的实例表读得出")
+        .records;
+    let oldest = readable_roots(
+        &devices,
+        &parameters.region_devices,
+        &parameters.geometry,
+        &parameters.filesystem_identifier,
+    )
+    .into_iter()
+    .filter(|root| {
+        root.checkpoint_txg >= effective_floor
+            && root.checkpoint_txg.0 >= 3
+            && !root_is_abandoned_by_the_instance_table(root, &current_table)
+    })
+    .min_by_key(|root| root.checkpoint_txg)
+    .expect("回退候选集至少一个根");
+    let txg_before = current.root.checkpoint_txg.0;
+    let instance_before = current.root.instance.0;
+    let instance_table_rows_before = instance_table_row_count(&devices, &current.root);
+    roll_back_by_a_forward_publish(
+        &parameters,
+        &mut devices,
+        &mut allocator,
+        &mut current,
+        RollbackTarget {
+            instance: oldest.instance,
+            checkpoint_txg: oldest.checkpoint_txg,
+        },
+    )
+    .expect("U13 挂着回退到候选集里最旧的根");
+    let pool = memory_pool_snapshot(&devices);
+    let (item1_slots, _item2_slots, item5_slots) =
+        mirror_accounting_row_slots(&pool, current.unit(TransactionUnit::AccountingTree).slot.0);
+    OldestCandidateRollback {
+        overwrites,
+        target_txg: oldest.checkpoint_txg.0,
+        txg_before,
+        txg_after: current.root.checkpoint_txg.0,
+        instance_before,
+        instance_after: current.root.instance.0,
+        instance_table_rows_before,
+        instance_table_rows_after: instance_table_row_count(&devices, &current.root),
+        item1_slots,
+        item5_slots,
+        allocated_minus_deferred_verdict: verdict(&pool, "I-3.11"),
+    }
+}
+
+/// β0（S = 8、第一个事务之后）与 β_syn（β0 的镜像把 D0 第 1 项 − 1、第 5 项 − 1 成 0、第 2 项 + 1，重封）：U13 (b) 与 [`main`] 共用。
+struct SyntheticBase {
+    pool: MemoryPool,
+    accounting_slot: u64,
+    referenced: u64,
+}
+
+fn synthetic_base_with_zero_deferred() -> SyntheticBase {
+    let parameters = parameters();
+    let mut devices = new_pool_devices();
+    let genesis = make_filesystem(&parameters, &mut devices).expect("β0 mkfs");
+    let mut allocator = allocator_after_make_filesystem(&parameters, &devices, &genesis);
+    let instance = {
+        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
+        acquire_instance(&mut pool).expect("β0 取号")
+    };
+    let warm_up_output = {
+        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
+        warm_up(&mut pool, &genesis.root, instance).expect("β0 暖机")
+    };
+    let first = {
+        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
+        publish_first_file(
+            &mut pool,
+            &mut allocator,
+            warm_up_output.roots.last().expect("暖机两代根"),
+            FirstFile {
+                content: &overwrite_content(0),
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS,
+            },
+            instance,
+            &warm_up_output.last_record_bytes,
+        )
+        .expect("β0 第一个事务")
+    };
+    let accounting_slot = first.unit(TransactionUnit::AccountingTree).slot.0;
+    let tree_table_slot = first.unit(TransactionUnit::TreeTable).slot.0;
+    let slot_bytes = i64::try_from(SLOT_BYTES).expect("16384");
+    let pool = corrupt_device_zero_accounting(
+        &memory_pool_snapshot(&devices),
+        accounting_slot,
+        tree_table_slot,
+        &parameters.region_devices,
+        parameters.geometry.fixed_structure_slot_spacing,
+        &[(1u16, -slot_bytes), (5u16, -slot_bytes), (2u16, slot_bytes)],
+    );
+    SyntheticBase {
+        pool,
+        accounting_slot,
+        referenced: referenced_slots(&first),
+    }
+}
+
+// ============================================================================================
+// 判定（登记第六节 6.2、第八节 8.2；PC-判定器在单测 U18 与 [`main`] 里各跑一遍）。
+// ============================================================================================
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum PeakJudgement {
+    AtMostTheThreshold,
+    AboveTheThreshold,
+    NothingObserved,
+}
+
+impl PeakJudgement {
+    fn label(self) -> &'static str {
+        match self {
+            PeakJudgement::AtMostTheThreshold => "at_most",
+            PeakJudgement::AboveTheThreshold => "above",
+            PeakJudgement::NothingObserved => "nothing_observed",
+        }
+    }
+}
+
+/// 全部分组键上的峰值里有一个越过门槛 ⇒ 越过；一个都没有 ⇒ 没越过；一个观测都没有 ⇒ 没有观测。
+fn judge_peak_against_threshold(peaks: &BTreeMap<u64, i64>, threshold_slots: i64) -> PeakJudgement {
+    if peaks.is_empty() {
+        return PeakJudgement::NothingObserved;
+    }
+    if peaks.values().any(|peak| *peak > threshold_slots) {
+        PeakJudgement::AboveTheThreshold
+    } else {
+        PeakJudgement::AtMostTheThreshold
+    }
+}
+
+fn smallest_key_above_threshold(peaks: &BTreeMap<u64, i64>, threshold_slots: i64) -> Option<u64> {
+    peaks
+        .iter()
+        .find(|(_, peak)| **peak > threshold_slots)
+        .map(|(key, _)| *key)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum GeometrySensitivity {
+    Consistent { sampling_points: usize },
+    Unstable,
+    NoSamplingPoint,
+}
+
+impl GeometrySensitivity {
+    fn label(self) -> String {
+        match self {
+            GeometrySensitivity::Consistent { sampling_points } => {
+                format!("consistent_on_{sampling_points}_sampling_points")
+            }
+            GeometrySensitivity::Unstable => "unstable".to_string(),
+            GeometrySensitivity::NoSamplingPoint => "no_sampling_point".to_string(),
+        }
+    }
+}
+
+/// r2「八」字面：逐个取样点的判定值，任意两个不同 ⇒ 不稳定；全部相同 ⇒ N 个取样点一致。没有观测的取样点不算进去。
+fn judge_geometry_sensitivity(judgements: &[PeakJudgement]) -> GeometrySensitivity {
+    let judged: Vec<PeakJudgement> = judgements
+        .iter()
+        .copied()
+        .filter(|judgement| *judgement != PeakJudgement::NothingObserved)
+        .collect();
+    match judged.first() {
+        None => GeometrySensitivity::NoSamplingPoint,
+        Some(first) if judged.iter().all(|judgement| judgement == first) => {
+            GeometrySensitivity::Consistent {
+                sampling_points: judged.len(),
+            }
+        }
+        Some(_) => GeometrySensitivity::Unstable,
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum GrowthWithHoles {
+    IndependentOfHoles,
+    GrowsWithHoles,
+    NotMonotonic,
+    FewerThanTwoPoints,
+}
+
+impl GrowthWithHoles {
+    fn label(self) -> &'static str {
+        match self {
+            GrowthWithHoles::IndependentOfHoles => "independent_of_holes",
+            GrowthWithHoles::GrowsWithHoles => "grows_with_holes",
+            GrowthWithHoles::NotMonotonic => "not_monotonic",
+            GrowthWithHoles::FewerThanTwoPoints => "fewer_than_two_points",
+        }
+    }
+}
+
+/// Q1d：按洞的计数升序列峰值，相邻差全 0 ⇒ 与洞无关；全部 ≥ 0 且有一个 > 0 ⇒ 随洞增长；否则不单调。
+fn judge_growth_with_holes(peaks: &BTreeMap<u64, i64>) -> GrowthWithHoles {
+    let values: Vec<i64> = peaks.values().copied().collect();
+    if values.len() < 2 {
+        return GrowthWithHoles::FewerThanTwoPoints;
+    }
+    let differences: Vec<i64> = values.windows(2).map(|pair| pair[1] - pair[0]).collect();
+    if differences.iter().all(|difference| *difference == 0) {
+        GrowthWithHoles::IndependentOfHoles
+    } else if differences.iter().all(|difference| *difference >= 0) {
+        GrowthWithHoles::GrowsWithHoles
+    } else {
+        GrowthWithHoles::NotMonotonic
+    }
+}
+
+/// PC-判定器的合成用例（登记第五节 5.4、第八节 8.2 判别力自证 ①）：(说明, 实际, 应得)。
+fn judge_positive_control_cases() -> Vec<(&'static str, String, String)> {
+    let peaks = |pairs: &[(u64, i64)]| -> BTreeMap<u64, i64> { pairs.iter().copied().collect() };
+    vec![
+        (
+            "peak_three_against_two",
+            judge_peak_against_threshold(&peaks(&[(1, 3)]), E156_THRESHOLD_ONE_SPAN_TWO_UNIT_SLOTS)
+                .label()
+                .to_string(),
+            "above".to_string(),
+        ),
+        (
+            "peak_two_against_two",
+            judge_peak_against_threshold(&peaks(&[(1, 2)]), E156_THRESHOLD_ONE_SPAN_TWO_UNIT_SLOTS)
+                .label()
+                .to_string(),
+            "at_most".to_string(),
+        ),
+        (
+            "peak_one_against_one",
+            judge_peak_against_threshold(&peaks(&[(1, 1)]), E156_THRESHOLD_ONE_SPAN_ONE_UNIT_SLOTS)
+                .label()
+                .to_string(),
+            "at_most".to_string(),
+        ),
+        (
+            "peak_two_against_one",
+            judge_peak_against_threshold(&peaks(&[(1, 2)]), E156_THRESHOLD_ONE_SPAN_ONE_UNIT_SLOTS)
+                .label()
+                .to_string(),
+            "above".to_string(),
+        ),
+        (
+            "three_at_most_one_above",
+            judge_geometry_sensitivity(&[
+                PeakJudgement::AtMostTheThreshold,
+                PeakJudgement::AtMostTheThreshold,
+                PeakJudgement::AtMostTheThreshold,
+                PeakJudgement::AboveTheThreshold,
+            ])
+            .label(),
+            "unstable".to_string(),
+        ),
+        (
+            "four_at_most",
+            judge_geometry_sensitivity(&[PeakJudgement::AtMostTheThreshold; 4]).label(),
+            "consistent_on_4_sampling_points".to_string(),
+        ),
+        (
+            "synthetic_zero_and_five_against_two",
+            judge_peak_against_threshold(
+                &peaks(&[(1, 0), (2, 5)]),
+                E156_THRESHOLD_ONE_SPAN_TWO_UNIT_SLOTS,
+            )
+            .label()
+            .to_string(),
+            "above".to_string(),
+        ),
+        (
+            "growth_flat",
+            judge_growth_with_holes(&peaks(&[(1, 2), (2, 2)]))
+                .label()
+                .to_string(),
+            "independent_of_holes".to_string(),
+        ),
+        (
+            "growth_rising",
+            judge_growth_with_holes(&peaks(&[(1, 1), (2, 3), (4, 3)]))
+                .label()
+                .to_string(),
+            "grows_with_holes".to_string(),
+        ),
+        (
+            "growth_falling",
+            judge_growth_with_holes(&peaks(&[(1, 3), (2, 1)]))
+                .label()
+                .to_string(),
+            "not_monotonic".to_string(),
+        ),
+    ]
+}
+
+/// 一个 (S, ρ, 回收时点) 分组里的一个 Δ 观测。
+#[derive(Clone, Debug)]
+struct DeltaSample {
+    shape: HhCellShape,
+    txg: u64,
+    workload_publishes: u64,
+    missing_txgs: u64,
+    live_holes: u64,
+    delta: i64,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord)]
+enum DensityKey {
+    EveryPublishOverwrites,
+    OneOverwriteInFourPublishes,
+}
+
+fn density_key(density: WorkloadDensity) -> DensityKey {
+    match density {
+        WorkloadDensity::EveryPublishOverwrites => DensityKey::EveryPublishOverwrites,
+        WorkloadDensity::OneOverwriteInFourPublishes => DensityKey::OneOverwriteInFourPublishes,
+    }
+}
+
+type GroupKey = (u64, DensityKey, ReclaimTiming);
+
+fn group_label(key: &GroupKey) -> String {
+    let density = match key.1 {
+        DensityKey::EveryPublishOverwrites => "1",
+        DensityKey::OneOverwriteInFourPublishes => "1/4",
+    };
+    format!("s={} rho={density} timing={}", key.0, key.2.label())
+}
+
+/// 一组 Δ 按分组键（h_缺 或 h_洞 或 k）取峰值、和、条数、为正的条数。
+fn group_statistics(
+    samples: &[&DeltaSample],
+    key_of: impl Fn(&DeltaSample) -> u64,
+) -> BTreeMap<u64, (i64, i64, u64, u64)> {
+    let mut statistics: BTreeMap<u64, (i64, i64, u64, u64)> = BTreeMap::new();
+    for sample in samples {
+        let entry = statistics
+            .entry(key_of(sample))
+            .or_insert((i64::MIN, 0, 0, 0));
+        entry.0 = entry.0.max(sample.delta);
+        entry.1 += sample.delta;
+        entry.2 += 1;
+        if sample.delta > 0 {
+            entry.3 += 1;
+        }
+    }
+    statistics
+}
+
+fn peaks_of(statistics: &BTreeMap<u64, (i64, i64, u64, u64)>) -> BTreeMap<u64, i64> {
+    statistics
+        .iter()
+        .map(|(key, entry)| (*key, entry.0))
+        .collect()
+}
+
+fn statistics_text(statistics: &BTreeMap<u64, (i64, i64, u64, u64)>) -> String {
+    let parts: Vec<String> = statistics
+        .iter()
+        .map(|(key, (peak, sum, count, positive))| {
+            format!("{key}:peak{peak}:sum{sum}:count{count}:positive{positive}")
+        })
+        .collect();
+    if parts.is_empty() {
+        "none".to_string()
+    } else {
+        parts.join(",")
+    }
+}
+
+/// 第一次越过门槛的观测（最小的那个越过门槛的分组键里，工作负载发布数、txg 最小的一条）。
+fn first_crossing_text(
+    samples: &[&DeltaSample],
+    key_of: impl Fn(&DeltaSample) -> u64,
+    peaks: &BTreeMap<u64, i64>,
+    threshold_slots: i64,
+) -> String {
+    let Some(key) = smallest_key_above_threshold(peaks, threshold_slots) else {
+        return "not_crossed_before_the_end".to_string();
+    };
+    samples
+        .iter()
+        .filter(|sample| key_of(sample) == key && sample.delta > threshold_slots)
+        .min_by_key(|sample| (sample.workload_publishes, sample.txg))
+        .map_or_else(
+            || "none".to_string(),
+            |sample| {
+                format!(
+                    "key{key}:k{}:position{}:workload_publishes{}:txg{}",
+                    sample.shape.hole_count,
+                    sample.shape.position_label(),
+                    sample.workload_publishes,
+                    sample.txg
+                )
+            },
+        )
+}
+
+/// 一个分组的四个 Q1c 读数与 Q1d（登记第六节 6.2 表里 Q1c、Q1c-洞、Q1c-前、Q1c-后、Q1d 各一行）。
+#[derive(Clone, Copy, Debug)]
+struct GroupJudgements {
+    all_points: PeakJudgement,
+    on_holes: PeakJudgement,
+    not_on_holes: PeakJudgement,
+    front_holes: PeakJudgement,
+    back_holes: PeakJudgement,
+    front_holes_one_slot: PeakJudgement,
+    growth: GrowthWithHoles,
+    front_peak_is_zero_everywhere: bool,
+    back_peak_is_zero_everywhere: bool,
 }
 
 #[allow(
     clippy::too_many_lines,
-    reason = "跑前登记「五、5.7」第一段的全部量集中在一个可复跑的二进制里，拆开反而难对拍"
+    reason = "一个分组的 Q1c 四行、Q1d 三张表与判别力自证 ② 连着打，才能与登记第六节那张表逐行对"
 )]
-fn main() {
-    let mut emitter = Emitter { emitted: 0 };
-    let parameters = parameters();
-    let region_devices = parameters.region_devices;
-    let spacing = parameters.geometry.fixed_structure_slot_spacing;
-    let slots_per_region = parameters.geometry.root_ring_slots_per_region;
-    // 装置的本地 S 与这个池真用的 S 回比（入库装置第 ① 条）。
+fn judge_group(emitter: &mut Emitter, key: &GroupKey, samples: &[DeltaSample]) -> GroupJudgements {
+    let label = group_label(key);
+    let all: Vec<&DeltaSample> = samples.iter().collect();
+    let on_holes: Vec<&DeltaSample> = all
+        .iter()
+        .copied()
+        .filter(|sample| sample.missing_txgs >= 1)
+        .collect();
+    let not_on_holes: Vec<&DeltaSample> = all
+        .iter()
+        .copied()
+        .filter(|sample| sample.missing_txgs == 0)
+        .collect();
+    let front: Vec<&DeltaSample> = on_holes
+        .iter()
+        .copied()
+        .filter(|sample| sample.shape.position == Some(HolePosition::Front))
+        .collect();
+    let back: Vec<&DeltaSample> = on_holes
+        .iter()
+        .copied()
+        .filter(|sample| sample.shape.position == Some(HolePosition::Back))
+        .collect();
+    let by_missing = |sample: &DeltaSample| sample.missing_txgs;
+    let mut judge_quantity = |quantity: &str,
+                              subset: &[&DeltaSample]|
+     -> (PeakJudgement, PeakJudgement, BTreeMap<u64, i64>) {
+        let statistics = group_statistics(subset, by_missing);
+        let peaks = peaks_of(&statistics);
+        let two = judge_peak_against_threshold(&peaks, E156_THRESHOLD_ONE_SPAN_TWO_UNIT_SLOTS);
+        let one = judge_peak_against_threshold(&peaks, E156_THRESHOLD_ONE_SPAN_ONE_UNIT_SLOTS);
+        emitter.emit(&format!(
+            "name=q1c {label} quantity={quantity} samples={} judgement_two_slots={} judgement_one_slot={} smallest_h_que_above_two={} smallest_h_que_above_one={} first_crossing_two={} by_h_que={}",
+            subset.len(),
+            two.label(),
+            one.label(),
+            smallest_key_above_threshold(&peaks, E156_THRESHOLD_ONE_SPAN_TWO_UNIT_SLOTS)
+                .map_or_else(|| "none".to_string(), |key| key.to_string()),
+            smallest_key_above_threshold(&peaks, E156_THRESHOLD_ONE_SPAN_ONE_UNIT_SLOTS)
+                .map_or_else(|| "none".to_string(), |key| key.to_string()),
+            first_crossing_text(subset, by_missing, &peaks, E156_THRESHOLD_ONE_SPAN_TWO_UNIT_SLOTS),
+            statistics_text(&statistics)
+        ));
+        (two, one, peaks)
+    };
+    let (all_points, _, all_peaks) = judge_quantity("q1c", &all);
+    let (on_holes_judgement, _, _) = judge_quantity("q1c_on_holes", &on_holes);
+    let (not_on_holes_judgement, _, _) = judge_quantity("q1c_not_on_holes", &not_on_holes);
+    let (front_judgement, front_one_slot, front_peaks) = judge_quantity("q1c_front", &front);
+    let (back_judgement, _, back_peaks) = judge_quantity("q1c_back", &back);
+
+    let growth = judge_growth_with_holes(&all_peaks);
+    let adjacent: Vec<String> = all_peaks
+        .iter()
+        .collect::<Vec<_>>()
+        .windows(2)
+        .map(|pair| format!("{}->{}:{}", pair[0].0, pair[1].0, pair[1].1 - pair[0].1))
+        .collect();
+    let by_live_holes = group_statistics(&all, |sample| sample.live_holes);
+    let by_hole_count = group_statistics(&all, |sample| sample.shape.hole_count);
+    emitter.emit(&format!(
+        "name=q1d {label} growth_by_h_que={} adjacent_differences={} first_crossing_two={} first_crossing_one={} by_h_dong={} by_injected_k={}",
+        growth.label(),
+        if adjacent.is_empty() { "none".to_string() } else { adjacent.join(",") },
+        first_crossing_text(&all, by_missing, &all_peaks, E156_THRESHOLD_ONE_SPAN_TWO_UNIT_SLOTS),
+        first_crossing_text(&all, by_missing, &all_peaks, E156_THRESHOLD_ONE_SPAN_ONE_UNIT_SLOTS),
+        statistics_text(&by_live_holes),
+        statistics_text(&by_hole_count),
+    ));
+
+    // 判别力自证 ②（第八节 8.2）：把 Q1c-前 的门槛挪到真产物 Δ 峰值两个观测值之间，同一份真产物上的判定必须转一次。
+    let distinct_front_peaks: BTreeSet<i64> = front_peaks.values().copied().collect();
+    if distinct_front_peaks.len() >= 2 {
+        let largest = *distinct_front_peaks.iter().next_back().expect("至少两个");
+        let second_largest = *distinct_front_peaks.iter().rev().nth(1).expect("至少两个");
+        let between = judge_peak_against_threshold(&front_peaks, second_largest);
+        let at_largest = judge_peak_against_threshold(&front_peaks, largest);
+        emitter.emit(&format!(
+            "name=q1c_front_threshold_moved {label} threshold_between={second_largest} judgement_between={} threshold_at_largest={largest} judgement_at_largest={} flips={}",
+            between.label(),
+            at_largest.label(),
+            between != at_largest
+        ));
+    } else {
+        let synthetic: BTreeMap<u64, i64> = [(1u64, 0i64), (2, 5)].into_iter().collect();
+        let synthetic_judgement =
+            judge_peak_against_threshold(&synthetic, E156_THRESHOLD_ONE_SPAN_TWO_UNIT_SLOTS);
+        emitter.emit(&format!(
+            "name=q1c_front_threshold_moved {label} real_distinct_peaks={} real_product_has_no_two_points_to_move_between=true synthetic_zero_and_five_against_two={} synthetic_is_red={}",
+            distinct_front_peaks.len(),
+            synthetic_judgement.label(),
+            synthetic_judgement == PeakJudgement::AboveTheThreshold
+        ));
+    }
+    GroupJudgements {
+        all_points,
+        on_holes: on_holes_judgement,
+        not_on_holes: not_on_holes_judgement,
+        front_holes: front_judgement,
+        back_holes: back_judgement,
+        front_holes_one_slot: front_one_slot,
+        growth,
+        front_peak_is_zero_everywhere: front_peaks.values().all(|peak| *peak == 0),
+        back_peak_is_zero_everywhere: back_peaks.values().all(|peak| *peak == 0),
+    }
+}
+
+// ============================================================================================
+// main
+// ============================================================================================
+
+fn emit_static_anchors(emitter: &mut Emitter) {
+    let default_parameters = parameters();
+    // 装置的本地 S 与实现侧回比（入库装置第 ① 条）：mkfs 默认、上下界、区域设备。
     assert_eq!(
         E156_SLOTS_PER_REGION,
-        slots_per_region.count(),
-        "装置写死的每区槽数 S 与这个池写进系统配置的那个不等"
+        default_parameters
+            .geometry
+            .root_ring_slots_per_region
+            .count(),
+        "装置写死的 mkfs 默认每区槽数 S 与实现侧不等"
+    );
+    assert_eq!(
+        (E156_SLOTS_PER_REGION_MINIMUM, E156_SLOTS_PER_REGION_MAXIMUM),
+        (
+            singlefs_format::ROOT_RING_SLOTS_PER_REGION_MINIMUM,
+            singlefs_format::ROOT_RING_SLOTS_PER_REGION_MAXIMUM
+        ),
+        "装置写死的 S 上下界与实现侧不等"
+    );
+    assert_eq!(
+        E156_REGION_DEVICE_NUMBERS.map(DeviceIdentity),
+        default_parameters.region_devices,
+        "装置写死的区域设备与 mkfs 参数不等"
+    );
+    assert_eq!(
+        E156_ROOT_RING_REGIONS, ROOT_RING_REGIONS,
+        "装置写死的区域数 R 与实现侧不等"
+    );
+    for slots_per_region in E156_SLOTS_PER_REGION_SAMPLING_POINTS {
+        assert!(
+            RootRingSlotsPerRegion::from_system_configuration_field(slots_per_region).is_ok(),
+            "K8：S = {slots_per_region} 应被接受"
+        );
+    }
+    assert_eq!(
+        (
+            E156_SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE,
+            E156_SYSTEM_CONFIGURATION_SLOT_BYTES
+        ),
+        (
+            singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE,
+            singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES
+        ),
+        "装置写死的系统配置槽数与槽宽与实现侧不等"
     );
     // A1：单元区起点与实现侧同名常量回比（入库装置第 ① 条）。
     assert_eq!(
@@ -2770,7 +4009,6 @@ fn main() {
         unit_area_slot_count, 211968,
         "A1：4 GiB 设备的单元区槽数应为 211968"
     );
-    // A7：分配记录节点容量。
     let allocation_record_node_capacity =
         (16384 - E156_ALLOCATION_RECORD_NODE_HEADER_BYTES) / E156_ALLOCATION_RECORD_BYTES;
     emitter.emit(&format!(
@@ -2780,973 +4018,993 @@ fn main() {
         allocation_record_node_capacity, 812,
         "A7：分配记录节点容量应为 812"
     );
-    // A-D8（第七节 7.1）：本地叶宽 / 扇出与实装的 `singlefs_format` 同名常量回比，本地「根层级规则」
-    // 与实装的 `AllocationRecordTreeGeometry::of_allocator` 回比——只观测，不 assert：这两条出自被测
-    // 条款本身，对不上走 F21，不作废、不停机（第十节 F21、第七节 7.1 表头）。
     let leaf_slots_match_format_crate = E156_ALLOCATION_RECORD_TREE_LEAF_SLOTS
         == singlefs_format::ALLOCATION_RECORD_TREE_LEAF_SLOTS;
     let internal_fanout_match_format_crate = E156_ALLOCATION_RECORD_TREE_INTERNAL_FANOUT
         == singlefs_format::ALLOCATION_RECORD_TREE_INTERNAL_FANOUT;
     let my_root_level = e156_root_level_for_symmetric_devices(unit_area_slot_count, 2);
-    emitter.emit(&format!(
-        "name=anchor_a_d8 local_leaf_slots={E156_ALLOCATION_RECORD_TREE_LEAF_SLOTS} local_internal_fanout={E156_ALLOCATION_RECORD_TREE_INTERNAL_FANOUT} local_leaf_slots_matches_format_crate={leaf_slots_match_format_crate} local_internal_fanout_matches_format_crate={internal_fanout_match_format_crate} my_root_level={my_root_level}"
-    ));
-
-    // ===== mkfs + 取号 + 暖机 + 第一个事务：K1、S1(a)(g)、H0/HR/HK 共用的起点 =====
-    let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = (0..2u32)
-        .map(|number| {
-            (
-                DeviceIdentity(number),
-                SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
-            )
-        })
-        .collect();
-    let genesis = make_filesystem(&parameters, &mut devices).expect("mkfs");
-
-    // S1(g)：mkfs 之后 txg 0 的根在环里。
-    let genesis_roots = readable_roots(
-        &devices,
-        &region_devices,
-        &parameters.geometry,
-        &parameters.filesystem_identifier,
-    );
-    let s1g_holds = genesis_roots.iter().any(|root| root.checkpoint_txg.0 == 0);
-    emitter.emit(&format!("name=s1g_mkfs_root_in_ring holds={s1g_holds}"));
-    assert!(s1g_holds, "S1(g)：mkfs 之后 txg 0 的根应当在环里");
-
-    // A2：根环 3S 槽、txg 落的槽与 target_for_publish 的映射自洽（用真实几何函数核，不是拿常量比常量）。
-    let root_ring_slot_count = ROOT_RING_REGIONS * E156_SLOTS_PER_REGION;
-    let mut root_ring_mapping_mismatches = 0u64;
-    for probe_txg in 0..(root_ring_slot_count * 2) {
-        let target = target_for_publish(CheckpointTxg(probe_txg), slots_per_region);
-        let expect_region = probe_txg % ROOT_RING_REGIONS;
-        let expect_slot = (probe_txg / ROOT_RING_REGIONS) % E156_SLOTS_PER_REGION;
-        if target.region != expect_region || target.slot != expect_slot {
-            root_ring_mapping_mismatches += 1;
-        }
-    }
-    emitter.emit(&format!("name=anchor_a2 ring_slots={root_ring_slot_count} mismatches={root_ring_mapping_mismatches}"));
-    assert_eq!(
-        root_ring_mapping_mismatches, 0,
-        "A2：target_for_publish 与 u mod 3S 的映射应当逐点一致"
-    );
-
-    let mut allocator = PoolAllocator::new(
-        devices
-            .iter()
-            .map(|(identity, device)| DeviceFreeMap::new(*identity, device.size_in_bytes()))
-            .collect(),
-    );
-    allocator.mark_format_time_units(
-        Placement {
-            slot: INSTANCE_TABLE_SLOT,
-            span: 2,
-        },
-        Placement {
-            slot: TREE_TABLE_GENESIS_SLOT,
-            span: 1,
-        },
-    );
-    // A-D8（续）：实装的根层级只由每块盘的槽数决定，与记录内容无关，mkfs 之后就能读——与上面本地
-    // 算出的 `my_root_level` 回比（只观测，F21）。
+    let mut devices = new_pool_devices();
+    let genesis = make_filesystem(&default_parameters, &mut devices).expect("A-D8 mkfs");
+    let allocator = allocator_after_make_filesystem(&default_parameters, &devices, &genesis);
     let real_root_level =
         singlefs_core::allocation_record_tree::AllocationRecordTreeGeometry::of_allocator(
             &allocator,
         )
         .root_level();
     emitter.emit(&format!(
-        "name=anchor_a_d8_root_level my_root_level={my_root_level} real_root_level={real_root_level} matches={}",
+        "name=anchor_a_d8 local_leaf_slots={E156_ALLOCATION_RECORD_TREE_LEAF_SLOTS} local_internal_fanout={E156_ALLOCATION_RECORD_TREE_INTERNAL_FANOUT} local_leaf_slots_matches_format_crate={leaf_slots_match_format_crate} local_internal_fanout_matches_format_crate={internal_fanout_match_format_crate} my_root_level={my_root_level} real_root_level={real_root_level} root_level_matches={}",
         my_root_level == real_root_level
     ));
-    let instance = {
-        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
-        acquire_instance(&mut pool).expect("取号")
-    };
-    assert_eq!(instance, InstanceGeneration(1));
-    let warm_up_output = {
-        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
-        warm_up(&mut pool, &genesis.root, instance).expect("暖机")
-    };
-    let mut current: TransactionOutput = {
-        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
-        publish_first_file(
-            &mut pool,
-            &mut allocator,
-            warm_up_output.roots.last().expect("暖机两代根"),
-            FirstFile {
-                content: &overwrite_content(0),
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS,
-            },
-            instance,
-            &warm_up_output.last_record_bytes,
-        )
-        .expect("第一个事务")
-    };
-
-    // K1：txg 3 之后 D0 的记账第 1/2/5 项，与登记里钉的绝对值比对（S1(a)）。K1-1（第七节 7.2）：
-    // 分配记录树按位置寻址之后第 1 项为 17（不再是原登记的 13：多出的 4 槽是这五个树节点里比原来
-    // 单节点多出的那四个），第 5 项仍是 1。
-    let (allocated0, free0, deferred0) = accounting_row_slots(&allocator, DeviceIdentity(0));
-    let k1_1_matches_registered_item1_of_17_and_item5_of_1 = allocated0 == 17 && deferred0 == 1;
-    emitter.emit(&format!(
-        "name=k1_after_first_transaction txg={} allocated_slots={allocated0} free_slots={free0} deferred_slots={deferred0} registered_item1_slots=17 registered_item5_slots=1 matches_registered={k1_1_matches_registered_item1_of_17_and_item5_of_1}",
-        current.root.checkpoint_txg.0,
-    ));
-    assert!(
-        k1_1_matches_registered_item1_of_17_and_item5_of_1,
-        "S1(a)：K1-1 应当逐字匹配登记（第七节 7.2，17/1）"
-    );
-    let mut placements: Vec<(u64, u64)> = current
-        .units
-        .iter()
-        .map(|unit| (unit.slot.0, unit.identity.span_slots()))
-        .collect();
-    placements.sort_unstable();
-    let placements_text: Vec<String> = placements
-        .iter()
-        .map(|(slot, span)| format!("{slot}:{span}"))
-        .collect();
-    emitter.emit(&format!(
-        "name=k1_placements txg={} units={}",
-        current.root.checkpoint_txg.0,
-        placements_text.join(",")
-    ));
-
-    // S1(f)：第一个事务之后的分配记录条数（D0 + D1 合计）。
-    let previous_record_count = allocator.records().len();
-    emitter.emit(&format!(
-        "name=s1f_record_count txg={} count={previous_record_count}",
-        current.root.checkpoint_txg.0
-    ));
-    assert_eq!(
-        previous_record_count, E156_FIRST_TRANSACTION_EXPECTED_RECORD_COUNT,
-        "S1(f)：第一个事务之后的分配记录条数应为 20"
-    );
-
-    let mut legal_states: Vec<LegalState> = Vec::new();
-    record_legal_state(
-        &mut emitter,
-        &mut legal_states,
-        "beta0",
-        "first_file",
-        &current,
-        &memory_pool_snapshot(&devices),
-    );
-    let beta0_basis = basis_of("beta0_k1", &memory_pool_snapshot(&devices), &current, true);
-    // 镜像读法与内存读法在未 corrupt 的 β0 上应当一致（内部自洽核）。
-    let memory_holds = allocated_minus_deferred_matches_referenced(
-        &allocator,
-        DeviceIdentity(0),
-        beta0_basis.referenced,
-    );
-    let mirror_red = allocated_minus_deferred_mismatches_referenced(
-        &beta0_basis.pool,
-        beta0_basis.accounting_slot,
-        beta0_basis.referenced,
-    );
-    emitter.emit(&format!(
-        "name=beta0_mirror_vs_memory memory_holds={memory_holds} mirror_check_is_red={mirror_red}"
-    ));
-    assert_eq!(
-        memory_holds, !mirror_red,
-        "β0 上镜像读法与内存读法应当一致（都还没 corrupt）"
-    );
-
-    // ===== H0：暖机之后连续覆盖写 6N 次（N = 3S，S 是每区槽数；ρ = 1，每次都是 O），写失败即截断 =====
-    let ring_length = ROOT_RING_REGIONS * E156_SLOTS_PER_REGION;
-    let baseline_workload_length = 6 * ring_length;
-    let hr_prefix_length = 3 * ring_length;
-    let hr_tail_length = 3 * ring_length;
-    emitter.emit(&format!(
-        "name=geometry ring_length={ring_length} baseline_workload_length={baseline_workload_length} hr_prefix_length={hr_prefix_length} hr_tail_length={hr_tail_length}"
-    ));
-
-    let s1d_cutoff = 3 * E156_SLOTS_PER_REGION + 6;
-    let mut baseline_workload_actual_length: u64 = 0;
-    // Q3r.2（第七节 R-3）：闭式不再是常数，逐次核对，出不符不 panic（S1(e)(f) 现在是「两边都查」的
-    // 观测型停机，不是硬 panic：一次不符就让整轮产物都出不来，反而没法看后面每一步的读数）。
-    let mut overwrite_release_samples: Vec<u64> = Vec::new();
-    let mut s1ef_mismatches: u64 = 0;
-    let mut s1ef_leaf_count_histogram: BTreeMap<usize, u64> = BTreeMap::new();
-    for step in 1..=baseline_workload_length {
-        let existing_leaves_before_step = e156_existing_leaf_positions(&allocator, DeviceIdentity(0));
-        let records_before_step = allocator.records().len();
-        let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
-        let outcome = publish_overwrite(
-            &mut pool,
-            &mut allocator,
-            &current,
-            FirstFile {
-                content: &overwrite_content(step),
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60 + step,
-            },
-            instance,
-        );
-        let published = match outcome {
-            Ok(published) => published,
-            Err(failure) => {
-                // 分配记录树按位置寻址之后（D8（核心索引结构） 已定项 14）没有一个节点 812 条那道墙，截断只剩别的失败。
-                emitter.emit(&format!(
-                    "name=baseline_workload_truncated_by_write_failure requested_length={baseline_workload_length} actual_length={baseline_workload_actual_length} failed_at_step={step} failure={failure:?}"
-                ));
-                break;
+    // A2：根环 3S 槽、txg 落的槽与 u mod 3S 一一对应（每个取样点的 S 各核一次，用真实几何函数）。
+    for slots_per_region in E156_SLOTS_PER_REGION_SAMPLING_POINTS {
+        let geometry = RootRingSlotsPerRegion::from_system_configuration_field(slots_per_region)
+            .expect("S 落在区间里");
+        let ring_length = E156_ROOT_RING_REGIONS * slots_per_region;
+        let mut distinct_slots: BTreeSet<RootRingSlot> = BTreeSet::new();
+        let mut mismatches = 0u64;
+        for probe_txg in 0..(ring_length * 4) {
+            let target = target_for_publish(CheckpointTxg(probe_txg), geometry);
+            if probe_txg < ring_length {
+                distinct_slots.insert(target);
             }
-        };
-        current = published;
-        baseline_workload_actual_length = step;
-        // R-3a/R-3b（第七节 7.2）：一次 O 的释放槽数与记录增量按闭式逐次核对（Q3r.2）。
-        let released = self_release_slots_of_this_publish(
-            &allocator,
-            DeviceIdentity(0),
-            current.root.checkpoint_txg,
-        );
-        let touched_leaves_this_step =
-            e156_touched_leaf_positions(&allocator, DeviceIdentity(0), current.root.checkpoint_txg);
-        let (expected_released, expected_record_delta) = e156_closed_form_expected(
-            &existing_leaves_before_step,
-            &touched_leaves_this_step,
-            true,
-        );
-        let record_count = allocator.records().len();
-        let record_delta = u64::try_from(record_count - records_before_step)
-            .expect("这一步的记录增量落在 u64 内");
-        let step_matches = released == expected_released && record_delta == expected_record_delta;
-        if !step_matches {
-            s1ef_mismatches += 1;
+            let wrapped = target_for_publish(CheckpointTxg(probe_txg % ring_length), geometry);
+            if target != wrapped {
+                mismatches += 1;
+            }
         }
-        let changed_internal_count = touched_leaves_this_step
-            .iter()
-            .map(|&leaf| e156_level1_position_of_leaf(leaf))
-            .collect::<BTreeSet<_>>()
-            .len();
-        *s1ef_leaf_count_histogram
-            .entry(touched_leaves_this_step.len())
-            .or_insert(0) += 1;
+        let holds =
+            distinct_slots.len() == usize::try_from(ring_length).expect("环长") && mismatches == 0;
         emitter.emit(&format!(
-            "name=s1ef_step step={step} txg={} changed_leaves={} changed_internal={changed_internal_count} released_d0={released} expected_released_d0={expected_released} record_delta={record_delta} expected_record_delta={expected_record_delta} matches={step_matches}",
-            current.root.checkpoint_txg.0,
-            touched_leaves_this_step.len(),
+            "name=anchor_a2 s={slots_per_region} ring_slots={ring_length} distinct_slots_in_one_ring={} wrap_mismatches={mismatches} holds={holds}",
+            distinct_slots.len()
         ));
-        overwrite_release_samples.push(released);
-        let pool_snapshot = memory_pool_snapshot(&devices);
-        // S1(d)：前 3S + 6 次逐次报第 1/2/5 项与今天两条检查（应当全绿：这些都是合法状态）。
-        if step <= s1d_cutoff {
-            let (item1, item2, item5) = mirror_accounting_row_slots(
-                &pool_snapshot,
-                current.unit(TransactionUnit::AccountingTree).slot.0,
-            );
-            emitter.emit(&format!(
-                "name=s1d_step txg={} item1={item1} item2={item2} item5={item5} i31_red={} i52_red={}",
-                current.root.checkpoint_txg.0,
-                is_red(&verdict(&pool_snapshot, "I-3.1")),
-                is_red(&verdict(&pool_snapshot, "I-5.2")),
+        assert!(
+            holds,
+            "A2：S = {slots_per_region} 时 txg 的槽与 u mod 3S 应一一对应"
+        );
+    }
+}
+
+/// 一个 S 下锚点模型的全部格：k = 0 与 (k, 位置) ∈ {1, 2, 4} × {前, 后}。
+struct AnchorCellsOfOneSlotsPerRegion {
+    without_holes: anchor_model::AnchorCell,
+    cells: Vec<(u64, HolePosition, anchor_model::AnchorCell)>,
+}
+
+fn anchor_cells_of(slots_per_region: u64) -> AnchorCellsOfOneSlotsPerRegion {
+    let without_holes_end = anchor_model::without_holes_end(slots_per_region);
+    let mut cells = Vec::new();
+    for position in [HolePosition::Front, HolePosition::Back] {
+        for hole_count in [1u64, 2, 4] {
+            cells.push((
+                hole_count,
+                position,
+                anchor_model::run(
+                    slots_per_region,
+                    hole_count,
+                    position == HolePosition::Front,
+                    None,
+                ),
             ));
         }
-        record_legal_state(
-            &mut emitter,
-            &mut legal_states,
-            "H0",
-            "O",
-            &current,
-            &pool_snapshot,
-        );
     }
-    if baseline_workload_actual_length == baseline_workload_length {
-        emitter.emit(&format!(
-            "name=baseline_workload_completed_full_length length={baseline_workload_length}"
-        ));
+    AnchorCellsOfOneSlotsPerRegion {
+        without_holes: anchor_model::run(slots_per_region, 0, false, Some(without_holes_end)),
+        cells,
     }
-    // Q3r.2 汇总：H0 上逐次核对的不符次数与「改动落在几片叶」的直方图（第八节 8.2 要求两个方向都要有：
-    // 落在 1 片叶与落在 ≥ 2 片叶的步各至少一次）。
-    let s1ef_histogram_text: Vec<String> = s1ef_leaf_count_histogram
-        .iter()
-        .map(|(leaf_count, steps)| format!("{leaf_count}:{steps}"))
-        .collect();
+}
+
+fn anchor_cell_for(
+    anchors: &BTreeMap<u64, AnchorCellsOfOneSlotsPerRegion>,
+    slots_per_region: u64,
+    hole_count: u64,
+    position: Option<HolePosition>,
+) -> &anchor_model::AnchorCell {
+    let of_slots = &anchors[&slots_per_region];
+    match position {
+        None => &of_slots.without_holes,
+        Some(position) => of_slots
+            .cells
+            .iter()
+            .find(|(count, cell_position, _)| *count == hole_count && *cell_position == position)
+            .map(|(_, _, cell)| cell)
+            .expect("锚点模型有这一格"),
+    }
+}
+
+/// 一格的 A10–A16、K8、S1 与 V 系列核对的汇总（第二段的 V / S / F 判定从这里取）。
+#[derive(Default, Clone, Copy)]
+struct CellCheckTotals {
+    hole_count_anchor_mismatches: u64,
+    threshold_anchor_mismatches: u64,
+    every_publish_below_tree_table_bound: u64,
+    real_below_tree_table_bound: u64,
+    every_publish_nonzero_without_holes: u64,
+    real_nonzero_without_holes: u64,
+    interval_rule_every_publish_nonzero: u64,
+    interval_rule_real_nonzero: u64,
+    reclaim_rule_violation_points: u64,
+    devices_unequal: u64,
+    root_ring_missing: u64,
+    anchor_rows_missing: u64,
+    real_every_differ: u64,
+    q1a_plus_positive: u64,
+    device_and_crates_disagreements: u64,
+    admission_touches: u64,
+    abandoned_or_unknown: u64,
+    slots_per_region_read_back_mismatches: u64,
+    tree_table_lag_every_publish_mismatch: u64,
+    tree_table_lag_real_mismatch: u64,
+}
+
+impl CellCheckTotals {
+    fn add(&mut self, other: CellCheckTotals) {
+        self.hole_count_anchor_mismatches += other.hole_count_anchor_mismatches;
+        self.threshold_anchor_mismatches += other.threshold_anchor_mismatches;
+        self.every_publish_below_tree_table_bound += other.every_publish_below_tree_table_bound;
+        self.real_below_tree_table_bound += other.real_below_tree_table_bound;
+        self.every_publish_nonzero_without_holes += other.every_publish_nonzero_without_holes;
+        self.real_nonzero_without_holes += other.real_nonzero_without_holes;
+        self.interval_rule_every_publish_nonzero += other.interval_rule_every_publish_nonzero;
+        self.interval_rule_real_nonzero += other.interval_rule_real_nonzero;
+        self.reclaim_rule_violation_points += other.reclaim_rule_violation_points;
+        self.devices_unequal += other.devices_unequal;
+        self.root_ring_missing += other.root_ring_missing;
+        self.anchor_rows_missing += other.anchor_rows_missing;
+        self.real_every_differ += other.real_every_differ;
+        self.q1a_plus_positive += other.q1a_plus_positive;
+        self.device_and_crates_disagreements += other.device_and_crates_disagreements;
+        self.admission_touches += other.admission_touches;
+        self.abandoned_or_unknown += other.abandoned_or_unknown;
+        self.slots_per_region_read_back_mismatches += other.slots_per_region_read_back_mismatches;
+        self.tree_table_lag_every_publish_mismatch += other.tree_table_lag_every_publish_mismatch;
+        self.tree_table_lag_real_mismatch += other.tree_table_lag_real_mismatch;
+    }
+}
+
+fn count_where(observations: &[HhObservation], predicate: impl Fn(&HhObservation) -> bool) -> u64 {
+    u64::try_from(
+        observations
+            .iter()
+            .filter(|observation| predicate(observation))
+            .count(),
+    )
+    .expect("落在 u64 内")
+}
+
+fn check_cell(
+    outcome: &HhRunOutcome,
+    expected_tree_table_lags: Option<&BTreeSet<u64>>,
+) -> CellCheckTotals {
+    let observations = &outcome.observations;
+    let has_no_holes = outcome.shape.hole_count == 0;
+    let floor_rule =
+        |observation: &HhObservation, timing| observation.over_withheld(Arm::FloorRule, timing);
+    let interval_rule = |observation: &HhObservation, timing| {
+        observation.over_withheld(Arm::LifetimeIntervalRule, timing)
+    };
+    CellCheckTotals {
+        hole_count_anchor_mismatches: count_where(observations, |observation| {
+            observation.anchor.is_some_and(|row| {
+                row.missing_txgs != observation.reading.missing_txgs
+                    || row.live_holes != observation.reading.live_holes
+            })
+        }),
+        threshold_anchor_mismatches: count_where(observations, |observation| {
+            observation
+                .anchor
+                .is_some_and(|row| row.floor != observation.reading.ring_threshold)
+        }),
+        every_publish_below_tree_table_bound: count_where(observations, |observation| {
+            observation.anchor.is_some_and(|row| {
+                floor_rule(observation, ReclaimTiming::EveryPublish) < row.tree_table_lower_bound
+            })
+        }),
+        real_below_tree_table_bound: count_where(observations, |observation| {
+            observation.anchor.is_some_and(|row| {
+                floor_rule(observation, ReclaimTiming::Real) < row.tree_table_lower_bound
+            })
+        }),
+        every_publish_nonzero_without_holes: if has_no_holes {
+            count_where(observations, |observation| {
+                floor_rule(observation, ReclaimTiming::EveryPublish) != 0
+                    || interval_rule(observation, ReclaimTiming::EveryPublish) != 0
+            })
+        } else {
+            0
+        },
+        real_nonzero_without_holes: if has_no_holes {
+            count_where(observations, |observation| {
+                floor_rule(observation, ReclaimTiming::Real) != 0
+                    || interval_rule(observation, ReclaimTiming::Real) != 0
+            })
+        } else {
+            0
+        },
+        interval_rule_every_publish_nonzero: count_where(observations, |observation| {
+            interval_rule(observation, ReclaimTiming::EveryPublish) != 0
+        }),
+        interval_rule_real_nonzero: count_where(observations, |observation| {
+            interval_rule(observation, ReclaimTiming::Real) != 0
+        }),
+        reclaim_rule_violation_points: count_where(observations, |observation| {
+            observation.reading.device_zero.reclaim_rule_violations > 0
+        }),
+        devices_unequal: count_where(observations, |observation| {
+            !observation.reading.devices_equal
+        }),
+        root_ring_missing: count_where(observations, |observation| {
+            !observation.reading.root_ring_installed
+        }),
+        anchor_rows_missing: count_where(observations, |observation| observation.anchor.is_none()),
+        real_every_differ: count_where(observations, |observation| {
+            floor_rule(observation, ReclaimTiming::Real)
+                != floor_rule(observation, ReclaimTiming::EveryPublish)
+                || interval_rule(observation, ReclaimTiming::Real)
+                    != interval_rule(observation, ReclaimTiming::EveryPublish)
+        }),
+        q1a_plus_positive: count_where(observations, |observation| {
+            let device_zero = &observation.reading.device_zero;
+            device_zero.floor_rule_real_referenced_but_free > 0
+                || device_zero.floor_rule_every_publish_referenced_but_free > 0
+                || device_zero.interval_rule_referenced_but_free > 0
+        }),
+        device_and_crates_disagreements: u64::from(!outcome.genesis_root_in_ring)
+            + u64::from(!outcome.first_transaction_matches_the_registered_anchor)
+            + outcome.ring_wrap_overwrite_mismatches
+            + outcome.mount_schedule_mismatches
+            + outcome.disk_cross_check_mismatches
+            + outcome.tree_table_release_violations
+            + u64::try_from(
+                outcome
+                    .recoveries
+                    .iter()
+                    .filter(|recovery| {
+                        outcome.cut_point == CrashCutPoint::BeforeTheRootSlotWrite
+                            && (!recovery.cut_matches_the_restored_image
+                                || recovery.root_slot_writes_in_the_crashed_publish != 1)
+                    })
+                    .count(),
+            )
+            .expect("落在 u64 内"),
+        admission_touches: outcome.admission_refusals
+            + u64::try_from(
+                outcome
+                    .recoveries
+                    .iter()
+                    .filter(|recovery| {
+                        recovery.mount_admission != "admitted_before_acquisition"
+                            || recovery.mount_floor_raise_sequences > 0
+                    })
+                    .count(),
+            )
+            .expect("落在 u64 内")
+            + count_where(observations, |observation| {
+                observation.reading.effective_floor > 0
+            }),
+        abandoned_or_unknown: count_where(observations, |observation| {
+            observation.reading.abandoned_roots > 0
+                || observation.reading.roots_without_version_facts > 0
+        }),
+        slots_per_region_read_back_mismatches: u64::from(
+            outcome.slots_per_region_read_back != outcome.shape.slots_per_region,
+        ),
+        tree_table_lag_every_publish_mismatch: u64::from(
+            expected_tree_table_lags
+                .is_some_and(|lags| *lags != outcome.tree_table_lags_every_publish),
+        ),
+        tree_table_lag_real_mismatch: u64::from(
+            expected_tree_table_lags.is_some_and(|lags| *lags != outcome.tree_table_lags_real),
+        ),
+    }
+}
+
+fn emit_cell_checks(emitter: &mut Emitter, outcome: &HhRunOutcome, totals: &CellCheckTotals) {
     emitter.emit(&format!(
-        "name=s1ef_summary steps={baseline_workload_actual_length} mismatches={s1ef_mismatches} steps_by_changed_leaf_count={}",
-        s1ef_histogram_text.join(",")
+        "name=q1_cell_checks family={} {} a11_mismatches={} a14_mismatches={} a15_every_below={} a15_real_below={} a12_every_nonzero={} a12_real_nonzero={} a13_every_nonzero={} a13_real_nonzero={} k10_violation_points={} devices_unequal_points={} root_ring_missing_points={} anchor_rows_missing={} real_every_differ_points={} referenced_but_free_points={} s1_failures={} g_adm_nonzero={} abandoned_or_unknown_root_points={} k8_mismatches={} a10_every_mismatch={} a10_real_mismatch={}",
+        outcome.family,
+        outcome.shape.fields(),
+        totals.hole_count_anchor_mismatches,
+        totals.threshold_anchor_mismatches,
+        totals.every_publish_below_tree_table_bound,
+        totals.real_below_tree_table_bound,
+        totals.every_publish_nonzero_without_holes,
+        totals.real_nonzero_without_holes,
+        totals.interval_rule_every_publish_nonzero,
+        totals.interval_rule_real_nonzero,
+        totals.reclaim_rule_violation_points,
+        totals.devices_unequal,
+        totals.root_ring_missing,
+        totals.anchor_rows_missing,
+        totals.real_every_differ,
+        totals.q1a_plus_positive,
+        totals.device_and_crates_disagreements,
+        totals.admission_touches,
+        totals.abandoned_or_unknown,
+        totals.slots_per_region_read_back_mismatches,
+        totals.tree_table_lag_every_publish_mismatch,
+        totals.tree_table_lag_real_mismatch,
     ));
-    let beta1_basis = basis_of("beta1_h0", &memory_pool_snapshot(&devices), &current, true);
+}
+
+/// PQ1 一段历史里「造出了洞」的判定（登记第六节 6.1：② = t + 1 且 ③ 没有）。
+fn premise_one_reproduced(outcome: &HhRunOutcome) -> bool {
+    !outcome.recoveries.is_empty()
+        && outcome.recoveries.iter().all(|recovery| {
+            recovery.first_txg_of_the_new_instance == recovery.hole_txg + 1
+                && !recovery.ring_has_a_root_at_the_hole_txg
+        })
+}
+
+fn hh_request<'anchor>(
+    family: &'static str,
+    shape: HhCellShape,
+    anchor: &'anchor anchor_model::AnchorCell,
+) -> HhRunRequest<'anchor> {
+    let is_first_geometry = shape.slots_per_region == E156_SLOTS_PER_REGION
+        && shape.density == WorkloadDensity::EveryPublishOverwrites;
+    HhRunRequest {
+        family,
+        shape,
+        allocator_source: HhAllocatorSource::ProductPathWithRootRing,
+        cut_point: CrashCutPoint::BeforeTheRootSlotWrite,
+        anchor,
+        check_overwrites_before_the_ring_wraps: is_first_geometry && shape.hole_count == 0,
+        judge_checker_on_hole_states: is_first_geometry,
+        emit_positive_control_no_reclaim: shape.hole_count == 0
+            || (shape.hole_count == 2 && shape.position == Some(HolePosition::Back)),
+    }
+}
+
+#[allow(
+    clippy::too_many_lines,
+    reason = "第一段、第二段与全部判定行按登记第五节 5.5 的次序连着跑，拆开反而难与登记逐行对"
+)]
+fn main() {
+    let mut emitter = Emitter { emitted: 0 };
+    emit_static_anchors(&mut emitter);
+
+    // 锚点模型（命令四的移植）：逐观测点那几行，去掉前缀之后与 Python 脚本的 `--dump` 逐行比（报告里的命令）。
+    let mut anchors: BTreeMap<u64, AnchorCellsOfOneSlotsPerRegion> = BTreeMap::new();
+    for slots_per_region in E156_SLOTS_PER_REGION_SAMPLING_POINTS {
+        for line in anchor_model::dump_lines(slots_per_region) {
+            emitter.emit(&format!("name=anchor_dump {line}"));
+        }
+        let cells = anchor_cells_of(slots_per_region);
+        let lags = anchor_model::tree_table_reclaim_lags(slots_per_region, cells.without_holes.end);
+        // 命令四的另两样：排得下的格上 r2 的两条闭式与按环现数逐点相同（A11），k = 0 的 Q1a / Q1b 与全部格的 Q1b 恒 0（A12、A13）。
+        let fitting_rows = || {
+            cells
+                .cells
+                .iter()
+                .filter(|(_, _, cell)| cell.fits)
+                .flat_map(|(_, _, cell)| cell.rows.iter())
+        };
+        let closed_form_mismatches = fitting_rows()
+            .filter(|row| {
+                row.live_holes != row.live_holes_closed_form
+                    || row.missing_txgs != row.missing_txgs_closed_form
+            })
+            .count();
+        let interval_rule_maximum = fitting_rows()
+            .chain(cells.without_holes.rows.iter())
+            .map(|row| row.interval_rule_tree_table_over_withheld)
+            .max()
+            .unwrap_or(0);
+        let without_holes_floor_rule_maximum = cells
+            .without_holes
+            .rows
+            .iter()
+            .map(|row| row.tree_table_lower_bound)
+            .max()
+            .unwrap_or(0);
+        emitter.emit(&format!(
+            "name=anchor_model s={slots_per_region} k0_end={} a10_lags={} a11_closed_form_mismatches_on_fitting_cells={closed_form_mismatches} a12_k0_max_q1a={without_holes_floor_rule_maximum} a13_max_q1b={interval_rule_maximum} fits={}",
+            cells.without_holes.end,
+            set_text(&lags),
+            cells
+                .cells
+                .iter()
+                .map(|(count, position, cell)| format!("{count}{}:{}", position.label(), cell.fits))
+                .collect::<Vec<_>>()
+                .join(",")
+        ));
+        anchors.insert(slots_per_region, cells);
+    }
+
+    // ===================== 第一段 =====================
+    let shape_of = |slots_per_region: u64,
+                    density: WorkloadDensity,
+                    hole_count: u64,
+                    position: Option<HolePosition>| HhCellShape {
+        slots_per_region,
+        density,
+        hole_count,
+        position,
+    };
+    let premise_front_shape = shape_of(
+        4,
+        WorkloadDensity::EveryPublishOverwrites,
+        1,
+        Some(HolePosition::Front),
+    );
+    let premise_back_shape = shape_of(
+        4,
+        WorkloadDensity::EveryPublishOverwrites,
+        1,
+        Some(HolePosition::Back),
+    );
+    let premise_front = run_hh_history(
+        &mut emitter,
+        &hh_request(
+            "Hh",
+            premise_front_shape,
+            anchor_cell_for(&anchors, 4, 1, Some(HolePosition::Front)),
+        ),
+    );
+    let premise_back = run_hh_history(
+        &mut emitter,
+        &hh_request(
+            "Hh",
+            premise_back_shape,
+            anchor_cell_for(&anchors, 4, 1, Some(HolePosition::Back)),
+        ),
+    );
+    for (label, outcome) in [("front", &premise_front), ("back", &premise_back)] {
+        for recovery in &outcome.recoveries {
+            emitter.emit(&format!(
+                "name=pq1 position={label} hole_txg={} prefix_applied={} first_txg_of_new_instance={} ring_has_root_at_hole_txg={} hole_slot_content={} a16_applicable={}",
+                recovery.hole_txg,
+                recovery.prefix_applied,
+                recovery.first_txg_of_the_new_instance,
+                recovery.ring_has_a_root_at_the_hole_txg,
+                recovery.hole_slot_content,
+                recovery.prefix_applied > 0
+            ));
+        }
+    }
+    let positive_control_crash = {
+        let mut request = hh_request(
+            "PC-c2",
+            premise_back_shape,
+            anchor_cell_for(&anchors, 4, 1, Some(HolePosition::Back)),
+        );
+        request.cut_point = CrashCutPoint::AfterTheRootSlotWritePositiveControl;
+        request.emit_positive_control_no_reclaim = false;
+        run_hh_history(&mut emitter, &request)
+    };
+    let positive_control_crash_seen = positive_control_crash
+        .recoveries
+        .first()
+        .is_some_and(|recovery| recovery.ring_has_a_root_at_the_hole_txg)
+        && positive_control_crash
+            .observations
+            .iter()
+            .find(|observation| observation.point == ObservationPoint::MountReturn)
+            .is_some_and(|observation| observation.reading.missing_txgs == 0)
+        && check_cell(&positive_control_crash, None).threshold_anchor_mismatches > 0;
     emitter.emit(&format!(
-        "name=beta1_h0_end txg={} accounting_slot={} referenced={}",
-        current.root.checkpoint_txg.0, beta1_basis.accounting_slot, beta1_basis.referenced
+        "name=pc_c2 ring_has_root_at_hole_txg={} mount_return_h_que={} a14_mismatches={} seen={positive_control_crash_seen}",
+        positive_control_crash
+            .recoveries
+            .first()
+            .is_some_and(|recovery| recovery.ring_has_a_root_at_the_hole_txg),
+        positive_control_crash
+            .observations
+            .iter()
+            .find(|observation| observation.point == ObservationPoint::MountReturn)
+            .map_or_else(|| "none".to_string(), |observation| observation.reading.missing_txgs.to_string()),
+        check_cell(&positive_control_crash, None).threshold_anchor_mismatches
     ));
 
-    // ===== HR：H0 前 3N 次（与 H0 共享前缀，从同一条真实历史分叉）→ 管理员回退到候选集里 txg 最小的根（影子账 On）
-    //          → 工作负载段 3N 次 =====
-    // 为了不与 H0 共用同一份可变设备状态（分叉不能回改已经跑过的 H0），HR 从 mkfs 重新独立跑一遍前 3N 步。
-    let mut hr_devices: Vec<(DeviceIdentity, SparseBlockDevice)> = (0..2u32)
-        .map(|number| {
-            (
-                DeviceIdentity(number),
-                SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
+    let floor_raise = run_floor_raise_trace();
+    let pushed_roots_text: Vec<String> = floor_raise
+        .pushed_roots
+        .iter()
+        .map(|(txg, root_floor, effective)| {
+            format!("txg{txg}:root_floor{root_floor}:effective{effective}")
+        })
+        .collect();
+    let premise_two_merged = floor_raise.the_two_readings_merge();
+    emitter.emit(&format!(
+        "name=pq2 raised={} floor_before={} new_floor={} effective_floor_before_any_write={} system_configuration_writes={} effective_floor_after_last_system_configuration_write={} system_configuration_writes_after_first_root={} pushed_roots={} publishes={} reclaimed_placements={} the_two_readings_merge={premise_two_merged}",
+        floor_raise.raised,
+        floor_raise.floor_before,
+        floor_raise.new_floor,
+        floor_raise.effective_floor_before_any_write,
+        floor_raise.system_configuration_writes,
+        floor_raise
+            .effective_floor_after_the_last_system_configuration_write
+            .map_or_else(|| "none".to_string(), |floor| floor.to_string()),
+        floor_raise.system_configuration_writes_after_the_first_root,
+        pushed_roots_text.join(","),
+        floor_raise.publishes,
+        floor_raise.reclaimed_placements,
+    ));
+
+    let forward_rollback = run_forward_rollback_scenario();
+    let forward_rollback_structure_holds = forward_rollback.txg_of_the_rollback_publish
+        == forward_rollback.txg_before_the_rollback + 1
+        && forward_rollback.instance_after == forward_rollback.instance_before
+        && forward_rollback.instance_table_rows_after
+            == forward_rollback.instance_table_rows_before
+        && forward_rollback.isolated_after_the_plain_remount
+            == vec![(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)]
+        && forward_rollback.abandoned_roots_after_the_plain_remount == 0;
+    emitter.emit(&format!(
+        "name=u11_forward_rollback txg_before={} txg_of_rollback_publish={} instance_before={} instance_after={} instance_table_rows_before={} instance_table_rows_after={} remount_instance={} isolated_after_plain_remount={:?} abandoned_roots_after_plain_remount={} forward_rollback_structure_holds={forward_rollback_structure_holds}",
+        forward_rollback.txg_before_the_rollback,
+        forward_rollback.txg_of_the_rollback_publish,
+        forward_rollback.instance_before,
+        forward_rollback.instance_after,
+        forward_rollback.instance_table_rows_before,
+        forward_rollback.instance_table_rows_after,
+        forward_rollback.remount_instance,
+        forward_rollback
+            .isolated_after_the_plain_remount
+            .iter()
+            .map(|(device, slots)| (device.0, *slots))
+            .collect::<Vec<_>>(),
+        forward_rollback.abandoned_roots_after_the_plain_remount,
+    ));
+    let oldest_rollback = run_rollback_to_the_oldest_candidate();
+    let u13a_structure_holds = oldest_rollback.txg_after == oldest_rollback.txg_before + 1
+        && oldest_rollback.instance_after == oldest_rollback.instance_before
+        && oldest_rollback.instance_table_rows_after == oldest_rollback.instance_table_rows_before;
+    emitter.emit(&format!(
+        "name=u13a_rollback_to_oldest_candidate overwrites={} target_txg={} txg_before={} txg_after={} instance_before={} instance_after={} instance_table_rows_before={} instance_table_rows_after={} item1_slots={} item5_slots={} i311={} structure_holds={u13a_structure_holds}",
+        oldest_rollback.overwrites,
+        oldest_rollback.target_txg,
+        oldest_rollback.txg_before,
+        oldest_rollback.txg_after,
+        oldest_rollback.instance_before,
+        oldest_rollback.instance_after,
+        oldest_rollback.instance_table_rows_before,
+        oldest_rollback.instance_table_rows_after,
+        oldest_rollback.item1_slots,
+        oldest_rollback.item5_slots,
+        verdict_label(&oldest_rollback.allocated_minus_deferred_verdict),
+    ));
+    let synthetic = synthetic_base_with_zero_deferred();
+    let (synthetic_flip1, synthetic_flip2) = q7c_self_test(
+        &mut emitter,
+        "beta_syn",
+        &synthetic.pool,
+        synthetic.accounting_slot,
+        synthetic.referenced,
+    );
+
+    let premise_totals = {
+        let mut totals = check_cell(&premise_front, None);
+        totals.add(check_cell(&premise_back, None));
+        totals
+    };
+    let premise_one_holds =
+        premise_one_reproduced(&premise_front) && premise_one_reproduced(&premise_back);
+    let stage_one_stop_reasons: Vec<&str> = [
+        (!premise_one_holds, "sp1_premise_one_not_reproduced"),
+        (
+            premise_totals.device_and_crates_disagreements > 0,
+            "s1_device_and_crates_disagree",
+        ),
+        (
+            premise_totals.root_ring_missing > 0,
+            "s1h_root_ring_not_installed",
+        ),
+        (
+            premise_totals.slots_per_region_read_back_mismatches > 0,
+            "k8_slots_per_region_read_back",
+        ),
+        (
+            premise_totals.admission_touches > 0,
+            "s12_admission_touched_the_history",
+        ),
+        (
+            premise_totals.hole_count_anchor_mismatches > 0,
+            "v6_hole_counts_differ_from_the_anchor",
+        ),
+        (
+            premise_totals.threshold_anchor_mismatches > 0,
+            "v2_threshold_differs_from_the_anchor",
+        ),
+        (!positive_control_crash_seen, "v2_pc_c2_not_seen"),
+    ]
+    .into_iter()
+    .filter(|(triggered, _)| *triggered)
+    .map(|(_, reason)| reason)
+    .collect();
+    emitter.emit(&format!(
+        "name=verdict stage=first premise_one_reproduced={premise_one_holds} premise_two_the_two_readings_merge={premise_two_merged} premise_two_answer={} fork_three={} g_adm_nonzero={} s1_failures={} a11_mismatches={} a14_mismatches={} pc_c2_seen={positive_control_crash_seen} k11_holds={} forward_rollback_structure_holds={forward_rollback_structure_holds} u13a_structure_holds={u13a_structure_holds} u13b_flip1={synthetic_flip1} u13b_flip2_not_applicable={} stop_reasons={}",
+        if premise_two_merged { "not_holds" } else { "holds" },
+        if premise_two_merged { "void_not_measured" } else { "sp2_needs_a_new_registration" },
+        premise_totals.admission_touches,
+        premise_totals.device_and_crates_disagreements,
+        premise_totals.hole_count_anchor_mismatches,
+        premise_totals.threshold_anchor_mismatches,
+        floor_raise.effective_floor_after_the_last_system_configuration_write == Some(floor_raise.new_floor),
+        !synthetic_flip2,
+        if stage_one_stop_reasons.is_empty() { "none".to_string() } else { stage_one_stop_reasons.join(",") },
+    ));
+    if !stage_one_stop_reasons.is_empty() {
+        emitter.emit("name=stage_two_not_run reason=stage_one_stop");
+        emitter.finish();
+        return;
+    }
+
+    // ===================== 第二段 =====================
+    let judge_cases = judge_positive_control_cases();
+    let judge_wrong = judge_cases
+        .iter()
+        .filter(|(_, actual, expected)| actual != expected)
+        .count();
+    for (case, actual, expected) in &judge_cases {
+        emitter.emit(&format!(
+            "name=pc_judge case={case} actual={actual} expected={expected} holds={}",
+            actual == expected
+        ));
+    }
+
+    let mut outcomes: Vec<HhRunOutcome> = Vec::new();
+    let mut grid_totals = CellCheckTotals::default();
+    let mut every_publish_tree_table_lag_mismatch_cells = 0u64;
+    let mut not_fitting = 0u64;
+    for slots_per_region in E156_SLOTS_PER_REGION_SAMPLING_POINTS {
+        let expected_lags = anchor_model::tree_table_reclaim_lags(
+            slots_per_region,
+            anchors[&slots_per_region].without_holes.end,
+        );
+        for density in [
+            WorkloadDensity::EveryPublishOverwrites,
+            WorkloadDensity::OneOverwriteInFourPublishes,
+        ] {
+            let mut shapes = vec![shape_of(slots_per_region, density, 0, None)];
+            for position in [HolePosition::Front, HolePosition::Back] {
+                for hole_count in [1u64, 2, 4] {
+                    shapes.push(shape_of(
+                        slots_per_region,
+                        density,
+                        hole_count,
+                        Some(position),
+                    ));
+                }
+            }
+            for shape in shapes {
+                let anchor =
+                    anchor_cell_for(&anchors, slots_per_region, shape.hole_count, shape.position);
+                if !anchor.fits {
+                    not_fitting += 1;
+                    emitter.emit(&format!(
+                        "name=q1_cell_not_run {} reason=geometry_does_not_fit",
+                        shape.fields()
+                    ));
+                    continue;
+                }
+                let reuse = if slots_per_region == 4
+                    && density == WorkloadDensity::EveryPublishOverwrites
+                    && shape.hole_count == 1
+                {
+                    match shape.position {
+                        Some(HolePosition::Front) => Some(premise_front.clone()),
+                        Some(HolePosition::Back) => Some(premise_back.clone()),
+                        None => None,
+                    }
+                } else {
+                    None
+                };
+                let outcome = match reuse {
+                    Some(outcome) => {
+                        emitter.emit(&format!(
+                            "name=q1_cell_reused {} from=stage_one_premise_history",
+                            shape.fields()
+                        ));
+                        outcome
+                    }
+                    None => run_hh_history(&mut emitter, &hh_request("Hh", shape, anchor)),
+                };
+                let lags = if shape.hole_count == 0 {
+                    Some(&expected_lags)
+                } else {
+                    None
+                };
+                let totals = check_cell(&outcome, lags);
+                every_publish_tree_table_lag_mismatch_cells +=
+                    totals.tree_table_lag_every_publish_mismatch;
+                emit_cell_checks(&mut emitter, &outcome, &totals);
+                grid_totals.add(totals);
+                outcomes.push(outcome);
+            }
+        }
+    }
+
+    // PC-分配器：Hh(0, —, S = 4, ρ = 1) 换回不装根环表的分配器，环转过一圈之后 A10 应判红。
+    let positive_control_allocator = {
+        let shape = shape_of(4, WorkloadDensity::EveryPublishOverwrites, 0, None);
+        let mut request = hh_request("PC-allocator", shape, anchor_cell_for(&anchors, 4, 0, None));
+        request.allocator_source = HhAllocatorSource::WithoutRootRingPositiveControl;
+        request.emit_positive_control_no_reclaim = false;
+        run_hh_history(&mut emitter, &request)
+    };
+    let expected_lags_four =
+        anchor_model::tree_table_reclaim_lags(4, anchors[&4].without_holes.end);
+    let positive_control_allocator_seen = positive_control_allocator.tree_table_lags_real
+        != expected_lags_four
+        && positive_control_allocator
+            .observations
+            .iter()
+            .all(|observation| !observation.reading.root_ring_installed);
+    emitter.emit(&format!(
+        "name=pc_allocator a10_lags_real={} expected={} root_ring_installed_points={} seen={positive_control_allocator_seen}",
+        set_text(&positive_control_allocator.tree_table_lags_real),
+        set_text(&expected_lags_four),
+        positive_control_allocator
+            .observations
+            .iter()
+            .filter(|observation| observation.reading.root_ring_installed)
+            .count()
+    ));
+
+    // PC-多扣：每个 (S, ρ) 的 Hh(0, —) 与 Hh(2, 后)，四个组合的期末值都要 > 0。
+    let mut over_withheld_controls_void = 0u64;
+    for outcome in outcomes.iter().filter(|outcome| {
+        outcome.shape.hole_count == 0
+            || (outcome.shape.hole_count == 2 && outcome.shape.position == Some(HolePosition::Back))
+    }) {
+        let last = outcome
+            .observations
+            .last()
+            .map(|observation| observation.reading.device_zero);
+        let finals = last.map_or([0u64; 4], |device_zero| {
+            [
+                device_zero.no_reclaim_floor_rule_real,
+                device_zero.no_reclaim_floor_rule_every_publish,
+                device_zero.no_reclaim_interval_rule_real,
+                device_zero.no_reclaim_interval_rule_every_publish,
+            ]
+        });
+        let void = finals.iter().filter(|value| **value == 0).count();
+        over_withheld_controls_void += u64::try_from(void).expect("落在 u64 内");
+        emitter.emit(&format!(
+            "name=pc_over_withheld {} final_floor_rule_real={} final_floor_rule_every={} final_interval_rule_real={} final_interval_rule_every={} seen={}",
+            outcome.shape.fields(),
+            finals[0],
+            finals[1],
+            finals[2],
+            finals[3],
+            void == 0
+        ));
+    }
+
+    // PC-洞：h_缺、h_洞 两个计数器改成恒 0，A11 在每一条 k ≥ 1 的族上都要判红。
+    let mut hole_controls_not_seen = 0u64;
+    for outcome in outcomes
+        .iter()
+        .filter(|outcome| outcome.shape.hole_count >= 1)
+    {
+        let red_points = outcome
+            .observations
+            .iter()
+            .filter(|observation| {
+                observation
+                    .anchor
+                    .is_some_and(|row| row.missing_txgs != 0 || row.live_holes != 0)
+            })
+            .count();
+        if red_points == 0 {
+            hole_controls_not_seen += 1;
+        }
+        emitter.emit(&format!(
+            "name=pc_hole_counters_zeroed {} a11_red_points={red_points} seen={}",
+            outcome.shape.fields(),
+            red_points > 0
+        ));
+    }
+
+    // 分组、判定。
+    let mut groups: BTreeMap<GroupKey, Vec<DeltaSample>> = BTreeMap::new();
+    for outcome in &outcomes {
+        if outcome.truncation.is_some() {
+            emitter.emit(&format!(
+                "name=q1_cell_truncated {} note=only_points_before_truncation_are_used",
+                outcome.shape.fields()
+            ));
+        }
+        for timing in [ReclaimTiming::Real, ReclaimTiming::EveryPublish] {
+            let key = (
+                outcome.shape.slots_per_region,
+                density_key(outcome.shape.density),
+                timing,
+            );
+            let entry = groups.entry(key).or_default();
+            for observation in &outcome.observations {
+                entry.push(DeltaSample {
+                    shape: outcome.shape,
+                    txg: observation.txg,
+                    workload_publishes: observation.workload_publishes,
+                    missing_txgs: observation.reading.missing_txgs,
+                    live_holes: observation.reading.live_holes,
+                    delta: observation.delta(timing),
+                });
+            }
+        }
+    }
+    let mut judgements: BTreeMap<GroupKey, GroupJudgements> = BTreeMap::new();
+    for (key, samples) in &groups {
+        judgements.insert(*key, judge_group(&mut emitter, key, samples));
+    }
+    let sensitivity = |pick: &dyn Fn(&GroupJudgements) -> PeakJudgement| {
+        let values: Vec<PeakJudgement> = judgements.values().map(pick).collect();
+        let listing: Vec<String> = judgements
+            .iter()
+            .map(|(key, judgement)| {
+                format!(
+                    "{}:{}",
+                    group_label(key).replace(' ', "_"),
+                    pick(judgement).label()
+                )
+            })
+            .collect();
+        (judge_geometry_sensitivity(&values), listing.join(","))
+    };
+    for (quantity, pick) in [
+        (
+            "q1c",
+            &(|judgement: &GroupJudgements| judgement.all_points)
+                as &dyn Fn(&GroupJudgements) -> PeakJudgement,
+        ),
+        ("q1c_on_holes", &|judgement: &GroupJudgements| {
+            judgement.on_holes
+        }),
+        ("q1c_front", &|judgement: &GroupJudgements| {
+            judgement.front_holes
+        }),
+        ("q1c_back", &|judgement: &GroupJudgements| {
+            judgement.back_holes
+        }),
+    ] {
+        let (result, listing) = sensitivity(pick);
+        emitter.emit(&format!(
+            "name=geometry_sensitivity quantity={quantity} result={} per_sampling_point={listing}",
+            result.label()
+        ));
+    }
+    let growth_listing: Vec<String> = judgements
+        .iter()
+        .map(|(key, judgement)| {
+            format!(
+                "{}:{}",
+                group_label(key).replace(' ', "_"),
+                judgement.growth.label()
             )
         })
         .collect();
-    let hr_genesis = make_filesystem(&parameters, &mut hr_devices).expect("HR mkfs");
-    let mut hr_allocator = PoolAllocator::new(
-        hr_devices
-            .iter()
-            .map(|(identity, device)| DeviceFreeMap::new(*identity, device.size_in_bytes()))
-            .collect(),
-    );
-    hr_allocator.mark_format_time_units(
-        Placement {
-            slot: INSTANCE_TABLE_SLOT,
-            span: 2,
-        },
-        Placement {
-            slot: TREE_TABLE_GENESIS_SLOT,
-            span: 1,
-        },
-    );
-    let hr_instance = {
-        let mut pool = PoolWriter::new(&parameters, hr_devices.as_mut_slice());
-        acquire_instance(&mut pool).expect("HR 取号")
-    };
-    let hr_warm_up = {
-        let mut pool = PoolWriter::new(&parameters, hr_devices.as_mut_slice());
-        warm_up(&mut pool, &hr_genesis.root, hr_instance).expect("HR 暖机")
-    };
-    let mut hr_current: TransactionOutput = {
-        let mut pool = PoolWriter::new(&parameters, hr_devices.as_mut_slice());
-        publish_first_file(
-            &mut pool,
-            &mut hr_allocator,
-            hr_warm_up.roots.last().expect("暖机两代根"),
-            FirstFile {
-                content: &overwrite_content(0),
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS,
-            },
-            hr_instance,
-            &hr_warm_up.last_record_bytes,
-        )
-        .expect("HR 第一个事务")
-    };
-    record_legal_state(
-        &mut emitter,
-        &mut legal_states,
-        "HR",
-        "first_file",
-        &hr_current,
-        &memory_pool_snapshot(&hr_devices),
-    );
-    // 同 H0：分配记录树按位置寻址之后（D8（核心索引结构） 已定项 14）没有一个节点 812 条那道墙，截断只剩别的失败。
-    let mut hr_prefix_actual_length: u64 = 0;
-    for step in 1..=hr_prefix_length {
-        let mut pool = PoolWriter::new(&parameters, hr_devices.as_mut_slice());
-        let outcome = publish_overwrite(
-            &mut pool,
-            &mut hr_allocator,
-            &hr_current,
-            FirstFile {
-                content: &overwrite_content(step),
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60 + step,
-            },
-            hr_instance,
-        );
-        let published = match outcome {
-            Ok(published) => published,
-            Err(failure) => {
-                emitter.emit(&format!(
-                    "name=hr_prefix_truncated_by_write_failure requested_length={hr_prefix_length} actual_length={hr_prefix_actual_length} failed_at_step={step} failure={failure:?}"
-                ));
-                break;
-            }
-        };
-        hr_current = published;
-        hr_prefix_actual_length = step;
-        // Q7d-1（R2 ⑤）：H0 与 HR 的每一次 O 都要计进「这次发布自己的释放」的取样；HR 这里只量测，
-        // 不逐次核闭式（Q3r.2 只在 H0 一条历史上核，第八节 8.2）。
-        overwrite_release_samples.push(self_release_slots_of_this_publish(
-            &hr_allocator,
-            DeviceIdentity(0),
-            hr_current.root.checkpoint_txg,
-        ));
-        record_legal_state(
-            &mut emitter,
-            &mut legal_states,
-            "HR",
-            "O",
-            &hr_current,
-            &memory_pool_snapshot(&hr_devices),
-        );
-    }
-    // 回退候选集 = 按实例表判仍然有效 ∧ txg ≥ F_生效（D16（发布语义） 已定项 1）；HR 没抬过 F（F_生效 = 0），
-    // 这一条过滤在 HR 上恒真，写出来只为与 HK 那一处同一个读法，不是两处各判各的。
-    let hr_effective_floor = effective_rollback_floor(
-        &hr_devices,
-        &region_devices,
-        &parameters.geometry,
-        &parameters.filesystem_identifier,
-    );
-    let candidates = readable_roots(
-        &hr_devices,
-        &region_devices,
-        &parameters.geometry,
-        &parameters.filesystem_identifier,
-    );
-    let oldest_candidate = candidates
-        .iter()
-        .filter(|root| root.checkpoint_txg.0 >= hr_effective_floor.0)
-        .min_by_key(|root| root.checkpoint_txg.0)
-        .expect("回退候选集至少一个根");
-    let rollback_target = RollbackTarget {
-        instance: oldest_candidate.instance,
-        checkpoint_txg: oldest_candidate.checkpoint_txg,
-    };
-    emitter.emit(&format!(
-        "name=hr_rollback_target instance={} txg={} candidate_count={}",
-        rollback_target.instance.0,
-        rollback_target.checkpoint_txg.0,
-        candidates.len()
-    ));
-    let mounted = mount_rollback(
-        &parameters,
-        &mut hr_devices,
-        rollback_target,
-        ShadowLedger::On,
-    )
-    .expect("HR 管理员回退");
-    hr_allocator = mounted.allocator;
-    record_legal_state(
-        &mut emitter,
-        &mut legal_states,
-        "HR",
-        "rollback_row",
-        mounted
-            .output
-            .row_publish
-            .file_version()
-            .expect("回退写行那一版带文件"),
-        &memory_pool_snapshot(&hr_devices),
-    );
-    // 第 10 个基底（E156 第 3 次重跑登记「十二」修订 4）：这一步是这个装置迄今第一个第 5 项恰为 0 的
-    // 可达合法状态（`q7d2_min_item5` 在这一步之后会读到 `family=HR kind=rollback_row txg=76`）——
-    // 岔路 7 Q7c① 的判别力自证隐含要求「基底第 5 项恰为 0」，此前 7 个可达基底都不满足，这里第一次有对象。
-    let beta_hr_rollback_row = basis_of(
-        "beta_hr_rollback_row",
-        &memory_pool_snapshot(&hr_devices),
-        mounted
-            .output
-            .row_publish
-            .file_version()
-            .expect("回退写行那一版带文件"),
-        true,
-    );
-    for warm in &mounted.output.warm_up_publishes {
-        record_legal_state(
-            &mut emitter,
-            &mut legal_states,
-            "HR",
-            "warmup",
-            warm.file_version().expect("暖机那一版带文件"),
-            &memory_pool_snapshot(&hr_devices),
-        );
-    }
-    hr_current = mounted
-        .current
-        .file_version()
-        .expect("回退目标带文件版本")
-        .clone();
-    let hr_instance_after_rollback = mounted.output.instance;
-
-    let mut hr_tail_actual_length: u64 = 0;
-    for step in 1..=hr_tail_length {
-        let mut pool = PoolWriter::new(&parameters, hr_devices.as_mut_slice());
-        let outcome = publish_overwrite(
-            &mut pool,
-            &mut hr_allocator,
-            &hr_current,
-            FirstFile {
-                content: &overwrite_content(hr_prefix_length + step),
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60 + hr_prefix_length + step,
-            },
-            hr_instance_after_rollback,
-        );
-        let published = match outcome {
-            Ok(published) => published,
-            Err(failure) => {
-                emitter.emit(&format!(
-                    "name=hr_tail_truncated_by_write_failure requested_length={hr_tail_length} actual_length={hr_tail_actual_length} failed_at_step={step} failure={failure:?}"
-                ));
-                break;
-            }
-        };
-        hr_current = published;
-        hr_tail_actual_length = step;
-        overwrite_release_samples.push(self_release_slots_of_this_publish(
-            &hr_allocator,
-            DeviceIdentity(0),
-            hr_current.root.checkpoint_txg,
-        ));
-        record_legal_state(
-            &mut emitter,
-            &mut legal_states,
-            "HR",
-            "O",
-            &hr_current,
-            &memory_pool_snapshot(&hr_devices),
-        );
-    }
-    emitter.emit(&format!(
-        "name=hr_lengths requested_prefix={hr_prefix_length} actual_prefix={hr_prefix_actual_length} requested_tail={hr_tail_length} actual_tail={hr_tail_actual_length}"
-    ));
-    let beta2_basis = basis_of(
-        "beta2_hr",
-        &memory_pool_snapshot(&hr_devices),
-        &hr_current,
-        true,
-    );
-    emitter.emit(&format!(
-        "name=beta2_hr_end txg={} instance={} accounting_slot={} referenced={}",
-        hr_current.root.checkpoint_txg.0,
-        hr_instance_after_rollback.0,
-        beta2_basis.accounting_slot,
-        beta2_basis.referenced
-    ));
-
-    // ===== HK（真实：GatedByTheRollbackFloor）与 HK-F0（不可达阳性对照：ForcedToZero） =====
-    let hk = run_hk_family(
-        &parameters,
-        &region_devices,
-        spacing,
-        slots_per_region,
-        "HK",
-        ReuseWindow::GatedByTheRollbackFloor,
-        true,
-        &mut emitter,
-        &mut legal_states,
-    );
-    // S1(e)：空发布 E 自己的释放槽数不再是登记第一、二版钉的常数 4（分配记录树按位置寻址之后
-    // 不再是一个节点，R-5：这一次 = 8）；闭式核对已经在 `run_hk_family` 里对 `label == "HK"` 做过
-    // （`name=r5_empty_publish_closed_form`），这里只留一行观测方便直接搜。
-    emitter.emit(&format!(
-        "name=s1e_empty_publish_release slots={}",
-        hk.empty_publish_release_slots
-    ));
-
-    let mut hk_forced_to_zero_legal_states: Vec<LegalState> = Vec::new();
-    let hk_forced_to_zero = run_hk_family(
-        &parameters,
-        &region_devices,
-        spacing,
-        slots_per_region,
-        "HK-F0",
-        ReuseWindow::ForcedToZero,
-        false,
-        &mut emitter,
-        &mut hk_forced_to_zero_legal_states,
-    );
-    let beta_forced_to_zero = BasisSnapshot {
-        label: "beta_F0".to_string(),
-        reachable: false,
-        ..hk_forced_to_zero.beta_first
-    };
-
-    // ===== β_syn：β0 的镜像做 (第 1 项 −1、第 5 项 −1、第 2 项 +1) =====
-    let beta_syn_pool = corrupt_device_zero_accounting(
-        &beta0_basis.pool,
-        beta0_basis.accounting_slot,
-        beta0_basis.tree_table_slot,
-        &region_devices,
-        spacing,
-        &[
-            (1u16, -i64::try_from(SLOT_BYTES).expect("16384")),
-            (5u16, -i64::try_from(SLOT_BYTES).expect("16384")),
-            (2u16, i64::try_from(SLOT_BYTES).expect("16384")),
-        ],
-    );
-    let beta_syn = BasisSnapshot {
-        label: "beta_syn".to_string(),
-        pool: beta_syn_pool,
-        accounting_slot: beta0_basis.accounting_slot,
-        tree_table_slot: beta0_basis.tree_table_slot,
-        referenced: beta0_basis.referenced,
-        reachable: false,
-    };
-    let (syn_item1, syn_item2, syn_item5) =
-        mirror_accounting_row_slots(&beta_syn.pool, beta_syn.accounting_slot);
-    emitter.emit(&format!(
-        "name=beta_syn_row item1={syn_item1} item2={syn_item2} item5={syn_item5} referenced={}",
-        beta_syn.referenced
-    ));
-
-    // ===== S1(c) =====
-    run_s1c_rollback_isolation_scenario(&mut emitter, &parameters);
-
-    // ===== Q7b：HK、H0、HR 全部合法状态上 G27 判红的状态数（L1、L2 分开数） =====
-    let (
-        mut red_count_before_crash_recovery,
-        mut total_count_before_crash_recovery,
-        mut red_count_after_crash_recovery,
-        mut total_count_after_crash_recovery,
-    ) = (0u64, 0u64, 0u64, 0u64);
-    let mut first_red_legal_states: Vec<String> = Vec::new();
-    for state in &legal_states {
-        let is_after_crash_recovery = state.kind.contains("after_c2");
-        if is_after_crash_recovery {
-            total_count_after_crash_recovery += 1;
-        } else {
-            total_count_before_crash_recovery += 1;
-        }
-        if state.check_is_red {
-            if is_after_crash_recovery {
-                red_count_after_crash_recovery += 1;
-            } else {
-                red_count_before_crash_recovery += 1;
-            }
-            if first_red_legal_states.len() < 5 {
-                first_red_legal_states
-                    .push(format!("{}:{}:txg={}", state.family, state.kind, state.txg));
-            }
-        }
-    }
-    emitter.emit(&format!(
-        "name=q7b red_l1={red_count_before_crash_recovery} total_l1={total_count_before_crash_recovery} red_l2={red_count_after_crash_recovery} total_l2={total_count_after_crash_recovery} first_red={}",
-        first_red_legal_states.join(" | ")
-    ));
-
-    // ===== Q7d-1（R2 ⑤，逐次现量）：按发布种类分组的「这次发布自己的释放」（min/max/count）。
-    // O 不再是常数：`overwrite_release_samples` 逐次收自 H0 与 HR（前缀 + 尾段）的每一次 O；
-    // E 的唯一样本来自 HK（`hk.empty_publish_release_slots`）。 =====
-    let (overwrite_release_minimum, overwrite_release_maximum) =
-        e156_minimum_and_maximum(&overwrite_release_samples);
-    emitter.emit(&format!(
-        "name=q7d1_by_kind kind=O min={overwrite_release_minimum} max={overwrite_release_maximum} count={}",
-        overwrite_release_samples.len()
-    ));
-    emitter.emit(&format!(
-        "name=q7d1_by_kind kind=E min={0} max={0} count=1",
-        hk.empty_publish_release_slots
-    ));
-
-    // ===== Q7d-2：可达合法状态（H0、HR、HK）上第 5 项的最小值 =====
-    let smallest_item5_state = legal_states
-        .iter()
-        .min_by_key(|state| state.item5)
-        .expect("legal_states 非空");
-    emitter.emit(&format!(
-        "name=q7d2_min_item5 min_item5={} family={} kind={} txg={}",
-        smallest_item5_state.item5,
-        smallest_item5_state.family,
-        smallest_item5_state.kind,
-        smallest_item5_state.txg
-    ));
-
-    // ===== Q7d-3（= PC-可达）：HK-F0 全部发布之后状态与 β_syn 上的同一个量必须 = 0 =====
-    let hk_forced_to_zero_smallest_item5 = hk_forced_to_zero_legal_states
-        .iter()
-        .map(|state| state.item5)
-        .min()
-        .unwrap_or(u64::MAX);
-    let q7d3_holds = hk_forced_to_zero_smallest_item5 == 0 && syn_item5 == 0;
-    emitter.emit(&format!("name=q7d3_pc_reachable hk_forced_to_zero_smallest_item5_item5={hk_forced_to_zero_smallest_item5} beta_syn_item5={syn_item5} holds={q7d3_holds}"));
-
-    // ===== 统一的基底列表：Q7a（三档 delta）、Q7c①②、PC-检查、Q7f =====
-    // 第 10 个（beta_hr_rollback_row，E156 第 3 次重跑登记「十二」修订 4）：唯一一个第 5 项恰为 0 的
-    // 可达基底，Q7c① 的判别力自证第一次在它上面有对象（见插入这个基底那一处的注释）。
-    let bases: [&BasisSnapshot; 10] = [
-        &beta0_basis,
-        &beta1_basis,
-        &beta2_basis,
-        &hk.beta_after_reopen,
-        &hk.beta_after_rollback,
-        &hk.beta_after_raise_floor,
-        &hk.beta_after_crash_recovery,
-        &beta_hr_rollback_row,
-        &beta_syn,
-        &beta_forced_to_zero,
-    ];
-    let mut q7a_all_red_count = 0u64;
-    let mut flips: Vec<(String, bool, bool)> = Vec::new();
-    let mut q7f_count = 0u64;
-    for basis in bases {
-        let (item1, _item2, item5) =
-            mirror_accounting_row_slots(&basis.pool, basis.accounting_slot);
-        emitter.emit(&format!(
-            "name=basis_snapshot label={} item1={item1} item5={item5} referenced={} reachable={}",
-            basis.label, basis.referenced, basis.reachable
-        ));
-        for delta in [1i64, -1, 8] {
-            let (_allocated, _free, deferred) =
-                mirror_accounting_row_slots(&basis.pool, basis.accounting_slot);
-            if delta < 0 && u64::try_from(-delta).expect("delta 的绝对值") > deferred {
-                emitter.emit(&format!("name=q7a basis={} defer_delta={delta} not_applicable=true reason=deferred_underflow", basis.label));
-                continue;
-            }
-            let (corrupted_red, both_green) = run_q7a_cell(
-                &mut emitter,
-                &basis.label,
-                &delta.to_string(),
-                &basis.pool,
-                basis.accounting_slot,
-                basis.tree_table_slot,
-                &region_devices,
-                spacing,
-                basis.referenced,
-                delta,
-            );
-            if corrupted_red && both_green {
-                q7a_all_red_count += 1;
-            }
-        }
-        let (flip1, flip2) = q7c_self_test(
-            &mut emitter,
-            &basis.label,
-            &basis.pool,
-            basis.accounting_slot,
-            basis.referenced,
-        );
-        flips.push((basis.label.clone(), flip1, flip2));
-        run_pc_check(
-            &mut emitter,
-            &basis.label,
-            &basis.pool,
-            basis.accounting_slot,
-            basis.tree_table_slot,
-            &region_devices,
-            spacing,
-            basis.referenced,
-        );
-
-        // Q7f（附带）：只在可达基底上，真实 G27 绿 ∧「不减第 5 项」变体红。
-        if basis.reachable {
-            let real_red = allocated_minus_deferred_mismatches_referenced(
-                &basis.pool,
-                basis.accounting_slot,
-                basis.referenced,
-            );
-            let variant_red = item1 != basis.referenced;
-            if !real_red && variant_red {
-                q7f_count += 1;
-            }
-        }
-    }
-    let q7c1_flip_seen = flips.iter().any(|(_, flip1, _)| *flip1);
-    let q7c2_flip_seen = flips.iter().any(|(_, _, flip2)| *flip2);
-    emitter.emit(&format!("name=q7a_summary all_red_count={q7a_all_red_count} q7c1_flip_seen={q7c1_flip_seen} q7c2_flip_seen={q7c2_flip_seen}"));
-    emitter.emit(&format!("name=q7f_count count={q7f_count}"));
-
-    // ===== Q7e：Q7c①②③ 在 β_F0、β_syn 上转不转色（从上面的 flips 里挑出来，另加今天两条检查的判定） =====
-    let (_, beta_forced_to_zero_flip1, beta_forced_to_zero_flip2) = flips
-        .iter()
-        .find(|(label, _, _)| label == "beta_F0")
-        .cloned()
-        .unwrap_or((String::new(), false, false));
-    let (_, beta_syn_flip1, beta_syn_flip2) = flips
-        .iter()
-        .find(|(label, _, _)| label == "beta_syn")
-        .cloned()
-        .unwrap_or((String::new(), false, false));
-    emitter.emit(&format!(
-        "name=q7e beta_forced_to_zero_flip1={beta_forced_to_zero_flip1} beta_forced_to_zero_flip2={beta_forced_to_zero_flip2} beta_syn_flip1={beta_syn_flip1} beta_syn_flip2={beta_syn_flip2} beta_forced_to_zero_i31_red={} beta_forced_to_zero_i52_red={} beta_syn_i31_red={} beta_syn_i52_red={}",
-        is_red(&verdict(&beta_forced_to_zero.pool, "I-3.1")), is_red(&verdict(&beta_forced_to_zero.pool, "I-5.2")),
-        is_red(&verdict(&beta_syn.pool, "I-3.1")), is_red(&verdict(&beta_syn.pool, "I-5.2")),
-    ));
-
-    // ===== 完整性闸（V7）：族数、取样点数、逐发布行数（岔路 7，第一段）=====
-    emitter.emit(&format!(
-        "name=integrity families=3 legal_state_rows={} hk_forced_to_zero_rows={} basis_count=10",
-        legal_states.len(),
-        hk_forced_to_zero_legal_states.len(),
-    ));
-
-    // ===== 岔路 3（第二段，缩小范围：S = 8、ρ = 1 一个几何取样点，见文件顶注释）=====
-    run_hf_single_cell(&parameters, &mut emitter);
-    run_small_pool_cell(&mut emitter, "hx", None);
-    // R-7：HY 的覆盖写次数不再写死 3——3 次不满足 e ≥ max(8, f) 就减少直到满足（第十二节记录用了几次）。
-    let hy_cap = e156_find_hy_cap_satisfying_open_segment_condition(&small_pool_parameters());
-    emitter.emit(&format!("name=r7_hy_cap chosen_cap={hy_cap}"));
-    run_small_pool_cell(&mut emitter, "hy", Some(hy_cap));
-
-    // ===== 岔路 1（第三段 a 的一部分，S 这一维：S = 8（mkfs 默认）与 S = 4（下界，方向相反，
-    // 「五、5.6」第六类「至少一个方向相反的取样点」），ρ = 1、回收时点固定「实」、洞位置固定「后」，
-    // k ∈ {0, 1, 2}；ρ = 1/4、回收时点「每」、洞位置「前」、S = 16 这几维见交回报告岔路表，这一段未扫）=====
-    let parameters_at_four_slots_per_region = parameters_with_slots_per_region(4);
-    let slots_per_region_at_four = parameters_at_four_slots_per_region
-        .geometry
-        .root_ring_slots_per_region;
-    // K8（新，登记「七」）：mkfs 喂的系统配置字段与本地打算跑的 S 一致。这里核的是「喂给 mkfs 的值」，
-    // 不是从盘上字节读回来的值——与文件顶那条 S = 8 的基线检查（`E156_SLOTS_PER_REGION` 那条 assert）
-    // 是同一个严格程度，不是从盘上重新解析系统配置槽。
-    assert_eq!(
-        4,
-        slots_per_region_at_four.count(),
-        "K8：S = 4 这一格，本地打算跑的 S 与喂给 mkfs 的系统配置字段不等"
-    );
-    emitter.emit("name=anchor_k8 configured=4 local=4 holds=true");
-
-    let mut hh_cells: Vec<HhCell> = Vec::new();
-    for (geometry_parameters, geometry_slots_per_region) in [
-        (&parameters, slots_per_region),
-        (
-            &parameters_at_four_slots_per_region,
-            slots_per_region_at_four,
-        ),
-    ] {
-        for holes in [0u64, 1, 2] {
-            let cell = run_hh_cell(
-                geometry_parameters,
-                &region_devices,
-                spacing,
-                geometry_slots_per_region,
-                holes,
-                0,
-                &mut emitter,
-            );
-            hh_cells.push(cell);
-        }
-    }
-    // Q1d：相邻两点的差，第一次让 Δ 越过 2 槽 / 1 槽的 (h_missing, txg)；另报 q1a/q1b 各自的轨迹与 h_missing，
-    // 免得只看 Δ 看不出是哪一边在长（`test-discipline.md`「端点不是轨迹」）。按 S 分组比较：跨 S 比较
-    // holes 相邻两点没有意义（S 一变，ring_length、造洞的时点全变），只在同一个 S 内部比。
-    let mut crossing_two_slots_by_slots_per_region: Vec<(u64, bool)> = Vec::new();
-    for group_slots_per_region in [8u64, 4u64] {
-        let group: Vec<&HhCell> = hh_cells
-            .iter()
-            .filter(|cell| cell.slots_per_region == group_slots_per_region)
-            .collect();
-        for window in group.windows(2) {
-            let (previous, next) = (window[0], window[1]);
-            emitter.emit(&format!(
-                "name=q1d_adjacent_diff s={group_slots_per_region} holes_from={} holes_to={} q1a_from={} q1a_to={} q1b_from={} q1b_to={} delta_from={} delta_to={} diff={} h_missing_from={} h_missing_to={}",
-                previous.holes, next.holes, previous.q1a_over_withheld, next.q1a_over_withheld,
-                previous.q1b_over_withheld, next.q1b_over_withheld, previous.delta, next.delta,
-                i64::try_from(next.delta).unwrap_or(i64::MAX) - i64::try_from(previous.delta).unwrap_or(0),
-                previous.missing_txg_count, next.missing_txg_count,
-            ));
-        }
-        let first_crossing_2 = group.iter().find(|cell| cell.delta > 2);
-        let first_crossing_1 = group.iter().find(|cell| cell.delta > 1);
-        crossing_two_slots_by_slots_per_region
-            .push((group_slots_per_region, first_crossing_2.is_some()));
-        emitter.emit(&format!(
-            "name=q1d_first_crossing s={group_slots_per_region} threshold_2_slots={} threshold_1_slot={}",
-            first_crossing_2.map_or("not_crossed_in_sampled_range".to_string(), |cell| format!(
-                "holes={} txg={} delta={}",
-                cell.holes, cell.txg, cell.delta
-            )),
-            first_crossing_1.map_or("not_crossed_in_sampled_range".to_string(), |cell| format!(
-                "holes={} txg={} delta={}",
-                cell.holes, cell.txg, cell.delta
-            )),
-        ));
-        let monotonic = group
-            .windows(2)
-            .all(|window| window[1].delta >= window[0].delta);
-        emitter.emit(&format!(
-            "name=q1d_monotonic s={group_slots_per_region} holds={monotonic}"
-        ));
-    }
-    // 几何敏感性（「八」，第六类）：S = 8 与 S = 4 这两个取样点上，「Δ 越过 2 槽」这条判定是不是同一个值。
-    // 相同 ⇒ 报「2 个取样点一致」；不同 ⇒ 报「不稳定（依赖几何）」，正文不许把它写成臂或检查的性质（F9）。
-    let crossing_2_values: Vec<bool> = crossing_two_slots_by_slots_per_region
-        .iter()
-        .map(|(_, crossed)| *crossed)
+    let growth_values: BTreeSet<&str> = judgements
+        .values()
+        .map(|judgement| judgement.growth.label())
         .collect();
-    let crossing_2_stable = crossing_2_values
-        .windows(2)
-        .all(|window| window[0] == window[1]);
     emitter.emit(&format!(
-        "name=q1_geometry_sensitivity_s crossing_two_slots_by_slots_per_region={} stable={crossing_2_stable}",
-        crossing_two_slots_by_slots_per_region
-            .iter()
-            .map(|(slots_per_region_value, crossed)| format!("s{slots_per_region_value}={crossed}"))
-            .collect::<Vec<_>>()
-            .join(","),
+        "name=geometry_sensitivity quantity=q1d_growth result={} per_sampling_point={}",
+        if growth_values.len() == 1 {
+            format!("consistent_on_{}_sampling_points", judgements.len())
+        } else {
+            "unstable".to_string()
+        },
+        growth_listing.join(",")
     ));
 
-    // ===== 主 agent 续派第 1 条：步数对齐对照——k=0，但工作负载发布次数补到与 holes=1 / holes=2 相同
-    // （同样只在最后无崩溃重开一次），S = 8 与 S = 4 各一组。目的：把「Δ 随洞数长」与「Δ 随步数长」分开。=====
-    let mut matched_cells: Vec<HhCell> = Vec::new();
-    for (geometry_parameters, geometry_slots_per_region) in [
-        (&parameters, slots_per_region),
-        (
-            &parameters_at_four_slots_per_region,
-            slots_per_region_at_four,
-        ),
-    ] {
-        for matched_to_holes in [1u64, 2] {
-            let cell = run_hh_cell(
-                geometry_parameters,
-                &region_devices,
-                spacing,
-                geometry_slots_per_region,
-                0,
-                matched_to_holes,
-                &mut emitter,
-            );
-            matched_cells.push(cell);
+    // 失败条款（第十节）。
+    let front_above_two_groups: Vec<String> = judgements
+        .iter()
+        .filter(|(_, judgement)| judgement.front_holes == PeakJudgement::AboveTheThreshold)
+        .map(|(key, _)| group_label(key).replace(' ', "_"))
+        .collect();
+    let no_observable_difference = judgements.values().all(|judgement| {
+        judgement.front_peak_is_zero_everywhere && judgement.back_peak_is_zero_everywhere
+    });
+    let front_back_differ_groups: Vec<String> = judgements
+        .iter()
+        .filter(|(_, judgement)| {
+            judgement.front_holes != PeakJudgement::NothingObserved
+                && judgement.back_holes != PeakJudgement::NothingObserved
+                && judgement.front_holes != judgement.back_holes
+        })
+        .map(|(key, _)| group_label(key).replace(' ', "_"))
+        .collect();
+    let back_at_most_two_groups: Vec<String> = judgements
+        .iter()
+        .filter(|(_, judgement)| judgement.back_holes == PeakJudgement::AtMostTheThreshold)
+        .map(|(key, _)| group_label(key).replace(' ', "_"))
+        .collect();
+    let front_one_slot: Vec<String> = judgements
+        .iter()
+        .map(|(key, judgement)| {
+            format!(
+                "{}:{}",
+                group_label(key).replace(' ', "_"),
+                judgement.front_holes_one_slot.label()
+            )
+        })
+        .collect();
+    let not_on_holes: Vec<String> = judgements
+        .iter()
+        .map(|(key, judgement)| {
+            format!(
+                "{}:{}",
+                group_label(key).replace(' ', "_"),
+                judgement.not_on_holes.label()
+            )
+        })
+        .collect();
+    let list_or_none = |values: &[String]| {
+        if values.is_empty() {
+            "none".to_string()
+        } else {
+            values.join(",")
         }
-    }
-    // Δ(k) − Δ(0, 步数对齐)：真实 holes=k 格与「没有洞、但总步数相同」那格的 Δ 之差。差 ≈ 0 ⇒ Δ 的
-    // 增长主要来自步数、与洞本身无关；差远大于 0 ⇒ 洞本身在同样的步数下额外贡献了这么多多扣。
-    for group_slots_per_region in [8u64, 4u64] {
-        for matched_to_holes in [1u64, 2] {
-            let real_cell = hh_cells
-                .iter()
-                .find(|cell| {
-                    cell.slots_per_region == group_slots_per_region
-                        && cell.holes == matched_to_holes
-                })
-                .expect("真实 holes=k 格应当已经跑过");
-            let matched_cell = matched_cells
-                .iter()
-                .find(|cell| {
-                    cell.slots_per_region == group_slots_per_region
-                        && cell.matched_to_holes == matched_to_holes
-                })
-                .expect("步数对齐对照格应当已经跑过");
-            assert_eq!(
-                real_cell.txg, matched_cell.txg,
-                "步数对齐没对上：真实 holes={matched_to_holes}（s={group_slots_per_region}）与它的步数对照格终点 txg 应当相同"
-            );
-            let diff = i64::try_from(real_cell.delta).unwrap_or(i64::MAX)
-                - i64::try_from(matched_cell.delta).unwrap_or(0);
-            emitter.emit(&format!(
-                "name=q1_step_matched_diff s={group_slots_per_region} k={matched_to_holes} txg={} delta_k={} delta_0_matched={} diff={diff} h_missing_k={} h_missing_0_matched={}",
-                real_cell.txg, real_cell.delta, matched_cell.delta,
-                real_cell.missing_txg_count, matched_cell.missing_txg_count,
-            ));
-        }
-    }
-
-    // ===== 完整性闸（V7，第二/三段追加）：这一轮新增的取样点数 =====
+    };
     emitter.emit(&format!(
-        "name=integrity_r2_segments hf_cells=1 hh_cells={} hh_holes_sampled={} matched_cells={} matched_sampled={}",
-        hh_cells.len(),
-        hh_cells
-            .iter()
-            .map(|cell| format!("s{}h{}", cell.slots_per_region, cell.holes))
-            .collect::<Vec<_>>()
-            .join(","),
-        matched_cells.len(),
-        matched_cells
-            .iter()
-            .map(|cell| format!("s{}m{}", cell.slots_per_region, cell.matched_to_holes))
-            .collect::<Vec<_>>()
-            .join(","),
+        "name=failure_clauses f1_front_above_two_groups={} f2_no_observable_difference={no_observable_difference} f22_front_and_back_differ_groups={} f23_back_at_most_two_groups={} f24_real_every_differ_points={} q1c_front_one_slot={} q1c_not_on_holes={}",
+        list_or_none(&front_above_two_groups),
+        list_or_none(&front_back_differ_groups),
+        list_or_none(&back_at_most_two_groups),
+        grid_totals.real_every_differ,
+        front_one_slot.join(","),
+        not_on_holes.join(","),
     ));
 
+    // 作废与停机（第十一节）。
+    let cells_run = outcomes.len();
+    emitter.emit(&format!(
+        "name=verdict stage=second cells_run={cells_run} cells_not_fitting={not_fitting} truncated_cells={} v1_over_withheld_controls_void={over_withheld_controls_void} v2_a10_every_mismatch_cells={every_publish_tree_table_lag_mismatch_cells} v2_a12_every_nonzero_points={} v2_a14_mismatch_points={} v2_a15_every_below_points={} v2_pc_allocator_seen={positive_control_allocator_seen} v2_pc_c2_seen={positive_control_crash_seen} v6_a11_mismatch_points={} v6_devices_unequal_points={} v6_pc_hole_not_seen_cells={hole_controls_not_seen} v16_judge_cases_wrong={judge_wrong} v17_a13_every_nonzero_points={} s1_failures={} s1h_root_ring_missing_points={} s11_a10_real_mismatch_cells={} s11_a12_real_nonzero_points={} s11_a15_real_below_points={} s11_k10_violation_points={} s12_g_adm_nonzero={} k8_mismatches={} referenced_but_free_points={} abandoned_or_unknown_root_points={} anchor_rows_missing={}",
+        outcomes.iter().filter(|outcome| outcome.truncation.is_some()).count(),
+        grid_totals.every_publish_nonzero_without_holes,
+        grid_totals.threshold_anchor_mismatches,
+        grid_totals.every_publish_below_tree_table_bound,
+        grid_totals.hole_count_anchor_mismatches,
+        grid_totals.devices_unequal,
+        grid_totals.interval_rule_every_publish_nonzero,
+        grid_totals.device_and_crates_disagreements,
+        grid_totals.root_ring_missing,
+        grid_totals.tree_table_lag_real_mismatch,
+        grid_totals.real_nonzero_without_holes,
+        grid_totals.real_below_tree_table_bound,
+        grid_totals.reclaim_rule_violation_points,
+        grid_totals.admission_touches,
+        grid_totals.slots_per_region_read_back_mismatches,
+        grid_totals.q1a_plus_positive,
+        grid_totals.abandoned_or_unknown,
+        grid_totals.anchor_rows_missing,
+    ));
+    for (key, judgement) in &judgements {
+        emitter.emit(&format!(
+            "name=verdict stage=second_group {} q1c={} q1c_on_holes={} q1c_front={} q1c_back={} q1d_growth={}",
+            group_label(key),
+            judgement.all_points.label(),
+            judgement.on_holes.label(),
+            judgement.front_holes.label(),
+            judgement.back_holes.label(),
+            judgement.growth.label(),
+        ));
+    }
     emitter.finish();
 }
 
 #[cfg(test)]
 mod tests {
-    //! K1（第一个事务之后的记账三项）、G27（`referenced_slots`）、R8（U7）、R3 的判别力（U8）的最小单测。
-    //! `crates/mutations.tsv` 里 `e156_referenced_slots_drops_instance_table` 那条钉着 `referenced_slots`
-    //! 的实例表兜底分支：删掉它，第一条测试必须红（`assert_eq!` 那一行断言 12，变异之后会算出 10）。
+    //! K1（第一个事务之后的记账三项）、G27（`referenced_slots`）、R8（U7）、R3 的判别力（U8）、R-3 闭式（U10、U12）的最小单测，
+    //! 与第 4 次重跑登记第九节的 U11、U13–U18。
     use super::{
         accounting_row_slots, allocated_minus_deferred_matches_referenced,
-        allocated_minus_deferred_mismatches_referenced, basis_of, corrupt_device_zero_accounting,
-        e156_allocation_record_tree_new_node_count, e156_closed_form_expected,
-        e156_existing_leaf_positions, e156_touched_leaf_positions,
-        memory_pool_snapshot, mirror_accounting_row_slots, parameters, q7c_self_test,
-        referenced_slots, run_s1c_rollback_isolation_scenario,
-        self_release_slots_of_this_publish, Emitter, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
+        allocated_minus_deferred_mismatches_referenced, anchor_cell_for, anchor_cells_of,
+        corrupt_device_zero_accounting, e156_allocation_record_tree_new_node_count,
+        e156_closed_form_expected, e156_existing_leaf_positions, e156_touched_leaf_positions,
+        hh_request, judge_geometry_sensitivity, judge_growth_with_holes,
+        judge_peak_against_threshold, judge_positive_control_cases, memory_pool_snapshot,
+        parameters, q7c_self_test, referenced_slots, run_forward_rollback_scenario, run_hh_history,
+        run_rollback_to_the_oldest_candidate, self_release_slots_of_this_publish,
+        synthetic_base_with_zero_deferred, AnchorCellsOfOneSlotsPerRegion, Arm, Emitter,
+        GeometrySensitivity, GrowthWithHoles, HhCellShape, HhRunOutcome, HolePosition,
+        PeakJudgement, ReclaimTiming, WorkloadDensity, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
     };
-    use std::collections::BTreeSet;
     use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
     use singlefs_core::allocator::{
         AllocationRecord, DeviceFreeMap, Placement, PoolAllocator, ReclaimedReuse,
@@ -3755,14 +5013,13 @@ mod tests {
     use singlefs_core::make_filesystem::{
         make_filesystem, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
     };
-    use singlefs_core::mount::{mount_rollback, RollbackTarget, ShadowLedger};
-    use singlefs_core::recovery::{effective_rollback_floor, readable_roots};
     use singlefs_core::transaction::{
-        acquire_instance, publish_first_file, publish_overwrite, warm_up, FirstFile, PoolWriter,
-        TransactionOutput, TransactionUnit,
+        acquire_instance, publish_first_file, warm_up, FirstFile, PoolWriter, TransactionOutput,
+        TransactionUnit,
     };
-    use singlefs_format::{ROOT_RING_REGIONS, SLOT_BYTES};
+    use singlefs_format::SLOT_BYTES;
     use singlefs_harness::crash::SparseBlockDevice;
+    use std::collections::{BTreeMap, BTreeSet};
 
     fn first_transaction_state() -> (
         PoolAllocator,
@@ -3967,13 +5224,10 @@ mod tests {
 
     #[test]
     fn reclaimed_records_are_not_removed_but_their_slots_become_free() {
-        // 派发第 1 条溯源出的事实（`PoolAllocator::reclaim_released_up_to` 不删记录，`allocator.rs` I8 字面）：
-        // 一条记录被真实分配器回收之后，`is_released` 仍是 `true`、条目还留在 `records()` 里，直到下一次
-        // `record()` 落在同一个起点槽上才被改写；但它的槽此刻已经是空闲的（`DeviceFreeMap::is_free`）。
-        // `run_hh_cell` 的 Q1b／delta 诊断原来直接按 `is_released` 过全部记录，把这类「回收过但记录条目还没
-        // 被覆盖」的槽也算成「还扣着」（holes=0 那一格因此把 unblocked 集合多算了 11 槽，见交回报告）；
-        // 本轮改成额外核 `is_free` 排除它们。这条测试钉住这份诊断赖以成立的前提本身：前提变了（比如哪天
-        // 回收改成即时删记录），这条测试必须先红，而不是等 Q1a/Q1b 的数字悄悄错掉才被发现。
+        // `PoolAllocator::reclaim_released_up_to` 不删记录（`allocator.rs` I8 字面）：一条记录被真实分配器回收之后，
+        // `is_released` 仍是 `true`、条目还留在 `records()` 里，直到下一次 `record()` 落在同一个起点槽上才被改写；
+        // 但它的槽此刻已经是空闲的（`DeviceFreeMap::is_free`）。岔路 1 的「已释放未回收」按 `is_free` 现查，
+        // 这条测试钉住这份读法赖以成立的前提本身。
         let (mut allocator, first, mut devices) = first_transaction_state();
         let parameters = parameters();
         let instance = singlefs_core::address::InstanceGeneration(1);
@@ -4021,19 +5275,25 @@ mod tests {
         );
     }
 
-    // U5（岔路 3，登记逐字「第一次推空之后那一行记账仍含这批槽」）这一轮没有补——`raise_rollback_floor_via_g7`
-    // 不暴露推空循环中途的钩子，而空发布本身会重写树表单元（连带新分配 + 释放旧树表槽，登记 D16（发布语义）
-    // 已定项 1「非空」段落逐字），使「推空前后记账第 1 项该差多少」不是一条简单算式，贸然钉一个数风险比价值大；
-    // 写进交回报告的岔路表，留给下一段。
-
     /// PC-闭式自测第一、二、四组（E156 第 3 次重跑登记「七」7.2 R-3c）：只在合成的叶位置集合上单测
     /// 闭式函数本身，不依赖真实分配器。M27（闭式漏掉根）、M28（闭式每个改动的叶位置只算一块盘）应当
-    /// 分别让第一组从 5 变成 4 与 3。
+    /// 分别让第一组从 5 变成 4 与 3。第三组的前提（61、170 号叶分落第一、第二个层级 1 节点）先用
+    /// `e156_level1_position_of_leaf` 现算钉住，不写成两边都是字面量的比较。
     #[test]
     fn pc_closed_form_matches_the_registered_anchor_r3c() {
         let one_leaf: BTreeSet<u64> = [61].into_iter().collect();
         let two_leaves: BTreeSet<u64> = [61, 62].into_iter().collect();
         let leaves_in_two_internal: BTreeSet<u64> = [61, 170].into_iter().collect();
+        assert_eq!(
+            super::e156_level1_position_of_leaf(61),
+            0,
+            "R-3c：61 号叶应落在第一个层级 1 节点里"
+        );
+        assert_eq!(
+            super::e156_level1_position_of_leaf(170),
+            1,
+            "R-3c：170 号叶应落在第二个层级 1 节点里"
+        );
         assert_eq!(
             e156_allocation_record_tree_new_node_count(&one_leaf, 2),
             5,
@@ -4053,10 +5313,6 @@ mod tests {
             e156_allocation_record_tree_new_node_count(&one_leaf, 1),
             3,
             "R-3c：一盘、只在第 61 片叶"
-        );
-        assert!(
-            170 * 812 >= 812 * 169,
-            "R-3c：170 号叶应落在第二个层级 1 节点里"
         );
     }
 
@@ -4089,7 +5345,8 @@ mod tests {
         let allocator = PoolAllocator::rebuild_from_records(devices, records);
         let touched = e156_touched_leaf_positions(&allocator, DeviceIdentity(0), txg);
         assert_eq!(
-            touched, BTreeSet::from([61, 170]),
+            touched,
+            BTreeSet::from([61, 170]),
             "PC-闭式第三组：应当同时看到释放在第 61 片、分配在第 170 片两条"
         );
         assert_eq!(
@@ -4099,10 +5356,9 @@ mod tests {
         );
     }
 
-    /// U10（第九节）：β0 之后连续覆盖写，逐次核对 R-3 的闭式；次序不钉死，只保证跑够多步、两个方向
-    /// （落在 1 片叶 / 落在 ≥ 2 片叶）都至少出现一次（第八节 8.2）。前 4 次另外钉 R-4 的绝对值
-    /// （released_d0=14、record_delta=24）。U12（Q7d-1，R2 ⑤）：这段历史上逐次现量的最小值 14、
-    /// 最大值 ≥ 16——M30（Q7d-1 覆盖写那一组退回字面 10）应当让最小值变成 10。
+    /// U10（第 3 次重跑登记第九节）：β0 之后连续覆盖写，逐次核对 R-3 的闭式；两个方向（落在 1 片叶 / 落在 ≥ 2 片叶）
+    /// 都至少出现一次。前 4 次另外钉 R-4 的绝对值（released_d0=14、record_delta=24）。U12（Q7d-1）：这段历史上逐次现量的
+    /// 最小值 14、最大值 ≥ 16——M30（Q7d-1 覆盖写那一组退回字面 10）应当让最小值变成 10。
     #[test]
     fn overwrite_steps_match_the_closed_form_and_cross_a_second_leaf() {
         let (mut allocator, first, mut devices) = first_transaction_state();
@@ -4176,121 +5432,331 @@ mod tests {
         );
     }
 
-    /// U11（第九节，R-6）：重放 S1(c) 场景（`run_s1c_rollback_isolation_scenario` 内部的
-    /// `assert_eq!` 已经改成 54），只是从单测里再触发一次，M32（S1(c) 的隔离槽数退回 34）应当让这条
-    /// 测试红。
+    /// U11（第 4 次重跑登记第一节 1.2、第九节）：A → B → 干净重开 → C → 同一次挂载里挂着回退到 A → 普通重开。
+    /// K12：回退那次发布的 txg = C 的 txg + 1、实例代号不变、实例表行数不变；普通重开之后按实例表判被抛弃的根 0 条、每盘隔离 0 槽。
+    /// M32（`crates/mutations.tsv`）把期望的隔离改回挂载时回退那一形的 54 槽，这条测试必须红。
     #[test]
-    fn rollback_isolation_scenario_matches_the_new_layout() {
-        let mut emitter = Emitter { emitted: 0 };
-        run_s1c_rollback_isolation_scenario(&mut emitter, &parameters());
+    fn rolling_back_by_a_forward_publish_keeps_the_instance_and_isolates_nothing_after_a_plain_remount(
+    ) {
+        let scenario = run_forward_rollback_scenario();
+        assert_eq!(
+            scenario.txg_of_the_rollback_publish,
+            scenario.txg_before_the_rollback + 1,
+            "K12：回退那次发布的 txg = 现行 + 1"
+        );
+        assert_eq!(
+            scenario.instance_after, scenario.instance_before,
+            "K12：挂着回退不取号，实例代号不变"
+        );
+        assert_eq!(
+            scenario.instance_table_rows_after, scenario.instance_table_rows_before,
+            "K12：挂着回退不写行，实例表行数不变"
+        );
+        assert_eq!(
+            scenario.isolated_after_the_plain_remount,
+            vec![(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)],
+            "K12：挂着回退不抛弃任何根，普通重开之后每盘隔离 0 槽"
+        );
+        assert_eq!(
+            scenario.abandoned_roots_after_the_plain_remount, 0,
+            "K12：按实例表判被抛弃的根 0 条"
+        );
     }
 
-    /// U13（E156 第 3 次重跑登记「十二」修订 4，岔路 7 Q7c①）：独立重放 HR 家族到管理员回退写行那一步
-    /// （mkfs → 第一个事务 → 3N 次前缀覆盖写 → 回退到候选集里最旧的根，N = `ROOT_RING_REGIONS` ×
-    /// `E156_SLOTS_PER_REGION`），不调用 `main()` 里那一段代码，只借同样的公开入口独立走一遍。
-    /// 这一步应当落在 txg = 76、第 5 项恰为 0——此前 7 个可达基底（β0/β1/β2/βK-w/r/f/l2）第 5 项都
-    /// ≥ 1，`q7c_self_test` 的①在它们身上恒不转色（见 `q7c_self_test` 的推导：`flip1` 要求
-    /// `deferred == 0` 时 `without_subtracting_defer_is_red` 才会是 `false`）；这是第一次有一个
-    /// **可达**基底能让①转色。M33/M34（`crates/mutations.tsv`）分别改坏 `q7c_self_test` 里
-    /// `without_subtracting_defer_is_red` 与 `real_check_red_plus1` 的比较符号，应当让这条测试红。
+    /// U13 (a)（第 4 次重跑登记第一节 1.2、第九节）：覆盖写 72 次之后在同一个进程里挂着回退到候选集里 txg 最小的根：
+    /// K12 的前三样成立。第 5 项只报数（产物 `name=u13a_rollback_to_oldest_candidate`），这里不钉。
     #[test]
-    fn hr_rollback_row_basis_has_zero_deferred_and_flips_the_q7c1_self_test() {
-        let parameters = parameters();
-        let (mut allocator, first, mut devices) = first_transaction_state();
-        let instance = InstanceGeneration(1);
-        let mut current = first;
-        let ring_length = ROOT_RING_REGIONS * super::E156_SLOTS_PER_REGION;
-        let prefix_length = 3 * ring_length;
-        let mut actual_length: u64 = 0;
-        for step in 1..=prefix_length {
-            let outcome = {
-                let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
-                publish_overwrite(
-                    &mut pool,
-                    &mut allocator,
-                    &current,
-                    FirstFile {
-                        content: &super::overwrite_content(step),
-                        write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60 + step,
-                    },
-                    instance,
-                )
-            };
-            match outcome {
-                Ok(published) => {
-                    current = published;
-                    actual_length = step;
-                }
-                Err(failure) => panic!(
-                    "U13：HR 前缀第 {step} 步写失败：{failure:?}（这一格依赖跑满 {prefix_length} 步才能到 txg=76）"
-                ),
-            }
-        }
+    fn rolling_back_to_the_oldest_candidate_after_seventy_two_overwrites_is_one_forward_publish() {
+        let rollback = run_rollback_to_the_oldest_candidate();
+        assert_eq!(rollback.overwrites, 72, "3N = 3 × 3S = 72（S = 8）");
         assert_eq!(
-            actual_length, prefix_length,
-            "U13：HR 前缀应跑满 {prefix_length} 步，不应撞上分配记录树的任何上限"
+            rollback.txg_after,
+            rollback.txg_before + 1,
+            "K12：txg = 现行 + 1"
         );
-
-        let region_devices = parameters.region_devices;
-        let effective_floor = effective_rollback_floor(
-            &devices,
-            &region_devices,
-            &parameters.geometry,
-            &parameters.filesystem_identifier,
-        );
-        let candidates = readable_roots(
-            &devices,
-            &region_devices,
-            &parameters.geometry,
-            &parameters.filesystem_identifier,
-        );
-        let oldest = candidates
-            .iter()
-            .filter(|root| root.checkpoint_txg.0 >= effective_floor.0)
-            .min_by_key(|root| root.checkpoint_txg.0)
-            .expect("U13：回退候选集至少一个根");
-        let rollback_target = RollbackTarget {
-            instance: oldest.instance,
-            checkpoint_txg: oldest.checkpoint_txg,
-        };
-        let mounted = mount_rollback(&parameters, &mut devices, rollback_target, ShadowLedger::On)
-            .expect("U13：HR 管理员回退");
-        let row_publish = mounted
-            .output
-            .row_publish
-            .file_version()
-            .expect("U13：回退写行那一版带文件");
         assert_eq!(
-            row_publish.root.checkpoint_txg.0, 76,
-            "U13：回退写行那一版应落在 txg=76（这个装置今天实测到的取样点）"
+            rollback.instance_after, rollback.instance_before,
+            "K12：实例代号不变"
         );
-
-        let pool = memory_pool_snapshot(&devices);
-        let basis = basis_of("test_beta_hr_rollback_row", &pool, row_publish, true);
-        let (item1, _item2, item5) = mirror_accounting_row_slots(&basis.pool, basis.accounting_slot);
-        assert_eq!(item5, 0, "U13：这一格的第 5 项应恰为 0（Q7c① 判别力自证的前提）");
-        let check_is_red = item1 != item5 + basis.referenced;
-        assert!(
-            !check_is_red,
-            "U13：G27 在这个基底上应当判绿——它是一个真实的合法状态，不是坏镜像"
+        assert_eq!(
+            rollback.instance_table_rows_after, rollback.instance_table_rows_before,
+            "K12：实例表行数不变"
         );
+    }
 
+    /// U13 (b)（第 4 次重跑登记第一节 1.2、第九节）：Q7c① 的转色在 β_syn（造出来的基底，第 5 项为 0）上核：`flip1` 为真、`flip2` 为假。
+    /// M33、M34（`crates/mutations.tsv`）分别改坏 `q7c_self_test` 里两处比较符号，这条测试必须红。
+    #[test]
+    fn synthetic_base_with_zero_deferred_flips_the_q7c1_self_test() {
+        let base = synthetic_base_with_zero_deferred();
+        let (_item1, _item2, item5) =
+            super::mirror_accounting_row_slots(&base.pool, base.accounting_slot);
+        assert_eq!(item5, 0, "β_syn 的第 5 项为 0（造法：β0 第 5 项 − 1）");
         let mut emitter = Emitter { emitted: 0 };
         let (flip1, flip2) = q7c_self_test(
             &mut emitter,
-            "test_beta_hr_rollback_row",
-            &basis.pool,
-            basis.accounting_slot,
-            basis.referenced,
+            "test_beta_syn",
+            &base.pool,
+            base.accounting_slot,
+            base.referenced,
         );
         assert!(
             flip1,
-            "U13：在这个第 5 项恰为 0 的可达基底上，Q7c① 必须转色——去掉『减 defer』那一步之后 \
-             corrupted 镜像的判定必须从红变绿，而 G27（减 defer 的真实检查）仍判红"
+            "U13 (b)：第 5 项为 0 的基底上 Q7c① 必须转色——去掉『减 defer』之后坏镜像由红变绿，G27 仍判红"
         );
         assert!(
             !flip2,
-            "U13：Q7c② 在 deferred == 0 的基底上不适用（Bd(−1) 会让 item5 减成负数），不应转色"
+            "U13 (b)：Q7c② 在第 5 项为 0 的基底上不适用，不应转色"
         );
+    }
+
+    fn run_cell(
+        anchors: &BTreeMap<u64, AnchorCellsOfOneSlotsPerRegion>,
+        hole_count: u64,
+        position: Option<HolePosition>,
+    ) -> HhRunOutcome {
+        let shape = HhCellShape {
+            slots_per_region: 4,
+            density: WorkloadDensity::EveryPublishOverwrites,
+            hole_count,
+            position,
+        };
+        let mut emitter = Emitter { emitted: 0 };
+        run_hh_history(
+            &mut emitter,
+            &hh_request(
+                "Hh",
+                shape,
+                anchor_cell_for(anchors, 4, hole_count, position),
+            ),
+        )
+    }
+
+    fn anchors_for_four_slots_per_region() -> BTreeMap<u64, AnchorCellsOfOneSlotsPerRegion> {
+        BTreeMap::from([(4, anchor_cells_of(4))])
+    }
+
+    fn observation_at(outcome: &HhRunOutcome, txg: u64) -> &super::HhObservation {
+        outcome
+            .observations
+            .iter()
+            .find(|observation| observation.txg == txg)
+            .unwrap_or_else(|| panic!("txg {txg} 有一个观测点"))
+    }
+
+    /// U14（第 4 次重跑登记第九节）：Hh(0, —, S = 4, ρ = 1) 跑到 txg 48：实与每两个时点 A10 的滞后全是 12、A12 每个观测点
+    /// Q1a = Q1b = 0、每个观测点分配器装着根环表。M35（分配器退回不装根环表）、M42（「每」的门槛晚一次）在这里红。
+    #[test]
+    fn hh_without_holes_at_four_slots_per_region_reclaims_each_tree_table_one_ring_length_after_release(
+    ) {
+        let outcome = run_cell(&anchors_for_four_slots_per_region(), 0, None);
+        assert_eq!(outcome.actual_end, 48, "Hh(0, —, S = 4) 跑到 txg 48");
+        assert!(outcome.truncation.is_none(), "没有截断");
+        assert_eq!(
+            outcome.tree_table_lags_real,
+            BTreeSet::from([12]),
+            "A10（实）：滞后全是 3S = 12"
+        );
+        assert_eq!(
+            outcome.tree_table_lags_every_publish,
+            BTreeSet::from([12]),
+            "A10（每）：滞后全是 3S = 12"
+        );
+        for observation in &outcome.observations {
+            for timing in [ReclaimTiming::Real, ReclaimTiming::EveryPublish] {
+                assert_eq!(
+                    observation.over_withheld(Arm::FloorRule, timing),
+                    0,
+                    "A12：Q1a = 0，txg {}",
+                    observation.txg
+                );
+                assert_eq!(
+                    observation.over_withheld(Arm::LifetimeIntervalRule, timing),
+                    0,
+                    "A12：Q1b = 0，txg {}",
+                    observation.txg
+                );
+            }
+            assert!(
+                observation.reading.root_ring_installed,
+                "W7：每个观测点装着根环表，txg {}",
+                observation.txg
+            );
+        }
+    }
+
+    /// U15（第 4 次重跑登记第九节）：PQ1-后（S = 4）：环里没有 txg 16 的根、槽里是 txg 4 的根；txg 19–27 门槛 = 4、txg 28 门槛 = 17；
+    /// txg 19 Q1a ≥ 4、txg 27 Q1a ≥ 12；每个观测点 Q1b = 0；txg 30 h_缺 = 0。M36、M37、M38、M41 在这里红。
+    #[test]
+    fn hh_back_hole_at_four_slots_per_region_pins_the_threshold_to_txg_four_until_txg_twenty_eight()
+    {
+        let outcome = run_cell(
+            &anchors_for_four_slots_per_region(),
+            1,
+            Some(HolePosition::Back),
+        );
+        let recovery = outcome.recoveries.first().expect("造了一个洞");
+        assert_eq!(recovery.hole_txg, 16, "洞在 txg 16");
+        assert!(
+            !recovery.ring_has_a_root_at_the_hole_txg,
+            "环里没有 txg 16 的根"
+        );
+        assert_eq!(
+            recovery.hole_slot_content, "root_txg_4",
+            "txg 16 的槽里仍是 txg 4 的根"
+        );
+        for txg in 19..=27u64 {
+            assert_eq!(
+                observation_at(&outcome, txg).reading.ring_threshold,
+                4,
+                "A14：txg {txg} 门槛 = 4"
+            );
+        }
+        assert_eq!(
+            observation_at(&outcome, 28).reading.ring_threshold,
+            17,
+            "A14：txg 28 门槛 = 17"
+        );
+        for timing in [ReclaimTiming::Real, ReclaimTiming::EveryPublish] {
+            assert!(
+                observation_at(&outcome, 19).over_withheld(Arm::FloorRule, timing) >= 4,
+                "A16：txg 19 Q1a ≥ 4"
+            );
+            assert!(
+                observation_at(&outcome, 27).over_withheld(Arm::FloorRule, timing) >= 12,
+                "A15：txg 27 Q1a ≥ 12"
+            );
+        }
+        for observation in &outcome.observations {
+            for timing in [ReclaimTiming::Real, ReclaimTiming::EveryPublish] {
+                assert_eq!(
+                    observation.over_withheld(Arm::LifetimeIntervalRule, timing),
+                    0,
+                    "A13：Q1b = 0，txg {}",
+                    observation.txg
+                );
+            }
+        }
+        assert_eq!(
+            observation_at(&outcome, 30).reading.missing_txgs,
+            0,
+            "txg 30 环里只剩 19–30，h_缺 = 0"
+        );
+    }
+
+    /// U16（第 4 次重跑登记第九节）：Hh(2, 后, S = 4, ρ = 1)：每个观测点 h_缺、h_洞 等于锚点模型那一格（txg 28–33 的 h_洞 = 1）。M39 在这里红。
+    #[test]
+    fn hh_two_back_holes_at_four_slots_per_region_match_the_anchor_hole_counts() {
+        let outcome = run_cell(
+            &anchors_for_four_slots_per_region(),
+            2,
+            Some(HolePosition::Back),
+        );
+        assert!(!outcome.observations.is_empty(), "至少一个观测点");
+        for observation in &outcome.observations {
+            let row = observation.anchor.expect("每个观测点都有锚点那一行");
+            assert_eq!(
+                observation.reading.missing_txgs, row.missing_txgs,
+                "A11：h_缺，txg {}",
+                observation.txg
+            );
+            assert_eq!(
+                observation.reading.live_holes, row.live_holes,
+                "A11：h_洞，txg {}",
+                observation.txg
+            );
+        }
+        for txg in 28..=33u64 {
+            assert_eq!(
+                observation_at(&outcome, txg).reading.live_holes,
+                1,
+                "txg {txg} 的 h_洞 = 1"
+            );
+        }
+    }
+
+    /// U17（第 4 次重跑登记第九节）：PQ1-前（S = 4）：txg 7 那一刻 h_缺 = h_洞 = 1、Q1a ≥ 1、Q1b = 0。M40 在这里红。
+    #[test]
+    fn hh_front_hole_at_four_slots_per_region_over_withholds_one_slot_under_the_floor_rule_only() {
+        let outcome = run_cell(
+            &anchors_for_four_slots_per_region(),
+            1,
+            Some(HolePosition::Front),
+        );
+        let recovery = outcome.recoveries.first().expect("造了一个洞");
+        assert_eq!(recovery.hole_txg, 5, "洞在 txg 5");
+        assert_eq!(
+            recovery.hole_slot_content, "never_written",
+            "txg 5 的槽从没写过"
+        );
+        let observation = observation_at(&outcome, 7);
+        assert_eq!(observation.reading.missing_txgs, 1, "txg 7 h_缺 = 1");
+        assert_eq!(observation.reading.live_holes, 1, "txg 7 h_洞 = 1");
+        for timing in [ReclaimTiming::Real, ReclaimTiming::EveryPublish] {
+            assert!(
+                observation.over_withheld(Arm::FloorRule, timing) >= 1,
+                "txg 7 Q1a ≥ 1"
+            );
+            assert_eq!(
+                observation.over_withheld(Arm::LifetimeIntervalRule, timing),
+                0,
+                "txg 7 Q1b = 0"
+            );
+        }
+    }
+
+    /// U18（第 4 次重跑登记第九节，PC-判定器）：判定函数在合成用例上逐条判对。M43（「> 2」写成「≥ 2」）在这里红。
+    #[test]
+    fn judgement_of_peak_delta_against_threshold_and_geometry_sensitivity_on_synthetic_cases() {
+        let peaks =
+            |pairs: &[(u64, i64)]| -> BTreeMap<u64, i64> { pairs.iter().copied().collect() };
+        assert_eq!(
+            judge_peak_against_threshold(&peaks(&[(1, 3)]), 2),
+            PeakJudgement::AboveTheThreshold
+        );
+        assert_eq!(
+            judge_peak_against_threshold(&peaks(&[(1, 2)]), 2),
+            PeakJudgement::AtMostTheThreshold
+        );
+        assert_eq!(
+            judge_peak_against_threshold(&peaks(&[(1, 1)]), 1),
+            PeakJudgement::AtMostTheThreshold
+        );
+        assert_eq!(
+            judge_peak_against_threshold(&peaks(&[(1, 2)]), 1),
+            PeakJudgement::AboveTheThreshold
+        );
+        assert_eq!(
+            judge_peak_against_threshold(&peaks(&[]), 2),
+            PeakJudgement::NothingObserved
+        );
+        assert_eq!(
+            judge_geometry_sensitivity(&[
+                PeakJudgement::AtMostTheThreshold,
+                PeakJudgement::AtMostTheThreshold,
+                PeakJudgement::AtMostTheThreshold,
+                PeakJudgement::AboveTheThreshold,
+            ]),
+            GeometrySensitivity::Unstable
+        );
+        assert_eq!(
+            judge_geometry_sensitivity(&[PeakJudgement::AtMostTheThreshold; 4]),
+            GeometrySensitivity::Consistent { sampling_points: 4 }
+        );
+        assert_eq!(
+            judge_growth_with_holes(&peaks(&[(1, 2), (2, 2)])),
+            GrowthWithHoles::IndependentOfHoles
+        );
+        assert_eq!(
+            judge_growth_with_holes(&peaks(&[(1, 1), (2, 3)])),
+            GrowthWithHoles::GrowsWithHoles
+        );
+        assert_eq!(
+            judge_growth_with_holes(&peaks(&[(1, 3), (2, 1)])),
+            GrowthWithHoles::NotMonotonic
+        );
+        for (case, actual, expected) in judge_positive_control_cases() {
+            assert_eq!(actual, expected, "PC-判定器用例 {case}");
+        }
     }
 }

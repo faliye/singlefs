@@ -1,8 +1,8 @@
 //! I-7.8（根记录树 ID 水位不低于全池最大树 ID） 扫描方向的改法 D（`research/prompts/m2-wave3-code-r1-main-verification.md`
 //! 第三节 Y1、第四节第 1 条，被攻过零轮）：第一个文件版本那次发布崩在录制流的每一个前缀上 → 可写挂载 → 挂载之后六种动作，
-//! 池级 checker 一条违例都没有。两条流：
-//! ① mkfs → 取号 → 暖机 → 第一个文件版本（从水位 11 发八棵树）；
-//! ② ① 跑完之后回退到暖机根 (1, 2)（回退行 (1, 2, 0)），在回退那个会话里再发第一个文件版本（从带过来的水位 19 发）。
+//! 池级 checker 一条违例都没有。流：mkfs → 取号 → 暖机 → 第一个文件版本（从水位 11 发八棵树）。
+//! 原先的流 ②（回退到暖机根 (1, 2) 之后在回退那个会话里再发第一个文件版本）随管理员回退改成挂着时的向前发布删掉：
+//! 向前回退的候选要带文件，退不到树表 0 条的暖机根（D23（journal 的角色与格式） 已定项 14）。
 //!
 //! 崩在记录落盘之前的那几个前缀上，盘上留着那次发布写出的码 2 节点（孤儿），头里的树 ID 不低于根环里的水位；
 //! 下一个实例第一次发布取的 txg 等于孤儿的诞生代号（D23（journal 的角色与格式） 已定项 14 注 3 的「≥ max(…) + 1」取等号），
@@ -20,15 +20,13 @@ use common::{
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::index_node_view;
 use singlefs_checker::walk::check_pool_image;
-use singlefs_core::address::{
-    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
-};
+use singlefs_core::address::{CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes};
 use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
 use singlefs_core::journal::back_chain_of;
 use singlefs_core::make_filesystem::{
     make_filesystem, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
 };
-use singlefs_core::mount::{mount_rollback, mount_writable, Mounted, RollbackTarget, ShadowLedger};
+use singlefs_core::mount::{mount_writable, Mounted};
 use singlefs_core::recovery::{readable_roots, PoolReader};
 use singlefs_core::transaction::{
     acquire_instance, publish_first_file, publish_without_units, warm_up, FirstFile, PoolVersion,
@@ -109,55 +107,6 @@ fn first_file_publish_after_mkfs() -> (
         (start, stream.operation_count())
     };
     (FirstFilePublishInTheStream { stream, start, end }, devices)
-}
-
-/// 流 ②：流 ① 跑完之后回退到暖机根 (1, 2)（取号 2、回退行 (1, 2, 0)，带过来根环里的水位 19），在回退那个会话里
-/// 接着现行那一版（树表 0 条）再发第一个文件版本。交回的那段是回退之后那次第一个文件版本的发布。
-fn first_file_publish_after_rolling_back_to_the_warm_up_root() -> FirstFilePublishInTheStream {
-    let (after_mkfs, mut devices) = first_file_publish_after_mkfs();
-    let rolled_back = mount_rollback(
-        &parameters(),
-        &mut devices,
-        RollbackTarget {
-            instance: InstanceGeneration(1),
-            checkpoint_txg: CheckpointTxg(2),
-        },
-        ShadowLedger::On,
-    )
-    .expect("环里还留着带文件版本的根 (1, 3) 时回退到暖机根照常做");
-    let PoolVersion::WithoutFile(version) = &rolled_back.current else {
-        panic!("回退到树表 0 条的暖机根：现行那一版仍是「没有文件版本」的一版")
-    };
-    assert_eq!(
-        version.root.tree_identifier_watermark, 19,
-        "回退那一版带根环里的水位 max 19（D8（核心索引结构） 已定项 8 ②）"
-    );
-    let mut allocator = rolled_back.allocator.clone();
-    let publish_parameters = parameters();
-    let mut writer = PoolWriter::new(&publish_parameters, &mut devices);
-    let start = after_mkfs.stream.operation_count();
-    let first_file = publish_first_file(
-        &mut writer,
-        &mut allocator,
-        &version.root,
-        FirstFile {
-            content: &content_of(3300, 17),
-            write_time_seconds: FIXED_WRITE_TIME_SECONDS + 120,
-        },
-        rolled_back.output.instance,
-        &version.record_bytes,
-    )
-    .expect("回退之后第一个文件版本");
-    assert_eq!(
-        first_file.root.tree_identifier_watermark, 27,
-        "流 ②：回退之后第一个文件版本从 19 发 19..26、新水位 27"
-    );
-    let end = after_mkfs.stream.operation_count();
-    FirstFilePublishInTheStream {
-        stream: after_mkfs.stream,
-        start,
-        end,
-    }
 }
 
 /// 可写挂载之后用户接着做的事（Y1-a 攻方驱动 `opus_attack_y1.rs` 的 `after_mount` 那六种）。
@@ -363,15 +312,4 @@ fn every_crash_inside_the_first_file_version_after_mkfs_then_a_writable_mount_le
     let (publish, _) = first_file_publish_after_mkfs();
     let tally = sweep_every_crash_inside_the_publish(&publish, "流 ①（mkfs 之后）");
     assert_the_sweep_stays_green_and_reached_the_orphans(&tally, "流 ①（mkfs 之后）");
-}
-
-/// 流 ②：回退到暖机根之后那次第一个文件版本崩在每一个前缀上、可写挂载、再做那六种动作，池级 checker 一条违例都没有；
-/// 改法 D 之前的读法在其中有格子判红（孤儿 19..23、水位 19）。回退行 (1, 2, 0) 不排除 (1, 3) 那一版写出的码 2 节点
-/// （树 ID 11..15）：它们低于水位 19，照样被数进「出现过的」。
-#[test]
-fn every_crash_inside_the_first_file_version_after_rolling_back_to_the_warm_up_root_then_a_writable_mount_leaves_the_orphans_out_of_the_tree_identifier_watermark(
-) {
-    let publish = first_file_publish_after_rolling_back_to_the_warm_up_root();
-    let tally = sweep_every_crash_inside_the_publish(&publish, "流 ②（回退到暖机根之后）");
-    assert_the_sweep_stays_green_and_reached_the_orphans(&tally, "流 ②（回退到暖机根之后）");
 }

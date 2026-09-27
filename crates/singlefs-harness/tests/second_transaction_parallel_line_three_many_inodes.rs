@@ -457,7 +457,7 @@ fn assert_no_invariant_is_violated(image: &MemoryPool, what: &str) {
 ///   「不带提交标记就停」在这一格少施加一整次发布）；
 /// - 崩在第二条记录之前（第一条两份都落了）：末条没到，这次发布整体不施加，走的还是上一版的根。
 #[test]
-fn a_publish_naming_more_units_than_one_journal_record_holds_spills_its_one_transaction_over_two_records_and_only_the_second_ends_the_publish(
+fn publish_naming_more_units_than_one_journal_record_holds_spills_its_one_transaction_over_two_records_and_only_the_second_ends_the_publish(
 ) {
     let mut pool = build_pool("parallel-line-three-spill-over-two-records");
     let before = pool.output.clone();

@@ -5,20 +5,25 @@
 mod common;
 
 use common::{build_pool, file_content, geometry};
+use singlefs_checker::image::MAPPING_KEY_MATCHES_THE_UNIT_HEADER;
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
+use singlefs_core::recovery::RecoveryReport;
 use singlefs_core::recovery::{recover, JournalPolicy};
 use singlefs_harness::crash::{
-    check_records, closed_form_state_count, enumerate_layer0_selecting,
-    enumerate_layer0_selecting_versions_observing_each_state, evaluate_state, oracle_violation,
-    root_identity_written_by, writes_and_segments, CrashImage, Layer0Tally, MemoryPool,
+    check_records, closed_form_state_count, enumerate_layer0_in_state_slices_or_one_shard,
+    enumerate_layer0_selecting, evaluate_state, full_expansion, layer0_state_count,
+    layer0_state_count_with_torn_in_place_overwrites, oracle_violation, quick_tier_expansion,
+    root_identity_written_by, writes_and_segments, CrashImage, Layer0EnumerationOutcome,
+    Layer0ObserverCounts, Layer0Parallelism, Layer0SegmentExpansion, Layer0Tally, MemoryPool,
     PublishedVersion, RetainedWrite,
 };
+use singlefs_harness::layer0_progress::Layer0Resume;
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::RecordedOperationKind;
 
-/// oracle 那一半：产物第 45 行逐字 `states=262165 … violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6
-/// verification_failed=0 first_violation=none`，第 48 行 `differing_states=3`。
+/// oracle 那一半：字段照 E142（第一个事务的干跑） 产物的 `name=layer0` / `name=journal_effect` 两行（第八次跑那一份是 A 只有 16 个单元写时的形状：
+/// `states=262165 … no_file=262158 file_read=7 … verification_ran=6`、`differing_states=3`；今天 A 有 24 个单元写，数由下面的用例钉）。
 #[derive(Debug, PartialEq, Eq)]
 struct OracleCounts {
     states: u64,
@@ -76,8 +81,13 @@ fn checker_line(tally: &Layer0Tally) -> String {
     )
 }
 
-/// checker 与记录核对器那一半的钉死值。只在根槽 txg 3 已持久的状态上才走得到记账树、inode 树与分配记录树，那 15 条只在这些状态上评估
+/// checker 与记录核对器那一半的钉死值。只在根槽 txg 3 已持久的状态上才走得到记账树、inode 树、分配记录树与中央映射树的条目，
+/// 那 16 条只在这些状态上评估
 /// （I-5.4（分配记录罩住的槽互不相交） 在其中，
+/// 映射 key 与单元头相符（`MAPPING_KEY_MATCHES_THE_UNIT_HEADER`，实审 B2 新立、编号待定）判的是中央映射树叶里的每一条条目：
+/// 种子根与暖机根的映射根指针全零（没有文件的一版），走不到条目；txg 3 的记录已落而根槽没落时，由记录施加出来的那一版
+/// 在这条流上不走（它要实例表里有一行记着某次恢复施加到过 txg 3，实例表的行是挂载写行时写的，而这条流上唯一一次挂载在 txg 3 之前），
+/// I-3.10 读下一次挂载会先施加的那一版只读树表、不走映射树，
 /// I-9.15（inode 记录的 blocks 等于 ⌈size ÷ 512⌉） 与 I-9.7 同一个理由——要走得到 inode 叶容器里的记录，
 /// I-3.11（已分配减 defer 等于最新根走读） 与 I-3.1（已分配统计对得上） 同一个理由——要最新根下面的记账树：
 /// 种子根与暖机根指着的第 0 版树表是空的，没有分配记录树；
@@ -88,7 +98,7 @@ fn checker_line(tally: &Layer0Tally) -> String {
 /// I-9.14（树表条目的诞生 txg 跨根不变）在这条流上一个状态都评估不到；
 /// I-8.6（反向链算法） 要环里至少有一条自证过的记录，环还空着的那几个状态上报「不适用」；
 /// I-8.7（实例内事务号不重号）、I-8.8（前缀里的事务不被切开） 与 I-7.9（回退下界 F 不高于抬 F 的上限） 在这条流上一个状态都评估不到；
-/// 其余 22 条每个状态都评估。
+/// 其余 23 条每个状态都评估。
 /// 违例只许出现在 I-7.7（系统配置实例代号不低于根环）：C322（取号那一步的屏障怎么放没有条款） 未还，
 /// 取号只落了一块盘的那 2 个状态里两份系统配置的实例代号不等。
 fn assert_checker_counts(
@@ -107,8 +117,22 @@ fn assert_checker_counts(
         "记录核对器两条判据在已定的持久顺序下恒 0"
     );
     let only_under_the_new_root = [
-        "I-1.10", "I-3.1", "I-3.9", "I-3.11", "I-5.2", "I-5.4", "I-9.1", "I-9.2", "I-9.4", "I-9.6",
-        "I-9.7", "I-9.10", "I-9.12", "I-9.13", "I-9.15",
+        "I-1.10",
+        "I-3.1",
+        "I-3.9",
+        "I-3.11",
+        "I-5.2",
+        "I-5.4",
+        "I-9.1",
+        "I-9.2",
+        "I-9.4",
+        "I-9.6",
+        "I-9.7",
+        "I-9.10",
+        "I-9.12",
+        "I-9.13",
+        "I-9.15",
+        MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
     ];
     // I-3.10 除了回退候选集，还读下一次挂载会先施加的那一版（射程 ④）：新根没落而 txg 3 的记录已落时，
     // 恢复要由那条记录重建 txg 3 那一版，它的分配记录树在记录的新根段指着的树表下面。
@@ -127,7 +151,8 @@ fn assert_checker_counts(
     // 抬过 F 的流在 `second_transaction_step_zero_layer0.rs`（E 之前抬到 11），那里它真被评估过。
     let never_comparable_on_this_stream = ["I-9.14", "I-8.7", "I-8.8", "I-7.9"];
     // I-8.6 判的是「本实例内逻辑前一条」与这一条的链值，环里一条自证过的记录都没有时判不了：
-    // 什么都没持久那一个状态，加上取号那一段（两盘各一次系统配置写）的 3 个非空子集，一共 4 个状态还没有记录落盘。
+    // 取号那一段（两盘各一次系统配置写，原地覆写各三态）的 3² − 1 个状态，加上暖机第一次的记录段整段没落那一个，
+    // 一共 9 个状态还没有记录落盘（补第三态之前 4 个）。
     // w1 的记录一落盘（两盘任一份）就判得了：它的计数器是 1 ⇒ 本实例第一条 ⇒ 反向链恒 0。
     // I-8.9（一次发布的记录序号连续且只有末条带标志） 同一个理由：环里有一条自证过的记录就判得了（记录标志其余位、序号 0 逐条判），
     // 没有就报不适用；这条流上 w1、w4、t9 各是一次只有一条记录的发布（序号 1、带末条标志）。
@@ -321,16 +346,33 @@ struct AllocationGenerationReadSetCounts {
     states_through_the_record_the_next_mount_applies_first: u64,
 }
 
+/// 观察者计数里这两类的名字（随进度文件续跑，`crash::Layer0ObserverCounts`）。
+const STATES_THROUGH_THE_LANDED_ROOT: &str = "states_through_the_landed_root";
+const STATES_THROUGH_THE_RECORD_THE_NEXT_MOUNT_APPLIES_FIRST: &str =
+    "states_through_the_record_the_next_mount_applies_first";
+
 impl AllocationGenerationReadSetCounts {
-    fn count(&mut self, read_set: TransactionVersionInAllocationGenerationReadSet) {
+    /// 一个状态记进观察者计数：续跑时读回的片不再给观察者看，这两类的累计要随片进进度文件。
+    fn count_into(
+        read_set: TransactionVersionInAllocationGenerationReadSet,
+        counts: &mut Layer0ObserverCounts,
+    ) {
         match read_set {
             TransactionVersionInAllocationGenerationReadSet::ThroughItsLandedRoot => {
-                self.states_through_the_landed_root += 1;
+                counts.add(STATES_THROUGH_THE_LANDED_ROOT, 1);
             }
             TransactionVersionInAllocationGenerationReadSet::ThroughTheRecordTheNextMountAppliesFirst => {
-                self.states_through_the_record_the_next_mount_applies_first += 1;
+                counts.add(STATES_THROUGH_THE_RECORD_THE_NEXT_MOUNT_APPLIES_FIRST, 1);
             }
             TransactionVersionInAllocationGenerationReadSet::NotRead => {}
+        }
+    }
+
+    fn from_observer_counts(counts: &Layer0ObserverCounts) -> Self {
+        Self {
+            states_through_the_landed_root: counts.get(STATES_THROUGH_THE_LANDED_ROOT),
+            states_through_the_record_the_next_mount_applies_first: counts
+                .get(STATES_THROUGH_THE_RECORD_THE_NEXT_MOUNT_APPLIES_FIRST),
         }
     }
 
@@ -350,30 +392,60 @@ fn single_version(prepared: &Prepared) -> Vec<PublishedVersion> {
     }]
 }
 
-/// 按段枚举（`expand` 决定哪一段展开子集），每个状态上逐个现算 I-3.10 那一类。
+/// 按段枚举（`expansion` 决定每一段怎么展开），每个状态上逐个现算 I-3.10 那一类，记进观察者计数（续跑时随进度文件接上；
+/// 双机分片时随账本到 merge 那一趟）。分片跑一片（`SINGLEFS_LAYER0_SHARD=<i>/<n>`）时交回 `None`：这一片的计数进了账本，整条流的等 merge。
 fn enumerate_counting_allocation_generation_read_sets(
     prepared: &Prepared,
-    expand: &dyn Fn(usize, &[usize]) -> bool,
-) -> (Layer0Tally, AllocationGenerationReadSetCounts) {
+    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+    resume: &Layer0Resume,
+) -> Option<(Layer0Tally, AllocationGenerationReadSetCounts)> {
     let versions = single_version(prepared);
-    let mut read_set_counts = AllocationGenerationReadSetCounts::default();
-    let tally = enumerate_layer0_selecting_versions_observing_each_state(
+    let outcome = enumerate_layer0_in_state_slices_or_one_shard(
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         prepared.root_index,
         &versions,
-        expand,
-        &mut |image, _consulted_report| {
-            read_set_counts.count(
+        expansion,
+        Layer0Parallelism::from_environment(),
+        Some(&mut |image: &CrashImage<'_>,
+                   _consulted_report: &RecoveryReport,
+                   counts: &mut Layer0ObserverCounts| {
+            AllocationGenerationReadSetCounts::count_into(
                 prepared
                     .transaction_publish
                     .allocation_generation_read_set_in(image.writes, &image.persisted),
+                counts,
             );
-        },
+        }),
+        resume,
     );
-    (tally, read_set_counts)
+    let tally = match outcome {
+        Layer0EnumerationOutcome::WholeStream(tally) => tally,
+        Layer0EnumerationOutcome::OneShardWrittenToItsLedger(_written) => return None,
+    };
+    let read_set_counts =
+        AllocationGenerationReadSetCounts::from_observer_counts(&tally.observer_counts);
+    Some((tally, read_set_counts))
 }
+
+/// 全量那条流在进度文件名里的名字（断点续跑按「输入指纹 + 流名 + 计划哈希」分格）。
+const FULL_ENUMERATION_STREAM_NAME: &str = "first_transaction_stream";
+/// 每次写只取两态时的闭式：1 + Σ(2^|段| − 1)，A 那一段 26 个写（两个系统配置槽写 + 24 个单元写）占 2^26 − 1
+/// （E142（第一个事务的干跑） 产物 `closed_form=` 那个数，登记表八整条流那一句）。
+const FULL_STATES_WITH_TWO_STATES_PER_WRITE: u64 = 67_108_885;
+/// 全量枚举的状态数（代码审阅第 4 条，用户 2026-09-27 定「原地覆写补第三态、全量也跑」）：这条流上取三态的只有 8 次系统配置槽写，
+/// 四个系统配置槽段各 3² − 1、A 那一段 3² · 2²⁴ − 1，其余同两态，再加全部持久那一个。
+const FULL_STATES: u64 = 150_994_980;
+/// 甲二快档的状态数：A 那一段 2 原地写（系统配置槽写，各三态）× 单元写全不落或全落 3² · 2 − 1 = 17，四个系统配置槽段各 3² − 1 = 8，
+/// 其余每段同全量（2 写段 3、1 写段 1），再加全部持久那一个（补第三态之前 29）。
+const QUICK_TIER_STATES: u64 = 54;
+/// 根槽 txg 3 已持久的状态：A 的根之后那一段（两块盘的系统配置槽轮换）3² − 1，再加全部持久那一个（补第三态之前 4）。
+const ROOT_PERSISTED_STATES: u64 = 9;
+/// 读出文件的状态：根已持久的那 [`ROOT_PERSISTED_STATES`] 个，加 A 的记录已落、根没落而恢复施加了记录的 3 个（补第三态之前 7）。
+const FILE_READ_STATES: u64 = 12;
+/// 环里一条记录都还没有的状态：取号那一段 3² − 1，加暖机第一次记录段整段没落那一个（补第三态之前 4）。
+const STATES_WITH_AN_EMPTY_JOURNAL_RING: u64 = 9;
 
 fn prepare(tag: &str) -> Prepared {
     let pool = build_pool(tag);
@@ -383,9 +455,13 @@ fn prepare(tag: &str) -> Prepared {
         writes_and_segments(&operations[pool.mkfs_operation_count..], &geometry());
     assert_eq!(
         segments.iter().map(Vec::len).collect::<Vec<_>>(),
-        vec![2, 2, 1, 2, 2, 1, 18, 2, 1, 2]
+        vec![2, 2, 1, 2, 2, 1, 26, 2, 1, 2]
     );
-    assert_eq!(writes.len(), 33, "mkfs 之后 39 步里 33 次写、6 道屏障");
+    assert_eq!(
+        writes.len(),
+        41,
+        "取号 2 + 暖机两次各 5 + A 29（24 个单元写、两份记录、根槽、两块盘的系统配置槽轮换）"
+    );
     let root_index = writes
         .iter()
         .rposition(|write| write.kind == StepKind::RootRecordFua)
@@ -404,16 +480,33 @@ fn prepare(tag: &str) -> Prepared {
     }
 }
 
-/// 全量：262165 个状态。跑得慢（每个状态两遍恢复 + checker + 记录核对器），门禁 54 号在 release 下跑它；平时 `cargo test` 跳过。
+/// 全量：[`FULL_STATES`] 个状态。跑得慢（每个状态两遍恢复 + checker + 记录核对器），门禁 54 号在 release 下跑它；平时 `cargo test` 跳过。
+/// 带断点续跑（`singlefs_harness::layer0_progress`）：进度目录、输入指纹与强制从头跑的开关都从环境变量取，没设进度目录就不留进度文件；
+/// I-3.10 那一类的逐状态计数记在观察者计数里，续跑时随进度文件接上。双机分片（`SINGLEFS_LAYER0_SHARD`，
+/// `research/scripts/layer0-shard-run.sh`）：跑一片时只写账本、不打计数行、不判；merge 那一趟拿并齐的计数照下面逐项判、逐字打同样的行。
 #[test]
-#[ignore = "全量 262165 个状态要一两分钟，门禁 54 号（.claude/gate.d/54-layer0-replay.sh）在 release 下跑"]
+#[ignore = "全量六千七百多万个状态，门禁 54 号（.claude/gate.d/54-layer0-replay.sh）在 release 下跑，带断点续跑"]
 fn layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violations() {
     let prepared = prepare("layer0-full");
-    let closed_form = closed_form_state_count(&prepared.segments);
-    let (tally, read_set_counts) = enumerate_counting_allocation_generation_read_sets(
-        &prepared,
-        &|_segment_index, _segment| true,
+    assert_eq!(
+        closed_form_state_count(&prepared.segments),
+        FULL_STATES_WITH_TWO_STATES_PER_WRITE,
+        "每次写只取两态时的闭式（E142 产物的 closed_form）"
     );
+    // 计数行的 closed_form 报枚举域的闭式（原地覆写三态），54 号认 exhaustive=true 就是枚举到的恰好这么多。
+    let closed_form = layer0_state_count_with_torn_in_place_overwrites(
+        &prepared.base,
+        &prepared.writes,
+        &prepared.segments,
+        &full_expansion,
+    );
+    let Some((tally, read_set_counts)) = enumerate_counting_allocation_generation_read_sets(
+        &prepared,
+        &full_expansion,
+        &Layer0Resume::from_environment(FULL_ENUMERATION_STREAM_NAME),
+    ) else {
+        return;
+    };
     println!(
         "LAYER0 states={} closed_form={closed_form} violations={} root_persisted_states={} no_file={} file_read={} failed={} verification_ran={} verification_failed={} journal_differing={} exhaustive={} states_by_publish=[{}]",
         tally.states,
@@ -435,14 +528,18 @@ fn layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violation
         "不看 journal 那一遍恢复同样过 oracle：{:?}",
         tally.first_ignored_violation
     );
+    // 读出文件、根槽已持久、journal 承重、验证跑过的那几格都在 A 那一段之后（记录段、根槽段、轮换段、全部持久），与甲二快档相同；
+    // A 那一段的单元写只落一部分的状态上 A 的记录与根都没落，恢复落在暖机 txg 2 的根上、没有文件（实六推的，54 号全量核）。
+    // 系统配置槽撕裂的状态（第三态）与那次写没持久的同一状态恢复得一样：撕裂的那一槽解不开，择的是同一块盘上另一槽，
+    // 而没持久时那一槽里是更旧的一代、择的也是另一槽（推的，补第三态之后 54 号全量核）；它们不带待施加的记录，journal 承重、验证那几格不变。
     assert_eq!(
         oracle_counts(&tally),
         OracleCounts {
-            states: 262_165,
+            states: FULL_STATES,
             violations: 0,
-            root_persisted_states: 4,
-            no_file_states: 262_158,
-            file_read_states: 7,
+            root_persisted_states: ROOT_PERSISTED_STATES,
+            no_file_states: FULL_STATES - FILE_READ_STATES,
+            file_read_states: FILE_READ_STATES,
             failed_states: 0,
             journal_differing_states: 3,
             verification_ran_states: 6,
@@ -450,19 +547,19 @@ fn layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violation
             first_violation: None,
         }
     );
-    assert_eq!(closed_form, 262_165, "全量：枚举到的状态数等于闭式");
-    // 按发布分（里程碑「第二个事务」步 6 验收第 1 条的口径，第一条流同样报）：暖机 txg 1、2 各 3 + 3 + 1，
-    // A 是 18 写段 262143 + 记录段 3 + 根槽段 1，A 的系统配置槽轮换 3，再加全部持久那一个。
+    assert_eq!(closed_form, FULL_STATES, "全量：枚举到的状态数等于闭式");
+    // 按发布分（里程碑「第二个事务」步 6 验收第 1 条的口径，第一条流同样报）：暖机 txg 1、2 各 8 + 3 + 1（取号、轮换那一段各 3² − 1），
+    // A 是 26 写段 3² · 2²⁴ − 1 = 150994943 + 记录段 3 + 根槽段 1，A 的系统配置槽轮换 8，再加全部持久那一个。
     assert_eq!(
         tally.states_by_publish_text(),
-        "instance1_txg1=7 instance1_txg2=7 instance1_txg3=262147 after_the_last_root=3 every_write_persisted=1"
+        "instance1_txg1=12 instance1_txg2=12 instance1_txg3=150994947 after_the_last_root=8 every_write_persisted=1"
     );
     assert_allocation_generation_read_set_reached_through_the_record(&read_set_counts);
     assert_checker_counts(
         &tally,
-        262_165,
-        4,
-        4,
+        FULL_STATES,
+        ROOT_PERSISTED_STATES,
+        STATES_WITH_AN_EMPTY_JOURNAL_RING,
         read_set_counts.states_judging_allocation_generations(),
     );
 }
@@ -477,46 +574,67 @@ fn assert_allocation_generation_read_set_reached_through_the_record(
     );
 }
 
-/// 平时跑的那一份：18 个写的那一段不展开子集（只作为整段持久），其余九段全展开——22 个状态；报出来的是「不是全量」。
+/// 平时跑的那一份（甲二快档，用户 2026-09-26 定）：每段原地写各取它的几态、任意组合 × 单元写全不落或全落——A 那一段 26 个写只展开
+/// 两个系统配置槽写（各三态）的组合各配单元写全不落或全落（17 个），其余九段全展开——[`QUICK_TIER_STATES`] 个状态；报出来的是「不是全量」。
 #[test]
-fn layer0_partial_enumeration_skipping_the_eighteen_write_segment_matches_the_full_tally_shape() {
+fn layer0_quick_tier_matches_the_full_tally_shape() {
     let prepared = prepare("layer0-partial");
     let (tally, read_set_counts) = enumerate_counting_allocation_generation_read_sets(
         &prepared,
-        &|_segment_index, segment| segment.len() < 18,
-    );
+        &quick_tier_expansion,
+        &Layer0Resume::NoProgressFile,
+    )
+    .expect("不留进度文件就不分片，交回整条流的计数");
     println!("{}", checker_line(&tally));
     println!("CHECKER_FIRST {:?}", tally.checker_first_violation);
     assert_eq!(
         oracle_counts(&tally),
         OracleCounts {
-            states: 22,
+            states: QUICK_TIER_STATES,
             violations: 0,
-            root_persisted_states: 4,
-            no_file_states: 15,
-            file_read_states: 7,
+            root_persisted_states: ROOT_PERSISTED_STATES,
+            no_file_states: QUICK_TIER_STATES - FILE_READ_STATES,
+            file_read_states: FILE_READ_STATES,
             failed_states: 0,
             journal_differing_states: 3,
             verification_ran_states: 6,
             verification_failed_states: 0,
             first_violation: None,
         },
-        "少展开的只有 18 个写那一段的 262143 个子集：文件在 / 根已持久 / 验证跑过 / journal 承重的状态数都与全量相同"
+        "少展开的只有 A 那一段单元写只落一部分的组合：文件在 / 根已持久 / 验证跑过 / journal 承重的状态数都与全量相同"
     );
     assert_eq!(
         tally.states_by_publish_text(),
-        "instance1_txg1=7 instance1_txg2=7 instance1_txg3=4 after_the_last_root=3 every_write_persisted=1",
-        "22 个状态按发布分：少的只在 A 那一格（18 写段不展开）"
+        "instance1_txg1=12 instance1_txg2=12 instance1_txg3=21 after_the_last_root=8 every_write_persisted=1",
+        "甲二按发布分：少的只在 A 那一格（A 那一段 17 + 记录段 3 + 根槽段 1）"
+    );
+    assert_eq!(
+        layer0_state_count_with_torn_in_place_overwrites(
+            &prepared.base,
+            &prepared.writes,
+            &prepared.segments,
+            &quick_tier_expansion
+        ),
+        QUICK_TIER_STATES,
+        "甲二按闭式数"
+    );
+    assert_eq!(
+        layer0_state_count(&prepared.writes, &prepared.segments, &quick_tier_expansion),
+        29,
+        "每次写只取两态时甲二的闭式（补第三态之前的数）"
     );
     assert_allocation_generation_read_set_reached_through_the_record(&read_set_counts);
     assert_checker_counts(
         &tally,
-        22,
-        4,
-        4,
+        QUICK_TIER_STATES,
+        ROOT_PERSISTED_STATES,
+        STATES_WITH_AN_EMPTY_JOURNAL_RING,
         read_set_counts.states_judging_allocation_generations(),
     );
-    assert_eq!(closed_form_state_count(&prepared.segments), 262_165);
+    assert_eq!(
+        closed_form_state_count(&prepared.segments),
+        FULL_STATES_WITH_TWO_STATES_PER_WRITE
+    );
 }
 
 /// checker 在写完第一个事务的镜像上：每条第一版不变量的判定。
@@ -529,7 +647,7 @@ fn checker_report_on_the_final_image() {
 }
 
 /// 阳性对照（靶向，不是 E142 那条单盘无屏障臂）：根槽已持久而某个单元两份都没持久——这正是段与段之间少一道屏障会放进来的那类状态。
-/// oracle 对 8 个单元逐个都要判红；全部持久那一个判绿；根槽已持久而 journal 记录两份都没持久不算违例（根自己带着全部字段）。
+/// oracle 对 12 个单元逐个都要判红；全部持久那一个判绿；根槽已持久而 journal 记录两份都没持久不算违例（根自己带着全部字段）。
 #[test]
 fn positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle() {
     let prepared = prepare("layer0-control");
@@ -554,7 +672,7 @@ fn positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle() {
         .filter(|(_, write)| write.kind == StepKind::UnitWrite)
         .map(|(index, _)| index)
         .collect();
-    assert_eq!(unit_write_indices.len(), 16);
+    assert_eq!(unit_write_indices.len(), 24);
     let mut violations = 0;
     for pair in unit_write_indices.chunks(2) {
         let mut persisted = all_persisted.clone();
@@ -578,7 +696,7 @@ fn positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle() {
             "根槽已持久而单元 {pair:?} 两份都没持久：必须判红"
         );
     }
-    assert_eq!(violations, 8, "8 个单元逐个抽掉，8 次都判红");
+    assert_eq!(violations, 12, "12 个单元逐个抽掉，12 次都判红");
     let journal_indices: Vec<usize> = prepared
         .writes
         .iter()
@@ -616,7 +734,9 @@ fn positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle() {
 }
 
 /// 记录核对器的判别力（C6（块层语义假设写错） 那条「崩溃测试必须变红」在模型层的形态，与 E77（发布的持久顺序） b_ur 臂同形）：
-/// 摘掉第一个事务里「journal 记录 → 根槽」那道屏障，两份记录与根槽同段；枚举里出现根在案而记录一份都不在的状态。oracle 在这里不红。
+/// 摘掉第一个事务里「journal 记录 → 根槽」那道池屏障（录制器按设备记屏障，两块盘各一步，两步都摘），两份记录与根槽同段；
+/// 枚举里出现根在案而记录一份都不在的状态。oracle 在这里不红。只摘盘 1 那一步的判别力在
+/// `crash_segments_per_device_and_torn_in_place_overwrites.rs`（按 A 那一段并到系统配置槽轮换，5 个写）。
 #[test]
 fn removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker() {
     let pool = build_pool("record-checker-barrier-two");
@@ -626,28 +746,35 @@ fn removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker() {
         .iter()
         .rposition(|retained| geometry().classify(&retained.operation) == StepKind::RootRecordFua)
         .expect("有根槽写");
-    let barrier_position = operations[..root_position]
+    let first_barrier_before_the_root = operations[..root_position]
         .iter()
-        .rposition(|retained| retained.operation.kind == RecordedOperationKind::Barrier)
-        .expect("根槽之前有屏障");
-    operations.remove(barrier_position);
+        .rposition(|retained| retained.operation.kind != RecordedOperationKind::Barrier)
+        .expect("根槽之前有写")
+        + 1;
+    assert_eq!(
+        root_position - first_barrier_before_the_root,
+        2,
+        "根槽之前那道池屏障两块盘各记一步"
+    );
+    operations.drain(first_barrier_before_the_root..root_position);
     let (writes, segments) = writes_and_segments(&operations, &geometry());
     assert_eq!(
         segments.iter().map(Vec::len).collect::<Vec<_>>(),
-        vec![2, 2, 1, 2, 2, 1, 18, 3, 2],
+        vec![2, 2, 1, 2, 2, 1, 26, 3, 2],
         "记录两份与根槽并成一段"
     );
     let root_index = writes
         .iter()
         .rposition(|write| write.kind == StepKind::RootRecordFua)
         .expect("根槽");
+    // A 那一段 26 个写不展开（只以整段持久进入后面的状态），其余每段任意子集。
     let tally = enumerate_layer0_selecting(
         &base,
         &writes,
         &segments,
         root_index,
         &file_content(),
-        &|_segment_index, segment| segment.len() < 18,
+        &|_segment_index, segment| segment.len() <= 3,
     );
     assert_eq!(tally.violations, 0, "oracle 不红：根记录自己带着全部字段");
     assert_eq!(

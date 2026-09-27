@@ -34,11 +34,13 @@ use singlefs_harness::fault_injection::{
     FaultedSegment, FaultedSegmentKind, FlippedBit, InjectedFault, SharedFaultPlan,
 };
 use singlefs_harness::history::{
-    execute_history_with_faults, generate_history_with_weights, GeneratedHistory,
+    execute_history_with, execute_history_with_faults, generate_history_with_weights,
+    ContentChoice, ContentLength, FailureSignature, FloorTargetChoice, GeneratedHistory,
     GenerationWeights, HarnessJudgement, HistoryDeviceWidth, HistoryEnding, HistoryExecution,
     HistoryOperation, HistoryOperationKind, HistoryRun, HistorySeed, HistoryStartingPoint,
-    PerStepChecker, StartingPointStep,
+    PerStepChecker, StartingPointStep, StepPosition,
 };
+use singlefs_harness::model::ModelDisagreementAspect;
 use singlefs_harness::scenario::{e142_parameters, first_file_content, FIXED_WRITE_TIME_SECONDS};
 use singlefs_harness::segments::{FixedGeometry, StepKind};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
@@ -179,11 +181,11 @@ fn assert_every_fault_injection_path_was_exercised(report: &FaultInjectionReport
             .contains_key(FaultOutcome::SurfacedAsAnError.name()),
         "一次都没有「注入那一步返回了错误」：这一件要的就是这一格\n{rendered}"
     );
-    // 会写盘的四类操作：发布（覆盖写）、零单元发布、可写挂载、回退挂载、抬 F。冷启动只读不写，不要求写落点上注入过。
+    // 会写盘的四类操作：发布（覆盖写）、可写挂载、挂着时回退（一次向前发布）、抬 F。冷启动只读不写，不要求写落点上注入过。
     for operation in [
         HistoryOperationKind::PublishOverwrite,
         HistoryOperationKind::CloseAndMountWritable,
-        HistoryOperationKind::CloseAndMountRollback,
+        HistoryOperationKind::RollBackWhileMounted,
         HistoryOperationKind::RaiseRollbackFloor,
     ] {
         assert!(
@@ -271,15 +273,17 @@ fn fault_injection_large_tier_from_the_environment() {
 
 /// 说谎的设备许可留下的盘面不一致里 `["I-3.1"]` 那一组的取样点（`fault_injection::INCONSISTENCIES_A_LYING_DEVICE_MAY_LEAVE`；
 /// `crates/mutations.tsv` 钉着把那一组去掉的变异）。快档那 24 段里说谎的设备留下的不一致全落在另一组（`["I-2.1", "I-4.8", "I-7.4"]`），
-/// 那一组去掉了快档照样绿；大档（这个测试周期的种子基起 512 段、每段 30 步、注入 6 次）里 `["I-3.1"]` 那一组落在 13 个注入点上。
-/// 这里只跑其中一段：种子 7463871032432355306，同一组规模下抽出的 6 个注入点里有一次被吞掉的写（`write_is_swallowed`，
-/// 整池第 107 次写调用）落在 `step_index` 6 那一步（覆盖写）上，之后池级 checker 只判红 I-3.1。它要被白名单豁免、记进说谎那一格，
-/// 不算新发现（这一格为什么只剩 I-3.1、丢的是哪一份，没有逐字节追过）。
+/// 那一组去掉了快档照样绿；大档（这个测试周期的种子基起 512 段、每段 30 步、注入 6 次）里 `["I-3.1"]` 那一组落在 14 个注入点上
+/// （2026-09-26 在管理员回退改成挂着时的向前发布之后的代码上扫的：比重表里关着时回退并进可写挂载，同一个种子生成的历史变了，
+/// 原先取的种子 7463871032432355306 那一段里不再有这一组）。
+/// 这里只跑其中一段：种子 7463871032432355210，同一组规模下抽出的 6 个注入点里有一次被吞掉的写（`write_is_swallowed`，
+/// 整池第 620 次写调用、`step_index` 25 那一步覆盖写 33 次写里的第 31 次，即这次发布的根槽写）落在覆盖写上，之后池级 checker 只判红 I-3.1。
+/// 它要被白名单豁免、记进说谎那一格，不算新发现（这一格为什么只剩 I-3.1，没有逐字节追过）。
 #[test]
-fn a_swallowed_write_after_which_the_checker_flags_only_i_3_1_is_excused_as_what_a_lying_device_may_leave(
+fn swallowed_write_after_which_the_checker_flags_only_the_allocated_statistic_invariant_is_excused_as_what_the_lying_device_may_leave(
 ) {
     let report = run_fault_injection_campaign(&FaultInjectionCampaign {
-        first_seed: 7_463_871_032_432_355_306,
+        first_seed: 7_463_871_032_432_355_210,
         seed_count: 1,
         operations_per_history: 30,
         faults_per_history: 6,
@@ -362,7 +366,7 @@ fn the_drawn_injection_points_reach_the_starting_segment() {
 
 /// 只有起点段的一段历史：操作 0 步，跑起来只有 mkfs、取号、暖机、第一个文件。
 /// 比重挑一律从第一个文件起的那一组，起点段四步才都走得到。
-fn a_history_with_only_the_starting_point() -> GeneratedHistory {
+fn history_with_only_the_starting_point() -> GeneratedHistory {
     generate_history_with_weights(
         HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
         0,
@@ -423,7 +427,7 @@ fn the_starting_point_step_that_returned_an_error(
 /// 起点段每一次写都注入一遍，四步谁少了一处 `expect` 没改，这里必红。
 #[test]
 fn every_entry_in_the_starting_segment_returns_an_error_instead_of_panicking() {
-    let history = a_history_with_only_the_starting_point();
+    let history = history_with_only_the_starting_point();
     // 一、不注入跑一遍，数起点段发了多少次读 / 写 / 刷盘（验收要的那个数，这里现量）。
     let (measured, measurement) = run_the_starting_point(&history, None);
     assert!(
@@ -471,11 +475,11 @@ fn every_entry_in_the_starting_segment_returns_an_error_instead_of_panicking() {
 /// checker 判的每一条都没有对象），**取号 / 暖机 / 第一个文件报错那几次照跑**（mkfs 已经做完，盘上有池）。
 ///
 /// 用户 2026-09-21 定的口径，分界与「重开走读失败算不算失败」同一条：mkfs 做没做完
-/// （`history.rs` 的 `StartingPointStep::a_finished_filesystem_is_on_the_devices`）。
+/// （`history.rs` 的 `StartingPointStep::finished_filesystem_is_on_the_devices`）。
 /// 起点段 44 次写逐次注入，两边都数出来——口径被改掉（两边都跑、或者两边都不跑），这里必红。
 #[test]
 fn the_pool_checker_runs_on_a_starting_point_failure_only_when_make_filesystem_finished() {
-    let history = a_history_with_only_the_starting_point();
+    let history = history_with_only_the_starting_point();
     // 不注入时起点段跑完，起点之后跑一次 checker：下面那两格拿它当对照。
     let (measured, measurement) = run_the_starting_point(&history, None);
     assert!(
@@ -497,7 +501,7 @@ fn the_pool_checker_runs_on_a_starting_point_failure_only_when_make_filesystem_f
             .entry(step.name())
             .or_default()
             .insert(run.tally.checker_runs);
-        let expected_checker_runs = u64::from(step.a_finished_filesystem_is_on_the_devices());
+        let expected_checker_runs = u64::from(step.finished_filesystem_is_on_the_devices());
         assert_eq!(
             run.tally.checker_runs,
             expected_checker_runs,
@@ -554,7 +558,7 @@ fn the_report_is_the_same_text_with_one_worker_thread_and_with_four() {
 /// 现在 B 冻结在分配器上：再发 C 在任何写之前被拒；原样重发 B 之后那条根指着的单元就是它自己写的那一份，checker 不红、冷启动读回 B；
 /// 之后 C 接在 B 上照常发布。
 #[test]
-fn a_publish_that_fails_on_the_system_configuration_slot_is_frozen_so_the_next_publish_cannot_overwrite_the_units_of_its_root(
+fn publish_that_fails_on_the_system_configuration_slot_is_frozen_so_the_next_publish_cannot_overwrite_the_units_of_its_root(
 ) {
     let parameters = e142_parameters(512, 512);
     let geometry = FixedGeometry {
@@ -730,7 +734,7 @@ fn a_publish_that_fails_on_the_system_configuration_slot_is_frozen_so_the_next_p
 }
 
 /// 起点（mkfs、取号 1、暖机、第一个文件）之后只做一步：关掉会话、可写挂载（取号 2 → 写行 → 暖机）。
-fn a_history_that_mounts_once_after_the_first_file() -> GeneratedHistory {
+fn history_that_mounts_once_after_the_first_file() -> GeneratedHistory {
     GeneratedHistory {
         seed: HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
         starting_point: HistoryStartingPoint::AfterFirstFile,
@@ -739,10 +743,12 @@ fn a_history_that_mounts_once_after_the_first_file() -> GeneratedHistory {
 }
 
 /// 那一步可写挂载里的第几次写：取号是头两次（两块盘各一次系统配置槽写），写行那次发布的第一个单元写是第 3 次；
-/// 写行那次发布一共 15 次写（实例表与四个固定点单元各两盘 10 次、记录两盘 2 次、根槽 1 次、系统配置槽轮换 2 次），
-/// 暖机第一次空发布的第一个单元写是第 2 + 15 + 1 = 18 次。
+/// 写行那次发布一共 23 次写（实例表两盘 2 次、分配记录树按位置寻址这一次重写的节点两盘 10 次、记账 / 映射 / 树表各两盘 6 次、
+/// 记录两盘 2 次、根槽 1 次、系统配置槽轮换 2 次），暖机第一次空发布的第一个单元写是第 2 + 23 + 1 = 26 次
+/// （这一步一共 46 次写：暖机一次 21 次）。分配记录树按位置寻址（D8（核心索引结构） 已定项 14）之前那棵树只有一个节点，
+/// 写行那次 15 次写、这一格摆在第 18 次；照旧摆在第 18 次就落进写行那次、记成「新号一条根都没有」。
 const FIRST_ROW_PUBLISH_WRITE_OF_THE_MOUNT: u64 = 3;
-const FIRST_WARM_UP_WRITE_OF_THE_MOUNT: u64 = 18;
+const FIRST_WARM_UP_WRITE_OF_THE_MOUNT: u64 = 26;
 
 /// C378（取号之后写行发布被拒，已烧掉的实例代号不回卷）按用户 2026-09-23 定的那一边（认了，写成已知行为；
 /// D23（journal 的角色与格式） 已定项 16 的射程）断言：取号之后写行或暖机那一次写报块设备错，挂载返回错误，
@@ -753,9 +759,9 @@ const FIRST_WARM_UP_WRITE_OF_THE_MOUNT: u64 = 18;
 /// 判别力自证：把挂载改成「发布报错之后把系统配置的实例代号写回旧号」（回卷，`crates/mutations.tsv` 里那一条），
 /// 重开的盘上系统配置是 1，这一格记不上，这里红。
 #[test]
-fn a_write_error_after_the_acquisition_leaves_the_new_instance_in_the_system_configuration_and_the_report_names_it(
+fn write_error_after_the_acquisition_leaves_the_new_instance_in_the_system_configuration_and_the_report_names_it(
 ) {
-    let history = a_history_that_mounts_once_after_the_first_file();
+    let history = history_that_mounts_once_after_the_first_file();
     let mount_step = FaultedSegment::Operation {
         step_index: 0,
         operation_kind: HistoryOperationKind::CloseAndMountWritable,
@@ -860,6 +866,368 @@ fn image_from(stream: &SharedStream) -> MemoryPool {
     let mut image = MemoryPool::with_devices(&[DeviceIdentity(0), DeviceIdentity(1)], IMAGE_BYTES);
     image.apply(&stream.retained_operations());
     image
+}
+
+/// 第一个文件（txg 3）之后覆盖写，每次换一份内容。
+fn overwrite_with_fill_seed(fill_seed: u64) -> HistoryOperation {
+    HistoryOperation::PublishOverwrite(ContentChoice {
+        length: ContentLength::InsideOneDataUnit { selector: 2999 },
+        fill_seed,
+    })
+}
+
+/// 不注入跑一遍这段历史，数第 `step_index` 步发出的写里落在根槽上的那一次是这一步的第几次写（1 起）：
+/// `inject_one_fault_into_the_segment` 按「这一段发出的第几次写」摆注入点。
+fn ordinal_of_the_root_slot_write_within_the_step(
+    history: &GeneratedHistory,
+    step_index: usize,
+) -> u64 {
+    let stream = SharedStream::new();
+    let mut stream_length_after: BTreeMap<StepPosition, usize> = BTreeMap::new();
+    let run = execute_history_with(
+        history,
+        CHECKED_AFTER_EVERY_STEP,
+        &stream,
+        &mut |observation| {
+            stream_length_after.insert(observation.position, stream.operation_count());
+        },
+    );
+    assert_eq!(run.ending, HistoryEnding::Completed, "不注入时这段历史跑完");
+    let step_start = match step_index.checked_sub(1) {
+        None => stream_length_after[&StepPosition::StartingPoint],
+        Some(previous) => stream_length_after[&StepPosition::Operation(previous)],
+    };
+    let step_end = stream_length_after[&StepPosition::Operation(step_index)];
+    let geometry = CHECKED_AFTER_EVERY_STEP.device_width.fixed_geometry();
+    let writes_of_the_step: Vec<_> = stream.operations()[step_start..step_end]
+        .iter()
+        .filter(|operation| operation.kind != singlefs_harness::RecordedOperationKind::Barrier)
+        .cloned()
+        .collect();
+    let index = writes_of_the_step
+        .iter()
+        .position(|operation| geometry.classify(operation) == StepKind::RootRecordFua)
+        .expect("一次发布恰好写一次根槽");
+    u64::try_from(index + 1).expect("一步至多几十次写")
+}
+
+/// 按注入点认说谎的设备留下的那两格（主 agent 2026-09-26 定，实七；实四丙交回 ③ offset 339 与 ④ offset 284 那两形）：
+/// 第一个文件（txg 3）之后覆盖写五次（4–8），txg 7 那次的根槽 FUA 写被吞；再可写挂载（实例 2，择到 txg 8、不施加记录，
+/// 与模型对得上），接着抬 F 到 1。这个进程挂载时 txg 7 那个根槽就读不出（从没写对过），实现照旧当没有根
+/// （445 的定案：挂载时就读不出、这个进程之后也没写过的槽照旧当没有根），报的上限按看不见 (1, 7) 算，模型按确认过的根算、多一个非空状态——
+/// 历史停在这一步；按模型去掉 (1, 7) 之后重算的上限与实现报的相等，认成说谎的设备留下的。抬 F 那一步照实现的上限做成、写出的那几条
+/// 空发布根不在模型认过的版本里，重开走到最新那一条、读回的是 txg 8 那一版的内容：「放行集并进历史停下那一步实现已写出的根」认下它。
+/// 两格任一格不认，这一次注入就成了新发现。
+/// （同一个进程里吞了根槽再抬 F 走的是另一格，见
+/// `floor_raise_in_the_same_process_after_a_swallowed_root_slot_write_is_refused_for_that_slot_and_recognised_as_left_by_the_lying_device`。）
+#[test]
+fn a_swallowed_root_slot_write_is_recognised_by_the_ceiling_recomputed_without_its_root_and_the_floor_raise_it_left_behind_is_allowed_on_reopen(
+) {
+    let history = GeneratedHistory {
+        seed: HistorySeed(0),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations: vec![
+            overwrite_with_fill_seed(1),
+            overwrite_with_fill_seed(2),
+            overwrite_with_fill_seed(3),
+            overwrite_with_fill_seed(4),
+            overwrite_with_fill_seed(5),
+            HistoryOperation::CloseAndMountWritable,
+            HistoryOperation::RaiseRollbackFloor(FloorTargetChoice {
+                steps_above_current_floor: 1,
+            }),
+        ],
+    };
+    // 每一步之后不跑池级 checker：txg 8 那次覆盖写之后 checker 就判红 I-3.1（被吞的根槽留下的，被吞的写插回去就消失），
+    // 跑着的话历史停在那一步、走不到抬 F；重开之后那一次 checker 照跑、照判。
+    let execution_without_the_per_step_checker = HistoryExecution {
+        per_step_checker: PerStepChecker::Skipped,
+        device_width: HistoryDeviceWidth::FourGibibytes,
+        space_admission: SpaceAdmission::JudgedByTheFormula,
+    };
+    let injection = inject_one_fault_into_the_segment(
+        &history,
+        execution_without_the_per_step_checker,
+        InjectedFault::WriteIsSwallowed,
+        FaultedSegment::Operation {
+            step_index: 3,
+            operation_kind: HistoryOperationKind::PublishOverwrite,
+        },
+        ordinal_of_the_root_slot_write_within_the_step(&history, 3),
+    );
+    let tally = &injection.tally;
+    assert!(
+        injection.new_findings.is_empty(),
+        "按注入点认得出的两格不许成新发现：{:?}",
+        injection.new_findings
+    );
+    assert_eq!(
+        tally
+            .lying_device_signatures
+            .get("ModelDisagreement { aspect: \"抬 F 的上限\" }"),
+        Some(&1),
+        "抬 F 的上限那一格按去掉被吞的根之后重算的上限认下：{:?}",
+        tally.lying_device_signatures
+    );
+    assert_eq!(
+        tally.reopened_into_the_version_the_faulted_step_was_writing, 1,
+        "重开走到停下那一步写出的根上，放行集认下它"
+    );
+}
+
+/// 同一个进程里根槽写被吞之后再抬 F（实七报告 (b)，实八）：第一个文件（txg 3）之后覆盖写五次（4–8），txg 7 那次的根槽 FUA 写被吞，
+/// 不重新挂载，接着抬 F 到 1。这个进程写过 txg 7 那个槽、FUA 返回过，算上限时读它读坏、重读仍坏，实现照 D16（发布语义） 已定项 1
+/// 「根槽这一次读坏」那一行拒这次抬 F、报 `RollbackFloorCeilingRootRingSlotStillBadAfterOneReread`，点名的就是 txg 7 那个槽。
+/// 模型不知道根槽没落，要它成或按上限拒，对拍报对不上（前半截钉住这一形）；按注入点认：读坏的槽正是被吞那次写的，认成说谎的设备留下的，
+/// 不成新发现（后半截）。复现的随机种子是故障注入大档种子基 + 116。
+#[test]
+fn floor_raise_in_the_same_process_after_a_swallowed_root_slot_write_is_refused_for_that_slot_and_recognised_as_left_by_the_lying_device(
+) {
+    let history = GeneratedHistory {
+        seed: HistorySeed(0),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations: vec![
+            overwrite_with_fill_seed(1),
+            overwrite_with_fill_seed(2),
+            overwrite_with_fill_seed(3),
+            overwrite_with_fill_seed(4),
+            overwrite_with_fill_seed(5),
+            HistoryOperation::RaiseRollbackFloor(FloorTargetChoice {
+                steps_above_current_floor: 1,
+            }),
+        ],
+    };
+    // 每一步之后不跑池级 checker：txg 8 那次覆盖写之后 checker 就判红 I-3.1（被吞的根槽留下的），跑着的话历史停在那一步、走不到抬 F。
+    let execution_without_the_per_step_checker = HistoryExecution {
+        per_step_checker: PerStepChecker::Skipped,
+        device_width: HistoryDeviceWidth::FourGibibytes,
+        space_admission: SpaceAdmission::JudgedByTheFormula,
+    };
+    let parameters = execution_without_the_per_step_checker
+        .device_width
+        .parameters();
+    let root_slot_of_the_swallowed_publish = singlefs_core::root_ring::target_for_publish(
+        CheckpointTxg(7),
+        parameters.geometry.root_ring_slots_per_region,
+    );
+    let plan = SharedFaultPlan::armed(
+        execution_without_the_per_step_checker
+            .device_width
+            .fixed_geometry(),
+        FaultSchedule {
+            fault: InjectedFault::WriteIsSwallowed,
+            device: FaultDeviceSelector::OnlyDevice(
+                parameters.region_devices[usize::try_from(
+                    root_slot_of_the_swallowed_publish.region,
+                )
+                .expect("区域号小于 3")],
+            ),
+            placement: FaultPlacement::OffsetExactly(singlefs_core::root_ring::slot_offset(
+                root_slot_of_the_swallowed_publish,
+                parameters.geometry.fixed_structure_slot_spacing,
+            )),
+            counting: FaultCounting::AcrossThePool,
+            occurrence: FaultOccurrence::TheNthMatchingCall(1),
+        },
+    );
+    let run = execute_history_with_faults(
+        &history,
+        execution_without_the_per_step_checker,
+        &SharedStream::new(),
+        &plan,
+        &mut |_| {},
+    );
+    assert_eq!(plan.fired().len(), 1, "只吞掉 txg 7 那一次根槽写");
+    let HistoryEnding::NewFinding { observation, .. } = &run.ending else {
+        panic!("不按注入点认时，抬 F 那一步对拍对不上：{:?}", run.ending);
+    };
+    assert_eq!(observation.position, StepPosition::Operation(5));
+    let disagreement = observation
+        .model_disagreement
+        .as_ref()
+        .expect("停在模型对不上");
+    assert!(
+        matches!(
+            disagreement.aspect,
+            ModelDisagreementAspect::RefusedWhenModelRequiresSuccess
+                | ModelDisagreementAspect::RefusalReason
+        ),
+        "模型要它成或按上限拒，实现拒了：{disagreement:?}"
+    );
+    assert!(
+        disagreement
+            .implementation_answer
+            .contains("RollbackFloorCeilingRootRingSlotStillBadAfterOneReread"),
+        "实现报的是「根环槽读坏、重读仍坏」：{}",
+        disagreement.implementation_answer
+    );
+    assert_eq!(
+        disagreement.implementation_reported_root_ring_slot_still_bad_after_one_reread,
+        Some(singlefs_harness::model_comparison::model_ring_position(
+            root_slot_of_the_swallowed_publish
+        )),
+        "实现点名的读坏的槽是 txg 7 那一次被吞的根槽写的槽"
+    );
+
+    let injection = inject_one_fault_into_the_segment(
+        &history,
+        execution_without_the_per_step_checker,
+        InjectedFault::WriteIsSwallowed,
+        FaultedSegment::Operation {
+            step_index: 3,
+            operation_kind: HistoryOperationKind::PublishOverwrite,
+        },
+        ordinal_of_the_root_slot_write_within_the_step(&history, 3),
+    );
+    assert!(
+        injection.new_findings.is_empty(),
+        "读坏的槽正是被吞那次写的，不许成新发现：{:?}",
+        injection.new_findings
+    );
+    let signature = format!(
+        "{:?}",
+        FailureSignature::ModelDisagreement {
+            aspect: disagreement.aspect.name()
+        }
+    );
+    assert_eq!(
+        injection.tally.lying_device_signatures.get(&signature),
+        Some(&1),
+        "按注入点认下的是抬 F 那一格：{:?}",
+        injection.tally.lying_device_signatures
+    );
+}
+
+/// 「写的实例表行」那一形（实四丙交回第五节第 6 条没判的那一格；实七造、判）：第一个文件（txg 3）之后覆盖写一次（txg 4），
+/// 它的根槽 FUA 写被吞——记录与单元落了盘、根槽没落；接着可写挂载。挂载里的恢复择到 txg 3、施加 txg 4 的记录（走到 (1, 4)），
+/// 给实例 1 写的行是 (1, 4, W)，W 取这次恢复施加的记录里最大的事务号（D23（journal 的角色与格式） 已定项 14 第 4 条），
+/// 实现照条款写。模型不知道根槽没落，按「不建崩溃、一条记录都不施加」答 (1, 4, 0)，对拍报「写的实例表行」。
+/// 这里钉住不按注入点认时对拍看到的样子：行里所选根的 txg 两边一样，差的只有 W，而实现写的 W 正是那条记录的事务号。
+/// 按注入点认的那一半见 `the_rows_written_after_a_swallowed_root_slot_write_are_recognised_by_the_rows_the_model_recomputes_with_the_record_applied`。
+#[test]
+fn mount_after_a_swallowed_root_slot_write_writes_the_transaction_of_the_record_it_applied_while_the_model_expects_none_applied(
+) {
+    let execution = CHECKED_AFTER_EVERY_STEP;
+    let parameters = execution.device_width.parameters();
+    let root_slot_of_the_overwrite = singlefs_core::root_ring::target_for_publish(
+        CheckpointTxg(4),
+        parameters.geometry.root_ring_slots_per_region,
+    );
+    let plan = SharedFaultPlan::armed(
+        execution.device_width.fixed_geometry(),
+        FaultSchedule {
+            fault: InjectedFault::WriteIsSwallowed,
+            device: FaultDeviceSelector::OnlyDevice(
+                parameters.region_devices
+                    [usize::try_from(root_slot_of_the_overwrite.region).expect("区域号小于 3")],
+            ),
+            placement: FaultPlacement::OffsetExactly(singlefs_core::root_ring::slot_offset(
+                root_slot_of_the_overwrite,
+                parameters.geometry.fixed_structure_slot_spacing,
+            )),
+            counting: FaultCounting::AcrossThePool,
+            occurrence: FaultOccurrence::TheNthMatchingCall(1),
+        },
+    );
+    let history = GeneratedHistory {
+        seed: HistorySeed(0),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations: vec![
+            overwrite_with_fill_seed(1),
+            HistoryOperation::CloseAndMountWritable,
+        ],
+    };
+    let mut image_before_the_mount: Option<MemoryPool> = None;
+    let run = execute_history_with_faults(
+        &history,
+        execution,
+        &SharedStream::new(),
+        &plan,
+        &mut |observation| {
+            if observation.position == StepPosition::Operation(0) {
+                image_before_the_mount = Some(observation.image.clone());
+            }
+        },
+    );
+    assert_eq!(plan.fired().len(), 1, "只吞掉覆盖写那一次根槽写");
+    let recovery_the_mount_runs = recover(
+        &image_before_the_mount.expect("观察者见过覆盖写之后的镜像"),
+        JournalPolicy::Consult,
+    );
+    assert_eq!(
+        recovery_the_mount_runs.effective_root,
+        Some((InstanceGeneration(1), CheckpointTxg(4))),
+        "恢复择到 txg 3、施加 txg 4 的记录"
+    );
+    let applied_transaction = recovery_the_mount_runs.journal.maximum_applied_transaction;
+    assert!(applied_transaction > 0, "施加的是一次带单元的覆盖写的记录");
+    let HistoryEnding::NewFinding { observation, .. } = &run.ending else {
+        panic!("今天这一格报成新发现：{:?}", run.ending);
+    };
+    assert_eq!(observation.position, StepPosition::Operation(1));
+    let disagreement = observation
+        .model_disagreement
+        .as_ref()
+        .expect("停在模型对不上");
+    assert_eq!(disagreement.aspect, ModelDisagreementAspect::InstanceRows);
+    for (who, rows, high_water) in [
+        ("模型", &disagreement.model_answer, 0),
+        (
+            "实现",
+            &disagreement.implementation_answer,
+            applied_transaction,
+        ),
+    ] {
+        assert!(
+            rows.contains("selected_root_txg: ModelCheckpointTxg(4)")
+                && rows.contains(&format!("applied_transaction_high_water: {high_water}")),
+            "{who}写的行是 (1, 4, {high_water})：{rows}"
+        );
+    }
+}
+
+/// 「写的实例表行」那一形按注入点认（实七报告 (d)，实八）：同一段历史（第一个文件之后覆盖写一次、它的根槽写被吞、接着可写挂载），
+/// 注入经 `inject_one_fault_into_the_segment` 走。模型拿历史停下那一步之前的自己、按「txg 4 的根槽没落、它的记录与单元落了」重算
+/// 可写挂载写的行：恢复择到 txg 3、施加 txg 4 的记录，行是 (1, 4, W)，W 取那条记录的事务号（D23（journal 的角色与格式） 已定项 14 第 4 条）。
+/// 实现写的正是这一行，认成说谎的设备留下的，不成新发现。
+#[test]
+fn the_rows_written_after_a_swallowed_root_slot_write_are_recognised_by_the_rows_the_model_recomputes_with_the_record_applied(
+) {
+    let history = GeneratedHistory {
+        seed: HistorySeed(0),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations: vec![
+            overwrite_with_fill_seed(1),
+            HistoryOperation::CloseAndMountWritable,
+        ],
+    };
+    let injection = inject_one_fault_into_the_segment(
+        &history,
+        CHECKED_AFTER_EVERY_STEP,
+        InjectedFault::WriteIsSwallowed,
+        FaultedSegment::Operation {
+            step_index: 0,
+            operation_kind: HistoryOperationKind::PublishOverwrite,
+        },
+        ordinal_of_the_root_slot_write_within_the_step(&history, 0),
+    );
+    assert!(
+        injection.new_findings.is_empty(),
+        "实现写的行等于模型重算的行，不许成新发现：{:?}",
+        injection.new_findings
+    );
+    let signature = format!(
+        "{:?}",
+        FailureSignature::ModelDisagreement {
+            aspect: ModelDisagreementAspect::InstanceRows.name()
+        }
+    );
+    assert_eq!(
+        injection.tally.lying_device_signatures.get(&signature),
+        Some(&1),
+        "按注入点认下的是「写的实例表行」那一格：{:?}",
+        injection.tally.lying_device_signatures
+    );
 }
 
 /// 环里自证过的根的 txg，从小到大。

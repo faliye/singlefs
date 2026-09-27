@@ -59,7 +59,7 @@ fn sequential_write(
 
 /// 一个单元装得下的顺序写走得通：切出一个事务、一条记录，接在 `publish_overwrite` 那一路上。
 #[test]
-fn a_sequential_write_that_fits_one_data_unit_publishes_through_the_single_transaction_path() {
+fn sequential_write_that_fits_one_data_unit_publishes_through_the_single_transaction_path() {
     let mut pool = build_pool("parallel-line-one-one-unit");
     assert_eq!(
         data_unit_count_of_a_sequential_write(PAYLOAD_CAPACITY_IN_BYTES as u64),
@@ -139,7 +139,7 @@ fn the_second_extent_leaf_record_key_is_the_file_byte_offset_of_the_second_data_
 /// 前一条只点名它自己那个数据单元，这次发布共享的提交内生块（extent 根、inode 叶容器与根、分配记录树、记账树、映射树、树表）
 /// 只在最后一条点名（D23（journal 的角色与格式） 已定项 17）。两条连号、同一个 checkpoint_txg、各带提交标记、反向链接成一串。
 #[test]
-fn a_publish_of_two_data_units_names_the_shared_commit_generated_units_only_in_its_last_record() {
+fn publish_of_two_data_units_names_the_shared_commit_generated_units_only_in_its_last_record() {
     let mut pool = build_pool("parallel-line-one-two-records");
     let previous = pool.output.clone();
     let content = content_of(PAYLOAD_CAPACITY_IN_BYTES + 4000);

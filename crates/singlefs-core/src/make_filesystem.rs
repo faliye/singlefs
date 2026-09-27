@@ -10,8 +10,9 @@
 //! 根环连着一起清是同一天的续作（C484（mkfs 不清根环，同 fsid 重来旧根还择得中），用户 2026-09-22 定案）。
 
 use singlefs_format::{
-    INSTANCE_ROW_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, NODE_POINTER_BYTES,
-    ROOT_RING_REGIONS, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE,
+    INSTANCE_ROW_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, JOURNAL_SAFETY_FACTOR,
+    NODE_BYTES, NODE_POINTER_BYTES, ROOT_RECORD_BYTES, ROOT_RING_REGIONS, SLOT_BYTES,
+    SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE, SYSTEM_CONFIGURATION_SLOT_BYTES,
     TREE_IDENTIFIER_WATERMARK_AT_MKFS, TREE_TABLE_ENTRY_BYTES, UNIT_AREA_START_SLOT,
 };
 
@@ -26,11 +27,12 @@ use crate::block_device::{BlockDevice, BlockDeviceError, WriteDurability};
 use crate::bytes::ByteWriter;
 use crate::checksum::crc32_castagnoli;
 use crate::pointer::{BirthSequence, LocationEntry, NodePointer, PointerHead};
-use crate::root_record::RootRecord;
+use crate::root_record::{RootRecord, UnmountMarker};
 use crate::root_ring::{region_length_in_bytes, region_start, ring_end, slot_offset, RootRingSlot};
 use crate::system_configuration::{
-    SystemConfiguration, SystemImmutableConfiguration, SystemImmutableSizes,
-    SystemMutableConfiguration, SystemRuntimeConfiguration, SystemRuntimeQuantities,
+    journal_in_flight_record_limit, SystemConfiguration, SystemImmutableConfiguration,
+    SystemImmutableSizes, SystemMutableConfiguration, SystemRuntimeConfiguration,
+    SystemRuntimeQuantities,
 };
 use crate::unit::{
     build_index_node, build_packed_unit, PackedIdentity, WriteOrder, PACKED_TYPE_INSTANCE_TABLE,
@@ -40,6 +42,9 @@ use crate::unit::{
 pub const MKFS_INSTANCE_GENERATION: InstanceGeneration = InstanceGeneration(0);
 /// 系统配置槽世代号从 1 起，mkfs 把两个槽都种上 1（D22（单元原子性怎么合成） 已定项 16）。
 pub const SYSTEM_CONFIGURATION_GENERATION_AT_MKFS: u64 = 1;
+/// mkfs 写的回退下界 F：第 0 代根与每个系统配置槽两处都写 0（`.claude/kb/layout/01-first-txn.md` 一「回退下界 F」、
+/// 七「回退下界 F」两行；D16（发布语义） 已定项 1：F 平时不动，准入不够或正常卸载时才抬）。
+pub const ROLLBACK_FLOOR_AT_MKFS: CheckpointTxg = CheckpointTxg(0);
 /// 实例表单元第 0 片落槽 50176（占两槽），树表单元第 0 版落槽 50178（D3（空间分配） 已定项 10 ④）。
 pub const INSTANCE_TABLE_SLOT: SlotNumber = SlotNumber(UNIT_AREA_START_SLOT);
 pub const TREE_TABLE_GENESIS_SLOT: SlotNumber = SlotNumber(UNIT_AREA_START_SLOT + 2);
@@ -60,9 +65,65 @@ pub struct MakeFilesystemParameters {
     pub geometry: SystemImmutableSizes,
 }
 
-/// mkfs 能出的错：几何放不下，或底层块设备错。
+/// 每块盘开头那几段固定结构（D22（单元原子性怎么合成） 已定项 8 / 已定项 16，D23（journal 的角色与格式） 已定项 2）。
+/// 封闭集合：`match` 不写通配臂。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FixedStructure {
+    /// 系统配置槽 `slot_index`（每盘两槽，槽 i 在 i × 固定结构槽距处，宽 4096）。
+    SystemConfigurationSlot { slot_index: u64 },
+    /// 根环区域 `region`（起点 = 基址 + region × P × chunk，长 = S × 固定结构槽距）。mkfs 在每块盘上把三个区域都清零，
+    /// 所以三个区域在每块盘上都占着这一段，不论这块盘背不背它的根。
+    RootRingRegion { region: u64 },
+    /// journal 环（从槽 1024 起，长 = 系统配置里的环长）。
+    JournalRing,
+}
+
+/// 一段固定结构在盘上占的字节：`[start, start + length_in_bytes)`，设备内偏移。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FixedStructureExtent {
+    pub structure: FixedStructure,
+    pub start: DeviceOffsetInBytes,
+    pub length_in_bytes: u64,
+}
+
+impl FixedStructureExtent {
+    fn end_exclusive(self) -> u64 {
+        self.start.0 + self.length_in_bytes
+    }
+
+    /// 两段半开区间有没有共同的字节：首尾相接不算。
+    fn overlaps(self, other: Self) -> bool {
+        self.start.0 < other.end_exclusive() && other.start.0 < self.end_exclusive()
+    }
+}
+
+/// mkfs 能出的错：几何放不下，或底层块设备错。几何那几样都在任何写之前判（[`make_filesystem`] 的第一步）。
 #[derive(Debug)]
 pub enum MakeFilesystemError {
+    /// 根槽宽（= 参数里的 physical_block_size）装不下根记录（457 字节，D22（单元原子性怎么合成） 已定项 7）。
+    RootSlotNarrowerThanTheRootRecord {
+        physical_block_size: u32,
+        root_record_bytes: u64,
+    },
+    /// 根槽宽（= 参数里的 physical_block_size）大于固定结构槽距：每条根写盖到同一区域的下一个槽
+    /// （槽 j 在区域起点 + j × 槽距，D22（单元原子性怎么合成） 已定项 16 第 2 句）。
+    RootSlotWiderThanTheFixedStructureSlotSpacing {
+        physical_block_size: u32,
+        fixed_structure_slot_spacing: u32,
+    },
+    /// journal 环短于一条记录：环槽数是 0，记录落点（`journal::record_offset`，按环槽数取模）无处可落。
+    JournalRingShorterThanOneRecord {
+        ring_bytes: u64,
+        record_bytes: u64,
+    },
+    /// journal 环装不下 F 条记录（F = [`JOURNAL_SAFETY_FACTOR`]，I-8.1（环几何够大） 的安全系数）：在飞上限 = 环槽数 ÷ F
+    /// （D23（journal 的角色与格式） 已定项 18）是 0，恢复一条记录都不施加（`recovery::replay_journal` 按在飞上限取前缀）。
+    /// I-8.1 要环 ≥ F × 任一事务的最坏 journal 占用，最坏占用至少一条记录，这是它最低的那一格。
+    /// `minimum_ring_bytes` = F × 一条记录的字节数。
+    JournalRingHoldsFewerRecordsThanTheSafetyFactor {
+        ring_bytes: u64,
+        minimum_ring_bytes: u64,
+    },
     /// journal 环超过设备容量的四分之一（D23（journal 的角色与格式） 已定项 19）。
     JournalRingTooLargeForDevice {
         ring_bytes: u64,
@@ -73,10 +134,27 @@ pub enum MakeFilesystemError {
         ring_end: u64,
         device_bytes: u64,
     },
-    /// 单元区起点越过设备末尾。
+    /// 单元区起点越过设备末尾：`unit_area_start` 是 mkfs 写实例表单元的那个设备内字节偏移（[`INSTANCE_TABLE_SLOT`]），
+    /// 实例表单元第 0 片与树表单元第 0 版装不进最小那块盘。
     UnitAreaBeyondDevice {
         unit_area_start: u64,
         device_bytes: u64,
+    },
+    /// 两段固定结构有共同的字节（系统配置两槽、三个根环区域、journal 环两两比）：写后一段会撕掉前一段。
+    /// 两段按它们在格式里的排布次序给（系统配置槽 0、槽 1、区域 0、1、2、journal 环）。
+    /// 固定结构槽距的上界就由它定：两槽要落在根环基址之前、区域长 S × 槽距不能越过区域间距 P × chunk。
+    FixedStructuresOverlap {
+        first_in_layout_order: FixedStructureExtent,
+        second_in_layout_order: FixedStructureExtent,
+    },
+    /// journal 环的末端越过单元区起点：环会盖住实例表单元与分配器发出去的单元。
+    /// D23（journal 的角色与格式） 已定项 19 ③ 写单元区起始槽号随环长走，而实例表 / 树表的落点（[`INSTANCE_TABLE_SLOT`]、
+    /// [`TREE_TABLE_GENESIS_SLOT`]）、分配器（`allocator::unit_area_slots_of_device` 与空闲图的下标）、
+    /// 恢复判分配记录落点（`recovery::allocation_records_fit_the_pool_geometry`）都还按编译期常量 `UNIT_AREA_START_SLOT` 算
+    /// （C475（非默认环长下单元区起点取编译期常量））⇒ 第一版不支持末端越过它的环长。末端不越过它的环照收，单元区照旧从那个常量起。
+    JournalRingPastTheCompiledUnitAreaStartUnsupported {
+        journal_ring_end_in_bytes: u64,
+        unit_area_start_in_bytes: u64,
     },
     /// 参数说三个区域住哪块盘，而池里没有那块盘。
     RegionDeviceMissing {
@@ -141,12 +219,69 @@ pub fn location_entries(
     ]
 }
 
+/// 每块盘开头那几段固定结构各占哪一段字节，按它们在格式里的排布次序：系统配置槽 0、槽 1、根环区域 0、1、2、journal 环。
+/// 与 [`make_filesystem`] 写它们用的是同一组式子（槽 i 在 i × 槽距、[`region_start`] 与 [`region_length_in_bytes`]、
+/// journal 环从 [`JOURNAL_RING_START_SLOT`] 起），判定与写读的是同一份参数。
+fn fixed_structure_extents(geometry: &SystemImmutableSizes) -> Vec<FixedStructureExtent> {
+    let system_configuration_slots =
+        (0..SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE).map(|slot_index| FixedStructureExtent {
+            structure: FixedStructure::SystemConfigurationSlot { slot_index },
+            start: DeviceOffsetInBytes(
+                slot_index * u64::from(geometry.fixed_structure_slot_spacing),
+            ),
+            length_in_bytes: SYSTEM_CONFIGURATION_SLOT_BYTES,
+        });
+    let root_ring_regions = (0..ROOT_RING_REGIONS).map(|region| FixedStructureExtent {
+        structure: FixedStructure::RootRingRegion { region },
+        start: region_start(region),
+        length_in_bytes: region_length_in_bytes(
+            geometry.fixed_structure_slot_spacing,
+            geometry.root_ring_slots_per_region,
+        ),
+    });
+    let journal_ring = FixedStructureExtent {
+        structure: FixedStructure::JournalRing,
+        start: DeviceOffsetInBytes(JOURNAL_RING_START_SLOT * SLOT_BYTES),
+        length_in_bytes: geometry.journal_ring_bytes,
+    };
+    system_configuration_slots
+        .chain(root_ring_regions)
+        .chain(std::iter::once(journal_ring))
+        .collect()
+}
+
+/// 几何判定，全在任何写之前（[`make_filesystem`] 的第一步）。次序：根槽宽、环长下界（一条记录、F 条记录）与上界、根环末端与单元区在不在盘内、
+/// 根槽宽不超过槽距、固定结构两两不重叠、journal 环末端不越过单元区起点、区域归属。
 fn check_geometry(
     parameters: &MakeFilesystemParameters,
     devices: &[(DeviceIdentity, u64)],
 ) -> Result<(), MakeFilesystemError> {
+    let geometry = &parameters.geometry;
+    // 根槽宽 = physical_block_size（`RootRecord::to_slot` 按它切）：装不下根记录就在这里拒，不走到那里的断言——
+    // 那时根环与 journal 环已经清过、两个单元已经写了。
+    if u64::from(geometry.physical_block_size) < ROOT_RECORD_BYTES {
+        return Err(MakeFilesystemError::RootSlotNarrowerThanTheRootRecord {
+            physical_block_size: geometry.physical_block_size,
+            root_record_bytes: ROOT_RECORD_BYTES,
+        });
+    }
     let smallest = devices.iter().map(|(_, bytes)| *bytes).min().unwrap_or(0);
-    let ring_bytes = parameters.geometry.journal_ring_bytes;
+    let ring_bytes = geometry.journal_ring_bytes;
+    if ring_bytes < JOURNAL_RECORD_BYTES {
+        return Err(MakeFilesystemError::JournalRingShorterThanOneRecord {
+            ring_bytes,
+            record_bytes: JOURNAL_RECORD_BYTES,
+        });
+    }
+    // 判的是恢复真正用的那个数（在飞上限），不另写一遍「环槽数 < F」：两处同一个式子。
+    if journal_in_flight_record_limit(ring_bytes) == 0 {
+        return Err(
+            MakeFilesystemError::JournalRingHoldsFewerRecordsThanTheSafetyFactor {
+                ring_bytes,
+                minimum_ring_bytes: JOURNAL_SAFETY_FACTOR * JOURNAL_RECORD_BYTES,
+            },
+        );
+    }
     if ring_bytes > smallest / 4 {
         return Err(MakeFilesystemError::JournalRingTooLargeForDevice {
             ring_bytes,
@@ -154,8 +289,8 @@ fn check_geometry(
         });
     }
     let root_ring_end = ring_end(
-        parameters.geometry.fixed_structure_slot_spacing,
-        parameters.geometry.root_ring_slots_per_region,
+        geometry.fixed_structure_slot_spacing,
+        geometry.root_ring_slots_per_region,
     );
     if root_ring_end > smallest {
         return Err(MakeFilesystemError::RootRingBeyondDevice {
@@ -163,12 +298,45 @@ fn check_geometry(
             device_bytes: smallest,
         });
     }
-    let unit_area_start = (JOURNAL_RING_START_SLOT + ring_bytes / SLOT_BYTES) * SLOT_BYTES;
-    if unit_area_start + 3 * SLOT_BYTES > smallest {
+    // 单元区起点取 mkfs 真正写实例表单元的那个偏移：它今天是编译期常量，不随环长走（C475），按环长现算出来的数只在默认环长下与它相等。
+    let unit_area_start = INSTANCE_TABLE_SLOT.to_device_offset().0;
+    let end_of_the_units_written_by_make_filesystem =
+        TREE_TABLE_GENESIS_SLOT.to_device_offset().0 + NODE_BYTES;
+    if end_of_the_units_written_by_make_filesystem > smallest {
         return Err(MakeFilesystemError::UnitAreaBeyondDevice {
             unit_area_start,
             device_bytes: smallest,
         });
+    }
+    if geometry.physical_block_size > geometry.fixed_structure_slot_spacing {
+        return Err(
+            MakeFilesystemError::RootSlotWiderThanTheFixedStructureSlotSpacing {
+                physical_block_size: geometry.physical_block_size,
+                fixed_structure_slot_spacing: geometry.fixed_structure_slot_spacing,
+            },
+        );
+    }
+    let extents = fixed_structure_extents(geometry);
+    // 六段两两比，路径数只有「第一对重叠的在哪」一种出口；迭代次数的上界是 6 × 5 ÷ 2。
+    for (index, first_in_layout_order) in extents.iter().enumerate() {
+        for second_in_layout_order in &extents[index + 1..] {
+            if first_in_layout_order.overlaps(*second_in_layout_order) {
+                return Err(MakeFilesystemError::FixedStructuresOverlap {
+                    first_in_layout_order: *first_in_layout_order,
+                    second_in_layout_order: *second_in_layout_order,
+                });
+            }
+        }
+    }
+    // 上面判过两两不重叠，区域与系统配置槽都落在 journal 环起点（16 MiB）之前；越得过单元区起点的只有 journal 环。
+    let journal_ring_end_in_bytes = JOURNAL_RING_START_SLOT * SLOT_BYTES + ring_bytes;
+    if journal_ring_end_in_bytes > unit_area_start {
+        return Err(
+            MakeFilesystemError::JournalRingPastTheCompiledUnitAreaStartUnsupported {
+                journal_ring_end_in_bytes,
+                unit_area_start_in_bytes: unit_area_start,
+            },
+        );
     }
     for (region, device) in parameters.region_devices.iter().enumerate() {
         if !devices.iter().any(|(identity, _)| identity == device) {
@@ -254,7 +422,7 @@ pub fn make_filesystem<Device: BlockDevice>(
     // `singlefs-checker` 的 `image.rs`），任一处以后改成扫全部盘，漏就回来了。
     // 按几何清之后 mkfs 的后置条件只有一句：根环三段在每块盘上只剩这次写下的三条第 0 代根，别处全 0。
     // 次序与屏障：清零按设备内偏移升序发（根环 1 / 4 / 7 MiB，journal 环 16 MiB），几段之间不另加屏障——
-    // 它们互不重叠，也不与同一段里的单元写重叠（单元区从 784 MiB 起）；真正重叠的是清根环与根槽 FUA 写
+    // 它们互不重叠，也不与同一段里的单元写重叠（`check_geometry` 判过：固定结构两两不重叠、journal 环末端不越过单元区起点）；真正重叠的是清根环与根槽 FUA 写
     //（区域 r 的槽 0），那一对由原有的那道屏障（单元写之后、根 FUA 之前）隔开，不靠发出次序。
     // mkfs 中途崩溃第一版没有条款（层 0 从 mkfs 之后的池起枚举，`.claude/kb/layout/01-first-txn.md` 八
     // mkfs 那一行的「层 0 枚举」格写「不在」），不为一个没有条款的语义加屏障。
@@ -289,6 +457,7 @@ pub fn make_filesystem<Device: BlockDevice>(
 
     let root = RootRecord {
         filesystem_identifier: parameters.filesystem_identifier,
+        unmount_marker: UnmountMarker::NotWrittenByTheUnmountSequence,
         instance,
         checkpoint_txg: genesis,
         tree_table: NodePointer {
@@ -305,7 +474,7 @@ pub fn make_filesystem<Device: BlockDevice>(
             birth_sequence: tree_table_sequence,
         },
         tree_identifier_watermark: TREE_IDENTIFIER_WATERMARK_AT_MKFS,
-        rollback_floor: CheckpointTxg(0),
+        rollback_floor: ROLLBACK_FLOOR_AT_MKFS,
         instance_table: NodePointer {
             head: PointerHead {
                 birth_tree: TreeIdentifier(0),
@@ -348,9 +517,8 @@ pub fn make_filesystem<Device: BlockDevice>(
                 slot_generation: SYSTEM_CONFIGURATION_GENERATION_AT_MKFS,
                 journal_tail: 0,
                 journal_instance: instance,
+                rollback_floor: ROLLBACK_FLOOR_AT_MKFS,
             },
-            // mkfs 之后还没有回退过：见证表空，槽内那 753 字节全 0（第一个事务的字节不变）。
-            rollback_witness: crate::rollback_witness::RollbackWitnessTable::EMPTY,
         };
         let slot = system_configuration.to_slot();
         for slot_index in 0..SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE {
@@ -363,7 +531,6 @@ pub fn make_filesystem<Device: BlockDevice>(
     for (_, device) in devices.iter_mut() {
         device.barrier()?;
     }
-    let _ = JOURNAL_RECORD_BYTES;
     Ok(MakeFilesystemOutput {
         root,
         instance_table_unit,

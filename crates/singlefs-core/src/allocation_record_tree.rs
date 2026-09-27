@@ -964,7 +964,7 @@ mod tests {
 
     /// 一个叶的记录变了：那片叶、它的父节点与根变，同一块盘上另一片叶与另一块盘上的整条路径不变。
     #[test]
-    fn a_changed_record_changes_its_leaf_and_every_ancestor_only() {
+    fn changed_record_changes_its_leaf_and_every_ancestor_only() {
         let geometry = geometry_of_two_four_gibibyte_devices();
         let before = vec![
             record(0, 50176, 2),

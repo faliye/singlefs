@@ -16,7 +16,7 @@
 //!
 //! extent 叶记录 key 第三段是文件字节偏移（D8（核心索引结构） 已定项 3，C490（extent 叶 key 的 offset 段没定单位） 2026-09-23 定）：
 //! 合成镜像把它写成单元序号时，挂载态打开这个文件当场拒绝、不按位次猜着读
-//! （`a_mount_state_open_refuses_an_extent_key_whose_offset_segment_is_the_unit_index_instead_of_the_file_byte_offset`）。
+//! （`mount_state_open_refuses_an_extent_key_whose_offset_segment_is_the_unit_index_instead_of_the_file_byte_offset`）。
 
 mod common;
 
@@ -40,7 +40,7 @@ use singlefs_core::records::{
     InodeRecord, TreeTableEntry, TREE_KIND_EXTENT, TREE_KIND_INODE,
 };
 use singlefs_core::recovery::{recover, JournalPolicy, RecoveryFailure, RecoveryOutcome};
-use singlefs_core::root_record::RootRecord;
+use singlefs_core::root_record::{RootRecord, UnmountMarker};
 use singlefs_core::transaction::{FIRST_INODE_NUMBER, TREE_IDENTIFIER_NONE};
 use singlefs_core::unit::{
     build_data_unit, build_index_node, build_packed_unit, data_unit_payload_capacity,
@@ -615,6 +615,7 @@ fn build_synthetic_multi_unit_image(plan: SyntheticImagePlan) -> SyntheticMultiU
     // 根记录只住内存：这份镜像不进根环、不走恢复，读路径按这条根直接打开挂载态。
     let root = RootRecord {
         filesystem_identifier: E142_FILESYSTEM_IDENTIFIER,
+        unmount_marker: UnmountMarker::NotWrittenByTheUnmountSequence,
         instance: SYNTHETIC_INSTANCE,
         checkpoint_txg: SYNTHETIC_TXG,
         tree_table: NodePointer {
@@ -980,7 +981,7 @@ fn corrupting_one_byte_in_a_data_unit_makes_reads_over_it_report_a_checksum_erro
 /// （头校验和与载荷 CRC 都重算过），位置条目里的整单元校验和还是旧的——
 /// 这时只有位置条目那一道拦得住它。比对一关，那次读就会返回坏数据。
 #[test]
-fn a_data_unit_resealed_with_only_its_own_checksums_is_caught_by_the_location_entry_checksum() {
+fn data_unit_resealed_with_only_its_own_checksums_is_caught_by_the_location_entry_checksum() {
     let mut built = build_synthetic_multi_unit_image(SyntheticImagePlan::of_four_units());
     let other_payload = pseudo_random_bytes(
         usize::try_from(payload_capacity()).expect("32634"),
@@ -1023,7 +1024,7 @@ fn a_data_unit_resealed_with_only_its_own_checksums_is_caught_by_the_location_en
 /// 变异「把位置提示故意指到别的槽」的正向用例：提示指到一个从没写过的空槽 ⇒ 经中央映射仍读对，多跳计数加一
 /// （D19（块指针的结构与宽度预算） 已定项 5：位置条目降为提示、中央映射是唯一入口；硬规则 3 的观测点）。
 #[test]
-fn a_location_hint_pointing_at_another_slot_still_reads_through_the_central_mapping_and_counts_one_extra_hop(
+fn location_hint_pointing_at_another_slot_still_reads_through_the_central_mapping_and_counts_one_extra_hop(
 ) {
     let built = build_synthetic_multi_unit_image(SyntheticImagePlan {
         damage: LocationHintDamage::PointTheHintOfThisUnitAtAnEmptySlot(DataUnitIndexInFile(1)),
@@ -1104,7 +1105,7 @@ fn a_location_hint_pointing_at_another_slot_still_reads_through_the_central_mapp
 /// 同一份内容把 key 第三段（连同锚点偏移）写成单元序号时，挂载态打开这个文件当场拒绝，拒在下段叶里第 1 条记录（offset 1 除不尽净荷容量，
 /// 按位置寻址认不出它是哪个单元；第 0 条两种读法都是 0、分不开），不按位次猜着往下读。C490（extent 叶 key 的 offset 段没定单位） 的读侧那一半。
 #[test]
-fn a_mount_state_open_refuses_an_extent_key_whose_offset_segment_is_the_unit_index_instead_of_the_file_byte_offset(
+fn mount_state_open_refuses_an_extent_key_whose_offset_segment_is_the_unit_index_instead_of_the_file_byte_offset(
 ) {
     let by_byte_offset = build_synthetic_multi_unit_image(SyntheticImagePlan {
         reading: ExtentKeyThirdSegmentReading::FileByteOffset,
@@ -1163,7 +1164,7 @@ fn a_mount_state_open_refuses_an_extent_key_whose_offset_segment_is_the_unit_ind
 /// 根兼叶那一档在上面 `a_location_hint_pointing_at_another_slot_...` 里钉着，这里是两层。
 /// 判别力：挂载态只读映射树根、不往下读叶，映射里就只剩内部条目、查不到数据单元的 key ⇒ 这一读报 `CentralMappingMiss`。
 #[test]
-fn a_stale_hint_under_a_two_level_central_mapping_still_costs_three_device_reads_because_the_whole_tree_is_in_the_mount_state(
+fn stale_hint_under_the_two_level_central_mapping_still_costs_three_device_reads_because_the_whole_tree_is_in_the_mount_state(
 ) {
     let built = build_synthetic_multi_unit_image(SyntheticImagePlan {
         damage: LocationHintDamage::PointTheHintOfThisUnitAtAnEmptySlot(DataUnitIndexInFile(1)),
@@ -1215,7 +1216,7 @@ fn a_stale_hint_under_a_two_level_central_mapping_still_costs_three_device_reads
 /// （D8（核心索引结构） 已定项 11），条目宽窄于它就不按内部条目切，也不把它们当映射条目解。
 /// 读完映射树根就停，树表、extent / inode 单元一个都不读。
 #[test]
-fn a_central_mapping_root_claiming_level_one_over_mapping_entries_is_refused_instead_of_being_read_as_entries(
+fn central_mapping_root_claiming_level_one_over_mapping_entries_is_refused_instead_of_being_read_as_entries(
 ) {
     let built = build_synthetic_multi_unit_image(SyntheticImagePlan {
         central_mapping_shape: SyntheticCentralMappingShape::RootClaimingLevelOneOverMappingEntries,
@@ -1249,7 +1250,7 @@ fn a_central_mapping_root_claiming_level_one_over_mapping_entries_is_refused_ins
 /// **这一判判的是「今天这个读者要几个字节」，不是「映射条目该有多宽」**：后者归 C307（映射树两种 key 宽怎么装进
 /// 一棵定宽 key 的树），那一条还开着。
 #[test]
-fn a_central_mapping_root_whose_entry_width_is_narrower_than_the_field_table_is_refused_instead_of_slicing_past_the_entry(
+fn central_mapping_root_whose_entry_width_is_narrower_than_the_field_table_is_refused_instead_of_slicing_past_the_entry(
 ) {
     let built = build_synthetic_multi_unit_image(SyntheticImagePlan {
         central_mapping_entry_width: u16::try_from(MAPPING_KEY_BYTES).expect("27"),
@@ -1272,7 +1273,7 @@ fn a_central_mapping_root_whose_entry_width_is_narrower_than_the_field_table_is_
 /// extent 记录条数与「文件大小按净荷容量算出来的单元数」对不上（文件有洞，或 key 第三段的单位与位次不一致）：
 /// 位次定位对它不成立，而那两样都要那条没定的条款先定案 ⇒ 在打开文件这一步拒绝，不猜一个读法往下读。
 #[test]
-fn a_file_whose_extent_record_count_does_not_match_its_size_is_refused_instead_of_guessing() {
+fn file_whose_extent_record_count_does_not_match_its_size_is_refused_instead_of_guessing() {
     let capacity = payload_capacity();
     let built = build_synthetic_multi_unit_image(SyntheticImagePlan {
         // 盘上四条 extent 记录，inode 记录却自称有六个单元那么大。
@@ -1300,7 +1301,7 @@ fn a_file_whose_extent_record_count_does_not_match_its_size_is_refused_instead_o
 
 /// 越过文件末尾的读当场拒绝：第一版不做短读、不补零。
 #[test]
-fn a_read_that_runs_past_the_end_of_the_file_is_refused_before_any_unit_is_dereferenced() {
+fn read_that_runs_past_the_end_of_the_file_is_refused_before_any_unit_is_dereferenced() {
     let built = build_synthetic_multi_unit_image(SyntheticImagePlan::of_four_units());
     let counting = ReadCountingPoolReader::new(&built.image, journal_ring());
     let mounted = open_pool_for_read(&counting, &built.root).expect("打开挂载态");

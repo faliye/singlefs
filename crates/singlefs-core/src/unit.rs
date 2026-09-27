@@ -1,9 +1,9 @@
 //! 单元的头：共同前缀 42（D18（块里携带什么信息） 已定项 7），码 2 索引节点头（已定项 18），码 3 打包记录单元头（已定项 11）。
 
 use singlefs_format::{
-    index_node_header_bytes, DATA_UNIT_BYTES, DATA_UNIT_HEADER_BYTES, NODE_BYTES,
-    NONCE_MAC_ALGORITHM_RESERVED_BYTES, PACKED_UNIT_HEADER_BYTES, UNIT_COMMON_PREFIX_BYTES,
-    WIDE_CHECKSUM_BYTES,
+    DATA_UNIT_BYTES, DATA_UNIT_HEADER_BYTES, INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE,
+    INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT, NODE_BYTES, NONCE_MAC_ALGORITHM_RESERVED_BYTES,
+    PACKED_UNIT_HEADER_BYTES, UNIT_COMMON_PREFIX_BYTES, WIDE_CHECKSUM_BYTES,
 };
 
 use crate::address::{CheckpointTxg, InstanceGeneration, TreeIdentifier};
@@ -121,13 +121,30 @@ pub fn build_packed_unit(
 /// 42 树 ID / 50 层级 / 51 key 宽 / 52 key 区间 2k / 52+2k 诞生代号 / 60+2k fsid / 68+2k 写序 4 / 72+2k 出生序号 /
 /// 76+2k 载荷 CRC / 80+2k 预留 2 / 82+2k 条目数 / 84+2k 条目宽 / 86+2k 预留位 29 / 115+2k 条目区。
 /// 头校验和罩 [0, 86+2k)，载荷 CRC 罩 [86+2k, 16384)；条目定宽、key 打头；声明长度 = 条目数 × 条目宽。
+///
+/// 这里算的是明文头末尾 `86 + 2 × key 宽`：头校验和罩 [0, 这里)、载荷 CRC 从这里罩起。
+fn index_node_plain_header_end(key_width: usize) -> usize {
+    let key_range_bytes = usize::try_from(INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT)
+        .expect("key 区间两个 key")
+        * key_width;
+    usize::try_from(INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE).expect("86") + key_range_bytes
+}
+
+/// 码 2 索引节点含 key 区间与预留位的头宽，也是条目区的起点：明文头 `86 + 2 × key 宽` 再加预留位 29
+/// （D8（核心索引结构） 已定项 11；D18（块里携带什么信息） 已定项 16 / 已定项 18）。
+///
+/// core 自己的一份式子：checker（`singlefs_checker::index_node_header_bytes`）与理想模型（`singlefs_harness::model::index_node_header_bytes`）
+/// 各写各的、互不调用（D13（验证路线） 已定项 5：`singlefs-format` 只放标量；2026-09-27 用户定案「三方各算一份 + 交叉断言」），
+/// `crates/singlefs-harness/tests/index_node_header_width_computed_three_ways_agrees_for_every_key_width.rs` 在 key 宽的全部取值上把三份连起来比。
+#[must_use]
+pub fn index_node_header_bytes(key_width: usize) -> usize {
+    index_node_plain_header_end(key_width) + reserved_bytes()
+}
+
 /// 一个码 2 节点装得下多少条定宽条目：(16384 − 头 − 预留) / 条目宽。写者在装节点之前拿它判「装不下」并报错，不走到断言。
 #[must_use]
 pub fn index_node_entry_capacity(key_width: usize, entry_width: usize) -> usize {
-    let entries_start = usize::try_from(index_node_header_bytes(
-        u64::try_from(key_width).expect("key 宽"),
-    ))
-    .expect("头宽");
+    let entries_start = index_node_header_bytes(key_width);
     (usize::try_from(NODE_BYTES).expect("16384") - entries_start) / entry_width
 }
 
@@ -151,11 +168,7 @@ pub fn build_index_node(
 ) -> Vec<u8> {
     assert_eq!(smallest_key.len(), key_width);
     assert_eq!(largest_key.len(), key_width);
-    let header_end = usize::try_from(
-        index_node_header_bytes(u64::try_from(key_width).expect("key 宽"))
-            - NONCE_MAC_ALGORITHM_RESERVED_BYTES,
-    )
-    .expect("头宽");
+    let header_end = index_node_plain_header_end(key_width);
     let declared_length = entries.len() * usize::from(entry_width);
     assert!(
         entries.len() <= index_node_entry_capacity(key_width, usize::from(entry_width)),
@@ -349,11 +362,7 @@ pub fn parse_index_node(bytes: &[u8]) -> Result<IndexNodeHeader, UnitError> {
         return Err(UnitError::TooShort);
     }
     let key_width = usize::from(bytes[51]);
-    let header_end = usize::try_from(
-        index_node_header_bytes(u64::try_from(key_width).expect("key 宽"))
-            - NONCE_MAC_ALGORITHM_RESERVED_BYTES,
-    )
-    .expect("头宽");
+    let header_end = index_node_plain_header_end(key_width);
     let declared_length = usize::from(check_common_prefix(
         bytes,
         UNIT_CLASS_INDEX_NODE,

@@ -21,6 +21,7 @@ pub mod fault_injection;
 pub mod first_transaction_regions;
 pub mod hexadecimal;
 pub mod history;
+pub mod layer0_progress;
 pub mod model;
 pub mod model_comparison;
 pub mod on_device_modes;
@@ -110,15 +111,34 @@ pub struct RetainedOperation {
     pub contents: Option<Vec<u8>>,
 }
 
+/// 录制流里一段操作是从哪个入口发出来的（C557（卸载记号只由卸载入口打没有检查）：录制流要记每次发布的入口）。
+/// 块设备一层看不见入口，由驱动这条流的一方在调入口时记（[`SharedStream::record_entry`]）。
+/// 只登记要核的那一个：正常卸载那一串；没记下入口的操作一律按「不是卸载入口发的」算。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RecordedPublishEntry {
+    /// `singlefs_core::mount::unmount` 发的那一串：先写系统配置那一步与那几次带卸载记号的空发布。
+    Unmount,
+}
+
+/// 录制流里一个入口发出的那一段：`operations` 是录制流下标的半开区间 [起, 止)（与 [`SharedStream::operations`] 同一套下标）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecordedEntrySpan {
+    pub entry: RecordedPublishEntry,
+    pub operations: std::ops::Range<usize>,
+}
+
 #[derive(Default)]
 struct StreamState {
     operations: Vec<RecordedOperation>,
     contents: Vec<Option<Vec<u8>>>,
     retain_contents: bool,
+    entry_spans: Vec<RecordedEntrySpan>,
 }
 
 /// 一个池里几块设备共用的录制流：按发出次序记，谁先发谁在前。
-/// 连续几道屏障之间没有任何写 ⇒ 记成一道池屏障（mkfs 对每块盘各发一道屏障，段序列登记表按池算一道）。
+/// 屏障按设备记（代码审阅第 1 条，用户 2026-09-27 定「按设备记屏障」）：一块盘的屏障只让这块盘上它之前的写持久，
+/// 不同设备的屏障各记一步，不并成一道池屏障——并了，一块盘漏发屏障时录下来的流与每盘都发的逐步相同，切段看不出来。
+/// 只有同一块盘上连着的几道（一串连着的屏障里这块盘已经记过一道）记成一道：它们之间这块盘一个写都没有。
 /// 开了内容保留的流把每次写的字节也留下来，崩溃点重放拿它在内存里重建镜像（步 7）。
 #[derive(Clone, Default)]
 pub struct SharedStream(Rc<RefCell<StreamState>>);
@@ -134,15 +154,43 @@ impl SharedStream {
             operations: Vec::new(),
             contents: Vec::new(),
             retain_contents: true,
+            entry_spans: Vec::new(),
         })))
+    }
+
+    /// 调 `run`（驱动这条流的一方调一个入口），把它期间录下的操作记成 `entry` 发的一段（[`RecordedEntrySpan`]）。
+    /// `run` 报错也照记：报错之前已经发出去的写同样是这个入口发的。
+    pub fn record_entry<Output>(
+        &self,
+        entry: RecordedPublishEntry,
+        run: impl FnOnce() -> Output,
+    ) -> Output {
+        let start = self.operation_count();
+        let output = run();
+        let end = self.operation_count();
+        self.0.borrow_mut().entry_spans.push(RecordedEntrySpan {
+            entry,
+            operations: start..end,
+        });
+        output
+    }
+
+    /// 记下来的每一段入口，按记的先后。
+    #[must_use]
+    pub fn entry_spans(&self) -> Vec<RecordedEntrySpan> {
+        self.0.borrow().entry_spans.clone()
     }
     fn push(&self, operation: RecordedOperation, contents: Option<&[u8]>) {
         let mut state = self.0.borrow_mut();
-        let previous_is_barrier = state
+        let this_device_already_barriered_in_the_trailing_run_of_barriers = state
             .operations
-            .last()
-            .is_some_and(|previous| previous.kind == RecordedOperationKind::Barrier);
-        if operation.kind == RecordedOperationKind::Barrier && previous_is_barrier {
+            .iter()
+            .rev()
+            .take_while(|previous| previous.kind == RecordedOperationKind::Barrier)
+            .any(|previous| previous.device == operation.device);
+        if operation.kind == RecordedOperationKind::Barrier
+            && this_device_already_barriered_in_the_trailing_run_of_barriers
+        {
             return;
         }
         let retained = if state.retain_contents {
@@ -516,7 +564,7 @@ mod tests {
     /// 整段清零记一步：录制流多的是一条 `write_zeroes`，不是底下拆出来的那几次写；
     /// 内层设备真的被清了；开了内容保留的流也不为它留字节（768 MiB 的 0 不进内存）。
     #[test]
-    fn a_zero_fill_is_recorded_as_one_step_and_keeps_no_contents() {
+    fn zero_fill_is_recorded_as_one_step_and_keeps_no_contents() {
         let stream = SharedStream::retaining_contents();
         let mut recorder = RecordingBlockDevice::with_shared_stream(
             DeviceIdentity(0),

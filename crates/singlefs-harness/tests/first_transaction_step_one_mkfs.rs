@@ -280,16 +280,16 @@ fn recorded_stream_matches_the_registered_mkfs_segment_sequence() {
     );
     assert_eq!(
         segment_kinds_text(&segments),
-        "[zero_fill×8,unit_write×4,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier]"
+        "[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]"
     );
     assert_eq!(
         operations.len(),
-        21,
-        "mkfs 21 次操作（每盘 3 段根环 + 1 段环共八次清零、四个单元写、三次根 FUA、四次系统配置槽写、两道池屏障）"
+        23,
+        "mkfs 23 次操作（每盘 3 段根环 + 1 段环共八次清零、四个单元写、三次根 FUA、四次系统配置槽写、两道池屏障——录制器按设备记屏障，每道两块盘各记一步）"
     );
     assert_eq!(
         check_stream_integrity(&pool.stream.render()),
-        StreamIntegrity::Consistent { operations: 21 }
+        StreamIntegrity::Consistent { operations: 23 }
     );
     remove_images(&pool);
 }

@@ -1,7 +1,7 @@
 //! E142（第一个事务的干跑） 量 5 的实装一侧（`first_transaction_regions` 与 `first_transaction_region_bytes`）的验收：
-//! ① 区域清单就是登记那 21 行，数目与顺序都对，而且与第一个事务真正发出的 21 条写逐条配得上；
+//! ① 区域清单就是写清单那 29 行，数目与顺序都对，而且与第一个事务真正发出的 29 条写逐条配得上；
 //! ② 同一条路跑两次、结果行逐字节相同；
-//! ③ 改动计数那 8 字节改一位，对应区域的 sha256 变、别的 20 行一个字符都不变。
+//! ③ 改动计数那 8 字节改一位，对应区域的 sha256 变、别的 28 行一个字符都不变。
 //!
 //! 期望值一律从 `.claude/kb/layout/01-first-txn.md` 零那一节的写清单抄成字面量（双份记账：
 //! 代码里的常量表与这里的期望表分别抄一遍登记，抄错一处就对不上），不从被测的常量表反推。
@@ -97,37 +97,45 @@ fn read_bytes(image: &MemoryPool, device: DeviceIdentity, offset: u64, length: u
     sector[index_in_sector..index_in_sector + length].to_vec()
 }
 
-/// 登记那 21 行抄一遍：(区域名, 设备号, 盘上绝对偏移, 长度, 十六进制打法)。
-/// 偏移列由「16 KiB 槽号 × 16384」算出（字节表零那一节的写清单），固定结构三样各自的来历写在行尾注释里。
-/// 一行一个登记行，所以这个函数不让 rustfmt 拆行（拆开之后「21 行」这件事在源码里就看不出来了）。
+/// 写清单那 29 行抄一遍：(区域名, 设备号, 盘上绝对偏移, 长度, 十六进制打法)。
+/// 偏移列由「16 KiB 槽号 × 16384」算出（字节表零那一节的写清单，2026-09-25 按位置寻址改写之后那一版），固定结构三样各自的来历写在行尾注释里。
+/// 一行一个登记行，所以这个函数不让 rustfmt 拆行（拆开之后「29 行」这件事在源码里就看不出来了）。
 #[rustfmt::skip]
 fn registry_rows() -> Vec<(&'static str, u32, u64, u64, HexadecimalExtent)> {
     use HexadecimalExtent::{HeadAndTail, WholeRegion};
     vec![
-        ("data_unit",       0, 50180 * 16384, 32768, HeadAndTail), // t1
-        ("data_unit",       1, 50180 * 16384, 32768, HeadAndTail),
-        ("extent_root",     0, 50240 * 16384, 16384, HeadAndTail), // t2
-        ("extent_root",     1, 50240 * 16384, 16384, HeadAndTail),
-        ("inode_leaf",      0, 50242 * 16384, 32768, HeadAndTail), // t3
-        ("inode_leaf",      1, 50242 * 16384, 32768, HeadAndTail),
-        ("inode_root",      0, 50244 * 16384, 16384, HeadAndTail), // t4
-        ("inode_root",      1, 50244 * 16384, 16384, HeadAndTail),
-        ("allocation_root", 0, 50245 * 16384, 16384, HeadAndTail), // t5
-        ("allocation_root", 1, 50245 * 16384, 16384, HeadAndTail),
-        ("accounting_root", 0, 50246 * 16384, 16384, HeadAndTail), // t6
-        ("accounting_root", 1, 50246 * 16384, 16384, HeadAndTail),
-        ("mapping_root",    0, 50247 * 16384, 16384, HeadAndTail), // t7
-        ("mapping_root",    1, 50247 * 16384, 16384, HeadAndTail),
-        ("tree_table",      0, 50248 * 16384, 16384, HeadAndTail), // t8
-        ("tree_table",      1, 50248 * 16384, 16384, HeadAndTail),
-        // t10：第 3 代根记录，根环区域 0（起点 1 MiB）的槽 1（槽距 4096），槽宽 = physical_block_size 512
-        ("root_record",     0, 1024 * 1024 + 4096, 512, WholeRegion),
-        // t9：jsn (1, 3) 那条记录，journal 环从槽 1024（16 MiB）起，环内偏移 8192（两次暖机各占一条 4096）
-        ("journal_record",  0, 16 * 1024 * 1024 + 8192, 4096, WholeRegion),
-        ("journal_record",  1, 16 * 1024 * 1024 + 8192, 4096, WholeRegion),
-        // t11：系统配置槽 1（世代号 5、tail = 3），槽距 4096、槽宽 4096
-        ("system_configuration",      0, 4096, 4096, WholeRegion),
-        ("system_configuration",      1, 4096, 4096, WholeRegion),
+        ("data_unit",                       0, 50180 * 16384, 32768, HeadAndTail), // t1
+        ("data_unit",                       1, 50180 * 16384, 32768, HeadAndTail),
+        ("extent_root",                     0, 50240 * 16384, 16384, HeadAndTail), // t2
+        ("extent_root",                     1, 50240 * 16384, 16384, HeadAndTail),
+        ("inode_leaf",                      0, 50242 * 16384, 32768, HeadAndTail), // t3
+        ("inode_leaf",                      1, 50242 * 16384, 32768, HeadAndTail),
+        ("inode_root",                      0, 50244 * 16384, 16384, HeadAndTail), // t4
+        ("inode_root",                      1, 50244 * 16384, 16384, HeadAndTail),
+        ("allocation_leaf_of_device_0",     0, 50245 * 16384, 16384, HeadAndTail), // t5：设备 0 那 14 条记录的叶
+        ("allocation_leaf_of_device_0",     1, 50245 * 16384, 16384, HeadAndTail),
+        ("allocation_leaf_of_device_1",     0, 50246 * 16384, 16384, HeadAndTail), // t6：设备 1 那 14 条记录的叶
+        ("allocation_leaf_of_device_1",     1, 50246 * 16384, 16384, HeadAndTail),
+        ("allocation_internal_of_device_0", 0, 50247 * 16384, 16384, HeadAndTail), // t7：层级 1，指 t5
+        ("allocation_internal_of_device_0", 1, 50247 * 16384, 16384, HeadAndTail),
+        ("allocation_internal_of_device_1", 0, 50248 * 16384, 16384, HeadAndTail), // t8：层级 1，指 t6
+        ("allocation_internal_of_device_1", 1, 50248 * 16384, 16384, HeadAndTail),
+        ("allocation_root",                 0, 50249 * 16384, 16384, HeadAndTail), // t9：层级 2 的根
+        ("allocation_root",                 1, 50249 * 16384, 16384, HeadAndTail),
+        ("accounting_root",                 0, 50250 * 16384, 16384, HeadAndTail), // t10
+        ("accounting_root",                 1, 50250 * 16384, 16384, HeadAndTail),
+        ("mapping_root",                    0, 50251 * 16384, 16384, HeadAndTail), // t11
+        ("mapping_root",                    1, 50251 * 16384, 16384, HeadAndTail),
+        ("tree_table",                      0, 50252 * 16384, 16384, HeadAndTail), // t12
+        ("tree_table",                      1, 50252 * 16384, 16384, HeadAndTail),
+        // t14：第 3 代根记录，根环区域 0（起点 1 MiB）的槽 1（槽距 4096），槽宽 = physical_block_size 512
+        ("root_record",                     0, 1024 * 1024 + 4096, 512, WholeRegion),
+        // t13：jsn (1, 3) 那条记录，journal 环从槽 1024（16 MiB）起，环内偏移 8192（两次暖机各占一条 4096）
+        ("journal_record",                  0, 16 * 1024 * 1024 + 8192, 4096, WholeRegion),
+        ("journal_record",                  1, 16 * 1024 * 1024 + 8192, 4096, WholeRegion),
+        // t15：系统配置槽 1（世代号 5、tail = 3），槽距 4096、槽宽 4096
+        ("system_configuration",            0, 4096, 4096, WholeRegion),
+        ("system_configuration",            1, 4096, 4096, WholeRegion),
     ]
 }
 
@@ -142,12 +150,12 @@ fn describe(region: &FirstTransactionRegion) -> (&'static str, u32, u64, u64, He
 }
 
 #[test]
-fn the_region_table_lists_the_twenty_one_registered_regions_in_order() {
+fn the_region_table_lists_the_twenty_nine_registered_regions_in_order() {
     let expected = registry_rows();
     assert_eq!(
         expected.len(),
         FIRST_TRANSACTION_REGION_COUNT,
-        "登记第一节第 3 条写死 21 行：8 个单元 × 2 盘 + 根槽 1 + journal 记录 × 2 盘 + 系统配置槽 × 2 盘"
+        "写清单 29 行：12 个单元 × 2 盘 + 根槽 1 + journal 记录 × 2 盘 + 系统配置槽 × 2 盘"
     );
     assert_eq!(
         FIRST_TRANSACTION_REGIONS.len(),
@@ -157,7 +165,7 @@ fn the_region_table_lists_the_twenty_one_registered_regions_in_order() {
         FIRST_TRANSACTION_REGIONS.iter().map(describe).collect();
     assert_eq!(
         actual, expected,
-        "区域清单要与登记那 21 行逐行相同，顺序也相同"
+        "区域清单要与写清单那 29 行逐行相同，顺序也相同"
     );
     let whole_region_rows = FIRST_TRANSACTION_REGIONS
         .iter()
@@ -185,7 +193,7 @@ fn the_region_table_matches_the_writes_the_first_transaction_really_issues() {
     );
     assert_eq!(
         against_writes.write_calls, FIRST_TRANSACTION_REGION_COUNT,
-        "字节表零那一节：事务本身 21 条写请求"
+        "字节表零那一节：事务本身 29 条写请求"
     );
     assert!(against_writes.matches());
 
@@ -223,7 +231,7 @@ fn running_the_same_pipeline_twice_gives_byte_identical_result_lines() {
     assert_eq!(
         first_lines,
         region_result_lines(&second_run.image),
-        "整条路跑两次（不取系统时钟、不取随机数），21 行结果行逐字节相同"
+        "整条路跑两次（不取系统时钟、不取随机数），29 行结果行逐字节相同"
     );
 }
 
@@ -260,7 +268,7 @@ fn flipping_one_bit_of_the_change_count_moves_only_that_regions_digest() {
     assert_eq!(
         changed,
         vec![4],
-        "翻的是盘 0 的 inode 叶那一位：只有第 5 行（inode_leaf device=0）该变，别的 20 行一个字符都不许动"
+        "翻的是盘 0 的 inode 叶那一位：只有第 5 行（inode_leaf device=0）该变，别的 28 行一个字符都不许动"
     );
     let changed_region = &FIRST_TRANSACTION_REGIONS[4];
     assert_eq!(changed_region.name, "inode_leaf");

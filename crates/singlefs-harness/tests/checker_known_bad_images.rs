@@ -5,9 +5,9 @@
 mod common;
 
 use common::{
-    build_pool, crash_state_devices, geometry, memory_pool_of_sparse_devices, parameters,
-    publish_overwrite_in_process, replace_the_witness_on_one_device, BuiltPool,
-    FIXED_WRITE_TIME_SECONDS,
+    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before, build_pool,
+    crash_state_devices, format_pool, geometry, memory_pool_of_sparse_devices, parameters,
+    publish_overwrite_in_process, BuiltPool, FIXED_WRITE_TIME_SECONDS,
 };
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
@@ -15,13 +15,17 @@ use singlefs_core::address::{
     CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
 };
 use singlefs_core::allocation_record_tree::AllocationRecordTreeNodePosition;
+use singlefs_core::block_device::BlockDevice;
 use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
+use singlefs_core::make_filesystem::INSTANCE_TABLE_SLOT;
 use singlefs_core::mount::{
-    mount_rollback, mount_writable, raise_rollback_floor, InstanceRow, RollbackTarget, ShadowLedger,
+    mount_writable, raise_rollback_floor, roll_back_by_a_forward_publish, unmount, InstanceRow,
+    RollbackTarget, ShadowLedger, Unmounted,
 };
 use singlefs_core::recovery::PoolReader;
 use singlefs_core::transaction::{
-    publish_first_file, publish_overwrite, FirstFile, PoolVersion, PoolWriter, TransactionUnit,
+    publish_first_file, publish_overwrite, FirstFile, PoolVersion, PoolWriter, TransactionOutput,
+    TransactionUnit,
 };
 use singlefs_format::{ALLOCATION_RECORD_TREE_LEAF_SLOTS, NODE_BYTES, TREE_IDENTIFIER_EXTENT};
 use singlefs_harness::crash::MemoryPool;
@@ -471,6 +475,69 @@ fn get_u64(bytes: &[u8], offset: usize) -> u64 {
     u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
 }
 
+/// 中央映射树（根兼叶，key 宽 27、条目 55）里唯一那条码 1 条目：key 的出生 txg（key 偏移 9）从 `from` 改成 `to`。
+/// 码 1 排在最前（类标签 1 最小），头里的最小 key 就是它的 key，跟着改；改完仍按 key 升序。
+fn rewrite_the_data_unit_mapping_key_birth_txg(bytes: &mut [u8], from: u64, to: u64) {
+    const MAPPING_KEY_BIRTH_TXG_OFFSET: usize = 9;
+    const HEADER_SMALLEST_KEY_OFFSET: usize = 52;
+    let key_width = usize::from(bytes[51]);
+    assert_eq!(key_width, 27, "映射 key 宽 27");
+    let entries_start = 115 + 2 * key_width;
+    assert_eq!(bytes[entries_start], 1, "第一条是码 1 那一条");
+    assert_eq!(
+        bytes[entries_start..entries_start + key_width],
+        bytes[HEADER_SMALLEST_KEY_OFFSET..HEADER_SMALLEST_KEY_OFFSET + key_width],
+        "头里的最小 key 就是第一条的 key"
+    );
+    for key_start in [entries_start, HEADER_SMALLEST_KEY_OFFSET] {
+        assert_eq!(
+            get_u64(bytes, key_start + MAPPING_KEY_BIRTH_TXG_OFFSET),
+            from,
+            "码 1 映射 key 的出生 txg 本来是 {from}"
+        );
+        set_u64(bytes, key_start + MAPPING_KEY_BIRTH_TXG_OFFSET, to);
+    }
+}
+
+/// 实审 B2 新立的「中央映射条目的 key 与它指的单元头相符」：I-1.11（映射 key 与单元头相符）。
+const MAPPING_KEY_INVARIANT: &str = singlefs_checker::image::MAPPING_KEY_MATCHES_THE_UNIT_HEADER;
+
+/// 中央映射树（根兼叶，key 宽 27、条目 55）里指着 `slot` 那个码 2 节点的那条条目：key 尾段的出生序号（key 偏移 21，4 字节）+1。
+/// 头里的最小 / 最大 key 是它时跟着改；改完仍按 key 严格升序（码 2 的 key 按出生树分开，这一条与左右邻不同出生树）。
+fn raise_the_mapping_key_tail_of_the_node_at(bytes: &mut [u8], slot: u64) {
+    const MAPPING_KEY_TAIL_OFFSET: usize = 21;
+    const MAPPING_ENTRY_BYTES: usize = 55;
+    const MAPPING_ENTRY_FIRST_LOCATION_SLOT_OFFSET: usize = 27 + 4;
+    const HEADER_SMALLEST_KEY_OFFSET: usize = 52;
+    let key_width = usize::from(bytes[51]);
+    assert_eq!(key_width, 27, "映射 key 宽 27");
+    let header_largest_key_offset = HEADER_SMALLEST_KEY_OFFSET + key_width;
+    let entry_count = usize::from(u16::from_le_bytes([
+        bytes[82 + 2 * key_width],
+        bytes[83 + 2 * key_width],
+    ]));
+    let entries_start = 115 + 2 * key_width;
+    let entry_start = (0..entry_count)
+        .map(|index| entries_start + index * MAPPING_ENTRY_BYTES)
+        .find(|start| {
+            bytes[*start] == 2
+                && get_u64(bytes, start + MAPPING_ENTRY_FIRST_LOCATION_SLOT_OFFSET)
+                    & 0xFFFF_FFFF_FFFF
+                    == slot
+        })
+        .expect("映射里有指着这个码 2 节点的那一条");
+    let old_key = bytes[entry_start..entry_start + key_width].to_vec();
+    let tail = entry_start + MAPPING_KEY_TAIL_OFFSET;
+    let birth_sequence = u32::from_le_bytes(bytes[tail..tail + 4].try_into().expect("4 字节"));
+    bytes[tail..tail + 4].copy_from_slice(&(birth_sequence + 1).to_le_bytes());
+    let new_key = bytes[entry_start..entry_start + key_width].to_vec();
+    for header_key in [HEADER_SMALLEST_KEY_OFFSET, header_largest_key_offset] {
+        if bytes[header_key..header_key + key_width] == old_key[..] {
+            bytes[header_key..header_key + key_width].copy_from_slice(&new_key);
+        }
+    }
+}
+
 /// 分配记录树叶里，把代字段等于 `from` 的已释放记录改成 `to`；返回改了几条。
 fn rewrite_released_generations(bytes: &mut [u8], from: u64, to: u64) -> usize {
     let count = usize::from(u16::from_le_bytes([
@@ -887,6 +954,8 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
         // extent 树根（码 2，key 宽 24）头里的出生序号 +1，引用它的树表条目里那条指针一个字节不动：
         // 头里的出生身份与引用它的指针记的不符 ⇒ I-1.2（块头写序已发布） 红。
         // 出生序号不是已发布谓词的输入（谓词只读诞生代号与写序），所以 I-4.2（无被引用未提交块） 不跟着红。
+        // 中央映射里 extent 根那条 key 的尾段就是它的出生序号（D19（块指针的结构与宽度预算） 已定项 6）：跟着 +1，
+        // 不跟着改就是映射 key 与单元头不符、映射 key 那一条（I-1.11（映射 key 与单元头相符）） 一起红。
         (
             "I-1.2",
             Box::new(|image: &mut MemoryPool| {
@@ -903,7 +972,26 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
                             .copy_from_slice(&(birth_sequence + 1).to_le_bytes());
                     },
                     true,
-                )
+                );
+                mutate_unit(
+                    image,
+                    MAPPING_ROOT,
+                    |bytes| raise_the_mapping_key_tail_of_the_node_at(bytes, EXTENT_ROOT),
+                    true,
+                );
+            }),
+        ),
+        // 中央映射里数据单元那条 key 的出生 txg 从 3 改成 4，数据单元一个字节不动：映射 key 与它指的单元头里的诞生代号不符
+        // ⇒ 映射 key 那一条（I-1.11（映射 key 与单元头相符）） 红。
+        (
+            MAPPING_KEY_INVARIANT,
+            Box::new(|image: &mut MemoryPool| {
+                mutate_unit(
+                    image,
+                    MAPPING_ROOT,
+                    |bytes| rewrite_the_data_unit_mapping_key_birth_txg(bytes, 3, 4),
+                    true,
+                );
             }),
         ),
         // 数据单元头里的诞生代号从 3 改成 4（最新的根就是 txg 3、实例 1），引用它的 extent 记录里那条数据指针的
@@ -939,6 +1027,14 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
                         );
                         set_u64(bytes, EXTENT_RECORD_DATA_POINTER_BIRTH_TXG_OFFSET, 4);
                     },
+                    true,
+                );
+                // 中央映射里那个数据单元的 key 带着它的诞生代号（D19（块指针的结构与宽度预算） 已定项 6）：跟着改成 4，
+                // 不跟着改就是映射 key 与单元头的出生身份不符、I-1.2 一起红（实审 B1 起 checker 拿映射 key 比单元头）。
+                mutate_unit(
+                    image,
+                    MAPPING_ROOT,
+                    |bytes| rewrite_the_data_unit_mapping_key_birth_txg(bytes, 3, 4),
                     true,
                 );
                 assert_eq!(
@@ -1488,7 +1584,7 @@ fn an_allocation_record_whose_span_covers_the_next_record_reddens_only_the_disjo
 ///    ⇒ I-8.7 红在 ①（2 之后是 1）与 ②（1 被隔开之后又出现），I-8.8 红在 ③（事务号 1 那一组两条都带提交标记）。
 /// ③ ④ 两份的判定整张表比一次；每一份都要求除 I-8.7 与 I-8.8 之外每一条的判定与 ① 那一份逐项相同。
 #[test]
-fn a_repeated_transaction_number_in_one_instance_reddens_the_uncut_transaction_invariant_and_only_when_separated_the_transaction_number_invariant(
+fn repeated_transaction_number_in_one_instance_reddens_the_uncut_transaction_invariant_and_only_when_separated_the_transaction_number_invariant(
 ) {
     let clean = image_after_the_overwrite("known-bad-transaction-number");
     for device in DEVICES {
@@ -2204,7 +2300,7 @@ fn the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target()
             ),
             // 这一份上实例 1 只有 A 一条非 0 事务号的记录（写行与两次暖机空发布都写 0）：一对可比的号凑不出来。
             // 这一条的坏镜像与阳性对照都在发布 B 之后那一份上
-            // （`a_repeated_transaction_number_in_one_instance_reddens_the_uncut_transaction_invariant_and_only_when_separated_the_transaction_number_invariant` 与
+            // （`repeated_transaction_number_in_one_instance_reddens_the_uncut_transaction_invariant_and_only_when_separated_the_transaction_number_invariant` 与
             // `each_transaction_boundary_bad_image_reddens_only_its_own_invariant_on_its_registered_criteria`）。
             "I-8.7" => InvariantVerdict::NotApplicable(
                 "环里没有哪个实例写出过两条非 0 事务号的记录：一对可比的号都凑不出来",
@@ -2233,7 +2329,8 @@ fn the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target()
         .chain(known_bad_images_of_a_pure_leak().iter())
         .chain(known_bad_images_of_the_deferred_statistic().iter())
         .chain(known_bad_images_of_the_rollback_floor().iter())
-        .chain(known_bad_images_of_the_rollback_witness().iter())
+        .chain(known_bad_images_of_the_unmount_floor().iter())
+        .chain(known_bad_images_of_the_system_configuration_floor().iter())
         .map(|(invariant, _)| *invariant)
         .collect();
     let listed: std::collections::BTreeSet<&str> = singlefs_checker::image::IMPLEMENTED_INVARIANTS
@@ -2251,97 +2348,6 @@ fn the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target()
         assert!(
             matches!(found, InvariantVerdict::Violated(_)),
             "{invariant} 那份坏镜像应当判违例，实际 {found:?}"
-        );
-    }
-}
-
-/// 回退见证那两条不变量（D23（journal 的角色与格式） 已定项 14「回退见证」；checker 的 `walk::judge_rollback_witness_tables` 与
-/// `judge_rollback_witness_against_the_chosen_roots_table`）各一份坏镜像，做法与 `second_transaction_supplement_two_rollback_witness.rs`
-/// 里那两条用例相同：
-/// - I-7.10（回退见证表各槽自洽、各盘一致）：写完第一个事务的镜像上，盘 0 两槽的见证表条数改成 24（这个池 S = 8，上限 23），
-///   整槽校验和重封——校验和罩得住的槽里见证表解不开；
-/// - I-7.11（所选根不被见证抛弃、与实例表对得上）：A、B 之后重开可写挂载（实例 2 写的行是 (1, 4, W)），四个系统配置槽里塞一条见证 (2, 1, 3)——
-///   所选根（实例 2）的实例表里实例 1 那一行记的是 4，罩不住它。这一份从头建自己的镜像（与 `known_bad_images_of_the_rollback_floor` 同一个做法）。
-///
-/// 各自判红的不变量钉在 `each_rollback_witness_bad_image_reddens_its_own_invariant`。
-fn known_bad_images_of_the_rollback_witness() -> Vec<(&'static str, Mutation)> {
-    vec![
-        (
-            "I-7.10",
-            Box::new(|image: &mut MemoryPool| {
-                let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
-                let slot_bytes = usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES)
-                    .expect("4096");
-                let checksum_offset =
-                    singlefs_core::system_configuration::SYSTEM_CONFIGURATION_CHECKSUM_OFFSET;
-                let witness_count_offset = usize::try_from(
-                    singlefs_format::ROLLBACK_WITNESS_TABLE_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT,
-                )
-                .expect("481");
-                for offset in [0, spacing] {
-                    let mut bytes = read(image, 0, offset, slot_bytes);
-                    bytes[witness_count_offset] = 24;
-                    let digest =
-                        wide_checksum_with_field_zeroed(&bytes, slot_bytes, checksum_offset);
-                    bytes[checksum_offset..checksum_offset + 32].copy_from_slice(&digest);
-                    write(image, 0, offset, &bytes);
-                }
-            }),
-        ),
-        (
-            "I-7.11",
-            Box::new(|image: &mut MemoryPool| {
-                let mut pool = build_pool("known-bad-witness-not-covered-by-the-instance-table");
-                overwrite_and_advance(&mut pool, &content_seeded(4100, 3), InstanceGeneration(1));
-                let mut devices = pool.reopen_recorded();
-                mount_writable(&parameters(), &mut devices).expect("重开可写挂载");
-                pool.devices = Some(devices);
-                *image = pool.memory_pool();
-                let planted = singlefs_core::rollback_witness::RollbackWitnessTable::of_entries(
-                    [singlefs_core::rollback_witness::RollbackWitnessEntry {
-                        new_instance: InstanceGeneration(2),
-                        rollback_target_instance: InstanceGeneration(1),
-                        rollback_target_txg: CheckpointTxg(3),
-                    }],
-                    23,
-                )
-                .expect("一条");
-                for device in [DeviceIdentity(0), DeviceIdentity(1)] {
-                    replace_the_witness_on_one_device(image, device, planted);
-                }
-            }),
-        ),
-    ]
-}
-
-/// 回退见证那两份坏镜像各自判红的不变量，次序照 `known_bad_images_of_the_rollback_witness`：
-/// I-7.10 那一份只红它；I-7.11 那一份塞进去的条目还把 B（1, 4）判成被抛弃，checker 的候选集随之少了 B、B 引用的单元不再算进遍历，
-/// I-3.1（已分配统计对得上） 跟着红（与见证用例文件里那一条同一个结论）。
-const INVARIANTS_EACH_ROLLBACK_WITNESS_BAD_IMAGE_REDDENS: [&[&str]; 2] =
-    [&["I-7.10"], &["I-3.1", "I-7.11"]];
-
-/// 回退见证那两份坏镜像（`known_bad_images_of_the_rollback_witness`）在写完第一个事务的干净镜像上起手，各自只红登记的那几条；
-/// 干净镜像上两条都真被判过、成立。
-#[test]
-fn each_rollback_witness_bad_image_reddens_its_own_invariant() {
-    let clean = build_pool("known-bad-witness").memory_pool();
-    for invariant in ["I-7.10", "I-7.11"] {
-        assert_eq!(
-            verdict(&clean, invariant),
-            InvariantVerdict::Holds,
-            "干净镜像上 {invariant} 真被判过、成立"
-        );
-    }
-    for ((invariant, mutation), expected) in known_bad_images_of_the_rollback_witness()
-        .into_iter()
-        .zip(INVARIANTS_EACH_ROLLBACK_WITNESS_BAD_IMAGE_REDDENS)
-    {
-        let mut image = clean.clone();
-        mutation(&mut image);
-        assert_eq!(
-            violated_invariants(&check_pool_image(&image)),
-            expected.to_vec(),
-            "{invariant} 那份坏镜像红的不变量"
         );
     }
 }
@@ -2582,7 +2588,7 @@ const ANOTHER_ISSUED_TREE_BELOW_THE_WATERMARK: u64 = 16;
 /// 取 16 不取一个大数：16 是这个池发过的号（livelist 树）、低于水位 19，改成水位之上的号会让 I-7.8（根记录树 ID 水位不低于全池最大树 ID）
 /// 跟着红（它扫码 2 单元头），判别力就算不到 I-1.3 一条头上。
 #[test]
-fn a_central_mapping_root_whose_header_tree_differs_from_its_root_pointer_birth_tree_reddens_only_the_tree_identifier_invariant(
+fn central_mapping_root_whose_header_tree_differs_from_its_root_pointer_birth_tree_reddens_only_the_tree_identifier_invariant(
 ) {
     let clean = build_pool("known-bad-central-mapping-tree").memory_pool();
     let violated_on_the_clean_image = violated_invariants(&check_pool_image(&clean));
@@ -2733,7 +2739,7 @@ fn an_entry_width_that_is_not_the_field_table_width_reddens_only_the_entry_width
 /// 写死的字节：槽里偏移 361 那一字节（R）从 3 改成 4，整槽自证校验和照新内容重算 ⇒
 /// `check_system_configuration_slot` 那一道照样过，**只有**新加的这一道拦得住它。
 #[test]
-fn a_region_count_past_the_region_device_fields_is_refused_by_the_geometry_reader() {
+fn region_count_past_the_region_device_fields_is_refused_by_the_geometry_reader() {
     let mut pool = build_pool("known-bad-region-count").memory_pool();
     let clean_slot = read(&pool, 0, 0, 4096);
     let clean_view =
@@ -2754,40 +2760,9 @@ fn a_region_count_past_the_region_device_fields_is_refused_by_the_geometry_reade
     );
 }
 
-/// 回退到 A 之后的干净镜像，与 `second_transaction_step_four_rollback.rs` 的
-/// `rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_row_and_cold_start_reads_the_first_content`
-/// 同一段脚本（落点、行与各条根由那条验收钉住）：A (1, 3)、B (1, 4) → 重开取号 2、写行、暖机两次、C (2, 8) →
-/// 重开回退到 A：取号 3、在 A 那一版实例表上写回退行 (1, 3, 0) 与中间实例行 (2, 0, 0)、发布 D (3, 9)、暖机 (3, 10)。
-///
-/// 这份镜像上最新根指着的实例表**有行**：A 的 T = 3 = 回退行的 Ti，仍在现行线上；B 与实例 2 的根被行判出局。
-/// I-9.14（树表条目的诞生 txg 跨根不变） 的射程收窄（C511（回退到无文件那一版之后诞生代怎么接），2026-09-23 用户定案：
-/// 只在同一条时间线内比）要在这里两头都判得出——跨过回退行、同一条线上的不一致照样红，被切掉的那条线上的不一致不比。
-/// 发布 B 之后那份镜像（C374 那两份）上实例表一行都没有，这两头在那里分不出来。
-struct ImageAfterTheRollbackToTheFirstRoot {
-    image: MemoryPool,
-    /// 回退目标 A 的 txg：它那一版树表里 extent 树那条的诞生 txg 就是它。
-    rollback_target_txg: u64,
-    /// 回退之后这条线上每条根各自那片树表单元的槽号（两盘同槽）：D 一片、暖机 (3, 10) 另写了一片。
-    tree_table_slots_of_the_line_after_the_rollback: Vec<u64>,
-    /// D 那次发布的 txg。
-    rollback_publish_txg: u64,
-    /// 被回退切掉的那条线上最后一条根 C 的树表单元槽号（两盘同槽），与它那次发布的 txg。
-    tree_table_slot_of_the_abandoned_root: u64,
-    abandoned_publish_txg: u64,
-}
-
-/// 两盘同槽（D2（RAID 条带策略） 已定项 10）：`mutate_unit_of` 读第一块盘那一份、两盘写同一个槽，靠的就是这一条。
-fn slot_shared_by_both_copies(
-    pointer_locations: [singlefs_core::pointer::LocationEntry; 2],
-) -> u64 {
-    assert_eq!(
-        pointer_locations[0].slot, pointer_locations[1].slot,
-        "两盘同槽：这份镜像的改法按一个槽号改两盘"
-    );
-    pointer_locations[0].slot.0
-}
-
-fn image_after_rolling_back_to_the_first_root(tag: &str) -> ImageAfterTheRollbackToTheFirstRoot {
+/// A (1, 3)、B (1, 4) → 重开取号 2、写行、暖机两次、C (2, 8)，与 `second_transaction_step_four_rollback.rs` 的固定脚本同一段。
+/// 交回池、A 与 C 那两版。
+fn pool_through_the_third_version(tag: &str) -> (BuiltPool, TransactionOutput, TransactionOutput) {
     let mut pool = build_pool(tag);
     let first = pool.output.clone();
     let second_content: Vec<u8> = (0..4100usize)
@@ -2821,49 +2796,70 @@ fn image_after_rolling_back_to_the_first_root(tag: &str) -> ImageAfterTheRollbac
         InstanceGeneration(2),
     )
     .expect("覆盖写 C");
-    let mut devices_reopened_for_the_rollback = pool.reopen_recorded();
-    let rolled_back = mount_rollback(
-        &parameters(),
-        &mut devices_reopened_for_the_rollback,
+    pool.output = third.clone();
+    (pool, first, third)
+}
+
+/// 挂着的时候回退到 A 之后的干净镜像（D23（journal 的角色与格式） 已定项 14：一次向前发布 D (2, 9)，新根的 inode 树、extent 树取 A 的，
+/// 树表现算、另写一片）。A、B、C、D 同在一条时间线上：没有哪条根被实例表判出局。
+struct ImageAfterTheRollbackToTheFirstRoot {
+    image: MemoryPool,
+    /// 回退目标 A 的 txg：它那一版树表里 extent 树那条的诞生 txg 就是它。
+    rollback_target_txg: u64,
+    /// D 那片树表单元的槽号（两盘同槽）与 D 那次发布的 txg。
+    tree_table_slot_of_the_rollback_publish: u64,
+    rollback_publish_txg: u64,
+}
+
+/// 两盘同槽（D2（RAID 条带策略） 已定项 10）：`mutate_unit_of` 读第一块盘那一份、两盘写同一个槽，靠的就是这一条。
+fn slot_shared_by_both_copies(
+    pointer_locations: [singlefs_core::pointer::LocationEntry; 2],
+) -> u64 {
+    assert_eq!(
+        pointer_locations[0].slot, pointer_locations[1].slot,
+        "两盘同槽：这份镜像的改法按一个槽号改两盘"
+    );
+    pointer_locations[0].slot.0
+}
+
+fn image_after_rolling_back_to_the_first_root(tag: &str) -> ImageAfterTheRollbackToTheFirstRoot {
+    let (mut pool, first, mut third) = pool_through_the_third_version(tag);
+    let rollback_parameters = parameters();
+    let devices = pool.devices.as_mut().expect("镜像还开着");
+    roll_back_by_a_forward_publish(
+        &rollback_parameters,
+        devices,
+        &mut pool.allocator,
+        &mut third,
         RollbackTarget {
             instance: first.root.instance,
             checkpoint_txg: first.root.checkpoint_txg,
         },
-        ShadowLedger::On,
     )
-    .expect("回退到 A");
-    pool.devices = Some(devices_reopened_for_the_rollback);
-    let rollback_publish = rolled_back
-        .output
-        .row_publish
-        .file_version()
-        .expect("回退到带文件的 A：D 是带文件的一版");
-    let mut tree_table_slots_of_the_line_after_the_rollback = vec![slot_shared_by_both_copies(
-        rollback_publish.root.tree_table.locations,
-    )];
-    for warm_up in &rolled_back.output.warm_up_publishes {
-        let slot = slot_shared_by_both_copies(
-            warm_up
-                .file_version()
-                .expect("带文件的一版上的暖机")
-                .root
-                .tree_table
-                .locations,
-        );
-        if !tree_table_slots_of_the_line_after_the_rollback.contains(&slot) {
-            tree_table_slots_of_the_line_after_the_rollback.push(slot);
-        }
-    }
+    .expect("挂着的时候回退到 A");
+    let rollback_publish = third;
     ImageAfterTheRollbackToTheFirstRoot {
         image: pool.memory_pool(),
         rollback_target_txg: first.root.checkpoint_txg.0,
-        tree_table_slots_of_the_line_after_the_rollback,
-        rollback_publish_txg: rollback_publish.root.checkpoint_txg.0,
-        tree_table_slot_of_the_abandoned_root: slot_shared_by_both_copies(
-            third.root.tree_table.locations,
+        tree_table_slot_of_the_rollback_publish: slot_shared_by_both_copies(
+            rollback_publish.root.tree_table.locations,
         ),
-        abandoned_publish_txg: third.root.checkpoint_txg.0,
+        rollback_publish_txg: rollback_publish.root.checkpoint_txg.0,
     }
+}
+
+/// 崩溃恢复抛弃 C 之后的干净镜像（`common::abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before`：
+/// C 的根槽与数据单元暂时读不出，恢复落到 (2, 7)，实例 3 写行与暖机，再把 C 写回）：C (2, 8) 读得出、按实例 3 的实例表判出局。
+/// 交回镜像、A 那一版记的诞生 txg、C 那片树表单元的槽号与 C 那次发布的 txg。
+fn image_after_a_recovery_abandoned_the_third_root(tag: &str) -> (MemoryPool, u64, u64, u64) {
+    let (mut pool, first, third) = pool_through_the_third_version(tag);
+    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(&mut pool, &third);
+    (
+        pool.memory_pool(),
+        first.root.checkpoint_txg.0,
+        slot_shared_by_both_copies(third.root.tree_table.locations),
+        third.root.checkpoint_txg.0,
+    )
 }
 
 /// 一片树表单元里 extent 树（树 ID 11，按树 ID 升序排第一条）那条的诞生 txg 从 `from` 改成 `to`，重封、沿引用链补到根槽。
@@ -2896,15 +2892,9 @@ fn rewrite_the_extent_tree_birth_txg_in_tree_table(
     );
 }
 
-/// 反向那一头（C511 收窄之后仍要红的那一格）：回退之后的这条线把 extent 树的诞生 txg 一致地记成 D 那次发布的 txg
-/// （回退之后在现行线上重新建树的样子），而回退目标 A 那一版仍记 3。A 的 T = 3 = 回退行的 Ti，与 D、(3, 10) 在**同一条时间线上**
-/// ⇒ I-9.14（树表条目的诞生 txg 跨根不变） 必须红，而且只红它。
-///
-/// 回退之后那两片树表都改：只改 D 的话 D 与 (3, 10) 之间也不一致，把 A 错判出局照样判得出，钉不住「A 在现行线上」这一条。
-/// 两片都改之后唯一的不一致在 A 与回退之后这条线之间。只在 I-9.14 那一遍上把收窄做宽的（例如把「同一条时间线」读成
-/// 「同一个实例」、只拿最新根那个实例的根比），I-9.14 就判不出这一格、这条用例红；C374 那份镜像上实例表一行都没有、
-/// 只有一个实例，那样做宽它照样绿。做宽做在共用的候选集上的（连回退目标一起判出局），这条在干净镜像那一段先红在
-/// I-3.1（已分配统计对得上） 上。
+/// 反向那一头（C511 收窄之后仍要红的那一格）：挂着的时候回退到 A 之后，D 那片树表把 extent 树的诞生 txg 记成 D 那次发布的 txg
+/// （在现行线上重新建树的样子），而回退目标 A 那一版仍记 3。向前回退不切掉任何一条线，A 与 D 在**同一条时间线上**
+/// ⇒ I-9.14（树表条目的诞生 txg 跨根不变） 必须红，而且只红它。把 I-9.14 的收窄做宽到把回退目标判出局的，这条红。
 #[test]
 fn birth_txg_that_the_line_after_a_rollback_records_differently_from_the_rollback_target_reddens_only_the_birth_invariant(
 ) {
@@ -2918,18 +2908,12 @@ fn birth_txg_that_the_line_after_a_rollback_records_differently_from_the_rollbac
         );
     }
     let mut image = rolled_back.image.clone();
-    for tree_table_slot in rolled_back
-        .tree_table_slots_of_the_line_after_the_rollback
-        .iter()
-        .copied()
-    {
-        rewrite_the_extent_tree_birth_txg_in_tree_table(
-            &mut image,
-            tree_table_slot,
-            rolled_back.rollback_target_txg,
-            rolled_back.rollback_publish_txg,
-        );
-    }
+    rewrite_the_extent_tree_birth_txg_in_tree_table(
+        &mut image,
+        rolled_back.tree_table_slot_of_the_rollback_publish,
+        rolled_back.rollback_target_txg,
+        rolled_back.rollback_publish_txg,
+    );
     let verdicts = check_pool_image(&image);
     let violated: Vec<&str> = verdicts
         .iter()
@@ -2939,26 +2923,25 @@ fn birth_txg_that_the_line_after_a_rollback_records_differently_from_the_rollbac
     assert_eq!(
         violated,
         ["I-9.14"],
-        "回退目标 A 与回退之后这条线同在现行线上，诞生 txg 不一致只该红 I-9.14：{verdicts:?}"
+        "回退目标 A 与回退那次发布 D 同在现行线上，诞生 txg 不一致只该红 I-9.14：{verdicts:?}"
     );
 }
 
-/// 正向那一头（C511 的收窄本身）：只有被回退切掉的那条线上的 C 把 extent 树的诞生 txg 记成它自己那次发布的 txg，
-/// 现行线上 A、D、(3, 10) 仍一致记 3 ⇒ I-9.14（树表条目的诞生 txg 跨根不变） 不拿 C 比，判成立；别的每一条也都成立。
-/// 这是回退到无文件那一版之后「再发一次第一个文件版本」重新建树那一格在盘上的关系（旧线与新线记的诞生 txg 不同），
-/// 这里在回退到带文件的 A 那一格上造出来——回退到无文件那一版今天仍由挂载那道拒绝挡着（C511 的第 3 步没做）。
+/// 正向那一头（C511 的收窄本身）：只有被崩溃恢复切掉的 C 把 extent 树的诞生 txg 记成它自己那次发布的 txg，
+/// 现行线上 A、B、实例 2 与实例 3 的根仍一致记 3 ⇒ I-9.14（树表条目的诞生 txg 跨根不变） 不拿 C 比，判成立；别的每一条也都成立。
+/// 管理员回退改成向前发布之后，被切掉的线只由崩溃恢复造出（D23（journal 的角色与格式） 已定项 14）。
 /// 把收窄去掉（I-9.14 拿根环里每一条根比，不按实例表判出局）这条就红。
 #[test]
-fn birth_txg_recorded_differently_only_on_the_timeline_cut_off_by_a_rollback_is_not_compared_and_every_invariant_holds(
+fn birth_txg_recorded_differently_only_on_the_timeline_cut_off_by_a_recovery_is_not_compared_and_every_invariant_holds(
 ) {
-    let rolled_back =
-        image_after_rolling_back_to_the_first_root("known-good-after-rollback-abandoned-line");
-    let mut image = rolled_back.image.clone();
+    let (clean, birth_txg, tree_table_slot_of_the_abandoned_root, abandoned_publish_txg) =
+        image_after_a_recovery_abandoned_the_third_root("known-good-after-recovery-abandoned-line");
+    let mut image = clean;
     rewrite_the_extent_tree_birth_txg_in_tree_table(
         &mut image,
-        rolled_back.tree_table_slot_of_the_abandoned_root,
-        rolled_back.rollback_target_txg,
-        rolled_back.abandoned_publish_txg,
+        tree_table_slot_of_the_abandoned_root,
+        birth_txg,
+        abandoned_publish_txg,
     );
     let verdicts = check_pool_image(&image);
     let birth_invariant = verdicts
@@ -2968,7 +2951,7 @@ fn birth_txg_recorded_differently_only_on_the_timeline_cut_off_by_a_rollback_is_
     assert_eq!(
         birth_invariant.1,
         InvariantVerdict::Holds,
-        "被回退切掉的 C 不与现行线比；现行线上 A 与回退之后那几片树表一致，I-9.14 要真被评估过且成立"
+        "被崩溃恢复切掉的 C 不与现行线比；现行线上的树表一致，I-9.14 要真被评估过且成立"
     );
     for (invariant, found) in &verdicts {
         assert_eq!(
@@ -3145,7 +3128,7 @@ const INVARIANTS_EACH_PURE_LEAK_REDDENS: [&[&str]; 2] = [&["I-3.1", "I-3.11"], &
 /// 纯泄漏的两份坏镜像照样都红 I-3.1，别的判定除 `INVARIANTS_EACH_PURE_LEAK_REDDENS` 登记的之外与干净镜像逐项相同
 /// （Z3-A 让 I-5.2 照旧绿，是这份镜像要的样子）。
 #[test]
-fn a_pure_leak_that_keeps_free_plus_allocated_equal_to_the_unit_area_reddens_only_the_allocated_statistic_invariant(
+fn pure_leak_that_keeps_free_plus_allocated_equal_to_the_unit_area_reddens_only_the_allocated_statistic_invariant(
 ) {
     let clean = build_pool("known-bad-pure-leak").memory_pool();
     let verdicts_on_the_clean_image = check_pool_image(&clean);
@@ -3389,9 +3372,9 @@ fn overwrite_and_advance(pool: &mut BuiltPool, content: &[u8], instance: Instanc
     .expect("覆盖写");
 }
 
-/// 步 5 那段历史走到抬 F 之前：A、B、重开写行、C（实例 2）、重开回退到 (1, 3)（回退行那次发布 txg 9、暖机 txg 10）、
-/// 实例 3 覆盖写四次（txg 11–14）。按实例 3 自己的实例表，有效根是实例 1 的 0–3 与实例 3 的 9–14（实例 2 那一段被抛弃）；
-/// 非空的是 3、11、12、13、14（回退那次发布照抄 A 的文件、暖机是空发布，都不算），抬 F 的上限 = min(每块盘上最新的 13, 第 4 新的非空 11) = 11
+/// 步 5 那段历史走到抬 F 之前：A、B、重开写行、C（实例 2）、挂着的时候回退到 (1, 3)（一次向前发布 D，txg 9，实例仍是 2）、
+/// 实例 2 覆盖写五次（txg 10–14）。没有哪条根被实例表判出局；非空的不同状态按新到旧是 14、13、12、11、……（D 与 A 是同一个状态，
+/// 只算一次），抬 F 的上限 = min(每块盘上最新的 13, 第 4 个不同状态 11) = 11
 /// （`second_transaction_step_five_reuse.rs` 的 `raising_the_floor_above_the_fourth_newest_non_empty_root_is_refused` 钉着同一个上限）。
 fn pool_before_raising_the_floor(tag: &str) -> BuiltPool {
     let mut pool = build_pool(tag);
@@ -3405,34 +3388,35 @@ fn pool_before_raising_the_floor(tag: &str) -> BuiltPool {
         .into_file_version()
         .expect("B 之后重开，现行那一版带文件");
     overwrite_and_advance(&mut pool, &content_seeded(2500, 11), InstanceGeneration(2));
-    let mut reopened = pool.reopen_recorded();
-    let rolled_back = mount_rollback(
-        &parameters(),
-        &mut reopened,
+    let rollback_parameters = parameters();
+    let open_devices = pool.devices.as_mut().expect("镜像还开着");
+    roll_back_by_a_forward_publish(
+        &rollback_parameters,
+        open_devices,
+        &mut pool.allocator,
+        &mut pool.output,
         RollbackTarget {
             instance: InstanceGeneration(1),
             checkpoint_txg: CheckpointTxg(3),
         },
-        ShadowLedger::On,
     )
-    .expect("回退到 A");
-    pool.devices = Some(reopened);
-    pool.allocator = rolled_back.allocator;
-    pool.output = rolled_back
-        .current
-        .into_file_version()
-        .expect("回退到 A，现行那一版带文件");
-    for seed in [17usize, 19, 23, 29] {
+    .expect("挂着的时候回退到 A");
+    assert_eq!(
+        pool.output.root.checkpoint_txg,
+        CheckpointTxg(9),
+        "回退那次发布是 txg 9"
+    );
+    for seed in [17usize, 19, 23, 29, 31] {
         overwrite_and_advance(
             &mut pool,
             &content_seeded(3000 + seed, seed),
-            InstanceGeneration(3),
+            InstanceGeneration(2),
         );
     }
     assert_eq!(
         pool.output.root.checkpoint_txg,
         CheckpointTxg(14),
-        "实例 3 覆盖写到 txg 14"
+        "实例 2 覆盖写到 txg 14"
     );
     pool
 }
@@ -3462,6 +3446,30 @@ fn raise_the_floor(
     pool.output = current;
 }
 
+/// 抬 F 到 11 之后再发两版（txg 17、18）：E0 的数据单元落回 mkfs 种的实例表那两槽，E 的数据单元落回 mkfs 种的第 0 版树表那一槽
+/// （都只被 txg 11 之下的根引用，抬 F 生效之后合法回收）——第 0 代根那几条的实例表与树表从此读不出。
+fn overwrite_and_advance_onto_the_genesis_tree_table_slot(pool: &mut BuiltPool) {
+    let data_slot = |current: &BuiltPool| {
+        current
+            .output
+            .unit(TransactionUnit::Data(DataUnitIndexInFile::FIRST))
+            .slot
+            .0
+    };
+    overwrite_and_advance(pool, &content_seeded(1200, 3), InstanceGeneration(2));
+    assert_eq!(
+        data_slot(pool),
+        INSTANCE_TABLE_SLOT.0,
+        "E0 的数据单元落回 mkfs 种的实例表那两槽"
+    );
+    overwrite_and_advance(pool, &content_seeded(1234, 5), InstanceGeneration(2));
+    assert_eq!(
+        data_slot(pool),
+        GENESIS_TREE_TABLE,
+        "E 的数据单元落回 mkfs 种的第 0 版树表那一槽"
+    );
+}
+
 /// I-7.9（回退下界 F 不高于抬 F 的上限） 的坏镜像：步 5 那段历史上把 F 抬到 12，而上限是 11。
 /// 不是改一处字节改得出来的（见 `raise_the_floor`），所以这一格的「改法」是整份换成那段历史的镜像，入参那份不用。
 fn known_bad_images_of_the_rollback_floor() -> Vec<(&'static str, Mutation)> {
@@ -3477,7 +3485,8 @@ fn known_bad_images_of_the_rollback_floor() -> Vec<(&'static str, Mutation)> {
 
 /// I-7.9（回退下界 F 不高于抬 F 的上限）：同一段历史（步 5 的脚本，上限 11）上三份镜像——
 /// ① **抬到上限 11**（推 txg 15、16 两条带 F 11 的空发布；抬 F 的根是 15，它同实例的前一条 14 带 F 0）：I-7.9 真被评估过且成立，别的一条不红；
-/// ② **① 之后再发一版 E**：E 的数据单元落回 mkfs 种的第 0 版树表那一槽（抬 F 生效之后它被合法回收），第 0 代根那几条的树表从此读不出——
+/// ② **① 之后再发两版 E0、E**（`overwrite_and_advance_onto_the_genesis_tree_table_slot`）：E 的数据单元落回 mkfs 种的第 0 版树表那一槽
+///    （抬 F 生效之后它被合法回收），第 0 代根那几条的树表从此读不出——
 ///    它们在「抬之前的 F」（0）之上，是算上限的有效根，空不空判不了；把它们都算非空，第 4 新的非空根还是 11，上限的两沿都是 11，
 ///    I-7.9 照样真被评估过且成立（「不在后来每张镜像上重算」那一半，读不出的根不按空或非空猜）；
 /// ③ **抬到 12**（上限 11，入口被骗过，见 `raise_the_floor`）⇒ **只**红 I-7.9，红在「从 0 抬到 12、上限 11」那一格。
@@ -3508,20 +3517,7 @@ fn raising_the_floor_above_its_ceiling_reddens_only_the_rollback_floor_invariant
         InvariantVerdict::Holds,
         "抬到上限 11：I-7.9 要真被评估过且成立"
     );
-    overwrite_and_advance(
-        &mut at_the_ceiling,
-        &content_seeded(1234, 5),
-        InstanceGeneration(3),
-    );
-    assert_eq!(
-        at_the_ceiling
-            .output
-            .unit(TransactionUnit::Data(DataUnitIndexInFile::FIRST))
-            .slot
-            .0,
-        GENESIS_TREE_TABLE,
-        "E 的数据单元落回 mkfs 种的第 0 版树表那一槽：第 0 代根那几条的树表从此读不出"
-    );
+    overwrite_and_advance_onto_the_genesis_tree_table_slot(&mut at_the_ceiling);
     let image_after_reuse = at_the_ceiling.memory_pool();
     let verdicts_after_reuse = check_pool_image(&image_after_reuse);
     assert_eq!(
@@ -3547,11 +3543,247 @@ fn raising_the_floor_above_its_ceiling_reddens_only_the_rollback_floor_invariant
             panic!("上面判过 {invariant} 红");
         };
         assert!(
-            detail.contains("实例 3 txg 15 那条根把回退下界 F 从 0 抬到 12，高于它之前的根算出的抬 F 上限 11")
-                && detail.contains("非空有效根 [3, 11, 12, 13, 14]"),
-            "红在「抬 F 的根 txg 15、从 0 抬到 12、非空有效根 3 与 11–14、上限 11」那一格：{detail}"
+            detail.contains("实例 2 txg 15 那条根把回退下界 F 从 0 抬到 12，高于它之前的根算出的抬 F 上限 11")
+                && detail.contains("非空有效根 [3, 4, 8, 9, 10, 11, 12, 13, 14]"),
+            "红在「抬 F 的根 txg 15、从 0 抬到 12、非空有效根 3、4、8–14、上限 11」那一格：{detail}"
         );
     }
+}
+
+/// 系统配置槽里回退下界 F 那 8 字节的偏移：字段表最后一行（D22（单元原子性怎么合成） 已定项 9）。
+fn system_configuration_rollback_floor_offset() -> usize {
+    usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_BYTES - 8).expect("字段表里的偏移")
+}
+
+/// 把 `device` 那块盘两个系统配置槽里的 F 都改成 `rollback_floor`（整槽重封，别的字节不动）。
+fn set_the_system_configuration_floor_on_one_device(
+    image: &mut MemoryPool,
+    device: u32,
+    rollback_floor: u64,
+) {
+    let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
+    for slot_offset in [0, spacing] {
+        mutate_system_configuration_slot(image, device, slot_offset, |bytes| {
+            set_u64(
+                bytes,
+                system_configuration_rollback_floor_offset(),
+                rollback_floor,
+            );
+        });
+    }
+}
+
+/// checkpoint_txg 为 `txg` 的那条根住的根槽：(盘, 偏移)（与写者同一条根环公式）。
+fn root_slot_of(txg: CheckpointTxg) -> (u32, u64) {
+    let target = singlefs_core::root_ring::target_for_publish(
+        txg,
+        parameters().geometry.root_ring_slots_per_region,
+    );
+    let device = parameters().region_devices[usize::try_from(target.region).expect("区域号")];
+    let offset = singlefs_core::root_ring::slot_offset(
+        target,
+        parameters().geometry.fixed_structure_slot_spacing,
+    );
+    (device.0, offset.0)
+}
+
+/// 把 checkpoint_txg 为 `txg` 的那条根带的 F（根记录偏移 130）改成 `rollback_floor`，自证校验和重封。
+fn set_the_root_floor(image: &mut MemoryPool, txg: CheckpointTxg, rollback_floor: u64) {
+    let (device, offset) = root_slot_of(txg);
+    let root_slot_bytes = usize::try_from(parameters().geometry.physical_block_size).expect("512");
+    let mut bytes = read(image, device, offset, root_slot_bytes);
+    set_u64(&mut bytes, 130, rollback_floor);
+    let checksum_offset = singlefs_core::root_record::ROOT_CHECKSUM_OFFSET;
+    let digest = wide_checksum_with_field_zeroed(&bytes, root_slot_bytes, checksum_offset);
+    bytes[checksum_offset..checksum_offset + 32].copy_from_slice(&digest);
+    write(image, device, offset, &bytes);
+}
+
+/// 把 checkpoint_txg 为 `txg` 的那条根所在的根槽改坏一个字节（自证校验和罩整槽）：那条根读不出。
+fn make_the_root_unreadable(image: &mut MemoryPool, txg: CheckpointTxg) {
+    let (device, offset) = root_slot_of(txg);
+    let root_slot_bytes = usize::try_from(parameters().geometry.physical_block_size).expect("512");
+    let mut bytes = read(image, device, offset, root_slot_bytes);
+    bytes[100] ^= 0xff;
+    write(image, device, offset, &bytes);
+}
+
+/// I-7.12（系统配置 F 不低于同盘根上的 F） 的坏镜像：步 5 那段历史上抬到上限 11（先把 11 写进两盘的系统配置，再推 txg 15 落盘 0、
+/// 16 落盘 1），然后把盘 1 两个系统配置槽里的 F 都改回 0——就是「先写系统配置」挪到第一条根之后、崩在两者之间的那一格：
+/// 盘 1 上 txg 16 那条根带 11，盘 1 的系统配置里读得出的最大 F 是 0。F 生效值照旧是 11（最新根与盘 0 的系统配置都带 11）。
+/// 不是改一处字节就走得到抬 F 之后的历史，所以这一格的「改法」是整份换成那段历史的镜像再改，入参那份不用。
+fn known_bad_images_of_the_system_configuration_floor() -> Vec<(&'static str, Mutation)> {
+    vec![(
+        "I-7.12",
+        Box::new(|image: &mut MemoryPool| {
+            let mut pool = pool_before_raising_the_floor("known-bad-system-configuration-floor");
+            raise_the_floor(&mut pool, CheckpointTxg(11), CheckpointTxg(0));
+            let mut raised = pool.memory_pool();
+            set_the_system_configuration_floor_on_one_device(&mut raised, 1, 0);
+            *image = raised;
+        }),
+    )]
+}
+
+/// I-7.12（系统配置 F 不低于同盘根上的 F）：步 5 那段历史上抬到上限 11 的镜像一条都不红、I-7.12 真被评估过且成立（每块盘的系统配置里
+/// 都有先写进去的 11）；[`known_bad_images_of_the_system_configuration_floor`] 那份（盘 1 两槽的 F 改回 0）**只**红 I-7.12，红在盘 1、txg 16 那一格。
+#[test]
+fn one_device_whose_system_configuration_floor_is_below_a_root_on_it_reddens_only_the_system_configuration_floor_invariant(
+) {
+    let mut at_the_ceiling = pool_before_raising_the_floor("known-good-system-configuration-floor");
+    raise_the_floor(&mut at_the_ceiling, CheckpointTxg(11), CheckpointTxg(0));
+    let clean = at_the_ceiling.memory_pool();
+    let clean_verdicts = check_pool_image(&clean);
+    assert_eq!(
+        violated_invariants(&clean_verdicts),
+        Vec::<&str>::new(),
+        "抬到上限 11：一条都不许红：{clean_verdicts:?}"
+    );
+    assert_eq!(
+        verdict(&clean, "I-7.12"),
+        InvariantVerdict::Holds,
+        "抬到上限 11：I-7.12 要真被评估过且成立"
+    );
+    for (invariant, mutation) in known_bad_images_of_the_system_configuration_floor() {
+        let mut image = clean.clone();
+        mutation(&mut image);
+        let verdicts = check_pool_image(&image);
+        assert_eq!(
+            violated_invariants(&verdicts),
+            [invariant],
+            "盘 1 两槽的 F 改回 0：判红的该只有 {invariant}：{verdicts:?}"
+        );
+        let InvariantVerdict::Violated(detail) = verdict(&image, invariant) else {
+            panic!("上面判过 {invariant} 红");
+        };
+        assert!(
+            detail.contains("盘 1：两槽里自证过的系统配置带的 F 最大 0")
+                && detail.contains("txg 16 那条根带的 F 11"),
+            "红在盘 1、txg 16 那条带 11 的根那一格：{detail}"
+        );
+    }
+}
+
+/// 正常卸载那段历史：第一个事务之后同一个实例里覆盖写三次（txg 4–6），卸载把 F 抬到 6，推 txg 7（落盘 1）、8（落盘 0）两条带卸载记号的根。
+/// 这段历史上准入抬 F 的上限是 3（第 4 新的非空根是 A 的 3）。
+fn image_after_the_normal_unmount(tag: &str) -> MemoryPool {
+    let mut pool = build_pool(tag);
+    for seed in [3usize, 5, 7] {
+        overwrite_and_advance(
+            &mut pool,
+            &content_seeded(2600 + seed, seed),
+            InstanceGeneration(1),
+        );
+    }
+    let mut current = PoolVersion::WithFile(pool.output.clone());
+    let devices = pool.devices.as_mut().expect("镜像还开着");
+    let Unmounted::FloorRaisedToTheCurrentVersion(unmounted) = unmount(
+        &parameters(),
+        devices,
+        &mut pool.allocator,
+        &mut current,
+        ShadowLedger::On,
+    )
+    .expect("正常卸载") else {
+        panic!("现行那一版带文件：卸载抬 F");
+    };
+    assert_eq!(unmounted.rollback_floor, CheckpointTxg(6));
+    pool.memory_pool()
+}
+
+/// I-7.9（回退下界 F 不高于抬 F 的上限） 带卸载记号那一支的坏镜像：卸载之后把 txg 7 那条带记号的根（抬 F 的那一条，盘 1）带的 F 改成 7，
+/// 高于根环里 txg 比它小的最新那条根的 txg 6；盘 1 两个系统配置槽的 F 一起改成 7，I-7.12 不先红。
+fn known_bad_images_of_the_unmount_floor() -> Vec<(&'static str, Mutation)> {
+    vec![(
+        "I-7.9",
+        Box::new(|image: &mut MemoryPool| {
+            *image =
+                image_after_the_normal_unmount("known-bad-unmount-floor-above-the-previous-root");
+            set_the_root_floor(image, CheckpointTxg(7), 7);
+            set_the_system_configuration_floor_on_one_device(image, 1, 7);
+        }),
+    )]
+}
+
+/// I-7.9（回退下界 F 不高于抬 F 的上限） 按卸载记号分两支（D22（单元原子性怎么合成） 已定项 7）：
+/// ① 正常卸载之后的镜像（txg 7 那条带记号的根把 F 从 0 抬到 6）一条都不红，I-7.9 真被评估过且成立——按带记号那一支判 6 ≤ 6；
+///    按准入那一支判它就红了（这段历史上准入上限是 3）；
+/// ② [`known_bad_images_of_the_unmount_floor`] 那份（F 改成 7）**只**红 I-7.9，红在「带卸载记号的根从 0 抬到 7、前一条根 txg 6」那一格。
+/// 不带记号那一支的坏镜像是 [`known_bad_images_of_the_rollback_floor`]（准入入口抬到 12、上限 11）。
+#[test]
+fn marked_root_raising_the_floor_above_the_previous_root_reddens_only_the_rollback_floor_invariant()
+{
+    let clean = image_after_the_normal_unmount("known-good-unmount-floor");
+    let clean_verdicts = check_pool_image(&clean);
+    assert_eq!(
+        violated_invariants(&clean_verdicts),
+        Vec::<&str>::new(),
+        "正常卸载之后：一条都不许红：{clean_verdicts:?}"
+    );
+    assert_eq!(
+        verdict(&clean, "I-7.9"),
+        InvariantVerdict::Holds,
+        "正常卸载之后：I-7.9 按带记号那一支真被评估过且成立"
+    );
+    for (invariant, mutation) in known_bad_images_of_the_unmount_floor() {
+        let mut image = clean.clone();
+        mutation(&mut image);
+        let verdicts = check_pool_image(&image);
+        assert_eq!(
+            violated_invariants(&verdicts),
+            [invariant],
+            "带记号的根把 F 抬到 7（前一条根 txg 6）：判红的该只有 {invariant}：{verdicts:?}"
+        );
+        let InvariantVerdict::Violated(detail) = verdict(&image, invariant) else {
+            panic!("上面判过 {invariant} 红");
+        };
+        assert!(
+            detail.contains(
+                "实例 1 txg 7 那条带卸载记号的根把回退下界 F 从 0 抬到 7，高于根环里 txg 比它小的最新那条根的 txg 6"
+            ),
+            "红在带记号那一支：{detail}"
+        );
+    }
+}
+
+/// C556（checker 与层 0 不读系统配置里的 F）：步 5 那段历史上抬到 11、再发两版 E0、E（txg 17、18，E 的数据单元落回 mkfs 种的第 0 版树表那一槽），
+/// 然后把四条带 F 11 的根（txg 15–18）都改坏——根环里读得出的根带的 F 全是 0，两块盘的系统配置里还是 11（抬 F 先写进去的）。
+/// checker 的回退候选集下界取 F 生效值 max(最新根带的, 系统配置里的) = 11：被复用的那一槽只有 txg 11 之下的根引用，它们不在候选集里，
+/// 一条都不红；I-3.1 报不适用（最新根 txg 14 带 F 0，它的记账按 0 记，与按 11 取的候选集并集不可比）。
+/// 判别力自证：同一张镜像再把四个系统配置槽的 F 都改回 0（等于只读根上的 F），txg 11 之下的根回到候选集、走到被复用的那一槽，
+/// 按回退候选集判的那几条红。
+#[test]
+fn every_root_carrying_the_raised_floor_unreadable_keeps_the_candidate_invariants_green_because_the_checker_reads_the_system_configuration_floor(
+) {
+    let mut pool = pool_before_raising_the_floor("c556-roots-carrying-the-floor-unreadable");
+    raise_the_floor(&mut pool, CheckpointTxg(11), CheckpointTxg(0));
+    overwrite_and_advance_onto_the_genesis_tree_table_slot(&mut pool);
+    assert_eq!(pool.output.root.checkpoint_txg, CheckpointTxg(18));
+    let mut image = pool.memory_pool();
+    for txg in [15, 16, 17, 18] {
+        make_the_root_unreadable(&mut image, CheckpointTxg(txg));
+    }
+    let verdicts = check_pool_image(&image);
+    assert_eq!(
+        violated_invariants(&verdicts),
+        Vec::<&str>::new(),
+        "带 F 11 的根全读不出、系统配置里的 11 还在：一条都不许红：{verdicts:?}"
+    );
+    assert!(
+        matches!(verdict(&image, "I-3.1"), InvariantVerdict::NotApplicable(_)),
+        "最新根 txg 14 带 F 0、F 生效值 11：I-3.1 报不适用"
+    );
+    let mut floor_only_on_the_roots = image.clone();
+    for device in DEVICES {
+        set_the_system_configuration_floor_on_one_device(&mut floor_only_on_the_roots, device, 0);
+    }
+    let verdicts_reading_only_the_roots = check_pool_image(&floor_only_on_the_roots);
+    assert_eq!(
+        violated_invariants(&verdicts_reading_only_the_roots),
+        ["I-2.1", "I-3.10", "I-4.8", "I-7.4"],
+        "系统配置里的 F 也改回 0（等于只读根上的 F）：txg 11 之下的根回到候选集、走到被复用的那两处（实例表那两槽的分配记录分配代 0、\
+         单元头诞生代号 17，I-3.10 也红）：{verdicts_reading_only_the_roots:?}"
+    );
 }
 
 /// 残留记录那一版的内容：与 A、B 都不同长、不同字节（具体哪些字节不承重）。
@@ -3653,7 +3885,6 @@ fn image_after_a_writable_mount_over_a_version_applied_only_by_its_journal_recor
             instance: InstanceGeneration(1),
             selected_root_txg: CheckpointTxg(5),
             applied_transaction_high_water: 3,
-            is_rollback: false,
         }],
         "写行 (1, 5, 3)"
     );
@@ -3722,7 +3953,7 @@ fn units_found_on_device_zero(image: &MemoryPool) -> Vec<(u64, usize)> {
 ///    （I-3.11（已分配减 defer 等于最新根走读） 跟着红：defer 行没动），别的不红，
 ///    说明文字里的机理标识报出那一版确实并进了遍历——补上的只是等式右边缺的那一版，没把泄漏一起吞掉。
 #[test]
-fn a_version_applied_only_by_its_journal_record_is_walked_so_the_allocated_statistic_holds_and_a_leak_on_top_still_reddens_it(
+fn version_applied_only_by_its_journal_record_is_walked_so_the_allocated_statistic_holds_and_the_leak_on_top_still_reddens_it(
 ) {
     let built = image_after_a_writable_mount_over_a_version_applied_only_by_its_journal_record(
         "known-good-version-applied-only-by-its-record",
@@ -3776,7 +4007,7 @@ fn a_version_applied_only_by_its_journal_record_is_walked_so_the_allocated_stati
 /// 这一刻它的单元是孤儿、不在记账里；把它并进遍历就是遍历多算，I-3.1（已分配统计对得上） 红
 /// （`second_transaction_step_zero_layer0.rs` 残留记录那条流里「链接得到残留记录」的 19 个状态就是这一格）。
 #[test]
-fn a_journal_record_that_no_mount_has_applied_yet_is_not_walked_and_every_invariant_holds() {
+fn journal_record_that_no_mount_has_applied_yet_is_not_walked_and_every_invariant_holds() {
     let built = image_after_a_writable_mount_over_a_version_applied_only_by_its_journal_record(
         "known-good-record-not-applied-yet",
     );
@@ -3900,7 +4131,7 @@ fn overwrite_in_the_second_instance(
 /// (1, 5) 那一版被写行发布 txg 6 换下的单元（释放代 6）就在其中——不再算已分配。把它照旧并进遍历就是遍历多算，I-3.1 红。
 /// 环里比它老的有效根还在（txg 1–4），第 ④ 条拦不住这一格，拦它的只有第 ③ 条。
 #[test]
-fn a_version_applied_only_by_its_journal_record_leaves_the_walk_once_the_rollback_floor_is_raised_past_it(
+fn version_applied_only_by_its_journal_record_leaves_the_walk_once_the_rollback_floor_is_raised_past_it(
 ) {
     let mut built = image_after_a_writable_mount_over_a_version_applied_only_by_its_journal_record(
         "known-good-version-applied-only-by-its-record-below-the-floor",
@@ -3944,6 +4175,125 @@ fn a_version_applied_only_by_its_journal_record_leaves_the_walk_once_the_rollbac
     );
 }
 
+/// 由记录施加出来的那一版照它施加在其上那一版的根走实例表（D23（journal 的角色与格式） 已定项 15「实例表单元指针照所选根」，
+/// 主 agent 2026-09-27 定、零轮）：同一段历史在实例 2 里接着发三版（txg 8–10），再把 F 抬到 5——它施加在其上的 B (1, 4) 掉到 F 之下、
+/// 不在回退候选集里，(1, 5) 自己还在（txg 5 ≥ F）。实例 1 那张实例表（mkfs 写的第 0 片，槽 50176）只有实例 1 的根与 (1, 5) 这一版引用，
+/// 写行发布 txg 6 换下它、释放代 6 > max(F 5, 环里最旧有效根 1)，抬 F 之后仍算已分配。checker 走 (1, 5) 时照 B 的根记录走它的实例表，
+/// I-3.1（已分配统计对得上） 对得上、一条都不红。改之前只走记录新根段里的树表与映射根，那一片 32768 字节没人数，I-3.1 红
+/// （崩溃注入快档种子 7463871032432355136 第 91 段那两条同形，`research/prompts/m2-investigate-crash-injection-reds-report.md` 第三节）。
+#[test]
+fn version_applied_only_by_its_journal_record_walks_the_instance_table_of_the_root_it_was_applied_on_even_below_the_floor(
+) {
+    let mut built = image_after_a_writable_mount_over_a_version_applied_only_by_its_journal_record(
+        "known-good-version-applied-only-by-its-record-base-below-the-floor",
+    );
+    let mut current = overwrite_in_the_second_instance(
+        &mut built,
+        OVERWRITES_BEFORE_RAISING_THE_FLOOR_PAST_THE_VERSION,
+        180,
+    );
+    assert_eq!(
+        current.root.checkpoint_txg,
+        CheckpointTxg(10),
+        "实例 2 发到 txg 10"
+    );
+    singlefs_core::mount::raise_rollback_floor(
+        &parameters(),
+        &mut built.devices,
+        &mut built.allocator,
+        &mut current,
+        CheckpointTxg(5),
+        ShadowLedger::On,
+    )
+    .expect("抬 F 到 5");
+    let image = memory_pool_of_sparse_devices(&built.devices);
+    let verdicts = check_pool_image(&image);
+    assert_eq!(
+        violated_invariants(&verdicts),
+        Vec::<&str>::new(),
+        "B 掉到 F 之下、(1, 5) 还在：一条都不许红：{verdicts:?}"
+    );
+    assert_eq!(
+        verdict(&image, "I-3.1"),
+        InvariantVerdict::Holds,
+        "I-3.1 要真被评估过且成立"
+    );
+}
+
+/// journal 环里计数器 `counter` 那条记录（两块盘各一份）的反向链字段改掉（最低位翻过来）、重封头校验和：
+/// 写者写错了链，两盘写出同一份错的记录。它的载荷（点名项）一个字节不动。
+fn break_the_back_chain_of_journal_record(pool: &mut MemoryPool, counter: u64) {
+    let offset =
+        singlefs_core::journal::record_offset(counter, singlefs_format::JOURNAL_RING_DEFAULT_BYTES)
+            .0;
+    for device in DEVICES {
+        let mut record = read(pool, device, offset, 4096);
+        record[JOURNAL_RECORD_BACK_CHAIN_OFFSET] ^= 1;
+        let digest = wide_checksum_with_field_zeroed(&record, 4096, 46);
+        record[46..78].copy_from_slice(&digest);
+        write(pool, device, offset, &record);
+    }
+}
+
+/// I-8.6（反向链算法）「不等的记录不进重放前缀」，checker 的前缀口径跟着恢复对齐（代码审阅 6c 第 25 条，用户 2026-09-27 定恢复补反向链检查；
+/// 实审 A2a 报告「checker 要跟着改什么」）：可写挂载施加过 (1, 5) 那条记录、写了行的那份镜像上，把那条记录两盘各一份的反向链改坏。
+/// 恢复照 I-8.6 不施加它，checker 也不再把它当「被恢复施加过的那一版」并进遍历：它换下的固定点单元仍记在已分配里、没人走到，
+/// I-3.1（已分配统计对得上） 红，机理标识报并进遍历的版本 0 个；I-8.6 在那条记录上红，别的不红。改之前 checker 认版本时不看链，照旧并进，I-3.1 成立。
+#[test]
+fn a_journal_record_whose_back_chain_does_not_match_is_not_walked_as_a_version_a_recovery_applied()
+{
+    let built = image_after_a_writable_mount_over_a_version_applied_only_by_its_journal_record(
+        "known-bad-version-applied-only-by-a-record-with-a-broken-back-chain",
+    );
+    let mut image = built.image.clone();
+    let (counter, _, _) = journal_records_on_device(&image, 0)
+        .into_iter()
+        .find(|(_, instance, transaction)| *instance == 1 && *transaction == 3)
+        .expect("环里有实例 1、事务号 3 的那条记录（只由记录施加出来的 (1, 5)）");
+    break_the_back_chain_of_journal_record(&mut image, counter);
+    let verdicts = check_pool_image(&image);
+    assert_eq!(
+        violated_invariants(&verdicts),
+        ["I-3.1", "I-8.6"],
+        "只该红 I-3.1 与 I-8.6：{verdicts:?}"
+    );
+    let InvariantVerdict::Violated(detail) = verdict(&image, "I-3.1") else {
+        panic!("上面判过 I-3.1 红");
+    };
+    assert!(
+        detail.contains("并进遍历的由记录施加出来的版本 0 个"),
+        "机理标识要报出那一版没并进遍历：{detail}"
+    );
+}
+
+/// 同一个前缀口径的另一处（实审 A2a 报告那一节第 3 条）：「下一次挂载会先施加的那一版」。发布 B 的记录已落、根槽没落的崩溃镜像上，
+/// B 那棵分配记录树里 B 的数据单元的分配代改成诞生代号 + 1（这一步单红 I-3.10，见上一条用例），再把 B 那条记录的反向链改坏：
+/// 下一次挂载的恢复照 I-8.6 不施加它，checker 不再读它那一版的分配记录——只红 I-8.6，I-3.10 由候选集里 A 那一版判成立。
+/// 改之前 checker 取那一版时不看链，I-3.10 照红。
+#[test]
+fn a_record_whose_back_chain_does_not_match_is_not_the_version_the_next_mount_applies_first() {
+    let mut image = crash_image_with_the_overwrite_record_but_not_its_root(
+        "known-bad-next-mount-version-with-a-broken-back-chain",
+    );
+    raise_the_allocation_generation_of_the_overwrite_data_unit_past_its_birth(&mut image);
+    let (counter, _, _) = journal_records_on_device(&image, 0)
+        .into_iter()
+        .find(|(_, instance, transaction)| *instance == 1 && *transaction == 2)
+        .expect("环里有 B 那条记录（实例 1、事务号 2）");
+    break_the_back_chain_of_journal_record(&mut image, counter);
+    let verdicts = check_pool_image(&image);
+    assert_eq!(
+        violated_invariants(&verdicts),
+        ["I-8.6"],
+        "B 那条记录进不了前缀：只该红 I-8.6：{verdicts:?}"
+    );
+    assert_eq!(
+        verdict(&image, "I-3.10"),
+        InvariantVerdict::Holds,
+        "I-3.10 由候选集里 A 那一版判成立"
+    );
+}
+
 /// 环转过 (1, 5) 那一版之前实例 2 在同一次挂载里接着发几版：从 txg 8 起到 txg 29 为止，环里每个槽都被 txg ≥ 6 的根盖过
 /// （根环 24 槽：三个区域各 8 槽，槽位按 txg 轮换）。
 const OVERWRITES_TURNING_THE_ROOT_RING_PAST_THE_VERSION: u64 = 22;
@@ -3957,7 +4307,7 @@ const OVERWRITES_TURNING_THE_ROOT_RING_PAST_THE_VERSION: u64 = 22;
 /// 这一份镜像上一条都不红：那一版的单元已回收、不再算已分配，第 ④ 条让它不并进遍历，记账与遍历对得上。
 /// 把第 ④ 条拿掉，那一版照旧并进遍历，遍历多出它那几个已回收的槽，I-3.1（已分配统计对得上） 红。
 #[test]
-fn a_version_applied_only_by_its_journal_record_leaves_the_walk_once_the_root_ring_has_turned_past_it_and_a_mount_reclaimed_its_units(
+fn version_applied_only_by_its_journal_record_leaves_the_walk_once_the_root_ring_has_turned_past_it_and_the_mount_reclaimed_its_units(
 ) {
     let mut built = image_after_a_writable_mount_over_a_version_applied_only_by_its_journal_record(
         "known-good-version-applied-only-by-its-record-after-the-ring-turned",
@@ -4309,61 +4659,33 @@ fn assert_lowering_the_watermark_reddens_only_the_watermark_invariant(
 }
 
 /// 改法 D（I-7.8（根记录树 ID 水位不低于全池最大树 ID） 扫描方向排除「最新根的实例表判得出没发布过」的码 2 节点，
-/// `research/prompts/m2-wave3-code-r1-main-verification.md` 第三节 Y1、第四节第 1 条，被攻过零轮）的两道「不排除」，
-/// 各配一份只红 I-7.8 的坏镜像：
-/// ① **回退行不排除**：回退到暖机根 (1, 2)（实例 2，回退行 (1, 2, 0)）之后，(1, 3) 那一版写出的码 2 节点诞生代号 3 > 2，
-///    按回退行的 T 看是「之后写的」，而它们发布过——被抛弃时间线的根发过号，水位要盖住它们（D8（核心索引结构） 已定项 8 ②）。
-///    (1, 3) 发了 11..18，其中 16..18 只有树表条目、没有单元，而 (1, 3) 被抛弃、它的树表不走 ⇒ 扫出来最大的是映射树 15。
-///    根环里的水位全压到 11，I-7.8 要红在 15 上。
-/// ② **T = 0 的行不排除**：实例 2 在回退那个会话里发第一个文件版本（19..26），再回退到 (1, 2)（实例 3，回退行 (1, 2, 0) 与中间实例行 (2, 0, 0)）：
-///    实例 2 写出的码 2 节点只由 (2, 0, 0) 那一行说到，行里说不出它发布到哪一代；扫出来最大的是它的映射树 23（24..26 只在树表里）。
-///    根环里的水位全压到 19，I-7.8 要红在 23 上。
-/// 两份干净镜像上一条都不红（水位 19、27 都高于各自盘上发过的号）。
+/// `research/prompts/m2-wave3-code-r1-main-verification.md` 第三节 Y1、第四节第 1 条，被攻过零轮）的「T = 0 的行不排除」那一道
+/// 配一份只红 I-7.8 的坏镜像：只做过 mkfs 的池可写挂载（实例 1，暖机），再挂一次（实例 2）发第一个文件版本；
+/// 进程退出之后实例 2 的每一条根的根槽都读不出（清零），可写挂载一次——择根落到实例 1 的根，前缀规则不跨实例边界、实例 2 的记录
+/// 一条都不施加，实例 3 写行 (1, T, ·) 与中间实例行 (2, 0, 0)。实例 2 写出的码 2 节点只由 (2, 0, 0) 那一行说到，行里说不出它发布到
+/// 哪一代，照旧算「出现过」（D8（核心索引结构） 已定项 8 ②）。根环里的水位全压到实例 2 发的第一个号，I-7.8 要红在盘上还留着的
+/// 实例 2 节点里最大的那个号上。干净镜像上一条都不红（实例 3 的水位按环里的记录取，盖得住实例 2 发过的号）。
+/// 回退行那一道（① 回退行不排除）随回退行删掉（D18（块里携带什么信息） 已定项 11），没有对象。
 #[test]
-fn published_nodes_behind_a_rollback_row_or_an_intermediate_row_still_count_against_the_tree_identifier_watermark(
-) {
-    let mut pool = build_pool("known-bad-watermark-behind-rollback-and-intermediate-rows");
-    let warm_up_root = RollbackTarget {
-        instance: InstanceGeneration(1),
-        checkpoint_txg: CheckpointTxg(2),
+fn published_nodes_behind_an_intermediate_row_still_count_against_the_tree_identifier_watermark() {
+    let mut pool = format_pool("known-bad-watermark-behind-an-intermediate-row");
+    let mut devices = pool.reopen_recorded();
+    let first_instance =
+        mount_writable(&parameters(), &mut devices).expect("只做过 mkfs 的池可写挂载");
+    assert_eq!(first_instance.output.instance, InstanceGeneration(1));
+    drop(first_instance);
+    let second_instance = mount_writable(&parameters(), &mut devices).expect("再挂一次");
+    assert_eq!(second_instance.output.instance, InstanceGeneration(2));
+    let PoolVersion::WithoutFile(version) = &second_instance.current else {
+        panic!("只做过 mkfs 的池上现行那一版树表 0 条")
     };
-    let mut devices_for_the_first_rollback = pool.reopen_recorded();
-    let first_rollback = mount_rollback(
-        &parameters(),
-        &mut devices_for_the_first_rollback,
-        warm_up_root,
-        ShadowLedger::On,
-    )
-    .expect("环里还留着 (1, 3) 时回退到暖机根 (1, 2)");
-    pool.devices = Some(devices_for_the_first_rollback);
-    assert_eq!(
-        first_rollback.output.rows_written,
-        vec![InstanceRow {
-            instance: InstanceGeneration(1),
-            selected_root_txg: CheckpointTxg(2),
-            applied_transaction_high_water: 0,
-            is_rollback: true,
-        }],
-        "第一次回退：实例 2 只写回退行 (1, 2, 0)"
-    );
-    assert_lowering_the_watermark_reddens_only_the_watermark_invariant(
-        &pool.memory_pool(),
-        11,
-        15,
-        "① 回退行后面的 (1, 3)",
-    );
-
-    let PoolVersion::WithoutFile(version) = &first_rollback.current else {
-        panic!("回退到树表 0 条的暖机根：现行那一版仍是「没有文件版本」的一版")
-    };
-    let mut allocator = first_rollback.allocator.clone();
+    let mut allocator = second_instance.allocator.clone();
     let content: Vec<u8> = (0..3300usize)
         .map(|index| u8::try_from((index * 7 + 17) % 253).expect("小于 256"))
         .collect();
     let first_file_of_the_second_instance = {
         let publish_parameters = parameters();
-        let open_devices = pool.devices.as_mut().expect("镜像还开着");
-        let mut writer = PoolWriter::new(&publish_parameters, open_devices.as_mut_slice());
+        let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
         publish_first_file(
             &mut writer,
             &mut allocator,
@@ -4372,51 +4694,75 @@ fn published_nodes_behind_a_rollback_row_or_an_intermediate_row_still_count_agai
                 content: &content,
                 write_time_seconds: FIXED_WRITE_TIME_SECONDS + 120,
             },
-            first_rollback.output.instance,
+            second_instance.output.instance,
             &version.record_bytes,
         )
-        .expect("实例 2 在回退之后发第一个文件版本")
+        .expect("实例 2 发第一个文件版本")
     };
-    assert_eq!(
-        first_file_of_the_second_instance
-            .tree_identifiers
-            .highest()
-            .0,
-        26,
-        "实例 2 从带过来的水位 19 起发 19..26"
+    let first_identifier_of_the_second_instance = version.root.tree_identifier_watermark;
+    let mut roots_of_the_second_instance: Vec<CheckpointTxg> =
+        vec![second_instance.output.row_publish.root().checkpoint_txg];
+    roots_of_the_second_instance.extend(
+        second_instance
+            .output
+            .warm_up_publishes
+            .iter()
+            .map(|warm_up| warm_up.root().checkpoint_txg),
     );
-    let mut devices_for_the_second_rollback = pool.reopen_recorded();
-    let second_rollback = mount_rollback(
-        &parameters(),
-        &mut devices_for_the_second_rollback,
-        warm_up_root,
-        ShadowLedger::On,
-    )
-    .expect("再回退到暖机根 (1, 2)：实例 2 那一版实例表里 (1, 2, 0) 的 T = 2，(1, 2) 仍可选");
-    pool.devices = Some(devices_for_the_second_rollback);
+    roots_of_the_second_instance.push(first_file_of_the_second_instance.root.checkpoint_txg);
+    drop(devices);
+    let mut reopened = pool.reopen_recorded();
+    let root_slot_bytes = usize::try_from(parameters().geometry.physical_block_size).expect("512");
+    for txg in &roots_of_the_second_instance {
+        let (device, offset) = root_slot_of(*txg);
+        let (_, recorded) = reopened
+            .iter_mut()
+            .find(|(identity, _)| identity.0 == device)
+            .expect("根槽所在的盘");
+        recorded
+            .write_at(
+                DeviceOffsetInBytes(offset),
+                &vec![0u8; root_slot_bytes],
+                singlefs_core::block_device::WriteDurability::Plain,
+            )
+            .expect("清零实例 2 的根槽");
+    }
+    let third_instance = mount_writable(&parameters(), &mut reopened)
+        .expect("实例 2 的根都读不出：择根落到实例 1 的根，照常可写挂载");
+    assert_eq!(third_instance.output.instance, InstanceGeneration(3));
     assert_eq!(
-        second_rollback.output.rows_written,
+        third_instance.output.rows_written,
         vec![
             InstanceRow {
                 instance: InstanceGeneration(1),
-                selected_root_txg: CheckpointTxg(2),
+                selected_root_txg: third_instance.output.effective_root.checkpoint_txg,
                 applied_transaction_high_water: 0,
-                is_rollback: true,
             },
             InstanceRow {
                 instance: InstanceGeneration(2),
                 selected_root_txg: CheckpointTxg(0),
                 applied_transaction_high_water: 0,
-                is_rollback: false,
             }
         ],
-        "第二次回退：实例 3 写回退行 (1, 2, 0) 与中间实例行 (2, 0, 0)，后者不带回退标志"
+        "实例 3 写实例 1 那一行与中间实例行 (2, 0, 0)"
+    );
+    pool.devices = Some(reopened);
+    assert_eq!(
+        (
+            first_identifier_of_the_second_instance,
+            first_file_of_the_second_instance
+                .tree_identifiers
+                .highest()
+                .0
+        ),
+        (11, 18),
+        "实例 2 发 11..18，其中 16..18 只有树表条目、没有单元 ⇒ 盘上扫得出来最大的是映射树 15"
     );
     assert_lowering_the_watermark_reddens_only_the_watermark_invariant(
         &pool.memory_pool(),
-        19,
-        23,
-        "② 中间实例行后面的实例 2",
+        11,
+        15,
+        "中间实例行后面的实例 2",
     );
 }
 
@@ -4551,7 +4897,7 @@ fn set_released_generation_of_slot(bytes: &mut [u8], slot: u64, generation: u64)
 /// 已释放记录的释放代写成那次写行的 txg − 1：引用过它的最新一条有效根就是 txg − 1 那一条，释放代不在 (txg − 1, txg] 里 ⇒ I-3.9 红。
 /// 引用集合不认第 1 片时这两条被当成「见证它释放的根已不在候选集里」跳过，I-3.9 照样判成立。干净镜像上 I-3.9 判成立（不是不适用）。
 #[test]
-fn a_release_generation_outside_its_interval_on_the_second_page_of_a_replaced_instance_table_chain_reddens_the_release_generation_invariant(
+fn release_generation_outside_its_interval_on_the_second_page_of_the_replaced_instance_table_chain_reddens_the_release_generation_invariant(
 ) {
     let (clean, current, old_second_page_slot, release_txg, units) =
         image_after_rewriting_a_two_page_instance_table_chain();

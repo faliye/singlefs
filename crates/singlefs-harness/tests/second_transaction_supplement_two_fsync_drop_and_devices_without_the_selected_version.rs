@@ -6,7 +6,8 @@
 //!   原样重发做成、故障消失之后可写挂载做成、最后那一版每个单元两块盘各一份、池级 checker 不红、冷重开读回最后确认的一版
 //!   （「屏障报错丢脏页」那一档的镜像同判）；
 //! - 挂载那一半：盘 1 缺席、盘 1 是空盘、盘 1 停在旧状态三格。可写挂载要么拒、要么挂上之后这一版每个单元两块盘各一份；
-//!   盘 1 缺席那一格按 w 的下限拒（`MountError::WritableDeviceCountBelowTheStripeWidthLowerBound`，可写挂载与回退各一条）。
+//!   盘 1 缺席那一格按 w 的下限拒（`MountError::WritableDeviceCountBelowTheStripeWidthLowerBound`）。管理员回退改成挂着时的
+//!   一次向前发布之后不再是一次挂载（D23（journal 的角色与格式） 已定项 14），设备准入在它之前那次可写挂载判过，回退那两条删了。
 //!   另有读路径一格：盘 1 每次读都报错时可写挂载拒成哪个成员。
 //!
 //! 后半钉可写挂载准入的逐盘核（D2（RAID 条带策略） 已定项 13「挂载准入」、已定项 6 `w ≥ 2`；D18（块里携带什么信息） 已定项 11
@@ -41,14 +42,15 @@ use singlefs_core::make_filesystem::{
     make_filesystem, MakeFilesystemParameters, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
 };
 use singlefs_core::mount::{
-    mount_rollback, mount_writable, DeviceCount, DeviceWithoutTheSelectedVersion, MountError,
-    RollbackTarget, SelectedVersionLackingOnDevice, ShadowLedger, STRIPE_WIDTH_LOWER_BOUND,
+    mount_writable, DeviceCount, DeviceWithoutTheSelectedVersion, MountError, RollbackTarget,
+    SelectedVersionLackingOnDevice, STRIPE_WIDTH_LOWER_BOUND,
 };
 use singlefs_core::mounted_read::mount_read_only;
 use singlefs_core::records::STATISTIC_ALLOCATED_BYTES;
 use singlefs_core::recovery::{
-    choose_root, choose_system_configuration, readable_roots_with_ring_slots, recover,
-    verified_system_configuration_slots, JournalPolicy, RecoveryOutcome,
+    allocation_records_under_root, choose_root, choose_system_configuration,
+    readable_roots_with_ring_slots, recover, verified_system_configuration_slots, JournalPolicy,
+    PoolReader, RecoveryFailure, RecoveryOutcome,
 };
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
 use singlefs_core::transaction::{
@@ -1346,46 +1348,140 @@ fn mount_writable_with_only_device_zero_is_refused() {
     );
 }
 
-/// 回退同一道判：只把盘 0 交给回退（目标 (1, 3)），在读任何一块盘之前拒掉、报同一个成员，盘 0 一次都没被读、逐字节不变。
-/// 对照：同一个池两块盘都交，回退到 (1, 3) 照旧做成。
+/// 同一块盘交两次（盘表两项都标成盘 0，都是 txg 5 那一版整池镜像上的盘 0）：可写设备数数的是不同的设备身份，只有 1 块，
+/// 可写挂载在读任何一块盘之前拒成「可写设备数低于 w 的下限」（D2（RAID 条带策略） 已定项 13 挂载准入第一条合取；实二八交回第 2 问，
+/// 调度记录实四那一项「数不同的设备身份」）。两项都没被读、逐字节不变。按盘表项数数是 2，这一判就放过去了。
 #[test]
-fn mount_rollback_with_only_device_zero_is_refused() {
+fn mount_writable_with_device_zero_handed_in_twice_counts_one_device_and_is_refused_before_any_read(
+) {
     let pool = pool_at_txg_five_with_device_one_stale_at_txg_three();
-    let mut only_device_zero = only_device_zero_counting_reads(&pool);
+    let mut device_zero_twice: Vec<(DeviceIdentity, ReadCountingDevice)> = (0..2)
+        .map(|_| {
+            (
+                DEVICE_ZERO,
+                ReadCountingDevice {
+                    inner: sparse_from(&pool.full, DEVICE_ZERO),
+                    reads: Cell::new(0),
+                },
+            )
+        })
+        .collect();
     let before = pool.full.devices[&DEVICE_ZERO].clone();
-    let refusal = mount_rollback(
-        &pool.parameters,
-        &mut only_device_zero,
-        version_key(1, 3),
-        ShadowLedger::On,
-    )
-    .expect_err("盘 1 缺席时回退必须拒绝，不许单盘可写");
-    assert_refused_below_the_stripe_width_lower_bound_before_any_read(
-        &refusal,
-        &only_device_zero,
-        &before,
-        "只把盘 0 交给回退",
+    let refusal = mount_writable(&pool.parameters, &mut device_zero_twice)
+        .expect_err("同一块盘交两次也只是一块盘，可写挂载必须拒绝");
+    let MountError::WritableDeviceCountBelowTheStripeWidthLowerBound {
+        devices_handed_in,
+        stripe_width_lower_bound,
+    } = refusal
+    else {
+        panic!(
+            "盘 0 交两次：该报 WritableDeviceCountBelowTheStripeWidthLowerBound，实际 {refusal:?}"
+        )
+    };
+    assert_eq!(
+        (devices_handed_in, stripe_width_lower_bound),
+        (DeviceCount(1), STRIPE_WIDTH_LOWER_BOUND),
+        "盘表两项、不同的设备身份 1 个：数的是 1 块盘"
     );
+    for (index, (identity, counting)) in device_zero_twice.iter().enumerate() {
+        assert_eq!(*identity, DEVICE_ZERO);
+        assert_eq!(
+            counting.reads.get(),
+            0,
+            "盘表第 {index} 项：拒在读任何一块盘之前"
+        );
+        assert_eq!(
+            counting.inner.image, before,
+            "盘表第 {index} 项：拒在任何写之前，逐字节不变"
+        );
+    }
+}
 
-    let mut both_devices = vec![
-        (DEVICE_ZERO, sparse_from(&pool.full, DEVICE_ZERO)),
-        (DEVICE_ONE, sparse_from(&pool.full, DEVICE_ONE)),
-    ];
-    let rolled_back = mount_rollback(
-        &pool.parameters,
-        &mut both_devices,
-        version_key(1, 3),
-        ShadowLedger::On,
-    )
-    .unwrap_or_else(|error| panic!("两块盘都交的健康池，回退到 (1, 3) 照旧做成，实际 {error:?}"));
+/// `crates/mutations.tsv` 里「只交盘 0 时分配记录树那一判 panic」那一行（实二七）原先靠可写挂载只交盘 0 走到分配记录树的读者；
+/// 实二八让可写挂载在读盘之前就拒了，那一行点名的用例走不到它（实二八交回第 1 问）。这里从公开入口直接喂一个只有盘 0 的读者：
+/// 按一块盘的几何读两块盘写的分配记录树，根里指盘 1 那一格的内部条目 key 在这个几何里不是任何一个孩子那一段的起点
+/// ⇒ 交回 I-1.1 的错，不 panic（盘上读来的 key 可以是任何值，`allocation_record_tree::read_allocation_record_tree` 的文档注释）。
+#[test]
+fn reading_the_allocation_record_tree_with_the_reader_of_only_device_zero_reports_the_child_key_violation_instead_of_panicking(
+) {
+    let pool = pool_at_txg_five_with_device_one_stale_at_txg_three();
+    let mut only_device_zero = MemoryPool::with_devices(&[DEVICE_ZERO], IMAGE_BYTES);
+    only_device_zero
+        .devices
+        .insert(DEVICE_ZERO, pool.full.devices[&DEVICE_ZERO].clone());
+    let newest_root = pool.versions[2].root;
+    assert_eq!(newest_root.checkpoint_txg, CheckpointTxg(5));
+    let both_devices_read = allocation_records_under_root(&pool.full, &newest_root)
+        .expect("两块盘都在的读者读得出 txg 5 那一版的分配记录树");
+    assert!(
+        both_devices_read
+            .iter()
+            .any(|record| record.device == DEVICE_ONE),
+        "对照：两块盘写的树里有盘 1 的记录，根里有指盘 1 那一格的内部条目"
+    );
+    let refusal = catch_unwind(AssertUnwindSafe(|| {
+        allocation_records_under_root(&only_device_zero, &newest_root)
+    }))
+    .unwrap_or_else(|payload| {
+        panic!(
+            "只有盘 0 的读者读分配记录树不许 panic：{}",
+            panic_text(payload.as_ref())
+        )
+    });
+    assert_eq!(
+        refusal,
+        Err(RecoveryFailure::InvariantViolated {
+            invariant: "I-1.1",
+            detail: "分配记录树内部条目的 key 不是这个节点里一个孩子那一段的起点",
+        }),
+        "按一块盘的几何读：指盘 1 那一格的 key 不是这个几何里任何孩子那一段的起点"
+    );
+}
+
+/// 只交一块盘的只读挂载（D2（RAID 条带策略） 已定项 13「降级期间只读」：可写挂载准入不成立即只读挂载）：读者里只有盘 0
+/// （txg 5 那一版整池镜像上的盘 0，盘 1 不在读者里——不是空盘，是读者列不出它）。根环区域 1 归盘 1、读不到就跳过，
+/// 盘 0 上两个区域里最新的是 txg 5 那条根；只读挂载做成、沿 (1, 5) 打开，读回第三版内容。一个字节都不写（读者是只读的）。
+#[test]
+fn read_only_mount_with_only_device_zero_handed_in_opens_the_newest_version_on_it_and_reads_it_back(
+) {
+    let pool = pool_at_txg_five_with_device_one_stale_at_txg_three();
+    let mut only_device_zero = MemoryPool::with_devices(&[DEVICE_ZERO], IMAGE_BYTES);
+    only_device_zero
+        .devices
+        .insert(DEVICE_ZERO, pool.full.devices[&DEVICE_ZERO].clone());
+    assert_eq!(
+        only_device_zero.device_identities(),
+        vec![DEVICE_ZERO],
+        "读者只列得出盘 0"
+    );
+    let mounted = mount_read_only(&only_device_zero).unwrap_or_else(|failure| {
+        panic!("只交盘 0：只读挂载要做成（降级期间只读），实际 {failure:?}")
+    });
     assert_eq!(
         version_key(
-            rolled_back.output.effective_root.instance.0,
-            rolled_back.output.effective_root.checkpoint_txg.0
+            mounted.effective_root.instance.0,
+            mounted.effective_root.checkpoint_txg.0
         ),
-        version_key(1, 3),
-        "两块盘都交：新实例接在 R_old = (1, 3) 那一版后面"
+        version_key(1, 5),
+        "盘 0 上最新的根是 txg 5（根环区域 2 归盘 0），只读挂载沿它打开"
     );
+    assert_eq!(
+        mounted.journal.prefix_applied, 0,
+        "txg 5 之上没有记录，一条都不施加"
+    );
+    let expected_content = content_of(3);
+    let file = mounted
+        .mounted
+        .open_file(&only_device_zero, InodeNumber(FIRST_INODE_NUMBER))
+        .unwrap_or_else(|failure| panic!("只交盘 0：文件要打得开，实际 {failure:?}"));
+    let read = file
+        .read_at(
+            &only_device_zero,
+            FileOffsetInBytes(0),
+            u64::try_from(expected_content.len()).expect("4100"),
+        )
+        .unwrap_or_else(|failure| panic!("只交盘 0：文件要读得出，实际 {failure:?}"));
+    assert_eq!(read.bytes, expected_content, "只交盘 0：读回第三版内容");
 }
 
 fn assert_refused_or_both_copies(verdict: &AuxiliaryMount, what: &str) {
@@ -1975,96 +2071,6 @@ fn device_one_stale_on_the_version_without_file_refuses_the_writable_mount_namin
         memory_pool_of(&devices),
         before,
         "拒在取号之前，两块盘逐字节不变"
-    );
-}
-
-/// 回退也是可写挂载（取号、写行、暖机），同一道逐盘核，所选那一版是 R_old 那一版：
-/// 盘 1 是空盘时回退到 (1, 3)（根在盘 0 的区域 0）拒掉、点名盘 1；盘 1 停在 txg 3 之后时回退到最新的 (1, 5)
-/// （盘 1 上没有 txg 4 的根，(1, 4) 不在根环里）拒掉、点名盘 1 缺 txg 4 之后的单元。两格都在取号之前，两块盘逐字节不变。
-#[test]
-fn rollback_onto_the_blank_or_stale_device_one_is_refused_the_same_way_before_any_write() {
-    let pool = pool_at_txg_five_with_device_one_stale_at_txg_three();
-    let expected_missing = units_written_after_txg_three(&pool);
-
-    let mut onto_a_blank_device = vec![
-        (DEVICE_ZERO, sparse_from(&pool.full, DEVICE_ZERO)),
-        (DEVICE_ONE, blank_device()),
-    ];
-    let before_the_rollback_onto_a_blank_device = memory_pool_of(&onto_a_blank_device);
-    let blank_device_error = mount_rollback(
-        &pool.parameters,
-        &mut onto_a_blank_device,
-        version_key(1, 3),
-        ShadowLedger::On,
-    )
-    .expect_err("盘 1 是空盘，回退要拒");
-    let blank_device_refusal =
-        refusal_by_devices_without_the_selected_version(&blank_device_error, "回退到空盘上");
-    assert_eq!(
-        blank_device_refusal.selected_version,
-        version_key(1, 3),
-        "所选那一版是 R_old"
-    );
-    assert_eq!(
-        blank_device_refusal.selected_version_journal_position,
-        journal_position(1, 3)
-    );
-    assert_eq!(
-        blank_device_refusal.devices,
-        vec![DeviceWithoutTheSelectedVersion {
-            device: DEVICE_ONE,
-            lacking: SelectedVersionLackingOnDevice::NoSelfVerifiedSystemConfiguration,
-        }]
-    );
-    assert_eq!(
-        memory_pool_of(&onto_a_blank_device),
-        before_the_rollback_onto_a_blank_device,
-        "两块盘逐字节不变"
-    );
-
-    let mut onto_a_stale_device = vec![
-        (DEVICE_ZERO, sparse_from(&pool.full, DEVICE_ZERO)),
-        (DEVICE_ONE, sparse_from(&pool.stale, DEVICE_ONE)),
-    ];
-    let before_the_rollback_onto_a_stale_device = memory_pool_of(&onto_a_stale_device);
-    let stale_device_error = mount_rollback(
-        &pool.parameters,
-        &mut onto_a_stale_device,
-        version_key(1, 5),
-        ShadowLedger::On,
-    )
-    .expect_err("盘 1 停在旧状态，回退到它没有的那一版要拒");
-    let stale_device_refusal = refusal_by_devices_without_the_selected_version(
-        &stale_device_error,
-        "回退到停在旧状态的盘上",
-    );
-    assert_eq!(stale_device_refusal.selected_version, version_key(1, 5));
-    assert_eq!(
-        stale_device_refusal.selected_version_journal_position,
-        journal_position(1, 5)
-    );
-    let [DeviceWithoutTheSelectedVersion {
-        device,
-        lacking:
-            SelectedVersionLackingOnDevice::BehindTheSelectedVersionAndMissingItsUnits {
-                newest_system_configuration_journal_tail,
-                units_missing,
-            },
-    }] = stale_device_refusal.devices.as_slice()
-    else {
-        panic!("只点名盘 1：{:?}", stale_device_refusal.devices)
-    };
-    assert_eq!(
-        (*device, *newest_system_configuration_journal_tail),
-        (DEVICE_ONE, journal_position(1, 3))
-    );
-    let mut missing_sorted = units_missing.clone();
-    missing_sorted.sort_unstable();
-    assert_eq!(missing_sorted, expected_missing);
-    assert_eq!(
-        memory_pool_of(&onto_a_stale_device),
-        before_the_rollback_onto_a_stale_device,
-        "两块盘逐字节不变"
     );
 }
 

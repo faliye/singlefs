@@ -44,8 +44,9 @@ use singlefs_core::transaction::{
 };
 use singlefs_core::unit::data_unit_payload_capacity;
 use singlefs_harness::crash::{
-    closed_form_state_count, enumerate_layer0_selecting_versions, writes_and_segments, Layer0Tally,
-    MemoryPool, PublishedVersion, RetainedWrite, SparseBlockDevice,
+    enumerate_layer0_selecting_versions, layer0_state_count_with_torn_in_place_overwrites,
+    writes_and_segments, Layer0SegmentExpansion, Layer0Tally, MemoryPool, PublishedVersion,
+    RetainedWrite, SparseBlockDevice,
 };
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
@@ -394,7 +395,25 @@ fn assert_clean(stream: PositionAddressedStream, tally: &Layer0Tally) {
     }
 }
 
-/// 枚举一条流：`expand` 为真的段展开任意子集，别的段只以整段持久进入后面的状态。
+/// 每次写只取两态时整条流的闭式 1 + Σ(2^|段| − 1)，只供计数行打印，比较不用它。装不进 u64 时交回一句说明、不 panic：
+/// `crash::closed_form_state_count` 直接算 `1u64 << |段|`，第三条流的单元写段 322 写，debug 与 release（工作区开着溢出检查）都会 panic。
+fn closed_form_of_every_segment_for_the_count_line(segments: &[Vec<usize>]) -> String {
+    let closed_form = segments.iter().try_fold(1u64, |state_count, segment| {
+        let segment_length = u32::try_from(segment.len()).ok()?;
+        let proper_subsets = 1u64.checked_shl(segment_length)?.checked_sub(1)?;
+        state_count.checked_add(proper_subsets)
+    });
+    match closed_form {
+        Some(state_count) => state_count.to_string(),
+        None => format!(
+            "超过 2^64 − 1，装不进 u64（最长一段 {} 写）",
+            segments.iter().map(Vec::len).max().unwrap_or(0)
+        ),
+    }
+}
+
+/// 枚举一条流：`expand` 为真的段展开（每次写各取它的几态、任意组合，系统配置槽写是原地覆写、取三态），
+/// 别的段只以整段持久进入后面的状态。
 fn enumerate(
     stream: PositionAddressedStream,
     expand: &dyn Fn(usize, &[usize]) -> bool,
@@ -408,23 +427,27 @@ fn enumerate(
         &prepared.versions,
         expand,
     );
-    let expanded: Vec<Vec<usize>> = prepared
-        .segments
-        .iter()
-        .enumerate()
-        .filter(|(index, segment)| expand(*index, segment))
-        .map(|(_, segment)| segment.clone())
-        .collect();
     assert_eq!(
         tally.states,
-        closed_form_state_count(&expanded),
-        "{stream:?}：展开的段按闭式数"
+        layer0_state_count_with_torn_in_place_overwrites(
+            &prepared.base,
+            &prepared.writes,
+            &prepared.segments,
+            &|segment_index, segment| {
+                if expand(segment_index, segment) {
+                    Layer0SegmentExpansion::EveryProperSubset
+                } else {
+                    Layer0SegmentExpansion::NotExpanded
+                }
+            },
+        ),
+        "{stream:?}：展开的段按层 0 的枚举域数（原地覆写取三态）"
     );
     println!(
         "LAYER0_POSITION_ADDRESSED stream={stream:?} segments={:?} states={} closed_form_of_every_segment={} root_persisted_states={} journal_differing_states={} verification_ran_states={} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
         prepared.segments.iter().map(Vec::len).collect::<Vec<_>>(),
         tally.states,
-        closed_form_state_count(&prepared.segments),
+        closed_form_of_every_segment_for_the_count_line(&prepared.segments),
         tally.root_persisted_states,
         tally.journal_differing_states,
         tally.verification_ran_states,

@@ -96,7 +96,8 @@ fn overwrite_publishes_the_second_version_through_the_same_commit_shape() {
     );
     assert_eq!(
         segment_kinds_text(&segments),
-        "[unit_write×24,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]"
+        "[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]",
+        "种类串里屏障按设备数：每道池屏障两块盘各记一步（实审 B3a-2 第 1 条，录制器按设备记屏障）"
     );
 
     assert_eq!(second.root.checkpoint_txg, CheckpointTxg(4));
