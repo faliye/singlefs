@@ -53,8 +53,8 @@ use singlefs_core::transaction::{
 use singlefs_core::unit::data_unit_payload_capacity;
 use singlefs_format::{DATA_UNIT_BYTES, SLOT_BYTES};
 
-use crate::crash::{MemoryPool, RecordCheck, SparseBlockDevice};
 use crate::fault_injection::{FaultInjectingBlockDevice, SharedFaultPlan};
+use crate::memory_pool::{MemoryPool, RecordCheck, SparseBlockDevice};
 use crate::model::{
     IdealModel, ModelAnswer, ModelCheckpointTxg, ModelDeviceIdentity, ModelDisagreement,
     ModelJudgementCounts, ModelPoolGeometry, ModelRingPosition, ModelRootKey, ObservedEffect,
@@ -71,6 +71,21 @@ use crate::model_comparison::{
 use crate::scenario::{e142_parameters, first_file_content, FIXED_WRITE_TIME_SECONDS};
 use crate::segments::FixedGeometry;
 use crate::{RecordingBlockDevice, SharedStream};
+
+/// 随机历史、崩溃注入与坏盘输入三场战役共用的种子基（从 checker 档的 `crash_injection` 挪到这里：harness 档的随机历史与故障注入用例也用它，
+/// 放在 harness 才不让 harness 的测试依赖 checker 档，D13（验证路线） 已定项 15）。
+/// 全部随机路径的种子基：随机历史那五段（增补 3 第 1 件）、崩溃注入这三档（第 3 件）、坏盘输入、故障注入与 E158 装置的种子区间都从它起。
+///
+/// **永久固定，不重抽**（用户 2026-09-27 定）：崩溃放量要把每个状态的过程落文件、按内容 hash 复用判定，
+/// 种子一换这些产物整批作废；`crates/mutations.tsv` 的「这条变异必须红」与里程碑验收说的判红也都绑在这一批历史上，
+/// 种子基一动它们就成了掷骰子。值是 2026-09-20 抽的（`python3 -c "import secrets; print(secrets.randbits(63))"`），从此不动。
+///
+/// **要多测别的历史，只往后追加新的种子区间**（新的偏移段）：已有区间与它们的判红、镜像、过程文件照旧可复用；
+/// 不重抽这个基，也不改已有区间的偏移。
+///
+/// TODO：名字里的 `THIS_TEST_CYCLE` 与「永久固定」不符；改名要动另一个会话正在改的三份文件，
+/// 等里程碑二提交之后做，登记在 `records/2026-09-24-里程碑二收尾调度.md` 第三节「种子基永久固定」那一行。
+pub const SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE: u64 = 7_463_871_032_432_355_113;
 
 /// 历史里两块内存盘多宽（取样点的参数；两块恒等大：模型的几何只有一个盘大小，`ModelPoolGeometry::device_size_in_bytes`）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -832,7 +847,12 @@ fn image_of(
     MemoryPool {
         devices: devices
             .iter()
-            .map(|(identity, device)| (*identity, device.inner().inner().image.clone()))
+            .map(|(identity, device)| {
+                (
+                    *identity,
+                    device.wrapped_device().wrapped_device().image.clone(),
+                )
+            })
             .collect(),
         device_size_in_bytes: device_width.device_bytes(),
     }
@@ -2099,7 +2119,7 @@ pub struct HistoryRun {
     pub tally: HistoryTally,
     /// mkfs 占了录制流开头的几步：崩溃注入（增补 3 第 3 件）的基线与层 0 一样取「mkfs 之后」——
     /// mkfs 不是事务，它写到一半的盘面上没有池，恢复报不出根是对的，不该拿事务的 oracle 去判
-    /// （层 0 那一路同样从 `mkfs_operation_count` 之后起枚举，见 `tests/first_transaction_step_seven_layer0.rs`）。
+    /// （层 0 那一路同样从 `mkfs_operation_count` 之后起枚举，见 `crates/singlefs-checker-tier/tests/first_transaction_step_seven_layer0.rs`）。
     pub operations_written_by_make_filesystem: usize,
     /// 这段历史停下时模型根环里的每一条根（`IdealModel::committed_versions`）：故障注入（增补 3 第 4 件）拿它当
     /// 「模型认下来的每一版」判重开走到的那一版——失败那一步的根，模型认了就在里面，没认（判定对不上、模型没往前走）就不在。

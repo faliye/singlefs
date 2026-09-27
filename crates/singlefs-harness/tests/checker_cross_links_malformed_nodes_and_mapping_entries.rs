@@ -20,7 +20,7 @@ use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed}
 use singlefs_core::transaction::{TransactionOutput, TransactionUnit};
 use singlefs_core::unit::{build_index_node, parse_index_node, IndexNodeHeader};
 use singlefs_format::{DATA_UNIT_BYTES, JOURNAL_RING_DEFAULT_BYTES};
-use singlefs_harness::crash::MemoryPool;
+use singlefs_harness::memory_pool::MemoryPool;
 
 /// 中央映射树叶压到 3 条：第一个文件版本的映射树长成两层（根是内部节点）。
 const SMALL_CENTRAL_MAPPING: (usize, usize) = (3, 3);

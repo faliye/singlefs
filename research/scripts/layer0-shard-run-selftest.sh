@@ -4,7 +4,7 @@
 # 工具链与输入指纹两边比、清场与复原（回读）、两片、拷账本、merge、判、写 54 号那一格全绿标记。
 # 默认用假 cargo（不编译、不跑用例）：登记的是临时仓里新写的一条标了 #[ignore] 的替身用例，三趟都不带 --include-ignored，不算重型；
 # 假 cargo 分片跑时往进度目录写账本、merge 时核两份账本在不在、记的输入指纹对不对，打与层 0 同形的计数行与带 shards= 的线程行。
-# 带 SINGLEFS_HEAVY_TESTS（commit 或 user-request）时换真 cargo：登记 crates/singlefs-harness/tests/crash_enumeration_sharded_across_processes.rs
+# 带 SINGLEFS_HEAVY_TESTS（commit 或 user-request）时换真 cargo：登记 crates/singlefs-checker-tier/tests/crash_enumeration_sharded_across_processes.rs
 # 里不标 ignore 的小流用例（第一条流按甲二展开 29 个状态），release 下真编真跑；不带时成功行写明真 cargo 那一趟本次未跑。逐格核：
 #   ① 不分片跑那条用例打的计数行，与双机分片 merge 之后记进全绿标记的那一行逐字相同；标记作数；清场复原了；第二台这一趟的目录删了
 #   ② --merged-log（门禁 54 号调的那一条）：merge 那一趟的日志写进给的文件，带 LAYER0_SHARD mode=merge shards=2 与同一行计数
@@ -14,7 +14,7 @@
 #   ⑥ 没登记 shard=across-machines 的用例 ⇒ 拒
 #   ⑦ 发现日志：--merged-log 时三趟各有一份，merge 那一份是 <日志文件>.findings.tsv（一节、begin 行不带 shard=、有 summary），
 #      两片的在各自日志旁边（begin 行带 shard=0/2、shard=1/2），第二台上那一份拷回之后删了，三份路径都打进驱动的输出；单独跑时三份在 common-dir 下这一趟的目录里
-# 假 cargo 设了 SINGLEFS_LAYER0_FINDINGS_FILE 就往里追加一节（行格式照 crates/singlefs-harness/src/crash.rs 的发现日志），标准输出另打一行 LAYER0_FINDINGS。
+# 假 cargo 设了 SINGLEFS_LAYER0_FINDINGS_FILE 就往里追加一节（行格式照 crates/singlefs-checker-tier/src/crash.rs 的发现日志），标准输出另打一行 LAYER0_FINDINGS。
 #   ⑧ 第二台那一片经 research/scripts/run-with-memory-cap.sh 起（上限是配置的 PEER_MEMORY_CAP）：假 cargo 在 1/2 那一片记下自己的 cgroup，
 #      要在 singlefs-memory-cap- 那个 scope 里；驱动的输出里那一行写着经它起；配置缺 PEER_MEMORY_CAP、写成不带单位的数，配置判法拒
 # 弄坏开关（驱动脚本的）LAYER0_SHARD_RUN_BREAK=no-peer-findings-copy、no-merge-findings 各自打开时 ⑦ 判错，peer-without-memory-cap 打开时 ⑧ 判错。
@@ -263,7 +263,7 @@ expect "⑥ 没登记 shard=across-machines 的用例 ⇒ 拒（退 1），出�
 
 if (( failures > 0 )); then
   echo "  ✗ layer0-shard-run.sh 自证没过：${failures} 格判错（共 ${checked} 格）"
-  echo "     → 怎么办：照上面每一格的说明改驱动脚本（research/scripts/layer0-shard-run.sh）或分片那一段（crates/singlefs-harness/src/layer0_progress.rs、crash.rs）"
+  echo "     → 怎么办：照上面每一格的说明改驱动脚本（research/scripts/layer0-shard-run.sh）或分片那一段（crates/singlefs-checker-tier/src/layer0_progress.rs、crash.rs）"
   exit 1
 fi
 echo "  ✓ layer0-shard-run.sh 自证通过：${checked} 格都对（${cargo_mode}；第二台是本机上的另一个目录，没碰真的第二台）"

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: checker 与实现只共享常量模块，记账语义不许同源
+# gate-stage: checker 与实现只共享常量模块，记账语义不许同源；harness 档不依赖 checker 档
 #
 # 判据：D13（验证路线） 已定项 5 逐字「checker 与实现之间只共享一样东西：一份由 kb 的字段表
-# 生成的常量模块，生成器从 kb 读、两边都只消费，任何人不许手改」。三条，任一条不成立判红：
+# 生成的常量模块，生成器从 kb 读、两边都只消费，任何人不许手改」，以及 D13（验证路线） 已定项 15
+# 的依赖方向（checker 档包依赖 harness 与 checker，反过来不许）。四条，任一条不成立判红：
 #   ① 按本仓 `crates/*/Cargo.toml` 建内部依赖图，`singlefs-checker` 与 `singlefs-core` 各取
 #      传递闭包再求交集，减去 `singlefs-format` 之后必须为空——这是 C12（增量语义共用） 要的
 #      「两侧调用集合交集为空（格式解析、常量除外）」在 crate 粒度上的形态。取闭包而不是只看直接依赖：
@@ -16,6 +17,9 @@
 #   ③ 共享的那个常量模块 `crates/singlefs-format/src/**/*.rs` 里，除去 `#[cfg(test)]` 标着的那一项
 #      （它后面紧跟的那一个 item：花括号配平到收尾，或一行以分号收尾），正文不许有分支或循环
 #      （`if` / `match` / `for` / `while` / `loop`）——它只许发射标量与纯算术。`#[cfg(test)]` 之后的别的 item 照扫。
+#   ④ harness 档包 `singlefs-harness` 的传递闭包（三种依赖表都算，dev-dependencies 也算）里没有 checker 档包
+#      `singlefs-checker-tier`，它的源码里也零处引 `singlefs_checker_tier`：harness 档随时跑，一旦依赖 checker 档，
+#      改一行代码跑 harness 就把 checker 档一起编进来，两档又耦合回去（.claude/rules/verification.md「定义与名字」）。
 #
 # 依赖表怎么读（①②两条都靠它）：`[dependencies]`、`[dev-dependencies]`、`[build-dependencies]` 与
 # `[target.'…'.dependencies]` 这几种节头都认；`[dependencies.X]` 这种按 crate 开的表认成 X；
@@ -33,11 +37,12 @@
 # ⚠️ 射程：判的是「两侧有没有共享代码」，判不了「两边各自手写的那份语义对不对」——
 # 后者归模型对拍与变异表。C12（增量语义共用） 另一半（把运行时某条记账分支的符号取反，
 # I-3.1（已分配统计对得上） 必须变红）不在这一道里，它住在 `crates/mutations.tsv`，由门禁 59 号复跑。
-# ⚠️ 三个 crate 的名字写死在这里：改名或搬家时这一道找不到文件会判红，不会静默跳过。
+# ⚠️ 五个 crate 的名字写死在这里：改名或搬家时这一道找不到文件会判红，不会静默跳过。
 #
 # 判别力：fixtures/94-checker-implementation-disjoint.sh/red 一次造出三条的形状（依赖表另用别名、`[dependencies.X]`、
 # `[target.'…'.dependencies]` 与 `X.workspace = true` 几种写法，常量模块在前部一个 item 上贴了 `#[cfg(test)]`），
-# green 是干净的一份（测试模块里的分支不算）。
+# green 是干净的一份（测试模块里的分支不算）；red 里的 harness 在 dev-dependencies 里经一个中间包依赖 checker 档包、
+# 源码里引一处 `singlefs_checker_tier`，green 里的 checker 档包依赖 harness（方向对的那一边不判红）。
 #
 #   bash .claude/gate.d/94-checker-implementation-disjoint.sh [项目根]
 set -uo pipefail
@@ -52,6 +57,8 @@ CHECKER = "crates/singlefs-checker"
 CORE = "crates/singlefs-core"
 SHARED = "crates/singlefs-format"
 SHARED_CRATE_NAME = "singlefs-format"
+HARNESS = "crates/singlefs-harness"
+CHECKER_TIER = "crates/singlefs-checker-tier"
 
 def fail(message, steps):
     print(f"  ✗ {message}")
@@ -87,7 +94,7 @@ def manifest_of(crate_dir):
     path = os.path.join(crate_dir, "Cargo.toml")
     if not os.path.isfile(path):
         fail(f"找不到 {path}", [
-            f"怎么办：crate 改名或搬家了，同步改这个阶段里写死的三个路径（{CHECKER} / {CORE} / {SHARED}）。",
+            f"怎么办：crate 改名或搬家了，同步改这个阶段里写死的五个路径（{CHECKER} / {CORE} / {SHARED} / {HARNESS} / {CHECKER_TIER}）。",
             "        这一道判的是 checker 与实现之间共享了什么，路径对不上就没有对象可判，所以它判红而不是跳过。",
         ])
     package_name, names, aliases = None, set(), {}
@@ -249,6 +256,39 @@ if branches:
          "        而前两条一个字都不会说——把那段逻辑搬回各自的 crate，两边各写一份。"],
     ))
 
+# ④ 依赖方向：harness 档不依赖 checker 档（D13（验证路线） 已定项 15）。
+harness_dependencies = closure_of(HARNESS)
+checker_tier_name, _, _ = manifest_of(CHECKER_TIER)
+_, _, harness_aliases = manifest_of(HARNESS)
+if checker_tier_name in harness_dependencies:
+    via = [alias for alias, real in sorted(harness_aliases.items()) if real == checker_tier_name]
+    problems.append((
+        f"harness 档包的依赖闭包里有 checker 档包 `{checker_tier_name}`（按本仓内部依赖图算的传递闭包，dev-dependencies 也算）：",
+        [checker_tier_name + (f"（harness 的 Cargo.toml 里写成别名 `{'`、`'.join(via)}`）" if via else "")],
+        ["怎么办：依赖方向只许 checker 档 → harness 与 checker（D13（验证路线） 已定项 15，.claude/rules/verification.md「定义与名字」）。",
+         "        harness 要用的脚手架留在 harness 自己这边或拷一份进来（宁可多份，不要耦合）；",
+         "        用得到 checker 档东西的用例本身就属于 checker 档，把它搬进 crates/singlefs-checker-tier/tests/。"],
+    ))
+harness_sources = sorted(glob.glob(f"{HARNESS}/src/**/*.rs", recursive=True) + glob.glob(f"{HARNESS}/tests/**/*.rs", recursive=True))
+if not harness_sources:
+    fail(f"{HARNESS} 的 src/ 与 tests/ 下一个 .rs 都没有", [
+        "怎么办：harness 搬家了就同步改这个阶段里的路径；扫到 0 个文件而报绿，与判过了一模一样。",
+    ])
+tier_crate_identifiers = {"singlefs_checker_tier"} | {alias.replace("-", "_") for alias, real in harness_aliases.items() if real == checker_tier_name}
+tier_pattern = re.compile(r"(?<![\w])(" + "|".join(sorted(map(re.escape, tier_crate_identifiers))) + r")(?![\w])")
+tier_references = []
+for path in harness_sources:
+    for line_number, line in enumerate(open(path, encoding="utf-8"), 1):
+        if tier_pattern.search(line.split("//", 1)[0]):
+            tier_references.append(f"{path}:{line_number}：{line.strip()}")
+if tier_references:
+    problems.append((
+        f"harness 档的源码里有 {len(tier_references)} 处引 checker 档包：",
+        tier_references,
+        ["怎么办：harness 档不依赖 checker 档（D13（验证路线） 已定项 15）。要用的东西在 harness 里自己写一份，",
+         "        或者把这条用例搬进 crates/singlefs-checker-tier/tests/（它要 checker 档的东西，它就是 checker 档的用例）。"],
+    ))
+
 if problems:
     for title, entries, steps in problems:
         print(f"  ✗ {title}")  # gate-lint:summary
@@ -260,7 +300,8 @@ if problems:
 
 print(f"  ✓ checker 与实现只共享常量模块 `{SHARED_CRATE_NAME}`（传递闭包的交集减去它为空：checker 闭包 {len(checker_dependencies)} 个、实现闭包 {len(core_dependencies)} 个，内部依赖图 {len(internal)} 个 crate）；"
       f"checker 的 {len(checker_sources)} 份源码零处引 `singlefs_core`（别名引进来的 {len(core_aliases)} 个）；"
-      f"共享模块 {len(shared_sources)} 份源码的正文 {scanned_lines} 行里没有分支与循环（`#[cfg(test)]` 标着的项 {skipped_test_lines} 行不扫）")
+      f"共享模块 {len(shared_sources)} 份源码的正文 {scanned_lines} 行里没有分支与循环（`#[cfg(test)]` 标着的项 {skipped_test_lines} 行不扫）；"
+      f"harness 档的依赖闭包 {len(harness_dependencies)} 个里没有 checker 档包，它的 {len(harness_sources)} 份源码零处引它")
 print(f"    这一道判不了的：两边各自手写的那份语义对不对（归模型对拍与变异表），以及 C12（增量语义共用） 另一半"
       f"「运行时记账分支取反 ⇒ I-3.1（已分配统计对得上） 必须红」——那一条在 `crates/mutations.tsv` 里，门禁 59 号复跑")
 PY

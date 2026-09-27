@@ -18,7 +18,7 @@ use singlefs_core::transaction::{
     PublishError, TransactionOutput, WarmUpOutput,
 };
 use singlefs_format::JOURNAL_RING_DEFAULT_BYTES;
-use singlefs_harness::crash::MemoryPool;
+use singlefs_harness::memory_pool::MemoryPool;
 use singlefs_harness::segments::FixedGeometry;
 use singlefs_harness::{RecordingBlockDevice, RetainedOperation, SharedStream};
 
@@ -248,17 +248,17 @@ impl FormattedPool {
 /// 一个崩溃状态的两块内存盘：mkfs 之后的基线再施加持久了的那几条写，外面包录制器、录进一条新流（挂载之后流里多一步就是发了写或屏障）。
 pub fn crash_state_devices(
     base: &MemoryPool,
-    writes: &[singlefs_harness::crash::RetainedWrite],
+    writes: &[singlefs_harness::memory_pool::RetainedWrite],
     persisted: &[bool],
     stream: &SharedStream,
 ) -> Vec<(
     DeviceIdentity,
-    RecordingBlockDevice<singlefs_harness::crash::SparseBlockDevice>,
+    RecordingBlockDevice<singlefs_harness::memory_pool::SparseBlockDevice>,
 )> {
     base.devices
         .iter()
         .map(|(identity, sparse)| {
-            let mut device = singlefs_harness::crash::SparseBlockDevice::new(
+            let mut device = singlefs_harness::memory_pool::SparseBlockDevice::new(
                 IMAGE_BYTES,
                 PhysicalBlockSizeInBytes(512),
             );
@@ -280,13 +280,13 @@ pub fn crash_state_devices(
 pub fn memory_pool_of_sparse_devices(
     devices: &[(
         DeviceIdentity,
-        RecordingBlockDevice<singlefs_harness::crash::SparseBlockDevice>,
+        RecordingBlockDevice<singlefs_harness::memory_pool::SparseBlockDevice>,
     )],
 ) -> MemoryPool {
     MemoryPool {
         devices: devices
             .iter()
-            .map(|(identity, device)| (*identity, device.inner().image.clone()))
+            .map(|(identity, device)| (*identity, device.wrapped_device().image.clone()))
             .collect(),
         device_size_in_bytes: IMAGE_BYTES,
     }

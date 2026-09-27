@@ -21,7 +21,7 @@ use singlefs_core::transaction::{
     PublishPlan, TransactionOutput,
 };
 use singlefs_format::SLOT_BYTES;
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
+use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::{RecordingBlockDevice, RetainedOperation, SharedStream};
 
 use crate::common::{file_content, parameters, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES};
@@ -364,7 +364,7 @@ impl TreeSplitPool {
             .map(|(identity, device)| {
                 let mut reopened =
                     SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512));
-                reopened.image = device.inner().image.clone();
+                reopened.image = device.wrapped_device().image.clone();
                 (
                     *identity,
                     RecordingBlockDevice::with_shared_stream(
@@ -390,7 +390,7 @@ impl TreeSplitPool {
             devices: self
                 .devices
                 .iter()
-                .map(|(identity, device)| (*identity, device.inner().image.clone()))
+                .map(|(identity, device)| (*identity, device.wrapped_device().image.clone()))
                 .collect(),
             device_size_in_bytes: IMAGE_BYTES,
         }

@@ -11,30 +11,65 @@
 #
 # 触发文件的清单不在这里，在 .claude/gate.d/knowledge-sync-triggers.tsv，68 号与 11 号都读那一份。
 
-.claude/rules/implementation-workflow.md	# 阶段同步判「要改」：第 37 行把「说清一道阶段读什么」全压在手工现查上，现在有登记表与脚本自动比对了
-.claude/agent-common.md	# 第 4 行指错门禁号：「71 号」改指上游「规则纪律（项目本地）」阶段（三方 gate-fix-forks 第三轮判决）
-.claude/gate.d/12-no-prime-marks.sh	# 新立：全仓禁止撇号类字符当角标（用户 2026-09-24 指示「全仓禁止」）
-.claude/gate.d/47-research-script-selftests.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/63-agent-write-scope.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/64-change-range-single-source.sh	# 新立：改动范围只许一份取法（三方 gate-fix-forks 第二、三轮判决）
-crates/singlefs-core/src/mount.rs	# 角标改名：变体起新名字，不用撇号（用户 2026-09-24 指示）
-research/scripts/changed-paths.sh	# 新立：门禁阶段取改动范围的共用脚本（三方 gate-fix-forks）
-research/scripts/replay.sh	# E153、E154、E155、E155R2 四行改指角标改名后复跑的新产物（与旧产物只差改名）；这一文件别的行归另一个会话
-.claude/agents/implementation-writer.md	# 实现员验证负载写死（用户 2026-09-24：只跑自己动到的测试、层 0 全量每次提交跑一次）
-.claude/gate.d/lib-prime-marks.py	# 撇号类角标字符集抽成一处，12 号与写入闸共读
-.claude/hooks/bash-command-detector.sh	# 拦看门狗前台起法（提案记录第四十节第 5 行）
-.claude/hooks/heavy-test-guard.sh	# 新立：重型测试只在提交时跑、子 agent 不许跑（用户 2026-09-24）
-.claude/hooks/write-guard.sh	# 写入那一刻拒撇号类角标（用户 2026-09-24）
-CLAUDE.md	# checker 判的不变量条数 40 → 43
-crates/singlefs-checker/src/image.rs	# 实十四：I-7.9、I-9.15 进已实现清单
-crates/singlefs-checker/src/walk.rs	# 实十四：I-7.9、I-9.15 checker 判定
-crates/singlefs-core/src/recovery.rs	# 实十四：重建经映射回退、N2
-crates/singlefs-harness/src/bin/e158_root_choice_repair.rs	# E158 第六、七段装置
-crates/singlefs-harness/src/bin/first_transaction_on_device.rs	# 实十八：抬 F 失败账的设备侧判相等
-crates/singlefs-harness/src/fault_injection.rs	# 实十八：第 208 行变异的敏感取样点
-crates/singlefs-harness/src/history.rs	# 实十八：取号前准入的新错误成员
-crates/singlefs-harness/src/model_comparison.rs	# 实十八：取号前准入的新错误成员
-research/scripts/agent-watch.py	# 看门狗：管道尾不误报、每跨一个整小时报一次询问
-research/scripts/capped.sh	# 新立：线程上限包装脚本（用户 2026-09-24）
-research/scripts/watch.conf	# 看门狗新键 ask-every-minutes
-research/scripts/watch.sh	# 看门狗配置白名单加新键
+.claude/agent-common.md	# 验证两档拆分：重型测试那一条改成 checker 档（singlefs-checker-tier）按包判
+.claude/agents/crash-verifier.md	# 验证两档拆分：54 号默认快档（-p singlefs-checker-tier）、--full 只在用户要求或夜间
+.claude/agents/gate-triage.md	# 验证两档拆分：54 号快档核标记，不作数报本次未跑
+.claude/agents/implementation-writer.md	# 验证两档拆分：崩溃枚举用例写进 checker 档包、交回前只跑 harness 档
+.claude/agents/mutation-triage.md	# 验证两档拆分：指向的规则小节改名
+.claude/gate.d/13-vague-names.sh	# 验证两档拆分：新立，函数名与类型名不许只由空泛词拼成（用户 2026-09-27「run_cell 这种命名判违规」）
+.claude/gate.d/54-layer0-replay.sh	# 验证两档拆分：快档改跑 cargo test -p singlefs-checker-tier，标记不作数报本次未跑不判红
+.claude/gate.d/55-qemu-first-transaction.sh	# 验证两档拆分：真设备二进制搬进 checker 档包，cargo build -p 改名（这一份另有 singlefs-99 的全绿标记改动，不归这一批）
+.claude/gate.d/stage-inputs.tsv	# 验证两档拆分：crash-case 行改包名 singlefs-checker-tier，补登记位置寻址那条全量用例
+.claude/hooks/heavy-test-guard.sh	# 验证两档拆分：checker 档两个 kind 放行给崩溃验证员，规矩句改
+.claude/hooks/lib_heavy_tests.py	# 验证两档拆分：checker 档按包判；-p 认通配、@版本、pkgid URL；看得到值的别名展开再判
+.claude/rules/implementation-workflow.md	# 验证两档拆分：「重型测试只在提交时跑」一节改成两档、指向 verification.md
+.claude/rules/verification.md	# 验证两档拆分：新立，三个包三个名字、快档与全量、空泛名禁令、从上游收回的四节
+CLAUDE.md	# 验证两档拆分：规则清单加 verification.md、crate 数改成五个
+crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs	# 验证两档拆分：整份从 harness 搬进 checker 档包，check 改名 segment_two_check
+crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs	# 验证两档拆分：整份从 harness 搬进 checker 档包，run_cell 一族改名
+research/scripts/admission.py	# 验证两档拆分：54 号自证的快档期望改成报本次未跑、样本带 checker 档包
+research/scripts/crash-case-check.py	# 验证两档拆分：判法改成崩溃枚举用例住 checker 档包、跟同文件 helper
+research/scripts/replay.sh	# 验证两档拆分：装置二进制的 cargo run -p 改成 singlefs-checker-tier
+research/scripts/e152-run.sh	# 验证两档拆分：真设备二进制的 cargo build -p 改成 singlefs-checker-tier
+research/scripts/e152-stage-root.sh	# 验证两档拆分：同上
+research/scripts/layer0-shard-run.sh	# 验证两档拆分：测试文件路径改到 checker 档包
+crates/singlefs-checker-tier/src/lib.rs	# 验证两档拆分：新包 checker 档的库入口
+crates/singlefs-checker-tier/src/crash.rs	# 验证两档拆分：原 harness crash.rs 的枚举引擎与记录核对器那一半，get 改名 count_named
+crates/singlefs-checker-tier/src/crash_injection.rs	# 验证两档拆分：从 harness 整份搬来，导入改到 harness 的 memory_pool / history
+crates/singlefs-checker-tier/src/bad_disk_input.rs	# 验证两档拆分：从 harness 整份搬来
+crates/singlefs-checker-tier/src/layer0_progress.rs	# 验证两档拆分：从 harness 整份搬来
+crates/singlefs-checker-tier/src/device_log.rs	# 验证两档拆分：从 harness 整份搬来
+crates/singlefs-checker-tier/src/on_device_modes.rs	# 验证两档拆分：从 harness 整份搬来
+crates/singlefs-checker-tier/src/bin/e142_first_transaction_write_dump.rs	# 验证两档拆分：装置二进制搬进 checker 档包
+crates/singlefs-checker-tier/src/bin/e142_first_transaction_write_dump_one_device.rs	# 验证两档拆分：装置二进制搬进 checker 档包
+crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs	# 验证两档拆分：装置二进制搬进 checker 档包，run / run_cell / check_cell 改名
+crates/singlefs-checker-tier/src/bin/first_transaction_device_log_check.rs	# 验证两档拆分：真设备装置搬进 checker 档包
+crates/singlefs-checker-tier/src/bin/first_transaction_region_bytes.rs	# 验证两档拆分：装置二进制搬进 checker 档包
+crates/singlefs-harness/src/lib.rs	# 验证两档拆分：模块表去掉搬走的，加 memory_pool；inner 改名 wrapped_device
+crates/singlefs-harness/src/memory_pool.rs	# 验证两档拆分：原 crash.rs 的内存池、保留写、崩溃镜像那一半
+crates/singlefs-harness/src/first_transaction_regions.rs	# 验证两档拆分：导入改到 memory_pool
+crates/singlefs-core/src/admission.rs	# 验证两档拆分：空泛名 get 改名 replicas
+crates/singlefs-core/src/transaction.rs	# 验证两档拆分：空泛名 perform 改名 perform_commit_step
+crates/singlefs-core/src/system_configuration.rs	# 验证两档拆分：注释里的测试文件路径改到 checker 档包
+crates/singlefs-format/src/lib.rs	# 验证两档拆分：注释里的测试文件路径改到 checker 档包
+.claude/gate.d/stage-owners.tsv	# 验证两档拆分：登记新阶段 13 号
+.claude/gate.d/80-absolute-assertions.sh	# 验证两档拆分：里面的测试文件路径改到 checker 档包
+research/scripts/layer0-shard-run-selftest.sh	# 验证两档拆分：里面的测试文件路径改到 checker 档包
+.claude/agents/experiment-designer.md	# 验证两档拆分：装置路径改到 checker 档包
+.claude/agents/experiment-runner.md	# 验证两档拆分：装置路径改到 checker 档包
+.claude/agents/three-way-attack.md	# 验证两档拆分：装置路径改到 checker 档包
+.claude/gate.d/86-experiment-orphans.sh	# 验证两档拆分：装置路径改到 checker 档包
+.claude/gate.d/96-experiment-source-discipline.sh	# 验证两档拆分：装置路径改到 checker 档包
+.claude/hooks/agent-write-scope.tsv	# 验证两档拆分：执行员可写的装置路径改到 checker 档包
+.claude/hooks/bash-command-detector.sh	# 验证两档拆分：装置路径改到 checker 档包，git 调用带 core.quotepath=false
+.claude/hooks/write-guard.sh	# 验证两档拆分：装置路径改到 checker 档包
+.claude/rules/implementation-first.md	# 验证两档拆分：crate 数改成五个，指向 verification.md
+.claude/rules/path-moves.md	# 验证两档拆分：「怎么做」加第 7 步，自检样本与用例跟着搬
+crates/singlefs-checker/src/walk.rs	# 验证两档拆分：空泛名 value 改名 birth_identity_tail_number
+crates/singlefs-checker-tier/src/bin/first_transaction_on_device.rs	# 验证两档拆分：真设备装置搬进 checker 档包
+crates/singlefs-harness/src/fault_injection.rs	# 验证两档拆分：导入改到 memory_pool
+crates/singlefs-harness/src/history.rs	# 验证两档拆分：导入改到 memory_pool，种子基从 crash_injection 挪来
+research/scripts/agent-watch.py	# 验证两档拆分：重型进程告警说明与假进程改成按包判
+research/scripts/compile-then-swap.py	# 验证两档拆分：装置路径改到 checker 档包
+.claude/gate.d/94-checker-implementation-disjoint.sh	# 验证两档拆分：加第 ④ 条，harness 档不依赖 checker 档包；样本补 harness 与 checker 档包
+research/scripts/rerun-failed-tests.py	# 验证两档拆分：新立，从 cargo test 日志取失败用例、按测试目标打印只重跑它们的命令（用户 2026-09-27「改为仅仅跑错误用例的」）

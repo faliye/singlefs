@@ -4,7 +4,7 @@
 # gate-stage: research 里的实验号在 kb 里有没有正文
 #
 # 判据：`research/` 下（逐层往下扫，`target/` 编译目录不扫）凡是以 `eNN` 命名的东西（提示、产物、源码、变异表、数据），
-# 以及住在 `crates/singlefs-harness/src/bin/` 下的实验装置（`eNN_*.rs`），
+# 以及住在 `crates/singlefs-checker-tier/src/bin/` 下的实验装置（`eNN_*.rs`），
 # `kb/experiments/` 里就必须有对应编号的正文文件。没有 = 干了活但没入库，
 # 而**跑过的东西没入库比没跑更危险**——它会以「我们量过」的形式活在对话里，谁也复核不了。
 #
@@ -20,7 +20,7 @@ preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT
 
 have=$(ls "$EXP_DIR" | grep -oE '^[0-9]+' | sed 's/^0*//' | sort -un)
 # 射程逐个目录报：不在的列进成功行，读不了的（find 出错）判红——射程静默缩小与判过了在输出里长得一样
-SCOPE_DIRS=(research crates/singlefs-harness/src/bin)
+SCOPE_DIRS=(research crates/singlefs-checker-tier/src/bin)
 absent=(); names_file="$(mktemp)"; errors_file="$(mktemp)"
 trap 'rm -f "$names_file" "$errors_file"' EXIT
 for d in "${SCOPE_DIRS[@]}"; do

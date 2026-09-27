@@ -1,0 +1,44 @@
+FINAL I-5.4 Holds
+FINAL I-7.1 Holds
+FINAL I-7.2 Holds
+FINAL I-7.3 Holds
+FINAL I-7.4 Holds
+FINAL I-7.6 Holds
+FINAL I-7.7 Holds
+FINAL I-7.8 Holds
+FINAL I-7.9 NotApplicable("根环里没有抬 F 的根：每条根带的 F 都不高于同一实例里它前一条根带的（回退与新实例的第一条根不算抬）")
+FINAL I-7.12 Holds
+FINAL I-7.13 Holds
+FINAL I-8.6 Holds
+FINAL I-8.7 NotApplicable("环里没有哪个实例写出过两条非 0 事务号的记录：一对可比的号都凑不出来")
+FINAL I-8.8 NotApplicable("环里没有哪一组（同一块盘上实例代号与事务号都相同的非 0 记录）落了两条以上、也没有哪一组一条提交标记都没有：③ ④ 没有判的对象，提交标记字节单独成立不算这一条成立")
+FINAL I-8.9 Holds
+FINAL I-9.1 Holds
+FINAL I-9.2 Holds
+FINAL I-9.4 Holds
+FINAL I-9.6 Holds
+FINAL I-9.7 Holds
+FINAL I-9.10 Holds
+FINAL I-9.12 Holds
+FINAL I-9.13 Holds
+FINAL I-9.14 NotApplicable("没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来")
+FINAL I-9.15 Holds
+FINAL I-9.16 Holds
+test positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle ... FAILED
+test applying_a_record_whose_units_are_missing_is_caught_by_the_record_checker ... ok
+test checker_report_on_the_final_image ... ok
+
+failures:
+
+failures:
+    layer0_quick_tier_matches_the_full_tally_shape
+    positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle
+    removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker
+
+test result: FAILED. 2 passed; 3 failed; 1 ignored; 0 measured; 0 filtered out; finished in 73.93s
+
+error: test failed, to rerun pass `-p singlefs-checker --test first_transaction_step_seven_layer0`
+  ✗ checker 档快档判红（上面是 cargo test 的尾部）
+     → 怎么办：单跑看细节：cargo test --release -p singlefs-checker -- --nocapture（只看一个测试二进制加 --test <名>）；
+                断言消息里是第一处对不上的计数或违例；改代码还是改断言先想清楚是哪一种——直接改断言等于把测试关掉。
+exit=1

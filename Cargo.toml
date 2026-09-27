@@ -7,6 +7,7 @@ members = [
     "crates/singlefs-core",
     "crates/singlefs-harness",
     "crates/singlefs-checker",
+    "crates/singlefs-checker-tier",
 ]
 exclude = ["research"]
 

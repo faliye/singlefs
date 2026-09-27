@@ -1,2 +1,2 @@
 [workspace]
-members = ["crates/singlefs-harness"]
+members = ["crates/singlefs-checker-tier"]

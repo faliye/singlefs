@@ -119,10 +119,11 @@ waaagh！
 提交前跑门禁：
 
 ```bash
-bash .claude/scripts/gate.sh              # 共享阶段 + .claude/gate.d/ 的项目阶段（含层 0 快档与逐条全绿标记核对、QEMU 真设备、herd7、crates 变异表复跑；层 0 全量不在里面）
+bash .claude/scripts/gate.sh              # 共享阶段 + .claude/gate.d/ 的项目阶段（含 checker 档快档与逐条全绿标记核对、QEMU 真设备、herd7、crates 变异表复跑；层 0 全量不在里面）
 
-cargo test --workspace                    # 平时的单测；登记的崩溃枚举用例（层 0 全量等）都标 ignored，这里只跑快档与缩小版
-bash .claude/gate.d/54-layer0-replay.sh   # 单跑层 0 快档（两条流里不标 ignored 的用例），再逐条核登记的崩溃枚举用例各自那一格全绿标记
+cargo test -p singlefs-harness            # harness 档：单元与集成测试，改了代码随时跑（.claude/rules/verification.md）
+SINGLEFS_HEAVY_TESTS=user-request cargo test --release -p singlefs-checker-tier --lib --tests   # checker 档快档：崩溃枚举用例住这个包的 tests/，全量那几条标 ignored；默认只在提交时由门禁 54 号跑
+bash .claude/gate.d/54-layer0-replay.sh   # 单跑 54 号快档（checker 档包不标 ignored 的用例），再逐条核登记的崩溃枚举用例各自那一格全绿标记，不作数的报「本次未跑」
 bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full <worktree>  # 层 0 全量（release）：暂存之后在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑（建法见快档判红时的出路句），逐条崩溃枚举用例按它自己的输入指纹复用或重跑，判绿写那一条的全绿标记
 bash .claude/gate.d/55-qemu-first-transaction.sh  # 单跑 QEMU 两块 virtio 盘上的第一个事务、发布 B、第二个实例、发布 D 与抬 F
 bash .claude/scripts/lkmm.sh              # 单跑 LKMM，需要 herd7 与一棵内核树

@@ -303,16 +303,16 @@ def selftest(hook_dir):
             case("两道都中时先报覆盖", "Write", "kb-scribe", f"{work}/untracked.md", 2),
             # 四、实验执行员对主工作区 crates/ 下 .rs 的写：拒的那一道要是「绕过先编后换」，不是写范围那一道（出路不同）
             finding_case("先编后换:experiment-runner Edit 主工作区的入库装置", "Edit", "experiment-runner",
-                         f"{work}/crates/singlefs-harness/src/bin/e161_x.rs", "绕过先编后换"),
+                         f"{work}/crates/singlefs-checker-tier/src/bin/e161_x.rs", "绕过先编后换"),
             finding_case("先编后换:experiment-runner Write 新建入库装置", "Write", "experiment-runner",
-                         f"{work}/crates/singlefs-harness/src/bin/e999_new.rs", "绕过先编后换"),
+                         f"{work}/crates/singlefs-checker-tier/src/bin/e999_new.rs", "绕过先编后换"),
             finding_case("先编后换:experiment-runner 改 crates 里 bin 以外的 .rs", "Edit", "experiment-runner",
                          f"{work}/crates/singlefs-core/src/lib.rs", "绕过先编后换"),
             finding_case("先编后换:.. 绕路进 crates 也算", "Edit", "experiment-runner",
-                         f"{work}/research/../crates/singlefs-harness/src/bin/e161_x.rs", "绕过先编后换"),
+                         f"{work}/research/../crates/singlefs-checker-tier/src/bin/e161_x.rs", "绕过先编后换"),
             finding_case("先编后换:implementation-writer 同一处放行", "Edit", "implementation-writer",
-                         f"{work}/crates/singlefs-harness/src/bin/e161_x.rs", None),
-            finding_case("先编后换:主 agent 同一处放行", "Edit", None, f"{work}/crates/singlefs-harness/src/bin/e161_x.rs", None),
+                         f"{work}/crates/singlefs-checker-tier/src/bin/e161_x.rs", None),
+            finding_case("先编后换:主 agent 同一处放行", "Edit", None, f"{work}/crates/singlefs-checker-tier/src/bin/e161_x.rs", None),
             finding_case("先编后换:experiment-runner 改草稿目录里的副本放行", "Edit", "experiment-runner",
                          "/tmp/claude-1000/runner-x/e161_x.rs", None),
             finding_case("先编后换:experiment-runner 追加 crates/mutations.tsv 放行", "Edit", "experiment-runner",
@@ -350,7 +350,7 @@ def selftest(hook_dir):
             stdin_case("stdin:大内容越界", {"tool_name": "Write", "agent_type": "implementation-writer", "tool_input": {"file_path": f"{work}/research/big.md", "content": "y" * 300000}}, 2),
         ]
         runner_entry = run_entry({"tool_name": "Edit", "agent_type": "experiment-runner",
-                                  "tool_input": {"file_path": f"{work}/crates/singlefs-harness/src/bin/e161_x.rs", "old_string": "a", "new_string": "b"}})
+                                  "tool_input": {"file_path": f"{work}/crates/singlefs-checker-tier/src/bin/e161_x.rs", "old_string": "a", "new_string": "b"}})
         cases.append(("stdin:experiment-runner 改主工作区的入库装置拒绝", 2, runner_entry.returncode))
         cases.append(("stdin:先编后换的拒绝点名那条脚本与草稿目录", True,
                       all(fragment in runner_entry.stderr for fragment in ("research/scripts/compile-then-swap.py", "草稿目录", "→ 怎么办"))))

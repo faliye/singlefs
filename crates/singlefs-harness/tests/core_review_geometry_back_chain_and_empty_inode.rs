@@ -4,7 +4,7 @@
 //! （D23（journal 的角色与格式） 已定项 19 ③、D3（空间分配） 已定项 10 ④、D22（单元原子性怎么合成） 已定项 16、D2（RAID 条带策略） 已定项 19）；
 //! 只读挂载打得开新建的空 inode；恢复照 I-8.6（反向链算法）把链值不等的记录挡在重放前缀之外；
 //! 槽 0 自证不过的盘按池里别的盘槽 0 记的槽距找它的槽 1。
-//! 盘都是内存稀疏盘（`singlefs_harness::crash::SparseBlockDevice`），恢复与只读挂载读的是 `MemoryPool`。
+//! 盘都是内存稀疏盘（`singlefs_harness::memory_pool::SparseBlockDevice`），恢复与只读挂载读的是 `MemoryPool`。
 
 use singlefs_core::address::{
     DeviceIdentity, DeviceOffsetInBytes, InodeNumber, InstanceGeneration, SlotNumber,
@@ -32,7 +32,7 @@ use singlefs_format::{
     JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT,
     JOURNAL_SAFETY_FACTOR, ROOT_RECORD_BYTES, SLOT_BYTES, UNIT_AREA_START_SLOT,
 };
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice, SparseDevice};
+use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice, SparseDevice};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 const DEVICE_BYTES: u64 = 4 << 30;
@@ -126,14 +126,14 @@ fn make_filesystem_on_patterned_devices(
     let images_unchanged = devices
         .iter()
         .zip(&images_before)
-        .all(|((_, device), before)| device.inner().image == *before);
+        .all(|((_, device), before)| device.wrapped_device().image == *before);
     MakeFilesystemObservation {
         result,
         recorded_operations: stream.operations().len(),
         images_unchanged,
         images_after: devices
             .iter()
-            .map(|(_, device)| device.inner().image.clone())
+            .map(|(_, device)| device.wrapped_device().image.clone())
             .collect(),
     }
 }

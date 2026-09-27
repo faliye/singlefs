@@ -1,7 +1,7 @@
 # 三样验证手段怎么落地：checker、事务层、崩溃点重放
 
 **口径**：2026-09-03 调研立档，2026-09-14 按代码现状改写（现查 `ls crates/`、根 `Cargo.toml` 的 workspace、`gate.sh` 的未实现清单与门禁 54 / 55 号的 `gate-covers` 头）。
-**现状**：`crates/` 下四个 crate——`singlefs-format`（格式常量）、`singlefs-core`（mkfs、分配器、事务层、journal、恢复）、`singlefs-harness`（录制器、崩溃点重放、记录核对器、QEMU 设备日志比对）、`singlefs-checker`（池级 checker，只依赖 `singlefs-format`）；第一个事务从 mkfs 到恢复跑通，层 0 崩溃点重放在门禁 54 号（两条流：第一个事务的全部 262165 个崩溃状态，里程碑「第二个事务」步 0 那条固定脚本到 E 的全部 2104413 个崩溃状态），QEMU 真设备在门禁 55 号（只跑第一个事务）。
+**现状**：`crates/` 下五个 crate——`singlefs-format`（格式常量）、`singlefs-core`（mkfs、分配器、事务层、journal、恢复）、`singlefs-harness`（harness 档：录制器、内存池、理想模型、随机历史、故障注入设备与日常用例）、`singlefs-checker`（池级 checker，只依赖 `singlefs-format`）、`singlefs-checker-tier`（checker 档：崩溃点重放引擎、记录核对器、注入战役、QEMU 设备日志比对与装置二进制，D13（验证路线） 已定项 15）；第一个事务从 mkfs 到恢复跑通，层 0 崩溃点重放在门禁 54 号（两条流：第一个事务的全部 262165 个崩溃状态，里程碑「第二个事务」步 0 那条固定脚本到 E 的全部 2104413 个崩溃状态），QEMU 真设备在门禁 55 号（只跑第一个事务）。
 门禁的未实现清单今天剩 QEMU 崩溃注入与 shell 命名纪律两条；崩溃点重放由 54 号覆盖，射程是那两条流；QEMU 真实负载由 55 号覆盖，射程只到第一个事务；模型对拍由 74 号覆盖，射程是随机历史那五段取样点。
 这份文档原是「三样怎么落地」的调研：每一样要消费哪些已定条款、被哪些未定项挡着、能从仓里复用什么、第一版最小该做到哪；各节里写着今天做到了哪一步，末尾是当时挡在代码前面、只有用户能定的几个问题。
 
@@ -151,7 +151,7 @@ harness 要按自己的写流另算闭式（反推腿指出）。
 | 关掉「`R` 在意图期内不可作分配目的地」那条保护（D26（后台整理与放置回收） 已定项 1 第 3 条），跑一批整理 | 意图完成时 `R` 内出现本批整理自己写出的落点（C146（无空段时的回落政策全仓无定义） ①）、且全空段的净增量塌向 0（C243（停机谓词那个量从来没有过轨迹） 的判别力自证）；打开必须恢复。E151（用户数据落点的到达序与容器臂） 第六次跑的两条臂就是这一对；要等整理进第一版之后层 0 脚本才有对象 | C146（无空段时的回落政策全仓无定义）、C243（停机谓词那个量从来没有过轨迹），2026-09-13 |
 | 放开对被抛弃的根的保护：分配器按 R_old 的账把只被被抛弃的根引用的单元当空闲发出去（影子账关掉） | 两格都必须红：① 回退那次发布崩在单元写完之后、记录之前 ⇒ 恢复挂上最新那个根，它引用的单元已被复用（I-7.4（近 K 代块未被复用） 红）；② 回退确认之后复用、再让回退实例的根全读不出（无暖机一个故障、暖机之后四个）⇒ 恢复挂上被抛弃的根，同一判决。影子账打开 ⇒ 两格 0 违例。E150（回退复用被抛弃的根引用的单元） 计数模型：基线 3 / 5 个崩溃状态违例、影子账与墓碑都 0 | C314（回退可以复用被抛弃的根引用的单元），2026-09-13 用户取影子账；E150（回退复用被抛弃的根引用的单元） |
 
-2026-09-14 现状：「harness 自己要证明会红的用例」那张表的第一条（摘掉根槽前的屏障）已做成用例（`crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs` 的 `removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker`）；第二条只做了「验证开着、坏事务被挡在重建的根外面」那一半（`first_transaction_step_six_recovery.rs` 的 `named_unit_verification_keeps_a_damaged_transaction_out_of_the_rebuilt_root`）；其余七条要的覆盖写、释放、多次挂载、回退还不在层 0 的负载里。（2026-09-17 起覆盖写、释放、多次挂载、回退都已进层 0 第二条流，现状见 `.claude/kb/milestone/02-second-txn.md` 步 0 与增补 2 收口表第 22 行。）
+2026-09-14 现状：「harness 自己要证明会红的用例」那张表的第一条（摘掉根槽前的屏障）已做成用例（`crates/singlefs-checker-tier/tests/first_transaction_step_seven_layer0.rs` 的 `removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker`）；第二条只做了「验证开着、坏事务被挡在重建的根外面」那一半（`first_transaction_step_six_recovery.rs` 的 `named_unit_verification_keeps_a_damaged_transaction_out_of_the_rebuilt_root`）；其余七条要的覆盖写、释放、多次挂载、回退还不在层 0 的负载里。（2026-09-17 起覆盖写、释放、多次挂载、回退都已进层 0 第二条流，现状见 `.claude/kb/milestone/02-second-txn.md` 步 0 与增补 2 收口表第 22 行。）
 
 ⚠️ **层 0 的负载不能只是「第一个事务」**（2026-09-14 的负载还只有它）：mkfs 之后写一个文件并发布一次，数据侧一个块都不释放，
 C22（刚释放的块立即重分配）与 C80（记账更新必须原子地随根发布）两条用例没有东西可抓

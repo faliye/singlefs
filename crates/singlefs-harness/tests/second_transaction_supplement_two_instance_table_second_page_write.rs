@@ -32,7 +32,7 @@ use singlefs_core::recovery::{
 };
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::transaction::{acquire_instance, PoolVersion, PoolWriter, TransactionUnit};
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
+use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::scenario::run_first_transaction;
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 

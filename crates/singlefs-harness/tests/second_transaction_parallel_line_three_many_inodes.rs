@@ -39,7 +39,7 @@ use singlefs_format::{
     INODE_LEAF_RECORDS, JOURNAL_NAMED_ENTRIES_PER_RECORD, JOURNAL_RECORD_BYTES,
     JOURNAL_RING_DEFAULT_BYTES,
 };
-use singlefs_harness::crash::MemoryPool;
+use singlefs_harness::memory_pool::MemoryPool;
 use singlefs_harness::RecordedOperationKind;
 
 /// 分配记录树根之下 (层级, 盘, 同盘同层序号) 那个节点的角色（D8（核心索引结构） 已定项 14：按绝对槽号按位置寻址）。

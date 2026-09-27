@@ -20,7 +20,7 @@ use singlefs_core::recovery::{
 };
 use singlefs_core::system_configuration::SystemConfiguration;
 use singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES;
-use singlefs_harness::crash::MemoryPool;
+use singlefs_harness::memory_pool::MemoryPool;
 
 /// 翻掉槽里的这一个字节来制造「读得出来但自证不过」：它落在系统配置槽的保留区，
 /// magic（0..4）、incompat 位图（6..38）、宽校验和字段（155..187）都不含它，

@@ -10,11 +10,11 @@ use singlefs_core::address::{CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes}
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
 use singlefs_format::{FIRST_TRANSACTION_TXG, ROOT_RING_REGION_DEVICES, TEST_IMAGE_DEFAULT_BYTES};
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice, SECTOR_BYTES};
 use singlefs_harness::first_transaction_regions::{
     region_result_lines, region_table_against_writes, FirstTransactionRegion, HexadecimalExtent,
     FIRST_TRANSACTION_REGIONS, FIRST_TRANSACTION_REGION_COUNT,
 };
+use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice, SECTOR_BYTES};
 use singlefs_harness::scenario::{e142_parameters, run_first_transaction, ScenarioPoint};
 use singlefs_harness::{RecordedOperation, RecordingBlockDevice, SharedStream};
 
@@ -66,7 +66,7 @@ fn run_on_memory_devices() -> FirstTransactionImage {
         image: MemoryPool {
             devices: devices
                 .iter()
-                .map(|(identity, device)| (*identity, device.inner().image.clone()))
+                .map(|(identity, device)| (*identity, device.wrapped_device().image.clone()))
                 .collect(),
             device_size_in_bytes: TEST_IMAGE_DEFAULT_BYTES,
         },

@@ -18,8 +18,8 @@ use singlefs_core::allocator::PlacementRefusal;
 use singlefs_core::mount::{FloorRaiseStop, MountError, MountSpaceAdmission};
 use singlefs_core::mounted_session::UserChangeRefused;
 use singlefs_core::transaction::PublishError;
-use singlefs_harness::crash::SparseBlockDevice;
 use singlefs_harness::history::HistoryDeviceWidth;
+use singlefs_harness::memory_pool::SparseBlockDevice;
 
 const DEVICE_WIDTH: HistoryDeviceWidth = HistoryDeviceWidth::UnitAreaOf256Slots;
 

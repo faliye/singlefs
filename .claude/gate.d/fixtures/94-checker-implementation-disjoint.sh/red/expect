@@ -8,3 +8,6 @@ want=sample-shared-helper
 want=1 处引实现侧的 `singlefs_core`
 want=常量模块正文里有 2 处分支或循环
 want=src/lib.rs:5：pub const fn clamp
+want=harness 档包的依赖闭包里有 checker 档包 `singlefs-checker-tier`
+want=harness 档的源码里有 1 处引 checker 档包
+want=tests/daily_case.rs:3

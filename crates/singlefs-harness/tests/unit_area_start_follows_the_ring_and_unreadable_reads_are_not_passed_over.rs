@@ -59,7 +59,7 @@ use singlefs_format::{
     JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT,
     JOURNAL_SAFETY_FACTOR, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
 };
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice, SparseDevice, SECTOR_BYTES};
+use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice, SparseDevice, SECTOR_BYTES};
 
 const FOUR_GIBIBYTES: u64 = 4 << 30;
 const MEBIBYTE: u64 = 1 << 20;

@@ -9,7 +9,7 @@ use common::{build_pool, crash_state_devices, IMAGE_BYTES};
 use singlefs_core::address::DeviceIdentity;
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::mount::{mount_writable, MountError, RepeatedDeviceIdentity};
-use singlefs_harness::crash::SparseBlockDevice;
+use singlefs_harness::memory_pool::SparseBlockDevice;
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 /// 第一个事务写完的池（盘 0 = A、盘 1 = B），再交一块空盘 C、也标成盘 0：可写挂载拒成 `DeviceIdentitiesHandedInMoreThanOnce`，
@@ -31,7 +31,7 @@ fn mount_with_device_zero_handed_in_again_as_a_third_device_is_refused_before_an
     ));
     let images_before: Vec<_> = devices
         .iter()
-        .map(|(_, device)| device.inner().image.clone())
+        .map(|(_, device)| device.wrapped_device().image.clone())
         .collect();
     let refusal = mount_writable(&common::parameters(), &mut devices)
         .expect_err("盘 0 交了两次，可写挂载必须拒");
@@ -52,7 +52,11 @@ fn mount_with_device_zero_handed_in_again_as_a_third_device_is_refused_before_an
         "拒在任何写之前：录制流一步都没有"
     );
     for (index, ((_, device), before)) in devices.iter().zip(&images_before).enumerate() {
-        assert_eq!(&device.inner().image, before, "盘表第 {index} 项逐字节不变");
+        assert_eq!(
+            &device.wrapped_device().image,
+            before,
+            "盘表第 {index} 项逐字节不变"
+        );
     }
 
     let mut both_devices = crash_state_devices(&image, &[], &[], &SharedStream::new());

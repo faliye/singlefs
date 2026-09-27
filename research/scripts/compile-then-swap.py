@@ -8,7 +8,7 @@
     compile-then-swap.py --clean --scratch <草稿目录>     # 删掉这条脚本在草稿目录里建的仓副本与编译目录
     compile-then-swap.py --selftest                        # COMPILE_THEN_SWAP_BREAK=<项> 时必须判红
 
-<目标> 写相对仓根的路径（crates/singlefs-harness/src/bin/e<号>_<英文名>.rs）或绝对路径；只收 crates/<crate>/src/bin/ 下的
+<目标> 写相对仓根的路径（crates/singlefs-checker-tier/src/bin/e<号>_<英文名>.rs）或绝对路径；只收 crates/<crate>/src/bin/ 下的
 <名>.rs 与 <名>/main.rs。<草稿副本> 与 <草稿目录> 都要在仓外。
 
 做法：

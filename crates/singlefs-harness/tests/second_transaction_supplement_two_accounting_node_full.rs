@@ -22,7 +22,7 @@ use singlefs_format::{
     ACCOUNTING_ENTRY_BYTES, ACCOUNTING_KEY_BYTES, FIRST_TRANSACTION_TXG,
     TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH,
 };
-use singlefs_harness::crash::SparseBlockDevice;
+use singlefs_harness::memory_pool::SparseBlockDevice;
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 const FILE_CONTENT: [u8; 3000] = [0x42; 3000];
@@ -171,7 +171,7 @@ fn eightieth_device_splits_the_accounting_tree_into_two_leaves_under_a_root_inst
     {
         for (_, device) in &pool.devices {
             let on_disk = device
-                .inner()
+                .wrapped_device()
                 .image
                 .read(pointer.locations[0].slot.to_device_offset(), 16384);
             let header = parse_index_node(&on_disk).expect("盘上的节点解得开");

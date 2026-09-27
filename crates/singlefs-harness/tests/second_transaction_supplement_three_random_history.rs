@@ -23,13 +23,12 @@ use singlefs_core::mount::{
     MountError, RollbackCandidateExclusion, RollbackError, RollbackTarget, ShadowLedger,
 };
 use singlefs_core::transaction::{TransactionOutput, TransactionUnit};
-use singlefs_harness::crash::{MemoryPool, RecordCheck, SparseBlockDevice};
-use singlefs_harness::crash_injection::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::fault_injection::{
     FaultCounting, FaultDeviceSelector, FaultOccurrence, FaultPlacement, FaultSchedule,
     InjectedFault, SharedFaultPlan,
 };
 use singlefs_harness::history::newest_ring_root_and_slot_count;
+use singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::history::{
     allocation_records_on_the_image_under, classify_failure, execute_history,
     execute_history_observing, execute_history_with, execute_history_with_faults, generate_history,
@@ -41,6 +40,7 @@ use singlefs_harness::history::{
     HistoryTally, MountAllocationComparison, MountSpaceAdmissionOutcome, NewFindingReport,
     PerStepChecker, RollbackTargetChoice, StepOutcome, StepPosition,
 };
+use singlefs_harness::memory_pool::{MemoryPool, RecordCheck, SparseBlockDevice};
 use singlefs_harness::model::{
     ModelCheckpointTxg, ModelInstanceGeneration, ModelRefusalReason, ModelRootKey,
     ObservedRefusalReason,
@@ -733,7 +733,7 @@ fn writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquis
     );
     for (identity, device) in &devices {
         assert!(
-            device.inner().image == image_before_the_mount.devices[identity],
+            device.wrapped_device().image == image_before_the_mount.devices[identity],
             "盘 {identity:?} 逐字节不变"
         );
     }

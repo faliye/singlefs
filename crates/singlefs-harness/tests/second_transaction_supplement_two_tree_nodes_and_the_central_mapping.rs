@@ -61,7 +61,7 @@ use singlefs_format::{
     DATA_UNIT_BYTES, EXTENT_KEY_BYTES, JOURNAL_RING_DEFAULT_BYTES, MAPPING_KEY_BYTES, NODE_BYTES,
     NODE_POINTER_BYTES, UNIT_AREA_START_SLOT,
 };
-use singlefs_harness::crash::MemoryPool;
+use singlefs_harness::memory_pool::MemoryPool;
 use singlefs_harness::read_tally::{JournalRingRegion, ReadCountingPoolReader};
 
 /// 搬过去的落点：单元区起点之后 16384 个槽，第一个事务从单元区起点往上取最低空槽，离这里很远。

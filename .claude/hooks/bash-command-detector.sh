@@ -1906,27 +1906,27 @@ def selftest_in(hook_dir, work):
         for label, agent, command, want in repository_edit_cases:
             results.append((f"就地改仓内文件:{label}", want, 1 if repository_in_place_edit_refusal(command, agent, edit_repository) else 0))
         # ⑨ 先编后换：experiment-runner 在 Bash 里写主工作区 crates/ 下的 .rs：(说明, agent 类型, 命令, 该不该拒)
-        harness_bin = os.path.join(edit_repository, "crates", "singlefs-harness", "src", "bin")
+        harness_bin = os.path.join(edit_repository, "crates", "singlefs-checker-tier", "src", "bin")
         os.makedirs(harness_bin)
         open(os.path.join(harness_bin, "e161_x.rs"), "w").write("fn main() {}\n")
         open(os.path.join(edit_repository, "crates", "mutations.tsv"), "w").write("# 表头\n")
-        bin_path = "crates/singlefs-harness/src/bin/e161_x.rs"
+        bin_path = "crates/singlefs-checker-tier/src/bin/e161_x.rs"
         draft_path = "/tmp/claude-1000/runner-x/e161_x.rs"
         compile_first_cases = [
             ("执行员 cp 草稿副本盖主工作区的入库装置", "experiment-runner", f"cp {draft_path} {bin_path}", 1),
-            ("执行员 cat > 新建入库装置", "experiment-runner", "cat > crates/singlefs-harness/src/bin/e999_new.rs <<'EOF'\nfn main() {}\nEOF", 1),
+            ("执行员 cat > 新建入库装置", "experiment-runner", "cat > crates/singlefs-checker-tier/src/bin/e999_new.rs <<'EOF'\nfn main() {}\nEOF", 1),
             ("执行员 >> 追加", "experiment-runner", f"echo '// x' >> {bin_path}", 1),
             ("执行员 tee -a", "experiment-runner", f"echo x | tee -a {bin_path}", 1),
-            ("执行员 mv 草稿副本进 bin 目录", "experiment-runner", f"mv {draft_path} crates/singlefs-harness/src/bin/", 1),
-            ("执行员 cd 进 bin 目录之后 cp 到 .", "experiment-runner", f"cd crates/singlefs-harness/src/bin && cp {draft_path} .", 1),
+            ("执行员 mv 草稿副本进 bin 目录", "experiment-runner", f"mv {draft_path} crates/singlefs-checker-tier/src/bin/", 1),
+            ("执行员 cd 进 bin 目录之后 cp 到 .", "experiment-runner", f"cd crates/singlefs-checker-tier/src/bin && cp {draft_path} .", 1),
             ("执行员 sed -i", "experiment-runner", f"sed -i 's/a/b/' {bin_path}", 1),
             ("执行员 perl -pi -e", "experiment-runner", f"perl -pi -e 's/a/b/' {bin_path}", 1),
             ("执行员 rsync", "experiment-runner", f"rsync -a {draft_path} {bin_path}", 1),
             ("执行员 rm 入库装置", "experiment-runner", f"rm {bin_path}", 1),
             ("执行员 mv 把入库装置挪走", "experiment-runner", f"mv {bin_path} /tmp/claude-1000/runner-x/", 1),
             ("执行员 bash -c 里 cp", "experiment-runner", f"bash -c 'cp {draft_path} {bin_path}'", 1),
-            ("执行员变量里的目录", "experiment-runner", f"d=crates/singlefs-harness/src/bin; cp {draft_path} \"$d/e161_x.rs\"", 1),
-            ("执行员目标算不出、对得上已有的入库装置", "experiment-runner", f"cp {draft_path} \"$DIR\"/crates/singlefs-harness/src/bin/e161_x.rs", 1),
+            ("执行员变量里的目录", "experiment-runner", f"d=crates/singlefs-checker-tier/src/bin; cp {draft_path} \"$d/e161_x.rs\"", 1),
+            ("执行员目标算不出、对得上已有的入库装置", "experiment-runner", f"cp {draft_path} \"$DIR\"/crates/singlefs-checker-tier/src/bin/e161_x.rs", 1),
             ("执行员 python shutil.copy", "experiment-runner",
              f"python3 -c \"import shutil; shutil.copy('{draft_path}', '{bin_path}')\"", 1),
             ("执行员 python open(…, 'a')", "experiment-runner", f"python3 -c \"open('{bin_path}', 'a').write('x')\"", 1),
@@ -2430,11 +2430,11 @@ def selftest_in(hook_dir, work):
                               env=dict(os.environ, AGENT_HOOK_DETECTIONS=detections),
                               input=json.dumps({"tool_name": "Bash", "session_id": "s", "agent_type": agent_type,
                                                 "tool_input": {"command": command, "run_in_background": False}}))
-    runner_copy = entry_as("experiment-runner", "cp /tmp/claude-1000/runner-x/e161_x.rs crates/singlefs-harness/src/bin/e161_x.rs")
+    runner_copy = entry_as("experiment-runner", "cp /tmp/claude-1000/runner-x/e161_x.rs crates/singlefs-checker-tier/src/bin/e161_x.rs")
     results.append(("stdin:experiment-runner cp 进主工作区的入库装置拒绝（退出码 2）", 2, runner_copy.returncode))
     results.append(("stdin:先编后换的拒绝点名那条脚本与出路", 1,
                     int("✗" in runner_copy.stderr and "→" in runner_copy.stderr and COMPILE_THEN_SWAP_SCRIPT in runner_copy.stderr)))
-    writer_copy = entry_as("implementation-writer", "cp /tmp/claude-1000/runner-x/e161_x.rs crates/singlefs-harness/src/bin/e161_x.rs")
+    writer_copy = entry_as("implementation-writer", "cp /tmp/claude-1000/runner-x/e161_x.rs crates/singlefs-checker-tier/src/bin/e161_x.rs")
     results.append(("stdin:implementation-writer 同样的 cp 放行（退出码 0）", 0, writer_copy.returncode))
     renamed, renamed_recorded = through_entry(f"cp /tmp/new.sh research/scripts/.running.sh.installing && mv research/scripts/.running.sh.installing {running}")
     results.append(("stdin:写到临时文件再 mv 换上放行（退出码 0）、不记检出", (0, 0), (renamed.returncode, renamed_recorded)))

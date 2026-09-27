@@ -1,0 +1,6 @@
+exit=1
+want=crates/demo/src/main.rs:2 fn run_cell
+want=crates/demo/src/main.rs:1 struct CellRun
+want=2 个函数名或类型名只由空泛词拼成
+want=crates/demo/src/renamed.rs 里已经一个空泛名都没有了
+want=指向不存在的文件 crates/demo/src/gone.rs

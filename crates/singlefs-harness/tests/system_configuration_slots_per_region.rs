@@ -27,7 +27,7 @@ use singlefs_core::system_configuration::{
     SystemImmutableSizes, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
 };
 use singlefs_format::{JOURNAL_RING_DEFAULT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES};
-use singlefs_harness::crash::SparseBlockDevice;
+use singlefs_harness::memory_pool::SparseBlockDevice;
 
 const IMAGE_BYTES: u64 = 4 << 30;
 const PHYSICAL_BLOCK_SIZE: u32 = 512;

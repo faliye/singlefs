@@ -182,13 +182,13 @@ research/e7-index-bench/src/bin/e97_entry_encoding.rs  # 还没改完：实验�
 research/e7-index-bench/src/bin/e98_inode_record.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 research/e7-index-bench/src/bin/e99_writebuffer_sequence.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 research/e7-index-bench/src/bin/e9_keylayout.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-crates/singlefs-harness/src/bin/e142_first_transaction_write_dump.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动还要走代码三方（门禁 56 号）
-crates/singlefs-harness/src/bin/e142_first_transaction_write_dump_one_device.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动还要走代码三方（门禁 56 号）
-crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动还要走代码三方（门禁 56 号）
-crates/singlefs-harness/src/bin/e158_root_choice_repair.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动还要走代码三方（门禁 56 号）
-crates/singlefs-harness/src/bin/first_transaction_device_log_check.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试并走代码三方（门禁 56 号）
-crates/singlefs-harness/src/bin/first_transaction_on_device.rs  # 在虚机的 busybox initramfs 里跑的静态二进制，那里没有 python3，preflight 判不了条件
-crates/singlefs-harness/src/bin/first_transaction_region_bytes.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试并走代码三方（门禁 56 号）
+crates/singlefs-checker-tier/src/bin/e142_first_transaction_write_dump.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动还要走代码三方（门禁 56 号）
+crates/singlefs-checker-tier/src/bin/e142_first_transaction_write_dump_one_device.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动还要走代码三方（门禁 56 号）
+crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动还要走代码三方（门禁 56 号）
+crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动还要走代码三方（门禁 56 号）
+crates/singlefs-checker-tier/src/bin/first_transaction_device_log_check.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试并走代码三方（门禁 56 号）
+crates/singlefs-checker-tier/src/bin/first_transaction_on_device.rs  # 在虚机的 busybox initramfs 里跑的静态二进制，那里没有 python3，preflight 判不了条件
+crates/singlefs-checker-tier/src/bin/first_transaction_region_bytes.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试并走代码三方（门禁 56 号）
 .claude/scripts/preflight.sh  # 被项目脚本 source 的函数库：找到规范副本里的 preflight.sh（本树或主仓）就 source 它，找不到就定义一个当场判红的 preflight；不单独调
 .claude/scripts/project_preflight.py  # 被项目的 python 脚本 import 的函数库：找到规范副本里的 preflight.py（本树或主仓）再转调，找不到判红；不单独调
 .claude/gate.d/lib-governance-refs.py  # 被门禁 10 号调的函数库（治理文档里的门禁号、路径与「小节」指不指得到），不单独调

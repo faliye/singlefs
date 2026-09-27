@@ -17,7 +17,7 @@ use singlefs_core::unit::unit_filesystem_identifier;
 use singlefs_format::{
     DATA_UNIT_HEADER_BYTES, FIRST_TRANSACTION_TXG, JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES,
 };
-use singlefs_harness::crash::MemoryPool;
+use singlefs_harness::memory_pool::MemoryPool;
 
 const ROOT_ONE_THREE: (InstanceGeneration, CheckpointTxg) =
     (InstanceGeneration(1), CheckpointTxg(3));

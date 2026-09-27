@@ -1,0 +1,8 @@
+[package]
+name = "singlefs-harness"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+
+[dev-dependencies]
+bridge = { package = "sample-tier-bridge", path = "../sample-tier-bridge" }

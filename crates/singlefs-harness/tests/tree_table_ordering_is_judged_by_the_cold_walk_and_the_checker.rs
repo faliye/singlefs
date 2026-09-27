@@ -30,7 +30,7 @@ use singlefs_core::root_record::RootRecord;
 use singlefs_core::root_ring::slot_offset;
 use singlefs_core::unit::seal_header_checksum;
 use singlefs_format::NODE_BYTES;
-use singlefs_harness::crash::MemoryPool;
+use singlefs_harness::memory_pool::MemoryPool;
 
 /// 树表条目里种类那 2 字节的偏移（树 ID 8 + 条目长度 2 之后，D8（核心索引结构） 已定项 8）。
 const TREE_TABLE_ENTRY_KIND_OFFSET: usize = 10;

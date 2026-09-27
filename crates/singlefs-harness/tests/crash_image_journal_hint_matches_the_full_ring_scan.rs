@@ -15,7 +15,7 @@ use std::collections::BTreeSet;
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
 use singlefs_core::recovery::{choose_system_configuration, scan_journal, PoolReader};
 use singlefs_format::{JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, SLOT_BYTES};
-use singlefs_harness::crash::{
+use singlefs_harness::memory_pool::{
     writes_and_segments, CrashImage, MemoryPool, RetainedWrite, WrittenContents, SECTOR_BYTES,
 };
 use singlefs_harness::segments::StepKind;

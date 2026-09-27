@@ -645,7 +645,7 @@ rustup 追加在文件末尾的 PATH 那句因此从不执行；
 | 27 号（格式常量） | kb 标记改值后，`research/**/*.rs` 里每一份同名 `const` 都要跟（JOURNAL_HEADER_BYTES 95 → 277 时 E43（扩展点字节上限）、E116（打包容器的账·补元数据写与整理策略） 两份装置都重跑换产物）；`stale=` 列的旧值串不许再出现在 kb 正文 | 别把仍在别处合法出现的串（`base = 95`）加进 `stale=` |
 | clippy `shadow_unrelated` | 同一个测试函数里第二次 `let reader = …` / `let segments = …` 判红，rustfmt 重排之后用正则替换还会漏改后半段（2026-09-14 三次返工） | 每个读者 / 段 / 报告起不同的名字（`extent_reader`、`warm_up_segments`、`control_report`） |
 | naming-lint | 「字母 + 数字」当单字母：`read_u48` 判红，测试名以 `a_` 开头判红；它扫全仓的 .rs，连 `research/prompts` 里云端腿写的模型源码也扫 | 写 `read_six_byte_unsigned`；`research/prompts` 2026-09-14 起在 `.claude/naming-lint-exclude`（证据目录，不回收），腿的模型写到别的目录照查 |
-| 54 号（层 0 全量） | 用例标 `#[ignore]`，平时 `cargo test --workspace` 报 1 ignored 是正常的 | 门禁在 release 下跑它，每个状态加池级 checker 与记录核对器后约 171 s；全量在跑时换 `CARGO_TARGET_DIR` 就能同时编别的测试 |
+| 54 号（层 0 全量） | 用例标 `#[ignore]`、住 `crates/singlefs-checker-tier/tests/`（D13（验证路线） 已定项 15），`cargo test -p singlefs-checker-tier` 报几条 ignored 是正常的；harness 档 `cargo test -p singlefs-harness` 跑不到它们 | 门禁在 release 下跑它，每个状态加池级 checker 与记录核对器后约 171 s；全量在跑时换 `CARGO_TARGET_DIR` 就能同时编别的测试 |
 | 变异证明 | rustfmt 之后多行调用的整串匹配「没命中」 | 按「找到含关键串的行、删到以 `);` 收尾的那一行」做；改完复原并 `assert` 文件逐字节等于原文 |
 | checker 新判定 | 只在对象已经过了同一关之后才判的判定永远判不红：2026-09-14 checker「根是码 2」那条第一稿只在根按码 2 读通之后才判，坏镜像语料当场让它报「不适用」 | 每条新判定配一份坏镜像（`checker_known_bad_images.rs` 的形态），不许只看干净镜像全绿 |
 | 批量定点替换 | 逐条写盘会在一处锚点不中时留下半套改动（2026-09-14 写回 54 处，一处原文「没被」锚点写成「没有被」） | 用 `research/scripts/replace-batch.py`：全部替换先在内存里核「恰好命中 1 次」，全过了才写盘 |

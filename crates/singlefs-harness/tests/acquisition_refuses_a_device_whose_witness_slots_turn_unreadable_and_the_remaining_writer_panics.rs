@@ -54,7 +54,7 @@ use singlefs_format::{
     DATA_UNIT_BYTES, INODE_LEAF_RECORDS, JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES,
     NODE_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
 };
-use singlefs_harness::crash::{SparseBlockDevice, SparseDevice};
+use singlefs_harness::memory_pool::{SparseBlockDevice, SparseDevice};
 use singlefs_harness::RecordedOperationKind;
 
 // ─── 一、取号那一刻读见证值时读不出的那块盘拒 ───

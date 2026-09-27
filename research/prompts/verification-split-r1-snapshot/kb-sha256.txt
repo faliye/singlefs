@@ -1,0 +1,5 @@
+493d33351f2c7279cc786da2e44897e5308356c83f76c8fbd61d49a6b8f956b8  .claude/kb/decisions/13-验证路线.md
+4399ebacb1732c394189adb4c4d7b6ff5176d08a8c0ca193e121f2c0f98c9dcd  .claude/rules/verification.md
+011127b752bbf74b24270f3d823e48b7799a21d132acbb8e45ac3d45589cbb5d  .claude/rules/implementation-workflow.md
+6cef06dd6c78f356b09af5f481a53901d6aaa83f5104f0c8ac0428585387edce  records/2026-09-27-验证两档拆分.md
+f5058c61bde0a3d37c59eb97e8709ecc338c0c732d93e9b40cae5573532c8365  .claude/kb/checks-owed.md

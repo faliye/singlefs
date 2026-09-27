@@ -10,6 +10,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "singlefs-checker-tier"
+version = "0.1.0"
+dependencies = [
+ "singlefs-checker",
+ "singlefs-core",
+ "singlefs-format",
+ "singlefs-harness",
+]
+
+[[package]]
 name = "singlefs-core"
 version = "0.1.0"
 dependencies = [

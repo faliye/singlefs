@@ -22,7 +22,7 @@ use singlefs_core::instance_table::{InstanceTablePage, InstanceTablePageIndex};
 use singlefs_core::mount::{mount_writable, Mounted};
 use singlefs_core::recovery::{instance_table_chain_of_root, PoolReader};
 use singlefs_core::transaction::{acquire_instance, PoolWriter};
-use singlefs_harness::crash::SparseBlockDevice;
+use singlefs_harness::memory_pool::SparseBlockDevice;
 use singlefs_harness::scenario::run_first_transaction;
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 

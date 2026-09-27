@@ -351,7 +351,7 @@ enum TailOfTheBirthIdentity {
 }
 
 impl TailOfTheBirthIdentity {
-    fn value(self) -> u64 {
+    fn birth_identity_tail_number(self) -> u64 {
         match self {
             TailOfTheBirthIdentity::TransactionNumber(transaction) => transaction,
             TailOfTheBirthIdentity::BirthSequence(birth_sequence) => u64::from(birth_sequence),
@@ -491,14 +491,14 @@ impl<'reader> Walk<'reader> {
         self.referenced_units_judged_against_their_pointer += 1;
         let matches_the_pointer = identity.write_order.birth_txg() == pointer.birth_txg
             && identity.write_order.instance() == pointer.instance
-            && identity.tail.value() == pointer.tail;
+            && identity.tail.birth_identity_tail_number() == pointer.tail;
         self.judgements.judge("I-1.2", matches_the_pointer, || {
             format!(
                 "{what}：头里的出生身份（诞生代号 {}、写序实例 {}、{} {}）与引用它的指针记的（诞生代号 {}、实例 {}、尾段 {}）不符",
                 identity.write_order.birth_txg(),
                 identity.write_order.instance(),
                 identity.tail.name(),
-                identity.tail.value(),
+                identity.tail.birth_identity_tail_number(),
                 pointer.birth_txg,
                 pointer.instance,
                 pointer.tail
@@ -1047,7 +1047,7 @@ impl<'reader> Walk<'reader> {
             };
             let matches_the_key = identity.write_order.birth_txg() == key_birth_txg
                 && identity.write_order.instance() == key_instance
-                && identity.tail.value() == key_tail;
+                && identity.tail.birth_identity_tail_number() == key_tail;
             self.judgements
                 .judge(MAPPING_KEY_MATCHES_THE_UNIT_HEADER, matches_the_key, || {
                     format!(
@@ -1055,7 +1055,7 @@ impl<'reader> Walk<'reader> {
                         identity.write_order.birth_txg(),
                         identity.write_order.instance(),
                         identity.tail.name(),
-                        identity.tail.value()
+                        identity.tail.birth_identity_tail_number()
                     )
                 });
             match identity.tail {

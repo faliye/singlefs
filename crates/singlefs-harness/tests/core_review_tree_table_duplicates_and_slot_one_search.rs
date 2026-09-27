@@ -4,7 +4,7 @@
 //! 全池槽 0 都自证不过时，在格式允许的每一档槽距上找槽 1，只收自己记的槽距等于所在偏移的那一槽，几档都收得到时取世代号最大的
 //! （D22（单元原子性怎么合成） 已定项 16、D2（RAID 条带策略） 已定项 19）；
 //! journal 环装不下 F 条记录时 mkfs 在任何写之前拒掉（I-8.1（环几何够大）、D23（journal 的角色与格式） 已定项 18 / 已定项 19）。
-//! 盘都是内存稀疏盘（`singlefs_harness::crash::SparseBlockDevice`），恢复、只读挂载与各个读者读的是 `MemoryPool`。
+//! 盘都是内存稀疏盘（`singlefs_harness::memory_pool::SparseBlockDevice`），恢复、只读挂载与各个读者读的是 `MemoryPool`。
 
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
@@ -46,7 +46,7 @@ use singlefs_format::{
     JOURNAL_SAFETY_FACTOR, NODE_BYTES, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
     UNIT_AREA_START_SLOT,
 };
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice, SparseDevice};
+use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice, SparseDevice};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 const DEVICE_BYTES: u64 = 4 << 30;
@@ -774,7 +774,7 @@ fn make_filesystem_on_patterned_devices(
     let images_unchanged = devices
         .iter()
         .zip(&images_before)
-        .all(|((_, device), before)| device.inner().image == *before);
+        .all(|((_, device), before)| device.wrapped_device().image == *before);
     MakeFilesystemObservation {
         result,
         recorded_operations: stream.operations().len(),

@@ -1,4 +1,5 @@
-//! 录制器：包在块设备外面，把每个写请求与屏障记成一条流，落到文件给崩溃点重放用（里程碑步 0）。
+//! harness 档的脚手架库（D13（验证路线） 已定项 15）：录制器（包在块设备外面，把每个写请求与屏障记成一条流）、内存池、理想模型、随机历史、故障注入设备、场景。
+//! 崩溃态枚举引擎与注入战役在 checker 档的 `singlefs-checker-tier`。
 //!
 //! 每条记：设备身份、偏移、长度、内容哈希、种类（普通写 / FUA 写 / 屏障）。读不记——崩溃状态只由写与屏障切段（D13（验证路线） 已定项 4）。
 #![forbid(unsafe_code)]
@@ -13,18 +14,13 @@ use singlefs_core::block_device::{
     BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
 };
 
-pub mod bad_disk_input;
-pub mod crash;
-pub mod crash_injection;
-pub mod device_log;
 pub mod fault_injection;
 pub mod first_transaction_regions;
 pub mod hexadecimal;
 pub mod history;
-pub mod layer0_progress;
+pub mod memory_pool;
 pub mod model;
 pub mod model_comparison;
-pub mod on_device_modes;
 pub mod read_tally;
 pub mod scenario;
 pub mod segments;
@@ -266,12 +262,12 @@ impl<Inner: BlockDevice> RecordingBlockDevice<Inner> {
     }
 
     #[must_use]
-    pub fn inner(&self) -> &Inner {
+    pub fn wrapped_device(&self) -> &Inner {
         &self.inner
     }
 
     /// 故障注入要在两次发布之间改里面那块设备的状态（虚机档的「漏一道屏障」）。
-    pub fn inner_mut(&mut self) -> &mut Inner {
+    pub fn wrapped_device_mut(&mut self) -> &mut Inner {
         &mut self.inner
     }
 

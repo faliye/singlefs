@@ -216,7 +216,7 @@ pub const JOURNAL_RING_DEFAULT_BYTES: u64 = 805_306_368;
 ///
 /// 在飞记录数上限 `环槽数 ÷ F`（D23（journal 的角色与格式） 已定项 18）这条式子**不在这里**：这里只放标量。
 /// core 的 `singlefs_core::system_configuration::journal_in_flight_record_limit` 与实验装置 E158（择根与修复四岔路）
-/// （`crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`）各写一份、互不调用；checker 不算在飞上限（它不判重放前缀取几条），
+/// （`crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs`）各写一份、互不调用；checker 不算在飞上限（它不判重放前缀取几条），
 /// 不另造一份。两份在环长上的交叉断言在那个装置的 `journal_in_flight_record_limit_cross_check_tests` 模块里。
 pub const JOURNAL_SAFETY_FACTOR: u64 = 3;
 

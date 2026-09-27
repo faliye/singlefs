@@ -269,7 +269,8 @@ fn barrier_right_after_the_acquisition_barrier_is_not_sent_to_the_devices() {
         let parameters = parameters();
         let mut pool = PoolWriter::new(&parameters, &mut devices);
         acquire_instance(&mut pool).expect("取号");
-        pool.perform(CommitStep::Barrier).expect("紧跟着的一道屏障");
+        pool.perform_commit_step(CommitStep::Barrier)
+            .expect("紧跟着的一道屏障");
     }
     for (identity, _) in &devices {
         assert_eq!(

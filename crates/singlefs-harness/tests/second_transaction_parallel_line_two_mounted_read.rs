@@ -51,7 +51,7 @@ use singlefs_format::{
     MAPPING_ENTRY_BYTES, MAPPING_KEY_BYTES, TREE_IDENTIFIER_EXTENT, TREE_IDENTIFIER_INODE,
     TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH, TREE_TABLE_ENTRY_BYTES, UNIT_AREA_START_SLOT,
 };
-use singlefs_harness::crash::MemoryPool;
+use singlefs_harness::memory_pool::MemoryPool;
 use singlefs_harness::read_tally::{JournalRingRegion, ReadCountingPoolReader};
 
 /// 一页 4 KiB：E152（按里程碑对比六家文件系统的文件性能） 的随机读作业按这个粒度发。

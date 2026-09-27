@@ -164,11 +164,11 @@ if ((prerecorded == 0)); then
   # 三个前置（QEMU、/dev/kvm、内核镜像）登记在 stage-inputs.tsv 本阶段那一行第三列，没齐判红
   python3 "$ADMISSION_MODULE" gate-preconditions "$STAGE_REPOSITORY" "$(basename "$0")" || exit 1
 
-  if ! cargo build --release --target x86_64-unknown-linux-musl -p singlefs-harness --bin first_transaction_on_device >/dev/null 2>&1; then
-    fail "虚机二进制（musl 静态）编不过" "单跑 cargo build --release --target x86_64-unknown-linux-musl -p singlefs-harness --bin first_transaction_on_device 看报错。"
+  if ! cargo build --release --target x86_64-unknown-linux-musl -p singlefs-checker-tier --bin first_transaction_on_device >/dev/null 2>&1; then
+    fail "虚机二进制（musl 静态）编不过" "单跑 cargo build --release --target x86_64-unknown-linux-musl -p singlefs-checker-tier --bin first_transaction_on_device 看报错。"
   fi
-  if ! cargo build -p singlefs-harness --bin first_transaction_device_log_check >/dev/null 2>&1; then
-    fail "宿主一侧的设备日志检查编不过" "单跑 cargo build -p singlefs-harness --bin first_transaction_device_log_check 看报错。"
+  if ! cargo build -p singlefs-checker-tier --bin first_transaction_device_log_check >/dev/null 2>&1; then
+    fail "宿主一侧的设备日志检查编不过" "单跑 cargo build -p singlefs-checker-tier --bin first_transaction_device_log_check 看报错。"
   fi
 fi
 
@@ -240,7 +240,7 @@ for mode in "${MODES[@]}"; do
   checks=$((checks + 1))
   while IFS= read -r pattern; do
     [[ -n "$pattern" ]] || continue
-    grep -aq "$pattern" "$out" || fail "虚机跑 $mode 的输出里没有「$pattern」" "这一档该跑的那次发布没跑、或者结果行改了字段名；先看 $mode 的 out.txt 有哪些 name= 行，再对 crates/singlefs-harness/src/bin/first_transaction_on_device.rs 里这一档打的行。"
+    grep -aq "$pattern" "$out" || fail "虚机跑 $mode 的输出里没有「$pattern」" "这一档该跑的那次发布没跑、或者结果行改了字段名；先看 $mode 的 out.txt 有哪些 name= 行，再对 crates/singlefs-checker-tier/src/bin/first_transaction_on_device.rs 里这一档打的行。"
     checks=$((checks + 1))
   done < <(required_lines_of "$mode")
   while IFS= read -r pattern; do
@@ -311,7 +311,7 @@ for mode in "${MODES[@]}"; do
       for device in 0 1; do
         grep -q "name=device_log device=$device .* divergence_window=none divergence=none" "$work/$mode/check.txt" \
           || { sed 's/^/        /' "$work/$mode/check.txt"
-               fail "$mode 盘 $device：宿主检查退出 0，却没有这块盘 divergence=none 的 name=device_log 行" "退出码与结果行对不上，先查 crates/singlefs-harness/src/bin/first_transaction_device_log_check.rs 的 main 与 compare_one_device。"; }
+               fail "$mode 盘 $device：宿主检查退出 0，却没有这块盘 divergence=none 的 name=device_log 行" "退出码与结果行对不上，先查 crates/singlefs-checker-tier/src/bin/first_transaction_device_log_check.rs 的 main 与 compare_one_device。"; }
         checks=$((checks + 1))
       done
       host_rerun_windows="$(host_rerun_windows_of "$mode")"
@@ -336,3 +336,8 @@ if ((prerecorded)); then
 fi
 echo "  ✓ QEMU 真设备：${#MODES[@]} 次虚机跑（${MODES[*]}）、$checks 项检查全过；${matched_device_log_modes[*]} 设备侧逐项对得上（宿主照模式重跑到这一档最后那次发布），${#control_modes[@]} 个对照（${control_modes[*]}）都红在该红的地方"
 echo "     ! 这一道没罩到：$uncovered"
+# 判绿之后写这一道这批输入的全绿标记（git common-dir）：整轮门禁与下一趟按它复用，不再跑第二遍（用户 2026-09-27 定：照 54 号写标记、只跑变了的）。
+# 写不成只报不红：缺标记时下一趟判「要跑」，方向是多跑。
+if ! python3 "$ADMISSION_MODULE" stage-marker-write "$ROOT" "$(basename "$0")" >/dev/null; then
+  echo "  ! 没写成这一道的全绿标记（admission.py stage-marker-write 没成）：下一趟这一道照跑，不会复用"
+fi

@@ -10,11 +10,11 @@
 
 use singlefs_core::address::DeviceIdentity;
 use singlefs_core::block_device::{BlockDevice, PhysicalBlockSizeInBytes};
-use singlefs_harness::crash::SparseBlockDevice;
 use singlefs_harness::fault_injection::{
     FaultCounting, FaultDeviceSelector, FaultInjectingBlockDevice, FaultOccurrence, FaultPlacement,
     FaultSchedule, InjectedFault, SharedFaultPlan,
 };
+use singlefs_harness::memory_pool::SparseBlockDevice;
 use singlefs_harness::scenario::e142_parameters;
 use singlefs_harness::segments::FixedGeometry;
 use singlefs_harness::{RecordedOperationKind, RecordingBlockDevice, SharedStream};

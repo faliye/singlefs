@@ -42,7 +42,7 @@ use singlefs_core::transaction::{
     TransactionUnit, FIRST_INODE_NUMBER,
 };
 use singlefs_core::unit::{build_index_node, parse_index_node};
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
+use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 /// 两棵树都压小：记账树 15 行按叶 4 条长成两层（四片叶），中央映射树按叶 3 条长成两层。
@@ -489,7 +489,7 @@ fn a_central_mapping_root_whose_separator_hides_a_key_is_refused_by_the_rebuild_
     let after_image = MemoryPool {
         devices: devices
             .iter()
-            .map(|(identity, device)| (*identity, device.inner().image.clone()))
+            .map(|(identity, device)| (*identity, device.wrapped_device().image.clone()))
             .collect(),
         device_size_in_bytes: common::IMAGE_BYTES,
     };

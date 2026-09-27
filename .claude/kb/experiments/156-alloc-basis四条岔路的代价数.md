@@ -15,7 +15,7 @@
 
 **备料**：给 alloc-basis 四条岔路（`research/prompts/alloc-basis-forks.md`）交用户之前配代价数——判决收口表第 ② 行因此挡着第 5、60、54、43 行；用户 2026-09-21 定「先跑计数实验，量完一次全交」。第二、七行判决标着「无运行时代价」，第二行量的是「删掉 D28（挂载期承诺量） 已定项 1『− defer 待释放』这一项要同步改的清单能不能被一条命令核」，第七行量的是「G27（给 defer 账加的一条检查）分不分得出今天两条检查判不出的差别」。等 D28（挂载期承诺量） 已定项 1 与 D16（发布语义） 已定项 1 按岔路定案时引用本实验。岔路单第 2、7 行用户已定（岔路单那两行的状态列），第 3 行按第 4 次重跑的前提 2 失效、不量；第 1 行用户 2026-09-27 定留到里程碑三、要考虑重排算法（弹窗原话「可以留到里程碑3 但是要考虑重排算法」），记成欠账 C566（环上有洞时多扣的槽随洞数无界增长）。
 
-**问题**：第 4 次重跑登记 `research/prompts/e156-r4-prereg.md`（回答问题单 `research/prompts/e156-r4-questions.md` 的四节）。实一至实五之后，管理员回退改成挂着时的一次向前发布（挂载时回退与截断删了）、每次发布都做挂载内回收、准入不再扣「defer 待释放」；岔路单第 2、7 行用户已定不量，第 1、3 行先答三个前提：前提 1（今天的代码上根环还会不会出洞）、前提 2（两个 F 口径在今天的抬 F 路径上还分不分得开）、前提 3（哪几个量是按旧准入式子定义的）。前提 1 成立才量第 1 行（登记第五节 5.5 的第二段），前提 2 不成立则第 3 行失效、不设量。装置是**入库装置**：`crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs`，只读驱动真实 mkfs、暖机、第一个事务、覆盖写、空发布、可写挂载、挂着回退、抬 F，不改 `crates/singlefs-core`、`crates/singlefs-checker` 的生产代码。
+**问题**：第 4 次重跑登记 `research/prompts/e156-r4-prereg.md`（回答问题单 `research/prompts/e156-r4-questions.md` 的四节）。实一至实五之后，管理员回退改成挂着时的一次向前发布（挂载时回退与截断删了）、每次发布都做挂载内回收、准入不再扣「defer 待释放」；岔路单第 2、7 行用户已定不量，第 1、3 行先答三个前提：前提 1（今天的代码上根环还会不会出洞）、前提 2（两个 F 口径在今天的抬 F 路径上还分不分得开）、前提 3（哪几个量是按旧准入式子定义的）。前提 1 成立才量第 1 行（登记第五节 5.5 的第二段），前提 2 不成立则第 3 行失效、不设量。装置是**入库装置**：`crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs`，只读驱动真实 mkfs、暖机、第一个事务、覆盖写、空发布、可写挂载、挂着回退、抬 F，不改 `crates/singlefs-core`、`crates/singlefs-checker` 的生产代码。
 
 ### 这一段做了什么
 
@@ -25,7 +25,7 @@
 2. **装置整个改写**：挂载时回退的本地替身、HK / HK-F0 / HR / H0 / HF / HX / HY 与挂载时回退那一形的隔离场景全部删掉，岔路 3、7 的量不再跑。新写的：岔路 1 的族（分配器走产品路径 `allocator_after_make_filesystem`，装着根环表；「记录已持久、根槽没持久」的崩溃按录下来的设备写切在根槽那一次写之前造；每个观测点从镜像的根环现读门槛、h_缺、h_洞，两条臂 × 两个回收时点各算一次多扣）；锚点模型（命令四 `anchors_e156_r4.py` 的逐行移植，产物里 `name=anchor_dump` 那 1092 行去掉前缀之后与 Python 的 `--dump` 逐字节相同，命令在「结果」）；前提 2 的录写（抬 F 那一串的设备写，切在系统配置写完之后、每条推空根之后读 F_生效）；两个回退单测的新形态；判定函数（门槛 2 槽、1 槽照登记）。
 3. **第一段撞上一次停机 S1(i)，按登记 S1 行「查装置读错了实现（改装置，写进第十二节）」处置**：录写切段镜像与装置原有的「发完只改回根槽」镜像每次都差每块盘一个系统配置扇区——实现在根槽 FUA 之后还轮换每块盘的系统配置槽（`crates/singlefs-core/src/transaction.rs` 的 `persist_the_root_then_rotate_the_system_configuration`），原有造法的前提「根槽是那次发布最后一笔写」不成立。对照镜像改成「发完把根槽与每块盘的系统配置两槽都改回」，S1(i) 的判据（两份逐字节相同）不动，差在哪几个扇区逐洞照报。这一处改动记在登记第十二节修订 2 第 1 条，要不要认由主 agent 定。
 4. **第二段**：S ∈ {4, 8, 16} × ρ ∈ {1, 1/4} × (k, 位置) ∈ {(0, —), (1, 前), (2, 前), (4, 前), (1, 后), (2, 后), (4, 后)} 共 42 格，S = 4 的 (4, 前)、(4, 后) 两格几何排不下（锚点模型 `fits=false`），跑 38 格；每格两个回收时点，共 76 组读数。阳性对照 PC-多扣（每个 (S, ρ) 的 k = 0 与 (2, 后)）、PC-洞、PC-分配器（S = 4、ρ = 1、k = 0，换回不装根环表的分配器）、PC-判定器（10 条合成用例）都跑了。Q1e（附带）只在 S = 8、ρ = 1 的格上算（登记写死），别的格标「够判后未跑」。
-5. **单测与变异**：`cargo test -p singlefs-harness --bin e156_allocation_basis_counts` → `test result: ok. 17 passed`。`crates/mutations.tsv` 里点着这个装置的 22 行：这一次新加 9 行（M35–M43）、改锚 3 行（M32–M34，测试名跟着改），其余 10 行没动；22 行在草稿目录的仓副本里逐条施加、跑点名的测试，22 行全红（抓到 22 / 无效 0 / 没红 0），门禁 33 号（锚点唯一命中）通过。门禁 59 号整表复跑没跑（归提交前的整轮）。其中另有 9 行测试名末尾带 `$`，门禁 59 号按字面找 `test … FAILED` 找不到它们，没改，交主 agent（登记第十二节修订 2 第 10 条）。
+5. **单测与变异**：`cargo test -p singlefs-checker-tier --bin e156_allocation_basis_counts` → `test result: ok. 17 passed`。`crates/mutations.tsv` 里点着这个装置的 22 行：这一次新加 9 行（M35–M43）、改锚 3 行（M32–M34，测试名跟着改），其余 10 行没动；22 行在草稿目录的仓副本里逐条施加、跑点名的测试，22 行全红（抓到 22 / 无效 0 / 没红 0），门禁 33 号（锚点唯一命中）通过。门禁 59 号整表复跑没跑（归提交前的整轮）。其中另有 9 行测试名末尾带 `$`，门禁 59 号按字面找 `test … FAILED` 找不到它们，没改，交主 agent（登记第十二节修订 2 第 10 条）。
 
 ### 结果整行抄自产物
 
@@ -189,10 +189,10 @@ $ grep '^E7RESULT name=q1_observation ' research/results/e156-alloc-basis-counts
 
 ```
 bash research/scripts/replay.sh E156
-cargo test -p singlefs-harness --bin e156_allocation_basis_counts
+cargo test -p singlefs-checker-tier --bin e156_allocation_basis_counts
 ```
 
-`research/scripts/replay.sh` 里 E156（alloc-basis 四条岔路的代价数） 那一行改指 `e156-alloc-basis-counts-2026-09-26.out`（驱动 `driver_e156` 在仓根 `cargo run -q -p singlefs-harness --bin e156_allocation_basis_counts`，经内存包装）；2026-09-26 UTC 15:2x 复跑那一行判「字节一致」，汇总行原样：
+`research/scripts/replay.sh` 里 E156（alloc-basis 四条岔路的代价数） 那一行改指 `e156-alloc-basis-counts-2026-09-26.out`（驱动 `driver_e156` 在仓根 `cargo run -q -p singlefs-checker-tier --bin e156_allocation_basis_counts`，经内存包装）；2026-09-26 UTC 15:2x 复跑那一行判「字节一致」，汇总行原样：
 
 ```
 字节一致 1 ／ 仅计时不同 0 ／ 对不上 0 ／ 跑不了 0 ／ 结论断言不中 0 ／ 产物已归档 0 ／ 输入没变没跑 0
@@ -214,13 +214,13 @@ cargo test -p singlefs-harness --bin e156_allocation_basis_counts
 
 | # | 路径 | 怎么算 | 源码落点 | 读了哪些共用项 |
 |---|---|---|---|---|
-| 1 | 装置自己那一份引用 | 每个 txg 的那一版的发布输出里全部单元的落点（跨度展开），实例表单元第一次重写之前按根记录的实例表指针补上；零单元那几版按 mkfs 根记录的两条指针 | `crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs:1496` `facts_of_published_version` | 发布输出（`TransactionOutput.units`、根记录指针）；「两盘同槽」这一前提 |
-| 2 | 盘上仍分配记录 | 同一批环里的根，`recovery::allocation_records_under_root` 读出的未释放记录逐盘展开；没有分配记录树的那几版按根记录两条指针的这块盘那一份 | `crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs:1541` `referenced_slots_read_from_disk` | 盘上的分配记录树与根记录；跨度的定义 |
-| 3 | 从镜像的根环现读 | 每个观测点读环里全部自证过的根，门槛 = max(F_生效, 环里最旧有效根)，h_缺、h_洞 按登记字面现数 | `crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs:1798` `read_hh_state` | 根环落点公式（`target_for_publish`）、`effective_rollback_floor`、实例表判被抛弃 |
-| 4 | 锚点模型 | 命令四 `anchors_e156_r4.py` 的逐行移植：只用脚本头那几句条款算洞、挂载做完的 txg、门槛、h_缺、h_洞、树表下界 | `crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs:1181` `anchor_model::run` | 根环 txg u 落槽 u mod 3S、区域设备 [0, 1, 0]、「每次发布换下树表单元」、暖机规则、c2 之后首 txg 规则 |
-| 5 | 录写切段 | 录下崩溃那次发布的设备写，切在根槽那一次写之前施加到发布之前的镜像上 | `crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs:915` `crash_publish_before_its_root_persists` | `FixedGeometry::classify` 认根槽写；同一次发布的输入 |
-| 6 | 发完改回 | 真发一次，再把根槽与每块盘系统配置两槽改回发布之前 | `crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs:828` `crash_before_root_persists` | 根槽落点公式；系统配置每盘 2 槽、槽宽 4096（本地常量）；同一次发布的输入 |
-| 7 | 甲-T1「实」与「每」 | 「实」读真实分配器的空闲图；「每」按门槛对记录现算 | `crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs:1673` `over_withheld_on_device` | 同一份分配器记录、同一个门槛、同一份引用 |
+| 1 | 装置自己那一份引用 | 每个 txg 的那一版的发布输出里全部单元的落点（跨度展开），实例表单元第一次重写之前按根记录的实例表指针补上；零单元那几版按 mkfs 根记录的两条指针 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:1496` `facts_of_published_version` | 发布输出（`TransactionOutput.units`、根记录指针）；「两盘同槽」这一前提 |
+| 2 | 盘上仍分配记录 | 同一批环里的根，`recovery::allocation_records_under_root` 读出的未释放记录逐盘展开；没有分配记录树的那几版按根记录两条指针的这块盘那一份 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:1541` `referenced_slots_read_from_disk` | 盘上的分配记录树与根记录；跨度的定义 |
+| 3 | 从镜像的根环现读 | 每个观测点读环里全部自证过的根，门槛 = max(F_生效, 环里最旧有效根)，h_缺、h_洞 按登记字面现数 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:1798` `read_hh_state` | 根环落点公式（`target_for_publish`）、`effective_rollback_floor`、实例表判被抛弃 |
+| 4 | 锚点模型 | 命令四 `anchors_e156_r4.py` 的逐行移植：只用脚本头那几句条款算洞、挂载做完的 txg、门槛、h_缺、h_洞、树表下界 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:1181` `anchor_model::run` | 根环 txg u 落槽 u mod 3S、区域设备 [0, 1, 0]、「每次发布换下树表单元」、暖机规则、c2 之后首 txg 规则 |
+| 5 | 录写切段 | 录下崩溃那次发布的设备写，切在根槽那一次写之前施加到发布之前的镜像上 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:915` `crash_publish_before_its_root_persists` | `FixedGeometry::classify` 认根槽写；同一次发布的输入 |
+| 6 | 发完改回 | 真发一次，再把根槽与每块盘系统配置两槽改回发布之前 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:828` `crash_before_root_persists` | 根槽落点公式；系统配置每盘 2 槽、槽宽 4096（本地常量）；同一次发布的输入 |
+| 7 | 甲-T1「实」与「每」 | 「实」读真实分配器的空闲图；「每」按门槛对记录现算 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:1673` `over_withheld_on_device` | 同一份分配器记录、同一个门槛、同一份引用 |
 
 路径 1 与 2 在每次挂载交回与每格终点逐根逐盘比（`w9_mismatches`，全部 0）；路径 3 与 4 在每个观测点比（判决行 `v6_a11_mismatch_points=0`、`v2_a14_mismatch_points=0`），路径 4 与 Python 脚本逐行比（「结果」里的 sha256）；路径 5 与 6 逐洞比（`cut_matches_root_and_system_configuration_restored_image`，全部 true）；路径 7 两列逐观测点比（`f24_real_every_differ_points=0`）。三组比对各自共用的前提（发布输出与盘上记录同出一次发布、根环落点公式、同一份记录与门槛）一起错时比不出来；锚点模型只用条款句，是唯一不经 `crates/` 的一条。
 
@@ -228,12 +228,12 @@ cargo test -p singlefs-harness --bin e156_allocation_basis_counts
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D28（挂载期承诺量） 已定项 1 | 备料 | 2026-09-27 不受影响：这次只在页首加了 doc-lint 的 not-numbers 标记，结论、数与产物不变；2026-09-26 不受影响：第 4 次重跑只核了哪些量按旧式子定义（岔路 2 那一族），式子本身不量；Hh 历史上准入拒、挂载处推、抬 F 都是 0 |
-| D16（发布语义） 已定项 1 | 备料 | 2026-09-27 不受影响：这次只在页首加了 doc-lint 的 not-numbers 标记，结论、数与产物不变；2026-09-26 不受影响：前提 2 量到屏障之后 F_生效 已是新值、两个 F 口径合成一个，第 3 行失效；「可再分配」谓词在 38 格上与真实分配器逐观测点相同；扣住位晚放那一格交主 agent，不改这一分项 |
-| D23（journal 的角色与格式） 已定项 14 | 备料 | 2026-09-27 不受影响：这次只在页首加了 doc-lint 的 not-numbers 标记，结论、数与产物不变；2026-09-26 不受影响：崩溃恢复之后首 txg = 洞 + 1、挂着回退 txg 加一且不取号不写行，都与条款一致 |
-| D3（空间分配） 已定项 7 | 备料 | 2026-09-27 不受影响：这次只在页首加了 doc-lint 的 not-numbers 标记，结论、数与产物不变；2026-09-26 不受影响：这一段没量落点与记录格式 |
-| D5（快照 / 空间记账机制） 已定项 4 | 备料 | 2026-09-27 不受影响：这次只在页首加了 doc-lint 的 not-numbers 标记，结论、数与产物不变；2026-09-26 不受影响：这一段没量记账项的对照表 |
-| D8（核心索引结构） 已定项 14 | 备料 | 2026-09-27 不受影响：这次只在页首加了 doc-lint 的 not-numbers 标记，结论、数与产物不变；2026-09-26 不受影响：这一段只把 K1-1、R-4 的旧锚点当停机对拍项重核，没量新数 |
+| D28（挂载期承诺量） 已定项 1 | 备料 | 2026-09-27 不受影响：装置搬进 checker 档包 `crates/singlefs-checker-tier`（验证两档拆分），只改路径与包名，结论、数与产物不变；2026-09-27 不受影响：这次只在页首加了 doc-lint 的 not-numbers 标记，结论、数与产物不变；2026-09-26 不受影响：第 4 次重跑只核了哪些量按旧式子定义（岔路 2 那一族），式子本身不量；Hh 历史上准入拒、挂载处推、抬 F 都是 0 |
+| D16（发布语义） 已定项 1 | 备料 | 2026-09-27 不受影响：装置搬进 checker 档包 `crates/singlefs-checker-tier`（验证两档拆分），只改路径与包名，结论、数与产物不变；2026-09-27 不受影响：这次只在页首加了 doc-lint 的 not-numbers 标记，结论、数与产物不变；2026-09-26 不受影响：前提 2 量到屏障之后 F_生效 已是新值、两个 F 口径合成一个，第 3 行失效；「可再分配」谓词在 38 格上与真实分配器逐观测点相同；扣住位晚放那一格交主 agent，不改这一分项 |
+| D23（journal 的角色与格式） 已定项 14 | 备料 | 2026-09-27 不受影响：装置搬进 checker 档包 `crates/singlefs-checker-tier`（验证两档拆分），只改路径与包名，结论、数与产物不变；2026-09-27 不受影响：这次只在页首加了 doc-lint 的 not-numbers 标记，结论、数与产物不变；2026-09-26 不受影响：崩溃恢复之后首 txg = 洞 + 1、挂着回退 txg 加一且不取号不写行，都与条款一致 |
+| D3（空间分配） 已定项 7 | 备料 | 2026-09-27 不受影响：装置搬进 checker 档包 `crates/singlefs-checker-tier`（验证两档拆分），只改路径与包名，结论、数与产物不变；2026-09-27 不受影响：这次只在页首加了 doc-lint 的 not-numbers 标记，结论、数与产物不变；2026-09-26 不受影响：这一段没量落点与记录格式 |
+| D5（快照 / 空间记账机制） 已定项 4 | 备料 | 2026-09-27 不受影响：装置搬进 checker 档包 `crates/singlefs-checker-tier`（验证两档拆分），只改路径与包名，结论、数与产物不变；2026-09-27 不受影响：这次只在页首加了 doc-lint 的 not-numbers 标记，结论、数与产物不变；2026-09-26 不受影响：这一段没量记账项的对照表 |
+| D8（核心索引结构） 已定项 14 | 备料 | 2026-09-27 不受影响：装置搬进 checker 档包 `crates/singlefs-checker-tier`（验证两档拆分），只改路径与包名，结论、数与产物不变；2026-09-27 不受影响：这次只在页首加了 doc-lint 的 not-numbers 标记，结论、数与产物不变；2026-09-26 不受影响：这一段只把 K1-1、R-4 的旧锚点当停机对拍项重核，没量新数 |
 
 ## 历史版本
 
@@ -435,11 +435,11 @@ E7RESULT name=q1d_monotonic holds=true
 bash research/scripts/replay.sh E156
 ```
 
-当时报「字节一致」（`replay.sh` 的 `driver_e156` 直接 `cargo run -q -p singlefs-harness --bin e156_allocation_basis_counts`，先例同 E142（第一个事务的干跑），两个 cargo workspace 互相看不到对方，不能合并成一次调用；确定性——同一个二进制跑两遍逐字节一致，V8 未触发，续派两段各自现跑过；产物换到 `…-stage4.out`，sha256 `5311e01a0cec4797bf848ffacbbf3f624b6a01627412491c76a8c92f2cea0f02`）。单测：`cargo test -p singlefs-harness --bin e156_allocation_basis_counts` → `6 passed`（续派第一段新增 1 条：`reclaimed_records_are_not_removed_but_their_slots_become_free`，钉住 Q1 诊断修法的前提；此前 5 条不变）。变异：`crates/mutations.tsv` 对这个 bin 累计仍是 4 条（续派两段没有新增变异行——新加的诊断/构造代码要么不改变任何已判的量、要么是新的产品行为组合，不是候选/判据分歧，加变异的收益与工作量都没到位，逐条理由见「它答不了的」），逐条手工改坏、`cargo test` 判红、还原后再判绿（未跑门禁 59 号整张表，归 `gate-triage`）。**手工验证过一条没红的变异**（G7 重组里 `ReclaimedReuse::Immediately` 改成 `HeldUntilFloorTakesEffect`）：当前的 Q3a/Q3b/Q3c/K9 输出逐字节不变，按 `mutation-sampling.md`「三类」判为**第一类：真盲区**——`run_hf_single_cell` 那条历史在回收之后没有再做一次分配尝试；**X8A（续派第二段）从另一个角度补了这条盲区的证据**：`x8a_held_measure` 直接量出「回收但扣住」之后 `free_slots` 涨了、`lowest_empty_segment` 却仍是 `none`，`q3e_f_kou`/`q3e_g7` 也确实随两种回收方式而表现不同（HX 上二者都失败但是不同代码路径导致），但这仍不是给 `run_hf_single_cell` 那条历史加的变异，两处是两个独立的观测点，不进 `crates/mutations.tsv`。
+当时报「字节一致」（`replay.sh` 的 `driver_e156` 直接 `cargo run -q -p singlefs-checker-tier --bin e156_allocation_basis_counts`，先例同 E142（第一个事务的干跑），两个 cargo workspace 互相看不到对方，不能合并成一次调用；确定性——同一个二进制跑两遍逐字节一致，V8 未触发，续派两段各自现跑过；产物换到 `…-stage4.out`，sha256 `5311e01a0cec4797bf848ffacbbf3f624b6a01627412491c76a8c92f2cea0f02`）。单测：`cargo test -p singlefs-checker-tier --bin e156_allocation_basis_counts` → `6 passed`（续派第一段新增 1 条：`reclaimed_records_are_not_removed_but_their_slots_become_free`，钉住 Q1 诊断修法的前提；此前 5 条不变）。变异：`crates/mutations.tsv` 对这个 bin 累计仍是 4 条（续派两段没有新增变异行——新加的诊断/构造代码要么不改变任何已判的量、要么是新的产品行为组合，不是候选/判据分歧，加变异的收益与工作量都没到位，逐条理由见「它答不了的」），逐条手工改坏、`cargo test` 判红、还原后再判绿（未跑门禁 59 号整张表，归 `gate-triage`）。**手工验证过一条没红的变异**（G7 重组里 `ReclaimedReuse::Immediately` 改成 `HeldUntilFloorTakesEffect`）：当前的 Q3a/Q3b/Q3c/K9 输出逐字节不变，按 `mutation-sampling.md`「三类」判为**第一类：真盲区**——`run_hf_single_cell` 那条历史在回收之后没有再做一次分配尝试；**X8A（续派第二段）从另一个角度补了这条盲区的证据**：`x8a_held_measure` 直接量出「回收但扣住」之后 `free_slots` 涨了、`lowest_empty_segment` 却仍是 `none`，`q3e_f_kou`/`q3e_g7` 也确实随两种回收方式而表现不同（HX 上二者都失败但是不同代码路径导致），但这仍不是给 `run_hf_single_cell` 那条历史加的变异，两处是两个独立的观测点，不进 `crates/mutations.tsv`。
 
-**第 3 次重跑之后（现状）**：`replay.sh` 报「字节一致」（产物换到 `…-2026-09-25-r3.out`，sha256 `1356c1dff9b31cf944516976972d241f7d1ad7df1f77c7c599a785432e5f95cd`）。单测：`cargo test -p singlefs-harness --bin e156_allocation_basis_counts` → `10 passed`（新增 4 条：`pc_closed_form_matches_the_registered_anchor_r3c`、`pc_closed_form_third_group_counts_released_and_allocated_records`、`overwrite_steps_match_the_closed_form_and_cross_a_second_leaf`（U10/U12）、`rollback_isolation_scenario_matches_the_new_layout`（U11）；此前 6 条改了断言里的绝对值（13→17、12→16、34→54）但函数与场景不变）。变异：`crates/mutations.tsv` 对这个 bin 累计 10 条（本轮新增 M27–M32 六条：R-3 闭式漏根/丢 devices 因子/只取分配不取释放、Q7d-1 退回字面 10、K1-1 退回 13、S1(c) 退回 34），逐条手工改坏、`cargo test` 判红、还原后再判绿；此前 4 条的锚点核过在改完的源码里仍唯一命中，函数体未改，不必重新逐条证红。全表复跑仍归门禁 59 号（`gate-triage`）。
+**第 3 次重跑之后（现状）**：`replay.sh` 报「字节一致」（产物换到 `…-2026-09-25-r3.out`，sha256 `1356c1dff9b31cf944516976972d241f7d1ad7df1f77c7c599a785432e5f95cd`）。单测：`cargo test -p singlefs-checker-tier --bin e156_allocation_basis_counts` → `10 passed`（新增 4 条：`pc_closed_form_matches_the_registered_anchor_r3c`、`pc_closed_form_third_group_counts_released_and_allocated_records`、`overwrite_steps_match_the_closed_form_and_cross_a_second_leaf`（U10/U12）、`rollback_isolation_scenario_matches_the_new_layout`（U11）；此前 6 条改了断言里的绝对值（13→17、12→16、34→54）但函数与场景不变）。变异：`crates/mutations.tsv` 对这个 bin 累计 10 条（本轮新增 M27–M32 六条：R-3 闭式漏根/丢 devices 因子/只取分配不取释放、Q7d-1 退回字面 10、K1-1 退回 13、S1(c) 退回 34），逐条手工改坏、`cargo test` 判红、还原后再判绿；此前 4 条的锚点核过在改完的源码里仍唯一命中，函数体未改，不必重新逐条证红。全表复跑仍归门禁 59 号（`gate-triage`）。
 
-**第 3 次重跑续派之后（现状）**：`replay.sh` 报「字节一致」（产物换到 `…-2026-09-25-fork7-selfproof.out`，sha256 `59b1be11c762c057a5260d412da371ee89138d991aae64352bbd88cb793b0b2a`；两次直接 `cargo run` 逐字节一致，见「历史版本」）。单测：`cargo test -p singlefs-harness --bin e156_allocation_basis_counts` → `11 passed`（新增 1 条：`hr_rollback_row_basis_has_zero_deferred_and_flips_the_q7c1_self_test`；此前 10 条断言与场景不变，`naming-lint.sh` 对新代码零违规）。变异：`crates/mutations.tsv` 对这个 bin 累计 12 条（本轮新增 M33/M34：`q7c_self_test` 里 `without_subtracting_defer_is_red`/`real_check_red_plus1` 的比较符号各改坏一次），逐条手工改坏、`cargo test` 单独跑新测试判红、还原后再判绿；此前 10 条的锚点核过在改完的源码里仍逐条唯一命中（`python3` 用 `content.count(original)` 核过 12 条全部原文，见交回报告）。全表复跑仍归门禁 59 号（`gate-triage`）。
+**第 3 次重跑续派之后（现状）**：`replay.sh` 报「字节一致」（产物换到 `…-2026-09-25-fork7-selfproof.out`，sha256 `59b1be11c762c057a5260d412da371ee89138d991aae64352bbd88cb793b0b2a`；两次直接 `cargo run` 逐字节一致，见「历史版本」）。单测：`cargo test -p singlefs-checker-tier --bin e156_allocation_basis_counts` → `11 passed`（新增 1 条：`hr_rollback_row_basis_has_zero_deferred_and_flips_the_q7c1_self_test`；此前 10 条断言与场景不变，`naming-lint.sh` 对新代码零违规）。变异：`crates/mutations.tsv` 对这个 bin 累计 12 条（本轮新增 M33/M34：`q7c_self_test` 里 `without_subtracting_defer_is_red`/`real_check_red_plus1` 的比较符号各改坏一次），逐条手工改坏、`cargo test` 单独跑新测试判红、还原后再判绿；此前 10 条的锚点核过在改完的源码里仍逐条唯一命中（`python3` 用 `content.count(original)` 核过 12 条全部原文，见交回报告）。全表复跑仍归门禁 59 号（`gate-triage`）。
 #### 它答不了的（第 1–3 次重跑）
 
 - **S1(b)（`second_transaction_step_five_reuse.rs` 两个用例）仍没有装置侧重放**：只现跑了测试文件本身，不像 S1(c) 那样在装置里重新走一遍那个场景再逐项 `assert_eq!`。
@@ -473,7 +473,7 @@ bash research/scripts/replay.sh E156
 ### 2026-09-23
 
 - 撤回「独立于 Q7a 的一格干净信号」那一段。原文：**独立于 Q7a 的一格干净信号**（`stage3.out` 的 `name=q7a basis=beta0_k1` 那一行，字段语义修正之后才读得对）：基底上 G27 成立、`I-3.1（已分配统计对得上）` 与 `I-5.2（空闲统计对得上）` 都判绿；坏镜像（Bd(+1)）上 **G27 不成立（判红）而那两条仍判绿**。⇒ G27 在这一格分得出差别、而今天那两条分不出，且 G27 在基底上不误报。这一格不进 Q7a 的聚合（那张表已按 V3 作废），单独可读。
-- 撤回依据：重跑登记的设计员现查、主 agent 复核 `crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs` 的 `run_q7a_cell`——`corrupted_check_holds = allocated == deferred + referenced`，其中 `(allocated, _free, deferred)` 取自调用方传入的 `corrupted_allocator_row`，不读 `corrupted_pool`；基底那一侧的 `base_check_holds` 读的是内存分配器。G27 在第一段里一次都没读过盘上的记账行。
+- 撤回依据：重跑登记的设计员现查、主 agent 复核 `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs` 的 `run_q7a_cell`——`corrupted_check_holds = allocated == deferred + referenced`，其中 `(allocated, _free, deferred)` 取自调用方传入的 `corrupted_allocator_row`，不读 `corrupted_pool`；基底那一侧的 `base_check_holds` 读的是内存分配器。G27 在第一段里一次都没读过盘上的记账行。
 
 **（同日，R2 第一段，执行员）** 装置改写：R3（G27 改读镜像）、新增 HK/HK-F0 两族历史、9 个基底、Q7d/Q7e/Q7f、S1(c) 完整重放、锚1/锚2/锚3 锚点。结论：岔路 7（岔路单第 12 行）仍不够判，且这一次的证据面比第一、二段宽得多（7 个可达基底、168 个可达状态，横跨 H0/HR/HK 三族、八种发布种类）——Q7c①在可达状态上从来看不到转色，Q7d-2/Q7d-3 排除了「量法本身看不见 0」这条解释，剩下的只有「可达合法状态第 5 项从来不是 0」。续跑这套自证设计翻不了面，改判据还是认下，交主 agent（见「结果」与本页顶的岔路表）。产物换成 `research/results/e156-alloc-basis-counts-2026-09-23-stage1.out`（324 行），`replay.sh` 已改指向它；旧的 `stage1/2/3.out`（第一、二段）原样保留，不再承重。
 

@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 research/scripts/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判（用户 2026-09-26 定：项目更严）
-# gate-stage: 层 0 崩溃点重放与登记的崩溃枚举用例（整轮门禁跑快档：两条流不标 ignored 的用例，再逐条核 stage-inputs.tsv 里 crash-case: 那几条用例各自那一格全绿标记与它这批输入的指纹相等；全量由主 agent 暂存之后在 HEAD + 暂存区的 worktree 里跑 --full，逐条用例照复用判定跑：那一格全绿标记在就复用，不在才在 release 下跑它、判绿写那一格；两条流的层 0 全量带断点续跑，第一个事务与 E142 产物逐字比对、里程碑「第二个事务」固定脚本到 E 与用例的闭式比对由用例自己断言；只做过 mkfs 的池可写挂载再发第一个文件版本那条流与第一个事务逐项相同，由 cargo test 里的快用例钉住，不另枚举）
+# gate-stage: 层 0 崩溃点重放与登记的崩溃枚举用例（整轮门禁与提交时跑快档：checker 档包（crates/singlefs-checker-tier，D13 已定项 15）不标 ignored 的用例，再逐条核 stage-inputs.tsv 里 crash-case: 那几条用例各自那一格全绿标记与它这批输入的指纹相等，不作数的报「本次未跑」、不判红；全量由用户要求或夜间在 HEAD + 暂存区的 worktree 里跑 --full，逐条用例照复用判定跑：那一格全绿标记在就复用，不在才在 release 下跑它、判绿写那一格；两条流的层 0 全量带断点续跑，第一个事务与 E142 产物逐字比对、里程碑「第二个事务」固定脚本到 E 与用例的闭式比对由用例自己断言；只做过 mkfs 的池可写挂载再发第一个文件版本那条流与第一个事务逐项相同，由 cargo test 里的快用例钉住，不另枚举）
 # gate-covers: 崩溃点重放
 #
 # 分两档（用户 2026-09-19 定，原话「每次主 agent 执行完任务后统一执行」，records/2026-09-19-里程碑二遗留收拢.md「五之二」第 8 问；
 # 用户 2026-09-26 定逐条用例复用，原话「下次肯定要接入提交时崩溃验证员， 并且以后跑也不能全量这么跑，改了只跑改了的部分。」，
-# records/2026-09-24-里程碑二收尾调度.md 第三节「崩溃枚举的跑法」那一行）：
+# records/2026-09-24-里程碑二收尾调度.md 第三节「崩溃枚举的跑法」那一行；
+# 用户 2026-09-27 定验证代码分两档、提交时默认只跑快档，原话「checker可以自己跑，但是默认只有在提交时候才跑」，records/2026-09-27-验证两档拆分.md）：
 #
 #   bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full [--start-over] <worktree>
 #     主 agent 暂存之后（提交时由崩溃验证员），在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑。worktree 的建法与 `gate.sh --staged` 相同，命令在快档的出路句里。
@@ -21,14 +22,14 @@
 #     （崩溃验证员的定义里「另有 --full 在跑时不起」挡着这一种）。
 #     断点续跑（crash-case-command 设）：跑用例时设 SINGLEFS_LAYER0_PROGRESS_DIRECTORY=<common-dir>/singlefs-layer0-progress/<这条用例的输入指纹>
 #     （不随 worktree 删掉）、SINGLEFS_LAYER0_INPUT_FINGERPRINT=<这条用例的输入指纹>；--start-over 设 SINGLEFS_LAYER0_START_OVER=1（丢掉进度文件、从头跑），
-#     不带它时从调用方的环境里清掉这个变量。续跑的判法（片方案、校验和、观察者计数、判红删进度文件）在 crates/singlefs-harness/src/layer0_progress.rs。
+#     不带它时从调用方的环境里清掉这个变量。续跑的判法（片方案、校验和、观察者计数、判红删进度文件）在 crates/singlefs-checker-tier/src/layer0_progress.rs。
 #     双机分片（里程碑三第六项，用户 2026-09-27 定默认不分片）：本地配置（${SINGLEFS_LAYER0_SHARD_CONFIG:-<主工作树的根>/layer0-shard.env}，
 #     模板是仓根 layer0-shard.env.example）在、research/scripts/layer0-shard-configuration-check.sh 判得过（键齐、第二台 ssh 连得上、它上面有 cargo）
 #     才开；开着时登记了 shard=across-machines 的用例（admission.py crash-case-shardable）交给 research/scripts/layer0-shard-run.sh --merged-log
 #     （本机 0/2、第二台 1/2、本机 merge/2；驱动脚本与配置判法按内容进这几条用例的指纹），它交回的 merge 那一趟日志照单机的判法判、写同一格标记；
 #     别的用例、配置不在或判不过时，照 crash-case-command 单机跑。开没开、为什么，开跑时打一行。
 #     发现日志（用户 2026-09-27 定「崩溃放量日志要全量与发现双份，不然读不过来」，records/2026-09-24-里程碑二收尾调度.md「层 0 放量的发现日志」那一行；
-#     行格式以 crates/singlefs-harness/src/crash.rs 的发现日志为准）：每趟 --full 的全量日志与发现日志放 <common-dir>/singlefs-layer0-logs/<开跑时刻>-<pid>/，
+#     行格式以 crates/singlefs-checker-tier/src/crash.rs 的发现日志为准）：每趟 --full 的全量日志与发现日志放 <common-dir>/singlefs-layer0-logs/<开跑时刻>-<pid>/，
 #     不随 worktree 删、跑完不删；一条用例的全量日志是 log.<用例名>，发现日志是它同名加 .findings.tsv。单机跑时在 crash-case-command 交的命令外面
 #     设 SINGLEFS_LAYER0_FINDINGS_FILE=<发现日志>；双机分片时驱动脚本照同一个命名（<它交回的 merge 日志>.findings.tsv）给 merge 那一趟，两片各自的
 #     发现日志在那一片的日志旁边（驱动脚本的输出里打出三份路径）。跑完逐节读发现日志（一节一趟枚举；这一趟的目录是新建的，里面的节都是这一趟的）：
@@ -44,9 +45,11 @@
 #     （范围那一问不摘掉它）。
 #   bash .claude/gate.d/54-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
 #     快档先核登记的每一条路径 git 至少列得出一个文件（git ls-files -co --exclude-standard -- <那一条>），有一条列不出判红，之后才问复用与改动范围。
-#     两条流的测试二进制在 release 下只跑不标 ignored 的用例，一条都没通过判红；再逐条崩溃枚举用例算它这批输入的指纹、核那一格
+#     checker 档包在 release 下只跑不标 ignored 的用例（cargo test --release -p singlefs-checker-tier --lib --tests：库与集成测试，崩溃枚举用例都住那个包的 tests/；装置二进制 src/bin/ 的内联单测不在快档里，归它们的变异表（59 号）与实验复跑），一条都没通过判红；
+#     再逐条崩溃枚举用例算它这批输入的指纹、核那一格
 #     （admission.py crash-case-marker-check：在、记的指纹与用例相同、test result 是 1 passed、登记的计数行各恰好一行、要 exhaustive=true 的带着），
-#     全部作数才判绿，成功句逐条原样带出那一格的计数行与时刻；有一条不作数判红，逐条列原因（没有那一格时比最近写的一格与这一次的清单），出路是跑 --full。
+#     全部作数成功句逐条原样带出那一格的计数行与时刻；有不作数的逐条列原因（没有那一格时比最近写的一格与这一次的清单）、每条往 GATE_NOT_RUN_FILE 报一行「本次未跑」，
+#     不判红、退 0（全量默认不在提交时跑，D13 已定项 15；报过本次未跑的这一轮不算覆盖崩溃点重放），出路是跑 --full。
 #     按整批输入分格的旧标记（singlefs-layer0-full-green.*）不再认。
 #
 # 输入：整道阶段的复用判定与改动范围按 stage-inputs.tsv 里本阶段那一行（唯一登记位）；每条崩溃枚举用例的输入按它自己那一行，
@@ -162,7 +165,7 @@ if [[ "$layer0_tier" == quick ]]; then
     "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 ${layer0_input_paths_text}，加 ${layer0_judge_paths[*]}，判据见 research/scripts/change-touches-crates.sh。" \
     -- "$ROOT" "${layer0_registered_input_paths[@]}" "${layer0_judge_paths[@]}"
 fi
-[[ -f Cargo.toml && -d crates/singlefs-harness ]] || { echo "  ! 没有 crates/singlefs-harness，本阶段跳过（步 0 之前没有装置）"; exit 77; }
+[[ -f Cargo.toml && -d crates/singlefs-checker-tier ]] || { echo "  ! 没有 crates/singlefs-checker-tier（checker 档包），本阶段跳过"; exit 77; }
 # 前提（cargo、rustc）登记在 stage-inputs.tsv 本阶段那一行第三列，经准入模块判，没齐判红（不退 77）
 python3 "$layer0_admission_module" gate-preconditions "$layer0_stage_repository" "$layer0_stage_file_name" || exit 1
 
@@ -217,11 +220,11 @@ delete_crash_case_marker() {
   return 0
 }
 
-# run_layer0_test_binary <测试二进制> <日志>：快档跑一条流不标 ignored 的用例；cargo 的整段输出进日志。
+# run_checker_package_tests <日志>：快档跑 checker 档包不标 ignored 的全部用例（崩溃枚举用例住那个包的 tests/，D13 已定项 15）；cargo 的整段输出进日志。
 # 快档不写发现日志：调用方环境里的 SINGLEFS_LAYER0_FINDINGS_FILE 清掉，不漏给快用例。
-run_layer0_test_binary() {
-  env -u SINGLEFS_LAYER0_FINDINGS_FILE cargo test --release -p singlefs-harness --test "$1" -- --nocapture 2>&1 \
-    | tee "$2" \
+run_checker_package_tests() {
+  env -u SINGLEFS_LAYER0_FINDINGS_FILE cargo test --release -p singlefs-checker-tier --lib --tests -- --nocapture 2>&1 \
+    | tee "$1" \
     | { grep --line-buffered '^LAYER0_PROGRESS ' || true; } \
     | sed -u 's/^/    /'
   return "${PIPESTATUS[0]}"
@@ -277,7 +280,7 @@ run_crash_case_in_two_shards() {
   return "${PIPESTATUS[0]}"
 }
 
-# report_crash_case_findings <发现日志> <全量日志>：逐节打发现表（行格式与节的写法以 crates/singlefs-harness/src/crash.rs 的发现日志为准：
+# report_crash_case_findings <发现日志> <全量日志>：逐节打发现表（行格式与节的写法以 crates/singlefs-checker-tier/src/crash.rs 的发现日志为准：
 # 字段制表符分，第一个字段是行的种类，其余 key=value）。每一处不对各打一行「问题：…」，有问题返回 1；发现日志不在又不该有时返回 0。
 report_crash_case_findings() {
   local findings_file="$1" log_file="$2" stdout_findings_lines
@@ -381,34 +384,37 @@ print_staged_worktree_full_commands() {
   echo '                if [ "$layer0_tree_ready" = 1 ]; then SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash "${layer0_full_base:?}/tree/.claude/gate.d/54-layer0-replay.sh" --full "${layer0_full_base:?}/tree"; layer0_full_rc=$?; else echo "worktree 没建好或暂存区的 diff 套不上，--full 没跑"; layer0_full_rc=1; fi; git worktree remove --force "${layer0_full_base:?}/tree" 2>/dev/null; rm -rf "${layer0_full_base:?}"; ( exit "$layer0_full_rc" )'
 }
 
-# run_quick_tier_of_stream <测试二进制> <流的名字>：快档跑一条流。判红打出路、返回 1；判绿把这条流的计数接到 quick_tier_report 后面。
-run_quick_tier_of_stream() {
-  local quick_log passed_and_ignored passed_count ignored_count
-  quick_log="$layer0_scratch_directory/quick-$1.log"
-  if ! run_layer0_test_binary "$1" "$quick_log"; then
+# run_checker_quick_tier：快档跑 checker 档包不标 ignored 的用例。判红打出路、返回 1；判绿把每个测试二进制那一行 test result 的 passed / ignored 加总进 quick_tier_report。
+run_checker_quick_tier() {
+  local quick_log result_lines passed_count ignored_count passed_total ignored_total binary_count
+  quick_log="$layer0_scratch_directory/quick-singlefs-checker-tier.log"
+  if ! run_checker_package_tests "$quick_log"; then
     tail -40 "$quick_log"
-    echo "  ✗ $2的快档用例判红（上面是 cargo test 的尾部）"
-    echo "     → 怎么办：单跑看细节：cargo test --release -p singlefs-harness --test $1 -- --nocapture"
+    echo "  ✗ checker 档快档判红（上面是 cargo test 的尾部）"
+    echo "     → 怎么办：单跑看细节：cargo test --release -p singlefs-checker-tier -- --nocapture（只看一个测试二进制加 --test <名>）；"
     echo "                断言消息里是第一处对不上的计数或违例；改代码还是改断言先想清楚是哪一种——直接改断言等于把测试关掉。"
     return 1
   fi
-  passed_and_ignored="$(sed -n 's/^test result: ok\. \([0-9]*\) passed; 0 failed; \([0-9]*\) ignored;.*/\1 \2/p' "$quick_log" | head -1)"
-  read -r passed_count ignored_count <<< "$passed_and_ignored"
-  if [[ -z "${passed_count:-}" || "$passed_count" == 0 ]]; then
-    echo "  ✗ $2的快档跑过了，却读不到 cargo 的 test result 行，或一条用例都没通过：扫到 0 条不是通过"
-    echo "     → 怎么办：cargo test --release -p singlefs-harness --test $1 -- --list 看这个测试二进制里还剩几条不标 ignored 的用例；"
+  result_lines="$(sed -n 's/^test result: ok\. \([0-9]*\) passed; 0 failed; \([0-9]*\) ignored;.*/\1 \2/p' "$quick_log")"
+  passed_total=0; ignored_total=0; binary_count=0
+  while read -r passed_count ignored_count; do
+    [[ -n "${passed_count:-}" ]] || continue
+    passed_total=$((passed_total + passed_count)); ignored_total=$((ignored_total + ignored_count)); binary_count=$((binary_count + 1))
+  done <<< "$result_lines"
+  if (( passed_total == 0 )); then
+    echo "  ✗ checker 档快档跑过了，却读不到 cargo 的 test result 行，或一条用例都没通过：扫到 0 条不是通过"
+    echo "     → 怎么办：cargo test --release -p singlefs-checker-tier -- --list 看这个包里还剩几条不标 ignored 的用例；"
     echo "                一条都没有，就是快用例被整批标了 ignored 或删掉了，补回来。"
     return 1
   fi
-  quick_tier_report+="${quick_tier_report:+；}$2 ${passed_count} 条通过、${ignored_count} 条 ignored"
+  quick_tier_report="checker 档包 ${binary_count} 个测试二进制，${passed_total} 条通过、${ignored_total} 条 ignored（全量那几条留给 --full）"
   return 0
 }
 
-# ── 快档：两条流不标 ignored 的用例，再逐条核崩溃枚举用例这批输入那一格全绿标记 ─────────
+# ── 快档：checker 档包不标 ignored 的用例，再逐条核崩溃枚举用例这批输入那一格全绿标记 ─────────
 if [[ "$layer0_tier" == quick ]]; then
   quick_tier_report=""
-  run_quick_tier_of_stream first_transaction_step_seven_layer0 "第一个事务那条流" || exit 1
-  run_quick_tier_of_stream second_transaction_step_zero_layer0 "两次发布那条流" || exit 1
+  run_checker_quick_tier || exit 1
   present_report="$layer0_scratch_directory/present-report"
   missing_report="$layer0_scratch_directory/missing-report"
   : > "$present_report"
@@ -436,20 +442,24 @@ if [[ "$layer0_tier" == quick ]]; then
       } >> "$missing_report"
     fi
   done
+  echo "  ✓ checker 档快档跑完（release，只跑不标 ignored 的用例，全量留给 --full）：${quick_tier_report}"
   if (( ${#missing_cases[@]} > 0 )); then
-    echo "  ✗ 快档绿了（${quick_tier_report}），但 ${#missing_cases[@]} 条崩溃枚举用例没有作数的全绿标记：${missing_cases[*]}"
+    echo "  ! ${#missing_cases[@]} 条崩溃枚举用例没有作数的全绿标记，全量这一轮没跑，记「本次未跑」、不判红（全量默认不在提交时跑，D13 已定项 15）：${missing_cases[*]}"
     cat "$missing_report"
     legacy_marker_total="$(find "$git_common_directory" -maxdepth 1 -type f -name 'singlefs-layer0-full-green*' 2>/dev/null | grep -c .)"
     if [[ "$legacy_marker_total" -gt 0 ]]; then
       echo "       common-dir 里还有 ${legacy_marker_total} 格按整批输入分格的旧标记（singlefs-layer0-full-green*）：分成逐条用例之后不再认，可以删掉。"
     fi
-    echo "     → 怎么办：这几条的输入自上一次判绿以来变了（或从来没跑过）。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>"
+    echo "     → 要跑全量（用户要求或夜间）：暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>"
     echo "                （与 gate.sh --staged 同一建法；它只跑没有作数标记的那几条，别的复用）："
     print_staged_worktree_full_commands
-    exit 1
+    if [[ -n "${GATE_NOT_RUN_FILE:-}" ]]; then
+      for missing_case in "${missing_cases[@]}"; do
+        echo "崩溃枚举用例 ${missing_case} 这批输入没有作数的全绿标记，全量没跑（要跑：54 号 --full）" >> "$GATE_NOT_RUN_FILE"
+      done
+    fi
   fi
-  echo "  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量留给 --full）：${quick_tier_report}"
-  echo "  ✓ ${#crash_case_rows[@]} 条崩溃枚举用例的全绿标记都与各自这批输入的指纹相同（登记路径 ${layer0_input_paths_text}，逐条减去用例读不到的文件），标记里的计数行原样："
+  echo "  ✓ 登记 ${#crash_case_rows[@]} 条崩溃枚举用例，$(( ${#crash_case_rows[@]} - ${#missing_cases[@]} )) 条的全绿标记与各自这批输入的指纹相同（登记路径 ${layer0_input_paths_text}，逐条减去用例读不到的文件），标记里的计数行原样："
   cat "$present_report"
   exit 0
 fi
@@ -552,7 +562,7 @@ for crash_case_row in "${crash_case_rows[@]}"; do
     printf '%s\n' "$judge_output" | sed 's/^/       /'
     echo "  ✗ $case_key 的用例跑过了，日志却判不绿（上面逐条列出）"
     echo "     → 怎么办：计数行不是恰好一行、过滤之后没跑到恰好一条用例，对一对 stage-inputs.tsv 里 $case_key 那一行第三列与用例打印的行；"
-    echo "                不是全量去 crates/singlefs-harness/src/crash.rs 的 enumerate_layer0 看；只起了 1 个线程看 Layer0Parallelism::from_environment 读没读到 SINGLEFS_LAYER0_THREADS，"
+    echo "                不是全量去 crates/singlefs-checker-tier/src/crash.rs 的 enumerate_layer0 看；只起了 1 个线程看 Layer0Parallelism::from_environment 读没读到 SINGLEFS_LAYER0_THREADS，"
     echo "                真要单线程跑（比对单进程读数），显式写 SINGLEFS_LAYER0_THREADS=1 bash .claude/gate.d/54-layer0-replay.sh --full <根>。"
     red_cases+=("$case_key")
     continue
@@ -561,7 +571,7 @@ for crash_case_row in "${crash_case_rows[@]}"; do
     delete_crash_case_marker "$case_key" "$fingerprint_at_start"
     echo "  ✗ $case_key 的用例跑过了、日志也判得绿，发现日志却判红（上面发现表里的「问题：」逐条列出）"
     echo "     → 怎么办：「这一趟没跑完」看全量日志 $case_log 的尾部是 panic 还是被杀；red_states 不是 0 是有状态判红而用例没红，"
-    echo "                对一对用例的计数断言与 crates/singlefs-harness/src/crash.rs 的发现表；发现日志不在而全量日志里有 LAYER0_FINDINGS 行，"
+    echo "                对一对用例的计数断言与 crates/singlefs-checker-tier/src/crash.rs 的发现表；发现日志不在而全量日志里有 LAYER0_FINDINGS 行，"
     echo "                是 SINGLEFS_LAYER0_FINDINGS_FILE 没传进用例（单机看本阶段 run_crash_case，双机看 research/scripts/layer0-shard-run.sh 给 merge 那一趟的设置）。"
     red_cases+=("$case_key")
     continue

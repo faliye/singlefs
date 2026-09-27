@@ -38,7 +38,7 @@ use singlefs_core::unit::{unit_filesystem_identifier, UNIT_CLASS_INDEX_NODE, UNI
 use singlefs_format::{
     DATA_UNIT_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, NODE_BYTES,
 };
-use singlefs_harness::crash::{writes_and_segments, MemoryPool};
+use singlefs_harness::memory_pool::{writes_and_segments, MemoryPool};
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::SharedStream;
 

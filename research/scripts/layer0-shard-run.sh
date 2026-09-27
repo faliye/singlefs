@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 层 0 崩溃重放按双机分片跑一条崩溃枚举用例（里程碑三第六项，.claude/kb/milestone/03-third-txn.md 第六节）：本机跑第 0/2 片、
-# 第二台跑第 1/2 片（SINGLEFS_LAYER0_SHARD，切法与账本在 crates/singlefs-harness/src/layer0_progress.rs），第二台的账本拷回本机，
+# 第二台跑第 1/2 片（SINGLEFS_LAYER0_SHARD，切法与账本在 crates/singlefs-checker-tier/src/layer0_progress.rs），第二台的账本拷回本机，
 # 本机 SINGLEFS_LAYER0_SHARD=merge/2 再跑同一条用例（只读两份账本、核齐、按切片序号并，不枚举）。
 #
 #   layer0-shard-run.sh <崩溃枚举用例的键> <树根>
@@ -33,7 +33,7 @@
 # cargo 由这里起、不经 admission.py crash-case-command，改了这里那几条用例的旧全绿标记不再作数。
 # 重型：跑的是标了 ignore 的崩溃枚举用例（--include-ignored），只在提交时（SINGLEFS_HEAVY_TESTS=commit）或用户要求时跑；--selftest 不算。
 #
-# 日志与发现日志（用户 2026-09-27 定全量与发现双份，records/2026-09-24-里程碑二收尾调度.md「层 0 放量的发现日志」那一行；行格式以 crates/singlefs-harness/src/crash.rs 为准）：
+# 日志与发现日志（用户 2026-09-27 定全量与发现双份，records/2026-09-24-里程碑二收尾调度.md「层 0 放量的发现日志」那一行；行格式以 crates/singlefs-checker-tier/src/crash.rs 为准）：
 # 三趟 cargo 各设 SINGLEFS_LAYER0_FINDINGS_FILE，发现日志一律是那一趟的日志同名加 .findings.tsv，开跑前先删掉旧的。--merged-log 时两片的日志放在
 # 给的日志文件旁边（<日志文件>.shard-0-of-2.log、.shard-1-of-2.log），merge 那一趟的发现日志是 <日志文件>.findings.tsv——门禁 54 号读的就是这一份；
 # 单独跑时三份日志放 <git common-dir>/singlefs-layer0-logs/<这一趟>/。第二台那一片的发现日志先写在第二台 runs/<这一趟>.shard-1-of-2.findings.tsv，

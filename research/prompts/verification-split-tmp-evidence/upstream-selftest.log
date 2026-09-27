@@ -1,0 +1,47 @@
+
+══ 门禁自检：doc-lint 的判别力 ══
+
+══ 门禁自检：gate-lint 的判别力 ══
+
+══ 门禁自检：默认扫描范围 ══
+
+══ 门禁自检：shell-lint 的判别力 ══
+
+══ 门禁自检：rules-lint 的判别力 ══
+
+══ 门禁自检：pattern-process-guard 的判别力 ══
+
+══ 门禁自检：proc.py 的判别力 ══
+
+══ 门禁自检：准入与运行条件的判别力 ══
+
+══ 门禁自检：show-me-test 的判别力 ══
+
+══ 门禁自检：bump.sh 的判别力 ══
+
+══ 门禁自检：install.sh 的判别力 ══
+
+══ 门禁自检：gate.sh 判决逻辑的判别力 ══
+
+══ 门禁自检：changelog-lint 的判别力 ══
+
+══ 门禁自检：naming-lint 的判别力 ══
+
+══ 门禁自检：version-discipline 的判别力 ══
+
+══ 门禁自检：manifest / i18n-sync 的判别力 ══
+
+══ 门禁自检：check.sh 的判别力 ══
+
+══ 门禁自检：install.sh 铺出来的东西 ══
+
+══ 门禁自检：环境守卫的判别力 ══
+
+══ 门禁自检：manifest 覆盖面 ══
+
+══ 门禁自检：link-targets / env / rules-lint --not-impl 的判别力 ══
+
+══ 门禁自检：push-all 的判别力 ══
+
+  ✓ 门禁自检通过：600 个用例判定与预期一致（SELFTEST_VERBOSE=1 看逐条）；本次未跑 0 部分
+selftest rc=0

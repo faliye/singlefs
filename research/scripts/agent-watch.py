@@ -2234,14 +2234,14 @@ def selftest_pipe_upstream(work, thresholds, failures, probed_processes):
 
 
 def selftest_heavy_tests(work, failures, probed_processes, watch_runs):
-    """「重型测试没带前缀」的自检：拿自检进程当 Claude 实例，起几个假的重型进程（名字照 cargo 编出来的层 0 测试二进制，里面只是睡）。
+    """「重型测试没带前缀」的自检：拿自检进程当 Claude 实例，起几个假的重型进程（名字照 cargo 编出来的 checker 档包 singlefs-checker-tier 的测试二进制，里面只是睡）。
     没带前缀的、带别的值的报，带 commit / user-request 的不报；bash -c 里写着带前缀的重型命令、那条命令还没起的不报；
     timeout 包着带前缀的不报，timeout 包着没带前缀的只报 timeout 那一个、下一步给整棵子树从最底层往上的停止次序；
     后台起、开着一个子 agent 后台任务输出文件的，归属报出那个子 agent。返回起了几个假进程。"""
     deps = os.path.join(work, "heavy", "target", "release", "deps")
     os.makedirs(deps, exist_ok=True)
     fake_binary = os.path.join(deps, "first_transaction_step_seven_layer0-0123456789abcdef")   # python 顶着这个 argv[0] 睡，不用真的编
-    fake_script = os.path.join(deps, "second_stream_layer0-fedcba9876543210")                    # sh 脚本：timeout、bash -c 要真的 exec 它
+    fake_script = os.path.join(deps, "second_transaction_step_zero_layer0-fedcba9876543210")                    # sh 脚本：timeout、bash -c 要真的 exec 它
     with open(fake_script, "w") as handle:
         handle.write("#!/bin/sh\nsleep 60\nexit 0\n")
     os.chmod(fake_script, 0o755)
@@ -3078,7 +3078,7 @@ def selftest_in(work):
           f"交回的、任务通知 failed 的不报）；"
           f"交回、被 TaskStop 停掉、最近一次任务通知是 failed 的子 agent 过了宽限还有进程开着它后台任务的输出文件报「交回之后后台还在跑」（交回不到宽限、没交回还在等、"
           f"stopped 之后又被续做的不报，进程没了不报，--ack 进程:<pid> 不叫醒），被看的全部交回时退出前也报、只剩宽限里的等宽限过了再查，--processes-only 带 --session-dir 也报、不带就写明没查；"
-          f"名字含 layer0 的测试二进制在跑而环境里没有 {HEAVY_TEST_VARIABLE}=commit / =user-request 的报「{HEAVY_TEST_ALERT}」（带别的值照报，带这两个值的、"
+          f"checker 档包 singlefs-checker-tier 的测试二进制在跑而环境里没有 {HEAVY_TEST_VARIABLE}=commit / =user-request 的报「{HEAVY_TEST_ALERT}」（带别的值照报，带这两个值的、"
           f"bash -c 里写着带前缀而还没起的、timeout 包着带前缀的不报，另一个看门狗的自检那一支整棵不扫，一条链只报最上面那个、下一步给从最底层往上的停止次序，归属认出开着输出文件的子 agent），"
           f"--processes-only 与 --agents 两条路都报、--ack 进程:<pid> 不叫醒；常驻内存过阈值的进程报「{MEMORY_ALERT}」（写常驻内存、阈值、归属与出路，"
           f"只睡的小进程不报，阈值 0 不查），两条路整查都报、--ack 进程:<pid> 不叫醒，看门狗起了之后才过线的由两次整查之间的单查几秒内叫醒（{memory_processes_started} 个进程）；"

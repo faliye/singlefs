@@ -22,7 +22,7 @@ use singlefs_core::allocator::{AllocationRecord, PoolAllocator};
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::mount::mount_writable;
 use singlefs_core::transaction::{publish_overwrite, FirstFile, PoolWriter, TransactionOutput};
-use singlefs_harness::crash::SparseBlockDevice;
+use singlefs_harness::memory_pool::SparseBlockDevice;
 use singlefs_harness::scenario::run_first_transaction;
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 

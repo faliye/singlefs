@@ -122,7 +122,7 @@ E12（攒批的顺序追加 vs 不攒批的随机页读改写） 更是靠它做
 
 `VM_BLKLOGWRITES_DIR=<目录>` 时，`vm-bench.sh` 在每块盘前面套一层 QEMU 的 `blklogwrites` 过滤节点（本机 QEMU 8.2.2 带这个驱动，2026-09-14 现查）。
 来宾发到盘上的每个写（带数据）与每个 FLUSH 按 dm-log-writes 格式记进 `<目录>/log<d>.img`；数据盘也放在同一个目录（`disk<d>.img`），跑完不删。
-录制在来宾之外，与被测程序自己的录制器不共享代码。解析与比对在 `crates/singlefs-harness/src/device_log.rs`，判据在门禁 55 号（`.claude/gate.d/55-qemu-first-transaction.sh`）。
+录制在来宾之外，与被测程序自己的录制器不共享代码。解析与比对在 `crates/singlefs-checker-tier/src/device_log.rs`，判据在门禁 55 号（`.claude/gate.d/55-qemu-first-transaction.sh`）。
 
 | 现象（2026-09-14 实测，第一个事务） | 口径 |
 |---|---|

@@ -1,0 +1,1 @@
+  ✓ 崩溃枚举用例都住在 singlefs-checker 包里、标了 #[ignore] 的都登记了（查了 11 条；按测试函数直接调 enumerate_layer0 一族认，经共用函数间接调的认不出）

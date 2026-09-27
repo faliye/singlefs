@@ -71,7 +71,7 @@ const COMPACTION_WATERMARK_BUILT_IN_DEFAULT: u64 = 0;
 ///
 /// 式子住 core 自己这里：`singlefs-format` 只放标量（D13（验证路线） 已定项 5；2026-09-27 用户定案「三方各算一份 + 交叉断言」）。
 /// 实验装置 E158（择根与修复四岔路） 自写一份、不调它；checker 不算在飞上限，不另造。两份在环长上的交叉断言在
-/// `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs` 的 `journal_in_flight_record_limit_cross_check_tests` 模块。
+/// `crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs` 的 `journal_in_flight_record_limit_cross_check_tests` 模块。
 #[must_use]
 pub fn journal_in_flight_record_limit(journal_ring_bytes: u64) -> u64 {
     journal_ring_bytes / JOURNAL_RECORD_BYTES / JOURNAL_SAFETY_FACTOR

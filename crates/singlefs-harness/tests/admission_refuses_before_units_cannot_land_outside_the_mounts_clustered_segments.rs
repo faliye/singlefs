@@ -23,8 +23,8 @@ use singlefs_core::transaction::{
 };
 use singlefs_core::unit::data_unit_payload_capacity;
 use singlefs_format::{CLUSTER_SEGMENT_SLOTS, SLOT_BYTES};
-use singlefs_harness::crash::SparseBlockDevice;
 use singlefs_harness::history::HistoryDeviceWidth;
+use singlefs_harness::memory_pool::SparseBlockDevice;
 
 /// 这次挂载的会话上直接发一次空发布（暖机、抬 F 与卸载推的那一种：不写文件内容、实例表照抄），不经会话的准入与推抬 F。
 fn publish_an_empty_version_directly_on_the_session(pool: &mut PoolUnderTest<SparseBlockDevice>) {

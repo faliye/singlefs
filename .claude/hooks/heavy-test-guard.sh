@@ -25,9 +25,10 @@
 # 重型测试，按类（只认命令位置；「cargo test」在下面各类里一样指 cargo t、cargo nextest run、cargo miri test、cargo llvm-cov、cargo hack test、
 # cargo mutants 与 --config / CARGO_ALIAS_ 定的别名；libtest 参数里 --list 当选项出现的只列用例、一条都不跑，哪一类都不算，
 # 跟在 --skip、--logfile 这类带值的选项后面的 --list 是那个选项的值，照算）：
-#   层 0          cargo test 会跑到名字含 layer0 的测试二进制：--test 的名字含 layer0、--test 的通配命中它、
-#                 或不带目标选择（带 --tests / --all-targets 也算）而包里有这种二进制；.claude/gate.d/54-*；
-#                 直接执行名字含 layer0 的测试二进制（`<target 目录>/<profile>/deps/<名字>-<16 位十六进制哈希>`）
+#   checker 档    cargo test 的范围里有 checker 档包 singlefs-checker-tier（-p 点名它，认通配、@版本、pkgid URL；不挑包而范围含它；
+#                 在它目录里裸跑；别名展开成这样的），不管挑哪个目标；直接执行它的测试二进制（tests/ 下的目标、src/bin/ 下的装置、库本身）；
+#                 .claude/gate.d/54-*、research/scripts/layer0-shard-run.sh（--selftest 不算）。只按包判，不按测试名、不看 --ignored
+#                 （.claude/rules/verification.md「定义与名字」；判定在 lib_heavy_tests.py）
 #   QEMU          .claude/gate.d/55-*、qemu-system-*、research/scripts/vm-bench.sh（--selftest 也起虚机，照算）
 #   herd7         .claude/gate.d/57-*、.claude/scripts/lkmm.sh、herd7
 #   crates 变异整表 .claude/gate.d/59-*、research/scripts/mutate.sh 的参数里有 crates/mutations.tsv
@@ -37,16 +38,10 @@
 #   全部实验复跑  .claude/gate.d/87-*
 #   整轮门禁      gate.sh、research/scripts/gate-staged.sh（--selftest 不算）
 #   E152 装置     e152-file-system-benchmark（直接起、或 cargo run 它）、research/scripts/e152-run.sh
-#   崩溃枚举用例  .claude/gate.d/stage-inputs.tsv 里键是 crash-case: 的那几条用例（门禁 54 号逐条跑）的测试目标——cargo test 点名它、--test 的通配命中它、
-#                 或不挑目标而包里有它；直接执行它的测试二进制——而下面任一条成立：libtest 参数带 --ignored 或 --include-ignored（nextest 是
-#                 --run-ignored only / all）；--config 或环境变量里定了测试二进制的 runner（--config 的值另按 TOML 读；systemd-run -E / --setenv
-#                 设给里面那条命令的也算）、或子命令是别名（带没带 --ignored 看不见）；登记的用例函数有一处定义没标 #[ignore]，或判不出标没标
-#                 （读源码判，同名的每一处都算；找不到函数、宏生成的、导入不了 admission.py 按没标算）。另按参数认：任何命令（grep、git 这类按文本处理参数的除外）
-#                 带 --ignored / --include-ignored 又点名登记的用例函数（拷走改名的测试二进制、find -exec 起的）。判定与登记表取法在 lib_heavy_tests.py
 #   .claude/gate.d/ 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑、不用带前缀。
 # 谁、带什么才放行（都要带环境变量 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，别的值或没带一律拒）：
 #   主 agent（输入里没有 agent_type）：上面每一类；
-#   crash-verifier：层 0、崩溃枚举用例、55 号与 qemu-system-*、herd7、crates 变异整表（vm-bench.sh、全量测试、整轮门禁、E152 拒）；
+#   crash-verifier：checker 档（54 号与 checker 档包的测试）、55 号与 qemu-system-*、herd7、crates 变异整表（vm-bench.sh、全量测试、整轮门禁、E152 拒）；
 #   gate-triage：整轮门禁（gate.sh、gate-staged.sh）与 87 号（gate.sh 里 54 / 55 / 57 / 59 靠「输入没变就复用上一次全绿判定」，直接调它们拒）；
 #   其余子 agent：一律拒，带不带前缀都拒。
 # 前缀认三种写法：写在命令前（`SINGLEFS_HEAVY_TESTS=commit bash …`）、写进 `env` 的参数、同一行前面的 `export`；
@@ -145,7 +140,7 @@ SHELL_SCRIPT_EXTENSION = ".sh"  # 直接执行、没有 `#!` 的文件，只有�
 
 # 子 agent 自己那一份（kind 见 lib_heavy_tests.KIND_CATEGORY）；不在表里的子 agent 一样也不许
 AGENT_KINDS = {
-    "crash-verifier": {"layer0-stage", "layer0-cargo", "layer0-binary", "crash-case-cargo", "crash-case-binary", "qemu-stage", "qemu-system",
+    "crash-verifier": {"checker-tier-cargo", "checker-tier-binary", "layer0-stage", "qemu-stage", "qemu-system",
                        "herd7-stage", "lkmm", "herd7", "crates-mutation-stage", "crates-mutation-mutate"},
     "gate-triage": {"gate-sh", "gate-staged", "replay-all-stage"},
 }
@@ -545,10 +540,11 @@ def heavy_uses(text, directory, environment=None, frames_above=(), script=None, 
                                                  [run._replace(frames=run.frames[len(here):]) for run in inner.uncapped])
     return HeavyScan(uses, notices, scripts_read, hit_depth_limit, lowest_cycle_frame, uncapped)
 
-POLICY = ("→ 规矩：重型测试（层 0、崩溃枚举用例、QEMU、herd7、crates 变异整表、全量测试、整轮门禁、全部实验复跑、E152 装置）只在提交代码时跑一次、或用户要求时跑；"
-          "子 agent 一律不跑，只跑自己动到的测试二进制（`cargo test -p <crate> --test <自己的目标>`、`--lib`）与 fmt / clippy / build；"
+POLICY = ("→ 规矩：重型测试就是 checker 档那一批（.claude/rules/verification.md）：checker 档包 singlefs-checker-tier 的测试（按包判，挑哪个目标都算）与 54 号、QEMU、herd7、crates 变异整表、"
+          "全量测试、整轮门禁、全部实验复跑、E152 装置，只在提交代码时跑一次、或用户要求时跑；"
+          "子 agent 一律不跑，只跑 harness 档——自己动到的 singlefs-harness 与别的非 checker 档包的测试二进制（`cargo test -p <crate> --test <自己的目标>`、`--lib`）与 fmt / clippy / build；"
           "主 agent 在提交流程里跑要带 `SINGLEFS_HEAVY_TESTS=commit`，用户要求时带 `SINGLEFS_HEAVY_TESTS=user-request`。\n"
-          "→ 各自那一份：crash-verifier 只跑 54、55、57、59 号与它们底下的层 0 测试、登记的崩溃枚举用例、qemu-system、lkmm.sh / herd7、crates 变异整表；"
+          "→ 各自那一份：crash-verifier 只跑 54、55、57、59 号与它们底下的 checker 档包 singlefs-checker-tier 的测试（快档与登记的全量用例）、qemu-system、lkmm.sh / herd7、crates 变异整表；"
           "gate-triage 只跑 `gate.sh` 整轮与 87 号（54、55、57、59 靠「输入没变就复用上一次全绿判定」）；两个都要带那个前缀，都不跑全量 `cargo test`。"
           "`.claude/gate.d/` 下其余阶段不是重型，谁都能跑。\n"
           "→ 提交之外任务确实要跑的：主 agent 先弹窗问用户，用户同意了才带 `SINGLEFS_HEAVY_TESTS=user-request` 跑；"
@@ -702,20 +698,29 @@ def selftest(hook_dir):
         build_sample_scripts(work)
         writer, crash, triage, scribe = "implementation-writer", "crash-verifier", "gate-triage", "kb-scribe"
         commit, request = "SINGLEFS_HEAVY_TESTS=commit ", "SINGLEFS_HEAVY_TESTS=user-request "
-        layer0_binary = "./target/release/deps/first_transaction_step_seven_layer0-0123456789abcdef"
+        tier_binary = "./target/release/deps/first_transaction_step_seven_layer0-0123456789abcdef"
         # (说明, agent_type（None 是主 agent）, 命令, 该拒 2 / 该放 0[, 该记几条检出, 该读进去几份脚本]；后两列不写是 0、0)
         cases = [
             ("实现员跑 cargo test --all", writer, "cargo test --all", 2),
-            ("实现员跑层 0 测试目标", writer, "cargo test --release -p singlefs-harness --test first_transaction_step_seven_layer0", 2),
+            ("实现员跑 checker 档包的测试（checker 档按包判）", writer, "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker-tier", 2),
+            ("实现员跑 checker 档包点名一个快档目标", writer, "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker-tier --test checker_quick_stream", 2),
+            ("实现员跑判决器库 singlefs-checker 的单测不算", writer, "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker --lib", 0),
+            ("实现员跑 checker 档包的库单测也拒", writer, "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker-tier --lib", 2),
+            ("崩溃验证员带前缀经包装跑 checker 档包快档", crash, commit + "nice -n 19 bash research/scripts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-checker-tier", 0),
+            ("主 agent 不带前缀跑 checker 档包", None, "bash research/scripts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-checker-tier", 2),
+            ("主 agent 带 =user-request 跑 checker 档包", None, request + "bash research/scripts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-checker-tier", 0),
+            ("实现员跑 checker 档的集成测试", writer, "cargo test --release -p singlefs-checker-tier --test first_transaction_step_seven_layer0", 2),
             ("实现员跑 check.sh", writer, "bash .claude/scripts/check.sh", 2),
             ("实现员经 capped.sh 跑 --workspace", writer, "bash research/scripts/capped.sh 4 cargo test --workspace", 2),
             ("实现员经 run-with-memory-cap.sh 跑 --workspace", writer, "bash research/scripts/run-with-memory-cap.sh 4G cargo test --workspace", 2),
             ("实现员 run-with-memory-cap.sh --selftest", writer, "bash research/scripts/run-with-memory-cap.sh --selftest", 0),
             ("实现员在 bash -c 里跑 --all", writer, "bash -c 'cargo test --all'", 2),
             ("实现员在仓根裸跑 cargo test", writer, "cargo test", 2),
-            ("实现员 cd 进 harness 裸跑", writer, "cd crates/singlefs-harness && cargo test --release", 2),
-            ("实现员 -p harness 不挑目标", writer, "cargo test -p singlefs-harness", 2),
-            ("实现员 --test 通配命中层 0", writer, "cargo test -p singlefs-harness --test '*'", 2),
+            ("实现员 cd 进 harness 档裸跑、不经内存包装（拒的是包装，不是重型）", writer, "cd crates/singlefs-harness && cargo test --release", 2),
+            ("实现员 cd 进 harness 档裸跑、经内存包装放行（harness 档随时跑）", writer, "cd crates/singlefs-harness && bash ../../research/scripts/run-with-memory-cap.sh 4G cargo test --release", 0),
+            ("实现员 -p harness 档不挑目标、不经内存包装（拒的是包装）", writer, "cargo test -p singlefs-harness", 2),
+            ("实现员 -p harness 档不挑目标、经内存包装放行", writer, "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness", 0),
+            ("实现员 -p checker 档 --test 通配", writer, "cargo test -p singlefs-checker-tier --test '*'", 2),
             ("实现员前缀一串再跑 --workspace", writer, "nice -n 19 timeout 600 env A=1 cargo +stable --offline test --workspace", 2),
             ("实现员在 research 工作区根裸跑", writer, "cd research && cargo test --release", 2),
             ("实现员在 research 唯一的成员里裸跑", writer, "cd research/e7-index-bench && cargo test", 2),
@@ -727,7 +732,7 @@ def selftest(hook_dir):
             ("实现员跑 lkmm.sh", writer, "bash .claude/scripts/lkmm.sh", 2),
             ("实现员跑 gate-staged.sh", writer, "bash research/scripts/gate-staged.sh", 2),
             ("实现员喂给 bash 的 heredoc 里跑 --all", writer, "bash <<'EOF'\ncargo test --all\nEOF", 2),
-            ("实现员直接执行层 0 测试二进制", writer, layer0_binary + " --test-threads 4", 2),
+            ("实现员直接执行 checker 档的测试二进制", writer, tier_binary + " --test-threads 4", 2),
             ("书记员跑 87 号", scribe, "nice -n 19 bash .claude/gate.d/87-replay.sh", 2),
             ("通用 agent 跑 54 号", "general-purpose", "bash .claude/gate.d/54-layer0-replay.sh", 2),
             ("崩溃验证员跑 54 号不带前缀", crash, "bash .claude/gate.d/54-layer0-replay.sh", 2),
@@ -749,91 +754,64 @@ def selftest(hook_dir):
             ("主 agent 前缀往包装里传", None, "nice -n 19 env SINGLEFS_HEAVY_TESTS=commit bash research/scripts/capped.sh 8 bash -c 'cargo test --workspace'", 0),
             ("主 agent 跑一个测试目标不是重型", None, "cargo test -p singlefs-core --test core_contract", 0),
             ("崩溃验证员带前缀跑 54 号全量", crash, commit + "bash .claude/gate.d/54-layer0-replay.sh --full /tmp/wt", 0),
-            ("崩溃验证员带前缀跑层 0 测试目标", crash,
-             commit + "nice -n 19 bash research/scripts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-harness --test first_transaction_step_seven_layer0", 0),
-            ("崩溃验证员带前缀直接执行层 0 测试二进制", crash, commit + "bash research/scripts/run-with-memory-cap.sh 16G " + layer0_binary, 0),
-            ("实现员跑登记的崩溃枚举用例（带 --include-ignored）", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G cargo test --release -p singlefs-harness --test sample_crash_enumeration -- --include-ignored --exact the_full_case", 2),
-            ("实现员跑崩溃枚举用例那个测试目标的快用例（不带 --ignored）", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --test sample_crash_enumeration", 0),
-            ("崩溃验证员不带前缀跑崩溃枚举用例", crash,
-             "bash research/scripts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-harness --test sample_crash_enumeration -- --ignored", 2),
-            ("崩溃验证员带前缀跑崩溃枚举用例", crash,
-             commit + "bash research/scripts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-harness --test sample_crash_enumeration -- --include-ignored --exact the_full_case", 0),
-            ("主 agent 不带前缀直接执行崩溃枚举用例的测试二进制", None, "./target/release/deps/sample_crash_enumeration-0123456789abcdef --ignored", 2),
-            ("主 agent 带前缀直接执行崩溃枚举用例的测试二进制", None, commit + "./target/release/deps/sample_crash_enumeration-0123456789abcdef --ignored", 0),
+            ("崩溃验证员带前缀跑 checker 档的集成测试", crash,
+             commit + "nice -n 19 bash research/scripts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-checker-tier --test first_transaction_step_seven_layer0", 0),
+            ("崩溃验证员带前缀直接执行 checker 档的测试二进制", crash, commit + "bash research/scripts/run-with-memory-cap.sh 16G " + tier_binary, 0),
+            ("实现员跑登记的checker 档的用例（带 --include-ignored）", writer,
+             "bash research/scripts/run-with-memory-cap.sh 4G cargo test --release -p singlefs-checker-tier --test first_transaction_step_seven_layer0 -- --include-ignored --exact the_full_case", 2),
+            ("实现员跑 checker 档集成测试的快用例（不带 --ignored 也拒：按包判）", writer,
+             "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker-tier --test first_transaction_step_seven_layer0", 2),
+            ("崩溃验证员不带前缀跑checker 档的用例", crash,
+             "bash research/scripts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-checker-tier --test first_transaction_step_seven_layer0 -- --ignored", 2),
+            ("崩溃验证员带前缀跑checker 档的用例", crash,
+             commit + "bash research/scripts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-checker-tier --test first_transaction_step_seven_layer0 -- --include-ignored --exact the_full_case", 0),
+            ("主 agent 不带前缀直接执行checker 档的用例的测试二进制", None, "./target/release/deps/first_transaction_step_seven_layer0-0123456789abcdef --ignored", 2),
+            ("主 agent 带前缀直接执行checker 档的用例的测试二进制", None, commit + "./target/release/deps/first_transaction_step_seven_layer0-0123456789abcdef --ignored", 0),
             # 包在外面照样起那条命令的（/usr/bin/time、flock、systemd-run……）剥掉之后照判；里面经内存包装的算经包装
             ("实现员 /usr/bin/time -v 包一层跑 --all", writer, "/usr/bin/time -v cargo test --all", 2),
-            ("实现员 systemd-run --scope 自设内存上限跑崩溃枚举用例", writer,
-             "systemd-run --user --scope -q -p MemoryMax=8G cargo test -p singlefs-harness --test sample_crash_enumeration -- --ignored", 2),
+            ("实现员 systemd-run --scope 自设内存上限跑checker 档的用例", writer,
+             "systemd-run --user --scope -q -p MemoryMax=8G cargo test -p singlefs-checker-tier --test first_transaction_step_seven_layer0 -- --ignored", 2),
             ("实现员 perf stat 包一层跑 --all", writer, "perf stat -e cycles cargo test --all", 2),
             ("实现员 /usr/bin/time 包一层跑自己的测试目标、没经内存包装", writer, "/usr/bin/time -v cargo test -p singlefs-core --test core_contract", 2),
             ("实现员内存包装里 /usr/bin/time 包一层跑自己的测试目标", writer,
              "bash research/scripts/run-with-memory-cap.sh 4G /usr/bin/time -v cargo test -p singlefs-core --test core_contract", 0),
             ("实现员 /usr/bin/time 包在内存包装外面跑自己的测试目标", writer,
              "/usr/bin/time -v bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-core --test core_contract", 0),
-            ("崩溃验证员带前缀 /usr/bin/time 包一层经内存包装跑崩溃枚举用例", crash,
-             commit + "/usr/bin/time -v bash research/scripts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-harness --test sample_crash_enumeration "
+            ("崩溃验证员带前缀 /usr/bin/time 包一层经内存包装跑checker 档的用例", crash,
+             commit + "/usr/bin/time -v bash research/scripts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-checker-tier --test first_transaction_step_seven_layer0 "
              "-- --include-ignored --exact the_full_case", 0),
             ("主 agent 不带前缀 flock 包一层跑 gate.sh", None, "flock /tmp/gate.lock bash .claude/scripts/gate.sh --staged", 2),
             # 短选项合写、systemd-run -E 设的 runner、--list 是别的选项的值、--config 里带引号的 runner 键、用例函数有一处没标或判不出：
             # lib_heavy_tests.py 的 LIB_HEAVY_TESTS_BREAK 与 admission.py 的 ADMISSION_BREAK 那几个开关下这几格红（开关写在两份的文件头）
-            ("实现员内存包装里 strace -fo 包一层跑崩溃枚举用例", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G strace -fo /tmp/s cargo test -p singlefs-harness --test sample_crash_enumeration -- --ignored", 2),
-            ("实现员不经内存包装 strace -fo 包一层跑崩溃枚举用例", writer,
-             "strace -fo /tmp/s cargo test -p singlefs-harness --test sample_crash_enumeration -- --ignored", 2),
-            ("实现员内存包装里 flock -xw 10 包一层跑崩溃枚举用例", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G flock -xw 10 /tmp/l cargo test -p singlefs-harness --test sample_crash_enumeration -- --ignored", 2),
-            ("实现员内存包装里 systemd-run -E 设 runner、不带 --ignored", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G systemd-run --user --scope -E CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh "
-             "cargo test -p singlefs-harness --test sample_crash_enumeration", 2),
-            ("实现员内存包装里 --config 带引号的 runner 键、不带 --ignored", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G cargo --config 'target.x86_64-unknown-linux-gnu.\"runner\"=\"/tmp/add-ignored.sh\"' test "
-             "-p singlefs-harness --test sample_crash_enumeration", 2),
+            ("实现员内存包装里 strace -fo 包一层跑checker 档的用例", writer,
+             "bash research/scripts/run-with-memory-cap.sh 4G strace -fo /tmp/s cargo test -p singlefs-checker-tier --test first_transaction_step_seven_layer0 -- --ignored", 2),
+            ("实现员不经内存包装 strace -fo 包一层跑checker 档的用例", writer,
+             "strace -fo /tmp/s cargo test -p singlefs-checker-tier --test first_transaction_step_seven_layer0 -- --ignored", 2),
+            ("实现员内存包装里 flock -xw 10 包一层跑checker 档的用例", writer,
+             "bash research/scripts/run-with-memory-cap.sh 4G flock -xw 10 /tmp/l cargo test -p singlefs-checker-tier --test first_transaction_step_seven_layer0 -- --ignored", 2),
             ("实现员内存包装里 -- --include-ignored --skip --list（--list 是 --skip 的值）", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --test sample_crash_enumeration -- --include-ignored --skip --list", 2),
-            ("实现员内存包装里直接执行崩溃枚举用例的测试二进制 --include-ignored --skip --list", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G ./target/release/deps/sample_crash_enumeration-0123456789abcdef --include-ignored --skip --list", 2),
-            ("实现员内存包装里跑同名函数 cfg 二选一、一份不标的登记目标（不带 --ignored）", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G cargo test --release -p singlefs-harness --test cfg_split_crash_enumeration", 2),
-            ("实现员内存包装里跑用例是宏生成的登记目标（判不出，按没标算）", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --test macro_crash_enumeration", 2),
-            ("实现员内存包装里跑用例函数标 # [ignore] 的登记目标（算标了，不带 --ignored 放行）", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --test spaced_ignore_crash_enumeration", 0),
+             "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker-tier --test first_transaction_step_seven_layer0 -- --include-ignored --skip --list", 2),
+            ("实现员内存包装里直接执行checker 档的用例的测试二进制 --include-ignored --skip --list", writer,
+             "bash research/scripts/run-with-memory-cap.sh 4G ./target/release/deps/first_transaction_step_seven_layer0-0123456789abcdef --include-ignored --skip --list", 2),
             # 门禁批第三轮的 F1、F2、F3、F10：要值的长选项值另起一个词、systemd-run -p Environment=、第二个 -- 之后的 --list、写在 test 之后的 --config
             # （lib_heavy_tests.py 的 launcher-long-options-partial、launcher-drops-property-environment、list-past-separator、
             # configuration-before-subcommand-only 各自打开时对应那几格红）
-            ("实现员内存包装里 systemd-run --expand-environment no 包一层跑崩溃枚举用例", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G systemd-run --user --scope --expand-environment no cargo test -p singlefs-harness "
-             "--test sample_crash_enumeration -- --ignored", 2),
-            ("实现员内存包装里 strace --output 文件包一层跑崩溃枚举用例", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G strace --output /tmp/s cargo test -p singlefs-harness --test sample_crash_enumeration -- --ignored", 2),
-            ("实现员内存包装里 systemd-run -p Environment= 设 runner、不带 --ignored", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G systemd-run --user --wait --pipe -p Environment=CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh "
-             "cargo test -p singlefs-harness --test sample_crash_enumeration", 2),
+            ("实现员内存包装里 systemd-run --expand-environment no 包一层跑checker 档的用例", writer,
+             "bash research/scripts/run-with-memory-cap.sh 4G systemd-run --user --scope --expand-environment no cargo test -p singlefs-checker-tier "
+             "--test first_transaction_step_seven_layer0 -- --ignored", 2),
+            ("实现员内存包装里 strace --output 文件包一层跑checker 档的用例", writer,
+             "bash research/scripts/run-with-memory-cap.sh 4G strace --output /tmp/s cargo test -p singlefs-checker-tier --test first_transaction_step_seven_layer0 -- --ignored", 2),
             ("实现员内存包装里 -- --include-ignored the_full_case -- --list（第二个 -- 之后是过滤词）", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --test sample_crash_enumeration -- --include-ignored the_full_case -- --list", 2),
-            ("实现员内存包装里跑 release 下 include! 进来一份不标的同名用例的登记目标（admission.py 的 target-own-files-only 下这一格红）", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G cargo test --release -p singlefs-harness --test include_crash_enumeration", 2),
-            ("实现员内存包装里 --config 写在 test 之后定 runner、不带 --ignored", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G cargo test --config 'target.x86_64-unknown-linux-gnu.runner=\"/tmp/add-ignored.sh\"' "
-             "-p singlefs-harness --test sample_crash_enumeration", 2),
+             "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker-tier --test first_transaction_step_seven_layer0 -- --include-ignored the_full_case -- --list", 2),
             # 起测试的外部子命令、别名与 runner、只列不跑、没标 #[ignore] 的登记用例
-            ("实现员经内存包装 cargo nextest run --run-ignored all 跑崩溃枚举用例", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G cargo nextest run -p singlefs-harness --test sample_crash_enumeration --run-ignored all", 2),
-            ("实现员 cargo mutants 整包", writer, "cargo mutants -p singlefs-harness", 2),
-            ("实现员经内存包装、前缀里设 runner、点名崩溃枚举用例不带 --ignored", writer,
-             "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness "
-             "--test sample_crash_enumeration", 2),
+            ("实现员经内存包装 cargo nextest run --run-ignored all 跑checker 档的用例", writer,
+             "bash research/scripts/run-with-memory-cap.sh 4G cargo nextest run -p singlefs-checker-tier --test first_transaction_step_seven_layer0 --run-ignored all", 2),
+            ("实现员 cargo mutants 整个 checker 档", writer, "cargo mutants -p singlefs-checker-tier", 2),
+            ("实现员 cargo mutants 整个 harness 档（随时跑）", writer, "bash research/scripts/run-with-memory-cap.sh 4G cargo mutants -p singlefs-harness", 0),
             ("实现员经内存包装、--config 定别名再用别名", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G cargo --config 'alias.xt=\"test\"' xt -p singlefs-harness --test sample_crash_enumeration", 2),
-            ("实现员经内存包装列崩溃枚举用例（--ignored --list）", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --test sample_crash_enumeration -- --ignored --list", 0),
-            ("实现员经内存包装跑用例函数没标 #[ignore] 的登记目标、不带 --ignored", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --test unmarked_crash_enumeration", 2),
-            ("实现员经内存包装执行拷走改名的测试二进制、点名登记的用例函数", writer,
-             "bash research/scripts/run-with-memory-cap.sh 4G /tmp/elsewhere/rc --ignored --exact the_full_case", 2),
-            ("实现员 grep 找 --include-ignored 与登记的用例函数名", writer, "grep -rn -e --include-ignored -e the_full_case crates", 0),
+             "bash research/scripts/run-with-memory-cap.sh 4G cargo --config 'alias.xt=\"test\"' xt -p singlefs-checker-tier --test first_transaction_step_seven_layer0", 2),
+            ("实现员经内存包装列checker 档的用例（--ignored --list）", writer,
+             "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker-tier --test first_transaction_step_seven_layer0 -- --ignored --list", 0),
             ("崩溃验证员带 =user-request 跑 55 号", crash, request + "bash .claude/gate.d/55-qemu-first-transaction.sh", 0),
             ("崩溃验证员带前缀跑 59 号", crash, "GATE_MUTATION_TARGET_DIR=/tmp/t " + commit + "nice -n 19 bash .claude/gate.d/59-crates-mutation-replay.sh", 0),
             ("门禁分诊带前缀跑 gate.sh --staged", triage, commit + "nice -n 19 bash .claude/scripts/gate.sh --staged", 0),
@@ -879,7 +857,7 @@ def selftest(hook_dir):
              "cat > gen-unwrapped.sh <<'EOF'\ncargo run --release --bin e160-random-small-read-share\nEOF\nbash gen-unwrapped.sh", 2, 0, 1),
             ("主 agent 不经内存包装跑测试目标：这一道不判主 agent", None, "cargo test -p singlefs-core --lib", 0),
             ("崩溃验证员带前缀不经内存包装跑测试目标", crash, commit + "cargo test --release -p singlefs-harness --test first_transaction_step_six_recovery", 2),
-            ("崩溃验证员带前缀不经内存包装跑层 0 测试目标", crash, commit + "cargo test --release -p singlefs-harness --test first_transaction_step_seven_layer0", 2),
+            ("崩溃验证员带前缀不经内存包装跑 checker 档的集成测试", crash, commit + "cargo test --release -p singlefs-checker-tier --test first_transaction_step_seven_layer0", 2),
             ("崩溃验证员带前缀经内存包装跑 54 号全量", crash,
              commit + "bash research/scripts/run-with-memory-cap.sh 16G bash .claude/gate.d/54-layer0-replay.sh --full /tmp/wt", 0),
             ("崩溃验证员带前缀经内存包装跑 55 号", crash, commit + "bash research/scripts/run-with-memory-cap.sh 16G bash .claude/gate.d/55-qemu-first-transaction.sh", 0),
@@ -1142,7 +1120,7 @@ def selftest(hook_dir):
             handle.write("def test_function_is_marked_ignored(*arguments):\n    return definitions_marked_ignored(*arguments)\n")
         raising = subprocess.run(["bash", os.path.join(raising_repository, ".claude", "hooks", "heavy-test-guard.sh")], capture_output=True, text=True,
                                  env=environment, input=json.dumps({"tool_name": "Bash", "cwd": work, "agent_type": writer, "tool_input": {
-                                     "command": "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --test sample_crash_enumeration"}}))
+                                     "command": "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker-tier --test first_transaction_step_seven_layer0"}}))
         results.append(("stdin:admission.py 判的那一刻抛异常时，点名标了 #[ignore] 的登记目标、不带 --ignored 的 cargo test 照拒（退出码 2）", 2, raising.returncode))
         results.append(("stdin:admission.py 判的那一刻抛异常时 stderr 不是「没判成、照常执行」", 1, int("没判成" not in raising.stderr)))
     finally:
@@ -1156,7 +1134,7 @@ def selftest(hook_dir):
               "HEAVY_TEST_GUARD_DISABLE_CHECK 设着的话这里本来就该红")
         return 1
     refused_count = sum(1 for item in results if item[1] == 2)
-    print(f"  ✓ 自检通过（查了 {len(results)} 种，其中该拒 {refused_count} 种）：子 agent 跑层 0、全量测试、check.sh、整轮门禁、QEMU、herd7、crates 变异整表拒绝，"
+    print(f"  ✓ 自检通过（查了 {len(results)} 种，其中该拒 {refused_count} 种）：子 agent 跑 checker 档（按包判）、全量测试、check.sh、整轮门禁、QEMU、herd7、crates 变异整表拒绝，harness 档经内存包装放行，"
           "崩溃验证员与门禁分诊带前缀跑各自那一份放行、越出那一份或不带前缀拒绝，主 agent 带 commit / user-request 放行、不带或带别的值拒绝；"
           "写进脚本再执行的（bash / ./ / capped.sh / source / 嵌套）读进去照判、拒绝写出路径与行号，脚本读不到或看不全的放行并记检出；"
           "同一条命令里 heredoc（cat / tee）写出或 cp 拷出再执行的拿写出的内容判、不记「不存在」，认不出的写法照旧记检出；"

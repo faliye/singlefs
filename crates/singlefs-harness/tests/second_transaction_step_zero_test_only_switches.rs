@@ -22,11 +22,11 @@ use singlefs_core::recovery::{
 };
 use singlefs_core::root_ring::{target_for_publish, RootRingSlot, RootRingSlotsPerRegion};
 use singlefs_core::transaction::{publish_overwrite, FirstFile, PoolWriter, TransactionOutput};
-use singlefs_harness::crash::MemoryPool;
 use singlefs_harness::fault_injection::{
     FaultInjectingBlockDevice, FaultSchedule, NamedRootRingSlots,
     PoolReaderWithUnreadableRootRingSlots, RootRingSlotTarget, SharedFaultPlan,
 };
+use singlefs_harness::memory_pool::MemoryPool;
 
 fn content_of(length: usize, seed: usize) -> Vec<u8> {
     (0..length)

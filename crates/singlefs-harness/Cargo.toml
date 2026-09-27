@@ -3,7 +3,7 @@ name = "singlefs-harness"
 version = "0.1.0"
 publish = false
 edition = "2021"
-description = "验证装置：包在块设备外面的录制器，把每个写请求与屏障记成一条流，给崩溃点重放用"
+description = "harness 档：单元测试与集成测试，改了代码随时跑；连同它们用的脚手架库（录制器、内存池、理想模型、随机历史、故障注入设备、场景）。不依赖 checker 档（D13 已定项 15，.claude/rules/verification.md）"
 
 [dependencies]
 singlefs-checker = { path = "../singlefs-checker" }

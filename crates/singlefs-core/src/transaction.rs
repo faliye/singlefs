@@ -265,7 +265,7 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
         self.journal_record_named_entry_capacity
     }
 
-    pub fn perform(&mut self, step: CommitStep<'_>) -> Result<(), BlockDeviceError> {
+    pub fn perform_commit_step(&mut self, step: CommitStep<'_>) -> Result<(), BlockDeviceError> {
         if !matches!(step, CommitStep::Barrier) {
             self.has_writes_since_barrier = true;
         }
@@ -446,7 +446,7 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
         // 回卷写之前一道池屏障（代码审阅第 19 条）：回卷写覆写的是这块盘上取号之前最新的那一槽，另一槽是刚写的取号写、还可能没持久；
         // 两槽轮换要「覆写旧槽时新槽已持久」。这道屏障报错就不写回卷：回卷不成，只读挂载（D18（块里携带什么信息） 已定项 11），
         // 盘上可能留着新号，下一次取号跳过它。
-        if let Err(barrier_error) = self.perform(CommitStep::Barrier) {
+        if let Err(barrier_error) = self.perform_commit_step(CommitStep::Barrier) {
             return AcquisitionFailed {
                 cause,
                 rollback: AcquisitionRollback::RollbackFailed(barrier_error),
@@ -553,7 +553,7 @@ pub fn write_the_raised_floor_into_every_system_configuration<Device: BlockDevic
     // 发布末尾已有一道屏障（C577）：紧跟在同一个写入口的发布之后时下面这一道前面没有写，写入口不发它；留着它，不靠调用方前面是什么。
     // 第一个系统配置写之前一道池屏障（代码审阅第 19 条）：这一写覆写的是这块盘上较旧的那一槽，另一槽是上一次发布末尾轮换刚写的、
     // 还可能没持久；两槽轮换要的是「覆写旧槽时新槽已持久」，没有这一道，两次写同在一段里，崩溃时两槽可以一起撕坏。
-    if let Err(cause) = pool.perform(CommitStep::Barrier) {
+    if let Err(cause) = pool.perform_commit_step(CommitStep::Barrier) {
         return Err(RaisedFloorSystemConfigurationWriteFailed {
             devices_carrying_the_raised_floor,
             cause,
@@ -579,7 +579,7 @@ pub fn write_the_raised_floor_into_every_system_configuration<Device: BlockDevic
         }
         devices_carrying_the_raised_floor.push(pool.devices[index].0);
     }
-    if let Err(cause) = pool.perform(CommitStep::Barrier) {
+    if let Err(cause) = pool.perform_commit_step(CommitStep::Barrier) {
         return Err(RaisedFloorSystemConfigurationWriteFailed {
             devices_carrying_the_raised_floor,
             cause,
@@ -822,7 +822,7 @@ fn write_acquired_instance<Device: BlockDevice>(
     // 第一个取号写之前一道池屏障（代码审阅第 19 条）：取号写覆写的是这块盘上较旧的那一槽，另一槽可能是上一次发布末尾轮换刚写的
     // （同一个进程里，或上一个进程退出之前）、还没持久；两槽轮换要的是「覆写旧槽时新槽已持久」。这道屏障在任何取号写之前报错，
     // 一个字节都没写，取号失败、没有要回卷的。首次挂载紧接在 mkfs 末尾那道屏障之后，这一道前面没有写：录制流里并掉，设备多收一次 FLUSH。
-    if let Err(cause) = pool.perform(CommitStep::Barrier) {
+    if let Err(cause) = pool.perform_commit_step(CommitStep::Barrier) {
         return Err(AcquisitionFailed {
             cause,
             rollback: AcquisitionRollback::NothingWritten,
@@ -852,7 +852,7 @@ fn write_acquired_instance<Device: BlockDevice>(
         }
         written.push(index);
     }
-    if let Err(cause) = pool.perform(CommitStep::Barrier) {
+    if let Err(cause) = pool.perform_commit_step(CommitStep::Barrier) {
         return Err(pool.roll_back_acquisition(
             &written,
             previous_instance,
@@ -1041,20 +1041,20 @@ fn persist_publish_writes<Device: BlockDevice>(
     writes: &PublishWrites,
 ) -> Result<(), BlockDeviceError> {
     for unit in &writes.units {
-        writer.perform(CommitStep::WriteUnitToEveryDevice {
+        writer.perform_commit_step(CommitStep::WriteUnitToEveryDevice {
             slot: unit.slot,
             unit: &unit.bytes,
             identity: unit.identity,
         })?;
     }
-    writer.perform(CommitStep::Barrier)?;
+    writer.perform_commit_step(CommitStep::Barrier)?;
     for record in &writes.records {
-        writer.perform(CommitStep::WriteJournalRecordToEveryDevice {
+        writer.perform_commit_step(CommitStep::WriteJournalRecordToEveryDevice {
             counter: record.counter,
             record: &record.bytes,
         })?;
     }
-    writer.perform(CommitStep::Barrier)?;
+    writer.perform_commit_step(CommitStep::Barrier)?;
     persist_the_root_then_rotate_the_system_configuration(
         writer,
         writes.checkpoint_txg,
@@ -1197,15 +1197,15 @@ fn persist_the_root_then_rotate_the_system_configuration<Device: BlockDevice>(
     journal_tail: u64,
     journal_instance: InstanceGeneration,
 ) -> Result<(), BlockDeviceError> {
-    writer.perform(CommitStep::WriteRootRecordForceUnitAccess {
+    writer.perform_commit_step(CommitStep::WriteRootRecordForceUnitAccess {
         checkpoint_txg,
         root_slot,
     })?;
-    writer.perform(CommitStep::RotateSystemConfigurationSlots {
+    writer.perform_commit_step(CommitStep::RotateSystemConfigurationSlots {
         journal_tail,
         journal_instance,
     })?;
-    writer.perform(CommitStep::Barrier)
+    writer.perform_commit_step(CommitStep::Barrier)
 }
 
 /// 零单元发布（D16（发布语义） 已定项 9「树表 0 条 ⇒ 零单元」）：屏障 → 空记录 → 屏障 → 根槽 FUA → 系统配置槽轮换 → 屏障；

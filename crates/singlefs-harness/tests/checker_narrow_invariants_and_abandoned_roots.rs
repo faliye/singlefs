@@ -37,7 +37,7 @@ use singlefs_core::pointer::BirthSequence;
 use singlefs_core::transaction::{TransactionOutput, TransactionUnit};
 use singlefs_core::unit::{build_index_node, parse_index_node, IndexNodeHeader};
 use singlefs_format::{DATA_UNIT_BYTES, JOURNAL_RING_DEFAULT_BYTES, NODE_BYTES, SLOT_BYTES};
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
+use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 /// 新立那一条不变量：I-1.11（映射 key 与单元头相符），登记在 `.claude/kb/invariants.md`。

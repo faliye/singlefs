@@ -27,8 +27,8 @@ use singlefs_core::mount::{
 };
 use singlefs_core::mounted_session::{UserChange, UserChangeRefused};
 use singlefs_core::transaction::{FirstFile, PoolVersion, TransactionOutput};
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::history::HistoryDeviceWidth;
+use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 type RecordedSparse = RecordingBlockDevice<SparseBlockDevice>;
@@ -89,17 +89,17 @@ fn extra_device(
 
 fn images_of(
     devices: &[(DeviceIdentity, RecordedSparse)],
-) -> Vec<singlefs_harness::crash::SparseDevice> {
+) -> Vec<singlefs_harness::memory_pool::SparseDevice> {
     devices
         .iter()
-        .map(|(_, device)| device.inner().image.clone())
+        .map(|(_, device)| device.wrapped_device().image.clone())
         .collect()
 }
 
 /// 录制流一步都没有、每块盘逐字节不变：拒在任何写之前。
 fn assert_nothing_written(
     devices: &[(DeviceIdentity, RecordedSparse)],
-    images_before: &[singlefs_harness::crash::SparseDevice],
+    images_before: &[singlefs_harness::memory_pool::SparseDevice],
     stream: &SharedStream,
 ) {
     assert_eq!(

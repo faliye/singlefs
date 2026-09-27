@@ -1,0 +1,236 @@
+### cargo test --offline -p singlefs-harness --test a_floor_raise_refused_for_space_counts_as_short_of_space -- --exact a_floor_raise_pushed_by_the_session_whose_own_publishes_find_no_slot_reports_no_space a_mount_whose_floor_raise_after_the_row_publish_finds_no_slot_is_still_made_and_still_short
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/a_floor_raise_refused_for_space_counts_as_short_of_space.rs (/tmp/claude-1000/-home-fy5090-code-singlefs/32ce7af3-9b7f-4cb2-9aee-31fb18b94fb2/scratchpad/staged-target/debug/deps/a_floor_raise_refused_for_space_counts_as_short_of_space-f317b5923c67e721)
+
+running 2 tests
+test a_floor_raise_pushed_by_the_session_whose_own_publishes_find_no_slot_reports_no_space ... FAILED
+test a_mount_whose_floor_raise_after_the_row_publish_finds_no_slot_is_still_made_and_still_short ... FAILED
+
+failures:
+
+---- a_floor_raise_pushed_by_the_session_whose_own_publishes_find_no_slot_reports_no_space stdout ----
+
+thread 'a_floor_raise_pushed_by_the_session_whose_own_publishes_find_no_slot_reports_no_space' (22032) panicked at crates/singlefs-harness/tests/a_floor_raise_refused_for_space_counts_as_short_of_space.rs:53:10:
+第 19 次覆盖写：单元区满了，推抬 F 也推不出空间: UserChangePublished { floor_raises: [], refusals_that_pushed_the_floor_raises: [] }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_mount_whose_floor_raise_after_the_row_publish_finds_no_slot_is_still_made_and_still_short stdout ----
+
+thread 'a_mount_whose_floor_raise_after_the_row_publish_finds_no_slot_is_still_made_and_still_short' (22033) panicked at crates/singlefs-harness/tests/a_floor_raise_refused_for_space_counts_as_short_of_space.rs:138:5:
+抬 F 那一串三次空发布在预演里第 1 次就取不到落点：RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { refused_publish_in_the_sequence: 3, publishes_in_the_sequence: 3, cause: PlacementRefused { unit: AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 0, device: DeviceIdentity(0), index_in_device: 2 }), refusal: NoFreeSlotOnAnyDevice } }
+
+
+failures:
+    a_floor_raise_pushed_by_the_session_whose_own_publishes_find_no_slot_reports_no_space
+    a_mount_whose_floor_raise_after_the_row_publish_finds_no_slot_is_still_made_and_still_short
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+error: test failed, to rerun pass `-p singlefs-harness --test a_floor_raise_refused_for_space_counts_as_short_of_space`
+rc=101
+### cargo test --offline -p singlefs-harness --test admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments -- --exact a_write_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_refused_by_the_space_admission_before_any_write_while_the_byte_formula_admits with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments.rs (/tmp/claude-1000/-home-fy5090-code-singlefs/32ce7af3-9b7f-4cb2-9aee-31fb18b94fb2/scratchpad/staged-target/debug/deps/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments-0c3313fbbd50c6b6)
+
+running 2 tests
+test a_write_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_refused_by_the_space_admission_before_any_write_while_the_byte_formula_admits ... FAILED
+test with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write ... FAILED
+
+failures:
+
+---- a_write_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_refused_by_the_space_admission_before_any_write_while_the_byte_formula_admits stdout ----
+
+thread 'a_write_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_refused_by_the_space_admission_before_any_write_while_the_byte_formula_admits' (22101) panicked at crates/singlefs-harness/tests/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments.rs:180:5:
+assertion `left == right` failed: 每块盘成对的空槽：这次挂载开过的聚簇段外 0 对、段内 79 对
+  left: [(DeviceIdentity(0), 20, 54), (DeviceIdentity(1), 20, 54)]
+ right: [(DeviceIdentity(0), 0, 79), (DeviceIdentity(1), 0, 79)]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write stdout ----
+
+thread 'with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write' (22102) panicked at crates/singlefs-harness/tests/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments.rs:424:5:
+推过一串抬 F，推它的是数据单元 0 的落点被拒：[]
+
+
+failures:
+    a_write_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_refused_by_the_space_admission_before_any_write_while_the_byte_formula_admits
+    with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.76s
+
+error: test failed, to rerun pass `-p singlefs-harness --test admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments`
+rc=101
+### cargo test --offline -p singlefs-harness --test second_transaction_step_five_reuse -- --exact raising_the_floor_into_the_txg_of_the_root_abandoned_by_crash_recovery_ends_in_the_known_red_form_of_closeout_row_43
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_step_five_reuse.rs (/tmp/claude-1000/-home-fy5090-code-singlefs/32ce7af3-9b7f-4cb2-9aee-31fb18b94fb2/scratchpad/staged-target/debug/deps/second_transaction_step_five_reuse-476d15df3067cc3e)
+
+running 1 test
+test raising_the_floor_into_the_txg_of_the_root_abandoned_by_crash_recovery_ends_in_the_known_red_form_of_closeout_row_43 ... FAILED
+
+failures:
+
+---- raising_the_floor_into_the_txg_of_the_root_abandoned_by_crash_recovery_ends_in_the_known_red_form_of_closeout_row_43 stdout ----
+
+thread 'raising_the_floor_into_the_txg_of_the_root_abandoned_by_crash_recovery_ends_in_the_known_red_form_of_closeout_row_43' (22171) panicked at crates/singlefs-harness/tests/second_transaction_step_five_reuse.rs:898:5:
+抬 F 之前一条违例都没有：[("I-1.1", Holds), ("I-1.2", Holds), ("I-1.3", Holds), ("I-1.4", Holds), ("I-1.6", Holds), ("I-1.7", Holds), ("I-1.8", Holds), ("I-1.10", Holds), ("I-1.11", Holds), ("I-2.1", Holds), ("I-2.3", Holds), ("I-2.4", Holds), ("I-2.5", Holds), ("I-3.1", Holds), ("I-3.8", Holds), ("I-3.9", Holds), ("I-3.10", Holds), ("I-3.11", Holds), ("I-4.2", Holds), ("I-4.8", Holds), ("I-5.1", Holds), ("I-5.2", Holds), ("I-5.4", Holds), ("I-7.1", Holds), ("I-7.2", Holds), ("I-7.3", Holds), ("I-7.4", Violated("被抛弃的根（实例 1、txg 5）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：数据单元 在盘 0 槽 50184 的那一份与位置条目里的校验和对不上；数据单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的")), ("I-7.6", Holds), ("I-7.7", Holds), ("I-7.8", Holds), ("I-7.9", NotApplicable("根环里没有抬 F 的根：每条根带的 F 都不高于同一实例里它前一条根带的（回退与新实例的第一条根不算抬）")), ("I-7.12", Holds), ("I-7.13", Holds), ("I-8.6", Holds), ("I-8.7", Holds), ("I-8.8", NotApplicable("环里没有哪一组（同一块盘上实例代号与事务号都相同的非 0 记录）落了两条以上、也没有哪一组一条提交标记都没有：③ ④ 没有判的对象，提交标记字节单独成立不算这一条成立")), ("I-8.9", Holds), ("I-9.1", Holds), ("I-9.2", Holds), ("I-9.4", Holds), ("I-9.6", Holds), ("I-9.7", Holds), ("I-9.10", Holds), ("I-9.12", Holds), ("I-9.13", Holds), ("I-9.14", Holds), ("I-9.15", Holds), ("I-9.16", Holds)]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    raising_the_floor_into_the_txg_of_the_root_abandoned_by_crash_recovery_ends_in_the_known_red_form_of_closeout_row_43
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 3.95s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_step_five_reuse`
+rc=101
+### cargo test --offline -p singlefs-harness --test second_transaction_step_three_second_instance -- --exact torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_step_three_second_instance.rs (/tmp/claude-1000/-home-fy5090-code-singlefs/32ce7af3-9b7f-4cb2-9aee-31fb18b94fb2/scratchpad/staged-target/debug/deps/second_transaction_step_three_second_instance-c86efe2c9eb2f749)
+
+running 1 test
+test torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg ... FAILED
+
+failures:
+
+---- torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg stdout ----
+
+thread 'torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg' (22266) panicked at crates/singlefs-harness/tests/second_transaction_step_three_second_instance.rs:661:67:
+可写挂载: NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }, witness: NewerPublishWitness { witnessed_journal_counter: 6, comparison: AgainstTheRecordAtTheWitnessedCounter { record: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(6) } } } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }, witness: NewerPublishWitness { witnessed_journal_counter: 6, comparison: AgainstTheRecordAtTheWitnessedCounter { record: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(6) } } } } })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 4.68s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_step_three_second_instance`
+rc=101
+### cargo test --offline -p singlefs-harness --test second_transaction_supplement_three_random_history -- --exact crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43 seed_4000000204_raising_the_floor_on_narrow_devices_is_refused_before_any_write_instead_of_leaving_the_new_floor_on_one_device writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquisition_with_the_disk_unchanged
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_supplement_three_random_history.rs (/tmp/claude-1000/-home-fy5090-code-singlefs/32ce7af3-9b7f-4cb2-9aee-31fb18b94fb2/scratchpad/staged-target/debug/deps/second_transaction_supplement_three_random_history-9b00c3508ae33345)
+
+running 3 tests
+test crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43 ... FAILED
+test writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquisition_with_the_disk_unchanged ... FAILED
+test seed_4000000204_raising_the_floor_on_narrow_devices_is_refused_before_any_write_instead_of_leaving_the_new_floor_on_one_device ... FAILED
+
+failures:
+
+---- crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43 stdout ----
+
+thread 'crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43' (22359) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:1201:5:
+assertion `left == right` failed: 抬 F 之前一条违例都没有
+  left: [("I-7.4", "被抛弃的根（实例 1、txg 5）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：数据单元 在盘 0 槽 50184 的那一份与位置条目里的校验和对不上；数据单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的")]
+ right: []
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquisition_with_the_disk_unchanged stdout ----
+
+thread 'writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquisition_with_the_disk_unchanged' (22361) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:663:5:
+assertion `left == right` failed
+  left: Applied(Mounted { instance: InstanceGeneration(2), publishes: 3, allocation_records_compared: Compared { publishes: 3 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: NotJudgedByTheTestOnlySwitch })
+ right: Refused { member: "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)" }
+
+---- seed_4000000204_raising_the_floor_on_narrow_devices_is_refused_before_any_write_instead_of_leaving_the_new_floor_on_one_device stdout ----
+
+thread 'seed_4000000204_raising_the_floor_on_narrow_devices_is_refused_before_any_write_instead_of_leaving_the_new_floor_on_one_device' (22360) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:1559:5:
+assertion `left == right` failed: 种子 4000000204 第 31 步：这一串的第二次在预演里取不到落点，一次都不发（历史停在：Completed）
+  left: Some(Applied(RaisedFloor { new_floor: CheckpointTxg(20), publishes: 3, reclaimed_placements: 22, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 } }))
+ right: Some(Refused { member: "MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice))" })
+
+
+failures:
+    crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43
+    seed_4000000204_raising_the_floor_on_narrow_devices_is_refused_before_any_write_instead_of_leaving_the_new_floor_on_one_device
+    writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquisition_with_the_disk_unchanged
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 23 filtered out; finished in 16.06s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_three_random_history`
+rc=101
+### cargo test --offline -p singlefs-harness --test second_transaction_supplement_two_admission_formula -- --exact an_overwrite_whose_new_slots_exceed_the_available_bytes_is_refused_by_the_space_admission_before_any_write writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_the_row_publish_and_is_admitted
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_supplement_two_admission_formula.rs (/tmp/claude-1000/-home-fy5090-code-singlefs/32ce7af3-9b7f-4cb2-9aee-31fb18b94fb2/scratchpad/staged-target/debug/deps/second_transaction_supplement_two_admission_formula-e9ea9d50e18a1127)
+
+running 2 tests
+test an_overwrite_whose_new_slots_exceed_the_available_bytes_is_refused_by_the_space_admission_before_any_write ... FAILED
+test writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_the_row_publish_and_is_admitted ... FAILED
+
+failures:
+
+---- an_overwrite_whose_new_slots_exceed_the_available_bytes_is_refused_by_the_space_admission_before_any_write stdout ----
+
+thread 'an_overwrite_whose_new_slots_exceed_the_available_bytes_is_refused_by_the_space_admission_before_any_write' (22536) panicked at crates/singlefs-harness/tests/second_transaction_supplement_two_admission_formula.rs:638:9:
+式子判拒：None
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_the_row_publish_and_is_admitted stdout ----
+
+thread 'writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_the_row_publish_and_is_admitted' (22537) panicked at crates/singlefs-harness/tests/second_transaction_supplement_two_admission_formula.rs:499:5:
+assertion `left == right` failed: 取号之前两块盘都短：可用 −47 槽，挂载这一刻不另要需求
+  left: AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-638976), demand: BytesOnOneDevice(0) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-638976), demand: BytesOnOneDevice(0) }] }
+ right: AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-770048), demand: BytesOnOneDevice(0) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-770048), demand: BytesOnOneDevice(0) }] }
+
+
+failures:
+    an_overwrite_whose_new_slots_exceed_the_available_bytes_is_refused_by_the_space_admission_before_any_write
+    writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_the_row_publish_and_is_admitted
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 1 filtered out; finished in 3.69s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_two_admission_formula`
+rc=101
+### cargo test --offline -p singlefs-harness --test second_transaction_supplement_two_fsync_drop_and_devices_without_the_selected_version -- --exact blank_device_refuses_the_writable_mount_by_name_before_any_write mount_writable_while_every_read_of_device_one_fails_is_refused_naming_device_one
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_supplement_two_fsync_drop_and_devices_without_the_selected_version.rs (/tmp/claude-1000/-home-fy5090-code-singlefs/32ce7af3-9b7f-4cb2-9aee-31fb18b94fb2/scratchpad/staged-target/debug/deps/second_transaction_supplement_two_fsync_drop_and_devices_without_the_selected_version-a08389757e78f50b)
+
+running 2 tests
+test mount_writable_while_every_read_of_device_one_fails_is_refused_naming_device_one ... FAILED
+test blank_device_refuses_the_writable_mount_by_name_before_any_write ... FAILED
+
+failures:
+
+---- mount_writable_while_every_read_of_device_one_fails_is_refused_naming_device_one stdout ----
+
+thread 'mount_writable_while_every_read_of_device_one_fails_is_refused_naming_device_one' (22627) panicked at crates/singlefs-harness/tests/second_transaction_supplement_two_fsync_drop_and_devices_without_the_selected_version.rs:1556:9:
+盘 1 每次读都报错：该报 WritableMountRefusedByDevicesWithoutTheSelectedVersion，实际 NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, witness: NewerPublishWitness { witnessed_journal_counter: 4, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 } } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, witness: NewerPublishWitness { witnessed_journal_counter: 4, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 } } } })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- blank_device_refuses_the_writable_mount_by_name_before_any_write stdout ----
+
+thread 'blank_device_refuses_the_writable_mount_by_name_before_any_write' (22626) panicked at crates/singlefs-harness/tests/second_transaction_supplement_two_fsync_drop_and_devices_without_the_selected_version.rs:1556:9:
+盘 0 是空盘：该报 WritableMountRefusedByDevicesWithoutTheSelectedVersion，实际 NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }, witness: NewerPublishWitness { witnessed_journal_counter: 5, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 4 } } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }, witness: NewerPublishWitness { witnessed_journal_counter: 5, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 4 } } } })
+
+
+failures:
+    blank_device_refuses_the_writable_mount_by_name_before_any_write
+    mount_writable_while_every_read_of_device_one_fails_is_refused_naming_device_one
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 15 filtered out; finished in 5.84s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_two_fsync_drop_and_devices_without_the_selected_version`
+rc=101
+### cargo test --offline -p singlefs-harness --test second_transaction_supplement_two_warm_up_counter -- --exact c366_when_the_chosen_root_own_record_is_unreadable_the_new_instance_numbers_records_and_tail_from_the_highest_readable_record
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_supplement_two_warm_up_counter.rs (/tmp/claude-1000/-home-fy5090-code-singlefs/32ce7af3-9b7f-4cb2-9aee-31fb18b94fb2/scratchpad/staged-target/debug/deps/second_transaction_supplement_two_warm_up_counter-417e12908dfd70bd)
+
+running 1 test
+test c366_when_the_chosen_root_own_record_is_unreadable_the_new_instance_numbers_records_and_tail_from_the_highest_readable_record ... FAILED
+
+failures:
+
+---- c366_when_the_chosen_root_own_record_is_unreadable_the_new_instance_numbers_records_and_tail_from_the_highest_readable_record stdout ----
+
+thread 'c366_when_the_chosen_root_own_record_is_unreadable_the_new_instance_numbers_records_and_tail_from_the_highest_readable_record' (22729) panicked at crates/singlefs-harness/tests/second_transaction_supplement_two_warm_up_counter.rs:231:63:
+可写挂载: NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }, witness: NewerPublishWitness { witnessed_journal_counter: 4, comparison: Undecidable } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }, witness: NewerPublishWitness { witnessed_journal_counter: 4, comparison: Undecidable } } })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    c366_when_the_chosen_root_own_record_is_unreadable_the_new_instance_numbers_records_and_tail_from_the_highest_readable_record
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 5.31s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_two_warm_up_counter`
+rc=101

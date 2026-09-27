@@ -34,7 +34,7 @@ use singlefs_core::address::{DataUnitIndexInFile, DeviceIdentity, DeviceOffsetIn
 use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
 use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
 use singlefs_core::transaction::{PublishedUnit, TransactionUnit};
-use singlefs_harness::crash::MemoryPool;
+use singlefs_harness::memory_pool::MemoryPool;
 
 /// 单元头共同前缀里格式版本那 2 字节（magic 4 之后，D18（块里携带什么信息） 已定项 7）；系统配置自举头同一个偏移。
 const FORMAT_VERSION_OFFSET: usize = 4;

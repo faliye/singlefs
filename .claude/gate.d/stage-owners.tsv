@@ -4,6 +4,7 @@
 10-kb-rot.sh	kb-scribe	kb 内部的引用、结论与条数
 11-batch-scope.sh	gate-triage	这一批的触发文件有没有登记进 .claude/batch-scope：判据是暂存区，而暂存与提交归主 agent，跑整轮门禁的分诊先替它看一眼
 12-no-prime-marks.sh	gate-triage	全仓不许用角标写法给变体起名：谁写文件都可能写进一撇，收尾跑整轮门禁时一并判
+13-vague-names.sh	gate-triage	函数名与类型名不许只由空泛词拼成：谁写 .rs 都可能起出 run_cell 这种名字，收尾跑整轮门禁时一并判
 15-research-build.sh	gate-triage	research 构建与单测（全工作区十几分钟，2026-09-17 从 experiment-runner 挪到收尾：执行员前台等它会让缓存过期、整份上下文重写）
 16-freeze-layer-membership.sh	kb-scribe	冻结层归属登记表是 kb：每个结构的行、态别与退不退出冻结、依据分项都由书记员写回，写完就跑
 20-kb-shape.sh	kb-scribe	kb 用词、指代、链接、条数与标题

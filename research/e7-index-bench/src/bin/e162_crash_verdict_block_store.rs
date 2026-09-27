@@ -8,7 +8,7 @@
 //!
 //! 独立手写模型，不与 `crates/` 共用代码（`.claude/rules/implementation-first.md` 第 4 条）。
 //! 与 `crates/` 的接点只有两处，都是照抄形态、不引代码：块键的形态（登记第三节「状态怎么编号」），
-//! 候选「加固的文件」的持久步骤（`crates/singlefs-harness/src/layer0_progress.rs:1139-1159`）。
+//! 候选「加固的文件」的持久步骤（`crates/singlefs-checker-tier/src/layer0_progress.rs:1140-1160`）。
 //!
 //! 角色：父进程按模式驱动；被杀的写入进程（`writer`）、核对进程（`verify`）、读进程（`read`）
 //! 都是这个 bin 按角色参数起的子进程。子进程不判准入（父进程已经判过），免得 python3 的启动

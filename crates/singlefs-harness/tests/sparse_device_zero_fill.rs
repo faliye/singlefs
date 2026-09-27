@@ -10,7 +10,7 @@
 //! 这条用例钉的是**两种写法在内存与「盘上哪里有东西」这两件事上不同**。
 
 use singlefs_core::address::DeviceOffsetInBytes;
-use singlefs_harness::crash::{SparseDevice, SECTOR_BYTES};
+use singlefs_harness::memory_pool::{SparseDevice, SECTOR_BYTES};
 
 /// 与 `JOURNAL_RING_DEFAULT_BYTES` 同一个数：mkfs 真正要清的那一段。
 const RING_BYTES: u64 = 768 * 1024 * 1024;

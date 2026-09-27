@@ -31,11 +31,11 @@ use singlefs_core::transaction::{
     TREE_IDENTIFIER_NONE,
 };
 use singlefs_format::{JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES};
-use singlefs_harness::crash::{writes_and_segments, MemoryPool};
 use singlefs_harness::fault_injection::{
     FaultCounting, FaultDeviceSelector, FaultInjectingBlockDevice, FaultOccurrence, FaultPlacement,
     FaultSchedule, InjectedFault, SharedFaultPlan,
 };
+use singlefs_harness::memory_pool::{writes_and_segments, MemoryPool};
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::SharedStream;
 

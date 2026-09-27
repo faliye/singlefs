@@ -2,7 +2,7 @@
 //! 规矩（`/tmp` 规格与 `code-discipline.md`「错误：能恢复的写进类型，破坏不变量的就断言」）：盘上读到的坏内容是可恢复的失败，
 //! 每一处改成带名字的错误成员往上交；这里每条用例造一份让改之前那一版 panic、静默收下或报别的成员的坏镜像（各条文档写明改之前是哪一种），钉住改之后的结局。
 //!
-//! 盘都是内存稀疏盘（`singlefs_harness::crash::SparseBlockDevice`），池在进程里 mkfs、取号、暖机、写第一个文件（txg 3）造出来；
+//! 盘都是内存稀疏盘（`singlefs_harness::memory_pool::SparseBlockDevice`），池在进程里 mkfs、取号、暖机、写第一个文件（txg 3）造出来；
 //! 改盘上字节之后，指着它的每一道校验和（父指针里的位置条目、映射条目、树表、根记录的自证校验和）都重算，读者走到被改的那一格才判得到。
 //! 「在任何写之前拒」用两块盘此刻的整份镜像比：拒之前、拒之后逐字节相同。
 
@@ -56,7 +56,7 @@ use singlefs_format::{
     DATA_UNIT_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, NODE_BYTES,
     SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
 };
-use singlefs_harness::crash::{SparseBlockDevice, SparseDevice};
+use singlefs_harness::memory_pool::{SparseBlockDevice, SparseDevice};
 
 const DEVICE_BYTES: u64 = 4 << 30;
 const MEBIBYTE: u64 = 1 << 20;

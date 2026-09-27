@@ -5,7 +5,7 @@
 //! [`FaultInjectingBlockDevice`] 本身不定包在录制器的哪一边，录制流记的是什么由搭栈的一方定。两条要紧的栈次序相反：
 //! * 这一件（历史里的盘，`crate::history::HistoryDevice`）：注入在录制器**外面**（调用方与录制器之间）。报错的写、被吞掉的写与
 //!   被吞掉的屏障都不进录制流，录制流因此恒等于真正落到内存盘上的那一串——注入之后的镜像可以从录制流重建
-//!   （`crate::crash::MemoryPool::apply`），不必把执行器里的两块盘再交出来一份。
+//!   （`crate::memory_pool::MemoryPool::apply`），不必把执行器里的两块盘再交出来一份。
 //! * 门禁 55 号的装置（`src/bin/first_transaction_on_device.rs` 的 `CountedDevice`）：录制器在**外面**、注入在里面。录制流记的是
 //!   程序发给这块盘的每一次调用，被吞掉的屏障也在里面；真设备收到了什么另看这一层的计数（[`FaultDeviceCounts`] 的
 //!   `barriers_forwarded` / `barriers_swallowed`）——那条栈上录制流不等于落盘的那一串，不能拿它按上一条那样重建镜像。
@@ -45,16 +45,16 @@ use singlefs_core::recovery::{
 use singlefs_core::root_ring::{slot_offset, RootRingSlot, RootRingSlotsPerRegion};
 use singlefs_format::{ROOT_RING_REGIONS, ROOT_RING_SLOTS_PER_REGION_MAXIMUM};
 
-use crate::crash::{
-    newest_persisted_root, root_identity_written_by, writes_and_segments_with_stream_indexes,
-    MemoryPool, RecordCheck,
-};
 use crate::history::{
     classify_failure, execute_history_with_faults, generate_history_with_weights,
     newest_ring_root_and_slot_count, raised_floor_lands_only_on_abandoned_roots, AppliedEffect,
     ColdStartReadBack, FailureObservation, FailureSignature, GeneratedHistory, GenerationWeights,
     HarnessJudgement, HistoryEnding, HistoryExecution, HistoryOperation, HistoryOperationKind,
     HistoryRun, HistorySeed, PerStepChecker, SeededRandomSource, StepOutcome, StepPosition,
+};
+use crate::memory_pool::{
+    newest_persisted_root, root_identity_written_by, writes_and_segments_with_stream_indexes,
+    MemoryPool, RecordCheck,
 };
 use crate::model::{
     crash_recovery_disagreement, ModelCheckpointTxg, ModelDisagreementAspect, ModelInstanceRow,
@@ -347,7 +347,7 @@ impl RootRingSlotTarget {
 ///
 /// 块设备那个口子（`FaultInjectingBlockDevice` + `FaultSchedule::every_read_of_named_root_ring_slots_fails`）
 /// 罩得住走 `Vec<(DeviceIdentity, Device)>` 的路径（可写挂载、回退、抬 F）；层 0 枚举出来的崩溃镜像
-/// （`crate::crash::MemoryPool` / `CrashImage`）不是块设备、只是 `PoolReader`，那一路要这个口子。
+/// （`crate::memory_pool::MemoryPool` / `CrashImage`）不是块设备、只是 `PoolReader`，那一路要这个口子。
 /// 两个口子判「这一次读落在哪个点名的槽里」用的是同一个 `RootRingSlotTarget::slot_covering`。
 ///
 /// 读**持续**失败：点名的槽上每一次读都返回 None，次数不限；`reads_refused` 数得出来它被拦了几次。
@@ -949,11 +949,11 @@ impl<Inner: BlockDevice> FaultInjectingBlockDevice<Inner> {
     }
 
     #[must_use]
-    pub fn inner(&self) -> &Inner {
+    pub fn wrapped_device(&self) -> &Inner {
         &self.inner
     }
 
-    pub fn inner_mut(&mut self) -> &mut Inner {
+    pub fn wrapped_device_mut(&mut self) -> &mut Inner {
         &mut self.inner
     }
 
@@ -1179,7 +1179,7 @@ pub enum FaultedSegmentKind {
 impl FaultedSegmentKind {
     /// 报告里从上到下的次序：起点段排在七类操作之前（它在历史里也排在最前面）。
     #[must_use]
-    pub fn all() -> Vec<FaultedSegmentKind> {
+    pub fn every_kind_in_report_order() -> Vec<FaultedSegmentKind> {
         let mut kinds = vec![FaultedSegmentKind::TheStartingPoint];
         kinds.extend(
             HistoryOperationKind::ALL
@@ -1242,9 +1242,9 @@ impl InjectionPoint {
     /// 全部注入点：（起点段 + 七类操作） × （四类写落点 + 读 + 屏障）。里面有几格在今天的实现上摆不出来
     /// （冷启动只读不写、零单元发布不写单元），报告里按「没命中」列名，不当失败。
     #[must_use]
-    pub fn all() -> Vec<InjectionPoint> {
+    pub fn every_injection_point() -> Vec<InjectionPoint> {
         let mut points = Vec::new();
-        for segment in FaultedSegmentKind::all() {
+        for segment in FaultedSegmentKind::every_kind_in_report_order() {
             for structure in WRITTEN_STRUCTURES {
                 points.push(InjectionPoint {
                     segment,
@@ -1470,7 +1470,7 @@ impl FaultInjectionTally {
     /// 一个注入点都没命中的那几格（验收要的「没命中的逐个列名」）。
     #[must_use]
     pub fn injection_points_never_hit(&self) -> Vec<String> {
-        InjectionPoint::all()
+        InjectionPoint::every_injection_point()
             .into_iter()
             .map(|point| point.render())
             .filter(|name| !self.faults_by_injection_point.contains_key(name))
@@ -1519,7 +1519,7 @@ impl FaultInjectionTally {
         for (signature, count) in &self.lying_device_signatures {
             let _ = writeln!(text, "    {signature}：{count} 次");
         }
-        for segment in FaultedSegmentKind::all() {
+        for segment in FaultedSegmentKind::every_kind_in_report_order() {
             let _ = writeln!(
                 text,
                 "  {} 上注入 {} 次",
@@ -2851,8 +2851,8 @@ fn seed_slices(seed_count: u64, worker_threads: usize) -> Vec<std::ops::Range<u6
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::crash::SparseBlockDevice;
     use crate::history::{CapturedPanic, StartingPointStep};
+    use crate::memory_pool::SparseBlockDevice;
     use crate::model::ModelDisagreement;
 
     /// 用例里的几何：与 E142 装置相同（物理块 512、io_min 512 ⇒ 固定结构槽距 4096），journal 环取默认的 768 MiB。

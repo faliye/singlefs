@@ -59,11 +59,11 @@ use singlefs_core::transaction::{
     FIRST_INODE_NUMBER,
 };
 use singlefs_format::{DATA_UNIT_BYTES, SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE};
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice, SparseDevice};
 use singlefs_harness::fault_injection::{
     FaultCounting, FaultDeviceSelector, FaultInjectingBlockDevice, FaultOccurrence, FaultPlacement,
     FaultSchedule, InjectedFault, SharedFaultPlan,
 };
+use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice, SparseDevice};
 use singlefs_harness::scenario::{e142_parameters, first_file_content, FIXED_WRITE_TIME_SECONDS};
 use singlefs_harness::segments::FixedGeometry;
 use singlefs_harness::{RecordedOperationKind, RecordingBlockDevice, SharedStream};

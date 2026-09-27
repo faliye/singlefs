@@ -959,7 +959,7 @@ fn raising_the_floor_into_the_txg_of_the_root_abandoned_by_crash_recovery_ends_i
                 &image_before_raising,
                 CheckpointTxg(5),
             ),
-        record_check: singlefs_harness::crash::RecordCheck::default(),
+        record_check: singlefs_harness::memory_pool::RecordCheck::default(),
     };
     let ending = singlefs_harness::history::classify_failure(observation);
     assert!(

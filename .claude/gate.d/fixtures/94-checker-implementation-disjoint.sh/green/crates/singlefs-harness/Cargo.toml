@@ -1,0 +1,7 @@
+[package]
+name = "singlefs-harness"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }

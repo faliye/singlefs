@@ -1,0 +1,282 @@
+  ✓ 老产物没有指纹行时放行并报判不了
+  ✓ 放行时产物头第一行是带键的输入指纹
+  ✓ 输入没变时拒绝（退 77、stdout 为空、出路写强制开关）
+  ✓ 弄坏开关 skip-unchanged 下「输入没变」那一格红（放行了）
+  ✓ 改一个输入字节就放行并报变了
+  ✓ 字节写回原样又判没变
+  ✓ 登记目录下新加一个未跟踪文件就放行
+  ✓ 强制开关带理由时放行、理由原样进产物头
+  ✓ 强制开关理由为空时退 2
+  ✓ 前提没齐时拒绝（退 3）并点名那一行
+  ✓ 弄坏开关 skip-preconditions 下「前提没齐」那一格红（放行了）
+  ✓ 前提齐了放行，且别的键的同一个指纹不算数
+  ✓ 产物判决字段不是要的值时拒绝（退 3）
+  ✓ 问题单判的是另一个候选时拒绝（退 3）
+  ✓ 没登记的实验键退 2
+  ✓ 登记的路径列不出文件时退 2
+  ✓ 登记的路径罩住 research/results/ 或 replay.sh 时退 2（新产物一存进来指纹就对不上自己）
+  ✓ 认不出的准入条件退 2
+  ✓ 登记表自查点得出认不出的条件
+  ✓ 登记行改了就放行（登记行本身进指纹）
+  ✓ 产物指纹对得上时状态是 matched
+  ✓ 输入变了时状态是 stale
+  ✓ 没有一份带这个键指纹的产物时状态是 unfingerprinted
+  ✓ 没登记的键状态是 unregistered
+  ✓ 清单与另算的一遍（sha256sum、sort -zu、cargo -V && rustc -V）逐字节相同
+  ✓ 门禁复用判定出异常时 stage-must-run.sh 判要跑
+  ✓ stage-fingerprint 打「<64 位指纹> <文件数>」
+  ✓ 没有全绿标记时 stage-marker-check 退 1、说没有
+  ✓ 没有标记、也不是 gate-staged.sh 起的：gate-reuse 判要跑
+  ✓ stage-marker-write 把标记写进 git common-dir、打它的路径
+  ✓ 写过之后 stage-marker-check 退 0、第一行 ok
+  ✓ 有全绿标记时 gate-reuse 不看暂存树也判可跳过（退 10）
+  ✓ 弄坏开关 stage-marker-ignored 下「有标记可跳过」那一格转红（判要跑）
+  ✓ 复用上限 0 小时：标记再新也不作数、判要跑
+  ✓ 登记的输入改了一个字节就没有它那一格标记、判要跑
+  ✓ 没登记的阶段 stage-marker-check 退 2
+  ✓ 门禁前提都齐时退 0、stdout 一个字不打
+  ✓ 门禁前提 command= 缺了判红（退 1）：点名那个可执行名，带出路与那一行的注释
+  ✓ 弄坏开关 skip-gate-preconditions 下「前提没齐」那一格红（放行了）
+  ✓ 门禁前提 readwrite= 不可写判红（退 1）并点名那个路径（以 root 跑这一格判不出）
+  ✓ 门禁前提 probe= 退非 0 判红（退 1），明细带出探针自己打的那几行
+  ✓ 登记表里没有那一道时退 2，照样打 ✗ 与出路
+  ✓ 自查点得出门禁行写实验的种类、实验行写门禁的种类、probe= 指的脚本不在
+  ✓ 登记了 environment= 的门禁，输入相同而环境没记下时判要跑
+  ✓ 不是 gate-staged.sh 起的（没有 SINGLEFS_STAGED_TREE）不记环境、一个字不打
+  ✓ 判绿之后记下环境：打一行「·」，记录落在 git common-dir
+  ✓ 输入与环境都没变时判可跳过，依据句带出 herd7 的版本
+  ✓ herd7 的版本变了判要跑，依据句带出记下的与现在的两个版本
+  ✓ 弄坏开关 ignore-gate-environment 下「版本变了」那一格红（判成可跳过）
+  ✓ herd7 不在时环境取不出来，判要跑
+  ✓ herd7 不在时 gate-preconditions 判红（退 1），明细带出探针打的那一行
+  ✓ 环境相同、但记下环境的那一趟判的是另一批输入时判要跑
+  ✓ 在这一批输入上重新记下环境之后又判可跳过
+  ✓ 登记目录底下的中文文件名没变时判可跳过
+  ✓ 登记的路径本身是中文、没变时判可跳过
+  ✓ 登记目录底下的中文文件改了判要跑，依据句里是原样的中文路径（不是八进制转义）
+  ✓ 登记的路径本身是中文、改了判要跑
+  ✓ replay.sh：老产物没有产物头、新跑的有，比对前删掉产物头之后判字节一致
+  ✓ 弄坏 replay.sh 比对前删产物头那一步（换成 cat）判对不上：上一格分得出差别
+  ✓ replay.sh：留存产物头上的指纹与今天的输入相同时判「输入没变」、装置一次都没跑、汇总报没跑 1 行
+  ✓ replay.sh：前提没齐时判跑不了（准入退 3）、装置一次都没跑
+  ✓ replay.sh：登记了准入、装置却没打指纹行时判跑不了
+  ✓ 构建环境：加一份仓根往上一层的 .cargo/config.toml，指纹变；删掉又回到原样
+  ✓ 构建环境：加一份仓根往上一层的 .cargo/config，指纹变；删掉又回到原样
+  ✓ 构建环境：加一份仓根自己的 .cargo/config.toml，指纹变；删掉又回到原样
+  ✓ 构建环境：加一份CARGO_HOME 下的 config.toml，指纹变；删掉又回到原样
+  ✓ 构建环境：加一份CARGO_HOME 下的 config，指纹变；删掉又回到原样
+  ✓ 构建环境：加一份仓根往上一层的 rust-toolchain，指纹变；删掉又回到原样
+  ✓ 构建环境：加一份仓根往上一层的 rust-toolchain.toml，指纹变；删掉又回到原样
+  ✓ 构建环境：设了环境变量 RUSTFLAGS，指纹变
+  ✓ 构建环境：设了环境变量 CARGO_ENCODED_RUSTFLAGS，指纹变
+  ✓ 构建环境：设了环境变量 CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS，指纹变
+  ✓ 构建环境：设了环境变量 CARGO_BUILD_RUSTFLAGS，指纹变
+  ✓ 构建环境：设了环境变量 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS，指纹变
+  ✓ 构建环境：设了环境变量 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER，指纹变
+  ✓ 构建环境：设了环境变量 RUSTC_WRAPPER，指纹变
+  ✓ 构建环境：设了环境变量 RUSTC_WORKSPACE_WRAPPER，指纹变
+  ✓ 构建环境：只设 CARGO_BUILD_JOBS（编译并行度，包装会设它），指纹不变
+  ✓ 构建环境：RUSTC 设了指纹变；同一个 RUSTC 的 -V 变了，指纹也变
+  ✓ 登记路径下指向目录的符号链接：链接指向的目录里的文件改了，指纹变
+  ✓ 弄坏开关 ignore-linked-directories 下「链接那头改了」那一格红（指纹不变）
+  ✓ 弄坏开关 skip-build-environment 下「上一层的 .cargo/config.toml」那一格红（指纹不变）
+  ✓ 构建环境：环境变量 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER（值带参数）指的程序换了内容、值不变，指纹变
+  ✓ 构建环境：环境变量 RUSTC_WRAPPER指的程序换了内容、值不变，指纹变
+  ✓ 构建环境：环境变量 CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER（不带斜杠、在 PATH 里找）指的程序换了内容、值不变，指纹变
+  ✓ 构建环境：环境变量 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=bash <脚本>（首词是解释器，脚本在参数里）指的程序换了内容、值不变，指纹变
+  ✓ 弄坏开关 runner-program-only 下「runner = bash <脚本>，脚本换了内容」那一格红（指纹不变）
+  ✓ 构建环境：仓根 .cargo/config.toml 里 target.<三元组>.runner指的程序换了内容、配置原文不变，指纹变
+  ✓ 构建环境：仓根 .cargo/config.toml 里 target.<三元组>.runner = ["bash", <从 .cargo 那一层起的相对路径>]指的程序换了内容、配置原文不变，指纹变
+  ✓ 构建环境：仓根 .cargo/config.toml 里 build.rustc-wrapper（从 .cargo 所在的那一层起的相对路径）指的程序换了内容、配置原文不变，指纹变
+  ✓ 构建环境：仓根 .cargo/config.toml 里 build.rustc 指的编译器 -V 变了、配置原文不变，指纹变
+  ✓ 构建环境：配置文件与环境变量都拿掉之后，指纹回到原样
+  ✓ 实验的输入指纹同样带构建环境：设了 RUSTFLAGS，产物头的指纹变
+  ✓ 构建环境：仓根 .cargo/config.toml 里 runner = "sh ../../tools/r.sh"（从包目录起才解得到），改 tools/r.sh 指纹变
+  ✓ 弄坏开关 runner-arguments-from-configuration-directory-only 下「仓根 .cargo/config.toml 里 runner = "sh ../../tools/r.sh"（从包目录起才解得到）」那一格红（指纹不变）
+  ✓ 构建环境：环境变量 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="sh ../../tools/r.sh"，改 tools/r.sh 指纹变
+  ✓ 弄坏开关 runner-arguments-from-configuration-directory-only 下「环境变量 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="sh ../../tools/r.sh"」那一格红（指纹不变）
+  ✓ 去注释找点名：行注释里提到不算
+  ✓ 去注释找点名：可嵌套的块注释里提到不算
+  ✓ 去注释找点名：文档注释里提到不算
+  ✓ 去注释找点名：mod 声明算
+  ✓ 去注释找点名：字符串里的路径算
+  ✓ 去注释找点名：字符串里带 // 之后的代码照样算
+  ✓ 去注释找点名：原始字符串里带引号之后的代码照样算
+  ✓ 去注释找点名：字符字面量是双引号之后的代码照样算
+  ✓ 去注释找点名：生命周期之后的代码照样算
+  ✓ 去注释找点名：转义的单引号字符之后的代码照样算
+  ✓ 去注释找点名：更长的名字里含它不算（按整词）
+  ✓ crash-cases 逐条打「键、包、测试目标、用例函数」
+  ✓ 减去的恰好是没被代码点名的 other_target.rs（注释里提到不算）；被 mod 点名的、被字符串点名的、共用的 common/ 与用例自己都留着
+  ✓ 崩溃枚举用例的输入：改别的测试目标独占的 other_target.rs，指纹不变
+  ✓ 崩溃枚举用例的输入：新加一个没人点名的测试目标 new_unrelated.rs，指纹不变
+  ✓ 崩溃枚举用例的输入：改被用例 mod 点名的 helper_target.rs，指纹变
+  ✓ 崩溃枚举用例的输入：改被 lib.rs 里的字符串点名的 string_named.rs，指纹变
+  ✓ 崩溃枚举用例的输入：改共用的 tests/common/mod.rs，指纹变
+  ✓ 崩溃枚举用例的输入：新加一份与 common/mod.rs 并存的 tests/common.rs（用例写着 mod common），指纹变
+  ✓ 崩溃枚举用例的输入：改 src/lib.rs，指纹变
+  ✓ 弄坏开关 exclude-mentioned-test-targets 下「改被 mod 点名的 helper_target.rs」那一格红（指纹不变）
+  ✓ 包里有 build.rs 时这个包的测试文件一份都不减（指纹变、减去 0 个）
+  ✓ 改了这条用例登记行的第三列，指纹变
+  ✓ crash-cases 自查：用例函数在测试目标里找不到，退 2 并说出来
+  ✓ crash-cases 自查：测试目标不在，退 2 并说出来
+  ✓ crash-cases 自查：包不是工作区成员，退 2 并说出来
+  ✓ crash-cases 自查：test= 写了两条，退 2 并说出来
+  ✓ crash-cases 自查：exhaustive= 点名的前缀没登记成 count-line=，退 2 并说出来
+  ✓ crash-cases 自查：认不出的条件，退 2 并说出来
+  ✓ crash-cases 自查：同一个键两行，退 2 并说出来
+  ✓ crash-cases 自查：用例函数没标 #[ignore] ⇒ 退 2 并说没标 #[ignore]
+  ✓ crash-cases 自查：只有 cfg_attr 里的条件 ignore ⇒ 退 2 并说没标 #[ignore]
+  ✓ crash-cases 自查：#[ignore] 挂在前一个函数上 ⇒ 退 2 并说没标 #[ignore]
+  ✓ crash-cases 自查：#[ignore] 只写在注释里 ⇒ 退 2 并说没标 #[ignore]
+  ✓ crash-cases 自查：#[ignore] 在 #[test] 前面、fn 前面有 pub ⇒ 退 0
+  ✓ crash-cases 自查：ignore 的理由里带方括号、引号与 // ⇒ 退 0
+  ✓ crash-cases 自查：同名函数 cfg 二选一：debug 那一份标 ignore、release 那一份不标 ⇒ 退 2 并说没标 #[ignore]
+  ✓ crash-cases 自查：子模块里同名标 ignore 的写在前面、顶层那一份（--exact the_case 跑的）不标 ⇒ 退 2 并说没标 #[ignore]
+  ✓ crash-cases 自查：# [ignore]（# 与 [ 之间有空格，rustc 认） ⇒ 退 0
+  ✓ crash-cases 自查：同名的两处都标了 ignore（cfg 二选一） ⇒ 退 0
+  ✓ 弄坏开关 first-definition-only 下「同名函数 cfg 二选一、一份不标」那一格红（crash-cases 退 0）
+  ✓ 弄坏开关 first-definition-only 下「子模块里同名标 ignore 的写在前面、顶层那一份不标」那一格红（crash-cases 退 0）
+  ✓ 弄坏开关 ignore-attribute-without-space 下「# [ignore]」那一格红（crash-cases 退 2）
+  ✓ crash-cases 自查（带进来的源文件）：debug 下标 ignore、release 下 include!("common/release_case.rs") 进来一份不标的同名用例 ⇒ 退 2 并说没标 #[ignore]
+  ✓ crash-cases 自查（带进来的源文件）：include! 的参数是 concat!(…)（读的是哪一份判不出） ⇒ 退 2 并说判不出
+  ✓ crash-cases 自查（带进来的源文件）：#[path = "common/p.rs"] mod p; 里有一份不标的同名用例 ⇒ 退 2 并说没标 #[ignore]
+  ✓ crash-cases 自查（带进来的源文件）：mod 指的文件找不到 ⇒ 退 2 并说判不出
+  ✓ crash-cases 自查（带进来的源文件）：use core::include as pull; 把 include! 改名引进来 ⇒ 退 2 并说判不出
+  ✓ crash-cases 自查（带进来的源文件）：对照：include! 进来的同名用例也标了 ignore ⇒ 退 0
+  ✓ 弄坏开关 target-own-files-only 下「release 下 include! 进来一份不标的同名用例」那一格红（crash-cases 退 0）
+  ✓ 崩溃枚举用例的输入：用例里 include!(concat!("other_", "target.rs"))，改 other_target.rs 指纹变
+  ✓ 崩溃枚举用例的输入：用例里 ::core::include_str!(::core::concat!(…))（宏名带路径），改 other_target.rs 指纹变
+  ✓ 崩溃枚举用例的输入：用例里 include_str!(env!("…"))（路径在构建环境里），改 other_target.rs 指纹变
+  ✓ 崩溃枚举用例的输入：用例里 use core::include_str as grab; 再 grab!(concat!(…))（改名之后的调用认不出），改 other_target.rs 指纹变
+  ✓ 崩溃枚举用例的输入：对照：用例里 include_str!("helper_target.rs")（字面量，读的是哪一份认得出），改 other_target.rs 指纹不变
+  ✓ 崩溃枚举用例的输入：别的包的 build.rs 按目录读 ../pkg/tests，改 other_target.rs 指纹变
+  ✓ 崩溃枚举用例的输入：别的包 package.build 指的构建脚本按目录读 tests，改 other_target.rs 指纹变
+  ✓ 崩溃枚举用例的输入：对照：别的包的 build.rs 不读 tests，改 other_target.rs 指纹不变
+  ✓ 弄坏开关 concat-include-only 下「::core::include_str!(::core::concat!(…))」那一格红（改 other_target.rs 指纹不变）
+  ✓ 弄坏开关 include-alias-subtracts 下「use core::include_str as grab; 再 grab!(concat!(…))」那一格红（改 other_target.rs 指纹不变）
+  ✓ 崩溃枚举用例的输入：crates/mutations.tsv 加一行（没有代码点名它），指纹不变
+  ✓ 崩溃枚举用例的输入：lib.rs 的字符串里点名 mutations.tsv 时，crates/mutations.tsv 加一行，指纹变
+  ✓ 崩溃枚举用例的输入：src/bin/tool.rs 改了（没有代码读 CARGO_BIN_EXE_），指纹不变
+  ✓ 崩溃枚举用例的输入：用例读 CARGO_BIN_EXE_tool 时，src/bin/tool.rs 改了，指纹变
+  ✓ 崩溃枚举用例的输入：lib.rs 用 #[path = "bin/tool.rs"] 把它编进来时，src/bin/tool.rs 改了，指纹变
+  ✓ 崩溃枚举用例的输入：用例里 include_str!(concat!(…)) 拼出 ../mutations.tsv 时，crates/mutations.tsv 加一行，指纹变
+  ✓ 崩溃枚举用例的输入：用例里 use core::include_str as grab; 再 grab!(concat!(…)) 拼出 ../mutations.tsv 时，crates/mutations.tsv 加一行，指纹变
+  ✓ 崩溃枚举用例的输入：用例里 include!(concat!(…)) 拼出 src/bin/tool.rs 时，src/bin/tool.rs 改了，指纹变
+  ✓ 弄坏开关 computed-include-subtracts-non-test-files 下「include_str!(concat!(…)) 拼出 ../mutations.tsv」那一格红（指纹不变）
+  ✓ 崩溃枚举用例的输入：按宽处理与读不到的那几格改回之后，指纹回到原样
+  ✓ 弄坏开关 single-worker-threads-field 下「配的与起的线程分两格记」那一格红（只剩一格 worker_threads=）
+  ✓ crash-case-record 把配的线程数记成 configured_worker_threads=（线程数、显式设的、本机几核，由它自己现取），不记旧的 worker_threads=
+  ✓ crash-case-record 写的那一格，crash-case-marker-check 判作数并带出计数行
+  ✓ 输入变了的那一批没有自己那一格：不作数，并比出与最近写的一格不同的是哪个文件
+  ✓ 全绿标记记的指纹被改了：不作数并说出来
+  ✓ 全绿标记计数行不带 exhaustive=true：不作数并说出来
+  ✓ 全绿标记计数行抄了两遍：不作数并说出来
+  ✓ 全绿标记test result 不是 1 passed：不作数并说出来
+  ✓ 判 --full 日志：全量、32 个线程跑了 64 片 ⇒ 绿
+  ✓ 判 --full 日志：全部 64 片从进度文件读回、起 0 个线程 ⇒ 绿
+  ✓ 判 --full 日志：读回 63 片、只剩 1 片要跑、起 1 个线程 ⇒ 绿
+  ✓ 判 --full 日志：跑了 64 片却只起 1 个线程（本机 32 核、线程数没显式设） ⇒ 红
+  ✓ 判 --full 日志：跑了 64 片只起 1 个线程，线程数显式设成 1 ⇒ 绿
+  ✓ 判 --full 日志：跑了 64 片只起 1 个线程，本机只有 1 核 ⇒ 绿
+  ✓ 判 --full 日志：跑了 5 片却报起了 0 个线程 ⇒ 红
+  ✓ 判 --full 日志：读回的片 + 这一趟跑的片 ≠ 总片数 ⇒ 红
+  ✓ 判 --full 日志：LAYER0_PARALLEL_FINISHED 缺续跑片数（旧格式） ⇒ 红
+  ✓ 判 --full 日志：没有状态数对得上的 LAYER0_PARALLEL_FINISHED ⇒ 红
+  ✓ 判 --full 日志：过滤之后一条用例都没跑（0 passed） ⇒ 红
+  ✓ 判 --full 日志：没有 test result 行 ⇒ 红
+  ✓ 判 --full 日志：不是全量（exhaustive=false） ⇒ 红
+  ✓ 判 --full 日志：LAYER0 计数行抄了两遍 ⇒ 红
+  ✓ 判 --full 日志：没有 CHECKER 行 ⇒ 红
+  ✓ 弄坏开关 threads-by-worker-count 下「只剩 1 片要跑、起 1 个线程」那一格红（照旧只看 worker_threads=1）
+  ✓ 判绿时记 started_worker_threads=：登记了 threads= 的记 LAYER0_PARALLEL_FINISHED 里起了几个（24 个，不是配的 32）
+  ✓ 判绿时记 started_worker_threads=：没登记 threads= 的记「读不到」（门禁不读它起了几个）
+  ✓ 判 --full 日志：merge：两片各 16 个线程各跑 32 片 ⇒ 绿
+  ✓ 判 --full 日志：merge：第 1 片那台 32 核、线程数没显式设，跑了 32 片却只起 1 个线程 ⇒ 红
+  ✓ 判 --full 日志：merge：第 1 片只起 1 个线程，那一片的线程数显式设成 1 ⇒ 绿
+  ✓ 判 --full 日志：merge：第 1 片只起 1 个线程，那台只有 1 核 ⇒ 绿
+  ✓ 判 --full 日志：merge：第 1 片跑了 32 片却报起了 0 个线程 ⇒ 红
+  ✓ 判 --full 日志：merge：shards=3 而逐片字段只有两片 ⇒ 红
+  ✓ 弄坏开关 threads-ignore-shards 下「第 1 片只起 1 个线程跑了 32 片」那一格判绿（只看各片之和 17 个线程，分不出是哪一片只起了 1 个）
+  ✓ 崩溃枚举用例登记行：登记了 shard=across-machines ⇒ True
+  ✓ 崩溃枚举用例登记行：没登记 shard= ⇒ False
+  ✓ 崩溃枚举用例登记行：shard= 写成别的值 ⇒ error
+  ✓ 崩溃枚举用例登记行：shard= 写了两条 ⇒ error
+  ✓ 判法摘要算得出来，闭包里有判日志、读写标记、起用例的命令与 crash-case-command 那几个定义
+  ✓ 判法摘要：实验准入：admit_experiment 里加一行注释 ⇒ 摘要不变
+  ✓ 判法摘要：门禁复用：gate_reuse 的一句说明改字 ⇒ 摘要不变
+  ✓ 判法摘要：自证：run_selftest 里加一行注释 ⇒ 摘要不变
+  ✓ 判法摘要：排除规则：files_crash_cases_do_not_read 里加一行注释（它的结果变了，清单自己会变） ⇒ 摘要不变
+  ✓ 判法摘要：判法：judge_worker_threads 把「至少两片」改成「至少三片」 ⇒ 摘要变
+  ✓ 判法摘要：判法调的小函数：fields_of_line 改写法 ⇒ 摘要变
+  ✓ 判法摘要：判法用的常量：PASSED_ONE_TEST_FORM 放宽 ⇒ 摘要变
+  ✓ 判法摘要：登记行怎么读：parse_crash_case 不再要求 exhaustive= / threads= 先登记成 count-line= ⇒ 摘要变
+  ✓ 判法摘要：起用例的命令：crash_case_launch 把 --include-ignored 换成 --ignored ⇒ 摘要变
+  ✓ 判法摘要：标记里配的线程那一格：configured_worker_threads_text 改字 ⇒ 摘要变
+  ✓ 判法摘要：main：分派的写法改了 ⇒ 摘要变
+  ✓ 判法摘要：单机跑还是双机分片：command_crash_case_shardable 把「没登记 shard=」也答成登记了 ⇒ 摘要变
+  ✓ 判法摘要：分派表里 crash-case-judge 与 crash-case-record 指的函数对调（闭包里的定义一个没变） ⇒ 摘要变
+  ✓ 弄坏开关 judging-digest-without-dispatch 下「分派表两项对调」那一格红（摘要没变）
+  ✓ 弄坏开关 whole-module-in-judging-digest 下「实验准入加一行注释」那一格红（摘要变了）
+  ✓ 判法摘要换写法：元组解包赋值：PASSED_ONE_TEST_FORM 挪进 `A, B = …`，再把判绿的正则放宽成「test result: 」开头都算 ⇒ 第二步摘要变
+  ✓ 弄坏开关 digest-skips-other-statements 下「元组解包赋值：PASSED_ONE_TEST_FORM 挪进 `A, B = …`，再把判绿的正则放宽成「test result: 」开头都算」那一格红（第二步摘要不变、不拒算）
+  ✓ 判法摘要换写法：if 块里的 def：fields_of_line 挪进 `if True:` 块，再让它把 exhaustive=false 读成 true ⇒ 第二步摘要变
+  ✓ 弄坏开关 digest-skips-other-statements 下「if 块里的 def：fields_of_line 挪进 `if True:` 块，再让它把 exhaustive=false 读成 true」那一格红（第二步摘要不变、不拒算）
+  ✓ 判法摘要换写法：分派表的值不是名字：crash-case-judge 那一项写成 lambda，再改 command_crash_case_judge 让它一律判绿 ⇒ 两步都拒算
+  ✓ 弄坏开关 digest-allows-non-name-dispatch 下「分派表的值不是名字：crash-case-judge 那一项写成 lambda，再改 command_crash_case_judge 让它一律判绿」那一格红（第二步摘要不变、不拒算）
+  ✓ 判法摘要换写法：判法挪进 import 的别的模块：`from judging_helpers import fields_of_line`（再改那份模块，准入模块原文一个字不变） ⇒ 两步都拒算
+  ✓ 弄坏开关 digest-allows-imported-names 下「判法挪进 import 的别的模块：`from judging_helpers import fields_of_line`（再改那份模块，准入模块原文一个字不变）」那一格红（第二步摘要不变、不拒算）
+  ✓ 判法摘要：真准入模块自己不拒算（分派表那几项都是名字、判法闭包里没有非标准库的 import）
+  ✓ 弄坏开关 shardable-outside-judging-digest 下「crash-case-shardable 把没登记答成登记了」那一格红（摘要没变）
+  ✓ crash-case-command：登记了 threads-variable=SINGLEFS_SAMPLE_CASE_THREADS、调用方设着它等于 1 ⇒ 起的用例看到配的 32（盖掉调用方的）
+  ✓ 弄坏开关 thread-variable-ignored 下「调用方设着用例读的线程变量」那一格红（用例看到 1）
+  ✓ 标记里 configured_worker_threads= 记的是这条用例读的那个变量（SINGLEFS_SAMPLE_CASE_THREADS=…），不是 SINGLEFS_LAYER0_THREADS
+  ✓ 弄坏开关 thread-variable-ignored 下「标记记的变量」那一格红（记成 SINGLEFS_LAYER0_THREADS）
+  ✓ 崩溃枚举用例登记行：threads-variable= 写成小写 ⇒ 拒
+  ✓ 崩溃枚举用例登记行：threads-variable= 写了两条 ⇒ 拒
+  ✓ 本机核数：PATH 里的 nproc 打 1、OMP_NUM_THREADS=1 ⇒ 仍是 os.cpu_count() 与 CPU 亲和的小者（32），线程数同它、default
+  ✓ 弄坏开关 cores-from-nproc 下「nproc 打 1」那一格红（交的核数是 1）
+  ✓ crash-case-judge 自己现取线程数：没设 SINGLEFS_LAYER0_THREADS：64 片 1 个线程 ⇒ 退 1
+  ✓ crash-case-judge 自己现取线程数：调用方显式设 SINGLEFS_LAYER0_THREADS=1：64 片 1 个线程 ⇒ 退 0
+  ✓ crash-case-judge 自己现取线程数：没设 SINGLEFS_LAYER0_THREADS、转过来 --threads 1 --threads-origin explicit（54 号改前的转法） ⇒ 退 2
+  ✓ 弄坏开关 judge-takes-forwarded-threads 下「转过来 --threads 1 explicit」那一格红（照旧收、判绿退 0）
+  ✓ 54 号 --full：没有本地分片配置（临时仓里没有 layer0-shard-configuration-check.sh 判得过的配置）⇒ 打一行「双机分片：关」、逐条单机跑
+  ✓ 54 号 --full 头一趟：三条用例在 release 下逐条跑（--include-ignored --exact 各自的用例函数），各写一格标记
+  ✓ 54 号 --full 设续跑的环境变量：进度目录 <common-dir>/singlefs-layer0-progress/<这条用例的指纹>、输入指纹是这条用例的；调用方环境里的 SINGLEFS_LAYER0_START_OVER=1 在不带 --start-over 时被清掉
+  ✓ 54 号 --full 的线程数由 crash-case-command 交出：调用方没设 SINGLEFS_LAYER0_THREADS，用例看到的是本机核数 32（PATH 里的 nproc 打 1、OMP_NUM_THREADS=1 都不认）
+  ✓ 54 号 --full 写的标记里线程分两格：configured_worker_threads= 记配的（没设，取本机核数 32），started_worker_threads= 记登记了 threads= 的用例起了几个（32 个工作线程），没登记的记读不到；没有旧的 worker_threads= 那一格
+  ✓ 54 号快档：跑一遍 checker 包不标 ignored 的用例（一次 cargo test -p singlefs-checker），三条用例的标记都作数，判绿、不报本次未跑
+  ✓ 54 号 --full 第二趟：输入没变，三条全复用、一条都不跑
+  ✓ 54 号 --full：只改了 case_c 独占的测试文件，只重跑 case_c，另两条复用
+  ✓ 54 号快档：删掉 stream-b 那一格标记，快档照样绿、退 0，那一条报「本次未跑」并点名 crash-case:stream-b，出路是 --full（D13 已定项 15：全量默认不在提交时跑）
+  ✓ 54 号 --full --start-over：设 SINGLEFS_LAYER0_START_OVER=1；只剩 1 片要跑、起 1 个线程不误红，写回那一格
+  ✓ 54 号 --full 显式设 SINGLEFS_LAYER0_THREADS=7：用例看到 7，标记里 configured_worker_threads= 记「显式设的」
+  ✓ 54 号 --start-over 不带 --full：退 2，说只跟 --full 一起用
+  ✓ 54 号 --full：这批输入那一格在而不作数就重跑，重跑判红时删掉那一格（先绿后红，前一趟的不再作数）
+  ✓ 54 号 --full：stream-b 跑了 64 片却只起 1 个线程 ⇒ 这一条判红、不写标记，退 1
+  ✓ 54 号 --full：stream-b 过滤之后一条用例都没跑（0 passed） ⇒ 这一条判红、不写标记，退 1
+  ✓ 54 号 --full：stream-b cargo test 退非 0 ⇒ 这一条判红、不写标记，退 1
+  ✓ 54 号 --full：stream-a 判红之后接着跑下一条，stream-b 与 case-c 照样判绿、写标记
+  ✓ 54 号 --full：跑的过程中共用的 src/lib.rs 被改了 ⇒ 那一条判红、不写标记，出路里列出变了的文件
+  ✓ 输入清单：放进双机分片的驱动脚本与配置判法 ⇒ 登记了 shard=across-machines 的 stream-a 指纹变、没登记的 stream-b 不变
+  ✓ 弄坏开关 shard-driver-outside-manifest 下「放进驱动脚本」那一格红（stream-a 指纹没变）
+  ✓ 54 号 --full 分片开着：打一行「双机分片：开」；stream-a（登记了 shard=across-machines）交给驱动脚本 --merged-log，另两条单机跑；三条都判绿、各写一格
+  ✓ 54 号 --full 分片开着：驱动脚本退非 0 ⇒ stream-a 判红、不写标记，另两条复用
+  ✓ crash-case-command：调用方环境里设着 SINGLEFS_LAYER0_SHARD=0/2 ⇒ 起的用例看不到它
+  ✓ 弄坏开关 keep-caller-shard-switch 下「调用方设着分片开关」那一格红（用例看到 0/2）
+  ✓ 54 号快档（不带 SINGLEFS_GATE_FULL=1）：提交之后一个改动都没有，范围那一问答「没碰」，退 77
+  ✓ 54 号快档（不带 SINGLEFS_GATE_FULL=1）：只改登记表（stream-b 那一行第三列去掉 threads=LAYER0B） ⇒ 照样核标记，退 0 而报「本次未跑」并点名 crash-case:stream-b，不退 77
+  ✓ 54 号快档（不带 SINGLEFS_GATE_FULL=1）：只改 54 号（加一行注释；54 号不进指纹） ⇒ 照样核标记（不退 77），三条标记都作数，判绿、不报本次未跑
+  ✓ 54 号快档（不带 SINGLEFS_GATE_FULL=1）：只改准入模块判法之外的部分（文件尾加一行注释） ⇒ 照样核标记（不退 77），三条标记都作数，判绿、不报本次未跑
+  ✓ 54 号快档（不带 SINGLEFS_GATE_FULL=1）：只改准入模块的判法（judge_worker_threads 把「至少两片」改成「至少三片」） ⇒ 照样核标记，退 0 而报「本次未跑」并点名 crash-case:stream-a、crash-case:stream-b、crash-case:case-c，不退 77
+  ✓ 真仓的登记表 .claude/gate.d/stage-inputs.tsv 自查没有问题
+  ✓ 真仓登记的 crash-case:c561-sigma-full：两行都对 ⇒ 绿
+  ✓ 真仓登记的 crash-case:c561-sigma-full：计数行 exhaustive=false（状态数不等于闭式） ⇒ 红
+  ✓ 真仓登记的 crash-case:c561-sigma-full：本机 32 核、线程数没显式设，1 个线程跑了 64 片 ⇒ 红
+  ✓ 真仓登记的 crash-case:crash-injection-fast-tier：计数行恰好一行 ⇒ 绿
+  ✓ 真仓登记的 crash-case:crash-injection-fast-tier：计数行打了两行 ⇒ 红
+  ✓ 真仓登记的 crash-case:crash-injection-fast-tier：本机 32 核、线程数没显式设，跑完那一行报 1 个线程跑了 24 片 ⇒ 红
+  ✓ 弄坏开关 threads-skip-self-contained-finish-line 下「crash-injection 快档 1 个线程跑了 24 片」那一格红（判绿）
+  ✓ 真仓登记的 crash-case:crash-injection-fast-tier 的 threads-variable= 就是用例读的那个变量
+  ✓ admission.py 自证通过：280 格都对（含弄坏开关 skip-unchanged、skip-preconditions、skip-gate-preconditions、ignore-gate-environment、skip-build-environment、ignore-linked-directories、exclude-mentioned-test-targets、threads-by-worker-count、first-definition-only、ignore-attribute-without-space、concat-include-only、computed-include-subtracts-non-test-files、runner-program-only、whole-module-in-judging-digest、judging-digest-without-dispatch、single-worker-threads-field、threads-ignore-shards、shardable-outside-judging-digest、shard-driver-outside-manifest、keep-caller-shard-switch、target-own-files-only、include-alias-subtracts、runner-arguments-from-configuration-directory-only、digest-skips-other-statements、digest-allows-non-name-dispatch、digest-allows-imported-names、judge-takes-forwarded-threads、cores-from-nproc、thread-variable-ignored、threads-skip-self-contained-finish-line、stage-marker-ignored 下各自那一格转红，弄坏 replay.sh 比对前删产物头那一步判对不上）
+exit=0

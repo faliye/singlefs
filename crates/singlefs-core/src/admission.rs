@@ -87,7 +87,7 @@ impl BytesSummedOverAllReplicas {
         Self(
             one_copy
                 .0
-                .checked_mul(replicas.get())
+                .checked_mul(replicas.replicas())
                 .expect("一份副本的字节乘副本数装得进 u64"),
         )
     }
@@ -96,7 +96,7 @@ impl BytesSummedOverAllReplicas {
     /// 可用只会少报、不会多报（式子是按字节的实数除法，条款没写取整；用 `of_one_copy_on_every_replica` 记下的量总除得尽）。
     #[must_use]
     pub fn share_of_one_device(self, replicas: ReplicaCount) -> BytesOnOneDevice {
-        BytesOnOneDevice(self.0.div_ceil(replicas.get()))
+        BytesOnOneDevice(self.0.div_ceil(replicas.replicas()))
     }
 }
 
@@ -125,7 +125,7 @@ impl ReplicaCount {
     }
 
     #[must_use]
-    pub fn get(self) -> u64 {
+    pub fn replicas(self) -> u64 {
         self.0.get()
     }
 }
@@ -1415,7 +1415,7 @@ mod tests {
             mount_time_commitment,
             PoolWideCommitments::of_the_first_version(BytesSummedOverAllReplicas::ZERO),
         );
-        assert_eq!(reading.replicas().get(), 2, "每个单元落两块盘各一份");
+        assert_eq!(reading.replicas().replicas(), 2, "每个单元落两块盘各一份");
         let per_device_expectation = |device: u32, isolated_slots: u64| DeviceAdmissionTerms {
             device: DeviceIdentity(device),
             capacity: slots(unit_area_slots),

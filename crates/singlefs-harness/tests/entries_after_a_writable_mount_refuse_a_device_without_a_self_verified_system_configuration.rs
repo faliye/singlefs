@@ -30,9 +30,9 @@ use singlefs_core::mounted_session::{MountedSession, UserChange, UserChangeRefus
 use singlefs_core::recovery::RecoveryFailure;
 use singlefs_core::transaction::{FirstFile, PoolVersion, TransactionOutput};
 use singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES;
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice, SparseDevice};
 use singlefs_harness::fault_injection::{FaultInjectingBlockDevice, SharedFaultPlan};
 use singlefs_harness::history::HistoryDeviceWidth;
+use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice, SparseDevice};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 const DEVICE_WIDTH: HistoryDeviceWidth = HistoryDeviceWidth::FourGibibytes;

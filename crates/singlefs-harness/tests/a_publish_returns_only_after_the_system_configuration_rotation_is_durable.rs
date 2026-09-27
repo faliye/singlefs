@@ -32,8 +32,8 @@ use singlefs_core::transaction::{
     TransactionOutput,
 };
 use singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE;
-use singlefs_harness::crash::MemoryPool;
 use singlefs_harness::fault_injection::injected_block_device_error;
+use singlefs_harness::memory_pool::MemoryPool;
 use singlefs_harness::segments::{SegmentAfterOperation, SegmentClosingRule, StepKind};
 use singlefs_harness::RetainedOperation;
 

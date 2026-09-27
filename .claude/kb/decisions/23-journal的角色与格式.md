@@ -86,7 +86,7 @@ D23（journal 的角色与格式） 管 journal 是什么、写什么、崩溃�
 - E16（journal 的角色：WAL vs 意图日志）：延后祖先的臂只在 checkpoint 发根、从没在 fsync 时发过根；攒批吃不掉延后祖先的收益只在「批 ≤ 并发流数」时成立——它改的是「乙的收益形状」那条已降级依据的强度，不是结论。
 - 三方：2026-08-28 三方论证（材料 `_axis2-background.md`），正推腿给出「轴一 ⇒ 轴二」这条结构性依据，三条原依据怎么降级、腿况在变更史。
 
-**欠**：C1（意图续做做成常规路径）；反向判据的 N 没有声明，记录核对器已接在层 0 上（`crates/singlefs-harness/src/crash.rs` 的 `check_records`），事件数没人计。
+**欠**：C1（意图续做做成常规路径）；反向判据的 N 没有声明，记录核对器已接在层 0 上（`crates/singlefs-checker-tier/src/crash.rs` 的 `check_records`），事件数没人计。
 
 #### 已定项 2：journal 是定长环还是链式
 
@@ -404,6 +404,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 - 实现今天的链首不锚在所选根覆盖的最后一条（`crates/singlefs-core/src/recovery.rs` 的 `replay_journal`），欠在 C365（恢复路径的链首不锚在所选根覆盖的最后一条）。
 - ⚠️ **只读复核买的是落点持续坏那一类，代价是它自己零轮。** 固定落点探针写单独用时，落点持续坏那一类会反复白切换（攻方在副本装置上量到 24 个持续故障场景合计 46 次，那个数没在入库装置重做过、不进 kb）；只读复核能分辨它。这条改法是攻方腿自己提的，**被攻过零轮**，用户 2026-09-21 知情接受。
 - **切换重新读盘择根带出的三件**：读盘选出的根比内存里记的新时，不重发在飞 checkpoint，以读盘选出的根为准接着走；切换写的实例表行与 W 按读盘选出的根写；回退那次发布里，管理员选的 R_old 必须在「以读盘选出的根为最新根」算出的回退候选集里，不在就拒绝、盘上逐字节不变。挂载内实例切换的实现随里程碑「第二个事务」收口表第 16、40 行在后面的里程碑（C458（实例切换取内存里的根，不重新读盘））。
+- ⚠️ **零单元发布这一支不冻结**：发布末尾系统配置轮换之后那道屏障报错时，带单元 / 带记录的发布与轮换报错同一处置（冻结、原样重发）；零单元发布（`crates/singlefs-core/src/transaction.rs` 的 `publish_without_units`，末尾走 `persist_the_root_then_rotate_the_system_configuration` 那一路）这一支不冻结、整个挂载返回错误（失败经 `PublishError::BlockDevice`），下一次发布落在下一次挂载、换了实例代号；这是替条款没写的一支做的选择（判决 `research/prompts/m2-closeout-code-r2-main-verification.md` 第一节「最新根读不出、见证与屏障」那一格；`research/prompts/m2-impl-c577-barrier-implementer-report.md` 第 106–111 行「停下交主 agent 的设计问题」第 2 条），钉它的用例随代码三方第三轮那一批写。
 
 **依据**：
 

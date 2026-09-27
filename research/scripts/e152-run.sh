@@ -28,8 +28,8 @@ cargo build --release --target x86_64-unknown-linux-musl --bin e152-file-system-
   || fail "来宾二进制编不过" "cd research && cargo build --release --target x86_64-unknown-linux-musl --bin e152-file-system-benchmark"
 cargo build --release --bin e152-file-system-benchmark >/dev/null 2>&1 \
   || fail "宿主上的汇总二进制编不过" "cd research && cargo build --release --bin e152-file-system-benchmark"
-( cd "$REPOSITORY" && cargo build --release --target x86_64-unknown-linux-musl -p singlefs-harness --bin first_transaction_on_device >/dev/null 2>&1 ) \
-  || fail "singlefs 的真设备二进制编不过" "在仓根跑 cargo build --release --target x86_64-unknown-linux-musl -p singlefs-harness --bin first_transaction_on_device"
+( cd "$REPOSITORY" && cargo build --release --target x86_64-unknown-linux-musl -p singlefs-checker-tier --bin first_transaction_on_device >/dev/null 2>&1 ) \
+  || fail "singlefs 的真设备二进制编不过" "在仓根跑 cargo build --release --target x86_64-unknown-linux-musl -p singlefs-checker-tier --bin first_transaction_on_device"
 GUEST_BINARY="$RESEARCH/target/x86_64-unknown-linux-musl/release/e152-file-system-benchmark"
 HOST_BINARY="$RESEARCH/target/release/e152-file-system-benchmark"
 SINGLEFS_BINARY="$REPOSITORY/target/x86_64-unknown-linux-musl/release/first_transaction_on_device"

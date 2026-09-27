@@ -18,7 +18,7 @@ PACKAGES="${E152_PACKAGE_CACHE:-${TMPDIR:-/tmp}/singlefs-e152-packages}"
 fail() { echo "  ✗ $1" >&2; echo "    → $2" >&2; exit 1; }
 
 [[ -d "/lib/modules/$RELEASE" ]] || fail "没有 /lib/modules/$RELEASE" "内核版本要与 /lib/modules 下的目录同名：ls /lib/modules"
-[[ -x "$SINGLEFS_BINARY" ]] || fail "$SINGLEFS_BINARY 不可执行" "在仓根跑 cargo build --release --target x86_64-unknown-linux-musl -p singlefs-harness --bin first_transaction_on_device"
+[[ -x "$SINGLEFS_BINARY" ]] || fail "$SINGLEFS_BINARY 不可执行" "在仓根跑 cargo build --release --target x86_64-unknown-linux-musl -p singlefs-checker-tier --bin first_transaction_on_device"
 for tool in fio mkfs.ext4 mkfs.xfs mkfs.f2fs mkfs.btrfs sfdisk mdadm zstd dpkg-deb curl sha256sum ldd modprobe; do
   command -v "$tool" >/dev/null || fail "缺 $tool" "装上它（fio / e2fsprogs / xfsprogs / f2fs-tools / btrfs-progs / zstd / dpkg / curl / coreutils / libc-bin / kmod）"
 done

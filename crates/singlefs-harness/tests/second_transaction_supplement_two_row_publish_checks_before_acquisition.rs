@@ -28,7 +28,7 @@ use singlefs_core::transaction::{
     TransactionUnit,
 };
 use singlefs_core::unit::{build_index_node, parse_index_node};
-use singlefs_harness::crash::SparseBlockDevice;
+use singlefs_harness::memory_pool::SparseBlockDevice;
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 const DISKS: [DeviceIdentity; 2] = [DeviceIdentity(0), DeviceIdentity(1)];

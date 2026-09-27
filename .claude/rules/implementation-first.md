@@ -3,7 +3,7 @@
 **这是 singlefs 的项目本地规则**，不在共享 SOP 里——它说的是这个仓的实现住在哪、设计讨论从哪起步。
 共享规则在 `.claude/singlefs-ai-sop/rules/`。
 
-盘上格式、分配器、发布路径、恢复与 checker 都有真代码（`crates/` 下四个 crate）。
+盘上格式、分配器、发布路径、恢复与 checker 都有真代码（`crates/` 下五个 crate，三个验证用的包怎么称呼见 `.claude/rules/verification.md`「定义与名字」）。
 除了独立验证这类确有需要的场合，一般的方案和探讨都建在实现上。
 
 ## 规矩

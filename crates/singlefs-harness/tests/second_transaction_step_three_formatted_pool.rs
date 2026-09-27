@@ -50,11 +50,11 @@ use singlefs_core::transaction::{
     FirstFile, PoolVersion, PoolWriter, PublishError,
     TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees, ZeroUnitPublishPlan,
 };
-use singlefs_harness::crash::{writes_and_segments, MemoryPool};
 use singlefs_harness::fault_injection::{
     FaultCounting, FaultDeviceSelector, FaultInjectingBlockDevice, FaultOccurrence, FaultPlacement,
     FaultSchedule, InjectedFault, SharedFaultPlan,
 };
+use singlefs_harness::memory_pool::{writes_and_segments, MemoryPool};
 use singlefs_harness::SharedStream;
 
 /// 每块盘第 `ordinal` 次读系统配置槽 0（偏移 0）时注入一次读错，别的读写原样交给内层
@@ -244,12 +244,12 @@ fn formatted_pool_mount_starting_after_a_leftover_record_publishes_from_the_next
     for (_, device) in &mut devices {
         let mut sector = vec![0u8; 512];
         device
-            .inner()
+            .wrapped_device()
             .read_at(DeviceOffsetInBytes(0), &mut sector)
             .expect("读系统配置槽 0");
         sector[100] ^= 0xff;
         device
-            .inner_mut()
+            .wrapped_device_mut()
             .image
             .write(DeviceOffsetInBytes(0), &sector);
     }
@@ -1556,7 +1556,7 @@ fn devices_crashed_right_after_the_root_slot_of(
     checkpoint_txg: CheckpointTxg,
 ) -> Vec<(
     DeviceIdentity,
-    singlefs_harness::RecordingBlockDevice<singlefs_harness::crash::SparseBlockDevice>,
+    singlefs_harness::RecordingBlockDevice<singlefs_harness::memory_pool::SparseBlockDevice>,
 )> {
     let operations = formatted.retained_operations();
     let (writes, _segments) =

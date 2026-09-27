@@ -4,7 +4,7 @@
 //! 第一个文件版本释放 mkfs 那片树表与树表 0 条那一版的分配记录树节点时，照映射那一路逐盘核（不只看第一块盘）；
 //! 一次发布切出来的 journal 记录多于在飞上限在任何写之前拒（第 26 条）；txg、实例代号加一越过顶在任何写之前报错、不 panic（第 36 条）；
 //! 可写挂载写行与暖机之后推抬 F、抬 F 报错时交回已落盘那几次的写账（实审 A1b Q5）；管理员回退照可写挂载同一套核调用方的参数与盘表。
-//! 盘都是内存稀疏盘（`singlefs_harness::crash::SparseBlockDevice`）。
+//! 盘都是内存稀疏盘（`singlefs_harness::memory_pool::SparseBlockDevice`）。
 
 mod common_admission;
 
@@ -45,12 +45,12 @@ use singlefs_format::{
     CLUSTER_SEGMENT_SLOTS, JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_SAFETY_FACTOR,
     SLOT_BYTES, SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE, UNIT_AREA_START_SLOT,
 };
-use singlefs_harness::crash::{SparseBlockDevice, SparseDevice};
 use singlefs_harness::fault_injection::{
     FaultCounting, FaultDeviceSelector, FaultInjectingBlockDevice, FaultOccurrence, FaultPlacement,
     FaultSchedule, InjectedFault, SharedFaultPlan,
 };
 use singlefs_harness::history::HistoryDeviceWidth;
+use singlefs_harness::memory_pool::{SparseBlockDevice, SparseDevice};
 
 const DEVICE_BYTES: u64 = 4 << 30;
 const FILESYSTEM_IDENTIFIER: [u8; 16] = *b"singlefs-rev-a2c";

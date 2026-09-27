@@ -1,4 +1,4 @@
 exit=1
 want=kb/experiments/ 里却没有正文
-want=E161  crates/singlefs-harness/src/bin/e161_sample.rs
+want=E161  crates/singlefs-checker-tier/src/bin/e161_sample.rs
 want=E162  research/data/e162-sample.tsv

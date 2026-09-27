@@ -1,4 +1,4 @@
 # 实验脚本与实验二进制的源文件放在哪（.claude/singlefs-ai-sop/rules/preflight-discipline.md）：一行一个目录，只算它自己那一层
 research/scripts  # 研究脚本：实验的驱动脚本、三方论证与回扫的工具、门禁阶段调的检查脚本
 research/e7-index-bench/src/bin  # 实验二进制（E<号>_ 开头的计数模型与装置）
-crates/singlefs-harness/src/bin  # 住在 crates/ 里的实验二进制（e142、e156、e158）与真设备装置
+crates/singlefs-checker-tier/src/bin  # 住在 crates/ 里的实验二进制（e142、e156、e158）与真设备装置

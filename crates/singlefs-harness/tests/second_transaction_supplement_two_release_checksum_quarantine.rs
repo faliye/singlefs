@@ -958,7 +958,10 @@ fn two_mapping_locations_on_the_same_device_are_refused_as_a_damaged_mapping_ent
 }
 
 /// 池级 checker 对一条不变量的判定。
-fn verdict_of(image: &singlefs_harness::crash::MemoryPool, invariant: &str) -> InvariantVerdict {
+fn verdict_of(
+    image: &singlefs_harness::memory_pool::MemoryPool,
+    invariant: &str,
+) -> InvariantVerdict {
     check_pool_image(image)
         .into_iter()
         .find(|(judged, _)| *judged == invariant)

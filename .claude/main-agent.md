@@ -7,17 +7,17 @@
 主 agent 只调度和判断：和用户说话、写三方正文与判决、定案、git 暂存与提交、收尾报进度留在主 agent，其余按下面那张表派；一批实现员交回后的合入与验证派一个 `implementation-writer` 做「合入后验证」（派发表那一行）；探索性的 `crates/` 改动、定案后主 agent 自己写得清的小处 kb 改动可以自己写（派发表「改 `crates/`：探索性的」与「一个阶段任务结束」两行），自己写的 `crates/` 改动并进同一批的代码轮三方。定义在 `.claude/agents/`，每个定义的「输入」一节是派发时必须给的东西，缺一样它不开工；共用约束在 `.claude/agent-common.md`。一次性的活照旧临时写提示派 general-purpose。
 
 ## 禁止
-- **崩溃点测试准确率和正确率优先，其次再衡量时间成本**：要加崩溃点、要多枚举一档，就加。挂钟长不是收窄它的理由，优先保证正确率和准确率。
+- **崩溃点测试准确率和正确率优先，其次再衡量时间成本**：要加崩溃点、要多枚举一档，就加。挂钟长不是收窄它的理由，优先保证正确率和准确率。这一条管枚举域，不管跑的时机：什么时候跑按 `.claude/rules/verification.md`，checker 档默认只在提交时跑快档，全量由用户要求或夜间。
 - **禁止自行扩大任务范围，只改自己的部分**。一个任务（派出去的一件活）一个出口，达成出口即终止任务，扩大任务必须弹窗；一件活可以关多条问题（「一轮怎么开、怎么收」第 4 条的一簇），每条各有验收标准，出口是全部达成。禁止因为产物变化无限继续任务。尤其是门禁检测等任务，不属于自己任务的验证，如果验证为红给其他任务发消息，严禁自行修改扩大任务范围。
 - **测试结果与预期不符，禁止立刻直接修改方向和结论，先检查代码中有没有bug。**
 
-- **禁止在subagent中跑重型测试**（例外只有 `crash-verifier` 与 `gate-triage` 各跑自己那一部分、命令带 `SINGLEFS_HEAVY_TESTS` 前缀），完整清单以 `.claude/rules/implementation-workflow.md`「重型测试只在提交时跑」那一节开头的清单为准。
+- **禁止在subagent中跑重型测试**（例外只有 `crash-verifier` 与 `gate-triage` 各跑自己那一部分、命令带 `SINGLEFS_HEAVY_TESTS` 前缀），完整清单以 `.claude/rules/implementation-workflow.md`「checker 档只在提交时跑，harness 随时跑」那一节为准。
 
 ## 一轮怎么开、怎么收
 
 1. **开工前写死这一轮的课题与出口**：要关哪几项、做到什么算完（形态照实验的岔路单）。把这一轮的任务列全，逐个标它依赖谁、输入齐没齐：没有依赖、输入齐的同类任务各成一批、在同一条消息里同时派——调查各派各的调查员，实验各派各的执行员（分开实验），改 `crates/` 的按第 4 条聚簇（统一实现），写回 kb 的照第 10 条一批一份规格；类别按 agent 定义分（调查、调研、改 `crates/`、改门禁与定义与脚本、写回 kb、跑实验、回扫、分诊、三方腿各是一类），改 `crates/` 与改门禁不合给一个 agent（写范围不同）。同时派受派发闸 ⑦ 的 opus 并发上限约束，超出的排下一波。有依赖的只串依赖那一环；散的活不排成一串，合成大块。课题、出口与这张依赖表写进这一轮的调度记录（`records/`），第 7、8 条回头对着它判。派之前按这张表问一遍「哪几件能现在一起做」，答不出就还没规划完。
 2. **冒出新点先判阻塞**：只问一句——**这个决策能不能留到下次开？它挡不挡着本轮的课题？** 挡着就现在定（判断与定案现在做，改动并进第 4 条最近的一批）；不挡就记进该记的地方（里程碑收口表、`.claude/kb/checks-owed.md`、决策正文），往后延。判据不是花了多少 token、跑了多久。
-3. **重型测试**（哪几样以 `.claude/rules/implementation-workflow.md`「重型测试只在提交时跑」那一节开头的清单为准）提交之外任务确实要跑，先弹窗问用户，同意了才跑。
+3. **重型测试**（哪几样以 `.claude/rules/implementation-workflow.md`「checker 档只在提交时跑，harness 随时跑」那一节为准）提交之外任务确实要跑，先弹窗问用户，同意了才跑。
 4. **派实现员之前先聚簇，不为一条发现单派**：把这一轮已抓到、条款已定、要改 `crates/` 的改动全部列出来，按要动的 `crates/` 文件聚簇——文件有交集的并进同一个实现员一次改完（派发提示逐条列问题与各自的验收标准，一个实现员可以关多条，出口是全部达成），互不相交的在同一条消息里同时派、各自的「不碰」清单写上兄弟实现员的文件；同时派几个时一律交补丁（各在副本里改，交 `crates.patch` 与 `mutations-append.tsv` 等，主 agent 用 `research/scripts/apply-writer-patch.py` 打），`crates/mutations.tsv` 只追加、不算撞文件；份数不设上限。批内冒出的新发现进下一批清单，凑批再派；照第 2 条判为挡着本轮课题的，也并进下一批，不单派；与在跑的实现员撞文件的等它交回、进下一批，不给在跑的追加文件。下一批在上一批合入、取过代码轮快照之后就派，要改快照里文件的等那一轮判决（派发闸 ⑥）。
 5. **弹窗问用户之前，问句里每一句事实写出处**（产物的整行、命令与输出、文件:行号）；推出来、没量过的，句子里写明「推的，没量过」。
 6. **派一个 agent 之前说清它关的是哪几条已经抓到的问题**（可以不止一条，逐条列）；说不出来的，那条该进记录、不该进本轮。调查、调研类的派发点名的是要回答的问题，不是已抓到的问题。
@@ -55,12 +55,12 @@
 | 什么时候 | 派谁、按什么次序 |
 |---|---|
 | 要推论：设计判断、取舍，拿依据（包括实验结论）去推翻或确立决策，实现改动的对抗 | 主 agent 写 `research/prompts/_<轮>-body.md` → `three-way-materials` → 同一条消息并行派 `three-way-forward` 或 `three-way-defense`（一轮一条；第一轮派正推，辩方只在有前一轮判决可复核时派）、`three-way-attack`、`three-way-local-attack` 或 `three-way-local-defense`（一轮一条）→ 全部交齐后，照 `.claude/rules/three-way-inference.md`「核查员按轮派」派 `three-way-verifier`（有腿交了模型、产物或复跑命令就派，输入里给派腿时主 agent 记下的 `date -u`，代码轮另给开工快照；不派的在判决里写明为什么）→ 主 agent 写判决；本地腿派攻方还是辩方由主 agent 定，在正文分工表里写明理由；云端腿报「没打中」而要拿它支撑结论时，主 agent 用同一份提示再派一条同立场腿；三轮之后停 |
-| 改 `crates/`：条款已定、验收标准写得清、改动有界（照已定分项实现、补测试与变异、修原因已知的红） | `implementation-writer`（后台派，按「一轮怎么开、怎么收」第 4 条聚簇，一件可关多条、每条各自的验收标准，主 agent 审 diff）→ 一批交回到齐派「合入后验证」（下面那一行）→ 上一行的三方（代码轮，第 10 条：一批一轮）→ 提交时照「暂存之后、提交之前跑门禁」那一行：派 `crash-verifier` 跑层 0 全量、QEMU、herd7、crates 变异表（命令带 `SINGLEFS_HEAVY_TESTS=commit`，见「暂存之后、提交之前跑门禁」那一行；平时不跑） |
+| 改 `crates/`：条款已定、验收标准写得清、改动有界（照已定分项实现、补测试与变异、修原因已知的红） | `implementation-writer`（后台派，按「一轮怎么开、怎么收」第 4 条聚簇，一件可关多条、每条各自的验收标准，主 agent 审 diff）→ 一批交回到齐派「合入后验证」（下面那一行）→ 上一行的三方（代码轮，第 10 条：一批一轮）→ 提交时照「暂存之后、提交之前跑门禁」那一行：派 `crash-verifier` 跑 checker 档：54 号快档、QEMU、herd7、crates 变异表（命令带 `SINGLEFS_HEAVY_TESTS=commit`，见「暂存之后、提交之前跑门禁」那一行；层 0 全量只在用户要求或夜间跑，平时不跑） |
 | 一批实现员交回到齐、合入之前 | `implementation-writer` 做「合入后验证」（输入给这一批的补丁目录与各份报告；照「一轮怎么开、怎么收」第 10 条：打全部补丁、编一次、非层 0 测试二进制逐个 `--test` 跑一遍、红的照报告改钉值、只证合入时改过的变异行）→ 主 agent 审 diff、合入 → 上面那一行的三方 |
-| 改 `crates/`：探索性的、条款没写全、要用户边看边拍板 | 主 agent 自己写、直接和用户对话 → 并进同一批的「合入后验证」与三方（代码轮）→ 提交时照「暂存之后、提交之前跑门禁」那一行：`crash-verifier` 跑层 0 全量、QEMU、herd7、crates 变异表 |
+| 改 `crates/`：探索性的、条款没写全、要用户边看边拍板 | 主 agent 自己写、直接和用户对话 → 并进同一批的「合入后验证」与三方（代码轮）→ 提交时照「暂存之后、提交之前跑门禁」那一行：`crash-verifier` 跑 checker 档（54 号快档、QEMU、herd7、crates 变异表） |
 | 跑变异表、看抓到 / 无效 / 没红 | `mutation-triage` → 要补取样点、补断言的：`crates/` 那侧并进「一轮怎么开、怎么收」第 4 条的下一批交 `implementation-writer`（输入给分诊报告），`research/` 那侧主 agent 先写问题单 → `experiment-designer` 写重跑登记 → `experiment-runner`（续派带「这一段回答的岔路：…」与「上一段岔路表里还差：…」两句，派发闸 ⑪） |
 | 一批阶段任务结束（里程碑一步、一轮判决、一段实验、一批定义或脚本改完，同时结束的几件算一批、一批做一次），这一批交回到齐、暂存之前 | `sweep` 写事实表（阶段同步第一段；输入给改动范围与做成的事，只用过、没留改动的也写；交回的事实表过了 `research/scripts/stale-candidates.py --check-facts`）→ 候选表按组切段，每段约 200 行（参考值：一组超过就整组一段、不拆组），一段派一个 `sweep` 逐行判（第二段；输入同样给做成的事）→ 交回齐了主 agent 跑 `stale-candidates.py --check-report 候选表 各份报告`，退出码 0 才往下，再**逐行全看**：每一条判定都对着载体今天的原文核一遍，不抽样、不按判定种类挑。判错的那一段重派，重派交回照样全看 → 主 agent 逐处判，自己改或交 `kb-scribe` → 主 agent 写 `research/prompts/<阶段>-sync.md`（格式见门禁 68 号文件头，68 号判形式）→ 下一行 |
-| 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → 派 `crash-verifier` 跑它那几道，命令带 `SINGLEFS_HEAVY_TESTS=commit`：这一批改了门禁 54 号在 `.claude/gate.d/stage-inputs.tsv` 登记的输入，就在 HEAD + 暂存区的 worktree 里跑那棵树里的 `SINGLEFS_HEAVY_TESTS=commit bash .claude/gate.d/54-layer0-replay.sh --full <它的根>`（整条经内存包装，照 `crash-verifier` 定义第 1b 步；层 0 全量只在这一步跑，判绿按输入哈希写全绿标记，整轮门禁的 54 号只核标记），55、57、59 同样带前缀、同样按各自输入的哈希只跑变了的、判绿写全绿标记（55、57 与 54 号并行，59 号与 54 号串行，内存上限照派发提示各给）→ `gate-triage` 带 `SINGLEFS_HEAVY_TESTS=commit` 跑 `research/scripts/gate-staged.sh`（它跑 `gate.sh --staged`，整轮全绿才前移 `refs/sop/staged-green`）并分诊（54、55、57、59 在 `gate.sh` 里只核标记与复用判定，它不直接调）；用户要求时两处都换成 `=user-request` |
+| 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → 派 `crash-verifier` 跑它那几道，命令带 `SINGLEFS_HEAVY_TESTS=commit`：54 号跑快档（`cargo test --release -p singlefs-checker-tier --lib --tests`，再逐条核崩溃枚举用例的全绿标记，不作数的报「本次未跑」不判红）；`--full` 不默认跑，用户要求或夜间才在 HEAD + 暂存区的 worktree 里跑那棵树里的 `SINGLEFS_HEAVY_TESTS=user-request bash .claude/gate.d/54-layer0-replay.sh --full <它的根>`（整条经内存包装，照 `crash-verifier` 定义第 1b 步；判绿按输入哈希写全绿标记），55、57、59 同样带前缀、同样按各自输入的哈希只跑变了的、判绿写全绿标记（55、57 与 54 号并行，59 号与 54 号串行，内存上限照派发提示各给）→ `gate-triage` 带 `SINGLEFS_HEAVY_TESTS=commit` 跑 `research/scripts/gate-staged.sh`（它跑 `gate.sh --staged`，整轮全绿才前移 `refs/sop/staged-green`）并分诊（54、55、57、59 在 `gate.sh` 里只核标记与复用判定，它不直接调）；用户要求时两处都换成 `=user-request` |
 | 撤回一个数、改格式常量、新立一条判据 | `sweep` |
 | 定案之后写回 kb | `kb-spec-drafter` 起草规格（条目少、主 agent 自己写得清的可以自己写）→ 主 agent 判 → `kb-scribe`（按「一轮怎么开、怎么收」第 10 条一批定案一份规格，按 kb 文件不相交切给几个书记员同时写）；规格动了某条分项的「**依据**」段时，同一份规格要带上那个实验页 `### 影响的决策` 表里对应那几行（门禁 75 号那条双向检查两侧要同时到位，而判一个实验撑不撑一条分项是主 agent 的活）；它翻了分项状态、33 号红（变异表锚点腐化）→ `research/mutations/` 的锚点 `experiment-runner` 只修锚点，`crates/mutations.tsv` 的锚点与 `relabel-item.py` 列出的 `crates/` 下的 `.rs` 并进第 4 条下一批交 `implementation-writer`，书记员不改 `crates/` |
 | 改门禁、钩子、研究脚本、看门狗，或照判决改定义与共用约束 | `tooling-writer`（按文件聚簇，一件可关多条，照 `.claude/agents/tooling-writer.md`「输入」给）→ 改了定义与共用约束的走一轮三方或由用户逐份豁免（门禁 72 号） |

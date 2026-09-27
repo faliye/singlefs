@@ -37,12 +37,12 @@ use singlefs_core::transaction::{
     publish_overwrite, FirstFile, PoolWriter, PublishError, TransactionOutput, TransactionUnit,
 };
 use singlefs_format::SLOT_BYTES;
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::history::{
     execute_history_with, ContentChoice, ContentLength, GeneratedHistory, HistoryDeviceWidth,
     HistoryEnding, HistoryExecution, HistoryOperation, HistorySeed, HistoryStartingPoint,
     PerStepChecker, StepOutcome,
 };
+use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 use std::collections::BTreeSet;
 
@@ -457,7 +457,7 @@ fn image_of_the_devices(
     MemoryPool {
         devices: devices
             .iter()
-            .map(|(identity, device)| (*identity, device.inner().image.clone()))
+            .map(|(identity, device)| (*identity, device.wrapped_device().image.clone()))
             .collect(),
         device_size_in_bytes,
     }

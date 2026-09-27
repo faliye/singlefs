@@ -24,8 +24,8 @@ use singlefs_format::{
     ROOT_RING_PRIME_STEP, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
 };
 
-use crate::crash::MemoryPool;
 use crate::hexadecimal::hexadecimal_text;
+use crate::memory_pool::MemoryPool;
 use crate::sha256::sha256_hexadecimal;
 use crate::{RecordedOperation, RecordedOperationKind};
 

@@ -33,7 +33,7 @@ use singlefs_core::transaction::{
 };
 use singlefs_core::unit::{data_unit_payload_capacity, unit_filesystem_identifier};
 use singlefs_format::{JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES};
-use singlefs_harness::crash::MemoryPool;
+use singlefs_harness::memory_pool::MemoryPool;
 use singlefs_harness::{RecordedOperationKind, SharedStream};
 
 const DEVICES: [DeviceIdentity; 2] = [DeviceIdentity(0), DeviceIdentity(1)];

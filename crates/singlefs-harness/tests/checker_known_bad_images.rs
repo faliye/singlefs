@@ -34,7 +34,7 @@ use singlefs_core::transaction::{
     ZeroUnitPublishPlan,
 };
 use singlefs_format::{ALLOCATION_RECORD_TREE_LEAF_SLOTS, NODE_BYTES, TREE_IDENTIFIER_EXTENT};
-use singlefs_harness::crash::MemoryPool;
+use singlefs_harness::memory_pool::MemoryPool;
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::{RetainedOperation, SharedStream};
 
@@ -3964,7 +3964,7 @@ struct ImageAfterAVersionAppliedOnlyByItsJournalRecord {
     image: MemoryPool,
     devices: Vec<(
         DeviceIdentity,
-        singlefs_harness::RecordingBlockDevice<singlefs_harness::crash::SparseBlockDevice>,
+        singlefs_harness::RecordingBlockDevice<singlefs_harness::memory_pool::SparseBlockDevice>,
     )>,
     allocator: singlefs_core::allocator::PoolAllocator,
     newest: singlefs_core::transaction::TransactionOutput,
@@ -5046,7 +5046,7 @@ fn image_after_rewriting_a_two_page_instance_table_chain() -> (
 ) {
     type Devices = Vec<(
         DeviceIdentity,
-        singlefs_harness::RecordingBlockDevice<singlefs_harness::crash::SparseBlockDevice>,
+        singlefs_harness::RecordingBlockDevice<singlefs_harness::memory_pool::SparseBlockDevice>,
     )>;
     let stream = SharedStream::new();
     let mut devices: Devices = [DeviceIdentity(0), DeviceIdentity(1)]
@@ -5056,7 +5056,7 @@ fn image_after_rewriting_a_two_page_instance_table_chain() -> (
                 *identity,
                 singlefs_harness::RecordingBlockDevice::with_shared_stream(
                     *identity,
-                    singlefs_harness::crash::SparseBlockDevice::new(
+                    singlefs_harness::memory_pool::SparseBlockDevice::new(
                         common::IMAGE_BYTES,
                         singlefs_core::block_device::PhysicalBlockSizeInBytes(512),
                     ),

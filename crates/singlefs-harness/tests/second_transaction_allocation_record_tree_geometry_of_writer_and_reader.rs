@@ -24,7 +24,7 @@ use singlefs_core::transaction::{
     TransactionOutput,
 };
 use singlefs_format::{ALLOCATION_RECORD_TREE_LEAF_SLOTS, SLOT_BYTES};
-use singlefs_harness::crash::SparseBlockDevice;
+use singlefs_harness::memory_pool::SparseBlockDevice;
 use singlefs_harness::scenario::e142_parameters;
 
 /// 每块盘 84 片叶那么多个整槽：两盘各 84 格、168 ≤ 169，根在第 1 层的最后一档。

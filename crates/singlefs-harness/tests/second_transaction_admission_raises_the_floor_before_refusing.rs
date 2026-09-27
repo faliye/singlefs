@@ -36,17 +36,17 @@ use singlefs_core::root_ring::{slot_offset, RootRingSlot};
 use singlefs_core::transaction::{PoolVersion, PublishError};
 use singlefs_core::unit::data_unit_payload_capacity;
 use singlefs_format::CLUSTER_SEGMENT_SLOTS;
-use singlefs_harness::crash::{SparseBlockDevice, SparseDevice};
-use singlefs_harness::crash_injection::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::fault_injection::{
     FaultCounting, FaultDeviceSelector, FaultInjectingBlockDevice, FaultOccurrence, FaultPlacement,
     FaultSchedule, InjectedFault, SharedFaultPlan,
 };
+use singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::history::{
     execute_history_with_faults, generate_history_with_weights, GenerationWeights,
     HistoryDeviceWidth, HistoryEnding, HistoryExecution, HistoryOperation, HistorySeed,
     StepOutcome, StepPosition,
 };
+use singlefs_harness::memory_pool::{SparseBlockDevice, SparseDevice};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 /// 这次挂载里推过抬 F 的那一次覆盖写：第几次、推之前每块盘段外成对的空槽最少几对、推它的那几次被拒是哪一种。

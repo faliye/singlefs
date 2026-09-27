@@ -37,7 +37,7 @@ use singlefs_core::root_ring::{slot_offset, target_for_publish};
 use singlefs_core::transaction::{PublishError, TransactionUnit};
 use singlefs_core::unit::{build_packed_unit, parse_packed_unit};
 use singlefs_format::{DATA_UNIT_BYTES, INSTANCE_ROW_BYTES};
-use singlefs_harness::crash::SparseBlockDevice;
+use singlefs_harness::memory_pool::SparseBlockDevice;
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 const DISKS: [DeviceIdentity; 2] = [DeviceIdentity(0), DeviceIdentity(1)];
@@ -92,7 +92,7 @@ fn read_unit(devices: &Devices, slot: SlotNumber) -> Vec<u8> {
 fn write_unit(devices: &mut Devices, slot: SlotNumber, unit: &[u8]) {
     for (_, device) in devices.iter_mut() {
         device
-            .inner_mut()
+            .wrapped_device_mut()
             .image
             .write(slot.to_device_offset(), unit);
     }
@@ -230,7 +230,7 @@ fn write_two_page_chain(
             .find(|(identity, _)| *identity == device)
             .expect("区域的盘在池里")
             .1
-            .inner_mut()
+            .wrapped_device_mut()
             .image
             .write(offset, &rewritten.to_slot(root_slot_bytes));
         rewritten_roots += 1;

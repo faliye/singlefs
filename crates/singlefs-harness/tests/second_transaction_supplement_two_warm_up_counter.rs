@@ -25,7 +25,7 @@ use singlefs_core::system_configuration::SystemConfiguration;
 use singlefs_core::transaction::{acquire_instance, warm_up_after_journal_counter, PoolWriter};
 use singlefs_core::unit::unit_filesystem_identifier;
 use singlefs_format::{JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES};
-use singlefs_harness::crash::SparseBlockDevice;
+use singlefs_harness::memory_pool::SparseBlockDevice;
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::RetainedOperation;
 

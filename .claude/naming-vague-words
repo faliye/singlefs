@@ -1,0 +1,48 @@
+# 门禁 13 号（.claude/gate.d/13-vague-names.sh）的空泛词表：一个函数名或类型名的每一个词都在这张表里，这个名字就什么都没说，判违规。
+# 一行一个词，# 后面写为什么空泛。只收「放进任何领域都成立」的词；带领域含义的词（state、count、segment、publish……）不收。
+# 判据是 .claude/singlefs-ai-sop/rules/code-discipline.md「名字：光看名字，就说得出它是什么、做什么」：run_cell 说不出跑的是什么、格是什么。
+run  # 没说跑的是什么
+do  # 没说做的是什么
+perform  # 同 do
+handle  # 没说处理什么、怎么处理
+process  # 同 handle
+exec  # 同 run
+execute  # 同 run
+go  # 同 run
+work  # 没说是哪件活
+task  # 同 work
+cell  # 没说是哪一格、按什么切的格
+cells  # 同 cell
+case  # 没说是哪一种情形
+cases  # 同 case
+helper  # 没说帮什么
+helpers  # 同 helper
+util  # 没说是什么工具
+utils  # 同 util
+misc  # 没说是什么
+stuff  # 没说是什么
+thing  # 没说是什么
+things  # 同 thing
+item  # 没说是哪一项
+items  # 同 item
+data  # 没说是什么数据
+info  # 没说是什么信息
+value  # 没说是哪个量
+values  # 同 value
+result  # 没说是什么的结果
+results  # 同 result
+tmp  # 没说是什么
+temp  # 同 tmp
+inner  # 没说里面是什么
+base  # 没说是哪一个基
+one  # 没说是哪一个
+all  # 没说是哪一批
+it  # 没说指什么
+check  # 没说查什么、判据是什么
+compute  # 没说算的是哪个量
+calc  # 同 compute
+update  # 没说改的是什么
+get  # 没说取的是什么（trait 规定的方法名不判）
+set  # 没说设的是什么（trait 规定的方法名不判）
+make  # 没说造的是什么
+build  # 没说建的是什么

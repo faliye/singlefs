@@ -7,7 +7,7 @@ heavy-test-guard.sh（执行前拒绝）与看门狗（research/scripts/agent-wa
 入口：
   classify(words, directory, environment=None) -> HeavyTest | None
       一条已经剥掉前缀与包装的命令：words[0] 是命令词（照写的样子，没取 basename），其后是参数；directory 是它的当前目录，认不出时 None；
-      environment 是这条命令看得到的、命令文本里设过的变量（lib_shell_words 的 CommandAtPosition.environment），认 runner 与别名要用。
+      environment 是这条命令看得到的、命令文本里设过的变量（lib_shell_words 的 CommandAtPosition.environment），认别名要用。
   command_under_launcher(words) -> (list[str], str | None) | None
       words[0] 是 LAUNCHER_OPTIONS_WITH_VALUE 里的程序（/usr/bin/time、flock、rustup run、chrt、prlimit、systemd-run、strace、perf）时，
       剥掉它交回它起的那条命令与那条命令的当前目录（None 是不变）；调用方把交回的命令再交给 lib_shell_words 切一遍、逐条判。
@@ -15,8 +15,8 @@ heavy-test-guard.sh（执行前拒绝）与看门狗（research/scripts/agent-wa
       长选项查要值与不要值两张表（照各自的 --help 列全），值另起一个词的（`--expand-environment no`、`--output <文件>`）跳过那个值，
       只写前缀的（getopt_long 认唯一的前缀，`--outp`）按前缀认；
       systemd-run 的 `-E NAME=VALUE` / `--setenv=NAME=VALUE`、`-p Environment=…` / `--property=Environment=…`（`EnvironmentFile=<文件>` 按内容读，
-      读不了按设了 runner 算）、strace 的 `-E NAME=VALUE` / `--env=NAME=VALUE` 设的变量写在交回那条命令的最前面
-      （再切一遍时当它的环境变量，认 runner 要用；strace 的 `-E NAME` 只清变量，不带）。
+      读不了当它没设）、strace 的 `-E NAME=VALUE` / `--env=NAME=VALUE` 设的变量写在交回那条命令的最前面
+      （再切一遍时当它的环境变量，认别名要用；strace 的 `-E NAME` 只清变量，不带）。
       这张表不进 lib_shell_words 的前缀表：bash-command-detector.sh 要按命令词认出 systemd-run，判它等不等结束。
   classify_process(argv, cwd) -> list[HeavyTest]
       一个在跑的进程：argv 是 /proc/<pid>/cmdline 按 NUL 切开的那一串，cwd 是 /proc/<pid>/cwd 指向的目录。
@@ -32,36 +32,25 @@ heavy-test-guard.sh（执行前拒绝）与看门狗（research/scripts/agent-wa
   python3 lib_heavy_tests.py --selftest
 
 认的输入：cargo 命令行（test / t、run / r，以及起测试的 nextest run、miri、llvm-cov、hack、mutants）、按名字认的脚本与门禁阶段、
-qemu-system-*、herd7，以及直接执行的测试二进制 `<target 目录>/[<目标三元组>/]<profile>/deps/<名字>-<16 位十六进制哈希>`：按 <名字> 判，
-名字含 layer0 的算层 0。libtest 参数里 --list 当选项出现的（只列用例、一条都不跑）不算重型；跟在带一个值的 libtest 选项（--skip、--logfile、
+qemu-system-*、herd7，以及直接执行的测试二进制 `<target 目录>/[<目标三元组>/]<profile>/deps/<名字>-<16 位十六进制哈希>`。
+**checker 档按包判，是唯一的判法**（D13（验证路线） 已定项 15，.claude/rules/verification.md「定义与名字」）：cargo 起测试、范围里有
+checker 档包 singlefs-checker-tier（-p 点名它，-p 的值认光名字、name@version、pkgid URL 与通配；不挑包而范围含它；当前目录在它里面裸跑），
+不管挑哪个目标（--lib、--doc、--bin、--test、--tests 都算：整个包都是 checker 档，库单测与装置二进制的内联单测也在内），算重型；
+直接执行它的测试二进制（名字是它 tests/ 下的测试目标、src/bin/ 下的装置、或库本身 singlefs_checker_tier）也算。
+harness 档（singlefs-harness）、core、format、池级 checker（singlefs-checker）的测试随时跑，不算重型；工作区全量（--workspace / --all、
+工作区根裸跑、范围是全部成员）算「全量测试」。
+别名：--config 里 alias.<名> 或环境变量 CARGO_ALIAS_<名> 定的、子命令就是它的，看得到值就展开再判；值读不出（TOML 写坏了）按 checker 档算。
+libtest 参数里 --list 当选项出现的（只列用例、一条都不跑）不算重型；跟在带一个值的 libtest 选项（--skip、--logfile、
 --test-threads、--format、--color、-Z、--shuffle-seed：LIBTEST_OPTIONS_WITH_VALUE）后面的 --list 是那个选项的值，照样全跑，不算只列；
 libtest 在 `--` 处停止认选项，`--` 之后的 --list 是过滤词，照样全跑，不算只列。
-崩溃枚举用例（门禁 54 号逐条跑的那几条，登记在 .claude/gate.d/stage-inputs.tsv 键是 crash-case: 的行，第三列 test=<包>:<测试目标>:<用例函数>）：
-跑到它们的测试目标（cargo test 点名它、通配命中它、或不挑目标而包里有它；直接执行它的测试二进制）而下面任一条成立的算重型：
-  libtest 参数带 --ignored 或 --include-ignored（nextest 是 --run-ignored 的值不是 default）；
-  可能带上它而看不见：cargo 全局选项 --config（写在子命令之前、或子命令之后 `--` 之前都算）里定了别名（alias.<名>，且子命令就是那个别名）或 runner（按正则认 .runner =，
-  另把值按 TOML 读，定了 target.<任何>.runner 也算：带引号的键 "runner" 这一类），
-  命令看得到的环境变量里有 CARGO_TARGET_*_RUNNER（systemd-run -E / --setenv / -p Environment= / -p EnvironmentFile=、strace -E / --env 设给里面那条命令的也算），
-  或 CARGO_ALIAS_<名> 定的别名就是子命令；
-  登记的用例函数有一处定义没标 #[ignore]，或判不出标没标（找不到那个目标、那个函数，宏生成的用例，读不了源码，导入不了 admission.py，
-  导入得了而判的那一刻抛异常：都按没标算）。
-  读那个包里测试目标的源码，判法与 research/scripts/admission.py 的 crash-cases 自查同一份：本模块按文件路径导入它，同名的每一处 fn <名>( 都判。
-另有一条按参数认：任何命令（按文本处理参数的 grep、git、sed 这一类除外）参数里有 --ignored 或 --include-ignored、又有登记的用例函数名，
-按跑崩溃枚举用例算（拷走改名的测试二进制、find -exec 起的这类，名字认不出，靠点名的用例函数认）。
-登记表取两份的并：从命令的当前目录（有 --manifest-path 时取它所在的目录）往上找到的第一份，与这份文件所在仓的那一份。
-接受的误拒：`--include-ignored --exact <同一目标里的快用例>` 照拒（过滤之后剩下哪几条，执行前判不出）；别名展开之后不是 test 的照拒；
-同一目标里别的模块有与登记的用例函数同名、合法不标 #[ignore] 的快用例时照拒；admission.py 导入不了、或判的时候抛异常时，点名登记目标的 cargo test 一律拒；
-`-- --ignored -- --list`（第二个 `--` 之后只剩过滤词 --list，一条都不跑）照拒。
-看不见的：.cargo/config.toml 与 `--config <文件>` 里定的别名与 runner；拷走改名、又不点名用例函数的测试二进制；
-cargo mutants -d 指到别处的树。别名与 runner 那两种由看门狗（research/scripts/agent-watch.py）在进程这一层兜：cargo 最后照样以原名
-带 --ignored 起那个测试二进制（推的，没量）；拷走改名、又不点名用例函数的，看门狗同样认不出。
+看不见的：.cargo/config.toml 与 `--config <文件>` 里定的别名；拷走改名的 checker 档测试二进制；systemd-run -p EnvironmentFile= 指到读不了的文件时里面定没定别名；
+cargo mutants -d 指到别处的树。
 弄坏开关（只给自证用，证明那几格会红）：LIB_HEAVY_TESTS_BREAK 设成下面一个或几个（逗号分隔），--selftest 与 heavy-test-guard.sh --selftest 都必须判红：
   launcher-whole-word-options（短选项合写不拆，照旧按整词查表）、launcher-drops-setenv（systemd-run -E / --setenv 设的变量不带进里面那条命令）、
-  list-by-presence（见到 --list 这个词就算只列）、undecided-ignore-allowed（判不出标没标时放行）、
-  runner-configuration-by-regex-only（--config 只按正则认 runner）、strace-drops-env（strace -E / --env 设的变量不带进里面那条命令）、
-  launcher-long-options-partial（要值的长选项照补全之前的表、不认前缀）、launcher-drops-property-environment（systemd-run -p Environment= /
-  EnvironmentFile= 设的变量不带进里面那条命令）、list-past-separator（找 --list 时见到 `--` 不停）、judging-error-propagates（准入模块判的时候抛的异常
-  不接住）、configuration-before-subcommand-only（只收子命令之前的 --config）。
+  list-by-presence（见到 --list 这个词就算只列）、strace-drops-env（strace -E / --env 设的变量不带进里面那条命令）、
+  launcher-long-options-partial（要值的长选项照补全之前的表、不认前缀）、alias-not-expanded（--config / CARGO_ALIAS_ 定的别名看得到值也不展开）、
+  package-specification-literal（-p 的值只按字面名比，不认通配、@版本、pkgid URL）、launcher-drops-property-environment（systemd-run -p Environment= /
+  EnvironmentFile= 设的变量不带进里面那条命令）、list-past-separator（找 --list 时见到 `--` 不停）、configuration-before-subcommand-only（只收子命令之前的 --config）、mutants-configuration-ignored（cargo mutants 不看 --test-package、--test-workspace 与 .cargo/mutants.toml 的 test_workspace）。
 """
 import fnmatch, functools, glob, importlib.util, os, re, shlex, shutil, sys, tempfile, tomllib
 from typing import NamedTuple
@@ -78,21 +67,21 @@ shell_words = load_sibling_module("lib_shell_words")
 
 
 class HeavyTest(NamedTuple):
-    kind: str      # 细分的用法（layer0-cargo、gate-sh……），heavy-test-guard.sh 按它定谁能跑
+    kind: str      # 细分的用法（checker-tier-cargo、gate-sh……），heavy-test-guard.sh 按它定谁能跑
     category: str  # 报给人看的类名（层 0、全量测试……），KIND_CATEGORY 的值
     detail: str    # 这一条为什么算：认出的是什么
 
 
 # 每一种重型用法：kind → 它属于哪一类
 KIND_CATEGORY = {
-    "layer0-stage": "层 0", "layer0-cargo": "层 0", "layer0-binary": "层 0",
+    "checker-tier-cargo": "checker 档", "checker-tier-binary": "checker 档",
+    "layer0-stage": "层 0",
     "qemu-stage": "QEMU", "qemu-system": "QEMU", "vm-bench": "QEMU",
     "herd7-stage": "herd7", "lkmm": "herd7", "herd7": "herd7",
     "crates-mutation-stage": "crates 变异整表", "crates-mutation-mutate": "crates 变异整表",
     "full-cargo": "全量测试", "check-sh": "全量测试",
     "gate-sh": "整轮门禁", "gate-staged": "整轮门禁", "replay-all-stage": "全部实验复跑",
     "e152": "E152 装置",
-    "crash-case-cargo": "崩溃枚举用例", "crash-case-binary": "崩溃枚举用例",
 }
 # 只有这几道阶段是重型；.claude/gate.d/ 下其余阶段谁都能跑
 STAGE_KIND = {"54": "layer0-stage", "55": "qemu-stage", "57": "herd7-stage", "59": "crates-mutation-stage", "87": "replay-all-stage"}
@@ -130,118 +119,14 @@ def libtest_lists_only(libtest_arguments):
     return False
 
 
-# 崩溃枚举用例的登记表（与 research/scripts/admission.py 读的是同一份）：键是 crash-case: 的行，第三列 test=<包>:<测试目标>:<用例函数>
-CRASH_CASE_REGISTRY = os.path.join(".claude", "gate.d", "stage-inputs.tsv")
-CRASH_CASE_TEST_CONDITION = re.compile(r"^test=(?P<package>[A-Za-z0-9_-]+):(?P<target>[A-Za-z0-9_]+):(?P<function>[A-Za-z_][A-Za-z0-9_]*)$")
+CHECKER_PACKAGE_NAME = "singlefs-checker-tier"   # checker 档住的包（D13 已定项 15）：它的集成测试、库单测与装置二进制都算重型
 HOOK_REPOSITORY = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-IGNORED_TEST_ARGUMENTS = {"--ignored", "--include-ignored"}
 # libtest 只列用例、一条都不跑的参数
 LIST_ONLY_TEST_ARGUMENT = "--list"
 # libtest 带一个值的选项：`--skip --list` 里的 --list 是 --skip 的值（照样全跑），不是「只列」
 LIBTEST_OPTIONS_WITH_VALUE = {"--logfile", "--skip", "--test-threads", "--format", "--color", "-Z", "--shuffle-seed"}
 # 弄坏开关的环境变量（写法见文件头）
 BREAK_VARIABLE = "LIB_HEAVY_TESTS_BREAK"
-# 判用例函数标没标 #[ignore] 的那一份（与门禁 54 号的 crash-cases 自查同一套判法）
-ADMISSION_MODULE_PATH = os.path.join(HOOK_REPOSITORY, "research", "scripts", "admission.py")
-# 按参数认崩溃枚举用例时不看的命令：它们把参数当文本搜、打印、比对，不执行测试二进制
-COMMANDS_TREATING_ARGUMENTS_AS_TEXT = {"grep", "egrep", "fgrep", "rg", "ag", "git", "sed", "awk", "echo", "printf", "cat", "head", "tail",
-                                       "less", "wc", "sort", "uniq", "diff", "tee", "jq", "ls"}
-
-
-class RegisteredCrashCase(NamedTuple):
-    registry_root: str  # 登记它的那份登记表所在的仓根
-    package: str
-    target: str
-    function: str
-
-
-def crash_case_registries(directory):
-    """要读的登记表：从 directory 往上找到的第一份，加这份文件所在仓的那一份（两份是同一个文件时只算一次）。"""
-    found = []
-    while directory:
-        candidate = os.path.join(directory, CRASH_CASE_REGISTRY)
-        if os.path.isfile(candidate):
-            found.append(candidate)
-            break
-        parent = os.path.dirname(directory)
-        if parent == directory:
-            break
-        directory = parent
-    own = os.path.join(HOOK_REPOSITORY, CRASH_CASE_REGISTRY)
-    if os.path.isfile(own) and all(os.path.realpath(own) != os.path.realpath(path) for path in found):
-        found.append(own)
-    return found
-
-
-def registered_crash_cases(directory):
-    """登记的崩溃枚举用例（RegisteredCrashCase 的集合）。读不了的登记表当它没有。"""
-    cases = set()
-    for path in crash_case_registries(directory):
-        try:
-            with open(path, encoding="utf-8", errors="replace") as handle:
-                lines = handle.read().split("\n")
-        except OSError:
-            continue
-        registry_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(path))))
-        for line in lines:
-            columns = line.split("\t")
-            if not columns[0].startswith("crash-case:") or len(columns) < 3 or columns[2].lstrip().startswith("#"):
-                continue
-            for token in columns[2].split():
-                match = CRASH_CASE_TEST_CONDITION.match(token)
-                if match:
-                    cases.add(RegisteredCrashCase(registry_root, match.group("package"), match.group("target"), match.group("function")))
-    return cases
-
-
-def registered_crash_case_targets(directory):
-    """登记的崩溃枚举用例：{(包名, 测试目标)}。"""
-    return {(case.package, case.target) for case in registered_crash_cases(directory)}
-
-
-@functools.cache
-def admission_module():
-    """research/scripts/admission.py（按文件路径导入一次）；导入不了交 None，调用方按「判不出」处理。"""
-    try:
-        spec = importlib.util.spec_from_file_location("admission_for_heavy_tests", ADMISSION_MODULE_PATH)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-    except Exception:  # 文件不在、语法错、导入时抛的都算导入不了
-        return None
-    return module
-
-
-def crash_case_package_directory(case, members):
-    """这条用例的包目录（绝对路径）：命令所在工作区的成员里有它就取那一份（cargo 编的是它），没有就取登记它的那个仓的；都没有交 None。"""
-    if case.package in members:
-        return members[case.package]
-    root_manifest = os.path.join(case.registry_root, "Cargo.toml")
-    sections = manifest_sections(root_manifest)
-    if sections and "workspace" in sections:
-        return workspace_packages(root_manifest, sections).get(case.package)
-    return None
-
-
-def crash_case_function_runs_without_ignored(case, package_directory):
-    """登记的用例函数在 package_directory 这个包里可能不带 --ignored 也被跑到：同名的每一处定义都标了 #[ignore] 才交 False；
-    有一处没标，或判不出（找不到包、那个目标、那个函数，宏生成的用例，读不了源码，导入不了 admission.py）都交 True——
-    判不出时放行，这一条在提交时 54 号的 crash-cases 自查判红之前就已经跑完了。准入模块导入得了、判的那一刻抛异常（改了名、改了签名、
-    判到一半出错）同样算判不出（弄坏开关 judging-error-propagates 下异常照旧往外抛，闸的入口接住之后放行）。"""
-    module = admission_module()
-    if module is None or package_directory is None:
-        return not break_is_set("undecided-ignore-allowed")
-    if break_is_set("judging-error-propagates"):
-        marked = module.test_function_is_marked_ignored(package_directory, ".", case.target, case.function)
-    else:
-        try:
-            marked = module.test_function_is_marked_ignored(package_directory, ".", case.target, case.function)
-        except Exception:  # 准入模块判的时候抛的哪一种都算判不出
-            return not break_is_set("undecided-ignore-allowed")
-    if break_is_set("undecided-ignore-allowed"):
-        return marked is False
-    return marked is not True
-
-
 def manifest_sections(path):
     try:
         with open(path, "rb") as handle:
@@ -288,8 +173,8 @@ def workspace_packages(root_manifest, root_sections):
     return packages
 
 
-def layer0_test_targets(package_directory):
-    """包里名字含 layer0 的集成测试目标：tests/*.rs、tests/<名>/main.rs 与 [[test]] 的 name。"""
+def integration_test_targets(package_directory):
+    """包里全部集成测试目标：tests/*.rs、tests/<名>/main.rs 与 [[test]] 的 name。"""
     names = set()
     for path in glob.glob(os.path.join(package_directory, "tests", "*.rs")):
         names.add(os.path.basename(path)[:-3])
@@ -298,7 +183,31 @@ def layer0_test_targets(package_directory):
     for target in (manifest_sections(os.path.join(package_directory, "Cargo.toml")) or {}).get("test") or []:
         if isinstance(target, dict) and target.get("name"):
             names.add(target["name"])
-    return sorted(name for name in names if "layer0" in name)
+    return sorted(names)
+
+
+def checker_package_directories(directory):
+    """directory 往上找到的第一个含 crates/<checker 档包> 的根里那个包目录；一个都找不到（仓外执行）才取本 hook 所在仓的那一个。"""
+    while directory:
+        candidate = os.path.join(directory, "crates", CHECKER_PACKAGE_NAME)
+        if os.path.isdir(candidate):
+            return [candidate]
+        parent = os.path.dirname(directory)
+        if parent == directory:
+            break
+        directory = parent
+    own = os.path.join(HOOK_REPOSITORY, "crates", CHECKER_PACKAGE_NAME)
+    return [own] if os.path.isdir(own) else []
+
+
+def checker_test_targets(directory):
+    """checker 档包的测试二进制名：tests/ 下的测试目标、src/bin/ 下的装置（它们的内联单测编成同名测试二进制）、库本身（包名把 - 换成 _）。"""
+    names = set()
+    for package_directory in checker_package_directories(directory):
+        names.update(integration_test_targets(package_directory))
+        names.update(os.path.splitext(os.path.basename(path))[0] for path in glob.glob(os.path.join(package_directory, "src", "bin", "*.rs")))
+        names.add(CHECKER_PACKAGE_NAME.replace("-", "_"))
+    return names
 
 
 CARGO_GLOBAL_OPTIONS_WITH_VALUE = {"--color", "--config", "-Z"}
@@ -309,16 +218,12 @@ CARGO_TEST_OPTIONS_WITH_VALUE = {"-p", "--package", "--exclude", "--test", "--bi
                                  "--run-ignored", "-E", "--filterset", "-P", "--retries", "--partition", "--test-threads", "--max-fail"}
 NARROWING_SELECTORS = {"--test", "--lib", "--bin", "--bins", "--example", "--examples", "--bench", "--benches", "--doc"}
 GLOB_CHARACTERS = set("*?[")
-# cargo nextest run --run-ignored 的值里会跑 ignored 用例的（default 不跑）
-NEXTEST_RUN_IGNORED_VALUES = {"only", "all", "ignored-only"}
 # cargo llvm-cov 不起测试的子命令；cargo hack 后面接的、起测试或跑程序的子命令
 LLVM_COV_NON_RUNNING_SUBCOMMANDS = {"report", "clean", "show-env"}
 HACK_INNER_SUBCOMMANDS = {"test", "t", "run", "r", "nextest", "miri", "llvm-cov", "mutants"}
 # cargo mutants 的选项里 cargo test 也认、照搬过去的（选包的那几个）
 MUTANTS_PACKAGE_OPTIONS_WITH_VALUE = {"-p", "--package", "--manifest-path"}
-RUNNER_CONFIGURATION = re.compile(r"\.runner\s*=")
 ALIAS_CONFIGURATION = re.compile(r"^\s*alias\.([A-Za-z0-9_-]+)\s*=")
-RUNNER_ENVIRONMENT_VARIABLE = re.compile(r"^CARGO_TARGET_.+_RUNNER$")
 ALIAS_ENVIRONMENT_PREFIX = "CARGO_ALIAS_"
 
 
@@ -377,23 +282,86 @@ def configuration_values_after_subcommand(rest):
     return values
 
 
-def mutants_test_arguments(rest):
-    """cargo mutants 的参数 → 它反复起的 cargo test 的参数：选包的选项（-p / --package / --manifest-path / --workspace）照搬，`--` 之后的原样接上。"""
+MUTANTS_TEST_WORKSPACE_SETTING = re.compile(r"^\s*test_workspace\s*=\s*(true|false)\b", re.MULTILINE)
+
+
+def mutants_configured_test_workspace(source_directory):
+    """源码树里 .cargo/mutants.toml 的 test_workspace（True / False），没有这份配置或没写这一项交 None。
+    cargo mutants 从源码树（-d 给的目录，不给就是当前目录）往上找工作区根，读那里的 .cargo/mutants.toml；这里从 source_directory 往上逐级找第一份。"""
+    current = os.path.abspath(source_directory or ".")
+    while True:
+        path = os.path.join(current, ".cargo", "mutants.toml")
+        if os.path.isfile(path):
+            try:
+                found = MUTANTS_TEST_WORKSPACE_SETTING.search(open(path, encoding="utf-8").read())
+            except (OSError, UnicodeDecodeError):
+                return None
+            return None if found is None else found.group(1) == "true"
+        parent = os.path.dirname(current)
+        if parent == current:
+            return None
+        current = parent
+
+
+def mutants_test_arguments(rest, directory=None):
+    """cargo mutants 的参数 → 它反复起的 cargo test 的参数。选包的选项（-p / --package / --manifest-path / --workspace）照搬，`--` 之后的原样接上；
+    测哪些包另看三样（cargo mutants 的 --test-workspace / --test-package 与 .cargo/mutants.toml 的 test_workspace）：
+    --test-package X 测的是 X（换成 -p X）；--test-workspace=true 或配置里 test_workspace = true（没带 --no-config、没被 --test-workspace=false 盖掉）
+    测整个工作区（加 --workspace）。-d / --dir 给的源码树换掉当前目录去找配置与工作区。"""
     before, after = (rest[:rest.index("--")], rest[rest.index("--") + 1:]) if "--" in rest else (rest, [])
-    kept, index = [], 0
+    kept, test_packages, test_workspace_option, source_directory, reads_configuration = [], [], None, directory, True
+    index = 0
     while index < len(before):
         word = before[index]
         if word in MUTANTS_PACKAGE_OPTIONS_WITH_VALUE:
             kept += before[index:index + 2]
             index += 2
             continue
-        if word == "--workspace" or word.startswith(("--package=", "--manifest-path=")) or (word.startswith("-p") and len(word) > 2):
+        if word in ("-d", "--dir") and index + 1 < len(before):
+            source_directory = shell_words.resolve_path(directory, before[index + 1]) if directory else before[index + 1]
+            index += 2
+            continue
+        if word.startswith("--dir="):
+            value = word.split("=", 1)[1]
+            source_directory = shell_words.resolve_path(directory, value) if directory else value
+        elif word == "--test-package" and index + 1 < len(before):
+            test_packages += [name for name in before[index + 1].split(",") if name]
+            index += 2
+            continue
+        elif word.startswith("--test-package="):
+            test_packages += [name for name in word.split("=", 1)[1].split(",") if name]
+        elif word == "--test-workspace" and index + 1 < len(before) and before[index + 1] in ("true", "false"):
+            test_workspace_option = before[index + 1] == "true"
+            index += 2
+            continue
+        elif word.startswith("--test-workspace="):
+            test_workspace_option = word.split("=", 1)[1] == "true"
+        elif word == "--no-config":
+            reads_configuration = False
+        elif word == "--workspace" or word.startswith(("--package=", "--manifest-path=")) or (word.startswith("-p") and len(word) > 2):
             kept.append(word)
         index += 1
+    if break_is_set("mutants-configuration-ignored"):
+        return kept + after
+    if source_directory is not None and source_directory != directory and not any(
+            word == "--manifest-path" or word.startswith("--manifest-path=") for word in kept):
+        kept += ["--manifest-path", os.path.join(source_directory, "Cargo.toml")]
+    if test_packages:
+        kept = [word for position, word in enumerate(kept)
+                if not (word in ("-p", "--package") or word.startswith(("--package=",)) or (word.startswith("-p") and len(word) > 2)
+                        or (position > 0 and kept[position - 1] in ("-p", "--package")))]
+        for name in test_packages:
+            kept += ["-p", name]
+        return kept + after
+    test_workspace = test_workspace_option
+    if test_workspace is None and reads_configuration:
+        test_workspace = mutants_configured_test_workspace(source_directory)
+    if test_workspace:
+        kept.append("--workspace")
     return kept + after
 
 
-def test_invocation(subcommand, rest):
+def test_invocation(subcommand, rest, directory=None):
     """cargo 的子命令与它后面的参数 → (怎么起的：'test'、'nextest'、'run' 或 None, 照 cargo test 的写法读的参数)。
     nextest 只认 run（r）；miri、llvm-cov、hack 剥掉自己那一层再看里面那个子命令（llvm-cov 不带子命令时就是跑测试）；mutants 反复起 cargo test。"""
     if subcommand in ("test", "t"):
@@ -419,8 +387,37 @@ def test_invocation(subcommand, rest):
                 return test_invocation(word, rest[:index] + rest[index + 1:])
         return None, []
     if subcommand == "mutants":
-        return "test", mutants_test_arguments(rest)
+        return "test", mutants_test_arguments(rest, directory)
     return None, []
+
+
+def package_specification_members(specification, members):
+    """-p 的一个值对上的工作区成员名（集合）：认 cargo 的几种包规格——光名字、name@version、pkgid URL（path+file://…#name@version、…#name）、
+    通配（*、?、[…]，cargo 1.64 起 -p 认 glob）。一个都对不上交空集。"""
+    text = specification.strip().strip("'\"")
+    if "#" in text:
+        text = text.rsplit("#", 1)[1]
+    text = text.split("@", 1)[0]
+    if GLOB_CHARACTERS & set(text):
+        return set(fnmatch.filter(list(members), text))
+    return {text} if text in members else set()
+
+
+def alias_expansion(command, environment):
+    """别名展开成的那几个词：--config 里 alias.<名> = "…" 或环境变量 CARGO_ALIAS_<名> 的值，按空白切；看不到值交 None。"""
+    for value in command.configuration_values:
+        match = re.match(r"^\s*alias\.([A-Za-z0-9_-]+)\s*=\s*(.+?)\s*$", value)
+        if match and match.group(1) == command.subcommand:
+            raw = match.group(2).strip()
+            try:
+                parsed = tomllib.loads(f"value = {raw}")["value"]
+            except (tomllib.TOMLDecodeError, KeyError):
+                return None
+            return parsed if isinstance(parsed, list) else str(parsed).split()
+    alias_variable = ALIAS_ENVIRONMENT_PREFIX + command.subcommand.upper().replace("-", "_")
+    if alias_variable in environment and environment[alias_variable]:
+        return environment[alias_variable].split()
+    return None
 
 
 def alias_of_subcommand(command, environment):
@@ -434,40 +431,25 @@ def alias_of_subcommand(command, environment):
     return None
 
 
-def configuration_value_names_runner(value):
-    """--config 的一个值按 TOML 读：定了 target.<任何>.runner（带不带引号的键、点号两边带不带空白都算）交 True；
-    读不成 TOML 的（多半是配置文件的路径，文件头「看不见的」）交 False，交给正则那一道。"""
-    try:
-        settings = tomllib.loads(value)
-    except ValueError:  # TOMLDecodeError 是 ValueError
-        return False
-    targets = settings.get("target") if isinstance(settings.get("target"), dict) else {}
-    return any(isinstance(table, dict) and "runner" in table for table in targets.values())
-
-
-def runner_of_test_binaries(command, environment):
-    """--config 里定了 …runner、或环境变量里有 CARGO_TARGET_*_RUNNER 时交一句（runner 能替测试二进制加 --ignored，命令行上看不见）；没有交 None。"""
-    by_table = not break_is_set("runner-configuration-by-regex-only")
-    if any(RUNNER_CONFIGURATION.search(value) or (by_table and configuration_value_names_runner(value)) for value in command.configuration_values):
-        return "--config 里定的 runner（它能替测试二进制加 --ignored）"
-    runners = sorted(name for name in environment if RUNNER_ENVIRONMENT_VARIABLE.match(name))
-    if runners:
-        return f"环境变量 {runners[0]} 定的 runner（它能替测试二进制加 --ignored）"
-    return None
-
-
 def cargo_use(arguments, directory, environment=None):
     """cargo 这一条算不算重型：返回 HeavyTest 或 None。environment 是这条命令看得到的变量（认 runner 与别名）。"""
     found = cargo_subcommand(arguments, directory)
     if found is None:
         return None
     environment = environment or {}
+    expansion = alias_expansion(found, environment) if not break_is_set("alias-not-expanded") else None
+    if expansion:
+        expanded = cargo_use(list(expansion) + list(found.rest), found.directory,
+                             {name: value for name, value in environment.items() if not name.startswith(ALIAS_ENVIRONMENT_PREFIX)})
+        # 展开看得见：展开之后是什么就判什么（跑 harness 档的别名不重型），不再走「看不见」那一支
+        return expanded._replace(detail=f"别名 {found.subcommand} 展开成 cargo {' '.join(expansion)}：{expanded.detail}") if expanded else None
     alias_reason = alias_of_subcommand(found, environment)
-    invocation, rest = ("test", found.rest) if alias_reason else test_invocation(found.subcommand, found.rest)
-    unseen_reason = alias_reason or runner_of_test_binaries(found, environment)
+    if alias_reason:
+        return heavy_test("checker-tier-cargo", f"cargo {found.subcommand}：{alias_reason}，跑到哪个包看不见，按 checker 档算")
+    invocation, rest = test_invocation(found.subcommand, found.rest, found.directory)
     directory = found.directory
     packages, test_names, selectors, binaries = [], [], set(), []
-    whole_workspace, manifest_argument, run_ignored_value = False, None, None
+    whole_workspace, manifest_argument = False, None
     position = 0
     while position < len(rest):
         argument = rest[position]
@@ -501,8 +483,6 @@ def cargo_use(arguments, directory, environment=None):
             whole_workspace = True
         elif option in ("--lib", "--bins", "--examples", "--tests", "--benches", "--all-targets", "--doc"):
             selectors.add(option)
-        elif option == "--run-ignored":
-            run_ignored_value = value
     if invocation == "run":
         if "e152-file-system-benchmark" in binaries:
             return heavy_test("e152", "cargo run --bin e152-file-system-benchmark")
@@ -515,69 +495,35 @@ def cargo_use(arguments, directory, environment=None):
         return None
     if whole_workspace:
         return heavy_test("full-cargo", f"{described} 带 --workspace / --all")
-    named_layer0 = [name for name in test_names if "layer0" in name]
-    if named_layer0:
-        return heavy_test("layer0-cargo", f"{described} --test {named_layer0[0]}")
-    ignored_reasons = sorted(IGNORED_TEST_ARGUMENTS & set(libtest_arguments))
-    if invocation == "nextest" and run_ignored_value in NEXTEST_RUN_IGNORED_VALUES:
-        ignored_reasons.append(f"--run-ignored {run_ignored_value}")
-    if unseen_reason:
-        ignored_reasons.append(unseen_reason)
     manifest_path = shell_words.resolve_path(directory, manifest_argument) if manifest_argument else (nearest_manifest(directory) if directory else None)
-    crash_cases = registered_crash_cases(os.path.dirname(manifest_path) if manifest_path else directory)
     sections = manifest_sections(manifest_path) if manifest_path else None
     root_manifest, root_sections = workspace_root_manifest(manifest_path) if sections is not None else (None, None)
     members = workspace_packages(root_manifest, root_sections) if root_manifest else {}
-    crash_case_targets = sorted({case.target for case in crash_cases})
-    for pattern in test_names:
-        matched = fnmatch.filter(crash_case_targets, pattern) if GLOB_CHARACTERS & set(pattern) else [name for name in crash_case_targets if name == pattern]
-        found_heavy = crash_case_run("crash-case-cargo", f"{described} --test {pattern}", [case for case in crash_cases if case.target in matched],
-                                     ignored_reasons, members) if matched else None
-        if found_heavy:
-            return found_heavy
-    if sections is None:
-        return None
-    is_virtual_workspace_root = "workspace" in sections and "package" not in sections
     narrowed = bool(selectors & NARROWING_SELECTORS)
-    if not packages and is_virtual_workspace_root and not narrowed:
+    scope, is_virtual_workspace_root = [], False
+    if sections is not None:
+        is_virtual_workspace_root = "workspace" in sections and "package" not in sections
+        if packages:
+            named = set()
+            for specification in packages:
+                named |= (package_specification_members(specification, members) if not break_is_set("package-specification-literal")
+                          else ({specification} if specification in members else set()))
+            scope = [members[name] for name in sorted(named)]
+        elif is_virtual_workspace_root:
+            scope = list(members.values())
+        else:
+            scope = [os.path.normpath(os.path.dirname(manifest_path))]
+    if sections is not None and not packages and is_virtual_workspace_root and not narrowed:
         return heavy_test("full-cargo", f"在工作区根（{os.path.dirname(manifest_path)}）上不带 -p / --test / --lib / --bin 的 {described}")
-    if packages:
-        scope = [members[name] for name in packages if name in members]
-    elif is_virtual_workspace_root:
-        scope = list(members.values())
-    else:
-        scope = [os.path.normpath(os.path.dirname(manifest_path))]
-    if not narrowed and members and set(scope) == set(members.values()):
+    if sections is not None and not narrowed and members and set(scope) == set(members.values()):
         return heavy_test("full-cargo", (f"{described} 不挑目标，而包的范围是整个工作区（{os.path.dirname(root_manifest)} 的全部 "
                                          f"{len(members)} 个成员），等于全量"))
-    layer0_targets = sorted({name for package_directory in scope for name in layer0_test_targets(package_directory)})
-    unselected = not selectors or bool(selectors & {"--tests", "--all-targets"})
-    crash_cases_in_scope = [case for case in crash_cases if members.get(case.package) in scope]
-    if not layer0_targets and unselected and crash_cases_in_scope:
-        found_heavy = crash_case_run("crash-case-cargo", f"{described} 不挑目标", crash_cases_in_scope, ignored_reasons, members)
-        if found_heavy:
-            return found_heavy
-    if not layer0_targets:
-        return None
-    if not selectors or selectors & {"--tests", "--all-targets"}:
-        return heavy_test("layer0-cargo", f"{described} 不挑目标，会跑到名字含 layer0 的测试二进制（{'、'.join(layer0_targets)}）")
-    for pattern in test_names:
-        if GLOB_CHARACTERS & set(pattern):
-            matched = fnmatch.filter(layer0_targets, pattern)
-            if matched:
-                return heavy_test("layer0-cargo", f"{described} --test {pattern} 命中名字含 layer0 的测试二进制（{'、'.join(matched)}）")
-    return None
-
-
-def crash_case_run(kind, described, cases, ignored_reasons, members):
-    """点到登记的崩溃枚举用例 cases 的那一条算不算重型：带了（或可能带了）跑 ignored 用例的参数，或有一条的用例函数没标 #[ignore]，
-    交 kind 那一类的 HeavyTest；否则交 None。members 是命令所在工作区的成员（包名 → 包目录），找用例的源码用。"""
-    targets = "、".join(sorted({case.target for case in cases}))
-    if ignored_reasons:
-        return heavy_test(kind, f"{described} 带 {ignored_reasons[0]}，跑到登记的崩溃枚举用例（{targets}）")
-    unmarked = sorted({case.function for case in cases if crash_case_function_runs_without_ignored(case, crash_case_package_directory(case, members))})
-    if unmarked:
-        return heavy_test(kind, f"{described} 不带 --ignored，而登记的用例函数 {unmarked[0]} 没标 #[ignore]，照样跑到全量（{targets}）")
+    # checker 档按包判（D13 已定项 15）：范围里有 checker 档包，不管挑哪个目标（库单测、集成测试、装置二进制的内联单测、doctest）都是重型；
+    # 别的包（harness 档、core、format、池级 checker）的测试随时跑
+    checker_directory = members.get(CHECKER_PACKAGE_NAME)
+    if checker_directory and os.path.normpath(checker_directory) in {os.path.normpath(path) for path in scope}:
+        return heavy_test("checker-tier-cargo", f"{described} 跑到 {CHECKER_PACKAGE_NAME} 包的测试（checker 档，默认只在提交时跑；"
+                                                f"{'--test ' + '、'.join(test_names) if test_names else '按包'}）")
     return None
 
 
@@ -809,11 +755,9 @@ def classify(words, directory, environment=None):
     if binary is not None:
         if libtest_lists_only(arguments):
             return None
-        if "layer0" in binary:
-            return heavy_test("layer0-binary", f"直接执行名字含 layer0 的测试二进制（{binary}）")
-        cases = [case for case in registered_crash_cases(directory) if case.target == binary]
-        runs_ignored = sorted(IGNORED_TEST_ARGUMENTS & set(arguments))
-        return crash_case_run("crash-case-binary", f"直接执行登记的崩溃枚举用例的测试二进制（{binary}）", cases, runs_ignored, {}) if cases else None
+        if binary in checker_test_targets(directory or HOOK_REPOSITORY):
+            return heavy_test("checker-tier-binary", f"直接执行 {CHECKER_PACKAGE_NAME} 包的测试二进制（{binary}）：checker 档，默认只在提交时跑")
+        return None
     if name.startswith("qemu-system"):
         return heavy_test("qemu-system", name)
     if name == "vm-bench.sh":
@@ -836,24 +780,12 @@ def classify(words, directory, environment=None):
         return None if "--selftest" in arguments else heavy_test("gate-staged", "research/scripts/gate-staged.sh（跑 gate.sh --staged）")
     if name == "layer0-shard-run.sh":
         return None if "--selftest" in arguments else heavy_test(
-            "crash-case-cargo", "research/scripts/layer0-shard-run.sh（两台各跑一片登记的崩溃枚举用例、带 --include-ignored，再本机 merge）")
+            "checker-tier-cargo", "research/scripts/layer0-shard-run.sh（两台各跑一片 checker 档登记的崩溃枚举用例、带 --include-ignored，再本机 merge）")
     if name in ("e152-file-system-benchmark", "e152-run.sh"):
         return heavy_test("e152", name)
     if name == "cargo":
         return cargo_use(arguments, directory, environment)
-    return crash_case_named_in_arguments(name, arguments, directory)
-
-
-def crash_case_named_in_arguments(name, arguments, directory):
-    """不认得的命令（按文本处理参数的 grep、git 这一类除外）参数里有 --ignored / --include-ignored、又有登记的用例函数名：
-    按跑崩溃枚举用例算（拷走改名的测试二进制、find -exec 起的，名字认不出，靠点名的用例函数认）。"""
-    runs_ignored = sorted(IGNORED_TEST_ARGUMENTS & set(arguments))
-    if name in COMMANDS_TREATING_ARGUMENTS_AS_TEXT or not runs_ignored:
-        return None
-    named = sorted({case.function for case in registered_crash_cases(directory)} & set(arguments))
-    if not named:
-        return None
-    return heavy_test("crash-case-binary", f"{name} 带 {runs_ignored[0]} 与登记的用例函数名 {named[0]}：按跑崩溃枚举用例算")
+    return None
 
 
 def heavy_tests_in_command_text(text, directory, environment=None):
@@ -897,57 +829,35 @@ def judged_by_name(word, directory):
 
 
 def build_sample_workspace(work):
-    """仓根与 research/ 两个虚工作区，harness 里有一个名字含 layer0 的测试目标；登记表登记七条崩溃枚举用例：
-    harness 里的 sample_crash_enumeration，与只有它一个测试目标的包 singlefs-checker 里的 checker_crash_enumeration（用例函数都标了 #[ignore]），
-    harness 里用例函数没标 #[ignore] 的 unmarked_crash_enumeration；harness 里另四种写法：同名函数 cfg 二选一、一份不标（cfg_split），
-    子模块里同名标 ignore 的写在前面、顶层那一份不标（submodule_first），宏生成的用例（macro，没有字面的 fn <名>(），
-    `# [ignore]`（# 与 [ 之间有空格，spaced_ignore，算标了）；release 下 include! 进来一份不标的同名用例（include），
-    include! 进来的那一份标了 ignore（marked_include，算标了）。"""
+    """仓根虚工作区四个成员：core、harness 档（singlefs-harness）、池级 checker（singlefs-checker，只有库）、checker 档（singlefs-checker-tier：
+    两个集成测试目标、一个装置二进制、库）；research/ 是另一个虚工作区；mutants-sample/ 是两个成员的虚工作区，带一份 test_workspace = true 的 .cargo/mutants.toml。另有两份给 systemd-run -p EnvironmentFile= 读的环境文件。"""
     def write(relative, text):
         path = os.path.join(work, relative)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as handle:
             handle.write(text)
-    write("Cargo.toml", '[workspace]\nresolver = "2"\nmembers = ["crates/singlefs-core", "crates/singlefs-harness", "crates/singlefs-checker"]\n'
+    write("Cargo.toml", '[workspace]\nresolver = "2"\nmembers = ["crates/singlefs-core", "crates/singlefs-harness", "crates/singlefs-checker", "crates/singlefs-checker-tier"]\n'
                         'exclude = ["research"]\n')
     write("crates/singlefs-core/Cargo.toml", '[package]\nname = "singlefs-core"\nversion = "0.0.0"\n')
     write("crates/singlefs-core/tests/core_contract.rs", "")
     write("crates/singlefs-harness/Cargo.toml", '[package]\nname = "singlefs-harness"\nversion = "0.0.0"\n')
-    write("crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs", "")
-    write("crates/singlefs-harness/tests/second_transaction_step_one_overwrite.rs", "")
-    marked_case = '#[test]\nfn quick_case() {}\n#[test]\n#[ignore = "崩溃枚举（样本）：平时不跑"]\nfn the_full_case() {}\n'
-    write("crates/singlefs-harness/tests/sample_crash_enumeration.rs", marked_case)
-    write("crates/singlefs-harness/tests/unmarked_crash_enumeration.rs", "#[test]\nfn the_unmarked_case() {}\n")
-    write("crates/singlefs-harness/tests/cfg_split_crash_enumeration.rs",
-          "#[cfg(debug_assertions)]\n#[test]\n#[ignore]\nfn the_split_case() {}\n#[cfg(not(debug_assertions))]\n#[test]\nfn the_split_case() {}\n")
-    write("crates/singlefs-harness/tests/submodule_first_crash_enumeration.rs",
-          "mod slow {\n    #[test]\n    #[ignore]\n    fn the_shadowed_case() {}\n}\n#[test]\nfn the_shadowed_case() {}\n")
-    write("crates/singlefs-harness/tests/macro_crash_enumeration.rs",
-          "macro_rules! crash_case {\n    ($name:ident) => {\n        #[test]\n        fn $name() {}\n    };\n}\ncrash_case!(the_generated_case);\n")
-    write("crates/singlefs-harness/tests/spaced_ignore_crash_enumeration.rs", "#[test]\n# [ignore]\nfn the_spaced_case() {}\n")
-    write("crates/singlefs-harness/tests/include_crash_enumeration.rs",
-          "#[cfg(debug_assertions)]\n#[test]\n#[ignore]\nfn the_included_case() {}\n#[cfg(not(debug_assertions))]\ninclude!(\"common/release_case.rs\");\n")
-    write("crates/singlefs-harness/tests/common/release_case.rs", "#[test]\nfn the_included_case() {}\n")
-    write("crates/singlefs-harness/tests/marked_include_crash_enumeration.rs", "include!(\"common/marked_case.rs\");\n")
-    write("crates/singlefs-harness/tests/common/marked_case.rs", "#[test]\n#[ignore]\nfn the_marked_included_case() {}\n")
+    write("crates/singlefs-harness/tests/second_transaction_step_one_overwrite.rs", "#[test]\nfn a_daily_case() {}\n")
     write("crates/singlefs-checker/Cargo.toml", '[package]\nname = "singlefs-checker"\nversion = "0.0.0"\n')
-    write("crates/singlefs-checker/tests/checker_crash_enumeration.rs", marked_case)
-    write(CRASH_CASE_REGISTRY, "# 样本登记表\n54-layer0-replay.sh\tcrates/\t# 样本\n"
-                               "crash-case:sample\tcrates/ Cargo.toml\ttest=singlefs-harness:sample_crash_enumeration:the_full_case\t# 样本\n"
-                               "crash-case:checker\tcrates/ Cargo.toml\ttest=singlefs-checker:checker_crash_enumeration:the_full_case\t# 样本\n"
-                               "crash-case:unmarked\tcrates/ Cargo.toml\ttest=singlefs-harness:unmarked_crash_enumeration:the_unmarked_case\t# 样本\n"
-                               "crash-case:cfg-split\tcrates/ Cargo.toml\ttest=singlefs-harness:cfg_split_crash_enumeration:the_split_case\t# 样本\n"
-                               "crash-case:submodule-first\tcrates/ Cargo.toml\t"
-                               "test=singlefs-harness:submodule_first_crash_enumeration:the_shadowed_case\t# 样本\n"
-                               "crash-case:macro\tcrates/ Cargo.toml\ttest=singlefs-harness:macro_crash_enumeration:the_generated_case\t# 样本\n"
-                               "crash-case:spaced-ignore\tcrates/ Cargo.toml\ttest=singlefs-harness:spaced_ignore_crash_enumeration:the_spaced_case\t# 样本\n"
-                               "crash-case:include\tcrates/ Cargo.toml\ttest=singlefs-harness:include_crash_enumeration:the_included_case\t# 样本\n"
-                               "crash-case:marked-include\tcrates/ Cargo.toml\t"
-                               "test=singlefs-harness:marked_include_crash_enumeration:the_marked_included_case\t# 样本\n")
-    write("runner.env", '# 样本：systemd-run -p EnvironmentFile= 读的\nexport CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="/tmp/add-ignored.sh"\n')
+    write("crates/singlefs-checker/src/lib.rs", "pub fn check_pool_image() {}\n")
+    write("crates/singlefs-checker-tier/Cargo.toml", '[package]\nname = "singlefs-checker-tier"\nversion = "0.1.0"\n')
+    write("crates/singlefs-checker-tier/src/lib.rs", "pub fn judge() {}\n")
+    write("crates/singlefs-checker-tier/src/bin/e161_sample_device.rs", "fn main() {}\n")
+    write("crates/singlefs-checker-tier/tests/first_transaction_step_seven_layer0.rs",
+          '#[test]\nfn quick_case() {}\n#[test]\n#[ignore = "崩溃枚举（样本）：平时不跑"]\nfn the_full_case() {}\n')
+    write("crates/singlefs-checker-tier/tests/checker_quick_stream.rs", "#[test]\nfn a_quick_case() {}\n")
+    write("alias.env", '# 样本：systemd-run -p EnvironmentFile= 读的\nCARGO_ALIAS_XT="test -p singlefs-checker-tier"\n')
     write("plain.env", "# 样本\nRUST_BACKTRACE=1\n")
     write("research/Cargo.toml", '[workspace]\nresolver = "2"\nmembers = ["e7-index-bench"]\n')
     write("research/e7-index-bench/Cargo.toml", '[package]\nname = "e7-index-bench"\nversion = "0.0.0"\n')
+    write("mutants-sample/Cargo.toml", '[workspace]\nresolver = "2"\nmembers = ["mutated", "other"]\n')
+    write("mutants-sample/mutated/Cargo.toml", '[package]\nname = "mutated"\nversion = "0.0.0"\n')
+    write("mutants-sample/other/Cargo.toml", '[package]\nname = "other"\nversion = "0.0.0"\n')
+    write("mutants-sample/.cargo/mutants.toml", "# 样本：cargo mutants 每次测整个工作区\ntest_workspace = true\n")
 
 
 def selftest():
@@ -957,144 +867,98 @@ def selftest():
     try:
         build_sample_workspace(work)
         harness = os.path.join(work, "crates", "singlefs-harness")
-        layer0_binary = "first_transaction_step_seven_layer0-0123456789abcdef"
+        tier = os.path.join(work, "crates", "singlefs-checker-tier")
+        tier_binary = "first_transaction_step_seven_layer0-0123456789abcdef"
+        alias_to_tier = "CARGO_ALIAS_XT=test -p singlefs-checker-tier"
         # (说明, 进程的 argv, 进程的 cwd, 该认出的 kind；None 是不重型)
         cargo_cases = [
+            # 工作区全量
             ("cargo test --all", ["cargo", "test", "--all"], work, "full-cargo"),
             ("argv[0] 是 cargo 的全路径", ["/home/user/.rustup/toolchains/stable/bin/cargo", "test", "--workspace"], work, "full-cargo"),
             ("在工作区根裸跑", ["cargo", "test"], work, "full-cargo"),
-            ("-p harness 点名层 0 目标", ["cargo", "test", "--release", "-p", "singlefs-harness", "--test", "first_transaction_step_seven_layer0"], work, "layer0-cargo"),
-            ("在 harness 里不挑目标", ["cargo", "test", "--release"], harness, "layer0-cargo"),
             ("经 nice 包一层", ["/usr/bin/nice", "-n", "19", "cargo", "test", "--workspace"], work, "full-cargo"),
-            ("bash -c 里", ["bash", "-c", "cd crates/singlefs-harness && cargo test"], work, "layer0-cargo"),
+            ("cargo nextest run 在工作区根裸跑", ["cargo", "nextest", "run"], work, "full-cargo"),
+            ("cargo hack 在子命令前带自己的选项、test --workspace", ["cargo", "hack", "--each-feature", "test", "--workspace"], work, "full-cargo"),
+            # harness 档、core、池级 checker：随时跑
+            ("harness 档整包", ["cargo", "test", "-p", "singlefs-harness"], work, None),
+            ("在 harness 档目录里裸跑", ["cargo", "test", "--release"], harness, None),
+            ("bash -c 里进 harness 档裸跑", ["bash", "-c", "cd crates/singlefs-harness && cargo test"], work, None),
+            ("harness 档带 --ignored（它的重用例随时跑）", ["cargo", "test", "-p", "singlefs-harness", "--", "--ignored"], work, None),
+            ("cargo mutants 整个 harness 档", ["cargo", "mutants", "-p", "singlefs-harness"], work, None),
+            ("cargo mutants 变异 core、--test-package 点名 harness 档", ["cargo", "mutants", "-p", "singlefs-core", "--test-package", "singlefs-harness"], work, None),
+            ("cargo mutants 变异 core、--test-package 点名 checker 档", ["cargo", "mutants", "-p", "singlefs-core", "--test-package=singlefs-checker-tier"], work, "checker-tier-cargo"),
+            ("cargo mutants --test-workspace=true 测整个工作区", ["cargo", "mutants", "-p", "singlefs-harness", "--test-workspace=true"], work, "full-cargo"),
+            ("cargo mutants 配置里 test_workspace = true", ["cargo", "mutants", "-p", "mutated"], os.path.join(work, "mutants-sample"), "full-cargo"),
+            ("cargo mutants -d 指到带 test_workspace = true 配置的树", ["cargo", "mutants", "-d", "mutants-sample", "-p", "mutated"], work, "full-cargo"),
+            ("cargo mutants 配置里 test_workspace = true、命令行 --test-workspace false 盖掉", ["cargo", "mutants", "-p", "mutated", "--test-workspace", "false"], os.path.join(work, "mutants-sample"), None),
+            ("cargo mutants --no-config 不读 test_workspace", ["cargo", "mutants", "--no-config", "-p", "mutated"], os.path.join(work, "mutants-sample"), None),
+            ("core 的一个测试目标", ["cargo", "test", "-p", "singlefs-core", "--test", "core_contract"], work, None),
+            ("池级 checker 不是 checker 档", ["cargo", "test", "-p", "singlefs-checker"], work, None),
+            ("池级 checker 的库单测", ["cargo", "test", "-p", "singlefs-checker", "--lib"], work, None),
+            ("clippy --all-targets 不起测试", ["cargo", "clippy", "--all-targets"], work, None),
+            ("cargo nextest list 不起测试", ["cargo", "nextest", "list", "--workspace"], work, None),
+            ("cargo llvm-cov report 不起测试", ["cargo", "llvm-cov", "report"], work, None),
+            # checker 档：按包判，挑哪个目标都算
+            ("checker 档整包", ["cargo", "test", "-p", "singlefs-checker-tier"], work, "checker-tier-cargo"),
+            ("checker 档点名一个集成测试", ["cargo", "test", "--release", "-p", "singlefs-checker-tier", "--test", "first_transaction_step_seven_layer0"], work,
+             "checker-tier-cargo"),
+            ("checker 档 --tests", ["cargo", "test", "-p", "singlefs-checker-tier", "--tests"], work, "checker-tier-cargo"),
+            ("checker 档 --lib", ["cargo", "test", "-p", "singlefs-checker-tier", "--lib"], work, "checker-tier-cargo"),
+            ("checker 档 --doc", ["cargo", "test", "-p", "singlefs-checker-tier", "--doc"], work, "checker-tier-cargo"),
+            ("checker 档 --bin 装置的内联单测", ["cargo", "test", "-p", "singlefs-checker-tier", "--bin", "e161_sample_device"], work, "checker-tier-cargo"),
+            ("checker 档 --test 通配", ["cargo", "test", "-p", "singlefs-checker-tier", "--test", "*"], work, "checker-tier-cargo"),
+            ("checker 档带 --include-ignored --exact", ["cargo", "test", "-p", "singlefs-checker-tier", "--test", "first_transaction_step_seven_layer0", "--",
+                                                     "--include-ignored", "--exact", "the_full_case"], work, "checker-tier-cargo"),
+            ("在 checker 档目录里裸跑", ["cargo", "test", "--release"], tier, "checker-tier-cargo"),
+            ("-p core 加 -p checker 档", ["cargo", "test", "-p", "singlefs-core", "-p", "singlefs-checker-tier"], work, "checker-tier-cargo"),
+            ("--manifest-path 指 checker 档", ["cargo", "test", "--manifest-path", "crates/singlefs-checker-tier/Cargo.toml"], work, "checker-tier-cargo"),
+            ("cargo nextest run -p checker 档", ["cargo", "nextest", "run", "-p", "singlefs-checker-tier"], work, "checker-tier-cargo"),
+            ("cargo miri test -p checker 档", ["cargo", "miri", "test", "-p", "singlefs-checker-tier"], work, "checker-tier-cargo"),
+            ("cargo llvm-cov 不带子命令 -p checker 档", ["cargo", "llvm-cov", "-p", "singlefs-checker-tier"], work, "checker-tier-cargo"),
+            ("cargo mutants -p checker 档", ["cargo", "mutants", "-p", "singlefs-checker-tier"], work, "checker-tier-cargo"),
+            # -p 的几种包规格（开关 package-specification-literal 下这三格红）
+            ("-p 通配命中 checker 档", ["cargo", "test", "-p", "singlefs-checker-t*"], work, "checker-tier-cargo"),
+            ("-p name@version", ["cargo", "test", "-p", "singlefs-checker-tier@0.1.0"], work, "checker-tier-cargo"),
+            ("-p pkgid URL", ["cargo", "test", "-p", "path+file:///x/crates/singlefs-checker-tier#singlefs-checker-tier@0.1.0"], work, "checker-tier-cargo"),
+            # 别名：看得到值就展开再判（开关 alias-not-expanded 下前三格红；configuration-before-subcommand-only 下第四格红）
+            ("--config 别名展开成 test -p checker 档", ["cargo", "--config", 'alias.xt="test -p singlefs-checker-tier"', "xt"], harness, "checker-tier-cargo"),
+            ("--config 别名写成数组", ["cargo", "--config", 'alias.xt=["test", "-p", "singlefs-checker-tier"]', "xt"], work, "checker-tier-cargo"),
+            ("环境变量 CARGO_ALIAS_XT 定的别名", ["env", alias_to_tier, "cargo", "xt"], work, "checker-tier-cargo"),
+            ("--config 写在子命令之后定的别名", ["cargo", "xt", "--config", 'alias.xt="test -p singlefs-checker-tier"'], work, "checker-tier-cargo"),
+            ("别名展开成 harness 档", ["env", "CARGO_ALIAS_XT=test -p singlefs-harness", "cargo", "xt"], work, None),
+            ("--config 定了别名、子命令不是它（cargo build）", ["cargo", "--config", 'alias.xt="test -p singlefs-checker-tier"', "build"], work, None),
+            ("别名的值读不出（TOML 写坏了）：按 checker 档算", ["cargo", "--config", "alias.xt=[unclosed", "xt"], work, "checker-tier-cargo"),
+            # --list：只列不跑（开关 list-by-presence 下前三格红；list-past-separator 下后两格红）
+            ("checker 档 -- --include-ignored --skip --list（--list 是 --skip 的值）",
+             ["cargo", "test", "-p", "singlefs-checker-tier", "--", "--include-ignored", "--skip", "--list"], work, "checker-tier-cargo"),
+            ("checker 档 -- --logfile --list（--list 是日志文件名）", ["cargo", "test", "-p", "singlefs-checker-tier", "--", "--logfile", "--list"], work,
+             "checker-tier-cargo"),
+            ("checker 档 -- --ignored --skip=--list（一个词，没有 --list 选项）", ["cargo", "test", "-p", "singlefs-checker-tier", "--", "--ignored", "--skip=--list"],
+             work, "checker-tier-cargo"),
+            ("checker 档 -- --list（只列）", ["cargo", "test", "-p", "singlefs-checker-tier", "--", "--list"], work, None),
+            ("checker 档 -- --ignored --test-threads 4 --list（只列）", ["cargo", "test", "-p", "singlefs-checker-tier", "--", "--ignored", "--test-threads", "4",
+                                                                  "--list"], work, None),
+            ("checker 档 -- --include-ignored the_full_case -- --list（第二个 -- 之后 --list 是过滤词）",
+             ["cargo", "test", "-p", "singlefs-checker-tier", "--", "--include-ignored", "the_full_case", "--", "--list"], work, "checker-tier-cargo"),
+            ("checker 档 -- --exact the_full_case -- --list", ["cargo", "test", "-p", "singlefs-checker-tier", "--", "--exact", "the_full_case", "--", "--list"],
+             work, "checker-tier-cargo"),
+            # 按名字认的脚本与门禁阶段
             ("bash 起 54 号", ["bash", ".claude/gate.d/54-layer0-replay.sh", "--full", "/tmp/wt"], work, "layer0-stage"),
-            ("bash 起双机分片的驱动脚本", ["bash", "research/scripts/layer0-shard-run.sh", "crash-case:sample", "/tmp/wt"], work, "crash-case-cargo"),
-            ("双机分片的驱动脚本 --merged-log", ["bash", "research/scripts/layer0-shard-run.sh", "--merged-log", "crash-case:sample", "/tmp/wt", "0" * 64, "/tmp/log"],
-             work, "crash-case-cargo"),
+            ("bash 起双机分片的驱动脚本", ["bash", "research/scripts/layer0-shard-run.sh", "crash-case:sample", "/tmp/wt"], work, "checker-tier-cargo"),
             ("双机分片的驱动脚本 --selftest 不重型", ["bash", "research/scripts/layer0-shard-run.sh", "--selftest"], work, None),
             ("cargo run E152", ["cargo", "run", "--release", "--bin", "e152-file-system-benchmark"], os.path.join(work, "research"), "e152"),
-            ("一个不是层 0 的测试目标", ["cargo", "test", "-p", "singlefs-core", "--test", "core_contract"], work, None),
-            ("clippy --all-targets", ["cargo", "clippy", "--all-targets"], work, None),
             ("bash 起轻阶段 12 号", ["bash", ".claude/gate.d/12-no-prime-marks.sh"], work, None),
-            ("点名崩溃枚举用例、带 --include-ignored --exact",
-             ["cargo", "test", "--release", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--include-ignored", "--exact", "the_full_case"],
-             work, "crash-case-cargo"),
-            ("点名崩溃枚举用例、带 --ignored", ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--ignored"], work,
-             "crash-case-cargo"),
-            ("--test 通配命中崩溃枚举用例、带 --ignored", ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_*", "--", "--ignored"], work,
-             "crash-case-cargo"),
-            ("只有崩溃枚举用例的包不挑目标、带 --ignored", ["cargo", "test", "-p", "singlefs-checker", "--", "--ignored"], work, "crash-case-cargo"),
-            ("点名崩溃枚举用例、不带 --ignored（只跑它的快用例）", ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration"], work, None),
-            ("点名崩溃枚举用例、libtest 参数只有 --nocapture",
-             ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--nocapture"], work, None),
-            ("只有崩溃枚举用例的包 --lib 带 --ignored", ["cargo", "test", "-p", "singlefs-checker", "--lib", "--", "--ignored"], work, None),
-            ("别的测试目标带 --ignored", ["cargo", "test", "-p", "singlefs-harness", "--test", "second_transaction_step_one_overwrite", "--", "--ignored"],
-             work, None),
-            # 用例函数没标 #[ignore]：不带 --ignored 也跑到全量（读源码判，与 admission.py crash-cases 同一套）
-            ("点名用例函数没标 #[ignore] 的登记目标、不带 --ignored", ["cargo", "test", "-p", "singlefs-harness", "--test", "unmarked_crash_enumeration"],
-             work, "crash-case-cargo"),
-            # 只列用例、一条都不跑的不算
-            ("点名崩溃枚举用例、--ignored --list", ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--ignored", "--list"],
-             work, None),
-            ("点名层 0 目标、-- --list", ["cargo", "test", "-p", "singlefs-harness", "--test", "first_transaction_step_seven_layer0", "--", "--list"], work, None),
-            # 起测试的外部子命令与包装子命令
-            ("cargo nextest run --run-ignored all 点名崩溃枚举用例",
-             ["cargo", "nextest", "run", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--run-ignored", "all"], work, "crash-case-cargo"),
-            ("cargo nextest run --run-ignored=only -E 过滤式、只有崩溃枚举用例的包",
-             ["cargo", "nextest", "run", "-p", "singlefs-checker", "--run-ignored=only", "-E", "test(=the_full_case)"], work, "crash-case-cargo"),
-            ("cargo nextest run --run-ignored default 只跑快用例",
-             ["cargo", "nextest", "run", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--run-ignored", "default"], work, None),
-            ("cargo nextest run 在工作区根裸跑", ["cargo", "nextest", "run"], work, "full-cargo"),
-            ("cargo nextest list 不起测试", ["cargo", "nextest", "list", "--workspace"], work, None),
-            ("cargo mutants 整包（反复跑 cargo test，包里有层 0 目标）", ["cargo", "mutants", "-p", "singlefs-harness"], work, "layer0-cargo"),
-            ("cargo mutants 尾参交给 cargo test、带 --include-ignored",
-             ["cargo", "mutants", "-p", "singlefs-checker", "--", "--test", "checker_crash_enumeration", "--", "--include-ignored"], work, "crash-case-cargo"),
-            ("cargo miri test 点名崩溃枚举用例、带 --ignored",
-             ["cargo", "miri", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--ignored"], work, "crash-case-cargo"),
-            ("cargo llvm-cov 不带子命令、点名崩溃枚举用例带 --ignored",
-             ["cargo", "llvm-cov", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--ignored"], work, "crash-case-cargo"),
-            ("cargo llvm-cov report 不起测试", ["cargo", "llvm-cov", "report"], work, None),
-            ("cargo hack 在子命令前带自己的选项、test --workspace", ["cargo", "hack", "--each-feature", "test", "--workspace"], work, "full-cargo"),
-            # 别名与 runner：展开之后带什么参数看不见，当可能带 --ignored
-            ("--config 定别名再用别名、点名崩溃枚举用例", ["cargo", "--config", 'alias.xt="test"', "xt", "-p", "singlefs-harness", "--test", "sample_crash_enumeration"],
-             work, "crash-case-cargo"),
-            ("--config= 写法定的 runner、点名崩溃枚举用例不带 --ignored",
-             ["cargo", '--config=target.x86_64-unknown-linux-gnu.runner=["/tmp/add-ignored.sh"]', "test", "-p", "singlefs-harness", "--test",
-              "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("环境变量里的 runner、点名崩溃枚举用例不带 --ignored",
-             ["env", "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh", "cargo", "test", "-p", "singlefs-harness", "--test",
-              "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("环境变量 CARGO_ALIAS_XT 定的别名", ["env", "CARGO_ALIAS_XT=test", "cargo", "xt", "-p", "singlefs-harness", "--test", "sample_crash_enumeration"],
-             work, "crash-case-cargo"),
-            ("--config 定了别名、子命令不是它（cargo build）", ["cargo", "--config", 'alias.xt="test"', "build"], work, None),
-            ("环境变量里有 runner、cargo build 不跑测试", ["env", "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/x", "cargo", "build", "-p", "singlefs-harness"],
-             work, None),
-            ("环境变量里有 runner、点名不是崩溃枚举用例的目标", ["env", "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/x", "cargo", "test", "-p", "singlefs-core",
-                                                  "--test", "core_contract"], work, None),
-            # --config 的值按 TOML 读：带引号的键、点号两边带空白的 runner 正则认不出（开关 runner-configuration-by-regex-only 下这两格红）
-            ("--config 里带引号的键 target.<三元组>.\"runner\"、点名崩溃枚举用例不带 --ignored",
-             ["cargo", "--config", 'target.x86_64-unknown-linux-gnu."runner"="/tmp/add-ignored.sh"', "test", "-p", "singlefs-harness", "--test",
-              "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("--config 里点号两边带空白的 target . <三元组> . runner",
-             ["cargo", "--config", 'target . x86_64-unknown-linux-gnu . runner = "/tmp/add-ignored.sh"', "test", "-p", "singlefs-harness", "--test",
-              "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("--config 定的是 build.jobs、不是 runner", ["cargo", "--config", "build.jobs=4", "test", "-p", "singlefs-harness", "--test",
-                                                    "sample_crash_enumeration"], work, None),
-            # --list 是 --skip、--logfile 这类带值选项的值时照样全跑（开关 list-by-presence 下前两格红）
-            ("点名崩溃枚举用例、-- --include-ignored --skip --list（--list 是 --skip 的值）",
-             ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--include-ignored", "--skip", "--list"], work, "crash-case-cargo"),
-            ("点名崩溃枚举用例、-- --include-ignored --exact the_full_case --logfile --list（--list 是日志文件名）",
-             ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--include-ignored", "--exact", "the_full_case",
-              "--logfile", "--list"], work, "crash-case-cargo"),
-            ("点名崩溃枚举用例、-- --ignored --test-threads 4 --list（只列）",
-             ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--ignored", "--test-threads", "4", "--list"], work, None),
-            ("点名崩溃枚举用例、-- --ignored --skip=--list（一个词，没有 --list 选项）",
-             ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--ignored", "--skip=--list"], work, "crash-case-cargo"),
-            # libtest 在 -- 处停止认选项：第二个 -- 之后的 --list 是过滤词，照样全跑（开关 list-past-separator 下前两格红）
-            ("点名崩溃枚举用例、-- --include-ignored the_full_case -- --list（第二个 -- 之后 --list 是过滤词）",
-             ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--include-ignored", "the_full_case", "--", "--list"],
-             work, "crash-case-cargo"),
-            ("点名崩溃枚举用例、-- --include-ignored --exact the_full_case -- --list",
-             ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--include-ignored", "--exact", "the_full_case", "--",
-              "--list"], work, "crash-case-cargo"),
-            ("点名崩溃枚举用例、-- --ignored -- --list（一条都不跑，照拒：接受的误拒）",
-             ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--ignored", "--", "--list"], work, "crash-case-cargo"),
-            # --config 是 cargo 的全局选项，写在 test 之后照认（开关 configuration-before-subcommand-only 下前三格红）
-            ("--config 写在 test 之后定 runner、点名崩溃枚举用例不带 --ignored",
-             ["cargo", "test", "--config", 'target.x86_64-unknown-linux-gnu.runner="/tmp/add-ignored.sh"', "-p", "singlefs-harness", "--test",
-              "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("--config= 写在 --test 之后定 runner", ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration",
-                                                   '--config=target.x86_64-unknown-linux-gnu.runner="/tmp/add-ignored.sh"'], work, "crash-case-cargo"),
-            ("--config 行内表写在 test 之后定 runner",
-             ["cargo", "test", "--config", 'target.x86_64-unknown-linux-gnu = { runner = "/tmp/add-ignored.sh" }', "-p", "singlefs-harness", "--test",
-              "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("--config 写在 -- 之后是测试二进制的参数、不是 cargo 的", ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--",
-                                                           "--config", 'target.x86_64-unknown-linux-gnu.runner="/tmp/add-ignored.sh"'], work, None),
-            ("--features 的值碰巧是 --config（不是 cargo 的 --config）", ["cargo", "test", "--features", "--config", "-p", "singlefs-harness", "--test",
-                                                              "sample_crash_enumeration"], work, None),
-            # 用例函数的每一处定义都要标 #[ignore]；判不出标没标的按没标算（开关：admission.py 的 first-definition-only、ignore-attribute-without-space，
-            # 这里的 undecided-ignore-allowed）
-            ("点名同名函数 cfg 二选一、一份不标的登记目标、不带 --ignored", ["cargo", "test", "--release", "-p", "singlefs-harness", "--test",
-                                                          "cfg_split_crash_enumeration"], work, "crash-case-cargo"),
-            ("点名子模块里同名标 ignore 写在前面、顶层那一份不标的登记目标、不带 --ignored",
-             ["cargo", "test", "-p", "singlefs-harness", "--test", "submodule_first_crash_enumeration"], work, "crash-case-cargo"),
-            ("点名用例是宏生成的（找不到字面的 fn <名>(）登记目标、不带 --ignored：判不出按没标算",
-             ["cargo", "test", "-p", "singlefs-harness", "--test", "macro_crash_enumeration"], work, "crash-case-cargo"),
-            ("点名用例函数标的是 # [ignore]（# 与 [ 之间有空格）的登记目标、不带 --ignored", ["cargo", "test", "-p", "singlefs-harness", "--test",
-                                                                      "spaced_ignore_crash_enumeration"], work, None),
-            # 顺着 include! 带进来的同名用例一起判（admission.py 的弄坏开关 target-own-files-only 下头一格红）
-            ("点名 release 下 include! 进来一份不标的同名用例的登记目标、不带 --ignored",
-             ["cargo", "test", "--release", "-p", "singlefs-harness", "--test", "include_crash_enumeration"], work, "crash-case-cargo"),
-            ("点名 include! 进来的同名用例标了 ignore 的登记目标、不带 --ignored",
-             ["cargo", "test", "--release", "-p", "singlefs-harness", "--test", "marked_include_crash_enumeration"], work, None),
         ]
         # lib_shell_words 前缀表之外、包在命令外面照样起那条命令的程序（command_under_launcher）
         launcher_cases = [
-            ("/usr/bin/time -v 包一层、点名崩溃枚举用例带 --ignored",
-             ["/usr/bin/time", "-v", "cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--ignored"], work, "crash-case-cargo"),
-            ("time -f 格式 -o 文件包一层层 0 目标",
-             ["time", "-f", "%M", "-o", "/tmp/t", "cargo", "test", "--release", "-p", "singlefs-harness", "--test", "first_transaction_step_seven_layer0"],
-             work, "layer0-cargo"),
+            ("/usr/bin/time -v 包 checker 档", ["/usr/bin/time", "-v", "cargo", "test", "-p", "singlefs-checker-tier"], work, "checker-tier-cargo"),
+            ("time -f 格式 -o 文件包 checker 档的集成测试",
+             ["time", "-f", "%M", "-o", "/tmp/t", "cargo", "test", "--release", "-p", "singlefs-checker-tier", "--test", "first_transaction_step_seven_layer0"],
+             work, "checker-tier-cargo"),
+            ("systemd-run --working-directory= 进 checker 档裸跑",
+             ["systemd-run", "--user", "--scope", "--working-directory=crates/singlefs-checker-tier", "cargo", "test"], work, "checker-tier-cargo"),
+            ("systemd-run --working-directory= 进 harness 档裸跑",
+             ["systemd-run", "--user", "--scope", "--working-directory=crates/singlefs-harness", "cargo", "test"], work, None),
             ("flock -w 秒数 锁文件 包一层", ["flock", "-w", "5", "/tmp/lock", "cargo", "test", "--workspace"], work, "full-cargo"),
             ("flock 锁文件 -c 字符串", ["flock", "/tmp/lock", "-c", "cargo test --workspace"], work, "full-cargo"),
             ("rustup run --install stable 包一层", ["rustup", "run", "--install", "stable", "cargo", "test", "--all"], work, "full-cargo"),
@@ -1102,8 +966,6 @@ def selftest():
             ("prlimit --as= 包一层", ["prlimit", "--as=8000000000", "cargo", "test", "--all"], work, "full-cargo"),
             ("systemd-run --user --scope -p MemoryMax=8G 包一层", ["systemd-run", "--user", "--scope", "-q", "-p", "MemoryMax=8G", "cargo", "test", "--all"],
              work, "full-cargo"),
-            ("systemd-run --working-directory= 进 harness 裸跑",
-             ["systemd-run", "--user", "--scope", "--working-directory=crates/singlefs-harness", "cargo", "test"], work, "layer0-cargo"),
             ("strace -f -o 文件包一层", ["strace", "-f", "-o", "/tmp/trace", "cargo", "test", "--all"], work, "full-cargo"),
             ("perf stat -e 事件包一层", ["perf", "stat", "-e", "cycles", "cargo", "test", "--all"], work, "full-cargo"),
             ("perf record -g -- 之后", ["perf", "record", "-g", "--", "cargo", "test", "--all"], work, "full-cargo"),
@@ -1121,34 +983,17 @@ def selftest():
             ("/usr/bin/time -ao 文件（短选项合写）", ["/usr/bin/time", "-ao", "/tmp/t", "cargo", "test", "--all"], work, "full-cargo"),
             ("strace -o文件（值贴着写）", ["strace", "-o/tmp/s", "cargo", "test", "--all"], work, "full-cargo"),
             # systemd-run -E / --setenv 设的变量带进里面那条命令（开关 launcher-drops-setenv 下前三格红）
-            ("systemd-run -E 设 runner、点名崩溃枚举用例不带 --ignored",
-             ["systemd-run", "--user", "--scope", "-E", "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh", "cargo", "test", "-p",
-              "singlefs-harness", "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("systemd-run --setenv= 设 runner、点名崩溃枚举用例不带 --ignored",
-             ["systemd-run", "--user", "--scope", "--setenv=CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh", "cargo", "test", "-p",
-              "singlefs-harness", "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("systemd-run -qE 合写设 runner、点名崩溃枚举用例不带 --ignored",
-             ["systemd-run", "--user", "--scope", "-qE", "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh", "cargo", "test", "-p",
-              "singlefs-harness", "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("systemd-run -E 设的不是 runner（值的末段叫 strace 也不当包装剥）、点名崩溃枚举用例不带 --ignored",
-             ["systemd-run", "--user", "--scope", "-E", "TRACER=/usr/bin/strace", "cargo", "test", "-p", "singlefs-harness", "--test",
-              "sample_crash_enumeration"], work, None),
+            ("systemd-run -E 设别名", ["systemd-run", "--user", "--scope", "-E", alias_to_tier, "cargo", "xt"], work, "checker-tier-cargo"),
+            ("systemd-run --setenv= 设别名", ["systemd-run", "--user", "--scope", "--setenv=" + alias_to_tier, "cargo", "xt"], work, "checker-tier-cargo"),
+            ("systemd-run -qE 合写设别名", ["systemd-run", "--user", "--scope", "-qE", alias_to_tier, "cargo", "xt"], work, "checker-tier-cargo"),
+            ("systemd-run -E 设的不是别名（值的末段叫 strace 也不当包装剥）", ["systemd-run", "--user", "--scope", "-E", "TRACER=/usr/bin/strace", "cargo", "xt"],
+             work, None),
             # strace -E / --env 设的变量同样带进里面那条命令（开关 strace-drops-env 下前四格红）
-            ("strace -E 设 runner、点名崩溃枚举用例不带 --ignored",
-             ["strace", "-f", "-E", "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh", "cargo", "test", "-p", "singlefs-harness",
-              "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("strace --env= 设 runner、点名崩溃枚举用例不带 --ignored",
-             ["strace", "--env=CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh", "cargo", "test", "-p", "singlefs-harness",
-              "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("strace --env 值另起一个词、设 runner、点名崩溃枚举用例不带 --ignored",
-             ["strace", "--env", "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh", "cargo", "test", "-p", "singlefs-harness",
-              "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("strace -fE 合写设 runner、点名崩溃枚举用例不带 --ignored",
-             ["strace", "-fE", "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh", "cargo", "test", "-p", "singlefs-harness",
-              "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("strace -E 只清变量（不带 =）、点名崩溃枚举用例不带 --ignored",
-             ["strace", "-E", "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER", "cargo", "test", "-p", "singlefs-harness", "--test",
-              "sample_crash_enumeration"], work, None),
+            ("strace -E 设别名", ["strace", "-f", "-E", alias_to_tier, "cargo", "xt"], work, "checker-tier-cargo"),
+            ("strace --env= 设别名", ["strace", "--env=" + alias_to_tier, "cargo", "xt"], work, "checker-tier-cargo"),
+            ("strace --env 值另起一个词设别名", ["strace", "--env", alias_to_tier, "cargo", "xt"], work, "checker-tier-cargo"),
+            ("strace -fE 合写设别名", ["strace", "-fE", alias_to_tier, "cargo", "xt"], work, "checker-tier-cargo"),
+            ("strace -E 只清变量（不带 =）", ["strace", "-E", "CARGO_ALIAS_XT", "cargo", "xt"], work, None),
             # 要值的长选项、值另起一个词：跳过那个值（开关 launcher-long-options-partial 下前四格红）
             ("systemd-run --user --scope --expand-environment no（值另起一个词）包一层",
              ["systemd-run", "--user", "--scope", "--expand-environment", "no", "cargo", "test", "--all"], work, "full-cargo"),
@@ -1158,106 +1003,43 @@ def selftest():
             ("strace --quiet（不带值的长选项）包一层", ["strace", "--quiet", "cargo", "test", "--all"], work, "full-cargo"),
             ("systemd-run --user --scope --collect --same-dir（不带值的长选项）包一层",
              ["systemd-run", "--user", "--scope", "--collect", "--same-dir", "cargo", "test", "--all"], work, "full-cargo"),
-            # systemd-run -p Environment= / EnvironmentFile= 设给里面那条命令的变量（开关 launcher-drops-property-environment 下前五格红）
-            ("systemd-run -p Environment= 设 runner、点名崩溃枚举用例不带 --ignored",
-             ["systemd-run", "--user", "--wait", "--pipe", "-p", "Environment=CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh", "cargo",
-              "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("systemd-run --property=Environment= 设两个变量、第二个是 runner",
-             ["systemd-run", "--user", "--wait", "--pipe", '--property=Environment=A=1 "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add ignored.sh"',
-              "cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("systemd-run --prop Environment=（长选项只写前缀）设 runner",
-             ["systemd-run", "--user", "--wait", "--pipe", "--prop", "Environment=CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh", "cargo",
-              "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("systemd-run -p EnvironmentFile= 文件里设 runner",
-             ["systemd-run", "--user", "--wait", "--pipe", "-p", "EnvironmentFile=" + os.path.join(work, "runner.env"), "cargo", "test", "-p",
-              "singlefs-harness", "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("systemd-run -p EnvironmentFile=- 读不了的文件（里面设了什么判不出，按设了 runner 算）",
-             ["systemd-run", "--user", "--wait", "--pipe", "-p", "EnvironmentFile=-" + os.path.join(work, "no-such.env"), "cargo", "test", "-p",
-              "singlefs-harness", "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
-            ("systemd-run -p Environment= 设的不是 runner、点名崩溃枚举用例不带 --ignored",
-             ["systemd-run", "--user", "--wait", "--pipe", "-p", "Environment=RUST_BACKTRACE=1", "cargo", "test", "-p", "singlefs-harness", "--test",
-              "sample_crash_enumeration"], work, None),
-            ("systemd-run -p EnvironmentFile= 文件里设的不是 runner",
-             ["systemd-run", "--user", "--wait", "--pipe", "-p", "EnvironmentFile=" + os.path.join(work, "plain.env"), "cargo", "test", "-p",
-              "singlefs-harness", "--test", "sample_crash_enumeration"], work, None),
+            # systemd-run -p Environment= / EnvironmentFile= 设给里面那条命令的变量（开关 launcher-drops-property-environment 下前四格红）
+            ("systemd-run -p Environment= 设别名", ["systemd-run", "--user", "--wait", "--pipe", "-p", 'Environment="' + alias_to_tier + '"', "cargo", "xt"],
+             work, "checker-tier-cargo"),
+            ("systemd-run --property=Environment= 设两个变量、第二个是别名",
+             ["systemd-run", "--user", "--wait", "--pipe", '--property=Environment=A=1 "' + alias_to_tier + '"', "cargo", "xt"], work, "checker-tier-cargo"),
+            ("systemd-run --prop Environment=（长选项只写前缀）设别名", ["systemd-run", "--user", "--wait", "--pipe", "--prop", 'Environment="' + alias_to_tier + '"',
+                                                                  "cargo", "xt"], work, "checker-tier-cargo"),
+            ("systemd-run -p EnvironmentFile= 文件里设别名", ["systemd-run", "--user", "--wait", "--pipe", "-p", "EnvironmentFile=" + os.path.join(work, "alias.env"),
+                                                         "cargo", "xt"], work, "checker-tier-cargo"),
+            ("systemd-run -p Environment= 设的不是别名", ["systemd-run", "--user", "--wait", "--pipe", "-p", "Environment=RUST_BACKTRACE=1", "cargo", "xt"], work, None),
+            ("systemd-run -p EnvironmentFile= 文件里设的不是别名", ["systemd-run", "--user", "--wait", "--pipe", "-p", "EnvironmentFile=" + os.path.join(work, "plain.env"),
+                                                               "cargo", "xt"], work, None),
         ]
         binary_cases = [
-            ("绝对路径的层 0 测试二进制", [os.path.join(work, "target", "release", "deps", layer0_binary), "--test-threads", "4"], work, "layer0-binary"),
-            ("相对路径的层 0 测试二进制", [os.path.join("target", "debug", "deps", layer0_binary)], work, "layer0-binary"),
-            ("带目标三元组、自定的 target 目录", ["/tmp/target-elsewhere/x86_64-unknown-linux-gnu/release/deps/some_layer0_stream-fedcba9876543210"], work, "layer0-binary"),
-            ("经 timeout 包一层", ["timeout", "600", os.path.join(".", "target", "release", "deps", layer0_binary), "--exact", "case"], work, "layer0-binary"),
-            ("名字不含 layer0 的测试二进制", [os.path.join(work, "target", "release", "deps", "second_transaction_step_one_overwrite-0123456789abcdef")], work, None),
-            ("deps 下的 .d 依赖文件不是二进制", [os.path.join(work, "target", "release", "deps", layer0_binary + ".d")], work, None),
+            ("绝对路径的 checker 档集成测试二进制", [os.path.join(work, "target", "release", "deps", tier_binary), "--test-threads", "4"], work, "checker-tier-binary"),
+            ("相对路径的 checker 档集成测试二进制", [os.path.join("target", "debug", "deps", tier_binary)], work, "checker-tier-binary"),
+            ("经 timeout 包一层", ["timeout", "600", os.path.join(".", "target", "release", "deps", tier_binary), "--exact", "case"], work, "checker-tier-binary"),
+            ("checker 档装置二进制的内联单测", [os.path.join(work, "target", "debug", "deps", "e161_sample_device-0123456789abcdef")], work, "checker-tier-binary"),
+            ("checker 档库的单测", [os.path.join(work, "target", "debug", "deps", "singlefs_checker_tier-0123456789abcdef")], work, "checker-tier-binary"),
+            ("checker 档二进制 --logfile --list（--list 是日志文件名）", [os.path.join(work, "target", "release", "deps", tier_binary), "--logfile", "--list"], work,
+             "checker-tier-binary"),
+            ("checker 档二进制 --list（只列）", [os.path.join(work, "target", "release", "deps", tier_binary), "--list"], work, None),
+            ("harness 档的测试二进制", [os.path.join(work, "target", "release", "deps", "second_transaction_step_one_overwrite-0123456789abcdef")], work, None),
+            ("名字带 layer0 而不是 checker 档的二进制（按包判，不按名字）", ["/tmp/target-elsewhere/release/deps/some_layer0_stream-fedcba9876543210"], work, None),
+            ("deps 下的 .d 依赖文件不是二进制", [os.path.join(work, "target", "release", "deps", tier_binary + ".d")], work, None),
             ("哈希不是 16 位", [os.path.join(work, "target", "release", "deps", "first_transaction_step_seven_layer0-0123abcd")], work, None),
-            ("名字只当参数", ["grep", "-c", "x", os.path.join("target", "release", "deps", layer0_binary)], work, None),
-            ("崩溃枚举用例的测试二进制带 --include-ignored",
-             [os.path.join(work, "target", "release", "deps", "sample_crash_enumeration-0123456789abcdef"), "--include-ignored", "--exact", "the_full_case"],
-             work, "crash-case-binary"),
-            ("崩溃枚举用例的测试二进制不带 --ignored", [os.path.join(work, "target", "release", "deps", "sample_crash_enumeration-0123456789abcdef")], work, None),
-            ("用例函数没标 #[ignore] 的登记用例的测试二进制、不带 --ignored",
-             [os.path.join(work, "target", "release", "deps", "unmarked_crash_enumeration-0123456789abcdef")], work, "crash-case-binary"),
-            ("崩溃枚举用例的测试二进制 --ignored --list", [os.path.join(work, "target", "release", "deps", "sample_crash_enumeration-0123456789abcdef"),
-                                                  "--ignored", "--list"], work, None),
-            ("层 0 测试二进制 --list", [os.path.join(work, "target", "release", "deps", layer0_binary), "--list"], work, None),
-            ("崩溃枚举用例的测试二进制 --include-ignored --skip --list（--list 是 --skip 的值）",
-             [os.path.join(work, "target", "release", "deps", "sample_crash_enumeration-0123456789abcdef"), "--include-ignored", "--skip", "--list"],
-             work, "crash-case-binary"),
-            ("层 0 测试二进制 --logfile --list（--list 是日志文件名）", [os.path.join(work, "target", "release", "deps", layer0_binary), "--logfile", "--list"],
-             work, "layer0-binary"),
-            ("崩溃枚举用例的测试二进制 --include-ignored the_full_case -- --list（-- 之后 --list 是过滤词）",
-             [os.path.join(work, "target", "release", "deps", "sample_crash_enumeration-0123456789abcdef"), "--include-ignored", "the_full_case", "--",
-              "--list"], work, "crash-case-binary"),
-            # 名字认不出（拷走改名、find -exec）时按参数认：带 --ignored 又点名登记的用例函数
-            ("拷走改名的测试二进制带 --ignored --exact 登记的用例函数", ["/tmp/elsewhere/rc", "--ignored", "--exact", "the_full_case"], work, "crash-case-binary"),
-            ("find -exec 执行测试二进制、点名登记的用例函数",
-             ["find", "target", "-name", "sample_crash_enumeration-*", "-exec", "{}", "--ignored", "the_full_case", ";"], work, "crash-case-binary"),
-            ("拷走改名的测试二进制带 --ignored、不点名用例函数：认不出（文件头「看不见的」）", ["/tmp/elsewhere/rc", "--ignored"], work, None),
-            ("grep 找 --include-ignored 与用例函数名：按文本处理参数的不算", ["grep", "-rn", "-e", "--include-ignored", "-e", "the_full_case", "crates"],
-             work, None),
+            ("名字只当参数", ["grep", "-c", "x", os.path.join("target", "release", "deps", tier_binary)], work, None),
         ]
-        # 名字不含 layer0 的那几条：含 layer0 的按层 0 那一类先认出来，判不出登记表取没取到
-        own_repository_targets = sorted(target for _package, target in registered_crash_case_targets(HOOK_REPOSITORY) if "layer0" not in target)
+        own_repository_targets = sorted(checker_test_targets(HOOK_REPOSITORY))
         if own_repository_targets:
-            binary_cases.append(("仓外执行、登记表取这份文件所在仓的那一份：那里登记的崩溃枚举用例带 --ignored",
-                                 [f"/tmp/target-elsewhere/release/deps/{own_repository_targets[0]}-0123456789abcdef", "--ignored"], "/",
-                                 "crash-case-binary"))
+            binary_cases.append(("仓外执行、取这份文件所在仓的 checker 档包：直接执行它的测试二进制按包判",
+                                 [f"/tmp/target-elsewhere/release/deps/{own_repository_targets[0]}-0123456789abcdef"], "/", "checker-tier-binary"))
         else:
-            results.append((f"这份文件所在仓的登记表（{os.path.join(HOOK_REPOSITORY, CRASH_CASE_REGISTRY)}）里有名字不含 layer0 的崩溃枚举用例",
-                            True, False))
+            results.append((f"这份文件所在仓（{HOOK_REPOSITORY}）里找得到 checker 档包的测试目标", True, False))
         for label, argv, cwd, want in cargo_cases + launcher_cases + binary_cases:
             found = classify_process(argv, cwd)
             results.append((label, want, found[0].kind if found else None))
-        # 导入不了 admission.py 时判不出标没标：点名登记目标、不带 --ignored 的 cargo test 按没标算（开关 undecided-ignore-allowed 下这一格红）
-        module_globals, saved_module_path = globals(), ADMISSION_MODULE_PATH
-        module_globals["ADMISSION_MODULE_PATH"] = os.path.join(work, "no-such-admission.py")
-        admission_module.cache_clear()
-        try:
-            found = classify_process(["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration"], work)
-        finally:
-            module_globals["ADMISSION_MODULE_PATH"] = saved_module_path
-            admission_module.cache_clear()
-        results.append(("导入不了 admission.py：点名标了 #[ignore] 的登记目标、不带 --ignored 的 cargo test 按没标算", "crash-case-cargo",
-                        found[0].kind if found else None))
-        # 导入得了、判的那一刻抛异常（判法函数里调的名字改了没跟上、闸调的函数改了名）：同样按判不出算（开关 judging-error-propagates 下两格红）
-        raising_modules = [
-            ("判的那一刻抛 NameError", "def test_function_is_marked_ignored(*arguments):\n    return definitions_marked_ignored(*arguments)\n"),
-            ("闸调的 test_function_is_marked_ignored 改了名（AttributeError）", "def renamed_marked_ignored(*arguments):\n    return True\n"),
-        ]
-        for label, module_text in raising_modules:
-            stub_path = os.path.join(work, "raising-admission.py")
-            with open(stub_path, "w", encoding="utf-8") as handle:
-                handle.write(module_text)
-            module_globals["ADMISSION_MODULE_PATH"] = stub_path
-            admission_module.cache_clear()
-            try:
-                found = classify_process(["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration"], work)
-                got = found[0].kind if found else None
-            except Exception as error:  # 弄坏开关 judging-error-propagates 下异常抛到这里：闸的入口接住之后放行
-                got = f"抛了 {error!r}（闸的入口接住之后放行）"
-            finally:
-                module_globals["ADMISSION_MODULE_PATH"] = saved_module_path
-                admission_module.cache_clear()
-            results.append((f"admission.py 导入得了、{label}：点名标了 #[ignore] 的登记目标、不带 --ignored 的 cargo test 按判不出算", "crash-case-cargo", got))
         name_cases = [
             ("门禁阶段按名字判", ".claude/gate.d/12-no-prime-marks.sh", work, True),
             ("仓内位置上的 gate-staged.sh 按名字判", "research/scripts/gate-staged.sh", work, True),
@@ -1305,16 +1087,14 @@ def selftest():
     for label, want, got in failures:
         print(f"  ✗ lib_heavy_tests 自检：{label} 应当是 {want}，实际 {got}")  # gate-lint:detail
     if failures:
-        print("    → 看 classify()、cargo_subcommand()、cargo_use()、test_invocation()、crash_case_run()、command_under_launcher()、launcher_option()、"
-              "libtest_lists_only()、runner_of_test_binaries()、crash_case_function_runs_without_ignored()、test_binary_name()、"
+        print("    → 看 classify()、cargo_subcommand()、cargo_use()、package_specification_members()、alias_expansion()、test_invocation()、"
+              "command_under_launcher()、launcher_option()、libtest_lists_only()、checker_test_targets()、test_binary_name()、"
               "runs_compiled_code()、classify_process()、judged_by_name() 与 TEST_BINARY_PATH / BUILT_BINARY_PATH / COMPILED_CODE_SUBCOMMANDS / "
-              "KNOWN_SCRIPT_LOCATIONS / LAUNCHER_OPTIONS_WITH_VALUE / LIBTEST_OPTIONS_WITH_VALUE 几张表；判用例函数标没标 #[ignore] 的那一段在 "
-              f"research/scripts/admission.py；{BREAK_VARIABLE} 或 ADMISSION_BREAK 设着的话这里本来就该红")
+              f"KNOWN_SCRIPT_LOCATIONS / LAUNCHER_OPTIONS_WITH_VALUE / LIBTEST_OPTIONS_WITH_VALUE 几张表；{BREAK_VARIABLE} 设着的话这里本来就该红")
         return 1
     print(f"  ✓ lib_heavy_tests 自检通过（查了 {len(results)} 种：cargo 与包装过的命令行 {len(cargo_cases)} 种、"
           f"/usr/bin/time、flock、systemd-run 这一类包在外面的 {len(launcher_cases)} 种、"
-          f"直接执行的测试二进制 {len(binary_cases)} 种、按名字判的脚本 {len(name_cases)} 种、跑不跑编译出来的代码 {len(compiled_cases)} 种、"
-          f"导入不了 admission.py 1 种、导入得了而判的时候抛异常 {len(raising_modules)} 种）")
+          f"直接执行的测试二进制 {len(binary_cases)} 种、按名字判的脚本 {len(name_cases)} 种、跑不跑编译出来的代码 {len(compiled_cases)} 种）")
     return 0
 
 

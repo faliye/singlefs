@@ -11,7 +11,7 @@ use common::{build_pool, crash_state_devices, parameters, IMAGE_BYTES};
 use singlefs_core::address::DeviceIdentity;
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::mount::{mount_writable, DeviceCount, DeviceTableDisagreement, MountError};
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
+use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 type RecordedSparse = RecordingBlockDevice<SparseBlockDevice>;
@@ -38,7 +38,7 @@ fn mount_refused_before_any_write(
 ) -> MountError {
     let images_before: Vec<_> = devices
         .iter()
-        .map(|(_, device)| device.inner().image.clone())
+        .map(|(_, device)| device.wrapped_device().image.clone())
         .collect();
     let refusal = mount_writable(&parameters(), devices)
         .expect_err("盘表与盘上系统配置不一致，可写挂载必须拒");
@@ -48,7 +48,11 @@ fn mount_refused_before_any_write(
         "拒在任何写之前：录制流一步都没有（没发写、没发屏障）"
     );
     for (index, ((_, device), before)) in devices.iter().zip(&images_before).enumerate() {
-        assert_eq!(&device.inner().image, before, "盘表第 {index} 项逐字节不变");
+        assert_eq!(
+            &device.wrapped_device().image,
+            before,
+            "盘表第 {index} 项逐字节不变"
+        );
     }
     refusal
 }

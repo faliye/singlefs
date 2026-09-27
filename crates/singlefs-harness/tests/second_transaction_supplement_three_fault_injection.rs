@@ -24,8 +24,6 @@ use singlefs_core::transaction::{
     FirstFile, PoolVersion, PoolWriter, PublishError,
 };
 use singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE;
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
-use singlefs_harness::crash_injection::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::fault_injection::{
     inject_faults_into_history, inject_one_fault_into_the_segment, run_fault_injection_campaign,
     AcquiredInstanceLeft, AcquiredInstanceLeftAfterAFailedMount, DrawnFault, FaultCounting,
@@ -33,6 +31,7 @@ use singlefs_harness::fault_injection::{
     FaultInjectionWorkerThreads, FaultOccurrence, FaultOutcome, FaultPlacement, FaultSchedule,
     FaultedSegment, FaultedSegmentKind, FlippedBit, InjectedFault, SharedFaultPlan,
 };
+use singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::history::{
     execute_history_with, execute_history_with_faults, generate_history_with_weights,
     ContentChoice, ContentLength, FailureSignature, FloorTargetChoice, GeneratedHistory,
@@ -40,6 +39,7 @@ use singlefs_harness::history::{
     HistoryOperation, HistoryOperationKind, HistoryRun, HistorySeed, HistoryStartingPoint,
     PerStepChecker, StartingPointStep, StepPosition,
 };
+use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::model::ModelDisagreementAspect;
 use singlefs_harness::scenario::{e142_parameters, first_file_content, FIXED_WRITE_TIME_SECONDS};
 use singlefs_harness::segments::{FixedGeometry, StepKind};

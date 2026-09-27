@@ -51,8 +51,8 @@ use singlefs_core::transaction::{
 };
 use singlefs_core::unit::data_unit_payload_capacity;
 use singlefs_format::{JOURNAL_RING_DEFAULT_BYTES, SLOT_BYTES};
-use singlefs_harness::crash::SparseBlockDevice;
 use singlefs_harness::history::HistoryDeviceWidth;
+use singlefs_harness::memory_pool::SparseBlockDevice;
 
 const GIBIBYTE: u64 = 1 << 30;
 

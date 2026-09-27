@@ -24,9 +24,11 @@ use singlefs_core::transaction::{
     acquire_instance, publish_first_file, warm_up, FirstFile, PoolVersion, PoolWriter,
     TransactionOutput,
 };
-use singlefs_harness::crash::{MemoryPool, PublishedVersion, SparseBlockDevice, SparseDevice};
 use singlefs_harness::fault_injection::FaultInjectingBlockDevice;
 use singlefs_harness::history::HistoryDeviceWidth;
+use singlefs_harness::memory_pool::{
+    MemoryPool, PublishedVersion, SparseBlockDevice, SparseDevice,
+};
 use singlefs_harness::RecordingBlockDevice;
 
 /// 第一个文件与之后几次覆盖写的写入时刻起点（与 `tests/common` 的 `FIXED_WRITE_TIME_SECONDS` 同一个数）。
@@ -48,13 +50,13 @@ impl DeviceOverASparseImage for SparseBlockDevice {
 
 impl DeviceOverASparseImage for FaultInjectingBlockDevice<SparseBlockDevice> {
     fn sparse_image(&self) -> &SparseDevice {
-        &self.inner().image
+        &self.wrapped_device().image
     }
 }
 
 impl DeviceOverASparseImage for RecordingBlockDevice<SparseBlockDevice> {
     fn sparse_image(&self) -> &SparseDevice {
-        &self.inner().image
+        &self.wrapped_device().image
     }
 }
 

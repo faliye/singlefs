@@ -35,10 +35,10 @@ use singlefs_core::transaction::{
 };
 use singlefs_core::write_accounting::WriteCallsAndBytes;
 use singlefs_format::{CLUSTER_SEGMENT_SLOTS, UNIT_AREA_START_SLOT};
-use singlefs_harness::crash::SparseBlockDevice;
 use singlefs_harness::fault_injection::{
     FaultInjectingBlockDevice, FaultSchedule, InjectedFault, SharedFaultPlan,
 };
+use singlefs_harness::memory_pool::SparseBlockDevice;
 use singlefs_harness::{RecordedOperationKind, RecordingBlockDevice, SharedStream};
 
 /// 分配记录树根之下 (层级, 盘, 同盘同层序号) 那个节点的角色（D8（核心索引结构） 已定项 14：按绝对槽号按位置寻址）。

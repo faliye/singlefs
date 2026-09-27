@@ -33,7 +33,7 @@ use singlefs_core::transaction::{
     PoolWriter, ZeroUnitPublishPlan,
 };
 use singlefs_format::{NODE_BYTES, UNIT_AREA_START_SLOT};
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
+use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 type RecordedMemoryDevice = RecordingBlockDevice<SparseBlockDevice>;

@@ -34,7 +34,7 @@ use singlefs_core::transaction::{
     JournalRecordNamedEntryCapacity, PoolWriter, PublishPlan, ZeroUnitPublishPlan,
 };
 use singlefs_format::{JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES};
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
+use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::{RecordedOperationKind, RecordingBlockDevice, SharedStream};
 
 const DISKS: [DeviceIdentity; 2] = [DeviceIdentity(0), DeviceIdentity(1)];

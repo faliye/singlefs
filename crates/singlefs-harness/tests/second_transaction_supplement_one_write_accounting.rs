@@ -18,11 +18,11 @@ use singlefs_core::transaction::{
 use singlefs_core::write_accounting::{
     WriteCallsAndBytes, WritesByStructureKind, WrittenStructureKind,
 };
-use singlefs_harness::crash::SparseBlockDevice;
 use singlefs_harness::fault_injection::{
     FaultCounting, FaultDeviceSelector, FaultInjectingBlockDevice, FaultOccurrence, FaultPlacement,
     FaultSchedule, InjectedFault, SharedFaultPlan,
 };
+use singlefs_harness::memory_pool::SparseBlockDevice;
 use singlefs_harness::scenario::{e142_parameters, first_file_content, FIXED_WRITE_TIME_SECONDS};
 use singlefs_harness::segments::FixedGeometry;
 use singlefs_harness::{

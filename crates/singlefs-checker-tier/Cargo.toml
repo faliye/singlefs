@@ -1,0 +1,12 @@
+[package]
+name = "singlefs-checker-tier"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "checker 档：崩溃态枚举引擎、记录核对器、oracle、断点续跑、崩溃注入与坏盘输入战役、真设备与实验装置，以及它们的用例；默认只在提交时跑（D13 已定项 15，.claude/rules/verification.md）。判决器库在 singlefs-checker，脚手架在 singlefs-harness"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-harness = { path = "../singlefs-harness" }

@@ -3,7 +3,7 @@
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 实验源码的两条读数纪律——种子不许折叠，读数不许恒为字面量 0
 #
-# 判据：扫 `research/e7-index-bench/src/bin/*.rs` 与住在 crates 下的实验装置 `crates/singlefs-harness/src/bin/e<号>*.rs`
+# 判据：扫 `research/e7-index-bench/src/bin/*.rs` 与住在 crates 下的实验装置 `crates/singlefs-checker-tier/src/bin/e<号>*.rs`
 # （与门禁 80 号同规矩：住在 crates 下的实验照样是实验），两条各自成段、两条都判完再退出（一次把问题说全）。
 #   ① C59（种子折叠成同一个状态）：名字里带 `seed` 的标识符后面直接跟 `| 1` 或 `& !1`，判红。
 #      `seed | 1` 把 2 与 3、4 与 5 折成同一个状态：命令行给五个种子，实际只有三个访问模式，
@@ -48,7 +48,7 @@
 #   代价是同一个文件里删一行再加一行它看不出来。
 #
 # 判别力：fixtures/96-experiment-source-discipline.sh/red 是一个同时犯两条的小仓，另带一张挂在认不出的欠账表上的豁免表、
-# 一份住在 crates/singlefs-harness/src/bin/ 下同样折叠了种子的装置，豁免表基准那一版的 blob 被 setup.sh 从对象库里删掉，必须判红；
+# 一份住在 crates/singlefs-checker-tier/src/bin/ 下同样折叠了种子的装置，豁免表基准那一版的 blob 被 setup.sh 从对象库里删掉，必须判红；
 # green 是同一份源码加上两张对得上的豁免表，必须判绿。
 #
 #   bash .claude/gate.d/96-experiment-source-discipline.sh [项目根]
@@ -73,7 +73,7 @@ base = sys.argv[1]
 owed_library_spec = importlib.util.spec_from_file_location("owed", sys.argv[2])
 owed_library = importlib.util.module_from_spec(owed_library_spec)
 owed_library_spec.loader.exec_module(owed_library)
-BIN_GLOBS = ("research/e7-index-bench/src/bin/*.rs", "crates/singlefs-harness/src/bin/e[0-9]*.rs")
+BIN_GLOBS = ("research/e7-index-bench/src/bin/*.rs", "crates/singlefs-checker-tier/src/bin/e[0-9]*.rs")
 BIN_GLOB = " 与 ".join(BIN_GLOBS)
 OWED_PATH = ".claude/kb/checks-owed.md"
 SEED_LAG = ".claude/gate.d/experiment-seed-fold-lag.tsv"

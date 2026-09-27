@@ -31,11 +31,11 @@ use singlefs_core::root_ring::target_for_publish;
 use singlefs_core::transaction::{publish_overwrite, FirstFile, PoolWriter};
 use singlefs_core::unit::{UNIT_CLASS_DATA, UNIT_CLASS_INDEX_NODE, UNIT_CLASS_PACKED};
 use singlefs_format::{DATA_UNIT_BYTES, NODE_BYTES};
-use singlefs_harness::crash::{MemoryPool, SparseDevice};
 use singlefs_harness::fault_injection::{
     FaultCounting, FaultDeviceSelector, FaultInjectingBlockDevice, FaultOccurrence, FaultPlacement,
     FaultSchedule, InjectedFault, SharedFaultPlan,
 };
+use singlefs_harness::memory_pool::{MemoryPool, SparseDevice};
 
 /// 掉了的那块盘：txg 6 的根落在区域 0，区域 0 归盘 0（D2（RAID 条带策略） 已定项 7 的 0 / 1 / 0）。
 const LOST_DEVICE: DeviceIdentity = DeviceIdentity(0);

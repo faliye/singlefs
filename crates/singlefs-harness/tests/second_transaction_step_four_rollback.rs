@@ -8,11 +8,13 @@
 //! 与 C558（回退目标是环里最旧的根时回退那次发布会写坏它） 判可达性的用例。
 
 mod common;
+mod common_corrupted_allocation_record;
 
 use common::{
     abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before, build_pool, disk_snapshot,
     file_content, parameters, BuiltPool, Recorded, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
 };
+use common_corrupted_allocation_record::move_the_first_allocation_record_past_the_end_of_the_unit_area_and_reseal_the_chain;
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{
@@ -47,12 +49,11 @@ use singlefs_core::transaction::{
     PublishError, TransactionOutput, TransactionUnit,
 };
 use singlefs_format::UNIT_AREA_START_SLOT;
-use singlefs_harness::bad_disk_input::move_the_first_allocation_record_past_the_end_of_the_unit_area_and_reseal_the_chain;
-use singlefs_harness::crash::MemoryPool;
 use singlefs_harness::fault_injection::{
     injected_block_device_error, NamedRootRingSlots, PoolReaderWithUnreadableRootRingSlots,
     RootRingSlotTarget,
 };
+use singlefs_harness::memory_pool::MemoryPool;
 use std::collections::BTreeSet;
 
 const SECOND_FILE_BYTES: usize = 4100;

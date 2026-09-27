@@ -13,6 +13,5 @@ CLAUDE.md  # 项目自己的开工说明：本地规则清单、里程碑、分�
 .claude/kb/invariants.md  # 不变量清单是这个文件系统特有的，模板给不了内容
 .claude/kb/pitfalls.md  # 踩过的坑是项目自己的
 .claude/kb/prior-art.md  # 别家实现的调研是项目自己做的
-.claude/skills/crash-test/SKILL.md  # 桩的 description 按项目实际能力改过
 .claude/skills/decide/SKILL.md  # 同上
 .claude/skills/gate/SKILL.md  # 同上

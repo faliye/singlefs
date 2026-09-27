@@ -44,7 +44,7 @@ use singlefs_core::unit::{
     build_index_node, data_unit_payload_capacity, index_node_entry_capacity, parse_index_node,
 };
 use singlefs_format::{JOURNAL_RING_DEFAULT_BYTES, SLOT_BYTES, UNIT_AREA_START_SLOT};
-use singlefs_harness::crash::MemoryPool;
+use singlefs_harness::memory_pool::MemoryPool;
 use singlefs_harness::segments::{segment_kinds_text, segment_sizes_text, split_into_segments};
 
 /// 第二次写的内容：与第一次不同长、不同字节。

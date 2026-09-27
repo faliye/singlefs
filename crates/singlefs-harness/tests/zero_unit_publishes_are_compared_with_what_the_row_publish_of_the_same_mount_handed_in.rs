@@ -19,11 +19,11 @@ use singlefs_core::transaction::{
     VersionWithoutFilePublishOutput,
 };
 use singlefs_core::unit::{build_packed_unit, parse_packed_unit};
-use singlefs_harness::crash::SparseBlockDevice;
 use singlefs_harness::history::{
     execute_history, AppliedEffect, GeneratedHistory, HistoryDeviceWidth, HistoryEnding,
     HistoryOperation, HistorySeed, HistoryStartingPoint, StepOutcome,
 };
+use singlefs_harness::memory_pool::SparseBlockDevice;
 use singlefs_harness::model::{
     IdealModel, ModelAnswer, ModelDeviceIdentity, ModelDisagreement, ModelDisagreementAspect,
     ModelJudgementCounts, ModelPoolGeometry, ObservedEffect, ObservedOutcome, ObservedRoot,

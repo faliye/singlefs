@@ -15,7 +15,7 @@ use singlefs_core::block_device::{
     BlockDevice, BlockDeviceError, FileBackedBlockDevice, PhysicalBlockSizeInBytes, WriteDurability,
 };
 use singlefs_core::recovery::PoolReader;
-use singlefs_harness::crash::{CrashImage, MemoryPool, SparseBlockDevice, SECTOR_BYTES};
+use singlefs_harness::memory_pool::{CrashImage, MemoryPool, SparseBlockDevice, SECTOR_BYTES};
 
 /// 两边的盘都是 1 MiB、物理块 512 字节。
 const DEVICE_BYTES: u64 = 1 << 20;
