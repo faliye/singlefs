@@ -725,11 +725,72 @@ struct PublishWrites {
     checkpoint_txg: u64,
 }
 
-fn publishes_in(writes: &[RetainedWrite]) -> Vec<PublishWrites> {
+/// 交给记录核对器的写表是怎么来的：一条录制流从头到尾，还是一条被崩溃截断的录制流后面接上崩溃之后在那份崩溃后镜像上写出的流
+/// （[`publishes_in`] 按它在接缝处断开）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RecordStreamContinuity {
+    /// 一条录制流从头到尾（层 0 与崩溃注入第一截）。
+    OneRecording,
+    /// 写表前 `first_write_after_the_crash` 项是被一次崩溃截断的那条录制流（整条录下来的，截断处之后的写都记成没持久），
+    /// 从这一项起是崩溃之后在那份崩溃后镜像上写出的流（崩溃注入第二、三截：可写挂载那一段）。
+    ResumedAfterACrash {
+        first_write_after_the_crash: usize,
+        /// 那次崩溃之后只读恢复落到的那一版（恢复失败是 None）：截断处在飞的那次发布只在恢复落到它上（由它的记录重建）时算发生过。
+        version_landed_on_after_the_crash: Option<(InstanceGeneration, CheckpointTxg)>,
+    },
+}
+
+/// 写表里的每次发布。一条录制流里按根槽写分：一次根槽写之前、上一次根槽写之后的单元写与 journal 记录写都归它。
+///
+/// 写表是崩溃截断的流接上崩溃之后写出的流（[`RecordStreamContinuity::ResumedAfterACrash`]）时，在接缝处断开，两条流各分各的：
+/// - 截断的那条流末尾没等到根槽写的单元写与记录写，不归接缝之后的第一次发布（那次发布是崩溃之后另起的实例写的）；
+/// - 截断的那条流里只留崩溃之后那条时间线上的发布：根槽写落了盘的（`persisted`），与那次崩溃之后恢复落到的那一版
+///   （由记录重建时它的根槽写在截断处之后、没落盘）。截断处之后才写根槽写、恢复又没落到的发布没发生过：崩溃之后的挂载另起实例、
+///   txg 从盘上最大的往上接，与它们的 (实例, txg) 撞得上，挂载写的实例表也不带挂载自己实例的行，留着就会被当成恢复自称的那一版该有的发布。
+///
+/// 两条流接成一条来分（B3b 报告第二节第 4 条）会假红：第一次崩溃截在一次发布中间时，只接到截断处为止，那次发布没落根的单元写与记录写
+/// 归进挂载写行那次发布；整条接上，截断处之后的历史发布与挂载的发布撞了身份。
+fn publishes_in(
+    writes: &[RetainedWrite],
+    persisted: &[bool],
+    continuity: RecordStreamContinuity,
+) -> Vec<PublishWrites> {
+    match continuity {
+        RecordStreamContinuity::OneRecording => publishes_of_one_recording(writes, 0),
+        RecordStreamContinuity::ResumedAfterACrash {
+            first_write_after_the_crash,
+            version_landed_on_after_the_crash,
+        } => {
+            let (cut_recording, resumed_recording) = writes.split_at(first_write_after_the_crash);
+            publishes_of_one_recording(cut_recording, 0)
+                .into_iter()
+                .filter(|publish| {
+                    persisted[publish.root]
+                        || version_landed_on_after_the_crash
+                            == Some((
+                                InstanceGeneration(publish.instance),
+                                CheckpointTxg(publish.checkpoint_txg),
+                            ))
+                })
+                .chain(publishes_of_one_recording(
+                    resumed_recording,
+                    first_write_after_the_crash,
+                ))
+                .collect()
+        }
+    }
+}
+
+/// 一条录制流（`writes`，它的第一项在整张写表里的下标是 `first_write_index`）里的每次发布，下标按整张写表记。
+fn publishes_of_one_recording(
+    writes: &[RetainedWrite],
+    first_write_index: usize,
+) -> Vec<PublishWrites> {
     let mut publishes = Vec::new();
     let mut units = Vec::new();
     let mut records = Vec::new();
-    for (index, write) in writes.iter().enumerate() {
+    for (index_in_the_recording, write) in writes.iter().enumerate() {
+        let index = first_write_index + index_in_the_recording;
         match write.kind {
             StepKind::UnitWrite => units.push(index),
             StepKind::JournalRecord => records.push(index),
@@ -752,25 +813,45 @@ fn publishes_in(writes: &[RetainedWrite]) -> Vec<PublishWrites> {
 
 /// 记录核对器（D13（验证路线） 已定项 7，故意不给它编号；入参 (崩溃前镜像, 记录流, 崩溃后镜像, 持久集合)）：崩溃前镜像是 `image.base`、
 /// 记录流是 `image.writes`、崩溃后镜像是 `image` 本身、持久集合是 `image.persisted`（枚举器给的这个崩溃状态里哪些写落了盘，
-/// 与 `image.writes` 逐条对应——四样都从同一个崩溃状态里取，对不上的组合写不出来）。第一条判据里一处写「在盘上」= 崩溃后镜像
-/// 那个位置上的字节与记录流里写下的逐字节相同；第二条判据按扇区、拿持久集合判一份单元副本缺不缺席（[`check_records_against`]）。
+/// 与 `image.writes` 逐条对应——四样都从同一个崩溃状态里取，对不上的组合写不出来）。层 0 只跑只读恢复、不改盘，
+/// 崩溃后镜像的两份（崩溃态、实现恢复后）是同一份。第一条判据里一处写「在盘上」= 崩溃后镜像那个位置上的字节与记录流里写下的
+/// 逐字节相同；第二条判据按扇区、拿持久集合判一份单元副本缺不缺席（[`check_records_against`]）。
 /// 不经恢复代码、不解析树。`effective_root` 取恢复报出来的实际走的那条根。
 #[must_use]
 pub fn check_records(
     image: &CrashImage<'_>,
     effective_root: Option<(InstanceGeneration, CheckpointTxg)>,
 ) -> RecordCheck {
-    check_records_against(image, image.writes, &image.persisted, effective_root)
+    check_records_against(
+        image,
+        image,
+        image.writes,
+        &image.persisted,
+        RecordStreamContinuity::OneRecording,
+        effective_root,
+    )
 }
 
-/// 同一条判据，读盘的口子、被核的记录流与它的持久集合分开给（`persisted` 与 `writes` 逐条对应）。装置里三处调用各交什么
-/// （用例另有直接调它的）：
-/// - 层 0（[`check_records`]）：两张是同一张，枚举用的写表（录制流里的写在前，原地覆写的撕裂镜像与重放接在后面，见 [`CrashImage`]）。
-/// - 崩溃注入第一截（增补 3 第 3 件，`crash_injection.rs`）：读的是「更早的段整段持久 + 当前段一个子集」那份镜像（`reader`），
-///   核的是这段历史的整条录制流（`writes`）——`persisted` 里更早的段整段持久、当前段按这个崩溃点的子集、更晚的段一个都没持久；
+/// 同一条判据，两份崩溃后镜像、被核的记录流与它的持久集合分开给（`persisted` 与 `writes` 逐条对应；`continuity` 说这张写表是
+/// 一条录制流，还是崩溃截断的流接上崩溃之后写出的流，[`publishes_in`] 按它分发布）。
+///
+/// 崩溃后镜像是两份（D13（验证路线） 已定项 7）：`crash_state_image` 是崩溃态镜像，判择根与前缀——第一条判据里根槽写与记录写
+/// 「在盘上」看它；`recovered_image` 是实现恢复后的镜像，判在不在——第二条判据里单元副本缺不缺席、恢复落到的那一版的实例表
+/// 都从它读（实现的恢复会改盘：可写挂载写行、暖机，恢复落到的那一版可以是恢复自己写出的，只在恢复后的镜像上）。
+/// 只读恢复不改盘，两份是同一份。
+///
+/// 装置里各处交什么（用例另有直接调它的）：
+/// - 层 0（[`check_records`]）：两份镜像同一份；写表是枚举用的那一张（录制流里的写在前，原地覆写的撕裂镜像与重放接在后面，
+///   见 [`CrashImage`]），一条录制流。
+/// - 崩溃注入第一截（增补 3 第 3 件，`crash_injection.rs`）：两份镜像都是「更早的段整段持久 + 当前段一个子集」那份崩溃镜像；
+///   写表是这段历史的整条录制流，一条录制流——`persisted` 里更早的段整段持久、当前段按这个崩溃点的子集、更晚的段一个都没持久；
 ///   恢复落到由记录重建的一版时，那一版的根槽写在更晚的段里，也在这张表里。
-/// - 崩溃注入第三截（挂载途中的二次崩溃）：读的是二次崩溃镜像，核的只是这次挂载自己的写表到当前段为止的前缀
-///   （更早的段整段持久、当前段按子集），历史那几次发布与当前段之后的写都不在表里。
+/// - 崩溃注入第二截（崩溃后镜像上可写挂载、再发一次布之后的池）：崩溃态镜像是第一截那份崩溃镜像，恢复后的镜像是挂载与那次发布
+///   之后的池；写表是整条历史录制流接上挂载那一段录制流、再接上那次发布的录制流，在历史与挂载的接缝处断开——历史那一段的持久集合
+///   同第一截，挂载与那次发布全落了；`effective_root` 取挂载与那次发布写出的最新那条根（一条根都没写出时取第一次崩溃之后
+///   恢复落到的那一版）。
+/// - 崩溃注入第三截（挂载途中的二次崩溃）：两份镜像都是二次崩溃镜像；写表同第二截，挂载那一段的持久集合按二次崩溃——
+///   更早的段整段持久、当前段按子集、更晚的段一个都没持久，之后那次发布一个都没写到。历史那几次发布在二次崩溃镜像上还在不在也核得到。
 ///
 /// 第一条判据只在随机历史上才遇得到的限定：一次发布一条 journal 记录都没写过时不判「根在而记录一条都不在」（记录流本来就是空的，不是有洞）。
 ///
@@ -792,12 +873,17 @@ pub fn check_records(
 /// 读不出时一次发布都不算被抛弃（判据不放宽）。
 ///
 /// # Panics
-/// `persisted` 与 `writes` 不一样长；单元副本的长度不是整扇区。
+/// `persisted` 与 `writes` 不一样长；接缝的下标越过写表；单元副本的长度不是整扇区。
 #[must_use]
-pub fn check_records_against<Reader: PoolReader + ImageReader>(
-    reader: &Reader,
+pub fn check_records_against<
+    CrashStateImage: PoolReader + ImageReader,
+    RecoveredImage: PoolReader + ImageReader,
+>(
+    crash_state_image: &CrashStateImage,
+    recovered_image: &RecoveredImage,
     writes: &[RetainedWrite],
     persisted: &[bool],
+    continuity: RecordStreamContinuity,
     effective_root: Option<(InstanceGeneration, CheckpointTxg)>,
 ) -> RecordCheck {
     assert_eq!(
@@ -808,20 +894,21 @@ pub fn check_records_against<Reader: PoolReader + ImageReader>(
     let in_place = |index: usize| {
         let write = &writes[index];
         let length = usize::try_from(write.length_in_bytes()).expect("写长装得进 usize");
-        PoolReader::read(reader, write.device, write.offset, length)
+        PoolReader::read(crash_state_image, write.device, write.offset, length)
             .is_some_and(|bytes| write.contents.still_on_disk(&bytes))
     };
-    let copy_is_missing =
-        |copy: usize| unit_copy_is_missing_under_the_persisted_set(reader, writes, persisted, copy);
+    let copy_is_missing = |copy: usize| {
+        unit_copy_is_missing_under_the_persisted_set(recovered_image, writes, persisted, copy)
+    };
     let instance_table_of_the_landed_version =
-        instance_table_of_the_effective_root(reader, writes, effective_root);
+        instance_table_of_the_effective_root(recovered_image, writes, effective_root);
     let abandoned_by_the_landed_version = |publish: &PublishWrites| {
         instance_table_of_the_landed_version
             .as_ref()
             .is_some_and(|table| table.abandons(publish.instance, publish.checkpoint_txg))
     };
     let mut check = RecordCheck::default();
-    for publish in publishes_in(writes) {
+    for publish in publishes_in(writes, persisted, continuity) {
         if !publish.records.is_empty()
             && in_place(publish.root)
             && !publish.records.iter().any(|record| in_place(*record))
@@ -849,12 +936,12 @@ pub fn check_records_against<Reader: PoolReader + ImageReader>(
     check
 }
 
-/// 恢复落到的那一版（`effective_root`）的实例表，从 `reader`（崩溃后镜像）上沿链读：那一版的根记录取记录流里写出这个根身份的
+/// 恢复落到的那一版（`effective_root`）的实例表，从 `reader`（实现恢复后的镜像）上沿链读：那一版的根记录取记录流里写出这个根身份的
 /// 最后一次根槽写的字节（同一实例里实例表不重写，重建的根的实例表指针照所选根，D23（journal 的角色与格式） 已定项 15，
-/// 与这次根槽写带的是同一个）。根槽没落盘、由记录重建的那一版，它的根槽写在不在记录流里看调用方交的写表：层 0 与崩溃注入第一截
-/// 交整条流，在；崩溃注入第三截只交挂载那一段到当前段为止的前缀，那次根槽写落在更晚的段里时不在（见 [`check_records_against`]）。
-/// 记录流里没有这个根身份（基镜像里的根，如 mkfs 的第 0 代根，实例表一行都没有；前缀里还没写到的那次根槽写）、恢复没落到任何一版、
-/// 链读不出，都是 None。
+/// 与这次根槽写带的是同一个）。根槽没落盘、由记录重建的那一版，它的根槽写在截断处或二次崩溃的当前段之后：层 0 与崩溃注入三截
+/// 交的都是整条流（第二、三截是整条历史录制流接上整条挂载流），都在表里（见 [`check_records_against`]）。
+/// 同一个根身份在表里出现两次时（第二、三截里历史截断处之后那一截与挂载撞了身份），挂载的接在后面，取到的是盘上那一条。
+/// 记录流里没有这个根身份（基镜像里的根，如 mkfs 的第 0 代根，实例表一行都没有）、恢复没落到任何一版、链读不出，都是 None。
 fn instance_table_of_the_effective_root<Reader: PoolReader + ImageReader>(
     reader: &Reader,
     writes: &[RetainedWrite],
@@ -970,6 +1057,9 @@ fn rollback_floor_written_by(bytes: &[u8]) -> CheckpointTxg {
 ///   （下界过得了它）、要么比它新而它自己的根还在环里（本来就不许复用）。
 ///
 /// 按这三个界判，合法的复用不会被判成过不了；漏的是释放代比 `earlier_publish_txg + 1` 晚得多、又晚过门槛的那一类。
+/// 崩溃注入第二、三截的写表（崩溃截断的历史流接上崩溃之后写出的流，[`RecordStreamContinuity::ResumedAfterACrash`]）里，
+/// 截断处之后那一截历史写没发生过，接缝之后的写取「这次写之前」时照样把它们算进去：那一截的根比截断处之前的 txg 都大、
+/// 带的 F 不比之前的小，算进去只会把两个界往「过得了」那边推，不会把合法的复用判成过不了（推的，没造状态量过松了多少）。
 /// 前提有两条，写表的来路都满足：基镜像里的根带的 F 为 0（层 0 的基是 mkfs 之后，崩溃注入的基是空池），
 /// 写表里没有写失败的根槽写（录制器只录落下了的写；写失败时旧根留在槽里、环不再按 txg 连续，上面那条关于被抛弃根的论证就不成立）。
 /// 写表里这次写之前一条根槽写都没有时，环里是什么只有基镜像知道，一律按过得了。
@@ -1348,14 +1438,16 @@ pub fn some_publish_persisted_without_its_root(
     writes: &[RetainedWrite],
     persisted: &[bool],
 ) -> bool {
-    publishes_in(writes).iter().any(|publish| {
-        !persisted[publish.root]
-            && publish
-                .units
-                .iter()
-                .chain(publish.records.iter())
-                .any(|write| persisted[*write])
-    })
+    publishes_in(writes, persisted, RecordStreamContinuity::OneRecording)
+        .iter()
+        .any(|publish| {
+            !persisted[publish.root]
+                && publish
+                    .units
+                    .iter()
+                    .chain(publish.records.iter())
+                    .any(|write| persisted[*write])
+        })
 }
 
 /// 这一状态里持久了的根槽写中最新的那一条，按 (txg, 实例) 字典序取（D22（单元原子性怎么合成） 已定项 7 的择新序）。
@@ -1364,7 +1456,7 @@ pub fn newest_persisted_root(
     writes: &[RetainedWrite],
     persisted: &[bool],
 ) -> Option<(CheckpointTxg, InstanceGeneration)> {
-    publishes_in(writes)
+    publishes_in(writes, persisted, RecordStreamContinuity::OneRecording)
         .iter()
         .filter(|publish| persisted[publish.root])
         .map(|publish| {

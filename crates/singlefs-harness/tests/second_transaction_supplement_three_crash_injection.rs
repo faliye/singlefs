@@ -16,7 +16,7 @@ use singlefs_core::recovery::{recover, JournalPolicy, PoolReader};
 use singlefs_format::DATA_UNIT_BYTES;
 use singlefs_harness::crash::{
     check_records, check_records_against, root_identity_written_by, writes_and_segments,
-    CrashImage, MemoryPool, RecordCheck, RetainedWrite,
+    CrashImage, MemoryPool, RecordCheck, RecordStreamContinuity, RetainedWrite,
 };
 use singlefs_harness::crash_injection::{
     inject_crashes_into_history, run_crash_injection_campaign, CrashInjectionCampaign,
@@ -157,7 +157,7 @@ fn crash_injection_fast_tier_recovers_only_into_versions_the_model_committed() {
 
 /// 小快档：快档的头 [`SMALL_FAST_TIER_SEEDS`] 段（每段步数、每段几个崩溃状态、比重与快档相同），普通 `cargo test` 里守着崩溃注入这一路。
 /// 清单外的失败一条都不许有；三截每一截在每个崩溃状态上都真的跑了（每个崩溃状态都问过模型、跑过池级 checker 与记录核对器，
-/// 都起过可写挂载、之后的池都跑过 checker；二次崩溃摆出来过，每个都问过模型、跑过 checker 与记录核对器）。
+/// 都起过可写挂载、之后的池都跑过 checker 与记录核对器；二次崩溃摆出来过，每个都问过模型、跑过 checker 与记录核对器）。
 /// 只钉这些「每个崩溃状态都做了什么」的结构计数，不钉抽样摆出来的形态（那是快档的事，头几段里未必每一形都有）。
 #[test]
 fn crash_injection_small_fast_tier_recovers_only_into_versions_the_model_committed() {
@@ -199,6 +199,10 @@ fn crash_injection_small_fast_tier_recovers_only_into_versions_the_model_committ
         (
             "可写挂载之后的池上 checker",
             tally.checker_runs_after_the_writable_mount,
+        ),
+        (
+            "可写挂载之后的池上记录核对器",
+            tally.record_checks_after_the_writable_mount,
         ),
     ] {
         assert_eq!(
@@ -958,8 +962,10 @@ fn on_the_whole_stream_a_kept_publish_missing_a_unit_under_a_version_rebuilt_fro
     assert_eq!(
         check_records_against(
             &image,
+            &image,
             &state.writes,
             &nothing_else_withheld,
+            RecordStreamContinuity::OneRecording,
             Some(state.landed_version)
         ),
         RecordCheck::default(),
@@ -1010,8 +1016,10 @@ fn on_the_whole_stream_a_kept_publish_missing_a_unit_under_a_version_rebuilt_fro
         assert!(
             check_records_against(
                 &image_with_the_unit_withheld,
+                &image_with_the_unit_withheld,
                 &state.writes,
                 &persisted,
+                RecordStreamContinuity::OneRecording,
                 recovery.effective_root
             )
             .claimed_state_missing_unit,
