@@ -1,0 +1,14 @@
+exit=1
+want=第 1 节（stream=two-signatures states=100）：signatures=2 red_states=3 states=100
+want=#1 pass=journal_consulted_oracle violated=wrong_content segment=2 publish=instance0_txg5_root_write3 states=2 sample_states=17,18
+want=#2 pass=pool_checker violated=I-3.1 segment=all_persisted publish=every_write_persisted states=1 sample_states=99
+want=问题：第 1 节 red_states=3：有状态判红
+want=✗ crash-case:two-signatures 的用例跑过了、日志也判得绿，发现日志却判红
+want=第 1 节（stream=unfinished states=100）：这一趟没跑完（没有 layer0_findings_summary 行）；死之前找到 1 个签名：
+want=#1 pass=record_checker violated=root_without_record segment=0 publish=after_the_last_root first_state=5
+want=问题：第 1 节这一趟没跑完
+want=✗ crash-case:unfinished 的用例跑过了、日志也判得绿，发现日志却判红
+want=#30 pass=journal_ignored_oracle violated=read_failed segment=30
+want=其余 2 个见
+want=✗ crash-case:many-signatures 的用例跑过了、日志也判得绿，发现日志却判红
+want=--full 有 3 条崩溃枚举用例判红

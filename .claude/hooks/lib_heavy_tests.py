@@ -12,7 +12,10 @@ heavy-test-guard.sh（执行前拒绝）与看门狗（research/scripts/agent-wa
       words[0] 是 LAUNCHER_OPTIONS_WITH_VALUE 里的程序（/usr/bin/time、flock、rustup run、chrt、prlimit、systemd-run、strace、perf）时，
       剥掉它交回它起的那条命令与那条命令的当前目录（None 是不变）；调用方把交回的命令再交给 lib_shell_words 切一遍、逐条判。
       短选项合写（`-fo <文件>`、`-xw 10`、`-qu <名>`）逐个字母查那张表：头一个要值的字母之后剩下的是它的值，没剩下就取下一个词；
-      systemd-run 的 `-E NAME=VALUE` / `--setenv=NAME=VALUE`、strace 的 `-E NAME=VALUE` / `--env=NAME=VALUE` 设的变量写在交回那条命令的最前面
+      长选项查要值与不要值两张表（照各自的 --help 列全），值另起一个词的（`--expand-environment no`、`--output <文件>`）跳过那个值，
+      只写前缀的（getopt_long 认唯一的前缀，`--outp`）按前缀认；
+      systemd-run 的 `-E NAME=VALUE` / `--setenv=NAME=VALUE`、`-p Environment=…` / `--property=Environment=…`（`EnvironmentFile=<文件>` 按内容读，
+      读不了按设了 runner 算）、strace 的 `-E NAME=VALUE` / `--env=NAME=VALUE` 设的变量写在交回那条命令的最前面
       （再切一遍时当它的环境变量，认 runner 要用；strace 的 `-E NAME` 只清变量，不带）。
       这张表不进 lib_shell_words 的前缀表：bash-command-detector.sh 要按命令词认出 systemd-run，判它等不等结束。
   classify_process(argv, cwd) -> list[HeavyTest]
@@ -31,27 +34,34 @@ heavy-test-guard.sh（执行前拒绝）与看门狗（research/scripts/agent-wa
 认的输入：cargo 命令行（test / t、run / r，以及起测试的 nextest run、miri、llvm-cov、hack、mutants）、按名字认的脚本与门禁阶段、
 qemu-system-*、herd7，以及直接执行的测试二进制 `<target 目录>/[<目标三元组>/]<profile>/deps/<名字>-<16 位十六进制哈希>`：按 <名字> 判，
 名字含 layer0 的算层 0。libtest 参数里 --list 当选项出现的（只列用例、一条都不跑）不算重型；跟在带一个值的 libtest 选项（--skip、--logfile、
---test-threads、--format、--color、-Z、--shuffle-seed：LIBTEST_OPTIONS_WITH_VALUE）后面的 --list 是那个选项的值，照样全跑，不算只列。
+--test-threads、--format、--color、-Z、--shuffle-seed：LIBTEST_OPTIONS_WITH_VALUE）后面的 --list 是那个选项的值，照样全跑，不算只列；
+libtest 在 `--` 处停止认选项，`--` 之后的 --list 是过滤词，照样全跑，不算只列。
 崩溃枚举用例（门禁 54 号逐条跑的那几条，登记在 .claude/gate.d/stage-inputs.tsv 键是 crash-case: 的行，第三列 test=<包>:<测试目标>:<用例函数>）：
 跑到它们的测试目标（cargo test 点名它、通配命中它、或不挑目标而包里有它；直接执行它的测试二进制）而下面任一条成立的算重型：
   libtest 参数带 --ignored 或 --include-ignored（nextest 是 --run-ignored 的值不是 default）；
-  可能带上它而看不见：cargo 全局选项 --config 里定了别名（alias.<名>，且子命令就是那个别名）或 runner（按正则认 .runner =，
+  可能带上它而看不见：cargo 全局选项 --config（写在子命令之前、或子命令之后 `--` 之前都算）里定了别名（alias.<名>，且子命令就是那个别名）或 runner（按正则认 .runner =，
   另把值按 TOML 读，定了 target.<任何>.runner 也算：带引号的键 "runner" 这一类），
-  命令看得到的环境变量里有 CARGO_TARGET_*_RUNNER（systemd-run -E / --setenv、strace -E / --env 设给里面那条命令的也算），或 CARGO_ALIAS_<名> 定的别名就是子命令；
-  登记的用例函数有一处定义没标 #[ignore]，或判不出标没标（找不到那个目标、那个函数，宏生成的用例，读不了源码，导入不了 admission.py：都按没标算）。
+  命令看得到的环境变量里有 CARGO_TARGET_*_RUNNER（systemd-run -E / --setenv / -p Environment= / -p EnvironmentFile=、strace -E / --env 设给里面那条命令的也算），
+  或 CARGO_ALIAS_<名> 定的别名就是子命令；
+  登记的用例函数有一处定义没标 #[ignore]，或判不出标没标（找不到那个目标、那个函数，宏生成的用例，读不了源码，导入不了 admission.py，
+  导入得了而判的那一刻抛异常：都按没标算）。
   读那个包里测试目标的源码，判法与 research/scripts/admission.py 的 crash-cases 自查同一份：本模块按文件路径导入它，同名的每一处 fn <名>( 都判。
 另有一条按参数认：任何命令（按文本处理参数的 grep、git、sed 这一类除外）参数里有 --ignored 或 --include-ignored、又有登记的用例函数名，
 按跑崩溃枚举用例算（拷走改名的测试二进制、find -exec 起的这类，名字认不出，靠点名的用例函数认）。
 登记表取两份的并：从命令的当前目录（有 --manifest-path 时取它所在的目录）往上找到的第一份，与这份文件所在仓的那一份。
 接受的误拒：`--include-ignored --exact <同一目标里的快用例>` 照拒（过滤之后剩下哪几条，执行前判不出）；别名展开之后不是 test 的照拒；
-同一目标里别的模块有与登记的用例函数同名、合法不标 #[ignore] 的快用例时照拒；admission.py 导入不了时，点名登记目标的 cargo test 一律拒。
+同一目标里别的模块有与登记的用例函数同名、合法不标 #[ignore] 的快用例时照拒；admission.py 导入不了、或判的时候抛异常时，点名登记目标的 cargo test 一律拒；
+`-- --ignored -- --list`（第二个 `--` 之后只剩过滤词 --list，一条都不跑）照拒。
 看不见的：.cargo/config.toml 与 `--config <文件>` 里定的别名与 runner；拷走改名、又不点名用例函数的测试二进制；
 cargo mutants -d 指到别处的树。别名与 runner 那两种由看门狗（research/scripts/agent-watch.py）在进程这一层兜：cargo 最后照样以原名
 带 --ignored 起那个测试二进制（推的，没量）；拷走改名、又不点名用例函数的，看门狗同样认不出。
 弄坏开关（只给自证用，证明那几格会红）：LIB_HEAVY_TESTS_BREAK 设成下面一个或几个（逗号分隔），--selftest 与 heavy-test-guard.sh --selftest 都必须判红：
   launcher-whole-word-options（短选项合写不拆，照旧按整词查表）、launcher-drops-setenv（systemd-run -E / --setenv 设的变量不带进里面那条命令）、
   list-by-presence（见到 --list 这个词就算只列）、undecided-ignore-allowed（判不出标没标时放行）、
-  runner-configuration-by-regex-only（--config 只按正则认 runner）、strace-drops-env（strace -E / --env 设的变量不带进里面那条命令）。
+  runner-configuration-by-regex-only（--config 只按正则认 runner）、strace-drops-env（strace -E / --env 设的变量不带进里面那条命令）、
+  launcher-long-options-partial（要值的长选项照补全之前的表、不认前缀）、launcher-drops-property-environment（systemd-run -p Environment= /
+  EnvironmentFile= 设的变量不带进里面那条命令）、list-past-separator（找 --list 时见到 `--` 不停）、judging-error-propagates（准入模块判的时候抛的异常
+  不接住）、configuration-before-subcommand-only（只收子命令之前的 --config）。
 """
 import fnmatch, functools, glob, importlib.util, os, re, shlex, shutil, sys, tempfile, tomllib
 from typing import NamedTuple
@@ -105,12 +115,15 @@ def break_is_set(switch_name):
 
 
 def libtest_lists_only(libtest_arguments):
-    """libtest 的参数里 --list 当选项出现（只列用例、一条都不跑）：跳过带一个值的选项的那个值再找，`--skip --list` 里的 --list 不算。"""
+    """libtest 的参数里 --list 当选项出现（只列用例、一条都不跑）：跳过带一个值的选项的那个值再找，`--skip --list` 里的 --list 不算；
+    见到 `--` 就停、交「不是只列」：libtest 在 `--` 处停止认选项，之后的 --list 是过滤词（`-- --ignored -- --list` 一条都不跑，照样算不是只列，接受的误拒）。"""
     if break_is_set("list-by-presence"):
         return LIST_ONLY_TEST_ARGUMENT in libtest_arguments
     position = 0
     while position < len(libtest_arguments):
         argument = libtest_arguments[position]
+        if argument == "--" and not break_is_set("list-past-separator"):
+            return False
         if argument == LIST_ONLY_TEST_ARGUMENT:
             return True
         position += 2 if argument in LIBTEST_OPTIONS_WITH_VALUE else 1
@@ -212,11 +225,18 @@ def crash_case_package_directory(case, members):
 def crash_case_function_runs_without_ignored(case, package_directory):
     """登记的用例函数在 package_directory 这个包里可能不带 --ignored 也被跑到：同名的每一处定义都标了 #[ignore] 才交 False；
     有一处没标，或判不出（找不到包、那个目标、那个函数，宏生成的用例，读不了源码，导入不了 admission.py）都交 True——
-    判不出时放行，这一条在提交时 54 号的 crash-cases 自查判红之前就已经跑完了。"""
+    判不出时放行，这一条在提交时 54 号的 crash-cases 自查判红之前就已经跑完了。准入模块导入得了、判的那一刻抛异常（改了名、改了签名、
+    判到一半出错）同样算判不出（弄坏开关 judging-error-propagates 下异常照旧往外抛，闸的入口接住之后放行）。"""
     module = admission_module()
     if module is None or package_directory is None:
         return not break_is_set("undecided-ignore-allowed")
-    marked = module.test_function_is_marked_ignored(package_directory, ".", case.target, case.function)
+    if break_is_set("judging-error-propagates"):
+        marked = module.test_function_is_marked_ignored(package_directory, ".", case.target, case.function)
+    else:
+        try:
+            marked = module.test_function_is_marked_ignored(package_directory, ".", case.target, case.function)
+        except Exception:  # 准入模块判的时候抛的哪一种都算判不出
+            return not break_is_set("undecided-ignore-allowed")
     if break_is_set("undecided-ignore-allowed"):
         return marked is False
     return marked is not True
@@ -331,7 +351,30 @@ def cargo_subcommand(arguments, directory):
             break
     if index >= len(arguments):
         return None
-    return CargoCommand(arguments[index], arguments[index + 1:], directory, configuration_values)
+    rest = arguments[index + 1:]
+    if not break_is_set("configuration-before-subcommand-only"):
+        configuration_values += configuration_values_after_subcommand(rest)
+    return CargoCommand(arguments[index], rest, directory, configuration_values)
+
+
+def configuration_values_after_subcommand(rest):
+    """子命令之后、`--` 之前的 --config 值（--config 是 cargo 的全局选项，写在 test 之后照认）：--config <值> 与 --config=<值> 两种写法；
+    按 cargo test 的带值选项表跳过别的选项的值（`--features --config` 里的 --config 是 --features 的值）。"""
+    values, position = [], 0
+    while position < len(rest):
+        word = rest[position]
+        if word == "--":
+            break
+        if word == "--config":
+            if position + 1 < len(rest):
+                values.append(rest[position + 1])
+            position += 2
+        elif word.startswith("--config="):
+            values.append(word[len("--config="):])
+            position += 1
+        else:
+            position += 2 if word in CARGO_TEST_OPTIONS_WITH_VALUE else 1
+    return values
 
 
 def mutants_test_arguments(rest):
@@ -593,12 +636,43 @@ LAUNCHER_OPTIONS_WITH_VALUE = {
     "systemd-run": {"-u", "--unit", "-p", "--property", "--description", "--slice", "-E", "--setenv", "-M", "--machine", "-H", "--host",
                     "--uid", "--gid", "--nice", "--working-directory", "--on-active", "--on-boot", "--on-startup", "--on-unit-active",
                     "--on-unit-inactive", "--on-calendar", "--path-property", "--socket-property", "--timer-property", "--service-type",
-                    "-C", "--capsule"},
-    "strace": {"-a", "-b", "-e", "-E", "--env", "-I", "-o", "-O", "-p", "-P", "-s", "-S", "-u", "-U", "-X"},
+                    "-C", "--capsule", "--expand-environment"},
+    "strace": {"-a", "-b", "-e", "-E", "--env", "-I", "-o", "-O", "-p", "-P", "-s", "-S", "-u", "-U", "-X",
+               "--columns", "--detach-on", "--interruptible", "--stack-trace-frame-limit", "--output", "--summary-syscall-overhead", "--attach",
+               "--trace-path", "--string-limit", "--summary-sort-by", "--user", "--summary-columns", "--const-print-style", "--syscall-limit",
+               "--argv0", "--trace", "--trace-fds", "--abbrev", "--verbose", "--raw", "--signal", "--signals", "--status", "--read", "--write",
+               "--fault", "--inject", "--kvm", "--decode-pids"},
     "perf": {"-e", "--event", "-o", "--output", "-p", "--pid", "-t", "--tid", "-C", "--cpu", "-r", "--repeat", "-I", "--interval-print",
              "-G", "--cgroup", "-x", "--field-separator", "-F", "--freq", "-c", "--count", "-m", "--mmap-pages", "-u", "--uid", "-j",
              "--branch-filter", "--call-graph", "-D", "--delay", "-M", "--metrics"},
     "rustup": set(),
+}
+# 各包装程序不带值（或值只能用 = 贴着写）的长选项：长选项可以只写一个前缀（getopt_long 认），前缀对不上这里的、却是某个要值的长选项的前缀时，
+# 按要值算（下一个词是它的值）。两张表照各自的 --help（systemd-run 照 systemd 255 的 man 页）列；strace 那几个「要不要值」照 strace -o /dev/null --<选项> true 量过
+LAUNCHER_LONG_OPTIONS_WITHOUT_VALUE = {
+    "time": {"--append", "--portability", "--quiet", "--verbose", "--help", "--version"},
+    "flock": {"--shared", "--exclusive", "--unlock", "--nonblock", "--nb", "--close", "--no-fork", "--verbose", "--help", "--version"},
+    "chrt": {"--batch", "--deadline", "--fifo", "--idle", "--other", "--rr", "--reset-on-fork", "--all-tasks", "--max", "--pid", "--verbose",
+             "--help", "--version"},
+    "prlimit": {"--noheadings", "--raw", "--verbose", "--help", "--version", "--core", "--data", "--nice", "--fsize", "--sigpending", "--memlock",
+                "--rss", "--nofile", "--msgqueue", "--rtprio", "--stack", "--cpu", "--nproc", "--as", "--locks", "--rttime"},
+    "systemd-run": {"--collect", "--help", "--no-ask-password", "--no-block", "--on-clock-change", "--on-timezone-change", "--pipe", "--pty",
+                    "--quiet", "--remain-after-exit", "--same-dir", "--scope", "--send-sighup", "--shell", "--slice-inherit", "--system", "--user",
+                    "--version", "--wait"},
+    "strace": {"--output-append-mode", "--summary-only", "--summary", "--debug", "--daemonize", "--follow-forks", "--output-separately", "--help",
+               "--instruction-pointer", "--kill-on-exit", "--stack-trace", "--syscall-number", "--relative-timestamps", "--absolute-timestamps",
+               "--timestamps", "--syscall-times", "--no-abbrev", "--version", "--summary-wall-clock", "--strings-in-hex", "--pidns-translation",
+               "--successful-only", "--failed-only", "--failing-only", "--seccomp-bpf", "--tips", "--quiet", "--silent", "--silence", "--decode-fds"},
+    "perf": set(),
+    "rustup": set(),
+}
+# 弄坏开关 launcher-long-options-partial 下从要值的那张表里拿掉的（补全之前的表），同时不认长选项的前缀
+LAUNCHER_LONG_OPTIONS_COMPLETED = {
+    "systemd-run": {"--expand-environment"},
+    "strace": {"--columns", "--detach-on", "--interruptible", "--stack-trace-frame-limit", "--output", "--summary-syscall-overhead", "--attach",
+               "--trace-path", "--string-limit", "--summary-sort-by", "--user", "--summary-columns", "--const-print-style", "--syscall-limit",
+               "--argv0", "--trace", "--trace-fds", "--abbrev", "--verbose", "--raw", "--signal", "--signals", "--status", "--read", "--write",
+               "--fault", "--inject", "--kvm", "--decode-pids"},
 }
 # 选项之后、那条命令之前还有几个位置参数：flock 的锁文件、chrt 的优先级、rustup run 的工具链
 LAUNCHER_POSITIONAL_COUNT = {"flock": 1, "chrt": 1, "rustup": 1}
@@ -611,14 +685,30 @@ PERF_SUBCOMMANDS_RUNNING_A_COMMAND = {"stat", "record", "trace"}
 PERF_GROUPS_WITH_RECORD = {"mem", "c2c", "sched", "lock", "kmem", "kwork"}
 
 
-def launcher_option(word, next_word, options_with_value):
-    """包装程序的一个选项词：交回 (选项名, 它的值, 这个选项占几个词)。长选项 `--名=值` 与 `--名 值` 按整词查表；
-    短选项合写（`-fo 文件`、`-xw 10`、`-o文件`）逐个字母查表，头一个要值的字母之后剩下的是它的值，没剩下就取下一个词；一个要值的字母都没有的只占自己。"""
+def resolved_long_option(option, options_with_value, options_without_value):
+    """一个长选项词（`=` 之前那一段）：交回 (认成的选项名, 要不要值)。整词在两张表里的照表；都不在时按前缀认（getopt_long 认唯一的前缀）：
+    恰好是一个已知长选项的前缀就当那一个；是几个的前缀时程序自己报「有歧义」、一条都不起，其中有要值的就按要值算（怎么算都一样）。
+    弄坏开关 launcher-long-options-partial 下只按整词查表。"""
+    if option in options_with_value:
+        return option, True
+    if option in options_without_value or break_is_set("launcher-long-options-partial") or not option.startswith("--"):
+        return option, False
+    matches = sorted(candidate for candidate in options_with_value | options_without_value if candidate.startswith("--") and candidate.startswith(option))
+    if len(matches) == 1:
+        return matches[0], matches[0] in options_with_value
+    return option, any(candidate in options_with_value for candidate in matches)
+
+
+def launcher_option(word, next_word, options_with_value, options_without_value=frozenset()):
+    """包装程序的一个选项词：交回 (选项名, 它的值, 这个选项占几个词)。长选项 `--名=值` 与 `--名 值` 查两张表（resolved_long_option，认前缀，
+    交回的选项名是认成的那一个）；短选项合写（`-fo 文件`、`-xw 10`、`-o文件`）逐个字母查表，头一个要值的字母之后剩下的是它的值，没剩下就取下一个词；
+    一个要值的字母都没有的只占自己。"""
     if word.startswith("--") or break_is_set("launcher-whole-word-options"):
         option, has_attached_value, attached_value = word.partition("=")
+        option, takes_value = resolved_long_option(option, options_with_value, options_without_value)
         if has_attached_value:
             return option, attached_value, 1
-        return (option, next_word, 2) if option in options_with_value else (option, "", 1)
+        return (option, next_word, 2) if takes_value else (option, "", 1)
     for index, letter in enumerate(word[1:], start=1):
         if "-" + letter in options_with_value:
             attached_value = word[index + 1:]
@@ -626,11 +716,46 @@ def launcher_option(word, next_word, options_with_value):
     return word, "", 1
 
 
+# systemd-run -p EnvironmentFile= 读不了时替它交的那一个变量：名字照 CARGO_TARGET_*_RUNNER 的形状，判法按「环境变量里定了 runner」算（判不出，按宽）
+UNREADABLE_ENVIRONMENT_FILE_RUNNER = "CARGO_TARGET_UNREADABLE_ENVIRONMENT_FILE_RUNNER"
+
+
+def assignments_of_environment_property(value):
+    """systemd-run -p / --property 的一个值设给里面那条命令的 NAME=VALUE：`Environment=A=1 "B=2 3"` 按 systemd 的引号规矩切；
+    `EnvironmentFile=[-]<文件>` 按内容读（一行一个 NAME=VALUE，# 与 ; 起头的行、空行不算，行首的 export 去掉）；
+    文件读不了（不在、没权限）交一个 UNREADABLE_ENVIRONMENT_FILE_RUNNER=<文件>：里面设了什么判不出，按设了 runner 算。别的属性交空表。"""
+    name, _equals, rest = value.partition("=")
+    if name == "Environment":
+        try:
+            words = shlex.split(rest)
+        except ValueError:
+            words = rest.split()
+        return [word for word in words if ENVIRONMENT_ASSIGNMENT_WORD.match(word)]
+    if name == "EnvironmentFile":
+        path = rest[1:] if rest.startswith("-") else rest
+        try:
+            with open(path, encoding="utf-8", errors="replace") as handle:
+                lines = handle.read().split("\n")
+        except OSError:
+            return [f"{UNREADABLE_ENVIRONMENT_FILE_RUNNER}={path}"]
+        assignments = []
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith(("#", ";")):
+                continue
+            line = line[len("export "):].lstrip() if line.startswith("export ") else line
+            if ENVIRONMENT_ASSIGNMENT_WORD.match(line):
+                key, _separator, assigned = line.partition("=")
+                assignments.append(f"{key}={assigned.strip().strip(chr(34)).strip(chr(39))}")
+        return assignments
+    return []
+
+
 def command_under_launcher(words):
     """words[0] 是 LAUNCHER_OPTIONS_WITH_VALUE 里的程序时，剥掉它（连同它的选项与位置参数），交回 (它起的那条命令的词, 那条命令的当前目录：
     None 是不变，systemd-run --working-directory 给的是相对当前目录的写法)；不是这几样、或后面没有要起的命令（strace -p、flock 只给 fd）交 None。
-    选项词怎么切见 launcher_option；LAUNCHER_ENVIRONMENT_OPTIONS 里的选项（systemd-run 的 -E / --setenv、strace 的 -E / --env）设的 NAME=VALUE
-    写在交回那条命令的最前面。
+    选项词怎么切见 launcher_option；LAUNCHER_ENVIRONMENT_OPTIONS 里的选项（systemd-run 的 -E / --setenv、strace 的 -E / --env）设的 NAME=VALUE，
+    与 systemd-run -p / --property 的 Environment= / EnvironmentFile= 设的（assignments_of_environment_property）写在交回那条命令的最前面。
     flock 的 -c <字符串> 交回成 sh -c <字符串>。rustup 只认 rustup run，perf 只认 stat / record / trace 与 <组> record。"""
     name = os.path.basename(words[0])
     if name not in LAUNCHER_OPTIONS_WITH_VALUE or ENVIRONMENT_ASSIGNMENT_WORD.match(words[0]):
@@ -648,6 +773,9 @@ def command_under_launcher(words):
         else:
             return None
     options_with_value, working_directory, assignments = LAUNCHER_OPTIONS_WITH_VALUE[name], None, []
+    if break_is_set("launcher-long-options-partial"):
+        options_with_value = options_with_value - LAUNCHER_LONG_OPTIONS_COMPLETED.get(name, set())
+    options_without_value = LAUNCHER_LONG_OPTIONS_WITHOUT_VALUE.get(name, set())
     environment_options = set() if name == "strace" and break_is_set("strace-drops-env") else LAUNCHER_ENVIRONMENT_OPTIONS.get(name, set())
     while position < len(words):
         word = words[position]
@@ -656,11 +784,14 @@ def command_under_launcher(words):
             break
         if not word.startswith("-") or word == "-":
             break
-        option, value, word_count = launcher_option(word, words[position + 1] if position + 1 < len(words) else "", options_with_value)
+        option, value, word_count = launcher_option(word, words[position + 1] if position + 1 < len(words) else "", options_with_value,
+                                                    options_without_value)
         if name == "systemd-run" and option == "--working-directory":
             working_directory = value
         if option in environment_options and "=" in value and not break_is_set("launcher-drops-setenv"):
             assignments.append(value)
+        if name == "systemd-run" and option in ("-p", "--property") and not break_is_set("launcher-drops-property-environment"):
+            assignments += assignments_of_environment_property(value)
         position += word_count
     if name == "flock" and position + 1 < len(words) and words[position + 1] in ("-c", "--command"):
         return (["sh", "-c", words[position + 2]], working_directory) if position + 2 < len(words) else None
@@ -770,7 +901,8 @@ def build_sample_workspace(work):
     harness 里的 sample_crash_enumeration，与只有它一个测试目标的包 singlefs-checker 里的 checker_crash_enumeration（用例函数都标了 #[ignore]），
     harness 里用例函数没标 #[ignore] 的 unmarked_crash_enumeration；harness 里另四种写法：同名函数 cfg 二选一、一份不标（cfg_split），
     子模块里同名标 ignore 的写在前面、顶层那一份不标（submodule_first），宏生成的用例（macro，没有字面的 fn <名>(），
-    `# [ignore]`（# 与 [ 之间有空格，spaced_ignore，算标了）。"""
+    `# [ignore]`（# 与 [ 之间有空格，spaced_ignore，算标了）；release 下 include! 进来一份不标的同名用例（include），
+    include! 进来的那一份标了 ignore（marked_include，算标了）。"""
     def write(relative, text):
         path = os.path.join(work, relative)
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -793,6 +925,11 @@ def build_sample_workspace(work):
     write("crates/singlefs-harness/tests/macro_crash_enumeration.rs",
           "macro_rules! crash_case {\n    ($name:ident) => {\n        #[test]\n        fn $name() {}\n    };\n}\ncrash_case!(the_generated_case);\n")
     write("crates/singlefs-harness/tests/spaced_ignore_crash_enumeration.rs", "#[test]\n# [ignore]\nfn the_spaced_case() {}\n")
+    write("crates/singlefs-harness/tests/include_crash_enumeration.rs",
+          "#[cfg(debug_assertions)]\n#[test]\n#[ignore]\nfn the_included_case() {}\n#[cfg(not(debug_assertions))]\ninclude!(\"common/release_case.rs\");\n")
+    write("crates/singlefs-harness/tests/common/release_case.rs", "#[test]\nfn the_included_case() {}\n")
+    write("crates/singlefs-harness/tests/marked_include_crash_enumeration.rs", "include!(\"common/marked_case.rs\");\n")
+    write("crates/singlefs-harness/tests/common/marked_case.rs", "#[test]\n#[ignore]\nfn the_marked_included_case() {}\n")
     write("crates/singlefs-checker/Cargo.toml", '[package]\nname = "singlefs-checker"\nversion = "0.0.0"\n')
     write("crates/singlefs-checker/tests/checker_crash_enumeration.rs", marked_case)
     write(CRASH_CASE_REGISTRY, "# 样本登记表\n54-layer0-replay.sh\tcrates/\t# 样本\n"
@@ -803,7 +940,12 @@ def build_sample_workspace(work):
                                "crash-case:submodule-first\tcrates/ Cargo.toml\t"
                                "test=singlefs-harness:submodule_first_crash_enumeration:the_shadowed_case\t# 样本\n"
                                "crash-case:macro\tcrates/ Cargo.toml\ttest=singlefs-harness:macro_crash_enumeration:the_generated_case\t# 样本\n"
-                               "crash-case:spaced-ignore\tcrates/ Cargo.toml\ttest=singlefs-harness:spaced_ignore_crash_enumeration:the_spaced_case\t# 样本\n")
+                               "crash-case:spaced-ignore\tcrates/ Cargo.toml\ttest=singlefs-harness:spaced_ignore_crash_enumeration:the_spaced_case\t# 样本\n"
+                               "crash-case:include\tcrates/ Cargo.toml\ttest=singlefs-harness:include_crash_enumeration:the_included_case\t# 样本\n"
+                               "crash-case:marked-include\tcrates/ Cargo.toml\t"
+                               "test=singlefs-harness:marked_include_crash_enumeration:the_marked_included_case\t# 样本\n")
+    write("runner.env", '# 样本：systemd-run -p EnvironmentFile= 读的\nexport CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="/tmp/add-ignored.sh"\n')
+    write("plain.env", "# 样本\nRUST_BACKTRACE=1\n")
     write("research/Cargo.toml", '[workspace]\nresolver = "2"\nmembers = ["e7-index-bench"]\n')
     write("research/e7-index-bench/Cargo.toml", '[package]\nname = "e7-index-bench"\nversion = "0.0.0"\n')
 
@@ -908,6 +1050,28 @@ def selftest():
              ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--ignored", "--test-threads", "4", "--list"], work, None),
             ("点名崩溃枚举用例、-- --ignored --skip=--list（一个词，没有 --list 选项）",
              ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--ignored", "--skip=--list"], work, "crash-case-cargo"),
+            # libtest 在 -- 处停止认选项：第二个 -- 之后的 --list 是过滤词，照样全跑（开关 list-past-separator 下前两格红）
+            ("点名崩溃枚举用例、-- --include-ignored the_full_case -- --list（第二个 -- 之后 --list 是过滤词）",
+             ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--include-ignored", "the_full_case", "--", "--list"],
+             work, "crash-case-cargo"),
+            ("点名崩溃枚举用例、-- --include-ignored --exact the_full_case -- --list",
+             ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--include-ignored", "--exact", "the_full_case", "--",
+              "--list"], work, "crash-case-cargo"),
+            ("点名崩溃枚举用例、-- --ignored -- --list（一条都不跑，照拒：接受的误拒）",
+             ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--ignored", "--", "--list"], work, "crash-case-cargo"),
+            # --config 是 cargo 的全局选项，写在 test 之后照认（开关 configuration-before-subcommand-only 下前三格红）
+            ("--config 写在 test 之后定 runner、点名崩溃枚举用例不带 --ignored",
+             ["cargo", "test", "--config", 'target.x86_64-unknown-linux-gnu.runner="/tmp/add-ignored.sh"', "-p", "singlefs-harness", "--test",
+              "sample_crash_enumeration"], work, "crash-case-cargo"),
+            ("--config= 写在 --test 之后定 runner", ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration",
+                                                   '--config=target.x86_64-unknown-linux-gnu.runner="/tmp/add-ignored.sh"'], work, "crash-case-cargo"),
+            ("--config 行内表写在 test 之后定 runner",
+             ["cargo", "test", "--config", 'target.x86_64-unknown-linux-gnu = { runner = "/tmp/add-ignored.sh" }', "-p", "singlefs-harness", "--test",
+              "sample_crash_enumeration"], work, "crash-case-cargo"),
+            ("--config 写在 -- 之后是测试二进制的参数、不是 cargo 的", ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--",
+                                                           "--config", 'target.x86_64-unknown-linux-gnu.runner="/tmp/add-ignored.sh"'], work, None),
+            ("--features 的值碰巧是 --config（不是 cargo 的 --config）", ["cargo", "test", "--features", "--config", "-p", "singlefs-harness", "--test",
+                                                              "sample_crash_enumeration"], work, None),
             # 用例函数的每一处定义都要标 #[ignore]；判不出标没标的按没标算（开关：admission.py 的 first-definition-only、ignore-attribute-without-space，
             # 这里的 undecided-ignore-allowed）
             ("点名同名函数 cfg 二选一、一份不标的登记目标、不带 --ignored", ["cargo", "test", "--release", "-p", "singlefs-harness", "--test",
@@ -918,6 +1082,11 @@ def selftest():
              ["cargo", "test", "-p", "singlefs-harness", "--test", "macro_crash_enumeration"], work, "crash-case-cargo"),
             ("点名用例函数标的是 # [ignore]（# 与 [ 之间有空格）的登记目标、不带 --ignored", ["cargo", "test", "-p", "singlefs-harness", "--test",
                                                                       "spaced_ignore_crash_enumeration"], work, None),
+            # 顺着 include! 带进来的同名用例一起判（admission.py 的弄坏开关 target-own-files-only 下头一格红）
+            ("点名 release 下 include! 进来一份不标的同名用例的登记目标、不带 --ignored",
+             ["cargo", "test", "--release", "-p", "singlefs-harness", "--test", "include_crash_enumeration"], work, "crash-case-cargo"),
+            ("点名 include! 进来的同名用例标了 ignore 的登记目标、不带 --ignored",
+             ["cargo", "test", "--release", "-p", "singlefs-harness", "--test", "marked_include_crash_enumeration"], work, None),
         ]
         # lib_shell_words 前缀表之外、包在命令外面照样起那条命令的程序（command_under_launcher）
         launcher_cases = [
@@ -980,6 +1149,37 @@ def selftest():
             ("strace -E 只清变量（不带 =）、点名崩溃枚举用例不带 --ignored",
              ["strace", "-E", "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER", "cargo", "test", "-p", "singlefs-harness", "--test",
               "sample_crash_enumeration"], work, None),
+            # 要值的长选项、值另起一个词：跳过那个值（开关 launcher-long-options-partial 下前四格红）
+            ("systemd-run --user --scope --expand-environment no（值另起一个词）包一层",
+             ["systemd-run", "--user", "--scope", "--expand-environment", "no", "cargo", "test", "--all"], work, "full-cargo"),
+            ("strace --output 文件（值另起一个词）包一层", ["strace", "--output", "/tmp/s", "cargo", "test", "--all"], work, "full-cargo"),
+            ("strace --string-limit 200 包一层", ["strace", "--string-limit", "200", "cargo", "test", "--all"], work, "full-cargo"),
+            ("strace -c --summary-col calls（长选项只写前缀）包一层", ["strace", "-c", "--summary-col", "calls", "cargo", "test", "--all"], work, "full-cargo"),
+            ("strace --quiet（不带值的长选项）包一层", ["strace", "--quiet", "cargo", "test", "--all"], work, "full-cargo"),
+            ("systemd-run --user --scope --collect --same-dir（不带值的长选项）包一层",
+             ["systemd-run", "--user", "--scope", "--collect", "--same-dir", "cargo", "test", "--all"], work, "full-cargo"),
+            # systemd-run -p Environment= / EnvironmentFile= 设给里面那条命令的变量（开关 launcher-drops-property-environment 下前五格红）
+            ("systemd-run -p Environment= 设 runner、点名崩溃枚举用例不带 --ignored",
+             ["systemd-run", "--user", "--wait", "--pipe", "-p", "Environment=CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh", "cargo",
+              "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
+            ("systemd-run --property=Environment= 设两个变量、第二个是 runner",
+             ["systemd-run", "--user", "--wait", "--pipe", '--property=Environment=A=1 "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add ignored.sh"',
+              "cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
+            ("systemd-run --prop Environment=（长选项只写前缀）设 runner",
+             ["systemd-run", "--user", "--wait", "--pipe", "--prop", "Environment=CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh", "cargo",
+              "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
+            ("systemd-run -p EnvironmentFile= 文件里设 runner",
+             ["systemd-run", "--user", "--wait", "--pipe", "-p", "EnvironmentFile=" + os.path.join(work, "runner.env"), "cargo", "test", "-p",
+              "singlefs-harness", "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
+            ("systemd-run -p EnvironmentFile=- 读不了的文件（里面设了什么判不出，按设了 runner 算）",
+             ["systemd-run", "--user", "--wait", "--pipe", "-p", "EnvironmentFile=-" + os.path.join(work, "no-such.env"), "cargo", "test", "-p",
+              "singlefs-harness", "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
+            ("systemd-run -p Environment= 设的不是 runner、点名崩溃枚举用例不带 --ignored",
+             ["systemd-run", "--user", "--wait", "--pipe", "-p", "Environment=RUST_BACKTRACE=1", "cargo", "test", "-p", "singlefs-harness", "--test",
+              "sample_crash_enumeration"], work, None),
+            ("systemd-run -p EnvironmentFile= 文件里设的不是 runner",
+             ["systemd-run", "--user", "--wait", "--pipe", "-p", "EnvironmentFile=" + os.path.join(work, "plain.env"), "cargo", "test", "-p",
+              "singlefs-harness", "--test", "sample_crash_enumeration"], work, None),
         ]
         binary_cases = [
             ("绝对路径的层 0 测试二进制", [os.path.join(work, "target", "release", "deps", layer0_binary), "--test-threads", "4"], work, "layer0-binary"),
@@ -1004,6 +1204,9 @@ def selftest():
              work, "crash-case-binary"),
             ("层 0 测试二进制 --logfile --list（--list 是日志文件名）", [os.path.join(work, "target", "release", "deps", layer0_binary), "--logfile", "--list"],
              work, "layer0-binary"),
+            ("崩溃枚举用例的测试二进制 --include-ignored the_full_case -- --list（-- 之后 --list 是过滤词）",
+             [os.path.join(work, "target", "release", "deps", "sample_crash_enumeration-0123456789abcdef"), "--include-ignored", "the_full_case", "--",
+              "--list"], work, "crash-case-binary"),
             # 名字认不出（拷走改名、find -exec）时按参数认：带 --ignored 又点名登记的用例函数
             ("拷走改名的测试二进制带 --ignored --exact 登记的用例函数", ["/tmp/elsewhere/rc", "--ignored", "--exact", "the_full_case"], work, "crash-case-binary"),
             ("find -exec 执行测试二进制、点名登记的用例函数",
@@ -1035,6 +1238,26 @@ def selftest():
             admission_module.cache_clear()
         results.append(("导入不了 admission.py：点名标了 #[ignore] 的登记目标、不带 --ignored 的 cargo test 按没标算", "crash-case-cargo",
                         found[0].kind if found else None))
+        # 导入得了、判的那一刻抛异常（判法函数里调的名字改了没跟上、闸调的函数改了名）：同样按判不出算（开关 judging-error-propagates 下两格红）
+        raising_modules = [
+            ("判的那一刻抛 NameError", "def test_function_is_marked_ignored(*arguments):\n    return definitions_marked_ignored(*arguments)\n"),
+            ("闸调的 test_function_is_marked_ignored 改了名（AttributeError）", "def renamed_marked_ignored(*arguments):\n    return True\n"),
+        ]
+        for label, module_text in raising_modules:
+            stub_path = os.path.join(work, "raising-admission.py")
+            with open(stub_path, "w", encoding="utf-8") as handle:
+                handle.write(module_text)
+            module_globals["ADMISSION_MODULE_PATH"] = stub_path
+            admission_module.cache_clear()
+            try:
+                found = classify_process(["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration"], work)
+                got = found[0].kind if found else None
+            except Exception as error:  # 弄坏开关 judging-error-propagates 下异常抛到这里：闸的入口接住之后放行
+                got = f"抛了 {error!r}（闸的入口接住之后放行）"
+            finally:
+                module_globals["ADMISSION_MODULE_PATH"] = saved_module_path
+                admission_module.cache_clear()
+            results.append((f"admission.py 导入得了、{label}：点名标了 #[ignore] 的登记目标、不带 --ignored 的 cargo test 按判不出算", "crash-case-cargo", got))
         name_cases = [
             ("门禁阶段按名字判", ".claude/gate.d/12-no-prime-marks.sh", work, True),
             ("仓内位置上的 gate-staged.sh 按名字判", "research/scripts/gate-staged.sh", work, True),
@@ -1091,7 +1314,7 @@ def selftest():
     print(f"  ✓ lib_heavy_tests 自检通过（查了 {len(results)} 种：cargo 与包装过的命令行 {len(cargo_cases)} 种、"
           f"/usr/bin/time、flock、systemd-run 这一类包在外面的 {len(launcher_cases)} 种、"
           f"直接执行的测试二进制 {len(binary_cases)} 种、按名字判的脚本 {len(name_cases)} 种、跑不跑编译出来的代码 {len(compiled_cases)} 种、"
-          "导入不了 admission.py 1 种）")
+          f"导入不了 admission.py 1 种、导入得了而判的时候抛异常 {len(raising_modules)} 种）")
     return 0
 
 

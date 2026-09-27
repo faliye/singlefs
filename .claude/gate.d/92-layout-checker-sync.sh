@@ -10,11 +10,16 @@
 #   ③ 每个 incompat 位号在 `.claude/kb/decisions/15-格式冻结政策.md` 已定项 4 那张登记表里有行，
 #      且布局名与那一行的含义列逐字相同（位号的唯一登记位在那张表，这里只引用，不另立第二处）；
 #   ④ 这次改动让某套布局的格式定义里「常量名 → 值」的集合发生增、删或改值，
-#      而它的 checker 判定路径一个都没被这次改动碰过 ⇒ 判红。
+#      而它的 checker 判定路径一个都没被这次改动碰过 ⇒ 判红；但一个名字新出现在某条格式定义
+#      路径时，若同一套布局的另一条格式定义路径里这次没变、值恰好等于新出现的这个值，只算头一次
+#      给已经存在的值挂标记，不算这次改动引入的变化——常量没变，checker 不欠它，不判红。
 #
 # 为什么：一套布局的格式改了而它的 checker 判定路径没跟，门禁照样全绿——checker 会拿旧口径
 # 去判新字节，而「checker 没报错」被读成「镜像是好的」。C13（checker 判定失效） 拦的是判定逻辑失效，
 # 这一道拦的是它最常见的成因：格式先走了一步。
+# 首次登记不算改动：给一个值一直没变的常量第一次挂上标记，是把没写下来的事实补写下来，
+# 不是格式走了一步；判红只会让人去登记一笔不存在的欠账（layouts-checker-lag.tsv）
+# 或者去改一个本来就不用跟的 checker——两条出路都不对症。
 #
 # ⚠️ 射程：④ 判的是「格式变了没人跟」，判不了 checker 跟得对不对——后者要人看。
 # ⚠️ 这里的变更探测器**不是** D15（格式冻结政策） 已定项 3 要的那个 `spec_hash`：那一个恒对
@@ -40,6 +45,9 @@
 # 另带一份多写了键又重复登记的格式定义、一张挂在认不出的欠账表上的滞后表，必须判红；
 # green 是同一处改动加上 checker 跟着改（checker 路径是中文文件名），另带一张滞后表，挂的欠账号
 # 排在一行正文提到「### 已还清」的开着的账后面，必须判绿。
+# first-registration-same-value 是给一个值一直没变的常量第一次挂标记、checker 没碰，必须判绿；
+# first-registration-changed-value 是同一次改动里源值也变了、新标记记的是新值，必须判红——
+# 首次登记那条豁免只认「另一处这次没变」，源值真变了不豁免。
 #
 #   bash .claude/gate.d/92-layout-checker-sync.sh [项目根]
 set -uo pipefail
@@ -191,6 +199,21 @@ def baseline_text(path):
     result = subprocess.run([*GIT, "show", f"{base}:{path}"], capture_output=True, text=True)
     return result.stdout if result.returncode == 0 else ""
 
+NUMERIC_LITERAL_AFTER_UNDERSCORE_STRIP = re.compile(r"-?[0-9]+")
+
+def numeric_value_or_none(value_text):
+    """去掉数字分隔符 `_` 后当整数读；读不出整数就交回 None——这时只能按原文本比。
+    .rs 里的整数字面量允许 `805_306_368` 这种写法，format-const 标记的文法不认下划线，
+    只写得出 `805306368`；两边字面不同、数值相同，不按原文本比就会把「同一个值」误判成「变了」。"""
+    stripped = value_text.strip().replace("_", "")
+    return int(stripped) if NUMERIC_LITERAL_AFTER_UNDERSCORE_STRIP.fullmatch(stripped) else None
+
+def same_underlying_value(value_text_a, value_text_b):
+    numeric_a, numeric_b = numeric_value_or_none(value_text_a), numeric_value_or_none(value_text_b)
+    if numeric_a is not None and numeric_b is not None:
+        return numeric_a == numeric_b
+    return value_text_a == value_text_b
+
 lag = {}
 if os.path.isfile(lag_path):
     for line_number, line in enumerate(open(lag_path, encoding="utf-8"), 1):
@@ -231,7 +254,7 @@ if lag:
 
 # 键是（格式定义路径, 常量名），不是光一个常量名：同一个常量在 kb 字段表与常量模块里各登记一次
 # （门禁 27 号绑住这两处），按名字合并时后读到的那一份会把前一份盖掉，那一侧的改值就此看不见。
-drifted, empty_sources, checked_constants, excused, followed = [], [], 0, [], []
+drifted, empty_sources, checked_constants, excused, followed, registered_without_change = [], [], 0, [], [], []
 for row in rows:
     current, baseline = {}, {}
     for path in row["format"]:
@@ -243,10 +266,32 @@ for row in rows:
         for name, value in constants_in(baseline_text(path), path, record_problems=False).items():
             baseline[(path, name)] = value
     checked_constants += len(current)
+
+    def first_registration_of_unchanged_value(new_path, name, value):
+        """一个 (格式定义路径, 常量名) 键这次才出现，检查同一套布局里别的格式定义路径这次
+        是不是恰好没变、且原值的底层数值就等于这个新出现的值——是就说明这只是给已经存在的值
+        第一次挂标记，不是这次改动把常量变成了这个值。「没变」按同一个格式定义路径自己的原文
+        逐字比（baseline == current，不许用数值等价放宽——那样会把这个路径自己的改值放过）；
+        跨路径比对新出现的值时用 same_underlying_value：.rs 字面量带下划线分隔、标记的文法不许带，
+        字面不同但数值相同不能算「变了」。"""
+        for other_path in row["format"]:
+            if other_path == new_path:
+                continue
+            other_key = (other_path, name)
+            if (other_key in baseline and other_key in current
+                    and baseline[other_key] == current[other_key]
+                    and same_underlying_value(baseline[other_key], value)):
+                return True
+        return False
+
     changes = []
     for key in sorted(set(current) | set(baseline)):
         path, name = key
         if key not in baseline:
+            if first_registration_of_unchanged_value(path, name, current[key]):
+                registered_without_change.append(
+                    f'{name} = {current[key]}（{path}，同一套布局里别的格式定义路径这次没变、原值就是这个）')
+                continue
             changes.append((name, f'新增 {name} = {current[key]}（{path}）'))
         elif key not in current:
             changes.append((name, f'删掉 {name}（原值 {baseline[key]}，{path}）'))
@@ -295,13 +340,19 @@ paths_total = sum(len(row["format"]) + len(row["checker"]) for row in rows)
 drifted_total = len(followed) + len(excused)
 print(f"  ✓ 布局清单 {len(rows)} 套布局、{paths_total} 条路径都在，位号都对得上 D15（格式冻结政策） 已定项 4 的登记表；"
       f"这次改动比 {base}，{checked_constants} 个格式常量里变了 {drifted_total} 个"
-      f"（checker 在同一次改动里跟了 {len(followed)} 个，按滞后表放行 {len(excused)} 个），都不欠 checker 跟进")
+      f"（checker 在同一次改动里跟了 {len(followed)} 个，按滞后表放行 {len(excused)} 个），都不欠 checker 跟进"
+      + (f"；另有 {len(registered_without_change)} 个是第一次登记标记，源里的值这次没变，不算这次的变动"
+         if registered_without_change else ""))
 for entry in followed:
     print(f"      跟上了：{entry}")
 if excused:
     print(f"    这 {len(excused)} 个变动是按 {lag_path} 放行的（checker 今天判不了它们，各挂着一条开着的欠账）：")
     for entry in excused:
         print(f"      {entry}")
+if registered_without_change:
+    print(f"    这 {len(registered_without_change)} 个是首次登记，不是这次改动引入的变化：")
+    for entry in registered_without_change:
+        print(f"      首次登记：{entry}")
 if empty_sources:
     print(f"    没抽到常量的格式定义路径 {len(empty_sources)} 条（第 ④ 条对它们没有对象可判，只受第 ②③ 条管）：")
     for entry in empty_sources:

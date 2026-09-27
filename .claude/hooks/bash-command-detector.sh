@@ -4,7 +4,7 @@
 # PreToolUse hook（Bash）：检出可能出问题的命令，记下来交给主 agent 判断；起看门狗的错误写法、前台没超时的等待循环、把活放出追踪的写法、run_in_background 里后面没有 wait 的单独 `&`、整份覆盖 `research/results/` 下未跟踪产物的写法、打得到别人进程的终止写法与在同一个 inode 上改已有脚本的写法在执行前拒绝，其余只记不拦，不停任何在跑的命令与脚本。
 # hook-events: PreToolUse:Bash
 # gate-similar: heavy-test-guard.sh 同挂 PreToolUse[Bash]、按同一个切词模块认命令位置，但它只判重型测试与内存包装；这里判等待循环、放出追踪、单独的 &、覆盖产物、终止进程、同 inode 改脚本、就地改仓内文件，判据没有一条相同
-# gate-similar: write-guard.sh 管 Write / Edit 的写范围；这里 ⑧ 管有 Edit 的子 agent 绕到 Bash 里写仓内文件，两边判的工具不同
+# gate-similar: write-guard.sh 管 Write / Edit 的写范围与先编后换；这里 ⑧ 管有 Edit 的子 agent 绕到 Bash 里写仓内文件、⑨ 管执行员在 Bash 里写主工作区 crates/ 下的 .rs，两边判的工具不同
 # gate-similar: pattern-process-guard.sh（上游）同挂 Bash、拒按模式找进程；这里不判那一类
 #
 # 按模式找进程（`pgrep -f`、`pkill -f`、`killall`）不在这里判：上游 SOP 的 `.claude/singlefs-ai-sop/scripts/claude-hooks/pattern-process-guard.sh`
@@ -54,6 +54,18 @@
 # ⑧ 有 Edit 工具的项目子 agent（`.claude/agents/<agent_type>.md` 的 tools 里有 Edit）在 Bash 里就地改仓内文件：命令位置上的 `sed -i`（目标不在 /tmp/ 下），
 #   或 python 代码里 open(<仓内路径字面量>, 'w' / 'a' / 'x')、Path(<仓内路径字面量>).write_text( / .write_bytes(。写范围闸只看 Write / Edit，这样写它看不见；
 #   草稿目录照写，定义点名的脚本（replace-once.py 这类）不在这一条里。路径放在变量里的认不出。
+# ⑨ 先编后换：experiment-runner（名单是 COMPILE_FIRST_AGENTS）在 Bash 里写主工作区 crates/ 下的 .rs：出路是在草稿目录的副本里改、
+#   经 research/scripts/compile-then-swap.py 编过再整份换进来。write-guard.sh「四、先编后换」判 Write / Edit 那一半，这里判 Bash 那一半；
+#   agent 名单与路径判据两边各写一份、改的时候一起改。排在 ⑧ 之前判，执行员拿到的出路是这条脚本。
+#   为什么：执行员直接在主工作区改入库装置，改到一半编不过，别的会话带 --all-targets 的编译一起卡住（records/2026-09-16-subagent拆分提案.md 第四十节那张表第 51 行）。
+#   认的写法：⑤ ⑦ 那一段 overwrite_steps 认的（>、>|、&>、>& 文件、不带 -a 的 tee、cp / mv / install 的目标、dd of=、truncate），every_write 时另认
+#   >>、&>>、tee -a、sed -i、perl -i、rsync 的目标，mv 挪走与 rm 删掉的源（连同 crates/ 里的目录），喂给 python 的代码里 open(…, 带 w / a / x / + 的模式)、
+#   Path.write_text / write_bytes、shutil.copyfile / copy / copy2 / move 与 os.replace / os.rename 的目标。cd 与前面赋过值的变量跟着算，每一层都判；
+#   目标里有这一刻算不出的段的，按通配对主工作区已有的文件，对得上 crates/ 下的 .rs 就拒。前台、run_in_background 一样拒。
+#   放行：主 agent、implementation-writer 与别的 agent；草稿目录里的写；把主工作区那份拷进草稿目录；crates/ 下不是 .rs 的（crates/mutations.tsv）；
+#   `python3 research/scripts/compile-then-swap.py …`（脚本文件里的写这里本来就判不到）；引号里当数据写的、写进文件的 heredoc 正文、注释里的。
+#   判不到的：变量里拼出来的命令、eval、`bash x.sh` 起的脚本文件里的写法、patch 与 git apply / checkout / restore、目标算不出又是新文件名的、
+#   python 里从运行期值来的路径与 os.open / os.write、经 subprocess 起的写法。
 #   「外面有 timeout」按包装的层次认：`timeout N bash -c '…'`、`capped.sh N timeout N bash -c '…'`、`timeout N bash <<EOF` 喂进去的正文里的循环算有；
 #   只在循环条件或循环体里的 timeout（`until timeout 5 grep …; do sleep 10; done`）不算，循环照样能一直转下去。
 #   只认命令位置（按 shell 的规矩切词），引号里当数据写的、写进文件的 heredoc 正文、注释里的循环不拒；
@@ -156,6 +168,7 @@
 #                                        # BASH_COMMAND_DETECTOR_ALLOW_UNWAITED_AMPERSAND=1（run_in_background 里后面没有 wait 的单独 & 也放行）或
 #                                        # BASH_COMMAND_DETECTOR_ALLOW_BACKGROUND_TASK_OUTPUT_WAIT=1（run_in_background 里轮询 tasks/*.output 也放行）或
 #                                        # BASH_COMMAND_DETECTOR_ALLOW_REPOSITORY_IN_PLACE_EDIT=1（有 Edit 的子 agent 在 Bash 里就地改仓内文件也放行）或
+#                                        # BASH_COMMAND_DETECTOR_ALLOW_COMPILE_FIRST_BYPASS=1（⑨ experiment-runner 在 Bash 里写主工作区 crates/ 下的 .rs 也放行）或
 #                                        # BASH_COMMAND_DETECTOR_ALLOW_RESULTS_OVERWRITE=1（整份覆盖 research/results/ 下未跟踪产物也放行、也不记检出）或
 #                                        # BASH_COMMAND_DETECTOR_ALLOW_PROCESS_SIGNALS=1（⑥ 终止进程的写法也放行）或
 #                                        # BASH_COMMAND_DETECTOR_ALLOW_SCRIPT_IN_PLACE_WRITE=1（⑦ 在同一个 inode 上改已有脚本也放行）或
@@ -486,6 +499,57 @@ def repository_in_place_edit_refusal(command, agent_type, repository_root):
         found.append(f"python 写 {match.group('open') or match.group('path')}")
     return list(dict.fromkeys(found))
 
+# ⑨ 先编后换：experiment-runner 在 Bash 里写主工作区 crates/ 下的 .rs。写法沿用 ⑤ ⑦ 的 overwrite_steps（every_write=True），
+#   mv 挪走、rm 删掉的源也算改。agent 名单与路径判据与 write-guard.sh「四、先编后换」各写一份、改的时候一起改。
+COMPILE_FIRST_AGENTS = ("experiment-runner",)
+COMPILE_THEN_SWAP_SCRIPT = "research/scripts/compile-then-swap.py"
+
+def is_main_workspace_crate_source(path, repository_root):
+    return path.endswith(".rs") and is_inside(path, os.path.join(repository_root, "crates"))
+
+def compile_first_verdict(command, repository_root):
+    """整条命令里写主工作区 crates/ 下 .rs 的每一步，交回 `写法 相对仓库根的路径`。"""
+    crates_directory = os.path.join(repository_root, "crates")
+    refused = []
+    for step in overwrite_steps(command, repository_root, every_write=True):
+        base = step.directory if step.directory is not None else repository_root
+        targets = []
+        if isinstance(step, PreservingStep):
+            if step.kind in ("mv", "rm"):
+                for path in preserved_paths(step, base):
+                    if is_main_workspace_crate_source(path, repository_root) or (
+                            os.path.isdir(path) and (os.path.normpath(path) == crates_directory or is_inside(path, crates_directory))):
+                        refused.append(f"{step.kind} {os.path.relpath(path, repository_root)}")
+            continue
+        if isinstance(step, PythonCode):
+            for write in python_in_place_writes(step.code, every_write=True):
+                path = shell_words.resolve_path(base, write.path)
+                if write.source is not None and os.path.isdir(path):
+                    path = os.path.join(path, os.path.basename(write.source))
+                targets.append((write.form, path))
+        else:
+            for word in destination_words(step, base):
+                pattern, has_unknown_piece, has_glob = target_pattern(os.path.expanduser(word))
+                path = shell_words.resolve_path(base, pattern)
+                if has_unknown_piece or has_glob:
+                    # `"$变量"/crates/…` 这类变量在前的，另从 crates/ 那一段起按仓库根接（与 ⑤ 认 research/results/ 同一个办法）
+                    anchor = pattern.find("crates/")
+                    patterns = [path] + ([os.path.join(repository_root, pattern[anchor:])] if anchor > 0 and "*" in pattern[:anchor] else [])
+                    targets += [(step.form, match) for candidate in patterns for match in sorted(glob.glob(candidate))]
+                else:
+                    targets.append((step.form, path))
+        for form, path in targets:
+            if is_main_workspace_crate_source(path, repository_root):
+                refused.append(f"{form} {os.path.relpath(path, repository_root)}")
+    return list(dict.fromkeys(refused))
+
+def compile_first_refusal(command, agent_type, repository_root):
+    """交回要拒的写法与目标；只判 COMPILE_FIRST_AGENTS 里的 agent，前台、run_in_background 一样判。"""
+    if (agent_type not in COMPILE_FIRST_AGENTS or os.environ.get("BASH_COMMAND_DETECTOR_DISABLE_CHECK") == "1"
+            or os.environ.get("BASH_COMMAND_DETECTOR_ALLOW_COMPILE_FIRST_BYPASS") == "1"):
+        return []
+    return compile_first_verdict(command, repository_root)
+
 # run_in_background 里等本会话后台任务输出文件（<会话目录>/tasks/<id>.output）的循环：等自己起的后台任务要结束本轮等完成通知，不写轮询
 TASK_OUTPUT_PATH = re.compile(r"(?:^|/)tasks/[^/\s]+\.output\b")
 
@@ -574,6 +638,7 @@ def unwaited_ampersand_refusal(command, run_in_background):
 
 # ⑤ 整份覆盖 research/results/ 下未跟踪的产物：按命令位置认会整份覆盖文件的写法，跟着 cd 与这条命令里赋过的变量算目标
 OVERWRITING_REDIRECTS = {">", ">|", "&>", ">&"}   # >> 与 &>> 是追加；>& 后面跟 fd 号或 - 时是复制、关闭 fd，不写文件
+APPENDING_REDIRECTS = {">>", "&>>"}                # 只有 ⑨（every_write）认：追加也改了那一份
 FILE_DESCRIPTOR_WORD = re.compile(r"^(?:\d+-?|-)$")
 ASSIGNED_VARIABLE = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
 # 目标词里这一刻算不出的段：变量（含 ${…} 的各种展开与特殊参数）、花括号展开；命令替换另由共用模块的 substitution_span 认
@@ -754,7 +819,23 @@ def truncate_files(arguments):
                 position += 1
     return files
 
-def follow_simple_command(words, directory, variables, steps, depth, heredoc_bodies=()):
+def in_place_editor_files(name, arguments):
+    """sed -i / perl -i 改的文件（⑨ 用）；不带 -i 的交 []。sed 沿用 ⑧ 的 sed_in_place_targets（/tmp/ 下的不交）。"""
+    if name == "sed":
+        return sed_in_place_targets(arguments)
+    if not any(re.match(r"^-[a-zA-Z]*i", argument) for argument in arguments):
+        return []
+    files, skip_next, script_given = [], False, False
+    for argument in arguments:
+        if skip_next:
+            skip_next = False
+        elif re.match(r"^-[a-zA-Z]*[eE]$", argument):
+            skip_next, script_given = True, True
+        elif not argument.startswith("-"):
+            files.append(argument)
+    return files if script_given else files[1:]
+
+def follow_simple_command(words, directory, variables, steps, depth, heredoc_bodies=(), every_write=False):
     """一条简单命令：会整份覆盖文件的写法（tee、cp、mv、install、dd、truncate；⑦ 另认喂给 python 的代码）与让旧字节留住的一步
     （git add、mv 挪走源；⑦ 另认 rm）追加进 steps；跟着 cd / pushd 换目录，跟着独立的赋值与 export 记变量（改 variables）；
     bash -c 的那段代码按这一刻的目录与变量递归进去。heredoc_bodies 是喂给这一条的、被当数据剥掉的 heredoc 正文。交回这条之后的当前目录。"""
@@ -782,7 +863,16 @@ def follow_simple_command(words, directory, variables, steps, depth, heredoc_bod
     elif name == "popd":
         return None
     elif name == "tee":
-        steps += [OverwriteCandidate("tee", file, directory) for file in tee_files(arguments)]
+        files = tee_files(arguments)
+        if every_write and not files:
+            files = [argument for argument in arguments if argument != "-" and not argument.startswith("-")]
+        steps += [OverwriteCandidate("tee", file, directory) for file in files]
+    elif every_write and name in ("sed", "perl"):
+        steps += [OverwriteCandidate(f"{name} -i", file, directory) for file in in_place_editor_files(name, arguments)]
+    elif every_write and name == "rsync":
+        operands = [argument for argument in arguments if not argument.startswith("-")]
+        if len(operands) >= 2:
+            steps.append(OverwriteCandidate("rsync", operands[-1], directory, tuple(operands[:-1]), None))
     elif name in COPY_SHORT_OPTIONS_WITH_VALUE:
         parsed = parse_copy_arguments(name, arguments)
         if parsed.creates_directories:
@@ -814,7 +904,7 @@ def follow_simple_command(words, directory, variables, steps, depth, heredoc_bod
     elif name in shell_words.SHELL_NAMES:
         code = shell_words.shell_invocation(arguments).code_string
         if code is not None:
-            steps += overwrite_steps(code, directory, variables, depth + 1)
+            steps += overwrite_steps(code, directory, variables, depth + 1, every_write)
     return directory
 
 def command_pieces(tokens):
@@ -842,10 +932,11 @@ def command_pieces(tokens):
         pieces.append(piece)
     return pieces
 
-def overwrite_steps(text, directory, variables=None, depth=0):
+def overwrite_steps(text, directory, variables=None, depth=0, every_write=False):
     """整条命令每一层（顶层、bash -c 的代码、喂给 shell 的 heredoc 正文、命令替换与进程替换）命令位置上，会整份覆盖文件的写法
     （OverwriteCandidate：重定向、tee、cp、mv、install、dd、truncate）与让旧字节留住的一步（PreservingStep），按执行的先后交回。
-    喂给 shell 的 heredoc 正文留在原位按行切（共用模块的 strip_data_heredocs 只剥喂给别的命令的）；directory 是开头的当前目录。"""
+    喂给 shell 的 heredoc 正文留在原位按行切（共用模块的 strip_data_heredocs 只剥喂给别的命令的）；directory 是开头的当前目录。
+    every_write（⑨ 用）另交追加与别的改法：>>、&>>、tee -a、sed -i、perl -i、rsync 的目标。"""
     if depth > shell_words.MAXIMUM_NESTING:
         return []
     variables = dict(variables or {})
@@ -854,16 +945,16 @@ def overwrite_steps(text, directory, variables=None, depth=0):
     for piece in command_pieces(shell_words.shell_tokens(shell_words.strip_data_heredocs(text, stripped_bodies=data_heredocs))):
         for is_operator, substitution in piece:
             if is_operator is None:
-                steps += overwrite_steps(substitution, directory, variables, depth + 1)
+                steps += overwrite_steps(substitution, directory, variables, depth + 1, every_write)
         for (is_operator, operator), (next_is_operator, target) in zip(piece, piece[1:]):
-            if (is_operator and operator in OVERWRITING_REDIRECTS and next_is_operator is False
+            if (is_operator and (operator in OVERWRITING_REDIRECTS or (every_write and operator in APPENDING_REDIRECTS)) and next_is_operator is False
                     and not (operator == ">&" and FILE_DESCRIPTOR_WORD.match(target))):
                 steps.append(OverwriteCandidate(operator, substitute_assigned_variables(target, variables), directory))
         commands, _, _, redirections = shell_words.simple_commands(piece)
         if commands and commands[0]:
             fed_heredocs = [data_heredocs[int(marker.group(1))] for operator, target in redirections[0] if operator in ("<<", "<<-")
                             for marker in [shell_words.HEREDOC_BODY_MARKER.match(target)] if marker and int(marker.group(1)) < len(data_heredocs)]
-            directory = follow_simple_command(commands[0], directory, variables, steps, depth, fed_heredocs)
+            directory = follow_simple_command(commands[0], directory, variables, steps, depth, fed_heredocs, every_write)
     return steps
 
 def target_pattern(word):
@@ -1090,15 +1181,17 @@ def mode_writes_in_place(mode):
     """'w' 截断重写、'r+' 从头改写，都在原 inode 上；'a' 追加、'x' 只建新文件，不算。"""
     return mode is not None and ("w" in mode or ("r" in mode and "+" in mode))
 
-def python_in_place_writes(code):
+def python_in_place_writes(code, every_write=False):
     """python 代码里在原 inode 上写文件的调用：open(路径, 带 w 或 r+ 的模式)、Path(路径).open(同上)、Path(路径).write_text / write_bytes、
-    shutil.copyfile / copy / copy2 的目标。路径与模式算不出的不判，解析不了的代码不判。"""
+    shutil.copyfile / copy / copy2 的目标。路径与模式算不出的不判，解析不了的代码不判。
+    every_write（⑨ 用）另交带 a、x、+ 的模式与换 inode 的写：shutil.move、os.replace、os.rename 的目标。"""
     try:
         tree = ast.parse(code)
     except (SyntaxError, ValueError):
         return []
     assignments = single_assignments(tree)
     writes = []
+    mode_writes = (lambda mode: mode is not None and any(letter in mode for letter in "wax+")) if every_write else mode_writes_in_place
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -1107,12 +1200,12 @@ def python_in_place_writes(code):
         if name == "open" and (receiver is None or (isinstance(receiver, ast.Name) and receiver.id in PYTHON_OPEN_MODULES)):
             mode = opening_mode(call_argument(node, 1, "mode"))
             path = python_literal_path(call_argument(node, 0, "file"), assignments)
-            if path is not None and mode_writes_in_place(mode):
+            if path is not None and mode_writes(mode):
                 writes.append(PythonWrite(f"python open(…, '{mode}')", path, None))
         elif name == "open":
             mode = opening_mode(call_argument(node, 0, "mode"))
             path = python_literal_path(receiver, assignments)
-            if path is not None and mode_writes_in_place(mode):
+            if path is not None and mode_writes(mode):
                 writes.append(PythonWrite(f"python Path.open('{mode}')", path, None))
         elif name in PYTHON_PATH_WRITERS and receiver is not None:
             path = python_literal_path(receiver, assignments)
@@ -1123,6 +1216,11 @@ def python_in_place_writes(code):
             source = python_literal_path(call_argument(node, 0, "src"), assignments) if name != "copyfile" else None
             if path is not None:
                 writes.append(PythonWrite(f"python shutil.{name}", path, source))
+        elif every_write and ((name == "move" and owner == "shutil") or (name in ("replace", "rename") and owner == "os")):
+            path = python_literal_path(call_argument(node, 1, "dst"), assignments)
+            source = python_literal_path(call_argument(node, 0, "src"), assignments)
+            if path is not None:
+                writes.append(PythonWrite(f"python {owner}.{name}", path, source))
     return writes
 
 def is_existing_script(path, repository_root, scratch_root):
@@ -1807,6 +1905,45 @@ def selftest_in(hook_dir, work):
         ]
         for label, agent, command, want in repository_edit_cases:
             results.append((f"就地改仓内文件:{label}", want, 1 if repository_in_place_edit_refusal(command, agent, edit_repository) else 0))
+        # ⑨ 先编后换：experiment-runner 在 Bash 里写主工作区 crates/ 下的 .rs：(说明, agent 类型, 命令, 该不该拒)
+        harness_bin = os.path.join(edit_repository, "crates", "singlefs-harness", "src", "bin")
+        os.makedirs(harness_bin)
+        open(os.path.join(harness_bin, "e161_x.rs"), "w").write("fn main() {}\n")
+        open(os.path.join(edit_repository, "crates", "mutations.tsv"), "w").write("# 表头\n")
+        bin_path = "crates/singlefs-harness/src/bin/e161_x.rs"
+        draft_path = "/tmp/claude-1000/runner-x/e161_x.rs"
+        compile_first_cases = [
+            ("执行员 cp 草稿副本盖主工作区的入库装置", "experiment-runner", f"cp {draft_path} {bin_path}", 1),
+            ("执行员 cat > 新建入库装置", "experiment-runner", "cat > crates/singlefs-harness/src/bin/e999_new.rs <<'EOF'\nfn main() {}\nEOF", 1),
+            ("执行员 >> 追加", "experiment-runner", f"echo '// x' >> {bin_path}", 1),
+            ("执行员 tee -a", "experiment-runner", f"echo x | tee -a {bin_path}", 1),
+            ("执行员 mv 草稿副本进 bin 目录", "experiment-runner", f"mv {draft_path} crates/singlefs-harness/src/bin/", 1),
+            ("执行员 cd 进 bin 目录之后 cp 到 .", "experiment-runner", f"cd crates/singlefs-harness/src/bin && cp {draft_path} .", 1),
+            ("执行员 sed -i", "experiment-runner", f"sed -i 's/a/b/' {bin_path}", 1),
+            ("执行员 perl -pi -e", "experiment-runner", f"perl -pi -e 's/a/b/' {bin_path}", 1),
+            ("执行员 rsync", "experiment-runner", f"rsync -a {draft_path} {bin_path}", 1),
+            ("执行员 rm 入库装置", "experiment-runner", f"rm {bin_path}", 1),
+            ("执行员 mv 把入库装置挪走", "experiment-runner", f"mv {bin_path} /tmp/claude-1000/runner-x/", 1),
+            ("执行员 bash -c 里 cp", "experiment-runner", f"bash -c 'cp {draft_path} {bin_path}'", 1),
+            ("执行员变量里的目录", "experiment-runner", f"d=crates/singlefs-harness/src/bin; cp {draft_path} \"$d/e161_x.rs\"", 1),
+            ("执行员目标算不出、对得上已有的入库装置", "experiment-runner", f"cp {draft_path} \"$DIR\"/crates/singlefs-harness/src/bin/e161_x.rs", 1),
+            ("执行员 python shutil.copy", "experiment-runner",
+             f"python3 -c \"import shutil; shutil.copy('{draft_path}', '{bin_path}')\"", 1),
+            ("执行员 python open(…, 'a')", "experiment-runner", f"python3 -c \"open('{bin_path}', 'a').write('x')\"", 1),
+            ("执行员 python os.replace", "experiment-runner", f"python3 -c \"import os; os.replace('{draft_path}', '{bin_path}')\"", 1),
+            ("执行员经先编后换脚本换进来放行", "experiment-runner",
+             f"bash research/scripts/capped.sh 16 python3 {COMPILE_THEN_SWAP_SCRIPT} {draft_path} {bin_path} --scratch /tmp/claude-1000/runner-x", 0),
+            ("执行员把主工作区那份拷进草稿目录放行", "experiment-runner", f"cp {bin_path} /tmp/claude-1000/runner-x/", 0),
+            ("执行员在草稿目录里改放行", "experiment-runner", f"sed -i 's/a/b/' {draft_path}", 0),
+            ("执行员追加 crates/mutations.tsv 放行", "experiment-runner", "printf 'x\\n' >> crates/mutations.tsv", 0),
+            ("执行员 grep 读入库装置放行", "experiment-runner", f"grep -n main {bin_path}", 0),
+            ("执行员 python 只读入库装置放行", "experiment-runner", f"python3 -c \"print(open('{bin_path}').read())\"", 0),
+            ("执行员引号里当数据写的放行", "experiment-runner", f"echo 'cp {draft_path} {bin_path}'", 0),
+            ("实现员同样的 cp 放行", "implementation-writer", f"cp {draft_path} {bin_path}", 0),
+            ("主 agent 同样的 cp 放行", None, f"cp {draft_path} {bin_path}", 0),
+        ]
+        for label, agent, command, want in compile_first_cases:
+            results.append((f"先编后换:{label}", want, 1 if compile_first_refusal(command, agent, edit_repository) else 0))
     finally:
         shutil.rmtree(edit_repository, ignore_errors=True)
     # 把活放出追踪的写法：(说明, 命令, 该不该拒绝)；前台、run_in_background 一样拒，detaching_refusal 不看 run_in_background
@@ -2287,6 +2424,18 @@ def selftest_in(hook_dir, work):
     results.append(("stdin:就地改脚本拒了的不记检出", 0, in_place_recorded))
     python_in_place = through_entry(f"python3 - <<'EOF'\nopen('{running}', 'w').write('x')\nEOF", True)[0]
     results.append(("stdin:run_in_background 里喂给 python 的 open(…, 'w') 同样拒绝（退出码 2）", 2, python_in_place.returncode))
+    # 走真实入口：experiment-runner 在 Bash 里 cp 进主工作区 crates/ 下的 .rs 拒绝（退出码 2）、stderr 点名先编后换那条脚本；implementation-writer 放行
+    def entry_as(agent_type, command):
+        return subprocess.run(["bash", os.path.join(repository_hooks, "bash-command-detector.sh")], capture_output=True, text=True,
+                              env=dict(os.environ, AGENT_HOOK_DETECTIONS=detections),
+                              input=json.dumps({"tool_name": "Bash", "session_id": "s", "agent_type": agent_type,
+                                                "tool_input": {"command": command, "run_in_background": False}}))
+    runner_copy = entry_as("experiment-runner", "cp /tmp/claude-1000/runner-x/e161_x.rs crates/singlefs-harness/src/bin/e161_x.rs")
+    results.append(("stdin:experiment-runner cp 进主工作区的入库装置拒绝（退出码 2）", 2, runner_copy.returncode))
+    results.append(("stdin:先编后换的拒绝点名那条脚本与出路", 1,
+                    int("✗" in runner_copy.stderr and "→" in runner_copy.stderr and COMPILE_THEN_SWAP_SCRIPT in runner_copy.stderr)))
+    writer_copy = entry_as("implementation-writer", "cp /tmp/claude-1000/runner-x/e161_x.rs crates/singlefs-harness/src/bin/e161_x.rs")
+    results.append(("stdin:implementation-writer 同样的 cp 放行（退出码 0）", 0, writer_copy.returncode))
     renamed, renamed_recorded = through_entry(f"cp /tmp/new.sh research/scripts/.running.sh.installing && mv research/scripts/.running.sh.installing {running}")
     results.append(("stdin:写到临时文件再 mv 换上放行（退出码 0）、不记检出", (0, 0), (renamed.returncode, renamed_recorded)))
     # 同走 run_in_background 的那一条：只记检出
@@ -2398,7 +2547,8 @@ def selftest_in(hook_dir, work):
               "_ALLOW_FOREGROUND_WAIT_LOOP、_REFUSE_EVERY_WAIT_LOOP、_ALLOW_DETACHING、_ALLOW_UNWAITED_AMPERSAND、_ALLOW_RESULTS_OVERWRITE、_ALLOW_PROCESS_SIGNALS "
               "或 _ALLOW_SCRIPT_IN_PLACE_WRITE 设着的话这里本来就该红；"
               "「终止进程:」「扫脚本:」红的看 process_signal_refusal() / termination_findings() / call_findings() / scan_scripts()；"
-              "「就地改脚本:」红的看 script_in_place_refusal() / script_in_place_verdict() / python_in_place_writes() / is_existing_script()")
+              "「就地改脚本:」红的看 script_in_place_refusal() / script_in_place_verdict() / python_in_place_writes() / is_existing_script()；"
+              "「先编后换:」红的看 compile_first_refusal() / compile_first_verdict() / overwrite_steps(every_write=True)，_ALLOW_COMPILE_FIRST_BYPASS 设着的话本来就该红")
         return 1
     summary = ("没超时的等待循环、run_in_background 里又自己放后台记进检出记录，普通命令、重定向里的 & 、前台的 & 、写进文件的 heredoc 正文与按模式找进程（归上游钩子）不记；"
                "起看门狗不用 run_in_background、或带 &、nohup、setsid、disown、丢进 /dev/null 的拒绝（退出码 2），run_in_background 只写 watch.sh 的、把名字当参数的、"
@@ -2422,7 +2572,10 @@ def selftest_in(hook_dir, work):
                "dd of=、truncate、python 的 open(…, 'w' / 'r+' / mode='wb')、Path.open('w')、write_text、write_bytes、shutil.copyfile / copy 写的拒绝"
                "（bash -c、heredoc、命令替换、cd 与变量跟着算，python 的只赋过一次的名字、Path / 、os.path.join 算得出），"
                ">>、&>>、tee -a、python 'a' / 'x' / 读、新文件名、临时文件再 mv、mv、install、cp --remove-destination / -l / -n / -b、sed -i、先 rm 或挪走再写、"
-               "os.replace、非脚本文件、仓外与 scratch 根外、当数据写的与算不出的放行；dd、truncate 现在 ⑤ 也认（同一段 overwrite_steps），⑤ 仍不认 python 的写法")
+               "os.replace、非脚本文件、仓外与 scratch 根外、当数据写的与算不出的放行；dd、truncate 现在 ⑤ 也认（同一段 overwrite_steps），⑤ 仍不认 python 的写法；"
+               "先编后换：experiment-runner 在 Bash 里写主工作区 crates/ 下的 .rs（cp、cat >、>>、tee -a、mv 进目录、cd 之后 cp 到 .、sed -i、perl -pi、rsync、rm、mv 挪走、"
+               "bash -c、变量里的目录、算不出而对得上已有装置的、python shutil.copy / open 'a' / os.replace）拒绝并点名 compile-then-swap.py，"
+               "经那条脚本换进来、拷进草稿目录、改草稿目录、追加 crates/mutations.tsv、只读、当数据写的与 implementation-writer、主 agent 放行")
     print(f"  ✓ 自检通过（查了 {len(results)} 种）：{summary}")
     return 0
 
@@ -2546,6 +2699,19 @@ def main():
             print("     → 怎么办：写到同目录临时文件再 `mv` 换上（`mv` 换 inode，正在跑它的进程读的还是旧内容），"
                   "或者用 `research/scripts/replace-once.py` / `insert-row.py` 定点改。追加（`>>`、`tee -a`）与新建不拦；"
                   "Edit / Write 工具本来就换 inode。这一道只拒这种写法，不停你在跑的任何东西", file=sys.stderr)
+            return 2
+        try:
+            crate_writes = compile_first_refusal(tool_input.get("command") or "", hook_input.get("agent_type"), repository_root_of(hook_dir))
+        except Exception as error:
+            print(f"  ! bash-command-detector.sh 没判成绕过先编后换的写法（{error!r}），这条命令照常执行", file=sys.stderr)
+            crate_writes = []
+        if crate_writes:
+            print(f"  ✗ {hook_input.get('agent_type')} 在 Bash 里写主工作区 crates/ 下的 .rs（认出的写法与目标：{'；'.join(crate_writes)}）："
+                  "入库装置先在草稿目录的副本里改，编过再整份换进主工作区，主工作区里任何时候都只放编得过的版本", file=sys.stderr)
+            print(f"     → 怎么办：在草稿目录那一份上改完，跑 `bash research/scripts/capped.sh <线程上限> python3 {COMPILE_THEN_SWAP_SCRIPT} "
+                  "<草稿副本> crates/<crate>/src/bin/<名>.rs --scratch <草稿目录>`，它在仓副本里编过才整份换进来，编不过一个字节不写；"
+                  "把主工作区那份拷进草稿目录（`cp crates/… <草稿目录>/`）不拦。目标不是 crates/<crate>/src/bin/ 下的装置的，不归你改，"
+                  "写进报告交回主 agent。这一道只拒这种写法，不停你在跑的任何东西", file=sys.stderr)
             return 2
         try:
             repository_edits = repository_in_place_edit_refusal(tool_input.get("command") or "", hook_input.get("agent_type"), repository_root_of(hook_dir))

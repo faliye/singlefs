@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# 54 号判别力样本的假 cargo：-V 打版本；test 照 cases/<测试目标>.log 打日志、退 0；设了 SINGLEFS_LAYER0_FINDINGS_FILE 时
+# 把 cases/<测试目标>.findings.tsv 追加进那个文件（与 crates 里的发现日志同一个脾气：有就往末尾追加）。别的一律退 101。
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${1:-}" == -V ]]; then echo "cargo 0.0.0-layer0-sample"; exit 0; fi
+[[ "${1:-}" == test ]] || { echo "样本的假 cargo 只认 -V 与 test：$*"; exit 101; }
+target=""
+previous=""
+for word in "$@"; do
+  if [[ "$previous" == --test ]]; then target="$word"; fi
+  previous="$word"
+done
+[[ -n "$target" && -f "$here/cases/$target.log" ]] || { echo "样本里没有测试目标 $target 的日志"; exit 101; }
+if [[ -n "${SINGLEFS_LAYER0_FINDINGS_FILE:-}" && -f "$here/cases/$target.findings.tsv" ]]; then
+  cat "$here/cases/$target.findings.tsv" >> "$SINGLEFS_LAYER0_FINDINGS_FILE" || exit 101
+fi
+cat "$here/cases/$target.log"
+exit 0

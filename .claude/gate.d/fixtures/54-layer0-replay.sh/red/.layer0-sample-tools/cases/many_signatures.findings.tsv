@@ -1,0 +1,34 @@
+layer0_findings_begin	format=1	stream=many-signatures	states=400
+layer0_finding	finding=1	pass=journal_ignored_oracle	violated=read_failed	segment=1	publish=after_the_last_root	states=1	sample_states=1	sample_violation_1=读失败
+layer0_finding	finding=2	pass=journal_ignored_oracle	violated=read_failed	segment=2	publish=after_the_last_root	states=1	sample_states=2	sample_violation_1=读失败
+layer0_finding	finding=3	pass=journal_ignored_oracle	violated=read_failed	segment=3	publish=after_the_last_root	states=1	sample_states=3	sample_violation_1=读失败
+layer0_finding	finding=4	pass=journal_ignored_oracle	violated=read_failed	segment=4	publish=after_the_last_root	states=1	sample_states=4	sample_violation_1=读失败
+layer0_finding	finding=5	pass=journal_ignored_oracle	violated=read_failed	segment=5	publish=after_the_last_root	states=1	sample_states=5	sample_violation_1=读失败
+layer0_finding	finding=6	pass=journal_ignored_oracle	violated=read_failed	segment=6	publish=after_the_last_root	states=1	sample_states=6	sample_violation_1=读失败
+layer0_finding	finding=7	pass=journal_ignored_oracle	violated=read_failed	segment=7	publish=after_the_last_root	states=1	sample_states=7	sample_violation_1=读失败
+layer0_finding	finding=8	pass=journal_ignored_oracle	violated=read_failed	segment=8	publish=after_the_last_root	states=1	sample_states=8	sample_violation_1=读失败
+layer0_finding	finding=9	pass=journal_ignored_oracle	violated=read_failed	segment=9	publish=after_the_last_root	states=1	sample_states=9	sample_violation_1=读失败
+layer0_finding	finding=10	pass=journal_ignored_oracle	violated=read_failed	segment=10	publish=after_the_last_root	states=1	sample_states=10	sample_violation_1=读失败
+layer0_finding	finding=11	pass=journal_ignored_oracle	violated=read_failed	segment=11	publish=after_the_last_root	states=1	sample_states=11	sample_violation_1=读失败
+layer0_finding	finding=12	pass=journal_ignored_oracle	violated=read_failed	segment=12	publish=after_the_last_root	states=1	sample_states=12	sample_violation_1=读失败
+layer0_finding	finding=13	pass=journal_ignored_oracle	violated=read_failed	segment=13	publish=after_the_last_root	states=1	sample_states=13	sample_violation_1=读失败
+layer0_finding	finding=14	pass=journal_ignored_oracle	violated=read_failed	segment=14	publish=after_the_last_root	states=1	sample_states=14	sample_violation_1=读失败
+layer0_finding	finding=15	pass=journal_ignored_oracle	violated=read_failed	segment=15	publish=after_the_last_root	states=1	sample_states=15	sample_violation_1=读失败
+layer0_finding	finding=16	pass=journal_ignored_oracle	violated=read_failed	segment=16	publish=after_the_last_root	states=1	sample_states=16	sample_violation_1=读失败
+layer0_finding	finding=17	pass=journal_ignored_oracle	violated=read_failed	segment=17	publish=after_the_last_root	states=1	sample_states=17	sample_violation_1=读失败
+layer0_finding	finding=18	pass=journal_ignored_oracle	violated=read_failed	segment=18	publish=after_the_last_root	states=1	sample_states=18	sample_violation_1=读失败
+layer0_finding	finding=19	pass=journal_ignored_oracle	violated=read_failed	segment=19	publish=after_the_last_root	states=1	sample_states=19	sample_violation_1=读失败
+layer0_finding	finding=20	pass=journal_ignored_oracle	violated=read_failed	segment=20	publish=after_the_last_root	states=1	sample_states=20	sample_violation_1=读失败
+layer0_finding	finding=21	pass=journal_ignored_oracle	violated=read_failed	segment=21	publish=after_the_last_root	states=1	sample_states=21	sample_violation_1=读失败
+layer0_finding	finding=22	pass=journal_ignored_oracle	violated=read_failed	segment=22	publish=after_the_last_root	states=1	sample_states=22	sample_violation_1=读失败
+layer0_finding	finding=23	pass=journal_ignored_oracle	violated=read_failed	segment=23	publish=after_the_last_root	states=1	sample_states=23	sample_violation_1=读失败
+layer0_finding	finding=24	pass=journal_ignored_oracle	violated=read_failed	segment=24	publish=after_the_last_root	states=1	sample_states=24	sample_violation_1=读失败
+layer0_finding	finding=25	pass=journal_ignored_oracle	violated=read_failed	segment=25	publish=after_the_last_root	states=1	sample_states=25	sample_violation_1=读失败
+layer0_finding	finding=26	pass=journal_ignored_oracle	violated=read_failed	segment=26	publish=after_the_last_root	states=1	sample_states=26	sample_violation_1=读失败
+layer0_finding	finding=27	pass=journal_ignored_oracle	violated=read_failed	segment=27	publish=after_the_last_root	states=1	sample_states=27	sample_violation_1=读失败
+layer0_finding	finding=28	pass=journal_ignored_oracle	violated=read_failed	segment=28	publish=after_the_last_root	states=1	sample_states=28	sample_violation_1=读失败
+layer0_finding	finding=29	pass=journal_ignored_oracle	violated=read_failed	segment=29	publish=after_the_last_root	states=1	sample_states=29	sample_violation_1=读失败
+layer0_finding	finding=30	pass=journal_ignored_oracle	violated=read_failed	segment=30	publish=after_the_last_root	states=1	sample_states=30	sample_violation_1=读失败
+layer0_finding	finding=31	pass=journal_ignored_oracle	violated=read_failed	segment=31	publish=after_the_last_root	states=1	sample_states=31	sample_violation_1=读失败
+layer0_finding	finding=32	pass=journal_ignored_oracle	violated=read_failed	segment=32	publish=after_the_last_root	states=1	sample_states=32	sample_violation_1=读失败
+layer0_findings_summary	signatures=32	red_states=40	states=400	states_by_finding=1:1

@@ -1,0 +1,4 @@
+LAYER0_FINDING event=new finding=1 pass=journal_consulted_oracle violated=wrong_content segment=2 publish=instance0_txg5_root_write3 first_state=17 first_violation=文件内容不对
+LAYER0_FINDING event=new finding=2 pass=pool_checker violated=I-3.1 segment=all_persisted publish=every_write_persisted first_state=99 first_violation=I-3.1 违例
+LAYER0_FINDINGS signatures=2 red_states=3 states=100
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.01s

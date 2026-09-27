@@ -57,6 +57,7 @@ for runner in "bash research/scripts/ask-local-selftest.sh" "python3 research/sc
               "python3 research/scripts/cite-check.py --selftest" "python3 research/scripts/kb-spec-check.py --selftest" \
               "python3 research/scripts/crash-case-check.py --selftest" "bash research/scripts/prove-red.sh --selftest" \
               "python3 research/scripts/apply-writer-patch.py --selftest" "python3 research/scripts/closeout-status.py --selftest" \
+              "python3 research/scripts/compile-then-swap.py --selftest" \
               "python3 research/scripts/corruption-check.py --selftest"; do
   ((coverage_only)) && continue
   checked=$((checked + 1))

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always Claude Code 每一次触发都要现判这一次调用，上一次的结论不替这一次作保
 # run-condition: command python3
-# PreToolUse hook（Write、Edit）：写文件之前的三道判定，合在一个 hook 里；拒绝的同时把它记进检出记录，交主 agent 看。
+# PreToolUse hook（Write、Edit）：写文件之前的四道判定，合在一个 hook 里；拒绝的同时把它记进检出记录，交主 agent 看。
 #
 # 一、整份覆盖未跟踪文件（只管 Write）：仓里已存在、又没进 git 的文件，拒绝用 Write 整份覆盖。
 #    为什么：几个会话同时在一个仓里干活。2026-09-11 一个会话用 Write 新建 `research/prompts/e137-preregistration.md`，
@@ -15,6 +15,11 @@
 #    出现撇号类字符之一就拒绝；只在 old_string 里出现（删掉它的改动）放行，ASCII 单引号不判。主 agent 与所有子 agent 一样判，目标在不在仓里都判。
 #    为什么：门禁 12 号只在收尾跑整轮门禁时判，2026-09-24 实验设计员照样把这类名字写进三份重跑登记、执行员又抄进源码。
 #    字符集与 12 号同一份：../gate.d/lib-prime-marks.py，不在这里另抄；读不到就拒绝（不静默放行）。
+# 四、先编后换（Write、Edit）：experiment-runner（名单是 COMPILE_FIRST_AGENTS）写主工作区 crates/ 下的 .rs（改已有的、新建的都算）一律拒绝，
+#    出路是在草稿目录的副本里改、经 research/scripts/compile-then-swap.py 编过再整份换进来。排在写范围那一道之前判，拒绝信息给的是这条出路。
+#    implementation-writer、主 agent、别的 agent 不判；草稿目录里的副本与 crates/ 下不是 .rs 的（crates/mutations.tsv）不判。
+#    为什么：执行员直接在主工作区改入库装置，改到一半编不过，别的会话带 --all-targets 的编译一起卡住
+#    （records/2026-09-16-subagent拆分提案.md 第四十节那张表第 51 行）。Bash 里的同一类写法归 bash-command-detector.sh 的 ⑨。
 #
 # 三道原本是两个 hook（refuse-overwrite-untracked.sh、agent-write-scope.sh），2026-09-17 用户定合并；第三道 2026-09-24 加进来。
 # 它们拒的是一次写，不停任务和脚本；拒绝时退出码 2、stderr 交给做这次写的模型，同时往检出记录
@@ -24,7 +29,7 @@
 # 2026-09-24 写这一道时实测，Write 的 content 里写的反斜杠 u 转义落盘成了字符本身，这道闸也会拒这样的写。
 #
 #   write-guard.sh             # 从 stdin 读 hook 的 JSON
-#   write-guard.sh --selftest  # 走一遍三道判定的放行与拒绝；WRITE_GUARD_DISABLE_OVERWRITE=1 或 WRITE_GUARD_DISABLE_SCOPE=1 时自检必须判红
+#   write-guard.sh --selftest  # 走一遍四道判定的放行与拒绝；WRITE_GUARD_DISABLE_OVERWRITE=1、WRITE_GUARD_DISABLE_COMPILE_FIRST=1 或 WRITE_GUARD_DISABLE_SCOPE=1 时自检必须判红
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -107,6 +112,28 @@ def decide_scope(hook_input, project_root, table_path):
                f"→ 它的写范围：{'、'.join(patterns)}（.claude/hooks/agent-write-scope.tsv）。\n"
                f"→ 怎么办：范围外的改动不自己做，写进报告交回主 agent，由主 agent 改或派该写的 agent。")
 
+# 四、先编后换：这几个项目 subagent 不直接写主工作区 crates/ 下的 .rs，出路是 research/scripts/compile-then-swap.py。
+# Bash 里的同一类写法由 bash-command-detector.sh 的 ⑨ 判，agent 名单与路径判据两边各写一份、改的时候一起改。
+COMPILE_FIRST_AGENTS = ("experiment-runner",)
+COMPILE_THEN_SWAP_SCRIPT = "research/scripts/compile-then-swap.py"
+
+def decide_compile_first(hook_input, project_root):
+    """四、登记在 COMPILE_FIRST_AGENTS 里的 agent 写主工作区 crates/ 下的 .rs。"""
+    agent_type = hook_input.get("agent_type")
+    if agent_type not in COMPILE_FIRST_AGENTS or os.environ.get("WRITE_GUARD_DISABLE_COMPILE_FIRST") == "1":
+        return 0, None
+    absolute = absolute_target(hook_input, project_root)
+    root = os.path.normpath(project_root)
+    if not absolute or not absolute.endswith(".rs") or not absolute.startswith(os.path.join(root, "crates") + os.sep):
+        return 0, None
+    relative = os.path.relpath(absolute, root)
+    return 2, (f"✗ {agent_type} 不直接写主工作区的 {relative}：入库装置先在草稿目录的副本里改，编过再整份换进主工作区，"
+               "主工作区里任何时候都只放编得过的版本。\n"
+               f"→ 怎么办：cp {relative} <草稿目录>/ 拷一份（新建的装置直接在草稿目录里建），在草稿目录那一份上用 Edit / Write 改；"
+               f"改完跑 bash research/scripts/capped.sh <线程上限> python3 {COMPILE_THEN_SWAP_SCRIPT} <草稿目录>/{os.path.basename(relative)} "
+               f"{relative} --scratch <草稿目录>，它编过才整份换进来，编不过一个字节不写。\n"
+               "→ 目标不是 crates/<crate>/src/bin/ 下的装置（crate 的库、测试）的，不归你改，写进报告交回主 agent。")
+
 def prime_marks_library_path(hook_dir):
     return os.path.join(os.path.dirname(hook_dir), "gate.d", "lib-prime-marks.py")
 
@@ -165,6 +192,9 @@ def decide(hook_input, project_root, table_path, prime_marks_library):
     code, message = decide_overwrite(hook_input, project_root)
     if code:
         return code, message, "整份覆盖未跟踪文件"
+    code, message = decide_compile_first(hook_input, project_root)
+    if code:
+        return code, message, "绕过先编后换"
     code, message = decide_scope(hook_input, project_root, table_path)
     if code:
         return code, message, "越出写范围"
@@ -237,6 +267,11 @@ def selftest(hook_dir):
             if agent:
                 hook_input["agent_type"] = agent
             return (label, want, decide(hook_input, work, table, library)[0])
+        def finding_case(label, tool_name, agent, path, want):
+            hook_input = {"tool_name": tool_name, "tool_input": {"file_path": path}}
+            if agent:
+                hook_input["agent_type"] = agent
+            return (label, want, decide(hook_input, work, table, library)[2])
         def prime_case(label, tool_name, agent, tool_input, want, library_path=library):
             hook_input = {"tool_name": tool_name, "tool_input": dict(tool_input, file_path=f"{work}/crates/a.rs")}
             if agent:
@@ -266,6 +301,22 @@ def selftest(hook_dir):
             case("范围:experiment-runner mutate.sh", "Edit", "experiment-runner", f"{work}/research/scripts/mutate.sh", 2),
             case("范围:未登记的项目 agent", "Edit", "unscoped-writer", f"{work}/anything.md", 2),
             case("两道都中时先报覆盖", "Write", "kb-scribe", f"{work}/untracked.md", 2),
+            # 四、实验执行员对主工作区 crates/ 下 .rs 的写：拒的那一道要是「绕过先编后换」，不是写范围那一道（出路不同）
+            finding_case("先编后换:experiment-runner Edit 主工作区的入库装置", "Edit", "experiment-runner",
+                         f"{work}/crates/singlefs-harness/src/bin/e161_x.rs", "绕过先编后换"),
+            finding_case("先编后换:experiment-runner Write 新建入库装置", "Write", "experiment-runner",
+                         f"{work}/crates/singlefs-harness/src/bin/e999_new.rs", "绕过先编后换"),
+            finding_case("先编后换:experiment-runner 改 crates 里 bin 以外的 .rs", "Edit", "experiment-runner",
+                         f"{work}/crates/singlefs-core/src/lib.rs", "绕过先编后换"),
+            finding_case("先编后换:.. 绕路进 crates 也算", "Edit", "experiment-runner",
+                         f"{work}/research/../crates/singlefs-harness/src/bin/e161_x.rs", "绕过先编后换"),
+            finding_case("先编后换:implementation-writer 同一处放行", "Edit", "implementation-writer",
+                         f"{work}/crates/singlefs-harness/src/bin/e161_x.rs", None),
+            finding_case("先编后换:主 agent 同一处放行", "Edit", None, f"{work}/crates/singlefs-harness/src/bin/e161_x.rs", None),
+            finding_case("先编后换:experiment-runner 改草稿目录里的副本放行", "Edit", "experiment-runner",
+                         "/tmp/claude-1000/runner-x/e161_x.rs", None),
+            finding_case("先编后换:experiment-runner 追加 crates/mutations.tsv 放行", "Edit", "experiment-runner",
+                         f"{work}/crates/mutations.tsv", None),
             # 三、撇号类角标：五个字符各写死一例（共用字符集少了哪一个，这里就红）
             prime_case("角标:Write 内容含 B2 加一撇（U+2032）", "Write", None, {"content": "取 B2\u2032 的读法\n"}, 2),
             prime_case("角标:Edit new_string 含 P1 加两撇（U+2033）", "Edit", None, {"old_string": "P1", "new_string": "P1\u2033"}, 2),
@@ -298,12 +349,17 @@ def selftest(hook_dir):
             stdin_case("stdin:kb-scribe 范围内", {"tool_name": "Edit", "agent_type": "kb-scribe", "tool_input": {"file_path": f"{work}/.claude/kb/x.md"}}, 0),
             stdin_case("stdin:大内容越界", {"tool_name": "Write", "agent_type": "implementation-writer", "tool_input": {"file_path": f"{work}/research/big.md", "content": "y" * 300000}}, 2),
         ]
+        runner_entry = run_entry({"tool_name": "Edit", "agent_type": "experiment-runner",
+                                  "tool_input": {"file_path": f"{work}/crates/singlefs-harness/src/bin/e161_x.rs", "old_string": "a", "new_string": "b"}})
+        cases.append(("stdin:experiment-runner 改主工作区的入库装置拒绝", 2, runner_entry.returncode))
+        cases.append(("stdin:先编后换的拒绝点名那条脚本与草稿目录", True,
+                      all(fragment in runner_entry.stderr for fragment in ("research/scripts/compile-then-swap.py", "草稿目录", "→ 怎么办"))))
         prime_entry = run_entry({"tool_name": "Edit", "tool_input": {"file_path": f"{work}/crates/a.rs", "old_string": "B2", "new_string": "取 B2\u2032 的读法"}})
         cases.append(("stdin:Edit 写进角标", 2, prime_entry.returncode))
         cases.append(("stdin:角标的拒绝带字符、前后几个字与出路", True,
                       all(fragment in prime_entry.stderr for fragment in ("撇号类角标 \u2032", "取 B2\u2032 的读法", "→ 怎么办", "path-moves.md"))))
         recorded = sum(1 for _ in open(detections, encoding="utf-8")) if os.path.exists(detections) else 0
-        cases.append(("stdin:四次拒绝都落进检出记录", 4, recorded))
+        cases.append(("stdin:五次拒绝都落进检出记录", 5, recorded))
         os.unlink(outside.name)
     finally:
         shutil.rmtree(work)
@@ -311,10 +367,12 @@ def selftest(hook_dir):
     for label, want, got in failures:
         print(f"  ✗ 自检：{label} 应当是 {want}，实际 {got}")  # gate-lint:detail
     if failures:
-        print("    → 看 decide_overwrite() / decide_scope() / decide_prime_marks() 与入口；WRITE_GUARD_DISABLE_OVERWRITE / WRITE_GUARD_DISABLE_SCOPE 设着的话这里本来就该红")
+        print("    → 看 decide_overwrite() / decide_compile_first() / decide_scope() / decide_prime_marks() 与入口；"
+              "WRITE_GUARD_DISABLE_OVERWRITE / WRITE_GUARD_DISABLE_COMPILE_FIRST / WRITE_GUARD_DISABLE_SCOPE 设着的话这里本来就该红")
         return 1
     print(f"  ✓ 自检通过（查了 {len(cases)} 种情形）：未跟踪的已有文件整份覆盖拒绝，已跟踪 / 不存在 / 仓外 / Edit 放行；主 agent 与内置 agent 放行、范围内放行、"
-          "范围外与 .. 绕路与未登记的项目 agent 拒绝；Write 内容、Edit 与 MultiEdit 的 new_string 里有撇号类角标（五个字符各一例，主 agent 与子 agent 一样）拒绝，"
+          "范围外与 .. 绕路与未登记的项目 agent 拒绝；experiment-runner 写主工作区 crates/ 下的 .rs（改、新建、.. 绕路）按先编后换拒绝并点名 compile-then-swap.py，"
+          "implementation-writer 与主 agent 写同一处、执行员写草稿目录与 crates/mutations.tsv 放行；Write 内容、Edit 与 MultiEdit 的 new_string 里有撇号类角标（五个字符各一例，主 agent 与子 agent 一样）拒绝，"
           "只在 old_string 里有、ASCII 单引号放行，共用字符集读不到拒绝；拒绝都记进检出记录")
     return 0
 

@@ -1,0 +1,4 @@
+54-layer0-replay.sh	crates/ Cargo.toml	command=cargo command=rustc	# 样本：本阶段那一行
+crash-case:two-signatures	crates/ Cargo.toml	test=singlefs-harness:two_signatures:two_signatures_full	# 样本
+crash-case:unfinished	crates/ Cargo.toml	test=singlefs-harness:unfinished:unfinished_full	# 样本
+crash-case:many-signatures	crates/ Cargo.toml	test=singlefs-harness:many_signatures:many_signatures_full	# 样本

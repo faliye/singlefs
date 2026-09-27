@@ -1,0 +1,3 @@
+54-layer0-replay.sh	crates/ Cargo.toml	command=cargo command=rustc	# 样本：本阶段那一行
+crash-case:clean-stream	crates/ Cargo.toml	test=singlefs-harness:clean_stream:clean_stream_full	# 样本
+crash-case:no-enumeration	crates/ Cargo.toml	test=singlefs-harness:no_enumeration:no_enumeration_full	# 样本

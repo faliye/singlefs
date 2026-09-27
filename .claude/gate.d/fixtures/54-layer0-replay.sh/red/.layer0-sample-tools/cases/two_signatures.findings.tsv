@@ -1,0 +1,4 @@
+layer0_findings_begin	format=1	stream=two-signatures	states=100
+layer0_finding	finding=1	pass=journal_consulted_oracle	violated=wrong_content	segment=2	publish=instance0_txg5_root_write3	states=2	sample_states=17,18	sample_violation_1=文件内容不对	sample_violation_2=文件内容不对
+layer0_finding	finding=2	pass=pool_checker	violated=I-3.1	segment=all_persisted	publish=every_write_persisted	states=1	sample_states=99	sample_violation_1=I-3.1 违例
+layer0_findings_summary	signatures=2	red_states=3	states=100	states_by_finding=1:2,2:1

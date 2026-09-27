@@ -85,7 +85,8 @@
 #   执行时文件还不在的按「不存在」放行并记检出，已经在的读到的是旧内容；source 进来的文件里 export 的变量对外层后面命令的影响；
 #   .cargo/config.toml 与 `--config <文件>` 里定的别名与 runner；拷走改名、又不点名登记的用例函数的测试二进制（看门狗在进程这一层同样认不出）。
 # 接受的误拒：`--include-ignored --exact <同一目标里的快用例>` 照拒（过滤之后剩下哪几条，执行前判不出）；别名展开之后不是 test 的照拒；
-#   同一目标里别的模块有与登记的用例函数同名、合法不标 #[ignore] 的快用例时照拒；admission.py 导入不了时点名登记目标的 cargo test 一律拒。
+#   同一目标里别的模块有与登记的用例函数同名、合法不标 #[ignore] 的快用例时照拒；admission.py 导入不了、或导入得了而判的那一刻抛异常时，
+#   点名登记目标的 cargo test 一律拒；`-- --ignored -- --list`（第二个 `--` 之后只剩过滤词，一条都不跑）照拒。
 # 另一道，与重型不重型无关：子 agent 跑编译出来的代码——cargo test / t / run / r / bench（test、bench 带 --no-run 的只编不跑，不算）、
 #   直接执行 cargo 编出来的二进制（lib_heavy_tests.runs_compiled_code）——要经 research/scripts/run-with-memory-cap.sh 跑，不经它的拒
 #   （它先判整机放不放得下、放不下排队，撞了上限只杀这一条；records/2026-09-16-subagent拆分提案.md 第四十节第 30 行）。放在这里而不另起一个 hook：
@@ -799,6 +800,24 @@ def selftest(hook_dir):
              "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --test macro_crash_enumeration", 2),
             ("实现员内存包装里跑用例函数标 # [ignore] 的登记目标（算标了，不带 --ignored 放行）", writer,
              "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --test spaced_ignore_crash_enumeration", 0),
+            # 门禁批第三轮的 F1、F2、F3、F10：要值的长选项值另起一个词、systemd-run -p Environment=、第二个 -- 之后的 --list、写在 test 之后的 --config
+            # （lib_heavy_tests.py 的 launcher-long-options-partial、launcher-drops-property-environment、list-past-separator、
+            # configuration-before-subcommand-only 各自打开时对应那几格红）
+            ("实现员内存包装里 systemd-run --expand-environment no 包一层跑崩溃枚举用例", writer,
+             "bash research/scripts/run-with-memory-cap.sh 4G systemd-run --user --scope --expand-environment no cargo test -p singlefs-harness "
+             "--test sample_crash_enumeration -- --ignored", 2),
+            ("实现员内存包装里 strace --output 文件包一层跑崩溃枚举用例", writer,
+             "bash research/scripts/run-with-memory-cap.sh 4G strace --output /tmp/s cargo test -p singlefs-harness --test sample_crash_enumeration -- --ignored", 2),
+            ("实现员内存包装里 systemd-run -p Environment= 设 runner、不带 --ignored", writer,
+             "bash research/scripts/run-with-memory-cap.sh 4G systemd-run --user --wait --pipe -p Environment=CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh "
+             "cargo test -p singlefs-harness --test sample_crash_enumeration", 2),
+            ("实现员内存包装里 -- --include-ignored the_full_case -- --list（第二个 -- 之后是过滤词）", writer,
+             "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --test sample_crash_enumeration -- --include-ignored the_full_case -- --list", 2),
+            ("实现员内存包装里跑 release 下 include! 进来一份不标的同名用例的登记目标（admission.py 的 target-own-files-only 下这一格红）", writer,
+             "bash research/scripts/run-with-memory-cap.sh 4G cargo test --release -p singlefs-harness --test include_crash_enumeration", 2),
+            ("实现员内存包装里 --config 写在 test 之后定 runner、不带 --ignored", writer,
+             "bash research/scripts/run-with-memory-cap.sh 4G cargo test --config 'target.x86_64-unknown-linux-gnu.runner=\"/tmp/add-ignored.sh\"' "
+             "-p singlefs-harness --test sample_crash_enumeration", 2),
             # 起测试的外部子命令、别名与 runner、只列不跑、没标 #[ignore] 的登记用例
             ("实现员经内存包装 cargo nextest run --run-ignored all 跑崩溃枚举用例", writer,
              "bash research/scripts/run-with-memory-cap.sh 4G cargo nextest run -p singlefs-harness --test sample_crash_enumeration --run-ignored all", 2),
@@ -1110,6 +1129,22 @@ def selftest(hook_dir):
         results.append(("stdin:读不到共用模块时 stderr 点名两份模块、记一条检出", 1,
                         int("lib_heavy_tests.py" in without_library.stderr and "lib_shell_words.py" in without_library.stderr
                             and count_detections() == recorded + 1)))
+        # 走真实入口：admission.py 导入得了、判的那一刻抛异常（判法里调的名字没跟上）——判不出，点名登记目标的 cargo test 照拒，不落到入口的「没判成、照常执行」
+        # （lib_heavy_tests.py 的 judging-error-propagates 打开时这一格红）
+        raising_repository = os.path.join(work, "repository-with-raising-admission")
+        os.makedirs(os.path.join(raising_repository, ".claude", "hooks"))
+        os.makedirs(os.path.join(raising_repository, "research", "scripts"))
+        for name in ("heavy-test-guard.sh", "lib_heavy_tests.py", "lib_shell_words.py"):
+            shutil.copy(os.path.join(hook_dir, name), os.path.join(raising_repository, ".claude", "hooks", name))
+        for name in ("scripts", "singlefs-ai-sop"):
+            os.symlink(os.path.join(os.path.dirname(hook_dir), name), os.path.join(raising_repository, ".claude", name))
+        with open(os.path.join(raising_repository, "research", "scripts", "admission.py"), "w", encoding="utf-8") as handle:
+            handle.write("def test_function_is_marked_ignored(*arguments):\n    return definitions_marked_ignored(*arguments)\n")
+        raising = subprocess.run(["bash", os.path.join(raising_repository, ".claude", "hooks", "heavy-test-guard.sh")], capture_output=True, text=True,
+                                 env=environment, input=json.dumps({"tool_name": "Bash", "cwd": work, "agent_type": writer, "tool_input": {
+                                     "command": "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --test sample_crash_enumeration"}}))
+        results.append(("stdin:admission.py 判的那一刻抛异常时，点名标了 #[ignore] 的登记目标、不带 --ignored 的 cargo test 照拒（退出码 2）", 2, raising.returncode))
+        results.append(("stdin:admission.py 判的那一刻抛异常时 stderr 不是「没判成、照常执行」", 1, int("没判成" not in raising.stderr)))
     finally:
         shutil.rmtree(work)
     failures = [item for item in results if item[1] != item[2]]

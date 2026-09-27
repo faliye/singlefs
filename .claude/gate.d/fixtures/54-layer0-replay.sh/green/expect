@@ -1,0 +1,9 @@
+exit=3
+want=样本档：
+want=第 1 节（stream=clean-stream states=100）：signatures=0 red_states=0 states=100
+want=没有签名
+want=这条用例没走读 SINGLEFS_LAYER0_FINDINGS_FILE 的枚举入口
+want=crash-case:clean-stream 判绿
+want=crash-case:no-enumeration 判绿
+want=这一趟跑了判绿 2 条
+want=退 3 不退 0

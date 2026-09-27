@@ -21,6 +21,11 @@
 # 设备侧比对每一档都逐项比到这一档最后那次发布：`first_transaction_device_log_check` 的第一个参数是模式，宿主照模式重跑
 # 发布 B / 可写挂载与发布 C / 发布 D 与抬 F（`name=host_rerun` 行列出重跑了哪几段）。所以后三档照 direct 判：退出码 0、两块盘都没有分歧。
 #
+# 设备侧日志的容量：本阶段给 vm-bench.sh 传 VM_LOG_MB，默认取一块数据盘的大小（4096 MiB），不用 vm-bench.sh 自己的 256 MiB。
+# mkfs 按 4 MiB 一块写零 768 MiB，blklogwrites 连数据一起记，每块盘的日志实用约 770 MiB；256 MiB 时 direct、second-transaction、
+# second-instance 三档在 mkfs 里报 `run_failed step=mkfs cause=BlockDevice(InputOutput(…I/O error))`。
+# 判红时留下的现场里有 log<d>.img，`du -m` 看实际用了多少；数据盘或写路再变大，先看它。
+#
 # 判别力样本 fixtures/55-qemu-first-transaction.sh/{red,green}（共享门禁的 .claude/singlefs-ai-sop/scripts/stage-selftest.sh 跑）拿预录输出喂：样本目录里放一个 `.qemu-prerecorded` 标记文件，再按 `<模式>/out.txt`、`vm-exit`、
 # `check.txt`、`check-exit` 摆好某一轮真跑留下来的原样输出，本阶段就不起虚机、不编译，只拿同一段判定代码判它们
 # （`.claude/rules/fs-design.md` 五条硬要求第 2 条：只供测试的开关）。预录档判全过退 3，不退 0——
@@ -191,16 +196,22 @@ if ((prerecorded)); then
   MODES=("${present[@]}")
 else
   work="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-gate55.XXXXXX")"
+  # 设备侧日志（blklogwrites）连数据一起记下来宾发到每块盘的每个写，要装得下 mkfs 写零的那 768 MiB 与之后的写：
+  # 默认取一块数据盘的大小（4096 MiB）。vm-bench.sh 自己的默认 256 MiB 装不下，direct 那几档会在 mkfs 里撞 I/O error。
+  # 镜像是 truncate 建的稀疏文件，只占真写进去的那些。要换就设 VM_LOG_MB。
+  QEMU_DEVICE_LOG_MEGABYTES="${VM_LOG_MB:-4096}"
+  [[ "$QEMU_DEVICE_LOG_MEGABYTES" =~ ^[1-9][0-9]*$ ]] || fail "VM_LOG_MB 写成了「$QEMU_DEVICE_LOG_MEGABYTES」，vm-bench.sh 要的是正整数（MiB）" "写成正整数，例 VM_LOG_MB=4096；不设就用一块数据盘的大小 4096。"
   # 判绿才清理：判红时出路点名的 check.txt、out.txt 都在 $work 底下，退出时一删，人照着出路去看就扑空。
   # 判红（退出码不是 0）把现场留下、把路径印出来，删不删由看的人定；盘镜像是 vm-bench.sh 用 truncate 建的稀疏文件，留下只占真写进去的那些。
-  trap 'if (($? == 0)); then rm -rf "${work:?}"; else echo "     ! 判红，现场没清：$work（出路里点名的文件都在这底下，看完自己删）"; fi' EXIT
+  # 要把判绿的现场也留下（重录判别力样本 fixtures/55-qemu-first-transaction.sh 时拷四件套用），设 GATE55_KEEP_WORK=1：不删、打印路径。
+  trap 'stage_exit_code=$?; if ((stage_exit_code == 0)) && [[ "${GATE55_KEEP_WORK:-0}" != 1 ]]; then rm -rf "${work:?}"; elif ((stage_exit_code == 0)); then echo "     ! GATE55_KEEP_WORK=1，判绿的现场留着：$work（看完自己删）"; else echo "     ! 判红，现场没清：$work（出路里点名的文件都在这底下，看完自己删）"; fi' EXIT
   missing=()
   BIN="target/x86_64-unknown-linux-musl/release/first_transaction_on_device"
   CHECK="target/debug/first_transaction_device_log_check"
   pids=()
   for mode in "${MODES[@]}"; do
     mkdir -p "$work/$mode"
-    ( VM_DISKS=2 VM_DISK_MB=4096 VM_BLKLOGWRITES_DIR="$work/$mode" bash research/scripts/vm-bench.sh "$BIN" "$mode" >"$work/$mode/out.txt" 2>&1
+    ( VM_DISKS=2 VM_DISK_MB=4096 VM_LOG_MB="$QEMU_DEVICE_LOG_MEGABYTES" VM_BLKLOGWRITES_DIR="$work/$mode" bash research/scripts/vm-bench.sh "$BIN" "$mode" >"$work/$mode/out.txt" 2>&1
       echo "$?" >"$work/$mode/vm-exit" ) &
     pids+=("$!")
   done
@@ -212,7 +223,7 @@ for mode in "${MODES[@]}"; do
   out="$work/$mode/out.txt"
   if [[ "$(cat "$work/$mode/vm-exit")" != 0 ]]; then
     tail -15 "$out" | sed 's/^/        /'
-    fail "虚机跑 $mode 没过（vm-bench.sh 的退出码或条数闸）" "单跑：VM_DISKS=2 VM_DISK_MB=4096 VM_BLKLOGWRITES_DIR=<目录> bash research/scripts/vm-bench.sh <musl 二进制> $mode"
+    fail "虚机跑 $mode 没过（vm-bench.sh 的退出码或条数闸）" "单跑：VM_DISKS=2 VM_DISK_MB=4096 VM_LOG_MB=$QEMU_DEVICE_LOG_MEGABYTES VM_BLKLOGWRITES_DIR=<目录> bash research/scripts/vm-bench.sh <musl 二进制> $mode"
   fi
   checks=$((checks + 1))
   if ! diff <(grep -ao 'E7RESULT name=segments .*' "$PRODUCT" | tr -d '\r') <(grep -ao 'E7RESULT name=segments .*' "$out" | tr -d '\r') >/dev/null; then

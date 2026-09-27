@@ -27,8 +27,21 @@
 #     才开；开着时登记了 shard=across-machines 的用例（admission.py crash-case-shardable）交给 research/scripts/layer0-shard-run.sh --merged-log
 #     （本机 0/2、第二台 1/2、本机 merge/2；驱动脚本与配置判法按内容进这几条用例的指纹），它交回的 merge 那一趟日志照单机的判法判、写同一格标记；
 #     别的用例、配置不在或判不过时，照 crash-case-command 单机跑。开没开、为什么，开跑时打一行。
-#     这一份 54 号不进指纹：改它（出路句、快档、次序）不废旧标记。它里面还定着结论的只剩流程的次序（开跑与跑完各算一次指纹、先判日志再写标记、
-#     判红删那一格），由 admission.py --selftest 的「54 号」那几格核；改它时快档照样核标记（范围那一问不摘掉它）。
+#     发现日志（用户 2026-09-27 定「崩溃放量日志要全量与发现双份，不然读不过来」，records/2026-09-24-里程碑二收尾调度.md「层 0 放量的发现日志」那一行；
+#     行格式以 crates/singlefs-harness/src/crash.rs 的发现日志为准）：每趟 --full 的全量日志与发现日志放 <common-dir>/singlefs-layer0-logs/<开跑时刻>-<pid>/，
+#     不随 worktree 删、跑完不删；一条用例的全量日志是 log.<用例名>，发现日志是它同名加 .findings.tsv。单机跑时在 crash-case-command 交的命令外面
+#     设 SINGLEFS_LAYER0_FINDINGS_FILE=<发现日志>；双机分片时驱动脚本照同一个命名（<它交回的 merge 日志>.findings.tsv）给 merge 那一趟，两片各自的
+#     发现日志在那一片的日志旁边（驱动脚本的输出里打出三份路径）。跑完逐节读发现日志（一节一趟枚举；这一趟的目录是新建的，里面的节都是这一趟的）：
+#     有 layer0_findings_summary 的节打一行 signatures / red_states / states 与发现表（每签名一行：号、pass、violated、segment、publish、states、
+#     sample_states；超过 30 个签名只打前 30 行加一行「其余 N 个见 <路径>」）；没有 summary 的节报「这一趟没跑完」判红；red_states 不是 0 判红
+#     （用例自己也会红，这是第二道）；定稿行数与 signatures= 对不上判红。发现日志不在或是空的：全量日志里有 LAYER0_FINDINGS 行（枚举跑完了却没写）判红，
+#     一行都没有（这条用例不走读这个变量的枚举入口）打一行说明、不判红。全量日志不转进阶段输出，只给路径（LAYER0_PROGRESS 照旧边跑边转，
+#     cargo 退非 0 时照旧打它的尾部）；全绿标记不带发现表。快档不设、不读发现日志，还从起 cargo 的环境里清掉调用方的这个变量。
+#     这一份 54 号不进指纹：改它（出路句、快档、次序）不废旧标记。本机核数、线程数不经它转：crash-case-judge 与 crash-case-record 自己现取
+#     （与 crash-case-command 同一个算法、同一份环境），crash-case-command 交的前三个词这里只拿来打开跑那一行。它里面还定着结论的只剩流程的次序
+#     （开跑与跑完各算一次指纹、先判日志再写标记、判红删那一格）与两处第二道判红（cargo 退非 0、发现日志那几条）——这两处的第一道
+#     （test result 恰好 1 passed、登记的计数行）在准入模块的判法摘要里；由 admission.py --selftest 的「54 号」那几格核；改它时快档照样核标记
+#     （范围那一问不摘掉它）。
 #   bash .claude/gate.d/54-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
 #     快档先核登记的每一条路径 git 至少列得出一个文件（git ls-files -co --exclude-standard -- <那一条>），有一条列不出判红，之后才问复用与改动范围。
 #     两条流的测试二进制在 release 下只跑不标 ignored 的用例，一条都没通过判红；再逐条崩溃枚举用例算它这批输入的指纹、核那一格
@@ -54,7 +67,13 @@
 #
 # 判别力：日志与标记怎么判、输入指纹怎么算，由 research/scripts/admission.py --selftest 的「崩溃枚举用例」那几格拿合成日志与临时仓核；
 # 这一份脚本的流程（逐条复用、只重跑输入变了的那一条、续跑的三个环境变量、--start-over、快档缺一格判红、跑的过程中输入变了不写标记）
-# 由同一份自证的「54 号」那几格核：把这一份拷进临时仓（不放在 .claude/gate.d/ 下）、拿打合成日志的假 cargo 跑。本阶段没有 fixtures 样本。
+# 由同一份自证的「54 号」那几格核：把这一份拷进临时仓（不放在 .claude/gate.d/ 下）、拿打合成日志的假 cargo 跑。
+# 发现日志那一段的判别力样本 fixtures/54-layer0-replay.sh/{red,green}（共享门禁的 .claude/singlefs-ai-sop/scripts/stage-selftest.sh 跑，setup.sh 在临时目录里 git init）：
+# 样本根上放一个 .layer0-sample-tools/ 目录，本阶段就进样本档——把它放到 PATH 最前面（里面是假 cargo 与假 rustc：照 cases/<测试目标>.log 打日志，
+# 设了 SINGLEFS_LAYER0_FINDINGS_FILE 时把 cases/<测试目标>.findings.tsv 追加进去），不管带没带 --full 都走 --full 那一路；判绿退 3（不退 0，
+# 样本档不算真跑过），判红照常退 1。green：一条用例的发现日志一节、0 个签名，一条用例不走发现日志；red：两个签名 red_states=3、没有 summary、32 个签名三条用例。
+# 弄坏开关（只给证红用）GATE_LAYER0_BREAK=<项>：no-findings-file 不设 SINGLEFS_LAYER0_FINDINGS_FILE、ignore-unfinished 没有 summary 的节当跑完了、
+# ignore-red-states 不看 red_states、no-truncation 签名全打不截；各自打开时 red 或 green 样本判错。
 set -uo pipefail
 # 参数：`--full`、`--start-over` 与项目根，顺序不限；gate.sh 只传项目根，于是整轮门禁走快档。
 layer0_tier="quick"
@@ -85,6 +104,17 @@ layer0_stage_script_path="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 layer0_stage_repository="$(cd "$(dirname "$0")/../.." && pwd)"
 layer0_admission_module="$layer0_stage_repository/research/scripts/admission.py"
 cd "$ROOT" 2>/dev/null || exit 2
+# 样本档：样本根上有 .layer0-sample-tools/ 时，假 cargo 与假 rustc 放到 PATH 最前面、走 --full 那一路，判绿退 3（写法见文件头「判别力」那一段）
+layer0_sample_mode=0
+if [[ -d "$PWD/.layer0-sample-tools" ]]; then
+  layer0_sample_mode=1
+  layer0_tier="full"
+  PATH="$PWD/.layer0-sample-tools:$PATH"
+  export PATH
+  echo "  ! 样本档：$PWD/.layer0-sample-tools 在，起用例的是那里面的假 cargo，走 --full 那一路；这一趟不算真跑过层 0"
+fi
+# 弄坏开关（只给证红用，文件头「判别力」那一段）
+layer0_break="${GATE_LAYER0_BREAK:-}"
 
 # 这一道读的路径：`.claude/gate.d/stage-inputs.tsv` 里登记给本阶段的那几条（唯一登记位），经准入模块的 paths 读。
 # 快档的复用判定与改动范围按它算；每条崩溃枚举用例的输入另按它自己那一行算。
@@ -188,8 +218,9 @@ delete_crash_case_marker() {
 }
 
 # run_layer0_test_binary <测试二进制> <日志>：快档跑一条流不标 ignored 的用例；cargo 的整段输出进日志。
+# 快档不写发现日志：调用方环境里的 SINGLEFS_LAYER0_FINDINGS_FILE 清掉，不漏给快用例。
 run_layer0_test_binary() {
-  cargo test --release -p singlefs-harness --test "$1" -- --nocapture 2>&1 \
+  env -u SINGLEFS_LAYER0_FINDINGS_FILE cargo test --release -p singlefs-harness --test "$1" -- --nocapture 2>&1 \
     | tee "$2" \
     | { grep --line-buffered '^LAYER0_PROGRESS ' || true; } \
     | sed -u 's/^/    /'
@@ -197,7 +228,8 @@ run_layer0_test_binary() {
 }
 
 # read_crash_case_command <键> <输入指纹>：准入模块 crash-case-command 交出的这一条的命令与环境（以 NUL 分隔）读进 case_machine_cores、
-# case_threads、case_threads_origin、case_progress_directory 与数组 case_command。交不出、写法不对返回 1，原因放进 case_command_problem。
+# case_threads、case_threads_origin（这三个只打进开跑那一行，不转给 crash-case-judge / record）、case_progress_directory 与数组 case_command。
+# 交不出、写法不对返回 1，原因放进 case_command_problem。
 read_crash_case_command() {
   local command_file="$layer0_scratch_directory/command.${1#crash-case:}" command_output
   local -a start_over_option=()
@@ -222,12 +254,14 @@ read_crash_case_command() {
   return 0
 }
 
-# run_crash_case <日志> <命令的词…>：--full 照准入模块交的命令跑一条崩溃枚举用例；
+# run_crash_case <日志> <发现日志> <命令的词…>：--full 照准入模块交的命令跑一条崩溃枚举用例，环境里设 SINGLEFS_LAYER0_FINDINGS_FILE=<发现日志>；
 # 整段输出进日志，`LAYER0_PROGRESS` 行边跑边转到本阶段的输出（跑全量时这里一直在涨）。
 run_crash_case() {
   local log_file="$1"
-  shift
-  "$@" 2>&1 \
+  local -a findings_setting=(SINGLEFS_LAYER0_FINDINGS_FILE="$2")
+  if [[ "$layer0_break" == no-findings-file ]]; then findings_setting=(-u SINGLEFS_LAYER0_FINDINGS_FILE); fi
+  shift 2
+  env "${findings_setting[@]}" "$@" 2>&1 \
     | tee "$log_file" \
     | { grep --line-buffered '^LAYER0_PROGRESS ' || true; } \
     | sed -u 's/^/    /'
@@ -241,6 +275,83 @@ run_crash_case_in_two_shards() {
   if [[ "$layer0_start_over" == 1 ]]; then start_over_setting=(SINGLEFS_LAYER0_START_OVER=1); fi
   env "${start_over_setting[@]}" bash "$layer0_shard_driver" --merged-log "$1" "$ROOT" "$3" "$2" 2>&1 | sed -u 's/^/    /'
   return "${PIPESTATUS[0]}"
+}
+
+# report_crash_case_findings <发现日志> <全量日志>：逐节打发现表（行格式与节的写法以 crates/singlefs-harness/src/crash.rs 的发现日志为准：
+# 字段制表符分，第一个字段是行的种类，其余 key=value）。每一处不对各打一行「问题：…」，有问题返回 1；发现日志不在又不该有时返回 0。
+report_crash_case_findings() {
+  local findings_file="$1" log_file="$2" stdout_findings_lines
+  stdout_findings_lines="$(grep -c '^LAYER0_FINDINGS ' "$log_file" 2>/dev/null)"
+  stdout_findings_lines="${stdout_findings_lines:-0}"
+  if [[ ! -s "$findings_file" ]]; then
+    if [[ "$stdout_findings_lines" == 0 ]]; then
+      echo "    发现日志：没有（$findings_file 不在或是空的，全量日志里也没有 LAYER0_FINDINGS 行：这条用例没走读 SINGLEFS_LAYER0_FINDINGS_FILE 的枚举入口）"
+      return 0
+    fi
+    echo "    发现日志：$findings_file 不在或是空的"
+    echo "      问题：全量日志里有 ${stdout_findings_lines} 行 LAYER0_FINDINGS（枚举跑完了 ${stdout_findings_lines} 趟），发现日志却一节都没写：SINGLEFS_LAYER0_FINDINGS_FILE 没传进用例"
+    return 1
+  fi
+  echo "    发现日志：$findings_file（全量日志里 LAYER0_FINDINGS ${stdout_findings_lines} 行）"
+  awk -F'\t' -v shown_limit=30 -v findings_path="$findings_file" -v break_item="$layer0_break" '
+    function field(name,   position, equals) {
+      for (position = 2; position <= NF; position++) {
+        equals = index($position, "=")
+        if (equals > 0 && substr($position, 1, equals - 1) == name) return substr($position, equals + 1)
+      }
+      return ""
+    }
+    function signature_text(tail_name) {
+      return "#" field("finding") " pass=" field("pass") " violated=" field("violated") " segment=" field("segment") " publish=" field("publish") " " tail_name
+    }
+    $1 == "layer0_findings_begin" {
+      sections++
+      section_name[sections] = "stream=" field("stream") (field("shard") != "" ? " shard=" field("shard") : "") " states=" field("states")
+      next
+    }
+    sections == 0 { lines_before_first_section++; next }
+    $1 == "layer0_finding" { final_rows[sections, ++final_count[sections]] = signature_text("states=" field("states") " sample_states=" field("sample_states")); next }
+    $1 == "layer0_finding_new" { new_rows[sections, ++new_count[sections]] = signature_text("first_state=" field("first_state")); next }
+    $1 == "layer0_finding_threshold" { next }
+    $1 == "layer0_findings_summary" {
+      summary_count[sections]++
+      summary_signatures[sections] = field("signatures"); summary_red_states[sections] = field("red_states"); summary_states[sections] = field("states")
+      next
+    }
+    { unknown_kinds[$1]++ }
+    function print_rows(kind, section, count,   row, limit) {
+      limit = (break_item == "no-truncation") ? count : shown_limit
+      for (row = 1; row <= count && row <= limit; row++) print "        " (kind == "final" ? final_rows[section, row] : new_rows[section, row])
+      if (count > limit) print "        其余 " (count - limit) " 个见 " findings_path
+    }
+    END {
+      problems = 0
+      if (sections == 0) { print "      问题：一行 layer0_findings_begin 都没有，认不出节"; problems++ }
+      if (lines_before_first_section > 0) { print "      问题：第一行 layer0_findings_begin 之前有 " lines_before_first_section " 行"; problems++ }
+      for (kind in unknown_kinds) print "      （认不出的行种类 " kind "：" unknown_kinds[kind] " 行，没判）"
+      for (section = 1; section <= sections; section++) {
+        if (summary_count[section] == 0) {
+          if (break_item == "ignore-unfinished") continue
+          print "      第 " section " 节（" section_name[section] "）：这一趟没跑完（没有 layer0_findings_summary 行）；死之前找到 " (new_count[section] + 0) " 个签名："
+          print_rows("new", section, new_count[section] + 0)
+          print "      问题：第 " section " 节这一趟没跑完（没有 layer0_findings_summary 行：还在跑、被杀或 panic 判红）"
+          problems++
+          continue
+        }
+        print "      第 " section " 节（" section_name[section] "）：signatures=" summary_signatures[section] " red_states=" summary_red_states[section] " states=" summary_states[section]
+        if (final_count[section] + 0 == 0) print "        没有签名"
+        print_rows("final", section, final_count[section] + 0)
+        if (summary_count[section] > 1) { print "      问题：第 " section " 节有 " summary_count[section] " 行 layer0_findings_summary"; problems++ }
+        if (summary_signatures[section] != ((final_count[section] + 0) "")) {
+          print "      问题：第 " section " 节定稿 " (final_count[section] + 0) " 行 layer0_finding，summary 却说 signatures=" summary_signatures[section]; problems++
+        }
+        if (break_item != "ignore-red-states" && summary_red_states[section] != "0") {
+          print "      问题：第 " section " 节 red_states=" summary_red_states[section] "：有状态判红（不是 0 都判红；读不出数也判红）"; problems++
+        }
+      }
+      exit (problems > 0 ? 1 : 0)
+    }
+  ' "$findings_file"
 }
 
 # report_manifest_differences <前一份清单> <后一份清单> <前一份的叫法> <后一份的叫法>：逐个列出两份清单里不同的文件，最多 20 个，另报总数。
@@ -348,6 +459,14 @@ full_started_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 start_over_note="不带 --start-over：有进度文件就接着跑"
 if [[ "$layer0_start_over" == 1 ]]; then start_over_note="带 --start-over：进度文件整份丢掉、从头跑"; fi
 echo "  · --full 开跑（${full_started_utc}）：${#crash_case_rows[@]} 条崩溃枚举用例逐条照复用判定跑（这批输入那一格全绿标记在就复用）；续跑的进度文件在 ${layer0_progress_root}/<输入指纹>/，${start_over_note}"
+# 这一趟的全量日志与发现日志：common-dir 下新建一个目录（不随 worktree 删，跑完不删；每趟一个新目录，不拿上一趟的输出顶上）
+layer0_log_directory="$git_common_directory/singlefs-layer0-logs/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+if ! mkdir -p -- "$layer0_log_directory"; then
+  echo "  ✗ 建不了这一趟的日志目录 $layer0_log_directory：全量日志与发现日志没处放"
+  echo "     → 怎么办：看 $git_common_directory 可不可写、盘满没满，修好之后重跑 --full。"
+  exit 1
+fi
+echo "  · 这一趟的全量日志与发现日志放 ${layer0_log_directory}/（log.<用例名> 与 log.<用例名>.findings.tsv，跑完不删）"
 # 双机分片开不开：本地配置在、判得过才开（判法在 layer0-shard-configuration-check.sh，与驱动脚本的运行条件同一份）
 layer0_shard_driver="$ROOT/research/scripts/layer0-shard-run.sh"
 if layer0_shard_configuration_note="$(bash "$ROOT/research/scripts/layer0-shard-configuration-check.sh" "$ROOT" 2>&1)"; then
@@ -388,7 +507,9 @@ for crash_case_row in "${crash_case_rows[@]}"; do
     continue
   fi
   case_started_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  case_log="$layer0_scratch_directory/log.$case_label"
+  case_log="$layer0_log_directory/log.$case_label"
+  case_findings_file="$case_log.findings.tsv"
+  rm -f -- "$case_log" "$case_findings_file"
   case_threads_origin_text="没设，取本机核数"
   if [[ "$case_threads_origin" == explicit ]]; then case_threads_origin_text="显式设的"; fi
   case_threads_note="SINGLEFS_LAYER0_THREADS=${case_threads}（${case_threads_origin_text}），本机 ${case_machine_cores} 核"
@@ -401,12 +522,15 @@ for crash_case_row in "${crash_case_rows[@]}"; do
   fi
   echo "  · $case_key 开跑（${case_started_utc}；${case_way}；${case_threads_note}；这批输入的指纹 ${fingerprint_at_start:0:16}…，${file_count_at_start} 个文件，减去用例读不到的 ${excluded_count_at_start} 个）："
   sed 's/^/      /' <<< "$marker_check_output"
+  echo "    全量日志：${case_log}；发现日志：${case_findings_file}"
   if [[ "$case_sharded" == 1 ]]; then
     run_crash_case_in_two_shards "$case_key" "$case_log" "$fingerprint_at_start"
   else
-    run_crash_case "$case_log" "${case_command[@]}"
+    run_crash_case "$case_log" "$case_findings_file" "${case_command[@]}"
   fi
   case_run_exit=$?
+  # 发现表跑完就打（判红的那一趟最要看它）；判定留到下面，cargo 退非 0、日志判不绿先报
+  if report_crash_case_findings "$case_findings_file" "$case_log"; then case_findings_exit=0; else case_findings_exit=$?; fi
   if [[ "$case_run_exit" != 0 ]]; then
     [[ -f "$case_log" ]] && tail -40 "$case_log"
     delete_crash_case_marker "$case_key" "$fingerprint_at_start"
@@ -423,14 +547,22 @@ for crash_case_row in "${crash_case_rows[@]}"; do
     continue
   fi
   judged_lines_file="$layer0_scratch_directory/judged.$case_label"
-  if ! judge_output="$(python3 "$layer0_admission_module" crash-case-judge "$ROOT" "$case_key" "$case_log" "$judged_lines_file" \
-      --machine-cores "$case_machine_cores" --threads "$case_threads" --threads-origin "$case_threads_origin")"; then
+  if ! judge_output="$(python3 "$layer0_admission_module" crash-case-judge "$ROOT" "$case_key" "$case_log" "$judged_lines_file")"; then
     delete_crash_case_marker "$case_key" "$fingerprint_at_start"
     printf '%s\n' "$judge_output" | sed 's/^/       /'
     echo "  ✗ $case_key 的用例跑过了，日志却判不绿（上面逐条列出）"
     echo "     → 怎么办：计数行不是恰好一行、过滤之后没跑到恰好一条用例，对一对 stage-inputs.tsv 里 $case_key 那一行第三列与用例打印的行；"
     echo "                不是全量去 crates/singlefs-harness/src/crash.rs 的 enumerate_layer0 看；只起了 1 个线程看 Layer0Parallelism::from_environment 读没读到 SINGLEFS_LAYER0_THREADS，"
     echo "                真要单线程跑（比对单进程读数），显式写 SINGLEFS_LAYER0_THREADS=1 bash .claude/gate.d/54-layer0-replay.sh --full <根>。"
+    red_cases+=("$case_key")
+    continue
+  fi
+  if [[ "$case_findings_exit" != 0 ]]; then
+    delete_crash_case_marker "$case_key" "$fingerprint_at_start"
+    echo "  ✗ $case_key 的用例跑过了、日志也判得绿，发现日志却判红（上面发现表里的「问题：」逐条列出）"
+    echo "     → 怎么办：「这一趟没跑完」看全量日志 $case_log 的尾部是 panic 还是被杀；red_states 不是 0 是有状态判红而用例没红，"
+    echo "                对一对用例的计数断言与 crates/singlefs-harness/src/crash.rs 的发现表；发现日志不在而全量日志里有 LAYER0_FINDINGS 行，"
+    echo "                是 SINGLEFS_LAYER0_FINDINGS_FILE 没传进用例（单机看本阶段 run_crash_case，双机看 research/scripts/layer0-shard-run.sh 给 merge 那一趟的设置）。"
     red_cases+=("$case_key")
     continue
   fi
@@ -451,8 +583,7 @@ for crash_case_row in "${crash_case_rows[@]}"; do
   fi
   threads_text="${judge_output//$'\n'/；}${judge_output:+；}${case_threads_note}"
   if ! record_output="$(python3 "$layer0_admission_module" crash-case-record "$ROOT" "$case_key" "$fingerprint_at_start" "$manifest_at_start" "$judged_lines_file" \
-      --files "$file_count_at_start" --excluded "$excluded_count_at_start" --started "$case_started_utc" --judged-root "$ROOT" \
-      --machine-cores "$case_machine_cores" --threads "$case_threads" --threads-origin "$case_threads_origin")"; then
+      --files "$file_count_at_start" --excluded "$excluded_count_at_start" --started "$case_started_utc" --judged-root "$ROOT")"; then
     echo "  ✗ $case_key 判绿，全绿标记却没写成：$record_output"
     echo "     → 怎么办：看 $git_common_directory 可不可写、盘满没满，修好之后重跑 --full（没有标记，整轮门禁的快档会一直红）。"
     red_cases+=("$case_key")
@@ -469,4 +600,9 @@ if (( ${#red_cases[@]} > 0 )); then
   echo "     → 怎么办：逐条照它自己那一句「→ 怎么办」改；改完暂存，再在 HEAD + 暂存区的 worktree 里跑 --full（这一趟判绿的与复用的那几条下一趟照样复用）。"
   exit 1
 fi
-echo "  ✓ --full 跑完（开跑 ${full_started_utc}，跑完 ${full_finished_utc}）：${#crash_case_rows[@]} 条崩溃枚举用例，这一趟跑了判绿 ${#green_cases[@]} 条（${green_cases[*]:-无}），复用 ${#reused_cases[@]} 条（${reused_cases[*]:-无}）"
+echo "  ✓ --full 跑完（开跑 ${full_started_utc}，跑完 ${full_finished_utc}）：${#crash_case_rows[@]} 条崩溃枚举用例，这一趟跑了判绿 ${#green_cases[@]} 条（${green_cases[*]:-无}），复用 ${#reused_cases[@]} 条（${reused_cases[*]:-无}）；日志在 ${layer0_log_directory}/"
+if [[ "$layer0_sample_mode" == 1 ]]; then
+  echo "  ! 样本档（.layer0-sample-tools，假 cargo）：流程判绿，退 3 不退 0——这一趟没跑过真的层 0"
+  echo "     → 真跑要在不带 .layer0-sample-tools 的树里跑 --full（建法见快档的出路句）。"
+  exit 3
+fi

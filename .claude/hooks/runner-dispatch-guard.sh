@@ -12,7 +12,7 @@
 #      定义不在、没写这一行的不查。
 #   ④ 写范围：类型在 `.claude/hooks/agent-write-scope.tsv` 里的，提示里「报告路径 / 报告写进 / 写进 / 写到 / 更新」后面紧跟的路径
 #      （/tmp/claude-<uid>/、research/、.claude/、crates/、litmus/、records/ 起头）逐个按它那几行模式判，不在里面就拒；前面六个字以内有否定词的不判。
-#   ⑤ 实现员：要有一行「要动的 crates 文件：…」，里面的 crates/ 路径不超过 IMPLEMENTATION_WRITER_FILE_LIMIT 个（8，推的；拆不开的交用户定，放行行「文件上限已判：<理由>」）；
+#   ⑤ 实现员：要有一行「要动的 crates 文件：…」（份数不设上限，用户 2026-09-27 定；`crates/mutations.tsv` 只追加、不算撞）；
 #      与本会话还在跑的实现员登记的文件有交集就拒。登记在 <DISPATCH_GUARD_STATE_ROOT>/<会话 id>/implementation-writers.tsv，一行一次派发
 #      （时刻、提示的 sha256、文件）；每次判之前先删掉已结束的：主会话记录里那次派发（toolUseResult 的 prompt 同 sha256）的 agent
 #      交回了（`<agent-message from="<id>">` 后跟 `[Subagent hand-back]`）、任务通知是 failed / killed / stopped、或被 TaskStop 停了；
@@ -40,7 +40,7 @@
 #                                        # snapshot-closed-round-open / snapshot-body-optional / snapshot-valve-ignored / snapshot-valve-loose /
 #                                        # snapshot-any-agent / snapshot-loose-lines / snapshot-no-edges / snapshot-unreadable-denies /
 #                                        # snapshot-unreadable-aborts / snapshot-missing-spec-denies / json-error-silent / json-error-denies /
-#                                        # inputs-ignored / general-purpose-free / scope-ignored / scope-negation-ignored / crates-no-limit /
+#                                        # inputs-ignored / general-purpose-free / scope-ignored / scope-negation-ignored /
 #                                        # registry-ignored / registry-no-prune / opus-no-limit / window-ignored / spec-check-skipped /
 #                                        # admission-ignored / mutation-table-free / runner-backfill-refused / valve-loose-all / window-never-lifted 各自也必须让它红
 # gate-similar: heavy-test-guard.sh 管同一条「子 agent 不跑重型测试」，但挂 Bash、在执行那一刻判真要跑的命令与它执行的脚本；这里只在派发那一刻查一行结构化声明，判法没有能共用的
@@ -67,7 +67,6 @@ HEAVY_TEST_OWNERS = {"crash-verifier", "gate-triage"}
 LINE_START = r"^[ \t>*_\-]*"
 HEAVY_TEST_LINE = re.compile(LINE_START + r"重型测试[* \t]*[：:][* \t]*不跑", re.M)
 COMMON_CONSTRAINTS_READ = re.compile(r"开工先读[^\n]*\.claude/agent-common\.md")
-IMPLEMENTATION_WRITER_FILE_LIMIT = 8        # 推的，没量过：965k 那几次实现员各动了 8 个以上 crates 文件，倒推的上限
 OPUS_CONCURRENCY_LIMIT = 8                  # 用户 2026-09-27 JST 02:2x 定（弹窗原话「8」）
 INHERITED_MODEL_FAMILY = "opus"             # inherit 与没有定义的类型按主 agent 的模型算；这个项目的主 agent 跑 opus（推的）
 RUNNING_RECENT_SECONDS = 3 * 3600
@@ -286,11 +285,8 @@ def implementation_writer_verdict(hook_input, prompt, launches, ended):
     if line is None:
         return ("✗ 派 implementation-writer 的提示里没有「要动的 crates 文件：…」一行。\n"
                 "→ 怎么办：把这一件要动的 crates/ 文件逐个写进这一行（路径从仓根起）；说不全要动哪些文件，这件活还没切小，先切。"), [], []
-    files = sorted(set(CRATES_PATH.findall(line.group(1))))
-    if (len(files) > IMPLEMENTATION_WRITER_FILE_LIMIT and not break_switch_is("crates-no-limit")
-            and valve_reason(prompt, "文件上限已判") is None):
-        return (f"✗ 这一件要动 {len(files)} 个 crates 文件，超过 {IMPLEMENTATION_WRITER_FILE_LIMIT} 个（推的上限）。\n"
-                "→ 怎么办：拆成几件分开派，一件不超过上限；拆不开的交用户定，定了在提示里写一行「文件上限已判：<用户怎么定的>」。"), files, []
+    # crates/mutations.tsv 只追加、不算撞文件（主 agent 合补丁时按 mutations-append.tsv 并）；份数不设上限（用户 2026-09-27 定）。
+    files = sorted(set(CRATES_PATH.findall(line.group(1))) - {"crates/mutations.tsv"})
     live = live_registry_rows(hook_input, launches, ended)
     if break_switch_is("registry-ignored"):
         return None, files, live
@@ -803,9 +799,8 @@ def selftest(hook_dir):
         write_session("registry", [launch("a00000000000000a1", "claude-opus-5", heavy_line + writer_one), handed_back("a00000000000000a1")])
         cases.append(session_case("实现员:第一件交回之后不再撞", "implementation-writer", "要动的 crates 文件：crates/a/src/two.rs\n", 0, "registry"))
         cases.append(session_case("实现员:没写要动的文件", "implementation-writer", "改挂载准入。", 2, "registry"))
-        cases.append(session_case("实现员:文件超过上限", "implementation-writer", "要动的 crates 文件：" + " ".join(f"crates/b/src/f{n}.rs" for n in range(IMPLEMENTATION_WRITER_FILE_LIMIT + 1)) + "\n", 2, "registry"))
-        cases.append(session_case("实现员:文件超过上限、用户定了放宽", "implementation-writer", "要动的 crates 文件：" + " ".join(f"crates/c/src/f{n}.rs" for n in range(IMPLEMENTATION_WRITER_FILE_LIMIT + 1)) + "\n文件上限已判：用户定这一件放宽到 12\n", 0, "registry"))
-        cases.append(session_case("实现员:文件超过上限、放行行理由空", "implementation-writer", "要动的 crates 文件：" + " ".join(f"crates/d/src/f{n}.rs" for n in range(IMPLEMENTATION_WRITER_FILE_LIMIT + 1)) + "\n文件上限已判：\n", 2, "registry"))
+        cases.append(session_case("实现员:文件多也不拒（份数不设上限）", "implementation-writer", "要动的 crates 文件：" + " ".join(f"crates/b/src/f{n}.rs" for n in range(12)) + "\n", 0, "registry"))
+        cases.append(session_case("实现员:mutations.tsv 与在跑的重叠不算撞", "implementation-writer", "要动的 crates 文件：crates/mutations.tsv crates/a/src/four.rs\n", 0, "registry"))
         # opus 并发：4 个在跑（1 个交回、1 个失败的不算）；限额窗口：失败通知写着还没到的 resets 时刻
         write_session("busy", [launch(f"a000000000000b{n:02d}", "claude-opus-5-5[1m]", f"活 {n}") for n in range(OPUS_CONCURRENCY_LIMIT + 2)]
                       + [handed_back("a000000000000b00"), notification("a000000000000b01", "failed")])
