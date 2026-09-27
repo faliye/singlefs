@@ -3309,7 +3309,7 @@ fn run_forward_rollback_scenario() -> ForwardRollbackScenario {
         .expect("U11 B");
     }
     let mounted = mount_writable(&parameters, &mut devices).expect("U11 干净重开");
-    let mut allocator = mounted.allocator;
+    let mut reopened_allocator = mounted.allocator;
     let reopened_instance = mounted.output.instance;
     let reopened = mounted
         .current
@@ -3319,7 +3319,7 @@ fn run_forward_rollback_scenario() -> ForwardRollbackScenario {
         let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
         publish_overwrite(
             &mut pool,
-            &mut allocator,
+            &mut reopened_allocator,
             &reopened,
             FirstFile {
                 content: &vec![0u8; 2500],
@@ -3335,7 +3335,7 @@ fn run_forward_rollback_scenario() -> ForwardRollbackScenario {
     roll_back_by_a_forward_publish(
         &parameters,
         &mut devices,
-        &mut allocator,
+        &mut reopened_allocator,
         &mut current,
         RollbackTarget {
             instance: first_instance,
@@ -3877,9 +3877,9 @@ fn judge_group(emitter: &mut Emitter, key: &GroupKey, samples: &[DeltaSample]) -
             two.label(),
             one.label(),
             smallest_key_above_threshold(&peaks, E156_THRESHOLD_ONE_SPAN_TWO_UNIT_SLOTS)
-                .map_or_else(|| "none".to_string(), |key| key.to_string()),
+                .map_or_else(|| "none".to_string(), |smallest_key| smallest_key.to_string()),
             smallest_key_above_threshold(&peaks, E156_THRESHOLD_ONE_SPAN_ONE_UNIT_SLOTS)
-                .map_or_else(|| "none".to_string(), |key| key.to_string()),
+                .map_or_else(|| "none".to_string(), |smallest_key| smallest_key.to_string()),
             first_crossing_text(subset, by_missing, &peaks, E156_THRESHOLD_ONE_SPAN_TWO_UNIT_SLOTS),
             statistics_text(&statistics)
         ));

@@ -271,6 +271,24 @@ pub struct DeviceFreeMap {
     /// 正好开到刚回收空的那一段，崩在两条带新 F 的根之间时 F 之下的根仍是候选、它们的单元已被盖）。只住内存。
     held_until_floor_takes_effect: Vec<bool>,
     held_per_segment: Vec<u64>,
+    /// 已分配、影子账隔离、抬 F 扣住三种位一个都没置的槽数：提交内生块落得下的槽（开放段 bump、开全空段、回落挡的都是这三种位，
+    /// [`Self::is_blocked_for_commit_generated`]），三种位每变一次跟着增量维护（[`Self::set_blocking_bit`]）。
+    /// 发布路径在走固定点之前判「这次的单元落得下」读它（C545（空间准入罩不住分裂与聚簇段层），用户 2026-09-27 定准入先拒）。
+    unblocked_slots: u64,
+    /// 每个 64 槽聚簇段里两槽都没挡（三种位都没置）的偶数起点槽对数：用户数据落得下的槽对（[`Self::lowest_user_data_slot`] 认的那一种，
+    /// 段内外之分由读的一方减），同上增量维护。单元区起点在段边界上（[`UnitAreaStart`] 的不变量）、段长是偶数 ⇒ 一对不跨段；
+    /// 单元区末尾凑不成一对的那一槽不算。
+    unblocked_slot_pairs_per_segment: Vec<u64>,
+    /// 上一项全部段之和。
+    unblocked_slot_pairs: u64,
+}
+
+/// 挡住一个槽的三种位（[`DeviceFreeMap`] 的三张位图）：一个都没置的槽才发得出去。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SlotBlockingBit {
+    Allocated,
+    IsolatedByTheShadowLedger,
+    HeldUntilFloorTakesEffect,
 }
 
 /// 一块盘上有几个完整的 16 KiB 槽（盘上绝对槽数，槽号从 0 起数到它为止）：字节数 ÷ 16384，盘尾不足一槽的零头不算。
@@ -283,32 +301,45 @@ pub fn absolute_slot_count_of_device(device_bytes: u64) -> u64 {
     device_bytes / SLOT_BYTES
 }
 
+/// 一块盘的完整槽数不到单元区起点：盘末尾落在单元区起点之前，这块盘上没有单元区（代码审阅第 35 条）。
+/// 盘的字节数是块设备报的、或崩溃镜像自述的，可以是任何值：挂载入口与恢复判分配记录落点那一道都按它报错，不拿它去减。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DeviceEndsBeforeTheUnitAreaStart {
+    pub device_bytes: u64,
+    pub unit_area_start: SlotNumber,
+}
+
 /// 一块盘的单元区有几个 16 KiB 槽：从 `unit_area_start` 起到设备末尾（[`absolute_slot_count_of_device`]）。
 /// **这是这个量唯一的一处定义**：[`DeviceFreeMap::with_unit_area_start`] 与恢复那一侧「分配记录的跨度在不在单元区内」
-/// 那一道判（`recovery::allocation_records_fit_the_pool_geometry`，经 [`unit_area_slots_of_device`]）都读它，两处手抄会分叉。
+/// 那一道判（`recovery::allocation_records_fit_the_pool_geometry`）都读它，两处手抄会分叉。
 ///
-/// # Panics
-/// 设备末尾在单元区起点之前（减法下溢，`overflow-checks = true`）：mkfs 拒单元区在盘外的几何（`UnitAreaBeyondDevice`）；
-/// 恢复那一侧读盘上报的盘容量之前没有这一道守卫（代码审阅第 35 条，不在实审 A2c 里）。
-#[must_use]
+/// # Errors
+/// 设备末尾在单元区起点之前 ⇒ [`DeviceEndsBeforeTheUnitAreaStart`]（改之前是一句直接的减法，`overflow-checks = true` 下下溢 panic）。
 pub fn unit_area_slots_of_device_starting_at(
     device_bytes: u64,
     unit_area_start: UnitAreaStart,
-) -> u64 {
-    absolute_slot_count_of_device(device_bytes) - unit_area_start.slot().0
+) -> Result<u64, DeviceEndsBeforeTheUnitAreaStart> {
+    absolute_slot_count_of_device(device_bytes)
+        .checked_sub(unit_area_start.slot().0)
+        .ok_or(DeviceEndsBeforeTheUnitAreaStart {
+            device_bytes,
+            unit_area_start: unit_area_start.slot(),
+        })
 }
 
 /// 默认环长下（[`UnitAreaStart::of_the_default_journal_ring`]，槽 50176 起）一块盘的单元区槽数：
 /// [`unit_area_slots_of_device_starting_at`] 取默认环的起点。
 ///
 /// # Panics
-/// 同 [`unit_area_slots_of_device_starting_at`]。
+/// 设备末尾在单元区起点之前：调用方交进来的是判过的盘——mkfs 拒单元区在盘外的几何（`UnitAreaBeyondDevice`），
+/// 可写挂载在读盘之前按 `recovery::every_device_reaches_the_unit_area_start` 拒（代码审阅第 35 条）。
 #[must_use]
 pub fn unit_area_slots_of_device(device_bytes: u64) -> u64 {
     unit_area_slots_of_device_starting_at(
         device_bytes,
         UnitAreaStart::of_the_default_journal_ring(),
     )
+    .expect("盘末尾不在单元区起点之前：mkfs 判过 UnitAreaBeyondDevice，可写挂载在读盘之前判过 every_device_reaches_the_unit_area_start")
 }
 
 impl DeviceFreeMap {
@@ -327,15 +358,25 @@ impl DeviceFreeMap {
     /// 单元区从 `unit_area_start` 起到设备末尾的空闲图；mkfs 占的槽由调用方标上。
     ///
     /// # Panics
-    /// 同 [`unit_area_slots_of_device_starting_at`]。
+    /// 设备末尾在单元区起点之前（[`unit_area_slots_of_device_starting_at`] 交回 [`DeviceEndsBeforeTheUnitAreaStart`]）：
+    /// 建空闲图的两处都先判过盘容量——mkfs 的 `UnitAreaBeyondDevice`，可写挂载读盘之前的
+    /// `recovery::every_device_reaches_the_unit_area_start`（代码审阅第 35 条）。
     #[must_use]
     pub fn with_unit_area_start(
         device: DeviceIdentity,
         device_bytes: u64,
         unit_area_start: UnitAreaStart,
     ) -> Self {
-        let unit_area_slots = unit_area_slots_of_device_starting_at(device_bytes, unit_area_start);
+        let unit_area_slots = unit_area_slots_of_device_starting_at(device_bytes, unit_area_start)
+            .expect("建空闲图的盘末尾不在单元区起点之前：mkfs 判过 UnitAreaBeyondDevice，可写挂载读盘之前判过 every_device_reaches_the_unit_area_start");
         let segments = unit_area_slots.div_ceil(CLUSTER_SEGMENT_SLOTS);
+        // 起步整个单元区都空：每段的槽对数是这一段的槽数 ÷ 2（末尾那一段可能不满 64 槽、槽数可能是奇数，多出的一槽不成对）。
+        let unblocked_slot_pairs_per_segment: Vec<u64> = (0..segments)
+            .map(|segment_index| {
+                let first_slot_of_the_segment = segment_index * CLUSTER_SEGMENT_SLOTS;
+                (unit_area_slots - first_slot_of_the_segment).min(CLUSTER_SEGMENT_SLOTS) / 2
+            })
+            .collect();
         Self {
             device,
             device_size_in_bytes: device_bytes,
@@ -356,18 +397,24 @@ impl DeviceFreeMap {
                     .expect("单元区槽数")
             ],
             held_per_segment: vec![0; usize::try_from(segments).expect("段数")],
+            unblocked_slots: unit_area_slots,
+            unblocked_slot_pairs: unblocked_slot_pairs_per_segment.iter().sum(),
+            unblocked_slot_pairs_per_segment,
         }
     }
 
     /// 槽号 → 位图下标。**槽号在单元区内是这里的前置条件，不是这里判的东西**：
     /// 落点由分配器自己发（`lowest_user_data_slot` / `lowest_empty_segment` / bump 都从这张图的单元区起点起），
-    /// 从盘上读来的分配记录在进分配器之前由 `recovery::allocation_records_fit_the_pool_geometry` 判过
-    /// （槽号 ≥ 单元区起点、跨度不越过单元区末尾、设备身份在池里、同一块盘上两条不罩同一个槽）。
+    /// 从盘上读来的槽号在进分配器之前都判过：分配记录由 `recovery::allocation_records_fit_the_pool_geometry` 判
+    /// （槽号 ≥ 单元区起点、跨度不越过单元区末尾、设备身份在池里、同一块盘上两条不罩同一个槽）；
+    /// mkfs 那一版根记录里实例表与树表两条指针的槽号（`mount::format_time_allocator`）按同一道判；
+    /// 影子账里被抛弃根的指针槽号（`mount::placements_referenced_by_root`）按 `recovery::placement_lies_in_the_unit_area_of_its_device` 判，
+    /// 不在单元区里的那条根当「账读不出」只计数（代码审阅第 32 条）。
     /// 写成 `checked_sub(...).expect(...)` 而不是直接减：`Cargo.toml` 的 `overflow-checks = true` 下直接减也会炸，
     /// 但炸出来的是一句 `attempt to subtract with overflow`，说不出是哪条前置条件没守住。
     fn index(&self, slot: SlotNumber) -> usize {
         let offset_in_slots = slot.0.checked_sub(self.unit_area_start.slot().0).expect(
-            "槽号在单元区内：盘上读来的分配记录在 recovery::allocation_records_fit_the_pool_geometry 判过，分配器自己发的落点都从单元区起点起",
+            "槽号在单元区内：盘上读来的分配记录与 mkfs 那一版两条指针在 recovery::allocation_records_fit_the_pool_geometry 判过，被抛弃根的指针槽号在 recovery::placement_lies_in_the_unit_area_of_its_device 判过，分配器自己发的落点都从单元区起点起",
         );
         usize::try_from(offset_in_slots).expect("单元区内的槽号装得进 usize")
     }
@@ -375,6 +422,92 @@ impl DeviceFreeMap {
     /// 单元区末尾（不含）的槽号：起点加单元区槽数。
     fn unit_area_end_slot(&self) -> u64 {
         self.unit_area_start.slot().0 + self.unit_area_slots
+    }
+
+    /// 位图下标上的这一槽三种位（已分配、影子账隔离、抬 F 扣住）一个都没置。
+    fn is_unblocked_at_index(&self, index: usize) -> bool {
+        !self.allocated[index]
+            && !self.isolated[index]
+            && !self.held_until_floor_takes_effect[index]
+    }
+
+    /// 位图下标 `index` 所在的那一对（从偶数下标起：单元区起点在段边界上、是偶数槽，下标的奇偶就是槽号的奇偶）两槽都没挡；
+    /// 单元区末尾凑不成一对的那一槽答否。
+    fn is_unblocked_pair_at_index(&self, index: usize) -> bool {
+        let first_index_of_the_pair = index - index % 2;
+        first_index_of_the_pair + 1 < self.allocated.len()
+            && self.is_unblocked_at_index(first_index_of_the_pair)
+            && self.is_unblocked_at_index(first_index_of_the_pair + 1)
+    }
+
+    /// 改一槽的一种挡位，同时增量维护没挡的槽数与没挡的槽对数（每段一份与总数）：三张位图只经这里改。
+    fn set_blocking_bit(&mut self, index: usize, bit: SlotBlockingBit, is_set: bool) {
+        let slot_was_unblocked = self.is_unblocked_at_index(index);
+        let pair_was_unblocked = self.is_unblocked_pair_at_index(index);
+        match bit {
+            SlotBlockingBit::Allocated => self.allocated[index] = is_set,
+            SlotBlockingBit::IsolatedByTheShadowLedger => self.isolated[index] = is_set,
+            SlotBlockingBit::HeldUntilFloorTakesEffect => {
+                self.held_until_floor_takes_effect[index] = is_set;
+            }
+        }
+        match (slot_was_unblocked, self.is_unblocked_at_index(index)) {
+            (true, false) => self.unblocked_slots -= 1,
+            (false, true) => self.unblocked_slots += 1,
+            (true, true) | (false, false) => {}
+        }
+        let segment = index / usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
+        match (pair_was_unblocked, self.is_unblocked_pair_at_index(index)) {
+            (true, false) => {
+                self.unblocked_slot_pairs_per_segment[segment] -= 1;
+                self.unblocked_slot_pairs -= 1;
+            }
+            (false, true) => {
+                self.unblocked_slot_pairs_per_segment[segment] += 1;
+                self.unblocked_slot_pairs += 1;
+            }
+            (true, true) | (false, false) => {}
+        }
+    }
+
+    /// 三种位都没置的槽数（字段 `unblocked_slots`）：提交内生块落得下的槽，聚簇段内外都算。
+    #[must_use]
+    pub fn unblocked_slots(&self) -> u64 {
+        self.unblocked_slots
+    }
+
+    /// 用户数据落得下的槽对数：两槽都没挡、起点偶数、不在 `cluster_segments` 里任何一段（[`Self::lowest_user_data_slot`] 认的那一种；
+    /// D3（空间分配） 已定项 8 第 1、2 条，已定项 10 ②）。读时总数减那几段各自的数，O(段数)，不扫单元区
+    /// （`.claude/rules/fs-design.md`「记账是事务的副产品」：准入是运行时决策路径，代价不许随盘容量增长）。
+    ///
+    /// # Panics
+    /// `cluster_segments` 里有一段的起点不在这块盘单元区里的段边界上：那几段都是各盘一致答出来的全空段起点
+    /// （[`Self::lowest_empty_segment`]），每块盘上都是整段、在单元区里。
+    #[must_use]
+    pub fn unblocked_slot_pairs_outside_the_cluster_segments(
+        &self,
+        cluster_segments: &BTreeSet<SlotNumber>,
+    ) -> u64 {
+        let pairs_inside_the_cluster_segments: u64 = cluster_segments
+            .iter()
+            .map(|segment_start| {
+                let offset_in_slots = segment_start
+                    .0
+                    .checked_sub(self.unit_area_start.slot().0)
+                    .expect("聚簇段在单元区里：它是各盘一致答出来的全空段起点");
+                assert!(
+                    offset_in_slots.is_multiple_of(CLUSTER_SEGMENT_SLOTS),
+                    "聚簇段起点在段边界上：{segment_start:?}"
+                );
+                let segment = usize::try_from(offset_in_slots / CLUSTER_SEGMENT_SLOTS)
+                    .expect("段号装得进 usize");
+                *self
+                    .unblocked_slot_pairs_per_segment
+                    .get(segment)
+                    .expect("聚簇段在这块盘的单元区里：各盘一致答出来的整段")
+            })
+            .sum();
+        self.unblocked_slot_pairs - pairs_inside_the_cluster_segments
     }
 
     #[must_use]
@@ -443,10 +576,13 @@ impl DeviceFreeMap {
     pub fn isolate(&mut self, slot: SlotNumber, span: u64) {
         let start = self.index(slot);
         let end = start + usize::try_from(span).expect("跨度");
-        assert!(end <= self.allocated.len(), "跨度越过单元区末尾");
+        assert!(
+            end <= self.allocated.len(),
+            "跨度越过单元区末尾：隔离的落点来自被抛弃根，它的槽与跨度在 recovery::placement_lies_in_the_unit_area_of_its_device / allocation_records_fit_the_pool_geometry 判过"
+        );
         for index in start..end {
             if !self.isolated[index] {
-                self.isolated[index] = true;
+                self.set_blocking_bit(index, SlotBlockingBit::IsolatedByTheShadowLedger, true);
                 let segment = index / usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
                 self.isolated_per_segment[segment] += 1;
                 self.isolated_slots += 1;
@@ -465,7 +601,7 @@ impl DeviceFreeMap {
     pub fn clear_isolation_of_slot(&mut self, slot: SlotNumber) {
         let index = self.index(slot);
         if self.isolated[index] {
-            self.isolated[index] = false;
+            self.set_blocking_bit(index, SlotBlockingBit::IsolatedByTheShadowLedger, false);
             let segment = index / usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
             self.isolated_per_segment[segment] -= 1;
             self.isolated_slots -= 1;
@@ -479,7 +615,7 @@ impl DeviceFreeMap {
         assert!(end <= self.allocated.len(), "跨度越过单元区末尾");
         for index in start..end {
             if !self.held_until_floor_takes_effect[index] {
-                self.held_until_floor_takes_effect[index] = true;
+                self.set_blocking_bit(index, SlotBlockingBit::HeldUntilFloorTakesEffect, true);
                 let segment = index / usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
                 self.held_per_segment[segment] += 1;
             }
@@ -496,10 +632,24 @@ impl DeviceFreeMap {
         self.allocated[index] || self.isolated[index] || self.held_until_floor_takes_effect[index]
     }
 
-    /// F 在每块盘上生效之后把扣住的槽放开。
+    /// F 在每块盘上生效之后把扣住的槽放开。只走有扣住的那几段（`held_per_segment` 非 0），逐槽经 [`Self::set_blocking_bit`] 清，
+    /// 没挡的槽数与槽对数跟着维护。
     pub fn release_holds(&mut self) {
-        self.held_until_floor_takes_effect.fill(false);
-        self.held_per_segment.fill(0);
+        let segment_slots = usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
+        // 迭代上界是段数；每一段里至多 64 槽。
+        for segment in 0..self.held_per_segment.len() {
+            if self.held_per_segment[segment] == 0 {
+                continue;
+            }
+            let first_index = segment * segment_slots;
+            let past_the_last_index = (first_index + segment_slots).min(self.allocated.len());
+            for index in first_index..past_the_last_index {
+                if self.held_until_floor_takes_effect[index] {
+                    self.set_blocking_bit(index, SlotBlockingBit::HeldUntilFloorTakesEffect, false);
+                }
+            }
+            self.held_per_segment[segment] = 0;
+        }
     }
 
     /// 回收：一个已释放、释放代 ≤ max(F_生效, 环里最旧有效根) 的落点回到空闲（D16（发布语义） 已定项 1 的可再分配谓词）：
@@ -516,7 +666,7 @@ impl DeviceFreeMap {
         // runs 的增量：两边都空是把两段并成一段（−1），两边都占是新开一段（+1），一边空是接上去（不变）。
         self.free_runs = self.free_runs + 1 - u64::from(left_free) - u64::from(right_free);
         for index in start..end {
-            self.allocated[index] = false;
+            self.set_blocking_bit(index, SlotBlockingBit::Allocated, false);
             let segment = index / usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
             self.used_per_segment[segment] -= 1;
         }
@@ -568,7 +718,7 @@ impl DeviceFreeMap {
         let pieces_left = u64::from(left_free) + u64::from(right_free);
         self.free_runs = self.free_runs + pieces_left - 1;
         for index in start..end {
-            self.allocated[index] = true;
+            self.set_blocking_bit(index, SlotBlockingBit::Allocated, true);
             let segment = index / usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
             self.used_per_segment[segment] += 1;
         }
@@ -1714,6 +1864,120 @@ mod tests {
             pool.records().len(),
             20,
             "m1 m2 t1..t8 十个单元 × 2 盘（字节表五）"
+        );
+    }
+
+    /// 逐槽扫出来的「没挡的槽数」与「这次挂载开过的聚簇段之外、两槽都没挡的偶数起点槽对数」：只用公开的 `is_free`
+    /// （与 `lowest_user_data_slot` 同一个谓词）与聚簇段集合，不读增量维护的那几个计数。
+    fn unblocked_slots_and_pairs_outside_the_cluster_segments_by_scan(
+        pool: &PoolAllocator,
+        device_map: &DeviceFreeMap,
+    ) -> (u64, u64) {
+        let first_slot = device_map.unit_area_start().slot().0;
+        let past_the_last_slot = first_slot + device_map.unit_area_slots();
+        let unblocked_slots = u64::try_from(
+            (first_slot..past_the_last_slot)
+                .filter(|slot| device_map.is_free(SlotNumber(*slot)))
+                .count(),
+        )
+        .expect("槽数装得进 u64");
+        let pairs_outside = u64::try_from(
+            (first_slot..past_the_last_slot)
+                .step_by(2)
+                .filter(|pair_start| {
+                    pair_start + 1 < past_the_last_slot
+                        && device_map.is_free(SlotNumber(*pair_start))
+                        && device_map.is_free(SlotNumber(pair_start + 1))
+                        && !pool.cluster_segments().iter().any(|segment_start| {
+                            *pair_start >= segment_start.0
+                                && *pair_start < segment_start.0 + CLUSTER_SEGMENT_SLOTS
+                        })
+                })
+                .count(),
+        )
+        .expect("槽对数装得进 u64");
+        (unblocked_slots, pairs_outside)
+    }
+
+    /// 发布路径准入先判「这次的单元落得下」读的两个数（C545（空间准入罩不住分裂与聚簇段层），用户 2026-09-27 定准入先拒）——
+    /// 提交内生块落得下的槽数、用户数据落得下的段外槽对数——是增量维护的，这里每一步之后拿逐槽扫出来的同一个量对，两块盘都要对得上。
+    /// 三种挡位的置与清各走一遍：分配（开段、bump、用户数据）、回收、抬 F 扣住与放开、影子账隔离（只在盘 0）与清隔离；
+    /// 单元区 385 槽（末尾一槽不成对、末尾一段不满 64 槽）。
+    /// 判别力：放开扣住时只清位图、不跟着维护（改之前的 `fill(false)`），放开之后两个数都少算放开的那几槽。
+    #[test]
+    fn unblocked_slot_and_slot_pair_counts_are_maintained_incrementally_and_match_a_scan() {
+        let device_bytes = (UNIT_AREA_START_SLOT + 385) * SLOT_BYTES;
+        let mut pool = PoolAllocator::new(vec![
+            DeviceFreeMap::new(DeviceIdentity(0), device_bytes),
+            DeviceFreeMap::new(DeviceIdentity(1), device_bytes),
+        ]);
+        let check = |pool_after_the_step: &PoolAllocator, step: &str| {
+            for device_map in &pool_after_the_step.devices {
+                assert_eq!(
+                    (
+                        device_map.unblocked_slots(),
+                        device_map.unblocked_slot_pairs_outside_the_cluster_segments(
+                            pool_after_the_step.cluster_segments()
+                        )
+                    ),
+                    unblocked_slots_and_pairs_outside_the_cluster_segments_by_scan(
+                        pool_after_the_step,
+                        device_map
+                    ),
+                    "{step}：盘 {:?} 的（没挡的槽数，段外没挡的槽对数）与逐槽扫的相同",
+                    device_map.device
+                );
+            }
+        };
+        check(&pool, "空盘");
+        assert_eq!(
+            pool.devices[0].unblocked_slot_pairs_outside_the_cluster_segments(&BTreeSet::new()),
+            192,
+            "385 槽：192 对，末尾一槽不成对"
+        );
+        let mut placements = Vec::new();
+        for _ in 0..3 {
+            placements.push(
+                pool.allocate_user_data(CheckpointTxg(1))
+                    .expect("空盘上分得到数据单元"),
+            );
+        }
+        for footprint in [
+            UnitFootprint::OneSlot,
+            UnitFootprint::TwoSlotsAligned,
+            UnitFootprint::OneSlot,
+        ] {
+            placements.push(
+                pool.allocate_commit_generated(footprint, CheckpointTxg(1))
+                    .expect("开段、bump"),
+            );
+        }
+        check(&pool, "分配三个数据单元、开一段 bump 三个提交内生块");
+        for placement in &placements[..4] {
+            pool.release(*placement, CheckpointTxg(2));
+        }
+        pool.reclaim_released_up_to(CheckpointTxg(2), ReclaimedReuse::Immediately);
+        check(&pool, "释放四个、回收");
+        for _ in 0..2 {
+            let placement = pool
+                .allocate_user_data(CheckpointTxg(3))
+                .expect("回收之后分得到");
+            pool.release(placement, CheckpointTxg(4));
+        }
+        pool.reclaim_released_up_to(CheckpointTxg(4), ReclaimedReuse::HeldUntilFloorTakesEffect);
+        check(&pool, "回收的两个扣住到 F 生效");
+        pool.isolate_abandoned(DeviceIdentity(0), SlotNumber(UNIT_AREA_START_SLOT + 301), 2);
+        pool.isolate_abandoned(DeviceIdentity(0), SlotNumber(UNIT_AREA_START_SLOT + 384), 1);
+        check(&pool, "盘 0 隔离一对跨两对的槽与末尾不成对的那一槽");
+        pool.devices[0].clear_isolation_of_slot(SlotNumber(UNIT_AREA_START_SLOT + 302));
+        check(&pool, "盘 0 清一槽的隔离");
+        let unblocked_before_releasing_the_holds = pool.devices[1].unblocked_slots();
+        pool.release_reclaim_holds();
+        check(&pool, "放开扣住");
+        assert_eq!(
+            pool.devices[1].unblocked_slots(),
+            unblocked_before_releasing_the_holds + 4,
+            "放开扣住的两个数据单元（4 槽）"
         );
     }
 

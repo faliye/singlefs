@@ -26,7 +26,7 @@ use singlefs_checker::image::{
 use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::admission::SpaceAdmission;
-use singlefs_core::allocator::{AllocationRecord, PlacementRefusal, PoolAllocator};
+use singlefs_core::allocator::{AllocationRecord, PlacementRefusal, PoolAllocator, UnitAreaStart};
 use singlefs_core::block_device::{BlockDeviceError, PhysicalBlockSizeInBytes};
 use singlefs_core::journal::back_chain_of;
 use singlefs_core::make_filesystem::{
@@ -35,6 +35,7 @@ use singlefs_core::make_filesystem::{
 use singlefs_core::mount::{
     mount_writable_with_space_admission, raise_rollback_floor, roll_back_by_a_forward_publish,
     MountError, ParametersAndDeviceTableOfTheMount, RollbackError, RollbackTarget, ShadowLedger,
+    StillUnreadableAfterOneReread,
 };
 use singlefs_core::mounted_session::{
     MountedSession, UserChange, UserChangePublished, UserChangeRefused,
@@ -50,7 +51,7 @@ use singlefs_core::transaction::{
     PoolWriter, PublishError, TransactionOutput, ZeroUnitPublishPlan,
 };
 use singlefs_core::unit::data_unit_payload_capacity;
-use singlefs_format::{DATA_UNIT_BYTES, SLOT_BYTES, UNIT_AREA_START_SLOT};
+use singlefs_format::{DATA_UNIT_BYTES, SLOT_BYTES};
 
 use crate::crash::{MemoryPool, RecordCheck, SparseBlockDevice};
 use crate::fault_injection::{FaultInjectingBlockDevice, SharedFaultPlan};
@@ -60,11 +61,12 @@ use crate::model::{
     ObservedOutcome, ObservedRefusalReason,
 };
 use crate::model_comparison::{
-    model_root_key, observed_mount, observed_read_back_after_a_crash,
-    observed_root_of_file_version, observed_root_of_version_without_file,
-    refusal_reason_of_block_device_error, refusal_reason_of_mount_error,
+    model_root_key, observed_mount_carrying_to_zero_unit_publishes,
+    observed_read_back_after_a_crash, observed_root_of_file_version,
+    observed_root_of_version_without_file_carrying, refusal_reason_of_mount_error,
     refusal_reason_of_publish_error, refusal_reason_of_rollback_error,
     reported_ceiling_of_mount_error, root_ring_slot_still_bad_after_one_reread_of_mount_error,
+    ContentsCarriedToZeroUnitPublishes,
 };
 use crate::scenario::{e142_parameters, first_file_content, FIXED_WRITE_TIME_SECONDS};
 use crate::segments::FixedGeometry;
@@ -77,8 +79,9 @@ pub enum HistoryDeviceWidth {
     FourGibibytes,
     /// 单元区 384 槽的小盘：第一个文件之后每盘占 13 槽、一次覆盖写再占 10 槽，回收之前几十次发布就写满，分配器的落点拒绝
     /// （每块盘上都没有合政策的落点）在一段历史里走得到（增补 3 第 2 件代码三方第二轮判决第三节第 2 条，照攻方副本的做法：
-    /// 4 GiB 的盘上四段历史里落点拒绝一次都没有，映射把它报成什么都没人看得见）。journal 环缩到 128 MiB：mkfs 要求环不超过设备容量的
-    /// 四分之一（`make_filesystem::check_geometry`），默认 768 MiB 的环放不进这块盘。
+    /// 4 GiB 的盘上四段历史里落点拒绝一次都没有，映射把它报成什么都没人看得见）。单元区起点随环长走（journal 环末尾的下一个槽，
+    /// C475（非默认环长下单元区起点取编译期常量），实审 A3b），盘宽 = 起点 + 单元区槽数；mkfs 要求环不超过设备容量的四分之一
+    /// （`make_filesystem::check_geometry`），环缩到 6 MiB（[`SMALL_DEVICE_JOURNAL_RING_BYTES`]）。
     UnitAreaOf384Slots,
     /// 单元区 256 槽的小盘（journal 环同 384 槽那一档）：单元区墙那一格的取样点用它。mkfs 同一个进程那条会话也装上根环表之后
     /// （`make_filesystem::allocator_after_make_filesystem`），每条会话在根环转过之后都按谓词回收，稳态占用约是根环里那 24 版的账
@@ -99,8 +102,20 @@ const SMALLER_DEVICE_UNIT_AREA_SLOTS: u64 = 256;
 /// 再窄一档小盘的单元区槽数（`HistoryDeviceWidth::UnitAreaOf240Slots`）：三个整 64 槽的聚簇段加 48 槽的尾巴。
 const NARROWEST_DEVICE_UNIT_AREA_SLOTS: u64 = 240;
 
-/// 小盘上的 journal 环字节数：不超过设备容量的四分之一（设备约 790 MiB）。
-const SMALL_DEVICE_JOURNAL_RING_BYTES: u64 = 128 << 20;
+/// 小盘上的 journal 环字节数：6 MiB。单元区从环末尾的下一个槽 1024 + 384 = 1408（= 22 × 64，落在聚簇段边界上）起，
+/// 三档小盘的盘宽 = 1408 + 单元区槽数，最窄那档（240 槽）是 1648 槽 = 25.75 MiB，环 6 MiB 不超过它的四分之一；
+/// 7 MiB 的环在 256 槽、240 槽那两档就超了。在飞上限 = 6 MiB ÷ 4096 ÷ 3 = 512 条。
+/// 改之前是 128 MiB、单元区从编译期常量 50176 起（盘约 790 MiB）；单元区起点改成随环长走之后，128 MiB 的环把起点拉到 9216，
+/// 同样宽的盘上单元区有四万多槽、走不到单元区墙，四分之一那一关又不许环更长。
+const SMALL_DEVICE_JOURNAL_RING_BYTES: u64 = 6 << 20;
+
+/// 小盘的单元区起始槽号：[`SMALL_DEVICE_JOURNAL_RING_BYTES`] 那条环末尾的下一个槽（mkfs 写实例表单元、挂载建空闲图都从它起）。
+fn small_device_unit_area_start_slot() -> u64 {
+    UnitAreaStart::following_the_journal_ring(SMALL_DEVICE_JOURNAL_RING_BYTES)
+        .expect("6 MiB 的环末尾的下一个槽 1408 = 22 × 64，落在聚簇段边界上")
+        .slot()
+        .0
+}
 
 impl HistoryDeviceWidth {
     /// 每块盘的字节数。
@@ -109,13 +124,14 @@ impl HistoryDeviceWidth {
         match self {
             HistoryDeviceWidth::FourGibibytes => 4 << 30,
             HistoryDeviceWidth::UnitAreaOf384Slots => {
-                (UNIT_AREA_START_SLOT + SMALL_DEVICE_UNIT_AREA_SLOTS) * SLOT_BYTES
+                (small_device_unit_area_start_slot() + SMALL_DEVICE_UNIT_AREA_SLOTS) * SLOT_BYTES
             }
             HistoryDeviceWidth::UnitAreaOf256Slots => {
-                (UNIT_AREA_START_SLOT + SMALLER_DEVICE_UNIT_AREA_SLOTS) * SLOT_BYTES
+                (small_device_unit_area_start_slot() + SMALLER_DEVICE_UNIT_AREA_SLOTS) * SLOT_BYTES
             }
             HistoryDeviceWidth::UnitAreaOf240Slots => {
-                (UNIT_AREA_START_SLOT + NARROWEST_DEVICE_UNIT_AREA_SLOTS) * SLOT_BYTES
+                (small_device_unit_area_start_slot() + NARROWEST_DEVICE_UNIT_AREA_SLOTS)
+                    * SLOT_BYTES
             }
         }
     }
@@ -151,15 +167,9 @@ impl HistoryDeviceWidth {
     pub fn name(self) -> &'static str {
         match self {
             HistoryDeviceWidth::FourGibibytes => "两块 4 GiB 的盘",
-            HistoryDeviceWidth::UnitAreaOf384Slots => {
-                "两块单元区 384 槽的小盘（journal 环 128 MiB）"
-            }
-            HistoryDeviceWidth::UnitAreaOf256Slots => {
-                "两块单元区 256 槽的小盘（journal 环 128 MiB）"
-            }
-            HistoryDeviceWidth::UnitAreaOf240Slots => {
-                "两块单元区 240 槽的小盘（journal 环 128 MiB）"
-            }
+            HistoryDeviceWidth::UnitAreaOf384Slots => "两块单元区 384 槽的小盘（journal 环 6 MiB）",
+            HistoryDeviceWidth::UnitAreaOf256Slots => "两块单元区 256 槽的小盘（journal 环 6 MiB）",
+            HistoryDeviceWidth::UnitAreaOf240Slots => "两块单元区 240 槽的小盘（journal 环 6 MiB）",
         }
     }
 }
@@ -336,11 +346,11 @@ pub enum HistoryOperation {
     /// 关掉这个进程的可写会话，冷启动 `recovery::recover`（看 journal）。
     ColdStartRecover,
     /// 崩溃恢复抛弃根（D23（journal 的角色与格式） 已定项 14：影子账与按实例表判抛弃留着，理由是崩溃恢复）：这个进程崩掉，
-    /// 下一次可写挂载时根环里最新那条根（这个会话的现行版本）的根槽与它那次发布的记录点名的单元暂时读不出（读回全 0），
-    /// 择根落到它前一条根、那条记录施加前验点名单元失败不施加，新实例写行与暖机；挂载之后那几处又读得出，最新那条根按新实例的
-    /// 实例表判是被抛弃的。造法照 `tests/common/mod.rs` 的 `abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before`，
-    /// 只把「清零再原样写回」换成挂载期间读回全 0（`DeviceReadingZerosOverHiddenRanges`）：录制流里不多出那几次写，
-    /// 挂载自己写到那几处的照常落盘。
+    /// 下一次可写挂载时根环里最新那条根（这个会话的现行版本）的根槽与它那次发布的记录点名的单元整次挂载读不出（读回全 0；
+    /// `DeviceReadingZerosOverHiddenRanges`：录制流里不多出写，挂载自己写到那几处的照常落盘）。那条根系统配置见证过，
+    /// C554 乙之后读阶段重读一次仍读不出、取号之前拒可写（`MountError::NewerStateStillUnreadableAfterOneReread`），
+    /// 这一步不再造出被抛弃的根；乙罩不到的「系统配置没见证到最新那条根」那一形（`tests/common/mod.rs` 的
+    /// `abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before` 另把见证它的系统配置槽清掉）这一步不造。
     CrashRecoveryAbandoningTheNewestRoot,
 }
 
@@ -748,6 +758,10 @@ struct WritableSession {
     parameters_and_device_table: ParametersAndDeviceTableOfTheMount,
     /// 这次挂载（或起点那个进程）里写出了几条根：写行、暖机、每次发布、抬 F 的每次空发布都算。
     publishes_in_this_mount: usize,
+    /// 这次挂载里最近一版交回（或往下带下来）的实例表字节与分配记录：现行那一版是树表 0 条的一版、同一次挂载里写行那次交回过它们时有，
+    /// 零单元发布从它往下带着比（实审 B3c-4）；一次挂载里第一版就是零单元发布（mkfs 之后第一次可写挂载）、现行那一版带文件
+    /// （零单元发布只接在树表 0 条的一版后面）时是 None。
+    carried_to_zero_unit_publishes: Option<ContentsCarriedToZeroUnitPublishes>,
 }
 
 /// 一段历史跑到哪了：两块盘（与它们的宽度）、这个进程的会话、挂载的次数、理想模型、录制流（判「拒绝之前写没写盘」）。
@@ -916,13 +930,16 @@ impl HistoryPool {
             }
         };
         let operations_written_by_make_filesystem = stream.operation_count();
-        let mut model = IdealModel::after_make_filesystem(ModelPoolGeometry {
-            devices: devices
-                .iter()
-                .map(|(identity, _)| ModelDeviceIdentity(identity.0))
-                .collect(),
-            device_size_in_bytes: device_bytes,
-        });
+        let mut model = IdealModel::after_make_filesystem_on_a_journal_ring_of(
+            ModelPoolGeometry {
+                devices: devices
+                    .iter()
+                    .map(|(identity, _)| ModelDeviceIdentity(identity.0))
+                    .collect(),
+                device_size_in_bytes: device_bytes,
+            },
+            parameters.geometry.journal_ring_bytes,
+        );
         let mut verdict = None;
         let session = match starting_point {
             HistoryStartingPoint::AfterMakeFilesystem => None,
@@ -982,6 +999,7 @@ impl HistoryPool {
                     shadow_ledger: ShadowLedger::On,
                     parameters_and_device_table,
                     publishes_in_this_mount: 3,
+                    carried_to_zero_unit_publishes: None,
                 })
             }
         };
@@ -2046,6 +2064,17 @@ impl HistoryTally {
             counts.rollbacks_accepted_at_the_effective_floor,
             counts.unit_area_wall_refusals_in_the_interval
         );
+        // 每一版比没比实例表与分配代（代码审阅第 12 条）：树表 0 条的一版里「比不了」与「只比重写的角色」只剩一次挂载里第一版就是
+        // 零单元发布的那几版（实审 B3c-4 往下带之后）；「比不了」另含带文件的那两格（mkfs 之后第一次重写实例表之前、从盘上重建且多于一片）。
+        // 这几个数跑到了多少看这一行。
+        let _ = writeln!(
+            text,
+            "  模型比每一版的实例表：比过 {} 张、输出不带整条链比不了 {} 张；零单元发布只比重写的角色 {} 次；比过文件内容 {} 次",
+            counts.instance_tables_compared,
+            counts.instance_tables_not_in_the_output,
+            counts.rewritten_role_sets_compared,
+            counts.file_contents_compared
+        );
         for invariant in singlefs_checker::image::IMPLEMENTED_INVARIANTS {
             let _ = writeln!(
                 text,
@@ -2197,6 +2226,12 @@ fn recovery_failure_member(failure: &RecoveryFailure) -> String {
                 out_of_range.declared_slots_per_region
             )
         }
+        RecoveryFailure::SystemConfigurationValueRefused { value, .. } => {
+            format!("RecoveryFailure::SystemConfigurationValueRefused（{value:?}）")
+        }
+        RecoveryFailure::DeviceEndsBeforeTheUnitAreaStart { .. } => {
+            "RecoveryFailure::DeviceEndsBeforeTheUnitAreaStart".to_string()
+        }
         RecoveryFailure::NoValidRoot => "RecoveryFailure::NoValidRoot".to_string(),
         RecoveryFailure::UnitUnreadable { .. } => "RecoveryFailure::UnitUnreadable".to_string(),
         RecoveryFailure::UnitMalformed { what } => {
@@ -2222,6 +2257,12 @@ fn recovery_failure_member(failure: &RecoveryFailure) -> String {
             ..
         } => "RecoveryFailure::RootPublishCarriesMoreThanOneLastRecordFlagWhoseAnchorIsUndecided"
             .to_string(),
+        RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread { .. } => {
+            "RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread".to_string()
+        }
+        RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread { .. } => {
+            "RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread".to_string()
+        }
     }
 }
 
@@ -2337,6 +2378,19 @@ fn mount_error_member(error: &MountError) -> String {
             return format!(
                 "MountError::FloorRaiseFailedAfterTheMountsPublishes({})",
                 mount_error_member(&failed.cause)
+            )
+        }
+        MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable) => {
+            return format!(
+                "MountError::NewerStateStillUnreadableAfterOneReread({})",
+                match **still_unreadable {
+                    StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { .. } => {
+                        "PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion"
+                    }
+                    StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger { .. } => {
+                        "InstanceTableOfTheNewestRootForTheShadowLedger"
+                    }
+                }
             )
         }
     };
@@ -2571,6 +2625,7 @@ fn settle_file_publish(
         }),
     );
     session.current = PoolVersion::WithFile(output);
+    session.carried_to_zero_unit_publishes = None;
     session.publishes_in_this_mount += 1;
     AppliedStep {
         outcome: StepOutcome::Applied(AppliedEffect::Published {
@@ -2613,6 +2668,7 @@ fn apply_publish_overwrite(
         shadow_ledger,
         parameters_and_device_table,
         publishes_in_this_mount,
+        carried_to_zero_unit_publishes,
     } = session_slot.take().expect("上面判过这个进程的会话开着");
     let mut mounted_session = MountedSession {
         allocator,
@@ -2635,6 +2691,7 @@ fn apply_publish_overwrite(
         shadow_ledger: mounted_session.shadow_ledger,
         parameters_and_device_table: mounted_session.parameters_and_device_table,
         publishes_in_this_mount,
+        carried_to_zero_unit_publishes,
     });
     settle_user_change(
         session_after_the_change,
@@ -2734,7 +2791,8 @@ fn settle_user_change(
         Ok(published) => &published.floor_raises,
         Err(
             UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount { .. }
-            | UserChangeRefused::NoFileVersionToChange,
+            | UserChangeRefused::NoFileVersionToChange
+            | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. },
         ) => &[],
         Err(UserChangeRefused::Publish { floor_raises, .. }) => floor_raises,
         Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(refused)) => &refused.floor_raises,
@@ -2810,6 +2868,11 @@ fn settle_user_change(
         ),
         UserChangeRefused::NoFileVersionToChange => (
             "UserChangeRefused::NoFileVersionToChange".to_string(),
+            ObservedRefusalReason::Unexplained,
+        ),
+        // 执行器交的是整池那两块盘、没换过盘（Z3-A 乙那一判）：走不到，走到了就按说不出理由的拒绝判。
+        UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. } => (
+            "UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration".to_string(),
             ObservedRefusalReason::Unexplained,
         ),
         UserChangeRefused::Publish { cause, .. } => (
@@ -2894,14 +2957,20 @@ fn apply_publish_without_units(
     let mut writer = PoolWriter::new(parameters, devices.as_mut_slice());
     match publish_without_units(&mut writer, &previous_root, plan) {
         Ok(output) => {
+            // 零单元发布从这次挂载里前一版交回的那一份往下带着比（实审 B3c-4）；这次挂载里没有可带的照旧计数。
+            let (observed, carried) = observed_root_of_version_without_file_carrying(
+                &output,
+                session.carried_to_zero_unit_publishes.as_ref(),
+            );
             let verdict = judge_by_model(
                 model,
                 answer,
                 &ObservedOutcome::Succeeded(ObservedEffect::Publishes {
-                    roots: vec![observed_root_of_version_without_file(&output)],
+                    roots: vec![observed],
                     reported_ceiling: None,
                 }),
             );
+            session.carried_to_zero_unit_publishes = carried;
             session.current = PoolVersion::WithoutFile(output);
             session.publishes_in_this_mount += 1;
             AppliedStep::judged_by_outcome_and_model(
@@ -2913,16 +2982,13 @@ fn apply_publish_without_units(
             )
         }
         Err(error) => {
-            let member = format!(
-                "publish_without_units({})",
-                block_device_error_member(&error)
-            );
+            let member = format!("publish_without_units({})", publish_error_member(&error));
             let verdict = judge_by_model(
                 model,
                 answer,
                 &observed_refusal(
                     member.clone(),
-                    refusal_reason_of_block_device_error(&error),
+                    refusal_reason_of_publish_error(&error),
                     0,
                     stream_length_before,
                     stream,
@@ -3021,10 +3087,13 @@ fn settle_mount(
         Ok(mounted) => {
             let (allocation_records_compared, reuse, harness_judgement) =
                 mount_publish_allocation_judgement(image_before_mount, &mounted);
+            // 暖机的零单元发布从这次挂载里写行那一版交回的那一份往下带着比（实审 B3c-4），带到最后的那一份交给会话。
+            let (observed, carried_to_zero_unit_publishes) =
+                observed_mount_carrying_to_zero_unit_publishes(&mounted);
             let mut verdict = judge_by_model(
                 &mut pool.model,
                 Ok(answer),
-                &ObservedOutcome::Succeeded(observed_mount(&mounted)),
+                &ObservedOutcome::Succeeded(observed),
             );
             // 可写挂载准入不够时写行之后推的那几串抬 F（D16（发布语义） 已定项 1「准入」那一行）：每一串照模型的抬 F 逐串比
             // （新 F 就是那一串的根带的、上限是实现报的），接在挂载那几条根后面；前面一处对不上就不再往下比。
@@ -3073,6 +3142,7 @@ fn settle_mount(
                 shadow_ledger: mounted.output.shadow_ledger,
                 parameters_and_device_table: mounted.output.parameters_and_device_table,
                 publishes_in_this_mount: publishes,
+                carried_to_zero_unit_publishes,
             });
             AppliedStep {
                 outcome: StepOutcome::Applied(AppliedEffect::Mounted {
@@ -3262,9 +3332,11 @@ fn ranges_hidden_by_the_crash_recovery(
 }
 
 /// 崩溃恢复抛弃根（`HistoryOperation::CrashRecoveryAbandoningTheNewestRoot`）：这个进程崩掉，下一次可写挂载时最新那条根的根槽与
-/// 它那次发布点名的单元读回全 0，择根落到前一条根、那条记录验点名单元不过不施加，新实例写行与暖机；挂载交回之后那几处照旧读得出。
-/// 模型那一侧照同一个造法答（`IdealModel::answer_mount_writable_with_the_newest_root_unreadable`）：最新那条根不在择根的视野里，
-/// 其余照可写挂载。
+/// 它那次发布点名的单元整次挂载读回全 0；挂载交回之后那几处照旧读得出。那条根是这个会话发的、系统配置见证过它，C554 乙之后
+/// 读阶段重读一次仍读不出、取号之前拒可写（`MountError::NewerStateStillUnreadableAfterOneReread`），这一步因此造不出被抛弃的根。
+/// 模型那一侧答必须拒（`IdealModel::answer_mount_writable_with_the_newest_root_unreadable`）；结局交给可写挂载那一处共用的
+/// [`settle_mount`]：拒了就按成员映射出的理由与「录制流有没有多出写」同模型比，会话照旧关着（挂载之前就关了），
+/// 后面的步与一次被拒的可写挂载之后一样按「没有可写会话」走。
 fn apply_crash_recovery_abandoning_the_newest_root(
     pool: &mut HistoryPool,
     parameters: &MakeFilesystemParameters,

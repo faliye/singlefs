@@ -16,14 +16,18 @@
 //!   「实例切换的预留拿得到」（D2（RAID 条带策略） 已定项 13），需求逐盘 0。
 //!
 //! 条款给的量：checkpoint 保留池的 ckpt_cost 按一次空发布至多写出的固定点计，一律按最坏情况（D28（挂载期承诺量） 已定项 4，用户 2026-09-27 定：
-//! 分配记录树按盘分路、每块盘两条叶路径加根，中央映射树逐层按可能改的路径数与可能切出来的节点数，记账树按每发布的节点数，树表一项，实例表链不进；
-//! [`checkpoint_cost_of_the_version_to_build_on`]）；挂载期承诺量暖机那一半的 c_max
+//! 分配记录树取几何上整棵树（每块盘单元区在根之下每一层罩到的位置数之和加根，用户同日再定取 K1），中央映射树逐层按可能改的路径数与可能切出来的节点数，
+//! 记账树按每发布的节点数，树表一项，实例表链不进；[`checkpoint_cost_of_the_version_to_build_on`]）；挂载期承诺量暖机那一半的 c_max
 //! 与保留池「按同一个现算的 c_max 取」（D28（挂载期承诺量） 已定项 4 末条）；需求 = 这次发布新写的全部槽（普通分配加这次写出的固定点，
 //! 不加这次换下的槽），没有普通分配的发布（空发布、写行、暖机、抬 F）不判（D28（挂载期承诺量） 已定项 1 接线，用户 2026-09-25 定）。
 //!
 //! 实现员取的读法（条款没写，交主 agent）：需求按盘字节记（C370（需求、可用与 df 没有共同单位） 2026-09-17 收窄：与「已分配」同口径只能读成盘字节），
 //! 第一版每个单元落每块盘，每块盘的需求相同；读数取分配器此刻的计数（挂载时是回收与影子账隔离之后、写行之前那一刻；admission 读哪一个
 //! 在那两段里条款没写，见 [`AdmissionReading::of_allocator`]）。
+//!
+//! 发布路径另有一判排在式子之前、走固定点之前：这次的单元按分配器今天的落点规则落不落得下（[`admit_the_units_landing_on_every_device`]，
+//! C545（空间准入罩不住分裂与聚簇段层），用户 2026-09-27 定准入先拒）——数据单元要段外成对的空槽、提交内生块要没挡的槽，
+//! 读的是分配器增量维护的两个数（[`PlacementRoomOnOneDevice`]），不扫单元区。落不下同样交回空间准入不够。
 //!
 //! 准入不够、或准入放行而落点取不到时先推空发布抬 F 再判（D16（发布语义） 已定项 1「准入」那一行，C283（准入失败时不先推发布就报 ENOSPC））
 //! 不在这里做：发布那一处归挂着的会话（`mounted_session`），可写挂载那一处归 `mount::establish_instance`（写行之后推）。
@@ -33,8 +37,8 @@ use std::num::NonZeroU64;
 
 use singlefs_format::{INSTANCE_TABLE_PAGE_RECORDS, SLOT_BYTES};
 
-use crate::address::DeviceIdentity;
-use crate::allocation_record_tree::AllocationRecordTreeGeometry;
+use crate::address::{DataUnitIndexInFile, DeviceIdentity};
+use crate::allocation_record_tree::{span_in_slots_at_level, AllocationRecordTreeGeometry};
 use crate::allocator::PoolAllocator;
 use crate::code_two_tree::{CodeTwoTreeNodeCapacity, CodeTwoTreeShape};
 use crate::transaction::{
@@ -389,7 +393,9 @@ pub struct DemandOnDevice {
     pub bytes: BytesOnOneDevice,
 }
 
-/// 一块不够的盘：它的可用与需求。
+/// 一块不够的盘：它的可用与需求。式子那一判（[`admit_on_every_device`]）里是可用(d) 与需求(d)；「这次的单元落得下」那一判
+/// （[`admit_the_units_landing_on_every_device`]）里是这块盘上短的那一种单元落得下的字节与这次那一种单元要的字节，
+/// 两种怎么取见那个函数的文档。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DeviceShortOfDemand {
     pub device: DeviceIdentity,
@@ -452,6 +458,143 @@ pub fn admit_on_every_device(
     }
 }
 
+/// 「这次的单元落得下」那一判的读数，一块盘一条（C545（空间准入罩不住分裂与聚簇段层），用户 2026-09-27 定准入先拒）：
+/// 这块盘此刻按分配器今天的落点规则（D3（空间分配） 已定项 8、已定项 10）还落得下多少。两个数都是分配器随三种挡位增量维护的
+/// （`DeviceFreeMap::set_blocking_bit`），读它们 O(这次挂载开过的聚簇段数)，不扫单元区（`.claude/rules/fs-design.md`「记账是事务的副产品」）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PlacementRoomOnOneDevice {
+    pub device: DeviceIdentity,
+    /// 数据单元落得下的槽对：两槽都没挡（已分配、影子账隔离、抬 F 扣住三种位都没置）、起点偶数、不在这次挂载开过的任何一个聚簇段里
+    /// （已定项 8 第 1、2 条，已定项 10 ②③；`DeviceFreeMap::unblocked_slot_pairs_outside_the_cluster_segments`）。
+    pub slot_pairs_for_data_units: u64,
+    /// 提交内生块落得下的槽：三种位都没置，聚簇段内外都算——开放段 bump、开全空段、回落到最低空槽挡的都只是这三种位
+    /// （已定项 8 第 2 条、已定项 10 ①⑤；`DeviceFreeMap::unblocked_slots`）。
+    pub slots_for_commit_generated_units: u64,
+}
+
+impl PlacementRoomOnOneDevice {
+    /// 分配器此刻每块盘一条，按 `allocator.devices` 的次序。
+    #[must_use]
+    pub fn of_every_device_of_the_allocator(allocator: &PoolAllocator) -> Vec<Self> {
+        allocator
+            .devices
+            .iter()
+            .map(|device_map| PlacementRoomOnOneDevice {
+                device: device_map.device,
+                slot_pairs_for_data_units: device_map
+                    .unblocked_slot_pairs_outside_the_cluster_segments(
+                        allocator.cluster_segments(),
+                    ),
+                slots_for_commit_generated_units: device_map.unblocked_slots(),
+            })
+            .collect()
+    }
+}
+
+/// 一次发布要落的单元（第一版每个单元落池里每一块盘，每块盘一样多）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UnitsOfAPublishToLand {
+    /// 这次的数据单元个数：每个两槽，落一个槽对。
+    pub data_units: u64,
+    /// 这次提交内生块至多要的槽（[`units_of_a_publish_to_land`]）。
+    pub commit_generated_slots: u64,
+}
+
+/// 一次发布要落的单元：`ordinary_allocation_roles` 是这次普通分配那一半的角色（数据单元、extent 树与 inode 树的节点，
+/// 在走分配记录树的固定点之前就定了，`transaction::prepare_the_version_publish`），按角色数槽；固定点按 `checkpoint_cost` 计，
+/// 每个一槽（码 2 节点与树表单元都是一槽）——这次重写分配记录树哪几个节点要在分配器上走到固定点才知道，拿 ckpt_cost 的最坏数
+/// （分配记录树那一项是 K1 整棵树）顶它（C545 的准入先拒，用户 2026-09-27 定）。
+///
+/// # Panics
+/// `ordinary_allocation_roles` 里有一个不是普通分配的角色（[`space_budget_of_role`]）：调用方只交普通分配那一半。
+#[must_use]
+pub fn units_of_a_publish_to_land(
+    ordinary_allocation_roles: &[TransactionUnit],
+    checkpoint_cost: MetadataBlocks,
+) -> UnitsOfAPublishToLand {
+    assert!(
+        ordinary_allocation_roles
+            .iter()
+            .all(|role| space_budget_of_role(*role) == SpaceBudgetOfARole::OrdinaryAllocation),
+        "只交普通分配那一半的角色：{ordinary_allocation_roles:?}"
+    );
+    let data_units = ordinary_allocation_roles
+        .iter()
+        .filter(|role| matches!(role, TransactionUnit::Data(_)))
+        .count();
+    let ordinary_commit_generated_slots: u64 = ordinary_allocation_roles
+        .iter()
+        .filter(|role| !matches!(role, TransactionUnit::Data(_)))
+        .map(|role| role.span_slots())
+        .sum();
+    UnitsOfAPublishToLand {
+        data_units: u64::try_from(data_units).expect("一次发布的数据单元数装得进 u64"),
+        commit_generated_slots: ordinary_commit_generated_slots
+            .checked_add(checkpoint_cost.0)
+            .expect("一次发布的提交内生块槽数装得进 u64"),
+    }
+}
+
+/// 「这次的单元落得下」逐设备合取（C545（空间准入罩不住分裂与聚簇段层）：D3（空间分配） 已定项 5「字节总量够」与「聚簇段里有合法空槽」
+/// 之间没有条款连起来，用户 2026-09-27 定准入先拒）：每块盘都要两样都够才放行——
+/// ① 数据单元：段外成对的空槽 ≥ 这次的数据单元个数（数据单元在这次的角色里排最前、先取落点，`transaction::PublishShape::rewritten_roles`）；
+/// ② 提交内生块：没挡的槽减去数据单元取走的那几对 ≥ 这次提交内生块至多要的槽。
+///
+/// ② 只数槽：两槽的 inode 叶容器要成对、各盘的落点要同槽（开段各盘一致、回落各盘同槽），这两样今天的落点规则里有、这一判不判——
+/// 条款没写这一判要不要判它们，放行之后落点照样可能被拒（`PlacementRefused`），在任何写之前。
+///
+/// # Errors
+/// `AdmissionRefusedOnSomeDevices`：至少一块盘落不下，按 `room` 的次序交回每一块；那一块的 `available` 与 `demand` 说的是短的那一种：
+/// ① 短时是段外槽对 × 2 槽的字节与这次数据单元 × 2 槽的字节；① 够而 ② 短时是数据单元取走之后剩下没挡的槽的字节与提交内生块要的槽的字节。
+pub fn admit_the_units_landing_on_every_device(
+    room: &[PlacementRoomOnOneDevice],
+    units: UnitsOfAPublishToLand,
+) -> Result<(), AdmissionRefusedOnSomeDevices> {
+    let slots_of_a_data_unit = TransactionUnit::Data(DataUnitIndexInFile::FIRST).span_slots();
+    let slots_of_the_data_units = units
+        .data_units
+        .checked_mul(slots_of_a_data_unit)
+        .expect("数据单元的槽数装得进 u64");
+    let bytes_of_slots = |slots: u64| -> (AvailableBytesOnOneDevice, BytesOnOneDevice) {
+        let bytes = BytesOnOneDevice::of_slots(slots);
+        (AvailableBytesOnOneDevice(i128::from(bytes.0)), bytes)
+    };
+    let devices_where_the_units_cannot_land: Vec<DeviceShortOfDemand> = room
+        .iter()
+        .filter_map(|room_on_the_device| {
+            if room_on_the_device.slot_pairs_for_data_units < units.data_units {
+                let slots_of_the_pairs = room_on_the_device
+                    .slot_pairs_for_data_units
+                    .checked_mul(slots_of_a_data_unit)
+                    .expect("槽对的槽数装得进 u64");
+                return Some(DeviceShortOfDemand {
+                    device: room_on_the_device.device,
+                    available: bytes_of_slots(slots_of_the_pairs).0,
+                    demand: bytes_of_slots(slots_of_the_data_units).1,
+                });
+            }
+            let slots_left_after_the_data_units = room_on_the_device
+                .slots_for_commit_generated_units
+                .checked_sub(slots_of_the_data_units)
+                .expect("段外没挡的槽对都是没挡的槽：槽对够，槽就不少于它们");
+            (slots_left_after_the_data_units < units.commit_generated_slots).then(|| {
+                DeviceShortOfDemand {
+                    device: room_on_the_device.device,
+                    available: bytes_of_slots(slots_left_after_the_data_units).0,
+                    demand: bytes_of_slots(units.commit_generated_slots).1,
+                }
+            })
+        })
+        .collect();
+    if devices_where_the_units_cannot_land.is_empty() {
+        Ok(())
+    } else {
+        Err(AdmissionRefusedOnSomeDevices {
+            short_devices: devices_where_the_units_cannot_land,
+        })
+    }
+}
+
 /// 只供测试的开关（`.claude/rules/fs-design.md` 五条硬要求第 2 条）：发布与可写挂载判不判空间准入。产品路径恒 `JudgedByTheFormula`。
 /// 准入接进来之后，「准入放行而落点仍取不到、在任何写之前拒绝」那一条（D3（空间分配） 已定项 5；C545（空间准入罩不住分裂与聚簇段层））
 /// 在健康的历史里走不到——小盘上式子先拒。关掉准入，那一条拒绝路径（取号之前的预演取不到落点、发布取不到落点、抬 F 的空发布取不到固定点）
@@ -475,24 +618,25 @@ impl SpaceAdmission {
 
 /// checkpoint 保留池的 ckpt_cost（D28（挂载期承诺量） 已定项 4）：一次空发布至多写出的固定点单元数，按这次发布要接在后面的那一版的结构现算，
 /// 一律按最坏情况计（用户 2026-09-27 定：游标跨叶、中央映射树多层都不许少扣；此前按盘分路的那一版只罩「每块盘一片叶、中央映射树 1 层」）：
-/// - 分配记录树：每块盘两条从叶到根之下那一层的路径加共用的根，盘数 × 2 × (高 − 1) + 1
-///   （[`allocation_record_tree_nodes_on_two_leaf_paths_per_device`]）；
+/// - 分配记录树：几何上整棵树（用户同日再定取 K1），1 + Σ_盘 Σ_{层级 L = 0 … 根层级 − 1} 这块盘单元区在层级 L 上罩到的位置数
+///   （[`allocation_record_tree_positions_over_the_unit_areas`]）；
 /// - 中央映射树：逐层按这次可能改的路径数与可能切出来的节点数计（[`central_mapping_tree_nodes_an_empty_publish_rewrites_at_most`]）；
 /// - 记账树每次发布整批重写（`transaction` 装记账行那一段，条目数每次发布相同、整棵按同一个形状重建）：这一版记账树的节点数；
 /// - 树表 1（每次发布重写一个单元，D16（发布语义） 已定项 9）；实例表链不进（它的开销归已定项 3 的切换预留）。
 ///
 /// 「当前」= 这次发布要接在后面的那一版：
-/// - 带文件的一版：分配记录树与中央映射树的高从各自根节点的码 2 头里现读（层级 + 1，不用内存里另存一份，已定项 4）；
-///   中央映射树每层的节点数从这一版的形状里取。
+/// - 带文件的一版：分配记录树与中央映射树的高从各自根节点的码 2 头里现读（层级 + 1，不用内存里另存一份，已定项 4）——分配记录树那一项
+///   按读出来的根层级数每一层的位置；中央映射树每层的节点数从这一版的形状里取。
 /// - 树表 0 条的一版（`None`）：没有中央映射树与记账树（0 与 0）；分配记录树只在那一版写过行时有（分配器记着它，
 ///   `PoolAllocator::allocation_record_tree_of_the_version_without_file`），它按位置寻址、根的层级由池几何定（D8（核心索引结构） 已定项 14），
-///   高取几何的高——这一处分配器里只有节点与指针、没有根节点的字节可读；没写过行的（mkfs 的第 0 代）一棵都没有，取 0。
+///   根层级取几何的——这一处分配器里只有节点与指针、没有根节点的字节可读；没写过行的（mkfs 的第 0 代）一棵都没有，取 0。
 ///
 /// 中央映射树的节点容量按节点格式算（产品路径）；只供测试的压小容量下量同一个数用
 /// [`checkpoint_cost_of_the_version_to_build_on_with_node_capacities`]。
 ///
-/// ⚠️ 射程：分配记录树的「每块盘两条路径」罩的是 bump 游标在一个开放段里走、跨过一片叶的末槽那一次（这次取的落点在新叶、换下的上一版落点在旧叶）。
-/// 一次发布里开放段装不下、开新段或回落到最低空槽，或者换下的是很久以前落在别处的节点时，一块盘上改的叶可以多于两片，这一格条款没写怎么计。
+/// 分配记录树那一项不读这一版有哪些节点：此前「每块盘两条叶路径」（K0）在开放段装不下开新段、没有全空段回落到最低空槽、
+/// 换下很久以前落在别处的节点这三种情形下少扣（实审 A4c 量到一块盘改 3–4 片叶，报告 `research/prompts/m2-rev-a4c-implementer-report.md` 第二节），
+/// 一次发布改几片叶的不动点收不了口，拿得准的上界只有几何上整棵树。代价随单元区线性涨（两块 4 GiB 盘 529 个节点）。
 ///
 /// 同一个数也是挂载期承诺量里暖机那一半的 c_max（已定项 4 末条「按同一个现算的 c_max 取」）。
 #[must_use]
@@ -516,16 +660,20 @@ pub fn checkpoint_cost_of_the_version_to_build_on_with_node_capacities(
     node_capacities: CodeTwoTreeNodeCapacities,
 ) -> MetadataBlocks {
     const TREE_TABLE_UNITS_PER_PUBLISH: u64 = 1;
-    let devices_in_the_pool = u64::try_from(allocator.devices.len()).expect("盘数装得进 u64");
     let record_trees_and_accounting_nodes = match version_to_build_on {
         Some(file_version) => {
-            let allocation_record_tree_nodes =
-                allocation_record_tree_nodes_on_two_leaf_paths_per_device(
-                    file_version
-                        .position_addressed_tree_heights_read_from_the_root_node_headers()
-                        .allocation_record_tree,
-                    devices_in_the_pool,
-                );
+            let root_level_read_from_the_root_node_header = u8::try_from(
+                file_version
+                    .position_addressed_tree_heights_read_from_the_root_node_headers()
+                    .allocation_record_tree
+                    .checked_sub(1)
+                    .expect("树高是根节点头里的层级 + 1，至少 1"),
+            )
+            .expect("码 2 头的层级是 1 字节");
+            let allocation_record_tree_nodes = allocation_record_tree_positions_over_the_unit_areas(
+                root_level_read_from_the_root_node_header,
+                allocator,
+            );
             let accounting_tree_nodes = u64::try_from(file_version.accounting_tree.node_count())
                 .expect("记账树的节点数装得进 u64");
             // 一次空发布在中央映射树里改的条目只有这两棵树的节点（别的进映射的单元照抄上一版、key 不变）：
@@ -559,9 +707,9 @@ pub fn checkpoint_cost_of_the_version_to_build_on_with_node_capacities(
             .expect("三棵树的节点数加起来装得进 u64")
         }
         None => match allocator.allocation_record_tree_of_the_version_without_file() {
-            Some(_) => allocation_record_tree_nodes_on_two_leaf_paths_per_device(
-                AllocationRecordTreeGeometry::of_allocator(allocator).height(),
-                devices_in_the_pool,
+            Some(_) => allocation_record_tree_positions_over_the_unit_areas(
+                AllocationRecordTreeGeometry::of_allocator(allocator).root_level(),
+                allocator,
             ),
             None => 0,
         },
@@ -569,30 +717,47 @@ pub fn checkpoint_cost_of_the_version_to_build_on_with_node_capacities(
     MetadataBlocks(record_trees_and_accounting_nodes + TREE_TABLE_UNITS_PER_PUBLISH)
 }
 
-/// 一次空发布在一块盘上至多改几条分配记录树的叶路径（用户 2026-09-27 定按最坏情况计：游标跨叶那一次每盘多算一条路径）：
-/// bump 游标走过一片叶的末槽时，这次取的落点在新叶、换下的上一版落点在旧叶。
-const ALLOCATION_RECORD_TREE_LEAF_PATHS_PER_DEVICE_AT_MOST: u64 = 2;
-
-/// 分配记录树一次空发布至多重写的节点数，按盘分路（D8（核心索引结构） 已定项 14：根里按盘分路、根之下每个节点只属于一块盘）：
-/// 第一版每个单元落池里每一块盘，一次发布取的落点与换下的落点在每块盘上各有记录要改；每块盘至多改两条从叶到根之下那一层的路径
-/// （每条树高 − 1 个节点，[`ALLOCATION_RECORD_TREE_LEAF_PATHS_PER_DEVICE_AT_MOST`]）；根罩整个 key 空间，一次改一个
-/// ⇒ 盘数 × 2 × (树高 − 1) + 1。两块 4 GiB 盘高 3 时 9 个（每块盘一片叶的那几次实写 5 个，
-/// `second_transaction_supplement_one_write_accounting` 钉的 `ALLOCATION_RECORD_TREE_NODES_REWRITTEN`；跨叶那一次实写 7 个）。
+/// 分配记录树一次空发布至多重写的节点数，取几何上整棵树（K1，用户 2026-09-27 定；D8（核心索引结构） 已定项 14：按位置寻址、根里按盘分路、
+/// 根之下每个节点只属于一块盘）：
+/// 1（根，罩整个 key 空间）+ Σ_盘 Σ_{层级 L = 0 … 根层级 − 1}（这块盘单元区 [s, e) 在层级 L 上罩到的位置数 = ⌊(e − 1) ÷ S_L⌋ − ⌊s ÷ S_L⌋ + 1），
+/// S_L = 812 × 169^L（[`span_in_slots_at_level`]，两个数是 `singlefs_format` 的 `ALLOCATION_RECORD_TREE_LEAF_SLOTS` 与
+/// `ALLOCATION_RECORD_TREE_INTERNAL_FANOUT`）。分配记录只落在单元区里，一次发布重写的节点都是这一版之后那棵树的节点，
+/// 而那棵树每块盘在根之下至多这么多个位置——所以恒是上界，不读这一版有哪些节点、不依赖 ckpt_cost，O(盘数 × 根层级) 算完。
+/// 两块 4 GiB 盘（单元区 [50176, 262144)、根层级 2）：每块盘叶 262 个、层级 1 两个，1 + 2 × 264 = 529；
+/// 单元区 240 / 256 / 384 槽的窄盘每块盘只罩叶 61、62 两片，1 + 2 × 2 = 5（与每块盘两条叶路径那一版同值）。
 ///
 /// # Panics
-/// 树高是 0：分配记录树的根层级至少 1（`AllocationRecordTreeGeometry::of_devices`），树高至少 2；或乘积装不进 u64。
-fn allocation_record_tree_nodes_on_two_leaf_paths_per_device(
-    tree_height: u64,
-    devices_in_the_pool: u64,
+/// 根层级是 0（分配记录树的根层级至少 1，`AllocationRecordTreeGeometry::of_devices`）；有一块盘的单元区一槽都没有
+/// （mkfs 把实例表与树表写在单元区里，拒单元区在盘外的几何）；或加起来装不进 u64。
+fn allocation_record_tree_positions_over_the_unit_areas(
+    root_level: u8,
+    allocator: &PoolAllocator,
 ) -> u64 {
-    let one_leaf_path_below_the_root = tree_height
-        .checked_sub(1)
-        .expect("分配记录树的根层级至少 1：树高至少 2");
-    devices_in_the_pool
-        .checked_mul(ALLOCATION_RECORD_TREE_LEAF_PATHS_PER_DEVICE_AT_MOST)
-        .and_then(|leaf_paths| leaf_paths.checked_mul(one_leaf_path_below_the_root))
-        .and_then(|nodes_below_the_root| nodes_below_the_root.checked_add(1))
-        .expect("盘数 × 2 × 路径长 + 1 装得进 u64：盘数至多 169、树高至多 256")
+    assert!(
+        root_level >= 1,
+        "分配记录树的根层级至少 1：根装每块盘上根层级 − 1 那一层的格"
+    );
+    const THE_ROOT_COVERING_THE_WHOLE_KEY_SPACE: u64 = 1;
+    let mut positions: u64 = THE_ROOT_COVERING_THE_WHOLE_KEY_SPACE;
+    // 迭代上界：盘数 × 根层级（根层级至多 6，`AllocationRecordTreeGeometry::of_devices`）；跨轮只累加 `positions`。
+    for device_map in &allocator.devices {
+        let first_slot_of_the_unit_area = device_map.unit_area_start().slot().0;
+        let last_slot_of_the_unit_area = first_slot_of_the_unit_area
+            + device_map
+                .unit_area_slots()
+                .checked_sub(1)
+                .expect("单元区至少一槽：mkfs 把实例表与树表写在单元区里");
+        for level in 0..root_level {
+            let span_at_this_level = span_in_slots_at_level(level);
+            let positions_at_this_level = last_slot_of_the_unit_area / span_at_this_level
+                - first_slot_of_the_unit_area / span_at_this_level
+                + 1;
+            positions = positions
+                .checked_add(positions_at_this_level)
+                .expect("整棵树的位置数装得进 u64：槽号至多 2^48");
+        }
+    }
+    positions
 }
 
 /// 一次空发布在中央映射树里至多删几把 key、插几把 key。
@@ -1095,20 +1260,41 @@ mod tests {
         );
     }
 
-    /// ckpt_cost 里分配记录树那一项按盘分路、按最坏情况（D28（挂载期承诺量） 已定项 4，用户 2026-09-27 定）：每块盘两条从叶到根之下那一层的路径
-    /// 加共用的根。两块盘高 2 / 3 / 4（1 GiB / 4 GiB 与 64 GiB / 1 TiB）是 5 / 9 / 13，三块盘高 3 是 13；
-    /// 每块盘只算一条路径是 3 / 5 / 7 与 7，按树高算是 2 / 3 / 4 与 3。
+    /// ckpt_cost 里分配记录树那一项取几何上整棵树（K1，D28（挂载期承诺量） 已定项 4，用户 2026-09-27 定）：
+    /// 1 + Σ_盘 Σ_{L < 根层级}（⌊(e − 1) ÷ S_L⌋ − ⌊s ÷ S_L⌋ + 1），单元区 [s, e) 从槽 50176 起（叶 61 罩 [49532, 50344)）。
+    /// - 两块单元区 16 槽的盘：只罩叶 61，根层级 1 ⇒ 1 + 2 × 1 = 3；
+    /// - 两块 384 槽：叶 61、62 ⇒ 1 + 2 × 2 = 5；
+    /// - 两块 2600 槽（[50176, 52776)）：叶 61–64 ⇒ 1 + 2 × 4 = 9；
+    /// - 两块 1 GiB（[50176, 65536)，每块盘 81 格、两盘 162 ≤ 169，根层级 1）：叶 61–80 ⇒ 1 + 2 × 20 = 41；
+    /// - 两块 4 GiB（[50176, 262144)，根层级 2）：叶 61–322 共 262 个、层级 1 两个 ⇒ 1 + 2 × 264 = 529；三块 4 GiB ⇒ 1 + 3 × 264 = 793。
+    ///
+    /// 判别力：每块盘两条叶路径（K0，盘数 × 2 × (高 − 1) + 1）是 5 / 5 / 5 / 5 / 9 / 13；每块盘只数叶、不数层级 1 是 3 / 5 / 9 / 41 / 525 / 787。
     #[test]
-    fn allocation_record_tree_term_is_two_leaf_paths_on_each_device_plus_the_shared_root() {
+    fn allocation_record_tree_term_counts_every_position_the_unit_areas_cover_below_the_root_plus_the_root(
+    ) {
+        let term_of_devices = |devices: u32, device_bytes: u64| {
+            let allocator = PoolAllocator::new(
+                (0..devices)
+                    .map(|device| DeviceFreeMap::new(DeviceIdentity(device), device_bytes))
+                    .collect(),
+            );
+            allocation_record_tree_positions_over_the_unit_areas(
+                AllocationRecordTreeGeometry::of_allocator(&allocator).root_level(),
+                &allocator,
+            )
+        };
+        let unit_area_of = |slots: u64| (UNIT_AREA_START_SLOT + slots) * SLOT_BYTES;
         assert_eq!(
-            [(2, 2), (3, 2), (4, 2), (3, 3)].map(|(tree_height, devices_in_the_pool)| {
-                allocation_record_tree_nodes_on_two_leaf_paths_per_device(
-                    tree_height,
-                    devices_in_the_pool,
-                )
-            }),
-            [5, 9, 13, 13],
-            "盘数 × 2 × (高 − 1) + 1"
+            [
+                term_of_devices(2, unit_area_of(16)),
+                term_of_devices(2, unit_area_of(384)),
+                term_of_devices(2, unit_area_of(2600)),
+                term_of_devices(2, 1 << 30),
+                term_of_devices(2, 4 << 30),
+                term_of_devices(3, 4 << 30),
+            ],
+            [3, 5, 9, 41, 529, 793],
+            "1 + 每块盘单元区在根之下每一层罩到的位置数之和"
         );
     }
 
@@ -1117,12 +1303,12 @@ mod tests {
         MultiLevelCodeTwoTree::CentralMapping.node_capacity_of_the_node_format()
     }
 
-    /// 两块 4 GiB 盘上一次空发布改的映射条目：分配记录树至多 9 个节点、记账树 1 个，各删一把旧 key、插一把新 key。
-    const CHANGES_OF_AN_EMPTY_PUBLISH_ON_TWO_FOUR_GIBIBYTE_DEVICES:
-        CentralMappingEntryChangesOfAnEmptyPublish = CentralMappingEntryChangesOfAnEmptyPublish {
-        deleted_at_most: 10,
-        inserted_at_most: 10,
-    };
+    /// 一次空发布重写十个进映射的节点（分配记录树与记账树的节点合起来十个）时改的映射条目：各删一把旧 key、插一把新 key。
+    const CHANGES_OF_TEN_REWRITTEN_MAPPED_NODES: CentralMappingEntryChangesOfAnEmptyPublish =
+        CentralMappingEntryChangesOfAnEmptyPublish {
+            deleted_at_most: 10,
+            inserted_at_most: 10,
+        };
 
     /// 中央映射树逐层按可能改的路径数与可能切出来的节点数计（D28（挂载期承诺量） 已定项 4，用户 2026-09-27 定按最坏情况）：
     /// - 一层、条目加插的装得进一片叶：一次都切不了，重写根一个；
@@ -1139,7 +1325,7 @@ mod tests {
             (294, 143),
             "节点格式算出来的中央映射树容量"
         );
-        let changes = CHANGES_OF_AN_EMPTY_PUBLISH_ON_TWO_FOUR_GIBIBYTE_DEVICES;
+        let changes = CHANGES_OF_TEN_REWRITTEN_MAPPED_NODES;
         assert_eq!(
             [
                 (vec![1], 20),
@@ -1343,6 +1529,99 @@ mod tests {
             instance_switch_reserve_on_one_device(367, checkpoint_cost).0,
             instance_switch_reserve_on_one_device(366, checkpoint_cost).0 + slots(8).0,
             "两片比一片每块盘多 4 次链重写 × 2 槽"
+        );
+    }
+
+    fn room(
+        device: u32,
+        slot_pairs_for_data_units: u64,
+        slots_for_commit_generated_units: u64,
+    ) -> PlacementRoomOnOneDevice {
+        PlacementRoomOnOneDevice {
+            device: DeviceIdentity(device),
+            slot_pairs_for_data_units,
+            slots_for_commit_generated_units,
+        }
+    }
+
+    /// 「这次的单元落得下」逐盘两样都判（C545（空间准入罩不住分裂与聚簇段层），用户 2026-09-27 定准入先拒）：
+    /// - 两块盘段外各 3 对、没挡的槽各 20，要 3 个数据单元与 14 槽提交内生块：20 − 6 = 14 ≥ 14，放行；
+    /// - 盘 1 段外只有 2 对：只拒盘 1，报段外 4 槽 < 数据单元 6 槽；
+    /// - 两块盘没挡的槽各 19、要 15 槽提交内生块：数据单元取走 6 槽之后剩 13 < 15，两块盘都拒。
+    ///
+    /// 判别力：数据单元那一样不判时第二格放行；提交内生块不减数据单元取走的槽时第三格放行（19 ≥ 15）。
+    #[test]
+    fn landing_needs_slot_pairs_outside_the_cluster_segments_for_data_units_and_the_remaining_slots_for_commit_generated_units(
+    ) {
+        let three_data_units_and_fourteen_slots = UnitsOfAPublishToLand {
+            data_units: 3,
+            commit_generated_slots: 14,
+        };
+        assert_eq!(
+            admit_the_units_landing_on_every_device(
+                &[room(0, 3, 20), room(1, 3, 20)],
+                three_data_units_and_fourteen_slots
+            ),
+            Ok(()),
+            "两块盘都正好够"
+        );
+        assert_eq!(
+            admit_the_units_landing_on_every_device(
+                &[room(0, 3, 20), room(1, 2, 20)],
+                three_data_units_and_fourteen_slots
+            ),
+            Err(AdmissionRefusedOnSomeDevices {
+                short_devices: vec![DeviceShortOfDemand {
+                    device: DeviceIdentity(1),
+                    available: available_slots(4),
+                    demand: slots(6),
+                }],
+            }),
+            "盘 1 段外的槽对不够三个数据单元"
+        );
+        assert_eq!(
+            admit_the_units_landing_on_every_device(
+                &[room(0, 3, 19), room(1, 3, 19)],
+                UnitsOfAPublishToLand {
+                    data_units: 3,
+                    commit_generated_slots: 15,
+                }
+            ),
+            Err(AdmissionRefusedOnSomeDevices {
+                short_devices: [0, 1]
+                    .map(|device| DeviceShortOfDemand {
+                        device: DeviceIdentity(device),
+                        available: available_slots(13),
+                        demand: slots(15),
+                    })
+                    .to_vec(),
+            }),
+            "数据单元取走 6 槽之后提交内生块只剩 13 槽"
+        );
+    }
+
+    /// 一次覆盖写要落的单元：普通分配那一半是数据单元 1 个、extent 根 1 槽、inode 叶容器 2 槽、inode 根 1 槽，固定点按 ckpt_cost 8 ⇒
+    /// 数据单元 1、提交内生块 1 + 2 + 1 + 8 = 12 槽。
+    /// 判别力：固定点不加 ckpt_cost 是 4；数据单元也算进提交内生块是 14。
+    #[test]
+    fn units_to_land_are_the_data_units_and_the_ordinary_commit_generated_slots_plus_the_checkpoint_cost(
+    ) {
+        assert_eq!(
+            units_of_a_publish_to_land(
+                &[
+                    TransactionUnit::Data(DataUnitIndexInFile::FIRST),
+                    TransactionUnit::ExtentRoot,
+                    TransactionUnit::InodeLeafContainer(
+                        crate::inode_tree::InodeLeafContainerIndexInTree::LEFTMOST,
+                    ),
+                    TransactionUnit::InodeRoot,
+                ],
+                MetadataBlocks(8)
+            ),
+            UnitsOfAPublishToLand {
+                data_units: 1,
+                commit_generated_slots: 12,
+            }
         );
     }
 }

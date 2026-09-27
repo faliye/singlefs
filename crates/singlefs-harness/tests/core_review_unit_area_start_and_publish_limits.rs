@@ -12,11 +12,13 @@ use std::collections::BTreeSet;
 
 use common_admission::PoolUnderTest;
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
+use singlefs_core::admission::INSTANCE_ROWS_PER_INSTANCE_TABLE_PAGE;
 use singlefs_core::allocator::{
     DeviceFreeMap, Placement, PoolAllocator, UnitAreaStart,
     UnitAreaStartOffTheClusterSegmentBoundaryUnsupported, UnitFootprint,
 };
 use singlefs_core::block_device::{BlockDevice, PhysicalBlockSizeInBytes};
+use singlefs_core::instance_table::InstanceRow;
 use singlefs_core::journal::{record_offset, slot_after_the_journal_ring};
 use singlefs_core::make_filesystem::{
     allocator_after_make_filesystem, make_filesystem, root_ring_occupancy_after_make_filesystem,
@@ -38,9 +40,10 @@ use singlefs_core::transaction::{
     InstanceTableOnlyPublishPlan, InstanceTableRewrite, JournalRecordNamedEntryCapacity,
     PoolVersion, PoolWriter, PublishError, TransactionOutput, TransactionUnit,
 };
+use singlefs_core::unit::data_unit_payload_capacity;
 use singlefs_format::{
-    CLUSTER_SEGMENT_SLOTS, JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, SLOT_BYTES,
-    SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE, UNIT_AREA_START_SLOT,
+    CLUSTER_SEGMENT_SLOTS, JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_SAFETY_FACTOR,
+    SLOT_BYTES, SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE, UNIT_AREA_START_SLOT,
 };
 use singlefs_harness::crash::{SparseBlockDevice, SparseDevice};
 use singlefs_harness::fault_injection::{
@@ -539,23 +542,40 @@ fn pool_after_the_first_file_on_a_journal_ring_of(
 
 // ── 第 26 条：一次发布切出来的 journal 记录数设上限 ──
 
-/// 六条记录长的环：在飞上限 = 6 ÷ 3 = 2 条。
-const JOURNAL_RING_OF_SIX_RECORDS: u64 = 6 * JOURNAL_RECORD_BYTES;
+/// 1 MiB 的环：64 槽，环末尾的下一个槽 1088 = 17 × 64 落在聚簇段边界上（实审 A3b 之后 mkfs 只收这样的环，主 agent 定：不为测试开口子）。
+/// 256 条记录，在飞上限 = 256 ÷ 3 = 85 条。环长是 1 MiB 整数倍的环里它的上限最小。
+const JOURNAL_RING_OF_ONE_MEBIBYTE: u64 = 1 << 20;
 
-/// 六条记录长的环上（在飞上限 2），第一个文件之后顺序写 3 个数据单元：切成 3 条记录（前 2 条各点名自己那个数据单元、末条点名其余），
-/// 多于上限，在任何写之前拒成 `JournalRecordsOfThePublishExceedTheLimit { 3, 2 }`，两块盘逐字节不变、分配器的记录不动。
-/// 改之前照写：3 条记录落进 6 槽的环里，恢复施加前缀时最多取 2 条、那次发布永远施加不全。
+/// [`JOURNAL_RING_OF_ONE_MEBIBYTE`] 上一次发布至多切成几条记录：256 ÷ 3 = 85（用例这一侧照格式常量算）。
+const RECORD_LIMIT_ON_THE_ONE_MEBIBYTE_RING: u64 =
+    JOURNAL_RING_OF_ONE_MEBIBYTE / JOURNAL_RECORD_BYTES / JOURNAL_SAFETY_FACTOR;
+
+/// 从文件偏移 0 顺序写这么多字节切成 `data_units` 个一单元事务（`write_request_split`：每个数据单元装 32634 字节净荷）。
+fn content_bytes_of_a_sequential_write_into(data_units: u64) -> usize {
+    let payload_bytes =
+        u64::try_from(data_unit_payload_capacity()).expect("一个数据单元的净荷装得进 u64");
+    usize::try_from((data_units - 1) * payload_bytes + 1).expect("几兆字节装得进 usize")
+}
+
+/// 1 MiB 的环上（在飞上限 85），第一个文件之后顺序写 86 个数据单元：切成 86 条记录（前 85 条各点名自己那个数据单元、末条点名其余），
+/// 多于上限，在任何写之前拒成 `JournalRecordsOfThePublishExceedTheLimit { 86, 85 }`，两块盘逐字节不变、分配器的记录不动。
+/// 改之前照写：86 条记录落进环里，恢复施加前缀时最多取 85 条、那次发布永远施加不全。
+/// 原先用六条记录长的环（在飞上限 2）测同一件事；A3b 之后那条环的起点落在槽 1026、不在段边界上，mkfs 拒它。
 #[test]
 fn a_sequential_write_cut_into_more_journal_records_than_the_in_flight_limit_is_refused_before_any_write(
 ) {
-    let mut pool = pool_after_the_first_file_on_a_journal_ring_of(JOURNAL_RING_OF_SIX_RECORDS);
+    let mut pool = pool_after_the_first_file_on_a_journal_ring_of(JOURNAL_RING_OF_ONE_MEBIBYTE);
     assert_eq!(
-        journal_record_limit_of_one_publish(JOURNAL_RING_OF_SIX_RECORDS),
-        2
+        journal_record_limit_of_one_publish(JOURNAL_RING_OF_ONE_MEBIBYTE),
+        RECORD_LIMIT_ON_THE_ONE_MEBIBYTE_RING
     );
+    assert_eq!(RECORD_LIMIT_ON_THE_ONE_MEBIBYTE_RING, 85, "256 ÷ 3");
     let images_before = images_of(&pool.devices);
     let records_before = pool.allocator.records().to_vec();
-    let content = content_of(2 * 32768, 1);
+    let content = content_of(
+        content_bytes_of_a_sequential_write_into(RECORD_LIMIT_ON_THE_ONE_MEBIBYTE_RING + 1),
+        1,
+    );
     let mut writer = PoolWriter::new(&pool.parameters, pool.devices.as_mut_slice());
     let refused = publish_sequential_write(
         &mut writer,
@@ -567,13 +587,13 @@ fn a_sequential_write_cut_into_more_journal_records_than_the_in_flight_limit_is_
         },
         pool.instance,
     )
-    .expect_err("3 条记录多于在飞上限 2 条");
+    .expect_err("86 条记录多于在飞上限 85 条");
     assert!(
         matches!(
             refused,
             PublishError::JournalRecordsOfThePublishExceedTheLimit {
-                records_of_the_publish: 3,
-                record_limit: 2,
+                records_of_the_publish: 86,
+                record_limit: 85,
             }
         ),
         "报的是记录条数超上限：{refused:?}"
@@ -586,11 +606,14 @@ fn a_sequential_write_cut_into_more_journal_records_than_the_in_flight_limit_is_
     );
 }
 
-/// 对照：同一个环上顺序写 2 个数据单元切成 2 条记录，正好等于上限，照发（上限是「多于才拒」）。
+/// 对照：同一个环上顺序写 85 个数据单元切成 85 条记录，正好等于上限，照发（上限是「多于才拒」）。
 #[test]
 fn a_sequential_write_cut_into_as_many_journal_records_as_the_in_flight_limit_is_published() {
-    let mut pool = pool_after_the_first_file_on_a_journal_ring_of(JOURNAL_RING_OF_SIX_RECORDS);
-    let content = content_of(32768 + 1, 2);
+    let mut pool = pool_after_the_first_file_on_a_journal_ring_of(JOURNAL_RING_OF_ONE_MEBIBYTE);
+    let content = content_of(
+        content_bytes_of_a_sequential_write_into(RECORD_LIMIT_ON_THE_ONE_MEBIBYTE_RING),
+        2,
+    );
     let mut writer = PoolWriter::new(&pool.parameters, pool.devices.as_mut_slice());
     let published = publish_sequential_write(
         &mut writer,
@@ -602,35 +625,51 @@ fn a_sequential_write_cut_into_as_many_journal_records_as_the_in_flight_limit_is
         },
         pool.instance,
     )
-    .expect("2 条记录不多于上限 2 条");
+    .expect("85 条记录不多于上限 85 条");
     assert_eq!(published.root.checkpoint_txg, CheckpointTxg(4));
     assert_eq!(
-        published.earlier_records_of_this_publish.len() + 1,
-        2,
-        "这次发布切成 2 条记录"
+        u64::try_from(published.earlier_records_of_this_publish.len()).expect("条数") + 1,
+        RECORD_LIMIT_ON_THE_ONE_MEBIBYTE_RING,
+        "这次发布切成 85 条记录"
     );
 }
 
-/// 三条记录长的环（在飞上限 1 条）上，mkfs 同一个进程里取号之后直接在 mkfs 那一版上写行，一条记录只许点名一项（只供测试的开关）：
-/// 实例表那一片加分配记录树的节点至少两项、切成至少两条记录，多于上限，在动分配器与任何写之前拒，两块盘逐字节不变。
+/// 1 MiB 的环上（在飞上限 85 条），mkfs 同一个进程里取号之后直接在 mkfs 那一版上写行，一条记录只许点名一项（只供测试的开关）：
+/// 行写满 85 片实例表（85 × 369 行），实例表 85 片加分配记录树的节点至少 86 项、切成至少 86 条记录，多于上限，
+/// 在动分配器与任何写之前拒，两块盘逐字节不变。
+/// 原先用三条记录长的环（在飞上限 1）、实例表一片加分配记录树的节点就超；A3b 之后那条环的起点落在槽 1025、不在段边界上，mkfs 拒它。
 #[test]
 fn a_row_publish_on_a_version_without_file_cut_into_more_journal_records_than_the_limit_is_refused_before_any_write(
 ) {
-    let journal_ring_of_three_records = 3 * JOURNAL_RECORD_BYTES;
     let parameters = parameters_with(geometry_with_journal_ring_bytes(
-        journal_ring_of_three_records,
+        JOURNAL_RING_OF_ONE_MEBIBYTE,
     ));
     let mut devices = sparse_devices(DEVICE_BYTES);
-    let genesis = make_filesystem(&parameters, &mut devices).expect("三条记录长的环上 mkfs");
+    let genesis = make_filesystem(&parameters, &mut devices).expect("1 MiB 的环上 mkfs");
     let mut allocator = allocator_after_make_filesystem(&parameters, &devices, &genesis);
     let instance = acquire_instance(&mut PoolWriter::new(&parameters, devices.as_mut_slice()))
         .expect("取号 1");
     let images_before = images_of(&devices);
     let records_before = allocator.records().to_vec();
+    let rows_filling_as_many_pages_as_the_limit = u32::try_from(
+        RECORD_LIMIT_ON_THE_ONE_MEBIBYTE_RING * INSTANCE_ROWS_PER_INSTANCE_TABLE_PAGE,
+    )
+    .expect("85 × 369 行装得进实例代号的 32 位");
     let instance_table = InstanceTableRewrite {
-        rows: Vec::new(),
+        rows: (1..=rows_filling_as_many_pages_as_the_limit)
+            .map(|row_number| InstanceRow {
+                instance: InstanceGeneration(row_number),
+                selected_root_txg: CheckpointTxg(0),
+                applied_transaction_high_water: 0,
+            })
+            .collect(),
         replaced_chain: vec![genesis.root.instance_table],
     };
+    assert_eq!(
+        u64::try_from(instance_table.pages_after_this_publish()).expect("片数装得进 u64"),
+        RECORD_LIMIT_ON_THE_ONE_MEBIBYTE_RING,
+        "85 × 369 行正好写满 85 片"
+    );
     let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
     writer.set_journal_record_named_entry_capacity(
         JournalRecordNamedEntryCapacity::CappedForTests {
@@ -651,14 +690,14 @@ fn a_row_publish_on_a_version_without_file_cut_into_more_journal_records_than_th
             tree_identifier_watermark: genesis.root.tree_identifier_watermark,
         },
     )
-    .expect_err("点名项至少两项、一条记录一项：至少两条，多于上限 1 条");
+    .expect_err("点名项至少 86 项、一条记录一项：至少 86 条，多于上限 85 条");
     assert!(
         matches!(
             refused,
             PublishError::JournalRecordsOfThePublishExceedTheLimit {
                 records_of_the_publish,
-                record_limit: 1,
-            } if records_of_the_publish >= 2
+                record_limit: 85,
+            } if records_of_the_publish >= 86
         ),
         "报的是记录条数超上限：{refused:?}"
     );

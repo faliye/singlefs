@@ -9,23 +9,29 @@ use common::{
     crash_state_devices, format_pool, geometry, memory_pool_of_sparse_devices, parameters,
     publish_overwrite_in_process, BuiltPool, FIXED_WRITE_TIME_SECONDS,
 };
-use singlefs_checker::image::InvariantVerdict;
+use singlefs_checker::image::{
+    InvariantVerdict, SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS,
+};
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{
     CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
 };
 use singlefs_core::allocation_record_tree::AllocationRecordTreeNodePosition;
+use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
 use singlefs_core::block_device::BlockDevice;
 use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
-use singlefs_core::make_filesystem::INSTANCE_TABLE_SLOT;
+use singlefs_core::journal::back_chain_of;
+use singlefs_core::make_filesystem::{INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT};
 use singlefs_core::mount::{
     mount_writable, raise_rollback_floor, roll_back_by_a_forward_publish, unmount, InstanceRow,
-    RollbackTarget, ShadowLedger, Unmounted,
+    MountError, RollbackTarget, ShadowLedger, Unmounted,
 };
-use singlefs_core::recovery::PoolReader;
+use singlefs_core::recovery::{instance_table_chain_of_root, PoolReader, RecoveryFailure};
 use singlefs_core::transaction::{
-    publish_first_file, publish_overwrite, FirstFile, PoolVersion, PoolWriter, TransactionOutput,
-    TransactionUnit,
+    acquire_instance, publish_first_file, publish_instance_table_on_version_without_file,
+    publish_overwrite, publish_without_units, FirstFile, InstanceTableOnlyPublishPlan,
+    InstanceTableRewrite, PoolVersion, PoolWriter, TransactionOutput, TransactionUnit,
+    ZeroUnitPublishPlan,
 };
 use singlefs_format::{ALLOCATION_RECORD_TREE_LEAF_SLOTS, NODE_BYTES, TREE_IDENTIFIER_EXTENT};
 use singlefs_harness::crash::MemoryPool;
@@ -401,6 +407,15 @@ fn set_transaction_number_of_journal_record(
         write(pool, device, offset, &record);
     }
 }
+
+/// 系统配置字段表（`.claude/kb/layout/01-first-txn.md` 一）：加密类型在整槽校验和（155，宽 32）、自身 MAC（16）、nonce 水位（12）、
+/// KDF 标识（4）之后，偏移 219；第一版只读 0（不加密）。
+const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET: usize = 219;
+/// 登记过的加密算法，第一版读者不读加密的卷：带它的系统配置槽自证过也整池拒绝挂载。
+const ENCRYPTION_TYPE_THE_FIRST_VERSION_DOES_NOT_READ: u8 = 1;
+/// I-7.13（系统配置池级字段在读者收的范围里） 那份坏镜像改的那一槽：盘 1 的槽 0。
+const DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT: u32 = 1;
+const OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT: u64 = 0;
 
 /// 系统配置槽重封：自证校验和在 155，罩整槽 4096。
 fn mutate_system_configuration_slot(
@@ -794,6 +809,22 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
                 })
             }),
         ),
+        // 盘 1 槽 0 的加密类型改成 1、重算整槽校验和：这一槽自证过而带这一版读者不收的值，实现整池拒绝挂载
+        // （A3-checker-2 第四节第 1 条，别的三槽照原样）。
+        (
+            SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS,
+            Box::new(|image: &mut MemoryPool| {
+                mutate_system_configuration_slot(
+                    image,
+                    DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT,
+                    OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT,
+                    |bytes| {
+                        bytes[SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET] =
+                            ENCRYPTION_TYPE_THE_FIRST_VERSION_DOES_NOT_READ
+                    },
+                )
+            }),
+        ),
         // C322（取号那一步的屏障怎么放没有条款） 的撞号镜像：没人引用的槽 50302 上放一份写序实例代号 2 的数据单元（头与载荷
         // 校验和都过），两盘系统配置都还是实例 1 ⇒ ① 红（旧的「各盘相等且 ≥ 根环」在这里判成立）。
         (
@@ -889,6 +920,18 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
                     image,
                     INODE_LEAF,
                     |bytes| set_u64(bytes, 136 + INODE_RECORD_BLOCKS_OFFSET, 64),
+                    true,
+                )
+            }),
+        ),
+        // 树表里 livelist 与稀疏旁表两条互换种类：盘上仍按树 ID 升序（I-1.1 不红），按发号次序 livelist 的号 17 大过稀疏旁表的号 16。
+        (
+            "I-9.16",
+            Box::new(|image: &mut MemoryPool| {
+                mutate_unit(
+                    image,
+                    TREE_TABLE,
+                    |bytes| swap_the_kinds_of_the_livelist_and_sparse_side_table_entries(bytes),
                     true,
                 )
             }),
@@ -2288,6 +2331,54 @@ fn the_merge_and_the_back_chain_bad_images_redden_only_their_own_invariant() {
     }
 }
 
+/// I-7.13（系统配置池级字段在读者收的范围里） 那份坏镜像（盘 1 槽 0 加密类型 1）**只**红 I-7.13，红在盘 1 偏移 0 那一槽；
+/// 别的每一条都报不适用（主 agent 2026-09-27 认的处置：实现整池拒绝挂载，checker 不拿别的三槽照判、不替这个池作保）。
+#[test]
+fn a_system_configuration_slot_whose_encryption_type_is_on_reddens_only_its_own_invariant_and_every_other_is_not_applicable(
+) {
+    let clean = build_pool("known-bad-refused-system-configuration-value").memory_pool();
+    let cases: Vec<(&'static str, Mutation)> = known_bad_images(&clean)
+        .into_iter()
+        .filter(|(invariant, _)| {
+            *invariant == SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS
+        })
+        .collect();
+    assert_eq!(
+        cases.len(),
+        1,
+        "写完第一个事务那份镜像上 I-7.13 有一份坏镜像"
+    );
+    for (invariant, mutation) in cases {
+        let mut image = clean.clone();
+        mutation(&mut image);
+        let verdicts = check_pool_image(&image);
+        assert!(
+            verdicts.iter().any(|(judged, _)| *judged == invariant),
+            "{invariant} 在判定清单里：{verdicts:?}"
+        );
+        for (judged, found) in &verdicts {
+            if *judged == invariant {
+                match found {
+                    InvariantVerdict::Violated(detail) => assert!(
+                        detail.contains(&format!(
+                            "盘 {DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT} 偏移 {OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT}"
+                        )),
+                        "违例要点名被改的那一槽：{detail}"
+                    ),
+                    other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
+                        panic!("加密类型 1 的槽自证过：实现整池拒绝挂载，{invariant} 要判违例，得到 {other:?}")
+                    }
+                }
+            } else {
+                assert!(
+                    matches!(found, InvariantVerdict::NotApplicable(_)),
+                    "这个池挂不上，{judged} 要报不适用，得到 {found:?}"
+                );
+            }
+        }
+    }
+}
+
 #[test]
 fn the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target() {
     let clean = build_pool("known-bad").memory_pool();
@@ -2571,6 +2662,74 @@ fn inode_record_blocks_other_than_the_logical_length_in_512_byte_blocks_reddens_
             "红在第一个文件那条记录上"
         );
     }
+}
+
+/// 树表条目里种类那 2 字节的偏移（树 ID 8 + 条目长度 2 之后，D8（核心索引结构） 已定项 8）。
+const TREE_TABLE_ENTRY_KIND_OFFSET: usize = 10;
+/// 第一个事务那一版树表里七条按发号次序排：livelist 是第 4 条（从 0 数，号 16）、稀疏旁表第 5 条（号 17）。
+const LIVELIST_TREE_TABLE_ENTRY_INDEX: usize = 4;
+const SPARSE_SIDE_TABLE_TREE_TABLE_ENTRY_INDEX: usize = 5;
+const TREE_KIND_LIVELIST: u16 = 6;
+const TREE_KIND_SPARSE_SIDE_TABLE: u16 = 7;
+
+/// 树表单元里 livelist 与稀疏旁表两条互换种类（条目偏移 10 的 2 字节）；树 ID、根指针不动。
+fn swap_the_kinds_of_the_livelist_and_sparse_side_table_entries(tree_table: &mut [u8]) {
+    for (index, kind_before, kind_after) in [
+        (
+            LIVELIST_TREE_TABLE_ENTRY_INDEX,
+            TREE_KIND_LIVELIST,
+            TREE_KIND_SPARSE_SIDE_TABLE,
+        ),
+        (
+            SPARSE_SIDE_TABLE_TREE_TABLE_ENTRY_INDEX,
+            TREE_KIND_SPARSE_SIDE_TABLE,
+            TREE_KIND_LIVELIST,
+        ),
+    ] {
+        let kind_offset = tree_table_entry_offset(index) + TREE_TABLE_ENTRY_KIND_OFFSET;
+        assert_eq!(
+            u16::from_le_bytes([tree_table[kind_offset], tree_table[kind_offset + 1]]),
+            kind_before,
+            "树表第 {index} 条的种类"
+        );
+        set_u16(tree_table, kind_offset, kind_after);
+    }
+}
+
+/// I-9.16（树表条目按树 ID 严格升序且合发号次序）：写完第一个事务那一版树表里 livelist（号 16）与稀疏旁表（号 17）两条互换种类。
+/// 盘上次序仍按树 ID 升序（① 成立，树表的 key 就是树 ID，I-1.1 也不红），按发号次序 livelist 的号 17 大过稀疏旁表的号 16（② 不成立）：
+/// **只**红 I-9.16，第一处违例写明最新那条根（实例 1、txg 3）与发号次序上相邻的那两条。两条的根都是空根，改种类不牵动别的判定。
+/// 两条整条互换位置（只违反 ①）的那一份连 I-1.1 一起红，钉在 `tree_table_ordering_is_judged_by_the_cold_walk_and_the_checker.rs`。
+#[test]
+fn a_tree_table_whose_two_entries_swapped_their_kinds_reddens_only_the_tree_table_ordering_invariant(
+) {
+    let clean = build_pool("known-bad-tree-table-ordering").memory_pool();
+    assert_eq!(
+        verdict(&clean, "I-9.16"),
+        InvariantVerdict::Holds,
+        "干净镜像上 I-9.16 真被评估过且成立"
+    );
+    let mut image = clean.clone();
+    mutate_unit(
+        &mut image,
+        TREE_TABLE,
+        |bytes| swap_the_kinds_of_the_livelist_and_sparse_side_table_entries(bytes),
+        true,
+    );
+    let verdicts = check_pool_image(&image);
+    assert_eq!(
+        violated_invariants(&verdicts),
+        ["I-9.16"],
+        "两条互换种类：判红的该只有 I-9.16：{verdicts:?}"
+    );
+    assert_eq!(
+        verdict(&image, "I-9.16"),
+        InvariantVerdict::Violated(
+            "根（实例 1、txg 3）的树表：种类 6 那条（第 5 条，树 ID 17）与发号次序上的下一棵、种类 7 那条（第 4 条，树 ID 16）不按树 ID 严格升序（② 发号次序）"
+                .to_owned()
+        ),
+        "红在最新那条根的树表、livelist 与稀疏旁表那两条"
+    );
 }
 
 /// 第一个事务写出的中央映射树根（bump 次序：分配记录树五个节点、记账树、映射树、树表）。
@@ -4520,9 +4679,10 @@ fn raise_the_allocation_generation_of_the_overwrite_data_unit_past_its_birth(
 /// 都读不到 B 那棵分配记录树，只有 E 那一步读得到：
 /// ① 干净的崩溃镜像上一条都不红，I-3.10 真被评估过且成立（E 不在合法镜像上误报）；
 /// ② B 的数据单元那两条未释放记录的分配代改成诞生代号 + 1，崩溃镜像上**只**红 I-3.10、别的判定与干净镜像逐项相同——
-///    E 之前的读法在这张镜像上判成立，要等挂载之后才红；
-/// ③ 这张坏镜像可写挂载，恢复择 A 的根、施加 B 那条记录（前缀 1 条，现行版是 txg 4），挂载之后 I-3.10 照样红：
-///    坏镜像不是恢复会拒掉的样子，E 读的就是下一次挂载会施加的那一版。
+///    E 之前的读法在这张镜像上判成立；
+/// ③ 这张坏镜像可写挂载在任何写之前被拒：挂载重建上一版时判分配记录的代与跨度（实审 A3a，`rebuild_version` 调
+///    `allocation_record_generations_and_spans_are_judged`），分配代 5 晚于那一版的根，报「E142 走读同款」那一句；
+///    两块盘逐字节不变、录制流一步没多。checker 在挂载之前红的，正是下一次挂载会拒掉的那一版。
 #[test]
 fn an_allocation_generation_past_its_unit_birth_in_the_version_only_its_journal_record_carries_reddens_the_allocation_generation_invariant_before_the_mount(
 ) {
@@ -4564,25 +4724,38 @@ fn an_allocation_generation_past_its_unit_birth_in_the_version_only_its_journal_
         "红在 B 的数据单元那条记录上：分配代 5、单元头里的诞生代号 4：{detail}"
     );
 
-    let mut devices = crash_state_devices(&image, &[], &[], &SharedStream::new());
-    let mounted = mount_writable(&parameters(), &mut devices).expect("坏镜像照样可写挂载");
-    assert_eq!(
-        (
+    let stream = SharedStream::new();
+    let mut devices = crash_state_devices(&image, &[], &[], &stream);
+    let image_before_the_mount = memory_pool_of_sparse_devices(&devices);
+    let recorded_operations_before_the_mount = stream.operation_count();
+    let refusal = match mount_writable(&parameters(), &mut devices) {
+        Ok(mounted) => panic!(
+            "坏镜像被可写挂载收下了：择根 txg {:?}、现行版 txg {:?}、施加记录前缀 {} 条",
             mounted.output.chosen_root.checkpoint_txg,
             mounted.output.effective_root.checkpoint_txg,
             mounted.output.journal.prefix_applied
         ),
-        (CheckpointTxg(3), CheckpointTxg(4), 1),
-        "恢复择 A 的根 (1, 3)、施加 B 那条记录，现行版是 txg 4"
-    );
-    let image_after_the_mount = memory_pool_of_sparse_devices(&devices);
+        Err(refusal) => refusal,
+    };
     assert!(
         matches!(
-            verdict(&image_after_the_mount, "I-3.10"),
-            InvariantVerdict::Violated(_)
+            refusal,
+            MountError::Recovery(RecoveryFailure::InvariantViolated {
+                invariant: "E142 走读同款",
+                detail: "分配记录跨度为 0，或分配代 / 释放代晚于根",
+            })
         ),
-        "挂载之后 B 那一版进了候选集，I-3.10 照样红：{:?}",
-        check_pool_image(&image_after_the_mount)
+        "重建上一版时分配代 5 晚于那一版的根，可写挂载要拒在分配记录的代 / 跨度这一条上：{refusal:?}"
+    );
+    assert_eq!(
+        memory_pool_of_sparse_devices(&devices),
+        image_before_the_mount,
+        "拒在任何写之前：两块盘逐字节不变（{refusal:?}）"
+    );
+    assert_eq!(
+        stream.operation_count(),
+        recorded_operations_before_the_mount,
+        "拒在任何写之前：录制流一步没多（一个写、一道屏障都没发）"
     );
 }
 
@@ -4661,10 +4834,12 @@ fn assert_lowering_the_watermark_reddens_only_the_watermark_invariant(
 /// 改法 D（I-7.8（根记录树 ID 水位不低于全池最大树 ID） 扫描方向排除「最新根的实例表判得出没发布过」的码 2 节点，
 /// `research/prompts/m2-wave3-code-r1-main-verification.md` 第三节 Y1、第四节第 1 条，被攻过零轮）的「T = 0 的行不排除」那一道
 /// 配一份只红 I-7.8 的坏镜像：只做过 mkfs 的池可写挂载（实例 1，暖机），再挂一次（实例 2）发第一个文件版本；
-/// 进程退出之后实例 2 的每一条根的根槽都读不出（清零），可写挂载一次——择根落到实例 1 的根，前缀规则不跨实例边界、实例 2 的记录
-/// 一条都不施加，实例 3 写行 (1, T, ·) 与中间实例行 (2, 0, 0)。实例 2 写出的码 2 节点只由 (2, 0, 0) 那一行说到，行里说不出它发布到
-/// 哪一代，照旧算「出现过」（D8（核心索引结构） 已定项 8 ②）。根环里的水位全压到实例 2 发的第一个号，I-7.8 要红在盘上还留着的
-/// 实例 2 节点里最大的那个号上。干净镜像上一条都不红（实例 3 的水位按环里的记录取，盖得住实例 2 发过的号）。
+/// 进程退出之后实例 2 的每一条根的根槽都清零，接着在实例 1 那一版上建实例 3：取号、写行 (1, T, 0) 与中间实例行 (2, 0, 0)、暖机——
+/// 经事务层的入口直接写（`acquire_instance`、`publish_instance_table_on_version_without_file` 交这里拼好的行、零单元发布），
+/// 不经可写挂载：系统配置见证过实例 2 的发布，C554 乙之后可写挂载重读一次仍读不出实例 2 的根就拒，走不到写中间实例行。
+/// 实例 2 写出的码 2 节点只由 (2, 0, 0) 那一行说到，行里说不出它发布到哪一代，照旧算「出现过」（D8（核心索引结构） 已定项 8 ②）。
+/// 根环里的水位全压到实例 2 发的第一个号，I-7.8 要红在盘上还留着的实例 2 节点里最大的那个号上。干净镜像上一条都不红
+/// （实例 3 的水位照可写挂载的取法按环里的记录取，盖得住实例 2 发过的号）。
 /// 回退行那一道（① 回退行不排除）随回退行删掉（D18（块里携带什么信息） 已定项 11），没有对象。
 #[test]
 fn published_nodes_behind_an_intermediate_row_still_count_against_the_tree_identifier_watermark() {
@@ -4673,6 +4848,10 @@ fn published_nodes_behind_an_intermediate_row_still_count_against_the_tree_ident
     let first_instance =
         mount_writable(&parameters(), &mut devices).expect("只做过 mkfs 的池可写挂载");
     assert_eq!(first_instance.output.instance, InstanceGeneration(1));
+    let PoolVersion::WithoutFile(version_of_the_first_instance) = &first_instance.current else {
+        panic!("只做过 mkfs 的池上实例 1 那一版树表 0 条")
+    };
+    let newest_root_of_the_first_instance = version_of_the_first_instance.root;
     drop(first_instance);
     let second_instance = mount_writable(&parameters(), &mut devices).expect("再挂一次");
     assert_eq!(second_instance.output.instance, InstanceGeneration(2));
@@ -4727,15 +4906,104 @@ fn published_nodes_behind_an_intermediate_row_still_count_against_the_tree_ident
             )
             .expect("清零实例 2 的根槽");
     }
-    let third_instance = mount_writable(&parameters(), &mut reopened)
-        .expect("实例 2 的根都读不出：择根落到实例 1 的根，照常可写挂载");
-    assert_eq!(third_instance.output.instance, InstanceGeneration(3));
+    let rows_of_the_third_instance = vec![
+        InstanceRow {
+            instance: InstanceGeneration(1),
+            selected_root_txg: newest_root_of_the_first_instance.checkpoint_txg,
+            applied_transaction_high_water: 0,
+        },
+        InstanceRow {
+            instance: InstanceGeneration(2),
+            selected_root_txg: CheckpointTxg(0),
+            applied_transaction_high_water: 0,
+        },
+    ];
+    let newest_root_of_the_third_instance = {
+        let publish_parameters = parameters();
+        let mut writer = PoolWriter::new(&publish_parameters, reopened.as_mut_slice());
+        let third_instance = acquire_instance(&mut writer).expect("取号 3");
+        assert_eq!(third_instance, InstanceGeneration(3));
+        // 账照可写挂载在实例 1 那一版上重建的样子：那一版分配记录树根指针全零，只有 mkfs 写在单元区里的两个单元；实例 2 的根清零了，
+        // 影子账看不见它的单元。
+        let mut allocator_rebuilt_on_the_first_instance = PoolAllocator::new(
+            DEVICES
+                .iter()
+                .map(|device| DeviceFreeMap::new(DeviceIdentity(*device), common::IMAGE_BYTES))
+                .collect(),
+        );
+        allocator_rebuilt_on_the_first_instance.mark_format_time_units(
+            Placement {
+                slot: INSTANCE_TABLE_SLOT,
+                span: 2,
+            },
+            Placement {
+                slot: TREE_TABLE_GENESIS_SLOT,
+                span: 1,
+            },
+        );
+        let rewrite = InstanceTableRewrite {
+            rows: rows_of_the_third_instance,
+            replaced_chain: vec![newest_root_of_the_first_instance.instance_table],
+        };
+        // 写行那次的 txg 与 jsn 照可写挂载接在环里全部根与全部记录的最大值后面（D23（journal 的角色与格式） 已定项 14 第 3 条）：
+        // 实例 2 的根清零了、记录还在，最大的是它第一个文件那一版；水位照可写挂载取环里的 max（D8（核心索引结构） 已定项 8 ②）。
+        let row_publish = publish_instance_table_on_version_without_file(
+            &mut writer,
+            &mut allocator_rebuilt_on_the_first_instance,
+            &newest_root_of_the_first_instance,
+            InstanceTableOnlyPublishPlan {
+                txg: CheckpointTxg(first_file_of_the_second_instance.root.checkpoint_txg.0 + 1),
+                counter: first_file_of_the_second_instance.record.counter + 1,
+                instance: third_instance,
+                back_chain: 0,
+                rollback_floor: CheckpointTxg(0),
+                instance_table: &rewrite,
+                tree_identifier_watermark: first_file_of_the_second_instance
+                    .root
+                    .tree_identifier_watermark,
+            },
+        )
+        .expect("实例 3 在实例 1 那一版上写行");
+        // 暖机：本实例的根覆盖两块盘之前连推零单元发布（D16（发布语义） 已定项 8 戊，至多根环区域数那么多次）。
+        let mut devices_holding_a_root_of_the_third_instance =
+            std::collections::BTreeSet::from([root_slot_of(row_publish.root.checkpoint_txg).0]);
+        let mut newest = row_publish;
+        for _ in 0..parameters().region_devices.len() {
+            if DEVICES
+                .iter()
+                .all(|device| devices_holding_a_root_of_the_third_instance.contains(device))
+            {
+                break;
+            }
+            let warm_up = publish_without_units(
+                &mut writer,
+                &newest.root,
+                ZeroUnitPublishPlan {
+                    txg: CheckpointTxg(newest.root.checkpoint_txg.0 + 1),
+                    counter: newest.record.counter + 1,
+                    instance: third_instance,
+                    back_chain: back_chain_of(&newest.record_bytes),
+                    rollback_floor: CheckpointTxg(0),
+                    tree_identifier_watermark: newest.root.tree_identifier_watermark,
+                },
+            )
+            .expect("实例 3 暖机");
+            devices_holding_a_root_of_the_third_instance
+                .insert(root_slot_of(warm_up.root.checkpoint_txg).0);
+            newest = warm_up;
+        }
+        newest.root
+    };
+    pool.devices = Some(reopened);
     assert_eq!(
-        third_instance.output.rows_written,
+        instance_table_chain_of_root(&pool.memory_pool(), &newest_root_of_the_third_instance)
+            .expect("实例 3 最新那条根的实例表读得出")
+            .records
+            .rows,
         vec![
             InstanceRow {
                 instance: InstanceGeneration(1),
-                selected_root_txg: third_instance.output.effective_root.checkpoint_txg,
+                selected_root_txg: newest_root_of_the_first_instance.checkpoint_txg,
                 applied_transaction_high_water: 0,
             },
             InstanceRow {
@@ -4744,9 +5012,8 @@ fn published_nodes_behind_an_intermediate_row_still_count_against_the_tree_ident
                 applied_transaction_high_water: 0,
             }
         ],
-        "实例 3 写实例 1 那一行与中间实例行 (2, 0, 0)"
+        "盘上实例 3 最新那条根的表里是实例 1 那一行与中间实例行 (2, 0, 0)"
     );
-    pool.devices = Some(reopened);
     assert_eq!(
         (
             first_identifier_of_the_second_instance,

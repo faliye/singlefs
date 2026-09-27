@@ -553,8 +553,11 @@ fn open(path: &str, policy: PageCachePolicy) -> DirectInputOutputBlockDevice {
     })
 }
 
-/// 录制器外面那一层数调用、按需注入的盘。
-type CountedDevice<Inner> = FaultInjectingBlockDevice<RecordingBlockDevice<Inner>>;
+/// 录制器在外、按需注入的盘在里：录制流记的是程序发给这块盘的每一次调用，故障注入只决定这次调用有没有转发给
+/// 它下面那块真设备——被吞掉的调用因此进录制流、不进真设备实际收到的那一份（里程碑「第二个事务」收尾批
+/// 「55 号装置包装次序」；模块头那句「包装的位置在录制器外面」说的是 `history.rs::HistoryDevice` 那一条独立的栈，
+/// 不是这个二进制自己的 `CountedDevice`）。
+type CountedDevice<Inner> = RecordingBlockDevice<FaultInjectingBlockDevice<Inner>>;
 
 /// 每块盘此刻的计数快照，按 `devices` 的次序。
 fn device_call_counts<Inner: BlockDevice>(
@@ -760,17 +763,17 @@ where
 {
     let closed_devices: Vec<(DeviceIdentity, Inner)> = devices_after_second_transaction
         .into_iter()
-        .map(|(identity, device)| (identity, device.into_inner().into_inner_and_operations().0))
+        .map(|(identity, device)| (identity, device.into_inner_and_operations().0.into_inner()))
         .collect();
     let mut devices: Vec<(DeviceIdentity, CountedDevice<Inner>)> = reopen(closed_devices)
         .into_iter()
         .map(|(identity, inner)| {
             (
                 identity,
-                FaultInjectingBlockDevice::new(
+                RecordingBlockDevice::with_shared_stream(
                     identity,
-                    RecordingBlockDevice::with_shared_stream(identity, inner, stream.clone()),
-                    plan.clone(),
+                    FaultInjectingBlockDevice::new(identity, inner, plan.clone()),
+                    stream.clone(),
                 ),
             )
         })
@@ -832,7 +835,9 @@ where
                 | MountError::SequenceNumberPastTheTopOfItsRange(_)
                 // 写行与暖机之后推的抬 F 报错（实审 A1b Q5，账在错里）：这个二进制每次都在新建的池上挂，取号之前的准入不会不够、走不到推抬 F；
                 // 走到了也只报原样的错，窗口的账不比（推的，没在真设备上造过这一格）。
-                | MountError::FloorRaiseFailedAfterTheMountsPublishes(_) => {
+                | MountError::FloorRaiseFailedAfterTheMountsPublishes(_)
+                // 读到更新的东西读不出、重读一次仍读不出（C554 乙）：取号之前拒，一个写都没发。
+                | MountError::NewerStateStillUnreadableAfterOneReread(_) => {
                     vec![describe_run_failure("reopen_and_writable_mount", &cause)]
                 }
             };
@@ -1243,7 +1248,9 @@ fn raise_the_rollback_floor_and_describe<Inner: BlockDevice>(
                 }
                 // 现行那一版 txg 到顶：算这一串的 txg 时拒，一个写都没发；可写挂载那一处的抬 F 报错成员抬 F 自己报不出来。
                 | MountError::SequenceNumberPastTheTopOfItsRange(_)
-                | MountError::FloorRaiseFailedAfterTheMountsPublishes(_) => {
+                | MountError::FloorRaiseFailedAfterTheMountsPublishes(_)
+                // 重读一次仍读不出只由可写挂载交回，抬 F 报不出来。
+                | MountError::NewerStateStillUnreadableAfterOneReread(_) => {
                     vec![describe_run_failure("raise_rollback_floor", &cause)]
                 }
             };
@@ -1316,6 +1323,33 @@ fn raise_the_rollback_floor_and_describe<Inner: BlockDevice>(
     })
 }
 
+/// 五段路径：mkfs、取号、暖机、第一个事务、mkfs 之后整条。暖机与事务的分界是 `operation_count_before_first_transaction`
+/// ——`ScenarioPoint::BeforeFirstTransaction` 处量到的流长度，暖机 `warm_up()` 已调完、`publish_first_file()`
+/// 还没调，与 `first_transaction_step_five_publish.rs` 的 `warm_up_operation_count` 量的是同一处；
+/// 不是从流尾往回数几步（里程碑「第二个事务」收尾批「55 号装置步数」；`crates/mutations.tsv` 里点名这个函数的那条变异钉住这一点）。
+fn first_transaction_paths(
+    operations: &[RecordedOperation],
+    mkfs_operation_count: usize,
+    operation_count_before_first_transaction: usize,
+) -> [(&'static str, &[RecordedOperation]); 5] {
+    [
+        ("mkfs", &operations[..mkfs_operation_count]),
+        (
+            "instance_acquisition",
+            &operations[mkfs_operation_count..mkfs_operation_count + 2],
+        ),
+        (
+            "warm_up",
+            &operations[mkfs_operation_count + 2..operation_count_before_first_transaction],
+        ),
+        (
+            "transaction",
+            &operations[operation_count_before_first_transaction..],
+        ),
+        ("post_mkfs_stream", &operations[mkfs_operation_count..]),
+    ]
+}
+
 #[allow(
     clippy::too_many_lines,
     reason = "虚机里只跑这一件事：写、数、重开、读回，结果行按次序打"
@@ -1382,14 +1416,10 @@ fn main() {
                 let identity = DeviceIdentity(u32::try_from(index).expect("设备号"));
                 (
                     identity,
-                    FaultInjectingBlockDevice::new(
+                    RecordingBlockDevice::with_shared_stream(
                         identity,
-                        RecordingBlockDevice::with_shared_stream(
-                            identity,
-                            open(path, policy),
-                            stream.clone(),
-                        ),
-                        plan.clone(),
+                        FaultInjectingBlockDevice::new(identity, open(path, policy), plan.clone()),
+                        stream.clone(),
                     ),
                 )
             })
@@ -1407,6 +1437,10 @@ fn main() {
         .collect();
     let mut counts_after_acquisition: Option<Vec<DeviceCallCounts>> = None;
     let mut counts_before_first_transaction: Option<Vec<DeviceCallCounts>> = None;
+    // 暖机 warm_up() 已调完、publish_first_file() 还没调的那一处：与 first_transaction_step_five_publish.rs 的
+    // warm_up_operation_count（该文件第 187–188 行）量的是同一个边界，不是从流尾往回数几步
+    // （里程碑「第二个事务」收尾批「55 号装置步数」）。
+    let mut operation_count_before_first_transaction: Option<usize> = None;
     // 分段挂钟在这里起表：往下每一段末尾取一次，行先攒着、跑完一起打——
     // 打印会阻塞（虚机的串口），把它摆在两次取表之间就等于把打印积压算进那一段
     //（`test-discipline.md`「分段计时在被测进程里计，不在转发输出的循环里计」）。
@@ -1427,6 +1461,7 @@ fn main() {
             }
             ScenarioPoint::BeforeFirstTransaction => {
                 counts_before_first_transaction = Some(counts);
+                operation_count_before_first_transaction = Some(stream.operation_count());
                 segment_timing_lines.push(clock.mark("warm_up"));
                 if mode == OnDeviceRunMode::SkipFirstTransactionBarrier {
                     plan.arm(swallow_the_next_barrier_on(devices[0].0));
@@ -1472,20 +1507,12 @@ fn main() {
         journal_ring_bytes: parameters.geometry.journal_ring_bytes,
         root_ring_slots_per_region: parameters.geometry.root_ring_slots_per_region,
     };
-    let warm_up_end = operations.len() - 23;
-    let paths: [(&str, &[RecordedOperation]); 5] = [
-        ("mkfs", &operations[..run.mkfs_operation_count]),
-        (
-            "instance_acquisition",
-            &operations[run.mkfs_operation_count..run.mkfs_operation_count + 2],
-        ),
-        (
-            "warm_up",
-            &operations[run.mkfs_operation_count + 2..warm_up_end],
-        ),
-        ("transaction", &operations[warm_up_end..]),
-        ("post_mkfs_stream", &operations[run.mkfs_operation_count..]),
-    ];
+    let warm_up_end = operation_count_before_first_transaction.expect(
+        "run_first_transaction 在第一个事务之前叫过一次（ScenarioPoint::BeforeFirstTransaction）：\
+         这里就是暖机 warm_up() 已调完、publish_first_file() 还没调的那一处，\
+         与 first_transaction_step_five_publish.rs 的 warm_up_operation_count 量的是同一个边界",
+    );
+    let paths = first_transaction_paths(&operations, run.mkfs_operation_count, warm_up_end);
     for (name, slice) in paths {
         let segments = split_into_segments(slice, &geometry);
         emitter.emit(&format!(
@@ -1757,17 +1784,17 @@ mod tests {
                 let identity = DeviceIdentity(device_number);
                 (
                     identity,
-                    FaultInjectingBlockDevice::new(
+                    RecordingBlockDevice::with_shared_stream(
                         identity,
-                        RecordingBlockDevice::with_shared_stream(
+                        FaultInjectingBlockDevice::new(
                             identity,
                             SparseBlockDevice::new(
                                 SPARSE_DEVICE_BYTES,
                                 PhysicalBlockSizeInBytes(512),
                             ),
-                            stream.clone(),
+                            plan.clone(),
                         ),
-                        plan.clone(),
+                        stream.clone(),
                     ),
                 )
             })
@@ -1882,7 +1909,7 @@ mod tests {
         let cold: Vec<(DeviceIdentity, SparseBlockDevice)> = switched
             .devices
             .into_iter()
-            .map(|(identity, device)| (identity, device.into_inner().into_inner_and_operations().0))
+            .map(|(identity, device)| (identity, device.into_inner_and_operations().0.into_inner()))
             .collect();
         let report = recover(&cold, JournalPolicy::Consult);
         match report.outcome {
@@ -2126,7 +2153,7 @@ mod tests {
     }
 
     use super::{
-        describe_first_transaction_path_failure, device_call_counts,
+        describe_first_transaction_path_failure, device_call_counts, first_transaction_paths,
         publish_the_fourth_version_and_describe,
         publish_the_fourth_version_and_raise_the_rollback_floor,
         publish_the_second_version_and_describe, publish_the_third_version_and_describe,
@@ -2147,7 +2174,7 @@ mod tests {
         }
     }
 
-    /// 两块稀疏内存盘，外面各包一层录制器、再包一层数调用的注入包装（与虚机里那一套同形）。
+    /// 两块稀疏内存盘，外面各包一层数调用的注入包装、再包一层录制器（与虚机里那一套同形）。
     fn counted_sparse_devices(
         stream: &SharedStream,
         plan: &SharedFaultPlan,
@@ -2157,17 +2184,17 @@ mod tests {
                 let identity = DeviceIdentity(device_number);
                 (
                     identity,
-                    FaultInjectingBlockDevice::new(
+                    RecordingBlockDevice::with_shared_stream(
                         identity,
-                        RecordingBlockDevice::with_shared_stream(
+                        FaultInjectingBlockDevice::new(
                             identity,
                             SparseBlockDevice::new(
                                 SPARSE_DEVICE_BYTES,
                                 PhysicalBlockSizeInBytes(512),
                             ),
-                            stream.clone(),
+                            plan.clone(),
                         ),
-                        plan.clone(),
+                        stream.clone(),
                     ),
                 )
             })
@@ -2373,6 +2400,45 @@ mod tests {
         );
         assert_the_failed_window_is_reconciled(&failed.lines, "third_transaction", &[], "4", "4");
         assert!(lines_named(&failed.lines, "third_transaction").is_empty());
+    }
+
+    /// 暖机与第一个事务的分界不是从流尾往回数几步：`ScenarioPoint::BeforeFirstTransaction` 处量到的流长度，
+    /// 与 `first_transaction_step_five_publish.rs` 的 `warm_up_operation_count`（该文件第 187–188 行）量的是同一处
+    /// ——暖机 `warm_up()` 已调完、`publish_first_file()` 还没调。这里在内存盘上走同一条路径，用它切出五段，
+    /// 钉住该文件第 329、341、353、365、377 行断言的五个操作数：23、2、18、33、53。
+    #[test]
+    fn the_boundary_marked_before_the_first_transaction_splits_warm_up_from_the_transaction() {
+        let parameters = e142_parameters(512, 512);
+        let geometry = geometry_of(&parameters);
+        let stream = SharedStream::new();
+        let plan = SharedFaultPlan::unarmed(geometry);
+        let mut devices = counted_sparse_devices(&stream, &plan);
+        let mut operation_count_before_first_transaction: Option<usize> = None;
+        let run =
+            run_first_transaction(
+                &parameters,
+                &mut devices,
+                &stream,
+                |point, _devices| match point {
+                    ScenarioPoint::AfterMakeFilesystem
+                    | ScenarioPoint::AfterInstanceAcquisition => {}
+                    ScenarioPoint::BeforeFirstTransaction => {
+                        operation_count_before_first_transaction = Some(stream.operation_count());
+                    }
+                },
+            )
+            .expect("这条路没有摆注入故障，走得到底");
+        let boundary = operation_count_before_first_transaction
+            .expect("run_first_transaction 在第一个事务之前叫过一次");
+        let operations = stream.operations();
+        let paths = first_transaction_paths(&operations, run.mkfs_operation_count, boundary);
+        let lengths: Vec<usize> = paths.into_iter().map(|(_, slice)| slice.len()).collect();
+        assert_eq!(
+            lengths,
+            vec![23, 2, 18, 33, 53],
+            "mkfs / instance_acquisition / warm_up / transaction / post_mkfs_stream 五段的操作数：\
+             与 first_transaction_step_five_publish.rs 断言的五个数（该文件第 329、341、353、365、377 行）逐字相同"
+        );
     }
 
     /// 第一个事务那条路：第一个事务整池第 5 次写报错 ⇒ 失败账 4 次写，与设备一层逐项相等。
@@ -2730,7 +2796,7 @@ mod tests {
         let cold: Vec<(DeviceIdentity, SparseBlockDevice)> = raised
             .devices
             .into_iter()
-            .map(|(identity, device)| (identity, device.into_inner().into_inner_and_operations().0))
+            .map(|(identity, device)| (identity, device.into_inner_and_operations().0.into_inner()))
             .collect();
         let report = recover(&cold, JournalPolicy::Consult);
         match report.outcome {
@@ -2797,7 +2863,7 @@ mod tests {
         let cold: Vec<(DeviceIdentity, SparseBlockDevice)> = raised
             .devices
             .into_iter()
-            .map(|(identity, device)| (identity, device.into_inner().into_inner_and_operations().0))
+            .map(|(identity, device)| (identity, device.into_inner_and_operations().0.into_inner()))
             .collect();
         let line = super::rollback_floor_read_back_from_the_chosen_root_line(&cold);
         assert_eq!(
@@ -2992,8 +3058,13 @@ mod tests {
         {
             let second_transaction_counted = counts_after_the_second_transaction[index]
                 .since(counts_after_the_first_transaction[index]);
-            let after_reopen_counted =
-                DeviceCallCounts::of(switched.devices[index].1.plan().counts_of_device(identity));
+            let after_reopen_counted = DeviceCallCounts::of(
+                switched.devices[index]
+                    .1
+                    .inner()
+                    .plan()
+                    .counts_of_device(identity),
+            );
             for ((window, slice), counted) in windows
                 .iter()
                 .zip([second_transaction_counted, after_reopen_counted])

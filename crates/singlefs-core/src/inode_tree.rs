@@ -85,14 +85,21 @@ impl InodeLeafContainer {
     /// 这片容器还能再装几条：一容器 233 条（D8（核心索引结构） 已定项 6，`INODE_LEAF_RECORDS`）。
     ///
     /// # Panics
-    /// 这片容器已经装了多于 233 条。装记录的唯一入口是
-    /// [`write_records_into_leaf_containers`]，它只在这个函数报「还装得下」时才往里追加 ⇒ 装不到 234 条；
-    /// 装到了说明那条纪律被绕过了，不许当成「还能装 0 条」往下走。
+    /// 这片容器已经装了多于 233 条。容器里的记录只有两个来处，两处都装不到第 234 条：
+    /// 写者往里追加只经 [`write_records_into_leaf_containers`]，它只在这个函数报「还装得下」时才追加；
+    /// 盘上读来的（可写挂载重建上一版，`recovery::rebuild_version`）由读者判过记录宽 140
+    /// （`recovery::inode_leaf_container_judged_against_its_entry`）、记录区不越过单元末尾（`unit::parse_packed_unit`），
+    /// 一片至多 ⌊(32768 − 107 − 29) ÷ 140⌋ = 233 条（C476 普查「缺口」表 `inode_tree.rs:88` 那一行；这条算术由单测
+    /// `a_packed_unit_holds_no_more_inode_records_than_the_leaf_record_limit` 盯着）。装到了说明这两道之一被绕过了，
+    /// 不许当成「还能装 0 条」往下走。
     #[must_use]
     pub fn free_record_slots(&self) -> u64 {
         INODE_LEAF_RECORDS
             .checked_sub(u64::try_from(self.records.len()).expect("一容器 233 条"))
-            .expect("一容器最多 233 条记录（D8 已定项 6）：装到第 234 条说明分裂纪律被绕过了")
+            .expect(
+                "一容器最多 233 条记录（D8 已定项 6）：写者只经 write_records_into_leaf_containers 追加（分裂纪律），盘上读来的由 \
+                 recovery::inode_leaf_container_judged_against_its_entry 判过记录宽 140、unit::parse_packed_unit 判过记录区不越过单元末尾",
+            )
     }
 }
 
@@ -359,6 +366,24 @@ mod tests {
         assert_eq!(
             after.rewritten,
             vec![InodeLeafContainerIndexInTree::LEFTMOST]
+        );
+    }
+
+    /// 一个码 3 单元按 inode 记录宽装得下的条数不多于一容器的上限：`free_record_slots` 那道断言对盘上读来的容器从盘上走不到，
+    /// 靠的就是这条算术（读者判记录宽 = `INODE_RECORD_BYTES`、记录区不越过单元末尾）。改了记录宽、单元头宽或预留位而不重算
+    /// `INODE_LEAF_RECORDS`，盘上一片就可能装得下第 234 条（C476 普查「缺口」表 `inode_tree.rs:88` 那一行）。
+    #[test]
+    fn a_packed_unit_holds_no_more_inode_records_than_the_leaf_record_limit() {
+        use singlefs_format::{
+            DATA_UNIT_BYTES, INODE_RECORD_BYTES, NONCE_MAC_ALGORITHM_RESERVED_BYTES,
+            PACKED_UNIT_HEADER_BYTES,
+        };
+        let records_a_packed_unit_holds =
+            (DATA_UNIT_BYTES - PACKED_UNIT_HEADER_BYTES - NONCE_MAC_ALGORITHM_RESERVED_BYTES)
+                / INODE_RECORD_BYTES;
+        assert!(
+            records_a_packed_unit_holds <= INODE_LEAF_RECORDS,
+            "一个码 3 单元装得下 {records_a_packed_unit_holds} 条 inode 记录，多于一容器的上限 {INODE_LEAF_RECORDS}"
         );
     }
 

@@ -6,7 +6,9 @@ mod common;
 use common::{build_pool, geometry, parameters, BuiltPool, Recorded};
 use singlefs_core::address::{DeviceIdentity, InstanceGeneration};
 use singlefs_core::recovery::{choose_system_configuration, verified_system_configuration_slots};
-use singlefs_core::transaction::{acquire_instance, AcquisitionRollback, CommitStep, PoolWriter};
+use singlefs_core::transaction::{
+    acquire_instance, AcquisitionRollback, CommitStep, InstanceAcquisitionFailed, PoolWriter,
+};
 use singlefs_harness::fault_injection::{
     FaultCounting, FaultDeviceSelector, FaultInjectingBlockDevice, FaultOccurrence, FaultPlacement,
     FaultSchedule, InjectedFault, SharedFaultPlan,
@@ -111,7 +113,12 @@ fn acquire(
 ) -> Result<InstanceGeneration, singlefs_core::transaction::AcquisitionFailed> {
     let parameters = parameters();
     let mut pool = PoolWriter::new(&parameters, devices);
-    acquire_instance(&mut pool)
+    acquire_instance(&mut pool).map_err(|failure| match failure {
+        InstanceAcquisitionFailed::Acquisition(acquisition) => acquisition,
+        InstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness {
+            device,
+        } => panic!("这条用例里每块盘两槽都读得出自证过的系统配置，取号不该拒在见证值那一核：{device:?}"),
+    })
 }
 
 const DISKS: [DeviceIdentity; 2] = [DeviceIdentity(0), DeviceIdentity(1)];

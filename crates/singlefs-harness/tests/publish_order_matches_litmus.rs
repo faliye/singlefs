@@ -44,7 +44,17 @@ fn writer_steps_of(litmus_file_name: &str) -> Vec<StepKind> {
 fn litmus_writer_threads_follow_the_recorded_publish_order() {
     let pool = build_pool("litmus-binding");
     let operations = pool.stream.operations();
-    let transaction = &operations[operations.len() - 23..];
+    // 暖机与第一个事务的分界取自 warm_up_operation_count（暖机已调完、发布还没调），不从流尾往回数几步：
+    // 写死的步数过期时事务前几次单元写会被划进暖机，`collapsed` 却因为去重相邻同类而看不出来——
+    // 下面这条步数断言才是钉住它的那一条（里程碑「第二个事务」收尾批「55 号装置步数」）。
+    let transaction = &operations[pool.warm_up_operation_count..];
+    assert_eq!(
+        transaction.len(),
+        33,
+        "第一个事务的步数写死错了就在这里先红：24 次单元写 + 2 道屏障 + 2 条 journal 记录 + 2 道屏障 \
+         + 1 次根槽 FUA + 2 次系统配置槽写，与 first_transaction_step_five_publish.rs 的断言\
+         （第 365 行 `(33, \"24+2+1+2\", 16_777_223)`）同一个数"
+    );
     let mut collapsed: Vec<StepKind> = Vec::new();
     for operation in transaction {
         let kind = geometry().classify(operation);

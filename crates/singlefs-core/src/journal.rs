@@ -189,13 +189,14 @@ pub fn slot_after_the_journal_ring(journal_ring_bytes: u64) -> SlotNumber {
 /// 记录 n 落在环内偏移 `(计数器 − 1) mod 槽数 × 4096`（D23（journal 的角色与格式） 已定项 18）。
 ///
 /// # Panics
-/// 环短于一条记录（环槽数 0）：mkfs 拒这种环长（`make_filesystem` 的 `JournalRingShorterThanOneRecord`）；
-/// 发布写记录那一步拿的环长是 `PoolWriter` 的参数，与 mkfs 判过、写进系统配置的是同一个值。
+/// 环短于一条记录（环槽数 0）：mkfs 拒这种环长（`make_filesystem` 的 `JournalRingShorterThanOneRecord`），读者一侧择系统配置时
+/// 拒装不下 F 条记录的环长（`recovery::choose_system_configuration` 报 `SystemConfigurationValueRefused`，代码审阅第 38 条）；
+/// 发布写记录那一步拿的环长是 `PoolWriter` 的参数，可写挂载按择到的那份系统配置建它，与读者判过的是同一个值。
 #[must_use]
 pub fn record_offset(counter: u64, ring_bytes: u64) -> DeviceOffsetInBytes {
     let ring_slots = ring_bytes / JOURNAL_RECORD_BYTES;
     let slot_in_ring = (counter - 1).checked_rem(ring_slots).expect(
-        "环至少装得下一条记录：mkfs 的 check_geometry 拒短于一条记录的环（JournalRingShorterThanOneRecord）",
+        "环至少装得下一条记录：mkfs 的 check_geometry 拒短于一条记录的环（JournalRingShorterThanOneRecord），择系统配置时读者拒装不下 F 条记录的环",
     );
     DeviceOffsetInBytes(JOURNAL_RING_START_SLOT * SLOT_BYTES + slot_in_ring * JOURNAL_RECORD_BYTES)
 }
@@ -263,8 +264,9 @@ impl JournalRecord {
         bytes
     }
 
-    /// 读者：magic、类型、整条校验和、fsid、载荷校验和四关，外加三条当损坏的（D23（journal 的角色与格式） 已定项 4 / 已定项 7）：
-    /// 记录标志位 0 之外有位为 1、本次发布内序号为 0、提交标记不是 0 也不是 1。当损坏就是与校验和不过同一个结局——这条记录不算在，前缀在它之前断
+    /// 读者：magic、类型、整条校验和、fsid、载荷校验和四关，外加四条当损坏的（D23（journal 的角色与格式） 已定项 4 / 已定项 7；最后一条是代码审阅第 29 条）：
+    /// 记录标志位 0 之外有位为 1、本次发布内序号为 0、提交标记不是 0 也不是 1，另有新根段两条指针头部里加密与压缩那几段不是第一版的取值
+    /// （代码审阅第 29 条）。当损坏就是与校验和不过同一个结局——这条记录不算在，前缀在它之前断
     /// （已定项 22 断号即止）。不查反向链，也不查一次发布之内跳不跳号：那两样要看别的记录，是前缀取法的事。
     #[must_use]
     pub fn parse(bytes: &[u8], expected_filesystem_identifier: u64) -> Option<Self> {
@@ -305,8 +307,14 @@ impl JournalRecord {
         }
         let back_chain = reader.get_u32();
         let payload_checksum = reader.get_u32();
-        let new_tree_table = NodePointer::read_from(&mut reader);
-        let new_mapping_root = NodePointer::read_from(&mut reader);
+        // 新根段那两条指针头部里加密与压缩那几段不是第一版的取值（代码审阅第 29 条，`pointer::PointerHeadFieldOutsideTheFirstVersion`）：
+        // 与上面几格同一个结局，这条记录不算在、前缀在它之前断。
+        let new_tree_table =
+            NodePointer::read_judging_the_encryption_and_compression_fields_from(&mut reader)
+                .ok()?;
+        let new_mapping_root =
+            NodePointer::read_judging_the_encryption_and_compression_fields_from(&mut reader)
+                .ok()?;
         let new_tree_identifier_watermark = reader.get_u64();
         let new_rollback_floor = CheckpointTxg(reader.get_u64());
         let filesystem_identifier = reader.get_u64();

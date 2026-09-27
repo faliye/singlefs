@@ -125,6 +125,30 @@ pub enum Verdict {
     /// 也不 panic：S = 0 会让环长变 0、实现侧取模除零。挂载侧同一条判定是
     /// `singlefs_core::recovery::RecoveryFailure::RootRingSlotsPerRegionOutOfRange`。
     RootRingSlotsPerRegionOutsideTheFormatInterval,
+    /// 单元头或系统配置槽偏移 4 那 2 字节格式版本不是这一版 checker 读得了的那一版
+    /// （`UNIT_FORMAT_VERSION_THIS_CHECKER_READS`、`SYSTEM_CONFIGURATION_FORMAT_VERSION_THIS_CHECKER_READS`）：
+    /// 版本号定的是后面每个字段按哪张表读，不认得就不按今天的表往下解。
+    FormatVersionNotRecognized,
+    /// 单元类身份段之后那 29 字节 nonce / MAC / 算法类型预留位有非 0 字节。它们不在头校验和覆盖内（在载荷 CRC 覆盖内），
+    /// 由「恒 0、读者遇到非 0 一律判该结构损坏」这条规则守（I-2.4（头校验和覆盖范围）；D18（块里携带什么信息） 已定项 16 / 已定项 17）。
+    EncryptionReservedBytesNotZero,
+    /// 码 2 节点头里条目宽是 0、条目数不是 0：声明长度 0 过得了「声明长度 = 条目数 × 条目宽」（D18（块里携带什么信息） 已定项 18），
+    /// key 宽也是 0 时「条目宽 ≥ key 宽」同样过，切出来的条目却一条都没有，与头里自述的条目数对不上。
+    EntryWidthZeroWithEntries,
+    /// 码 3 单元头里记录宽是 0、记录数不是 0：与 [`Self::EntryWidthZeroWithEntries`] 同一个坏法。
+    RecordWidthZeroWithRecords,
+    /// 系统配置偏移 219 的加密类型不是 0（关）：加密不进第一个可运行版本（D9（加密） 已定项 10），
+    /// 登记表里的 1、2 是算法（D22（单元原子性怎么合成） 已定项 17），别的码不认得——都不是这一版读得了的卷。
+    EncryptionTypeNotOff,
+    /// 系统配置自述的固定结构槽距落在格式允许的区间之外：小于 4096（D2（RAID 条带策略） 已定项 19），
+    /// 或槽 1（设备内偏移 = 槽距，D22（单元原子性怎么合成） 已定项 16）整槽不在同一槽自述的根环起点之前。
+    FixedStructureSlotSpacingOutsideTheFormatRange,
+    /// 系统配置自述的 `physical_block_size`（根槽宽，D22（单元原子性怎么合成） 已定项 2）装不下一条根记录（已定项 7），
+    /// 或宽过固定结构槽距（根槽 j 在区域起点 + j × 槽距，已定项 16 第 2 句）。读根槽按它开缓冲。
+    PhysicalBlockSizeOutsideTheRootSlotBounds,
+    /// 系统配置自述的 journal 环长装不下 F 条记录（在飞记录数上限 = 环槽数 ÷ F 是 0，D23（journal 的角色与格式） 已定项 18），
+    /// 或环的末端越过同一槽自述的单元区起点（已定项 19 ③：单元区起始槽号随环长走）。
+    JournalRingBytesOutsideTheSupportedRange,
 }
 
 /// 系统配置槽解出来的几个要紧字段。
@@ -174,6 +198,19 @@ const ROOT_FLAGS_OFFSET: usize = 20;
 /// 根记录 flags 位 0 = 卸载记号（D22（单元原子性怎么合成） 已定项 7）；其余位第一版恒 0、非 0 拒收（已定项 17）。
 const ROOT_FLAG_UNMOUNT_MARKER: u32 = 1 << 0;
 const UNIT_HEADER_CHECKSUM_OFFSET: usize = 10;
+/// 格式版本那 2 字节的偏移：单元头共同前缀与系统配置自举头都是紧跟 magic 4（D18（块里携带什么信息） 已定项 7 的共同前缀表；
+/// D22（单元原子性怎么合成） 已定项 9 的字段表）。
+pub(crate) const FORMAT_VERSION_OFFSET: usize = 4;
+/// 这一版 checker 读得了的单元格式版本：`.claude/kb/layout/01-first-txn.md` 二「单元头 | 格式版本 | 2 | 1」（D18（块里携带什么信息） 已定项 7）。
+/// checker 自己写一份，不从 `singlefs-core` 引。单元级（`check_unit`）与池级走读（`walk` 的 `judge_unit_header`）共用这一个数。
+pub(crate) const UNIT_FORMAT_VERSION_THIS_CHECKER_READS: u16 = 1;
+/// 这一版 checker 读得了的系统配置格式版本：D22（单元原子性怎么合成） 已定项 9 的字段表（`.claude/kb/layout/01-first-txn.md` 一）
+/// 「自举头 | 格式版本 | 2 | 1」。与单元头那一份是两个字段、各记一个数。
+const SYSTEM_CONFIGURATION_FORMAT_VERSION_THIS_CHECKER_READS: u16 = 1;
+/// 系统配置里加密类型那 1 字节的偏移：整槽校验和 32 之后是 MAC 16、nonce 水位 12、KDF 标识 4，再是它（字段表偏移 219）。
+const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET: usize = 155 + 32 + 16 + 12 + 4;
+/// 加密类型登记表里的「关」（未加密；D9（加密） 已定项 10，登记位 D22（单元原子性怎么合成） 已定项 17）。
+const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFF: u8 = 0;
 
 pub(crate) fn read_u16(bytes: &[u8], offset: usize) -> u16 {
     u16::from_le_bytes(bytes[offset..offset + 2].try_into().expect("2 字节"))
@@ -190,7 +227,8 @@ pub(crate) fn read_u64(bytes: &[u8], offset: usize) -> u64 {
     u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
 }
 
-/// 判一个系统配置槽（4096 字节）。
+/// 判一个系统配置槽（4096 字节）：magic、整槽校验和、格式版本、incompat 位、加密类型。
+/// 几何字段的上下界在 [`image::geometry_of`] 判（R、S、槽距、`physical_block_size`、环长）。
 pub fn check_system_configuration_slot(slot: &[u8]) -> Result<SystemConfigurationView, Verdict> {
     let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
     if slot.len() < slot_bytes {
@@ -202,6 +240,11 @@ pub fn check_system_configuration_slot(slot: &[u8]) -> Result<SystemConfiguratio
     if !checksum_field_holds(slot, slot_bytes, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET) {
         return Err(Verdict::ChecksumMismatch);
     }
+    if read_u16(slot, FORMAT_VERSION_OFFSET)
+        != SYSTEM_CONFIGURATION_FORMAT_VERSION_THIS_CHECKER_READS
+    {
+        return Err(Verdict::FormatVersionNotRecognized);
+    }
     let incompat = &slot
         [SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 32];
     if incompat[0] & !INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT != 0
@@ -209,6 +252,10 @@ pub fn check_system_configuration_slot(slot: &[u8]) -> Result<SystemConfiguratio
         || incompat[0] & INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT == 0
     {
         return Err(Verdict::UnknownIncompatBit);
+    }
+    if slot[SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET] != SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFF
+    {
+        return Err(Verdict::EncryptionTypeNotOff);
     }
     Ok(SystemConfigurationView {
         filesystem_identifier: slot
@@ -309,7 +356,8 @@ pub fn index_node_header_bytes(key_width_byte_at_offset_51: u8) -> usize {
     .expect("key 宽至多 255，头宽至多 86 + 2 × 255 + 29 = 625，装得进 usize")
 }
 
-/// 判一个单元的头：magic、flags、类标签合法（1 / 2 / 3）、头校验和、载荷 CRC；返回类标签。
+/// 判一个单元的头：magic、flags、类标签合法（1 / 2 / 3）、头校验和、载荷 CRC，再判格式版本认得、
+/// 类身份段之后那 29 字节 nonce / MAC / 算法类型预留位恒 0（I-2.4（头校验和覆盖范围））；返回类标签。
 pub fn check_unit(unit: &[u8]) -> Result<u8, Verdict> {
     if unit.len() < 42 {
         return Err(Verdict::TooShort);
@@ -348,6 +396,20 @@ pub fn check_unit(unit: &[u8]) -> Result<u8, Verdict> {
     if read_u32(unit, payload_crc_offset) != crc32_castagnoli_bitwise(&unit[header_end..]) {
         return Err(Verdict::ChecksumMismatch);
     }
+    // 两道校验和之后才判这两样：版本号在头校验和里、预留位在载荷 CRC 里，校验和过了，它们就是写这个单元的那一方写下的值，
+    // 不认得、非 0 是格式上的拒收，不是一个字节坏了（坏了的那一种上面已经报成校验和对不上）。
+    if read_u16(unit, FORMAT_VERSION_OFFSET) != UNIT_FORMAT_VERSION_THIS_CHECKER_READS {
+        return Err(Verdict::FormatVersionNotRecognized);
+    }
+    // 预留位不看系统配置里的加密类型就判恒 0：这一版 checker 不收加密类型非 0 的系统配置（`check_system_configuration_slot`），
+    // 它判的池都是加密关着的，那 29 字节只能是 0（D9（加密） 已定项 10）。
+    let reserved_bytes = usize::try_from(NONCE_MAC_ALGORITHM_RESERVED_BYTES).expect("29");
+    if unit[header_end..header_end + reserved_bytes]
+        .iter()
+        .any(|byte| *byte != 0)
+    {
+        return Err(Verdict::EncryptionReservedBytesNotZero);
+    }
     Ok(unit_class)
 }
 
@@ -368,7 +430,7 @@ pub struct IndexNodeView {
     pub entries: Vec<Vec<u8>>,
 }
 
-/// 解一个码 2 节点：头与载荷两道校验和先过，再核声明长度 = 条目数 × 条目宽、条目宽 ≥ key 宽、条目区装得下。
+/// 解一个码 2 节点：头与载荷两道校验和先过，再核声明长度 = 条目数 × 条目宽、条目宽 ≥ key 宽、条目宽 0 时条目数也是 0、条目区装得下。
 pub fn index_node_view(unit: &[u8]) -> Result<IndexNodeView, Verdict> {
     if check_unit(unit)? != 2 {
         return Err(Verdict::WrongUnitClass);
@@ -395,15 +457,23 @@ pub fn index_node_view(unit: &[u8]) -> Result<IndexNodeView, Verdict> {
     if declared_length != entry_count * entry_width || entry_width < key_width {
         return Err(Verdict::DeclaredLengthMismatch);
     }
+    if entry_width == 0 && entry_count != 0 {
+        return Err(Verdict::EntryWidthZeroWithEntries);
+    }
     let entries_start = offset + usize::try_from(NONCE_MAC_ALGORITHM_RESERVED_BYTES).expect("29");
     if entries_start + declared_length > unit.len() {
         return Err(Verdict::TooShort);
     }
-    let entries = unit[entries_start..entries_start + declared_length]
-        .chunks(entry_width.max(1))
-        .take(entry_count)
-        .map(<[u8]>::to_vec)
-        .collect();
+    // 条目区恰好是 条目数 × 条目宽 字节（上面判过），按条目宽切正好切出条目数那么多条；
+    // 条目宽是 0 只剩条目数也是 0 这一种，那时条目区是空的、一刀都不用切。
+    let entries = if entry_count == 0 {
+        Vec::new()
+    } else {
+        unit[entries_start..entries_start + declared_length]
+            .chunks(entry_width)
+            .map(<[u8]>::to_vec)
+            .collect()
+    };
     Ok(IndexNodeView {
         tree_identifier: read_u64(unit, 42),
         level: unit[50],
@@ -546,17 +616,24 @@ pub fn packed_unit_view(unit: &[u8]) -> Result<PackedUnitView, Verdict> {
     if declared_length != record_count * record_width {
         return Err(Verdict::DeclaredLengthMismatch);
     }
+    if record_width == 0 && record_count != 0 {
+        return Err(Verdict::RecordWidthZeroWithRecords);
+    }
     let records_start =
         usize::try_from(PACKED_UNIT_HEADER_BYTES + NONCE_MAC_ALGORITHM_RESERVED_BYTES)
             .expect("136");
     if records_start + declared_length > unit.len() {
         return Err(Verdict::TooShort);
     }
-    let records = unit[records_start..records_start + declared_length]
-        .chunks(record_width.max(1))
-        .take(record_count)
-        .map(<[u8]>::to_vec)
-        .collect();
+    // 与码 2 条目区同一个切法：记录区恰好 记录数 × 记录宽 字节，记录宽 0 只剩记录数也是 0。
+    let records = if record_count == 0 {
+        Vec::new()
+    } else {
+        unit[records_start..records_start + declared_length]
+            .chunks(record_width)
+            .map(<[u8]>::to_vec)
+            .collect()
+    };
     Ok(PackedUnitView {
         birth_tree: read_u64(unit, 43),
         record_type: read_u16(unit, 51),

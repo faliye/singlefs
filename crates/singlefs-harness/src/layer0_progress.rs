@@ -17,17 +17,26 @@
 //! `shard-<i>-of-<n>`，与单机的进度文件不混。
 
 use std::collections::BTreeMap;
+use std::ffi::OsString;
 use std::fs::{File, OpenOptions};
 use std::io::Write as _;
 use std::num::NonZeroU32;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use singlefs_checker::image::IMPLEMENTED_INVARIANTS;
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::checksum::crc32_castagnoli;
 
-use crate::crash::{Layer0ObserverCounts, Layer0PublishOfState, Layer0Tally};
+use crate::crash::{
+    Layer0Finding, Layer0FindingSample, Layer0FindingSignature, Layer0Findings,
+    Layer0ObserverCounts, Layer0OracleViolationKind, Layer0PublishOfState, Layer0RedPass,
+    Layer0SegmentOfState, Layer0Tally, RecordCheck, LAYER0_FINDING_SAMPLES_KEPT,
+    LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE, LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE,
+    LAYER0_RED_PASS_POOL_CHECKER, LAYER0_RED_PASS_RECORD_CHECKER,
+    RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT, RECORD_CHECKER_ROOT_WITHOUT_RECORD,
+};
 use crate::hexadecimal::hexadecimal_text;
 
 /// 进度文件放在哪个目录。没设就不留进度文件（平时的 `cargo test`）。
@@ -40,9 +49,12 @@ pub const LAYER0_START_OVER_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_LAYER0_START_
 /// 双机分片：`<i>/<n>`（0 ≤ i < n）只跑分给第 i 片的切片、写这一片的账本；`merge/<n>` 只读 n 份账本并起来。没设就不分片。
 /// 设了就要同时设进度目录与输入指纹（账本写在进度目录里，文件头记输入指纹）。
 pub const LAYER0_SHARD_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_LAYER0_SHARD";
+/// 发现日志写到哪个文件（层 0 放量的「出错那一份」，用户 2026-09-27 定「全量和错误双份日志」）：每趟枚举往末尾追加一节
+/// （[`Layer0FindingsLogSection`]）。没设就不写（标准输出上的 `LAYER0_FINDING` / `LAYER0_FINDINGS` 照打）。
+pub const LAYER0_FINDINGS_FILE_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_LAYER0_FINDINGS_FILE";
 
-/// 进度文件格式的版本：写进文件头，格式改了就换号，旧文件整份作废。
-const PROGRESS_FILE_FORMAT: u32 = 1;
+/// 进度文件格式的版本：写进文件头，格式改了就换号，旧文件整份作废。2：片行多了发现表（`findings=`）。
+const PROGRESS_FILE_FORMAT: u32 = 2;
 /// 文件名里一段（输入指纹、流名）最长几个字节。
 const NAME_PART_MAXIMUM_BYTES: usize = 128;
 
@@ -486,7 +498,7 @@ fn header_body(settings: &Layer0ProgressFileSettings, plan: &Layer0ProgressPlan)
 }
 
 /// 片行的字段，按行里的次序。读回时逐个核：少一个、多一个、次序不对，整份作废。
-const SLICE_LINE_KEYS: [&str; 24] = [
+const SLICE_LINE_KEYS: [&str; 25] = [
     "slice",
     "first",
     "end",
@@ -511,6 +523,7 @@ const SLICE_LINE_KEYS: [&str; 24] = [
     "checker_not_applicable_states",
     "observed_states",
     "observer_counts",
+    "findings",
 ];
 
 fn optional_text_field(text: Option<&str>) -> String {
@@ -573,6 +586,7 @@ pub fn slice_line(slice_index: usize, slice: &Range<u64>, tally: &Layer0Tally) -
         checker_not_applicable_states,
         observed_states,
         observer_counts,
+        findings,
     } = tally;
     let invariant_counts = |counts: &BTreeMap<&'static str, u64>| {
         map_field(
@@ -581,7 +595,7 @@ pub fn slice_line(slice_index: usize, slice: &Range<u64>, tally: &Layer0Tally) -
                 .map(|(invariant, count)| ((*invariant).to_string(), count.to_string())),
         )
     };
-    let values: [String; 24] = [
+    let values: [String; 25] = [
         slice_index.to_string(),
         slice.start.to_string(),
         slice.end.to_string(),
@@ -619,6 +633,7 @@ pub fn slice_line(slice_index: usize, slice: &Range<u64>, tally: &Layer0Tally) -
                 .iter()
                 .map(|(name, count)| (name.to_string(), count.to_string())),
         ),
+        findings_field(findings),
     ];
     let body: Vec<String> = SLICE_LINE_KEYS
         .iter()
@@ -745,6 +760,157 @@ fn publish_from_field(text: &str) -> Result<Layer0PublishOfState, String> {
     }
 }
 
+/// 片行里的发现表（[`Layer0Findings`]）：空表写 `none`；否则写 `hex:<十六进制>`，解开是几行（最后一行不带换行）：
+/// 第一行 `red_states=<至少一遍判红的状态数>`，之后每个签名一行，列与列之间是制表符：pass、violated、段、发布（片行写法）、
+/// 状态数，再跟每个样本的序号与原文（原文照 [`escaped_finding_text`] 转义）。
+fn findings_field(findings: &Layer0Findings) -> String {
+    if *findings == Layer0Findings::default() {
+        return "none".to_string();
+    }
+    let mut lines = vec![format!("red_states={}", findings.red_states)];
+    for (signature, finding) in &findings.by_signature {
+        let mut columns = vec![
+            signature.red_pass.pass_name().to_string(),
+            signature.red_pass.violated_names().join(","),
+            signature.segment.name(),
+            publish_field(signature.publish),
+            finding.states.to_string(),
+        ];
+        for sample in &finding.earliest_samples {
+            columns.push(sample.state_ordinal.to_string());
+            columns.push(escaped_finding_text(&sample.violation));
+        }
+        lines.push(columns.join("\t"));
+    }
+    format!("hex:{}", hexadecimal_text(lines.join("\n").as_bytes()))
+}
+
+/// 判红的那一遍与违了哪几条，从名字解回来（[`Layer0RedPass::pass_name`] 与 [`Layer0RedPass::violated_names`] 反过来）。
+fn red_pass_from_names(pass: &str, violated: &str) -> Result<Layer0RedPass, String> {
+    let names: Vec<&str> = violated.split(',').collect();
+    let oracle_kind = || match names.as_slice() {
+        [name] => Layer0OracleViolationKind::from_name(name)
+            .ok_or_else(|| format!("oracle 违例的类解不开：{name:?}")),
+        _not_exactly_one => Err(format!("oracle 那一遍恰好违一类：{violated:?}")),
+    };
+    match pass {
+        LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE => {
+            Ok(Layer0RedPass::JournalConsultedOracle(oracle_kind()?))
+        }
+        LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE => {
+            Ok(Layer0RedPass::JournalIgnoredOracle(oracle_kind()?))
+        }
+        LAYER0_RED_PASS_POOL_CHECKER => names
+            .iter()
+            .map(|name| implemented_invariant_named(name))
+            .collect::<Result<Vec<&'static str>, String>>()
+            .map(Layer0RedPass::PoolChecker),
+        LAYER0_RED_PASS_RECORD_CHECKER => {
+            let red_pass = Layer0RedPass::RecordChecker(RecordCheck {
+                root_without_record: names.contains(&RECORD_CHECKER_ROOT_WITHOUT_RECORD),
+                claimed_state_missing_unit: names
+                    .contains(&RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT),
+            });
+            if red_pass.violated_names() == names {
+                Ok(red_pass)
+            } else {
+                Err(format!("记录核对器违的判据解不开：{violated:?}"))
+            }
+        }
+        unknown_pass => Err(format!("判红的那一遍解不开：{unknown_pass:?}")),
+    }
+}
+
+fn segment_from_name(name: &str) -> Result<Layer0SegmentOfState, String> {
+    if name == Layer0SegmentOfState::AllPersisted.name() {
+        return Ok(Layer0SegmentOfState::AllPersisted);
+    }
+    usize::try_from(decimal_field(name)?)
+        .map(Layer0SegmentOfState::Segment)
+        .map_err(|error| format!("段号装不进 usize：{error}"))
+}
+
+/// [`findings_field`] 反过来，另核发现表的形状：每个签名至少一个状态、不多于判红的状态数；样本个数 = min(状态数, 3)、序号从小到大；
+/// 判红的状态数是 0 当且仅当一个签名都没有；同一签名不出现两次。
+fn findings_from_field(text: &str) -> Result<Layer0Findings, String> {
+    if text == "none" {
+        return Ok(Layer0Findings::default());
+    }
+    let hexadecimal = text
+        .strip_prefix("hex:")
+        .ok_or_else(|| format!("发现表要是 none 或 hex:<十六进制>：{text:?}"))?;
+    let decoded = decoded_hexadecimal_text(hexadecimal)?;
+    let mut lines = decoded.split('\n');
+    let red_states = decimal_field(
+        lines
+            .next()
+            .and_then(|line| line.strip_prefix("red_states="))
+            .ok_or_else(|| format!("发现表第一行要是 red_states=<数>：{decoded:?}"))?,
+    )?;
+    let mut by_signature: BTreeMap<Layer0FindingSignature, Layer0Finding> = BTreeMap::new();
+    for line in lines {
+        let columns: Vec<&str> = line.split('\t').collect();
+        let [pass, violated, segment, publish, states, sample_columns @ ..] = columns.as_slice()
+        else {
+            return Err(format!("发现表的一行少于五列：{line:?}"));
+        };
+        let (sample_pairs, unpaired_columns) = sample_columns.as_chunks::<2>();
+        if !unpaired_columns.is_empty() {
+            return Err(format!("发现表的样本要成对（序号、原文）：{line:?}"));
+        }
+        let earliest_samples = sample_pairs
+            .iter()
+            .map(|[state_ordinal, violation]| {
+                Ok(Layer0FindingSample {
+                    state_ordinal: decimal_field(state_ordinal)?,
+                    violation: unescaped_finding_text(violation)?,
+                })
+            })
+            .collect::<Result<Vec<Layer0FindingSample>, String>>()?;
+        let finding = Layer0Finding {
+            states: decimal_field(states)?,
+            earliest_samples,
+        };
+        let expected_samples = usize::try_from(finding.states)
+            .map_or(LAYER0_FINDING_SAMPLES_KEPT, |states_of_the_signature| {
+                states_of_the_signature.min(LAYER0_FINDING_SAMPLES_KEPT)
+            });
+        let samples_ascend = finding
+            .earliest_samples
+            .windows(2)
+            .all(|pair| pair[0].state_ordinal < pair[1].state_ordinal);
+        if finding.states == 0
+            || finding.states > red_states
+            || finding.earliest_samples.len() != expected_samples
+            || !samples_ascend
+        {
+            return Err(format!(
+                "发现表的一个签名形状不对（状态数 {}、判红的状态数 {red_states}、样本 {} 个、序号从小到大 {samples_ascend}）：{line:?}",
+                finding.states,
+                finding.earliest_samples.len()
+            ));
+        }
+        let signature = Layer0FindingSignature {
+            red_pass: red_pass_from_names(pass, violated)?,
+            segment: segment_from_name(segment)?,
+            publish: publish_from_field(publish)?,
+        };
+        if by_signature.insert(signature, finding).is_some() {
+            return Err(format!("发现表里同一签名出现了两次：{line:?}"));
+        }
+    }
+    if (red_states == 0) != by_signature.is_empty() {
+        return Err(format!(
+            "判红的状态数 {red_states} 与签名数 {} 对不上（有一个就都有）",
+            by_signature.len()
+        ));
+    }
+    Ok(Layer0Findings {
+        red_states,
+        by_signature,
+    })
+}
+
 /// 读回来的一片：片号、区间与计数。
 struct RestoredSlice {
     slice_index: usize,
@@ -812,6 +978,7 @@ fn restored_slice_from_body(body: &str) -> Result<RestoredSlice, String> {
         checker_not_applicable_states: invariant_counts_from_field(value(21))?,
         observed_states: count(22)?,
         observer_counts,
+        findings: findings_from_field(value(24))?,
     };
     Ok(RestoredSlice {
         slice_index: usize::try_from(count(0)?)
@@ -1069,8 +1236,8 @@ impl Drop for DeleteTheProgressFileWhenPanicking {
     }
 }
 
-/// 账本格式的版本：写进文件头，格式改了就换号，merge 读到别的号就不并。
-const SHARD_LEDGER_FORMAT: u32 = 1;
+/// 账本格式的版本：写进文件头，格式改了就换号，merge 读到别的号就不并。2：片行多了发现表（`findings=`）。
+const SHARD_LEDGER_FORMAT: u32 = 2;
 
 /// 这一片的账本放在哪：`<目录>/layer0-shard-<流名>-<i>-of-<n>.tally`。名字里不带输入指纹与计划哈希：两台的指纹或切法对不上时，
 /// merge 照样读得到这一份、报出是文件头哪一处不同，而不是报缺账本。
@@ -1510,6 +1677,388 @@ pub fn read_shard_ledgers_for_merge(
     Ok(merged)
 }
 
+/// 发现日志格式的版本：写进每一节的 begin 行，格式改了就换号。
+const FINDINGS_LOG_FORMAT: u32 = 1;
+/// 不留进度文件的枚举没有流名，begin 行的 `stream=` 写这个。
+const FINDINGS_LOG_UNNAMED_STREAM: &str = "unnamed";
+/// 定稿里每个样本的原文字段名，依次是第 1、2、3 个样本（长度跟着 [`LAYER0_FINDING_SAMPLES_KEPT`] 走：改了样本数这里编译不过）。
+const FINDINGS_LOG_SAMPLE_VIOLATION_KEYS: [&str; LAYER0_FINDING_SAMPLES_KEPT] = [
+    "sample_violation_1",
+    "sample_violation_2",
+    "sample_violation_3",
+];
+
+/// 层 0 枚举写不写发现日志、写到哪。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Layer0FindingsLog {
+    /// 不写（标准输出上的 `LAYER0_FINDING` / `LAYER0_FINDINGS` 照打）。
+    NotWritten,
+    /// 每趟枚举往这个文件末尾追加一节（[`Layer0FindingsLogSection`]）。
+    AppendedTo(PathBuf),
+}
+
+impl Layer0FindingsLog {
+    /// 从 [`LAYER0_FINDINGS_FILE_ENVIRONMENT_VARIABLE`] 取。
+    ///
+    /// # Panics
+    /// 设了却是空串：配错了就停，不悄悄不写。
+    #[must_use]
+    pub fn from_environment() -> Self {
+        Self::from_environment_value(std::env::var_os(LAYER0_FINDINGS_FILE_ENVIRONMENT_VARIABLE))
+    }
+
+    /// [`Self::from_environment`] 的判定本身：环境变量读到什么由调用方给（用例不改进程的环境变量）。
+    ///
+    /// # Panics
+    /// 同 [`Self::from_environment`]。
+    #[must_use]
+    pub fn from_environment_value(value: Option<OsString>) -> Self {
+        match value {
+            None => Self::NotWritten,
+            Some(path) => {
+                assert!(
+                    !path.is_empty(),
+                    "{LAYER0_FINDINGS_FILE_ENVIRONMENT_VARIABLE} 设了却是空串"
+                );
+                Self::AppendedTo(PathBuf::from(path))
+            }
+        }
+    }
+}
+
+/// 一节发现日志的 begin 行说的事：哪条流、整条流几个状态、是不是分片跑的一片。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Layer0FindingsLogBegin {
+    /// 续跑、分片、merge 用的流名；不留进度文件的枚举没有流名。
+    pub stream_name: Option<String>,
+    pub whole_stream_states: u64,
+    /// 分片跑一片时：第几片、这一片负责的状态数。整条流（单机跑完，或 merge）时没有：merge 的定稿与单机跑的逐字节相同。
+    pub shard: Option<(Layer0ShardOfShards, u64)>,
+}
+
+/// 同一个进程里同一时刻只开一节发现日志：跑完那一下要把这一节截到起点重写，别的节插在中间会被一起截掉。
+static FINDINGS_LOG_SECTION_OPEN_IN_THIS_PROCESS: Mutex<()> = Mutex::new(());
+
+/// 开着的一节发现日志：跑的过程中逐行追加、每行落盘（中途读得到）；跑完换成定稿（[`Self::replace_with_final_lines`]）。
+/// 没换成定稿就结束的（被杀、panic）留着已经追加的那些行，没有汇总行。
+pub struct Layer0FindingsLogSection {
+    path: PathBuf,
+    appender: File,
+    /// 这一节从文件里第几个字节起：开这一节时文件的长度。
+    section_start_in_bytes: u64,
+    _only_section_open_in_this_process: MutexGuard<'static, ()>,
+}
+
+impl Layer0FindingsLogSection {
+    /// 在 `path` 末尾开一节：先等进程里别的节写完，没有文件就建（连同目录），记下这一节的起点，追加 begin 行并落盘。
+    ///
+    /// # Panics
+    /// 建目录、打开、写、落盘失败。
+    #[must_use]
+    pub fn begin(path: &Path, begin: &Layer0FindingsLogBegin) -> Self {
+        // 锁中毒说明上一节所在的枚举 panic 了：那一节照原样留着（没有汇总行），这一节照开。
+        let only_section_open_in_this_process = FINDINGS_LOG_SECTION_OPEN_IN_THIS_PROCESS
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if let Some(directory) = path
+            .parent()
+            .filter(|directory| !directory.as_os_str().is_empty())
+        {
+            std::fs::create_dir_all(directory).unwrap_or_else(|error| {
+                panic!("建发现日志的目录 {}：{error}", directory.display())
+            });
+        }
+        let appender = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .unwrap_or_else(|error| panic!("打开发现日志 {}：{error}", path.display()));
+        let section_start_in_bytes = appender
+            .metadata()
+            .unwrap_or_else(|error| panic!("读发现日志 {} 的长度：{error}", path.display()))
+            .len();
+        let mut section = Self {
+            path: path.to_path_buf(),
+            appender,
+            section_start_in_bytes,
+            _only_section_open_in_this_process: only_section_open_in_this_process,
+        };
+        section.append_line(&findings_log_begin_line(begin));
+        section
+    }
+
+    /// 追加一行（补上换行）并落盘。
+    ///
+    /// # Panics
+    /// 写或落盘失败。
+    pub fn append_line(&mut self, line: &str) {
+        self.appender
+            .write_all(format!("{line}\n").as_bytes())
+            .unwrap_or_else(|error| panic!("写发现日志 {}：{error}", self.path.display()));
+        self.appender
+            .sync_data()
+            .unwrap_or_else(|error| panic!("落盘发现日志 {}：{error}", self.path.display()));
+    }
+
+    /// 跑完：把这一节截到起点，写定稿（每行补上换行），落盘。前面别的节不动。
+    ///
+    /// # Panics
+    /// 截短、写或落盘失败。
+    pub fn replace_with_final_lines(mut self, final_lines: &[String]) {
+        self.appender
+            .set_len(self.section_start_in_bytes)
+            .unwrap_or_else(|error| panic!("截短发现日志 {}：{error}", self.path.display()));
+        let final_section: String = final_lines.iter().map(|line| format!("{line}\n")).collect();
+        self.appender
+            .write_all(final_section.as_bytes())
+            .unwrap_or_else(|error| panic!("写发现日志 {}：{error}", self.path.display()));
+        self.appender
+            .sync_all()
+            .unwrap_or_else(|error| panic!("落盘发现日志 {}：{error}", self.path.display()));
+    }
+}
+
+/// 发现日志与 `LAYER0_FINDING` 行里的违例原文：`\` 写成 `\\`、制表符写成 `\t`、换行写成 `\n`、回车写成 `\r`，其余原样——
+/// 一条一行、按制表符切得开。
+#[must_use]
+pub fn escaped_finding_text(text: &str) -> String {
+    let mut escaped = String::with_capacity(text.len());
+    for character in text.chars() {
+        match character {
+            '\\' => escaped.push_str("\\\\"),
+            '\t' => escaped.push_str("\\t"),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            unescaped_character => escaped.push(unescaped_character),
+        }
+    }
+    escaped
+}
+
+/// [`escaped_finding_text`] 反过来。
+///
+/// # Errors
+/// `\` 后面跟的不是 `\`、`t`、`n`、`r` 之一，或 `\` 在末尾。
+pub fn unescaped_finding_text(text: &str) -> Result<String, String> {
+    let mut unescaped = String::with_capacity(text.len());
+    let mut characters = text.chars();
+    while let Some(character) = characters.next() {
+        if character != '\\' {
+            unescaped.push(character);
+            continue;
+        }
+        match characters.next() {
+            Some('\\') => unescaped.push('\\'),
+            Some('t') => unescaped.push('\t'),
+            Some('n') => unescaped.push('\n'),
+            Some('r') => unescaped.push('\r'),
+            Some(unknown_escape) => {
+                return Err(format!("转义解不开：\\{unknown_escape}（{text:?}）"));
+            }
+            None => return Err(format!("转义解不开：\\ 在末尾（{text:?}）")),
+        }
+    }
+    Ok(unescaped)
+}
+
+/// 签名的四样（pass、violated、段、发布），发现日志与 `LAYER0_FINDING` 行同一个写法。
+fn finding_signature_fields(signature: &Layer0FindingSignature) -> [(&'static str, String); 4] {
+    [
+        ("pass", signature.red_pass.pass_name().to_string()),
+        ("violated", signature.red_pass.violated_names().join(",")),
+        ("segment", signature.segment.name()),
+        (
+            "publish",
+            signature.publish.name_with_the_root_write_index(),
+        ),
+    ]
+}
+
+/// 发现日志的一行：种类，再逐个 `\t<key>=<value>`。
+fn tab_separated_findings_line(kind: &str, fields: &[(&str, String)]) -> String {
+    fields.iter().fold(kind.to_string(), |line, (key, value)| {
+        format!("{line}\t{key}={value}")
+    })
+}
+
+/// 标准输出的一行：前缀，再逐个 ` <key>=<value>`。
+fn space_separated_findings_line(prefix: &str, fields: &[(&str, String)]) -> String {
+    fields
+        .iter()
+        .fold(prefix.to_string(), |line, (key, value)| {
+            format!("{line} {key}={value}")
+        })
+}
+
+fn new_signature_fields(
+    number: usize,
+    signature: &Layer0FindingSignature,
+    first_sample: &Layer0FindingSample,
+) -> Vec<(&'static str, String)> {
+    let mut fields = vec![("finding", number.to_string())];
+    fields.extend(finding_signature_fields(signature));
+    fields.push(("first_state", first_sample.state_ordinal.to_string()));
+    fields.push((
+        "first_violation",
+        escaped_finding_text(&first_sample.violation),
+    ));
+    fields
+}
+
+fn threshold_fields(
+    number: usize,
+    signature: &Layer0FindingSignature,
+    states_at_least: u64,
+) -> Vec<(&'static str, String)> {
+    let mut fields = vec![("finding", number.to_string())];
+    fields.extend(finding_signature_fields(signature));
+    fields.push(("states_at_least", states_at_least.to_string()));
+    fields
+}
+
+/// 一节的 begin 行：`layer0_findings_begin`，字段 `format=1`、`stream=<流名或 unnamed>`、`states=<整条流>`，
+/// 分片跑一片另带 `shard=`、`shard_states=`。
+#[must_use]
+pub fn findings_log_begin_line(begin: &Layer0FindingsLogBegin) -> String {
+    let mut fields = vec![
+        ("format", FINDINGS_LOG_FORMAT.to_string()),
+        (
+            "stream",
+            begin
+                .stream_name
+                .clone()
+                .unwrap_or_else(|| FINDINGS_LOG_UNNAMED_STREAM.to_string()),
+        ),
+        ("states", begin.whole_stream_states.to_string()),
+    ];
+    if let Some((shard_of_this_run, states_of_this_shard)) = begin.shard {
+        fields.push(("shard", shard_of_this_run.text()));
+        fields.push(("shard_states", states_of_this_shard.to_string()));
+    }
+    tab_separated_findings_line("layer0_findings_begin", &fields)
+}
+
+/// 跑的过程中：一个签名第一次出现（发现日志那一行）。
+#[must_use]
+pub fn findings_log_new_signature_line(
+    number: usize,
+    signature: &Layer0FindingSignature,
+    first_sample: &Layer0FindingSample,
+) -> String {
+    tab_separated_findings_line(
+        "layer0_finding_new",
+        &new_signature_fields(number, signature, first_sample),
+    )
+}
+
+/// 跑的过程中：一个签名的状态数跨过一级台阶（发现日志那一行）。
+#[must_use]
+pub fn findings_log_threshold_line(
+    number: usize,
+    signature: &Layer0FindingSignature,
+    states_at_least: u64,
+) -> String {
+    tab_separated_findings_line(
+        "layer0_finding_threshold",
+        &threshold_fields(number, signature, states_at_least),
+    )
+}
+
+/// 标准输出：一个签名第一次出现，`LAYER0_FINDING event=new …`（`first_violation=` 一直到行尾）。
+#[must_use]
+pub fn findings_standard_output_new_signature_line(
+    number: usize,
+    signature: &Layer0FindingSignature,
+    first_sample: &Layer0FindingSample,
+) -> String {
+    let mut fields = vec![("event", "new".to_string())];
+    fields.extend(new_signature_fields(number, signature, first_sample));
+    space_separated_findings_line("LAYER0_FINDING", &fields)
+}
+
+/// 标准输出：一个签名的状态数跨过一级台阶，`LAYER0_FINDING event=threshold …`。
+#[must_use]
+pub fn findings_standard_output_threshold_line(
+    number: usize,
+    signature: &Layer0FindingSignature,
+    states_at_least: u64,
+) -> String {
+    let mut fields = vec![("event", "threshold".to_string())];
+    fields.extend(threshold_fields(number, signature, states_at_least));
+    space_separated_findings_line("LAYER0_FINDING", &fields)
+}
+
+/// 标准输出：一趟枚举跑完，`LAYER0_FINDINGS signatures=… red_states=… states=…`（分片跑一片时调用方另接上分片的字段）。
+#[must_use]
+pub fn findings_standard_output_summary_line(
+    findings: &Layer0Findings,
+    states_of_this_run: u64,
+) -> String {
+    space_separated_findings_line(
+        "LAYER0_FINDINGS",
+        &[
+            ("signatures", findings.by_signature.len().to_string()),
+            ("red_states", findings.red_states.to_string()),
+            ("states", states_of_this_run.to_string()),
+        ],
+    )
+}
+
+/// 一节的定稿：begin 行，每个签名一行 `layer0_finding`（号按 [`Layer0Findings::signatures_in_first_state_order`]），
+/// 末尾一行 `layer0_findings_summary`。只看发现表与 begin：与线程数、切法、续跑与否无关。
+#[must_use]
+pub fn findings_log_final_lines(
+    begin: &Layer0FindingsLogBegin,
+    findings: &Layer0Findings,
+    states_of_this_section: u64,
+) -> Vec<String> {
+    let ordered = findings.signatures_in_first_state_order();
+    let mut lines = vec![findings_log_begin_line(begin)];
+    for (position, (signature, finding)) in ordered.iter().enumerate() {
+        let mut fields = vec![("finding", (position + 1).to_string())];
+        fields.extend(finding_signature_fields(signature));
+        fields.push(("states", finding.states.to_string()));
+        fields.push((
+            "sample_states",
+            finding
+                .earliest_samples
+                .iter()
+                .map(|sample| sample.state_ordinal.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
+        ));
+        for (key, sample) in FINDINGS_LOG_SAMPLE_VIOLATION_KEYS
+            .iter()
+            .zip(&finding.earliest_samples)
+        {
+            fields.push((key, escaped_finding_text(&sample.violation)));
+        }
+        lines.push(tab_separated_findings_line("layer0_finding", &fields));
+    }
+    let states_by_finding: Vec<String> = ordered
+        .iter()
+        .enumerate()
+        .map(|(position, (_signature, finding))| format!("{}:{}", position + 1, finding.states))
+        .collect();
+    lines.push(tab_separated_findings_line(
+        "layer0_findings_summary",
+        &[
+            ("signatures", ordered.len().to_string()),
+            ("red_states", findings.red_states.to_string()),
+            ("states", states_of_this_section.to_string()),
+            (
+                "states_by_finding",
+                if states_by_finding.is_empty() {
+                    "none".to_string()
+                } else {
+                    states_by_finding.join(",")
+                },
+            ),
+        ],
+    ));
+    lines
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1570,6 +2119,78 @@ mod tests {
             checker_not_applicable_states: BTreeMap::from([("I-7.9", 14)]),
             observed_states,
             observer_counts,
+            findings: findings_with_every_kind_of_signature(),
+        }
+    }
+
+    /// 四遍各一个签名（段、发布各种写法都有），样本原文带制表符、换行、回车、反斜杠、空格、`=`、`,`、`:`：往返之后逐项相同。
+    fn findings_with_every_kind_of_signature() -> Layer0Findings {
+        let sample = |state_ordinal: u64, violation: &str| Layer0FindingSample {
+            state_ordinal,
+            violation: violation.to_string(),
+        };
+        Layer0Findings {
+            red_states: 2,
+            by_signature: BTreeMap::from([
+                (
+                    Layer0FindingSignature {
+                        red_pass: Layer0RedPass::JournalConsultedOracle(
+                            Layer0OracleViolationKind::WrongContent,
+                        ),
+                        segment: Layer0SegmentOfState::Segment(3),
+                        publish: Layer0PublishOfState::UpToTheRootOf {
+                            root_write_index: 7,
+                            instance: InstanceGeneration(2),
+                            checkpoint_txg: CheckpointTxg(9),
+                        },
+                    },
+                    Layer0Finding {
+                        states: 2,
+                        earliest_samples: vec![
+                            sample(2, "读回的内容不对\t（制表符）\n第二行\r\\ 反斜杠 = , :"),
+                            sample(3, "第二个样本"),
+                        ],
+                    },
+                ),
+                (
+                    Layer0FindingSignature {
+                        red_pass: Layer0RedPass::JournalIgnoredOracle(
+                            Layer0OracleViolationKind::NoRootChosen,
+                        ),
+                        segment: Layer0SegmentOfState::Segment(0),
+                        publish: Layer0PublishOfState::AfterTheLastRoot,
+                    },
+                    Layer0Finding {
+                        states: 1,
+                        earliest_samples: vec![sample(2, "没择到根")],
+                    },
+                ),
+                (
+                    Layer0FindingSignature {
+                        red_pass: Layer0RedPass::PoolChecker(vec!["I-3.1", "I-7.9"]),
+                        segment: Layer0SegmentOfState::AllPersisted,
+                        publish: Layer0PublishOfState::EveryWritePersisted,
+                    },
+                    Layer0Finding {
+                        states: 1,
+                        earliest_samples: vec![sample(3, "I-3.1：细节；I-7.9：细节")],
+                    },
+                ),
+                (
+                    Layer0FindingSignature {
+                        red_pass: Layer0RedPass::RecordChecker(RecordCheck {
+                            root_without_record: true,
+                            claimed_state_missing_unit: true,
+                        }),
+                        segment: Layer0SegmentOfState::Segment(1),
+                        publish: Layer0PublishOfState::AfterTheLastRoot,
+                    },
+                    Layer0Finding {
+                        states: 1,
+                        earliest_samples: vec![sample(2, "两条判据都成立")],
+                    },
+                ),
+            ]),
         }
     }
 
@@ -1907,5 +2528,90 @@ mod tests {
                 .contains("文件头对不上"),
             "单机与分片的进度文件不混"
         );
+    }
+
+    /// 片行里的发现表形状不对（样本多于状态数、样本序号倒着、签名的状态数多于判红的状态数、有签名而判红的状态数是 0）：
+    /// 校验和对得上也整份作废，不带着坏的发现表并片。
+    #[test]
+    fn a_findings_table_whose_shape_does_not_hold_voids_the_whole_file() {
+        let with_findings = |findings: Layer0Findings| {
+            let mut tally = tally_with_every_field_set(2, 2);
+            tally.findings = findings;
+            file_with(&[header(true), slice_line(1, &(2..4), &tally)], true)
+        };
+        let well_formed = findings_with_every_kind_of_signature();
+        let first_signature = well_formed
+            .by_signature
+            .keys()
+            .next()
+            .expect("有签名")
+            .clone();
+        let mut more_samples_than_states = well_formed.clone();
+        more_samples_than_states
+            .by_signature
+            .get_mut(&first_signature)
+            .expect("有这个签名")
+            .states = 1;
+        let mut samples_in_reverse = well_formed.clone();
+        samples_in_reverse
+            .by_signature
+            .get_mut(&first_signature)
+            .expect("有这个签名")
+            .earliest_samples
+            .reverse();
+        let mut more_states_than_red_states = well_formed.clone();
+        more_states_than_red_states.red_states = 1;
+        let mut signatures_without_red_states = well_formed;
+        signatures_without_red_states.red_states = 0;
+        for (broken, expected_reason) in [
+            (more_samples_than_states, "形状不对"),
+            (samples_in_reverse, "形状不对"),
+            (more_states_than_red_states, "形状不对"),
+            (signatures_without_red_states, "形状不对"),
+        ] {
+            let voided = restored_slices_of(&with_findings(broken), &settings(), &plan(true))
+                .expect_err("发现表形状不对整份作废");
+            assert!(voided.contains(expected_reason), "{voided}");
+        }
+    }
+
+    /// 发现日志的环境变量：没设不写，设了写到那个文件，设了空串停下。
+    #[test]
+    fn the_environment_decides_whether_the_findings_log_is_written() {
+        assert_eq!(
+            Layer0FindingsLog::from_environment_value(None),
+            Layer0FindingsLog::NotWritten
+        );
+        assert_eq!(
+            Layer0FindingsLog::from_environment_value(Some(OsString::from("/tmp/findings.tsv"))),
+            Layer0FindingsLog::AppendedTo(PathBuf::from("/tmp/findings.tsv"))
+        );
+        let empty = std::panic::catch_unwind(|| {
+            Layer0FindingsLog::from_environment_value(Some(OsString::new()))
+        })
+        .expect_err("设了空串要停下");
+        let message = empty.downcast_ref::<String>().cloned().unwrap_or_default();
+        assert!(
+            message.contains(LAYER0_FINDINGS_FILE_ENVIRONMENT_VARIABLE),
+            "停下时说清是哪个环境变量：{message}"
+        );
+    }
+
+    /// 违例原文转义之后一行装得下、按制表符切得开，反过来解得回原样；`\` 后面跟别的、或 `\` 在末尾解不开。
+    #[test]
+    fn escaped_finding_text_fits_one_tab_separated_field_and_reads_back() {
+        let original = "第一行\t制表符\n第二行\r回车 \\ 反斜杠 \\t 字面的反斜杠 t";
+        let escaped = escaped_finding_text(original);
+        assert!(
+            !escaped.contains(['\t', '\n', '\r']),
+            "转义之后没有制表符、换行、回车：{escaped:?}"
+        );
+        assert_eq!(
+            unescaped_finding_text(&escaped).as_deref(),
+            Ok(original),
+            "解得回原样"
+        );
+        assert!(unescaped_finding_text("末尾\\").is_err());
+        assert!(unescaped_finding_text("\\x").is_err());
     }
 }

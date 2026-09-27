@@ -7241,15 +7241,21 @@ fn run_ledger_positive_controls(geometry: &Geometry, arm: &str) {
                 "unit=allocation_record_tree_root shared=false",
             );
             let tree_table_keys = location_keys(&record.tree_table.locations);
-            let ranges = ranges_of_both_copies(&record.tree_table.locations, "T");
-            let run = run_instrumented_mount_writable(&node.pool, &parameters, &ranges, None, None);
+            let tree_table_ranges = ranges_of_both_copies(&record.tree_table.locations, "T");
+            let tree_table_run = run_instrumented_mount_writable(
+                &node.pool,
+                &parameters,
+                &tree_table_ranges,
+                None,
+                None,
+            );
             emit_positive_control(
                 arm,
                 "PC1-b",
                 &node.label,
                 abandoned_root,
-                &ranges,
-                &run,
+                &tree_table_ranges,
+                &tree_table_run,
                 through(&tree_table_keys_of, &tree_table_keys),
                 &format!(
                     "unit=tree_table shared={}",
@@ -7719,8 +7725,11 @@ impl BlockDevice for ThirdRunDevice {
         self.inner.read_at(offset, buffer)?;
         for (range_offset, range_length) in zeroed {
             let start = range_offset.saturating_sub(offset.0);
-            let end = (range_offset + range_length).saturating_sub(offset.0).min(length);
-            buffer[usize::try_from(start).expect("缓冲区里")..usize::try_from(end).expect("缓冲区里")]
+            let end = (range_offset + range_length)
+                .saturating_sub(offset.0)
+                .min(length);
+            buffer[usize::try_from(start).expect("缓冲区里")
+                ..usize::try_from(end).expect("缓冲区里")]
                 .fill(0);
         }
         Ok(())
@@ -7944,8 +7953,11 @@ impl ImageReader for FirstPassReader<'_> {
         let mut bytes = ImageReader::read(self.pool, device, offset, length)?;
         for fault in active {
             let start = fault.offset.saturating_sub(offset);
-            let end = (fault.offset + fault.length).saturating_sub(offset).min(length_u64);
-            bytes[usize::try_from(start).expect("读内")..usize::try_from(end).expect("读内")].fill(0);
+            let end = (fault.offset + fault.length)
+                .saturating_sub(offset)
+                .min(length_u64);
+            bytes[usize::try_from(start).expect("读内")..usize::try_from(end).expect("读内")]
+                .fill(0);
         }
         Some(bytes)
     }
@@ -7987,8 +7999,11 @@ fn device_decode(reader: &dyn ImageReader, geometry: &PoolGeometry) -> DeviceDec
     let mut records = BTreeMap::new();
     for device in reader.devices() {
         for index in 0..ring_slots {
-            let Some(bytes) = reader.read(device, ring_start + index * JOURNAL_RECORD_BYTES, record_bytes)
-            else {
+            let Some(bytes) = reader.read(
+                device,
+                ring_start + index * JOURNAL_RECORD_BYTES,
+                record_bytes,
+            ) else {
                 continue;
             };
             if let Ok(view) =
@@ -8002,7 +8017,12 @@ fn device_decode(reader: &dyn ImageReader, geometry: &PoolGeometry) -> DeviceDec
         .into_iter()
         .flat_map(|(device, slots)| {
             slots.into_iter().map(move |(view, _)| {
-                (device, view.slot_generation, view.journal_tail, view.journal_instance)
+                (
+                    device,
+                    view.slot_generation,
+                    view.journal_tail,
+                    view.journal_instance,
+                )
             })
         })
         .collect();
@@ -8206,7 +8226,10 @@ fn device_replay(
         .map(|record| record.counter)
         .collect();
     if anchors.len() > 1 {
-        return Err(format!("所选根 {root:?} 那次发布带末条标志的记录 {} 条", anchors.len()));
+        return Err(format!(
+            "所选根 {root:?} 那次发布带末条标志的记录 {} 条",
+            anchors.len()
+        ));
     }
     let mut above: Vec<&singlefs_checker::JournalRecordView> = decoded
         .records
@@ -8351,10 +8374,7 @@ fn device_judgement(
     geometry: &PoolGeometry,
     faults: &[ThirdRunFault],
 ) -> DeviceJudgement {
-    let reader = FirstPassReader {
-        pool: twin,
-        faults,
-    };
+    let reader = FirstPassReader { pool: twin, faults };
     let decoded = device_decode(&reader, geometry);
     let chosen = device_chosen_root(&decoded);
     let mut error = None;
@@ -8402,7 +8422,9 @@ fn device_judgement(
 }
 
 fn key_text(key: Option<TimelineRoot>) -> String {
-    key.map_or("none".to_string(), |(instance, txg)| format!("{instance}:{txg}"))
+    key.map_or("none".to_string(), |(instance, txg)| {
+        format!("{instance}:{txg}")
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -8534,7 +8556,11 @@ fn record_confirmation(
 }
 
 /// 一次可写挂载写下的根（写行、暖机、抬 F）进时间线，沿用 `content_number`。
-fn push_the_publishes_of_a_mount(history: &mut ThirdRunHistory, mounted: &Mounted, content_number: u64) {
+fn push_the_publishes_of_a_mount(
+    history: &mut ThirdRunHistory,
+    mounted: &Mounted,
+    content_number: u64,
+) {
     let mut roots = vec![root_pair(mounted.output.row_publish.root())];
     roots.extend(
         mounted
@@ -8544,7 +8570,12 @@ fn push_the_publishes_of_a_mount(history: &mut ThirdRunHistory, mounted: &Mounte
             .map(|publish| root_pair(publish.root())),
     );
     for raised in mounted.output.space_admission.floor_raises() {
-        roots.extend(raised.publishes.iter().map(|publish| root_pair(&publish.root)));
+        roots.extend(
+            raised
+                .publishes
+                .iter()
+                .map(|publish| root_pair(&publish.root)),
+        );
     }
     for root in roots {
         history.push_carried(root, content_number);
@@ -8567,10 +8598,14 @@ fn third_run_change_content(
             write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60 * content_number,
         };
         match &session.current {
-            PoolVersion::WithFile(previous) => {
-                publish_overwrite(&mut writer, &mut session.allocator, previous, file, session.instance)
-                    .map_err(|error| format!("覆盖写: {error:?}"))?
-            }
+            PoolVersion::WithFile(previous) => publish_overwrite(
+                &mut writer,
+                &mut session.allocator,
+                previous,
+                file,
+                session.instance,
+            )
+            .map_err(|error| format!("覆盖写: {error:?}"))?,
             PoolVersion::WithoutFile(version) => publish_first_file(
                 &mut writer,
                 &mut session.allocator,
@@ -8590,7 +8625,10 @@ fn third_run_change_content(
 }
 
 /// P(n1, ·) 的前半：mkfs → `mount_writable`（实例 1）→ 首个文件 → n1 次覆盖写，会话开着。
-fn third_run_history_start(geometry: &Geometry, overwrites: u64) -> Result<ThirdRunHistory, String> {
+fn third_run_history_start(
+    geometry: &Geometry,
+    overwrites: u64,
+) -> Result<ThirdRunHistory, String> {
     let parameters = parameters_for(geometry);
     let mut devices = new_devices(IMAGE_BYTES);
     let genesis =
@@ -8715,7 +8753,10 @@ fn third_run_abandonment_faults(
             }
         }
         ReplayBreak::FirstCopyOfTheFirstNamedUnit | ReplayBreak::FirstNamedUnit => {
-            let Some(named) = records.iter().find_map(|(_, _, record)| record.named.first()) else {
+            let Some(named) = records
+                .iter()
+                .find_map(|(_, _, record)| record.named.first())
+            else {
                 return Ok(None);
             };
             let copies = match replay_break {
@@ -8729,7 +8770,10 @@ fn third_run_abandonment_faults(
                     length: SLOT_BYTES_LOCAL,
                     form,
                     duration,
-                    label: format!("unit(device={},slot={})", location.device.0, location.slot.0),
+                    label: format!(
+                        "unit(device={},slot={})",
+                        location.device.0, location.slot.0
+                    ),
                 });
             }
         }
@@ -8768,7 +8812,8 @@ impl TestedMountSummary {
             waits: call.waits,
             chosen: mounted.map(|mounted| root_pair(&mounted.output.chosen_root)),
             effective: mounted.map(|mounted| root_pair(&mounted.output.effective_root)),
-            abandoned_roots_unreadable: mounted.map(|mounted| mounted.output.abandoned_roots_unreadable),
+            abandoned_roots_unreadable: mounted
+                .map(|mounted| mounted.output.abandoned_roots_unreadable),
             isolated: mounted.map(|mounted| {
                 mounted
                     .output
@@ -8912,12 +8957,15 @@ fn evaluate_cell_loss(
         }
         (Some(_) | None, _) => false,
     };
-    let landing_unit_bytes: Result<UnitBytesOfAVersion, String> = match (read_back_root, &base_geometry) {
-        (Some(landing), Ok(base_pool_geometry)) if landing_in_base => root_record_of(base, base_pool_geometry, landing)
-            .ok_or_else(|| "根记录读不出".to_string())
-            .and_then(|record| unit_bytes_referenced_by(base, &record)),
-        (Some(_) | None, _) => Ok(BTreeMap::new()),
-    };
+    let landing_unit_bytes: Result<UnitBytesOfAVersion, String> =
+        match (read_back_root, &base_geometry) {
+            (Some(landing), Ok(base_pool_geometry)) if landing_in_base => {
+                root_record_of(base, base_pool_geometry, landing)
+                    .ok_or_else(|| "根记录读不出".to_string())
+                    .and_then(|record| unit_bytes_referenced_by(base, &record))
+            }
+            (Some(_) | None, _) => Ok(BTreeMap::new()),
+        };
     let overwritten_in = |version: &UnitBytesOfAVersion| -> u64 {
         version
             .iter()
@@ -8962,7 +9010,10 @@ fn evaluate_cell_loss(
                             length: u64::from(geometry.physical_block_size),
                             form: UnreadableForm::ReadFails,
                             duration: FaultDuration::WholeCall,
-                            label: format!("tail_root{}", key_text(Some((view.instance, view.checkpoint_txg)))),
+                            label: format!(
+                                "tail_root{}",
+                                key_text(Some((view.instance, view.checkpoint_txg)))
+                            ),
                         })
                 })
                 .collect();
@@ -9048,7 +9099,11 @@ impl ThirdRunFamilySummary {
         if loss.out_of_ring_overwritten > 0 {
             self.out_of_ring_overwrite_cells += 1;
         }
-        if loss.landing_overwritten.parse::<u64>().is_ok_and(|count| count > 0) {
+        if loss
+            .landing_overwritten
+            .parse::<u64>()
+            .is_ok_and(|count| count > 0)
+        {
             self.landing_overwrite_cells += 1;
         }
         if rollback {
@@ -9146,14 +9201,13 @@ fn first_txg_expected_by_the_rule_of_today(
         },
         geometry,
     );
-    let records = device_decode(
-        &FirstPassReader {
-            pool: twin,
-            faults,
-        },
-        geometry,
-    );
-    let highest_root = roots.root_keys.iter().map(|(_, txg)| *txg).max().unwrap_or(0);
+    let records = device_decode(&FirstPassReader { pool: twin, faults }, geometry);
+    let highest_root = roots
+        .root_keys
+        .iter()
+        .map(|(_, txg)| *txg)
+        .max()
+        .unwrap_or(0);
     let highest_record = records
         .records
         .values()
@@ -9179,7 +9233,8 @@ fn today_cross_checks(
     if let Ok(mounted) = &tested.outcome {
         let crates_chosen = root_pair(&mounted.output.chosen_root);
         let crates_effective = root_pair(&mounted.output.effective_root);
-        if judgement.chosen != Some(crates_chosen) || judgement.effective != Some(crates_effective) {
+        if judgement.chosen != Some(crates_chosen) || judgement.effective != Some(crates_effective)
+        {
             summary.stop_condition_four_mismatches.push(format!(
                 "{label}: 择根 / E 装置 {} / {}，crates {} / {}",
                 key_text(judgement.chosen),
@@ -9191,7 +9246,9 @@ fn today_cross_checks(
     }
     let devices = devices_from_pool(base, IMAGE_BYTES);
     let Ok(geometry) = independent_geometry(base) else {
-        summary.stop_condition_four_mismatches.push(format!("{label}: 几何解不出"));
+        summary
+            .stop_condition_four_mismatches
+            .push(format!("{label}: 几何解不出"));
         return;
     };
     let decoded = device_decode(base, &geometry);
@@ -9251,14 +9308,21 @@ fn held_once_durations_of(arm: &str) -> Vec<(FaultDuration, bool)> {
     ];
     match ThirdRunCandidate::of(arm) {
         Some(ThirdRunCandidate::Yi) => {
-            durations.push((FaultDuration::UntilVirtualTime(THIRD_RUN_VIRTUAL_INTERVAL), false));
+            durations.push((
+                FaultDuration::UntilVirtualTime(THIRD_RUN_VIRTUAL_INTERVAL),
+                false,
+            ));
             durations.push((
                 FaultDuration::UntilVirtualTime(2 * THIRD_RUN_VIRTUAL_INTERVAL),
                 false,
             ));
         }
-        Some(ThirdRunCandidate::Today | ThirdRunCandidate::Jia | ThirdRunCandidate::Bing) | None => {
-            durations.push((FaultDuration::UntilVirtualTime(THIRD_RUN_VIRTUAL_INTERVAL), true));
+        Some(ThirdRunCandidate::Today | ThirdRunCandidate::Jia | ThirdRunCandidate::Bing)
+        | None => {
+            durations.push((
+                FaultDuration::UntilVirtualTime(THIRD_RUN_VIRTUAL_INTERVAL),
+                true,
+            ));
         }
     }
     durations
@@ -9294,7 +9358,9 @@ fn run_tested_mount(
             if got != expected {
                 family_summary
                     .failure_clause_thirteen_findings
-                    .push(format!("{label}: 写行那次发布 txg {got}，按今天的规则 {expected}"));
+                    .push(format!(
+                        "{label}: 写行那次发布 txg {got}，按今天的规则 {expected}"
+                    ));
             }
         }
     }
@@ -9467,7 +9533,14 @@ fn run_third_run_held_once_family(geometry: &Geometry, arm: &str) {
                             continue;
                         }
                     };
-                    let tested = match run_tested_mount(arm, &base, &parameters, &faults, &head, &mut summary) {
+                    let tested = match run_tested_mount(
+                        arm,
+                        &base,
+                        &parameters,
+                        &faults,
+                        &head,
+                        &mut summary,
+                    ) {
                         Ok(tested) => tested,
                         Err(error) => {
                             emit_result(&format!(
@@ -9481,8 +9554,9 @@ fn run_third_run_held_once_family(geometry: &Geometry, arm: &str) {
                         &root_slots,
                         u64::from(pool_geometry.physical_block_size),
                     );
-                    let barriers = first_root_write
-                        .map_or(0, |index| barriers_before_write(&tested.call.applied, index + 1));
+                    let barriers = first_root_write.map_or(0, |index| {
+                        barriers_before_write(&tested.call.applied, index + 1)
+                    });
                     let cut_cells_expected = if only_the_uncut_cell {
                         1
                     } else {
@@ -9497,7 +9571,10 @@ fn run_third_run_held_once_family(geometry: &Geometry, arm: &str) {
                             .is_some_and(|number| number < last_confirmed);
                     *summary
                         .tested_classes
-                        .entry(format!("{}:{}", tested.summary.class, tested.summary.member))
+                        .entry(format!(
+                            "{}:{}",
+                            tested.summary.class, tested.summary.member
+                        ))
                         .or_insert(0) += 1;
                     let (hidden_in_ring_after, hidden_abandoned_after) =
                         hidden_root_after_the_tested_mount(&tested.call, hidden);
@@ -9605,7 +9682,11 @@ fn run_third_run_held_once_family(geometry: &Geometry, arm: &str) {
                                     &base,
                                     &failed.pool_after,
                                     &parameters,
-                                    &format!("{} fired={}", failed_summary.render("a"), failed.injected_failure_fired),
+                                    &format!(
+                                        "{} fired={}",
+                                        failed_summary.render("a"),
+                                        failed.injected_failure_fired
+                                    ),
                                     failed_rollback,
                                     failed_ok,
                                     false,
@@ -9636,7 +9717,11 @@ fn run_third_run_held_once_family(geometry: &Geometry, arm: &str) {
                                     &base,
                                     &failed.pool_after,
                                     &parameters,
-                                    &format!("{} fired={}", failed_summary.render("a"), failed.injected_failure_fired),
+                                    &format!(
+                                        "{} fired={}",
+                                        failed_summary.render("a"),
+                                        failed.injected_failure_fired
+                                    ),
                                     failed_rollback,
                                     failed_ok,
                                     false,
@@ -9673,7 +9758,8 @@ fn tail_durations_of(arm: &str) -> Vec<FaultDuration> {
             FaultDuration::WholeCall,
             FaultDuration::UntilVirtualTime(THIRD_RUN_VIRTUAL_INTERVAL),
         ],
-        Some(ThirdRunCandidate::Today | ThirdRunCandidate::Jia | ThirdRunCandidate::Bing) | None => {
+        Some(ThirdRunCandidate::Today | ThirdRunCandidate::Jia | ThirdRunCandidate::Bing)
+        | None => {
             vec![FaultDuration::WholeCall]
         }
     }
@@ -9728,7 +9814,14 @@ fn run_third_run_tail_family(geometry: &Geometry, arm: &str) {
                         ));
                         continue;
                     };
-                    let tested = match run_tested_mount(arm, &base, &parameters, &faults, &head, &mut summary) {
+                    let tested = match run_tested_mount(
+                        arm,
+                        &base,
+                        &parameters,
+                        &faults,
+                        &head,
+                        &mut summary,
+                    ) {
                         Ok(tested) => tested,
                         Err(error) => {
                             emit_result(&format!(
@@ -9766,7 +9859,10 @@ fn run_third_run_tail_family(geometry: &Geometry, arm: &str) {
                         *cells_by_duration.entry(duration.name()).or_insert(0) += 1;
                         *summary
                             .tested_classes
-                            .entry(format!("{}:{}", tested.summary.class, tested.summary.member))
+                            .entry(format!(
+                                "{}:{}",
+                                tested.summary.class, tested.summary.member
+                            ))
                             .or_insert(0) += 1;
                         if not_reached {
                             if arm == "today" {
@@ -9785,7 +9881,11 @@ fn run_third_run_tail_family(geometry: &Geometry, arm: &str) {
                                 let effective_content = history
                                     .content_number_of(root_pair(&mounted.output.effective_root))
                                     .unwrap_or(0);
-                                push_the_publishes_of_a_mount(&mut history, mounted, effective_content);
+                                push_the_publishes_of_a_mount(
+                                    &mut history,
+                                    mounted,
+                                    effective_content,
+                                );
                                 history.session = Some(Session {
                                     allocator: mounted.allocator.clone(),
                                     current: mounted.current.clone(),
@@ -9804,14 +9904,24 @@ fn run_third_run_tail_family(geometry: &Geometry, arm: &str) {
                                 }
                                 match failure {
                                     None => format!("done:{done}"),
-                                    Some(error) => format!("failed_after:{done}:{}", error_member_of_debug(&error)),
+                                    Some(error) => format!(
+                                        "failed_after:{done}:{}",
+                                        error_member_of_debug(&error)
+                                    ),
                                 }
                             }
                             Err(_) => "refused_not_done".to_string(),
                         };
                         let _ = third_run_close(&mut history, &parameters, Closing::ProcessExit);
-                        let remount = run_third_run_mount_writable(&history.pool, &parameters, &[], None, None);
-                        let remount_class = third_run_outcome_class(&remount.outcome, remount.write_calls);
+                        let remount = run_third_run_mount_writable(
+                            &history.pool,
+                            &parameters,
+                            &[],
+                            None,
+                            None,
+                        );
+                        let remount_class =
+                            third_run_outcome_class(&remount.outcome, remount.write_calls);
                         let first_new_instance = hidden.0 + 1;
                         let loss = evaluate_cell_loss(
                             &history,
@@ -9840,9 +9950,9 @@ fn run_third_run_tail_family(geometry: &Geometry, arm: &str) {
         let registered = 4 * 2 * 2 * 4;
         let passed = *cells == registered;
         if !passed {
-            summary
-                .formula_mismatches
-                .push(format!("H1e 时长 {duration}: {cells} 格，7.2 钉 {registered}"));
+            summary.formula_mismatches.push(format!(
+                "H1e 时长 {duration}: {cells} 格，7.2 钉 {registered}"
+            ));
         }
         emit_result(&format!(
             "name=r3_section_seven_two_anchor arm={arm} item=\"H1e 每种时长的格数 4×2×2×4\" duration={duration} computed={cells} registered={registered} verdict={}",
@@ -9898,7 +10008,12 @@ fn run_third_run_positive_control_newer(geometry: &Geometry, arm: &str) {
     let mut history = match third_run_history_start(geometry, 1) {
         Ok(history) => history,
         Err(error) => {
-            emit_third_run_positive_control(arm, "PC-N", "not_constructible", &format!("reason={error:?}"));
+            emit_third_run_positive_control(
+                arm,
+                "PC-N",
+                "not_constructible",
+                &format!("reason={error:?}"),
+            );
             return;
         }
     };
@@ -9923,12 +10038,23 @@ fn run_third_run_positive_control_newer(geometry: &Geometry, arm: &str) {
             ReplayBreak::EveryRecord,
             duration,
         ) else {
-            emit_third_run_positive_control(arm, "PC-N", "not_constructible", "reason=\"落点造不出\"");
+            emit_third_run_positive_control(
+                arm,
+                "PC-N",
+                "not_constructible",
+                "reason=\"落点造不出\"",
+            );
             continue;
         };
         let mut scratch = ThirdRunFamilySummary::default();
-        let Ok(tested) = run_tested_mount(arm, &base, &parameters, &faults, "PC-N", &mut scratch) else {
-            emit_third_run_positive_control(arm, "PC-N", "not_constructible", "reason=\"起始镜像几何解不出\"");
+        let Ok(tested) = run_tested_mount(arm, &base, &parameters, &faults, "PC-N", &mut scratch)
+        else {
+            emit_third_run_positive_control(
+                arm,
+                "PC-N",
+                "not_constructible",
+                "reason=\"起始镜像几何解不出\"",
+            );
             continue;
         };
         emit_scratch_findings("pc_n", arm, &scratch);
@@ -9943,11 +10069,16 @@ fn run_third_run_positive_control_newer(geometry: &Geometry, arm: &str) {
             .outcome
             .is_ok()
             .then(|| abandoned_roots_on(&tested.call.pool_after));
-        let abandoned_after = abandoned_after_reading
-            .as_ref()
-            .is_some_and(|reading| reading.as_ref().is_ok_and(|abandoned| abandoned.contains(&hidden)));
-        let hidden_in_ring_after = independent_geometry(&tested.call.pool_after)
-            .is_ok_and(|geometry| readable_roots_independent(&tested.call.pool_after, &geometry).contains(&hidden));
+        let abandoned_after = abandoned_after_reading.as_ref().is_some_and(|reading| {
+            reading
+                .as_ref()
+                .is_ok_and(|abandoned| abandoned.contains(&hidden))
+        });
+        let hidden_in_ring_after =
+            independent_geometry(&tested.call.pool_after).is_ok_and(|geometry_after| {
+                readable_roots_independent(&tested.call.pool_after, &geometry_after)
+                    .contains(&hidden)
+            });
         let abandoned_after_detail = match &abandoned_after_reading {
             None => "not_mounted".to_string(),
             Some(Ok(abandoned)) => abandoned
@@ -10046,11 +10177,16 @@ fn run_third_run_positive_control_newer(geometry: &Geometry, arm: &str) {
             &tested.call.pool_after,
             &parameters,
         );
-        let lost_write_seen = corrupted > 0 && loss.overwrite_cell() && loss.read_back != "last_confirmed";
+        let lost_write_seen =
+            corrupted > 0 && loss.overwrite_cell() && loss.read_back != "last_confirmed";
         emit_third_run_positive_control(
             arm,
             "PC-lost-write",
-            if corrupted == 0 { "not_constructible" } else { verdict_word(lost_write_seen) },
+            if corrupted == 0 {
+                "not_constructible"
+            } else {
+                verdict_word(lost_write_seen)
+            },
             &format!("corrupted_copies={corrupted} {}", loss.render()),
         );
     }
@@ -10102,7 +10238,12 @@ fn run_third_run_positive_control_second_read(geometry: &Geometry, arm: &str) {
     let mut history = match third_run_history_start(geometry, 1) {
         Ok(history) => history,
         Err(error) => {
-            emit_third_run_positive_control(arm, "PC-O", "not_constructible", &format!("reason={error:?}"));
+            emit_third_run_positive_control(
+                arm,
+                "PC-O",
+                "not_constructible",
+                &format!("reason={error:?}"),
+            );
             return;
         }
     };
@@ -10125,8 +10266,14 @@ fn run_third_run_positive_control_second_read(geometry: &Geometry, arm: &str) {
         return;
     };
     let mut scratch = ThirdRunFamilySummary::default();
-    let Ok(tested) = run_tested_mount(arm, &base, &parameters, &faults, "PC-O", &mut scratch) else {
-        emit_third_run_positive_control(arm, "PC-O", "not_constructible", "reason=\"起始镜像几何解不出\"");
+    let Ok(tested) = run_tested_mount(arm, &base, &parameters, &faults, "PC-O", &mut scratch)
+    else {
+        emit_third_run_positive_control(
+            arm,
+            "PC-O",
+            "not_constructible",
+            "reason=\"起始镜像几何解不出\"",
+        );
         return;
     };
     emit_scratch_findings("pc_o", arm, &scratch);
@@ -10167,7 +10314,10 @@ fn run_third_run_positive_control_second_read(geometry: &Geometry, arm: &str) {
 
 /// 这次调用写的结构种类与字节的指纹（PC-N0 跨臂比）：取号那几个系统配置槽写把 tail 与整槽校验和那两段抹成 0
 /// （-配置续 那 8 个字节按臂的定义与今天不同，另核它 = 装置算的 c_见证）。交回 (指纹, 取号写里解出的 tail 列表)。
-fn write_fingerprint_of(applied: &[AppliedDeviceStep], acquisition_writes: usize) -> (u64, Vec<u64>) {
+fn write_fingerprint_of(
+    applied: &[AppliedDeviceStep],
+    acquisition_writes: usize,
+) -> (u64, Vec<u64>) {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     let mut mix = |bytes: &[u8]| {
         for byte in bytes {
@@ -10187,14 +10337,19 @@ fn write_fingerprint_of(applied: &[AppliedDeviceStep], acquisition_writes: usize
                 mix(b"W");
                 mix(&device.0.to_le_bytes());
                 mix(&offset.to_le_bytes());
-                if write_index < acquisition_writes && bytes.len() >= SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL + 8 {
+                if write_index < acquisition_writes
+                    && bytes.len() >= SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL + 8
+                {
                     let mut masked = bytes.clone();
                     let mut tail = [0u8; 8];
                     tail.copy_from_slice(
-                        &masked[SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL..SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL + 8],
+                        &masked[SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL
+                            ..SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL + 8],
                     );
                     acquisition_tails.push(u64::from_le_bytes(tail));
-                    masked[SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL..SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL + 8].fill(0);
+                    masked[SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL
+                        ..SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL + 8]
+                        .fill(0);
                     masked[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET_LOCAL
                         ..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET_LOCAL + WIDE_CHECKSUM_BYTES_LOCAL]
                         .fill(0);
@@ -10235,14 +10390,24 @@ fn run_third_run_positive_control_no_newer(geometry: &Geometry, arm: &str) {
             let mut history = match third_run_history_start(geometry, overwrites) {
                 Ok(history) => history,
                 Err(error) => {
-                    emit_third_run_positive_control(arm, "PC-N0", "not_constructible", &format!("{coordinates} reason={error:?}"));
+                    emit_third_run_positive_control(
+                        arm,
+                        "PC-N0",
+                        "not_constructible",
+                        &format!("{coordinates} reason={error:?}"),
+                    );
                     continue;
                 }
             };
             let unmount_check = match third_run_close(&mut history, &parameters, closing) {
                 Ok(check) => check,
                 Err(error) => {
-                    emit_third_run_positive_control(arm, "PC-N0", "not_constructible", &format!("{coordinates} reason={error:?}"));
+                    emit_third_run_positive_control(
+                        arm,
+                        "PC-N0",
+                        "not_constructible",
+                        &format!("{coordinates} reason={error:?}"),
+                    );
                     continue;
                 }
             };
@@ -10254,8 +10419,15 @@ fn run_third_run_positive_control_no_newer(geometry: &Geometry, arm: &str) {
             }
             let base = history.pool.clone();
             let mut scratch = ThirdRunFamilySummary::default();
-            let Ok(tested) = run_tested_mount(arm, &base, &parameters, &[], &coordinates, &mut scratch) else {
-                emit_third_run_positive_control(arm, "PC-N0", "not_constructible", &format!("{coordinates} reason=\"几何解不出\""));
+            let Ok(tested) =
+                run_tested_mount(arm, &base, &parameters, &[], &coordinates, &mut scratch)
+            else {
+                emit_third_run_positive_control(
+                    arm,
+                    "PC-N0",
+                    "not_constructible",
+                    &format!("{coordinates} reason=\"几何解不出\""),
+                );
                 continue;
             };
             cells += 1;
@@ -10267,7 +10439,8 @@ fn run_third_run_positive_control_no_newer(geometry: &Geometry, arm: &str) {
             };
             let tails_hold = acquisition_tails.len() == 2
                 && acquisition_tails.iter().all(|tail| *tail == tail_expected);
-            let passed = tested.summary.class == "K0" && tails_hold && !tested.judgement.truth_newer;
+            let passed =
+                tested.summary.class == "K0" && tails_hold && !tested.judgement.truth_newer;
             emit_third_run_positive_control(
                 arm,
                 "PC-N0",
@@ -10358,8 +10531,8 @@ fn run_third_run_constants_and_anchors(arm: &str) -> bool {
         verdict_word(regions_match)
     ));
     let arm_known = THIRD_RUN_ARMS.contains(&arm);
-    let arm_code_matches = arm_known
-        && (arm == "today") != third_run_arm_hooks::arm_code_is_compiled_in();
+    let arm_code_matches =
+        arm_known && (arm == "today") != third_run_arm_hooks::arm_code_is_compiled_in();
     all_passed &= arm_code_matches;
     emit_result(&format!(
         "name=r3_arm_code_check arm={arm} verdict={} arm_known={arm_known} arm_code_compiled_in={}",
@@ -10397,11 +10570,21 @@ fn run_third_run_constants_and_anchors(arm: &str) -> bool {
             let pool = memory_pool_of(&devices, IMAGE_BYTES);
             let root_slots = checker_image::root_slot_positions(&geometry).len() as u64;
             let ring_slots = geometry.journal_ring_bytes / JOURNAL_RECORD_BYTES;
-            let configuration_slots = device_decode(&pool, &geometry).system_configuration_slots.len() as u64;
+            let configuration_slots = device_decode(&pool, &geometry)
+                .system_configuration_slots
+                .len() as u64;
             for (item, computed, registered) in [
-                ("根槽总数 3×S，S=8（装置在 G0 上枚举的槽数）", root_slots, 24u64),
+                (
+                    "根槽总数 3×S，S=8（装置在 G0 上枚举的槽数）",
+                    root_slots,
+                    24u64,
+                ),
                 ("环槽数 3MiB÷4096（装置在 G0 上的环槽数）", ring_slots, 768),
-                ("每个池的系统配置槽数 2×2（装置读到的自证槽数）", configuration_slots, 4),
+                (
+                    "每个池的系统配置槽数 2×2（装置读到的自证槽数）",
+                    configuration_slots,
+                    4,
+                ),
             ] {
                 let passed = computed == registered;
                 all_passed &= passed;
@@ -10505,8 +10688,14 @@ impl ExtraReads {
         }
         self.total_calls += calls;
         self.total_bytes += bytes;
-        self.minimum_calls = Some(self.minimum_calls.map_or(calls, |current| current.min(calls)));
-        self.maximum_calls = Some(self.maximum_calls.map_or(calls, |current| current.max(calls)));
+        self.minimum_calls = Some(
+            self.minimum_calls
+                .map_or(calls, |current| current.min(calls)),
+        );
+        self.maximum_calls = Some(
+            self.maximum_calls
+                .map_or(calls, |current| current.max(calls)),
+        );
     }
 }
 
@@ -10592,14 +10781,17 @@ fn run_third_run_compare(prefix: &str) -> bool {
         }
         // PC-多读（PC-N，W）：乙 ≥ R ×（第一遍里读失败的落点个数）且 > 0；丙 > 0。
         let whole_call_key = "PC-N duration=W".to_string();
-        if let (Some(cell), Some(today_cell)) = (arm_cells.get(&whole_call_key), today.get(&whole_call_key)) {
+        if let (Some(cell), Some(today_cell)) =
+            (arm_cells.get(&whole_call_key), today.get(&whole_call_key))
+        {
             let extra = i64::try_from(field_u64(cell, "a_reads").unwrap_or(0)).expect("读次数")
                 - i64::try_from(field_u64(today_cell, "a_reads").unwrap_or(0)).expect("读次数");
             let faults = i64::try_from(field_u64(cell, "faults").unwrap_or(0)).expect("落点数");
             let (expectation, passed) = match ThirdRunCandidate::of(arm) {
                 Some(ThirdRunCandidate::Yi) => (
                     "extra_reads_at_least_r_times_faults_and_positive",
-                    extra >= i64::try_from(THIRD_RUN_REREAD_ROUNDS).expect("R") * faults && extra > 0,
+                    extra >= i64::try_from(THIRD_RUN_REREAD_ROUNDS).expect("R") * faults
+                        && extra > 0,
                 ),
                 Some(ThirdRunCandidate::Bing) => ("extra_reads_positive", extra > 0),
                 Some(ThirdRunCandidate::Jia | ThirdRunCandidate::Today) | None => {
@@ -10618,7 +10810,10 @@ fn run_third_run_compare(prefix: &str) -> bool {
         // PC-N0 与今天逐项相同（F12）：K 类、所选根、E、写的指纹（-配置续 取号那 8 个字节已抹）。
         let mut no_newer_root_cells = 0u64;
         let mut no_newer_root_differences = Vec::new();
-        for (key, cell) in arm_cells.iter().filter(|(cell_key, _)| cell_key.starts_with("PC-N0")) {
+        for (key, cell) in arm_cells
+            .iter()
+            .filter(|(cell_key, _)| cell_key.starts_with("PC-N0"))
+        {
             no_newer_root_cells += 1;
             let Some(today_cell) = today.get(key) else {
                 no_newer_root_differences.push(format!("{key}: 今天那一臂没有这一格"));
@@ -10660,7 +10855,9 @@ fn run_third_run_compare(prefix: &str) -> bool {
             let device_says = field_text(today_cell, witness_field) == "true";
             let jia_refused = field_text(jia_cell, "a_error") == third_run_refusal_member(jia_arm);
             if device_says != jia_refused {
-                mismatches.push(format!("{key}: 装置 {witness_field}={device_says}，{jia_arm} 拒={jia_refused}"));
+                mismatches.push(format!(
+                    "{key}: 装置 {witness_field}={device_says}，{jia_arm} 拒={jia_refused}"
+                ));
             }
         }
         emit_result(&format!(
@@ -10669,7 +10866,9 @@ fn run_third_run_compare(prefix: &str) -> bool {
             if mismatches.is_empty() { "pass" } else { "stop_s4" }
         ));
         for mismatch in &mismatches {
-            emit_result(&format!("name=r3_compare_finding kind=s4 detail={mismatch:?}"));
+            emit_result(&format!(
+                "name=r3_compare_finding kind=s4 detail={mismatch:?}"
+            ));
         }
     }
     // 7.3 第三行：T(δ) 对今天、甲、丙各臂与 W 逐格相同（H1d 不断那一格与 PC-N）。
@@ -10681,7 +10880,10 @@ fn run_third_run_compare(prefix: &str) -> bool {
     }) {
         let mut compared = 0u64;
         let mut differences = Vec::new();
-        for (key, cell) in cells[arm].iter().filter(|(key, _)| key.contains("duration=T1")) {
+        for (key, cell) in cells[arm]
+            .iter()
+            .filter(|(key, _)| key.contains("duration=T1"))
+        {
             let whole_key = key.replace("duration=T1", "duration=W");
             let Some(whole_cell) = cells[arm].get(&whole_key) else {
                 continue;
@@ -10746,14 +10948,23 @@ fn run_third_run_compare(prefix: &str) -> bool {
         if failure_clause_eleven_differences.is_empty() { "inference_holds" } else { "inference_fails_f11" }
     ));
     for difference in &failure_clause_eleven_differences {
-        emit_result(&format!("name=r3_compare_finding kind=f11 detail={difference:?}"));
+        emit_result(&format!(
+            "name=r3_compare_finding kind=f11 detail={difference:?}"
+        ));
     }
     true
 }
 
 /// 第 3 次跑的模式：开跑检查不过就停（V3 / V4），过了跑点名的那一段。交回 true = 这个模式归第 3 次跑。
 fn run_third_run_mode(mode: &str, command_line_arguments: &[String]) -> bool {
-    let known = ["r3-seg1", "r3-constants", "r3-pc", "r3-h1d", "r3-h1e", "r3-compare"];
+    let known = [
+        "r3-seg1",
+        "r3-constants",
+        "r3-pc",
+        "r3-h1d",
+        "r3-h1e",
+        "r3-compare",
+    ];
     if !known.contains(&mode) {
         return false;
     }
@@ -10862,9 +11073,19 @@ mod third_run_tests {
             ..whole_call_read_failure_at(0, 4096)
         };
         let call = third_run_call(&pool, &[fault], None, None, |devices| {
-            let first = singlefs_core::recovery::PoolReader::read(&*devices, DeviceIdentity(0), DeviceOffsetInBytes(0), 4096);
+            let first = singlefs_core::recovery::PoolReader::read(
+                &*devices,
+                DeviceIdentity(0),
+                DeviceOffsetInBytes(0),
+                4096,
+            );
             third_run_arm_hooks::advance_one_interval(THIRD_RUN_VIRTUAL_INTERVAL);
-            let second = singlefs_core::recovery::PoolReader::read(&*devices, DeviceIdentity(0), DeviceOffsetInBytes(0), 4096);
+            let second = singlefs_core::recovery::PoolReader::read(
+                &*devices,
+                DeviceIdentity(0),
+                DeviceOffsetInBytes(0),
+                4096,
+            );
             (first.is_some(), second.is_some())
         });
         assert_eq!(call.outcome, (false, true));
@@ -10875,9 +11096,21 @@ mod third_run_tests {
     #[test]
     fn failed_reads_are_counted_as_reads() {
         let pool = memory_pool_of(&new_devices(IMAGE_BYTES), IMAGE_BYTES);
-        let call = third_run_call(&pool, &[whole_call_read_failure_at(0, 4096)], None, None, |devices| {
-            singlefs_core::recovery::PoolReader::read(&*devices, DeviceIdentity(0), DeviceOffsetInBytes(0), 4096).is_some()
-        });
+        let call = third_run_call(
+            &pool,
+            &[whole_call_read_failure_at(0, 4096)],
+            None,
+            None,
+            |devices| {
+                singlefs_core::recovery::PoolReader::read(
+                    &*devices,
+                    DeviceIdentity(0),
+                    DeviceOffsetInBytes(0),
+                    4096,
+                )
+                .is_some()
+            },
+        );
         assert!(!call.outcome);
         assert_eq!(call.read_calls, 1);
         assert_eq!(call.read_bytes, 4096);
@@ -10892,7 +11125,13 @@ mod third_run_tests {
             whole_call_read_failure_at(1 << 20, 4096),
         ];
         let call = third_run_call(&pool, &faults, None, None, |devices| {
-            singlefs_core::recovery::PoolReader::read(&*devices, DeviceIdentity(0), DeviceOffsetInBytes(0), 4096).is_some()
+            singlefs_core::recovery::PoolReader::read(
+                &*devices,
+                DeviceIdentity(0),
+                DeviceOffsetInBytes(0),
+                4096,
+            )
+            .is_some()
         });
         assert_eq!(call.unintercepted(&faults), vec![faults[1].label.clone()]);
     }
@@ -10938,7 +11177,8 @@ mod third_run_tests {
         let judgement = device_judgement(&history.pool, &geometry, &[]);
         let devices = devices_from_pool(&history.pool, IMAGE_BYTES);
         let system_configuration = choose_system_configuration(&devices).expect("系统配置");
-        let chosen = singlefs_core::recovery::choose_root(&devices, &system_configuration).expect("根");
+        let chosen =
+            singlefs_core::recovery::choose_root(&devices, &system_configuration).expect("根");
         let records = scan_journal(&devices, &system_configuration);
         let (_, effective) = replay_journal(
             &devices,
@@ -10975,10 +11215,14 @@ mod third_run_tests {
         let judgement = device_judgement(&history.pool, &geometry, &faults);
         assert!(judgement.truth_newer);
         assert!(judgement.configuration_newer);
-        assert_eq!(judgement.effective, history.timeline.iter().rev().nth(1).copied());
+        assert_eq!(
+            judgement.effective,
+            history.timeline.iter().rev().nth(1).copied()
+        );
     }
 
-    /// PC-丢写（今天那一臂）：P(1, C) → A（PC-N 那组故障）→ 最后确认那一版的数据单元被改写 → 再可写挂载：Q1 前两栏数得出、
+    /// PC-丢写（今天那一臂）：P(1, C) → A（PC-N 那组故障，另加系统配置没见证到被藏的根：每块盘世代号最大的那一槽读回全 0；
+    /// C554 乙合进 `crates` 之后见证在时可写挂载拒，造不出被抛弃的根）→ 最后确认那一版的数据单元被改写 → 再可写挂载：Q1 前两栏数得出、
     /// 读回不是最后确认那一版（变异 M8 要它红：那时恢复落到再挂载写下的根，它不在被测那次挂载开始时的镜像上）。
     #[test]
     fn an_overwritten_last_confirmed_version_counts_as_a_lost_write() {
@@ -10986,7 +11230,7 @@ mod third_run_tests {
         let mut history = third_run_history_start(&GEOMETRY_PRIMARY, 1).expect("P(1, ·)");
         third_run_close(&mut history, &parameters, Closing::ProcessExit).expect("关闭 C");
         let geometry = independent_geometry(&history.pool).expect("几何");
-        let faults = third_run_abandonment_faults(
+        let mut faults = third_run_abandonment_faults(
             &history,
             &geometry,
             UnreadableForm::ReadFails,
@@ -10995,6 +11239,19 @@ mod third_run_tests {
         )
         .expect("落点")
         .expect("有记录");
+        for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+            faults.push(ThirdRunFault {
+                device,
+                offset: crate::tests::newest_system_configuration_slot_offset(
+                    &history.pool,
+                    device,
+                ),
+                length: SYSTEM_CONFIGURATION_SLOT_BYTES_LOCAL,
+                form: UnreadableForm::ReadsZeros,
+                duration: FaultDuration::WholeCall,
+                label: format!("newest_system_configuration(device={})", device.0),
+            });
+        }
         let tested = run_third_run_mount_writable(&history.pool, &parameters, &faults, None, None);
         assert!(tested.outcome.is_ok());
         let protected = history.confirmations.last().cloned().expect("确认过");
@@ -11017,7 +11274,10964 @@ mod third_run_tests {
             "E7RESULT name=r3_h1d_cell arm=today n1=2 cut=none a_reads=12 q3c_tail=own_version:2:9",
         );
         assert_eq!(fields.get("n1").map(String::as_str), Some("2"));
-        assert_eq!(fields.get("q3c_tail").map(String::as_str), Some("own_version:2:9"));
+        assert_eq!(
+            fields.get("q3c_tail").map(String::as_str),
+            Some("own_version:2:9")
+        );
+    }
+}
+
+// ============================================================================
+// 十二、第 4 次跑（`research/prompts/e158-r4-prereg.md`）：C554 怎么修（岔路单 `research/prompts/c554-fix-forks.md` 第 1 行）。
+//      装置按登记 5.7 的五段写，模式 `r4-seg1` … `r4-seg5`，跨臂的量在 `r4-compare`。第 2、3 次跑的函数只调用、不改语义；
+//      要改的一律复制一份给 `r4-*` 用（登记文件头「装置写在哪」）。
+// ============================================================================
+
+/// 候选（岔路单第 1 行：甲 拒可写、乙 重读后再判、丙 从记录重建、对照 今天；乙-窄读 是主 agent 认定第 1 项另立的那一条乙）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FourthRunCandidate {
+    Today,
+    Jia,
+    Yi,
+    YiNarrow,
+    Bing,
+}
+
+/// 臂的判据 N 取哪一样（登记 5.1）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FourthRunWitness {
+    NotJudged,
+    SystemConfiguration,
+    SystemConfigurationCarried,
+    UnreadableRootRingSlot,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct FourthRunArm {
+    name: &'static str,
+    candidate: FourthRunCandidate,
+    witness: FourthRunWitness,
+    /// 乙、乙-窄读 的重读轮数 R（别的臂 0）。
+    reread_rounds: u64,
+}
+
+/// 第 4 次跑的臂（文件名拼写 = 臂表 r4 行里的名字）：前十二条是 G0 主族的臂；后六条是第五段敏感性点 R = 3 的 乙 与 乙-窄读。
+const FOURTH_RUN_ARMS: [FourthRunArm; 18] = [
+    FourthRunArm {
+        name: "today",
+        candidate: FourthRunCandidate::Today,
+        witness: FourthRunWitness::NotJudged,
+        reread_rounds: 0,
+    },
+    FourthRunArm {
+        name: "jia-cfg",
+        candidate: FourthRunCandidate::Jia,
+        witness: FourthRunWitness::SystemConfiguration,
+        reread_rounds: 0,
+    },
+    FourthRunArm {
+        name: "jia-cfg-carry",
+        candidate: FourthRunCandidate::Jia,
+        witness: FourthRunWitness::SystemConfigurationCarried,
+        reread_rounds: 0,
+    },
+    FourthRunArm {
+        name: "jia-slot",
+        candidate: FourthRunCandidate::Jia,
+        witness: FourthRunWitness::UnreadableRootRingSlot,
+        reread_rounds: 0,
+    },
+    FourthRunArm {
+        name: "yi-cfg",
+        candidate: FourthRunCandidate::Yi,
+        witness: FourthRunWitness::SystemConfiguration,
+        reread_rounds: 1,
+    },
+    FourthRunArm {
+        name: "yi-cfg-carry",
+        candidate: FourthRunCandidate::Yi,
+        witness: FourthRunWitness::SystemConfigurationCarried,
+        reread_rounds: 1,
+    },
+    FourthRunArm {
+        name: "yi-slot",
+        candidate: FourthRunCandidate::Yi,
+        witness: FourthRunWitness::UnreadableRootRingSlot,
+        reread_rounds: 1,
+    },
+    FourthRunArm {
+        name: "yi-narrow-cfg",
+        candidate: FourthRunCandidate::YiNarrow,
+        witness: FourthRunWitness::SystemConfiguration,
+        reread_rounds: 1,
+    },
+    FourthRunArm {
+        name: "yi-narrow-cfg-carry",
+        candidate: FourthRunCandidate::YiNarrow,
+        witness: FourthRunWitness::SystemConfigurationCarried,
+        reread_rounds: 1,
+    },
+    FourthRunArm {
+        name: "yi-narrow-slot",
+        candidate: FourthRunCandidate::YiNarrow,
+        witness: FourthRunWitness::UnreadableRootRingSlot,
+        reread_rounds: 1,
+    },
+    FourthRunArm {
+        name: "bing-cfg",
+        candidate: FourthRunCandidate::Bing,
+        witness: FourthRunWitness::SystemConfiguration,
+        reread_rounds: 0,
+    },
+    FourthRunArm {
+        name: "bing-cfg-carry",
+        candidate: FourthRunCandidate::Bing,
+        witness: FourthRunWitness::SystemConfigurationCarried,
+        reread_rounds: 0,
+    },
+    FourthRunArm {
+        name: "yi-cfg-three-rounds",
+        candidate: FourthRunCandidate::Yi,
+        witness: FourthRunWitness::SystemConfiguration,
+        reread_rounds: 3,
+    },
+    FourthRunArm {
+        name: "yi-cfg-carry-three-rounds",
+        candidate: FourthRunCandidate::Yi,
+        witness: FourthRunWitness::SystemConfigurationCarried,
+        reread_rounds: 3,
+    },
+    FourthRunArm {
+        name: "yi-slot-three-rounds",
+        candidate: FourthRunCandidate::Yi,
+        witness: FourthRunWitness::UnreadableRootRingSlot,
+        reread_rounds: 3,
+    },
+    FourthRunArm {
+        name: "yi-narrow-cfg-three-rounds",
+        candidate: FourthRunCandidate::YiNarrow,
+        witness: FourthRunWitness::SystemConfiguration,
+        reread_rounds: 3,
+    },
+    FourthRunArm {
+        name: "yi-narrow-cfg-carry-three-rounds",
+        candidate: FourthRunCandidate::YiNarrow,
+        witness: FourthRunWitness::SystemConfigurationCarried,
+        reread_rounds: 3,
+    },
+    FourthRunArm {
+        name: "yi-narrow-slot-three-rounds",
+        candidate: FourthRunCandidate::YiNarrow,
+        witness: FourthRunWitness::UnreadableRootRingSlot,
+        reread_rounds: 3,
+    },
+];
+
+fn fourth_run_arm_named(name: &str) -> Option<FourthRunArm> {
+    FOURTH_RUN_ARMS.iter().copied().find(|arm| arm.name == name)
+}
+
+impl FourthRunArm {
+    fn is_today(self) -> bool {
+        self.candidate == FourthRunCandidate::Today
+    }
+
+    fn rereads(self) -> bool {
+        match self.candidate {
+            FourthRunCandidate::Yi | FourthRunCandidate::YiNarrow => true,
+            FourthRunCandidate::Today | FourthRunCandidate::Jia | FourthRunCandidate::Bing => false,
+        }
+    }
+
+    /// N 判真之后这一臂交回的拒绝成员名（臂表 r4 行加进 `MountError` 的成员）；今天那一臂没有。
+    fn refusal_member(self) -> &'static str {
+        match (self.candidate, self.witness) {
+            (FourthRunCandidate::Today, _) | (_, FourthRunWitness::NotJudged) => "none",
+            (FourthRunCandidate::Bing, _) => "R3RebuildFromRecordsStoppedBelowTheWitness",
+            (
+                FourthRunCandidate::Jia | FourthRunCandidate::Yi | FourthRunCandidate::YiNarrow,
+                FourthRunWitness::UnreadableRootRingSlot,
+            ) => "R3UnreadableRootRingSlot",
+            (
+                FourthRunCandidate::Jia | FourthRunCandidate::Yi | FourthRunCandidate::YiNarrow,
+                FourthRunWitness::SystemConfiguration
+                | FourthRunWitness::SystemConfigurationCarried,
+            ) => "R3NewerRootWitnessedByTheSystemConfiguration",
+        }
+    }
+
+    /// 同一种 N 的甲臂（PC-多读 (iii) 与 Q5-拒 的参照）。
+    fn jia_arm_with_the_same_witness(self) -> Option<&'static str> {
+        match self.witness {
+            FourthRunWitness::NotJudged => None,
+            FourthRunWitness::SystemConfiguration => Some("jia-cfg"),
+            FourthRunWitness::SystemConfigurationCarried => Some("jia-cfg-carry"),
+            FourthRunWitness::UnreadableRootRingSlot => Some("jia-slot"),
+        }
+    }
+
+    fn witness_name(self) -> &'static str {
+        match self.witness {
+            FourthRunWitness::NotJudged => "none",
+            FourthRunWitness::SystemConfiguration => "cfg",
+            FourthRunWitness::SystemConfigurationCarried => "cfg-carry",
+            FourthRunWitness::UnreadableRootRingSlot => "slot",
+        }
+    }
+
+    fn candidate_name(self) -> &'static str {
+        match self.candidate {
+            FourthRunCandidate::Today => "today",
+            FourthRunCandidate::Jia => "jia",
+            FourthRunCandidate::Yi => "yi",
+            FourthRunCandidate::YiNarrow => "yi-narrow",
+            FourthRunCandidate::Bing => "bing",
+        }
+    }
+}
+
+/// H1d 与各族 A 的时长（登记 5.3：各臂 W 与 O(1 只)；乙、乙-窄读 另加 T(δ)、T(2δ)，R = 3 的另加到 T(4δ)（8.2）；
+/// 今天、甲、丙 另跑 T(δ) 只跑不断那一格，给 7.3 第三行 V5 对拍）。交回 (时长, 只跑不断那一格)。
+fn fourth_run_held_once_durations(arm: FourthRunArm) -> Vec<(FaultDuration, bool)> {
+    let mut durations = vec![
+        (FaultDuration::WholeCall, false),
+        (FaultDuration::OnlyTheNthRead(1), false),
+    ];
+    if arm.rereads() {
+        for intervals in 1..=(arm.reread_rounds + 1) {
+            durations.push((
+                FaultDuration::UntilVirtualTime(intervals * THIRD_RUN_VIRTUAL_INTERVAL),
+                false,
+            ));
+        }
+    } else {
+        durations.push((
+            FaultDuration::UntilVirtualTime(THIRD_RUN_VIRTUAL_INTERVAL),
+            true,
+        ));
+    }
+    durations
+}
+
+/// H1e 与接 H1e 尾巴的族的时长（登记 5.3：W；乙、乙-窄读 另加 T(δ)，R = 3 的另加到 T(4δ)（8.2））。
+fn fourth_run_tail_durations(arm: FourthRunArm) -> Vec<FaultDuration> {
+    let mut durations = vec![FaultDuration::WholeCall];
+    if arm.rereads() {
+        let longest = if arm.reread_rounds > 1 {
+            arm.reread_rounds + 1
+        } else {
+            1
+        };
+        for intervals in 1..=longest {
+            durations.push(FaultDuration::UntilVirtualTime(
+                intervals * THIRD_RUN_VIRTUAL_INTERVAL,
+            ));
+        }
+    }
+    durations
+}
+
+// ---------------------------------------------------------------------------
+// 12.1 受观测的入口调用（第 4 次跑）：第 3 次跑的故障设备外面再包一层，数「第一个等待标记之前 / 之后」打到盘上的读、
+//      标记之后读回全零的读（登记 5.0 第三条、8.1 末），与第一个标记那一刻已被拦下过的落点个数 f（5.4 PC-多读 (iii)）。
+// ---------------------------------------------------------------------------
+
+#[derive(Default)]
+struct FourthRunReadMarker {
+    read_calls: u64,
+    reads_before_the_first_wait: Option<u64>,
+    faults_intercepted_before_the_first_wait: Option<u64>,
+    all_zero_reads_after_the_first_wait: u64,
+}
+
+struct FourthRunDevice {
+    device: ThirdRunDevice,
+    marker: Rc<RefCell<FourthRunReadMarker>>,
+}
+
+impl BlockDevice for FourthRunDevice {
+    fn read_at(
+        &self,
+        offset: DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        let result = self.device.read_at(offset, buffer);
+        let mut marker = self.marker.borrow_mut();
+        marker.read_calls += 1;
+        if marker.reads_before_the_first_wait.is_some()
+            && result.is_ok()
+            && buffer.iter().all(|byte| *byte == 0)
+        {
+            marker.all_zero_reads_after_the_first_wait += 1;
+        }
+        result
+    }
+
+    fn write_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        bytes: &[u8],
+        durability: WriteDurability,
+    ) -> Result<(), BlockDeviceError> {
+        self.device.write_at(offset, bytes, durability)
+    }
+
+    fn write_zeroes_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<(), BlockDeviceError> {
+        self.device.write_zeroes_at(offset, length)
+    }
+
+    fn barrier(&mut self) -> Result<(), BlockDeviceError> {
+        self.device.barrier()
+    }
+
+    fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
+        self.device.probe_physical_block_size()
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        self.device.size_in_bytes()
+    }
+}
+
+/// 臂的观测里第 4 次跑新加的两样（臂表 r4 行的观测字段）：重读轮数上限 R、读缓存收不收 journal 空槽（乙-窄读 收）。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct FourthRunArmExtras {
+    reread_rounds_limit: u32,
+    zeroed_journal_ring_slots_are_cached: bool,
+}
+
+/// 等待钩子（第 4 次跑）：推进虚拟时钟之前先调 `on_wait`（记第一个等待标记）。臂的代码只在副本里有，见 `third_run_arm_hooks`。
+#[allow(
+    unexpected_cfgs,
+    reason = "特性 e158-r3-arm 只在草稿副本的 singlefs-harness/Cargo.toml 里声明（research/mutations/e158_arms.tsv 的 r4 收尾那一行）"
+)]
+mod fourth_run_arm_hooks {
+    #[cfg(feature = "e158-r3-arm")]
+    pub fn install_the_marking_wait_hook(interval: u64, on_wait: Box<dyn Fn()>) {
+        singlefs_core::mount::r3_install_wait_hook(Some(Box::new(move || {
+            on_wait();
+            super::third_run_arm_hooks::advance_one_interval(interval);
+        })));
+    }
+
+    #[cfg(not(feature = "e158-r3-arm"))]
+    pub fn install_the_marking_wait_hook(_interval: u64, _on_wait: Box<dyn Fn()>) {}
+
+    #[cfg(feature = "e158-r3-arm")]
+    pub fn take_the_arm_observation() -> Option<(super::ArmObservation, super::FourthRunArmExtras)>
+    {
+        let observation = singlefs_core::mount::r3_take_observation();
+        Some((
+            super::ArmObservation {
+                witness_judged: observation.witness_judged,
+                newer_root_on_the_first_pass: observation.newer_root_on_the_first_pass,
+                witnessed_tail: observation.witnessed_tail,
+                selected_version_last_counter: observation.selected_version_last_counter,
+                undecidable: observation.undecidable,
+                unreadable_ring_slots_on_the_first_pass: observation
+                    .unreadable_ring_slots_on_the_first_pass,
+                reread_rounds: observation.reread_rounds,
+                rebuilt_from_records: observation.rebuilt_from_records,
+                shadow_ledger_table_unreadable_on_the_first_read: observation
+                    .shadow_ledger_table_unreadable_on_the_first_read,
+                shadow_ledger_table_rereads: observation.shadow_ledger_table_rereads,
+            },
+            super::FourthRunArmExtras {
+                reread_rounds_limit: observation.reread_rounds_limit,
+                zeroed_journal_ring_slots_are_cached: observation
+                    .zeroed_journal_ring_slots_are_cached,
+            },
+        ))
+    }
+
+    #[cfg(not(feature = "e158-r3-arm"))]
+    pub fn take_the_arm_observation() -> Option<(super::ArmObservation, super::FourthRunArmExtras)>
+    {
+        None
+    }
+}
+
+/// 一次受观测的入口调用（第 4 次跑）：第 3 次跑那一份交回的东西，加标记前后的读。
+struct FourthRunCall<Outcome> {
+    call: ThirdRunCall<Outcome>,
+    extras: Option<FourthRunArmExtras>,
+    reads_before_the_first_wait: Option<u64>,
+    faults_intercepted_before_the_first_wait: Option<u64>,
+    all_zero_reads_after_the_first_wait: u64,
+    /// 每个点了名的落点在这次调用里被读了几次（坏没坏都数；L5 的 M 取今天那一臂孪生镜像上这个数）。
+    reads_of_the_targets: Vec<u64>,
+}
+
+impl<Outcome> FourthRunCall<Outcome> {
+    /// 第一个等待标记之后打到盘上的读调用数（没有标记 = 0）。
+    fn reads_after_the_first_wait(&self) -> u64 {
+        self.reads_before_the_first_wait
+            .map_or(0, |before| self.call.read_calls - before)
+    }
+
+    fn render_marker(&self, prefix: &str) -> String {
+        format!(
+            "{prefix}_reads_before_first_wait={} {prefix}_reads_after_first_wait={} {prefix}_faults_intercepted_before_first_wait={} {prefix}_zero_reads_after_first_wait={} {prefix}_arm_rounds_limit={} {prefix}_arm_caches_zeroed_journal_slots={}",
+            self.reads_before_the_first_wait
+                .map_or("none".to_string(), |reads| reads.to_string()),
+            self.reads_after_the_first_wait(),
+            self.faults_intercepted_before_the_first_wait
+                .map_or("none".to_string(), |count| count.to_string()),
+            self.all_zero_reads_after_the_first_wait,
+            self.extras
+                .map_or("none".to_string(), |extras| extras.reread_rounds_limit.to_string()),
+            self.extras.map_or("none".to_string(), |extras| {
+                extras.zeroed_journal_ring_slots_are_cached.to_string()
+            })
+        )
+    }
+}
+
+/// 等待钩子被调时记第一个等待标记：那一刻打到盘上的读调用数，与那一刻已被拦下过的落点个数 f（之后的标记不改它们）。
+fn mark_the_first_wait(
+    marker: &RefCell<FourthRunReadMarker>,
+    state: &RefCell<ThirdRunDeviceState>,
+) {
+    let mut marker = marker.borrow_mut();
+    if marker.reads_before_the_first_wait.is_none() {
+        marker.reads_before_the_first_wait = Some(marker.read_calls);
+        marker.faults_intercepted_before_the_first_wait = Some(
+            state
+                .borrow()
+                .intercepted_reads
+                .iter()
+                .filter(|intercepted| **intercepted > 0)
+                .count() as u64,
+        );
+    }
+}
+
+fn fourth_run_call<Outcome>(
+    base: &MemoryPool,
+    faults: &[ThirdRunFault],
+    failing_write_call: Option<u64>,
+    failing_barrier_call: Option<u64>,
+    call: impl FnOnce(&mut Vec<(DeviceIdentity, FourthRunDevice)>) -> Outcome,
+) -> FourthRunCall<Outcome> {
+    let state = Rc::new(RefCell::new(ThirdRunDeviceState::new(
+        faults.to_vec(),
+        failing_write_call,
+        failing_barrier_call,
+    )));
+    let marker = Rc::new(RefCell::new(FourthRunReadMarker::default()));
+    let mut devices: Vec<(DeviceIdentity, FourthRunDevice)> = devices_from_pool(base, IMAGE_BYTES)
+        .into_iter()
+        .map(|(identity, inner)| {
+            (
+                identity,
+                FourthRunDevice {
+                    device: ThirdRunDevice {
+                        identity,
+                        inner,
+                        state: Rc::clone(&state),
+                    },
+                    marker: Rc::clone(&marker),
+                },
+            )
+        })
+        .collect();
+    third_run_arm_hooks::reset_the_virtual_clock();
+    let marker_for_the_hook = Rc::clone(&marker);
+    let state_for_the_hook = Rc::clone(&state);
+    fourth_run_arm_hooks::install_the_marking_wait_hook(
+        THIRD_RUN_VIRTUAL_INTERVAL,
+        Box::new(move || mark_the_first_wait(&marker_for_the_hook, &state_for_the_hook)),
+    );
+    let outcome = call(&mut devices);
+    let taken = fourth_run_arm_hooks::take_the_arm_observation();
+    let waits = third_run_arm_hooks::waits();
+    let plain: Vec<(DeviceIdentity, SparseBlockDevice)> = devices
+        .into_iter()
+        .map(|(identity, device)| (identity, device.device.inner))
+        .collect();
+    let pool_after = memory_pool_of(&plain, IMAGE_BYTES);
+    let state = state.borrow();
+    let marker = marker.borrow();
+    FourthRunCall {
+        call: ThirdRunCall {
+            outcome,
+            write_calls: state.write_calls,
+            read_calls: state.read_calls,
+            read_bytes: state.read_bytes,
+            applied: state.applied.clone(),
+            intercepted_reads: state.intercepted_reads.clone(),
+            injected_failure_fired: state.injected_failure_fired,
+            pool_after,
+            waits,
+            observation: taken.as_ref().map(|(observation, _)| observation.clone()),
+        },
+        extras: taken.map(|(_, extras)| extras),
+        reads_before_the_first_wait: marker.reads_before_the_first_wait,
+        faults_intercepted_before_the_first_wait: marker.faults_intercepted_before_the_first_wait,
+        all_zero_reads_after_the_first_wait: marker.all_zero_reads_after_the_first_wait,
+        reads_of_the_targets: state.reads_of_the_target.clone(),
+    }
+}
+
+fn run_fourth_run_mount_writable(
+    base: &MemoryPool,
+    parameters: &MakeFilesystemParameters,
+    faults: &[ThirdRunFault],
+    failing_write_call: Option<u64>,
+    failing_barrier_call: Option<u64>,
+) -> FourthRunCall<Result<Mounted, singlefs_core::mount::MountError>> {
+    fourth_run_call(
+        base,
+        faults,
+        failing_write_call,
+        failing_barrier_call,
+        |devices| mount_writable(parameters, devices),
+    )
+}
+
+/// 一次被测挂载（第 4 次跑）：同第 3 次跑 `run_tested_mount`，调用走 `fourth_run_call`；今天那一臂照做 7.3 第一行与 F13。
+struct FourthRunTestedMount {
+    call: FourthRunCall<Result<Mounted, singlefs_core::mount::MountError>>,
+    summary: TestedMountSummary,
+    judgement: DeviceJudgement,
+    unintercepted: Vec<String>,
+}
+
+fn run_fourth_run_tested_mount(
+    arm: FourthRunArm,
+    base: &MemoryPool,
+    parameters: &MakeFilesystemParameters,
+    faults: &[ThirdRunFault],
+    label: &str,
+    family_summary: &mut ThirdRunFamilySummary,
+) -> Result<FourthRunTestedMount, String> {
+    let geometry = independent_geometry(base)?;
+    let call = run_fourth_run_mount_writable(base, parameters, faults, None, None);
+    let judgement = device_judgement(base, &geometry, faults);
+    let summary = TestedMountSummary::of(&call.call);
+    let unintercepted = call.call.unintercepted(faults);
+    if arm.is_today() {
+        today_cross_checks(base, &judgement, &call.call, label, family_summary);
+        if let Ok(mounted) = &call.call.outcome {
+            family_summary.failure_clause_thirteen_checks += 1;
+            let expected = first_txg_expected_by_the_rule_of_today(base, &geometry, faults);
+            let got = mounted.output.row_publish.root().checkpoint_txg.0;
+            if got != expected {
+                family_summary
+                    .failure_clause_thirteen_findings
+                    .push(format!(
+                        "{label}: 写行那次发布 txg {got}，按今天的规则 {expected}"
+                    ));
+            }
+        }
+    }
+    Ok(FourthRunTestedMount {
+        call,
+        summary,
+        judgement,
+        unintercepted,
+    })
+}
+
+fn render_fourth_run_tested_mount(tested: &FourthRunTestedMount) -> String {
+    format!(
+        "{} {} {}",
+        tested.summary.render("a"),
+        tested.call.render_marker("a"),
+        render_device_judgement(&tested.judgement)
+    )
+}
+
+// ---------------------------------------------------------------------------
+// 12.2 Q0 的去向栏（登记「读法写死」表「被藏那条根的去向」一行）：被测挂载交回（或崩在中途）之后、撤故障之后，按孪生读法解。
+//      判的次序（执行员修订第 4 条写死）：被择或被施加 → 环在且被抛弃 → 根槽被盖 → 原样留着 → 其它。
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum HiddenRootDestination {
+    InRingAndAbandoned,
+    RootSlotOverwritten,
+    ChosenOrApplied,
+    LeftAsItWas,
+    Other(String),
+}
+
+impl HiddenRootDestination {
+    fn name(&self) -> String {
+        match self {
+            HiddenRootDestination::InRingAndAbandoned => "in_ring_and_abandoned".to_string(),
+            HiddenRootDestination::RootSlotOverwritten => "root_slot_overwritten".to_string(),
+            HiddenRootDestination::ChosenOrApplied => "chosen_or_applied".to_string(),
+            HiddenRootDestination::LeftAsItWas => "left_as_it_was".to_string(),
+            HiddenRootDestination::Other(detail) => format!("other:{detail}"),
+        }
+    }
+}
+
+/// 被藏那条根：键 K_h 与它在起始镜像上住的根槽 s_h = (区域, 区域内槽)。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct HiddenRootPosition {
+    key: TimelineRoot,
+    region: u64,
+    slot: u64,
+}
+
+fn hidden_root_position(base: &MemoryPool, key: TimelineRoot) -> Option<HiddenRootPosition> {
+    let geometry = independent_geometry(base).ok()?;
+    checker_image::valid_roots(base, &geometry)
+        .into_iter()
+        .find(|(_, _, view)| (view.instance, view.checkpoint_txg) == key)
+        .map(|(region, slot, _)| HiddenRootPosition { key, region, slot })
+}
+
+/// 登记 D22（单元原子性怎么合成） 已定项 2「槽序」：txg 的根落在 (txg mod 3, (txg div 3) mod S)（PC-N-盖 的点预言，变异 M21）。
+fn predicted_root_ring_slot_of_a_publish(checkpoint_txg: u64, slots_per_region: u64) -> (u64, u64) {
+    (
+        checkpoint_txg % ROOT_RING_REGIONS_LOCAL,
+        (checkpoint_txg / ROOT_RING_REGIONS_LOCAL) % slots_per_region,
+    )
+}
+
+/// 按内容号表（装置的账，外加被测挂载写下的根沿用 E 的内容号）判去向；`tested_ok_effective` = 被测挂载交回 `Ok` 时 E 的键。
+fn hidden_root_destination(
+    position: &HiddenRootPosition,
+    content_numbers: &BTreeMap<TimelineRoot, u64>,
+    hidden_content_number: u64,
+    after: &MemoryPool,
+    tested_ok_effective: Option<TimelineRoot>,
+) -> HiddenRootDestination {
+    let Ok(geometry) = independent_geometry(after) else {
+        return HiddenRootDestination::Other("geometry".to_string());
+    };
+    if tested_ok_effective
+        .and_then(|effective| content_numbers.get(&effective))
+        .is_some_and(|number| *number >= hidden_content_number)
+    {
+        return HiddenRootDestination::ChosenOrApplied;
+    }
+    let roots = checker_image::valid_roots(after, &geometry);
+    let at_the_hidden_slot = roots
+        .iter()
+        .find(|(region, slot, _)| (*region, *slot) == (position.region, position.slot))
+        .map(|(_, _, view)| (view.instance, view.checkpoint_txg));
+    let abandoned = abandoned_roots_on(after);
+    let hidden_abandoned = abandoned
+        .as_ref()
+        .is_ok_and(|set| set.contains(&position.key));
+    let slot_holds_the_hidden_root = at_the_hidden_slot == Some(position.key);
+    if slot_holds_the_hidden_root && hidden_abandoned {
+        return HiddenRootDestination::InRingAndAbandoned;
+    }
+    let ring_has_the_hidden_content_or_newer = roots.iter().any(|(_, _, view)| {
+        content_numbers
+            .get(&(view.instance, view.checkpoint_txg))
+            .is_some_and(|number| *number >= hidden_content_number)
+    });
+    if at_the_hidden_slot.is_some()
+        && !slot_holds_the_hidden_root
+        && !ring_has_the_hidden_content_or_newer
+    {
+        return HiddenRootDestination::RootSlotOverwritten;
+    }
+    if tested_ok_effective.is_none() && slot_holds_the_hidden_root && !hidden_abandoned {
+        return HiddenRootDestination::LeftAsItWas;
+    }
+    HiddenRootDestination::Other(format!(
+        "slot_holds={}:abandoned={}:abandoned_reading={}:ring_has_content_at_least_hidden={ring_has_the_hidden_content_or_newer}:tested_ok={}",
+        key_text(at_the_hidden_slot),
+        hidden_abandoned,
+        abandoned.as_ref().map_or("error", |_| "ok"),
+        tested_ok_effective.is_some()
+    ))
+}
+
+/// 装置的内容号表，外加一次可写挂载写下的根（写行、暖机、抬 F）沿用 E 的内容号（「读法写死」表「内容号跟根走」一行）。
+fn content_numbers_with_the_publishes_of(
+    history: &ThirdRunHistory,
+    mounted: Option<&Mounted>,
+) -> BTreeMap<TimelineRoot, u64> {
+    let mut numbers = history.content_number_by_root.clone();
+    if let Some(mounted) = mounted {
+        let carried = numbers
+            .get(&root_pair(&mounted.output.effective_root))
+            .copied()
+            .unwrap_or(0);
+        let mut roots = vec![root_pair(mounted.output.row_publish.root())];
+        roots.extend(
+            mounted
+                .output
+                .warm_up_publishes
+                .iter()
+                .map(|publish| root_pair(publish.root())),
+        );
+        for raised in mounted.output.space_admission.floor_raises() {
+            roots.extend(
+                raised
+                    .publishes
+                    .iter()
+                    .map(|publish| root_pair(&publish.root)),
+            );
+        }
+        for root in roots {
+            numbers.insert(root, carried);
+        }
+    }
+    numbers
+}
+
+/// 一份镜像的指纹（Q5-同成 要「起始镜像逐字节相同」；也给 H1f 的前缀跨臂核同一份）：每块盘写过的扇区按序号与字节混进 FNV-1a。
+fn image_fingerprint(pool: &MemoryPool) -> u64 {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut mix = |bytes: &[u8]| {
+        for byte in bytes {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    };
+    for (identity, device) in &pool.devices {
+        mix(&identity.0.to_le_bytes());
+        for sector in device.written_sectors_in(DeviceOffsetInBytes(0), pool.device_size_in_bytes) {
+            mix(&sector.to_le_bytes());
+            mix(&device.read(DeviceOffsetInBytes(sector * SECTOR_BYTES_LOCAL), 512));
+        }
+    }
+    hash
+}
+
+// ---------------------------------------------------------------------------
+// 12.3 阳性对照的句子（登记 5.4：每一句带标签、各句单独打一个字段；判定词 pass / fail / not_constructible，
+//      条件式的 [测] 句前件不成立记 vacuous）。V1 按标签路由（11.1），由 `r4-compare` 机械算。
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SentenceTag {
+    /// [测]：只由装置自己的账决定真假。
+    Measured,
+    /// [臂]：由臂的定义推出的这一臂的结局。
+    ArmDefinition,
+    /// [今]：对今天那一臂的底座怎么表现的描述。
+    TodayDescription,
+}
+
+impl SentenceTag {
+    fn name(self) -> &'static str {
+        match self {
+            SentenceTag::Measured => "measure",
+            SentenceTag::ArmDefinition => "arm",
+            SentenceTag::TodayDescription => "today",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SentenceVerdict {
+    Pass,
+    Fail,
+    NotConstructible,
+    Vacuous,
+}
+
+impl SentenceVerdict {
+    fn name(self) -> &'static str {
+        match self {
+            SentenceVerdict::Pass => "pass",
+            SentenceVerdict::Fail => "fail",
+            SentenceVerdict::NotConstructible => "not_constructible",
+            SentenceVerdict::Vacuous => "vacuous",
+        }
+    }
+
+    fn of(holds: bool) -> SentenceVerdict {
+        if holds {
+            SentenceVerdict::Pass
+        } else {
+            SentenceVerdict::Fail
+        }
+    }
+
+    /// 条件式：前件不成立 ⇒ vacuous，成立 ⇒ 后件定 pass / fail。
+    fn conditional(antecedent: bool, consequent: bool) -> SentenceVerdict {
+        if antecedent {
+            SentenceVerdict::of(consequent)
+        } else {
+            SentenceVerdict::Vacuous
+        }
+    }
+}
+
+struct ControlSentence {
+    tag: SentenceTag,
+    name: &'static str,
+    verdict: SentenceVerdict,
+    /// 打不中走哪一条（[臂] 句：F9 / F10 / F12 / F16 / F18；[今] 句：F1 / F2 / F4 / F15 / F17 / F19；[测] 句：V1 作废）。
+    clause: &'static str,
+}
+
+fn sentence(
+    tag: SentenceTag,
+    name: &'static str,
+    verdict: SentenceVerdict,
+    clause: &'static str,
+) -> ControlSentence {
+    ControlSentence {
+        tag,
+        name,
+        verdict,
+        clause,
+    }
+}
+
+/// 一条对照的总判定：有 fail ⇒ fail；否则有 not_constructible ⇒ not_constructible；否则 pass。
+fn overall_verdict(sentences: &[ControlSentence]) -> &'static str {
+    if sentences
+        .iter()
+        .any(|sentence| sentence.verdict == SentenceVerdict::Fail)
+    {
+        "fail"
+    } else if sentences
+        .iter()
+        .any(|sentence| sentence.verdict == SentenceVerdict::NotConstructible)
+    {
+        "not_constructible"
+    } else {
+        "pass"
+    }
+}
+
+fn emit_fourth_run_positive_control(
+    arm: &str,
+    control: &str,
+    coordinates: &str,
+    sentences: &[ControlSentence],
+    detail: &str,
+) {
+    let fields: Vec<String> = sentences
+        .iter()
+        .map(|sentence| {
+            format!(
+                "sentence_{}_{}={}",
+                sentence.tag.name(),
+                sentence.name,
+                sentence.verdict.name()
+            )
+        })
+        .collect();
+    let routes: Vec<&str> = sentences
+        .iter()
+        .filter(|sentence| {
+            matches!(
+                sentence.verdict,
+                SentenceVerdict::Fail | SentenceVerdict::NotConstructible
+            )
+        })
+        .map(|sentence| sentence.clause)
+        .collect();
+    emit_result(&format!(
+        "name=r4_positive_control arm={arm} control={control} {coordinates} verdict={} sentences={} {} missed_routes={} {detail}",
+        overall_verdict(sentences),
+        sentences.len(),
+        fields.join(" "),
+        if routes.is_empty() { "none".to_string() } else { routes.join(",") }
+    ));
+}
+
+/// 阳性对照与 L 族那几格顺带做的 7.3 第一行对拍与 F13（今天那一臂）打成结果行（第 3 次跑 `emit_scratch_findings` 的第 4 次跑那一份）。
+fn emit_fourth_run_scratch_findings(family: &str, arm: &str, scratch: &ThirdRunFamilySummary) {
+    emit_result(&format!(
+        "name=r4_cross_checks family={family} arm={arm} s4_mismatches={} f13_checked={} f13_failures={}",
+        scratch.stop_condition_four_mismatches.len(),
+        scratch.failure_clause_thirteen_checks,
+        scratch.failure_clause_thirteen_findings.len()
+    ));
+    for (kind, list) in [
+        ("s4", &scratch.stop_condition_four_mismatches),
+        ("f13", &scratch.failure_clause_thirteen_findings),
+    ] {
+        for detail in list {
+            emit_result(&format!(
+                "name=r4_family_finding family={family} arm={arm} kind={kind} detail={detail:?}"
+            ));
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 12.4 起始镜像（被测那次挂载之前）与抛弃步 A（第 4 次跑）：P(n1, c)（第 3 次跑 5.3）、H1f 的「中间夹一次重挂载」、
+//      H1g 的「a 次挂载崩在取号之后」（这 a 次在这一臂自己的副本上做，登记 5.3 H1g 行）；A 藏最新 k 条根（k = 2 是 8.2 的敏感性点）。
+// ---------------------------------------------------------------------------
+
+/// 本地常量（登记 5.6；开跑时回比 `crates/`，`fourth_run_local_constants_checks`）：根环区域数；稀疏盘的扇区宽。
+const ROOT_RING_REGIONS_LOCAL: u64 = 3;
+const SECTOR_BYTES_LOCAL: u64 = 512;
+/// H1f（登记 5.3）：n1a ∈ {0, 1}，c ∈ {C, U}，n1b ∈ {1, 2}。
+const FOURTH_RUN_REMOUNT_PREFIX_FIRST_OVERWRITES: [u64; 2] = [0, 1];
+const FOURTH_RUN_REMOUNT_PREFIX_SECOND_OVERWRITES: [u64; 2] = [1, 2];
+/// H1g（登记 5.3）：n1 ∈ {1, 2}，a ∈ {1, 2}，m ∈ {1, 2}。
+const FOURTH_RUN_ACQUISITION_CRASH_PREFIX_OVERWRITES: [u64; 2] = [1, 2];
+const FOURTH_RUN_ACQUISITION_CRASHES: [u64; 2] = [1, 2];
+const FOURTH_RUN_ACQUISITION_CRASH_TAIL_OVERWRITES: [u64; 2] = [1, 2];
+/// 一块盘上取号写的槽数（D23（journal 的角色与格式） 已定项 16：取号逐盘写一个系统配置槽；G0 两块盘 ⇒ 取号写 2 个）。
+const ACQUISITION_WRITES_PER_DEVICE_LOCAL: usize = 1;
+
+/// 一份起始镜像：坐标（进结果行）与装置的账（镜像在 `history.pool`，会话已关）。
+struct FourthRunPrefix {
+    coordinates: String,
+    history: ThirdRunHistory,
+}
+
+/// P(n1, c)（第 3 次跑 5.3）：mkfs → `mount_writable` → 首个文件 → n1 次覆盖写 → 关闭 c。关闭 U 那几格的 F14 判定行另打。
+fn fourth_run_plain_prefix(
+    geometry: &Geometry,
+    overwrites: u64,
+    closing: Closing,
+    arm: &str,
+) -> Result<FourthRunPrefix, String> {
+    let parameters = parameters_for(geometry);
+    let mut history = third_run_history_start(geometry, overwrites)?;
+    let coordinates = format!("n1={overwrites} c={}", closing.name());
+    if let Some((holds, detail)) = third_run_close(&mut history, &parameters, closing)? {
+        emit_result(&format!(
+            "name=r4_section_seven_one_f14 arm={arm} geometry={} {coordinates} verdict={} {detail}",
+            geometry.label,
+            if holds { "pass" } else { "fail_f14" }
+        ));
+    }
+    Ok(FourthRunPrefix {
+        coordinates,
+        history,
+    })
+}
+
+/// 在装置的账上做一次可写挂载（不注入），把它写下的根记进时间线（沿用 E 的内容号），会话开着。
+fn fourth_run_mount_writable_into_the_history(
+    history: &mut ThirdRunHistory,
+    parameters: &MakeFilesystemParameters,
+) -> Result<(), String> {
+    let mut devices = devices_from_pool(&history.pool, IMAGE_BYTES);
+    let mounted = mount_writable(parameters, &mut devices)
+        .map_err(|error| format!("前缀里的可写挂载: {error:?}"))?;
+    history.pool = memory_pool_of(&devices, IMAGE_BYTES);
+    let carried = history
+        .content_number_of(root_pair(&mounted.output.effective_root))
+        .unwrap_or(0);
+    push_the_publishes_of_a_mount(history, &mounted, carried);
+    history.session = Some(Session {
+        allocator: mounted.allocator,
+        current: mounted.current,
+        instance: mounted.output.instance,
+    });
+    Ok(())
+}
+
+/// H1f 的前缀（登记 5.3 H1f 行）：mkfs → `mount_writable` → 首个文件 → n1a 次覆盖写 → 关闭 c → `mount_writable` → n1b 次覆盖写 → 关闭 C。
+/// 前缀在这一臂自己的进程里造：N 为假时各臂与今天同一串写（PC-N0、F12），-配置续 第二次取号写的 tail 按臂的定义不同；
+/// 各臂前缀的镜像指纹打进结果行，`r4-compare` 跨臂核（执行员修订第 7 条）。
+fn fourth_run_remount_prefix(
+    geometry: &Geometry,
+    first_overwrites: u64,
+    closing: Closing,
+    second_overwrites: u64,
+    arm: &str,
+) -> Result<FourthRunPrefix, String> {
+    let parameters = parameters_for(geometry);
+    let mut history = third_run_history_start(geometry, first_overwrites)?;
+    let coordinates = format!(
+        "n1a={first_overwrites} c={} n1b={second_overwrites}",
+        closing.name()
+    );
+    if let Some((holds, detail)) = third_run_close(&mut history, &parameters, closing)? {
+        emit_result(&format!(
+            "name=r4_section_seven_one_f14 arm={arm} geometry={} {coordinates} verdict={} {detail}",
+            geometry.label,
+            if holds { "pass" } else { "fail_f14" }
+        ));
+    }
+    fourth_run_mount_writable_into_the_history(&mut history, &parameters)?;
+    for _ in 0..second_overwrites {
+        third_run_change_content(&mut history, &parameters)?;
+    }
+    third_run_close(&mut history, &parameters, Closing::ProcessExit)?;
+    Ok(FourthRunPrefix {
+        coordinates,
+        history,
+    })
+}
+
+/// H1g 的前缀（登记 5.3 H1g 行）：P(n1, C) → a 次 `mount_writable` 各自在取号写全部落盘之后、下一个写之前崩溃（在这一臂的副本上做）。
+/// 交回前缀与每一次崩溃之后按装置解码核「每块盘世代号最新的系统配置槽的实例代号 = 这一次取的号」的结果（核不上 ⇒ 那一次不是崩在取号之后）。
+fn fourth_run_acquisition_crash_prefix(
+    geometry: &Geometry,
+    overwrites: u64,
+    acquisition_crashes: u64,
+) -> Result<(FourthRunPrefix, Vec<String>), String> {
+    let parameters = parameters_for(geometry);
+    let mut history = third_run_history_start(geometry, overwrites)?;
+    third_run_close(&mut history, &parameters, Closing::ProcessExit)?;
+    let mut acquisition_checks = Vec::new();
+    for crash in 0..acquisition_crashes {
+        let call = run_fourth_run_mount_writable(&history.pool, &parameters, &[], None, None);
+        let acquired = call
+            .call
+            .outcome
+            .as_ref()
+            .map_err(|error| format!("第 {crash} 次取号崩溃那次挂载被拒: {error:?}"))?
+            .output
+            .instance
+            .0;
+        let acquisition_writes = ACQUISITION_WRITES_PER_DEVICE_LOCAL * history.pool.devices.len();
+        let crashed =
+            image_with_the_first_writes(&history.pool, &call.call.applied, acquisition_writes);
+        let geometry_of_the_pool = independent_geometry(&crashed)?;
+        let decoded = device_decode(&crashed, &geometry_of_the_pool);
+        let newest_instances: Vec<Option<u32>> = [0u32, 1]
+            .iter()
+            .map(|device| {
+                decoded
+                    .system_configuration_slots
+                    .iter()
+                    .filter(|(slot_device, _, _, _)| slot_device == device)
+                    .max_by_key(|(_, generation, _, _)| *generation)
+                    .map(|(_, _, _, instance)| *instance)
+            })
+            .collect();
+        let holds = newest_instances
+            .iter()
+            .all(|instance| *instance == Some(acquired));
+        acquisition_checks.push(format!(
+            "crash{crash}:acquired={acquired}:newest_slot_instances={newest_instances:?}:holds={holds}"
+        ));
+        history.pool = crashed;
+    }
+    Ok((
+        FourthRunPrefix {
+            coordinates: format!("n1={overwrites} a={acquisition_crashes}"),
+            history,
+        },
+        acquisition_checks,
+    ))
+}
+
+/// 抛弃步 A 的落点（第 3 次跑 `third_run_abandonment_faults` 的推广）：当前时间线上最新 `hidden_count` 条根的根槽，
+/// 加第 `hidden_count` 新的那条根那次发布按 b 取的落点（k = 2：断链落在两条里较旧那一次发布上，登记 8.2）。
+/// `hidden_count` = 1 时与第 3 次跑那一份逐项相同（单测 `fourth_run_abandonment_faults_equal_the_third_run_ones_for_one_hidden_root`）。
+fn fourth_run_abandonment_faults(
+    history: &ThirdRunHistory,
+    geometry: &PoolGeometry,
+    form: UnreadableForm,
+    replay_break: ReplayBreak,
+    duration: FaultDuration,
+    hidden_count: usize,
+) -> Result<Option<Vec<ThirdRunFault>>, String> {
+    if history.timeline.len() < hidden_count + 1 {
+        return Ok(None);
+    }
+    let hidden_roots: Vec<TimelineRoot> = history.timeline[history.timeline.len() - hidden_count..]
+        .iter()
+        .rev()
+        .copied()
+        .collect();
+    let mut faults = Vec::new();
+    for hidden in &hidden_roots {
+        let (root_slot_device, root_slot_offset) =
+            root_slot_of(&history.pool, geometry, *hidden)
+                .ok_or_else(|| format!("被藏的根 {hidden:?} 在根环里读不出"))?;
+        faults.push(ThirdRunFault {
+            device: root_slot_device,
+            offset: root_slot_offset,
+            length: u64::from(geometry.physical_block_size),
+            form,
+            duration,
+            label: format!("root{}", key_text(Some(*hidden))),
+        });
+    }
+    let broken = *hidden_roots.last().expect("hidden_count ≥ 1");
+    let records = records_of_publish(&history.pool, geometry, broken);
+    if records.is_empty() {
+        return Ok(None);
+    }
+    match replay_break {
+        ReplayBreak::EveryRecord => {
+            for (counter, record_offset_on_the_device, _) in &records {
+                for record_device in [DeviceIdentity(0), DeviceIdentity(1)] {
+                    faults.push(ThirdRunFault {
+                        device: record_device,
+                        offset: *record_offset_on_the_device,
+                        length: JOURNAL_RECORD_BYTES,
+                        form,
+                        duration,
+                        label: format!("record(counter={counter},device={})", record_device.0),
+                    });
+                }
+            }
+        }
+        ReplayBreak::FirstCopyOfTheFirstNamedUnit | ReplayBreak::FirstNamedUnit => {
+            let Some(named) = records
+                .iter()
+                .find_map(|(_, _, record)| record.named.first())
+            else {
+                return Ok(None);
+            };
+            let copies = match replay_break {
+                ReplayBreak::FirstNamedUnit => named.locations.len(),
+                ReplayBreak::EveryRecord | ReplayBreak::FirstCopyOfTheFirstNamedUnit => 1,
+            };
+            for location in named.locations.iter().take(copies) {
+                faults.push(ThirdRunFault {
+                    device: location.device,
+                    offset: location.slot.0 * SLOT_BYTES_LOCAL,
+                    length: SLOT_BYTES_LOCAL,
+                    form,
+                    duration,
+                    label: format!(
+                        "unit(device={},slot={})",
+                        location.device.0, location.slot.0
+                    ),
+                });
+            }
+        }
+    }
+    Ok(Some(faults))
+}
+
+// ---------------------------------------------------------------------------
+// 12.5 一族的汇总（第 4 次跑）：第 3 次跑那一份的各栏，加 Q0 去向（每一臂每一格五类）、丢写格按去向分列、F15、F17 的点名。
+// ---------------------------------------------------------------------------
+
+#[derive(Default)]
+struct FourthRunFamilySummary {
+    counts: ThirdRunFamilySummary,
+    destinations: BTreeMap<String, u64>,
+    lost_write_cells_by_destination: BTreeMap<String, u64>,
+    /// 失败条款 F15（7.1 新加第一行）：今天那一臂 b = records、W 的不断格上，写行那次发布没落在被藏那条根的槽上或去向不是「根槽被盖」。
+    failure_clause_fifteen_findings: Vec<String>,
+    failure_clause_fifteen_checks: u64,
+    /// 失败条款 F6（第四节推的 ①、③）：今天那一臂被测挂载上装置算的 N-配置 为假的格。
+    failure_clause_six_findings: Vec<String>,
+    failure_clause_six_checks: u64,
+}
+
+impl FourthRunFamilySummary {
+    fn count(
+        &mut self,
+        loss: &CellLoss,
+        rollback: bool,
+        tested_ok: bool,
+        destination: &HiddenRootDestination,
+    ) {
+        self.counts.count(loss, rollback, tested_ok);
+        let destination_class = destination
+            .name()
+            .split(':')
+            .next()
+            .unwrap_or("")
+            .to_string();
+        *self
+            .destinations
+            .entry(destination_class.clone())
+            .or_insert(0) += 1;
+        if loss.lost_write_cell() || rollback {
+            *self
+                .lost_write_cells_by_destination
+                .entry(destination_class)
+                .or_insert(0) += 1;
+        }
+    }
+
+    fn emit(&self, family: &str, arm: &str, geometry: &Geometry) {
+        let counts = &self.counts;
+        emit_result(&format!(
+            "name=r4_family_summary family={family} arm={arm} geometry={} cells={} void_cells_v2={} fault_not_reached_cells={} q1_overwrite_cells={} q1_in_ring_overwrite_cells={} q1_out_of_ring_overwrite_cells={} q1_landing_overwrite_cells={} q2_rollback_cells={} tested_ok_cells={} q3_read_back={:?} q3_last_confirmed_cells={} q3_lost_cells={} q3c_tail={:?} q3c_lost_cells={} lost_write_cells_q1_q2_q3={} q0_destinations={:?} lost_write_cells_by_destination={:?} tested_classes={:?} remount_classes={:?} s4_mismatches={} f4_failures={} f6_checked={} f6_findings={} f13_checked={} f13_failures={} f15_checked={} f15_findings={} formula_mismatches={}",
+            geometry.label,
+            counts.cells,
+            counts.void_cells,
+            counts.fault_not_reached_cells,
+            counts.overwrite_cells,
+            counts.in_ring_overwrite_cells,
+            counts.out_of_ring_overwrite_cells,
+            counts.landing_overwrite_cells,
+            counts.rollback_cells,
+            counts.tested_ok_cells,
+            counts.read_back,
+            counts.read_back_last_confirmed_cells,
+            counts.read_back_lost_cells,
+            counts.tail,
+            counts.tail_lost_cells,
+            counts.lost_write_cells,
+            self.destinations,
+            self.lost_write_cells_by_destination,
+            counts.tested_classes,
+            counts.remount_classes,
+            counts.stop_condition_four_mismatches.len(),
+            counts.failure_clause_four_findings.len(),
+            self.failure_clause_six_checks,
+            self.failure_clause_six_findings.len(),
+            counts.failure_clause_thirteen_checks,
+            counts.failure_clause_thirteen_findings.len(),
+            self.failure_clause_fifteen_checks,
+            self.failure_clause_fifteen_findings.len(),
+            counts.formula_mismatches.len()
+        ));
+        for (kind, list) in [
+            ("s4", &counts.stop_condition_four_mismatches),
+            ("f4", &counts.failure_clause_four_findings),
+            ("f6", &self.failure_clause_six_findings),
+            ("f13", &counts.failure_clause_thirteen_findings),
+            ("f15", &self.failure_clause_fifteen_findings),
+            ("formula", &counts.formula_mismatches),
+        ] {
+            for detail in list {
+                emit_result(&format!(
+                    "name=r4_family_finding family={family} arm={arm} geometry={} kind={kind} detail={detail:?}",
+                    geometry.label
+                ));
+            }
+        }
+    }
+}
+
+/// 一族怎么跑：族名（进结果行）、几何、A 藏几条根、一个前缀之后怎么接（断点全枚举 / 只不断 / m 尾巴）。
+#[derive(Clone, Copy, Debug)]
+enum FourthRunContinuation {
+    /// H1d 的全部断点（不断、crash、write_fails、barrier_fails）。
+    EveryCut,
+    /// 只跑不断那一格（8.2 的敏感性点「H1d 的 `none`」）。
+    UncutOnly,
+    /// H1e 的 m 尾巴（A 不断 → m 次改内容 → 关闭 C）。
+    Tail,
+}
+
+struct FourthRunFamily<'plan> {
+    name: &'plan str,
+    geometry: &'plan Geometry,
+    hidden_count: usize,
+    continuation: FourthRunContinuation,
+    tail_overwrites: &'plan [u64],
+    durations: FourthRunDurationPlan,
+    /// 今天那一臂顺带核 F6（第四节推的 ①）与 F15（7.1 新加第一行）：只在登记点名的 G0 上的 H1d、H1e 开。
+    checks_the_clauses_on_the_hidden_root: ClauseChecksOnTheHiddenRoot,
+}
+
+/// A 取哪几种时长（登记 5.3：H1d 与接 H1d 断点的族按这一臂的 H1d 时长，接 H1e 尾巴的按这一臂的 H1e 时长；H1g 只 W）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FourthRunDurationPlan {
+    OfTheArm,
+    WholeCallOnly,
+}
+
+/// 这一族顺带核不核 F6、F15（登记第十节：F6 管 H1d、H1e；F15 管 H1d 的 `none` 格与 H1e 里 b = records、W 的格）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ClauseChecksOnTheHiddenRoot {
+    Checked,
+    NotRegisteredForThisFamily,
+}
+
+/// 被测挂载之后、断点那一刻（或 m 尾巴之后）的镜像 `post` → 撤故障 → 再可写挂载（这一臂的代码，不注入）→ 历史末尾算三样。
+struct FourthRunCellContext<'cell> {
+    arm: FourthRunArm,
+    family: &'cell FourthRunFamily<'cell>,
+    history: &'cell ThirdRunHistory,
+    protected: &'cell ThirdRunConfirmation,
+    base: &'cell MemoryPool,
+    parameters: &'cell MakeFilesystemParameters,
+    first_new_instance: u32,
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "一格的坐标、被测挂载那一行与它的判定原样打进结果行，拆成结构体只多一层搬运"
+)]
+fn evaluate_fourth_run_cell(
+    context: &FourthRunCellContext<'_>,
+    coordinates: &str,
+    post: &MemoryPool,
+    tested_line: &str,
+    rollback: bool,
+    tested_ok: bool,
+    do_the_tail: bool,
+    destination: &HiddenRootDestination,
+    summary: &mut FourthRunFamilySummary,
+) {
+    let remount = run_third_run_mount_writable(post, context.parameters, &[], None, None);
+    let remount_class = third_run_outcome_class(&remount.outcome, remount.write_calls);
+    let loss = evaluate_cell_loss(
+        context.history,
+        context.protected,
+        context.base,
+        &remount.pool_after,
+        do_the_tail.then_some(context.first_new_instance),
+    );
+    summary.count(&loss, rollback, tested_ok, destination);
+    *summary
+        .counts
+        .remount_classes
+        .entry(remount_class.to_string())
+        .or_insert(0) += 1;
+    emit_result(&format!(
+        "name=r4_cell family={} arm={} geometry={} {coordinates} {tested_line} q0_destination={} q2_rollback={rollback} remount_class={remount_class} remount_error={} remount_chosen={} {}",
+        context.family.name,
+        context.arm.name,
+        context.family.geometry.label,
+        destination.name(),
+        mount_error_member_or_none(&remount.outcome),
+        key_text(
+            remount
+                .outcome
+                .as_ref()
+                .ok()
+                .map(|mounted| root_pair(&mounted.output.chosen_root))
+        ),
+        loss.render()
+    ));
+}
+
+/// 一族在一条臂上跑完：每个前缀 × 造法 × b × 时长 → A →（断点 / m 尾巴）→ 撤故障 → 再挂载 → 三样。
+fn run_fourth_run_family(
+    family: &FourthRunFamily<'_>,
+    arm: FourthRunArm,
+    prefixes: Vec<Result<FourthRunPrefix, String>>,
+) {
+    let parameters = parameters_for(family.geometry);
+    let mut summary = FourthRunFamilySummary::default();
+    let durations: Vec<(FaultDuration, bool)> = match (family.durations, family.continuation) {
+        (FourthRunDurationPlan::WholeCallOnly, _) => vec![(FaultDuration::WholeCall, true)],
+        (FourthRunDurationPlan::OfTheArm, FourthRunContinuation::EveryCut) => {
+            fourth_run_held_once_durations(arm)
+        }
+        (FourthRunDurationPlan::OfTheArm, FourthRunContinuation::UncutOnly) => {
+            fourth_run_held_once_durations(arm)
+                .into_iter()
+                .map(|(duration, _)| (duration, true))
+                .collect()
+        }
+        (FourthRunDurationPlan::OfTheArm, FourthRunContinuation::Tail) => {
+            fourth_run_tail_durations(arm)
+                .into_iter()
+                .map(|duration| (duration, true))
+                .collect()
+        }
+    };
+    let mut cells_by_duration: BTreeMap<String, u64> = BTreeMap::new();
+    for prefix in prefixes {
+        let prefix = match prefix {
+            Ok(prefix) => prefix,
+            Err(error) => {
+                emit_result(&format!(
+                    "name=r4_prefix family={} arm={} geometry={} verdict=stop reason={error:?}",
+                    family.name, arm.name, family.geometry.label
+                ));
+                continue;
+            }
+        };
+        let history = &prefix.history;
+        let base = history.pool.clone();
+        let Ok(pool_geometry) = independent_geometry(&base) else {
+            emit_result(&format!(
+                "name=r4_prefix family={} arm={} geometry={} {} verdict=stop reason=\"几何解不出\"",
+                family.name, arm.name, family.geometry.label, prefix.coordinates
+            ));
+            continue;
+        };
+        let root_slots = root_slot_device_offsets(&pool_geometry);
+        let protected = history
+            .confirmations
+            .last()
+            .cloned()
+            .expect("前缀至少确认过首个文件");
+        let last_confirmed = protected.content_number;
+        let hidden = history.tip();
+        let hidden_position = hidden_root_position(&base, hidden);
+        let base_fingerprint = image_fingerprint(&base);
+        // 「不绕环」（第 3 次跑登记 5.3 G0 那一句）：最大计数器 < 环槽数。
+        let highest_counter = device_decode(&base, &pool_geometry)
+            .records
+            .keys()
+            .map(|(_, counter)| *counter)
+            .max()
+            .unwrap_or(0);
+        let ring_not_wrapped =
+            highest_counter < pool_geometry.journal_ring_bytes / JOURNAL_RECORD_BYTES;
+        emit_result(&format!(
+            "name=r4_prefix family={} arm={} geometry={} {} tip={} hidden_slot={} last_confirmed={last_confirmed} base_fingerprint={base_fingerprint:016x} highest_counter={highest_counter} ring_not_wrapped={ring_not_wrapped} tail_checks={} tail_check_failures={}",
+            family.name,
+            arm.name,
+            family.geometry.label,
+            prefix.coordinates,
+            key_text(Some(hidden)),
+            hidden_position.map_or("none".to_string(), |position| format!("{}:{}", position.region, position.slot)),
+            history.tail_checks,
+            history.tail_check_failures.len()
+        ));
+        for failure in &history.tail_check_failures {
+            emit_result(&format!(
+                "name=r4_f3_tail_check_failure family={} arm={} {} detail={failure:?}",
+                family.name, arm.name, prefix.coordinates
+            ));
+        }
+        let context = FourthRunCellContext {
+            arm,
+            family,
+            history,
+            protected: &protected,
+            base: &base,
+            parameters: &parameters,
+            first_new_instance: hidden.0 + 1,
+        };
+        for form in [UnreadableForm::ReadFails, UnreadableForm::ReadsZeros] {
+            for replay_break in [
+                ReplayBreak::EveryRecord,
+                ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+            ] {
+                for (duration, only_the_uncut_cell) in &durations {
+                    let head = format!(
+                        "{} b={} form={} duration={}",
+                        prefix.coordinates,
+                        replay_break.name(),
+                        form.name(),
+                        duration.name()
+                    );
+                    let faults = match fourth_run_abandonment_faults(
+                        history,
+                        &pool_geometry,
+                        form,
+                        replay_break,
+                        *duration,
+                        family.hidden_count,
+                    ) {
+                        Ok(Some(faults)) => faults,
+                        Ok(None) => {
+                            emit_result(&format!(
+                                "name=r4_group family={} arm={} geometry={} {head} verdict=not_applicable",
+                                family.name, arm.name, family.geometry.label
+                            ));
+                            continue;
+                        }
+                        Err(error) => {
+                            emit_result(&format!(
+                                "name=r4_group family={} arm={} geometry={} {head} verdict=stop reason={error:?}",
+                                family.name, arm.name, family.geometry.label
+                            ));
+                            continue;
+                        }
+                    };
+                    let Ok(tested) = run_fourth_run_tested_mount(
+                        arm,
+                        &base,
+                        &parameters,
+                        &faults,
+                        &head,
+                        &mut summary.counts,
+                    ) else {
+                        emit_result(&format!(
+                            "name=r4_group family={} arm={} geometry={} {head} verdict=stop reason=\"几何解不出\"",
+                            family.name, arm.name, family.geometry.label
+                        ));
+                        continue;
+                    };
+                    let tested_ok = tested.call.call.outcome.is_ok();
+                    let mounted = tested.call.call.outcome.as_ref().ok();
+                    let rollback = tested_ok
+                        && tested
+                            .summary
+                            .effective
+                            .and_then(|effective| history.content_number_of(effective))
+                            .is_some_and(|number| number < last_confirmed);
+                    let content_numbers = content_numbers_with_the_publishes_of(history, mounted);
+                    let destination_after_the_tested_mount = hidden_position.map_or_else(
+                        || HiddenRootDestination::Other("hidden_root_not_in_base".to_string()),
+                        |position| {
+                            hidden_root_destination(
+                                &position,
+                                &content_numbers,
+                                last_confirmed,
+                                &tested.call.call.pool_after,
+                                tested_ok.then_some(tested.summary.effective).flatten(),
+                            )
+                        },
+                    );
+                    if family.checks_the_clauses_on_the_hidden_root
+                        == ClauseChecksOnTheHiddenRoot::Checked
+                    {
+                        fourth_run_family_cross_checks(
+                            arm,
+                            &head,
+                            replay_break,
+                            *duration,
+                            history,
+                            &tested,
+                            hidden_position,
+                            family.geometry,
+                            &destination_after_the_tested_mount,
+                            &mut summary,
+                        );
+                    }
+                    let not_reached = !tested.unintercepted.is_empty();
+                    if not_reached {
+                        if arm.is_today() {
+                            summary.counts.void_cells += 1;
+                        } else {
+                            summary.counts.fault_not_reached_cells += 1;
+                        }
+                    }
+                    *summary
+                        .counts
+                        .tested_classes
+                        .entry(format!(
+                            "{}:{}",
+                            tested.summary.class, tested.summary.member
+                        ))
+                        .or_insert(0) += 1;
+                    let tested_line = format!(
+                        "{} hidden={} base_fingerprint={base_fingerprint:016x} faults={} unintercepted={}",
+                        render_fourth_run_tested_mount(&tested),
+                        key_text(Some(hidden)),
+                        faults.len(),
+                        tested.unintercepted.join(",")
+                    );
+                    if arm.is_today() && not_reached {
+                        emit_result(&format!(
+                            "name=r4_cell family={} arm={} geometry={} {head} cut=none point=none verdict=void_v2 {tested_line}",
+                            family.name, arm.name, family.geometry.label
+                        ));
+                        continue;
+                    }
+                    *cells_by_duration.entry(duration.name()).or_insert(0) += 1;
+                    match family.continuation {
+                        FourthRunContinuation::Tail => run_fourth_run_tail_cells(
+                            &context,
+                            &head,
+                            &tested,
+                            &tested_line,
+                            rollback,
+                            &destination_after_the_tested_mount,
+                            &mut summary,
+                        ),
+                        FourthRunContinuation::EveryCut | FourthRunContinuation::UncutOnly => {
+                            run_fourth_run_cut_cells(
+                                &context,
+                                &head,
+                                &faults,
+                                &tested,
+                                &tested_line,
+                                rollback,
+                                *only_the_uncut_cell,
+                                &root_slots,
+                                &pool_geometry,
+                                hidden_position,
+                                &destination_after_the_tested_mount,
+                                &mut summary,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for (duration, groups) in &cells_by_duration {
+        emit_result(&format!(
+            "name=r4_family_groups family={} arm={} geometry={} duration={duration} groups={groups}",
+            family.name, arm.name, family.geometry.label
+        ));
+        // 7.2：H1e 每种时长 4 × 2 × 2 × 4 格；H1g 每臂 n1 × a × m × b × 造法 = 32 格（只 W）。
+        let registered = match (family.continuation, family.name) {
+            (FourthRunContinuation::Tail, "h1e") if family.hidden_count == 1 => Some(4 * 2 * 2 * 4),
+            (FourthRunContinuation::Tail, "h1g") => Some(2 * 2 * 2 * 2 * 2),
+            (
+                FourthRunContinuation::Tail
+                | FourthRunContinuation::EveryCut
+                | FourthRunContinuation::UncutOnly,
+                _,
+            ) => None,
+        };
+        if let Some(registered) = registered {
+            let cells = groups * family.tail_overwrites.len() as u64;
+            emit_result(&format!(
+                "name=r4_section_seven_two_anchor arm={} geometry={} item=\"{} 每种时长的格数\" duration={duration} computed={cells} registered={registered} verdict={}",
+                arm.name,
+                family.geometry.label,
+                family.name,
+                if cells == registered { "pass" } else { "fail_v4" }
+            ));
+        }
+    }
+    summary.emit(family.name, arm.name, family.geometry);
+}
+
+/// 一组（一个前缀 × 造法 × b × 时长）在 H1d 那样的断点上全枚举：不断、crash j（前 j 个写落盘）、write_fails j、barrier_fails j。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "一组的上下文、被测挂载与它的判定原样传给每一格，拆成结构体只多一层搬运"
+)]
+fn run_fourth_run_cut_cells(
+    context: &FourthRunCellContext<'_>,
+    head: &str,
+    faults: &[ThirdRunFault],
+    tested: &FourthRunTestedMount,
+    tested_line: &str,
+    rollback: bool,
+    only_the_uncut_cell: bool,
+    root_slots: &[(DeviceIdentity, u64)],
+    pool_geometry: &PoolGeometry,
+    hidden_position: Option<HiddenRootPosition>,
+    destination_after_the_tested_mount: &HiddenRootDestination,
+    summary: &mut FourthRunFamilySummary,
+) {
+    let arm = context.arm;
+    let history = context.history;
+    let last_confirmed = context.protected.content_number;
+    let tested_ok = tested.call.call.outcome.is_ok();
+    let first_root_write = index_of_the_first_root_slot_write(
+        &tested.call.call.applied,
+        root_slots,
+        u64::from(pool_geometry.physical_block_size),
+    );
+    let barriers = first_root_write.map_or(0, |index| {
+        barriers_before_write(&tested.call.call.applied, index + 1)
+    });
+    let cut_cells_expected = if only_the_uncut_cell {
+        1
+    } else {
+        first_root_write.map_or(1, |index| 1 + 2 * (index as u64 + 1) + barriers)
+    };
+    let destination_of =
+        |pool: &MemoryPool, ok_effective: Option<TimelineRoot>, mounted: Option<&Mounted>| {
+            hidden_position.map_or_else(
+                || HiddenRootDestination::Other("hidden_root_not_in_base".to_string()),
+                |position| {
+                    hidden_root_destination(
+                        &position,
+                        &content_numbers_with_the_publishes_of(history, mounted),
+                        last_confirmed,
+                        pool,
+                        ok_effective,
+                    )
+                },
+            )
+        };
+    let mut enumerated = 0u64;
+    evaluate_fourth_run_cell(
+        context,
+        &format!("{head} cut=none point=none"),
+        &tested.call.call.pool_after,
+        &format!(
+            "{tested_line} first_root_write={} barriers_before_the_row_root={barriers}",
+            first_root_write.map_or("none".to_string(), |index| index.to_string())
+        ),
+        rollback,
+        tested_ok,
+        true,
+        destination_after_the_tested_mount,
+        summary,
+    );
+    enumerated += 1;
+    if !only_the_uncut_cell {
+        if let Some(first_root_write) = first_root_write {
+            let tested_mounted = tested.call.call.outcome.as_ref().ok();
+            for write_count in 0..=first_root_write {
+                let post = image_with_the_first_writes(
+                    context.base,
+                    &tested.call.call.applied,
+                    write_count,
+                );
+                let destination = destination_of(&post, None, tested_mounted);
+                evaluate_fourth_run_cell(
+                    context,
+                    &format!("{head} cut=crash point={write_count}"),
+                    &post,
+                    "a_outcome=crashed",
+                    false,
+                    false,
+                    false,
+                    &destination,
+                    summary,
+                );
+                enumerated += 1;
+            }
+            for (cut, failing_write, failing_barrier) in (0..=first_root_write)
+                .map(|index| ("write_fails", Some(index as u64), None))
+                .chain((0..barriers).map(|index| ("barrier_fails", None, Some(index))))
+            {
+                let failed = run_fourth_run_mount_writable(
+                    context.base,
+                    context.parameters,
+                    faults,
+                    failing_write,
+                    failing_barrier,
+                );
+                let failed_summary = TestedMountSummary::of(&failed.call);
+                let failed_ok = failed.call.outcome.is_ok();
+                let failed_rollback = failed_ok
+                    && failed_summary
+                        .effective
+                        .and_then(|effective| history.content_number_of(effective))
+                        .is_some_and(|number| number < last_confirmed);
+                let failed_mounted = failed.call.outcome.as_ref().ok();
+                let destination = destination_of(
+                    &failed.call.pool_after,
+                    failed_ok.then_some(failed_summary.effective).flatten(),
+                    failed_mounted,
+                );
+                evaluate_fourth_run_cell(
+                    context,
+                    &format!(
+                        "{head} cut={cut} point={}",
+                        failing_write.or(failing_barrier).unwrap_or(0)
+                    ),
+                    &failed.call.pool_after,
+                    &format!(
+                        "{} {} fired={}",
+                        failed_summary.render("a"),
+                        failed.render_marker("a"),
+                        failed.call.injected_failure_fired
+                    ),
+                    failed_rollback,
+                    failed_ok,
+                    false,
+                    &destination,
+                    summary,
+                );
+                enumerated += 1;
+            }
+        }
+    }
+    if enumerated != cut_cells_expected {
+        summary.counts.formula_mismatches.push(format!(
+            "{head}: 枚举 {enumerated} 格，公式 1 + 2(J + 1) + 屏障数 = {cut_cells_expected}"
+        ));
+    }
+    emit_result(&format!(
+        "name=r4_group family={} arm={} geometry={} {head} cells={enumerated} formula_cells={cut_cells_expected} verdict={}",
+        context.family.name,
+        arm.name,
+        context.family.geometry.label,
+        if enumerated == cut_cells_expected { "pass" } else { "fail_v4" }
+    ));
+}
+
+/// 一组接 H1e 的 m 尾巴：A 交回的会话里再做 m 次改内容 → 关闭 C → 撤故障 → 再挂载 → 三样（A 被拒的臂记「因拒没做」）。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "一组的上下文、被测挂载与它的判定原样传给每一格，拆成结构体只多一层搬运"
+)]
+fn run_fourth_run_tail_cells(
+    context: &FourthRunCellContext<'_>,
+    head: &str,
+    tested: &FourthRunTestedMount,
+    tested_line: &str,
+    rollback: bool,
+    destination_after_the_tested_mount: &HiddenRootDestination,
+    summary: &mut FourthRunFamilySummary,
+) {
+    let tested_ok = tested.call.call.outcome.is_ok();
+    for tail_overwrites in context.family.tail_overwrites {
+        let mut history = context.history.clone();
+        history.pool = tested.call.call.pool_after.clone();
+        let tail_writes = match &tested.call.call.outcome {
+            Ok(mounted) => {
+                let effective_content = history
+                    .content_number_of(root_pair(&mounted.output.effective_root))
+                    .unwrap_or(0);
+                push_the_publishes_of_a_mount(&mut history, mounted, effective_content);
+                history.session = Some(Session {
+                    allocator: mounted.allocator.clone(),
+                    current: mounted.current.clone(),
+                    instance: mounted.output.instance,
+                });
+                let mut done = 0u64;
+                let mut failure = None;
+                for _ in 0..*tail_overwrites {
+                    match third_run_change_content(&mut history, context.parameters) {
+                        Ok(()) => done += 1,
+                        Err(error) => {
+                            failure = Some(error);
+                            break;
+                        }
+                    }
+                }
+                match failure {
+                    None => format!("done:{done}"),
+                    Some(error) => format!("failed_after:{done}:{}", error_member_of_debug(&error)),
+                }
+            }
+            Err(_) => "refused_not_done".to_string(),
+        };
+        let _ = third_run_close(&mut history, context.parameters, Closing::ProcessExit);
+        let tail_context = FourthRunCellContext {
+            arm: context.arm,
+            family: context.family,
+            history: &history,
+            protected: context.protected,
+            base: context.base,
+            parameters: context.parameters,
+            first_new_instance: context.first_new_instance,
+        };
+        evaluate_fourth_run_cell(
+            &tail_context,
+            &format!("{head} m={tail_overwrites}"),
+            &history.pool.clone(),
+            &format!(
+                "{tested_line} tail_writes={tail_writes} last_confirmed_after_the_tail={}",
+                history.last_confirmed_content_number()
+            ),
+            rollback,
+            tested_ok,
+            true,
+            destination_after_the_tested_mount,
+            summary,
+        );
+    }
+}
+
+/// 一组的被测挂载上顺带核的条款（今天那一臂）：F4（7.1）、F6（第四节推的 ①）、F15（7.1 新加第一行）；Q0「被抛弃」那一栏。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "一组的坐标、被测挂载与装置的判定原样传进来，拆成结构体只多一层搬运"
+)]
+fn fourth_run_family_cross_checks(
+    arm: FourthRunArm,
+    head: &str,
+    replay_break: ReplayBreak,
+    duration: FaultDuration,
+    history: &ThirdRunHistory,
+    tested: &FourthRunTestedMount,
+    hidden_position: Option<HiddenRootPosition>,
+    geometry: &Geometry,
+    destination: &HiddenRootDestination,
+    summary: &mut FourthRunFamilySummary,
+) {
+    if !arm.is_today() {
+        return;
+    }
+    let tested_ok = tested.call.call.outcome.is_ok();
+    if *destination == HiddenRootDestination::InRingAndAbandoned {
+        summary.counts.abandoned_hidden_root_cells += 1;
+    }
+    let before_hidden = history.timeline.iter().rev().nth(1).copied();
+    if tested_ok
+        && replay_break == ReplayBreak::FirstCopyOfTheFirstNamedUnit
+        && duration == FaultDuration::WholeCall
+        && tested.summary.effective != before_hidden
+    {
+        summary.counts.failure_clause_four_findings.push(format!(
+            "{head}: E {}，被藏那条根前一条 {}",
+            key_text(tested.summary.effective),
+            key_text(before_hidden)
+        ));
+    }
+    summary.failure_clause_six_checks += 1;
+    if !tested.judgement.configuration_newer {
+        summary
+            .failure_clause_six_findings
+            .push(format!("{head}: 装置在今天那一臂上算的 N-配置 为假"));
+    }
+    if let (true, ReplayBreak::EveryRecord, FaultDuration::WholeCall, Ok(mounted), Some(position)) = (
+        tested_ok,
+        replay_break,
+        duration,
+        &tested.call.call.outcome,
+        hidden_position,
+    ) {
+        summary.failure_clause_fifteen_checks += 1;
+        let row_txg = mounted.output.row_publish.root().checkpoint_txg.0;
+        let predicted = predicted_root_ring_slot_of_a_publish(row_txg, geometry.slots_per_region);
+        let holds = row_txg == position.key.1
+            && predicted == (position.region, position.slot)
+            && *destination == HiddenRootDestination::RootSlotOverwritten;
+        if !holds {
+            summary.failure_clause_fifteen_findings.push(format!(
+                "{head}: 写行那次发布 txg {row_txg}（落在 {predicted:?}），被藏那条根 txg {}、s_h {:?}，去向 {}",
+                position.key.1,
+                (position.region, position.slot),
+                destination.name()
+            ));
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 12.6 第一段的阳性对照（登记 5.4，每一臂都跑）：PC-N-环、PC-N-盖、PC-O、PC-丢写、PC-只读、PC-N0（L0 那 8 格）。
+//      「与今天逐项相同」「PC-多读」这几句要跨臂，在 `r4-compare` 里判；这里把它们要的字段打进结果行。
+// ---------------------------------------------------------------------------
+
+/// 一格被测挂载跑完整段：A → 撤故障 → `mount_writable`（不注入）→ 冷启动 `recover` 读回，交回 A、去向、回滚与三样。
+struct FourthRunControlCell {
+    tested: FourthRunTestedMount,
+    destination: HiddenRootDestination,
+    rollback: bool,
+    loss: CellLoss,
+    remount_line: String,
+    write_fingerprint: u64,
+}
+
+fn run_fourth_run_control_cell(
+    arm: FourthRunArm,
+    history: &ThirdRunHistory,
+    parameters: &MakeFilesystemParameters,
+    faults: &[ThirdRunFault],
+    label: &str,
+    scratch: &mut ThirdRunFamilySummary,
+) -> Result<FourthRunControlCell, String> {
+    let base = history.pool.clone();
+    let tested = run_fourth_run_tested_mount(arm, &base, parameters, faults, label, scratch)?;
+    let protected = history
+        .confirmations
+        .last()
+        .cloned()
+        .ok_or("前缀没有确认过")?;
+    let hidden = history.tip();
+    let tested_ok = tested.call.call.outcome.is_ok();
+    let mounted = tested.call.call.outcome.as_ref().ok();
+    let rollback = tested_ok
+        && tested
+            .summary
+            .effective
+            .and_then(|effective| history.content_number_of(effective))
+            .is_some_and(|number| number < protected.content_number);
+    let destination = hidden_root_position(&base, hidden).map_or_else(
+        || HiddenRootDestination::Other("hidden_root_not_in_base".to_string()),
+        |position| {
+            hidden_root_destination(
+                &position,
+                &content_numbers_with_the_publishes_of(history, mounted),
+                protected.content_number,
+                &tested.call.call.pool_after,
+                tested_ok.then_some(tested.summary.effective).flatten(),
+            )
+        },
+    );
+    let remount =
+        run_third_run_mount_writable(&tested.call.call.pool_after, parameters, &[], None, None);
+    let loss = evaluate_cell_loss(
+        history,
+        &protected,
+        &base,
+        &remount.pool_after,
+        Some(hidden.0 + 1),
+    );
+    let remount_line = format!(
+        "remount_class={} remount_error={}",
+        third_run_outcome_class(&remount.outcome, remount.write_calls),
+        mount_error_member_or_none(&remount.outcome)
+    );
+    let (write_fingerprint, _) = write_fingerprint_of(&tested.call.call.applied, 2);
+    Ok(FourthRunControlCell {
+        tested,
+        destination,
+        rollback,
+        loss,
+        remount_line,
+        write_fingerprint,
+    })
+}
+
+/// 两格被测挂载在 7.3 第三行（V5）意义下逐项相同：K 类、错误成员、写次数、读次数、所选根、E、去向、读回、覆盖格。
+fn cells_agree_item_by_item(first: &FourthRunControlCell, second: &FourthRunControlCell) -> bool {
+    first.tested.summary.class == second.tested.summary.class
+        && first.tested.summary.member == second.tested.summary.member
+        && first.tested.summary.writes == second.tested.summary.writes
+        && first.tested.summary.reads == second.tested.summary.reads
+        && first.tested.summary.chosen == second.tested.summary.chosen
+        && first.tested.summary.effective == second.tested.summary.effective
+        && first.destination == second.destination
+        && first.loss.read_back == second.loss.read_back
+        && first.loss.overwrite_cell() == second.loss.overwrite_cell()
+}
+
+fn refused_before_any_write(cell: &FourthRunControlCell, arm: FourthRunArm) -> bool {
+    cell.tested.summary.member == arm.refusal_member() && cell.tested.summary.writes == 0
+}
+
+/// 这一臂在这一格上 N 判假（臂的观测：判了 N、第一遍为假）；-槽 臂在读回全零上要这一句（登记 5.4）。
+fn witness_judged_false(cell: &FourthRunControlCell) -> bool {
+    cell.tested
+        .summary
+        .observation
+        .as_ref()
+        .is_some_and(|observation| {
+            observation.witness_judged && !observation.newer_root_on_the_first_pass
+        })
+}
+
+/// PC-N-环（b = `unit_first_copy`）与 PC-N-盖（b = `records`）：P(1, C) → A（`read_fails`、`reads_zeros` × W、T(δ)）→ 撤故障 →
+/// `mount_writable`（不注入）→ 冷启动 `recover` 读回。每臂 4 格；W 格上拒了的做 PC-只读；PC-N-环 的 `read_fails`、W 格做 PC-丢写。
+fn run_fourth_run_positive_control_newer(
+    geometry: &Geometry,
+    arm: FourthRunArm,
+    replay_break: ReplayBreak,
+) {
+    let control = match replay_break {
+        ReplayBreak::FirstCopyOfTheFirstNamedUnit => "PC-N-ring",
+        ReplayBreak::EveryRecord | ReplayBreak::FirstNamedUnit => "PC-N-cover",
+    };
+    let parameters = parameters_for(geometry);
+    let history = match fourth_run_plain_prefix(geometry, 1, Closing::ProcessExit, arm.name) {
+        Ok(prefix) => prefix.history,
+        Err(error) => {
+            emit_fourth_run_positive_control(
+                arm.name,
+                control,
+                "form=none duration=none",
+                &[sentence(
+                    SentenceTag::Measured,
+                    "prefix",
+                    SentenceVerdict::NotConstructible,
+                    "V1",
+                )],
+                &format!("reason={error:?}"),
+            );
+            return;
+        }
+    };
+    let Ok(pool_geometry) = independent_geometry(&history.pool) else {
+        return;
+    };
+    let hidden = history.tip();
+    let before_hidden = history.timeline.iter().rev().nth(1).copied();
+    let hidden_position = hidden_root_position(&history.pool, hidden);
+    let mut cells_constructed = 0u64;
+    for form in [UnreadableForm::ReadFails, UnreadableForm::ReadsZeros] {
+        let mut by_duration: Vec<(FaultDuration, FourthRunControlCell, Vec<ThirdRunFault>)> =
+            Vec::new();
+        for duration in [
+            FaultDuration::WholeCall,
+            FaultDuration::UntilVirtualTime(THIRD_RUN_VIRTUAL_INTERVAL),
+        ] {
+            let coordinates = format!("form={} duration={}", form.name(), duration.name());
+            let faults = match fourth_run_abandonment_faults(
+                &history,
+                &pool_geometry,
+                form,
+                replay_break,
+                duration,
+                1,
+            ) {
+                Ok(Some(faults)) => faults,
+                Ok(None) | Err(_) => {
+                    emit_fourth_run_positive_control(
+                        arm.name,
+                        control,
+                        &coordinates,
+                        &[sentence(
+                            SentenceTag::Measured,
+                            "faults",
+                            SentenceVerdict::NotConstructible,
+                            "V1",
+                        )],
+                        "reason=\"落点造不出\"",
+                    );
+                    continue;
+                }
+            };
+            let mut scratch = ThirdRunFamilySummary::default();
+            match run_fourth_run_control_cell(
+                arm,
+                &history,
+                &parameters,
+                &faults,
+                control,
+                &mut scratch,
+            ) {
+                Ok(cell) => {
+                    emit_fourth_run_scratch_findings(control, arm.name, &scratch);
+                    by_duration.push((duration, cell, faults));
+                    cells_constructed += 1;
+                }
+                Err(error) => emit_fourth_run_positive_control(
+                    arm.name,
+                    control,
+                    &coordinates,
+                    &[sentence(
+                        SentenceTag::Measured,
+                        "cell",
+                        SentenceVerdict::NotConstructible,
+                        "V1",
+                    )],
+                    &format!("reason={error:?}"),
+                ),
+            }
+        }
+        let whole_call_cell = by_duration
+            .iter()
+            .find(|(duration, _, _)| *duration == FaultDuration::WholeCall)
+            .map(|(_, cell, _)| cell);
+        for (duration, cell, faults) in &by_duration {
+            let coordinates = format!("form={} duration={}", form.name(), duration.name());
+            let sentences = sentences_of_the_newer_root_controls(
+                arm,
+                replay_break,
+                form,
+                *duration,
+                cell,
+                whole_call_cell,
+                hidden,
+                before_hidden,
+                hidden_position,
+                geometry,
+                device_effective_content_is_older_than_the_hidden_one(&history, cell),
+            );
+            let row_publish = cell
+                .tested
+                .call
+                .call
+                .outcome
+                .as_ref()
+                .ok()
+                .map(|mounted| mounted.output.row_publish.root().checkpoint_txg.0);
+            emit_fourth_run_positive_control(
+                arm.name,
+                control,
+                &coordinates,
+                &sentences,
+                &format!(
+                    "faults={} hidden={} hidden_slot={} row_publish_txg={} row_publish_slot={} q0_destination={} q2_rollback={} write_fingerprint={:016x} {} {} {} unintercepted={}",
+                    faults.len(),
+                    key_text(Some(hidden)),
+                    hidden_position.map_or("none".to_string(), |position| format!("{}:{}", position.region, position.slot)),
+                    row_publish.map_or("none".to_string(), |txg| txg.to_string()),
+                    row_publish.map_or("none".to_string(), |txg| {
+                        let (region, slot) = predicted_root_ring_slot_of_a_publish(txg, geometry.slots_per_region);
+                        format!("{region}:{slot}")
+                    }),
+                    cell.destination.name(),
+                    cell.rollback,
+                    cell.write_fingerprint,
+                    render_fourth_run_tested_mount(&cell.tested),
+                    cell.remount_line,
+                    cell.loss.render(),
+                    cell.tested.unintercepted.join(",")
+                ),
+            );
+            if *duration != FaultDuration::WholeCall {
+                continue;
+            }
+            run_fourth_run_read_only_control(arm, control, form, &history, cell, faults);
+            if replay_break == ReplayBreak::FirstCopyOfTheFirstNamedUnit
+                && form == UnreadableForm::ReadFails
+            {
+                run_fourth_run_lost_write_control(arm, &history, &parameters, cell);
+            }
+        }
+    }
+    let registered = 2 * 2;
+    emit_result(&format!(
+        "name=r4_section_seven_two_anchor arm={} item=\"{control} 每臂 2 种造法 × 2 种时长\" computed={cells_constructed} registered={registered} verdict={}",
+        arm.name,
+        if cells_constructed == registered { "pass" } else { "fail_v4" }
+    ));
+}
+
+/// 装置自己重放出的 E_故障 的内容号小于被藏那一版的（PC-N-环、PC-N-盖 里「若今天交回 Ok 且 E 的内容号 < 被藏那一版的」的前件，
+/// 取装置的 E、不取 `crates/` 交回的，免得前件与后件（Q2，按 `crates/` 的 E 算）是同一个式子）。
+fn device_effective_content_is_older_than_the_hidden_one(
+    history: &ThirdRunHistory,
+    cell: &FourthRunControlCell,
+) -> bool {
+    let hidden_content = history.last_confirmed_content_number();
+    cell.tested
+        .judgement
+        .effective
+        .and_then(|effective| history.content_number_of(effective))
+        .is_some_and(|number| number < hidden_content)
+}
+
+/// PC-N-环、PC-N-盖 每一格每一臂要出的句子（登记 5.4 那两行，逐句带标签）。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "一格的坐标、这一格与同一造法的 W 格、被藏那条根的三样原样传进来，拆成结构体只多一层搬运"
+)]
+fn sentences_of_the_newer_root_controls(
+    arm: FourthRunArm,
+    replay_break: ReplayBreak,
+    form: UnreadableForm,
+    duration: FaultDuration,
+    cell: &FourthRunControlCell,
+    whole_call_cell: Option<&FourthRunControlCell>,
+    hidden: TimelineRoot,
+    before_hidden: Option<TimelineRoot>,
+    hidden_position: Option<HiddenRootPosition>,
+    geometry: &Geometry,
+    device_effective_is_older: bool,
+) -> Vec<ControlSentence> {
+    let summary = &cell.tested.summary;
+    let ok = cell.tested.call.call.outcome.is_ok();
+    let is_whole_call = duration == FaultDuration::WholeCall;
+    let cover = replay_break == ReplayBreak::EveryRecord;
+    let mut sentences = vec![sentence(
+        SentenceTag::Measured,
+        "truth_newer",
+        SentenceVerdict::of(cell.tested.judgement.truth_newer),
+        "V1",
+    )];
+    let timed_equals_whole_call = || {
+        sentence(
+            SentenceTag::Measured,
+            "timed_equals_whole_call",
+            whole_call_cell.map_or(SentenceVerdict::NotConstructible, |whole| {
+                SentenceVerdict::of(cells_agree_item_by_item(cell, whole))
+            }),
+            "V5",
+        )
+    };
+    let refused_before_writing_then_left_as_it_was = || {
+        sentence(
+            SentenceTag::Measured,
+            "if_k3_then_no_rollback_and_left_as_it_was",
+            SentenceVerdict::conditional(
+                cell.tested.summary.class == "K3",
+                !cell.rollback && cell.destination == HiddenRootDestination::LeftAsItWas,
+            ),
+            "V1",
+        )
+    };
+    let slot_arm_on_zeros = arm.witness == FourthRunWitness::UnreadableRootRingSlot
+        && form == UnreadableForm::ReadsZeros;
+    match arm.candidate {
+        FourthRunCandidate::Today => {
+            sentences.push(sentence(
+                SentenceTag::TodayDescription,
+                "ok_k0_effective_before_hidden",
+                SentenceVerdict::of(summary.class == "K0" && summary.effective == before_hidden),
+                if cover { "F15" } else { "F4" },
+            ));
+            if cover {
+                let row_txg = cell
+                    .tested
+                    .call
+                    .call
+                    .outcome
+                    .as_ref()
+                    .ok()
+                    .map(|mounted| mounted.output.row_publish.root().checkpoint_txg.0);
+                sentences.push(sentence(
+                    SentenceTag::TodayDescription,
+                    "row_publish_txg_equals_hidden_txg",
+                    SentenceVerdict::of(row_txg == Some(hidden.1)),
+                    "F15",
+                ));
+                sentences.push(sentence(
+                    SentenceTag::TodayDescription,
+                    "row_publish_lands_on_the_hidden_slot",
+                    SentenceVerdict::of(row_txg.is_some_and(|txg| {
+                        hidden_position.is_some_and(|position| {
+                            predicted_root_ring_slot_of_a_publish(txg, geometry.slots_per_region)
+                                == (position.region, position.slot)
+                        })
+                    })),
+                    "F15",
+                ));
+                sentences.push(sentence(
+                    SentenceTag::TodayDescription,
+                    "destination_root_slot_overwritten",
+                    SentenceVerdict::of(
+                        cell.destination == HiddenRootDestination::RootSlotOverwritten,
+                    ),
+                    "F15",
+                ));
+                sentences.push(sentence(
+                    SentenceTag::Measured,
+                    "if_overwritten_then_reads_back_older_and_counts_as_lost",
+                    SentenceVerdict::conditional(
+                        cell.destination == HiddenRootDestination::RootSlotOverwritten,
+                        cell.loss.read_back.starts_with("older") && cell.loss.lost_write_cell(),
+                    ),
+                    "V1",
+                ));
+            } else {
+                sentences.push(sentence(
+                    SentenceTag::TodayDescription,
+                    "hidden_in_ring_and_abandoned",
+                    SentenceVerdict::of(
+                        cell.destination == HiddenRootDestination::InRingAndAbandoned,
+                    ),
+                    "F17",
+                ));
+            }
+            sentences.push(sentence(
+                SentenceTag::Measured,
+                "if_ok_and_older_then_rollback_one",
+                SentenceVerdict::conditional(ok && device_effective_is_older, cell.rollback),
+                "V1",
+            ));
+            if !is_whole_call {
+                sentences.push(timed_equals_whole_call());
+            }
+        }
+        FourthRunCandidate::Jia => {
+            if slot_arm_on_zeros {
+                sentences.push(sentence(
+                    SentenceTag::ArmDefinition,
+                    "slot_witness_false_on_zeros",
+                    SentenceVerdict::of(witness_judged_false(cell)),
+                    "F12",
+                ));
+            } else {
+                sentences.push(sentence(
+                    SentenceTag::ArmDefinition,
+                    "refused_k3",
+                    SentenceVerdict::of(refused_before_any_write(cell, arm)),
+                    "F9",
+                ));
+                sentences.push(refused_before_writing_then_left_as_it_was());
+            }
+            if !is_whole_call {
+                sentences.push(timed_equals_whole_call());
+            }
+        }
+        FourthRunCandidate::Yi | FourthRunCandidate::YiNarrow => {
+            if slot_arm_on_zeros {
+                sentences.push(sentence(
+                    SentenceTag::ArmDefinition,
+                    "slot_witness_false_on_zeros",
+                    SentenceVerdict::of(witness_judged_false(cell)),
+                    "F12",
+                ));
+            } else if is_whole_call {
+                sentences.push(sentence(
+                    SentenceTag::ArmDefinition,
+                    "refused_after_r_rounds_k3",
+                    SentenceVerdict::of(
+                        refused_before_any_write(cell, arm) && summary.waits == arm.reread_rounds,
+                    ),
+                    "F9",
+                ));
+            } else {
+                sentences.push(sentence(
+                    SentenceTag::ArmDefinition,
+                    "ok_after_one_round_chosen_hidden_no_rollback",
+                    SentenceVerdict::of(
+                        ok && summary.chosen == Some(hidden)
+                            && !cell.rollback
+                            && summary.waits == 1,
+                    ),
+                    "F16",
+                ));
+                if cover {
+                    let row_txg = cell
+                        .tested
+                        .call
+                        .call
+                        .outcome
+                        .as_ref()
+                        .ok()
+                        .map(|mounted| mounted.output.row_publish.root().checkpoint_txg.0);
+                    sentences.push(sentence(
+                        SentenceTag::ArmDefinition,
+                        "row_publish_txg_is_hidden_txg_plus_one",
+                        SentenceVerdict::of(row_txg == Some(hidden.1 + 1)),
+                        "F16",
+                    ));
+                    sentences.push(sentence(
+                        SentenceTag::ArmDefinition,
+                        "destination_chosen_or_applied",
+                        SentenceVerdict::of(
+                            cell.destination == HiddenRootDestination::ChosenOrApplied,
+                        ),
+                        "F16",
+                    ));
+                }
+            }
+        }
+        FourthRunCandidate::Bing => {
+            if is_whole_call {
+                sentences.push(sentence(
+                    SentenceTag::ArmDefinition,
+                    "refused_k3",
+                    SentenceVerdict::of(refused_before_any_write(cell, arm)),
+                    "F9",
+                ));
+            } else {
+                sentences.push(timed_equals_whole_call());
+            }
+        }
+    }
+    sentences
+}
+
+/// PC-只读（登记 5.4）：W 格上拒了的每一臂，同一组故障下调冷启动 `recover`，交得出结局，读回 E_故障 那一版。
+fn run_fourth_run_read_only_control(
+    arm: FourthRunArm,
+    control: &str,
+    form: UnreadableForm,
+    history: &ThirdRunHistory,
+    cell: &FourthRunControlCell,
+    faults: &[ThirdRunFault],
+) {
+    let coordinates = format!("of={control} form={}", form.name());
+    if cell.tested.call.call.outcome.is_ok() {
+        emit_result(&format!(
+            "name=r4_positive_control arm={} control=PC-read-only {coordinates} verdict=not_applicable reason=\"这一臂在这一格上没拒\"",
+            arm.name
+        ));
+        return;
+    }
+    let read_only = run_third_run_recover(&history.pool, faults);
+    let expected = cell
+        .tested
+        .judgement
+        .effective
+        .and_then(|effective| history.content_number_of(effective));
+    let got = match &read_only.outcome.outcome {
+        RecoveryOutcome::FileRead { content, .. } => {
+            content_number_of_bytes(content, history.last_confirmed_content_number())
+        }
+        RecoveryOutcome::NoFile { .. } => Some(0),
+        RecoveryOutcome::Failed { .. } => None,
+    };
+    emit_fourth_run_positive_control(
+        arm.name,
+        "PC-read-only",
+        &coordinates,
+        &[sentence(
+            SentenceTag::ArmDefinition,
+            "recover_reads_back_the_version_under_the_faults",
+            SentenceVerdict::of(expected.is_some() && got == expected),
+            "F9",
+        )],
+        &format!(
+            "expected_content={expected:?} got_content={got:?} landing={} e_under_faults={}",
+            key_text(chosen_root_of(&read_only.outcome.outcome)),
+            key_text(cell.tested.judgement.effective)
+        ),
+    );
+}
+
+/// PC-丢写（登记 5.4）：PC-N-环 那段历史（`read_fails`、W）走完之后、最后那次 `mount_writable` 之前，
+/// 把被藏那一版的数据单元两份都改写成别的字节；每一臂：Q1 覆盖 > 0，Q3 读回不是最后确认那一版。
+fn run_fourth_run_lost_write_control(
+    arm: FourthRunArm,
+    history: &ThirdRunHistory,
+    parameters: &MakeFilesystemParameters,
+    cell: &FourthRunControlCell,
+) {
+    let protected = history.confirmations.last().cloned().expect("确认过");
+    let (corrupted, loss) = positive_control_lost_write(
+        history,
+        &protected,
+        &history.pool,
+        &cell.tested.call.call.pool_after,
+        parameters,
+    );
+    let verdict = if corrupted == 0 {
+        SentenceVerdict::NotConstructible
+    } else {
+        SentenceVerdict::of(loss.overwrite_cell() && loss.read_back != "last_confirmed")
+    };
+    emit_fourth_run_positive_control(
+        arm.name,
+        "PC-lost-write",
+        "form=read_fails duration=W",
+        &[sentence(
+            SentenceTag::Measured,
+            "overwrite_counted_and_not_last_confirmed",
+            verdict,
+            "V1",
+        )],
+        &format!("corrupted_copies={corrupted} {}", loss.render()),
+    );
+}
+
+/// PC-O（第 3 次跑登记 5.4 PC-O 行，标签照第 4 次跑 5.4）：P(1, C) → A（b = `unit_first_copy`、`read_fails`、O(1 只)）。
+fn run_fourth_run_positive_control_second_read(geometry: &Geometry, arm: FourthRunArm) {
+    let parameters = parameters_for(geometry);
+    let history = match fourth_run_plain_prefix(geometry, 1, Closing::ProcessExit, arm.name) {
+        Ok(prefix) => prefix.history,
+        Err(error) => {
+            emit_fourth_run_positive_control(
+                arm.name,
+                "PC-O",
+                "duration=O1only",
+                &[sentence(
+                    SentenceTag::Measured,
+                    "prefix",
+                    SentenceVerdict::NotConstructible,
+                    "V1",
+                )],
+                &format!("reason={error:?}"),
+            );
+            return;
+        }
+    };
+    let Ok(pool_geometry) = independent_geometry(&history.pool) else {
+        return;
+    };
+    let hidden = history.tip();
+    let before_hidden = history.timeline.iter().rev().nth(1).copied();
+    let Ok(Some(faults)) = fourth_run_abandonment_faults(
+        &history,
+        &pool_geometry,
+        UnreadableForm::ReadFails,
+        ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+        FaultDuration::OnlyTheNthRead(1),
+        1,
+    ) else {
+        emit_fourth_run_positive_control(
+            arm.name,
+            "PC-O",
+            "duration=O1only",
+            &[sentence(
+                SentenceTag::Measured,
+                "faults",
+                SentenceVerdict::NotConstructible,
+                "V1",
+            )],
+            "reason=\"落点造不出\"",
+        );
+        return;
+    };
+    let mut scratch = ThirdRunFamilySummary::default();
+    let Ok(cell) =
+        run_fourth_run_control_cell(arm, &history, &parameters, &faults, "PC-O", &mut scratch)
+    else {
+        return;
+    };
+    emit_fourth_run_scratch_findings("PC-O", arm.name, &scratch);
+    let summary = &cell.tested.summary;
+    let ok = cell.tested.call.call.outcome.is_ok();
+    let mut sentences = vec![sentence(
+        SentenceTag::Measured,
+        "truth_newer",
+        SentenceVerdict::of(cell.tested.judgement.truth_newer),
+        "V1",
+    )];
+    if arm.is_today() {
+        sentences.push(sentence(
+            SentenceTag::Measured,
+            "faults_reached",
+            SentenceVerdict::of(cell.tested.unintercepted.is_empty()),
+            "V2",
+        ));
+    }
+    sentences.push(match arm.candidate {
+        FourthRunCandidate::Today => sentence(
+            SentenceTag::TodayDescription,
+            "ok_effective_before_hidden",
+            SentenceVerdict::of(ok && summary.effective == before_hidden),
+            "F4",
+        ),
+        FourthRunCandidate::Jia => sentence(
+            SentenceTag::ArmDefinition,
+            "refused_k3",
+            SentenceVerdict::of(refused_before_any_write(&cell, arm)),
+            "F9",
+        ),
+        FourthRunCandidate::Yi | FourthRunCandidate::YiNarrow => sentence(
+            SentenceTag::ArmDefinition,
+            "ok_after_one_round_chosen_hidden",
+            SentenceVerdict::of(ok && summary.chosen == Some(hidden) && summary.waits == 1),
+            "F16",
+        ),
+        FourthRunCandidate::Bing => sentence(
+            SentenceTag::ArmDefinition,
+            "ok_effective_hidden",
+            SentenceVerdict::of(ok && summary.effective == Some(hidden)),
+            "F9",
+        ),
+    });
+    emit_fourth_run_positive_control(
+        arm.name,
+        "PC-O",
+        "duration=O1only",
+        &sentences,
+        &format!(
+            "faults={} q0_destination={} {} {} {} unintercepted={}",
+            faults.len(),
+            cell.destination.name(),
+            render_fourth_run_tested_mount(&cell.tested),
+            cell.remount_line,
+            cell.loss.render(),
+            cell.tested.unintercepted.join(",")
+        ),
+    );
+}
+
+/// PC-N0（L0 全部 8 格）：P(n1, c) → 被测挂载，不注入。每臂 `Ok`（K0）、N_真 为假、取号写的 tail（-配置续 = c_见证，别的 = 0）；
+/// 与今天逐项相同、PC-多读 (ii) 的点值在 `r4-compare` 里判（这里打出读数、指纹与 p）。L0 族（第四段）用同一批格。
+fn run_fourth_run_positive_control_no_newer(geometry: &Geometry, arm: FourthRunArm) {
+    let parameters = parameters_for(geometry);
+    let mut cells = 0u64;
+    for overwrites in THIRD_RUN_OVERWRITES {
+        for closing in [Closing::ProcessExit, Closing::NormalUnmount] {
+            let coordinates = format!("n1={overwrites} c={}", closing.name());
+            let history = match fourth_run_plain_prefix(geometry, overwrites, closing, arm.name) {
+                Ok(prefix) => prefix.history,
+                Err(error) => {
+                    emit_fourth_run_positive_control(
+                        arm.name,
+                        "PC-N0",
+                        &coordinates,
+                        &[sentence(
+                            SentenceTag::Measured,
+                            "prefix",
+                            SentenceVerdict::NotConstructible,
+                            "V1",
+                        )],
+                        &format!("reason={error:?}"),
+                    );
+                    continue;
+                }
+            };
+            let base = history.pool.clone();
+            let mut scratch = ThirdRunFamilySummary::default();
+            let Ok(tested) = run_fourth_run_tested_mount(
+                arm,
+                &base,
+                &parameters,
+                &[],
+                &coordinates,
+                &mut scratch,
+            ) else {
+                continue;
+            };
+            cells += 1;
+            let (fingerprint, acquisition_tails) =
+                write_fingerprint_of(&tested.call.call.applied, 2);
+            let tail_expected = if arm.witness == FourthRunWitness::SystemConfigurationCarried {
+                tested.judgement.witnessed_tail
+            } else {
+                0
+            };
+            let tails_hold = acquisition_tails.len() == 2
+                && acquisition_tails.iter().all(|tail| *tail == tail_expected);
+            let instance_table_pages = tested.call.call.outcome.as_ref().ok().and_then(|mounted| {
+                let devices = devices_from_pool(&base, IMAGE_BYTES);
+                singlefs_core::recovery::instance_table_chain_of_root(
+                    &devices,
+                    &mounted.output.effective_root,
+                )
+                .ok()
+                .map(|chain| chain.page_pointers.len())
+            });
+            let sentences = vec![
+                sentence(
+                    SentenceTag::Measured,
+                    "truth_not_newer",
+                    SentenceVerdict::of(!tested.judgement.truth_newer),
+                    "V1",
+                ),
+                sentence(
+                    SentenceTag::ArmDefinition,
+                    "ok_k0",
+                    SentenceVerdict::of(tested.summary.class == "K0"),
+                    "F12",
+                ),
+                sentence(
+                    SentenceTag::ArmDefinition,
+                    "acquisition_tails",
+                    SentenceVerdict::of(tails_hold),
+                    "F12",
+                ),
+            ];
+            emit_fourth_run_positive_control(
+                arm.name,
+                "PC-N0",
+                &coordinates,
+                &sentences,
+                &format!(
+                    "write_fingerprint={fingerprint:016x} base_fingerprint={:016x} acquisition_tails={} acquisition_tail_expected={tail_expected} effective_instance_table_pages={} {} s4_mismatches={}",
+                    image_fingerprint(&base),
+                    acquisition_tails
+                        .iter()
+                        .map(u64::to_string)
+                        .collect::<Vec<_>>()
+                        .join(","),
+                    instance_table_pages.map_or("none".to_string(), |pages| pages.to_string()),
+                    render_fourth_run_tested_mount(&tested),
+                    scratch.stop_condition_four_mismatches.len()
+                ),
+            );
+            emit_fourth_run_scratch_findings("PC-N0", arm.name, &scratch);
+        }
+    }
+    let registered = 4 * 2;
+    emit_result(&format!(
+        "name=r4_section_seven_two_anchor arm={} item=\"L0 格数 4×2\" computed={cells} registered={registered} verdict={}",
+        arm.name,
+        if cells == registered { "pass" } else { "fail_v4" }
+    ));
+}
+
+// ---------------------------------------------------------------------------
+// 12.7 在今天那一臂上造的起始镜像（登记「读法写死」表「被测那次挂载」一行：被测之前的镜像一律在今天那一臂上造）。
+//      起始镜像里有一段要靠今天那一臂的代码走的（L5、PC-22、PC-554 的 A；L1(b) 那次可写挂载的写序列；H1f 第二次取号），
+//      由今天那一份副本跑 `r4-bases` 写进目录（环境变量 `SINGLEFS_E158_TODAY_BASES`），各臂读回来；各臂自己按同一串步骤记账，
+//      账里的根与读回来的镜像上的自证根逐条核（`r4_today_base_check` 行）。
+// ---------------------------------------------------------------------------
+
+/// 一份在今天那一臂上造的起始镜像：镜像，今天那一臂那几次调用写下、装置的账要补的根（与它们沿用的内容号），
+/// 与 L5 要的「今天那一臂在孪生镜像上做那次挂载时每一片被读的次数」。
+struct TodayBase {
+    image: MemoryPool,
+    appended_roots: Vec<(TimelineRoot, u64)>,
+    page_reads: Vec<u64>,
+}
+
+const TODAY_BASE_MAGIC: &[u8; 8] = b"E158R4B1";
+
+fn today_bases_directory() -> Result<std::path::PathBuf, String> {
+    env::var("SINGLEFS_E158_TODAY_BASES")
+        .map(std::path::PathBuf::from)
+        .map_err(|_| {
+            "环境变量 SINGLEFS_E158_TODAY_BASES 没给（先在今天那一份副本上跑 r4-bases）".to_string()
+        })
+}
+
+fn encode_today_base(base: &TodayBase) -> Vec<u8> {
+    let mut bytes = TODAY_BASE_MAGIC.to_vec();
+    bytes.extend_from_slice(
+        &u32::try_from(base.image.devices.len())
+            .expect("两块盘")
+            .to_le_bytes(),
+    );
+    for (identity, device) in &base.image.devices {
+        let sectors =
+            device.written_sectors_in(DeviceOffsetInBytes(0), base.image.device_size_in_bytes);
+        bytes.extend_from_slice(&identity.0.to_le_bytes());
+        bytes.extend_from_slice(&(sectors.len() as u64).to_le_bytes());
+        for sector in sectors {
+            bytes.extend_from_slice(&sector.to_le_bytes());
+            bytes.extend_from_slice(
+                &device.read(DeviceOffsetInBytes(sector * SECTOR_BYTES_LOCAL), 512),
+            );
+        }
+    }
+    bytes.extend_from_slice(&(base.appended_roots.len() as u64).to_le_bytes());
+    for ((instance, txg), content_number) in &base.appended_roots {
+        bytes.extend_from_slice(&instance.to_le_bytes());
+        bytes.extend_from_slice(&txg.to_le_bytes());
+        bytes.extend_from_slice(&content_number.to_le_bytes());
+    }
+    bytes.extend_from_slice(&(base.page_reads.len() as u64).to_le_bytes());
+    for reads in &base.page_reads {
+        bytes.extend_from_slice(&reads.to_le_bytes());
+    }
+    bytes
+}
+
+/// 按字节流顺序取定宽的整数（`decode_today_base` 用）。
+struct ByteCursor<'bytes> {
+    bytes: &'bytes [u8],
+    position: usize,
+}
+
+impl ByteCursor<'_> {
+    fn take(&mut self, length: usize) -> Result<&[u8], String> {
+        let end = self.position + length;
+        let taken = self
+            .bytes
+            .get(self.position..end)
+            .ok_or_else(|| format!("起始镜像文件在第 {} 字节截断", self.position))?;
+        self.position = end;
+        Ok(taken)
+    }
+
+    fn u32_value(&mut self) -> Result<u32, String> {
+        Ok(u32::from_le_bytes(
+            self.take(4)?.try_into().expect("4 字节"),
+        ))
+    }
+
+    fn u64_value(&mut self) -> Result<u64, String> {
+        Ok(u64::from_le_bytes(
+            self.take(8)?.try_into().expect("8 字节"),
+        ))
+    }
+}
+
+fn decode_today_base(bytes: &[u8]) -> Result<TodayBase, String> {
+    let mut cursor = ByteCursor { bytes, position: 0 };
+    if cursor.take(8)? != TODAY_BASE_MAGIC {
+        return Err("起始镜像文件的魔数不对".to_string());
+    }
+    let device_count = cursor.u32_value()?;
+    let mut devices = BTreeMap::new();
+    for _ in 0..device_count {
+        let identity = DeviceIdentity(cursor.u32_value()?);
+        let sector_count = cursor.u64_value()?;
+        let mut device = SparseDevice::default();
+        for _ in 0..sector_count {
+            let sector = cursor.u64_value()?;
+            let content = cursor.take(512)?.to_vec();
+            device.write(DeviceOffsetInBytes(sector * SECTOR_BYTES_LOCAL), &content);
+        }
+        devices.insert(identity, device);
+    }
+    let appended_count = cursor.u64_value()?;
+    let mut appended_roots = Vec::new();
+    for _ in 0..appended_count {
+        let instance = cursor.u32_value()?;
+        let txg = cursor.u64_value()?;
+        let content_number = cursor.u64_value()?;
+        appended_roots.push(((instance, txg), content_number));
+    }
+    let page_count = cursor.u64_value()?;
+    let mut page_reads = Vec::new();
+    for _ in 0..page_count {
+        page_reads.push(cursor.u64_value()?);
+    }
+    Ok(TodayBase {
+        image: MemoryPool {
+            devices,
+            device_size_in_bytes: IMAGE_BYTES,
+        },
+        appended_roots,
+        page_reads,
+    })
+}
+
+fn today_base_path(key: &str) -> Result<std::path::PathBuf, String> {
+    Ok(today_bases_directory()?.join(format!("{key}.base")))
+}
+
+fn save_today_base(key: &str, base: &TodayBase) -> Result<(), String> {
+    let path = today_base_path(key)?;
+    std::fs::write(&path, encode_today_base(base))
+        .map_err(|error| format!("{}: {error}", path.display()))
+}
+
+fn load_today_base(key: &str) -> Result<TodayBase, String> {
+    let path = today_base_path(key)?;
+    let bytes = std::fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+    decode_today_base(&bytes)
+}
+
+/// 把今天那一臂造的镜像换进这一臂按同一串步骤记的账：补上今天那几次调用写下的根，逐条核账里的根都是读回来的镜像上的自证根。
+fn adopt_today_base(
+    history: &mut ThirdRunHistory,
+    key: &str,
+    arm: FourthRunArm,
+) -> Result<Vec<u64>, String> {
+    let base = load_today_base(key)?;
+    for (root, content_number) in &base.appended_roots {
+        history.push_carried(*root, *content_number);
+    }
+    let geometry = independent_geometry(&base.image)?;
+    let on_the_image = readable_roots_independent(&base.image, &geometry);
+    let missing: Vec<String> = history
+        .content_number_by_root
+        .keys()
+        .filter(|root| !on_the_image.contains(root))
+        .map(|root| key_text(Some(*root)))
+        .collect();
+    emit_result(&format!(
+        "name=r4_today_base_check arm={} key={key} base_fingerprint={:016x} appended_roots={} ledger_roots_missing_on_the_image={} note=\"根环转过的旧根不在镜像上是正常的，只报数\"",
+        arm.name,
+        image_fingerprint(&base.image),
+        base.appended_roots.len(),
+        missing.len()
+    ));
+    history.pool = base.image;
+    history.session = None;
+    Ok(base.page_reads)
+}
+
+// ---------------------------------------------------------------------------
+// 12.8 第三段：H1f（前缀中间夹一次重挂载，前缀镜像在今天那一臂上造）、H1g（a 次挂载崩在取号之后，在这一臂自己的副本上做）。
+// ---------------------------------------------------------------------------
+
+fn remount_prefix_key(
+    geometry: &Geometry,
+    first_overwrites: u64,
+    closing: Closing,
+    second_overwrites: u64,
+) -> String {
+    format!(
+        "h1f-s{}-ring{}-n1a{first_overwrites}-c{}-n1b{second_overwrites}",
+        geometry.slots_per_region,
+        geometry.journal_ring_bytes,
+        closing.name()
+    )
+}
+
+/// H1f 的八个前缀（这一臂按同一串步骤记账，镜像换成今天那一臂造的那一份）。
+fn fourth_run_remount_prefixes(
+    geometry: &Geometry,
+    arm: FourthRunArm,
+) -> Vec<Result<FourthRunPrefix, String>> {
+    let mut prefixes = Vec::new();
+    for first_overwrites in FOURTH_RUN_REMOUNT_PREFIX_FIRST_OVERWRITES {
+        for closing in [Closing::ProcessExit, Closing::NormalUnmount] {
+            for second_overwrites in FOURTH_RUN_REMOUNT_PREFIX_SECOND_OVERWRITES {
+                prefixes.push(
+                    fourth_run_remount_prefix(
+                        geometry,
+                        first_overwrites,
+                        closing,
+                        second_overwrites,
+                        arm.name,
+                    )
+                    .and_then(|mut prefix| {
+                        let key = remount_prefix_key(
+                            geometry,
+                            first_overwrites,
+                            closing,
+                            second_overwrites,
+                        );
+                        adopt_today_base(&mut prefix.history, &key, arm)?;
+                        Ok(prefix)
+                    }),
+                );
+            }
+        }
+    }
+    prefixes
+}
+
+fn run_fourth_run_segment_three(arm: FourthRunArm) {
+    run_fourth_run_remount_families(arm);
+    run_fourth_run_acquisition_crash_family(arm);
+}
+
+/// H1f（G0）：八个前缀接 H1d 的全部断点、接 H1e 的 m 尾巴。
+fn run_fourth_run_remount_families(arm: FourthRunArm) {
+    for (name, continuation) in [
+        ("h1f-cuts", FourthRunContinuation::EveryCut),
+        ("h1f-tail", FourthRunContinuation::Tail),
+    ] {
+        let family = FourthRunFamily {
+            name,
+            geometry: &GEOMETRY_PRIMARY,
+            hidden_count: 1,
+            continuation,
+            tail_overwrites: &THIRD_RUN_TAIL_OVERWRITES,
+            durations: FourthRunDurationPlan::OfTheArm,
+            checks_the_clauses_on_the_hidden_root:
+                ClauseChecksOnTheHiddenRoot::NotRegisteredForThisFamily,
+        };
+        run_fourth_run_family(
+            &family,
+            arm,
+            fourth_run_remount_prefixes(&GEOMETRY_PRIMARY, arm),
+        );
+    }
+}
+
+/// H1g（G0）：P(n1, C) → a 次挂载崩在取号之后（这一臂自己的副本上）→ A（不断，W）→ m 尾巴。
+fn run_fourth_run_acquisition_crash_family(arm: FourthRunArm) {
+    let family = FourthRunFamily {
+        name: "h1g",
+        geometry: &GEOMETRY_PRIMARY,
+        hidden_count: 1,
+        continuation: FourthRunContinuation::Tail,
+        tail_overwrites: &FOURTH_RUN_ACQUISITION_CRASH_TAIL_OVERWRITES,
+        durations: FourthRunDurationPlan::WholeCallOnly,
+        checks_the_clauses_on_the_hidden_root:
+            ClauseChecksOnTheHiddenRoot::NotRegisteredForThisFamily,
+    };
+    let mut prefixes = Vec::new();
+    for overwrites in FOURTH_RUN_ACQUISITION_CRASH_PREFIX_OVERWRITES {
+        for acquisition_crashes in FOURTH_RUN_ACQUISITION_CRASHES {
+            prefixes.push(
+                fourth_run_acquisition_crash_prefix(
+                    &GEOMETRY_PRIMARY,
+                    overwrites,
+                    acquisition_crashes,
+                )
+                .map(|(prefix, checks)| {
+                    emit_result(&format!(
+                        "name=r4_h1g_acquisition_crash arm={} {} checks={}",
+                        arm.name,
+                        prefix.coordinates,
+                        checks.join(",")
+                    ));
+                    prefix
+                }),
+            );
+        }
+    }
+    run_fourth_run_family(&family, arm, prefixes);
+}
+
+// ---------------------------------------------------------------------------
+// 12.9 第四段：L0–L6（第 3 次跑 5.3 那几行，合法状态与第 22 条那一格）；PC-多拒、PC-22、PC-554 的格（跨臂那几句在 compare 里判）。
+//      每一格打一行 `r4_l_cell`：被测挂载的结局、N_真、读数、起始镜像指纹（Q4、Q5-同成 的输入），L5 另打隔离总数与每一片的读数（Q6）。
+// ---------------------------------------------------------------------------
+
+/// L 族与第四、五段那几格的账：第 3 次跑那一份汇总（7.3 第一行、F13 的点名），加每族每个几何点实际跑到被测挂载的格数（7.2）。
+#[derive(Default)]
+struct FourthRunLegalAndFaultStateTally {
+    counts: ThirdRunFamilySummary,
+    cells: BTreeMap<String, u64>,
+}
+
+/// 一格 L 族被测挂载打一行。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "一格的族、坐标、起始镜像、被测挂载与故障原样打进结果行，拆成结构体只多一层搬运"
+)]
+fn emit_fourth_run_legal_or_fault_state_cell(
+    family: &str,
+    arm: FourthRunArm,
+    geometry: &Geometry,
+    coordinates: &str,
+    base: &MemoryPool,
+    tested: &FourthRunTestedMount,
+    faults: &[ThirdRunFault],
+    extra: &str,
+) {
+    let (write_fingerprint, _) = write_fingerprint_of(&tested.call.call.applied, 2);
+    emit_result(&format!(
+        "name=r4_l_cell family={family} arm={} geometry={} {coordinates} base_fingerprint={:016x} write_fingerprint={write_fingerprint:016x} faults={} unintercepted={} refused={} truth_newer_on_the_twin={} {} {extra}",
+        arm.name,
+        geometry.label,
+        image_fingerprint(base),
+        faults.len(),
+        tested.unintercepted.join(","),
+        tested.call.call.outcome.is_err(),
+        tested.judgement.truth_newer,
+        render_fourth_run_tested_mount(tested)
+    ));
+}
+
+/// 在装置的账上记下一次改内容的调用写了哪些（第 3 次跑 `third_run_change_content` 同一串调用，经受观测的设备走），交回写序列。
+fn fourth_run_change_content_recorded(
+    history: &mut ThirdRunHistory,
+    parameters: &MakeFilesystemParameters,
+) -> Result<Vec<AppliedDeviceStep>, String> {
+    let content_number = history.last_confirmed_content_number() + 1;
+    let content = third_run_content(content_number);
+    let mut session = history.session.take().ok_or("改内容：没有开着的会话")?;
+    let base = history.pool.clone();
+    let call = fourth_run_call(&base, &[], None, None, |devices| {
+        let mut writer = PoolWriter::new(parameters, devices.as_mut_slice());
+        let file = FirstFile {
+            content: &content,
+            write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60 * content_number,
+        };
+        match &session.current {
+            PoolVersion::WithFile(previous) => publish_overwrite(
+                &mut writer,
+                &mut session.allocator,
+                previous,
+                file,
+                session.instance,
+            )
+            .map_err(|error| format!("覆盖写: {error:?}")),
+            PoolVersion::WithoutFile(version) => publish_first_file(
+                &mut writer,
+                &mut session.allocator,
+                &version.root,
+                file,
+                session.instance,
+                session.current.record_bytes(),
+            )
+            .map_err(|error| format!("首个文件: {error:?}")),
+        }
+    });
+    let output = call.call.outcome?;
+    history.pool = call.call.pool_after;
+    let root_record = output.root;
+    session.current = PoolVersion::WithFile(output);
+    history.session = Some(session);
+    record_confirmation(history, &root_record, content_number)?;
+    Ok(call.call.applied)
+}
+
+/// 前 `count` 个写的崩溃状态里「写」的个数（屏障不数）。
+fn writes_in(applied: &[AppliedDeviceStep]) -> usize {
+    applied
+        .iter()
+        .filter(|step| !matches!(step, AppliedDeviceStep::Barrier { .. }))
+        .count()
+}
+
+fn legal_or_fault_state_prefix(
+    geometry: &Geometry,
+    overwrites: u64,
+    arm: FourthRunArm,
+) -> Result<ThirdRunHistory, String> {
+    Ok(fourth_run_plain_prefix(geometry, overwrites, Closing::ProcessExit, arm.name)?.history)
+}
+
+/// 一格 L 族被测挂载：在 `base` 上装 `faults` 跑这一臂的可写挂载，打一行。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "一格的族、坐标、起始镜像与故障原样打进结果行，拆成结构体只多一层搬运"
+)]
+fn run_fourth_run_legal_or_fault_state_cell(
+    family: &str,
+    arm: FourthRunArm,
+    geometry: &Geometry,
+    coordinates: &str,
+    base: &MemoryPool,
+    faults: &[ThirdRunFault],
+    extra: &str,
+    summary: &mut FourthRunLegalAndFaultStateTally,
+) -> Option<FourthRunTestedMount> {
+    *summary
+        .cells
+        .entry(format!("{family}:{}", geometry.label))
+        .or_insert(0) += 1;
+    let parameters = parameters_for(geometry);
+    match run_fourth_run_tested_mount(
+        arm,
+        base,
+        &parameters,
+        faults,
+        coordinates,
+        &mut summary.counts,
+    ) {
+        Ok(tested) => {
+            emit_fourth_run_legal_or_fault_state_cell(
+                family,
+                arm,
+                geometry,
+                coordinates,
+                base,
+                &tested,
+                faults,
+                extra,
+            );
+            Some(tested)
+        }
+        Err(error) => {
+            emit_result(&format!(
+                "name=r4_l_cell family={family} arm={} geometry={} {coordinates} verdict=stop reason={error:?}",
+                arm.name, geometry.label
+            ));
+            None
+        }
+    }
+}
+
+/// L0（P(n1, c)，不注入）与 L1（崩溃状态上不注入）。
+fn run_fourth_run_legal_state_families(
+    geometry: &Geometry,
+    arm: FourthRunArm,
+    summary: &mut FourthRunLegalAndFaultStateTally,
+) {
+    let parameters = parameters_for(geometry);
+    for overwrites in THIRD_RUN_OVERWRITES {
+        for closing in [Closing::ProcessExit, Closing::NormalUnmount] {
+            let coordinates = format!("n1={overwrites} c={}", closing.name());
+            match fourth_run_plain_prefix(geometry, overwrites, closing, arm.name) {
+                Ok(prefix) => {
+                    run_fourth_run_legal_or_fault_state_cell(
+                        "l0",
+                        arm,
+                        geometry,
+                        &coordinates,
+                        &prefix.history.pool,
+                        &[],
+                        "",
+                        summary,
+                    );
+                }
+                Err(error) => emit_result(&format!(
+                    "name=r4_l_cell family=l0 arm={} {coordinates} verdict=stop reason={error:?}",
+                    arm.name
+                )),
+            }
+        }
+        // L1(a)：P(n1, C) 最后一次改内容的发布的写序列上，前 j 个写落盘的崩溃状态（j 取全部真前缀）。
+        let history_before_the_last_change = if overwrites == 0 {
+            third_run_history_start_without_the_first_file(geometry)
+        } else {
+            third_run_history_start(geometry, overwrites - 1)
+        };
+        match history_before_the_last_change.and_then(|mut history| {
+            let before = history.pool.clone();
+            let applied = fourth_run_change_content_recorded(&mut history, &parameters)?;
+            Ok((before, applied))
+        }) {
+            Ok((before, applied)) => {
+                for writes in 0..writes_in(&applied) {
+                    let crashed = image_with_the_first_writes(&before, &applied, writes);
+                    run_fourth_run_legal_or_fault_state_cell(
+                        "l1a",
+                        arm,
+                        geometry,
+                        &format!("n1={overwrites} point={writes} of={}", writes_in(&applied)),
+                        &crashed,
+                        &[],
+                        "",
+                        summary,
+                    );
+                }
+            }
+            Err(error) => emit_result(&format!(
+                "name=r4_l_cell family=l1a arm={} n1={overwrites} verdict=stop reason={error:?}",
+                arm.name
+            )),
+        }
+        // L1(b)：P(n1, C) 之后一次可写挂载的写序列（今天那一臂上录的，r4-bases 存了每个崩溃状态）。
+        let mut point = 0usize;
+        loop {
+            let key = format!(
+                "l1b-s{}-ring{}-n1{overwrites}-point{point}",
+                geometry.slots_per_region, geometry.journal_ring_bytes
+            );
+            let Ok(base) = load_today_base(&key) else {
+                if point == 0 {
+                    emit_result(&format!(
+                        "name=r4_l_cell family=l1b arm={} n1={overwrites} verdict=stop reason=\"今天那一臂的起始镜像读不出（先跑 r4-bases）\"",
+                        arm.name
+                    ));
+                }
+                break;
+            };
+            run_fourth_run_legal_or_fault_state_cell(
+                "l1b",
+                arm,
+                geometry,
+                &format!("n1={overwrites} point={point}"),
+                &base.image,
+                &[],
+                "",
+                summary,
+            );
+            point += 1;
+        }
+        // L1(c)：P(n1, U) 的卸载写序列上前 j 个写落盘的崩溃状态。
+        match third_run_history_start(geometry, overwrites).and_then(|mut history| {
+            let before = history.pool.clone();
+            let applied = fourth_run_unmount_recorded(&mut history, &parameters)?;
+            Ok((before, applied))
+        }) {
+            Ok((before, applied)) => {
+                for writes in 0..writes_in(&applied) {
+                    let crashed = image_with_the_first_writes(&before, &applied, writes);
+                    run_fourth_run_legal_or_fault_state_cell(
+                        "l1c",
+                        arm,
+                        geometry,
+                        &format!("n1={overwrites} point={writes} of={}", writes_in(&applied)),
+                        &crashed,
+                        &[],
+                        "",
+                        summary,
+                    );
+                }
+            }
+            Err(error) => emit_result(&format!(
+                "name=r4_l_cell family=l1c arm={} n1={overwrites} verdict=stop reason={error:?}",
+                arm.name
+            )),
+        }
+    }
+}
+
+/// P(n1, ·) 走到「mkfs → 可写挂载」为止、首个文件之前（L1(a) 在 n1 = 0 上要首个文件那一次发布自己的写序列）。
+fn third_run_history_start_without_the_first_file(
+    geometry: &Geometry,
+) -> Result<ThirdRunHistory, String> {
+    let parameters = parameters_for(geometry);
+    let mut devices = new_devices(IMAGE_BYTES);
+    let genesis =
+        make_filesystem(&parameters, &mut devices).map_err(|error| format!("mkfs: {error:?}"))?;
+    let mounted = mount_writable(&parameters, &mut devices)
+        .map_err(|error| format!("第一次可写挂载: {error:?}"))?;
+    let mut history = ThirdRunHistory {
+        pool: memory_pool_of(&devices, IMAGE_BYTES),
+        session: None,
+        timeline: vec![root_pair(&genesis.root)],
+        content_number_by_root: BTreeMap::from([(root_pair(&genesis.root), 0)]),
+        confirmations: Vec::new(),
+        tail_checks: 0,
+        tail_check_failures: Vec::new(),
+    };
+    push_the_publishes_of_a_mount(&mut history, &mounted, 0);
+    history.session = Some(Session {
+        allocator: mounted.allocator,
+        current: mounted.current,
+        instance: mounted.output.instance,
+    });
+    Ok(history)
+}
+
+/// 正常卸载（经受观测的设备走），交回写序列（L1(c)）。
+fn fourth_run_unmount_recorded(
+    history: &mut ThirdRunHistory,
+    parameters: &MakeFilesystemParameters,
+) -> Result<Vec<AppliedDeviceStep>, String> {
+    let Session {
+        mut allocator,
+        mut current,
+        ..
+    } = history.session.take().ok_or("卸载：没有开着的会话")?;
+    let call = fourth_run_call(&history.pool, &[], None, None, |devices| {
+        singlefs_core::mount::unmount(
+            parameters,
+            devices,
+            &mut allocator,
+            &mut current,
+            ShadowLedger::On,
+        )
+        .map(|_| ())
+        .map_err(|error| format!("正常卸载: {error:?}"))
+    });
+    call.call.outcome?;
+    history.pool = call.call.pool_after;
+    Ok(call.call.applied)
+}
+
+/// 第 k 新的根（按时间线）根槽的落点，W 读坏（L2、PC-多拒 的 -槽 那一格）。
+fn older_root_slot_faults(
+    history: &ThirdRunHistory,
+    geometry: &PoolGeometry,
+    newest_rank: usize,
+    form: UnreadableForm,
+) -> Option<Vec<ThirdRunFault>> {
+    let root = *history.timeline.iter().rev().nth(newest_rank - 1)?;
+    let (device, offset) = root_slot_of(&history.pool, geometry, root)?;
+    Some(vec![ThirdRunFault {
+        device,
+        offset,
+        length: u64::from(geometry.physical_block_size),
+        form,
+        duration: FaultDuration::WholeCall,
+        label: format!("root{}", key_text(Some(root))),
+    }])
+}
+
+/// L3 的三种：(a) 最新那次发布的末条记录两份；(b) 全部记录两份；(c) 末条记录盘 0 那一份。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RecordFaultChoice {
+    LastRecordBothCopies,
+    EveryRecordBothCopies,
+    LastRecordDeviceZeroCopy,
+}
+
+impl RecordFaultChoice {
+    fn name(self) -> &'static str {
+        match self {
+            RecordFaultChoice::LastRecordBothCopies => "a",
+            RecordFaultChoice::EveryRecordBothCopies => "b",
+            RecordFaultChoice::LastRecordDeviceZeroCopy => "c",
+        }
+    }
+}
+
+fn record_faults(
+    history: &ThirdRunHistory,
+    geometry: &PoolGeometry,
+    choice: RecordFaultChoice,
+    form: UnreadableForm,
+) -> Option<Vec<ThirdRunFault>> {
+    let records = records_of_publish(&history.pool, geometry, history.tip());
+    let last_counter = records.iter().map(|(counter, _, _)| *counter).max()?;
+    let chosen: Vec<&(u64, u64, JournalRecord)> = records
+        .iter()
+        .filter(|(counter, _, _)| match choice {
+            RecordFaultChoice::LastRecordBothCopies
+            | RecordFaultChoice::LastRecordDeviceZeroCopy => *counter == last_counter,
+            RecordFaultChoice::EveryRecordBothCopies => true,
+        })
+        .collect();
+    let devices: &[u32] = match choice {
+        RecordFaultChoice::LastRecordDeviceZeroCopy => &[0],
+        RecordFaultChoice::LastRecordBothCopies | RecordFaultChoice::EveryRecordBothCopies => {
+            &[0, 1]
+        }
+    };
+    let mut faults = Vec::new();
+    for (counter, offset, _) in chosen {
+        for device in devices {
+            faults.push(ThirdRunFault {
+                device: DeviceIdentity(*device),
+                offset: *offset,
+                length: JOURNAL_RECORD_BYTES,
+                form,
+                duration: FaultDuration::WholeCall,
+                label: format!("record(counter={counter},device={device})"),
+            });
+        }
+    }
+    Some(faults)
+}
+
+/// L4：世代号最新的系统配置槽：(a) 盘 0 那一槽；(b) 两块盘各自那一槽。
+fn system_configuration_faults(
+    pool: &MemoryPool,
+    geometry: &PoolGeometry,
+    both_devices: bool,
+    form: UnreadableForm,
+) -> Vec<ThirdRunFault> {
+    let slot_spacing = geometry.slot_spacing;
+    let devices: &[u32] = if both_devices { &[0, 1] } else { &[0] };
+    let mut faults = Vec::new();
+    for device in devices {
+        let newest = [0u64, slot_spacing]
+            .into_iter()
+            .filter_map(|offset| {
+                let bytes = pool.read(*device, offset, 4096)?;
+                singlefs_core::system_configuration::SystemConfiguration::parse_slot(&bytes)
+                    .ok()
+                    .map(|parsed| (parsed.quantities.slot_generation, offset))
+            })
+            .max_by_key(|(generation, _)| *generation);
+        if let Some((generation, offset)) = newest {
+            faults.push(ThirdRunFault {
+                device: DeviceIdentity(*device),
+                offset,
+                length: SYSTEM_CONFIGURATION_SLOT_BYTES_LOCAL,
+                form,
+                duration: FaultDuration::WholeCall,
+                label: format!("system_configuration(device={device},generation={generation})"),
+            });
+        }
+    }
+    faults
+}
+
+/// L2（第 k 新的根槽读坏，k ∈ {2, 3}）、L3（记录读坏三种）、L4（系统配置读坏两种）、L6（最新根槽读坏、链完整），两种造法。
+fn run_fourth_run_fault_state_families(
+    geometry: &Geometry,
+    arm: FourthRunArm,
+    families: &[&str],
+    summary: &mut FourthRunLegalAndFaultStateTally,
+) {
+    for overwrites in THIRD_RUN_OVERWRITES {
+        let history = match legal_or_fault_state_prefix(geometry, overwrites, arm) {
+            Ok(history) => history,
+            Err(error) => {
+                emit_result(&format!(
+                    "name=r4_l_cell family=l arm={} n1={overwrites} verdict=stop reason={error:?}",
+                    arm.name
+                ));
+                continue;
+            }
+        };
+        let Ok(pool_geometry) = independent_geometry(&history.pool) else {
+            continue;
+        };
+        let hidden = history.tip();
+        for form in [UnreadableForm::ReadFails, UnreadableForm::ReadsZeros] {
+            if families.contains(&"l2") {
+                for newest_rank in [2usize, 3] {
+                    let coordinates =
+                        format!("n1={overwrites} k={newest_rank} form={}", form.name());
+                    match older_root_slot_faults(&history, &pool_geometry, newest_rank, form) {
+                        Some(faults) => {
+                            run_fourth_run_legal_or_fault_state_cell("l2", arm, geometry, &coordinates, &history.pool, &faults, "", summary);
+                        }
+                        None => emit_result(&format!(
+                            "name=r4_l_cell family=l2 arm={} geometry={} {coordinates} verdict=not_applicable reason=\"时间线上的根不够 k 条\"",
+                            arm.name, geometry.label
+                        )),
+                    }
+                }
+            }
+            if families.contains(&"l3") {
+                for choice in [
+                    RecordFaultChoice::LastRecordBothCopies,
+                    RecordFaultChoice::EveryRecordBothCopies,
+                    RecordFaultChoice::LastRecordDeviceZeroCopy,
+                ] {
+                    let coordinates = format!(
+                        "n1={overwrites} which={} form={}",
+                        choice.name(),
+                        form.name()
+                    );
+                    match record_faults(&history, &pool_geometry, choice, form) {
+                        Some(faults) => {
+                            run_fourth_run_legal_or_fault_state_cell("l3", arm, geometry, &coordinates, &history.pool, &faults, "", summary);
+                        }
+                        None => emit_result(&format!(
+                            "name=r4_l_cell family=l3 arm={} geometry={} {coordinates} verdict=not_applicable reason=\"最新那次发布没有记录\"",
+                            arm.name, geometry.label
+                        )),
+                    }
+                }
+            }
+            if families.contains(&"l4") {
+                for (which, both_devices) in [("a", false), ("b", true)] {
+                    let coordinates = format!("n1={overwrites} which={which} form={}", form.name());
+                    let faults = system_configuration_faults(
+                        &history.pool,
+                        &pool_geometry,
+                        both_devices,
+                        form,
+                    );
+                    run_fourth_run_legal_or_fault_state_cell(
+                        "l4",
+                        arm,
+                        geometry,
+                        &coordinates,
+                        &history.pool,
+                        &faults,
+                        "",
+                        summary,
+                    );
+                }
+            }
+            if families.contains(&"l6") {
+                let coordinates = format!("n1={overwrites} form={}", form.name());
+                if let Some(faults) = older_root_slot_faults(&history, &pool_geometry, 1, form) {
+                    if let Some(tested) = run_fourth_run_legal_or_fault_state_cell(
+                        "l6",
+                        arm,
+                        geometry,
+                        &coordinates,
+                        &history.pool,
+                        &faults,
+                        "",
+                        summary,
+                    ) {
+                        // 7.1 第三行（F5，今天那一臂）：根槽读不出而记录与单元都读得出时，恢复由记录重建那次发布的根。
+                        if arm.is_today() {
+                            let holds = tested.summary.effective == Some(hidden);
+                            emit_result(&format!(
+                                "name=r4_section_seven_one_f5 arm={} {coordinates} verdict={} effective={} hidden={}",
+                                arm.name,
+                                if holds { "pass" } else { "fail_f5" },
+                                key_text(tested.summary.effective),
+                                key_text(Some(hidden))
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// L5 的 n1 与 b（登记 5.3 L5 行：n1 ∈ {1, 2, 3}；b 两种）。
+const FOURTH_RUN_CELL_22_OVERWRITES: [u64; 3] = [1, 2, 3];
+
+fn cell_22_base_key(geometry: &Geometry, overwrites: u64, replay_break: ReplayBreak) -> String {
+    format!(
+        "l5-s{}-ring{}-n1{overwrites}-b{}",
+        geometry.slots_per_region,
+        geometry.journal_ring_bytes,
+        replay_break.name()
+    )
+}
+
+/// 最新根（择根那条）的实例表每一片的两份落点（`crates/` 的沿链读，`instance_table_page_pointers_as_far_as_readable`；
+/// 装置没有自己的沿链读，执行员修订第 8 条）。
+fn instance_table_page_faults_of_the_newest_root(
+    pool: &MemoryPool,
+    duration: FaultDuration,
+) -> Result<Vec<Vec<ThirdRunFault>>, String> {
+    let (_, newest) = landing_root_on(pool)?;
+    let devices = devices_from_pool(pool, IMAGE_BYTES);
+    let pages =
+        singlefs_core::recovery::instance_table_page_pointers_as_far_as_readable(&devices, &newest);
+    Ok(pages
+        .iter()
+        .enumerate()
+        .map(|(page, pointer)| {
+            pointer
+                .locations
+                .iter()
+                .map(|location| ThirdRunFault {
+                    device: location.device,
+                    offset: location.slot.0 * SLOT_BYTES_LOCAL,
+                    length: SLOT_BYTES_LOCAL,
+                    form: UnreadableForm::ReadFails,
+                    duration,
+                    label: format!(
+                        "instance_table_page{page}(device={},slot={})",
+                        location.device.0, location.slot.0
+                    ),
+                })
+                .collect()
+        })
+        .collect())
+}
+
+/// L5 的起始镜像（今天那一臂，`r4-bases` 里造）：P(n1, C) → A（`read_fails`、W、不断）→ 关闭 C → 撤故障；
+/// 另在它的孪生镜像上做一次不注入的可写挂载，数每一片（两份合计）被读的次数 M（登记 5.3 L5 行）。
+fn build_today_cell_22_base(
+    geometry: &Geometry,
+    overwrites: u64,
+    replay_break: ReplayBreak,
+) -> Result<TodayBase, String> {
+    let parameters = parameters_for(geometry);
+    let history =
+        fourth_run_plain_prefix(geometry, overwrites, Closing::ProcessExit, "today")?.history;
+    let pool_geometry = independent_geometry(&history.pool)?;
+    let faults = fourth_run_abandonment_faults(
+        &history,
+        &pool_geometry,
+        UnreadableForm::ReadFails,
+        replay_break,
+        FaultDuration::WholeCall,
+        1,
+    )?
+    .ok_or("A 的落点造不出")?;
+    let tested = run_fourth_run_mount_writable(&history.pool, &parameters, &faults, None, None);
+    let mounted = tested
+        .call
+        .outcome
+        .as_ref()
+        .map_err(|error| format!("今天那一臂的 A 被拒: {error:?}"))?;
+    let carried = history
+        .content_number_of(root_pair(&mounted.output.effective_root))
+        .unwrap_or(0);
+    let numbers = content_numbers_with_the_publishes_of(&history, Some(mounted));
+    let appended_roots: Vec<(TimelineRoot, u64)> = numbers
+        .iter()
+        .filter(|(root, _)| !history.content_number_by_root.contains_key(root))
+        .map(|(root, _)| (*root, carried))
+        .collect();
+    let image = tested.call.pool_after.clone();
+    let page_faults = instance_table_page_faults_of_the_newest_root(
+        &image,
+        FaultDuration::FromTheNthRead(u64::MAX),
+    )?;
+    let flat: Vec<ThirdRunFault> = page_faults.iter().flatten().cloned().collect();
+    let twin = run_fourth_run_mount_writable(&image, &parameters, &flat, None, None);
+    let page_reads = page_faults
+        .iter()
+        .scan(0usize, |start, copies| {
+            let reads: u64 = twin.reads_of_the_targets[*start..*start + copies.len()]
+                .iter()
+                .sum();
+            *start += copies.len();
+            Some(reads)
+        })
+        .collect();
+    Ok(TodayBase {
+        image,
+        appended_roots,
+        page_reads,
+    })
+}
+
+/// L1(b) 的崩溃状态（今天那一臂）：P(n1, C) 之后一次可写挂载的写序列上前 j 个写落盘（j 取全部真前缀）。
+fn build_today_mount_crash_bases(
+    geometry: &Geometry,
+    overwrites: u64,
+) -> Result<Vec<TodayBase>, String> {
+    let parameters = parameters_for(geometry);
+    let history =
+        fourth_run_plain_prefix(geometry, overwrites, Closing::ProcessExit, "today")?.history;
+    let call = run_fourth_run_mount_writable(&history.pool, &parameters, &[], None, None);
+    call.call
+        .outcome
+        .as_ref()
+        .map_err(|error| format!("今天那一臂的可写挂载被拒: {error:?}"))?;
+    Ok((0..writes_in(&call.call.applied))
+        .map(|writes| TodayBase {
+            image: image_with_the_first_writes(&history.pool, &call.call.applied, writes),
+            appended_roots: Vec::new(),
+            page_reads: Vec::new(),
+        })
+        .collect())
+}
+
+/// H1f 的前缀镜像（今天那一臂）。
+fn build_today_remount_prefix_base(
+    geometry: &Geometry,
+    first_overwrites: u64,
+    closing: Closing,
+    second_overwrites: u64,
+) -> Result<TodayBase, String> {
+    let prefix = fourth_run_remount_prefix(
+        geometry,
+        first_overwrites,
+        closing,
+        second_overwrites,
+        "today",
+    )?;
+    Ok(TodayBase {
+        image: prefix.history.pool,
+        appended_roots: Vec::new(),
+        page_reads: Vec::new(),
+    })
+}
+
+/// `r4-bases`（只在今天那一份副本上跑）：把各段要的「在今天那一臂上造」的起始镜像写进目录。
+fn run_fourth_run_today_bases(arm: FourthRunArm) {
+    if !arm.is_today() {
+        emit_result(&format!(
+            "name=r4_today_bases arm={} verdict=stop reason=\"r4-bases 只在今天那一份副本上跑\"",
+            arm.name
+        ));
+        return;
+    }
+    let mut saved = 0u64;
+    let mut failures = Vec::new();
+    let mut save = |key: String, base: Result<TodayBase, String>| match base.and_then(|base| {
+        save_today_base(&key, &base)?;
+        Ok(base)
+    }) {
+        Ok(base) => {
+            saved += 1;
+            emit_result(&format!(
+                "name=r4_today_base key={key} base_fingerprint={:016x} appended_roots={} page_reads={:?}",
+                image_fingerprint(&base.image),
+                base.appended_roots.len(),
+                base.page_reads
+            ));
+        }
+        Err(error) => failures.push(format!("{key}: {error}")),
+    };
+    for first_overwrites in FOURTH_RUN_REMOUNT_PREFIX_FIRST_OVERWRITES {
+        for closing in [Closing::ProcessExit, Closing::NormalUnmount] {
+            for second_overwrites in FOURTH_RUN_REMOUNT_PREFIX_SECOND_OVERWRITES {
+                save(
+                    remount_prefix_key(
+                        &GEOMETRY_PRIMARY,
+                        first_overwrites,
+                        closing,
+                        second_overwrites,
+                    ),
+                    build_today_remount_prefix_base(
+                        &GEOMETRY_PRIMARY,
+                        first_overwrites,
+                        closing,
+                        second_overwrites,
+                    ),
+                );
+            }
+        }
+    }
+    for overwrites in THIRD_RUN_OVERWRITES {
+        match build_today_mount_crash_bases(&GEOMETRY_PRIMARY, overwrites) {
+            Ok(bases) => {
+                for (point, base) in bases.into_iter().enumerate() {
+                    save(
+                        format!(
+                            "l1b-s{}-ring{}-n1{overwrites}-point{point}",
+                            GEOMETRY_PRIMARY.slots_per_region, GEOMETRY_PRIMARY.journal_ring_bytes
+                        ),
+                        Ok(base),
+                    );
+                }
+            }
+            Err(error) => save(format!("l1b-n1{overwrites}-mount"), Err(error)),
+        }
+    }
+    for geometry in [
+        &GEOMETRY_PRIMARY,
+        &GEOMETRY_SMALLER_ROOT_RING,
+        &GEOMETRY_LARGER_ROOT_RING,
+    ] {
+        for overwrites in FOURTH_RUN_CELL_22_OVERWRITES {
+            for replay_break in [
+                ReplayBreak::EveryRecord,
+                ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+            ] {
+                save(
+                    cell_22_base_key(geometry, overwrites, replay_break),
+                    build_today_cell_22_base(geometry, overwrites, replay_break),
+                );
+            }
+        }
+    }
+    for failure in &failures {
+        emit_result(&format!("name=r4_today_base_failure detail={failure:?}"));
+    }
+    emit_result(&format!(
+        "name=r4_today_bases arm={} saved={saved} failures={} verdict={}",
+        arm.name,
+        failures.len(),
+        if failures.is_empty() { "pass" } else { "fail" }
+    ));
+}
+
+/// 被抛弃根独占的槽（起始镜像上：它引用的落点里，不被任何一条没被抛弃的可读根引用的那几个）。
+fn exclusive_slots_of_an_abandoned_root(
+    pool: &MemoryPool,
+    abandoned: TimelineRoot,
+) -> Result<u64, String> {
+    let geometry = independent_geometry(pool)?;
+    let abandoned_set = abandoned_roots_on(pool)?;
+    let record_of = |root: TimelineRoot| {
+        root_record_of(pool, &geometry, root).ok_or(format!("根 {root:?} 的记录读不出"))
+    };
+    let referenced_by_it = placements_referenced_by_root_on(pool, &record_of(abandoned)?)?;
+    let mut referenced_by_others = BTreeSet::new();
+    for root in readable_roots_independent(pool, &geometry) {
+        if root == abandoned || abandoned_set.contains(&root) {
+            continue;
+        }
+        if let Ok(placements) = placements_referenced_by_root_on(pool, &record_of(root)?) {
+            referenced_by_others.extend(placements);
+        }
+    }
+    Ok(referenced_by_it.difference(&referenced_by_others).count() as u64)
+}
+
+/// L5 与 PC-554（起始镜像同一份，今天那一臂上造）：每一片的两份按 O(m 只)、O(m 起) 各一格（m = 1..M），另打这一臂自己在孪生镜像上
+/// 那次不注入的挂载（隔离总数与每一片被读的次数，Q6 与 PC-22 丙 那一句要）；PC-554：那条被抛弃根自己的根槽 W 读坏。
+fn run_fourth_run_shadow_ledger_families(
+    geometry: &Geometry,
+    arm: FourthRunArm,
+    summary: &mut FourthRunLegalAndFaultStateTally,
+) {
+    let parameters = parameters_for(geometry);
+    let mut constructed_bases = 0u64;
+    let mut pc_554_done = false;
+    for overwrites in FOURTH_RUN_CELL_22_OVERWRITES {
+        for replay_break in [
+            ReplayBreak::EveryRecord,
+            ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+        ] {
+            let coordinates = format!("n1={overwrites} b={}", replay_break.name());
+            let key = cell_22_base_key(geometry, overwrites, replay_break);
+            let adopted =
+                legal_or_fault_state_prefix(geometry, overwrites, arm).and_then(|mut history| {
+                    let page_reads = adopt_today_base(&mut history, &key, arm)?;
+                    Ok((history, page_reads))
+                });
+            let (history, page_reads) = match adopted {
+                Ok(adopted) => adopted,
+                Err(error) => {
+                    emit_result(&format!(
+                        "name=r4_l_cell family=l5 arm={} geometry={} {coordinates} verdict=stop reason={error:?}",
+                        arm.name, geometry.label
+                    ));
+                    continue;
+                }
+            };
+            constructed_bases += 1;
+            let base = history.pool.clone();
+            let counting_faults = match instance_table_page_faults_of_the_newest_root(
+                &base,
+                FaultDuration::FromTheNthRead(u64::MAX),
+            ) {
+                Ok(faults) => faults,
+                Err(error) => {
+                    emit_result(&format!(
+                        "name=r4_l_cell family=l5 arm={} geometry={} {coordinates} verdict=stop reason={error:?}",
+                        arm.name, geometry.label
+                    ));
+                    continue;
+                }
+            };
+            let flat: Vec<ThirdRunFault> = counting_faults.iter().flatten().cloned().collect();
+            let twin = run_fourth_run_mount_writable(&base, &parameters, &flat, None, None);
+            let twin_summary = TestedMountSummary::of(&twin.call);
+            let own_page_reads: Vec<u64> = counting_faults
+                .iter()
+                .scan(0usize, |start, copies| {
+                    let reads: u64 = twin.reads_of_the_targets[*start..*start + copies.len()]
+                        .iter()
+                        .sum();
+                    *start += copies.len();
+                    Some(reads)
+                })
+                .collect();
+            let twin_isolated = twin_summary.isolated;
+            emit_result(&format!(
+                "name=r4_l5_twin arm={} geometry={} {coordinates} base_fingerprint={:016x} today_page_reads={page_reads:?} own_page_reads={own_page_reads:?} twin_class={} twin_isolated={} twin_abandoned_roots_unreadable={}",
+                arm.name,
+                geometry.label,
+                image_fingerprint(&base),
+                twin_summary.class,
+                twin_isolated.map_or("none".to_string(), |count| count.to_string()),
+                twin_summary
+                    .abandoned_roots_unreadable
+                    .map_or("none".to_string(), |count| count.to_string())
+            ));
+            for (page, reads) in page_reads.iter().enumerate() {
+                for nth in 1..=*reads {
+                    for (duration_name, duration) in [
+                        ("only", FaultDuration::OnlyTheNthRead(nth)),
+                        ("from", FaultDuration::FromTheNthRead(nth)),
+                    ] {
+                        let Ok(page_faults) =
+                            instance_table_page_faults_of_the_newest_root(&base, duration)
+                        else {
+                            continue;
+                        };
+                        let Some(faults) = page_faults.get(page) else {
+                            continue;
+                        };
+                        let cell_coordinates = format!(
+                            "{coordinates} page={page} m={nth} duration=O{nth}{duration_name}"
+                        );
+                        if let Some(tested) = run_fourth_run_legal_or_fault_state_cell(
+                            "l5",
+                            arm,
+                            geometry,
+                            &cell_coordinates,
+                            &base,
+                            faults,
+                            &format!(
+                                "twin_isolated={}",
+                                twin_isolated.map_or("none".to_string(), |count| count.to_string())
+                            ),
+                            summary,
+                        ) {
+                            let not_covered = tested.call.call.outcome.is_ok()
+                                && matches!((tested.summary.isolated, twin_isolated), (Some(isolated), Some(isolated_on_the_twin)) if isolated < isolated_on_the_twin);
+                            emit_result(&format!(
+                                "name=r4_q6_cell arm={} geometry={} {cell_coordinates} ok={} isolated={} twin_isolated={} abandoned_roots_unreadable={} q6_not_covered={not_covered}",
+                                arm.name,
+                                geometry.label,
+                                tested.call.call.outcome.is_ok(),
+                                tested.summary.isolated.map_or("none".to_string(), |count| count.to_string()),
+                                twin_isolated.map_or("none".to_string(), |count| count.to_string()),
+                                tested
+                                    .summary
+                                    .abandoned_roots_unreadable
+                                    .map_or("none".to_string(), |count| count.to_string())
+                            ));
+                        }
+                    }
+                }
+            }
+            if !pc_554_done && geometry.label == GEOMETRY_PRIMARY.label {
+                pc_554_done = run_fourth_run_positive_control_abandoned_root_slot(
+                    arm,
+                    &history,
+                    &coordinates,
+                    summary,
+                );
+            }
+        }
+    }
+    let registered = 3 * 2;
+    emit_result(&format!(
+        "name=r4_section_seven_two_anchor arm={} geometry={} item=\"L5 起始镜像 3×2\" computed={constructed_bases} registered={registered} verdict={}",
+        arm.name,
+        geometry.label,
+        if constructed_bases == registered { "pass" } else { "fail_v4" }
+    ));
+    if !pc_554_done && geometry.label == GEOMETRY_PRIMARY.label {
+        emit_fourth_run_positive_control(
+            arm.name,
+            "PC-554",
+            "n1=none b=none",
+            &[sentence(
+                SentenceTag::TodayDescription,
+                "an_abandoned_root_with_exclusive_slots",
+                SentenceVerdict::NotConstructible,
+                "F1",
+            )],
+            "reason=\"L5 的六份起始镜像上都找不到独占槽个数 > 0 的被抛弃根\"",
+        );
+    }
+}
+
+/// PC-554（第 3 次跑 5.4 PC-554 行，标签照第 4 次跑 5.4）：起始镜像同 L5；被测挂载时那条被抛弃根自己的根槽 W 读坏（`read_fails`）。
+/// 独占的槽个数 = 0 就交回 false（顺延到下一个 n1 与 b）。
+fn run_fourth_run_positive_control_abandoned_root_slot(
+    arm: FourthRunArm,
+    history: &ThirdRunHistory,
+    coordinates: &str,
+    summary: &mut FourthRunLegalAndFaultStateTally,
+) -> bool {
+    let base = &history.pool;
+    let Ok(abandoned) = abandoned_roots_on(base) else {
+        return false;
+    };
+    let Some(abandoned_root) = abandoned
+        .iter()
+        .copied()
+        .max_by_key(|(instance, txg)| (*txg, *instance))
+    else {
+        return false;
+    };
+    let exclusive = exclusive_slots_of_an_abandoned_root(base, abandoned_root).unwrap_or(0);
+    if exclusive == 0 {
+        return false;
+    }
+    let Ok(pool_geometry) = independent_geometry(base) else {
+        return false;
+    };
+    let Some((device, offset)) = root_slot_of(base, &pool_geometry, abandoned_root) else {
+        return false;
+    };
+    let faults = vec![ThirdRunFault {
+        device,
+        offset,
+        length: u64::from(pool_geometry.physical_block_size),
+        form: UnreadableForm::ReadFails,
+        duration: FaultDuration::WholeCall,
+        label: format!("abandoned_root{}", key_text(Some(abandoned_root))),
+    }];
+    let Some(tested) = run_fourth_run_legal_or_fault_state_cell(
+        "pc554",
+        arm,
+        &GEOMETRY_PRIMARY,
+        coordinates,
+        base,
+        &faults,
+        "",
+        summary,
+    ) else {
+        return false;
+    };
+    let ok_count_zero_isolated_zero = tested.call.call.outcome.is_ok()
+        && tested.summary.abandoned_roots_unreadable == Some(0)
+        && tested.summary.isolated == Some(0);
+    let sentences = vec![match (arm.candidate, arm.witness) {
+        (FourthRunCandidate::Today, _) | (_, FourthRunWitness::NotJudged) => sentence(
+            SentenceTag::TodayDescription,
+            "ok_count_zero_isolated_zero",
+            SentenceVerdict::of(ok_count_zero_isolated_zero),
+            "F1",
+        ),
+        (_, FourthRunWitness::UnreadableRootRingSlot) => sentence(
+            SentenceTag::ArmDefinition,
+            "slot_arm_refused",
+            SentenceVerdict::of(
+                tested.summary.member == arm.refusal_member() && tested.summary.writes == 0,
+            ),
+            "F9",
+        ),
+        (
+            _,
+            FourthRunWitness::SystemConfiguration | FourthRunWitness::SystemConfigurationCarried,
+        ) => sentence(
+            SentenceTag::ArmDefinition,
+            "same_outcome_as_today_ok_count_zero_isolated_zero",
+            SentenceVerdict::of(ok_count_zero_isolated_zero),
+            "F12",
+        ),
+    }];
+    emit_fourth_run_positive_control(
+        arm.name,
+        "PC-554",
+        coordinates,
+        &sentences,
+        &format!(
+            "abandoned_root={} exclusive_slots={exclusive} truth_newer_on_the_twin={} {}",
+            key_text(Some(abandoned_root)),
+            tested.judgement.truth_newer,
+            render_fourth_run_tested_mount(&tested)
+        ),
+    );
+    true
+}
+
+fn run_fourth_run_segment_four(arm: FourthRunArm) {
+    let mut summary = FourthRunLegalAndFaultStateTally::default();
+    run_fourth_run_legal_state_families(&GEOMETRY_PRIMARY, arm, &mut summary);
+    run_fourth_run_fault_state_families(
+        &GEOMETRY_PRIMARY,
+        arm,
+        &["l2", "l3", "l4", "l6"],
+        &mut summary,
+    );
+    run_fourth_run_shadow_ledger_families(&GEOMETRY_PRIMARY, arm, &mut summary);
+    emit_fourth_run_scratch_findings("l", arm.name, &summary.counts);
+    // 7.2（第 3 次跑那一行）：L0 格数 4 × 2；L3 4 × 3 × 2；L4 4 × 2 × 2；L6 4 × 2（按实际跑到被测挂载的格数）。
+    for (family, registered) in [
+        ("l0", 4 * 2),
+        ("l3", 4 * 3 * 2),
+        ("l4", 4 * 2 * 2),
+        ("l6", 4 * 2),
+    ] {
+        let computed = summary
+            .cells
+            .get(&format!("{family}:{}", GEOMETRY_PRIMARY.label))
+            .copied()
+            .unwrap_or(0);
+        emit_result(&format!(
+            "name=r4_section_seven_two_anchor arm={} item=\"{family} 格数\" computed={computed} registered={registered} verdict={}",
+            arm.name,
+            if computed == registered { "pass" } else { "fail_v4" }
+        ));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 12.10 第五段：8.2 的敏感性点（G_S4、G_S16、G_默认、G_小环、k = 2、R = 3），只重跑判决格（登记 8.2 的取样点表）。
+// ---------------------------------------------------------------------------
+
+/// mkfs 默认环长的几何点 G_默认 = (S = 8, 768 MiB, 4 GiB)（登记 8.2）。
+const GEOMETRY_DEFAULT_RING: Geometry = Geometry {
+    label: "G_default(S=8,ring=768MiB)",
+    slots_per_region: 8,
+    journal_ring_bytes: 768 * 1024 * 1024,
+};
+/// 小环的取法（第 3 次跑登记 8.2 末）：从 48 KiB 起、每次加 16 KiB。上界是装置自己的停手线（取不到记「这一点取不到」）。
+const SMALL_RING_START_BYTES: u64 = 48 * 1024;
+const SMALL_RING_STEP_BYTES: u64 = 16 * 1024;
+const SMALL_RING_LAST_TRIED_BYTES: u64 = 3 * 1024 * 1024;
+
+/// G_小环：第一个 mkfs 收、且 P(3, U) 接 H1e(m = 4)（不注入）整段跑得通的环长。
+fn small_ring_geometry() -> Result<Geometry, String> {
+    let mut ring_bytes = SMALL_RING_START_BYTES;
+    while ring_bytes <= SMALL_RING_LAST_TRIED_BYTES {
+        let label: &'static str =
+            Box::leak(format!("G_small_ring(S=8,ring={ring_bytes})").into_boxed_str());
+        let geometry = Geometry {
+            label,
+            slots_per_region: 8,
+            journal_ring_bytes: ring_bytes,
+        };
+        let parameters = parameters_for(&geometry);
+        let runs_through =
+            fourth_run_plain_prefix(&geometry, 3, Closing::NormalUnmount, "small-ring-search")
+                .and_then(|prefix| {
+                    let mut history = prefix.history;
+                    fourth_run_mount_writable_into_the_history(&mut history, &parameters)?;
+                    for _ in 0..4 {
+                        third_run_change_content(&mut history, &parameters)?;
+                    }
+                    Ok(())
+                });
+        emit_result(&format!(
+            "name=r4_small_ring_try ring_bytes={ring_bytes} runs_through={}",
+            runs_through.as_ref().map_or_else(
+                |error| format!("no:{}", error_member_of_debug(error)),
+                |()| "yes".to_string()
+            )
+        ));
+        if runs_through.is_ok() {
+            return Ok(geometry);
+        }
+        ring_bytes += SMALL_RING_STEP_BYTES;
+    }
+    Err(format!(
+        "{SMALL_RING_START_BYTES}..={SMALL_RING_LAST_TRIED_BYTES} 字节里没有一个环长跑得通"
+    ))
+}
+
+fn run_fourth_run_segment_five(arm: FourthRunArm) {
+    if arm.rereads() && arm.reread_rounds > 1 {
+        // R = 3（登记 8.2）：乙、乙-窄读 的重读轮数加到 3，时长 T(δ)–T(4δ)，H1d 的 `none`、H1e。
+        run_fourth_run_held_once_like_family(
+            "h1d-uncut-r3",
+            &GEOMETRY_PRIMARY,
+            arm,
+            1,
+            FourthRunContinuation::UncutOnly,
+        );
+        run_fourth_run_held_once_like_family(
+            "h1e-r3",
+            &GEOMETRY_PRIMARY,
+            arm,
+            1,
+            FourthRunContinuation::Tail,
+        );
+        return;
+    }
+    let mut summary = FourthRunLegalAndFaultStateTally::default();
+    for geometry in [&GEOMETRY_SMALLER_ROOT_RING, &GEOMETRY_LARGER_ROOT_RING] {
+        run_fourth_run_held_once_like_family(
+            "h1d-uncut",
+            geometry,
+            arm,
+            1,
+            FourthRunContinuation::UncutOnly,
+        );
+        run_fourth_run_held_once_like_family("h1e", geometry, arm, 1, FourthRunContinuation::Tail);
+        run_fourth_run_fault_state_families(geometry, arm, &["l2"], &mut summary);
+        run_fourth_run_shadow_ledger_families(geometry, arm, &mut summary);
+    }
+    run_fourth_run_held_once_like_family(
+        "h1d-uncut",
+        &GEOMETRY_DEFAULT_RING,
+        arm,
+        1,
+        FourthRunContinuation::UncutOnly,
+    );
+    run_fourth_run_held_once_like_family(
+        "h1e",
+        &GEOMETRY_DEFAULT_RING,
+        arm,
+        1,
+        FourthRunContinuation::Tail,
+    );
+    run_fourth_run_fault_state_families(&GEOMETRY_DEFAULT_RING, arm, &["l3"], &mut summary);
+    match small_ring_geometry() {
+        Ok(geometry) => {
+            emit_result(&format!(
+                "name=r4_small_ring arm={} geometry={} verdict=found",
+                arm.name, geometry.label
+            ));
+            run_fourth_run_held_once_like_family(
+                "h1e",
+                &geometry,
+                arm,
+                1,
+                FourthRunContinuation::Tail,
+            );
+            run_fourth_run_fault_state_families(&geometry, arm, &["l3"], &mut summary);
+        }
+        Err(error) => emit_result(&format!(
+            "name=r4_small_ring arm={} verdict=not_obtainable reason={error:?}",
+            arm.name
+        )),
+    }
+    // k = 2（登记 8.2）：A 藏最新 2 条根的根槽，断链落在两条里较旧那一次发布上；H1d 的 `none`、H1e。
+    run_fourth_run_held_once_like_family(
+        "h1d-uncut-k2",
+        &GEOMETRY_PRIMARY,
+        arm,
+        2,
+        FourthRunContinuation::UncutOnly,
+    );
+    run_fourth_run_held_once_like_family(
+        "h1e-k2",
+        &GEOMETRY_PRIMARY,
+        arm,
+        2,
+        FourthRunContinuation::Tail,
+    );
+    emit_fourth_run_scratch_findings("seg5", arm.name, &summary.counts);
+}
+
+// ---------------------------------------------------------------------------
+// 12.12 跨臂对拍（`r4-compare <产物前缀>…`）：读每个前缀下各臂的产物 `<前缀>-<臂>.out`，算跨臂的句子（与今天逐项相同、PC-多读、PC-多拒、
+//       PC-22）、Q4（多拒、拦下）、Q5 两栏、7.3 第二三行、F11、起始镜像跨臂同一份，最后按 5.4 每一句的标签机械算 V1 的作废范围（`r4_void`）。
+// ---------------------------------------------------------------------------
+
+/// 一句对照的判定（在臂里打出的，或 compare 里跨臂算的）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct SentenceRecord {
+    arm: String,
+    control: String,
+    name: String,
+    tag: SentenceTag,
+    verdict: SentenceVerdict,
+}
+
+/// 一条对照管哪几个量（登记 11.1 V1 末：PC-N-环、PC-N-盖、PC-O、PC-丢写 ⇒ Q1–Q3；PC-随 ⇒ H-随 那一栏的 Q1–Q3；PC-N0、PC-多拒 ⇒ Q4；
+/// PC-多读 ⇒ Q5（(i) 全部、(ii) 同成、(iii) 拒）；PC-22 ⇒ Q6；PC-只读 ⇒ 甲那一句「只读照常」；PC-554 ⇒ F1 与那几臂的 Q4）。
+fn quantities_of_a_control(control: &str) -> &'static [&'static str] {
+    match control {
+        "PC-N-ring" | "PC-N-cover" | "PC-O" | "PC-lost-write" => &["Q1-Q3"],
+        "PC-random" => &["Q1-Q3-random-histories"],
+        "PC-N0" | "PC-extra-refusal" | "PC-554" => &["Q4"],
+        "PC-extra-reads-i" => &["Q5-both-mounted", "Q5-refused"],
+        "PC-extra-reads-ii" => &["Q5-both-mounted"],
+        "PC-extra-reads-iii" => &["Q5-refused"],
+        "PC-22" => &["Q6"],
+        "PC-read-only" => &["read-only"],
+        _ => &[],
+    }
+}
+
+/// 拿今天当参照的量（V1 ②：[测] 句在今天那一臂上打不中，别的臂只作废这几样）。
+const QUANTITIES_REFERRING_TO_TODAY: [&str; 3] = ["Q4", "Q5-both-mounted", "Q5-refused"];
+const EVERY_VOIDABLE_QUANTITY: [&str; 7] = [
+    "Q1-Q3",
+    "Q1-Q3-random-histories",
+    "Q4",
+    "Q5-both-mounted",
+    "Q5-refused",
+    "Q6",
+    "read-only",
+];
+
+/// (臂, 量) → 作废的依据（空 = 不作废）。
+type VoidedQuantities = BTreeMap<(String, &'static str), Vec<String>>;
+
+/// V1（登记 11.1，按句子标签分五种）的作废范围：交回 (臂, 量) → 作废的依据（空 = 不作废），外加「装置缺陷（全部臂一起）」的那几句。
+fn fourth_run_void_scope(
+    sentences: &[SentenceRecord],
+    arms: &[&str],
+) -> (VoidedQuantities, Vec<String>) {
+    let mut voided: VoidedQuantities = BTreeMap::new();
+    for arm in arms {
+        for quantity in EVERY_VOIDABLE_QUANTITY {
+            voided.insert(((*arm).to_string(), quantity), Vec::new());
+        }
+    }
+    let missed = |record: &SentenceRecord| {
+        matches!(
+            record.verdict,
+            SentenceVerdict::Fail | SentenceVerdict::NotConstructible
+        )
+    };
+    let mut device_defects = Vec::new();
+    let mut measured_misses_by_sentence: BTreeMap<(String, String), BTreeSet<String>> =
+        BTreeMap::new();
+    for record in sentences.iter().filter(|record| missed(record)) {
+        let basis = format!("{}:{}({})", record.control, record.name, record.tag.name());
+        match record.tag {
+            SentenceTag::TodayDescription => {}
+            SentenceTag::ArmDefinition => {
+                for quantity in quantities_of_a_control(&record.control) {
+                    if let Some(list) = voided.get_mut(&(record.arm.clone(), *quantity)) {
+                        list.push(basis.clone());
+                    }
+                }
+            }
+            SentenceTag::Measured => {
+                measured_misses_by_sentence
+                    .entry((record.control.clone(), record.name.clone()))
+                    .or_default()
+                    .insert(record.arm.clone());
+                if record.arm == "today" {
+                    for quantity in quantities_of_a_control(&record.control) {
+                        if let Some(list) = voided.get_mut(&("today".to_string(), *quantity)) {
+                            list.push(basis.clone());
+                        }
+                    }
+                    for arm in arms.iter().filter(|arm| **arm != "today") {
+                        for quantity in quantities_of_a_control(&record.control)
+                            .iter()
+                            .filter(|quantity| QUANTITIES_REFERRING_TO_TODAY.contains(quantity))
+                        {
+                            if let Some(list) = voided.get_mut(&((*arm).to_string(), *quantity)) {
+                                list.push(format!("{basis}@today"));
+                            }
+                        }
+                    }
+                } else {
+                    for quantity in quantities_of_a_control(&record.control) {
+                        if let Some(list) = voided.get_mut(&(record.arm.clone(), *quantity)) {
+                            list.push(basis.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for ((control, name), missing_arms) in &measured_misses_by_sentence {
+        let asked_of: BTreeSet<&str> = sentences
+            .iter()
+            .filter(|record| &record.control == control && &record.name == name)
+            .map(|record| record.arm.as_str())
+            .collect();
+        if asked_of.len() > 1 && asked_of.iter().all(|arm| missing_arms.contains(*arm)) {
+            device_defects.push(format!("{control}:{name}"));
+            for arm in arms {
+                for quantity in quantities_of_a_control(control) {
+                    if let Some(list) = voided.get_mut(&((*arm).to_string(), *quantity)) {
+                        list.push(format!("{control}:{name}(measure,every_arm)"));
+                    }
+                }
+            }
+        }
+    }
+    (voided, device_defects)
+}
+
+/// PC-多读 (iii) 与 Q5-拒 的参照臂：同一种 N 的甲臂（登记 5.8 第二件：乙 的参照不再是今天那一臂；变异 M20 把它换回今天）。
+fn extra_reads_reference_arm(arm: FourthRunArm) -> Option<&'static str> {
+    arm.jia_arm_with_the_same_witness()
+}
+
+/// 产物里的一行（字段表）与它来自哪条臂。
+struct ProductLine {
+    fields: BTreeMap<String, String>,
+}
+
+impl ProductLine {
+    fn text(&self, name: &str) -> &str {
+        self.fields.get(name).map_or("", String::as_str)
+    }
+
+    fn number(&self, name: &str) -> Option<i64> {
+        self.fields.get(name).and_then(|value| value.parse().ok())
+    }
+
+    fn key(&self, coordinate_names: &[&str]) -> String {
+        coordinate_names
+            .iter()
+            .filter_map(|name| {
+                self.fields
+                    .get(*name)
+                    .map(|value| format!("{name}={value}"))
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+}
+
+const LEGAL_OR_FAULT_STATE_CELL_COORDINATES: [&str; 14] = [
+    "family", "geometry", "n1", "c", "k", "which", "form", "point", "of", "b", "page", "m",
+    "duration", "seed",
+];
+const CONTROL_COORDINATES: [&str; 7] = ["control", "form", "duration", "n1", "c", "of", "b"];
+
+/// 被测挂载那几行（Q4、Q5 的输入）：H1d 那样的族只取不断那一格，接尾巴的族只取第一个 m（A 的读数与 m 无关），L 族与第二段的每一次被测挂载全取。
+fn tested_mount_lines(lines: &[ProductLine]) -> BTreeMap<String, &ProductLine> {
+    let mut tested = BTreeMap::new();
+    for line in lines {
+        let key = match line.text("name") {
+            "r4_cell"
+                if line.text("cut") == "none"
+                    || (line.text("cut").is_empty() && line.text("m") == "1") =>
+            {
+                format!(
+                    "cell {}",
+                    line.key(&[
+                        "family", "geometry", "n1", "c", "n1a", "n1b", "a", "b", "form", "duration"
+                    ])
+                )
+            }
+            "r4_l_cell" if line.text("verdict").is_empty() => {
+                format!("l {}", line.key(&LEGAL_OR_FAULT_STATE_CELL_COORDINATES))
+            }
+            "r4_random_mount" => format!(
+                "random {}",
+                line.key(&["family", "seed", "step", "attempt"])
+            ),
+            _ => continue,
+        };
+        tested.entry(key).or_insert(line);
+    }
+    tested
+}
+
+/// K0–K2 是挂载交回 `Ok`（只差空间准入怎么判），K3、K4 是拒（`mount_outcome_class`）。
+fn class_is_a_successful_mount(class: &str) -> bool {
+    matches!(class, "K0" | "K1" | "K2")
+}
+
+fn class_is_a_refusal(class: &str) -> bool {
+    matches!(class, "K3" | "K4")
+}
+
+fn duration_class(duration: &str) -> &'static str {
+    if duration.starts_with('T') {
+        "T"
+    } else if duration.starts_with('O') {
+        "O"
+    } else {
+        "W"
+    }
+}
+
+/// Q5-同成 的一格：臂与今天那一臂都交回 `Ok`、起始镜像逐字节相同（变异 M18：把臂拒了的格也算进来）。
+fn both_mounted_extra_reads(
+    arm_cell: &ProductLine,
+    today_cell: &ProductLine,
+) -> Option<(i64, i64)> {
+    let same_start = !arm_cell.text("base_fingerprint").is_empty()
+        && arm_cell.text("base_fingerprint") == today_cell.text("base_fingerprint");
+    let both_ok = class_is_a_successful_mount(arm_cell.text("a_class"))
+        && class_is_a_successful_mount(today_cell.text("a_class"));
+    if !(same_start && both_ok) {
+        return None;
+    }
+    Some((
+        arm_cell.number("a_reads")? - today_cell.number("a_reads")?,
+        arm_cell.number("a_read_bytes")? - today_cell.number("a_read_bytes")?,
+    ))
+}
+
+fn read_product_lines(path: &str) -> Result<Vec<ProductLine>, String> {
+    let text = std::fs::read_to_string(path).map_err(|error| format!("{path}: {error}"))?;
+    let finished = text
+        .lines()
+        .last()
+        .is_some_and(|line| line.starts_with("E7RESULT name=done emitted="));
+    if !finished {
+        return Err(format!("{path}: 末行不是完成标记"));
+    }
+    Ok(text
+        .lines()
+        .filter(|line| line.starts_with("E7RESULT "))
+        .map(|line| ProductLine {
+            fields: fields_of_a_result_line(line),
+        })
+        .collect())
+}
+
+fn sentence_records_of(arm: &str, lines: &[ProductLine]) -> Vec<SentenceRecord> {
+    let mut records = Vec::new();
+    for line in lines
+        .iter()
+        .filter(|line| line.text("name") == "r4_positive_control")
+    {
+        for (field, value) in &line.fields {
+            let Some(rest) = field.strip_prefix("sentence_") else {
+                continue;
+            };
+            let (tag, name) = if let Some(name) = rest.strip_prefix("measure_") {
+                (SentenceTag::Measured, name)
+            } else if let Some(name) = rest.strip_prefix("arm_") {
+                (SentenceTag::ArmDefinition, name)
+            } else if let Some(name) = rest.strip_prefix("today_") {
+                (SentenceTag::TodayDescription, name)
+            } else {
+                continue;
+            };
+            let verdict = match value.as_str() {
+                "pass" => SentenceVerdict::Pass,
+                "fail" => SentenceVerdict::Fail,
+                "not_constructible" => SentenceVerdict::NotConstructible,
+                _ => SentenceVerdict::Vacuous,
+            };
+            records.push(SentenceRecord {
+                arm: arm.to_string(),
+                control: line.text("control").to_string(),
+                name: format!(
+                    "{}[{}]",
+                    name,
+                    line.key(&["form", "duration", "n1", "c", "of"])
+                ),
+                tag,
+                verdict,
+            });
+        }
+    }
+    records
+}
+
+fn emit_cross_arm_sentence(record: &SentenceRecord, detail: &str) {
+    emit_result(&format!(
+        "name=r4_cross_arm_sentence arm={} control={} sentence={} tag={} verdict={} {detail}",
+        record.arm,
+        record.control,
+        record.name,
+        record.tag.name(),
+        record.verdict.name()
+    ));
+}
+
+#[allow(
+    clippy::too_many_lines,
+    reason = "跨臂对拍的每一样按登记的次序写在一处，拆开只多几层参数搬运"
+)]
+fn run_fourth_run_compare(prefixes: &[String]) {
+    let mut lines_by_arm: BTreeMap<&'static str, Vec<ProductLine>> = BTreeMap::new();
+    for arm in FOURTH_RUN_ARMS {
+        let mut lines = Vec::new();
+        for prefix in prefixes {
+            let path = format!("{prefix}-{}.out", arm.name);
+            if !std::path::Path::new(&path).exists() {
+                continue;
+            }
+            match read_product_lines(&path) {
+                Ok(read) => {
+                    emit_result(&format!(
+                        "name=r4_compare_input arm={} path={path} lines={} verdict=pass",
+                        arm.name,
+                        read.len()
+                    ));
+                    lines.extend(read);
+                }
+                Err(error) => emit_result(&format!(
+                    "name=r4_compare_input arm={} verdict=stop reason={error:?}",
+                    arm.name
+                )),
+            }
+        }
+        if !lines.is_empty() {
+            lines_by_arm.insert(arm.name, lines);
+        }
+    }
+    let Some(today_lines) = lines_by_arm.get("today") else {
+        emit_result(
+            "name=r4_compare_input arm=today verdict=stop reason=\"今天那一臂的产物一份都没有\"",
+        );
+        return;
+    };
+    let today_tested = tested_mount_lines(today_lines);
+    let today_controls: BTreeMap<String, &ProductLine> = today_lines
+        .iter()
+        .filter(|line| line.text("name") == "r4_positive_control")
+        .map(|line| (line.key(&CONTROL_COORDINATES), line))
+        .collect();
+    let mut sentences: Vec<SentenceRecord> = Vec::new();
+    for (arm_name, lines) in &lines_by_arm {
+        sentences.extend(sentence_records_of(arm_name, lines));
+    }
+    // PC-多读 (i)：今天那一臂减自己 = 0（每一格）。
+    emit_result(&format!(
+        "name=r4_section_seven_three row=4 arm=today cells={} nonzero_cells=0 verdict=pass",
+        today_tested.len()
+    ));
+    sentences.push(SentenceRecord {
+        arm: "today".to_string(),
+        control: "PC-extra-reads-i".to_string(),
+        name: "today_minus_itself_is_zero".to_string(),
+        tag: SentenceTag::Measured,
+        verdict: SentenceVerdict::Pass,
+    });
+    for (arm_name, lines) in &lines_by_arm {
+        let Some(arm) = fourth_run_arm_named(arm_name) else {
+            continue;
+        };
+        if arm.is_today() {
+            continue;
+        }
+        let tested = tested_mount_lines(lines);
+        // Q5 两栏、Q4（按族分报）。
+        let mut both_mounted: BTreeMap<String, ExtraReads> = BTreeMap::new();
+        let mut refused_minus_today: BTreeMap<String, ExtraReads> = BTreeMap::new();
+        let mut extra_refusals: BTreeMap<String, u64> = BTreeMap::new();
+        let mut intercepted: BTreeMap<String, u64> = BTreeMap::new();
+        let mut compared: BTreeMap<String, u64> = BTreeMap::new();
+        let mut diverged_mounts: BTreeMap<String, u64> = BTreeMap::new();
+        let mut diverged_refusals: BTreeMap<String, u64> = BTreeMap::new();
+        for (key, cell) in &tested {
+            let family = format!("{}@{}", cell.text("family"), cell.text("geometry"));
+            let today_cell = today_tested.get(key);
+            // 第二段那几族整段在各臂上各跑一遍（登记 5.3）：与今天走岔之后的挂载（起始镜像不同，或今天那一臂没有这一格）没有
+            // 「今天的同一格」，只按「臂拒 ∧ N_真 为假」记，单列一栏（r3 登记「读法写死」表「多拒」一行）。
+            if cell.text("name") == "r4_random_mount"
+                && today_cell.is_none_or(|today_cell| {
+                    cell.text("base_fingerprint") != today_cell.text("base_fingerprint")
+                })
+            {
+                *diverged_mounts.entry(family.clone()).or_insert(0) += 1;
+                if class_is_a_refusal(cell.text("a_class")) && cell.text("truth_newer") != "true" {
+                    *diverged_refusals.entry(family).or_insert(0) += 1;
+                }
+                continue;
+            }
+            let Some(today_cell) = today_cell else {
+                continue;
+            };
+            *compared.entry(family.clone()).or_insert(0) += 1;
+            if let Some((calls, bytes)) = both_mounted_extra_reads(cell, today_cell) {
+                both_mounted
+                    .entry(family.clone())
+                    .or_default()
+                    .add(calls, bytes);
+            }
+            let arm_refused = class_is_a_refusal(cell.text("a_class"));
+            let today_refused = class_is_a_refusal(today_cell.text("a_class"));
+            if arm_refused {
+                if let (Some(calls), Some(today_calls)) =
+                    (cell.number("a_reads"), today_cell.number("a_reads"))
+                {
+                    refused_minus_today.entry(family.clone()).or_default().add(
+                        calls - today_calls,
+                        cell.number("a_read_bytes").unwrap_or(0)
+                            - today_cell.number("a_read_bytes").unwrap_or(0),
+                    );
+                }
+            }
+            if arm_refused && !today_refused {
+                let truth_newer = cell.text("truth_newer") == "true"
+                    || cell.text("truth_newer_on_the_twin") == "true";
+                if truth_newer {
+                    *intercepted
+                        .entry(format!(
+                            "{family}:{}",
+                            duration_class(cell.text("duration"))
+                        ))
+                        .or_insert(0) += 1;
+                } else {
+                    *extra_refusals.entry(family.clone()).or_insert(0) += 1;
+                }
+            }
+        }
+        for (family, cells) in &compared {
+            emit_result(&format!(
+                "name=r4_q4 arm={arm_name} family={family} compared_tested_mounts={cells} extra_refusals={} intercepted={:?}",
+                extra_refusals.get(family).copied().unwrap_or(0),
+                intercepted
+                    .iter()
+                    .filter(|(key, _)| key.starts_with(&format!("{family}:")))
+                    .map(|(key, count)| format!("{}={count}", key.rsplit(':').next().unwrap_or("")))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ));
+        }
+        for (family, mounts) in &diverged_mounts {
+            emit_result(&format!(
+                "name=r4_q4_after_divergence arm={arm_name} family={family} tested_mounts_after_divergence={mounts} refusals_with_truth_newer_false={}",
+                diverged_refusals.get(family).copied().unwrap_or(0)
+            ));
+        }
+        for (column, table) in [
+            ("both_mounted", &both_mounted),
+            ("refused_minus_today", &refused_minus_today),
+        ] {
+            for (family, extra) in table {
+                emit_result(&format!(
+                    "name=r4_q5 arm={arm_name} column={column} family={family} cells={} positive_cells={} total_extra_read_calls={} total_extra_read_bytes={} minimum_extra_read_calls={} maximum_extra_read_calls={}",
+                    extra.cells,
+                    extra.positive_cells,
+                    extra.total_calls,
+                    extra.total_bytes,
+                    extra.minimum_calls.map_or("none".to_string(), |value| value.to_string()),
+                    extra.maximum_calls.map_or("none".to_string(), |value| value.to_string())
+                ));
+            }
+        }
+        // 与今天逐项相同：PC-N0（F12，全部臂）与 PC-N-环 / PC-N-盖 的读回全零格（-槽 臂，N-槽 判假）。
+        for line in lines
+            .iter()
+            .filter(|line| line.text("name") == "r4_positive_control")
+        {
+            let control = line.text("control");
+            let needs_same_as_today = control == "PC-N0"
+                || (matches!(control, "PC-N-ring" | "PC-N-cover")
+                    && arm.witness == FourthRunWitness::UnreadableRootRingSlot
+                    && line.text("form") == "reads_zeros");
+            if !needs_same_as_today {
+                continue;
+            }
+            let key = line.key(&CONTROL_COORDINATES);
+            let differing: Vec<&str> = match today_controls.get(&key) {
+                Some(today_line) => ["a_class", "a_chosen", "a_effective", "write_fingerprint"]
+                    .into_iter()
+                    .filter(|field| line.text(field) != today_line.text(field))
+                    .collect(),
+                None => vec!["today_line_missing"],
+            };
+            let record = SentenceRecord {
+                arm: arm_name.to_string(),
+                control: control.to_string(),
+                name: format!(
+                    "same_as_today[{}]",
+                    line.key(&["form", "duration", "n1", "c"])
+                ),
+                tag: SentenceTag::ArmDefinition,
+                verdict: SentenceVerdict::of(differing.is_empty()),
+            };
+            emit_cross_arm_sentence(
+                &record,
+                &format!(
+                    "differing_fields={}",
+                    if differing.is_empty() {
+                        "none".to_string()
+                    } else {
+                        differing.join(",")
+                    }
+                ),
+            );
+            sentences.push(record);
+        }
+        // PC-随（登记 5.4）：-槽 各臂在 H-随 那三段上，到崩溃恢复抛弃根那一步为止与今天逐项相同（每一步做完时的镜像指纹）。
+        if arm.witness == FourthRunWitness::UnreadableRootRingSlot {
+            for line in lines.iter().filter(|line| {
+                line.text("name") == "r4_positive_control" && line.text("control") == "PC-random"
+            }) {
+                let label = line.text("seed");
+                let last = line.number("crash_recovery_order");
+                let fingerprints_of = |step_lines: &[ProductLine]| -> BTreeMap<i64, String> {
+                    step_lines
+                        .iter()
+                        .filter(|step| {
+                            step.text("name") == "r4_random_step"
+                                && step.text("family") == "h-random"
+                                && step.text("seed") == label
+                        })
+                        .filter_map(|step| {
+                            Some((
+                                step.number("order")?,
+                                step.text("fingerprint_after").to_string(),
+                            ))
+                        })
+                        .collect()
+                };
+                let arm_fingerprints = fingerprints_of(lines);
+                let today_fingerprints = fingerprints_of(today_lines);
+                let differing: Vec<i64> = match last {
+                    Some(last) => (0..=last)
+                        .filter(|order| {
+                            !arm_fingerprints.contains_key(order)
+                                || arm_fingerprints.get(order) != today_fingerprints.get(order)
+                        })
+                        .collect(),
+                    None => Vec::new(),
+                };
+                let record = SentenceRecord {
+                    arm: arm_name.to_string(),
+                    control: "PC-random".to_string(),
+                    name: format!(
+                        "slot_arm_same_as_today_up_to_the_crash_recovery_step[of={}]",
+                        line.text("of")
+                    ),
+                    tag: SentenceTag::ArmDefinition,
+                    verdict: if last.is_none() {
+                        SentenceVerdict::NotConstructible
+                    } else {
+                        SentenceVerdict::of(differing.is_empty())
+                    },
+                };
+                emit_cross_arm_sentence(
+                    &record,
+                    &format!("seed={label} differing_orders={differing:?}").replace(' ', ""),
+                );
+                sentences.push(record);
+            }
+        }
+        // PC-多读 (ii)：L0 上 Q5-同成 的点值（甲 / 乙 / 乙-窄读 -配置 +4、-配置续 +8、-槽 +3S；丙-X = 甲-X 的点值减 3S + p）。
+        for line in lines.iter().filter(|line| {
+            line.text("name") == "r4_positive_control" && line.text("control") == "PC-N0"
+        }) {
+            let key = line.key(&CONTROL_COORDINATES);
+            let Some(today_line) = today_controls.get(&key) else {
+                continue;
+            };
+            let three_slots_per_region =
+                i64::try_from(ROOT_RING_REGIONS_LOCAL * GEOMETRY_PRIMARY.slots_per_region)
+                    .expect("24");
+            let witness_point = match arm.witness {
+                FourthRunWitness::NotJudged => 0,
+                FourthRunWitness::SystemConfiguration => 4,
+                FourthRunWitness::SystemConfigurationCarried => 8,
+                FourthRunWitness::UnreadableRootRingSlot => three_slots_per_region,
+            };
+            let pages = today_line.number("effective_instance_table_pages");
+            let expected = match arm.candidate {
+                FourthRunCandidate::Bing => {
+                    pages.map(|pages| witness_point - (three_slots_per_region + pages))
+                }
+                FourthRunCandidate::Jia
+                | FourthRunCandidate::Yi
+                | FourthRunCandidate::YiNarrow
+                | FourthRunCandidate::Today => Some(witness_point),
+            };
+            let measured = both_mounted_extra_reads(line, today_line).map(|(calls, _)| calls);
+            let record = SentenceRecord {
+                arm: arm_name.to_string(),
+                control: "PC-extra-reads-ii".to_string(),
+                name: format!("point_value[{}]", line.key(&["n1", "c"])),
+                tag: SentenceTag::ArmDefinition,
+                verdict: match (measured, expected) {
+                    (Some(measured), Some(expected)) => SentenceVerdict::of(measured == expected),
+                    (None, _) | (_, None) => SentenceVerdict::NotConstructible,
+                },
+            };
+            emit_cross_arm_sentence(&record, &format!("measured_extra_read_calls={measured:?} expected={expected:?} instance_table_pages={pages:?}").replace(' ', ""));
+            sentences.push(record);
+        }
+        // PC-多读 (iii)：PC-N-环 与 PC-N-盖 的 W 格。
+        if let Some(jia_name) = extra_reads_reference_arm(arm) {
+            if arm.rereads() || arm.candidate == FourthRunCandidate::Bing {
+                let jia_controls: BTreeMap<String, &ProductLine> = lines_by_arm
+                    .get(jia_name)
+                    .map(|jia_lines| {
+                        jia_lines
+                            .iter()
+                            .filter(|line| line.text("name") == "r4_positive_control")
+                            .map(|line| (line.key(&CONTROL_COORDINATES), line))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                for line in lines.iter().filter(|line| {
+                    line.text("name") == "r4_positive_control"
+                        && matches!(line.text("control"), "PC-N-ring" | "PC-N-cover")
+                        && line.text("duration") == "W"
+                }) {
+                    if arm.witness == FourthRunWitness::UnreadableRootRingSlot
+                        && line.text("form") != "read_fails"
+                    {
+                        continue;
+                    }
+                    let key = line.key(&CONTROL_COORDINATES);
+                    let jia_total = jia_controls
+                        .get(&key)
+                        .and_then(|jia_line| jia_line.number("a_reads"));
+                    let total = line.number("a_reads");
+                    let coordinates = line.key(&["control", "form"]);
+                    let mut push =
+                        |name: &str, tag: SentenceTag, verdict: SentenceVerdict, detail: String| {
+                            let record = SentenceRecord {
+                                arm: arm_name.to_string(),
+                                control: "PC-extra-reads-iii".to_string(),
+                                name: format!("{name}[{coordinates}]"),
+                                tag,
+                                verdict,
+                            };
+                            emit_cross_arm_sentence(&record, &detail);
+                            sentences.push(record);
+                        };
+                    if arm.rereads() {
+                        let before = line.number("a_reads_before_first_wait");
+                        let after = line.number("a_reads_after_first_wait");
+                        let faults_before = line.number("a_faults_intercepted_before_first_wait");
+                        push(
+                            "first_pass_reads_equal_jia_total",
+                            SentenceTag::ArmDefinition,
+                            match (before, jia_total) {
+                                (Some(before), Some(jia_total)) => {
+                                    SentenceVerdict::of(before == jia_total)
+                                }
+                                (None, _) | (_, None) => SentenceVerdict::NotConstructible,
+                            },
+                            format!("before={before:?} jia_total={jia_total:?}").replace(' ', ""),
+                        );
+                        let rounds = i64::try_from(arm.reread_rounds).expect("R");
+                        push(
+                            "reads_after_the_mark_at_least_r_times_f_and_positive",
+                            SentenceTag::ArmDefinition,
+                            match (after, faults_before) {
+                                (Some(after), Some(faults)) => {
+                                    SentenceVerdict::of(after >= rounds * faults && after > 0)
+                                }
+                                (None, _) | (_, None) => SentenceVerdict::NotConstructible,
+                            },
+                            format!("after={after:?} f={faults_before:?} r={rounds}")
+                                .replace(' ', ""),
+                        );
+                        push(
+                            "total_is_before_plus_after",
+                            SentenceTag::Measured,
+                            match (total, before, after) {
+                                (Some(total), Some(before), Some(after)) => {
+                                    SentenceVerdict::of(total == before + after)
+                                }
+                                (None, _, _) | (_, None, _) | (_, _, None) => {
+                                    SentenceVerdict::NotConstructible
+                                }
+                            },
+                            format!("total={total:?}").replace(' ', ""),
+                        );
+                    } else if arm.witness != FourthRunWitness::UnreadableRootRingSlot {
+                        push(
+                            "bing_minus_jia_positive",
+                            SentenceTag::ArmDefinition,
+                            match (total, jia_total) {
+                                (Some(total), Some(jia_total)) => {
+                                    SentenceVerdict::of(total - jia_total > 0)
+                                }
+                                (None, _) | (_, None) => SentenceVerdict::NotConstructible,
+                            },
+                            format!("total={total:?} jia_total={jia_total:?}").replace(' ', ""),
+                        );
+                    }
+                }
+            }
+        }
+    }
+    compare_extra_refusal_and_cell_22_controls(&lines_by_arm, &today_tested, &mut sentences);
+    compare_row_two_three_and_clause_eleven(&lines_by_arm);
+    compare_base_identity(&lines_by_arm);
+    compare_losses(&lines_by_arm);
+    let arm_names: Vec<&str> = lines_by_arm.keys().copied().collect();
+    let (voided, device_defects) = fourth_run_void_scope(&sentences, &arm_names);
+    for defect in &device_defects {
+        emit_result(&format!("name=r4_device_defect sentence={defect:?} verdict=stop reason=\"同一句 [测] 在每一臂上都打不中（V1 ③）\""));
+    }
+    for ((arm, quantity), bases) in &voided {
+        emit_result(&format!(
+            "name=r4_void arm={arm} quantity={quantity} voided={} basis={}",
+            !bases.is_empty(),
+            if bases.is_empty() {
+                "none".to_string()
+            } else {
+                bases.join(",")
+            }
+        ));
+    }
+    let missed_routes: Vec<String> = sentences
+        .iter()
+        .filter(|record| {
+            record.tag != SentenceTag::Measured
+                && matches!(
+                    record.verdict,
+                    SentenceVerdict::Fail | SentenceVerdict::NotConstructible
+                )
+        })
+        .map(|record| {
+            format!(
+                "{}:{}:{}({})",
+                record.arm,
+                record.control,
+                record.name,
+                record.tag.name()
+            )
+        })
+        .collect();
+    emit_result(&format!(
+        "name=r4_missed_arm_and_today_sentences count={} list={}",
+        missed_routes.len(),
+        if missed_routes.is_empty() {
+            "none".to_string()
+        } else {
+            missed_routes.join(",")
+        }
+    ));
+}
+
+/// PC-多拒（-配置 各臂 L3(a) `read_fails` n1 = 1；-槽 各臂 L2 k = 2 `read_fails` n1 = 1；今天不 `Ok` 就顺延 n1）与 PC-22（L5）。
+fn compare_extra_refusal_and_cell_22_controls(
+    lines_by_arm: &BTreeMap<&'static str, Vec<ProductLine>>,
+    today_tested: &BTreeMap<String, &ProductLine>,
+    sentences: &mut Vec<SentenceRecord>,
+) {
+    for (arm_name, lines) in lines_by_arm {
+        let Some(arm) = fourth_run_arm_named(arm_name) else {
+            continue;
+        };
+        if arm.is_today() || arm.witness == FourthRunWitness::NotJudged {
+            continue;
+        }
+        let tested = tested_mount_lines(lines);
+        let (family, fixed) = match arm.witness {
+            FourthRunWitness::UnreadableRootRingSlot => ("l2", "k=2"),
+            FourthRunWitness::SystemConfiguration
+            | FourthRunWitness::SystemConfigurationCarried
+            | FourthRunWitness::NotJudged => ("l3", "which=a"),
+        };
+        let mut found = None;
+        for overwrites in [1u64, 2, 3] {
+            let key_part = format!(
+                "family={family} geometry={} n1={overwrites} {fixed} form=read_fails",
+                GEOMETRY_PRIMARY.label
+            );
+            let today_cell = today_tested
+                .iter()
+                .find(|(key, _)| key.starts_with("l ") && key.contains(&key_part))
+                .map(|(_, cell)| *cell);
+            if today_cell.is_some_and(|cell| class_is_a_successful_mount(cell.text("a_class"))) {
+                let arm_cell = tested
+                    .iter()
+                    .find(|(key, _)| key.starts_with("l ") && key.contains(&key_part))
+                    .map(|(_, cell)| *cell);
+                found = Some((overwrites, arm_cell));
+                break;
+            }
+        }
+        let mut push = |name: &str, tag: SentenceTag, verdict: SentenceVerdict, detail: String| {
+            let record = SentenceRecord {
+                arm: arm_name.to_string(),
+                control: "PC-extra-refusal".to_string(),
+                name: name.to_string(),
+                tag,
+                verdict,
+            };
+            emit_cross_arm_sentence(&record, &detail);
+            sentences.push(record);
+        };
+        match found {
+            None => push(
+                "today_ok_on_the_cell",
+                SentenceTag::TodayDescription,
+                SentenceVerdict::NotConstructible,
+                "n1=1,2,3".to_string(),
+            ),
+            Some((overwrites, arm_cell)) => {
+                push(
+                    "today_ok_on_the_cell",
+                    SentenceTag::TodayDescription,
+                    SentenceVerdict::Pass,
+                    format!("n1={overwrites}"),
+                );
+                let refused = arm_cell.is_some_and(|cell| cell.text("refused") == "true");
+                let truth_newer =
+                    arm_cell.is_some_and(|cell| cell.text("truth_newer_on_the_twin") == "true");
+                push(
+                    "arm_refuses",
+                    SentenceTag::ArmDefinition,
+                    SentenceVerdict::of(refused),
+                    format!("n1={overwrites}"),
+                );
+                push(
+                    "counted_as_extra_refusal",
+                    SentenceTag::Measured,
+                    SentenceVerdict::conditional(refused, !truth_newer),
+                    format!("n1={overwrites} truth_newer={truth_newer}"),
+                );
+            }
+        }
+    }
+    // PC-22：今天那一臂找一个 m（这次挂载 Ok、计数 0、隔离 0，而它自己的孪生镜像上隔离 > 0）；那个 m 上 甲 拒、乙 O(m 起) 拒 O(m 只) Ok 且隔离 = 孪生；
+    // 丙：孪生镜像上那一片被读的次数 = 今天的 − 1、隔离 = 今天的。
+    let cell_22_lines = |arm: &str| -> Vec<&ProductLine> {
+        lines_by_arm
+            .get(arm)
+            .map(|lines| {
+                lines
+                    .iter()
+                    .filter(|line| {
+                        line.text("name") == "r4_q6_cell"
+                            && line.text("geometry") == GEOMETRY_PRIMARY.label
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let twins = |arm: &str| -> Vec<&ProductLine> {
+        lines_by_arm
+            .get(arm)
+            .map(|lines| {
+                lines
+                    .iter()
+                    .filter(|line| {
+                        line.text("name") == "r4_l5_twin"
+                            && line.text("geometry") == GEOMETRY_PRIMARY.label
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let today_cells = cell_22_lines("today");
+    let today_twins = twins("today");
+    let chosen = today_cells.iter().find(|cell| {
+        cell.text("ok") == "true"
+            && cell.text("abandoned_roots_unreadable") == "0"
+            && cell.text("isolated") == "0"
+            && cell.number("twin_isolated").is_some_and(|twin| twin > 0)
+    });
+    let Some(chosen) = chosen else {
+        let record = SentenceRecord {
+            arm: "today".to_string(),
+            control: "PC-22".to_string(),
+            name: "an_m_with_ok_zero_count_zero_isolation".to_string(),
+            tag: SentenceTag::TodayDescription,
+            verdict: SentenceVerdict::NotConstructible,
+        };
+        emit_cross_arm_sentence(&record, "route=F2");
+        sentences.push(record);
+        return;
+    };
+    let chosen_key = chosen.key(&["n1", "b", "page", "m"]);
+    let today_record = SentenceRecord {
+        arm: "today".to_string(),
+        control: "PC-22".to_string(),
+        name: "an_m_with_ok_zero_count_zero_isolation".to_string(),
+        tag: SentenceTag::TodayDescription,
+        verdict: SentenceVerdict::Pass,
+    };
+    emit_cross_arm_sentence(&today_record, &chosen_key.replace(' ', ","));
+    sentences.push(today_record);
+    for arm in FOURTH_RUN_ARMS
+        .iter()
+        .filter(|arm| !arm.is_today() && lines_by_arm.contains_key(arm.name))
+    {
+        let cells = cell_22_lines(arm.name);
+        let cell_at = |duration_suffix: &str| {
+            cells.iter().find(|cell| {
+                cell.key(&["n1", "b", "page", "m"]) == chosen_key
+                    && cell.text("duration").ends_with(duration_suffix)
+            })
+        };
+        let mut push = |name: &str, verdict: SentenceVerdict, detail: String| {
+            let record = SentenceRecord {
+                arm: arm.name.to_string(),
+                control: "PC-22".to_string(),
+                name: name.to_string(),
+                tag: SentenceTag::ArmDefinition,
+                verdict,
+            };
+            emit_cross_arm_sentence(&record, &detail);
+            sentences.push(record);
+        };
+        let refused = |cell: Option<&&ProductLine>| {
+            cell.map(|cell| SentenceVerdict::of(cell.text("ok") == "false"))
+        };
+        match arm.candidate {
+            FourthRunCandidate::Jia => {
+                for suffix in ["only", "from"] {
+                    push(
+                        &format!("refused_{suffix}"),
+                        refused(cell_at(suffix)).unwrap_or(SentenceVerdict::NotConstructible),
+                        chosen_key.replace(' ', ","),
+                    );
+                }
+            }
+            FourthRunCandidate::Yi | FourthRunCandidate::YiNarrow => {
+                push(
+                    "refused_from",
+                    refused(cell_at("from")).unwrap_or(SentenceVerdict::NotConstructible),
+                    chosen_key.replace(' ', ","),
+                );
+                let only_ok_and_equal = cell_at("only").map(|cell| {
+                    SentenceVerdict::of(
+                        cell.text("ok") == "true"
+                            && cell.text("isolated") == cell.text("twin_isolated"),
+                    )
+                });
+                push(
+                    "ok_only_with_twin_isolation",
+                    only_ok_and_equal.unwrap_or(SentenceVerdict::NotConstructible),
+                    chosen_key.replace(' ', ","),
+                );
+            }
+            FourthRunCandidate::Bing => {
+                let base_key = chosen.key(&["n1", "b"]);
+                let page: usize = chosen
+                    .number("page")
+                    .and_then(|page| usize::try_from(page).ok())
+                    .unwrap_or(0);
+                let own = twins(arm.name)
+                    .into_iter()
+                    .find(|twin| twin.key(&["n1", "b"]) == base_key);
+                let today_twin = today_twins
+                    .iter()
+                    .find(|twin| twin.key(&["n1", "b"]) == base_key);
+                let page_reads = |line: &ProductLine, field: &str| -> Option<i64> {
+                    line.text(field)
+                        .trim_matches(|character| character == '[' || character == ']')
+                        .split(',')
+                        .nth(page)
+                        .and_then(|value| value.trim().parse().ok())
+                };
+                let verdict = match (own, today_twin) {
+                    (Some(own), Some(today_twin)) => SentenceVerdict::of(
+                        page_reads(own, "own_page_reads").is_some_and(|reads| {
+                            Some(reads)
+                                == page_reads(today_twin, "own_page_reads").map(|today| today - 1)
+                        }) && own.text("twin_isolated") == today_twin.text("twin_isolated"),
+                    ),
+                    (None, _) | (_, None) => SentenceVerdict::NotConstructible,
+                };
+                push(
+                    "page_read_once_less_and_same_isolation_as_today",
+                    verdict,
+                    chosen_key.replace(' ', ","),
+                );
+            }
+            FourthRunCandidate::Today => {}
+        }
+    }
+}
+
+/// 7.3 第二行（今天那一臂上装置算的 N-配置 / N-槽 为真的被测挂载 = 甲-配置 / 甲-槽 交回「N 判真」拒绝成员的那几格）、第三行（T(δ) 对今天、甲、丙 与 W 逐格相同）、F11。
+fn compare_row_two_three_and_clause_eleven(
+    lines_by_arm: &BTreeMap<&'static str, Vec<ProductLine>>,
+) {
+    let Some(today_lines) = lines_by_arm.get("today") else {
+        return;
+    };
+    let today_tested = tested_mount_lines(today_lines);
+    for (witness_field, jia_name) in [("device_n_cfg", "jia-cfg"), ("device_n_slot", "jia-slot")] {
+        let Some(jia_lines) = lines_by_arm.get(jia_name) else {
+            continue;
+        };
+        let jia_tested = tested_mount_lines(jia_lines);
+        let jia = fourth_run_arm_named(jia_name).expect("甲臂");
+        let mut compared = 0u64;
+        let mut mismatches = Vec::new();
+        for (key, today_cell) in &today_tested {
+            let Some(jia_cell) = jia_tested.get(key) else {
+                continue;
+            };
+            if today_cell.text(witness_field).is_empty() || key.contains("family=h1g") {
+                continue;
+            }
+            compared += 1;
+            let device_says = today_cell.text(witness_field) == "true";
+            let jia_refused = jia_cell.text("a_error") == jia.refusal_member();
+            if device_says != jia_refused {
+                mismatches.push(format!(
+                    "{key}: 装置 {witness_field}={device_says}，{jia_name} 拒={jia_refused}"
+                ));
+            }
+        }
+        emit_result(&format!(
+            "name=r4_section_seven_three row=2 witness={witness_field} jia_arm={jia_name} cells={compared} mismatches={} verdict={}",
+            mismatches.len(),
+            if mismatches.is_empty() { "pass" } else { "stop_s4" }
+        ));
+        for mismatch in &mismatches {
+            emit_result(&format!(
+                "name=r4_compare_finding kind=s4 detail={mismatch:?}"
+            ));
+        }
+    }
+    for (arm_name, lines) in lines_by_arm {
+        let Some(arm) = fourth_run_arm_named(arm_name) else {
+            continue;
+        };
+        if arm.rereads() {
+            continue;
+        }
+        let tested = tested_mount_lines(lines);
+        let mut compared = 0u64;
+        let mut differences = Vec::new();
+        for (key, cell) in tested.iter().filter(|(key, _)| key.contains("duration=T1")) {
+            let Some(whole) = tested.get(&key.replace("duration=T1", "duration=W")) else {
+                continue;
+            };
+            compared += 1;
+            for field in [
+                "a_class",
+                "a_error",
+                "a_writes",
+                "a_reads",
+                "a_chosen",
+                "a_effective",
+                "q3_read_back",
+                "overwrite_cell",
+                "q0_destination",
+            ] {
+                if cell.text(field) != whole.text(field) {
+                    differences.push(format!(
+                        "{key}: {field} T {} W {}",
+                        cell.text(field),
+                        whole.text(field)
+                    ));
+                }
+            }
+        }
+        emit_result(&format!(
+            "name=r4_section_seven_three row=3 arm={arm_name} cells={compared} differences={} verdict={}",
+            differences.len(),
+            if differences.is_empty() { "pass" } else { "void_v5" }
+        ));
+        for difference in &differences {
+            emit_result(&format!(
+                "name=r4_compare_finding arm={arm_name} kind=v5 detail={difference:?}"
+            ));
+        }
+    }
+    if let (Some(bing_lines), Some(jia_lines)) =
+        (lines_by_arm.get("bing-cfg"), lines_by_arm.get("jia-cfg"))
+    {
+        let bing = tested_mount_lines(bing_lines);
+        let jia = tested_mount_lines(jia_lines);
+        let mut cells = 0u64;
+        let mut differing = Vec::new();
+        for (key, bing_cell) in &bing {
+            if key.contains("duration=O1only")
+                || key.contains("family=l5")
+                || key.contains("family=pc554")
+            {
+                continue;
+            }
+            let Some(jia_cell) = jia.get(key) else {
+                continue;
+            };
+            cells += 1;
+            let jia_refused =
+                jia_cell.text("a_error") == "R3NewerRootWitnessedByTheSystemConfiguration";
+            let bing_refused =
+                bing_cell.text("a_error") == "R3RebuildFromRecordsStoppedBelowTheWitness";
+            let same = jia_refused == bing_refused
+                && [
+                    "a_class",
+                    "a_chosen",
+                    "a_effective",
+                    "q3_read_back",
+                    "overwrite_cell",
+                ]
+                .iter()
+                .all(|field| bing_cell.text(field) == jia_cell.text(field));
+            if !same {
+                differing.push(key.clone());
+            }
+        }
+        emit_result(&format!(
+            "name=r4_f11 cells={cells} cells_differing_outside_o1_and_cell_22={} verdict={}",
+            differing.len(),
+            if differing.is_empty() {
+                "inference_holds"
+            } else {
+                "inference_fails_f11"
+            }
+        ));
+        for key in &differing {
+            emit_result(&format!("name=r4_compare_finding kind=f11 detail={key:?}"));
+        }
+    }
+}
+
+/// 起始镜像跨臂同一份（「被测那次挂载之前的镜像一律在今天那一臂上造」的核：前缀在各臂自己进程里造的族，镜像指纹要与今天那一臂的相同；H1g 例外）。
+fn compare_base_identity(lines_by_arm: &BTreeMap<&'static str, Vec<ProductLine>>) {
+    let Some(today_lines) = lines_by_arm.get("today") else {
+        return;
+    };
+    let today: BTreeMap<String, &str> = today_lines
+        .iter()
+        .filter(|line| line.text("name") == "r4_prefix")
+        .map(|line| {
+            (
+                line.key(&["family", "geometry", "n1", "c", "n1a", "n1b", "a"]),
+                line.text("base_fingerprint"),
+            )
+        })
+        .collect();
+    for (arm_name, lines) in lines_by_arm {
+        let mut compared = 0u64;
+        let mut differing = Vec::new();
+        for line in lines
+            .iter()
+            .filter(|line| line.text("name") == "r4_prefix" && line.text("family") != "h1g")
+        {
+            let key = line.key(&["family", "geometry", "n1", "c", "n1a", "n1b", "a"]);
+            let Some(today_fingerprint) = today.get(&key) else {
+                continue;
+            };
+            compared += 1;
+            if line.text("base_fingerprint") != *today_fingerprint {
+                differing.push(key);
+            }
+        }
+        emit_result(&format!(
+            "name=r4_base_identity arm={arm_name} prefixes={compared} differing={} verdict={}",
+            differing.len(),
+            if differing.is_empty() {
+                "pass"
+            } else {
+                "differs"
+            }
+        ));
+        for key in &differing {
+            emit_result(&format!(
+                "name=r4_compare_finding arm={arm_name} kind=base_identity detail={key:?}"
+            ));
+        }
+    }
+}
+
+/// 丢写格与 Q6 按臂 × 族汇总（臂自己的账；出局由主 agent 按岔路单原文判）。
+fn compare_losses(lines_by_arm: &BTreeMap<&'static str, Vec<ProductLine>>) {
+    for (arm_name, lines) in lines_by_arm {
+        for line in lines.iter().filter(|line| {
+            line.text("name") == "r4_family_summary" || line.text("name") == "r4_random_summary"
+        }) {
+            emit_result(&format!(
+                "name=r4_loss arm={arm_name} family={} geometry={} cells={} lost_write_cells={} q1_overwrite_cells={} q2_rollback_cells={} q3_lost_cells={} q3c_lost_cells={} q3_last_confirmed_cells={}",
+                line.text("family"),
+                line.text("geometry"),
+                line.text("cells"),
+                line.text("lost_write_cells_q1_q2_q3"),
+                line.text("q1_overwrite_cells"),
+                line.text("q2_rollback_cells"),
+                line.text("q3_lost_cells"),
+                line.text("q3c_lost_cells"),
+                line.text("q3_last_confirmed_cells")
+            ));
+        }
+        let cell_22_verdicts: Vec<&ProductLine> = lines
+            .iter()
+            .filter(|line| line.text("name") == "r4_q6_cell")
+            .collect();
+        if !cell_22_verdicts.is_empty() {
+            let mut by_geometry: BTreeMap<&str, (u64, u64)> = BTreeMap::new();
+            for line in cell_22_verdicts {
+                let entry = by_geometry.entry(line.text("geometry")).or_insert((0, 0));
+                entry.0 += 1;
+                if line.text("q6_not_covered") == "true" {
+                    entry.1 += 1;
+                }
+            }
+            for (geometry, (cells, not_covered)) in by_geometry {
+                emit_result(&format!(
+                    "name=r4_q6 arm={arm_name} geometry={geometry} cells={cells} not_covered_cells={not_covered} verdict={}",
+                    if not_covered == 0 { "covered" } else { "not_covered" }
+                ));
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 12.9 开跑检查（第 4 次跑）：5.6 常量回比（V3）、7.2 锚点（V4）、臂与副本对得上（装置编进的臂代码、R、读缓存收法与环境变量说的臂一致）。
+// ---------------------------------------------------------------------------
+
+fn fourth_run_local_constants_checks() -> Vec<ConstantCheck> {
+    let mut checks = third_run_local_constants_checks();
+    checks.extend([
+        ConstantCheck {
+            name: "根环区域数（槽序点预言用的那一个）ROOT_RING_REGIONS",
+            local_value: ROOT_RING_REGIONS_LOCAL,
+            crates_value: singlefs_format::ROOT_RING_REGIONS,
+        },
+        ConstantCheck {
+            name: "稀疏盘扇区宽（镜像指纹用的那一个）SECTOR_BYTES",
+            local_value: SECTOR_BYTES_LOCAL,
+            crates_value: singlefs_harness::crash::SECTOR_BYTES,
+        },
+    ]);
+    checks
+}
+
+/// 臂探针：mkfs → 可写挂载 → 首个文件 → 关闭 C → 再可写挂载（不注入），读臂的观测。乙、乙-窄读 每次可写挂载都走重读那一支、
+/// 记下 R 与读缓存收法；别的臂两样都是缺省。交回 (探针那次挂载的 K 类, 观测到的 R, 收不收 journal 空槽)。
+fn fourth_run_arm_probe() -> Result<(&'static str, Option<FourthRunArmExtras>), String> {
+    let history =
+        fourth_run_plain_prefix(&GEOMETRY_PRIMARY, 0, Closing::ProcessExit, "probe")?.history;
+    let parameters = parameters_for(&GEOMETRY_PRIMARY);
+    let call = run_fourth_run_mount_writable(&history.pool, &parameters, &[], None, None);
+    Ok((
+        third_run_outcome_class(&call.call.outcome, call.call.write_calls),
+        call.extras,
+    ))
+}
+
+fn run_fourth_run_constants_and_anchors(arm_name: &str) -> bool {
+    let mut all_passed = true;
+    for check in fourth_run_local_constants_checks() {
+        let passed = check.matches();
+        all_passed &= passed;
+        emit_result(&format!(
+            "name=r4_local_constant_check arm={arm_name} item={:?} verdict={} local_value={} crates_value={}",
+            check.name,
+            verdict_word(passed),
+            check.local_value,
+            check.crates_value
+        ));
+    }
+    let (regions_match, local_regions, crates_regions) = region_devices_matches_crates();
+    all_passed &= regions_match;
+    emit_result(&format!(
+        "name=r4_local_constant_check arm={arm_name} item=region_devices verdict={} local_value={local_regions:?} crates_value={crates_regions:?}",
+        verdict_word(regions_match)
+    ));
+    let arm = fourth_run_arm_named(arm_name);
+    let arm_code_compiled_in = third_run_arm_hooks::arm_code_is_compiled_in();
+    let probe = fourth_run_arm_probe();
+    let arm_code_matches = match (arm, &probe) {
+        (Some(arm), Ok((class, extras))) => {
+            let extras_match = match extras {
+                None => arm.is_today(),
+                Some(extras) => {
+                    !arm.is_today()
+                        && u64::from(extras.reread_rounds_limit) == arm.reread_rounds
+                        && extras.zeroed_journal_ring_slots_are_cached
+                            == (arm.candidate == FourthRunCandidate::YiNarrow)
+                }
+            };
+            *class == "K0" && arm.is_today() != arm_code_compiled_in && extras_match
+        }
+        (None, _) | (_, Err(_)) => false,
+    };
+    all_passed &= arm_code_matches;
+    emit_result(&format!(
+        "name=r4_arm_code_check arm={arm_name} verdict={} arm_known={} candidate={} witness={} registered_rounds={} arm_code_compiled_in={arm_code_compiled_in} probe={}",
+        verdict_word(arm_code_matches),
+        arm.is_some(),
+        arm.map_or("none", FourthRunArm::candidate_name),
+        arm.map_or("none", FourthRunArm::witness_name),
+        arm.map_or(0, |arm| arm.reread_rounds),
+        match &probe {
+            Ok((class, extras)) => format!("{class}:{extras:?}").replace(' ', ""),
+            Err(error) => format!("error:{}", error.replace(' ', "_")),
+        }
+    ));
+    match decoded_tail_instance_and_floor_offsets() {
+        Ok((tail, instance, floor)) => {
+            let passed = tail == SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL
+                && instance == tail + 8
+                && floor == SYSTEM_CONFIGURATION_TAIL_OFFSET_LOCAL + 8 + 4
+                && instance == 477
+                && floor == 481;
+            all_passed &= passed;
+            emit_result(&format!(
+                "name=r4_section_seven_two_anchor arm={arm_name} item=\"journal 实例代号偏移 469 + 8；F 偏移 489 − 8\" verdict={} tail_offset={tail} instance_offset={instance} floor_offset={floor} registered_instance=477 registered_floor=481",
+                verdict_word(passed)
+            ));
+        }
+        Err(error) => {
+            all_passed = false;
+            emit_result(&format!(
+                "name=r4_section_seven_two_anchor arm={arm_name} item=offsets verdict=fail reason={error:?}"
+            ));
+        }
+    }
+    for geometry in [
+        &GEOMETRY_PRIMARY,
+        &GEOMETRY_SMALLER_ROOT_RING,
+        &GEOMETRY_LARGER_ROOT_RING,
+    ] {
+        let parameters = parameters_for(geometry);
+        let mut devices = new_devices(IMAGE_BYTES);
+        let anchor = make_filesystem(&parameters, &mut devices)
+            .map_err(|error| format!("{error:?}"))
+            .and_then(|_| independent_geometry(&memory_pool_of(&devices, IMAGE_BYTES)));
+        match anchor {
+            Ok(pool_geometry) => {
+                let pool = memory_pool_of(&devices, IMAGE_BYTES);
+                let root_slots = checker_image::root_slot_positions(&pool_geometry).len() as u64;
+                let ring_slots = pool_geometry.journal_ring_bytes / JOURNAL_RECORD_BYTES;
+                let configuration_slots = device_decode(&pool, &pool_geometry)
+                    .system_configuration_slots
+                    .len() as u64;
+                for (item, computed, registered) in [
+                    (
+                        "根槽总数 3×S（装置在这个几何上枚举的槽数）",
+                        root_slots,
+                        ROOT_RING_REGIONS_LOCAL * geometry.slots_per_region,
+                    ),
+                    (
+                        "环槽数 环÷4096（装置在这个几何上的环槽数）",
+                        ring_slots,
+                        geometry.journal_ring_bytes / 4096,
+                    ),
+                    (
+                        "每个池的系统配置槽数 2×2（装置读到的自证槽数）",
+                        configuration_slots,
+                        2 * 2,
+                    ),
+                ] {
+                    let passed = computed == registered;
+                    all_passed &= passed;
+                    emit_result(&format!(
+                        "name=r4_section_seven_two_anchor arm={arm_name} geometry={} item={item:?} verdict={} computed={computed} registered={registered}",
+                        geometry.label,
+                        verdict_word(passed)
+                    ));
+                }
+            }
+            Err(error) => {
+                all_passed = false;
+                emit_result(&format!(
+                    "name=r4_section_seven_two_anchor arm={arm_name} geometry={} item=geometry verdict=fail reason={error:?}",
+                    geometry.label
+                ));
+            }
+        }
+    }
+    let registered_pieces = [
+        (
+            "G0 上 3×S（PC-多读 (ii) 里 -槽 臂的点值）",
+            ROOT_RING_REGIONS_LOCAL * GEOMETRY_PRIMARY.slots_per_region,
+            24u64,
+        ),
+        (
+            "H1f 每臂前缀数 n1a×c×n1b",
+            (FOURTH_RUN_REMOUNT_PREFIX_FIRST_OVERWRITES.len()
+                * 2
+                * FOURTH_RUN_REMOUNT_PREFIX_SECOND_OVERWRITES.len()) as u64,
+            8,
+        ),
+        (
+            "H1g 每臂格数 n1×a×m×b×造法",
+            (FOURTH_RUN_ACQUISITION_CRASH_PREFIX_OVERWRITES.len()
+                * FOURTH_RUN_ACQUISITION_CRASHES.len()
+                * FOURTH_RUN_ACQUISITION_CRASH_TAIL_OVERWRITES.len()
+                * 2
+                * 2) as u64,
+            32,
+        ),
+    ];
+    for (item, computed, registered) in registered_pieces {
+        let passed = computed == registered;
+        all_passed &= passed;
+        emit_result(&format!(
+            "name=r4_section_seven_two_anchor arm={arm_name} item={item:?} verdict={} computed={computed} registered={registered}",
+            verdict_word(passed)
+        ));
+    }
+    all_passed
+}
+
+fn fourth_run_arm_label() -> String {
+    env::var("SINGLEFS_E158_ARM").unwrap_or_else(|_| "today".to_string())
+}
+
+/// 第一段（登记 5.7）：阳性对照里不靠 L 族的那几条（PC-N-环、PC-N-盖、PC-O、PC-丢写、PC-只读，PC-多读 在 compare）、
+/// PC-N0 与 PC-多读 (ii)（L0 那 8 格），H1d、H1e（G0），Q0 去向栏。
+fn run_fourth_run_segment_one(arm: FourthRunArm) {
+    run_fourth_run_positive_control_newer(
+        &GEOMETRY_PRIMARY,
+        arm,
+        ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+    );
+    run_fourth_run_positive_control_newer(&GEOMETRY_PRIMARY, arm, ReplayBreak::EveryRecord);
+    run_fourth_run_positive_control_second_read(&GEOMETRY_PRIMARY, arm);
+    run_fourth_run_positive_control_no_newer(&GEOMETRY_PRIMARY, arm);
+    run_fourth_run_held_once_like_family(
+        "h1d",
+        &GEOMETRY_PRIMARY,
+        arm,
+        1,
+        FourthRunContinuation::EveryCut,
+    );
+    run_fourth_run_held_once_like_family(
+        "h1e",
+        &GEOMETRY_PRIMARY,
+        arm,
+        1,
+        FourthRunContinuation::Tail,
+    );
+}
+
+/// H1d / H1e 在一个几何点上：前缀 P(n1, C)，n1 ∈ {0, 1, 2, 3}；H1e 的 m ∈ {1, 2, 3, 4}。
+fn run_fourth_run_held_once_like_family(
+    name: &str,
+    geometry: &Geometry,
+    arm: FourthRunArm,
+    hidden_count: usize,
+    continuation: FourthRunContinuation,
+) {
+    let clause_checks = if hidden_count == 1
+        && geometry.label == GEOMETRY_PRIMARY.label
+        && matches!(name, "h1d" | "h1e")
+    {
+        ClauseChecksOnTheHiddenRoot::Checked
+    } else {
+        ClauseChecksOnTheHiddenRoot::NotRegisteredForThisFamily
+    };
+    let family = FourthRunFamily {
+        name,
+        geometry,
+        hidden_count,
+        continuation,
+        tail_overwrites: &THIRD_RUN_TAIL_OVERWRITES,
+        durations: FourthRunDurationPlan::OfTheArm,
+        checks_the_clauses_on_the_hidden_root: clause_checks,
+    };
+    let prefixes = THIRD_RUN_OVERWRITES
+        .iter()
+        .map(|overwrites| {
+            fourth_run_plain_prefix(geometry, *overwrites, Closing::ProcessExit, arm.name)
+        })
+        .collect();
+    run_fourth_run_family(&family, arm, prefixes);
+}
+
+/// 第 4 次跑的模式：开跑检查不过就停（V3 / V4），过了跑点名的那一段。交回 true = 这个模式归第 4 次跑。
+fn run_fourth_run_mode(mode: &str, command_line_arguments: &[String]) -> bool {
+    let known = [
+        "r4-constants",
+        "r4-seg1",
+        "r4-pc",
+        "r4-h1d",
+        "r4-h1e",
+        "r4-compare",
+        "r4-bases",
+        "r4-seg3",
+        "r4-seg4",
+        "r4-seg5",
+        "r4-h1f",
+        "r4-h1g",
+        "r4-seg2",
+    ];
+    if !known.contains(&mode) {
+        return false;
+    }
+    emit_input_header();
+    if mode == "r4-compare" {
+        let prefixes: Vec<String> = command_line_arguments.iter().skip(2).cloned().collect();
+        run_fourth_run_compare(&prefixes);
+        emit_result(&format!(
+            "name=done emitted={}",
+            emitted_result_line_count() + 1
+        ));
+        return true;
+    }
+    let arm_name = fourth_run_arm_label();
+    if !run_fourth_run_constants_and_anchors(&arm_name) {
+        emit_result(&format!(
+            "name=stop arm={arm_name} reason=V3 detail=\"第 4 次跑的常量回比、第七节锚点或臂与副本的对应有不过的，整轮不开跑\""
+        ));
+        emit_result(&format!(
+            "name=done emitted={}",
+            emitted_result_line_count() + 1
+        ));
+        return true;
+    }
+    let arm = fourth_run_arm_named(&arm_name).expect("开跑检查里核过臂名");
+    match mode {
+        "r4-constants" => {}
+        "r4-seg1" => run_fourth_run_segment_one(arm),
+        "r4-pc" => {
+            run_fourth_run_positive_control_newer(
+                &GEOMETRY_PRIMARY,
+                arm,
+                ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+            );
+            run_fourth_run_positive_control_newer(&GEOMETRY_PRIMARY, arm, ReplayBreak::EveryRecord);
+            run_fourth_run_positive_control_second_read(&GEOMETRY_PRIMARY, arm);
+            run_fourth_run_positive_control_no_newer(&GEOMETRY_PRIMARY, arm);
+        }
+        "r4-h1d" => run_fourth_run_held_once_like_family(
+            "h1d",
+            &GEOMETRY_PRIMARY,
+            arm,
+            1,
+            FourthRunContinuation::EveryCut,
+        ),
+        "r4-h1e" => run_fourth_run_held_once_like_family(
+            "h1e",
+            &GEOMETRY_PRIMARY,
+            arm,
+            1,
+            FourthRunContinuation::Tail,
+        ),
+        "r4-bases" => run_fourth_run_today_bases(arm),
+        "r4-seg3" => run_fourth_run_segment_three(arm),
+        "r4-seg4" => run_fourth_run_segment_four(arm),
+        "r4-seg5" => run_fourth_run_segment_five(arm),
+        "r4-h1f" => run_fourth_run_remount_families(arm),
+        "r4-h1g" => run_fourth_run_acquisition_crash_family(arm),
+        "r4-seg2" => fourth_run_segment_two::run_segment_two(arm),
+        other => unreachable!("第 4 次跑的模式表 known 已经挡过：{other}"),
+    }
+    emit_result(&format!(
+        "name=done emitted={}",
+        emitted_result_line_count() + 1
+    ));
+    true
+}
+
+#[cfg(test)]
+mod fourth_run_tests {
+    use super::*;
+
+    fn read_failure_at(offset: u64) -> ThirdRunFault {
+        ThirdRunFault {
+            device: DeviceIdentity(0),
+            offset,
+            length: 4096,
+            form: UnreadableForm::ReadFails,
+            duration: FaultDuration::WholeCall,
+            label: format!("probe({offset})"),
+        }
+    }
+
+    fn product_line(text: &str) -> ProductLine {
+        ProductLine {
+            fields: fields_of_a_result_line(text),
+        }
+    }
+
+    /// 登记 5.6 与 7.2：第 4 次跑的常量回比、偏移解码、三个几何上的根槽 / 环槽 / 系统配置槽数、H1f / H1g 的格数、臂探针全过（V3、V4）。
+    #[test]
+    fn fourth_run_constants_and_anchors_all_pass() {
+        assert!(run_fourth_run_constants_and_anchors("today"));
+    }
+
+    /// 臂名单：十八条，十二条主族；每条臂的候选、N 与 R 照登记 5.2 与主 agent 认定第 1 项。
+    #[test]
+    fn the_arm_table_follows_the_registration() {
+        assert_eq!(FOURTH_RUN_ARMS.len(), 18);
+        let narrow = fourth_run_arm_named("yi-narrow-cfg-carry").expect("乙-窄读-配置续");
+        assert_eq!(narrow.candidate, FourthRunCandidate::YiNarrow);
+        assert_eq!(narrow.witness, FourthRunWitness::SystemConfigurationCarried);
+        assert_eq!(narrow.reread_rounds, 1);
+        assert_eq!(
+            fourth_run_arm_named("yi-slot-three-rounds")
+                .expect("R = 3")
+                .reread_rounds,
+            3
+        );
+        assert_eq!(
+            fourth_run_arm_named("bing-cfg")
+                .expect("丙")
+                .refusal_member(),
+            "R3RebuildFromRecordsStoppedBelowTheWitness"
+        );
+        assert_eq!(
+            fourth_run_arm_named("yi-narrow-slot")
+                .expect("乙-窄读-槽")
+                .refusal_member(),
+            "R3UnreadableRootRingSlot"
+        );
+        assert_eq!(
+            fourth_run_arm_named("today")
+                .expect("今天")
+                .refusal_member(),
+            "none"
+        );
+    }
+
+    /// 时长表（登记 5.3、8.2）：乙 W、O(1 只)、T(δ)、T(2δ)；R = 3 的乙 到 T(4δ)；今天 T(δ) 只跑不断那一格；H1e 的乙 W、T(δ)。
+    #[test]
+    fn the_durations_follow_the_registration() {
+        let yi = fourth_run_arm_named("yi-cfg").expect("乙");
+        let names: Vec<String> = fourth_run_held_once_durations(yi)
+            .iter()
+            .map(|(duration, _)| duration.name())
+            .collect();
+        assert_eq!(names, vec!["W", "O1only", "T1", "T2"]);
+        let three = fourth_run_arm_named("yi-narrow-cfg-three-rounds").expect("R = 3");
+        assert_eq!(fourth_run_held_once_durations(three).len(), 2 + 4);
+        assert_eq!(fourth_run_tail_durations(three).len(), 1 + 4);
+        let today = fourth_run_arm_named("today").expect("今天");
+        assert_eq!(
+            fourth_run_held_once_durations(today)[2],
+            (FaultDuration::UntilVirtualTime(1), true)
+        );
+        assert_eq!(
+            fourth_run_tail_durations(yi),
+            vec![FaultDuration::WholeCall, FaultDuration::UntilVirtualTime(1)]
+        );
+    }
+
+    /// D22（单元原子性怎么合成） 已定项 2「槽序」：(txg mod 3, (txg div 3) mod S)（变异 M21：h = 4 时 (h div 3) mod 8 = 1 ≠ h mod 8 = 4）。
+    #[test]
+    fn the_predicted_root_ring_slot_follows_the_slot_order() {
+        assert_eq!(predicted_root_ring_slot_of_a_publish(4, 8), (1, 1));
+        assert_eq!(predicted_root_ring_slot_of_a_publish(13, 8), (1, 4));
+        assert_eq!(predicted_root_ring_slot_of_a_publish(30, 4), (0, 2));
+    }
+
+    /// A 藏一条根时与第 3 次跑那一份落点逐项相同（k 的推广不改 k = 1）。
+    #[test]
+    fn fourth_run_abandonment_faults_equal_the_third_run_ones_for_one_hidden_root() {
+        let parameters = parameters_for(&GEOMETRY_PRIMARY);
+        let mut history = third_run_history_start(&GEOMETRY_PRIMARY, 2).expect("P(2, ·)");
+        third_run_close(&mut history, &parameters, Closing::ProcessExit).expect("关闭 C");
+        let geometry = independent_geometry(&history.pool).expect("几何");
+        for (form, replay_break) in [
+            (UnreadableForm::ReadFails, ReplayBreak::EveryRecord),
+            (
+                UnreadableForm::ReadsZeros,
+                ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+            ),
+        ] {
+            let third = third_run_abandonment_faults(
+                &history,
+                &geometry,
+                form,
+                replay_break,
+                FaultDuration::WholeCall,
+            )
+            .expect("第 3 次跑");
+            let fourth = fourth_run_abandonment_faults(
+                &history,
+                &geometry,
+                form,
+                replay_break,
+                FaultDuration::WholeCall,
+                1,
+            )
+            .expect("第 4 次跑");
+            assert_eq!(third, fourth);
+        }
+        let two = fourth_run_abandonment_faults(
+            &history,
+            &geometry,
+            UnreadableForm::ReadFails,
+            ReplayBreak::EveryRecord,
+            FaultDuration::WholeCall,
+            2,
+        )
+        .expect("k = 2")
+        .expect("有记录");
+        assert_eq!(
+            two.iter()
+                .filter(|fault| fault.label.starts_with("root"))
+                .count(),
+            2
+        );
+        let one = fourth_run_abandonment_faults(
+            &history,
+            &geometry,
+            UnreadableForm::ReadFails,
+            ReplayBreak::EveryRecord,
+            FaultDuration::WholeCall,
+            1,
+        )
+        .expect("k = 1")
+        .expect("有记录");
+        let record_labels = |faults: &[ThirdRunFault]| -> BTreeSet<String> {
+            faults
+                .iter()
+                .filter(|fault| fault.label.starts_with("record"))
+                .map(|fault| fault.label.clone())
+                .collect()
+        };
+        assert!(record_labels(&two).is_disjoint(&record_labels(&one)));
+    }
+
+    /// 标记前后的读（登记 5.0 第三条、5.4 PC-多读 (iii)；变异 M14 第 4 次跑那一份）：三次读坏、两次读成都数，
+    /// 第一个标记记下那一刻的读数与已拦下过的落点个数，之后读回全零的另数。
+    #[test]
+    fn reads_before_and_after_the_first_wait_count_failed_reads_too() {
+        let pool = memory_pool_of(&new_devices(IMAGE_BYTES), IMAGE_BYTES);
+        let state = Rc::new(RefCell::new(ThirdRunDeviceState::new(
+            vec![read_failure_at(0)],
+            None,
+            None,
+        )));
+        let marker = Rc::new(RefCell::new(FourthRunReadMarker::default()));
+        let (identity, inner) = devices_from_pool(&pool, IMAGE_BYTES).remove(0);
+        let device = FourthRunDevice {
+            device: ThirdRunDevice {
+                identity,
+                inner,
+                state: Rc::clone(&state),
+            },
+            marker: Rc::clone(&marker),
+        };
+        let mut buffer = vec![0u8; 4096];
+        for _ in 0..3 {
+            assert!(device.read_at(DeviceOffsetInBytes(0), &mut buffer).is_err());
+        }
+        mark_the_first_wait(&marker, &state);
+        for _ in 0..2 {
+            assert!(device
+                .read_at(DeviceOffsetInBytes(1 << 20), &mut buffer)
+                .is_ok());
+        }
+        mark_the_first_wait(&marker, &state);
+        let marker = marker.borrow();
+        assert_eq!(marker.read_calls, 5);
+        assert_eq!(marker.reads_before_the_first_wait, Some(3));
+        assert_eq!(marker.faults_intercepted_before_the_first_wait, Some(1));
+        assert_eq!(marker.all_zero_reads_after_the_first_wait, 2);
+        assert_eq!(state.borrow().read_calls, 5);
+    }
+
+    /// Q0 去向（「读法写死」表；变异 M16）：s_h 上换成别的键的根、环里没有内容号 ≥ 被藏那一版的 ⇒ 根槽被盖；原样的镜像、没交回 Ok ⇒ 原样留着。
+    #[test]
+    fn the_hidden_root_destination_tells_an_overwritten_slot_from_an_untouched_one() {
+        let parameters = parameters_for(&GEOMETRY_PRIMARY);
+        let mut history = third_run_history_start(&GEOMETRY_PRIMARY, 1).expect("P(1, ·)");
+        third_run_close(&mut history, &parameters, Closing::ProcessExit).expect("关闭 C");
+        let geometry = independent_geometry(&history.pool).expect("几何");
+        let hidden = history.tip();
+        let before_hidden = *history.timeline.iter().rev().nth(1).expect("前一条");
+        let position = hidden_root_position(&history.pool, hidden).expect("被藏那条根在环里");
+        let untouched = hidden_root_destination(
+            &position,
+            &history.content_number_by_root,
+            history.last_confirmed_content_number(),
+            &history.pool,
+            None,
+        );
+        assert_eq!(untouched, HiddenRootDestination::LeftAsItWas);
+        let (hidden_device, hidden_offset) =
+            root_slot_of(&history.pool, &geometry, hidden).expect("s_h");
+        let (before_device, before_offset) =
+            root_slot_of(&history.pool, &geometry, before_hidden).expect("前一条的槽");
+        let length = usize::try_from(geometry.physical_block_size).expect("根槽宽");
+        let copied = history
+            .pool
+            .read(before_device.0, before_offset, length)
+            .expect("读得出");
+        let mut devices = devices_from_pool(&history.pool, IMAGE_BYTES);
+        devices[usize::try_from(hidden_device.0).expect("盘号")]
+            .1
+            .write_at(
+                DeviceOffsetInBytes(hidden_offset),
+                &copied,
+                WriteDurability::Plain,
+            )
+            .expect("内存盘写不报错");
+        let overwritten_pool = memory_pool_of(&devices, IMAGE_BYTES);
+        let overwritten = hidden_root_destination(
+            &position,
+            &history.content_number_by_root,
+            history.last_confirmed_content_number(),
+            &overwritten_pool,
+            None,
+        );
+        assert_eq!(overwritten, HiddenRootDestination::RootSlotOverwritten);
+        let chosen = hidden_root_destination(
+            &position,
+            &history.content_number_by_root,
+            history.last_confirmed_content_number(),
+            &history.pool,
+            Some(hidden),
+        );
+        assert_eq!(chosen, HiddenRootDestination::ChosenOrApplied);
+    }
+
+    /// Q5-同成（登记第六节；变异 M18）：手写三格（两格都 Ok、一格臂拒），同成栏只收两格。
+    #[test]
+    fn both_mounted_extra_reads_leave_out_the_refused_cells() {
+        let today = product_line("E7RESULT name=r4_cell a_class=K0 a_reads=100 a_read_bytes=409600 base_fingerprint=00ab");
+        let arms = [
+            product_line("E7RESULT name=r4_cell a_class=K0 a_reads=104 a_read_bytes=425984 base_fingerprint=00ab"),
+            product_line("E7RESULT name=r4_cell a_class=K1 a_reads=108 a_read_bytes=442368 base_fingerprint=00ab"),
+            product_line("E7RESULT name=r4_cell a_class=K3 a_reads=60 a_read_bytes=245760 base_fingerprint=00ab"),
+        ];
+        let counted: Vec<(i64, i64)> = arms
+            .iter()
+            .filter_map(|arm| both_mounted_extra_reads(arm, &today))
+            .collect();
+        assert_eq!(counted, vec![(4, 16384), (8, 32768)]);
+        let different_start = product_line("E7RESULT name=r4_cell a_class=K0 a_reads=104 a_read_bytes=425984 base_fingerprint=00ac");
+        assert_eq!(both_mounted_extra_reads(&different_start, &today), None);
+    }
+
+    fn record(
+        arm: &str,
+        control: &str,
+        name: &str,
+        tag: SentenceTag,
+        verdict: SentenceVerdict,
+    ) -> SentenceRecord {
+        SentenceRecord {
+            arm: arm.to_string(),
+            control: control.to_string(),
+            name: name.to_string(),
+            tag,
+            verdict,
+        }
+    }
+
+    /// V1（登记 11.1；变异 M19）：今天那一臂一句 [今] 打不中、其余全过 ⇒ 作废集合为空；[测] 在今天那一臂上打不中 ⇒ 今天那一臂那条对照管的量作废，
+    /// 别的臂只作废拿今天当参照的量；[臂] 打不中 ⇒ 那一臂那条对照管的量；同一句 [测] 每一臂都打不中 ⇒ 装置缺陷（全部臂一起）。
+    #[test]
+    fn the_void_scope_routes_by_the_sentence_tag() {
+        let arms = ["today", "jia-cfg", "yi-cfg"];
+        let passes = |control: &str, name: &str, tag: SentenceTag| {
+            arms.iter()
+                .map(|arm| record(arm, control, name, tag, SentenceVerdict::Pass))
+                .collect::<Vec<_>>()
+        };
+        let mut sentences = passes("PC-N-ring", "truth_newer", SentenceTag::Measured);
+        sentences.push(record(
+            "today",
+            "PC-N-ring",
+            "hidden_in_ring_and_abandoned",
+            SentenceTag::TodayDescription,
+            SentenceVerdict::Fail,
+        ));
+        let (voided_by_a_today_sentence, defects_of_a_today_sentence) =
+            fourth_run_void_scope(&sentences, &arms);
+        assert!(voided_by_a_today_sentence.values().all(Vec::is_empty));
+        assert!(defects_of_a_today_sentence.is_empty());
+
+        let measured_and_arm_sentences = vec![
+            record(
+                "today",
+                "PC-N0",
+                "truth_not_newer",
+                SentenceTag::Measured,
+                SentenceVerdict::Fail,
+            ),
+            record(
+                "jia-cfg",
+                "PC-N0",
+                "truth_not_newer",
+                SentenceTag::Measured,
+                SentenceVerdict::Pass,
+            ),
+            record(
+                "yi-cfg",
+                "PC-N-ring",
+                "refused_after_r_rounds_k3",
+                SentenceTag::ArmDefinition,
+                SentenceVerdict::Fail,
+            ),
+        ];
+        let (voided_by_measured_and_arm, defects_of_measured_and_arm) =
+            fourth_run_void_scope(&measured_and_arm_sentences, &arms);
+        let is_voided = |arm: &str, quantity: &'static str| {
+            !voided_by_measured_and_arm[&(arm.to_string(), quantity)].is_empty()
+        };
+        assert!(is_voided("today", "Q4"));
+        assert!(is_voided("jia-cfg", "Q4"));
+        assert!(!is_voided("jia-cfg", "Q1-Q3"));
+        assert!(is_voided("yi-cfg", "Q1-Q3"));
+        assert!(!is_voided("today", "Q1-Q3"));
+        assert!(defects_of_measured_and_arm.is_empty());
+
+        let everyone_misses: Vec<SentenceRecord> = arms
+            .iter()
+            .map(|arm| {
+                record(
+                    arm,
+                    "PC-lost-write",
+                    "overwrite_counted_and_not_last_confirmed",
+                    SentenceTag::Measured,
+                    SentenceVerdict::Fail,
+                )
+            })
+            .collect();
+        let (voided_on_every_arm, defects_on_every_arm) =
+            fourth_run_void_scope(&everyone_misses, &arms);
+        assert_eq!(
+            defects_on_every_arm,
+            vec!["PC-lost-write:overwrite_counted_and_not_last_confirmed".to_string()]
+        );
+        assert!(!voided_on_every_arm[&("jia-cfg".to_string(), "Q1-Q3")].is_empty());
+    }
+
+    /// PC-多读 (iii) 与 Q5-拒 的参照是同一种 N 的甲臂，不是今天那一臂（登记 5.8 第二件；变异 M20）。
+    #[test]
+    fn the_extra_reads_reference_is_the_jia_arm_with_the_same_witness() {
+        let reference =
+            |name: &str| extra_reads_reference_arm(fourth_run_arm_named(name).expect("臂"));
+        assert_eq!(reference("yi-cfg"), Some("jia-cfg"));
+        assert_eq!(reference("yi-narrow-cfg-carry"), Some("jia-cfg-carry"));
+        assert_eq!(reference("yi-slot-three-rounds"), Some("jia-slot"));
+        assert_eq!(reference("bing-cfg"), Some("jia-cfg"));
+        assert_eq!(reference("today"), None);
+    }
+
+    /// 今天那一臂造的起始镜像经文件原样读回（镜像指纹、补上的根、每一片的读数）。
+    #[test]
+    fn today_base_round_trips_through_its_file_encoding() {
+        let history = third_run_history_start(&GEOMETRY_PRIMARY, 1).expect("P(1, ·)");
+        let base = TodayBase {
+            image: history.pool.clone(),
+            appended_roots: vec![((2, 7), 2), ((2, 8), 2)],
+            page_reads: vec![3, 1],
+        };
+        let decoded = decode_today_base(&encode_today_base(&base)).expect("读回");
+        assert_eq!(
+            image_fingerprint(&decoded.image),
+            image_fingerprint(&base.image)
+        );
+        assert_eq!(decoded.image, base.image);
+        assert_eq!(decoded.appended_roots, base.appended_roots);
+        assert_eq!(decoded.page_reads, base.page_reads);
+        assert!(decode_today_base(b"E158R4B0").is_err());
+    }
+
+    /// 条件式句子前件不成立记 vacuous，不算打不中；总判定按 fail > not_constructible > pass。
+    #[test]
+    fn conditional_sentences_are_vacuous_when_the_antecedent_does_not_hold() {
+        assert_eq!(
+            SentenceVerdict::conditional(false, false),
+            SentenceVerdict::Vacuous
+        );
+        assert_eq!(
+            SentenceVerdict::conditional(true, false),
+            SentenceVerdict::Fail
+        );
+        let sentences = vec![
+            sentence(
+                SentenceTag::Measured,
+                "first",
+                SentenceVerdict::Vacuous,
+                "V1",
+            ),
+            sentence(
+                SentenceTag::ArmDefinition,
+                "second",
+                SentenceVerdict::NotConstructible,
+                "F9",
+            ),
+        ];
+        assert_eq!(overall_verdict(&sentences), "not_constructible");
+    }
+}
+
+// ============================================================================
+// 十三、第 4 次跑第二段（`research/prompts/e158-r4-prereg.md` 5.3 实七-甲、实七-乙、实八、H-随，5.5 主 agent 认定第 9 项 H-随全，
+//      5.4 PC-随，5.6 H-随 的常量回比，11.2 S5a、S5b、S7、S9，第九节 M22）：模式 `r4-seg2`。
+//      harness 按种子生成的历史在每一臂的副本上逐步执行。执行器是装置自己的：八种操作照 harness 执行器（`history.rs` 的 `apply_*`）
+//      同一串入口、同一套前提各写一遍，盘照 harness 那一叠（故障注入包录制器包内存盘）；checker 每一步的判定原样记下，判红不截断。
+//      harness 的注入点与崩溃状态按「同一步、步内同一序号」映到各臂自己的调用与写序列上（第十二节第二段修订）。
+//      今天那一臂上每一步与 harness 自己的执行器比镜像与调用数：对得上，映射才站得住（对不上走 S9 / S7）。
+// ============================================================================
+
+mod fourth_run_segment_two {
+    use super::*;
+
+    use singlefs_checker::image::InvariantVerdict;
+    use singlefs_checker::walk::check_pool_image;
+    use singlefs_core::admission::SpaceAdmission;
+    use singlefs_core::journal::back_chain_of;
+    use singlefs_core::make_filesystem::allocator_after_make_filesystem;
+    use singlefs_core::mount::{
+        mount_writable_with_space_admission, ParametersAndDeviceTableOfTheMount,
+    };
+    use singlefs_core::mounted_session::{MountedSession, UserChange, UserChangeRefused};
+    use singlefs_core::recovery::RecoveryReport;
+    use singlefs_core::transaction::{publish_without_units, ZeroUnitPublishPlan};
+    use singlefs_harness::crash::{writes_and_segments_with_stream_indexes, RetainedWrite};
+    use singlefs_harness::crash_injection::{inject_crashes_into_history, CrashPointDraw};
+    use singlefs_harness::fault_injection::{inject_faults_into_history, FaultCallCounts};
+    use singlefs_harness::history::{
+        execute_history, execute_history_with_faults, generate_history_with_weights,
+        with_panic_capture, ContentChoice, ContentLength, FloorTargetChoice, GeneratedHistory,
+        GenerationWeights, HistoryDevice, HistoryDeviceWidth, HistoryEnding, HistoryExecution,
+        HistoryOperation, HistorySeed, HistoryStartingPoint, PerStepChecker, RollbackTargetChoice,
+        StepPosition,
+    };
+    use singlefs_harness::scenario::{
+        first_file_content, FIXED_WRITE_TIME_SECONDS as WRITE_TIME_SECONDS_OF_THE_HARNESS_HISTORIES,
+    };
+    use singlefs_harness::{RecordingBlockDevice, SharedStream};
+
+    /// 产物里这一段各族的几何名：几何是被复现的那段历史的一部分（登记 5.3：快档的 4 GiB 盘与 harness 的几何），S6 对这几族不适用。
+    const HARNESS_GEOMETRY_NAME: &str = "harness-4gib";
+
+    /// 随机历史快档的段数与每段步数（登记 5.6：抄自 `crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs`
+    /// 第 43、44 行 `FAST_TIER_SEEDS`、`FAST_TIER_OPERATIONS_PER_HISTORY`；私有常量引不到，开跑时按那份源码的文本回比，现查的值记在第十二节）。
+    const FAST_TIER_SEEDS_LOCAL: u64 = 96;
+    const FAST_TIER_OPERATIONS_PER_HISTORY_LOCAL: usize = 30;
+
+    /// H-随 (a) 的 28 个种子偏移（登记 5.6、7.2：调查员报告 `research/prompts/m2-investigate-gate74-reds-report.md` 第 61 行那一串各减种子基）。
+    const RANDOM_HISTORY_RED_SEED_OFFSETS: [u64; 28] = [
+        2, 6, 9, 11, 15, 16, 18, 21, 23, 24, 29, 31, 35, 52, 54, 55, 58, 65, 70, 71, 76, 79, 81,
+        84, 85, 86, 90, 92,
+    ];
+    /// 7.2：H-随 (a) 最小、最大的种子（登记第 7.2 节那一行的两个数）。
+    const RANDOM_HISTORY_RED_SEED_MINIMUM_REGISTERED: u64 = 7_463_871_032_432_355_115;
+    const RANDOM_HISTORY_RED_SEED_MAXIMUM_REGISTERED: u64 = 7_463_871_032_432_355_205;
+    /// 7.2：H-随 的段数 28 + 1 + 1（登记第 7.2 节那一行）。
+    const RANDOM_HISTORY_SEGMENTS_REGISTERED: usize = 30;
+
+    /// 实八：崩溃注入种子基 + 2、24 步、4 个崩溃状态（r3 登记第 373–391 行那张表「实八」一行；
+    /// 步数与抽法同崩溃注入快档 `crates/singlefs-harness/tests/second_transaction_supplement_three_crash_injection.rs` 第 39、41 行）。
+    const EIGHTH_BATCH_CRASH_REPRODUCTION_SEED_OFFSET: u64 = 2;
+    const EIGHTH_BATCH_CRASH_REPRODUCTION_OPERATIONS: usize = 24;
+    const EIGHTH_BATCH_CRASH_REPRODUCTION_CRASH_POINTS: usize = 4;
+
+    /// S5 的签名（r3 登记第 604 行）：实七-甲 重开走到 (1, 3) 并报 `MappingStillUnreadable { slot: 50240 }`；实七-乙 在崩溃状态上读回同一个错；
+    /// 实八 (1, 4) 那次发布的单元在它还在根环里时被复用。
+    const SEVENTH_BATCH_SIGNATURE_SLOT: u64 = 50240;
+    const SEVENTH_BATCH_SIGNATURE_ROOT: TimelineRoot = (1, 3);
+    const EIGHTH_BATCH_SIGNATURE_ROOT: TimelineRoot = (1, 4);
+
+    /// PC-随 描述今天那一臂的三句（登记 5.4 PC-随 [今]，F19）：checker 第一次判 I-7.4 被抛弃根那一半红的那一步与点名的根。
+    /// (a) 种子基 + 2 那一段：Operation(4)、(实例 1, txg 4)；(b) 最短复现：Operation(2)；(c) 第 43 行那条：Operation(3)、(实例 1, txg 5)。
+    const POSITIVE_CONTROL_RANDOM_FIRST_RED_OF_THE_SEED_PLUS_TWO: (usize, TimelineRoot) =
+        (4, (1, 4));
+    const POSITIVE_CONTROL_RANDOM_FIRST_RED_OF_THE_SHORTEST: usize = 2;
+    const POSITIVE_CONTROL_RANDOM_FIRST_RED_OF_ROW_FORTY_THREE: (usize, TimelineRoot) = (3, (1, 5));
+
+    /// harness 执行器撞到判红就停（它的缺省）。登记 5.3 要这一族把它关掉、照原操作序列走完；变异 M22 把它打开。
+    const RANDOM_HISTORIES_STOP_AT_THE_FIRST_CHECKER_RED: bool = false;
+
+    /// checker 判 I-7.4 被抛弃根那一半时违例细节的开头（`singlefs_checker::walk` 的那一句）：后面跟「（实例 X、txg Y）」。
+    const ABANDONED_ROOT_VIOLATION_PREFIX: &str = "被抛弃的根（实例 ";
+    const ABANDONED_ROOT_INVARIANT: &str = "I-7.4";
+
+    /// 这一段跑的历史从哪来。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    enum SegmentTwoFamily {
+        /// H-随：调查员点名的 28 段、最短复现、收口表第 43 行那条（登记 5.3）。
+        RandomRed,
+        /// H-随全：快档其余 68 段，只进 Q4、Q5（登记 5.5 主 agent 认定第 9 项）。
+        RandomAll,
+        /// 实七-甲：故障注入大档种子基 + 110 那段历史，harness 摆的 6 个注入点各一个分支。
+        SeventhFault,
+        /// 实七-乙：崩溃注入快档种子基 + 16 那段历史，harness 摆的 4 个崩溃状态各一个分支。
+        SeventhCrash,
+        /// 实八：崩溃注入种子基 + 2 那段历史，同实七-乙的做法。
+        EighthCrash,
+    }
+
+    impl SegmentTwoFamily {
+        fn name(self) -> &'static str {
+            match self {
+                SegmentTwoFamily::RandomRed => "h-random",
+                SegmentTwoFamily::RandomAll => "h-random-all",
+                SegmentTwoFamily::SeventhFault => "seventh-fault",
+                SegmentTwoFamily::SeventhCrash => "seventh-crash",
+                SegmentTwoFamily::EighthCrash => "eighth-crash",
+            }
+        }
+
+        /// 这一族的丢写进不进出局（H-随全 只进 Q4、Q5，认定第 9 项）。
+        fn measures_lost_writes(self) -> bool {
+            match self {
+                SegmentTwoFamily::RandomRed
+                | SegmentTwoFamily::SeventhFault
+                | SegmentTwoFamily::SeventhCrash
+                | SegmentTwoFamily::EighthCrash => true,
+                SegmentTwoFamily::RandomAll => false,
+            }
+        }
+
+        /// 每一步之后跑不跑池级 checker（Q9 与 PC-随 要 H-随 的；实七、实八的主路径给 S5 与对照；H-随全 只要挂载）。
+        fn checks_every_step(self) -> bool {
+            match self {
+                SegmentTwoFamily::RandomRed
+                | SegmentTwoFamily::SeventhFault
+                | SegmentTwoFamily::SeventhCrash
+                | SegmentTwoFamily::EighthCrash => true,
+                SegmentTwoFamily::RandomAll => false,
+            }
+        }
+
+        /// 历史走完之后接不接尾巴（关闭 C → 可写挂载 → 冷启动读回 → ③c；登记 5.3 H-随，实七、实八照同一条，第十二节第二段修订）。
+        fn runs_the_tail(self) -> bool {
+            self.measures_lost_writes()
+        }
+    }
+
+    /// 一段历史：族、在族里的名字（种子偏移或写死的那两条）、操作序列。
+    #[derive(Clone, Debug)]
+    struct SegmentTwoHistory {
+        family: SegmentTwoFamily,
+        label: String,
+        history: GeneratedHistory,
+    }
+
+    fn fast_tier_history(offset: u64) -> GeneratedHistory {
+        generate_history_with_weights(
+            HistorySeed(SEED_BASE_OF_THIS_TEST_CYCLE_LOCAL + offset),
+            FAST_TIER_OPERATIONS_PER_HISTORY_LOCAL,
+            &GenerationWeights::BROAD,
+        )
+    }
+
+    fn empty_content() -> ContentChoice {
+        ContentChoice {
+            length: ContentLength::Empty,
+            fill_seed: 0,
+        }
+    }
+
+    /// H-随 (b)：种子基 + 2 那一段收缩出来的 3 步（登记 5.3、5.6；调查员报告第 298–301 行）。
+    fn shortest_reproduction_history() -> GeneratedHistory {
+        GeneratedHistory {
+            seed: HistorySeed(SEED_BASE_OF_THIS_TEST_CYCLE_LOCAL + 2),
+            starting_point: HistoryStartingPoint::AfterMakeFilesystem,
+            operations: vec![
+                HistoryOperation::CloseAndMountWritable,
+                HistoryOperation::PublishFirstFile(empty_content()),
+                HistoryOperation::CrashRecoveryAbandoningTheNewestRoot,
+            ],
+        }
+    }
+
+    /// H-随 (c)：收口表第 43 行那条用例的写死历史（登记 5.6；随机历史测试第 1082 行那条用例的 `operations`）。
+    fn closeout_row_forty_three_history() -> GeneratedHistory {
+        GeneratedHistory {
+            seed: HistorySeed(0),
+            starting_point: HistoryStartingPoint::AfterFirstFile,
+            operations: vec![
+                HistoryOperation::PublishOverwrite(empty_content()),
+                HistoryOperation::PublishOverwrite(empty_content()),
+                HistoryOperation::CrashRecoveryAbandoningTheNewestRoot,
+                HistoryOperation::PublishOverwrite(empty_content()),
+                HistoryOperation::PublishOverwrite(empty_content()),
+                HistoryOperation::PublishOverwrite(empty_content()),
+                HistoryOperation::PublishOverwrite(empty_content()),
+                HistoryOperation::RaiseRollbackFloor(FloorTargetChoice {
+                    steps_above_current_floor: 5,
+                }),
+            ],
+        }
+    }
+
+    const SHORTEST_REPRODUCTION_LABEL: &str = "shortest";
+    const ROW_FORTY_THREE_LABEL: &str = "row43";
+
+    fn seed_label(offset: u64) -> String {
+        format!("base+{offset}")
+    }
+
+    /// H-随 的 30 段：28 段种子、最短复现、第 43 行那条（次序照登记 5.3）。
+    fn random_red_histories() -> Vec<SegmentTwoHistory> {
+        let mut histories: Vec<SegmentTwoHistory> = RANDOM_HISTORY_RED_SEED_OFFSETS
+            .iter()
+            .map(|offset| SegmentTwoHistory {
+                family: SegmentTwoFamily::RandomRed,
+                label: seed_label(*offset),
+                history: fast_tier_history(*offset),
+            })
+            .collect();
+        histories.push(SegmentTwoHistory {
+            family: SegmentTwoFamily::RandomRed,
+            label: SHORTEST_REPRODUCTION_LABEL.to_string(),
+            history: shortest_reproduction_history(),
+        });
+        histories.push(SegmentTwoHistory {
+            family: SegmentTwoFamily::RandomRed,
+            label: ROW_FORTY_THREE_LABEL.to_string(),
+            history: closeout_row_forty_three_history(),
+        });
+        histories
+    }
+
+    /// H-随全 的 68 段：快档 96 段里 H-随 没取的那几段。
+    fn random_all_histories() -> Vec<SegmentTwoHistory> {
+        (0..FAST_TIER_SEEDS_LOCAL)
+            .filter(|offset| !RANDOM_HISTORY_RED_SEED_OFFSETS.contains(offset))
+            .map(|offset| SegmentTwoHistory {
+                family: SegmentTwoFamily::RandomAll,
+                label: seed_label(offset),
+                history: fast_tier_history(offset),
+            })
+            .collect()
+    }
+
+    fn seventh_fault_history() -> SegmentTwoHistory {
+        SegmentTwoHistory {
+            family: SegmentTwoFamily::SeventhFault,
+            label: seed_label(SEVENTH_BATCH_FAULT_REPRODUCTION_SEED_OFFSET),
+            history: generate_history_with_weights(
+                HistorySeed(
+                    SEED_BASE_OF_THIS_TEST_CYCLE_LOCAL
+                        + SEVENTH_BATCH_FAULT_REPRODUCTION_SEED_OFFSET,
+                ),
+                SEVENTH_BATCH_FAULT_REPRODUCTION_OPERATIONS,
+                &GenerationWeights::BROAD,
+            ),
+        }
+    }
+
+    fn seventh_crash_history() -> SegmentTwoHistory {
+        SegmentTwoHistory {
+            family: SegmentTwoFamily::SeventhCrash,
+            label: seed_label(SEVENTH_BATCH_CRASH_REPRODUCTION_SEED_OFFSET),
+            history: generate_history_with_weights(
+                HistorySeed(
+                    SEED_BASE_OF_THIS_TEST_CYCLE_LOCAL
+                        + SEVENTH_BATCH_CRASH_REPRODUCTION_SEED_OFFSET,
+                ),
+                SEVENTH_BATCH_CRASH_REPRODUCTION_OPERATIONS,
+                &GenerationWeights::BROAD,
+            ),
+        }
+    }
+
+    fn eighth_crash_history() -> SegmentTwoHistory {
+        SegmentTwoHistory {
+            family: SegmentTwoFamily::EighthCrash,
+            label: seed_label(EIGHTH_BATCH_CRASH_REPRODUCTION_SEED_OFFSET),
+            history: generate_history_with_weights(
+                HistorySeed(
+                    SEED_BASE_OF_THIS_TEST_CYCLE_LOCAL
+                        + EIGHTH_BATCH_CRASH_REPRODUCTION_SEED_OFFSET,
+                ),
+                EIGHTH_BATCH_CRASH_REPRODUCTION_OPERATIONS,
+                &GenerationWeights::BROAD,
+            ),
+        }
+    }
+
+    fn harness_execution(per_step_checker: PerStepChecker) -> HistoryExecution {
+        HistoryExecution {
+            per_step_checker,
+            device_width: HistoryDeviceWidth::FourGibibytes,
+            space_admission: SpaceAdmission::JudgedByTheFormula,
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // 13.1 开跑检查（登记 5.6 的 H-随 常量回比、7.2 的 H-随 锚点、11.2 S9 的前两句）。
+    //      调查员报告与两份测试源码按文本读：报告不在副本里，路径由环境变量给（缺省是仓根下的相对路径，`replay.sh` 在仓根跑）。
+    // ------------------------------------------------------------------------
+
+    const INVESTIGATOR_REPORT_DEFAULT_PATH: &str =
+        "research/prompts/m2-investigate-gate74-reds-report.md";
+    const INVESTIGATOR_REPORT_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_E158_INVESTIGATOR_REPORT";
+    /// 调查员报告里种子那一行与最短复现那几行（登记 5.6：第 61 行、第 298–301 行）。
+    const INVESTIGATOR_REPORT_SEED_LINE: usize = 61;
+    const INVESTIGATOR_REPORT_SHORTEST_FIRST_LINE: usize = 298;
+    const RANDOM_HISTORY_TEST_SOURCE: &str =
+        "crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs";
+    const CRASH_INJECTION_TEST_SOURCE: &str =
+        "crates/singlefs-harness/tests/second_transaction_supplement_three_crash_injection.rs";
+
+    fn investigator_report_text() -> Result<String, String> {
+        let path = env::var(INVESTIGATOR_REPORT_ENVIRONMENT_VARIABLE)
+            .unwrap_or_else(|_| INVESTIGATOR_REPORT_DEFAULT_PATH.to_string());
+        std::fs::read_to_string(&path).map_err(|error| format!("{path}: {error}"))
+    }
+
+    /// 报告第 61 行里 `[` 与 `]` 之间的种子（逗号分隔）。
+    fn seeds_listed_on_the_line(line: &str) -> Vec<u64> {
+        let Some(start) = line.find("同签名的种子 [") else {
+            return Vec::new();
+        };
+        let rest = &line[start + "同签名的种子 [".len()..];
+        let Some(end) = rest.find(']') else {
+            return Vec::new();
+        };
+        rest[..end]
+            .split(',')
+            .filter_map(|seed| seed.trim().parse().ok())
+            .collect()
+    }
+
+    /// 一行开检查的结果：名字、判定、细节。判定 fail 的那一条让它管的那一族停（S9 / V3）。
+    struct SegmentTwoCheck {
+        item: String,
+        passed: bool,
+        detail: String,
+    }
+
+    fn check(item: &str, passed: bool, detail: String) -> SegmentTwoCheck {
+        SegmentTwoCheck {
+            item: item.to_string(),
+            passed,
+            detail,
+        }
+    }
+
+    /// S9 前两句与 5.6、7.2 的 H-随 那几行：种子、最短复现、第 43 行那条、快档段数与步数。交回每一项，失败的那几项让 H-随 停。
+    fn random_history_source_checks(report: &Result<String, String>) -> Vec<SegmentTwoCheck> {
+        let mut checks = Vec::new();
+        let seeds: Vec<u64> = RANDOM_HISTORY_RED_SEED_OFFSETS
+            .iter()
+            .map(|offset| SEED_BASE_OF_THIS_TEST_CYCLE_LOCAL + offset)
+            .collect();
+        checks.push(check(
+            "7.2 H-随 (a) 种子个数、最小、最大",
+            seeds.len() == RANDOM_HISTORY_RED_SEED_OFFSETS.len()
+                && seeds.iter().min() == Some(&RANDOM_HISTORY_RED_SEED_MINIMUM_REGISTERED)
+                && seeds.iter().max() == Some(&RANDOM_HISTORY_RED_SEED_MAXIMUM_REGISTERED),
+            format!(
+                "count={} minimum={:?} maximum={:?}",
+                seeds.len(),
+                seeds.iter().min(),
+                seeds.iter().max()
+            ),
+        ));
+        checks.push(check(
+            "7.2 H-随 段数 28 + 1 + 1",
+            random_red_histories().len() == RANDOM_HISTORY_SEGMENTS_REGISTERED,
+            format!("segments={}", random_red_histories().len()),
+        ));
+        match report {
+            Ok(text) => {
+                let lines: Vec<&str> = text.lines().collect();
+                let seed_line = lines
+                    .get(INVESTIGATOR_REPORT_SEED_LINE - 1)
+                    .copied()
+                    .unwrap_or("");
+                let listed = seeds_listed_on_the_line(seed_line);
+                checks.push(check(
+                    "S9 (a) 种子与调查员报告第 61 行逐个相等",
+                    listed == seeds,
+                    format!("listed={} local={}", listed.len(), seeds.len()),
+                ));
+                let shortest = shortest_reproduction_history();
+                let first = INVESTIGATOR_REPORT_SHORTEST_FIRST_LINE - 1;
+                let header_holds = lines
+                    .get(first)
+                    .is_some_and(|line| line.contains("最短复现：起点 AfterMakeFilesystem，3 步"))
+                    && shortest.starting_point == HistoryStartingPoint::AfterMakeFilesystem
+                    && shortest.operations.len() == 3;
+                let steps_hold =
+                    shortest
+                        .operations
+                        .iter()
+                        .enumerate()
+                        .all(|(index, operation)| {
+                            lines.get(first + 1 + index).is_some_and(|line| {
+                                line.trim_start()
+                                    .starts_with(&format!("{index}. {operation:?} →"))
+                            })
+                        });
+                checks.push(check(
+                    "S9 (b) 最短复现 3 步与调查员报告第 298–301 行逐项相等",
+                    header_holds && steps_hold,
+                    format!("header={header_holds} steps={steps_hold}"),
+                ));
+            }
+            Err(error) => {
+                checks.push(check(
+                    "S9 (a)(b) 调查员报告读得出",
+                    false,
+                    format!("{error:?}"),
+                ));
+            }
+        }
+        checks.push(row_forty_three_source_check());
+        checks.push(fast_tier_constant_check());
+        checks
+    }
+
+    /// 第 43 行那条用例（随机历史测试 `crash_recovery_abandoning_the_newest_root_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43`）
+    /// 的起点、空内容与 8 步，按源码文本逐项比（登记 5.6「逐项比」）。
+    fn row_forty_three_source_check() -> SegmentTwoCheck {
+        const CASE_NAME: &str = "fn crash_recovery_abandoning_the_newest_root_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43";
+        let Ok(source) = std::fs::read_to_string(RANDOM_HISTORY_TEST_SOURCE) else {
+            return check(
+                "S9 (c) 第 43 行那条用例读得出",
+                false,
+                RANDOM_HISTORY_TEST_SOURCE.to_string(),
+            );
+        };
+        let Some(start) = source.find(CASE_NAME) else {
+            return check(
+                "S9 (c) 第 43 行那条用例在源码里",
+                false,
+                CASE_NAME.to_string(),
+            );
+        };
+        let body = &source[start..];
+        let end = body.find("let run = execute_history").unwrap_or(body.len());
+        let body = &body[..end];
+        let history = closeout_row_forty_three_history();
+        let mut expected: Vec<String> = vec![
+            "length: ContentLength::Empty,".to_string(),
+            "fill_seed: 0,".to_string(),
+            "seed: HistorySeed(0),".to_string(),
+            "starting_point: HistoryStartingPoint::AfterFirstFile,".to_string(),
+        ];
+        for operation in &history.operations {
+            expected.push(match operation {
+                HistoryOperation::PublishOverwrite(_) => {
+                    "HistoryOperation::PublishOverwrite(empty),".to_string()
+                }
+                HistoryOperation::CrashRecoveryAbandoningTheNewestRoot => {
+                    "HistoryOperation::CrashRecoveryAbandoningTheNewestRoot,".to_string()
+                }
+                HistoryOperation::RaiseRollbackFloor(choice) => format!(
+                    "steps_above_current_floor: {},",
+                    choice.steps_above_current_floor
+                ),
+                HistoryOperation::PublishFirstFile(_)
+                | HistoryOperation::PublishWithoutUnits
+                | HistoryOperation::CloseAndMountWritable
+                | HistoryOperation::RollBackWhileMounted(_)
+                | HistoryOperation::ColdStartRecover => format!("{operation:?}"),
+            });
+        }
+        let source_lines: Vec<&str> = body
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .collect();
+        let mut cursor = 0usize;
+        let mut matched = 0usize;
+        for wanted in &expected {
+            match source_lines[cursor..]
+                .iter()
+                .position(|line| line == wanted)
+            {
+                Some(found) => {
+                    cursor += found + 1;
+                    matched += 1;
+                }
+                None => break,
+            }
+        }
+        let operation_lines = source_lines
+            .iter()
+            .filter(|line| line.starts_with("HistoryOperation::"))
+            .count();
+        check(
+            "S9 (c) 第 43 行那条用例 8 步与源码逐项相等",
+            matched == expected.len() && operation_lines == history.operations.len(),
+            format!(
+                "matched={matched}/{} operation_lines={operation_lines}",
+                expected.len()
+            ),
+        )
+    }
+
+    /// 5.6：快档首种子、段数、每段步数按随机历史测试源码第 42–44 行的文本回比；实八、实七-乙的步数与抽法按崩溃注入测试第 39、41 行回比。
+    /// 不等的照本地常量跑、写进第十二节（登记 5.6 那一行），这一项只报不停。
+    fn fast_tier_constant_check() -> SegmentTwoCheck {
+        let random_source = std::fs::read_to_string(RANDOM_HISTORY_TEST_SOURCE).unwrap_or_default();
+        let crash_source = std::fs::read_to_string(CRASH_INJECTION_TEST_SOURCE).unwrap_or_default();
+        let wanted_random = [
+            "const FAST_TIER_FIRST_SEED: u64 = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;".to_string(),
+            format!("const FAST_TIER_SEEDS: u64 = {FAST_TIER_SEEDS_LOCAL};"),
+            format!(
+                "const FAST_TIER_OPERATIONS_PER_HISTORY: usize = {FAST_TIER_OPERATIONS_PER_HISTORY_LOCAL};"
+            ),
+        ];
+        let wanted_crash = [
+            format!(
+                "const FAST_TIER_OPERATIONS_PER_HISTORY: usize = {EIGHTH_BATCH_CRASH_REPRODUCTION_OPERATIONS};"
+            ),
+            format!(
+                "crash_points_per_history: {EIGHTH_BATCH_CRASH_REPRODUCTION_CRASH_POINTS},"
+            ),
+        ];
+        let random_holds = wanted_random
+            .iter()
+            .all(|line| random_source.lines().any(|source| source.trim() == line));
+        let crash_holds = wanted_crash
+            .iter()
+            .all(|line| crash_source.lines().any(|source| source.trim() == line));
+        check(
+            "5.6 快档首种子、段数、每段步数与崩溃注入快档步数、抽法（源码文本回比；不等只报，照本地常量跑）",
+            random_holds && crash_holds,
+            format!(
+                "random_history_source={random_holds} crash_injection_source={crash_holds} seeds={FAST_TIER_SEEDS_LOCAL} operations={FAST_TIER_OPERATIONS_PER_HISTORY_LOCAL} crash_operations={EIGHTH_BATCH_CRASH_REPRODUCTION_OPERATIONS} crash_points={EIGHTH_BATCH_CRASH_REPRODUCTION_CRASH_POINTS}"
+            ),
+        )
+    }
+
+    // ------------------------------------------------------------------------
+    // 13.2 盘与一次受观测的入口调用：harness 那一叠盘（`HistoryDevice`）外面包一层，数这次调用打到盘上的读（Q5）、写（K3 / K4），
+    //      崩溃恢复抛弃根那一步把点名的几段读回全 0（harness `DeviceReadingZerosOverHiddenRanges` 同一造法：读照样交下去、交回之前清零；
+    //      写到哪一段那一段就不再藏），并数被藏范围被读了几次（V2 对这几族不适用，只报数）。
+    // ------------------------------------------------------------------------
+
+    /// 盘上被藏起来的一段（读回全 0）。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    struct HiddenRange {
+        device: DeviceIdentity,
+        offset: u64,
+        length: u64,
+    }
+
+    impl HiddenRange {
+        fn overlaps(self, device: DeviceIdentity, offset: u64, length: u64) -> bool {
+            self.device == device
+                && self.offset < offset + length
+                && offset < self.offset + self.length
+        }
+
+        /// 装置自己的第一遍读（`device_judgement`）用的那一种写法：读回全零、整次调用都坏。
+        fn as_third_run_fault(self) -> ThirdRunFault {
+            ThirdRunFault {
+                device: self.device,
+                offset: self.offset,
+                length: self.length,
+                form: UnreadableForm::ReadsZeros,
+                duration: FaultDuration::WholeCall,
+                label: format!("hidden(device={},offset={})", self.device.0, self.offset),
+            }
+        }
+    }
+
+    /// 一次入口调用这一层数到的东西。
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    struct CallWindow {
+        read_calls: u64,
+        read_bytes: u64,
+        write_calls: u64,
+        reads_over_hidden_ranges: u64,
+        reads_before_the_first_wait: Option<u64>,
+    }
+
+    struct ObservedDevice<Inner: BlockDevice> {
+        identity: DeviceIdentity,
+        inner: Inner,
+        hidden: Vec<HiddenRange>,
+        window: Rc<RefCell<CallWindow>>,
+    }
+
+    impl<Inner: BlockDevice> BlockDevice for ObservedDevice<Inner> {
+        fn read_at(
+            &self,
+            offset: DeviceOffsetInBytes,
+            buffer: &mut [u8],
+        ) -> Result<(), BlockDeviceError> {
+            let length = u64::try_from(buffer.len()).expect("一次读的长度装得进 u64");
+            {
+                let mut window = self.window.borrow_mut();
+                window.read_calls += 1;
+                window.read_bytes += length;
+            }
+            self.inner.read_at(offset, buffer)?;
+            let mut read_a_hidden_range = false;
+            for hidden in &self.hidden {
+                if !hidden.overlaps(self.identity, offset.0, length) {
+                    continue;
+                }
+                read_a_hidden_range = true;
+                let start_in_buffer = hidden.offset.saturating_sub(offset.0);
+                let end_in_buffer = (hidden.offset + hidden.length - offset.0).min(length);
+                buffer[usize::try_from(start_in_buffer).expect("落在缓冲区里")
+                    ..usize::try_from(end_in_buffer).expect("落在缓冲区里")]
+                    .fill(0);
+            }
+            if read_a_hidden_range {
+                self.window.borrow_mut().reads_over_hidden_ranges += 1;
+            }
+            Ok(())
+        }
+
+        fn write_at(
+            &mut self,
+            offset: DeviceOffsetInBytes,
+            bytes: &[u8],
+            durability: WriteDurability,
+        ) -> Result<(), BlockDeviceError> {
+            let length = u64::try_from(bytes.len()).expect("一次写的长度装得进 u64");
+            self.window.borrow_mut().write_calls += 1;
+            let identity = self.identity;
+            self.hidden
+                .retain(|hidden| !hidden.overlaps(identity, offset.0, length));
+            self.inner.write_at(offset, bytes, durability)
+        }
+
+        fn write_zeroes_at(
+            &mut self,
+            offset: DeviceOffsetInBytes,
+            length: u64,
+        ) -> Result<(), BlockDeviceError> {
+            self.window.borrow_mut().write_calls += 1;
+            let identity = self.identity;
+            self.hidden
+                .retain(|hidden| !hidden.overlaps(identity, offset.0, length));
+            self.inner.write_zeroes_at(offset, length)
+        }
+
+        fn barrier(&mut self) -> Result<(), BlockDeviceError> {
+            self.inner.barrier()
+        }
+
+        fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
+            self.inner.probe_physical_block_size()
+        }
+
+        fn size_in_bytes(&self) -> u64 {
+            self.inner.size_in_bytes()
+        }
+    }
+
+    /// 一次受观测的入口调用交回的读数（Q5、Q7；可写挂载另带臂的观测与等待标记）。
+    #[derive(Clone, Debug, Default)]
+    struct ObservedCallReading {
+        window: CallWindow,
+        waits: u64,
+        observation: Option<ArmObservation>,
+        extras: Option<FourthRunArmExtras>,
+    }
+
+    /// 在 `devices` 外面包一层受观测的盘跑 `call`，跑完原样拆回。`installs_the_arm_hooks` = 可写挂载：装等待钩子（记第一个等待标记）、
+    /// 虚拟时钟归 0、跑完取臂的观测（臂的代码只在副本里有，`fourth_run_arm_hooks`）。
+    fn observed_call<Inner: BlockDevice, Output>(
+        devices: &mut Vec<(DeviceIdentity, Inner)>,
+        hidden: &[HiddenRange],
+        installs_the_arm_hooks: bool,
+        call: impl FnOnce(&mut Vec<(DeviceIdentity, ObservedDevice<Inner>)>) -> Output,
+    ) -> (Output, ObservedCallReading) {
+        let window = Rc::new(RefCell::new(CallWindow::default()));
+        let mut wrapped: Vec<(DeviceIdentity, ObservedDevice<Inner>)> = std::mem::take(devices)
+            .into_iter()
+            .map(|(identity, inner)| {
+                (
+                    identity,
+                    ObservedDevice {
+                        identity,
+                        inner,
+                        hidden: hidden
+                            .iter()
+                            .filter(|range| range.device == identity)
+                            .copied()
+                            .collect(),
+                        window: Rc::clone(&window),
+                    },
+                )
+            })
+            .collect();
+        if installs_the_arm_hooks {
+            third_run_arm_hooks::reset_the_virtual_clock();
+            let window_for_the_hook = Rc::clone(&window);
+            fourth_run_arm_hooks::install_the_marking_wait_hook(
+                THIRD_RUN_VIRTUAL_INTERVAL,
+                Box::new(move || {
+                    let mut marked = window_for_the_hook.borrow_mut();
+                    if marked.reads_before_the_first_wait.is_none() {
+                        marked.reads_before_the_first_wait = Some(marked.read_calls);
+                    }
+                }),
+            );
+        }
+        let output = call(&mut wrapped);
+        let taken = if installs_the_arm_hooks {
+            fourth_run_arm_hooks::take_the_arm_observation()
+        } else {
+            None
+        };
+        let waits = if installs_the_arm_hooks {
+            third_run_arm_hooks::waits()
+        } else {
+            0
+        };
+        *devices = wrapped
+            .into_iter()
+            .map(|(identity, device)| (identity, device.inner))
+            .collect();
+        let window_reading = *window.borrow();
+        (
+            output,
+            ObservedCallReading {
+                window: window_reading,
+                waits,
+                observation: taken.as_ref().map(|(observation, _)| observation.clone()),
+                extras: taken.map(|(_, extras)| extras),
+            },
+        )
+    }
+
+    fn history_device_bytes() -> u64 {
+        HistoryDeviceWidth::FourGibibytes.device_bytes()
+    }
+
+    /// harness 那一叠盘此刻的整份镜像（harness `image_of` 同一取法）。
+    fn image_of_history_devices(devices: &[(DeviceIdentity, HistoryDevice)]) -> MemoryPool {
+        MemoryPool {
+            devices: devices
+                .iter()
+                .map(|(identity, device)| (*identity, device.inner().inner().image.clone()))
+                .collect(),
+            device_size_in_bytes: history_device_bytes(),
+        }
+    }
+
+    /// 一份镜像上的两块盘（崩溃状态的分支在它上面做可写挂载与读回）。
+    fn plain_devices_of(image: &MemoryPool) -> Vec<(DeviceIdentity, SparseBlockDevice)> {
+        devices_from_pool(image, history_device_bytes())
+    }
+
+    /// 按 checker 的读法读根环：(txg, 实例) 从新到旧、去重（harness `ring_roots_newest_first_of` 的同一取法）。
+    fn ring_roots_newest_first_of_the_image(image: &MemoryPool) -> Vec<(u64, u32)> {
+        let Some(geometry) = checker_image::chosen_system_configurations(image)
+            .into_iter()
+            .find_map(|(_, chosen)| chosen.map(|(_, geometry)| geometry))
+        else {
+            return Vec::new();
+        };
+        let mut roots: Vec<(u64, u32)> = checker_image::valid_roots(image, &geometry)
+            .into_iter()
+            .map(|(_, _, view)| (view.checkpoint_txg, view.instance))
+            .collect();
+        roots.sort_unstable_by(|left, right| right.cmp(left));
+        roots.dedup();
+        roots
+    }
+
+    /// 按 checker 的读法：根环里最新那条根带的 F（harness `newest_ring_root_floor` 的同一取法）。
+    fn newest_ring_root_floor_of_the_image(image: &MemoryPool) -> Option<u64> {
+        let geometry = checker_image::chosen_system_configurations(image)
+            .into_iter()
+            .find_map(|(_, chosen)| chosen.map(|(_, geometry)| geometry))?;
+        checker_image::valid_roots(image, &geometry)
+            .into_iter()
+            .map(|(_, _, view)| view)
+            .max_by_key(|view| (view.checkpoint_txg, view.instance))
+            .map(|view| view.rollback_floor)
+    }
+
+    /// 崩溃恢复要藏起来的那几段（harness `ranges_hidden_by_the_crash_recovery` 的同一取法）：现行版本的根槽，与它那次发布每一条记录
+    /// 点名的每一份单元的第一个槽。那次发布一个单元都没点名时交回 None。
+    fn ranges_hidden_by_the_crash_recovery(
+        parameters: &MakeFilesystemParameters,
+        current: &PoolVersion,
+    ) -> Option<Vec<HiddenRange>> {
+        let earlier_records = match current {
+            PoolVersion::WithoutFile(version) => &version.earlier_records_of_this_publish,
+            PoolVersion::WithFile(version) => &version.earlier_records_of_this_publish,
+        };
+        let named_units: Vec<LocationEntry> = earlier_records
+            .iter()
+            .map(|written| &written.record)
+            .chain(std::iter::once(current.record()))
+            .flat_map(|record| record.named.iter())
+            .flat_map(|named| named.locations)
+            .collect();
+        if named_units.is_empty() {
+            return None;
+        }
+        let root_slot = singlefs_core::root_ring::target_for_publish(
+            current.root().checkpoint_txg,
+            parameters.geometry.root_ring_slots_per_region,
+        );
+        let root_slot_device =
+            parameters.region_devices[usize::try_from(root_slot.region).expect("区域号小于 3")];
+        let root_slot_offset = singlefs_core::root_ring::slot_offset(
+            root_slot,
+            parameters.geometry.fixed_structure_slot_spacing,
+        );
+        Some(
+            std::iter::once(HiddenRange {
+                device: root_slot_device,
+                offset: root_slot_offset.0,
+                length: u64::from(parameters.geometry.physical_block_size),
+            })
+            .chain(named_units.into_iter().map(|location| HiddenRange {
+                device: location.device,
+                offset: location.slot.0 * SLOT_BYTES_LOCAL,
+                length: SLOT_BYTES_LOCAL,
+            }))
+            .collect(),
+        )
+    }
+
+    // ------------------------------------------------------------------------
+    // 13.3 确认账（登记「读法写死」表「确认」「内容号跟根走」两行）：内容号是装置的写日志记的，按确认的先后递增，跟着根走；
+    //      harness 的内容可以重复（空内容），所以读回按根认内容号、再拿字节核（第十二节第二段修订）。管理员回退交回 `Ok` 另记一笔
+    //      （回退读法，只报数，第十二节第二段修订）。
+    // ------------------------------------------------------------------------
+
+    #[derive(Clone)]
+    struct RandomConfirmation {
+        /// 这笔确认落在哪一步（起点 0，第 i 步 i + 1，尾巴 = 步数 + 1）。
+        order: usize,
+        content_number: u64,
+        root: TimelineRoot,
+        unit_bytes: UnitBytesOfAVersion,
+    }
+
+    #[derive(Clone, Default)]
+    struct RandomLedger {
+        /// 内容号 → 那一版的文件字节（None = 没有文件）。内容号 0 是 mkfs 那一版。
+        contents: Vec<Option<Vec<u8>>>,
+        /// 交回过 `Ok` 的内容号（没交回 `Ok` 的改内容调用也发一个号，记它要写的字节，读回落到它算「更新」）。
+        confirmed_numbers: BTreeSet<u64>,
+        content_number_by_root: BTreeMap<TimelineRoot, u64>,
+        confirmations: Vec<RandomConfirmation>,
+        /// 管理员回退交回 `Ok` 的那几次：(步, 承接的内容号, 回退那次发布的根)。
+        rollback_confirmations: Vec<(usize, u64, TimelineRoot)>,
+    }
+
+    impl RandomLedger {
+        fn after_make_filesystem(genesis: TimelineRoot) -> Self {
+            RandomLedger {
+                contents: vec![None],
+                confirmed_numbers: BTreeSet::from([0]),
+                content_number_by_root: BTreeMap::from([(genesis, 0)]),
+                confirmations: Vec::new(),
+                rollback_confirmations: Vec::new(),
+            }
+        }
+
+        fn carry(&mut self, root: TimelineRoot, content_number: u64) {
+            self.content_number_by_root.insert(root, content_number);
+        }
+
+        fn content_number_of(&self, root: TimelineRoot) -> Option<u64> {
+            self.content_number_by_root.get(&root).copied()
+        }
+
+        fn new_content_number(&mut self, bytes: Option<Vec<u8>>) -> u64 {
+            self.contents.push(bytes);
+            u64::try_from(self.contents.len() - 1).expect("内容号装得进 u64")
+        }
+
+        fn confirm(
+            &mut self,
+            order: usize,
+            root_record: &RootRecord,
+            content: Vec<u8>,
+            image: &MemoryPool,
+        ) {
+            let content_number = self.new_content_number(Some(content));
+            self.confirmed_numbers.insert(content_number);
+            let root = root_pair(root_record);
+            self.carry(root, content_number);
+            self.confirmations.push(RandomConfirmation {
+                order,
+                content_number,
+                root,
+                unit_bytes: unit_bytes_referenced_by(image, root_record).unwrap_or_default(),
+            });
+        }
+
+        fn record_attempt(&mut self, content: Vec<u8>) -> u64 {
+            self.new_content_number(Some(content))
+        }
+
+        /// 字面读法：`order` 那一步开始之前最后一笔改内容的确认（没有 = mkfs 那一版，内容号 0）。
+        fn last_confirmation_before(&self, order: usize) -> Option<&RandomConfirmation> {
+            self.confirmations
+                .iter()
+                .rev()
+                .find(|confirmation| confirmation.order < order)
+        }
+
+        fn last_confirmed_number_before(&self, order: usize) -> u64 {
+            self.last_confirmation_before(order)
+                .map_or(0, |confirmation| confirmation.content_number)
+        }
+
+        /// 回退读法：改内容的确认与管理员回退交回 `Ok` 两种一起排，取 `order` 之前最后一笔的内容号。
+        fn last_confirmed_number_before_rollback_aware(&self, order: usize) -> u64 {
+            let content = self
+                .last_confirmation_before(order)
+                .map(|confirmation| (confirmation.order, confirmation.content_number));
+            let rollback = self
+                .rollback_confirmations
+                .iter()
+                .rev()
+                .find(|(rollback_order, _, _)| *rollback_order < order)
+                .map(|(rollback_order, number, _)| (*rollback_order, *number));
+            match (content, rollback) {
+                (Some(content_event), Some(rollback_event)) => {
+                    if rollback_event.0 >= content_event.0 {
+                        rollback_event.1
+                    } else {
+                        content_event.1
+                    }
+                }
+                (Some((_, number)), None) | (None, Some((_, number))) => number,
+                (None, None) => 0,
+            }
+        }
+    }
+
+    /// 一次冷启动读回按内容号分类（Q3 四类：最后确认那一版 / 更新 / 更旧 / 读失败），字面与回退两种读法各一份。
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    struct RandomReadBack {
+        literal: String,
+        rollback_aware: String,
+        root: Option<TimelineRoot>,
+        content_number: Option<u64>,
+        /// 读失败时 `crates` 报的错原样（S5 的签名按它认：`MappingStillUnreadable { slot: … }`）。
+        failure_debug: Option<String>,
+    }
+
+    impl RandomReadBack {
+        fn literal_lost(&self) -> bool {
+            self.literal.starts_with("older") || self.literal.starts_with("failed")
+        }
+
+        fn rollback_aware_lost(&self) -> bool {
+            self.rollback_aware.starts_with("older") || self.rollback_aware.starts_with("failed")
+        }
+
+        fn render(&self, prefix: &str) -> String {
+            format!(
+                "{prefix}={} {prefix}_rollback_aware={} {prefix}_root={} {prefix}_content={}",
+                self.literal,
+                self.rollback_aware,
+                key_text(self.root),
+                self.content_number
+                    .map_or("none".to_string(), |number| number.to_string())
+            )
+        }
+    }
+
+    fn classify_random_read_back(
+        report: &RecoveryReport,
+        ledger: &RandomLedger,
+        literal_last: u64,
+        rollback_aware_last: u64,
+    ) -> RandomReadBack {
+        let outcome_root = chosen_root_of(&report.outcome);
+        let landing = report
+            .effective_root
+            .map(|(instance, txg)| (instance.0, txg.0))
+            .or(outcome_root);
+        let file: Option<Vec<u8>> = match &report.outcome {
+            RecoveryOutcome::Failed { failure, .. } => {
+                let failure_debug = format!("{failure:?}");
+                let member = format!("failed:{}", error_member_of_debug(&failure_debug));
+                return RandomReadBack {
+                    literal: member.clone(),
+                    rollback_aware: member,
+                    root: landing,
+                    content_number: None,
+                    failure_debug: Some(failure_debug),
+                };
+            }
+            RecoveryOutcome::NoFile { .. } => None,
+            RecoveryOutcome::FileRead { content, .. } => Some(content.clone()),
+        };
+        let by_root = landing.and_then(|root| ledger.content_number_of(root));
+        let (number, how) = match by_root {
+            Some(number) => {
+                if ledger
+                    .contents
+                    .get(usize::try_from(number).expect("内容号"))
+                    != Some(&file)
+                {
+                    let member = "failed:content_differs_from_the_ledger".to_string();
+                    return RandomReadBack {
+                        literal: member.clone(),
+                        rollback_aware: member,
+                        root: landing,
+                        content_number: Some(number),
+                        failure_debug: None,
+                    };
+                }
+                (number, "")
+            }
+            None => {
+                let candidates: Vec<u64> = ledger
+                    .contents
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, bytes)| **bytes == file)
+                    .map(|(number, _)| u64::try_from(number).expect("内容号"))
+                    .collect();
+                let chosen = if candidates.contains(&literal_last) {
+                    Some(literal_last)
+                } else {
+                    candidates.last().copied()
+                };
+                match chosen {
+                    Some(number) => (number, ":by_bytes"),
+                    None => {
+                        let member = "failed:content_not_in_the_ledger".to_string();
+                        return RandomReadBack {
+                            literal: member.clone(),
+                            rollback_aware: member,
+                            root: landing,
+                            content_number: None,
+                            failure_debug: None,
+                        };
+                    }
+                }
+            }
+        };
+        let literal = if number == literal_last {
+            format!("last_confirmed{how}")
+        } else if number > literal_last {
+            format!("newer:{number}{how}")
+        } else {
+            format!("older:{number}{how}")
+        };
+        let rollback_aware = if number == rollback_aware_last {
+            format!("last_confirmed{how}")
+        } else if !ledger.confirmed_numbers.contains(&number) {
+            format!("newer:{number}{how}")
+        } else {
+            format!("older:{number}{how}")
+        };
+        RandomReadBack {
+            literal,
+            rollback_aware,
+            root: landing,
+            content_number: Some(number),
+            failure_debug: None,
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // 13.4 执行器：八种操作照 harness 执行器的入口与前提各写一遍（`history.rs` 的 `apply_publish_first_file`、`apply_publish_overwrite`、
+    //      `apply_publish_without_units`、`apply_mount_writable`、`apply_rollback_while_mounted`、`apply_raise_rollback_floor`、
+    //      `apply_cold_start_recover`、`apply_crash_recovery_abandoning_the_newest_root`），不跑模型、不判红就停（M22 那个开关除外）。
+    //      一臂拒了可写挂载，之后要会话的操作照 harness 的做法记「前提不满足」、照历史往下走（登记 5.3）。
+    // ------------------------------------------------------------------------
+
+    /// 这个进程里开着的可写会话（harness `WritableSession` 的同几样）。
+    struct RandomSession {
+        allocator: PoolAllocator,
+        current: PoolVersion,
+        instance: InstanceGeneration,
+        shadow_ledger: ShadowLedger,
+        parameters_and_device_table: ParametersAndDeviceTableOfTheMount,
+    }
+
+    impl RandomSession {
+        fn of_the_mount(mounted: Mounted) -> Self {
+            RandomSession {
+                allocator: mounted.allocator,
+                current: mounted.current,
+                instance: mounted.output.instance,
+                shadow_ledger: mounted.output.shadow_ledger,
+                parameters_and_device_table: mounted.output.parameters_and_device_table,
+            }
+        }
+    }
+
+    /// 一次可写挂载（被测的，或第一次崩溃恢复抛弃根之前的合法状态）：Q4、Q5、Q7、Q2 的输入。
+    struct RandomMount {
+        order: usize,
+        step_label: String,
+        operation: &'static str,
+        phase: &'static str,
+        base_fingerprint: u64,
+        summary: TestedMountSummary,
+        reading: ObservedCallReading,
+        judgement: Option<DeviceJudgement>,
+        hidden_ranges: usize,
+        literal_last: u64,
+        rollback_aware_last: u64,
+        effective_content: Option<u64>,
+        device_effective_content: Option<u64>,
+        older_version_returned: bool,
+        older_version_returned_rollback_aware: bool,
+        stop_clause_four_findings: Vec<String>,
+        /// F6（登记第十节 F6 的改动）：崩溃恢复抛弃根那一步的被测挂载上 N-配置 判真、N-槽 判假；别的挂载 None。
+        failure_clause_six: Option<bool>,
+    }
+
+    /// checker 在一步之后的判定：红的不变量与 I-7.4 被抛弃根那一半点名的根。
+    #[derive(Clone, Debug, Default, PartialEq, Eq)]
+    struct CheckerReading {
+        red_invariants: Vec<&'static str>,
+        abandoned_roots_named: Vec<TimelineRoot>,
+    }
+
+    impl CheckerReading {
+        fn abandoned_half_is_red(&self) -> bool {
+            !self.abandoned_roots_named.is_empty()
+        }
+    }
+
+    /// 「被抛弃的根（实例 X、txg Y）引用的单元……」里的 (X, Y)。
+    fn abandoned_root_named_by(detail: &str) -> Vec<TimelineRoot> {
+        let mut named = Vec::new();
+        let mut rest = detail;
+        while let Some(start) = rest.find(ABANDONED_ROOT_VIOLATION_PREFIX) {
+            let after = &rest[start + ABANDONED_ROOT_VIOLATION_PREFIX.len()..];
+            let instance_text: String = after.chars().take_while(char::is_ascii_digit).collect();
+            let after_instance = &after[instance_text.len()..];
+            let txg_start = after_instance
+                .find("txg ")
+                .map(|index| index + "txg ".len());
+            let txg_text: String = txg_start
+                .map(|index| {
+                    after_instance[index..]
+                        .chars()
+                        .take_while(char::is_ascii_digit)
+                        .collect()
+                })
+                .unwrap_or_default();
+            if let (Ok(instance), Ok(txg)) = (instance_text.parse::<u32>(), txg_text.parse::<u64>())
+            {
+                named.push((instance, txg));
+            }
+            rest = after_instance;
+        }
+        named
+    }
+
+    fn checker_reading_of(image: &MemoryPool) -> CheckerReading {
+        let mut reading = CheckerReading::default();
+        for (invariant, verdict) in check_pool_image(image) {
+            match verdict {
+                InvariantVerdict::Violated(detail) => {
+                    reading.red_invariants.push(invariant);
+                    if invariant == ABANDONED_ROOT_INVARIANT {
+                        for root in abandoned_root_named_by(&detail) {
+                            if !reading.abandoned_roots_named.contains(&root) {
+                                reading.abandoned_roots_named.push(root);
+                            }
+                        }
+                    }
+                }
+                InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => {}
+            }
+        }
+        reading
+    }
+
+    /// 一步的记录：操作、结局、这一步之后的镜像指纹、checker 的判定（这一族不跑 checker 或这一步没写盘时 None）。
+    struct RandomStepRecord {
+        order: usize,
+        operation: String,
+        outcome: String,
+        fingerprint_after: u64,
+        checker: Option<CheckerReading>,
+        read_back: Option<RandomReadBack>,
+    }
+
+    /// 一次崩溃恢复抛弃根那一步（登记 5.3：V_LC、Q1、Q2 按每一次这一步各算一份）：被藏那条根、那一步开始与交回时的镜像。
+    struct CrashRecoveryEvent {
+        order: usize,
+        hidden_root: TimelineRoot,
+        hidden_content_number: Option<u64>,
+        base: MemoryPool,
+        after: MemoryPool,
+        mount_index: usize,
+    }
+
+    /// 一段历史在一臂上的一次执行（一个分支：主路径、一个注入点、一个崩溃状态之前的主路径都是它）。
+    struct RandomExecutor {
+        arm: FourthRunArm,
+        parameters: MakeFilesystemParameters,
+        devices: Vec<(DeviceIdentity, HistoryDevice)>,
+        stream: SharedStream,
+        plan: SharedFaultPlan,
+        session: Option<RandomSession>,
+        ledger: RandomLedger,
+        mounts: Vec<RandomMount>,
+        steps: Vec<RandomStepRecord>,
+        /// 下标 = 步（起点 0）：那一步开始时录制流有几步。
+        stream_length_at_step_start: Vec<usize>,
+        /// 下标 = 步：那一步做完时整池发出的读 / 写 / 屏障数（注入计划数的，与 harness 的测量跑同一数法）。
+        calls_after_step: Vec<FaultCallCounts>,
+        crash_recovery_events: Vec<CrashRecoveryEvent>,
+        /// 跑 checker 的那几族：最后一次跑 checker 时录制流有几步（harness 只在这一步写过盘时跑）。
+        checked_stream_length: usize,
+        checks_every_step: bool,
+        panicked: Option<(usize, String)>,
+        stopped_at_the_first_red: Option<usize>,
+        starting_point_error: Option<String>,
+        /// 内容号 → 那一版引用的单元第一次被改的那一步（Q1 的时点栏，第十二节第二段修订）。
+        first_changes: BTreeMap<u64, FirstChange>,
+        /// 要留下哪一步做完时的镜像（注入点那一步：重开读回在它上面做）。
+        capture_after_order: Option<usize>,
+        captured_image: Option<MemoryPool>,
+        /// 冷启动那一步的读回（经这一叠盘读，调用数与 harness 同一数法）。
+        pending_read_back: Option<RandomReadBack>,
+    }
+
+    /// 一版引用的单元第一次被改：那一步、那一刻它之后已经有几笔改内容的确认、它的根那一刻还在不在根环里。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    struct FirstChange {
+        order: usize,
+        later_confirmations: usize,
+        root_in_ring_then: bool,
+    }
+
+    /// 前提不满足的结局（harness `MissingPrecondition` 的成员名）。
+    fn not_applicable(precondition: &str) -> String {
+        format!("not_applicable:{precondition}")
+    }
+
+    fn refused(error_debug: &str) -> String {
+        format!("refused:{}", error_member_of_debug(error_debug))
+    }
+
+    impl RandomExecutor {
+        /// 起点（harness `HistoryPool::start` 的同一串）：mkfs；`AfterFirstFile` 再在同一个进程里取号、暖机、发第一个文件（内容 `first_file_content`）。
+        fn start(
+            arm: FourthRunArm,
+            starting_point: HistoryStartingPoint,
+            plan: SharedFaultPlan,
+            checks_every_step: bool,
+        ) -> Self {
+            let parameters = HistoryDeviceWidth::FourGibibytes.parameters();
+            let stream = SharedStream::retaining_contents();
+            let mut devices: Vec<(DeviceIdentity, HistoryDevice)> =
+                [DeviceIdentity(0), DeviceIdentity(1)]
+                    .into_iter()
+                    .map(|identity| {
+                        (
+                            identity,
+                            FaultInjectingBlockDevice::new(
+                                identity,
+                                RecordingBlockDevice::with_shared_stream(
+                                    identity,
+                                    SparseBlockDevice::new(
+                                        history_device_bytes(),
+                                        PhysicalBlockSizeInBytes(512),
+                                    ),
+                                    stream.clone(),
+                                ),
+                                plan.clone(),
+                            ),
+                        )
+                    })
+                    .collect();
+            let mut executor = RandomExecutor {
+                arm,
+                parameters: parameters.clone(),
+                devices: Vec::new(),
+                stream: stream.clone(),
+                plan: plan.clone(),
+                session: None,
+                ledger: RandomLedger::default(),
+                mounts: Vec::new(),
+                steps: Vec::new(),
+                stream_length_at_step_start: vec![0],
+                calls_after_step: Vec::new(),
+                crash_recovery_events: Vec::new(),
+                checked_stream_length: 0,
+                checks_every_step,
+                panicked: None,
+                stopped_at_the_first_red: None,
+                starting_point_error: None,
+                first_changes: BTreeMap::new(),
+                capture_after_order: None,
+                captured_image: None,
+                pending_read_back: None,
+            };
+            let genesis = match make_filesystem(&parameters, &mut devices) {
+                Ok(genesis) => genesis,
+                Err(error) => {
+                    executor.devices = devices;
+                    executor.starting_point_error = Some(format!("make_filesystem:{error:?}"));
+                    executor.finish_the_starting_point();
+                    return executor;
+                }
+            };
+            executor.ledger = RandomLedger::after_make_filesystem(root_pair(&genesis.root));
+            match starting_point {
+                HistoryStartingPoint::AfterMakeFilesystem => {}
+                HistoryStartingPoint::AfterFirstFile => {
+                    match Self::acquire_warm_up_and_publish_the_first_file(
+                        &parameters,
+                        &mut devices,
+                        &genesis,
+                    ) {
+                        Ok((session, warm_up_roots)) => {
+                            for root in warm_up_roots {
+                                executor.ledger.carry(root, 0);
+                            }
+                            let first_file_root = *session.current.root();
+                            executor.devices = devices;
+                            let image = executor.image();
+                            executor.ledger.confirm(
+                                0,
+                                &first_file_root,
+                                first_file_content(),
+                                &image,
+                            );
+                            executor.session = Some(session);
+                            executor.finish_the_starting_point();
+                            return executor;
+                        }
+                        Err(error) => executor.starting_point_error = Some(error),
+                    }
+                }
+            }
+            executor.devices = devices;
+            executor.finish_the_starting_point();
+            executor
+        }
+
+        fn acquire_warm_up_and_publish_the_first_file(
+            parameters: &MakeFilesystemParameters,
+            devices: &mut Vec<(DeviceIdentity, HistoryDevice)>,
+            genesis: &singlefs_core::make_filesystem::MakeFilesystemOutput,
+        ) -> Result<(RandomSession, Vec<TimelineRoot>), String> {
+            let mut allocator = allocator_after_make_filesystem(parameters, devices, genesis);
+            allocator.set_space_admission(SpaceAdmission::JudgedByTheFormula);
+            let parameters_and_device_table =
+                ParametersAndDeviceTableOfTheMount::of_a_pool_on_disk(devices)
+                    .map_err(|error| format!("read_the_pool_for_the_session:{error:?}"))?;
+            let content = first_file_content();
+            let mut writer = PoolWriter::new(parameters, devices.as_mut_slice());
+            let instance = acquire_instance(&mut writer)
+                .map_err(|error| format!("acquire_instance:{error:?}"))?;
+            let warmed = warm_up(&mut writer, &genesis.root, instance)
+                .map_err(|error| format!("warm_up:{error:?}"))?;
+            let warm_up_roots: Vec<TimelineRoot> = warmed.roots.iter().map(root_pair).collect();
+            let output = publish_first_file(
+                &mut writer,
+                &mut allocator,
+                warmed.roots.last().expect("暖机两代根"),
+                FirstFile {
+                    content: &content,
+                    write_time_seconds: WRITE_TIME_SECONDS_OF_THE_HARNESS_HISTORIES,
+                },
+                instance,
+                &warmed.last_record_bytes,
+            )
+            .map_err(|error| format!("publish_first_file:{error:?}"))?;
+            Ok((
+                RandomSession {
+                    allocator,
+                    current: PoolVersion::WithFile(output),
+                    instance,
+                    shadow_ledger: ShadowLedger::On,
+                    parameters_and_device_table,
+                },
+                warm_up_roots,
+            ))
+        }
+
+        fn finish_the_starting_point(&mut self) {
+            self.calls_after_step.push(self.plan.calls());
+            let fingerprint_after = if self.devices.is_empty() {
+                0
+            } else {
+                image_fingerprint(&self.image())
+            };
+            let checker = if self.checks_every_step && !self.devices.is_empty() {
+                self.checked_stream_length = self.stream.operation_count();
+                Some(checker_reading_of(&self.image()))
+            } else {
+                None
+            };
+            self.steps.push(RandomStepRecord {
+                order: 0,
+                operation: "starting_point".to_string(),
+                outcome: self
+                    .starting_point_error
+                    .clone()
+                    .map_or("applied".to_string(), |error| format!("refused:{error}")),
+                fingerprint_after,
+                checker,
+                read_back: None,
+            });
+        }
+
+        fn image(&self) -> MemoryPool {
+            image_of_history_devices(&self.devices)
+        }
+
+        /// 现行那一版的内容号（没有会话时取字面读法的最后确认那一版）。
+        fn carried_content_number(&self, order: usize) -> u64 {
+            self.session
+                .as_ref()
+                .and_then(|session| {
+                    self.ledger
+                        .content_number_of(root_pair(session.current.root()))
+                })
+                .unwrap_or_else(|| self.ledger.last_confirmed_number_before(order))
+        }
+
+        /// 一步做完之后根环里有、账里还没有的根（发布报错或挂载半路报错时已经落盘的那几条）按 `default_number` 记内容号。
+        fn carry_new_ring_roots(&mut self, default_number: u64) {
+            let image = self.image();
+            let Ok(geometry) = independent_geometry(&image) else {
+                return;
+            };
+            for root in readable_roots_independent(&image, &geometry) {
+                if self.ledger.content_number_of(root).is_none() {
+                    self.ledger.carry(root, default_number);
+                }
+            }
+        }
+
+        /// 跑一段历史：逐步执行；某一步 panic ⇒ 到此为止（登记 5.3）；M22 那个开关开着时判红就停。
+        fn run_the_operations(&mut self, history: &GeneratedHistory) {
+            if self.starting_point_error.is_some() {
+                return;
+            }
+            for (step_index, operation) in history.operations.iter().enumerate() {
+                let order = step_index + 1;
+                self.stream_length_at_step_start
+                    .push(self.stream.operation_count());
+                let applied =
+                    with_panic_capture(|| self.apply_operation(order, step_index, operation));
+                let outcome = match applied {
+                    Ok(outcome) => outcome,
+                    Err(panic) => {
+                        let text = format!("{}: {}", panic.location, panic.message);
+                        self.panicked = Some((order, text.clone()));
+                        self.calls_after_step.push(self.plan.calls());
+                        self.steps.push(RandomStepRecord {
+                            order,
+                            operation: format!("{:?}", operation.kind()),
+                            outcome: format!("panic:{text}"),
+                            fingerprint_after: 0,
+                            checker: None,
+                            read_back: None,
+                        });
+                        return;
+                    }
+                };
+                self.calls_after_step.push(self.plan.calls());
+                let default_number = self.carried_content_number(order);
+                self.carry_new_ring_roots(default_number);
+                let image = self.image();
+                let stream_length = self.stream.operation_count();
+                let checker =
+                    if self.checks_every_step && stream_length != self.checked_stream_length {
+                        self.checked_stream_length = stream_length;
+                        Some(checker_reading_of(&image))
+                    } else {
+                        None
+                    };
+                let red = checker
+                    .as_ref()
+                    .is_some_and(|reading| !reading.red_invariants.is_empty());
+                let read_back = self.pending_read_back.take();
+                self.after_a_step(order, &image);
+                self.steps.push(RandomStepRecord {
+                    order,
+                    operation: format!("{:?}", operation.kind()),
+                    outcome,
+                    fingerprint_after: image_fingerprint(&image),
+                    checker,
+                    read_back,
+                });
+                if RANDOM_HISTORIES_STOP_AT_THE_FIRST_CHECKER_RED && red {
+                    self.stopped_at_the_first_red = Some(order);
+                    return;
+                }
+            }
+        }
+
+        fn apply_operation(
+            &mut self,
+            order: usize,
+            step_index: usize,
+            operation: &HistoryOperation,
+        ) -> String {
+            let write_time_seconds = WRITE_TIME_SECONDS_OF_THE_HARNESS_HISTORIES
+                + u64::try_from(step_index).expect("步号装得进 u64");
+            match operation {
+                HistoryOperation::PublishFirstFile(content) => {
+                    self.apply_publish_first_file(order, content, write_time_seconds)
+                }
+                HistoryOperation::PublishOverwrite(content) => {
+                    self.apply_publish_overwrite(order, content, write_time_seconds)
+                }
+                HistoryOperation::PublishWithoutUnits => self.apply_publish_without_units(order),
+                HistoryOperation::CloseAndMountWritable => {
+                    self.session = None;
+                    self.observed_mount(order, &order.to_string(), "mount", &[])
+                }
+                HistoryOperation::RollBackWhileMounted(choice) => {
+                    self.apply_rollback_while_mounted(order, *choice)
+                }
+                HistoryOperation::RaiseRollbackFloor(choice) => {
+                    self.apply_raise_rollback_floor(order, *choice)
+                }
+                HistoryOperation::ColdStartRecover => {
+                    self.session = None;
+                    let report = recover(&self.devices, JournalPolicy::Consult);
+                    self.pending_read_back = Some(classify_random_read_back(
+                        &report,
+                        &self.ledger,
+                        self.ledger.last_confirmed_number_before(order),
+                        self.ledger
+                            .last_confirmed_number_before_rollback_aware(order),
+                    ));
+                    "applied:recovered".to_string()
+                }
+                HistoryOperation::CrashRecoveryAbandoningTheNewestRoot => {
+                    self.apply_crash_recovery_abandoning_the_newest_root(order)
+                }
+            }
+        }
+
+        fn apply_publish_first_file(
+            &mut self,
+            order: usize,
+            choice: &ContentChoice,
+            write_time_seconds: u64,
+        ) -> String {
+            let RandomExecutor {
+                parameters,
+                devices,
+                session,
+                ..
+            } = self;
+            let Some(session) = session.as_mut() else {
+                return not_applicable("NoWritableSession");
+            };
+            let content = choice.bytes();
+            let root_to_carry_instance_table_from = *session.current.root();
+            let previous_record_bytes = session.current.record_bytes().to_vec();
+            let published = {
+                let mut writer = PoolWriter::new(parameters, devices.as_mut_slice());
+                publish_first_file(
+                    &mut writer,
+                    &mut session.allocator,
+                    &root_to_carry_instance_table_from,
+                    FirstFile {
+                        content: &content,
+                        write_time_seconds,
+                    },
+                    session.instance,
+                    &previous_record_bytes,
+                )
+            };
+            match published {
+                Ok(output) => {
+                    let root = output.root;
+                    session.current = PoolVersion::WithFile(output);
+                    let image = self.image();
+                    self.ledger.confirm(order, &root, content, &image);
+                    "applied:published".to_string()
+                }
+                Err(error) => {
+                    let attempted = self.ledger.record_attempt(content);
+                    self.carry_new_ring_roots(attempted);
+                    refused(&format!("{error:?}"))
+                }
+            }
+        }
+
+        fn apply_publish_overwrite(
+            &mut self,
+            order: usize,
+            choice: &ContentChoice,
+            write_time_seconds: u64,
+        ) -> String {
+            let Some(open_session) = self.session.as_ref() else {
+                return not_applicable("NoWritableSession");
+            };
+            if open_session.current.file_version().is_none() {
+                return not_applicable("CurrentVersionWithoutFile");
+            }
+            let carried = self
+                .ledger
+                .content_number_of(root_pair(open_session.current.root()))
+                .unwrap_or_else(|| self.ledger.last_confirmed_number_before(order));
+            let content = choice.bytes();
+            let RandomSession {
+                allocator,
+                current,
+                instance,
+                shadow_ledger,
+                parameters_and_device_table,
+            } = self.session.take().expect("上面判过这个进程的会话开着");
+            let mut mounted_session = MountedSession {
+                allocator,
+                current,
+                instance,
+                shadow_ledger,
+                parameters_and_device_table,
+            };
+            let change = mounted_session.publish_user_change(
+                &mut self.devices,
+                UserChange::Overwrite(FirstFile {
+                    content: &content,
+                    write_time_seconds,
+                }),
+            );
+            let current_root = *mounted_session.current.root();
+            self.session = Some(RandomSession {
+                allocator: mounted_session.allocator,
+                current: mounted_session.current,
+                instance: mounted_session.instance,
+                shadow_ledger: mounted_session.shadow_ledger,
+                parameters_and_device_table: mounted_session.parameters_and_device_table,
+            });
+            let floor_raises: &[singlefs_core::mount::RaisedFloor] = match &change {
+                Ok(published) => &published.floor_raises,
+                Err(
+                    UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount { .. }
+                    | UserChangeRefused::NoFileVersionToChange
+                    | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. },
+                ) => &[],
+                Err(UserChangeRefused::Publish { floor_raises, .. }) => floor_raises,
+                Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(refused_change)) => {
+                    &refused_change.floor_raises
+                }
+                Err(UserChangeRefused::FloorRaiseFailedWhilePushingForSpace(refused_change)) => {
+                    &refused_change.floor_raises
+                }
+            };
+            let floor_raise_roots: Vec<TimelineRoot> = floor_raises
+                .iter()
+                .flat_map(|raised| {
+                    raised
+                        .publishes
+                        .iter()
+                        .map(|publish| root_pair(&publish.root))
+                })
+                .collect();
+            for root in floor_raise_roots {
+                self.ledger.carry(root, carried);
+            }
+            match change {
+                Ok(_) => {
+                    let image = self.image();
+                    self.ledger.confirm(order, &current_root, content, &image);
+                    "applied:published".to_string()
+                }
+                Err(error) => {
+                    self.carry_new_ring_roots(carried);
+                    let attempted = self.ledger.record_attempt(content);
+                    self.carry_new_ring_roots(attempted);
+                    refused(&format!("{error:?}"))
+                }
+            }
+        }
+
+        fn apply_publish_without_units(&mut self, order: usize) -> String {
+            let carried = self.carried_content_number(order);
+            let RandomExecutor {
+                parameters,
+                devices,
+                session,
+                ledger,
+                ..
+            } = self;
+            let Some(session) = session.as_mut() else {
+                return not_applicable("NoWritableSession");
+            };
+            let PoolVersion::WithoutFile(previous) = &session.current else {
+                return not_applicable("CurrentVersionWithFile");
+            };
+            let plan = ZeroUnitPublishPlan {
+                txg: CheckpointTxg(previous.root.checkpoint_txg.0 + 1),
+                counter: previous.record.counter + 1,
+                instance: session.instance,
+                back_chain: back_chain_of(&previous.record_bytes),
+                rollback_floor: previous.root.rollback_floor,
+                tree_identifier_watermark: previous.root.tree_identifier_watermark,
+            };
+            let previous_root = previous.root;
+            let mut writer = PoolWriter::new(parameters, devices.as_mut_slice());
+            match publish_without_units(&mut writer, &previous_root, plan) {
+                Ok(output) => {
+                    ledger.carry(root_pair(&output.root), carried);
+                    session.current = PoolVersion::WithoutFile(output);
+                    "applied:published_without_units".to_string()
+                }
+                Err(error) => refused(&format!("{error:?}")),
+            }
+        }
+
+        fn apply_rollback_while_mounted(
+            &mut self,
+            order: usize,
+            choice: RollbackTargetChoice,
+        ) -> String {
+            let image_before = self.image();
+            let RandomExecutor {
+                parameters,
+                devices,
+                session,
+                ledger,
+                ..
+            } = self;
+            let Some(session) = session.as_mut() else {
+                return not_applicable("NoWritableSession");
+            };
+            let PoolVersion::WithFile(current) = &mut session.current else {
+                return not_applicable("CurrentVersionWithoutFile");
+            };
+            let roots = ring_roots_newest_first_of_the_image(&image_before);
+            let Some((newest_txg, newest_instance)) = roots.first().copied() else {
+                return not_applicable("NoReadableRootInRing");
+            };
+            let target = match choice {
+                RollbackTargetChoice::RingRoot { index_from_newest } => {
+                    let root_count = u64::try_from(roots.len()).expect("根环至多几十条");
+                    let (txg, instance) =
+                        roots[usize::try_from(index_from_newest % root_count).expect("小于条数")];
+                    RollbackTarget {
+                        instance: InstanceGeneration(instance),
+                        checkpoint_txg: CheckpointTxg(txg),
+                    }
+                }
+                RollbackTargetChoice::BeyondNewestRoot { txg_beyond_newest } => RollbackTarget {
+                    instance: InstanceGeneration(newest_instance),
+                    checkpoint_txg: CheckpointTxg(newest_txg + 1 + txg_beyond_newest % 3),
+                },
+                RollbackTargetChoice::RingRootAtTheNewestFloor => {
+                    let floor = newest_ring_root_floor_of_the_image(&image_before);
+                    let (txg, instance) = roots
+                        .iter()
+                        .copied()
+                        .find(|(txg, _)| Some(*txg) == floor)
+                        .unwrap_or((newest_txg, newest_instance));
+                    RollbackTarget {
+                        instance: InstanceGeneration(instance),
+                        checkpoint_txg: CheckpointTxg(txg),
+                    }
+                }
+            };
+            let target_key = (target.instance.0, target.checkpoint_txg.0);
+            match roll_back_by_a_forward_publish(
+                parameters,
+                devices,
+                &mut session.allocator,
+                current,
+                target,
+            ) {
+                Ok(_) => {
+                    let root = root_pair(&current.root);
+                    let number = ledger
+                        .content_number_of(target_key)
+                        .unwrap_or_else(|| ledger.last_confirmed_number_before(order));
+                    ledger.carry(root, number);
+                    ledger.rollback_confirmations.push((order, number, root));
+                    format!("applied:rolled_back_to:{}", key_text(Some(target_key)))
+                }
+                Err(error) => refused(&format!("{error:?}")),
+            }
+        }
+
+        fn apply_raise_rollback_floor(
+            &mut self,
+            order: usize,
+            choice: FloorTargetChoice,
+        ) -> String {
+            let carried = self.carried_content_number(order);
+            let RandomExecutor {
+                parameters,
+                devices,
+                session,
+                ledger,
+                ..
+            } = self;
+            let Some(session) = session.as_mut() else {
+                return not_applicable("NoWritableSession");
+            };
+            let PoolVersion::WithFile(current) = &mut session.current else {
+                return not_applicable("CurrentVersionWithoutFile");
+            };
+            let current_floor = current.root.rollback_floor.0;
+            let txg_before_raise = current.root.checkpoint_txg.0;
+            let choices = txg_before_raise.saturating_sub(current_floor) + 3;
+            let new_floor =
+                CheckpointTxg(current_floor + choice.steps_above_current_floor % choices);
+            match raise_rollback_floor(
+                parameters,
+                devices,
+                &mut session.allocator,
+                current,
+                new_floor,
+                ShadowLedger::On,
+            ) {
+                Ok(raised) => {
+                    for publish in &raised.publishes {
+                        ledger.carry(root_pair(&publish.root), carried);
+                    }
+                    format!("applied:raised_floor_to:{}", new_floor.0)
+                }
+                Err(error) => refused(&format!("{error:?}")),
+            }
+        }
+
+        fn apply_crash_recovery_abandoning_the_newest_root(&mut self, order: usize) -> String {
+            let Some(session) = self.session.as_ref() else {
+                return not_applicable("NoWritableSession");
+            };
+            let image_before = self.image();
+            let roots = ring_roots_newest_first_of_the_image(&image_before);
+            let current_root = session.current.root();
+            if roots.first().copied()
+                != Some((current_root.checkpoint_txg.0, current_root.instance.0))
+            {
+                return not_applicable("NewestRingRootIsNotTheCurrentVersionOfThisSession");
+            }
+            if roots.len() < 2 {
+                return not_applicable("NoReadableRootBeforeTheNewest");
+            }
+            let Some(hidden) =
+                ranges_hidden_by_the_crash_recovery(&self.parameters, &session.current)
+            else {
+                return not_applicable("NewestPublishNamesNoUnit");
+            };
+            let hidden_root = root_pair(current_root);
+            let hidden_content_number = self.ledger.content_number_of(hidden_root);
+            self.session = None;
+            let outcome = self.observed_mount(order, &order.to_string(), "crash_recovery", &hidden);
+            let after = self.image();
+            self.crash_recovery_events.push(CrashRecoveryEvent {
+                order,
+                hidden_root,
+                hidden_content_number,
+                base: image_before,
+                after,
+                mount_index: self.mounts.len() - 1,
+            });
+            outcome
+        }
+
+        /// 这一次可写挂载落在哪一段（登记 5.3：第一次崩溃恢复抛弃根之前的挂载是合法状态，另算进 Q4、Q5-同成）。
+        fn phase_of_a_mount(&self, operation: &'static str) -> &'static str {
+            if operation == "crash_recovery" {
+                "crash_recovery"
+            } else if self.crash_recovery_events.is_empty() {
+                "before_first_crash_recovery"
+            } else {
+                "after_crash_recovery"
+            }
+        }
+
+        /// 一次受观测的可写挂载（`hidden` 那几段读回全 0）：记进 `mounts`，交回的是这一步的结局。
+        fn observed_mount(
+            &mut self,
+            order: usize,
+            step_label: &str,
+            operation: &'static str,
+            hidden: &[HiddenRange],
+        ) -> String {
+            let base = self.image();
+            let parameters = self.parameters.clone();
+            let (mounted, reading) = observed_call(&mut self.devices, hidden, true, |devices| {
+                mount_writable_with_space_admission(
+                    &parameters,
+                    devices,
+                    SpaceAdmission::JudgedByTheFormula,
+                )
+            });
+            let phase = self.phase_of_a_mount(operation);
+            let record = evaluate_a_random_mount(
+                self.arm,
+                &self.ledger,
+                &base,
+                order,
+                step_label,
+                operation,
+                phase,
+                hidden,
+                &mounted,
+                &reading,
+            );
+            let outcome = match &mounted {
+                Ok(_) => format!("applied:mounted:{}", record.summary.class),
+                Err(error) => refused(&format!("{error:?}")),
+            };
+            let carried = record.effective_content.unwrap_or(record.literal_last);
+            self.mounts.push(record);
+            match mounted {
+                Ok(mounted) => {
+                    let mut roots = vec![root_pair(mounted.output.row_publish.root())];
+                    roots.extend(
+                        mounted
+                            .output
+                            .warm_up_publishes
+                            .iter()
+                            .map(|publish| root_pair(publish.root())),
+                    );
+                    for raised in mounted.output.space_admission.floor_raises() {
+                        roots.extend(
+                            raised
+                                .publishes
+                                .iter()
+                                .map(|publish| root_pair(&publish.root)),
+                        );
+                    }
+                    for root in roots {
+                        self.ledger.carry(root, carried);
+                    }
+                    self.session = Some(RandomSession::of_the_mount(mounted));
+                }
+                Err(_) => {
+                    let device_carried = self
+                        .mounts
+                        .last()
+                        .and_then(|last_mount| last_mount.device_effective_content)
+                        .unwrap_or(carried);
+                    self.carry_new_ring_roots(device_carried);
+                }
+            }
+            outcome
+        }
+    }
+
+    fn summary_of_a_random_mount(
+        mounted: &Result<Mounted, singlefs_core::mount::MountError>,
+        reading: &ObservedCallReading,
+    ) -> TestedMountSummary {
+        let ok = mounted.as_ref().ok();
+        TestedMountSummary {
+            class: mount_outcome_class(mounted, reading.window.write_calls),
+            member: mount_error_member_or_none(mounted),
+            writes: reading.window.write_calls,
+            reads: reading.window.read_calls,
+            read_bytes: reading.window.read_bytes,
+            waits: reading.waits,
+            chosen: ok.map(|succeeded| root_pair(&succeeded.output.chosen_root)),
+            effective: ok.map(|succeeded| root_pair(&succeeded.output.effective_root)),
+            abandoned_roots_unreadable: ok
+                .map(|succeeded| succeeded.output.abandoned_roots_unreadable),
+            isolated: ok.map(|succeeded| {
+                succeeded
+                    .output
+                    .isolated_slots_per_device
+                    .iter()
+                    .map(|(_, slots)| *slots)
+                    .sum()
+            }),
+            observation: reading.observation.clone(),
+        }
+    }
+
+    /// 一次可写挂载的账（Q2 两种读法、7.3 第一二行的对拍、F6）。
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "一次挂载的坐标与上下文原样进结果行，拆成结构体只多一层搬运"
+    )]
+    fn evaluate_a_random_mount(
+        arm: FourthRunArm,
+        ledger: &RandomLedger,
+        base: &MemoryPool,
+        order: usize,
+        step_label: &str,
+        operation: &'static str,
+        phase: &'static str,
+        hidden: &[HiddenRange],
+        mounted: &Result<Mounted, singlefs_core::mount::MountError>,
+        reading: &ObservedCallReading,
+    ) -> RandomMount {
+        let summary = summary_of_a_random_mount(mounted, reading);
+        let faults: Vec<ThirdRunFault> = hidden
+            .iter()
+            .map(|range| range.as_third_run_fault())
+            .collect();
+        let judgement = independent_geometry(base)
+            .ok()
+            .map(|geometry| device_judgement(base, &geometry, &faults));
+        let literal_last = ledger.last_confirmed_number_before(order);
+        let rollback_aware_last = ledger.last_confirmed_number_before_rollback_aware(order);
+        let effective_content = summary
+            .effective
+            .and_then(|effective| ledger.content_number_of(effective));
+        let device_effective_content = judgement
+            .as_ref()
+            .and_then(|judged| judged.effective)
+            .and_then(|effective| ledger.content_number_of(effective));
+        let older_version_returned = effective_content.is_some_and(|number| number < literal_last);
+        let older_version_returned_rollback_aware = effective_content.is_some_and(|number| {
+            number != rollback_aware_last && ledger.confirmed_numbers.contains(&number)
+        });
+        let mut stop_clause_four_findings = Vec::new();
+        if let Some(judged) = &judgement {
+            if arm.is_today() {
+                if let Ok(result) = mounted {
+                    if judged.chosen != Some(root_pair(&result.output.chosen_root))
+                        || judged.effective != Some(root_pair(&result.output.effective_root))
+                    {
+                        stop_clause_four_findings.push(format!(
+                            "7.3 第一行：装置择根 {} / E {}，crates {} / {}",
+                            key_text(judged.chosen),
+                            key_text(judged.effective),
+                            key_text(Some(root_pair(&result.output.chosen_root))),
+                            key_text(Some(root_pair(&result.output.effective_root)))
+                        ));
+                    }
+                }
+            }
+            let refused_by_the_arm = summary.member == arm.refusal_member();
+            let device_witness = match arm.witness {
+                FourthRunWitness::SystemConfiguration => Some(judged.configuration_newer),
+                FourthRunWitness::UnreadableRootRingSlot => Some(judged.unreadable_root_slots > 0),
+                FourthRunWitness::NotJudged | FourthRunWitness::SystemConfigurationCarried => None,
+            };
+            if arm.candidate == FourthRunCandidate::Jia {
+                if let Some(witnessed) = device_witness {
+                    if witnessed != refused_by_the_arm {
+                        stop_clause_four_findings.push(format!(
+                            "7.3 第二行：装置算的 N={witnessed}，臂拒={refused_by_the_arm}（成员 {}）",
+                            summary.member
+                        ));
+                    }
+                }
+            }
+        }
+        let failure_clause_six = (operation == "crash_recovery").then(|| {
+            judgement.as_ref().is_some_and(|judged| {
+                judged.configuration_newer && judged.unreadable_root_slots == 0
+            })
+        });
+        RandomMount {
+            order,
+            step_label: step_label.to_string(),
+            operation,
+            phase,
+            base_fingerprint: image_fingerprint(base),
+            summary,
+            reading: reading.clone(),
+            judgement,
+            hidden_ranges: hidden.len(),
+            literal_last,
+            rollback_aware_last,
+            effective_content,
+            device_effective_content,
+            older_version_returned,
+            older_version_returned_rollback_aware,
+            stop_clause_four_findings,
+            failure_clause_six,
+        }
+    }
+
+    impl RandomExecutor {
+        /// 每一步做完：记各版单元第一次被改的那一步；要留的那一步的镜像留下。
+        fn after_a_step(&mut self, order: usize, image: &MemoryPool) {
+            let ring_roots = independent_geometry(image)
+                .map(|geometry| readable_roots_independent(image, &geometry))
+                .unwrap_or_default();
+            for confirmation in &self.ledger.confirmations {
+                if self
+                    .first_changes
+                    .contains_key(&confirmation.content_number)
+                    || confirmation.order >= order
+                {
+                    continue;
+                }
+                let changed =
+                    confirmation
+                        .unit_bytes
+                        .iter()
+                        .any(|((device, slot, span), bytes)| {
+                            let length = usize::try_from(span * SLOT_BYTES_LOCAL).expect("单元长");
+                            image
+                                .read(*device, slot * SLOT_BYTES_LOCAL, length)
+                                .unwrap_or_default()
+                                != *bytes
+                        });
+                if changed {
+                    let later_confirmations = self
+                        .ledger
+                        .confirmations
+                        .iter()
+                        .filter(|later| later.content_number > confirmation.content_number)
+                        .count();
+                    self.first_changes.insert(
+                        confirmation.content_number,
+                        FirstChange {
+                            order,
+                            later_confirmations,
+                            root_in_ring_then: ring_roots.contains(&confirmation.root),
+                        },
+                    );
+                }
+            }
+            if self.capture_after_order == Some(order) {
+                self.captured_image = Some(image.clone());
+            }
+        }
+
+        /// 尾巴（登记 5.3 H-随：关闭 C → 可写挂载（不注入）→ 冷启动读回 → ③c）。交回尾巴那次读回、③c 的分类与尾巴之后的镜像。
+        fn run_the_tail(&mut self, order_of_the_tail: usize) -> TailReading {
+            self.session = None;
+            self.stream_length_at_step_start
+                .push(self.stream.operation_count());
+            let outcome = self.observed_mount(order_of_the_tail, "tail", "tail", &[]);
+            self.calls_after_step.push(self.plan.calls());
+            let end = self.image();
+            self.after_a_step(order_of_the_tail, &end);
+            let report = recover(&end, JournalPolicy::Consult);
+            let read_back = classify_random_read_back(
+                &report,
+                &self.ledger,
+                self.ledger
+                    .last_confirmed_number_before(order_of_the_tail + 1),
+                self.ledger
+                    .last_confirmed_number_before_rollback_aware(order_of_the_tail + 1),
+            );
+            let first_hidden_instance = self
+                .crash_recovery_events
+                .first()
+                .map(|event| event.hidden_root.0);
+            let tail_class = third_tail_class(&end, &self.ledger, first_hidden_instance);
+            self.steps.push(RandomStepRecord {
+                order: order_of_the_tail,
+                operation: "tail".to_string(),
+                outcome,
+                fingerprint_after: image_fingerprint(&end),
+                checker: None,
+                read_back: Some(read_back.clone()),
+            });
+            TailReading {
+                read_back,
+                tail_class,
+                end,
+            }
+        }
+    }
+
+    /// 尾巴那一截读到的东西。
+    struct TailReading {
+        read_back: RandomReadBack,
+        tail_class: String,
+        end: MemoryPool,
+    }
+
+    /// ③c（登记 5.3 H-随 与 r3 登记第 373–391 行 ③c 那一行）：历史末尾镜像上实例代号 ≥ 第一次崩溃恢复抛弃根那一步被藏那条根的实例代号 + 1
+    /// 的全部自证根的根槽读坏（W、`read_fails`），冷启动读回：读回它落到的那条根自己那一版 / 别的 / 读失败（只有读失败按丢写记）。
+    fn third_tail_class(
+        end: &MemoryPool,
+        ledger: &RandomLedger,
+        first_hidden_instance: Option<u32>,
+    ) -> String {
+        let Some(hidden_instance) = first_hidden_instance else {
+            return "na".to_string();
+        };
+        let Ok(geometry) = independent_geometry(end) else {
+            return "failed:geometry".to_string();
+        };
+        let slots = checker_image::root_slot_positions(&geometry);
+        let faults: Vec<ThirdRunFault> = checker_image::valid_roots(end, &geometry)
+            .into_iter()
+            .filter(|(_, _, view)| view.instance > hidden_instance)
+            .filter_map(|(region, slot, view)| {
+                slots
+                    .iter()
+                    .find(|(candidate_region, candidate_slot, _, _)| {
+                        *candidate_region == region && *candidate_slot == slot
+                    })
+                    .map(|(_, _, device, offset)| ThirdRunFault {
+                        device: DeviceIdentity(*device),
+                        offset: *offset,
+                        length: u64::from(geometry.physical_block_size),
+                        form: UnreadableForm::ReadFails,
+                        duration: FaultDuration::WholeCall,
+                        label: format!(
+                            "tail_root{}",
+                            key_text(Some((view.instance, view.checkpoint_txg)))
+                        ),
+                    })
+            })
+            .collect();
+        let tail = run_third_run_recover(end, &faults);
+        match &tail.outcome.outcome {
+            RecoveryOutcome::Failed { failure, .. } => {
+                format!("failed:{}", error_member_of_debug(&format!("{failure:?}")))
+            }
+            RecoveryOutcome::NoFile { .. } | RecoveryOutcome::FileRead { .. } => {
+                let landing = tail
+                    .outcome
+                    .effective_root
+                    .map(|(instance, txg)| (instance.0, txg.0))
+                    .or_else(|| chosen_root_of(&tail.outcome.outcome));
+                let expected = landing.and_then(|root| ledger.content_number_of(root));
+                let file: Option<Vec<u8>> = match &tail.outcome.outcome {
+                    RecoveryOutcome::FileRead { content, .. } => Some(content.clone()),
+                    RecoveryOutcome::NoFile { .. } | RecoveryOutcome::Failed { .. } => None,
+                };
+                let own = expected.is_some_and(|number| {
+                    ledger
+                        .contents
+                        .get(usize::try_from(number).expect("内容号"))
+                        == Some(&file)
+                });
+                if own {
+                    format!("own_version:{}", key_text(landing))
+                } else {
+                    format!("other:{}:expected={expected:?}", key_text(landing))
+                }
+            }
+        }
+    }
+
+    fn tail_class_is_lost(tail_class: &str) -> bool {
+        tail_class.starts_with("failed")
+    }
+
+    /// 这份镜像上 `target` 那条根的根记录（fsid 取这份镜像自己的系统配置：harness 的池用 E142 那一个 fsid，不是本装置的）。
+    fn root_record_on_the_image(pool: &MemoryPool, target: TimelineRoot) -> Option<RootRecord> {
+        let geometry = independent_geometry(pool).ok()?;
+        let slot_bytes = usize::try_from(geometry.physical_block_size).ok()?;
+        for (_region, _slot, device_number, offset) in checker_image::root_slot_positions(&geometry)
+        {
+            let Some(bytes) = pool.read(device_number, offset, slot_bytes) else {
+                continue;
+            };
+            if let Some(record) = RootRecord::parse_slot(&bytes, &geometry.filesystem_identifier) {
+                if (record.instance.0, record.checkpoint_txg.0) == target {
+                    return Some(record);
+                }
+            }
+        }
+        None
+    }
+
+    // ------------------------------------------------------------------------
+    // 13.5 一格（登记第六节 Q0–Q3 与丢写格；5.3「V_LC、Q1、Q2 按每一次崩溃恢复抛弃根那一步各算一份」）：
+    //      主路径与注入点分支上每一次崩溃恢复抛弃根那一步、注入点那一步（不是崩溃恢复那一步时另立一格）、每一个崩溃状态各是一格。
+    //      V_LC = 那一步开始之前最后确认那一版（字面读法；回退读法另一栏）。Q1 = V_LC 引用的单元在这个分支末尾被改的份数，按那条根在末尾
+    //      还在 / 不在根环里分两栏，另报第三栏（尾巴读回落到的根）与时点栏（第一次被改在哪一步、那一刻之后已有几笔确认、那一刻根在不在环里）。
+    //      Q2 = 那一格的被测挂载交回 `Ok` 而 E 的内容号更旧。Q3 = 这一格之后的每一次读回（分支末尾那一次、注入点分支的重开、崩溃状态的两次）。
+    // ------------------------------------------------------------------------
+
+    struct RandomCell {
+        name: String,
+        kind: &'static str,
+        order: usize,
+        protected: Option<RandomConfirmation>,
+        protected_rollback_aware: u64,
+        mount: Option<usize>,
+        read_backs: Vec<(String, RandomReadBack)>,
+        tail_class: String,
+        destination: Option<String>,
+    }
+
+    /// 一格三样的结果。
+    struct RandomCellLoss {
+        in_ring_overwritten: u64,
+        out_of_ring_overwritten: u64,
+        landing_overwritten: String,
+        first_change: Option<FirstChange>,
+        older_version_returned: bool,
+        older_version_returned_rollback_aware: bool,
+        read_back_lost: bool,
+        read_back_lost_rollback_aware: bool,
+        read_back_last_confirmed: bool,
+        broken_root_slots_read_back_lost: bool,
+    }
+
+    impl RandomCellLoss {
+        fn overwrite_cell(&self) -> bool {
+            self.in_ring_overwritten + self.out_of_ring_overwritten > 0
+        }
+
+        fn lost_write_cell(&self) -> bool {
+            self.overwrite_cell()
+                || self.older_version_returned
+                || self.read_back_lost
+                || self.broken_root_slots_read_back_lost
+        }
+
+        fn lost_write_cell_rollback_aware(&self) -> bool {
+            self.overwrite_cell()
+                || self.older_version_returned_rollback_aware
+                || self.read_back_lost_rollback_aware
+                || self.broken_root_slots_read_back_lost
+        }
+    }
+
+    fn evaluate_a_random_cell(
+        cell: &RandomCell,
+        mounts: &[RandomMount],
+        first_changes: &BTreeMap<u64, FirstChange>,
+        base: &MemoryPool,
+        end: &MemoryPool,
+        final_landing: Option<TimelineRoot>,
+    ) -> RandomCellLoss {
+        let end_roots = independent_geometry(end)
+            .map(|geometry| readable_roots_independent(end, &geometry))
+            .unwrap_or_default();
+        let overwritten_in = |version: &UnitBytesOfAVersion| -> u64 {
+            version
+                .iter()
+                .filter(|((device, slot, span), bytes)| {
+                    let length = usize::try_from(span * SLOT_BYTES_LOCAL).expect("单元长");
+                    end.read(*device, slot * SLOT_BYTES_LOCAL, length)
+                        .unwrap_or_default()
+                        != **bytes
+                })
+                .count() as u64
+        };
+        let (in_ring_overwritten, out_of_ring_overwritten) = match &cell.protected {
+            Some(protected) => {
+                let overwritten = overwritten_in(&protected.unit_bytes);
+                if end_roots.contains(&protected.root) {
+                    (overwritten, 0)
+                } else {
+                    (0, overwritten)
+                }
+            }
+            None => (0, 0),
+        };
+        let landing_overwritten = match final_landing {
+            Some(landing) => match root_record_on_the_image(base, landing) {
+                Some(record) => match unit_bytes_referenced_by(base, &record) {
+                    Ok(version) => overwritten_in(&version).to_string(),
+                    Err(error) => format!("unreadable_in_base:{}", error.replace(' ', "_")),
+                },
+                None => "written_after_the_cell".to_string(),
+            },
+            None => "none".to_string(),
+        };
+        let mount = cell.mount.and_then(|index| mounts.get(index));
+        RandomCellLoss {
+            in_ring_overwritten,
+            out_of_ring_overwritten,
+            landing_overwritten,
+            first_change: cell
+                .protected
+                .as_ref()
+                .and_then(|protected| first_changes.get(&protected.content_number).copied()),
+            older_version_returned: mount.is_some_and(|record| record.older_version_returned),
+            older_version_returned_rollback_aware: mount
+                .is_some_and(|record| record.older_version_returned_rollback_aware),
+            read_back_lost: cell
+                .read_backs
+                .iter()
+                .any(|(_, read_back)| read_back.literal_lost()),
+            read_back_lost_rollback_aware: cell
+                .read_backs
+                .iter()
+                .any(|(_, read_back)| read_back.rollback_aware_lost()),
+            read_back_last_confirmed: cell
+                .read_backs
+                .iter()
+                .all(|(_, read_back)| read_back.literal.starts_with("last_confirmed")),
+            broken_root_slots_read_back_lost: tail_class_is_lost(&cell.tail_class),
+        }
+    }
+
+    /// Q0 的去向（登记「读法写死」表那一行，判的次序见执行员修订第 8 条）：崩溃恢复抛弃根那一步交回（或崩在中途）之后的镜像上判。
+    fn destination_of_the_hidden_root(
+        event: &CrashRecoveryEvent,
+        mounts: &[RandomMount],
+        ledger: &RandomLedger,
+    ) -> String {
+        let Some(position) = hidden_root_position(&event.base, event.hidden_root) else {
+            return "other:hidden_root_not_in_the_base".to_string();
+        };
+        let Some(hidden_content_number) = event.hidden_content_number else {
+            return "other:hidden_root_not_in_the_ledger".to_string();
+        };
+        let tested_ok_effective = mounts
+            .get(event.mount_index)
+            .filter(|record| class_is_a_successful_mount(record.summary.class))
+            .and_then(|record| record.summary.effective);
+        hidden_root_destination(
+            &position,
+            &ledger.content_number_by_root,
+            hidden_content_number,
+            &event.after,
+            tested_ok_effective,
+        )
+        .name()
+    }
+
+    fn render_first_change(first_change: Option<FirstChange>) -> String {
+        first_change.map_or("none".to_string(), |change| {
+            format!(
+                "order{}:later_confirmations{}:in_ring{}",
+                change.order, change.later_confirmations, change.root_in_ring_then
+            )
+        })
+    }
+
+    // ------------------------------------------------------------------------
+    // 13.6 今天那一臂上与 harness 自己的执行器比（S9 末句的收严、S7、S5a / S5b）：harness 执行器（不跑 checker，只在模型、执行器判定、
+    //      panic 上停）每个观察到的位置的镜像指纹与整池调用数，与装置执行器同一位置的逐项比；harness 判红的那一步（跑 checker 那一档）。
+    // ------------------------------------------------------------------------
+
+    /// harness 执行器在今天那一份副本上跑同一段历史：每个观察到的位置（步）→（镜像指纹，那一步做完时整池的调用数）。
+    fn harness_trace(history: &GeneratedHistory) -> Vec<(usize, u64, FaultCallCounts)> {
+        let plan = SharedFaultPlan::unarmed(HistoryDeviceWidth::FourGibibytes.fixed_geometry());
+        let mut positions = Vec::new();
+        let _run = execute_history_with_faults(
+            history,
+            harness_execution(PerStepChecker::Skipped),
+            &SharedStream::new(),
+            &plan,
+            &mut |observation| {
+                let order = match observation.position {
+                    StepPosition::StartingPoint => 0,
+                    StepPosition::Operation(index) => index + 1,
+                };
+                positions.push((order, image_fingerprint(observation.image), plan.calls()));
+            },
+        );
+        positions
+    }
+
+    /// harness 执行器（每一步跑 checker、判红就停，快档那一档）第一次判红在哪一步（步序：起点 0，第 i 步 i + 1）、
+    /// I-7.4 被抛弃根那一半点名了哪几条根。跑完没判红交回 None。
+    fn harness_first_red(
+        history: &GeneratedHistory,
+    ) -> Option<(usize, Vec<TimelineRoot>, Vec<&'static str>)> {
+        let run = execute_history(history);
+        match run.ending {
+            HistoryEnding::Completed => None,
+            HistoryEnding::KnownRed { observation, .. }
+            | HistoryEnding::NewFinding { observation, .. } => {
+                let order = match observation.position {
+                    StepPosition::StartingPoint => 0,
+                    StepPosition::Operation(index) => index + 1,
+                };
+                let mut named = Vec::new();
+                let mut invariants = Vec::new();
+                for (invariant, detail) in &observation.violations {
+                    invariants.push(*invariant);
+                    if *invariant == ABANDONED_ROOT_INVARIANT {
+                        named.extend(abandoned_root_named_by(detail));
+                    }
+                }
+                Some((order, named, invariants))
+            }
+        }
+    }
+
+    /// 装置执行器（今天那一臂）与 harness 执行器逐步比：交回比了几步、对不上的那几步。
+    fn executor_agreement(
+        executor: &RandomExecutor,
+        trace: &[(usize, u64, FaultCallCounts)],
+    ) -> (usize, Vec<String>) {
+        let mut mismatches = Vec::new();
+        for (order, fingerprint, calls) in trace {
+            let mine = executor.steps.iter().find(|step| step.order == *order);
+            let my_calls = executor.calls_after_step.get(*order);
+            let agrees = mine.is_some_and(|step| step.fingerprint_after == *fingerprint)
+                && my_calls == Some(calls);
+            if !agrees {
+                mismatches.push(format!(
+                    "order{order}:harness_fingerprint={fingerprint:016x}:device_fingerprint={}:harness_calls={}/{}/{}:device_calls={}",
+                    mine.map_or("none".to_string(), |step| format!("{:016x}", step.fingerprint_after)),
+                    calls.reads,
+                    calls.writes,
+                    calls.barriers,
+                    my_calls.map_or("none".to_string(), |counts| format!(
+                        "{}/{}/{}",
+                        counts.reads, counts.writes, counts.barriers
+                    ))
+                ));
+            }
+        }
+        (trace.len(), mismatches)
+    }
+
+    // ------------------------------------------------------------------------
+    // 13.7 harness 的注入点与崩溃状态怎么映到各臂（第十二节第二段修订）：今天那一臂上，harness 摆的每个注入点换成（步，步内第几次那一种调用），
+    //      每个崩溃状态换成（它那一段第一个写落在哪一步，那一步里的第几段，段内持久了哪几个写）；打进今天那一臂的产物，别的臂从那份产物读回来。
+    // ------------------------------------------------------------------------
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    struct FaultPointKey {
+        index: usize,
+        fault: InjectedFault,
+        order: usize,
+        ordinal_within_the_step: u64,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    struct CrashPointKey {
+        index: usize,
+        order_of_the_first_write: usize,
+        segment_within_the_step: usize,
+        persisted_within_the_segment: Vec<bool>,
+    }
+
+    fn render_injected_fault(fault: InjectedFault) -> String {
+        match fault {
+            InjectedFault::ReadReturnsCorruptedBytes { flipped_bit } => format!(
+                "{}:{}:{}",
+                fault.name(),
+                flipped_bit.byte_index,
+                flipped_bit.bit_index
+            ),
+            InjectedFault::WriteFails
+            | InjectedFault::WriteIsSwallowed
+            | InjectedFault::ReadFails
+            | InjectedFault::BarrierFails
+            | InjectedFault::BarrierIsSwallowed => fault.name().to_string(),
+        }
+    }
+
+    fn parse_injected_fault(text: &str) -> Option<InjectedFault> {
+        let mut parts = text.split(':');
+        let name = parts.next()?;
+        [
+            InjectedFault::WriteFails,
+            InjectedFault::WriteIsSwallowed,
+            InjectedFault::ReadFails,
+            InjectedFault::BarrierFails,
+            InjectedFault::BarrierIsSwallowed,
+        ]
+        .into_iter()
+        .find(|fault| fault.name() == name)
+        .or_else(|| {
+            if name != "read_returns_corrupted_bytes" {
+                return None;
+            }
+            let byte_index = parts.next()?.parse().ok()?;
+            let bit_index = parts.next()?.parse().ok()?;
+            Some(InjectedFault::ReadReturnsCorruptedBytes {
+                flipped_bit: singlefs_harness::fault_injection::FlippedBit {
+                    byte_index,
+                    bit_index,
+                },
+            })
+        })
+    }
+
+    fn render_persisted(persisted: &[bool]) -> String {
+        persisted
+            .iter()
+            .map(|is_persisted| if *is_persisted { '1' } else { '0' })
+            .collect()
+    }
+
+    fn parse_persisted(text: &str) -> Vec<bool> {
+        text.chars().map(|bit| bit == '1').collect()
+    }
+
+    /// 录制流的下标落在哪一步（起点 0）：那一步开始时录制流的长度不超过它的最后一步。
+    fn order_of_a_stream_index(
+        stream_length_at_step_start: &[usize],
+        stream_index: usize,
+    ) -> usize {
+        stream_length_at_step_start
+            .iter()
+            .rposition(|start| *start <= stream_index)
+            .unwrap_or(0)
+    }
+
+    /// 一个分支的录制流切成写表与段（harness 崩溃注入同一切法），外加每一段第一个写落在哪一步。
+    struct SegmentedStream {
+        writes: Vec<RetainedWrite>,
+        segments: Vec<Vec<usize>>,
+        order_of_the_first_write: Vec<usize>,
+        order_of_each_write: Vec<usize>,
+    }
+
+    fn segmented_stream_of(executor: &RandomExecutor) -> SegmentedStream {
+        let operations = executor.stream.retained_operations();
+        let (writes, segments, stream_indexes) = writes_and_segments_with_stream_indexes(
+            &operations,
+            &HistoryDeviceWidth::FourGibibytes.fixed_geometry(),
+        );
+        let order_of_each_write: Vec<usize> = stream_indexes
+            .iter()
+            .map(|stream_index| {
+                order_of_a_stream_index(&executor.stream_length_at_step_start, *stream_index)
+            })
+            .collect();
+        let order_of_the_first_write = segments
+            .iter()
+            .map(|segment| {
+                segment
+                    .first()
+                    .map_or(0, |first| order_of_each_write[*first])
+            })
+            .collect();
+        SegmentedStream {
+            writes,
+            segments,
+            order_of_the_first_write,
+            order_of_each_write,
+        }
+    }
+
+    impl SegmentedStream {
+        /// 第 `segment_index` 段在它第一个写那一步里是第几段。
+        fn segment_within_the_step(&self, segment_index: usize) -> usize {
+            let order = self.order_of_the_first_write[segment_index];
+            self.order_of_the_first_write[..segment_index]
+                .iter()
+                .filter(|other| **other == order)
+                .count()
+        }
+
+        fn find(&self, order: usize, segment_within_the_step: usize) -> Option<usize> {
+            self.order_of_the_first_write
+                .iter()
+                .enumerate()
+                .filter(|(_, first)| **first == order)
+                .nth(segment_within_the_step)
+                .map(|(index, _)| index)
+        }
+
+        /// 崩溃状态的镜像：更早的段整段持久，这一段按 `persisted` 挑，更晚的一个都没有（harness 崩溃注入同一摆法）。
+        fn crash_image(&self, segment_index: usize, persisted: &[bool]) -> MemoryPool {
+            let segment = &self.segments[segment_index];
+            let first = segment[0];
+            let mut image = MemoryPool::with_devices(
+                &[DeviceIdentity(0), DeviceIdentity(1)],
+                history_device_bytes(),
+            );
+            image.apply_writes(&self.writes[..first]);
+            for (within, is_persisted) in persisted.iter().enumerate() {
+                if *is_persisted {
+                    image.apply_writes(&self.writes[first + within..=first + within]);
+                }
+            }
+            image
+        }
+
+        /// 崩溃在哪一步：这一段第一个没持久的写落在的那一步（harness `CrashPoint::step` 同一取法）。
+        fn crash_order(&self, segment_index: usize, persisted: &[bool]) -> usize {
+            let segment = &self.segments[segment_index];
+            let withheld = persisted
+                .iter()
+                .position(|is_persisted| !*is_persisted)
+                .unwrap_or(0);
+            self.order_of_each_write[segment[withheld]]
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // 13.8 一段历史在一臂上的一个分支的结果（主路径、注入点、崩溃状态），与结果行。
+    // ------------------------------------------------------------------------
+
+    struct BranchResult {
+        attempt: String,
+        mounts: Vec<RandomMount>,
+        cells: Vec<(RandomCell, RandomCellLoss)>,
+        detail: String,
+        /// 注入点分支：注入真的发出的那一次调用是整池第几次那一种调用（没发出 None）。
+        fired_call_ordinal: Option<u64>,
+    }
+
+    fn cells_of_an_executed_branch(
+        executor: &RandomExecutor,
+        tail: &TailReading,
+        attempt: &str,
+        from_order: usize,
+        fault_event: Option<(usize, RandomReadBack)>,
+    ) -> Vec<(RandomCell, RandomCellLoss)> {
+        let mut cells = Vec::new();
+        let mut fault_event_is_a_crash_recovery = false;
+        for event in executor
+            .crash_recovery_events
+            .iter()
+            .filter(|event| event.order >= from_order)
+        {
+            let mut read_backs = vec![("tail_read_back".to_string(), tail.read_back.clone())];
+            if let Some((order, reopen)) = &fault_event {
+                if *order == event.order {
+                    read_backs.push(("reopen_read_back".to_string(), reopen.clone()));
+                    fault_event_is_a_crash_recovery = true;
+                }
+            }
+            let cell = RandomCell {
+                name: format!("{attempt}:crash_recovery@{}", event.order),
+                kind: "crash_recovery",
+                order: event.order,
+                protected: executor
+                    .ledger
+                    .last_confirmation_before(event.order)
+                    .cloned(),
+                protected_rollback_aware: executor
+                    .ledger
+                    .last_confirmed_number_before_rollback_aware(event.order),
+                mount: Some(event.mount_index),
+                read_backs,
+                tail_class: tail.tail_class.clone(),
+                destination: Some(destination_of_the_hidden_root(
+                    event,
+                    &executor.mounts,
+                    &executor.ledger,
+                )),
+            };
+            let loss = evaluate_a_random_cell(
+                &cell,
+                &executor.mounts,
+                &executor.first_changes,
+                &event.base,
+                &tail.end,
+                tail.read_back.root,
+            );
+            cells.push((cell, loss));
+        }
+        if let Some((order, reopen)) = fault_event {
+            if !fault_event_is_a_crash_recovery {
+                let cell = RandomCell {
+                    name: format!("{attempt}:fault@{order}"),
+                    kind: "fault",
+                    order,
+                    protected: executor.ledger.last_confirmation_before(order).cloned(),
+                    protected_rollback_aware: executor
+                        .ledger
+                        .last_confirmed_number_before_rollback_aware(order),
+                    mount: executor
+                        .mounts
+                        .iter()
+                        .position(|mount| mount.order == order),
+                    read_backs: vec![
+                        ("tail_read_back".to_string(), tail.read_back.clone()),
+                        ("reopen_read_back".to_string(), reopen),
+                    ],
+                    tail_class: tail.tail_class.clone(),
+                    destination: None,
+                };
+                let base = executor
+                    .captured_image
+                    .clone()
+                    .unwrap_or_else(|| tail.end.clone());
+                let loss = evaluate_a_random_cell(
+                    &cell,
+                    &executor.mounts,
+                    &executor.first_changes,
+                    &base,
+                    &tail.end,
+                    tail.read_back.root,
+                );
+                cells.push((cell, loss));
+            }
+        }
+        cells
+    }
+
+    /// 一段历史的主路径（不注入）：跑完操作、接尾巴（这一族要的话）、按每一次崩溃恢复抛弃根那一步立格。
+    fn run_the_main_branch(
+        arm: FourthRunArm,
+        segment: &SegmentTwoHistory,
+    ) -> (RandomExecutor, BranchResult) {
+        let family = segment.family;
+        let mut executor = RandomExecutor::start(
+            arm,
+            segment.history.starting_point,
+            SharedFaultPlan::unarmed(HistoryDeviceWidth::FourGibibytes.fixed_geometry()),
+            family.checks_every_step(),
+        );
+        executor.run_the_operations(&segment.history);
+        let finished = executor.panicked.is_none()
+            && executor.stopped_at_the_first_red.is_none()
+            && executor.starting_point_error.is_none();
+        let mut cells = Vec::new();
+        let mut detail = String::new();
+        if family.runs_the_tail() && finished {
+            let order_of_the_tail = segment.history.operations.len() + 1;
+            match with_panic_capture(|| executor.run_the_tail(order_of_the_tail)) {
+                Ok(tail) => {
+                    detail = format!(
+                        "{} q3c_tail={}",
+                        tail.read_back.render("tail_read_back"),
+                        tail.tail_class
+                    );
+                    cells = cells_of_an_executed_branch(&executor, &tail, "main", 0, None);
+                }
+                Err(panic) => {
+                    executor.panicked = Some((
+                        order_of_the_tail,
+                        format!("{}: {}", panic.location, panic.message),
+                    ));
+                }
+            }
+        }
+        let mounts = std::mem::take(&mut executor.mounts);
+        (
+            executor,
+            BranchResult {
+                attempt: "main".to_string(),
+                mounts,
+                cells,
+                detail,
+                fired_call_ordinal: None,
+            },
+        )
+    }
+
+    /// 一个注入点的分支：先按主路径的调用数把「步内第几次」换成这一臂的整池序号，再开着注入重跑这段历史、接尾巴；
+    /// 注入那一步做完时的镜像上冷启动读回（harness 的「重开」）。
+    fn run_a_fault_branch(
+        arm: FourthRunArm,
+        segment: &SegmentTwoHistory,
+        main: &RandomExecutor,
+        point: &FaultPointKey,
+    ) -> BranchResult {
+        let attempt = format!("fault{}", point.index);
+        let kind = point.fault.call_kind();
+        let calls_before = if point.order == 0 {
+            FaultCallCounts::default()
+        } else {
+            main.calls_after_step
+                .get(point.order - 1)
+                .copied()
+                .unwrap_or_default()
+        };
+        let calls_after = main.calls_after_step.get(point.order).copied();
+        let reachable = calls_after.is_some_and(|after| {
+            calls_before.of(kind) + point.ordinal_within_the_step <= after.of(kind)
+        });
+        if !reachable {
+            return BranchResult {
+                attempt,
+                mounts: Vec::new(),
+                cells: Vec::new(),
+                fired_call_ordinal: None,
+                detail: format!(
+                    "fault={} order={} ordinal_within_the_step={} fault_not_reached=true arm_calls_in_the_step={}",
+                    render_injected_fault(point.fault),
+                    point.order,
+                    point.ordinal_within_the_step,
+                    calls_after.map_or("none".to_string(), |after| {
+                        (after.of(kind) - calls_before.of(kind)).to_string()
+                    })
+                ),
+            };
+        }
+        let arm_ordinal = calls_before.of(kind) + point.ordinal_within_the_step;
+        let plan = SharedFaultPlan::armed(
+            HistoryDeviceWidth::FourGibibytes.fixed_geometry(),
+            FaultSchedule::the_nth_call_across_the_pool(point.fault, arm_ordinal),
+        );
+        let mut executor =
+            RandomExecutor::start(arm, segment.history.starting_point, plan.clone(), false);
+        executor.capture_after_order = Some(point.order);
+        if point.order == 0 {
+            executor.captured_image = Some(executor.image());
+        }
+        executor.run_the_operations(&segment.history);
+        let fired = plan.fired_count();
+        let fired_call_ordinal = plan
+            .fired()
+            .first()
+            .map(|fired_fault| fired_fault.call_ordinal_across_the_pool);
+        let reopen = executor.captured_image.as_ref().map(|image| {
+            let report = recover(image, JournalPolicy::Consult);
+            classify_random_read_back(
+                &report,
+                &executor.ledger,
+                executor
+                    .ledger
+                    .last_confirmed_number_before(point.order + 1),
+                executor
+                    .ledger
+                    .last_confirmed_number_before_rollback_aware(point.order + 1),
+            )
+        });
+        let finished = executor.panicked.is_none()
+            && executor.stopped_at_the_first_red.is_none()
+            && executor.starting_point_error.is_none();
+        let mut cells = Vec::new();
+        let mut detail = format!(
+            "fault={} order={} ordinal_within_the_step={} arm_ordinal={arm_ordinal} fired={fired} {} starting_point_error={} panicked={}",
+            render_injected_fault(point.fault),
+            point.order,
+            point.ordinal_within_the_step,
+            reopen
+                .as_ref()
+                .map_or("reopen_read_back=none".to_string(), |read_back| read_back
+                    .render("reopen_read_back")),
+            executor.starting_point_error.is_some(),
+            executor.panicked.is_some()
+        );
+        if let Some(read_back) = &reopen {
+            detail.push_str(&format!(
+                " reopen_failure={:?}",
+                read_back.failure_debug.clone().unwrap_or_default()
+            ));
+        }
+        if finished {
+            let order_of_the_tail = segment.history.operations.len() + 1;
+            match with_panic_capture(|| executor.run_the_tail(order_of_the_tail)) {
+                Ok(tail) => {
+                    detail.push_str(&format!(
+                        " {} q3c_tail={}",
+                        tail.read_back.render("tail_read_back"),
+                        tail.tail_class
+                    ));
+                    cells = cells_of_an_executed_branch(
+                        &executor,
+                        &tail,
+                        &attempt,
+                        point.order,
+                        reopen.map(|read_back| (point.order, read_back)),
+                    );
+                }
+                Err(panic) => {
+                    detail.push_str(&format!(
+                        " tail_panic={:?}",
+                        format!("{}: {}", panic.location, panic.message)
+                    ));
+                }
+            }
+        }
+        let mounts = std::mem::take(&mut executor.mounts)
+            .into_iter()
+            .filter(|mount| mount.order >= point.order)
+            .collect();
+        BranchResult {
+            attempt,
+            mounts,
+            cells,
+            detail,
+            fired_call_ordinal,
+        }
+    }
+
+    /// 崩溃分支那次可写挂载之后读回用的账（第 4 次跑 seg2b 修的装置记账撞键，调查报告 `research/prompts/e158-r4-seg2-ledger-investigation-report.md`
+    /// 第一节）：账按根的键 (实例, txg) 记内容号，键里没有时间线这一维；分支挂载在崩溃镜像上取号、发布，会与主路径后来的某次发布落到同一个键上，
+    /// 按主路径的账查就查到主路径那一版。分支自己的账 = 主路径的账拷一份（崩溃镜像只含主路径写序列的前缀，镜像里的根与主路径同源），
+    /// 再把分支那次挂载写出的根——挂载之后读得出、崩溃镜像里没有同一条（键与根记录逐字节）的——改记成这次挂载承接的那一版。
+    /// 承接的那一版照主路径 `observed_mount` 同一条规则：交回 `Ok` 记 E 的内容号，查不到记字面最后确认那一版；拒了记装置判的 E 的内容号，查不到同上。
+    fn ledger_after_the_mount_of_a_crash_branch(
+        main_ledger: &RandomLedger,
+        crash_image: &MemoryPool,
+        after_mount: &MemoryPool,
+        mount_returned_ok: bool,
+        mount: &RandomMount,
+    ) -> RandomLedger {
+        let carried_when_ok = mount.effective_content.unwrap_or(mount.literal_last);
+        let carried = if mount_returned_ok {
+            carried_when_ok
+        } else {
+            mount.device_effective_content.unwrap_or(carried_when_ok)
+        };
+        let roots_with_their_records = |pool: &MemoryPool| -> BTreeSet<(TimelineRoot, Vec<u8>)> {
+            independent_geometry(pool)
+                .map(|geometry| {
+                    checker_image::valid_roots(pool, &geometry)
+                        .into_iter()
+                        .map(|(_, _, view)| {
+                            ((view.instance, view.checkpoint_txg), view.record_bytes)
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        let roots_in_the_crash_image = roots_with_their_records(crash_image);
+        let mut ledger = main_ledger.clone();
+        for (root, record_bytes) in roots_with_their_records(after_mount) {
+            if !roots_in_the_crash_image.contains(&(root, record_bytes)) {
+                ledger.carry(root, carried);
+            }
+        }
+        ledger
+    }
+
+    /// 一个崩溃状态的分支（r3 登记第 373–391 行实七-乙那一行）：主路径的写序列上按映射摆出崩溃镜像，冷启动读回，再可写挂载一次、读回一次。
+    fn run_a_crash_branch(
+        arm: FourthRunArm,
+        main: &RandomExecutor,
+        stream: &SegmentedStream,
+        point: &CrashPointKey,
+    ) -> BranchResult {
+        let attempt = format!("crash{}", point.index);
+        let Some(segment_index) = stream.find(
+            point.order_of_the_first_write,
+            point.segment_within_the_step,
+        ) else {
+            return BranchResult {
+                attempt,
+                mounts: Vec::new(),
+                cells: Vec::new(),
+                fired_call_ordinal: None,
+                detail: format!(
+                    "not_constructible=segment_missing order_of_the_first_write={} segment_within_the_step={}",
+                    point.order_of_the_first_write, point.segment_within_the_step
+                ),
+            };
+        };
+        let writes_in_the_segment = stream.segments[segment_index].len();
+        if writes_in_the_segment != point.persisted_within_the_segment.len() {
+            return BranchResult {
+                attempt,
+                mounts: Vec::new(),
+                cells: Vec::new(),
+                fired_call_ordinal: None,
+                detail: format!(
+                    "not_constructible=segment_length arm_writes_in_the_segment={writes_in_the_segment} registered_writes={}",
+                    point.persisted_within_the_segment.len()
+                ),
+            };
+        }
+        let crash_order = stream.crash_order(segment_index, &point.persisted_within_the_segment);
+        let image = stream.crash_image(segment_index, &point.persisted_within_the_segment);
+        let literal_last = main.ledger.last_confirmed_number_before(crash_order);
+        let rollback_aware_last = main
+            .ledger
+            .last_confirmed_number_before_rollback_aware(crash_order);
+        let crash_read_back = classify_random_read_back(
+            &recover(&image, JournalPolicy::Consult),
+            &main.ledger,
+            literal_last,
+            rollback_aware_last,
+        );
+        let mut devices = plain_devices_of(&image);
+        let parameters = HistoryDeviceWidth::FourGibibytes.parameters();
+        let (mounted, reading) = observed_call(&mut devices, &[], true, |observed| {
+            mount_writable_with_space_admission(
+                &parameters,
+                observed,
+                SpaceAdmission::JudgedByTheFormula,
+            )
+        });
+        let phase = if main
+            .crash_recovery_events
+            .iter()
+            .any(|event| event.order < crash_order)
+        {
+            "after_crash_recovery"
+        } else {
+            "before_first_crash_recovery"
+        };
+        let mount = evaluate_a_random_mount(
+            arm,
+            &main.ledger,
+            &image,
+            crash_order,
+            &attempt,
+            "after_crash",
+            phase,
+            &[],
+            &mounted,
+            &reading,
+        );
+        let after_mount = memory_pool_of(&devices, history_device_bytes());
+        let ledger_of_the_branch = ledger_after_the_mount_of_a_crash_branch(
+            &main.ledger,
+            &image,
+            &after_mount,
+            mounted.is_ok(),
+            &mount,
+        );
+        let after_mount_read_back = classify_random_read_back(
+            &recover(&after_mount, JournalPolicy::Consult),
+            &ledger_of_the_branch,
+            literal_last,
+            rollback_aware_last,
+        );
+        let mounts = vec![mount];
+        let cell = RandomCell {
+            name: format!("{attempt}:crash@{crash_order}"),
+            kind: "crash",
+            order: crash_order,
+            protected: main.ledger.last_confirmation_before(crash_order).cloned(),
+            protected_rollback_aware: rollback_aware_last,
+            mount: Some(0),
+            read_backs: vec![
+                ("crash_read_back".to_string(), crash_read_back.clone()),
+                (
+                    "after_mount_read_back".to_string(),
+                    after_mount_read_back.clone(),
+                ),
+            ],
+            tail_class: "na".to_string(),
+            destination: None,
+        };
+        let loss = evaluate_a_random_cell(
+            &cell,
+            &mounts,
+            &BTreeMap::new(),
+            &image,
+            &after_mount,
+            after_mount_read_back.root,
+        );
+        BranchResult {
+            attempt,
+            mounts,
+            cells: vec![(cell, loss)],
+            fired_call_ordinal: None,
+            detail: format!(
+                "segment_index={segment_index} crash_order={crash_order} persisted={} {} crash_failure={:?} {}",
+                render_persisted(&point.persisted_within_the_segment),
+                crash_read_back.render("crash_read_back"),
+                crash_read_back.failure_debug.clone().unwrap_or_default(),
+                after_mount_read_back.render("after_mount_read_back")
+            ),
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // 13.9 结果行。
+    // ------------------------------------------------------------------------
+
+    fn optional_number_text(number: Option<u64>) -> String {
+        number.map_or("none".to_string(), |value| value.to_string())
+    }
+
+    fn render_random_mount(
+        family: SegmentTwoFamily,
+        label: &str,
+        attempt: &str,
+        arm: FourthRunArm,
+        mount: &RandomMount,
+    ) -> String {
+        let judgement = mount.judgement.as_ref().map_or(
+            "device_judgement=none truth_newer=false".to_string(),
+            render_device_judgement,
+        );
+        let extras = mount.reading.extras.map_or("none".to_string(), |extras| {
+            format!(
+                "{}:{}",
+                extras.reread_rounds_limit, extras.zeroed_journal_ring_slots_are_cached
+            )
+        });
+        format!(
+            "name=r4_random_mount family={} geometry={HARNESS_GEOMETRY_NAME} seed={label} step={} attempt={attempt} arm={} operation={} phase={} duration=W hidden_ranges={} reads_over_hidden_ranges={} base_fingerprint={:016x} {} a_reads_before_first_wait={} a_arm_extras={extras} {judgement} last_confirmed={} last_confirmed_rollback_aware={} e_content={} device_e_content={} q2_rollback={} q2_rollback_rollback_aware={} f6={} s4_findings={:?}",
+            family.name(),
+            mount.step_label,
+            arm.name,
+            mount.operation,
+            mount.phase,
+            mount.hidden_ranges,
+            mount.reading.window.reads_over_hidden_ranges,
+            mount.base_fingerprint,
+            mount.summary.render("a"),
+            optional_number_text(mount.reading.window.reads_before_the_first_wait),
+            mount.literal_last,
+            mount.rollback_aware_last,
+            optional_number_text(mount.effective_content),
+            optional_number_text(mount.device_effective_content),
+            mount.older_version_returned,
+            mount.older_version_returned_rollback_aware,
+            mount
+                .failure_clause_six
+                .map_or("na".to_string(), |holds| holds.to_string()),
+            mount.stop_clause_four_findings
+        )
+    }
+
+    fn render_random_cell(
+        family: SegmentTwoFamily,
+        label: &str,
+        arm: FourthRunArm,
+        cell: &RandomCell,
+        loss: &RandomCellLoss,
+    ) -> String {
+        let read_backs: Vec<String> = cell
+            .read_backs
+            .iter()
+            .map(|(name, read_back)| read_back.render(name))
+            .collect();
+        format!(
+            "name=r4_random_cell family={} geometry={HARNESS_GEOMETRY_NAME} seed={label} arm={} cell={} kind={} order={} protected={} protected_root={} protected_rollback_aware={} q1_in_ring_overwritten={} q1_out_of_ring_overwritten={} q1_landing_overwritten={} overwrite_cell={} q1_first_change={} q2_rollback={} q2_rollback_rollback_aware={} {} q3_lost={} q3_lost_rollback_aware={} q3_last_confirmed={} q3c_tail={} q3c_lost={} lost_write_cell={} lost_write_cell_rollback_aware={} q0_destination={}",
+            family.name(),
+            arm.name,
+            cell.name,
+            cell.kind,
+            cell.order,
+            cell.protected
+                .as_ref()
+                .map_or("none".to_string(), |protected| protected.content_number.to_string()),
+            key_text(cell.protected.as_ref().map(|protected| protected.root)),
+            cell.protected_rollback_aware,
+            loss.in_ring_overwritten,
+            loss.out_of_ring_overwritten,
+            loss.landing_overwritten,
+            loss.overwrite_cell(),
+            render_first_change(loss.first_change),
+            loss.older_version_returned,
+            loss.older_version_returned_rollback_aware,
+            read_backs.join(" "),
+            loss.read_back_lost,
+            loss.read_back_lost_rollback_aware,
+            loss.read_back_last_confirmed,
+            cell.tail_class,
+            loss.broken_root_slots_read_back_lost,
+            loss.lost_write_cell(),
+            loss.lost_write_cell_rollback_aware(),
+            cell.destination.clone().unwrap_or_else(|| "na".to_string())
+        )
+    }
+
+    /// 峰值、为正的次数、期末值（登记 8.1：被谓词消费的量报轨迹）。
+    fn trajectory(values: &[u64]) -> String {
+        format!(
+            "peak{}:positive{}:final{}",
+            values.iter().max().copied().unwrap_or(0),
+            values.iter().filter(|value| **value > 0).count(),
+            values
+                .last()
+                .map_or("none".to_string(), ToString::to_string)
+        )
+    }
+
+    fn render_random_segment(
+        family: SegmentTwoFamily,
+        label: &str,
+        arm: FourthRunArm,
+        executor: &RandomExecutor,
+        branch: &BranchResult,
+        operations: usize,
+    ) -> String {
+        let operation_steps: Vec<&RandomStepRecord> = executor
+            .steps
+            .iter()
+            .filter(|step| step.order >= 1 && step.order <= operations)
+            .collect();
+        let checked: Vec<&RandomStepRecord> = executor
+            .steps
+            .iter()
+            .filter(|step| step.checker.is_some())
+            .collect();
+        let first_red = checked
+            .iter()
+            .find(|step| {
+                step.checker
+                    .as_ref()
+                    .is_some_and(|reading| !reading.red_invariants.is_empty())
+            })
+            .map(|step| step.order);
+        let abandoned_red: Vec<&&RandomStepRecord> = checked
+            .iter()
+            .filter(|step| {
+                step.checker
+                    .as_ref()
+                    .is_some_and(CheckerReading::abandoned_half_is_red)
+            })
+            .collect();
+        let mut named: Vec<TimelineRoot> = Vec::new();
+        for step in &abandoned_red {
+            for root in step
+                .checker
+                .as_ref()
+                .map(|reading| reading.abandoned_roots_named.clone())
+                .unwrap_or_default()
+            {
+                if !named.contains(&root) {
+                    named.push(root);
+                }
+            }
+        }
+        let count_outcomes = |prefix: &str| {
+            operation_steps
+                .iter()
+                .filter(|step| step.outcome.starts_with(prefix))
+                .count()
+        };
+        let abandoned_unreadable: Vec<u64> = branch
+            .mounts
+            .iter()
+            .filter_map(|mount| mount.summary.abandoned_roots_unreadable)
+            .collect();
+        let isolated: Vec<u64> = branch
+            .mounts
+            .iter()
+            .filter_map(|mount| mount.summary.isolated)
+            .collect();
+        let rounds: Vec<u64> = branch
+            .mounts
+            .iter()
+            .filter_map(|mount| {
+                mount
+                    .summary
+                    .observation
+                    .as_ref()
+                    .map(|observation| u64::from(observation.reread_rounds))
+            })
+            .collect();
+        format!(
+            "name=r4_random_segment family={} geometry={HARNESS_GEOMETRY_NAME} seed={label} arm={} attempt={} operations={operations} steps_walked={} tail_run={} stop_at_the_first_checker_red={RANDOM_HISTORIES_STOP_AT_THE_FIRST_CHECKER_RED} stopped_at_the_first_red={} panicked={:?} starting_point_error={:?} crash_recovery_orders={:?} applied={} refused={} not_applicable={} checker_runs={} checker_first_red_order={} checker_first_abandoned_red_order={} checker_abandoned_red_steps={} checker_abandoned_roots_named={:?} mounts={} cells={} abandoned_roots_unreadable={} isolated={} reread_rounds={} {}",
+            family.name(),
+            arm.name,
+            branch.attempt,
+            operation_steps.len(),
+            executor.steps.iter().any(|step| step.operation == "tail"),
+            optional_number_text(executor.stopped_at_the_first_red.map(|order| u64::try_from(order).expect("步"))),
+            executor.panicked,
+            executor.starting_point_error,
+            executor
+                .crash_recovery_events
+                .iter()
+                .map(|event| event.order)
+                .collect::<Vec<_>>(),
+            count_outcomes("applied"),
+            count_outcomes("refused"),
+            count_outcomes("not_applicable"),
+            checked.len(),
+            optional_number_text(first_red.map(|order| u64::try_from(order).expect("步"))),
+            optional_number_text(
+                abandoned_red
+                    .first()
+                    .map(|step| u64::try_from(step.order).expect("步"))
+            ),
+            abandoned_red.len(),
+            named,
+            branch.mounts.len(),
+            branch.cells.len(),
+            trajectory(&abandoned_unreadable),
+            trajectory(&isolated),
+            trajectory(&rounds),
+            branch.detail
+        )
+    }
+
+    fn render_random_step(
+        family: SegmentTwoFamily,
+        label: &str,
+        arm: FourthRunArm,
+        step: &RandomStepRecord,
+    ) -> String {
+        format!(
+            "name=r4_random_step family={} seed={label} arm={} order={} operation={} outcome={:?} fingerprint_after={:016x} checker_red={} abandoned_named={} {}",
+            family.name(),
+            arm.name,
+            step.order,
+            step.operation,
+            step.outcome,
+            step.fingerprint_after,
+            step.checker.as_ref().map_or("not_run".to_string(), |reading| format!(
+                "{:?}",
+                reading.red_invariants
+            )),
+            step.checker.as_ref().map_or("not_run".to_string(), |reading| format!(
+                "{:?}",
+                reading.abandoned_roots_named
+            )),
+            step.read_back
+                .as_ref()
+                .map_or("read_back=none".to_string(), |read_back| read_back.render("read_back"))
+        )
+    }
+
+    /// 一族在一臂上的汇总（Q0–Q3、丢写格；`r4-compare` 把它换成 `r4_loss`）。
+    #[derive(Default)]
+    struct FamilyTally {
+        segments: u64,
+        segments_panicked: u64,
+        cells: u64,
+        lost_write_cells: u64,
+        lost_write_cells_rollback_aware: u64,
+        /// 丢写格的分解（只报数，不改丢写格的算法）：不算 ③c 的；Q1 只算「还在根环里」那一栏、也不算 ③c 的。
+        lost_write_cells_without_the_broken_root_slots_read_back: u64,
+        lost_write_cells_with_in_ring_overwrite_only_and_without_the_broken_root_slots_read_back:
+            u64,
+        overwrite_cells: u64,
+        in_ring_overwrite_cells: u64,
+        out_of_ring_overwrite_cells: u64,
+        overwrite_cells_first_changed_while_the_newest: u64,
+        older_version_returned_cells: u64,
+        older_version_returned_cells_rollback_aware: u64,
+        read_back_lost_cells: u64,
+        read_back_lost_cells_rollback_aware: u64,
+        broken_root_slots_read_back_lost_cells: u64,
+        read_back_last_confirmed_cells: u64,
+        destinations: BTreeMap<String, u64>,
+        lost_write_cells_by_destination: BTreeMap<String, u64>,
+        mounts: u64,
+        classes: BTreeMap<String, u64>,
+        stop_clause_four_mismatches: u64,
+        failure_clause_six_checked: u64,
+        failure_clause_six_failures: u64,
+        branches_not_constructible: u64,
+    }
+
+    impl FamilyTally {
+        fn absorb_branch(&mut self, branch: &BranchResult) {
+            if branch.detail.contains("not_constructible=")
+                || branch.detail.contains("fault_not_reached=true")
+            {
+                self.branches_not_constructible += 1;
+            }
+            for mount in &branch.mounts {
+                self.mounts += 1;
+                *self
+                    .classes
+                    .entry(mount.summary.class.to_string())
+                    .or_insert(0) += 1;
+                self.stop_clause_four_mismatches +=
+                    u64::try_from(mount.stop_clause_four_findings.len()).expect("条数");
+                if let Some(holds) = mount.failure_clause_six {
+                    self.failure_clause_six_checked += 1;
+                    if !holds {
+                        self.failure_clause_six_failures += 1;
+                    }
+                }
+            }
+            for (cell, loss) in &branch.cells {
+                self.cells += 1;
+                let destination = cell
+                    .destination
+                    .clone()
+                    .unwrap_or_else(|| cell.kind.to_string());
+                *self.destinations.entry(destination.clone()).or_insert(0) += 1;
+                if loss.lost_write_cell() {
+                    self.lost_write_cells += 1;
+                    *self
+                        .lost_write_cells_by_destination
+                        .entry(destination)
+                        .or_insert(0) += 1;
+                }
+                if loss.lost_write_cell_rollback_aware() {
+                    self.lost_write_cells_rollback_aware += 1;
+                }
+                if loss.overwrite_cell() || loss.older_version_returned || loss.read_back_lost {
+                    self.lost_write_cells_without_the_broken_root_slots_read_back += 1;
+                }
+                if loss.in_ring_overwritten > 0
+                    || loss.older_version_returned
+                    || loss.read_back_lost
+                {
+                    self.lost_write_cells_with_in_ring_overwrite_only_and_without_the_broken_root_slots_read_back += 1;
+                }
+                if loss.overwrite_cell() {
+                    self.overwrite_cells += 1;
+                    if loss
+                        .first_change
+                        .is_some_and(|change| change.later_confirmations == 0)
+                    {
+                        self.overwrite_cells_first_changed_while_the_newest += 1;
+                    }
+                }
+                if loss.in_ring_overwritten > 0 {
+                    self.in_ring_overwrite_cells += 1;
+                }
+                if loss.out_of_ring_overwritten > 0 {
+                    self.out_of_ring_overwrite_cells += 1;
+                }
+                if loss.older_version_returned {
+                    self.older_version_returned_cells += 1;
+                }
+                if loss.older_version_returned_rollback_aware {
+                    self.older_version_returned_cells_rollback_aware += 1;
+                }
+                if loss.read_back_lost {
+                    self.read_back_lost_cells += 1;
+                }
+                if loss.read_back_lost_rollback_aware {
+                    self.read_back_lost_cells_rollback_aware += 1;
+                }
+                if loss.broken_root_slots_read_back_lost {
+                    self.broken_root_slots_read_back_lost_cells += 1;
+                }
+                if loss.read_back_last_confirmed {
+                    self.read_back_last_confirmed_cells += 1;
+                }
+            }
+        }
+
+        fn render(&self, family: SegmentTwoFamily, arm: FourthRunArm, extra: &str) -> String {
+            format!(
+                "name=r4_random_summary family={} geometry={HARNESS_GEOMETRY_NAME} arm={} segments={} segments_panicked={} cells={} lost_write_cells_q1_q2_q3={} lost_write_cells_rollback_aware={} lost_write_cells_without_q3c={} lost_write_cells_with_q1_in_ring_only_and_without_q3c={} q1_overwrite_cells={} q1_in_ring_overwrite_cells={} q1_out_of_ring_overwrite_cells={} q1_overwrite_cells_first_changed_while_the_newest={} q2_rollback_cells={} q2_rollback_cells_rollback_aware={} q3_lost_cells={} q3_lost_cells_rollback_aware={} q3c_lost_cells={} q3_last_confirmed_cells={} q0_destinations={:?} lost_write_cells_by_destination={:?} tested_mounts={} tested_classes={:?} s4_mismatches={} f6_checked={} f6_failures={} branches_not_constructible={} {extra}",
+                family.name(),
+                arm.name,
+                self.segments,
+                self.segments_panicked,
+                self.cells,
+                self.lost_write_cells,
+                self.lost_write_cells_rollback_aware,
+                self.lost_write_cells_without_the_broken_root_slots_read_back,
+                self.lost_write_cells_with_in_ring_overwrite_only_and_without_the_broken_root_slots_read_back,
+                self.overwrite_cells,
+                self.in_ring_overwrite_cells,
+                self.out_of_ring_overwrite_cells,
+                self.overwrite_cells_first_changed_while_the_newest,
+                self.older_version_returned_cells,
+                self.older_version_returned_cells_rollback_aware,
+                self.read_back_lost_cells,
+                self.read_back_lost_cells_rollback_aware,
+                self.broken_root_slots_read_back_lost_cells,
+                self.read_back_last_confirmed_cells,
+                self.destinations,
+                self.lost_write_cells_by_destination,
+                self.mounts,
+                self.classes,
+                self.stop_clause_four_mismatches,
+                self.failure_clause_six_checked,
+                self.failure_clause_six_failures,
+                self.branches_not_constructible
+            )
+        }
+    }
+
+    fn lines_of_a_branch(
+        family: SegmentTwoFamily,
+        label: &str,
+        arm: FourthRunArm,
+        branch: &BranchResult,
+    ) -> Vec<String> {
+        let mut lines: Vec<String> = branch
+            .mounts
+            .iter()
+            .map(|mount| render_random_mount(family, label, &branch.attempt, arm, mount))
+            .collect();
+        lines.extend(
+            branch
+                .cells
+                .iter()
+                .map(|(cell, loss)| render_random_cell(family, label, arm, cell, loss)),
+        );
+        lines
+    }
+
+    // ------------------------------------------------------------------------
+    // 13.10 PC-随（登记 5.4）：H-随 的 (a) 种子基 + 2、(b) 最短复现、(c) 第 43 行那条，每一臂都跑。
+    // ------------------------------------------------------------------------
+
+    /// PC-随 的三段：`of` 坐标、在 H-随 里的名字。
+    const POSITIVE_CONTROL_RANDOM_SEGMENTS: [(&str, &str); 3] = [
+        ("a", "base+2"),
+        ("b", SHORTEST_REPRODUCTION_LABEL),
+        ("c", ROW_FORTY_THREE_LABEL),
+    ];
+
+    fn first_abandoned_red(executor: &RandomExecutor) -> Option<(usize, Vec<TimelineRoot>)> {
+        executor.steps.iter().find_map(|step| {
+            step.checker
+                .as_ref()
+                .filter(|reading| reading.abandoned_half_is_red())
+                .map(|reading| (step.order, reading.abandoned_roots_named.clone()))
+        })
+    }
+
+    fn checker_ever_named(executor: &RandomExecutor, root: TimelineRoot) -> bool {
+        executor.steps.iter().any(|step| {
+            step.checker
+                .as_ref()
+                .is_some_and(|reading| reading.abandoned_roots_named.contains(&root))
+        })
+    }
+
+    /// 一段 PC-随 在一臂上的句子（每一句的标签与打不中走哪一条见登记 5.4 PC-随 那一行与执行员修订第 12 条的写法）。
+    fn positive_control_random_sentences(
+        arm: FourthRunArm,
+        of: &str,
+        executor: &RandomExecutor,
+        branch: &BranchResult,
+    ) -> (Vec<ControlSentence>, String) {
+        let mut sentences = Vec::new();
+        let event = executor.crash_recovery_events.first();
+        let mount = event.and_then(|event| branch.mounts.get(event.mount_index));
+        let cell = event.and_then(|event| {
+            branch
+                .cells
+                .iter()
+                .find(|(cell, _)| cell.kind == "crash_recovery" && cell.order == event.order)
+        });
+        let first_red = first_abandoned_red(executor);
+        if arm.is_today() {
+            let expected = match of {
+                "a" => Some((
+                    POSITIVE_CONTROL_RANDOM_FIRST_RED_OF_THE_SEED_PLUS_TWO.0,
+                    Some(POSITIVE_CONTROL_RANDOM_FIRST_RED_OF_THE_SEED_PLUS_TWO.1),
+                )),
+                "b" => Some((POSITIVE_CONTROL_RANDOM_FIRST_RED_OF_THE_SHORTEST, None)),
+                "c" => Some((
+                    POSITIVE_CONTROL_RANDOM_FIRST_RED_OF_ROW_FORTY_THREE.0,
+                    Some(POSITIVE_CONTROL_RANDOM_FIRST_RED_OF_ROW_FORTY_THREE.1),
+                )),
+                _ => None,
+            };
+            if let Some((operation_index, root)) = expected {
+                let holds = first_red.as_ref().is_some_and(|(order, named)| {
+                    *order == operation_index + 1 && root.is_none_or(|root| named.contains(&root))
+                });
+                sentences.push(sentence(
+                    SentenceTag::TodayDescription,
+                    "checker_first_abandoned_red_step_and_root",
+                    SentenceVerdict::of(holds),
+                    "F19",
+                ));
+            }
+            if of == "b" || of == "c" {
+                let protected_root = cell
+                    .and_then(|(cell, _)| cell.protected.as_ref().map(|protected| protected.root));
+                let verdict = match (protected_root, cell) {
+                    (Some(root), Some((_, loss))) => SentenceVerdict::conditional(
+                        checker_ever_named(executor, root),
+                        loss.in_ring_overwritten > 0,
+                    ),
+                    (None, _) | (_, None) => SentenceVerdict::NotConstructible,
+                };
+                sentences.push(sentence(
+                    SentenceTag::Measured,
+                    "checker_names_the_protected_root_implies_q1_in_ring",
+                    verdict,
+                    "V1",
+                ));
+            }
+            let verdict = match (mount, cell, event) {
+                (Some(mount), Some((_, loss)), Some(event)) => SentenceVerdict::conditional(
+                    class_is_a_successful_mount(mount.summary.class)
+                        && mount
+                            .device_effective_content
+                            .zip(event.hidden_content_number)
+                            .is_some_and(|(effective, hidden)| effective < hidden),
+                    loss.older_version_returned,
+                ),
+                (None, _, _) | (_, None, _) | (_, _, None) => SentenceVerdict::NotConstructible,
+            };
+            sentences.push(sentence(
+                SentenceTag::Measured,
+                "ok_on_an_older_version_implies_q2_rollback",
+                verdict,
+                "V1",
+            ));
+        } else {
+            match arm.witness {
+                FourthRunWitness::SystemConfiguration
+                | FourthRunWitness::SystemConfigurationCarried => {
+                    let verdict = match mount {
+                        Some(mount) => SentenceVerdict::of(
+                            mount.summary.member == arm.refusal_member()
+                                && mount.summary.writes == 0
+                                && (!arm.rereads()
+                                    || mount.summary.observation.as_ref().is_some_and(
+                                        |observation| {
+                                            u64::from(observation.reread_rounds)
+                                                == arm.reread_rounds
+                                        },
+                                    )),
+                        ),
+                        None => SentenceVerdict::NotConstructible,
+                    };
+                    sentences.push(sentence(
+                        SentenceTag::ArmDefinition,
+                        "refuses_at_the_crash_recovery_step_before_any_write",
+                        verdict,
+                        "F9",
+                    ));
+                }
+                FourthRunWitness::UnreadableRootRingSlot => {
+                    let verdict = match mount {
+                        Some(mount) => {
+                            SentenceVerdict::of(mount.summary.observation.as_ref().is_some_and(
+                                |observation| {
+                                    observation.witness_judged
+                                        && !observation.newer_root_on_the_first_pass
+                                },
+                            ))
+                        }
+                        None => SentenceVerdict::NotConstructible,
+                    };
+                    sentences.push(sentence(
+                        SentenceTag::ArmDefinition,
+                        "slot_witness_false_at_the_crash_recovery_step",
+                        verdict,
+                        "F12",
+                    ));
+                }
+                FourthRunWitness::NotJudged => {}
+            }
+        }
+        let detail = format!(
+            "crash_recovery_order={} first_abandoned_red={} mount_class={} mount_member={} mount_writes={} q1_in_ring={} q2_rollback={}",
+            event.map_or("none".to_string(), |event| event.order.to_string()),
+            first_red.map_or("none".to_string(), |(order, named)| format!("order{order}:{named:?}")),
+            mount.map_or("none", |mount| mount.summary.class),
+            mount.map_or("none".to_string(), |mount| mount.summary.member.clone()),
+            mount.map_or("none".to_string(), |mount| mount.summary.writes.to_string()),
+            cell.map_or("none".to_string(), |(_, loss)| loss.in_ring_overwritten.to_string()),
+            cell.map_or("none".to_string(), |(_, loss)| loss.older_version_returned.to_string())
+        );
+        (sentences, detail)
+    }
+
+    // ------------------------------------------------------------------------
+    // 13.11 各族怎么跑。今天那一臂先跑：与 harness 执行器逐步比、摆注入点与崩溃状态、判 S5a / S5b / S7 / S9，打进它的产物；
+    //       别的臂从今天那一臂的产物读回注入点、崩溃状态与停下的族（环境变量 `SINGLEFS_E158_SEGMENT_TWO_TODAY_PRODUCT`）。
+    // ------------------------------------------------------------------------
+
+    const TODAY_PRODUCT_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_E158_SEGMENT_TWO_TODAY_PRODUCT";
+
+    /// 今天那一臂的产物里别的臂要用的几样。
+    #[derive(Default)]
+    struct TodayPoints {
+        fault_points: Vec<FaultPointKey>,
+        crash_points: BTreeMap<&'static str, Vec<CrashPointKey>>,
+        stopped_families: BTreeSet<String>,
+    }
+
+    fn family_named(name: &str) -> Option<SegmentTwoFamily> {
+        [
+            SegmentTwoFamily::RandomRed,
+            SegmentTwoFamily::RandomAll,
+            SegmentTwoFamily::SeventhFault,
+            SegmentTwoFamily::SeventhCrash,
+            SegmentTwoFamily::EighthCrash,
+        ]
+        .into_iter()
+        .find(|family| family.name() == name)
+    }
+
+    fn read_today_points() -> Result<TodayPoints, String> {
+        let path = env::var(TODAY_PRODUCT_ENVIRONMENT_VARIABLE)
+            .map_err(|_| format!("环境变量 {TODAY_PRODUCT_ENVIRONMENT_VARIABLE} 没给"))?;
+        let text = std::fs::read_to_string(&path).map_err(|error| format!("{path}: {error}"))?;
+        if !text
+            .lines()
+            .last()
+            .is_some_and(|line| line.starts_with("E7RESULT name=done emitted="))
+        {
+            return Err(format!("{path}: 末行不是完成标记"));
+        }
+        let mut points = TodayPoints::default();
+        for line in text.lines().filter(|line| line.starts_with("E7RESULT ")) {
+            let fields = fields_of_a_result_line(line);
+            let text_of = |name: &str| fields.get(name).map_or("", String::as_str);
+            let number_of = |name: &str| text_of(name).parse::<usize>().ok();
+            match text_of("name") {
+                "r4_segment_two_fault_point" => {
+                    let (Some(index), Some(order), Some(fault), Ok(ordinal_within_the_step)) = (
+                        number_of("index"),
+                        number_of("order"),
+                        parse_injected_fault(text_of("fault")),
+                        text_of("ordinal_within_the_step").parse::<u64>(),
+                    ) else {
+                        return Err(format!("注入点那一行读不出：{line}"));
+                    };
+                    points.fault_points.push(FaultPointKey {
+                        index,
+                        fault,
+                        order,
+                        ordinal_within_the_step,
+                    });
+                }
+                "r4_segment_two_crash_point" => {
+                    let (
+                        Some(family),
+                        Some(index),
+                        Some(order_of_the_first_write),
+                        Some(segment_within_the_step),
+                    ) = (
+                        family_named(text_of("family")),
+                        number_of("index"),
+                        number_of("order_of_the_first_write"),
+                        number_of("segment_within_the_step"),
+                    )
+                    else {
+                        return Err(format!("崩溃状态那一行读不出：{line}"));
+                    };
+                    points
+                        .crash_points
+                        .entry(family.name())
+                        .or_default()
+                        .push(CrashPointKey {
+                            index,
+                            order_of_the_first_write,
+                            segment_within_the_step,
+                            persisted_within_the_segment: parse_persisted(text_of("persisted")),
+                        });
+                }
+                "stop" if !text_of("family").is_empty() => {
+                    points
+                        .stopped_families
+                        .insert(text_of("family").to_string());
+                }
+                _ => {}
+            }
+        }
+        Ok(points)
+    }
+
+    /// 一族跑完交回的结果行与停机（停了的族只打停机那几行，别的行不进产物）。
+    struct FamilyRun {
+        lines: Vec<String>,
+        stop: Option<String>,
+    }
+
+    fn emit_family(family: SegmentTwoFamily, run: FamilyRun) {
+        match run.stop {
+            Some(stop) => emit_result(&format!(
+                "name=stop family={} {stop} dropped_result_lines={}",
+                family.name(),
+                run.lines.len()
+            )),
+            None => {
+                for line in &run.lines {
+                    emit_result(line);
+                }
+            }
+        }
+    }
+
+    fn agreement_line(family: SegmentTwoFamily, compared: usize, mismatches: &[String]) -> String {
+        format!(
+            "name=r4_segment_two_executor_agreement family={} compared_steps={compared} mismatches={} verdict={} detail={:?}",
+            family.name(),
+            mismatches.len(),
+            if compared > 0 && mismatches.is_empty() { "pass" } else { "fail" },
+            mismatches.iter().take(5).collect::<Vec<_>>()
+        )
+    }
+
+    fn run_the_random_families(
+        arm: FourthRunArm,
+        family: SegmentTwoFamily,
+        histories: Vec<SegmentTwoHistory>,
+    ) -> FamilyRun {
+        let mut lines = Vec::new();
+        let mut tally = FamilyTally::default();
+        let mut compared = 0usize;
+        let mut mismatches: Vec<String> = Vec::new();
+        let mut segments_without_an_abandoned_red = Vec::new();
+        for segment in &histories {
+            let (executor, branch) = run_the_main_branch(arm, segment);
+            tally.segments += 1;
+            if executor.panicked.is_some() {
+                tally.segments_panicked += 1;
+            }
+            tally.absorb_branch(&branch);
+            if arm.is_today() {
+                let trace = harness_trace(&segment.history);
+                let (steps, segment_mismatches) = executor_agreement(&executor, &trace);
+                compared += steps;
+                mismatches.extend(
+                    segment_mismatches
+                        .into_iter()
+                        .map(|mismatch| format!("{}:{mismatch}", segment.label)),
+                );
+                if family == SegmentTwoFamily::RandomRed {
+                    let harness_red = harness_first_red(&segment.history);
+                    lines.push(format!(
+                        "name=r4_harness_first_red family={} seed={} arm={} harness_first_red_order={} harness_abandoned_named={:?} harness_invariants={:?} device_first_abandoned_red={}",
+                        family.name(),
+                        segment.label,
+                        arm.name,
+                        harness_red.as_ref().map_or("none".to_string(), |(order, _, _)| order.to_string()),
+                        harness_red.as_ref().map(|(_, named, _)| named.clone()).unwrap_or_default(),
+                        harness_red.as_ref().map(|(_, _, invariants)| invariants.clone()).unwrap_or_default(),
+                        first_abandoned_red(&executor).map_or("none".to_string(), |(order, named)| format!("order{order}:{named:?}"))
+                    ));
+                    if segment.label.starts_with("base+")
+                        && first_abandoned_red(&executor).is_none()
+                    {
+                        segments_without_an_abandoned_red.push(segment.label.clone());
+                    }
+                }
+            }
+            lines.push(render_random_segment(
+                family,
+                &segment.label,
+                arm,
+                &executor,
+                &branch,
+                segment.history.operations.len(),
+            ));
+            if family == SegmentTwoFamily::RandomRed {
+                lines.extend(
+                    executor
+                        .steps
+                        .iter()
+                        .map(|step| render_random_step(family, &segment.label, arm, step)),
+                );
+                if let Some((of, _)) = POSITIVE_CONTROL_RANDOM_SEGMENTS
+                    .iter()
+                    .find(|(_, label)| *label == segment.label)
+                {
+                    let (sentences, detail) =
+                        positive_control_random_sentences(arm, of, &executor, &branch);
+                    let fields: Vec<String> = sentences
+                        .iter()
+                        .map(|one| {
+                            format!(
+                                "sentence_{}_{}={}",
+                                one.tag.name(),
+                                one.name,
+                                one.verdict.name()
+                            )
+                        })
+                        .collect();
+                    let routes: Vec<&str> = sentences
+                        .iter()
+                        .filter(|one| {
+                            matches!(
+                                one.verdict,
+                                SentenceVerdict::Fail | SentenceVerdict::NotConstructible
+                            )
+                        })
+                        .map(|one| one.clause)
+                        .collect();
+                    lines.push(format!(
+                        "name=r4_positive_control arm={} control=PC-random of={of} seed={} verdict={} sentences={} {} missed_routes={} {detail}",
+                        arm.name,
+                        segment.label,
+                        overall_verdict(&sentences),
+                        sentences.len(),
+                        fields.join(" "),
+                        if routes.is_empty() { "none".to_string() } else { routes.join(",") }
+                    ));
+                }
+            }
+            if family.measures_lost_writes() {
+                lines.extend(lines_of_a_branch(family, &segment.label, arm, &branch));
+            } else {
+                lines.extend(
+                    branch.mounts.iter().map(|mount| {
+                        render_random_mount(family, &segment.label, "main", arm, mount)
+                    }),
+                );
+            }
+        }
+        if family == SegmentTwoFamily::RandomRed && arm.is_today() {
+            lines.push(format!(
+                "name=r4_failure_clause clause=F19 family={} arm={} segments_without_an_abandoned_red={} labels={:?} verdict={}",
+                family.name(),
+                arm.name,
+                segments_without_an_abandoned_red.len(),
+                segments_without_an_abandoned_red,
+                if segments_without_an_abandoned_red.is_empty() { "not_triggered" } else { "triggered" }
+            ));
+        }
+        let segments_registered_holds = family != SegmentTwoFamily::RandomRed
+            || tally.segments == u64::try_from(RANDOM_HISTORY_SEGMENTS_REGISTERED).expect("段数");
+        lines.push(format!(
+            "name=r4_section_seven_two_anchor arm={} item=\"H-随 实际跑的段数（每臂）\" family={} computed={} registered={} verdict={}",
+            arm.name,
+            family.name(),
+            tally.segments,
+            if family == SegmentTwoFamily::RandomRed { RANDOM_HISTORY_SEGMENTS_REGISTERED.to_string() } else { "na".to_string() },
+            if segments_registered_holds { "pass" } else { "fail" }
+        ));
+        if family.measures_lost_writes() {
+            lines.push(tally.render(family, arm, ""));
+        } else {
+            lines.push(format!(
+                "name=r4_random_all_summary family={} geometry={HARNESS_GEOMETRY_NAME} arm={} segments={} segments_panicked={} tested_mounts={} tested_classes={:?} s4_mismatches={} f6_checked={} f6_failures={}",
+                family.name(),
+                arm.name,
+                tally.segments,
+                tally.segments_panicked,
+                tally.mounts,
+                tally.classes,
+                tally.stop_clause_four_mismatches,
+                tally.failure_clause_six_checked,
+                tally.failure_clause_six_failures
+            ));
+        }
+        let mut stop = None;
+        if arm.is_today() {
+            lines.insert(0, agreement_line(family, compared, &mismatches));
+            if compared == 0 || !mismatches.is_empty() {
+                stop = Some(format!(
+                    "clause=S9 reason=\"装置执行器与 harness 执行器在今天那一臂上对不上\" compared_steps={compared} mismatches={} first_mismatches={:?}",
+                    mismatches.len(),
+                    mismatches.iter().take(3).map(|mismatch| mismatch.replace(' ', "")).collect::<Vec<_>>()
+                ));
+            }
+        }
+        if tally.stop_clause_four_mismatches > 0 && stop.is_none() {
+            stop = Some(format!(
+                "clause=S4 reason=\"7.3 第一二行在这一族的被测挂载上对不上（{} 处）\"",
+                tally.stop_clause_four_mismatches
+            ));
+        }
+        FamilyRun { lines, stop }
+    }
+
+    /// 实七-甲（故障注入）。今天那一臂：harness 在这一份副本上抽 6 个注入点（`inject_faults_into_history`），用 harness 测量跑的调用数
+    /// 换成「步、步内第几次」；S5 按 harness 那一遍与装置这一遍各自复现不复现判。别的臂：从今天那一臂的产物读注入点。
+    fn run_the_seventh_fault_family(arm: FourthRunArm, today_points: &TodayPoints) -> FamilyRun {
+        let family = SegmentTwoFamily::SeventhFault;
+        let segment = seventh_fault_history();
+        let (main, main_branch) = run_the_main_branch(arm, &segment);
+        let mut lines = Vec::new();
+        let mut stop = None;
+        let mut harness_reproduces = false;
+        let points: Vec<FaultPointKey> = if arm.is_today() {
+            let trace = harness_trace(&segment.history);
+            let (compared, mismatches) = executor_agreement(&main, &trace);
+            lines.push(agreement_line(family, compared, &mismatches));
+            if compared == 0 || !mismatches.is_empty() {
+                stop = Some(
+                    "clause=S7 reason=\"装置执行器与 harness 执行器对不上，注入点映不过去\""
+                        .to_string(),
+                );
+            }
+            let injection = inject_faults_into_history(
+                &segment.history,
+                harness_execution(PerStepChecker::Run),
+                SEVENTH_BATCH_FAULT_REPRODUCTION_FAULTS,
+            );
+            harness_reproduces = injection.new_findings.iter().any(|finding| {
+                finding.reopen.contains(&format!(
+                    "MappingStillUnreadable {{ slot: SlotNumber({SEVENTH_BATCH_SIGNATURE_SLOT}) }}"
+                )) && finding.reopen.contains(&format!(
+                    "ModelCheckpointTxg({})",
+                    SEVENTH_BATCH_SIGNATURE_ROOT.1
+                ))
+            });
+            lines.push(format!(
+                "name=r4_harness_signature family={} arm={} harness_reproduces={harness_reproduces} drawn={} new_findings={} findings={:?}",
+                family.name(),
+                arm.name,
+                injection.drawn_faults.len(),
+                injection.new_findings.len(),
+                injection
+                    .new_findings
+                    .iter()
+                    .map(|finding| format!("{}|{}", finding.drawn.render(), finding.reopen))
+                    .collect::<Vec<_>>()
+            ));
+            let mut keys = Vec::new();
+            for (index, drawn) in injection.drawn_faults.iter().enumerate() {
+                let order = match drawn.segment.position() {
+                    StepPosition::StartingPoint => 0,
+                    StepPosition::Operation(step_index) => step_index + 1,
+                };
+                let kind = drawn.fault.call_kind();
+                let calls_before = if order == 0 {
+                    0
+                } else {
+                    trace
+                        .iter()
+                        .find(|(traced, _, _)| *traced == order - 1)
+                        .map_or(0, |(_, _, calls)| calls.of(kind))
+                };
+                let key = FaultPointKey {
+                    index,
+                    fault: drawn.fault,
+                    order,
+                    ordinal_within_the_step: drawn.call_ordinal - calls_before,
+                };
+                lines.push(format!(
+                    "name=r4_segment_two_fault_point family={} index={index} fault={} order={order} ordinal_within_the_step={} harness_call_ordinal={} harness_drawn={:?}",
+                    family.name(),
+                    render_injected_fault(drawn.fault),
+                    key.ordinal_within_the_step,
+                    drawn.call_ordinal,
+                    drawn.render()
+                ));
+                keys.push(key);
+            }
+            keys
+        } else {
+            today_points.fault_points.clone()
+        };
+        lines.push(render_random_segment(
+            family,
+            &segment.label,
+            arm,
+            &main,
+            &main_branch,
+            segment.history.operations.len(),
+        ));
+        lines.extend(
+            main.steps
+                .iter()
+                .map(|step| render_random_step(family, &segment.label, arm, step)),
+        );
+        let mut tally = FamilyTally {
+            segments: 1,
+            ..FamilyTally::default()
+        };
+        tally.absorb_branch(&main_branch);
+        lines.extend(lines_of_a_branch(family, &segment.label, arm, &main_branch));
+        let mut device_reproduces = false;
+        for point in &points {
+            let branch = with_panic_capture(|| run_a_fault_branch(arm, &segment, &main, point))
+                .unwrap_or_else(|panic| BranchResult {
+                    attempt: format!("fault{}", point.index),
+                    mounts: Vec::new(),
+                    cells: Vec::new(),
+                    detail: format!(
+                        "panic={:?}",
+                        format!("{}: {}", panic.location, panic.message)
+                    ),
+                    fired_call_ordinal: None,
+                });
+            device_reproduces = device_reproduces
+                || branch.cells.iter().any(|(cell, _)| {
+                    cell.read_backs.iter().any(|(name, read_back)| {
+                        name == "reopen_read_back"
+                            && read_back.root == Some(SEVENTH_BATCH_SIGNATURE_ROOT)
+                            && read_back.failure_debug.as_ref().is_some_and(|debug| {
+                                debug.contains("MappingStillUnreadable")
+                                    && debug.contains(&format!(
+                                        "SlotNumber({SEVENTH_BATCH_SIGNATURE_SLOT})"
+                                    ))
+                            })
+                    })
+                });
+            lines.push(format!(
+                "name=r4_random_branch family={} seed={} arm={} attempt={} mounts={} cells={} fired_call_ordinal={} {}",
+                family.name(),
+                segment.label,
+                arm.name,
+                branch.attempt,
+                branch.mounts.len(),
+                branch.cells.len(),
+                optional_number_text(branch.fired_call_ordinal),
+                branch.detail
+            ));
+            tally.absorb_branch(&branch);
+            lines.extend(lines_of_a_branch(family, &segment.label, arm, &branch));
+        }
+        lines.push(tally.render(
+            family,
+            arm,
+            &format!("device_reproduces={device_reproduces}"),
+        ));
+        if arm.is_today() {
+            let verdict = stop_clause_five(harness_reproduces, device_reproduces);
+            lines.push(format!(
+                "name=r4_stop_check clause=S5 family={} harness_reproduces={harness_reproduces} device_reproduces={device_reproduces} verdict={verdict}",
+                family.name()
+            ));
+            if verdict == "S5a_stop" && stop.is_none() {
+                stop = Some("clause=S5a reason=\"harness 复现得出、装置在今天那一臂上复现不出实七-甲的签名\"".to_string());
+            }
+        }
+        FamilyRun { lines, stop }
+    }
+
+    /// S5a / S5b（登记 11.2）：harness 复现得出而装置复现不出 ⇒ 停（S5a）；harness 也复现不出 ⇒ 不停，标「底座上复现不出」（S5b）。
+    fn stop_clause_five(harness_reproduces: bool, device_reproduces: bool) -> &'static str {
+        match (harness_reproduces, device_reproduces) {
+            (true, true) => "reproduced",
+            (true, false) => "S5a_stop",
+            (false, true) => "S5b_harness_does_not_reproduce_device_does",
+            (false, false) => "S5b_not_reproduced_on_the_base",
+        }
+    }
+
+    /// 实七-乙、实八（崩溃注入）。今天那一臂：harness 在这一份副本上抽 4 个崩溃状态（`inject_crashes_into_history`），按装置这一遍的录制流
+    /// 换成「第一个写落在哪一步、那一步里第几段、段内持久哪几个」（段号与写数与 harness 那一遍逐个核，对不上走 S7）。
+    fn run_a_crash_family(
+        arm: FourthRunArm,
+        family: SegmentTwoFamily,
+        segment: &SegmentTwoHistory,
+        today_points: &TodayPoints,
+    ) -> FamilyRun {
+        let (main, main_branch) = run_the_main_branch(arm, segment);
+        let stream = segmented_stream_of(&main);
+        let mut lines = Vec::new();
+        let mut stop = None;
+        let mut harness_reproduces = false;
+        let points: Vec<CrashPointKey> = if arm.is_today() {
+            let trace = harness_trace(&segment.history);
+            let (compared, mismatches) = executor_agreement(&main, &trace);
+            lines.push(agreement_line(family, compared, &mismatches));
+            let injection = inject_crashes_into_history(
+                &segment.history,
+                harness_execution(PerStepChecker::Skipped),
+                CrashPointDraw::Sampled {
+                    crash_points_per_history: match family {
+                        SegmentTwoFamily::SeventhCrash => {
+                            SEVENTH_BATCH_CRASH_REPRODUCTION_CRASH_POINTS
+                        }
+                        SegmentTwoFamily::EighthCrash
+                        | SegmentTwoFamily::RandomRed
+                        | SegmentTwoFamily::RandomAll
+                        | SegmentTwoFamily::SeventhFault => {
+                            EIGHTH_BATCH_CRASH_REPRODUCTION_CRASH_POINTS
+                        }
+                    },
+                },
+                None,
+            );
+            harness_reproduces = match family {
+                SegmentTwoFamily::SeventhCrash => injection.new_findings.iter().any(|finding| {
+                    finding.read_back.contains(&format!(
+                        "MappingStillUnreadable {{ slot: SlotNumber({SEVENTH_BATCH_SIGNATURE_SLOT}) }}"
+                    ))
+                }),
+                SegmentTwoFamily::EighthCrash
+                | SegmentTwoFamily::RandomRed
+                | SegmentTwoFamily::RandomAll
+                | SegmentTwoFamily::SeventhFault => harness_first_red(&segment.history)
+                    .is_some_and(|(_, named, _)| named.contains(&EIGHTH_BATCH_SIGNATURE_ROOT)),
+            };
+            lines.push(format!(
+                "name=r4_harness_signature family={} arm={} harness_reproduces={harness_reproduces} crash_points={} new_findings={} findings={:?}",
+                family.name(),
+                arm.name,
+                injection.crash_points.len(),
+                injection.new_findings.len(),
+                injection
+                    .new_findings
+                    .iter()
+                    .map(|finding| format!("{}|{}|{}", finding.crash_point.render(), finding.stage.name(), finding.read_back.chars().take(200).collect::<String>()))
+                    .collect::<Vec<_>>()
+            ));
+            let mut keys = Vec::new();
+            let mut mapping_mismatches = Vec::new();
+            for (index, crash_point) in injection.crash_points.iter().enumerate() {
+                let segment_index = crash_point.segment_index;
+                let harness_order = match crash_point.step {
+                    StepPosition::StartingPoint => 0,
+                    StepPosition::Operation(step_index) => step_index + 1,
+                };
+                let agrees = stream.segments.get(segment_index).is_some_and(|writes| {
+                    writes.len() == crash_point.persisted_within_the_segment.len()
+                }) && stream
+                    .crash_order(segment_index, &crash_point.persisted_within_the_segment)
+                    == harness_order;
+                if !agrees {
+                    mapping_mismatches.push(format!("crash{index}:{}", crash_point.render()));
+                    continue;
+                }
+                let key = CrashPointKey {
+                    index,
+                    order_of_the_first_write: stream.order_of_the_first_write[segment_index],
+                    segment_within_the_step: stream.segment_within_the_step(segment_index),
+                    persisted_within_the_segment: crash_point.persisted_within_the_segment.clone(),
+                };
+                lines.push(format!(
+                    "name=r4_segment_two_crash_point family={} index={index} order_of_the_first_write={} segment_within_the_step={} persisted={} harness_segment_index={segment_index} harness_crash_order={harness_order} harness_point={:?}",
+                    family.name(),
+                    key.order_of_the_first_write,
+                    key.segment_within_the_step,
+                    render_persisted(&key.persisted_within_the_segment),
+                    crash_point.render()
+                ));
+                keys.push(key);
+            }
+            if compared == 0 || !mismatches.is_empty() || !mapping_mismatches.is_empty() {
+                stop = Some(format!(
+                    "clause=S7 reason=\"装置执行器与 harness 执行器对不上，或崩溃状态映不过去\" executor_mismatches={} mapping_mismatches={:?}",
+                    mismatches.len(),
+                    mapping_mismatches
+                ));
+            }
+            keys
+        } else {
+            today_points
+                .crash_points
+                .get(family.name())
+                .cloned()
+                .unwrap_or_default()
+        };
+        lines.push(render_random_segment(
+            family,
+            &segment.label,
+            arm,
+            &main,
+            &main_branch,
+            segment.history.operations.len(),
+        ));
+        lines.extend(
+            main.steps
+                .iter()
+                .map(|step| render_random_step(family, &segment.label, arm, step)),
+        );
+        let mut tally = FamilyTally {
+            segments: 1,
+            ..FamilyTally::default()
+        };
+        tally.absorb_branch(&main_branch);
+        lines.extend(lines_of_a_branch(family, &segment.label, arm, &main_branch));
+        let mut device_reproduces = match family {
+            SegmentTwoFamily::EighthCrash => checker_ever_named(&main, EIGHTH_BATCH_SIGNATURE_ROOT),
+            SegmentTwoFamily::SeventhCrash
+            | SegmentTwoFamily::RandomRed
+            | SegmentTwoFamily::RandomAll
+            | SegmentTwoFamily::SeventhFault => false,
+        };
+        for point in &points {
+            let branch = with_panic_capture(|| run_a_crash_branch(arm, &main, &stream, point))
+                .unwrap_or_else(|panic| BranchResult {
+                    attempt: format!("crash{}", point.index),
+                    mounts: Vec::new(),
+                    cells: Vec::new(),
+                    detail: format!(
+                        "panic={:?}",
+                        format!("{}: {}", panic.location, panic.message)
+                    ),
+                    fired_call_ordinal: None,
+                });
+            if family == SegmentTwoFamily::SeventhCrash {
+                device_reproduces = device_reproduces
+                    || branch.cells.iter().any(|(cell, _)| {
+                        cell.read_backs.iter().any(|(_, read_back)| {
+                            read_back.failure_debug.as_ref().is_some_and(|debug| {
+                                debug.contains("MappingStillUnreadable")
+                                    && debug.contains(&format!(
+                                        "SlotNumber({SEVENTH_BATCH_SIGNATURE_SLOT})"
+                                    ))
+                            })
+                        })
+                    });
+            }
+            lines.push(format!(
+                "name=r4_random_branch family={} seed={} arm={} attempt={} mounts={} cells={} {}",
+                family.name(),
+                segment.label,
+                arm.name,
+                branch.attempt,
+                branch.mounts.len(),
+                branch.cells.len(),
+                branch.detail
+            ));
+            tally.absorb_branch(&branch);
+            lines.extend(lines_of_a_branch(family, &segment.label, arm, &branch));
+        }
+        lines.push(tally.render(
+            family,
+            arm,
+            &format!("device_reproduces={device_reproduces}"),
+        ));
+        if arm.is_today() {
+            let verdict = stop_clause_five(harness_reproduces, device_reproduces);
+            lines.push(format!(
+                "name=r4_stop_check clause=S5 family={} harness_reproduces={harness_reproduces} device_reproduces={device_reproduces} verdict={verdict}",
+                family.name()
+            ));
+            if verdict == "S5a_stop" && stop.is_none() {
+                stop = Some(format!(
+                    "clause=S5a reason=\"harness 复现得出、装置在今天那一臂上复现不出{}的签名\"",
+                    family.name()
+                ));
+            }
+        }
+        FamilyRun { lines, stop }
+    }
+
+    /// 模式 `r4-seg2` 的入口（开跑检查 `run_fourth_run_constants_and_anchors` 已在调用方过了）。
+    pub(super) fn run_segment_two(arm: FourthRunArm) {
+        let report = investigator_report_text();
+        let checks = random_history_source_checks(&report);
+        let mut random_sources_hold = true;
+        for one in &checks {
+            let stops = !one.item.starts_with("5.6");
+            if stops && !one.passed {
+                random_sources_hold = false;
+            }
+            emit_result(&format!(
+                "name=r4_segment_two_check arm={} item=\"{}\" verdict={} stops_the_family={} detail=\"{}\"",
+                arm.name,
+                one.item,
+                if one.passed { "pass" } else { "fail" },
+                stops,
+                one.detail
+            ));
+        }
+        let today_points = if arm.is_today() {
+            TodayPoints::default()
+        } else {
+            match read_today_points() {
+                Ok(points) => points,
+                Err(error) => {
+                    emit_result(&format!(
+                        "name=stop arm={} reason=\"今天那一臂的第二段产物读不出：{error}\"",
+                        arm.name
+                    ));
+                    return;
+                }
+            }
+        };
+        emit_result(&format!(
+            "name=r4_segment_two_start arm={} stop_at_the_first_checker_red={RANDOM_HISTORIES_STOP_AT_THE_FIRST_CHECKER_RED} fault_points_from_today={} crash_points_from_today={} stopped_families_from_today={:?}",
+            arm.name,
+            today_points.fault_points.len(),
+            today_points.crash_points.values().map(Vec::len).sum::<usize>(),
+            today_points.stopped_families
+        ));
+        for family in [
+            SegmentTwoFamily::RandomRed,
+            SegmentTwoFamily::RandomAll,
+            SegmentTwoFamily::SeventhFault,
+            SegmentTwoFamily::SeventhCrash,
+            SegmentTwoFamily::EighthCrash,
+        ] {
+            if today_points.stopped_families.contains(family.name()) {
+                emit_result(&format!(
+                    "name=r4_segment_two_family_skipped family={} arm={} reason=\"今天那一臂的产物里这一族停了\"",
+                    family.name(),
+                    arm.name
+                ));
+                continue;
+            }
+            let random_family = matches!(
+                family,
+                SegmentTwoFamily::RandomRed | SegmentTwoFamily::RandomAll
+            );
+            if random_family && !random_sources_hold {
+                emit_result(&format!(
+                    "name=stop family={} arm={} clause=S9 reason=\"种子或写死的两条历史与调查员报告、测试源码对不上\"",
+                    family.name(),
+                    arm.name
+                ));
+                continue;
+            }
+            let run = match family {
+                SegmentTwoFamily::RandomRed => {
+                    run_the_random_families(arm, family, random_red_histories())
+                }
+                SegmentTwoFamily::RandomAll => {
+                    run_the_random_families(arm, family, random_all_histories())
+                }
+                SegmentTwoFamily::SeventhFault => run_the_seventh_fault_family(arm, &today_points),
+                SegmentTwoFamily::SeventhCrash => {
+                    run_a_crash_family(arm, family, &seventh_crash_history(), &today_points)
+                }
+                SegmentTwoFamily::EighthCrash => {
+                    run_a_crash_family(arm, family, &eighth_crash_history(), &today_points)
+                }
+            };
+            emit_family(family, run);
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        fn today() -> FourthRunArm {
+            fourth_run_arm_named("today").expect("今天那一臂在臂表里")
+        }
+
+        fn row_forty_three() -> SegmentTwoHistory {
+            SegmentTwoHistory {
+                family: SegmentTwoFamily::RandomRed,
+                label: ROW_FORTY_THREE_LABEL.to_string(),
+                history: closeout_row_forty_three_history(),
+            }
+        }
+
+        fn shortest() -> SegmentTwoHistory {
+            SegmentTwoHistory {
+                family: SegmentTwoFamily::RandomRed,
+                label: SHORTEST_REPRODUCTION_LABEL.to_string(),
+                history: shortest_reproduction_history(),
+            }
+        }
+
+        /// 登记 7.2：H-随 (a) 28 个种子、最小 7463871032432355115、最大 7463871032432355205；段数 28 + 1 + 1 = 30；H-随全 68 段。
+        #[test]
+        fn random_history_seeds_and_segment_counts_match_the_registered_values() {
+            let seeds: Vec<u64> = random_red_histories()
+                .iter()
+                .take(RANDOM_HISTORY_RED_SEED_OFFSETS.len())
+                .map(|segment| segment.history.seed.0)
+                .collect();
+            assert_eq!(seeds.len(), 28);
+            assert_eq!(
+                seeds.iter().min(),
+                Some(&RANDOM_HISTORY_RED_SEED_MINIMUM_REGISTERED)
+            );
+            assert_eq!(
+                seeds.iter().max(),
+                Some(&RANDOM_HISTORY_RED_SEED_MAXIMUM_REGISTERED)
+            );
+            assert_eq!(
+                random_red_histories().len(),
+                RANDOM_HISTORY_SEGMENTS_REGISTERED
+            );
+            assert_eq!(random_all_histories().len() + 28, 96);
+            assert!(random_all_histories()
+                .iter()
+                .all(|segment| segment.history.operations.len() == 30));
+        }
+
+        #[test]
+        fn seeds_listed_on_the_investigator_line_are_read_between_the_brackets() {
+            let line = "新发现：第一个种子 7（同签名的种子 [7463871032432355115, 7463871032432355119]），在 Operation(4)";
+            assert_eq!(
+                seeds_listed_on_the_line(line),
+                vec![7_463_871_032_432_355_115, 7_463_871_032_432_355_119]
+            );
+        }
+
+        #[test]
+        fn abandoned_root_named_by_reads_the_instance_and_the_txg() {
+            let detail = "被抛弃的根（实例 1、txg 5）引用的单元已被重新分配或抹头；被抛弃的根（实例 12、txg 340）引用的单元已被重新分配";
+            assert_eq!(abandoned_root_named_by(detail), vec![(1, 5), (12, 340)]);
+            assert!(abandoned_root_named_by("别的违例").is_empty());
+        }
+
+        #[test]
+        fn injected_faults_and_persisted_subsets_round_trip_through_the_result_line() {
+            for fault in [
+                InjectedFault::WriteFails,
+                InjectedFault::WriteIsSwallowed,
+                InjectedFault::ReadFails,
+                InjectedFault::BarrierFails,
+                InjectedFault::BarrierIsSwallowed,
+                InjectedFault::ReadReturnsCorruptedBytes {
+                    flipped_bit: singlefs_harness::fault_injection::FlippedBit {
+                        byte_index: 1_234_567,
+                        bit_index: 5,
+                    },
+                },
+            ] {
+                assert_eq!(
+                    parse_injected_fault(&render_injected_fault(fault)),
+                    Some(fault)
+                );
+            }
+            let persisted = vec![true, false, false, true];
+            assert_eq!(render_persisted(&persisted), "1001");
+            assert_eq!(parse_persisted("1001"), persisted);
+        }
+
+        fn ledger_with_three_confirmations_and_a_rollback() -> RandomLedger {
+            let mut ledger = RandomLedger::after_make_filesystem((0, 1));
+            for (order, content) in [
+                (1usize, b"one".to_vec()),
+                (2, b"two".to_vec()),
+                (3, b"three".to_vec()),
+            ] {
+                let number = ledger.new_content_number(Some(content));
+                ledger.confirmed_numbers.insert(number);
+                let root = (1, 3 + u64::try_from(order).expect("小"));
+                ledger.carry(root, number);
+                ledger.confirmations.push(RandomConfirmation {
+                    order,
+                    content_number: number,
+                    root,
+                    unit_bytes: BTreeMap::new(),
+                });
+            }
+            ledger.carry((1, 8), 1);
+            ledger.rollback_confirmations.push((5, 1, (1, 8)));
+            ledger
+        }
+
+        #[test]
+        fn rollback_aware_reading_takes_the_later_of_the_two_kinds_of_confirmation() {
+            let ledger = ledger_with_three_confirmations_and_a_rollback();
+            assert_eq!(ledger.last_confirmed_number_before(6), 3);
+            assert_eq!(ledger.last_confirmed_number_before_rollback_aware(6), 1);
+            assert_eq!(ledger.last_confirmed_number_before_rollback_aware(5), 3);
+            assert_eq!(ledger.last_confirmed_number_before(2), 1);
+        }
+
+        fn report_landing_on(root: TimelineRoot, content: Option<&[u8]>) -> RecoveryReport {
+            let key = (InstanceGeneration(root.0), CheckpointTxg(root.1));
+            RecoveryReport {
+                outcome: match content {
+                    Some(bytes) => RecoveryOutcome::FileRead {
+                        root: key,
+                        content: bytes.to_vec(),
+                    },
+                    None => RecoveryOutcome::NoFile { root: key },
+                },
+                effective_root: Some(key),
+                journal: singlefs_core::recovery::JournalScanReport::default(),
+                mapping_fallbacks: 0,
+            }
+        }
+
+        #[test]
+        fn read_back_is_classified_by_the_content_number_of_the_landing_root() {
+            let ledger = ledger_with_three_confirmations_and_a_rollback();
+            let newest = classify_random_read_back(
+                &report_landing_on((1, 6), Some(b"three")),
+                &ledger,
+                3,
+                1,
+            );
+            assert_eq!(newest.literal, "last_confirmed");
+            assert_eq!(newest.rollback_aware, "older:3");
+            let rolled_back =
+                classify_random_read_back(&report_landing_on((1, 8), Some(b"one")), &ledger, 3, 1);
+            assert_eq!(rolled_back.literal, "older:1");
+            assert_eq!(rolled_back.rollback_aware, "last_confirmed");
+            assert!(rolled_back.literal_lost());
+            assert!(!rolled_back.rollback_aware_lost());
+            let wrong_bytes =
+                classify_random_read_back(&report_landing_on((1, 6), Some(b"two")), &ledger, 3, 3);
+            assert_eq!(
+                wrong_bytes.literal,
+                "failed:content_differs_from_the_ledger"
+            );
+            let genesis =
+                classify_random_read_back(&report_landing_on((0, 1), None), &ledger, 3, 3);
+            assert_eq!(genesis.literal, "older:0");
+        }
+
+        /// 装置执行器在今天那一臂上与 harness 执行器逐步同一份镜像、同样多的调用（S9 末句、S7 的前提；变异 M35 让藏起来的那几段不再读回全 0）。
+        #[test]
+        fn device_executor_agrees_with_the_harness_executor_on_the_two_written_histories() {
+            for segment in [shortest(), row_forty_three()] {
+                let (executor, _) = run_the_main_branch(today(), &segment);
+                let (compared, mismatches) =
+                    executor_agreement(&executor, &harness_trace(&segment.history));
+                assert!(compared > 0, "{}：harness 一步都没观察到", segment.label);
+                assert!(mismatches.is_empty(), "{}：{mismatches:?}", segment.label);
+            }
+        }
+
+        /// 比对真的看调用数：把 harness 那一份的读数改大一次，就对不上（变异 M34）。
+        #[test]
+        fn executor_agreement_catches_a_different_call_count() {
+            let segment = shortest();
+            let (executor, _) = run_the_main_branch(today(), &segment);
+            let mut trace = harness_trace(&segment.history);
+            trace[1].2.reads += 1;
+            let (_, mismatches) = executor_agreement(&executor, &trace);
+            assert_eq!(mismatches.len(), 1);
+        }
+
+        /// 登记 5.3：这一族判红不截断，第 43 行那条 8 步走完、尾巴跑了（变异 M22 打开「判红就停」）。
+        #[test]
+        fn row_forty_three_walks_every_step_and_runs_the_tail() {
+            let segment = row_forty_three();
+            let (executor, branch) = run_the_main_branch(today(), &segment);
+            let walked = executor
+                .steps
+                .iter()
+                .filter(|step| step.order >= 1 && step.order <= 8)
+                .count();
+            assert_eq!(walked, 8);
+            assert!(executor.steps.iter().any(|step| step.operation == "tail"));
+            assert_eq!(executor.stopped_at_the_first_red, None);
+            assert_eq!(branch.cells.len(), 1, "一次崩溃恢复抛弃根，一格");
+        }
+
+        /// 最短复现、系统配置没见证到被藏的根（崩溃恢复那一步之前每块盘世代号最大的那一槽系统配置清零、不写回，同 `tests/common/mod.rs`
+        /// `abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before`；C554 乙合进 `crates` 之后见证在时崩溃恢复那次挂载拒）：
+        /// 崩溃恢复那次挂载交回 `Ok`、落在没有文件的那一版，Q2 = 1（变异 M36 把更旧写成更新）。
+        #[test]
+        fn shortest_reproduction_with_the_witness_unreadable_returns_the_older_version() {
+            let history = shortest_reproduction_history();
+            let crash_recovery_step = history.operations.len();
+            let mut executor = RandomExecutor::start(
+                today(),
+                history.starting_point,
+                SharedFaultPlan::unarmed(HistoryDeviceWidth::FourGibibytes.fixed_geometry()),
+                false,
+            );
+            executor.run_the_operations(&GeneratedHistory {
+                seed: history.seed,
+                starting_point: history.starting_point,
+                operations: history.operations[..crash_recovery_step - 1].to_vec(),
+            });
+            let image = executor.image();
+            let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES_LOCAL).expect("4096");
+            for (identity, device) in &mut executor.devices {
+                let offset =
+                    crate::tests::newest_system_configuration_slot_offset(&image, *identity);
+                device
+                    .write_at(
+                        DeviceOffsetInBytes(offset),
+                        &vec![0u8; slot_bytes],
+                        WriteDurability::Plain,
+                    )
+                    .expect("清零");
+            }
+            let outcome = executor.apply_operation(
+                crash_recovery_step,
+                crash_recovery_step - 1,
+                &history.operations[crash_recovery_step - 1],
+            );
+            assert!(outcome.starts_with("applied:mounted"), "{outcome}");
+            let mount = executor.mounts.last().expect("崩溃恢复那次挂载记下了");
+            assert_eq!(mount.operation, "crash_recovery");
+            assert_eq!(mount.literal_last, 1);
+            assert_eq!(mount.effective_content, Some(0));
+            assert!(mount.older_version_returned);
+        }
+
+        /// 崩溃镜像：最后一段整段持久 = 全部写都落了盘 = 执行器此刻的镜像；全不持久 = 前面各段（变异 M33 把挑法反过来）。
+        #[test]
+        fn crash_image_applies_exactly_the_persisted_writes_of_the_segment() {
+            let segment = shortest();
+            let mut executor = RandomExecutor::start(
+                today(),
+                segment.history.starting_point,
+                SharedFaultPlan::unarmed(HistoryDeviceWidth::FourGibibytes.fixed_geometry()),
+                false,
+            );
+            executor.run_the_operations(&segment.history);
+            let stream = segmented_stream_of(&executor);
+            let last = stream.segments.len() - 1;
+            let every_write = vec![true; stream.segments[last].len()];
+            assert_eq!(
+                image_fingerprint(&stream.crash_image(last, &every_write)),
+                image_fingerprint(&executor.image())
+            );
+            let no_write = vec![false; stream.segments[last].len()];
+            let mut earlier = MemoryPool::with_devices(
+                &[DeviceIdentity(0), DeviceIdentity(1)],
+                history_device_bytes(),
+            );
+            earlier.apply_writes(&stream.writes[..stream.segments[last][0]]);
+            assert_eq!(
+                image_fingerprint(&stream.crash_image(last, &no_write)),
+                image_fingerprint(&earlier)
+            );
+        }
+
+        /// seg2b 修的装置记账撞键：崩溃分支那次可写挂载写出的根，读回按这次挂载承接的那一版判，不按主路径在同一个 (实例, txg) 上记的那一版判。
+        /// 主路径的账在分支落到的那个键上改记成另一版（照 -配置 各臂实七-乙 `crash0`：主路径第 8 步那次挂载在同一个键上发布过内容号 1），
+        /// 读回仍是最后确认那一版、内容号 0（变异 M39 让读回改回拿主路径的账，M40 让分支写出的根一条都不改记）。
+        #[test]
+        fn crash_branch_read_back_after_its_mount_goes_by_the_roots_that_branch_wrote() {
+            let segment = seventh_crash_history();
+            let (mut main, _) = run_the_main_branch(today(), &segment);
+            let stream = segmented_stream_of(&main);
+            let point = CrashPointKey {
+                index: 0,
+                order_of_the_first_write: 0,
+                segment_within_the_step: 7,
+                persisted_within_the_segment: vec![false],
+            };
+            let after_mount_read_back_of = |branch: &BranchResult| -> RandomReadBack {
+                let (cell, _) = branch.cells.first().expect("一个崩溃状态一格");
+                cell.read_backs
+                    .iter()
+                    .find(|(name, _)| name == "after_mount_read_back")
+                    .map(|(_, read_back)| read_back.clone())
+                    .expect("挂载之后读回了一次")
+            };
+            let untouched =
+                after_mount_read_back_of(&run_a_crash_branch(today(), &main, &stream, &point));
+            assert_eq!(untouched.literal, "last_confirmed");
+            assert_eq!(untouched.content_number, Some(0));
+            let landing = untouched.root.expect("读回落到一条根");
+            let crash_image = stream.crash_image(
+                stream
+                    .find(
+                        point.order_of_the_first_write,
+                        point.segment_within_the_step,
+                    )
+                    .expect("今天那一臂上有这一段"),
+                &point.persisted_within_the_segment,
+            );
+            let roots_in_the_crash_image = independent_geometry(&crash_image)
+                .map(|geometry| readable_roots_independent(&crash_image, &geometry))
+                .expect("崩溃镜像有几何");
+            assert!(
+                !roots_in_the_crash_image.contains(&landing),
+                "落到的根 {landing:?} 是分支那次挂载写出的，崩溃镜像里没有"
+            );
+            let another_version = main
+                .ledger
+                .new_content_number(Some(b"another timeline".to_vec()));
+            main.ledger.carry(landing, another_version);
+            let collided =
+                after_mount_read_back_of(&run_a_crash_branch(today(), &main, &stream, &point));
+            assert_eq!(collided.literal, "last_confirmed");
+            assert_eq!(collided.content_number, Some(0));
+        }
+
+        /// 注入点的映射：「步内第 k 次」换成这一臂整池第（那一步之前的调用数 + k）次（变异 M29 差一）。
+        /// 步取这一臂主路径上第一个至少有两次屏障的那一步（C554 乙合进 `crates` 之后，最短复现第 3 步的崩溃恢复拒了、那一步的屏障不够两次）。
+        #[test]
+        fn fault_point_fires_at_the_arm_ordinal_of_the_named_call_within_the_step() {
+            let segment = shortest();
+            let (main, _) = run_the_main_branch(today(), &segment);
+            let order = (1..main.calls_after_step.len())
+                .find(|order| {
+                    main.calls_after_step[*order].barriers
+                        >= main.calls_after_step[*order - 1].barriers + 2
+                })
+                .expect("最短复现的主路径上有一步至少两次屏障");
+            let point = FaultPointKey {
+                index: 0,
+                fault: InjectedFault::BarrierFails,
+                order,
+                ordinal_within_the_step: 2,
+            };
+            let branch = run_a_fault_branch(today(), &segment, &main, &point);
+            let barriers_before = main.calls_after_step[order - 1].barriers;
+            assert_eq!(branch.fired_call_ordinal, Some(barriers_before + 2));
+        }
     }
 }
 
@@ -11031,6 +22245,9 @@ fn main() {
         return;
     }
     if run_third_run_mode(mode, &command_line_arguments) {
+        return;
+    }
+    if run_fourth_run_mode(mode, &command_line_arguments) {
         return;
     }
 
@@ -11447,6 +22664,45 @@ mod tests {
     use singlefs_core::address::SlotNumber;
     use singlefs_core::pointer::NodePointer;
     use singlefs_core::unit::build_index_node;
+
+    /// 每块盘世代号最大的那一槽系统配置在盘上的偏移（槽字节按装置自己的 `newest_system_configuration_slot_bytes` 挑，再认它在两槽里的哪一槽）。
+    pub(crate) fn newest_system_configuration_slot_offset(
+        pool: &MemoryPool,
+        device: DeviceIdentity,
+    ) -> u64 {
+        let slot_spacing = u64::from(
+            parameters_for(&GEOMETRY_PRIMARY)
+                .geometry
+                .fixed_structure_slot_spacing,
+        );
+        let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES_LOCAL).expect("4096");
+        let newest = newest_system_configuration_slot_bytes(pool, device, slot_spacing)
+            .expect("每块盘都有自证的系统配置槽");
+        [0u64, slot_spacing]
+            .into_iter()
+            .find(|offset| pool.read(device.0, *offset, slot_bytes).as_ref() == Some(&newest))
+            .expect("最新那一槽在两槽之一")
+    }
+
+    /// 崩溃恢复抛弃最新那条根、而系统配置没见证到它（C554 乙合进 `crates` 之后还造得出被抛弃根的只剩这一形：见证在时可写挂载
+    /// 重读一次仍读不出就拒可写，`MountError::NewerStateStillUnreadableAfterOneReread`）。做法同 `tests/common/mod.rs`
+    /// `abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before`：被测那次调用里每块盘世代号最大的那一槽系统配置读回全 0，
+    /// 这次挂载的取号写落回这一槽之后照常读得出。只接在落点表末尾，前面各项的下标不变。
+    fn with_the_witness_unreadable(
+        pool: &MemoryPool,
+        mut ranges: Vec<UnreadableRange>,
+    ) -> Vec<UnreadableRange> {
+        for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+            ranges.push(UnreadableRange {
+                device,
+                offset: newest_system_configuration_slot_offset(pool, device),
+                length: SYSTEM_CONFIGURATION_SLOT_BYTES_LOCAL,
+                form: UnreadableForm::ReadsZeros,
+                label: format!("newest_system_configuration(device={})", device.0),
+            });
+        }
+        ranges
+    }
 
     /// PC-Nw：手写一段假账（两次回退，两段被抛弃根都读得出），不碰 `crates/`，只证计数函数会数到 2。
     #[test]
@@ -12948,36 +24204,43 @@ mod tests {
         let history = closed_history(1);
         let geometry = independent_geometry(&history.pool).expect("几何");
         let parameters = parameters_for(&GEOMETRY_PRIMARY);
-        let both = unreadable_ranges_of_the_abandonment(
-            &history,
-            &geometry,
-            1,
-            UnreadableForm::ReadFails,
-            ReplayBreak::FirstNamedUnit,
-        )
-        .expect("落点")
-        .expect("有点名单元");
+        let both = with_the_witness_unreadable(
+            &history.pool,
+            unreadable_ranges_of_the_abandonment(
+                &history,
+                &geometry,
+                1,
+                UnreadableForm::ReadFails,
+                ReplayBreak::FirstNamedUnit,
+            )
+            .expect("落点")
+            .expect("有点名单元"),
+        );
         let run = run_instrumented_mount_writable(&history.pool, &parameters, &both, None, None);
         assert!(run.intercepted_reads[0] > 0, "根槽拦到了");
         assert!(run.intercepted_reads[1] > 0, "第一份拦到了");
         assert_eq!(run.intercepted_reads[2], 0, "第二份一次都没读");
-        let first = unreadable_ranges_of_the_abandonment(
-            &history,
-            &geometry,
-            1,
-            UnreadableForm::ReadFails,
-            ReplayBreak::FirstCopyOfTheFirstNamedUnit,
-        )
-        .expect("落点")
-        .expect("有点名单元");
-        let run = run_instrumented_mount_writable(&history.pool, &parameters, &first, None, None);
-        let mounted = run.result.as_ref().expect("挂载做成");
+        let first = with_the_witness_unreadable(
+            &history.pool,
+            unreadable_ranges_of_the_abandonment(
+                &history,
+                &geometry,
+                1,
+                UnreadableForm::ReadFails,
+                ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+            )
+            .expect("落点")
+            .expect("有点名单元"),
+        );
+        let first_copy_run =
+            run_instrumented_mount_writable(&history.pool, &parameters, &first, None, None);
+        let mounted = first_copy_run.result.as_ref().expect("挂载做成");
         assert_eq!(
             root_pair(&mounted.output.chosen_root),
             history.timeline[history.timeline.len() - 2]
         );
         assert_eq!(
-            abandoned_roots_on(&run.pool_after).expect("S5 不停"),
+            abandoned_roots_on(&first_copy_run.pool_after).expect("S5 不停"),
             BTreeSet::from([tip_of(&history)]),
             "只坏第一份，最新那条根就被抛弃"
         );
@@ -13000,15 +24263,18 @@ mod tests {
             let (_, tip_record) = landing_root_on(&history.pool).expect("择根");
             let tip_units =
                 placements_referenced_by_root_on(&history.pool, &tip_record).expect("账");
-            let ranges = unreadable_ranges_of_the_abandonment(
-                &history,
-                &geometry,
-                1,
-                UnreadableForm::ReadsZeros,
-                ReplayBreak::FirstCopyOfTheFirstNamedUnit,
-            )
-            .expect("落点")
-            .expect("有点名单元");
+            let ranges = with_the_witness_unreadable(
+                &history.pool,
+                unreadable_ranges_of_the_abandonment(
+                    &history,
+                    &geometry,
+                    1,
+                    UnreadableForm::ReadsZeros,
+                    ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+                )
+                .expect("落点")
+                .expect("有点名单元"),
+            );
             let reference =
                 run_instrumented_mount_writable(&history.pool, &parameters, &ranges, None, None);
             let first_root_write = index_of_the_first_root_slot_write(
@@ -13050,24 +24316,30 @@ mod tests {
         let mut observed = Vec::new();
         for ranges in [
             Vec::new(),
-            unreadable_ranges_of_the_abandonment(
-                &history,
-                &geometry,
-                1,
-                UnreadableForm::ReadFails,
-                ReplayBreak::EveryRecord,
-            )
-            .expect("落点")
-            .expect("有记录"),
-            unreadable_ranges_of_the_abandonment(
-                &history,
-                &geometry,
-                1,
-                UnreadableForm::ReadFails,
-                ReplayBreak::FirstCopyOfTheFirstNamedUnit,
-            )
-            .expect("落点")
-            .expect("有点名单元"),
+            with_the_witness_unreadable(
+                &history.pool,
+                unreadable_ranges_of_the_abandonment(
+                    &history,
+                    &geometry,
+                    1,
+                    UnreadableForm::ReadFails,
+                    ReplayBreak::EveryRecord,
+                )
+                .expect("落点")
+                .expect("有记录"),
+            ),
+            with_the_witness_unreadable(
+                &history.pool,
+                unreadable_ranges_of_the_abandonment(
+                    &history,
+                    &geometry,
+                    1,
+                    UnreadableForm::ReadFails,
+                    ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+                )
+                .expect("落点")
+                .expect("有点名单元"),
+            ),
         ] {
             let run =
                 run_instrumented_mount_writable(&history.pool, &parameters, &ranges, None, None);
@@ -13090,46 +24362,54 @@ mod tests {
         assert_eq!(observed, vec![tip_txg + 1, tip_txg, tip_txg + 1]);
     }
 
-    /// Q1-0 的最小复现（前提 1）：藏最新两条根、断第二新那条的记录，挂载做成、那两条被按新实例表判抛弃（装置与 crates 一致）；
-    /// 只藏一条、断它自己的记录时，新实例第一次发布的 txg 恰与被藏那条相同、落进同一个根槽，被藏那条就不在了（抛弃集合为空）。
+    /// Q1-0 的最小复现（前提 1），系统配置没见证到被藏的最新根（`with_the_witness_unreadable`；C554 乙之后见证只罩最新一次发布之外的，
+    /// 藏两条根时较旧的那一槽系统配置仍见证第二新那条，可写挂载照拒，这一形造不出）：藏最新那条根、只坏它第一条记录点名的第一个单元的第一份，
+    /// 挂载做成、最新那条根被按新实例表判抛弃（装置与 crates 一致）；断它自己的全部记录时，新实例第一次发布的 txg 恰与被藏那条相同、
+    /// 落进同一个根槽，被藏那条就不在了（抛弃集合为空）。
     #[test]
-    fn abandonment_step_produces_abandoned_roots_from_two_hidden_roots_and_none_from_one_with_its_records(
-    ) {
+    fn abandonment_step_abandons_the_hidden_newest_root_unless_the_row_publish_lands_on_its_slot() {
         let parameters = parameters_for(&GEOMETRY_PRIMARY);
         let history = closed_history(1);
         let geometry = independent_geometry(&history.pool).expect("几何");
-        let count = history.timeline.len();
-        let two = unreadable_ranges_of_the_abandonment(
-            &history,
-            &geometry,
-            2,
-            UnreadableForm::ReadFails,
-            ReplayBreak::EveryRecord,
-        )
-        .expect("落点")
-        .expect("有记录");
-        let run = run_instrumented_mount_writable(&history.pool, &parameters, &two, None, None);
+        let unit_broken = with_the_witness_unreadable(
+            &history.pool,
+            unreadable_ranges_of_the_abandonment(
+                &history,
+                &geometry,
+                1,
+                UnreadableForm::ReadFails,
+                ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+            )
+            .expect("落点")
+            .expect("有点名单元"),
+        );
+        let run =
+            run_instrumented_mount_writable(&history.pool, &parameters, &unit_broken, None, None);
         assert!(run.result.is_ok());
         assert_eq!(
             abandoned_roots_on(&run.pool_after).expect("S5 不停"),
-            BTreeSet::from([history.timeline[count - 2], history.timeline[count - 1]])
+            BTreeSet::from([history.tip()])
         );
-        let one = unreadable_ranges_of_the_abandonment(
-            &history,
-            &geometry,
-            1,
-            UnreadableForm::ReadFails,
-            ReplayBreak::EveryRecord,
-        )
-        .expect("落点")
-        .expect("有记录");
-        let run = run_instrumented_mount_writable(&history.pool, &parameters, &one, None, None);
-        let mounted = run.result.as_ref().expect("挂载做成");
+        let one = with_the_witness_unreadable(
+            &history.pool,
+            unreadable_ranges_of_the_abandonment(
+                &history,
+                &geometry,
+                1,
+                UnreadableForm::ReadFails,
+                ReplayBreak::EveryRecord,
+            )
+            .expect("落点")
+            .expect("有记录"),
+        );
+        let one_root_run =
+            run_instrumented_mount_writable(&history.pool, &parameters, &one, None, None);
+        let mounted = one_root_run.result.as_ref().expect("挂载做成");
         assert_eq!(
             mounted.output.row_publish.root().checkpoint_txg.0,
             history.tip().1
         );
-        assert!(abandoned_roots_on(&run.pool_after)
+        assert!(abandoned_roots_on(&one_root_run.pool_after)
             .expect("S5 不停")
             .is_empty());
     }
@@ -13160,10 +24440,55 @@ mod tests {
     }
 
     /// 两条沿用的单测从 H1c 抛弃步造出的节点里挑被抛弃根（跑前登记第一节处理表：「改从 H1c 的 PC1-a 构造取（同一个落点选法）」）。
+    /// 固定次序与挑法同装置的 `abandonment_step_node_list`（n1、c1、b；挂载做成、落点全拦到、按新实例表判出至少一条被抛弃的根），
+    /// 只是系统配置没见证到被藏的根（`with_the_witness_unreadable`）、k 只取 1：C554 乙合进 `crates` 之后，见证在时可写挂载拒，
+    /// 藏两条以上时较旧那一槽仍见证被藏的根，造不出被抛弃的根。n1 取到 6：k = 1 只抛弃一条，抬 F 的上限要第 4 新的非空有效根
+    /// （D16（发布语义） 已定项 1），n1 = 1–3 的节点上上限等于现行 F、抬 F 那一种 op1 没有目标（装置的节点表靠 k = 4 那几格才有目标）。
     fn abandonment_step_nodes() -> Vec<(MemoryPool, BTreeSet<TimelineRoot>)> {
-        abandonment_step_node_list(&GEOMETRY_PRIMARY)
-            .into_iter()
-            .map(|node| (node.pool, node.abandoned))
-            .collect()
+        let parameters = parameters_for(&GEOMETRY_PRIMARY);
+        let mut nodes = Vec::new();
+        for overwrites in 1u64..=6 {
+            for closing in [Closing::ProcessExit, Closing::NormalUnmount] {
+                let mut history = second_run_start(&GEOMETRY_PRIMARY, overwrites).expect("历史");
+                second_run_close(&mut history, &parameters, closing, "node-list", "node-list")
+                    .expect("关闭");
+                let pool_geometry = independent_geometry(&history.pool).expect("几何");
+                for replay_break in [
+                    ReplayBreak::EveryRecord,
+                    ReplayBreak::FirstNamedUnit,
+                    ReplayBreak::FirstCopyOfTheFirstNamedUnit,
+                ] {
+                    let Ok(Some(ranges)) = unreadable_ranges_of_the_abandonment(
+                        &history,
+                        &pool_geometry,
+                        1,
+                        UnreadableForm::ReadFails,
+                        replay_break,
+                    ) else {
+                        continue;
+                    };
+                    let ranges = with_the_witness_unreadable(&history.pool, ranges);
+                    let run = run_instrumented_mount_writable(
+                        &history.pool,
+                        &parameters,
+                        &ranges,
+                        None,
+                        None,
+                    );
+                    if run.result.is_err()
+                        || !unintercepted_ranges(&ranges, &run.intercepted_reads).is_empty()
+                    {
+                        continue;
+                    }
+                    let Ok(abandoned) = abandoned_roots_on(&run.pool_after) else {
+                        continue;
+                    };
+                    if !abandoned.is_empty() {
+                        nodes.push((run.pool_after, abandoned));
+                    }
+                }
+            }
+        }
+        nodes
     }
 }

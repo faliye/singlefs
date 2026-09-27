@@ -81,6 +81,9 @@ pub struct BuiltPool {
     pub output: TransactionOutput,
     pub allocator: PoolAllocator,
     pub mkfs_operation_count: usize,
+    /// 暖机 `warm_up()` 已调完、`publish_first_file()` 还没调时录制流的长度：暖机与第一个事务的分界，
+    /// 不是从流尾往回数几步（里程碑「第二个事务」收尾批「55 号装置步数」）。
+    pub warm_up_operation_count: usize,
 }
 
 impl Drop for BuiltPool {
@@ -385,11 +388,15 @@ pub fn build_pool(tag: &str) -> BuiltPool {
         },
     );
     let content = file_content();
+    let warm_up_operation_count;
     let (warm_up, output) = {
         let mut pool = PoolWriter::new(&parameters, &mut devices);
         let instance = acquire_instance(&mut pool).expect("取号");
         assert_eq!(instance, InstanceGeneration(1));
         let warm_up = warm_up(&mut pool, &genesis.root, instance).expect("暖机");
+        // 暖机已调完、发布还没调：这里就是暖机与第一个事务的分界，不从流尾往回数几步
+        // （里程碑「第二个事务」收尾批「55 号装置步数」）。
+        warm_up_operation_count = stream.operations().len();
         let output = publish_first_file(
             &mut pool,
             &mut allocator,
@@ -413,11 +420,13 @@ pub fn build_pool(tag: &str) -> BuiltPool {
         output,
         allocator,
         mkfs_operation_count,
+        warm_up_operation_count,
     }
 }
 
 /// 崩溃恢复造出一条被抛弃的根（第一轮判决 H6 那一形；D23（journal 的角色与格式） 已定项 14 射程：影子账与按实例表判抛弃留着，
 /// 理由是崩溃恢复）：进程退出之后，`newest`（根环里最新的那条根那一版）的根槽与它的数据单元（两份）暂时读不出（暂存、清零），
+/// 它那次发布之后轮换写的系统配置槽（每块盘一槽）坏掉、系统配置没见证到它（清零、不写回；见证在时 C554 乙拒可写，造不出被抛弃的根），
 /// 重开可写挂载——择根落到它前一条根，它那条记录施加前验点名单元失败、不施加；新实例写行与暖机。再把暂存的字节原样写回：
 /// `newest` 的根又读得出，按新实例的实例表判是被抛弃的。池换成那次挂载交回的分配器与现行版本（要带文件），交回那次挂载——
 /// 它看不见 `newest`，影子账隔离 0；之后的挂载才看得见。
@@ -476,6 +485,46 @@ pub fn abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(
             .expect("清零");
         saved.push((identity, offset, bytes));
     }
+    // 系统配置没见证到 `newest`：C554 乙之后崩溃恢复还抛弃得了最新那条根的只剩这一形（系统配置在根槽 FUA 之后才轮换，D16（发布语义） 已定项 7；
+    // 见证在时可写挂载重读一次仍读不出它就拒可写，`MountError::NewerStateStillUnreadableAfterOneReread`）。`newest` 那次发布之后轮换写的
+    // 系统配置槽（每块盘世代号最大的那一槽，槽号 = 世代号 mod 2）坏掉：每块盘两槽轮换，容得下一槽坏（D22（单元原子性怎么合成） 已定项 8）。
+    // 清零、不写回：这次挂载的取号写正好落回这一槽（世代号取读得出的最大 + 1）。
+    let slot_spacing_in_bytes = u64::from(publish_parameters.geometry.fixed_structure_slot_spacing);
+    let system_configuration_slot_bytes =
+        usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+    let newest_system_configuration_slot_of_each_device: Vec<
+        singlefs_core::address::DeviceOffsetInBytes,
+    > = devices
+        .iter()
+        .map(|(identity, _)| {
+            let newest_generation = singlefs_core::recovery::verified_system_configuration_slots(
+                devices.as_slice(),
+                *identity,
+                slot_spacing_in_bytes,
+                &publish_parameters.filesystem_identifier,
+            )
+            .into_iter()
+            .map(|slot| slot.quantities.slot_generation)
+            .max()
+            .expect("每块盘都有自证过的系统配置");
+            singlefs_core::address::DeviceOffsetInBytes(
+                (newest_generation % singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE)
+                    * slot_spacing_in_bytes,
+            )
+        })
+        .collect();
+    for ((_, device), newest_slot) in devices
+        .iter_mut()
+        .zip(newest_system_configuration_slot_of_each_device)
+    {
+        device
+            .write_at(
+                newest_slot,
+                &vec![0u8; system_configuration_slot_bytes],
+                WriteDurability::Plain,
+            )
+            .expect("见证 newest 的系统配置槽清零");
+    }
     let mounted = singlefs_core::mount::mount_writable(&publish_parameters, &mut devices)
         .expect("最新那条根与它的数据单元读不出：择根落到前一条根，照常可写挂载");
     for (identity, offset, bytes) in &saved {
@@ -493,4 +542,266 @@ pub fn abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(
         .expect("落到的那一版带文件")
         .clone();
     mounted
+}
+
+/// 一段读坏的落点（C554 乙的用例用：暂时读不出的根槽、一次发布点名的单元、实例表那一片）：哪块盘、从哪个字节起、多长，这一段哪几次读坏。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UnreadableRange {
+    pub device: DeviceIdentity,
+    pub offset_in_bytes: u64,
+    pub length_in_bytes: u64,
+    pub failing_reads: FailingReadsOfARange,
+}
+
+impl UnreadableRange {
+    fn overlaps(&self, device: DeviceIdentity, offset_in_bytes: u64, length_in_bytes: u64) -> bool {
+        self.device == device
+            && offset_in_bytes < self.offset_in_bytes + self.length_in_bytes
+            && self.offset_in_bytes < offset_in_bytes + length_in_bytes
+    }
+}
+
+/// 一段在它那块盘上哪几次读坏：按这一段自己被读的次数从 1 数（一次读碰到这一段就算它被读一次）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FailingReadsOfARange {
+    /// 一次都不坏，只数它被读了几次。
+    Never,
+    /// 撤掉之前每次都坏。
+    Every,
+    /// 只有第一次坏，之后照读（只坏一次的瞬时读错）。
+    OnlyTheFirst,
+    /// 第 n 次起每次都坏（之前那几次照读）。
+    FromTheNthOnward(u64),
+}
+
+/// 读坏的那一次交回什么。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnreadableRangeReadBack {
+    /// 块设备报错（`BlockDeviceError::InputOutput`），缓冲区不动。
+    DeviceError,
+    /// 报成功，落在读坏那几段里的字节全是 0（历史执行器「崩溃恢复抛弃根」那一步的造法）；段外的字节照读。
+    Zeros,
+}
+
+/// 读故障在不在：用例的钩子（`mount::BeforeTheOneReread::CallTheTestOnlyHookFirst`）里撤掉，之后每次读都照读。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum UnreadableRangesPresence {
+    InPlace,
+    Lifted,
+}
+
+struct UnreadableRangesState {
+    ranges: Vec<UnreadableRange>,
+    read_back: UnreadableRangeReadBack,
+    presence: UnreadableRangesPresence,
+    /// 与 `ranges` 同序：每一段被读了几次（撤掉之后的读照数）。
+    reads_of_each_range: Vec<u64>,
+    /// 读坏了几次（一次读碰到几段、只要有一段坏，算一次）。
+    failed_reads: u64,
+}
+
+/// 几块盘共用的一份读故障：几段落点、读坏的那一次交回什么、撤没撤，每一段被读了几次。
+#[derive(Clone)]
+pub struct SharedUnreadableRanges(std::rc::Rc<std::cell::RefCell<UnreadableRangesState>>);
+
+impl SharedUnreadableRanges {
+    #[must_use]
+    pub fn new(ranges: Vec<UnreadableRange>, read_back: UnreadableRangeReadBack) -> Self {
+        let range_count = ranges.len();
+        Self(std::rc::Rc::new(std::cell::RefCell::new(
+            UnreadableRangesState {
+                ranges,
+                read_back,
+                presence: UnreadableRangesPresence::InPlace,
+                reads_of_each_range: vec![0; range_count],
+                failed_reads: 0,
+            },
+        )))
+    }
+
+    /// 撤掉读故障：之后每次读都照读（计数照记）。
+    pub fn lift(&self) {
+        self.0.borrow_mut().presence = UnreadableRangesPresence::Lifted;
+    }
+
+    /// 第 `index` 段（按 `new` 交进来的次序）被读了几次。
+    #[must_use]
+    pub fn reads_of_range(&self, index: usize) -> u64 {
+        self.0.borrow().reads_of_each_range[index]
+    }
+
+    /// 读坏了几次。
+    #[must_use]
+    pub fn failed_reads(&self) -> u64 {
+        self.0.borrow().failed_reads
+    }
+
+    /// 记下这一次读碰到的每一段被读了一次，交回这一次读里读坏的那几段（读故障撤了、或碰到的段这一次都不坏时为空）。
+    fn note_a_read(
+        &self,
+        device: DeviceIdentity,
+        offset_in_bytes: u64,
+        length_in_bytes: u64,
+    ) -> Vec<UnreadableRange> {
+        let mut state = self.0.borrow_mut();
+        let UnreadableRangesState {
+            ranges,
+            presence,
+            reads_of_each_range,
+            failed_reads,
+            ..
+        } = &mut *state;
+        let mut failing = Vec::new();
+        for (range, reads_of_this_range) in ranges.iter().zip(reads_of_each_range.iter_mut()) {
+            if !range.overlaps(device, offset_in_bytes, length_in_bytes) {
+                continue;
+            }
+            *reads_of_this_range += 1;
+            let fails_this_time = match range.failing_reads {
+                FailingReadsOfARange::Never => false,
+                FailingReadsOfARange::Every => true,
+                FailingReadsOfARange::OnlyTheFirst => *reads_of_this_range == 1,
+                FailingReadsOfARange::FromTheNthOnward(first_failing) => {
+                    *reads_of_this_range >= first_failing
+                }
+            };
+            if *presence == UnreadableRangesPresence::InPlace && fails_this_time {
+                failing.push(*range);
+            }
+        }
+        if !failing.is_empty() {
+            *failed_reads += 1;
+        }
+        failing
+    }
+
+    fn read_back(&self) -> UnreadableRangeReadBack {
+        self.0.borrow().read_back
+    }
+}
+
+/// 读的时候按 [`SharedUnreadableRanges`] 读坏几段的盘；写、写零、屏障原样交给里面那块盘。
+pub struct DeviceWithUnreadableRanges<Inner: singlefs_core::block_device::BlockDevice> {
+    identity: DeviceIdentity,
+    inner: Inner,
+    ranges: SharedUnreadableRanges,
+}
+
+impl<Inner: singlefs_core::block_device::BlockDevice> singlefs_core::block_device::BlockDevice
+    for DeviceWithUnreadableRanges<Inner>
+{
+    fn read_at(
+        &self,
+        offset: singlefs_core::address::DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), singlefs_core::block_device::BlockDeviceError> {
+        let length_in_bytes = u64::try_from(buffer.len()).expect("一次读的长度装得进 u64");
+        let failing = self
+            .ranges
+            .note_a_read(self.identity, offset.0, length_in_bytes);
+        if failing.is_empty() {
+            return self.inner.read_at(offset, buffer);
+        }
+        match self.ranges.read_back() {
+            UnreadableRangeReadBack::DeviceError => {
+                Err(singlefs_core::block_device::BlockDeviceError::InputOutput(
+                    std::io::Error::other("用例点名的这一段读坏"),
+                ))
+            }
+            UnreadableRangeReadBack::Zeros => {
+                self.inner.read_at(offset, buffer)?;
+                for range in failing {
+                    let start_in_buffer = range.offset_in_bytes.saturating_sub(offset.0);
+                    let end_in_buffer = (range.offset_in_bytes + range.length_in_bytes - offset.0)
+                        .min(length_in_bytes);
+                    buffer[usize::try_from(start_in_buffer).expect("落在缓冲区里")
+                        ..usize::try_from(end_in_buffer).expect("落在缓冲区里")]
+                        .fill(0);
+                }
+                Ok(())
+            }
+        }
+    }
+
+    fn write_at(
+        &mut self,
+        offset: singlefs_core::address::DeviceOffsetInBytes,
+        bytes: &[u8],
+        durability: singlefs_core::block_device::WriteDurability,
+    ) -> Result<(), singlefs_core::block_device::BlockDeviceError> {
+        self.inner.write_at(offset, bytes, durability)
+    }
+
+    fn write_zeroes_at(
+        &mut self,
+        offset: singlefs_core::address::DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<(), singlefs_core::block_device::BlockDeviceError> {
+        self.inner.write_zeroes_at(offset, length)
+    }
+
+    fn barrier(&mut self) -> Result<(), singlefs_core::block_device::BlockDeviceError> {
+        self.inner.barrier()
+    }
+
+    fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
+        self.inner.probe_physical_block_size()
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        self.inner.size_in_bytes()
+    }
+}
+
+/// 把一池盘逐块包上同一份读故障。
+pub fn with_unreadable_ranges<Inner: singlefs_core::block_device::BlockDevice>(
+    devices: Vec<(DeviceIdentity, Inner)>,
+    ranges: &SharedUnreadableRanges,
+) -> Vec<(DeviceIdentity, DeviceWithUnreadableRanges<Inner>)> {
+    devices
+        .into_iter()
+        .map(|(identity, inner)| {
+            (
+                identity,
+                DeviceWithUnreadableRanges {
+                    identity,
+                    inner,
+                    ranges: ranges.clone(),
+                },
+            )
+        })
+        .collect()
+}
+
+/// 拆掉读故障，交回里面那几块盘。
+pub fn without_unreadable_ranges<Inner: singlefs_core::block_device::BlockDevice>(
+    devices: Vec<(DeviceIdentity, DeviceWithUnreadableRanges<Inner>)>,
+) -> Vec<(DeviceIdentity, Inner)> {
+    devices
+        .into_iter()
+        .map(|(identity, device)| (identity, device.inner))
+        .collect()
+}
+
+/// txg 为 `checkpoint_txg` 的那次发布写的根槽（根环落点公式定的区域与槽，那一个区域住的盘），整个根槽一段。
+#[must_use]
+pub fn unreadable_root_slot_of(
+    checkpoint_txg: singlefs_core::address::CheckpointTxg,
+    failing_reads: FailingReadsOfARange,
+) -> UnreadableRange {
+    let publish_parameters = parameters();
+    let target = singlefs_core::root_ring::target_for_publish(
+        checkpoint_txg,
+        publish_parameters.geometry.root_ring_slots_per_region,
+    );
+    UnreadableRange {
+        device: publish_parameters.region_devices[usize::try_from(target.region).expect("区域号")],
+        offset_in_bytes: singlefs_core::root_ring::slot_offset(
+            target,
+            publish_parameters.geometry.fixed_structure_slot_spacing,
+        )
+        .0,
+        length_in_bytes: u64::from(publish_parameters.geometry.physical_block_size),
+        failing_reads,
+    }
 }

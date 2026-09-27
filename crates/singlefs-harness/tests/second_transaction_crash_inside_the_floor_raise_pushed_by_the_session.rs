@@ -25,9 +25,11 @@ use singlefs_harness::layer0_progress::Layer0Resume;
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
-/// 崩在准入推的那一串空发布中间（攻方「崩在准入推空发布的那一串中间」那一形）：会话里数据单元落点取不到的那一刻（单元区 384 槽的小盘，
-/// 崩了再挂之后第 62 次覆盖写，见 `second_transaction_admission_raises_the_floor_before_refusing.rs` 的 `an_admitted_overwrite_whose_data_unit_finds_no_slot_raises_the_floor_and_is_published_in_the_session`；
-/// ckpt_cost 按最坏情况计之后第 18、32、47 次是式子先拒、会话推过再发成，落点那一道第一次走到是第 62 次），
+/// 崩在准入推的那一串空发布中间（攻方「崩在准入推空发布的那一串中间」那一形）：会话里数据单元在段外落不下的那一刻（单元区 384 槽的小盘，
+/// 崩了再挂之后第 62 次覆盖写，见 `second_transaction_admission_raises_the_floor_before_refusing.rs` 的
+/// `an_overwrite_whose_data_unit_has_no_slot_pair_outside_the_cluster_segments_is_refused_by_the_admission_and_published_after_raising_the_floor_in_the_session`；
+/// ckpt_cost 按最坏情况计之后第 18、32、47 次是式子先拒、会话推过再发成，第 62 次是「这次的单元落得下」那一判先拒——C545 用户 2026-09-27 定准入先拒，
+/// 此前那一次是走固定点时落点被拒），
 /// 只录会话推的那一串抬 F（先把新 F 写进每块盘的系统配置、那几次带新 F 的空发布），按层 0 的枚举域（每一段都展开）枚举这条流的每个崩溃状态：
 /// 恢复之后 oracle 与池级 checker 0 违例（枚举器自己判）；再可写挂载（空间准入判着），挂载之后的镜像池级 checker 0 违例；
 /// 挂载全做成。状态数照层 0 的口径另算（系统配置槽写是原地覆写、取三态，[`layer0_state_count_with_torn_in_place_overwrites`]），
@@ -55,7 +57,7 @@ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount
         pool.overwrite(OVERWRITE_BYTES)
             .unwrap_or_else(|refusal| panic!("第 {overwrite_index} 次覆盖写：{refusal:?}"));
     }
-    // 第 62 次：直接调发布路径，数据单元落点被拒（发布路径算定形状时在分配器的拷贝上就取不到，在准入与任何写之前返回）；再照会话被拒之后那一步推一串抬 F
+    // 第 62 次：直接调发布路径，准入先拒（每块盘段外成对的空槽 0 对，走固定点之前「这次的单元落得下」那一判拒，在任何写之前返回）；再照会话被拒之后那一步推一串抬 F
     // （`push_one_floor_raise_within_the_admission_budget`，会话调的就是它），只录这一串。
     let mut session = pool.session.take().expect("这次挂载的会话");
     pool.write_time_seconds += 1;
@@ -77,8 +79,8 @@ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount
         )
     };
     assert!(
-        matches!(refused, Err(PublishError::PlacementRefused { .. })),
-        "第 62 次：数据单元落点被拒：{:?}",
+        matches!(refused, Err(PublishError::SpaceAdmissionRefused(_))),
+        "第 62 次：准入先拒（数据单元在段外落不下）：{:?}",
         refused.as_ref().map(|version| version.root.checkpoint_txg)
     );
     let base = pool.image();

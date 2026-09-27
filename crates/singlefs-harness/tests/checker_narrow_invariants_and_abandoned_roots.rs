@@ -185,7 +185,9 @@ fn verdict_of(image: &dyn ImageReader, invariant: &str) -> InvariantVerdict {
 fn detail_of_the_violation(image: &dyn ImageReader, invariant: &str) -> String {
     match verdict_of(image, invariant) {
         InvariantVerdict::Violated(detail) => detail,
-        other => panic!("{invariant} 该判违例，实际 {other:?}"),
+        other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
+            panic!("{invariant} 该判违例，实际 {other:?}")
+        }
     }
 }
 
@@ -615,7 +617,9 @@ fn an_unreadable_root_ring_slot_leaves_the_abandoned_half_of_the_reuse_invariant
             reason.contains("读不出"),
             "理由要说是根环有读不出的槽：{reason}"
         ),
-        other => panic!("被抛弃根那一半判不了，I-7.4 不许报成立：{other:?}"),
+        other @ (InvariantVerdict::Holds | InvariantVerdict::Violated(_)) => {
+            panic!("被抛弃根那一半判不了，I-7.4 不许报成立：{other:?}")
+        }
     }
 }
 

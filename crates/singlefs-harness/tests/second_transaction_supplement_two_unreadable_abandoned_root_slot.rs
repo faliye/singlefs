@@ -11,8 +11,12 @@
 //! 两条臂只差一个点名集合：不点名（阳性对照，证明这几个槽本来罩得住、而且这层包装自己什么都不改）、
 //! 点名 C 那条根的槽（暴露面）。
 //!
-//! ⚠️ 这一格该是什么样还没有条款（隔离不了要不要拒绝挂载、要不要另立一个计数、要不要按最坏整段隔离），
-//! 用例只钉住今天的行为与暴露面，不钉它该是什么样。
+//! C554 乙（用户 2026-09-27 定：可写挂载读到的样子里有更新的东西读不出就重读一次，仍读不出拒可写）罩不到这一格：判据 N-配置
+//! 只问「系统配置有没有见证过比所选那一版新的发布」，C 比重开时所选的那一版旧，判据为假、不重读（E158 第 3 次跑登记 PC-554 那一句写的就是
+//! 这个结局）。C 也只能是系统配置没见证到的根——见证过的最新根暂时读不出，C554 乙在崩溃恢复那次挂载就拒可写，抛弃不了它
+//! （`common::abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before` 因此让见证它的系统配置槽坏掉）。
+//! ⚠️ 被抛弃根的根槽读不出这一格该是什么样还没有条款（隔离不了要不要拒绝挂载、要不要另立一个计数、要不要按最坏整段隔离），
+//! 用例钉住乙之后照旧的行为与暴露面，不钉它该是什么样。
 mod common;
 
 use common::{
@@ -21,7 +25,10 @@ use common::{
 };
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
 use singlefs_core::allocator::PoolAllocator;
-use singlefs_core::mount::mount_writable;
+use singlefs_core::mount::{
+    mount_writable, NewerPublishWitness, ReadStageSettled, RollbackTarget,
+    SelectedVersionAgainstTheWitness, WitnessedCounterComparison,
+};
 use singlefs_core::root_ring::target_for_publish;
 use singlefs_core::transaction::{publish_overwrite, FirstFile, PoolWriter, TransactionOutput};
 use singlefs_format::UNIT_AREA_START_SLOT;
@@ -80,6 +87,8 @@ struct RemountFacts {
     allocator: PoolAllocator,
     /// 点名的槽上注入了几次：阳性对照恒 0，暴露面 ≥ 1。
     faults_fired: usize,
+    /// 重开那一次挂载的读阶段在哪一遍判完（C554 乙）。
+    read_stage: ReadStageSettled,
     _pool: BuiltPool,
 }
 
@@ -167,6 +176,7 @@ fn remount_after_a_recovery_abandoned_the_third_version(
         instance_table_slot_of_the_second_instance,
         allocator: remounted.allocator,
         faults_fired: plan.fired_count(),
+        read_stage: remounted.output.rereads.read_stage,
         _pool: pool,
     }
 }
@@ -217,11 +227,13 @@ const SLOTS_ONLY_THE_ABANDONED_THIRD_VERSION_REFERENCES: [u64; 14] = [
     50342,
 ];
 
-/// 收口表第 27 行「被抛弃根的根槽读不出时既不隔离也不计数」：一条被抛弃根的根槽持续读不出时，
+/// 收口表第 27 行「被抛弃根的根槽读不出时既不隔离也不计数」，C554 乙之后照旧：一条被抛弃根的根槽持续读不出时，
 /// 只有它引用的那几个槽从隔离集里掉出来（发得出去了），而报出来的读不出计数仍然是 0——
-/// 两半都没人罩，外面看不出少罩了几个槽。被抛弃的根由崩溃恢复造出（C，txg 8），两条臂只差重开那一次点不点名 C 的根槽。
+/// 两半都没人罩，外面看不出少罩了几个槽。被抛弃的根由崩溃恢复造出（C，txg 8，系统配置没见证到它），两条臂只差重开那一次点不点名 C 的根槽。
+/// 重开那一次两条臂的读阶段都在第一遍判完：所选那一版 (3, 10) 就是系统配置见证到的那次发布（jsn 10），C 比它旧，C554 乙不重读。
 #[test]
-fn an_abandoned_root_whose_own_root_slot_is_unreadable_is_neither_isolated_nor_counted() {
+fn an_abandoned_root_older_than_the_version_the_system_configuration_witnessed_is_neither_isolated_nor_counted_when_its_root_slot_is_unreadable(
+) {
     let readable = remount_after_a_recovery_abandoned_the_third_version(
         "unreadable-abandoned-root-slot-readable",
         AbandonedRootSlotReadability::Readable,
@@ -229,6 +241,26 @@ fn an_abandoned_root_whose_own_root_slot_is_unreadable_is_neither_isolated_nor_c
     let unreadable = remount_after_a_recovery_abandoned_the_third_version(
         "unreadable-abandoned-root-slot-unreadable",
         AbandonedRootSlotReadability::UnreadableOnEveryRead,
+    );
+
+    let settled_on_the_first_read = ReadStageSettled::OnTheFirstRead {
+        first_read: SelectedVersionAgainstTheWitness {
+            selected_version: RollbackTarget {
+                instance: InstanceGeneration(3),
+                checkpoint_txg: CheckpointTxg(10),
+            },
+            witness: NewerPublishWitness {
+                witnessed_journal_counter: 10,
+                comparison: WitnessedCounterComparison::AgainstTheSelectedVersionsLastRecord {
+                    selected_version_last_record_counter: 10,
+                },
+            },
+        },
+    };
+    assert_eq!(
+        (readable.read_stage, unreadable.read_stage),
+        (settled_on_the_first_read, settled_on_the_first_read),
+        "两条臂重开时都落到 (3, 10)、系统配置见证到的就是它（jsn 10），C554 乙不重读：C 的根槽读不读得出它都不管"
     );
 
     // 阳性对照：点名集合为空时一次都不注入，这条臂与不包装走的是同一条路。

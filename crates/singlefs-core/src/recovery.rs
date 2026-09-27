@@ -14,8 +14,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use singlefs_format::{
     ACCOUNTING_ENTRY_BYTES, DATA_UNIT_BYTES, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
     INODE_INTERNAL_ENTRY, INODE_RECORD_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT,
-    MAPPING_ENTRY_BYTES, NODE_BYTES, ROOT_RING_REGIONS, SLOT_BYTES,
-    SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
+    MAPPING_ENTRY_BYTES, NODE_BYTES, ROOT_RECORD_BYTES, ROOT_RING_REGIONS, SLOT_BYTES,
+    SYSTEM_CONFIGURATION_SLOT_BYTES,
 };
 
 use crate::address::{
@@ -27,7 +27,8 @@ use crate::allocation_record_tree::{
     AllocationRecordTreeReadFromDisk,
 };
 use crate::allocator::{
-    unit_area_slots_of_device, AllocationRecord, AllocationRecordTreeOfTheVersionWithoutFile,
+    unit_area_slots_of_device_starting_at, AllocationRecord,
+    AllocationRecordTreeOfTheVersionWithoutFile, DeviceEndsBeforeTheUnitAreaStart, UnitAreaStart,
 };
 use crate::block_device::BlockDevice;
 use crate::checksum::crc32_castagnoli;
@@ -43,11 +44,11 @@ use crate::instance_table::{
     InstanceTableChainRecord, InstanceTablePage, InstanceTablePageIndex, InstanceTableRecords,
 };
 use crate::journal::{
-    back_chain_of, record_offset, JournalRecord, JournalRecordOrdinalWithinPublish,
-    JournalRecordPlaceInPublish, FIRST_JOURNAL_COUNTER,
+    back_chain_of, record_offset, slot_after_the_journal_ring, JournalRecord,
+    JournalRecordOrdinalWithinPublish, JournalRecordPlaceInPublish, FIRST_JOURNAL_COUNTER,
 };
 use crate::make_filesystem::TREE_TABLE_KEY_WIDTH;
-use crate::pointer::{DataPointer, LocationEntry, NodePointer};
+use crate::pointer::{location_entries_ascend_by_device, DataPointer, LocationEntry, NodePointer};
 use crate::records::{
     mapping_key_for_data, mapping_key_for_node, parse_inode_internal_entry, parse_mapping_entry,
     AccountingEntry, InodeRecord, TreeTableEntry, STATISTIC_INODE_WATERMARK, TREE_KIND_ACCOUNTING,
@@ -57,7 +58,8 @@ use crate::records::{
 use crate::root_record::{RootRecord, UnmountMarker};
 use crate::root_ring::{region_start, slot_offset, RootRingSlot, RootRingSlotsPerRegionOutOfRange};
 use crate::system_configuration::{
-    journal_in_flight_record_limit, IncompatBitmap, SystemConfiguration,
+    journal_in_flight_record_limit, journal_in_flight_record_limit_fits_its_four_byte_field,
+    unit_area_start_slot_recorded_in_the_slot, IncompatBitmap, SystemConfiguration,
     SystemConfigurationSlotRefusal, SystemImmutableSizes,
 };
 use crate::transaction::{
@@ -67,8 +69,9 @@ use crate::transaction::{
 };
 use crate::unit::{
     data_unit_payload, data_unit_payload_capacity, parse_data_unit, parse_index_node,
-    parse_packed_unit, unit_filesystem_identifier, IndexNodeHeader, PACKED_TYPE_INODE,
-    PACKED_TYPE_INSTANCE_TABLE, UNIT_CLASS_DATA, UNIT_CLASS_INDEX_NODE, UNIT_CLASS_PACKED,
+    parse_packed_unit, unit_filesystem_identifier, IndexNodeHeader, PackedIdentity,
+    PackedUnitHeader, PACKED_TYPE_INODE, PACKED_TYPE_INSTANCE_TABLE, UNIT_CLASS_DATA,
+    UNIT_CLASS_INDEX_NODE, UNIT_CLASS_PACKED,
 };
 use crate::write_accounting::WritesByStructureKind;
 use crate::write_request_split::data_unit_count_of_a_sequential_write;
@@ -184,6 +187,21 @@ pub enum RecoveryFailure {
         device: DeviceIdentity,
         out_of_range: RootRingSlotsPerRegionOutOfRange,
     },
+    /// 系统配置里一个池级不可变字段的值这个读者不收（[`SystemConfigurationValueOutsideWhatThisReaderAccepts`]：格式版本、加密类型、
+    /// 固定结构槽距、`physical_block_size`、journal 环长，代码审阅第 29 条与第 38 条）。这几样都是**盘上读来的值**、不是不变量；
+    /// 与每区槽数 S 越界同一个处置（[`Self::RootRingSlotsPerRegionOutOfRange`]）：池级字段两盘四槽同值，换一槽换一盘读到的还是它 ⇒ 整池拒绝挂载，
+    /// 不退化成「这一槽不可择」。在读系统配置那一步就返回，盘上逐字节不变。`device` 是先读到这一槽的那块盘。
+    SystemConfigurationValueRefused {
+        device: DeviceIdentity,
+        value: SystemConfigurationValueOutsideWhatThisReaderAccepts,
+    },
+    /// 一块盘的完整槽数不到单元区起点（代码审阅第 35 条）：盘的字节数是块设备报的、或崩溃镜像自述的，不是不变量。
+    /// 可写挂载在择系统配置之后、读根环之前逐盘判（[`every_device_reaches_the_unit_area_start`]），盘上逐字节不变；
+    /// 恢复判分配记录落点那一道（`allocation_records_fit_the_pool_geometry`）同样报它，不拿它去减。
+    DeviceEndsBeforeTheUnitAreaStart {
+        device: DeviceIdentity,
+        device_bytes: u64,
+    },
     /// 根环里一条自证过的根都没有。
     NoValidRoot,
     /// 一个单元两条位置条目都读不到校验和相符的那份。
@@ -225,6 +243,18 @@ pub enum RecoveryFailure {
         checkpoint_txg: CheckpointTxg,
         counters: Vec<u64>,
     },
+    /// 算生效的回退下界 F 时（[`effective_rollback_floor_rereading_the_newest_instance_table_once`]），根环里最新那条根指着的实例表
+    /// （按它判哪几条根被抛弃）读不出、解不开，或一条自证过的根都择不到；重读一次（C554 乙的形态，R = 1：立即重读根环与那张表）仍是这样。
+    /// 不按「不按表滤」往下走（那样被抛弃时间线上的根带的 F 也算进生效值，C554 乙报告 Q6）。挂着时抬 F 在动分配器与任何写之前拒这一次抬，
+    /// 盘上逐字节不变。`newest_root_on_the_reread` 是重读那一遍择到的最新那条根（实例代号, checkpoint_txg），一条都没择到时 `None`。
+    InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
+        newest_root_on_the_reread: Option<(InstanceGeneration, CheckpointTxg)>,
+    },
+    /// 读根环时一个根槽读不出（`PoolReader::read` 交回空：设备报错、越界），立即重读一次仍读不出
+    /// （[`readable_roots_rereading_unreadable_root_ring_slots_once`]，C554 乙的形态，R = 1）：那一槽里有没有一条被抛弃的根判不了，
+    /// 不按「没有根」往下走（那样它引用的槽不隔离、也不计进读不出账的被抛弃根，C554 乙报告 Q6）。挂着时抬 F 重算影子账在动分配器与
+    /// 任何写之前拒这一次抬，盘上逐字节不变。读得出、自证不过的槽（从没写过的全 0 槽、校验和不过）不走这一条，照旧当没有根。
+    RootRingSlotStillUnreadableAfterOneReread { ring_slot: RootRingSlot },
 }
 
 /// 恢复的结果：择到的根下面没有文件（第 0 代）、读回文件、或走不下去。`root` 恒是**所选**的那条根。
@@ -470,20 +500,27 @@ impl DataUnitReadThroughTheCentralMapping {
 
 /// 从盘上重建上一版、读一条根的分配记录时用的中央映射树（自举豁免，只按父指针里的位置条目读，D19（块指针的结构与宽度预算） 已定项 8）：
 /// 到第一次有提示读不出、要经映射回退时，或重建走到映射树那一步时才读，读过一次就留着——每个节点的盘上字节连同形状，重建要把字节照抄进上一版。
-/// 多层时整棵读回来（D8（核心索引结构） 已定项 11），按「拼得成一棵树」核（`code_two_tree::CodeTwoTreeHeaderJudgement::OnlyWhatTheShapeNeeds`，
-/// 与重建原来读映射树根那一步同一个口径：解得开就收、不核自描述），冷走读那一份（`CentralMappingTreeReadOnFirstUse`）另核树 ID、
-/// key 宽、出生身份、fsid、层级与区间。不提前读：提示都读得出的镜像上，读序与报错的次序照旧。
+/// 多层时整棵读回来（D8（核心索引结构） 已定项 11），核到哪一步看 `judgement`：从盘上重建上一版照冷走读判全
+/// （`EveryHeaderAgainstItsReference`：树 ID、key 宽、出生身份、fsid、层级、区间与 key 次序，代码审阅第 24 / 33 条），
+/// 读别的根的分配记录（影子账、抬 F 的上限）只按「拼得成一棵树」核（`OnlyWhatTheShapeNeeds`）。
+/// 不提前读：提示都读得出的镜像上，读序与报错的次序照旧。
 struct CentralMappingTreeWithBytesReadOnFirstUse<'reader> {
     reader: &'reader dyn PoolReader,
     root: &'reader RootRecord,
+    judgement: CodeTwoTreeHeaderJudgement,
     tree: OnceCell<CodeTwoTreeReadFromDisk>,
 }
 
 impl<'reader> CentralMappingTreeWithBytesReadOnFirstUse<'reader> {
-    fn new(reader: &'reader dyn PoolReader, root: &'reader RootRecord) -> Self {
+    fn new(
+        reader: &'reader dyn PoolReader,
+        root: &'reader RootRecord,
+        judgement: CodeTwoTreeHeaderJudgement,
+    ) -> Self {
         Self {
             reader,
             root,
+            judgement,
             tree: OnceCell::new(),
         }
     }
@@ -497,7 +534,7 @@ impl<'reader> CentralMappingTreeWithBytesReadOnFirstUse<'reader> {
             &self.root.mapping_root,
             &MultiLevelCodeTwoTree::CentralMapping
                 .read_expectation(self.root.mapping_root.head.birth_tree),
-            CodeTwoTreeHeaderJudgement::OnlyWhatTheShapeNeeds,
+            self.judgement,
             self.root,
             unit_filesystem_identifier(&self.root.filesystem_identifier),
             &mut |pointer: &NodePointer| {
@@ -565,8 +602,163 @@ impl SystemConfigurationSlotReading {
     }
 }
 
-/// 一个槽读回来之后分四路：读不到 / 自证不过 ⇒ 不可择（换一槽换一盘还可以试）；自证得过、incompat 位图不认识 ⇒ 同样不可择、
-/// 另记一笔；自述的每区槽数 S 越界 ⇒ 整池拒绝挂载，把点名的成员交回去；三关都过 ⇒ 可择。
+/// 系统配置里这个读者不收的那一个池级不可变字段与它的值（[`RecoveryFailure::SystemConfigurationValueRefused`]）。封闭集合，`match` 不写通配臂。
+/// 上下界取 mkfs 判几何用的同一组条款（`make_filesystem::check_geometry`），读者这一侧的判法条款没有写，实审 A3a 的报告给了要补的原句。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SystemConfigurationValueOutsideWhatThisReaderAccepts {
+    /// 格式版本不是这个读者写的那一版（`system_configuration::FORMAT_VERSION`）。
+    FormatVersionNotRecognized { format_version: u16 },
+    /// 加密类型不是 0（关）：加密不进第一个可运行版本（D9（加密） 已定项 10），1、2 是登记过的算法、别的码不认识，都不收。
+    EncryptionTypeNotOff { encryption_type: u8 },
+    /// 固定结构槽距落在格式允许的区间之外：不小于 4096、槽 1 整槽落在根环基址之前（与逐档找槽 1 同一个区间，
+    /// [`largest_fixed_structure_slot_spacing_the_format_allows`]）。槽距是根槽宽的上界，这一条先于根槽宽判。
+    FixedStructureSlotSpacingOutsideTheFormatRange { fixed_structure_slot_spacing: u32 },
+    /// `physical_block_size`（根槽宽，D22（单元原子性怎么合成） 已定项 2）装不下根记录（457 字节，已定项 7），或大于固定结构槽距
+    /// （槽 j 在区域起点 + j × 槽距，已定项 16）。读根槽按它开缓冲，不设上界时一个盘上的 4 字节就定得了每一次读的内存。
+    PhysicalBlockSizeOutsideTheRootSlotBounds { physical_block_size: u32 },
+    /// journal 环长装不下 F 条记录（在飞上限 = 环槽数 ÷ F 是 0，D23（journal 的角色与格式） 已定项 18），在飞上限装不进系统配置里它那 4 字节
+    /// （mkfs 的 `JournalInFlightRecordLimitWiderThanItsFourByteField`；不拒的话挂载之后轮换系统配置槽时写这 4 字节那一句 panic），
+    /// 或环的末端越过同一槽记着的单元区起点（偏移 417 的 8 字节；与 checker 同一个判法，C475（非默认环长下单元区起点取编译期常量）之后
+    /// 单元区起点随环长走、不再有编译期的上界）。写记录按它取模，不设界时一个盘上的 8 字节就定得了算术溢不溢出；扫环逐槽列偏移只列到
+    /// 那块盘的末尾（[`scan_journal`]）。
+    JournalRingBytesOutsideTheSupportedRange { journal_ring_bytes: u64 },
+    /// 同一槽记着的单元区起始槽号（偏移 417 的 8 字节）不是环长现算的那个（journal 环末尾的下一个槽，D3（空间分配） 已定项 10 ④
+    /// 「第一版 = journal 环末尾的下一个槽」）：挂载建空闲图、恢复判分配记录落点都按环长现算的起点走（`allocator::UnitAreaStart`，
+    /// 由环长算只有 `journal::slot_after_the_journal_ring` 一处），两个数不一样时按哪一个条款没写，第一版不收。
+    UnitAreaStartNotTheSlotAfterTheJournalRing {
+        recorded_unit_area_start_slot: SlotNumber,
+        slot_after_the_journal_ring: SlotNumber,
+    },
+    /// 单元区起点（环长现算、与偏移 417 那 8 字节相等）不落在 64 槽聚簇段边界上：这样的单元区怎么分段条款没写，第一版不支持
+    /// （`allocator::UnitAreaStart` 的不变量；mkfs 同一格拒成 `UnitAreaStartOffTheClusterSegmentBoundaryUnsupported`）。
+    UnitAreaStartOffTheClusterSegmentBoundaryUnsupported { unit_area_start_slot: SlotNumber },
+}
+
+/// 系统配置槽里格式版本那 2 字节的偏移：紧跟 magic（`system_configuration::SystemConfiguration::to_slot` 的写法）。
+const SYSTEM_CONFIGURATION_FORMAT_VERSION_OFFSET: usize =
+    crate::system_configuration::SYSTEM_CONFIGURATION_MAGIC.len();
+/// 系统配置槽里加密类型那 1 字节的偏移：整槽校验和 32 之后是 MAC 16、nonce 水位 12、KDF 标识 4，再是它（字段表偏移 219）。
+const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET: usize =
+    crate::system_configuration::SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32 + 16 + 12 + 4;
+/// 加密类型登记表里的「关」（未加密，D9（加密） 已定项 10；D22（单元原子性怎么合成） 已定项 17）。
+const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFF: u8 = 0;
+
+/// 格式允许的最大固定结构槽距：槽 1 整槽落在根环基址（区域 0 的起点）之前。逐档找槽 1 与读者判槽距共用这一个上界。
+fn largest_fixed_structure_slot_spacing_the_format_allows() -> u64 {
+    region_start(0).0 - SYSTEM_CONFIGURATION_SLOT_BYTES
+}
+
+/// 一槽自证得过的系统配置，逐个判这个读者收不收它的池级不可变字段（[`SystemConfigurationValueOutsideWhatThisReaderAccepts`] 各成员的出处）。
+/// 次序：格式版本、加密类型、槽距、根槽宽、环长、单元区起点——根槽宽的上界是槽距，所以槽距先判；环末端对单元区起点那一判先于起点是不是
+/// 环长现算的那个，与 checker 的环长判法（`journal_ring_bytes_lie_in_the_supported_range`）报同一格。
+fn system_configuration_values_this_reader_accepts(
+    slot: &[u8],
+    system_configuration: &SystemConfiguration,
+) -> Result<(), SystemConfigurationValueOutsideWhatThisReaderAccepts> {
+    let format_version = u16::from_le_bytes([
+        slot[SYSTEM_CONFIGURATION_FORMAT_VERSION_OFFSET],
+        slot[SYSTEM_CONFIGURATION_FORMAT_VERSION_OFFSET + 1],
+    ]);
+    if format_version != crate::system_configuration::FORMAT_VERSION {
+        return Err(
+            SystemConfigurationValueOutsideWhatThisReaderAccepts::FormatVersionNotRecognized {
+                format_version,
+            },
+        );
+    }
+    let encryption_type = slot[SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET];
+    if encryption_type != SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFF {
+        return Err(
+            SystemConfigurationValueOutsideWhatThisReaderAccepts::EncryptionTypeNotOff {
+                encryption_type,
+            },
+        );
+    }
+    let sizes = &system_configuration.immutable.sizes;
+    let fixed_structure_slot_spacing = u64::from(sizes.fixed_structure_slot_spacing);
+    if fixed_structure_slot_spacing < FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES
+        || fixed_structure_slot_spacing > largest_fixed_structure_slot_spacing_the_format_allows()
+    {
+        return Err(
+            SystemConfigurationValueOutsideWhatThisReaderAccepts::FixedStructureSlotSpacingOutsideTheFormatRange {
+                fixed_structure_slot_spacing: sizes.fixed_structure_slot_spacing,
+            },
+        );
+    }
+    if u64::from(sizes.physical_block_size) < ROOT_RECORD_BYTES
+        || sizes.physical_block_size > sizes.fixed_structure_slot_spacing
+    {
+        return Err(
+            SystemConfigurationValueOutsideWhatThisReaderAccepts::PhysicalBlockSizeOutsideTheRootSlotBounds {
+                physical_block_size: sizes.physical_block_size,
+            },
+        );
+    }
+    let recorded_unit_area_start_slot = unit_area_start_slot_recorded_in_the_slot(slot);
+    // 环末端 = 环起点 + 环长；单元区起点 × 16384。两个都是盘上读来的数：乘加溢出时环末端算越界，起点乘出来溢出时它在任何设备偏移之外。
+    let journal_ring_end_in_bytes =
+        (JOURNAL_RING_START_SLOT * SLOT_BYTES).checked_add(sizes.journal_ring_bytes);
+    let journal_ring_ends_by_the_recorded_unit_area_start =
+        journal_ring_end_in_bytes.is_some_and(|journal_ring_end| {
+            recorded_unit_area_start_slot
+                .0
+                .checked_mul(SLOT_BYTES)
+                .is_none_or(|unit_area_start| journal_ring_end <= unit_area_start)
+        });
+    if journal_in_flight_record_limit(sizes.journal_ring_bytes) == 0
+        || !journal_in_flight_record_limit_fits_its_four_byte_field(sizes.journal_ring_bytes)
+        || !journal_ring_ends_by_the_recorded_unit_area_start
+    {
+        return Err(
+            SystemConfigurationValueOutsideWhatThisReaderAccepts::JournalRingBytesOutsideTheSupportedRange {
+                journal_ring_bytes: sizes.journal_ring_bytes,
+            },
+        );
+    }
+    let slot_after_the_ring = slot_after_the_journal_ring(sizes.journal_ring_bytes);
+    if recorded_unit_area_start_slot != slot_after_the_ring {
+        return Err(
+            SystemConfigurationValueOutsideWhatThisReaderAccepts::UnitAreaStartNotTheSlotAfterTheJournalRing {
+                recorded_unit_area_start_slot,
+                slot_after_the_journal_ring: slot_after_the_ring,
+            },
+        );
+    }
+    UnitAreaStart::following_the_journal_ring(sizes.journal_ring_bytes).map_err(|off_the_boundary| {
+        SystemConfigurationValueOutsideWhatThisReaderAccepts::UnitAreaStartOffTheClusterSegmentBoundaryUnsupported {
+            unit_area_start_slot: off_the_boundary.slot_after_the_journal_ring,
+        }
+    })?;
+    Ok(())
+}
+
+/// 择到的系统配置下的单元区起点：journal 环末尾的下一个槽（`allocator::UnitAreaStart::following_the_journal_ring`）。
+/// 挂载建空闲图、判分配记录与被抛弃根的落点在不在单元区里，都按它（C475（非默认环长下单元区起点取编译期常量），实审 A3b）。
+///
+/// # Panics
+/// 环长算出的起点不在聚簇段边界上：`system_configuration` 必须是 [`choose_system_configuration`] 交回的——择的时候
+/// `system_configuration_values_this_reader_accepts` 判过起点在段边界上、且与槽里偏移 417 那 8 字节相等。
+pub(crate) fn unit_area_start_of_the_chosen_system_configuration(
+    system_configuration: &SystemConfiguration,
+) -> UnitAreaStart {
+    UnitAreaStart::following_the_journal_ring(system_configuration.immutable.sizes.journal_ring_bytes)
+        .expect("择系统配置时 system_configuration_values_this_reader_accepts 判过环长算出的单元区起点在聚簇段边界上")
+}
+
+/// 这个池的单元区起点：先择系统配置（[`choose_system_configuration`]），再按它的环长算。给不带单元区起点的那几个公开入口
+/// （[`rebuild_version`]、[`walk_to_file`]、[`allocation_records_under_root`]、[`allocation_records_of_version_without_file`]）用：
+/// 它们的调用方多是用例与实验装置，手里没有择好的系统配置；挂载与冷走读手里有，走带起点的那一份，不多读系统配置槽。
+///
+/// # Errors
+/// 择不到系统配置（[`choose_system_configuration`] 的各个成员）。
+fn unit_area_start_of_the_pool(reader: &dyn PoolReader) -> Result<UnitAreaStart, RecoveryFailure> {
+    choose_system_configuration(reader).map(|system_configuration| {
+        unit_area_start_of_the_chosen_system_configuration(&system_configuration)
+    })
+}
+
+/// 一个槽读回来之后分五路：读不到 / 自证不过 ⇒ 不可择（换一槽换一盘还可以试）；自证得过、incompat 位图不认识 ⇒ 同样不可择、
+/// 另记一笔；自述的每区槽数 S 越界、或别的池级不可变字段这个读者不收 ⇒ 整池拒绝挂载，把点名的成员交回去；都过 ⇒ 可择。
 ///
 /// 单拎成一个函数是因为 [`choose_system_configuration`] 每块盘要做两次（槽 0、槽 1），
 /// 而两次的分流必须一模一样：其中一次把越界悄悄当成「这一槽不可择」，越界的池就会靠另一槽挂上去。
@@ -578,9 +770,16 @@ fn mountable_slot_or_refusal(
         return Ok(SystemConfigurationSlotReading::NotSelfDescribing);
     };
     match SystemConfiguration::parse_slot(&bytes) {
-        Ok(system_configuration) => Ok(SystemConfigurationSlotReading::Mountable(
-            system_configuration,
-        )),
+        Ok(system_configuration) => {
+            system_configuration_values_this_reader_accepts(&bytes, &system_configuration)
+                .map_err(|value| RecoveryFailure::SystemConfigurationValueRefused {
+                    device,
+                    value,
+                })?;
+            Ok(SystemConfigurationSlotReading::Mountable(
+                system_configuration,
+            ))
+        }
         Err(SystemConfigurationSlotRefusal::NotSelfDescribing) => {
             Ok(SystemConfigurationSlotReading::NotSelfDescribing)
         }
@@ -623,7 +822,7 @@ fn slot_one_found_by_trying_every_slot_spacing_the_format_allows(
     device: DeviceIdentity,
 ) -> Result<SystemConfigurationSlotReading, RecoveryFailure> {
     let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
-    let largest_spacing = region_start(0).0 - SYSTEM_CONFIGURATION_SLOT_BYTES;
+    let largest_spacing = largest_fixed_structure_slot_spacing_the_format_allows();
     let mut highest_generation_found: Option<SystemConfiguration> = None;
     let mut first_slot_with_incompat_bits_not_recognized: Option<IncompatBitmap> = None;
     // 迭代次数的上界是档数（2033）；跨轮带着的是至今世代号最大的那一槽与第一个 incompat 位图，都只换不删。
@@ -972,6 +1171,51 @@ pub fn readable_roots<Reader: PoolReader + ?Sized>(
     roots
 }
 
+/// 同 [`readable_roots`]，而一个根槽读不出（[`BadRootRingSlotReading::Unreadable`]：设备报错、越界）时立即重读那一槽一次
+/// （C554 乙的形态，R = 1；D16（发布语义） 已定项 1「根槽这一次读坏」那一行的「重读一次」），重读读得出就照它算；读得出、自证不过的槽
+/// 照旧当没有根。挂着时抬 F 重算影子账与回收门槛用它（C554 乙报告 Q6：`readable_roots` 把读不出的槽当没有根，那一槽里的被抛弃根
+/// 引用的槽不隔离、也不计进读不出账的被抛弃根）。
+///
+/// # Errors
+/// 某一槽重读仍读不出 ⇒ [`RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread`]（按 [`every_root_ring_slot`] 的次序第一个）。只读盘。
+pub fn readable_roots_rereading_unreadable_root_ring_slots_once<Reader: PoolReader + ?Sized>(
+    reader: &Reader,
+    region_devices: &[DeviceIdentity; 3],
+    immutable_sizes: &SystemImmutableSizes,
+    filesystem_identifier: &[u8; 16],
+) -> Result<Vec<RootRecord>, RecoveryFailure> {
+    let read_the_slot = |ring_slot| {
+        read_root_ring_slot(
+            reader,
+            region_devices,
+            immutable_sizes,
+            filesystem_identifier,
+            ring_slot,
+        )
+    };
+    let mut roots = Vec::new();
+    // 迭代次数的上界是根环槽数 R × S；跨轮只带已认出的根。提前出口只有「重读仍读不出」一个。
+    for ring_slot in every_root_ring_slot(immutable_sizes) {
+        let reading = match read_the_slot(ring_slot) {
+            RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => {
+                read_the_slot(ring_slot)
+            }
+            first_reading @ (RootRingSlotReading::SelfVerified(_)
+            | RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified)) => first_reading,
+        };
+        match reading {
+            RootRingSlotReading::SelfVerified(root) => roots.push(root),
+            RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified) => {}
+            RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => {
+                return Err(RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread {
+                    ring_slot,
+                });
+            }
+        }
+    }
+    Ok(roots)
+}
+
 /// 同 `readable_roots`，每条根带着它读出来的那个根环槽（挂载与抬 F 给分配器建根环那张表用，`allocator::RootRingOccupancy`）。
 #[must_use]
 pub fn readable_roots_with_ring_slots<Reader: PoolReader + ?Sized>(
@@ -1016,6 +1260,9 @@ pub fn root_is_abandoned_by_the_instance_table(
 ///   的槽带的 F 的最大值。
 ///
 /// 两处一条都读不出时 0（mkfs 写的就是 0）。
+///
+/// ⚠️ 那张表读不出时「不按表滤」是无声放过（C554 乙报告 Q6）：可写挂载与挂着时抬 F 不走这一份——可写挂载按重读过的那张表算
+/// （[`effective_rollback_floor_under_the_newest_roots_table`]），抬 F 走 [`effective_rollback_floor_rereading_the_newest_instance_table_once`]。
 #[must_use]
 pub fn effective_rollback_floor<Reader: PoolReader + ?Sized>(
     reader: &Reader,
@@ -1029,17 +1276,120 @@ pub fn effective_rollback_floor<Reader: PoolReader + ?Sized>(
         immutable_sizes,
         filesystem_identifier,
     );
-    let newest_roots_table = roots_with_ring_slots
-        .iter()
-        .map(|(_, root)| root)
-        .max_by_key(|root| (root.checkpoint_txg, root.instance))
-        .and_then(|newest| instance_table_chain_of_root(reader, newest).ok())
+    let newest_roots_table = newest_root_among(&roots_with_ring_slots)
+        .and_then(|newest| instance_table_chain_of_root(reader, &newest).ok())
         .map(|chain| chain.records);
+    effective_rollback_floor_of_the_roots_read(
+        reader,
+        region_devices,
+        immutable_sizes,
+        filesystem_identifier,
+        &roots_with_ring_slots,
+        newest_roots_table.as_ref(),
+    )
+}
+
+/// 生效的回退下界 F（[`effective_rollback_floor`] 同一个算法），判「有效根」用调用方交进来的那张表：调用方已经把根环里最新那条根的实例表
+/// 读出来了（可写挂载重建分配器时读过、读不出重读过一次，`mount` 的 `instance_table_of_the_newest_root_read_at_most_twice`），
+/// 不再读一遍、也就没有「读不出就不按表滤」那一支。
+#[must_use]
+pub fn effective_rollback_floor_under_the_newest_roots_table<Reader: PoolReader + ?Sized>(
+    reader: &Reader,
+    region_devices: &[DeviceIdentity; 3],
+    immutable_sizes: &SystemImmutableSizes,
+    filesystem_identifier: &[u8; 16],
+    newest_roots_table: &InstanceTableRecords,
+) -> CheckpointTxg {
+    let roots_with_ring_slots = readable_roots_with_ring_slots(
+        reader,
+        region_devices,
+        immutable_sizes,
+        filesystem_identifier,
+    );
+    effective_rollback_floor_of_the_roots_read(
+        reader,
+        region_devices,
+        immutable_sizes,
+        filesystem_identifier,
+        &roots_with_ring_slots,
+        Some(newest_roots_table),
+    )
+}
+
+/// 生效的回退下界 F（[`effective_rollback_floor`] 同一个算法），根环里最新那条根的实例表这一次读不出、解不开（或一条自证过的根都择不到）时
+/// 立即重读一次根环与那张表（C554 乙的形态，R = 1；D16（发布语义） 已定项 1「重读一次」），仍是这样就报错，不按「不按表滤」往下走。
+///
+/// # Errors
+/// 重读仍读不出 ⇒ [`RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread`]。只读盘、不写盘。
+pub fn effective_rollback_floor_rereading_the_newest_instance_table_once<
+    Reader: PoolReader + ?Sized,
+>(
+    reader: &Reader,
+    region_devices: &[DeviceIdentity; 3],
+    immutable_sizes: &SystemImmutableSizes,
+    filesystem_identifier: &[u8; 16],
+) -> Result<CheckpointTxg, RecoveryFailure> {
+    // 读一遍根环、择最新那条根、沿链读它的实例表：第一次读与重读一次走同一段。
+    let read_the_ring_and_the_newest_roots_table = || {
+        let roots_with_ring_slots = readable_roots_with_ring_slots(
+            reader,
+            region_devices,
+            immutable_sizes,
+            filesystem_identifier,
+        );
+        let newest = newest_root_among(&roots_with_ring_slots);
+        let newest_roots_table = newest
+            .and_then(|newest| instance_table_chain_of_root(reader, &newest).ok())
+            .map(|chain| chain.records);
+        (roots_with_ring_slots, newest, newest_roots_table)
+    };
+    let floor_under = |roots_with_ring_slots: &[(RootRingSlot, RootRecord)],
+                       table: &InstanceTableRecords| {
+        effective_rollback_floor_of_the_roots_read(
+            reader,
+            region_devices,
+            immutable_sizes,
+            filesystem_identifier,
+            roots_with_ring_slots,
+            Some(table),
+        )
+    };
+    if let (roots_with_ring_slots, _, Some(table)) = read_the_ring_and_the_newest_roots_table() {
+        return Ok(floor_under(&roots_with_ring_slots, &table));
+    }
+    match read_the_ring_and_the_newest_roots_table() {
+        (roots_with_ring_slots, _, Some(table)) => Ok(floor_under(&roots_with_ring_slots, &table)),
+        (_, newest_on_the_reread, None) => Err(
+            RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
+                newest_root_on_the_reread: newest_on_the_reread
+                    .map(|root| (root.instance, root.checkpoint_txg)),
+            },
+        ),
+    }
+}
+
+/// 读出来的根里 (checkpoint_txg, 实例代号) 最大的那一条（与 [`choose_root`] 同一个择法）；一条都没有时 `None`。
+fn newest_root_among(roots_with_ring_slots: &[(RootRingSlot, RootRecord)]) -> Option<RootRecord> {
+    roots_with_ring_slots
+        .iter()
+        .map(|(_, root)| *root)
+        .max_by_key(|root| (root.checkpoint_txg, root.instance))
+}
+
+/// 生效的回退下界 F 的算法本身（[`effective_rollback_floor`] 的文档），根环已经读过、判「有效根」的那张表已经读过（读不出时 `None`：
+/// 不按表滤，只有 [`effective_rollback_floor`] 那一份这样传）。
+fn effective_rollback_floor_of_the_roots_read<Reader: PoolReader + ?Sized>(
+    reader: &Reader,
+    region_devices: &[DeviceIdentity; 3],
+    immutable_sizes: &SystemImmutableSizes,
+    filesystem_identifier: &[u8; 16],
+    roots_with_ring_slots: &[(RootRingSlot, RootRecord)],
+    newest_roots_table: Option<&InstanceTableRecords>,
+) -> CheckpointTxg {
     let mut newest_valid_root_on_each_device: BTreeMap<DeviceIdentity, RootRecord> =
         BTreeMap::new();
-    for (ring_slot, root) in &roots_with_ring_slots {
+    for (ring_slot, root) in roots_with_ring_slots {
         if newest_roots_table
-            .as_ref()
             .is_some_and(|table| root_is_abandoned_by_the_instance_table(root, table))
         {
             continue;
@@ -1089,36 +1439,28 @@ pub fn effective_rollback_floor<Reader: PoolReader + ?Sized>(
 /// 槽号在单元区起点之下（R6，`DeviceFreeMap::index` 的减法）、跨度越过单元区末尾与同一块盘上两条记录罩住同一个槽
 /// （R6 / R8，`mark_allocated` 的两条断言）。
 ///
-/// 单元区槽数只有 [`crate::allocator::unit_area_slots_of_device`] 一处定义，分配器的位图长度读的也是它。
+/// 单元区槽数只有 [`crate::allocator::unit_area_slots_of_device_starting_at`] 一处定义，分配器的位图长度读的也是它。
+/// 前三样逐条走 [`placement_lies_in_the_unit_area_of_its_device`]；mkfs 那一版的两个单元进分配器之前也走这一道
+/// （`mount::format_time_allocator`，代码审阅第 32 条）。
 ///
 /// # Errors
-/// 四样里任一样不成立 ⇒ [`RecoveryFailure::AllocationRecordOutsideThePoolGeometry`]，`what` 说清是哪一样。
-fn allocation_records_fit_the_pool_geometry(
+/// 四样里任一样不成立 ⇒ [`RecoveryFailure::AllocationRecordOutsideThePoolGeometry`]，`what` 说清是哪一样；
+/// 记录所在那块盘末尾在单元区起点之前 ⇒ [`RecoveryFailure::DeviceEndsBeforeTheUnitAreaStart`]。
+pub(crate) fn allocation_records_fit_the_pool_geometry(
     reader: &dyn PoolReader,
+    unit_area_start: UnitAreaStart,
     records: &[AllocationRecord],
 ) -> Result<(), RecoveryFailure> {
     let mut covered_slots: BTreeSet<(DeviceIdentity, u64)> = BTreeSet::new();
     for record in records {
-        // 「这块盘在不在池里」只这一处判：`PoolReader::device_size_in_bytes` 对池外的盘交 `None`
-        // （每个实现都从 `device_identities` 那张表里找），另写一句 `device_identities().contains(…)`
-        // 是同一条判定的第二份手抄，两份会分叉（`code-discipline.md`「重复要生成，不许手抄」）。
-        let device_bytes = reader.device_size_in_bytes(record.device).ok_or(
-            RecoveryFailure::AllocationRecordOutsideThePoolGeometry {
-                what: "分配记录的设备身份不在池里",
-            },
-        )?;
-        if record.slot.0 < UNIT_AREA_START_SLOT {
-            return Err(RecoveryFailure::AllocationRecordOutsideThePoolGeometry {
-                what: "分配记录的槽号落在单元区起点之下",
-            });
-        }
-        let unit_area_end_slot = UNIT_AREA_START_SLOT + unit_area_slots_of_device(device_bytes);
         let span = u64::from(record.span_slots);
-        if record.slot.0 + span > unit_area_end_slot {
-            return Err(RecoveryFailure::AllocationRecordOutsideThePoolGeometry {
-                what: "分配记录的跨度越过单元区末尾",
-            });
-        }
+        placement_lies_in_the_unit_area_of_its_device(
+            reader,
+            unit_area_start,
+            record.device,
+            record.slot,
+            span,
+        )?;
         for slot in record.slot.0..record.slot.0 + span {
             if !covered_slots.insert((record.device, slot)) {
                 return Err(RecoveryFailure::AllocationRecordOutsideThePoolGeometry {
@@ -1126,6 +1468,75 @@ fn allocation_records_fit_the_pool_geometry(
                 });
             }
         }
+    }
+    Ok(())
+}
+
+/// 盘上读来的一个落点 `(device, [slot, slot + span))` 落不落在那块盘的单元区里（单元区从 `unit_area_start` 起：择到的系统配置按环长现算的那个，
+/// [`unit_area_start_of_the_chosen_system_configuration`]）：设备身份在池里、槽号不在单元区起点之下、跨度不越过单元区末尾
+/// （[`allocation_records_fit_the_pool_geometry`] 逐条记录判的前三样；影子账拿被抛弃根的指针槽号进分配器之前也走这一处，代码审阅第 32 条）。
+/// 分配器的位图下标与「跨度越过单元区末尾」那几句断言按这一判已经做过来写（`allocator::DeviceFreeMap::index`、`isolate`、`mark_allocated`）。
+///
+/// # Errors
+/// 设备身份不在池里、槽号在单元区起点之下、跨度越过单元区末尾 ⇒ [`RecoveryFailure::AllocationRecordOutsideThePoolGeometry`]；
+/// 那块盘末尾在单元区起点之前 ⇒ [`RecoveryFailure::DeviceEndsBeforeTheUnitAreaStart`]。
+pub(crate) fn placement_lies_in_the_unit_area_of_its_device(
+    reader: &dyn PoolReader,
+    unit_area_start: UnitAreaStart,
+    device: DeviceIdentity,
+    slot: SlotNumber,
+    span_slots: u64,
+) -> Result<(), RecoveryFailure> {
+    // 「这块盘在不在池里」只这一处判：`PoolReader::device_size_in_bytes` 对池外的盘交 `None`
+    // （每个实现都从 `device_identities` 那张表里找），另写一句 `device_identities().contains(…)`
+    // 是同一条判定的第二份手抄，两份会分叉（`code-discipline.md`「重复要生成，不许手抄」）。
+    let device_bytes = reader.device_size_in_bytes(device).ok_or(
+        RecoveryFailure::AllocationRecordOutsideThePoolGeometry {
+            what: "分配记录的设备身份不在池里",
+        },
+    )?;
+    if slot.0 < unit_area_start.slot().0 {
+        return Err(RecoveryFailure::AllocationRecordOutsideThePoolGeometry {
+            what: "分配记录的槽号落在单元区起点之下",
+        });
+    }
+    let unit_area_slots = unit_area_slots_of_device_starting_at(device_bytes, unit_area_start)
+        .map_err(|DeviceEndsBeforeTheUnitAreaStart { device_bytes, .. }| {
+            RecoveryFailure::DeviceEndsBeforeTheUnitAreaStart {
+                device,
+                device_bytes,
+            }
+        })?;
+    // 槽号是盘上的 6 字节（< 2⁴⁸）、跨度 ≤ 2¹⁶ 由调用方的字段宽给出，两个加法都装得进 u64。
+    let unit_area_end_slot = unit_area_start.slot().0 + unit_area_slots;
+    if slot.0 + span_slots > unit_area_end_slot {
+        return Err(RecoveryFailure::AllocationRecordOutsideThePoolGeometry {
+            what: "分配记录的跨度越过单元区末尾",
+        });
+    }
+    Ok(())
+}
+
+/// 池里每块盘的完整槽数都到得了单元区起点 `unit_area_start`（择到的系统配置按环长现算的那个；代码审阅第 35 条）：
+/// 可写挂载建空闲图（`allocator::DeviceFreeMap::with_unit_area_start`）的前置条件，在择系统配置之后、读根环之前逐盘判。
+/// 只读盘的字节数，不读盘。
+///
+/// # Errors
+/// 按 [`PoolReader::device_identities`] 次序第一块末尾在单元区起点之前的盘 ⇒ [`RecoveryFailure::DeviceEndsBeforeTheUnitAreaStart`]。
+pub fn every_device_reaches_the_unit_area_start(
+    reader: &dyn PoolReader,
+    unit_area_start: UnitAreaStart,
+) -> Result<(), RecoveryFailure> {
+    for device in reader.device_identities() {
+        let device_bytes = reader
+            .device_size_in_bytes(device)
+            .expect("device_identities 列出的盘，device_size_in_bytes 交得出它的字节数（PoolReader 的契约）");
+        unit_area_slots_of_device_starting_at(device_bytes, unit_area_start).map_err(
+            |_ends_before| RecoveryFailure::DeviceEndsBeforeTheUnitAreaStart {
+                device,
+                device_bytes,
+            },
+        )?;
     }
     Ok(())
 }
@@ -1139,8 +1550,12 @@ fn allocation_records_fit_the_pool_geometry(
 /// 树表读不到、解不开，同一种树有两条（[`TREE_TABLE_CARRIES_ONE_KIND_OF_TREE_TWICE`]）；
 /// 分配记录树根提示读不出且映射里没有它（`MappingMiss`）、映射落点也读不出（`MappingStillUnreadable`）、
 /// 映射树根读不出或解不开、分配记录树根解不开；条目宽或结构值判红（见 [`allocation_records_of_node`]）。
-pub fn allocation_records_under_root(
+///
+/// 单元区从 `unit_area_start` 起（择到的系统配置按环长现算的那个，[`unit_area_start_of_the_chosen_system_configuration`]）：
+/// 分配记录落不落在单元区里按它判。
+pub fn allocation_records_under_root_in_the_unit_area_starting_at(
     reader: &dyn PoolReader,
+    unit_area_start: UnitAreaStart,
     root: &RootRecord,
 ) -> Result<Vec<AllocationRecord>, RecoveryFailure> {
     let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
@@ -1156,7 +1571,12 @@ pub fn allocation_records_under_root(
     else {
         return Ok(Vec::new());
     };
-    let central_mapping_root = CentralMappingTreeWithBytesReadOnFirstUse::new(reader, root);
+    // 读的是别的根（影子账、抬 F 的上限）的账：映射树只按「拼得成一棵树」核，与这里读分配记录树同一个口径。
+    let central_mapping_root = CentralMappingTreeWithBytesReadOnFirstUse::new(
+        reader,
+        root,
+        CodeTwoTreeHeaderJudgement::OnlyWhatTheShapeNeeds,
+    );
     let mut stale_location_hint_hops_not_exposed_by_this_reader = 0usize;
     // 分配记录树按绝对槽号按位置寻址、可以多层（D8（核心索引结构） 已定项 14）：整棵读回来，节点进映射、提示读不出经这条根的中央映射回退。
     let tree = read_allocation_record_tree(
@@ -1176,8 +1596,24 @@ pub fn allocation_records_under_root(
             )
         },
     )?;
-    allocation_records_fit_the_pool_geometry(reader, &tree.records)?;
+    allocation_records_fit_the_pool_geometry(reader, unit_area_start, &tree.records)?;
     Ok(tree.records)
+}
+
+/// 同 [`allocation_records_under_root_in_the_unit_area_starting_at`]，单元区起点先择一次系统配置现算
+/// （[`choose_system_configuration`]：多读每块盘的两个系统配置槽）。给手里没有择好的系统配置的调用方（用例、实验装置）。
+///
+/// # Errors
+/// 择不到系统配置（[`choose_system_configuration`] 的各个成员）；其余同带起点的那一份。
+pub fn allocation_records_under_root(
+    reader: &dyn PoolReader,
+    root: &RootRecord,
+) -> Result<Vec<AllocationRecord>, RecoveryFailure> {
+    allocation_records_under_root_in_the_unit_area_starting_at(
+        reader,
+        unit_area_start_of_the_pool(reader)?,
+        root,
+    )
 }
 
 /// 树表 0 条的那一版自己那棵分配记录树（根指针住根记录那一项，C512（树表 0 条的一版上被换下的单元记在哪））：整棵读回来
@@ -1185,8 +1621,49 @@ pub fn allocation_records_under_root(
 /// 指针全零 ⇒ `None`，那是 mkfs 的第 0 代（那一版的账由实例表与树表两条指针直接算）。
 ///
 /// # Errors
-/// 分配记录树的节点读不到、解不开、位置对不上（`crate::allocation_record_tree::read_allocation_record_tree`）；结构值判红
-/// （`allocation_records_fit_the_pool_geometry`）。
+/// 分配记录树的节点读不到、解不开、位置对不上、节点头里的自描述与指着它的指针对不上（`crate::allocation_record_tree::read_allocation_record_tree`，
+/// `EveryHeaderAgainstItsReference`）；结构值判红（`allocation_records_fit_the_pool_geometry`）。
+///
+/// 单元区从 `unit_area_start` 起（择到的系统配置按环长现算的那个）：分配记录落不落在单元区里按它判。
+pub fn allocation_records_of_version_without_file_in_the_unit_area_starting_at(
+    reader: &dyn PoolReader,
+    unit_area_start: UnitAreaStart,
+    root: &RootRecord,
+) -> Result<Option<AllocationRecordTreeOfTheVersionWithoutFile>, RecoveryFailure> {
+    if root.allocation_record_tree_root == NodePointer::empty_root() {
+        return Ok(None);
+    }
+    let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
+    // 这是可写挂载要接着写的那一版自己的账：节点头照冷走读判全（树 ID、key 宽、出生身份、fsid，代码审阅第 24 / 33 条）。
+    let tree = read_allocation_record_tree(
+        &root.allocation_record_tree_root,
+        &AllocationRecordTreeGeometry::of_reader(reader),
+        TreeIdentifier(crate::transaction::TREE_IDENTIFIER_NONE),
+        AllocationRecordTreeHeaderJudgement::EveryHeaderAgainstItsReference,
+        root,
+        unit_filesystem_identifier(&root.filesystem_identifier),
+        &mut |pointer: &NodePointer| {
+            read_unit_via_locations(reader, &pointer.locations, node_bytes)
+        },
+    )?;
+    allocation_records_fit_the_pool_geometry(reader, unit_area_start, &tree.records)?;
+    // 这棵树的节点指针下一次发布照抄或换下时写回内部条目：按 I-2.5 判（`pointers_of_the_rebuilt_version_ascend_by_device` 同一道）。
+    for (_, pointer, _) in &tree.nodes {
+        pointer
+            .location_entries_ascend_by_device()
+            .map_err(|_not_ascending| location_entries_not_ascending())?;
+    }
+    Ok(Some(AllocationRecordTreeOfTheVersionWithoutFile {
+        version: tree.version(),
+        records: tree.records,
+    }))
+}
+
+/// 同 [`allocation_records_of_version_without_file_in_the_unit_area_starting_at`]；根记录那一项全零（没有分配记录树）时直接交 `None`、
+/// 不读系统配置，否则单元区起点先择一次系统配置现算（[`choose_system_configuration`]）。给手里没有择好的系统配置的调用方。
+///
+/// # Errors
+/// 择不到系统配置（[`choose_system_configuration`] 的各个成员）；其余同带起点的那一份。
 pub fn allocation_records_of_version_without_file(
     reader: &dyn PoolReader,
     root: &RootRecord,
@@ -1194,23 +1671,11 @@ pub fn allocation_records_of_version_without_file(
     if root.allocation_record_tree_root == NodePointer::empty_root() {
         return Ok(None);
     }
-    let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
-    let tree = read_allocation_record_tree(
-        &root.allocation_record_tree_root,
-        &AllocationRecordTreeGeometry::of_reader(reader),
-        TreeIdentifier(crate::transaction::TREE_IDENTIFIER_NONE),
-        AllocationRecordTreeHeaderJudgement::OnlyWhatThePositionsNeed,
+    allocation_records_of_version_without_file_in_the_unit_area_starting_at(
+        reader,
+        unit_area_start_of_the_pool(reader)?,
         root,
-        unit_filesystem_identifier(&root.filesystem_identifier),
-        &mut |pointer: &NodePointer| {
-            read_unit_via_locations(reader, &pointer.locations, node_bytes)
-        },
-    )?;
-    allocation_records_fit_the_pool_geometry(reader, &tree.records)?;
-    Ok(Some(AllocationRecordTreeOfTheVersionWithoutFile {
-        version: tree.version(),
-        records: tree.records,
-    }))
+    )
 }
 
 /// 一条根指着的整张实例表（全部行）：沿链读到「无下一片」为止（[`instance_table_chain_of_root`]）；
@@ -1393,6 +1858,90 @@ pub(crate) fn tree_table_entries_each_kind_at_most_once(
     Ok(entries)
 }
 
+/// 树表条目不按排序时报的不变量名：I-9.16（树表条目按树 ID 严格升序且合发号次序）。两道合成这一条，任一道不成立即判红：
+/// ① 盘上次序树 ID 严格升序（D8（核心索引结构） 已定项 8 排序契约「条目按树 ID 升序排」）；② 按发号次序相邻两棵的树 ID 严格升序
+/// （D8 已定项 8 ②「八棵树的号从水位起连号发，次序照格式常量 11..18 那一组」）。立号：实审 A3b Q2 交上来，用户 2026-09-27 JST 17:4x 定
+/// 「立不变量并同步」；`invariants.md` 那一行由 kb 第八批写。
+pub const TREE_TABLE_ENTRIES_ORDERING_CONTRACT: &str = "I-9.16";
+
+/// 七棵进树表的树的种类，按发号次序（D8（核心索引结构） 已定项 8 ②：extent、inode、分配记录、记账、中央映射、livelist、稀疏旁表、deadlist，
+/// 中央映射树不进树表，这里没有它）。
+const TREE_KINDS_OF_THE_TREE_TABLE_IN_THE_ISSUING_ORDER: [u16; 7] = [
+    TREE_KIND_EXTENT,
+    TREE_KIND_INODE,
+    TREE_KIND_ALLOCATION,
+    TREE_KIND_ACCOUNTING,
+    TREE_KIND_LIVELIST,
+    TREE_KIND_SPARSE_SIDE_TABLE,
+    TREE_KIND_DEADLIST,
+];
+
+/// I-9.16（树表条目按树 ID 严格升序且合发号次序）：先判 ①（盘上次序），再判 ②（发号次序）。读树表取条目、要往下走的两处都在
+/// [`tree_table_entries_each_kind_at_most_once`] 之后、读任何一棵树之前调它：[`rebuild_version`]（可写挂载接着这一版发布，
+/// 写者按种类装树表条目、断言树 ID 升序，走得到那条断言的镜像在任何写之前拒）与 [`walk_to_file`]。
+///
+/// # Errors
+/// ① 不成立 ⇒ `InvariantViolated { invariant: "I-9.16", detail: "树表条目不按树 ID 严格升序" }`；
+/// ① 成立、② 不成立 ⇒ 同一个不变量名，detail 是发号次序那一句。
+pub(crate) fn tree_table_entries_ascend_by_tree_identifier_and_in_the_issuing_order(
+    tree_table_entries: &[TreeTableEntry],
+) -> Result<(), RecoveryFailure> {
+    tree_table_entries_ascend_strictly_by_tree_identifier(tree_table_entries)?;
+    tree_table_entries_ascend_strictly_in_the_issuing_order(tree_table_entries)
+}
+
+/// I-9.16 ①：树表条目按盘上的次序树 ID 严格升序（两条同号也拒：同一个号认成两棵树）。
+///
+/// # Errors
+/// 相邻两条的树 ID 不是严格升序 ⇒ `InvariantViolated { invariant: "I-9.16", .. }`。
+fn tree_table_entries_ascend_strictly_by_tree_identifier(
+    tree_table_entries: &[TreeTableEntry],
+) -> Result<(), RecoveryFailure> {
+    if tree_table_entries
+        .windows(2)
+        .all(|pair| pair[0].tree < pair[1].tree)
+    {
+        return Ok(());
+    }
+    Err(RecoveryFailure::InvariantViolated {
+        invariant: TREE_TABLE_ENTRIES_ORDERING_CONTRACT,
+        detail: "树表条目不按树 ID 严格升序",
+    })
+}
+
+/// I-9.16 ②：树表里的树按发号次序（[`TREE_KINDS_OF_THE_TREE_TABLE_IN_THE_ISSUING_ORDER`]）相邻两棵的树 ID 严格升序。
+/// 写者每次发布按这个次序装树表条目、断言它们升序（`transaction` 装树表那一步）：照抄上一版的号，这个次序就是上一版盘上的样子，
+/// 那条断言靠的就是这一判（实审 A3c Q-A：两条条目的种类互换之后盘上次序仍按树 ID 升序、写者按种类装出来却降序）。
+/// 只比树表里有的种类：缺哪一棵、有没登记的种类，由读那一棵的那一步报（[`rebuild_version`] 报「树表里没有那棵树」，
+/// [`walk_to_file`] 报「树表里缺一棵有根的树」或「树的种类没登记」）；同一种至多一条已由 [`tree_table_entries_each_kind_at_most_once`] 判过。
+///
+/// # Errors
+/// 发号次序上相邻两棵的树 ID 不是严格升序 ⇒ `InvariantViolated { invariant: "I-9.16", .. }`。
+fn tree_table_entries_ascend_strictly_in_the_issuing_order(
+    tree_table_entries: &[TreeTableEntry],
+) -> Result<(), RecoveryFailure> {
+    let tree_identifiers_in_the_issuing_order: Vec<TreeIdentifier> =
+        TREE_KINDS_OF_THE_TREE_TABLE_IN_THE_ISSUING_ORDER
+            .iter()
+            .filter_map(|kind| {
+                tree_table_entries
+                    .iter()
+                    .find(|entry| entry.kind == *kind)
+                    .map(|entry| entry.tree)
+            })
+            .collect();
+    if tree_identifiers_in_the_issuing_order
+        .windows(2)
+        .all(|pair| pair[0] < pair[1])
+    {
+        return Ok(());
+    }
+    Err(RecoveryFailure::InvariantViolated {
+        invariant: TREE_TABLE_ENTRIES_ORDERING_CONTRACT,
+        detail: "树表里七棵树的树 ID 不按发号次序（extent、inode、分配记录、记账、livelist、稀疏旁表、deadlist）严格升序",
+    })
+}
+
 /// 从盘上按所选根重建出来的上一版。
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(
@@ -1427,18 +1976,28 @@ impl From<RecoveryFailure> for RebuildVersionFailure {
 /// 豁免三类之外的单元位置提示读不出时经这一版的中央映射回退（D19（块指针的结构与宽度预算） 已定项 8）；
 /// 提示与映射都读不出的**数据单元**不算失败：照抄它的位置项、不读内容，那一项的字节是空的（D19 已定项 5，用户 2026-09-24 定 N2）。
 ///
+/// 读到手的每个节点与单元照冷走读判全（代码审阅第 24 / 33 条，用户定案「重建时把已经读到的节点照冷走读那套判全，坏了报错拒挂载，不多读盘」）：
+/// 四棵树与中央映射树的节点头按指着它的指针与父条目核（`EveryHeaderAgainstItsReference`，含 key 严格递增），inode 树根按
+/// `tree_root_checked_against_its_pointer` 核、层级 1，树表 key 宽与 I-7.8，inode 叶容器的 I-9.2 / I-1.2 / I-9.4，分配记录每盘一条、代与跨度，
+/// 记账条目数与代、seq，映射条目数，读到手的数据单元按查找路径与 inode 记录核——与 [`walk_to_file`] 调同一组判定函数。不多读一个单元。
+///
 /// # Errors
 /// 树表不是 0 条而 `record_standing_for_root` 是 `None` ⇒ `NoRecordStandingForFileVersion`；树表里同一种树有两条
-/// （[`TREE_TABLE_CARRIES_ONE_KIND_OF_TREE_TWICE`]）；实例表、树表、映射树根读不到，
-/// 树根或 inode 叶容器提示读不出且经映射也读不回（`MappingMiss` / `MappingStillUnreadable`），单元解不开 ⇒ 走读同款的错；
+/// （[`TREE_TABLE_CARRIES_ONE_KIND_OF_TREE_TWICE`]）；树表条目不合 I-9.16（[`TREE_TABLE_ENTRIES_ORDERING_CONTRACT`]）；实例表、树表、映射树根读不到，
+/// 树根或 inode 叶容器提示读不出且经映射也读不回（`MappingMiss` / `MappingStillUnreadable`），单元解不开、上面那几道判定判红 ⇒ 走读同款的错；
 /// 记账行里没有 inode 号水位那一行 ⇒ `InodeNumberWatermarkRowMissingFromTheAccountingTree`。
-pub fn rebuild_version(
+///
+/// 单元区从 `unit_area_start` 起（择到的系统配置按环长现算的那个）：这一版的分配记录落不落在单元区里按它判。
+pub fn rebuild_version_in_the_unit_area_starting_at(
     reader: &dyn PoolReader,
+    unit_area_start: UnitAreaStart,
     root: &RootRecord,
     record_standing_for_root: Option<JournalRecord>,
 ) -> Result<RebuiltVersion, RebuildVersionFailure> {
     let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
     let data_bytes = usize::try_from(DATA_UNIT_BYTES).expect("32768");
+    // 树表 0 条的一版也要判：可写挂载接着它发的零单元发布照抄根记录里的实例表与树表指针。
+    root_record_pointers_ascend_by_device(root)?;
     let instance_table_bytes =
         read_unit_via_locations(reader, &root.instance_table.locations, data_bytes)?;
     let tree_table_bytes = read_unit_via_locations(reader, &root.tree_table.locations, node_bytes)?;
@@ -1446,6 +2005,7 @@ pub fn rebuild_version(
         parse_index_node(&tree_table_bytes).map_err(|_error| RecoveryFailure::UnitMalformed {
             what: "树表单元",
         })?;
+    tree_table_key_width_is_the_tree_tables(&tree_table)?;
     if tree_table.entries.is_empty() {
         return Ok(RebuiltVersion::WithoutFile);
     }
@@ -1454,6 +2014,12 @@ pub fn rebuild_version(
     let record_bytes = record.to_bytes();
     let tree_table_entries = tree_table_entries_each_kind_at_most_once(&tree_table.entries)
         .map_err(RecoveryFailure::from)?;
+    // 可写挂载接着这一版发布，写者按种类装树表条目、断言树 ID 升序：盘上的次序与种类在这里先判（I-9.16），
+    // 走得到那条断言的镜像在任何写之前拒。
+    tree_table_entries_ascend_by_tree_identifier_and_in_the_issuing_order(&tree_table_entries)?;
+    for entry in &tree_table_entries {
+        tree_identifier_of_the_entry_is_below_the_watermark(entry, root)?;
+    }
     let pointer_of = |kind: u16| {
         tree_table_entries
             .iter()
@@ -1491,24 +2057,15 @@ pub fn rebuild_version(
     // 豁免三类之外的单元（数据单元、四棵树的根、inode 叶容器）位置提示读不出时经这一版的中央映射回退，与冷走读同一条
     // （D19（块指针的结构与宽度预算） 已定项 8）；映射树根、树表、实例表是自举豁免，只按根记录里的位置条目读。
     // 映射树根到第一次要回退、或走到它那一步时才读：提示都读得出的镜像上读序与报错次序照旧。
-    let central_mapping_root = CentralMappingTreeWithBytesReadOnFirstUse::new(reader, root);
+    let central_mapping_root = CentralMappingTreeWithBytesReadOnFirstUse::new(
+        reader,
+        root,
+        CodeTwoTreeHeaderJudgement::EveryHeaderAgainstItsReference,
+    );
     let central_mapping_locations_of_key =
         |mapping_key: &[u8]| central_mapping_root.locations_of_key(mapping_key);
     // 回退的次数这里不交出去：`RebuiltVersion` 与可写挂载今天没有接多跳观测点的口子（挂载态的读有，`MountedPoolForRead`）。
     let mut stale_location_hint_hops_not_exposed_by_this_reader = 0usize;
-    let read_node =
-        |pointer: &NodePointer, what: &'static str, stale_location_hint_hops: &mut usize| {
-            let bytes = read_mapped_tree_node_via_hint_then_central_mapping(
-                reader,
-                pointer,
-                MappedTreeNodeClass::IndexNode,
-                &central_mapping_locations_of_key,
-                stale_location_hint_hops,
-            )?;
-            let node = parse_index_node(&bytes)
-                .map_err(|_error| RecoveryFailure::UnitMalformed { what })?;
-            Ok::<(Vec<u8>, IndexNodeHeader), RecoveryFailure>((bytes, node))
-        };
     // extent 树按 key 空间定形状（D8（核心索引结构） 已定项 14 的两段）：整棵读回来，每个节点按位置核，节点进映射、提示读不出经映射回退。
     // 第一个文件的数据指针按单元号排，第 i 个就是文件第 i 个数据单元（一个文件跨多个单元，并行线一）；
     // 每个指的数据单元都读回来，照抄进这一版的角色（覆盖写经映射释放它们要这几个 key，写行与暖机照抄它们的字节）。
@@ -1519,7 +2076,7 @@ pub fn rebuild_version(
     let extent_tree_read = read_extent_tree(
         &ExtentTreeReading {
             tree: tree_identifiers.extent,
-            judgement: ExtentTreeHeaderJudgement::OnlyWhatThePositionsNeed,
+            judgement: ExtentTreeHeaderJudgement::EveryHeaderAgainstItsReference,
             root,
             expected_filesystem_identifier,
         },
@@ -1555,11 +2112,23 @@ pub fn rebuild_version(
         data_unit_contents_in_file_order.push(content_or_nothing_when_unreadable);
         data_pointers.push(data_pointer);
     }
-    let (inode_root_bytes, inode_root_node) = read_node(
+    // inode 树根照冷走读核它的自描述（树 ID、key 宽、出生身份、fsid、key 区间，与 `read_mapped_tree_root` 同一道）与层级 1。
+    let inode_root_bytes = read_mapped_tree_node_via_hint_then_central_mapping(
+        reader,
         &inode_root_pointer,
-        "inode 树根",
+        MappedTreeNodeClass::IndexNode,
+        &central_mapping_locations_of_key,
         &mut stale_location_hint_hops_not_exposed_by_this_reader,
     )?;
+    let inode_root_node = tree_root_checked_against_its_pointer(
+        &inode_root_bytes,
+        tree_identifiers.inode,
+        key_width_for_kind(TREE_KIND_INODE).expect("inode 树的 key 宽登记过"),
+        &inode_root_pointer,
+        root,
+        expected_filesystem_identifier,
+    )?;
+    inode_tree_root_level_is_one(&inode_root_node)?;
     if inode_root_node.entries.is_empty() {
         return Err(RecoveryFailure::UnitMalformed {
             what: "inode 树根没有条目",
@@ -1570,14 +2139,8 @@ pub fn rebuild_version(
     let mut inode_leaf_containers: Vec<InodeLeafContainerVersion> = Vec::new();
     let mut inode_leaf_container_bytes: Vec<Vec<u8>> = Vec::new();
     for entry in &inode_root_node.entries {
-        let (_separator_key, _identity_in_the_entry, leaf_pointer) = parse_inode_internal_entry(
-            entry,
-        )
-        .ok_or(RecoveryFailure::EntryNarrowerThanItsFieldTable {
-            what: "inode 树内部条目",
-            entry_bytes: entry.len(),
-            field_table_bytes: usize::try_from(INODE_INTERNAL_ENTRY).expect("120"),
-        })?;
+        let (separator_key, identity_in_the_entry, leaf_pointer) =
+            inode_internal_entry_parsed_and_judged(entry)?;
         let leaf_bytes = read_mapped_tree_node_via_hint_then_central_mapping(
             reader,
             &leaf_pointer,
@@ -1589,14 +2152,16 @@ pub fn rebuild_version(
             parse_packed_unit(&leaf_bytes).map_err(|_error| RecoveryFailure::UnitMalformed {
                 what: "inode 叶容器",
             })?;
-        let mut records = Vec::with_capacity(leaf.records.len());
-        for inode_record_bytes in &leaf.records {
-            records.push(InodeRecord::parse(inode_record_bytes).ok_or(
-                RecoveryFailure::UnitMalformed {
-                    what: "inode 记录"
-                },
-            )?);
-        }
+        let records = inode_leaf_container_judged_against_its_entry(
+            &leaf,
+            InodeInternalEntry {
+                separator_key,
+                identity: identity_in_the_entry,
+                child: leaf_pointer,
+            },
+            root,
+            expected_filesystem_identifier,
+        )?;
         if records.is_empty() {
             return Err(RecoveryFailure::UnitMalformed {
                 what: "inode 叶容器没有记录",
@@ -1604,7 +2169,7 @@ pub fn rebuild_version(
             .into());
         }
         inode_leaf_containers.push(InodeLeafContainerVersion {
-            // 身份取容器头那一份：条目里的身份引用与它逐字相等是 I-9.2（条目身份与子头相符），走读同款在 `walk_to_file` 判。
+            // 身份取容器头那一份：条目里的身份引用与它逐字相等是 I-9.2（条目身份与子头相符），上面刚判过。
             contents: InodeLeafContainer {
                 identity: leaf.identity,
                 records,
@@ -1621,12 +2186,34 @@ pub fn rebuild_version(
         .ok_or(RecoveryFailure::UnitMalformed {
             what: "inode 树里没有第一个文件那条记录",
         })?;
+    // 数据单元照冷走读核：个数对得上 inode size，读到手的每一个按查找路径与 inode 记录核；提示与映射都读不出的那几个（字节是空的）
+    // 不读、不核（D19（块指针的结构与宽度预算） 已定项 5，用户 2026-09-24 定 N2）。
+    data_unit_count_matches_the_inode_size(data_pointers.len(), &inode_record)?;
+    for (position, (data_pointer, content)) in data_pointers
+        .iter()
+        .zip(&data_unit_contents_in_file_order)
+        .enumerate()
+    {
+        if content.is_empty() {
+            continue;
+        }
+        data_unit_judged_against_its_pointer_and_the_inode_record(
+            content,
+            DataUnitOfTheFirstFile {
+                position,
+                pointer: data_pointer,
+                extent_tree: tree_identifiers.extent,
+            },
+            &inode_record,
+            expected_filesystem_identifier,
+        )?;
+    }
     // 分配记录树按绝对槽号按位置寻址（D8（核心索引结构） 已定项 14）：整棵读回来，每个节点按位置核，节点进映射、提示读不出经映射回退。
     let allocation_tree_read = read_allocation_record_tree(
         &allocation_pointer,
         &AllocationRecordTreeGeometry::of_reader(reader),
         tree_identifiers.allocation_records,
-        AllocationRecordTreeHeaderJudgement::OnlyWhatThePositionsNeed,
+        AllocationRecordTreeHeaderJudgement::EveryHeaderAgainstItsReference,
         root,
         expected_filesystem_identifier,
         &mut |pointer: &NodePointer| {
@@ -1639,14 +2226,26 @@ pub fn rebuild_version(
             )
         },
     )?;
-    allocation_records_fit_the_pool_geometry(reader, &allocation_tree_read.records)?;
+    allocation_records_fit_the_pool_geometry(
+        reader,
+        unit_area_start,
+        &allocation_tree_read.records,
+    )?;
+    let device_identities = reader.device_identities();
+    allocation_records_are_one_placement_per_device_on_every_device(
+        &allocation_tree_read.records,
+        &device_identities,
+    )?;
+    allocation_record_generations_and_spans_are_judged(&allocation_tree_read.records, root)?;
     let allocation_records: Vec<AllocationRecord> = allocation_tree_read.records.clone();
     // 记账树可以是多层（D8（核心索引结构） 已定项 11）：从根往下整棵读回来，节点进映射、提示读不出经这一版的中央映射回退
-    // （与读别的树根同一条）；中央映射树同样整棵读回来（下面）。两棵树按「拼得成一棵树」核（`code_two_tree::read_code_two_tree`）。
+    // （与读别的树根同一条）；中央映射树同样整棵读回来（下面）。两棵树照冷走读判全（`code_two_tree::read_code_two_tree` 的
+    // `EveryHeaderAgainstItsReference`：节点头、层级、区间与 key 严格递增——有重复 key 的记账叶交出去，挂载之后第一次发布规划那棵树时
+    // 在 `transaction` 的断言上 panic，代码审阅第 33 条）。
     let accounting_tree = read_code_two_tree(
         &accounting_pointer,
         &MultiLevelCodeTwoTree::Accounting.read_expectation(tree_identifiers.accounting),
-        CodeTwoTreeHeaderJudgement::OnlyWhatTheShapeNeeds,
+        CodeTwoTreeHeaderJudgement::EveryHeaderAgainstItsReference,
         root,
         expected_filesystem_identifier,
         &mut |pointer: &NodePointer| {
@@ -1658,16 +2257,16 @@ pub fn rebuild_version(
                 &mut stale_location_hint_hops_not_exposed_by_this_reader,
             )
         },
+    )?;
+    accounting_entry_count_is_three_plus_six_per_device(
+        accounting_tree.leaf_entries_in_key_order.len(),
+        device_identities.len(),
     )?;
     let mut accounting_entries: Vec<AccountingEntry> =
         Vec::with_capacity(accounting_tree.leaf_entries_in_key_order.len());
     for bytes in &accounting_tree.leaf_entries_in_key_order {
-        accounting_entries.push(AccountingEntry::parse(bytes).ok_or(
-            RecoveryFailure::EntryNarrowerThanItsFieldTable {
-                what: "记账条目",
-                entry_bytes: bytes.len(),
-                field_table_bytes: usize::try_from(ACCOUNTING_ENTRY_BYTES).expect("34"),
-            },
+        accounting_entries.push(accounting_entry_parsed_and_judged_against_the_root(
+            bytes, root,
         )?);
     }
     // 记账行的统计量标签是盘上读来的 2 字节：这一版交出去之前判一次「inode 号水位那一行在」，往里就信
@@ -1680,6 +2279,16 @@ pub fn rebuild_version(
     }
     // 映射树是自举豁免：不经映射回退，只按父指针里的位置条目读；上面有提示读不出、经映射回退过的，这里拿的就是那时读进来的那一份。
     let mapping_tree = central_mapping_root.into_tree()?;
+    mapping_entry_count_is_one_per_mapped_unit(
+        mapping_tree.leaf_entries_in_key_order.len(),
+        MappedUnitCounts {
+            extent_tree_nodes: first_file_extents.nodes_in_bump_order.len(),
+            allocation_record_tree_nodes: allocation_tree_read.nodes.len(),
+            accounting_tree_nodes: accounting_tree.version.node_count(),
+            inode_leaf_containers: inode_root_node.entries.len(),
+            data_units: data_pointers.len(),
+        },
+    )?;
     let mut mapping_keys: Vec<Vec<u8>> =
         Vec::with_capacity(mapping_tree.leaf_entries_in_key_order.len());
     for entry in &mapping_tree.leaf_entries_in_key_order {
@@ -1819,7 +2428,7 @@ pub fn rebuild_version(
         ),
     ]);
     let transaction_number_on_the_record_standing_for_this_root = record.transaction;
-    Ok(RebuiltVersion::WithFile(TransactionOutput {
+    let rebuilt = TransactionOutput {
         root: *root,
         record,
         record_bytes,
@@ -1852,7 +2461,9 @@ pub fn rebuild_version(
         // 「上一条记录的事务号 + 1」，33 条里只有 I-8.7 judged 出来。
         highest_transaction_number_in_this_instance:
             transaction_number_on_the_record_standing_for_this_root,
-    }))
+    };
+    pointers_of_the_rebuilt_version_ascend_by_device(&rebuilt)?;
+    Ok(RebuiltVersion::WithFile(rebuilt))
 }
 
 /// 一条根的树表里用户可见的两棵树（inode 树、extent 树）的根指针，取树表条目里那 86 字节的盘上原样；树表里没有那棵树的条目时 `None`。
@@ -1955,6 +2566,9 @@ pub fn verified_system_configuration_slots<Reader: PoolReader + ?Sized>(
 }
 
 /// 全环扫描：每盘每个记录槽都读（有提示时只读提示的那些），两份镜像任一份自证过即算在；fsid 不符的不算数。
+/// 没有提示时逐槽列偏移只列到那块盘的末尾：环长是盘上读来的 8 字节，读者只按「环末端不越过同一槽记着的单元区起点、在飞上限装得进 4 字节」
+/// 判它（`system_configuration_values_this_reader_accepts`），不按盘的字节数判；盘末尾之后的槽本来就读不出（`PoolReader::read` 交空），
+/// 不列它们，扫环的内存就不由那 8 字节定。
 #[must_use]
 pub fn scan_journal(
     reader: &dyn PoolReader,
@@ -1967,10 +2581,15 @@ pub fn scan_journal(
     let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
     let mut records = BTreeMap::new();
     for device in reader.device_identities() {
+        let ring_bytes_inside_the_device = reader
+            .device_size_in_bytes(device)
+            .map_or(0, |device_bytes| {
+                ring_bytes.min(device_bytes.saturating_sub(ring_start.0))
+            });
         let offsets = reader
             .journal_record_offsets_hint(device, ring_start, ring_bytes)
             .unwrap_or_else(|| {
-                (0..ring_bytes / JOURNAL_RECORD_BYTES)
+                (0..ring_bytes_inside_the_device / JOURNAL_RECORD_BYTES)
                     .map(|record_index| {
                         DeviceOffsetInBytes(ring_start.0 + record_index * JOURNAL_RECORD_BYTES)
                     })
@@ -2576,6 +3195,382 @@ impl CentralMappingTreeReadOnFirstUse<'_> {
     }
 }
 
+// ─── 冷走读与从盘上重建上一版共用的判定 ───
+// 代码审阅第 24 / 33 条，用户定案（`records/2026-09-27-代码审阅38条去向.md` 第 51 行）：「重建时把已经读到的节点照冷走读那套判全，
+// 坏了报错拒挂载，不多读盘」。下面每一道只判两边都已经读到手的字节，[`walk_to_file`] 与 [`rebuild_version`] 各在读到那一样的地方调，
+// 报的成员两边相同；一道判定一处定义，不各写一份（`code-discipline.md`「重复要生成，不许手抄」）。
+
+/// 树表单元自述的 key 宽是树表的（[`TREE_TABLE_KEY_WIDTH`]）。
+fn tree_table_key_width_is_the_tree_tables(
+    tree_table: &IndexNodeHeader,
+) -> Result<(), RecoveryFailure> {
+    if tree_table.key_width != TREE_TABLE_KEY_WIDTH {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: "E142 走读同款",
+            detail: "树表单元自述 key 宽不是 8",
+        });
+    }
+    Ok(())
+}
+
+/// 树表条目里的树 ID 低于根记录的树 ID 水位（I-7.8（根记录树 ID 水位不低于全池最大树 ID） 在读路径上的那一半）。
+fn tree_identifier_of_the_entry_is_below_the_watermark(
+    entry: &TreeTableEntry,
+    root: &RootRecord,
+) -> Result<(), RecoveryFailure> {
+    if entry.tree.0 >= root.tree_identifier_watermark {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: "I-7.8",
+            detail: "树 ID 不低于水位",
+        });
+    }
+    Ok(())
+}
+
+/// 每个落点每盘一条（两盘同槽）：第一个事务 10 × 盘数，每次覆盖写再加 8 × 盘数（换下的那些改写、不删）。
+/// 只核总数是盘数的整数倍拦不住「一盘多一条、另一盘少一条」——发布 B 三方第一轮正推腿打中，改成逐盘核同一批（槽, 跨度）
+/// （[`allocation_records_are_one_per_device`]）。
+fn allocation_records_are_one_placement_per_device_on_every_device(
+    records: &[AllocationRecord],
+    device_identities: &[DeviceIdentity],
+) -> Result<(), RecoveryFailure> {
+    if !allocation_records_are_one_per_device(records, device_identities) {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: "E142 走读同款",
+            detail: "分配记录不是每个落点每盘各一条：各盘的（槽, 跨度, 代, 已释放）集合不同，或少于 10 个落点",
+        });
+    }
+    Ok(())
+}
+
+/// 记账条目数是 3 + 6 × 盘数（D5（快照 / 空间记账机制） 已定项 8：池级三行加每盘六行）。
+fn accounting_entry_count_is_three_plus_six_per_device(
+    accounting_entries: usize,
+    device_count: usize,
+) -> Result<(), RecoveryFailure> {
+    if accounting_entries != 3 + 6 * device_count {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: "E142 走读同款",
+            detail: "记账条目数不是 3 + 6 × 盘数",
+        });
+    }
+    Ok(())
+}
+
+/// 进映射的单元各有几个（[`mapping_entry_count_is_one_per_mapped_unit`] 的输入）。
+struct MappedUnitCounts {
+    extent_tree_nodes: usize,
+    allocation_record_tree_nodes: usize,
+    accounting_tree_nodes: usize,
+    /// inode 树的叶容器数 = 它的根的条目数（根恒是层级 1，下面每条条目一片容器；层级另判）。
+    inode_leaf_containers: usize,
+    /// 数据单元数 = extent 树里第一个文件的数据指针数（下段叶记录条数，或内联的那一个）。
+    data_units: usize,
+}
+
+/// 映射条目数 = 进映射的单元数：inode 根一条，extent 树、分配记录树、记账树每个节点一条，加上 inode 树的每一片叶容器与文件的每一个数据单元
+/// （映射树自己的节点、树表、实例表豁免，D19（块指针的结构与宽度预算） 已定项 8 / 已定项 12）。
+fn mapping_entry_count_is_one_per_mapped_unit(
+    mapping_entries: usize,
+    counts: MappedUnitCounts,
+) -> Result<(), RecoveryFailure> {
+    let expected = 1
+        + counts.extent_tree_nodes
+        + counts.allocation_record_tree_nodes
+        + counts.accounting_tree_nodes
+        + counts.inode_leaf_containers
+        + counts.data_units;
+    if mapping_entries != expected {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: "E142 走读同款",
+            detail: "映射条目数不是 1 + extent 树、分配记录树、记账树的节点数 + inode 叶容器数 + 数据单元数",
+        });
+    }
+    Ok(())
+}
+
+/// 分配记录的跨度不是 0、代不晚于根。已释放的记录合法（D3（空间分配） 已定项 7：改写不删），它的代是释放代，同样不许晚于根。
+fn allocation_record_generations_and_spans_are_judged(
+    records: &[AllocationRecord],
+    root: &RootRecord,
+) -> Result<(), RecoveryFailure> {
+    for record in records {
+        if record.generation > root.checkpoint_txg || record.span_slots == 0 {
+            return Err(RecoveryFailure::InvariantViolated {
+                invariant: "E142 走读同款",
+                detail: "分配记录跨度为 0，或分配代 / 释放代晚于根",
+            });
+        }
+    }
+    Ok(())
+}
+
+/// 解一条记账条目（条目宽是盘上的值，窄于 34 报 `EntryNarrowerThanItsFieldTable`），判它的代不晚于根、seq 不是 0。
+fn accounting_entry_parsed_and_judged_against_the_root(
+    entry_bytes: &[u8],
+    root: &RootRecord,
+) -> Result<AccountingEntry, RecoveryFailure> {
+    let entry = AccountingEntry::parse(entry_bytes).ok_or(
+        RecoveryFailure::EntryNarrowerThanItsFieldTable {
+            what: "记账条目",
+            entry_bytes: entry_bytes.len(),
+            field_table_bytes: usize::try_from(ACCOUNTING_ENTRY_BYTES).expect("34"),
+        },
+    )?;
+    if entry.generation > root.checkpoint_txg || entry.sequence == 0 {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: "E142 走读同款",
+            detail: "记账条目的代晚于根或 seq 为 0",
+        });
+    }
+    Ok(entry)
+}
+
+/// inode 树根恒是层级 1（I-9.1）。
+fn inode_tree_root_level_is_one(inode_root: &IndexNodeHeader) -> Result<(), RecoveryFailure> {
+    if inode_root.level != 1 {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: "I-9.1",
+            detail: "inode 树根层级不是 1",
+        });
+    }
+    Ok(())
+}
+
+/// inode 树根的一条内部条目解开之后的三样：分隔 key、身份引用、指向叶容器的子指针。
+struct InodeInternalEntry {
+    separator_key: u64,
+    identity: PackedIdentity,
+    child: NodePointer,
+}
+
+/// 解一条 inode 树内部条目（条目宽是盘上的值，窄于 120 报 `EntryNarrowerThanItsFieldTable`），判类型段是 2（I-9.2（条目身份与子头相符）
+/// 的第一句；第一版 inode 树根下面只有叶容器）。
+fn inode_internal_entry_parsed_and_judged(
+    entry: &[u8],
+) -> Result<(u64, PackedIdentity, NodePointer), RecoveryFailure> {
+    let (separator_key, identity, child) = parse_inode_internal_entry(entry).ok_or(
+        RecoveryFailure::EntryNarrowerThanItsFieldTable {
+            what: "inode 树内部条目",
+            entry_bytes: entry.len(),
+            field_table_bytes: usize::try_from(INODE_INTERNAL_ENTRY).expect("120"),
+        },
+    )?;
+    if identity.record_type != PACKED_TYPE_INODE {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: "I-9.2",
+            detail: "inode 内部条目类型段不是 2",
+        });
+    }
+    Ok((separator_key, identity, child))
+}
+
+/// 一片 inode 叶容器按指着它的那条内部条目核（I-9.2（条目身份与子头相符）：叶头的四元组身份等于条目的身份引用、记录宽 140、fsid 是本池；
+/// I-1.2：出生树与出生序号等于子指针的、诞生不晚于根、写序实例等于子指针的），再逐条解它的记录、判记录号不小于分隔 key 与容器号（I-9.4）。
+/// 交回解开的记录，按容器里的次序。
+fn inode_leaf_container_judged_against_its_entry(
+    leaf: &PackedUnitHeader,
+    entry: InodeInternalEntry,
+    root: &RootRecord,
+    expected_filesystem_identifier: u64,
+) -> Result<Vec<InodeRecord>, RecoveryFailure> {
+    let InodeInternalEntry {
+        separator_key,
+        identity,
+        child,
+    } = entry;
+    if leaf.identity != identity
+        || u64::try_from(leaf.record_width).expect("记录宽") != INODE_RECORD_BYTES
+        || leaf.filesystem_identifier != expected_filesystem_identifier
+    {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: "I-9.2",
+            detail: "inode 叶头与条目身份引用不符",
+        });
+    }
+    if child.head.birth_tree != identity.birth_tree || leaf.birth_sequence != child.birth_sequence {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: "I-1.2",
+            detail: "inode 叶的出生身份与子指针不符",
+        });
+    }
+    if leaf.birth_txg > root.checkpoint_txg || leaf.write_order.instance != child.instance {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: "I-1.2",
+            detail: "inode 叶诞生于根之后或写序实例与子指针不符",
+        });
+    }
+    let mut records = Vec::with_capacity(leaf.records.len());
+    for record_bytes in &leaf.records {
+        let record = InodeRecord::parse(record_bytes).ok_or(RecoveryFailure::UnitMalformed {
+            what: "inode 记录",
+        })?;
+        if record.inode < separator_key || record.inode < identity.container {
+            return Err(RecoveryFailure::InvariantViolated {
+                invariant: "I-9.4",
+                detail: "inode 记录号小于分隔 key 或容器号",
+            });
+        }
+        records.push(record);
+    }
+    Ok(records)
+}
+
+/// 第一个文件的数据指针个数等于 inode size 按净荷容量除出来的单元数（D4（校验和位置） 已定项 5；与写侧切分同一条除法）——
+/// 文件没有洞，第一版不写稀疏文件。
+fn data_unit_count_matches_the_inode_size(
+    data_units: usize,
+    inode_record: &InodeRecord,
+) -> Result<(), RecoveryFailure> {
+    if u64::try_from(data_units).expect("单元数")
+        != data_unit_count_of_a_sequential_write(inode_record.size)
+    {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: "E142 走读同款",
+            detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符",
+        });
+    }
+    Ok(())
+}
+
+/// 第一个文件的第 `position` 个数据单元在查找路径上的样子：它的数据指针与 extent 树的号（数据单元头里的出生树要与它相同）。
+struct DataUnitOfTheFirstFile<'pointer> {
+    position: usize,
+    pointer: &'pointer DataPointer,
+    extent_tree: TreeIdentifier,
+}
+
+/// 一个读到手的数据单元按查找路径核（I-1.1：五元组与查找路径相符；I-9.10：对象出生代等于 inode 记录的；I-1.2：诞生代号、写序、fsid
+/// 与指针相符；声明长度等于 inode size 按净荷容量切出来的这一段——最后一个单元之外恒装满一个净荷；I-2.3：补齐字节为 0），交回它的净荷。
+fn data_unit_judged_against_its_pointer_and_the_inode_record<'unit>(
+    bytes: &'unit [u8],
+    unit: DataUnitOfTheFirstFile<'_>,
+    inode_record: &InodeRecord,
+    expected_filesystem_identifier: u64,
+) -> Result<&'unit [u8], RecoveryFailure> {
+    let payload_capacity_in_bytes = u64::try_from(data_unit_payload_capacity()).expect("32634");
+    let unit_index_in_file = DataUnitIndexInFile(u64::try_from(unit.position).expect("单元序号"));
+    let first_file_byte = unit_index_in_file.first_file_byte(payload_capacity_in_bytes);
+    let header = parse_data_unit(bytes).map_err(|_error| RecoveryFailure::UnitMalformed {
+        what: "数据单元",
+    })?;
+    if header.identity.tree != unit.extent_tree
+        || header.identity.object != FIRST_INODE_NUMBER
+        || header.identity.anchor_offset != first_file_byte.0
+    {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: "I-1.1",
+            detail: "数据单元五元组与查找路径不符",
+        });
+    }
+    if header.identity.object_birth != inode_record.object_birth {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: "I-9.10",
+            detail: "对象出生代与 inode 记录不符",
+        });
+    }
+    if header.birth_txg != unit.pointer.head.birth_txg
+        || header.write_order != unit.pointer.write_order
+        || header.filesystem_identifier != expected_filesystem_identifier
+    {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: "I-1.2",
+            detail: "数据单元头与指针的出生身份不符",
+        });
+    }
+    let expected_payload_length = inode_record
+        .size
+        .saturating_sub(first_file_byte.0)
+        .min(payload_capacity_in_bytes);
+    if u64::from(header.declared_length) != expected_payload_length {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: "E142 走读同款",
+            detail: "声明长度与 inode size 按净荷容量切出来的这一段不符",
+        });
+    }
+    data_unit_payload(bytes, header.declared_length).map_err(|_error| {
+        RecoveryFailure::InvariantViolated {
+            invariant: "I-2.3",
+            detail: "补齐字节非零",
+        }
+    })
+}
+
+/// 盘上一条指针的位置条目不按设备身份严格升序时报的成员（I-2.5（位置条目按设备身份升序））。
+fn location_entries_not_ascending() -> RecoveryFailure {
+    RecoveryFailure::InvariantViolated {
+        invariant: "I-2.5",
+        detail: "位置条目不按设备身份严格升序",
+    }
+}
+
+/// 根记录里的四条指针按 I-2.5 判（全零的豁免）：可写挂载要照抄写回的那几条（零单元发布、暖机照抄实例表与树表指针）从这里进来。
+fn root_record_pointers_ascend_by_device(root: &RootRecord) -> Result<(), RecoveryFailure> {
+    for pointer in [
+        &root.tree_table,
+        &root.instance_table,
+        &root.mapping_root,
+        &root.allocation_record_tree_root,
+    ] {
+        pointer
+            .location_entries_ascend_by_device()
+            .map_err(|_not_ascending| location_entries_not_ascending())?;
+    }
+    Ok(())
+}
+
+/// 重建出来的这一版里每一条盘上读来的指针按 I-2.5 判（C476 普查「缺口」那张表 `pointer.rs` 那一行，实审 A3a 实测坐实走得到）：
+/// 下一次发布照抄没重写的角色时把它们原样写回（树表条目、多层码 2 树与分配记录树的内部条目、inode 树根的条目、extent 树），
+/// 写者 `NodePointer::write_to` / `DataPointer::write_to` 在那里断言升序——不在读进来的地方判，坏镜像就在写者的断言上 panic。
+fn pointers_of_the_rebuilt_version_ascend_by_device(
+    output: &TransactionOutput,
+) -> Result<(), RecoveryFailure> {
+    root_record_pointers_ascend_by_device(&output.root)?;
+    let node_pointers = output
+        .tree_table_entries
+        .iter()
+        .map(|entry| &entry.root)
+        .chain(
+            output
+                .extent_tree
+                .upper_nodes
+                .iter()
+                .map(|(_, pointer)| pointer),
+        )
+        .chain(
+            output
+                .extent_tree
+                .lower_nodes
+                .iter()
+                .map(|(_, pointer)| pointer),
+        )
+        .chain(
+            output
+                .inode_leaf_containers
+                .iter()
+                .map(|container| &container.pointer),
+        )
+        .chain(
+            output
+                .allocation_record_tree
+                .nodes
+                .iter()
+                .map(|(_, pointer)| pointer),
+        )
+        .chain(output.accounting_tree.pointers.iter())
+        .chain(output.central_mapping_tree.pointers.iter());
+    for pointer in node_pointers {
+        pointer
+            .location_entries_ascend_by_device()
+            .map_err(|_not_ascending| location_entries_not_ascending())?;
+    }
+    for data_pointer in &output.data_pointers {
+        location_entries_ascend_by_device(&data_pointer.locations)
+            .map_err(|_not_ascending| location_entries_not_ascending())?;
+    }
+    Ok(())
+}
+
 struct TreeRoots {
     extent: ExtentsOfTheFirstFile,
     /// extent 树的号（数据单元头里的出生树要与它相同）。
@@ -2591,8 +3586,11 @@ struct TreeRoots {
     clippy::too_many_lines,
     reason = "一次走读就是一条挂载关键链，每一步的不变量检查都写在它发生的地方"
 )]
-pub fn walk_to_file(
+///
+/// 单元区从 `unit_area_start` 起（择到的系统配置按环长现算的那个）：这一版的分配记录落不落在单元区里按它判。
+pub fn walk_to_file_in_the_unit_area_starting_at(
     reader: &dyn PoolReader,
+    unit_area_start: UnitAreaStart,
     root: &RootRecord,
     mapping_fallbacks: &mut usize,
 ) -> Result<Option<Vec<u8>>, RecoveryFailure> {
@@ -2636,17 +3634,14 @@ pub fn walk_to_file(
         parse_index_node(&tree_table_bytes).map_err(|_error| RecoveryFailure::UnitMalformed {
             what: "树表单元",
         })?;
-    if tree_table.key_width != TREE_TABLE_KEY_WIDTH {
-        return Err(RecoveryFailure::InvariantViolated {
-            invariant: "E142 走读同款",
-            detail: "树表单元自述 key 宽不是 8",
-        });
-    }
+    tree_table_key_width_is_the_tree_tables(&tree_table)?;
     if tree_table.entries.is_empty() {
         return Ok(None);
     }
     // 同一种树至多一条（审阅第 27 条）：下面按种类各读一棵，不会有第二条把前一条覆盖掉。
     let entries = tree_table_entries_each_kind_at_most_once(&tree_table.entries)?;
+    // I-9.16（树表条目按树 ID 严格升序且合发号次序）：与重建上一版同一组判定，在读任何一棵树之前判。
+    tree_table_entries_ascend_by_tree_identifier_and_in_the_issuing_order(&entries)?;
     let central_mapping_tree = CentralMappingTreeReadOnFirstUse {
         reader,
         root,
@@ -2660,12 +3655,7 @@ pub fn walk_to_file(
     let mut allocation_tree: Option<AllocationRecordTreeReadFromDisk> = None;
     let mut extent_tree: Option<(TreeIdentifier, ExtentsOfTheFirstFile)> = None;
     for entry in &entries {
-        if entry.tree.0 >= root.tree_identifier_watermark {
-            return Err(RecoveryFailure::InvariantViolated {
-                invariant: "I-7.8",
-                detail: "树 ID 不低于水位",
-            });
-        }
+        tree_identifier_of_the_entry_is_below_the_watermark(entry, root)?;
         if entry.root == NodePointer::empty_root() {
             continue;
         }
@@ -2771,85 +3761,36 @@ pub fn walk_to_file(
     };
     let device_identities = reader.device_identities();
     let device_count = device_identities.len();
-    allocation_records_fit_the_pool_geometry(reader, &roots.allocation.records)?;
+    allocation_records_fit_the_pool_geometry(reader, unit_area_start, &roots.allocation.records)?;
     let allocation_records: &[AllocationRecord] = &roots.allocation.records;
-    // 每个落点每盘一条（两盘同槽）：第一个事务 10 × 盘数，每次覆盖写再加 8 × 盘数（换下的那些改写、不删）。
-    // 只核总数是盘数的整数倍拦不住「一盘多一条、另一盘少一条」——发布 B 三方第一轮正推腿打中，改成逐盘核同一批（槽, 跨度）。
-    if !allocation_records_are_one_per_device(allocation_records, &device_identities) {
-        return Err(RecoveryFailure::InvariantViolated {
-            invariant: "E142 走读同款",
-            detail: "分配记录不是每个落点每盘各一条：各盘的（槽, 跨度, 代, 已释放）集合不同，或少于 10 个落点",
-        });
-    }
-    if roots.accounting.leaf_entries_in_key_order.len() != 3 + 6 * device_count {
-        return Err(RecoveryFailure::InvariantViolated {
-            invariant: "E142 走读同款",
-            detail: "记账条目数不是 3 + 6 × 盘数",
-        });
-    }
-    // 进映射的单元：inode 根一条，extent 树、分配记录树、记账树每个节点一条，加上 inode 树的每一片叶容器与文件的每一个数据单元
-    // （映射树自己的节点、树表、实例表豁免，D19（块指针的结构与宽度预算） 已定项 8 / 已定项 12）。
-    // inode 树的叶容器数 = 它的根的条目数（根恒是层级 1，下面每条条目一片容器；层级检查在下面）；
-    // 数据单元数 = extent 树里第一个文件的数据指针数（下段叶记录条数，或内联的那一个）。
-    let mapping_entries_expected = 1
-        + roots.extent.nodes_in_bump_order.len()
-        + roots.allocation.nodes.len()
-        + roots.accounting.version.node_count()
-        + roots.inode.entries.len()
-        + roots.extent.data_pointers.len();
-    if roots.mapping.leaf_entries_in_key_order.len() != mapping_entries_expected {
-        return Err(RecoveryFailure::InvariantViolated {
-            invariant: "E142 走读同款",
-            detail: "映射条目数不是 1 + extent 树、分配记录树、记账树的节点数 + inode 叶容器数 + 数据单元数",
-        });
-    }
-    // 已释放的记录合法（D3（空间分配） 已定项 7：改写不删），它的代是释放代，同样不许晚于根。
-    for record in allocation_records {
-        if record.generation > root.checkpoint_txg || record.span_slots == 0 {
-            return Err(RecoveryFailure::InvariantViolated {
-                invariant: "E142 走读同款",
-                detail: "分配记录跨度为 0，或分配代 / 释放代晚于根",
-            });
-        }
-    }
+    allocation_records_are_one_placement_per_device_on_every_device(
+        allocation_records,
+        &device_identities,
+    )?;
+    accounting_entry_count_is_three_plus_six_per_device(
+        roots.accounting.leaf_entries_in_key_order.len(),
+        device_count,
+    )?;
+    mapping_entry_count_is_one_per_mapped_unit(
+        roots.mapping.leaf_entries_in_key_order.len(),
+        MappedUnitCounts {
+            extent_tree_nodes: roots.extent.nodes_in_bump_order.len(),
+            allocation_record_tree_nodes: roots.allocation.nodes.len(),
+            accounting_tree_nodes: roots.accounting.version.node_count(),
+            inode_leaf_containers: roots.inode.entries.len(),
+            data_units: roots.extent.data_pointers.len(),
+        },
+    )?;
+    allocation_record_generations_and_spans_are_judged(allocation_records, root)?;
     for entry_bytes in &roots.accounting.leaf_entries_in_key_order {
-        let entry = AccountingEntry::parse(entry_bytes).ok_or(
-            RecoveryFailure::EntryNarrowerThanItsFieldTable {
-                what: "记账条目",
-                entry_bytes: entry_bytes.len(),
-                field_table_bytes: usize::try_from(ACCOUNTING_ENTRY_BYTES).expect("34"),
-            },
-        )?;
-        if entry.generation > root.checkpoint_txg || entry.sequence == 0 {
-            return Err(RecoveryFailure::InvariantViolated {
-                invariant: "E142 走读同款",
-                detail: "记账条目的代晚于根或 seq 为 0",
-            });
-        }
+        accounting_entry_parsed_and_judged_against_the_root(entry_bytes, root)?;
     }
 
     // inode 树：根（码 2、层级 1）→ 内部条目 → 叶容器（码 3）→ 记录。
-    if roots.inode.level != 1 {
-        return Err(RecoveryFailure::InvariantViolated {
-            invariant: "I-9.1",
-            detail: "inode 树根层级不是 1",
-        });
-    }
+    inode_tree_root_level_is_one(&roots.inode)?;
     let mut inode_record: Option<InodeRecord> = None;
     for entry in &roots.inode.entries {
-        let (separator_key, identity, child) = parse_inode_internal_entry(entry).ok_or(
-            RecoveryFailure::EntryNarrowerThanItsFieldTable {
-                what: "inode 树内部条目",
-                entry_bytes: entry.len(),
-                field_table_bytes: usize::try_from(INODE_INTERNAL_ENTRY).expect("120"),
-            },
-        )?;
-        if identity.record_type != PACKED_TYPE_INODE {
-            return Err(RecoveryFailure::InvariantViolated {
-                invariant: "I-9.2",
-                detail: "inode 内部条目类型段不是 2",
-            });
-        }
+        let (separator_key, identity, child) = inode_internal_entry_parsed_and_judged(entry)?;
         let leaf_bytes = read_mapped_tree_node_via_hint_then_central_mapping(
             reader,
             &child,
@@ -2866,40 +3807,17 @@ pub fn walk_to_file(
             parse_packed_unit(&leaf_bytes).map_err(|_error| RecoveryFailure::UnitMalformed {
                 what: "inode 叶容器",
             })?;
-        if leaf.identity != identity
-            || u64::try_from(leaf.record_width).expect("记录宽") != INODE_RECORD_BYTES
-            || leaf.filesystem_identifier != expected_filesystem_identifier
-        {
-            return Err(RecoveryFailure::InvariantViolated {
-                invariant: "I-9.2",
-                detail: "inode 叶头与条目身份引用不符",
-            });
-        }
-        if child.head.birth_tree != identity.birth_tree
-            || leaf.birth_sequence != child.birth_sequence
-        {
-            return Err(RecoveryFailure::InvariantViolated {
-                invariant: "I-1.2",
-                detail: "inode 叶的出生身份与子指针不符",
-            });
-        }
-        if leaf.birth_txg > root.checkpoint_txg || leaf.write_order.instance != child.instance {
-            return Err(RecoveryFailure::InvariantViolated {
-                invariant: "I-1.2",
-                detail: "inode 叶诞生于根之后或写序实例与子指针不符",
-            });
-        }
-        for record_bytes in &leaf.records {
-            let record =
-                InodeRecord::parse(record_bytes).ok_or(RecoveryFailure::UnitMalformed {
-                    what: "inode 记录",
-                })?;
-            if record.inode < separator_key || record.inode < identity.container {
-                return Err(RecoveryFailure::InvariantViolated {
-                    invariant: "I-9.4",
-                    detail: "inode 记录号小于分隔 key 或容器号",
-                });
-            }
+        let records = inode_leaf_container_judged_against_its_entry(
+            &leaf,
+            InodeInternalEntry {
+                separator_key,
+                identity,
+                child,
+            },
+            root,
+            expected_filesystem_identifier,
+        )?;
+        for record in records {
             if record.inode == FIRST_INODE_NUMBER {
                 inode_record = Some(record);
             }
@@ -2913,21 +3831,11 @@ pub fn walk_to_file(
     // (locality 0, inode 1, 第 i 个单元第一个字节的文件偏移)、单元从 0 起连号，D8（核心索引结构） 已定项 3 / 已定项 14）。
     // 个数要等于 inode size 按净荷容量除出来的单元数（D4（校验和位置） 已定项 5；与写侧切分同一条除法）——文件没有洞，第一版不写稀疏文件。
     // 解引用先按位置提示、读不到再查映射（D19（块指针的结构与宽度预算） 已定项 5）。
-    let payload_capacity_in_bytes = u64::try_from(data_unit_payload_capacity()).expect("32634");
-    if u64::try_from(roots.extent.data_pointers.len()).expect("单元数")
-        != data_unit_count_of_a_sequential_write(inode_record.size)
-    {
-        return Err(RecoveryFailure::InvariantViolated {
-            invariant: "E142 走读同款",
-            detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符",
-        });
-    }
+    data_unit_count_matches_the_inode_size(roots.extent.data_pointers.len(), &inode_record)?;
     let mut content: Vec<u8> =
         Vec::with_capacity(usize::try_from(inode_record.size).expect("文件长度装得进 usize"));
     // 迭代次数的上界是这个文件的单元数（上面核过等于 inode size 除出来的单元数）；跨轮携带的只有已经拼出来的内容，每一个提前出口都是交回一个错。
     for (position, pointer) in roots.extent.data_pointers.iter().enumerate() {
-        let unit_index_in_file = DataUnitIndexInFile(u64::try_from(position).expect("单元序号"));
-        let first_file_byte = unit_index_in_file.first_file_byte(payload_capacity_in_bytes);
         let bytes = read_data_unit_via_hint_then_central_mapping(
             reader,
             pointer,
@@ -2940,53 +3848,55 @@ pub fn walk_to_file(
             mapping_fallbacks,
         )?
         .into_content()?;
-        let header = parse_data_unit(&bytes).map_err(|_error| RecoveryFailure::UnitMalformed {
-            what: "数据单元",
-        })?;
-        if header.identity.tree != roots.extent_tree
-            || header.identity.object != FIRST_INODE_NUMBER
-            || header.identity.anchor_offset != first_file_byte.0
-        {
-            return Err(RecoveryFailure::InvariantViolated {
-                invariant: "I-1.1",
-                detail: "数据单元五元组与查找路径不符",
-            });
-        }
-        if header.identity.object_birth != inode_record.object_birth {
-            return Err(RecoveryFailure::InvariantViolated {
-                invariant: "I-9.10",
-                detail: "对象出生代与 inode 记录不符",
-            });
-        }
-        if header.birth_txg != pointer.head.birth_txg
-            || header.write_order != pointer.write_order
-            || header.filesystem_identifier != expected_filesystem_identifier
-        {
-            return Err(RecoveryFailure::InvariantViolated {
-                invariant: "I-1.2",
-                detail: "数据单元头与指针的出生身份不符",
-            });
-        }
-        // 最后一个单元之外恒装满一个净荷（与写侧切分同一条口径）。
-        let expected_payload_length = inode_record
-            .size
-            .saturating_sub(first_file_byte.0)
-            .min(payload_capacity_in_bytes);
-        if u64::from(header.declared_length) != expected_payload_length {
-            return Err(RecoveryFailure::InvariantViolated {
-                invariant: "E142 走读同款",
-                detail: "声明长度与 inode size 按净荷容量切出来的这一段不符",
-            });
-        }
-        let payload = data_unit_payload(&bytes, header.declared_length).map_err(|_error| {
-            RecoveryFailure::InvariantViolated {
-                invariant: "I-2.3",
-                detail: "补齐字节非零",
-            }
-        })?;
+        let payload = data_unit_judged_against_its_pointer_and_the_inode_record(
+            &bytes,
+            DataUnitOfTheFirstFile {
+                position,
+                pointer,
+                extent_tree: roots.extent_tree,
+            },
+            &inode_record,
+            expected_filesystem_identifier,
+        )?;
         content.extend_from_slice(payload);
     }
     Ok(Some(content))
+}
+
+/// 同 [`walk_to_file_in_the_unit_area_starting_at`]，单元区起点先择一次系统配置现算（[`choose_system_configuration`]：
+/// 多读每块盘的两个系统配置槽）。给手里没有择好的系统配置的调用方（用例）；[`recover`] 走带起点的那一份。
+///
+/// # Errors
+/// 择不到系统配置（[`choose_system_configuration`] 的各个成员）；其余同带起点的那一份。
+pub fn walk_to_file(
+    reader: &dyn PoolReader,
+    root: &RootRecord,
+    mapping_fallbacks: &mut usize,
+) -> Result<Option<Vec<u8>>, RecoveryFailure> {
+    walk_to_file_in_the_unit_area_starting_at(
+        reader,
+        unit_area_start_of_the_pool(reader)?,
+        root,
+        mapping_fallbacks,
+    )
+}
+
+/// 同 [`rebuild_version_in_the_unit_area_starting_at`]，单元区起点先择一次系统配置现算（[`choose_system_configuration`]：
+/// 多读每块盘的两个系统配置槽）。给手里没有择好的系统配置的调用方（用例）；可写挂载与管理员回退走带起点的那一份。
+///
+/// # Errors
+/// 择不到系统配置 ⇒ `Walk(`[`choose_system_configuration`] 的各个成员`)`；其余同带起点的那一份。
+pub fn rebuild_version(
+    reader: &dyn PoolReader,
+    root: &RootRecord,
+    record_standing_for_root: Option<JournalRecord>,
+) -> Result<RebuiltVersion, RebuildVersionFailure> {
+    rebuild_version_in_the_unit_area_starting_at(
+        reader,
+        unit_area_start_of_the_pool(reader)?,
+        root,
+        record_standing_for_root,
+    )
 }
 
 /// 整条恢复路径。报出去的 `root` 恒是所选的那条根；施加记录之后走的是重建出来的根。
@@ -3047,7 +3957,13 @@ pub fn recover(reader: &dyn PoolReader, policy: JournalPolicy) -> RecoveryReport
             }
         }
     };
-    let outcome = match walk_to_file(reader, &effective_root, &mut mapping_fallbacks) {
+    let unit_area_start = unit_area_start_of_the_chosen_system_configuration(&system_configuration);
+    let outcome = match walk_to_file_in_the_unit_area_starting_at(
+        reader,
+        unit_area_start,
+        &effective_root,
+        &mut mapping_fallbacks,
+    ) {
         Ok(Some(content)) => RecoveryOutcome::FileRead {
             root: root_key,
             content,
@@ -3192,7 +4108,7 @@ mod allocation_records_per_device_tests {
 mod allocation_record_pool_geometry_tests {
     use super::{allocation_records_fit_the_pool_geometry, PoolReader, RecoveryFailure};
     use crate::address::{CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, SlotNumber};
-    use crate::allocator::AllocationRecord;
+    use crate::allocator::{AllocationRecord, UnitAreaStart};
     use singlefs_format::{SLOT_BYTES, UNIT_AREA_START_SLOT};
 
     /// 每块盘 4 GiB（与坏盘输入那一档的盘同宽）：单元区从 [`UNIT_AREA_START_SLOT`] 起到槽
@@ -3242,8 +4158,13 @@ mod allocation_record_pool_geometry_tests {
         }
     }
 
+    /// 默认环长的池：单元区从 [`UNIT_AREA_START_SLOT`] 起（这组用例按那个常量摆记录）。
     fn judge(records: &[AllocationRecord]) -> Result<(), RecoveryFailure> {
-        allocation_records_fit_the_pool_geometry(&PoolOfTwoDevicesOfFourGibibytes, records)
+        allocation_records_fit_the_pool_geometry(
+            &PoolOfTwoDevicesOfFourGibibytes,
+            UnitAreaStart::of_the_default_journal_ring(),
+            records,
+        )
     }
 
     fn outside_the_geometry(what: &'static str) -> Result<(), RecoveryFailure> {

@@ -21,7 +21,8 @@ use crate::address::{
     TreeIdentifier,
 };
 use crate::allocator::{
-    DeviceFreeMap, Placement, PoolAllocator, RootRingOccupancy, RootRingOccupant,
+    DeviceFreeMap, Placement, PoolAllocator, RootRingOccupancy, RootRingOccupant, UnitAreaStart,
+    UnitAreaStartOffTheClusterSegmentBoundaryUnsupported,
 };
 use crate::block_device::{BlockDevice, BlockDeviceError, WriteDurability};
 use crate::bytes::ByteWriter;
@@ -30,9 +31,9 @@ use crate::pointer::{BirthSequence, LocationEntry, NodePointer, PointerHead};
 use crate::root_record::{RootRecord, UnmountMarker};
 use crate::root_ring::{region_length_in_bytes, region_start, ring_end, slot_offset, RootRingSlot};
 use crate::system_configuration::{
-    journal_in_flight_record_limit, SystemConfiguration, SystemImmutableConfiguration,
-    SystemImmutableSizes, SystemMutableConfiguration, SystemRuntimeConfiguration,
-    SystemRuntimeQuantities,
+    journal_in_flight_record_limit, journal_in_flight_record_limit_fits_its_four_byte_field,
+    SystemConfiguration, SystemImmutableConfiguration, SystemImmutableSizes,
+    SystemMutableConfiguration, SystemRuntimeConfiguration, SystemRuntimeQuantities,
 };
 use crate::unit::{
     build_index_node, build_packed_unit, PackedIdentity, WriteOrder, PACKED_TYPE_INSTANCE_TABLE,
@@ -45,9 +46,15 @@ pub const SYSTEM_CONFIGURATION_GENERATION_AT_MKFS: u64 = 1;
 /// mkfs 写的回退下界 F：第 0 代根与每个系统配置槽两处都写 0（`.claude/kb/layout/01-first-txn.md` 一「回退下界 F」、
 /// 七「回退下界 F」两行；D16（发布语义） 已定项 1：F 平时不动，准入不够或正常卸载时才抬）。
 pub const ROLLBACK_FLOOR_AT_MKFS: CheckpointTxg = CheckpointTxg(0);
-/// 实例表单元第 0 片落槽 50176（占两槽），树表单元第 0 版落槽 50178（D3（空间分配） 已定项 10 ④）。
+/// **默认环长（768 MiB）下** mkfs 写实例表单元第 0 片的槽 50176（占两槽）与树表单元第 0 版的槽 50178：单元区起点与起点加 2
+/// （D3（空间分配） 已定项 10 ④）。mkfs 按这一次的环长现算起点（[`MakeFilesystemOutput::unit_area_start`]），
+/// 别的环长下落点跟着走（[`MakeFilesystemOutput::instance_table_placement`]）；这两个常量只对默认环长的池说话，
+/// 默认环下与现算的相等由 `make_filesystem` 的单测钉住。
 pub const INSTANCE_TABLE_SLOT: SlotNumber = SlotNumber(UNIT_AREA_START_SLOT);
 pub const TREE_TABLE_GENESIS_SLOT: SlotNumber = SlotNumber(UNIT_AREA_START_SLOT + 2);
+/// 实例表单元第 0 片在单元区起点处、占两槽；树表单元第 0 版紧跟其后（起点加 2），占一槽。
+const INSTANCE_TABLE_SPAN_SLOTS: u64 = 2;
+const TREE_TABLE_GENESIS_SPAN_SLOTS: u64 = 1;
 /// 树表单元的 key = 树 ID，8 字节。
 pub const TREE_TABLE_KEY_WIDTH: usize = 8;
 /// 第一版两块盘时根环三个区域的归属：区域 0 → 盘 0、区域 1 → 盘 1、区域 2 → 盘 0（D2（RAID 条带策略） 已定项 7，写死、不是 mkfs 参数）。
@@ -134,7 +141,7 @@ pub enum MakeFilesystemError {
         ring_end: u64,
         device_bytes: u64,
     },
-    /// 单元区起点越过设备末尾：`unit_area_start` 是 mkfs 写实例表单元的那个设备内字节偏移（[`INSTANCE_TABLE_SLOT`]），
+    /// 单元区起点越过设备末尾：`unit_area_start` 是 mkfs 写实例表单元的那个设备内字节偏移（按这一次的环长现算的单元区起点），
     /// 实例表单元第 0 片与树表单元第 0 版装不进最小那块盘。
     UnitAreaBeyondDevice {
         unit_area_start: u64,
@@ -147,15 +154,21 @@ pub enum MakeFilesystemError {
         first_in_layout_order: FixedStructureExtent,
         second_in_layout_order: FixedStructureExtent,
     },
-    /// journal 环的末端越过单元区起点：环会盖住实例表单元与分配器发出去的单元。
-    /// D23（journal 的角色与格式） 已定项 19 ③ 写单元区起始槽号随环长走，而实例表 / 树表的落点（[`INSTANCE_TABLE_SLOT`]、
-    /// [`TREE_TABLE_GENESIS_SLOT`]）、分配器（`allocator::unit_area_slots_of_device` 与空闲图的下标）、
-    /// 恢复判分配记录落点（`recovery::allocation_records_fit_the_pool_geometry`）都还按编译期常量 `UNIT_AREA_START_SLOT` 算
-    /// （C475（非默认环长下单元区起点取编译期常量））⇒ 第一版不支持末端越过它的环长。末端不越过它的环照收，单元区照旧从那个常量起。
-    JournalRingPastTheCompiledUnitAreaStartUnsupported {
-        journal_ring_end_in_bytes: u64,
-        unit_area_start_in_bytes: u64,
+    /// 在飞记录数上限（环槽数 ÷ F，D23（journal 的角色与格式） 已定项 18）装不进系统配置里它那 4 字节
+    /// （`layout/01-first-txn.md` 一「journal 在飞记录数上限 | 4」）：环长 ≥ 2³² × 12288 字节（约 48 TiB）才走得到，
+    /// 要一块 ≥ 192 TiB 的盘才过得了环长上界那一关。该拒还是该改字段宽，条款没写（实审 C11b 报告顺带看到的第 5 条）；
+    /// 第一版在任何写之前拒，改之前 mkfs 写系统配置那一步 panic（`SystemConfiguration::to_slot` 的 expect），那时根环、journal 环
+    /// 已清、两个单元与三条第 0 代根已写。`in_flight_record_limit` 是这个环长算出来的上限。
+    JournalInFlightRecordLimitWiderThanItsFourByteField {
+        ring_bytes: u64,
+        in_flight_record_limit: u64,
     },
+    /// 按环长现算的单元区起点（journal 环末尾的下一个槽，D3（空间分配） 已定项 10 ④）不落在 64 槽聚簇段边界上：
+    /// 这样的单元区怎么分段条款没写，第一版不支持（`allocator::UnitAreaStart` 的不变量，实审 A2c）。环长落在 1 MiB 整数倍上
+    /// （更一般：环末尾所在的槽数是 64 的整数倍）的都在边界上。
+    UnitAreaStartOffTheClusterSegmentBoundaryUnsupported(
+        UnitAreaStartOffTheClusterSegmentBoundaryUnsupported,
+    ),
     /// 参数说三个区域住哪块盘，而池里没有那块盘。
     RegionDeviceMissing {
         region: u64,
@@ -176,12 +189,45 @@ impl From<BlockDeviceError> for MakeFilesystemError {
     }
 }
 
-/// mkfs 写出的三样东西，给验收与步 5 用。
+/// mkfs 写出的三样东西与它按环长现算的单元区起点，给验收与步 5 用。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MakeFilesystemOutput {
     pub root: RootRecord,
     pub instance_table_unit: Vec<u8>,
     pub tree_table_genesis_unit: Vec<u8>,
+    /// 这一次 mkfs 的单元区起点：journal 环末尾的下一个槽（`allocator::UnitAreaStart::following_the_journal_ring`），
+    /// 与写进系统配置偏移 417 那 8 字节的是同一个数；实例表单元第 0 片就写在这里。
+    pub unit_area_start: UnitAreaStart,
+}
+
+impl MakeFilesystemOutput {
+    /// mkfs 写实例表单元第 0 片的落点：单元区起点，两槽。
+    #[must_use]
+    pub fn instance_table_placement(&self) -> Placement {
+        instance_table_placement_at(self.unit_area_start)
+    }
+
+    /// mkfs 写树表单元第 0 版的落点：单元区起点加 2，一槽。
+    #[must_use]
+    pub fn tree_table_genesis_placement(&self) -> Placement {
+        tree_table_genesis_placement_at(self.unit_area_start)
+    }
+}
+
+/// 单元区从 `unit_area_start` 起时 mkfs 写实例表单元第 0 片的落点（写与记账出自这一处）。
+fn instance_table_placement_at(unit_area_start: UnitAreaStart) -> Placement {
+    Placement {
+        slot: unit_area_start.slot(),
+        span: INSTANCE_TABLE_SPAN_SLOTS,
+    }
+}
+
+/// 单元区从 `unit_area_start` 起时 mkfs 写树表单元第 0 版的落点：紧跟实例表那两槽。
+fn tree_table_genesis_placement_at(unit_area_start: UnitAreaStart) -> Placement {
+    Placement {
+        slot: SlotNumber(unit_area_start.slot().0 + INSTANCE_TABLE_SPAN_SLOTS),
+        span: TREE_TABLE_GENESIS_SPAN_SLOTS,
+    }
 }
 
 /// 实例表 kind 1 链指针记录（88 字节）：kind 1 + flags 0 + 指向下一片的指针 86，第一片「无下一片」指针全 0。
@@ -250,12 +296,16 @@ fn fixed_structure_extents(geometry: &SystemImmutableSizes) -> Vec<FixedStructur
         .collect()
 }
 
-/// 几何判定，全在任何写之前（[`make_filesystem`] 的第一步）。次序：根槽宽、环长下界（一条记录、F 条记录）与上界、根环末端与单元区在不在盘内、
-/// 根槽宽不超过槽距、固定结构两两不重叠、journal 环末端不越过单元区起点、区域归属。
+/// 几何判定，全在任何写之前（[`make_filesystem`] 的第一步）。次序：根槽宽、环长下界（一条记录、F 条记录）、在飞上限装不装得进 4 字节、
+/// 环长上界、根环末端在不在盘内、按环长现算的单元区起点在不在聚簇段边界上、单元区在不在盘内、根槽宽不超过槽距、
+/// 固定结构两两不重叠、区域归属。
+///
+/// 交回按环长现算的单元区起点：mkfs 写实例表与树表、写系统配置偏移 417 那 8 字节、建 mkfs 同一个进程里的分配器，都用这一个数，
+/// 判定与写读的是同一份输入。journal 环末端不会越过它：起点就是环末尾的下一个槽（向上取整到槽边界）。
 fn check_geometry(
     parameters: &MakeFilesystemParameters,
     devices: &[(DeviceIdentity, u64)],
-) -> Result<(), MakeFilesystemError> {
+) -> Result<UnitAreaStart, MakeFilesystemError> {
     let geometry = &parameters.geometry;
     // 根槽宽 = physical_block_size（`RootRecord::to_slot` 按它切）：装不下根记录就在这里拒，不走到那里的断言——
     // 那时根环与 journal 环已经清过、两个单元已经写了。
@@ -282,6 +332,16 @@ fn check_geometry(
             },
         );
     }
+    // 在飞上限写进系统配置的是 4 字节（`SystemConfiguration::to_slot`）：装不下就在这里拒，不走到写系统配置那一步的 expect——
+    // 那时根环与 journal 环已经清过、两个单元与三条第 0 代根已经写了（实审 C11b 顺带看到的第 5 条）。
+    if !journal_in_flight_record_limit_fits_its_four_byte_field(ring_bytes) {
+        return Err(
+            MakeFilesystemError::JournalInFlightRecordLimitWiderThanItsFourByteField {
+                ring_bytes,
+                in_flight_record_limit: journal_in_flight_record_limit(ring_bytes),
+            },
+        );
+    }
     if ring_bytes > smallest / 4 {
         return Err(MakeFilesystemError::JournalRingTooLargeForDevice {
             ring_bytes,
@@ -298,13 +358,19 @@ fn check_geometry(
             device_bytes: smallest,
         });
     }
-    // 单元区起点取 mkfs 真正写实例表单元的那个偏移：它今天是编译期常量，不随环长走（C475），按环长现算出来的数只在默认环长下与它相等。
-    let unit_area_start = INSTANCE_TABLE_SLOT.to_device_offset().0;
+    // 单元区起点按这一次的环长现算（journal 环末尾的下一个槽，D3（空间分配） 已定项 10 ④；C475（非默认环长下单元区起点取编译期常量）），
+    // mkfs 写实例表单元的就是这个槽；不在聚簇段边界上第一版不支持（实审 A2c）。
+    let unit_area_start = UnitAreaStart::following_the_journal_ring(ring_bytes)
+        .map_err(MakeFilesystemError::UnitAreaStartOffTheClusterSegmentBoundaryUnsupported)?;
     let end_of_the_units_written_by_make_filesystem =
-        TREE_TABLE_GENESIS_SLOT.to_device_offset().0 + NODE_BYTES;
+        tree_table_genesis_placement_at(unit_area_start)
+            .slot
+            .to_device_offset()
+            .0
+            + NODE_BYTES;
     if end_of_the_units_written_by_make_filesystem > smallest {
         return Err(MakeFilesystemError::UnitAreaBeyondDevice {
-            unit_area_start,
+            unit_area_start: unit_area_start.slot().to_device_offset().0,
             device_bytes: smallest,
         });
     }
@@ -328,16 +394,6 @@ fn check_geometry(
             }
         }
     }
-    // 上面判过两两不重叠，区域与系统配置槽都落在 journal 环起点（16 MiB）之前；越得过单元区起点的只有 journal 环。
-    let journal_ring_end_in_bytes = JOURNAL_RING_START_SLOT * SLOT_BYTES + ring_bytes;
-    if journal_ring_end_in_bytes > unit_area_start {
-        return Err(
-            MakeFilesystemError::JournalRingPastTheCompiledUnitAreaStartUnsupported {
-                journal_ring_end_in_bytes,
-                unit_area_start_in_bytes: unit_area_start,
-            },
-        );
-    }
     for (region, device) in parameters.region_devices.iter().enumerate() {
         if !devices.iter().any(|(identity, _)| identity == device) {
             return Err(MakeFilesystemError::RegionDeviceMissing {
@@ -351,7 +407,7 @@ fn check_geometry(
             region_devices: parameters.region_devices,
         });
     }
-    Ok(())
+    Ok(unit_area_start)
 }
 
 /// 对两块设备做 mkfs。`devices` 里每块盘的身份由调用方给（位置条目按设备身份升序）。
@@ -368,7 +424,9 @@ pub fn make_filesystem<Device: BlockDevice>(
         .iter()
         .map(|(identity, device)| (*identity, device.size_in_bytes()))
         .collect();
-    check_geometry(parameters, &sizes)?;
+    let unit_area_start = check_geometry(parameters, &sizes)?;
+    let instance_table_placement = instance_table_placement_at(unit_area_start);
+    let tree_table_genesis_placement = tree_table_genesis_placement_at(unit_area_start);
     let identities: Vec<DeviceIdentity> = sizes.iter().map(|(identity, _)| *identity).collect();
     let instance = MKFS_INSTANCE_GENERATION;
     let genesis = CheckpointTxg(0);
@@ -422,7 +480,7 @@ pub fn make_filesystem<Device: BlockDevice>(
     // `singlefs-checker` 的 `image.rs`），任一处以后改成扫全部盘，漏就回来了。
     // 按几何清之后 mkfs 的后置条件只有一句：根环三段在每块盘上只剩这次写下的三条第 0 代根，别处全 0。
     // 次序与屏障：清零按设备内偏移升序发（根环 1 / 4 / 7 MiB，journal 环 16 MiB），几段之间不另加屏障——
-    // 它们互不重叠，也不与同一段里的单元写重叠（`check_geometry` 判过：固定结构两两不重叠、journal 环末端不越过单元区起点）；真正重叠的是清根环与根槽 FUA 写
+    // 它们互不重叠，也不与同一段里的单元写重叠（`check_geometry` 判过固定结构两两不重叠；单元区起点是环末尾的下一个槽）；真正重叠的是清根环与根槽 FUA 写
     //（区域 r 的槽 0），那一对由原有的那道屏障（单元写之后、根 FUA 之前）隔开，不靠发出次序。
     // mkfs 中途崩溃第一版没有条款（层 0 从 mkfs 之后的池起枚举，`.claude/kb/layout/01-first-txn.md` 八
     // mkfs 那一行的「层 0 枚举」格写「不在」），不为一个没有条款的语义加屏障。
@@ -441,12 +499,12 @@ pub fn make_filesystem<Device: BlockDevice>(
     }
     for (_, device) in devices.iter_mut() {
         device.write_at(
-            INSTANCE_TABLE_SLOT.to_device_offset(),
+            instance_table_placement.slot.to_device_offset(),
             &instance_table_unit,
             WriteDurability::Plain,
         )?;
         device.write_at(
-            TREE_TABLE_GENESIS_SLOT.to_device_offset(),
+            tree_table_genesis_placement.slot.to_device_offset(),
             &tree_table_genesis_unit,
             WriteDurability::Plain,
         )?;
@@ -467,7 +525,7 @@ pub fn make_filesystem<Device: BlockDevice>(
             },
             locations: location_entries(
                 &identities,
-                TREE_TABLE_GENESIS_SLOT,
+                tree_table_genesis_placement.slot,
                 &tree_table_genesis_unit,
             ),
             instance,
@@ -480,7 +538,11 @@ pub fn make_filesystem<Device: BlockDevice>(
                 birth_tree: TreeIdentifier(0),
                 birth_txg: genesis,
             },
-            locations: location_entries(&identities, INSTANCE_TABLE_SLOT, &instance_table_unit),
+            locations: location_entries(
+                &identities,
+                instance_table_placement.slot,
+                &instance_table_unit,
+            ),
             instance,
             birth_sequence: instance_table_sequence,
         },
@@ -535,6 +597,7 @@ pub fn make_filesystem<Device: BlockDevice>(
         root,
         instance_table_unit,
         tree_table_genesis_unit,
+        unit_area_start,
     })
 }
 
@@ -572,8 +635,12 @@ pub fn root_ring_occupancy_after_make_filesystem(
 }
 
 /// mkfs 同一个进程里接着写（取号、暖机、第一个文件版本、之后的发布）、一次挂载都没做的那条会话用的分配器：每块盘一张空闲图，
+/// 单元区从这一次 mkfs 按环长现算的起点起（[`MakeFilesystemOutput::unit_area_start`]，与挂载按盘上系统配置建的空闲图同一个起点），
 /// mkfs 写在单元区里的两个单元记成分配代 0（`PoolAllocator::mark_format_time_units`），装上 mkfs 刚写下的根环
 /// （`root_ring_occupancy_after_make_filesystem`）。
+///
+/// # Panics
+/// 某块盘末尾在单元区起点之前：`genesis` 是在这几块盘上做成的 mkfs 交回的，mkfs 按最小那块盘判过 `UnitAreaBeyondDevice`。
 #[must_use]
 pub fn allocator_after_make_filesystem<Device: BlockDevice>(
     parameters: &MakeFilesystemParameters,
@@ -583,18 +650,18 @@ pub fn allocator_after_make_filesystem<Device: BlockDevice>(
     let mut allocator = PoolAllocator::new(
         devices
             .iter()
-            .map(|(identity, device)| DeviceFreeMap::new(*identity, device.size_in_bytes()))
+            .map(|(identity, device)| {
+                DeviceFreeMap::with_unit_area_start(
+                    *identity,
+                    device.size_in_bytes(),
+                    genesis.unit_area_start,
+                )
+            })
             .collect(),
     );
     allocator.mark_format_time_units(
-        Placement {
-            slot: INSTANCE_TABLE_SLOT,
-            span: 2,
-        },
-        Placement {
-            slot: TREE_TABLE_GENESIS_SLOT,
-            span: 1,
-        },
+        genesis.instance_table_placement(),
+        genesis.tree_table_genesis_placement(),
     );
     allocator.install_root_ring_occupancy(root_ring_occupancy_after_make_filesystem(
         parameters, genesis,

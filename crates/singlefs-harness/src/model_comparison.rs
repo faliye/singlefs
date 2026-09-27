@@ -8,7 +8,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use singlefs_core::address::{CheckpointTxg, DataUnitIndexInFile, InstanceGeneration};
+use singlefs_core::address::{CheckpointTxg, DataUnitIndexInFile, InstanceGeneration, SlotNumber};
 use singlefs_core::allocator::{AllocationRecord, PlacementRefusal};
 use singlefs_core::block_device::BlockDeviceError;
 use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
@@ -17,11 +17,15 @@ use singlefs_core::instance_table::{
 };
 use singlefs_core::mount::{
     InstanceRow, MountError, Mounted, RollbackCandidateExclusion, RollbackError,
+    StillUnreadableAfterOneReread,
 };
+use singlefs_core::pointer::LocationEntry;
 use singlefs_core::recovery::{RecoveryOutcome, RecoveryReport};
+use singlefs_core::root_record::RootRecord;
 use singlefs_core::root_ring::RootRingSlot;
 use singlefs_core::transaction::{
-    PoolVersion, PublishError, TransactionOutput, TransactionUnit, VersionWithoutFilePublishOutput,
+    AllocationRecordsOfTheVersionWithoutFile, PoolVersion, PublishError, PublishedUnit,
+    TransactionOutput, TransactionUnit, VersionWithoutFilePublishOutput,
 };
 use singlefs_core::unit::{data_unit_payload, parse_data_unit};
 
@@ -128,7 +132,11 @@ pub fn observed_root_of_file_version(output: &TransactionOutput) -> ObservedRoot
         file: observed_file_of_file_version(output),
         instance_table: observed_instance_table_of_file_version(output),
         unit_allocation_records: ObservedUnitAllocationRecords::EveryRoleOfTheVersion(
-            allocation_records_of_every_role_of_file_version(output),
+            allocation_records_of_every_role(
+                &output.units,
+                &output.allocation_records,
+                &output.root,
+            ),
         ),
     }
 }
@@ -176,92 +184,174 @@ fn instance_table_page_of_role(identity: TransactionUnit) -> Option<InstanceTabl
     }
 }
 
-/// 这一版的整张实例表：`units` 里实例表链的各片，从第 0 片起按每片末尾的链指针记录往下接，接到「无下一片」为止。
-/// `units` 里一片都没有（mkfs 之后第一次重写之前，实例表还是 mkfs 那一片、`units` 不带它），或链指着的下一片不在 `units` 里
-/// （从盘上重建的一版只带第 0 片），交回 [`ObservedInstanceTable::NotInTheOutput`]：比不了，不当成空表。
+/// 从 `units` 里解不出整张实例表的原因（[`instance_table_rows_of_units`]）。
+enum InstanceTableNotDecodedFromTheUnits {
+    /// `units` 里一片实例表都没有。
+    NoPageInTheUnits,
+    /// 链指着的那一片不在 `units` 里。
+    ChainedPageNotInTheUnits,
+    /// 这一片的字节解不开。
+    PageUndecodable(InstanceTablePageIndex),
+}
+
+/// `units` 里实例表链的各片，从第 0 片起按每片末尾的链指针记录往下接，接到「无下一片」为止，交回整张表的行（各片的行按链上的次序）。
+/// 带文件的一版与树表 0 条上写行的那一版共用这一处：两处各解一份，片的接法会分叉。
 ///
 /// 迭代上界是 `units` 里实例表的片数；跨轮带的是已接起来的行与下一片的片序号；提前出口是链断在 `units` 之外、一片解不开。
-#[must_use]
-pub fn observed_instance_table_of_file_version(
-    output: &TransactionOutput,
-) -> ObservedInstanceTable {
-    let pages: BTreeMap<InstanceTablePageIndex, &[u8]> = output
-        .units
+fn instance_table_rows_of_units(
+    units: &[PublishedUnit],
+) -> Result<Vec<ModelInstanceRow>, InstanceTableNotDecodedFromTheUnits> {
+    let pages: BTreeMap<InstanceTablePageIndex, &[u8]> = units
         .iter()
         .filter_map(|unit| {
             instance_table_page_of_role(unit.identity).map(|page| (page, unit.bytes.as_slice()))
         })
         .collect();
     if pages.is_empty() {
-        return ObservedInstanceTable::NotInTheOutput {
-            why: "这一版的 units 里没有实例表（mkfs 之后第一次重写之前实例表还是 mkfs 那一片，输出不带它）",
-        };
+        return Err(InstanceTableNotDecodedFromTheUnits::NoPageInTheUnits);
     }
     let mut rows = Vec::new();
     let mut page_index = InstanceTablePageIndex::FIRST;
     for _ in 0..pages.len() {
         let Some(bytes) = pages.get(&page_index) else {
-            return ObservedInstanceTable::NotInTheOutput {
-                why: "实例表链指着的那一片不在这一版的 units 里（从盘上重建的一版只带第 0 片）",
-            };
+            return Err(InstanceTableNotDecodedFromTheUnits::ChainedPageNotInTheUnits);
         };
         let Some(page) = InstanceTablePage::parse(bytes, page_index) else {
-            return ObservedInstanceTable::Undecodable {
-                what: format!("实例表第 {} 片解不开", page_index.0),
-            };
+            return Err(InstanceTableNotDecodedFromTheUnits::PageUndecodable(
+                page_index,
+            ));
         };
         rows.extend(page.rows.iter().map(model_instance_row));
         match page.chain {
-            InstanceTableChainRecord::LastPage => return ObservedInstanceTable::Rows(rows),
+            InstanceTableChainRecord::LastPage => return Ok(rows),
             InstanceTableChainRecord::NextPage(_) => page_index = page_index.next(),
         }
     }
-    ObservedInstanceTable::NotInTheOutput {
-        why: "实例表链指着的那一片不在这一版的 units 里（从盘上重建的一版只带第 0 片）",
+    Err(InstanceTableNotDecodedFromTheUnits::ChainedPageNotInTheUnits)
+}
+
+/// 带文件的一版的整张实例表：`units` 里实例表链的各片接起来（[`instance_table_rows_of_units`]）。
+/// `units` 里一片都没有（mkfs 之后第一次重写之前，实例表还是 mkfs 那一片、`units` 不带它），或链指着的下一片不在 `units` 里
+/// （从盘上重建的一版只带第 0 片），交回 [`ObservedInstanceTable::NotInTheOutput`]：比不了，不当成空表。
+#[must_use]
+pub fn observed_instance_table_of_file_version(
+    output: &TransactionOutput,
+) -> ObservedInstanceTable {
+    match instance_table_rows_of_units(&output.units) {
+        Ok(rows) => ObservedInstanceTable::Rows(rows),
+        Err(InstanceTableNotDecodedFromTheUnits::NoPageInTheUnits) => {
+            ObservedInstanceTable::NotInTheOutput {
+                why: "这一版的 units 里没有实例表（mkfs 之后第一次重写之前实例表还是 mkfs 那一片，输出不带它）",
+            }
+        }
+        Err(InstanceTableNotDecodedFromTheUnits::ChainedPageNotInTheUnits) => {
+            ObservedInstanceTable::NotInTheOutput {
+                why: "实例表链指着的那一片不在这一版的 units 里（从盘上重建的一版只带第 0 片）",
+            }
+        }
+        Err(InstanceTableNotDecodedFromTheUnits::PageUndecodable(page_index)) => {
+            ObservedInstanceTable::Undecodable {
+                what: format!("实例表第 {} 片解不开", page_index.0),
+            }
+        }
     }
 }
 
-/// 这一版每个角色的单元在这一版分配记录里的那几条：`units` 里的每个角色按单元的槽号找；`units` 里没有实例表时
-/// （mkfs 之后第一次重写之前），实例表那个角色按根记录里那条实例表指针的两条位置条目找——这一版仍然有这个角色，
-/// 模型那一侧照样问它（代码审阅第 12 条：两个方向都比，漏交的角色也报）。
-fn allocation_records_of_every_role_of_file_version(
-    output: &TransactionOutput,
-) -> Vec<(ModelUnitRole, Vec<ObservedAllocationRecord>)> {
-    let observed_record = |record: &AllocationRecord| ObservedAllocationRecord {
+/// 树表 0 条的一版上写行那次发布写出的整张实例表：写行 COW 重写整条链（D18（块里携带什么信息） 已定项 11），
+/// 这次写出的 `units` 里就是整条链。一片都没有、链接不上、一片解不开，都是实现交出的东西与它自己的根对不上：
+/// 交回 [`ObservedInstanceTable::Undecodable`]（模型报这一版的实例表），不当成比不了。
+fn observed_instance_table_written_by_a_row_publish(
+    units: &[PublishedUnit],
+) -> ObservedInstanceTable {
+    let what = match instance_table_rows_of_units(units) {
+        Ok(rows) => return ObservedInstanceTable::Rows(rows),
+        Err(InstanceTableNotDecodedFromTheUnits::NoPageInTheUnits) => {
+            "写行那次发布重写整条实例表链，交回的 units 里一片实例表都没有".to_string()
+        }
+        Err(InstanceTableNotDecodedFromTheUnits::ChainedPageNotInTheUnits) => {
+            "写行那次发布重写整条实例表链，链指着的那一片不在交回的 units 里".to_string()
+        }
+        Err(InstanceTableNotDecodedFromTheUnits::PageUndecodable(page_index)) => {
+            format!("实例表第 {} 片解不开", page_index.0)
+        }
+    };
+    ObservedInstanceTable::Undecodable { what }
+}
+
+fn observed_allocation_record(record: &AllocationRecord) -> ObservedAllocationRecord {
+    ObservedAllocationRecord {
         device: ModelDeviceIdentity(record.device.0),
         generation: model_txg(record.generation),
         is_released: record.is_released,
-    };
-    let mut records_of_roles: Vec<(ModelUnitRole, Vec<ObservedAllocationRecord>)> = output
-        .units
+    }
+}
+
+/// 根记录直接指着的一个单元在这一版分配记录里的那几条：按那条指针的两条位置条目（盘、槽）找。
+fn observed_allocation_records_at_the_locations(
+    allocation_records: &[AllocationRecord],
+    locations: &[LocationEntry],
+) -> Vec<ObservedAllocationRecord> {
+    allocation_records
+        .iter()
+        .filter(|record| {
+            locations
+                .iter()
+                .any(|location| location.device == record.device && location.slot == record.slot)
+        })
+        .map(observed_allocation_record)
+        .collect()
+}
+
+/// 这次写出（或照抄进来）的一个单元在这一版分配记录里的那几条：落点在它的槽上的（两盘同槽，每块盘一条）。
+fn observed_allocation_records_on_the_slot(
+    allocation_records: &[AllocationRecord],
+    slot: SlotNumber,
+) -> Vec<ObservedAllocationRecord> {
+    allocation_records
+        .iter()
+        .filter(|record| record.slot == slot)
+        .map(observed_allocation_record)
+        .collect()
+}
+
+/// 这一版每个角色的单元在这一版分配记录里的那几条：`units` 里的每个角色按单元的槽号找；根记录直接指着、而 `units` 里没有的
+/// 两个角色按根记录里那条指针的两条位置条目找——实例表（带文件的一版在 mkfs 之后第一次重写之前）与树表（树表 0 条的一版从不重写
+/// mkfs 写的那一片）。这一版仍然有这两个角色，模型那一侧照样问它们（代码审阅第 12 条：两个方向都比，漏交的角色也报）。
+/// 带文件的一版与树表 0 条上写行的那一版共用这一处。
+fn allocation_records_of_every_role(
+    units: &[PublishedUnit],
+    allocation_records: &[AllocationRecord],
+    root: &RootRecord,
+) -> Vec<(ModelUnitRole, Vec<ObservedAllocationRecord>)> {
+    let mut records_of_roles: Vec<(ModelUnitRole, Vec<ObservedAllocationRecord>)> = units
         .iter()
         .filter_map(|unit| {
             let role = model_unit_role(unit.identity)?;
-            let records = output
-                .allocation_records
-                .iter()
-                .filter(|record| record.slot == unit.slot)
-                .map(observed_record)
-                .collect();
-            Some((role, records))
+            Some((
+                role,
+                observed_allocation_records_on_the_slot(allocation_records, unit.slot),
+            ))
         })
         .collect();
     if !records_of_roles
         .iter()
         .any(|(role, _)| *role == ModelUnitRole::InstanceTable)
     {
-        let pointed = output.root.instance_table.locations;
-        let records = output
-            .allocation_records
-            .iter()
-            .filter(|record| {
-                pointed.iter().any(|location| {
-                    location.device == record.device && location.slot == record.slot
-                })
-            })
-            .map(observed_record)
-            .collect();
+        let records = observed_allocation_records_at_the_locations(
+            allocation_records,
+            &root.instance_table.locations,
+        );
         records_of_roles.push((ModelUnitRole::InstanceTable, records));
+    }
+    if !records_of_roles
+        .iter()
+        .any(|(role, _)| *role == ModelUnitRole::TreeTable)
+    {
+        let records = observed_allocation_records_at_the_locations(
+            allocation_records,
+            &root.tree_table.locations,
+        );
+        records_of_roles.push((ModelUnitRole::TreeTable, records));
     }
     records_of_roles
 }
@@ -275,22 +365,40 @@ pub fn rewritten_model_roles(rewritten: &[TransactionUnit]) -> BTreeSet<ModelUni
         .collect()
 }
 
-/// 树表 0 条的一版（零单元发布、树表 0 条上写行）：没有文件；输出不带实例表单元的字节与分配记录，只带这次重写了哪几个角色。
+/// 树表 0 条的一版（零单元发布、树表 0 条上写行）：没有文件。写行那次发布交回这次写出的单元（整条实例表链、分配记录树重写的节点）
+/// 与这一版的全部分配记录：同带文件的一版，比整张实例表与每个角色的分配代（两个方向，代码审阅第 12 条）。
+/// 零单元发布一个字节都不写、不经分配器，输出不带这一版的实例表与分配记录：实例表比不了（照计数），分配代只比这次重写了哪几个角色。
 #[must_use]
 pub fn observed_root_of_version_without_file(
     output: &VersionWithoutFilePublishOutput,
 ) -> ObservedRoot {
+    let (instance_table, unit_allocation_records) = match &output.allocation_records {
+        AllocationRecordsOfTheVersionWithoutFile::WrittenIntoTheAllocationRecordTreeByThisPublish(
+            allocation_records,
+        ) => (
+            observed_instance_table_written_by_a_row_publish(&output.units),
+            ObservedUnitAllocationRecords::EveryRoleOfTheVersion(allocation_records_of_every_role(
+                &output.units,
+                allocation_records,
+                &output.root,
+            )),
+        ),
+        AllocationRecordsOfTheVersionWithoutFile::SameAsThePreviousVersionNotHandedInByAZeroUnitPublish => (
+            ObservedInstanceTable::NotInTheOutput {
+                why: "零单元发布一个字节都不写：这一版的实例表是上一版那一条（根记录里实例表指针照抄），输出不带它的字节",
+            },
+            ObservedUnitAllocationRecords::RewrittenRolesOnly(rewritten_model_roles(
+                &output.rewritten,
+            )),
+        ),
+    };
     ObservedRoot {
         key: model_root_key(output.root.instance, output.root.checkpoint_txg),
         journal_counter: ModelJournalCounter(output.record.counter),
         rollback_floor: model_txg(output.root.rollback_floor),
         file: ObservedFile::NoFile,
-        instance_table: ObservedInstanceTable::NotInTheOutput {
-            why: "树表 0 条的一版的输出（VersionWithoutFilePublishOutput）不带实例表单元的字节",
-        },
-        unit_allocation_records: ObservedUnitAllocationRecords::RewrittenRolesOnly(
-            rewritten_model_roles(&output.rewritten),
-        ),
+        instance_table,
+        unit_allocation_records,
     }
 }
 
@@ -302,7 +410,159 @@ pub fn observed_root_of_pool_version(version: &PoolVersion) -> ObservedRoot {
     }
 }
 
-/// 一次挂载做成了什么：取到的号、写的行、写行与暖机那几条根。
+/// 零单元发布从同一次挂载里前一版往下带着比的那一份（实审 B3c-4，代码审阅第 12 条「每一版比内容和实例表」）：树表 0 条的一版上
+/// 写行那次发布交回的单元（整条实例表链、分配记录树重写的节点）与这一版的全部分配记录，连同同一次挂载里最近那一版的根。
+/// 零单元发布一个字节都不写、不经分配器，根记录照抄上一版的实例表指针与分配记录树根指针：两条指针与前一版逐字段相同，
+/// 这一版的实例表与分配记录就是写行那次交回的那一份。比的是实现交出的东西，不另读盘、不从挂着的分配器取。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ContentsCarriedToZeroUnitPublishes {
+    /// 同一次挂载里最近那一版的根：下一次零单元发布的两条指针拿它比。
+    root_of_the_previous_version: RootRecord,
+    /// 写行那次发布交回的单元。
+    units: Vec<PublishedUnit>,
+    /// 写行那次发布交回的这一版全部分配记录。
+    allocation_records: Vec<AllocationRecord>,
+}
+
+/// 一版树表 0 条的发布，`carried` 是同一次挂载里前一版交回（或往下带下来）的那一份（挂载里第一版、前一版没有可带的是 None）。
+/// 交回这一版给模型比的样子，与这一版之后的零单元发布接着往下带的那一份：
+/// - 写行那次（交回了单元与全部分配记录）：照 [`observed_root_of_version_without_file`] 比，之后从它带；
+/// - 零单元发布、有可带的：根记录里的实例表指针、分配记录树根指针与前一版的逐字段相同 ⇒ 拿带下来的那一份比整张实例表与每个角色的
+///   分配代（两个方向，与写行那一版同一套判法）；有一条不同 ⇒ 交回模型判红的那一样（零单元发布改了指针），不算比不了；
+/// - 零单元发布、没有可带的（一次挂载里第一版就是零单元：取号之后第一次发布接的是从盘上恢复的那一版，没有单元字节）：
+///   照旧交比不了的两臂，模型照计数。
+#[must_use]
+pub fn observed_root_of_version_without_file_carrying(
+    output: &VersionWithoutFilePublishOutput,
+    carried: Option<&ContentsCarriedToZeroUnitPublishes>,
+) -> (ObservedRoot, Option<ContentsCarriedToZeroUnitPublishes>) {
+    match (&output.allocation_records, carried) {
+        (
+            AllocationRecordsOfTheVersionWithoutFile::WrittenIntoTheAllocationRecordTreeByThisPublish(
+                allocation_records,
+            ),
+            Some(_) | None,
+        ) => (
+            observed_root_of_version_without_file(output),
+            Some(ContentsCarriedToZeroUnitPublishes {
+                root_of_the_previous_version: output.root,
+                units: output.units.clone(),
+                allocation_records: allocation_records.clone(),
+            }),
+        ),
+        (
+            AllocationRecordsOfTheVersionWithoutFile::SameAsThePreviousVersionNotHandedInByAZeroUnitPublish,
+            None,
+        ) => (observed_root_of_version_without_file(output), None),
+        (
+            AllocationRecordsOfTheVersionWithoutFile::SameAsThePreviousVersionNotHandedInByAZeroUnitPublish,
+            Some(carried),
+        ) => observed_zero_unit_publish_carried_from_the_version_before(output, carried),
+    }
+}
+
+/// 零单元发布拿同一次挂载里前一版交回（或往下带下来）的那一份比：两条指针与前一版逐字段相同才带，之后接着带同一份；
+/// 有一条不同，那一样交回模型判红的那一臂、之后不再带（模型判红，这段历史停在这一步）。
+fn observed_zero_unit_publish_carried_from_the_version_before(
+    output: &VersionWithoutFilePublishOutput,
+    carried: &ContentsCarriedToZeroUnitPublishes,
+) -> (ObservedRoot, Option<ContentsCarriedToZeroUnitPublishes>) {
+    let previous_root = &carried.root_of_the_previous_version;
+    let instance_table_pointer_carried = output.root.instance_table == previous_root.instance_table;
+    let allocation_record_tree_root_carried =
+        output.root.allocation_record_tree_root == previous_root.allocation_record_tree_root;
+    let instance_table = if instance_table_pointer_carried {
+        observed_instance_table_written_by_a_row_publish(&carried.units)
+    } else {
+        ObservedInstanceTable::Undecodable {
+            what: format!(
+                "零单元发布该照抄同一次挂载里前一版的实例表指针，交回的根换了一条：前一版 {:?}，这一版 {:?}",
+                previous_root.instance_table, output.root.instance_table
+            ),
+        }
+    };
+    let unit_allocation_records = if allocation_record_tree_root_carried {
+        ObservedUnitAllocationRecords::EveryRoleOfTheVersion(allocation_records_of_every_role(
+            &carried.units,
+            &carried.allocation_records,
+            &output.root,
+        ))
+    } else {
+        ObservedUnitAllocationRecords::AllocationRecordTreeRootChangedByAZeroUnitPublish {
+            what: format!(
+                "交回的根换了分配记录树根指针：前一版 {:?}，这一版 {:?}",
+                previous_root.allocation_record_tree_root, output.root.allocation_record_tree_root
+            ),
+        }
+    };
+    let observed = ObservedRoot {
+        key: model_root_key(output.root.instance, output.root.checkpoint_txg),
+        journal_counter: ModelJournalCounter(output.record.counter),
+        rollback_floor: model_txg(output.root.rollback_floor),
+        file: ObservedFile::NoFile,
+        instance_table,
+        unit_allocation_records,
+    };
+    let carried_on =
+        (instance_table_pointer_carried && allocation_record_tree_root_carried).then(|| {
+            ContentsCarriedToZeroUnitPublishes {
+                root_of_the_previous_version: output.root,
+                units: carried.units.clone(),
+                allocation_records: carried.allocation_records.clone(),
+            }
+        });
+    (observed, carried_on)
+}
+
+/// 同 [`observed_root_of_version_without_file_carrying`]，带文件的一版照 [`observed_root_of_file_version`] 比，之后没有可带的
+/// （零单元发布只接在树表 0 条的一版后面）。
+#[must_use]
+pub fn observed_root_of_pool_version_carrying(
+    version: &PoolVersion,
+    carried: Option<&ContentsCarriedToZeroUnitPublishes>,
+) -> (ObservedRoot, Option<ContentsCarriedToZeroUnitPublishes>) {
+    match version {
+        PoolVersion::WithFile(output) => (observed_root_of_file_version(output), None),
+        PoolVersion::WithoutFile(output) => {
+            observed_root_of_version_without_file_carrying(output, carried)
+        }
+    }
+}
+
+/// 一次挂载做成了什么（同 [`observed_mount`]），暖机的零单元发布从这次挂载里前一版往下带着比（实审 B3c-4）：写行那一版交回过
+/// 单元与分配记录的，之后的暖机拿它比整张实例表与每个角色的分配代。交回挂载做成了什么，与这次挂载之后的零单元发布接着往下带的那一份。
+/// 执行器（`history`）用这一处；[`observed_mount`] 一次挂载单独看、不往下带。
+#[must_use]
+pub fn observed_mount_carrying_to_zero_unit_publishes(
+    mounted: &Mounted,
+) -> (ObservedEffect, Option<ContentsCarriedToZeroUnitPublishes>) {
+    let mut carried: Option<ContentsCarriedToZeroUnitPublishes> = None;
+    let mut roots = Vec::new();
+    // 迭代上界是写行一次加暖机至多根环区域数那么多次；跨轮带的是可带的那一份；没有提前出口。
+    for version in
+        std::iter::once(&mounted.output.row_publish).chain(mounted.output.warm_up_publishes.iter())
+    {
+        let (observed, next) = observed_root_of_pool_version_carrying(version, carried.as_ref());
+        roots.push(observed);
+        carried = next;
+    }
+    (
+        ObservedEffect::Mount {
+            instance: model_instance(mounted.output.instance),
+            rows_written: mounted
+                .output
+                .rows_written
+                .iter()
+                .map(model_instance_row)
+                .collect(),
+            roots,
+        },
+        carried,
+    )
+}
+
+/// 一次挂载做成了什么：取到的号、写的行、写行与暖机那几条根。一次挂载单独看、零单元发布不往下带
+/// （往下带的是 [`observed_mount_carrying_to_zero_unit_publishes`]）。
 #[must_use]
 pub fn observed_mount(mounted: &Mounted) -> ObservedEffect {
     ObservedEffect::Mount {
@@ -477,6 +737,22 @@ pub fn refusal_reason_of_mount_error(error: &MountError) -> ObservedRefusalReaso
         MountError::VersionWithoutFileNotWrittenByMakeFilesystem { .. } => {
             explained(ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem)
         }
+        // 读阶段判出系统配置见证过比所选那一版新的发布、重读一次仍判真（C554 乙）：崩溃恢复抛弃根那一步把最新那条根读成全 0 就走到，
+        // 模型那一步答必须拒（`IdealModel::answer_mount_writable_with_the_newest_root_unreadable`）。
+        MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable) => {
+            match **still_unreadable {
+                StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { .. } => {
+                    explained(
+                        ModelRefusalReason::NewerPublishWitnessedBySystemConfigurationStillUnreadableAfterOneReread,
+                    )
+                }
+                // 重建分配器时最新那条根的实例表重读仍读不出（代码审阅第 22 条）：读阶段判完、判据为假之后才读它，崩溃恢复抛弃根
+                // 那一步在读阶段就拒了走不到；只在读路径上注入故障、正好落在那一片上才有，模型没有这一条。
+                StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger { .. } => {
+                    ObservedRefusalReason::Unexplained
+                }
+            }
+        }
         // 恢复失败、记录读不出、表解不开、取号失败、坏盘上才有的根、判定与取号之间号变了、有盘不带所选那一版（空盘、停在旧状态）、
         // 交进来的盘少于 w 的下限（随机历史每次都交整池两块盘）、抬 F 先写系统配置那一步的块设备错、要抬到的 F 低于盘上的生效值
         // （同一个进程里上一次先写系统配置只写进一部分盘才有）、算抬 F 上限时一个知道住着根的根环槽读坏又重读仍坏（读路径上注入故障才有）：
@@ -546,7 +822,8 @@ pub fn root_ring_slot_still_bad_after_one_reread_of_mount_error(
         | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided { .. }
         | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
-        | MountError::SequenceNumberPastTheTopOfItsRange(_) => None,
+        | MountError::SequenceNumberPastTheTopOfItsRange(_)
+        | MountError::NewerStateStillUnreadableAfterOneReread(_) => None,
     }
 }
 
@@ -581,7 +858,8 @@ pub fn reported_ceiling_of_mount_error(error: &MountError) -> Option<ModelCheckp
         | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided { .. }
         | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
-        | MountError::SequenceNumberPastTheTopOfItsRange(_) => None,
+        | MountError::SequenceNumberPastTheTopOfItsRange(_)
+        | MountError::NewerStateStillUnreadableAfterOneReread(_) => None,
     }
 }
 
@@ -752,6 +1030,54 @@ mod tests {
         assert_eq!(
             root_ring_slot_still_bad_after_one_reread_of_mount_error(&wrapped(still_bad)),
             Some(model_ring_position(ring_slot))
+        );
+    }
+
+    /// C554 乙那一拒（`MountError::NewerStateStillUnreadableAfterOneReread`）按它说的是哪一样分：系统配置见证过比所选那一版新的发布、
+    /// 重读一次仍判真，映射成模型那一条理由（崩溃恢复抛弃根那一步模型答必须拒的就是它）；重建分配器时最新那条根的实例表重读仍读不出，
+    /// 模型没有这一条，照 Unexplained——两样不许混成一条。
+    #[test]
+    fn only_the_witnessed_newer_publish_still_unreadable_after_one_reread_maps_to_the_models_reason(
+    ) {
+        use singlefs_core::mount::{
+            NewerPublishWitness, SelectedVersionAgainstTheWitness, StillUnreadableAfterOneReread,
+            WitnessedCounterComparison,
+        };
+        let against_the_witness = SelectedVersionAgainstTheWitness {
+            selected_version: RollbackTarget {
+                instance: InstanceGeneration(1),
+                checkpoint_txg: CheckpointTxg(4),
+            },
+            witness: NewerPublishWitness {
+                witnessed_journal_counter: 5,
+                comparison: WitnessedCounterComparison::AgainstTheSelectedVersionsLastRecord {
+                    selected_version_last_record_counter: 4,
+                },
+            },
+        };
+        let witnessed_newer_publish = MountError::NewerStateStillUnreadableAfterOneReread(Box::new(
+            StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion {
+                first_read: against_the_witness,
+                reread: against_the_witness,
+            },
+        ));
+        let instance_table_of_the_newest_root =
+            MountError::NewerStateStillUnreadableAfterOneReread(Box::new(
+                StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger {
+                    newest_root_on_the_reread: None,
+                },
+            ));
+        assert_eq!(
+            (
+                refusal_reason_of_mount_error(&witnessed_newer_publish),
+                refusal_reason_of_mount_error(&instance_table_of_the_newest_root)
+            ),
+            (
+                ObservedRefusalReason::Explained(
+                    ModelRefusalReason::NewerPublishWitnessedBySystemConfigurationStillUnreadableAfterOneReread
+                ),
+                ObservedRefusalReason::Unexplained
+            )
         );
     }
 

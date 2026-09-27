@@ -22,7 +22,7 @@ use singlefs_format::NODE_POINTER_BYTES;
 
 use crate::address::{SlotNumber, TreeIdentifier};
 use crate::bytes::{ByteReader, ByteWriter};
-use crate::pointer::NodePointer;
+use crate::pointer::{NodePointer, PointerHeadFieldOutsideTheFirstVersion};
 use crate::recovery::RecoveryFailure;
 use crate::root_record::RootRecord;
 use crate::unit::{index_node_entry_capacity, parse_index_node, IndexNodeHeader};
@@ -128,21 +128,32 @@ pub fn build_internal_entry(separator_key: &[u8], child: NodePointer) -> Vec<u8>
     writer.into_bytes()
 }
 
-/// 解一条内部节点条目：条目宽是节点头里的**盘上字段**，窄于 key 宽 + 86 时交回 `None`（调用方报「条目窄于字段表」），
+/// 一条内部节点条目解不开是哪一种（[`parse_internal_entry`] 交回）。封闭集合，`match` 不写通配臂。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InternalEntryRefusal {
+    /// 条目宽（节点头里的盘上字段）窄于 key 宽 + 86：调用方报「条目窄于字段表」。
+    NarrowerThanTheKeyAndTheChildPointer,
+    /// 子指针头部里加密与压缩那几段不是第一版的取值（代码审阅第 29 条）。
+    ChildPointerHeadOutsideTheFirstVersion(PointerHeadFieldOutsideTheFirstVersion),
+}
+
+/// 解一条内部节点条目：条目宽是节点头里的**盘上字段**，子指针头部里加密与压缩那几段也是盘上的字节，
 /// 这里是盘上字节进字段表的边界。
-#[must_use]
+///
+/// # Errors
+/// 条目窄于 key 宽 + 86 ⇒ `NarrowerThanTheKeyAndTheChildPointer`；子指针头部那几段不是第一版的取值 ⇒
+/// `ChildPointerHeadOutsideTheFirstVersion`。
 pub fn parse_internal_entry(
     entry: &[u8],
     key_width_in_bytes: usize,
-) -> Option<(Vec<u8>, NodePointer)> {
+) -> Result<(Vec<u8>, NodePointer), InternalEntryRefusal> {
     if entry.len() < internal_entry_width_in_bytes(key_width_in_bytes) {
-        return None;
+        return Err(InternalEntryRefusal::NarrowerThanTheKeyAndTheChildPointer);
     }
     let mut reader = ByteReader::at(entry, key_width_in_bytes);
-    Some((
-        entry[..key_width_in_bytes].to_vec(),
-        NodePointer::read_from(&mut reader),
-    ))
+    let child = NodePointer::read_judging_the_encryption_and_compression_fields_from(&mut reader)
+        .map_err(InternalEntryRefusal::ChildPointerHeadOutsideTheFirstVersion)?;
+    Ok((entry[..key_width_in_bytes].to_vec(), child))
 }
 
 /// 一个码 2 节点在一版树里的位置：层级（0 是叶）与同层从左数第几个（按 key 升序）。派生的全序（层级升序、同层按 key 升序）
@@ -760,13 +771,14 @@ struct NodeReadFromDisk {
 /// 从盘上读一棵多层码 2 树时核到哪一步。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CodeTwoTreeHeaderJudgement {
-    /// 冷启动走读与挂载态打开：每个节点的头都按指着它的指针与父条目核（树 ID、key 宽、出生身份、fsid、层级、区间、分隔 key），
-    /// 与走读核别的树根同一套口径、同一组判定名（根那一个节点的报错逐字沿用 `recovery` 核树根的那几句）。
+    /// 冷启动走读、挂载态打开与从盘上重建上一版（`recovery::rebuild_version`，代码审阅第 24 / 33 条：可写挂载要接着写的那一版照冷走读判全）：
+    /// 每个节点的头都按指着它的指针与父条目核（树 ID、key 宽、出生身份、fsid、层级、区间、分隔 key），叶里的条目与内部节点的分隔 key
+    /// 按 key 严格递增，与走读核别的树根同一套口径、同一组判定名（根那一个节点的报错逐字沿用 `recovery` 核树根的那几句）。
     EveryHeaderAgainstItsReference,
-    /// 从盘上重建上一版（`recovery::rebuild_version`）：只核把节点拼成一棵树非核不可的那几样——层级逐层减一、节点不空、
-    /// 内部条目不窄于 key 宽 + 86、同一个节点不被两条父条目引用；头里的出生身份、区间与分隔 key 不核，与重建路径读别的树同一个口径
-    /// （解得开就收，叶条目窄于字段表由解条目的一方报）。分隔 key 与孩子对不上时，下一次发布按它删 key 删不掉，由规划那一步交回
-    /// `CodeTwoTreeRefusal::PreviousShapeRoutesAKeyAwayFromTheLeafHoldingIt`。
+    /// 读别的根的账（`recovery::allocation_records_under_root`：影子账、抬 F 的上限按它们读中央映射树回退）：只核把节点拼成一棵树
+    /// 非核不可的那几样——层级逐层减一、节点不空、内部条目不窄于 key 宽 + 86、子指针头部是第一版的取值、同一个节点不被两条父条目引用；
+    /// 头里的出生身份、区间、分隔 key 与 key 次序不核（解得开就收，叶条目窄于字段表由解条目的一方报）。那几棵树只拿来查映射，
+    /// 不交给发布路径规划下一版，所以 key 次序在这里不是「拼得成一棵树」非要不可的。
     OnlyWhatTheShapeNeeds,
 }
 
@@ -776,6 +788,11 @@ fn violated(detail: &'static str) -> RecoveryFailure {
         detail,
     }
 }
+
+/// 多层码 2 树（记账树、中央映射树）内部条目里的子指针头部，加密与压缩那几段不是第一版的取值时报
+/// [`RecoveryFailure::UnitMalformed`]，`what` 取这一句（`pointer::PointerHeadFieldOutsideTheFirstVersion`，代码审阅第 29 条）。
+pub const MULTI_LEVEL_CODE_TWO_TREE_CHILD_POINTER_HEAD_OUTSIDE_THE_FIRST_VERSION: &str =
+    "多层码 2 树内部条目的子指针头部里加密或压缩那几段不是第一版的取值";
 
 /// 核一个节点的头：只有 `EveryHeaderAgainstItsReference` 才走到这里。根（`is_root`）的报错逐字沿用 `recovery` 核树根的那几句，
 /// 读路径上几种坏法报的成员因此不随树长没长多层而变。
@@ -995,7 +1012,16 @@ impl TreeReading<'_> {
         // 迭代上界是这个节点的条目数；跨轮携带的是已经读回来的孩子（下一个孩子的分隔 key 要比上一个孩子头里的最大 key 大）。
         for entry in &header.entries {
             let (separator_bytes, child_pointer) =
-                parse_internal_entry(entry, key_width).expect("条目宽上面判过不窄于 key 宽 + 86");
+                parse_internal_entry(entry, key_width).map_err(|refusal| match refusal {
+                    InternalEntryRefusal::NarrowerThanTheKeyAndTheChildPointer => {
+                        panic!("条目宽上面判过不窄于 key 宽 + 86")
+                    }
+                    InternalEntryRefusal::ChildPointerHeadOutsideTheFirstVersion(_field) => {
+                        RecoveryFailure::UnitMalformed {
+                            what: MULTI_LEVEL_CODE_TWO_TREE_CHILD_POINTER_HEAD_OUTSIDE_THE_FIRST_VERSION,
+                        }
+                    }
+                })?;
             let separator_key = self.key(&separator_bytes);
             if self.judges_every_header() {
                 if let Some((previous_separator, previous_child)) = children.last() {
@@ -1213,6 +1239,79 @@ mod tests {
         assert_eq!(
             CodeTwoKeyFieldWidths::CENTRAL_MAPPING.key_width_in_bytes(),
             usize::try_from(MAPPING_KEY_BYTES).expect("27")
+        );
+    }
+
+    /// 两层的上一版：左叶 [1, 2]、右叶 [5, 6]，根里右叶的分隔 key 是 `separator_of_the_right_leaf`。
+    fn two_leaves_under_a_root(separator_of_the_right_leaf: u64) -> CodeTwoTreeShape {
+        let left = CodeTwoTreeNodePosition {
+            level: 0,
+            index_in_level: 0,
+        };
+        let right = CodeTwoTreeNodePosition {
+            level: 0,
+            index_in_level: 1,
+        };
+        CodeTwoTreeShape {
+            nodes: vec![
+                CodeTwoTreeShapeNode {
+                    position: left,
+                    contents: CodeTwoTreeNodeContents::Leaf {
+                        keys: vec![key(1), key(2)],
+                    },
+                },
+                CodeTwoTreeShapeNode {
+                    position: right,
+                    contents: CodeTwoTreeNodeContents::Leaf {
+                        keys: vec![key(5), key(6)],
+                    },
+                },
+                CodeTwoTreeShapeNode {
+                    position: CodeTwoTreeNodePosition {
+                        level: 1,
+                        index_in_level: 0,
+                    },
+                    contents: CodeTwoTreeNodeContents::Internal {
+                        children: vec![
+                            CodeTwoTreeChild {
+                                separator_key: key(1),
+                                child: left,
+                            },
+                            CodeTwoTreeChild {
+                                separator_key: key(separator_of_the_right_leaf),
+                                child: right,
+                            },
+                        ],
+                    },
+                },
+            ],
+        }
+    }
+
+    /// 场景：上一版右叶的分隔 key 是 6、叶里最小的 key 是 5（分隔 key 把 5 藏起来了），这一版删掉 5。
+    /// 预期：规划交回 `PreviousShapeRoutesAKeyAwayFromTheLeafHoldingIt`；分隔 key 是 5 的同一棵树照常删得掉。
+    /// 从盘上重建的上一版照冷走读判了分隔 key（实审 A3a，代码审阅第 33 条）之后，这样的形状从盘上进不来，这一道是规划自己的最后一道。
+    #[test]
+    fn a_previous_shape_whose_separator_hides_a_key_is_refused_by_the_planner() {
+        assert!(
+            plan_the_tree_after_this_publish(
+                &two_leaves_under_a_root(5),
+                &keys([1, 2, 6]),
+                capacity(8, 4)
+            )
+            .is_ok(),
+            "分隔 key 等于右叶最小的 key：删得掉 5"
+        );
+        assert!(
+            matches!(
+                plan_the_tree_after_this_publish(
+                    &two_leaves_under_a_root(6),
+                    &keys([1, 2, 6]),
+                    capacity(8, 4)
+                ),
+                Err(CodeTwoTreeRefusal::PreviousShapeRoutesAKeyAwayFromTheLeafHoldingIt)
+            ),
+            "分隔 key 6 把 5 藏到左叶那条路上：删不掉，交回拒绝"
         );
     }
 

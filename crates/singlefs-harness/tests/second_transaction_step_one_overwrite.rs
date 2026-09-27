@@ -16,10 +16,11 @@ use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{
     CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, InstanceGeneration, SlotNumber,
 };
+use singlefs_core::admission::{AvailableBytesOnOneDevice, BytesOnOneDevice, DeviceShortOfDemand};
 use singlefs_core::allocation_record_tree::{
     AllocationRecordTreeNode, AllocationRecordTreeNodePosition,
 };
-use singlefs_core::allocator::{PlacementRefusal, UnitFootprint};
+use singlefs_core::allocator::UnitFootprint;
 use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
 use singlefs_core::journal::{back_chain_of, record_offset};
 use singlefs_core::mounted_read::mount_read_only;
@@ -904,8 +905,10 @@ fn release_reports_a_mapping_entry_whose_slot_has_no_record_or_the_wrong_span_in
     );
 }
 
-/// 准入之后失败的发布不留半新的池：把 A 开的那个提交内生段用到头、单元区里别的空槽全标成已分配、只留 50182–50183 给 B 的数据单元，
-/// B 释放了 A、分配到了数据单元、第一个提交内生块拿不到 ⇒ 落点被拒（`PlacementRefused`，每块盘上都没有）；返回之后分配器要和进去之前一模一样。
+/// 准入之后失败的发布不留半新的池：把 A 开的那个提交内生段用到头、单元区里别的空槽全标成已分配、只留 50182–50183 给 B 的数据单元。
+/// B 的数据单元落得下这一对，但两个数据槽被它取走之后没挡的槽剩 0，第一个提交内生块（extent 根 + inode 叶容器 + inode 根 + ckpt_cost）
+/// 落不下 ⇒ 准入先拒（C545（空间准入罩不住分裂与聚簇段层），用户 2026-09-27 定「准入先拒」，`PublishError::SpaceAdmissionRefused`），
+/// 在走分配记录树的固定点、动分配器与发任何一个写之前返回；返回之后分配器要和进去之前一模一样。
 #[test]
 fn publish_running_out_of_space_midway_leaves_the_allocator_as_it_was() {
     let mut pool = build_pool("no-space-midway");
@@ -943,15 +946,19 @@ fn publish_running_out_of_space_midway_leaves_the_allocator_as_it_was() {
     let records_before = pool.allocator.records().to_vec();
     let previous = pool.output.clone();
     let result = try_overwrite(&mut pool, &previous);
-    assert!(
-        matches!(
-            result,
-            Err(PublishError::PlacementRefused {
-                unit: TransactionUnit::ExtentRoot,
-                refusal: PlacementRefusal::NoFreeSlotOnAnyDevice,
+    let Err(PublishError::SpaceAdmissionRefused(refusal)) = &result else {
+        panic!("数据单元拿到了 50182，第一个提交内生块（extent 根 + inode 叶容器 + inode 根 + ckpt_cost）落不下：{result:?}");
+    };
+    assert_eq!(
+        refusal.short_devices,
+        [DeviceIdentity(0), DeviceIdentity(1)]
+            .map(|device| DeviceShortOfDemand {
+                device,
+                available: AvailableBytesOnOneDevice(0),
+                demand: BytesOnOneDevice(8_863_744),
             })
-        ),
-        "数据单元拿到了 50182，第一个提交内生块拿不到（每块盘上都没有：容量不够那一种）：{result:?}"
+            .to_vec(),
+        "每块盘两个数据槽被数据单元取走之后没挡的槽剩 0（0 字节）< 第一个提交内生块要的 541 槽（8 863 744 字节）"
     );
     assert_eq!(
         pool.allocator.records(),

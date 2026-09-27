@@ -10,13 +10,16 @@
 //! （`research/prompts/m2-safety-r3-sonnet-output.md` 第二节）。这一层怎么放是实现员提的（交主 agent 定）：它持着挂载认下的池
 //! （`mount::ParametersAndDeviceTableOfTheMount`：盘上择到的系统配置里的参数、挂载时核过的盘表），写入口只按那份参数建、不收调用方的参数；
 //! 盘本身不持，每次调用由调用方把盘表交进来——用例在两次调用之间照样摸得到盘（拷镜像、注入故障）——交进来的盘表与挂载时的逐项比，
-//! 对不上在任何读写之前拒（实审 A1b Q2、Q3）。发布路径与抬 F 各自开写入口的做法不变。
+//! 对不上在任何读写之前拒（实审 A1b Q2、Q3）；身份对得上，还要每块盘「可见」（两个系统配置槽里至少一份本池自证过的），
+//! 有一块不可见就在任何写之前拒（代码三方 m2-closeout-code-r1 Z3-A 乙：只比身份时，换上去的一块空盘照样收到本池的写）。
+//! 发布路径与抬 F 各自开写入口的做法不变。
 
 use crate::address::{DeviceIdentity, InstanceGeneration};
 use crate::allocator::PoolAllocator;
 use crate::block_device::BlockDevice;
 use crate::make_filesystem::MakeFilesystemParameters;
 use crate::mount::{
+    devices_without_a_self_verified_system_configuration,
     push_one_floor_raise_within_the_admission_budget, FloorRaisePushedWithinTheAdmissionBudget,
     FloorRaiseStop, MountError, MountOutput, Mounted, ParametersAndDeviceTableOfTheMount,
     RaisedFloor, ShadowLedger,
@@ -59,7 +62,7 @@ pub struct UserChangePublished {
     pub refusals_that_pushed_the_floor_raises: Vec<PublishError>,
 }
 
-/// 一次用户改动没发成。成员按调用方要做的决定分：换一份盘表再发、换一个版本再改、原样看发布路径的错、报空间不够。
+/// 一次用户改动没发成。成员按调用方要做的决定分：换一份盘表再发、换回这个池的盘、换一个版本再改、原样看发布路径的错、报空间不够。
 #[derive(Debug)]
 pub enum UserChangeRefused {
     /// 交进来的盘表的设备身份（按次序）与这次挂载核过的那一份不同（多一块、少一块、换了次序、同一个身份交两次）：
@@ -72,6 +75,13 @@ pub enum UserChangeRefused {
     /// 现行那一版树表 0 条：这三种改动都要接在带文件的一版后面（第一个文件版本走 `transaction::publish_first_file`，不经这一层）。
     /// 在任何读写之前返回。
     NoFileVersionToChange,
+    /// 盘表的身份与这次挂载核过的那一份相同，`devices` 里的这几块（按交进来的次序）却不「可见」：两个系统配置槽里一份本池自证过的
+    /// （整槽校验和过、fsid 与本池相同）都没有——换上去的空盘、别的池的盘、两槽都读不出（D18（块里携带什么信息） 已定项 11
+    /// 「可写挂载的顺序」；与可写挂载取号之前的逐盘核第一支、挂着之后收盘表的入口同一判，`mount::devices_without_a_self_verified_system_configuration`）。
+    /// 只比身份时，发布照样做成、本池的写落到那块盘上（代码三方 m2-closeout-code-r1 Z3-A 乙，用户 2026-09-27 定）。
+    /// 读过每块盘的两个系统配置槽，一个写都没发：盘上逐字节不变、会话不动。调用方要做的是停下这块盘上的写（换回这个池的盘），
+    /// 不是换一份盘表的次序再发（那是 `DeviceTableOtherThanTheOneOfTheMount`）。
+    DevicesWithoutASelfVerifiedSystemConfiguration { devices: Vec<DeviceIdentity> },
     /// 发布被拒、不是空间不够的那两种（内容装不下、释放判定对不上、块设备错、冻结着一次没重发……）：`cause` 原样，不因它推。
     /// `floor_raises` 是这之前已经因为空间不够推过的那几串（它们已落盘，现行那一版在它们后面）。
     Publish {
@@ -193,13 +203,16 @@ impl MountedSession {
     /// 发布一次用户改动：被拒是空间不够的那两种（[`refusal_is_short_of_space`]）就推一串抬 F 的空发布、再重判，
     /// 直到发成或不再推（D16（发布语义） 已定项 1「准入」那一行）。发成时 `current` 换成新的一版；推了的那几串已落盘，
     /// 没发成时 `current` 停在最后一次落盘的空发布上。写入口只按会话持着的那份参数建（`parameters_and_device_table`），
-    /// 交进来的盘表先与它逐项比（实审 A1b Q2、Q3）。
+    /// 交进来的盘表先与它逐项比（实审 A1b Q2、Q3），再读每块盘的两个系统配置槽核它「可见」（Z3-A 乙）。
+    /// 「可见」在进循环之前核一次：一次调用里盘表借着、换不了盘；循环里推的每一串抬 F 在它自己的第一个写之前再核一遍
+    /// （`mount::push_one_floor_raise_within_the_admission_budget` 经 `caller_inputs_agreeing_with_the_disk`），
+    /// 所以这次调用发出的每一个写之前都核过。
     ///
     /// 循环：每一轮发一次；被拒是空间不够就推一串（至少一次空发布、推的次数增加）进下一轮，不推了就交回。
     /// 预算把推的次数压在 B − 1 以内 ⇒ 至多 8 轮；跨轮携带的是现行那一版（抬 F 就地推进它）与已推的几串。
     ///
     /// # Errors
-    /// [`UserChangeRefused`] 的五种。
+    /// [`UserChangeRefused`] 的六种。
     pub fn publish_user_change<Device: BlockDevice>(
         &mut self,
         devices: &mut Vec<(DeviceIdentity, Device)>,
@@ -225,6 +238,15 @@ impl MountedSession {
             PoolVersion::WithFile(current_file_version) => current_file_version,
             PoolVersion::WithoutFile(_) => return Err(UserChangeRefused::NoFileVersionToChange),
         };
+        let devices_not_visible =
+            devices_without_a_self_verified_system_configuration(devices.as_slice(), parameters);
+        if !devices_not_visible.is_empty() {
+            return Err(
+                UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration {
+                    devices: devices_not_visible,
+                },
+            );
+        }
         let mut floor_raises: Vec<RaisedFloor> = Vec::new();
         let mut refusals_that_pushed_the_floor_raises: Vec<PublishError> = Vec::new();
         let mut publishes_pushed = 0;

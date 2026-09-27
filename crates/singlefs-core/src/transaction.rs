@@ -1,8 +1,8 @@
 //! 事务层（里程碑步 3 / 步 4 / 步 5）：一个共享的提交状态机 + 一个封闭的提交步骤枚举
 //! （D17（实现分层与第三方管道） 已定项 2；`.claude/rules/fs-design.md`「一个事务层，所有结构共用」）。
 //! 三条路径都从同一个枚举走：取号 = 逐盘一次系统配置槽写 + 一道屏障（D23（journal 的角色与格式） 已定项 16，C322（取号那一步的屏障怎么放没有条款） 2026-09-14 定案）；
-//! 暖机（D16（发布语义） 已定项 8）= 屏障 → 空记录 → 屏障 → 根槽 FUA → 系统配置槽轮换；
-//! 第一个事务（D16（发布语义） 已定项 7）= 单元写 × 8 → 屏障 → journal 记录 → 屏障 → 根槽 FUA → 系统配置槽轮换。
+//! 暖机（D16（发布语义） 已定项 8）= 屏障 → 空记录 → 屏障 → 根槽 FUA → 系统配置槽轮换 → 屏障；
+//! 第一个事务（D16（发布语义） 已定项 7）= 单元写 × 8 → 屏障 → journal 记录 → 屏障 → 根槽 FUA → 系统配置槽轮换 → 屏障。
 //! 覆盖写（里程碑「第二个事务」步 1 / 步 2）走同一条骨架：新数据单元 COW 到新落点、六个提交内生块与树表 COW 出新版本，
 //! 被换下的八个单元在同一次发布里释放（分配记录改写成已释放 + 释放代，条目不删，D3（空间分配） 已定项 7）。
 //! 每一步都经过块设备接口，录制器挂在那层（D17（实现分层与第三方管道） 已定项 5）。
@@ -24,8 +24,12 @@ use crate::address::{
     SlotNumber, TreeIdentifier,
 };
 use crate::admission::{
-    admission_reading_before_a_publish, admit_on_every_device, demand_of_the_roles_on_each_device,
-    publish_has_an_ordinary_allocation, AdmissionRefusedOnSomeDevices, SpaceAdmission,
+    admission_reading_before_a_publish, admit_on_every_device,
+    admit_the_units_landing_on_every_device,
+    checkpoint_cost_of_the_version_to_build_on_with_node_capacities,
+    demand_of_the_roles_on_each_device, publish_has_an_ordinary_allocation,
+    units_of_a_publish_to_land, AdmissionRefusedOnSomeDevices, PlacementRoomOnOneDevice,
+    SpaceAdmission,
 };
 use crate::allocation_record_tree::{
     build_allocation_record_tree_node, children_of, nodes_holding_records,
@@ -423,17 +427,21 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
     }
 
     /// 取号全或无失败：已写出的那几份回卷成旧代号（D18（块里携带什么信息） 已定项 11），回卷写发生在任何单元之前。
+    /// 回卷写带的 tail 是取号那一写带的同一个见证值（`witnessed_journal_tail`，取号那一刻读的那一次）：回卷是「像没取过号」，
+    /// 取号之前盘上的见证值是它，不退回 0（C554 乙-配置续，用户 2026-09-27 JST 12:08 定）。
     fn roll_back_acquisition(
         &mut self,
         written: &[usize],
         previous_instance: InstanceGeneration,
+        witnessed_journal_tail: u64,
         cause: BlockDeviceError,
-    ) -> AcquisitionFailed {
+    ) -> InstanceAcquisitionFailed {
         if written.is_empty() {
             return AcquisitionFailed {
                 cause,
                 rollback: AcquisitionRollback::NothingWritten,
-            };
+            }
+            .into();
         }
         // 回卷写之前一道池屏障（代码审阅第 19 条）：回卷写覆写的是这块盘上取号之前最新的那一槽，另一槽是刚写的取号写、还可能没持久；
         // 两槽轮换要「覆写旧槽时新槽已持久」。这道屏障报错就不写回卷：回卷不成，只读挂载（D18（块里携带什么信息） 已定项 11），
@@ -442,25 +450,28 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
             return AcquisitionFailed {
                 cause,
                 rollback: AcquisitionRollback::RollbackFailed(barrier_error),
-            };
+            }
+            .into();
         }
         for &index in written {
             if let Err(rollback_error) = self.write_system_configuration_slot(
                 index,
-                0,
+                witnessed_journal_tail,
                 previous_instance,
                 RollbackFloorOfASystemConfigurationWrite::PoolEffectiveFloor,
             ) {
                 return AcquisitionFailed {
                     cause,
                     rollback: AcquisitionRollback::RollbackFailed(rollback_error),
-                };
+                }
+                .into();
             }
         }
         AcquisitionFailed {
             cause,
             rollback: AcquisitionRollback::RolledBack,
         }
+        .into()
     }
 
     #[must_use]
@@ -539,6 +550,7 @@ pub fn write_the_raised_floor_into_every_system_configuration<Device: BlockDevic
 ) -> Result<WritesByStructureKind, RaisedFloorSystemConfigurationWriteFailed> {
     let writes_before_this_step = pool.writes_by_structure_kind.clone();
     let mut devices_carrying_the_raised_floor = Vec::new();
+    // 发布末尾已有一道屏障（C577）：紧跟在同一个写入口的发布之后时下面这一道前面没有写，写入口不发它；留着它，不靠调用方前面是什么。
     // 第一个系统配置写之前一道池屏障（代码审阅第 19 条）：这一写覆写的是这块盘上较旧的那一槽，另一槽是上一次发布末尾轮换刚写的、
     // 还可能没持久；两槽轮换要的是「覆写旧槽时新槽已持久」，没有这一道，两次写同在一段里，崩溃时两槽可以一起撕坏。
     if let Err(cause) = pool.perform(CommitStep::Barrier) {
@@ -602,6 +614,61 @@ fn highest_system_configuration_instance<Device: BlockDevice>(
         .unwrap_or(MKFS_INSTANCE_GENERATION)
 }
 
+/// 判据 N-配置 的「没有这样的槽 ⇒ c_见证 = 0」（E158 第 3 次跑登记 `research/prompts/e158-r3-prereg.md` 第 347 行），与 mkfs 写进每个槽的
+/// tail 同值。取号时有一块盘两槽都读不出就拒（[`self_verified_system_configurations_of_every_device`]），所以取号读到的见证值只在
+/// 盘表为空、一个槽都没有可读的时候取它。
+const JOURNAL_TAIL_WITNESSED_BY_NO_SYSTEM_CONFIGURATION: u64 = 0;
+
+/// 取号那一刻逐盘读到的两槽：盘表里每块盘两槽中本池自证过（整槽校验和过、fsid 与本池相同）的系统配置，按盘表次序、一块盘一项。
+/// 只读盘、不写。
+///
+/// 某块盘一份都读不出就拒（C554 乙-配置续 Q1，主 agent 2026-09-27 定走「拒」）：这块盘不「可见」（D18（块里携带什么信息） 已定项 11
+/// 「可写挂载的顺序」：「可见」= 独占打开成功且系统配置读得通），与可写挂载取号之前的逐盘核（`mount.rs` 的
+/// `devices_without_the_selected_version` 第一支，Z3-A 乙）同一判。那一道核与这一次读之间一次瞬时读错（或盘在两次读之间坏掉）就走得到这里；
+/// 不拒的话见证值取别的盘的，这块盘上自证过的槽里见证的那次发布就漏在见证值之外。
+///
+/// # Errors
+/// 按盘表次序第一块一份都读不出的盘 ⇒ [`InstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness`]。
+fn self_verified_system_configurations_of_every_device<Device: BlockDevice>(
+    pool: &PoolWriter<'_, Device>,
+) -> Result<Vec<Vec<SystemConfiguration>>, InstanceAcquisitionFailed> {
+    let spacing = u64::from(pool.parameters.geometry.fixed_structure_slot_spacing);
+    let filesystem_identifier = pool.parameters.filesystem_identifier;
+    pool.devices
+        .iter()
+        .map(|(identity, _)| {
+            let slots_of_this_device = verified_system_configuration_slots(
+                &*pool.devices,
+                *identity,
+                spacing,
+                &filesystem_identifier,
+            );
+            if slots_of_this_device.is_empty() {
+                return Err(
+                    InstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness {
+                        device: *identity,
+                    },
+                );
+            }
+            Ok(slots_of_this_device)
+        })
+        .collect()
+}
+
+/// 取号那一刻的见证值 c_见证（C554 乙-配置续，用户 2026-09-27 JST 12:08 定；定义取自 `research/prompts/e158-r3-prereg.md`
+/// 第 348 行「N-配置续」与 `research/prompts/e158-r4-prereg.md` 第 413 行）：每块盘两槽里全部自证过的系统配置的 journal tail 的最大值，
+/// 与可写挂载判 N-配置 同一取法（`mount.rs` 的 `newer_publish_witness`）。`slots_of_every_device` 是
+/// [`self_verified_system_configurations_of_every_device`] 那一次读到的（每块盘至少一份）；盘表为空时
+/// [`JOURNAL_TAIL_WITNESSED_BY_NO_SYSTEM_CONFIGURATION`]。
+fn highest_journal_tail_of(slots_of_every_device: &[Vec<SystemConfiguration>]) -> u64 {
+    slots_of_every_device
+        .iter()
+        .flatten()
+        .map(|system_configuration| system_configuration.quantities.journal_tail)
+        .max()
+        .unwrap_or(JOURNAL_TAIL_WITNESSED_BY_NO_SYSTEM_CONFIGURATION)
+}
+
 /// 盘上最大的实例代号已是 `u32::MAX`，取号要的下一个号（它加一）装不下（代码审阅第 36 条）：实例代号是盘上读来的 4 字节
 /// （系统配置槽与根记录里的），坏镜像、外来镜像才走得到。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -649,17 +716,44 @@ pub fn instance_generation_to_acquire<Device: BlockDevice>(
 /// 取号（D23（journal 的角色与格式） 已定项 16、D18（块里携带什么信息） 已定项 11；2026-09-14 用户定案，
 /// C322（取号那一步的屏障怎么放没有条款） 三轮三方）：新号 = max(每块盘两槽里全部自证过的槽的实例代号, 根环里全部根记录的
 /// 实例代号) + 1；第一个取号写之前一道屏障（代码审阅第 19 条：取号写覆写较旧那一槽之前，另一槽里上一次轮换写的先持久）；
-/// 逐盘写一次系统配置槽（世代号逐盘 +1）；两写之后一道屏障，屏障完成才把新号交出去，于是本实例的第一个
+/// 逐盘写一次系统配置槽（世代号逐盘 +1；tail 写取号那一刻的见证值，C554 乙-配置续）；两写之后一道屏障，屏障完成才把新号交出去，于是本实例的第一个
 /// 非系统配置写一定排在它之后。首次挂载路径上它就是暖机开场那道：暖机那道屏障前面没有写，写入口不再发第二次，录制流与设备
 /// 收到的 FLUSH 数都与只发一道时相同。写之前那道屏障报错 ⇒ 一个字节没写、取号失败；任一块盘的取号写或写之后那道屏障报错
 /// ⇒ 已写出的那几份回卷成旧代号（取号之前全部自证过的槽中最大的实例代号；回卷写之前同样先过一道屏障），报失败。
 /// ⚠️ D18（块里携带什么信息） 已定项 11 的「重试到 T_retry 用尽才算失败」这里没有做：
 /// 块设备报的第一个错就判失败（写路径上的重试全仓都还没有）。
+///
+/// 前面没有可写挂载那一道逐盘核（mkfs 同一个进程里那条流、用例与装置在调）：取号那一刻读见证值时某块盘两槽一份本池自证过的都读不出，
+/// 同样在第一个取号写之前拒（[`InstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness`]）。
+///
+/// # Errors
+/// 某块盘读不出自证过的系统配置 ⇒ `DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness`（一个字节没写）；
+/// 屏障或取号写报错 ⇒ `Acquisition`（回卷的结局在里面）。
+///
+/// # Panics
+/// 盘上最大的实例代号已是 `u32::MAX`（坏镜像、外来镜像：实例代号是盘上读来的 4 字节）：取号要的下一个号装不下
+/// （[`instance_generation_to_acquire`]）。可写挂载走 `acquire_expected_instance`，同一格在任何写之前拒、不 panic。
 pub fn acquire_instance<Device: BlockDevice>(
     pool: &mut PoolWriter<'_, Device>,
-) -> Result<InstanceGeneration, AcquisitionFailed> {
+) -> Result<InstanceGeneration, InstanceAcquisitionFailed> {
     let instance = instance_generation_to_acquire(pool);
     write_acquired_instance(pool, instance)
+}
+
+/// 取号没做成（[`acquire_instance`]、取号的写那一半）。
+#[derive(Debug)]
+pub enum InstanceAcquisitionFailed {
+    /// 取号那一刻读见证值时，`device` 两槽里一份本池自证过的系统配置都读不出（C554 乙-配置续 Q1；D18（块里携带什么信息） 已定项 11
+    /// 「可见」）：一个字节都没写。第一道屏障之前就读不出时连屏障都没发；屏障之后重读才读不出时发了那一道屏障、没有写。
+    DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness { device: DeviceIdentity },
+    /// 屏障或取号写报错（回卷的结局在里面）。
+    Acquisition(AcquisitionFailed),
+}
+
+impl From<AcquisitionFailed> for InstanceAcquisitionFailed {
+    fn from(failure: AcquisitionFailed) -> Self {
+        InstanceAcquisitionFailed::Acquisition(failure)
+    }
 }
 
 /// 按调用方判定时算出的号取号没做成。
@@ -672,6 +766,11 @@ pub enum ExpectedInstanceAcquisitionFailed {
     },
     /// 写之前重算时盘上最大的实例代号已是 `u32::MAX`（两次读之间瞬时读错才会与判定时不同）：一个字节都没写。
     InstanceGenerationPastTheTopOfItsRange(InstanceGenerationPastTheTopOfItsRange),
+    /// 同 [`InstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness`]：可写挂载取号之前的逐盘核读得出、
+    /// 取号那一刻读见证值时这块盘两槽都读不出（两次读之间一次瞬时读错就够）。一个字节都没写。
+    DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness {
+        device: DeviceIdentity,
+    },
     Acquisition(AcquisitionFailed),
 }
 
@@ -680,7 +779,8 @@ pub enum ExpectedInstanceAcquisitionFailed {
 /// 各报一次瞬时读错，判定看到号 1 放行、取号读到号 2 写进两盘）。
 ///
 /// # Errors
-/// 重算的号不同 ⇒ `InstanceGenerationChangedBeforeWrite`；取号写或屏障报错 ⇒ `Acquisition`（与 `acquire_instance` 同）。
+/// 重算的号不同 ⇒ `InstanceGenerationChangedBeforeWrite`；读见证值时某块盘两槽都读不出 ⇒
+/// `DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness`；取号写或屏障报错 ⇒ `Acquisition`（与 `acquire_instance` 同）。
 pub fn acquire_expected_instance<Device: BlockDevice>(
     pool: &mut PoolWriter<'_, Device>,
     expected: InstanceGeneration,
@@ -695,18 +795,30 @@ pub fn acquire_expected_instance<Device: BlockDevice>(
             },
         );
     }
-    write_acquired_instance(pool, recomputed)
-        .map_err(ExpectedInstanceAcquisitionFailed::Acquisition)
+    write_acquired_instance(pool, recomputed).map_err(|failure| match failure {
+        InstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness {
+            device,
+        } => ExpectedInstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness {
+            device,
+        },
+        InstanceAcquisitionFailed::Acquisition(acquisition) => {
+            ExpectedInstanceAcquisitionFailed::Acquisition(acquisition)
+        }
+    })
 }
 
-/// 取号的写那一半：一道屏障，逐盘写一次系统配置槽，两写之后一道屏障；写之前那道报错就一个字节不写、报失败，
-/// 之后任一报错就把已写出的回卷成旧代号。
+/// 取号的写那一半：逐盘核一遍每块盘两槽读得出自证过的系统配置，一道屏障，再读一次每块盘两槽、取见证值
+/// （[`self_verified_system_configurations_of_every_device`]、[`highest_journal_tail_of`]），逐盘写一次系统配置槽（实例代号写新号、
+/// tail 写见证值），两写之后一道屏障。两次读里有一块盘两槽都读不出就一个字节不写、报它；写之前那道屏障报错就一个字节不写、报失败，
+/// 之后任一报错就把已写出的回卷成旧代号（tail 仍写见证值）。
 fn write_acquired_instance<Device: BlockDevice>(
     pool: &mut PoolWriter<'_, Device>,
     instance: InstanceGeneration,
-) -> Result<InstanceGeneration, AcquisitionFailed> {
+) -> Result<InstanceGeneration, InstanceAcquisitionFailed> {
     let previous_instance = highest_system_configuration_instance(pool);
     let mut written = Vec::new();
+    // 读见证值时有一块盘两槽都读不出就拒（C554 乙-配置续 Q1 第 1 条）：这一核放在第一道屏障之前，拒的时候连屏障都没发，录制流一步不多。
+    self_verified_system_configurations_of_every_device(pool)?;
     // 第一个取号写之前一道池屏障（代码审阅第 19 条）：取号写覆写的是这块盘上较旧的那一槽，另一槽可能是上一次发布末尾轮换刚写的
     // （同一个进程里，或上一个进程退出之前）、还没持久；两槽轮换要的是「覆写旧槽时新槽已持久」。这道屏障在任何取号写之前报错，
     // 一个字节都没写，取号失败、没有要回卷的。首次挂载紧接在 mkfs 末尾那道屏障之后，这一道前面没有写：录制流里并掉，设备多收一次 FLUSH。
@@ -714,21 +826,39 @@ fn write_acquired_instance<Device: BlockDevice>(
         return Err(AcquisitionFailed {
             cause,
             rollback: AcquisitionRollback::NothingWritten,
-        });
+        }
+        .into());
     }
+    // 取号那一写带的 tail 是这一刻的见证值（C554 乙-配置续，用户 2026-09-27 JST 12:08 定），不是 0：连着几次取号之后崩溃、中间没有
+    // 发布轮换，两槽都换成了取号写，写 0 就把上一次轮换见证的那次发布抹掉，下一次可写挂载的 N-配置 判不出、会抛弃暂时读不出的最新根。
+    // 第一道屏障之后、第一个取号写之前另读每块盘两槽一次（E158 第 4 次跑登记第 413 行）；逐盘取号写与回卷写都用这一次读到的。
+    // 屏障前那一核与这一次读之间又有一块盘读不出，就不写（判定与写读同一份输入：写之前重算、对不上不写）。
+    // mkfs 写的 tail 是 0，mkfs 之后第一次取号读到的就是 0：第一个事务的字节不变。
+    let witnessed_journal_tail =
+        highest_journal_tail_of(&self_verified_system_configurations_of_every_device(pool)?);
     for index in 0..pool.devices.len() {
         if let Err(cause) = pool.write_system_configuration_slot(
             index,
-            0,
+            witnessed_journal_tail,
             instance,
             RollbackFloorOfASystemConfigurationWrite::PoolEffectiveFloor,
         ) {
-            return Err(pool.roll_back_acquisition(&written, previous_instance, cause));
+            return Err(pool.roll_back_acquisition(
+                &written,
+                previous_instance,
+                witnessed_journal_tail,
+                cause,
+            ));
         }
         written.push(index);
     }
     if let Err(cause) = pool.perform(CommitStep::Barrier) {
-        return Err(pool.roll_back_acquisition(&written, previous_instance, cause));
+        return Err(pool.roll_back_acquisition(
+            &written,
+            previous_instance,
+            witnessed_journal_tail,
+            cause,
+        ));
     }
     Ok(instance)
 }
@@ -743,12 +873,13 @@ pub struct WarmUpOutput {
     pub writes: Vec<WritesByStructureKind>,
 }
 
-/// 暖机那两次空发布里有一次没做成：块设备的错，连同失败之前已经落盘的那几次各自的写（按先后）。
+/// 暖机那两次空发布里有一次没做成：零单元发布报的错（块设备的错；写入口参数里的环在飞上限为 0 时的记录条数上限），
+/// 连同失败之前已经落盘的那几次各自的写（按先后）。
 /// 失败那一次落盘阶段已记的写照旧进调用方那个写入口的失败账（`PoolWriter::writes_of_failed_publishes`）；已经落盘的那几次的账
 /// 只在这里——它们的输出随错一起丢掉，不交出来，这段暖机里设备一层数到的写与程序交得出的账就对不上（增补 2 收口表第 58 行）。
 #[derive(Debug)]
 pub struct WarmUpFailed {
-    pub cause: BlockDeviceError,
+    pub cause: PublishError,
     pub writes_of_persisted_publishes: Vec<WritesByStructureKind>,
 }
 
@@ -759,7 +890,7 @@ const LAST_JOURNAL_COUNTER_AFTER_MAKE_FILESYSTEM: u64 = 0;
 /// jsn 从 1 起。其余见 `warm_up_after_journal_counter`。
 ///
 /// # Errors
-/// 块设备报的错，连同已经落盘的那几次的账（[`WarmUpFailed`]）。
+/// 零单元发布报的错（[`publish_without_units`]），连同已经落盘的那几次的账（[`WarmUpFailed`]）。
 pub fn warm_up<Device: BlockDevice>(
     pool: &mut PoolWriter<'_, Device>,
     genesis: &RootRecord,
@@ -780,7 +911,7 @@ pub fn warm_up<Device: BlockDevice>(
 /// 根记录只改 checkpoint_txg 与实例代号。今天只有 `warm_up` 调它，环是空的、两个量按构造相等；给不相等的起点才分得出它们。
 ///
 /// # Errors
-/// 块设备报的错，连同已经落盘的那几次的账（[`WarmUpFailed`]）。
+/// 零单元发布报的错（[`publish_without_units`]），连同已经落盘的那几次的账（[`WarmUpFailed`]）。
 pub fn warm_up_after_journal_counter<Device: BlockDevice>(
     pool: &mut PoolWriter<'_, Device>,
     genesis: &RootRecord,
@@ -840,9 +971,10 @@ pub struct ZeroUnitPublishPlan {
     pub tree_identifier_watermark: u64,
 }
 
-/// 树表 0 条的一版上一次发布写出的东西：根、记录、记录的字节（下一条的反向链要罩它）、按结构种类的写。
-/// 零单元发布（暖机）与写行那次发布（重写实例表一个单元）都交回它——两者写出的可观测态只差根记录里的实例表指针，
-/// 而这一版没有记账树、分配记录树与映射树，没有别的内存态要带到下一次发布（`PoolVersion::WithoutFile` 装的就是它）。
+/// 树表 0 条的一版上一次发布写出的东西：根、记录、记录的字节（下一条的反向链要罩它）、按结构种类的写，
+/// 以及这次写出的单元与这一版的分配记录（对拍拿它们比这一版的实例表与分配代，代码审阅第 12 条；字段名同带文件那一版的 [`TransactionOutput`]）。
+/// 零单元发布（暖机）与写行那次发布（重写实例表链与分配记录树）都交回它；下一次发布只用根、记录与记录的字节
+/// （这一版没有记账树与映射树；分配记录树住分配器上，`PoolAllocator::allocation_record_tree_of_the_version_without_file`）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VersionWithoutFilePublishOutput {
     pub root: RootRecord,
@@ -854,11 +986,26 @@ pub struct VersionWithoutFilePublishOutput {
     pub earlier_records_of_this_publish: Vec<WrittenJournalRecord>,
     /// 这次发布真正写出的角色，按写出的次序（= 点名项的次序：实例表链各片尾片先，再分配记录树重写的节点先叶后根）；零单元发布是空的。
     pub rewritten: Vec<TransactionUnit>,
+    /// 这次发布写出的单元，与 `rewritten` 逐项同序、同角色（就是交给设备的那几个单元写）：写行那次是整条实例表链的各片
+    /// （写行 COW 重写整条链，D18（块里携带什么信息） 已定项 11）加分配记录树这次重写的节点；零单元发布是空的。
+    /// 与带文件那一版的 `units` 不同，没重写的单元不照抄进来：这一版没重写的只有 mkfs 的树表单元与分配记录树没变的节点。
+    pub units: Vec<PublishedUnit>,
+    /// 这一版的分配记录（[`AllocationRecordsOfTheVersionWithoutFile`]）。
+    pub allocation_records: AllocationRecordsOfTheVersionWithoutFile,
     pub writes: WritesByStructureKind,
 }
 
+/// 树表 0 条的一版上一次发布交出的这一版分配记录。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AllocationRecordsOfTheVersionWithoutFile {
+    /// 写行那次发布：这一版的全部分配记录，按 (设备, 槽号) 升序——就是这次装进分配记录树的那一份（释放、取落点都做完之后）。
+    WrittenIntoTheAllocationRecordTreeByThisPublish(Vec<AllocationRecord>),
+    /// 零单元发布不经分配器、一个字节都不写：这一版的分配记录就是上一版的（根记录里分配记录树根指针照抄），这次发布手里没有那一份。
+    SameAsThePreviousVersionNotHandedInByAZeroUnitPublish,
+}
+
 /// 一次发布要交给设备的全部字节，按 D16（发布语义） 已定项 7 的持久顺序排好：这次重写的单元 → 屏障 → journal 记录 → 屏障 →
-/// 根槽 FUA → 系统配置槽轮换。三条发布路径（带单元的、零单元的、树表 0 条上写行的）都先装成它、再交给
+/// 根槽 FUA → 系统配置槽轮换 → 屏障。三条发布路径（带单元的、零单元的、树表 0 条上写行的）都先装成它、再交给
 /// [`persist_publish_writes`] 落盘；落盘中途失败的那一次原样冻结着它，重发时照它逐字节再发一遍
 /// （D23（journal 的角色与格式） 已定项 14「这一版的失败处置」：checkpoint_txg、计数器、本次发布内序号、记录标志、
 /// 单元的位置与字节都不变）。系统配置槽不在里面：它的世代号按写那一刻盘上自证过的槽现算（D22（单元原子性怎么合成） 已定项 16，逐盘计），
@@ -1034,9 +1181,15 @@ pub fn resend_the_frozen_publish<Device: BlockDevice>(
     ))
 }
 
-/// 发布的最后两步（D16（发布语义） 已定项 7 的持久顺序）：根槽 FUA 写 → 系统配置槽轮换。
-/// 三条发布路径（带单元的、零单元的、树表 0 条上只写实例表的）共用这一处，不各抄一份——
-/// 抄出来的三份会分叉，而「根槽在系统配置槽之前」正是崩溃窗口那几格的前提。
+/// 发布的最后三步（D16（发布语义） 已定项 7 的持久顺序）：根槽 FUA 写 → 系统配置槽轮换 → 屏障，屏障完成才返回。
+/// 三条发布路径（带单元的、零单元的、树表 0 条上只写实例表的）与重发冻结的那一次共用这一处，不各抄一份——
+/// 抄出来的几份会分叉，而「根槽在系统配置槽之前」「轮换持久之后才返回」正是崩溃窗口那几格的前提。
+///
+/// 末尾那道屏障（C577（系统配置没见证到的最新根，乙罩不到），用户 2026-09-27 JST 15:1x 定「发布返回前加屏障」）：
+/// 没有它，发布返回时轮换还可能在写缓存里，崩溃之后系统配置只见证到上一次发布；这次的根槽一时读不出，可写挂载的见证判据
+/// （D23（journal 的角色与格式） 已定项 14「可写挂载读到的更新状态读不出」）就看不出有更新的状态、把这次发布当被抛弃，
+/// 它引用的单元再发出去。屏障报错与轮换报错同一格：这次发布失败，由调用方冻结或整个挂载返回错误
+/// （D23（journal 的角色与格式） 已定项 14「这一版的失败处置」）。
 fn persist_the_root_then_rotate_the_system_configuration<Device: BlockDevice>(
     writer: &mut PoolWriter<'_, Device>,
     checkpoint_txg: CheckpointTxg,
@@ -1051,27 +1204,37 @@ fn persist_the_root_then_rotate_the_system_configuration<Device: BlockDevice>(
     writer.perform(CommitStep::RotateSystemConfigurationSlots {
         journal_tail,
         journal_instance,
-    })
+    })?;
+    writer.perform(CommitStep::Barrier)
 }
 
-/// 零单元发布（D16（发布语义） 已定项 9「树表 0 条 ⇒ 零单元」）：屏障 → 空记录 → 屏障 → 根槽 FUA → 系统配置槽轮换；
+/// 零单元发布（D16（发布语义） 已定项 9「树表 0 条 ⇒ 零单元」）：屏障 → 空记录 → 屏障 → 根槽 FUA → 系统配置槽轮换 → 屏障；
 /// 空记录不点名任何单元、事务号 0、提交标记 1，新根段照上一版的根，根记录照上一版的根、只换 checkpoint_txg、实例代号、回退下界
 /// 与树 ID 水位（取计划里给的，D8（核心索引结构） 已定项 8 ②）。
 /// 第一次可写挂载的暖机与「只做过 mkfs 的池」上的可写挂载都走它（第一个事务的字节不变）。
 ///
 /// # Errors
-/// 块设备报的错原样交回。
+/// 这次发布的记录条数（恒一条）多于 [`journal_record_limit_of_one_publish`]（在飞上限为 0 的环）⇒
+/// `PublishError::JournalRecordsOfThePublishExceedTheLimit`，在任何写之前（代码审阅第 26 条，与带文件的一版、写行那一版同一个判定）；
+/// 块设备报的错 ⇒ `PublishError::BlockDevice`。
 pub fn publish_without_units<Device: BlockDevice>(
     pool: &mut PoolWriter<'_, Device>,
     previous_root: &RootRecord,
     plan: ZeroUnitPublishPlan,
-) -> Result<VersionWithoutFilePublishOutput, BlockDeviceError> {
+) -> Result<VersionWithoutFilePublishOutput, PublishError> {
     let (writes, output) = prepare_the_publish_without_units(pool, previous_root, plan);
+    // 条数上限（代码审阅第 26 条，实审 A2c 报告「停下交主 agent 的」第 4 条）：可写挂载择系统配置时已拒在飞上限为 0 的环
+    // （`recovery::system_configuration_values_this_reader_accepts`，实审 A3a 第 38 条），mkfs 也拒；走到这里的只有写入口的参数
+    // 由调用方自己给、带着这种环的时候（`PoolWriter::new` 不判参数）。
+    refuse_a_publish_of_more_journal_records_than_the_limit(
+        writes.records.len(),
+        pool.parameters.geometry.journal_ring_bytes,
+    )?;
     let writes_before_this_publish = pool.writes_by_structure_kind.clone();
     // 中途失败时这次已记的写要交出去（增补 2 第 20b 行）：失败在这里记账再把错原样交回。零单元发布不冻结（见 `FrozenPublish`）。
     if let Err(cause) = persist_publish_writes(pool, &writes) {
         pool.count_failed_publish(&writes_before_this_publish);
-        return Err(cause);
+        return Err(PublishError::BlockDevice(cause));
     }
     let VersionWithoutFilePublishOutput {
         root,
@@ -1079,6 +1242,8 @@ pub fn publish_without_units<Device: BlockDevice>(
         record_bytes,
         earlier_records_of_this_publish,
         rewritten,
+        units,
+        allocation_records,
         writes: _nothing_written_before_persisting,
     } = output;
     Ok(VersionWithoutFilePublishOutput {
@@ -1087,6 +1252,8 @@ pub fn publish_without_units<Device: BlockDevice>(
         record_bytes,
         earlier_records_of_this_publish,
         rewritten,
+        units,
+        allocation_records,
         writes: pool
             .writes_by_structure_kind
             .since(&writes_before_this_publish),
@@ -1136,7 +1303,8 @@ pub fn prepare_the_publish_without_units<Device: BlockDevice>(
         // 零单元发布一个字节都不写：分配记录树照抄上一版的那一条指针，账也因此一条都没变。
         allocation_record_tree_root: previous_root.allocation_record_tree_root,
     };
-    // 零单元：屏障 → 空记录 → 屏障 → 根槽 FUA → 系统配置槽轮换（单元那一段是空的，头一道屏障前面没有写，写入口不发它）。
+    // 零单元：屏障 → 空记录 → 屏障 → 根槽 FUA → 系统配置槽轮换 → 屏障（单元那一段是空的，头一道屏障前面没有写——上一次发布
+    // 末尾那道或取号那道已经放行了——同一个写入口上不发它）。
     let writes = PublishWrites {
         units: Vec::new(),
         records: vec![JournalRecordWrite {
@@ -1156,6 +1324,9 @@ pub fn prepare_the_publish_without_units<Device: BlockDevice>(
             record_bytes,
             earlier_records_of_this_publish: Vec::new(),
             rewritten: Vec::new(),
+            units: Vec::new(),
+            allocation_records:
+                AllocationRecordsOfTheVersionWithoutFile::SameAsThePreviousVersionNotHandedInByAZeroUnitPublish,
             writes: WritesByStructureKind::NOTHING_WRITTEN,
         },
     )
@@ -1179,7 +1350,7 @@ pub struct InstanceTableOnlyPublishPlan<'records> {
 }
 
 /// 写行那次发布，上一版树表 0 条：**重写实例表链与分配记录树**（链有几片就几个实例表单元，加分配记录树这次内容变了的节点），
-/// 落盘顺序同别的发布（D16（发布语义） 已定项 7）——单元写 → 屏障 → journal 记录（点名这几个单元）→ 屏障 → 根槽 FUA → 系统配置槽轮换。
+/// 落盘顺序同别的发布（D16（发布语义） 已定项 7）——单元写 → 屏障 → journal 记录（点名这几个单元）→ 屏障 → 根槽 FUA → 系统配置槽轮换 → 屏障。
 ///
 /// 为什么是这两样：树表 0 条 ⇒ 这一版没有记账树，D16（发布语义） 已定项 9 那五样（记账行、记账树节点、映射条目、
 /// 树表单元、树表条目）一样都不写；而 D18（块里携带什么信息） 已定项 11 要求每次可写挂载都写行、写行 COW 重写整条链 ⇒ 实例表自己那几个单元
@@ -1535,7 +1706,7 @@ pub fn prepare_the_row_publish_on_a_version_without_file<Device: BlockDevice>(
     allocator.note_allocation_record_tree_of_the_version_without_file(
         crate::allocator::AllocationRecordTreeOfTheVersionWithoutFile {
             version: allocation_built.version.clone(),
-            records: allocation_records,
+            records: allocation_records.clone(),
         },
     );
     // 点名项（D23（journal 的角色与格式） 已定项 17）：这次重写的角色各一项，按 bump 次序——实例表链的各片（尾片先），分配记录树重写的节点。
@@ -1699,6 +1870,8 @@ pub fn prepare_the_row_publish_on_a_version_without_file<Device: BlockDevice>(
     } = written_records
         .pop()
         .expect("一次发布至少一条记录（`roles_named_by_each_record_of_the_publish` 至少给一项）");
+    // 交出去的单元就是这次交给设备的那几个（与 `rewritten` 逐项同序）：对拍比的是实现写出的字节，不另装一份。
+    let units_handed_in_with_the_version = writes.units.clone();
     Ok((
         writes,
         VersionWithoutFilePublishOutput {
@@ -1707,6 +1880,11 @@ pub fn prepare_the_row_publish_on_a_version_without_file<Device: BlockDevice>(
             record_bytes,
             earlier_records_of_this_publish: written_records,
             rewritten: settled.rewritten_roles,
+            units: units_handed_in_with_the_version,
+            allocation_records:
+                AllocationRecordsOfTheVersionWithoutFile::WrittenIntoTheAllocationRecordTreeByThisPublish(
+                    allocation_records,
+                ),
             writes: WritesByStructureKind::NOTHING_WRITTEN,
         },
     ))
@@ -3100,7 +3278,9 @@ pub enum PublishError {
     /// 空间准入不够（D28（挂载期承诺量） 已定项 1 的式子逐设备合取；C363 (b) 判决 `research/prompts/c363b-r1-main-verification.md`
     /// 第四节第 2 条把它接进发布路径）：这次发布有普通分配（用户数据单元、extent 树与 inode 树的节点，`admission::space_budget_of_role`），
     /// 它新写的全部角色在至少一块盘上多于可用(d)，带着不够的每一块。在算定这次发布的样子之后、读盘核被换下的单元与动分配器之前返回，
-    /// 一个写都没发、盘上逐字节不变。准入不够时先推空发布抬 F 再判（D16（发布语义） 已定项 1，C283（准入失败时不先推发布就报 ENOSPC））
+    /// 一个写都没发、盘上逐字节不变。同一个成员也报「这次的单元落不下」（C545（空间准入罩不住分裂与聚簇段层），用户 2026-09-27 定准入先拒）：
+    /// 在走分配记录树的固定点之前，至少一块盘上段外成对的空槽少于这次的数据单元、或剩下没挡的槽少于这次提交内生块至多要的
+    /// （`admission::admit_the_units_landing_on_every_device`；那一判里不够的每一块报的是短的那一种单元，见它的文档）。准入不够时先推空发布抬 F 再判（D16（发布语义） 已定项 1，C283（准入失败时不先推发布就报 ENOSPC））
     /// 归挂着的会话（`mounted_session`）：直接调发布路径的调用方收到的就是这一次的拒绝。
     SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices),
     /// 记账树或中央映射树这次之后的形状算不出来（`code_two_tree::plan_the_tree_after_this_publish`）：要长到 257 层、
@@ -3988,6 +4168,37 @@ struct MultiLevelTreesOfThisPublish {
     mapped_units: Vec<(TransactionUnit, Vec<u8>)>,
 }
 
+/// 一次发布里普通分配那一半（`PublishPlan::ordinary_allocation_part`）：这次之后 inode 树的叶容器、extent 树的样子，
+/// 与写的文件内容切成的一单元事务（没有文件版本的发布为空）。
+struct OrdinaryAllocationPartOfThePublish {
+    inode_tree: InodeLeafContainersAfterThisPublish,
+    extent_tree: ExtentTreePlan,
+    file_content_transactions: Vec<OneUnitTransaction>,
+}
+
+impl OrdinaryAllocationPartOfThePublish {
+    /// 这一半重写的角色（`admission::space_budget_of_role` 都是普通分配）：数据单元、extent 树的节点、inode 叶容器与 inode 根，
+    /// 与 `PublishPlan::resolve` 排进 bump 次序的是同一批（实例表的几片夹在数据单元与 extent 树之间，不在这一半里）。
+    fn rewritten_roles(&self) -> Vec<TransactionUnit> {
+        let mut roles: Vec<TransactionUnit> = self
+            .file_content_transactions
+            .iter()
+            .map(|transaction| TransactionUnit::Data(transaction.unit_index_in_file))
+            .collect();
+        roles.extend(self.extent_tree.rewritten_roles());
+        roles.extend(
+            self.inode_tree
+                .rewritten
+                .iter()
+                .map(|index| TransactionUnit::InodeLeafContainer(*index)),
+        );
+        if !self.inode_tree.rewritten.is_empty() {
+            roles.push(TransactionUnit::InodeRoot);
+        }
+        roles
+    }
+}
+
 impl PublishPlan<'_> {
     /// 这次发布写的文件内容按切分纪律切出来的一单元事务，按单元序号升序（= extent key 升序，D16（发布语义） 已定项 5 末段）；
     /// 没有文件版本的发布（写行、暖机、建 inode）为空。事务号从 `transaction` 起连号。
@@ -4014,6 +4225,40 @@ impl PublishPlan<'_> {
         records
     }
 
+    /// 这次发布里普通分配那一半的样子（[`OrdinaryAllocationPartOfThePublish`]）：inode 树与 extent 树这次之后怎样、写的文件内容切成哪几个
+    /// 一单元事务。只由计划与上一版定，与分配记录树这次重写哪几个节点无关——[`Self::resolve`] 每一轮都从它起，
+    /// [`prepare_the_version_publish`] 在走分配记录树的固定点之前判「这次的单元落得下」也读它。
+    ///
+    /// # Errors
+    /// inode 记录的落法要的条款仓里还没定 ⇒ `InodeTreeWriteRefused`（`crate::inode_tree` 的三格）。
+    fn ordinary_allocation_part(
+        &self,
+        previous: Option<&TransactionOutput>,
+        trees: &FileVersionTreeIdentifiers,
+    ) -> Result<OrdinaryAllocationPartOfThePublish, PublishError> {
+        let containers_before = previous
+            .map(TransactionOutput::inode_leaf_container_contents)
+            .unwrap_or_default();
+        let inode_tree = write_records_into_leaf_containers(
+            &containers_before,
+            &self.inode_record_writes(),
+            self.txg,
+            trees.inode,
+        )?;
+        let file_content_transactions = self.file_content_transactions();
+        let extent_tree = plan_the_extent_tree_after_this_publish(
+            previous.map(|version| &version.extent_tree),
+            self.file
+                .as_ref()
+                .map(|_| u64::try_from(file_content_transactions.len()).expect("这次写的单元数")),
+        );
+        Ok(OrdinaryAllocationPartOfThePublish {
+            inode_tree,
+            extent_tree,
+            file_content_transactions,
+        })
+    }
+
     /// 把这张计划算成「这次之后 extent 树、inode 树、记账树、中央映射树各长什么样、这次重写哪些角色」。`trees` 是这一版那八棵树的号
     /// （接在上一版之后就是上一版的，第一个文件版本是这次发出来的），新分裂出来的叶容器的出生树取其中的 inode 树。
     /// `device_identities` 是记账行按盘展开的那几块盘（与装记账行时的分配器同一批），`capacities` 是两棵多层码 2 树的节点容量
@@ -4032,22 +4277,11 @@ impl PublishPlan<'_> {
         capacities: CodeTwoTreeNodeCapacities,
         allocation_record_tree: AllocationRecordTreePlan,
     ) -> Result<ResolvedPublish, PublishError> {
-        let containers_before = previous
-            .map(TransactionOutput::inode_leaf_container_contents)
-            .unwrap_or_default();
-        let inode_tree = write_records_into_leaf_containers(
-            &containers_before,
-            &self.inode_record_writes(),
-            self.txg,
-            trees.inode,
-        )?;
-        let file_content_transactions = self.file_content_transactions();
-        let extent_tree = plan_the_extent_tree_after_this_publish(
-            previous.map(|version| &version.extent_tree),
-            self.file
-                .as_ref()
-                .map(|_| u64::try_from(file_content_transactions.len()).expect("这次写的单元数")),
-        );
+        let OrdinaryAllocationPartOfThePublish {
+            inode_tree,
+            extent_tree,
+            file_content_transactions,
+        } = self.ordinary_allocation_part(previous, trees)?;
         let mut rewritten_roles: Vec<TransactionUnit> = file_content_transactions
             .iter()
             .map(|transaction| TransactionUnit::Data(transaction.unit_index_in_file))
@@ -4805,7 +5039,8 @@ pub enum ReleaseChecksumCheck {
 /// 根记录的卸载记号照 `unmount_marker` 写（D22（单元原子性怎么合成） 已定项 7）：预演与真发给同一个。
 ///
 /// # Errors
-/// `InodeTreeWriteRefused`、`MultiLevelCodeTwoTreeRefused`、释放判定路径的几种错、`PlacementRefused`。
+/// `InodeTreeWriteRefused`、`SpaceAdmissionRefused`（这次的单元落不下，排在走固定点之前；或式子那一判不够）、
+/// `MultiLevelCodeTwoTreeRefused`、释放判定路径的几种错、`PlacementRefused`。
 pub fn prepare_the_version_publish<Device: BlockDevice>(
     pool: &PoolWriter<'_, Device>,
     allocator: &mut PoolAllocator,
@@ -4822,6 +5057,36 @@ pub fn prepare_the_version_publish<Device: BlockDevice>(
         .iter()
         .map(|device_map| device_map.device)
         .collect();
+    // 准入先判这次的单元落不落得下（C545（空间准入罩不住分裂与聚簇段层），用户 2026-09-27 定准入先拒）：下面走固定点时就在分配器的拷贝上
+    // 取落点，取不到交回 `PlacementRefused`，排在式子那一判之前——落得下不下要在它之前判。判不判与式子那一判同一条：有普通分配、
+    // 准入判着。数据单元要段外成对的空槽、提交内生块要没挡的槽（普通分配那一半照计划数，固定点按 ckpt_cost 的最坏数），
+    // 读的是分配器增量维护的两个数；不够交回 `SpaceAdmissionRefused`（会话照旧推抬 F 再判），在动分配器与任何写之前，盘上逐字节不变。
+    let ordinary_allocation_roles = plan
+        .ordinary_allocation_part(previous, &trees)?
+        .rewritten_roles();
+    let units_landing_is_judged = match allocator.space_admission() {
+        SpaceAdmission::JudgedByTheFormula => {
+            publish_has_an_ordinary_allocation(&ordinary_allocation_roles)
+        }
+        SpaceAdmission::SkippedByTheTestOnlySwitch => {
+            // 关掉准入的那一档这一判与式子那一判都不判，留给落点那一道在任何写之前拒。
+            false
+        }
+    };
+    if units_landing_is_judged {
+        admit_the_units_landing_on_every_device(
+            &PlacementRoomOnOneDevice::of_every_device_of_the_allocator(allocator),
+            units_of_a_publish_to_land(
+                &ordinary_allocation_roles,
+                checkpoint_cost_of_the_version_to_build_on_with_node_capacities(
+                    previous,
+                    allocator,
+                    pool.code_two_tree_node_capacities(),
+                ),
+            ),
+        )
+        .map_err(PublishError::SpaceAdmissionRefused)?;
+    }
     let settled = settle_the_allocation_record_tree(
         plan,
         previous,
@@ -6510,7 +6775,7 @@ fn publish_admitted<Device: BlockDevice>(
         // 两处都写就成了同一个量的两份手抄。`root_record_of_a_file_version_leaves_the_allocation_record_tree_pointer_zero` 钉住。
         allocation_record_tree_root: NodePointer::empty_root(),
     };
-    // 持久顺序（D16（发布语义） 已定项 7）：这次重写的单元 → 屏障 → journal 记录 → 屏障 → 根槽 FUA → 系统配置槽轮换。
+    // 持久顺序（D16（发布语义） 已定项 7）：这次重写的单元 → 屏障 → journal 记录 → 屏障 → 根槽 FUA → 系统配置槽轮换 → 屏障。
     // 这里只装、不落盘：调用方拿它落盘，中途失败时这次已记的写进失败账（增补 2 第 20b 行）、这次发布冻结等原样重发。
     let writes = PublishWrites {
         units: written_units.into_iter().cloned().collect(),
@@ -6610,7 +6875,11 @@ impl BuiltMultiLevelTree {
 ///
 /// # Panics
 /// 计划里叶的 key 与 `leaf_entry_bytes_by_key` 的 key 不是同一个集合（计划按 `resolve` 现算的 key 算，条目按这次装出来的，
-/// 两边出生序号的发号次序不同步就对不上）；照抄的节点不在上一版里；重写的节点没拿到落点——三样都是发布路径自己的不变量。
+/// 两边出生序号的发号次序不同步就对不上；上一版叶里有重复 key 时条目那一边并掉一把，也对不上）；照抄的节点不在上一版里；
+/// 重写的节点没拿到落点——三样都是发布路径自己的不变量。重复 key 那一格从盘上走不到，靠的是读者那一道：可写挂载接着发布的上一版由
+/// `recovery::rebuild_version` 读记账树与中央映射树，按 `CodeTwoTreeHeaderJudgement::EveryHeaderAgainstItsReference` 判过
+/// 每个节点的 key 严格递增、区间落在父条目里（实审 A3a 第 33 条；坏镜像用例在 `corrupt_on_disk_content_is_refused_instead_of_panicking.rs`）；
+/// 同一个进程里接着的上一版是发布路径自己装的，key 取自 `BTreeMap`。
 #[allow(
     clippy::too_many_arguments,
     reason = "装一棵树要的八样：哪一棵、它的号、计划、上一版、条目、身份字段、落点、发号器，各自独立"
@@ -6632,7 +6901,8 @@ fn build_multi_level_tree(
                 .iter()
                 .zip(leaf_entry_bytes_by_key.keys())
                 .all(|(planned, built)| *planned == built),
-        "{tree:?}：计划里叶的 key 与这次装出来的条目的 key 不是同一个集合"
+        "{tree:?}：计划里叶的 key 与这次装出来的条目的 key 不是同一个集合（上一版叶里有重复 key 时才会分叉：盘上读来的上一版由 \
+         recovery::rebuild_version 按 CodeTwoTreeHeaderJudgement::EveryHeaderAgainstItsReference 判过 key 严格递增）"
     );
     let key_width = tree.key_field_widths().key_width_in_bytes();
     let key_ranges = crate::code_two_tree::key_ranges_in_bump_order(&plan.shape);

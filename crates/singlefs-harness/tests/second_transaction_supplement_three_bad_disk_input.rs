@@ -22,11 +22,15 @@ use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::mount::{mount_writable, MountError};
 use singlefs_core::transaction::TransactionUnit;
 use singlefs_harness::bad_disk_input::{
-    damage_image, feed_a_damaged_image, known_panic_site_among, known_panic_site_of,
-    newest_root_has_the_trees_the_targeted_damages_need, run_bad_disk_campaign, BadDiskCampaign,
-    BadDiskFinding, BadDiskInputWorkerThreads, BadDiskReport, DamageKind, KnownPanicSite,
-    ReadBackVerdict, ReaderOutcome, BAD_DISK_INPUT_WORKER_THREADS_ENVIRONMENT_VARIABLE,
-    EVERY_BASE_IMAGE_TIER, EVERY_DAMAGE_KIND, KNOWN_PANIC_SITES,
+    damage_image, damage_image_the_way_the_header_judgement_refuses, feed_a_damaged_image,
+    known_panic_site_among, known_panic_site_of,
+    newest_root_has_the_trees_the_targeted_damages_need,
+    release_check_of_the_instance_table_placement_released_on_the_second_device_only,
+    run_bad_disk_campaign, BadDiskCampaign, BadDiskFinding, BadDiskInputWorkerThreads,
+    BadDiskObservation, BadDiskReport, DamageKind, DamageRefusedAtTheHeaderJudgement, DamagedImage,
+    KnownPanicSite, ReadBackVerdict, ReaderOutcome,
+    BAD_DISK_INPUT_WORKER_THREADS_ENVIRONMENT_VARIABLE, EVERY_BASE_IMAGE_TIER, EVERY_DAMAGE_KIND,
+    KNOWN_PANIC_SITES,
 };
 use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::crash_injection::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
@@ -316,12 +320,12 @@ fn the_location_entry_checksum_refuses_the_unit_that_was_resealed_with_only_its_
 /// 用的是写死的那一段历史（种子基 + [`SEED_OFFSET_OF_THE_FIXED_HISTORY`]）加写死的坏法，
 /// 每一格的坏法与随机源都是定死的，重跑逐字相同。
 ///
-/// **两个读者各钉一格，因为它们走的不是同一条路**：恢复走 `walk_to_file`，它在解条目之前先有
-/// `read_tree_root` 那一道「根的 key 区间贴紧首末条目」（`recovery.rs` 的 `InvariantViolated { invariant: "I-1.1" }`），
-/// 凡是动了首末条目 key 的坏法（条目数从 94 / 15 缩成 1、第一条记录的 key 被换掉）都先红在那里；
-/// 可写挂载重建分配器走的是 `allocation_records_under_root`，不经那一道，于是落在这一批新加的边界判上。
-/// 两格都钉，才看得出**这一批的判定真的被走到过**——只钉恢复那一格的话，把新加的判全删掉，
-/// 恢复照样红在 I-1.1 上，这条用例不会响。
+/// **两个读者各钉一格**：可写挂载重建与恢复的冷走读调同一组判定函数（代码审阅第 24 / 33 条，用户定案「可写挂载判全树头与
+/// key 次序，坏了报错拒挂载，不多读盘」），可两边读的东西不全一样——冷走读只在位置提示读不出时才解映射条目、不取 inode 号水位，
+/// 那两格恢复照常读回文件，只有可写挂载走得到那一处。两格都钉，才看得出**这一批的判定在可写挂载那一侧真的被走到过**。
+/// 坏法因此都要过得了判全那一道（叶根的 key 区间、条目数、key 次序都对得上）：记账树根、中央映射树根缩条目宽时每条只留 key、
+/// 条目数不变，水位那一行改标签时节点头的最大 key 跟着改。它们原来的样子在判全那一道就被两个读者拒掉，
+/// 那几格由下面 `…_is_refused_at_the_header_judgement_by_both_readers` 那三条与分配记录那一条钉。
 #[test]
 fn every_fixed_panic_site_reports_its_own_error_member_instead_of_panicking() {
     let base = base_image_for(HistorySeed(
@@ -330,15 +334,15 @@ fn every_fixed_panic_site_reports_its_own_error_member_instead_of_panicking() {
     // (坏法, 恢复那一侧交回里必然出现的那一段, 可写挂载那一侧交回里必然出现的那一段)。
     // 前四条是条目宽（普查 R1 / R3 / R4），中间四条是喂进分配器的结构值（普查 R6 / R8 / R9），
     // 第九条是第四批的 R2（中央映射树根的条目宽，它的根住根记录、不经树表），
-    // 第十条是第四批的 R10（两块盘的分配记录树不对称：实例表那个落点只在盘 1 上写成已释放），
-    // 第十一、十二条是第三批修的那两族——记账行的统计量标签（R11）与一条指针的两条位置条目槽号（R5），
+    // 第十、十一条是第三批修的那两族——记账行的统计量标签（R11）与一条指针的两条位置条目槽号（R5），
     // 末一条是 C504（树表条目宽在走读里无守卫，今天没坏法打得到）：树表单元自己的条目宽；
     // `what` 那一段就是错误成员里带的那个字段，逐字照 `crates/singlefs-core/src/recovery.rs` 写。
+    // 第四批的 R10（两块盘的分配记录树不对称）不在这张表里：见表后那一段。
     //
-    // ⚠️ 末两条的恢复那一侧本来就不该报错，照实钉：
-    // 记账行改标签的那份镜像上，恢复走 `walk_to_file`，先红在 I-1.1（标签在记账 key 里，根的 key 区间跟着对不上）；
-    // 位置条目那份上恢复**读回了文件**（那条指针指的实例表不在读路径上，两条位置条目的第一条又还是好的）——
-    // 这一条钉的正是「改法没有把读路径也一起拒掉」。
+    // ⚠️ 第九、十、十一条的恢复那一侧本来就不该报错，照实钉——三份镜像上恢复都**读回了文件**：
+    // 映射条目那份上冷走读的位置提示都读得出，一条映射条目都不解；记账行改标签那份上冷走读不取 inode 号水位；
+    // 位置条目那份上那条指针指的实例表不在读路径上，两条位置条目的第一条又还是好的——
+    // 这几条钉的正是「改法没有把读路径也一起拒掉」。
     //
     // ⚠️ 这段写死的历史（种子基 + 4、16 步）第 3 步（从 0 数）是「挂着时回退到环里第 3 新的根」，那是一条暖机根（树表 0 条）：
     // 管理员回退改成挂着时的向前发布之后（实三），回退的候选集要带文件（D23（journal 的角色与格式） 已定项 14），它在写之前被拒
@@ -350,7 +354,7 @@ fn every_fixed_panic_site_reports_its_own_error_member_instead_of_panicking() {
     // ⚠️ 「跨度越过单元区末尾」那条坏法在**两块 4 GiB 的盘**上够不着它名字里说的那一格：跨度写成 0x7FFF = 32767 槽，
     // 从 50176 起到 82943，而单元区末尾是槽 262144（4 GiB ÷ 16 KiB）。分配记录树按位置寻址之后，它先撞上的是叶判
     // （末槽越过它所在叶的末槽）。照实钉，不按坏法的名字钉。
-    let expected_error_member: [(DamageKind, &str, &str); 13] = [
+    let expected_error_member: [(DamageKind, &str, &str); 12] = [
         // extent 树按位置寻址（D8（核心索引结构） 已定项 14）：第一个文件那一版的 extent 树根是上段根兼叶，条目是上段叶条目 113。
         (
             DamageKind::NarrowedEntryWidthOfTheExtentTreeRoot,
@@ -371,7 +375,7 @@ fn every_fixed_panic_site_reports_its_own_error_member_instead_of_panicking() {
         ),
         (
             DamageKind::NarrowedEntryWidthOfTheAccountingTreeRoot,
-            "InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }",
+            "EntryNarrowerThanItsFieldTable { what: \"记账条目\"",
             "EntryNarrowerThanItsFieldTable { what: \"记账条目\"",
         ),
         // 这四条坏的是最左那片叶的记录（分配记录树按位置寻址，D8（核心索引结构） 已定项 14）：记录的槽号、跨度、设备改了，
@@ -400,18 +404,12 @@ fn every_fixed_panic_site_reports_its_own_error_member_instead_of_panicking() {
         ),
         (
             DamageKind::NarrowedEntryWidthOfTheCentralMappingTreeRoot,
-            "InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }",
+            "FileRead（实例 2 第 9 代根",
             "EntryNarrowerThanItsFieldTable { what: \"映射条目\"",
         ),
         (
-            DamageKind::AllocationRecordReleasedOnTheSecondDeviceOnly,
-            "InvariantViolated { invariant: \"E142 走读同款\", detail: \"分配记录不是每个落点每盘各一条",
-            "ReleaseTargetAlreadyReleased { unit: InstanceTable, device: DeviceIdentity(1), \
-             slot: SlotNumber(50304) }",
-        ),
-        (
             DamageKind::RelabelledInodeWatermarkAccountingRow,
-            "InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }",
+            "FileRead（实例 2 第 9 代根",
             "InodeNumberWatermarkRowMissingFromTheAccountingTree",
         ),
         (
@@ -478,6 +476,221 @@ fn every_fixed_panic_site_reports_its_own_error_member_instead_of_panicking() {
                 damaged.what
             );
         }
+    }
+
+    // 第四批的 R10（两块盘的分配记录树不对称：实例表那个落点只在盘 1 上写成已释放）从盘上走不到了：可写挂载重建判全
+    // （代码审阅第 24 / 33 条）在取号之前就按「分配记录每个落点每盘各一条」拒掉那份镜像
+    // （`allocation_records_released_on_the_second_device_only_are_refused_at_the_one_record_per_device_judgement_by_both_readers`
+    // 钉着）。释放判定逐盘核那一处（`transaction.rs` 的 `placement_registered_unreleased_on_every_device`）因此越过盘上那一道、
+    // 直接调发布路径：同一对记录手搭进分配器，拿这段历史最新那条根的实例表指针调写行那次发布用的释放判定。成员逐字与它从盘上走得到时相同。
+    let release_check =
+        release_check_of_the_instance_table_placement_released_on_the_second_device_only(
+            &base.image,
+        )
+        .expect("这段历史最新那条根的实例表指针不是全零");
+    let refused = format!("{release_check:?}");
+    print_uncaptured(&format!(
+        "{}（越过盘上那一道，直接调发布路径的释放判定）\n  释放判定：{refused}\n",
+        DamageKind::AllocationRecordReleasedOnTheSecondDeviceOnly.name()
+    ));
+    assert!(
+        refused.contains(
+            "Err(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: DeviceIdentity(1), \
+             slot: SlotNumber(50304) })"
+        ),
+        "两块盘的账不对称（盘 1 上那条已释放）时，发布路径的释放判定该逐盘核、在盘 1 上报已释放，实际交回的是 {refused}"
+    );
+}
+
+/// 一份坏镜像喂给恢复、可写挂载与池级 checker，把三个读者各自交回的样子打出来（通过时也看得见）。
+fn observation_of(base: &BaseImageForOneHistory, damaged: &DamagedImage) -> BadDiskObservation {
+    let observation = feed_a_damaged_image(
+        damaged,
+        &base.committed_contents,
+        &HistoryDeviceWidth::FourGibibytes.parameters(),
+        HistoryDeviceWidth::FourGibibytes,
+    );
+    // 不打 `damaged.kind.name()`：判全那几种是 `DamageKind` 里同名那一种原来的样子，名字说的是改对之后的那一种；`what` 写明了是哪一样。
+    print_uncaptured(&format!(
+        "坏在哪：{}\n  恢复：{:?}\n  可写挂载：{:?}\n  池级 checker：{:?}\n",
+        damaged.what, observation.recovery, observation.mount, observation.checker
+    ));
+    observation
+}
+
+/// 判全那一道（代码审阅第 24 / 33 条）：记账树根的条目宽缩到 key 宽、只留第一条，节点头的 key 区间照旧——
+/// [`DamageKind::NarrowedEntryWidthOfTheAccountingTreeRoot`] 原来的样子。冷走读与可写挂载的重建调同一个叶判，
+/// 两个读者都在解记账条目之前红在「根 key 区间与条目不符」上（末条的 key 与头里的最大 key 对不上）。
+/// 判别力：重建读记账树时不判节点头（`recovery.rs` 的 `rebuild_version` 那一处改回 `OnlyWhatTheShapeNeeds`），
+/// 可写挂载改报「记账条目数不是 3 + 6 × 盘数」——`crates/mutations.tsv` 里以「实审 A3d：重建读记账树不判节点头（记账根只剩一条」开头的那一行。
+#[test]
+fn an_accounting_root_narrowed_to_its_first_entry_is_refused_at_the_header_judgement_by_both_readers(
+) {
+    let base = base_image_for(HistorySeed(
+        SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE.wrapping_add(SEED_OFFSET_OF_THE_FIXED_HISTORY),
+    ));
+    let damaged = damage_image_the_way_the_header_judgement_refuses(
+        &base.image,
+        DamageRefusedAtTheHeaderJudgement::AccountingTreeRootNarrowedToItsFirstEntry,
+    )
+    .expect("这段历史最新那条根下面有记账树，根是一片叶");
+    let observation = observation_of(&base, &damaged);
+    for (reader, outcome) in [
+        ("恢复", &observation.recovery),
+        ("可写挂载", &observation.mount),
+        ("池级 checker", &observation.checker),
+    ] {
+        assert!(
+            outcome.panic().is_none(),
+            "{reader}打 panic 了：{outcome:?}"
+        );
+    }
+    for (reader, outcome) in [
+        ("恢复", &observation.recovery),
+        ("可写挂载", &observation.mount),
+    ] {
+        let ReaderOutcome::Finished { how } = outcome else {
+            unreachable!("上一条断言已经排掉了 panic 那一支")
+        };
+        assert!(
+            how.contains(
+                "InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }"
+            ),
+            "记账树根只剩一条、头里的最大 key 照旧，{reader}该红在判全那一道的叶区间上，实际交回的是 {how}"
+        );
+    }
+}
+
+/// 判全那一道（代码审阅第 24 / 33 条）：中央映射树根的条目宽缩到 key 宽、只留第一条，节点头的 key 区间照旧——
+/// [`DamageKind::NarrowedEntryWidthOfTheCentralMappingTreeRoot`] 原来的样子。两个读者读映射树都判全，
+/// 都在数映射条目、解映射条目之前红在「根 key 区间与条目不符」上。
+/// 判别力：重建读映射树时不判节点头（`rebuild_version` 里映射树那一处改回 `OnlyWhatTheShapeNeeds`），
+/// 可写挂载改报「映射条目数不是 1 + …」——`crates/mutations.tsv` 里以「实审 A3d：重建读中央映射树不判节点头（映射根只剩一条」开头的那一行。
+#[test]
+fn a_central_mapping_root_narrowed_to_its_first_entry_is_refused_at_the_header_judgement_by_both_readers(
+) {
+    let base = base_image_for(HistorySeed(
+        SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE.wrapping_add(SEED_OFFSET_OF_THE_FIXED_HISTORY),
+    ));
+    let damaged = damage_image_the_way_the_header_judgement_refuses(
+        &base.image,
+        DamageRefusedAtTheHeaderJudgement::CentralMappingTreeRootNarrowedToItsFirstEntry,
+    )
+    .expect("这段历史最新那条根的中央映射树根指针不是全零");
+    let observation = observation_of(&base, &damaged);
+    for (reader, outcome) in [
+        ("恢复", &observation.recovery),
+        ("可写挂载", &observation.mount),
+        ("池级 checker", &observation.checker),
+    ] {
+        assert!(
+            outcome.panic().is_none(),
+            "{reader}打 panic 了：{outcome:?}"
+        );
+    }
+    for (reader, outcome) in [
+        ("恢复", &observation.recovery),
+        ("可写挂载", &observation.mount),
+    ] {
+        let ReaderOutcome::Finished { how } = outcome else {
+            unreachable!("上一条断言已经排掉了 panic 那一支")
+        };
+        assert!(
+            how.contains(
+                "InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }"
+            ),
+            "中央映射树根只剩一条、头里的最大 key 照旧，{reader}该红在判全那一道的叶区间上，实际交回的是 {how}"
+        );
+    }
+}
+
+/// 判全那一道（代码审阅第 24 / 33 条）：记账树里 inode 号水位那一行改挂到登记表外的标签上，节点头的最大 key 照旧——
+/// [`DamageKind::RelabelledInodeWatermarkAccountingRow`] 原来的样子。标签是记账 key 的第一段，末条的 key 跟着变了，
+/// 两个读者都在取水位之前红在「根 key 区间与条目不符」上。
+/// 判别力：重建读记账树时不判节点头，可写挂载改报「记账树里没有 inode 号水位那一行」——
+/// `crates/mutations.tsv` 里以「实审 A3d：重建读记账树不判节点头（水位那一行」开头的那一行。
+#[test]
+fn an_inode_watermark_row_relabelled_under_the_old_largest_key_is_refused_at_the_header_judgement_by_both_readers(
+) {
+    let base = base_image_for(HistorySeed(
+        SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE.wrapping_add(SEED_OFFSET_OF_THE_FIXED_HISTORY),
+    ));
+    let damaged = damage_image_the_way_the_header_judgement_refuses(
+        &base.image,
+        DamageRefusedAtTheHeaderJudgement::InodeWatermarkRowRelabelledUnderTheOldLargestKey,
+    )
+    .expect("这段历史最新那条根下面有记账树，根是一片叶，里面有 inode 号水位那一行");
+    let observation = observation_of(&base, &damaged);
+    for (reader, outcome) in [
+        ("恢复", &observation.recovery),
+        ("可写挂载", &observation.mount),
+        ("池级 checker", &observation.checker),
+    ] {
+        assert!(
+            outcome.panic().is_none(),
+            "{reader}打 panic 了：{outcome:?}"
+        );
+    }
+    for (reader, outcome) in [
+        ("恢复", &observation.recovery),
+        ("可写挂载", &observation.mount),
+    ] {
+        let ReaderOutcome::Finished { how } = outcome else {
+            unreachable!("上一条断言已经排掉了 panic 那一支")
+        };
+        assert!(
+            how.contains(
+                "InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }"
+            ),
+            "水位那一行改了标签、头里的最大 key 照旧，{reader}该红在判全那一道的叶区间上，实际交回的是 {how}"
+        );
+    }
+}
+
+/// 判全那一道（代码审阅第 24 / 33 条）：实例表那个落点的分配记录只在盘 1 上写成已释放（[`DamageKind::AllocationRecordReleasedOnTheSecondDeviceOnly`]，
+/// 这一种坏法没改）。冷走读与可写挂载的重建调同一个判定「分配记录每个落点每盘各一条」，两个读者都在取号、发布之前就拒——
+/// 释放判定逐盘核那一处（普查 R10）从盘上因此走不到，改由 `every_fixed_panic_site_reports_its_own_error_member_instead_of_panicking`
+/// 直接调发布路径钉。
+/// 判别力：重建不判分配记录每盘一条，可写挂载也走不到发布——释放代写成高过任何根的那个数，下一道「分配代 / 释放代不晚于根」接走，
+/// 改报「分配记录跨度为 0，或分配代 / 释放代晚于根」——
+/// `crates/mutations.tsv` 里以「实审 A3d：重建不判分配记录每个落点每盘各一条」开头的那一行。
+#[test]
+fn allocation_records_released_on_the_second_device_only_are_refused_at_the_one_record_per_device_judgement_by_both_readers(
+) {
+    let base = base_image_for(HistorySeed(
+        SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE.wrapping_add(SEED_OFFSET_OF_THE_FIXED_HISTORY),
+    ));
+    let mut random = SeededRandomSource::from_seed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE);
+    let damaged = damage_image(
+        &base.image,
+        DamageKind::AllocationRecordReleasedOnTheSecondDeviceOnly,
+        &mut random,
+    )
+    .expect("这段历史最新那条根的实例表落点在两块盘上各有一条还着的分配记录");
+    let observation = observation_of(&base, &damaged);
+    for (reader, outcome) in [
+        ("恢复", &observation.recovery),
+        ("可写挂载", &observation.mount),
+        ("池级 checker", &observation.checker),
+    ] {
+        assert!(
+            outcome.panic().is_none(),
+            "{reader}打 panic 了：{outcome:?}"
+        );
+    }
+    for (reader, outcome) in [
+        ("恢复", &observation.recovery),
+        ("可写挂载", &observation.mount),
+    ] {
+        let ReaderOutcome::Finished { how } = outcome else {
+            unreachable!("上一条断言已经排掉了 panic 那一支")
+        };
+        assert!(
+            how.contains(
+                "InvariantViolated { invariant: \"E142 走读同款\", detail: \"分配记录不是每个落点每盘各一条"
+            ),
+            "两块盘的分配记录树不对称，{reader}该红在「分配记录每个落点每盘各一条」上，实际交回的是 {how}"
+        );
     }
 }
 

@@ -92,8 +92,8 @@ fn the_test_cycle_seed_base_is_the_number_drawn_for_this_cycle() {
     assert_eq!(
         SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
         7_463_871_032_432_355_113,
-        "种子基不是这个测试周期 2026-09-20 抽的那个数：周期之内不许换，换了这个周期量过的判红全部作废；\
-         下一个周期才重抽（周期怎么算、抽法、周期开头还要做什么，写在 SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE 的文档注释里）"
+        "种子基不是 2026-09-20 抽的那个数：它永久固定，换了就让绑在这批历史上的判红、镜像与过程文件整批作废\
+         （为什么固定、要多测历史怎么追加区间，写在 SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE 的文档注释里）"
     );
     let report = run_crash_injection_campaign(&CrashInjectionCampaign {
         first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,

@@ -1,8 +1,9 @@
 //! 里程碑「第二个事务」增补 2 收进来的 C368（分配器落点只看盘 0，盘不等大时断言失败）：D2（RAID 条带策略） 已定项 2「各盘不必等大」，
 //! D3（空间分配） 已定项 8 第 1 条「在每一块被选中的设备上各自取该设备内」。
 //! 两块不等大的盘（盘 0 4 GiB、盘 1 3 GiB 加 33 槽）：mkfs、第一个事务、可写挂载今天都接受；填到小盘单元区末尾之后，
-//! 分配按设备取落点，小盘答不出就在动任何状态之前拒绝、发布报 `PlacementRefused` 并带着分配器的原因（不再一律报装不下），
-//! 不 panic、一个写都不发。
+//! 分配器直接取落点时按设备算，小盘答不出就在动任何状态之前拒绝、报 `PlacementRefused` 并带着分配器的原因（不再一律报装不下）；
+//! 发布路径先判「这次的单元落不落得下」（C545（空间准入罩不住分裂与聚簇段层），用户 2026-09-27 定「准入先拒」），小盘落不下时交回
+//! `SpaceAdmissionRefused`，落得下、只是各盘落点不一致时仍是 `PlacementRefused`；两条路都不 panic、一个写都不发。
 //! 另钉两个第一版不支持、没有条款的分支（拒绝成员的名字说哪条没定）：各盘给提交内生块的去处不同（一块开段一块回落，D3 已定项 8 待办 ①）；
 //! 各盘的用户数据落点不同（`Placement` 两盘同槽）。
 //!
@@ -19,6 +20,7 @@ use common::{
 use singlefs_core::address::{
     CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, InstanceGeneration, SlotNumber,
 };
+use singlefs_core::admission::{AvailableBytesOnOneDevice, BytesOnOneDevice, DeviceShortOfDemand};
 use singlefs_core::allocator::{
     AllocationRecord, CommitGeneratedDeviceAnswer, DeviceFreeMap, Placement, PlacementRefusal,
     PoolAllocator, UnitFootprint,
@@ -253,8 +255,9 @@ fn try_overwrite(pool: &mut UnequalPool) -> Result<TransactionOutput, PublishErr
 }
 
 /// C368 的验收：小盘单元区末尾那一对偶数槽在两块盘上都空时，用户数据按设备取、两块盘都落在那里；之后小盘一个空槽都没有、
-/// 大盘在小盘末尾之后还有 1 万多个槽——用户数据、一槽节点、两槽容器都拒成「小盘满了、设备集合怎么选没有条款」，分配器一样没动；
-/// 走发布路径报 `PlacementRefused`（数据单元先分配），原因照样是小盘满了，录制流一步都不多、分配器退回。只看盘 0 的写法在这里 panic（小盘越界）。
+/// 大盘在小盘末尾之后还有 1 万多个槽——用户数据、一槽节点、两槽容器直接调分配器都拒成「小盘满了、设备集合怎么选没有条款」，分配器一样没动；
+/// 走发布路径时，准入先判「这次的单元落不落得下」（C545（空间准入罩不住分裂与聚簇段层），用户 2026-09-27 定「准入先拒」）：小盘段外没有
+/// 成对的空槽，交回 `SpaceAdmissionRefused`（只报盘 1），录制流一步都不多、分配器退回。只看盘 0 的写法在这里 panic（小盘越界）。
 #[test]
 fn filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking(
 ) {
@@ -322,17 +325,16 @@ fn filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placem
     let operations_before = pool.stream.operations().len();
     let refused = try_overwrite(&mut pool);
     match &refused {
-        Err(PublishError::PlacementRefused {
-            unit: TransactionUnit::Data(DataUnitIndexInFile::FIRST),
-            refusal,
-        }) => assert_eq!(
-            *refusal,
-            PlacementRefusal::SomeDevicesFullDeviceSetSelectionUndefined {
-                full_devices: vec![DeviceIdentity(1)],
-            },
-            "发布层报的是分配器的原因（小盘满了），不是一律报装不下"
+        Err(PublishError::SpaceAdmissionRefused(refusal)) => assert_eq!(
+            refusal.short_devices,
+            vec![DeviceShortOfDemand {
+                device: DeviceIdentity(1),
+                available: AvailableBytesOnOneDevice(0),
+                demand: BytesOnOneDevice(32_768),
+            }],
+            "准入先拒（C545）：小盘段外没有成对的空槽（0 字节）< 这次的数据单元（2 槽 32 768 字节），只报盘 1"
         ),
-        other => panic!("数据单元的落点该被拒：{:?}", other.as_ref().err()),
+        other => panic!("数据单元的落点该被拒（准入先拒）：{:?}", other.as_ref().err()),
     }
     assert_eq!(
         pool.stream.operations().len(),
@@ -343,8 +345,10 @@ fn filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placem
 }
 
 /// 各盘给提交内生块的去处不同：小盘单元区里只剩末尾三个槽、一个全空段都没有 ⇒ 小盘回落到 196638；大盘在小盘末尾之后还有全空段 ⇒
-/// 开段 196672。各盘上的聚簇段要不要对齐没有条款（D3（空间分配） 已定项 8 待办 ①），拒成那个成员、分配器不动；发布里数据单元两块盘
-/// 同落 196638，extent 树根在这里被拒 ⇒ `PlacementRefused`、原因是各盘去处不同，录制流一步都不多。
+/// 开段 196672。各盘上的聚簇段要不要对齐没有条款（D3（空间分配） 已定项 8 待办 ①），直接调分配器拒成那个成员、分配器不动；
+/// 发布路径里数据单元两块盘同落 196638，段外的空槽够，但准入先判「这次的单元落不落得下」（C545（空间准入罩不住分裂与聚簇段层），
+/// 用户 2026-09-27 定「准入先拒」）时小盘剩下没挡的槽不够第一个提交内生块（extent 树根）要的槽 ⇒ `SpaceAdmissionRefused`（只报盘 1），
+/// 录制流一步都不多。
 #[test]
 fn devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written(
 ) {
@@ -387,17 +391,17 @@ fn devices_answering_different_places_for_a_commit_generated_block_are_refused_b
     let operations_before = pool.stream.operations().len();
     let refused = try_overwrite(&mut pool);
     match &refused {
-        Err(PublishError::PlacementRefused {
-            unit: TransactionUnit::ExtentRoot,
-            refusal,
-        }) => assert!(
-            matches!(
-                refusal,
-                PlacementRefusal::CommitGeneratedPlacementsDifferAcrossDevicesSegmentAlignmentUndefined { .. }
-            ),
-            "发布层报的是分配器的原因（各盘去处不同），不是一律报装不下：{refusal:?}"
+        Err(PublishError::SpaceAdmissionRefused(refusal)) => assert_eq!(
+            refusal.short_devices,
+            vec![DeviceShortOfDemand {
+                device: DeviceIdentity(1),
+                available: AvailableBytesOnOneDevice(16_384),
+                demand: BytesOnOneDevice(7_553_024),
+            }],
+            "准入先拒（C545）：小盘数据单元取走那一对之后没挡的槽剩 1（16 384 字节）< 第一个提交内生块要的 461 槽\
+             （extent 根 + inode 叶容器 + inode 根 + ckpt_cost，7 553 024 字节），只报盘 1"
         ),
-        other => panic!("extent 树根的落点该被拒：{:?}", other.as_ref().err()),
+        other => panic!("extent 树根的落点该被拒（准入先拒）：{:?}", other.as_ref().err()),
     }
     assert_eq!(
         pool.stream.operations().len(),

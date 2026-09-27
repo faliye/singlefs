@@ -15,7 +15,9 @@ use common::{
 };
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::mount::{mount_writable, raise_rollback_floor, ShadowLedger};
-use singlefs_core::transaction::{acquire_instance, AcquisitionRollback, PoolWriter};
+use singlefs_core::transaction::{
+    acquire_instance, AcquisitionRollback, InstanceAcquisitionFailed, PoolWriter,
+};
 use singlefs_harness::fault_injection::{
     FaultCounting, FaultDeviceSelector, FaultInjectingBlockDevice, FaultOccurrence, FaultPlacement,
     FaultSchedule, InjectedFault, SharedFaultPlan,
@@ -163,7 +165,12 @@ fn rolling_back_a_failed_acquisition_overwrites_the_older_slot_only_behind_a_bar
     let publish_parameters = parameters();
     let failure = {
         let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
-        acquire_instance(&mut writer).expect_err("盘 1 的取号写报错，取号必须失败")
+        match acquire_instance(&mut writer).expect_err("盘 1 的取号写报错，取号必须失败") {
+            InstanceAcquisitionFailed::Acquisition(acquisition) => acquisition,
+            InstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness {
+                device,
+            } => panic!("这条用例里每块盘两槽都读得出自证过的系统配置，取号不该拒在见证值那一核：{device:?}"),
+        }
     };
     plan.disarm();
     assert!(

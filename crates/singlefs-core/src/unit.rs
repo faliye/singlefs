@@ -292,10 +292,35 @@ pub enum UnitError {
     BadMagic,
     UnknownFormatVersion,
     NonZeroFlags,
-    WrongUnitClass { expected: u8, found: u8 },
+    WrongUnitClass {
+        expected: u8,
+        found: u8,
+    },
     HeaderChecksumMismatch,
     PayloadChecksumMismatch,
+    /// 类身份段之后那 29 字节 nonce / MAC / 算法类型预留位有非 0 字节：它们不在头校验和覆盖内（在载荷 CRC 覆盖内），
+    /// 由「恒 0、读者遇到非 0 一律判该结构损坏」这条规则守（I-2.4（头校验和覆盖范围）；D18（块里携带什么信息） 已定项 16 / 已定项 17）。
+    EncryptionReservedBytesNotZero,
     Structure(&'static str),
+}
+
+/// 码 2 节点头里条目宽是 0、条目数不是 0 时 [`parse_index_node`] 报 [`UnitError::Structure`]，带这一句。
+pub const ENTRY_WIDTH_ZERO_WITH_ENTRIES: &str = "条目宽为 0 而条目数不为 0";
+/// 码 3 单元头里记录宽是 0、记录数不是 0 时 [`parse_packed_unit`] 报 [`UnitError::Structure`]，带这一句。
+pub const RECORD_WIDTH_ZERO_WITH_RECORDS: &str = "记录宽为 0 而记录数不为 0";
+
+/// 类身份段之后那 29 字节预留位（从 `header_end` 起）全 0 才过（I-2.4（头校验和覆盖范围））：三类单元的读者共用这一判。
+fn check_encryption_reserved_bytes_are_zero(
+    bytes: &[u8],
+    header_end: usize,
+) -> Result<(), UnitError> {
+    if bytes[header_end..header_end + reserved_bytes()]
+        .iter()
+        .any(|byte| *byte != 0)
+    {
+        return Err(UnitError::EncryptionReservedBytesNotZero);
+    }
+    Ok(())
 }
 
 /// 共同前缀四关（magic、版本、类标签、flags）+ 头校验和；返回声明长度。
@@ -369,6 +394,7 @@ pub fn parse_index_node(bytes: &[u8]) -> Result<IndexNodeHeader, UnitError> {
         header_end,
     )?);
     check_payload_checksum(bytes, header_end, header_end - 10)?;
+    check_encryption_reserved_bytes_are_zero(bytes, header_end)?;
     let mut reader = ByteReader::at(bytes, 42);
     let tree = TreeIdentifier(reader.get_u64());
     let level = reader.get_u8();
@@ -385,6 +411,10 @@ pub fn parse_index_node(bytes: &[u8]) -> Result<IndexNodeHeader, UnitError> {
     assert_eq!(reader.position(), header_end);
     if entry_count * entry_width != declared_length {
         return Err(UnitError::Structure("声明长度 ≠ 条目数 × 条目宽"));
+    }
+    // 条目宽 0 而条目数不为 0：声明长度 0 过得了上一判，切出来的条目却一条都没有，读者看到的条数与头里写的不符（代码审阅第 38 条）。
+    if entry_width == 0 && entry_count != 0 {
+        return Err(UnitError::Structure(ENTRY_WIDTH_ZERO_WITH_ENTRIES));
     }
     if entry_width < key_width {
         return Err(UnitError::Structure("条目宽小于 key 宽"));
@@ -432,6 +462,7 @@ pub fn parse_packed_unit(bytes: &[u8]) -> Result<PackedUnitHeader, UnitError> {
     let header_end = usize::try_from(PACKED_UNIT_HEADER_BYTES).expect("107");
     let declared_length = usize::from(check_common_prefix(bytes, UNIT_CLASS_PACKED, header_end)?);
     check_payload_checksum(bytes, header_end, 89)?;
+    check_encryption_reserved_bytes_are_zero(bytes, header_end)?;
     let mut reader = ByteReader::at(bytes, 42);
     if reader.get_u8() != UNIT_CLASS_PACKED {
         return Err(UnitError::Structure("类标签副本不是 3"));
@@ -455,6 +486,10 @@ pub fn parse_packed_unit(bytes: &[u8]) -> Result<PackedUnitHeader, UnitError> {
     assert_eq!(reader.position(), header_end);
     if record_count * record_width != declared_length {
         return Err(UnitError::Structure("声明长度 ≠ 记录数 × 记录宽"));
+    }
+    // 记录宽 0 而记录数不为 0：与码 2 那一格同一个坏法（代码审阅第 38 条）。
+    if record_width == 0 && record_count != 0 {
+        return Err(UnitError::Structure(RECORD_WIDTH_ZERO_WITH_RECORDS));
     }
     let records_start = header_end + reserved_bytes();
     if records_start + declared_length > bytes.len() {
@@ -493,6 +528,7 @@ pub fn parse_data_unit(bytes: &[u8]) -> Result<DataUnitHeader, UnitError> {
     let header_end = usize::try_from(DATA_UNIT_HEADER_BYTES).expect("105");
     let declared_length = check_common_prefix(bytes, UNIT_CLASS_DATA, header_end)?;
     check_payload_checksum(bytes, header_end, 101)?;
+    check_encryption_reserved_bytes_are_zero(bytes, header_end)?;
     let mut reader = ByteReader::at(bytes, 42);
     if reader.get_u8() != UNIT_CLASS_DATA {
         return Err(UnitError::Structure("类标签副本不是 1"));

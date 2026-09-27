@@ -7,9 +7,11 @@
 //! 盘都是内存稀疏盘（`singlefs_harness::crash::SparseBlockDevice`），恢复、只读挂载与各个读者读的是 `MemoryPool`。
 
 use singlefs_core::address::{
-    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
+    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
 };
-use singlefs_core::allocator::PoolAllocator;
+use singlefs_core::allocator::{
+    PoolAllocator, UnitAreaStartOffTheClusterSegmentBoundaryUnsupported,
+};
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
 use singlefs_core::journal::JournalRecord;
@@ -787,7 +789,9 @@ fn ring_of(ring_bytes: u64) -> MakeFilesystemParameters {
 }
 
 /// 在飞上限 = 环槽数 ÷ F（F = 3，D23（journal 的角色与格式） 已定项 18）：环装不下 3 条记录时上限是 0，恢复一条记录都不施加。
-/// 一条记录长（改前放行）与差一个字节够三条的环都在任何写之前拒掉；恰好三条放行。
+/// 一条记录长（改前放行）与差一个字节够三条的环都在任何写之前拒掉。恰好三条的环过了这一判，由紧跟着的段边界那一判在任何写之前拒
+/// （环末尾的下一个槽 1025 不在 64 槽聚簇段边界上，实审 A3b；主 agent 定不为测试开口子）；段边界上最短的 1 MiB 环（在飞上限 85）做成。
+/// 改之前这一格钉「恰好三条放行」：A3b 让单元区起点随环长走之后，环长不是 1 MiB 整数倍的环都被段边界那一判拒。
 #[test]
 fn a_journal_ring_holding_fewer_records_than_the_safety_factor_is_refused_before_any_write() {
     let minimum_ring_bytes = JOURNAL_SAFETY_FACTOR * JOURNAL_RECORD_BYTES;
@@ -820,8 +824,31 @@ fn a_journal_ring_holding_fewer_records_than_the_safety_factor_is_refused_before
     }
     let exactly_three = make_filesystem_on_patterned_devices(&ring_of(minimum_ring_bytes));
     assert!(
-        exactly_three.result.is_ok(),
-        "恰好三条记录长的环放行：{:?}",
+        matches!(
+            exactly_three.result,
+            Err(MakeFilesystemError::UnitAreaStartOffTheClusterSegmentBoundaryUnsupported(
+                UnitAreaStartOffTheClusterSegmentBoundaryUnsupported {
+                    journal_ring_bytes,
+                    slot_after_the_journal_ring,
+                }
+            )) if journal_ring_bytes == minimum_ring_bytes
+                && slot_after_the_journal_ring == SlotNumber(JOURNAL_RING_START_SLOT + 1)
+        ),
+        "恰好三条记录长的环过了在飞上限那一判，被段边界那一判拒：{:?}",
         exactly_three.result.as_ref().err()
+    );
+    assert_eq!(
+        exactly_three.recorded_operations, 0,
+        "恰好三条记录长的环：拒绝之前录制流里一步都没有"
+    );
+    assert!(
+        exactly_three.images_unchanged,
+        "恰好三条记录长的环：两块盘与 mkfs 之前逐字节相同"
+    );
+    let one_mebibyte = make_filesystem_on_patterned_devices(&ring_of(MEBIBYTE));
+    assert!(
+        one_mebibyte.result.is_ok(),
+        "1 MiB 的环（末尾的下一个槽 1088 = 17 × 64）做成：{:?}",
+        one_mebibyte.result.as_ref().err()
     );
 }

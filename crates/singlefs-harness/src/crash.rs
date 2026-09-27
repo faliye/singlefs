@@ -21,16 +21,20 @@ use singlefs_core::block_device::{BlockDeviceError, PhysicalBlockSizeInBytes};
 use singlefs_core::recovery::{
     recover, JournalPolicy, PoolReader, RecoveryOutcome, RecoveryReport,
 };
+use singlefs_core::system_configuration::unit_area_start_slot_recorded_in_the_slot;
 use singlefs_format::{
-    JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT, NODE_POINTER_BYTES,
-    SLOT_BYTES, UNIT_AREA_START_SLOT,
+    JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, NODE_POINTER_BYTES, SLOT_BYTES,
+    SYSTEM_CONFIGURATION_SLOT_BYTES,
 };
 
 use crate::layer0_progress::{
-    read_shard_ledgers_for_merge, shard_ledger_path, write_shard_ledger,
-    DeleteTheProgressFileWhenPanicking, Layer0ProgressFile, Layer0ProgressFileAfterCompletion,
-    Layer0ProgressPlan, Layer0Resume, Layer0ShardMerge, Layer0ShardOfShards,
-    Layer0ShardWorkerThreads,
+    findings_log_final_lines, findings_log_new_signature_line, findings_log_threshold_line,
+    findings_standard_output_new_signature_line, findings_standard_output_summary_line,
+    findings_standard_output_threshold_line, read_shard_ledgers_for_merge, shard_ledger_path,
+    write_shard_ledger, DeleteTheProgressFileWhenPanicking, Layer0FindingsLog,
+    Layer0FindingsLogBegin, Layer0FindingsLogSection, Layer0ProgressFile,
+    Layer0ProgressFileAfterCompletion, Layer0ProgressPlan, Layer0Resume, Layer0ShardMerge,
+    Layer0ShardOfShards, Layer0ShardWorkerThreads,
 };
 use crate::segments::{FixedGeometry, SegmentAfterOperation, SegmentClosingRule, StepKind};
 use crate::{RecordedEntrySpan, RecordedOperationKind, RecordedPublishEntry, RetainedOperation};
@@ -641,26 +645,94 @@ impl ImageReader for MemoryPool {
             length,
         )
     }
+    /// 单元区里写过的扇区所在的槽：单元区从这块盘系统配置槽 0 自述的单元区起始槽号起（[`MemoryPool::recorded_geometry_of`]）。
     fn candidate_unit_slots(&self, device: u32) -> Option<Vec<u64>> {
         let image = self.devices.get(&DeviceIdentity(device))?;
+        let lowest_candidate_slot = self
+            .recorded_geometry_of(DeviceIdentity(device))
+            .lowest_candidate_unit_slot();
         let slots: BTreeSet<u64> = image
             .sectors
             .keys()
             .map(|sector| sector * SECTOR_BYTES / SLOT_BYTES)
-            .filter(|slot| *slot >= UNIT_AREA_START_SLOT)
+            .filter(|slot| *slot >= lowest_candidate_slot)
             .collect();
         Some(slots.into_iter().collect())
     }
-    /// journal 环里写过的扇区所在的记录槽（录制流只收真的记录写，环没有整段写 0 的那一次）。
+    /// journal 环里写过的扇区所在的记录槽（录制流只收真的记录写，环没有整段写 0 的那一次）。环长取这块盘系统配置槽 0 自述的
+    /// （[`MemoryPool::recorded_geometry_of`]）。
     fn candidate_journal_slots(&self, device: u32) -> Option<Vec<u64>> {
         let image = self.devices.get(&DeviceIdentity(device))?;
         let ring_start = JOURNAL_RING_START_SLOT * SLOT_BYTES;
+        let candidate_ring_bytes = self
+            .recorded_geometry_of(DeviceIdentity(device))
+            .candidate_journal_ring_bytes(self.device_size_in_bytes);
         let slots: BTreeSet<u64> = image
-            .written_sectors_in(DeviceOffsetInBytes(ring_start), JOURNAL_RING_DEFAULT_BYTES)
+            .written_sectors_in(DeviceOffsetInBytes(ring_start), candidate_ring_bytes)
             .into_iter()
             .map(|sector| (sector * SECTOR_BYTES - ring_start) / JOURNAL_RECORD_BYTES)
             .collect();
         Some(slots.into_iter().collect())
+    }
+}
+
+/// 一块盘系统配置槽 0 自述的 journal 环长与单元区起始槽号（偏移 333、417；checker 划环与单元区读的也是这两处，
+/// `singlefs_checker::image::geometry_of`）。扫描候选只用来缩小 checker 要读的槽：宁多不少，自证不过时退到能罩住任何合法几何的那一档。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RecordedGeometryForScanCandidates {
+    RecordedInSlotZero {
+        journal_ring_bytes: u64,
+        unit_area_start_slot: u64,
+    },
+    /// 槽 0 读不出或自证不过：环长与单元区起点都不知道。
+    SlotZeroNotSelfDescribing,
+}
+
+impl RecordedGeometryForScanCandidates {
+    /// 单元扫描候选的下界：自述的单元区起始槽号；不知道时取 journal 环起点（任何合法环长下单元区起点都不低于它）。
+    fn lowest_candidate_unit_slot(self) -> u64 {
+        match self {
+            RecordedGeometryForScanCandidates::RecordedInSlotZero {
+                unit_area_start_slot,
+                ..
+            } => unit_area_start_slot,
+            RecordedGeometryForScanCandidates::SlotZeroNotSelfDescribing => JOURNAL_RING_START_SLOT,
+        }
+    }
+
+    /// journal 扫描候选罩住的环长：自述的环长；不知道时从环起点罩到盘尾。
+    fn candidate_journal_ring_bytes(self, device_size_in_bytes: u64) -> u64 {
+        match self {
+            RecordedGeometryForScanCandidates::RecordedInSlotZero {
+                journal_ring_bytes, ..
+            } => journal_ring_bytes,
+            RecordedGeometryForScanCandidates::SlotZeroNotSelfDescribing => {
+                device_size_in_bytes.saturating_sub(JOURNAL_RING_START_SLOT * SLOT_BYTES)
+            }
+        }
+    }
+}
+
+impl MemoryPool {
+    /// 这块盘系统配置槽 0 自述的 journal 环长与单元区起始槽号（单元区起点随环长走，C475（非默认环长下单元区起点取编译期常量））。
+    fn recorded_geometry_of(&self, device: DeviceIdentity) -> RecordedGeometryForScanCandidates {
+        let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+        PoolReader::read(self, device, DeviceOffsetInBytes(0), slot_bytes)
+            .and_then(|slot| {
+                SystemConfiguration::parse_slot(&slot)
+                    .ok()
+                    .map(|system_configuration| {
+                        RecordedGeometryForScanCandidates::RecordedInSlotZero {
+                            journal_ring_bytes: system_configuration
+                                .immutable
+                                .sizes
+                                .journal_ring_bytes,
+                            unit_area_start_slot: unit_area_start_slot_recorded_in_the_slot(&slot)
+                                .0,
+                        }
+                    })
+            })
+            .unwrap_or(RecordedGeometryForScanCandidates::SlotZeroNotSelfDescribing)
     }
 }
 
@@ -692,13 +764,17 @@ impl ImageReader for CrashImage<'_> {
     }
     fn candidate_journal_slots(&self, device: u32) -> Option<Vec<u64>> {
         let ring_start = JOURNAL_RING_START_SLOT * SLOT_BYTES;
+        let candidate_ring_bytes = self
+            .base
+            .recorded_geometry_of(DeviceIdentity(device))
+            .candidate_journal_ring_bytes(self.base.device_size_in_bytes);
         let mut slots: BTreeSet<u64> = ImageReader::candidate_journal_slots(self.base, device)?
             .into_iter()
             .collect();
         for (write, is_persisted) in self.writes.iter().zip(&self.persisted) {
             if *is_persisted
                 && write.device.0 == device
-                && (ring_start..ring_start + JOURNAL_RING_DEFAULT_BYTES).contains(&write.offset.0)
+                && (ring_start..ring_start + candidate_ring_bytes).contains(&write.offset.0)
             {
                 slots.insert((write.offset.0 - ring_start) / JOURNAL_RECORD_BYTES);
             }
@@ -707,8 +783,8 @@ impl ImageReader for CrashImage<'_> {
     }
 }
 
-/// 记录核对器两条判据在一个状态上的结论。
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// 记录核对器两条判据在一个状态上的结论。可比大小：层 0 发现表把它当签名的一段（[`Layer0RedPass::RecordChecker`]）。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RecordCheck {
     /// 某次发布的根槽写已在盘上，而那次发布的 journal 记录一份都不在（E77（发布的持久顺序） b_ur 臂的「记录流有洞」）。
     pub root_without_record: bool,
@@ -1137,6 +1213,20 @@ impl Layer0PublishOfState {
             Layer0PublishOfState::EveryWritePersisted => "every_write_persisted".to_string(),
         }
     }
+
+    /// 发现日志里的名字：`instance2_txg5_root_write14`、`after_the_last_root`、`every_write_persisted`。
+    /// 比 [`Self::name`] 多带根槽写的下标：两块盘各写一条同身份的根时，两格只差这一项，发现表的签名不许把它们并成一格。
+    #[must_use]
+    pub fn name_with_the_root_write_index(self) -> String {
+        match self {
+            Layer0PublishOfState::UpToTheRootOf {
+                root_write_index, ..
+            } => format!("{}_root_write{root_write_index}", self.name()),
+            Layer0PublishOfState::AfterTheLastRoot | Layer0PublishOfState::EveryWritePersisted => {
+                self.name()
+            }
+        }
+    }
 }
 
 /// 每一段归哪次发布（[`Layer0PublishOfState`] 的归法）：从最后一段往前走，记着「后面最近的那次根槽写」。
@@ -1164,6 +1254,337 @@ pub fn publish_of_each_segment(
             next_root.unwrap_or(Layer0PublishOfState::AfterTheLastRoot);
     }
     publish_of_segment
+}
+
+/// 层 0 的 oracle（[`oracle_violation_for_versions`]）判的违例是哪一类：层 0 发现表按它分签名（两遍恢复各判一次）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Layer0OracleViolationKind {
+    /// 恢复没择到根。
+    NoRootChosen,
+    /// 盘上已持久的最新根槽比恢复实际走的根新。
+    RecoveredToAnOlderRoot,
+    /// 走读失败。
+    ReadFailed,
+    /// 走到一个没有版本的根、报没有文件，而更旧的根下面有文件。
+    NoFileWhereAnOlderRootHasOne,
+    /// 走到的根下面有文件却报没有。
+    NoFileWhereThisRootHasOne,
+    /// 走到的根下面没有文件却读出了内容。
+    FileReadWhereThisRootHasNone,
+    /// 读回的内容与走到的根写出的那一版不同。
+    WrongContent,
+}
+
+impl Layer0OracleViolationKind {
+    /// 每一类各一个：[`Self::from_name`] 在里面找（新加一类要加进来，不然进度文件里这一类读不回、整份作废、从头跑）。
+    pub const EVERY_KIND: [Self; 7] = [
+        Self::NoRootChosen,
+        Self::RecoveredToAnOlderRoot,
+        Self::ReadFailed,
+        Self::NoFileWhereAnOlderRootHasOne,
+        Self::NoFileWhereThisRootHasOne,
+        Self::FileReadWhereThisRootHasNone,
+        Self::WrongContent,
+    ];
+
+    /// 发现日志与 `LAYER0_FINDING` 行里的名字。
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::NoRootChosen => "no_root_chosen",
+            Self::RecoveredToAnOlderRoot => "recovered_to_an_older_root",
+            Self::ReadFailed => "read_failed",
+            Self::NoFileWhereAnOlderRootHasOne => "no_file_where_an_older_root_has_one",
+            Self::NoFileWhereThisRootHasOne => "no_file_where_this_root_has_one",
+            Self::FileReadWhereThisRootHasNone => "file_read_where_this_root_has_none",
+            Self::WrongContent => "wrong_content",
+        }
+    }
+
+    /// [`Self::name`] 反过来：不是 [`Self::EVERY_KIND`] 里哪一类的名字交回 `None`。
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::EVERY_KIND
+            .into_iter()
+            .find(|kind| kind.name() == name)
+    }
+}
+
+/// oracle 判的一处违例：哪一类、给人看的原因。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Layer0OracleViolation {
+    pub kind: Layer0OracleViolationKind,
+    pub reason: String,
+}
+
+/// 层 0 发现表里一个签名的一半：判红的是哪一遍、违了哪几条。一个状态几遍都红，就各进各的签名。
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Layer0RedPass {
+    /// 看 journal 那一遍恢复过 oracle 判违例（计进 [`Layer0Tally::violations`]）。
+    JournalConsultedOracle(Layer0OracleViolationKind),
+    /// 不看 journal 那一遍恢复过 oracle 判违例（计进 [`Layer0Tally::ignored_violations`]）。
+    JournalIgnoredOracle(Layer0OracleViolationKind),
+    /// 池级 checker 判违例的不变量，至少一条；次序照 `check_pool_image` 报的次序（它按 checker 的清单 `IMPLEMENTED_INVARIANTS` 报）。
+    PoolChecker(Vec<&'static str>),
+    /// 记录核对器：两条判据里至少一条成立。
+    RecordChecker(RecordCheck),
+}
+
+/// 记录核对器第一条判据在发现日志里的名字。
+pub const RECORD_CHECKER_ROOT_WITHOUT_RECORD: &str = "root_without_record";
+/// 记录核对器第二条判据在发现日志里的名字。
+pub const RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT: &str = "claimed_state_missing_unit";
+/// 发现日志里 `pass=` 的四个值，依次是 [`Layer0RedPass`] 的四个成员。
+pub const LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE: &str = "journal_consulted_oracle";
+pub const LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE: &str = "journal_ignored_oracle";
+pub const LAYER0_RED_PASS_POOL_CHECKER: &str = "pool_checker";
+pub const LAYER0_RED_PASS_RECORD_CHECKER: &str = "record_checker";
+
+impl Layer0RedPass {
+    /// 发现日志里 `pass=` 的值。
+    #[must_use]
+    pub fn pass_name(&self) -> &'static str {
+        match self {
+            Self::JournalConsultedOracle(_) => LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE,
+            Self::JournalIgnoredOracle(_) => LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE,
+            Self::PoolChecker(_) => LAYER0_RED_PASS_POOL_CHECKER,
+            Self::RecordChecker(_) => LAYER0_RED_PASS_RECORD_CHECKER,
+        }
+    }
+
+    /// 发现日志里 `violated=` 的那几项（逗号拼起来就是值）。
+    #[must_use]
+    pub fn violated_names(&self) -> Vec<&'static str> {
+        match self {
+            Self::JournalConsultedOracle(kind) | Self::JournalIgnoredOracle(kind) => {
+                vec![kind.name()]
+            }
+            Self::PoolChecker(invariants) => invariants.clone(),
+            Self::RecordChecker(record_check) => {
+                let mut names = Vec::new();
+                if record_check.root_without_record {
+                    names.push(RECORD_CHECKER_ROOT_WITHOUT_RECORD);
+                }
+                if record_check.claimed_state_missing_unit {
+                    names.push(RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT);
+                }
+                names
+            }
+        }
+    }
+}
+
+/// 一个状态在哪一段：段表里的下标，或最后那个每一段都整段持久的状态（不在任何一段里）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Layer0SegmentOfState {
+    Segment(usize),
+    AllPersisted,
+}
+
+impl Layer0SegmentOfState {
+    /// 发现日志与 `LAYER0_PROGRESS` 行里的写法：段号，或 `all_persisted`。
+    #[must_use]
+    pub fn name(self) -> String {
+        match self {
+            Self::Segment(segment_index) => segment_index.to_string(),
+            Self::AllPersisted => "all_persisted".to_string(),
+        }
+    }
+}
+
+/// 层 0 发现表的签名：判红的是哪一遍、违了哪几条、状态所在的段、状态归哪次发布。大小次序（先 pass 与违了哪几条，再段、再发布）
+/// 只在同一个状态上出了几个签名时用来排号。
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Layer0FindingSignature {
+    pub red_pass: Layer0RedPass,
+    pub segment: Layer0SegmentOfState,
+    pub publish: Layer0PublishOfState,
+}
+
+/// 发现表里每个签名最多留几个样本（最先的几个状态）。
+pub const LAYER0_FINDING_SAMPLES_KEPT: usize = 3;
+
+/// 签名下的一个样本：状态序号与那一条违例原文。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Layer0FindingSample {
+    pub state_ordinal: u64,
+    pub violation: String,
+}
+
+/// 一个签名下判红的状态：几个，与最先的至多 [`LAYER0_FINDING_SAMPLES_KEPT`] 个（序号从小到大，个数 = min(状态数, 3)）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Layer0Finding {
+    pub states: u64,
+    pub earliest_samples: Vec<Layer0FindingSample>,
+}
+
+impl Layer0Finding {
+    /// 最先那个状态：签名进表时就记了第一个样本。
+    ///
+    /// # Panics
+    /// 一个样本都没有（不变量被破坏：进表的签名至少一个状态、至少一个样本）。
+    #[must_use]
+    pub fn first_sample(&self) -> &Layer0FindingSample {
+        self.earliest_samples
+            .first()
+            .expect("进了发现表的签名至少一个状态，第一个状态进表时就记成了样本")
+    }
+}
+
+/// 层 0 的发现表：判红的状态按签名去重（[`Layer0FindingSignature`]），每个签名记状态数与最先几个样本；另记至少一遍判红的状态数
+/// （一个状态几遍都红只算一次）。只有按段枚举的那几个入口记这一项（签名要状态所在的段与发布）；直接调
+/// [`evaluate_state_for_versions`] 评手摆的状态时它是空的。并片按状态序号从小到大（[`Layer0Findings::absorb_following_slice`]），
+/// 与线程数、切法无关。
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Layer0Findings {
+    pub red_states: u64,
+    pub by_signature: BTreeMap<Layer0FindingSignature, Layer0Finding>,
+}
+
+/// 发现日志的台阶：签名的状态数跨过 10、100、1000……各报一次（1 由「新签名」那一次报过）。
+const LAYER0_FINDING_THRESHOLD_BASE: u64 = 10;
+
+/// 并进一片时报的一件事。
+enum Layer0FindingEvent<'findings> {
+    /// 这个签名第一次出现：它最先那个状态（全流最先，因为片按序号从小到大并）。
+    NewSignature {
+        signature: &'findings Layer0FindingSignature,
+        first_sample: &'findings Layer0FindingSample,
+    },
+    /// 这个签名的状态数跨过了一级台阶。
+    ThresholdCrossed {
+        signature: &'findings Layer0FindingSignature,
+        states_at_least: u64,
+    },
+}
+
+impl Layer0Findings {
+    /// 记一个判红的状态在一个签名下；这个签名的样本还不满 [`LAYER0_FINDING_SAMPLES_KEPT`] 个时才调 `violation` 取原文。
+    /// 同一片里状态按序号从小到大评，样本自然从小到大。
+    fn record_red_state(
+        &mut self,
+        signature: Layer0FindingSignature,
+        state_ordinal: u64,
+        violation: impl FnOnce() -> String,
+    ) {
+        let finding = self
+            .by_signature
+            .entry(signature)
+            .or_insert_with(|| Layer0Finding {
+                states: 0,
+                earliest_samples: Vec::new(),
+            });
+        finding.states += 1;
+        if finding.earliest_samples.len() < LAYER0_FINDING_SAMPLES_KEPT {
+            finding.earliest_samples.push(Layer0FindingSample {
+                state_ordinal,
+                violation: violation(),
+            });
+        }
+    }
+
+    /// 把紧跟在后面的那一片的发现表并进来：状态数相加；样本接在后面、只留最先的 [`LAYER0_FINDING_SAMPLES_KEPT`] 个。
+    /// 按字段拆开写全：新加一个字段而这里没并，编译不过。
+    ///
+    /// # Panics
+    /// 后面那一片的样本序号不大于前面已留的（不变量被破坏：片要按状态序号从小到大并）。
+    pub fn absorb_following_slice(&mut self, following_slice: Layer0Findings) {
+        let Layer0Findings {
+            red_states,
+            by_signature,
+        } = following_slice;
+        self.red_states += red_states;
+        for (signature, following_finding) in by_signature {
+            let Some(earlier_finding) = self.by_signature.get_mut(&signature) else {
+                self.by_signature.insert(signature, following_finding);
+                continue;
+            };
+            let Layer0Finding {
+                states,
+                earliest_samples,
+            } = following_finding;
+            earlier_finding.states += states;
+            for sample in earliest_samples {
+                if earlier_finding.earliest_samples.len() == LAYER0_FINDING_SAMPLES_KEPT {
+                    break;
+                }
+                let last_kept_ordinal = earlier_finding
+                    .earliest_samples
+                    .last()
+                    .expect("进了发现表的签名至少一个样本")
+                    .state_ordinal;
+                assert!(
+                    sample.state_ordinal > last_kept_ordinal,
+                    "并片要按状态序号从小到大：后面那一片的样本 {} 不大于前面已留的 {last_kept_ordinal}",
+                    sample.state_ordinal
+                );
+                earlier_finding.earliest_samples.push(sample);
+            }
+        }
+    }
+
+    /// 签名按最先那个状态的序号排（同一个状态上的几个签名按签名的大小次序）：发现日志里的号就是这个次序里的第几个（从 1 起）。
+    #[must_use]
+    pub fn signatures_in_first_state_order(
+        &self,
+    ) -> Vec<(&Layer0FindingSignature, &Layer0Finding)> {
+        let mut ordered: Vec<(&Layer0FindingSignature, &Layer0Finding)> =
+            self.by_signature.iter().collect();
+        ordered.sort_by(
+            |(left_signature, left_finding), (right_signature, right_finding)| {
+                (left_finding.first_sample().state_ordinal, *left_signature)
+                    .cmp(&(right_finding.first_sample().state_ordinal, *right_signature))
+            },
+        );
+        ordered
+    }
+
+    /// 紧跟在后面的那一片并进来会报的事：先是这一片里第一次出现的签名（按最先那个状态的序号、再按签名排），
+    /// 再是跨过台阶的（签名之间按签名排，同一签名按台阶从小到大）。只看状态数与样本，不改表。
+    fn events_of_absorbing<'following>(
+        &self,
+        following_slice: &'following Layer0Findings,
+    ) -> Vec<Layer0FindingEvent<'following>> {
+        let mut new_signatures: Vec<(&Layer0FindingSignature, &Layer0FindingSample)> = Vec::new();
+        let mut thresholds_crossed: Vec<Layer0FindingEvent<'following>> = Vec::new();
+        for (signature, following_finding) in &following_slice.by_signature {
+            let states_before = self
+                .by_signature
+                .get(signature)
+                .map_or(0, |earlier_finding| earlier_finding.states);
+            if states_before == 0 {
+                new_signatures.push((signature, following_finding.first_sample()));
+            }
+            let states_after = states_before + following_finding.states;
+            thresholds_crossed.extend(
+                std::iter::successors(Some(LAYER0_FINDING_THRESHOLD_BASE), |threshold| {
+                    threshold.checked_mul(LAYER0_FINDING_THRESHOLD_BASE)
+                })
+                .take_while(|threshold| *threshold <= states_after)
+                .filter(|threshold| *threshold > states_before)
+                .map(|threshold| Layer0FindingEvent::ThresholdCrossed {
+                    signature,
+                    states_at_least: threshold,
+                }),
+            );
+        }
+        new_signatures.sort_by(
+            |(left_signature, left_sample), (right_signature, right_sample)| {
+                (left_sample.state_ordinal, *left_signature)
+                    .cmp(&(right_sample.state_ordinal, *right_signature))
+            },
+        );
+        new_signatures
+            .into_iter()
+            .map(
+                |(signature, first_sample)| Layer0FindingEvent::NewSignature {
+                    signature,
+                    first_sample,
+                },
+            )
+            .chain(thresholds_crossed)
+            .collect()
+    }
 }
 
 /// 层 0 的计数：每个状态跑一遍看 journal 的恢复与一遍不看的，oracle 只判前者。
@@ -1202,6 +1623,8 @@ pub struct Layer0Tally {
     pub observed_states: u64,
     /// 观察者按名字累计的数（[`Layer0ObserverCounts`]），随片进进度文件。
     pub observer_counts: Layer0ObserverCounts,
+    /// 判红的状态按签名去重的发现表（[`Layer0Findings`]），随片进进度文件与分片账本。
+    pub findings: Layer0Findings,
 }
 
 /// 观察者在状态上记的数，按名字累计（名字只许小写字母、数字、`_`：它原样进进度文件）。续跑时已跑完的片不再给观察者看，
@@ -1305,10 +1728,12 @@ impl Layer0Tally {
             checker_not_applicable_states,
             observed_states,
             observer_counts,
+            findings,
         } = following_slice;
         self.states += states;
         self.observed_states += observed_states;
         self.observer_counts.absorb(observer_counts);
+        self.findings.absorb_following_slice(findings);
         for (publish, publish_states) in states_by_publish {
             *self.states_by_publish.entry(publish).or_insert(0) += publish_states;
         }
@@ -1380,7 +1805,7 @@ pub struct PublishedVersion {
 
 /// 多版本形态的 oracle：实际走的根是哪一代，读回的就得是那一代写出的内容；根下面没有文件的那几代（mkfs、暖机）只许报没有文件；
 /// 盘上已持久的最新根槽是 (T, 实例 i)，恢复就不许落到按 (txg, 实例) 字典序比它旧的根上（D22（单元原子性怎么合成） 已定项 7：
-/// 择新 txg 为主、平局按实例代号高者赢）；走读不许失败。
+/// 择新 txg 为主、平局按实例代号高者赢）；走读不许失败。交回给人看的原因；哪一类见 [`classified_oracle_violation_for_versions`]。
 #[must_use]
 pub fn oracle_violation_for_versions(
     outcome: &RecoveryOutcome,
@@ -1388,14 +1813,39 @@ pub fn oracle_violation_for_versions(
     newest_persisted_root: Option<(CheckpointTxg, InstanceGeneration)>,
     versions: &[PublishedVersion],
 ) -> Option<String> {
+    classified_oracle_violation_for_versions(
+        outcome,
+        effective_root,
+        newest_persisted_root,
+        versions,
+    )
+    .map(|violation| violation.reason)
+}
+
+/// 同 [`oracle_violation_for_versions`]，另交回违例是哪一类（[`Layer0OracleViolationKind`]，层 0 发现表按它分签名）。
+#[must_use]
+pub fn classified_oracle_violation_for_versions(
+    outcome: &RecoveryOutcome,
+    effective_root: Option<(InstanceGeneration, CheckpointTxg)>,
+    newest_persisted_root: Option<(CheckpointTxg, InstanceGeneration)>,
+    versions: &[PublishedVersion],
+) -> Option<Layer0OracleViolation> {
+    let violation =
+        |kind: Layer0OracleViolationKind, reason: String| Layer0OracleViolation { kind, reason };
     let Some((effective_instance, effective_txg)) = effective_root else {
-        return Some("没择到根".to_string());
+        return Some(violation(
+            Layer0OracleViolationKind::NoRootChosen,
+            "没择到根".to_string(),
+        ));
     };
     if let Some((newest_txg, newest_instance)) = newest_persisted_root {
         if (effective_txg, effective_instance) < (newest_txg, newest_instance) {
-            return Some(format!(
+            return Some(violation(
+                Layer0OracleViolationKind::RecoveredToAnOlderRoot,
+                format!(
                 "根槽已持久而恢复到旧态（盘上最新的根槽是实例 {} 第 {} 代，走的是实例 {} 第 {} 代）",
                 newest_instance.0, newest_txg.0, effective_instance.0, effective_txg.0
+            ),
             ));
         }
     }
@@ -1403,7 +1853,10 @@ pub fn oracle_violation_for_versions(
         version.checkpoint_txg == effective_txg && version.instance == effective_instance
     });
     match (outcome, version) {
-        (RecoveryOutcome::Failed { failure, .. }, _) => Some(format!("走读失败：{failure:?}")),
+        (RecoveryOutcome::Failed { failure, .. }, _) => Some(violation(
+            Layer0OracleViolationKind::ReadFailed,
+            format!("走读失败：{failure:?}"),
+        )),
         // 落在一个没发布过的更新的根上报「没有文件」：更旧的根下面有文件时是违例（第二轮攻方腿：此前一律放过）。
         (RecoveryOutcome::NoFile { .. }, None) => versions
             .iter()
@@ -1412,23 +1865,33 @@ pub fn oracle_violation_for_versions(
                     < (effective_txg, effective_instance)
             })
             .map(|older_version| {
-                format!(
+                violation(
+                    Layer0OracleViolationKind::NoFileWhereAnOlderRootHasOne,
+                    format!(
                     "走到实例 {} 第 {} 代根报没有文件，而没有这一代的版本、实例 {} 第 {} 代下面有文件",
                     effective_instance.0,
                     effective_txg.0,
                     older_version.instance.0,
                     older_version.checkpoint_txg.0
+                ),
                 )
             }),
-        (RecoveryOutcome::NoFile { .. }, Some(_)) => {
-            Some(format!("第 {} 代根下面有文件却报没有", effective_txg.0))
-        }
-        (RecoveryOutcome::FileRead { .. }, None) => Some(format!(
-            "第 {} 代根下面没有文件却读出了内容",
-            effective_txg.0
+        (RecoveryOutcome::NoFile { .. }, Some(_)) => Some(violation(
+            Layer0OracleViolationKind::NoFileWhereThisRootHasOne,
+            format!("第 {} 代根下面有文件却报没有", effective_txg.0),
         )),
-        (RecoveryOutcome::FileRead { content, .. }, Some(version)) => (*content != version.content)
-            .then(|| format!("读回的内容不对（走的是第 {} 代根）", effective_txg.0)),
+        (RecoveryOutcome::FileRead { .. }, None) => Some(violation(
+            Layer0OracleViolationKind::FileReadWhereThisRootHasNone,
+            format!("第 {} 代根下面没有文件却读出了内容", effective_txg.0),
+        )),
+        (RecoveryOutcome::FileRead { content, .. }, Some(version)) => {
+            (*content != version.content).then(|| {
+                violation(
+                    Layer0OracleViolationKind::WrongContent,
+                    format!("读回的内容不对（走的是第 {} 代根）", effective_txg.0),
+                )
+            })
+        }
     }
 }
 
@@ -1586,13 +2049,86 @@ pub fn evaluate_state(
 }
 
 /// 评一个状态：跑两种 journal 政策的恢复，记进计数。`judged_root_index` 是被判的那次根槽 FUA 写（计「根槽已持久」的状态数用），
-/// oracle 按 `versions` 判实际走的根该读出哪一版。
+/// oracle 按 `versions` 判实际走的根该读出哪一版。手摆的状态不在任何一段里，发现表（[`Layer0Tally::findings`]）不记。
 pub fn evaluate_state_for_versions(
     base: &MemoryPool,
     writes: &[RetainedWrite],
     persisted: Vec<bool>,
     judged_root_index: usize,
     versions: &[PublishedVersion],
+    tally: &mut Layer0Tally,
+) -> RecoveryReport {
+    evaluate_state_recording_findings(
+        base,
+        writes,
+        persisted,
+        judged_root_index,
+        versions,
+        None,
+        tally,
+    )
+}
+
+/// 层 0 按段枚举时一个状态在哪：序号、所在的段、归哪次发布。发现表的签名要后两样、样本要序号。
+#[derive(Clone, Copy, Debug)]
+struct Layer0StatePosition {
+    ordinal: u64,
+    segment: Layer0SegmentOfState,
+    publish: Layer0PublishOfState,
+}
+
+impl Layer0StatePosition {
+    fn signature_of(self, red_pass: Layer0RedPass) -> Layer0FindingSignature {
+        Layer0FindingSignature {
+            red_pass,
+            segment: self.segment,
+            publish: self.publish,
+        }
+    }
+}
+
+/// 看 journal 那一遍 oracle 的违例原文：原因后面带这一状态里持久了的写的种类（[`Layer0Tally::first_violation`] 与发现表的样本同一个写法）。
+fn violation_with_the_persisted_write_kinds(reason: &str, image: &CrashImage<'_>) -> String {
+    let persisted_kinds: Vec<&str> = image
+        .persisted
+        .iter()
+        .zip(image.writes)
+        .filter(|(is_persisted, _)| **is_persisted)
+        .map(|(_, write)| write.kind.name())
+        .collect();
+    format!("{reason}（持久的写：{}）", persisted_kinds.join("|"))
+}
+
+/// 池级 checker 在一个状态上判违例的那几条拼成一条原文：`I-3.1：细节；I-7.1：细节`。
+fn pool_checker_violation_text(violated_invariants: &[(&'static str, String)]) -> String {
+    violated_invariants
+        .iter()
+        .map(|(invariant, detail)| format!("{invariant}：{detail}"))
+        .collect::<Vec<String>>()
+        .join("；")
+}
+
+/// 记录核对器在一个状态上成立的判据拼成一条原文。
+fn record_checker_violation_text(record_check: RecordCheck) -> String {
+    let mut criteria = Vec::new();
+    if record_check.root_without_record {
+        criteria.push("根槽写在盘上而那次发布的 journal 记录一份都不在");
+    }
+    if record_check.claimed_state_missing_unit {
+        criteria.push("恢复自称的那一版该有的单元两份都缺席");
+    }
+    criteria.join("；")
+}
+
+/// [`evaluate_state_for_versions`] 的本体：`position` 是这个状态在按段枚举里的位置（手摆的状态没有），有位置时把判红的每一遍
+/// 按签名记进发现表（[`Layer0Findings`]），至少一遍判红的状态另记一个。
+fn evaluate_state_recording_findings(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    persisted: Vec<bool>,
+    judged_root_index: usize,
+    versions: &[PublishedVersion],
+    position: Option<Layer0StatePosition>,
     tally: &mut Layer0Tally,
 ) -> RecoveryReport {
     let root_persisted = persisted[judged_root_index];
@@ -1622,38 +2158,49 @@ pub fn evaluate_state_for_versions(
         RecoveryOutcome::FileRead { .. } => tally.file_read_states += 1,
         RecoveryOutcome::Failed { .. } => tally.failed_states += 1,
     }
-    if let Some(reason) = oracle_violation_for_versions(
+    let mut is_red_state = false;
+    if let Some(violation) = classified_oracle_violation_for_versions(
         &consulted.outcome,
         consulted.effective_root,
         newest_persisted,
         versions,
     ) {
         tally.violations += 1;
+        is_red_state = true;
         if tally.first_violation.is_none() {
-            let persisted_kinds: Vec<&str> = image
-                .persisted
-                .iter()
-                .zip(writes)
-                .filter(|(is_persisted, _)| **is_persisted)
-                .map(|(_, write)| write.kind.name())
-                .collect();
-            tally.first_violation = Some(format!(
-                "{reason}（持久的写：{}）",
-                persisted_kinds.join("|")
+            tally.first_violation = Some(violation_with_the_persisted_write_kinds(
+                &violation.reason,
+                &image,
             ));
         }
+        if let Some(position) = position {
+            tally.findings.record_red_state(
+                position.signature_of(Layer0RedPass::JournalConsultedOracle(violation.kind)),
+                position.ordinal,
+                || violation_with_the_persisted_write_kinds(&violation.reason, &image),
+            );
+        }
     }
-    if let Some(reason) = oracle_violation_for_versions(
+    if let Some(violation) = classified_oracle_violation_for_versions(
         &ignored.outcome,
         ignored.effective_root,
         newest_persisted,
         versions,
     ) {
         tally.ignored_violations += 1;
+        is_red_state = true;
         if tally.first_ignored_violation.is_none() {
-            tally.first_ignored_violation = Some(reason);
+            tally.first_ignored_violation = Some(violation.reason.clone());
+        }
+        if let Some(position) = position {
+            tally.findings.record_red_state(
+                position.signature_of(Layer0RedPass::JournalIgnoredOracle(violation.kind)),
+                position.ordinal,
+                || violation.reason,
+            );
         }
     }
+    let mut violated_invariants: Vec<(&'static str, String)> = Vec::new();
     for (invariant, verdict) in check_pool_image(&image) {
         match verdict {
             InvariantVerdict::Holds => {
@@ -1665,7 +2212,8 @@ pub fn evaluate_state_for_versions(
                 tally
                     .checker_first_violation
                     .entry(invariant)
-                    .or_insert(detail);
+                    .or_insert_with(|| detail.clone());
+                violated_invariants.push((invariant, detail));
             }
             InvariantVerdict::NotApplicable(_) => {
                 *tally
@@ -1675,12 +2223,40 @@ pub fn evaluate_state_for_versions(
             }
         }
     }
+    if !violated_invariants.is_empty() {
+        is_red_state = true;
+        if let Some(position) = position {
+            tally.findings.record_red_state(
+                position.signature_of(Layer0RedPass::PoolChecker(
+                    violated_invariants
+                        .iter()
+                        .map(|(invariant, _detail)| *invariant)
+                        .collect(),
+                )),
+                position.ordinal,
+                || pool_checker_violation_text(&violated_invariants),
+            );
+        }
+    }
     let records = check_records(&image, consulted.effective_root);
     if records.root_without_record {
         tally.record_root_without_record += 1;
     }
     if records.claimed_state_missing_unit {
         tally.record_claimed_state_missing_unit += 1;
+    }
+    if records.root_without_record || records.claimed_state_missing_unit {
+        is_red_state = true;
+        if let Some(position) = position {
+            tally.findings.record_red_state(
+                position.signature_of(Layer0RedPass::RecordChecker(records)),
+                position.ordinal,
+                || record_checker_violation_text(records),
+            );
+        }
+    }
+    if is_red_state && position.is_some() {
+        tally.findings.red_states += 1;
     }
     consulted
 }
@@ -2402,13 +2978,18 @@ impl<'plan> Layer0StatePlan<'plan> {
         persisted
     }
 
+    /// [`Self::segment_of_state`] 交回的段号换成发现表与进度行里的段：最后全部持久那一个状态不在任何一段里。
+    fn segment_of_state_for_findings(&self, segment_index: usize) -> Layer0SegmentOfState {
+        if segment_index < self.segments.len() {
+            Layer0SegmentOfState::Segment(segment_index)
+        } else {
+            Layer0SegmentOfState::AllPersisted
+        }
+    }
+
     /// 进度行里的段号：最后全部持久那一个状态不在任何一段里，报成 `all_persisted`。
     fn segment_label(&self, segment_index: usize) -> String {
-        if segment_index < self.segments.len() {
-            segment_index.to_string()
-        } else {
-            "all_persisted".to_string()
-        }
+        self.segment_of_state_for_findings(segment_index).name()
     }
 }
 
@@ -2547,30 +3128,34 @@ fn evaluate_state_slice(
     let mut tally = Layer0Tally::default();
     let mut observed_states = Vec::new();
     for ordinal in slice {
-        *tally
-            .states_by_publish
-            .entry(plan.publish_of_state(ordinal))
-            .or_insert(0) += 1;
+        let position = Layer0StatePosition {
+            ordinal,
+            segment: plan.segment_of_state_for_findings(plan.segment_of_state(ordinal)),
+            publish: plan.publish_of_state(ordinal),
+        };
+        *tally.states_by_publish.entry(position.publish).or_insert(0) += 1;
         let persisted = plan.persisted_writes_of_state(ordinal);
         match retention {
             StateReportRetention::HandEachStateToObserver => {
-                let consulted_report = evaluate_state_for_versions(
+                let consulted_report = evaluate_state_recording_findings(
                     base,
                     writes,
                     persisted.clone(),
                     judged_root_index,
                     versions,
+                    Some(position),
                     &mut tally,
                 );
                 observed_states.push((persisted, consulted_report));
             }
             StateReportRetention::CountOnly => {
-                evaluate_state_for_versions(
+                evaluate_state_recording_findings(
                     base,
                     writes,
                     persisted,
                     judged_root_index,
                     versions,
+                    Some(position),
                     &mut tally,
                 );
             }
@@ -2771,6 +3356,114 @@ fn layer0_plan_hash(
     crate::sha256::sha256_hexadecimal(&message)
 }
 
+/// 并片时报发现：每并进一片之前，这一片带来的新签名、跨台阶各打一行 `LAYER0_FINDING`（标准输出），开了发现日志的另追加进这一节；
+/// 跑完打一行 `LAYER0_FINDINGS`，把发现日志里这一节换成定稿（`layer0_progress::findings_log_final_lines`）。
+struct Layer0FindingsReporter {
+    /// 报过「新签名」的签名与它的号：从 1 起，按报的次序。
+    number_by_signature: BTreeMap<Layer0FindingSignature, usize>,
+    log_section: Option<(Layer0FindingsLogSection, Layer0FindingsLogBegin)>,
+}
+
+impl Layer0FindingsReporter {
+    /// 开跑、并任何一片之前调：开了发现日志的，在文件末尾开一节。
+    fn begin(findings_log: &Layer0FindingsLog, begin: Layer0FindingsLogBegin) -> Self {
+        let log_section = match findings_log {
+            Layer0FindingsLog::NotWritten => None,
+            Layer0FindingsLog::AppendedTo(path) => {
+                Some((Layer0FindingsLogSection::begin(path, &begin), begin))
+            }
+        };
+        Self {
+            number_by_signature: BTreeMap::new(),
+            log_section,
+        }
+    }
+
+    /// 紧跟在后面的一片并进 `merged` 之前调：报这一片带来的事（[`Layer0Findings::events_of_absorbing`]）。
+    fn report_before_absorbing(
+        &mut self,
+        merged: &Layer0Findings,
+        following_slice: &Layer0Findings,
+    ) {
+        for event in merged.events_of_absorbing(following_slice) {
+            let (standard_output_line, log_line) = match event {
+                Layer0FindingEvent::NewSignature {
+                    signature,
+                    first_sample,
+                } => {
+                    let number = self.number_by_signature.len() + 1;
+                    self.number_by_signature.insert(signature.clone(), number);
+                    (
+                        findings_standard_output_new_signature_line(
+                            number,
+                            signature,
+                            first_sample,
+                        ),
+                        findings_log_new_signature_line(number, signature, first_sample),
+                    )
+                }
+                Layer0FindingEvent::ThresholdCrossed {
+                    signature,
+                    states_at_least,
+                } => {
+                    let number = *self.number_by_signature.get(signature).expect(
+                        "跨台阶的签名先报过新签名：同一片里新签名排在跨台阶前面，更早的片里报过的记在表里",
+                    );
+                    (
+                        findings_standard_output_threshold_line(number, signature, states_at_least),
+                        findings_log_threshold_line(number, signature, states_at_least),
+                    )
+                }
+            };
+            println!("{standard_output_line}");
+            if let Some((section, _begin)) = self.log_section.as_mut() {
+                section.append_line(&log_line);
+            }
+        }
+    }
+
+    /// 这一趟并完：打一行 `LAYER0_FINDINGS`（`shard_fields` 是分片跑一片时接在后面的那一串，别的时候空），
+    /// 开了发现日志的把这一节换成定稿。`states_of_this_run` 是这一趟评过的状态数（分片跑一片时是这一片的）。
+    ///
+    /// # Panics
+    /// 跑的过程中报的号与定稿里的号对不上（不变量被破坏：片没按状态序号从小到大并）。
+    fn finish(self, findings: &Layer0Findings, states_of_this_run: u64, shard_fields: &str) {
+        // 号从 1 起，没报过的记成 0：对不上时一眼看得出是哪个签名没报过。
+        let reported_numbers_in_first_state_order: Vec<usize> = findings
+            .signatures_in_first_state_order()
+            .into_iter()
+            .map(|(signature, _finding)| {
+                self.number_by_signature
+                    .get(signature)
+                    .copied()
+                    .unwrap_or(0)
+            })
+            .collect();
+        assert_eq!(
+            (
+                reported_numbers_in_first_state_order,
+                self.number_by_signature.len()
+            ),
+            (
+                (1..=findings.by_signature.len()).collect::<Vec<usize>>(),
+                findings.by_signature.len()
+            ),
+            "跑的过程中报的号就是定稿里按最先那个状态排的次序"
+        );
+        println!(
+            "{}{shard_fields}",
+            findings_standard_output_summary_line(findings, states_of_this_run)
+        );
+        if let Some((section, begin)) = self.log_section {
+            section.replace_with_final_lines(&findings_log_final_lines(
+                &begin,
+                findings,
+                states_of_this_run,
+            ));
+        }
+    }
+}
+
 /// 调用线程上等着按片号次序并进来的一片：这一趟跑完的，或从进度文件读回来的。
 enum SliceWaitingToBeMerged {
     FreshlyRun(FinishedSlice),
@@ -2869,13 +3562,16 @@ pub struct Layer0ShardLedgerWritten {
 ///   按切片序号从小到大并（与单机并片的次序相同，「第一处」取序号最小的），交回整条流的计数。打一行 `LAYER0_SHARD mode=merge`，
 ///   `LAYER0_PARALLEL_START` / `FINISHED` 两行报 n 片的工作线程之和与逐片的数（`shard_worker_threads=` 等，逗号分隔、按第几片排）。
 ///
+/// 发现表（[`Layer0Findings`]）：并片时每一片带来的新签名、跨台阶各打一行 `LAYER0_FINDING`，跑完打一行 `LAYER0_FINDINGS`；
+/// 发现日志写不写、写到哪取环境变量 `SINGLEFS_LAYER0_FINDINGS_FILE`（`layer0_progress::Layer0FindingsLog::from_environment`），
+/// 写法见 [`enumerate_layer0_in_state_slices_or_one_shard_with_findings_log`]。
+///
 /// # Panics
 /// 同 [`enumerate_layer0_in_state_slices`]；另有账本写失败，merge 时缺账本、账本文件头与这一趟不同（输入指纹、切片方案、工具链……）、
-/// 两份账本同一片、账本里的切片不归它或缺切片（逐条说清是第几片、哪一处）。
+/// 两份账本同一片、账本里的切片不归它或缺切片（逐条说清是第几片、哪一处）；发现日志的环境变量设了却是空串。
 #[allow(
     clippy::too_many_arguments,
-    clippy::too_many_lines,
-    reason = "前六个与单线程时的枚举相同，多出来的是切法、观察者与续跑；续跑的读回、并片、落盘、收尾是同一件事的几步，拆开要把可变状态来回传"
+    reason = "前六个与单线程时的枚举相同，多出来的是切法、观察者与续跑"
 )]
 #[must_use]
 pub fn enumerate_layer0_in_state_slices_or_one_shard(
@@ -2886,8 +3582,47 @@ pub fn enumerate_layer0_in_state_slices_or_one_shard(
     versions: &[PublishedVersion],
     expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
     parallelism: Layer0Parallelism,
+    observe_state: Option<Layer0StateObserver<'_>>,
+    resume: &Layer0Resume,
+) -> Layer0EnumerationOutcome {
+    enumerate_layer0_in_state_slices_or_one_shard_with_findings_log(
+        base,
+        writes,
+        segments,
+        judged_root_index,
+        versions,
+        expansion,
+        parallelism,
+        observe_state,
+        resume,
+        &Layer0FindingsLog::from_environment(),
+    )
+}
+
+/// 同 [`enumerate_layer0_in_state_slices_or_one_shard`]，发现日志由调用方给（用例不改进程的环境变量）。
+/// `findings_log` 是 [`Layer0FindingsLog::AppendedTo`] 时这一趟往那个文件末尾追加一节：开跑先写 begin 行，每并进一片把它带来的
+/// 新签名、跨台阶各追加一行并落盘；跑完把这一节换成定稿（每个签名一行、一行汇总），定稿与线程数、切法、续跑与否无关，
+/// merge 那一趟写的定稿与单机跑同一条流的逐字节相同。一个进程里同一时刻只开一节（别的带发现日志的枚举排队）。
+///
+/// # Panics
+/// 同 [`enumerate_layer0_in_state_slices_or_one_shard`]；另有发现日志建、写、落盘失败。
+#[allow(
+    clippy::too_many_arguments,
+    clippy::too_many_lines,
+    reason = "前六个与单线程时的枚举相同，多出来的是切法、观察者、续跑与发现日志；续跑的读回、并片、落盘、收尾是同一件事的几步，拆开要把可变状态来回传"
+)]
+#[must_use]
+pub fn enumerate_layer0_in_state_slices_or_one_shard_with_findings_log(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    judged_root_index: usize,
+    versions: &[PublishedVersion],
+    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+    parallelism: Layer0Parallelism,
     mut observe_state: Option<Layer0StateObserver<'_>>,
     resume: &Layer0Resume,
+    findings_log: &Layer0FindingsLog,
 ) -> Layer0EnumerationOutcome {
     let tearable = TearableInPlaceOverwrites::of(base, writes);
     let writes_with_torn_images = WritesWithTornImages::of(base, writes, segments, &tearable);
@@ -2931,6 +3666,7 @@ pub fn enumerate_layer0_in_state_slices_or_one_shard(
             return Layer0EnumerationOutcome::WholeStream(merge_the_shard_ledgers(
                 &whole_plan,
                 merge,
+                findings_log,
             ));
         }
     };
@@ -3020,6 +3756,15 @@ pub fn enumerate_layer0_in_state_slices_or_one_shard(
         parallelism.worker_threads_source.name(),
         slices_to_run.len()
     );
+    let mut findings_reporter = Layer0FindingsReporter::begin(
+        findings_log,
+        Layer0FindingsLogBegin {
+            stream_name: progress_settings
+                .map(|settings| settings.stream_name.as_str().to_string()),
+            whole_stream_states: plan.state_count,
+            shard: shard.map(|shard_of_this_run| (shard_of_this_run, states_of_this_run)),
+        },
+    );
     let next_position_in_slices_to_run = AtomicUsize::new(0);
     let some_worker_thread_panicked = AtomicBool::new(false);
     let merged_slices_of_this_run = std::thread::scope(|scope| {
@@ -3099,6 +3844,10 @@ pub fn enumerate_layer0_in_state_slices_or_one_shard(
                     match in_order {
                         SliceWaitingToBeMerged::RestoredFromTheProgressFile(restored_tally) => {
                             keep_for_the_ledger(slice_index, &restored_tally);
+                            findings_reporter.report_before_absorbing(
+                                &merged.findings,
+                                &restored_tally.findings,
+                            );
                             merged.absorb_following_slice(restored_tally);
                         }
                         SliceWaitingToBeMerged::FreshlyRun(finished) => {
@@ -3125,6 +3874,8 @@ pub fn enumerate_layer0_in_state_slices_or_one_shard(
                                 );
                             }
                             keep_for_the_ledger(slice_index, &slice_tally);
+                            findings_reporter
+                                .report_before_absorbing(&merged.findings, &slice_tally.findings);
                             merged.absorb_following_slice(slice_tally);
                             merged_fresh_slice_count += 1;
                         }
@@ -3220,6 +3971,7 @@ pub fn enumerate_layer0_in_state_slices_or_one_shard(
         );
         (run.shard, ledger_path)
     });
+    findings_reporter.finish(&tally.findings, states_of_this_run, &shard_fields);
     let progress_file_after_completion = progress_file.map(Layer0ProgressFile::finish);
     println!(
         "LAYER0_PARALLEL_FINISHED states={states_of_this_run} slices={} worker_threads={spawned_worker_threads} configured_worker_threads={} worker_threads_source={} resumed_slices={restored_slice_count} freshly_run_slices={merged_fresh_slice_count} progress_file_after_completion={} elapsed_seconds={:.1}{shard_fields}",
@@ -3267,12 +4019,14 @@ fn per_shard_field(
 
 /// merge：读 n 份账本、核齐，按切片序号从小到大并（「第一处」取序号最小的，与单机并片同一个次序）。打一行 `LAYER0_SHARD mode=merge`
 /// 与两行 `LAYER0_PARALLEL_*`：工作线程、读回与跑过的片是 n 片之和（读回 + 跑过 = 总片数，与单机的判法对得上），另逐片报出来。
+/// 发现表照单机并片报（`LAYER0_FINDING` / `LAYER0_FINDINGS`），开了发现日志的写一节定稿：与单机跑同一条流的那一节逐字节相同。
 ///
 /// # Panics
-/// 账本核不齐（缺哪一片、哪一片的哪一处不同）；并完之后状态数、观察者看过的状态数对不上（不变量被破坏）。
+/// 账本核不齐（缺哪一片、哪一片的哪一处不同）；并完之后状态数、观察者看过的状态数对不上（不变量被破坏）；发现日志写失败。
 fn merge_the_shard_ledgers(
     whole_plan: &Layer0ProgressPlan,
     merge: &Layer0ShardMerge,
+    findings_log: &Layer0FindingsLog,
 ) -> Layer0Tally {
     let started = Instant::now();
     let ledgers = read_shard_ledgers_for_merge(merge, whole_plan)
@@ -3326,8 +4080,17 @@ fn merge_the_shard_ledgers(
         whole_plan.slices.len(),
         whole_plan.slices.first().map_or(0, |slice| slice.end - slice.start),
     );
+    let mut findings_reporter = Layer0FindingsReporter::begin(
+        findings_log,
+        Layer0FindingsLogBegin {
+            stream_name: Some(merge.stream_name.as_str().to_string()),
+            whole_stream_states: whole_plan.state_count,
+            shard: None,
+        },
+    );
     let mut tally = Layer0Tally::default();
     for (_slice_index, slice_tally) in ledgers.slice_tallies {
+        findings_reporter.report_before_absorbing(&tally.findings, &slice_tally.findings);
         tally.absorb_following_slice(slice_tally);
     }
     assert_eq!(
@@ -3340,6 +4103,7 @@ fn merge_the_shard_ledgers(
             "n 片的观察者合起来看过每一个状态（层 0 规模第三轮判决 U3）"
         );
     }
+    findings_reporter.finish(&tally.findings, whole_plan.state_count, "");
     println!(
         "LAYER0_PARALLEL_FINISHED states={} slices={} worker_threads={spawned_worker_threads} configured_worker_threads={configured_worker_threads} worker_threads_source=shard_ledgers resumed_slices={resumed_slices} freshly_run_slices={freshly_run_slices} progress_file_after_completion=none elapsed_seconds={:.1} {shard_fields}",
         whole_plan.state_count,
@@ -4078,6 +4842,7 @@ mod tests {
             checker_not_applicable_states: BTreeMap::from([("I-3.1", 3)]),
             observed_states: 3,
             observer_counts: observer_counts_of(&[("read_through_the_record", 2)]),
+            findings: Layer0Findings::default(),
         };
         let following = Layer0Tally {
             states: 5,
@@ -4111,6 +4876,7 @@ mod tests {
                 ("read_through_the_record", 1),
                 ("read_through_the_root", 4),
             ]),
+            findings: Layer0Findings::default(),
         };
         earlier.absorb_following_slice(following);
         assert_eq!(
@@ -4202,6 +4968,7 @@ mod tests {
             checker_not_applicable_states: BTreeMap::new(),
             observed_states: 0,
             observer_counts: Layer0ObserverCounts::default(),
+            findings: Layer0Findings::default(),
         }
     }
 
@@ -4263,6 +5030,152 @@ mod tests {
             ),
             (15, 7, 12, 10),
             "走读失败 2 + 5、验证跑过 4 + 8、验证失败 3 + 7：两片逐项相加"
+        );
+    }
+
+    fn finding_signature(red_pass: Layer0RedPass, segment_index: usize) -> Layer0FindingSignature {
+        Layer0FindingSignature {
+            red_pass,
+            segment: Layer0SegmentOfState::Segment(segment_index),
+            publish: Layer0PublishOfState::AfterTheLastRoot,
+        }
+    }
+
+    /// 发现表：每项是（签名、状态数、样本序号），样本原文写成「状态 <序号>」。
+    fn findings_with(
+        red_states: u64,
+        entries: &[(&Layer0FindingSignature, u64, &[u64])],
+    ) -> Layer0Findings {
+        Layer0Findings {
+            red_states,
+            by_signature: entries
+                .iter()
+                .map(|(signature, states, sample_ordinals)| {
+                    (
+                        (*signature).clone(),
+                        Layer0Finding {
+                            states: *states,
+                            earliest_samples: sample_ordinals
+                                .iter()
+                                .map(|ordinal| Layer0FindingSample {
+                                    state_ordinal: *ordinal,
+                                    violation: format!("状态 {ordinal}"),
+                                })
+                                .collect(),
+                        },
+                    )
+                })
+                .collect(),
+        }
+    }
+
+    /// 发现表并片：同一签名状态数相加、样本接在后面只留最先 3 个；只在一片里有的签名原样并进来；判红的状态数相加。
+    #[test]
+    fn absorbing_a_following_slice_adds_the_states_of_each_signature_and_keeps_its_earliest_three_samples(
+    ) {
+        let wrong_content = finding_signature(
+            Layer0RedPass::JournalConsultedOracle(Layer0OracleViolationKind::WrongContent),
+            2,
+        );
+        let pool_checker = finding_signature(Layer0RedPass::PoolChecker(vec!["I-3.1"]), 5);
+        let record_checker = finding_signature(
+            Layer0RedPass::RecordChecker(RecordCheck {
+                root_without_record: true,
+                claimed_state_missing_unit: false,
+            }),
+            5,
+        );
+        let mut earlier =
+            findings_with(3, &[(&wrong_content, 2, &[1, 4]), (&pool_checker, 1, &[7])]);
+        earlier.absorb_following_slice(findings_with(
+            6,
+            &[
+                (&wrong_content, 4, &[10, 11, 12]),
+                (&record_checker, 2, &[13, 14]),
+            ],
+        ));
+        assert_eq!(
+            earlier,
+            findings_with(
+                9,
+                &[
+                    (&wrong_content, 6, &[1, 4, 10]),
+                    (&pool_checker, 1, &[7]),
+                    (&record_checker, 2, &[13, 14]),
+                ]
+            ),
+            "状态数 2 + 4、样本 1、4 之后只接上 10；另两个签名原样；判红的状态数 3 + 6"
+        );
+    }
+
+    /// 并进一片之前报的事：这一片里第一次出现的签名按最先那个状态排在前面（不按签名的大小次序），再是跨过的台阶（一下跨两级报两件）；
+    /// 更早的片里有过的签名不再报「新」，早就跨过的台阶不再报。
+    #[test]
+    fn absorbing_a_slice_reports_new_signatures_by_their_first_state_and_every_threshold_crossed() {
+        let wrong_content = finding_signature(
+            Layer0RedPass::JournalConsultedOracle(Layer0OracleViolationKind::WrongContent),
+            2,
+        );
+        let no_root_chosen = finding_signature(
+            Layer0RedPass::JournalIgnoredOracle(Layer0OracleViolationKind::NoRootChosen),
+            0,
+        );
+        let pool_checker = finding_signature(Layer0RedPass::PoolChecker(vec!["I-3.1"]), 1);
+        let record_checker = finding_signature(
+            Layer0RedPass::RecordChecker(RecordCheck {
+                root_without_record: false,
+                claimed_state_missing_unit: true,
+            }),
+            1,
+        );
+        let merged = findings_with(
+            21,
+            &[
+                (&wrong_content, 9, &[1, 2, 3]),
+                (&no_root_chosen, 12, &[4, 5, 6]),
+            ],
+        );
+        let following = findings_with(
+            118,
+            &[
+                (&wrong_content, 1, &[20]),
+                (&no_root_chosen, 5, &[30, 31, 32]),
+                (&pool_checker, 110, &[40, 41, 42]),
+                (&record_checker, 2, &[25, 26]),
+            ],
+        );
+        let reported: Vec<String> = merged
+            .events_of_absorbing(&following)
+            .iter()
+            .map(|event| match event {
+                Layer0FindingEvent::NewSignature {
+                    signature,
+                    first_sample,
+                } => format!(
+                    "new {} {}",
+                    signature.red_pass.pass_name(),
+                    first_sample.state_ordinal
+                ),
+                Layer0FindingEvent::ThresholdCrossed {
+                    signature,
+                    states_at_least,
+                } => format!(
+                    "threshold {} {states_at_least}",
+                    signature.red_pass.pass_name()
+                ),
+            })
+            .collect();
+        assert_eq!(
+            reported,
+            vec![
+                "new record_checker 25",
+                "new pool_checker 40",
+                "threshold journal_consulted_oracle 10",
+                "threshold pool_checker 10",
+                "threshold pool_checker 100",
+            ],
+            "记录核对器最先在 25、池级 checker 在 40（签名次序反过来）；看 journal 那一遍 9 → 10 跨一级；池级 checker 0 → 110 跨两级；\
+             不看 journal 那一遍 12 → 17 早就跨过 10、不报"
         );
     }
 }

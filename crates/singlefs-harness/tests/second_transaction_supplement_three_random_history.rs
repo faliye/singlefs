@@ -1,24 +1,35 @@
 //! 里程碑「第二个事务」增补 3 第 1 件：随机历史。生成器、执行器、「已知红」清单与收缩在 `singlefs_harness::history`；
 //! 这里是快档（普通 `cargo test`）、大档（`#[ignore]`，种子数与步数从环境变量取）与清单每一条的复现。
 //!
-//! 五段取样的种子基都是 `SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`：这个测试周期开头抽一次、之后写死
-//! （用户 2026-09-20 定案第 7 条），崩溃注入那个二进制用的是同一个；种子数照旧写死，里程碑的验收说的是「写死的种子数之内判红」。
+//! 五段取样的种子基都是 `SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`：永久固定、不重抽
+//! （用户 2026-09-27 定，为什么见它的文档注释），崩溃注入那个二进制用的是同一个；种子数照旧写死，里程碑的验收说的是「写死的种子数之内判红」。
+
+mod common;
 
 use std::io::Write as _;
 
-use singlefs_checker::image::{chosen_system_configurations, valid_roots};
+use common::{
+    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before, build_pool, disk_snapshot,
+    publish_overwrite_in_process, BuiltPool, FIXED_WRITE_TIME_SECONDS,
+};
+use singlefs_checker::image::{chosen_system_configurations, valid_roots, InvariantVerdict};
+use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::allocator::PlacementRefusal;
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
-use singlefs_core::mount::{mount_writable_with_space_admission, MountError};
-use singlefs_core::transaction::TransactionUnit;
+use singlefs_core::mount::{
+    mount_writable_with_space_admission, raise_rollback_floor, roll_back_by_a_forward_publish,
+    MountError, RollbackCandidateExclusion, RollbackError, RollbackTarget, ShadowLedger,
+};
+use singlefs_core::transaction::{TransactionOutput, TransactionUnit};
 use singlefs_harness::crash::{MemoryPool, RecordCheck, SparseBlockDevice};
 use singlefs_harness::crash_injection::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::fault_injection::{
     FaultCounting, FaultDeviceSelector, FaultOccurrence, FaultPlacement, FaultSchedule,
     InjectedFault, SharedFaultPlan,
 };
+use singlefs_harness::history::newest_ring_root_and_slot_count;
 use singlefs_harness::history::{
     allocation_records_on_the_image_under, classify_failure, execute_history,
     execute_history_observing, execute_history_with, execute_history_with_faults, generate_history,
@@ -30,13 +41,17 @@ use singlefs_harness::history::{
     HistoryTally, MountAllocationComparison, MountSpaceAdmissionOutcome, NewFindingReport,
     PerStepChecker, RollbackTargetChoice, StepOutcome, StepPosition,
 };
-use singlefs_harness::model::{ModelCheckpointTxg, ModelInstanceGeneration, ModelRootKey};
+use singlefs_harness::model::{
+    ModelCheckpointTxg, ModelInstanceGeneration, ModelRefusalReason, ModelRootKey,
+    ObservedRefusalReason,
+};
+use singlefs_harness::model_comparison::refusal_reason_of_rollback_error;
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
-// 下面五段的种子基都是同一个：这个测试周期开头抽一次、抽完在这个周期之内写死的那个数
-// （`SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`，崩溃注入那个二进制用的是同一个；用户 2026-09-20 定案第 7 条）。
+// 下面五段的种子基都是同一个：永久固定、不重抽的那个数
+// （`SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`，崩溃注入那个二进制用的是同一个；用户 2026-09-27 定）。
 // 种子**数**（96 / 48 / 48 / 32 / 32）与每段步数照旧写死：里程碑的验收说的是「写死的种子数之内判红」，管的是数不是基。
-// 下一个测试周期重抽种子基之后，这五段跑的就是另一批历史，那时量过的判出率要重量。
+// 要多测别的历史只往后追加种子区间、不重抽这个基：这五段的判出率与它们的产物一直有效。
 
 /// 快档的种子区间与每段步数：门禁每次跑同一批。
 const FAST_TIER_FIRST_SEED: u64 = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
@@ -105,15 +120,32 @@ fn count_of(counts: &std::collections::BTreeMap<String, u64>, key: &str) -> u64 
     counts.get(key).copied().unwrap_or(0)
 }
 
-/// 各条路径都真的跑到了：每类操作至少一次 Ok，回退的目标候选集里外都试过，抬 F 撞过上限也回收过落点，复用改写过已释放的记录
-/// （含跨度变了的与被删的），六种内容长度都进过入口，冷启动读回过文件，checker 真的判过 I-3.1 与 I-5.4，至少一段历史转过根环。
+/// 各条路径都真的跑到了：崩溃恢复抛弃根之外的每类操作至少一次 Ok、崩溃恢复抛弃根至少被乙拒过一次，回退的目标候选集里外都试过，
+/// 抬 F 撞过上限也回收过落点，复用改写过已释放的记录（含跨度变了的与被删的），六种内容长度都进过入口，冷启动读回过文件，
+/// checker 真的判过 I-3.1 与 I-5.4，至少一段历史转过根环。
 fn assert_every_path_was_exercised(tally: &HistoryTally) {
     for kind in HistoryOperationKind::ALL {
-        let applied = tally
+        let operation = tally
             .operations_by_kind
             .get(&kind)
-            .map_or(0, |operation| operation.applied);
-        assert!(applied >= 1, "{kind:?} 一次 Ok 都没有");
+            .copied()
+            .unwrap_or_default();
+        match kind {
+            // 那一步藏的是这个会话发的、系统配置见证过的最新那条根：C554 乙之后读阶段重读一次仍读不出、取号之前拒可写
+            // （用户 2026-09-27 定），这一步跑到了是「拒过」，不再有做成的。
+            HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot => {
+                assert!(operation.refused >= 1, "{kind:?} 一次都没被拒过");
+            }
+            HistoryOperationKind::PublishFirstFile
+            | HistoryOperationKind::PublishOverwrite
+            | HistoryOperationKind::PublishWithoutUnits
+            | HistoryOperationKind::CloseAndMountWritable
+            | HistoryOperationKind::RollBackWhileMounted
+            | HistoryOperationKind::RaiseRollbackFloor
+            | HistoryOperationKind::ColdStartRecover => {
+                assert!(operation.applied >= 1, "{kind:?} 一次 Ok 都没有");
+            }
+        }
     }
     let refusals = &tally.refusals_by_member;
     for member in [
@@ -121,6 +153,7 @@ fn assert_every_path_was_exercised(tally: &HistoryTally) {
         "RollbackError::TargetNotACandidate(NotInRing)",
         "PublishError::ContentExceedsDataUnit",
         "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile",
+        "MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)",
     ] {
         assert!(count_of(refusals, member) >= 1, "没见过 {member}");
     }
@@ -131,15 +164,9 @@ fn assert_every_path_was_exercised(tally: &HistoryTally) {
         ) >= 1,
         "回退的目标没落到过 F 之下的根"
     );
-    // 被抛弃的根只由崩溃恢复造出（D23（journal 的角色与格式） 已定项 14）：生成器里的「崩溃恢复抛弃根」（实七加）造出来之后，
-    // 回退的目标要落到过它上面、被按被抛弃的时间线拒过。
-    assert!(
-        count_of(
-            refusals,
-            "RollbackError::TargetNotACandidate(OnAbandonedTimeline)"
-        ) >= 1,
-        "回退的目标没落到过崩溃恢复抛弃的根"
-    );
+    // 回退的目标落到被抛弃的根上、按被抛弃的时间线拒，这一路随机历史不再要求跑到：被抛弃的根只由崩溃恢复造出
+    // （D23（journal 的角色与格式） 已定项 14），生成器那一步 C554 乙之后一律被拒、造不出它；乙罩不到的「系统配置没见证到最新那条根」
+    // 那一形由写死的用例 `rolling_back_to_a_root_crash_recovery_abandoned_without_a_system_configuration_witness_is_refused_on_the_abandoned_timeline` 钉。
     assert!(tally.raises_that_reclaimed >= 1, "抬 F 一次都没回收到落点");
     assert!(
         tally.records_rewritten_from_released >= 1,
@@ -1021,7 +1048,8 @@ fn turning_the_root_ring_with_overwrites_in_the_make_filesystem_process_runs_to_
 /// 可写挂载（实例 2，txg 4、5）、覆盖写两次（6、7）、挂着的时候回退到最新那条根 (2, 7)（txg 8）、再回退到从新到旧第 4 条 (2, 5)（txg 9）、
 /// 覆盖写（10）、可写挂载（实例 3，txg 11、12）、覆盖写三次（13–15）、抬 F（选择子 8）。旧形态下两次回退各开一个实例、抛弃前一段，
 /// F = 8 落进回退留下的空档，I-3.1 记账多算 12 槽；向前回退不抛弃任何根，这一段没有空档，每一步之后 checker 判绿、跑完。
-/// 清单那一条的形态今天只剩崩溃恢复抛弃的时间线造得出（实四乙第 7 件），生成器实七加了「崩溃恢复抛弃根」，复现在下面那条用例里。
+/// 清单那一条的形态今天只剩崩溃恢复抛弃的时间线造得出（实四乙第 7 件）；C554 乙之后只剩系统配置没见证到被抛弃那条根的那一形，
+/// 复现在 `crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43`。
 #[test]
 fn the_history_that_raised_the_floor_into_a_rollback_gap_completes_under_the_forward_rollback() {
     let empty = ContentChoice {
@@ -1074,89 +1102,196 @@ fn the_history_that_raised_the_floor_into_a_rollback_gap_completes_under_the_for
     );
 }
 
-/// 生成器的「崩溃恢复抛弃根」一步（实七）照 `tests/common` 的 `abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before`
-/// 那一形走：第一个文件 A（txg 3）之后覆盖写 B（4）、C（5），崩溃恢复抛弃 C——择根落到 B，实例 2 写行 6、暖机 7；再覆盖写四次（8–11），
-/// 抬 F（选择子 5 ⇒ F = 5，上限 8）。F 落在被抛弃的 C 那个 txg 上，历史以「已知红」第 0 条（增补 2 收口表第 43 行）收尾——
-/// 实四乙第 7 件在写死的用例里造出、随机历史里一直复现不了的那一形（`second_transaction_step_five_reuse.rs` 那一条同形）。
-#[test]
-fn crash_recovery_abandoning_the_newest_root_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43(
-) {
-    let empty = ContentChoice {
-        length: ContentLength::Empty,
-        fill_seed: 0,
-    };
-    let history = GeneratedHistory {
-        seed: HistorySeed(0),
-        starting_point: HistoryStartingPoint::AfterFirstFile,
-        operations: vec![
-            HistoryOperation::PublishOverwrite(empty),
-            HistoryOperation::PublishOverwrite(empty),
-            HistoryOperation::CrashRecoveryAbandoningTheNewestRoot,
-            HistoryOperation::PublishOverwrite(empty),
-            HistoryOperation::PublishOverwrite(empty),
-            HistoryOperation::PublishOverwrite(empty),
-            HistoryOperation::PublishOverwrite(empty),
-            HistoryOperation::RaiseRollbackFloor(FloorTargetChoice {
-                steps_above_current_floor: 5,
-            }),
-        ],
-    };
-    let run = execute_history(&history);
-    assert!(
-        matches!(
-            run.outcomes[2],
-            StepOutcome::Applied(AppliedEffect::Mounted {
-                instance: InstanceGeneration(2),
-                ..
-            })
-        ),
-        "崩溃恢复抛弃根那一步是一次做成的可写挂载、取号 2：{:?}",
-        run.outcomes[2]
-    );
-    match &run.ending {
-        HistoryEnding::KnownRed { form, observation } => {
-            assert_eq!(*form, 0, "收口表第 43 行那一条");
-            assert_eq!(observation.position, StepPosition::Operation(7));
-            assert_eq!(
-                observation.raised_floor_lands_only_on_abandoned_roots,
-                Some(true),
-                "F = 5 只落在被抛弃的 C 上"
-            );
-        }
-        other @ (HistoryEnding::Completed | HistoryEnding::NewFinding { .. }) => {
-            panic!("要以「已知红」第 0 条收尾：{other:?}")
-        }
-    }
+fn content_seeded_by(length: usize, seed: usize) -> Vec<u8> {
+    (0..length)
+        .map(|index| u8::try_from((index * 7 + seed) % 253).expect("小于 256"))
+        .collect()
 }
 
-/// 崩溃恢复抛弃的那条根不在回退的候选集里：同上造出被抛弃的 C（实例 1、txg 5），回退的目标取根环从新到旧第 3 条
-/// （实例 2 的 7、6 之后就是它），被拒成「在被抛弃的时间线上」，模型也要求拒，历史跑完。
-#[test]
-fn rolling_back_to_the_root_abandoned_by_the_crash_recovery_step_is_refused_on_the_abandoned_timeline(
-) {
-    let empty = ContentChoice {
-        length: ContentLength::Empty,
-        fill_seed: 0,
-    };
-    let history = GeneratedHistory {
-        seed: HistorySeed(0),
-        starting_point: HistoryStartingPoint::AfterFirstFile,
-        operations: vec![
-            HistoryOperation::PublishOverwrite(empty),
-            HistoryOperation::PublishOverwrite(empty),
-            HistoryOperation::CrashRecoveryAbandoningTheNewestRoot,
-            HistoryOperation::RollBackWhileMounted(RollbackTargetChoice::RingRoot {
-                index_from_newest: 2,
-            }),
-        ],
-    };
-    let run = execute_history(&history);
-    assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
+/// 同一个进程里对建好的池覆盖写一次，`pool.output` 换成这一版。
+fn overwrite_the_built_pool(
+    pool: &mut BuiltPool,
+    content: &[u8],
+    instance: InstanceGeneration,
+) -> TransactionOutput {
+    let previous = pool.output.clone();
+    let output = publish_overwrite_in_process(
+        pool,
+        &previous,
+        content,
+        FIXED_WRITE_TIME_SECONDS + 60,
+        instance,
+    )
+    .expect("覆盖写");
+    pool.output = output.clone();
+    output
+}
+
+/// 建池（第一个文件 A，txg 3）→ 同一个进程里覆盖写 B（txg 4）、C（txg 5）→ 崩溃恢复抛弃 C：`tests/common` 的
+/// `abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before`——C 的根槽与数据单元暂时读不出、见证 C 的系统配置槽坏掉
+/// （系统配置没见证到 C：C554 乙罩不到、照旧抛弃的那一形），择根落到 B、实例 2 写行 txg 6、暖机 txg 7，再把 C 写回，C 按实例 2 的表判被抛弃。
+/// 随机历史生成器的「崩溃恢复抛弃根」一步藏的是系统配置见证过的最新根，C554 乙之后一律被拒、造不出被抛弃的根，要它的用例从这里造。
+/// 交回池（现行版本是实例 2 暖机那一版）与 C 那一版。
+fn pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version(
+    tag: &str,
+) -> (BuiltPool, TransactionOutput) {
+    let mut pool = build_pool(tag);
+    overwrite_the_built_pool(
+        &mut pool,
+        &content_seeded_by(4100, 3),
+        InstanceGeneration(1),
+    );
+    let third = overwrite_the_built_pool(
+        &mut pool,
+        &content_seeded_by(2500, 11),
+        InstanceGeneration(1),
+    );
+    let abandoning =
+        abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(&mut pool, &third);
     assert_eq!(
-        run.outcomes[3],
-        StepOutcome::Refused {
-            member: "RollbackError::TargetNotACandidate(OnAbandonedTimeline)".to_string()
-        }
+        (
+            third.root.checkpoint_txg,
+            abandoning.output.effective_root.checkpoint_txg,
+            abandoning.output.instance,
+            abandoning.output.row_publish.root().checkpoint_txg,
+            pool.output.root.checkpoint_txg
+        ),
+        (
+            CheckpointTxg(5),
+            CheckpointTxg(4),
+            InstanceGeneration(2),
+            CheckpointTxg(6),
+            CheckpointTxg(7)
+        ),
+        "C 是 txg 5；恢复落到 B（txg 4），实例 2 写行 txg 6、暖机 txg 7"
+    );
+    (pool, third)
+}
+
+fn violations_on_the_image(image: &MemoryPool) -> Vec<(&'static str, String)> {
+    check_pool_image(image)
+        .into_iter()
+        .filter_map(|(invariant, verdict)| match verdict {
+            InvariantVerdict::Violated(detail) => Some((invariant, detail)),
+            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+        })
+        .collect()
+}
+
+/// 「已知红」清单第 0 条（增补 2 收口表第 43 行）那一形：第一个文件 A（txg 3）之后覆盖写 B（4）、C（5），崩溃恢复抛弃 C——择根落到 B，
+/// 实例 2 写行 6、暖机 7；再覆盖写四次（8–11），抬 F 到 5（上限 8）。F 落在被抛弃的 C 那个 txg 上，拿这一次的观察按清单归类，归到第 0 条
+/// （`second_transaction_step_five_reuse.rs` 那一条同形）。生成器的那一步 C554 乙之后造不出被抛弃的根，被抛弃的 C 改由
+/// [`pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version`] 造（系统配置没见证到 C 的那一形）。
+/// 今天红在抬 F 之前：那次崩溃恢复看不见 C、把 C 引用的单元又发出去，池级 checker 的 I-7.4 红——乙罩不到的那一格
+/// （`research/prompts/m2-impl-c554-yi-implementer-report.md` 第六节 Q1），不是乙的拒；那一格修掉之前这条红着。
+#[test]
+fn crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43(
+) {
+    let (mut pool, abandoned) =
+        pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version("random-history-row-43");
+    for seed in [17usize, 19, 23, 29] {
+        overwrite_the_built_pool(
+            &mut pool,
+            &content_seeded_by(3000 + seed, seed),
+            InstanceGeneration(2),
+        );
+    }
+    assert_eq!(pool.output.root.checkpoint_txg, CheckpointTxg(11));
+    let image_before_raising = pool.memory_pool();
+    assert_eq!(
+        violations_on_the_image(&image_before_raising),
+        Vec::new(),
+        "抬 F 之前一条违例都没有"
+    );
+    let floor_on_the_abandoned_root = abandoned.root.checkpoint_txg;
+    assert_eq!(
+        raised_floor_lands_only_on_abandoned_roots(
+            &image_before_raising,
+            floor_on_the_abandoned_root
+        ),
+        Some(true),
+        "抬之前的镜像上 txg 5 那一条根（C）属于被抛弃的实例"
+    );
+    let mut current = pool.output.clone();
+    let raised = raise_rollback_floor(
+        &common::parameters(),
+        pool.devices.as_mut().expect("镜像还开着"),
+        &mut pool.allocator,
+        &mut current,
+        floor_on_the_abandoned_root,
+        ShadowLedger::On,
+    )
+    .expect("F 抬到 5：不超过上限 8");
+    pool.output = current;
+    assert_eq!(raised.ceiling, CheckpointTxg(8));
+    let image_after_raising = pool.memory_pool();
+    let (newest_ring_root_txg, root_ring_slot_count) =
+        newest_ring_root_and_slot_count(&image_after_raising);
+    let ending = classify_failure(FailureObservation {
+        position: StepPosition::Operation(0),
+        operation_kind: Some(HistoryOperationKind::RaiseRollbackFloor),
+        violations: violations_on_the_image(&image_after_raising),
+        panic: None,
+        newest_ring_root_txg,
+        root_ring_slot_count,
+        harness_judgement: None,
+        model_disagreement: None,
+        raised_floor_lands_only_on_abandoned_roots: raised_floor_lands_only_on_abandoned_roots(
+            &image_before_raising,
+            floor_on_the_abandoned_root,
+        ),
+        record_check: RecordCheck::default(),
+    });
+    assert!(
+        matches!(ending, HistoryEnding::KnownRed { form: 0, .. }),
+        "归到「已知红」清单第 0 条（收口表第 43 行）：{ending:?}"
+    );
+}
+
+/// 崩溃恢复抛弃的那条根不在回退的候选集里：照 [`pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version`] 造出被抛弃的 C
+/// （实例 1、txg 5；系统配置没见证到它），挂在实例 2 上回退到 C：被拒成「在被抛弃的时间线上」，拒之前盘上逐字节不变
+/// （两盘的系统配置槽、根环里读得出的根、录制流步数），胶水把这个成员映射成模型的「回退目标在被抛弃的时间线上」
+/// （随机历史里模型对这一格要求拒的就是这一条）。
+#[test]
+fn rolling_back_to_a_root_crash_recovery_abandoned_without_a_system_configuration_witness_is_refused_on_the_abandoned_timeline(
+) {
+    let (mut pool, abandoned) = pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version(
+        "random-history-rollback-onto-the-abandoned",
+    );
+    assert_eq!(
+        (abandoned.root.instance, abandoned.root.checkpoint_txg),
+        (InstanceGeneration(1), CheckpointTxg(5))
+    );
+    let disk_before = disk_snapshot(&pool.memory_pool(), &pool.stream);
+    let refused = roll_back_by_a_forward_publish(
+        &common::parameters(),
+        pool.devices.as_mut().expect("镜像还开着"),
+        &mut pool.allocator,
+        &mut pool.output,
+        RollbackTarget {
+            instance: abandoned.root.instance,
+            checkpoint_txg: abandoned.root.checkpoint_txg,
+        },
+    )
+    .expect_err("C 在被抛弃的时间线上");
+    assert!(
+        matches!(
+            refused,
+            RollbackError::TargetNotACandidate {
+                exclusion: RollbackCandidateExclusion::OnAbandonedTimeline,
+                ..
+            }
+        ),
+        "被拒成「在被抛弃的时间线上」：{refused:?}"
+    );
+    assert_eq!(
+        disk_snapshot(&pool.memory_pool(), &pool.stream),
+        disk_before,
+        "拒之前一个字节都不写"
+    );
+    assert_eq!(
+        refusal_reason_of_rollback_error(&refused),
+        ObservedRefusalReason::Explained(ModelRefusalReason::RollbackTargetOnAbandonedTimeline)
     );
 }
 

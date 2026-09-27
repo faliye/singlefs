@@ -32,11 +32,15 @@ use singlefs_checker::image::{
     valid_roots, ImageReader, InvariantVerdict, PoolGeometry,
 };
 use singlefs_checker::walk::check_pool_image;
-use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
+use singlefs_core::address::{CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes};
+use singlefs_core::allocator::{AllocationRecord, DeviceFreeMap, Placement, PoolAllocator};
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+use singlefs_core::bytes::ByteReader;
 use singlefs_core::make_filesystem::MakeFilesystemParameters;
 use singlefs_core::mount::mount_writable;
+use singlefs_core::pointer::NodePointer;
 use singlefs_core::recovery::{recover, JournalPolicy};
+use singlefs_core::transaction::{instance_table_chain_to_release, PublishError, TransactionUnit};
 use singlefs_format::{
     DATA_UNIT_BYTES, DATA_UNIT_HEADER_BYTES, DATA_UNIT_PAYLOAD_OFFSET, EXTENT_LEAF_RECORD_BYTES,
     INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE, NODE_BYTES, NONCE_MAC_ALGORITHM_RESERVED_BYTES,
@@ -78,6 +82,10 @@ const UNIT_DECLARED_LENGTH_OFFSET: usize = 8;
 
 /// 码 2 索引节点头里 key 宽那一字节的偏移（D18 已定项 18，2026-09-14 用户定案）。
 const INDEX_NODE_KEY_WIDTH_OFFSET: usize = 51;
+
+/// 码 2 索引节点头里 key 区间的起点：最小 key 紧跟 key 宽那一字节，最大 key 紧跟最小 key（各 key 宽那么长；
+/// `singlefs-core` 的 `build_index_node` 同一张字段表，这里按字段表另写一份）。
+const INDEX_NODE_SMALLEST_KEY_OFFSET: usize = INDEX_NODE_KEY_WIDTH_OFFSET + 1;
 
 /// 码 1 数据单元头里载荷 CRC 那 4 字节的偏移（D18 已定项 18 的字段表）。
 const DATA_UNIT_PAYLOAD_CHECKSUM_OFFSET: usize = 101;
@@ -166,9 +174,13 @@ pub enum DamageKind {
     NarrowedEntryWidthOfTheInodeTreeRoot,
     /// 条目宽度那一族（普查 R4）：同上，改分配记录树根（key 宽 10，记录该有 20）。
     NarrowedEntryWidthOfTheAllocationRecordsTreeRoot,
-    /// 条目宽度那一族（普查 R4、R13）：同上，改记账树根（key 宽 22，条目该有 34）。
+    /// 条目宽度那一族（普查 R4、R13）：改记账树根（key 宽 22，条目该有 34），条目宽缩到 key 宽，**每条条目只留它的 key、
+    /// 条目数不变**，节点头的 key 区间照旧与首末两条对得上。只缩成 1 条（extent、inode、分配记录树根那三种的缩法）过不了判全那一道：可写挂载重建与冷走读
+    /// 都照冷走读判全（代码审阅第 24 / 33 条），先红在「根 key 区间与条目不符」与「记账条目数不是 3 + 6 × 盘数」上，
+    /// 走不到解记账条目那一步；那一种原来的样子留在 [`DamageRefusedAtTheHeaderJudgement`]。
     NarrowedEntryWidthOfTheAccountingTreeRoot,
-    /// 条目宽度那一族（普查 R2、R13）：同上，改中央映射树根（key 宽 27，条目该有 55）。映射树的根住根记录、不经树表
+    /// 条目宽度那一族（普查 R2、R13）：同上，改中央映射树根（key 宽 27，条目该有 55），每条只留 key、条目数不变
+    /// （映射条目数同样要对得上进映射的单元数）。映射树的根住根记录、不经树表
     /// （D19（块指针的结构与宽度预算） 已定项 11），所以这一条重算的是三道校验和，不是五道。
     NarrowedEntryWidthOfTheCentralMappingTreeRoot,
     /// 条目宽度那一族（C504（树表条目宽在走读里无守卫，今天没坏法打得到））：改**树表单元自己**（key 宽 8，条目该有 200）。
@@ -187,8 +199,14 @@ pub enum DamageKind {
     /// 于是「两块盘的分配记录树不对称」原样喂进 `PoolAllocator::release` 的断言。
     /// 只动已释放位与释放代：两块盘的位图一个字节都不差（`mark_released` 不清位），
     /// 挂载之后的落点政策两盘照样答同一个槽，坏法不会在别处先被拦下。
+    /// 可写挂载重建判全（代码审阅第 24 / 33 条）之后，这份镜像在重建那一步就红在「分配记录不是每个落点每盘各一条」上
+    /// （那一道之后还有「分配代 / 释放代不晚于根」，高过任何根的释放代同样过不去），释放判定那一处从盘上走不到了；那一处改由 [`release_check_of_the_instance_table_placement_released_on_the_second_device_only`]
+    /// 直接调发布路径的释放判定。
     AllocationRecordReleasedOnTheSecondDeviceOnly,
     /// 分配器那一族（普查 R11）：把记账树里 inode 号水位那一行的统计量标签换掉，读路径找不到水位。
+    /// 水位那一行排在最后，换上的标签仍排在最后，**节点头的最大 key 跟着改成这一行的新 key**：头里的最大 key 照旧的话，
+    /// 两个读者都先红在判全那一道「根 key 区间与条目不符」上（代码审阅第 24 / 33 条），走不到取水位那一步；
+    /// 那一种原来的样子留在 [`DamageRefusedAtTheHeaderJudgement`]。
     RelabelledInodeWatermarkAccountingRow,
     /// 写侧断言那一族（普查 R12）：把系统配置里的区域数改到那个长 3 的数组之外。
     RegionCountPastTheThreeRegionArray,
@@ -255,10 +273,10 @@ impl DamageKind {
                 "条目宽：分配记录树根自述的条目宽缩到 key 宽（链上校验和重算）"
             }
             DamageKind::NarrowedEntryWidthOfTheAccountingTreeRoot => {
-                "条目宽：记账树根自述的条目宽缩到 key 宽（链上校验和重算）"
+                "条目宽：记账树根自述的条目宽缩到 key 宽、每条只留 key（链上校验和重算）"
             }
             DamageKind::NarrowedEntryWidthOfTheCentralMappingTreeRoot => {
-                "条目宽：中央映射树根自述的条目宽缩到 key 宽（根记录那条链上校验和重算）"
+                "条目宽：中央映射树根自述的条目宽缩到 key 宽、每条只留 key（根记录那条链上校验和重算）"
             }
             DamageKind::NarrowedEntryWidthOfTheTreeTableUnit => {
                 "条目宽：树表单元自己自述的条目宽缩到 key 宽（树表两道 + 根槽自证一道校验和重算）"
@@ -279,7 +297,7 @@ impl DamageKind {
                 "分配器：实例表那个落点的分配记录只在第二块盘上写成已释放（两盘的账不对称）"
             }
             DamageKind::RelabelledInodeWatermarkAccountingRow => {
-                "分配器：记账树里 inode 号水位那一行被改挂到别的标签上"
+                "分配器：记账树里 inode 号水位那一行被改挂到别的标签上（节点头的最大 key 跟着改）"
             }
             DamageKind::RegionCountPastTheThreeRegionArray => {
                 "写侧断言：系统配置里的区域数越过那个长 3 的数组"
@@ -1394,17 +1412,18 @@ fn newest_geometry(image: &MemoryPool) -> Option<PoolGeometry> {
         .map(|(_, geometry)| geometry)
 }
 
-/// 镜像上最新那条自证过的根：住哪块盘的哪个偏移、整槽的字节。
+/// 镜像上最新那条自证过的根：住哪块盘的哪个偏移、整槽的字节、它的 txg。
 #[derive(Clone, Debug)]
 struct NewestRootSlot {
     device: u32,
     offset_in_bytes: u64,
     slot_bytes: Vec<u8>,
+    checkpoint_txg: u64,
 }
 
 fn newest_root_slot(image: &MemoryPool, geometry: &PoolGeometry) -> Option<NewestRootSlot> {
     let slot_width = usize::try_from(geometry.physical_block_size).ok()?;
-    let (region, slot, _) = valid_roots(image, geometry)
+    let (region, slot, newest_view) = valid_roots(image, geometry)
         .into_iter()
         .max_by_key(|(_, _, view)| (view.checkpoint_txg, view.instance))?;
     let (_, _, device, offset_in_bytes) = root_slot_positions(geometry).into_iter().find(
@@ -1417,6 +1436,7 @@ fn newest_root_slot(image: &MemoryPool, geometry: &PoolGeometry) -> Option<Newes
         device,
         offset_in_bytes,
         slot_bytes,
+        checkpoint_txg: newest_view.checkpoint_txg,
     })
 }
 
@@ -1793,20 +1813,31 @@ pub fn damage_image(
         DamageKind::FlippedBitsInWrittenSectors => flip_bits(&mut image, random)?,
         DamageKind::ZeroedOneWrittenSector => zero_one_sector(&mut image, random)?,
         DamageKind::DroppedEverySectorPastACut => drop_every_sector_past_a_cut(&mut image, random)?,
-        DamageKind::NarrowedEntryWidthOfTheExtentTreeRoot => {
-            narrow_the_entry_width_of(&mut image, TREE_KIND_EXTENT)?
-        }
-        DamageKind::NarrowedEntryWidthOfTheInodeTreeRoot => {
-            narrow_the_entry_width_of(&mut image, TREE_KIND_INODE)?
-        }
-        DamageKind::NarrowedEntryWidthOfTheAllocationRecordsTreeRoot => {
-            narrow_the_entry_width_of(&mut image, TREE_KIND_ALLOCATION_RECORDS)?
-        }
-        DamageKind::NarrowedEntryWidthOfTheAccountingTreeRoot => {
-            narrow_the_entry_width_of(&mut image, TREE_KIND_ACCOUNTING)?
-        }
+        DamageKind::NarrowedEntryWidthOfTheExtentTreeRoot => narrow_the_entry_width_of(
+            &mut image,
+            TREE_KIND_EXTENT,
+            EntriesKeptWhenNarrowing::OnlyTheFirst,
+        )?,
+        DamageKind::NarrowedEntryWidthOfTheInodeTreeRoot => narrow_the_entry_width_of(
+            &mut image,
+            TREE_KIND_INODE,
+            EntriesKeptWhenNarrowing::OnlyTheFirst,
+        )?,
+        DamageKind::NarrowedEntryWidthOfTheAllocationRecordsTreeRoot => narrow_the_entry_width_of(
+            &mut image,
+            TREE_KIND_ALLOCATION_RECORDS,
+            EntriesKeptWhenNarrowing::OnlyTheFirst,
+        )?,
+        DamageKind::NarrowedEntryWidthOfTheAccountingTreeRoot => narrow_the_entry_width_of(
+            &mut image,
+            TREE_KIND_ACCOUNTING,
+            EntriesKeptWhenNarrowing::EveryOneAsItsKey,
+        )?,
         DamageKind::NarrowedEntryWidthOfTheCentralMappingTreeRoot => {
-            narrow_the_entry_width_of_the_central_mapping_tree_root(&mut image)?
+            narrow_the_entry_width_of_the_central_mapping_tree_root(
+                &mut image,
+                EntriesKeptWhenNarrowing::EveryOneAsItsKey,
+            )?
         }
         DamageKind::NarrowedEntryWidthOfTheTreeTableUnit => {
             narrow_the_entry_width_of_the_tree_table_unit(&mut image)?
@@ -1829,9 +1860,10 @@ pub fn damage_image(
             &mut image,
             AllocationRecordDamage::InstanceTablePlacementReleasedOnTheSecondDeviceOnly,
         )?,
-        DamageKind::RelabelledInodeWatermarkAccountingRow => {
-            relabel_the_inode_watermark_row(&mut image)?
-        }
+        DamageKind::RelabelledInodeWatermarkAccountingRow => relabel_the_inode_watermark_row(
+            &mut image,
+            LargestKeyOfTheNodeHeader::FollowsTheRelabelledRow,
+        )?,
         DamageKind::RegionCountPastTheThreeRegionArray => {
             widen_the_region_count_past_the_array(&mut image)?
         }
@@ -1843,6 +1875,124 @@ pub fn damage_image(
         }
     };
     Some(DamagedImage { kind, what, image })
+}
+
+/// [`DamageKind`] 里改坏记账树根、中央映射树根的那三种坏法**原来的样子**：只改了坏法名字里那个字段，节点里跟着它的条目数、
+/// 节点头的 key 区间没改对。可写挂载重建照冷走读判全（代码审阅第 24 / 33 条，用户定案「可写挂载判全树头与 key 次序，
+/// 坏了报错拒挂载，不多读盘」）之后，两个读者都在判全那一道（叶根「根 key 区间与条目不符」）就拒了，走不到坏法要打的那一处；
+/// [`DamageKind`] 里那三种因此改成改对的样子，这三种留给用例钉「判全那一道拒成哪个成员」。
+/// 不进 [`EVERY_DAMAGE_KIND`]、不进种子那一批。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DamageRefusedAtTheHeaderJudgement {
+    /// 记账树根的条目宽缩到 key 宽、只留第一条（[`DamageKind::NarrowedEntryWidthOfTheAccountingTreeRoot`] 原来的缩法）。
+    AccountingTreeRootNarrowedToItsFirstEntry,
+    /// 中央映射树根的条目宽缩到 key 宽、只留第一条（[`DamageKind::NarrowedEntryWidthOfTheCentralMappingTreeRoot`] 原来的缩法）。
+    CentralMappingTreeRootNarrowedToItsFirstEntry,
+    /// inode 号水位那一行改挂到登记表外的标签上，节点头的最大 key 照旧（[`DamageKind::RelabelledInodeWatermarkAccountingRow`] 原来的改法）。
+    InodeWatermarkRowRelabelledUnderTheOldLargestKey,
+}
+
+impl DamageRefusedAtTheHeaderJudgement {
+    /// 坏的是 [`DamageKind`] 里哪一种的那个字段（[`DamagedImage::kind`] 记成它）。
+    #[must_use]
+    pub fn damage_kind_of_the_same_field(self) -> DamageKind {
+        match self {
+            DamageRefusedAtTheHeaderJudgement::AccountingTreeRootNarrowedToItsFirstEntry => {
+                DamageKind::NarrowedEntryWidthOfTheAccountingTreeRoot
+            }
+            DamageRefusedAtTheHeaderJudgement::CentralMappingTreeRootNarrowedToItsFirstEntry => {
+                DamageKind::NarrowedEntryWidthOfTheCentralMappingTreeRoot
+            }
+            DamageRefusedAtTheHeaderJudgement::InodeWatermarkRowRelabelledUnderTheOldLargestKey => {
+                DamageKind::RelabelledInodeWatermarkAccountingRow
+            }
+        }
+    }
+}
+
+/// 按 [`DamageRefusedAtTheHeaderJudgement`] 里的一种把一份合法镜像坏掉（坏之前那份不动）；盘面上没有它要坏的对象时交回 None。
+/// 交回的 [`DamagedImage::kind`] 是坏同一个字段的那一种 [`DamageKind`]，`what` 写明是原来的样子。
+#[must_use]
+pub fn damage_image_the_way_the_header_judgement_refuses(
+    base: &MemoryPool,
+    damage: DamageRefusedAtTheHeaderJudgement,
+) -> Option<DamagedImage> {
+    let mut image = base.clone();
+    let what = match damage {
+        DamageRefusedAtTheHeaderJudgement::AccountingTreeRootNarrowedToItsFirstEntry => {
+            narrow_the_entry_width_of(
+                &mut image,
+                TREE_KIND_ACCOUNTING,
+                EntriesKeptWhenNarrowing::OnlyTheFirst,
+            )?
+        }
+        DamageRefusedAtTheHeaderJudgement::CentralMappingTreeRootNarrowedToItsFirstEntry => {
+            narrow_the_entry_width_of_the_central_mapping_tree_root(
+                &mut image,
+                EntriesKeptWhenNarrowing::OnlyTheFirst,
+            )?
+        }
+        DamageRefusedAtTheHeaderJudgement::InodeWatermarkRowRelabelledUnderTheOldLargestKey => {
+            relabel_the_inode_watermark_row(&mut image, LargestKeyOfTheNodeHeader::LeftAsItWas)?
+        }
+    };
+    Some(DamagedImage {
+        kind: damage.damage_kind_of_the_same_field(),
+        what: format!("（原来的样子）{what}"),
+        image,
+    })
+}
+
+/// 普查 R10 那一处（释放判定逐盘核，`transaction.rs` 的 `placement_registered_unreleased_on_every_device`）从盘上走不到之后的入口：
+/// [`DamageKind::AllocationRecordReleasedOnTheSecondDeviceOnly`] 那份镜像在可写挂载重建那一步就红在「分配记录不是每个落点每盘各一条」上
+/// （代码审阅第 24 / 33 条的判全），走不到发布。这里越过盘上那一道，直接调发布路径的释放判定：
+/// 拿 `image` 上最新那条根里的实例表指针，手搭一个分配器，只装这个落点在两条位置条目那两块盘上各一条记录——
+/// 与坏法在盘上造的那一对相同：第一条位置条目那块盘上那条还着（分配代取这条根的 txg），第二条那块盘上那条已释放、
+/// 释放代是 [`RELEASE_GENERATION_ABOVE_EVERY_ROOT`]（释放判定只看在不在册、释放没有、跨度，不看代）——
+/// 再调 [`instance_table_chain_to_release`]（写行那次发布换下整条实例表链时调的就是它）。
+/// 镜像上择不出根、实例表指针全零时交回 None。
+#[must_use]
+pub fn release_check_of_the_instance_table_placement_released_on_the_second_device_only(
+    image: &MemoryPool,
+) -> Option<Result<Vec<Placement>, PublishError>> {
+    let geometry = newest_geometry(image)?;
+    let newest_root = newest_root_slot(image, &geometry)?;
+    let instance_table_pointer = NodePointer::read_from(&mut ByteReader::at(
+        &newest_root.slot_bytes,
+        ROOT_INSTANCE_TABLE_POINTER_OFFSET,
+    ));
+    if instance_table_pointer == NodePointer::empty_root() {
+        return None;
+    }
+    let span_slots = u16::try_from(TransactionUnit::InstanceTable.span_slots())
+        .expect("实例表的跨度是 2 槽，装得进分配记录的 15 位跨度");
+    let [first_location, second_location] = instance_table_pointer.locations;
+    let records = vec![
+        AllocationRecord {
+            device: first_location.device,
+            slot: first_location.slot,
+            span_slots,
+            generation: CheckpointTxg(newest_root.checkpoint_txg),
+            is_released: false,
+        },
+        AllocationRecord {
+            device: second_location.device,
+            slot: first_location.slot,
+            span_slots,
+            generation: CheckpointTxg(RELEASE_GENERATION_ABOVE_EVERY_ROOT),
+            is_released: true,
+        },
+    ];
+    let devices = image
+        .devices
+        .keys()
+        .map(|identity| DeviceFreeMap::new(*identity, image.device_size_in_bytes))
+        .collect();
+    let allocator = PoolAllocator::rebuild_from_records(devices, records);
+    Some(instance_table_chain_to_release(
+        &[instance_table_pointer],
+        &allocator,
+    ))
 }
 
 fn flip_bits(image: &mut MemoryPool, random: &mut SeededRandomSource) -> Option<String> {
@@ -1952,35 +2102,103 @@ fn drop_every_sector_past_a_cut(
 /// 读者只判「条目宽 ≥ key 宽」（`unit.rs` 的 `parse_index_node`、checker 的 `index_node_view`），
 /// 之后按字段表的固定偏移切条目——切出界就 panic（普查 R1–R4、R13）。
 /// 一棵树一条坏法、不按种子挑：挑的话每个种子只打到四棵里的一棵，哪一处 panic 撞不撞得到就成了掷骰子。
-/// 一个码 2 节点自述的条目宽缩到刚好等于 key 宽、条目数改成 1、声明长度跟着改；交回改之前的 (条目宽, 条目数, 新条目宽)。
+/// 缩条目宽那一族把条目宽缩到 key 宽之后，条目区留下什么。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum EntriesKeptWhenNarrowing {
+    /// 只留第一条（条目数 → 1），节点头的 key 区间照旧。叶根上末条的 key 因此与头里的最大 key 对不上：
+    /// 读者要是先判区间（记账树、中央映射树的叶根，代码审阅第 24 / 33 条之后的两个读者都这样），就红在区间上、走不到解条目那一步。
+    OnlyTheFirst,
+    /// 每条都留、只剩它的 key（条目数不变，按新条目宽从头紧排）：首末两条的 key 不变，节点头的 key 区间、条目数、key 次序都照旧对得上，
+    /// 读者走到按字段表解条目那一步才红。
+    EveryOneAsItsKey,
+}
+
+/// 缩完条目宽之后那几个字段各从什么改成什么（写进「坏在哪」那句话）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct NarrowedEntryArea {
+    entry_width_before: usize,
+    entry_count_before: usize,
+    narrowed_entry_width: u16,
+    entry_count_after: u16,
+    declared_length_after: u16,
+}
+
+impl NarrowedEntryArea {
+    fn render(self) -> String {
+        format!(
+            "条目宽 {} → {}（= key 宽）、条目数 {} → {}、声明长度 → {}",
+            self.entry_width_before,
+            self.narrowed_entry_width,
+            self.entry_count_before,
+            self.entry_count_after,
+            self.declared_length_after
+        )
+    }
+}
+
+/// 一个码 2 节点自述的条目宽缩到刚好等于 key 宽，条目区按 `kept` 留条目，条目数与声明长度跟着改。
 /// 条目区本来就是 0 条、或者条目宽本来就等于 key 宽（没得缩）时交回 None。
-/// **五棵树共用这一份**：偏移与缩法只有这一处，两条链（经树表的四棵、住根记录的映射树）各自重算自己那几道校验和。
-fn narrow_the_entry_width_of_the_node(node: &mut [u8]) -> Option<(usize, usize, u16)> {
+/// **六处共用这一份**（五棵树的根与树表单元自己）：偏移与缩法只有这一处，各条链各自重算自己那几道校验和。
+fn narrow_the_entry_width_of_the_node(
+    node: &mut [u8],
+    kept: EntriesKeptWhenNarrowing,
+) -> Option<NarrowedEntryArea> {
     let key_width = index_node_key_width(node);
     let layout = IndexNodeEntryLayout::of(node);
     if layout.entry_count == 0 || layout.entry_width <= key_width {
         return None;
     }
     let narrowed = u16::try_from(key_width).expect("key 宽装得进 u16");
+    let entry_count_after = match kept {
+        EntriesKeptWhenNarrowing::OnlyTheFirst => 1,
+        EntriesKeptWhenNarrowing::EveryOneAsItsKey => {
+            // 迭代上界是条目数。第 i 条的 key 从 i × 原条目宽挪到 i × key 宽：原条目宽 > key 宽，往前挪写到的那一段
+            // 止于 (i + 1) × key 宽 < (i + 1) × 原条目宽，盖不到还没挪的那几条。
+            for entry_index in 0..layout.entry_count {
+                let from = layout.offset_of_entry(entry_index);
+                let to = layout.start_in_the_node + entry_index * key_width;
+                node.copy_within(from..from + key_width, to);
+            }
+            // 紧排之后空出来的那一段清零（写者写出来的节点，条目区之后恒 0）。
+            node[layout.start_in_the_node + layout.entry_count * key_width
+                ..layout.offset_of_entry(layout.entry_count)]
+                .fill(0);
+            u16::try_from(layout.entry_count).expect("条目数是从 2 字节的字段读来的")
+        }
+    };
+    let declared_length_after = entry_count_after
+        .checked_mul(narrowed)
+        .expect("缩之后的条目区比缩之前短，缩之前的声明长度装得进 2 字节");
     let entry_count_offset = index_node_entry_count_offset(node);
     let entry_width_offset = index_node_entry_width_offset(node);
-    node[entry_count_offset..entry_count_offset + 2].copy_from_slice(&1u16.to_le_bytes());
+    node[entry_count_offset..entry_count_offset + 2]
+        .copy_from_slice(&entry_count_after.to_le_bytes());
     node[entry_width_offset..entry_width_offset + 2].copy_from_slice(&narrowed.to_le_bytes());
     node[UNIT_DECLARED_LENGTH_OFFSET..UNIT_DECLARED_LENGTH_OFFSET + 2]
-        .copy_from_slice(&narrowed.to_le_bytes());
-    Some((layout.entry_width, layout.entry_count, narrowed))
+        .copy_from_slice(&declared_length_after.to_le_bytes());
+    Some(NarrowedEntryArea {
+        entry_width_before: layout.entry_width,
+        entry_count_before: layout.entry_count,
+        narrowed_entry_width: narrowed,
+        entry_count_after,
+        declared_length_after,
+    })
 }
 
-fn narrow_the_entry_width_of(image: &mut MemoryPool, tree_kind: u16) -> Option<String> {
+fn narrow_the_entry_width_of(
+    image: &mut MemoryPool,
+    tree_kind: u16,
+    kept: EntriesKeptWhenNarrowing,
+) -> Option<String> {
     let mut chain = open_chain_to_the_root_of(image, tree_kind)?;
-    let (entry_width, entry_count, narrowed) =
-        narrow_the_entry_width_of_the_node(&mut chain.tree_root_node)?;
+    let narrowed = narrow_the_entry_width_of_the_node(&mut chain.tree_root_node, kept)?;
     let what = format!(
-        "条目宽：树种类 {} 的根（盘 {:?} 槽 {}，层级 {}）条目宽 {entry_width} → {narrowed}（= key 宽）、条目数 {entry_count} → 1、声明长度 → {narrowed}；链上三道校验和重算",
+        "条目宽：树种类 {} 的根（盘 {:?} 槽 {}，层级 {}）{}；链上三道校验和重算",
         chain.tree_kind,
         chain.tree_root_devices,
         chain.tree_root_slot,
         chain.tree_root_node[INDEX_NODE_LEVEL_OFFSET],
+        narrowed.render(),
     );
     seal_and_write_back_the_chain(chain, image);
     Some(what)
@@ -1992,11 +2210,15 @@ fn narrow_the_entry_width_of(image: &mut MemoryPool, tree_kind: u16) -> Option<S
 /// 条目宽 200 → 8（= 树表的 key 宽）、条目数 → 1、声明长度 → 8，重算树表节点两道与根槽自证一道。
 fn narrow_the_entry_width_of_the_tree_table_unit(image: &mut MemoryPool) -> Option<String> {
     let mut reached = reach_the_tree_table_whatever_its_entry_width_says(image)?;
-    let (entry_width, entry_count, narrowed) =
-        narrow_the_entry_width_of_the_node(&mut reached.tree_table_node)?;
+    let narrowed = narrow_the_entry_width_of_the_node(
+        &mut reached.tree_table_node,
+        EntriesKeptWhenNarrowing::OnlyTheFirst,
+    )?;
     let what = format!(
-        "条目宽：树表单元自己（盘 {:?} 槽 {}）条目宽 {entry_width} → {narrowed}（= key 宽 8）、条目数 {entry_count} → 1、声明长度 → {narrowed}；节点两道 + 根槽自证一道校验和重算",
-        reached.tree_table_devices, reached.tree_table_slot,
+        "条目宽：树表单元自己（盘 {:?} 槽 {}）{}（key 宽 8）；节点两道 + 根槽自证一道校验和重算",
+        reached.tree_table_devices,
+        reached.tree_table_slot,
+        narrowed.render(),
     );
     seal_and_write_back_the_tree_table(reached, image);
     Some(what)
@@ -2005,15 +2227,16 @@ fn narrow_the_entry_width_of_the_tree_table_unit(image: &mut MemoryPool) -> Opti
 /// 条目宽度那一族的第五棵树（普查 R2）：中央映射树的根。它住根记录，所以走的是那条只有两环的链。
 fn narrow_the_entry_width_of_the_central_mapping_tree_root(
     image: &mut MemoryPool,
+    kept: EntriesKeptWhenNarrowing,
 ) -> Option<String> {
     let mut chain = open_chain_to_the_central_mapping_tree_root(image)?;
-    let (entry_width, entry_count, narrowed) =
-        narrow_the_entry_width_of_the_node(&mut chain.mapping_root_node)?;
+    let narrowed = narrow_the_entry_width_of_the_node(&mut chain.mapping_root_node, kept)?;
     let what = format!(
-        "条目宽：中央映射树根（住根记录，盘 {:?} 槽 {}，层级 {}）条目宽 {entry_width} → {narrowed}（= key 宽 27）、条目数 {entry_count} → 1、声明长度 → {narrowed}；节点两道 + 根槽自证一道校验和重算",
+        "条目宽：中央映射树根（住根记录，盘 {:?} 槽 {}，层级 {}）{}（key 宽 27）；节点两道 + 根槽自证一道校验和重算",
         chain.mapping_root_devices,
         chain.mapping_root_slot,
         chain.mapping_root_node[INDEX_NODE_LEVEL_OFFSET],
+        narrowed.render(),
     );
     seal_and_write_back_the_central_mapping_chain(chain, image);
     Some(what)
@@ -2268,8 +2491,22 @@ fn damage_an_allocation_record_in_the_leaf(
     Some(what)
 }
 
+/// 改完水位那一行的标签之后，记账树根（叶）节点头里的最大 key 怎么办。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LargestKeyOfTheNodeHeader {
+    /// 跟着改成水位那一行的新 key（那一行排在最后，换上的标签仍排在最后）：节点头的 key 区间照旧与首末两条对得上，读者走到取水位那一步。
+    FollowsTheRelabelledRow,
+    /// 照旧：头里的最大 key 还是水位那一行原来的 key，读者先判区间（代码审阅第 24 / 33 条之后的两个读者都这样），红在区间上。
+    LeftAsItWas,
+}
+
 /// 分配器那一族（普查 R11）：把记账树里 inode 号水位那一行改挂到登记表外的标签上，读路径取水位时找不到它。
-fn relabel_the_inode_watermark_row(image: &mut MemoryPool) -> Option<String> {
+/// 节点头的最大 key 按 `largest_key` 办；跟着改时要求水位那一行是最后一条（换上的标签比登记表里哪个都大，只有它原本在最后，
+/// 改完才仍按 key 严格递增），不是就交回 None。
+fn relabel_the_inode_watermark_row(
+    image: &mut MemoryPool,
+    largest_key: LargestKeyOfTheNodeHeader,
+) -> Option<String> {
     let mut chain = open_chain_to_the_root_of(image, TREE_KIND_ACCOUNTING)?;
     if !index_node_is_a_leaf(&chain.tree_root_node) {
         return None;
@@ -2285,8 +2522,23 @@ fn relabel_the_inode_watermark_row(image: &mut MemoryPool) -> Option<String> {
         layout.offset_of_entry(watermark_row) + ACCOUNTING_ENTRY_STATISTIC_OFFSET;
     chain.tree_root_node[statistic_offset..statistic_offset + 2]
         .copy_from_slice(&STATISTIC_LABEL_NOT_IN_THE_REGISTRY.to_le_bytes());
+    let header = match largest_key {
+        LargestKeyOfTheNodeHeader::FollowsTheRelabelledRow => {
+            if watermark_row + 1 != layout.entry_count {
+                return None;
+            }
+            let key_width = index_node_key_width(&chain.tree_root_node);
+            let row_start = layout.offset_of_entry(watermark_row);
+            let largest_key_offset = INDEX_NODE_SMALLEST_KEY_OFFSET + key_width;
+            chain
+                .tree_root_node
+                .copy_within(row_start..row_start + key_width, largest_key_offset);
+            "，节点头的最大 key 跟着改成这一行的新 key"
+        }
+        LargestKeyOfTheNodeHeader::LeftAsItWas => "，节点头的最大 key 照旧",
+    };
     let what = format!(
-        "分配器：记账树第 {watermark_row} 条的统计量标签 {STATISTIC_INODE_WATERMARK_LABEL}（inode 号水位）→ {STATISTIC_LABEL_NOT_IN_THE_REGISTRY}"
+        "分配器：记账树第 {watermark_row} 条的统计量标签 {STATISTIC_INODE_WATERMARK_LABEL}（inode 号水位）→ {STATISTIC_LABEL_NOT_IN_THE_REGISTRY}{header}"
     );
     seal_and_write_back_the_chain(chain, image);
     Some(what)

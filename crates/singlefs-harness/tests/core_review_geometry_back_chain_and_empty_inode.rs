@@ -1,14 +1,17 @@
 //! 代码审阅第 15、16、21、25、37 条（实审 A2a）的会红用例：
-//! mkfs 在任何写之前拒掉固定结构互相盖住、根槽装不下根记录、journal 环短于一条记录或越过单元区起点的几何
-//! （D23（journal 的角色与格式） 已定项 19 ③、D22（单元原子性怎么合成） 已定项 16、D2（RAID 条带策略） 已定项 19）；
+//! mkfs 在任何写之前拒掉固定结构互相盖住、根槽装不下根记录、journal 环短于一条记录、环末尾的下一个槽不在聚簇段边界上、
+//! mkfs 写的单元落到盘外的几何，越过 784 MiB 的环把单元区起点带到环末尾的下一个槽
+//! （D23（journal 的角色与格式） 已定项 19 ③、D3（空间分配） 已定项 10 ④、D22（单元原子性怎么合成） 已定项 16、D2（RAID 条带策略） 已定项 19）；
 //! 只读挂载打得开新建的空 inode；恢复照 I-8.6（反向链算法）把链值不等的记录挡在重放前缀之外；
 //! 槽 0 自证不过的盘按池里别的盘槽 0 记的槽距找它的槽 1。
 //! 盘都是内存稀疏盘（`singlefs_harness::crash::SparseBlockDevice`），恢复与只读挂载读的是 `MemoryPool`。
 
 use singlefs_core::address::{
-    DeviceIdentity, DeviceOffsetInBytes, InodeNumber, InstanceGeneration,
+    DeviceIdentity, DeviceOffsetInBytes, InodeNumber, InstanceGeneration, SlotNumber,
 };
-use singlefs_core::allocator::PoolAllocator;
+use singlefs_core::allocator::{
+    PoolAllocator, UnitAreaStartOffTheClusterSegmentBoundaryUnsupported,
+};
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::journal::{record_offset, JournalRecord};
 use singlefs_core::make_filesystem::{
@@ -26,8 +29,8 @@ use singlefs_core::transaction::{
     FirstFile, PoolWriter, TransactionOutput, FIRST_INODE_NUMBER,
 };
 use singlefs_format::{
-    JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT, ROOT_RECORD_BYTES,
-    SLOT_BYTES, UNIT_AREA_START_SLOT,
+    JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT,
+    JOURNAL_SAFETY_FACTOR, ROOT_RECORD_BYTES, SLOT_BYTES, UNIT_AREA_START_SLOT,
 };
 use singlefs_harness::crash::{MemoryPool, SparseBlockDevice, SparseDevice};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
@@ -91,11 +94,12 @@ fn offsets_carrying_the_pattern(device_bytes: u64) -> Vec<u64> {
     .collect()
 }
 
-/// 在两块带花样的盘上做一次 mkfs：交回结果、录制流里记了几步、两块盘是不是与 mkfs 之前逐字节相同。
+/// 在两块带花样的盘上做一次 mkfs：交回结果、录制流里记了几步、两块盘是不是与 mkfs 之前逐字节相同、mkfs 之后两块盘的镜像。
 struct MakeFilesystemObservation {
     result: Result<MakeFilesystemOutput, MakeFilesystemError>,
     recorded_operations: usize,
     images_unchanged: bool,
+    images_after: Vec<SparseDevice>,
 }
 
 fn make_filesystem_on_patterned_devices(
@@ -127,6 +131,10 @@ fn make_filesystem_on_patterned_devices(
         result,
         recorded_operations: stream.operations().len(),
         images_unchanged,
+        images_after: devices
+            .iter()
+            .map(|(_, device)| device.inner().image.clone())
+            .collect(),
     }
 }
 
@@ -141,12 +149,23 @@ fn assert_refused_before_any_write(observation: &MakeFilesystemObservation, geom
     );
 }
 
-// ── 第 15 条：journal 环长是 mkfs 参数，单元区起点仍是编译期常量 ──
+// ── 第 15 条：journal 环长是 mkfs 参数，单元区起点随环长走（环末尾的下一个槽，实审 A3b） ──
 
-/// 环 1 GiB（≤ 4 GiB ÷ 4，环长上界那一关放行）：环从 16 MiB 盖到 1040 MiB，越过单元区起点 784 MiB（实例表单元就写在那里）。
-/// 单元区起点还不随环长走（分配器与恢复都按 `UNIT_AREA_START_SLOT` 算，C475），第一版在任何写之前拒掉。
+/// 环长 `journal_ring_bytes` 那条环末尾的下一个 16 KiB 槽（D3（空间分配） 已定项 10 ④「单元区起始槽号……第一版 = journal 环末尾的下一个槽」）：
+/// 用例这一侧照格式常量自己算，不调 `journal::slot_after_the_journal_ring`。
+fn slot_after_a_journal_ring_of(journal_ring_bytes: u64) -> SlotNumber {
+    SlotNumber(JOURNAL_RING_START_SLOT + journal_ring_bytes.div_ceil(SLOT_BYTES))
+}
+
+/// 环 1 GiB（≤ 4 GiB ÷ 4，环长上界那一关放行）：环从 16 MiB 盖到 1040 MiB，越过默认环的单元区起点 784 MiB（槽 50176）。
+/// 单元区起点随环长走（实审 A3b，C475（非默认环长下单元区起点取编译期常量）），mkfs 做成，起点是环末尾的下一个槽 66560（= 1040 × 64，
+/// 落在聚簇段边界上）：实例表单元第 0 片写在槽 66560、树表第 0 版在 66562，两块盘各一份；784 MiB 那处在环里，mkfs 清环时连那里的花样
+/// 一起清掉，实例表不写进环里。
+/// 改之前这一格在任何写之前拒成 `JournalRingPastTheCompiledUnitAreaStartUnsupported`（起点是编译期常量时，越过它的环会盖住实例表）；
+/// A3b 把起点改成按环长现算，那一判随之删掉，「实例表不落在环里」由起点现算那一处保证，这条用例钉它。
 #[test]
-fn a_journal_ring_reaching_past_the_compiled_unit_area_start_is_refused_before_any_write() {
+fn a_journal_ring_reaching_past_784_mebibytes_is_made_with_the_instance_table_at_the_slot_after_the_ring_instead_of_inside_it(
+) {
     let ring_bytes = 1 << 30;
     let observation = make_filesystem_on_patterned_devices(
         &parameters_with(SystemImmutableSizes {
@@ -155,27 +174,61 @@ fn a_journal_ring_reaching_past_the_compiled_unit_area_start_is_refused_before_a
         }),
         DEVICE_BYTES,
     );
-    assert!(
-        matches!(
-            observation.result,
-            Err(MakeFilesystemError::JournalRingPastTheCompiledUnitAreaStartUnsupported {
-                journal_ring_end_in_bytes,
-                unit_area_start_in_bytes,
-            }) if journal_ring_end_in_bytes == JOURNAL_RING_START_SLOT * SLOT_BYTES + ring_bytes
-                && unit_area_start_in_bytes == UNIT_AREA_START_SLOT * SLOT_BYTES
-        ),
-        "1 GiB 的环盖住实例表单元：{:?}",
-        observation.result.as_ref().err()
+    let made = observation
+        .result
+        .as_ref()
+        .unwrap_or_else(|error| panic!("1 GiB 的环做得成：{error:?}"));
+    let slot_after_the_ring = slot_after_a_journal_ring_of(ring_bytes);
+    assert_eq!(
+        slot_after_the_ring,
+        SlotNumber(66560),
+        "16 MiB + 1 GiB = 1040 MiB，槽 66560"
     );
-    assert_refused_before_any_write(&observation, "1 GiB 的环");
+    assert_eq!(
+        made.unit_area_start.slot(),
+        slot_after_the_ring,
+        "单元区起点是环末尾的下一个槽"
+    );
+    assert_eq!(
+        (
+            made.instance_table_placement().slot,
+            made.tree_table_genesis_placement().slot
+        ),
+        (SlotNumber(66560), SlotNumber(66562)),
+        "实例表第 0 片在起点、树表第 0 版在起点加 2"
+    );
+    for (device_index, image) in observation.images_after.iter().enumerate() {
+        assert_eq!(
+            image.read(
+                slot_after_the_ring.to_device_offset(),
+                made.instance_table_unit.len()
+            ),
+            made.instance_table_unit,
+            "盘 {device_index}：实例表单元写在环末尾的下一个槽"
+        );
+        assert_eq!(
+            image.read(
+                DeviceOffsetInBytes(UNIT_AREA_START_SLOT * SLOT_BYTES),
+                PATTERN_BYTES
+            ),
+            vec![0; PATTERN_BYTES],
+            "盘 {device_index}：784 MiB 那处在环里，mkfs 清环清掉了花样，没有写实例表"
+        );
+    }
 }
 
-/// 边界：环比默认值多一条记录（4096 字节，不是槽宽的整数倍）也越过单元区起点；恰好默认 768 MiB 时环末端正好是单元区起点，放行。
+/// 边界：环比默认值多一条记录（4096 字节，不是槽宽的整数倍），末尾落进下一个槽，环末尾的下一个槽是 50177，不在 64 槽聚簇段边界上：
+/// mkfs 在任何写之前拒成 `UnitAreaStartOffTheClusterSegmentBoundaryUnsupported`（这样的单元区怎么分段条款没写，实审 A2c、A3b）。
+/// 恰好默认 768 MiB 时下一个槽是 50176（= 784 × 64），与格式常量 `UNIT_AREA_START_SLOT` 同一个数，做成。
+/// 改之前这一格按「环末端越过编译期起点」拒（`JournalRingPastTheCompiledUnitAreaStartUnsupported`，随起点现算删掉）；
+/// 默认环再长一条记录现在由段边界那一判挡住。
 #[test]
-fn a_journal_ring_one_record_longer_than_the_default_is_refused_and_the_default_ring_is_not() {
+fn a_journal_ring_one_record_longer_than_the_default_ends_off_the_cluster_segment_boundary_and_is_refused_and_the_default_ring_is_not(
+) {
+    let one_record_longer_bytes = JOURNAL_RING_DEFAULT_BYTES + JOURNAL_RECORD_BYTES;
     let one_record_longer = make_filesystem_on_patterned_devices(
         &parameters_with(SystemImmutableSizes {
-            journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES + JOURNAL_RECORD_BYTES,
+            journal_ring_bytes: one_record_longer_bytes,
             ..default_geometry()
         }),
         DEVICE_BYTES,
@@ -183,7 +236,13 @@ fn a_journal_ring_one_record_longer_than_the_default_is_refused_and_the_default_
     assert!(
         matches!(
             one_record_longer.result,
-            Err(MakeFilesystemError::JournalRingPastTheCompiledUnitAreaStartUnsupported { .. })
+            Err(MakeFilesystemError::UnitAreaStartOffTheClusterSegmentBoundaryUnsupported(
+                UnitAreaStartOffTheClusterSegmentBoundaryUnsupported {
+                    journal_ring_bytes,
+                    slot_after_the_journal_ring,
+                }
+            )) if journal_ring_bytes == one_record_longer_bytes
+                && slot_after_the_journal_ring == SlotNumber(UNIT_AREA_START_SLOT + 1)
         ),
         "默认环长加一条记录：{:?}",
         one_record_longer.result.as_ref().err()
@@ -191,16 +250,24 @@ fn a_journal_ring_one_record_longer_than_the_default_is_refused_and_the_default_
     assert_refused_before_any_write(&one_record_longer, "默认环长加一条记录");
     let default_ring =
         make_filesystem_on_patterned_devices(&parameters_with(default_geometry()), DEVICE_BYTES);
-    assert!(
-        default_ring.result.is_ok(),
-        "默认 768 MiB 的环末端正好是单元区起点，不重叠：{:?}",
-        default_ring.result.as_ref().err()
+    let made = default_ring
+        .result
+        .as_ref()
+        .unwrap_or_else(|error| panic!("默认 768 MiB 的环做得成：{error:?}"));
+    assert_eq!(
+        made.unit_area_start.slot(),
+        SlotNumber(UNIT_AREA_START_SLOT),
+        "默认环末尾的下一个槽就是格式常量那个起点 50176"
     );
 }
 
-/// 环短于一条记录：`journal::record_offset` 按环槽数取模，环槽数是 0。mkfs 在任何写之前拒掉；恰好一条记录那么长放行。
+/// 环短于一条记录：`journal::record_offset` 按环槽数取模，环槽数是 0。mkfs 在任何写之前拒成 `JournalRingShorterThanOneRecord`。
+/// 恰好一条记录长的环过了这一判，由紧跟着的在飞上限那一判（1 ÷ 3 = 0 条，代码审阅第 38 条）拒成
+/// `JournalRingHoldsFewerRecordsThanTheSafetyFactor`，同样在任何写之前。
+/// 改之前这一格钉「一条记录长的环放行」：第 38 条那一判加上之后它就不成立（主工作区上这条用例本来就红，与 A3b 无关）。
 #[test]
-fn a_journal_ring_shorter_than_one_record_is_refused_before_any_write() {
+fn a_journal_ring_shorter_than_one_record_is_refused_before_any_write_and_one_record_long_passes_on_to_the_safety_factor_check(
+) {
     let half_a_record = JOURNAL_RECORD_BYTES / 2;
     let observation = make_filesystem_on_patterned_devices(
         &parameters_with(SystemImmutableSizes {
@@ -229,37 +296,78 @@ fn a_journal_ring_shorter_than_one_record_is_refused_before_any_write() {
         DEVICE_BYTES,
     );
     assert!(
-        one_record.result.is_ok(),
-        "一条记录长的环放行：{:?}",
+        matches!(
+            one_record.result,
+            Err(MakeFilesystemError::JournalRingHoldsFewerRecordsThanTheSafetyFactor {
+                ring_bytes,
+                minimum_ring_bytes,
+            }) if ring_bytes == JOURNAL_RECORD_BYTES
+                && minimum_ring_bytes == JOURNAL_SAFETY_FACTOR * JOURNAL_RECORD_BYTES
+        ),
+        "一条记录长的环过了「短于一条记录」那一判，被在飞上限那一判拒：{:?}",
         one_record.result.as_ref().err()
     );
+    assert_refused_before_any_write(&one_record, "一条记录长的环");
 }
 
-/// 100 MiB 的盘、16 MiB 的环：环长上界放行，而 mkfs 真正写实例表的单元区起点（784 MiB）在盘外。
-/// 按 mkfs 实际写单元的那个起点判越界，在任何写之前拒掉，不在清完根环与 journal 环之后才撞上块设备的越界错。
+/// mkfs 在单元区起点（环末尾的下一个槽）写实例表（两槽）与树表（一槽）：三个单元的末端越过盘尾，在任何写之前拒成 `UnitAreaBeyondDevice`，
+/// 不在清完根环与 journal 环之后才撞上块设备的越界错。环 5 MiB 少一条记录（末尾落在第 320 个槽里，起点向上取整到
+/// 1024 + 320 = 1344 = 21 × 64）：盘宽 1346 槽（环不超过它的四分之一）时实例表放得下、树表那一槽在盘外，拒；
+/// 盘宽 1347 槽，三个单元正好放得下，做成。环末尾不落在槽边界上，按环长向下取整算起点的判法在这一格少算一槽、放它过去。
+/// 100 MiB 的盘、16 MiB 的环：改之前单元区起点是编译期的 784 MiB、在盘外被拒；起点随环长之后是槽 2048（32 MiB），做成。
 #[test]
-fn a_unit_area_starting_past_the_device_end_is_refused_before_any_write() {
-    let device_bytes = 100 * MEBIBYTE;
-    let observation = make_filesystem_on_patterned_devices(
+fn make_filesystem_units_ending_past_the_device_are_refused_before_any_write_and_a_sixteen_mebibyte_ring_on_a_hundred_mebibyte_device_is_made(
+) {
+    let ring_bytes = 5 * MEBIBYTE - JOURNAL_RECORD_BYTES;
+    let parameters = parameters_with(SystemImmutableSizes {
+        journal_ring_bytes: ring_bytes,
+        ..default_geometry()
+    });
+    let unit_area_start = slot_after_a_journal_ring_of(ring_bytes);
+    assert_eq!(
+        unit_area_start,
+        SlotNumber(1344),
+        "16 MiB + 5 MiB − 4 KiB 的末尾在槽 1343 里，下一个槽 1344 = 21 × 64"
+    );
+    let tree_table_outside_device_bytes = (unit_area_start.0 + 2) * SLOT_BYTES;
+    let refused =
+        make_filesystem_on_patterned_devices(&parameters, tree_table_outside_device_bytes);
+    assert!(
+        matches!(
+            refused.result,
+            Err(MakeFilesystemError::UnitAreaBeyondDevice {
+                unit_area_start: refused_unit_area_start,
+                device_bytes: refused_device_bytes,
+            }) if refused_unit_area_start == unit_area_start.0 * SLOT_BYTES
+                && refused_device_bytes == tree_table_outside_device_bytes
+        ),
+        "树表那一槽在盘外：{:?}",
+        refused.result.as_ref().err()
+    );
+    assert_refused_before_any_write(&refused, "盘宽 1346 槽");
+    let three_units_just_fit =
+        make_filesystem_on_patterned_devices(&parameters, (unit_area_start.0 + 3) * SLOT_BYTES);
+    assert!(
+        three_units_just_fit.result.is_ok(),
+        "盘宽 1347 槽，三个单元正好放得下：{:?}",
+        three_units_just_fit.result.as_ref().err()
+    );
+    let hundred_mebibyte_device = make_filesystem_on_patterned_devices(
         &parameters_with(SystemImmutableSizes {
             journal_ring_bytes: 16 * MEBIBYTE,
             ..default_geometry()
         }),
-        device_bytes,
+        100 * MEBIBYTE,
     );
-    assert!(
-        matches!(
-            observation.result,
-            Err(MakeFilesystemError::UnitAreaBeyondDevice {
-                unit_area_start,
-                device_bytes: refused_device_bytes,
-            }) if unit_area_start == UNIT_AREA_START_SLOT * SLOT_BYTES
-                && refused_device_bytes == device_bytes
-        ),
-        "单元区起点在盘外：{:?}",
-        observation.result.as_ref().err()
+    let made = hundred_mebibyte_device
+        .result
+        .as_ref()
+        .unwrap_or_else(|error| panic!("100 MiB 的盘、16 MiB 的环做得成：{error:?}"));
+    assert_eq!(
+        made.unit_area_start.slot(),
+        SlotNumber(2048),
+        "16 MiB + 16 MiB = 32 MiB，槽 2048"
     );
-    assert_refused_before_any_write(&observation, "100 MiB 的盘");
 }
 
 // ── 第 16 条：固定结构几何互不重叠 ──

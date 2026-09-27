@@ -30,7 +30,6 @@ use singlefs_core::allocator::Placement;
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::bytes::ByteReader;
 use singlefs_core::checksum::crc32_castagnoli;
-use singlefs_core::code_two_tree::CodeTwoTreeRefusal;
 use singlefs_core::code_two_tree::{CodeTwoTreeNodeContents, CodeTwoTreeNodeOrigin};
 use singlefs_core::mount::{mount_writable, MountError};
 use singlefs_core::mounted_read::mount_read_only;
@@ -39,7 +38,7 @@ use singlefs_core::recovery::{
     rebuild_version, recover, JournalPolicy, RebuiltVersion, RecoveryFailure, RecoveryOutcome,
 };
 use singlefs_core::transaction::{
-    multi_level_tree_of_role, MultiLevelCodeTwoTree, PoolVersion, PublishError, TransactionOutput,
+    multi_level_tree_of_role, MultiLevelCodeTwoTree, PoolVersion, TransactionOutput,
     TransactionUnit, FIRST_INODE_NUMBER,
 };
 use singlefs_core::unit::{build_index_node, parse_index_node};
@@ -378,15 +377,17 @@ fn pool_with_multi_level_trees_mounts_writable_and_the_row_and_warm_up_publishes
     assert_eq!(violations(&image), Vec::new(), "池级 checker 全绿");
 }
 
-/// 从盘上重建的上一版里，中央映射树根的一条分隔 key 被抬到它那个孩子的最小 key 之上（重建只核拼得成树的那几样，不核分隔 key，
-/// `code_two_tree::CodeTwoTreeHeaderJudgement::OnlyWhatTheShapeNeeds`）：下一次发布按分隔 key 删分配记录树那把旧 key，
-/// 走到了左边那片叶、删不掉。这一格走得到（坏盘），条款只说分隔 key 该是什么样、没说遇到不是的怎么办 ⇒ 规划那一步交回
-/// `CodeTwoTreeRefusal::PreviousShapeRoutesAKeyAwayFromTheLeafHoldingIt`，可写挂载在取号之前就拒（取号之前在分配器拷贝上预演写行那一串，
-/// `mount` 的 `dry_run_of_the_publishes_after_acquisition`）：两盘系统配置槽逐字节不变、根环没有新根、录制流一步都没多。
-/// 判别力：规划删不掉 key 时照常往下走（`delete_at_the_root` 里那一判交回成立），挂载照常取号写行——`crates/mutations.tsv` 里
-/// 以「树分裂 规划删不掉上一版的 key 也照常往下走」开头的那一行。
+/// 盘上中央映射树根的一条分隔 key 被抬到它那个孩子的最小 key 之上（藏住了那片叶的最小 key：按分隔 key 走会走到左边那片叶）。
+/// 可写挂载从盘上重建这一版时照冷走读判全（代码审阅第 24 / 33 条，用户定案「可写挂载判全树头与 key 次序，坏了报错拒挂载，不多读盘」，
+/// `code_two_tree::CodeTwoTreeHeaderJudgement::EveryHeaderAgainstItsReference`）：分隔 key 的两条不等式在重建那一步就判，
+/// 挂载在读盘阶段报 `Recovery(InvariantViolated { invariant: "I-1.1", detail: "分隔 key 大于孩子头里的最小 key" })`，
+/// 还没取号、没预演写行：两盘系统配置槽逐字节不变、根环没有新根、录制流一步都没多。
+/// 规划那一步自己的拒绝（上一版的形状把一把 key 引到别的叶、删不掉，`CodeTwoTreeRefusal::PreviousShapeRoutesAKeyAwayFromTheLeafHoldingIt`）
+/// 从盘上因此走不到了，由 `singlefs-core` 的单测 `code_two_tree::tests::a_previous_shape_whose_separator_hides_a_key_is_refused_by_the_planner` 钉。
+/// 判别力：重建读中央映射树时不判节点头（`recovery.rs` 的 `rebuild_version` 那一处改回 `OnlyWhatTheShapeNeeds`），挂载改由规划那一步拒、
+/// 报的成员不再是 I-1.1——`crates/mutations.tsv` 里以「实审 A3d：重建读中央映射树不判节点头（分隔 key」开头的那一行。
 #[test]
-fn rebuilt_central_mapping_root_whose_separator_hides_the_key_is_refused_before_the_instance_generation_is_acquired(
+fn a_central_mapping_root_whose_separator_hides_a_key_is_refused_by_the_rebuild_before_the_instance_generation_is_acquired(
 ) {
     let pool = TreeSplitPool::with_the_first_file_version_under(capacities(
         common_tree_split::ACCOUNTING_OF_THE_NODE_FORMAT,
@@ -477,15 +478,12 @@ fn rebuilt_central_mapping_root_whose_separator_hides_the_key_is_refused_before_
     assert!(
         matches!(
             refused,
-            Err(MountError::RowPublishAdmissionRefusedBeforeAcquisition {
-                cause: PublishError::MultiLevelCodeTwoTreeRefused {
-                    tree: MultiLevelCodeTwoTree::CentralMapping,
-                    refusal: CodeTwoTreeRefusal::PreviousShapeRoutesAKeyAwayFromTheLeafHoldingIt,
-                },
-                ..
-            })
+            Err(MountError::Recovery(RecoveryFailure::InvariantViolated {
+                invariant: "I-1.1",
+                detail: "分隔 key 大于孩子头里的最小 key",
+            }))
         ),
-        "取号之前就拒：{:?}",
+        "重建判全那一道在取号之前就拒：{:?}",
         refused.err()
     );
     let after_image = MemoryPool {

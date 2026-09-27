@@ -10,13 +10,13 @@ use singlefs_format::{
     DATA_UNIT_BYTES, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES, JOURNAL_RECORD_BYTES,
     JOURNAL_RING_START_SLOT, JOURNAL_SAFETY_FACTOR, LOC_ENTRY, NODE_BYTES, ROOT_RING_BASE_SLOT,
     ROOT_RING_CHUNK_BYTES, ROOT_RING_PRIME_STEP, ROOT_RING_REGIONS, SLOT_BYTES,
-    SYSTEM_CONFIGURATION_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
-    WIDE_CHECKSUM_BYTES,
+    SYSTEM_CONFIGURATION_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES, WIDE_CHECKSUM_BYTES,
 };
 
-use crate::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
+use crate::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
 use crate::bytes::{ByteReader, ByteWriter};
 use crate::checksum::{wide_checksum_field_holds, wide_checksum_with_field_zeroed};
+use crate::journal::slot_after_the_journal_ring;
 use crate::root_ring::{RootRingSlotsPerRegion, RootRingSlotsPerRegionOutOfRange};
 
 pub const SYSTEM_CONFIGURATION_MAGIC: [u8; 4] = *b"SFSB";
@@ -45,6 +45,9 @@ const FSID_OFFSET: usize = 4 + 2 + 96;
 /// 一个偏移只有这一处定义。
 const ROOT_RING_SLOTS_PER_REGION_OFFSET: u64 = 362;
 const REGION_DEVICES_OFFSET: u64 = 379;
+/// 几何段里「单元区起始槽号」那 8 字节（字段表 `layout/01-first-txn.md` 一；D3（空间分配） 已定项 10 ④）。
+/// 写侧 [`SystemConfiguration::to_slot`] 写它之前断言位置、读侧 [`unit_area_start_slot_recorded_in_the_slot`] 按它切。
+const UNIT_AREA_START_SLOT_OFFSET: u64 = 417;
 const TAIL_OFFSET: u64 = 469;
 /// 回退下界 F 那一行的宽：checkpoint_txg 小端 8 字节（D22（单元原子性怎么合成） 已定项 9 的字段表）。
 const ROLLBACK_FLOOR_FIELD_BYTES: u64 = 8;
@@ -72,6 +75,32 @@ const COMPACTION_WATERMARK_BUILT_IN_DEFAULT: u64 = 0;
 #[must_use]
 pub fn journal_in_flight_record_limit(journal_ring_bytes: u64) -> u64 {
     journal_ring_bytes / JOURNAL_RECORD_BYTES / JOURNAL_SAFETY_FACTOR
+}
+
+/// 这个环长下的在飞记录数上限（[`journal_in_flight_record_limit`]）装不装得进系统配置里它那 4 字节
+/// （`layout/01-first-txn.md` 一「journal 在飞记录数上限 | 4」）。环长 ≥ 2³² × 12288 字节时装不下：mkfs 在任何写之前拒
+/// （`make_filesystem` 的 `JournalInFlightRecordLimitWiderThanItsFourByteField`），读者择系统配置时拒
+/// （`recovery::choose_system_configuration` 报 `JournalRingBytesOutsideTheSupportedRange`）——[`SystemConfiguration::to_slot`]
+/// 写这 4 字节那一句的 expect 靠的就是这两道。
+#[must_use]
+pub fn journal_in_flight_record_limit_fits_its_four_byte_field(journal_ring_bytes: u64) -> bool {
+    u32::try_from(journal_in_flight_record_limit(journal_ring_bytes)).is_ok()
+}
+
+/// 一槽系统配置里记着的单元区起始槽号（偏移 417 的 8 字节，小端）。只切字节、不判值：读者择系统配置时拿它与环长现算的起点比
+/// （`recovery` 的 `system_configuration_values_this_reader_accepts`）。
+///
+/// # Panics
+/// 槽短于 4096 字节：调用方先过了 [`SystemConfiguration::parse_slot`]（它判过槽宽）才调这里。
+#[must_use]
+pub fn unit_area_start_slot_recorded_in_the_slot(slot: &[u8]) -> SlotNumber {
+    SlotNumber(
+        ByteReader::at(
+            slot,
+            usize::try_from(UNIT_AREA_START_SLOT_OFFSET).expect("字段表里的偏移装得进 usize"),
+        )
+        .get_u64(),
+    )
 }
 
 /// 系统配置槽里一个字段属于哪一档可改性（D22（单元原子性怎么合成） 已定项 26）。
@@ -378,7 +407,9 @@ impl SystemConfiguration {
             writer.put_u32(u32::try_from(JOURNAL_RECORD_BYTES).expect("记录尺寸"));
             let in_flight_limit =
                 journal_in_flight_record_limit(self.immutable.sizes.journal_ring_bytes);
-            writer.put_u32(u32::try_from(in_flight_limit).expect("在飞上限 4 字节"));
+            writer.put_u32(u32::try_from(in_flight_limit).expect(
+                "在飞上限装得进 4 字节：mkfs 与读者择系统配置都按 journal_in_flight_record_limit_fits_its_four_byte_field 拒过装不下的环长",
+            ));
             writer.put_u64(in_flight_limit * JOURNAL_RECORD_BYTES);
             writer.put_u32(u32::try_from(JOURNAL_SAFETY_FACTOR).expect("安全系数"));
             writer.put_u8(u8::try_from(ROOT_RING_REGIONS).expect("R"));
@@ -399,7 +430,10 @@ impl SystemConfiguration {
             writer.put_u8(MAXIMUM_STRIPE_WIDTH);
             writer.put_u8(GROUP_SIZE);
             writer.skip(24); // 映射来源：第一版全 0
-            writer.put_u64(UNIT_AREA_START_SLOT);
+            writer.assert_position(UNIT_AREA_START_SLOT_OFFSET, "单元区起始槽号");
+            // 第一版 = journal 环末尾的下一个槽（D3（空间分配） 已定项 10 ④），随环长走（D23（journal 的角色与格式） 已定项 19 ③）：
+            // 由环长算只有 `journal::slot_after_the_journal_ring` 一处，mkfs 写实例表的落点、挂载建空闲图的起点都从它来。
+            writer.put_u64(slot_after_the_journal_ring(self.immutable.sizes.journal_ring_bytes).0);
             writer.put_u32(self.immutable.sizes.minimum_input_output_bytes);
             writer.put_u32(self.immutable.sizes.fixed_structure_slot_spacing);
         });
