@@ -11,15 +11,20 @@
 
 | 位号 | 类别 | 名称 | 引入版本 | 引入 commit | 状态 | 语义一句话 |
 |---|---|---|---|---|---|---|
-| 0 | incompat | INCOMPAT_FIRST_SSD_LINE_BIT | 格式版本 1 | 53c9f38 | 在用 | 第一条纯 SSD 布局线；mkfs 起就置上，不认识这一位的读者挂不上（D12（目标介质） 已定项 1「每套布局一个 incompat 位」） |
+| 0 | incompat | INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT | 格式版本 1 | 53c9f38 | 退役 | 第一条纯 SSD 布局线；mkfs 起就置上，不认识这一位的读者挂不上（D12（目标介质） 已定项 1「每套布局一个 incompat 位」） |
+| 1 | incompat | INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT | 格式版本 1 | 待提交 | 在用 | 第一条纯 SSD 布局线（系统配置带回退下界 F、根记录带卸载记号、没有回退见证与回退行）；mkfs 起就置上，不认识这一位的读者挂不上；位 0 退役之后读者见到位 0 一律拒挂 |
 
-**compat_ro 与 compat 两张位图一位都没分，incompat 除位 0 之外也一位都没分**（出处：D15（格式冻结政策） 已定项 4 登记表，那三行写的是「未分配」）。
+**compat_ro 与 compat 两张位图一位都没分，incompat 分了位 0（退役）与位 1，别的位一位都没分**（出处：D15（格式冻结政策） 已定项 4 登记表）。
 
-**代码侧引用了哪几位**：`crates/singlefs-core/src/system_configuration.rs` 的 `INCOMPAT_FIRST_SSD_LINE_BIT = 0x01`，位 0；同一份文件的 `SUPPORTED_INCOMPAT_BITS` 由它合成，不是位掩码字面量，门禁 93 号解不出位号，把它列进成功那句的「没判位号的」名单。`crates/singlefs-checker/src/lib.rs` 判 incompat 时写的是裸字面量 `0x01`，不带 feature bit 常量名，93 号的射程罩不到——这一格靠 review。
+**代码侧引用了哪几位**：`crates/singlefs-core/src/system_configuration.rs` 的 `INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT = 0x02`，位 1；同一份文件的 `INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT = 0x01` 是退役的位 0，只在测试与注释里用，留着让「用过的位不回收」写进代码；`SUPPORTED_INCOMPAT_BITS` 由位 1 合成，不是位掩码字面量，门禁 93 号解不出位号，把它列进成功那句的「没判位号的」名单。`crates/singlefs-checker/src/lib.rs` 判 incompat 用它自己的具名常量 `INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT = 0x02`（第 219 行）。
 
 **位图的字节序**：位图小端，位 n 住第 n div 8 个字节的第 n mod 8 低位（D22（单元原子性怎么合成） 已定项 13）。
 
 ## 历史版本
+
+### 2026-09-26（实一）
+
+- 位 1 的名称列填上代码里的常量名；位 0 的名称列改成退役常量名（改前 `INCOMPAT_FIRST_SSD_LINE_BIT`，实一已从代码删掉）；「代码侧引用了哪几位」改成现状：checker 不再写裸字面量 `0x01`，改用具名常量。
 
 ### 2026-09-21
 
