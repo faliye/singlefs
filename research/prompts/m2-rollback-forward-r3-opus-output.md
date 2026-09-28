@@ -1,6 +1,6 @@
 # m2-rollback-forward-r3 云端攻方腿（Opus）报告
 
-轮名 m2-rollback-forward-r3（设计轮第三轮，最后一轮）；攻击面：正文第一节 K1–K7，照第四节分工表「云端攻方」那一行——式子本身、K3 反过来多保留的那一边、K4 三条臂各自新开的失败面、K6 各改法丢掉的判别力、K7 绕过去的路；第二轮攻过的挂载时那一形、按字面求差、B1 各盘取小不再攻。写于 2026-09-25 UTC 16:0x–17:1x（JST 2026-09-26 01:0x–02:1x）。冻结副本 `/tmp/claude-1000/m2-rollback-forward-r3/tree/` 开工与交回前各按 `research/prompts/m2-rollback-forward-r3-snapshot/crates-sha256.txt` 核一次，`sha256sum -c` 全 OK；它与第二轮开工快照的清单逐行相同（`crates/` 两轮之间没改）。
+轮名 m2-rollback-forward-r3（设计轮第三轮，最后一轮）；攻击面：正文第一节 K1–K7，照第四节分工表「云端攻方」那一行——式子本身、K3 反过来多保留的那一边、K4 三条臂各自新开的失败面、K6 各改法丢掉的判别力、K7 绕过去的路；第二轮攻过的挂载时那一形、按字面求差、B1 各盘取小不再攻。写于 2026-09-26。冻结副本 `/tmp/claude-1000/m2-rollback-forward-r3/tree/` 开工与交回前各按 `research/prompts/m2-rollback-forward-r3-snapshot/crates-sha256.txt` 核一次，`sha256sum -c` 全 OK；它与第二轮开工快照的清单逐行相同（`crates/` 两轮之间没改）。
 
 ## 〇、复跑命令与文件
 

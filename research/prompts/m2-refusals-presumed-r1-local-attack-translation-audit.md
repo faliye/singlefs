@@ -1,4 +1,4 @@
-# 转述核对表：m2-refusals-presumed-r1-local-attack（2026-09-22 UTC / 2026-09-23 JST）
+# 转述核对表：m2-refusals-presumed-r1-local-attack（2026-09-23）
 
 逐条核对 `research/prompts/m2-refusals-presumed-r1-local-attack.md`（R5–R8，20 条 Fact、4 道
 Judgment）里每一句英文转述与中文原文/源码原文。行号现查工作区版本（`git status` 显示这些文件都是
@@ -203,7 +203,7 @@ crates/singlefs-core/src/system_configuration.rs:471:                region_devi
 Fact 4 / Fact 5 / Fact 7 / Fact 8 / Fact 9 / Fact 18 依据：本报告正文（本次派发任务过程中）对
 `crates/singlefs-core/src/transaction.rs`、`crates/singlefs-core/src/mount.rs`、
 `crates/singlefs-core/src/make_filesystem.rs` 三份文件的直接 `grep -n` 与 `Read` 现查，
-行号见上方各 Fact 行的「原文文件:行」列，均为本轮现查所得，不沿用背景材料里 2026-09-22 上午的旧行号。
+行号见上方各 Fact 行的「原文文件:行」列，均为本轮现查所得，不沿用背景材料里 2026-09-22 的旧行号。
 
 ## 历史版本
 

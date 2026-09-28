@@ -1,0 +1,186 @@
+32,34c32,34
+< E7RESULT name=warm_up publishes=2 writes=10 barriers=4 fua=2 new_pool_file_creation_txg=3 last_warm_up_root_txg=2
+< E7RESULT name=before_window_summary side=model operations=37 writes=31 last_five=device0@16781312+4096,device1@16781312+4096,device0@7340032+512,device0@0+4096,device1@0+4096
+< E7RESULT name=segments path=mkfs operations=21 segments=12+1+1+1+4 closed_form=4114 kinds=[unit_write×4,zero_fill×8,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier]
+---
+> E7RESULT name=warm_up publishes=2 writes=10 barriers=10 fua=2 new_pool_file_creation_txg=3 last_warm_up_root_txg=2
+> E7RESULT name=before_window_summary side=model operations=45 writes=31 last_five=device0@16781312+4096,device1@16781312+4096,device0@7340032+512,device0@0+4096,device1@0+4096
+> E7RESULT name=segments path=mkfs operations=23 segments=12+1+1+1+4 closed_form=4114 kinds=[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]
+36,38c36,56
+< E7RESULT name=segments path=warm_up operations=14 segments=2+1+2+2+1+2 closed_form=15 kinds=[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]
+< E7RESULT name=segments path=transaction operations=31 segments=24+2+1+2 closed_form=16777223 kinds=[unit_write×24,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]
+< E7RESULT name=segments path=post_mkfs_stream operations=47 segments=2+2+1+2+2+1+26+2+1+2 closed_form=67108885 kinds=[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]
+---
+> E7RESULT name=segments path=warm_up operations=20 segments=2+1+2+2+1+2 closed_form=15 kinds=[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]
+> E7RESULT name=segments path=transaction operations=35 segments=24+2+1+2 closed_form=16777223 kinds=[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]
+> E7RESULT name=segments path=post_mkfs_stream operations=57 segments=2+2+1+2+2+1+2+24+2+1+2 closed_form=16777240 kinds=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]
+> E7RESULT name=segments_three_state path=mkfs writes=19 in_place_overwrites=0 in_place_per_segment=0+0+0+0+0 in_place_kinds=none closed_form_two_state=4114 closed_form_three_state=4114
+> E7RESULT name=segments_three_state path=instance_acquisition writes=2 in_place_overwrites=2 in_place_per_segment=2 in_place_kinds=[system_configuration_slot×2] closed_form_two_state=4 closed_form_three_state=9
+> E7RESULT name=segments_three_state path=warm_up writes=10 in_place_overwrites=4 in_place_per_segment=0+0+2+0+0+2 in_place_kinds=[system_configuration_slot×4] closed_form_two_state=15 closed_form_three_state=25
+> E7RESULT name=segments_three_state path=transaction writes=29 in_place_overwrites=2 in_place_per_segment=0+0+0+2 in_place_kinds=[system_configuration_slot×2] closed_form_two_state=16777223 closed_form_three_state=16777228
+> E7RESULT name=segments_three_state path=post_mkfs_stream writes=41 in_place_overwrites=8 in_place_per_segment=2+0+0+2+0+0+2+0+0+0+2 in_place_kinds=[system_configuration_slot×8] closed_form_two_state=16777240 closed_form_three_state=16777260
+> E7RESULT name=segments_sensitivity point=G10a swallowed_device=1 path=transaction operations=34 segments=24+5 closed_form=16777247 closed_form_three_state=16777287 in_place_per_segment=0+2 kinds=[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,system_configuration_slot×2,barrier×3]
+> E7RESULT name=segments_sensitivity point=G10a swallowed_device=1 path=post_mkfs_stream operations=56 segments=2+2+1+2+2+1+2+24+5 closed_form=16777264 closed_form_three_state=16777319 in_place_per_segment=2+0+0+2+0+0+2+0+2 kinds=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,system_configuration_slot×2,barrier×3]
+> E7RESULT name=segments_sensitivity point=G10b swallowed_device=0 path=transaction operations=34 segments=24+3+2 closed_form=16777226 closed_form_three_state=16777231 in_place_per_segment=0+0+2 kinds=[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,barrier]|[system_configuration_slot×2,barrier×2]
+> E7RESULT name=segments_sensitivity point=G10b swallowed_device=0 path=post_mkfs_stream operations=56 segments=2+2+1+2+2+1+2+24+3+2 closed_form=16777243 closed_form_three_state=16777263 in_place_per_segment=2+0+0+2+0+0+2+0+0+2 kinds=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,barrier]|[system_configuration_slot×2,barrier×2]
+> E7RESULT name=segments_sensitivity point=G11 trailing_barrier=off path=mkfs operations=23 segments=12+1+1+1+4 closed_form=4114 closed_form_three_state=4114 in_place_per_segment=0+0+0+0+0 kinds=[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]
+> E7RESULT name=segments_sensitivity point=G11 trailing_barrier=off path=instance_acquisition operations=2 segments=2 closed_form=4 closed_form_three_state=9 in_place_per_segment=2 kinds=[system_configuration_slot×2]
+> E7RESULT name=segments_sensitivity point=G11 trailing_barrier=off path=warm_up operations=18 segments=2+1+2+2+1+2 closed_form=15 closed_form_three_state=25 in_place_per_segment=0+0+2+0+0+2 kinds=[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]
+> E7RESULT name=segments_sensitivity point=G11 trailing_barrier=off path=transaction operations=33 segments=24+2+1+2 closed_form=16777223 closed_form_three_state=16777228 in_place_per_segment=0+0+0+2 kinds=[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]
+> E7RESULT name=segments_sensitivity point=G11 trailing_barrier=off path=post_mkfs_stream operations=53 segments=2+2+1+2+2+1+26+2+1+2 closed_form=67108885 closed_form_three_state=150994980 in_place_per_segment=2+0+0+2+0+0+2+0+0+2 kinds=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]
+> E7RESULT name=segments_sensitivity point=G12a trailing_barrier=off swallowed_device=1 path=transaction operations=32 segments=24+5 closed_form=16777247 closed_form_three_state=16777287 in_place_per_segment=0+2 kinds=[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,system_configuration_slot×2,barrier]
+> E7RESULT name=segments_sensitivity point=G12a trailing_barrier=off swallowed_device=1 path=post_mkfs_stream operations=52 segments=2+2+1+2+2+1+26+5 closed_form=67108909 closed_form_three_state=150995039 in_place_per_segment=2+0+0+2+0+0+2+2 kinds=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier×2]|[journal_record×2,root_record_fua,system_configuration_slot×2,barrier]
+> E7RESULT name=segments_sensitivity point=G12b trailing_barrier=off swallowed_device=0 path=transaction operations=32 segments=24+3+2 closed_form=16777226 closed_form_three_state=16777231 in_place_per_segment=0+0+2 kinds=[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,barrier]|[system_configuration_slot×2]
+> E7RESULT name=segments_sensitivity point=G12b trailing_barrier=off swallowed_device=0 path=post_mkfs_stream operations=52 segments=2+2+1+2+2+1+26+3+2 closed_form=67108888 closed_form_three_state=150994983 in_place_per_segment=2+0+0+2+0+0+2+0+2 kinds=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier×2]|[journal_record×2,root_record_fua,barrier]|[system_configuration_slot×2]
+41c59
+< E7RESULT name=write_list writes=29 barriers=2 fua=1 named=12 units=t1@50180x32768,t2@50240x16384,t3@50242x32768,t4@50244x16384,t5@50245x16384,t6@50246x16384,t7@50247x16384,t8@50248x16384,t9@50249x16384,t10@50250x16384,t11@50251x16384,t12@50252x16384
+---
+> E7RESULT name=write_list writes=29 barriers=6 fua=1 named=12 units=t1@50180x32768,t2@50240x16384,t3@50242x32768,t4@50244x16384,t5@50245x16384,t6@50246x16384,t7@50247x16384,t8@50248x16384,t9@50249x16384,t10@50250x16384,t11@50251x16384,t12@50252x16384
+62,109c80,127
+< E7RESULT name=header311_write_digest index=13 kind=root_record_fua device=0 offset=1048576 length=512 sha256=ffa877f6a816b74c722d5dc7d937b06330cee7a5e306b984c4ca3c8622454441
+< E7RESULT name=header311_write_digest index=14 kind=root_record_fua device=1 offset=4194304 length=512 sha256=ffa877f6a816b74c722d5dc7d937b06330cee7a5e306b984c4ca3c8622454441
+< E7RESULT name=header311_write_digest index=15 kind=root_record_fua device=0 offset=7340032 length=512 sha256=ffa877f6a816b74c722d5dc7d937b06330cee7a5e306b984c4ca3c8622454441
+< E7RESULT name=header311_write_digest index=16 kind=system_configuration_slot device=0 offset=0 length=4096 sha256=8b3017f34352c99f5091f1d023d0fd05963b34912caed3403ac695161b0db140
+< E7RESULT name=header311_write_digest index=17 kind=system_configuration_slot device=0 offset=4096 length=4096 sha256=8b3017f34352c99f5091f1d023d0fd05963b34912caed3403ac695161b0db140
+< E7RESULT name=header311_write_digest index=18 kind=system_configuration_slot device=1 offset=0 length=4096 sha256=11d1f5ce683a1b7f19596b2000aad1871f1b4af910b8ff2549e7894f209f4fd6
+< E7RESULT name=header311_write_digest index=19 kind=system_configuration_slot device=1 offset=4096 length=4096 sha256=11d1f5ce683a1b7f19596b2000aad1871f1b4af910b8ff2549e7894f209f4fd6
+< E7RESULT name=header311_write_digest index=21 kind=system_configuration_slot device=0 offset=0 length=4096 sha256=8926ff75622db47de4b2f7ca9345b78ab7f121590cda6efc439050d6e3b75e61
+< E7RESULT name=header311_write_digest index=22 kind=system_configuration_slot device=1 offset=0 length=4096 sha256=d1dca9df289c30163010cc632047cece7041591f6d274471e8522201eb192215
+< E7RESULT name=header311_write_digest index=24 kind=journal_record device=0 offset=16777216 length=4096 sha256=e18ff0b43007cea2051fe1af6785dec1e79fe195a770c418339a51096d6f2102
+< E7RESULT name=header311_write_digest index=25 kind=journal_record device=1 offset=16777216 length=4096 sha256=e18ff0b43007cea2051fe1af6785dec1e79fe195a770c418339a51096d6f2102
+< E7RESULT name=header311_write_digest index=27 kind=root_record_fua device=1 offset=4194304 length=512 sha256=fdcfcdcd102e9ad41ca7c9fd6d61cc93aa3cbbe9111e1e673c61abc2273bf980
+< E7RESULT name=header311_write_digest index=28 kind=system_configuration_slot device=0 offset=4096 length=4096 sha256=de6bb6dbd38f6143d26565f884257ed0cf5ec4db7ec10a21fb72f8ef9184d9b1
+< E7RESULT name=header311_write_digest index=29 kind=system_configuration_slot device=1 offset=4096 length=4096 sha256=f416026b60ac505802f995c1322d976fac4748635aec14c3165558f2602f3206
+< E7RESULT name=header311_write_digest index=31 kind=journal_record device=0 offset=16781312 length=4096 sha256=ba31537f0529bb0c6e04e914eb81aa013371f5d67a459150bd434a0569dea86e
+< E7RESULT name=header311_write_digest index=32 kind=journal_record device=1 offset=16781312 length=4096 sha256=ba31537f0529bb0c6e04e914eb81aa013371f5d67a459150bd434a0569dea86e
+< E7RESULT name=header311_write_digest index=34 kind=root_record_fua device=0 offset=7340032 length=512 sha256=1f7859f049061be6eb147a9fa5dbaa3743f8413ca846b5dcb130cf624ee0b88b
+< E7RESULT name=header311_write_digest index=35 kind=system_configuration_slot device=0 offset=0 length=4096 sha256=3b7ffd1280944043ae88dcaf3cfe41eef0065b76960b0fedaba6bf245e7eb540
+< E7RESULT name=header311_write_digest index=36 kind=system_configuration_slot device=1 offset=0 length=4096 sha256=9330048c40490ff4554ab7fb66156866c44cfc58927456ad9079dcf52f53b659
+< E7RESULT name=header311_write_digest index=37 kind=unit_write device=0 offset=822149120 length=32768 sha256=af0d80b54d127f606b7afcaadfe948aaf3ab9ca8d0ec36c89d855e38677ffcd8
+< E7RESULT name=header311_write_digest index=38 kind=unit_write device=1 offset=822149120 length=32768 sha256=af0d80b54d127f606b7afcaadfe948aaf3ab9ca8d0ec36c89d855e38677ffcd8
+< E7RESULT name=header311_write_digest index=39 kind=unit_write device=0 offset=823132160 length=16384 sha256=4a521e69496395791d94f9bebad9c960c0a341ced53041b963b1aab93ba081b6
+< E7RESULT name=header311_write_digest index=40 kind=unit_write device=1 offset=823132160 length=16384 sha256=4a521e69496395791d94f9bebad9c960c0a341ced53041b963b1aab93ba081b6
+< E7RESULT name=header311_write_digest index=41 kind=unit_write device=0 offset=823164928 length=32768 sha256=4aebb3547222c19e4bf96db2a5e9660c7b3646bd434a3a4cbbf419c4832d673d
+< E7RESULT name=header311_write_digest index=42 kind=unit_write device=1 offset=823164928 length=32768 sha256=4aebb3547222c19e4bf96db2a5e9660c7b3646bd434a3a4cbbf419c4832d673d
+< E7RESULT name=header311_write_digest index=43 kind=unit_write device=0 offset=823197696 length=16384 sha256=0134efbeb67748240d82f9f6490ca7a286ac78a226fb9e32dd01de9c771cb914
+< E7RESULT name=header311_write_digest index=44 kind=unit_write device=1 offset=823197696 length=16384 sha256=0134efbeb67748240d82f9f6490ca7a286ac78a226fb9e32dd01de9c771cb914
+< E7RESULT name=header311_write_digest index=45 kind=unit_write device=0 offset=823214080 length=16384 sha256=ef42aeca0fefb6f7bb124d1425e2bf443cadc6d50ddff438c6b8624b0b741aa3
+< E7RESULT name=header311_write_digest index=46 kind=unit_write device=1 offset=823214080 length=16384 sha256=ef42aeca0fefb6f7bb124d1425e2bf443cadc6d50ddff438c6b8624b0b741aa3
+< E7RESULT name=header311_write_digest index=47 kind=unit_write device=0 offset=823230464 length=16384 sha256=8e71193a44f9d116eb60c5af1dfedae2b16865f86eeab3ee007c0552c9856738
+< E7RESULT name=header311_write_digest index=48 kind=unit_write device=1 offset=823230464 length=16384 sha256=8e71193a44f9d116eb60c5af1dfedae2b16865f86eeab3ee007c0552c9856738
+< E7RESULT name=header311_write_digest index=49 kind=unit_write device=0 offset=823246848 length=16384 sha256=45007a9e031a77213f061a13be4b62a861033da6aab2053b4e39f5703684f44e
+< E7RESULT name=header311_write_digest index=50 kind=unit_write device=1 offset=823246848 length=16384 sha256=45007a9e031a77213f061a13be4b62a861033da6aab2053b4e39f5703684f44e
+< E7RESULT name=header311_write_digest index=51 kind=unit_write device=0 offset=823263232 length=16384 sha256=54f457c03fd8b5ac0a795374b4604b8d8653662a2178db3c724b2d0dddf35d40
+< E7RESULT name=header311_write_digest index=52 kind=unit_write device=1 offset=823263232 length=16384 sha256=54f457c03fd8b5ac0a795374b4604b8d8653662a2178db3c724b2d0dddf35d40
+< E7RESULT name=header311_write_digest index=53 kind=unit_write device=0 offset=823279616 length=16384 sha256=553d9e1f74c90b0a107e9aedb550eb7cf73d6979c50ad747ff9255d968462f79
+< E7RESULT name=header311_write_digest index=54 kind=unit_write device=1 offset=823279616 length=16384 sha256=553d9e1f74c90b0a107e9aedb550eb7cf73d6979c50ad747ff9255d968462f79
+< E7RESULT name=header311_write_digest index=55 kind=unit_write device=0 offset=823296000 length=16384 sha256=cd028e589626b737e37624f2fad0198b861198b7b219fd6403d9ad5baf65996c
+< E7RESULT name=header311_write_digest index=56 kind=unit_write device=1 offset=823296000 length=16384 sha256=cd028e589626b737e37624f2fad0198b861198b7b219fd6403d9ad5baf65996c
+< E7RESULT name=header311_write_digest index=57 kind=unit_write device=0 offset=823312384 length=16384 sha256=b6884c0230fb761c32c54e83863fb079196245d1ee93c60611040df3c34ab4f0
+< E7RESULT name=header311_write_digest index=58 kind=unit_write device=1 offset=823312384 length=16384 sha256=b6884c0230fb761c32c54e83863fb079196245d1ee93c60611040df3c34ab4f0
+< E7RESULT name=header311_write_digest index=59 kind=unit_write device=0 offset=823328768 length=16384 sha256=3b6239beab2dcd9bde142c8521fc88b127b781909ee0557a1fb9fa11d2795531
+< E7RESULT name=header311_write_digest index=60 kind=unit_write device=1 offset=823328768 length=16384 sha256=3b6239beab2dcd9bde142c8521fc88b127b781909ee0557a1fb9fa11d2795531
+< E7RESULT name=header311_write_digest index=62 kind=journal_record device=0 offset=16785408 length=4096 sha256=6a51dfab3dd5f55da72a0d5531fe6c34a1661366d954d06fe1c2c035d748f6da
+< E7RESULT name=header311_write_digest index=63 kind=journal_record device=1 offset=16785408 length=4096 sha256=6a51dfab3dd5f55da72a0d5531fe6c34a1661366d954d06fe1c2c035d748f6da
+< E7RESULT name=header311_write_digest index=65 kind=root_record_fua device=0 offset=1052672 length=512 sha256=78481a1acb457a64c793b5909d131f9b45769be65a8b541f14d7f8325b58af7f
+< E7RESULT name=header311_write_digest index=66 kind=system_configuration_slot device=0 offset=4096 length=4096 sha256=e305c8810ee77e4ab706c42297d958ba21d2e225e11b4f0b147394767ab0d39e
+< E7RESULT name=header311_write_digest index=67 kind=system_configuration_slot device=1 offset=4096 length=4096 sha256=5dc1f792b1d2c39a0291ebbe9a7a39045423787534e33eabbf7a138f1852dadc
+---
+> E7RESULT name=header311_write_digest index=14 kind=root_record_fua device=0 offset=1048576 length=512 sha256=ffa877f6a816b74c722d5dc7d937b06330cee7a5e306b984c4ca3c8622454441
+> E7RESULT name=header311_write_digest index=15 kind=root_record_fua device=1 offset=4194304 length=512 sha256=ffa877f6a816b74c722d5dc7d937b06330cee7a5e306b984c4ca3c8622454441
+> E7RESULT name=header311_write_digest index=16 kind=root_record_fua device=0 offset=7340032 length=512 sha256=ffa877f6a816b74c722d5dc7d937b06330cee7a5e306b984c4ca3c8622454441
+> E7RESULT name=header311_write_digest index=17 kind=system_configuration_slot device=0 offset=0 length=4096 sha256=8b3017f34352c99f5091f1d023d0fd05963b34912caed3403ac695161b0db140
+> E7RESULT name=header311_write_digest index=18 kind=system_configuration_slot device=0 offset=4096 length=4096 sha256=8b3017f34352c99f5091f1d023d0fd05963b34912caed3403ac695161b0db140
+> E7RESULT name=header311_write_digest index=19 kind=system_configuration_slot device=1 offset=0 length=4096 sha256=11d1f5ce683a1b7f19596b2000aad1871f1b4af910b8ff2549e7894f209f4fd6
+> E7RESULT name=header311_write_digest index=20 kind=system_configuration_slot device=1 offset=4096 length=4096 sha256=11d1f5ce683a1b7f19596b2000aad1871f1b4af910b8ff2549e7894f209f4fd6
+> E7RESULT name=header311_write_digest index=23 kind=system_configuration_slot device=0 offset=0 length=4096 sha256=8926ff75622db47de4b2f7ca9345b78ab7f121590cda6efc439050d6e3b75e61
+> E7RESULT name=header311_write_digest index=24 kind=system_configuration_slot device=1 offset=0 length=4096 sha256=d1dca9df289c30163010cc632047cece7041591f6d274471e8522201eb192215
+> E7RESULT name=header311_write_digest index=27 kind=journal_record device=0 offset=16777216 length=4096 sha256=e18ff0b43007cea2051fe1af6785dec1e79fe195a770c418339a51096d6f2102
+> E7RESULT name=header311_write_digest index=28 kind=journal_record device=1 offset=16777216 length=4096 sha256=e18ff0b43007cea2051fe1af6785dec1e79fe195a770c418339a51096d6f2102
+> E7RESULT name=header311_write_digest index=31 kind=root_record_fua device=1 offset=4194304 length=512 sha256=fdcfcdcd102e9ad41ca7c9fd6d61cc93aa3cbbe9111e1e673c61abc2273bf980
+> E7RESULT name=header311_write_digest index=32 kind=system_configuration_slot device=0 offset=4096 length=4096 sha256=de6bb6dbd38f6143d26565f884257ed0cf5ec4db7ec10a21fb72f8ef9184d9b1
+> E7RESULT name=header311_write_digest index=33 kind=system_configuration_slot device=1 offset=4096 length=4096 sha256=f416026b60ac505802f995c1322d976fac4748635aec14c3165558f2602f3206
+> E7RESULT name=header311_write_digest index=36 kind=journal_record device=0 offset=16781312 length=4096 sha256=ba31537f0529bb0c6e04e914eb81aa013371f5d67a459150bd434a0569dea86e
+> E7RESULT name=header311_write_digest index=37 kind=journal_record device=1 offset=16781312 length=4096 sha256=ba31537f0529bb0c6e04e914eb81aa013371f5d67a459150bd434a0569dea86e
+> E7RESULT name=header311_write_digest index=40 kind=root_record_fua device=0 offset=7340032 length=512 sha256=1f7859f049061be6eb147a9fa5dbaa3743f8413ca846b5dcb130cf624ee0b88b
+> E7RESULT name=header311_write_digest index=41 kind=system_configuration_slot device=0 offset=0 length=4096 sha256=3b7ffd1280944043ae88dcaf3cfe41eef0065b76960b0fedaba6bf245e7eb540
+> E7RESULT name=header311_write_digest index=42 kind=system_configuration_slot device=1 offset=0 length=4096 sha256=9330048c40490ff4554ab7fb66156866c44cfc58927456ad9079dcf52f53b659
+> E7RESULT name=header311_write_digest index=45 kind=unit_write device=0 offset=822149120 length=32768 sha256=af0d80b54d127f606b7afcaadfe948aaf3ab9ca8d0ec36c89d855e38677ffcd8
+> E7RESULT name=header311_write_digest index=46 kind=unit_write device=1 offset=822149120 length=32768 sha256=af0d80b54d127f606b7afcaadfe948aaf3ab9ca8d0ec36c89d855e38677ffcd8
+> E7RESULT name=header311_write_digest index=47 kind=unit_write device=0 offset=823132160 length=16384 sha256=4a521e69496395791d94f9bebad9c960c0a341ced53041b963b1aab93ba081b6
+> E7RESULT name=header311_write_digest index=48 kind=unit_write device=1 offset=823132160 length=16384 sha256=4a521e69496395791d94f9bebad9c960c0a341ced53041b963b1aab93ba081b6
+> E7RESULT name=header311_write_digest index=49 kind=unit_write device=0 offset=823164928 length=32768 sha256=4aebb3547222c19e4bf96db2a5e9660c7b3646bd434a3a4cbbf419c4832d673d
+> E7RESULT name=header311_write_digest index=50 kind=unit_write device=1 offset=823164928 length=32768 sha256=4aebb3547222c19e4bf96db2a5e9660c7b3646bd434a3a4cbbf419c4832d673d
+> E7RESULT name=header311_write_digest index=51 kind=unit_write device=0 offset=823197696 length=16384 sha256=0134efbeb67748240d82f9f6490ca7a286ac78a226fb9e32dd01de9c771cb914
+> E7RESULT name=header311_write_digest index=52 kind=unit_write device=1 offset=823197696 length=16384 sha256=0134efbeb67748240d82f9f6490ca7a286ac78a226fb9e32dd01de9c771cb914
+> E7RESULT name=header311_write_digest index=53 kind=unit_write device=0 offset=823214080 length=16384 sha256=ef42aeca0fefb6f7bb124d1425e2bf443cadc6d50ddff438c6b8624b0b741aa3
+> E7RESULT name=header311_write_digest index=54 kind=unit_write device=1 offset=823214080 length=16384 sha256=ef42aeca0fefb6f7bb124d1425e2bf443cadc6d50ddff438c6b8624b0b741aa3
+> E7RESULT name=header311_write_digest index=55 kind=unit_write device=0 offset=823230464 length=16384 sha256=8e71193a44f9d116eb60c5af1dfedae2b16865f86eeab3ee007c0552c9856738
+> E7RESULT name=header311_write_digest index=56 kind=unit_write device=1 offset=823230464 length=16384 sha256=8e71193a44f9d116eb60c5af1dfedae2b16865f86eeab3ee007c0552c9856738
+> E7RESULT name=header311_write_digest index=57 kind=unit_write device=0 offset=823246848 length=16384 sha256=45007a9e031a77213f061a13be4b62a861033da6aab2053b4e39f5703684f44e
+> E7RESULT name=header311_write_digest index=58 kind=unit_write device=1 offset=823246848 length=16384 sha256=45007a9e031a77213f061a13be4b62a861033da6aab2053b4e39f5703684f44e
+> E7RESULT name=header311_write_digest index=59 kind=unit_write device=0 offset=823263232 length=16384 sha256=54f457c03fd8b5ac0a795374b4604b8d8653662a2178db3c724b2d0dddf35d40
+> E7RESULT name=header311_write_digest index=60 kind=unit_write device=1 offset=823263232 length=16384 sha256=54f457c03fd8b5ac0a795374b4604b8d8653662a2178db3c724b2d0dddf35d40
+> E7RESULT name=header311_write_digest index=61 kind=unit_write device=0 offset=823279616 length=16384 sha256=553d9e1f74c90b0a107e9aedb550eb7cf73d6979c50ad747ff9255d968462f79
+> E7RESULT name=header311_write_digest index=62 kind=unit_write device=1 offset=823279616 length=16384 sha256=553d9e1f74c90b0a107e9aedb550eb7cf73d6979c50ad747ff9255d968462f79
+> E7RESULT name=header311_write_digest index=63 kind=unit_write device=0 offset=823296000 length=16384 sha256=cd028e589626b737e37624f2fad0198b861198b7b219fd6403d9ad5baf65996c
+> E7RESULT name=header311_write_digest index=64 kind=unit_write device=1 offset=823296000 length=16384 sha256=cd028e589626b737e37624f2fad0198b861198b7b219fd6403d9ad5baf65996c
+> E7RESULT name=header311_write_digest index=65 kind=unit_write device=0 offset=823312384 length=16384 sha256=b6884c0230fb761c32c54e83863fb079196245d1ee93c60611040df3c34ab4f0
+> E7RESULT name=header311_write_digest index=66 kind=unit_write device=1 offset=823312384 length=16384 sha256=b6884c0230fb761c32c54e83863fb079196245d1ee93c60611040df3c34ab4f0
+> E7RESULT name=header311_write_digest index=67 kind=unit_write device=0 offset=823328768 length=16384 sha256=3b6239beab2dcd9bde142c8521fc88b127b781909ee0557a1fb9fa11d2795531
+> E7RESULT name=header311_write_digest index=68 kind=unit_write device=1 offset=823328768 length=16384 sha256=3b6239beab2dcd9bde142c8521fc88b127b781909ee0557a1fb9fa11d2795531
+> E7RESULT name=header311_write_digest index=71 kind=journal_record device=0 offset=16785408 length=4096 sha256=6a51dfab3dd5f55da72a0d5531fe6c34a1661366d954d06fe1c2c035d748f6da
+> E7RESULT name=header311_write_digest index=72 kind=journal_record device=1 offset=16785408 length=4096 sha256=6a51dfab3dd5f55da72a0d5531fe6c34a1661366d954d06fe1c2c035d748f6da
+> E7RESULT name=header311_write_digest index=75 kind=root_record_fua device=0 offset=1052672 length=512 sha256=78481a1acb457a64c793b5909d131f9b45769be65a8b541f14d7f8325b58af7f
+> E7RESULT name=header311_write_digest index=76 kind=system_configuration_slot device=0 offset=4096 length=4096 sha256=e305c8810ee77e4ab706c42297d958ba21d2e225e11b4f0b147394767ab0d39e
+> E7RESULT name=header311_write_digest index=77 kind=system_configuration_slot device=1 offset=4096 length=4096 sha256=5dc1f792b1d2c39a0291ebbe9a7a39045423787534e33eabbf7a138f1852dadc
+377,391c395,409
+< E7RESULT name=device_region_bytes step=25 region=journal_record device=0 offset=16785408 length=4096 sha256=6a51dfab3dd5f55da72a0d5531fe6c34a1661366d954d06fe1c2c035d748f6da hexadecimal_sha256=5befceb8808e6678f1eea18ab74dbf4599e9d56958d55de760e10dae23a637a6
+< E7RESULT name=write_list_row step=25 writer=transaction unit=journal_record class=other bytes=4096 slot=none tree=none device=0 offset=16785408 level=none entries=none entry_width=none declared_length=none min_key=none max_key=none birth_sequence=none sha256=6a51dfab3dd5f55da72a0d5531fe6c34a1661366d954d06fe1c2c035d748f6da
+< E7RESULT name=impl_bytes_equal step=25 region=journal_record device=0 offset=16785408 length=4096 matched=true equal=true first_diff_offset=none mismatch_bytes=0 fields=none
+< E7RESULT name=device_region_bytes step=26 region=journal_record device=1 offset=16785408 length=4096 sha256=6a51dfab3dd5f55da72a0d5531fe6c34a1661366d954d06fe1c2c035d748f6da hexadecimal_sha256=5befceb8808e6678f1eea18ab74dbf4599e9d56958d55de760e10dae23a637a6
+< E7RESULT name=write_list_row step=26 writer=transaction unit=journal_record class=other bytes=4096 slot=none tree=none device=1 offset=16785408 level=none entries=none entry_width=none declared_length=none min_key=none max_key=none birth_sequence=none sha256=6a51dfab3dd5f55da72a0d5531fe6c34a1661366d954d06fe1c2c035d748f6da
+< E7RESULT name=impl_bytes_equal step=26 region=journal_record device=1 offset=16785408 length=4096 matched=true equal=true first_diff_offset=none mismatch_bytes=0 fields=none
+< E7RESULT name=device_region_bytes step=28 region=root_record device=0 offset=1052672 length=512 sha256=78481a1acb457a64c793b5909d131f9b45769be65a8b541f14d7f8325b58af7f hexadecimal_sha256=de71336691ac59c24c8cb5becb6cb7ed8e772d9f3bb55fc26ce77a8316d269a6
+< E7RESULT name=write_list_row step=28 writer=transaction unit=root_record class=other bytes=512 slot=none tree=none device=0 offset=1052672 level=none entries=none entry_width=none declared_length=none min_key=none max_key=none birth_sequence=none sha256=78481a1acb457a64c793b5909d131f9b45769be65a8b541f14d7f8325b58af7f
+< E7RESULT name=impl_bytes_equal step=28 region=root_record device=0 offset=1052672 length=512 matched=true equal=true first_diff_offset=none mismatch_bytes=0 fields=none
+< E7RESULT name=device_region_bytes step=29 region=unregistered device=0 offset=4096 length=4096 sha256=e305c8810ee77e4ab706c42297d958ba21d2e225e11b4f0b147394767ab0d39e hexadecimal_sha256=54f97bda2b4885f95fe7f1681de822d7e0ac86461a0fd8f535db164f0e63eff2
+< E7RESULT name=write_list_row step=29 writer=transaction unit=unregistered class=other bytes=4096 slot=none tree=none device=0 offset=4096 level=none entries=none entry_width=none declared_length=none min_key=none max_key=none birth_sequence=none sha256=e305c8810ee77e4ab706c42297d958ba21d2e225e11b4f0b147394767ab0d39e
+< E7RESULT name=impl_bytes_equal step=29 region=unregistered device=0 offset=4096 length=4096 matched=true equal=true first_diff_offset=none mismatch_bytes=0 fields=none
+< E7RESULT name=device_region_bytes step=30 region=unregistered device=1 offset=4096 length=4096 sha256=5dc1f792b1d2c39a0291ebbe9a7a39045423787534e33eabbf7a138f1852dadc hexadecimal_sha256=c8bbe87e50ce205ef154a4511c121c9dbeebb266cb7f51a838ec1e5f0071ee07
+< E7RESULT name=write_list_row step=30 writer=transaction unit=unregistered class=other bytes=4096 slot=none tree=none device=1 offset=4096 level=none entries=none entry_width=none declared_length=none min_key=none max_key=none birth_sequence=none sha256=5dc1f792b1d2c39a0291ebbe9a7a39045423787534e33eabbf7a138f1852dadc
+< E7RESULT name=impl_bytes_equal step=30 region=unregistered device=1 offset=4096 length=4096 matched=true equal=true first_diff_offset=none mismatch_bytes=0 fields=none
+---
+> E7RESULT name=device_region_bytes step=26 region=journal_record device=0 offset=16785408 length=4096 sha256=6a51dfab3dd5f55da72a0d5531fe6c34a1661366d954d06fe1c2c035d748f6da hexadecimal_sha256=5befceb8808e6678f1eea18ab74dbf4599e9d56958d55de760e10dae23a637a6
+> E7RESULT name=write_list_row step=26 writer=transaction unit=journal_record class=other bytes=4096 slot=none tree=none device=0 offset=16785408 level=none entries=none entry_width=none declared_length=none min_key=none max_key=none birth_sequence=none sha256=6a51dfab3dd5f55da72a0d5531fe6c34a1661366d954d06fe1c2c035d748f6da
+> E7RESULT name=impl_bytes_equal step=26 region=journal_record device=0 offset=16785408 length=4096 matched=true equal=true first_diff_offset=none mismatch_bytes=0 fields=none
+> E7RESULT name=device_region_bytes step=27 region=journal_record device=1 offset=16785408 length=4096 sha256=6a51dfab3dd5f55da72a0d5531fe6c34a1661366d954d06fe1c2c035d748f6da hexadecimal_sha256=5befceb8808e6678f1eea18ab74dbf4599e9d56958d55de760e10dae23a637a6
+> E7RESULT name=write_list_row step=27 writer=transaction unit=journal_record class=other bytes=4096 slot=none tree=none device=1 offset=16785408 level=none entries=none entry_width=none declared_length=none min_key=none max_key=none birth_sequence=none sha256=6a51dfab3dd5f55da72a0d5531fe6c34a1661366d954d06fe1c2c035d748f6da
+> E7RESULT name=impl_bytes_equal step=27 region=journal_record device=1 offset=16785408 length=4096 matched=true equal=true first_diff_offset=none mismatch_bytes=0 fields=none
+> E7RESULT name=device_region_bytes step=30 region=root_record device=0 offset=1052672 length=512 sha256=78481a1acb457a64c793b5909d131f9b45769be65a8b541f14d7f8325b58af7f hexadecimal_sha256=de71336691ac59c24c8cb5becb6cb7ed8e772d9f3bb55fc26ce77a8316d269a6
+> E7RESULT name=write_list_row step=30 writer=transaction unit=root_record class=other bytes=512 slot=none tree=none device=0 offset=1052672 level=none entries=none entry_width=none declared_length=none min_key=none max_key=none birth_sequence=none sha256=78481a1acb457a64c793b5909d131f9b45769be65a8b541f14d7f8325b58af7f
+> E7RESULT name=impl_bytes_equal step=30 region=root_record device=0 offset=1052672 length=512 matched=true equal=true first_diff_offset=none mismatch_bytes=0 fields=none
+> E7RESULT name=device_region_bytes step=31 region=unregistered device=0 offset=4096 length=4096 sha256=e305c8810ee77e4ab706c42297d958ba21d2e225e11b4f0b147394767ab0d39e hexadecimal_sha256=54f97bda2b4885f95fe7f1681de822d7e0ac86461a0fd8f535db164f0e63eff2
+> E7RESULT name=write_list_row step=31 writer=transaction unit=unregistered class=other bytes=4096 slot=none tree=none device=0 offset=4096 level=none entries=none entry_width=none declared_length=none min_key=none max_key=none birth_sequence=none sha256=e305c8810ee77e4ab706c42297d958ba21d2e225e11b4f0b147394767ab0d39e
+> E7RESULT name=impl_bytes_equal step=31 region=unregistered device=0 offset=4096 length=4096 matched=true equal=true first_diff_offset=none mismatch_bytes=0 fields=none
+> E7RESULT name=device_region_bytes step=32 region=unregistered device=1 offset=4096 length=4096 sha256=5dc1f792b1d2c39a0291ebbe9a7a39045423787534e33eabbf7a138f1852dadc hexadecimal_sha256=c8bbe87e50ce205ef154a4511c121c9dbeebb266cb7f51a838ec1e5f0071ee07
+> E7RESULT name=write_list_row step=32 writer=transaction unit=unregistered class=other bytes=4096 slot=none tree=none device=1 offset=4096 level=none entries=none entry_width=none declared_length=none min_key=none max_key=none birth_sequence=none sha256=5dc1f792b1d2c39a0291ebbe9a7a39045423787534e33eabbf7a138f1852dadc
+> E7RESULT name=impl_bytes_equal step=32 region=unregistered device=1 offset=4096 length=4096 matched=true equal=true first_diff_offset=none mismatch_bytes=0 fields=none
+393c411
+< E7RESULT name=write_list_summary writes=29 barriers=2 fua=1 allocation_records_per_device=14 allocation_record_leaves=2
+---
+> E7RESULT name=write_list_summary writes=29 barriers=6 fua=1 allocation_records_per_device=14 allocation_record_leaves=2
+629,630c647,648
+< E7RESULT name=layer0 arm=settled_two_devices segments=2+2+1+2+2+1+26+2+1+2 states=not_run closed_form=67108885 skipped=true reason=附带_够判后未跑
+< E7RESULT name=layer0_fua_not_boundary segments=2+2+3+2+27+2+3 closed_form=134217754
+---
+> E7RESULT name=layer0 arm=settled_two_devices segments=2+2+1+2+2+1+2+24+2+1+2 states=not_run closed_form=16777240 skipped=true reason=附带_够判后未跑
+> E7RESULT name=layer0_fua_not_boundary segments=2+2+3+2+3+24+2+3 closed_form=16777249
+706c724
+< E7RESULT name=self_check_text_numbers text_fields=114 numbers=438 bound=21 bound_mismatched=0 literal_allowlisted=417 unclassified=0
+---
+> E7RESULT name=self_check_text_numbers text_fields=131 numbers=564 bound=21 bound_mismatched=0 literal_allowlisted=543 unclassified=0
+714c732
+< E7RESULT name=done emitted=714
+---
+> E7RESULT name=done emitted=732

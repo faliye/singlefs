@@ -1,8 +1,8 @@
 # 附录二：门禁批改动的 diff（原样放，另附主 agent 对 check-segment-registry.py 的两处修补）
 
-**生成时刻**：2026-09-26 12:49 UTC（JST 21:4x）。
+**生成时刻**：2026-09-26。
 
-**基准**：门禁批实现员在改动前用 `cp -p` 备份的文件快照（记在 `/tmp/claude-1000/gate-batch-m2/spec.md`「怎么改」一节），**不是**某个 git 提交号。经核对（`git diff HEAD -- <文件>`，HEAD = `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`，2026-09-25 13:31:56 +0000），当前工作区里这 7 个 git 追踪文件相对 HEAD 的差异比下面这份 diff 更大：例如 `.claude/agents/crash-verifier.md` frontmatter 的 `model: sonnet` → `model: opus`、新增 `effort: high`，`.claude/rules/implementation-workflow.md`「重型测试只在提交时跑」一节的整段改写，这两处在下面这份 diff 里都是没有 `+`/`-` 的上下文行（说明改动前的那份备份本身已经带着比 HEAD 更多、这次任务之外的改动，大概率是同一批「里程碑二收尾」里更早、还没提交的另一层改动）；`research/scripts/admission.py` 在 git 里完全未跟踪（`git status --porcelain` 显示 `??`），diff 的「改动前」一侧只对应那份 `cp -p` 备份，不对应任何 git 版本。下面「一」原样是 `/tmp/claude-1000/gate-batch-m2/my-changes.diff` 的内容（`wc -l` 2543 行、8 个文件，用 `diff -u`／等价手段生成，不带 `diff --git` 头），不是 `git diff HEAD` 的内容；「二」是主 agent 自己对 `research/scripts/check-segment-registry.py` 的两处修补（数字间下划线、认不出第二条流登记句就判红），改前备份 `check-segment-registry.py.before`（2026-09-22 22:14），与仓里今天这份 `diff -u` 原样。
+**基准**：门禁批实现员在改动前用 `cp -p` 备份的文件快照（记在 `/tmp/claude-1000/gate-batch-m2/spec.md`「怎么改」一节），**不是**某个 git 提交号。经核对（`git diff HEAD -- <文件>`，HEAD = `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`，2026-09-25 +0000），当前工作区里这 7 个 git 追踪文件相对 HEAD 的差异比下面这份 diff 更大：例如 `.claude/agents/crash-verifier.md` frontmatter 的 `model: sonnet` → `model: opus`、新增 `effort: high`，`.claude/rules/implementation-workflow.md`「重型测试只在提交时跑」一节的整段改写，这两处在下面这份 diff 里都是没有 `+`/`-` 的上下文行（说明改动前的那份备份本身已经带着比 HEAD 更多、这次任务之外的改动，大概率是同一批「里程碑二收尾」里更早、还没提交的另一层改动）；`research/scripts/admission.py` 在 git 里完全未跟踪（`git status --porcelain` 显示 `??`），diff 的「改动前」一侧只对应那份 `cp -p` 备份，不对应任何 git 版本。下面「一」原样是 `/tmp/claude-1000/gate-batch-m2/my-changes.diff` 的内容（`wc -l` 2543 行、8 个文件，用 `diff -u`／等价手段生成，不带 `diff --git` 头），不是 `git diff HEAD` 的内容；「二」是主 agent 自己对 `research/scripts/check-segment-registry.py` 的两处修补（数字间下划线、认不出第二条流登记句就判红），改前备份 `check-segment-registry.py.before`（2026-09-22），与仓里今天这份 `diff -u` 原样。
 
 ## 一、门禁批交回的 diff（`/tmp/claude-1000/gate-batch-m2/my-changes.diff` 原样，2543 行，8 个文件）
 
@@ -27,7 +27,7 @@
 -#     开跑一格都不删：同一批输入（连同判它的 54 号与工具链，见「输入」一段）的结果是确定的，前一趟写下的那一格在这一趟跑的过程中照样算数。
 -#     这一趟没写成标记就退出（判红、被 TERM / INT / HUP 打断）时，退出前删这批输入那一格；「跑的过程中输入变了」那一支判红不删：
 -#     两条流读到的不一定是开跑那一批，它说不出那一批的好坏。被 SIGKILL 杀掉来不及删，前一趟那一格留着。别的格不动；全绿才写这一格。
--#     标记里有输入哈希、逐文件的「sha256  路径」、开跑与跑完的 UTC 时刻、工作线程数、两条流的计数行与 CHECKER 行原样。
+-#     标记里有输入哈希、逐文件的「sha256  路径」、开跑与跑完的时刻、工作线程数、两条流的计数行与 CHECKER 行原样。
 +#   bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full [--start-over] <worktree>
 +#     主 agent 暂存之后（提交时由崩溃验证员），在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑。worktree 的建法与 `gate.sh --staged` 相同，命令在快档的出路句里。
 +#     逐条崩溃枚举用例（.claude/gate.d/stage-inputs.tsv 里键是 crash-case: 的那几行，照登记表的次序）：先算这条用例这批输入的指纹
@@ -1895,7 +1895,7 @@
 +                                "LAYER0 states=5 closed_form=5 exhaustive=true\nparallel_finished=LAYER0_PARALLEL_FINISHED states=5 slices=1\n")
 +        fingerprint_now, _count = fingerprint()
 +        exit_code, marker_path, _messages = admission("crash-case-record", work, "crash-case:own", fingerprint_now, manifest_file, judged_file,
-+                                                      "--files", "6", "--excluded", "1", "--started", "2026-09-26T00:00:00Z",
++                                                      "--files", "6", "--excluded", "1", "--started", "2026-09-26",
 +                                                      "--judged-root", work, "--threads-text", "样本")
 +        marker_path = marker_path.strip()
 +        exit_code_check, output, _messages = admission("crash-case-marker-check", work, "crash-case:own", fingerprint_now, manifest_file)
@@ -2554,11 +2554,11 @@
 
 ## 二、主 agent 对 `research/scripts/check-segment-registry.py` 的两处修补（`diff -u` 改前备份 vs 仓里今天这份）
 
-改前备份：`/tmp/claude-1000/-home-fy5090-code-singlefs/d16a74c5-453c-44d5-8a19-7e71d116de72/scratchpad/check-segment-registry.py.before`（2026-09-22 22:14:21，改前）。今天这份：`research/scripts/check-segment-registry.py`（2026-09-26 12:20:27，改后）。
+改前备份：`/tmp/claude-1000/-home-fy5090-code-singlefs/d16a74c5-453c-44d5-8a19-7e71d116de72/scratchpad/check-segment-registry.py.before`（2026-09-22，改前）。今天这份：`research/scripts/check-segment-registry.py`（2026-09-26，改后）。
 
 ```diff
---- /tmp/claude-1000/-home-fy5090-code-singlefs/d16a74c5-453c-44d5-8a19-7e71d116de72/scratchpad/check-segment-registry.py.before	2026-09-22 22:14:21.113191558 +0000
-+++ /home/fy5090/code/singlefs/research/scripts/check-segment-registry.py	2026-09-26 12:20:27.679787412 +0000
+--- /tmp/claude-1000/-home-fy5090-code-singlefs/d16a74c5-453c-44d5-8a19-7e71d116de72/scratchpad/check-segment-registry.py.before	2026-09-23
++++ research/scripts/check-segment-registry.py	2026-09-26
 @@ -357,9 +357,14 @@
          array_count = len(array_pattern.findall(normalized_test_text))
          if array_count == 0:

@@ -1,6 +1,6 @@
 # 增补 3 第 3 件（崩溃注入）代码轮第一轮：主 agent 核实与判决（2026-09-20）
 
-正文 `research/prompts/_m2-supp3-item3-code-r1-body.md`，背景材料 `-background.md`（附录 `-appendix.md`、小节清单 `-checklist.md`），被判的 diff 与新模块整份 `-diff.md`。代码轮，开工快照 `m2-supp3-item3-code-r1-start-snapshot.sha256`（12 个文件，08:07 UTC 记）；核查员开工先 `sha256sum -c`，12 个全 OK——腿跑着的时候这些文件没被改过。
+正文 `research/prompts/_m2-supp3-item3-code-r1-body.md`，背景材料 `-background.md`（附录 `-appendix.md`、小节清单 `-checklist.md`），被判的 diff 与新模块整份 `-diff.md`。代码轮，开工快照 `m2-supp3-item3-code-r1-start-snapshot.sha256`（12 个文件）；核查员开工先 `sha256sum -c`，12 个全 OK——腿跑着的时候这些文件没被改过。
 
 这一轮判的是这几个文件（门禁 56 号按路径点名）：`crates/singlefs-harness/src/crash_injection.rs`（新增）、`crates/singlefs-harness/src/crash.rs`、`crates/singlefs-harness/src/history.rs`、`crates/singlefs-harness/src/lib.rs`、`crates/singlefs-harness/src/model.rs`、`crates/singlefs-harness/src/model_comparison.rs`，连同 `crates/singlefs-harness/tests/second_transaction_supplement_three_crash_injection.rs` 与 `crates/mutations.tsv`。
 

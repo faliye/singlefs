@@ -1,8 +1,8 @@
 # 实 C554 乙-模型（模型跟上「重读一次仍读不出就拒可写」）+ 实审 B3c-4（零单元发布按指针往下带着比）——实现员报告
 
-时刻：UTC 开工 02:52，JST = UTC + 9。规格 `/tmp/claude-1000/impl-c554-yi-model/spec.md`。交补丁：在副本 `work/` 里改，主工作区一个字没动；补丁在 `patch/`。
-副本取于 2026-09-27 02:52:53Z（`rsync -a --exclude target --exclude .git`，主工作区 HEAD `faf255e2`，B3c-3 补丁已在）；取副本那一刻 `crates/` 原件的逐文件 sha256 在 `base-sha.txt`。
-这份报告分两段写成：前一个实现员写到 05:2x UTC（14:2x JST）撞会话限额停下；接手的实现员 05:3x UTC 起核现场、把补丁按主工作区现状重新生成、在现状加补丁的副本上重跑全部交回前验证、量第二件第 2 条那几种历史各几版，补齐第六节，改了第二、三、四、七、八节里跟底座有关的句子。
+规格 `/tmp/claude-1000/impl-c554-yi-model/spec.md`。交补丁：在副本 `work/` 里改，主工作区一个字没动；补丁在 `patch/`。
+副本取于 2026-09-27Z（`rsync -a --exclude target --exclude .git`，主工作区 HEAD `faf255e2`，B3c-3 补丁已在）；取副本那一刻 `crates/` 原件的逐文件 sha256 在 `base-sha.txt`。
+这份报告分两段写成：前一个实现员写到撞会话限额停下；接手的实现员随即核现场、把补丁按主工作区现状重新生成、在现状加补丁的副本上重跑全部交回前验证、量第二件第 2 条那几种历史各几版，补齐第六节，改了第二、三、四、七、八节里跟底座有关的句子。
 
 ## 一、结论
 
@@ -19,7 +19,7 @@
    - 新测试文件 7 条。先在桩（不往下带）上跑：6 红 1 绿，红的 6 条都红在「比不了」的计数或 `expect_err`；实做之后 7 条全绿。
    - 一次挂载里第一版就是零单元发布的，照旧走比不了的两臂，只有 mkfs 之后第一次可写挂载会这样，次数见第四节。
    - 那几种历史各几版（第四节表）：比不了的零单元版只出在 mkfs 之后第一次可写挂载（快档 53 次、复用 6 次、回退 6 次，每次 2 版）与接在它后面、第一个文件发出之前实例 1 会话里的 `PublishWithoutUnits`（10、2、1 版），逐段加起来与报告行的数相等；三个墙取样段 0 版。
-   - 在主工作区现状（05:33:54Z）加补丁上重跑了全部交回前验证（第六节）：结局与前面相同，只多红 `checker_known_bad_images` 第 4527 行那条，不打补丁同样红，是 A3a 带来的（第七节 Q8）。
+   - 在主工作区现状加补丁上重跑了全部交回前验证（第六节）：结局与前面相同，只多红 `checker_known_bad_images` 第 4527 行那条，不打补丁同样红，是 A3a 带来的（第七节 Q8）。
 3. **变异**：追加 19 行、删 3 行（第 27、800、801 行的名字，原因见第五节），证红结果见第五节。B3c-3 那 13 行点名的用例没改名，全部复证。
 4. **推翻条件**：
    - 主工作区打上补丁之后，门禁 74 号在快档报出 `ModelDisagreement` 的任何签名，结论 1 的「快档归零」就不成立。
@@ -40,7 +40,7 @@
 
 `tests/common/mod.rs` 没改：帮手照原样用得上。`transaction.rs` 没动（规格约束）。
 
-`patch/crates.patch` 在 05:33:54Z 按主工作区当时的样子重新生成过（这 6 份文件的主工作区原件对 `rebased/` 里改好的那份逐个 `diff -u`），各段没有偏移；内容与前一版补丁打出来的结果逐字节相同（`rebased/` 就是用前一版补丁打出来的）。06:03 UTC 再核：主工作区这 6 份原件打上补丁，与 `rebased/` 里验过的那份逐个 `cmp` 相同。
+`patch/crates.patch` 接手后按主工作区当时的样子重新生成过（这 6 份文件的主工作区原件对 `rebased/` 里改好的那份逐个 `diff -u`），各段没有偏移；内容与前一版补丁打出来的结果逐字节相同（`rebased/` 就是用前一版补丁打出来的）。之后再核：主工作区这 6 份原件打上补丁，与 `rebased/` 里验过的那份逐个 `cmp` 相同。
 补丁的统计（`git apply --stat patch/crates.patch`，在主工作区跑，原样）：
 
 ```text
@@ -86,7 +86,7 @@ assertion `left == right` failed: 抬 F 之前一条违例都没有
 
 **剩下的签名**：六段取样点改后都是 `新发现 0`，没有要收缩的种子（改前那 46 段的签名就是规格要归零的那一个，最短复现见 C554 乙报告第三节）。
 
-**门禁 74 号**：改前 `test result: FAILED. 21 passed; 3 failed`、`exit=1`；改后（两件都改完）`test result: FAILED. 23 passed; 1 failed`、末行 `  ✗ 随机历史的测试二进制判红（上面是 cargo test 的尾部）`、`exit=1`。在主工作区现状加补丁的副本 `rebased/`（05:33:54Z 取，见第六节）上又跑一次，结局相同：`test result: FAILED. 23 passed; 1 failed; 2 ignored; 0 measured; 0 filtered out; finished in 93.36s`，红的只有 `crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43`，末行 `  ✗ 随机历史的测试二进制判红（上面是 cargo test 的尾部）`、`exit=1`（`logs/rebased-gate-74.log`）。同一副本上单跑这个二进制（`logs/rebased-random-history-release.log`）快档那一段原样：`历史 96 段：跑完 96、以已知红收尾 {}、新发现 0`、`操作 CrashRecoveryAbandoningTheNewestRoot：Ok 0、Err 53、前提不满足没调 15`，`:1082` 新名红在第 1201 行「抬 F 之前一条违例都没有」、`left: [("I-7.4", "被抛弃的根（实例 1、txg 5）引用的单元已被重新分配或抹头…`。
+**门禁 74 号**：改前 `test result: FAILED. 21 passed; 3 failed`、`exit=1`；改后（两件都改完）`test result: FAILED. 23 passed; 1 failed`、末行 `  ✗ 随机历史的测试二进制判红（上面是 cargo test 的尾部）`、`exit=1`。在主工作区现状加补丁的副本 `rebased/`（见第六节）上又跑一次，结局相同：`test result: FAILED. 23 passed; 1 failed; 2 ignored; 0 measured; 0 filtered out; finished in 93.36s`，红的只有 `crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43`，末行 `  ✗ 随机历史的测试二进制判红（上面是 cargo test 的尾部）`、`exit=1`（`logs/rebased-gate-74.log`）。同一副本上单跑这个二进制（`logs/rebased-random-history-release.log`）快档那一段原样：`历史 96 段：跑完 96、以已知红收尾 {}、新发现 0`、`操作 CrashRecoveryAbandoningTheNewestRoot：Ok 0、Err 53、前提不满足没调 15`，`:1082` 新名红在第 1201 行「抬 F 之前一条违例都没有」、`left: [("I-7.4", "被抛弃的根（实例 1、txg 5）引用的单元已被重新分配或抹头…`。
 74 号跑整个二进制，`:1082` 按规格红着，所以 74 号在 `:1082` 转绿之前（C554 的「系统配置没见证到」那一格修掉）一直是红的，见第七节 Q4。
 
 **`second_transaction_supplement_three_fault_injection` 快档（debug，不带 `--ignored`）**，跟 C554 乙报告第 214 行比：那一行是「12 passed; 1 failed; 1 ignored（基线同样 12 / 1：快档新发现 今天 38、乙 30）」；这一件的基线（`repo/`）同样是 `12 passed; 1 failed`，新发现 30、测量跑就提前停的 13 段，签名 `ModelDisagreement { aspect: "模型说该成、实现拒了" }`。改后 `test result: ok. 13 passed; 0 failed; 1 ignored`，`历史 24 段：测量跑就提前停的 0 段、摆不出注入点的 0 段；注入 96 次`，`以「已知红」收尾 {}、新发现 0`（`logs/final-fault-injection.log`）。
@@ -142,7 +142,7 @@ assertion `left == right` failed: 抬 F 之前一条违例都没有
 - 快档、复用、回退三段抽的起点有 mkfs（`history.rs` 第 434、476、510 行），所以非 0；三个墙取样点只从第一个文件起（第 544、566 行），所以是 0。
 - 「只比重写的角色」那个数拆成「挂载那两版」与「同一会话里的 `PublishWithoutUnits`」，报告行里分不出，下面另量了。
 
-**各几版（接手之后量的，2026-09-27 05:4x UTC）**：在 `measure/`（`rebased/` 的另一份副本，只多三行 `eprintln!`，不进补丁）里逐段单跑六个取样用例（`measure.sh`，release、`--exact`、`--test-threads=1`），每次挂载打一行「实例号、写了几行、几版、几版比不了、带没带下去」，每次会话里的 `PublishWithoutUnits` 打一行「比没比」。日志 `logs/measure/<用例名>.log`，汇总 `logs/measure-table.txt`，六段都 `1 passed`。
+**各几版（接手之后量的，2026-09-27）**：在 `measure/`（`rebased/` 的另一份副本，只多三行 `eprintln!`，不进补丁）里逐段单跑六个取样用例（`measure.sh`，release、`--exact`、`--test-threads=1`），每次挂载打一行「实例号、写了几行、几版、几版比不了、带没带下去」，每次会话里的 `PublishWithoutUnits` 打一行「比没比」。日志 `logs/measure/<用例名>.log`，汇总 `logs/measure-table.txt`，六段都 `1 passed`。
 
 | 取样段 | 挂载次数 | mkfs 后第一次可写挂载（实例 1、写 0 行） | 有「比不了」的挂载 | 会话里 `PublishWithoutUnits` 比不了 / 带着比 | 挂载 ×2 + 会话 | 报告行「只比重写的角色」 |
 |---|---|---|---|---|---|---|
@@ -210,11 +210,11 @@ assertion `left == right` failed: 抬 F 之前一条违例都没有
 
 两批一共 34 条（这一件追加的 19 条、复证的 15 条），都抓到；没有「只追加、没证、留给 59 号」的行。
 日志说明：两批用的是同一个日志目录，prove-red 每次从 001 起编号，第二批的 001–003 盖掉了第一批的 001–003（A1、A2、A3）；那三条的红法是第二批跑之前从日志里抄进上表的，判定行原样还在 `logs/prove-batch1.out`。
-底座说明：两批证红都跑在 `prove/`（`work/` 的副本，底座是 02:52:53Z 的主工作区，没有 A3a 在 core 七份读者上的改动）。接手之后没在现状上重证（派发写「已证红的不重做」）；A8、A11 两行改的是 core `mount.rs`，锚点在现状里各命中一次（门禁 33 号的 crates 表那一半在 `rebased/` 上没报，见第六节），红不红留给提交时的 59 号整表。
+底座说明：两批证红都跑在 `prove/`（`work/` 的副本，底座是较早取的主工作区，没有 A3a 在 core 七份读者上的改动）。接手之后没在现状上重证（派发写「已证红的不重做」）；A8、A11 两行改的是 core `mount.rs`，锚点在现状里各命中一次（门禁 33 号的 crates 表那一半在 `rebased/` 上没报，见第六节），红不红留给提交时的 59 号整表。
 
 ## 六、交回前的验证（主工作区现状加补丁）
 
-副本 `rebased/`：05:33:54Z 把主工作区 `rsync -a --delete --exclude target --exclude .git` 过来，`patch -p1 < patch/crates.patch`，变异表按 `patch/mutations-*.tsv|txt` 合并（`追加 19 行、删 3 行，原文各命中一次`，合并后 1271 行）。这一刻的主工作区与前一个实现员 04:56:45Z 取的那份，只差 `e158_root_choice_repair.rs` 与 `crates/mutations.tsv`（`diff -rq` 查的），这 6 份文件一样。跑法 `verify-rebased.sh`（每条 cargo 经 `capped.sh 4`，跑测试的经 `run-with-memory-cap.sh 8G`），日志 `logs/rebased-<名>.log`；04:56 那一轮的旧日志挪进了 `logs/rebased-0456/`。开跑前 `ps`：别的会话在跑 `cargo test`（harness 的随机历史、bad_disk_input、step_five_reuse，e163 的 GPU bin，e161 的 bin），没有 `qemu-system`、`vm-bench.sh`、`e152-file-system-benchmark`、`fio`；负载 56（32 核），没等锁。
+副本 `rebased/`：接手后把主工作区 `rsync -a --delete --exclude target --exclude .git` 过来，`patch -p1 < patch/crates.patch`，变异表按 `patch/mutations-*.tsv|txt` 合并（`追加 19 行、删 3 行，原文各命中一次`，合并后 1271 行）。这一刻的主工作区与前一个实现员先前取的那份，只差 `e158_root_choice_repair.rs` 与 `crates/mutations.tsv`（`diff -rq` 查的），这 6 份文件一样。跑法 `verify-rebased.sh`（每条 cargo 经 `capped.sh 4`，跑测试的经 `run-with-memory-cap.sh 8G`），日志 `logs/rebased-<名>.log`；先前那一轮的旧日志挪进了 `logs/rebased-0456/`。开跑前 `ps`：别的会话在跑 `cargo test`（harness 的随机历史、bad_disk_input、step_five_reuse，e163 的 GPU bin，e161 的 bin），没有 `qemu-system`、`vm-bench.sh`、`e152-file-system-benchmark`、`fio`；负载 56（32 核），没等锁。
 
 汇总（`logs/verify-rebased-summary.log`，原样）：
 ```
@@ -229,11 +229,11 @@ harness-lib: exit=0 test result: ok. 97 passed; 0 failed; 0 ignored; 0 measured;
 fault-injection: exit=0 test result: ok. 13 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 447.25s 
 ```
 逐样说：
-- `cargo fmt --all -- --check` 退 1，只报 `Diff in /tmp/claude-1000/impl-c554-yi-model/rebased/crates/singlefs-harness/src/bin/first_transaction_on_device.rs:3059:`，不是这一件的文件（55 号那一路在改）。06:03 UTC 主工作区自己跑 `cargo fmt --all -- --check` 退 0（那份文件已经又改过，与 `rebased/` 里的不同）；这一件的 6 份文件（打上补丁之后）单独 `rustfmt --edition 2021 --check` 退 0。
+- `cargo fmt --all -- --check` 退 1，只报 `Diff in /tmp/claude-1000/impl-c554-yi-model/rebased/crates/singlefs-harness/src/bin/first_transaction_on_device.rs:3059:`，不是这一件的文件（55 号那一路在改）。主工作区自己跑 `cargo fmt --all -- --check` 退 0（那份文件已经又改过，与 `rebased/` 里的不同）；这一件的 6 份文件（打上补丁之后）单独 `rustfmt --edition 2021 --check` 退 0。
 - clippy（`--all-targets --all-features -- -D warnings` 加 `check.sh` 第 72–80 行那 7 条 `-D`）末行 `    Finished \`dev\` profile [unoptimized + debuginfo] target(s) in 18.60s`、`exit=0`；`cargo build --offline --all-targets` 末行 `    Finished \`dev\` profile [unoptimized + debuginfo] target(s) in 1m 56s`、`exit=0`。
 - 随机历史（release）：红的一条是 `:1082` 新名，按规格红在 I-7.4（第三节）。
-- `checker_known_bad_images` 红的一条是 `an_allocation_generation_past_its_unit_birth_in_the_version_only_its_journal_record_carries_reddens_the_allocation_generation_invariant_before_the_mount`（第 4527 行起），红在第 4572 行 `坏镜像照样可写挂载: Recovery(InvariantViolated { invariant: "E142 走读同款", detail: "分配记录跨度为 0，或分配代 / 释放代晚于根" })`。这条这一件没碰；主工作区 04:56:45Z 那份不打补丁（`mainbase/`）单跑它同样红在这一处（`logs/mainbase-checker-two.log`：`test result: FAILED. 0 passed; 2 failed`，另一条是这一件改好的 `published_nodes_behind_…`，不打补丁时红在 C554 乙那一拒）。前一个实现员在 02:52 的底座上跑这个二进制是 39/0，所以是 A3a 那批 core 改动带来的，不归这一件，照写不修。
-- `fault_injection` 快档、`--lib`、新测试文件、B3c-3 那份测试都绿；`--lib` 97 个（02:52 底座上是 91 个，多出来的 6 个是别的会话加的）。
+- `checker_known_bad_images` 红的一条是 `an_allocation_generation_past_its_unit_birth_in_the_version_only_its_journal_record_carries_reddens_the_allocation_generation_invariant_before_the_mount`（第 4527 行起），红在第 4572 行 `坏镜像照样可写挂载: Recovery(InvariantViolated { invariant: "E142 走读同款", detail: "分配记录跨度为 0，或分配代 / 释放代晚于根" })`。这条这一件没碰；主工作区先前取的那份不打补丁（`mainbase/`）单跑它同样红在这一处（`logs/mainbase-checker-two.log`：`test result: FAILED. 0 passed; 2 failed`，另一条是这一件改好的 `published_nodes_behind_…`，不打补丁时红在 C554 乙那一拒）。前一个实现员在开工时的底座上跑这个二进制是 39/0，所以是 A3a 那批 core 改动带来的，不归这一件，照写不修。
+- `fault_injection` 快档、`--lib`、新测试文件、B3c-3 那份测试都绿；`--lib` 97 个（开工时的底座上是 91 个，多出来的 6 个是别的会话加的）。
 
 登记给实现员的门禁阶段（在 `rebased/` 上跑，`SINGLEFS_GATE_FULL=1`；末行与退出码原样）：
 
@@ -248,10 +248,10 @@ fault-injection: exit=0 test result: ok. 13 passed; 0 failed; 1 ignored; 0 measu
 | 92 | `  ! /tmp/claude-1000/impl-c554-yi-model/rebased 不是 git 仓，本阶段跳过` | 77（本次未跑） |
 
 - 74 号红，只红在 `:1082` 新名（第三节、第七节 Q4）。
-- 33 号红只有一处：`research/mutations/e163_gpu_multicard_crc32c.tsv 不存在（被测的是 research/e7-index-bench/src/bin/e163_gpu_multicard_crc32c.rs）`，是别的会话的实验，不归这一件。crates 表那一半这回没报（04:56 那一轮报的第 658 行 E158 锚点，主工作区后来改好了）。
+- 33 号红只有一处：`research/mutations/e163_gpu_multicard_crc32c.tsv 不存在（被测的是 research/e7-index-bench/src/bin/e163_gpu_multicard_crc32c.rs）`，是别的会话的实验，不归这一件。crates 表那一半这回没报（先前那一轮报的第 658 行 E158 锚点，主工作区后来改好了）。
 - 89、92 退 77，按没判写。
 
-补丁对主工作区（06:03 UTC）：`git apply --check patch/crates.patch` 过；`python3 research/scripts/apply-writer-patch.py patch --dry-run` 原样 `✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 1286 行`（主工作区的表这时已是 1270 行，又长了）。
+补丁对主工作区：`git apply --check patch/crates.patch` 过；`python3 research/scripts/apply-writer-patch.py patch --dry-run` 原样 `✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 1286 行`（主工作区的表这时已是 1270 行，又长了）。
 
 ## 七、停下交主 agent 的
 
@@ -286,12 +286,12 @@ fault-injection: exit=0 test result: ok. 13 passed; 0 failed; 1 ignored; 0 measu
 
 **Q6 `history.rs` 多打了一行计数**（第 2061 行）：规格没要，是为了报出第四节那些数（五条硬要求第 4 条「分支必须可观测」）。它另起一行，门禁 74 号认的「模型对拍 N 步」那一行不动。不要就删那一段 `writeln!`，没有变异护它。
 
-**Q7 乙-配置续（主 agent 12:1x JST 来消息）**：模型不建系统配置的 journal tail，`model.rs` 只记取过的最大实例代号 `highest_acquired_instance`，取号那一写的 tail 模型里没有，今天也没答 0；续落地之后模型这边不用改。
+**Q7 乙-配置续（主 agent 来消息）**：模型不建系统配置的 journal tail，`model.rs` 只记取过的最大实例代号 `highest_acquired_instance`，取号那一写的 tail 模型里没有，今天也没答 0；续落地之后模型这边不用改。
 续会动的是 `tests/common` 帮手那一形（「没见证」靠清掉见证槽造）在实现里的结局。`:1082`、`:1135` 两条新名都靠它，续之后要重跑这两条看结局变没变。
 
 **另记（不是问题，是底座变了）**：
 - 主工作区的 `history.rs` 在我取副本之后被别的会话改了：`RecoveryFailure` 的穷举 match 多了 `SystemConfigurationValueRefused`、`DeviceEndsBeforeTheUnitAreaStart` 两臂，+6 行，core 那边有对应改动。补丁已按现状重新生成，没有偏移了（第二节）。
-- 第三到五节的验证跑在 02:52 的底座上，不含那批 core 改动；第六节在现状加补丁上重跑了一遍，结局除了 `checker_known_bad_images` 多红一条（A3a 带来的，不打补丁同红）之外都一样。证红没在现状上重跑（第五节末）。
+- 第三到五节的验证跑在开工时的底座上，不含那批 core 改动；第六节在现状加补丁上重跑了一遍，结局除了 `checker_known_bad_images` 多红一条（A3a 带来的，不打补丁同红）之外都一样。证红没在现状上重跑（第五节末）。
 
 **Q8 `checker_known_bad_images` 第 4527 行那条在主工作区现状红着，不归这一件**（第六节）。它在我的文件单里的那份测试文件里，但红因是 A3a 之后可写挂载在恢复阶段就判出「E142 走读同款」、不再让坏镜像挂上；要改的是那条用例的造法或断言，不是这一件的条款。交主 agent 派给 A3a 那一路。
 

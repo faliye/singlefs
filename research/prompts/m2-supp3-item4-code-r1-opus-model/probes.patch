@@ -1,5 +1,5 @@
---- crates/singlefs-harness/src/history.rs	2026-09-21 14:20:46.030581906 +0000
-+++ /tmp/claude-1000/m2s3i4-r1-opus/repo/crates/singlefs-harness/src/history.rs	2026-09-21 15:27:22.333567439 +0000
+--- crates/singlefs-harness/src/history.rs	2026-09-21
++++ /tmp/claude-1000/m2s3i4-r1-opus/repo/crates/singlefs-harness/src/history.rs	2026-09-22
 @@ -53,6 +53,7 @@
  use crate::fault_injection::{FaultInjectingBlockDevice, SharedFaultPlan};
  use crate::model::{
@@ -71,8 +71,8 @@
                  tally.ring_turn_form_steps_noted += 1;
                  tally.histories_with_the_ring_turn_form_noted = 1;
              }
---- crates/singlefs-harness/src/fault_injection.rs	2026-09-21 14:32:46.516701658 +0000
-+++ /tmp/claude-1000/m2s3i4-r1-opus/repo/crates/singlefs-harness/src/fault_injection.rs	2026-09-21 15:30:14.910334881 +0000
+--- crates/singlefs-harness/src/fault_injection.rs	2026-09-21
++++ /tmp/claude-1000/m2s3i4-r1-opus/repo/crates/singlefs-harness/src/fault_injection.rs	2026-09-22
 @@ -1273,13 +1273,45 @@
      accumulator: &mut FaultInjectionAccumulator<'_>,
  ) {

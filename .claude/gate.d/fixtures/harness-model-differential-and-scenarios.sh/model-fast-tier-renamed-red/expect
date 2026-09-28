@@ -1,0 +1,4 @@
+exit=1
+want=这一段却没有「模型对拍 N 步」那一行：「随机历史快档」
+want=cargo 这一次一条用例都没跑：点的名字 random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 在 tests/random_histories.rs 里找不到
+want=model-fast-tier：红（退出 1）

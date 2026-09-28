@@ -1,0 +1,13 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.82s
+     Running tests/acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics.rs (target/debug/deps/acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics-2535bc8528222042)
+
+running 5 tests
+test a_zero_unit_publish_on_a_ring_with_no_record_in_flight_is_refused_before_any_write ... ok
+test an_inode_leaf_container_claiming_more_records_than_a_unit_holds_is_refused_by_the_writable_mount ... ok
+test acquire_instance_refuses_a_device_whose_slots_are_unreadable_before_any_step ... ok
+test a_device_whose_slots_turn_unreadable_before_the_acquisition_barrier_refuses_the_writable_mount_without_a_step ... ok
+test a_device_whose_slots_turn_unreadable_after_the_acquisition_barrier_refuses_before_any_write ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.50s
+

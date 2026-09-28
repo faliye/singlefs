@@ -1,0 +1,6 @@
+  ✗ 这些实验二进制没有同名变异表：
+      research/mutations/e162_verdict_store_network.tsv 不存在（被测的是 research/e7-index-bench/src/bin/e162_verdict_store_network.rs）
+      research/mutations/e162_verdict_store_sender.tsv 不存在（被测的是 research/e7-index-bench/src/bin/e162_verdict_store_sender.rs）
+  → 怎么办：缺表的写 research/mutations/<bin名>.tsv（每行：变异名<TAB>原文<TAB>替换文）；
+    锚点对不上的把「原文」改成今天源码里逐字存在、且只出现一次的那一段，
+    改完跑 bash research/scripts/mutate.sh <bin> <源文件> <表> 证明每条都被抓，再来。

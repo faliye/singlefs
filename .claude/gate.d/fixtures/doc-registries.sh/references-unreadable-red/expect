@@ -1,0 +1,7 @@
+exit=1
+want=抽 E 号引用时有文件读不了（grep 退 2）
+want=抽 D 号引用时有文件读不了（grep 退 2）
+want=.claude/kb/dangling-link.md
+want=  experiment-refs：红（退出 1）
+want=  decision-refs：红（退出 1）
+want=doc-registries.sh：2 格里 2 格红（experiment-refs decision-refs）

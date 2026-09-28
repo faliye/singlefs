@@ -922,10 +922,10 @@
                                  "LAYER0 states=5 closed_form=5 exhaustive=true\nparallel_finished=LAYER0_PARALLEL_FINISHED states=5 slices=1\n")
          fingerprint_now, _count = fingerprint()
 -        exit_code, marker_path, _messages = admission("crash-case-record", work, "crash-case:own", fingerprint_now, manifest_file, judged_file,
--                                                      "--files", "6", "--excluded", "1", "--started", "2026-09-26T00:00:00Z",
+-                                                      "--files", "6", "--excluded", "1", "--started", "2026-09-26",
 -                                                      "--judged-root", work, "--threads-text", "样本")
 +        record_arguments = ("crash-case-record", work, "crash-case:own", fingerprint_now, manifest_file, judged_file, "--files", "6", "--excluded", "1",
-+                            "--started", "2026-09-26T00:00:00Z", "--judged-root", work, "--machine-cores", "32", "--threads", "7",
++                            "--started", "2026-09-26", "--judged-root", work, "--machine-cores", "32", "--threads", "7",
 +                            "--threads-origin", "explicit")
 +        exit_code, marker_path, _messages = admission(*record_arguments, changes={BREAK_VARIABLE: "single-worker-threads-field"})
 +        with open(marker_path.strip(), encoding="utf-8") as handle:

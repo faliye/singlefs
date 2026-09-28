@@ -40,17 +40,19 @@ fn pool_after_overwrites_with_the_space_admission_switched_off(
     pool
 }
 
-/// 覆盖写 18 次之后第 19 次：用户那次发布取不到落点，会话推抬 F，那一串两次空发布在预演里第 2 次也取不到落点。
+/// 覆盖写 19 次之后第 20 次：用户那次发布取不到落点，会话推抬 F，那一串三次空发布在预演里第 1 次就取不到落点
+/// （A3b 把小盘改成 6 MiB 环、单元区从 1408 起之前是「18 次之后第 19 次、两次空发布里第 2 次」：分配记录树按绝对槽号按位置寻址，
+/// 单元区挪了位置，每次发布重写的节点跟着变，撞墙的步数与那一串的次数都变；草稿探针在新几何上逐次覆盖写现跑的数）。
 /// 会话报空间不够（`NoSpaceAfterRaisingTheFloor`），最后一次被拒是用户那次的落点拒绝、一串都没推成；
 /// 这一次一个字节都没写（用户那次在落盘之前被拒，抬 F 那一串在预演里被拒），会话的现行版本不动。
 #[test]
 fn a_floor_raise_pushed_by_the_session_whose_own_publishes_find_no_slot_reports_no_space() {
-    let mut pool = pool_after_overwrites_with_the_space_admission_switched_off(18);
+    let mut pool = pool_after_overwrites_with_the_space_admission_switched_off(19);
     let image_before = pool.image();
     let root_before = *pool.session().current.root();
     let refusal = pool
         .overwrite(OVERWRITE_BYTES)
-        .expect_err("第 19 次覆盖写：单元区满了，推抬 F 也推不出空间");
+        .expect_err("第 20 次覆盖写：单元区满了，推抬 F 也推不出空间");
     let UserChangeRefused::NoSpaceAfterRaisingTheFloor(no_space) = refusal else {
         panic!("抬 F 自己也取不到落点，该报空间不够 NoSpaceAfterRaisingTheFloor，实际 {refusal:?}")
     };
@@ -84,15 +86,15 @@ fn a_floor_raise_pushed_by_the_session_whose_own_publishes_find_no_slot_reports_
         matches!(
             **raise_refusal,
             MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite {
-                refused_publish_in_the_sequence: 2,
-                publishes_in_the_sequence: 2,
+                refused_publish_in_the_sequence: 1,
+                publishes_in_the_sequence: 3,
                 cause: PublishError::PlacementRefused {
                     refusal: PlacementRefusal::NoFreeSlotOnAnyDevice,
                     ..
                 },
             }
         ),
-        "抬 F 那一串两次空发布在预演里第 2 次取不到落点：{raise_refusal:?}"
+        "抬 F 那一串三次空发布在预演里第 1 次就取不到落点：{raise_refusal:?}"
     );
     assert_eq!(
         pool.image(),
@@ -106,11 +108,13 @@ fn a_floor_raise_pushed_by_the_session_whose_own_publishes_find_no_slot_reports_
     );
 }
 
-/// 覆盖写 17 次之后崩了再挂（空间准入判着）：取号之前不够，写行与暖机之后推抬 F，那一串三次空发布在预演里第 1 次就取不到落点。
+/// 覆盖写 18 次之后崩了再挂（空间准入判着）：取号之前不够，写行与暖机之后推抬 F，那一串两次空发布在预演里第 1 次就取不到落点。
+/// （A3b 把小盘改成 6 MiB 环、单元区从 1408 起之前是「17 次、三次空发布里第 1 次」；新几何下 17 次那一串是三次里第 3 次才取不到，
+/// 草稿探针在 16–18 次上现跑，取 18 次，留住「第 1 次就取不到」那一形。）
 /// 挂载照样做成（C565 那一格：推满仍不够，`StillShortAfterTheFloorRaises`），实例已取、一串都没推成。
 #[test]
 fn a_mount_whose_floor_raise_after_the_row_publish_finds_no_slot_is_still_made_and_still_short() {
-    let mut pool = pool_after_overwrites_with_the_space_admission_switched_off(17);
+    let mut pool = pool_after_overwrites_with_the_space_admission_switched_off(18);
     let output = pool.crash_and_mount_writable().unwrap_or_else(|error| {
         panic!("抬 F 自己也取不到落点是推满仍不够：挂载照样做成（C565 那一格），实际 {error:?}")
     });
@@ -140,13 +144,13 @@ fn a_mount_whose_floor_raise_after_the_row_publish_finds_no_slot_is_still_made_a
             **raise_refusal,
             MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite {
                 refused_publish_in_the_sequence: 1,
-                publishes_in_the_sequence: 3,
+                publishes_in_the_sequence: 2,
                 cause: PublishError::PlacementRefused {
                     refusal: PlacementRefusal::NoFreeSlotOnAnyDevice,
                     ..
                 },
             }
         ),
-        "抬 F 那一串三次空发布在预演里第 1 次就取不到落点：{raise_refusal:?}"
+        "抬 F 那一串两次空发布在预演里第 1 次就取不到落点：{raise_refusal:?}"
     );
 }

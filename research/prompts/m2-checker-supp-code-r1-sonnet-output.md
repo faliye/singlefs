@@ -193,7 +193,7 @@ I18DEBUG data-unit-payload-mismatch verdict=Some(Violated("归并成一组的成
 **清理**：副本上的归并键改动已在做完对照实验后用同一份备份文件（`/tmp/claude-1000/m2-checker-supp-r1-sonnet/walk.rs.bak`，实验前的原始拷贝）整份覆盖复原，`diff` 副本与主工作区确认只剩一段自己加的调试 `eprintln`（不影响判定逻辑）：
 
 ```
-$ diff /tmp/claude-1000/m2-checker-supp-r1-sonnet/repo/crates/singlefs-checker/src/walk.rs /home/fy5090/code/singlefs/crates/singlefs-checker/src/walk.rs | wc -l
+$ diff /tmp/claude-1000/m2-checker-supp-r1-sonnet/repo/crates/singlefs-checker/src/walk.rs crates/singlefs-checker/src/walk.rs | wc -l
 9
 ```
 主工作区自始至终未被写入（第 0 节已用 sha256 核过）。

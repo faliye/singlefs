@@ -15,6 +15,7 @@ use singlefs_core::root_ring::RootRingSlotsPerRegion;
 use singlefs_core::system_configuration::{
     SlotBytesByMutability, SystemConfiguration, SystemImmutableConfiguration, SystemImmutableSizes,
     SystemMutableConfiguration, SystemRuntimeConfiguration, SystemRuntimeQuantities,
+    JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION, ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
 };
 use singlefs_format::{JOURNAL_RING_DEFAULT_BYTES, SYSTEM_CONFIGURATION_BYTES};
 use singlefs_harness::sha256::sha256_hexadecimal;
@@ -34,6 +35,8 @@ fn system_configuration_at_mkfs() -> SystemConfiguration {
                 journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
                 root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
             },
+            journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
+            root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
         },
         mutable: SystemMutableConfiguration,
         runtime: SystemRuntimeConfiguration,
@@ -65,6 +68,8 @@ fn system_configuration_after_the_new_pool_file_creation() -> SystemConfiguratio
                 journal_ring_bytes: 805_306_368,
                 root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
             },
+            journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
+            root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
         },
         mutable: SystemMutableConfiguration,
         runtime: SystemRuntimeConfiguration,

@@ -26,8 +26,8 @@ test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 | 文件 | 行数 | 完成标记 |
 |---|---|---|
-| `research/results/e142-r15-crates-sha256-before.txt`（快照一，02:48:36 UTC） | 126 | — |
-| `research/results/e142-r15-crates-write-dump-2026-09-25.out`（crates 导出，02:55:56 UTC 采集） | 35 | `E7RESULT name=done emitted=35` |
+| `research/results/e142-r15-crates-sha256-before.txt`（快照一） | 126 | — |
+| `research/results/e142-r15-crates-write-dump-2026-09-25.out`（crates 导出采集） | 35 | `E7RESULT name=done emitted=35` |
 | `research/results/e142-first-txn-dry-run-2026-09-25-position-addressed-comparison.out`（模型主产物） | 668 | `E7RESULT name=done emitted=668` |
 | `research/results/e142-first-txn-dry-run-2026-09-25-position-addressed-combined.out`（两者拼合，`replay.sh:157` 用它） | 703 | 两段各自的 `name=done` 都在 |
 | `research/results/e142-r15-crates-sha256-after-2026-09-25.txt`（快照二） | 126 | — |
@@ -73,7 +73,7 @@ E142  @driver_e142             字节一致 e142-first-txn-dry-run-2026-09-25-po
 3. 变异表：新增 M108/M109；删除 M74/M75（风险随 `compare_region` 一起消失）；改锚 M73（风险以等价形式还在 `compare_paired_write`）。
 4. 命名整改：`arm_o_text`/`arm_o_lines` → `historical_layout_reference_text`/`historical_layout_reference_lines`（`naming-lint.sh` 判「o」单字母）。
 5. crates 导出 bin 收尾补三条编译期绝对值断言（过门禁 80 号），补前补后输出逐字节相同。
-6. S4 记一笔：`crates/` 两次快照对不上（`crates/mutations.tsv`、`e158_root_choice_repair.rs` 在 03:02–03:03 UTC 改动），但这两个文件与这一段 02:55:56 UTC 采集的数据、以及 `e142_first_transaction_write_dump` 的编译图都无关，判不影响这一轮结论，交主 agent 复核。
+6. S4 记一笔：`crates/` 两次快照对不上（`crates/mutations.tsv`、`e158_root_choice_repair.rs` 在这一段采集之后改动），但这两个文件与这一段采集的数据、以及 `e142_first_transaction_write_dump` 的编译图都无关，判不影响这一轮结论，交主 agent 复核。
 7. Q142.8 的 arm O 参照记一笔：跑前冻结的 arm O 源码（sha256 `232430d2…`）已找不到（`git log` 与 `/tmp/claude-1000` 全目录搜索均未命中），改用 r14 留存产物 `research/results/e142-first-txn-dry-run-2026-09-25-header311-last-flag-arm-o.out` 当参照，S1「重跑核对」这一步做不了。
 
 ## 七、门禁（跑归属表登记给 experiment-runner 的 13 个阶段）

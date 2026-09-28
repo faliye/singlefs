@@ -1,6 +1,6 @@
 # 55 号装置包装次序：改回 Recording 在外、FaultInjecting 在里
 
-时刻 UTC（本机时钟）。里程碑 `.claude/kb/milestone/02-second-txn.md` 收尾批「55 号装置包装次序」。在草稿目录的副本里改，主工作区一个字节没动；交 `patch/`。
+里程碑 `.claude/kb/milestone/02-second-txn.md` 收尾批「55 号装置包装次序」。在草稿目录的副本里改，主工作区一个字节没动；交 `patch/`。
 
 ## 结论
 

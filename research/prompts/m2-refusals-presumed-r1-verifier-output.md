@@ -23,15 +23,15 @@ $ sed -n '196p' 草稿副本/03-空间分配.md
 
 ## 关于本轮多份 crates/ 源码同时被并行会话改写的说明（贯穿全篇的背景事实）
 
-开工快照 `start-2.sha256`（2026-09-22 13:45 重拍）只含 15 个文件的哈希、不含内容本身。核对时按以下顺序处理：
+开工快照 `start-2.sha256`（2026-09-22 重拍）只含 15 个文件的哈希、不含内容本身。核对时按以下顺序处理：
 
-| 文件 | 现状（本次核对时刻，约 22:35 UTC）与快照的关系 |
+| 文件 | 现状（本次核对时）与快照的关系 |
 |---|---|
 | 全部 7 份 `.claude/kb/decisions/*.md`（16/18/22/23/03/02/28） | 与快照哈希**逐字节相同**，可直接对主树核 |
 | `crates/singlefs-core/src/make_filesystem.rs` | 与快照哈希**相同** |
 | `crates/singlefs-format/src/lib.rs` | `git status` 干净（今日未改），视同稳定 |
-| `crates/singlefs-core/src/mount.rs` | 与快照**不同**；`stat` 显示最后一次改动在 22:14:33 UTC——**早于**这一步核对、**晚于**云端两条腿交报告的时刻。已用 Opus model 目录里 `mount-rs-opus-fixes.patch` 对 Opus 自己 rsync 副本里已打过补丁的 `mount.rs` 做 `patch -R`，回收出补丁前的原文，`sha256sum` 与快照的 `mount.rs` 哈希**完全一致**（`1bef6b8d…`）。以下用这份「回收快照」核 Opus 与 Sonnet 对 `mount.rs` 的引用 |
-| `crates/singlefs-core/src/transaction.rs`、`crates/singlefs-core/src/recovery.rs` | 与快照**不同**（`git diff --stat` 显示分别改动 1255 行、554 行）。Opus 自己 rsync 副本里（打补丁前）这两个文件的哈希与快照**完全一致**，说明这两个文件在快照时刻（13:45）到 Opus 起跑复制仓（约 21:5x）之间没有改过；Opus 报告自己交代「recovery.rs（21:56 UTC）与 transaction.rs（21:57 UTC）在这一轮中途被别的会话改过」，并说明report 里这两个文件的引用行号是之后重新现查所得，不是对着快照抄的 |
+| `crates/singlefs-core/src/mount.rs` | 与快照**不同**；`stat` 显示最后一次改动在——**早于**这一步核对、**晚于**云端两条腿交报告的时刻。已用 Opus model 目录里 `mount-rs-opus-fixes.patch` 对 Opus 自己 rsync 副本里已打过补丁的 `mount.rs` 做 `patch -R`，回收出补丁前的原文，`sha256sum` 与快照的 `mount.rs` 哈希**完全一致**（`1bef6b8d…`）。以下用这份「回收快照」核 Opus 与 Sonnet 对 `mount.rs` 的引用 |
+| `crates/singlefs-core/src/transaction.rs`、`crates/singlefs-core/src/recovery.rs` | 与快照**不同**（`git diff --stat` 显示分别改动 1255 行、554 行）。Opus 自己 rsync 副本里（打补丁前）这两个文件的哈希与快照**完全一致**，说明这两个文件在快照时刻到 Opus 起跑复制仓之间没有改过；Opus 报告自己交代「recovery.rs与 transaction.rs在这一轮中途被别的会话改过」，并说明report 里这两个文件的引用行号是之后重新现查所得，不是对着快照抄的 |
 
 ⇒ 下面核对 `mount.rs` 引用一律对「回收快照」核；核对 `transaction.rs`／`recovery.rs` 引用**两边都核**（对回收快照、对当前主树），
 两边都写出结果，不各打一半。
@@ -130,7 +130,7 @@ $ sed -n '1297,1301p' 回收快照/mount.rs
 ```
 
 `if` 判定本身在快照版 `mount.rs` 第 1299 行——**与 Opus 报告「判定点 `mount.rs:1299`」逐字对得上**（先前一度误对
-当前主树核，当前主树因今天 22:14 UTC 之后一次改动比快照多出 1 行、该判定点挪到 1300 行；对回收快照核才是对的口径，
+当前主树核，当前主树因今天后来的一次改动比快照多出 1 行、该判定点挪到 1300 行；对回收快照核才是对的口径，
 两边行号差 1 与「今天比快照多 1 行」这一事实一致，不算 Opus 引用出错）。错误成员名 `RollbackToVersionWithoutFileUnsupported`
 ——用的正是「树表 0 条」这条**候选集条文里没有的理由**。
 

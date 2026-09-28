@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# admission: always 判的是此刻 litmus/ 与代码里的锚点，上一次的结论不替这一次作保（门禁 57 号的复用另由 stage-must-run.sh 判）
-# run-condition: none herd7 与内核树由它自己找（PATH、opam、fetch-deps.sh），找不到就判红并给出路，57 号靠这一条判红，不交给调用方预判
+# admission: always 判的是此刻 litmus/ 与代码里的锚点，上一次的结论不替这一次作保（门禁 checker-tier-lkmm 的复用另由 stage-must-run.sh 判）
+# run-condition: none herd7 与内核树由它自己找（PATH、opam、fetch-deps.sh），找不到就判红并给出路，checker-tier-lkmm 靠这一条判红，不交给调用方预判
 # 用 LKMM 判内存序结论：herd7 给模型判定。
 #
 # 这是本工程自己的一份：上游 singlefs-ai-sop 2026-09-16 起不再管 herd7 / LKMM（移交那次的记录与删前原样在提交 fbae43e 里，`git show fbae43e:.claude/handover/qemu-herd7/README.md`），
 # 原文取自那里的 `sop-0.0.50-snapshot/scripts/lkmm.sh`，只改了 lib.sh 的路径、`litmus/` 改指本仓 `litmus/`。
-# 门禁阶段 `.claude/gate.d/57-lkmm.sh` 调它；提交前必跑（`.claude/rules/implementation-workflow.md`）。
+# 门禁阶段 `.claude/gate.d/checker-tier-lkmm.sh` 调它；提交前必跑（`.claude/rules/implementation-workflow.md`）。
 #
 #   lkmm.sh [项目根]                  跑 <项目根>/litmus/*.litmus
 #   lkmm.sh [项目根] --static-only    只跑不需要 herd7 的检查；全过也退 3——它不是通过
 #   lkmm.sh --herd7-version           只找 herd7（与全量判定同一段找法，PATH 里没有就试 opam 的环境），stdout 打它版本输出的第一行、退 0；
-#                                     找不到退 1。门禁 57 号经登记表（.claude/gate.d/stage-inputs.tsv）拿它判前提、把版本当复用判定的一项输入
+#                                     找不到退 1。门禁 checker-tier-lkmm 经登记表（.claude/gate.d/stage-inputs.tsv）拿它判前提、把版本当复用判定的一项输入
 #
 # 每个 .litmus 必须在文件里声明期望判定：
 #

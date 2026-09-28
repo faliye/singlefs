@@ -1,10 +1,10 @@
 # E158（择根与修复四岔路） 第 3 次跑的重跑登记：C554 怎么修（岔路单 `c554-fix` 第 1 行）
 
-写于 2026-09-27 00:41–01:2x JST（UTC 2026-09-26 15:41–16:2x），装置改写之前、任何第 3 次跑的产物之前。写的人没看第 3 次跑的任何读数（还没有）；第 2 次跑的读数读到了一部分（派发点名的执行员报告第五、十一节），全部列在第四节。
+写于 2026-09-27，装置改写之前、任何第 3 次跑的产物之前。写的人没看第 3 次跑的任何读数（还没有）；第 2 次跑的读数读到了一部分（派发点名的执行员报告第五、十一节），全部列在第四节。
 
 装置写在哪（写死）：**入库装置**——执行员改写 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`（`crates/singlefs-harness/src/bin/`），新加的模式一律以 `r3-` 起头。理由：岔路单第 1 行问的是「把甲 / 乙 / 丙三种改法各自改进 `crates/` 今天这份可写挂载路径之后，在 H1d、实七、实八那几段历史上丢不丢已确认的写、多拒几格、多读几次」，量的是 `crates/` 这份代码（与它的改法）在故障下的行为，另写独立模型答不了。各臂对 `crates/` 的改动写成 `research/mutations/e158_arms.tsv` 的新行（四列同 `crates/mutations.tsv`：说明、文件、旧串、新串；第 2 次跑的旧行不删、不改，新行的说明列以 `r3 ` 起头），在草稿目录里整树 `cp -a` 出来的副本上逐臂套用、各自编译；装置源码各臂同一份。装置要读 `crates/` 的哪些常量见 5.6：一律改成本地常量加回比断言，不直接引。
 
-**快照写死在派执行员那一刻，不在写登记这一刻**：写这份登记时 `crates/` 正在被实现员（主 agent 派发里叫 A1）改（15:41 与 15:54 UTC 两次现查之间 `mount.rs` 的行号已经挪了，第三节 3.1）。执行员开工第一步取快照：记下时刻（JST）、`git rev-parse HEAD`、`git status --porcelain crates/` 的原样输出、`crates/` 下全部文件的 sha256 汇总；全部臂的副本从**同一次** `cp -a` 派生；产物文件头第一行写这个汇总 sha256。第三节的行号与事实是 2026-09-26 15:54 UTC 在工作树上现查的，执行员在快照上按停机条款 S0 逐行重核。
+**快照写死在派执行员那一刻，不在写登记这一刻**：写这份登记时 `crates/` 正在被实现员（主 agent 派发里叫 A1）改（两次现查之间 `mount.rs` 的行号已经挪了，第三节 3.1）。执行员开工第一步取快照：记下日期、`git rev-parse HEAD`、`git status --porcelain crates/` 的原样输出、`crates/` 下全部文件的 sha256 汇总；全部臂的副本从**同一次** `cp -a` 派生；产物文件头第一行写这个汇总 sha256。第三节的行号与事实是 2026-09-27 在工作树上现查的，执行员在快照上按停机条款 S0 逐行重核。
 
 ## 一、问题
 
@@ -12,7 +12,7 @@
 
 > 写 E158（择根与修复四岔路） 第 3 次跑的重跑登记，回答岔路单 `research/prompts/c554-fix-forks.md` 第 1 行（C554 怎么修：甲 拒可写、乙 重读后再判、丙 从记录重建，对照今天）。
 > 被测条款：C554 那一行（`.claude/kb/checks-owed.md`）、D23（journal 的角色与格式） 已定项 14（影子账）与 15（由记录重建的根）、D16（发布语义） 已定项 1（择根与「根槽这一次读坏」那一行）、I-7.4（近 K 代块未被复用）。实现今天的样子读 `crates/singlefs-core/src/recovery.rs`（择根、读根环槽、重建）、`mount.rs`（影子账重建第 853 行附近 `.and_then(|newest| instance_table_of_root(devices, &newest))`、`mount_writable_with_test_only_switches`）、`system_configuration.rs`（系统配置记不记最新根的位置）、`journal.rs`。
-> 上一次登记与报告：`research/prompts/e158-r2-prereg.md`、`research/prompts/e158-r2-runner-report.md`（H1d 的造法与 800 格、实七两段历史、A1 臂的定义与它为什么没罩住——第十一节第 1、2 条）；实八那一格在 `research/prompts/m2-impl8-implementer-report.md`「交你定的」第 3 条。上一次的产物（`research/results/e158-root-choice-repair-2026-09-26-r2-all-*`）是在 2026-09-26 15:28 UTC 之前的 core 上跑的，现在复跑对不上（H1d 800 → 832 格）：这一次的登记要写明在哪一版 core 上跑（`crates/` 正被实现员 A1 改，登记写成交回之后主 agent 派执行员时再取快照）。
+> 上一次登记与报告：`research/prompts/e158-r2-prereg.md`、`research/prompts/e158-r2-runner-report.md`（H1d 的造法与 800 格、实七两段历史、A1 臂的定义与它为什么没罩住——第十一节第 1、2 条）；实八那一格在 `research/prompts/m2-impl8-implementer-report.md`「交你定的」第 3 条。上一次的产物（`research/results/e158-root-choice-repair-2026-09-26-r2-all-*`）是在 2026-09-27 之前的 core 上跑的，现在复跑对不上（H1d 800 → 832 格）：这一次的登记要写明在哪一版 core 上跑（`crates/` 正被实现员 A1 改，登记写成交回之后主 agent 派执行员时再取快照）。
 > 另外两件上一次执行员交来的，登记里一并处理：`r2-all` 那一行重出与否（随这一次在新 core 上重出，还是改指），甲-txg 两行 `verdict=fail`（PC1 在那一臂摆不出）的判定词。
 
 问法只有一种读法：岔路单只有第 1 行，四个候选（甲、乙、丙、今天）在三类历史（H1d、实七两段、实八那一格）的全部格上各报三样（丢写、多拒、多读），外加「判据用的那一样今天有没有」。第 2 次跑的岔路（旧岔路单 `m2-rootchoice-repair-r1-forks.md` 第 1、2 行）这一次不量，第 2 次跑的臂（A1、甲-txg、乙族、丁族）不带进来。
@@ -63,7 +63,7 @@
 
 | 件 | 处理（跑前写死；主 agent 认可或划掉，见 5.5 第 6、7 条） |
 |---|---|
-| `research/scripts/replay.sh` 里 E158 `@driver_e158_r2_all` 那一行（今天第 202 行，指 `e158-root-choice-repair-2026-09-26-r2-all-today.out`）复跑对不上 | **随这一次在新 core 上重出，不改指别的产物**：执行员取完快照、在工作树的 `crates/` 与快照逐字节相同的那一刻，照 `driver_e158_r2_all` 同一条命令跑 `r2-all`，产物另存 `e158-root-choice-repair-2026-09-<日>-r2-all-today.out`（日期取跑的那天，JST），登记行改指它，旧产物原样留着；文件头记快照 sha256。理由：那一行的驱动跑的就是 `r2-all` 这个模式，改指 `r3-*` 的产物等于换了被复跑的对象。约束：第 3 次跑改装置时，`r2-all` 那条路径调用的函数一律不改语义——要改就复制一份给 `r3-*` 用；只有「甲-txg 的判定词」那一件要改的打印例外。重出之后工作树的 `crates/` 再变，那一行照旧会漂，不归这一次，执行员在报告里写明 |
+| `research/scripts/replay.sh` 里 E158 `@driver_e158_r2_all` 那一行（今天第 202 行，指 `e158-root-choice-repair-2026-09-26-r2-all-today.out`）复跑对不上 | **随这一次在新 core 上重出，不改指别的产物**：执行员取完快照、在工作树的 `crates/` 与快照逐字节相同的那一刻，照 `driver_e158_r2_all` 同一条命令跑 `r2-all`，产物另存 `e158-root-choice-repair-2026-09-<日>-r2-all-today.out`（日期取跑的那天），登记行改指它，旧产物原样留着；文件头记快照 sha256。理由：那一行的驱动跑的就是 `r2-all` 这个模式，改指 `r3-*` 的产物等于换了被复跑的对象。约束：第 3 次跑改装置时，`r2-all` 那条路径调用的函数一律不改语义——要改就复制一份给 `r3-*` 用；只有「甲-txg 的判定词」那一件要改的打印例外。重出之后工作树的 `crates/` 再变，那一行照旧会漂，不归这一次，执行员在报告里写明 |
 | 甲-txg 产物里 PC1 那两行 `verdict=fail`（PC1 在那一臂的历史族里找不到能摆出前提的历史） | **判定词分开**：前提摆不出（找不到满足前提的历史）记 `verdict=not_constructible`，摆出来了而结局与构造定死的不同才记 `verdict=fail`；两种都按作废条款 V1 让那一臂的相应各行作废，但报告与实验页写明是哪一种。装置里改：第 2 次跑那几处「找不到……（V1）」的打印（执行员 `grep -n 'verdict=fail reason=\"H1c 里找不到' crates/singlefs-harness/src/bin/e158_root_choice_repair.rs` 现查）换成 `not_constructible`，第 3 次跑的全部阳性对照照同一套词。**已落盘的 `…-2026-09-26-r2-all-jia-txg.out` 不回改**（原样保存的证据）；实验页引它那两行时写明「这里的 `fail` 是前提摆不出」。重出的 `r2-all-today` 若今天那一臂的 PC1 摆得出，这一处改动不改它的任何一行；摆不出就照新词打，报告写明 |
 
 ## 二、被测条款与它引的定义
@@ -156,7 +156,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 - 用户定案 2026-09-24：这一版发布失败原样重发（实二十报告 `research/prompts/m2-lastflag-implementer-report.md` 第六节 1：同一实例失败后接着发，会留下两条同 (实例代号, checkpoint_txg) 都带末条标志的记录），原话在变更史；无实验：只定失败之后发什么，不改盘上格式。
 - `research/prompts/m2-final-code-r2-main-verification.md` 第三节 Z8（这一版发布失败原样重发，攻方没打中）；那一份的 Z9 与第四节改法 1–4 是回退见证的，随见证删掉不再承重。
 - 管理员回退改成挂着时的一次向前发布（候选集、释放、复活、水位、拒）、删前缀第五条与回退见证、影子账依据改指 H6：无实验，三方原型（`research/prompts/m2-rollback-forward-r1-opus-model/`、`m2-rollback-forward-r2-opus-model/`、`m2-rollback-forward-r3-opus-model/`）在冻结副本上量过，没立实验号，原型上的数不是入库装置上的数；三轮判决 `research/prompts/m2-rollback-forward-r1-main-verification.md`、`m2-rollback-forward-r2-main-verification.md`、`m2-rollback-forward-r3-main-verification.md`。水位取 max(内存, 环) 的收严（第三轮判决第二节 K1 的水位分句）被攻过零轮；用户定案 2026-09-25（向前发布、只在挂着的时候做）与 2026-09-26（第三轮交用户的四问），原话在变更史。
-- 主 agent 2026-09-26 定：回退那次发布之前逐盘验复活集里的每个单元（「在任何写之前拒」那一格最后一句），照用户 2026-09-25 JST 12:1x 原话「1 就是fsync失败后 两个盘掉一个盘。这个不能认，这个违背我们数据安全的承诺」（`records/2026-09-24-里程碑二收尾调度.md` 第三节那一时刻的一行），与 C519（丢一整块盘时恢复丢掉刚确认的那一版） 那一格「两份都验过才施加」同一方向；无实验，推的，被攻过零轮；多读的量随 R_old 之后释放的用户可见单元数涨，没量。
+- 主 agent 2026-09-26 定：回退那次发布之前逐盘验复活集里的每个单元（「在任何写之前拒」那一格最后一句），照用户 2026-09-25 原话「1 就是fsync失败后 两个盘掉一个盘。这个不能认，这个违背我们数据安全的承诺」（`records/2026-09-24-里程碑二收尾调度.md` 第三节那一时刻的一行），与 C519（丢一整块盘时恢复丢掉刚确认的那一版） 那一格「两份都验过才施加」同一方向；无实验，推的，被攻过零轮；多读的量随 R_old 之后释放的用户可见单元数涨，没量。
 - 用户定案 2026-09-25：点名单元两份都验过才施加、认下丢一整块盘时丢掉刚确认的那一版（C519（丢一整块盘时恢复丢掉刚确认的那一版） 实一复现：`crates/singlefs-harness/tests/second_transaction_supplement_two_c519_whole_device_loss_after_warm_up.rs`），原话在变更史；无实验：照今天的实现写成条款，另一读法「任一份验过」会不会放过 E77（发布的持久顺序） 那种嫁接没量。
 
 **欠**：C77（重放起点未定义）；C314（回退可以复用被抛弃的根引用的单元）；C554（崩溃恢复抛弃的根暂时读不出时影子账算不到）；C318（影子账隔离的单元没进准入不等式）；C331（择根倒挂压过已确认的写）；C334（切换的所选根没有会红的检查）；C365（恢复路径的链首不锚在所选根覆盖的最后一条）；C287（切换收养开放 checkpoint 的事务后再崩）；C126（切换预留的最坏量没有口径）；C493（回退候选集条文与实现说反话）；C500（所选根那条记录读不出时链首接法没有条款）；C381（根已落盘之后发布失败，分配器仍退回）——三方第二、三轮打中失败表那两支判别子（探针写在盘上没有落点、屏障类失败点连「失败的那个落点」都没有定义），用户已定「落点进地址空间表、射程逐个失败点列一张表」，第 2、4 题已定（`D16（发布语义）` 新立一条已定项、失败表改两步判别子），「实例切换取的是内存里的根」那一题定成切换重新读盘择根、带出的三件待定（`research/prompts/c381-r2-main-verification.md`、`c381-r3-main-verification.md`）；代码那一半（探针写、只读复核、实例切换、转只读）跟里程碑「第二个事务」收口表第 16 行一起挪到后面的里程碑；C458（实例切换取内存里的根，不重新读盘）：切换重新读盘择根那条会红的检查；C539（锚点读得出时下一次发布的首条序号不是 1）；C540（末条标志坏在一次发布中间，读者切出两次发布）；C541（原样重发把一次失败放大成整条发布流阻塞）；C558（回退目标是环里最旧的根时回退那次发布会写坏它）。
@@ -261,7 +261,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 ### 3.1　现查的是哪一版
 
-2026-09-26 15:54–16:01 UTC 在工作树上现查：`git rev-parse HEAD` = `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`，`git status --porcelain crates/` 共 103 行未提交改动（其中 `crates/singlefs-core/src/` 下 16 个 M、1 个 D（`rollback_witness.rs`）、1 个未跟踪）；`mount.rs` sha256 前 16 位 `7f4900cf95920cd6`、`recovery.rs` `960234cc3825b876`。15:41 与 15:54 两次现查之间，`mount.rs` 里 `let newest_table = choose_root` 那一行从第 886 行挪到第 888 行（语义没变，第 878–892 行原文重读过）——`crates/` 正在被改，3.2、3.3 两张表的行号只对这一刻成立，执行员在快照上按函数名重找（S0）。
+2026-09-27 在工作树上现查：`git rev-parse HEAD` = `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`，`git status --porcelain crates/` 共 103 行未提交改动（其中 `crates/singlefs-core/src/` 下 16 个 M、1 个 D（`rollback_witness.rs`）、1 个未跟踪）；`mount.rs` sha256 前 16 位 `7f4900cf95920cd6`、`recovery.rs` `960234cc3825b876`。两次现查之间，`mount.rs` 里 `let newest_table = choose_root` 那一行从第 886 行挪到第 888 行（语义没变，第 878–892 行原文重读过）——`crates/` 正在被改，3.2、3.3 两张表的行号只对这一刻成立，执行员在快照上按函数名重找（S0）。
 
 ### 3.2　岔路单要的「判据用的那一样今天有没有」（够判条件第二半；读代码的答案，S0 重核）
 
@@ -274,7 +274,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 ### 3.3　可写挂载今天的路径（被测那一段）
 
-| 文件:行号（15:54–16:01 UTC） | 函数 / 语句 | 它做的那件事 |
+| 文件:行号 | 函数 / 语句 | 它做的那件事 |
 |---|---|---|
 | `mount.rs:2993` 起 | `mount_writable_with_test_only_switches` | `choose_system_configuration` → `choose_root` → `scan_journal` → `replay_journal(…, true)` → `own_record`（`:3022`；认不出顶上环里最大计数器那条，`:3031`）→ `selected_version_journal_position`（`:3033`）→ `rebuild_previous_version` → `next_counter`（`:3037`）→ `first_txg_of_new_instance`（`:3043`）→ `rebuilt_allocator`（`:3050`）→ `establish_instance` |
 | `mount.rs:582`、`:589` | `rebuild_previous_version` | 重建 E 那一版，并沿链读 E 的实例表（第一次读实例表；读不出交 `InstanceTableMalformed`） |
@@ -294,7 +294,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 - 读故障：装置里已有 `MultiOffsetReadFailingBlockDevice`（`e158_root_choice_repair.rs:3607`）；harness 的 `RootRingSlotTarget` 与 `FaultSchedule::every_read_of_named_root_ring_slots_fails`（C554 那一行点名）。第 m 次读失败只有一个测试文件里的辅助函数（`crates/singlefs-harness/tests/second_transaction_step_three_formatted_pool.rs:54` `fail_the_nth_read_of_system_configuration_slot_zero_on_each_device`），库里没有。
 - C554 前半段今天的行为钉在 `crates/singlefs-harness/tests/second_transaction_supplement_two_unreadable_abandoned_root_slot.rs:224`。
 
-实现里没有的（命令原样，2026-09-26 16:0x UTC 在仓根跑；输出原样）：
+实现里没有的（命令原样，2026-09-27 在仓根跑；输出原样）：
 
 ```
 $ grep -n journal_tail crates/singlefs-core/src/mount.rs
@@ -320,7 +320,7 @@ $ grep -rn -e tree_table_rebuilt_from -e newer_root -e NewerRoot crates/singlefs
 | H1d 每臂 800 格；今天那一臂 ① 覆盖 128 / 800，② 再挂载 K0 680、K3 120，③ 读回最后确认那一版 664 / 800；A1 与今天差 2 格（n1 = 0、`unit_first_copy`、不断，K0 → K3 `AbandonedRootLedgerUnreadable`）；岔路单第 2 行六臂与今天逐格相同；按 n1 与断法：n1 = 0 的 crash / write_fails 各 68 格覆盖 56、barrier_fails 24 格覆盖 16、不断 4 格覆盖 0，n1 = 1、2、3 各 212 格覆盖 0、K3 0，「不断」那 4 格读回 `other_content` | 第 2 次跑执行员报告第五节 | ⚠️ 旧 core 上的数（报告第十一节第 4 条：新 core 上 800 → 832 格、664 → 696）。不作任何门槛、不作锚；只进第十节 F8（今天那一臂在 H1d 族上一格都不丢写就触发）。**它影响了族的选法**：「n1 ≥ 1 时一格都不覆盖、覆盖只在 n1 = 0」让我加了 H1f（n1 ≥ 1 且中间夹一次重挂载，报告第十一节第 2 条说没造）作敏感性点——先读了答案再定取样点，照 `evidence-discipline.md` 如实记 |
 | 「重跑登记里没有一条臂能量用户要改的那一形」；A1 = 被抛弃根的账读不出就拒，它在 H1d 上几乎看不见被藏的根（计数 0） | 执行员报告第十一节第 1 条、第五节 | 影响了臂的选法：A1 不带进来（它不在岔路单 c554-fix 第 1 行的候选里，且它的触发量在被藏那一形上按定义为 0）；5.1 的判据来源改从「有没有一条更新的根」判，不从被抛弃根的账判 |
 | 实七两段历史在 A1、甲-txg、乙F-留环副本上「走岔」（harness 的模型按今天的规则答），没罩住 | 执行员报告第十一节第 3 条 | 影响了实七、实八的量法：不拿 harness 的模型对拍当判据，装置按自己的账判三样（5.3） |
-| 故障注入大档种子基 + 110 = 7463871032432355223，30 步、注入 6 次，抛弃根那一步注入 `barrier_fails`，挂载报 `MountError::Publish(BlockDevice)`，重开走到 (1, 3)、报 `MappingStillUnreadable { slot: 50240 }`；崩溃注入快档种子基 + 16 = 7463871032432355129，24 步、每段 4 个崩溃状态，同一形 | 第 2 次跑登记第十二节 12.1 第 5 条与主 agent 22:5x 跑前修订；实八报告第 33–34 行 | 这是「实七两段历史」的定义（取哪段历史），不是被测结论；今天那一臂复现得出这两个签名作停机条款 S5 的锚（复现不出就停） |
+| 故障注入大档种子基 + 110 = 7463871032432355223，30 步、注入 6 次，抛弃根那一步注入 `barrier_fails`，挂载报 `MountError::Publish(BlockDevice)`，重开走到 (1, 3)、报 `MappingStillUnreadable { slot: 50240 }`；崩溃注入快档种子基 + 16 = 7463871032432355129，24 步、每段 4 个崩溃状态，同一形 | 第 2 次跑登记第十二节 12.1 第 5 条与主 agent 跑前修订；实八报告第 33–34 行 | 这是「实七两段历史」的定义（取哪段历史），不是被测结论；今天那一臂复现得出这两个签名作停机条款 S5 的锚（复现不出就停） |
 | 实八：崩溃注入种子基 + 2 = 7463871032432355115，24 步、4 个崩溃状态；(1, 4) 在第 3 步被崩溃恢复抛弃（抛弃时读不出、影子账看不到），到 txg 11 它的单元缺席；三个红状态落到 (3, 11) / (5, 15) / (5, 20)，实例表行 (1, 3, 0)，缺席的单元在偏移 822181888 | 实八报告第 19、25 行与「交你定的」第 3 条 | 「实八那一格」的定义；今天那一臂复现得出「(1, 4) 的单元在它还在根环里时被复用」作 S5 的锚 |
 | C554：独占的 14 个槽全掉出隔离集、计数仍 0 | C554 正文（第二节） | 14 是那条用例自己那段历史上的数，本装置的历史不同，不作锚；「计数 0、隔离 0」作条款锚（7.1） |
 | 代码审阅第 22 条：`newest_table` 为 `None` 时一个槽不隔离、计数 0 | `research/prompts/m2-code-review-6c/00-handover-message.md:47` | 作 PC-22 在今天那一臂上的结局（它是审阅员读代码的判断，没量过） |
@@ -419,11 +419,11 @@ N 在哪一步判（各臂同一处，跑前写死）：`mount_writable_with_tes
 7. 判定词：前提摆不出记 `not_constructible`、与 `fail` 分开；已落盘的甲-txg 产物不回改（同一处）。
 8. 「有更新的根、而重读或重建就读得出」的拒（乙、丙能免、甲免不了的那一类）只在 Q4 里按时长分栏报数，不算进岔路单定义的「多拒」；要不要把它算进「选哪个」的依据，交主 agent。
 
-**主 agent 认定（2026-09-27 JST 04:0x，装置改写与任何产物之前）**：第 1 项认——「回滚」算进出局规则（一次 `Ok` 的可写挂载在比最后确认那一版更旧的一版上往下走，就是丢了已确认的写，与覆盖、读回同样出局；用户 2026-09-25「fsync失败后 两个盘掉一个盘。这个不能认，这个违背我们数据安全的承诺」与 2026-09-26「崩溃恢复把一条暂时读不出的最新根当成被抛弃 这个不能接受」）。第 2 项认。第 3 项**划掉**：丙-不验点名 不跑（它放宽的正是 D23（journal 的角色与格式） 已定项 14 前提第四条「两份都读得出、校验和都对才施加」，与用户上面那条定案方向相反）。第 4 项认（族与取样点在读报告之后加，照实记）。第 5 项不量；候选里拒可写的那几条要是胜出，D23 已定项 18「不因此拒绝挂载」那一句要改成「只读挂载照常、可写挂载按那条改法拒」，交用户定案时一并写明。第 6、7 项认。第 8 项：这一类拒按时长分栏照报，**算进「选哪个」的依据**，排在丢写之后、多读之前（两个候选都不丢写时，先比这类可免的拒，再比多读）。\n\n### 5.6　装置要本地化的常量
+**主 agent 认定（2026-09-27，装置改写与任何产物之前）**：第 1 项认——「回滚」算进出局规则（一次 `Ok` 的可写挂载在比最后确认那一版更旧的一版上往下走，就是丢了已确认的写，与覆盖、读回同样出局；用户 2026-09-25「fsync失败后 两个盘掉一个盘。这个不能认，这个违背我们数据安全的承诺」与 2026-09-26「崩溃恢复把一条暂时读不出的最新根当成被抛弃 这个不能接受」）。第 2 项认。第 3 项**划掉**：丙-不验点名 不跑（它放宽的正是 D23（journal 的角色与格式） 已定项 14 前提第四条「两份都读得出、校验和都对才施加」，与用户上面那条定案方向相反）。第 4 项认（族与取样点在读报告之后加，照实记）。第 5 项不量；候选里拒可写的那几条要是胜出，D23 已定项 18「不因此拒绝挂载」那一句要改成「只读挂载照常、可写挂载按那条改法拒」，交用户定案时一并写明。第 6、7 项认。第 8 项：这一类拒按时长分栏照报，**算进「选哪个」的依据**，排在丢写之后、多读之前（两个候选都不丢写时，先比这类可免的拒，再比多读）。\n\n### 5.6　装置要本地化的常量
 
 装置里一律写本地常量，开跑时逐个与 `crates/` 那一份比，不等就不开跑（V3）；各臂的副本都比同一套值（这一次没有动格式常量的臂）。
 
-| 本地常量 | 比对的 `crates/` 那一份 | 2026-09-26 16:0x UTC 的值 |
+| 本地常量 | 比对的 `crates/` 那一份 | 2026-09-27 的值 |
 |---|---|---|
 | 根环区域数；每区槽数 mkfs 默认 / 下界 / 上界 | `singlefs_format::ROOT_RING_REGIONS`；`ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM` / `_MINIMUM` / `_MAXIMUM` | 3；8 / 4 / 16 |
 | journal 默认环长、记录宽、环起点槽 | `JOURNAL_RING_DEFAULT_BYTES`、`JOURNAL_RECORD_BYTES`、`JOURNAL_RING_START_SLOT` | 768 MiB、4096、1024 |
@@ -614,9 +614,9 @@ N 在哪一步判（各臂同一处，跑前写死）：`mount_writable_with_tes
 
 （留空；装置写之后、产物之前由执行员写，只许收严或补臂，写明改了什么、依据是哪个单测读数、时点在产物之前。S0 那个例外、5.1 末「N 在哪一步判」的实际读法、F6 触发之后第六节开头那句作废，也写在这里。）
 
-**执行员修订（2026-09-27 01:52 JST 落盘（文件 mtime 01:52:19），装置写完、11 条单测绿、第 3 次跑的任何产物之前——第一份产物 01:56 起跑；原判据原样保留）**
+**执行员修订（2026-09-27 落盘，装置写完、11 条单测绿、第 3 次跑的任何产物之前——落盘之后第一份产物才起跑；原判据原样保留）**
 
-快照：2026-09-27 01:20:12 JST（UTC 2026-09-26 16:20:12）取，`git rev-parse HEAD` = `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`，`crates/` 145 个文件的 sha256 清单的 sha256 = `74912842b9a57eeb09336fbe3207866c9204fd565bbc1930c994b9bede44a41a`（`git status --porcelain crates/` 104 行，原样在执行员报告里）。S0 在快照上逐条重核都没变（行号见报告）；快照里没有 A1 那种拒，S0 的例外不适用。
+快照：2026-09-27 取，`git rev-parse HEAD` = `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`，`crates/` 145 个文件的 sha256 清单的 sha256 = `74912842b9a57eeb09336fbe3207866c9204fd565bbc1930c994b9bede44a41a`（`git status --porcelain crates/` 104 行，原样在执行员报告里）。S0 在快照上逐条重核都没变（行号见报告）；快照里没有 A1 那种拒，S0 的例外不适用。
 
 | # | 写的是什么 | 依据 / 为什么 |
 |---|---|---|
@@ -657,7 +657,7 @@ N 在哪一步判（各臂同一处，跑前写死）：`mount_writable_with_tes
 | `.claude/kb/decisions/16-发布语义.md` | `grep -n '^#### 已定项'`；27–74；154–176 里 grep「择 / 骑手」命中的 158、160、171、172、175；177–193；grep「择根」命中 12、37、111、116、277 |
 | `.claude/kb/invariants.md` | grep「I-7.4」命中 12、54、107、308、350、381、417 |
 | `crates/singlefs-core/src/recovery.rs` | `grep -n '^pub fn\|^fn\|…'` 函数表；682–931；1826–2090；函数名定位行号（第三节 3.3） |
-| `crates/singlefs-core/src/mount.rs` | 函数表；72–80；560–979；878–900（15:54 重读）；1062–1131；2300–2449；2563–2700 里 grep 命中行；2965–3090；grep 命中 150、298、1073、1105、1127、1344、2394–2416 与第三节 3.3 列的各行 |
+| `crates/singlefs-core/src/mount.rs` | 函数表；72–80；560–979；878–900（第二次现查时重读）；1062–1131；2300–2449；2563–2700 里 grep 命中行；2965–3090；grep 命中 150、298、1073、1105、1127、1344、2394–2416 与第三节 3.3 列的各行 |
 | `crates/singlefs-core/src/transaction.rs` | 678–712；1014–1040；1110–1128；1645–1665；grep「journal_tail」命中 130、315、321、344、388、537、556、850、889、1018、1026、1122、1658、6399 |
 | `crates/singlefs-core/src/system_configuration.rs` | 常量与类型表（grep）；190–219；grep「journal_tail」命中 199、403、464、493、570 |
 | `crates/singlefs-core/src/journal.rs` | `JournalRecord` 字段 147–162；grep 命中 167、178、187 |
@@ -720,4 +720,4 @@ L4 cells 4*2*2 = 16
 L3 cells 4*3*2 = 24
 ```
 
-读代码与定位用的命令（输出只看了命中行，要点已写进第三节）：`git rev-parse HEAD`（`73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`）；`git status --porcelain crates/`（103 行）与 `git status --porcelain crates/singlefs-core/src/ | awk '{print $1}' | sort | uniq -c`（16 M、1 D、1 `??`，未跟踪的是 `mounted_session.rs`）；`sha256sum` 五个 core 文件（15:54 UTC，第三节 3.1 列了前 16 位）；第三节 3.3 的行号由 `grep -n -F '<函数名或语句>'` 逐个取：`mount.rs` 在 15:54 与 16:01 UTC 各取一遍、两遍都取了的几行相同，别的文件 16:01 取一遍；`git diff --stat -- crates/singlefs-core/src/mount.rs`（只看末行）；第三节「实现里没有的」三条命令（输出原样在那里）；`grep -rn -i -e virtual_clock -e nth_read -e read_ordinal crates/`（2 行，都在 `second_transaction_step_three_formatted_pool.rs`）；`grep -rn '7463871032432355113\|7_463_871_032_432_355_113' crates/ | cut -c1-200 | head -5`（前 5 行里有 `crash_injection.rs:81`）；`ls research/results/ | grep -i 'e158.*r2'`（9 个文件名）；`ls -la research/prompts/e158-r3-prereg.md`（不存在）。
+读代码与定位用的命令（输出只看了命中行，要点已写进第三节）：`git rev-parse HEAD`（`73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`）；`git status --porcelain crates/`（103 行）与 `git status --porcelain crates/singlefs-core/src/ | awk '{print $1}' | sort | uniq -c`（16 M、1 D、1 `??`，未跟踪的是 `mounted_session.rs`）；`sha256sum` 五个 core 文件（第三节 3.1 列了前 16 位）；第三节 3.3 的行号由 `grep -n -F '<函数名或语句>'` 逐个取：`mount.rs` 取了两遍、两遍都取了的几行相同，别的文件之后取一遍；`git diff --stat -- crates/singlefs-core/src/mount.rs`（只看末行）；第三节「实现里没有的」三条命令（输出原样在那里）；`grep -rn -i -e virtual_clock -e nth_read -e read_ordinal crates/`（2 行，都在 `second_transaction_step_three_formatted_pool.rs`）；`grep -rn '7463871032432355113\|7_463_871_032_432_355_113' crates/ | cut -c1-200 | head -5`（前 5 行里有 `crash_injection.rs:81`）；`ls research/results/ | grep -i 'e158.*r2'`（9 个文件名）；`ls -la research/prompts/e158-r3-prereg.md`（不存在）。

@@ -27,9 +27,9 @@
 
 **共用问句**：每一格都要回答「那一版引用的块有没有被复用、读不读得对」，答案要量，不许推。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-26 00:5x JST）
+## 二、实现今天的样子（主 agent 的观测，2026-09-26）
 
-- `crates/` 自第二轮开工快照（`research/prompts/m2-rollback-forward-r2-snapshot/crates-sha256.txt`，125 个文件）以来没改过：主 agent 2026-09-26 JST 00:3x 在主树上 `sha256sum -c` 全 OK。冻结副本由材料员重取，照第二轮的排除规则。
+- `crates/` 自第二轮开工快照（`research/prompts/m2-rollback-forward-r2-snapshot/crates-sha256.txt`，125 个文件）以来没改过：主 agent 2026-09-26 在主树上 `sha256sum -c` 全 OK。冻结副本由材料员重取，照第二轮的排除规则。
 - 挂着时回退、B1、C419 的三条臂、K3 的去重、K6、K7：`crates/` 里都没有。第二轮攻方原型 `research/prompts/m2-rollback-forward-r2-opus-model/prototype.patch` 有挂着时回退（`prototype_rollback_in_mount`）、B1（`prototype_unmount_b1`）、MAX 与 MAX+HOLD 的开关、删掉见证与截断的开关，可以借。
 - 今天的回退候选、见证、截断在冻结副本的这几处：`mount.rs` 的 `mount_rollback_with_space_admission`（`OnAbandonedTimeline` 唯一的产生处在它里面），`recovery.rs` 的 `choose_root`、`rollback_high_water_of_root`，`rollback_witness.rs`；行号由材料员照冻结副本现查。
 - I-7.9 的 checker 判定在 `crates/singlefs-checker/src/`，由材料员现查落点。
@@ -70,7 +70,7 @@
 
 ## 材料员补注：正文第二节点名的函数，行号照冻结副本现查
 
-冻结副本：`/tmp/claude-1000/m2-rollback-forward-r3/tree/crates/`（sha256 清单见 `research/prompts/m2-rollback-forward-r3-snapshot/crates-sha256.txt`，与主 agent 2026-09-26 00:3x JST 在主树上核验的 125 个文件逐个一致）。以下行号在该冻结副本里现查，用 `grep -n`／`awk` 逐行核对，未从任何背景材料或判决转抄：
+冻结副本：`/tmp/claude-1000/m2-rollback-forward-r3/tree/crates/`（sha256 清单见 `research/prompts/m2-rollback-forward-r3-snapshot/crates-sha256.txt`，与主 agent 2026-09-26 在主树上核验的 125 个文件逐个一致）。以下行号在该冻结副本里现查，用 `grep -n`／`awk` 逐行核对，未从任何背景材料或判决转抄：
 
 - **`mount_rollback_with_space_admission`**：`crates/singlefs-core/src/mount.rs` 第 2491-2648 行（`pub fn mount_rollback_with_space_admission<Device: BlockDevice>(` 起，到它的闭合 `}`，第 2649 行起是 `#[cfg(test)]` 模块，其间没有别的顶层 `fn`）。**其中 `OnAbandonedTimeline` 那一行**：第 2546 行 `exclusion: RollbackCandidateExclusion::OnAbandonedTimeline,`。核过冻结副本全仓：`RollbackCandidateExclusion::OnAbandonedTimeline` 在 `crates/singlefs-core/src/mount.rs` 里只在这一处被构造（其余命中都在 `crates/singlefs-harness/` 的测试与 `model_comparison.rs`，是消费方，以及 `crates/mutations.tsv` 里两条变异登记行），与正文「`OnAbandonedTimeline` 唯一的产生处在它里面」的说法一致。
 - **`choose_root`**：`crates/singlefs-core/src/recovery.rs` 第 669-697 行（`pub fn choose_root(` 起，到下一个顶层 `pub fn rollback_witness_of_the_pool<Reader: PoolReader + ?Sized>(` 第 698 行之前）。

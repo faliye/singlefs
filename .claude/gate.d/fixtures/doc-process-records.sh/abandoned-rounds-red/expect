@@ -1,0 +1,17 @@
+exit=1
+want=没有判决、也不在撂下登记表里
+want=drop-r3（_drop-r3-body.md、drop-r3-opus.md、drop-r3-sonnet.md）
+want=cited-r1（_cited-r1-body.md）
+want=补判决（写 research/prompts/<轮>-main-verification.md），或在 research/prompts/abandoned-rounds.tsv 加一行：轮名、日期、为什么撂下、去向
+want=日期不是 YYYY-MM-DD
+want=不是四列、或有空列
+want=dup-r1（第 
+want=认不出它们发过腿
+want=ghost-r1
+want=done-r1：判决在 research/prompts/done-r1-main-verification.md
+want=归档进版本库的腿文件读不到（git log 退出码 128
+want=样本只跑 .gate-cells 点名的格：abandoned-rounds
+want=── 汇总：doc-process-records.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-process-records.sh：1 格里 1 格红（abandoned-rounds）
+want=→ abandoned-rounds：补判决 research/prompts/<轮>-main-verification.md
+want=bash .claude/gate.d/doc-process-records.sh --check abandoned-rounds

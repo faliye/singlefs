@@ -1,0 +1,19 @@
+## 这一轮写过的文件（都在副本里，主工作区一个字没动）
+
+- `crates/singlefs-core/src/transaction.rs`：加屏障，并改了 6 处注释里的持久顺序文字（模块头两行、`PublishWrites`、零单元发布的文档与行内注释、写行那一版、带文件那一版），末尾都加上「→ 屏障」。另在 `write_the_raised_floor_into_every_system_configuration` 第一道屏障之前加了一行注释，说明同一个写入口紧跟在发布之后时，这道屏障前面没有写，写入口不发它。取号那里我也加过一行同样意思的注释，但它挡住了 `crates/mutations.tsv` 第 1301 行（实审 A3c Q1）的锚点，门禁 33 号判红，已经拿掉。第 880 行（实审 A1 第 19 条）的锚点也被挡过一次，我把那行注释挪到了锚点之前。
+- 新建 `crates/singlefs-harness/tests/a_publish_returns_only_after_the_system_configuration_rotation_is_durable.rs`。
+- `crates/mutations.tsv`：只在末尾追加 3 行，内容在 `patch/mutations-append.tsv`，变异名是：
+  - `C577：发布在系统配置轮换之后不过屏障就返回（每条发布路径返回之后见证值可以落后）`
+  - `C577：发布在系统配置轮换之后不过屏障就返回（树表 0 条的一版上返回之后见证值可以落后）`
+  - `C577：发布在系统配置轮换之后不过屏障就返回（轮换之后没有屏障可报错，发布不冻结）`
+- 补丁对主工作区 `git apply --stat` 的原样输出（我没动主工作区，所以没有 `git diff --stat -- crates litmus`）：
+
+```
+ crates/singlefs-core/src/transaction.rs            |   31 +
+ ...the_system_configuration_rotation_is_durable.rs |  523 ++++++++++++++++++++
+ 2 files changed, 543 insertions(+), 11 deletions(-)
+```
+
+- 对主工作区跑 `git apply --check /tmp/claude-1000/impl-c577-barrier/patch/crates.patch`，退出码 0。主工作区的 `transaction.rs` 最后一次改动在我建副本之前，底座就是它。
+- 补丁目录 `/tmp/claude-1000/impl-c577-barrier/patch/` 下有 `crates.patch`、`mutations-append.tsv` 和 `report.md`（这份报告的拷贝）。
+

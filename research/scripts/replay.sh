@@ -155,6 +155,9 @@ E8|e8-split||e8-split-2026-08-28.out|exact
 E9|@driver_e9||e9-keylayout-2026-08-28.out|exact
 E16|e16-journal||e16-journal-2026-08-31.out|exact
 E16|e16-journal|bytes|e16-bytes-2026-09-03.out|exact
+E16R5|e16-fifth-run-peak-under-today-widths||e16-fifth-run-peak-under-today-widths-2026-09-28.out|exact
+E16R5|e16-fifth-run-peak-under-today-widths|pc3|e16-fifth-run-peak-under-today-widths-pc3-2026-09-28.out|exact
+E16R5|e16-fifth-run-peak-under-today-widths|second_segment|e16-fifth-run-peak-under-today-widths-second-segment-2026-09-28.out|exact
 E17|e17-merge||e17-merge-2026-08-29-repro.out|timing
 E20|e20-fanout||e20-poscontrol-2026-08-29.out|timing
 E21|e21-cpu|2048 5|e21-cpu-2026-08-28.out|timing
@@ -168,7 +171,7 @@ E136|e136_fork_cost_rows||e136-fork-cost-rows-2026-09-11.out|exact
 E138|e138_per_disk_floor||e138-per-disk-floor-2026-09-11.out|exact
 E139|e139_tightened_floor||e139-tightened-floor-2026-09-12.out|exact
 E141|e141_switch_reserve_mount_admission||e141-switch-reserve-mount-admission-2026-09-14-row-writing.out|exact
-E142|@driver_e142||e142-new-pool-file-creation-dry-run-2026-09-26-r18-main-2.out|exact
+E142|@driver_e142||e142-new-pool-file-creation-dry-run-2026-09-28-r19-main-2026-09-28.out|exact
 E143|e143-one-unit-per-txn-journal||e143-one-unit-per-txn-journal-2026-09-13.out|exact
 E145|e145-self-describing-node-header||e145-self-describing-node-header-2026-09-16-tree-table-200.out|exact
 E146|e146-livelist-entry-width||e146-livelist-entry-width-2026-09-16-tree-table-200.out|exact
@@ -208,10 +211,11 @@ E158|@driver_e158_r3_seg1_today||e158-root-choice-repair-2026-09-27-r3-seg1-toda
 E158|@driver_e158_r3_seg1_compare||e158-root-choice-repair-2026-09-27-r3-seg1-compare.out|exact
 E158|@driver_e158_r4_compare||e158-root-choice-repair-2026-09-27-r4-compare.out|exact
 E159|e159-fsync-wait-group-commit|anchors|e159-fsync-wait-group-commit-2026-09-25-h311-replay.out|exact
-E162|@driver_e162_anchors||e162-crash-verdict-block-store-2026-09-27-anchors.out|exact
+E162|@driver_e162_anchors||e162-crash-verdict-block-store-2026-09-27-anchors-2026-09-28.out|exact
 E162|@driver_e162_power_cut_selftest||e162-verdict-store-power-cut-2026-09-27-selftest-r2.out|exact
 E161|@driver_e161_feasibility||e161-crash-state-dedup-and-time-split-feasibility-2026-09-27.out|timing
 E163|@driver_e163_r1_merge||e163-gpu-multicard-crc32c-2026-09-27-r1-merge.out|exact
+E164|e164-crash-amplification-design-function-test|models|e164-crash-amplification-design-function-test-2026-09-28-models.out|exact
 TSV
 )
 
@@ -651,7 +655,7 @@ driver_e158_q2_1_hc1_lower_bound() {
 driver_e158_r2_all() {
   (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- r2-all)
 }
-# E158 第 3 次跑第一段（重跑登记 `research/prompts/e158-r3-prereg.md`，2026-09-27）：`r2-all` 那一行 2026-09-27 01:21 JST 在
+# E158 第 3 次跑第一段（重跑登记 `research/prompts/e158-r3-prereg.md`，2026-09-27）：`r2-all` 那一行 2026-09-27 在
 # 开工快照上重出（工作树的 `crates/` 那一刻与快照逐字节相同，登记 S8），改指 `…-2026-09-27-r2-all-today.out`，旧产物原样留着。
 # `r3-seg1` 在九份臂副本上各跑一遍，这里只登记今天那一臂（工作树的 `crates/` 就是它）；另外八臂的产物
 # `e158-root-choice-repair-2026-09-27-r3-seg1-<臂>.out` 要在 `research/mutations/e158_arms.tsv` 的 r3 行套出来的副本上重编才跑得出来，

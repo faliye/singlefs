@@ -1,0 +1,5 @@
+10-references-and-invariants.sh rc=1 secs=2 lines=204
+20-doc-decision-documents.sh rc=1 secs=0 lines=113
+30-decision-history-entries.sh rc=0 secs=1 lines=7
+32-doc-field-and-layout-registry.sh rc=0 secs=1 lines=40
+43-checks-owed-and-closeout.sh rc=1 secs=2 lines=24

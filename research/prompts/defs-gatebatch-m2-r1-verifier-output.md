@@ -107,7 +107,7 @@ row35 c561-sigma-full:            test=… count-line=C561_SIGMA_FULL（只有 c
 
 ```
 $ grep -n "推翻\|覆盖\|不再维持\|不再作数" research/prompts/m2-layer0-scale-r3-main-verification.md
-51:**用户 2026-09-26 JST 18:5x 定案覆盖第三节「乙」那一条**（`records/2026-09-24-里程碑二收尾调度.md` 第三节「崩溃枚举的跑法」那一行，原话「这次跑可以 下次肯定要接入提交时崩溃验证员， 并且以后跑也不能全量这么跑，改了只跑改了的部分。」）：崩溃枚举按用例各自登记输入、各自复用，也就是采纳乙；第二轮打中的「按流列的清单漏新加的共用文件」照当时的修法补（清单用排除法写、指纹补第三轮 U4 那几样），由门禁批实现，它的一轮三方是 `research/prompts/_defs-gatebatch-m2-r1-body.md`。第三节那一条原文照留。
+51:**用户 2026-09-26 定案覆盖第三节「乙」那一条**（`records/2026-09-24-里程碑二收尾调度.md` 第三节「崩溃枚举的跑法」那一行，原话「这次跑可以 下次肯定要接入提交时崩溃验证员， 并且以后跑也不能全量这么跑，改了只跑改了的部分。」）：崩溃枚举按用例各自登记输入、各自复用，也就是采纳乙；第二轮打中的「按流列的清单漏新加的共用文件」照当时的修法补（清单用排除法写、指纹补第三轮 U4 那几样），由门禁批实现，它的一轮三方是 `research/prompts/_defs-gatebatch-m2-r1-body.md`。第三节那一条原文照留。
 ```
 
 这第 51 行原样写着「用户……定案**覆盖**第三节『乙』那一条」，并且逐字解释了 Sonnet 报告标为「核心发现」「字面矛盾」的那个现象：`research/prompts/m2-layer0-scale-r3-main-verification.md:25` 那句「54 号照旧按整批输入哈希记一格全绿标记」之所以仍原样留在文件里，是因为第 51 行的作者故意让「第三节那一条原文照留」——这不是矛盾没被发现，是矛盾被显式记录在同一份文件里、只是不在 Sonnet 核对的第 25 行附近。
@@ -116,13 +116,13 @@ $ grep -n "推翻\|覆盖\|不再维持\|不再作数" research/prompts/m2-layer
 
 ```
 $ stat -c '%y %n' research/prompts/m2-layer0-scale-r3-main-verification.md research/prompts/defs-gatebatch-m2-r1-sonnet-output.md
-2026-09-26 13:07:43.900565503 +0000 research/prompts/m2-layer0-scale-r3-main-verification.md
-2026-09-26 13:06:45.966676811 +0000 research/prompts/defs-gatebatch-m2-r1-sonnet-output.md
+2026-09-26 research/prompts/m2-layer0-scale-r3-main-verification.md
+2026-09-26 research/prompts/defs-gatebatch-m2-r1-sonnet-output.md
 $ git status --porcelain -- research/prompts/m2-layer0-scale-r3-main-verification.md
 ?? research/prompts/m2-layer0-scale-r3-main-verification.md
 ```
 
-`m2-layer0-scale-r3-main-verification.md` 的 mtime（13:07:43）比 sonnet-output.md 的 mtime（13:06:45）晚约 58 秒，且是未跟踪文件（`??`），说明它在 Sonnet 完成并落盘报告之后仍被写动过一次。我不能判定这次改动是不是就是第 51 行的来历、也不能判定 Sonnet 核对时那一行在不在——只能把这两条时间线摆出来：**如果第 51 行是在 Sonnet 交报告之后才补上的，那么 Sonnet 报告 1.2 节写「没有找到」是当时真实的观测；如果第 51 行早就在，Sonnet 报告这一句就是漏检**。这两种情况都不改变一个事实：**此刻**主树上的 `m2-layer0-scale-r3-main-verification.md` 已经带着覆盖第 51 行，Sonnet 报告 1.2 节据以展开的「两处权威记录互相矛盾、没有一处指向另一处」这个前提，现在不成立。
+`m2-layer0-scale-r3-main-verification.md` 的 mtime 比 sonnet-output.md 的 mtime 晚约 58 秒，且是未跟踪文件（`??`），说明它在 Sonnet 完成并落盘报告之后仍被写动过一次。我不能判定这次改动是不是就是第 51 行的来历、也不能判定 Sonnet 核对时那一行在不在——只能把这两条时间线摆出来：**如果第 51 行是在 Sonnet 交报告之后才补上的，那么 Sonnet 报告 1.2 节写「没有找到」是当时真实的观测；如果第 51 行早就在，Sonnet 报告这一句就是漏检**。这两种情况都不改变一个事实：**此刻**主树上的 `m2-layer0-scale-r3-main-verification.md` 已经带着覆盖第 51 行，Sonnet 报告 1.2 节据以展开的「两处权威记录互相矛盾、没有一处指向另一处」这个前提，现在不成立。
 
 这一条不是「引用与产物对不上」的普通 ✗，而是核对对象本身在腿交回之后发生了变化；按定义第 6 步与「分不清」单列，不计入下面的 ✗ 计数，但因为它直接冲击 Sonnet 报告的核心结论，单独加粗标出，供主 agent 逐条现查时优先看。
 
@@ -180,9 +180,9 @@ $ git status --porcelain -- research/prompts/m2-layer0-scale-r3-main-verificatio
 方法：`cp -r research/prompts/defs-gatebatch-m2-r1-opus-model/. /tmp/claude-1000/defs-gatebatch-r1-verifier/opus-rerun/`；`rerun.sh` 与 `probe_common.py` 里用相对路径的深度计算真实仓根，拷到别处会算错，改成硬编码绝对路径（`research/scripts/replace-once.py` 定点替换，仅改这两行，只在草稿副本上），指向的仍是这台机器上未经改动的真实仓（只读）。改动记录：
 
 ```
-$ python3 research/scripts/replace-once.py rerun.sh 'repo="$(cd "$here/../../.." && pwd)"' 'repo="/home/fy5090/code/singlefs"'
+$ python3 research/scripts/replace-once.py rerun.sh 'repo="$(cd "$here/../../.." && pwd)"' 'repo="<仓根>"'
   ✓ rerun.sh：命中 1 次，已替换
-$ python3 research/scripts/replace-once.py probe_common.py 'REPOSITORY = os.path.dirname(...)' 'REPOSITORY = "/home/fy5090/code/singlefs"'
+$ python3 research/scripts/replace-once.py probe_common.py 'REPOSITORY = os.path.dirname(...)' 'REPOSITORY = "<仓根>"'
   ✓ probe_common.py：命中 1 次，已替换
 ```
 
@@ -297,7 +297,7 @@ $ python3 research/scripts/oov-check.py …-s1.md ; echo exit=$?
 - 没有判 J1（假复用等语义漏洞）、J2、J3、J4 的攻击是否站得住——那是主 agent 的判决权，我只核 Opus 报告里写的字面引用与复跑数字是否与仓里的实况、与我自己重跑出的数字一致。
 - 没有对 `crates/` 做任何改动，也没有跑任何重型测试、没有执行 54 号本身、没有跑任何门禁阶段。
 - `probe_j3_environment` 的复跑只核对了「改前=改后」这个相对关系，没有、也不可能核对绝对哈希值本身（临时路径每次不同，是这个探针的构造决定的，不是我核对方法的缺口）。
-- 没有重新判定 `research/prompts/m2-layer0-scale-r3-main-verification.md` 第 51 行的「用户 18:5x 定案覆盖第三节『乙』」这句话本身是不是合法、够不够格推翻 r3 判决的挂起——那是主 agent 的判决权（`.claude/rules/three-way-inference.md`「判决由主 agent 做，不由投票做」）；我只报告这句话现在存在、它直接回应了 Sonnet 报告标为「核心发现」的那个现象，以及这句话可能是在 Sonnet 交报告之后才写入的（mtime 证据），无法进一步确定写入的确切时刻是不是真的晚于 Sonnet 核对的那一刻。
+- 没有重新判定 `research/prompts/m2-layer0-scale-r3-main-verification.md` 第 51 行的「用户定案覆盖第三节『乙』」这句话本身是不是合法、够不够格推翻 r3 判决的挂起——那是主 agent 的判决权（`.claude/rules/three-way-inference.md`「判决由主 agent 做，不由投票做」）；我只报告这句话现在存在、它直接回应了 Sonnet 报告标为「核心发现」的那个现象，以及这句话可能是在 Sonnet 交报告之后才写入的（mtime 证据），无法进一步确定写入的确切时刻是不是真的晚于 Sonnet 核对的那一刻。
 - 没有核 Opus 报告「没打中的形状」一节里全部叙述性描述（例如注释剥离、符号链接、Cargo.toml 注释）逐条重跑，这些多数是没有构造出攻击格、没有产物可比对的叙述；只核了里面有具体命令与产物编号的那几处（已在第三节列出）。
 - 没有核实 Opus 报告的「四句」自证段落（分辨臂/看不看得到/满足哪个分句/改法还中不中）——那是分析性文字，不是引用或产物，不属于我的核对范围。
 - 没有重跑 `ask-local.sh` 本身去验证本地腿的样本是模型真实产出而非伪造——运行记录声称的命令与判定我核对了产物（wc、两道闸）能不能自洽，但没有能力重新调用同一个本地模型网关去验证「这份输出确实是那次调用产生的」这个更底层的事实，只能确认现有产物内部各项数字互相吻合、且过闸。

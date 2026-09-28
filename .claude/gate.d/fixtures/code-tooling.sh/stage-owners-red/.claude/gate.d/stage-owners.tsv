@@ -1,0 +1,8 @@
+# 样本表（红）：四列，门禁文件名、格名、判红时派给谁修、为什么
+10-a.sh	a1	alpha	样本理由
+10-a.sh	a1	beta	重复登记
+20-b.sh	b1	ghost	没有这个定义
+20-b.sh	b9	alpha	20-b.sh 没有这一格
+40-gone.sh	g1	alpha	门禁目录里没有这道门禁
+20-b.sh	b1	alpha
+30-c.sh	c1	alpha	样本理由

@@ -29,7 +29,7 @@ $ awk 'NR==32' /tmp/claude-1000/defs-closeout-r3-verifier/selftest/experiment-ru
 | L7 `r2-main-verification.md:32`（G2 原文整行） | ✓ | `sed -n '32p' research/prompts/defs-m2-closeout-r2-main-verification.md` 命中原样 |
 | L11 `experiment-runner.md:31`（G2 改后整行） | ✓（判别力自证同一条） | `grep -nF "这一次的新文件也不删……" .claude/agents/experiment-runner.md` → 31 |
 | L23 `.claude/gate.d/40-results-cited.sh:19`（case 分支整行） | **✗ 实际在第 33 行**。sonnet 自己的 `rerun.sh` 第 5 节独立 grep 同一句，输出就是 `33:  case "$b" in …`——同一份报告内部自相矛盾，不是事后被改（mtime 2026-09-23 早于 r3 全部产物） | `grep -n 'r\[0-9\]\.out' .claude/gate.d/40-results-cited.sh` → 33；对照 `sonnet-rerun-output.txt` 第 95 行同样是 33 |
-| L27 「攻方 H2 附带的一格……」引 `/tmp/…/defs-closeout-r2-fixes/report.md:639` | **分不清**：该文件不在快照内，且全文只有 495 行，639 号行不存在；实际原句在第 222 行。文件 mtime 03:25:26，早于 sonnet 报告 mtime 04:01:04，不能排除是抄错而非事后改动，按本轮口径记「分不清」而非 ✗ | `wc -l report.md` → 495；`grep -n '附带的一格' report.md` → 222 |
+| L27 「攻方 H2 附带的一格……」引 `/tmp/…/defs-closeout-r2-fixes/report.md:639` | **分不清**：该文件不在快照内，且全文只有 495 行，639 号行不存在；实际原句在第 222 行。文件 mtime 早于 sonnet 报告 mtime，不能排除是抄错而非事后改动，按本轮口径记「分不清」而非 ✗ | `wc -l report.md` → 495；`grep -n '附带的一格' report.md` → 222 |
 | L33 `r2-main-verification.md:35`（G5 原文整行） | ✓ | `sed -n '35p' …` 命中原样 |
 | L37 `experiment-runner.md:33`（G5 改后整行） | ✓ | `grep -nF "在报告里逐个点名其中表示「没过」的字段" .claude/agents/experiment-runner.md` → 33 |
 | L63 `r2-main-verification.md:37`（G7 原文整行） | ✓ | `sed -n '37p' …` 命中原样 |
@@ -44,7 +44,7 @@ $ awk 'NR==32' /tmp/claude-1000/defs-closeout-r3-verifier/selftest/experiment-ru
 | L97 `34-experiment-index-sync.sh:67-69` | ✓ | `sed -n '67,69p'` 命中三行 |
 | L97 `75-decision-experiment-links.sh:40-41` | ✓ | `sed -n '40,41p'` 命中两行 |
 | L109 `84-verdict-false-named.sh:73`、`86-experiment-orphans.sh:13`、`85-repro-command.sh:14` | ✓（三处均命中） | `sed -n '73p' 84-…`、`sed -n '13p' 86-…`、`sed -n '14p' 85-…` |
-| rerun.sh 复跑（`defs-m2-closeout-r3-sonnet-model/rerun.sh`） | ✓ 逐字节一致 | 拷到草稿目录跑（脚本对 `$ROOT` 只读不写，仓 42G 无法整仓拷贝，改为直接指向主树、输出落草稿目录）：`nice -n 19 bash rerun.sh /home/fy5090/code/singlefs > sonnet-rerun-output.txt`；`diff` 零输出，`sha256sum` 与 `rerun-output-2026-09-26.txt` 一致（`680e04ac…`） |
+| rerun.sh 复跑（`defs-m2-closeout-r3-sonnet-model/rerun.sh`） | ✓ 逐字节一致 | 拷到草稿目录跑（脚本对 `$ROOT` 只读不写，仓 42G 无法整仓拷贝，改为直接指向主树、输出落草稿目录）：`nice -n 19 bash rerun.sh <仓根> > sonnet-rerun-output.txt`；`diff` 零输出，`sha256sum` 与 `rerun-output-2026-09-26.txt` 一致（`680e04ac…`） |
 
 **计数**：核了 20 处（17 file:line 引用 + 1 引 kb 原句 + rerun 复跑 + G5 判决行表已随 rerun 输出核对，见下）；✓ 17，✗ 2（L23 行号错，L67 掉字），分不清 1（L27，非快照文件）。
 G5 表（L45-56，「今天全部判决行各落哪一边」10 行）与 rerun 输出第 6 节的 26 行判决行逐一比对，字段与取值全部能在产物里找到、分类未见与判据字面矛盾之处（此为观测，判据成不成立仍由主 agent 判）。
@@ -70,7 +70,7 @@ Opus 报告里绝大多数引用标了「整行」，逐条 `sed -n '<行>p'` �
 | `research/scripts/replay.sh:50`（不在快照内） | ✓ | `sed -n '50p'` 命中 E14 登记行 |
 | `research/scripts/check-segment-registry.py:25`（不在快照内） | ✓ | `sed -n '25p'` |
 | `.claude/kb/experiments.md:165`（不在快照内） | ✓，含「67108885」与 opus 引用一致 | `sed -n '165p'` |
-| `research/scripts/memory-peaks.tsv:910`「2265972736 … every_crash_state_outside…」（不在快照内） | **分不清**：今天第 910 行是另一条记录，原句现在在第 919 行；`memory-peaks.tsv` mtime 04:24:09 **晚于** opus 报告 mtime 04:16:35，与「腿交回之后被改过」直接吻合（很可能是别的会话之后又跑了几次门禁、往表里追加了记录，把原来第 910 行的内容顶到了 919 行） | `grep -n 2265972736 research/scripts/memory-peaks.tsv` → 919；`stat -c '%y' research/scripts/memory-peaks.tsv research/prompts/defs-m2-closeout-r3-opus-output.md` |
+| `research/scripts/memory-peaks.tsv:910`「2265972736 … every_crash_state_outside…」（不在快照内） | **分不清**：今天第 910 行是另一条记录，原句现在在第 919 行；`memory-peaks.tsv` mtime **晚于** opus 报告 mtime，与「腿交回之后被改过」直接吻合（很可能是别的会话之后又跑了几次门禁、往表里追加了记录，把原来第 910 行的内容顶到了 919 行） | `grep -n 2265972736 research/scripts/memory-peaks.tsv` → 919；`stat -c '%y' research/scripts/memory-peaks.tsv research/prompts/defs-m2-closeout-r3-opus-output.md` |
 | `awk … 峰值表 0 行`（R6 现查命令） | ✓ 今天复跑同样 0 行 | `awk -F'\t' '!/^#/ && $4 ~ /54-layer0|57-lkmm|55-qemu|lkmm\.sh|herd7/' research/scripts/memory-peaks.tsv \| wc -l` → 0 |
 | 「仓里 git 跟踪的 3349 个文件」（G4 节） | ✓ | `git ls-files \| wc -l` → 3349 |
 | SHA256SUMS（12 个探针/演示文件） | ✓ 12/12 OK | `sha256sum -c SHA256SUMS` |

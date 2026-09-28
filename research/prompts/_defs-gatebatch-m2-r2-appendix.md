@@ -216,7 +216,7 @@ omitClaudeMd: true
 
 - 正文 `research/prompts/_defs-gatebatch-m2-r1-body.md`，背景材料 `_defs-gatebatch-m2-r1-background.md`，附录二 `_defs-gatebatch-m2-r1-diff.md`（门禁批 diff 的「改前」一侧是它 `cp -p` 的备份，不是某个 git 提交，射程只到这一批），开工快照 `research/prompts/defs-gatebatch-m2-r1-snapshot/sha256sums.txt`（派核查员前主 agent 核过 11 个全 OK）。
 - 腿：云端正推 `defs-gatebatch-m2-r1-sonnet-output.md`（只做文字核对，探针目录空）；云端攻方 `defs-gatebatch-m2-r1-opus-output.md`（模型 `defs-gatebatch-m2-r1-opus-model/`）；本地攻方 `-local-attack-output-s1.md`、`-s2.md` 两份干净（本地攻方的定义被别处把 `model` 改成 `local-model`，换账号后起不来，主 agent 派发时给 `model: sonnet` 覆盖）。
-- 核查员 `defs-gatebatch-m2-r1-verifier-output.md`：104 处 ✓101 ✗1 分不清 1。✗ 在正推：它说 `.claude/gate.d/stage-inputs.tsv` 四条崩溃枚举行的 `count-line=` / `exhaustive=` / `threads=` 都齐，实际第 34 行（会话里推抬 F 那条）三项全缺、第 35 行（c561 那条）只有 `count-line=`。分不清的那一处：正推说层 0 规模第三轮判决里没有一处写「覆盖」，核查员现跑是 1 处（第 51 行）——那一行是主 agent 在正推交回之后照它的报告补的（正推报告 13:06:45 UTC，那一行 13:07:43 UTC），正推核的时候确实没有，它判得对。攻方 38 处引用与 12 处复跑全 ✓，J1-a、J1-b、J4-b 三格复跑逐字节一致。
+- 核查员 `defs-gatebatch-m2-r1-verifier-output.md`：104 处 ✓101 ✗1 分不清 1。✗ 在正推：它说 `.claude/gate.d/stage-inputs.tsv` 四条崩溃枚举行的 `count-line=` / `exhaustive=` / `threads=` 都齐，实际第 34 行（会话里推抬 F 那条）三项全缺、第 35 行（c561 那条）只有 `count-line=`。分不清的那一处：正推说层 0 规模第三轮判决里没有一处写「覆盖」，核查员现跑是 1 处（第 51 行）——那一行是主 agent 在正推交回之后照它的报告补的（正推报告，那一行），正推核的时候确实没有，它判得对。攻方 38 处引用与 12 处复跑全 ✓，J1-a、J1-b、J4-b 三格复跑逐字节一致。
 
 ```
 
@@ -237,7 +237,7 @@ omitClaudeMd: true
 | J4-a 闸的绕法 | 打中（量过，只喂 JSON）：`cargo nextest`、`cargo mutants`、`--config` 别名与 runner、`CARGO_TARGET_*_RUNNER`、拷走测试二进制再执行、`find -exec`、`/usr/bin/time`、`flock`、`rustup run`、`chrt`、`systemd-run --scope`、`prlimit`；包装这一类以前就有，层 0 同样放行 | 攻方 |
 | J4-b 用例的 ignore 没人查 | **打中（量过）**：去掉 c561 那条的 `#[ignore]` 之后，不带 `--ignored` 的命令跑 2^18 个状态，闸放行、`crash-cases` 自查退 0 | 攻方、核查员复跑 |
 | J4-c 误拒 | 打中、危害小：`-- --ignored --list`、`--include-ignored --exact <一条快用例>` 被拒 | 攻方 |
-| J5 文字 | 几份文字之间没有互相矛盾，都改成了逐条复用；层 0 规模第三轮判决「乙不采纳」与用户 18:5x 定案之间没写覆盖——主 agent 已在那份判决第四节之后补了覆盖记录；正推说的「四行三项都齐」不对（核查员 ✗），见 Y8 | 正推、核查员 |
+| J5 文字 | 几份文字之间没有互相矛盾，都改成了逐条复用；层 0 规模第三轮判决「乙不采纳」与用户定案之间没写覆盖——主 agent 已在那份判决第四节之后补了覆盖记录；正推说的「四行三项都齐」不对（核查员 ✗），见 Y8 | 正推、核查员 |
 | 本地 | 两份样本一致：四条用例保留、减去的文件数与四个抽样文件的去留与 `admission.py crash-case-manifest` 现跑对得上 | 本地、核查员 |
 
 ```
@@ -301,5 +301,5 @@ omitClaudeMd: true
 **出处 `records/2026-09-24-里程碑二收尾调度.md:190-190`（整段抄，未转述）**
 
 ```markdown
-| 崩溃枚举的跑法（用户 2026-09-26 JST 18:5x） | 用户原话：「这次跑可以 下次肯定要接入提交时崩溃验证员， 并且以后跑也不能全量这么跑，改了只跑改了的部分。」起因：实五按主 agent 规格加了一条在会话推的抬 F 那一串上做小枚举的用例（`second_transaction_crash_inside_the_floor_raise_pushed_by_the_session`，20,493 个状态，debug 下单跑约 12 分钟、约 16 核），它是这条新写路径唯一的崩溃证据，层 0 两条流在 4 GiB 盘上碰不到准入被拒（推的）。**定**：① 这一次照跑；实五证红做完后给它加 `#[ignore]`，写明提交时由崩溃验证员按输入哈希跑（release）。② 门禁批（实六之后）把它接进提交时崩溃验证员那一组，在 `.claude/gate.d/stage-inputs.tsv` 登记它读的输入，输入没变复用上一次全绿判定。③ 以后崩溃枚举一律按用例 / 按流各自登记输入、各自复用，改了哪块只重跑读它的那几条——就是层 0 规模第二轮挂起的乙；第二轮打中「按流列的清单漏新加的共用文件」，门禁批照当时的修法做：清单用排除法写（整个 `crates/` 减去别的流自己的用例文件）、指纹补第三轮 U4 那几样；被攻过零轮，改的是门禁与崩溃验证员定义，照「改 agent 定义与共用约束，走同一条三步」走一轮三方 |
+| 崩溃枚举的跑法（用户 2026-09-26） | 用户原话：「这次跑可以 下次肯定要接入提交时崩溃验证员， 并且以后跑也不能全量这么跑，改了只跑改了的部分。」起因：实五按主 agent 规格加了一条在会话推的抬 F 那一串上做小枚举的用例（`second_transaction_crash_inside_the_floor_raise_pushed_by_the_session`，20,493 个状态，debug 下单跑约 12 分钟、约 16 核），它是这条新写路径唯一的崩溃证据，层 0 两条流在 4 GiB 盘上碰不到准入被拒（推的）。**定**：① 这一次照跑；实五证红做完后给它加 `#[ignore]`，写明提交时由崩溃验证员按输入哈希跑（release）。② 门禁批（实六之后）把它接进提交时崩溃验证员那一组，在 `.claude/gate.d/stage-inputs.tsv` 登记它读的输入，输入没变复用上一次全绿判定。③ 以后崩溃枚举一律按用例 / 按流各自登记输入、各自复用，改了哪块只重跑读它的那几条——就是层 0 规模第二轮挂起的乙；第二轮打中「按流列的清单漏新加的共用文件」，门禁批照当时的修法做：清单用排除法写（整个 `crates/` 减去别的流自己的用例文件）、指纹补第三轮 U4 那几样；被攻过零轮，改的是门禁与崩溃验证员定义，照「改 agent 定义与共用约束，走同一条三步」走一轮三方 |
 ```

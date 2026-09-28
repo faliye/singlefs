@@ -1,0 +1,27 @@
+--- a/crates/singlefs-harness/src/memory_pool.rs
++++ b/crates/singlefs-harness/src/memory_pool.rs
+@@ -747,7 +747,23 @@
+                 slots.insert(write.offset.0 / SLOT_BYTES);
+             }
+         }
+-        Some(slots.into_iter().collect())
++        // 攻方副本（F1 改法）：候选槽只留「这一槽上最后一次持久了的单元写从这一槽开头」的那些。
++        let last_covering_write_starts_here = |slot: u64| {
++            let slot_start = slot * SLOT_BYTES;
++            self.writes
++                .iter()
++                .zip(&self.persisted)
++                .filter(|(write, is_persisted)| {
++                    **is_persisted
++                        && write.kind == StepKind::UnitWrite
++                        && write.device.0 == device
++                        && write.offset.0 < slot_start + SLOT_BYTES
++                        && slot_start < write.offset.0 + write.length_in_bytes()
++                })
++                .last()
++                .is_none_or(|(write, _)| write.offset.0 == slot_start)
++        };
++        Some(slots.into_iter().filter(|slot| last_covering_write_starts_here(*slot)).collect())
+     }
+     fn candidate_journal_slots(&self, device: u32) -> Option<Vec<u64>> {
+         let ring_start = JOURNAL_RING_START_SLOT * SLOT_BYTES;

@@ -1,13 +1,13 @@
-# 实八报告（implementation-writer，接手 a710b10cf8d3e4f74；UTC 2026-09-26 14:21–14:45 写）
+# 实八报告（implementation-writer，接手 a710b10cf8d3e4f74；2026-09-26 写）
 
 ## 结论
 - 三件都做完、各带用例、证过会红，`crates/mutations.tsv` 末尾追加 13 行（第 813–825 行），4 行证过、9 行留给门禁 59 号。
 - 动到的、名字不带 layer0 的测试二进制：崩溃注入那个二进制里只剩快档那一条红，红的正是规格第 4 条点名的 C554 那一形；其余 5 个二进制全绿。
-- 出口里「build 过」**这一刻不成立，但不是这一轮的改动造成的**：另一个会话 14:41 UTC 在改 `crates/singlefs-harness/src/layer0_progress.rs`（未跟踪文件，加了 `shard` 字段与 `RunOneShardKeepingProgressFile` / `MergeShardLedgers` 两个成员），`crash.rs` 第 1884、2220 行（层 0 续跑那一段，不是我改的地方）跟着编不过。门禁 74 号与 33 号也红在这里。14:30 UTC 以前（那个会话改之前）我这边 clippy、release 编译都过，6 个二进制也在那时跑过。
+- 出口里「build 过」**这一刻不成立，但不是这一轮的改动造成的**：另一个会话在改 `crates/singlefs-harness/src/layer0_progress.rs`（未跟踪文件，加了 `shard` 字段与 `RunOneShardKeepingProgressFile` / `MergeShardLedgers` 两个成员），`crash.rs` 第 1884、2220 行（层 0 续跑那一段，不是我改的地方）跟着编不过。门禁 74 号与 33 号也红在这里。以前（那个会话改之前）我这边 clippy、release 编译都过，6 个二进制也在那时跑过。
 - 推翻条件：崩溃注入快档种子基 + 2 或故障注入大档种子基 + 116 在当前构建上复跑又出新发现；或者 13 行变异里有一条被 59 号判「没红」。
 
 ## 前任做到哪、我接着做了什么
-前任（14:08–14:11 UTC）已经做完 (b)(d) 的模型、胶水、执行器接线、按注入点认的判定、`inject_one_fault` 里的计算，还有一条 lib 单元测试。我核过这些，一处没改。它的最后一句「Now the computation in inject_one_fault」说的那段已经在文件里、编得过。
+前任已经做完 (b)(d) 的模型、胶水、执行器接线、按注入点认的判定、`inject_one_fault` 里的计算，还有一条 lib 单元测试。我核过这些，一处没改。它的最后一句「Now the computation in inject_one_fault」说的那段已经在文件里、编得过。
 没做的是：(c) 整件、三件的固定用例、变异行、收尾那几样。这些我补齐了。
 
 ## 三件各怎么做的
@@ -47,19 +47,19 @@
 
 留给门禁 59 号、没单独证的 9 行：814、816、817、818（b），820、821、822、823（d），825（c，`abandons` 的 `>` 改 `>=`，点名 (c) 用例里 (1, 3) 那一半）。变异名以 `实八 (b)` / `实八 (d)` / `实八 (c)` 开头。13 行原文都用 `rows.py` 在主工作区核过恰好命中一次，门禁 33 号也没点它们。
 
-## 第 4 步那几样（主工作区；末行原样；时刻都是 UTC）
-- 负载：14:24 与 14:3x 两次 `ps` 都没有 cargo、qemu、fio，没等锁。
-- 动到的测试二进制（14:33 UTC，release，`bash research/scripts/run-with-memory-cap.sh 16G bash research/scripts/capped.sh 10 bash /tmp/claude-1000/impl-rbf-8/run-touched-2.sh`，日志在 `/tmp/claude-1000/impl-rbf-8/logs2/touched/`）：
+## 第 4 步那几样（主工作区；末行原样）
+- 负载：两次 `ps` 都没有 cargo、qemu、fio，没等锁。
+- 动到的测试二进制（release，`bash research/scripts/run-with-memory-cap.sh 16G bash research/scripts/capped.sh 10 bash /tmp/claude-1000/impl-rbf-8/run-touched-2.sh`，日志在 `/tmp/claude-1000/impl-rbf-8/logs2/touched/`）：
   - `-p singlefs-harness --lib`：`test result: ok. 78 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.32s`
   - `-p singlefs-checker --lib`：`test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s`
   - `--test second_transaction_supplement_three_fault_injection`：`test result: ok. 13 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 5.46s`
   - `--test second_transaction_supplement_three_crash_injection`：`test result: FAILED. 7 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.26s`（红的是快档，C554 那一形，见「第 4 条」一节）
   - `--test record_checker_judges_absence_by_the_persisted_set`：`test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.70s`
   - `--test second_transaction_supplement_two_record_checker_reuse_legality`：`test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s`
-  - 随机历史那个二进制（模型改了，也是门禁 74 号跑的那一个）：主工作区 cargo 编不过（另一个会话的原因），所以直接跑了 14:30:44 UTC 编出来的 `target/release/deps/second_transaction_supplement_three_random_history-4ae23017673bae18`。它编译时我的语义改动已经全在里面，之后只动过 rustfmt 排版和测试文件。经 `run-with-memory-cap.sh 16G` 跑：`test result: ok. 24 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 39.34s`，六段「模型对拍 N 步」N 都大于 0。
-- `cargo fmt --all -- --check`（14:44）：退出 1，`Diff in` 只出现在 `crates/singlefs-harness/src/layer0_progress.rs`（6 处，另一个会话的文件）；我改的文件都用 `rustfmt --edition 2021` 单独排过。末行原样：`         merged.ledger_paths.push(path);`
-- `cargo clippy --offline --all-targets --all-features -- -D warnings` 加 check.sh 那 7 条 lint（14:3x，另一个会话动手之前）：退出 0，末行原样 `    Finished \`dev\` profile [unoptimized + debuginfo] target(s) in 0.75s`
-- `cargo build --offline --all-targets`（14:41）：退出 101，末行原样 `error: could not compile \`singlefs-harness\` (lib test) due to 5 previous errors`。报错全在 `layer0_progress.rs:1723/1733/1751` 和 `crash.rs:1884/2220`：`toolchain_never_asked` 找不到、`Layer0ProgressPlan` 缺 `shard`、`Layer0Resume` 多了两个成员。`layer0_progress.rs` 是未跟踪文件，14:41:37 UTC 被改过；`crash.rs` 里那几处是层 0 分片续跑，快照对比显示是 14:04–14:29 之间别人加的，不在我改的第 15 行和第 700–782 行里。
+  - 随机历史那个二进制（模型改了，也是门禁 74 号跑的那一个）：主工作区 cargo 编不过（另一个会话的原因），所以直接跑了编出来的 `target/release/deps/second_transaction_supplement_three_random_history-4ae23017673bae18`。它编译时我的语义改动已经全在里面，之后只动过 rustfmt 排版和测试文件。经 `run-with-memory-cap.sh 16G` 跑：`test result: ok. 24 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 39.34s`，六段「模型对拍 N 步」N 都大于 0。
+- `cargo fmt --all -- --check`：退出 1，`Diff in` 只出现在 `crates/singlefs-harness/src/layer0_progress.rs`（6 处，另一个会话的文件）；我改的文件都用 `rustfmt --edition 2021` 单独排过。末行原样：`         merged.ledger_paths.push(path);`
+- `cargo clippy --offline --all-targets --all-features -- -D warnings` 加 check.sh 那 7 条 lint（另一个会话动手之前）：退出 0，末行原样 `    Finished \`dev\` profile [unoptimized + debuginfo] target(s) in 0.75s`
+- `cargo build --offline --all-targets`：退出 101，末行原样 `error: could not compile \`singlefs-harness\` (lib test) due to 5 previous errors`。报错全在 `layer0_progress.rs:1723/1733/1751` 和 `crash.rs:1884/2220`：`toolchain_never_asked` 找不到、`Layer0ProgressPlan` 缺 `shard`、`Layer0Resume` 多了两个成员。`layer0_progress.rs` 是未跟踪文件被改过；`crash.rs` 里那几处是层 0 分片续跑，快照对比显示是两次快照之间别人加的，不在我改的第 15 行和第 700–782 行里。
 - 登记给我的门禁阶段（`nice -n 19 bash research/scripts/capped.sh 10 bash .claude/gate.d/<文件>`，74 号设了 `GATE_MODEL_DIFFERENTIAL_MEMORY_MAX=16G`）：
   - 33 号，退出 1，末行 `    → crates 这张表：把原文改到今天源码里逐字存在、只出现一次的那一段（原文里的换行写成 \n），改完单跑那几行证明点名的测试红。`。点名的只有 `crates/mutations.tsv:794`、`:799` 两行（实六续跑，原文在 `layer0_progress.rs` 里命中 0 次），都是那个会话正在改的文件，不是我追加的行。
   - 53 号，退出 0，末行 `  ✓ 格式常量文件里的占位都指得到分项或欠账（4 个占位：…）`
@@ -83,7 +83,7 @@
 `git diff --stat -- crates litmus` 原样（这些是多个会话自上次提交以来的全部改动，分不出谁改的）：`82 files changed, 11814 insertions(+), 7164 deletions(-)`
 
 ## 交主 agent 的
-1. **主工作区现在编不过**，原因是另一个会话在改 `crates/singlefs-harness/src/layer0_progress.rs`（14:41 UTC，未跟踪），`crash.rs` 里配套的改动（第 1884、2220 行）也没改完。不在交给我的「别的会话在改」清单里，我没碰。门禁 33、74 号也红在这里。那边收工之后要重跑 build 与 74 号。
+1. **主工作区现在编不过**，原因是另一个会话在改 `crates/singlefs-harness/src/layer0_progress.rs`（未跟踪），`crash.rs` 里配套的改动（第 1884、2220 行）也没改完。不在交给我的「别的会话在改」清单里，我没碰。门禁 33、74 号也红在这里。那边收工之后要重跑 build 与 74 号。
 2. **(c) 的实现取法是我定的**，条款只写了「按恢复落到的那一版的实例表判为被抛弃」：
    - 那一版的实例表，取记录流里写出这个根身份的最后一次根槽写所带的指针，在崩溃后镜像上沿链读，解析用的是 checker 那一份，不用 core 的。前提是同一实例里实例表不重写（core 里只有 `mount.rs:1890` 写行那次发布是 `InstanceTablePlan::Rewrite`），并且由记录重建的根的实例表指针照所选根（D23（journal 的角色与格式） 已定项 15）。
    - 读不出、或者根身份在基镜像里时，一律不豁免（偏严）。
@@ -93,11 +93,11 @@
 ## 没做什么
 - 没走三方对抗；层 0、QEMU、herd7 和 crates 变异整表归 `crash-verifier`；没提交。
 - 13 行变异里 9 行没单独证红，留给门禁 59 号。
-- 主工作区的 `cargo build --all-targets`、门禁 74 号没有在我的改动上跑绿，被另一个会话的编译错误挡住；74 号那个二进制用 14:30 UTC 的预编版本跑过，全绿。
+- 主工作区的 `cargo build --all-targets`、门禁 74 号没有在我的改动上跑绿，被另一个会话的编译错误挡住；74 号那个二进制用的预编版本跑过，全绿。
 - 崩溃注入快档还红在 C554 那一形（规格第 4 条），没修，也没 ignore。
 - 随机历史与故障注入的大档没整档跑，只复跑了两个复现种子。
 
 ## 草稿与清理
 - 删了：`/tmp/claude-1000/impl-rbf-8/copies/diag`（1.1G，诊断副本，含它自己的 target）；`/tmp/claude-1000/impl-rbf-8/copies/proof`（1.2G，证红副本，含它自己的 target）。
 - 留着的是报告和复跑材料，都在 `/tmp/claude-1000/impl-rbf-8/` 下：`progress-2.md`、`logs/`（复现日志、编译日志）、`logs2/`（动到的二进制、门禁、随机历史、fmt 的日志）、`proof-logs/`（证红日志）、`rows.py`、`rows.tsv`（13 行变异原文）、`mutate-one.py`、`proof-run.sh`、`run-touched-2.sh`。前任的 `before/`、`progress.md`、`logs/` 里它那几份，我没动。
-- `/tmp/singlefs-crash-injection-1155558-seedbase-7463871032432355115` 是前任 14:05 UTC 跑大档留下的判红镜像，不是我建的，没动。
+- `/tmp/singlefs-crash-injection-1155558-seedbase-7463871032432355115` 是前任跑大档留下的判红镜像，不是我建的，没动。

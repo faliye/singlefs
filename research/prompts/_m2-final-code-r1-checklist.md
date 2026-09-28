@@ -1,4 +1,4 @@
-# 小节清单：`m2-final-code-r1`（材料员生成，2026-09-25 01:38 JST / 2026-09-24 16:38 UTC）
+# 小节清单：`m2-final-code-r1`（材料员生成，2026-09-25）
 
 `python3 research/scripts/kb-sections.py` 全量生成，未再过滤（8 份文件：正文里点名的 6 份决策文件 + `invariants.md` + `checks-owed.md`）。8 份全部由正文里字面出现的 `D<n>（`／`C<n>（`／`I-<n>.<m>（` 编号命中（`quote-kb.py` 的 `--cited` 正则），不需要材料员另外补文件；`D3（空间分配）` 解析到 `.claude/kb/decisions/03-空间分配.md`（`glob` 命中「03-」这一个前缀，唯一）。
 

@@ -17,7 +17,7 @@
 ## 核法说明
 
 - 代码引文：核对 `refs/sop/m2-closeout-code-r1-snapshot` 的 `git archive` 副本（草稿目录 `/tmp/claude-1000/m2-closeout-code-r1-verifier/citecheck-tree/`），逐个用 `sha256sum -c` 与 `crates-src-sha256.txt` 核过一致（56 份全部 `OK`，命令与输出见下）。
-- kb 引文：kb-at-start 10 份文件用的以 `kb-at-start/` 为准；报告引到的 kb 文件不在这 10 份里的（如 D19、D2、D28 部分小节、checks-owed.md 里的行——checks-owed.md 本身在 10 份内），先查它在主工作区的 `git log`/`git status`：mtime 与最近一次提交都早于对应腿的开工时刻（2026-09-27 00:20:29 起）且工作区无未提交改动的，按主树核，判定记 ✓/✗；本报告核到的这几份（D19、D2、D28、checks-owed.md 的引用行、`records/2026-09-27-代码审阅38条去向.md`）逐一查过，均无腿开工之后的改动。
+- kb 引文：kb-at-start 10 份文件用的以 `kb-at-start/` 为准；报告引到的 kb 文件不在这 10 份里的（如 D19、D2、D28 部分小节、checks-owed.md 里的行——checks-owed.md 本身在 10 份内），先查它在主工作区的 `git log`/`git status`：mtime 与最近一次提交都早于对应腿的开工时刻（2026-09-27 起）且工作区无未提交改动的，按主树核，判定记 ✓/✗；本报告核到的这几份（D19、D2、D28、checks-owed.md 的引用行、`records/2026-09-27-代码审阅38条去向.md`）逐一查过，均无腿开工之后的改动。
 - `research/scripts/cite-check.py` 只认「「quote」（`path:line`）」与「`path:line`：「quote」」两种同行写法；报告里大量用「kb 原文（`path:line`）：「quote」」（location 在括号里、quote 另起）这种脚本认不出的写法，以及跨物理行的多行引用（Rust `///` 文档注释换行、`- ` 列表符号），这些逐条人工核对，见下表。
 - 复跑：把 opus 模型目录的 4 份用例与 `rerun.sh` 拷进快照 `git archive` 副本，在 `/tmp/claude-1000/m2-closeout-code-r1-verifier/rerun-opus/` 跑（含 `.git`？——实为纯 `tar` 副本，无 `.git`；`rerun.sh` 本身按快照 `git archive` 生成副本，未改写法），线程上限 5（`capped.sh 5`）、内存上限 12G（`run-with-memory-cap.sh 12G`），`nice -n 19`。
 
@@ -36,7 +36,7 @@ $ cd /tmp/claude-1000/m2-closeout-code-r1-verifier/citecheck-tree && sha256sum -
 | D18-已定项?（`18-块里携带什么信息.md:314`，第 42 行） | ✓ | 见判别力自证一节，未改行号时判绿 |
 | `mount.rs:2947-2956` 文档字面「照可写挂载同一套核」（第 42 行，无「」引号） | ✓：`mount.rs:2947-2956` 在快照里确有该函数文档 | `sed -n '2947,2956p' crates/singlefs-core/src/mount.rs`（citecheck-tree） |
 | D23 已定项 14（`23-journal的角色与格式.md:379`，第 90 行）「cur 那一版的账里仍分配、而 new 不引用的落点，释放代 = new 的 txg」 | ✓ | cite-check.py 判绿（第 6 处之一） |
-| D19 已定项 5 硬规则 1（`19-块指针的结构与宽度预算.md:112`，第 91 行）「另一块盘上那一份对得上也一起留，各盘的账保持对称」 | ✓，但该文件不在 kb-at-start 10 份快照内；查过 `git log`/`git status`：最近一次改动 2026-09-25T13:29:57Z，早于腿开工（00:20:29），工作区无未提交改动 → 按主树核，行 112 逐字含引文 | `grep -n` 现查；见上文核法说明 |
+| D19 已定项 5 硬规则 1（`19-块指针的结构与宽度预算.md:112`，第 91 行）「另一块盘上那一份对得上也一起留，各盘的账保持对称」 | ✓，但该文件不在 kb-at-start 10 份快照内；查过 `git log`/`git status`：最近一次改动 2026-09-25，早于腿开工，工作区无未提交改动 → 按主树核，行 112 逐字含引文 | `grep -n` 现查；见上文核法说明 |
 | D23 已定项 14「在任何写之前拒」一格（`23-journal的角色与格式.md:383`，第 111 行）「cur 的账里仍分配的单元分配器不会发出去，不在逐盘验之内」 | ✓ | cite-check.py 判绿 |
 | D13 已定项 4（`13-验证路线.md:71`，第 155-157 行）两条子引文（「不是单元写……这一类」「新旧不同的那一截……不按扇区」） | ✓✓：两条都逐字含在 kb-at-start D13 第 71 行内；cite-check.py 因引用位置与「」quote 不在同一行未捕获，人工核对 | `sed -n '71p'` 比对，见报告文本 |
 | D13 已定项 4（`13-验证路线.md:73`，第 159 行）「两条层 0 流上取第三态的只有系统配置槽写」 | ✓ | cite-check.py 判绿（第 6 处之一） |
@@ -96,7 +96,7 @@ $ cd /tmp/claude-1000/m2-closeout-code-r1-verifier/citecheck-tree && sha256sum -
 $ sed -n '464,465p' citecheck-tree/crates/singlefs-format/src/lib.rs
     /// 码 2 头宽按字段表的三段加起来：只在这份单测里用，核下面那几个字面量；core、checker、模型各自的那一份不调它
     /// （三份的交叉断言在 `crates/singlefs-harness/tests/index_node_header_width_computed_three_ways_agrees_for_every_key_width.rs`）。
-$ sed -n '506,507p' /home/fy5090/code/singlefs/crates/singlefs-format/src/lib.rs
+$ sed -n '506,507p' crates/singlefs-format/src/lib.rs
     /// 码 2 头宽按字段表的三段加起来：只在这份单测里用，核下面那几个字面量；core、checker、模型各自的那一份不调它
     /// （三份的交叉断言在 `crates/singlefs-harness/tests/index_node_header_width_computed_three_ways_agrees_for_every_key_width.rs`）。
 ```

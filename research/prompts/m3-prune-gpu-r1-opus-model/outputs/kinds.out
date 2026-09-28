@@ -1,0 +1,2 @@
+E7RESULT name=attack_kind_string overwrites=30 publishes=33 distinct_kind_strings=3 kind_strings_with_several_condition_signatures=1 detail=["SS|UUUUUUUUUUUUUUUUUUUUUUUUUUUU|JJ|R|SS=>{\"reuse=false,root_slot_rewrite=false,journal_slot_rewrite=false\", \"reuse=false,root_slot_rewrite=true,journal_slot_rewrite=false\"}"] must_be_nonzero=1
+E7RESULT name=done emitted=2

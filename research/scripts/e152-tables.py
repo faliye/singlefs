@@ -70,7 +70,7 @@ GROUPS = [
         ("capacity_total_percent", "总容量 %"),
         ("capacity_available_percent", "可用 %"),
     ]),
-    ("singlefs（两块 16 GiB 盘，门禁 55 号的真设备二进制）", [
+    ("singlefs（两块 16 GiB 盘，门禁 checker-tier-qemu-device-streams 的真设备二进制）", [
         ("singlefs_write_path_milliseconds", "mkfs + 取号 + 暖机 + 新池新建文件 ms"),
         ("singlefs_file_overwrite_milliseconds", "覆盖写、释放、回退与复用（覆盖写 B）ms"),
         ("singlefs_file_overwrite_inner_milliseconds", "发布 B（二进制自己计）ms"),

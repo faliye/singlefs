@@ -1,3 +1,0 @@
-exit=1
-want=写「99 条在用」，而 invariants.md 实际在用 3 条
-want=360-样例.md:5 写「26 条不变量在用」，而 invariants.md 实际在用 3 条

@@ -1,8 +1,8 @@
 # 实 C554 乙：挂载时有更新的根读不出，先重读一次，还读不出就拒可写——实现员报告
 
-写于 2026-09-27（UTC 00:29 开工；JST 09:29 起）。规格 `/tmp/claude-1000/impl-c554-yi/spec.md`；里程碑 `.claude/kb/milestone/02-second-txn.md` 收尾批「实 C554 乙」。
+写于 2026-09-27。规格 `/tmp/claude-1000/impl-c554-yi/spec.md`；里程碑 `.claude/kb/milestone/02-second-txn.md` 收尾批「实 C554 乙」。
 交补丁：在草稿目录的副本 `/tmp/claude-1000/impl-c554-yi/work/` 里改，补丁在 `/tmp/claude-1000/impl-c554-yi/patch/`，主工作区一个字没动。
-副本取于 2026-09-27 00:29:14Z（`rsync -a --exclude target --exclude .git`，主工作区当时 HEAD `260fa60a`），基线 sha 见 `base/sha-at-copy.txt`。
+副本取于 2026-09-27Z（`rsync -a --exclude target --exclude .git`，主工作区当时 HEAD `260fa60a`），基线 sha 见 `base/sha-at-copy.txt`。
 
 ## 一、结论
 
@@ -75,7 +75,7 @@
 
 ## 七、条款：哪一句要改或补才说得上「乙」（交主 agent 派书记员；我不写 kb）
 
-原文整行照抄（行号 2026-09-27 01:2xZ 在主工作区现取）。
+原文整行照抄（行号 2026-09-27Z 在主工作区现取）。
 
 `.claude/kb/decisions/23-journal的角色与格式.md` 第 400 行（已定项 14 射程）原文：
 
@@ -184,7 +184,7 @@ test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 没换行、点名的用例我改过或靠改过的帮手的旧行也复证了：`步 3：取号不核判定时算出的号`（001，formatted_pool 常数 4 → 5 之后仍红在 `mount.rs:3326` 的断言）、D8 已定项 8 ② 两条与 `publish_first_file 退回按水位判`、`只读挂载认中央映射树…写死 15`（005、006、007、014，改过的 `the_first_file_version_after_a_recovery_dropped_…`）、C503 两条、C518、第 27 行 ④（009、011、012、013）。
 
-**没红的一条**：`C503（隔离位清零的时机条文与实现说反话）：清隔离位时不看环里别的被抛弃根还引用不引用（多清）`（010）。在 `repo/`（今天的代码、没改动）上同样没红（`logs/prove-red-base/`，命令原样 `bash research/scripts/prove-red.sh --copy /tmp/claude-1000/impl-c554-yi/repo singlefs-harness "C503（…）：清隔离位时不看环里别的被抛弃根还引用不引用（多清）"`，输出「✗ … 没红」）——不是这一轮带进来的（主 agent 01:3xZ 来消息：那一行是 A2c 换过锚点的既有变异），在我的副本与今天的代码上都没红，没改它，留给门禁 59 号。
+**没红的一条**：`C503（隔离位清零的时机条文与实现说反话）：清隔离位时不看环里别的被抛弃根还引用不引用（多清）`（010）。在 `repo/`（今天的代码、没改动）上同样没红（`logs/prove-red-base/`，命令原样 `bash research/scripts/prove-red.sh --copy /tmp/claude-1000/impl-c554-yi/repo singlefs-harness "C503（…）：清隔离位时不看环里别的被抛弃根还引用不引用（多清）"`，输出「✗ … 没红」）——不是这一轮带进来的（主 agentZ 来消息：那一行是 A2c 换过锚点的既有变异），在我的副本与今天的代码上都没红，没改它，留给门禁 59 号。
 
 留给门禁 59 号的：追加的 14 行每行都证过（上表），没有「只追加、没证」的行。
 
@@ -239,7 +239,7 @@ repo/（今天）：同样这五行，逐字相同
 89-closeout-row27-preconditions.sh exit 77   ⊘ 本次未跑：收口表第 27 行那几笔的前置一个都没进来，今天无对象可判（5 条逐字探针、覆盖 4 笔，逐条对上今天的值）；主工作区上同样退 77
 74-model-differential.sh exit 1   ✗ 随机历史的测试二进制判红（签名是 ModelDisagreement，第三节；`repo/`——取副本那一刻的主工作区——上照 74 号跑法同样红，签名是 I-7.4，`logs/rh-repo.log`）
 ```
-补丁对主工作区的核（2026-09-27 01:3xZ，主工作区那一刻的样子）：`git apply --check --verbose /tmp/claude-1000/impl-c554-yi/patch/crates.patch` 八份逐个 `Checking patch …`、退 0；`python3 research/scripts/apply-writer-patch.py /tmp/claude-1000/impl-c554-yi/patch --dry-run` 原样 `✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 1151 行`、退 0。
+补丁对主工作区的核（2026-09-27Z，主工作区那一刻的样子）：`git apply --check --verbose /tmp/claude-1000/impl-c554-yi/patch/crates.patch` 八份逐个 `Checking patch …`、退 0；`python3 research/scripts/apply-writer-patch.py /tmp/claude-1000/impl-c554-yi/patch --dry-run` 原样 `✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 1151 行`、退 0。
 
 `git diff --stat -- crates litmus`：我没改主工作区，这条命令在主工作区上报的是别的会话的改动，不代表这一件；补丁的 stat 见下（`git apply --stat` 原样）。
      crates/singlefs-core/src/mount.rs                  |  440 +++++++++++++

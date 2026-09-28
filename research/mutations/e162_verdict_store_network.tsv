@@ -1,0 +1,2 @@
+M28_M15_库进程不校验帧CRC半帧补零照写键已在就跳过	        let accepts_torn_frames = self.receive_mode == ReceiveMode::TornAccepting;	        let accepts_torn_frames = true;
+S3修订十_V14收严读法不看库进程收过几条连接	        && number_field(&run.library_network, "connections") >= 2	        && number_field(&run.library_network, "connections") >= 0

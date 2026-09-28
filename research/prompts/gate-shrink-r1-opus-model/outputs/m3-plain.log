@@ -1,0 +1,24 @@
+  ── evidence-in-repo：跑出来的产物与引来的依据都要落在仓里，不许只留在 /tmp
+  ✗ 这些实验装置与变异表这一轮改了，research/results/ 里却没有一份不比它旧的产物——这一跑多半只留在 /tmp 的草稿里：
+     research/e7-index-bench/src/bin/e901_stale_product.rs（装置源码，改于 2026-09-05）：最新的 E901 产物 research/results/e901-stale-product-2026-09-01.out 还是 2026-09-01 那份
+     research/e7-index-bench/src/bin/e907_comment_and_code.rs（装置源码，改于 2026-09-05）：最新的 E907 产物 research/results/e907-comment-and-code-2026-09-01.out 还是 2026-09-01 那份
+     research/e7-index-bench/src/bin/e910_fingerprint_stale.rs（装置源码，改于 2026-09-05）：E910 的输入与产物头的指纹对不上，最新带指纹的产物 research/results/e910-fingerprint-stale-2026-09-06.out 记的是 000000000000，今天的输入是 0231a823b58e
+     research/mutations/e902_no_product.tsv（变异表，改于 2026-09-05）：research/results 下一份 E902 的产物都没有
+     → 怎么办：跑一次把产物存进 research/results/，并在 research/scripts/replay.sh 把这个实验的登记行指到它。
+               这一跑已经跑过、产物还在 /tmp 的草稿目录里，就现在拷进来（会话一重启那个目录就没了）；
+               只改了 // 注释的装置这一格不判；改了字符串里的路径，照 .claude/rules/path-moves.md 第 4 条连同留存产物一起改，复跑仍逐字相同。
+               登记了准入的实验（.claude/gate.d/stage-inputs.tsv 有 E<号> 那一行）按产物头的输入指纹判：指纹对不上就是产物跟不上今天的输入，
+               重跑一次（装置入口放行并把新指纹打在产物头），修改时刻新旧不作数。
+  ✗ 这些按要求才跑的实验装置改了、没有新产物，实验页也没写明之后没有正式跑：
+     research/e7-index-bench/src/bin/e908_on_request_no_note.rs（装置源码，改于 2026-09-05）：E908 按要求才跑，实验页没写明装置改过之后没有正式跑（只认这一轮新加进实验页的那一句）
+     research/e7-index-bench/src/bin/e911_on_request_old_note.rs（装置源码，改于 2026-09-05）：E911 按要求才跑，实验页没写明装置改过之后没有正式跑（只认这一轮新加进实验页的那一句）
+     → 怎么办：不用跑（research/on-request-experiments.tsv 里的实验只在用户说跑时才跑）；
+               这一轮在实验页新写一句「装置某日改过（改了什么），之后没有正式跑」，要数的时候等用户说跑；页里早先那句说的是上一次改装置，不算。
+  ✗ 这些地方把 /tmp 下的东西当依据引用了——那是会话自己的草稿目录，一重启就没了，三个月后没人核得动：
+     .claude/kb/sample-owed.md:3：…| 样本欠账 | 2026-09-18 还清，依据：/tmp/claude-1000/sample-round/report.md
+     research/prompts/newround-r1-opus.md:4：…2. 实现员报告 `/tmp/claude-1000/sample-impl/report.md
+     → 怎么办：把 /tmp 下那份东西拷进仓里该在的位置（报告、提示与判决进 research/prompts/，跑出来的数进 research/results/），
+               引用改成指那一份：在引用它的文件里把 /tmp 路径逐处换成仓内路径。
+               原件已经没了，就写明它没了、把还核得动的那部分落进仓里；只是在说做法（草稿放在哪），把句子里的依据词去掉。
+  ✗ 实验页与产物跑了 1 格，1 格判红：evidence-in-repo（退 1）
+     → 怎么办：按上面那一格自己的出路改；改完只重跑那一格：bash .claude/gate.d/34-doc-experiment-pages-and-products.sh --check <格名>。

@@ -1,0 +1,4 @@
+exit=1
+want=这一段模型一步都没判：「随机历史：偏向抬 F 之后复用的取样点」（用例 reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms）
+want=样本只跑 .gate-cells 点名的格：model-reuse-sampling
+want=model-reuse-sampling：红（退出 1）

@@ -1,6 +1,6 @@
 # D19（块指针的结构与宽度预算） 未定项 8·第二轮·主 agent 核实与判决
 
-**口径**：2026-09-12（JST）主 agent 写。材料 `_d19-item8-r2-background.md`；第一轮核实见 `d19-item8-r1-main-verification.md`。第二轮立场对调：Opus 正推、Sonnet 反推。
+**口径**：2026-09-12 主 agent 写。材料 `_d19-item8-r2-background.md`；第一轮核实见 `d19-item8-r1-main-verification.md`。第二轮立场对调：Opus 正推、Sonnet 反推。
 
 | 腿 | 文件 | 状况 |
 |---|---|---|

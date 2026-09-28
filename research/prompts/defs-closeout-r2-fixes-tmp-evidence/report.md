@@ -1,10 +1,10 @@
 # defs-m2-closeout-r2 改法 G1–G9 落地报告
 
-写于 2026-09-26 03:2x UTC（JST 12:2x）。依据：`research/prompts/defs-m2-closeout-r2-main-verification.md` 第三节（G1–G9）与第二节（H1–H9）；原文、探针与 G4 的收严取自 `research/prompts/defs-m2-closeout-r2-opus-output.md` 与 `research/prompts/defs-m2-closeout-r2-opus-model/`（`f13-fix-g1.sh`、`cases-f13.json`、`probe.py`）。
+写于 2026-09-26。依据：`research/prompts/defs-m2-closeout-r2-main-verification.md` 第三节（G1–G9）与第二节（H1–H9）；原文、探针与 G4 的收严取自 `research/prompts/defs-m2-closeout-r2-opus-output.md` 与 `research/prompts/defs-m2-closeout-r2-opus-model/`（`f13-fix-g1.sh`、`cases-f13.json`、`probe.py`）。
 改前备份：`/tmp/claude-1000/defs-closeout-r2-fixes/before/`（开工时 `cp -p`，11 份文件加 74 号样本目录）；改前 / 改后 sha256：同目录 `start-sha256.txt`、`end-sha256.txt`；改后全量 diff：`/tmp/claude-1000/defs-closeout-r2-fixes/my-changes-final.diff`（258 行，11 份文件；74 号样本没改），本报告末尾原样附上。
 开工时 `sha256sum -c research/prompts/defs-m2-closeout-r2-snapshot/sha256sums.txt` 24 个全 OK（第二轮快照之后没人动过这批文件）。
 只动了放行的文件；没 checkout / restore / reset / clean，没提交。三个脚本（弹窗闸、74 号、15 号）都是先在草稿目录写好、验过，再拷成同目录临时文件、`chmod --reference`、`mv` 换上；装上后 `cmp` 与草稿逐字节相同。
-最后一处改动 03:16:28 UTC（`three-way-local-defense.md`），七道门禁 03:17:33 UTC 起跑，之后 11 份文件的 sha256 与 `end-sha256.txt` 逐行相同。
+最后一处改动，七道门禁起跑，之后 11 份文件的 sha256 与 `end-sha256.txt` 逐行相同。
 
 ## 一、G1–G9 逐条
 
@@ -128,8 +128,8 @@ exit=0
   ✓ research 构建通过，2 个测试批次、共 2 个单测全绿
 exit=0
 == peaks
-9437184	2026-09-26T03:13:52Z	8G	cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
-28311552	2026-09-26T03:13:52Z	8G	gate 15-research-build: cargo test --release (research)
+9437184	2026-09-26	8G	cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
+28311552	2026-09-26	8G	gate 15-research-build: cargo test --release (research)
 ```
 
 私有峰值表里两行的上限列都是 8G、键是设计的那两个：两条 cargo 确实在包装里、按默认上限跑的。
@@ -198,7 +198,7 @@ exit=1
 
 样本走「没有 Cargo.toml、有录好的输出」那一支，碰不到经包装的 cargo 那一支，所以样本没改；那一支靠第三 b 节的假根演示。15 号没有样本目录、也没有 `--selftest`（`ls .claude/gate.d/fixtures/ | grep '^15'` 空），没有可单跑的自证；假根演示是它唯一跑过的一次。
 
-## 四、门禁判定行（原样；03:17:33–03:21:35 UTC 逐道跑，都在最后一处改动之后，`nice -n 19`；日志在 `gates/`）
+## 四、门禁判定行（原样，逐道跑，都在最后一处改动之后，`nice -n 19`；日志在 `gates/`）
 
 | 门禁 | 原样判定行 | 退出码 |
 |---|---|---|

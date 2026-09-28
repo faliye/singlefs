@@ -11,9 +11,9 @@ B10	detector	three-way-attack	fg	exit=0
 H1	heavy	crash-verifier	fg	exit=0	
 H2	heavy	crash-verifier	fg	exit=2	✗ 重型测试被拒：herd7（herd7）：crash-verifier 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 H2b	heavy	implementation-writer	fg	exit=2	✗ 重型测试被拒：herd7（herd7）：implementation-writer 不跑「herd7」
-H3	heavy	gate-triage	fg	exit=2	✗ 重型测试被拒：脚本 /home/fy5090/code/singlefs/.claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：gate-triage 不跑「herd7」
-H3b	heavy	crash-verifier	fg	exit=2	✗ 重型测试被拒：脚本 /home/fy5090/code/singlefs/.claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：crash-verifier 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-
-H3c	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：脚本 /home/fy5090/code/singlefs/.claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request
+H3	heavy	gate-triage	fg	exit=2	✗ 重型测试被拒：脚本 .claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：gate-triage 不跑「herd7」
+H3b	heavy	crash-verifier	fg	exit=2	✗ 重型测试被拒：脚本 .claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：crash-verifier 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-
+H3c	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：脚本 .claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request
 H5	heavy	implementation-writer	fg	exit=2	✗ 重型测试被拒：.claude/scripts/lkmm.sh（herd7）：implementation-writer 不跑「herd7」
 H6	heavy	implementation-writer	fg	exit=2	✗ 重型测试被拒：.claude/scripts/lkmm.sh（herd7）：implementation-writer 不跑「herd7」
 H6b	heavy	crash-verifier	fg	exit=2	✗ 重型测试被拒：.claude/scripts/lkmm.sh（herd7）：crash-verifier 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
@@ -38,12 +38,12 @@ H27	heavy	crash-verifier	rib	exit=0
 H21	heavy	crash-verifier	fg	exit=0	
 H22	heavy	implementation-writer	fg	exit=0	
 H23	heavy	implementation-writer	fg	exit=2	✗ 不经内存包装跑编译出来的代码被拒：cargo test（implementation-writer 不经 run-with-memory-cap.sh）
-H24	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（/home/fy5090/code/singlefs）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-req
+H24	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（<仓根>）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-req
 H24b	heavy	主 agent	fg	exit=0	
 H26	heavy	gate-triage	fg	exit=0	
 H29	heavy	implementation-writer	fg	exit=0	
 H30	heavy	gate-triage	fg	exit=0	
-H31	heavy	gate-triage	fg	exit=2	✗ 重型测试被拒：在工作区根（/home/fy5090/code/singlefs/research）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：gate-triage 不跑「全量测试」
+H31	heavy	gate-triage	fg	exit=2	✗ 重型测试被拒：在工作区根（research）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：gate-triage 不跑「全量测试」
 A1	ask	主 agent	fg	exit=2	✗ 弹窗里有 1 句带断言词，同一句里却没有出处，也没写明是推的——这样送到用户面前，推断就被当成了事实：
 A2	ask	主 agent	fg	exit=0	
 A3	ask	主 agent	fg	exit=2	✗ 弹窗里有 1 句带断言词，同一句里却没有出处，也没写明是推的——这样送到用户面前，推断就被当成了事实：

@@ -1,4 +1,4 @@
-# 运行记录：checkpoint-trigger-r1-local-attack（2026-09-22 UTC）
+# 运行记录：checkpoint-trigger-r1-local-attack（2026-09-22）
 
 提示文件：`research/prompts/checkpoint-trigger-r1-local-attack.md`（英文，覆盖 K3 三支打不打架
 的三问，加 K1 里「journal 环已占用的字节这个量今天在 crates/ 里存不存在」那一格；4 道 judgment，

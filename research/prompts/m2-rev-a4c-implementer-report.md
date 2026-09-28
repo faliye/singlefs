@@ -1,8 +1,8 @@
 # 实审 A4c 报告：准入「按最坏情况计」——每块盘改几片叶、用户数据落得下的槽、压小容量传进挂载准入
 
-时刻：2026-09-26 23:29 – 2026-09-27 00:3x UTC（JST 2026-09-27 08:29 – 09:3x）。规格 `/tmp/claude-1000/impl-rev-a4c/spec.md`。
-副本 `/tmp/claude-1000/impl-rev-a4c/copy`（23:29:15Z 取，那一刻在改文件的 sha256 在 `sha256-at-copy.txt`）做改动与证红；探针在另一份副本 `copy-probe` 里（只在副本里的探针函数与用例，源码存 `probes/`）。
-往主工作区搬之前，我那 4 份文件在主工作区里与取副本时逐字节相同（`sha256-main-now.txt`，00:00 UTC 核），改动照副本搬进主工作区，搬完逐份 `cmp` 相同。
+日期：2026-09-27。规格 `/tmp/claude-1000/impl-rev-a4c/spec.md`。
+副本 `/tmp/claude-1000/impl-rev-a4c/copy`（开工时取，那一刻在改文件的 sha256 在 `sha256-at-copy.txt`）做改动与证红；探针在另一份副本 `copy-probe` 里（只在副本里的探针函数与用例，源码存 `probes/`）。
+往主工作区搬之前，我那 4 份文件在主工作区里与取副本时逐字节相同（`sha256-main-now.txt` 核），改动照副本搬进主工作区，搬完逐份 `cmp` 相同。
 
 ## 一、结论
 
@@ -239,7 +239,7 @@ CRASH-COUNT overwrite-after-raise-ok
   基线（不改源码、同一组参数）：`test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.68s`（`prove-red-logs/baseline.log`），基线红集为空；改坏之后：`test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.70s`（`prove-red-logs/001.log`）。
 - 没加的变异：第 3 件的挂载两处是等价变异（第四节）；崩溃枚举那份只改钉值，点名它的既有一行（`crates/mutations.tsv` 第 777 行「崩在准入推的那一串空发布中间…」，参数不带 `--ignored`、那条用例标了 ignore）照旧，留给 59 号，我没在副本里跑它。
 
-## 七、第 4 步那几样（主工作区，00:0x UTC；开跑前 `ps` 看到别的会话一条 `cargo test --offline -p singlefs-harness --lib` 在跑，没有性能测量；等锁多久没量）
+## 七、第 4 步那几样（主工作区；开跑前 `ps` 看到别的会话一条 `cargo test --offline -p singlefs-harness --lib` 在跑，没有性能测量；等锁多久没量）
 
 动到的测试二进制与 core 单测（`nice -n 19 bash research/scripts/capped.sh 5 bash research/scripts/run-with-memory-cap.sh 8G bash /tmp/claude-1000/impl-rev-a4c/run-main-mine.sh`，debug），各末行原样：
 
@@ -256,7 +256,7 @@ singlefs-core --lib: test result: ok. 127 passed; 0 failed; 0 ignored; 0 measure
 
 ```text
 $ grep '^Diff in' main-fmt.log | sed -E 's/:[0-9]+:$//' | sort | uniq -c
-     67 Diff in /home/fy5090/code/singlefs/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs
+     67 Diff in crates/singlefs-harness/src/bin/e158_root_choice_repair.rs
 ```
 
 `cargo clippy --offline --all-targets --all-features -- -D warnings` 加 `check.sh` 那 7 条：第一次红在我加的第 8 个参数（`too_many_arguments`，`mount.rs` 第 3376 行），加了 `#[allow(…, reason)]`；第二次整仓跑红在别人的文件上（原样节选）：
@@ -305,7 +305,7 @@ build exit=101
 - 89 号退 77（本次未跑），按没判写。
 - 74 号红：`second_transaction_supplement_three_random_history` 22 过、2 红，红的是
   `crash_recovery_abandoning_the_newest_root_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43` 与 `random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation`。
-  不是我这一轮带来的：在没有我第 3 件改动的副本（`copy-probe`，23:45Z 快照）上 release 同一个二进制，同样这两条红、`test result: FAILED. 22 passed; 2 failed; 2 ignored`（`baseline-random-history.log`）；A4b 报告第七节记的也是「22 过、2 红，基线就红」，调查员报告第 1、2 条（被抛弃根引用的单元被重新发出去）。我没修。
+  不是我这一轮带来的：在没有我第 3 件改动的副本（`copy-probe`，快照）上 release 同一个二进制，同样这两条红、`test result: FAILED. 22 passed; 2 failed; 2 ignored`（`baseline-random-history.log`）；A4b 报告第七节记的也是「22 过、2 红，基线就红」，调查员报告第 1、2 条（被抛弃根引用的单元被重新发出去）。我没修。
 
 ## 八、交主 agent 的设计问题（停在那一处，没自己定）
 
@@ -331,7 +331,7 @@ build exit=101
 `crates/mutations.tsv` 要追加的 1 行在 `/tmp/claude-1000/impl-rev-a4c/mutations-append.tsv`（变异名见第六节）。
 我这 4 份文件相对取副本时那一版的改动另存成 `/tmp/claude-1000/impl-rev-a4c/record-of-main-edits/crates.patch`（`git apply --check --reverse` 在主工作区上干净：**已经在主工作区里，不要再打**），逐份增删：admission.rs +30 −7、mount.rs +28 −10、admission_raises… +185 −5、crash_inside… +6 −5。
 
-途中（约 00:10 UTC）主工作区被别的会话 `git stash`（`stash@{0}: On master: 同步远端前的工作区（2026-09-27 09:2x JST）`）再弹回：HEAD 换成 `ac927812`，这之间 `.claude/hooks/heavy-test-guard.sh` 带着合并冲突标记、我的 Bash 被那道 hook 拒了一阵；弹回之后我那 4 份文件与副本逐字节相同（上面 `cmp`），改动现在在暂存区里（弹回时连同别人的一起进了 index），所以 `git diff --stat -- crates litmus` 是空的。两样都原样：
+途中主工作区被别的会话 `git stash`（`stash@{0}: On master: 同步远端前的工作区（2026-09-27）`）再弹回：HEAD 换成 `ac927812`，这之间 `.claude/hooks/heavy-test-guard.sh` 带着合并冲突标记、我的 Bash 被那道 hook 拒了一阵；弹回之后我那 4 份文件与副本逐字节相同（上面 `cmp`），改动现在在暂存区里（弹回时连同别人的一起进了 index），所以 `git diff --stat -- crates litmus` 是空的。两样都原样：
 
 ```text
 $ git diff --stat -- crates litmus | wc -l

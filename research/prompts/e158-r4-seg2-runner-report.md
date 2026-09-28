@@ -1,4 +1,4 @@
-# E158 第 4 次跑第二段：产物（执行员，2026-09-27 JST 11:30–12:1x）
+# E158 第 4 次跑第二段：产物（执行员，2026-09-27）
 
 ## 一、结论
 
@@ -12,8 +12,8 @@
 
 ## 二、怎么跑的
 
-- 负载（11:2x JST，`ps -o pid,args -u "$(id -u)"`）：没有 qemu、vm-bench、e152、fio。别的会话有两条 cargo 在跑（`impl-layer0-findings` 那边的 `cargo test --lib`，`impl-rev-b3c3` 那边的 `cargo build --all-targets`），没等锁。
-- 今天那一臂先跑（`run_arm.sh 4 today`，经 `capped.sh 4`、`run-with-memory-cap.sh 10G`），11:33:18 JST 跑完，rc=0，用时 166 秒。其余 11 条臂分 4 条 lane 并行，**每条命令用 `capped.sh 1`**，四条合起来正好 4 个线程（装置本身是单线程；只有今天那一臂会调 harness 的注入函数，那些函数按线程变量开工人线程）。11 条都 rc=0，最后一条 11:50:02 JST 跑完。这和派发写的每条 `capped.sh 4` 不一样，是为了四条并行时不超过 4 个线程。
+- 负载（`ps -o pid,args -u "$(id -u)"`）：没有 qemu、vm-bench、e152、fio。别的会话有两条 cargo 在跑（`impl-layer0-findings` 那边的 `cargo test --lib`，`impl-rev-b3c3` 那边的 `cargo build --all-targets`），没等锁。
+- 今天那一臂先跑（`run_arm.sh 4 today`，经 `capped.sh 4`、`run-with-memory-cap.sh 10G`）跑完，rc=0，用时 166 秒。其余 11 条臂分 4 条 lane 并行，**每条命令用 `capped.sh 1`**，四条合起来正好 4 个线程（装置本身是单线程；只有今天那一臂会调 harness 的注入函数，那些函数按线程变量开工人线程）。11 条都 rc=0，最后一条跑完。这和派发写的每条 `capped.sh 4` 不一样，是为了四条并行时不超过 4 个线程。
 - 环境变量照 `research/prompts/e158-r4-seg2-device-runner-report.md` 的 `run_lane.sh`：另设了 `SINGLEFS_E158_INVESTIGATOR_REPORT`（`research/prompts/m2-investigate-gate74-reds-report.md`，sha256 `a03da8b5…1bc1bf14`，与登记第 434 行一致），以及非今天臂要读的 `SINGLEFS_E158_SEGMENT_TWO_TODAY_PRODUCT`。脚本 `/tmp/claude-1000/e158-r4-seg2-run/run_arm.sh`。
 - 12 份臂副本里的 bin sha256 都是 `12b82f491453e4f5…`。**主工作区的 bin 已经不是这一版**（此刻 sha256 `06d75b963e45a891…`，与副本差 5 行：第 19076 行的 match 多了 `UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. }` 一支）。不是我改的。
 - compare：在 `arms/today` 里跑 `r4-compare research/results/e158-root-choice-repair-2026-09-27-r4-seg2`，rc=0，375 行。

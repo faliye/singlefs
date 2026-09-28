@@ -2,7 +2,7 @@
 
 正文 `research/prompts/_m2-supp3-item1-code-r2-body.md`；三条腿：Opus 攻方 `m2-supp3-item1-code-r2-opus-output.md`（Y1、Y2、Y5），Sonnet 辩方 `m2-supp3-item1-code-r2-sonnet-output.md`（Y3、Y4、Y6 写回那一半），本地攻方两份干净样本 `m2-supp3-item1-code-r2-local-attack-output-s1.md`、`-s2.md`（Y5 算术、Y6 日志读法）；核查员 `m2-supp3-item1-code-r2-verifier-output.md`（56 处，✗ 4，都是引用写错；Y2 第二分句的两种形态与攻方的改法在副本上复跑，数逐个对上）。
 
-开工快照里 `.claude/kb/milestone/02-second-txn.md` 在 20:40:21 UTC 被另一个会话改了五处（步 1、步 5、步 7、增补 1，不在收口表与增补 3）；快照时的原样由主 agent 从那个会话的替换倒推，sha256 与快照相同，交给了核查员。
+开工快照里 `.claude/kb/milestone/02-second-txn.md` 中途被另一个会话改了五处（步 1、步 5、步 7、增补 1，不在收口表与增补 3）；快照时的原样由主 agent 从那个会话的替换倒推，sha256 与快照相同，交给了核查员。
 
 ## 一、逐格判定
 

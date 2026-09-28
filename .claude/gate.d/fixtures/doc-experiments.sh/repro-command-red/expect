@@ -1,0 +1,8 @@
+exit=1
+want=没写复跑命令
+want=98-只提到变异脚本.md
+want=样本只跑 .gate-cells 点名的格：repro-command
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（repro-command）
+want=→ repro-command：在实验页正文的口径一节补一句复跑命令
+want=bash .claude/gate.d/doc-experiments.sh --check repro-command

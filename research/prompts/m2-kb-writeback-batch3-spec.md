@@ -16,7 +16,7 @@
 | 释放 | cur 那一版的账里仍分配、而 new 不引用的落点，释放代 = new 的 txg；隔离单元（D19（块指针的结构与宽度预算） 已定项 5 硬规则 1：任一份核出对不上、两份都留在已分配的）除外，留在已分配（用户 2026-09-27 定） |
 ```
 
-依据：三方判决 research/prompts/m2-closeout-code-r1-main-verification.md「一、各格判定」表 Z1Q-B 行；用户 2026-09-27 JST 11:1x 弹窗选「照 D19：隔离单元不释放」（records/2026-09-24-里程碑二收尾调度.md 第 241 行）
+依据：三方判决 research/prompts/m2-closeout-code-r1-main-verification.md「一、各格判定」表 Z1Q-B 行；用户 2026-09-27 弹窗选「照 D19：隔离单元不释放」（records/2026-09-24-里程碑二收尾调度.md 第 241 行）
 
 ## 条 2
 
@@ -32,7 +32,7 @@
   - **取号之前逐盘核带不带所选那一版**（主 agent 2026-09-25 定，被攻过零轮；实现 `crates/singlefs-core/src/mount.rs` 的 `devices_without_the_selected_version`，实二七）：可写挂载核施加前缀之后那一版；交进来的盘有一块不带就在取号之前、任何写之前拒可写（`MountError::WritableMountRefusedByDevicesWithoutTheSelectedVersion`），只读挂载不做这道核、逐条试位置条目读所选那一版。「不带」两种：两个系统配置槽一份自证过的都没有（校验和过、fsid 与本池相同），即这块盘不「可见」；世代号最大那份系统配置的 (实例代号, journal tail) 小于所选那一版那次发布末条记录的 jsn，**并且**所选那一版有单元在这块盘上它的落点读不出或字节不同。放行两种：只落后、单元都在（根落盘之后、轮换之前崩；取号失败回卷写回 tail 0），这是正常崩溃状态；系统配置跟得上、只缺几份单元（单份坏，由 D19（块指针的结构与宽度预算） 已定项 5 硬规则 1 的读盘核隔离）。 挂着之后收盘表的每个入口（正常卸载、管理员回退、会话每次发布、抬 F）在任何写之前同样逐盘核，一块盘一份本池 fsid 的自证系统配置槽都没有就拒；实现随「Z3-A 乙」那一件（还没派，写「实现待派」）。
 ```
 
-依据：三方判决 research/prompts/m2-closeout-code-r1-main-verification.md「一、各格判定」表 Z3-A 行、「二、改法」表 Z3-A 乙行；用户 2026-09-27 JST 11:1x 弹窗选「乙：每个入口都逐盘核，含会话发布」（records/2026-09-24-里程碑二收尾调度.md 第 241 行）
+依据：三方判决 research/prompts/m2-closeout-code-r1-main-verification.md「一、各格判定」表 Z3-A 行、「二、改法」表 Z3-A 乙行；用户 2026-09-27 弹窗选「乙：每个入口都逐盘核，含会话发布」（records/2026-09-24-里程碑二收尾调度.md 第 241 行）
 
 ## 条 3
 
@@ -74,7 +74,7 @@
 
 - 改前：已定项 11「取号之前逐盘核带不带所选那一版」只写在可写挂载入口那一条（`crates/singlefs-core/src/mount.rs` 的 `devices_without_the_selected_version`，实二七）；挂着之后收盘表的入口（正常卸载、抬 F、管理员回退、会话发布）怎么核盘表没有条款，代码自己的文档写它们「照可写挂载同一套核」（`mount.rs:2947-2956`），实际只核了重复身份、择系统配置、参数与盘表比对三样，没带已定项 11 的逐盘「不可见」一支。
 - 改后：补一句：挂着之后收盘表的每个入口（正常卸载、管理员回退、会话每次发布、抬 F）在任何写之前同样逐盘核，一块盘一份本池 fsid 的自证系统配置槽都没有就拒；实现随「Z3-A 乙」那一件，还没派。
-- 依据：代码三方 m2-closeout-code-r1 攻方腿 Z3-A（`research/prompts/m2-closeout-code-r1-opus-output.md` 第 42、45 行：4 条用例，空盘换进这几个入口都做成、空盘收 28 次写，之后真盘再挂可写被拒、池级 checker 红 4 条）；判决 `research/prompts/m2-closeout-code-r1-main-verification.md`「一、各格判定」表 Z3-A 行、「二、改法」表 Z3-A 乙行；用户 2026-09-27 JST 11:1x 弹窗选「乙：每个入口都逐盘核，含会话发布」（`records/2026-09-24-里程碑二收尾调度.md` 第 241 行）。
+- 依据：代码三方 m2-closeout-code-r1 攻方腿 Z3-A（`research/prompts/m2-closeout-code-r1-opus-output.md` 第 42、45 行：4 条用例，空盘换进这几个入口都做成、空盘收 28 次写，之后真盘再挂可写被拒、池级 checker 红 4 条）；判决 `research/prompts/m2-closeout-code-r1-main-verification.md`「一、各格判定」表 Z3-A 行、「二、改法」表 Z3-A 乙行；用户 2026-09-27 弹窗选「乙：每个入口都逐盘核，含会话发布」（`records/2026-09-24-里程碑二收尾调度.md` 第 241 行）。
 
 ### 2026-09-27（其五）：D23（journal 的角色与格式） 已定项 14：管理员回退「释放」一格给隔离单元补例外，留在已分配
 
@@ -84,7 +84,7 @@
 
 - 改前：回退表「释放」一格写「cur 那一版的账里仍分配、而 new 不引用的落点，释放代 = new 的 txg」，字面上把隔离单元也一并释放；隔离单元当初留在已分配是 D19（块指针的结构与宽度预算） 已定项 5 硬规则 1 的既定处置，两条条款互相打架，没人判过。
 - 改后：「释放」一格补例外：隔离单元（D19（块指针的结构与宽度预算） 已定项 5 硬规则 1：任一份核出对不上、两份都留在已分配的）除外，留在已分配；代码不动。
-- 依据：代码三方 m2-closeout-code-r1 攻方腿 Z1Q-B（`research/prompts/m2-closeout-code-r1-opus-output.md` 第 87–107 行：回退到 txg 4，隔离单元 `quarantined_slot=50180` 的分配记录回退前后都留在 `Some((false, 3))`，没被释放）；判决 `research/prompts/m2-closeout-code-r1-main-verification.md`「一、各格判定」表 Z1Q-B 行；用户 2026-09-27 JST 11:1x 弹窗选弹窗里「隔离单元不释放」那一项（照 D19（块指针的结构与宽度预算） 已定项 5 硬规则 1）（`records/2026-09-24-里程碑二收尾调度.md` 第 241 行）。
+- 依据：代码三方 m2-closeout-code-r1 攻方腿 Z1Q-B（`research/prompts/m2-closeout-code-r1-opus-output.md` 第 87–107 行：回退到 txg 4，隔离单元 `quarantined_slot=50180` 的分配记录回退前后都留在 `Some((false, 3))`，没被释放）；判决 `research/prompts/m2-closeout-code-r1-main-verification.md`「一、各格判定」表 Z1Q-B 行；用户 2026-09-27 弹窗选弹窗里「隔离单元不释放」那一项（照 D19（块指针的结构与宽度预算） 已定项 5 硬规则 1）（`records/2026-09-24-里程碑二收尾调度.md` 第 241 行）。
 
 ### 2026-09-27（其四）：D28（挂载期承诺量） 已定项 4：分配记录树那一项的式子从 K0 换成 K1（整棵树）
 ```

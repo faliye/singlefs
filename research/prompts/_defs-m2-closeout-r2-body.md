@@ -14,7 +14,7 @@
 
 **共用问句**：照改后的字面干活，哪一步会做错或做不了；举出具体的派发情形或命令。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-26 JST 11:xx）
+## 二、实现今天的样子（主 agent 的观测，2026-09-26）
 
 - 被判的改动：修定义的 agent 报告 `research/prompts/defs-closeout-r1-fixes-tmp-evidence/report.md` 第一节逐条表，与它的 `my-changes-final.diff`（287 行，比的是开工时 `cp -p` 的备份）；材料员把 diff 原样放进附录二，把报告第一至六节抄进附录。开工快照 `research/prompts/defs-m2-closeout-r2-snapshot/sha256sums.txt`。
 - 这一轮新被改的文件，门禁 72 号管的：`.claude/agents/three-way-attack.md`、`three-way-local-defense.md`、`experiment-runner.md`、`crash-verifier.md`、`gate-triage.md`、`implementation-writer.md`、`mutation-triage.md`，`.claude/agent-common.md`，`.claude/main-agent.md`；另外改了 `.claude/rules/implementation-workflow.md`（重型清单）、`.claude/hooks/ask-user-claim-guard.sh`（F13，自证 23 → 30 种）、`.claude/gate.d/74-model-differential.sh`（F10，只改建议命令）。

@@ -1,0 +1,10 @@
+checker-tier-test-environment.sh	C.UTF-8	第 7 / 15 个	排在它后面的：code-research-build.sh code-source-discipline.sh code-tooling.sh doc-experiments.sh doc-kb.sh doc-process-records.sh doc-text.sh harness-tests.sh 
+checker-tier-test-environment.sh	en_US.UTF-8	第 7 / 15 个	排在它后面的：code-research-build.sh code-source-discipline.sh code-tooling.sh doc-experiments.sh doc-kb.sh doc-process-records.sh doc-text.sh harness-tests.sh 
+harness-test-environment.sh	C.UTF-8	第 14 / 15 个	排在它后面的：harness-tests.sh 
+harness-test-environment.sh	en_US.UTF-8	第 14 / 15 个	排在它后面的：harness-tests.sh 
+zz-test-environment.sh	C.UTF-8	第 15 / 15 个	排在它后面的：无
+zz-test-environment.sh	en_US.UTF-8	第 15 / 15 个	排在它后面的：无
+test-environment.sh	C.UTF-8	第 15 / 15 个	排在它后面的：无
+test-environment.sh	en_US.UTF-8	第 15 / 15 个	排在它后面的：无
+-- 两种 locale 下整张表的次序是否相同（77 号取 checker-tier-test-environment.sh）：
+相同

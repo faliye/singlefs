@@ -21,14 +21,14 @@
 
 **共用问句**：每个候选都要回答「崩在回退那次发布的任何一点、崩在卸载那一串的任何一点、之后最新的根读不出，恢复落在哪一版，那一版引用的块有没有被复用」；答案要量，不许推。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-25 18:2x JST 现查；冻结副本在派腿之前取，材料员记快照）
+## 二、实现今天的样子（主 agent 的观测，2026-09-25 现查；冻结副本在派腿之前取，材料员记快照）
 
 - **回退挂载**：`crates/singlefs-core/src/mount.rs` 的 `mount_rollback`（第 2437 行）、`mount_rollback_with_space_admission`（第 2456 行），回退 = 一次恢复：取号 → 写行（实例表加回退行）→ 系统配置轮换（见证随这一次写）→ 暖机。
 - **回退见证**：`crates/singlefs-core/src/rollback_witness.rs`（314 行）；`mount.rs` 的 `rollback_witness_entries_still_needed`（第 1791 行）、`rollback_witness_entries_not_covered_by_another`（第 1814 行）、`rollback_witness_entries_recovered_from_the_instance_table`（第 1842 行）、`rollback_witness_tables_of_this_mount`（第 1879 行）；格式常量 `crates/singlefs-format/src/lib.rs` 第 262–278 行（系统配置槽里偏移 481 起 753 字节、47 条）；checker `crates/singlefs-checker/src/lib.rs` 第 160 行起。
 - **被抛弃的根**：`mount.rs` 的 `abandoned_by_table`（第 559 行）、`isolate_slots_referenced_only_by_abandoned_roots`（第 594 行，影子账）、`ShadowLedger`（第 253 行）；择根 `crates/singlefs-core/src/recovery.rs` 的 `choose_root`（第 669 行，跳过被见证抛弃的根）。
 - **F**：`mount.rs` 的 `reclaim_floor`（第 550 行）、`rollback_floor_ceiling`（第 958 行）、`raise_rollback_floor`（第 1078 行）、`rehearse_the_publishes_raising_the_floor`（第 1326 行）。
 - **卸载**：`crates/` 里没有卸载 / 关闭这个操作——`grep -n "fn .*unmount\|fn .*close\|fn .*shutdown" crates/singlefs-core/src/*.rs` 零命中（只命中两个测试函数名）。D23（journal 的角色与格式） 已定项 14 写着第一版没有干净关闭标记、每次挂载一律走恢复。
-- 行号是 2026-09-25 18:2x JST 主树的；实二八此刻在改 `mount.rs`（加「可写设备数低于下限」那一判），材料员取快照时以冻结副本为准、行号照冻结副本现查。
+- 行号是 2026-09-25 主树的；实二八此刻在改 `mount.rs`（加「可写设备数低于下限」那一判），材料员取快照时以冻结副本为准、行号照冻结副本现查。
 
 ## 三、条款（材料员整段抄进附录）
 

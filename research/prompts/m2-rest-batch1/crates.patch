@@ -1,0 +1,244 @@
+diff --git a/crates/singlefs-checker-tier/tests/crash_injection_campaign.rs b/crates/singlefs-checker-tier/tests/crash_injection_campaign.rs
+index ce885d6..ca4d59f 100644
+--- a/crates/singlefs-checker-tier/tests/crash_injection_campaign.rs
++++ b/crates/singlefs-checker-tier/tests/crash_injection_campaign.rs
+@@ -186,6 +186,11 @@ fn crash_injection_small_fast_tier_recovers_only_into_versions_the_model_committ
+         "崩溃状态上「已知红」清单外的失败；{replay}\n{rendered}"
+     );
+     let tally = &report.tally;
++    // 每段历史都摆出过崩溃状态（总数够放得过「几段一个都没有」，判决第四节第 4 题；为什么每段都摆得出见快档那一条）。
++    assert_eq!(
++        tally.histories_without_any_crash_point, 0,
++        "有历史段一个崩溃状态都没摆出来；{replay}"
++    );
+     assert!(
+         tally.crash_points >= SMALL_FAST_TIER_SEEDS,
+         "平均每段连一个崩溃状态都没摆出来：{}；{replay}",
+@@ -233,6 +238,14 @@ fn crash_injection_small_fast_tier_recovers_only_into_versions_the_model_committ
+ fn assert_every_crash_injection_path_was_exercised(report: &CrashInjectionReport) {
+     let tally = &report.tally;
+     let replay = how_to_replay(report);
++    // 总数够不说明每段都摆到了：`crash_points >= FAST_TIER_SEEDS` 放得过「几段一个都没有、别的段多摆」（判决
++    // `m2-supp3-item3-code-r2-main-verification.md` 第四节第 4 题，用户定「全补」）。从第一个文件起的历史，起点那一段（取号、暖机、
++    // 第一个文件）就有写、都是候选段；从 mkfs 起的历史要等第一次做成的可写挂载，关着会话时只抽可写挂载与冷启动两种，
++    // 一次可写挂载都没做成就收尾的（新发现或已知红收尾在那之前）这一条照判红。推的，没在快档上跑过。
++    assert_eq!(
++        tally.histories_without_any_crash_point, 0,
++        "有历史段一个崩溃状态都没摆出来；{replay}"
++    );
+     assert!(
+         tally.crash_points >= FAST_TIER_SEEDS,
+         "平均每段连一个崩溃状态都没摆出来：{}；{replay}",
+@@ -519,6 +532,95 @@ fn crash_states_of_the_history_that_raised_the_floor_into_a_rollback_gap_are_cle
+     }
+ }
+ 
++/// 各类操作的写上摆到几个崩溃状态（判决 `m2-supp3-item3-code-r2-main-verification.md` 第四节第 4 题，用户定「全补」：七类操作各钉一条；
++/// 这之后又加了崩溃恢复抛弃根，共八类）。覆盖写与可写挂载由快档钉、回退与抬 F 由上一条写死历史钉，剩下四类钉在这一段写死的历史上：
++/// mkfs → 可写挂载 → 零单元发布（树表 0 条的一版上才调得成）→ 冷启动 → 可写挂载 → 第一个文件 → 崩溃恢复抛弃根（C554 乙拒）→ 可写挂载。
++/// 写数不超过 2 的段整段枚举（2^n − 1 个真子集），更长的段各抽 1 个，所以每一类摆到几个是定数，不靠抽样运气：
++/// 零单元发布的段是 2、1、2 ⇒ 3 + 1 + 3 = 7；第一个文件的段是 24、2、1、2 ⇒ 1 + 3 + 1 + 3 = 8；
++/// 冷启动只读盘、一个写都不发，崩溃恢复抛弃根在取号之前被拒、也不发写 ⇒ 两类都是 0（崩溃状态按第一个被扣下的写落在哪一步归类，
++/// 不发写的那一步归不到）。段序列是 2026-09-28 在 harness 侧按同一段历史、同一个执行（`execute_history_with` 加
++/// `writes_and_segments_with_stream_indexes`）现量的，这一条在 checker 档里没在交回之前跑过。
++/// 比已有的两段写死历史多罩的：树表 0 条的一版上的零单元发布、冷启动之后与崩溃恢复被拒之后的可写挂载那几段的崩溃状态。
++#[test]
++fn crash_states_land_in_zero_unit_publishes_and_first_files_but_never_in_cold_starts_or_refused_crash_recoveries(
++) {
++    let history = GeneratedHistory {
++        seed: HistorySeed(0),
++        starting_point: HistoryStartingPoint::AfterMakeFilesystem,
++        operations: vec![
++            HistoryOperation::CloseAndMountWritable,
++            HistoryOperation::PublishWithoutUnits,
++            HistoryOperation::ColdStartRecover,
++            HistoryOperation::CloseAndMountWritable,
++            HistoryOperation::PublishFirstFile(ContentChoice {
++                length: ContentLength::InsideOneDataUnit { selector: 3 },
++                fill_seed: 1,
++            }),
++            HistoryOperation::CrashRecoveryAbandoningTheNewestRoot,
++            HistoryOperation::CloseAndMountWritable,
++        ],
++    };
++    let crash_recovery_outcomes = outcomes_of_the_crash_recovery_steps(&history);
++    assert_eq!(
++        crash_recovery_outcomes,
++        vec![StepOutcome::Refused {
++            member: CRASH_RECOVERY_REFUSED_BY_THE_WITNESS.to_string()
++        }],
++        "崩溃恢复抛弃根那一步被 C554 乙拒：它归到 0 个崩溃状态说的是「被拒的那一步不发写」"
++    );
++    let injection = inject_crashes_into_history(
++        &history,
++        UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
++        CrashPointDraw::EveryProperSubsetOfShortSegments {
++            segment_writes: 2,
++            sampled_in_longer_segments: 1,
++        },
++        None,
++    );
++    print_uncaptured(&format!(
++        "── 崩溃注入：零单元发布、第一个文件、冷启动与崩溃恢复抛弃根各摆几个崩溃状态 ──\n{}",
++        injection.tally.render()
++    ));
++    let crash_points_in = |kind: HistoryOperationKind| {
++        injection
++            .tally
++            .crash_points_by_operation_kind
++            .get(&kind)
++            .copied()
++            .unwrap_or(0)
++    };
++    assert_eq!(
++        crash_points_in(HistoryOperationKind::ColdStartRecover),
++        0,
++        "冷启动一个写都不发，崩溃状态归不到它：{:?}",
++        injection.tally.crash_points_by_operation_kind
++    );
++    assert_eq!(
++        crash_points_in(HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot),
++        0,
++        "崩溃恢复抛弃根在取号之前被拒、一个写都不发，崩溃状态归不到它：{:?}",
++        injection.tally.crash_points_by_operation_kind
++    );
++    assert_eq!(
++        crash_points_in(HistoryOperationKind::PublishWithoutUnits),
++        7,
++        "零单元发布的段 2、1、2：3 + 1 + 3：{:?}",
++        injection.tally.crash_points_by_operation_kind
++    );
++    assert_eq!(
++        crash_points_in(HistoryOperationKind::PublishFirstFile),
++        8,
++        "第一个文件的段 24、2、1、2：1 + 3 + 1 + 3：{:?}",
++        injection.tally.crash_points_by_operation_kind
++    );
++    // 计数先钉、判定后钉：计数只看段序列与归步，少一道屏障那类变异先红在上面的计数上（`crates/mutations.tsv`）。
++    assert!(
++        injection.new_findings.is_empty(),
++        "一条清单外的失败都不许有：{:#?}",
++        injection.new_findings
++    );
++}
++
+ /// 一段历史上写出的每次发布：它写出的单元写（写表下标）与它的根身份 (实例代号, checkpoint_txg)。
+ /// 归法与记录核对器的相同：一次根槽写之前、上一次根槽写之后的单元写都归这一次。
+ fn unit_writes_of_each_publish(writes: &[RetainedWrite]) -> Vec<((u32, u64), Vec<usize>)> {
+diff --git a/crates/singlefs-core/src/transaction.rs b/crates/singlefs-core/src/transaction.rs
+index 9b57b23..4cd605b 100644
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -4759,11 +4759,13 @@ pub fn publish_overwrite<Device: BlockDevice>(
+ /// 只要一个数据单元的内容，写出的字节与同内容的 `publish_overwrite` 一个不差。上一版比这一版多出来的数据单元
+ /// 在同一次发布里释放（文件变短的那一格，`placements_to_release_via_mapping`）。
+ ///
++/// 切出的单元多于一片下段叶装得下的 144 个时不拒：这个文件的 extent 树下段按单元号按位置寻址长成两层及以上（叶罩 144 个单元、
++/// 内部扇出 147，D8（核心索引结构） 已定项 14），这一版下段的节点在同一次发布里重写、上一版的在同一次发布里释放；只有一个单元时
++/// 不建下段，那个数据指针内联在上段叶条目里。
++///
+ /// # Errors
+-/// 切出的单元多于一片 extent 叶装得下的记录数 ⇒ `ExtentTreeNeedsAnInternalNodeWhoseEntryFormatIsUndecided`
+-/// （extent 内部条目的格式没有条款），在分配器、块设备都还没被碰过的时候返回，盘上逐字节不变。
+-/// 最后一个事务要点名的项多于一条记录装得下的，末条再跨记录（D23（journal 的角色与格式） 已定项 17），不拒。其余与 `publish_overwrite` 相同
+-/// （不报 `ContentExceedsDataUnit`：多个数据单元正是这条路径要写的）。
++/// 与 `publish_overwrite` 相同（不报 `ContentExceedsDataUnit`：多个数据单元正是这条路径要写的）。这条路径不按单元数拒：extent 树
++/// 没有装不下这一格；最后一个事务要点名的项多于一条记录装得下的，末条再跨记录（D23（journal 的角色与格式） 已定项 17），也不拒。
+ pub fn publish_sequential_write<Device: BlockDevice>(
+     pool: &mut PoolWriter<'_, Device>,
+     allocator: &mut PoolAllocator,
+diff --git a/crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs b/crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs
+index 9258f61..8f3184f 100644
+--- a/crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs
++++ b/crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs
+@@ -12,7 +12,7 @@ mod common_corrupted_allocation_record;
+ 
+ use common::{
+     abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before, build_pool, disk_snapshot,
+-    file_content, parameters, BuiltPool, Recorded, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
++    file_content, geometry, parameters, BuiltPool, Recorded, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
+ };
+ use common_corrupted_allocation_record::move_the_first_allocation_record_past_the_end_of_the_unit_area_and_reseal_the_chain;
+ use singlefs_checker::image::InvariantVerdict;
+@@ -54,7 +54,9 @@ use singlefs_harness::fault_injection::{
+     injected_block_device_error, NamedRootRingSlots, PoolReaderWithUnreadableRootRingSlots,
+     RootRingSlotTarget,
+ };
+-use singlefs_harness::memory_pool::MemoryPool;
++use singlefs_harness::memory_pool::{writes_and_segments, MemoryPool};
++use singlefs_harness::segments::{segment_kinds_text, segment_sizes_text, split_into_segments};
++use singlefs_harness::{RecordedOperation, RecordedOperationKind};
+ use std::collections::BTreeSet;
+ 
+ const SECOND_FILE_BYTES: usize = 4100;
+@@ -456,6 +458,70 @@ fn rolling_back_to_the_first_version_while_mounted_publishes_one_root_carrying_i
+     );
+ }
+ 
++/// 步 4「写出的字节」里「每段写几个没有用例钉」那一格（layout/01-first-txn.md 八节「实例切换 / 管理员回退」那一行）：
++/// 从现行代码的录制流上截回退那次发布 D（回退调用之前流里有几步，到调用返回），按层 0 同一条切段规则切（`split_into_segments`，
++/// 屏障按设备记）。D 孤立看是 [20 个单元写] 屏障 [2 条记录] 屏障 [根 FUA] [2 个系统配置槽] 屏障：两块盘各重写 10 个固定点单元，
++/// 共 25 次写。整条流（mkfs 之后）到 D 为止的段序列与 checker 档固定脚本那条流的 `RollbackToFirstVersion` 那一臂钉的 36 段逐段相同：
++/// C 的 2 个系统配置槽写过了发布末尾那道屏障、自成一段，D 的 20 个单元写不与它并段。
++/// 不跑 checker 与冷启动，debug 下单跑几秒，是轻用例。
++#[test]
++fn rolling_back_to_the_first_version_rewrites_ten_fixed_point_units_on_each_device_in_one_segment_before_the_record_the_root_and_the_system_configuration(
++) {
++    let ThroughTheThirdPublish { mut pool, .. } =
++        build_through_third_publish("step-four-rollback-segments");
++    let operations_before_the_rollback = pool.stream.operation_count();
++    roll_back(&mut pool, first_root()).expect("回退到 A");
++    let rollback_version = pool.output.clone();
++    let operations_of_the_rollback: Vec<RecordedOperation> =
++        pool.stream.operations()[operations_before_the_rollback..].to_vec();
++    let segments_of_the_rollback = split_into_segments(&operations_of_the_rollback, &geometry());
++    assert_eq!(
++        segment_sizes_text(&segments_of_the_rollback),
++        "20+2+1+2",
++        "D 孤立看的段序列：单元写一段、记录一段、根一段、系统配置一段"
++    );
++    assert_eq!(
++        segment_kinds_text(&segments_of_the_rollback),
++        "[unit_write×20,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]",
++        "D 的单元写只有单元写一种，不取号、不写系统配置之外的原地写"
++    );
++    let writes_of_the_rollback = operations_of_the_rollback
++        .iter()
++        .filter(|operation| match operation.kind {
++            RecordedOperationKind::Write
++            | RecordedOperationKind::WriteForceUnitAccess
++            | RecordedOperationKind::WriteZeroes => true,
++            RecordedOperationKind::Barrier => false,
++        })
++        .count();
++    assert_eq!(writes_of_the_rollback, 25, "D 共 25 次写：20 + 2 + 1 + 2");
++    assert_eq!(
++        rollback_version.rewritten.len(),
++        10,
++        "D 重写 10 个固定点单元，每块盘各一份：{:?}",
++        rollback_version.rewritten
++    );
++    let retained = pool.retained_operations();
++    let (writes_after_mkfs, segments_after_mkfs) =
++        writes_and_segments(&retained[pool.mkfs_operation_count..], &geometry());
++    assert_eq!(
++        segments_after_mkfs
++            .iter()
++            .map(Vec::len)
++            .collect::<Vec<usize>>(),
++        vec![
++            2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16, 2, 1,
++            2, 24, 2, 1, 2, 20, 2, 1, 2
++        ],
++        "整条流到 D 为止的段序列：C 的系统配置槽写自成一段、D 的 20 个单元写自成一段"
++    );
++    assert_eq!(
++        writes_after_mkfs.len(),
++        166 + 25,
++        "到 C 166 次写、D 25 次写"
++    );
++}
++
+ /// 验收「释放与复活」：D 之后接着覆盖写 E，E 换下的是 D 引用的 A 的那几个单元——它们在 D 的账里是仍分配的（复活过），
+ /// 发布路径照常释放；checker 全绿。只释放不复活时 D 的账里 A 的单元是已释放的：I-3.11 在 D 上红，E 被释放判定路径拒
+ /// （`ReleaseTargetAlreadyReleased`，第一轮判决第二节 F1 里 H3 那一格）——`crates/mutations.tsv` 里拿掉复活那一步的那一行证它。

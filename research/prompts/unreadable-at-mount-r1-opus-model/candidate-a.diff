@@ -1,0 +1,135 @@
+diff -ruN '--exclude=r1-opus-crash-proto' '--exclude=c331_candidates_grid.rs' '--exclude=c393_candidates_grid.rs' '--exclude=c331_newer_instance_roots_unreadable_then_readable_again.rs' '--exclude=c393_abandoned_root_account_unreadable_at_remount.rs' '--exclude=mod.rs' tree/crates/singlefs-core/src/mount.rs opus/a/crates/singlefs-core/src/mount.rs
+--- tree/crates/singlefs-core/src/mount.rs
++++ opus/a/crates/singlefs-core/src/mount.rs
+@@ -331,6 +331,8 @@
+         first_reading: BadRootRingSlotReading,
+         reread: BadRootRingSlotReading,
+     },
++    /// 候选 (a)（unreadable-at-mount-r1）：影子账读一条被抛弃根的账（树表或分配记录树）读不出、解不开，重读一次仍是这样：拒可写。
++    AccountOfAnAbandonedRoot { abandoned_root: RollbackTarget },
+ }
+ 
+ impl From<RootRingSlotKnownToHoldARootStillBadAfterOneReread> for StillUnreadableAfterOneReread {
+@@ -1227,7 +1229,8 @@
+     is_abandoned: &dyn Fn(&RootRecord) -> bool,
+     floor: CheckpointTxg,
+     current_records: &[AllocationRecord],
+-) -> ShadowLedgerComputed {
++    before_the_one_reread: &mut BeforeTheOneReread<'_>,
++) -> Result<ShadowLedgerComputed, MountError> {
+     let mut referenced_by_candidates: BTreeSet<(u32, u64)> = current_records
+         .iter()
+         .filter(|record| !record.is_released)
+@@ -1249,9 +1252,26 @@
+     let mut unreadable = 0;
+     let mut placements_referenced_by_abandoned_root = BTreeMap::new();
+     for root in roots.iter().filter(|root| is_abandoned(root)) {
+-        let Some(placements) = placements_referenced_by_root(devices, unit_area_start, root) else {
+-            unreadable += 1;
+-            continue;
++        // 候选 (a)（unreadable-at-mount-r1）：读不出就重读一次（重读之前调钩子），仍读不出就拒可写、只读照常。
++        let placements = match placements_referenced_by_root(devices, unit_area_start, root) {
++            Some(placements) => placements,
++            None => {
++                unreadable += 1;
++                before_the_one_reread.before_rereading();
++                match placements_referenced_by_root(devices, unit_area_start, root) {
++                    Some(placements) => placements,
++                    None => {
++                        return Err(MountError::NewerStateStillUnreadableAfterOneReread(
++                            Box::new(StillUnreadableAfterOneReread::AccountOfAnAbandonedRoot {
++                                abandoned_root: RollbackTarget {
++                                    instance: root.instance,
++                                    checkpoint_txg: root.checkpoint_txg,
++                                },
++                            }),
++                        ))
++                    }
++                }
++            }
+         };
+         for (device, slot, span_slots) in placements.iter().copied() {
+             let key = (device.0, slot.0);
+@@ -1268,10 +1288,10 @@
+                 .collect(),
+         );
+     }
+-    ShadowLedgerComputed {
++    Ok(ShadowLedgerComputed {
+         abandoned_roots_unreadable: unreadable,
+         placements_referenced_by_abandoned_root,
+-    }
++    })
+ }
+ 
+ /// 一条根引用着的落点，逐盘：带文件的一版从它那一版的分配记录里取（账里已释放的是它换下的上一版的，不算它引用）；
+@@ -1443,7 +1463,8 @@
+             &is_abandoned,
+             effective_floor,
+             &current_records,
+-        ),
++            before_the_one_reread,
++        )?,
+         ShadowLedger::Off => ShadowLedgerComputed {
+             abandoned_roots_unreadable: 0,
+             placements_referenced_by_abandoned_root: BTreeMap::new(),
+@@ -2351,7 +2372,7 @@
+     // 候选集按新 F 缩小，只被被抛弃根引用的槽会变多（一个槽此前靠一条低于新 F 的根豁免），回收之前先按新 F 重算影子账，
+     // 不然那个槽回收之后就发得出去（步 4 / 步 5 代码三方第二轮辩方腿：窄读法要按每次挂载与每次抬 F 的候选集现算）。
+     let abandoned_roots_unreadable = if shadow_ledger == ShadowLedger::On {
+-        isolate_slots_referenced_only_by_abandoned_roots(
++        match isolate_slots_referenced_only_by_abandoned_roots(
+             devices,
+             unit_area_start_of_the_chosen_system_configuration(&system_configuration),
+             allocator,
+@@ -2359,8 +2380,14 @@
+             &|root| abandoned_by_table(root, &table),
+             new_floor,
+             &current.allocation_records,
+-        )
+-        .abandoned_roots_unreadable
++            &mut BeforeTheOneReread::RereadImmediately,
++        ) {
++            Ok(computed) => computed.abandoned_roots_unreadable,
++            Err(error) => {
++                *allocator = allocator_before_the_raise;
++                return Err(error);
++            }
++        }
+     } else {
+         0
+     };
+diff -ruN '--exclude=r1-opus-crash-proto' '--exclude=c331_candidates_grid.rs' '--exclude=c393_candidates_grid.rs' '--exclude=c331_newer_instance_roots_unreadable_then_readable_again.rs' '--exclude=c393_abandoned_root_account_unreadable_at_remount.rs' '--exclude=mod.rs' tree/crates/singlefs-harness/src/history.rs opus/a/crates/singlefs-harness/src/history.rs
+--- tree/crates/singlefs-harness/src/history.rs
++++ opus/a/crates/singlefs-harness/src/history.rs
+@@ -2424,6 +2424,7 @@
+         StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot { .. } => {
+             "RootRingSlotKnownToHoldARoot"
+         }
++        StillUnreadableAfterOneReread::AccountOfAnAbandonedRoot { .. } => "AccountOfAnAbandonedRoot",
+     }
+ }
+ 
+diff -ruN '--exclude=r1-opus-crash-proto' '--exclude=c331_candidates_grid.rs' '--exclude=c393_candidates_grid.rs' '--exclude=c331_newer_instance_roots_unreadable_then_readable_again.rs' '--exclude=c393_abandoned_root_account_unreadable_at_remount.rs' '--exclude=mod.rs' tree/crates/singlefs-harness/src/model_comparison.rs opus/a/crates/singlefs-harness/src/model_comparison.rs
+--- tree/crates/singlefs-harness/src/model_comparison.rs
++++ opus/a/crates/singlefs-harness/src/model_comparison.rs
+@@ -755,7 +755,8 @@
+                 // 挂着时抬 F 算 F 生效值读最新那条根的实例表、重算影子账读根环里这个进程知道住着根的槽，重读一次仍读坏（实审 A3b Q4，
+                 // 改之前经 `MountError::Recovery` 交出、同样记成没理由）：只在读路径上注入故障才有，模型没有这一条。
+                 | StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor { .. }
+-                | StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot { .. } => {
++                | StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot { .. }
++                | StillUnreadableAfterOneReread::AccountOfAnAbandonedRoot { .. } => {
+                     ObservedRefusalReason::Unexplained
+                 }
+             }
+@@ -851,7 +852,8 @@
+                 } => Some(model_ring_position(ring_slot)),
+                 StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { .. }
+                 | StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger { .. }
+-                | StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor { .. } => None,
++                | StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor { .. }
++                | StillUnreadableAfterOneReread::AccountOfAnAbandonedRoot { .. } => None,
+             }
+         }
+         RollbackError::PublishFrozenAfterAWriteFailureIsNotResentYet { .. }

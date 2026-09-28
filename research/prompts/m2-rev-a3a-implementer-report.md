@@ -1,6 +1,6 @@
 # 实审 A3a 实现员报告：坏盘输入的 panic 面（代码审阅第 24 / 29 / 32 / 33 / 35 / 38 条、C476 落在 core 读者这一侧的那几处）
 
-写于 2026-09-27（时刻都是 UTC；东京 JST = UTC + 9）。规格 `/tmp/claude-1000/impl-rev-a3a/spec.md`。在副本 `/tmp/claude-1000/impl-rev-a3a/work` 里改、交补丁 `/tmp/claude-1000/impl-rev-a3a/patch/`。
+写于 2026-09-27。规格 `/tmp/claude-1000/impl-rev-a3a/spec.md`。在副本 `/tmp/claude-1000/impl-rev-a3a/work` 里改、交补丁 `/tmp/claude-1000/impl-rev-a3a/patch/`。
 
 ## 一、结论
 
@@ -14,7 +14,7 @@
 
 ## 二、这一轮写过的文件
 
-补丁 `crates.patch` 里（相对快照 28ef00a，快照取自主工作区 2026-09-27 02:31 UTC；主工作区这七份源文件此刻的 sha256 与快照相同，见第十节）：
+补丁 `crates.patch` 里（相对快照 28ef00a，快照取自主工作区 2026-09-27；主工作区这七份源文件此刻的 sha256 与快照相同，见第十节）：
 
 - `crates/singlefs-core/src/pointer.rs`：`PointerHeadFieldOutsideTheFirstVersion`、三种指针的 `read_judging_the_encryption_and_compression_fields_from`；`LocationEntriesNotAscendingByDevice`、`location_entries_ascend_by_device` 与 `NodePointer::location_entries_ascend_by_device`；两处升序断言消息改写。
 - `crates/singlefs-core/src/unit.rs`：`UnitError::EncryptionReservedBytesNotZero` 与三个解析器的预留位判；条目宽 / 记录宽 0 而条数非 0 判结构错（`ENTRY_WIDTH_ZERO_WITH_ENTRIES`、`RECORD_WIDTH_ZERO_WITH_RECORDS`）。
@@ -194,7 +194,7 @@ C476 里不在我清单内、今天仍开着的（交主 agent）：R12、R13（
 
 ## 十、补丁与打法
 
-- `patch/crates.patch`（sha256 `00be023a962bd25ac246577426419f4d77757c5011dd7b1bb86adbb59dae6297`）：七份 core 源文件与新测试文件；对**主工作区 2026-09-27 04:09 UTC 的现状** `git apply --check` 退 0；这一刻主工作区那七份源文件的 sha256 与我取快照时逐份相同（`baseline-sources.sha256`）。`research/scripts/apply-writer-patch.py patch --dry-run` 输出 `✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 1230 行`。
+- `patch/crates.patch`（sha256 `00be023a962bd25ac246577426419f4d77757c5011dd7b1bb86adbb59dae6297`）：七份 core 源文件与新测试文件；对**主工作区 2026-09-27 的现状** `git apply --check` 退 0；这一刻主工作区那七份源文件的 sha256 与我取快照时逐份相同（`baseline-sources.sha256`）。`research/scripts/apply-writer-patch.py patch --dry-run` 输出 `✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 1230 行`。
 - `patch/mutations-append.tsv`（`6ce7fd0d…f55880`，31 行）、`patch/mutations-replacements.tsv`（`95a2ec0b…6a6ba6`，7 行）。
 - 补丁之外、要一起打的：`/tmp/claude-1000/impl-rev-a3a/history-arms.patch`（`a9692f46…07d23da`，第八节那两臂；对主工作区现状 `git apply --check` 退 0）。不打它，打上 `crates.patch` 之后 `singlefs-harness` 编不过。
 - 第七节甲 / 乙二选一之后，`tree_split` 与 `bad_disk_input` 两条才回绿；这两条在主 agent 决定之前是红的。

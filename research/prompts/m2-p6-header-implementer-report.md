@@ -1,7 +1,7 @@
 # impl-m2-p6-header 报告（P6 后一半：journal 记录头加「本次发布内序号」，JOURNAL_HEADER_BYTES 307 → 311）
 
-时刻都是 UTC（东京 = UTC + 9）。主工作区一个字没动（只跑了 `git apply --check` / `--stat`）；改动在副本 `repo/` 里做、交补丁。
-**基准**：补丁对 `base-crates/`（04:54:26–04:54:28 拷主工作区 `crates/`）做。05:33:28 对主工作区 `git apply --check -p1` 退出 0；
+主工作区一个字没动（只跑了 `git apply --check` / `--stat`）；改动在副本 `repo/` 里做、交补丁。
+**基准**：补丁对 `base-crates/`（开工时拷的主工作区 `crates/`）做。改完之后对主工作区 `git apply --check -p1` 退出 0；
 那时主工作区与基准差 `mutations.tsv`、`walk.rs`、`checker_known_bad_images.rs`、`second_transaction_step_four_rollback.rs`、
 `second_transaction_step_three_formatted_pool.rs`、`e156`、`e158` 与一份新用例（别的会话在改），其中 `checker_known_bad_images.rs`
 新加的代码按 307 写死了两个偏移，补丁打上之后要跟着改（第五节 ②）。下文行号除注明外都是 `repo/`（基准 + 补丁）里的。
@@ -50,7 +50,7 @@
 
 ## 三、新测试与「证明会红」
 
-**今天的代码上错接（派发要的那一格）**：`today/` 是基准的原样副本（今天的 307 字节头、没有序号那一判），只往 `second_transaction_parallel_line_one_multi_unit_file.rs` 末尾加了同一条用例、去掉从盘上读序号那一段（今天的头里没有这个字段）。05:04:44 跑整个二进制，红在第一格（原样，`today-k4.log`）：
+**今天的代码上错接（派发要的那一格）**：`today/` 是基准的原样副本（今天的 307 字节头、没有序号那一判），只往 `second_transaction_parallel_line_one_multi_unit_file.rs` 末尾加了同一条用例、去掉从盘上读序号那一段（今天的头里没有这个字段）。跑整个二进制，红在第一格（原样，`today-k4.log`）：
 
 ```
 thread 'without_an_anchor_the_chain_head_must_be_the_first_record_of_the_next_publish' (281941) panicked at crates/singlefs-harness/tests/second_transaction_parallel_line_one_multi_unit_file.rs:562:9:
@@ -64,7 +64,7 @@ test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; 
 
 **用例历史**：`build_pool`（mkfs → 暖机两次 → A，一条记录）→ 顺序写 3 个数据单元的 B（3 条记录，jsn 4–6，序号 1、2、3，txg 4）→ 取崩在 B 的根槽 FUA 之前那一刻的镜像（B 的记录两盘都落了）→ 两块盘上各翻 A 那条（jsn 3）记录的第 300 字节，第一格再翻 B 的第一条（jsn 4）。
 
-**变异证红**：`mutant/`（repo 的副本，自己的 target）上逐条改一处、跑那条测试所在的**整个**测试二进制（不带过滤）、从 `repo/` 拷回并 `touch`、`diff -q` 为空。基线：同一份未改的 `mutant/` 上 6 个二进制全绿（05:12:19–05:13:46，`mutations-run.log` 前 8 行）。全部 debug；这几处被测代码里没有 `debug_assert`，红的都是测试断言或测试里的 `expect`。第 1、2 行在 rustfmt 之后又重跑了一次（`mutations-rerun-after-fmt.log`），行号是 `repo/` 的。
+**变异证红**：`mutant/`（repo 的副本，自己的 target）上逐条改一处、跑那条测试所在的**整个**测试二进制（不带过滤）、从 `repo/` 拷回并 `touch`、`diff -q` 为空。基线：同一份未改的 `mutant/` 上 6 个二进制全绿（`mutations-run.log` 前 8 行）。全部 debug；这几处被测代码里没有 `debug_assert`，红的都是测试断言或测试里的 `expect`。第 1、2 行在 rustfmt 之后又重跑了一次（`mutations-rerun-after-fmt.log`），行号是 `repo/` 的。
 
 | 行（`mutations-append.tsv`） | 改坏哪一行 | 跑的二进制 | 红的断言（点名的那条） | 同时红的测试 |
 |---|---|---|---|---|
@@ -90,7 +90,7 @@ old_layout=307 back_chain_of_jsn_3=628216162 matches_e142_line_37=True
 new_layout=311 back_chain_of_jsn_2=823937809 back_chain_of_jsn_3=1057457588
 ```
 
-把常量留在旧值时，新代码上那条断言红成 `left: 1057457588 right: 628216162`（05:07 那次跑）——实现写出来的与独立换算一致，这条断言也证明了它对头的变化敏感。E142 产物第 37 行要等装置按 311 重跑才会是这个数（第五节 ④）。
+把常量留在旧值时，新代码上那条断言红成 `left: 1057457588 right: 628216162`——实现写出来的与独立换算一致，这条断言也证明了它对头的变化敏感。E142 产物第 37 行要等装置按 311 重跑才会是这个数（第五节 ④）。
 
 没另证红的：`journal::tests::record_is_4096_with_a_311_byte_header_and_round_trips` 只是改名改数（307 → 311）；`checker_known_bad_images.rs` 三处是跟着改偏移（I-8.6 那份坏镜像照旧只红 I-8.6，全量跑里那个二进制全绿）。
 
@@ -109,13 +109,13 @@ new_layout=311 back_chain_of_jsn_2=823937809 back_chain_of_jsn_3=1057457588
 
 ## 五、要主 agent 处置的（不在写范围，或不是这一轮的文件）
 
-① **`crates/mutations.tsv` 第 44 行锚点断**（主工作区 05:33 的表 486 行；`anchor_check.py` 对「主工作区 + 补丁」输出 `mutations.tsv:44 命中 0 次…` `rows=486 bad=1`，别的行全在）。替代行（整行，六段，已证红，见第三节表末行）在 `mutations-replace-row-44.tsv`：
+① **`crates/mutations.tsv` 第 44 行锚点断**（做 `git apply --check` 那一刻主工作区的表 486 行；`anchor_check.py` 对「主工作区 + 补丁」输出 `mutations.tsv:44 命中 0 次…` `rows=486 bad=1`，别的行全在）。替代行（整行，六段，已证红，见第三节表末行）在 `mutations-replace-row-44.tsv`：
 
 ```
 步 3 三方第一轮：链首没锚点时不看 txg、无条件接上水位之上最小的一条	crates/singlefs-core/src/recovery.rs	        } else if record.checkpoint_txg != chain_start_txg_without_anchor\n	        } else if false && record.checkpoint_txg != chain_start_txg_without_anchor\n	-p singlefs-harness --test second_transaction_step_three_second_instance -- torn_anchor_record	torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg
 ```
 
-② **别的会话 05:22 加进 `checker_known_bad_images.rs` 的代码按 307 写死了两个偏移**（08:21 主工作区的 3192–3197 行，基准里没有这一段，补丁没碰）：`JOURNAL_RECORD_PAYLOAD_CHECKSUM_OFFSET: usize = 91` 要改成 95，`JOURNAL_RECORD_HEADER_BYTES: usize = 307` 要改成 311，注释「事务段 78 + 事务号 8 + 提交标记 1 + 反向链 4 之后是载荷校验和」要补「本次发布内序号 4」。用到它们的是 `propagate_into_journal_records`（3203 行），被 3293 行的 `an_allocation_generation_past_its_unit_birth_in_the_version_only_its_journal_record_carries_reddens_the_allocation_generation_invariant_before_the_mount` 调；「主工作区 + 补丁」上它红不红见第七节。
+② **别的会话在这一轮当中加进 `checker_known_bad_images.rs` 的代码按 307 写死了两个偏移**（写报告时主工作区的 3192–3197 行，基准里没有这一段，补丁没碰）：`JOURNAL_RECORD_PAYLOAD_CHECKSUM_OFFSET: usize = 91` 要改成 95，`JOURNAL_RECORD_HEADER_BYTES: usize = 307` 要改成 311，注释「事务段 78 + 事务号 8 + 提交标记 1 + 反向链 4 之后是载荷校验和」要补「本次发布内序号 4」。用到它们的是 `propagate_into_journal_records`（3203 行），被 3293 行的 `an_allocation_generation_past_its_unit_birth_in_the_version_only_its_journal_record_carries_reddens_the_allocation_generation_invariant_before_the_mount` 调；「主工作区 + 补丁」上它红不红见第七节。
 
 ③ **`crates/singlefs-checker/src/walk.rs` 两行文档注释还写「307 字节头」**（基准 2358、2424 行；主工作区现在 2443、2509 行）：只是注释、代码走 `back_chain_of_record_header`，不影响判定。walk.rs 在别的会话手里，我没碰；改成 311 或写成「整个记录头」。
 
@@ -132,9 +132,9 @@ new_layout=311 back_chain_of_jsn_2=823937809 back_chain_of_jsn_3=1057457588
 
 ## 七、验证：check.sh 与全量单测
 
-开跑前看负载（04:51、05:33 UTC 两次 `ps`）：没有 `qemu-system` / `vm-bench.sh` / `e152` / `fio`；有别的会话的 `cargo test`（`checker_known_bad_images`、`second_transaction_supplement_three_*`），没等锁（各副本各自的 target）。
+开跑前看负载（两次 `ps`）：没有 `qemu-system` / `vm-bench.sh` / `e152` / `fio`；有别的会话的 `cargo test`（`checker_known_bad_images`、`second_transaction_supplement_three_*`），没等锁（各副本各自的 target）。
 
-**`check.sh`（`repo/` = 基准 + 补丁，05:33:10 起）原样末尾**：
+**`check.sh`（`repo/` = 基准 + 补丁）原样末尾**：
 
 ```
 error: could not compile `singlefs-harness` (bin "e158_root_choice_repair" test) due to 1 previous error
@@ -151,10 +151,10 @@ check.sh exit=1
 |---|---|---|
 | fmt `--check` | `repo/` | 过（`check.sh` 第一步「✓ 格式通过」） |
 | clippy（同一组 `-D`）除 e158 之外全部目标 | `repo/` | `-p singlefs-format -p singlefs-core -p singlefs-checker --all-targets` 与 `-p singlefs-harness --lib` 加每个 `--test`、除 e158 的每个 `--bin`（dev 与 test 两种 profile）零告警 |
-| `cargo test --all --no-fail-fast` | `repo/`（05:14:19–05:32:53） | 65 个 `test result` 全 ok：488 passed、0 failed、9 ignored（`repo-test.log`） |
-| 同上 | `pristine/`（04:54:56–05:12:20） | 485 passed、0 failed、9 ignored（`pristine-test.log`）；多出的 3 条是这一轮的新用例 |
+| `cargo test --all --no-fail-fast` | `repo/` | 65 个 `test result` 全 ok：488 passed、0 failed、9 ignored（`repo-test.log`） |
+| 同上 | `pristine/` | 485 passed、0 failed、9 ignored（`pristine-test.log`）；多出的 3 条是这一轮的新用例 |
 
-**「主工作区 + 补丁」**（`checkmerge/` = 05:33:28 拷的主工作区打上补丁）：`check.sh` 同样红在 e158 那条 clippy（那时主工作区的 2619 行）；`cargo test --all --no-fail-fast`（到 08:11:05）492 passed、**2 failed**、9 ignored：
+**「主工作区 + 补丁」**（`checkmerge/` = 做 `git apply --check` 那一刻拷的主工作区打上补丁）：`check.sh` 同样红在 e158 那条 clippy（那时主工作区的 2619 行）；`cargo test --all --no-fail-fast` 492 passed、**2 failed**、9 ignored：
 
 | 红的测试 | 归谁 | 依据 |
 |---|---|---|
@@ -167,7 +167,7 @@ check.sh exit=1
 
 补丁里的 9 个（都在 `repo/crates/` 里改，主工作区没动）：`crates/singlefs-format/src/lib.rs`、`crates/singlefs-core/src/journal.rs`、`crates/singlefs-core/src/recovery.rs`、`crates/singlefs-core/src/transaction.rs`、`crates/singlefs-checker/src/lib.rs`、`crates/singlefs-harness/tests/checker_known_bad_images.rs`、`crates/singlefs-harness/tests/first_transaction_step_five_publish.rs`、`crates/singlefs-harness/tests/second_transaction_step_three_formatted_pool.rs`、`crates/singlefs-harness/tests/second_transaction_parallel_line_one_multi_unit_file.rs`。`crates/mutations.tsv` 没写（追加的 13 行变异名见第三节表与 `mutations-append.tsv`，第 44 行替代行见第五节 ①）；`litmus/` 没动。别的会话在改的 `walk.rs`、`mount.rs`、`allocator.rs`、e156、e158 一行都没碰。
 
-`git apply --stat`（补丁本身，05:21 对主工作区）：
+`git apply --stat`（补丁本身，对主工作区）：
 
 ```
  crates/singlefs-checker/src/lib.rs                 |   28 +++--
@@ -182,7 +182,7 @@ check.sh exit=1
  9 files changed, 292 insertions(+), 43 deletions(-)
 ```
 
-主工作区 `git diff --stat -- crates litmus` 原样（08:22:05，全是别的会话与此前十份补丁的改动，这一轮一行都不在里面；未跟踪的新文件不在 `git diff` 里）：
+主工作区 `git diff --stat -- crates litmus` 原样（写报告时，全是别的会话与此前十份补丁的改动，这一轮一行都不在里面；未跟踪的新文件不在 `git diff` 里）：
 
 ```
  crates/mutations.tsv                               |  356 ++-
@@ -250,7 +250,7 @@ check.sh exit=1
 ## 九、没做什么
 
 - 没走三方对抗；层 0 全量、QEMU、herd7 与 crates 变异表整表复跑归 crash-verifier；没提交。登记给我的门禁阶段按派发没跑。
-- 没改 kb、`research/`、`walk.rs`、别的会话 05:22 加进 `checker_known_bad_images.rs` 的那段（第五节 ②③④）。E142 没重跑，第 37 行的新值只由独立换算得出。
+- 没改 kb、`research/`、`walk.rs`、别的会话在这一轮当中加进 `checker_known_bad_images.rs` 的那段（第五节 ②③④）。E142 没重跑，第 37 行的新值只由独立换算得出。
 - 第四节 ① 那一格（锚点读不出而同一次发布前面几条读得出）没改、没加用例；② ③ 的检查与分支没加。
 - 变异证红全在 debug 下跑；被测代码里没有 `debug_assert`，没另跑 `--release`。
 - `check.sh` 没跑绿：红在 e158 的 clippy（不是这一轮的文件），后三步照同一组参数分开跑，结果在第七节。
@@ -339,7 +339,7 @@ research/e7-index-bench/src/bin/e155_third_run_release_cascade.rs:35:const RECOR
 
 ## 十一、字节表 `.claude/kb/layout/01-first-txn.md`「六、journal」要改成什么（我不改 kb）
 
-行号是那份文件 08:2x 的现状。改的只有下面这些行，别的行原样：
+行号是那份文件的现状。改的只有下面这些行，别的行原样：
 
 - 64 行 w4：「反向链 = CRC32C(w1 的 307 字节头)」→「反向链 = CRC32C(w1 的 311 字节头)」；75 行 t9：「反向链 = CRC32C(w4 的 307 字节头)」→「… 311 字节头」。
 - 307 行（记录头那一行）改成：

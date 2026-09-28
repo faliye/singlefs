@@ -1,4 +1,4 @@
-# 运行记录：defs-m2-closeout-r3-local-attack（2026-09-26 UTC）
+# 运行记录：defs-m2-closeout-r3-local-attack（2026-09-26）
 
 提示文件：`research/prompts/defs-m2-closeout-r3-local-attack.md`（英文，K2 的 G7
 攻击面：把十道阶段——27、34、40、69、75、84、85、86、88、99——各自「读不读实验页或

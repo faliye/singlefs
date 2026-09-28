@@ -1,0 +1,4 @@
+E7RESULT name=r2_b7_publish_cell shared_segments=11 segments_whose_publish_cell_differs=["10:after_the_last_root->instance1_txg4:8"] states_whose_tally_cell_is_not_a_function_of_the_node=8 must_be_nonzero=8
+E7RESULT name=r2_state_budget world=b7_many_overwrites closed_form_state_count=11593057180 enumerated_with_torn=1845 writes=4535 segments=611
+E7RESULT name=r2_b7_distinct_vectors overwrites=150 states=1845 distinct_status_vectors=7 distinct_vectors_with_landed_roots=307 real_store_refused_at=Some("257:MoreThan256VerdictVectorsNotDecidedInTheFirstVersion") build_seconds=0.4 seconds=173.6 must_be_nonzero=51
+E7RESULT name=done emitted=4

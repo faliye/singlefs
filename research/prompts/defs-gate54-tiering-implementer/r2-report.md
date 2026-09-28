@@ -2,7 +2,7 @@
 
 依据：判决 `research/prompts/defs-gate54-tiering-r1-main-verification.md` 第三节 K3 那张表与第四节第 1 条；攻方报告 `research/prompts/defs-gate54-tiering-r1-opus-output.md` 第五节。
 
-改好的文件：`/home/fy5090/code/singlefs/.claude/gate.d/54-layer0-replay.sh`（393 行，sha256 `c3f9360fc9d1ceb0d22e421e380feacf78c38351cfd5554788a3cda545cf3537`）。
+改好的文件：`.claude/gate.d/54-layer0-replay.sh`（393 行，sha256 `c3f9360fc9d1ceb0d22e421e380feacf78c38351cfd5554788a3cda545cf3537`）。
 - 改前是 `86ff561e868cab9ffb138a2e5fbcd668c467caea6939592c32485a162e017ec9`：动手前现核过，与攻方、开工快照里的那一份相同。备份在 `r2/54-layer0-replay.sh.r1`。
 - diff 在 `r2/r2.diff`（+102 / −47）。
 - 18 处都用 `research/scripts/replace-once.py` 改，每处都是「命中 1 次，已替换并回读确认」。
@@ -85,10 +85,10 @@ f3 的其余自证在 `r2/selftest-output.txt`：
 
 ## 真仓快档
 
-`nice -n 19 bash .claude/gate.d/54-layer0-replay.sh`（工作区，不带 `--full`），日志 `r2/real-quick-run.log`。2026-09-24T00:14:15Z 开跑、00:14:29Z 结束，release 产物是现成的；转发的 `LAYER0_PROGRESS` 行 123 行。其余原样：
+`nice -n 19 bash .claude/gate.d/54-layer0-replay.sh`（工作区，不带 `--full`），日志 `r2/real-quick-run.log`。2026-09-24 开跑、结束，release 产物是现成的；转发的 `LAYER0_PROGRESS` 行 123 行。其余原样：
 
 ```
-  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 8 条通过、1 条 ignored），但这批输入（哈希 a721893541f8fd59…，94 个文件）没有层 0 全量的全绿标记（/home/fy5090/code/singlefs/.git/singlefs-layer0-full-green.a721893541f8fd59a182a7738a0390e57b8871553ee5bb49a606eb51cc81a47b）
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 8 条通过、1 条 ignored），但这批输入（哈希 a721893541f8fd59…，94 个文件）没有层 0 全量的全绿标记（.git/singlefs-layer0-full-green.a721893541f8fd59a182a7738a0390e57b8871553ee5bb49a606eb51cc81a47b）
        common-dir 里一格全绿标记都没有。
      → 怎么办：这批输入的层 0 全量没在收尾跑过。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>（与 gate.sh --staged 同一建法）：
                 在项目根、暂存之后：layer0_full_base="$(mktemp -d)"; git diff --cached --binary > "$layer0_full_base/staged.patch"
@@ -144,12 +144,12 @@ shell-lint 退出码 0
 ════ S2 [lock-only｜r2] 暂存的路径：Cargo.lock ｜[标记 1 个：singlefs-layer0-full-green.c07850adb431…（记 c07850adb431…；exhaustive=true,exhaustive=true）]
   ── 起门禁：gate-triage
       ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 8896f264c959b056…，8 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/gate54-tiering/r2/runs/s2/repo-lock-only-r2/.git/singlefs-layer0-full-green.8896f264c959b0563a497d21e258fa1a170fc38465398ae5802c4e86cb449918）
-           common-dir 里最近写的一格是 singlefs-layer0-full-green.c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b（跑完于 2026-09-24T00:11:39Z），与这一次的输入比：
+           common-dir 里最近写的一格是 singlefs-layer0-full-green.c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b（跑完于 2026-09-24），与这一次的输入比：
              内容不同：Cargo.lock
     [gate --staged 里 54 号的退出码 1]
   ── 起门禁：gate-staged
       ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 8896f264c959b056…，8 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/gate54-tiering/r2/runs/s2/repo-lock-only-r2/.git/singlefs-layer0-full-green.8896f264c959b0563a497d21e258fa1a170fc38465398ae5802c4e86cb449918）
-           common-dir 里最近写的一格是 singlefs-layer0-full-green.c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b（跑完于 2026-09-24T00:11:39Z），与这一次的输入比：
+           common-dir 里最近写的一格是 singlefs-layer0-full-green.c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b（跑完于 2026-09-24），与这一次的输入比：
              内容不同：Cargo.lock
     [gate --staged 里 54 号的退出码 1]
 ════ S2 [toml-only｜r1] 暂存的路径：Cargo.toml ｜[标记 1 个：singlefs-layer0-full-green（记 c07850adb431…；exhaustive=true,exhaustive=true）]
@@ -162,12 +162,12 @@ shell-lint 退出码 0
 ════ S2 [toml-only｜r2] 暂存的路径：Cargo.toml ｜[标记 1 个：singlefs-layer0-full-green.c07850adb431…（记 c07850adb431…；exhaustive=true,exhaustive=true）]
   ── 起门禁：gate-triage
       ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 d1cd05492c98b660…，8 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/gate54-tiering/r2/runs/s2/repo-toml-only-r2/.git/singlefs-layer0-full-green.d1cd05492c98b660dfd2ffcc46538bff89e3edbd7940557b881dec22813b7693）
-           common-dir 里最近写的一格是 singlefs-layer0-full-green.c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b（跑完于 2026-09-24T00:11:39Z），与这一次的输入比：
+           common-dir 里最近写的一格是 singlefs-layer0-full-green.c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b（跑完于 2026-09-24），与这一次的输入比：
              内容不同：Cargo.toml
     [gate --staged 里 54 号的退出码 1]
   ── 起门禁：gate-staged
       ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 d1cd05492c98b660…，8 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/gate54-tiering/r2/runs/s2/repo-toml-only-r2/.git/singlefs-layer0-full-green.d1cd05492c98b660dfd2ffcc46538bff89e3edbd7940557b881dec22813b7693）
-           common-dir 里最近写的一格是 singlefs-layer0-full-green.c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b（跑完于 2026-09-24T00:11:39Z），与这一次的输入比：
+           common-dir 里最近写的一格是 singlefs-layer0-full-green.c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b（跑完于 2026-09-24），与这一次的输入比：
              内容不同：Cargo.toml
     [gate --staged 里 54 号的退出码 1]
 ════ S2 [test-only｜r1] 暂存的路径：crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs ｜[标记 1 个：singlefs-layer0-full-green（记 c07850adb431…；exhaustive=true,exhaustive=true）]
@@ -182,12 +182,12 @@ shell-lint 退出码 0
 ════ S2 [test-only｜r2] 暂存的路径：crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs ｜[标记 1 个：singlefs-layer0-full-green.c07850adb431…（记 c07850adb431…；exhaustive=true,exhaustive=true）]
   ── 起门禁：gate-triage
       ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 b21d2a103829ec5c…，8 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/gate54-tiering/r2/runs/s2/repo-test-only-r2/.git/singlefs-layer0-full-green.b21d2a103829ec5cb7a756d4be380b992f2585d8a1df877cdb6f76395cd89936）
-           common-dir 里最近写的一格是 singlefs-layer0-full-green.c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b（跑完于 2026-09-24T00:11:39Z），与这一次的输入比：
+           common-dir 里最近写的一格是 singlefs-layer0-full-green.c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b（跑完于 2026-09-24），与这一次的输入比：
              内容不同：crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs
     [gate --staged 里 54 号的退出码 1]
   ── 起门禁：gate-staged
       ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 b21d2a103829ec5c…，8 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/gate54-tiering/r2/runs/s2/repo-test-only-r2/.git/singlefs-layer0-full-green.b21d2a103829ec5cb7a756d4be380b992f2585d8a1df877cdb6f76395cd89936）
-           common-dir 里最近写的一格是 singlefs-layer0-full-green.c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b（跑完于 2026-09-24T00:11:39Z），与这一次的输入比：
+           common-dir 里最近写的一格是 singlefs-layer0-full-green.c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b（跑完于 2026-09-24），与这一次的输入比：
              内容不同：crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs
     [gate --staged 里 54 号的退出码 1]
 ════ S2 [mutations-only｜r1] 暂存的路径：crates/mutations.tsv ｜[标记 1 个：singlefs-layer0-full-green（记 c07850adb431…；exhaustive=true,exhaustive=true）]
@@ -202,12 +202,12 @@ shell-lint 退出码 0
 ════ S2 [mutations-only｜r2] 暂存的路径：crates/mutations.tsv ｜[标记 1 个：singlefs-layer0-full-green.c07850adb431…（记 c07850adb431…；exhaustive=true,exhaustive=true）]
   ── 起门禁：gate-triage
       ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 2cfd45abffe5a5a2…，8 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/gate54-tiering/r2/runs/s2/repo-mutations-only-r2/.git/singlefs-layer0-full-green.2cfd45abffe5a5a237c549137a94ec6d08430da8c8efc86682395dbe004fb86b）
-           common-dir 里最近写的一格是 singlefs-layer0-full-green.c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b（跑完于 2026-09-24T00:11:40Z），与这一次的输入比：
+           common-dir 里最近写的一格是 singlefs-layer0-full-green.c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b（跑完于 2026-09-24），与这一次的输入比：
              内容不同：crates/mutations.tsv
     [gate --staged 里 54 号的退出码 1]
   ── 起门禁：gate-staged
       ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 2cfd45abffe5a5a2…，8 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/gate54-tiering/r2/runs/s2/repo-mutations-only-r2/.git/singlefs-layer0-full-green.2cfd45abffe5a5a237c549137a94ec6d08430da8c8efc86682395dbe004fb86b）
-           common-dir 里最近写的一格是 singlefs-layer0-full-green.c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b（跑完于 2026-09-24T00:11:40Z），与这一次的输入比：
+           common-dir 里最近写的一格是 singlefs-layer0-full-green.c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b（跑完于 2026-09-24），与这一次的输入比：
              内容不同：crates/mutations.tsv
     [gate --staged 里 54 号的退出码 1]
 ════ S2 [other-session-crates｜r1] 暂存的路径：NOTES.md ｜[标记 1 个：singlefs-layer0-full-green（记 c07850adb431…；exhaustive=true,exhaustive=true）]
@@ -232,7 +232,7 @@ shell-lint 退出码 0
 ════ S3a [r1]
 ── [r1｜验证员先跑过 --full：yes｜门禁起在收尾 --full 的：before] 起门禁前 [标记 1 个：singlefs-layer0-full-green（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24T00:11:40Z，标记里的计数行原样：
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
 ── [r1｜验证员先跑过 --full：yes｜门禁起在收尾 --full 的：during] 起门禁前 [标记 1 个：singlefs-layer0-full-green（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
     (收尾 --full 正在跑：[标记不在])
@@ -240,7 +240,7 @@ shell-lint 退出码 0
     [gate --staged 里 54 号的退出码 1]
 ── [r1｜验证员先跑过 --full：yes｜门禁起在收尾 --full 的：after] 起门禁前 [标记 1 个：singlefs-layer0-full-green（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24T00:11:43Z，标记里的计数行原样：
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
 ── [r1｜验证员先跑过 --full：no｜门禁起在收尾 --full 的：before] 起门禁前 [标记不在]
       ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但没有层 0 全量的全绿标记（/tmp/claude-1000/gate54-tiering/r2/runs/s3/a-r1-no-before/.git/singlefs-layer0-full-green）
@@ -251,7 +251,7 @@ shell-lint 退出码 0
     [gate --staged 里 54 号的退出码 1]
 ── [r1｜验证员先跑过 --full：no｜门禁起在收尾 --full 的：after] 起门禁前 [标记不在]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24T00:11:46Z，标记里的计数行原样：
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
 ════ S3b [r1]
     A 的 --full 退出码 0（HEAD + 暂存区的 worktree）
@@ -263,13 +263,13 @@ shell-lint 退出码 0
     A 的 --full 退出码 0（HEAD + 暂存区的 worktree）
 ── [r1｜B 的结果：green｜先后：B-then-A] A 起门禁前 [标记 1 个：singlefs-layer0-full-green（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24T00:11:46Z，标记里的计数行原样：
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
     B 的 --full 退出码 0（主工作区）
     A 的 --full 退出码 0（HEAD + 暂存区的 worktree）
 ── [r1｜B 的结果：green｜先后：B-inside-A] A 起门禁前 [标记 1 个：singlefs-layer0-full-green（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24T00:11:50Z，标记里的计数行原样：
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
     A 的 --full 退出码 0（HEAD + 暂存区的 worktree）
     B 的 --full 退出码 0（主工作区）
@@ -285,24 +285,24 @@ shell-lint 退出码 0
     A 的 --full 退出码 0（HEAD + 暂存区的 worktree）
 ── [r1｜B 的结果：red｜先后：B-then-A] A 起门禁前 [标记 1 个：singlefs-layer0-full-green（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24T00:11:53Z，标记里的计数行原样：
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
     B 的 --full 退出码 1（主工作区）
     A 的 --full 退出码 0（HEAD + 暂存区的 worktree）
 ── [r1｜B 的结果：red｜先后：B-inside-A] A 起门禁前 [标记 1 个：singlefs-layer0-full-green（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24T00:11:56Z，标记里的计数行原样：
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
     A 的 --full 退出码 0（HEAD + 暂存区的 worktree）
     B 的 --full 退出码 1（主工作区）
 ── [r1｜B 的结果：red｜先后：A-inside-B] A 起门禁前 [标记 1 个：singlefs-layer0-full-green（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24T00:11:57Z，标记里的计数行原样：
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
 ════ S3a [r2]
 ── [r2｜验证员先跑过 --full：yes｜门禁起在收尾 --full 的：before] 起门禁前 [标记 1 个：singlefs-layer0-full-green.0a906e4b33b8…（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:11:59Z，标记里的计数行原样：
+      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
 ── [r2｜验证员先跑过 --full：yes｜门禁起在收尾 --full 的：during] 起门禁前 [标记 1 个：singlefs-layer0-full-green.0a906e4b33b8…（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
     (收尾 --full 正在跑：[标记不在])
@@ -310,7 +310,7 @@ shell-lint 退出码 0
     [gate --staged 里 54 号的退出码 1]
 ── [r2｜验证员先跑过 --full：yes｜门禁起在收尾 --full 的：after] 起门禁前 [标记 1 个：singlefs-layer0-full-green.0a906e4b33b8…（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:12:02Z，标记里的计数行原样：
+      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
 ── [r2｜验证员先跑过 --full：no｜门禁起在收尾 --full 的：before] 起门禁前 [标记不在]
       ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 0a906e4b33b85a9b…，8 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/gate54-tiering/r2/runs/s3/a-r2-no-before/.git/singlefs-layer0-full-green.0a906e4b33b85a9b1db07a72f1059b9f0b804a7451e0a614f7374247be631050）
@@ -321,56 +321,56 @@ shell-lint 退出码 0
     [gate --staged 里 54 号的退出码 1]
 ── [r2｜验证员先跑过 --full：no｜门禁起在收尾 --full 的：after] 起门禁前 [标记不在]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:12:05Z，标记里的计数行原样：
+      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
 ════ S3b [r2]
     A 的 --full 退出码 0（HEAD + 暂存区的 worktree）
     B 的 --full 退出码 0（主工作区）
 ── [r2｜B 的结果：green｜先后：A-then-B] A 起门禁前 [标记 2 个：singlefs-layer0-full-green.0a906e4b33b8…（记 0a906e4b33b8…；exhaustive=true,exhaustive=true） singlefs-layer0-full-green.236ceeb156f9…（记 236ceeb156f9…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:12:06Z，标记里的计数行原样：
+      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
     B 的 --full 退出码 0（主工作区）
     A 的 --full 退出码 0（HEAD + 暂存区的 worktree）
 ── [r2｜B 的结果：green｜先后：B-then-A] A 起门禁前 [标记 2 个：singlefs-layer0-full-green.0a906e4b33b8…（记 0a906e4b33b8…；exhaustive=true,exhaustive=true） singlefs-layer0-full-green.236ceeb156f9…（记 236ceeb156f9…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:12:06Z，标记里的计数行原样：
+      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
     B 的 --full 退出码 0（主工作区）
     A 的 --full 退出码 0（HEAD + 暂存区的 worktree）
 ── [r2｜B 的结果：green｜先后：B-inside-A] A 起门禁前 [标记 2 个：singlefs-layer0-full-green.0a906e4b33b8…（记 0a906e4b33b8…；exhaustive=true,exhaustive=true） singlefs-layer0-full-green.236ceeb156f9…（记 236ceeb156f9…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:12:09Z，标记里的计数行原样：
+      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
     A 的 --full 退出码 0（HEAD + 暂存区的 worktree）
     B 的 --full 退出码 0（主工作区）
 ── [r2｜B 的结果：green｜先后：A-inside-B] A 起门禁前 [标记 2 个：singlefs-layer0-full-green.0a906e4b33b8…（记 0a906e4b33b8…；exhaustive=true,exhaustive=true） singlefs-layer0-full-green.236ceeb156f9…（记 236ceeb156f9…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:12:10Z，标记里的计数行原样：
+      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
     A 的 --full 退出码 0（HEAD + 暂存区的 worktree）
     B 的 --full 退出码 1（主工作区）
 ── [r2｜B 的结果：red｜先后：A-then-B] A 起门禁前 [标记 1 个：singlefs-layer0-full-green.0a906e4b33b8…（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:12:12Z，标记里的计数行原样：
+      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
     B 的 --full 退出码 1（主工作区）
     A 的 --full 退出码 0（HEAD + 暂存区的 worktree）
 ── [r2｜B 的结果：red｜先后：B-then-A] A 起门禁前 [标记 1 个：singlefs-layer0-full-green.0a906e4b33b8…（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:12:12Z，标记里的计数行原样：
+      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
     B 的 --full 退出码 1（主工作区）
     A 的 --full 退出码 0（HEAD + 暂存区的 worktree）
 ── [r2｜B 的结果：red｜先后：B-inside-A] A 起门禁前 [标记 1 个：singlefs-layer0-full-green.0a906e4b33b8…（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:12:15Z，标记里的计数行原样：
+      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
     A 的 --full 退出码 0（HEAD + 暂存区的 worktree）
     B 的 --full 退出码 1（主工作区）
 ── [r2｜B 的结果：red｜先后：A-inside-B] A 起门禁前 [标记 1 个：singlefs-layer0-full-green.0a906e4b33b8…（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:12:16Z，标记里的计数行原样：
+      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
 ```
 
@@ -379,16 +379,16 @@ shell-lint 退出码 0
 ```
 ── [变体｜验证员先跑过 --full：yes｜门禁起在收尾 --full 的：before] 起门禁前 [标记 1 个：singlefs-layer0-full-green.0a906e4b33b8…（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:12:54Z，标记里的计数行原样：
+      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
 ── [变体｜验证员先跑过 --full：yes｜门禁起在收尾 --full 的：during] 起门禁前 [标记 1 个：singlefs-layer0-full-green.0a906e4b33b8…（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
     (收尾 --full 正在跑：[标记 1 个：singlefs-layer0-full-green.0a906e4b33b8…（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）])
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:12:54Z，标记里的计数行原样：
+      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
 ── [变体｜验证员先跑过 --full：yes｜门禁起在收尾 --full 的：after] 起门禁前 [标记 1 个：singlefs-layer0-full-green.0a906e4b33b8…（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:12:57Z，标记里的计数行原样：
+      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
 ── [变体｜验证员先跑过 --full：no｜门禁起在收尾 --full 的：before] 起门禁前 [标记不在]
       ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 0a906e4b33b85a9b…，8 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/gate54-tiering/r2/runs/s3-variant/a-no-before/.git/singlefs-layer0-full-green.0a906e4b33b85a9b1db07a72f1059b9f0b804a7451e0a614f7374247be631050）
@@ -399,7 +399,7 @@ shell-lint 退出码 0
     [gate --staged 里 54 号的退出码 1]
 ── [变体｜验证员先跑过 --full：no｜门禁起在收尾 --full 的：after] 起门禁前 [标记不在]
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:13:00Z，标记里的计数行原样：
+      ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
 ── [变体｜同一输入先绿一趟] [标记 1 个：singlefs-layer0-full-green.0a906e4b33b8…（记 0a906e4b33b8…；exhaustive=true,exhaustive=true）]
       ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
@@ -416,11 +416,11 @@ shell-lint 退出码 0
       ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=false
       ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
       ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
-      ✓ 全绿标记写进 /tmp/claude-1000/gate54-tiering/r2/runs/s4/repo-r1/.git/singlefs-layer0-full-green（输入哈希 ad967f0e6db52cb2…，8 个文件；开跑 2026-09-24T00:12:18Z，跑完 2026-09-24T00:12:18Z）
+      ✓ 全绿标记写进 /tmp/claude-1000/gate54-tiering/r2/runs/s4/repo-r1/.git/singlefs-layer0-full-green（输入哈希 ad967f0e6db52cb2…，8 个文件；开跑 2026-09-24，跑完 2026-09-24）
     [标记 1 个：singlefs-layer0-full-green（记 ad967f0e6db5…；exhaustive=false,exhaustive=true）]
   ── gate.sh --staged
       ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-      ✓ 全绿标记与这批输入的内容哈希相同（ad967f0e6db52cb2…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24T00:12:18Z，标记里的计数行原样：
+      ✓ 全绿标记与这批输入的内容哈希相同（ad967f0e6db52cb2…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
           LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=false
     [gate --staged 里 54 号的退出码 0]
 ════ S4 [r2-main] 工作区 vs 暂存区： M .claude/gate.d/54-layer0-replay.sh M  crates/singlefs-harness/src/crash.rs ；B 的改动命中 1 行
@@ -428,7 +428,7 @@ shell-lint 退出码 0
       ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=false
       ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
       ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
-      ✓ 全绿标记写进 /tmp/claude-1000/gate54-tiering/r2/runs/s4/repo-r2-main/.git/singlefs-layer0-full-green.ad967f0e6db52cb2e138bb90236f89b66f458ecef8dae326c8450af88ce3aa5b（输入哈希 ad967f0e6db52cb2…，8 个文件；开跑 2026-09-24T00:12:18Z，跑完 2026-09-24T00:12:18Z；common-dir 里现有 1 格）
+      ✓ 全绿标记写进 /tmp/claude-1000/gate54-tiering/r2/runs/s4/repo-r2-main/.git/singlefs-layer0-full-green.ad967f0e6db52cb2e138bb90236f89b66f458ecef8dae326c8450af88ce3aa5b（输入哈希 ad967f0e6db52cb2…，8 个文件；开跑 2026-09-24，跑完 2026-09-24；common-dir 里现有 1 格）
     [标记 1 个：singlefs-layer0-full-green.ad967f0e6db5…（记 ad967f0e6db5…；exhaustive=false,exhaustive=true）]
   ── gate.sh --staged
       ✗ 这批输入那一格全绿标记里，LAYER0 与 LAYER0B 两行不都是 exhaustive=true（是的只有 1 行）：写它的那一趟 --full 没把「不是全量」判红
@@ -449,19 +449,19 @@ shell-lint 退出码 0
 ```
 ════ 准备：--full 写这批输入那一格（哈希 A）
 $ bash .claude/gate.d/54-layer0-replay.sh --full
-  · --full 开跑（2026-09-24T00:13:43Z）：这批输入那一格旧标记已删（别的格不动）；这一道的输入哈希 2c406d1eaecd2706…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
+  · --full 开跑（2026-09-24）：这批输入那一格旧标记已删（别的格不动）；这一道的输入哈希 2c406d1eaecd2706…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
     LAYER0_PROGRESS slice=1/2 states=[0,131083) segments=0..=9 finished_slices=1/2 finished_states=131083/262165 elapsed_seconds=1.0
   ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
   ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
   ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
-  ✓ 全绿标记写进 /tmp/claude-1000/gate54-tiering/r2/selftest-repo/.git/singlefs-layer0-full-green.2c406d1eaecd27061928685e1828c386709d3806ed2a4aa16ad72183d8a8c3d4（输入哈希 2c406d1eaecd2706…，3 个文件；开跑 2026-09-24T00:13:43Z，跑完 2026-09-24T00:13:43Z；common-dir 里现有 1 格）
+  ✓ 全绿标记写进 /tmp/claude-1000/gate54-tiering/r2/selftest-repo/.git/singlefs-layer0-full-green.2c406d1eaecd27061928685e1828c386709d3806ed2a4aa16ad72183d8a8c3d4（输入哈希 2c406d1eaecd2706…，3 个文件；开跑 2026-09-24，跑完 2026-09-24；common-dir 里现有 1 格）
 [退出码 0]
 [标记 1 个：singlefs-layer0-full-green.2c406d1eaecd…]
 
 ════ 自证一：这批输入那一格在、相等 ⇒ 快档判绿
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2c406d1eaecd2706…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:13:43Z，标记里的计数行原样：
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2c406d1eaecd2706…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
       LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
       CHECKER record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
       LAYER0B states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
@@ -473,7 +473,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
 ════ 自证二：改一个输入文件的一个字节 ⇒ 这批输入（哈希 B）没有自己那一格 ⇒ 判红，列出最近一格与这一次不同的文件
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 a1be3d5c2e6f5859…，3 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/gate54-tiering/r2/selftest-repo/.git/singlefs-layer0-full-green.a1be3d5c2e6f58592d6ea725fa7aa9b981622e40f54c58e77a729d196847c97d）
-       common-dir 里最近写的一格是 singlefs-layer0-full-green.2c406d1eaecd27061928685e1828c386709d3806ed2a4aa16ad72183d8a8c3d4（跑完于 2026-09-24T00:13:43Z），与这一次的输入比：
+       common-dir 里最近写的一格是 singlefs-layer0-full-green.2c406d1eaecd27061928685e1828c386709d3806ed2a4aa16ad72183d8a8c3d4（跑完于 2026-09-24），与这一次的输入比：
        不同的文件共 1 个（最多列 20 个）：
          内容不同：crates/singlefs-harness/src/lib.rs
      → 怎么办：这批输入的层 0 全量没在收尾跑过。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>（与 gate.sh --staged 同一建法）：
@@ -485,18 +485,18 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
 
 ════ 准备：哈希 B 上 --full 全绿 ⇒ 两格并存，A 那一格不删
 $ bash .claude/gate.d/54-layer0-replay.sh --full
-  · --full 开跑（2026-09-24T00:13:43Z）：这批输入那一格旧标记已删（别的格不动）；这一道的输入哈希 a1be3d5c2e6f5859…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
+  · --full 开跑（2026-09-24）：这批输入那一格旧标记已删（别的格不动）；这一道的输入哈希 a1be3d5c2e6f5859…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
     LAYER0_PROGRESS slice=1/2 states=[0,131083) segments=0..=9 finished_slices=1/2 finished_states=131083/262165 elapsed_seconds=1.0
   ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
   ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
   ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
-  ✓ 全绿标记写进 /tmp/claude-1000/gate54-tiering/r2/selftest-repo/.git/singlefs-layer0-full-green.a1be3d5c2e6f58592d6ea725fa7aa9b981622e40f54c58e77a729d196847c97d（输入哈希 a1be3d5c2e6f5859…，3 个文件；开跑 2026-09-24T00:13:43Z，跑完 2026-09-24T00:13:43Z；common-dir 里现有 2 格）
+  ✓ 全绿标记写进 /tmp/claude-1000/gate54-tiering/r2/selftest-repo/.git/singlefs-layer0-full-green.a1be3d5c2e6f58592d6ea725fa7aa9b981622e40f54c58e77a729d196847c97d（输入哈希 a1be3d5c2e6f5859…，3 个文件；开跑 2026-09-24，跑完 2026-09-24；common-dir 里现有 2 格）
 [退出码 0]
 [标记 2 个：singlefs-layer0-full-green.2c406d1eaecd… singlefs-layer0-full-green.a1be3d5c2e6f…]
 
 ════ 自证四：哈希 B 上 --full 喂缺 CHECKER 行的合成日志 ⇒ 判红、B 那一格删掉不写，A 那一格还在
 $ env FAKE_CARGO_DROP_CHECKER=1 bash .claude/gate.d/54-layer0-replay.sh --full
-  · --full 开跑（2026-09-24T00:13:43Z）：这批输入那一格旧标记已删（别的格不动）；这一道的输入哈希 a1be3d5c2e6f5859…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
+  · --full 开跑（2026-09-24）：这批输入那一格旧标记已删（别的格不动）；这一道的输入哈希 a1be3d5c2e6f5859…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
     LAYER0_PROGRESS slice=1/2 states=[0,131083) segments=0..=9 finished_slices=1/2 finished_states=131083/262165 elapsed_seconds=1.0
   ✗ 用例跑过了，LAYER0 计数行的下一行却不是以 CHECKER 开头的逐条不变量行：成功句里「逐条不变量」那一句会是空话
      → 怎么办：first_transaction_step_seven_layer0.rs 里全量那条用例打完 LAYER0 行要紧跟着 println! checker_line(&tally) 那一行；
@@ -506,7 +506,7 @@ $ env FAKE_CARGO_DROP_CHECKER=1 bash .claude/gate.d/54-layer0-replay.sh --full
 
 ════ 自证四（另一支）：哈希 B 上 cargo 判红 ⇒ 判红、B 那一格不写，A 那一格还在
 $ env FAKE_CARGO_FAIL=1 bash .claude/gate.d/54-layer0-replay.sh --full
-  · --full 开跑（2026-09-24T00:13:43Z）：这批输入那一格旧标记已删（别的格不动）；这一道的输入哈希 a1be3d5c2e6f5859…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
+  · --full 开跑（2026-09-24）：这批输入那一格旧标记已删（别的格不动）；这一道的输入哈希 a1be3d5c2e6f5859…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
 running 6 tests (fake cargo, test=first_transaction_step_seven_layer0, include_ignored=1)
 test full_enumeration ... FAILED
 test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
@@ -519,7 +519,7 @@ test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; 
 ════ 改回那个字节（回到哈希 A）⇒ 快档判绿（A 那一格没被 B 上的几趟 --full 删掉）
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2c406d1eaecd2706…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:13:43Z，标记里的计数行原样：
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2c406d1eaecd2706…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
       LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
       CHECKER record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
       LAYER0B states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
@@ -540,12 +540,12 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
 
 ════ 准备：--full 重写 A 那一格
 $ bash .claude/gate.d/54-layer0-replay.sh --full
-  · --full 开跑（2026-09-24T00:13:43Z）：这批输入那一格旧标记已删（别的格不动）；这一道的输入哈希 2c406d1eaecd2706…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
+  · --full 开跑（2026-09-24）：这批输入那一格旧标记已删（别的格不动）；这一道的输入哈希 2c406d1eaecd2706…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
     LAYER0_PROGRESS slice=1/2 states=[0,131083) segments=0..=9 finished_slices=1/2 finished_states=131083/262165 elapsed_seconds=1.0
   ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
   ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
   ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
-  ✓ 全绿标记写进 /tmp/claude-1000/gate54-tiering/r2/selftest-repo/.git/singlefs-layer0-full-green.2c406d1eaecd27061928685e1828c386709d3806ed2a4aa16ad72183d8a8c3d4（输入哈希 2c406d1eaecd2706…，3 个文件；开跑 2026-09-24T00:13:43Z，跑完 2026-09-24T00:13:43Z；common-dir 里现有 1 格）
+  ✓ 全绿标记写进 /tmp/claude-1000/gate54-tiering/r2/selftest-repo/.git/singlefs-layer0-full-green.2c406d1eaecd27061928685e1828c386709d3806ed2a4aa16ad72183d8a8c3d4（输入哈希 2c406d1eaecd2706…，3 个文件；开跑 2026-09-24，跑完 2026-09-24；common-dir 里现有 1 格）
 [退出码 0]
 [标记 1 个：singlefs-layer0-full-green.2c406d1eaecd…]
 
@@ -580,7 +580,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
 ════ f4a 换回原样 ⇒ 判绿
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2c406d1eaecd2706…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:13:43Z，标记里的计数行原样：
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2c406d1eaecd2706…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
       LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
       CHECKER record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
       LAYER0B states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
@@ -589,7 +589,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
 
 ════ --full 跑到第二条流时改了一个输入 ⇒ 判红、出路给 HEAD + 暂存区 worktree 的建法、不写这一格
 $ env FAKE_CARGO_TOUCH_DURING_SECOND=/tmp/claude-1000/gate54-tiering/r2/selftest-repo/crates/singlefs-harness/src/lib.rs bash .claude/gate.d/54-layer0-replay.sh --full
-  · --full 开跑（2026-09-24T00:13:43Z）：这批输入那一格旧标记已删（别的格不动）；这一道的输入哈希 2c406d1eaecd2706…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
+  · --full 开跑（2026-09-24）：这批输入那一格旧标记已删（别的格不动）；这一道的输入哈希 2c406d1eaecd2706…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
     LAYER0_PROGRESS slice=1/2 states=[0,131083) segments=0..=9 finished_slices=1/2 finished_states=131083/262165 elapsed_seconds=1.0
   ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
   ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
@@ -624,19 +624,19 @@ bash "$layer0_full_base/tree/.claude/gate.d/54-layer0-replay.sh" --full "$layer0
 
 Preparing worktree (detached HEAD da06d84)
 HEAD is now at da06d84 base
-  · --full 开跑（2026-09-24T00:13:43Z）：这批输入那一格旧标记已删（别的格不动）；这一道的输入哈希 5e3b302b7908e0d2…（4 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
+  · --full 开跑（2026-09-24）：这批输入那一格旧标记已删（别的格不动）；这一道的输入哈希 5e3b302b7908e0d2…（4 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
     LAYER0_PROGRESS slice=1/2 states=[0,131083) segments=0..=9 finished_slices=1/2 finished_states=131083/262165 elapsed_seconds=1.0
   ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
   ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
   ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
-  ✓ 全绿标记写进 /tmp/claude-1000/gate54-tiering/r2/selftest-repo/.git/singlefs-layer0-full-green.5e3b302b7908e0d228d14029c3148766c03d9e2aefc0f764f61317a149a0f0b9（输入哈希 5e3b302b7908e0d2…，4 个文件；开跑 2026-09-24T00:13:43Z，跑完 2026-09-24T00:13:43Z；common-dir 里现有 1 格）
+  ✓ 全绿标记写进 /tmp/claude-1000/gate54-tiering/r2/selftest-repo/.git/singlefs-layer0-full-green.5e3b302b7908e0d228d14029c3148766c03d9e2aefc0f764f61317a149a0f0b9（输入哈希 5e3b302b7908e0d2…，4 个文件；开跑 2026-09-24，跑完 2026-09-24；common-dir 里现有 1 格）
 [出路命令的退出码 0]
 [标记 1 个：singlefs-layer0-full-green.5e3b302b7908…]
 
 ════ 仿 gate.sh --staged：临时 worktree 里跑快档 ⇒ 判绿（工作区里别的会话的 other_session_wip.rs 与 Cargo.toml 改动都不在）
 $ env SINGLEFS_GATE_FULL=1 bash /tmp/claude-1000/gate54-tiering/r2/selftest-staged-worktree/.claude/gate.d/54-layer0-replay.sh /tmp/claude-1000/gate54-tiering/r2/selftest-staged-worktree
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（5e3b302b7908e0d2…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T00:13:43Z，标记里的计数行原样：
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（5e3b302b7908e0d2…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
       LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
       CHECKER record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
       LAYER0B states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
@@ -646,7 +646,7 @@ $ env SINGLEFS_GATE_FULL=1 bash /tmp/claude-1000/gate54-tiering/r2/selftest-stag
 ════ 对照：主工作区（带别的会话没暂存的改动）跑快档 ⇒ 判红
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 fff20e92dedbcecb…，5 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/gate54-tiering/r2/selftest-repo/.git/singlefs-layer0-full-green.fff20e92dedbcecbc16c11abbbb7ff1513eb8d32550c1633035a348653bf0ad5）
-       common-dir 里最近写的一格是 singlefs-layer0-full-green.5e3b302b7908e0d228d14029c3148766c03d9e2aefc0f764f61317a149a0f0b9（跑完于 2026-09-24T00:13:43Z），与这一次的输入比：
+       common-dir 里最近写的一格是 singlefs-layer0-full-green.5e3b302b7908e0d228d14029c3148766c03d9e2aefc0f764f61317a149a0f0b9（跑完于 2026-09-24），与这一次的输入比：
        不同的文件共 2 个（最多列 20 个）：
          内容不同：Cargo.toml
          只在这一次里：crates/singlefs-harness/src/other_session_wip.rs

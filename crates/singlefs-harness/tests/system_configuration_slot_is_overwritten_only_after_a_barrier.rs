@@ -167,7 +167,7 @@ fn rolling_back_a_failed_acquisition_overwrites_the_older_slot_only_behind_a_bar
         let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
         match acquire_instance(&mut writer).expect_err("盘 1 的取号写报错，取号必须失败") {
             InstanceAcquisitionFailed::Acquisition(acquisition) => acquisition,
-            InstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness {
+            InstanceAcquisitionFailed::DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness {
                 device,
             } => panic!("这条用例里每块盘两槽都读得出自证过的系统配置，取号不该拒在见证值那一核：{device:?}"),
         }

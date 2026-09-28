@@ -1,0 +1,56 @@
+--- jiaeio/crates/singlefs-core/src/mount.rs	2026-09-28 08:23:22.487964858 +0000
++++ jiaeiodev/crates/singlefs-core/src/mount.rs	2026-09-28 08:56:49.772345665 +0000
+@@ -4171,11 +4171,12 @@
+         .map(|slot| slot.quantities.journal_tail)
+         .max()
+         .unwrap_or(0);
+-    // 候选甲-读错（unreadable-at-mount-r2）：见证读里只要有一个系统配置槽设备报读错，就判不出（按真）；
+-    // 读得出而自证不过的槽（撕裂、全零、内容坏）照今天不进 max、不判不出。
+-    let witness_read_is_undecidable = slots_and_device_read_errors_of_each_device
+-        .iter()
+-        .any(|(_, device_read_errors)| *device_read_errors > 0);
++    // 攻方腿的收窄「甲-读错-每盘」（unreadable-at-mount-r2，被攻过零轮）：每一块盘都有一槽设备报读错才判不出（按真）；
++    // 有一块盘两槽都读得出，被确认过的发布的见证就在那块盘上（轮换每块盘各写一槽、屏障之后才确认）。自证不过的照今天不进 max。
++    let witness_read_is_undecidable = !slots_and_device_read_errors_of_each_device.is_empty()
++        && slots_and_device_read_errors_of_each_device
++            .iter()
++            .all(|(_, device_read_errors)| *device_read_errors > 0);
+     let comparison = if witness_read_is_undecidable {
+         WitnessedCounterComparison::Undecidable
+     } else if witnessed_journal_counter == 0 {
+--- jiaeio/crates/singlefs-core/src/transaction.rs	2026-09-28 08:23:15.013872714 +0000
++++ jiaeiodev/crates/singlefs-core/src/transaction.rs	2026-09-28 08:56:49.773471921 +0000
+@@ -642,19 +642,29 @@
+ ) -> Result<Vec<Vec<SystemConfiguration>>, InstanceAcquisitionFailed> {
+     let spacing = u64::from(pool.parameters.geometry.fixed_structure_slot_spacing);
+     let filesystem_identifier = pool.parameters.filesystem_identifier;
++    // 攻方腿的收窄「甲-读错-每盘」（unreadable-at-mount-r2，被攻过零轮）：每一块盘都有一槽设备报读错才拒；一份自证过的都没有照今天拒。
++    let every_device_has_a_slot_with_a_device_read_error = !pool.devices.is_empty()
++        && pool.devices.iter().all(|(identity, _)| {
++            crate::recovery::system_configuration_slots_read_once_with_device_read_errors(
++                &*pool.devices,
++                *identity,
++                spacing,
++                &filesystem_identifier,
++            )
++            .1
++                > 0
++        });
+     pool.devices
+         .iter()
+         .map(|(identity, _)| {
+-            // 候选甲-读错（unreadable-at-mount-r2）：取号那一刻按同一取法读见证值，有一槽设备报读错就拒（判不出取不了值）；
+-            // 自证不过的槽照今天不算，一份自证过的都没有照今天拒。
+-            let (slots_of_this_device, device_read_errors) =
++            let (slots_of_this_device, _device_read_errors) =
+                 crate::recovery::system_configuration_slots_read_once_with_device_read_errors(
+                     &*pool.devices,
+                     *identity,
+                     spacing,
+                     &filesystem_identifier,
+                 );
+-            if device_read_errors > 0 || slots_of_this_device.is_empty() {
++            if every_device_has_a_slot_with_a_device_read_error || slots_of_this_device.is_empty() {
+                 return Err(
+                     InstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness {
+                         device: *identity,

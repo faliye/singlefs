@@ -2,7 +2,7 @@
 
 你交的是观测，不是判决：核对表里的 ✗ 不免除主 agent 对推论的逐条现查。
 
-写于 2026-09-26（JST）。核的是三条腿的报告：辩方（Sonnet）、云端攻方（Opus，E1/E2）、本地攻方（E1 的 F14 格，两次抽样 s1/s2）。方法：`.claude/rules/three-way-inference.md`「判决由主 agent 做，不由投票做」、`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「校验路径本身也要证明它会红」「引产物就整行抄」。
+写于 2026-09-26。核的是三条腿的报告：辩方（Sonnet）、云端攻方（Opus，E1/E2）、本地攻方（E1 的 F14 格，两次抽样 s1/s2）。方法：`.claude/rules/three-way-inference.md`「判决由主 agent 做，不由投票做」、`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「校验路径本身也要证明它会红」「引产物就整行抄」。
 
 ## 判别力自证（先做，必须判 ✗）
 
@@ -111,7 +111,7 @@ $ nice -n 19 bash research/prompts/defs-m2-closeout-r2-opus-model/rerun.sh /tmp/
 |---|---|---|
 | 本机 `nproc` = 32 | ✓ | `nproc` → 32 |
 | slice 总上限 40.1 GiB | ✓ | `nice -n 19 bash research/scripts/run-with-memory-cap.sh --status` → `slice singlefs-heavy.slice 的总上限 40.1 GiB` |
-| `memory-peaks.tsv` 里 `checker_known_bad_images`\|`74-model-differential` 键共 46 行，其中「`-- ` 点名一两个用例」36 行、「只编不跑」1 行、`2026-09-25T15:18:10Z` 不带 `capped.sh` 撞 4G 顶 1 行、H1 节列出的 8 行 | ✓ 46/36/8 三个数字均现跑复核一致（8 行按内容逐条比对与报告列出的 8 行完全相同） | `grep -v '^#' research/scripts/memory-peaks.tsv \| awk -F'\t' '$4 ~ /checker_known_bad_images\|74-model-differential/' \| wc -l` → 46；`grep -c -- '-- '` → 36 |
+| `memory-peaks.tsv` 里 `checker_known_bad_images`\|`74-model-differential` 键共 46 行，其中「`-- ` 点名一两个用例」36 行、「只编不跑」1 行、`2026-09-26` 不带 `capped.sh` 撞 4G 顶 1 行、H1 节列出的 8 行 | ✓ 46/36/8 三个数字均现跑复核一致（8 行按内容逐条比对与报告列出的 8 行完全相同） | `grep -v '^#' research/scripts/memory-peaks.tsv \| awk -F'\t' '$4 ~ /checker_known_bad_images\|74-model-differential/' \| wc -l` → 46；`grep -c -- '-- '` → 36 |
 | `defs-m2-closeout-r2-opus-model/` 目录 13 个文件与自带 `SHA256SUMS` 一致 | ✓ 13/13 `OK` | `sha256sum -c SHA256SUMS`（在原目录跑，只读校验，不改动） |
 | 包装演示用的临时 slice 已停用、无残留 | ✓ 0 个残留 | `systemctl --user list-units --all \| grep -c singlefs_` → 0 |
 | `crates/singlefs-harness/src/crash.rs` 含 `SparseDevice`、`SparseBlockDevice`、`MemoryPool`、`closed_form_state_count`、`enumerate_layer0_versions`、`enumerate_layer0`（「没打中的形状」F3 一条） | ✓ 6/6 全部存在 | `grep -n 'fn enumerate_layer0\b\|fn enumerate_layer0_versions\|fn closed_form_state_count\|struct SparseBlockDevice\|struct SparseDevice\|struct MemoryPool' crates/singlefs-harness/src/crash.rs` |

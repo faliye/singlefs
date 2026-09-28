@@ -1,0 +1,39 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-a/copy/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.84s
+     Running tests/checker_judges_reserved_bytes_and_widths_it_used_to_skip.rs (/tmp/claude-1000/impl-r2-fixes-a/target/debug/deps/checker_judges_reserved_bytes_and_widths_it_used_to_skip-19c9f2049810bc23)
+
+running 15 tests
+test a_code_two_node_whose_entry_width_is_zero_while_its_entry_count_is_not_is_refused ... ok
+test a_journal_ring_that_holds_fewer_than_the_safety_factor_records_or_ends_past_the_unit_area_is_refused ... FAILED
+test a_fixed_structure_slot_spacing_below_four_kibibytes_or_reaching_into_the_root_ring_is_refused ... ok
+test a_code_three_unit_whose_record_width_is_zero_while_its_record_count_is_not_is_refused ... ok
+test a_physical_block_size_that_cannot_hold_a_root_record_or_is_wider_than_the_slot_spacing_is_refused ... ok
+test a_pool_where_one_system_configuration_slot_carries_a_refused_value_is_reported_and_not_vouched_for ... ok
+test a_system_configuration_slot_whose_encryption_type_is_not_off_is_refused ... ok
+test a_node_of_a_registered_tree_whose_entry_width_is_zero_while_its_entry_count_is_not_reddens_the_entry_width_invariant ... ok
+test a_system_configuration_slot_whose_format_version_is_not_the_one_this_checker_reads_is_refused ... ok
+test a_pool_whose_every_system_configuration_slot_carries_a_refused_value_gets_no_invariant_vouched_for ... ok
+test a_unit_with_a_non_zero_byte_among_the_twenty_nine_encryption_reserved_bytes_is_refused ... ok
+test a_unit_whose_format_version_is_not_the_one_this_checker_reads_is_refused_once_both_checksums_hold ... ok
+test an_inode_tree_root_with_a_non_zero_encryption_reserved_byte_breaks_the_walk_of_the_newest_root ... ok
+test a_followed_pointer_whose_mac_or_nonce_is_not_zero_reddens_the_header_invariant ... ok
+test every_unit_class_with_an_unrecognized_format_version_or_a_non_zero_reserved_byte_reddens_the_header_invariant_in_the_pool_walk ... ok
+
+failures:
+
+---- a_journal_ring_that_holds_fewer_than_the_safety_factor_records_or_ends_past_the_unit_area_is_refused stdout ----
+
+thread 'a_journal_ring_that_holds_fewer_than_the_safety_factor_records_or_ends_past_the_unit_area_is_refused' (3604947) panicked at crates/singlefs-harness/tests/checker_judges_reserved_bytes_and_widths_it_used_to_skip.rs:490:9:
+assertion `left == right` failed: 环长 12288：至少 3 条记录，末端不越过单元区起点（环起点槽 1024、单元区起始槽 50176）
+  left: Err(UnitAreaStartNotTheSlotAfterTheJournalRing)
+ right: Ok(())
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_journal_ring_that_holds_fewer_than_the_safety_factor_records_or_ends_past_the_unit_area_is_refused
+
+test result: FAILED. 14 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.29s
+
+error: test failed, to rerun pass `-p singlefs-harness --test checker_judges_reserved_bytes_and_widths_it_used_to_skip`
+exit=101

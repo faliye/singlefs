@@ -1,0 +1,4 @@
+exit=1
+want=这一段却没有「模型对拍 N 步」那一行：「随机历史：偏向抬 F 之后回退的取样点」（用例 rollback_heavy_random_histories_reach_the_floor_root_and_end_only_in_known_red_forms）
+want=样本只跑 .gate-cells 点名的格：model-rollback-sampling
+want=model-rollback-sampling：红（退出 1）

@@ -1,6 +1,6 @@
 # m2-rollback-forward-r1 云端攻方腿（Opus）报告
 
-轮名 m2-rollback-forward-r1（设计轮第一轮）；攻击面：F1、F2 的失败面（历史里会不会落到错的版本、块会不会被复用），F3 里的「可以删」，F4 的代价数。写于 2026-09-25（UTC 09:00–11:30 前后，JST +9）。
+轮名 m2-rollback-forward-r1（设计轮第一轮）；攻击面：F1、F2 的失败面（历史里会不会落到错的版本、块会不会被复用），F3 里的「可以删」，F4 的代价数。写于 2026-09-25。
 
 ## 〇、复跑命令与文件
 
@@ -261,19 +261,19 @@ D5 已定项 14 的引用区间 `birth(b) ≤ S.txg < death(b)` 自己在射程�
 
 ## 十、复跑原样行与 SHA256SUMS
 
-补写于 2026-09-25 12:10 UTC（21:10 JST），由接手的 agent 写；上面各节是前任写的，没改。
+补写于 2026-09-25，由接手的 agent 写；上面各节是前任写的，没改。
 
-**这一遍复跑怎么来的。** 前任最后那次全量复跑（草稿目录 `rerun4/`）在「回退那条流」那一步被会话中断打断：`rerun-fast.out`、`rerun-full-unmount.out` 跑完了，`rerun-full-rollback.out` 是空文件，也没有进程在跑。接手后从冻结副本整份重跑了一遍（11:55–12:08 UTC，exit 0）：
+**这一遍复跑怎么来的。** 前任最后那次全量复跑（草稿目录 `rerun4/`）在「回退那条流」那一步被会话中断打断：`rerun-fast.out`、`rerun-full-unmount.out` 跑完了，`rerun-full-rollback.out` 是空文件，也没有进程在跑。接手后从冻结副本整份重跑了一遍（exit 0）：
 
 ```
 bash research/prompts/m2-rollback-forward-r1-opus-model/rerun.sh /tmp/claude-1000/m2-rollback-forward-r1/tree /tmp/claude-1000/m2-rollback-forward-r1-opus/rerun5 full
 ```
 
-跑之前核过：冻结副本的 `crates/singlefs-core/src/mount.rs` 的 sha256 与 `research/prompts/m2-rollback-forward-r1-snapshot/crates-sha256.txt` 里那一行相同（`c9f7a2b0…2cf3`）；复跑目录里那份 `rbf_attack.rs` 与模型目录里的逐字节相同（`cmp`）。模型目录里的三份 `.out` 已换成这一遍（`rerun5/`）的输出，`SHA256SUMS` 重新生成了。原因是 11:03 UTC 那份 `SHA256SUMS` 生成之后 `rerun.sh` 的过滤改过（按「RBF 」切行首），`rerun.sh` 那一行已经对不上。
+跑之前核过：冻结副本的 `crates/singlefs-core/src/mount.rs` 的 sha256 与 `research/prompts/m2-rollback-forward-r1-snapshot/crates-sha256.txt` 里那一行相同（`c9f7a2b0…2cf3`）；复跑目录里那份 `rbf_attack.rs` 与模型目录里的逐字节相同（`cmp`）。模型目录里的三份 `.out` 已换成这一遍（`rerun5/`）的输出，`SHA256SUMS` 重新生成了。原因是那份 `SHA256SUMS` 生成之后 `rerun.sh` 的过滤改过（按「RBF 」切行首），`rerun.sh` 那一行已经对不上。
 
 **和前几遍比。**
 
-- `rerun-fast.out`：旧过滤那一遍（`rerun3/`，11:03 放进模型目录的那份）143 行，这一遍 161 行。旧的每一行这一遍都有；多出的 18 行是每条用例输出的第一行。libtest 把「test 名 ...」印在这一行的开头，旧过滤 `^RBF` 把它们漏掉了，其中有 `t6s-summary` 所在用例的第一行、`t4`/`t5a` 的计数行、`t1b` 的 `ReleaseTargetAlreadyReleased` 行等。`rerun4/` 与 `rerun5/` 的 `rerun-fast.out` 去掉 `test result` 那一行之后逐行相同。
+- `rerun-fast.out`：旧过滤那一遍（`rerun3/`，早先放进模型目录的那份）143 行，这一遍 161 行。旧的每一行这一遍都有；多出的 18 行是每条用例输出的第一行。libtest 把「test 名 ...」印在这一行的开头，旧过滤 `^RBF` 把它们漏掉了，其中有 `t6s-summary` 所在用例的第一行、`t4`/`t5a` 的计数行、`t1b` 的 `ReleaseTargetAlreadyReleased` 行等。`rerun4/` 与 `rerun5/` 的 `rerun-fast.out` 去掉 `test result` 那一行之后逐行相同。
 - 两份全量：`RBF` 行与 `rerun3/` 逐行相同，只有 `finished in` 的耗时不同（卸载那一串 202.88 s → 191.97 s，回退那条流 492.52 s → 488.10 s）。
 - 第七节末那条写的是「从头起跑了三遍（两遍 fast、一遍 full）」。现在还要加上两遍：`rerun4`（fast 与卸载那一串跑完，回退那条流被打断）与 `rerun5`（full，跑完）。`RBF` 行的结论不变，而且这仍只算这一条腿的一次观测。
 

@@ -1,0 +1,4 @@
+   Compiling e7-index-bench v0.1.0 (research/e7-index-bench)
+    Finished `release` profile [optimized + debuginfo] target(s) in 4.23s
+  Executable unittests src/bin/e142_first_transaction_dry_run.rs (target/release/deps/e142_first_txn_dry_run-1eeb2b80a4957fc1)
+exit=0

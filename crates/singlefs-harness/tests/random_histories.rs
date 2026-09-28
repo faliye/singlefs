@@ -16,18 +16,18 @@ use singlefs_checker::image::{chosen_system_configurations, valid_roots, Invaria
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::admission::SpaceAdmission;
+use singlefs_core::allocation_record_tree::AllocationRecordTreeNodePosition;
 use singlefs_core::allocator::PlacementRefusal;
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::mount::{
-    mount_writable_with_space_admission, raise_rollback_floor, roll_back_by_a_forward_publish,
-    MountError, RollbackCandidateExclusion, RollbackError, RollbackTarget, ShadowLedger,
+    mount_writable_with_space_admission, roll_back_by_a_forward_publish, MountError,
+    RollbackCandidateExclusion, RollbackError, RollbackTarget,
 };
 use singlefs_core::transaction::{TransactionOutput, TransactionUnit};
 use singlefs_harness::fault_injection::{
     FaultCounting, FaultDeviceSelector, FaultOccurrence, FaultPlacement, FaultSchedule,
     InjectedFault, SharedFaultPlan,
 };
-use singlefs_harness::history::newest_ring_root_and_slot_count;
 use singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::history::{
     allocation_records_on_the_image_under, classify_failure, execute_history,
@@ -618,21 +618,23 @@ const EMPTY_CONTENT_OVERWRITE: HistoryOperation =
     });
 
 /// 增补 2 收口表第 39 行那一族（取号之前的准入不算落点）：两块单元区 240 槽的小盘，从第一个文件起在 mkfs 那条会话里
-/// 覆盖写 16 次（txg 4–19；分配记录树按位置寻址之后每次多写几个节点，原先是 22 次，D8（核心索引结构） 已定项 14），
+/// 覆盖写 18 次（txg 4–21；分配记录树按位置寻址之后每次多写几个节点，原先是 22 次，D8（核心索引结构） 已定项 14），
 /// 再可写挂载——挂载自己那一串（写行与暖机）拿不到落点。这段历史是单元区墙取样点的比重
 /// （`GenerationWeights::TOWARD_THE_UNIT_AREA_WALL`）在 240 槽上跑出来、收缩到最短的（种子 7463871032432355113 在第 28 步
 /// 撞上「拒绝之前写了盘」）。改之前取号写完、写行那次才被落点拒绝（`MountError::Publish`）：实例代号一去不回、录制流里多了写与屏障，
 /// 模型判「拒绝之前写了盘」。今天取号之前在分配器的拷贝上就取不到，返回 `PlacementRefusedBeforeAcquisitionMountAdmissionUndecided`：
 /// 那一步前后镜像逐字节相同、录制流一步没多，跑完、每一步之后池级 checker 判绿。
-/// 同一份盘面（第 16 次覆盖写之后的镜像）另起两块内存盘直接调 `mount_writable`，钉住成员的每个字段，录制流一步都不许有。
-/// 覆盖写的次数在草稿副本上按 5–39 次扫过：16、17 两档「每一次都做成、挂载那一步被落点拒」，18 次起覆盖写自己先被拒；
-/// 17 次那一档写行那次自己就取不到，16 次这一档写行与第一次暖机都取得到、第二次暖机才取不到——取这一档，钉住预演罩到暖机那几次。
+/// 同一份盘面（第 18 次覆盖写之后的镜像）另起两块内存盘直接调 `mount_writable`，钉住成员的每个字段，录制流一步都不许有。
+/// 覆盖写的次数在草稿副本上按 8–30 次扫过（代码三方第二轮之后改法 B 的草稿探针，`research/prompts/m2-impl-r2-fixes-b-implementer-report.md`
+/// 第三节 5e）：只有 18 次那一档「每一次都做成、挂载那一步被落点拒」，14–17 次挂载做成，19 次起覆盖写自己先被拒；18 次这一档
+/// 写行那次（暖机计划 1 次）自己就取不到盘 1 第 0 层第 2 片分配记录树叶的落点。原来钉的是 16 次那一档（写行与第一次暖机取得到、
+/// 第二次暖机才取不到）：今天那一档挂载做成（同一探针），预演罩到暖机那几次这条历史走不到了。
 /// 空间准入关掉（只供测试的开关 `SpaceAdmission::SkippedByTheTestOnlySwitch`，执行器与直接调挂载两处都关）：判着准入时 240 槽的盘上
 /// 覆盖写没到 16 次就被式子拒、挂载在取号之前被式子拒，走不到预演取不到落点那一道——这里测的是准入放行之后那一条兜底拒绝。
 #[test]
 fn writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquisition_with_the_disk_unchanged(
 ) {
-    const OVERWRITES: usize = 16;
+    const OVERWRITES: usize = 18;
     let history = GeneratedHistory {
         seed: HistorySeed(0),
         starting_point: HistoryStartingPoint::AfterFirstFile,
@@ -722,14 +724,20 @@ fn writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquis
             Err(
                 MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided {
                     instance_to_acquire: InstanceGeneration(2),
-                    publish_index: 2,
-                    warm_up_publishes_planned: 2,
-                    unit: TransactionUnit::TreeTable,
+                    publish_index: 0,
+                    warm_up_publishes_planned: 1,
+                    unit: TransactionUnit::AllocationTreeNodeBelowTheRoot(
+                        AllocationRecordTreeNodePosition {
+                            level: 0,
+                            device: DeviceIdentity(1),
+                            index_in_device: 2,
+                        }
+                    ),
                     refusal: PlacementRefusal::NoFreeSlotOnAnyDevice,
                 }
             )
         ),
-        "写行那次与第一次暖机在拷贝上都取得到，第二次暖机的最后一个固定点（树表）取不到：{:?}",
+        "写行那次在拷贝上就取不到盘 1 第 0 层第 2 片分配记录树叶的落点：{:?}",
         refused.as_ref().err()
     );
     assert!(
@@ -1059,7 +1067,8 @@ fn turning_the_root_ring_with_overwrites_in_the_make_filesystem_process_runs_to_
 /// 覆盖写（10）、可写挂载（实例 3，txg 11、12）、覆盖写三次（13–15）、抬 F（选择子 8）。旧形态下两次回退各开一个实例、抛弃前一段，
 /// F = 8 落进回退留下的空档，I-3.1 记账多算 12 槽；向前回退不抛弃任何根，这一段没有空档，每一步之后 checker 判绿、跑完。
 /// 清单那一条的形态今天只剩崩溃恢复抛弃的时间线造得出（实四乙第 7 件）；C554 乙之后只剩系统配置没见证到被抛弃那条根的那一形，
-/// 复现在 `crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43`。
+/// 那一形的时间线由 `crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_is_red_only_on_i_7_4_before_any_floor_raise_in_the_known_double_fault_form`
+/// 造，抬 F 之前已经 I-7.4 红（C583（双故障形：每盘一槽系统配置坏加最新根一时读不出），已知）。
 #[test]
 fn the_history_that_raised_the_floor_into_a_rollback_gap_completes_under_the_forward_rollback() {
     let empty = ContentChoice {
@@ -1188,15 +1197,16 @@ fn violations_on_the_image(image: &MemoryPool) -> Vec<(&'static str, String)> {
         .collect()
 }
 
-/// 「已知红」清单第 0 条（增补 2 收口表第 43 行）那一形：第一个文件 A（txg 3）之后覆盖写 B（4）、C（5），崩溃恢复抛弃 C——择根落到 B，
-/// 实例 2 写行 6、暖机 7；再覆盖写四次（8–11），抬 F 到 5（上限 8）。F 落在被抛弃的 C 那个 txg 上，拿这一次的观察按清单归类，归到第 0 条
-/// （`reuse_after_raising_the_floor.rs` 那一条同形）。生成器的那一步 C554 乙之后造不出被抛弃的根，被抛弃的 C 改由
-/// [`pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version`] 造（系统配置没见证到 C 的那一形）。
-/// 今天红在抬 F 之前：那次崩溃恢复看不见 C、把 C 引用的单元又发出去，池级 checker 的 I-7.4 红——乙罩不到的那一格
-/// （`research/prompts/m2-impl-c554-yi-implementer-report.md` 第六节 Q1），不是乙的拒；那一格修掉之前这条红着。
+/// 双故障形（C583（双故障形：每盘一槽系统配置坏加最新根一时读不出），已知，留里程碑三）：第一个文件 A（txg 3）之后覆盖写 B（4）、C（5），
+/// 崩溃恢复抛弃 C——择根落到 B，实例 2 写行 6、暖机 7；再覆盖写四次（8–11）。那次崩溃恢复看不见 C、把 C 引用的单元又发出去，
+/// 抬 F 之前池级 checker 就恰好红一条 I-7.4（近 K 代块未被复用），说明文字点名实例 1、txg 5 那条被抛弃的根——乙罩不到的那一格
+/// （`research/prompts/m2-impl-c554-yi-implementer-report.md` 第六节 Q1），不是乙的拒。被抛弃的 C 由
+/// [`pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version`] 造（系统配置没见证到 C 的那一形；生成器的那一步 C554 乙之后造不出）。
+/// 原来这一条接着抬 F 到 5、拿观察按「已知红」清单归到第 0 条（收口表第 43 行）；第 0 条要「只有 I-3.1 红」，抬 F 之前已经 I-7.4 红，
+/// 抬 F 与归类那一段归不进第 0 条，删掉（`reuse_after_raising_the_floor.rs` 那一条同形、同样改钉）。
 #[test]
 #[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
-fn crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43(
+fn crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_is_red_only_on_i_7_4_before_any_floor_raise_in_the_known_double_fault_form(
 ) {
     let (mut pool, abandoned) =
         pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version("random-history-row-43");
@@ -1208,54 +1218,25 @@ fn crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnes
         );
     }
     assert_eq!(pool.output.root.checkpoint_txg, CheckpointTxg(11));
-    let image_before_raising = pool.memory_pool();
     assert_eq!(
-        violations_on_the_image(&image_before_raising),
-        Vec::new(),
-        "抬 F 之前一条违例都没有"
+        (abandoned.root.instance, abandoned.root.checkpoint_txg),
+        (InstanceGeneration(1), CheckpointTxg(5)),
+        "被抛弃的是 C：实例 1、txg 5"
     );
-    let floor_on_the_abandoned_root = abandoned.root.checkpoint_txg;
+    let violations = violations_on_the_image(&pool.memory_pool());
     assert_eq!(
-        raised_floor_lands_only_on_abandoned_roots(
-            &image_before_raising,
-            floor_on_the_abandoned_root
-        ),
-        Some(true),
-        "抬之前的镜像上 txg 5 那一条根（C）属于被抛弃的实例"
+        violations
+            .iter()
+            .map(|(invariant, _)| *invariant)
+            .collect::<Vec<_>>(),
+        vec!["I-7.4"],
+        "抬 F 之前恰好 I-7.4 红：{violations:?}"
     );
-    let mut current = pool.output.clone();
-    let raised = raise_rollback_floor(
-        &common::parameters(),
-        pool.devices.as_mut().expect("镜像还开着"),
-        &mut pool.allocator,
-        &mut current,
-        floor_on_the_abandoned_root,
-        ShadowLedger::On,
-    )
-    .expect("F 抬到 5：不超过上限 8");
-    pool.output = current;
-    assert_eq!(raised.ceiling, CheckpointTxg(8));
-    let image_after_raising = pool.memory_pool();
-    let (newest_ring_root_txg, root_ring_slot_count) =
-        newest_ring_root_and_slot_count(&image_after_raising);
-    let ending = classify_failure(FailureObservation {
-        position: StepPosition::Operation(0),
-        operation_kind: Some(HistoryOperationKind::RaiseRollbackFloor),
-        violations: violations_on_the_image(&image_after_raising),
-        panic: None,
-        newest_ring_root_txg,
-        root_ring_slot_count,
-        harness_judgement: None,
-        model_disagreement: None,
-        raised_floor_lands_only_on_abandoned_roots: raised_floor_lands_only_on_abandoned_roots(
-            &image_before_raising,
-            floor_on_the_abandoned_root,
-        ),
-        record_check: RecordCheck::default(),
-    });
     assert!(
-        matches!(ending, HistoryEnding::KnownRed { form: 0, .. }),
-        "归到「已知红」清单第 0 条（收口表第 43 行）：{ending:?}"
+        violations[0]
+            .1
+            .starts_with("被抛弃的根（实例 1、txg 5）引用的单元已被重新分配或抹头"),
+        "I-7.4 的说明文字点名实例 1、txg 5 那条被抛弃的根：{violations:?}"
     );
 }
 
@@ -1536,8 +1517,10 @@ fn the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice() {
 /// 两块单元区 240 槽的小盘、每一步之后跑池级 checker），空间准入关掉（判着准入时这几块小盘上式子先拒，走不到抬 F 那一串撞墙）。
 /// 旧形态（挂载时回退）下两段历史都在一次回退之后把 F 抬进回退留下的空档：种子 4000000045 第 27 步抬到 7，种子 4000000204 第 31 步
 /// 抬到 20。回退改成挂着时的一次向前发布之后，比重表里「关着时回退」并进了可写挂载，同一个种子生成的历史跟着变了，没有空档；
-/// 抬 F 那一步照样在同一步、第二次照样取不到落点。这一串要推 `publishes_in_the_sequence` 次空发布（两个种子那一步都是三次；
-/// 种子 4000000045 旧形态下是两次）。
+/// 种子 4000000045 抬 F 那一步照样在同一步、第二次照样取不到落点。种子 4000000204 在合入后验证二（代码三方第二轮改法 A、B 合入之后）的底座上
+/// 第 31 步的抬 F 做成了（三次空发布都发出去、新 F 20），走不到这一形；换成改法 B 草稿探针在种子 4000000000–399 上（不带 checker）扫出、
+/// 带 checker 跑过的种子 4000000001 第 30 步（同是三次里的第二次取不到；`research/prompts/m2-impl-r2-fixes-b-implementer-report.md` 第三节 5e）。
+/// 这一串要推 `publishes_in_the_sequence` 次空发布（两个种子那一步都是三次；种子 4000000045 旧形态下是两次）。
 /// 改之前逐次发：第一次（带新 F 的根）已经落盘、第二次才被拒，那条落了盘的新 F 让 checker 在那一步判 I-3.1 红、记账比遍历多
 /// 8 × 16384（收口表第 43 行那一形，但这一步不是做成的抬 F，已知红清单不接，判成新发现，历史停在那一步）；
 /// 扣住的槽也留在进程里（C546（抬 F 被拒时扣住的槽不退回） 第二次起那一半）。
@@ -1600,11 +1583,11 @@ fn seed_4000000045_raising_the_floor_on_narrow_devices_is_refused_before_any_wri
 
 #[test]
 #[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
-fn seed_4000000204_raising_the_floor_on_narrow_devices_is_refused_before_any_write_instead_of_leaving_the_new_floor_on_one_device(
+fn seed_4000000001_raising_the_floor_on_narrow_devices_is_refused_before_any_write_instead_of_leaving_the_new_floor_on_one_device(
 ) {
     the_raise_refused_part_way_by_the_rehearsal_writes_nothing_and_the_history_runs_to_the_end(
-        4_000_000_204,
-        31,
+        4_000_000_001,
+        30,
         3,
     );
 }

@@ -4,7 +4,7 @@
   ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 74f88a29d4fc1e39…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/m
   ── 红句里打出的三行与 54 号出路函数的三行逐字相同（cmp 0）
   ── 照红句三行原样跑完
-  · --full 开跑（2026-09-24T01:38:32Z）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 ccec9defeddec16d…（4 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
+  · --full 开跑（2026-09-24）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 ccec9defeddec16d…（4 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
   ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/v1-a/.git/singlefs-layer0-full-green.ccec9defeddec16d8b0a1f9419f2fb8d0764b102ae19d1e21fa132d21b
       [格] ccec9defedde worker_threads=32 judged_root=…/tmp.2LaIeWSGDo/tree
   ── 崩溃验证员再跑快档，退出码 1
@@ -22,7 +22,7 @@
   ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/v1-b/.git/singlefs-layer0-full-green.183ed074847ba5992ae7ed5344054fa674d589a1ff3e07ac4a7c03159d
   ── X 再起门禁
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（183ed074847ba599…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:38:38Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（183ed074847ba599…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 真值
     [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]

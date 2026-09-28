@@ -152,7 +152,7 @@ if __name__ == '__main__':
     preflight(__file__)
     if len(sys.argv) > 1 and sys.argv[1] == '--selftest':
         import os
-        d = sys.argv[2] if len(sys.argv) > 2 else '/home/fy5090/code/fs-refs/docs'
+        d = sys.argv[2] if len(sys.argv) > 2 else os.path.expanduser('~/code/fs-refs/docs')
         bad = 0
         for name, anchor in SELFTEST:
             p = os.path.join(d, name)

@@ -96,7 +96,7 @@
 ## 十、复跑命令
 
 ```
-cd /home/fy5090/code/singlefs/research
+cd research
 cargo test -p e7-index-bench --bin e142-first-txn-dry-run          # 60 通过、1 ignored
 cargo check -p e7-index-bench --bin e142-first-txn-dry-run          # 零警告
 bash scripts/mutate.sh e142-first-txn-dry-run e7-index-bench/src/bin/e142_first_transaction_dry_run.rs mutations/e142_first_transaction_dry_run.tsv   # 109/109 抓到，已还原

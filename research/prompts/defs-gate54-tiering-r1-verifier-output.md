@@ -135,7 +135,7 @@ runlog 明确没做这一步（「未判多次抽样之间答复方向是否一�
 
 ## 四、攻方腿是否用到正推腿的报告内容
 
-时间戳现查：`stat -c '%n %y'` 显示 sonnet 报告落盘于 `2026-09-23 23:22:20`；Opus 的模型脚本落盘于 `23:25:35` 起，`run-all.sh` 与 `s6-fix-arms.sh` 落盘于 `23:27:45`，Opus 报告本身落盘于 `23:34:26`——sonnet 报告确实先于 Opus 全部产物落盘，具备被读到的时间窗口。
+时间戳现查：`stat -c '%n %y'` 显示 sonnet 报告落盘于 `2026-09-23`，之后依次是 Opus 的模型脚本、`run-all.sh` 与 `s6-fix-arms.sh`、Opus 报告本身——sonnet 报告确实先于 Opus 全部产物落盘，具备被读到的时间窗口。
 
 `grep -in 'sonnet'` 对 Opus 的报告与模型目录全部文件零命中；进一步用 sonnet 报告里特有的措辞（「缺哪一句」「规则没说」）去 `grep -c` Opus 报告，同样零命中。Opus 报告「没做什么」一节自称「派发没给禁读清单，按「无」办；读过的东西都在本仓与派发点名的 `/tmp/claude-1000/gate54-tiering/` 里」。
 
@@ -152,5 +152,5 @@ runlog 明确没做这一步（「未判多次抽样之间答复方向是否一�
 - 没有核 `.claude/rules/implementation-workflow.md` 之外的规则文件是否还有别的相关条款漏引——三条腿各自的分工表已限定射程，本核查按它们各自声明的射程核。
 - 没有派发或催促主 agent 判决；这份报告只是观测清单。
 
-报告文件：`/home/fy5090/code/singlefs/research/prompts/defs-gate54-tiering-r1-verifier-output.md`
+报告文件：`research/prompts/defs-gate54-tiering-r1-verifier-output.md`
 草稿目录：`/tmp/claude-1000/defs54-verifier/`

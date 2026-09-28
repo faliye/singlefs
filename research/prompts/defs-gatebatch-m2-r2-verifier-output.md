@@ -95,7 +95,7 @@
 
 （第二段见下）
 
-**方法**：不在腿的原目录里跑。`rsync -a --exclude target /home/fy5090/code/singlefs/ /tmp/claude-1000/defs-gatebatch-m2-r2-verifier/repocopy/`
+**方法**：不在腿的原目录里跑。`rsync -a --exclude target <仓根>/ /tmp/claude-1000/defs-gatebatch-m2-r2-verifier/repocopy/`
 （含 `.git`，因为 `admission.py crash-case-manifest` 要调 `git ls-files`），把 `research/prompts/defs-gatebatch-m2-r2-opus-model/` 随副本
 一起带过去，在副本里 `cd` 进去跑 `nice -n 19 bash research/scripts/capped.sh 4 bash research/prompts/defs-gatebatch-m2-r2-opus-model/rerun.sh
 <草稿输出目录> <草稿 scratch 目录>`（线程上限 4，按派发提示），产物落进草稿目录，不落回仓里的 `outputs/`。跑了两次（第一次误排除

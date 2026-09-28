@@ -5,8 +5,9 @@
 //! C561 那一行要的四格各一条用例，前三格都在同一条可达历史 `UOOUOMSU` 上（A、B 之后：卸载重挂、覆盖写两次、卸载重挂、覆盖写、
 //! 进程重开重挂、写一个十几字节的小文件、卸载重挂；层 0 规模第二、三轮攻方的历史，字母的意思照他们的探针）：
 //! - B（txg 4）在相邻两槽写两个 16K 节点 u、u2；txg 17 的 32K 数据单元 l 复用这两槽；txg 25 在同样两槽写两个 16K 节点 y、x，
-//!   y、x 与 σ 那一段的其余 14 个单元写、两个系统配置槽写同段（σ：2 个原地写 + 16 个单元写）；
-//! - 假红状态 X：σ 之前整段持久、σ 的原地写全落、σ 的单元写只落 y（两盘）——u2 那一槽上是 l 的零尾，l 落了、合法复用，
+//!   y、x 与 σ 那一段的其余 14 个单元写同段（σ：16 个单元写；C577（发布返回之前、系统配置轮换之后一道屏障）之前上一次发布的
+//!   两个系统配置槽轮换也在这一段，2 个原地写 + 16 个单元写，C577 之后它们过了那道屏障、在 σ 前一段）；
+//! - 假红状态 X：σ 之前整段持久（上一次发布的轮换在内）、σ 的单元写只落 y（两盘）——u2 那一槽上是 l 的零尾，l 落了、合法复用，
 //!   按整份判的那一版判 u2 缺席（假红），按扇区、拿持久集合判不缺席；
 //! - 状态 Y（C507（记录核对器的复用豁免比登记的候选宽，把真洞变哑） 那一格的错位形）：X 再把 u2 与 l 摘成没落盘——u2 那一槽上是从没写过的零，
 //!   与 X 崩溃镜像逐字节相同，只有持久集合分得开：u2 真的缺席；
@@ -15,7 +16,7 @@
 //! - C513（复用豁免不判那次复用合不合法） 那三个状态（复用窗口置 0、txg 5 的数据单元落回 txg 4 的那一对槽）：解释那一槽的后写落了、
 //!   但过不了回收谓词，照判缺席。
 //!
-//! σ 那一段全部 2^18 个状态的记录核对器判定另有一条标了 ignore 的全量（崩溃枚举，提交时由崩溃验证员跑）。
+//! σ 那一段全部 2^16 个状态（C577 之前 2^18）的记录核对器判定另有一条标了 ignore 的全量（崩溃枚举，提交时由崩溃验证员跑）。
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
@@ -324,8 +325,8 @@ fn misaligned_reuse_chain(recorded: &RecordedHistory) -> MisalignedReuseChain {
                 .filter(|write_index| writes[**write_index].kind == StepKind::UnitWrite)
                 .count()
         ),
-        (18, 16),
-        "σ：2 个原地写（上一次发布的系统配置槽轮换）+ 16 个单元写"
+        (16, 16),
+        "σ：16 个单元写（C577 之后上一次发布的系统配置槽轮换过了发布末尾那道屏障、在 σ 前一段；改之前 2 个原地写 + 16 个单元写）"
     );
     MisalignedReuseChain {
         sigma,
@@ -337,7 +338,7 @@ fn misaligned_reuse_chain(recorded: &RecordedHistory) -> MisalignedReuseChain {
     }
 }
 
-/// σ 之前整段持久、σ 的原地写全落、σ 的单元写一个都不落。
+/// σ 之前整段持久、σ 的原地写全落（C577 之后 σ 里没有原地写）、σ 的单元写一个都不落。
 fn persisted_before_the_units_of_sigma(recorded: &RecordedHistory, sigma: usize) -> Vec<bool> {
     let mut persisted = vec![false; recorded.writes.len()];
     for segment in &recorded.segments[..sigma] {
@@ -498,7 +499,8 @@ fn a_node_whose_every_later_write_to_the_same_offset_never_landed_is_missing() {
     assert!(check.claimed_state_missing_unit, "u 与 l 都缺席");
 }
 
-/// σ 的两个原地写取任意子集 × y、x 两盘四份写取任意子集，σ 其余 12 个单元写不落：64 个状态，记录核对器一个都不判缺席。
+/// σ 的原地写取任意子集 × y、x 两盘四份写取任意子集，σ 其余 12 个单元写不落：C577 之后 σ 里没有原地写（上一次发布的轮换在 σ 前一段、
+/// 整段持久），16 个状态（改之前两个原地写、2^2 × 2^4 = 64 个），记录核对器一个都不判缺席。
 /// 按整份判的那一版在 y、x 只落一部分的状态上判 u 或 u2 缺席（C561 的假红那一类）。
 #[test]
 fn partial_landing_of_the_two_later_nodes_never_reports_a_unit_missing() {
@@ -534,7 +536,11 @@ fn partial_landing_of_the_two_later_nodes_never_reports_a_unit_missing() {
             }
         }
     }
-    assert_eq!(states, 64, "2^2 × 2^4");
+    assert_eq!(
+        (in_place_writes_of_sigma.len(), states),
+        (0, 16),
+        "2^0 × 2^4：C577 之后 σ 只有单元写"
+    );
     assert_eq!(
         reported_missing,
         Vec::<(u32, u32)>::new(),
@@ -703,12 +709,13 @@ fn persisted_before_sigma(recorded: &RecordedHistory, sigma: usize) -> Vec<bool>
     before_sigma
 }
 
-/// σ 那一段全部 2^18 个状态（σ 之前整段持久）：记录核对器一个都不判缺席。层 0 规模第二轮攻方在冻结副本上量过按整份判的那一版在这里红 32768 个
-/// （`research/prompts/m2-layer0-scale-r2-opus-output.md` 第一节，核查员复跑逐字一致）。每个状态一遍看 journal 的恢复加记录核对器，
+/// σ 那一段全部 2^16 个状态（σ 之前整段持久；C577 之前 σ 带上一次的轮换、2^18 个）：记录核对器一个都不判缺席。层 0 规模第二轮攻方
+/// 在冻结副本上量过按整份判的那一版在这里红 32768 个（那时 σ 18 个写；`research/prompts/m2-layer0-scale-r2-opus-output.md` 第一节，
+/// 核查员复跑逐字一致）。每个状态一遍看 journal 的恢复加记录核对器，
 /// 按掩码区间切片多线程跑（线程数与层 0 同一个来源）；打计数行 `C561_SIGMA_FULL`（状态数等于闭式时带 `exhaustive=true`）
 /// 与一行 `LAYER0_PARALLEL_FINISHED` 同形的线程行，门禁 54 号按这两行判穷尽没有、线程用没用上。
 #[test]
-#[ignore = "崩溃枚举（262144 个状态、每个一遍恢复）：提交时由崩溃验证员按输入哈希跑（release），平时不跑"]
+#[ignore = "崩溃枚举（65536 个状态、每个一遍恢复）：提交时由崩溃验证员按输入哈希跑（release），平时不跑"]
 fn every_crash_state_of_sigma_leaves_every_unit_of_the_claimed_publishes_present() {
     let recorded = record_history("c561-sigma-full", &HISTORY_UOOUOMSU);
     let chain = misaligned_reuse_chain(&recorded);
@@ -721,7 +728,10 @@ fn every_crash_state_of_sigma_leaves_every_unit_of_the_claimed_publishes_present
     );
     println!("{}", parallel_finished_line(&enumerated));
     println!("{}", count_line("C561_SIGMA_FULL", &enumerated));
-    assert_eq!(enumerated.states, 262_144, "σ 有 18 个写");
+    assert_eq!(
+        enumerated.states, 65_536,
+        "σ 有 16 个写（C577 之前 18 个、262144）"
+    );
     assert_eq!(
         enumerated.states, enumerated.closed_form_states,
         "σ 的每一个子集都评过"

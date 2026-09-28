@@ -40,7 +40,7 @@ diff --git a/crates/singlefs-checker/src/image.rs b/crates/singlefs-checker/src/
  /// I-2.4（头校验和覆盖范围） 的射程从「单元头 29 字节预留位」扩到「单元头与指针头部的加密预留位，加密关着时恒 0」
 @@ -54,7 +65,7 @@ pub const SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS: &str = "I
  ///
- /// I-9.16（树表条目按树 ID 严格升序且合发号次序）：实审 A3b Q2 交上来，用户 2026-09-27 JST 17:4x 定「立不变量并同步」；
+ /// I-9.16（树表条目按树 ID 严格升序且合发号次序）：实审 A3b Q2 交上来，用户 2026-09-27 定「立不变量并同步」；
  /// `invariants.md` 那一行由 kb 第八批写。池级走读每读一版的树表判一次（`walk` 的 `judge_tree_table_entries_ordering`）。
 -pub const IMPLEMENTED_INVARIANTS: [&str; 48] = [
 +pub const IMPLEMENTED_INVARIANTS: [&str; 49] = [

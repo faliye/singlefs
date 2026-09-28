@@ -27,7 +27,7 @@ P1、P2 是对照臂：P3 与 P1 比，量出 ND+A1n 在 C283 之上多换来什
 
 **共用问句**：每条臂都答「这条合法历史走完之后，池还能不能写、删文件能不能腾出空间再写」，答案要量，不许推；不许用「拒绝」换「安全」而把池永远卡在只读，除非说得出用户手里还有哪一步能让它重新可写；`.claude/rules/fs-design.md`「释放空间这个操作本身不需要申请空间」与 D3（空间分配） 已定项 9 逐句核。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-26 JST 13:xx；冻结副本 `/tmp/claude-1000/safety-r3-frozen/`，实一至实四乙之后、没提交，开工快照 `research/prompts/m2-safety-r3-snapshot/`）
+## 二、实现今天的样子（主 agent 的观测，2026-09-26；冻结副本 `/tmp/claude-1000/safety-r3-frozen/`，实一至实四乙之后、没提交，开工快照 `research/prompts/m2-safety-r3-snapshot/`）
 
 - **准入**：`crates/singlefs-core/src/admission.rs`：`available_on_each_device`（`own_terms` 五项加池级三项），`admit_on_every_device` 逐盘合取，`demand_of_the_roles_on_each_device` 只算 `Demand` 那一类角色，`admission_reading_before_a_publish` 发布与可写挂载共用；拒绝类型 `AdmissionRefusedOnSomeDevices` 的注释写明「先推空发布抬 F 再判一次是调用方的事，这里不做」。发布路径在 `crates/singlefs-core/src/transaction.rs` 调它（`PublishError::SpaceAdmissionRefused`），挂载路径在 `crates/singlefs-core/src/mount.rs`（`MountError::SpaceAdmissionRefusedBeforeAcquisition`）。
 - **C283 没实现**：`mount.rs` 的 `raise_rollback_floor` 注释写「今天只有测试入口，没有产品路径」，准入拒绝之后没有一处调它。抬 F 那一串（准入与卸载共用）是 `mount.rs` 的 `raise_the_floor_through`，入口 `RaiseFloorEntry::Admission` 判上限、`RaiseFloorEntry::Unmount` 不判。
@@ -61,7 +61,7 @@ P1、P2 是对照臂：P3 与 P1 比，量出 ND+A1n 在 C283 之上多换来什
 - 方案按 `crates/` 今天的实现来谈，也就是冻结副本。
 - **内存与进程**：编译与跑一律经 `bash research/scripts/run-with-memory-cap.sh <上限> <命令…>`，撞上限就记下、不许不套上限重跑；只停自己起的进程，一次一个 `python3 .claude/singlefs-ai-sop/scripts/proc.py stop <pid>`；等后台任务就结束本轮等通知，不用 `true` 或 `sleep` 空转；交回之前后台不许留着跑的东西。
 - 不跑名字带 `layer0` 的测试目标，不跑门禁 54、55、57、59 号。
-# 小节清单：`m2-safety-r3`（材料员拼装，2026-09-26 13:07 JST / 2026-09-26 04:07 UTC）
+# 小节清单：`m2-safety-r3`（材料员拼装，2026-09-26）
 
 清单由 `python3 research/scripts/kb-sections.py <文件…>` 一次性生成，未经任何过滤（`.claude/rules/three-way-inference.md`「机器生成的清单不许再过滤」）；命令与全部输出行数见交回。
 
@@ -757,7 +757,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 - 用户定案 2026-09-24：这一版发布失败原样重发（实二十报告 `research/prompts/m2-lastflag-implementer-report.md` 第六节 1：同一实例失败后接着发，会留下两条同 (实例代号, checkpoint_txg) 都带末条标志的记录），原话在变更史；无实验：只定失败之后发什么，不改盘上格式。
 - `research/prompts/m2-final-code-r2-main-verification.md` 第三节 Z8（这一版发布失败原样重发，攻方没打中）；那一份的 Z9 与第四节改法 1–4 是回退见证的，随见证删掉不再承重。
 - 管理员回退改成挂着时的一次向前发布（候选集、释放、复活、水位、拒）、删前缀第五条与回退见证、影子账依据改指 H6：无实验，三方原型（`research/prompts/m2-rollback-forward-r1-opus-model/`、`m2-rollback-forward-r2-opus-model/`、`m2-rollback-forward-r3-opus-model/`）在冻结副本上量过，没立实验号，原型上的数不是入库装置上的数；三轮判决 `research/prompts/m2-rollback-forward-r1-main-verification.md`、`m2-rollback-forward-r2-main-verification.md`、`m2-rollback-forward-r3-main-verification.md`。水位取 max(内存, 环) 的收严（第三轮判决第二节 K1 的水位分句）被攻过零轮；用户定案 2026-09-25（向前发布、只在挂着的时候做）与 2026-09-26（第三轮交用户的四问），原话在变更史。
-- 主 agent 2026-09-26 定：回退那次发布之前逐盘验复活集里的每个单元（「在任何写之前拒」那一格最后一句），照用户 2026-09-25 JST 12:1x 原话「1 就是fsync失败后 两个盘掉一个盘。这个不能认，这个违背我们数据安全的承诺」（`records/2026-09-24-里程碑二收尾调度.md` 第三节那一时刻的一行），与 C519（丢一整块盘时恢复丢掉刚确认的那一版） 那一格「两份都验过才施加」同一方向；无实验，推的，被攻过零轮；多读的量随 R_old 之后释放的用户可见单元数涨，没量。
+- 主 agent 2026-09-26 定：回退那次发布之前逐盘验复活集里的每个单元（「在任何写之前拒」那一格最后一句），照用户 2026-09-25 原话「1 就是fsync失败后 两个盘掉一个盘。这个不能认，这个违背我们数据安全的承诺」（`records/2026-09-24-里程碑二收尾调度.md` 第三节那一时刻的一行），与 C519（丢一整块盘时恢复丢掉刚确认的那一版） 那一格「两份都验过才施加」同一方向；无实验，推的，被攻过零轮；多读的量随 R_old 之后释放的用户可见单元数涨，没量。
 - 用户定案 2026-09-25：点名单元两份都验过才施加、认下丢一整块盘时丢掉刚确认的那一版（C519（丢一整块盘时恢复丢掉刚确认的那一版） 实一复现：`crates/singlefs-harness/tests/second_transaction_supplement_two_c519_whole_device_loss_after_warm_up.rs`），原话在变更史；无实验：照今天的实现写成条款，另一读法「任一份验过」会不会放过 E77（发布的持久顺序） 那种嫁接没量。
 
 **欠**：C77（重放起点未定义）；C314（回退可以复用被抛弃的根引用的单元）；C554（崩溃恢复抛弃的根暂时读不出时影子账算不到）；C318（影子账隔离的单元没进准入不等式）；C331（择根倒挂压过已确认的写）；C334（切换的所选根没有会红的检查）；C365（恢复路径的链首不锚在所选根覆盖的最后一条）；C287（切换收养开放 checkpoint 的事务后再崩）；C126（切换预留的最坏量没有口径）；C493（回退候选集条文与实现说反话）；C500（所选根那条记录读不出时链首接法没有条款）；C381（根已落盘之后发布失败，分配器仍退回）——三方第二、三轮打中失败表那两支判别子（探针写在盘上没有落点、屏障类失败点连「失败的那个落点」都没有定义），用户已定「落点进地址空间表、射程逐个失败点列一张表」，第 2、4 题已定（`D16（发布语义）` 新立一条已定项、失败表改两步判别子），「实例切换取的是内存里的根」那一题定成切换重新读盘择根、带出的三件待定（`research/prompts/c381-r2-main-verification.md`、`c381-r3-main-verification.md`）；代码那一半（探针写、只读复核、实例切换、转只读）跟里程碑「第二个事务」收口表第 16 行一起挪到后面的里程碑；C458（实例切换取内存里的根，不重新读盘）：切换重新读盘择根那条会红的检查；C539（锚点读得出时下一次发布的首条序号不是 1）；C540（末条标志坏在一次发布中间，读者切出两次发布）；C541（原样重发把一次失败放大成整条发布流阻塞）；C558（回退目标是环里最旧的根时回退那次发布会写坏它）。
@@ -812,7 +812,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 - **正文与材料**：正文 `research/prompts/_m2-safety-r2-body.md`；材料 `_m2-safety-r2-background.md`、`-checklist.md`、`-appendix.md`。
 - **开工快照**：`research/prompts/m2-safety-r2-snapshot/`。核查员在冻结副本下 `sha256sum -c`：代码 125 个、kb 5 个全 OK。两份云端腿报告的 sha256 与交回时给的一致。
 - **腿**：
-  - 云端正推（Sonnet）`m2-safety-r2-sonnet-output.md`，模型 `m2-safety-r2-sonnet-model/`。这个目录没有 `SHA256SUMS`，缺定义要的一样。这条腿跑到一半，被 2026-09-25 11:12 UTC 那一轮 TERM 打断（别的 agent 的自测，调度记录第三节），是接手的那一任交的。它重跑的 `s4-r2-candidates-run2.log` 末尾，紧跟着 `run-with-memory-cap.sh` 的一行语法错误：报在第 1006 行，而同一句话今天在第 991 行。核查员据此坐实了这个脚本在跑着的时候被原地改过；日志里的数据行都写在这行报错之前，与 run1 以及核查员自己的独立复跑逐字一致。
+  - 云端正推（Sonnet）`m2-safety-r2-sonnet-output.md`，模型 `m2-safety-r2-sonnet-model/`。这个目录没有 `SHA256SUMS`，缺定义要的一样。这条腿跑到一半，被 2026-09-25 那一轮 TERM 打断（别的 agent 的自测，调度记录第三节），是接手的那一任交的。它重跑的 `s4-r2-candidates-run2.log` 末尾，紧跟着 `run-with-memory-cap.sh` 的一行语法错误：报在第 1006 行，而同一句话今天在第 991 行。核查员据此坐实了这个脚本在跑着的时候被原地改过；日志里的数据行都写在这行报错之前，与 run1 以及核查员自己的独立复跑逐字一致。
   - 云端攻方（Opus）`m2-safety-r2-opus-output.md`，模型 `m2-safety-r2-opus-model/`。
   - 本地攻方：干净样本 `-local-attack-output-s2.md`、`-s3.md`；`-s1.md` 人工判带损坏（`refuteail`），`-void1.md` 被损坏闸判红作废。
 - **核查员** `m2-safety-r2-verifier-output.md`：一共核了 77 处，74 ✓、2 ✗、1 处核不动。

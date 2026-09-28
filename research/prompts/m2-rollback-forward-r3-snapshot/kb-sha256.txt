@@ -1,4 +1,4 @@
-# .claude/kb/ 与规则快照 sha256 清单（正文第三节点名的 5 份决策 + invariants.md + checks-owed.md + format-evolution.md + fs-design.md），取自 /tmp/claude-1000/m2-rollback-forward-r3/kb-snapshot/，2026-09-26 00:57 JST 拷贝，保持 .claude/… 的相对路径。
+# .claude/kb/ 与规则快照 sha256 清单（正文第三节点名的 5 份决策 + invariants.md + checks-owed.md + format-evolution.md + fs-design.md），取自 /tmp/claude-1000/m2-rollback-forward-r3/kb-snapshot/，2026-09-26 拷贝，保持 .claude/… 的相对路径。
 # 核验：cd /tmp/claude-1000/m2-rollback-forward-r3/kb-snapshot && sha256sum -c research/prompts/m2-rollback-forward-r3-snapshot/kb-sha256.txt（或把本文件拷到该目录下用相对路径核）。
 d66ad7c3cc77b24e2376caa9456ff56a2553fa992bc508acb60808ae0f7ea243  .claude/kb/checks-owed.md
 c7c45328f6f4ee13968042f75e5779298da62fb5632547588f9d437e6066a954  .claude/kb/decisions/15-格式冻结政策.md

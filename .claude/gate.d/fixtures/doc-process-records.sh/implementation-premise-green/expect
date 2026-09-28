@@ -1,0 +1,7 @@
+exit=0
+want=检查了 2 份
+want=另核了本地腿一侧与开工快照的 1 份
+want=没查 1 份（标题日期早于 2026-09-17，规范落地之前写的）：research/prompts/_c998-r1-body.md（2026-09-13）
+want=样本只跑 .gate-cells 点名的格：implementation-premise
+want=── 汇总：doc-process-records.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-process-records.sh：1 格里 1 格绿（implementation-premise），0 格本次未跑（无）

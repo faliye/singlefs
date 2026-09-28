@@ -1,5 +1,5 @@
 E163（GPU多卡算单元校验和）R2：双机五张 NVIDIA 独显卡各算一片，合并与 CPU 参照比对（M2）。
-跑于 2026-09-27（JST）。本机（RTX 5090、RTX 5060 Ti）+ faliye-jplife（RTX 5080、RTX 5060 Ti × 2）。
+跑于 2026-09-27。本机（RTX 5090、RTX 5060 Ti）+ 第二台（RTX 5080、RTX 5060 Ti × 2）。
 同一二进制两端 sha256 相同：c1783942b522a9a28ecc6d463e6356fde409bf67ae6041effd51c4782ee78d23
 同一输入文件两端 sha256 相同：3b4c64dab3c785e9b7a52f03da9d4931bb3926bf3335522b81134a21acd5b78e
 

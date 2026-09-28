@@ -1,6 +1,6 @@
 # defs-m2-closeout-r1 改法 F1–F16 落地报告
 
-写于 2026-09-26 01:4x UTC（JST 10:4x）。依据：`research/prompts/defs-m2-closeout-r1-main-verification.md` 第二、三节；原文、行号与探针取自 `research/prompts/defs-m2-closeout-r1-opus-output.md`（O1–O15）与 `research/prompts/defs-m2-closeout-r1-sonnet-output.md`（D2-e、D3-b）。
+写于 2026-09-26。依据：`research/prompts/defs-m2-closeout-r1-main-verification.md` 第二、三节；原文、行号与探针取自 `research/prompts/defs-m2-closeout-r1-opus-output.md`（O1–O15）与 `research/prompts/defs-m2-closeout-r1-sonnet-output.md`（D2-e、D3-b）。
 改前备份：`/tmp/claude-1000/defs-closeout-r1-fixes/before/`（12 份，开工时 `cp -p`）；改后全量 diff：`/tmp/claude-1000/defs-closeout-r1-fixes/my-changes-final.diff`（287 行，本报告末尾原样附上）；改前 / 改后 sha256：同目录 `start-sha256.txt`、`end-sha256.txt`。
 只动了放行的 12 个文件；没 checkout / restore / reset / clean，没提交。两个脚本（74 号、弹窗闸）都是写同目录临时文件、`chmod --reference`、`mv` 换上。
 
@@ -106,9 +106,9 @@ A1、A3 改前是 exit=2（攻方报告 D3 节原样）。A5 是「拆分提案�
 K1	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K2	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：qemu-system-x86_64（QEMU）：主 agent 跑「QEMU」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K3	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：直接执行名字含 layer0 的测试二进制（second_transaction_step_zero_layer0）（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
-K4	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（/home/fy5090/code/singlefs）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-req
-K5	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（/home/fy5090/code/singlefs/research）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 
-K6	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test 不挑目标，而包的范围是整个工作区（/home/fy5090/code/singlefs/research 的全部 1 个成员），等于全量（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-r
+K4	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（<仓根>）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-req
+K5	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（research）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 
+K6	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test 不挑目标，而包的范围是整个工作区（research 的全部 1 个成员），等于全量（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-r
 K7	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K8	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：research/scripts/mutate.sh 跑 crates/mutations.tsv 整表（crates 变异整表）：主 agent 跑「crates 变异整表」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K9	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：.claude/scripts/lkmm.sh（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
@@ -119,7 +119,7 @@ K13	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo run --bin e152-file
 K14	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：e152-run.sh（E152 装置）：主 agent 跑「E152 装置」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K15	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test 不挑目标，会跑到名字含 layer0 的测试二进制（first_transaction_step_seven_layer0、second_transaction_parallel_line_one_layer0、second_transaction_paral
 K16	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test --test second_transaction_step_zero_* 命中名字含 layer0 的测试二进制（second_transaction_step_zero_layer0）（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAV
-K17	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：脚本 /home/fy5090/code/singlefs/.claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request
+K17	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：脚本 .claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request
 K18	heavy	主 agent	fg	exit=0	
 K19	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：check.sh（里面是全量 cargo test）（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K20	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：门禁 87 号（87-replay.sh）（全部实验复跑）：主 agent 跑「全部实验复跑」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
@@ -173,8 +173,8 @@ F1-old-3c	detector	three-way-attack	rib	exit=0
 
 | 门禁 | 原样判定行 | 退出码 |
 |---|---|---|
-| 47（第一次，01:3x UTC 起跑） | ✗ bash research/scripts/mutate.sh --selftest 没过（退出码 1）：<br>→ 怎么办：按上面那份自证给的下一步修被测脚本，再单独跑这条命令看它转绿。 | 1 |
-| 47（第二次，01:45:33 UTC 跑完时 1 分钟负载 16.35） | ✓ research 脚本的自证都通过（本阶段跑了 31 条；research/scripts/ 里声称有 --selftest 的 35 份中 34 份有门禁阶段在跑） | 0 |
+| 47（第一次起跑） | ✗ bash research/scripts/mutate.sh --selftest 没过（退出码 1）：<br>→ 怎么办：按上面那份自证给的下一步修被测脚本，再单独跑这条命令看它转绿。 | 1 |
+| 47（第二次跑完时 1 分钟负载 16.35） | ✓ research 脚本的自证都通过（本阶段跑了 31 条；research/scripts/ 里声称有 --selftest 的 35 份中 34 份有门禁阶段在跑） | 0 |
 | 62 | ✓ 阶段归属表与门禁目录一致（76 个阶段，归 9 个 agent） | 0 |
 | 63 | ✓ 写范围闸、Bash 检出 hook、重型测试闸、续派闸、续做闸与弹窗断言闸注册着、自证通过，按模式找进程的上游钩子注册着、文件在，会话开始 hook（压缩后提示与启动时的 OOM 报告）注册着、自证通过，书记官写入后的核对 hook 注册着、自证通过，表与定义一致（3 个有 Write 或 Edit 的定义、18 条路径模式），共用切词模块的 14 个函数只在 lib_shell_words.py 里定义（查了 .claude/hooks/ 下另外 12 个文件），共用重型测试判定模块的 15 个函数只在 lib_heavy_tests.py 里定义（查了 .claude/hooks/ 下另外 12 个文件；selftest、load_sibling_module 不算，见 NOT_SHARED_JUDGMENT） | 0 |
 | 73 | ✓ 门禁自检通过：84 个脚本（.sh 与 .py）、260 条拒绝都带了出路<br>✓ 查了 72 个脚本：.sh 都可执行，暂存区里的模式与工作区一致<br>✓ 进程安全：查了 168 个脚本（.sh 127 个、.py 41 个），发信号的写法都只打得到点名的一个进程；own-scope 标注放行 1 处（research/scripts/run-with-memory-cap.sh:952）；没判的：.claude/process-safety-pending 里的 2 个文件 research/scripts/agent-watch.py（research/scripts/agent-watch.py:2162）；research/scripts/mutate.sh（research/scripts/mutate.sh:351）<br>✓ shell 纪律检查通过（共 34 个脚本）<br>✓ shell 纪律检查通过（共 8 个脚本）<br>✓ shell 纪律检查通过（共 9 个脚本） | 0 |
@@ -182,7 +182,7 @@ F1-old-3c	detector	three-way-attack	rib	exit=0
 | 规则纪律（项目本地，rules-lint 照 gate.sh 的 RULES_LINT_DIR / RULES_LINT_FILES 起） | ✓ 规则只写怎么做（扫了 29 份文件 1794 行；没扫 0 个；记录小节 0、论证小节 0、带日期的行 0（另有 8 行的日期只在「」或反引号里）、解释性段落 0、解释性半句 0、没带劝阻句的链接 0；词法说明判了 1671 行（围栏与表格行不判），命中 0；使用者名字这一条无对象可判：被扫的仓没有 I18N 或没登记 consumers=） | 0 |
 | gate-overlap（门禁查重） | ✓ 相对 97f5904b44cd：新加的门禁与钩子 1 个（.claude/gate.d/84-verdict-false-named.sh）都写明了比过谁，改过的 14 份脚本对照已有的 132 份没有整段相同 | 0 |
 
-47 号第一次红在 `research/scripts/mutate.sh --selftest` 的一格（自证用例里两条变异「2 秒没跑完」，原样见 `gate47.log`）；第二次同一道全绿。`mutate.sh` 与 47 号这一轮都没碰（47 号在工作区里是别的会话改的 ` M`）。第一次跑完之后一分钟内另一个会话在跑 `run-with-memory-cap.sh 24G … cargo test`，`uptime` 的 1 分钟负载 55.30（32 核，01:42:37 UTC）；判成负载下的超时是推的，没复现。两次一红一绿，按 test-discipline 记「不稳定」，不算这一轮的红，也不算两次都绿。
+47 号第一次红在 `research/scripts/mutate.sh --selftest` 的一格（自证用例里两条变异「2 秒没跑完」，原样见 `gate47.log`）；第二次同一道全绿。`mutate.sh` 与 47 号这一轮都没碰（47 号在工作区里是别的会话改的 ` M`）。第一次跑完之后一分钟内另一个会话在跑 `run-with-memory-cap.sh 24G … cargo test`，`uptime` 的 1 分钟负载 55.30（32 核）；判成负载下的超时是推的，没复现。两次一红一绿，按 test-discipline 记「不稳定」，不算这一轮的红，也不算两次都绿。
 62、63 号是最后一处改动（共用约束弹窗闸那一条补全放行词）之后重跑的；73、gate-overlap 在那之前跑，那一处改的是 `.md`、不在它们的射程里；doc-lint 与规则纪律在最后一处改动之后重跑。63 号那一行里「弹窗断言闸…自证通过」就是改后弹窗闸的 `--selftest`。
 
 ## 八、没做的与原因

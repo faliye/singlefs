@@ -61,6 +61,7 @@ use crate::system_configuration::{
     journal_in_flight_record_limit, journal_in_flight_record_limit_fits_its_four_byte_field,
     unit_area_start_slot_recorded_in_the_slot, IncompatBitmap, SystemConfiguration,
     SystemConfigurationSlotRefusal, SystemImmutableSizes,
+    JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION, ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
 };
 use crate::transaction::{
     role_of_allocation_record_tree_node, role_of_extent_upper_node, FileVersionTreeIdentifiers,
@@ -246,13 +247,15 @@ pub enum RecoveryFailure {
 }
 
 /// 读根环时，这个进程知道住着一条根的一个槽（挂载那一刻读得出、或这个进程写过且 FUA 返回过，
-/// `allocator::RootRingOccupancy::ring_slots_known_to_hold_a_root`）这一次读不出（[`BadRootRingSlotReading::Unreadable`]），
-/// 重读一次仍读不出（[`readable_roots_rereading_ring_slots_known_to_hold_a_root_once`]；D16（发布语义） 已定项 1「根槽这一次读坏」那一行的
-/// 两类分法，用户 2026-09-26 定）：那一槽里的根在不在判不了，不按有根或没根猜。挂着时抬 F 与管理员回退拒这一次，经
+/// `allocator::RootRingOccupancy::ring_slots_known_to_hold_a_root`）这一次读坏（`first_reading`：读不出或自证不过），
+/// 重读一次仍坏（`reread`；[`readable_roots_rereading_ring_slots_known_to_hold_a_root_once`]；D16（发布语义） 已定项 1「根槽这一次读坏」那一行
+/// 全句，用户 2026-09-26 定）：那一槽里的根在不在判不了，不按有根或没根猜。挂着时抬 F 与管理员回退拒这一次，经
 /// `mount::StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot` 交出。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread {
+pub struct RootRingSlotKnownToHoldARootStillBadAfterOneReread {
     pub ring_slot: RootRingSlot,
+    pub first_reading: BadRootRingSlotReading,
+    pub reread: BadRootRingSlotReading,
 }
 
 /// 算生效的回退下界 F 时（[`effective_rollback_floor_rereading_the_newest_instance_table_once`]），根环里最新那条根指着的实例表
@@ -269,7 +272,7 @@ pub struct InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
 /// 重读一次仍读坏的是哪一样。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EffectiveFloorReadingStillUnreadableAfterOneReread {
-    RootRingSlotKnownToHoldARoot(RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread),
+    RootRingSlotKnownToHoldARoot(RootRingSlotKnownToHoldARootStillBadAfterOneReread),
     InstanceTableOfTheNewestRoot(InstanceTableOfTheNewestRootStillUnreadableAfterOneReread),
 }
 
@@ -626,12 +629,29 @@ pub enum SystemConfigurationValueOutsideWhatThisReaderAccepts {
     FormatVersionNotRecognized { format_version: u16 },
     /// 加密类型不是 0（关）：加密不进第一个可运行版本（D9（加密） 已定项 10），1、2 是登记过的算法、别的码不认识，都不收。
     EncryptionTypeNotOff { encryption_type: u8 },
-    /// 固定结构槽距落在格式允许的区间之外：不小于 4096、槽 1 整槽落在根环基址之前（与逐档找槽 1 同一个区间，
-    /// [`largest_fixed_structure_slot_spacing_the_format_allows`]）。槽距是根槽宽的上界，这一条先于根槽宽判。
+    /// 固定结构槽距落在格式允许的区间之外：不小于 4096、槽 1 整槽落在同一槽自述的根环起点之前（D22（单元原子性怎么合成） 已定项 16
+    /// 第 5 句；根环起点字段 × 16384 − 4096 是上界，[`largest_fixed_structure_slot_spacing_under_the_root_ring_base`]；根环起点不到一个
+    /// 系统配置槽宽时一档槽距都不收）。槽距是根槽宽的上界，这一条先于根槽宽判；也先于根环起点等不等第一版常量那一判，
+    /// 根环起点落在槽 1 之前的槽报在这里（与 checker 的 I-7.13 报同一格）。
     FixedStructureSlotSpacingOutsideTheFormatRange { fixed_structure_slot_spacing: u32 },
     /// `physical_block_size`（根槽宽，D22（单元原子性怎么合成） 已定项 2）装不下根记录（457 字节，已定项 7），或大于固定结构槽距
     /// （槽 j 在区域起点 + j × 槽距，已定项 16）。读根槽按它开缓冲，不设上界时一个盘上的 4 字节就定得了每一次读的内存。
     PhysicalBlockSizeOutsideTheRootSlotBounds { physical_block_size: u32 },
+    /// 同一槽记着的根环起点（偏移 371 的 8 字节，16 KiB 槽号）不是第一版写的那个（64 = 1 MiB，
+    /// `system_configuration::ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION`）：core 读写根环按格式常量走（`root_ring::region_start`），
+    /// 字段与常量不等时两边读的不是同一个环；条款定的是按字段读、第一版只收常量，不等整池拒（D22（单元原子性怎么合成） 已定项 16 第 1 句，
+    /// 用户 2026-09-27 定「读字段，不等于常量就整池拒」；代码三方 m2-closeout-code-r2「core 与 checker 对系统配置几何字段的读法」）。
+    RootRingBaseNotTheFirstVersionSlot {
+        recorded_root_ring_base_slot: SlotNumber,
+        first_version_root_ring_base_slot: SlotNumber,
+    },
+    /// 同一槽记着的 journal 环起点（偏移 325 的 8 字节，16 KiB 槽号）不是第一版写的那个（1024，
+    /// `system_configuration::JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION`）：core 读写 journal 环按格式常量走，处置同
+    /// [`Self::RootRingBaseNotTheFirstVersionSlot`]（同一条款、同一次用户定案）。
+    JournalRingStartNotTheFirstVersionSlot {
+        recorded_journal_ring_start_slot: SlotNumber,
+        first_version_journal_ring_start_slot: SlotNumber,
+    },
     /// journal 环长装不下 F 条记录（在飞上限 = 环槽数 ÷ F 是 0，D23（journal 的角色与格式） 已定项 18），在飞上限装不进系统配置里它那 4 字节
     /// （mkfs 的 `JournalInFlightRecordLimitWiderThanItsFourByteField`；不拒的话挂载之后轮换系统配置槽时写这 4 字节那一句 panic），
     /// 或环的末端越过同一槽记着的单元区起点（偏移 417 的 8 字节；与 checker 同一个判法，C475（非默认环长下单元区起点取编译期常量）之后
@@ -659,14 +679,30 @@ const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET: usize =
 /// 加密类型登记表里的「关」（未加密，D9（加密） 已定项 10；D22（单元原子性怎么合成） 已定项 17）。
 const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFF: u8 = 0;
 
-/// 格式允许的最大固定结构槽距：槽 1 整槽落在根环基址（区域 0 的起点）之前。逐档找槽 1 与读者判槽距共用这一个上界。
+/// 格式允许的最大固定结构槽距：槽 1 整槽落在第一版根环基址（区域 0 的起点）之前。逐档找槽 1 用它：那时一槽可择的都没有，
+/// 没有哪一槽自述的根环起点可读。读者判一槽的槽距用那一槽自述的根环起点（[`largest_fixed_structure_slot_spacing_under_the_root_ring_base`]）。
 fn largest_fixed_structure_slot_spacing_the_format_allows() -> u64 {
     region_start(0).0 - SYSTEM_CONFIGURATION_SLOT_BYTES
 }
 
+/// 一槽自述的根环起点下格式允许的最大固定结构槽距：槽 1 整槽落在根环基址（该字段 × 16384）之前（D22（单元原子性怎么合成） 已定项 16
+/// 第 1、5 句）。根环起点是盘上读来的 8 字节：乘出来溢出时上界取 `u64::MAX`（基址在任何设备偏移之外，槽 1 落在它之前）；
+/// 基址不到一个系统配置槽宽时一档都不收（`None`）。
+fn largest_fixed_structure_slot_spacing_under_the_root_ring_base(
+    root_ring_base_slot: SlotNumber,
+) -> Option<u64> {
+    root_ring_base_slot.0.checked_mul(SLOT_BYTES).map_or(
+        Some(u64::MAX),
+        |root_ring_base_in_bytes| {
+            root_ring_base_in_bytes.checked_sub(SYSTEM_CONFIGURATION_SLOT_BYTES)
+        },
+    )
+}
+
 /// 一槽自证得过的系统配置，逐个判这个读者收不收它的池级不可变字段（[`SystemConfigurationValueOutsideWhatThisReaderAccepts`] 各成员的出处）。
-/// 次序：格式版本、加密类型、槽距、根槽宽、环长、单元区起点——根槽宽的上界是槽距，所以槽距先判；环末端对单元区起点那一判先于起点是不是
-/// 环长现算的那个，与 checker 的环长判法（`journal_ring_bytes_lie_in_the_supported_range`）报同一格。
+/// 次序：格式版本、加密类型、槽距、根槽宽、根环起点、journal 环起点、环长、单元区起点——根槽宽的上界是槽距，所以槽距先判；
+/// 槽距的上界取同一槽自述的根环起点，所以根环起点落在槽 1 之前的那一格报成槽距越界、与 checker 的 I-7.13 同一格，之后才判它等不等
+/// 第一版常量；环末端对单元区起点那一判先于起点是不是环长现算的那个，与 checker 的环长判法（`journal_ring_bytes_lie_in_the_supported_range`）报同一格。
 fn system_configuration_values_this_reader_accepts(
     slot: &[u8],
     system_configuration: &SystemConfiguration,
@@ -693,7 +729,10 @@ fn system_configuration_values_this_reader_accepts(
     let sizes = &system_configuration.immutable.sizes;
     let fixed_structure_slot_spacing = u64::from(sizes.fixed_structure_slot_spacing);
     if fixed_structure_slot_spacing < FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES
-        || fixed_structure_slot_spacing > largest_fixed_structure_slot_spacing_the_format_allows()
+        || largest_fixed_structure_slot_spacing_under_the_root_ring_base(
+            system_configuration.immutable.root_ring_base_slot,
+        )
+        .is_none_or(|largest_spacing| fixed_structure_slot_spacing > largest_spacing)
     {
         return Err(
             SystemConfigurationValueOutsideWhatThisReaderAccepts::FixedStructureSlotSpacingOutsideTheFormatRange {
@@ -707,6 +746,24 @@ fn system_configuration_values_this_reader_accepts(
         return Err(
             SystemConfigurationValueOutsideWhatThisReaderAccepts::PhysicalBlockSizeOutsideTheRootSlotBounds {
                 physical_block_size: sizes.physical_block_size,
+            },
+        );
+    }
+    let recorded_root_ring_base_slot = system_configuration.immutable.root_ring_base_slot;
+    if recorded_root_ring_base_slot != ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION {
+        return Err(
+            SystemConfigurationValueOutsideWhatThisReaderAccepts::RootRingBaseNotTheFirstVersionSlot {
+                recorded_root_ring_base_slot,
+                first_version_root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+            },
+        );
+    }
+    let recorded_journal_ring_start_slot = system_configuration.immutable.journal_ring_start_slot;
+    if recorded_journal_ring_start_slot != JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION {
+        return Err(
+            SystemConfigurationValueOutsideWhatThisReaderAccepts::JournalRingStartNotTheFirstVersionSlot {
+                recorded_journal_ring_start_slot,
+                first_version_journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
             },
         );
     }
@@ -1187,19 +1244,17 @@ pub fn readable_roots<Reader: PoolReader + ?Sized>(
     roots
 }
 
-/// 读根环，读不出的槽按这个进程知不知道那里住着一条根分两类（D16（发布语义） 已定项 1「根槽这一次读坏」那一行的分法，用户 2026-09-26 定；
-/// 与 `mount::rollback_floor_ceiling` 读根环同一个分法）：每个槽读一次；读不出（[`BadRootRingSlotReading::Unreadable`]：设备报错、越界）的槽
-/// 不在 `ring_slots_known_to_hold_a_root` 里（挂载那一刻就读不出或自证不过、这个进程之后也没写过）的当没有根、不重读；在里面的
-/// （挂载那一刻读得出、或这个进程写过且 FUA 返回过，`allocator::RootRingOccupancy::ring_slots_known_to_hold_a_root`）立即重读一次
-/// （C554 乙的形态，R = 1），重读读得出就照它算，仍读不出就报错，不按有根或没根猜。读得出、自证不过的槽（第一遍或重读那一遍）照旧当没有根，
-/// 不分类、不重读：合入后验证一的规格只要「读不出」这一支（D16 那一行另写的「或自证不过」没接进这两处读，带 F 的根被改坏、F 由系统配置撑着的
-/// 那一形——`reuse_after_raising_the_floor.rs` 的 `floor_carried_by_only_one_device_root_and_the_system_configuration_…`——
-/// 管理员回退照旧判到「低于 F_生效」）。交回读得出的每一条根连同它的槽，按根环槽的次序。
+/// 读根环，读坏的槽按这个进程知不知道那里住着一条根分两类（D16（发布语义） 已定项 1「根槽这一次读坏」那一行全句，用户 2026-09-26 定；
+/// 与 `mount::rollback_floor_ceiling` 读根环同一个分法）：每个槽读一次；读坏（读不出 [`BadRootRingSlotReading::Unreadable`]：设备报错、越界；
+/// 或自证不过 [`BadRootRingSlotReading::NotSelfVerified`]）的槽不在 `ring_slots_known_to_hold_a_root` 里（挂载那一刻就读不出或自证不过、
+/// 这个进程之后也没写过）的当没有根、不重读；在里面的（挂载那一刻读得出、或这个进程写过且 FUA 返回过，
+/// `allocator::RootRingOccupancy::ring_slots_known_to_hold_a_root`）立即重读一次（C554 乙的形态，R = 1），重读自证得过就照它算，
+/// 仍坏（读不出或自证不过）就报错，不按有根或没根猜。交回读得出的每一条根连同它的槽，按根环槽的次序。
 /// 挂着时抬 F 重算影子账与回收门槛、管理员回退判候选与算 F 生效值用它（C554 乙报告 Q6：`readable_roots` 把读不出的槽一律当没有根，
 /// 那一槽里的被抛弃根引用的槽不隔离、也不计进读不出账的被抛弃根）。
 ///
 /// # Errors
-/// 知道住着根的槽重读仍读不出 ⇒ [`RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread`]（按 [`every_root_ring_slot`] 的次序第一个）。
+/// 知道住着根的槽重读仍坏 ⇒ [`RootRingSlotKnownToHoldARootStillBadAfterOneReread`]（按 [`every_root_ring_slot`] 的次序第一个）。
 /// 只读盘。
 pub fn readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_once<
     Reader: PoolReader + ?Sized,
@@ -1209,10 +1264,7 @@ pub fn readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_
     immutable_sizes: &SystemImmutableSizes,
     filesystem_identifier: &[u8; 16],
     ring_slots_known_to_hold_a_root: &BTreeSet<RootRingSlot>,
-) -> Result<
-    Vec<(RootRingSlot, RootRecord)>,
-    RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread,
-> {
+) -> Result<Vec<(RootRingSlot, RootRecord)>, RootRingSlotKnownToHoldARootStillBadAfterOneReread> {
     let read_the_slot = |ring_slot| {
         read_root_ring_slot(
             reader,
@@ -1223,25 +1275,25 @@ pub fn readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_
         )
     };
     let mut roots = Vec::new();
-    // 迭代次数的上界是根环槽数 R × S；跨轮只带已认出的根。提前出口只有「知道住着根的槽重读仍读不出」一个。
+    // 迭代次数的上界是根环槽数 R × S；跨轮只带已认出的根。提前出口只有「知道住着根的槽重读仍坏」一个。
     for ring_slot in every_root_ring_slot(immutable_sizes) {
-        match read_the_slot(ring_slot) {
+        let first_reading = match read_the_slot(ring_slot) {
             RootRingSlotReading::SelfVerified(root) => {
                 roots.push((ring_slot, root));
                 continue;
             }
-            RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified) => continue,
-            RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => {}
-        }
+            RootRingSlotReading::Bad(first_reading) => first_reading,
+        };
         if !ring_slots_known_to_hold_a_root.contains(&ring_slot) {
             continue;
         }
         match read_the_slot(ring_slot) {
             RootRingSlotReading::SelfVerified(root) => roots.push((ring_slot, root)),
-            RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified) => {}
-            RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => {
-                return Err(RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread {
+            RootRingSlotReading::Bad(reread) => {
+                return Err(RootRingSlotKnownToHoldARootStillBadAfterOneReread {
                     ring_slot,
+                    first_reading,
+                    reread,
                 });
             }
         }
@@ -1261,7 +1313,7 @@ pub fn readable_roots_rereading_ring_slots_known_to_hold_a_root_once<
     immutable_sizes: &SystemImmutableSizes,
     filesystem_identifier: &[u8; 16],
     ring_slots_known_to_hold_a_root: &BTreeSet<RootRingSlot>,
-) -> Result<Vec<RootRecord>, RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread> {
+) -> Result<Vec<RootRecord>, RootRingSlotKnownToHoldARootStillBadAfterOneReread> {
     readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_once(
         reader,
         region_devices,
@@ -1357,7 +1409,7 @@ pub fn root_is_abandoned_by_the_instance_table(
 /// - 根那一半：根环里自证过的根，按根环落点公式归到它那块盘（区域归属表），每块盘取按实例表判仍然有效（[`root_is_abandoned_by_the_instance_table`]
 ///   判不是被抛弃的）的根里 (txg, 实例代号) 最大的那一条，取它带的 F；各盘取最大。判有效用的实例表是根环里 (txg, 实例代号) 最大那条根指着的
 ///   那一张（恢复择的就是它，`choose_root`）；那张表读不出、解不开时不按表滤，每块盘取读得出的根里最新的那条。
-///   被抛弃时间线上的根带的 F 算不算进 F_生效，D16（发布语义） 已定项 1「「生效」取 SysPre」那一段写着仍开着；这里照「有效根」的字面，不算。
+///   被抛弃时间线上的根带的 F 也算进来（D16（发布语义） 已定项 1，用户 2026-09-28 定「算进」）：根环里按那张表判被抛弃的根，取它们带的 F 的最大值，与各盘那一份取大；那张表读不出时没有「被抛弃」可判，照旧。
 /// - 系统配置那一半：池里每块盘两槽里全部自证过（整槽校验和过且 fsid 与本池相同，与取号同一读法，D18（块里携带什么信息） 已定项 11）
 ///   的槽带的 F 的最大值。
 ///
@@ -1468,7 +1520,7 @@ pub fn effective_rollback_floor_rereading_the_newest_instance_table_once<
 /// 那样 F 生效值可以算低，低于真 F 的目标被当成候选）。
 ///
 /// # Errors
-/// 知道住着根的槽重读仍读不出 ⇒ [`EffectiveFloorReadingStillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot`]；
+/// 知道住着根的槽重读仍坏 ⇒ [`EffectiveFloorReadingStillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot`]；
 /// 最新那条根的实例表重读仍读不出 ⇒ [`EffectiveFloorReadingStillUnreadableAfterOneReread::InstanceTableOfTheNewestRoot`]。只读盘、不写盘。
 pub fn effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instance_table_once<
     Reader: PoolReader + ?Sized,
@@ -1661,9 +1713,21 @@ fn effective_rollback_floor_of_the_roots_read<Reader: PoolReader + ?Sized>(
             *newest_on_this_device = *root;
         }
     }
+    // 被抛弃根带的 F 也算进 F_生效（收口表第 ② 行，用户 2026-09-28 定「算进」，被攻过一轮；
+    // `research/prompts/abandoned-floor-r1-main-verification.md` M2）：不算时被抛弃根带着比别处高的 F 那一形上 I-7.12 红、
+    // 回退能退到那个 F 之下，而被抛弃时间线抬 F 时已按它回收过槽。
+    let highest_on_the_abandoned_roots = roots_with_ring_slots
+        .iter()
+        .filter(|(_, root)| {
+            newest_roots_table
+                .is_some_and(|table| root_is_abandoned_by_the_instance_table(root, table))
+        })
+        .map(|(_, root)| root.rollback_floor)
+        .max();
     let highest_on_the_roots = newest_valid_root_on_each_device
         .values()
         .map(|root| root.rollback_floor)
+        .chain(highest_on_the_abandoned_roots)
         .max();
     let slot_spacing_in_bytes = u64::from(immutable_sizes.fixed_structure_slot_spacing);
     let highest_in_the_system_configurations = reader
@@ -2114,7 +2178,7 @@ pub(crate) fn tree_table_entries_each_kind_at_most_once(
 
 /// 树表条目不按排序时报的不变量名：I-9.16（树表条目按树 ID 严格升序且合发号次序）。两道合成这一条，任一道不成立即判红：
 /// ① 盘上次序树 ID 严格升序（D8（核心索引结构） 已定项 8 排序契约「条目按树 ID 升序排」）；② 按发号次序相邻两棵的树 ID 严格升序
-/// （D8 已定项 8 ②「八棵树的号从水位起连号发，次序照格式常量 11..18 那一组」）。立号：实审 A3b Q2 交上来，用户 2026-09-27 JST 17:4x 定
+/// （D8 已定项 8 ②「八棵树的号从水位起连号发，次序照格式常量 11..18 那一组」）。立号：实审 A3b Q2 交上来，用户 2026-09-27 定
 /// 「立不变量并同步」；`invariants.md` 那一行由 kb 第八批写。
 pub const TREE_TABLE_ENTRIES_ORDERING_CONTRACT: &str = "I-9.16";
 

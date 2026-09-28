@@ -1,13 +1,13 @@
 # E142 第十九次跑 执行员报告（停在步 ② 冻结之后；步 ③④ 没做）
 
-时刻：开工 2026-09-27 JST 20:40（UTC 11:40），交回 JST 22:0x（UTC 13:0x）。
+日期：2026-09-27 开工，同日交回。
 
 ## 结论
 
 - 步 ⓪ 八条开跑条件都过（命令与输出在「步 ⓪」一节）；R19E-1 把 S19-clause 基线换成 kb 第八批之后的现值 `e1bda65b…`，写进登记第十二节。
 - 步 ① 做完：四个 sha256 等于期望（模型 `0676ed9b…` 按 R19C-3(a)）；快照 A、臂 N18 产物落盘（准入放行）；Q142.56 零差异（臂 N18 的模型那一侧与第十八次 `-main-2` 逐行相同，V19a 没触发）；D_crates 归一化 diff 写成文件（28 行），没读内容、没归因。
 - 步 ② 做完并冻结（R19E-2）：模型照 N19C 的 ①–⑪ 改完，单测 94 过 0 败 1 忽略；变异表 180 条，第二次整张跑 抓到 180 / 无效 0 / 没红 0，内存撞顶 0、超时 0，「已还原，基线仍全绿」，退出码 0。
-- **步 ③ 没开，照主 agent 21:4x 的指示交回。** 快照 A（UTC 11:44）之后别的会话把 `crates/` 拆出新 crate `singlefs-checker-tier`（导出 bin 在内），`crates/singlefs-core/src/{mount,recovery,system_configuration,transaction}.rs` 与 `crates/singlefs-format/src/lib.rs` 的 sha256 都变了，`research/scripts/replay.sh` 的 `driver_e142` 被改成 `-p singlefs-checker-tier`，我的模型文件里也被改了两行注释。照原文跑步 ③，快照 A 与 B 一定不同，会触发 **V19c**。
+- **步 ③ 没开，照主 agent 的指示交回。** 快照 A之后别的会话把 `crates/` 拆出新 crate `singlefs-checker-tier`（导出 bin 在内），`crates/singlefs-core/src/{mount,recovery,system_configuration,transaction}.rs` 与 `crates/singlefs-format/src/lib.rs` 的 sha256 都变了，`research/scripts/replay.sh` 的 `driver_e142` 被改成 `-p singlefs-checker-tier`，我的模型文件里也被改了两行注释。照原文跑步 ③，快照 A 与 B 一定不同，会触发 **V19c**。
 - 问题单三行都**没够判**（见「岔路表」）。
 
 什么现象会推翻「步 ② 冻结有效」：冻结之后模型或变异表的 sha256 又变了（别的会话还有 4 处注释写着 `singlefs-harness`，会话的路径迁移可能还会改这份文件）。
@@ -62,15 +62,15 @@
 ```
 - 新第 3 条原样：`recovery.rs:741` 一行 `pub(crate) fn unit_area_start_of_the_chosen_system_configuration(`；`grep -c with_unit_area_start mount.rs` = 2；C577 报告在；`transaction.rs:1193` 一行；函数体里 `CommitStep::Barrier` 计数 1。
 - 第 4 条：`grep -c research/prompts/e142-r19-prereg.md .claude/gate.d/stage-inputs.tsv` = 1。
-- 第 5 条：`research/results/e142-r19-crates-status-2026-09-27.txt`（37 行，UTC 11:43，那一刻 16 份文件有未提交改动）。
-- 第 6 条（UTC 11:40 `ps`）：别的会话在跑三条 `cargo test -p singlefs-harness`（8G / 24G 包装）；没有 qemu、vm-bench、e152、fio。臂 N18 那次导出排内存队 88 秒。
+- 第 5 条：`research/results/e142-r19-crates-status-2026-09-27.txt`（37 行，那一刻 16 份文件有未提交改动）。
+- 第 6 条（`ps`）：别的会话在跑三条 `cargo test -p singlefs-harness`（8G / 24G 包装）；没有 qemu、vm-bench、e152、fio。臂 N18 那次导出排内存队 88 秒。
 - 第 7 条：派发提示有那一句（step_five 与 crash_segments 正由「合入后验证一」改钉值，没合入）。
-- 第 8 条：重抄七段 189 行，sha256 `e1bda65b8b3c333efc4cba03cf88dfbce7ca43d7a22ae837e7a49d5ba8cf49ce`，与 UTC 08:58 基线差三类（D13 出处行号挪一；`layout/01` 第八节五处用例路径 `crates/singlefs-harness/tests/` → `crates/singlefs-checker/tests/`；D16 已定项 7 依据「实现待派」→「实现已合入（…）」）。第二类派发提示没点名，判它只是路径、不碰段序列与字数，照 R19C-3(b) 同一种收严换基线，**交主 agent 认**（R19E-1）。步 ② 开工前（UTC 11:47）再抄一次，sha256 相同。
+- 第 8 条：重抄七段 189 行，sha256 `e1bda65b8b3c333efc4cba03cf88dfbce7ca43d7a22ae837e7a49d5ba8cf49ce`，与基线差三类（D13 出处行号挪一；`layout/01` 第八节五处用例路径 `crates/singlefs-harness/tests/` → `crates/singlefs-checker/tests/`；D16 已定项 7 依据「实现待派」→「实现已合入（…）」）。第二类派发提示没点名，判它只是路径、不碰段序列与字数，照 R19C-3(b) 同一种收严换基线，**交主 agent 认**（R19E-1）。步 ② 开工前再抄一次，sha256 相同。
 
 ## 步 ①
 
 - (1) `sha256sum` 原样：模型 `0676ed9bc6f21fd9a6627eb55543021c63e02d0c5c74d9452c0305d0cd3f7ba2`、独立 bin `f4f2638681bf548228ea9a71971a269e2eb72cc9581ac9c90e0dcd75bd12feeb`、模型变异表 `dfc51c2093fa7dd3761884af0f3b20bf8f68a7bd9e6ba049ed6d9154e29f0016`、独立 bin 变异表 `8978e80a8a70a454f244a77f650eff04620016b7794042ed8388547933708a8e`，与期望相同。
-- (2) 快照 A：`research/results/e142-r19-crates-sha256-a-2026-09-27.txt`，171 行，UTC 11:44。
+- (2) 快照 A：`research/results/e142-r19-crates-sha256-a-2026-09-27.txt`，171 行。
 - (3) 臂 N18 产物：`research/results/e142-first-txn-dry-run-2026-09-27-r19-arm-n18.out`，754 行，sha256 `2bbacde1ec2f45408537bf263a2dfe7959258f1a4751f3dffc5f752a0895d7d8`。照 `driver_e142` 当时的两条命令（`-p singlefs-harness`）跑，模型 stdout 在前、导出在后。准入 stderr 原样：`✓ 放行 E142：输入自 research/results/e142-first-txn-dry-run-2026-09-26-r18-main.out 以来变了（那一份 f62e18e1695d，今天 0c63a9f36181）`；头一行 `E7INPUT name=input_fingerprint key=E142 sha256=0c63a9f36181c2845b648ae1e77ac2dfa7a17c0873a61e079299baf60eed0655 files=192`；`forced_rerun` 0 行。完成标记：`2` 行 `name=done`。
 - (4) R36：`cmp e142-first-txn-dry-run-2026-09-26-r18-main.out …-main-2.out` 退 1，只差第 1 行（准入头：`f62e18e1…` 对 `d75bf4db…`），第 2 行起 `diff | wc -l` = 0。
 - D_crates（第十八次 `-main-2` → 臂 N18，归一化）：`research/results/e142-r19-diff-r18-to-arm-n18-2026-09-27.txt`，28 行（删 10、加 14）。按登记只打行数，内容没读、没归因（归因在步 ④）。
@@ -90,16 +90,16 @@
 第一次跑红两条（`transaction_issues_21_…` 与 `publish_group_boundaries_…` 还钉旧的 2 道屏障与 `26`），照 7.4 C5 / C11 改了钉值与名字，不是改模型。
 
 变异：表 158 → 180 行。重锚 3 条（M2、M13、M154，写法见登记 R19E-2）；加 M180–M201 共 22 条。整张第二次跑（`MUTATE_JOBS=2 capped.sh 2 bash scripts/mutate.sh e142-first-txn-dry-run …`，日志 `/tmp/claude-1000/e142-r19-runner/mutate-2.log`）按行首符号数：✅ 180、⏭ 0、❌ 0、💥 0、⚠️ 0、⏱ 0、🧱 0；收尾原样「计数：内存撞顶 0 条（上限 16G）、超时 0 条」「已还原，基线仍全绿」，退出码 0。**抓到 180 / 无效 0 / 没红 0**，没有要分类的。
-第一次整张跑同为 180 条抓到，但退 5（UTC 12:22:25 别的会话改了模型两行注释），不算数。
+第一次整张跑同为 180 条抓到，但退 5（别的会话改了模型两行注释），不算数。
 
 冻结（写进登记 R19E-2）：模型 9319 行 `41ef20b50ffc32adece04054d6ffdffce1d0f6ca8d127ad8680953b37e4b9dd1`；变异表 180 行 `15a4fe6da352e15236f267b38e6735295d7d0c7659900de6dedd80867d2e9c77`。
 `naming-lint.sh` 退 1，红在它自己的 awk 读不到 `crates/singlefs-harness/src/bad_disk_input.rs`（被别的会话挪走了），不是这份源码；没法用它核新名字，交主 agent。
 
 ## 快照 A 之后 crates/ 的改动（V19c 的事实）
 
-`find crates -type f -not -path '*/target/*' | sort | xargs sha256sum` 在 UTC 12:28 与快照 A 比：`diff` 282 行（删 114、加 118），存 `/tmp/claude-1000/e142-r19-runner/snapshotA-vs-1228.diff`。非测试文件：
+`find crates -type f -not -path '*/target/*' | sort | xargs sha256sum` 再与快照 A 比：`diff` 282 行（删 114、加 118），存 `/tmp/claude-1000/e142-r19-runner/snapshotA-vs-later.diff`。非测试文件：
 - 新 crate `crates/singlefs-checker-tier/`（`Cargo.toml` 未跟踪、`src/lib.rs` 新），从 `crates/singlefs-harness/src/` 挪进去：`bad_disk_input.rs`、`crash.rs`、`crash_injection.rs`、`device_log.rs`、`layer0_progress.rs`、`on_device_modes.rs` 与 bin `e142_first_transaction_write_dump.rs`、`e142_first_transaction_write_dump_one_device.rs`、`e156_…`、`e158_…`、`e161_…`、`first_transaction_device_log_check.rs`、`first_transaction_on_device.rs`、`first_transaction_region_bytes.rs`；十几份测试也挪了。
-- 内容变了：`crates/singlefs-core/src/mount.rs`、`recovery.rs`、`system_configuration.rs`、`transaction.rs`，`crates/singlefs-format/src/lib.rs`，`crates/singlefs-checker/Cargo.toml`、`crates/singlefs-harness/Cargo.toml`，`crates/mutations.tsv`（最后改在 UTC 12:23）。内容我没读（步 ② 禁读 core / format）。
+- 内容变了：`crates/singlefs-core/src/mount.rs`、`recovery.rs`、`system_configuration.rs`、`transaction.rs`，`crates/singlefs-format/src/lib.rs`，`crates/singlefs-checker/Cargo.toml`、`crates/singlefs-harness/Cargo.toml`，`crates/mutations.tsv`。内容我没读（步 ② 禁读 core / format）。
 - `research/scripts/replay.sh` 的 `driver_e142` 已被改成 `cargo run -q -p singlefs-checker-tier --bin e142_first_transaction_write_dump`；臂 N18 是按 `-p singlefs-harness` 跑的。
 - 模型里还有 4 处注释写着 `singlefs-harness`，迁移那边可能还会改这份文件（冻结的 sha256 随之失效）。
 
@@ -111,7 +111,7 @@
 - `g7_states_ok=false`、`g7_violations_zero=false`：第 642 行 `E7RESULT name=layer0_sensitivity point=G7 barriers=none fua_is_boundary=true segments=12+1 states=4097 closed_form=4097 violations=2046 …`，门槛写死 2050 与 0。登记第四节第 4 条预言这一格不改门槛时判 false，**预期内**。与第十八次同值。
 这三格都是臂 N18（改动前的模型）的值；N19C 那一列没有产物。
 
-## 门禁（登记给执行员的阶段；这一次不写实验页，14 道都在最后跑，UTC 13:0x）
+## 门禁（登记给执行员的阶段；这一次不写实验页，14 道都在最后跑）
 
     33-mutation-tables exit=0 |   ✓ 150 个实验二进制都有成形的变异表，1732 条变异的原文各命中源码一次；crates/mutations.tsv 1363 条的原文各命中源码一次；没有同名实验二进制、锚点不在本阶段射程的表 7 
     52-segment-registry exit=1 |        再让 research/scripts/replay.sh 里 E142 那一行的入库产物名字跟上。
@@ -133,7 +133,7 @@
 红的三道与这一次的关系：
 - 52 号红两处：mkfs 那一行种类串 kb 与钉它的用例不一致、第二条流的数组在挪到 `crates/singlefs-checker-tier/tests/` 的用例里找不到。两处都不指 E142 产物；登记本来就说改登记行之后 52 号预期会红，这一次没改登记行。
 - 40 号红：这一次落盘的四份文件（臂 N18 产物、快照 A、`crates/` 状态、D_crates diff）还没被实验页点名；另有别的实验（E142 旧产物、E152、E163…）的旧项。这一次按指示不写实验页，交主 agent。
-- 69 号红：模型（改于 12:22，是别的会话那一次）与变异表比最新带指纹的产物（臂 N18）新——要主产物才能转绿；另有一处 `research/prompts/m2-impl-r2-fixes-a-evidence/spec.md:25` 引 /tmp，不是这一次的。
+- 69 号红：模型（别的会话改的那一次）与变异表比最新带指纹的产物（臂 N18）新——要主产物才能转绿；另有一处 `research/prompts/m2-impl-r2-fixes-a-evidence/spec.md:25` 引 /tmp，不是这一次的。
 - 86 号出路里「删 research 下文件」那一句没照做（它这次是绿的）。
 
 ## 岔路表（问题单三行）

@@ -1,0 +1,8 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs (target/release/deps/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over-1c2fe329c59bef6b)
+
+running 1 test
+test the_rollback_takes_the_inode_number_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_its_root ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.01s
+

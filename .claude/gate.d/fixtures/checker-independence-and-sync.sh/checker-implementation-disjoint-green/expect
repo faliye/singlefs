@@ -1,0 +1,6 @@
+exit=0
+want=只共享常量模块 `singlefs-format`
+want=零处引 `singlefs_core`
+want=`#[cfg(test)]` 标着的项 7 行不扫
+want=harness 档的依赖闭包 3 个里没有 checker 档包
+want=checker-implementation-disjoint：绿

@@ -1,5 +1,5 @@
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/mount.rs	2026-09-24 18:48:58.241518146 +0000
-+++ singlefs-core/src/mount.rs	2026-09-24 20:43:35.685297592 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/mount.rs	2026-09-25
++++ singlefs-core/src/mount.rs	2026-09-25
 @@ -1728,8 +1728,82 @@
              .root_ring_slots_per_region,
      );
@@ -96,8 +96,8 @@
 +    fn read(&self, device: DeviceIdentity, offset: crate::address::DeviceOffsetInBytes, length: usize) -> Option<Vec<u8>> { self.0.read(device, offset, length) }
 +    fn journal_record_offsets_hint(&self, device: DeviceIdentity, ring_start: crate::address::DeviceOffsetInBytes, ring_bytes: u64) -> Option<Vec<crate::address::DeviceOffsetInBytes>> { self.0.journal_record_offsets_hint(device, ring_start, ring_bytes) }
 +}
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/transaction.rs	2026-09-24 18:48:58.241580116 +0000
-+++ singlefs-core/src/transaction.rs	2026-09-24 20:21:31.595028559 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/transaction.rs	2026-09-25
++++ singlefs-core/src/transaction.rs	2026-09-25
 @@ -191,9 +191,8 @@
              has_writes_since_barrier: true,
              writes_by_structure_kind: WritesByStructureKind::NOTHING_WRITTEN,

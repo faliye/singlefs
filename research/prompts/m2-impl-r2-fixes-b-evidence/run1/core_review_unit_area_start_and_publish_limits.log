@@ -1,0 +1,28 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.02s
+     Running tests/core_review_unit_area_start_and_publish_limits.rs (target/debug/deps/core_review_unit_area_start_and_publish_limits-cbec4f55cf93de5c)
+
+running 20 tests
+test a_free_map_whose_unit_area_follows_a_128_mebibyte_journal_ring_hands_out_slots_right_after_the_ring ... ok
+test a_journal_ring_ending_inside_a_slot_rounds_up_and_a_start_off_the_cluster_segment_boundary_is_refused ... ok
+test a_row_publish_on_a_version_without_file_cut_into_more_journal_records_than_the_limit_is_refused_before_any_write ... ok
+test a_sequential_write_cut_into_more_journal_records_than_the_in_flight_limit_is_refused_before_any_write ... ok
+test a_sequential_write_cut_into_as_many_journal_records_as_the_in_flight_limit_is_published ... ok
+test a_block_device_error_in_the_first_floor_raise_after_the_row_publish_hands_back_the_writes_of_the_mounts_publishes ... ok
+test a_block_device_error_in_the_second_floor_raise_after_the_row_publish_hands_back_the_first_raise_too ... ok
+test publishes_after_a_version_whose_txg_is_at_the_top_of_its_range_are_refused_before_any_write ... ok
+test raising_the_floor_after_a_version_at_the_top_txg_is_refused_before_the_allocator_moves ... ok
+test rolling_back_after_a_version_at_the_top_txg_is_refused_before_any_write ... ok
+test rolling_back_with_a_device_identity_handed_in_twice_is_refused_before_any_write ... ok
+test rolling_back_with_other_parameters_is_refused_before_any_write_and_with_the_pool_parameters_is_made ... ok
+test the_default_journal_ring_puts_the_unit_area_at_the_compiled_slot_and_the_first_file_lands_byte_for_byte_as_before ... ok
+test the_first_file_version_publishes_without_releasing_a_genesis_tree_table_released_on_every_device ... ok
+test the_first_file_version_refuses_a_genesis_tree_table_that_device_one_already_released_before_any_write ... ok
+test the_first_file_version_refuses_a_genesis_tree_table_that_device_zero_already_released_before_any_write ... ok
+test a_writable_mount_over_a_journal_record_at_the_top_txg_is_refused_before_any_write ... ok
+test a_writable_mount_over_a_system_configuration_slot_at_the_top_instance_is_refused_before_any_write ... ok
+test a_writable_mount_whose_warm_up_would_pass_the_top_txg_is_refused_before_any_write ... ok
+test the_first_file_version_refuses_an_allocation_record_tree_node_of_the_version_without_file_that_device_one_already_released ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 36.28s
+

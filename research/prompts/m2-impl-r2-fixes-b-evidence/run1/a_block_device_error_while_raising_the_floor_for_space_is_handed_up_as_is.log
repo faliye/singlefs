@@ -1,0 +1,10 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.57s
+     Running tests/a_block_device_error_while_raising_the_floor_for_space_is_handed_up_as_is.rs (target/debug/deps/a_block_device_error_while_raising_the_floor_for_space_is_handed_up_as_is-b586dd5682b169f4)
+
+running 2 tests
+test a_block_device_error_in_the_floor_raise_pushed_by_the_session_is_not_reported_as_no_space ... ok
+test a_block_device_error_in_the_floor_raise_pushed_by_the_mount_fails_the_mount_instead_of_reporting_still_short ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.33s
+

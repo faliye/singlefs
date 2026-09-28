@@ -1,0 +1,14 @@
+RUNS 124
+CELL ('raise_floor_to_the_admission_ceiling', 'barrier', 'Err RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot(RaisedFloorSystemConfigurationWriteFailed', 'false') 4
+CELL ('raise_floor_to_the_admission_ceiling', 'none', 'Ok', 'false') 10
+CELL ('rollback', 'barrier', 'Err Publish(PublishSequenceFailed', 'true') 24
+CELL ('rollback', 'none', 'Ok', 'false') 9
+CELL ('rollback', 'write', 'Err Publish(PublishSequenceFailed', 'true') 68
+CELL ('unmount', 'none', 'Ok', 'false') 9
+ENUM_STATES ('raise_floor_to_the_admission_ceiling', 'barrier') 18
+ENUM_STATES ('raise_floor_to_the_admission_ceiling', 'none') 90216
+ENUM_STATES ('rollback', 'barrier') 98424
+ENUM_STATES ('rollback', 'none') 221292
+ENUM_STATES ('rollback', 'write') 98352
+ENUM_STATES ('unmount', 'none') 213315
+ENUM_STATES_TOTAL 721617

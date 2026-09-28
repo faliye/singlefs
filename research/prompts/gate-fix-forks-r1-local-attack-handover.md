@@ -1,6 +1,6 @@
 # 交接摘要：子 agent a709ac0c84b604db0（three-way-local-attack「三方本地攻方」）
 
-会话记录 `/home/fy5090/.claude/projects/-home-fy5090-code-singlefs/a7b5431e-aebc-4cc0-b452-8eba497def6c/subagents/agent-a709ac0c84b604db0.jsonl`；模型调用 162 次，最后一次上下文 27.6 万。
+会话记录 `~/.claude/projects/-home-fy5090-code-singlefs/a7b5431e-aebc-4cc0-b452-8eba497def6c/subagents/agent-a709ac0c84b604db0.jsonl`；模型调用 162 次，最后一次上下文 27.6 万。
 这份摘要是机械抽的：只列它做过的动作与说过的话，不判哪一件做成了。接手的 agent 开工先核现场（编不编得过、测试绿不绿、产物是不是这一轮的），再接着做。
 
 ## 一、派发提示（原样）
@@ -32,7 +32,7 @@
 
 ## 四、会写东西或跑东西的 Bash 命令（最后 25 条，共 21 条；输出只留末 6 行）
 
-2026-09-23T14:32:17.574Z：
+2026-09-23：
 ```
 python3 - <<'PY'
 import re
@@ -65,7 +65,7 @@ new: '待删除结构算活的还是死的'
 old: '待删除结构算活的还是死'
 ```
 
-2026-09-23T14:32:27.147Z：
+2026-09-23：
 ```
 python3 - <<'PY'
 import re
@@ -95,7 +95,7 @@ full length: 50
 46 '校验和算法选定并锁死为SHA256，全仓统一改用这一种散列，不再允许旧算法继续出现在任何新代'
 ```
 
-2026-09-23T14:33:07.611Z：
+2026-09-23：
 ```
 mkdir -p /tmp/claude-1000/gate-fix-forks-r1-local-attack/
 cat > /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md <<'ENDOFPROMPT'
@@ -113,7 +113,7 @@ every qualifier in
 31 /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md
 ```
 
-2026-09-23T14:33:33.626Z：
+2026-09-23：
 ```
 cat >> /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md <<'ENDOFPROMPT'
 
@@ -133,7 +133,7 @@ that formula b
 160 /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md
 ```
 
-2026-09-23T14:34:05.198Z：
+2026-09-23：
 ```
 cat >> /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md <<'ENDOFPROMPT'
 
@@ -152,7 +152,7 @@ its line in the final summary printed as the exact same fixed sentence:
 328 /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md
 ```
 
-2026-09-23T14:34:34.657Z：
+2026-09-23：
 ```
 cat >> /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md <<'ENDOFPROMPT'
 
@@ -173,7 +173,7 @@ already fixed, source code today. clip(text, n) fir
 455 /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md
 ```
 
-2026-09-23T14:35:03.236Z：
+2026-09-23：
 ```
 cat >> /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md <<'ENDOFPROMPT'
 
@@ -194,7 +194,7 @@ Fact 9-1. The generator script first bu
 589 /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md
 ```
 
-2026-09-23T14:35:31.135Z：
+2026-09-23：
 ```
 cat >> /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md <<'ENDOFPROMPT'
 
@@ -214,7 +214,7 @@ expression
 719 /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md
 ```
 
-2026-09-23T14:38:11.471Z：
+2026-09-23：
 ```
 set -o noclobber && cp /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md research/prompts/gate-fix-forks-r1-local-attack.md && echo "written" && wc -l research/prompts/gate-fix-forks-r1-local-attack.md && sha256sum research/prompts/gate-fix-forks-r1-local-attack.md /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md
 ```
@@ -226,7 +226,7 @@ d4a91846943751c2f740c3244c0d6ef35284563a29eb3483b442a991d4596bd4  research/promp
 d4a91846943751c2f740c3244c0d6ef35284563a29eb3483b442a991d4596bd4  /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md
 ```
 
-2026-09-23T14:40:00.195Z：
+2026-09-23：
 ```
 rm research/prompts/gate-fix-forks-r1-local-attack.md && set -o noclobber && cp /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md research/prompts/gate-fix-forks-r1-local-attack.md && echo "written" && wc -l research/prompts/gate-fix-forks-r1-local-attack.md && sha256sum research/prompts/gate-fix-forks-r1-local-attack.md /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md
 ```
@@ -238,7 +238,7 @@ dde2b96959eb567353b94eb5e4aa896b506e5be612fc1a44d9359398f5a10aad  research/promp
 dde2b96959eb567353b94eb5e4aa896b506e5be612fc1a44d9359398f5a10aad  /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md
 ```
 
-2026-09-23T14:40:55.305Z：
+2026-09-23：
 ```
 cat > /tmp/claude-1000/gate-fix-forks-r1-local-attack/translation-audit-draft.md <<'ENDOFAUDIT'
 # 逐句核对：`gate-fix-forks-r1-local-attack.md`（轮 gate-fix-forks-r1，本地攻方腿）
@@ -256,7 +256,7 @@ cat > /tmp/claude-1000/gate-fix-forks-r1-local-attack/translation-audit-draft.md
 41 /tmp/claude-1000/gate-fix-forks-r1-local-attack/translation-audit-draft.md
 ```
 
-2026-09-23T14:41:33.497Z：
+2026-09-23：
 ```
 cat >> /tmp/claude-1000/gate-fix-forks-r1-local-attack/translation-audit-draft.md <<'ENDOFAUDIT'
 
@@ -271,7 +271,7 @@ cat >> /tmp/claude-1000/gate-fix-forks-r1-local-attack/translation-audit-draft.m
 68 /tmp/claude-1000/gate-fix-forks-r1-local-attack/translation-audit-draft.md
 ```
 
-2026-09-23T14:41:41.537Z：
+2026-09-23：
 ```
 set -o noclobber && cp /tmp/claude-1000/gate-fix-forks-r1-local-attack/translation-audit-draft.md research/prompts/gate-fix-forks-r1-local-attack-translation-audit.md && echo written && wc -l research/prompts/gate-fix-forks-r1-local-attack-translation-audit.md
 ```
@@ -281,7 +281,7 @@ written
 68 research/prompts/gate-fix-forks-r1-local-attack-translation-audit.md
 ```
 
-2026-09-23T14:42:17.070Z：
+2026-09-23：
 ```
 nice -n 19 bash research/scripts/ask-local.sh research/prompts/gate-fix-forks-r1-local-attack.md > research/prompts/gate-fix-forks-r1-local-attack-output-s1.md 2> /tmp/claude-1000/gate-fix-forks-r1-local-attack/s1-stderr.log
 echo "EXIT_CODE=$?"
@@ -291,7 +291,7 @@ echo "EXIT_CODE=$?"
 Command did not complete within its 120s timeout and was moved to the background (ID: bjbdnr7j0). Output is being written to: /tmp/claude-1000/-home-fy5090-code-singlefs/a7b5431e-aebc-4cc0-b452-8eba497def6c/tasks/bjbdnr7j0.output. You will be notified when it completes. To check interim output, use Read on that file path.
 ```
 
-2026-09-23T14:45:33.468Z：
+2026-09-23：
 ```
 nice -n 19 bash research/scripts/ask-local.sh research/prompts/gate-fix-forks-r1-local-attack.md > research/prompts/gate-fix-forks-r1-local-attack-output-s1.md 2> /tmp/claude-1000/gate-fix-forks-r1-local-attack/s1-retry-stderr.log
 echo "EXIT_CODE=$?"
@@ -301,7 +301,7 @@ echo "EXIT_CODE=$?"
 Command did not complete within its 120s timeout and was moved to the background (ID: b236twxnp). Output is being written to: /tmp/claude-1000/-home-fy5090-code-singlefs/a7b5431e-aebc-4cc0-b452-8eba497def6c/tasks/b236twxnp.output. You will be notified when it completes. To check interim output, use Read on that file path.
 ```
 
-2026-09-23T14:48:57.356Z：
+2026-09-23：
 ```
 rm research/prompts/gate-fix-forks-r1-local-attack.md && set -o noclobber && cp /tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md research/prompts/gate-fix-forks-r1-local-attack.md && echo written && sha256sum research/prompts/gate-fix-forks-r1-local-attack.md
 ```
@@ -311,7 +311,7 @@ written
 9256574228da42ec60882f2fb524406a014fb5dc6449f9e5f9cc5340e5ec8b5a  research/prompts/gate-fix-forks-r1-local-attack.md
 ```
 
-2026-09-23T14:49:02.434Z：
+2026-09-23：
 ```
 nice -n 19 bash research/scripts/ask-local.sh research/prompts/gate-fix-forks-r1-local-attack.md > research/prompts/gate-fix-forks-r1-local-attack-output-s1.md 2> /tmp/claude-1000/gate-fix-forks-r1-local-attack/s1-retry2-stderr.log
 echo "EXIT_CODE=$?"
@@ -321,7 +321,7 @@ echo "EXIT_CODE=$?"
 Command did not complete within its 120s timeout and was moved to the background (ID: banvnjo4x). Output is being written to: /tmp/claude-1000/-home-fy5090-code-singlefs/a7b5431e-aebc-4cc0-b452-8eba497def6c/tasks/banvnjo4x.output. You will be notified when it completes. To check interim output, use Read on that file path.
 ```
 
-2026-09-23T14:53:29.443Z：
+2026-09-23：
 ```
 python3 research/scripts/oov-check.py research/prompts/gate-fix-forks-r1-local-attack-output-s1.md
 ```
@@ -331,7 +331,7 @@ python3 research/scripts/oov-check.py research/prompts/gate-fix-forks-r1-local-a
      生词: apparatus measurement's exemption vocabulary
 ```
 
-2026-09-23T14:53:58.787Z：
+2026-09-23：
 ```
 nice -n 19 bash research/scripts/ask-local.sh research/prompts/gate-fix-forks-r1-local-attack.md > research/prompts/gate-fix-forks-r1-local-attack-output-s2.md 2> /tmp/claude-1000/gate-fix-forks-r1-local-attack/s2-stderr.log
 echo "EXIT_CODE=$?"
@@ -341,7 +341,7 @@ echo "EXIT_CODE=$?"
 Command did not complete within its 120s timeout and was moved to the background (ID: bu9dlkzxj). Output is being written to: /tmp/claude-1000/-home-fy5090-code-singlefs/a7b5431e-aebc-4cc0-b452-8eba497def6c/tasks/bu9dlkzxj.output. You will be notified when it completes. To check interim output, use Read on that file path.
 ```
 
-2026-09-23T14:57:59.088Z：
+2026-09-23：
 ```
 python3 research/scripts/oov-check.py research/prompts/gate-fix-forks-r1-local-attack-output-s2.md
 ```
@@ -351,7 +351,7 @@ python3 research/scripts/oov-check.py research/prompts/gate-fix-forks-r1-local-a
      生词: exemption apparatus
 ```
 
-2026-09-23T14:58:27.815Z：
+2026-09-23：
 ```
 nice -n 19 bash research/scripts/ask-local.sh research/prompts/gate-fix-forks-r1-local-attack.md > research/prompts/gate-fix-forks-r1-local-attack-output-s3.md 2> /tmp/claude-1000/gate-fix-forks-r1-local-attack/s3-stderr.log
 echo "EXIT_CODE=$?"
@@ -369,72 +369,72 @@ Exit code 137
 | 文件 | 读了几次 |
 |---|---|
 | `/tmp/claude-1000/gate-fix-forks-r1-local-attack/prompt-draft.md` | 4 |
-| `/home/fy5090/code/singlefs/.claude/agent-common.md` | 1 |
-| `/home/fy5090/code/singlefs/.claude/rules/three-way-inference.md` | 1 |
-| `/home/fy5090/code/singlefs/research/prompts/_gate-fix-forks-r1-body.md` | 1 |
-| `/home/fy5090/code/singlefs/research/prompts/_gate-fix-forks-r1-checklist.md` | 1 |
-| `/home/fy5090/code/singlefs/research/prompts/_gate-fix-forks-r1-appendix.md` | 1 |
-| `/home/fy5090/code/singlefs/research/prompts/gate-fix-forks-r1-local-attack-output-s1.md` | 1 |
-| `/home/fy5090/code/singlefs/research/prompts/gate-fix-forks-r1-local-attack-output-s2.md` | 1 |
+| `.claude/agent-common.md` | 1 |
+| `.claude/rules/three-way-inference.md` | 1 |
+| `research/prompts/_gate-fix-forks-r1-body.md` | 1 |
+| `research/prompts/_gate-fix-forks-r1-checklist.md` | 1 |
+| `research/prompts/_gate-fix-forks-r1-appendix.md` | 1 |
+| `research/prompts/gate-fix-forks-r1-local-attack-output-s1.md` | 1 |
+| `research/prompts/gate-fix-forks-r1-local-attack-output-s2.md` | 1 |
 
 ## 七、它最后说的话（最后 12 段文字，原样）
 
-2026-09-23T14:41:11.948Z：
+2026-09-23：
 ```
 Now let me append the T8, T9, T10 sections to the audit draft.
 ```
 
-2026-09-23T14:41:40.445Z：
+2026-09-23：
 ```
 All line numbers confirmed accurate. Now let's finalize and write the translation audit file to its destination path.
 ```
 
-2026-09-23T14:42:15.831Z：
+2026-09-23：
 ```
 No heavy processes running. Now let's run the first attempt in the foreground (blocking) since this is the local leg's own model call, not a build/compile task.
 ```
 
-2026-09-23T14:44:22.652Z：
+2026-09-23：
 ```
 The first ask-local.sh invocation is running in the background after exceeding the tool's 120s foreground timeout (automatic harness behavior, not a shell-level detach). I'll stop here and wait for the completion notification before proceeding.
 ```
 
-2026-09-23T14:44:26.836Z：
+2026-09-23：
 ```
 Waiting for the background ask-local.sh call (task bjbdnr7j0) to complete before continuing.
 ```
 
-2026-09-23T14:45:32.421Z：
+2026-09-23：
 ```
 Now retrying with the same s1 slot since the previous attempt was red/void.
 ```
 
-2026-09-23T14:47:35.908Z：
+2026-09-23：
 ```
 Waiting for this retry (task b236twxnp) to complete.
 ```
 
-2026-09-23T14:47:37.492Z：
+2026-09-23：
 ```
 Waiting for task b236twxnp to complete before continuing.
 ```
 
-2026-09-23T14:51:05.025Z：
+2026-09-23：
 ```
 Waiting for task banvnjo4x to complete.
 ```
 
-2026-09-23T14:51:07.359Z：
+2026-09-23：
 ```
 Waiting for task banvnjo4x (3rd ask-local.sh call, using the revised prompt) to complete before continuing.
 ```
 
-2026-09-23T14:56:01.306Z：
+2026-09-23：
 ```
 Waiting for task bu9dlkzxj (4th ask-local.sh call, s2 slot) to complete.
 ```
 
-2026-09-23T14:57:58.439Z：
+2026-09-23：
 ```
 Exit 0, clean per automated gates. Let's run the OOV check and then manually review.
 ```

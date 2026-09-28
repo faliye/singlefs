@@ -33,7 +33,7 @@
 
 - Opus 报告 `mount.rs:866` 应为 868（差 2 行，结论不受影响）；Sonnet 报告引 D23（journal 的角色与格式） 已定项 18 那句只标 1250 行，原句横跨 1249–1250。两处都不改结论。
 - Sonnet 搜 `fallback_policy_mismatches` 零命中就判「计数器没实现」，而代码里的名字是 `policy_mismatches`（`allocator.rs` 第 494 行）；它搜的名字与 `.claude/kb/verification-build.md` 第 76 行自己写的逐字相同 ⇒ 是 kb 里的名字与代码对不上，不是腿搜错。记进收口表第 53 行。
-- **代码轮没有开工快照**：这一轮主 agent 在腿跑着的时候改了 `.claude/kb/milestone/02-second-txn.md`（18:43:24，夹在两条腿交回之间），核查员靠 mtime 与 `git diff` 才分清哪处不一致是轮内编辑造成的。改法写进 `.claude/rules/implementation-workflow.md`：代码轮派腿之前记一份被判文件的 `sha256sum` 快照，交核查员当输入；轮内不改被判文件与材料点名的 kb 文件。
+- **代码轮没有开工快照**：这一轮主 agent 在腿跑着的时候改了 `.claude/kb/milestone/02-second-txn.md`（夹在两条腿交回之间），核查员靠 mtime 与 `git diff` 才分清哪处不一致是轮内编辑造成的。改法写进 `.claude/rules/implementation-workflow.md`：代码轮派腿之前记一份被判文件的 `sha256sum` 快照，交核查员当输入；轮内不改被判文件与材料点名的 kb 文件。
 
 ## 四、写回哪里
 

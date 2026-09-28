@@ -1,6 +1,6 @@
 # E142 重跑登记（第 15 次，按位置寻址）：第一个事务写出的每个区域与 `crates/` 逐字节比对，新写清单能不能整行抄进字节表
 
-写于 2026-09-25 08:14–（收尾时刻见第十三节）JST（本机 UTC 2026-09-24 23:14 起），装置改之前、这一次的任何产物之前。判据、门槛、作废与停机条款在这里写死；跑出数之后要改，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」三步走，不在这里回改。
+写于 2026-09-25，装置改之前、这一次的任何产物之前。判据、门槛、作废与停机条款在这里写死；跑出数之后要改，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」三步走，不在这里回改。
 
 **文件名取 `r15`**：`research/prompts/e142-r14-prereg.md` 是第 14 次跑的登记，这一次是第 15 次。
 
@@ -111,7 +111,7 @@
 
 **依据**：
 
-- 无实验：一套 btree 实现配多 keyspace 的形态没有可量的量，依据是 2026-08-29 现查 `linux-6.17/fs/bcachefs/bcachefs_format.h` 的 `BCH_BTREE_IDS()` 宏（数 `x(` 行与带 `BTREE_IS_write_buffer` 的行，源码固定在 `/home/fy5090/code/fs-refs/`）：bcachefs 用**一套 btree 实现 + 21 棵树**，其中 **5 棵**走 write buffer（`lru` / `backpointers` / `deleted_inodes` / `rebalance_work` / `accounting`）；比「按访问模式选不同结构」好在**只有一套结构要调对**——异构方案意味着 N 套实现、N 套崩溃一致性 bug、N 套 checker。prior-art.md 的 bcachefs 那一行以这一段为准。
+- 无实验：一套 btree 实现配多 keyspace 的形态没有可量的量，依据是 2026-08-29 现查 `linux-6.17/fs/bcachefs/bcachefs_format.h` 的 `BCH_BTREE_IDS()` 宏（数 `x(` 行与带 `BTREE_IS_write_buffer` 的行，源码固定在 `~/code/fs-refs/`）：bcachefs 用**一套 btree 实现 + 21 棵树**，其中 **5 棵**走 write buffer（`lru` / `backpointers` / `deleted_inodes` / `rebalance_work` / `accounting`）；比「按访问模式选不同结构」好在**只有一套结构要调对**——异构方案意味着 N 套实现、N 套崩溃一致性 bug、N 套 checker。prior-art.md 的 bcachefs 那一行以这一段为准。
 - 用户定案 2026-09-24：派生树可以异构（原话在变更史）；多出来的那套实现、崩溃一致性与 checker 由层 0 流与 checker 各自覆盖，不再拿「只有一套结构要调对」挡。
 - 无实验：三方原型（`research/prompts/m2-keyspace-r1-opus-model/`）在同一批历史与代价模型上量过，没立实验号，选哪一个由用户定，判决 `research/prompts/m2-keyspace-r1-main-verification.md`。
 - 用户定案 2026-09-24：K1、K2、K4（原话在变更史）。
@@ -245,7 +245,7 @@ m2（树表单元第 0 版）被 COW 之后仍被第 0 代根引用，但条目�
 
 ## 三、实现今天的样子
 
-### 3.1 `crates/`（2026-09-25 08:30–08:45 JST 现查；实二五此刻在改 `crates/`，`git status --short crates/ | wc -l` 为 82，行号只是那一刻的）
+### 3.1 `crates/`（2026-09-25 现查；实二五此刻在改 `crates/`，`git status --short crates/ | wc -l` 为 82，行号只是那一刻的）
 
 **这一节只为「比对侧怎么接」与「实现里有没有这几样」而读；按派发提示，模型不读 `crates/` 的实现。分配记录树与 extent 树的实现文件我只跑了 `grep -n` 列函数签名，没读函数体；签名里撞见的几个名字列进第四节。**
 
@@ -283,7 +283,7 @@ m2（树表单元第 0 版）被 COW 之后仍被第 0 代根引用，但条目�
 
 ## 四、跑之前已经存在的数
 
-读条款、读装置、读前例、判问法时已经撞见或自己推出来的，照实列，不删。第五、六、八至十一节的判据在 2026-09-25 08:47–08:50 JST 写完草稿（草稿文件的修改时刻在第十三节），08:50:59 JST 才跑第七节 B 类锚点的命令；判定以产物为准，不以下表为准。
+读条款、读装置、读前例、判问法时已经撞见或自己推出来的，照实列，不删。第五、六、八至十一节的判据在 2026-09-25 写完草稿（草稿文件的修改先后在第十三节），之后才跑第七节 B 类锚点的命令；判定以产物为准，不以下表为准。
 
 | # | 数 / 话 | 出处 | 对判据的影响 |
 |---|---|---|---|
@@ -390,7 +390,7 @@ Q142.1、Q142.8 是「两份实现比」「两臂比」；两边一起错（比�
 
 ### 7.2 独立算出、用命令核过的（第十三节命令一；不符 ⇒ 作废 V5）
 
-命令一 `anchors_e142_r15.py` 在第五、六、八至十一节写完之后跑（草稿文件修改时刻见第十三节），输出原样在第十三节。
+命令一 `anchors_e142_r15.py` 在第五、六、八至十一节写完之后跑（草稿文件的修改先后见第十三节），输出原样在第十三节。
 
 | # | 断言 | 值（命令一的输出行） |
 |---|---|---|
@@ -508,16 +508,16 @@ Q142.1、Q142.8 是「两份实现比」「两臂比」；两边一起错（比�
 
 **这一段只做了「执行员读什么、按什么次序做」表里的第 ① 步**（派发提示 2026-09-25：②③④ 这一段不做，等实二五改 `crates/` 落定后另派）。以下都在产物之前写（这一次没有产物，因为步②③④不做）。
 
-- **步①冻结**（2026-09-25 10:33 JST / 01:33 UTC）：模型源码 `research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs` sha256 `7aa3ac26534460f09bb9efcb6f88829f3b2693c3ce4ea38a543d748cfe26c13a`；变异表 `research/mutations/e142_first_transaction_dry_run.tsv` sha256 `63d93581d1fec73223479b3ac840f5ac424180c0da347928bee19745dd185f9b`（109 行：改动前 92 行 + 新增 17 行 M94–M107、M110–M112）。单测 `cargo test -p e7-index-bench --bin e142-first-txn-dry-run`：60 跑、1 个 `#[ignore]`（`layer0_state_count_is_67108885_with_zero_violations`，第九节指示挪出 `cargo test`），全绿，零警告。变异表 109 条跑两轮：第一轮 108/109 红、M110 未抓；改锚后第二轮 109/109 全红（`bash scripts/mutate.sh e142-first-txn-dry-run e7-index-bench/src/bin/e142_first_transaction_dry_run.rs mutations/e142_first_transaction_dry_run.tsv`，两轮都以「已还原，基线仍全绿」收尾）。
+- **步①冻结**（2026-09-25 /）：模型源码 `research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs` sha256 `7aa3ac26534460f09bb9efcb6f88829f3b2693c3ce4ea38a543d748cfe26c13a`；变异表 `research/mutations/e142_first_transaction_dry_run.tsv` sha256 `63d93581d1fec73223479b3ac840f5ac424180c0da347928bee19745dd185f9b`（109 行：改动前 92 行 + 新增 17 行 M94–M107、M110–M112）。单测 `cargo test -p e7-index-bench --bin e142-first-txn-dry-run`：60 跑、1 个 `#[ignore]`（`layer0_state_count_is_67108885_with_zero_violations`，第九节指示挪出 `cargo test`），全绿，零警告。变异表 109 条跑两轮：第一轮 108/109 红、M110 未抓；改锚后第二轮 109/109 全红（`bash scripts/mutate.sh e142-first-txn-dry-run e7-index-bench/src/bin/e142_first_transaction_dry_run.rs mutations/e142_first_transaction_dry_run.tsv`，两轮都以「已还原，基线仍全绿」收尾）。
 - **既有 92 条变异锚点**：跑前用脚本核对，92 条锚点在改过的源码里仍逐条唯一命中一次（含第九节点名的 M11、M30、M32、M33、M38、M39、M45、M60、M69、M73、M74、M75、M77，逐条确认它们所在的行本轮未改）；M3、M12、M13（原来部分依赖已挪出 `cargo test` 的整轮枚举那条测试）改由 `positive_control_without_barriers_has_4092_violations_out_of_8192`（M3、M12）与常跑的段序列测试（M13）接住，两轮变异跑的结果证实三条仍会红。**没有一条锚点需要改**（除下面 M110 那一条，是新加的变异自己改锚，不算「既有」）。
 - **M110 改锚记录**（收严，不改判据）：第九节原写「谁该红：G3 那条单测」，第一次把锚点钉在 `build_allocation_tree` 内部 `let device_slots: Vec<u64> = devices.iter().map(|_| DEVICE_SLOTS).collect();` 这一行——跑了一轮才发现这一行在这个装置的固定几何（两块 4 GiB 盘）下，δ 甲／δ乙两种读法给同一个数（`mutation-sampling.md` 第三类「取样点不敏感」），G3 测试用的是独立传参的纯函数、根本不经过这一行，一个测试都抓不到。按第三类的判据「补一个敏感的取样点，不是留档」：改锚到 `const DEVICE_SLOTS: u64 = DEVICE_BYTES / SLOT_BYTES;` 这条常量定义本身——G3 测试里已经有 `assert_eq!(DEVICE_SLOTS, 262_144, ...)` 这一句独立字面量断言，改锚之后单独验证过会红（`left: 211968 right: 262144`），复跑整表后确认全红。这一步只改了变异表这一行的「原文」列，不改任何判据，也不影响第 1、2 行的够判条件。
 - **M108、M109 这一次没有加**：第九节把它们列进「新加的（M94–M112）」，但它们的「谁该红」是「比对器单测」——那个按 (设备, 偏移, 长度) 配对、报 `impl_bytes_unmatched` 的新比对器是第三节 3.2 行 4476–4546 描述的 Q142.1 新输出格式，只在步④（`跑模型的主产物...做第六节全部量`）才用得上，这一段按派发提示不做步④。这不是漏做：加了这两条变异也无法在这一段验证会不会被抓（比对器本身还不存在），加了只能先标「未验证」，不如不加、留给做步④那一段一起加、一起验。这两条变异请下一段派发时一并加进变异表。
 - 没有其它「收严或补臂」：这一段没有跑出任何数（步②③④不做），第六节的够判条件不受这一段影响。
 
-**以下是步②③④这一段（2026-09-25 02:48–04:08 UTC）加的，全部在这一段的主产物落盘（02:55:56 UTC 取的 crates 导出、之后跑出的模型主产物）之前或之外，不改判据、不改主读法：**
+**以下是步②③④这一段（2026-09-25）加的，全部在这一段的主产物落盘（取的 crates 导出、之后跑出的模型主产物）之前或之外，不改判据、不改主读法：**
 
-- **步②**（02:48:36 UTC）：`crates/` 快照一，`research/results/e142-r15-crates-sha256-before.txt`（126 行）。
-- **步③**：新建只读入库装置 `crates/singlefs-harness/src/bin/e142_first_transaction_write_dump.rs`，只许读的模板与签名照第一节「装置写在哪」第 2 条执行；跑出的导出 02:55:56 UTC 落盘为 `research/results/e142-r15-crates-write-dump-2026-09-25.out`。**收尾时（04:08 UTC）为过门禁 80 号补了三条编译期绝对值断言**（`TEST_IMAGE_DEFAULT_BYTES == 4_294_967_296`、`FIRST_FILE_BYTES == 3000`、`EXPECTED_FILE_BYTES == 3000`，包进 `const { }` 块避免 clippy `assertions_on_constants`）——这是收紧证据、不改行为：补之前跑过 `cargo run` 与 `diff` 逐字节确认输出不变，补之后又跑一遍确认仍然逐字节相同（两次输出的 sha256 都是 `9a09c5317908c62b8747c98a597eedf0e0eee1ac5cd98a33f88191302d7163c9`）。
+- **步②**：`crates/` 快照一，`research/results/e142-r15-crates-sha256-before.txt`（126 行）。
+- **步③**：新建只读入库装置 `crates/singlefs-harness/src/bin/e142_first_transaction_write_dump.rs`，只许读的模板与签名照第一节「装置写在哪」第 2 条执行；跑出的导出落盘为 `research/results/e142-r15-crates-write-dump-2026-09-25.out`。**收尾时为过门禁 80 号补了三条编译期绝对值断言**（`TEST_IMAGE_DEFAULT_BYTES == 4_294_967_296`、`FIRST_FILE_BYTES == 3000`、`EXPECTED_FILE_BYTES == 3000`，包进 `const { }` 块避免 clippy `assertions_on_constants`）——这是收紧证据、不改行为：补之前跑过 `cargo run` 与 `diff` 逐字节确认输出不变，补之后又跑一遍确认仍然逐字节相同（两次输出的 sha256 都是 `9a09c5317908c62b8747c98a597eedf0e0eee1ac5cd98a33f88191302d7163c9`）。
 - **步④·模型改动**（在取到的 crates 导出字节之上，逐字段读法上不作任何选择，只搭比对与陈列的脚手架）：
   - 新增函数：`ModelWindowWrite`/`model_window_writes`（窗口写清单）、`ParsedWriteLine`/`parse_write_lines`（解析 crates 导出）、`find_matching_impl_write`/`unmatched_crates_indices`（按 (设备, 偏移, 长度) 配对，第九节 M108/M109 钉在这两个函数上）、`compare_paired_write`（sha256 相等判定，抽出来是因为 `main()` 不可测）、`window_segment_sizes_from_dump`（crates 侧段大小重建）、`catalog_unit_at_offset`/`write_list_row`（区域级写清单）、`code2_field_rows`（字段级行，头部固定偏移 + 条目区「非空格 + 第一个空格」政策）。
   - 删除：`compare_region`/`RegionComparison`（连同 6 条单测、`snapshot_fields` 辅助函数）——旧的按名字配对、支持 `head_and_tail` 抽样的比较器，第三节 3.2 行 4476–4546 描述的正是这一处要改的地方；crates 新导出恒发整段十六进制，不再需要抽样，旧函数彻底没有调用点，按 `code-discipline.md`「用不到的代码删掉」清掉。
@@ -526,7 +526,7 @@ Q142.1、Q142.8 是「两份实现比」「两臂比」；两边一起错（比�
   - 命名整改：`historical_layout_reference_text`/`historical_layout_reference_lines`（原 `arm_o_text`/`arm_o_lines`，`naming-lint.sh` 判「o」是单字母，改名不改逻辑，改前改后模型主产物逐字节相同）。
   - 单测 59 → **61**（新增 `find_matching_impl_write_*` 三条、`unmatched_crates_indices_*` 两条、`compare_paired_write_*` 两条，钉 M108/M109/M73）。冻结（本段结束）sha256：模型 `8e7b77b1afb2cb3a994d5c994793e3466dffc22741205a5b015e1b4834cdb544`。
 - **步④·变异表改动**：新增 M108（配对丢设备维度）、M109（crates 侧不配对的写漏报），109 行；因为删除 `compare_region`，M73/M74/M75 三条旧锚点全部失效（`mutate.sh` 第一轮在 M73 处以退出码 3 中止）——**M74（declared length 不等被忽略）与 M75（head_and_tail 抽样从不核对头部）随旧代码一起删除**（它们测的两种失败模式，在按 (设备,偏移,长度) 配对 + crates 恒发整段十六进制的新设计下已经结构性地不可能发生，不是「取样点不敏感」也不是「等价变异」，是被测代码本身没有了）；**M73（sha256 相等被误判为不等）改锚到 `compare_paired_write` 里同一条判断**（风险以等价形式还在），第一次改锚后单独跑仍不红（新逻辑没有单测覆盖），于是抽出 `compare_paired_write` 函数并新增两条单测，再跑红。整表三轮：第一轮 M1–M72 抓到、M73 处中止（旧锚点失效）；第二轮补齐 M73/M108/M109 之后 108/109 抓到、M73 没红；第三轮 **109/109 抓到、0 无效、0 没红**（日志 `research/results/e142_first_transaction_dry_run-mutate-2026-09-25-position-addressed-comparison.log`）。冻结 sha256：`73a549773605c280c8b862e955c7ef5dfabc08cba17d7b202d9940da8451b1ef`。
-- **停机 S4 记一笔（不停机、不作废，如实记）**：`crates/` 快照一（02:48:36 UTC）与收尾时现取的快照二不完全一致——`crates/mutations.tsv` 与 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs` 两个文件的哈希变了，两者 mtime 都在 03:02–03:03 UTC。这一段实际采集导出数据的时刻是 02:55:56 UTC，早于那两处改动；`e158_root_choice_repair.rs` 是独立的 `[[bin]]`（与 `e142_first_transaction_write_dump` 不共享编译图，Rust 不同二进制目标互不编译进对方），改它不可能污染这一段的导出字节。技术上仍算 S4 触发，交主 agent 复核是否需要更严的处置。
+- **停机 S4 记一笔（不停机、不作废，如实记）**：`crates/` 快照一与收尾时现取的快照二不完全一致——`crates/mutations.tsv` 与 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs` 两个文件的哈希变了。这一段实际采集导出数据早于那两处改动；`e158_root_choice_repair.rs` 是独立的 `[[bin]]`（与 `e142_first_transaction_write_dump` 不共享编译图，Rust 不同二进制目标互不编译进对方），改它不可能污染这一段的导出字节。技术上仍算 S4 触发，交主 agent 复核是否需要更严的处置。
 - **Q142.8 的 arm O 参照记一笔**：跑前冻结的 arm O 源码（sha256 `232430d2fbade2e44cb99b29be2358742ee7eb97614dc4be2a1b7b699bf7566f`）是步①在原地编辑覆盖掉的中间状态，从未提交、`git log` 与全部 `/tmp/claude-1000` 目录搜索均未命中留存副本——S1「重跑核对」这一步做不了。改用 r14 最后一次跑（2026-09-24）留存的 `research/results/e142-first-txn-dry-run-2026-09-25-header311-last-flag-arm-o.out`（模型侧 21 行 `name=device_region_bytes`，旧 8 单元布局）当参照，交主 agent 定这个替代是否可接受。
 
 **以下是这一段（Q142.1v 变体臂、组合臂、P1–P3/P5/P6、G4，2026-09-25，主产物落盘之前/之外，不改判据、不改主读法）加的**：
@@ -558,7 +558,7 @@ Q142.1、Q142.8 是「两份实现比」「两臂比」；两边一起错（比�
 
 ## 十三、读过的文件与跑过的命令
 
-E142 第 15 次与 E156 第 3 次两份重跑登记是同一次派发里一起写的，下面列的是这一次派发里读过的全部文件（不只这一份用到的）。行号是读的那一刻（2026-09-25 08:14–08:55 JST）的行号。`research/results/` 下的产物一份都没读（只 `ls` 过 E156 的文件名）。草稿目录：`/tmp/claude-1000/m2-keyspace-rerun-designer/`——**派发提示没给草稿目录**，照先例（`research/prompts/m2-witness-r1-verifier-output.md:5`）自建了这一个，报告里写明。
+E142 第 15 次与 E156 第 3 次两份重跑登记是同一次派发里一起写的，下面列的是这一次派发里读过的全部文件（不只这一份用到的）。行号是读的那一刻（2026-09-25）的行号。`research/results/` 下的产物一份都没读（只 `ls` 过 E156 的文件名）。草稿目录：`/tmp/claude-1000/m2-keyspace-rerun-designer/`——**派发提示没给草稿目录**，照先例（`research/prompts/m2-witness-r1-verifier-output.md:5`）自建了这一个，报告里写明。
 
 ### 13.1 规则、共用约束、定义、门禁与脚本
 
@@ -615,7 +615,7 @@ E142 第 15 次与 E156 第 3 次两份重跑登记是同一次派发里一起�
 ### 13.6 跑过的命令（原样；读文件的 `sed` / `awk` / `grep -n` / Read 在上面按行列过，不重列）
 
 ```
-$ TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M JST'           # 08:14（开工）、08:50:59（跑命令一之前）、08:52
+$ TZ=Asia/Tokyo date +%F                               # 跑了三次：开工、跑命令一之前、之后又一次
 $ mkdir -p /tmp/claude-1000/m2-keyspace-rerun-designer/{e142,e156,quotes,orig}
 $ git status --short crates/ | wc -l
 82
@@ -638,8 +638,7 @@ $ nice -n 19 python3 research/scripts/quote-kb.py <草稿>/quotes/e142-clauses.m
 $ sha256sum <草稿>/quotes/e142-clauses.md <草稿>/quotes/e142-question.md
 fd38ee4fc41581088d745d24c5a03f5ed0b16362346774e11193968cbb4b9cd1  …/quotes/e142-clauses.md
 b278dec9342368871b6a998f215f08cb79e4a9b29158d0596e6ef918c2be5a93  …/quotes/e142-question.md
-$ ls -l --time-style=+%H:%M:%S <草稿>/e142/                                  # UTC 修改时刻：判据草稿 s05 23:47:44、s05b 23:48:13、s06 23:48:52、
-                                                                              # s08 23:49:27、s10 23:50:13；命令一 23:50:59；s07 23:51:50；s04 两处更正 23:51:15 起
+$ ls -l --time-style=+%H:%M:%S <草稿>/e142/                                  # 修改先后：判据草稿 s05、s05b、s06、s08、s10，然后命令一，再 s04 两处更正起、s07
 ```
 
 #### 命令一：E142 的独立锚点（`anchors_e142_r15.py`，全文；第七节 7.2 用）
@@ -761,4 +760,4 @@ B13 8GiB devices=2 slots_reading=device slots=524288 R=2 root_cells=8 first_txn_
 B13 256GiB devices=2 slots_reading=device slots=16777216 R=3 root_cells=2 first_txn_allocation_nodes=7
 ```
 
-**收尾时刻**：2026-09-25 09:04 JST（本机 2026-09-25 00:04 UTC）。这一轮没有编译、没有跑装置、没有跑任何产物；草稿目录里只有抄条款的出口文件、两个锚点脚本与它们的输出、各节草稿。
+**收尾日期**：2026-09-25。这一轮没有编译、没有跑装置、没有跑任何产物；草稿目录里只有抄条款的出口文件、两个锚点脚本与它们的输出、各节草稿。

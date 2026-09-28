@@ -1,0 +1,64 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.72s
+     Running unittests src/lib.rs (target/debug/deps/singlefs_harness-ed0b65334d8d5632)
+
+running 56 tests
+test fault_injection::tests::a_refused_floor_raise_and_the_rows_written_are_left_by_the_lying_device_only_when_the_swallowed_root_slot_write_explains_them ... ok
+test fault_injection::tests::an_unarmed_plan_forwards_every_call_and_counts_it ... ok
+test fault_injection::tests::corrupted_read_flips_one_bit_in_the_buffer_and_leaves_the_device_alone ... ok
+test fault_injection::tests::every_call_from_the_second_onward_on_one_device_below_an_offset ... ok
+test fault_injection::tests::failed_reopen_is_excused_only_by_the_lying_device_or_by_the_failed_make_filesystem ... ok
+test fault_injection::tests::failing_barrier_returns_the_block_device_error ... ok
+test fault_injection::tests::failing_read_returns_the_block_device_error_and_leaves_the_buffer_alone ... ok
+test fault_injection::tests::only_the_two_swallowing_faults_report_success_without_doing_anything ... ok
+test fault_injection::tests::only_failures_that_the_swallowed_writes_explain_are_left_by_the_lying_device ... ok
+test fault_injection::tests::swallowed_barrier_reports_success_and_is_counted_apart ... ok
+test fault_injection::tests::seed_slices_cover_every_seed_exactly_once ... ok
+test fault_injection::tests::the_counts_when_the_first_barrier_after_a_write_arrived_are_frozen_at_that_moment ... ok
+test fault_injection::tests::swallowed_write_reports_success_and_changes_nothing_on_the_device ... ok
+test fault_injection::tests::the_nth_write_across_the_pool_fails_once_and_writes_nothing ... ok
+test fault_injection::tests::worker_thread_count_comes_from_the_environment_variable_or_available_parallelism ... ok
+test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+test history::tests::failed_cold_start_read_back_is_a_harness_judgement_and_the_other_read_backs_are_not ... ok
+test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+test history::tests::harness_judgement_is_never_classified_as_a_known_red_form ... ok
+test fault_injection::tests::the_random_draw_reaches_all_six_injected_faults ... ok
+test history::tests::known_red_forms_are_matched_by_mechanism_not_by_signature ... ok
+test history::tests::record_check_violations_are_never_absorbed_into_known_red_forms ... ok
+test history::tests::record_rewritten_by_a_publish_that_keeps_its_old_generation_is_reported ... ok
+test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+test model::tests::allocation_record_tree_nodes_rewritten_by_the_first_file_version_on_4_gib_are_at_most_nine ... ok
+test model::tests::after_a_forward_rollback_the_ceiling_counts_the_repeated_state_once ... ok
+test model::tests::a_role_of_the_version_that_the_implementation_did_not_hand_in_is_reported ... ok
+test model::tests::carried_unit_keeps_the_generation_of_the_publish_that_wrote_it ... ok
+test model::tests::content_of_exactly_the_payload_capacity_is_accepted_and_one_byte_more_is_refused ... ok
+test model::tests::each_version_compares_its_file_content ... ok
+test model::tests::crash_recovery_that_cannot_read_the_witnessed_newest_root_is_refused_before_any_write_and_leaves_the_model_unchanged ... ok
+test model::tests::each_version_compares_its_instance_table ... ok
+test model::tests::only_a_zero_unit_publish_on_a_version_without_file_may_hand_in_the_rewritten_roles_only ... ok
+test model::tests::mount_that_writes_more_rows_than_one_page_holds_counts_every_page_of_the_instance_table_chain ... ok
+test model::tests::raised_floor_carried_by_the_newest_root_of_one_device_takes_effect ... ok
+test model_comparison::tests::a_floor_raise_failure_after_the_mounts_publishes_is_judged_by_the_floor_raise_error_inside ... ok
+test model::tests::the_ceiling_is_the_fourth_newest_non_empty_root_capped_by_the_newest_root_on_every_device ... ok
+test model::tests::the_forward_rollback_to_the_effective_floor_publishes_one_root_and_leaves_the_newer_roots_candidates ... ok
+test model_comparison::tests::each_rollback_candidate_exclusion_maps_to_its_own_reason ... ok
+test model_comparison::tests::only_the_witnessed_newer_publish_still_unreadable_after_one_reread_maps_to_the_models_reason ... ok
+test model_comparison::tests::only_a_placement_refused_on_every_device_passes_as_the_unit_area_wall ... ok
+test read_tally::tests::full_journal_ring_scan_is_one_hundred_ninety_six_thousand_six_hundred_eight_reads ... ok
+test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+test segments::tests::writes_classify_by_their_landing_zone ... ok
+test segments::tests::zero_fill_is_its_own_kind_and_counts_as_one_plain_write_in_its_segment ... ok
+test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+test model_comparison::tests::the_model_module_uses_only_the_standard_library_and_the_format_constants ... ok
+test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+test tests::stream_lines_are_stable_text ... ok
+test tests::zero_fill_is_recorded_as_one_step_and_keeps_no_contents ... ok
+test tests::zero_hash_shortcut_agrees_with_hashing_real_zeros ... ok
+test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+test model_comparison::tests::every_published_version_is_compared_by_content_instance_table_and_every_role_both_ways ... ok
+
+test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.49s
+

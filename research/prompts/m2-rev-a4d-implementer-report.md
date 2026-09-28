@@ -1,6 +1,6 @@
 # 实审 A4d 报告：分配记录树那一项取 K1 整棵树；C545 那一格改成准入先拒
 
-时刻：2026-09-27 00:28 – 01:5x UTC（JST 09:28 – 10:5x）。规格 `/tmp/claude-1000/impl-rev-a4d/spec.md`。交补丁：副本 `/tmp/claude-1000/impl-rev-a4d/copy`（00:28:02Z 从主工作区取，那一刻我那 7 份文件的 sha256 在 `sha256-at-copy.txt`，交回前核过主工作区里仍逐字节相同）里改、证红、跑检查；补丁目录 `/tmp/claude-1000/impl-rev-a4d/patch/`。主工作区一个字没写。
+时刻：2026-09-27。规格 `/tmp/claude-1000/impl-rev-a4d/spec.md`。交补丁：副本 `/tmp/claude-1000/impl-rev-a4d/copy`（从主工作区取，那一刻我那 7 份文件的 sha256 在 `sha256-at-copy.txt`，交回前核过主工作区里仍逐字节相同）里改、证红、跑检查；补丁目录 `/tmp/claude-1000/impl-rev-a4d/patch/`。主工作区一个字没写。
 
 ## 一、结论
 
@@ -21,7 +21,7 @@
 - 第 657 行 `checkpoint_cost_of_the_version_to_build_on_with_node_capacities`：带文件的一版按根节点码 2 头现读的高 − 1 作根层级（D28 已定项 4「从根节点头里现读」）；树表 0 条、写过行的那一版（`None` 臂）取 `AllocationRecordTreeGeometry::of_allocator(allocator).root_level()`；没写过行的照旧 0。中央映射树那一项的删插数仍是「分配记录树那一项 + 记账树节点数」，跟着变。
 - 模块文档、函数文档照改；原来文档里「⚠️ 射程：每块盘两条路径罩不住开新段 / 回落 / 换下很久以前的节点」那一段删了，换成 K0 为什么少扣、K1 为什么拿得准。
 
-### 量表 8 格（`admission_checkpoint_cost_per_device_paths.rs`，debug，副本 01:0x UTC）
+### 量表 8 格（`admission_checkpoint_cost_per_device_paths.rs`，debug，副本）
 
 每格一行原样（`difference = 实写 − ckpt_cost`，多扣 = −difference）：
 
@@ -189,7 +189,7 @@ clippy 之后改了三处名字与一个 `match`（第五节），动到了追�
 - **A4c 第三节第 4 条：抬 F 回收之后「扣住」的槽式子没扣。** 现状：`admission.rs` `AdmissionReading::of_allocator` 文档那条 ⚠️ 还在（读数里「已分配」按占着的槽数，扣住的槽在记账上已回空闲、分配器却不发，式子里没有一项装它们）。这一轮的落得下那一判把扣住当挡住（`unblocked_slots` 不算它们），所以「放行之后因为扣住而落不下」那一格现在在准入先拒那一道就拒；式子那一判仍把它们当可用。要问的：扣住的槽要不要进 D28 已定项 1 的式子（单列一项，还是并进「已分配」），还是只靠落得下那一判兜着就够——前者改条款与记账口径，后者要在条款里写明「式子放行不等于落得下」。
 - **A4c 第三节第 5 条：`df` 把段内空槽算空闲会不会是 D3 已定项 9 第 1 条的假性 ENOSPC。** 现状：`crates/` 里没有 `df` 的实现（`grep -rnE 'fn [a-z_]*(df|statfs|reported_free)[a-z_]*' crates --include=*.rs` 零命中），`df` 报什么只在 D16 已定项 1 的条款里。C545 那一格段外 0 对、段内 79 对：段内那 79 对在这次挂载里对用户数据关着（D3 已定项 8 第 2 条），准入先拒只改交回的成员，不改这一点。要问的：`df` 的空闲要不要扣掉「这次挂载开过的聚簇段里的空槽」（扣了 `df` 少报、随挂载内开段数变；不扣则这一格按第 1 条字面是假性 ENOSPC），以及会话在这一格推抬 F 推到上限仍落不下（聚簇段只在重开之后才对用户数据开放）要不要多一种收尾（例如推一次卸载 / 重开，或放开段内空槽给用户数据）。
 
-## 五、第 4 步那几样（副本里，01:2x–01:3x UTC；开跑前 `ps` 看到别的会话的 cargo（`/tmp/claude-1000/m2-closeout-code-r1-opus/` 与 `/tmp/claude-1000/e158-r4-device/` 两处编译、测试），没有 qemu / fio / vm-bench / e152 测量；每条经 `capped.sh 5`，跑编出来的代码经 `run-with-memory-cap.sh 8G`）
+## 五、第 4 步那几样（副本里；开跑前 `ps` 看到别的会话的 cargo（`/tmp/claude-1000/m2-closeout-code-r1-opus/` 与 `/tmp/claude-1000/e158-r4-device/` 两处编译、测试），没有 qemu / fio / vm-bench / e152 测量；每条经 `capped.sh 5`，跑编出来的代码经 `run-with-memory-cap.sh 8G`）
 
 动到的测试二进制（整个二进制，debug）与 core 单测，末行原样（`progress.md`）：
 
@@ -201,7 +201,7 @@ final second_transaction_crash_inside_the_floor_raise_pushed_by_the_session exit
 final admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments exit=0 1s: test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.26s
 ```
 
-基线（改之前，同一份副本 00:40 UTC）：core 127 过；量表那份 3 过；会话那份 11 过；崩溃枚举那份 1 ignored。
+基线（改之前，同一份副本）：core 127 过；量表那份 3 过；会话那份 11 过；崩溃枚举那份 1 ignored。
 
 `cargo fmt --all -- --check`：退 1，差异全在别人的文件：
 
@@ -230,7 +230,7 @@ $ grep '^Diff in' final-fmt.log | sed -E 's/:[0-9]+:$//' | sort | uniq -c
 - 92 号在副本上退 77（不是 git 仓），89 号退 77，都按没判写。
 - 74 号红，**不是这一轮带来的**：在还原成取副本那一刻的副本（`copy-probe`）上同一个二进制 release 跑一遍当基线（`baseline-random-history.log`），也是 `test result: FAILED. 22 passed; 2 failed; 2 ignored`，红的同样是 `crash_recovery_abandoning_the_newest_root_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43` 与 `random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation`（快档「历史 96 段：跑完 67、以已知红收尾 {0: 1}、新发现 28」，新发现是 I-7.4）。改后同一个二进制（`after-random-history.log`）逐段汇总行与基线逐行相同（`diff` 只差末行用时 66.15s / 47.63s）。A4c 报告第七节记的也是这两条。我没修。
 
-补丁：`git apply --check` 在主工作区（01:34 UTC）上干净；我那 6 份已有文件在主工作区里与取副本时逐字节相同（`sha256sum -c sha256-at-copy.txt` 6 行 OK）。`git apply --check --stat` 原样：
+补丁：`git apply --check` 在主工作区上干净；我那 6 份已有文件在主工作区里与取副本时逐字节相同（`sha256sum -c sha256-at-copy.txt` 6 行 OK）。`git apply --check --stat` 原样：
 
 ```text
  crates/singlefs-core/src/admission.rs              |  405 +++++++++++++--

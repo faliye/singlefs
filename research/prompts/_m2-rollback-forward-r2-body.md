@@ -4,7 +4,7 @@
 
 ## 一、这一轮要判什么
 
-第一轮判决 `research/prompts/m2-rollback-forward-r1-main-verification.md` 定下的都是零轮形态，用户 2026-09-25 JST 21:5x 又定了两问（调度记录第三节「回退改形态第一轮判完、用户两问」那一行）。这一轮攻的就是这一整形：
+第一轮判决 `research/prompts/m2-rollback-forward-r1-main-verification.md` 定下的都是零轮形态，用户 2026-09-25 又定了两问（调度记录第三节「回退改形态第一轮判完、用户两问」那一行）。这一轮攻的就是这一整形：
 
 - **回退只在挂着的时候做**（第一轮判决 F1「在哪做」，取正推腿候选 B：走正常事务路径、不新增实例、不取号）：新根指向 R_old 那一版的用户可见树，txg 照常加一；
   - 复活：R_old 引用、之后已被换下的块改回「已分配」，分配代写回 R_old 那条记录的；
@@ -27,7 +27,7 @@
 
 **共用问句**：每一格都要回答「那一版引用的块有没有被复用、读不读得对」，答案要量，不许推。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-25 22:0x JST；冻结副本由材料员取）
+## 二、实现今天的样子（主 agent 的观测，2026-09-25；冻结副本由材料员取）
 
 - 第一轮正文第二节列的落点（`mount.rs` 的 `mount_rollback`、见证那几个函数、`abandoned_by_table`、`isolate_slots_referenced_only_by_abandoned_roots`、`raise_rollback_floor`、`rollback_floor_ceiling`；`recovery.rs` 的 `choose_root`；`rollback_witness.rs`）行号随实二八加的那一判下移，材料员按冻结副本现查。
 - 实二八（2026-09-25）在 `mount_writable_with_space_admission`、`mount_rollback_with_space_admission` 开头加了「交进来的盘数 ≥ w 的下限」那一判。

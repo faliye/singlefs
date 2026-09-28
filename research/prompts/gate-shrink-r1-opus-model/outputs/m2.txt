@@ -1,0 +1,14 @@
+== research/scripts/ 今天的文件：各认法认下的份数，与 R0 的差
+R0	claimed=53	R0 认而它不认=[]	它认而 R0 不认=[]
+R1	claimed=37	R0 认而它不认=['research/scripts/archive-past-rounds.py', 'research/scripts/check-segment-registry.py', 'research/scripts/check-staged.sh', 'research/scripts/gate-staged.sh', 'research/scripts/insert-row.py', 'research/scripts/layer0-shard-configuration-check.sh', 'research/scripts/layer0-shard-run-selftest.sh', 'research/scripts/layer0-shard-run.sh', 'research/scripts/memory-peaks.tsv', 'research/scripts/migrate-changelog-format.py', 'research/scripts/multi-host-run.sh', 'research/scripts/mutation-shard-run.sh', 'research/scripts/rules-sweep-audit.py', 'research/scripts/stale-candidates.py', 'research/scripts/sweep-term.py', 'research/scripts/test-environment-check.py']	它认而 R0 不认=[]
+R2	claimed=50	R0 认而它不认=['research/scripts/layer0-shard-configuration-check.sh', 'research/scripts/layer0-shard-run-selftest.sh', 'research/scripts/memory-peaks.tsv']	它认而 R0 不认=[]
+R3	claimed=50	R0 认而它不认=['research/scripts/layer0-shard-configuration-check.sh', 'research/scripts/layer0-shard-run-selftest.sh', 'research/scripts/memory-peaks.tsv']	它认而 R0 不认=[]
+== 临时造的七份：认下 = 1
+文件	该认	R0	R1	R2	R3
+new-getopts.sh	1	1	0	1	1
+new-match.py	1	1	0	0	1
+new-set-membership.py	1	1	0	0	1
+new-flag-constant.py	1	1	0	0	1
+new-if-test.sh	1	1	0	0	1
+mention-in-comment.sh	0	1	0	0	0
+mention-in-howto.sh	0	1	0	0	0

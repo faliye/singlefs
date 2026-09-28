@@ -149,17 +149,20 @@ fn slots_of_data_units(data_units: u64) -> u64 {
 }
 
 /// C545 那一格（实审 A4c 造出来的，报告第三节）：用户数据落得下的空槽对全在这次挂载开过的聚簇段里、段外一对都没有，而按字节算的式子放得下这次的需求。
-/// 两块单元区 384 槽的小盘，第一个文件之后崩了再挂；这次挂载里直接推 80 次空发布（固定点在这次挂载开的聚簇段里 bump，根环转过之后回收，
-/// 段里空出来的槽照旧只给提交内生块，D3（空间分配） 已定项 8 第 2 条），再直接把文件顺序写到 6 个数据单元，都做成。
-/// 接着顺序写到 7 个单元：每块盘段外成对的空槽 0 对、段内 79 对；按字节算的式子（`admission_reading_before_a_publish`）每块盘可用 49 槽，
-/// 放得下这次需求的上界（6 个单元那次新写的槽 + 多一个数据单元 2 槽 + 一次空发布的 ckpt_cost）。发布路径在走固定点之前判「这次的单元落得下」：
-/// 7 个数据单元要 7 对、段外 0 对，交回 `SpaceAdmissionRefused`，每块盘报段外 0 槽 < 数据单元 14 槽；两块盘逐字节不变、分配器不动。
+/// 两块单元区 384 槽的小盘，第一个文件之后崩了再挂；这次挂载里直接推 200 次空发布（固定点在这次挂载开的聚簇段里 bump，根环转过之后回收，
+/// 段里空出来的槽照旧只给提交内生块，D3（空间分配） 已定项 8 第 2 条），再直接把文件顺序写到 5 个数据单元，都做成。
+/// 接着顺序写到 6 个单元：每块盘段外成对的空槽 0 对、段内 85 对；按字节算的式子（`admission_reading_before_a_publish`）每块盘可用 60 槽，
+/// 放得下这次需求的上界（5 个单元那次新写的槽 + 多一个数据单元 2 槽 + 一次空发布的 ckpt_cost，31 槽）。发布路径在走固定点之前判「这次的单元落得下」：
+/// 6 个数据单元要 6 对、段外 0 对，交回 `SpaceAdmissionRefused`，每块盘报段外 0 槽 < 数据单元 12 槽；两块盘逐字节不变、分配器不动。
+/// A3b 把小盘改成 6 MiB 环、单元区从 1408 起之前是「80 次空发布、写到 6 个、段外 0 对段内 79 对、可用 49 槽、7 个单元 14 槽」：分配记录树按
+/// 绝对槽号按位置寻址，单元区挪了位置，每次发布重写的节点跟着变。草稿探针在空发布 60–200 次上扫：段外恰好 0 对、式子又放得下上界的是 200 次这一格
+/// （140 次那一格段外也是 0 对，式子可用 30 槽 < 上界 35 槽）。
 /// 判别力：「落得下」那一判不判数据单元（或整判拿掉）时，走固定点在分配器的拷贝上取不到数据单元 0 的落点，交回 `PlacementRefused`（实审 A4c 钉的那个）。
 #[test]
 fn a_write_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_refused_by_the_space_admission_before_any_write_while_the_byte_formula_admits(
 ) {
-    const EMPTY_PUBLISHES_IN_THIS_MOUNT: usize = 80;
-    const DATA_UNITS_THAT_STILL_LAND: usize = 6;
+    const EMPTY_PUBLISHES_IN_THIS_MOUNT: usize = 200;
+    const DATA_UNITS_THAT_STILL_LAND: usize = 5;
     let mut pool = start_plain(HistoryDeviceWidth::UnitAreaOf384Slots);
     pool.crash_and_mount_writable()
         .expect("第一个文件之后崩了再挂");
@@ -179,8 +182,8 @@ fn a_write_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_
     let allocator_before = pool.session().allocator.clone();
     assert_eq!(
         free_slot_pairs_outside_and_inside_the_cluster_segments_of_this_mount(&allocator_before),
-        vec![(DeviceIdentity(0), 0, 79), (DeviceIdentity(1), 0, 79)],
-        "每块盘成对的空槽：这次挂载开过的聚簇段外 0 对、段内 79 对"
+        vec![(DeviceIdentity(0), 0, 85), (DeviceIdentity(1), 0, 85)],
+        "每块盘成对的空槽：这次挂载开过的聚簇段外 0 对、段内 85 对"
     );
     let demand_upper_bound_in_slots = last_write_that_landed
         .rewritten
@@ -221,9 +224,9 @@ fn a_write_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_
         refusal.short_devices,
         the_same_shortage_on_both_devices(
             AvailableBytesOnOneDevice(0),
-            BytesOnOneDevice::of_slots(slots_of_data_units(7)),
+            BytesOnOneDevice::of_slots(slots_of_data_units(6)),
         ),
-        "每块盘段外 0 对（0 槽）< 7 个数据单元（14 槽）"
+        "每块盘段外 0 对（0 槽）< 6 个数据单元（12 槽）"
     );
     assert!(pool.image() == image_before, "两块盘逐字节不变");
     assert!(
@@ -385,11 +388,12 @@ fn a_write_whose_data_unit_lands_but_whose_commit_generated_units_find_no_unbloc
 }
 
 /// 第一格那一形，会话的准入用只供测试的开关关掉（`SpaceAdmission::SkippedByTheTestOnlySwitch`：式子与落得下两判都不判）：
-/// 落点那一道照样兜着。两块单元区 384 槽的小盘，崩了再挂、直接推 80 次空发布之后，经会话把文件顺序写到 2、3……6 个数据单元，都一次做成；
-/// 写到 7 个单元：走固定点时在分配器的拷贝上取不到数据单元 0 的落点，交回 `PlacementRefused { Data(0), NoFreeSlotOnAnyDevice }`，
+/// 落点那一道照样兜着。两块单元区 384 槽的小盘，崩了再挂、直接推 200 次空发布之后，经会话把文件顺序写到 2、3……5 个数据单元，都一次做成；
+/// 写到 6 个单元：走固定点时在分配器的拷贝上取不到数据单元 0 的落点，交回 `PlacementRefused { Data(0), NoFreeSlotOnAnyDevice }`，
 /// 会话照 D16（发布语义） 已定项 1「准入」那一行（准入放行而落点取不到也推）推一串抬 F、回收之后再发，做成——推过的只这一串、
 /// 推它的是那一次落点被拒；F 抬上去了，池级 checker 0 违例。
-/// 判别力：会话只在准入拒时推（落点被拒原样交回）时，写到 7 个单元报 `UserChangeRefused::Publish { PlacementRefused }`。
+/// 判别力：会话只在准入拒时推（落点被拒原样交回）时，写到 6 个单元报 `UserChangeRefused::Publish { PlacementRefused }`。
+/// A3b 把小盘改成 6 MiB 环、单元区从 1408 起之前是「80 次空发布、写到 6 个、第 7 个推」，与第一格同一次改（草稿探针在新几何上现跑的数）。
 #[test]
 fn with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write(
 ) {
@@ -401,10 +405,10 @@ fn with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_pl
         .expect("这次挂载的会话")
         .allocator
         .set_space_admission(SpaceAdmission::SkippedByTheTestOnlySwitch);
-    for _ in 0..80 {
+    for _ in 0..200 {
         publish_an_empty_version_directly_on_the_session(&mut pool);
     }
-    for data_units in 2..=6 {
+    for data_units in 2..=5 {
         let published = pool
             .sequential_write(data_units * data_unit_payload_capacity())
             .unwrap_or_else(|refusal| {
@@ -417,9 +421,9 @@ fn with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_pl
     }
     let floor_before = pool.rollback_floor();
     let published = pool
-        .sequential_write(7 * data_unit_payload_capacity())
+        .sequential_write(6 * data_unit_payload_capacity())
         .unwrap_or_else(|refusal| {
-            panic!("经会话顺序写到 7 个数据单元，推过抬 F 之后做成：{refusal:?}")
+            panic!("经会话顺序写到 6 个数据单元，推过抬 F 之后做成：{refusal:?}")
         });
     assert!(
         matches!(

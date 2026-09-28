@@ -1,4 +1,4 @@
-# 第四十节「要改定义」的几条落进定义：交回报告（2026-09-26 JST 08:4x）
+# 第四十节「要改定义」的几条落进定义：交回报告（2026-09-26）
 
 ## 一、结论一览
 
@@ -35,16 +35,16 @@
 
 ## 三、记录第四十节改了哪几格
 
-用 `research/scripts/replace-once.py` 定点改，四格都「命中 1 次，已替换…并回读确认」；日期后来统一改成 `2026-09-26 JST`（同样四次定点替换）。
+用 `research/scripts/replace-once.py` 定点改，四格都「命中 1 次，已替换…并回读确认」；日期后来统一改成 `2026-09-26`（同样四次定点替换）。
 
 | 行 | 原来 | 改成（要点） |
 |---|---|---|
-| 第 1 行 | 「没改。改定义要走一轮三方（门禁 72 号）」 | 「定义已改、待定义三方（2026-09-26 JST）」＋两份文件各改了哪一节 |
-| 第 29 行 ② | 「…——改定义走 72 号那一轮三方，与 ① 一起做。」 | 「…——定义已改、待定义三方（2026-09-26 JST，先于 ① 做）」＋第 3b 步、指今天已有的装置、缩取样不缩崩溃点、本地攻方不加 |
-| 第 33 行 ① | 「（改定义走门禁 72 号那一轮三方）」 | 「（定义已改、待定义三方（2026-09-26 JST）：`experiment-runner.md`「做什么」加第 4c 步、「产出」一节加判决行的点名，`false` 之外连 `not_run` 一起点名）」 |
+| 第 1 行 | 「没改。改定义要走一轮三方（门禁 72 号）」 | 「定义已改、待定义三方（2026-09-26）」＋两份文件各改了哪一节 |
+| 第 29 行 ② | 「…——改定义走 72 号那一轮三方，与 ① 一起做。」 | 「…——定义已改、待定义三方（2026-09-26，先于 ① 做）」＋第 3b 步、指今天已有的装置、缩取样不缩崩溃点、本地攻方不加 |
+| 第 33 行 ① | 「（改定义走门禁 72 号那一轮三方）」 | 「（定义已改、待定义三方（2026-09-26）：`experiment-runner.md`「做什么」加第 4c 步、「产出」一节加判决行的点名，`false` 之外连 `not_run` 一起点名）」 |
 | 第 30 行「欠」 | 「欠：崩溃验证员、门禁分诊员、实现员、执行员的定义里还没写经包装跑（…）」 | 执行员拆出来写「定义已改、待定义三方」＋第 1b 步；崩溃验证员、门禁分诊员、实现员三份照旧欠 |
 
-**执行员内存包装落在第 30 行、没落第 35 行**：「定义里还没写经包装跑」这笔欠账写在第 30 行现状格；第 35 行说的是 `replay.sh` 驱动函数，现状格是「已改（2026-09-26）…」，没有定义那一半可改。另外，派发提示说「E142 第十七次跑与第十八次跑的执行员都被拒过（第 35 行一带有记录）」：第 35 行只记了第十七次跑（「2026-09-26 JST 02:3x E142 第十七次跑的执行员跑 `replay.sh E142` 被 …拒」）；`grep -c '第十八次' records/2026-09-16-subagent拆分提案.md` 是 0，第十八次跑被拒这件事这份记录里没有。
+**执行员内存包装落在第 30 行、没落第 35 行**：「定义里还没写经包装跑」这笔欠账写在第 30 行现状格；第 35 行说的是 `replay.sh` 驱动函数，现状格是「已改（2026-09-26）…」，没有定义那一半可改。另外，派发提示说「E142 第十七次跑与第十八次跑的执行员都被拒过（第 35 行一带有记录）」：第 35 行只记了第十七次跑（「2026-09-26 E142 第十七次跑的执行员跑 `replay.sh E142` 被 …拒」）；`grep -c '第十八次' records/2026-09-16-subagent拆分提案.md` 是 0，第十八次跑被拒这件事这份记录里没有。
 
 第 30 行还欠的三份（`crash-verifier.md`、`gate-triage.md`、`implementation-writer.md`）不在这一次的派发里，没动。实现员第 4 步要跑「动到的测试二进制」，照今天的定义去跑会被 `heavy-test-guard.sh` 拒；要不要并进这一轮定义三方，主 agent 定。攻方腿同样：`_m2-rollback-forward-r3-body.md` 第 59 行「**内存与进程**：编译与跑一律经 `bash research/scripts/run-with-memory-cap.sh <上限> <命令…>`…」这一条，派发正文逐轮写着，没进 `three-way-attack.md`（任务单只点了「取样」那一条）。
 
@@ -238,7 +238,7 @@ index ea58224..d5e2eab 100644
 
 ## 八、门禁判定行（原样）
 
-跑的时刻 2026-09-25 UTC 23:37–23:4x（JST 2026-09-26 08:37–08:4x），`ps` 看负载时本用户没有 `qemu-system`、`vm-bench`、`e152`、`fio`、`cargo`、`gate.sh` 在跑。日志在 `/tmp/claude-1000/defs-closeout-draft/gate-*.log`、`doc-lint*.log`、`rules-lint.log`。
+跑的日期 2026-09-26，`ps` 看负载时本用户没有 `qemu-system`、`vm-bench`、`e152`、`fio`、`cargo`、`gate.sh` 在跑。日志在 `/tmp/claude-1000/defs-closeout-draft/gate-*.log`、`doc-lint*.log`、`rules-lint.log`。
 
 - 47 号 `nice -n 19 bash .claude/gate.d/47-research-script-selftests.sh`，exit=0：
   `  ✓ research 脚本的自证都通过（本阶段跑了 31 条；research/scripts/ 里声称有 --selftest 的 35 份中 34 份有门禁阶段在跑）`
@@ -248,10 +248,10 @@ index ea58224..d5e2eab 100644
        84-verdict-false-named.sh
        → 怎么办：在 .claude/gate.d/stage-owners.tsv 给它加一行，写明哪个 agent 干完活之后该先跑它、为什么；没有合适的 agent 就写 gate-triage。
   ```
-  不是这一轮的：`git status --short .claude/gate.d/84-verdict-false-named.sh` 是 `??`（未跟踪），文件 mtime 2026-09-25T13:52:42Z，是记录第 33 行 ② 那件活建的；这一轮没碰 `.claude/gate.d/`。它判的是「实验页有没有点名 false 字段」，与这一次加的执行员第 4c 步是同一件事的两半，照 `stage-owners.tsv` 的写法多半该登记给 `experiment-runner`（推的），归属表不在这一次的写范围里，交主 agent。
+  不是这一轮的：`git status --short .claude/gate.d/84-verdict-false-named.sh` 是 `??`（未跟踪），文件 mtime 2026-09-25，是记录第 33 行 ② 那件活建的；这一轮没碰 `.claude/gate.d/`。它判的是「实验页有没有点名 false 字段」，与这一次加的执行员第 4c 步是同一件事的两半，照 `stage-owners.tsv` 的写法多半该登记给 `experiment-runner`（推的），归属表不在这一次的写范围里，交主 agent。
 - 63 号 `nice -n 19 bash .claude/gate.d/63-agent-write-scope.sh`，exit=0：
   `  ✓ 写范围闸、Bash 检出 hook、重型测试闸、续派闸、续做闸与弹窗断言闸注册着、自证通过，…表与定义一致（3 个有 Write 或 Edit 的定义、18 条路径模式），…`（整行在 `gate-63-agent-write-scope.sh.log`）
-- doc-lint `nice -n 19 bash .claude/singlefs-ai-sop/scripts/doc-lint.sh .`，两次都 exit=0（第二次在记录日期改成 JST 之后）：
+- doc-lint `nice -n 19 bash .claude/singlefs-ai-sop/scripts/doc-lint.sh .`，两次都 exit=0（第二次在记录日期改过之后）：
   `  ✓ 文档铁律检查通过（检查 485，跳过 0；DOC_LINT_VERBOSE=1 看全部）`
 - 规则纪律（项目本地），照 `.claude/singlefs-ai-sop/scripts/gate.sh` 第 414–420 行接法：`GATE_IN_STAGE=1 RULES_LINT_DIR="$PWD/.claude/rules" RULES_LINT_FILES="CLAUDE.md .claude/agents/*.md .claude/agent-common.md .claude/main-agent.md .claude/skills/*/SKILL.md" nice -n 19 bash .claude/singlefs-ai-sop/scripts/rules-lint.sh "$PWD"`，exit=0：
   `  ✓ 规则只写怎么做（扫了 29 份文件 1750 行；没扫 0 个；记录小节 0、论证小节 0、带日期的行 0（另有 8 行的日期只在「」或反引号里）、解释性段落 0、解释性半句 0、没带劝阻句的链接 0；词法说明判了 1627 行（围栏与表格行不判），命中 0；使用者名字这一条无对象可判：被扫的仓没有 I18N 或没登记 consumers=）`

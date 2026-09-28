@@ -1,6 +1,6 @@
 # m2-layer0-scale-r3 云端辩方（Sonnet）报告：N1——替甲二辩护
 
-写于 2026-09-26（JST）。立场：替第二轮判决第二节 M1 行被打中、第三节挂起的甲二辩护，只答 N1
+写于 2026-09-26。立场：替第二轮判决第二节 M1 行被打中、第三节挂起的甲二辩护，只答 N1
 （`research/prompts/_m2-layer0-scale-r3-background.md:11`）。被复核判决 `research/prompts/m2-layer0-scale-r2-main-verification.md`，
 它依据的腿报告 `m2-layer0-scale-r2-opus-output.md`（云端攻方，打中 M1 的那一条腿）、`m2-layer0-scale-r2-sonnet-output.md`（第二轮辩方，
 另一格 M4）、`m2-layer0-scale-r2-local-attack-output-s1.md`/`-s2.md`、核查员 `m2-layer0-scale-r2-verifier-output.md`。

@@ -1,0 +1,3 @@
+exit=1
+want=1 个阶段的头部声称有判别力样本，而目录不存在
+want=tooling-claims.sh：头部写着 fixtures/tooling-claims.sh/…

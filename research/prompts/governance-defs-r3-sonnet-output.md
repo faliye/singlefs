@@ -88,7 +88,7 @@
 
 ### implementation-workflow.md「代码轮派腿之前记一份开工快照」一节：这一轮未改动，且已经满足 G3 的问题
 
-`grep -n "代码轮派腿之前记一份开工快照" research/prompts/_governance-defs-r3-diff.md` 零命中，确认这一节这一轮没有被改动（`git diff 1c58cfa bfc447e -- .claude/rules/implementation-workflow.md` 只有「重型测试」表那一处改动，行号在 `implementation-workflow.md:52` 附近，不在这一节）。现查该节原文（`.claude/rules/implementation-workflow.md:26`，`grep -n` 现取）：「派三方的腿之前，把这一轮被判的文件与材料点名的 kb 文件记一份 `sha256sum` 快照（放这一轮的材料目录），**连同派腿的时刻（`date -u`）交核查员当输入**；腿跑着的时候主 agent 不改这些文件，要改的等判决时一起改。」——这一句本来就要求「派腿时刻」交核查员，与 `three-way-verifier.md:22`（未改动）「腿开工时刻（UTC）：第 2 步现查…要用」互相对得上，G3 提出的「「派腿时刻」由谁、在哪一步记，main-agent 有没有要求」这个问题在改动之前就已经有答案（main-agent 经这条规则要求派腿时给出），这一轮的改动没有影响这一点，也没有必要改它。
+`grep -n "代码轮派腿之前记一份开工快照" research/prompts/_governance-defs-r3-diff.md` 零命中，确认这一节这一轮没有被改动（`git diff 1c58cfa bfc447e -- .claude/rules/implementation-workflow.md` 只有「重型测试」表那一处改动，行号在 `implementation-workflow.md:52` 附近，不在这一节）。现查该节原文（`.claude/rules/implementation-workflow.md:26`，`grep -n` 现取）：「派三方的腿之前，把这一轮被判的文件与材料点名的 kb 文件记一份 `sha256sum` 快照（放这一轮的材料目录），**连同派腿的时刻（`date -u`）交核查员当输入**；腿跑着的时候主 agent 不改这些文件，要改的等判决时一起改。」——这一句本来就要求「派腿时刻」交核查员，与 `three-way-verifier.md:22`（未改动）「腿开工时刻：第 2 步现查…要用」互相对得上，G3 提出的「「派腿时刻」由谁、在哪一步记，main-agent 有没有要求」这个问题在改动之前就已经有答案（main-agent 经这条规则要求派腿时给出），这一轮的改动没有影响这一点，也没有必要改它。
 
 什么现象会推翻它：`implementation-workflow.md` 这一节在此前某一轮被删除或弱化过「连同派腿的时刻…交核查员当输入」这句——现查 `git log -p -- .claude/rules/implementation-workflow.md` 未去做（不在这一轮判定范围内，只需确认这一轮没有改它），判定站得住。
 

@@ -1,4 +1,4 @@
-Translation audit: m2-final-code-r4-local-attack (2026-09-25 UTC)
+Translation audit: m2-final-code-r4-local-attack (2026-09-25)
 
 Line-by-line audit of every Fact and Item in
 research/prompts/m2-final-code-r4-local-attack.md against the source it is translated or

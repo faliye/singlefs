@@ -1,0 +1,15 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration.rs (/tmp/claude-1000/three-way-attack-r2/target/debug/deps/entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration-fbcf7645b6215771)
+
+running 8 tests
+test a_device_with_one_of_its_two_system_configuration_slots_corrupted_is_still_visible_to_the_session_and_to_unmount ... ok
+test raising_the_floor_with_device_one_replaced_by_a_blank_disk_is_refused_before_any_write_on_every_raise_entry ... ok
+test rolling_back_with_device_one_replaced_by_a_blank_disk_is_refused_before_any_write_for_the_current_and_an_older_target ... ok
+test the_session_refusal_reads_the_two_system_configuration_slots_of_each_device_and_writes_nothing ... ok
+test the_session_refuses_to_publish_with_device_one_replaced_by_a_blank_disk_before_any_write ... ok
+test the_session_refuses_to_publish_with_device_one_replaced_by_device_one_of_another_pool ... ok
+test unmount_with_device_one_replaced_by_a_blank_disk_is_refused_before_any_write_and_the_real_disk_still_unmounts ... ok
+test unmount_with_device_one_replaced_by_device_one_of_another_pool_is_still_refused_when_choosing_the_system_configuration ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+

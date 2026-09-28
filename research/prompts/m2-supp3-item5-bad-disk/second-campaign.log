@@ -1,4 +1,4 @@
-   Compiling singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+   Compiling singlefs-harness v0.1.0 (crates/singlefs-harness)
     Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
      Running tests/second_transaction_supplement_three_bad_disk_input.rs (/tmp/claude-1000/supp3-item5-bad-disk/target-main/debug/deps/second_transaction_supplement_three_bad_disk_input-bdf1d308d2eaa394)
 

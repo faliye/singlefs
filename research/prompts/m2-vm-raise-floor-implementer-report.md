@@ -1,14 +1,14 @@
 # 实现员报告：impl-m2-vm-raise-floor（实二四：真设备二进制加抬 F 模式，增补 2 收口表第 58 行「二进制那一侧判相等」）
 
-时刻一律 UTC（东京 = UTC+9）。仓副本 `repo/`（16:34:48 从主工作区 rsync，HEAD `e980a21`；我那三个文件的原件快照在 `base/`，不改动的对照副本 `pristine/`）。
+仓副本 `repo/`（从主工作区 rsync，HEAD `e980a21`；我那三个文件的原件快照在 `base/`，不改动的对照副本 `pristine/`）。
 主工作区一个字没动：改动只在补丁里，变异行只在追加文件里（锚点要补丁打上之后才命中）。
-**16:50 之后主工作区换了底**（别的会话打进一批 core / checker / harness 改动：`mount.rs`、`transaction.rs`、`recovery.rs`、新文件 `code_two_tree.rs` 等 20 来个文件，变异表 591 → 614 行），我那三个文件没被动过。16:54:19 按新底重拷 `repo2/`、打补丁，第七节的测试、clippy、build 与第四节的全部证红在 `repo2/` 上重跑了一遍，结果与第一轮逐条相同（第七节末）；16:58 核过：主工作区自 16:54 起只有 `e158_root_choice_repair.rs` 又变了，补丁仍 `git apply --check` 退出 0。
+**第一次 `git apply --check` 之后主工作区换了底**（别的会话打进一批 core / checker / harness 改动：`mount.rs`、`transaction.rs`、`recovery.rs`、新文件 `code_two_tree.rs` 等 20 来个文件，变异表 591 → 614 行），我那三个文件没被动过。随后按新底重拷 `repo2/`、打补丁，第七节的测试、clippy、build 与第四节的全部证红在 `repo2/` 上重跑了一遍，结果与第一轮逐条相同（第七节末）；重拷之后再核：主工作区自重拷起只有 `e158_root_choice_repair.rs` 又变了，补丁仍 `git apply --check` 退出 0。
 
 ## 一、交付物
 
 | 样 | 路径 | 说明 |
 |---|---|---|
-| 补丁 | `/tmp/claude-1000/impl-m2-vm-raise-floor/impl-m2-vm-raise-floor.patch` | 只含 3 个文件，不含 `crates/mutations.tsv`；16:50、16:58 两次在主工作区 `git apply --check` 退出 0 |
+| 补丁 | `/tmp/claude-1000/impl-m2-vm-raise-floor/impl-m2-vm-raise-floor.patch` | 只含 3 个文件，不含 `crates/mutations.tsv`；换底前后两次在主工作区 `git apply --check` 退出 0 |
 | 追加变异行 | `/tmp/claude-1000/impl-m2-vm-raise-floor/mutations-append.tsv` | 6 行整行，追加在 `crates/mutations.tsv` 末尾；锚点在「主工作区 + 补丁」上各恰好命中一次 |
 | 报告 | `/tmp/claude-1000/impl-m2-vm-raise-floor/report.md` | 本文件 |
 
@@ -45,14 +45,14 @@ name=publish_writes_against_device window=raise_rollback_floor publishes=2 by_ki
 ## 三、停下交主 agent 的问题
 
 1. **F 抬到多少，我按「现行那一版的 F」写了，F 在这段历史上不动（0 → 0）。** 条款（D16（发布语义） 已定项 1）只定上限与「一次处置的目标 = min(这次释放的释放代, 第 4 新的非空根)」，没定测试档抬到哪。这段历史上非空有效根只有 txg 3、4、8 三条（不足 4 条），上限取环里最旧的有效根 txg 0，结果行里 `ceiling=0` 就是实现算出来的这个数（用例钉着 `requested_floor=0 ceiling=0 reclaimed=0`）。所以这一档跑的是「抬 F 的那串空发布、推到每块盘各一条」这条写路与它的账（第 58 行要的就是这一串的账），**盘上根记录的 F 字段恒 0、回收集合为空**，设备侧比对对「F ≠ 0 的根记录字节」没有判别力。要 F 抬过 0，得在发布 C 之后再覆盖写一次攒出第 4 条非空根（按 `rollback_floor_ceiling` 的式子推算，上限会变成 min(每块盘上最新的, txg 3) = 3；没跑过），那是再加一次发布、一版内容、一段窗口，超出派发的三条验收，我没做；要不要做交你定。
-2. **合并时要跟着实十九改的地方**（不是设计问题）：补丁依赖 `mount.rs` 的 `raise_rollback_floor` 签名、`RaisedFloor` 的四个字段、`PublishSequenceFailed` 的三个字段，二进制里对 `MountError` 的穷举 match 从一处变成两处（可写挂载 `:733` 起那一处、抬 F `:970` 起这一处）。16:54 那一版主工作区的 `mount.rs`（已换了底）上补丁编得过、测试全绿；此后谁再加减 `MountError` 成员或改这几个字段，两处都要跟着改（编不过，不会静默漏）。
+2. **合并时要跟着实十九改的地方**（不是设计问题）：补丁依赖 `mount.rs` 的 `raise_rollback_floor` 签名、`RaisedFloor` 的四个字段、`PublishSequenceFailed` 的三个字段，二进制里对 `MountError` 的穷举 match 从一处变成两处（可写挂载 `:733` 起那一处、抬 F `:970` 起这一处）。重拷那一刻主工作区的 `mount.rs`（已换了底）上补丁编得过、测试全绿；此后谁再加减 `MountError` 成员或改这几个字段，两处都要跟着改（编不过，不会静默漏）。
 3. **观测，不归我**：主工作区的门禁 55 号仍按「宿主只重跑第一个事务」判 `second-transaction` / `second-instance`（要求 `check-exit` 为 1、红在程序之后），而宿主检查早已重跑发布 B、挂载、发布 C（收口表第 30 行）；绿样本 `green/second-instance/check.txt` 是 09-21 的旧输出（`expected_writes=23`）。新模式照新的宿主检查应判 0（见第六节），后两档要不要一起改由你定。
 
 条款没写、我没加的非分支项：无（没加 trait 实现、derive、访问器）。这一轮没写 `todo!` / `assert!`；新加的 `expect` 只在用例里。
 
 ## 四、每条新测试「改坏哪一行 → 哪条断言红」
 
-基线（`pristine/`，16:35 起跑，debug）：三个测试二进制全绿，基线红集为空——
+基线（`pristine/`，debug）：三个测试二进制全绿，基线红集为空——
 
 ```
 test result: ok. 68 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.36s
@@ -137,9 +137,9 @@ exit=0
 
 `cargo fmt --all -- --check` 退出 1，`Diff in` 只落在 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`（第 1927、2349、2887、3599 行，别的会话没提交的改动，不是我的）；我那三个文件单独 `rustfmt --edition 2021 --check` 退出 0。
 
-`git apply --check`（主工作区，16:50、16:58）退出 0，无输出。
+`git apply --check`（主工作区，换底前后各一次）退出 0，无输出。
 
-**新底上重跑（`repo2/` = 16:54 的主工作区 + 补丁）**，末尾原样：
+**新底上重跑（`repo2/` = 重拷那一刻的主工作区 + 补丁）**，末尾原样：
 
 ```
 test result: ok. 68 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.56s
@@ -149,7 +149,7 @@ test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 
 clippy（同上那套 lint）`Finished … in 3.06s` / `exit=0`、告警 0 条；`cargo build --offline --all-targets` `Finished … in 9.16s` / `exit=0`；三个文件 `rustfmt --check` 无差异。证红 8 条（新 6 行 + 那两行旧的）在 `repo2/` 上重跑，逐条红在与第四节相同的测试、相同的行（`:2347`、`:1965`、`:1970`…），同时红的集合也相同（`proof/rebase-rows-debug.txt`）。抬 F 那四行结果行在新底上逐字不变（`segments=8+2+1+10+2+1+2`、26 次 / 295936 字节）。
 
-## 八、主工作区 `git diff --stat -- crates litmus`（16:58 现跑，原样）
+## 八、主工作区 `git diff --stat -- crates litmus`（重拷之后再核时现跑，原样）
 
 那是别的会话没提交的改动（我的改动只在补丁里，不在主工作区），照定义原样附上：
 
@@ -204,7 +204,7 @@ clippy（同上那套 lint）`Finished … in 3.06s` / `exit=0`、告警 0 条�
 
 ## 九、负载
 
-开工（16:29）`ps` 看到：另一个实现员的 `cargo test --release … second_transaction_supplement_two_tree_…`（pid 1082482，在 `/tmp/claude-1000/impl-m2-treesplit/` 自己的 target 里）、别的会话的 `cargo test --release --bin e158_root_choice_repair`（pid 2853009）与 `cargo test --release --bin e142-first-txn-dry-run`（pid 2853162）；没有 `qemu-system`、`vm-bench.sh`、E152、`fio`。各用各的 target，没等文件锁。16:54 重跑前再看：只有别的会话的 `cargo test --release --bin e142-first-txn-dry-run`（pid 1778725），同样没有虚机与性能测量。我的每条命令都是 `nice -n 19 bash research/scripts/capped.sh 6 …`。
+开工时 `ps` 看到：另一个实现员的 `cargo test --release … second_transaction_supplement_two_tree_…`（pid 1082482，在 `/tmp/claude-1000/impl-m2-treesplit/` 自己的 target 里）、别的会话的 `cargo test --release --bin e158_root_choice_repair`（pid 2853009）与 `cargo test --release --bin e142-first-txn-dry-run`（pid 2853162）；没有 `qemu-system`、`vm-bench.sh`、E152、`fio`。各用各的 target，没等文件锁。重拷之后重跑前再看：只有别的会话的 `cargo test --release --bin e142-first-txn-dry-run`（pid 1778725），同样没有虚机与性能测量。我的每条命令都是 `nice -n 19 bash research/scripts/capped.sh 6 …`。
 
 ## 十、没做什么
 

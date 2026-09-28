@@ -8,7 +8,6 @@
 # gate-similar: runner-dispatch-guard.sh 管同一条规矩（子 agent 不跑重型测试），但挂 PreToolUse[Agent|Task]、在派发那一刻判派发提示里的中文句子（只在「跑 / 复跑 / 执行 / 运行 / bash / 起」的宾语是重型阶段时才拒，否定、转述、引号里的都不判）；这里挂 PreToolUse[Bash]、在执行那一刻判真要跑的命令与它执行的脚本，一边判自然语言、一边判 shell 命令，判法没有能共用的
 # gate-similar: write-guard.sh 同样按 agent_type 分谁能做什么，但挂 PreToolUse[Write|Edit]，判的是写哪个文件、写进什么字（整份覆盖未跟踪文件、写范围表、撇号类字符）；这里判 Bash 命令，放行表是各 agent 能跑哪几类重型测试，与写范围表没有共用的行
 # gate-similar: continuation-guard.sh 挂 PreToolUse[SendMessage]，判的是收件的子 agent 在会话记录里交回过没有、被中断过没有；这里挂 PreToolUse[Bash]，判命令本身，两边的对象与输入没有交集
-# gate-similar: kb-scribe-followup.sh 也看 Bash，但挂 PostToolUse、命令已经跑完，只管书记官写 kb 之后跑相关门禁阶段、只记不拦；这里在执行之前判、不合就拒，管的是每个 agent 跑的重型测试
 # gate-overlap:copy-kept bash-command-detector.sh 两边 main() 开头那十行（认 --selftest、从 stdin 读 hook 的 JSON、不是对象就放行）是入口，读不到共用模块时照样要跑：那时还要拿这份 JSON 带着 session_id 记一条检出，看门狗按 session_id 认本会话；抽进 lib_shell_words.py 或另一个同目录模块，模块读不到的那一刻入口跟着一起没了（两个 hook 自检里「hook 旁边没有共用模块」那一例走的就是这条路）
 #
 # 为什么：用户 2026-09-24 定「subagent任务派发的门禁里面写上 禁止跑0层测试等这种重测试 就跑自己相关的测试就好了」，
@@ -27,22 +26,34 @@
 # 跟在 --skip、--logfile 这类带值的选项后面的 --list 是那个选项的值，照算）：
 #   checker 档    cargo test 的范围里有 checker 档包 singlefs-checker-tier（-p 点名它，认通配、@版本、pkgid URL；不挑包而范围含它；
 #                 在它目录里裸跑；别名展开成这样的），不管挑哪个目标；直接执行它的测试二进制（tests/ 下的目标、src/bin/ 下的装置、库本身）；
-#                 .claude/gate.d/54-*、research/scripts/layer0-shard-run.sh（--selftest 不算）。只按包判，不按测试名、不看 --ignored
+#                 .claude/gate.d/54-layer0-replay.sh、research/scripts/layer0-shard-run.sh（按树根里键那一行登记的包判，登记的不是 checker 档包、
+#                 没登记分片或没有这一行的不算，判法在 lib_heavy_tests.py 的 shard_driver_runs_checker_tier）。只按包判，不按测试名、不看 --ignored
 #                 （.claude/rules/verification.md「定义与名字」；判定在 lib_heavy_tests.py）
-#   QEMU          .claude/gate.d/55-*、qemu-system-*、research/scripts/vm-bench.sh（--selftest 也起虚机，照算）
-#   herd7         .claude/gate.d/57-*、.claude/scripts/lkmm.sh、herd7
-#   crates 变异整表 .claude/gate.d/59-*、research/scripts/mutate.sh 的参数里有 crates/mutations.tsv
+#   QEMU          .claude/gate.d/checker-tier-qemu-device-streams.sh、qemu-system-*、research/scripts/vm-bench.sh（--selftest 也起虚机，照算）
+#   herd7         .claude/gate.d/checker-tier-lkmm.sh、.claude/scripts/lkmm.sh、herd7
+#   crates 变异整表 .claude/gate.d/checker-tier-crates-mutation-replay.sh、research/scripts/mutate.sh 的参数里有 crates/mutations.tsv、
+#                 research/scripts/mutation-shard-run.sh（它的双机分片驱动）
 #   全量测试      cargo test 带 --workspace / --all；在工作区根（清单有 [workspace] 没有 [package]：仓根与 research/ 都是）上
 #                 不带 -p / --test / --lib / --bin 的 cargo test；不挑目标而包的范围是工作区全部成员的 cargo test
 #                 （research/ 只有 e7-index-bench 一个成员，在它里面裸跑等于全量）；.claude/scripts/check.sh
-#   全部实验复跑  .claude/gate.d/87-*
-#   整轮门禁      gate.sh、research/scripts/gate-staged.sh（--selftest 不算）
+#   全部实验复跑  .claude/gate.d/checker-tier-research-build-and-replay.sh，只跑它的单测那一格（--check research-unit-tests）的除外：那一格落到下一类
+#   整轮门禁      gate.sh、research/scripts/gate-staged.sh
 #   E152 装置     e152-file-system-benchmark（直接起、或 cargo run 它）、research/scripts/e152-run.sh
-#   .claude/gate.d/ 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑、不用带前缀。
+#   门禁阶段按文件名认，不按编号认；带 --list、--list-items（只打格名表、逐项点名的清单）的哪一道都不算；带 --write（生成）的不算。
+# 提交时才跑的检查（不是重型，放行照同一张表；用户 2026-09-28 定「现在改到提交时候才验证的部分 都删掉」「门禁是靠 脚本和 hook来解决的 … 提示不执行 根本不靠谱」）：
+#   上面几类之外的 .claude/gate.d/ 阶段；.claude/singlefs-ai-sop/scripts/ 下的 doc-lint.sh、gate-lint.sh、shell-lint.sh、preflight-lint.py、gate-overlap.py
+#   （--list 查清单不算）、rules-lint.sh、hooks-registered.sh、stage-selftest.sh；research/scripts/gate-structure-check.py；research/scripts/、.claude/hooks/ 下
+#   脚本的 --selftest（gate-staged.sh、layer0-shard-run.sh、mutation-shard-run.sh、run-with-memory-cap.sh、capped.sh 的 --selftest 都在内）；
+#   .claude/gate.d/lib/ 下共用库的直接执行（就是跑它的自证）。这些都归提交前 gate-triage 跑的 research/scripts/gate-staged.sh：它带着前缀起整轮 gate.sh，
+#   gate.sh 在里面起的这些不经这道闸（闸只看 Bash 工具的命令，看不见 gate.sh 的子进程）；看门狗 agent-watch.py 在进程这一层不报这一类
+#   （Stop 钩子 gate-reuse-check.sh 每次收工也起 gate-overlap.py，那是钩子起的，不是哪个 agent 跑的）。
+#   判定在 lib_heavy_tests.py 的 classify（COMMIT_CHECK_KINDS）；弄坏开关 HEAVY_TEST_GUARD_IGNORE_COMMIT_CHECKS=1 时这一类一律放行，自检必须判红。
 # 谁、带什么才放行（都要带环境变量 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，别的值或没带一律拒）：
-#   主 agent（输入里没有 agent_type）：上面每一类；
-#   crash-verifier：checker 档（54 号与 checker 档包的测试）、55 号与 qemu-system-*、herd7、crates 变异整表（vm-bench.sh、全量测试、整轮门禁、E152 拒）；
-#   gate-triage：整轮门禁（gate.sh、gate-staged.sh）与 87 号（gate.sh 里 54 / 55 / 57 / 59 靠「输入没变就复用上一次全绿判定」，直接调它们拒）；
+#   主 agent（输入里没有 agent_type）：上面每一类，连同提交时才跑的检查；
+#   crash-verifier：checker 档（54 号与 checker 档包的测试）、QEMU 那一道与 qemu-system-*、herd7、crates 变异整表、提交时才跑的检查
+#   （vm-bench.sh、全量测试、整轮门禁、全部实验复跑、E152 拒）；
+#   gate-triage：整轮门禁（gate.sh、gate-staged.sh）、全部实验复跑那一道、提交时才跑的检查（gate.sh 里 54 号与 QEMU、herd7、crates 变异表那三道
+#   靠「输入没变就复用上一次全绿判定」，直接调它们拒）；
 #   其余子 agent：一律拒，带不带前缀都拒。
 # 前缀认三种写法：写在命令前（`SINGLEFS_HEAVY_TESTS=commit bash …`）、写进 `env` 的参数、同一行前面的 `export`；
 # 往 `bash -c '…'`、`capped.sh N …`、`nice`、`timeout` 这类包装里面传。git 的 pre-commit hook 由 git 起，不经这道闸。
@@ -88,16 +99,18 @@
 #   判的是同一批对象（Bash 命令里的 cargo test / run 与测试二进制）、同一个触发点、同一套切词与读脚本。
 #   算经它包着的：它剥出来的那条命令、它 `bash -c` 里的、它起的脚本里的（往里读时接着算，lib_shell_words 的 memory_capped）；
 #   包装外面的命令替换 `$(…)` 先于包装执行，不算。主 agent 不判这一道。按名字判的仓内脚本（门禁阶段、mutate.sh 这些）不读正文，
-#   它们里面起的 cargo 不在这一道的射程里（59 号与 mutate.sh 自己每条经包装跑）。喂给 shell 的 heredoc 正文里的命令不算在挂它的那条命令的包装里：
+#   它们里面起的 cargo 不在这一道的射程里（checker-tier-crates-mutation-replay 与 mutate.sh 自己每条经包装跑）。喂给 shell 的 heredoc 正文里的命令不算在挂它的那条命令的包装里：
 #   `run-with-memory-cap.sh 4G bash <<EOF` 会被误拒，写成脚本文件或 bash -c。HEAVY_TEST_GUARD_IGNORE_MEMORY_CAP=1 时不判这一道（只给自检证明它会红）。
 # 判定（一条命令是不是重型、属于哪一类）在同目录的 lib_heavy_tests.py，看门狗在进程这一层复用同一份；
 # 切词、切简单命令、认命令位置、剥前缀与包装、跟 cd 与 export 在同目录的 lib_shell_words.py（与 bash-command-detector.sh 共用），由 lib_heavy_tests.py 导入。
-# 两份都按文件路径导入，这里只留谁能跑什么、读脚本与拒绝；lib_shell_words.py 的函数在 .claude/hooks/ 别的文件里再定义一份，门禁 63 号判红。
+# 两份都按文件路径导入，这里只留谁能跑什么、读脚本与拒绝；lib_shell_words.py 的函数在 .claude/hooks/ 别的文件里再定义一份，门禁 code-tooling 的 agent-write-scope 格判红。
 # 读不到它们时这条命令照常执行，stderr 报一句并记一条检出。
 #
 #   heavy-test-guard.sh             # 从 stdin 读 hook 的 JSON；拒绝退出 2，放行退出 0
 #   heavy-test-guard.sh --selftest  # 在临时工作区里走一遍拒绝与放行（连同 lib_heavy_tests.py 的自检）；HEAVY_TEST_GUARD_DISABLE_CHECK=1、
-#                                   # HEAVY_TEST_GUARD_IGNORE_WRITTEN_SCRIPTS=1（不认同一条命令里写出的脚本）、HEAVY_TEST_GUARD_IGNORE_MEMORY_CAP=1（不判经没经内存包装）时自检必须判红；
+#                                   # HEAVY_TEST_GUARD_IGNORE_WRITTEN_SCRIPTS=1（不认同一条命令里写出的脚本）、HEAVY_TEST_GUARD_IGNORE_MEMORY_CAP=1（不判经没经内存包装）、
+#                                   # HEAVY_TEST_GUARD_IGNORE_COMMIT_CHECKS=1（提交时才跑的检查一律放行）时自检必须判红；
+#                                   # 切词那一份的 LIB_SHELL_WORDS_BREAK=arguments-as-executed（`python3 -` 后面的词、`bash -n` 的目标当被执行的脚本）同样必须判红；
 #                                   # 判定那一半的弄坏开关（lib_heavy_tests.py 的 LIB_HEAVY_TESTS_BREAK、admission.py 的 ADMISSION_BREAK，写法在两份的文件头）设了哪一个也必须判红
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
@@ -139,10 +152,12 @@ SCRIPT_HEAD_BYTES = 4096
 SHELL_SCRIPT_EXTENSION = ".sh"  # 直接执行、没有 `#!` 的文件，只有这个扩展名的当 shell 脚本读
 
 # 子 agent 自己那一份（kind 见 lib_heavy_tests.KIND_CATEGORY）；不在表里的子 agent 一样也不许
+# 提交时才跑的检查那一类的 kind（与 lib_heavy_tests.COMMIT_CHECK_KINDS 同一组；共用模块读不到时这里照样要有，自检核两边相同）
+COMMIT_CHECK_KINDS = {"commit-check-stage", "commit-check-lint", "commit-check-selftest", "commit-check-structure"}
 AGENT_KINDS = {
     "crash-verifier": {"checker-tier-cargo", "checker-tier-binary", "layer0-stage", "qemu-stage", "qemu-system",
-                       "herd7-stage", "lkmm", "herd7", "crates-mutation-stage", "crates-mutation-mutate"},
-    "gate-triage": {"gate-sh", "gate-staged", "replay-all-stage"},
+                       "herd7-stage", "lkmm", "herd7", "crates-mutation-stage", "crates-mutation-mutate"} | COMMIT_CHECK_KINDS,
+    "gate-triage": {"gate-sh", "gate-staged", "replay-all-stage"} | COMMIT_CHECK_KINDS,
 }
 
 class HeavyUse(NamedTuple):
@@ -544,11 +559,18 @@ POLICY = ("→ 规矩：重型测试就是 checker 档那一批（.claude/rules/
           "全量测试、整轮门禁、全部实验复跑、E152 装置，只在提交代码时跑一次、或用户要求时跑；"
           "子 agent 一律不跑，只跑 harness 档——自己动到的 singlefs-harness 与别的非 checker 档包的测试二进制（`cargo test -p <crate> --test <自己的目标>`、`--lib`）与 fmt / clippy / build；"
           "主 agent 在提交流程里跑要带 `SINGLEFS_HEAVY_TESTS=commit`，用户要求时带 `SINGLEFS_HEAVY_TESTS=user-request`。\n"
-          "→ 各自那一份：crash-verifier 只跑 54、55、57、59 号与它们底下的 checker 档包 singlefs-checker-tier 的测试（快档与登记的全量用例）、qemu-system、lkmm.sh / herd7、crates 变异整表；"
-          "gate-triage 只跑 `gate.sh` 整轮与 87 号（54、55、57、59 靠「输入没变就复用上一次全绿判定」）；两个都要带那个前缀，都不跑全量 `cargo test`。"
-          "`.claude/gate.d/` 下其余阶段不是重型，谁都能跑。\n"
+          "→ 各自那一份：crash-verifier 只跑 54 号与 checker-tier-qemu-device-streams.sh、checker-tier-lkmm.sh、checker-tier-crates-mutation-replay.sh 三道，"
+          "与它们底下的 checker 档包 singlefs-checker-tier 的测试（快档与登记的全量用例）、qemu-system、lkmm.sh / herd7、crates 变异整表；"
+          "gate-triage 只跑 `gate.sh` 整轮与 checker-tier-research-build-and-replay.sh（54 号与另外三道靠「输入没变就复用上一次全绿判定」）；"
+          "两个都要带那个前缀，都不跑全量 `cargo test`。\n"
           "→ 提交之外任务确实要跑的：主 agent 先弹窗问用户，用户同意了才带 `SINGLEFS_HEAVY_TESTS=user-request` 跑；"
           "子 agent 在交回里写明要跑什么、为什么，交主 agent 去问（派发提示里点名要你跑的也一样，写明被这道闸拒了）。")
+COMMIT_CHECK_POLICY = ("→ 规矩：提交时才跑的检查——扫仓的门禁阶段（重型那几道之外的）、上游的 doc-lint / gate-lint / shell-lint / preflight-lint / gate-overlap / "
+                       "rules-lint / hooks-registered / stage-selftest、research/scripts/gate-structure-check.py、研究脚本与钩子的 `--selftest`、"
+                       "`.claude/gate.d/lib/` 下共用库的自证——归提交前 gate-triage 跑的 research/scripts/gate-staged.sh（它起的整轮 gate.sh 在里面起这些，不经这道闸）；"
+                       "gate-triage 与 crash-verifier 带 `SINGLEFS_HEAVY_TESTS=commit`（用户要求时 `=user-request`）跑，别的子 agent 不跑，主 agent 不带前缀不跑。\n"
+                       "→ 交回前不跑它们：改了门禁、脚本或钩子的，在交回里逐份写明改了什么、各自的样本与自证格和弄坏开关，交主 agent 排进提交前那一趟；"
+                       "只查清单的放行（阶段的 `--list` / `--list-items`、`gate-overlap.py --list`），阶段的 `--write`（生成）放行。")
 MEMORY_CAP_POLICY = ("→ 规矩：子 agent 跑编译出来的代码（cargo test / cargo run / cargo bench、直接执行 cargo 编出来的二进制）要经内存包装跑："
                      "`bash research/scripts/run-with-memory-cap.sh <上限> <命令>`（上限例 4G）——它先判整机放不放得下、放不下就排队，撞了上限只杀这一条，"
                      "不把整机拖进 OOM；写在脚本里的，整条脚本经它跑：`bash research/scripts/run-with-memory-cap.sh <上限> bash <脚本>`。"
@@ -578,25 +600,31 @@ def decide(hook_input, project_root):
     state = JudgingState()
     scan = heavy_uses(command, directory, state=state)
     notices = [f"脚本 {frames_text(notice.frames)} 里{notice.text}" if notice.frames else notice.text for notice in scan.notices]
-    refused, in_script = [], False
+    refused, commit_check_refused, in_script = [], [], False
     for use in scan.uses:
         reason = refusal_reason(use.test.kind, use.occasion, agent_type)
         if reason:
+            commit_check = use.test.kind in COMMIT_CHECK_KINDS
+            if commit_check and os.environ.get("HEAVY_TEST_GUARD_IGNORE_COMMIT_CHECKS") == "1":
+                continue   # 弄坏开关：提交时才跑的检查一律放行（只给自检证明它会红）
             where = f"脚本 {frames_text(use.frames)} 里的 " if use.frames else ""
             in_script = in_script or bool(use.frames)
-            refused.append(f"{where}{use.test.detail}（{use.test.category}）：{reason}")
+            (commit_check_refused if commit_check else refused).append(f"{where}{use.test.detail}（{use.test.category}）：{reason}")
     uncapped_refused = []
     if agent_type and os.environ.get("HEAVY_TEST_GUARD_IGNORE_MEMORY_CAP") != "1":
         for run in scan.uncapped:
             where = f"脚本 {frames_text(run.frames)} 里的 " if run.frames else ""
             in_script = in_script or bool(run.frames)
             uncapped_refused.append(f"{where}{run.detail}（{agent_type} 不经 run-with-memory-cap.sh）")
-    if not refused and not uncapped_refused:
+    if not refused and not commit_check_refused and not uncapped_refused:
         return Decision(0, None, notices, scan.scripts_read, state.files_read)
     lines, policies = [], []
     if refused:
         lines += [f"✗ 重型测试被拒：{refused[0]}"] + [f"  另有：{entry}" for entry in refused[1:]]
         policies.append(POLICY)
+    if commit_check_refused:
+        lines += [f"✗ 提交时才跑的检查被拒：{commit_check_refused[0]}"] + [f"  另有：{entry}" for entry in commit_check_refused[1:]]
+        policies.append(COMMIT_CHECK_POLICY)
     if uncapped_refused:
         lines += [f"✗ 不经内存包装跑编译出来的代码被拒：{uncapped_refused[0]}"] + [f"  另有：{entry}" for entry in uncapped_refused[1:]]
         policies.append(MEMORY_CAP_POLICY)
@@ -713,7 +741,7 @@ def selftest(hook_dir):
             ("实现员跑 check.sh", writer, "bash .claude/scripts/check.sh", 2),
             ("实现员经 capped.sh 跑 --workspace", writer, "bash research/scripts/capped.sh 4 cargo test --workspace", 2),
             ("实现员经 run-with-memory-cap.sh 跑 --workspace", writer, "bash research/scripts/run-with-memory-cap.sh 4G cargo test --workspace", 2),
-            ("实现员 run-with-memory-cap.sh --selftest", writer, "bash research/scripts/run-with-memory-cap.sh --selftest", 0),
+            ("实现员 run-with-memory-cap.sh --selftest（提交时才跑的检查）", writer, "bash research/scripts/run-with-memory-cap.sh --selftest", 2),
             ("实现员在 bash -c 里跑 --all", writer, "bash -c 'cargo test --all'", 2),
             ("实现员在仓根裸跑 cargo test", writer, "cargo test", 2),
             ("实现员 cd 进 harness 档裸跑、不经内存包装（拒的是包装，不是重型）", writer, "cd crates/singlefs-harness && cargo test --release", 2),
@@ -733,7 +761,7 @@ def selftest(hook_dir):
             ("实现员跑 gate-staged.sh", writer, "bash research/scripts/gate-staged.sh", 2),
             ("实现员喂给 bash 的 heredoc 里跑 --all", writer, "bash <<'EOF'\ncargo test --all\nEOF", 2),
             ("实现员直接执行 checker 档的测试二进制", writer, tier_binary + " --test-threads 4", 2),
-            ("书记员跑 87 号", scribe, "nice -n 19 bash .claude/gate.d/87-replay.sh", 2),
+            ("书记员跑 research 构建与复跑那一道", scribe, "nice -n 19 bash .claude/gate.d/checker-tier-research-build-and-replay.sh", 2),
             ("通用 agent 跑 54 号", "general-purpose", "bash .claude/gate.d/54-layer0-replay.sh", 2),
             ("崩溃验证员跑 54 号不带前缀", crash, "bash .claude/gate.d/54-layer0-replay.sh", 2),
             ("崩溃验证员带前缀跑 gate.sh", crash, commit + "bash .claude/scripts/gate.sh --staged", 2),
@@ -741,8 +769,8 @@ def selftest(hook_dir):
             ("崩溃验证员带前缀起 E152", crash, commit + "./research/target/release/e152-file-system-benchmark", 2),
             ("崩溃验证员带前缀跑 vm-bench.sh", crash, commit + "bash research/scripts/vm-bench.sh run", 2),
             ("门禁分诊不带前缀跑 gate.sh --staged", triage, "bash .claude/scripts/gate.sh --staged", 2),
-            ("门禁分诊带前缀直接调 57 号", triage, commit + "bash .claude/gate.d/57-lkmm.sh", 2),
-            ("门禁分诊带前缀直接调 59 号", triage, commit + "bash .claude/gate.d/59-crates-mutation-replay.sh", 2),
+            ("门禁分诊带前缀直接调 herd7 那一道", triage, commit + "bash .claude/gate.d/checker-tier-lkmm.sh", 2),
+            ("门禁分诊带前缀直接调 crates 变异表那一道", triage, commit + "bash .claude/gate.d/checker-tier-crates-mutation-replay.sh", 2),
             ("主 agent 裸跑 gate.sh --staged", None, "bash .claude/scripts/gate.sh --staged", 2),
             ("主 agent 带 =whatever", None, "SINGLEFS_HEAVY_TESTS=whatever bash .claude/scripts/gate.sh --staged", 2),
             ("主 agent 第二条命令没带前缀", None, commit + "cargo test --all; bash .claude/scripts/gate.sh", 2),
@@ -812,14 +840,42 @@ def selftest(hook_dir):
              "bash research/scripts/run-with-memory-cap.sh 4G cargo --config 'alias.xt=\"test\"' xt -p singlefs-checker-tier --test crash_enumeration_new_pool_file_creation_stream", 2),
             ("实现员经内存包装列checker 档的用例（--ignored --list）", writer,
              "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker-tier --test crash_enumeration_new_pool_file_creation_stream -- --ignored --list", 0),
-            ("崩溃验证员带 =user-request 跑 55 号", crash, request + "bash .claude/gate.d/55-qemu-device-streams.sh", 0),
-            ("崩溃验证员带前缀跑 59 号", crash, "GATE_MUTATION_TARGET_DIR=/tmp/t " + commit + "nice -n 19 bash .claude/gate.d/59-crates-mutation-replay.sh", 0),
+            ("崩溃验证员带 =user-request 跑 QEMU 那一道", crash, request + "bash .claude/gate.d/checker-tier-qemu-device-streams.sh", 0),
+            ("崩溃验证员带前缀跑 crates 变异表那一道", crash, "GATE_MUTATION_TARGET_DIR=/tmp/t " + commit + "nice -n 19 bash .claude/gate.d/checker-tier-crates-mutation-replay.sh", 0),
             ("门禁分诊带前缀跑 gate.sh --staged", triage, commit + "nice -n 19 bash .claude/scripts/gate.sh --staged", 0),
-            ("门禁分诊带前缀跑 87 号", triage, commit + "bash .claude/gate.d/87-replay.sh", 0),
-            ("执行员跑 12 号（轻阶段）", "experiment-runner", "nice -n 19 bash .claude/gate.d/12-no-prime-marks.sh", 0),
-            ("书记员跑 20 号（轻阶段）", scribe, "nice -n 19 bash .claude/gate.d/20-kb-shape.sh", 0),
-            ("通用 agent 跑 63 号（轻阶段）", "general-purpose", "bash .claude/gate.d/63-agent-write-scope.sh", 0),
-            ("主 agent 不带前缀跑 47 号（轻阶段）", None, "bash .claude/gate.d/47-research-script-selftests.sh", 0),
+            ("门禁分诊带前缀跑 research 构建与复跑那一道", triage, commit + "bash .claude/gate.d/checker-tier-research-build-and-replay.sh", 0),
+            # 提交时才跑的检查：同一套放行（lib_heavy_tests.py 的 commit-checks-ignored、这里的 HEAVY_TEST_GUARD_IGNORE_COMMIT_CHECKS=1 下该拒的这几格红）
+            ("执行员跑 doc-text（不重型的阶段：提交时才跑的检查）", "experiment-runner", "nice -n 19 bash .claude/gate.d/doc-text.sh", 2),
+            ("书记员跑 doc-decisions（提交时才跑的检查）", scribe, "nice -n 19 bash .claude/gate.d/doc-decisions.sh", 2),
+            ("通用 agent 跑 code-tooling.sh 的 agent-write-scope 格（提交时才跑的检查）", "general-purpose", "bash .claude/gate.d/code-tooling.sh --check agent-write-scope", 2),
+            ("主 agent 不带前缀跑 code-tooling.sh（提交时才跑的检查）", None, "bash .claude/gate.d/code-tooling.sh", 2),
+            ("主 agent 带前缀跑 code-tooling.sh", None, commit + "bash .claude/gate.d/code-tooling.sh", 0),
+            ("门禁分诊带前缀跑不重型的阶段", triage, commit + "bash .claude/gate.d/code-tooling.sh . --check research-gate-lint", 0),
+            ("门禁分诊不带前缀跑 gate-lint.sh", triage, "GATE_LINT_DIR=research/scripts bash .claude/singlefs-ai-sop/scripts/gate-lint.sh", 2),
+            ("崩溃验证员带前缀跑 doc-lint.sh", crash, commit + "bash .claude/singlefs-ai-sop/scripts/doc-lint.sh .", 0),
+            ("工具实现员跑钩子的自证", "tooling-writer", "bash .claude/hooks/heavy-test-guard.sh --selftest", 2),
+            ("工具实现员带前缀跑 rules-lint.sh 照拒", "tooling-writer", commit + "bash .claude/singlefs-ai-sop/scripts/rules-lint.sh .", 2),
+            ("工具实现员拿样本跑 stage-selftest.sh", "tooling-writer", "nice -n 19 bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh /tmp/d/.claude/gate.d", 2),
+            ("实现员跑研究脚本的自证", writer, "python3 research/scripts/admission.py --selftest", 2),
+            ("实现员跑 gate-structure-check.py", writer, "python3 research/scripts/gate-structure-check.py", 2),
+            ("实现员直接执行门禁共用库（跑它的自证）", writer, "bash .claude/gate.d/lib/stage-cells.sh", 2),
+            ("实现员只跑 research 单测那一格（不重型，照样是提交时才跑的检查）", writer, "bash .claude/gate.d/checker-tier-research-build-and-replay.sh --check research-unit-tests", 2),
+            ("门禁分诊带前缀只跑 research 单测那一格", triage, commit + "bash .claude/gate.d/checker-tier-research-build-and-replay.sh --check research-unit-tests", 0),
+            ("主 agent 带前缀跑研究脚本的自证", None, commit + "python3 research/scripts/admission.py --selftest", 0),
+            ("主 agent 不带前缀跑 hooks-registered.sh", None, "bash .claude/singlefs-ai-sop/scripts/hooks-registered.sh .", 2),
+            # 只查清单、只生成、只读、只查语法的放行（lib_shell_words.py 的 LIB_SHELL_WORDS_BREAK=arguments-as-executed 下最后两格红）
+            ("实现员 gate-overlap.py --list 查清单", writer, "python3 .claude/singlefs-ai-sop/scripts/gate-overlap.py --list", 0),
+            ("实现员看门禁阶段的格名表", writer, "bash .claude/gate.d/code-tooling.sh --list", 0),
+            ("实现员列重型那一道可点名的变异", writer, "bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --list-items", 0),
+            ("书记员跑阶段的 --write（生成）", scribe, "bash .claude/gate.d/doc-decisions.sh --write", 0),
+            ("实现员 grep 门禁文件", writer, "grep -n gate-cell .claude/gate.d/checker-tier-lkmm.sh", 0),
+            ("工具实现员 bash -n 查门禁的语法", "tooling-writer", "bash -n .claude/gate.d/checker-tier-crates-mutation-replay.sh", 0),
+            ("工具实现员在门禁目录里 python3 - 读几份门禁（2026-09-28 误拦的那一条原样，目录换成自检的临时工作区）", "tooling-writer",
+             f"cd {work}/.claude/gate.d && python3 - doc-text.sh doc-process-records.sh doc-experiments.sh <<'EOF'\nimport re, sys\n"
+             "for path in sys.argv[1:]:\n    text = open(path, encoding=\"utf-8\").read()\nEOF", 0),
+            # 双机分片的驱动按树根里键那一行判（lib_heavy_tests.py 的 shard-driver-by-name 打开时第一格红）
+            ("实现员起双机分片的驱动、树根里登记的是 harness 档包的替身用例（驱动自检那样）", writer, "bash research/scripts/layer0-shard-run.sh crash-case:sharded-selftest .", 0),
+            ("实现员起双机分片的驱动、树根里登记的是 checker 档包的分片用例", writer, "bash research/scripts/layer0-shard-run.sh crash-case:sharded-checker .", 2),
             ("实现员跑自己动到的测试目标", writer,
              "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --test overwrite_in_one_instance", 0),
             ("实现员 clippy --all-targets", writer, "cargo clippy --all-targets -- -D warnings", 0),
@@ -831,7 +887,7 @@ def selftest(hook_dir):
             ("实现员 bash -n 只查语法", writer, "bash -n .claude/scripts/check.sh", 0),
             ("实现员 -p harness --lib", writer, "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --lib", 0),
             ("实现员 mutate.sh 跑 research 的表", writer, "cd research && bash scripts/mutate.sh e1 e7-index-bench/src/bin/e1.rs mutations/e1.tsv", 0),
-            ("实现员 capped.sh --selftest", writer, "bash research/scripts/capped.sh --selftest", 0),
+            ("实现员 capped.sh --selftest（提交时才跑的检查）", writer, "bash research/scripts/capped.sh --selftest", 2),
             ("实现员 cd 进没有层 0 的包裸跑", writer, "cd crates/singlefs-core && bash ../../research/scripts/run-with-memory-cap.sh 4G cargo test", 0),
             ("实现员 git diff 点名重型脚本", writer, "git diff -- crates/mutations.tsv .claude/gate.d/54-layer0-replay.sh", 0),
             ("执行员在 research 里跑自己的 bin", "experiment-runner",
@@ -860,13 +916,13 @@ def selftest(hook_dir):
             ("崩溃验证员带前缀不经内存包装跑 checker 档的集成测试", crash, commit + "cargo test --release -p singlefs-checker-tier --test crash_enumeration_new_pool_file_creation_stream", 2),
             ("崩溃验证员带前缀经内存包装跑 54 号全量", crash,
              commit + "bash research/scripts/run-with-memory-cap.sh 16G bash .claude/gate.d/54-layer0-replay.sh --full /tmp/wt", 0),
-            ("崩溃验证员带前缀经内存包装跑 55 号", crash, commit + "bash research/scripts/run-with-memory-cap.sh 16G bash .claude/gate.d/55-qemu-device-streams.sh", 0),
-            ("崩溃验证员带前缀经内存包装跑 57 号", crash, commit + "bash research/scripts/run-with-memory-cap.sh 8G bash .claude/gate.d/57-lkmm.sh", 0),
+            ("崩溃验证员带前缀经内存包装跑 QEMU 那一道", crash, commit + "bash research/scripts/run-with-memory-cap.sh 16G bash .claude/gate.d/checker-tier-qemu-device-streams.sh", 0),
+            ("崩溃验证员带前缀经内存包装跑 herd7 那一道", crash, commit + "bash research/scripts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-lkmm.sh", 0),
             ("门禁分诊带前缀经内存包装跑 gate.sh --staged", triage, commit + "bash research/scripts/run-with-memory-cap.sh 24G bash .claude/scripts/gate.sh --staged", 0),
             ("主 agent 带前缀经内存包装跑 54 号全量", None,
              commit + "bash research/scripts/run-with-memory-cap.sh 16G bash /tmp/wt/.claude/gate.d/54-layer0-replay.sh --full /tmp/wt", 0),
             ("实现员经内存包装跑 54 号照拒（重型那一道）", writer, "bash research/scripts/run-with-memory-cap.sh 16G bash .claude/gate.d/54-layer0-replay.sh", 2),
-            ("实现员 gate-staged.sh --selftest（仓内那份按名字判，不读正文）", writer, "bash research/scripts/gate-staged.sh --selftest", 0),
+            ("实现员 gate-staged.sh --selftest（仓内那份按名字判，不读正文；提交时才跑的检查）", writer, "bash research/scripts/gate-staged.sh --selftest", 2),
             # 写进脚本文件再执行：s.sh 第 4 行是 cargo test --all（上面第一例，实现员会被拒的那一条）。末两列是该记几条检出、该读进去几份脚本
             ("实现员 bash 起含它的脚本", writer, "bash s.sh", 2, 0, 1),
             ("实现员 ./ 直接执行含它的脚本", writer, "./s.sh", 2, 0, 1),
@@ -966,7 +1022,7 @@ def selftest(hook_dir):
             ("实现员 ./ 直接执行没扩展名、#! 指到 bash 的脚本：读进去照拒", writer, "./runner", 2, 0, 1),
             ("实现员 ./ 直接执行 .py 名字、#! 指到 sh 的脚本：读进去照拒", writer, "./mislabeled.py", 2, 0, 1),
             ("实现员 bash 起 .rs 文件：显式交给 shell 的照读，里面反引号括着的 .rs 不再读", writer, "bash crates/singlefs-checker/src/walk.rs", 2, 0, 1),
-            ("实现员复现输入那一条（反引号里的 walk.rs）：放行、不记检出，只读 doc-lint.sh", writer, SLOW_REPRODUCTION_COMMAND, 0, 0, 1),
+            ("实现员复现输入那一条（反引号里的 walk.rs）：末尾的 doc-lint.sh 是提交时才跑的检查、拒，不记检出，只读 doc-lint.sh", writer, SLOW_REPRODUCTION_COMMAND, 2, 0, 1),
             # 同一份脚本一次判定里只读一遍、只判一遍；换了当前目录、前缀的值、写出的内容，或那一遍撞上嵌套上限的，重判
             ("实现员同一条命令里起含 --all 的 s.sh 两遍：只判一遍", writer, "bash s.sh; ./s.sh", 2, 0, 1),
             ("实现员起的脚本里三种起法各起一遍 s.sh：s.sh 只判一遍", writer, "bash twice.sh", 2, 0, 2),
@@ -1063,6 +1119,17 @@ def selftest(hook_dir):
         results.append(("stdin:主 agent 带前缀放行（退出码 0）", 0, allowed.returncode))
         recorded = count_detections()
         results.append(("stdin:拒绝落进检出记录", 1, recorded))
+        # 走真实入口：提交时才跑的检查被拒，退出码 2、stderr 的出路点名 gate-staged.sh 与放行的两个子 agent
+        commit_check_refused = subprocess.run(["bash", script], capture_output=True, text=True, env=environment,
+                                              input=json.dumps({"tool_name": "Bash", "cwd": work, "agent_type": "tooling-writer",
+                                                                "tool_input": {"command": "bash .claude/singlefs-ai-sop/scripts/doc-lint.sh ."}}))
+        results.append(("stdin:工具实现员跑 doc-lint.sh 拒绝（退出码 2）", 2, commit_check_refused.returncode))
+        results.append(("stdin:提交时才跑的检查被拒时 stderr 的出路点名 gate-staged.sh、gate-triage 与 crash-verifier", 1,
+                        int("✗ 提交时才跑的检查被拒" in commit_check_refused.stderr and "research/scripts/gate-staged.sh" in commit_check_refused.stderr
+                            and "gate-triage" in commit_check_refused.stderr and "crash-verifier" in commit_check_refused.stderr)))
+        # 两份表里提交时才跑的检查是同一组 kind（共用模块读不到时这里的 COMMIT_CHECK_KINDS 照样要能放行门禁分诊与崩溃验证员）
+        results.append(("这里的 COMMIT_CHECK_KINDS 与 lib_heavy_tests.COMMIT_CHECK_KINDS 相同", True,
+                        COMMIT_CHECK_KINDS == set(heavy_tests.COMMIT_CHECK_KINDS)))
         # 走真实入口：实现员起含被拒命令的脚本，退出码 2、stderr 写出脚本路径与行号
         in_script = subprocess.run(["bash", script], capture_output=True, text=True, env=environment,
                                    input=json.dumps({"tool_name": "Bash", "cwd": work, "agent_type": writer, "tool_input": {"command": "bash s.sh"}}))
@@ -1140,7 +1207,8 @@ def selftest(hook_dir):
           "同一条命令里 heredoc（cat / tee）写出或 cp 拷出再执行的拿写出的内容判、不记「不存在」，认不出的写法照旧记检出；"
           "直接执行的只读 `#!` 指到 shell 的与没 `#!` 的 .sh（.rs、.md、没扩展名的文本不读不记），同一份脚本一次判定里只读一遍、只判一遍；"
           "子 agent 不经 run-with-memory-cap.sh 跑 cargo test / run / bench 与 cargo 编出来的二进制拒绝、经它包着的（连同 bash -c 与它起的脚本）放行；"
-          "只跑动到的测试目标、fmt / clippy / build、54 / 55 / 57 / 59 / 87 之外的门禁阶段、把名字当参数的放行")
+          "只跑动到的测试目标、fmt / clippy / build、把名字当参数的、只查清单与只查语法的放行；"
+          "提交时才跑的检查（不重型的门禁阶段、上游几道 lint 与样本自检、研究脚本与钩子的自证）只放行带前缀的主 agent、门禁分诊与崩溃验证员，拒绝写出路 gate-staged.sh")
     return 0
 
 def main():

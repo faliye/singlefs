@@ -1,4 +1,4 @@
-# 附录二：runner-compile-first-r1 被判的改动（基准 HEAD `faf255e2`，生成于 2026-09-27 08:07 UTC / JST 17:07）
+# 附录二：runner-compile-first-r1 被判的改动（基准 HEAD `faf255e2`，生成于 2026-09-27 /）
 
 ## 一、`git diff HEAD -- .claude/hooks/write-guard.sh .claude/hooks/bash-command-detector.sh`（原样，工作区相对 HEAD `faf255e2` 的改动；`git diff --stat` 核过为 244 行增、20 行删，与主 agent 给的数一致）
 

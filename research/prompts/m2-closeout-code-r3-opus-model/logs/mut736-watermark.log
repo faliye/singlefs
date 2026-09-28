@@ -1,0 +1,27 @@
+   Compiling singlefs-format v0.1.0 (/tmp/claude-1000/m2-closeout-code-r3-opus/mut736/crates/singlefs-format)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m2-closeout-code-r3-opus/mut736/crates/singlefs-checker)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m2-closeout-code-r3-opus/mut736/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-closeout-code-r3-opus/mut736/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 11.83s
+     Running tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs (target/release/deps/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over-1c2fe329c59bef6b)
+
+running 1 test
+test the_rollback_takes_the_inode_number_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_its_root ... FAILED
+
+failures:
+
+---- the_rollback_takes_the_inode_number_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_its_root stdout ----
+
+thread 'the_rollback_takes_the_inode_number_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_its_root' (1255971) panicked at crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs:1578:5:
+assertion `left == right` failed: 回退那次发布的 inode 号水位 = max(现行那一版内存里的 5, 环里读得出的根的 2)
+  left: 2
+ right: 5
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    the_rollback_takes_the_inode_number_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_its_root
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p singlefs-harness --test unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over`

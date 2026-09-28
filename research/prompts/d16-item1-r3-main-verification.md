@@ -1,14 +1,14 @@
 # D16（发布语义） 未定项 1 第三轮——主 agent 对正推腿「G放回 同样出局」的复现与机制探针
 
-**口径**：2026-09-12 凌晨（JST）主 agent 做。正推腿（`d16-item1-r3-sonnet-output.md`）报告：把臂 G 的处置改成「做到这次删的块放回为止」（材料的 G放回）之后，
+**口径**：2026-09-12 主 agent 做。正推腿（`d16-item1-r3-sonnet-output.md`）报告：把臂 G 的处置改成「做到这次删的块放回为止」（材料的 G放回）之后，
 近满盘上删了再写仍然失败，与原臂 G 逐种子相同。主 agent 在仓外副本（`research/` 整拷、不带 `target/`）里独立复现，并加一个探针看冷启动那一刻的账。
 **这是机制探针，不是跑前登记过的实验**：只跑了 `near_full` 这一个世界，没进故障世界；「准入按最坏残留收费」那一形要当候选，得另立实验。
 
 ## 副本相对仓里源码改了什么（`diff -u`）
 
 ```diff
---- research/e7-index-bench/src/bin/e138_per_disk_floor.rs	2026-09-11 15:55:27.015560082 +0000
-+++ /tmp/claude-1000/-home-fy5090-code-singlefs/86b2ac0e-7e65-418c-97a7-f3d755730fe6/scratchpad/verify-copy/research/e7-index-bench/src/bin/e138_per_disk_floor.rs	2026-09-11 16:31:53.334833010 +0000
+--- research/e7-index-bench/src/bin/e138_per_disk_floor.rs	2026-09-12
++++ /tmp/claude-1000/-home-fy5090-code-singlefs/86b2ac0e-7e65-418c-97a7-f3d755730fe6/scratchpad/verify-copy/research/e7-index-bench/src/bin/e138_per_disk_floor.rs	2026-09-12
 @@ -300,6 +300,8 @@
      nonempty_txgs: HashSet<u64>,
      admin_rollback_happened: bool,

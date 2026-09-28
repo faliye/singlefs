@@ -1,0 +1,2 @@
+snapshot=0cc2a238a57d297f511f9e08cedbbc36c6d56d67 tree=8bd5b978c1bf6342120c92cbbaabd4d89fe21551 taken=2026-09-28
+base=9a9cfb6c83281357a18529e416efd714dfeec882（同一刻、不含第一段）

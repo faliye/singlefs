@@ -1,0 +1,8 @@
+  ✗ crates/mutations.tsv 这些行的「原文」在源码里不是恰好命中一次（门禁 59 号预扫会整张表退出，一条都不跑）：
+      crates/mutations.tsv:798 实六 固定脚本：层 0 切段不带卸载入口段（C557 那一道在带卸载的流上当场断言停）：文件 crates/singlefs-checker/tests/second_transaction_step_zero_layer0.rs 不存在
+      crates/mutations.tsv:909 实审 B3b c561 计数行：评过的状态数少于闭式也打 exhaustive=true：文件 crates/singlefs-checker/tests/record_checker_judges_absence_by_the_persisted_set.rs 不存在
+      crates/mutations.tsv:910 实审 B3b c561 线程行：这一趟跑的片报得比总片数多一片（读回 + 跑的 ≠ 总片数）：文件 crates/singlefs-checker/tests/record_checker_judges_absence_by_the_persisted_set.rs 不存在
+      crates/mutations.tsv:911 实审 B3b c561 计数行：闭式按 σ 两遍算（评满了也打不出 exhaustive=true）：文件 crates/singlefs-checker/tests/record_checker_judges_absence_by_the_persisted_set.rs 不存在
+      crates/mutations.tsv:1079 实审 B3a-3c：按位置寻址的树计数行又直接算 1u64 << |段|（第三条流 322 写的单元写段移位溢出，快用例 panic）：文件 crates/singlefs-checker/tests/second_transaction_position_addressed_trees_layer0.rs 不存在
+      crates/mutations.tsv:1080 实审 B3a-3c：L8 叶容器数又按写死的 5 个角色取（63 片叶容器，点名 74 项、末条 7 项）：文件 crates/singlefs-checker/tests/second_transaction_parallel_line_three_spill_over_layer0.rs 不存在
+    → crates 这张表：把原文改到今天源码里逐字存在、只出现一次的那一段（原文里的换行写成 \n），改完单跑那几行证明点名的测试红。

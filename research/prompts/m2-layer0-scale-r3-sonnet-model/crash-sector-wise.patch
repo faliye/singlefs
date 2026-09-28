@@ -1,5 +1,5 @@
---- /tmp/claude-1000/l0scale-r1-frozen/crates/singlefs-harness/src/crash.rs	2026-09-25 22:14:09.080511883 +0000
-+++ /tmp/claude-1000/m2-layer0-scale-r3-sonnet/repo/crates/singlefs-harness/src/crash.rs	2026-09-26 04:15:13.358363270 +0000
+--- /tmp/claude-1000/l0scale-r1-frozen/crates/singlefs-harness/src/crash.rs	2026-09-26
++++ /tmp/claude-1000/m2-layer0-scale-r3-sonnet/repo/crates/singlefs-harness/src/crash.rs	2026-09-26
 @@ -691,27 +691,52 @@
      // （C507（记录核对器的复用豁免比登记的候选宽，把真洞变哑）：只看「流里有没有更晚的写」的那一版在这里失声）。
      // 更晚那次写已经落盘、而那次复用证得出违反 D16（发布语义） 已定项 1 的回收谓词时也不算盖过（C513（复用豁免不判那次复用合不合法）：

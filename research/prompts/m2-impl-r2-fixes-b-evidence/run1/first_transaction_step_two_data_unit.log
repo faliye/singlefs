@@ -1,0 +1,11 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running tests/first_transaction_step_two_data_unit.rs (target/debug/deps/first_transaction_step_two_data_unit-2083577dfe9be57a)
+
+running 3 tests
+test exactly_two_new_allocation_records_whose_slot_matches_the_recorded_write_offsets ... ok
+test corrupting_payload_or_header_is_caught_by_the_matching_checksum ... ok
+test data_unit_reads_back_from_both_devices_with_content_then_zeroes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.13s
+

@@ -11,16 +11,16 @@ seq 1 20 | sed 's/^/rule line /' > .claude/singlefs-ai-sop/rules/evidence-discip
 seq 1 20 | sed 's/^/peak /' > research/scripts/memory-peaks.tsv
 seq 1 20 | sed 's/^/hook line /' > .claude/hooks/bash-command-detector.sh
 seq 1 20 | sed 's/^/tracked line /' > .claude/hooks/tracked-changed-late.sh
-GIT_AUTHOR_DATE='2026-09-26T15:00:00Z' GIT_COMMITTER_DATE='2026-09-26T15:00:00Z' git add -A
-GIT_AUTHOR_DATE='2026-09-26T15:00:00Z' GIT_COMMITTER_DATE='2026-09-26T15:00:00Z' git commit -qm base
-# 腿甲 15:15 开工、15:20 读到这几份文件的第 10 行；腿乙 15:30 才派
-leg_a_start='2026-09-26T15:15:00Z'; given_time='2026-09-26T15:30:00Z'
-# 15:22 别的会话同步上游 SOP（被忽略的目录）、跑了一次内存包装（被忽略的峰值表），各在第 3 行前插一行
+GIT_AUTHOR_DATE='2026-09-26T15:00:00Z' GIT_COMMITTER_DATE='2026-09-26T15:00:00Z' git add -A  # clock-times:allow 造提交时间戳的自检输入
+GIT_AUTHOR_DATE='2026-09-26T15:00:00Z' GIT_COMMITTER_DATE='2026-09-26T15:00:00Z' git commit -qm base  # clock-times:allow 造提交时间戳的自检输入
+# 腿甲先开工、随后读到这几份文件的第 10 行；腿乙最后才派
+leg_a_start='2026-09-26T15:15:00Z'; given_time='2026-09-26T15:30:00Z'  # clock-times:allow 喂给 git log --since 的两个查询时刻
+# 之后别的会话同步上游 SOP（被忽略的目录）、跑了一次内存包装（被忽略的峰值表），各在第 3 行前插一行
 sed -i '3i inserted by upstream sync' .claude/singlefs-ai-sop/rules/evidence-discipline.md
 sed -i '3i peak of another run' research/scripts/memory-peaks.tsv
-# 15:25 别的会话在一份跟踪着的钩子第 3 行前插一行并提交
-sed -i '3i inserted and committed at 15:25' .claude/hooks/tracked-changed-late.sh
-GIT_AUTHOR_DATE='2026-09-26T15:25:00Z' GIT_COMMITTER_DATE='2026-09-26T15:25:00Z' git commit -qam 'other session'
+# 再之后别的会话在一份跟踪着的钩子第 3 行前插一行并提交
+sed -i '3i inserted and committed' .claude/hooks/tracked-changed-late.sh
+GIT_AUTHOR_DATE='2026-09-26T15:25:00Z' GIT_COMMITTER_DATE='2026-09-26T15:25:00Z' git commit -qam 'other session'  # clock-times:allow 造提交时间戳的自检输入
 echo "腿引的是第 10 行；现在第 10 行是什么、那两条现查各出什么（核查员第 2 步 / 输入一节第 21 行的判法：没改过记 ✗）"
 for f in .claude/singlefs-ai-sop/rules/evidence-discipline.md research/scripts/memory-peaks.tsv .claude/hooks/tracked-changed-late.sh .claude/hooks/bash-command-detector.sh; do
   for t in "$leg_a_start" "$given_time"; do

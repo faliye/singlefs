@@ -1,0 +1,32 @@
+--- transaction.rs.orig
++++ repo/crates/singlefs-core/src/transaction.rs
+@@ -1056,20 +1056,21 @@
+         })?;
+     }
+     writer.perform_commit_step(CommitStep::Barrier)?;
+-    for record in &writes.records {
+-        writer.perform_commit_step(CommitStep::WriteJournalRecordToEveryDevice {
+-            counter: record.counter,
+-            record: &record.bytes,
+-        })?;
+-    }
+-    writer.perform_commit_step(CommitStep::Barrier)?;
++    // 调查员副本里的改坏：先根（FUA）与系统配置，后记录。
+     persist_the_root_then_rotate_the_system_configuration(
+         writer,
+         writes.checkpoint_txg,
+         &writes.root_slot,
+         writes.journal_tail,
+         writes.journal_instance,
+-    )
++    )?;
++    for record in &writes.records {
++        writer.perform_commit_step(CommitStep::WriteJournalRecordToEveryDevice {
++            counter: record.counter,
++            record: &record.bytes,
++        })?;
++    }
++    writer.perform_commit_step(CommitStep::Barrier)
+ }
+ 
+ /// 落盘阶段中途失败、冻结着等原样重发的那一次发布（D23（journal 的角色与格式） 已定项 14「这一版的失败处置」：发布不接受失败，

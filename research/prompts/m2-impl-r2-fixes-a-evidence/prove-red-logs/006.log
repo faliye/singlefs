@@ -1,0 +1,25 @@
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/impl-r2-fixes-a/copy/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-a/copy/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.59s
+     Running tests/checker_known_bad_images.rs (/tmp/claude-1000/impl-r2-fixes-a/target/debug/deps/checker_known_bad_images-89a29090b0bda30e)
+
+running 1 test
+test devices_whose_own_device_numbers_are_swapped_redden_only_the_own_device_number_invariant ... FAILED
+
+failures:
+
+---- devices_whose_own_device_numbers_are_swapped_redden_only_the_own_device_number_invariant stdout ----
+
+thread 'devices_whose_own_device_numbers_are_swapped_redden_only_the_own_device_number_invariant' (4045767) panicked at crates/singlefs-harness/tests/checker_known_bad_images.rs:2554:5:
+assertion `left == right` failed: 只红 I-7.14：[("I-1.1", Holds), ("I-1.2", Holds), ("I-1.3", Holds), ("I-1.4", Holds), ("I-1.6", Holds), ("I-1.7", Holds), ("I-1.8", Holds), ("I-1.10", Holds), ("I-1.11", Holds), ("I-2.1", Holds), ("I-2.3", Holds), ("I-2.4", Holds), ("I-2.5", Holds), ("I-3.1", Holds), ("I-3.8", Holds), ("I-3.9", Holds), ("I-3.10", Holds), ("I-3.11", Holds), ("I-4.2", Holds), ("I-4.8", Holds), ("I-5.1", Holds), ("I-5.2", Holds), ("I-5.4", Holds), ("I-7.1", Holds), ("I-7.2", Holds), ("I-7.3", Holds), ("I-7.4", Holds), ("I-7.6", Holds), ("I-7.7", Holds), ("I-7.8", Holds), ("I-7.9", NotApplicable("根环里没有抬 F 的根：每条根带的 F 都不高于同一实例里它前一条根带的（回退与新实例的第一条根不算抬）")), ("I-7.12", Holds), ("I-7.13", Holds), ("I-7.14", Holds), ("I-8.6", Holds), ("I-8.7", NotApplicable("环里没有哪个实例写出过两条非 0 事务号的记录：一对可比的号都凑不出来")), ("I-8.8", NotApplicable("环里没有哪一组（同一块盘上实例代号与事务号都相同的非 0 记录）落了两条以上、也没有哪一组一条提交标记都没有：③ ④ 没有判的对象，提交标记字节单独成立不算这一条成立")), ("I-8.9", Holds), ("I-9.1", Holds), ("I-9.2", Holds), ("I-9.4", Holds), ("I-9.6", Holds), ("I-9.7", Holds), ("I-9.10", Holds), ("I-9.12", Holds), ("I-9.13", Holds), ("I-9.14", NotApplicable("没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来")), ("I-9.15", Holds), ("I-9.16", Holds)]
+  left: []
+ right: ["I-7.14"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    devices_whose_own_device_numbers_are_swapped_redden_only_the_own_device_number_invariant
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 42 filtered out; finished in 17.13s
+
+error: test failed, to rerun pass `-p singlefs-harness --test checker_known_bad_images`

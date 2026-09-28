@@ -1,4 +1,4 @@
-2026-09-24T09:28:55Z
+2026-09-24
 SHAPE P1 cfg=S1-Absent-LookBack-even txg=1 alloc_levels=2 alloc_nodes_on_disk=5 ext_nodes_on_disk=1 files=[(1, 1, Some(1))] records_dev0=12
 SELFTEST_FULL    S1-Absent-LookBack-even histories=1 publishes=1 refused=0 too_big=0 states=65540 closed_form=65540 classes=65540 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 applied_by_record=3 crossing_states=0 double_alloc=0 release_missing=0 fallback=0 grew=0 shrank=0 top_split=0 units=8 max_units=8 alloc_nodes=5 ext_nodes=1 leaves_by_alloc_chain=0 max_segment_writes=16 red_reasons={}
 SELFTEST_CLASSES S1-Absent-LookBack-even histories=1 publishes=1 refused=0 too_big=0 states=65540 closed_form=65540 classes=6564 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 applied_by_record=3 crossing_states=0 double_alloc=0 release_missing=0 fallback=0 grew=0 shrank=0 top_split=0 units=8 max_units=8 alloc_nodes=5 ext_nodes=1 leaves_by_alloc_chain=0 max_segment_writes=16 red_reasons={}
@@ -21,4 +21,4 @@ KNOWN_BAD_SKIPPED_SHRINK_SPINE S2-PerFile histories=1 publishes=2 refused=0 too_
   example: CHECK_RED I-3.1：未释放的记录（盘 0 槽 22）没有单元引用; recovered txg 3; suffix=[Write(1, 4), Trunc(1, 1)]
 FIXED_SHRINK_SPINE S2-PerFile histories=1 publishes=2 refused=0 too_big=0 states=67174407 closed_form=67174407 classes=1600889 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 applied_by_record=6 crossing_states=0 double_alloc=0 release_missing=0 fallback=0 grew=1 shrank=1 top_split=0 units=21 max_units=13 alloc_nodes=14 ext_nodes=4 leaves_by_alloc_chain=2 max_segment_writes=26 red_reasons={}
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 12.86s
-2026-09-24T09:29:08Z
+2026-09-24

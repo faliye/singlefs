@@ -1,5 +1,0 @@
-exit=1
-want=一份都找不到
-want=99-样本.md:6
-want=99-样本.md:7  E7RESULT name=verdict arm=b count=7
-want=只在没在 replay.sh 登记的产物里有（e99-sample-2026-09-15-old.out）

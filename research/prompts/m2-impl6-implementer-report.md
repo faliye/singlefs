@@ -1,4 +1,4 @@
-# 实六报告（implementation-writer，2026-09-26 UTC 写）
+# 实六报告（implementation-writer，2026-09-26 写）
 
 ## 结论
 

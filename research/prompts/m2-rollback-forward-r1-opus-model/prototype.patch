@@ -1,5 +1,5 @@
---- crates/singlefs-core/src/mount.rs	2026-09-25 08:57:11.937752319 +0000
-+++ crates/singlefs-core/src/mount.rs	2026-09-25 10:16:26.112252342 +0000
+--- crates/singlefs-core/src/mount.rs	2026-09-25
++++ crates/singlefs-core/src/mount.rs	2026-09-25
 @@ -515,6 +515,8 @@
      /// 所选那一版（`effective_root` 那一版）那次发布的末条记录的 jsn（`journal_position_of_the_selected_version`）：
      /// 取号之前逐盘核「这块盘落没落后于这一版」拿它比。
@@ -549,8 +549,8 @@
      )
  }
  
---- crates/singlefs-core/src/allocator.rs	2026-09-25 01:37:37.189188041 +0000
-+++ crates/singlefs-core/src/allocator.rs	2026-09-25 10:14:48.062208805 +0000
+--- crates/singlefs-core/src/allocator.rs	2026-09-25
++++ crates/singlefs-core/src/allocator.rs	2026-09-25
 @@ -318,6 +318,17 @@
          );
          self.deferred_slots += span;

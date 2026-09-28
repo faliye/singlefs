@@ -1,0 +1,38 @@
+diff -ruN '--exclude=r1-opus-crash-proto' '--exclude=c331_candidates_grid.rs' '--exclude=c393_candidates_grid.rs' '--exclude=c331_newer_instance_roots_unreadable_then_readable_again.rs' '--exclude=c393_abandoned_root_account_unreadable_at_remount.rs' '--exclude=mod.rs' tree/crates/singlefs-core/src/mount.rs opus/yi/crates/singlefs-core/src/mount.rs
+--- tree/crates/singlefs-core/src/mount.rs
++++ opus/yi/crates/singlefs-core/src/mount.rs
+@@ -4143,10 +4143,10 @@
+             .sizes
+             .fixed_structure_slot_spacing,
+     );
+-    let witnessed_journal_counter = devices
++    let verified_slots_of_each_device: Vec<Vec<crate::system_configuration::SystemConfiguration>> = devices
+         .device_identities()
+         .into_iter()
+-        .flat_map(|device| {
++        .map(|device| {
+             verified_system_configuration_slots(
+                 devices,
+                 device,
+@@ -4154,10 +4154,20 @@
+                 &system_configuration.immutable.filesystem_identifier,
+             )
+         })
++        .collect();
++    let witnessed_journal_counter = verified_slots_of_each_device
++        .iter()
++        .flatten()
+         .map(|slot| slot.quantities.journal_tail)
+         .max()
+         .unwrap_or(0);
+-    let comparison = if witnessed_journal_counter == 0 {
++    // 候选乙（unreadable-at-mount-r1）：一块盘两槽都读不出或自证不过才判不出（按真）；每块盘至少一槽自证过就照今天取读得出的 max。
++    let witness_read_is_undecidable = verified_slots_of_each_device
++        .iter()
++        .any(|slots_of_this_device| slots_of_this_device.is_empty());
++    let comparison = if witness_read_is_undecidable {
++        WitnessedCounterComparison::Undecidable
++    } else if witnessed_journal_counter == 0 {
+         WitnessedCounterComparison::NothingWitnessed
+     } else if let Some(last_record_of_the_selected_version) = records
+         .values()

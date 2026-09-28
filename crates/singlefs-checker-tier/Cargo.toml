@@ -10,3 +10,18 @@ singlefs-checker = { path = "../singlefs-checker" }
 singlefs-core = { path = "../singlefs-core" }
 singlefs-format = { path = "../singlefs-format" }
 singlefs-harness = { path = "../singlefs-harness" }
+# 崩溃放量的判定存储（src/verdict_store.rs，里程碑三第十一项；用户 2026-09-28 选 RocksDB）。版本钉成与 research/Cargo.lock 相同，
+# E162（崩溃放量判定块存储选型） K 臂杀进程量的就是这一版，默认特性也照那边不动（K 臂用的 LZ4 压缩在默认特性里）。
+# 只进 checker 档：harness 档、池级 checker、core 都不依赖它（.claude/rules/verification.md「定义与名字」，门禁 94 号）。
+# librocksdb-sys 在每个编译目录里现编一遍 C++；它的 bindgen 在本机找不到 stdbool.h（只有 libclang、没有 clang 的头文件），
+# 要 BINDGEN_EXTRA_CLANG_ARGS=-I/usr/lib/gcc/x86_64-linux-gnu/13/include 才编得过（与 research/e7-index-bench/Cargo.toml 同一条）。
+rocksdb = { version = "=0.25.0", optional = true }
+# 崩溃放量的 GPU 核对（src/gpu_unit_checks.rs）：版本与特性钉成 E163（GPU多卡算单元校验和） 装置用的那一份（research/e7-index-bench/Cargo.toml）。
+wgpu = { version = "=30.0.1", default-features = false, features = ["vulkan", "wgsl", "std"], optional = true }
+pollster = { version = "=1.0.1", optional = true }
+
+[features]
+# 判定存储（src/verdict_store.rs）与它的 RocksDB 依赖默认不编：只有用到 KV 的崩溃放量打开，平常编 checker 档不付现编 C++ 的代价。
+verdict-store = ["dep:rocksdb"]
+# GPU 核对默认不编：配置里 ENABLE_GPU=1 的跑法才开（单机或双机的 CPU + GPU）。
+gpu = ["dep:wgpu", "dep:pollster"]

@@ -4,7 +4,7 @@
 
 被判的 `crates/` 源文件（门禁 56 号按路径点名）：`crates/singlefs-harness/src/model.rs`、`crates/singlefs-harness/src/model_comparison.rs`、`crates/singlefs-harness/src/history.rs`、`crates/singlefs-harness/src/lib.rs`；另有测试 `crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs`、`crates/mutations.tsv` 第 146–155 行、门禁 `.claude/gate.d/74-model-differential.sh`。`crates/singlefs-core`、`crates/singlefs-checker` 一行没改（正推腿 `git diff --stat` 现查）。
 
-**快照里两个文件在腿跑的过程中被另一个会话改了**（决策正文瘦身，不是这一轮的改动）：`.claude/kb/decisions/28-挂载期承诺量.md`（正推腿 10:0x UTC 开工复核时发现），快照时刻的原样取自 HEAD、sha256 与快照相同，放在 `research/prompts/m2-supp3-item2-code-r1-snapshot-copies/.claude/kb/decisions/28-挂载期承诺量.md`，两条云端腿引 D28 的都按这份副本核；`.claude/kb/decisions/04-校验和位置.md`（核查员开工时发现，两条云端腿交回时还一致），HEAD 那一版与快照相同，核查员按 HEAD 核了正推腿引它的一处，一致。
+**快照里两个文件在腿跑的过程中被另一个会话改了**（决策正文瘦身，不是这一轮的改动）：`.claude/kb/decisions/28-挂载期承诺量.md`（正推腿开工复核时发现），快照时刻的原样取自 HEAD、sha256 与快照相同，放在 `research/prompts/m2-supp3-item2-code-r1-snapshot-copies/.claude/kb/decisions/28-挂载期承诺量.md`，两条云端腿引 D28 的都按这份副本核；`.claude/kb/decisions/04-校验和位置.md`（核查员开工时发现，两条云端腿交回时还一致），HEAD 那一版与快照相同，核查员按 HEAD 核了正推腿引它的一处，一致。
 
 | 腿 | 产出 | 核查员（`m2-supp3-item2-code-r1-verifier-output.md`）核了 / ✓ / ✗ |
 |---|---|---|

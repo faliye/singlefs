@@ -1,0 +1,8 @@
+exit=1
+want=自指
+want=186-兄弟样本丙.md:12 已定项正文里断言「校验算法选哪个」未定
+want=在同一条决策的另一条**已定**分项里已经定了
+want=182-自指样本甲.md:19 已定项正文里断言「取值」未定
+want=182-自指样本甲.md:21 已定项正文里断言「的取值」未定
+want=  settled-item-self-open：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（settled-item-self-open）

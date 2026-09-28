@@ -44,6 +44,10 @@ const FSID_OFFSET: usize = 4 + 2 + 96;
 /// 写侧 [`SystemConfiguration::to_slot`] 写它之前断言位置、读侧 [`SystemConfiguration::parse_slot`] 按它切，
 /// 一个偏移只有这一处定义。
 const ROOT_RING_SLOTS_PER_REGION_OFFSET: u64 = 362;
+/// 几何段里「journal 环起点」那 8 字节（16 KiB 槽号，字段表 `layout/01-first-txn.md` 一）。写侧写它之前断言位置、读侧按它切。
+const JOURNAL_RING_START_SLOT_OFFSET: u64 = 325;
+/// 几何段里「根环起点」那 8 字节（16 KiB 槽号，D22（单元原子性怎么合成） 已定项 16 第 1 句）。写侧写它之前断言位置、读侧按它切。
+const ROOT_RING_BASE_SLOT_OFFSET: u64 = 371;
 const REGION_DEVICES_OFFSET: u64 = 379;
 /// 几何段里「单元区起始槽号」那 8 字节（字段表 `layout/01-first-txn.md` 一；D3（空间分配） 已定项 10 ④）。
 /// 写侧 [`SystemConfiguration::to_slot`] 写它之前断言位置、读侧 [`unit_area_start_slot_recorded_in_the_slot`] 按它切。
@@ -54,6 +58,14 @@ const ROLLBACK_FLOOR_FIELD_BYTES: u64 = 8;
 /// 回退下界 F 住字段表最后一行、journal 实例代号之后（D22（单元原子性怎么合成） 已定项 9）：偏移 = 字段表合计减它自己的宽，
 /// 从格式常量 [`SYSTEM_CONFIGURATION_BYTES`] 推出来，不另写一个数。写侧写它之前断言位置、读侧按它切。
 const ROLLBACK_FLOOR_OFFSET: u64 = SYSTEM_CONFIGURATION_BYTES - ROLLBACK_FLOOR_FIELD_BYTES;
+/// 第一版写进、也只收的 journal 环起点（16 KiB 槽号 1024，D22（单元原子性怎么合成） 已定项 16 第 1 句）：mkfs 与写入口照它写，
+/// 读者择系统配置时拿槽里读到的与它比，不等整池拒（`recovery` 的 `system_configuration_values_this_reader_accepts`）。
+/// core 读写 journal 环按格式常量走，这一判保证盘上那一份与它相同。
+pub const JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION: SlotNumber =
+    SlotNumber(JOURNAL_RING_START_SLOT);
+/// 第一版写进、也只收的根环起点（16 KiB 槽号 64 = 1 MiB，D22（单元原子性怎么合成） 已定项 16 第 1 句）：同上，core 读写根环按格式常量走
+/// （`root_ring::region_start`）。
+pub const ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION: SlotNumber = SlotNumber(ROOT_RING_BASE_SLOT);
 /// D2（RAID 条带策略） 已定项 18：第一版 w_max 与 g 都写 4。
 const MAXIMUM_STRIPE_WIDTH: u8 = 4;
 const GROUP_SIZE: u8 = 4;
@@ -156,8 +168,10 @@ impl SystemImmutableSizes {
 /// 自举头 8 行 147（magic 4 + 格式版本 2 + feature bits 96 + fsid 16 + 写入者身份 20 +
 /// 校验和算法标识 1 + 本盘设备号 4 + 设备数 devs 4）+ 加密预留 6 行 114（系统配置自身 MAC 16 +
 /// nonce 水位 12 + KDF 标识 4 + 加密类型 1 + MAC 长度声明 1 + 主密钥槽 80）+ 几何段除节点大小之外的
-/// 23 行 128。这 37 行里只有下面 5 个字段（`sizes` 里 4 个值，合起来 8 个值）在内存里存着，
-/// 其余由 [`SystemConfiguration::to_slot`] 照格式常量写死。
+/// 23 行 128。这 37 行里只有下面 7 个字段（`sizes` 里 5 个值，合起来 11 个值）在内存里存着，
+/// 其余由 [`SystemConfiguration::to_slot`] 照格式常量写死。journal 环起点与根环起点两个字段读进来（代码三方 m2-closeout-code-r2
+/// 「core 与 checker 对系统配置几何字段的读法」：此前解槽跳过这两个字段、按编译期常量走，checker 按字段读，两边判不一致；
+/// 用户 2026-09-27 定「读字段，不等于常量就整池拒」）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SystemImmutableConfiguration {
     pub filesystem_identifier: [u8; 16],
@@ -166,6 +180,11 @@ pub struct SystemImmutableConfiguration {
     pub device_count: u32,
     pub region_devices: [DeviceIdentity; 3],
     pub sizes: SystemImmutableSizes,
+    /// journal 环起点（偏移 325，16 KiB 槽号）。写者写 [`JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION`]；读者收的只有它。
+    pub journal_ring_start_slot: SlotNumber,
+    /// 根环起点（偏移 371，16 KiB 槽号；基址 = 该字段 × 16384，D22（单元原子性怎么合成） 已定项 16 第 1 句）。
+    /// 写者写 [`ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION`]；读者收的只有它，判固定结构槽距的上界用它（同一槽自述的根环起点）。
+    pub root_ring_base_slot: SlotNumber,
 }
 
 impl SystemImmutableConfiguration {
@@ -402,7 +421,8 @@ impl SystemConfiguration {
             writer.put_u32(u32::try_from(LOC_ENTRY).expect("位置条目宽度"));
             writer.put_u32(self.immutable.sizes.physical_block_size);
             writer.put_u32(0); // 扩展点声明值 N：第一版 0（D21（权威态与派生态的分界） 已定项 8）
-            writer.put_u64(JOURNAL_RING_START_SLOT);
+            writer.assert_position(JOURNAL_RING_START_SLOT_OFFSET, "journal 环起点");
+            writer.put_u64(self.immutable.journal_ring_start_slot.0);
             writer.put_u64(self.immutable.sizes.journal_ring_bytes);
             writer.put_u32(u32::try_from(JOURNAL_RECORD_BYTES).expect("记录尺寸"));
             let in_flight_limit =
@@ -422,7 +442,8 @@ impl SystemConfiguration {
             );
             writer.put_u32(u32::try_from(ROOT_RING_PRIME_STEP).expect("P"));
             writer.put_u32(u32::try_from(ROOT_RING_CHUNK_BYTES).expect("chunk"));
-            writer.put_u64(ROOT_RING_BASE_SLOT);
+            writer.assert_position(ROOT_RING_BASE_SLOT_OFFSET, "根环起点");
+            writer.put_u64(self.immutable.root_ring_base_slot.0);
             writer.assert_position(REGION_DEVICES_OFFSET, "根环逐区域设备身份");
             for region_device in &self.immutable.region_devices {
                 writer.put_u32(region_device.0);
@@ -494,8 +515,22 @@ impl SystemConfiguration {
         let slot_generation = reader.get_u64();
         reader.skip(32 + 16 + 12 + 4 + 1 + 1 + 80 + 4 + 4 + 4 + 4);
         let physical_block_size = reader.get_u32();
+        let journal_ring_start_slot = SlotNumber(
+            ByteReader::at(
+                bytes,
+                usize::try_from(JOURNAL_RING_START_SLOT_OFFSET).expect("325"),
+            )
+            .get_u64(),
+        );
         reader.skip(4 + 8);
         let journal_ring_bytes = reader.get_u64();
+        let root_ring_base_slot = SlotNumber(
+            ByteReader::at(
+                bytes,
+                usize::try_from(ROOT_RING_BASE_SLOT_OFFSET).expect("371"),
+            )
+            .get_u64(),
+        );
         let mut region_reader =
             ByteReader::at(bytes, usize::try_from(REGION_DEVICES_OFFSET).expect("379"));
         let region_devices = [
@@ -527,6 +562,8 @@ impl SystemConfiguration {
                     journal_ring_bytes,
                     root_ring_slots_per_region,
                 },
+                journal_ring_start_slot,
+                root_ring_base_slot,
             },
             // 节点大小那 4 字节不读回来：它今天只可能是格式常量 `NODE_BYTES`，读回来会多出一个
             // 「盘上的值与格式常量不符」的状态而没人判它。有了 mkfs 参数那天连着判定一起加。
@@ -608,6 +645,8 @@ mod tests {
                     journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
                     root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
                 },
+                journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
+                root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
             },
             mutable: SystemMutableConfiguration,
             runtime: SystemRuntimeConfiguration,

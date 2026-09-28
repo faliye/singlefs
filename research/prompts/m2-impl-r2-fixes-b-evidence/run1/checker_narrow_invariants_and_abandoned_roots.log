@@ -1,0 +1,27 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.79s
+     Running tests/checker_narrow_invariants_and_abandoned_roots.rs (target/debug/deps/checker_narrow_invariants_and_abandoned_roots-51e0944e4e10d5f3)
+
+running 19 tests
+test a_device_whose_slot_zero_does_not_verify_has_its_slot_one_looked_for_at_the_spacing_another_device_records ... ok
+test a_journal_named_entry_whose_location_entries_are_not_in_ascending_device_order_reddens_only_the_location_order_invariant ... ok
+test a_journal_record_whose_counter_is_zero_reddens_the_back_chain_invariant ... ok
+test a_mapping_key_whose_birth_tree_is_not_the_one_in_the_unit_header_reddens_only_the_mapping_key_invariant ... ok
+test a_right_container_number_not_above_the_largest_key_on_its_left_reddens_only_the_container_number_invariant ... ok
+test a_mapping_key_whose_padding_after_the_birth_sequence_is_not_zero_reddens_only_the_mapping_key_invariant ... ok
+test a_type_zero_inode_entry_whose_container_segment_is_not_zero_reddens_only_the_entry_identity_invariant ... ok
+test a_legal_type_zero_inode_entry_is_walked_down_to_the_leaf_and_every_invariant_holds ... ok
+test an_older_version_naming_again_a_placement_inside_a_subtree_it_shares_with_a_newer_version_reddens_the_disjoint_ranges_invariant ... ok
+test container_numbers_going_backwards_along_the_leaf_order_redden_only_the_container_number_invariant ... ok
+test an_unreadable_root_ring_slot_leaves_the_abandoned_half_of_the_reuse_invariant_not_judged ... ok
+test a_released_record_in_the_allocation_record_tree_the_root_record_holds_is_judged_by_the_release_generation_invariant ... ok
+test the_birth_tree_in_a_mapping_key_of_an_index_node_is_not_judged_while_its_field_is_open ... ok
+test the_first_sentence_of_the_instance_carrier_invariant_is_not_judged_when_a_slot_is_unreadable ... ok
+test the_second_sentence_of_the_instance_carrier_invariant_is_judged_on_the_readable_carriers_when_a_slot_is_unreadable ... ok
+test two_leaf_containers_in_key_order_hold_every_invariant ... ok
+test an_abandoned_root_whose_units_a_mount_blind_to_it_handed_out_again_reddens_only_the_reuse_invariant ... ok
+test erasing_a_unit_only_an_abandoned_root_references_reddens_only_the_reuse_invariant ... ok
+test overlapping_records_in_the_allocation_record_tree_the_root_record_holds_redden_only_the_disjointness_invariant ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.58s
+

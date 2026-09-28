@@ -1,0 +1,14 @@
+[
+ {
+  "file": ".claude/kb/checks-owed.md",
+  "old": "；门禁 23 号只判 `[文字](路径)` 形态的链接",
+  "new": "；共享门禁「链接指向」阶段（上游 `link-targets.py`）只判 `[文字](路径)` 形态的链接",
+  "basis": "23-link-targets.sh 在提交 8186d5b5 挪进上游 gate.sh 的「链接指向」阶段（gate.sh:409）；records/2026-09-28-门禁59号提速与双机分片.md「旧编号与现在的门禁」"
+ },
+ {
+  "file": ".claude/kb/checks-owed.md",
+  "old": "或者让 23 号也判反引号里长得像仓内路径的串",
+  "new": "或者让「链接指向」阶段也判反引号里长得像仓内路径的串",
+  "basis": "同上一条"
+ }
+]

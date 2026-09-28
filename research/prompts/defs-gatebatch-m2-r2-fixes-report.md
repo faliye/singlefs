@@ -1,6 +1,6 @@
 # 门禁批第二轮改法（G1）交回：P1–P7、P9、P10、D2、标记字段，加 singlefs-39 的 54 号替换
 
-写于 2026-09-26 UTC（交回时刻见文末）。规格 `/tmp/claude-1000/gate-batch-m2-r2-fixes/spec.md`，判决 `research/prompts/defs-gatebatch-m2-r2-main-verification.md` 第二、三节。
+写于 2026-09-26（交回时刻见文末）。规格 `/tmp/claude-1000/gate-batch-m2-r2-fixes/spec.md`，判决 `research/prompts/defs-gatebatch-m2-r2-main-verification.md` 第二、三节。
 
 ## 结论
 
@@ -50,7 +50,7 @@ D2	改准入模块的判法（judge_worker_threads 把「至少两片」改成�
 
 ## 自证与弄坏开关证红
 
-仓里现文件上跑（2026-09-26 UTC），末行原样：
+仓里现文件上跑（2026-09-26），末行原样：
 
 ```
 $ python3 research/scripts/admission.py --selftest   → 退 0
@@ -204,7 +204,7 @@ ADMISSION_BREAK=ignore-attribute-without-space → 退 1
   ✗ 自检：实现员内存包装里跑用例函数标 # [ignore] 的登记目标（算标了，不带 --ignored 放行） 应当是 0，实际 2
 ```
 
-## 门禁与 lint（仓里现文件，2026-09-26 UTC）
+## 门禁与 lint（仓里现文件，2026-09-26）
 
 | 命令 | 退出码 | 末行 / 判红的那几行 |
 |---|---|---|
@@ -259,4 +259,4 @@ ADMISSION_BREAK=ignore-attribute-without-space → 退 1
 - 留着：`backup/`（五份改前原件，`cp -p`）、`my-changes.diff`、各份日志（`before-k1-*.log`、`rerun-out/`、`final-*.log`、`lib-break-*.log`、`guard-*break-*.log`、`lint-*.log`、`demo-d2-marker.log`、`mut54-selftest.log`）、`demo_d2_marker.py`、`54-before-d2.sh`（套完 singlefs-39 替换、D2 之前的 54 号，演示用）。
 - 攻方的草稿目录 `/tmp/claude-1000/defs-gatebatch-m2-r2-opus/` 不是我建的，没动（我的探针与复跑都把 SCRATCH_ROOT 指到了自己的草稿目录）。
 
-交回时刻：2026-09-26T17:06Z（JST 2026-09-27T02:06）。
+交回时刻：2026-09-27。

@@ -58,8 +58,8 @@ claim() {
   fi
   file="$root/research/prompts/e$number-preregistration.md"
   mkdir -p "$root/research/prompts"
-  if ! ( set -C; printf '# E%s 跑前登记：%s\n\n写于 %s JST，装置写之前。\n' "$number" "$short_name" \
-         "$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M')" > "$file" ) 2>/dev/null; then
+  if ! ( set -C; printf '# E%s 跑前登记：%s\n\n写于 %s，装置写之前。\n' "$number" "$short_name" \
+         "$(TZ=Asia/Tokyo date +%F)" > "$file" ) 2>/dev/null; then
     echo "  ✗ $file 已经存在（刚被别的会话占了）"
     echo "    → 取下一个：bash research/scripts/claim-experiment.sh --next"
     return 1

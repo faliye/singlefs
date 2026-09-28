@@ -1,0 +1,17 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.58s
+     Running tests/first_transaction_step_one_mkfs.rs (target/debug/deps/first_transaction_step_one_mkfs-e9ed4b4f0ba13c85)
+
+running 9 tests
+test recorded_stream_matches_the_registered_mkfs_segment_sequence ... ok
+test region_layout_other_than_zero_one_zero_is_refused_before_any_write ... ok
+test checker_reads_the_same_generation_zero_root_from_all_three_regions_and_isolates_a_torn_slot ... ok
+test ring_larger_than_a_quarter_of_the_device_is_refused_before_any_write ... ok
+test mkfs_zeroes_the_whole_journal_ring_and_writes_the_registered_number_of_bytes ... ok
+test both_system_configuration_slots_verify_with_the_same_generation_and_a_corrupt_slot_loses_the_choice ... ok
+test units_named_by_the_root_pass_their_own_header_checks ... ok
+test same_parameters_twice_give_byte_identical_images ... ok
+test remaking_the_pool_with_the_same_filesystem_identifier_leaves_no_root_of_the_old_pool ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.98s
+

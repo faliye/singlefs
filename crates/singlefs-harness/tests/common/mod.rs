@@ -486,44 +486,47 @@ pub fn abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(
         saved.push((identity, offset, bytes));
     }
     // 系统配置没见证到 `newest`：C554 乙之后崩溃恢复还抛弃得了最新那条根的只剩这一形（系统配置在根槽 FUA 之后才轮换，D16（发布语义） 已定项 7；
-    // 见证在时可写挂载重读一次仍读不出它就拒可写，`MountError::NewerStateStillUnreadableAfterOneReread`）。`newest` 那次发布之后轮换写的
-    // 系统配置槽（每块盘世代号最大的那一槽，槽号 = 世代号 mod 2）坏掉：每块盘两槽轮换，容得下一槽坏（D22（单元原子性怎么合成） 已定项 8）。
-    // 清零、不写回：这次挂载的取号写正好落回这一槽（世代号取读得出的最大 + 1）。
+    // 见证在时可写挂载重读一次仍读不出它就拒可写，`MountError::NewerStateStillUnreadableAfterOneReread`）：崩在 `newest` 的根槽 FUA 之后、
+    // 它那次系统配置轮换写之前。轮换写那一槽（每块盘世代号最大的那一槽，槽号 = 世代号 mod 2）因此还是再前一次轮换留下的内容：
+    // 世代号 g − 2、自证照过。录制流只记内容哈希、拿不回那份字节，这里拿另一槽（世代号 g − 1，见证的是 `newest` 前一次发布）的内容改世代号为 g − 2
+    // 重新编码写回——见证值与那份真内容一样停在 `newest` 之前，两槽都自证得过。不清零：C331（择根倒挂压过已确认的写） 取甲之后
+    // 见证读有一槽读不出或自证不过就拒可写（`WitnessedCounterComparison::SomeSystemConfigurationSlotUnreadOrUnverified`），清零造的是撕裂轮换那一形。
     let slot_spacing_in_bytes = u64::from(publish_parameters.geometry.fixed_structure_slot_spacing);
-    let system_configuration_slot_bytes =
-        usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
-    let newest_system_configuration_slot_of_each_device: Vec<
+    let rotation_not_written_of_each_device: Vec<(
         singlefs_core::address::DeviceOffsetInBytes,
-    > = devices
+        Vec<u8>,
+    )> = devices
         .iter()
         .map(|(identity, _)| {
-            let newest_generation = singlefs_core::recovery::verified_system_configuration_slots(
+            let mut verified_slots = singlefs_core::recovery::verified_system_configuration_slots(
                 devices.as_slice(),
                 *identity,
                 slot_spacing_in_bytes,
                 &publish_parameters.filesystem_identifier,
-            )
-            .into_iter()
-            .map(|slot| slot.quantities.slot_generation)
-            .max()
-            .expect("每块盘都有自证过的系统配置");
-            singlefs_core::address::DeviceOffsetInBytes(
-                (newest_generation % singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE)
-                    * slot_spacing_in_bytes,
+            );
+            verified_slots.sort_by_key(|slot| slot.quantities.slot_generation);
+            let [older, newest_slot] =
+                <[_; 2]>::try_from(verified_slots).expect("造被抛弃的根之前每块盘两槽都自证得过");
+            let newest_generation = newest_slot.quantities.slot_generation;
+            let mut rotation_not_written = older;
+            rotation_not_written.quantities.slot_generation = newest_generation
+                .checked_sub(2)
+                .expect("`newest` 之前至少还有两次轮换");
+            (
+                singlefs_core::address::DeviceOffsetInBytes(
+                    (newest_generation % singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE)
+                        * slot_spacing_in_bytes,
+                ),
+                rotation_not_written.to_slot(),
             )
         })
         .collect();
-    for ((_, device), newest_slot) in devices
-        .iter_mut()
-        .zip(newest_system_configuration_slot_of_each_device)
+    for ((_, device), (newest_slot, rotation_not_written)) in
+        devices.iter_mut().zip(rotation_not_written_of_each_device)
     {
         device
-            .write_at(
-                newest_slot,
-                &vec![0u8; system_configuration_slot_bytes],
-                WriteDurability::Plain,
-            )
-            .expect("见证 newest 的系统配置槽清零");
+            .write_at(newest_slot, &rotation_not_written, WriteDurability::Plain)
+            .expect("见证 newest 的系统配置槽写回成轮换之前的那一代");
     }
     let mounted = singlefs_core::mount::mount_writable(&publish_parameters, &mut devices)
         .expect("最新那条根与它的数据单元读不出：择根落到前一条根，照常可写挂载");
@@ -804,4 +807,122 @@ pub fn unreadable_root_slot_of(
         length_in_bytes: u64::from(publish_parameters.geometry.physical_block_size),
         failing_reads,
     }
+}
+
+/// 每块盘两个系统配置槽的全部字节，按 (盘在盘表里的位置, 偏移) 存。
+pub fn system_configuration_slots_of_every_device(
+    pool: &BuiltPool,
+) -> Vec<(usize, singlefs_core::address::DeviceOffsetInBytes, Vec<u8>)> {
+    use singlefs_core::block_device::BlockDevice;
+    let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
+    let slot_bytes =
+        usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+    let devices = pool.devices.as_ref().expect("镜像开着");
+    let mut saved = Vec::new();
+    for (index, (_, device)) in devices.iter().enumerate() {
+        for slot in 0..singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE {
+            let offset = singlefs_core::address::DeviceOffsetInBytes(slot * spacing);
+            let mut bytes = vec![0u8; slot_bytes];
+            device.read_at(offset, &mut bytes).expect("读系统配置槽");
+            saved.push((index, offset, bytes));
+        }
+    }
+    saved
+}
+
+/// 崩溃恢复造出一条被抛弃的根的另一形（收口表第 43 行调查员的最小复现，`research/prompts/closeout-recheck-2026-09-28/row43-investigator-report.md`）：
+/// `third` 的根槽 FUA 持久、系统配置轮换没持久就崩（`system_configuration_before_the_third` 是它那次发布之前每块盘两槽的字节，由
+/// [`system_configuration_slots_of_every_device`] 取）；下一次可写挂载时 C 的根槽与数据单元一时读不出（挂载交回之后原样写回）：择根落到 B，
+/// C 那条记录施加前验点名单元失败、不施加，新实例 2 写行、暖机。池换成那次挂载交回的分配器与现行版本。
+pub fn abandon_the_third_version_by_a_crash_before_its_rotation(
+    pool: &mut BuiltPool,
+    third: &TransactionOutput,
+    system_configuration_before_the_third: &[(
+        usize,
+        singlefs_core::address::DeviceOffsetInBytes,
+        Vec<u8>,
+    )],
+) {
+    use singlefs_core::block_device::BlockDevice;
+    let publish_parameters = parameters();
+    let target = singlefs_core::root_ring::target_for_publish(
+        third.root.checkpoint_txg,
+        publish_parameters.geometry.root_ring_slots_per_region,
+    );
+    let root_slot_device =
+        publish_parameters.region_devices[usize::try_from(target.region).expect("区域号")];
+    let root_slot_offset = singlefs_core::root_ring::slot_offset(
+        target,
+        publish_parameters.geometry.fixed_structure_slot_spacing,
+    );
+    let root_slot_bytes =
+        usize::try_from(publish_parameters.geometry.physical_block_size).expect("根槽宽");
+    let data_unit_bytes = usize::try_from(singlefs_format::DATA_UNIT_BYTES).expect("32768");
+    let mut devices = pool.reopen_recorded();
+    for (index, offset, bytes) in system_configuration_before_the_third {
+        devices[*index]
+            .1
+            .write_at(
+                *offset,
+                bytes,
+                singlefs_core::block_device::WriteDurability::Plain,
+            )
+            .expect("C 的轮换没落盘：退回轮换之前的字节");
+    }
+    let places_to_hide = std::iter::once((root_slot_device, root_slot_offset, root_slot_bytes))
+        .chain(
+            third
+                .data_pointers
+                .iter()
+                .flat_map(|pointer| pointer.locations)
+                .map(|location| {
+                    (
+                        location.device,
+                        location.slot.to_device_offset(),
+                        data_unit_bytes,
+                    )
+                }),
+        );
+    let mut hidden = Vec::new();
+    for (identity, offset, length) in places_to_hide {
+        let index = devices
+            .iter()
+            .position(|(candidate, _)| *candidate == identity)
+            .expect("池里有这块盘");
+        let mut bytes = vec![0u8; length];
+        devices[index].1.read_at(offset, &mut bytes).expect("暂存");
+        devices[index]
+            .1
+            .write_at(
+                offset,
+                &vec![0u8; length],
+                singlefs_core::block_device::WriteDurability::Plain,
+            )
+            .expect("一时读不出：清零");
+        hidden.push((index, offset, bytes));
+    }
+    let mounted = singlefs_core::mount::mount_writable(&publish_parameters, &mut devices);
+    for (index, offset, bytes) in &hidden {
+        devices[*index]
+            .1
+            .write_at(
+                *offset,
+                bytes,
+                singlefs_core::block_device::WriteDurability::Plain,
+            )
+            .expect("原样写回");
+    }
+    let mounted = mounted.expect("择根落到 B，照常可写挂载");
+    assert_eq!(
+        mounted.output.effective_root.checkpoint_txg,
+        singlefs_core::address::CheckpointTxg(4),
+        "恢复落到 B"
+    );
+    pool.devices = Some(devices);
+    pool.allocator = mounted.allocator.clone();
+    pool.output = mounted
+        .current
+        .file_version()
+        .expect("落到的那一版带文件")
+        .clone();
 }

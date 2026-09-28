@@ -695,7 +695,8 @@ pub fn refusal_reason_of_rollback_error(error: &RollbackError) -> ObservedRefusa
         | RollbackError::UserVisibleUnitWithoutItsRecordInTheCurrentAccount { .. }
         | RollbackError::UserVisibleUnitStillAllocatedUnderAnotherGeneration { .. }
         | RollbackError::ResurrectedUnitCopyUnreadableOrMismatched { .. }
-        // 判候选集读根环或算 F_生效 重读一次仍读坏（实审 A3b Q7）：只在读路径上注入故障才有，与 `MountError::Recovery(_)` 同一处置。
+        // 判候选集读根环或算 F_生效 重读一次仍读坏（实审 A3b Q7）：读路径上注入故障、或同一个进程里一次根槽写被说谎的设备吞掉
+        // （那一槽这个进程知道住着根、盘上却不是它写的那一份）才有，与 `MountError::Recovery(_)` 同一处置。
         | RollbackError::CandidateJudgementStillUnreadableAfterOneReread(_) => {
             ObservedRefusalReason::Unexplained
         }
@@ -754,7 +755,8 @@ pub fn refusal_reason_of_mount_error(error: &MountError) -> ObservedRefusalReaso
                 // 挂着时抬 F 算 F 生效值读最新那条根的实例表、重算影子账读根环里这个进程知道住着根的槽，重读一次仍读坏（实审 A3b Q4，
                 // 改之前经 `MountError::Recovery` 交出、同样记成没理由）：只在读路径上注入故障才有，模型没有这一条。
                 | StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor { .. }
-                | StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot { .. } => {
+                | StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot { .. }
+                | StillUnreadableAfterOneReread::AccountOfAnAbandonedRoot { .. } => {
                     ObservedRefusalReason::Unexplained
                 }
             }
@@ -775,9 +777,11 @@ pub fn refusal_reason_of_mount_error(error: &MountError) -> ObservedRefusalReaso
         | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. }
         | MountError::RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot(_)
         | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided { .. }
-        // 盘表里同一个身份交了几次、调用方参数与盘上系统配置不一致：随机历史每次都交整池两块盘、用建池的那一份参数，走不到。
+        // 盘表里同一个身份交了几次、调用方参数与盘上系统配置不一致、有盘落后于现行那一版又缺它的单元：随机历史每次都交整池两块盘
+        // （没换过盘）、用建池的那一份参数，走不到。
         | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
+        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
         // 盘上的实例代号或 txg 已到顶：坏镜像才有。
         | MountError::SequenceNumberPastTheTopOfItsRange(_) => ObservedRefusalReason::Unexplained,
     }
@@ -828,8 +832,46 @@ pub fn root_ring_slot_still_bad_after_one_reread_of_mount_error(
         | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided { .. }
         | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
+        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
         | MountError::SequenceNumberPastTheTopOfItsRange(_)
         | MountError::NewerStateStillUnreadableAfterOneReread(_) => None,
+    }
+}
+
+/// 挂着时回退判候选集读根环，一个知道住着根的根环槽读坏、重读仍坏
+/// （`RollbackError::CandidateJudgementStillUnreadableAfterOneReread` 装着 `RootRingSlotKnownToHoldARoot`）时实现点名的那个槽；别的成员 None。
+#[must_use]
+pub fn root_ring_slot_still_bad_after_one_reread_of_rollback_error(
+    error: &RollbackError,
+) -> Option<ModelRingPosition> {
+    match error {
+        RollbackError::CandidateJudgementStillUnreadableAfterOneReread(still_unreadable) => {
+            match **still_unreadable {
+                StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot {
+                    ring_slot, ..
+                } => Some(model_ring_position(ring_slot)),
+                StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { .. }
+                | StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger { .. }
+                | StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor { .. }
+                | StillUnreadableAfterOneReread::AccountOfAnAbandonedRoot { .. } => None,
+            }
+        }
+        RollbackError::PublishFrozenAfterAWriteFailureIsNotResentYet { .. }
+        | RollbackError::Recovery(_)
+        | RollbackError::CallerInputsDisagreeWithTheDisk(_)
+        | RollbackError::NextCheckpointTxgPastTheTopOfItsRange { .. }
+        | RollbackError::CurrentInstanceTableMalformed
+        | RollbackError::TargetNotACandidate { .. }
+        | RollbackError::TargetVersionUnreadable { .. }
+        | RollbackError::CurrentAccountUnreadable { .. }
+        | RollbackError::TargetTreeIdentifiersDifferFromTheCurrentVersionWhoseHandlingIsUndecided {
+            ..
+        }
+        | RollbackError::UserVisibleUnitWithoutItsRecordInTheCurrentAccount { .. }
+        | RollbackError::UserVisibleUnitStillAllocatedUnderAnotherGeneration { .. }
+        | RollbackError::ResurrectedUnitCopyUnreadableOrMismatched { .. }
+        | RollbackError::CurrentVersionUnitNotReleasable { .. }
+        | RollbackError::Publish(_) => None,
     }
 }
 
@@ -864,6 +906,7 @@ pub fn reported_ceiling_of_mount_error(error: &MountError) -> Option<ModelCheckp
         | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided { .. }
         | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
+        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
         | MountError::SequenceNumberPastTheTopOfItsRange(_)
         | MountError::NewerStateStillUnreadableAfterOneReread(_) => None,
     }
@@ -1037,6 +1080,81 @@ mod tests {
             root_ring_slot_still_bad_after_one_reread_of_mount_error(&wrapped(still_bad)),
             Some(model_ring_position(ring_slot))
         );
+    }
+
+    /// 挂着时回退判候选集读根环、一个知道住着根的槽重读仍坏：回退交回的成员点名的槽原样交给模型比对（故障注入按它认被吞的根槽写）；
+    /// 同一个成员里装的另外三样、回退别的成员都不点名槽。
+    #[test]
+    fn a_rollback_refused_on_a_root_ring_slot_known_to_hold_a_root_names_that_slot_and_no_other_refusal_names_one(
+    ) {
+        use singlefs_core::mount::{
+            NewerPublishWitness, SelectedVersionAgainstTheWitness, StillUnreadableAfterOneReread,
+            WitnessedCounterComparison,
+        };
+        use singlefs_core::recovery::BadRootRingSlotReading;
+        let candidate_judgement = |still_unreadable: StillUnreadableAfterOneReread| {
+            RollbackError::CandidateJudgementStillUnreadableAfterOneReread(Box::new(
+                still_unreadable,
+            ))
+        };
+        let root_ring_slot_still_bad = candidate_judgement(
+            StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot {
+                ring_slot: RootRingSlot { region: 0, slot: 6 },
+                first_reading: BadRootRingSlotReading::NotSelfVerified,
+                reread: BadRootRingSlotReading::NotSelfVerified,
+            },
+        );
+        assert_eq!(
+            root_ring_slot_still_bad_after_one_reread_of_rollback_error(&root_ring_slot_still_bad),
+            Some(ModelRingPosition {
+                region: 0,
+                slot_in_region: 6
+            }),
+            "回退点名的槽要原样交给模型比对"
+        );
+        let newest_root = RollbackTarget {
+            instance: InstanceGeneration(2),
+            checkpoint_txg: CheckpointTxg(18),
+        };
+        let against_the_witness = SelectedVersionAgainstTheWitness {
+            selected_version: newest_root,
+            witness: NewerPublishWitness {
+                witnessed_journal_counter: 5,
+                comparison: WitnessedCounterComparison::AgainstTheSelectedVersionsLastRecord {
+                    selected_version_last_record_counter: 4,
+                },
+            },
+        };
+        let refusals_naming_no_slot = [
+            candidate_judgement(
+                StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion {
+                    first_read: against_the_witness,
+                    reread: against_the_witness,
+                },
+            ),
+            candidate_judgement(
+                StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger {
+                    newest_root_on_the_reread: Some(newest_root),
+                },
+            ),
+            candidate_judgement(
+                StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor {
+                    newest_root_on_the_reread: Some(newest_root),
+                },
+            ),
+            RollbackError::CurrentInstanceTableMalformed,
+            RollbackError::TargetNotACandidate {
+                target: newest_root,
+                exclusion: RollbackCandidateExclusion::NotInRing,
+            },
+        ];
+        for error in &refusals_naming_no_slot {
+            assert_eq!(
+                root_ring_slot_still_bad_after_one_reread_of_rollback_error(error),
+                None,
+                "不是「知道住着根的根环槽重读仍坏」的回退拒绝不点名槽：{error:?}"
+            );
+        }
     }
 
     /// C554 乙那一拒（`MountError::NewerStateStillUnreadableAfterOneReread`）按它说的是哪一样分：系统配置见证过比所选那一版新的发布、

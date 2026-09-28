@@ -1,0 +1,8 @@
+exit=1
+want=工作区里还留着上一轮及更早的实验记录
+want=archive-past-rounds.py --apply
+want=样本只跑 .gate-cells 点名的格：archive-past-rounds
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（archive-past-rounds）
+want=→ archive-past-rounds：照这一格打出来的基准跑
+want=bash .claude/gate.d/doc-experiments.sh --check archive-past-rounds

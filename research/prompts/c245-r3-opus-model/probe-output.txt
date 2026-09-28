@@ -1,0 +1,36 @@
+# 甲副本（工作树拷自 HEAD e5253e8a 加工作区，2026-09-28）上 c245_r3_opus_probe 的 probe= 行，排序
+probe=A1-control rotation_lost_only=Mounted { effective_instance: 1, effective_txg: 5, new_instance: 2 } corrupted_copy_only=Mounted { effective_instance: 1, effective_txg: 5, new_instance: 2 }
+probe=A1-stale jia=RefusedByDevicesWithoutTheSelectedVersion { devices: [1], selected_txg: 5 } yi_j_devices_without=[1]
+probe=A1 state=rotation-lost-on-dev1+dev1-data-copy-corrupted jia_first=RefusedByDevicesWithoutTheSelectedVersion { devices: [1], selected_txg: 5 } jia_second=RefusedByDevicesWithoutTheSelectedVersion { devices: [1], selected_txg: 5 } disk_unchanged=true read_only_txg_and_content_ok=Ok((5, true)) yi_j_devices_without=[]
+probe=A2 state=both-rotations-lost+data-copy-corrupted-on-dev0 jia=RefusedByDevicesWithoutTheSelectedVersion { devices: [0], selected_txg: 5 }
+probe=A2 state=both-rotations-lost+data-copy-corrupted-on-dev1 jia=RefusedByDevicesWithoutTheSelectedVersion { devices: [1], selected_txg: 5 }
+probe=B2 bing_writable_mount=Mounted { effective_instance: 1, effective_txg: 4, new_instance: 2 } faults_lifted=[true, true] read_only_after_lift=Ok((7, false, true))
+probe=B-identity x_equals_y_under_jia=false under_bing=true under_yi_naive=true
+probe=B state=X-bing writable_mount=Mounted { effective_instance: 1, effective_txg: 4, new_instance: 2 }
+probe=B state=X-jia writable_mount=RefusedByTheWitnessOfANewerPublish
+probe=B state=X-yi-naive writable_mount=Mounted { effective_instance: 1, effective_txg: 4, new_instance: 2 }
+probe=B state=Y-jia-or-bing writable_mount=Mounted { effective_instance: 1, effective_txg: 4, new_instance: 2 }
+probe=B state=Y-yi-naive writable_mount=Mounted { effective_instance: 1, effective_txg: 4, new_instance: 2 }
+probe=B-yi-j2 zero_slot_means_never_written=false witness_on_x=true witness_on_y=true
+probe=B-yi-j2 zero_slot_means_never_written=true witness_on_x=false witness_on_y=false
+probe=C faults=1 yi_naive=RefusedByDevicesWithoutTheSelectedVersion { devices: [1], selected_txg: 5 } jia=Mounted { effective_instance: 1, effective_txg: 5, new_instance: 2 }
+probe=D state=X+sc0 faults=3 jia=RefusedByTheWitnessOfANewerPublish
+probe=D state=X+sc0+sc1 faults=4 jia=Mounted { effective_instance: 1, effective_txg: 4, new_instance: 2 }
+probe=D state=X+sc1 faults=3 jia=RefusedByTheWitnessOfANewerPublish
+probe=E faults=3 jia=RefusedByTheWitnessOfANewerPublish yi_naive=Mounted { effective_instance: 1, effective_txg: 4, new_instance: 2 } yi_j2_witness(zero=ambiguous,zero=never)=[false, false]
+# 乙-J 副本（打 yi-j-*.diff）上探针的 A / C 行；这一份 7 条里 A1、A2、C 三条红（预期）
+probe=A2 state=both-rotations-lost+data-copy-corrupted-on-dev0 jia=Mounted { effective_instance: 1, effective_txg: 5, new_instance: 2 }
+probe=C faults=1 yi_naive=Mounted { effective_instance: 1, effective_txg: 5, new_instance: 2 } jia=Mounted { effective_instance: 1, effective_txg: 5, new_instance: 2 }
+probe=A1 state=rotation-lost-on-dev1+dev1-data-copy-corrupted jia_first=Mounted { effective_instance: 1, effective_txg: 5, new_instance: 2 } jia_second=Mounted { effective_instance: 2, effective_txg: 7, new_instance: 3 } disk_unchanged=false read_only_txg_and_content_ok=Ok((5, true)) yi_j_devices_without=[]
+probe=A1-control rotation_lost_only=Mounted { effective_instance: 1, effective_txg: 5, new_instance: 2 } corrupted_copy_only=Mounted { effective_instance: 1, effective_txg: 5, new_instance: 2 }
+# 两份副本上的用例汇总
+behind-jia-acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics: test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.90s
+behind-jia-c245_r3_opus_probe: test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.38s
+behind-jia-entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration: test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+behind-jia-entries_after_mount_refuse_swapped_or_behind_devices: test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 44.70s
+behind-jia-fsync_drop_and_devices_without_the_selected_version: test result: ok. 16 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 58.67s
+behind-yij-acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics: test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.13s
+behind-yij-c245_r3_opus_probe: test result: FAILED. 4 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.87s
+behind-yij-entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration: test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+behind-yij-entries_after_mount_refuse_swapped_or_behind_devices: test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 49.49s
+behind-yij-fsync_drop_and_devices_without_the_selected_version: test result: ok. 16 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 75.51s

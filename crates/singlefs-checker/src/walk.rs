@@ -25,11 +25,11 @@ use crate::position_addressed::{
 
 use crate::image::{
     chosen_system_configurations, judge_location_entries_order, judge_location_order,
-    judge_pointer_mac_and_nonce_are_zero, judge_system_configuration_values_the_reader_accepts,
-    parse_data_pointer, parse_node_pointer, read_referenced_unit, root_slot_positions,
-    system_configuration_slot_readings, valid_roots, verified_system_configuration_slots,
-    ImageReader, InvariantVerdict, Judgements, PointerLocation, PointerView, PoolGeometry,
-    MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+    judge_own_device_number_is_the_device_identity, judge_pointer_mac_and_nonce_are_zero,
+    judge_system_configuration_values_the_reader_accepts, parse_data_pointer, parse_node_pointer,
+    read_referenced_unit, root_slot_positions, system_configuration_slot_readings, valid_roots,
+    verified_system_configuration_slots, ImageReader, InvariantVerdict, Judgements,
+    PointerLocation, PointerView, PoolGeometry, MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
 };
 use crate::{
     back_chain_of_record_header, check_index_node_keys, check_internal_node_separators,
@@ -4228,6 +4228,76 @@ impl LocationEntryChecksumsForQuarantine<'_> {
     }
 }
 
+/// 收口表第 43 行取丁-defer（用户 2026-09-28 定，被攻过一轮；`research/prompts/abandoned-floor-r1-main-verification.md` M1）：
+/// I-3.1（已分配统计对得上） 的「实际遍历」并上这样的槽——F_生效 之下、没被抛弃的根引用着，候选集那一遍没走到，而最新根的分配记录树里
+/// 罩住它的记录是已释放、释放代高于 F_生效 的（还在 defer 里，抬 F 还不许回收，记账照算已分配）。逐盘交回槽数。
+/// 最新根的树表或分配记录树读不出时一槽都不并（照旧判）。
+fn deferred_slots_referenced_only_below_the_floor_per_device(
+    reader: &dyn ImageReader,
+    filesystem_identifier_low: u64,
+    newest_root: &crate::RootView,
+    roots_below_the_floor: &[&crate::RootView],
+    walked_slots: &BTreeSet<(u32, u64)>,
+    effective_rollback_floor: u64,
+    cache: &mut IndexNodeCache,
+) -> BTreeMap<u32, u64> {
+    let mut deferred_per_device: BTreeMap<u32, u64> = BTreeMap::new();
+    let tree_table_pointer = parse_node_pointer(&newest_root.record_bytes[36..122]);
+    if tree_table_pointer.all_zero {
+        return deferred_per_device;
+    }
+    let Some(tree_table) = read_index_node_without_judging(reader, &tree_table_pointer, cache)
+    else {
+        return deferred_per_device;
+    };
+    let mut released_above_the_floor: BTreeSet<(u32, u64)> = BTreeSet::new();
+    for entry in &tree_table.entries {
+        if entry.len() < tree_table_entry_bytes() || read_u16(entry, 10) != TREE_KIND_ALLOCATION {
+            continue;
+        }
+        let allocation_root = parse_node_pointer(&entry[14..100]);
+        if allocation_root.all_zero {
+            continue;
+        }
+        let Some((_, records)) =
+            allocation_record_tree_without_judging(reader, &allocation_root, cache)
+        else {
+            continue;
+        };
+        for record in records {
+            if record.is_released && record.generation > effective_rollback_floor {
+                released_above_the_floor.extend(
+                    (record.slot..record.slot + record.span_slots)
+                        .map(|slot| (record.device, slot)),
+                );
+            }
+        }
+    }
+    let mut deferred: BTreeSet<(u32, u64)> = BTreeSet::new();
+    for root in roots_below_the_floor {
+        let mut walk_of_the_root_below_the_floor = Walk::starting_with(
+            reader,
+            Judgements::default(),
+            filesystem_identifier_low,
+            newest_root.instance,
+            newest_root.checkpoint_txg,
+        );
+        walk_of_the_root_below_the_floor.walk_root(&root.record_bytes, false);
+        for (device, start_slot, span_slots) in walk_of_the_root_below_the_floor.references.keys() {
+            for slot in *start_slot..*start_slot + *span_slots {
+                let key = (*device, slot);
+                if !walked_slots.contains(&key) && released_above_the_floor.contains(&key) {
+                    deferred.insert(key);
+                }
+            }
+        }
+    }
+    for (device, _) in deferred {
+        *deferred_per_device.entry(device).or_insert(0) += 1;
+    }
+    deferred_per_device
+}
+
 /// 隔离的记录（D19（块指针的结构与宽度预算） 已定项 5：释放之前读盘核出对不上的那个单元，每块盘上的分配记录都留在已分配，
 /// 映射条目去掉、没有任何根再引用它）在 I-3.1（已分配统计对得上） 与 I-3.11（已分配减 defer 等于最新根走读） 上怎么认
 /// （用户 2026-09-25 定；**按单元判**是主 agent 同日定的读法，I-3.1 / I-3.11 两行的措辞随后由书记员改）：已分配而没有根引用的记录，
@@ -5669,7 +5739,8 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
     // 「系统配置每盘放一份」买的就是这份冗余）。早退会让这种镜像上每一条不变量都报「不适用」，
     // 而它是一个挂得上的合法镜像——故障注入让一块盘的两个槽先后写失败就造得出它，判定会被静默放过
     // （.claude/kb/checks-owed.md 的 C461）。⚠️ 「哪块盘的系统配置全废了」今天没有编号报得出来，仍欠在 C461。
-    // 任一盘任一槽自证过而带这一版读者不收的池级值（格式版本、加密类型、槽距、physical_block_size、环长）：实现整池拒绝挂载
+    // 任一盘任一槽自证过而带这一版读者不收的池级值（格式版本、加密类型、槽距、physical_block_size、环长、journal 环起点、
+    // 根环起点、单元区起始槽号）：实现整池拒绝挂载
     // （`RecoveryFailure::SystemConfigurationValueRefused`），checker 报违例、别的不变量同「挂不上的镜像」一样不作保
     // （用户 2026-09-27 定系统配置越界整池拒，实审 A3-checker-2）。只有一部分槽带越界值时不拿别的槽照判下去。
     let any_system_configuration_slot_carries_a_refused_value =
@@ -5753,6 +5824,10 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
             )
         })
         .collect();
+    judge_own_device_number_is_the_device_identity(
+        &verified_system_configurations_of_this_pool,
+        &mut root_ring_judgements,
+    );
     judge_system_configuration_floor_against_the_roots_on_each_device(
         &verified_system_configurations_of_this_pool,
         &roots,
@@ -5837,7 +5912,7 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
     };
     // 回退候选集的下界取 F 生效值（D16（发布语义） 已定项 1「生效」，SysPre）：max(各幸存盘最新持久有效根所带 F 的最大值,
     // 池里自证过的系统配置槽带的 F)。有效 = 按最新根指着的实例表判不是被抛弃的；每块盘取落在它上面的根环区域里 (txg, 实例) 最大的那一条
-    // （被抛弃时间线上的根带的 F 算不算，D16 写着仍开着，这里照「有效根」的字面不算；最新根的实例表读不出时一行都没有、不滤）。
+    // （最新根的实例表读不出时一行都没有、不滤）；被抛弃时间线上的根带的 F 也算进来（D16（发布语义） 已定项 1，用户 2026-09-28 定「算进」）。
     // 只读根上的 F 时，带新 F 的根全坏、系统配置里的新 F 还在的合法镜像上，F 之下、单元已被合法复用的根会被当成候选，
     // I-7.4（近 K 代块未被复用） 等按候选集判的几条误红（C556（checker 与层 0 不读系统配置里的 F））。
     let mut newest_valid_root_on_each_device: BTreeMap<u32, &crate::RootView> = BTreeMap::new();
@@ -5858,15 +5933,26 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
             *newest_on_this_device = root;
         }
     }
-    let highest_floor_on_the_newest_valid_roots = newest_valid_root_on_each_device
-        .values()
-        .map(|root| root.rollback_floor)
+    let highest_floor_on_the_abandoned_roots = roots
+        .iter()
+        .filter(|(_, _, root)| abandoned_by_the_newest_roots_table(root))
+        .map(|(_, _, root)| root.rollback_floor)
         .max()
         .unwrap_or(0);
+    let highest_floor_on_the_newest_valid_and_the_abandoned_roots =
+        newest_valid_root_on_each_device
+            .values()
+            .map(|root| root.rollback_floor)
+            .max()
+            .unwrap_or(0)
+            .max(highest_floor_on_the_abandoned_roots);
     let effective_rollback_floor = verified_system_configurations_of_this_pool
         .iter()
         .flat_map(|(_, slots)| slots.iter().map(|view| view.rollback_floor))
-        .fold(highest_floor_on_the_newest_valid_roots, u64::max);
+        .fold(
+            highest_floor_on_the_newest_valid_and_the_abandoned_roots,
+            u64::max,
+        );
     // 掉出遍历的根槽按理由各记一次（两样都占的两边都记）：I-3.1 判红时这几个数就是「遍历为什么少算」的机理标识。
     let mut root_slots_dropped_as_abandoned = 0u64;
     let mut root_slots_dropped_below_floor = 0u64;
@@ -6139,6 +6225,31 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
         &mut location_entry_checksums,
         &mut index_node_cache,
     );
+    let walked_slots_of_every_walked_version: BTreeSet<(u32, u64)> = walk
+        .references
+        .keys()
+        .flat_map(|(device, start_slot, span_slots)| {
+            (*start_slot..*start_slot + *span_slots).map(move |slot| (*device, slot))
+        })
+        .collect();
+    let roots_below_the_floor: Vec<&crate::RootView> = roots
+        .iter()
+        .map(|(_, _, root)| root)
+        .filter(|root| {
+            !abandoned_by_the_newest_roots_table(root)
+                && root.checkpoint_txg < effective_rollback_floor
+        })
+        .collect();
+    let deferred_below_the_floor_against_every_walked_version =
+        deferred_slots_referenced_only_below_the_floor_per_device(
+            reader,
+            filesystem_identifier_low,
+            newest_root_view,
+            &roots_below_the_floor,
+            &walked_slots_of_every_walked_version,
+            effective_rollback_floor,
+            &mut index_node_cache,
+        );
     let quarantined_exempted_against_the_newest_root = quarantined_slots_exempted_per_device(
         reader,
         newest_root_view,
@@ -6158,19 +6269,25 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
                 .copied()
                 .unwrap_or(0)
                 * SLOT_BYTES;
+            let deferred_below_the_floor = deferred_below_the_floor_against_every_walked_version
+                .get(device)
+                .copied()
+                .unwrap_or(0)
+                * SLOT_BYTES;
             let walked = slots_referenced_by_every_walked_version
                 .get(device)
                 .copied()
                 .unwrap_or(0)
                 * SLOT_BYTES
-                + quarantined_exempted;
+                + quarantined_exempted
+                + deferred_below_the_floor;
             let allocated = accounting
                 .get(&(STATISTIC_ALLOCATED_BYTES, *device))
                 .copied();
             if accounting_was_written_under_the_effective_floor {
                 judgements.judge("I-3.1", allocated == Some(walked), || {
                     format!(
-                        "盘 {device}：记账的已分配 {allocated:?}，遍历全部有效根得到 {walked}（其中隔离豁免 {quarantined_exempted}）{}",
+                        "盘 {device}：记账的已分配 {allocated:?}，遍历全部有效根得到 {walked}（其中隔离豁免 {quarantined_exempted}、F 之下仍在 defer 的 {deferred_below_the_floor}）{}",
                         mechanism()
                     )
                 });

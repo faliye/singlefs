@@ -15,7 +15,7 @@
 | G1 | 整轮门禁改由门禁分诊员跑 `research/scripts/gate-staged.sh`；复用上一次整轮全绿判定只在那一趟里有（判据指到 `research/scripts/stage-must-run.sh`）；层 0 全量的三行命令放进同一次 Bash 调用、判绿之后才往下；54 号出路打印把说明与命令分开 | main-agent.md「暂存之后、提交之前跑门禁」一行与「探索性改 crates」一行；gate-triage.md 第 2 步与写范围；implementation-workflow.md 表；heavy-test-guard.sh 文件头与 POLICY；gate/SKILL.md；54-layer0-replay.sh 的 `print_staged_worktree_full_commands` |
 | G2 | 崩溃验证员不再放行层 0（钩子与派发闸）；它跑 55、57、59 前用 `git diff --quiet` 核工作区与暂存区在这几道的输入上相同，不同就停下报；实现员两处「层 0 归崩溃验证员」改掉；crash-test skill「子 agent 不跑」补例外 | crash-verifier.md 第 1 步；implementation-writer.md 第 4 步与「没做什么」；crash-test/SKILL.md；heavy-test-guard.sh 与 runner-dispatch-guard.sh 的放行集合 |
 | G3 | 变异计数：`💥` 不判整轮失败，`⚠️` `⏱` `🧱` 判；`mutate.sh` 与 59 号两行「计数：」分开说 | mutation-triage.md 第 5 步；mutation-sampling.md「改了一个格式常量之后」一节 |
-| G4 | 核查员三处「分不清」统一标签、补输入「腿开工时刻（UTC）」、「文件不在快照清单里」限定为给了快照的轮、末尾计数加两栏 | three-way-verifier.md |
+| G4 | 核查员三处「分不清」统一标签、补输入「腿开工时刻」、「文件不在快照清单里」限定为给了快照的轮、末尾计数加两栏 | three-way-verifier.md |
 | G5 | 其余：共用约束「写」一节排他新建与「只许点名的脚本写」的冲突、「门禁」一节重型阶段不按轻阶段那样单跑；执行员 7b ② 的「这一步」、bin 名只对 research 一支用连字符；书记员的标题状态加「待定」、状态列交给生成器；设计员的英文名挪进第 2 步与 `## 一、问题` 第一行；75 号认「两项未定」；20、90 号两句指向改成新规则 | agent-common.md「写」「门禁」；experiment-runner.md 第 2 步与 7b；kb-scribe.md 输入；experiment-designer.md 输入、第 2 步、固定节名表 |
 
 ## 二、实现今天的样子（主 agent 的观测，2026-09-26 现查）

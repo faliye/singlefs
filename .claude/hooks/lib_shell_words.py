@@ -2,13 +2,15 @@
 
 .claude/hooks/ 下判 Bash 命令的 hook（bash-command-detector.sh、heavy-test-guard.sh）共用这一份：
 各自按文件路径用 importlib 导入，只留自己的判定。这里 def 的函数名在 .claude/hooks/ 别的文件里再 def 一份，
-门禁 63 号判红——一份改了另一份不跟，同一条命令一个 hook 认得出、另一个认不出。
+门禁 code-tooling 的 agent-write-scope 格判红——一份改了另一份不跟，同一条命令一个 hook 认得出、另一个认不出。
 
 认得出的：引号与反斜杠、词首的 # 注释、重定向（连同目标去掉，输出重定向的目标另交）、
 命令替换 `$(…)` 与反引号（引号里外都认：整段留在所在的词里，里面的命令另按一条完整的命令递归判；`$((…))` 算术整段留在词里、不判）、
 进程替换 `<(…)` 与 `>(…)`（只在引号外认，办法同命令替换：整段留在所在的词里，`)` 之后的词照旧是外层命令的参数）、
 命令前的关键字与赋值、nohup / setsid / nice / ionice / timeout / env / stdbuf / sudo / taskset / command / exec 这类前缀、
 `bash [选项] 脚本` 与 `bash -c '…'`（递归进去）、`python3 [选项] 脚本`、`source` / `.`（后面跟的像一个路径才算）、`capped.sh N …` 与 `run-with-memory-cap.sh <上限> …`，
+（被执行的只是脚本位上那一个词：`bash -n 脚本` 只查语法、`python3 - 词…` 的程序从标准输入读，后面的词都是参数，都不当被执行的脚本交出；
+弄坏开关 LIB_SHELL_WORDS_BREAK=arguments-as-executed 把这两种里的参数照旧当被执行的脚本，只给 lib_heavy_tests.py 与 heavy-test-guard.sh 的自检证明它会红），
 数组赋值 `名字=(…)`（元素是值，不当命令）、`command -v` / `-V`（查名字，后面那个词不当命令），
 以及 cd / pushd 换目录、export / unset 改变量对后面命令的影响。喂给非 shell 命令的 heredoc 正文每一层都先剥掉。
 剥掉的 heredoc 正文与输出重定向挂回它所在的那条命令（CommandAtPosition 的 standard_input_heredocs、output_redirections）：
@@ -374,6 +376,11 @@ def skip_prefixes(words):
     return PrefixSkip(None, prefix_names, assignments)
 
 
+def arguments_as_executed():
+    """弄坏开关 LIB_SHELL_WORDS_BREAK=arguments-as-executed：`bash -n 脚本` 与 `python3 - 词…` 里的参数照旧当被执行的脚本（只给自检证红用）。"""
+    return "arguments-as-executed" in os.environ.get("LIB_SHELL_WORDS_BREAK", "").split(",")
+
+
 def shell_invocation(arguments):
     """bash / sh 这类后面的参数：是 -c 的一段代码、是起一个脚本，还是都不是（只查语法、从标准输入读）。"""
     option_count, only_checks_syntax = 0, False
@@ -386,7 +393,7 @@ def shell_invocation(arguments):
             option_count += 1
             continue
         letters = "" if argument.startswith("--") else argument[1:]
-        only_checks_syntax = only_checks_syntax or "n" in letters
+        only_checks_syntax = (only_checks_syntax or "n" in letters) and not arguments_as_executed()
         if "c" in letters:
             return ShellInvocation(arguments[option_count] if option_count < len(arguments) else "", None)
     if option_count >= len(arguments) or only_checks_syntax:
@@ -488,6 +495,9 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
             if PYTHON_NAME.match(name):
                 option_count = 0
                 while option_count < len(arguments) and arguments[option_count].startswith("-"):
+                    if arguments[option_count] == "-" and not arguments_as_executed():
+                        option_count = len(arguments)   # `python3 -`：程序从标准输入读，后面的词都是它的参数，没有被执行的脚本
+                        break
                     option_count += 1
                 if option_count >= len(arguments):
                     commands.append(CommandAtPosition(remaining, directory, command_environment, **attached, memory_capped=command_memory_capped))

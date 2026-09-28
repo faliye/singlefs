@@ -27,7 +27,7 @@ $ git diff --stat -- research/scripts/mutate.sh
 
 ## 判红输入：改前对 E162 表跑（今天的结局）
 
-命令（在 research/ 下跑，时间 2026-09-27 06:57 UTC）：`BINDGEN_EXTRA_CLANG_ARGS=-I/usr/lib/gcc/x86_64-linux-gnu/13/include MUTATE_JOBS=1 MUTATE_TARGET_DIR=/tmp/claude-1000/mutate-features/target nice -n 19 bash scripts/capped.sh 4 bash scripts/mutate.sh e162-crash-verdict-block-store e7-index-bench/src/bin/e162_crash_verdict_block_store.rs mutations/e162_crash_verdict_block_store.tsv`
+命令（在 research/ 下跑，时间 2026-09-27）：`BINDGEN_EXTRA_CLANG_ARGS=-I/usr/lib/gcc/x86_64-linux-gnu/13/include MUTATE_JOBS=1 MUTATE_TARGET_DIR=/tmp/claude-1000/mutate-features/target nice -n 19 bash scripts/capped.sh 4 bash scripts/mutate.sh e162-crash-verdict-block-store e7-index-bench/src/bin/e162_crash_verdict_block_store.rs mutations/e162_crash_verdict_block_store.tsv`
 ```
 mutate: 这一轮开 1 个工作进程（各项取最小、至少 1）：核数 32 的一半、至多 16，给 16 个；MUTATE_JOBS 给 1 个；表里 13 条。卡在「MUTATE_JOBS」这一项；每个 cargo 编译并行度 4（调用方的 CARGO_BUILD_JOBS）
 mutate: 基线就是红的，先修好再来
@@ -58,7 +58,7 @@ rc=0
 
 ## 改后对 E162 表跑（原样）
 
-命令与判红那次相同（换成改后的 mutate.sh），时间 2026-09-27 07:01:30Z–07:11:48Z UTC：
+命令与判红那次相同（换成改后的 mutate.sh），时间 2026-09-27：
 ```
 mutate: 这一轮开 1 个工作进程（各项取最小、至少 1）：核数 32 的一半、至多 16，给 16 个；MUTATE_JOBS 给 1 个；表里 13 条。卡在「MUTATE_JOBS」这一项；每个 cargo 编译并行度 4（调用方的 CARGO_BUILD_JOBS）
 mutate: e162-crash-verdict-block-store 在 e7-index-bench/src/bin/../../Cargo.toml 里挂了 required-features，每次 cargo test 带 --features e7-index-bench/e162-block-stores
@@ -79,7 +79,7 @@ mutate: e162-crash-verdict-block-store 在 e7-index-bench/src/bin/../../Cargo.to
 计数：内存撞顶 0 条（上限 16G）、超时 0 条
 已还原，基线仍全绿
 rc=0
-2026-09-27T07:11:48Z
+2026-09-27
 ```
 汇总（用 `grep -c` 数的）：抓到 ✅ 13、没红 ❌ 0、无效 ⏭ 0、超时 ⏱ 0、内存撞顶 🧱 0、没跑完 💥 0、抓名字有盲区 ⚠️ 0。rc=0。
 这份产物没有放进 `research/results/`：那个目录不在我的写范围里。原件在 `research/results/e162-crash-verdict-block-store-mutate-2026-09-27-features.log`，要入库的话请主 agent 拷过去（门禁 69 号判「变异表改了、results 里却没有不比它旧的产物」，这张表是这一轮新建的，没进 git）。

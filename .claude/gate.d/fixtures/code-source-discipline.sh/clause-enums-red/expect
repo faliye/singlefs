@@ -1,0 +1,12 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：clause-enums
+want=条文列的集合与代码里的枚举对不上
+want=枚举里有变体 `Bing`
+want=代码加了成员而没登记
+want=表里的「乙」不是 D99 已定项 1 正文那串列举里的一项
+want=条文列了「丙种」，而 .claude/gate.d/clause-enum-pairs.tsv 里 src/sample.rs:SampleKind 没有它那一行
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=clause-enums：红（退出 1）
+want=code-source-discipline.sh：1 格里 1 格红（clause-enums）
+want=→ clause-enums：
+want=bash .claude/gate.d/code-source-discipline.sh --check clause-enums

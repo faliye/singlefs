@@ -1,4 +1,4 @@
-# E158 第 4 次跑第二段重跑 seg2b：装置记账撞键修掉、12 臂重跑、主工作区单测改绿（执行员，2026-09-27 JST 12:35–14:2x）
+# E158 第 4 次跑第二段重跑 seg2b：装置记账撞键修掉、12 臂重跑、主工作区单测改绿（执行员，2026-09-27）
 
 ## 一、结论
 
@@ -11,7 +11,7 @@
 - **乙-配置、乙-配置续 在 seg2b 上**：H-随 6/37、实七-甲 0/10、实七-乙 0/6、实八 0/2（compare-r2 第 266–273 行，原样见第三节）。H-随 那 6 格仍全是 ③c（`q3c_lost_cells=6`），不算 ③c 是 2 格，Q1 只算环内且不算 ③c 是 1 格。
 - **compare 有两份**：`…-r4-seg2b-compare.out` 我漏设了 `SINGLEFS_E158_SNAPSHOT_SHA256`，首行是 `sha256=unset`。不许覆盖，所以另存 `…-r4-seg2b-compare-r2.out`，两份只差第 1 行（`diff` 原样见第三节）。**以 compare-r2 为准**，第一份留不留交主 agent 定。
 - **主工作区补丁**在 `patch/`：`crates.patch`（sha256 `9a58a6cb…`）。对主工作区现状（A3a 之后，bin 仍是 `06d75b96…`，`crates/mutations.tsv` 1242 行）`git apply --check` 过了。补丁打在主工作区现状的副本上：bin 单测 95 passed / 0 failed；变异 12 行全部锚点恰好 1 次、基线 ok、施加后 FAILED、已还原。
-- **要主 agent 知道的一件事**：第一版 `crates.patch` 是我在变异 M40 正施加在副本里的时候生成的，补丁里带着 M40。对主工作区现状重做时单测红，我才发现，已作废，另存为 `/tmp/claude-1000/e158-r4-seg2b/crates.patch.bad-contains-M40`，现在的 `crates.patch` 是重生成的。臂副本里的 bin 不受影响：它 13:14 从 dev 副本拷进来，那时 dev 副本上的变异早已还原；核过它含 `if !roots_in_the_crash_image`，函数与调用两段和主补丁逐字相同。
+- **要主 agent 知道的一件事**：第一版 `crates.patch` 是我在变异 M40 正施加在副本里的时候生成的，补丁里带着 M40。对主工作区现状重做时单测红，我才发现，已作废，另存为 `/tmp/claude-1000/e158-r4-seg2b/crates.patch.bad-contains-M40`，现在的 `crates.patch` 是重生成的。臂副本里的 bin 不受影响：它从 dev 副本拷进来时，dev 副本上的变异早已还原；核过它含 `if !roots_in_the_crash_image`，函数与调用两段和主补丁逐字相同。
 
 ## 二、装置与臂副本
 
@@ -124,7 +124,7 @@ E7RESULT name=r4_loss arm=yi-cfg-carry family=eighth-crash geometry=harness-4gib
   - 第 551、845、849、850、947 行（点名的用例我改过，主表不用动）。
   另外，主表 68 行加第二段草稿 11 行，在补丁打上之后锚点全部恰好 1 次（第 659 行按替换行算）。
 - 交付（`/tmp/claude-1000/e158-r4-seg2b/patch/`）：
-  - `crates.patch`：sha256 `9a58a6cbec482530362ad5520a1937c03381adbca85fc9c11406ccde68e56e3b`，14:1x JST 对主工作区现状 `git apply --check` 过。
+  - `crates.patch`：sha256 `9a58a6cbec482530362ad5520a1937c03381adbca85fc9c11406ccde68e56e3b` 对主工作区现状 `git apply --check` 过。
   - `mutations-replacements.tsv`：`5dff68a7…`。第 659 行用第二段执行员那一版，原样没改；第 844、846 行只改第六段。
   - `mutations-append.tsv`：`fa25b0a6…`。第 1 行替换第二段草稿 `/tmp/claude-1000/e158-r4-seg2/mutations-append.tsv` 的第 9 行（M36）；第 2、3 行是 M39、M40。
   - 行号对的是主工作区现在的 1242 行表，现查过 551–947 这几行仍是原来那几条。

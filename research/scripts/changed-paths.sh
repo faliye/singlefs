@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # 门禁阶段共用的「这次改动碰了哪些路径」取法（中文路径不转义、未跟踪可开关、基准的回退次序）。
 #
-# 这是门禁阶段共用的「这次改动碰了哪些路径、新增了哪些行」取法，阶段 source 它，不各抄一份（门禁 64 号判阶段里没有第二份）：
+# 这是门禁阶段共用的「这次改动碰了哪些路径、新增了哪些行」取法，阶段 source 它，不各抄一份（门禁 code-tooling 的 change-range-single-source 格判阶段里没有第二份）：
 # 六份拷贝已经分叉过——一半的 git 调用漏了 -c core.quotepath=false（中文路径被转成带引号的八进制串，
-# 与仓里的路径逐字对不上），97 号借「与 56 号同一条」时又省掉了未跟踪文件。
+# 与仓里的路径逐字对不上），今天门禁 doc-registries 的 invariant-anchors 那一格（当时单独是一道）借「与 doc-process-records 同一条」时又省掉了未跟踪文件。
 #
 # 两个函数：
 #   gate_diff_base <取法>
 #     gate：GATE_BASE 是个提交就用它；否则 @{upstream} 的 merge-base；都没有（或 merge-base 取不到）就 HEAD。
-#           一轮可以跨几个提交，问「这一轮碰了哪些」的阶段用它（56、68、69、97 号）。
+#           一轮可以跨几个提交，问「这一轮碰了哪些」的阶段用它（doc-process-records 的 verdict-names-local-samples、crates-adversarial-review、knowledge-sync、agent-def-adversarial-review 四格，doc-experiments 用改动范围的六格，doc-registries 的 invariant-anchors 那一格）。
 #           不认上游 gate.sh 导出的 GATE_DIFF_BASE（用户 2026-09-24 定）：带 --staged 那条路在里层把 GATE_BASE 设成上游
 #           diff_base，不带 --staged 的整轮用这里的回退次序；全推出去了时前者是 HEAD~1、后者是 HEAD，两条路判的窗口不同（C528）。
-#     head：HEAD。问「这一次提交要带哪些」的阶段用它（11 号；为什么不用 GATE_BASE 写在 11 号头部）。
+#     head：HEAD。问「这一次提交要带哪些」的阶段用它（doc-process-records 的 batch-scope 格；为什么不用 GATE_BASE 写在 doc-process-records 文件头 batch-scope 那一段）。
 #   gate_changed_paths <基准> <untracked | tracked-only> [<diff-filter>]
 #     一行一条、排序去重：基准到工作区的 diff、HEAD 到暂存区的 diff；第二个参数是 untracked 时再加未跟踪文件。
 #     给了 diff-filter（例 A）只在两个 diff 上加；未跟踪文件只在 diff-filter 为空或含 A 时加（它们本来就是新增）。
@@ -30,7 +30,7 @@
 #   changed="$(gate_changed_paths "$base" untracked)"
 #
 # 住在 research/scripts/ 而不是 .claude/gate.d/：共享门禁（gate.sh）把 gate.d 下每个 *.sh 都当阶段跑，
-# 阶段调用的共用 shell 脚本照 stage-must-run.sh、change-touches-crates.sh 的惯例放这里；自证由门禁 47 号跑。
+# 阶段调用的共用 shell 脚本照 stage-must-run.sh、change-touches-crates.sh 的惯例放这里；自证由门禁 code-tooling 跑。
 # `--selftest` 在临时 git 仓里自证：三种来源（工作区改、暂存新增、未跟踪）各放一个中文路径，逐字核两个函数的输出。
 # 判别力：LIB_CHANGED_PATHS_BREAK=quotepath 让取法漏掉 core.quotepath=false、=untracked 让它丢掉未跟踪文件、
 # =fallback 让 gate 取法不认 GATE_BASE、=empty-merge-base 让 merge-base 取不到时交出空串、
@@ -203,7 +203,7 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     printf '%s\n' "$failures" | sed 's/^FAIL /      /'   # gate-lint:detail
     printf '%s\n' "$selftest_output" | grep -v '^PASS \|^FAIL ' | sed 's/^/      /'   # gate-lint:detail
     echo "     → 怎么办：看 gate_changed_paths / gate_added_lines 的 git 调用有没有带 -c core.quotepath=false、未跟踪文件那一支有没有加 ls-files --others，"
-    echo "               gate_diff_base 的回退次序是不是 GATE_BASE → @{upstream} 的 merge-base → HEAD；门禁 11、56、68、69、97 号都靠它取改动范围。"
+    echo "               gate_diff_base 的回退次序是不是 GATE_BASE → @{upstream} 的 merge-base → HEAD；门禁 doc-process-records、doc-experiments 与 doc-registries 的 invariant-anchors 那一格都靠它取改动范围。"
     exit 1
   fi
   echo "  ✓ 共用库 research/scripts/changed-paths.sh 自证通过（$check_count 项：三种来源的中文路径逐字不转义、未跟踪可开关、diff-filter=A、新增行含未跟踪整份且只看给的路径、带空格路径与「++ 」开头的行、不读二进制、路径带制表符退非 0、基准解析不到退非 0、HEAD 没出生取空树、基准回退四档）"

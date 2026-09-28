@@ -1,0 +1,4 @@
+exit=1
+want=bash research/scripts/sample-fail-b.sh --selftest 没过（退出码 1）
+want=      ✗ b 的自证判错：样本故意红
+want=runner 表 4 条里 1 条没过

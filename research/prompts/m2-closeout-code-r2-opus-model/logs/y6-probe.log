@@ -1,0 +1,49 @@
+warning: unused import: `checker_violations_on`
+ --> crates/singlefs-harness/tests/opus_r2_y6_journal_ring_turned_torn_records.rs:9:24
+  |
+9 | use common_admission::{checker_violations_on, content_of, PoolUnderTest};
+  |                        ^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `mount_writable`
+  --> crates/singlefs-harness/tests/opus_r2_y6_journal_ring_turned_torn_records.rs:13:28
+   |
+13 | use singlefs_core::mount::{mount_writable, ParametersAndDeviceTableOfTheMount, ShadowLedger};
+   |                            ^^^^^^^^^^^^^^
+
+warning: unused imports: `Layer0Parallelism`, `MemoryPool`, and `enumerate_layer0_in_state_slices`
+  --> crates/singlefs-harness/tests/opus_r2_y6_journal_ring_turned_torn_records.rs:17:5
+   |
+17 |     enumerate_layer0_in_state_slices, full_expansion, layer0_state_count_with_torn_in_place_overwrites, writes_and_segments_with_str...
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+18 |     Layer0Parallelism, MemoryPool, RetainedWrite, SparseBlockDevice, TearableInPlaceOverwrites,
+   |     ^^^^^^^^^^^^^^^^^  ^^^^^^^^^^
+
+warning: unused import: `singlefs_harness::layer0_progress::Layer0Resume`
+  --> crates/singlefs-harness/tests/opus_r2_y6_journal_ring_turned_torn_records.rs:21:5
+   |
+21 | use singlefs_harness::layer0_progress::Layer0Resume;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `STATES_AT_MOST` is never used
+  --> crates/singlefs-harness/tests/opus_r2_y6_journal_ring_turned_torn_records.rs:28:7
+   |
+28 | const STATES_AT_MOST: u64 = 1_000_000;
+   |       ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "opus_r2_y6_journal_ring_turned_torn_records") generated 5 warnings (run `cargo fix --test "opus_r2_y6_journal_ring_turned_torn_records" -p singlefs-harness` to apply 4 suggestions)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_r2_y6_journal_ring_turned_torn_records.rs (/tmp/claude-1000/three-way-attack-r2/target/release/deps/opus_r2_y6_journal_ring_turned_torn_records-7c34bcd738a51373)
+
+running 1 test
+Y6 probe overwrites_to_turn=298 last_counter=301
+Y6 probe window=overwrite segments=24+2+1+2 journal_writes=2 tearable_journal_writes=2 tearable_total=4 layer0_states=16777233 counter_after=302
+Y6 probe window=unmount segments=2+16+2+1+2+16+2+1+2 journal_writes=4 tearable_journal_writes=4 tearable_total=10 layer0_states=131113 counter_after=304
+Y6 probe window=crash_remount segments=2+18+2+1+2+16+2+1+2+16+2+1+2 journal_writes=6 tearable_journal_writes=6 tearable_total=14 layer0_states=393273 counter_after=307
+test probe_segment_sizes_of_the_entries_on_a_turned_ring ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+

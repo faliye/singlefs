@@ -1,10 +1,10 @@
-# E158 第 4 次跑第二段：装置写完、交接（执行员，2026-09-27 JST 11:2x；主 agent 要求在此交接）
+# E158 第 4 次跑第二段：装置写完、交接（执行员，2026-09-27；主 agent 要求在此交接）
 
 ## 一、结论
 
-- 第二段装置写完、单测与变异证红、12 份第二段自己的臂副本编好；**第二段产物一份都没跑**（主 agent 11:5x 要求交接，停在跑产物之前）。
-- 主工作区 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs` 已是整份编得过的最终版：sha256 `12b82f491453e4f598f8262632dc949967508a8a1cae745a1b4db078499fb148`，24238 行；11:22:57 JST 在主工作区跑 `cargo build -p singlefs-harness --bin e158_root_choice_repair`：`build_rc=0`，末行 `Finished \`dev\` profile [unoptimized + debuginfo] target(s) in 0.00s`（11:16 那一次 `in 4.36s`、0 warning）。它与 12 份臂副本里的 bin `cmp` 相同。
-- 主 agent 11:4x 说的「unclosed delimiter」是我分段 Edit 插入模块的中间态；11:16:38 JST 已整份 `cp` 成编得过的版本（按主 agent 消息的做法）。
+- 第二段装置写完、单测与变异证红、12 份第二段自己的臂副本编好；**第二段产物一份都没跑**（主 agent 要求交接，停在跑产物之前）。
+- 主工作区 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs` 已是整份编得过的最终版：sha256 `12b82f491453e4f598f8262632dc949967508a8a1cae745a1b4db078499fb148`，24238 行；之后在主工作区跑 `cargo build -p singlefs-harness --bin e158_root_choice_repair`：`build_rc=0`，末行 `Finished \`dev\` profile [unoptimized + debuginfo] target(s) in 0.00s`（之前那一次 `in 4.36s`、0 warning）。它与 12 份臂副本里的 bin `cmp` 相同。
+- 主 agent 说的「unclosed delimiter」是我分段 Edit 插入模块的中间态已整份 `cp` 成编得过的版本（按主 agent 消息的做法）。
 - 推翻条件：主工作区那份与 `/tmp/claude-1000/e158-r4-seg2/arms/<臂>/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs` 不 `cmp` 相同；在任一臂副本上 `cargo test --release --bin e158_root_choice_repair` 不是 94 passed。
 
 ## 二、做完的
@@ -42,7 +42,7 @@ E7RESULT name=r4_failure_clause clause=F19 family=h-random arm=today segments_wi
    `cd /tmp/claude-1000/e158-r4-seg2 && SEGMENT_TWO_FINGERPRINT=ad9f544263a5a61bf0bed305ea6e98701042e63ff2ad5e96f2b66552f360f9dc bash run_lane.sh T today`
    产物 `research/results/e158-root-choice-repair-2026-09-27-r4-seg2-today.out`。先看它的 `r4_segment_two_executor_agreement`、`r4_stop_check`、`name=stop` 行：有 S9/S7/S5a 停的族，别的臂自动跳过那一族。
 2. 其余 11 条臂分 4 条 lane（每条进程单线程，合计 4 个线程），同一条命令换 lane 名与臂名，例：`bash run_lane.sh A jia-cfg yi-cfg bing-cfg`、`B jia-cfg-carry yi-cfg-carry bing-cfg-carry`、`C jia-slot yi-slot yi-narrow-slot`、`D yi-narrow-cfg yi-narrow-cfg-carry`（run_in_background 里每条 `{ …; echo $? > rc-<lane>; } &` 再 `wait`）。脚本写之前核同名文件不存在；每条臂约 3 分钟（今天那一臂试跑实测 2 分 28 秒，别的臂没量过）；每跑完一条往 `progress.md` 追加一行。
-3. `r4-compare`：在 `arms/today` 里跑 `… ./target/release/e158_root_choice_repair r4-compare /home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg2 > …-r4-seg2-compare.out`（同样经 `capped.sh 3` 与 `run-with-memory-cap.sh 10G`）。
+3. `r4-compare`：在 `arms/today` 里跑 `… ./target/release/e158_root_choice_repair r4-compare research/results/e158-root-choice-repair-2026-09-27-r4-seg2 > …-r4-seg2-compare.out`（同样经 `capped.sh 3` 与 `run-with-memory-cap.sh 10G`）。
 4. 第 4c 步判决行逐个点名、岔路表、实验页不写、`replay.sh` 不改（派发）。`replay.sh` 以后要复跑这一段，今天那一臂要先跑、别的臂要环境变量 `SINGLEFS_E158_SEGMENT_TWO_TODAY_PRODUCT` 与 `SINGLEFS_E158_INVESTIGATOR_REPORT`，写复跑登记时照 `run_lane.sh` 里那一行。
 5. 门禁：登记给 experiment-runner 的阶段一道都没跑。
 

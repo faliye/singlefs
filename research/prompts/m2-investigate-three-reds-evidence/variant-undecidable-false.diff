@@ -1,0 +1,11 @@
+--- /tmp/claude-1000/investigate-three-reds/mount.rs.now-original	2026-09-27
++++ /tmp/claude-1000/investigate-three-reds/nowvar/crates/singlefs-core/src/mount.rs	2026-09-27
+@@ -381,7 +381,7 @@
+                         self.selected_version.checkpoint_txg,
+                     )
+             }
+-            WitnessedCounterComparison::Undecidable => true,
++            WitnessedCounterComparison::Undecidable => false,
+         }
+     }
+ }

@@ -1,0 +1,349 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running tests/zz_probe_small_disks.rs (target/debug/deps/zz_probe_small_disks-33d40d038620059e)
+
+running 6 tests
+PROBE1 overwrite 1 ok floor_raises=0
+PROBE1 overwrite 2 ok floor_raises=0
+PROBE1 overwrite 3 ok floor_raises=0
+PROBE1 overwrite 4 ok floor_raises=0
+PROBE1 overwrite 5 ok floor_raises=0
+PROBE1 overwrite 6 ok floor_raises=0
+PROBE1 overwrite 7 ok floor_raises=0
+PROBE1 overwrite 8 ok floor_raises=0
+PROBE1 overwrite 9 ok floor_raises=0
+PROBE1 overwrite 10 ok floor_raises=0
+PROBE1 overwrite 11 ok floor_raises=0
+PROBE1 overwrite 12 ok floor_raises=0
+PROBE1 overwrite 13 ok floor_raises=0
+PROBE1 overwrite 14 ok floor_raises=0
+PROBE1 overwrite 15 ok floor_raises=0
+PROBE1 overwrite 16 ok floor_raises=0
+PROBE1 overwrite 17 ok floor_raises=0
+PROBE1 overwrite 18 ok floor_raises=0
+PROBE1 overwrite 19 ok floor_raises=0
+PROBE1 overwrite 20 refused NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: PlacementRefused { unit: InodeLeafContainer(InodeLeafContainerIndexInTree(0)), refusal: NoFreeSlotOnAnyDevice }, floor_raises: [], refusals_that_pushed_the_floor_raises: [], stop: FloorRaiseRefusedForSpace { refusal: RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { refused_publish_in_the_sequence: 1, publishes_in_the_sequence: 3, cause: PlacementRefused { unit: AccountingTree, refusal: NoFreeSlotOnAnyDevice } } } })
+test probe_one_session_wall ... ok
+PROBE5 overwrites=8 ending=Completed all_overwrites_applied=true last=Some(Applied(Mounted { instance: InstanceGeneration(2), publishes: 2, allocation_records_compared: Compared { publishes: 2 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: NotJudgedByTheTestOnlySwitch }))
+PROBE2 10 mount ok instance=InstanceGeneration(2) admission=AdmittedBeforeAcquisition
+PROBE4 width=UnitAreaOf256Slots overwrites=6 instance=InstanceGeneration(3) AdmittedBeforeAcquisition | overwrite ok
+PROBE5 overwrites=9 ending=Completed all_overwrites_applied=true last=Some(Applied(Mounted { instance: InstanceGeneration(2), publishes: 2, allocation_records_compared: Compared { publishes: 2 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: NotJudgedByTheTestOnlySwitch }))
+PROBE3 width=UnitAreaOf384Slots empties=60 pairs_after_empties=[(19, 92), (19, 92)] available=[112, 112]
+PROBE3 width=UnitAreaOf384Slots empties=60 units=2 ok pairs_before=[(19, 92), (19, 92)] available_before=[112, 112]
+PROBE2 11 mount ok instance=InstanceGeneration(2) admission=AdmittedAfterTheFloorRaises { refusal_before_acquisition: AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-49152), demand: BytesOnOneDevice(0) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-49152), demand: BytesOnOneDevice(0) }] }, floor_raises: [RaisedFloor { ceiling: CheckpointTxg(11), system_configuration_writes_before_the_first_publish: WritesByStructureKind { counted: {SystemConfigurationSlot: WriteCallsAndBytes { write_calls: 2, written_bytes: 8192 }} }, publis
+PROBE3 width=UnitAreaOf384Slots empties=60 units=3 ok pairs_before=[(17, 88), (17, 88)] available_before=[101, 101]
+PROBE3 width=UnitAreaOf384Slots empties=60 units=4 ok pairs_before=[(10, 88), (10, 88)] available_before=[88, 88]
+PROBE3 width=UnitAreaOf384Slots empties=60 units=5 refused pairs_before=[(0, 93), (0, 93)] available_before=[75, 75] SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(0), demand: BytesOnOneDevice(163840) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(0), demand: BytesOnOneDevice(163840) }] })
+PROBE4 width=UnitAreaOf256Slots overwrites=7 instance=InstanceGeneration(3) AdmittedBeforeAcquisition | overwrite ok
+PROBE5 overwrites=10 ending=Completed all_overwrites_applied=true last=Some(Applied(Mounted { instance: InstanceGeneration(2), publishes: 3, allocation_records_compared: Compared { publishes: 3 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: NotJudgedByTheTestOnlySwitch }))
+PROBE2 12 mount ok instance=InstanceGeneration(2) admission=AdmittedAfterTheFloorRaises { refusal_before_acquisition: AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-245760), demand: BytesOnOneDevice(0) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-245760), demand: BytesOnOneDevice(0) }] }, floor_raises: [RaisedFloor { ceiling: CheckpointTxg(12), system_configuration_writes_before_the_first_publish: WritesByStructureKind { counted: {SystemConfigurationSlot: WriteCallsAndBytes { write_calls: 2, written_bytes: 8192 }} }, publ
+PROBE5 overwrites=11 ending=Completed all_overwrites_applied=true last=Some(Applied(Mounted { instance: InstanceGeneration(2), publishes: 2, allocation_records_compared: Compared { publishes: 2 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: NotJudgedByTheTestOnlySwitch }))
+PROBE4 width=UnitAreaOf256Slots overwrites=8 instance=InstanceGeneration(3) AdmittedBeforeAcquisition | overwrite err SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-81920), demand: BytesOnOneDevice(229376) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-81920), demand: BytesOnOneDevice(229376) }] })
+PROBE2 13 mount ok instance=InstanceGeneration(2) admission=AdmittedAfterTheFloorRaises { refusal_before_acquisition: AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-442368), demand: BytesOnOneDevice(0) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-442368), demand: BytesOnOneDevice(0) }] }, floor_raises: [RaisedFloor { ceiling: CheckpointTxg(13), system_configuration_writes_before_the_first_publish: WritesByStructureKind { counted: {SystemConfigurationSlot: WriteCallsAndBytes { write_calls: 2, written_bytes: 8192 }} }, publ
+PROBE6 seed=4000000040 step=38 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE5 overwrites=12 ending=Completed all_overwrites_applied=true last=Some(Applied(Mounted { instance: InstanceGeneration(2), publishes: 2, allocation_records_compared: Compared { publishes: 2 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: NotJudgedByTheTestOnlySwitch }))
+PROBE4 width=UnitAreaOf256Slots overwrites=9 instance=InstanceGeneration(3) AdmittedBeforeAcquisition | overwrite err SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-212992), demand: BytesOnOneDevice(229376) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-212992), demand: BytesOnOneDevice(229376) }] })
+PROBE3 width=UnitAreaOf384Slots empties=80 pairs_after_empties=[(60, 49), (60, 49)] available=[110, 110]
+PROBE3 width=UnitAreaOf384Slots empties=80 units=2 ok pairs_before=[(60, 49), (60, 49)] available_before=[110, 110]
+PROBE3 width=UnitAreaOf384Slots empties=80 units=3 ok pairs_before=[(58, 45), (58, 45)] available_before=[99, 99]
+PROBE2 14 mount ok instance=InstanceGeneration(2) admission=AdmittedAfterTheFloorRaises { refusal_before_acquisition: AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-638976), demand: BytesOnOneDevice(0) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-638976), demand: BytesOnOneDevice(0) }] }, floor_raises: [RaisedFloor { ceiling: CheckpointTxg(14), system_configuration_writes_before_the_first_publish: WritesByStructureKind { counted: {SystemConfigurationSlot: WriteCallsAndBytes { write_calls: 2, written_bytes: 8192 }} }, publ
+PROBE3 width=UnitAreaOf384Slots empties=80 units=4 ok pairs_before=[(51, 45), (51, 45)] available_before=[86, 86]
+PROBE3 width=UnitAreaOf384Slots empties=80 units=5 ok pairs_before=[(41, 48), (41, 48)] available_before=[71, 71]
+PROBE3 width=UnitAreaOf384Slots empties=80 units=6 ok pairs_before=[(30, 51), (30, 51)] available_before=[56, 56]
+PROBE3 width=UnitAreaOf384Slots empties=80 units=7 ok pairs_before=[(20, 54), (20, 54)] available_before=[39, 39]
+PROBE3 width=UnitAreaOf384Slots empties=80 units=8 refused pairs_before=[(7, 57), (7, 57)] available_before=[20, 20] SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(229376), demand: BytesOnOneDevice(262144) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(229376), demand: BytesOnOneDevice(262144) }] })
+PROBE2 15 mount ok instance=InstanceGeneration(2) admission=AdmittedAfterTheFloorRaises { refusal_before_acquisition: AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-868352), demand: BytesOnOneDevice(0) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-868352), demand: BytesOnOneDevice(0) }] }, floor_raises: [RaisedFloor { ceiling: CheckpointTxg(15), system_configuration_writes_before_the_first_publish: WritesByStructureKind { counted: {SystemConfigurationSlot: WriteCallsAndBytes { write_calls: 2, written_bytes: 8192 }} }, publ
+PROBE5 overwrites=13 ending=Completed all_overwrites_applied=true last=Some(Applied(Mounted { instance: InstanceGeneration(2), publishes: 3, allocation_records_compared: Compared { publishes: 3 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: NotJudgedByTheTestOnlySwitch }))
+PROBE4 width=UnitAreaOf256Slots overwrites=10 instance=InstanceGeneration(3) after_raises refusal=[(-11, 0), (-11, 0)] raises=1 ceilings=[CheckpointTxg(12)] publishes=[2] | overwrite ok
+PROBE5 overwrites=14 ending=Completed all_overwrites_applied=true last=Some(Applied(Mounted { instance: InstanceGeneration(2), publishes: 2, allocation_records_compared: Compared { publishes: 2 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: NotJudgedByTheTestOnlySwitch }))
+PROBE6 seed=4000000080 step=36 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE3 width=UnitAreaOf384Slots empties=100 pairs_after_empties=[(37, 71), (37, 71)] available=[108, 108]
+PROBE3 width=UnitAreaOf384Slots empties=100 units=2 ok pairs_before=[(37, 71), (37, 71)] available_before=[108, 108]
+PROBE3 width=UnitAreaOf384Slots empties=100 units=3 ok pairs_before=[(29, 74), (29, 74)] available_before=[99, 99]
+PROBE3 width=UnitAreaOf384Slots empties=100 units=4 ok pairs_before=[(22, 77), (22, 77)] available_before=[88, 88]
+PROBE2 16 mount ok instance=InstanceGeneration(2) admission=AdmittedAfterTheFloorRaises { refusal_before_acquisition: AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-1097728), demand: BytesOnOneDevice(0) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-1097728), demand: BytesOnOneDevice(0) }] }, floor_raises: [RaisedFloor { ceiling: CheckpointTxg(16), system_configuration_writes_before_the_first_publish: WritesByStructureKind { counted: {SystemConfigurationSlot: WriteCallsAndBytes { write_calls: 2, written_bytes: 8192 }} }, pu
+PROBE3 width=UnitAreaOf384Slots empties=100 units=5 ok pairs_before=[(12, 80), (12, 80)] available_before=[75, 75]
+PROBE3 width=UnitAreaOf384Slots empties=100 units=6 refused pairs_before=[(2, 83), (2, 83)] available_before=[60, 60] SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(65536), demand: BytesOnOneDevice(196608) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(65536), demand: BytesOnOneDevice(196608) }] })
+PROBE5 overwrites=15 ending=Completed all_overwrites_applied=true last=Some(Applied(Mounted { instance: InstanceGeneration(2), publishes: 2, allocation_records_compared: Compared { publishes: 2 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: NotJudgedByTheTestOnlySwitch }))
+PROBE4 width=UnitAreaOf256Slots overwrites=11 instance=InstanceGeneration(3) after_raises refusal=[(-25, 0), (-25, 0)] raises=1 ceilings=[CheckpointTxg(13)] publishes=[3] | overwrite ok
+PROBE2 17 mount ok instance=InstanceGeneration(2) admission=StillShortAfterTheFloorRaises { refusal_before_acquisition: AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-1327104), demand: BytesOnOneDevice(0) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-1327104), demand: BytesOnOneDevice(0) }] }, floor_raises: [], last_refusal: AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-1589248), demand: BytesOnOneDevice(0) }, DeviceShortOfDemand { dev
+PROBE5 overwrites=16 ending=Completed all_overwrites_applied=true last=Some(Applied(Mounted { instance: InstanceGeneration(2), publishes: 3, allocation_records_compared: Compared { publishes: 3 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: NotJudgedByTheTestOnlySwitch }))
+PROBE4 width=UnitAreaOf256Slots overwrites=12 instance=InstanceGeneration(3) after_raises refusal=[(-39, 0), (-39, 0)] raises=1 ceilings=[CheckpointTxg(14)] publishes=[3] | overwrite ok
+PROBE2 18 mount ok instance=InstanceGeneration(2) admission=StillShortAfterTheFloorRaises { refusal_before_acquisition: AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-1556480), demand: BytesOnOneDevice(0) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-1556480), demand: BytesOnOneDevice(0) }] }, floor_raises: [], last_refusal: AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-1818624), demand: BytesOnOneDevice(0) }, DeviceShortOfDemand { dev
+PROBE3 width=UnitAreaOf384Slots empties=120 pairs_after_empties=[(33, 78), (33, 78)] available=[112, 112]
+PROBE3 width=UnitAreaOf384Slots empties=120 units=2 ok pairs_before=[(33, 78), (33, 78)] available_before=[112, 112]
+PROBE3 width=UnitAreaOf384Slots empties=120 units=3 ok pairs_before=[(31, 74), (31, 74)] available_before=[101, 101]
+PROBE3 width=UnitAreaOf384Slots empties=120 units=4 ok pairs_before=[(28, 72), (28, 72)] available_before=[90, 90]
+PROBE5 overwrites=17 ending=Completed all_overwrites_applied=true last=Some(Applied(Mounted { instance: InstanceGeneration(2), publishes: 2, allocation_records_compared: Compared { publishes: 2 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: NotJudgedByTheTestOnlySwitch }))
+PROBE3 width=UnitAreaOf384Slots empties=120 units=5 ok pairs_before=[(27, 66), (27, 66)] available_before=[77, 77]
+PROBE3 width=UnitAreaOf384Slots empties=120 units=6 ok pairs_before=[(24, 59), (24, 59)] available_before=[60, 60]
+PROBE4 width=UnitAreaOf256Slots overwrites=13 instance=InstanceGeneration(3) after_raises refusal=[(-51, 0), (-51, 0)] raises=1 ceilings=[CheckpointTxg(15)] publishes=[2] | overwrite ok
+PROBE3 width=UnitAreaOf384Slots empties=120 units=7 ok pairs_before=[(21, 52), (21, 52)] available_before=[41, 41]
+PROBE3 width=UnitAreaOf384Slots empties=120 units=8 refused pairs_before=[(17, 45), (17, 45)] available_before=[20, 20] SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(327680), demand: BytesOnOneDevice(475136) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(327680), demand: BytesOnOneDevice(475136) }] })
+PROBE2 19 mount err PlacementRefusedBeforeAcquisitionMountAdmissionUndecided { instance_to_acquire: InstanceGeneration(2), publish_index: 0, warm_up_publishes_planned: 2, unit: AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 0, device: DeviceIdentity(1), index_in_device: 1 }), refusal: NoFreeSlotOnAnyDevice }
+PROBE5 overwrites=18 ending=Completed all_overwrites_applied=true last=Some(Refused { member: "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)" })
+PROBE4 width=UnitAreaOf256Slots overwrites=14 instance=InstanceGeneration(3) after_raises refusal=[(-63, 0), (-63, 0)] raises=1 ceilings=[CheckpointTxg(16)] publishes=[3] | overwrite ok
+PROBE6 seed=4000000041 step=51 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000161 step=52 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000161 step=53 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000161 step=57 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE5 overwrites=19 ending=Completed all_overwrites_applied=false last=Some(Refused { member: "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)" })
+PROBE2 20 overwrites fail
+test probe_two_mount_after_overwrites ... ok
+PROBE4 width=UnitAreaOf256Slots overwrites=15 instance=InstanceGeneration(3) after_raises refusal=[(-75, 0), (-75, 0)] raises=1 ceilings=[CheckpointTxg(17)] publishes=[3] | overwrite ok
+PROBE5 overwrites=20 ending=Completed all_overwrites_applied=false last=Some(Refused { member: "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)" })
+PROBE6 seed=4000000201 step=26 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000001 step=30 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000001 step=33 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE3 width=UnitAreaOf384Slots empties=140 pairs_after_empties=[(54, 57), (54, 57)] available=[114, 114]
+PROBE3 width=UnitAreaOf384Slots empties=140 units=2 ok pairs_before=[(54, 57), (54, 57)] available_before=[114, 114]
+PROBE3 width=UnitAreaOf384Slots empties=140 units=3 ok pairs_before=[(46, 60), (46, 60)] available_before=[105, 105]
+PROBE3 width=UnitAreaOf384Slots empties=140 units=4 ok pairs_before=[(38, 63), (38, 63)] available_before=[94, 94]
+PROBE3 width=UnitAreaOf384Slots empties=140 units=5 ok pairs_before=[(29, 66), (29, 66)] available_before=[81, 81]
+PROBE5 overwrites=21 ending=Completed all_overwrites_applied=false last=Some(Refused { member: "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)" })
+PROBE3 width=UnitAreaOf384Slots empties=140 units=6 ok pairs_before=[(19, 69), (19, 69)] available_before=[66, 66]
+PROBE3 width=UnitAreaOf384Slots empties=140 units=7 ok pairs_before=[(7, 72), (7, 72)] available_before=[49, 49]
+PROBE3 width=UnitAreaOf384Slots empties=140 units=8 refused pairs_before=[(0, 70), (0, 70)] available_before=[30, 30] SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(0), demand: BytesOnOneDevice(262144) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(0), demand: BytesOnOneDevice(262144) }] })
+PROBE4 width=UnitAreaOf256Slots overwrites=16 instance=InstanceGeneration(3) StillShortAfterTheFloorRaises { refusal_before_acquisition: AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-1425408), demand: BytesOnOneDevice(0) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: Avai | overwrite err SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(147456), demand: BytesOnOneDevice(196608) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(147456), demand: BytesOnOneDevice(196608) }] })
+PROBE6 seed=4000000362 step=59 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE5 overwrites=22 ending=Completed all_overwrites_applied=false last=Some(Refused { member: "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)" })
+PROBE4 width=UnitAreaOf256Slots overwrites=17 mount err PlacementRefusedBeforeAcquisitionMountAdmissionUndecided { instance_to_acquire: InstanceGeneration(3), publish_index: 1, warm_up_publishes_planned: 2, unit: TreeTable, refusal: NoFreeSlotOnAnyDevice }
+PROBE5 overwrites=23 ending=Completed all_overwrites_applied=false last=Some(Refused { member: "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)" })
+PROBE4 width=UnitAreaOf256Slots overwrites=18 mount err PlacementRefusedBeforeAcquisitionMountAdmissionUndecided { instance_to_acquire: InstanceGeneration(3), publish_index: 0, warm_up_publishes_planned: 1, unit: InstanceTable, refusal: NoFreeSlotOnAnyDevice }
+PROBE3 width=UnitAreaOf384Slots empties=160 pairs_after_empties=[(19, 92), (19, 92)] available=[112, 112]
+PROBE3 width=UnitAreaOf384Slots empties=160 units=2 ok pairs_before=[(19, 92), (19, 92)] available_before=[112, 112]
+PROBE3 width=UnitAreaOf384Slots empties=160 units=3 ok pairs_before=[(17, 88), (17, 88)] available_before=[101, 101]
+PROBE3 width=UnitAreaOf384Slots empties=160 units=4 ok pairs_before=[(8, 93), (8, 93)] available_before=[90, 90]
+PROBE3 width=UnitAreaOf384Slots empties=160 units=5 ok pairs_before=[(6, 88), (6, 88)] available_before=[77, 77]
+PROBE3 width=UnitAreaOf384Slots empties=160 units=6 refused pairs_before=[(3, 81), (3, 81)] available_before=[60, 60] SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(98304), demand: BytesOnOneDevice(196608) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(98304), demand: BytesOnOneDevice(196608) }] })
+PROBE6 seed=4000000363 step=46 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE5 overwrites=24 ending=Completed all_overwrites_applied=false last=Some(Refused { member: "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)" })
+PROBE4 width=UnitAreaOf256Slots 19 image fail
+PROBE4 width=UnitAreaOf240Slots overwrites=1 instance=InstanceGeneration(3) AdmittedBeforeAcquisition | overwrite ok
+PROBE5 overwrites=25 ending=Completed all_overwrites_applied=false last=Some(Refused { member: "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)" })
+PROBE4 width=UnitAreaOf240Slots overwrites=2 instance=InstanceGeneration(3) AdmittedBeforeAcquisition | overwrite ok
+PROBE4 width=UnitAreaOf240Slots overwrites=3 instance=InstanceGeneration(3) AdmittedBeforeAcquisition | overwrite ok
+PROBE6 seed=4000000082 step=30 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000082 step=37 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE4 width=UnitAreaOf240Slots overwrites=4 instance=InstanceGeneration(3) AdmittedBeforeAcquisition | overwrite ok
+PROBE5 overwrites=26 ending=Completed all_overwrites_applied=false last=Some(Refused { member: "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)" })
+PROBE4 width=UnitAreaOf240Slots overwrites=5 instance=InstanceGeneration(3) AdmittedBeforeAcquisition | overwrite ok
+PROBE6 seed=4000000003 step=29 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE4 width=UnitAreaOf240Slots overwrites=6 instance=InstanceGeneration(3) AdmittedBeforeAcquisition | overwrite ok
+PROBE4 width=UnitAreaOf240Slots overwrites=7 instance=InstanceGeneration(3) AdmittedBeforeAcquisition | overwrite err SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(16384), demand: BytesOnOneDevice(196608) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(16384), demand: BytesOnOneDevice(196608) }] })
+PROBE3 width=UnitAreaOf384Slots empties=200 pairs_after_empties=[(34, 74), (34, 74)] available=[108, 108]
+PROBE3 width=UnitAreaOf384Slots empties=200 units=2 ok pairs_before=[(34, 74), (34, 74)] available_before=[108, 108]
+PROBE3 width=UnitAreaOf384Slots empties=200 units=3 ok pairs_before=[(27, 77), (27, 77)] available_before=[99, 99]
+PROBE3 width=UnitAreaOf384Slots empties=200 units=4 ok pairs_before=[(19, 80), (19, 80)] available_before=[88, 88]
+PROBE5 overwrites=27 ending=Completed all_overwrites_applied=false last=Some(Refused { member: "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)" })
+PROBE3 width=UnitAreaOf384Slots empties=200 units=5 ok pairs_before=[(9, 83), (9, 83)] available_before=[75, 75]
+PROBE3 width=UnitAreaOf384Slots empties=200 units=6 refused pairs_before=[(0, 85), (0, 85)] available_before=[60, 60] SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(0), demand: BytesOnOneDevice(196608) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(0), demand: BytesOnOneDevice(196608) }] })
+PROBE6 seed=4000000083 step=22 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000164 step=41 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000164 step=52 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000164 step=54 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000164 step=57 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE4 width=UnitAreaOf240Slots overwrites=8 instance=InstanceGeneration(3) AdmittedBeforeAcquisition | overwrite err SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-278528), demand: BytesOnOneDevice(196608) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-278528), demand: BytesOnOneDevice(196608) }] })
+PROBE3 width=UnitAreaOf256Slots empties=20 pairs_after_empties=[(48, 0), (48, 0)] available=[-13, -13]
+PROBE3 width=UnitAreaOf256Slots empties=20 units=2 refused pairs_before=[(48, 0), (48, 0)] available_before=[-13, -13] SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-212992), demand: BytesOnOneDevice(245760) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-212992), demand: BytesOnOneDevice(245760) }] })
+PROBE3 width=UnitAreaOf256Slots empties=30 pairs_after_empties=[(24, 24), (24, 24)] available=[-16, -16]
+PROBE3 width=UnitAreaOf256Slots empties=30 units=2 refused pairs_before=[(24, 24), (24, 24)] available_before=[-16, -16] SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-262144), demand: BytesOnOneDevice(245760) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-262144), demand: BytesOnOneDevice(245760) }] })
+PROBE4 width=UnitAreaOf240Slots overwrites=9 instance=InstanceGeneration(3) after_raises refusal=[(-9, 0), (-9, 0)] raises=1 ceilings=[CheckpointTxg(11)] publishes=[3] | overwrite ok
+PROBE6 seed=4000000364 step=30 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE5 overwrites=28 ending=Completed all_overwrites_applied=false last=Some(Refused { member: "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)" })
+PROBE3 width=UnitAreaOf256Slots empties=40 pairs_after_empties=[(0, 48), (0, 48)] available=[-14, -14]
+PROBE3 width=UnitAreaOf256Slots empties=40 units=2 refused pairs_before=[(0, 48), (0, 48)] available_before=[-14, -14] SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(0), demand: BytesOnOneDevice(65536) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(0), demand: BytesOnOneDevice(65536) }] })
+PROBE4 width=UnitAreaOf240Slots overwrites=10 instance=InstanceGeneration(3) after_raises refusal=[(-21, 0), (-21, 0)] raises=1 ceilings=[CheckpointTxg(12)] publishes=[2] | overwrite ok
+PROBE5 overwrites=29 ending=Completed all_overwrites_applied=false last=Some(Refused { member: "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)" })
+PROBE3 width=UnitAreaOf256Slots empties=50 pairs_after_empties=[(23, 26), (23, 26)] available=[-12, -12]
+PROBE3 width=UnitAreaOf256Slots empties=50 units=2 refused pairs_before=[(23, 26), (23, 26)] available_before=[-12, -12] SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-196608), demand: BytesOnOneDevice(278528) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-196608), demand: BytesOnOneDevice(278528) }] })
+PROBE6 seed=4000000044 step=29 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE4 width=UnitAreaOf240Slots overwrites=11 instance=InstanceGeneration(3) after_raises refusal=[(-33, 0), (-33, 0)] raises=1 ceilings=[CheckpointTxg(13)] publishes=[3] | overwrite ok
+PROBE5 overwrites=30 ending=Completed all_overwrites_applied=false last=Some(Refused { member: "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)" })
+test probe_five_mount_after_empty_overwrites ... ok
+PROBE6 seed=4000000123 step=43 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000123 step=44 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE3 width=UnitAreaOf256Slots empties=60 pairs_after_empties=[(31, 16), (31, 16)] available=[-16, -16]
+PROBE3 width=UnitAreaOf256Slots empties=60 units=2 refused pairs_before=[(31, 16), (31, 16)] available_before=[-16, -16] SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-262144), demand: BytesOnOneDevice(245760) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-262144), demand: BytesOnOneDevice(245760) }] })
+PROBE6 seed=4000000045 step=27 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000045 step=29 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000045 step=31 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000045 step=39 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+test probe_four_formula_mounts has been running for over 60 seconds
+test probe_six_seeds has been running for over 60 seconds
+test probe_three_cluster_segment_pairs has been running for over 60 seconds
+PROBE4 width=UnitAreaOf240Slots overwrites=12 instance=InstanceGeneration(3) after_raises refusal=[(-45, 0), (-45, 0)] raises=1 ceilings=[CheckpointTxg(14)] publishes=[3] | overwrite ok
+PROBE3 width=UnitAreaOf256Slots empties=80 pairs_after_empties=[(7, 42), (7, 42)] available=[-10, -10]
+PROBE3 width=UnitAreaOf256Slots empties=80 units=2 refused pairs_before=[(7, 42), (7, 42)] available_before=[-10, -10] SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-163840), demand: BytesOnOneDevice(245760) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-163840), demand: BytesOnOneDevice(245760) }] })
+test probe_three_cluster_segment_pairs ... ok
+PROBE4 width=UnitAreaOf240Slots overwrites=13 instance=InstanceGeneration(3) after_raises refusal=[(-57, 0), (-57, 0)] raises=1 ceilings=[CheckpointTxg(15)] publishes=[2] | overwrite ok
+PROBE6 seed=4000000085 step=38 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000085 step=40 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE4 width=UnitAreaOf240Slots overwrites=14 instance=InstanceGeneration(3) after_raises refusal=[(-69, 0), (-69, 0)] raises=1 ceilings=[CheckpointTxg(16)] publishes=[3] | overwrite ok
+test probe_four_formula_mounts ... ok
+PROBE6 seed=4000000324 step=49 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000324 step=53 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000005 step=59 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000247 step=39 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000006 step=32 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000167 step=21 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000167 step=27 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000167 step=35 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000286 step=29 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000326 step=54 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000248 step=48 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000327 step=45 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000327 step=46 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000008 step=47 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000008 step=53 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000008 step=55 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000170 step=56 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000170 step=58 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000011 step=31 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000172 step=58 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000252 step=23 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000252 step=25 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000252 step=47 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000252 step=48 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000252 step=50 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000252 step=56 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000373 step=49 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000373 step=56 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000014 step=50 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000333 step=43 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000333 step=45 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000333 step=47 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000333 step=49 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000174 step=43 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000255 step=20 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000255 step=21 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000295 step=33 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000295 step=34 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000295 step=36 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000295 step=54 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000256 step=46 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000217 step=44 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000217 step=45 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000217 step=53 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000296 step=49 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000296 step=54 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000258 step=32 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000139 step=23 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000337 step=34 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000337 step=36 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000337 step=42 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000219 step=45 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000298 step=47 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000061 step=23 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000260 step=37 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000379 step=31 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000299 step=59 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000261 step=51 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000261 step=55 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000261 step=56 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000261 step=58 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000261 step=59 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000020 step=51 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000020 step=52 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000021 step=29 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000021 step=47 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000021 step=49 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000021 step=54 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000222 step=58 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000144 step=52 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000023 step=34 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000067 step=40 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000383 step=40 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000024 step=29 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000024 step=30 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000345 step=30 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000345 step=32 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000226 step=27 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000070 step=24 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000107 step=48 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000107 step=53 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000107 step=56 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000306 step=32 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000306 step=39 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000306 step=57 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000027 step=31 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000027 step=34 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000189 step=46 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000189 step=50 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000347 step=47 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000228 step=33 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000228 step=35 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000228 step=42 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000386 step=48 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000109 step=31 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000109 step=36 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000109 step=38 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000029 step=23 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000029 step=28 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000029 step=36 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000029 step=41 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000029 step=42 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000029 step=43 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000029 step=44 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000029 step=49 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000029 step=57 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000350 step=40 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000350 step=44 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000030 step=23 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000150 step=27 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000150 step=35 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000150 step=39 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000031 step=39 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000031 step=48 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000271 step=34 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000075 step=47 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000075 step=48 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000075 step=52 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000075 step=53 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000075 step=55 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000194 step=30 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000194 step=31 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000194 step=33 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000312 step=21 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000389 step=35 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000076 step=45 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000076 step=49 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000076 step=50 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000076 step=55 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000232 step=31 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000034 step=33 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000234 step=48 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000234 step=51 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000234 step=55 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000356 step=35 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000153 step=59 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000357 step=27 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000115 step=27 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000196 step=56 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000196 step=57 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000315 step=18 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000315 step=23 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000315 step=32 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000315 step=36 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000315 step=52 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000275 step=45 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000117 step=37 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000117 step=38 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000276 step=39 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000276 step=40 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000276 step=45 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000038 step=29 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000038 step=33 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000038 step=35 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000038 step=46 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000038 step=50 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000319 step=21 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000396 step=40 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000396 step=44 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000396 step=47 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000396 step=53 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 3, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000159 step=41 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+PROBE6 seed=4000000159 step=45 member=MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)) ending=Completed len=60
+test probe_six_seeds ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 376.27s
+

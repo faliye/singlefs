@@ -1,4 +1,0 @@
-exit=0
-want=都有成形的变异表
-want=条变异的原文各命中源码一次
-want=crates/mutations.tsv 3 条的原文各命中源码一次

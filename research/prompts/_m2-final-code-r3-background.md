@@ -1,4 +1,4 @@
-# 三方论证背景材料：`m2-final-code-r3`（材料员拼装，2026-09-25 08:32 JST / 2026-09-24 23:32 UTC）
+# 三方论证背景材料：`m2-final-code-r3`（材料员拼装，2026-09-25）
 
 kb 引文与行号以 `/tmp/claude-1000/m2-final-code-r3/kb-snapshot/` 为准。
 
@@ -24,7 +24,7 @@ kb 引文与行号以 `/tmp/claude-1000/m2-final-code-r3/kb-snapshot/` 为准。
 - **共用问句与三种结论**：照第一轮正文 `research/prompts/_m2-final-code-r1-body.md` 第一节，逐字适用。
 - **可以攻的**：实现员自己取的值与做法，已由主 agent 写成 D8（核心索引结构） 已定项 14「实现取值」（被攻过零轮）。这一格欢迎攻，打中照常算。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-25 07:50 JST 现查）
+## 二、实现今天的样子（主 agent 的观测，2026-09-25 现查）
 
 - **冻结副本**：腿读代码一律读 `/tmp/claude-1000/m2-final-code-r3/tree/crates/`（实二一交回那一刻的整棵树），不读主工作区。
   - 实二五此刻正在主工作区改 `transaction.rs`、`mount.rs`、`allocator.rs`、`recovery.rs`、`rollback_witness.rs`、`walk.rs`。
@@ -112,7 +112,7 @@ kb 引文与行号以 `/tmp/claude-1000/m2-final-code-r3/kb-snapshot/` 为准。
 
 ## 二、小节清单
 
-# 小节清单：`m2-final-code-r3`（材料员生成，2026-09-25 08:32 JST / 2026-09-24 23:32 UTC）
+# 小节清单：`m2-final-code-r3`（材料员生成，2026-09-25）
 
 `python3 research/scripts/kb-sections.py` 全量生成，未再过滤（8 份文件：主 agent 给出的 5 份决策文件 `08-核心索引结构.md`、`18-块里携带什么信息.md`、`19-块指针的结构与宽度预算.md`、`03-空间分配.md`、`28-挂载期承诺量.md` + `invariants.md` + `checks-owed.md` + `.claude/singlefs-ai-sop/rules/rules-discipline.md`）。
 
@@ -461,7 +461,7 @@ kb 引文与行号以 `/tmp/claude-1000/m2-final-code-r3/kb-snapshot/` 为准。
 
 **依据**：
 
-- 无实验：一套 btree 实现配多 keyspace 的形态没有可量的量，依据是 2026-08-29 现查 `linux-6.17/fs/bcachefs/bcachefs_format.h` 的 `BCH_BTREE_IDS()` 宏（数 `x(` 行与带 `BTREE_IS_write_buffer` 的行，源码固定在 `/home/fy5090/code/fs-refs/`）：bcachefs 用**一套 btree 实现 + 21 棵树**，其中 **5 棵**走 write buffer（`lru` / `backpointers` / `deleted_inodes` / `rebalance_work` / `accounting`）；比「按访问模式选不同结构」好在**只有一套结构要调对**——异构方案意味着 N 套实现、N 套崩溃一致性 bug、N 套 checker。prior-art.md 的 bcachefs 那一行以这一段为准。
+- 无实验：一套 btree 实现配多 keyspace 的形态没有可量的量，依据是 2026-08-29 现查 `linux-6.17/fs/bcachefs/bcachefs_format.h` 的 `BCH_BTREE_IDS()` 宏（数 `x(` 行与带 `BTREE_IS_write_buffer` 的行，源码固定在 `~/code/fs-refs/`）：bcachefs 用**一套 btree 实现 + 21 棵树**，其中 **5 棵**走 write buffer（`lru` / `backpointers` / `deleted_inodes` / `rebalance_work` / `accounting`）；比「按访问模式选不同结构」好在**只有一套结构要调对**——异构方案意味着 N 套实现、N 套崩溃一致性 bug、N 套 checker。prior-art.md 的 bcachefs 那一行以这一段为准。
 - 用户定案 2026-09-24：派生树可以异构（原话在变更史）；多出来的那套实现、崩溃一致性与 checker 由层 0 流与 checker 各自覆盖，不再拿「只有一套结构要调对」挡。
 - 无实验：三方原型（`research/prompts/m2-keyspace-r1-opus-model/`）在同一批历史与代价模型上量过，没立实验号，选哪一个由用户定，判决 `research/prompts/m2-keyspace-r1-main-verification.md`。
 - 用户定案 2026-09-24：K1、K2、K4（原话在变更史）。

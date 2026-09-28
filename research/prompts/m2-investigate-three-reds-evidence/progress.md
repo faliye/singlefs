@@ -1,0 +1,13 @@
+# 进度
+- 建副本 r1、r2、now（now 取自主工作区）；起 run-three.sh（r1、r2、now 各跑两个目标）
+- r1 退 0（17 passed + 2 passed）
+- 建 r1yi = r1 + /tmp/claude-1000/impl-c554-yi/patch/crates.patch（git apply --check 退 0、apply 退 0）
+- 跑变体之前写下的预测：
+  - r1yi：三条都红，panic 消息与 run1 同形（NewerStateStillUnreadableAfterOneReread，fsync 两条 AgainstTheSelectedVersionsLastRecord 5>4 / 4>3，c366 Undecidable）。
+  - now-undecidable-false（只把 mount.rs Undecidable => true 改成 false）：c366 绿；fsync 两条照旧红、消息不变。
+  - now-last-record-false（只把「见证 > 所选那一版末条计数器」改成恒 false）：fsync 两条绿；c366 照旧红。
+  - now-both-false：三条都绿。
+  - 推翻：任一变体里预测会绿的那条仍红，或预测仍红的那条变绿，定位就不成立。
+- r2、now 退 101（fsync 两条红于 :1556:9；cargo 没带 --no-fail-fast，warm_up 没跑）；起 run-warmup.sh 补跑，再起 run-variants2.sh（带 --no-fail-fast）
+- r2/now warm_up 红于 :231:63；r1yi 三条都红、消息与 r2 逐字相同；变体那一段因 diff 退 1 短路没跑，改成 run-variants3.sh 重跑
+- 变体三格跑完（预测全中）；删 nowvar、r1yi

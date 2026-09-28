@@ -1,4 +1,4 @@
-# 实七报告（implementation-writer；UTC 2026-09-26 写）
+# 实七报告（implementation-writer；2026-09-26 写）
 
 ## 结论
 

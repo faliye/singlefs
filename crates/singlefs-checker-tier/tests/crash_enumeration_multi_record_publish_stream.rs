@@ -2,7 +2,7 @@
 //! 里程碑「覆盖写、释放、回退与复用」并行线一的层 0 小负载（验收第 3 条）：多条记录的发布边界在小单元数上造出来——
 //! 「取号 → 暖机 × 2 → A（第一个文件，一个数据单元：12 个单元）→ B（顺序写两个数据单元：14 个单元、两条记录）
 //! → C（顺序写三个数据单元：15 个单元、三条记录）」整条录制流按 D13（验证路线） 已定项 4 枚举崩溃状态，
-//! 与新池新建文件同一种切法（上一次发布的系统配置槽写与下一次发布的单元写落在同一段）。每个状态跑恢复 + 多版本 oracle、
+//! 与新池新建文件同一种切法（C577 之后上一次发布的系统配置槽轮换过了发布末尾那道屏障、自成一段；改之前与下一次发布的单元写落在同一段）。每个状态跑恢复 + 多版本 oracle、
 //! 池级 checker、记录核对器；另逐状态核发布边界（D23（journal 的角色与格式） 已定项 14 第六条）：
 //! 一次发布的第一条记录落了而末条一份都没落 ⇒ 那次发布整体不施加，读回上一版、文件是旧长度（I-4.3（提交原子））。
 //!
@@ -17,9 +17,9 @@
 //! extent 下段一片根兼叶装两条、三条记录（上段那条条目换成下段根指针，D8（核心索引结构） 已定项 14），
 //! 中央映射里两条、三条码 1 条目。多跑的一步只有恢复本身（这条流上没有重开、挂载）。
 //!
-//! 快的那条只展开写数小于 10 的段（A、B、C 三个单元段 26 写、30 写与 32 写不展开，只以整段持久进入后面的状态）；
-//! 全量标 ignored（层 0 的枚举域 12230590578 个状态，B、C 两个单元段占 12079595518；每次写只取两态时的闭式 5435818083、
-//! 两段占 5368709118），登记成崩溃枚举用例，门禁 54 号 --full 在 release 下跑，带断点续跑、可双机分片（与第一、第二条流同一个入口）。
+//! 快的那条只展开写数小于 10 的段（A、B、C 三个单元段 24 写、28 写与 30 写不展开，只以整段持久进入后面的状态）；
+//! 全量标 ignored（层 0 的枚举域 1358954634 个状态，B、C 两个单元段占 1342177278；每次写只取两态时的闭式 1358954604、
+//! 两段同样占 1342177278；C577 之前轮换并进单元段，12230590578 与 5435818083），登记成崩溃枚举用例，门禁 54 号 --full 在 release 下跑，带断点续跑、可双机分片（与第一、第二条流同一个入口）。
 //! 系统配置槽写是原地覆写，取三态（`crash::TearableInPlaceOverwrites`），其余写取两态。
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
@@ -182,9 +182,9 @@ fn prepare(tag: &str) -> Prepared {
     let sizes: Vec<usize> = segments.iter().map(Vec::len).collect();
     assert_eq!(
         sizes,
-        vec![2, 2, 1, 2, 2, 1, 26, 2, 1, 30, 4, 1, 32, 6, 1, 2],
-        "取号 2、暖机两次、A 的 24 个单元写并上一次的系统配置槽写 26；B 的 28 个单元写并 A 的轮换 30、两条记录 4 写；\
-         C 的 30 个单元写并 B 的轮换 32、三条记录 6 写"
+        vec![2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 28, 4, 1, 2, 30, 6, 1, 2],
+        "取号 2、暖机两次、上一次的系统配置槽轮换 2 与 A 的 24 个单元写各自成一段；A 的轮换 2、B 的 28 个单元写、两条记录 4 写；\
+         B 的轮换 2、C 的 30 个单元写、三条记录 6 写（C577 之后轮换之后有屏障，改之前轮换并进下一次的单元段：26、30、32）"
     );
     let root_indexes: Vec<usize> = writes
         .iter()
@@ -286,7 +286,7 @@ fn assert_clean(tally: &Layer0Tally) {
     }
 }
 
-/// 平时跑的那一份：B、C 两个单元段（30 写、32 写）与 A 那一段（26 写）不展开，其余每段任意子集——B 的两条记录段（4 写）、
+/// 平时跑的那一份：A、B、C 三个单元段（24 写、28 写、30 写）不展开，其余每段任意子集——B 的两条记录段（4 写）、
 /// C 的三条记录段（6 写）全展开，崩在一次发布的记录之间的每个状态都跑到。
 #[test]
 fn every_crash_state_between_the_records_of_a_multi_record_publish_keeps_the_version_before_it() {
@@ -312,8 +312,9 @@ fn every_crash_state_between_the_records_of_a_multi_record_publish_keeps_the_ver
         .collect();
     assert_eq!(
         closed_form_state_count(&expanded),
-        102,
-        "每次写只取两态时展开的段按闭式数（补第三态之前的口径）：1 + 六个 2 写段各 3 + 五个 1 写段各 1 + 4 写段 15 + 6 写段 63"
+        111,
+        "每次写只取两态时展开的段按闭式数（补第三态之前的口径）：1 + 九个 2 写段各 3 + 五个 1 写段各 1 + 4 写段 15 + 6 写段 63\
+         （C577 之前暖机第二次、A、B 的轮换并在单元段里不展开，六个 2 写段、102）"
     );
     assert_eq!(
         tally.states,
@@ -333,8 +334,9 @@ fn every_crash_state_between_the_records_of_a_multi_record_publish_keeps_the_ver
     );
     assert_eq!(
         tally.states,
-        1 + 3 * (3 * 3 - 1) + 3 * 3 + 5 + 15 + 63,
-        "1 + 三个系统配置槽 2 写段各 3² − 1 + 三个记录 2 写段各 3 + 五个 1 写段各 1 + 4 写段 15 + 6 写段 63（每次写只取两态时 102）"
+        1 + 6 * (3 * 3 - 1) + 3 * 3 + 5 + 15 + 63,
+        "1 + 六个系统配置槽 2 写段各 3² − 1 + 三个记录 2 写段各 3 + 五个 1 写段各 1 + 4 写段 15 + 6 写段 63（每次写只取两态时 111；\
+         C577 之前三个系统配置槽段、117）"
     );
     // B：记录段 4 写里第一条落了（至少一份）、第二条一份没落 ⇒ 3 × 1 = 3 个状态。
     // C：记录段 6 写里第一条落了、第三条一份没落 ⇒ 第一条 3 种 × 第二条 4 种 = 12 个状态。
@@ -352,23 +354,24 @@ fn every_crash_state_between_the_records_of_a_multi_record_publish_keeps_the_ver
     assert_clean(&tally);
 }
 
-/// 全量：16 段、闭式见下。B、C 两个单元段（各带上一次发布的两次系统配置槽轮换，取三态）各 3² · 2^28 − 1 与 3² · 2^30 − 1 个状态，
+/// 全量：19 段、闭式见下。A、B、C 三个单元段各 2^24 − 1、2^28 − 1 与 2^30 − 1 个状态（C577 之前各带上一次发布的两次系统配置槽轮换、
+/// 取三态，各 3² · 2^n − 1，共 16 段、12230590578），
 /// 每个状态两遍恢复 + checker。登记成崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv`），54 号认下面打印的
 /// `LAYER0_PARALLEL_LINE_ONE` 行里 `exhaustive=true`。带断点续跑：进度目录、输入指纹与强制从头跑的开关从环境变量取，
 /// 没设进度目录就不留进度文件。双机分片（`SINGLEFS_LAYER0_SHARD`，`research/scripts/layer0-shard-run.sh`）：
 /// 跑一片时只写账本、不打计数行、不判；merge 那一趟拿并齐的计数照下面逐项判、逐字打同样的行。
 #[test]
-#[ignore = "全量 12230590578 个状态（一百二十多亿）、每个两遍恢复 + checker；门禁 54 号 --full 在 release 下跑，带断点续跑、可双机分片"]
+#[ignore = "全量 1358954634 个状态（十三亿多）、每个两遍恢复 + checker；门禁 54 号 --full 在 release 下跑，带断点续跑、可双机分片"]
 fn full_enumeration_of_the_multi_record_publish_stream_is_exhaustive_and_clean() {
     let prepared = prepare("parallel-line-one-layer0-full");
     let closed_form_with_two_states_per_write = closed_form_state_count(&prepared.segments);
     assert_eq!(
         closed_form_with_two_states_per_write,
-        1 + 6 * 3 + 5 + ((1 << 26) - 1) + ((1 << 30) - 1) + 15 + ((1 << 32) - 1) + 63,
-        "每次写只取两态时的闭式：1 + Σ(2^|段| − 1)，十六段"
+        1 + 9 * 3 + 5 + ((1 << 24) - 1) + ((1 << 28) - 1) + 15 + ((1 << 30) - 1) + 63,
+        "每次写只取两态时的闭式：1 + Σ(2^|段| − 1)，十九段"
     );
-    assert_eq!(closed_form_with_two_states_per_write, 5_435_818_083);
-    // 计数行的 closed_form 报枚举域的闭式（原地覆写三态）：六段各带两次系统配置槽写，每段 3^m · 2^(n−m) − 1。
+    assert_eq!(closed_form_with_two_states_per_write, 1_358_954_604);
+    // 计数行的 closed_form 报枚举域的闭式（原地覆写三态）：六个系统配置槽 2 写段各 3² − 1，每段 3^m · 2^(n−m) − 1。
     let closed_form = layer0_state_count_with_torn_in_place_overwrites(
         &prepared.base,
         &prepared.writes,
@@ -377,17 +380,17 @@ fn full_enumeration_of_the_multi_record_publish_stream_is_exhaustive_and_clean()
     );
     assert_eq!(
         closed_form,
-        1 + 3 * (3 * 3 - 1)
+        1 + 6 * (3 * 3 - 1)
             + 3 * 3
             + 5
-            + (9 * (1 << 24) - 1)
-            + (9 * (1 << 28) - 1)
+            + ((1 << 24) - 1)
+            + ((1 << 28) - 1)
             + 15
-            + (9 * (1 << 30) - 1)
+            + ((1 << 30) - 1)
             + 63,
-        "枚举域的闭式：三个只有系统配置槽写的 2 写段各 3² − 1、三个记录 2 写段各 3、五个 1 写段、A / B / C 的单元段各 3² · 2^(n−2) − 1、4 写段 15、6 写段 63"
+        "枚举域的闭式：六个只有系统配置槽写的 2 写段各 3² − 1、三个记录 2 写段各 3、五个 1 写段、A / B / C 的单元段各 2^n − 1、4 写段 15、6 写段 63"
     );
-    assert_eq!(closed_form, 12_230_590_578);
+    assert_eq!(closed_form, 1_358_954_634);
     let tally = match enumerate_layer0_in_state_slices_or_one_shard(
         &prepared.base,
         &prepared.writes,

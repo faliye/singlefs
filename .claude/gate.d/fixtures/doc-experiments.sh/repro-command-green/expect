@@ -1,0 +1,5 @@
+exit=0
+want=写明「原始输出未留存」不判的 1 页：97-原始输出未留存.md
+want=样本只跑 .gate-cells 点名的格：repro-command
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格绿（repro-command），0 格本次未跑（无）

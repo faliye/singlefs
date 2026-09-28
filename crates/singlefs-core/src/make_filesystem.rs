@@ -34,6 +34,7 @@ use crate::system_configuration::{
     journal_in_flight_record_limit, journal_in_flight_record_limit_fits_its_four_byte_field,
     SystemConfiguration, SystemImmutableConfiguration, SystemImmutableSizes,
     SystemMutableConfiguration, SystemRuntimeConfiguration, SystemRuntimeQuantities,
+    JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION, ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
 };
 use crate::unit::{
     build_index_node, build_packed_unit, PackedIdentity, WriteOrder, PACKED_TYPE_INSTANCE_TABLE,
@@ -572,6 +573,8 @@ pub fn make_filesystem<Device: BlockDevice>(
                 device_count: u32::try_from(identities.len()).expect("设备数"),
                 region_devices: parameters.region_devices,
                 sizes: parameters.geometry,
+                journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
+                root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
             },
             mutable: SystemMutableConfiguration,
             runtime: SystemRuntimeConfiguration,

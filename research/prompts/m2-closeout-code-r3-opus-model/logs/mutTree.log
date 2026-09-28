@@ -1,0 +1,71 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 36.2 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 4 条
+run-with-memory-cap: 排队（已等 60 秒，至多 3600 秒）：slice 已占 36.2 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 4 条
+run-with-memory-cap: 排队（已等 120 秒，至多 3600 秒）：slice 已占 36.2 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 4 条
+run-with-memory-cap: 排队（已等 180 秒，至多 3600 秒）：slice 已占 36.2 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 4 条
+run-with-memory-cap: 排队（已等 240 秒，至多 3600 秒）：slice 已占 36.2 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 5 条
+run-with-memory-cap: 排队（已等 300 秒，至多 3600 秒）：slice 已占 36.2 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 4 条
+run-with-memory-cap: 排队（已等 360 秒，至多 3600 秒）：slice 已占 36.2 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 4 条
+run-with-memory-cap: 排了 397 秒，起跑（singlefs-memory-cap-1272182-2014027521）
+   Compiling singlefs-format v0.1.0 (/tmp/claude-1000/m2-closeout-code-r3-opus/mutTree/crates/singlefs-format)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m2-closeout-code-r3-opus/mutTree/crates/singlefs-core)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m2-closeout-code-r3-opus/mutTree/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-closeout-code-r3-opus/mutTree/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 36.31s
+     Running tests/rollback_by_a_forward_publish.rs (target/release/deps/rollback_by_a_forward_publish-5c4814cca4ae93f3)
+
+running 22 tests
+test after_rolling_back_to_the_first_version_the_next_overwrite_releases_the_resurrected_units_and_every_invariant_holds ... ok
+test after_rolling_back_to_the_first_version_the_third_versions_root_is_still_a_candidate_and_rolling_back_to_it_reads_the_third_content ... ok
+test plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_leaves_the_pre_recovery_image_red_only_by_what_that_root_alone_referenced ... ok
+test an_abandoned_roots_allocation_record_whose_span_runs_past_the_unit_area_is_counted_and_does_not_panic ... ok
+test refusal_before_any_write_when_allocation_record_tree_root_of_the_first_version_unreadable_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+test refusal_before_any_write_when_allocation_record_tree_root_of_the_third_version_unreadable_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+test refusal_before_any_write_when_current_account_without_the_data_unit_of_the_first_version_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+test refusal_before_any_write_when_current_account_allocating_the_data_slot_of_the_first_version_under_another_generation_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+test refusal_before_any_write_when_data_unit_of_the_first_version_corrupt_on_device_one_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+test refusal_before_any_write_when_tree_identifiers_of_the_current_version_differ_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+test rolling_back_to_the_first_version_while_mounted_publishes_one_root_carrying_its_state_and_cold_start_reads_the_first_content ... ok
+test rolling_back_to_a_missing_root_an_abandoned_root_or_a_root_without_file_is_refused_before_any_write ... ok
+test rolling_back_while_a_root_slot_this_process_wrote_reads_not_self_verified_is_refused_before_any_write ... ok
+test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_refused_before_writing_is_resent_in_process_or_replayed_after_a_crash ... ok
+test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_the_first_half_is_resent_in_process_or_replayed_after_a_crash ... ok
+test the_plain_remount_after_a_recovery_that_abandoned_roots_keeps_the_isolation ... ok
+test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_zeroed_is_resent_in_process_or_replayed_after_a_crash ... ok
+test with_the_file_version_root_slot_unreadable_the_ring_watermark_still_comes_from_its_journal_record ... ok
+test torn_tree_table_of_an_abandoned_root_is_counted_and_does_not_fail_the_mount ... ok
+test with_the_shadow_ledger_a_publish_after_a_recovery_keeps_off_the_abandoned_data_slot_and_the_abandoned_root_reads_the_third_content ... ok
+test without_the_shadow_ledger_a_publish_after_a_recovery_reuses_the_abandoned_data_slot_and_the_abandoned_root_reads_a_torn_unit ... ok
+test writable_mount_on_the_newest_root_cannot_reclaim_what_its_own_chain_released_so_the_rehearsal_without_the_release_read_cannot_diverge ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.46s
+
+     Running tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs (target/release/deps/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over-1c2fe329c59bef6b)
+
+running 23 tests
+test a_journal_ring_whose_in_flight_limit_overflows_four_bytes_is_refused_by_mkfs_before_any_write ... ok
+test a_journal_ring_whose_next_slot_is_off_the_cluster_segment_boundary_is_refused_by_mkfs_before_any_write ... ok
+test a_128_mebibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker ... ok
+test a_root_ring_slot_known_to_hold_a_root_not_self_verified_once_is_read_on_the_reread_and_the_floor_is_raised ... ok
+test a_root_ring_slot_known_to_hold_a_root_read_on_the_one_reread_lets_the_floor_be_raised ... ok
+test a_root_ring_slot_unreadable_once_is_read_on_the_reread_and_one_unreadable_twice_is_named ... ok
+test a_system_configuration_field_the_reader_does_not_accept_is_refused_by_both_mounts_before_any_write ... ok
+test a_system_configuration_recording_a_unit_area_start_other_than_the_slot_after_the_ring_is_refused_before_any_write ... ok
+test a_system_configuration_whose_in_flight_limit_overflows_its_four_bytes_is_refused_by_the_reader ... ok
+test a_system_configuration_write_rereads_an_unreadable_root_ring_slot_once_before_taking_the_effective_floor ... ok
+test a_tree_table_whose_two_entries_carry_the_same_tree_identifier_is_refused_by_the_writable_mount_before_any_write ... ok
+test a_one_gibibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker ... ok
+test raising_the_floor_while_a_root_ring_slot_known_to_hold_a_root_stays_not_self_verified_is_refused_before_any_write ... ok
+test raising_the_floor_while_a_root_ring_slot_known_to_hold_a_root_stays_unreadable_is_refused_before_any_write ... ok
+test raising_the_floor_while_a_root_ring_slot_never_written_stays_unreadable_counts_it_as_no_root ... ok
+test raising_the_floor_while_the_newest_roots_instance_table_stays_unreadable_is_refused_before_any_write ... ok
+test rolling_back_while_the_targets_root_ring_slot_stays_unreadable_is_refused_before_any_write ... ok
+test the_chosen_system_configuration_carries_the_first_version_journal_ring_start_and_root_ring_base ... ok
+test the_default_journal_ring_keeps_the_unit_area_at_slot_50176_and_the_new_pool_file_creation_bytes_unchanged ... ok
+test the_effective_floor_rereads_the_newest_roots_instance_table_once ... ok
+test the_newest_roots_instance_table_read_on_the_one_reread_lets_the_floor_be_raised ... ok
+test the_rollback_takes_the_inode_number_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_its_root ... ok
+test a_tree_table_whose_two_entries_swapped_their_kinds_is_refused_by_the_writable_mount_before_any_write ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s
+
+rc=0

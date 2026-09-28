@@ -1,6 +1,6 @@
 # A3b 善后一实现员报告：单元区起点随环长之后，8 份单外测试跟上
 
-写于 2026-09-27 JST（本机 UTC）。规格 `/tmp/claude-1000/impl-a3b-fallout-1/spec.md`。在副本 `work/`（主工作区 17:29 JST 现状 + A3b 补丁）里改，交 `patch/`。
+写于 2026-09-27。规格 `/tmp/claude-1000/impl-a3b-fallout-1/spec.md`。在副本 `work/`（主工作区现状 + A3b 补丁）里改，交 `patch/`。
 收到主 agent 消息（证红第二批做完之后）：A3b 与 C577 已进主工作区。补丁已对主工作区 `git apply --check` 过；另拷一份主工作区现状 `check/`，打上本补丁跑了 8 份（第六节）。
 
 ## 一、结论
@@ -193,7 +193,7 @@
 照主 agent 的消息（证红第二批之后收到）办：
 - `git apply --check patch/crates.patch` 直接对主工作区跑，退出码 0。
 - `research/scripts/apply-writer-patch.py patch --dry-run` 对主工作区的输出：`✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 1350 行`。
-- 另拷主工作区现状到 `check/`（09-27 09:01 UTC 前后），用 `apply-writer-patch.py --root check/` 打上补丁，33 号 0。
+- 另拷主工作区现状到 `check/`（09-27），用 `apply-writer-patch.py --root check/` 打上补丁，33 号 0。
 - 本节与第四节的源码行号都在 `check/` 上现取。
 
 8 份各跑一遍（内存上限 8G，线程上限 4），`test result` 行原样：

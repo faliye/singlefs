@@ -1,0 +1,5 @@
+E7RESULT name=r2_state_budget world=orphan_at_60001_then_data_unit_at_60000 closed_form_state_count=16777242 enumerated_with_torn=47 writes=43 segments=13
+E7RESULT name=r3_f1_torn world=orphan_at_60001_then_data_unit_at_60000 states_from_the_new_segments=3 orphan_intact_on_disk=1 i78_missed_by_the_f1_candidates=0 i78_missed_by_the_in_place_candidates=0 rows=["seg11:[0]:orphan_on_disk=false:overlay=false:f1=false:in_place=false", "seg12:[0]:orphan_on_disk=true:overlay=true:f1=true:in_place=true", "seg13:[]:orphan_on_disk=false:overlay=false:f1=false:in_place=false"] must_be_nonzero=0
+E7RESULT name=r2_state_budget world=f1_shifted_one_write_per_segment closed_form_state_count=16777242 enumerated_with_torn=47 writes=43 segments=13
+E7RESULT name=r3_f1_torn world=legit_node_at_60001_then_data_unit_with_a_node_like_second_half states_from_the_new_segments=3 i78_red_under_todays_overlay=1 i78_red_under_the_f1_candidates=0 i78_red_under_the_in_place_candidates=0 must_be_nonzero=-
+E7RESULT name=done emitted=5

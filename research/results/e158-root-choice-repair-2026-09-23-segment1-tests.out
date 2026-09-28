@@ -1,5 +1,5 @@
 # E158 第一段：cargo test -p singlefs-harness --bin e158_root_choice_repair 的原样输出
-跑于 2026-09-24 01:39:33 JST
+跑于 2026-09-24
     Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
      Running unittests src/bin/e158_root_choice_repair.rs (target/debug/deps/e158_root_choice_repair-510106b7a4fcb6a3)
 

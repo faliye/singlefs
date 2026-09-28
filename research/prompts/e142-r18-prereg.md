@@ -1,6 +1,6 @@
 # E142 重跑登记（第 18 次）：实一改格式之后，第一个事务写出的每个区域与 `crates/` 逐字节比；与第十七次跑主产物比哪些区域、哪些偏移变了，每一处能不能对到三条条款
 
-写于 2026-09-26 06:37 JST 起（本机 UTC 2026-09-25 21:37 起），装置改之前、这一次的任何产物之前。判据、门槛、作废与停机条款在这里写死；跑出数之后要改，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」三步走，不在这里回改。
+写于 2026-09-26 起，装置改之前、这一次的任何产物之前。判据、门槛、作废与停机条款在这里写死；跑出数之后要改，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」三步走，不在这里回改。
 
 **文件名取 `r18`**：`research/prompts/e142-r17-prereg.md` 是第 17 次跑的登记，这一次是第 18 次。
 
@@ -36,7 +36,7 @@
 | ③ | 开工前：派发提示里要有主 agent 写的一句「`crates/` 这一版就是要比的那一版」（S19 ⓪）；按 S16 再重抄条款核一次；取 `crates/` 快照一，存 `research/results/e142-r18-crates-sha256-before-2026-09-26.txt`，旁边存 `git status --short crates/` 与 `git diff --stat -- crates/` 的原样输出；照 `replay.sh` 的 `driver_e142` 两条命令原样跑（先导出、再模型，模型第 1 个参数是导出、第 2 个参数是第十六次跑的臂 N15 产物），导出存 `research/results/e142-r18-crates-dump-2026-09-26.out`，模型 stdout 与导出按 `driver_e142` 的次序拼成的整份存 `research/results/e142-first-txn-dry-run-2026-09-26-r18-main.out`（准入必须放行，S15）；取快照二存 `…-after-2026-09-26.txt`、与快照一 `cmp`；跑独立 bin 两种调用，输出存 `research/results/e142-region-diff-independent-2026-09-26-r18.out`、`research/results/e142-region-old-new-independent-2026-09-26-r18.out`；做 PC5、PC6、PC7 与第八节判别力自证第 2 条（合成文件在草稿目录，输出存 `research/results/e142-r18-controls-2026-09-26.out`）；做第六节全部格 | — |
 | ④ | 交回：照第十一节「交回之前」三条做 | 实验页「判决」「影响的决策」两节在这一步才读 |
 
-文件名里的日期取跑的那一天（JST），上表写作 2026-09-26；已存在的同名文件不覆盖，按日期另存。步 ② 冻结之后到产物落盘之前，两个 bin 的源码改动一律进第十二节修订，写明时点（在看过 `crates/` 字节之前还是之后）、依据的条款原文（整行抄）。**看过 `crates/` 字节或第十七次跑那 29 行之后，不许为了与 `crates/` 相等、或为了让第 2 行「全部对得到」去改模型的写法、第七节的字段表或锚点**；条款定了的字段上发现模型写错，照改，但修订里要写明「依据是条款原文第几行，不是 `crates/` 的字节」，两边都查（第十一节 S17）。
+文件名里的日期取跑的那一天，上表写作 2026-09-26；已存在的同名文件不覆盖，按日期另存。步 ② 冻结之后到产物落盘之前，两个 bin 的源码改动一律进第十二节修订，写明时点（在看过 `crates/` 字节之前还是之后）、依据的条款原文（整行抄）。**看过 `crates/` 字节或第十七次跑那 29 行之后，不许为了与 `crates/` 相等、或为了让第 2 行「全部对得到」去改模型的写法、第七节的字段表或锚点**；条款定了的字段上发现模型写错，照改，但修订里要写明「依据是条款原文第几行，不是 `crates/` 的字节」，两边都查（第十一节 S17）。
 
 ## 一、问题
 
@@ -426,7 +426,7 @@ mkfs 把第 0 代根写进三个区域各自的槽 0，一共 **3 份**；第 n 
 **没改的**：`SUPERBLOCK_MAGIC` 的**值** `*b"SFSB"` 不动——那是写进盘上的魔数，改它等于改磁盘格式。常量名跟着改了。
 ```
 
-第一节 R29 引了 D22 已定项 26 的射程（「按可改性贴的标签，不是盘上次序」那一句的依据），用 `quote-kb.py` 另抄一段，出口 `/tmp/claude-1000/e142-r18-design/section2b-quotes.md`（24 行，sha256 `91bb8e444f7dd0824fb7790b3aa25ce2d311b5d068743d6c25fd57be71e442e3`，UTC 21:57 抄，在任何产物之前），回读一致之后原样放在这里：
+第一节 R29 引了 D22 已定项 26 的射程（「按可改性贴的标签，不是盘上次序」那一句的依据），用 `quote-kb.py` 另抄一段，出口 `/tmp/claude-1000/e142-r18-design/section2b-quotes.md`（24 行，sha256 `91bb8e444f7dd0824fb7790b3aa25ce2d311b5d068743d6c25fd57be71e442e3` 抄，在任何产物之前），回读一致之后原样放在这里：
 
 **出处 `.claude/kb/decisions/22-单元原子性怎么合成.md:219-238`（整段抄，未转述）**
 
@@ -453,7 +453,7 @@ mkfs 把第 0 代根写进三个区域各自的槽 0，一共 **3 份**；第 n 
 
 ```
 
-第四节 P18 与第五节 5.3 引了 `layout/01-first-txn.md` 历史版本里实一那一条，整条抄在这里（出口 `/tmp/claude-1000/e142-r18-design/section2c-quotes.md`，UTC 21:58 抄，在任何产物之前，回读一致）：
+第四节 P18 与第五节 5.3 引了 `layout/01-first-txn.md` 历史版本里实一那一条，整条抄在这里（出口 `/tmp/claude-1000/e142-r18-design/section2c-quotes.md` 抄，在任何产物之前，回读一致）：
 
 **出处 `.claude/kb/layout/01-first-txn.md:432-434`（整段抄，未转述）**
 
@@ -465,19 +465,19 @@ mkfs 把第 0 代根写进三个区域各自的槽 0，一共 **3 份**；第 n 
 
 ## 三、实现今天的样子
 
-### 3.1 `crates/`（2026-09-26 06:45–06:47 JST 现查；`git status --short crates/ | wc -l` 为 17，行号只是那一刻的）
+### 3.1 `crates/`（2026-09-26 现查；`git status --short crates/ | wc -l` 为 17，行号只是那一刻的）
 
 这一次不改、不跑 `crates/` 的任何东西（导出 bin 由执行员在步 ③ 跑）；只为「比对侧怎么接」与「实现里有没有这几样」读了下面几处的 `grep -n` 命中行，没读任何函数体。**这几条 `grep` 是在第五至十一节的判据草稿写完之后才跑的**（草稿时刻见第十三节）。
 
 | 处 | 文件:行 | 看到的事实 |
 |---|---|---|
-| 比对侧：主导出 | `crates/singlefs-harness/src/bin/e142_first_transaction_write_dump.rs`（292 行，sha256 `87fcc0b02147aefa1977a15efd42e2026583e1e1256da0b60b7f6e1e0cc552a5`，`git status` 为 `M`，修改时刻 UTC 2026-09-25 16:07）：第 53 行 `name=done`、第 85 行 `fn main`、第 154 行 `name=impl_config`、第 185 行 `name=before_window_summary`、第 211 行 `name=device_region_bytes step= device= offset= length= kind= sha256= hexadecimal=`、第 221 行 `name=device_region_bytes_summary` | 导出自带一行 `name=done`，它的 `name=device_region_bytes ` 行没有 `region=` 字段；执行员只跑不读 |
+| 比对侧：主导出 | `crates/singlefs-harness/src/bin/e142_first_transaction_write_dump.rs`（292 行，sha256 `87fcc0b02147aefa1977a15efd42e2026583e1e1256da0b60b7f6e1e0cc552a5`，`git status` 为 `M`，修改于 2026-09-26）：第 53 行 `name=done`、第 85 行 `fn main`、第 154 行 `name=impl_config`、第 185 行 `name=before_window_summary`、第 211 行 `name=device_region_bytes step= device= offset= length= kind= sha256= hexadecimal=`、第 221 行 `name=device_region_bytes_summary` | 导出自带一行 `name=done`，它的 `name=device_region_bytes ` 行没有 `region=` 字段；执行员只跑不读 |
 | 格式常量 | `crates/singlefs-format/src/lib.rs:186`、`:224`、`:233` | `ROOT_RECORD_BYTES: u64 = 457`、`SYSTEM_CONFIGURATION_BYTES: u64 = 489`、`SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096` |
 | incompat 位 | `crates/singlefs-core/src/system_configuration.rs:29`、`:32`、`:33`；`crates/singlefs-checker/src/lib.rs:219` | 位 1 的常量 `= 0x02`、退役位 0 的常量 `= 0x01`、`SUPPORTED_INCOMPAT_BITS` 另起一行；checker 有自己的同名常量 `= 0x02`（与第二节 `feature-bits.md` 第 19 行的说法同） |
 | 系统配置 F | `crates/singlefs-core/src/system_configuration.rs:206`、`:412`、`:485`–`:489`、`:514` | 结构里有 `rollback_floor`、写路径 `put_u64`、读路径另起一个 reader 读它；偏移没读 |
 | 根 flags | `crates/singlefs-core/src/root_record.rs:16`、`:24`、`:55`、`:84`、`:108` | 结构里有 `unmount_marker`，写路径 `put_u32(self.unmount_marker.flags_bits())`，注释说「只有 `mount::unmount` 那一串写 1」「别的位非 0 拒收」 |
 
-**观察 O2（交主 agent）**：写这份登记的十几分钟里 `crates/` 正在被别的会话改——开工时（UTC 21:3x）`git status --short crates/` 里还没有 `crates/singlefs-core/src/mount.rs` 与 `recovery.rs`，UTC 21:45 再看时两份都成了 `M`，修改时刻 21:45:25、21:45:42；`crates/singlefs-core/src/root_record.rs` 的修改时刻是 21:40:01。所以这份登记**不拿写登记时的 `crates/` 快照当参照**（草稿目录里那一份 `crates-sha256-at-registration.txt`，130 个文件、sha256 `621084b2…`，只当记录）；比的是步 ③ 那一刻的 `crates/`，由 S19 ⓪（主 agent 认这一版）与 S19 ①（快照一、快照二相同）两道保证它在比对期间不动。
+**观察 O2（交主 agent）**：写这份登记的十几分钟里 `crates/` 正在被别的会话改——开工时`git status --short crates/` 里还没有 `crates/singlefs-core/src/mount.rs` 与 `recovery.rs` 再看时两份都成了 `M`；`crates/singlefs-core/src/root_record.rs` 也在写登记的这段时间里改过（比那两份早）。所以这份登记**不拿写登记时的 `crates/` 快照当参照**（草稿目录里那一份 `crates-sha256-at-registration.txt`，130 个文件、sha256 `621084b2…`，只当记录）；比的是步 ③ 那一刻的 `crates/`，由 S19 ⓪（主 agent 认这一版）与 S19 ①（快照一、快照二相同）两道保证它在比对期间不动。
 
 ### 3.2 模型（`research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs`，8615 行，sha256 `471f272b03542f4d2b6e59495fba5ed05a3d72c503b1959289fe5233a24e510e`；变异表 146 行，sha256 `264b014c79b72fffd26b9e4f0c25f2b204e7f742229b6f825018c73e6e1b27f8`）
 
@@ -518,7 +518,7 @@ mkfs 把第 0 代根写进三个区域各自的槽 0，一共 **3 份**；第 n 
 
 ## 四、跑之前已经存在的数
 
-读条款、读装置、读前例、判问法时已经撞见或自己推出来的，照实列，不删。第一节读法与第五、六、七（A 类与 7.3）、八至十一节的判据草稿在 UTC 2026-09-25 21:38–21:44（JST 09-26 06:38–06:44）写完（草稿文件修改时刻在第十三节），21:45 才跑第七节命令一、才对 `crates/` 跑第三节 3.1 的 `grep`；判定以产物为准，不以下表为准。
+读条款、读装置、读前例、判问法时已经撞见或自己推出来的，照实列，不删。第一节读法与第五、六、七（A 类与 7.3）、八至十一节的判据草稿在 2026-09-26 写完（草稿文件的修改先后在第十三节），之后才跑第七节命令一、才对 `crates/` 跑第三节 3.1 的 `grep`；判定以产物为准，不以下表为准。
 
 | # | 数 / 话 | 出处 | 对判据的影响 |
 |---|---|---|---|
@@ -617,7 +617,7 @@ Q142.38、Q142.39 是「两份实现比」「两条比对路比」，Q142.42 是
 
 ### 7.2 独立算出、用命令核过的（第十三节命令一；不符 ⇒ 作废 V14）
 
-命令一 `anchors_e142_r18.py` 在第五、六、八至十一节的草稿写完之后跑（草稿文件修改时刻见第十三节），输出原样在第十三节。它照 `layout/01-first-txn.md`「一」系统配置字段表的行序与「第一个事务里的值」那一列从头拼出整个 4096 字节的槽，不 import 任何装置、不读 `crates/`、不读 `research/results/`。fsid 是实验参数（R30「fsid 固定」），取模型里 `FIXED_FSID` 那 16 字节；magic `SFSB` 取 `.claude/kb/term-renames.md` 第 37 行。
+命令一 `anchors_e142_r18.py` 在第五、六、八至十一节的草稿写完之后跑（草稿文件的修改先后见第十三节），输出原样在第十三节。它照 `layout/01-first-txn.md`「一」系统配置字段表的行序与「第一个事务里的值」那一列从头拼出整个 4096 字节的槽，不 import 任何装置、不读 `crates/`、不读 `research/results/`。fsid 是实验参数（R30「fsid 固定」），取模型里 `FIXED_FSID` 那 16 字节；magic `SFSB` 取 `.claude/kb/term-renames.md` 第 37 行。
 
 | # | 断言 | 值（命令一的输出行，原样在第十三节） |
 |---|---|---|
@@ -772,9 +772,9 @@ B27、B28 取的是从 `layout/01-first-txn.md`「一」那张表拼出来的整
 
 ## 十三、读过的文件与跑过的命令
 
-下面列的是这一次派发里读过的全部文件。行号是读的那一刻（UTC 2026-09-25 21:30–21:52，JST 09-26 06:30–06:52）的行号。`research/results/` 下的产物一行都没读（只 `ls | grep -i e142` 看过文件名与大小，另用命令四只看了每份产物最前面 20 行里有没有 `E7INPUT … key=E142`，命令输出为空）；`.claude/kb/experiments/` 下一行都没读；`/tmp/claude-1000/impl-rbf-1/` 下一个文件都没读。草稿目录：`/tmp/claude-1000/e142-r18-design/`（派发提示给的）。
+下面列的是这一次派发里读过的全部文件。行号是读的那一刻（2026-09-26）的行号。`research/results/` 下的产物一行都没读（只 `ls | grep -i e142` 看过文件名与大小，另用命令四只看了每份产物最前面 20 行里有没有 `E7INPUT … key=E142`，命令输出为空）；`.claude/kb/experiments/` 下一行都没读；`/tmp/claude-1000/impl-rbf-1/` 下一个文件都没读。草稿目录：`/tmp/claude-1000/e142-r18-design/`（派发提示给的）。
 
-**草稿时刻（UTC 2026-09-25，文件修改时刻）**：开工 21:37:51（`design-start.txt`）；第一节读法 `draft-01-readings.md` 21:39:17；第五节 `draft-05-arms.md` 21:41:21；第六节 `draft-06-cells.md` 21:42:01；第七节 A 类与 7.3 `draft-07-anchors.md` 21:42:36；第八、九节 `draft-08-11.md` 21:43:58（21:44:42 改了 M173 那一格的预言值，从 `0300000000000000` 改成 `0000000001000000`，改前是我算错了挪位后落在 [481, 489) 的字节，没看任何产物）；第十、十一节 `draft-10-11.md` 21:44:42。之后：21:45:17 跑命令一；21:45:26–21:47 跑第三节 3.1 的 `crates/` 快照与 `grep`；21:47 用 `quote-kb.py` 抄第一、二节；21:50 在草稿里改了三处——第五节 P2 那一行的「该看到什么」改成模型产物里真有的字段名 `regions_flagged=1`、`matches_injection=true`（依据：模型第 5423 行的输出格式，不依据任何产物）；S19 原来的 ②「快照一与写登记时的快照不同 ⇒ 停机、交主 agent 定比哪一版」换成 ⓪「步 ③ 开工之前一律先要主 agent 认这一版」，另把两份快照的逐文件差异改成必报项（依据：第三节 3.1 观察 O2，写登记时 `crates/` 正在被改，那一份快照不能当参照；换上的 ⓪ 不论快照同不同都要主 agent 先认，比原来那一格严）；第七节 7.2 填上命令一的输出。三处都没有放松任何一格门槛。
+**草稿先后（2026-09-26，按文件修改时刻排）**：开工（`design-start.txt`）；第一节读法 `draft-01-readings.md`；第五节 `draft-05-arms.md`；第六节 `draft-06-cells.md`；第七节 A 类与 7.3 `draft-07-anchors.md`；第八、九节 `draft-08-11.md`（写完之后又改了 M173 那一格的预言值，从 `0300000000000000` 改成 `0000000001000000`，改前是我算错了挪位后落在 [481, 489) 的字节，没看任何产物）；第十、十一节 `draft-10-11.md`。之后依次：跑命令一；跑第三节 3.1 的 `crates/` 快照与 `grep`；用 `quote-kb.py` 抄第一、二节；在草稿里改了三处——第五节 P2 那一行的「该看到什么」改成模型产物里真有的字段名 `regions_flagged=1`、`matches_injection=true`（依据：模型第 5423 行的输出格式，不依据任何产物）；S19 原来的 ②「快照一与写登记时的快照不同 ⇒ 停机、交主 agent 定比哪一版」换成 ⓪「步 ③ 开工之前一律先要主 agent 认这一版」，另把两份快照的逐文件差异改成必报项（依据：第三节 3.1 观察 O2，写登记时 `crates/` 正在被改，那一份快照不能当参照；换上的 ⓪ 不论快照同不同都要主 agent 先认，比原来那一格严）；第七节 7.2 填上命令一的输出。三处都没有放松任何一格门槛。
 
 ### 13.1 规则、共用约束、门禁与脚本
 
@@ -809,12 +809,12 @@ B27、B28 取的是从 `layout/01-first-txn.md`「一」那张表拼出来的整
 
 ### 13.4 `crates/`
 
-- `git status --short crates/`（两次：开工时与 21:45）、`git diff --stat -- crates/`、`stat -c '%y %n'`（`mount.rs`、`recovery.rs`、`system_configuration.rs`、`root_record.rs`、`singlefs-format/src/lib.rs`、主导出 bin）
+- `git status --short crates/`（两次：开工时与跑命令一时）、`git diff --stat -- crates/`、`stat -c '%y %n'`（`mount.rs`、`recovery.rs`、`system_configuration.rs`、`root_record.rs`、`singlefs-format/src/lib.rs`、主导出 bin）
 - `crates/singlefs-harness/src/bin/e142_first_transaction_write_dump.rs`、`…_one_device.rs`：只 `wc -l` 与 `sha256sum`（主导出 292 行 `87fcc0b0…`；一盘导出 325 行 `eaef2e95…`），加上 `grep -n 'name=device_region_bytes\|name=impl_config\|name=before_window_summary\|name=done\|fn main'` 的命中行（第 53、85、154、185、211、221 行）
 - `crates/singlefs-format/src/lib.rs`：`grep -n 'pub const SYSTEM_CONFIGURATION_BYTES\|pub const ROOT_RECORD_BYTES\|pub const SYSTEM_CONFIGURATION_SLOT_BYTES'` 命中第 186、224、233 行
 - `crates/singlefs-core/src/system_configuration.rs`、`crates/singlefs-checker/src/lib.rs`：`grep -n 'const INCOMPAT_\|const SUPPORTED_INCOMPAT'` 命中第 29、32、33 行与第 219 行；`system_configuration.rs` 的 `grep -n 'rollback_floor' | head -5` 命中第 206、412、485、489、514 行
 - `crates/singlefs-core/src/root_record.rs`：`grep -n 'unmount' | head -5` 命中第 16、24、55、84、108 行
-- 快照：`find crates -type f \( -name '*.rs' -o -name 'Cargo.toml' -o -name '*.tsv' \) -not -path '*/target/*' | LC_ALL=C sort | xargs sha256sum > /tmp/claude-1000/e142-r18-design/crates-sha256-at-registration.txt`（130 行，整份 sha256 `621084b21af8e8d9b3670c4f7f1e23b7182aabb3e69473a717e65503e320f0c9`，UTC 21:45:26；第三节 3.1 O2：只当记录）
+- 快照：`find crates -type f \( -name '*.rs' -o -name 'Cargo.toml' -o -name '*.tsv' \) -not -path '*/target/*' | LC_ALL=C sort | xargs sha256sum > /tmp/claude-1000/e142-r18-design/crates-sha256-at-registration.txt`（130 行，整份 sha256 `621084b21af8e8d9b3670c4f7f1e23b7182aabb3e69473a717e65503e320f0c9`；第三节 3.1 O2：只当记录）
 
 ### 13.5 模型装置、独立 bin 与变异表
 
@@ -829,7 +829,7 @@ B27、B28 取的是从 `layout/01-first-txn.md`「一」那张表拼出来的整
 
 #### 命令一：E142 第 18 次跑的独立锚点（`anchors_e142_r18.py`，129 行，sha256 `3860475c16ec8ae09607af553fc9c9f48a092b3fe4a8d88524949e6ab7d973d8`，存在草稿目录；全文如下）
 
-`cd /tmp/claude-1000/e142-r18-design; nice -n 19 python3 anchors_e142_r18.py`（UTC 21:45:17 第一次跑；21:45:26 同一条命令把输出存进 `anchors_e142_r18.out`，sha256 `c97cb65f5fae5f8456ab60cd171b49b02f4f6593674a7d84b0339fb7d001a573`）
+`cd /tmp/claude-1000/e142-r18-design; nice -n 19 python3 anchors_e142_r18.py`（第一次跑；随后同一条命令把输出存进 `anchors_e142_r18.out`，sha256 `c97cb65f5fae5f8456ab60cd171b49b02f4f6593674a7d84b0339fb7d001a573`）
 
 ```python
 #!/usr/bin/env python3
@@ -980,7 +980,7 @@ B29 g8_differing_offsets device=0 count=12 offsets=155,156,157,158,481,482,483,4
 #### 命令二：模型今天减去准入那 6 行，是不是第十七次跑冻结的那一份
 
 ```bash
-cd /home/fy5090/code/singlefs; f=research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs; sed '5926,5931d' $f | sha256sum; sed '5926,5931d' $f | wc -l
+cd <仓根>; f=research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs; sed '5926,5931d' $f | sha256sum; sed '5926,5931d' $f | wc -l
 ```
 
 ```text
@@ -999,7 +999,7 @@ nice -n 19 python3 research/scripts/admission.py paths . E142
 #### 命令四：`research/results/` 里有没有头上带 E142 输入指纹的产物（只看每份最前面 20 行）
 
 ```bash
-cd /home/fy5090/code/singlefs; find research/results -type f | while IFS= read -r f; do if head -n 20 "$f" 2>/dev/null | grep -q 'E7INPUT name=input_fingerprint key=E142 '; then echo "$f"; fi; done; echo "loop-exit=$?"; find research/results -type f | wc -l
+cd <仓根>; find research/results -type f | while IFS= read -r f; do if head -n 20 "$f" 2>/dev/null | grep -q 'E7INPUT name=input_fingerprint key=E142 '; then echo "$f"; fi; done; echo "loop-exit=$?"; find research/results -type f | wc -l
 ```
 
 ```text
@@ -1012,7 +1012,7 @@ loop-exit=0
 #### 命令五、六：抄条款
 
 ```bash
-cd /home/fy5090/code/singlefs; K=.claude/kb; nice -n 19 python3 research/scripts/quote-kb.py /tmp/claude-1000/e142-r18-design/section2-quotes.md \
+cd <仓根>; K=.claude/kb; nice -n 19 python3 research/scripts/quote-kb.py /tmp/claude-1000/e142-r18-design/section2-quotes.md \
  "$K/decisions/22-单元原子性怎么合成.md@#### 已定项 9：系统配置的字段表" \
  "$K/decisions/22-单元原子性怎么合成.md@#### 已定项 7：根记录的字段表" \
  "$K/decisions/15-格式冻结政策.md@#### 已定项 4：feature bit 的位分配登记表" \
@@ -1030,10 +1030,10 @@ cd /home/fy5090/code/singlefs; K=.claude/kb; nice -n 19 python3 research/scripts
 nice -n 19 python3 research/scripts/quote-kb.py /tmp/claude-1000/e142-r18-design/section1-questions.md "research/prompts/m2-rbf1-e142-questions.md:7-10"
 ```
 
-两条都打「回读逐字节一致」、退 0（14 段、1 段）。四个 `~` 正则事先各用 `grep -cE` 核过在 `16-发布语义.md` 里恰命中 1 行。出口文件 sha256：`section2-quotes.md` `21061c418b47b5bda6fc473f9204d938dfd50b64aa865044bdf37b510aa58b21`（350 行）、`section1-questions.md` `9ab6ed85261c52ecf70ce5056894437c9a9181b1b624eb2c42c447a6e04c45b2`。第二节追加进这份登记之后，用 `awk` 取登记里对应的 350 行与出口文件 `cmp`，相同。第三条（UTC 21:57，第一节 R29 引到已定项 26，补抄）：`cd /home/fy5090/code/singlefs; K=.claude/kb; nice -n 19 python3 research/scripts/quote-kb.py /tmp/claude-1000/e142-r18-design/section2b-quotes.md "$K/decisions/22-单元原子性怎么合成.md@#### 已定项 26：系统配置的三档可改性"`，1 段、回读一致，放在第二节末尾、第三节之前，放进去之后同样用 `awk` 取出与出口 `cmp`，相同。执行员按 S16 重抄时照这三条原样跑，出口换成自己的草稿目录。
+两条都打「回读逐字节一致」、退 0（14 段、1 段）。四个 `~` 正则事先各用 `grep -cE` 核过在 `16-发布语义.md` 里恰命中 1 行。出口文件 sha256：`section2-quotes.md` `21061c418b47b5bda6fc473f9204d938dfd50b64aa865044bdf37b510aa58b21`（350 行）、`section1-questions.md` `9ab6ed85261c52ecf70ce5056894437c9a9181b1b624eb2c42c447a6e04c45b2`。第二节追加进这份登记之后，用 `awk` 取登记里对应的 350 行与出口文件 `cmp`，相同。第三条（第一节 R29 引到已定项 26，补抄）：`cd <仓根>; K=.claude/kb; nice -n 19 python3 research/scripts/quote-kb.py /tmp/claude-1000/e142-r18-design/section2b-quotes.md "$K/decisions/22-单元原子性怎么合成.md@#### 已定项 26：系统配置的三档可改性"`，1 段、回读一致，放在第二节末尾、第三节之前，放进去之后同样用 `awk` 取出与出口 `cmp`，相同。执行员按 S16 重抄时照这三条原样跑，出口换成自己的草稿目录。
 
 #### 其余
 
 - `sha256sum` / `wc -l`：模型、模型变异表、独立 bin、独立 bin 变异表、两个导出 bin（值在第三节）。
 - `date -u`、`TZ=Asia/Tokyo date`、`ps -o pid,etime,args -u "$(id -u)"`（看到别的 `claude` 会话在跑，没有 `cargo`、`qemu`）。
-- `research/scripts/replace-once.py` 在这份登记上改过十四处（这一条自己与命令五、六那一段的措辞另改过几次，不计）；第十四处是把 D22 已定项 26 那一段抄进第二节末尾（UTC 21:57）；第十五处（UTC 21:58）照同样做法把 `layout/01-first-txn.md` 第 432–434 行（历史版本「2026-09-26（实一）」那一条）抄在它后面，命令是 `nice -n 19 python3 research/scripts/quote-kb.py /tmp/claude-1000/e142-r18-design/section2c-quotes.md ".claude/kb/layout/01-first-txn.md:432-434"`。前四处在第五节以后追加之前，只改措辞与行号（第一节那句「文件第 3 行」、第三节 3.2 两处行号、第四节 P12 的读取范围）。后六处在全文追加完之后（UTC 21:53 前后，任何产物之前），都是收严或补做法：第八节 G8 的 `differing_offsets` 从「若干个」钉成 B29 那 12 个；第八节判别力自证第 2 条写明在仓副本上套变异；第三节 3.3 写明模型产物里没有 `name=done` 就报错退出；PC6 的合成文件末尾补 `name=done` 行；M8 的预言去掉我没核过的「58 行」；「交回之前」第 3 条写明对照输出拼进哪一份文件。再后三处（UTC 21:55 前后，同样在任何产物之前）：第五节臂 N18 第 ④ 条把写错的「Q142.46」改成 Q142.45、写明模型自己的 `name=r18_clause_fields` 喂哪两个判决字段；第十三节开头那段对 S19 改动的说明写实（原 ② 换成更严的 ⓪）；Q142.40 的逐项清单改成「两行都报的每一项」、去掉导出那一行其实没有的「改动计数」。
+- `research/scripts/replace-once.py` 在这份登记上改过十四处（这一条自己与命令五、六那一段的措辞另改过几次，不计）；第十四处是把 D22 已定项 26 那一段抄进第二节末尾；第十五处照同样做法把 `layout/01-first-txn.md` 第 432–434 行（历史版本「2026-09-26（实一）」那一条）抄在它后面，命令是 `nice -n 19 python3 research/scripts/quote-kb.py /tmp/claude-1000/e142-r18-design/section2c-quotes.md ".claude/kb/layout/01-first-txn.md:432-434"`。前四处在第五节以后追加之前，只改措辞与行号（第一节那句「文件第 3 行」、第三节 3.2 两处行号、第四节 P12 的读取范围）。后六处在全文追加完之后（任何产物之前），都是收严或补做法：第八节 G8 的 `differing_offsets` 从「若干个」钉成 B29 那 12 个；第八节判别力自证第 2 条写明在仓副本上套变异；第三节 3.3 写明模型产物里没有 `name=done` 就报错退出；PC6 的合成文件末尾补 `name=done` 行；M8 的预言去掉我没核过的「58 行」；「交回之前」第 3 条写明对照输出拼进哪一份文件。再后三处（同样在任何产物之前）：第五节臂 N18 第 ④ 条把写错的「Q142.46」改成 Q142.45、写明模型自己的 `name=r18_clause_fields` 喂哪两个判决字段；第十三节开头那段对 S19 改动的说明写实（原 ② 换成更严的 ⓪）；Q142.40 的逐项清单改成「两行都报的每一项」、去掉导出那一行其实没有的「改动计数」。

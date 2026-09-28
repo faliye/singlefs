@@ -1,4 +1,4 @@
-//! 实审 A3b（规格 `/tmp/claude-1000/impl-rev-a3b/spec.md`，写于 2026-09-27 JST）：
+//! 实审 A3b（规格 `/tmp/claude-1000/impl-rev-a3b/spec.md`，写于 2026-09-27）：
 //!
 //! 一、代码审阅第 15 条（C475（非默认环长下单元区起点取编译期常量））：单元区起点按环长现算、全链路一处来源——mkfs 按环长算起点
 //! （journal 环末尾的下一个槽，D3（空间分配） 已定项 10 ④）、写进系统配置偏移 417 的 8 字节、实例表与树表写在那里；读者择系统配置时
@@ -13,12 +13,18 @@
 //!
 //! 四、C554 乙报告 Q6（用户 2026-09-26「不能接受 要改」）：两处「读不出就无声放过」照乙的形态收——先重读一次，仍读不出就在任何写之前拒：
 //! 算生效 F 时最新那条根的实例表读不出（改之前「不按表滤」）；挂着时抬 F 重算影子账时根槽读不出（改之前当那一槽没有根）。
-//! 合入后验证一（规格 `/tmp/claude-1000/impl-merge-verify-1/spec.md`，2026-09-27 JST）改了三样：
+//! 合入后验证一（规格 `/tmp/claude-1000/impl-merge-verify-1/spec.md`，2026-09-27）改了三样：
 //! - 读根环照 D16（发布语义） 已定项 1「根槽这一次读坏」那一行分两类（善后一报告 P1）：挂载那一刻就读坏、这个进程之后没写过的槽当没有根，
 //!   不重读、不拒；这个进程知道住着根的槽读坏重读一次，仍坏才拒；
 //! - 两个拒的成员从 `RecoveryFailure` 挪进乙那一族 `StillUnreadableAfterOneReread`（A3b 报告 Q4）；
 //! - 另两处读不出就无声放过（A3b 报告 Q7）：管理员回退判候选照同一读法拒成 `RollbackError` 的新成员；写系统配置槽之前算 F 生效值
 //!   读不出的重读一次，仍读不出照原来的退路（写入口手里没有根环表，不拒）。
+//!
+//! 代码三方第二轮（`research/prompts/m2-closeout-code-r2-main-verification.md`，规格 `/tmp/claude-1000/impl-r2-fixes-b/spec.md`）改了两样：
+//! - 读根环照 D16（发布语义） 已定项 1「根槽这一次读坏」那一行全句（用户 2026-09-26 定）：知道住着根的槽「读不出**或自证不过**」都重读一次、
+//!   仍坏就拒（第四节末尾两条；包装盘另加「读得出、字节被改」那一种坏法）。管理员回退算水位读根环那一遍仍是 `readable_roots`
+//!   （不重读），判候选那两遍读得出、这一遍瞬时读坏时水位取内存里的现行那一版（`the_rollback_takes_the_inode_number_watermark_…`）。
+//! - 五、core 读系统配置的 journal 环起点（偏移 325）与根环起点（偏移 371），与第一版常量不等整池拒（Y4-a，用户 2026-09-27 定）。
 //!
 //! 盘：两块内存稀疏盘（`SparseBlockDevice`），改盘上字节之后重封每一道校验和；读故障用这个文件自己的包装盘按「这一段第几次读」坏。
 use std::cell::RefCell;
@@ -46,16 +52,17 @@ use singlefs_core::mount::{
     roll_back_by_a_forward_publish, MountError, RollbackError, RollbackTarget, ShadowLedger,
     StillUnreadableAfterOneReread,
 };
+use singlefs_core::mounted_read::{mount_read_only, MountReadOnlyFailure};
 use singlefs_core::records::{TREE_KIND_LIVELIST, TREE_KIND_SPARSE_SIDE_TABLE};
 use singlefs_core::recovery::{
     choose_system_configuration, effective_rollback_floor_rereading_the_newest_instance_table_once,
     effective_rollback_floor_rereading_unreadable_reads_once, every_root_ring_slot,
     read_root_ring_slot, readable_roots,
     readable_roots_rereading_ring_slots_known_to_hold_a_root_once, readable_roots_with_ring_slots,
-    recover, verified_system_configuration_slots,
+    recover, verified_system_configuration_slots, BadRootRingSlotReading,
     InstanceTableOfTheNewestRootStillUnreadableAfterOneReread, JournalPolicy, RecoveryFailure,
-    RecoveryOutcome, RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread,
-    RootRingSlotReading, SystemConfigurationValueOutsideWhatThisReaderAccepts,
+    RecoveryOutcome, RootRingSlotKnownToHoldARootStillBadAfterOneReread, RootRingSlotReading,
+    SystemConfigurationValueOutsideWhatThisReaderAccepts,
 };
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::root_ring::{slot_offset, RootRingSlot, RootRingSlotsPerRegion};
@@ -64,13 +71,14 @@ use singlefs_core::system_configuration::{
     SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
 };
 use singlefs_core::transaction::{
-    acquire_instance, publish_first_file, publish_overwrite, warm_up, FirstFile, PoolWriter,
-    TransactionOutput,
+    acquire_instance, publish_first_file, publish_new_inodes, publish_overwrite, warm_up,
+    FirstFile, PoolWriter, TransactionOutput,
 };
 use singlefs_core::unit::seal_header_checksum;
 use singlefs_format::{
     JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT,
-    JOURNAL_SAFETY_FACTOR, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
+    JOURNAL_SAFETY_FACTOR, ROOT_RING_BASE_SLOT, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
+    UNIT_AREA_START_SLOT,
 };
 use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice, SparseDevice, SECTOR_BYTES};
 
@@ -713,10 +721,19 @@ fn a_tree_table_whose_two_entries_carry_the_same_tree_identifier_is_refused_by_t
 
 // ─── 四、读不出就不无声放过（C554 乙报告 Q6） ───
 
-/// 这个文件自己的读故障：几段落点，每一段按它自己被读的次数（从 1 数，一次读碰到这一段就算一次）点名哪几次读坏
-/// （块设备报 `InputOutput`）。两块盘共用一份。
+/// 这个文件自己的读故障：几段落点，每一段按它自己被读的次数（从 1 数，一次读碰到这一段就算一次）点名哪几次读坏。
+/// 两块盘共用一份。
 struct ChosenReadFaults {
     ranges: Vec<ChosenReadFaultsOfARange>,
+}
+
+/// 点名的那几次读怎么坏。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ChosenReadFault {
+    /// 块设备报 `InputOutput`（读不出）。
+    Fails,
+    /// 读得出，这一段落在这次读里的第一个字节取反（根槽里是 magic 那一字节：自证不过）。
+    ReturnsTheFirstByteOfTheRangeFlipped,
 }
 
 struct ChosenReadFaultsOfARange {
@@ -724,18 +741,25 @@ struct ChosenReadFaultsOfARange {
     offset_in_bytes: u64,
     length_in_bytes: u64,
     failing_read_numbers: BTreeSet<u64>,
+    fault: ChosenReadFault,
     reads_so_far: u64,
 }
 
+/// 这一次读里点名要坏的那一段：它怎么坏，和它在这次读里从第几个字节起。
+struct ChosenReadGoingBad {
+    fault: ChosenReadFault,
+    first_byte_of_the_range_in_the_read: usize,
+}
+
 impl ChosenReadFaults {
-    /// 记下这一次读碰到的每一段被读了一次；这一次读里有一段点名这一次坏就交回 true。
-    fn note_a_read_and_tell_whether_it_fails(
+    /// 记下这一次读碰到的每一段被读了一次；这一次读里有一段点名这一次坏，就交回第一段点名的那一个。
+    fn note_a_read_and_tell_how_it_goes_bad(
         &mut self,
         device: DeviceIdentity,
         offset_in_bytes: u64,
         length_in_bytes: u64,
-    ) -> bool {
-        let mut fails = false;
+    ) -> Option<ChosenReadGoingBad> {
+        let mut going_bad = None;
         for range in &mut self.ranges {
             let overlaps = range.device == device
                 && offset_in_bytes < range.offset_in_bytes + range.length_in_bytes
@@ -744,9 +768,17 @@ impl ChosenReadFaults {
                 continue;
             }
             range.reads_so_far += 1;
-            fails |= range.failing_read_numbers.contains(&range.reads_so_far);
+            if going_bad.is_none() && range.failing_read_numbers.contains(&range.reads_so_far) {
+                going_bad = Some(ChosenReadGoingBad {
+                    fault: range.fault,
+                    first_byte_of_the_range_in_the_read: usize::try_from(
+                        range.offset_in_bytes.saturating_sub(offset_in_bytes),
+                    )
+                    .expect("一次读里的偏移装得进 usize"),
+                });
+            }
         }
-        fails
+        going_bad
     }
 }
 
@@ -764,16 +796,27 @@ impl BlockDevice for DeviceFailingChosenReads {
         buffer: &mut [u8],
     ) -> Result<(), BlockDeviceError> {
         let length_in_bytes = u64::try_from(buffer.len()).expect("一次读的长度装得进 u64");
-        if self
+        let going_bad = self
             .faults
             .borrow_mut()
-            .note_a_read_and_tell_whether_it_fails(self.identity, offset.0, length_in_bytes)
-        {
-            return Err(BlockDeviceError::InputOutput(std::io::Error::other(
+            .note_a_read_and_tell_how_it_goes_bad(self.identity, offset.0, length_in_bytes);
+        match going_bad {
+            None => self.inner.read_at(offset, buffer),
+            Some(ChosenReadGoingBad {
+                fault: ChosenReadFault::Fails,
+                ..
+            }) => Err(BlockDeviceError::InputOutput(std::io::Error::other(
                 "用例点名的这一次读坏",
-            )));
+            ))),
+            Some(ChosenReadGoingBad {
+                fault: ChosenReadFault::ReturnsTheFirstByteOfTheRangeFlipped,
+                first_byte_of_the_range_in_the_read,
+            }) => {
+                self.inner.read_at(offset, buffer)?;
+                buffer[first_byte_of_the_range_in_the_read] ^= 0xff;
+                Ok(())
+            }
         }
-        self.inner.read_at(offset, buffer)
     }
 
     fn write_at(
@@ -806,7 +849,7 @@ impl BlockDevice for DeviceFailingChosenReads {
     }
 }
 
-/// 一段读故障：哪块盘、从哪个字节起、多长，这一段第几次读坏。
+/// 一段读故障：哪块盘、从哪个字节起、多长，这一段第几次读坏（读不出）。
 fn chosen_read_faults_of(
     device: DeviceIdentity,
     offset_in_bytes: u64,
@@ -818,6 +861,24 @@ fn chosen_read_faults_of(
         offset_in_bytes,
         length_in_bytes,
         failing_read_numbers: failing_read_numbers.iter().copied().collect(),
+        fault: ChosenReadFault::Fails,
+        reads_so_far: 0,
+    }
+}
+
+/// 同 [`chosen_read_faults_of`]，点名的那几次读得出、这一段第一个字节取反（自证不过）。
+fn chosen_corrupted_reads_of(
+    device: DeviceIdentity,
+    offset_in_bytes: u64,
+    length_in_bytes: u64,
+    corrupted_read_numbers: &[u64],
+) -> ChosenReadFaultsOfARange {
+    ChosenReadFaultsOfARange {
+        device,
+        offset_in_bytes,
+        length_in_bytes,
+        failing_read_numbers: corrupted_read_numbers.iter().copied().collect(),
+        fault: ChosenReadFault::ReturnsTheFirstByteOfTheRangeFlipped,
         reads_so_far: 0,
     }
 }
@@ -1002,6 +1063,8 @@ fn raising_the_floor_while_a_root_ring_slot_known_to_hold_a_root_stays_unreadabl
                 if **still_unreadable
                     == StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot {
                         ring_slot: newest_slot,
+                        first_reading: BadRootRingSlotReading::Unreadable,
+                        reread: BadRootRingSlotReading::Unreadable,
                     }
         ),
         "{:?}",
@@ -1115,8 +1178,10 @@ fn a_root_ring_slot_unreadable_once_is_read_on_the_reread_and_one_unreadable_twi
             &pool.parameters.filesystem_identifier,
             &known,
         ),
-        Err(RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread {
+        Err(RootRingSlotKnownToHoldARootStillBadAfterOneReread {
             ring_slot: newest_slot,
+            first_reading: BadRootRingSlotReading::Unreadable,
+            reread: BadRootRingSlotReading::Unreadable,
         })
     );
     let last_slot = *every_root_ring_slot(&sizes).last().expect("根环至少一槽");
@@ -1370,6 +1435,280 @@ fn a_system_configuration_write_rereads_an_unreadable_root_ring_slot_once_before
             device.0
         );
     }
+}
+
+/// 抬 F 到 3 那一串里最新那条根住的槽（这个进程知道住着根）：第 3 次读（重算影子账那一遍）读得出而自证不过、重读（第 4 次）仍自证不过 ⇒
+/// 拒成 `StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot { first_reading: NotSelfVerified, reread: NotSelfVerified }`，
+/// 在动分配器与任何写之前（D16（发布语义） 已定项 1「根槽这一次读坏」那一行全句：「读不出或自证不过就重读一次，仍坏就拒」）。
+/// 合入后验证一那一版只管「读不出」，自证不过当没有根、这一次抬照做。
+#[test]
+fn raising_the_floor_while_a_root_ring_slot_known_to_hold_a_root_stays_not_self_verified_is_refused_before_any_write(
+) {
+    let mut pool = pool_after_three_overwrites();
+    let sizes = pool.parameters.geometry;
+    let (newest_slot, _) = newest_root_in_the_ring(&pool.devices);
+    assert!(
+        ring_slots_known_to_hold_a_root_by(&pool.allocator).contains(&newest_slot),
+        "最新那条根住的槽在这个进程的根环表里"
+    );
+    let slot_device =
+        pool.parameters.region_devices[usize::try_from(newest_slot.region).expect("区域号")];
+    let slot_start = slot_offset(newest_slot, sizes.fixed_structure_slot_spacing).0;
+    let images_before = images_of(&pool.devices);
+    let allocator_before = format!("{:?}", pool.allocator);
+    let refused = raise_the_floor_to_three_through(
+        &mut pool,
+        vec![chosen_corrupted_reads_of(
+            slot_device,
+            slot_start,
+            u64::from(sizes.physical_block_size),
+            &[3, 4],
+        )],
+    );
+    assert!(
+        matches!(
+            &refused,
+            Err(MountError::NewerStateStillUnreadableAfterOneReread(still_bad))
+                if **still_bad
+                    == StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot {
+                        ring_slot: newest_slot,
+                        first_reading: BadRootRingSlotReading::NotSelfVerified,
+                        reread: BadRootRingSlotReading::NotSelfVerified,
+                    }
+        ),
+        "{:?}",
+        refused.as_ref().err()
+    );
+    assert_eq!(images_of(&pool.devices), images_before, "两块盘逐字节不变");
+    assert_eq!(
+        format!("{:?}", pool.allocator),
+        allocator_before,
+        "分配器与抬 F 之前逐项相同"
+    );
+}
+
+/// 同一槽只在重算影子账那一遍的第一次读（第 3 次）自证不过，重读（第 4 次）自证得过：照读出来的根算，这一次抬照做。
+#[test]
+fn a_root_ring_slot_known_to_hold_a_root_not_self_verified_once_is_read_on_the_reread_and_the_floor_is_raised(
+) {
+    let mut pool = pool_after_three_overwrites();
+    let sizes = pool.parameters.geometry;
+    let (newest_slot, _) = newest_root_in_the_ring(&pool.devices);
+    let slot_device =
+        pool.parameters.region_devices[usize::try_from(newest_slot.region).expect("区域号")];
+    let slot_start = slot_offset(newest_slot, sizes.fixed_structure_slot_spacing).0;
+    let raised = raise_the_floor_to_three_through(
+        &mut pool,
+        vec![chosen_corrupted_reads_of(
+            slot_device,
+            slot_start,
+            u64::from(sizes.physical_block_size),
+            &[3],
+        )],
+    );
+    assert!(
+        raised.is_ok(),
+        "重读自证得过，抬 F 做成：{:?}",
+        raised.err()
+    );
+}
+
+/// 管理员回退算水位（D23（journal 的角色与格式） 已定项 14「水位」：inode 号水位 = max(现行那一版内存里的, 环里读得出的根的)）：
+/// txg 7 那一版新建三个 inode（号 2、3、4，水位 5），环里别的根的 inode 号水位都是 2。回退到 txg 5 时 txg 7 的根槽判候选那两遍
+/// （第 1、2 次读）读得出，算水位那一遍（第 3 次，`readable_roots`，不重读）瞬时读不出：回退那次发布的 inode 号水位仍是 5，
+/// 之后新建的 inode 不重发 2–4。只取环里读得出的根时是 2——`crates/mutations.tsv` 里那一行（实三「水位」）证这条断言红。
+/// 这一格原来钉在 `rollback_by_a_forward_publish.rs` 那一条（C 的根槽在回退之前改坏），D16（发布语义） 已定项 1「根槽这一次读坏」
+/// 全句接进判候选之后那一形在判候选时就被拒（那一条改钉拒），水位这一判挪到这里：判候选读得出、算水位那一遍读不出。
+#[test]
+fn the_rollback_takes_the_inode_number_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_its_root(
+) {
+    let mut pool = pool_after_three_overwrites();
+    let sizes = pool.parameters.geometry;
+    let with_new_inodes = {
+        let mut writer = PoolWriter::new(&pool.parameters, pool.devices.as_mut_slice());
+        publish_new_inodes(
+            &mut writer,
+            &mut pool.allocator,
+            &pool.first,
+            3,
+            WRITE_TIME_SECONDS + 120,
+            pool.instance,
+        )
+        .expect("新建三个 inode")
+    };
+    assert_eq!(with_new_inodes.root.checkpoint_txg, CheckpointTxg(7));
+    assert_eq!(with_new_inodes.inode_number_watermark(), 5);
+    let (newest_slot, newest) = newest_root_in_the_ring(&pool.devices);
+    assert_eq!(
+        newest.checkpoint_txg,
+        CheckpointTxg(7),
+        "最新那条根是新建 inode 那一版的"
+    );
+    let slot_device =
+        pool.parameters.region_devices[usize::try_from(newest_slot.region).expect("区域号")];
+    let slot_start = slot_offset(newest_slot, sizes.fixed_structure_slot_spacing).0;
+    let parameters = pool.parameters.clone();
+    let mut faulty = with_chosen_read_faults(
+        std::mem::take(&mut pool.devices),
+        vec![chosen_read_faults_of(
+            slot_device,
+            slot_start,
+            u64::from(sizes.physical_block_size),
+            &[3],
+        )],
+    );
+    let mut current = with_new_inodes;
+    roll_back_by_a_forward_publish(
+        &parameters,
+        &mut faulty,
+        &mut pool.allocator,
+        &mut current,
+        RollbackTarget {
+            instance: InstanceGeneration(1),
+            checkpoint_txg: CheckpointTxg(5),
+        },
+    )
+    .expect("判候选两遍读得出，回退做成");
+    pool.devices = without_chosen_read_faults(faulty);
+    assert_eq!(
+        current.root.checkpoint_txg,
+        CheckpointTxg(8),
+        "回退那次发布"
+    );
+    assert_eq!(
+        current.inode_number_watermark(),
+        5,
+        "回退那次发布的 inode 号水位 = max(现行那一版内存里的 5, 环里读得出的根的 2)"
+    );
+}
+
+// ─── 五、core 读系统配置的 journal 环起点与根环起点（代码三方 m2-closeout-code-r2 Y4-a） ───
+
+/// 系统配置槽里 journal 环起点那 8 字节（16 KiB 槽号，字段表 `layout/01-first-txn.md` 一）。
+const JOURNAL_RING_START_SLOT_OFFSET: usize = 325;
+/// 系统配置槽里根环起点那 8 字节（16 KiB 槽号，D22（单元原子性怎么合成） 已定项 16 第 1 句）。
+const ROOT_RING_BASE_SLOT_OFFSET: usize = 371;
+
+/// 攻方 Y4 那五格（`research/prompts/m2-closeout-code-r2-opus-model/opus_r2_y4_system_configuration_fields_core_and_checker_read_differently.rs`）：
+/// 第一个文件之后那份合法镜像，四个系统配置槽里改一个字段、整槽校验和重封。每一格改哪几个字段、core 该拒成哪一个值。
+struct SystemConfigurationFieldCell {
+    name: &'static str,
+    fields_written: Vec<(usize, u64)>,
+    refused_as: SystemConfigurationValueOutsideWhatThisReaderAccepts,
+}
+
+fn system_configuration_field_cells() -> Vec<SystemConfigurationFieldCell> {
+    let ring_off_the_segment_boundary = JOURNAL_RING_DEFAULT_BYTES - SLOT_BYTES;
+    let start_after_the_ring_off_the_boundary =
+        JOURNAL_RING_START_SLOT + ring_off_the_segment_boundary / SLOT_BYTES;
+    vec![
+        SystemConfigurationFieldCell {
+            name: "A：单元区起点改成现算起点 + 64",
+            fields_written: vec![(UNIT_AREA_START_SLOT_OFFSET, 50_240)],
+            refused_as: SystemConfigurationValueOutsideWhatThisReaderAccepts::UnitAreaStartNotTheSlotAfterTheJournalRing {
+                recorded_unit_area_start_slot: SlotNumber(50_240),
+                slot_after_the_journal_ring: SlotNumber(50_176),
+            },
+        },
+        SystemConfigurationFieldCell {
+            name: "B：journal 环起点 1024 改成 1023",
+            fields_written: vec![(JOURNAL_RING_START_SLOT_OFFSET, 1023)],
+            refused_as: SystemConfigurationValueOutsideWhatThisReaderAccepts::JournalRingStartNotTheFirstVersionSlot {
+                recorded_journal_ring_start_slot: SlotNumber(1023),
+                first_version_journal_ring_start_slot: SlotNumber(JOURNAL_RING_START_SLOT),
+            },
+        },
+        SystemConfigurationFieldCell {
+            name: "C：根环起点 64 改成 65",
+            fields_written: vec![(ROOT_RING_BASE_SLOT_OFFSET, 65)],
+            refused_as: SystemConfigurationValueOutsideWhatThisReaderAccepts::RootRingBaseNotTheFirstVersionSlot {
+                recorded_root_ring_base_slot: SlotNumber(65),
+                first_version_root_ring_base_slot: SlotNumber(ROOT_RING_BASE_SLOT),
+            },
+        },
+        SystemConfigurationFieldCell {
+            name: "D：环长改成 768 MiB − 16 KiB、单元区起点跟着改成它现算的 50175（不在段边界上）",
+            fields_written: vec![
+                (JOURNAL_RING_BYTES_OFFSET, ring_off_the_segment_boundary),
+                (UNIT_AREA_START_SLOT_OFFSET, start_after_the_ring_off_the_boundary),
+            ],
+            refused_as: SystemConfigurationValueOutsideWhatThisReaderAccepts::UnitAreaStartOffTheClusterSegmentBoundaryUnsupported {
+                unit_area_start_slot: SlotNumber(start_after_the_ring_off_the_boundary),
+            },
+        },
+        SystemConfigurationFieldCell {
+            name: "E：根环起点 64 改成 0（槽 1 不再整槽落在同一槽自述的根环起点之前）",
+            fields_written: vec![(ROOT_RING_BASE_SLOT_OFFSET, 0)],
+            refused_as: SystemConfigurationValueOutsideWhatThisReaderAccepts::FixedStructureSlotSpacingOutsideTheFormatRange {
+                fixed_structure_slot_spacing: 4096,
+            },
+        },
+    ]
+}
+
+/// 五格 core 都整池拒，只读挂载与可写挂载拒成同一个值（`RecoveryFailure::SystemConfigurationValueRefused`），两块盘逐字节不变。
+/// 改之前 core 解槽跳过 325 与 371、取编译期常量：B、C、E 三格只读与可写都做成（E 格 checker 报 I-7.13「实现整池拒绝挂载」而实现照挂）。
+#[test]
+fn a_system_configuration_field_the_reader_does_not_accept_is_refused_by_both_mounts_before_any_write(
+) {
+    for cell in system_configuration_field_cells() {
+        let mut pool = pool_after_the_first_file(JOURNAL_RING_DEFAULT_BYTES, FOUR_GIBIBYTES);
+        let parameters = pool.parameters.clone();
+        rewrite_every_system_configuration_slot(&mut pool.devices, &parameters, |slot| {
+            for (offset, value) in &cell.fields_written {
+                slot[*offset..*offset + 8].copy_from_slice(&value.to_le_bytes());
+            }
+        });
+        let images_before = images_of(&pool.devices);
+        let read_only = mount_read_only(&pool.devices);
+        assert!(
+            matches!(
+                &read_only,
+                Err(MountReadOnlyFailure::Recovery(RecoveryFailure::SystemConfigurationValueRefused {
+                    value,
+                    ..
+                })) if *value == cell.refused_as
+            ),
+            "{}：只读挂载 {:?}",
+            cell.name,
+            read_only.as_ref().err()
+        );
+        let writable = mount_writable(&parameters, &mut pool.devices);
+        assert!(
+            matches!(
+                &writable,
+                Err(MountError::Recovery(RecoveryFailure::SystemConfigurationValueRefused {
+                    value,
+                    ..
+                })) if *value == cell.refused_as
+            ),
+            "{}：可写挂载 {:?}",
+            cell.name,
+            writable.as_ref().err()
+        );
+        assert_eq!(
+            images_of(&pool.devices),
+            images_before,
+            "{}：两块盘逐字节不变",
+            cell.name
+        );
+    }
+}
+
+/// 解槽读回 325 与 371 两个字段：mkfs 写的是第一版常量，择到的系统配置里两个字段就是它们（没改过的镜像照挂）。
+#[test]
+fn the_chosen_system_configuration_carries_the_first_version_journal_ring_start_and_root_ring_base()
+{
+    let pool = pool_after_the_first_file(JOURNAL_RING_DEFAULT_BYTES, FOUR_GIBIBYTES);
+    let chosen = choose_system_configuration(&pool.devices).expect("没改过的镜像择得到");
+    assert_eq!(
+        chosen.immutable.journal_ring_start_slot,
+        SlotNumber(JOURNAL_RING_START_SLOT)
+    );
+    assert_eq!(
+        chosen.immutable.root_ring_base_slot,
+        SlotNumber(ROOT_RING_BASE_SLOT)
+    );
 }
 
 /// 一池内存盘的一份拷贝（盘宽与镜像都照抄）：读故障包在拷贝外面，原池不动。

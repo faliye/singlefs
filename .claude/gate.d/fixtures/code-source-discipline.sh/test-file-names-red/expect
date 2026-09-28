@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：test-file-names
+want=_transaction_step_one_sample.rs：文件名按里程碑
+want=测试文件名：crash-case-check --only file-names 退 1
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=test-file-names：红（退出 1）
+want=code-source-discipline.sh：1 格里 1 格红（test-file-names）
+want=→ test-file-names：
+want=bash .claude/gate.d/code-source-discipline.sh --check test-file-names

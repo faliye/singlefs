@@ -1,0 +1,16 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.48s
+     Running tests/first_transaction_step_five_publish.rs (target/debug/deps/first_transaction_step_five_publish-df11bc2a462f5621)
+
+running 8 tests
+test central_mapping_holds_ten_entries_rebuilt_from_the_named_entries_and_excludes_itself ... ok
+test allocation_and_accounting_trees_carry_the_byte_table_numbers ... ok
+test inode_and_extent_lookups_from_the_root_read_the_first_file_back ... ok
+test every_index_node_self_checks_with_tight_ascending_keys_and_merkle_checksums_hold ... ok
+test recorded_paths_match_the_registered_segment_sequences ... ok
+test tree_table_holds_seven_entries_keyed_by_tree_identifier ... ok
+test root_slots_system_configurations_and_journal_ring_hold_the_published_state ... ok
+test mutations_are_caught_by_the_check_that_owns_them ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.61s
+

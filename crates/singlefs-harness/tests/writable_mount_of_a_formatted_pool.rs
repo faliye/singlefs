@@ -219,7 +219,7 @@ fn writable_mount_after_a_crash_right_after_acquiring_an_instance_writes_a_row_f
 /// 环里留着一条孤记录时，只做过 mkfs 的池照常可写挂载（2026-09-23 用户定案收窄 R4：`NEW_POOL_FILE_CREATION_TXG` 只管 mkfs
 /// 同一个进程里那条流，不管任何池的第一个文件版本，所以「新实例的第一次发布不是 txg 1、jsn 1」不再是拒绝的理由）：
 /// mkfs 之后第一次可写挂载崩在取号两写与 txg 1 的记录两写都持久、txg 1 的根槽没持久；两块盘系统配置槽 0（取号写进号 1 的那一槽）
-/// 各坏一个字节——择系统配置只剩 mkfs 的槽 1、根环只有第 0 代根，要取的号 1、要写的行为空；环里那条 txg 1 的记录让新实例从
+/// 退回 mkfs 写的那一份（造出来的盘面：取号写之后才有记录，真崩溃留不下这一形）——择系统配置只剩 mkfs 的那一份、根环只有第 0 代根，要取的号 1、要写的行为空；环里那条 txg 1 的记录让新实例从
 /// txg 2、jsn 2 起 ⇒ 零单元发布 txg 2（落盘 0），暖机推到 txg 4（落盘 1）才覆盖两块盘，之后第一个文件版本接着写 txg 5。
 #[test]
 fn formatted_pool_mount_starting_after_a_leftover_record_publishes_from_the_next_txg() {
@@ -241,17 +241,21 @@ fn formatted_pool_mount_starting_after_a_leftover_record_publishes_from_the_next
         &persisted,
         &crash_stream,
     );
+    // 系统配置槽 0 退回 mkfs 写的那一份（mkfs 两槽写同一份字节，拿槽 1 的原样写回），两槽都自证得过：取号写进号 1 的那一槽看不见了。
+    // 不写坏一个字节：C331（择根倒挂压过已确认的写） 取甲之后见证读缺一槽就拒可写（用户 2026-09-28 定），那样造的是撕裂轮换，走不到孤记录这一支。
+    let slot_spacing_in_bytes = u64::from(geometry().fixed_structure_slot_spacing);
+    let system_configuration_slot_bytes =
+        usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
     for (_, device) in &mut devices {
-        let mut sector = vec![0u8; 512];
+        let mut mkfs_slot = vec![0u8; system_configuration_slot_bytes];
         device
             .wrapped_device()
-            .read_at(DeviceOffsetInBytes(0), &mut sector)
-            .expect("读系统配置槽 0");
-        sector[100] ^= 0xff;
+            .read_at(DeviceOffsetInBytes(slot_spacing_in_bytes), &mut mkfs_slot)
+            .expect("读系统配置槽 1（mkfs 写的那一份）");
         device
             .wrapped_device_mut()
             .image
-            .write(DeviceOffsetInBytes(0), &sector);
+            .write(DeviceOffsetInBytes(0), &mkfs_slot);
     }
     let image_before = memory_pool_of_sparse_devices(&devices);
     let before = disk_snapshot(&image_before, &crash_stream);

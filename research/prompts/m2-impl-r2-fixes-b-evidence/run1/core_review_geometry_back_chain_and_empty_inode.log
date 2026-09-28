@@ -1,0 +1,22 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.54s
+     Running tests/core_review_geometry_back_chain_and_empty_inode.rs (target/debug/deps/core_review_geometry_back_chain_and_empty_inode-d6e2350b0dfe0d3d)
+
+running 14 tests
+test a_journal_ring_one_record_longer_than_the_default_ends_off_the_cluster_segment_boundary_and_is_refused_and_the_default_ring_is_not ... ok
+test a_journal_ring_reaching_past_784_mebibytes_is_made_with_the_instance_table_at_the_slot_after_the_ring_instead_of_inside_it ... ok
+test a_journal_ring_shorter_than_one_record_is_refused_before_any_write_and_one_record_long_passes_on_to_the_safety_factor_check ... ok
+test a_new_empty_inode_opens_under_the_read_only_mount_with_no_data_unit ... ok
+test a_root_slot_narrower_than_the_root_record_is_refused_before_any_write ... ok
+test a_root_slot_wider_than_the_slot_spacing_is_refused_and_one_as_wide_is_not ... ok
+test a_system_configuration_slot_one_landing_on_root_ring_region_zero_is_refused_before_any_write ... ok
+test a_file_overwritten_with_empty_content_still_opens_with_its_one_data_unit ... ok
+test make_filesystem_units_ending_past_the_device_are_refused_before_any_write_and_a_sixteen_mebibyte_ring_on_a_hundred_mebibyte_device_is_made ... ok
+test root_ring_regions_longer_than_the_region_step_are_refused_and_regions_that_just_touch_are_not ... ok
+test system_configuration_slots_closer_than_a_slot_width_are_refused_before_any_write ... ok
+test slot_one_is_looked_for_at_the_slot_spacing_another_devices_slot_zero_records ... ok
+test a_journal_record_whose_back_chain_disagrees_with_the_previous_record_is_left_out_of_the_replayed_prefix ... ok
+test a_journal_record_whose_previous_record_is_not_on_disk_is_replayed_without_judging_its_back_chain ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+

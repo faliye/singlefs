@@ -1,0 +1,73 @@
+    Checking e7-index-bench v0.1.0 (research/e7-index-bench)
+error: this operation will always return zero. This is likely not the intended outcome
+   --> e7-index-bench/src/bin/e108_plaintext_layer_cost.rs:191:20
+    |
+191 |         assert_eq!(0 / bytes_per_publish, 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#erasing_op
+    = note: `#[deny(clippy::erasing_op)]` on by default
+
+warning: this operation has no effect
+   --> e7-index-bench/src/bin/e50_ring_slots.rs:197:36
+    |
+197 |             let total_slot_count = region_count * 1;
+    |                                    ^^^^^^^^^^^^^^^^ help: consider reducing it to: `region_count`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#identity_op
+    = note: `#[warn(clippy::identity_op)]` on by default
+
+error: could not compile `e7-index-bench` (bin "e108-plaintext-layer-cost" test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+warning: `e7-index-bench` (bin "e50_ring_slots" test) generated 1 warning (run `cargo clippy --fix --bin "e50_ring_slots" -p e7-index-bench --tests -- ` to apply 1 suggestion)
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> e7-index-bench/src/bin/e59_message_recompute.rs:140:13
+    |
+140 | const ARMS: [(&str, fn() -> Arm); 7] = [
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: the variable `physical_address` is used as a loop counter
+   --> e7-index-bench/src/bin/e59_message_recompute.rs:195:5
+    |
+195 |     for object_index in 0..load.object_count {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `for (physical_address, object_index) in (1_000_000u64..).zip((0..load.object_count))`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#explicit_counter_loop
+    = note: `#[warn(clippy::explicit_counter_loop)]` on by default
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> e7-index-bench/src/bin/e133_map_key_format_cost.rs:402:23
+    |
+402 |         let expected: [(&str, u64, u64, u64, u64, u64, u64, u64); 12] = [
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: this assertion has a constant value
+   --> e7-index-bench/src/bin/e76_payload_checksum.rs:540:9
+    |
+540 |         assert!(OFF_PAYLOAD_CHECKSUM < OFF_HEADER_CHECKSUM, "载荷校验和必须落在头校验和覆盖范围内");
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider moving this into a const block: `const { assert!(..) }`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+    = note: `#[warn(clippy::assertions_on_constants)]` on by default
+
+warning: `e7-index-bench` (bin "e133_map_key_format_cost" test) generated 1 warning
+warning: `e7-index-bench` (bin "e76-payload-checksum" test) generated 1 warning
+warning: `e7-index-bench` (bin "e59_message_recompute" test) generated 2 warnings
+warning: clamp-like pattern without using clamp function
+   --> e7-index-bench/src/bin/e56_epsilon.rs:590:34
+    |
+590 |     let internal_node_capacity = buffer_capacity.max(1).min(LEAF_ENTRY_CAPACITY);
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with clamp: `buffer_capacity.clamp(1, LEAF_ENTRY_CAPACITY)`
+    |
+    = note: clamp will panic if max < min
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_clamp
+    = note: `#[warn(clippy::manual_clamp)]` on by default
+
+warning: `e7-index-bench` (bin "e56_epsilon" test) generated 1 warning

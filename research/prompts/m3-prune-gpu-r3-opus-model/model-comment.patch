@@ -1,0 +1,11 @@
+--- a/crates/singlefs-harness/src/model.rs
++++ b/crates/singlefs-harness/src/model.rs
+@@ -16,7 +16,7 @@
+ //! 回收门槛差一、释放时不改写记录这几条变异，只留模型时三段都判不出，checker 都判红）。分配记录的真条数模型同样不记；分配记录树按绝对槽号
+ //! 按位置寻址之后（D8（核心索引结构） 已定项 14）没有「一个节点装不下」那道墙，模型也就没有那条拒绝理由。
+ 
+-use std::collections::{BTreeMap, BTreeSet};
++use std::collections::{BTreeMap, BTreeSet}; // 攻方副本：只在注释里提到 singlefs_core，代码一个字不动
+ use std::rc::Rc;
+ 
+ use singlefs_format::{

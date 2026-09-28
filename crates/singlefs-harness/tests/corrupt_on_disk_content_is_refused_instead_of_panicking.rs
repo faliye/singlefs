@@ -24,14 +24,14 @@ use singlefs_core::journal::{
 use singlefs_core::make_filesystem::{
     allocator_after_make_filesystem, make_filesystem, MakeFilesystemParameters,
 };
-use singlefs_core::mount::{mount_writable, MountError};
+use singlefs_core::mount::{mount_writable, MountError, StillUnreadableAfterOneReread};
 use singlefs_core::pointer::{
     BirthSequence, DataPointer, LocationEntry, NodePointer, PointerHead,
     PointerHeadFieldOutsideTheFirstVersion,
 };
 use singlefs_core::records::{
     mapping_key_for_node, parse_mapping_entry, TreeTableEntry, TREE_KIND_ACCOUNTING,
-    TREE_KIND_INODE, TREE_KIND_LIVELIST,
+    TREE_KIND_DEADLIST, TREE_KIND_INODE,
 };
 use singlefs_core::recovery::{
     choose_system_configuration, every_root_ring_slot, read_root_ring_slot, recover, JournalPolicy,
@@ -427,14 +427,16 @@ fn an_accounting_leaf_with_a_repeated_key_is_refused_by_the_writable_mount_befor
     );
 }
 
-/// 场景：最新那条根的树表里 livelist 那条条目的树 ID 改成根记录的树 ID 水位（第一个文件那一版是 19），树表与根记录重封。
-/// 预期：可写挂载在任何写之前报 I-7.8（根记录树 ID 水位不低于全池最大树 ID）「树 ID 不低于水位」。改之前重建不判它，
-/// 写行那次发布照抄这张树表，在 `transaction` 的「树表条目按树 ID 升序」断言上 panic（livelist 的号 19 排到了 deadlist 18 前面）。
+/// 场景：最新那条根的树表里 deadlist 那条条目的树 ID 改成根记录的树 ID 水位（第一个文件那一版是 19），树表与根记录重封。
+/// deadlist 在发号次序里排最后、号最大（18），改成 19 之后树表条目仍按树 ID 严格升序、合发号次序，只违反水位那一条。
+/// 预期：可写挂载在任何写之前报 I-7.8（根记录树 ID 水位不低于全池最大树 ID）「树 ID 不低于水位」。改之前重建不判它，写行那次发布照抄这张树表。
+/// 合入后验证一（2026-09-27）把被改的条目从 livelist 换成 deadlist：livelist 改成 19 同时违反 I-9.16（树表条目按树 ID 严格升序且合发号次序），
+/// 而 I-9.16 那一判排在水位之前（树表排序报告第八节第 3 条），报的是 I-9.16，这条用例就判不到 I-7.8 了。
 #[test]
 fn a_tree_table_entry_at_or_above_the_tree_identifier_watermark_is_refused_by_the_writable_mount() {
     let (mut devices, first) = pool_after_the_first_file();
     let watermark = first.root.tree_identifier_watermark;
-    rewrite_a_tree_table_entry_of_the_newest_root(&mut devices, TREE_KIND_LIVELIST, |entry| {
+    rewrite_a_tree_table_entry_of_the_newest_root(&mut devices, TREE_KIND_DEADLIST, |entry| {
         entry[..8].copy_from_slice(&watermark.to_le_bytes());
     });
     let refusal = writable_mount_refused_before_any_write(&mut devices);
@@ -552,10 +554,10 @@ fn a_format_time_instance_table_pointer_below_the_unit_area_is_refused_before_th
 
 /// 场景：第一个文件那一版之后重开一次（实例 2 写行 (1, 3, W)、暖机），再往根环一个空槽里放一条实例 1、txg 4 的根——照抄实例 1 暖机那条
 /// 树表 0 条的根、只改 txg 与实例表指针：实例表指针两条位置条目都指槽 100（单元区起点之下）。按最新那条根的实例表，它是被抛弃的根。
-/// 预期：第二次重开照常做成，这条根的账算「解不开」（`abandoned_roots_unreadable` 是 1），一个槽都不因它隔离。
+/// 预期：这条根的账算「解不开」，它是树表 0 条的一版、从中央映射也现算不成，第二次重开在取号之前拒可写、报出这条根（C393（被抛弃根的账读不出时修复没有条款） 取 (b)-从映射现算，用户 2026-09-28 定），不 panic。
 /// 改之前影子账只判了两条位置条目同槽，槽 100 进 `isolate_abandoned`，在 `DeviceFreeMap::index` 的 expect 上 panic。
 #[test]
-fn an_abandoned_root_whose_instance_table_pointer_sits_below_the_unit_area_counts_as_unreadable_instead_of_panicking(
+fn an_abandoned_root_whose_instance_table_pointer_sits_below_the_unit_area_refuses_the_writable_mount_instead_of_panicking(
 ) {
     let (mut devices, first) = pool_after_the_first_file();
     let first_remount =
@@ -582,12 +584,21 @@ fn an_abandoned_root_whose_instance_table_pointer_sits_below_the_unit_area_count
         location.slot = SLOT_BELOW_THE_UNIT_AREA_NOBODY_USES;
     }
     write_root_into_the_ring_slot(&mut devices, empty_ring_slot, &abandoned);
-    let second_remount = mount_writable(&parameters(), &mut devices)
-        .expect("被抛弃根的指针不在单元区里：这条根的账算读不出，挂载照常");
-    assert_eq!(second_remount.output.instance, InstanceGeneration(3));
-    assert_eq!(
-        second_remount.output.abandoned_roots_unreadable, 1,
-        "指针槽号不在单元区里的那条被抛弃根算「账读不出」"
+    // 指针槽号不在单元区里的那条被抛弃根算「账读不出」；它是暖机那一版（树表 0 条、映射根是空指针），从中央映射也现算不成，
+    // 重读一次仍不成就在取号之前拒可写（C393（被抛弃根的账读不出时修复没有条款） 取 (b)-从映射现算那一条的最后一支，用户 2026-09-28 定）——不 panic。
+    let refusal = mount_writable(&parameters(), &mut devices)
+        .expect_err("被抛弃根的指针不在单元区里、映射也现算不成：拒可写，不 panic");
+    let MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable) = &refusal else {
+        panic!("拒因是「重读一次仍读不出」：{refusal:?}");
+    };
+    assert!(
+        matches!(
+            still_unreadable.as_ref(),
+            StillUnreadableAfterOneReread::AccountOfAnAbandonedRoot { abandoned_root }
+                if abandoned_root.instance == first.root.instance
+                    && abandoned_root.checkpoint_txg == CheckpointTxg(first.root.checkpoint_txg.0 + 1)
+        ),
+        "拒因点名那条被抛弃根：{still_unreadable:?}"
     );
 }
 

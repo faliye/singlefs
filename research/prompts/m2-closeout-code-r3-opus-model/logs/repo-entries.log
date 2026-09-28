@@ -1,0 +1,17 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/entries_after_mount_refuse_swapped_or_behind_devices.rs (target/release/deps/entries_after_mount_refuse_swapped_or_behind_devices-a7abeee0fcee61d5)
+
+running 10 tests
+test a_floor_raise_with_the_two_device_bodies_swapped_is_refused_before_any_write ... ok
+test a_normal_unmount_with_the_two_device_bodies_swapped_is_refused_before_any_write ... ok
+test a_session_publish_with_the_two_device_bodies_swapped_is_refused_before_any_write ... ok
+test a_session_publish_onto_a_stale_snapshot_of_device_one_is_refused_before_any_write ... ok
+test an_administrator_rollback_onto_a_stale_snapshot_of_device_one_is_refused_before_any_write ... ok
+test a_floor_raise_onto_a_stale_snapshot_of_device_one_is_refused_before_any_write ... ok
+test a_normal_unmount_onto_a_stale_snapshot_of_device_one_is_refused_before_any_write ... ok
+test an_administrator_rollback_with_the_two_device_bodies_swapped_is_refused_before_any_write ... ok
+test a_device_left_with_one_self_verified_system_configuration_slot_is_not_refused_by_any_entry ... ok
+test stale_snapshot_substitution_is_refused_by_every_entry_over_the_swept_user_steps ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.67s
+

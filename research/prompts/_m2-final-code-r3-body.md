@@ -14,7 +14,7 @@
 - **共用问句与三种结论**：照第一轮正文 `research/prompts/_m2-final-code-r1-body.md` 第一节，逐字适用。
 - **可以攻的**：实现员自己取的值与做法，已由主 agent 写成 D8（核心索引结构） 已定项 14「实现取值」（被攻过零轮）。这一格欢迎攻，打中照常算。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-25 07:50 JST 现查）
+## 二、实现今天的样子（主 agent 的观测，2026-09-25 现查）
 
 - **冻结副本**：腿读代码一律读 `/tmp/claude-1000/m2-final-code-r3/tree/crates/`（实二一交回那一刻的整棵树），不读主工作区。
   - 实二五此刻正在主工作区改 `transaction.rs`、`mount.rs`、`allocator.rs`、`recovery.rs`、`rollback_witness.rs`、`walk.rs`。

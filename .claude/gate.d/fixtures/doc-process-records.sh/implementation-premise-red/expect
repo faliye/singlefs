@@ -1,0 +1,12 @@
+exit=1
+want=_c999-r1-body.md
+want=没有「实现今天的样子」
+want=没写这一轮本地腿派哪一侧
+want=research/prompts/_c995-r1-body.md
+want=c995-r1：没有 research/prompts/c995-r1-snapshot/
+want=research/prompts/_c997-r1-body.md（标题没有日期，按要查的算）
+want=样本只跑 .gate-cells 点名的格：implementation-premise
+want=── 汇总：doc-process-records.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-process-records.sh：1 格里 1 格红（implementation-premise）
+want=→ implementation-premise：正文前提表里加一行「实现今天的样子」
+want=bash .claude/gate.d/doc-process-records.sh --check implementation-premise

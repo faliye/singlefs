@@ -1,0 +1,12 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.48s
+     Running tests/first_transaction_region_bytes.rs (target/debug/deps/first_transaction_region_bytes-d99795274768b3cc)
+
+running 4 tests
+test the_region_table_lists_the_twenty_nine_registered_regions_in_order ... ok
+test the_region_table_matches_the_writes_the_first_transaction_really_issues ... ok
+test flipping_one_bit_of_the_change_count_moves_only_that_regions_digest ... ok
+test running_the_same_pipeline_twice_gives_byte_identical_result_lines ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+

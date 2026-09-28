@@ -1,0 +1,12 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：evidence-in-repo
+want=把 /tmp 下的东西当依据引用了
+want=.claude/kb/worktree-owed.md:3：…
+want=依据：/tmp/claude-1000/worktree-round/report.md
+want=research/prompts/worktree-r1-opus.md:4：…
+want=实现员报告 `/tmp/claude-1000/worktree-impl/report.md
+want=本次未跑 1 份要比修改时刻的（链接 worktree 里全部文件的时间戳都是检出那一刻写的
+want=research/e7-index-bench/src/bin/e920_worktree_stale.rs（装置源码，E920）
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（evidence-in-repo）
+want=→ evidence-in-repo：跑一次把产物存进 research/results/

@@ -1,0 +1,11 @@
+  ── agent-write-scope：项目钩子注册着、自证通过，写范围表与定义双向一致，定义头齐全，共用模块不另写一份
+  ✗ .claude/settings.json 没注册写范围闸：PreToolUse 里没有 matcher 同时覆盖 Write 与 Edit、命令指向 write-guard.sh 的一条
+     → 怎么办：在 hooks.PreToolUse 里加一条 matcher "Write|Edit"、command "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/write-guard.sh"。
+  ✗ .claude/settings.json 没注册重型测试闸：PreToolUse 里没有 matcher 覆盖 Bash、命令指向 heavy-test-guard.sh 的一条
+     → 怎么办：在 hooks.PreToolUse 的 Bash 那一条里加 command "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/heavy-test-guard.sh"。
+  ✗ .claude/settings.json 没注册压缩后提示 hook：SessionStart 里没有 matcher 覆盖 compact、命令指向 session-start.sh 的一条
+     → 怎么办：在 hooks.SessionStart 里加一条 matcher "startup|resume|compact"、command "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh"。
+  ✗ .claude/settings.json 没注册启动时的 OOM 报告 hook：SessionStart 里没有 matcher 同时覆盖 startup 与 resume、命令指向 session-start.sh 的一条
+     → 怎么办：在 hooks.SessionStart 里把 session-start.sh 那一条的 matcher 写成 "startup|resume|compact"（会话崩了再起是 startup 或 resume，这时要先看内核 OOM 杀过谁）。
+  ✗ 工具层自检跑了 1 格，1 格判红：agent-write-scope（退 1）
+     → 怎么办：按上面那一格自己的出路改；改完只重跑那一格：bash .claude/gate.d/47-code-tooling-selftests-and-registries.sh --check <格名>。

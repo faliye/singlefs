@@ -230,7 +230,7 @@ def selftest(hook_dir):
                                      notification("iiii9999jjjj0000", "failed"), notification("iiii9999jjjj0000", "completed"),
                                      notification("kkkk1212llll3434", "killed"), notification("mmmm1313nnnn1414", "completed"),
                                      notification("uuuu2121vvvv2222", "completed"), fake_command]) + "\n")
-        # 主会话那一侧已经收到交回消息、子 agent 自己的会话记录里还没落下交回结果（2026-09-26 那一次：交回 14:00:10、续做 14:00:15）
+        # 主会话那一侧已经收到交回消息、子 agent 自己的会话记录里还没落下交回结果（2026-09-26 那一次：交回之后 5 秒就续做）
         write_agent("wwww3131xxxx3232", 1000, 0)
         with open(session_transcript, "a") as handle:
             handle.write(json.dumps({"type": "user", "content": '<agent-message from="wwww3131xxxx3232">\n[Subagent hand-back] 报告'}) + "\n")

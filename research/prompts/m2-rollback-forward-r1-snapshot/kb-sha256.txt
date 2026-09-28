@@ -1,4 +1,4 @@
-# .claude/kb/ 快照 sha256 清单，取自 /tmp/claude-1000/m2-rollback-forward-r1/kb-snapshot/，2026-09-25 18:31 JST 拷贝，整份 kb 无排除项。
+# .claude/kb/ 快照 sha256 清单，取自 /tmp/claude-1000/m2-rollback-forward-r1/kb-snapshot/，2026-09-25 拷贝，整份 kb 无排除项。
 d66ad7c3cc77b24e2376caa9456ff56a2553fa992bc508acb60808ae0f7ea243  kb/checks-owed.md
 7a13b5b288be983cbbc477ebe63d0b70ac11c313b811c1e9ec2949c634c49ef0  kb/decisions/01-数据可移动性-反向索引.md
 f56030d8c1d8c1d5ae76185b10df5a77233c06845390e7cd6d732f987b2994ba  kb/decisions/02-RAID条带策略.md

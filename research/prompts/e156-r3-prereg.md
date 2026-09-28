@@ -1,6 +1,6 @@
 # E156 重跑登记（第 3 次）：分配记录树按位置寻址之后，装置里钉着旧布局的常量改成什么、岔路 1、3、7 的判决变不变
 
-写于 2026-09-25 08:53–（收尾时刻见第十三节）JST（本机 UTC 2026-09-24 23:53 起），装置改之前、第 3 次的任何产物之前。原登记 `research/prompts/e156-preregistration.md`、第 2 次重跑登记 `research/prompts/e156-r2-prereg.md`（含它第十二节修订 1–17）。判据、门槛、作废与停机条款在这里写死；跑出数之后要改，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」三步走，不在这里回改。
+写于 2026-09-25（收尾日期见第十三节），装置改之前、第 3 次的任何产物之前。原登记 `research/prompts/e156-preregistration.md`、第 2 次重跑登记 `research/prompts/e156-r2-prereg.md`（含它第十二节修订 1–17）。判据、门槛、作废与停机条款在这里写死；跑出数之后要改，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」三步走，不在这里回改。
 
 **这一份只回答问题单第 3 行**：今天这个装置从登记抄来的、钉着旧布局的数改成什么，改完重跑，岔路 1、3、7 的判定与留存产物比变没变。**不扩大取样面**：装置文件头第 1–7 行自陈的缩小范围照旧（岔路 3 的 HF 只跑 S = 8、ρ = 1 一格，岔路 1 的 Hh 只跑 S ∈ {8, 4} × k ∈ {0, 1, 2}、ρ = 1、回收时点「实」、洞位置「后」，另加步数对齐对照；S = 16、ρ = 1/4、位置「前」、k = 4、HF 18 格全扫仍未做）。r2 登记里只为这些没做的格写的量，这一份不跑、不改。
 
@@ -270,7 +270,7 @@
 
 **依据**：
 
-- 无实验：一套 btree 实现配多 keyspace 的形态没有可量的量，依据是 2026-08-29 现查 `linux-6.17/fs/bcachefs/bcachefs_format.h` 的 `BCH_BTREE_IDS()` 宏（数 `x(` 行与带 `BTREE_IS_write_buffer` 的行，源码固定在 `/home/fy5090/code/fs-refs/`）：bcachefs 用**一套 btree 实现 + 21 棵树**，其中 **5 棵**走 write buffer（`lru` / `backpointers` / `deleted_inodes` / `rebalance_work` / `accounting`）；比「按访问模式选不同结构」好在**只有一套结构要调对**——异构方案意味着 N 套实现、N 套崩溃一致性 bug、N 套 checker。prior-art.md 的 bcachefs 那一行以这一段为准。
+- 无实验：一套 btree 实现配多 keyspace 的形态没有可量的量，依据是 2026-08-29 现查 `linux-6.17/fs/bcachefs/bcachefs_format.h` 的 `BCH_BTREE_IDS()` 宏（数 `x(` 行与带 `BTREE_IS_write_buffer` 的行，源码固定在 `~/code/fs-refs/`）：bcachefs 用**一套 btree 实现 + 21 棵树**，其中 **5 棵**走 write buffer（`lru` / `backpointers` / `deleted_inodes` / `rebalance_work` / `accounting`）；比「按访问模式选不同结构」好在**只有一套结构要调对**——异构方案意味着 N 套实现、N 套崩溃一致性 bug、N 套 checker。prior-art.md 的 bcachefs 那一行以这一段为准。
 - 用户定案 2026-09-24：派生树可以异构（原话在变更史）；多出来的那套实现、崩溃一致性与 checker 由层 0 流与 checker 各自覆盖，不再拿「只有一套结构要调对」挡。
 - 无实验：三方原型（`research/prompts/m2-keyspace-r1-opus-model/`）在同一批历史与代价模型上量过，没立实验号，选哪一个由用户定，判决 `research/prompts/m2-keyspace-r1-main-verification.md`。
 - 用户定案 2026-09-24：K1、K2、K4（原话在变更史）。
@@ -356,7 +356,7 @@
 
 ## 三、实现今天的样子
 
-### 3.1 今天现查的（2026-09-25 08:30–08:55 JST；实二五此刻在改 `crates/`，`git status --short crates/ | wc -l` 为 82，行号只是那一刻的）
+### 3.1 今天现查的（2026-09-25；实二五此刻在改 `crates/`，`git status --short crates/ | wc -l` 为 82，行号只是那一刻的）
 
 | # | 事实 | 出处 |
 |---|---|---|
@@ -459,7 +459,7 @@ Q3r.4 比的是两次判定，Q3r.2 比的是实装与闭式；两边一起错�
 
 ### 7.2 独立算出、用命令核过的（第十三节命令二；不符 ⇒ 作废 V2）
 
-命令二 `anchors_e156_r3.py` 在第五、六、八至十一节写完之后跑（草稿文件修改时刻见第十三节），输出原样在第十三节。它只模拟到登记要钉绝对值的那几步，那几步里开放段都没用完、改动都落在第 61 片叶（脚本里逐步断言），用不上条款没写到的「开放段装不下时怎么办」。
+命令二 `anchors_e156_r3.py` 在第五、六、八至十一节写完之后跑（草稿文件的修改先后见第十三节），输出原样在第十三节。它只模拟到登记要钉绝对值的那几步，那几步里开放段都没用完、改动都落在第 61 片叶（脚本里逐步断言），用不上条款没写到的「开放段装不下时怎么办」。
 
 | # | 断言 | 值 |
 |---|---|---|
@@ -586,7 +586,7 @@ r2 S2、S4–S9 字面照旧。S1、S3 改写，S10 新加：
 
 ## 十三、读过的文件与跑过的命令
 
-E156 第 3 次与 E142 第 15 次两份重跑登记是同一次派发里一起写的，下面列的是这一次派发里读过的全部文件（与 E142 那一份第十三节相同，不只这一份用到的）。行号是读的那一刻（2026-09-25 08:14–08:55 JST）的行号。`research/results/` 下的产物一份都没读（只 `ls` 过 E156 的文件名）。草稿目录：`/tmp/claude-1000/m2-keyspace-rerun-designer/`——**派发提示没给草稿目录**，照先例（`research/prompts/m2-witness-r1-verifier-output.md:5`）自建了这一个，报告里写明。
+E156 第 3 次与 E142 第 15 次两份重跑登记是同一次派发里一起写的，下面列的是这一次派发里读过的全部文件（与 E142 那一份第十三节相同，不只这一份用到的）。行号是读的那一刻（2026-09-25）的行号。`research/results/` 下的产物一份都没读（只 `ls` 过 E156 的文件名）。草稿目录：`/tmp/claude-1000/m2-keyspace-rerun-designer/`——**派发提示没给草稿目录**，照先例（`research/prompts/m2-witness-r1-verifier-output.md:5`）自建了这一个，报告里写明。
 
 ### 13.1 规则、共用约束、定义、门禁与脚本
 
@@ -675,7 +675,7 @@ dd03fa8308f874422b24834ec5ed62aeed0aae7ee2fe6f68d61015df1622b06d  …/quotes/e15
 $ sed -n '70,225p' research/prompts/e156-r2-prereg.md | grep -v '^\*\*出处' > <草稿>/e156/r2-quotes-body.txt
 $ sed -n '1,157p' <草稿>/quotes/e156-clauses.md | grep -v '^\*\*出处' > <草稿>/e156/r3-quotes-body-first7.txt
 $ diff <草稿>/e156/r2-quotes-body.txt <草稿>/e156/r3-quotes-body-first7.txt    # 变了两段：D28 已定项 1（94c94、99,102c99,102、124a125、126c127）与 I-3.1（132c133）；其余逐字未变
-$ ls -l --time-style=+%H:%M:%S <草稿>/e156/     # UTC 修改时刻：判据草稿 s05 23:58:22、s06 23:58:52、s08-11 23:59:49；命令二 00:00:54；s07 在它之后
+$ ls -l --time-style=+%H:%M:%S <草稿>/e156/     # 修改时刻先后：判据草稿 s05、s06、s08-11，之后是命令二；s07 在它之后
 ```
 
 #### 命令二：E156 的独立锚点（`anchors_e156_r3.py`，全文；第七节 7.2 用）
@@ -771,4 +771,4 @@ R-6 check_old_layout B=10 W=6 E=4 E=4 C=10 -> 34
 A1 unit_area_slots = 211968  A7 leaf_capacity = 812
 ```
 
-**收尾时刻**：2026-09-25 09:04 JST（本机 2026-09-25 00:04 UTC）。这一轮没有编译、没有跑装置、没有跑任何产物；草稿目录里只有抄条款的出口文件、两个锚点脚本与它们的输出、各节草稿。
+**收尾日期**：2026-09-25。这一轮没有编译、没有跑装置、没有跑任何产物；草稿目录里只有抄条款的出口文件、两个锚点脚本与它们的输出、各节草稿。

@@ -10,7 +10,8 @@
 再退到该行之前最近出现过的 D 记号——三级都判不出的也判红，因为
 一个归属判不出的编号引用，读的人同样判不出。
 
-**归属规则只有这一份**：44 号阶段（引用写着已定项、紧跟着却说它没定）与
+**归属规则只有这一份**：门禁 doc-decisions（`doc-decisions.sh`）的格「分项引用状态」跑这里的 main，
+格「引用写已定紧跟说没定」（引用写着已定项、紧跟着却说它没定）、格「冻结层归属登记表」（查依据点名的分项是不是已定）与
 `research/scripts/relabel-item.py`（分项翻状态之后改写全仓引用）都 import 这里的函数，
 不各抄一份——两份归属规则一旦分叉，工具改写的与门禁判的就不是同一批引用。
 """
@@ -24,7 +25,7 @@ def decision_heads(strict=True):
     也不让调用方撞上裸的 AttributeError：strict 时当场打印 ✗ 与出路、退出码 1；
     不 strict 时交回清单，由调用方在报完自己的问题之后调 report_unreadable 并判红。
     跳过它的代价实测过：那条决策的分项从表里消失，写给它的「已定项 k」被改判到行内更早出现的另一条决策上并判绿。
-    load_map 与 self_decisions 都从这里取，两处的口径不许分叉（写法照 lib-index-vs-body.py 读首行那一段）。
+    load_map 与 self_decisions 都从这里取，两处的口径不许分叉（写法照门禁 doc-decisions INDEX_VS_BODY_SOURCE 读首行那一段）。
     """
     heads, unreadable = {}, []
     for f in sorted(glob.glob('.claude/kb/decisions/*.md')):
@@ -148,7 +149,7 @@ def references(path, item_map, self_map, skipped_fenced_lines=None):
 # 而且那个词之后句子就断了（标点、括号或行尾）。⚠️ 不收这一尾，「D5 已定项 4 没定的东西」
 # 「D2 已定项 6 还没定判据」会被误判——那里的「没定」修饰后面的名词，说的是「那条定了、但没定到这一样」
 # （实测：第一版在实验源码的注释里报了这两处）。两头都认 markdown 的 `**` 与反引号：「**D27 已定项 5 未定**」第一版就漏了。
-# 44 号阶段判红用它，relabel-item.py 列「要人看的句子」也用它。
+# 门禁 doc-decisions 的格「引用写已定紧跟说没定」判红用它，relabel-item.py 列「要人看的句子」也用它。
 # 「这类词」可以连着几个（「今天仍未定」「目前都还没定」），每个后面许跟空白与顿号逗号。
 OPEN_AFTER = re.compile(r'^(?:（[^）]*）)?[\s、，,：:*`]*(?:(?:今天|目前|仍然|仍|尚|还|都|均)[\s、，,]*)*(?:未定(?!项)|没定|定不下|待定|空着)'
                         r'(?=$|[\s。，、；：:;,.)）」』（(！？!?*`])')

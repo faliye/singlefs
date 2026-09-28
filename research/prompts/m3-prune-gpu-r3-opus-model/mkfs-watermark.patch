@@ -1,0 +1,11 @@
+--- a/crates/singlefs-core/src/make_filesystem.rs
++++ b/crates/singlefs-core/src/make_filesystem.rs
+@@ -532,7 +532,7 @@
+             instance,
+             birth_sequence: tree_table_sequence,
+         },
+-        tree_identifier_watermark: TREE_IDENTIFIER_WATERMARK_AT_MKFS,
++        tree_identifier_watermark: TREE_IDENTIFIER_WATERMARK_AT_MKFS + 1, // 攻方副本：只改 mkfs 写进第 0 代根的水位
+         rollback_floor: ROLLBACK_FLOOR_AT_MKFS,
+         instance_table: NodePointer {
+             head: PointerHead {

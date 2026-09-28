@@ -2,11 +2,11 @@
 
 攻的是 K1、K2 两面。**不判 K3（checker 判据本身）、K4（早退条件）**，那两面归正推腿与本地攻方腿。
 
-时区：下面写的时刻都是 UTC（本机时钟），人在东京是 UTC+9。
+
 
 ## 复跑命令与 sha256
 
-副本：`rsync -a --exclude target --exclude .git /home/fy5090/code/singlefs/ /tmp/claude-1000/m2-checker-supp-r1-opus/repo/`，
+副本：`rsync -a --exclude target --exclude .git <仓根>/ /tmp/claude-1000/m2-checker-supp-r1-opus/repo/`，
 基准是 HEAD `11a551b` 加这一批未提交的改动。开工与收尾各跑一次
 `sha256sum -c research/prompts/m2-checker-supp-code-r1-start-snapshot.sha256`，九个文件全部 OK——主工作区一个字都没动。
 
@@ -25,7 +25,7 @@ nice -n 19 cargo test -p singlefs-harness --test opus_probe_txn_chain sweeping -
 ```
 
 开跑前 `ps -o pid,args -u "$(id -u)"` 看过负载：没有 `qemu-system` / `vm-bench.sh` / `e152-file-system-benchmark` / `fio`
-在跑；在跑的是另一个会话的 `doc-lint.sh`（pid 30346）与常驻的 vllm 网关。副本编译与跑测试一律 `nice -n 19`，没等过锁。
+在跑；在跑的是另一个会话的 `doc-lint.sh`（pid 30346）与常驻的本地模型服务网关。副本编译与跑测试一律 `nice -n 19`，没等过锁。
 
 ## 各格判定一览
 
@@ -345,4 +345,4 @@ C464 本身成不成立归 K3 与主 agent。
    按「一条腿的『没打中』一次不算」，这几行不该拿去支撑任何结论。
 5. 探针把用户动作写死的地方，已经按 `.claude/rules/three-way-inference.md`「攻方腿的装置把用户动作写死时……」那一条放开扫过两维
    （失败前发几次、失败点落在哪一步）；**没放开的还有两维**：内容长度（固定 4100 / 3100 字节）与设备数（固定两块盘）。
-6. 时刻：这一轮的测量都在 2026-09-21 UTC 当天跑完（东京时间 UTC+9）。
+6. 日期：这一轮的测量都在 2026-09-21 当天跑完。

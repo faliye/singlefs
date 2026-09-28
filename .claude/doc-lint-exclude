@@ -1,17 +1,7 @@
 # doc-lint 扫描要绕开的目录。一行一条：<相对目录>  # 为什么
 # 判据见 .claude/singlefs-ai-sop/rules/evidence-discipline.md 的「原样保存的证据不许事后改」。
-# 与 .claude/gate.d/26-number-name-sync.sh 排除 prompts/ 是同一条理由，别处不再抄第三份。
 research/prompts/  # 当时原样发给模型的提示，与 research/results/ 的产物一一对应；改提示只能连同重跑一起改（文件与目录路径除外，见 .claude/rules/path-moves.md）
-.claude/gate.d/fixtures/43-owed-table-shape.sh/  # 门禁阶段「欠账表两张登记表的行形状」的判别力样本：故意造的登记表，与真表同号不同名，扫它只会报登记冲突
-.claude/gate.d/fixtures/51-admission-terms-covered.sh/  # 门禁阶段「准入不等式的每一项都有人维护」的判别力样本：造了带登记标题的 D28 / D5 样本文件，扫它只会报登记冲突
-.claude/gate.d/fixtures/53-format-const-placeholders.sh/  # 门禁阶段「格式常量文件里的占位」的判别力样本：造了带登记标题的 D22 样本决策与 C323 样本欠账行，扫它只会报登记冲突
-.claude/gate.d/fixtures/78-owed-cited-tests.sh/  # 门禁阶段「已还清的欠账行里点名的测试名还在不在」的判别力样本：造的欠账表，与真表同号不同名，扫它只会报登记冲突
-.claude/gate.d/fixtures/20-kb-shape.sh/  # 门禁阶段「kb 形状」的判别力样本：正文里故意写「此前写的是 X」这类历史陈述，扫它只会报那条本来就要它红的违规
-.claude/gate.d/fixtures/79-tree-table-reserve.sh/  # 门禁阶段「树表条目预留的认购表」的判别力样本：造了带登记标题的 D8 样本决策与 C271 / C272 / C144 样本欠账行，扫它只会报登记冲突
-.claude/gate.d/fixtures/81-audit-contradictions.sh/  # 门禁阶段「总审核第五节每行都有去向」的判别力样本：造的总审核记录与欠账表，与真表同号不同名，扫它只会报登记冲突
-.claude/gate.d/fixtures/82-clause-enum-pairs.sh/  # 门禁阶段「条文列的集合与代码里的枚举对得上」的判别力样本：造了带登记标题的 D99 样本决策，扫它只会报登记冲突
-.claude/gate.d/fixtures/16-freeze-layer-membership.sh/  # 门禁阶段「冻结层归属登记表」的判别力样本：造了带登记标题的 D15 / D18 / D21 / D8 / D19 / D2 样本决策与一份样本登记表，扫它只会报登记冲突
-.claude/gate.d/fixtures/40-results-cited.sh/  # 门禁阶段「实验产物有没有写回」的判别力样本：造了带登记标题的 E98 样本实验页，与真表同号不同名，扫它只会报登记冲突
-.claude/gate.d/fixtures/52-segment-registry.sh/  # 门禁阶段「段序列登记表与 E142 产物逐字比对」的判别力样本：合成的最小 layout 表只有「八、」一节，没有历史节，扫它只会报 kb 形状
-.claude/gate.d/fixtures/12-no-prime-marks.sh/  # 门禁阶段「全仓不许用撇号当角标」的判别力样本：造的最小 kb 文件只为让 12 号有东西可扫，没有历史节，扫它只会报 kb 形状
-.claude/gate.d/fixtures/84-verdict-false-named.sh/  # 门禁阶段「实验产物判决行里的 false 字段有没有被实验页点名」的判别力样本：red 与 green 各造了一份带登记标题的 E9001 样本实验页，与真表同号不同名，扫它只会报登记冲突
+.claude/gate.d/fixtures/doc-decisions.sh/  # 门禁 doc-decisions 的判别力样本：正文里故意写「此前写的是 X」这类历史陈述，造了带登记标题的样本决策、欠账号与冻结层登记表，与真表同号不同名，扫它只会报本来就要它红的违规与登记冲突
+.claude/gate.d/fixtures/doc-registries.sh/  # 门禁 doc-registries 的判别力样本：造的欠账表、收口表、总审核记录、带登记标题的样本决策与欠账行，合成的最小 layout 表只有「八、」一节、没有历史节，与真表同号不同名，扫它只会报登记冲突与 kb 形状
+.claude/gate.d/fixtures/doc-experiments.sh/  # 门禁 doc-experiments 的判别力样本：造了带登记标题的 E98、E9001 样本实验页，与真表同号不同名，扫它只会报登记冲突
+.claude/gate.d/fixtures/code-source-discipline.sh/  # 门禁 code-source-discipline 的判别力样本：造了带登记标题的 D99 样本决策，扫它只会报登记冲突

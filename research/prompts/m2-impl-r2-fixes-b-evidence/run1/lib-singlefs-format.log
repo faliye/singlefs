@@ -1,0 +1,19 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 42.1 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 排队（已等 60 秒，至多 3600 秒）：slice 已占 43.6 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 排队（已等 120 秒，至多 3600 秒）：slice 已占 45.0 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 排队（已等 180 秒，至多 3600 秒）：slice 已占 46.4 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 排队（已等 240 秒，至多 3600 秒）：slice 已占 48.1 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 排了 243 秒，起跑（singlefs-memory-cap-949733-1163523590）
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running unittests src/lib.rs (target/debug/deps/singlefs_format-dbbb0064ae005468)
+
+running 6 tests
+test tests::pointer_record_and_entry_width_literals_equal_the_field_sums_they_stand_for ... ok
+test tests::tree_identifiers_start_after_kind_codes_and_watermark_follows_the_last ... ok
+test tests::system_configuration_fits_in_the_slot_with_room_for_one_more_pointer ... ok
+test tests::arithmetic_initializer_literals_equal_the_expressions_they_replaced ... ok
+test tests::tree_index_node_header_literals_equal_the_header_formula_at_each_tree_key_width ... ok
+test tests::widths_match_the_first_transaction_byte_table ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

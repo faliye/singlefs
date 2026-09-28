@@ -59,7 +59,7 @@ required-inputs: 草稿目录, 被测条款, 岔路单|问题单|重跑
 ## 产出
 
 - 登记文件路径与实验号；读过的文件清单；登记里待主 agent 认的项（问法、简称）。
-- 登记落盘之后、实验页建起来之前，门禁 86 号会判这个实验号「有 research 文件没有 kb 正文」而红；报告里写明，由主 agent 尽快接派 `experiment-runner`。
+- 登记落盘之后、实验页建起来之前，门禁 doc-experiments 的 experiment-orphans 格会判这个实验号「有 research 文件没有 kb 正文」而红；报告里写明，由主 agent 尽快接派 `experiment-runner`。
 
 ## 没做什么（固定会有的）
 

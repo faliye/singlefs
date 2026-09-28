@@ -1,5 +1,5 @@
---- tree/crates/singlefs-core/src/mount.rs	2026-09-24 16:15:19.532769843 +0000
-+++ tree-fix/crates/singlefs-core/src/mount.rs	2026-09-24 17:14:27.679909077 +0000
+--- tree/crates/singlefs-core/src/mount.rs	2026-09-25
++++ tree-fix/crates/singlefs-core/src/mount.rs	2026-09-25
 @@ -1171,6 +1171,19 @@
                  },
              )?;
@@ -20,8 +20,8 @@
      if let PreviousVersion::WithFile { output, .. } = &start.previous {
          let shapes: Vec<PublishShape> =
              std::iter::once(PublishShape::row_publish_rewriting_instance_table_pages(
---- tree/crates/singlefs-core/src/transaction.rs	2026-09-24 16:15:19.532814592 +0000
-+++ tree-fix/crates/singlefs-core/src/transaction.rs	2026-09-24 17:14:27.679279950 +0000
+--- tree/crates/singlefs-core/src/transaction.rs	2026-09-25
++++ tree-fix/crates/singlefs-core/src/transaction.rs	2026-09-25
 @@ -791,7 +791,7 @@
  ///
  /// # Errors

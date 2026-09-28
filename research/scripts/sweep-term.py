@@ -14,13 +14,18 @@
 豁免写在项目根的 `.claude/term-rename-exempt`，一行一条、`#` 后写为什么；指向不存在的路径判红
 （不起作用的豁免项会让人以为那批文件已经被绕开了，判据与 `.claude/doc-lint-exclude` 同）。
 
-已归档产物的文件名不换也不报：一个文件名形态的串（`名字.out` / `.log` / `.txt` / `.tsv` / `.json` / `.csv`），
+已归档产物的文件名不换也不报：一个文件名形态的串（`名字.out` / `.log` / `.txt` / `.tsv` / `.json` / `.csv`，名字从一段 `[A-Za-z0-9_.-]` 连续串的开头起认），
 版本库历史里 `research/results/` 下出现过、今天树里没有，它就是一份已归档产物的名字，产物改不了名，
-引它的那一处留旧名 40 号才在历史里找得到（`.claude/rules/path-moves.md`「留存产物分两类」）。按串判，不整份豁免。
+引它的那一处留旧名 doc-experiments.sh 的 results-cited 格才在历史里找得到（`.claude/rules/path-moves.md`「留存产物分两类」）。按串判，不整份豁免。
 
 --apply 的写回不在原文件上就地写：每份文件同目录排他新建临时文件、fsync、照原权限位与属主、改名换上
 （`lib_atomic_replace.py`）。扫全仓会扫到 .sh 与 .py，正在按偏移边跑边读它的进程读的仍是旧 inode 的旧内容。
 一份被拒（多个硬链接、当前用户只读、建不了临时文件、写或改名失败）就跳过它、接着换别的，最后逐份列出。
+
+自证（--selftest）里有一格判长串掩码：一段 65536 字的连续 `[A-Za-z0-9_.-]` 串（不带扩展名）后面跟一个已归档产物的名字，
+掩码在子进程里跑、1 秒内要做完，换出来的与不加左边界时逐字相同（逐字比在短串上做：不加左边界的那一条在长串上跑不完）。
+弄坏开关 SWEEP_TERM_BREAK=<项>：archived-names-unprotected 不保护已归档产物的名字，已归档那几格判红；
+product-name-no-left-boundary 去掉产物名字的左边界，长串掩码那一格因超时判红。
 
 退出码：--check 0 搜不出旧名、1 还有旧名；--apply 0 换完、3 有文件没换上（那几份原文件没动、临时文件已删）；
 2 登记表或豁免表有问题。
@@ -39,7 +44,15 @@ from project_preflight import preflight  # noqa: E402
 
 SKIP_DIRS = {".git", "target", "node_modules"}
 RESULTS_DIRECTORY = "research/results"
-PRODUCT_FILE_NAME_PATTERN = re.compile(r"[A-Za-z0-9_.-]+\.(?:out|log|txt|tsv|json|csv)\b")
+# 左边界 (?<![A-Za-z0-9_.-])：名字只从一段 [A-Za-z0-9_.-] 连续串的开头起认。不加它时，一段不带扩展名的长串
+# 在每个起点都要吃到串尾再退回来找「.扩展名」，耗时随串长平方涨（research/results/ 逐份扫下来合计 1041 秒，加上 1.76 秒）；
+# 能从串中间起的匹配，从串开头起也匹配得上（中间那几个字符同样被 + 吃进去），所以换下来的串与不加边界时逐字相同。
+PRODUCT_FILE_NAME_BODY = r"[A-Za-z0-9_.-]+\.(?:out|log|txt|tsv|json|csv)\b"
+PRODUCT_FILE_NAME_PATTERN = re.compile(r"(?<![A-Za-z0-9_.-])" + PRODUCT_FILE_NAME_BODY)
+# 不带左边界的那一条只给自证比输出、给弄坏开关 SWEEP_TERM_BREAK=product-name-no-left-boundary 用
+PRODUCT_FILE_NAME_PATTERN_WITHOUT_LEFT_BOUNDARY = re.compile(PRODUCT_FILE_NAME_BODY)
+PRODUCT_NAME_PROBE_RUN_LENGTH = 65536
+PRODUCT_NAME_PROBE_SECONDS = 1.0
 ARCHIVED_PLACEHOLDER_PATTERN = re.compile("\x00archived(\\d+)\x00")
 EXEMPT_FILE = ".claude/term-rename-exempt"
 RENAMES_PATH = ".claude/kb/term-renames.md"
@@ -164,7 +177,10 @@ def mask_archived_product_names(text, archived_names):
             return match.group(0)
         masked.append(match.group(0))
         return "\x00archived%d\x00" % (len(masked) - 1)
-    return PRODUCT_FILE_NAME_PATTERN.sub(to_placeholder, text), masked
+    pattern = PRODUCT_FILE_NAME_PATTERN
+    if os.environ.get("SWEEP_TERM_BREAK") == "product-name-no-left-boundary":
+        pattern = PRODUCT_FILE_NAME_PATTERN_WITHOUT_LEFT_BOUNDARY
+    return pattern.sub(to_placeholder, text), masked
 
 
 def restore_archived_product_names(text, masked):
@@ -319,6 +335,12 @@ def selftest():
             print("  ✗ 自检失败：豁免登记表指不到文件时没判红")
             print("     → 怎么办：看 load_exempt() 的存在性断言。")
             return 1
+    long_run_problem = check_long_run_masking()
+    if long_run_problem:
+        print("  ✗ 自检失败：长串掩码那一格判错：" + long_run_problem)
+        print("     → 怎么办：看 PRODUCT_FILE_NAME_PATTERN 开头的左边界 (?<![A-Za-z0-9_.-]) 还在不在；没有它，一段不带扩展名的长串"
+              "在每个起点都要吃到串尾再退回来，耗时随串长平方涨。")
+        return 1
     # 写回的方式：inode 要换、在读的进程读旧内容、权限位与符号链接保住、硬链接与只读拒绝、失败不留临时文件（判据在 lib_atomic_replace.py）
     running_script = "#!/usr/bin/env bash\n" + "echo 前面这几行正在被 bash 边跑边读\n" * 20 + "run_step 超级块\nexit $?\n"
     problems = problems_with_replacement_by_rename(
@@ -330,10 +352,65 @@ def selftest():
         print("     → 怎么办：按方括号里那一格查 lib_atomic_replace.py 的 replace_file_contents_by_rename，"
               "以及 sweep() 里 --apply 那一段是不是还有就地写。")
         return 1
-    print("  ✓ 自检：带旧名判红、换完判绿、豁免目录不被换、已归档产物的名字不换不报而树里还在的照换、豁免指不到文件判红；--apply 换上的是新 inode、权限位不变、"
+    print("  ✓ 自检：带旧名判红、换完判绿、豁免目录不被换、已归档产物的名字不换不报而树里还在的照换、豁免指不到文件判红、"
+          "%d 字的连续串掩码在 %.0f 秒内做完且与不加左边界时逐字相同；--apply 换上的是新 inode、权限位不变、"
           "改之前打开文件的读者接着读到旧内容、fsync 在改名之前、经符号链接改的是它指向的文件、"
-          "有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件")
+          "有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件"
+          % (PRODUCT_NAME_PROBE_RUN_LENGTH, PRODUCT_NAME_PROBE_SECONDS))
     return 0
+
+
+# 长串掩码那一格在子进程里跑的那一段：载入这份脚本，掩一段 <长度> 字的连续串加一个已归档产物的名字，打「耗时 same|different」
+LONG_RUN_PROBE = r"""
+import importlib.util, os, sys, time
+sys.dont_write_bytecode = True
+script_path, run_length = sys.argv[1], int(sys.argv[2])
+sys.path.insert(0, os.path.dirname(script_path))
+spec = importlib.util.spec_from_file_location("sweep_term_long_run_probe", script_path)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+text = "x" * run_length + " e1-run.out"
+started = time.monotonic()
+masked_text, masked = module.mask_archived_product_names(text, {"e1-run.out"})
+elapsed = time.monotonic() - started
+same = masked_text == "x" * run_length + " \x00archived0\x00" and masked == ["e1-run.out"]
+print("%.3f %s" % (elapsed, "same" if same else "different"))
+"""
+
+
+def check_long_run_masking():
+    """自证的长串掩码那一格：返回空串是判对，否则是判错的说明。
+    逐字比在短串上做（带与不带左边界各掩一遍）；耗时在子进程里量，到点杀掉——正则在 C 里跑，同一个进程里的信号打断不了它。"""
+    import subprocess
+    archived = {"e1-run.out", "e2-old.log"}
+    sample = ("见 e1-run.out、x.e1-run.out 与 abc-e1-run.out.bak；e1-live.out-e1-run.out，(e2-old.log) "
+              + "y" * 2048 + " e2-old.log.gz e2-old.logx e2-old.log\n")
+
+    def mask_without_left_boundary(text):
+        masked = []
+
+        def to_placeholder(match):
+            if match.group(0) not in archived:
+                return match.group(0)
+            masked.append(match.group(0))
+            return "\x00archived%d\x00" % (len(masked) - 1)
+        return PRODUCT_FILE_NAME_PATTERN_WITHOUT_LEFT_BOUNDARY.sub(to_placeholder, text), masked
+    if mask_archived_product_names(sample, archived) != mask_without_left_boundary(sample):
+        return "短串上带左边界掩出来的与不带左边界时不一样"
+    try:
+        probe = subprocess.run([sys.executable, "-c", LONG_RUN_PROBE, os.path.abspath(__file__), str(PRODUCT_NAME_PROBE_RUN_LENGTH)],
+                               capture_output=True, text=True, timeout=PRODUCT_NAME_PROBE_SECONDS + 4)
+    except subprocess.TimeoutExpired:
+        return "%d 字的连续串掩码超时（子进程 %.0f 秒还没做完，已杀掉）" % (PRODUCT_NAME_PROBE_RUN_LENGTH, PRODUCT_NAME_PROBE_SECONDS + 4)
+    fields = probe.stdout.split()
+    if probe.returncode != 0 or len(fields) != 2:
+        return "子进程退出 %d，没打出「耗时 same|different」：%s" % (probe.returncode, (probe.stderr.strip().splitlines() or ["（没有报错）"])[-1])
+    elapsed, verdict = float(fields[0]), fields[1]
+    if elapsed >= PRODUCT_NAME_PROBE_SECONDS:
+        return "%d 字的连续串掩码用了 %.3f 秒，超时（上限 %.0f 秒）" % (PRODUCT_NAME_PROBE_RUN_LENGTH, elapsed, PRODUCT_NAME_PROBE_SECONDS)
+    if verdict != "same":
+        return "%d 字的连续串后面那个已归档产物的名字没被掩成占位符，或串本身被改了" % PRODUCT_NAME_PROBE_RUN_LENGTH
+    return ""
 
 
 def apply_to_this_file_only(path):

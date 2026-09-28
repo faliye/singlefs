@@ -1,0 +1,7 @@
+# 仓里每一处 cargo（门禁、gate.sh --staged 的临时 worktree、各子 agent 自己的编译目录）都读这一份：
+# singlefs-checker-tier 开 verdict-store 特性时要现编 librocksdb-sys，它的 bindgen 在本机只有 libclang、没有 clang 的头文件，
+# 找不到 stdbool.h；给它指到 gcc 自带的那一份头文件目录（13 与 14 都列上：两台机器各装的版本不同，不在的目录 -I 无害）。不开特性的编法不读这个变量。
+# 值要与 research/scripts/crash-amplification-two-hosts.sh 的 BINDGEN_INCLUDE_ARGUMENTS 逐字相同：这个变量进 librocksdb-sys 构建脚本的指纹，
+# 两处不一样，同一个 target 目录里 RocksDB 的 C++ 就会被反复重编。
+[env]
+BINDGEN_EXTRA_CLANG_ARGS = "-I/usr/lib/gcc/x86_64-linux-gnu/13/include -I/usr/lib/gcc/x86_64-linux-gnu/14/include"

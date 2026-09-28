@@ -1,0 +1,13 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 25.7 GiB，这一条要 16.0 GiB（峰值表里没有这条，按它的上限 16G 算），总上限 40.1 GiB；账上在跑 15 条
+run-with-memory-cap: 排了 3 秒，起跑（singlefs-memory-cap-2312768-51994901）
+rc files 10 of 10
+piece 1 rc 0
+piece 2 rc 0
+piece 3 rc 0
+piece 4 rc 0
+piece 5 rc 0
+piece 6 rc 0
+piece 7 rc 0
+piece 8 rc 0
+piece 9 rc 0
+piece 10 rc 0

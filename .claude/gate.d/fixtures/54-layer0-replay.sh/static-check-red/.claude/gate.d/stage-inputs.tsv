@@ -1,0 +1,2 @@
+54-layer0-replay.sh	crates/ Cargo.toml	command=cargo command=rustc	# 样本：本阶段那一行
+crash-case:registered-stream	crates/ Cargo.toml	test=singlefs-checker-tier:full_streams:registered_stream_full	# 样本：登记了的那一条；同文件的 forgot_to_register_full 故意不登记

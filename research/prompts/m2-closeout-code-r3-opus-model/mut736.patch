@@ -1,0 +1,13 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -5046,9 +5046,7 @@
+         &ring_roots,
+         &current.record,
+     )
+-    .map_or(current.inode_number_watermark(), |ring| {
+-        ring.max(current.inode_number_watermark())
+-    });
++    .map_or(current.inode_number_watermark(), |ring| ring);
+     let previous =
+         version_to_publish_the_rollback_after(current, &target_version, inode_number_watermark);
+     // 动分配器：先复活、再释放（释放代 = 新根的 txg），之后交给发布路径——它在这份账上照常释放 cur 被换下的固定点单元、取落点、

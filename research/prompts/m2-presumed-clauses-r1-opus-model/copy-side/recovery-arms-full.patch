@@ -1,5 +1,5 @@
---- recovery.rs.orig	2026-09-23 15:18:11.749391751 +0000
-+++ repo/crates/singlefs-core/src/recovery.rs	2026-09-23 15:27:54.217345097 +0000
+--- recovery.rs.orig	2026-09-24
++++ repo/crates/singlefs-core/src/recovery.rs	2026-09-24
 @@ -1168,12 +1168,26 @@
      // 链首接在所选根自己那条记录（同实例、checkpoint_txg 相等）之后；那条记录读不出（两份都撕了）时不知道它的 jsn，
      // 链首只能是 checkpoint_txg = 根的 txg + 1 的那条（第一版一次发布一条记录、txg 每次加一）：水位之上最小的那条若 txg 更大，

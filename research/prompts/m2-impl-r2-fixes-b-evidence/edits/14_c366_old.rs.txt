@@ -1,0 +1,143 @@
+/// 所选根 (1, 4) 自己那条记录 jsn 4 两份都读不出时，可写挂载写的 jsn 与 tail 跟着记录号走（D23（journal 的角色与格式） 已定项 14 注 3：
+/// 前缀末的计数器取环里读得出的最大那一个，新实例的第一条编在它 + 1、落回那条读不出的记录原来的槽；已定项 18：tail 存 jsn 计数器）。
+/// 历史：A（txg 3、jsn 3）→ B（txg 4、jsn 4）→ 进程退出 → 两块盘上 jsn 4 那一格各坏一个字节 → 可写挂载。
+/// 读得出的最大号是 jsn 3 ⇒ 写行那次发布 jsn 4、写进 jsn 4 那一格；txg = max(根环 4, 记录 3) + 1 = 5；暖机 txg 6、7 的 jsn 5、6；
+/// 三次发布各自轮换的系统配置 tail 是那次的 jsn（4、5、6），不是 txg。
+/// 再干净重开一次，落后 1 的差照样留着：前缀末 jsn 6 ⇒ 写行 txg 8、jsn 7，暖机 txg 9、10 的 jsn 8、9，tail 9。
+/// 判别力自证：写行那次的 jsn 取 txg、暖机的 jsn 取上一版的 txg + 1、tail 取 txg，三处各改一处都红（`crates/mutations.tsv`）。
+#[test]
+fn c366_when_the_chosen_root_own_record_is_unreadable_the_new_instance_numbers_records_and_tail_from_the_highest_readable_record(
+) {
+    let mut pool = build_pool("c366-chosen-root-record-unreadable");
+    let first_version = pool.output.clone();
+    let second_version = publish_overwrite_in_process(
+        &mut pool,
+        &first_version,
+        &second_version_content(),
+        FIXED_WRITE_TIME_SECONDS + 60,
+        InstanceGeneration(1),
+    )
+    .expect("发布 B");
+    assert_eq!(
+        (
+            second_version.root.checkpoint_txg,
+            second_version.record.counter
+        ),
+        (CheckpointTxg(4), 4),
+        "到 B 为止 txg 与 jsn 还相等"
+    );
+    pool.output = second_version;
+    let mut devices = pool.reopen_recorded();
+    let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
+    let chosen_root_own_record_offset = record_offset(4, JOURNAL_RING_DEFAULT_BYTES);
+    for (_, device) in &mut devices {
+        let mut bytes = vec![0u8; record_bytes];
+        device
+            .read_at(chosen_root_own_record_offset, &mut bytes)
+            .expect("读 jsn 4 那一格");
+        bytes[300] ^= 0xff;
+        device
+            .write_at(
+                chosen_root_own_record_offset,
+                &bytes,
+                WriteDurability::Plain,
+            )
+            .expect("改坏 jsn 4 那一格");
+    }
+    let operations_before_the_mount = pool.stream.operation_count();
+    let mounted = mount_writable(&parameters(), &mut devices).expect("可写挂载");
+    assert_eq!(
+        (
+            mounted.output.chosen_root.instance,
+            mounted.output.chosen_root.checkpoint_txg
+        ),
+        (InstanceGeneration(1), CheckpointTxg(4)),
+        "B 的根持久了：所选根是 (1, 4)"
+    );
+    assert_eq!(
+        (
+            mounted.output.journal.valid_records,
+            mounted.output.journal.prefix_applied
+        ),
+        (3, 0),
+        "环里读得出的只有 jsn 1–3（jsn 4 两份都坏了），一条都不施加"
+    );
+    assert_eq!(
+        mounted.output.effective_root, mounted.output.chosen_root,
+        "没有记录要施加"
+    );
+    assert_eq!(
+        txg_and_counter_of_each_publish(&mounted),
+        vec![
+            (CheckpointTxg(5), 4),
+            (CheckpointTxg(6), 5),
+            (CheckpointTxg(7), 6)
+        ],
+        "jsn 从读得出的最大号 3 接着数（4、5、6），txg 从 max(根环 4, 记录 3) + 1 = 5 起：两个量各走各的"
+    );
+    let written = written_journal_positions(
+        &pool.stream.retained_operations()[operations_before_the_mount..],
+    );
+    let record_written_to = |counter: u64, txg: u64| {
+        [DeviceIdentity(0), DeviceIdentity(1)].map(|device| {
+            (
+                device,
+                record_offset(counter, JOURNAL_RING_DEFAULT_BYTES),
+                CheckpointTxg(txg),
+                counter,
+            )
+        })
+    };
+    assert_eq!(
+        written.journal_records,
+        [
+            record_written_to(4, 5),
+            record_written_to(5, 6),
+            record_written_to(6, 7)
+        ]
+        .concat(),
+        "三条记录按 jsn 落格：写行那条落回那条读不出的 jsn 4 原来的槽"
+    );
+    let tail_written = |tail: u64| {
+        [DeviceIdentity(0), DeviceIdentity(1)].map(|device| (device, InstanceGeneration(2), tail))
+    };
+    assert_eq!(
+        written.system_configuration_tails.len(),
+        8,
+        "取号两份 + 三次发布各两份"
+    );
+    assert_eq!(
+        written.system_configuration_tails[2..],
+        [tail_written(4), tail_written(5), tail_written(6)].concat(),
+        "每次发布轮换的系统配置 tail 是那次的 jsn（4、5、6），不是 txg（5、6、7）"
+    );
+
+    pool.devices = Some(devices);
+    let mut reopened = pool.reopen_recorded();
+    let remounted = mount_writable(&parameters(), &mut reopened).expect("干净重开再可写挂载");
+    assert_eq!(
+        (
+            remounted.output.chosen_root.instance,
+            remounted.output.chosen_root.checkpoint_txg
+        ),
+        (InstanceGeneration(2), CheckpointTxg(7))
+    );
+    assert_eq!(
+        txg_and_counter_of_each_publish(&remounted),
+        vec![
+            (CheckpointTxg(8), 7),
+            (CheckpointTxg(9), 8),
+            (CheckpointTxg(10), 9)
+        ],
+        "落后 1 的差一直留着：前缀末 jsn 6 ⇒ jsn 7、8、9；txg 8 ≡ 2 (mod 3) 落盘 0，暖机推两次"
+    );
+    assert_eq!(
+        choose_system_configuration(&reopened)
+            .expect("挂载之后系统配置自证得过")
+            .quantities
+            .journal_tail,
+        9,
+        "盘上的 tail 是最后一条记录的 jsn 9，不是 txg 10"
+    );
+    pool.devices = Some(reopened);
+}

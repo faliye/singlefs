@@ -312,7 +312,7 @@ omitClaudeMd: true
 | J4-a 闸的绕法 | 打中（量过，只喂 JSON）：`cargo nextest`、`cargo mutants`、`--config` 别名与 runner、`CARGO_TARGET_*_RUNNER`、拷走测试二进制再执行、`find -exec`、`/usr/bin/time`、`flock`、`rustup run`、`chrt`、`systemd-run --scope`、`prlimit`；包装这一类以前就有，层 0 同样放行 | 攻方 |
 | J4-b 用例的 ignore 没人查 | **打中（量过）**：去掉 c561 那条的 `#[ignore]` 之后，不带 `--ignored` 的命令跑 2^18 个状态，闸放行、`crash-cases` 自查退 0 | 攻方、核查员复跑 |
 | J4-c 误拒 | 打中、危害小：`-- --ignored --list`、`--include-ignored --exact <一条快用例>` 被拒 | 攻方 |
-| J5 文字 | 几份文字之间没有互相矛盾，都改成了逐条复用；层 0 规模第三轮判决「乙不采纳」与用户 18:5x 定案之间没写覆盖——主 agent 已在那份判决第四节之后补了覆盖记录；正推说的「四行三项都齐」不对（核查员 ✗），见 Y8 | 正推、核查员 |
+| J5 文字 | 几份文字之间没有互相矛盾，都改成了逐条复用；层 0 规模第三轮判决「乙不采纳」与用户定案之间没写覆盖——主 agent 已在那份判决第四节之后补了覆盖记录；正推说的「四行三项都齐」不对（核查员 ✗），见 Y8 | 正推、核查员 |
 | 本地 | 两份样本一致：四条用例保留、减去的文件数与四个抽样文件的去留与 `admission.py crash-case-manifest` 现跑对得上 | 本地、核查员 |
 
 ```
@@ -322,7 +322,7 @@ omitClaudeMd: true
 ```markdown
 # 门禁批第二轮改法（G1）交回：P1–P7、P9、P10、D2、标记字段，加 singlefs-39 的 54 号替换
 
-写于 2026-09-26 UTC（交回时刻见文末）。规格 `/tmp/claude-1000/gate-batch-m2-r2-fixes/spec.md`，判决 `research/prompts/defs-gatebatch-m2-r2-main-verification.md` 第二、三节。
+写于 2026-09-26（交回日期见文末）。规格 `/tmp/claude-1000/gate-batch-m2-r2-fixes/spec.md`，判决 `research/prompts/defs-gatebatch-m2-r2-main-verification.md` 第二、三节。
 
 ```
 
@@ -392,7 +392,7 @@ D2	改准入模块的判法（judge_worker_threads 把「至少两片」改成�
 ````markdown
 ## 自证与弄坏开关证红
 
-仓里现文件上跑（2026-09-26 UTC），末行原样：
+仓里现文件上跑（2026-09-26），末行原样：
 
 ```
 $ python3 research/scripts/admission.py --selftest   → 退 0
@@ -561,7 +561,7 @@ ADMISSION_BREAK=ignore-attribute-without-space → 退 1
 **出处 `research/prompts/defs-gatebatch-m2-r2-fixes-report.md:207-222`（整段抄，未转述）**
 
 ```markdown
-## 门禁与 lint（仓里现文件，2026-09-26 UTC）
+## 门禁与 lint（仓里现文件，2026-09-26）
 
 | 命令 | 退出码 | 末行 / 判红的那几行 |
 |---|---|---|
@@ -641,7 +641,7 @@ ADMISSION_BREAK=ignore-attribute-without-space → 退 1
 - 留着：`backup/`（五份改前原件，`cp -p`）、`my-changes.diff`、各份日志（`before-k1-*.log`、`rerun-out/`、`final-*.log`、`lib-break-*.log`、`guard-*break-*.log`、`lint-*.log`、`demo-d2-marker.log`、`mut54-selftest.log`）、`demo_d2_marker.py`、`54-before-d2.sh`（套完 singlefs-39 替换、D2 之前的 54 号，演示用）。
 - 攻方的草稿目录 `/tmp/claude-1000/defs-gatebatch-m2-r2-opus/` 不是我建的，没动（我的探针与复跑都把 SCRATCH_ROOT 指到了自己的草稿目录）。
 
-交回时刻：2026-09-26T17:06Z（JST 2026-09-27T02:06）。
+交回于 2026-09-27。
 
 ```
 
@@ -650,7 +650,7 @@ ADMISSION_BREAK=ignore-attribute-without-space → 退 1
 ```markdown
 # G2 交回：门禁批第二轮判决的余项与实分一接入（tooling-writer）
 
-写于 2026-09-27 JST 08:4x（UTC 2026-09-26 23:4x）。规格 `/tmp/claude-1000/gate-batch-m2-g2/spec.md`；途中收到主 agent 四条追加（见「途中收到的追加」一节）。
+写于 2026-09-27。规格 `/tmp/claude-1000/gate-batch-m2-g2/spec.md`；途中收到主 agent 四条追加（见「途中收到的追加」一节）。
 
 ```
 
@@ -661,7 +661,7 @@ ADMISSION_BREAK=ignore-attribute-without-space → 退 1
 
 - 规格第 1–9 条都做完，第 9 条（54 号）最后套。途中追加的四件（admission 自证临时仓链 `.claude/singlefs-ai-sop` 与 `.claude/scripts`、仓根模板改放草稿目录、新脚本改 source 垫片并写准入声明、驱动自证默认改假 cargo）也做完。
 - 出口各项的原样末行都绿，只有两处红不在这一批：47 号红在 `research/scripts/check-segment-registry.py --selftest`；doc-lint 红在 O1–O3、F23 等编号与两份 kb 文件（这一批改过的文件里 grep 零命中）。
-- 仓根 `layer0-shard.env.example` 不在我的写范围，写闸拒了。成品在 `/tmp/claude-1000/gate-batch-m2-g2/layer0-shard.env.example`，sha256 `72ae03d4a01a49ccc069dc27c62a03e31d42dc420e52a879fa67bd4c2c458bd4`，与 deliver 那份逐字节相同（没改）；由主 agent 拷进仓根。
+- 仓根 `multi-host.env.example` 不在我的写范围，写闸拒了。成品在 `/tmp/claude-1000/gate-batch-m2-g2/multi-host.env.example`，sha256 `72ae03d4a01a49ccc069dc27c62a03e31d42dc420e52a879fa67bd4c2c458bd4`，与 deliver 那份逐字节相同（没改）；由主 agent 拷进仓根。
 - 第 4 条选「把驱动脚本按内容算进输入」，理由见第 4 条那一段。
 - 推翻条件：真 `--full` 在分片开着时，驱动脚本在 HEAD + 暂存区的临时树里算出的指纹与 54 号给的对不上（这一批只在假 cargo 与临时仓上证过）；或者别的会话再改 `stage-must-run.sh` 这类 helper 的 source 写法，admission 自证的临时仓又缺文件。
 
@@ -672,7 +672,7 @@ ADMISSION_BREAK=ignore-attribute-without-space → 退 1
 ````markdown
 ## 改过的文件与 git diff --stat
 
-逐文件相对开工时备份（`backup/`）的增删行数，由 `diff backup/<名> <仓里的文件>` 数 `>` / `<` 得出：admission.py +339 −23，stage-inputs.tsv +10 −7，lib_heavy_tests.py +34 −7，implementation-workflow.md +1 −1，54 号 +46 −4。54 号的数里含 singlefs-39 在 23:22Z 做的第 63 行替换（source 垫片，+1 −1），那一行不是我改的。新建三份：layer0-shard-run.sh 280 行，layer0-shard-run-selftest.sh 207 行，layer0-shard-configuration-check.sh 98 行，权限 775。八份都与测过的 dev 副本逐字节相同（`cmp` 现核）。合在一起的 diff：`/tmp/claude-1000/gate-batch-m2-g2/g2-changes.diff`（1498 行）。
+逐文件相对开工时备份（`backup/`）的增删行数，由 `diff backup/<名> <仓里的文件>` 数 `>` / `<` 得出：admission.py +339 −23，stage-inputs.tsv +10 −7，lib_heavy_tests.py +34 −7，implementation-workflow.md +1 −1，54 号 +46 −4。54 号的数里含 singlefs-39 做的第 63 行替换（source 垫片，+1 −1），那一行不是我改的。新建三份：layer0-shard-run.sh 280 行，layer0-shard-run-selftest.sh 207 行，layer0-shard-configuration-check.sh 98 行，权限 775。八份都与测过的 dev 副本逐字节相同（`cmp` 现核）。合在一起的 diff：`/tmp/claude-1000/gate-batch-m2-g2/g2-changes.diff`（1498 行）。
 
 `git diff --stat -- <这几份>` 原样。它比的是 HEAD，所以混着 G1 与别的会话没提交的改动；admission.py 与三份新脚本没进 git，不在 stat 里：
 
@@ -807,7 +807,7 @@ ADMISSION_BREAK=ignore-attribute-without-space → 退 1
 - 自证：admission.py 里 54 号那几格与实分一的两格分片格（第 3824 行起）全过，含「双机分片：关」「开：stream-a 交给驱动 --merged-log、另两条单机跑」「驱动退非 0 判红、不写标记」。
 
 ### 途中收到的追加
-1. 07:5x 之后，在做第 1–7 条时收到：admission 自证在 singlefs-39 补声明之后有 replay.sh 两格、54 号若干格红，要在两处临时仓链真仓的 `.claude/singlefs-ai-sop` 并写进 .gitignore。做法：第 2706 行 `LINKED_INTO_SELFTEST_REPOSITORIES`、第 2709 行 `link_sop_copy`，在 replay（`run_replay_cells`）与 54 号（`run_layer0_stage_cells`）两处调。
+1. 之后，在做第 1–7 条时收到：admission 自证在 singlefs-39 补声明之后有 replay.sh 两格、54 号若干格红，要在两处临时仓链真仓的 `.claude/singlefs-ai-sop` 并写进 .gitignore。做法：第 2706 行 `LINKED_INTO_SELFTEST_REPOSITORIES`、第 2709 行 `link_sop_copy`，在 replay（`run_replay_cells`）与 54 号（`run_layer0_stage_cells`）两处调。
    - 改前原样（开工时在仓里跑）：`  ✗ admission.py 自证没过：17 格判错（共 207 格）`；草稿副本上 replay.sh 也换成带 preflight 那一版之后：`  ✗ admission.py 自证没过：21 格判错（共 207 格）`。点名的是 54 号若干格与「replay.sh：老产物没有产物头…」两格，原因原样 `…/research/scripts/../../.claude/singlefs-ai-sop/scripts/preflight.sh: No such file or directory`。
    - 改后见「出口各项」232 格全过。
 2. 在新建三份脚本时收到：仓根模板超写范围，改放草稿目录（见「结论」）。
@@ -815,7 +815,7 @@ ADMISSION_BREAK=ignore-attribute-without-space → 退 1
 4. 看门狗报：驱动自证里真起了 `cargo test … --exact the_first_stream_quick_tier_sharded_by_the_environment_keeps_its_pinned_counts`，被判成崩溃枚举用例。
    - ① 主工作区的 stage-inputs.tsv 没有这一行：它是自证在临时仓副本的登记表里追加的（`crash-case:sharded-selftest`）。真仓登记只点名标了 `#[ignore]` 的用例；新加的 fast-tier 那条第 131 行标了。
    - ② 自证改成默认用假 cargo：临时仓里另写一条标 `#[ignore]` 的替身用例，三趟都不带 `--include-ignored`，不算重型。只有带 `SINGLEFS_HEAVY_TESTS` 时才用真 cargo 跑那条小流用例，不带时成功行写明真 cargo 那一趟本次未跑（自证第 48–89 行）。
-   - 那一次真 cargo 跑是 UTC 23:19–23:26（7 分钟，临时目录 1.2G，自己删了），10 格全过：`  ✓ layer0-shard-run.sh 自证通过：10 格都对（第二台是本机上的另一个目录，没碰真的第二台）`。它经 `capped.sh 4` 与 `run-with-memory-cap.sh 8G` 起。
+   - 那一次真 cargo 跑了 7 分钟（临时目录 1.2G，自己删了），10 格全过：`  ✓ layer0-shard-run.sh 自证通过：10 格都对（第二台是本机上的另一个目录，没碰真的第二台）`。它经 `capped.sh 4` 与 `run-with-memory-cap.sh 8G` 起。
    - 假 cargo 版的证红：草稿副本里把驱动比工具链与数账本两处换成 `true`，原样 `  ✗ layer0-shard-run.sh 自证没过：2 格判错（共 10 格）`（③ ④ 两格红），换回之后 10 格全过。
 
 ````
@@ -978,7 +978,7 @@ ADMISSION_BREAK=ignore-attribute-without-space → 退 1
 
 ```markdown
 ### 途中收到的追加
-1. 07:5x 之后，在做第 1–7 条时收到：admission 自证在 singlefs-39 补声明之后有 replay.sh 两格、54 号若干格红，要在两处临时仓链真仓的 `.claude/singlefs-ai-sop` 并写进 .gitignore。做法：第 2706 行 `LINKED_INTO_SELFTEST_REPOSITORIES`、第 2709 行 `link_sop_copy`，在 replay（`run_replay_cells`）与 54 号（`run_layer0_stage_cells`）两处调。
+1. 之后，在做第 1–7 条时收到：admission 自证在 singlefs-39 补声明之后有 replay.sh 两格、54 号若干格红，要在两处临时仓链真仓的 `.claude/singlefs-ai-sop` 并写进 .gitignore。做法：第 2706 行 `LINKED_INTO_SELFTEST_REPOSITORIES`、第 2709 行 `link_sop_copy`，在 replay（`run_replay_cells`）与 54 号（`run_layer0_stage_cells`）两处调。
    - 改前原样（开工时在仓里跑）：`  ✗ admission.py 自证没过：17 格判错（共 207 格）`；草稿副本上 replay.sh 也换成带 preflight 那一版之后：`  ✗ admission.py 自证没过：21 格判错（共 207 格）`。点名的是 54 号若干格与「replay.sh：老产物没有产物头…」两格，原因原样 `…/research/scripts/../../.claude/singlefs-ai-sop/scripts/preflight.sh: No such file or directory`。
    - 改后见「出口各项」232 格全过。
 2. 在新建三份脚本时收到：仓根模板超写范围，改放草稿目录（见「结论」）。
@@ -986,7 +986,7 @@ ADMISSION_BREAK=ignore-attribute-without-space → 退 1
 4. 看门狗报：驱动自证里真起了 `cargo test … --exact the_first_stream_quick_tier_sharded_by_the_environment_keeps_its_pinned_counts`，被判成崩溃枚举用例。
    - ① 主工作区的 stage-inputs.tsv 没有这一行：它是自证在临时仓副本的登记表里追加的（`crash-case:sharded-selftest`）。真仓登记只点名标了 `#[ignore]` 的用例；新加的 fast-tier 那条第 131 行标了。
    - ② 自证改成默认用假 cargo：临时仓里另写一条标 `#[ignore]` 的替身用例，三趟都不带 `--include-ignored`，不算重型。只有带 `SINGLEFS_HEAVY_TESTS` 时才用真 cargo 跑那条小流用例，不带时成功行写明真 cargo 那一趟本次未跑（自证第 48–89 行）。
-   - 那一次真 cargo 跑是 UTC 23:19–23:26（7 分钟，临时目录 1.2G，自己删了），10 格全过：`  ✓ layer0-shard-run.sh 自证通过：10 格都对（第二台是本机上的另一个目录，没碰真的第二台）`。它经 `capped.sh 4` 与 `run-with-memory-cap.sh 8G` 起。
+   - 那一次真 cargo 跑了 7 分钟（临时目录 1.2G，自己删了），10 格全过：`  ✓ layer0-shard-run.sh 自证通过：10 格都对（第二台是本机上的另一个目录，没碰真的第二台）`。它经 `capped.sh 4` 与 `run-with-memory-cap.sh 8G` 起。
    - 假 cargo 版的证红：草稿副本里把驱动比工具链与数账本两处换成 `true`，原样 `  ✗ layer0-shard-run.sh 自证没过：2 格判错（共 10 格）`（③ ④ 两格红），换回之后 10 格全过。
 
 ```
@@ -1011,7 +1011,7 @@ ADMISSION_BREAK=ignore-attribute-without-space → 退 1
 1. 54 号快档的 `run_layer0_test_binary` 起两条流的快用例时，没清调用方的 `SINGLEFS_LAYER0_SHARD`。第 6 条只点名 `crash-case-command`，这一处照旧（假红方向）。
 2. 分片 merge 那一趟，54 号交给 `crash-case-record` 的 `--machine-cores/--threads` 是本机那一片的，标记里 `configured_worker_threads=` 只记本机。第二台那一片配的数只在 `parallel_finished=` 行的 `shard_configured_worker_threads=` 里（推的：标记字面对分片的描述不全，没改）。
 3. strace 的别的长选项（`--output=`、`--user=` 等）不在 `LAUNCHER_OPTIONS_WITH_VALUE` 里：带值另起一个词的写法会被当成命令，剥错。只补了 `--env`。
-4. 仓根 `layer0-shard.env.example` 由主 agent 拷；实分一 deliver 里的 kb 第六节 diff 没碰（归书记员）。
+4. 仓根 `multi-host.env.example` 由主 agent 拷；实分一 deliver 里的 kb 第六节 diff 没碰（归书记员）。
 
 ```
 
@@ -1031,7 +1031,7 @@ ADMISSION_BREAK=ignore-attribute-without-space → 退 1
 ```markdown
 ## 草稿目录与清理
 - 删了：`/tmp/claude-1000/gate-batch-m2-g2/dev`（215M，开发用的仓副本）、`sim`（516K，套 hunk 的演练副本）、`try`（1.1M，patch 试打）。自证、探针建的临时仓都由它们自己删掉了（`ls -d /tmp/admission-selftest-* /tmp/g2-probe-*` 零个）。
-- 留着：`backup/`（五份改前原件）、`g2-changes.diff`、`*-vs-deliver.diff`、`hunks-*.diff`、`round2-*.diff`、`apply_hunks.py`、`probe_g2.py`、`probe_strace.py`、`logs/`、`progress.md`、`layer0-shard.env.example`（待拷）、`final-sha256.txt`（八份仓内文件交回时的 sha256）。
+- 留着：`backup/`（五份改前原件）、`g2-changes.diff`、`*-vs-deliver.diff`、`hunks-*.diff`、`round2-*.diff`、`apply_hunks.py`、`probe_g2.py`、`probe_strace.py`、`logs/`、`progress.md`、`multi-host.env.example`（待拷）、`final-sha256.txt`（八份仓内文件交回时的 sha256）。
 
 ```
 
@@ -1039,20 +1039,20 @@ ADMISSION_BREAK=ignore-attribute-without-space → 退 1
 
 ```markdown
 ## 补记
-仓根 `layer0-shard.env.example` 已由主 agent（README 那件）放进仓根，与草稿那份逐字节相同（`cmp` 现核相同，sha256 `72ae03d4a01a49ccc069dc27c62a03e31d42dc420e52a879fa67bd4c2c458bd4`），不用再拷。
+仓根 `multi-host.env.example` 已由主 agent（README 那件）放进仓根，与草稿那份逐字节相同（`cmp` 现核相同，sha256 `72ae03d4a01a49ccc069dc27c62a03e31d42dc420e52a879fa67bd4c2c458bd4`），不用再拷。
 
 ```
 
 **出处 `records/2026-09-24-里程碑二收尾调度.md:190-190`（整段抄，未转述）**
 
 ```markdown
-| 崩溃枚举的跑法（用户 2026-09-26 JST 18:5x） | 用户原话：「这次跑可以 下次肯定要接入提交时崩溃验证员， 并且以后跑也不能全量这么跑，改了只跑改了的部分。」起因：实五按主 agent 规格加了一条在会话推的抬 F 那一串上做小枚举的用例（`second_transaction_crash_inside_the_floor_raise_pushed_by_the_session`，20,493 个状态，debug 下单跑约 12 分钟、约 16 核），它是这条新写路径唯一的崩溃证据，层 0 两条流在 4 GiB 盘上碰不到准入被拒（推的）。**定**：① 这一次照跑；实五证红做完后给它加 `#[ignore]`，写明提交时由崩溃验证员按输入哈希跑（release）。② 门禁批（实六之后）把它接进提交时崩溃验证员那一组，在 `.claude/gate.d/stage-inputs.tsv` 登记它读的输入，输入没变复用上一次全绿判定。③ 以后崩溃枚举一律按用例 / 按流各自登记输入、各自复用，改了哪块只重跑读它的那几条——就是层 0 规模第二轮挂起的乙；第二轮打中「按流列的清单漏新加的共用文件」，门禁批照当时的修法做：清单用排除法写（整个 `crates/` 减去别的流自己的用例文件）、指纹补第三轮 U4 那几样；被攻过零轮，改的是门禁与崩溃验证员定义，照「改 agent 定义与共用约束，走同一条三步」走一轮三方 |
+| 崩溃枚举的跑法（用户 2026-09-26） | 用户原话：「这次跑可以 下次肯定要接入提交时崩溃验证员， 并且以后跑也不能全量这么跑，改了只跑改了的部分。」起因：实五按主 agent 规格加了一条在会话推的抬 F 那一串上做小枚举的用例（`second_transaction_crash_inside_the_floor_raise_pushed_by_the_session`，20,493 个状态，debug 下单跑约 12 分钟、约 16 核），它是这条新写路径唯一的崩溃证据，层 0 两条流在 4 GiB 盘上碰不到准入被拒（推的）。**定**：① 这一次照跑；实五证红做完后给它加 `#[ignore]`，写明提交时由崩溃验证员按输入哈希跑（release）。② 门禁批（实六之后）把它接进提交时崩溃验证员那一组，在 `.claude/gate.d/stage-inputs.tsv` 登记它读的输入，输入没变复用上一次全绿判定。③ 以后崩溃枚举一律按用例 / 按流各自登记输入、各自复用，改了哪块只重跑读它的那几条——就是层 0 规模第二轮挂起的乙；第二轮打中「按流列的清单漏新加的共用文件」，门禁批照当时的修法做：清单用排除法写（整个 `crates/` 减去别的流自己的用例文件）、指纹补第三轮 U4 那几样；被攻过零轮，改的是门禁与崩溃验证员定义，照「改 agent 定义与共用约束，走同一条三步」走一轮三方 |
 ```
 
 **出处 `research/prompts/defs-gatebatch-m2-g2-report.md:156-178`（整段抄，未转述）**
 
 ```markdown
-## 出口各项（在仓里现跑，UTC 2026-09-26 23:3x–23:5x；末行原样）
+## 出口各项（在仓里现跑，2026-09-27；末行原样）
 
 | 命令 | 退出码 | 末行 / 判红的行 |
 |---|---|---|

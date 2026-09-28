@@ -1,0 +1,53 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_r2_y2_session_and_entries_with_stale_or_swapped_devices.rs (/tmp/claude-1000/three-way-attack-r2/target-fix/release/deps/opus_r2_y2_session_and_entries_with_stale_or_swapped_devices-51159831c2e01b32)
+
+running 7 tests
+test control_writable_mount_directly_on_the_stale_snapshot_of_device_one ... Y2 control_stale_direct writable err=WritableMountRefusedByDevicesWithoutTheSelectedVersion { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(5) }, selected_version_journal_position: JournalSequenceNumber { instance_generation: InstanceGeneration(1), counter: 5 }, devices: [DeviceWithou
+Y2 control_stale_direct checker_violations=4 first=Some("I-2.1: 树表单元 在盘 1 槽 50276 的那一份与位置条目里的校验和对不上")
+ok
+test session_publishes_onto_a_stale_snapshot_of_device_one ... Y2 session_stale ok=false err=Some("DevicesWithoutASelfVerifiedSystemConfiguration { devices: [DeviceIdentity(1)] }") stale_disk_written=false
+Y2 session_stale read_only_after chosen=(1,5) effective=(1,5)
+Y2 session_stale checker_violations_after=4 first=Some("I-2.1: 树表单元 在盘 1 槽 50276 的那一份与位置条目里的校验和对不上")
+Y2 session_stale writable_after err=WritableMountRefusedByDevicesWithoutTheSelectedVersion { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(5) }, selected_version_journal_position: JournalSequenceNumber { instance_generation: InstanceGeneration(1), counter: 5 }, devices: [DeviceWithoutTheSelectedVersion { device: DeviceIdentity(1), lacking: BehindTheSelectedVersionAndMissingItsUnits
+ok
+test session_publishes_with_the_newer_system_configuration_slot_of_device_one_corrupted ... Y2 one_slot slot0_head=[53, 46, 53, 42, 01, 00, 02, 00, 00, 00, 00, 00, 00, 00, 00, 00]
+Y2 one_slot slot1_head=[53, 46, 53, 42, 01, 00, 02, 00, 00, 00, 00, 00, 00, 00, 00, 00]
+Y2 session_one_slot ok=true err=None
+Y2 session_one_slot read_only_after chosen=(1,5) effective=(1,5)
+Y2 session_one_slot checker_violations_after=0 first=None
+Y2 session_one_slot writable_after ok instance=2
+Y2 session_one_slot checker_violations_after_writable_mount=0 first=None
+ok
+test session_publishes_with_the_two_device_bodies_swapped ... Y2 session_swapped ok=false err=Some("DevicesWithoutASelfVerifiedSystemConfiguration { devices: [DeviceIdentity(0), DeviceIdentity(1)] }")
+Y2 session_swapped read_only_after chosen=(1,5) effective=(1,5)
+Y2 session_swapped checker_violations_after=0 first=None
+Y2 session_swapped writable_after ok instance=2
+Y2 session_swapped checker_violations_after_writable_mount=0 first=None
+ok
+test stale_snapshot_substitution_swept_over_the_user_steps ... Y2 sweep stale_after_overwrites=0 stale_device=0 steps=session1 control_direct_writable_ok=false entries_accepted=[false] checker_after=4 writable_after_ok=false writable_err=Some("NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: S")
+Y2 sweep stale_after_overwrites=0 stale_device=0 steps=session2 control_direct_writable_ok=false entries_accepted=[false, false] checker_after=4 writable_after_ok=false writable_err=Some("NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: S")
+Y2 sweep stale_after_overwrites=0 stale_device=0 steps=session3 control_direct_writable_ok=false entries_accepted=[false, false, false] checker_after=4 writable_after_ok=false writable_err=Some("NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: S")
+Y2 sweep stale_after_overwrites=0 stale_device=0 steps=unmount control_direct_writable_ok=false entries_accepted=[false] checker_after=4 writable_after_ok=false writable_err=Some("NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: S")
+Y2 sweep stale_after_overwrites=0 stale_device=1 steps=session1 control_direct_writable_ok=false entries_accepted=[false] checker_after=4 writable_after_ok=false writable_err=Some("WritableMountRefusedByDevicesWithoutTheSelectedVersion { selected_version: RollbackTarget { instance: InstanceGeneration")
+Y2 sweep stale_after_overwrites=0 stale_device=1 steps=session2 control_direct_writable_ok=false entries_accepted=[false, false] checker_after=4 writable_after_ok=false writable_err=Some("WritableMountRefusedByDevicesWithoutTheSelectedVersion { selected_version: RollbackTarget { instance: InstanceGeneration")
+Y2 sweep stale_after_overwrites=0 stale_device=1 steps=session3 control_direct_writable_ok=false entries_accepted=[false, false, false] checker_after=4 writable_after_ok=false writable_err=Some("WritableMountRefusedByDevicesWithoutTheSelectedVersion { selected_version: RollbackTarget { instance: InstanceGeneration")
+Y2 sweep stale_after_overwrites=0 stale_device=1 steps=unmount control_direct_writable_ok=false entries_accepted=[false] checker_after=4 writable_after_ok=false writable_err=Some("WritableMountRefusedByDevicesWithoutTheSelectedVersion { selected_version: RollbackTarget { instance: InstanceGeneration")
+Y2 sweep stale_after_overwrites=1 stale_device=0 steps=session1 control_direct_writable_ok=false entries_accepted=[false] checker_after=0 writable_after_ok=false writable_err=Some("NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: S")
+Y2 sweep stale_after_overwrites=1 stale_device=0 steps=session2 control_direct_writable_ok=false entries_accepted=[false, false] checker_after=0 writable_after_ok=false writable_err=Some("NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: S")
+Y2 sweep stale_after_overwrites=1 stale_device=0 steps=session3 control_direct_writable_ok=false entries_accepted=[false, false, false] checker_after=0 writable_after_ok=false writable_err=Some("NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: S")
+Y2 sweep stale_after_overwrites=1 stale_device=0 steps=unmount control_direct_writable_ok=false entries_accepted=[false] checker_after=0 writable_after_ok=false writable_err=Some("NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: S")
+Y2 sweep stale_after_overwrites=1 stale_device=1 steps=session1 control_direct_writable_ok=false entries_accepted=[false] checker_after=3 writable_after_ok=false writable_err=Some("WritableMountRefusedByDevicesWithoutTheSelectedVersion { selected_version: RollbackTarget { instance: InstanceGeneration")
+Y2 sweep stale_after_overwrites=1 stale_device=1 steps=session2 control_direct_writable_ok=false entries_accepted=[false, false] checker_after=3 writable_after_ok=false writable_err=Some("WritableMountRefusedByDevicesWithoutTheSelectedVersion { selected_version: RollbackTarget { instance: InstanceGeneration")
+Y2 sweep stale_after_overwrites=1 stale_device=1 steps=session3 control_direct_writable_ok=false entries_accepted=[false, false, false] checker_after=3 writable_after_ok=false writable_err=Some("WritableMountRefusedByDevicesWithoutTheSelectedVersion { selected_version: RollbackTarget { instance: InstanceGeneration")
+Y2 sweep stale_after_overwrites=1 stale_device=1 steps=unmount control_direct_writable_ok=false entries_accepted=[false] checker_after=3 writable_after_ok=false writable_err=Some("WritableMountRefusedByDevicesWithoutTheSelectedVersion { selected_version: RollbackTarget { instance: InstanceGeneration")
+ok
+test unmount_onto_a_stale_snapshot_of_device_one ... Y2 unmount_stale accepted=false err=Some("CallerParametersDisagreeWithTheSelectedSystemConfiguration { disagreeing_fields: [], disagreeing_device_table: [NoSelfVerifiedSystemConfigurationOnTheDeviceHandedIn { identity_handed_in: DeviceIdentit") stale_disk_written=false
+Y2 unmount_stale read_only_after chosen=(1,5) effective=(1,5)
+Y2 unmount_stale checker_violations_after=4 first=Some("I-2.1: 树表单元 在盘 1 槽 50276 的那一份与位置条目里的校验和对不上")
+Y2 unmount_stale writable_after err=WritableMountRefusedByDevicesWithoutTheSelectedVersion { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(5) }, selected_version_journal_position: JournalSequenceNumber { instance_generation: InstanceGeneration(1), counter: 5 }, devices: [DeviceWithoutTheSelectedVersion { device: DeviceIdentity(1), lacking: BehindTheSelectedVersionAndMissingItsUnits
+ok
+test unmount_with_the_two_device_bodies_swapped ... Y2 unmount_swapped accepted=false err=Some("CallerParametersDisagreeWithTheSelectedSystemConfiguration { disagreeing_fields: [], disagreeing_device_table: [OwnDeviceNumberDiffersFromTheIdentityHandedIn { identity_handed_in: DeviceIdentity(0), own_device_number_on_disk: DeviceIdentity(1) }, OwnDeviceNumberDiffersFromTheIdentityHandedIn { ident")
+ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.65s
+

@@ -1,0 +1,8 @@
+4378d2e923dbe97baa3144d9d14c5304814ff4053bb63330021e1a3af0cb54c3  .claude/kb/decisions/23-journal的角色与格式.md
+5750f2c743cb7e6b1d00401d408af9deec1c558db6106d0114c67992a11e1ac7  .claude/kb/decisions/16-发布语义.md
+dda80675e29bdfef6487175e47ba6e65f7f2f1aaf2bdb9af97ed4edcc84f7910  .claude/kb/decisions/18-块里携带什么信息.md
+a9426ca7497a1e7c98f8388e3b01093af864f669de24f687d076b45868380ad2  .claude/kb/decisions/22-单元原子性怎么合成.md
+c7b1bbdf8b0d3a19c1bd2f4e0d034e5c0333c7307122dd9c297a6647d839fe31  .claude/kb/experiments/23-journal几何.md
+2869f4709aadff71a0ea0c5b51a1cbc75f3b74c8d1eb8b195175403f9f86ced5  .claude/kb/checks-owed.md
+fe3b2814401720ce745d0c5ffe42a7bedf56d0af831eaee1f3097ecb6d799e25  .claude/kb/layout/01-first-txn.md
+22e5888d007cb7df663e04229955a8cc812f500345f944d8122e4768e9fc46da  .claude/kb/milestone/02-second-txn.md

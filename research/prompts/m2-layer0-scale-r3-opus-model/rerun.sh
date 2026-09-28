@@ -4,7 +4,7 @@
 #   冻结副本根默认 /tmp/claude-1000/l0scale-r1-frozen；草稿目录默认 /tmp/claude-1000/m2-layer0-scale-r3-opus-rerun
 # 环境变量 THREADS（线程上限，默认 6）。只跑本目录的两个测试目标（名字不带 layer0），不跑名字带 layer0 的目标、不跑 54 号；
 # 不做层 0 的崩溃状态枚举，只评手搭的单个状态（每条历史的闭式打在 R3A / R3B 行里，都远超 10^6）。
-# 挂钟（2026-09-26 JST 本机、6 线程、nice 19）：编译约 1 分钟；r3a 23 条历史约 40 秒；r3b 不到 1 秒；③ 的场景约 1 分钟。
+# 挂钟（2026-09-26 本机、6 线程、nice 19）：编译约 1 分钟；r3a 23 条历史约 40 秒；r3b 不到 1 秒；③ 的场景约 1 分钟。
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$here/../../.." && pwd)"

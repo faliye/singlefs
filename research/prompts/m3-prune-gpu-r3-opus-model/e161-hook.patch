@@ -1,0 +1,20 @@
+--- /home/fy5090/code/singlefs/crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs
++++ repo/crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs
+@@ -21,6 +21,9 @@
+ #[path = "../../../singlefs-harness/tests/common/mod.rs"]
+ mod common;
+ 
++#[path = "../../e161_attack/attack.rs"]
++mod attack;
++
+ use std::cell::RefCell;
+ use std::collections::{BTreeMap, BTreeSet, HashMap};
+ use std::hint::black_box;
+@@ -670,6 +673,7 @@
+         Some("probe") => run_probe(&mut output, arguments.get(1).map(String::as_str)),
+         Some("stop-clauses") => run_stop_clauses(&mut output),
+         Some("feasibility") => run_feasibility(&mut output),
++        Some("attack") => attack::run(&mut output, &arguments[1..]),
+         Some("probe-first-stream-stop-clauses") => run_first_stream_stop_clause_probe(&mut output),
+         Some(_) | None => {
+             eprintln!("  ✗ 用法：e161_crash_state_dedup_and_time_split stop-clauses | segment-one | probe <状态数> | probe-first-stream-stop-clauses");

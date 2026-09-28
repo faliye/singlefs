@@ -19,8 +19,8 @@
 #      派发之后 10 分钟主会话记录里还没有它的，按没派出去删。
 #   ⑥ 快照冲突：派 kb-scribe、implementation-writer 时要改的文件在还没判完的三方轮开工快照里，拒（判法见 snapshot_conflict_verdict 上面那段）。
 #   ⑦ 模型：新派的是 opus（tool_input.model，没给取定义的 model；inherit、没有定义的按 opus 算，推的）时，本会话还在跑的 opus 子 agent
-#      （主会话记录里 resolvedModel 含 opus、没结束、会话记录 3 小时内动过或 3 小时内派的）已有 OPUS_CONCURRENCY_LIMIT 个（8，用户 2026-09-27 定）就拒；
-#      放行行「opus 并发已判：<理由>」。另外，主会话记录里 8 天内有 failed 任务通知写着「resets <时刻> (UTC)」、它的
+#      （主会话记录里 resolvedModel 含 opus、没结束、会话记录 3 小时内动过或 3 小时内派的）已有 OPUS_CONCURRENCY_LIMIT 个（16，用户 2026-09-28 定）就拒；
+#      放行行「opus 并发已判：<理由>」。另外，主会话记录里 8 天内有 failed 任务通知写着「resets <时刻> (<时区缩写>)」、它的
 #      「model sent to the API」与新派的同一族（opus / sonnet / haiku），而现在还没到那个时刻，拒；那次失败之后同一族又派出去、没再撞限额的
 #      算窗口已解开（换了账号或提前恢复），不拒；放行行「限额窗口已判：<理由>」。
 #   ⑧ 书记员：提示里点名的 /tmp/claude-<uid>/ 下规格文件逐份交给 research/scripts/kb-spec-check.py，红了拒；一份认得出的规格都没有也拒
@@ -67,7 +67,7 @@ HEAVY_TEST_OWNERS = {"crash-verifier", "gate-triage"}
 LINE_START = r"^[ \t>*_\-]*"
 HEAVY_TEST_LINE = re.compile(LINE_START + r"重型测试[* \t]*[：:][* \t]*不跑", re.M)
 COMMON_CONSTRAINTS_READ = re.compile(r"开工先读[^\n]*\.claude/agent-common\.md")
-OPUS_CONCURRENCY_LIMIT = 8                  # 用户 2026-09-27 JST 02:2x 定（弹窗原话「8」）
+OPUS_CONCURRENCY_LIMIT = 16                 # 用户 2026-09-28 定（原话「子agent的数量限制在哪里 ？ 改为16」）
 INHERITED_MODEL_FAMILY = "opus"             # inherit 与没有定义的类型按主 agent 的模型算；这个项目的主 agent 跑 opus（推的）
 RUNNING_RECENT_SECONDS = 3 * 3600
 UNLAUNCHED_GRACE_SECONDS = 600
@@ -78,7 +78,7 @@ SCOPE_MENTION = re.compile(r"(?:报告路径|报告写进|报告写到|写进|�
 SCOPE_NEGATION = re.compile(r"不|别|禁止|勿")
 MUTATION_TABLE_MENTION = re.compile(r"research/mutations/[^\s`'\"]+\.tsv|crates/mutations\.tsv")
 RERUN_REGISTRATION = re.compile(r"research/prompts/e(\d+)-r\d+-prereg\.md")
-RESETS = re.compile(r"resets (?:(?P<month>[A-Z][a-z]{2}) (?P<day>\d{1,2}),? )?(?P<hour>\d{1,2})(?::(?P<minute>\d{2}))?(?P<half>am|pm) \(UTC\)")
+RESETS = re.compile(r"resets (?:(?P<month>[A-Z][a-z]{2}) (?P<day>\d{1,2}),? )?(?P<hour>\d{1,2})(?::(?P<minute>\d{2}))?(?P<half>am|pm) \(UTC\)")  # clock-times:allow 解析外部限额通知的原文，格式由对方定
 MODEL_SENT = re.compile(r"model sent to the API: ([\w.\-\[\]]+)")
 HANDBACK_FROM = re.compile(r'agent-message from=\\?"(a[0-9a-f]{6,})\\?">(?:\\n|\s)*\[Subagent hand-back\]')
 NOTIFICATION_BLOCK = re.compile(r"<task-notification>(.*?)</task-notification>", re.S)
@@ -207,7 +207,7 @@ def session_dispatch_events(transcript_path):
 
 
 def reset_moment(match, notified_at):
-    """「resets 3am (UTC)」→ 通知之后第一次到那个时刻；写了日期的取那一天（早于通知就算明年）。"""
+    """「resets 3am (<时区缩写>)」→ 通知之后第一次到那个时刻；写了日期的取那一天（早于通知就算明年）。"""
     hour = int(match.group("hour")) % 12 + (12 if match.group("half") == "pm" else 0)
     minute = int(match.group("minute") or 0)
     base = datetime.fromtimestamp(notified_at, timezone.utc)
@@ -309,14 +309,15 @@ def model_verdict(hook_input, prompt, subagent_type, fields, launches, ended, wi
                      for agent_id, (launched_at, model, _) in launches.items()) and not break_switch_is("window-never-lifted")
         if (window_family == family and now < until and not lifted and not break_switch_is("window-ignored")
                 and valve_reason(prompt, "限额窗口已判") is None):
-            tokyo = datetime.fromtimestamp(until, timezone(timedelta(hours=9))).strftime("%m-%d %H:%M")
-            return (f"✗ {family} 这一族撞过限额（「{original}」），到 {tokyo} JST 之前不派同一族的 agent。\n"
-                    f"→ 怎么办：等到 {tokyo} JST，或换模型（派发参数 model 写别的一族）——换不换交用户定；用户定了照派，提示里写一行「限额窗口已判：<用户怎么定的>」。")
+            wait_minutes = max(1, int((until - now + 59) // 60))
+            wait_text = f"{wait_minutes // 60} 小时 {wait_minutes % 60} 分钟" if wait_minutes >= 60 else f"{wait_minutes} 分钟"
+            return (f"✗ {family} 这一族撞过限额（「{original}」），限额窗口还要约 {wait_text} 才过去，这之前不派同一族的 agent。\n"
+                    f"→ 怎么办：等约 {wait_text} 窗口过去，或换模型（派发参数 model 写别的一族）——换不换交用户定；用户定了照派，提示里写一行「限额窗口已判：<用户怎么定的>」。")
     if family != "opus" or break_switch_is("opus-no-limit") or valve_reason(prompt, "opus 并发已判") is not None:
         return None
     running = [agent_id for agent_id in launches if model_family(launches[agent_id][1]) == "opus" and is_running(agent_id, launches, ended, transcript_path)]
     if len(running) >= OPUS_CONCURRENCY_LIMIT:
-        return (f"✗ 本会话已有 {len(running)} 个 opus 子 agent 在跑（{'、'.join(running[:10])}），上限 {OPUS_CONCURRENCY_LIMIT}（用户 2026-09-27 定）。\n"
+        return (f"✗ 本会话已有 {len(running)} 个 opus 子 agent 在跑（{'、'.join(running[:10])}），上限 {OPUS_CONCURRENCY_LIMIT}（用户 2026-09-28 定）。\n"
                 "→ 怎么办：等其中一个交回再派，或这一件换 sonnet（派发参数 model）；确要超过就交用户定，定了在提示里写一行「opus 并发已判：<用户怎么定的>」。")
     return None
 
@@ -566,7 +567,7 @@ def decide(hook_input, project_root, hook_dir=None):
             and not HEAVY_TEST_LINE.search(prompt)):
         return 2, (f"✗ 派 {subagent_type} 的提示里没有「重型测试：不跑」一行。\n"
                    "→ 规矩：重型测试（层 0、QEMU、herd7、crates 变异整表、全量测试、整轮门禁、全部实验复跑、E152 装置）只在提交代码时、或用户要求时跑，"
-                   "只由 crash-verifier（54、55、57、59 号）与 gate-triage（gate.sh 整轮与 87 号）跑；执行时 .claude/hooks/heavy-test-guard.sh 也拒。\n"
+                   "只由 crash-verifier（54-layer0-replay、checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay）与 gate-triage（gate.sh 整轮与 checker-tier-research-build-and-replay）跑；执行时 .claude/hooks/heavy-test-guard.sh 也拒。\n"
                    "→ 怎么办：提示里单独写一行「重型测试：不跑」；提交时的重阶段派 crash-verifier、整轮门禁派 gate-triage；提交之外确实要跑，先弹窗问用户，"
                    "用户同意了由主 agent 带 SINGLEFS_HEAVY_TESTS=user-request 跑。")
     fields = agent_definition_fields(project_root, subagent_type)
@@ -695,7 +696,7 @@ def selftest(hook_dir):
         write_sample(work, "research/prompts/r-nobody-snapshot/sources.sha256", f"{digest}  crates/singlefs-core/src/allocator.rs\n")
         write_sample(work, "research/prompts/_r-odd-body.md", "# r-odd 正文\n")
         write_sample(work, "research/prompts/r-odd-snapshot/odd-sha256.txt",
-                     f"快照时刻 14:09:00 UTC\n# 注释\n{digest}  README.md\n{digest}  research/prompts/r-odd-model.md\nnot-a-hash  .claude/kb/pitfalls.md\n")
+                     f"快照时刻\n# 注释\n{digest}  README.md\n{digest}  research/prompts/r-odd-model.md\nnot-a-hash  .claude/kb/pitfalls.md\n")
         # 另一个样本仓：一份清单读不了（悬空的符号链接），另一份读得了
         unreadable_work = tempfile.mkdtemp()
         other_directories.append(unreadable_work)
@@ -747,10 +748,10 @@ def selftest(hook_dir):
             case("重型:写在句子中间不算那一行", "implementation-writer", "这一件的重型测试：不跑也行吧", 2, footer=FOOTER_WITHOUT_HEAVY_LINE),
             case_in(defs_work, "共用约束:通用 agent 没写开工先读", "general-purpose", heavy_line + "查一个文件。", 2, footer=False),
             case_in(defs_work, "共用约束:通用 agent 写了开工先读", "general-purpose", heavy_line + "开工先读 `.claude/agent-common.md`。查一个文件。", 0, footer=False),
-            defs_case("输入:本地攻方缺禁读清单（09-23 12:48 那一次）", "three-way-local-attack", "提示文件 research/prompts/r-local-attack.md，草稿目录 /tmp/claude-1000/r/", 2),
+            defs_case("输入:本地攻方缺禁读清单（09-23 那一次）", "three-way-local-attack", "提示文件 research/prompts/r-local-attack.md，草稿目录 /tmp/claude-1000/r/", 2),
             defs_case("输入:本地攻方齐了", "three-way-local-attack", "提示文件 research/prompts/r-local-attack.md，草稿目录 /tmp/claude-1000/r/，禁读清单：别的腿的产出", 0),
-            defs_case("输入:核查员缺草稿目录（09-24 23:44 那一次）", "three-way-verifier", "快照 research/prompts/r-snapshot/，报告路径 research/prompts/r-verifier-output.md", 2),
-            defs_case("输入:核查员缺快照（09-25 02:53 那一次）", "three-way-verifier", "草稿目录 /tmp/claude-1000/v/，报告 research/prompts/r-verifier-output.md", 2),
+            defs_case("输入:核查员缺草稿目录（09-24 那一次）", "three-way-verifier", "快照 research/prompts/r-snapshot/，报告路径 research/prompts/r-verifier-output.md", 2),
+            defs_case("输入:核查员缺快照（09-25 那一次）", "three-way-verifier", "草稿目录 /tmp/claude-1000/v/，报告 research/prompts/r-verifier-output.md", 2),
             defs_case("输入:核查员同义词认得", "three-way-verifier", "快照 x，草稿目录 /tmp/claude-1000/v/，写 research/prompts/r-verifier-output.md", 0),
             defs_case("写范围:执行员报告写进 research/prompts（09-26 那一次）", "experiment-runner",
                       "草稿目录 /tmp/claude-1000/e/\n报告路径：research/prompts/e142-r15-runner-report.md\n这一段回答的岔路：岔路 1\n", 2),
@@ -810,16 +811,16 @@ def selftest(hook_dir):
         future = datetime.fromtimestamp(time.time() + 7200, timezone.utc)
         future_text = f"{future.hour % 12 or 12}{'pm' if future.hour >= 12 else 'am'}"
         write_session("window", [launch("a0000000000000d1", "claude-opus-5", "撞限额的", 1200),
-                                 notification("a0000000000000d1", "failed", f"You've hit your session limit · resets {future_text} (UTC) (error type rate_limit, model sent to the API: claude-opus-5)", 600)])
+                                 notification("a0000000000000d1", "failed", f"You've hit your session limit · resets {future_text} (UTC) (error type rate_limit, model sent to the API: claude-opus-5)", 600)])  # clock-times:allow 自检造的外部限额通知原文
         write_session("windowlifted", [launch("a0000000000000f1", "claude-opus-5", "撞限额的", 1200),
-                                       notification("a0000000000000f1", "failed", f"resets {future_text} (UTC) (model sent to the API: claude-opus-5)", 900),
+                                       notification("a0000000000000f1", "failed", f"resets {future_text} (UTC) (model sent to the API: claude-opus-5)", 900),  # clock-times:allow 自检造的外部限额通知原文
                                        launch("a0000000000000f2", "claude-opus-5-5[1m]", "换号之后派的", 300)])
         past = datetime.fromtimestamp(time.time() - 30 * 3600, timezone.utc)
         past_reset = datetime.fromtimestamp(time.time() - 29 * 3600, timezone.utc)
-        write_session("windowpast", [notification("a0000000000000e1", "failed", f"resets {past_reset.hour % 12 or 12}{'pm' if past_reset.hour >= 12 else 'am'} (UTC) (model sent to the API: claude-opus-5)", 30 * 3600)])
+        write_session("windowpast", [notification("a0000000000000e1", "failed", f"resets {past_reset.hour % 12 or 12}{'pm' if past_reset.hour >= 12 else 'am'} (UTC) (model sent to the API: claude-opus-5)", 30 * 3600)])  # clock-times:allow 自检造的外部限额通知原文
         cases += [
             session_case(f"opus:已有 {OPUS_CONCURRENCY_LIMIT} 个在跑再派 opus", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 2, "busy"),
-            session_case("opus:用户定了超上限", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物\nopus 并发已判：用户 23:10 定这一件照派", 0, "busy"),
+            session_case("opus:用户定了超上限", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物\nopus 并发已判：用户当面定这一件照派", 0, "busy"),
             session_case("opus:派 sonnet 不算", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 0, "busy", model="sonnet"),
             session_case(f"opus:{OPUS_CONCURRENCY_LIMIT - 1} 个在跑放行", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 0, "light"),
             session_case("opus:没有定义的类型按 opus 算", "general-purpose", "开工先读 `.claude/agent-common.md`。", 2, "busy"),

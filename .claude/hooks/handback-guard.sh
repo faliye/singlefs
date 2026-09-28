@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
-# PreToolUse hook（SubagentHandback）：项目子 agent 交回之前拦三样——交回正文太长、三方腿与核查员报告里的引文对不上、书记员与执行员的绿行不报数。
+# PreToolUse hook（SubagentHandback）：子 agent 交回之前拦四样——自己起的后台任务还在跑（全部子 agent），交回正文太长、三方腿与核查员报告里的引文对不上、
+# 书记员与执行员的绿行不报数（这三样只判项目子 agent）。
 # hook-events: PreToolUse:SubagentHandback
-# gate-similar: handback-scratch-check.sh 同挂 PreToolUse[SubagentHandback]，但它判的是临时目录里自己建的编译目录与仓副本删没删（上游副本，本仓不许就地改），判据与这里三样没有一条相同，并进去要改上游
+# gate-similar: handback-scratch-check.sh 同挂 PreToolUse[SubagentHandback]，但它判的是临时目录里自己建的编译目录与仓副本删没删（上游副本，本仓不许就地改），判据与这里四样没有一条相同（④ 判的是自己起的后台任务还在不在跑，不是临时目录），并进去要改上游
 # gate-similar: continuation-guard.sh 也按 agent 号去主会话目录下找子 agent 的会话记录，但它挂 SendMessage、判收件人交回过没有；这里只取子 agent 第一条记录的时刻当「开工时刻」，找法两行，不值得抽共用
-# gate-similar: kb-scribe-followup.sh 也只管书记员，但挂 PostToolUse、判写 kb 之后相关记录跟没跟上；这里在交回那一刻判报告里的绿行
 # admission: always Claude Code 在子 agent 每次调交回工具之前调它，判的是这一次交回的正文与它点名的报告
 # run-condition: command python3
 #
-# 判法，只判项目子 agent（`.claude/agents/<agent_type>.md` 在的）；主 agent、general-purpose 这类不判。任一条成立就拒（退出 2，stderr 写原因与出路）：
+# 判法。任一条成立就拒（退出 2，stderr 写原因与出路）：
+#   ④ 全部子 agent（输入里有 agent_id、不是 main；general-purpose 也判，主 agent 不判）：它自己起的后台任务（它会话记录
+#      <主会话记录去掉 .jsonl>/subagents/agent-<agent_id>.jsonl 里 run_in_background 的工具结果、或前台跑满超时被挪进后台的，带输出文件路径的那些）
+#      此刻还有进程开着输出文件，就是还在跑：拒，按任务列出最上层的进程号、已跑多久、命令与整棵子树从最底层往上的停止次序，
+#      出路是结束本轮等完成通知再交回，或按进程号逐个停掉再交回。认法与看门狗「交回之后后台还在跑」同一套，从 research/scripts/agent-watch.py 导入
+#      （background_start_in_result、own_background_tasks_still_running），不另抄一份。命令里自己用 `&`、`nohup` 放出去又改了输出去向的进程认不出（与看门狗同一处射程）。
+#      找不到它的会话记录、导入不了 agent-watch.py 就不判这一条，stderr 写一句。
+# 下面三条只判项目子 agent（`.claude/agents/<agent_type>.md` 在的）；主 agent、general-purpose 这类不判：
 #   ① 交回正文超过 HANDBACK_CHARACTER_LIMIT 个字符（按 python 的 len 数，默认 2000）：全文写进报告文件，交回只写结论、报告路径与 sha256；
 #   ② three-way-forward / three-way-attack / three-way-defense / three-way-verifier：交回里点名的 research/prompts/…-output.md 逐份交给
 #      research/scripts/cite-check.py（--root 项目根，--unchanged-since 取这个子 agent 会话记录第一条的时刻），有对不上的拒；交回里一份报告都没点名也拒；
@@ -18,7 +25,7 @@
 #
 #   handback-guard.sh             # 从 stdin 读 hook 的 JSON
 #   handback-guard.sh --selftest  # 在临时目录里走一遍放行与拒绝；HANDBACK_GUARD_BREAK=no-limit / no-cite / cite-any-agent / no-green-count /
-#                                 # zero-count-ok / judge-general-purpose 各自必须让它红
+#                                 # zero-count-ok / judge-general-purpose / no-background 各自必须让它红
 set -uo pipefail
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$HOOK_DIR/../singlefs-ai-sop/scripts/preflight.sh"
@@ -110,8 +117,44 @@ def green_count_problems(message, project_root):
     return problems
 
 
+def background_problems(hook_input, agent_watch_path):
+    """④ 这个子 agent 自己起的后台任务此刻还在跑的：交 own_background_tasks_still_running 的结果；主 agent、判不了的交空表。"""
+    agent_id = hook_input.get("agent_id") or ""
+    transcript_path = hook_input.get("transcript_path") or ""
+    if BROKEN == "no-background" or agent_id in ("", "main"):
+        return []
+    own = os.path.join(transcript_path[: -len(".jsonl")], "subagents", f"agent-{agent_id}.jsonl") if transcript_path.endswith(".jsonl") else ""
+    if not os.path.isfile(own):
+        print(f"! handback-guard：找不到这个子 agent 自己的会话记录（{own or '输入里没有主会话记录'}），后台任务这一条没判（放行）", file=sys.stderr)
+        return []
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("agent_watch", agent_watch_path)
+        agent_watch = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(agent_watch)
+        return agent_watch.own_background_tasks_still_running(own)
+    except Exception as error:   # 文件不在、导入失败、读不了会话记录：这一条没判，放行
+        print(f"! handback-guard：后台任务这一条没判（放行）：{type(error).__name__}：{error}", file=sys.stderr)
+        return []
+
+
+def background_refusal(running):
+    lines = []
+    for task_id, output, tops in running:
+        for pid, seconds, command, stop_order in tops:
+            lines.append(f"  任务 {task_id}（输出 {output}）：进程 {pid} 已跑 {int(seconds // 60)} 分 {int(seconds % 60)} 秒：{command[:160]}；"
+                         f"停的次序（从最底层往上）：{' '.join(map(str, stop_order[:24]))}{' …' if len(stop_order) > 24 else ''}")
+    return (f"✗ 交回时你自己起的后台任务还在跑（{len(running)} 个任务）：\n" + "\n".join(lines[:20]) +
+            "\n→ 怎么办：要它的结果就结束本轮、不再调工具，等它的完成通知到了、把结果写进报告再交回；不要了就按上面的次序逐个跑 "
+            "`python3 .claude/singlefs-ai-sop/scripts/proc.py stop <进程号>`，停完 `ps -o pid,ppid,args --ppid <进程号>` 再列一遍确认一个不剩，"
+            "在报告「没做什么」里写明停了哪条、为什么，再交回（.claude/agent-common.md「不做」一节停自己起的一条链那一条）。")
+
+
 def decide(hook_input, project_root, cite_check):
     """返回 (0, None) 放行；(2, 说明) 拒绝。"""
+    running = background_problems(hook_input, os.path.join(os.path.dirname(cite_check), "agent-watch.py"))
+    if running:
+        return 2, background_refusal(running)
     agent_type = hook_input.get("agent_type")
     if not is_project_agent(agent_type, project_root):
         return 0, None
@@ -135,6 +178,7 @@ def decide(hook_input, project_root, cite_check):
 
 def selftest(hook_dir):
     work = tempfile.mkdtemp(prefix="handback-guard-selftest-")
+    sleeper = None   # ④ 的样本：开着一个后台任务输出文件在睡的进程，自检自己起、自己停
     try:
         cite_check = os.path.join(os.path.dirname(os.path.dirname(hook_dir)), "research", "scripts", "cite-check.py")
         for agent in ("three-way-attack", "three-way-verifier", "kb-scribe", "experiment-runner", "sweep"):
@@ -150,12 +194,26 @@ def selftest(hook_dir):
         # 开工时刻取样本文件都建好之后：被引文件不算「开工之后改过」
         started = datetime.fromtimestamp(os.path.getmtime(os.path.join(work, "research", "prompts", "r2-opus-output.md")) + 5, timezone.utc)
         open(os.path.join(session, "subagents", "agent-a1.jsonl"), "w").write(json.dumps({"timestamp": started.isoformat()}) + "\n")
+        # ④ a2 起的后台任务 blive 的输出文件有一个在睡的进程开着（交回时还在跑）；a3 起的 bdone 输出文件在、没有进程开着（跑完了）
+        live_output, done_output = os.path.join(work, "tasks", "blive.output"), os.path.join(work, "tasks", "bdone.output")
+        os.makedirs(os.path.dirname(live_output))
+        open(done_output, "w").close()
+
+        def background_started_record(task_id, output):
+            return json.dumps({"type": "user", "timestamp": started.isoformat(), "message": {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": f"t-{task_id}",
+                 "content": f"Command running in background with ID: {task_id}. Output is being written to: {output}. You will be notified when it completes."}]}})
+        for agent_id, task_id, output in (("a2", "blive", live_output), ("a3", "bdone", done_output)):
+            open(os.path.join(session, "subagents", f"agent-{agent_id}.jsonl"), "w").write(
+                json.dumps({"timestamp": started.isoformat()}) + "\n" + background_started_record(task_id, output) + "\n")
+        with open(live_output, "w") as output_handle:
+            sleeper = subprocess.Popen(["sleep", "120"], stdout=output_handle, stderr=subprocess.STDOUT)
         scribe_report = os.path.join(work, "research", "prompts", "scribe-report.md")
         open(scribe_report, "w", encoding="utf-8").write("✓ 文档铁律检查通过（检查 486，跳过 0）\n✓ 通过\n")
 
-        def case(label, agent_type, message, want):
+        def case(label, agent_type, message, want, agent_id="a1"):
             hook_input = {"tool_name": "SubagentHandback", "tool_input": {"message": message}, "agent_type": agent_type,
-                          "agent_id": "a1", "transcript_path": session + ".jsonl"}
+                          "agent_id": agent_id, "transcript_path": session + ".jsonl"}
             return (label, want, decide(hook_input, work, cite_check)[0])
         cases = [
             case("超过上限的项目子 agent", "sweep", "字" * (HANDBACK_CHARACTER_LIMIT + 1), 2),
@@ -166,12 +224,23 @@ def selftest(hook_dir):
             case("攻方腿引文行号错", "three-way-attack", "报告 research/prompts/r2-opus-output.md sha256 x", 2),
             case("核查员没点名报告", "three-way-verifier", "核完了", 2),
             case("回扫员不核引文", "sweep", "报告 research/prompts/r2-opus-output.md", 0),
-            case("书记员绿行带数", "kb-scribe", "✓ 20 号检查通过（查了 12 项）", 0),
-            case("书记员绿行没数", "kb-scribe", "✓ 52 号转绿", 2),
-            case("书记员绿行 0 项", "kb-scribe", "✓ 52 号通过（查了 0 项）", 2),
+            case("书记员绿行带数", "kb-scribe", "✓ doc-decisions 检查通过（查了 12 项）", 0),
+            case("书记员绿行没数", "kb-scribe", "✓ doc-registries 转绿", 2),
+            case("书记员绿行 0 项", "kb-scribe", "✓ doc-registries 通过（查了 0 项）", 2),
             case("执行员报告文件里的绿行没数", "experiment-runner", f"报告 {os.path.relpath(scribe_report, work)}", 2),
             case("回扫员的绿行不判", "sweep", "✓ 通过", 0),
+            case("交回时自己起的后台任务还在跑（项目子 agent）", "sweep", "报告 /tmp/x", 2, "a2"),
+            case("交回时自己起的后台任务还在跑（通用 agent 也判）", "general-purpose", "交回", 2, "a2"),
+            case("起过的后台任务都跑完了", "sweep", "交回", 0, "a3"),
+            case("主 agent 不判后台任务", None, "交回", 0, None),
         ]
+        live_refusal = decide({"tool_name": "SubagentHandback", "tool_input": {"message": "交回"}, "agent_type": "sweep", "agent_id": "a2",
+                               "transcript_path": session + ".jsonl"}, work, cite_check)[1] or ""
+        cases.append(("后台还在跑的拒绝说明列出进程号、命令与两条出路（等完成通知、按进程号停）", True,
+                      all(part in live_refusal for part in (f"进程 {sleeper.pid}", "sleep 120", "blive", "完成通知", "proc.py stop"))))
+        sleeper.kill()
+        sleeper.wait()
+        cases.append(case("那个后台任务结束之后再交回放行", "sweep", "交回", 0, "a2"))
         stdin_input = json.dumps({"tool_name": "SubagentHandback", "tool_input": {"message": "字" * (HANDBACK_CHARACTER_LIMIT + 1)}, "agent_type": "sweep"})
         entry = subprocess.run(["bash", os.path.join(hook_dir, "handback-guard.sh")], input=stdin_input, capture_output=True, text=True,
                                env={**os.environ, "CLAUDE_PROJECT_DIR": work}, timeout=60)
@@ -182,10 +251,14 @@ def selftest(hook_dir):
         if failures:
             print("    → 看 decide()、citation_problems()、green_count_problems() 的判法；HANDBACK_GUARD_BREAK 设着的话这里本来就该红")
             return 1
-        print(f"  ✓ handback-guard 自检通过（查了 {len(cases)} 种）：项目子 agent 超长交回拒、正好在上限放行、非项目 agent 与主 agent 不判；"
+        print(f"  ✓ handback-guard 自检通过（查了 {len(cases)} 种）：子 agent 交回时自己起的后台任务还在跑拒（通用 agent 也判、主 agent 不判、说明里列出进程号与两条出路），"
+              "跑完了或停掉之后放行；项目子 agent 超长交回拒、正好在上限放行、非项目 agent 与主 agent 不判；"
               "三方腿与核查员引文对不上或没点名报告拒、对上放行；书记员与执行员绿行没数或报 0 项拒（交回正文与点名的报告文件都查）；走真实 stdin 入口拒得出")
         return 0
     finally:
+        if sleeper is not None and sleeper.poll() is None:
+            sleeper.kill()
+            sleeper.wait()
         shutil.rmtree(work, ignore_errors=True)
 
 

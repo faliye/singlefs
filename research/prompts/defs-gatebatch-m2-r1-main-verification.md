@@ -6,7 +6,7 @@
 
 - 正文 `research/prompts/_defs-gatebatch-m2-r1-body.md`，背景材料 `_defs-gatebatch-m2-r1-background.md`，附录二 `_defs-gatebatch-m2-r1-diff.md`（门禁批 diff 的「改前」一侧是它 `cp -p` 的备份，不是某个 git 提交，射程只到这一批），开工快照 `research/prompts/defs-gatebatch-m2-r1-snapshot/sha256sums.txt`（派核查员前主 agent 核过 11 个全 OK）。
 - 腿：云端正推 `defs-gatebatch-m2-r1-sonnet-output.md`（只做文字核对，探针目录空）；云端攻方 `defs-gatebatch-m2-r1-opus-output.md`（模型 `defs-gatebatch-m2-r1-opus-model/`）；本地攻方 `-local-attack-output-s1.md`、`-s2.md` 两份干净（本地攻方的定义被别处把 `model` 改成 `local-model`，换账号后起不来，主 agent 派发时给 `model: sonnet` 覆盖）。
-- 核查员 `defs-gatebatch-m2-r1-verifier-output.md`：104 处 ✓101 ✗1 分不清 1。✗ 在正推：它说 `.claude/gate.d/stage-inputs.tsv` 四条崩溃枚举行的 `count-line=` / `exhaustive=` / `threads=` 都齐，实际第 34 行（会话里推抬 F 那条）三项全缺、第 35 行（c561 那条）只有 `count-line=`。分不清的那一处：正推说层 0 规模第三轮判决里没有一处写「覆盖」，核查员现跑是 1 处（第 51 行）——那一行是主 agent 在正推交回之后照它的报告补的（正推报告 13:06:45 UTC，那一行 13:07:43 UTC），正推核的时候确实没有，它判得对。攻方 38 处引用与 12 处复跑全 ✓，J1-a、J1-b、J4-b 三格复跑逐字节一致。
+- 核查员 `defs-gatebatch-m2-r1-verifier-output.md`：104 处 ✓101 ✗1 分不清 1。✗ 在正推：它说 `.claude/gate.d/stage-inputs.tsv` 四条崩溃枚举行的 `count-line=` / `exhaustive=` / `threads=` 都齐，实际第 34 行（会话里推抬 F 那条）三项全缺、第 35 行（c561 那条）只有 `count-line=`。分不清的那一处：正推说层 0 规模第三轮判决里没有一处写「覆盖」，核查员现跑是 1 处（第 51 行）——那一行是主 agent 在正推交回之后照它的报告补的（正推报告，那一行），正推核的时候确实没有，它判得对。攻方 38 处引用与 12 处复跑全 ✓，J1-a、J1-b、J4-b 三格复跑逐字节一致。
 
 ## 二、逐格判
 
@@ -22,7 +22,7 @@
 | J4-a 闸的绕法 | 打中（量过，只喂 JSON）：`cargo nextest`、`cargo mutants`、`--config` 别名与 runner、`CARGO_TARGET_*_RUNNER`、拷走测试二进制再执行、`find -exec`、`/usr/bin/time`、`flock`、`rustup run`、`chrt`、`systemd-run --scope`、`prlimit`；包装这一类以前就有，层 0 同样放行 | 攻方 |
 | J4-b 用例的 ignore 没人查 | **打中（量过）**：去掉 c561 那条的 `#[ignore]` 之后，不带 `--ignored` 的命令跑 2^18 个状态，闸放行、`crash-cases` 自查退 0 | 攻方、核查员复跑 |
 | J4-c 误拒 | 打中、危害小：`-- --ignored --list`、`--include-ignored --exact <一条快用例>` 被拒 | 攻方 |
-| J5 文字 | 几份文字之间没有互相矛盾，都改成了逐条复用；层 0 规模第三轮判决「乙不采纳」与用户 18:5x 定案之间没写覆盖——主 agent 已在那份判决第四节之后补了覆盖记录；正推说的「四行三项都齐」不对（核查员 ✗），见 Y8 | 正推、核查员 |
+| J5 文字 | 几份文字之间没有互相矛盾，都改成了逐条复用；层 0 规模第三轮判决「乙不采纳」与用户定案之间没写覆盖——主 agent 已在那份判决第四节之后补了覆盖记录；正推说的「四行三项都齐」不对（核查员 ✗），见 Y8 | 正推、核查员 |
 | 本地 | 两份样本一致：四条用例保留、减去的文件数与四个抽样文件的去留与 `admission.py crash-case-manifest` 现跑对得上 | 本地、核查员 |
 
 ## 三、改法（被攻过零轮，第二轮攻）

@@ -1,0 +1,11 @@
+--- /tmp/claude-1000/investigate-three-reds/mount.rs.now-original	2026-09-27
++++ /tmp/claude-1000/investigate-three-reds/nowvar/crates/singlefs-core/src/mount.rs	2026-09-27
+@@ -373,7 +373,7 @@
+             WitnessedCounterComparison::NothingWitnessed => false,
+             WitnessedCounterComparison::AgainstTheSelectedVersionsLastRecord {
+                 selected_version_last_record_counter,
+-            } => self.witness.witnessed_journal_counter > selected_version_last_record_counter,
++            } => { let _ = selected_version_last_record_counter; false }
+             WitnessedCounterComparison::AgainstTheRecordAtTheWitnessedCounter { record } => {
+                 (record.instance, record.checkpoint_txg)
+                     > (

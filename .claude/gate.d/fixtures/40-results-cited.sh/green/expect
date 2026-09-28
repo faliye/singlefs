@@ -1,5 +1,0 @@
-exit=0
-want=已跑的 1 个实验都点了名或写明了产物未留存
-want=第一道没判的 1 份（本地腿的问答、没登记的逐轮中间件、确认目录）
-want=       e96-sample.r3.out
-want=research/results 下的实验产物全部被 experiments.md 点名（查了 2 份）

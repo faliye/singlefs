@@ -3,8 +3,8 @@
 D=/tmp/claude-1000/m2-closeout-code-r1-opus
 B=$1; F=$2; N=$3; S=$4
 T=opus_r1_z1_rollback_walk_with_multi_unit_files_inodes_and_unmount
-W="bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 6G"
-C="bash /home/fy5090/code/singlefs/research/scripts/capped.sh 2"
+W="bash research/scripts/run-with-memory-cap.sh 6G"
+C="bash research/scripts/capped.sh 2"
 export CARGO_TARGET_DIR=$D/target
 cd $D/tree
 rm -f $D/b$B-*.rc

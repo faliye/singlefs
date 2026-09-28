@@ -6,7 +6,7 @@
 # 5. Y6 没文件那一族全量（约 2 分钟）、有文件那一族正常卸载全量（约 40 分钟）  6. 原型补丁：打在第二份副本上重跑 Y2 与 5 份回归
 set -euo pipefail
 S=${1:?草稿目录}; N=${2:-4}
-R=/home/fy5090/code/singlefs
+R=<仓根>
 M=$R/research/prompts/m2-closeout-code-r2-opus-model
 mkdir -p "$S/tree" "$S/fix" "$S/logs"
 git -C "$R" archive refs/sop/m2-closeout-code-r2-snapshot crates Cargo.toml Cargo.lock | tar -x -C "$S/tree"

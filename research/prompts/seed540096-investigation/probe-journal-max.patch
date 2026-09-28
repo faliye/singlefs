@@ -1,5 +1,5 @@
---- /tmp/claude-1000/seed540096/main/crates/singlefs-core/src/transaction.rs	2026-09-25 07:52:13.603998783 +0000
-+++ crates/singlefs-core/src/transaction.rs	2026-09-25 08:06:29.442036605 +0000
+--- /tmp/claude-1000/seed540096/main/crates/singlefs-core/src/transaction.rs	2026-09-25
++++ crates/singlefs-core/src/transaction.rs	2026-09-25
 @@ -520,14 +520,48 @@
          &pool.parameters.filesystem_identifier,
      )

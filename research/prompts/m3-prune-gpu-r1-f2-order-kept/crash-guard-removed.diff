@@ -1,0 +1,12 @@
+--- crash.rs.orig
++++ repo/crates/singlefs-checker-tier/src/crash.rs
+@@ -136,8 +136,7 @@
+     };
+     let mut check = RecordCheck::default();
+     for publish in publishes_in(writes, persisted, continuity) {
+-        if !publish.records.is_empty()
+-            && in_place(publish.root)
++        if in_place(publish.root)
+             && !publish.records.iter().any(|record| in_place(*record))
+         {
+             check.root_without_record = true;

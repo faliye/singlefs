@@ -4,7 +4,7 @@
 
 ## 一、这一轮要判什么
 
-第一轮判决 `research/prompts/m2-closeout-code-r1-main-verification.md`（快照 `refs/sop/m2-closeout-code-r1-snapshot`，2026-09-26 23:40 UTC）第三节写明第二轮只攻：Z3-A 乙的改后代码；第一轮没罩到的（A2a 同一段同盘两次系统配置写、journal 环转圈后的撕裂、续跑与分片）；第一轮快照之后打进主工作区的那几批，以及 A3。这一轮攻的仍是**写好的代码与它的测试**，设计不重判；第一轮与设计轮的判决当已定的前提用。
+第一轮判决 `research/prompts/m2-closeout-code-r1-main-verification.md`（快照 `refs/sop/m2-closeout-code-r1-snapshot`，2026-09-27）第三节写明第二轮只攻：Z3-A 乙的改后代码；第一轮没罩到的（A2a 同一段同盘两次系统配置写、journal 环转圈后的撕裂、续跑与分片）；第一轮快照之后打进主工作区的那几批，以及 A3。这一轮攻的仍是**写好的代码与它的测试**，设计不重判；第一轮与设计轮的判决当已定的前提用。
 
 第一轮快照之后打进来的批次，报告都在 `research/prompts/` 下：
 
@@ -34,9 +34,9 @@
 | **替没写的条款做了选择** | 不同实现会做出不同的、都说得通的选择 | 那个选择是什么、它影响哪些字节或哪条可达历史、今天有没有会红的东西钉着 |
 | **和条款说反话** | 代码做的与某条已定分项的字面相反 | 两边各自的原文，以及这次差异在哪个字节 / 哪条历史上看得出来 |
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-27 09:27 UTC 现查）
+## 二、实现今天的样子（主 agent 的观测，2026-09-27 现查）
 
-- **腿读代码一律读快照**：提交 `30c084138f7da7488f27874417902caeb5272a15`（ref `refs/sop/m2-closeout-code-r2-snapshot`，树 `98cbcaf83b58cb6a2ee6dc8dee589eb0f1cbf81e`）。它是 09:27 UTC 主工作区 `crates/` 的原样，含未跟踪的新测试，不在任何分支上。取法：`git archive refs/sop/m2-closeout-code-r2-snapshot crates | tar -x -C <草稿目录>`。主工作区在腿跑着的时候还会被主 agent 改（下面「在飞」那几件），别读主工作区。
+- **腿读代码一律读快照**：提交 `30c084138f7da7488f27874417902caeb5272a15`（ref `refs/sop/m2-closeout-code-r2-snapshot`，树 `98cbcaf83b58cb6a2ee6dc8dee589eb0f1cbf81e`）。它是主工作区 `crates/` 的原样，含未跟踪的新测试，不在任何分支上。取法：`git archive refs/sop/m2-closeout-code-r2-snapshot crates | tar -x -C <草稿目录>`。主工作区在腿跑着的时候还会被主 agent 改（下面「在飞」那几件），别读主工作区。
 - 快照里 `crates/*/src/**/*.rs` 57 份的 sha256 在 `research/prompts/m2-closeout-code-r2-snapshot/crates-src-sha256.txt`。
 - 被判的范围：`git diff refs/sop/m2-closeout-code-r1-snapshot refs/sop/m2-closeout-code-r2-snapshot -- crates/`，71 个文件，+38121 / −2073 行。其中 src 29 份：
   - checker：`image.rs`、`lib.rs`、`walk.rs`；
@@ -44,11 +44,11 @@
   - format：`lib.rs`；
   - harness：`bad_disk_input.rs`、`crash.rs`、`crash_injection.rs`、`fault_injection.rs`、`history.rs`、`layer0_progress.rs`、`model.rs`、`model_comparison.rs`、`bin/first_transaction_on_device.rs`；
   - 实验装置 bin：`bin/e156_allocation_basis_counts.rs`、`bin/e158_root_choice_repair.rs`（对不对由各自实验页的变异表与单测判，判决里只按路径点名）；`bin/e161_crash_state_dedup_and_time_split.rs` 是别的会话（singlefs-e1）的 E161 装置，不在这一轮里，判决里按路径点名、写明归属。
-- **在飞、不在快照里、归第三轮的**（用户 2026-09-27 JST 18:0x 定第二轮与它们并行开）：测试钉值的统一修正（C577 与 A3b 带来的非层 0 钉值，C577 报告「第 1 条盘点」一节的算法；A3b 善后二：随机历史两条撞墙步数、小盘几份、故障注入第 595 行、E158 装置自拼的分配器 Q8）；A3b 第三节 Q7 剩下两处「读不出就放过」（`transaction.rs:368` 写系统配置前算生效 F 调原 `effective_rollback_floor`、`mount.rs` 管理员回退的候选判 `rollback_candidate`）与 Q4 新错误成员归到与乙同一级；善后一报告第五节 P1（抬 F 时挂载那一刻就读不出的根槽照 D16 第 37 行当没有根，只对挂载时读得出、这一次读不出的槽重读一次仍读不出才拒，A3b 今天对每个读不出的槽都拒）；层 0 文件、`.claude/gate.d/stage-inputs.tsv` 注释里的数与 litmus 的静态改。腿打中这几格时写「已知」并点名去向。
+- **在飞、不在快照里、归第三轮的**（用户 2026-09-27 定第二轮与它们并行开）：测试钉值的统一修正（C577 与 A3b 带来的非层 0 钉值，C577 报告「第 1 条盘点」一节的算法；A3b 善后二：随机历史两条撞墙步数、小盘几份、故障注入第 595 行、E158 装置自拼的分配器 Q8）；A3b 第三节 Q7 剩下两处「读不出就放过」（`transaction.rs:368` 写系统配置前算生效 F 调原 `effective_rollback_floor`、`mount.rs` 管理员回退的候选判 `rollback_candidate`）与 Q4 新错误成员归到与乙同一级；善后一报告第五节 P1（抬 F 时挂载那一刻就读不出的根槽照 D16 第 37 行当没有根，只对挂载时读得出、这一次读不出的槽重读一次仍读不出才拒，A3b 今天对每个读不出的槽都拒）；层 0 文件、`.claude/gate.d/stage-inputs.tsv` 注释里的数与 litmus 的静态改。腿打中这几格时写「已知」并点名去向。
 - **已知、不算打中**（腿打中这几格时写「已知」并点名去向）：
   - C572（回退目标引用隔离单元不进逐盘验）：第一轮 Z1Q-A 立的账。
   - C573–C576（准入固定点上界、落得下那一判、错误成员、三条用例连带红）、C578（乙的读缓存代价没量）、C579（判据在单故障合法状态上也拒可写）：`.claude/kb/checks-owed.md` 各行。
-  - 双故障形「每块盘各坏一槽系统配置，同时最新根一时读不出」：用户 2026-09-27 JST 18:0x 定不在容错射程、记欠账；`second_transaction_supplement_three_random_history.rs` 与 `second_transaction_step_five_reuse.rs` 那两条同形用例改钉「红在 I-7.4 是已知」归统一修正。
+  - 双故障形「每块盘各坏一槽系统配置，同时最新根一时读不出」：用户 2026-09-27 定不在容错射程、记欠账；`second_transaction_supplement_three_random_history.rs` 与 `second_transaction_step_five_reuse.rs` 那两条同形用例改钉「红在 I-7.4 是已知」归统一修正。
   - 宽 0 而条数非 0 在树表、中央映射树上只记走读失败（C307、C476）；指针头部 MAC / nonce 非 0 只判不断走读（A3-checker-2 第四节第 4 条，主 agent 接受，被攻过零轮——**这一格要攻**）。
   - 树表排序报告第八节三条（② 要不要连中央映射树的号一起比；② 只比树表里有的种类；② 在 `rebuild_version` 里排在水位与缺树判定之前，同时违反几条的镜像报 I-9.16）：主 agent 接受它的取法，被攻过零轮——**这一格要攻**。
   - C577 报告「停下交主 agent 的设计问题」第 2 条：屏障报错照 D23 已定项 14「这一版的失败处置」（冻结、原样重发；零单元发布整个挂载返回错误、那一支没专门用例）：主 agent 接受，被攻过零轮——**这一格要攻**。

@@ -1,0 +1,31 @@
+   Compiling e7-index-bench v0.1.0 (research/e7-index-bench)
+    Finished `release` profile [optimized + debuginfo] target(s) in 2.14s
+     Running unittests src/bin/e162_verdict_store_power_cut.rs (target/release/deps/e162_verdict_store_power_cut-c52e00e264f6819f)
+
+running 23 tests
+test tests::bucket_pools_split_windows_and_gaps_on_a_synthetic_marker_layout ... ok
+test tests::commit_window_boundaries_keep_both_ends_and_cap_at_sixty_four ... ok
+test tests::every_control_form_differs_from_its_correct_form_in_exactly_the_registered_setting ... ok
+test tests::forced_unit_access_write_after_the_last_flush_survives_drop_unflushed ... ok
+test tests::heavy_test_gate_only_admits_user_request_or_commit ... ok
+test tests::marker_audit_reports_a_missing_begin_and_a_count_mismatch ... ok
+test tests::parser_rejects_flush_with_data_and_unknown_flags ... ok
+test tests::parser_stops_at_the_declared_entry_count_when_a_stale_entry_follows ... ok
+test tests::marker_round_trips_and_rejects_a_flipped_byte ... ok
+test tests::planned_boots_follow_the_registered_order ... ok
+test tests::role_arguments_skip_the_device_path_that_vm_bench_prepends ... ok
+test tests::sha256_matches_the_standard_test_vectors ... ok
+test tests::subset_generator_matches_b3_and_b4 ... ok
+test tests::replay_images_match_the_registered_b8_digests ... ok
+test tests::write_cache_model_on_the_synthetic_log_gives_the_registered_counts ... ok
+test tests::every_registered_anchor_matches_the_independent_script ... ok
+test tests::main_arm_plan_has_the_registered_item_counts ... ok
+test tests::in_flight_block_between_its_markers_is_not_counted_as_confirmed ... ok
+test tests::write_loop_emits_the_confirm_marker_only_after_the_write_call_returns ... ok
+test tests::untouched_library_verifies_clean_on_every_candidate ... ok
+test tests::open_breaking_positive_control_fails_to_open_on_every_candidate ... ok
+test tests::silent_corruption_positive_control_finds_block_seven_on_every_candidate ... ok
+test tests::phantom_key_positive_control_finds_exactly_one_phantom_on_every_candidate ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.03s
+

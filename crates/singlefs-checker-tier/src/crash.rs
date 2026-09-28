@@ -1126,6 +1126,270 @@ fn record_checker_violation_text(record_check: RecordCheck) -> String {
     criteria.join("；")
 }
 
+/// 一个崩溃状态的全部判定：两种 journal 政策的恢复、两份 oracle、池级 checker 逐条、记录核对器。
+/// 层 0 的计数（[`evaluate_state_for_versions`] 一族）与崩溃放量流水线（`crash_amplification`）都从这一份取，不各判一遍。
+#[derive(Clone, Debug)]
+pub struct Layer0StateJudgement {
+    pub consulted: RecoveryReport,
+    pub ignored: RecoveryReport,
+    /// 被判的那次根槽写落没落（计「根槽已持久」的状态数用）。
+    pub root_persisted: bool,
+    pub consulted_oracle: Option<Layer0OracleViolation>,
+    pub ignored_oracle: Option<Layer0OracleViolation>,
+    pub pool_checker: Vec<(&'static str, InvariantVerdict)>,
+    pub records: RecordCheck,
+}
+
+impl Layer0StateJudgement {
+    /// 判红的各项，按固定次序：两份 oracle 各记它的违例种类，池级 checker 记违反的不变量名，记录核对器记它的两种结论；
+    /// 一项都没有就是绿。崩溃放量流水线按这串存「逐项原始判定」（读方现算红绿与计数）。
+    #[must_use]
+    pub fn red_items(&self) -> Vec<String> {
+        let mut items = Vec::new();
+        if let Some(violation) = &self.consulted_oracle {
+            items.push(format!(
+                "{LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE}:{}",
+                violation.kind.name()
+            ));
+        }
+        if let Some(violation) = &self.ignored_oracle {
+            items.push(format!(
+                "{LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE}:{}",
+                violation.kind.name()
+            ));
+        }
+        for (invariant, verdict) in &self.pool_checker {
+            match verdict {
+                InvariantVerdict::Violated(_) => {
+                    items.push(format!("{LAYER0_RED_PASS_POOL_CHECKER}:{invariant}"))
+                }
+                InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => {}
+            }
+        }
+        if self.records.root_without_record {
+            items.push(format!(
+                "{LAYER0_RED_PASS_RECORD_CHECKER}:{RECORD_CHECKER_ROOT_WITHOUT_RECORD}"
+            ));
+        }
+        if self.records.claimed_state_missing_unit {
+            items.push(format!(
+                "{LAYER0_RED_PASS_RECORD_CHECKER}:{RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT}"
+            ));
+        }
+        items
+    }
+
+    /// 违例正文：这个状态自己现算的（第三轮判决「正文逐状态」），不从类的代表取。绿的状态是空串。
+    #[must_use]
+    pub fn violation_text(&self, image: &CrashImage<'_>) -> String {
+        let mut text = String::new();
+        if let Some(violation) = &self.consulted_oracle {
+            text.push_str(&violation_with_the_persisted_write_kinds(
+                &violation.reason,
+                image,
+            ));
+            text.push('\n');
+        }
+        if let Some(violation) = &self.ignored_oracle {
+            text.push_str(&violation.reason);
+            text.push('\n');
+        }
+        let violated: Vec<(&'static str, String)> = self
+            .pool_checker
+            .iter()
+            .filter_map(|(invariant, verdict)| match verdict {
+                InvariantVerdict::Violated(detail) => Some((*invariant, detail.clone())),
+                InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            })
+            .collect();
+        if !violated.is_empty() {
+            text.push_str(&pool_checker_violation_text(&violated));
+            text.push('\n');
+        }
+        if self.records.root_without_record || self.records.claimed_state_missing_unit {
+            text.push_str(&record_checker_violation_text(self.records));
+            text.push('\n');
+        }
+        text
+    }
+}
+
+/// 判一个崩溃镜像（写表是枚举用的那一张，撕裂镜像与重放接在后面）；`judged_root_index` 是被判的那次根槽 FUA 写。
+#[must_use]
+pub fn judge_crash_image(
+    image: &CrashImage<'_>,
+    judged_root_index: usize,
+    versions: &[PublishedVersion],
+) -> Layer0StateJudgement {
+    let root_persisted = image.persisted[judged_root_index];
+    let newest_persisted = newest_persisted_root(image.writes, &image.persisted);
+    let consulted = recover(image, JournalPolicy::Consult);
+    let ignored = recover(image, JournalPolicy::Ignore);
+    let consulted_oracle = classified_oracle_violation_for_versions(
+        &consulted.outcome,
+        consulted.effective_root,
+        newest_persisted,
+        versions,
+    );
+    let ignored_oracle = classified_oracle_violation_for_versions(
+        &ignored.outcome,
+        ignored.effective_root,
+        newest_persisted,
+        versions,
+    );
+    let pool_checker = check_pool_image(image);
+    let records = check_records(image, consulted.effective_root);
+    Layer0StateJudgement {
+        consulted,
+        ignored,
+        root_persisted,
+        consulted_oracle,
+        ignored_oracle,
+        pool_checker,
+        records,
+    }
+}
+
+/// 同一条流、同一种展开，按层 0 的状态序号判 `ordinals` 这一段：每个状态现算持久集合、造镜像、[`judge_crash_image`]，
+/// 交给 `judge_state`（序号、镜像、判定）。交回整条流的状态数（与 [`enumerate_layer0_in_state_slices`] 数的相同）。
+/// 崩溃放量流水线按块调它：块就是一段序号，镜像到核对时现算，库里不存持久集合。
+///
+/// # Panics
+/// `ordinals` 越过整条流的状态数。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "前六个与枚举同一条流的参数相同，多出的是要判的序号段与收判定的回调"
+)]
+#[must_use]
+pub fn judge_layer0_state_range(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    judged_root_index: usize,
+    versions: &[PublishedVersion],
+    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+    ordinals: Range<u64>,
+    judge_state: &mut dyn FnMut(u64, &CrashImage<'_>, &Layer0StateJudgement),
+) -> u64 {
+    let tearable = TearableInPlaceOverwrites::of(base, writes);
+    let writes_with_torn_images = WritesWithTornImages::of(base, writes, segments, &tearable);
+    let plan = Layer0StatePlan::new(
+        writes,
+        segments,
+        expansion,
+        &tearable,
+        &writes_with_torn_images,
+    );
+    assert!(
+        ordinals.end <= plan.state_count,
+        "序号段 {ordinals:?} 越过整条流的 {} 个状态",
+        plan.state_count
+    );
+    let enumerated_writes = writes_with_torn_images.writes.as_slice();
+    for ordinal in ordinals {
+        let image = CrashImage {
+            base,
+            writes: enumerated_writes,
+            persisted: plan.persisted_writes_of_state(ordinal),
+        };
+        let judgement = judge_crash_image(&image, judged_root_index, versions);
+        judge_state(ordinal, &image, &judgement);
+    }
+    plan.state_count
+}
+
+/// 每一段展开出来的状态序号区间（与 `segments` 同序，不展开的段是空区间），与整条流的状态数（最后那个全持久状态的序号是它减一）。
+/// 崩溃放量流水线按它把状态分给崩溃点：一个点管它起头的那几段。
+#[must_use]
+pub fn layer0_state_ranges_by_segment(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+) -> (Vec<Range<u64>>, u64) {
+    let tearable = TearableInPlaceOverwrites::of(base, writes);
+    let writes_with_torn_images = WritesWithTornImages::of(base, writes, segments, &tearable);
+    let plan = Layer0StatePlan::new(
+        writes,
+        segments,
+        expansion,
+        &tearable,
+        &writes_with_torn_images,
+    );
+    (plan.state_ranges_by_segment.clone(), plan.state_count)
+}
+
+/// 层 0 枚举用的几张表，给崩溃放量第 ① 段抽事实用（`crate::crash_facts`）：枚举写表（录制流里的写在前、撕裂镜像与重放接在后面）、
+/// 哪几次写取三态、每次原地覆写的撕裂镜像与重放接在枚举写表的哪里、每段展开出来的状态序号区间、状态总数。
+/// 与 [`judge_layer0_state_range`] 按同一套 `Layer0StatePlan` 算：事实那边按这几张表现算的掩码与这里的 `persisted_writes_of_state` 逐位相同。
+/// 一次原地覆写的撕裂镜像接在枚举写表的哪里：写表下标、撕裂镜像在枚举写表里的下标、（重放在枚举写表里的下标，重放的是写表里哪一次写）。
+pub struct TornImageTableRow {
+    pub write_index: usize,
+    pub torn_image_index: usize,
+    pub replays: Vec<(usize, usize)>,
+}
+
+pub struct Layer0EnumerationTables {
+    pub enumerated_writes: Vec<RetainedWrite>,
+    pub is_tearable_by_write: Vec<bool>,
+    pub torn_images: Vec<TornImageTableRow>,
+    pub state_ranges_by_segment: Vec<Range<u64>>,
+    pub state_count: u64,
+}
+
+#[must_use]
+pub fn layer0_enumeration_tables(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+) -> Layer0EnumerationTables {
+    let tearable = TearableInPlaceOverwrites::of(base, writes);
+    let writes_with_torn_images = WritesWithTornImages::of(base, writes, segments, &tearable);
+    let plan = Layer0StatePlan::new(
+        writes,
+        segments,
+        expansion,
+        &tearable,
+        &writes_with_torn_images,
+    );
+    Layer0EnumerationTables {
+        enumerated_writes: writes_with_torn_images.writes.clone(),
+        is_tearable_by_write: tearable.is_tearable_by_write.clone(),
+        torn_images: writes_with_torn_images
+            .torn_image_by_write
+            .iter()
+            .map(|(write_index, torn)| TornImageTableRow {
+                write_index: *write_index,
+                torn_image_index: torn.torn_image_index,
+                replays: torn.replays.clone(),
+            })
+            .collect(),
+        state_ranges_by_segment: plan.state_ranges_by_segment.clone(),
+        state_count: plan.state_count,
+    }
+}
+
+/// 整条流在这种展开下的状态数，与 [`judge_layer0_state_range`] 交回的相同（不判任何状态）。
+#[must_use]
+pub fn layer0_plan_state_count(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+) -> u64 {
+    let tearable = TearableInPlaceOverwrites::of(base, writes);
+    let writes_with_torn_images = WritesWithTornImages::of(base, writes, segments, &tearable);
+    Layer0StatePlan::new(
+        writes,
+        segments,
+        expansion,
+        &tearable,
+        &writes_with_torn_images,
+    )
+    .state_count
+}
+
 /// [`evaluate_state_for_versions`] 的本体：`position` 是这个状态在按段枚举里的位置（手摆的状态没有），有位置时把判红的每一遍
 /// 按签名记进发现表（[`Layer0Findings`]），至少一遍判红的状态另记一个。
 fn evaluate_state_recording_findings(
@@ -1137,15 +1401,21 @@ fn evaluate_state_recording_findings(
     position: Option<Layer0StatePosition>,
     tally: &mut Layer0Tally,
 ) -> RecoveryReport {
-    let root_persisted = persisted[judged_root_index];
-    let newest_persisted = newest_persisted_root(writes, &persisted);
     let image = CrashImage {
         base,
         writes,
         persisted,
     };
-    let consulted = recover(&image, JournalPolicy::Consult);
-    let ignored = recover(&image, JournalPolicy::Ignore);
+    let judgement = judge_crash_image(&image, judged_root_index, versions);
+    let Layer0StateJudgement {
+        consulted,
+        ignored,
+        root_persisted,
+        consulted_oracle,
+        ignored_oracle,
+        pool_checker,
+        records,
+    } = judgement;
     tally.states += 1;
     if root_persisted {
         tally.root_persisted_states += 1;
@@ -1165,12 +1435,7 @@ fn evaluate_state_recording_findings(
         RecoveryOutcome::Failed { .. } => tally.failed_states += 1,
     }
     let mut is_red_state = false;
-    if let Some(violation) = classified_oracle_violation_for_versions(
-        &consulted.outcome,
-        consulted.effective_root,
-        newest_persisted,
-        versions,
-    ) {
+    if let Some(violation) = consulted_oracle {
         tally.violations += 1;
         is_red_state = true;
         if tally.first_violation.is_none() {
@@ -1187,12 +1452,7 @@ fn evaluate_state_recording_findings(
             );
         }
     }
-    if let Some(violation) = classified_oracle_violation_for_versions(
-        &ignored.outcome,
-        ignored.effective_root,
-        newest_persisted,
-        versions,
-    ) {
+    if let Some(violation) = ignored_oracle {
         tally.ignored_violations += 1;
         is_red_state = true;
         if tally.first_ignored_violation.is_none() {
@@ -1207,7 +1467,7 @@ fn evaluate_state_recording_findings(
         }
     }
     let mut violated_invariants: Vec<(&'static str, String)> = Vec::new();
-    for (invariant, verdict) in check_pool_image(&image) {
+    for (invariant, verdict) in pool_checker {
         match verdict {
             InvariantVerdict::Holds => {
                 *tally.checker_evaluated_states.entry(invariant).or_insert(0) += 1
@@ -1244,7 +1504,6 @@ fn evaluate_state_recording_findings(
             );
         }
     }
-    let records = check_records(&image, consulted.effective_root);
     if records.root_without_record {
         tally.record_root_without_record += 1;
     }
@@ -1404,6 +1663,18 @@ pub enum Layer0SegmentExpansion {
 }
 
 impl Layer0SegmentExpansion {
+    /// 进计划哈希的名字（崩溃放量的块键要分得开两种展开方式，哪怕状态数碰巧相同）。
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::NotExpanded => "not_expanded",
+            Self::EveryProperSubset => "every_proper_subset",
+            Self::InPlaceSubsetsWithCopyOnWriteNoneOrAll => {
+                "in_place_subsets_with_copy_on_write_none_or_all"
+            }
+        }
+    }
+
     /// 这一段按这种展开出几个状态；`tearable` 里的写取三态，其余取两态。
     ///
     /// # Panics

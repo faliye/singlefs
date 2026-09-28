@@ -1,6 +1,6 @@
 # 实现员报告：层 0 放量的发现日志（m2 收尾批「层 0 发现日志」，第二轮，交补丁）
 
-报告时刻：2026-09-27 JST 10:58 起写（本机 UTC 01:58）。第一节先落盘，供主 agent 转给同时在改 54 号与 `layer0-shard-run.sh` 的工具实现员；后面各节做完再追加。
+报告时刻：2026-09-27 起写。第一节先落盘，供主 agent 转给同时在改 54 号与 `layer0-shard-run.sh` 的工具实现员；后面各节做完再追加。
 
 ## 一、环境变量名与发现日志的行格式（接口，工具实现员照这一节）
 
@@ -137,7 +137,7 @@
 
 ## 五、验证（副本 `/tmp/claude-1000/impl-layer0-findings/copy`，自带 target；线程上限 4，跑测试经 `run-with-memory-cap.sh 8G`）
 
-开跑前 `ps`（2026-09-27 UTC 01:57）：没有 qemu-system / vm-bench / e152 / fio；有别的实现员副本里的 cargo build（`/tmp/claude-1000/impl-rev-a4e/…`），各用各的 target，没等锁。
+开跑前 `ps`（2026-09-27）：没有 qemu-system / vm-bench / e152 / fio；有别的实现员副本里的 cargo build（`/tmp/claude-1000/impl-rev-a4e/…`），各用各的 target，没等锁。
 
 基线红集（基线副本，同一批命令）：`--lib` 里 `model_comparison::tests::every_published_version_is_compared_by_content_instance_table_and_every_role_both_ways`（`test result: FAILED. 89 passed; 1 failed`，签名 `ModelDisagreement`「模型说该成、实现拒了」，`MountError::NewerStateStillUnreadableAfterOneReread`）；`crash_enumeration_sharded_across_processes` 里的钉值用例（打印行 `(65, 8e1ca03b…)` 对钉值 `(65, e4d8027a…)`）；门禁 74 号随机历史三条（见下）。都是开副本那一刻别的会话没提交的改动带来的，不在我的改动里，没修。
 
@@ -208,4 +208,4 @@
 - 没加的（条款没写的不是分支）：发现日志 panic 时追加一行「中断」（没有汇总行就是没跑完）；`Layer0Findings::absorb_following_slice` 是 `pub`（`Layer0Tally` 那个是私有的），没收窄。
 - 草稿与删除：副本 `/tmp/claude-1000/impl-layer0-findings/copy`、基线副本 `/tmp/claude-1000/impl-layer0-findings/baseline` 交回前删（大小写在交回里）；我跑钉值用例留下的四个 `/tmp/singlefs-crash-enumeration-sharded-<pid>-golden-progress` 目录（各 56K–60K）已删，`/tmp` 里另外几个同名目录不是这一趟的，没动。
 
-删除（交回前，UTC 2026-09-27T03:00:18Z）：`/tmp/claude-1000/impl-layer0-findings/copy`（17G，含它的 target 与 prove-red-logs）、`/tmp/claude-1000/impl-layer0-findings/baseline`（3.3G）已 rm -rf。留下的 `base/` 是补丁的底（四份源文件快照）与各趟日志，共 1.8M。
+删除（交回前，2026-09-27）：`/tmp/claude-1000/impl-layer0-findings/copy`（17G，含它的 target 与 prove-red-logs）、`/tmp/claude-1000/impl-layer0-findings/baseline`（3.3G）已 rm -rf。留下的 `base/` 是补丁的底（四份源文件快照）与各趟日志，共 1.8M。

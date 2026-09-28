@@ -4,7 +4,9 @@
 
 mod common;
 
-use common::{build_pool, parameters, BuiltPool, Recorded, FIXED_WRITE_TIME_SECONDS};
+use common::{
+    build_pool, disk_snapshot, parameters, BuiltPool, Recorded, FIXED_WRITE_TIME_SECONDS,
+};
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{
@@ -15,7 +17,11 @@ use singlefs_core::block_device::{BlockDevice, WriteDurability};
 use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
 use singlefs_core::journal::back_chain_of;
 use singlefs_core::journal::record_offset;
-use singlefs_core::mount::{mount_writable, InstanceRow, InstanceTableRecords, Mounted};
+use singlefs_core::mount::{
+    mount_writable, InstanceRow, InstanceTableRecords, MountError, Mounted, NewerPublishWitness,
+    RollbackTarget, SelectedVersionAgainstTheWitness, StillUnreadableAfterOneReread,
+    WitnessedCounterComparison,
+};
 use singlefs_core::records::{
     STATISTIC_ALLOCATED_BYTES, STATISTIC_DEFER_QUEUE_BYTES, STATISTIC_FREE_BYTES,
 };
@@ -569,7 +575,11 @@ fn one_missing_record_right_after_the_chosen_root_stops_the_prefix_even_when_lat
 
 /// 三方第一轮攻方腿打中的一格：所选根自己那条记录读不出时链首没有锚点，不许把水位之上最小的那条无条件接上——同一实例再发三版
 /// （txg 4、5、6），改坏 txg 5、6 的根槽让所选根退到 (1, 4)，再改坏 jsn 4 与 jsn 5 两份镜像：jsn 6 的 txg 是 6、不是 4 + 1 ⇒ 一条都不施加、
-/// 读回第二版；只改坏 jsn 4 时 jsn 5 的 txg 正是 5 ⇒ 接上、再顺着 jsn 6 施加到第四版。写行随之：前一种写 (1, 4, 0)，后一种 (1, 6, 4)。
+/// 读回第二版；只改坏 jsn 4 时 jsn 5 的 txg 正是 5 ⇒ 接上、再顺着 jsn 6 施加到第四版，可写挂载写行 (1, 6, 4)。
+/// 改坏 jsn 4 与 jsn 5 那一格的可写挂载被 C554 乙拒：系统配置见证过 jsn 6（第四版那次发布轮换写的 tail），所选那一版 (1, 4) 的末条
+/// jsn 4 读不出、计数器等于见证值的 jsn 6 读得出、它的 (1, 6) 比 (1, 4) 新，判据为真、重读一次仍为真 ⇒
+/// `NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { 见证 6、按 jsn 6 那条 (1, 6) 比 })`，
+/// 拒在任何写之前、盘上逐字节不变（原来钉的是写行 (1, 4, 0)，乙合入之后那一段不可达）。恢复那一段（链首没锚点、jsn 6 不接上）照旧。
 #[test]
 fn torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg_when_the_next_record_is_torn_too(
 ) {
@@ -594,23 +604,10 @@ enum AnchorTear {
 }
 
 fn torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg(tear: AnchorTear) {
-    let (tear_jsn_five, expected_effective_root, expected_content, expected_applied, expected_row) =
-        match tear {
-            AnchorTear::TheAnchorAndTheNextRecord => (
-                true,
-                CheckpointTxg(4),
-                second_content(),
-                0,
-                (CheckpointTxg(4), 0),
-            ),
-            AnchorTear::OnlyTheAnchor => (
-                false,
-                CheckpointTxg(6),
-                content_of(3300, 17),
-                2,
-                (CheckpointTxg(6), 4),
-            ),
-        };
+    let (tear_jsn_five, expected_effective_root, expected_content, expected_applied) = match tear {
+        AnchorTear::TheAnchorAndTheNextRecord => (true, CheckpointTxg(4), second_content(), 0),
+        AnchorTear::OnlyTheAnchor => (false, CheckpointTxg(6), content_of(3300, 17), 2),
+    };
     let mut pool = build_pool("step-three-torn-anchor");
     pool.output = overwrite_in_process(&mut pool, &second_content(), InstanceGeneration(1));
     pool.output = overwrite_in_process(&mut pool, &third_content(), InstanceGeneration(1));
@@ -675,16 +672,64 @@ fn torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg(tear:
                 .expect("改坏记录");
         }
     }
-    let mounted = mount_writable(&parameters(), &mut devices).expect("可写挂载");
     pool.devices = Some(devices);
-    assert_eq!(
-        mounted
-            .output
-            .rows_written
-            .iter()
-            .map(|row| (row.selected_root_txg, row.applied_transaction_high_water))
-            .collect::<Vec<_>>(),
-        vec![expected_row],
-        "撕掉 {torn:?} 之后写的行"
-    );
+    match tear {
+        AnchorTear::TheAnchorAndTheNextRecord => {
+            let operations_before_the_mount = pool.stream.operation_count();
+            let before = disk_snapshot(&pool.memory_pool(), &pool.stream);
+            let refused = mount_writable(&parameters(), pool.devices.as_mut().expect("镜像还开着"))
+                .expect_err("见证 jsn 6 的那一版比所选根新：可写挂载拒");
+            let reading = SelectedVersionAgainstTheWitness {
+                selected_version: RollbackTarget {
+                    instance: InstanceGeneration(1),
+                    checkpoint_txg: CheckpointTxg(4),
+                },
+                witness: NewerPublishWitness {
+                    witnessed_journal_counter: 6,
+                    comparison: WitnessedCounterComparison::AgainstTheRecordAtTheWitnessedCounter {
+                        record: RollbackTarget {
+                            instance: InstanceGeneration(1),
+                            checkpoint_txg: CheckpointTxg(6),
+                        },
+                    },
+                },
+            };
+            assert!(
+                matches!(
+                    &refused,
+                    MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable)
+                        if **still_unreadable
+                            == StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion {
+                                first_read: reading,
+                                reread: reading,
+                            }
+                ),
+                "撕掉 {torn:?}：C554 乙按 jsn 6 那条 (1, 6) 判、重读仍为真：{refused:?}"
+            );
+            assert_eq!(
+                pool.stream.operation_count(),
+                operations_before_the_mount,
+                "拒在取号之前：录制流一个写、一道屏障都没多"
+            );
+            assert_eq!(
+                disk_snapshot(&pool.memory_pool(), &pool.stream),
+                before,
+                "两块盘逐字节不变"
+            );
+        }
+        AnchorTear::OnlyTheAnchor => {
+            let mounted = mount_writable(&parameters(), pool.devices.as_mut().expect("镜像还开着"))
+                .expect("可写挂载");
+            assert_eq!(
+                mounted
+                    .output
+                    .rows_written
+                    .iter()
+                    .map(|row| (row.selected_root_txg, row.applied_transaction_high_water))
+                    .collect::<Vec<_>>(),
+                vec![(CheckpointTxg(6), 4)],
+                "撕掉 {torn:?} 之后写的行"
+            );
+        }
+    }
 }

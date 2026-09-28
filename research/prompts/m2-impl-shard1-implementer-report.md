@@ -1,6 +1,6 @@
 # 实分一交回：层 0 崩溃重放按双机分片（里程碑三第六项）
 
-时刻：2026-09-27 JST 凌晨（UTC 2026-09-26 15:xx）。实现员，线程上限 8，内存包装 8G（replay.sh 默认）。
+日期：2026-09-27。实现员，线程上限 8，内存包装 8G（replay.sh 默认）。
 
 ## 结论（出口 1–5 各到哪）
 
@@ -46,7 +46,7 @@
 | `research/scripts/layer0-shard-run.sh` | 同路径（新） | 拷过去，权限 775 |
 | `research/scripts/layer0-shard-run-selftest.sh` | 同路径（新） | 拷过去，775；`layer0-shard-run.sh --selftest` 转给它 |
 | `research/scripts/layer0-shard-configuration-check.sh` | 同路径（新） | 拷过去，775；54 号与驱动脚本的运行条件共用这一份判法 |
-| `layer0-shard.env.example` | 仓根（新） | 拷过去；7 个键，占位值，不写主机名 |
+| `multi-host.env.example` | 仓根（新） | 拷过去；7 个键，占位值，不写主机名 |
 | `research/scripts/admission.py.diff`（另附改完的整份） | `research/scripts/admission.py` | `patch -p1`（对今天主工作区的那一份 dry-run 过，能打上） |
 | `.claude/gate.d/54-layer0-replay.sh.diff`（另附整份） | `.claude/gate.d/54-layer0-replay.sh` | 同上 |
 | `.claude/gate.d/stage-inputs.tsv.diff`（另附整份） | `.claude/gate.d/stage-inputs.tsv` | 同上；两条流的全量行第三列加 `shard=across-machines`（会改这两条用例的输入指纹，它们的全绿标记本来就因 crates 改了而失效） |
@@ -63,7 +63,7 @@ c61d0b48c2cf3cc608b29781fb06ee6e604274acf719122ea40ff2fd94b3458a  ./.claude/gate
 bbd837ff23b0120a81c47246de78b964cb7c7844c819b54207a819fed8471c8f  ./.claude/hooks/lib_heavy_tests.py.diff
 830c0e8d853684d39ec960158c0a49634ab0323594dc2f4751b148e1e40d9d33  ./.claude/kb/milestone/03-third-txn.md
 98cf3000dd278c0115372dd58e918c63bd8b705ee0962dde6b586aa4718919ab  ./.claude/kb/milestone/03-third-txn.md.diff
-72ae03d4a01a49ccc069dc27c62a03e31d42dc420e52a879fa67bd4c2c458bd4  ./layer0-shard.env.example
+72ae03d4a01a49ccc069dc27c62a03e31d42dc420e52a879fa67bd4c2c458bd4  ./multi-host.env.example
 dea4f615ccd26c484641e2950d61243fe4496e7d5a5bd8a5607b8a12f369af96  ./research/scripts/admission.py
 71a3a162127988538c0fe656bb64579f26cd6f701235b2cecc704a9d111ed028  ./research/scripts/admission.py.diff
 18862ecdc45f37685b2f9231169184a5c87f16c4b6185bddf7b9193aa97a4096  ./research/scripts/layer0-shard-configuration-check.sh
@@ -75,7 +75,7 @@ cce3a0434fab12ba0c2a27a06d4c83474c8b7b34f2c50ad44b508a21dd48f855  ./research/scr
 
 ### 驱动脚本怎么走（与规格的步骤对照）
 
-- `layer0-shard-run.sh <crash-case:键> <树根>`：① 两台各 `rustc -Vv` 前三行与 host 行、`cargo -V` 比，不同就拒；各取 `nproc`。② 树 `rsync -a`（不带 `--delete`，排除 `target`、`.git`）到第二台 `<PEER_REPOSITORY_DIRECTORY>/runs/<用例>-<UTC 时刻>-<pid>/`（新建的空目录），在那里 `git init`（`crash-case-manifest` 要 git 列文件）。③ 两台各跑 `admission.py crash-case-manifest`（参数与 54 号 `--full` 逐字相同：`--extra-file` 54 号与准入模块、`--toolchain --build-environment`），指纹不同就拒；清场（配置写了才做）并回读，复原挂在 `trap … EXIT`。④ 本机 `SINGLEFS_LAYER0_SHARD=0/2`、第二台 `1/2` 同时跑（各记 pid、各 `wait "$pid"`、各写日志、`LAYER0_PROGRESS` 边跑边转出来），两片日志里都要有 `LAYER0_SHARD mode=run shard=<i>/2`。⑤ 第二台的账本 rsync 回本机进度目录，两片账本要各恰好一份。⑥ 本机 `merge/2`，日志交 `crash-case-judge`，跑完再算一次指纹、相同才 `crash-case-record`（与 54 号 `--full` 同一组标记）。⑦ 删第二台这一趟的 runs/ 子目录（连编译目录，删前 `du -sh`），两片的进度目录留着（被杀之后下一趟接着跑）。跑过之后判红删这批输入那一格标记（与 54 号同）。
+- `layer0-shard-run.sh <crash-case:键> <树根>`：① 两台各 `rustc -Vv` 前三行与 host 行、`cargo -V` 比，不同就拒；各取 `nproc`。② 树 `rsync -a`（不带 `--delete`，排除 `target`、`.git`）到第二台 `<PEER_REPOSITORY_DIRECTORY>/runs/<用例>-<时刻>-<pid>/`（新建的空目录），在那里 `git init`（`crash-case-manifest` 要 git 列文件）。③ 两台各跑 `admission.py crash-case-manifest`（参数与 54 号 `--full` 逐字相同：`--extra-file` 54 号与准入模块、`--toolchain --build-environment`），指纹不同就拒；清场（配置写了才做）并回读，复原挂在 `trap … EXIT`。④ 本机 `SINGLEFS_LAYER0_SHARD=0/2`、第二台 `1/2` 同时跑（各记 pid、各 `wait "$pid"`、各写日志、`LAYER0_PROGRESS` 边跑边转出来），两片日志里都要有 `LAYER0_SHARD mode=run shard=<i>/2`。⑤ 第二台的账本 rsync 回本机进度目录，两片账本要各恰好一份。⑥ 本机 `merge/2`，日志交 `crash-case-judge`，跑完再算一次指纹、相同才 `crash-case-record`（与 54 号 `--full` 同一组标记）。⑦ 删第二台这一趟的 runs/ 子目录（连编译目录，删前 `du -sh`），两片的进度目录留着（被杀之后下一趟接着跑）。跑过之后判红删这批输入那一格标记（与 54 号同）。
 - `--merged-log <键> <树根> <指纹> <日志>`：给 54 号用，只做 ①–⑥ 的跑，merge 那一趟整段输出写进日志，判与写标记归 54 号。
 - 进度目录：本机 `<git common-dir>/singlefs-layer0-progress/<指纹>`（与 54 号相同），第二台 `<PEER_REPOSITORY_DIRECTORY>/progress/<指纹>`。
 - 54 号 `--full`：开跑时 `bash research/scripts/layer0-shard-configuration-check.sh <根>` 判得过就打「双机分片：开（…）」，否则打「双机分片：关（原因）」；开着时登记了 `shard=across-machines` 的用例经 `--merged-log` 跑，别的单机跑；日志照单机的判法判、写同一格。
@@ -106,7 +106,7 @@ cce3a0434fab12ba0c2a27a06d4c83474c8b7b34f2c50ad44b508a21dd48f855  ./research/scr
 - `lib_heavy_tests.py`：把 `classify` 里认驱动脚本的那一支改名废掉，`✗ lib_heavy_tests 自检：bash 起双机分片的驱动脚本 应当是 crash-case-cargo，实际 None` 与 `--merged-log` 那一格红（同一次里另有三格红，是把文件拷到仓外跑、找不到登记表的缘故，与这次改动无关）。
 - 驱动脚本自证：把驱动脚本里比工具链的 `[[ "$local_toolchain" == "$peer_toolchain" ]]` 与数账本的 `[[ -f "${fetched_ledgers[0]}" … ]]` 都换成 `true` 再跑自证，③ ④ 两格红、其余 8 格绿（`driver-selftest-red.log`：`✗ layer0-shard-run.sh 自证没过：2 格判错（共 10 格）`）；改回之后 10 格全过。
 
-## 第 4 步那几样的末尾原样输出（主工作区，UTC 2026-09-26 15:2x–15:4x）
+## 第 4 步那几样的末尾原样输出（主工作区，2026-09-27）
 
 开跑前看负载：`ps` 看不到 qemu / vm-bench / e152 / fio；中途有别的会话的 `cargo build --release … --bin e158_root_choice_repair` 与 `cargo run … --bin e156_allocation_basis_counts` 在跑，我的命令都加了 `nice -n 19`，没见到等锁。
 
@@ -129,7 +129,7 @@ cce3a0434fab12ba0c2a27a06d4c83474c8b7b34f2c50ad44b508a21dd48f855  ./research/scr
 5. **配置多了两个键** `QUIESCE_STOPPED_CHECK_COMMAND`、`QUIESCE_STARTED_CHECK_COMMAND`（清场、复原之后回读用，退 0 才算做成），规格只列了五个键；写了 STOP 就要写 STOPPED_CHECK 与 START，写了 START 就要写 STARTED_CHECK。
 6. **登记表多一种写法** `shard=across-machines`（`admission.py` 解析、自查、新子命令 `crash-case-shardable`），54 号靠它认哪几条用例能分片；只有两条流的全量用例的枚举经 `Layer0Resume::from_environment` 认开关，另两条（`floor-raise-pushed-by-the-session`、`c561-sigma-full`）不认，54 号照单机跑它们。
 7. **驱动脚本多一种调法** `--merged-log`（给 54 号用，判与写标记留在 54 号，不抄第二份）。
-8. **第二台上的目录**：每一趟在 `PEER_REPOSITORY_DIRECTORY/runs/` 下新建子目录、跑完删；两片的进度目录在 `PEER_REPOSITORY_DIRECTORY/progress/<指纹>/`。主 agent 在第二台 `/home/faliye/coding/singlefs-layer0-shard/` 已放了一份仓副本，驱动脚本不用那份副本，只在它下面建 `runs/` 与 `progress/`；要另指一个空目录就改配置。
+8. **第二台上的目录**：每一趟在 `PEER_REPOSITORY_DIRECTORY/runs/` 下新建子目录、跑完删；两片的进度目录在 `PEER_REPOSITORY_DIRECTORY/progress/<指纹>/`。主 agent 在第二台上的仓副本目录已放了一份仓副本，驱动脚本不用那份副本，只在它下面建 `runs/` 与 `progress/`；要另指一个空目录就改配置。
 9. **第二台那一片的线程数**取第二台的 `nproc`，不跟本机的 `SINGLEFS_LAYER0_THREADS`（本机那一片照 54 号的取法）。
 10. **工具链怎么取**：`Layer0ToolchainIdentity::of_the_cargo_running_this_test` 在分片开关设了时起子进程问 `$CARGO -V` 与它旁边的 `rustc -Vv`（旁边没有就取 PATH 上的）；target triple 取 `rustc -Vv` 的 `host:` 行（几条流都不交叉编译）。环境里没有 `CARGO`（不是经 cargo test 起的）就 panic。
 11. **merge 带 `SINGLEFS_LAYER0_START_OVER=1` 就 panic**（只读账本，没有进度文件可丢）；设了分片开关而没设进度目录也 panic。驱动脚本 merge 那一趟清掉 START_OVER。
@@ -140,7 +140,7 @@ cce3a0434fab12ba0c2a27a06d4c83474c8b7b34f2c50ad44b508a21dd48f855  ./research/scr
 
 ## README 那一节要写的配置项（主 agent 写 README）
 
-配置文件：`${SINGLEFS_LAYER0_SHARD_CONFIG:-<主工作树的根>/layer0-shard.env}`，git 忽略；模板 `layer0-shard.env.example`（仓根）。一行一个 `KEY=值`，值不做 shell 展开，七个键都要写。没有这份配置（或判不过）时门禁 54 号 `--full` 照单机跑。
+配置文件：`${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}`，git 忽略；模板 `multi-host.env.example`（仓根）。一行一个 `KEY=值`，值不做 shell 展开，七个键都要写。没有这份配置（或判不过）时门禁 54 号 `--full` 照单机跑。
 
 | 键 | 一句话 |
 |---|---|
@@ -161,7 +161,7 @@ cce3a0434fab12ba0c2a27a06d4c83474c8b7b34f2c50ad44b508a21dd48f855  ./research/scr
 - 没跑任何名字带 layer0 的测试目标（`first_transaction_step_seven_layer0`、`second_transaction_step_zero_layer0` 只编过、clippy 过），没跑 54 号快档：规格说可以跑，但它跑的就是这两个 layer0 测试二进制，定义与派发都不许，重型闸也拒；「54 号快档不因我的改动变红」没验，只验了默认不分片时枚举的打印行与进度文件逐字节不变（golden 用例）。两条全量用例的分片分支（`OneShardWrittenToItsLedger` 就收工）没有任何跑过的测试罩着，要等 crash-verifier 在提交时跑全量、或主 agent 跑驱动脚本。
 - 写范围外的东西都没进仓：驱动脚本三份、模板、`admission.py`、54 号、`stage-inputs.tsv`、`lib_heavy_tests.py`、kb 第六节，都在 `deliver/`。它们在草稿拷贝上的自证都过了，放进仓之后要重跑一遍。
 - 门禁 59 号（变异整表复跑）没跑；33 号在我追加第 13 行之后红在别人的三行（mount.rs），没修。
-- 仓根那个未跟踪的 `-.rej`（76800 字节，UTC 14:54:29）是我留下的：在仓根跑 `patch -o - … crates/singlefs-harness/src/crash.rs <开工时的 diff>` 核行数时，patch 把打不上的块写成了 `-.rej`（`-o -` 的输出名是 `-`）。看过开头三行（`--- crash.rs` / `+++ crash.rs` / `@@ -12,7 +12,7 @@ use std::sync::mpsc;`，29 块）确认是它，已删；那条命令用 `-o -` 输出到标准输出，没改 `crash.rs`（同目录没有 `.orig` / `.rej`）。
+- 仓根那个未跟踪的 `-.rej`（76800 字节）是我留下的：在仓根跑 `patch -o - … crates/singlefs-harness/src/crash.rs <开工时的 diff>` 核行数时，patch 把打不上的块写成了 `-.rej`（`-o -` 的输出名是 `-`）。看过开头三行（`--- crash.rs` / `+++ crash.rs` / `@@ -12,7 +12,7 @@ use std::sync::mpsc;`，29 块）确认是它，已删；那条命令用 `-o -` 输出到标准输出，没改 `crash.rs`（同目录没有 `.orig` / `.rej`）。
 
 ## 草稿与清理
 

@@ -1,0 +1,10 @@
+exit=1
+want=正文标题写着结论作废，索引行里没有「作废」二字
+want=索引结论列的「15.8」
+want=正文状态是「已跑（够判）」，索引状态列写「已跑（01-01）」
+want=E354 索引结论列的「10」在 354-索引样本戊.md 正文里找不到
+want=样本只跑 .gate-cells 点名的格：index-sync
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（index-sync）
+want=→ index-sync：以正文标题为准改
+want=bash .claude/gate.d/doc-experiments.sh --check index-sync

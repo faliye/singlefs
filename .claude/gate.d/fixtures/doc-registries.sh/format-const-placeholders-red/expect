@@ -1,0 +1,7 @@
+exit=1
+want=  format-const-placeholders：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（format-const-placeholders）
+want=找不到 已定项 99
+want=找不到 未定项 2
+want=占位没写成
+want=crates/singlefs-format/src/lib.rs:6  D99 没有决策文件

@@ -8,7 +8,7 @@
 
 主 agent 自己做的全部改动（用户定不派实现员），diff 在 `research/prompts/_verification-split-r1-diff.md`（`git diff HEAD -M`，只含这一轮的路径，39 个文件、+524 / −226）。
 
-## 二、实现今天的样子（主 agent 的观测，开工快照 `refs/sop/verification-split-r1-snapshot`，时刻在 `research/prompts/verification-split-r1-snapshot/dispatched-at-utc.txt`）
+## 二、实现今天的样子（主 agent 的观测，开工快照 `refs/sop/verification-split-r1-snapshot`，时刻在 `research/prompts/verification-split-r1-snapshot/dispatch-date.txt`）
 
 腿读代码一律读那棵快照树（`git show refs/sop/verification-split-r1-snapshot:<路径>`），它是工作区整份，含别的会话未提交的改动；被判文件的 sha256 在 `research/prompts/verification-split-r1-snapshot/judged-files-sha256.txt`。
 

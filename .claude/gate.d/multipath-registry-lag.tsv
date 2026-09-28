@@ -1,5 +1,5 @@
 # 还没写「### 路径与结论登记」那一节的实验页，一份一行，第二列写普查判定的依据。
-# 这张表只缩不涨：补齐一份删一行；新写的实验页不许往里加。门禁 99 号判每一行指得到现存的页、那一页确实还没写登记节，
+# 这张表只缩不涨：补齐一份删一行；新写的实验页不许往里加。门禁 doc-experiments 的 multipath-registry 格判每一行指得到现存的页、那一页确实还没写登记节，
 # 并按实验编号与基准提交比，基准里没有的编号不许出现。
 # 名单来自 research/prompts/c48-c49-multipath-survey.md 的普查（2026-09-21；已归档，去 git 历史里找：
 # git show 13bccea:research/prompts/c48-c49-multipath-survey.md）：

@@ -5,7 +5,7 @@
 
 登记表是 .claude/gate.d/stage-inputs.tsv（唯一登记位，门禁阶段与实验各占几行）。一行一条，制表符分隔：
     <键> <制表符> <读的路径，空格分隔> [<制表符> <准入条件，空格分隔>] <制表符> #<为什么是这几条>
-  键：门禁阶段写文件名（59-crates-mutation-replay.sh）；实验写实验号（E142），同一个实验另有一种调用方式的写
+  键：门禁阶段写文件名（checker-tier-crates-mutation-replay.sh）；实验写实验号（E142），同一个实验另有一种调用方式的写
       实验号加斜杠加方式名（E142/layer0）。
   路径：从仓库根起；目录写成带斜杠的前缀。写成 @<别的键> 就是「那个键登记的全部路径」（只在实验行里用）。
   准入条件（第三列）：实验行认两种：
@@ -67,7 +67,7 @@
 子命令（<根> 是被判仓的根）：
   stage-fingerprint <根> <阶段文件名>    这一道登记输入在被判那棵树上的指纹：打「<sha256> <文件数>」
   stage-marker-check <根> <阶段文件名>   这一道这批输入有没有作数的全绿标记：退 0 有（第一行 ok <路径> <时刻>），退 1 没有或过了 SINGLEFS_REUSE_HOURS
-  stage-marker-write <根> <阶段文件名>   判绿之后写这一格标记（55、57、59 号自己调），打路径；gate-reuse 先看它再看暂存树
+  stage-marker-write <根> <阶段文件名>   判绿之后写这一格标记（checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay 自己调），打路径；gate-reuse 先看它再看暂存树
   gate-reuse <根> <阶段文件名>   门禁的复用判定：退 0 要跑，退 10 可跳过（stage-must-run.sh 翻成它原来的 1）；
                                  模块自己出错一律退 0（按要跑处理），不许出错就跳过
   experiment <根> <实验键>       实验的准入：退 0 放行，stdout 是要写在产物最前面的几行（E7INPUT 开头）；
@@ -223,7 +223,7 @@ LAYER0_SHARD_VARIABLE = "SINGLEFS_LAYER0_SHARD"
 CRASH_CASE_TEST_FORM = re.compile(r"^(?P<package>[A-Za-z0-9_-]+):(?P<target>[A-Za-z0-9_]+):(?P<function>[A-Za-z_][A-Za-z0-9_]*)$")
 COUNT_LINE_PREFIX_FORM = re.compile(r"^[A-Z][A-Z0-9_]*$")
 CRASH_CASE_MARKER_PREFIX = "singlefs-crash-case-green."
-STAGE_MARKER_PREFIX = "singlefs-stage-green."          # 55、57、59 号判绿之后按输入指纹写的全绿标记（用户 2026-09-27 定：照 54 号写标记、只跑变了的）
+STAGE_MARKER_PREFIX = "singlefs-stage-green."          # checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay 判绿之后按输入指纹写的全绿标记（用户 2026-09-27 定：照 54 号写标记、只跑变了的）
 LAYER0_PARALLEL_FINISHED_PREFIX = "LAYER0_PARALLEL_FINISHED "
 PASSED_ONE_TEST_FORM = re.compile(r"^test result: ok\. 1 passed; 0 failed; ")
 MARKER_DIFFERENCES_LISTED_AT_MOST = 20
@@ -256,7 +256,7 @@ COMPILE_TIME_COMPUTED_INCLUDE = re.compile(r'\binclude(?:_str|_bytes)?\s*!\s*[(\
 # 弄坏开关 concat-include-only 换回的旧写法：只认紧跟着不带路径的 concat!
 COMPILE_TIME_CONCATENATED_INCLUDE_ONLY = re.compile(r"\binclude(?:_str|_bytes)?!\s*[(\[{]\s*concat!")
 # 崩溃枚举用例的输入里减去的、不是测试文件的那几份：仓根起的路径 → 为什么用例读不到它（有代码按文件名点名它时照留）
-CRASH_CASE_FILES_NOT_READ = {"crates/mutations.tsv": "crates 变异表：59 号按它改源码再跑点名的测试，用例编译期与运行期都不读它"}
+CRASH_CASE_FILES_NOT_READ = {"crates/mutations.tsv": "crates 变异表：checker-tier-crates-mutation-replay 按它改源码再跑点名的测试，用例编译期与运行期都不读它"}
 # 集成测试拿本包 bin 的路径靠这个前缀的环境变量；没有代码读它时，src/bin/ 下的文件编不进也读不到用例
 BIN_EXECUTABLE_VARIABLE_PREFIX = "CARGO_BIN_EXE_"
 
@@ -932,7 +932,7 @@ def admit_experiment(root, key):
 
 
 def stored_product_status(root, key):
-    """给门禁 69 号：这个实验键的产物跟不跟得上今天的输入。
+    """给门禁 doc-experiments 的 evidence-in-repo 格：这个实验键的产物跟不跟得上今天的输入。
     返回 (状态, 说明)：unregistered（没登记准入）、unfingerprinted（没有一份带指纹的产物）、
     matched（有一份的指纹与今天的相同）、stale（带指纹的都与今天的不同）。算不出指纹抛 InputManifestError。"""
     rows = read_registration_rows(root)
@@ -1121,7 +1121,7 @@ def gate_reuse(root, stage):
     return_code, _output = git_output(root, "rev-parse", "--is-inside-work-tree")
     if return_code != 0:
         return EXIT_GATE_MUST_RUN, f"判不出来：{root} 不是 git 工作树，按要跑处理"
-    # 先看这一道在被判那棵树上的全绿标记（55、57、59 号判绿时自己写，按登记输入的指纹分格，住 git common-dir）：
+    # 先看这一道在被判那棵树上的全绿标记（checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay 判绿时自己写，按登记输入的指纹分格，住 git common-dir）：
     # 在且没过复用上限就可跳过——崩溃验证员在工作区跑过的那一趟，整轮门禁不用再跑一遍。指纹算不出、没登记这一行的照旧往下按暂存树判。
     if not break_is_set("stage-marker-ignored"):
         try:
@@ -2257,7 +2257,7 @@ def write_stage_marker(root, stage, fingerprint, file_count):
     marker_path = stage_marker_path(root, stage, fingerprint)
     if marker_path is None:
         raise InputManifestError(f"{root} 不是 git 工作树（取不到 git common-dir），全绿标记没处写")
-    text = ("# 门禁阶段的全绿标记：55、57、59 号判绿之后经 research/scripts/admission.py stage-marker-write 写，按阶段与它登记输入的指纹分格；"
+    text = ("# 门禁阶段的全绿标记：checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay 判绿之后经 research/scripts/admission.py stage-marker-write 写，按阶段与它登记输入的指纹分格；"
             "gate-reuse 按这一格判复用。不进工作树，别手改。\n"
             f"stage={stage}\ninput_hash={fingerprint}\ninput_file_count={file_count}\n"
             f"finished_utc={time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\njudged_root={os.path.abspath(root)}\n"
@@ -2324,7 +2324,7 @@ def command_stage_marker_write(arguments):
 def command_gate_reuse(arguments):
     if len(arguments) < 2 or not arguments[0] or not arguments[1]:
         print("  ✗ 用法：stage-must-run.sh <项目根> <阶段文件名>")
-        print("     → 怎么办：阶段名照 .claude/gate.d/ 下的文件名写，例 59-crates-mutation-replay.sh。")
+        print("     → 怎么办：阶段名照 .claude/gate.d/ 下的文件名写，例 checker-tier-crates-mutation-replay.sh。")
         return EXIT_GATE_MUST_RUN
     if break_is_set("raise-in-gate-reuse"):
         # 故意不接住：进程带着 traceback 退 1，看 stage-must-run.sh 会不会把它当成「可跳过」
@@ -2750,7 +2750,7 @@ def point_replay_row_at(work, product_name):
 
 
 def run_stage_marker_cells(selftest, module):
-    """55、57、59 号的全绿标记：没有时判不了、写了之后 gate-reuse 不看暂存树也可跳过、弄坏开关下转红、过上限不作数、输入改了就没有它的格。"""
+    """checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay 的全绿标记：没有时判不了、写了之后 gate-reuse 不看暂存树也可跳过、弄坏开关下转红、过上限不作数、输入改了就没有它的格。"""
     work = tempfile.mkdtemp(prefix="admission-stage-marker-")
     try:
         build_selftest_repository(work)
@@ -2886,7 +2886,7 @@ def run_selftest():
         selftest.expect("登记行改了就放行（登记行本身进指纹）", exit_code == 0, f"退 {exit_code}")
         write_text(table_path, good_table)
 
-        # ⑧ 给门禁 69 号的状态：matched / stale / unfingerprinted / unregistered
+        # ⑧ 给门禁 doc-experiments 的 evidence-in-repo 格的状态：matched / stale / unfingerprinted / unregistered
         status, _detail = stored_product_status(work, "E900")
         selftest.expect("产物指纹对得上时状态是 matched", status == "matched", f"实际 {status}")
         write_text(os.path.join(work, "research/src/e900.rs"), "fn main() { let changed = 1; }\n")
@@ -2916,7 +2916,7 @@ def run_selftest():
                                                    {BREAK_VARIABLE: "raise-in-gate-reuse", "SINGLEFS_STAGED_TREE": "0" * 40})
         selftest.expect("门禁复用判定出异常时 stage-must-run.sh 判要跑", exit_code == 0 and "按要跑处理" in output,
                         f"退 {exit_code}，stdout「{output.strip()}」")
-        # ⑩b 55、57、59 号的全绿标记（用户 2026-09-27 定：照 54 号写标记、只跑变了的）
+        # ⑩b checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay 的全绿标记（用户 2026-09-27 定：照 54 号写标记、只跑变了的）
         run_stage_marker_cells(selftest, module)
 
         # ⑪ 门禁行的第三列：前提（command= / readwrite= / probe=）、环境进复用判定（environment=，拿假 herd7 当桩）、中文路径
@@ -3044,7 +3044,7 @@ FAKE_HERD7_SCRIPT = '#!/usr/bin/env bash\nif [[ "${1:-}" == -version ]]; then ec
 
 
 def run_gate_environment_cells(selftest, module):
-    """门禁的环境进复用判定（照 57 号：herd7 的版本不在 git 树里）：拿 PATH 前面的假 herd7 当桩，经 stage-must-run.sh 判。
+    """门禁的环境进复用判定（照 checker-tier-lkmm：herd7 的版本不在 git 树里）：拿 PATH 前面的假 herd7 当桩，经 stage-must-run.sh 判。
     同一个仓里再核两道没登记环境的阶段在中文路径上判得对、依据句里是原样的中文路径。"""
     work = tempfile.mkdtemp(prefix="admission-selftest-environment-")
     tools = tempfile.mkdtemp(prefix="admission-selftest-tools-")
@@ -3758,7 +3758,7 @@ def run_crash_case_input_cells(selftest, module):
                                 "LAYER0 states=5 closed_form=5 exhaustive=true\nparallel_finished=LAYER0_PARALLEL_FINISHED states=5 slices=1\n")
         fingerprint_now, _count = fingerprint()
         record_arguments = ("crash-case-record", work, "crash-case:own", fingerprint_now, manifest_file, judged_file, "--files", "6", "--excluded", "1",
-                            "--started", "2026-09-26T00:00:00Z", "--judged-root", work)
+                            "--started", "2026-09-26T00:00:00Z", "--judged-root", work)   # clock-times:allow 自检造的开跑时刻，格式照真记录
         explicit_seven = {"SINGLEFS_LAYER0_THREADS": "7"}
         cores = machine_core_count(os.environ)
         exit_code, marker_path, _messages = admission(*record_arguments, changes={BREAK_VARIABLE: "single-worker-threads-field", **explicit_seven})

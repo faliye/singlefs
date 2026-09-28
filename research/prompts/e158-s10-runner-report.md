@@ -108,9 +108,9 @@ agent 定。
 `allocation_record_tree.rs`（抬 F、挂载读、分配记录树根层）。按要求取了两次快照：
 
 - 重出产物之前：`research/results/e158-root-choice-repair-2026-09-25-s10-crates-sha256.out`
-  （`snapshot_time_jst=2026-09-25 10:22:11`、`git_status_crates_lines=84`）。
+  （`snapshot_time_jst=2026-09-25`、`git_status_crates_lines=84`）。
 - 交回前：`research/results/e158-root-choice-repair-2026-09-25-s10-crates-sha256-final.out`
-  （`snapshot_time_jst=2026-09-25 11:50:20`、`git_status_crates_lines=85`）。
+  （`snapshot_time_jst=2026-09-25`、`git_status_crates_lines=85`）。
 
 两次对比：`mount.rs`/`allocator.rs`/`allocation_record_tree.rs` 等 10 个源文件哈希不同（另有
 `mutations.tsv` 与若干测试文件，不影响 e158 二进制的编译图）。产物重出中途又取了一次快照，与交回

@@ -1,0 +1,126 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 28.3 GiB，这一条要 16.0 GiB（按峰值表里上一次实测的峰值 16.0 GiB（2026-09-28T07:21:33Z 量的）算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排队（已等 60 秒，至多 3600 秒）：slice 已占 28.3 GiB，这一条要 16.0 GiB（按峰值表里上一次实测的峰值 16.0 GiB（2026-09-28T07:21:33Z 量的）算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排队（已等 120 秒，至多 3600 秒）：slice 已占 24.3 GiB，这一条要 16.0 GiB（按峰值表里上一次实测的峰值 16.0 GiB（2026-09-28T07:21:33Z 量的）算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排队（已等 180 秒，至多 3600 秒）：slice 已占 24.3 GiB，这一条要 16.0 GiB（按峰值表里上一次实测的峰值 16.0 GiB（2026-09-28T07:21:33Z 量的）算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排队（已等 240 秒，至多 3600 秒）：slice 已占 24.2 GiB，这一条要 16.0 GiB（按峰值表里上一次实测的峰值 16.0 GiB（2026-09-28T07:21:33Z 量的）算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排队（已等 300 秒，至多 3600 秒）：slice 已占 24.2 GiB，这一条要 16.0 GiB（按峰值表里上一次实测的峰值 16.0 GiB（2026-09-28T07:21:33Z 量的）算），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 排队（已等 360 秒，至多 3600 秒）：slice 已占 32.2 GiB，这一条要 16.0 GiB（按峰值表里上一次实测的峰值 16.0 GiB（2026-09-28T07:21:33Z 量的）算），总上限 40.1 GiB；账上在跑 4 条
+run-with-memory-cap: 排队（已等 420 秒，至多 3600 秒）：slice 已占 32.2 GiB，这一条要 16.0 GiB（按峰值表里上一次实测的峰值 16.0 GiB（2026-09-28T07:21:33Z 量的）算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排队（已等 480 秒，至多 3600 秒）：slice 已占 32.2 GiB，这一条要 16.0 GiB（按峰值表里上一次实测的峰值 16.0 GiB（2026-09-28T07:21:33Z 量的）算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排队（已等 540 秒，至多 3600 秒）：slice 已占 24.2 GiB，这一条要 16.0 GiB（按峰值表里上一次实测的峰值 16.0 GiB（2026-09-28T07:21:33Z 量的）算），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 排队（已等 600 秒，至多 3600 秒）：slice 已占 24.2 GiB，这一条要 16.0 GiB（按峰值表里上一次实测的峰值 16.0 GiB（2026-09-28T07:21:33Z 量的）算），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 排了 637 秒，起跑（singlefs-memory-cap-2389966-1420318387）
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running tests/c331_newer_instance_roots_unreadable_then_readable_again.rs (/tmp/claude-1000/unreadable-at-mount-r1/opus/target-bing/release/deps/c331_newer_instance_roots_unreadable_then_readable_again-d332f67934e10b12)
+
+running 11 tests
+history: A=(1,3,jsn 3) second-instance mount txgs=[CheckpointTxg(4), CheckpointTxg(5)] B=(2,6,jsn 6) C=(2,7,jsn 7)
+  config slot device 0 gen 10 tail 7 instance 2
+  config slot device 0 gen 9 tail 6 instance 2
+  config slot device 1 gen 10 tail 7 instance 2
+  config slot device 1 gen 9 tail 6 instance 2
+C data unit locations: [(0, 50184), (1, 50184)]
+C root tree table / instance table: [(0, 50348), (1, 50348)] / [(0, 50304), (1, 50304)]
+history: A=(1,3,jsn 3) second-instance mount txgs=[CheckpointTxg(4), CheckpointTxg(5)] B=(2,6,jsn 6) C=(2,7,jsn 7)
+history: A=(1,3,jsn 3) second-instance mount txgs=[CheckpointTxg(4), CheckpointTxg(5)] B=(2,6,jsn 6) C=(2,7,jsn 7)
+  config slot device 1 gen 10 tail 7 instance 2
+  config slot device 1 gen 9 tail 6 instance 2
+history: A=(1,3,jsn 3) second-instance mount txgs=[CheckpointTxg(4), CheckpointTxg(5)] B=(2,6,jsn 6) C=(2,7,jsn 7)
+history: A=(1,3,jsn 3) second-instance mount txgs=[CheckpointTxg(4), CheckpointTxg(5)] B=(2,6,jsn 6) C=(2,7,jsn 7)
+  config slot device 0 gen 10 tail 7 instance 2
+  config slot device 0 gen 9 tail 6 instance 2
+  config slot device 1 gen 10 tail 7 instance 2
+  config slot device 1 gen 9 tail 6 instance 2
+history: A=(1,3,jsn 3) second-instance mount txgs=[CheckpointTxg(4), CheckpointTxg(5)] B=(2,6,jsn 6) C=(2,7,jsn 7)
+history: A=(1,3,jsn 3) second-instance mount txgs=[CheckpointTxg(4), CheckpointTxg(5)] B=(2,6,jsn 6) C=(2,7,jsn 7)
+new-instance mount: Err: NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 } } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 } } } })
+new-instance mount: Err: NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 } } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 } } } })
+new-instance mount: Ok: instance 3 chosen (2,7) effective (2,7) row txg 8 warm-ups [9, 10] rereads RereadsOfThisMount { read_stage: OnTheFirstRead { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(7) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 7 } } } }, instance_table_of_the_newest_root: OnTheFirstRead } isolated [(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable 0
+E = (3,11) jsn 11
+final system configuration (device, generation, tail): [(0, 14, 10), (0, 15, 11), (1, 14, 10), (1, 15, 11)]
+new-instance mount: Ok: instance 3 chosen (2,7) effective (2,7) row txg 8 warm-ups [9, 10] rereads RereadsOfThisMount { read_stage: OnTheOneReread { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 } } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(7) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 7 } } } }, instance_table_of_the_newest_root: OnTheFirstRead } isolated [(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable 0
+mount k (crashes after the acquisition): Err: Publish(PublishSequenceFailed { cause: BlockDevice(InputOutput(Custom { kind: Other, error: "取号之后的写失败（用例造的崩溃点）" })), writes_before_the_first_publish: WritesByStructureKind { counted: {} }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [WritesByStructureKind { counted: {} }] })
+system configuration tails after the crashed acquisition: [6, 6, 6, 6]
+E = (3,11) jsn 11
+final system configuration (device, generation, tail): [(0, 14, 10), (0, 15, 11), (1, 14, 10), (1, 15, 11)]
+read-only under the same faults: (1,3) reads back A = true
+final system configuration (device, generation, tail): [(0, 10, 7), (0, 9, 6), (1, 10, 7), (1, 9, 6)]
+new-instance mount: Err: NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 } } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 } } } })
+new-instance mount: Err: NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 } } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 } } } })
+history: A=(1,3,jsn 3) second-instance mount txgs=[CheckpointTxg(4), CheckpointTxg(5)] B=(2,6,jsn 6) C=(2,7,jsn 7)
+  config slot device 0 gen 10 tail 7 instance 2
+  config slot device 0 gen 9 tail 6 instance 2
+  config slot device 1 gen 10 tail 7 instance 2
+  config slot device 1 gen 9 tail 6 instance 2
+C data unit locations: [(0, 50184), (1, 50184)]
+C root tree table / instance table: [(0, 50348), (1, 50348)] / [(0, 50304), (1, 50304)]
+final roots [(0, 0), (1, 1), (1, 2), (1, 3), (2, 4), (2, 5), (2, 6), (2, 7)]; final read-only Some((2, 7, false)); final writable: Ok: instance 3 chosen (2,7) effective (2,7) row txg 8 warm-ups [9, 10] rereads RereadsOfThisMount { read_stage: OnTheFirstRead { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(7) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 7 } } } }, instance_table_of_the_newest_root: OnTheFirstRead } isolated [(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable 0
+
+thread 'every_system_configuration_slot_unreadable_on_the_reread_witness_read_flips_the_judgement_and_lets_a_hidden_root_override_the_new_instance_write' (2867637) panicked at crates/singlefs-harness/tests/c331_newer_instance_roots_unreadable_then_readable_again.rs:834:5:
+Refused("NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 } } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 } } } })")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test every_system_configuration_slot_unreadable_on_the_reread_witness_read_flips_the_judgement_and_lets_a_hidden_root_override_the_new_instance_write ... FAILED
+new-instance mount: Ok: instance 4 chosen (2,6) effective (2,6) row txg 7 warm-ups [8] rereads RereadsOfThisMount { read_stage: OnTheFirstRead { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(6) }, witness: NewerPublishWitness { witnessed_journal_counter: 6, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 6 } } } }, instance_table_of_the_newest_root: OnTheFirstRead } isolated [(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable 0
+E = (4,9) jsn 9
+final system configuration (device, generation, tail): [(0, 14, 9), (0, 13, 8), (1, 14, 9), (1, 13, 8)]
+history: A=(1,3,jsn 3) second-instance mount txgs=[CheckpointTxg(4), CheckpointTxg(5)] B=(2,6,jsn 6) C=(2,7,jsn 7)
+final roots [(0, 0), (1, 1), (1, 2), (1, 3), (2, 4), (2, 5), (2, 6), (2, 7), (3, 8), (3, 9), (3, 10), (3, 11)]; final read-only Some((3, 11, true)); final writable: Ok: instance 4 chosen (3,11) effective (3,11) row txg 12 warm-ups [13] rereads RereadsOfThisMount { read_stage: OnTheFirstRead { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(3), checkpoint_txg: CheckpointTxg(11) }, witness: NewerPublishWitness { witnessed_journal_counter: 11, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 11 } } } }, instance_table_of_the_newest_root: OnTheFirstRead } isolated [(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable 0
+test c331_history_with_a_one_read_fault_rereads_into_the_newest_root_and_the_new_instance_write_survives ... ok
+read-only under the same faults: (1,3) reads back A = true
+final system configuration (device, generation, tail): [(0, 10, 7), (0, 9, 6), (1, 10, 7), (1, 9, 6)]
+history: A=(1,3,jsn 3) second-instance mount txgs=[CheckpointTxg(4), CheckpointTxg(5)] B=(2,6,jsn 6) C=(2,7,jsn 7)
+  config slot device 0 gen 10 tail 7 instance 2
+  config slot device 0 gen 9 tail 6 instance 2
+  config slot device 1 gen 10 tail 7 instance 2
+  config slot device 1 gen 9 tail 6 instance 2
+history: A=(1,3,jsn 3) second-instance mount txgs=[CheckpointTxg(4), CheckpointTxg(5)] B=(2,6,jsn 6) C=(2,7,jsn 7)
+  config slot device 0 gen 10 tail 7 instance 2
+  config slot device 0 gen 9 tail 6 instance 2
+  config slot device 1 gen 10 tail 7 instance 2
+  config slot device 1 gen 9 tail 6 instance 2
+C data unit locations: [(0, 50184), (1, 50184)]
+C root tree table / instance table: [(0, 50348), (1, 50348)] / [(0, 50304), (1, 50304)]
+read-only under the same faults: (1,3) reads back A = true
+final system configuration (device, generation, tail): [(0, 10, 7), (0, 9, 6), (1, 10, 7), (1, 9, 6)]
+final roots [(0, 0), (1, 1), (1, 2), (1, 3), (2, 4), (2, 5), (2, 6), (2, 7), (3, 8), (3, 9), (3, 10), (3, 11)]; final read-only Some((3, 11, true)); final writable: Ok: instance 4 chosen (3,11) effective (3,11) row txg 12 warm-ups [13] rereads RereadsOfThisMount { read_stage: OnTheFirstRead { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(3), checkpoint_txg: CheckpointTxg(11) }, witness: NewerPublishWitness { witnessed_journal_counter: 11, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 11 } } } }, instance_table_of_the_newest_root: OnTheFirstRead } isolated [(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable 0
+test a_newest_root_left_unwitnessed_by_a_failed_rotation_is_overwritten_by_the_new_instance_row_publish ... ok
+read-only under the same faults: (1,3) reads back A = true
+final system configuration (device, generation, tail): [(0, 10, 7), (0, 9, 6), (1, 10, 7), (1, 9, 6)]
+new-instance mount: Ok: instance 3 chosen (1,3) effective (1,3) row txg 4 warm-ups [5] rereads RereadsOfThisMount { read_stage: OnTheFirstRead { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, witness: NewerPublishWitness { witnessed_journal_counter: 0, comparison: NothingWitnessed } } }, instance_table_of_the_newest_root: OnTheFirstRead } isolated [(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable 0
+E = (3,6) jsn 6
+final system configuration (device, generation, tail): [(0, 14, 6), (0, 13, 5), (1, 14, 6), (1, 13, 5)]
+final roots [(0, 0), (1, 1), (1, 2), (1, 3), (2, 4), (2, 5), (2, 6), (4, 7), (4, 8), (4, 9)]; final read-only Some((4, 9, true)); final writable: Ok: instance 5 chosen (4,9) effective (4,9) row txg 10 warm-ups [11] rereads RereadsOfThisMount { read_stage: OnTheFirstRead { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(4), checkpoint_txg: CheckpointTxg(9) }, witness: NewerPublishWitness { witnessed_journal_counter: 9, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 9 } } } }, instance_table_of_the_newest_root: OnTheFirstRead } isolated [(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable 0
+test an_acquisition_that_cannot_read_the_newest_system_configuration_slots_overwrites_them_with_an_older_tail_and_a_later_mount_loses_the_acknowledged_publish ... ok
+new-instance mount: Ok: instance 3 chosen (2,6) effective (2,6) row txg 7 warm-ups [8] rereads RereadsOfThisMount { read_stage: OnTheFirstRead { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(6) }, witness: NewerPublishWitness { witnessed_journal_counter: 6, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 6 } } } }, instance_table_of_the_newest_root: OnTheFirstRead } isolated [(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable 0
+E = (3,9) jsn 9
+final system configuration (device, generation, tail): [(0, 10, 8), (0, 11, 9), (1, 10, 8), (1, 11, 9)]
+final roots [(0, 0), (1, 1), (1, 2), (1, 3), (2, 4), (2, 5), (2, 6), (2, 7)]; final read-only Some((2, 7, false)); final writable: Ok: instance 3 chosen (2,7) effective (2,7) row txg 8 warm-ups [9, 10] rereads RereadsOfThisMount { read_stage: OnTheFirstRead { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(7) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 7 } } } }, instance_table_of_the_newest_root: OnTheFirstRead } isolated [(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable 0
+test one_device_with_both_system_configuration_slots_unreadable_still_witnesses_the_newer_instance_and_refuses ... ok
+final roots [(0, 0), (1, 1), (1, 2), (1, 3), (3, 4), (3, 5), (3, 6), (2, 7)]; final read-only Some((2, 7, false)); final writable: Err: Recovery(UnitUnreadable { slot: SlotNumber(50304) })
+E data unit locations: [(0, 50182), (1, 50182)]
+E root tree table / instance table: [(0, 50334), (1, 50334)] / [(0, 50304), (1, 50304)]
+test every_system_configuration_slot_unreadable_on_the_first_witness_read_lets_a_hidden_root_override_the_new_instance_acknowledged_write ... ok
+final roots [(0, 0), (1, 1), (1, 2), (1, 3), (2, 4), (2, 5), (2, 6), (2, 7)]; final read-only Some((2, 7, false)); final writable: Ok: instance 3 chosen (2,7) effective (2,7) row txg 8 warm-ups [9, 10] rereads RereadsOfThisMount { read_stage: OnTheFirstRead { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(7) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 7 } } } }, instance_table_of_the_newest_root: OnTheFirstRead } isolated [(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable 0
+test c331_history_with_only_the_roots_unreadable_also_refuses_because_the_replay_stays_on_the_chosen_instance ... ok
+new-instance mount: Ok: instance 3 chosen (2,7) effective (2,7) row txg 8 warm-ups [9, 10] rereads RereadsOfThisMount { read_stage: OnTheOneReread { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 } } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(7) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 7 } } } }, instance_table_of_the_newest_root: OnTheFirstRead } isolated [(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable 0
+E = (3,11) jsn 11
+final system configuration (device, generation, tail): [(0, 14, 10), (0, 15, 11), (1, 14, 10), (1, 15, 11)]
+final roots [(0, 0), (1, 1), (1, 2), (1, 3), (2, 4), (2, 5), (2, 6), (2, 7)]; final read-only Some((2, 7, false)); final writable: Ok: instance 3 chosen (2,7) effective (2,7) row txg 8 warm-ups [9, 10] rereads RereadsOfThisMount { read_stage: OnTheFirstRead { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(7) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 7 } } } }, instance_table_of_the_newest_root: OnTheFirstRead } isolated [(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable 0
+test c331_history_refuses_the_writable_mount_while_every_root_and_record_of_the_newer_instance_stays_unreadable ... ok
+new-instance mount: Err: NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 } } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 } } } })
+final system configuration (device, generation, tail): [(0, 10, 7), (0, 9, 6), (1, 10, 7), (1, 9, 6)]
+final roots [(0, 0), (1, 1), (1, 2), (1, 3), (2, 4), (2, 5), (2, 6), (3, 7), (3, 8), (3, 9)]; final read-only Some((3, 9, true)); final writable: Ok: instance 4 chosen (3,9) effective (3,9) row txg 10 warm-ups [11] rereads RereadsOfThisMount { read_stage: OnTheFirstRead { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(3), checkpoint_txg: CheckpointTxg(9) }, witness: NewerPublishWitness { witnessed_journal_counter: 9, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 9 } } } }, instance_table_of_the_newest_root: OnTheFirstRead } isolated [(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable 0
+test the_newest_system_configuration_slot_unreadable_on_both_devices_loses_the_older_instance_acknowledged_publish_but_not_the_new_instance_write ... ok
+final roots [(0, 0), (1, 1), (1, 2), (1, 3), (2, 4), (2, 5), (2, 6), (2, 7)]; final read-only Some((2, 7, false)); final writable: Ok: instance 3 chosen (2,7) effective (2,7) row txg 8 warm-ups [9, 10] rereads RereadsOfThisMount { read_stage: OnTheFirstRead { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(7) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 7 } } } }, instance_table_of_the_newest_root: OnTheFirstRead } isolated [(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable 0
+test every_system_configuration_slot_unreadable_only_after_the_read_stage_still_refuses ... ok
+final roots [(0, 0), (1, 1), (1, 2), (1, 3), (2, 4), (2, 5), (2, 6), (2, 7), (3, 8), (3, 9), (3, 10), (3, 11)]; final read-only Some((3, 11, true)); final writable: Ok: instance 4 chosen (3,11) effective (3,11) row txg 12 warm-ups [13] rereads RereadsOfThisMount { read_stage: OnTheFirstRead { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(3), checkpoint_txg: CheckpointTxg(11) }, witness: NewerPublishWitness { witnessed_journal_counter: 11, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 11 } } } }, instance_table_of_the_newest_root: OnTheFirstRead } isolated [(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable 0
+test roots_and_records_readable_only_on_the_reread_are_chosen_and_the_new_instance_write_survives ... ok
+
+failures:
+
+failures:
+    every_system_configuration_slot_unreadable_on_the_reread_witness_read_flips_the_judgement_and_lets_a_hidden_root_override_the_new_instance_write
+
+test result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 28.47s
+
+error: test failed, to rerun pass `-p singlefs-harness --test c331_newer_instance_roots_unreadable_then_readable_again`

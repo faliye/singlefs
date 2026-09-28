@@ -1,0 +1,30 @@
+PROGRESS	500 files	0.1s
+PROGRESS	1000 files	0.2s
+PROGRESS	1500 files	1.2s
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-25-r17-main.out	chars=2210734	read=0.00	mask=60.65	detect=0.09
+SLOW	research/results/e142-r16-crates-dump-2026-09-25.out	chars=957126	read=0.00	mask=16.34	detect=0.03
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-28-r19-main-2026-09-28.out	chars=2218397	read=0.00	mask=65.24	detect=0.09
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-25-q142-1v-combined.out	chars=2059438	read=0.00	mask=60.48	detect=0.09
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-25-r17-s2prep-reverify.out	chars=2210734	read=0.00	mask=61.08	detect=0.10
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-25-header311-last-flag-arm-o.out	chars=126163	read=0.00	mask=0.55	detect=0.01
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-28-r19-main.out	chars=2218397	read=0.00	mask=72.74	detect=0.10
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-25-header311-last-flag.out	chars=132205	read=0.00	mask=0.51	detect=0.01
+SLOW	research/results/e142-r15-crates-write-dump-2026-09-25.out	chars=957126	read=0.00	mask=17.66	detect=0.03
+SLOW	research/results/e142-r18-crates-dump-2026-09-26.out	chars=957126	read=0.00	mask=17.25	detect=0.03
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-25-r16-combined.out	chars=2206872	read=0.00	mask=70.97	detect=0.15
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-25-position-addressed-comparison.out	chars=1055424	read=0.00	mask=45.90	detect=0.05
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-18-change-count-three.out	chars=116975	read=0.00	mask=0.63	detect=0.01
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-25-r16-main.out	chars=1249746	read=0.00	mask=43.64	detect=0.06
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-26-r18-main.out	chars=2211904	read=0.00	mask=74.04	detect=0.11
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-25-r17-arm-n16.out	chars=2206872	read=0.00	mask=71.25	detect=0.09
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-25-position-addressed-combined.out	chars=2012550	read=0.00	mask=58.80	detect=0.09
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-28-r19-arm-n18.out	chars=2212088	read=0.00	mask=62.63	detect=0.09
+SLOW	research/results/e154-two-gates-serial-rejudge-and-reclaim-timing-2026-09-24-rename.out	chars=12303609	read=0.01	mask=0.34	detect=0.58
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-25-r16-arm-n15.out	chars=1050660	read=0.00	mask=28.03	detect=0.04
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-25-r17-layer0.out	chars=1250599	read=0.00	mask=32.81	detect=0.05
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-26-r18-main-2.out	chars=2211904	read=0.00	mask=64.52	detect=0.09
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-26-r18-arm-n17.out	chars=1249573	read=0.00	mask=33.48	detect=0.05
+SLOW	research/results/e142-new-pool-file-creation-dry-run-2026-09-27-r19-arm-n18.out	chars=2212088	read=0.00	mask=65.43	detect=0.09
+PROGRESS	2000 files	1039.3s
+DONE	2148 files	1039.4s	read=0.2	mask=1029.3	detect=9.9
+rc=0

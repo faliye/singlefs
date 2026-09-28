@@ -5,7 +5,7 @@
 set -euo pipefail
 WORK=${1:?给一个空的工作目录}
 HERE=$(cd "$(dirname "$0")" && pwd)
-CAP=/home/fy5090/code/singlefs/research/scripts/capped.sh
+CAP=research/scripts/capped.sh
 mkdir -p "$WORK/logs"
 
 # ---- S4：admission.rs / mount.rs / transaction.rs 打点，加 s4_trace_probe.rs 与 s4_z19b_rerun.rs ----

@@ -34,7 +34,7 @@
 
 ## 三、攻方腿（Opus，`c355-c363-r1-opus-output.md` 323 行；模型 `c355-c363-r1-opus-model/` 两个 std 模型 + 一个钉在提交 `fbae43e` 导出副本上的实现探针）
 
-主 agent 在 `CARGO_TARGET_DIR=/tmp/claude-1000/c355-main-verify-target` 重建三者，`cmp` 与留存产物逐字节相同（2026-09-16 17:0x UTC）。这只说明产物可复现，不说明模型对；下表逐格核。
+主 agent 在 `CARGO_TARGET_DIR=/tmp/claude-1000/c355-main-verify-target` 重建三者，`cmp` 与留存产物逐字节相同（2026-09-17）。这只说明产物可复现，不说明模型对；下表逐格核。
 
 | 格（腿的编号） | 腿说 | 主 agent 核 |
 |---|---|---|

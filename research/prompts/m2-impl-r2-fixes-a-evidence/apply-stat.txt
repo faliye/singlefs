@@ -1,0 +1,9 @@
+ crates/singlefs-checker/src/image.rs               |   90 +++++-
+ crates/singlefs-checker/src/lib.rs                 |   13 +
+ crates/singlefs-checker/src/walk.rs                |   17 +
+ ...tation_barrier_fails_returns_the_mount_error.rs |  319 ++++++++++++++++++++
+ ...es_reserved_bytes_and_widths_it_used_to_skip.rs |    4 
+ .../tests/checker_known_bad_images.rs              |  201 +++++++++++++
+ ...turns-after-the-rotation-barrier-nofence.litmus |   32 ++
+ ...blish-returns-after-the-rotation-barrier.litmus |   41 +++
+ 8 files changed, 703 insertions(+), 14 deletions(-)

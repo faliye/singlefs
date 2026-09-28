@@ -1,6 +1,6 @@
 # c355-c363-r3 云端攻方腿（Opus）：W2，(b)「把固定点分配失败做成有定义的路径」自己的死角
 
-2026-09-23，时刻 UTC（东京 = UTC+9）。只攻 W2；W1、W3 不归这条腿。(b) 按第一轮判决的原文（`c355-c363-r1-main-verification.md:85`）读，第一轮攻方腿提它时括注了「从哪里借、发布怎么拆」（那份输出已归档，`git show 3cff909^:research/prompts/c355-c363-r1-opus-output.md` 第 260 行）。
+2026-09-23。只攻 W2；W1、W3 不归这条腿。(b) 按第一轮判决的原文（`c355-c363-r1-main-verification.md:85`）读，第一轮攻方腿提它时括注了「从哪里借、发布怎么拆」（那份输出已归档，`git show 3cff909^:research/prompts/c355-c363-r1-opus-output.md` 第 260 行）。
 
 ## 各格判定一览
 
@@ -23,7 +23,7 @@ bash research/prompts/c355-c363-r3-opus-model/run.sh [源仓目录] [草稿目�
 
 - 计数模型 `w2_count.rs` 只用 std，`rustc -O --edition 2021` 直接编；两条变异（`--mutate-ignore-device-cover`、`--mutate-split-pays-no-fixed-point`）必须让断言红，脚本在它们退 0 时失败。本次两条都退 101（`results/w2_count-mutations.txt`）。
 - 仓副本探针 `copy-probe/w2_probe.rs` 不是只用 std：它是拷进仓副本 `crates/singlefs-harness/tests/` 的一条测试，用 `singlefs-harness` 的随机历史执行器；v1 / v2 两个补丁只改副本里的 `crates/singlefs-core/src/mount.rs`。**副本上的数不是入库装置上的数。**
-- 本报告的 `results/` 由上面这条命令一次跑出，源仓用的是草稿目录里那份副本（`/tmp/claude-1000/c355-r3-opus/repo`，工作区取于约 13:2x UTC，`git rev-parse HEAD` = `3b60f098e97dc4c4f3ed9c6355422b607db1c34c` 加当时未提交的改动）；副本 crates 树的清单 `results/copy-manifest.txt` 与探索时那份逐字节相同（sha256 `7647758366389f81d4d78be364f623fc733331bc8c537727b614914c610f44a8`）。之后入库工作区又改了 5 个文件（`mount.rs` 那处只是一行文档注释），拿入库仓复跑时清单会不同。
+- 本报告的 `results/` 由上面这条命令一次跑出，源仓用的是草稿目录里那份副本（`/tmp/claude-1000/c355-r3-opus/repo`，工作区这一轮现取，`git rev-parse HEAD` = `3b60f098e97dc4c4f3ed9c6355422b607db1c34c` 加当时未提交的改动）；副本 crates 树的清单 `results/copy-manifest.txt` 与探索时那份逐字节相同（sha256 `7647758366389f81d4d78be364f623fc733331bc8c537727b614914c610f44a8`）。之后入库工作区又改了 5 个文件（`mount.rs` 那处只是一行文档注释），拿入库仓复跑时清单会不同。
 - 挂钟：计数模型不到 1 秒；探针全部约 12 分钟（24 线程，`nice -n 19`）。跑前 `ps` 没有性能测量、没有别的 cargo。
 
 文件 sha256（`find . -type f | sort | xargs sha256sum`，在模型目录里跑）：
@@ -354,7 +354,7 @@ defer 队列合法的「借」只有一条：抬 F。D23（journal 的角色与�
 
 ## 这条腿自己的限度
 
-- 副本上的数全是副本上的：仓副本取自 2026-09-23 约 13:2x UTC（东京约 22:2x）的工作区，含同一时刻别的线没提交的改动；副本 crates 树的清单哈希在开头。之后工作区里 `mount.rs` 只改了一行文档注释，别的几份改动在 checker 与测试里，没核它们会不会改变这些历史的结局。
+- 副本上的数全是副本上的：仓副本取自 2026-09-23 约的工作区，含同一时刻别的线没提交的改动；副本 crates 树的清单哈希在开头。之后工作区里 `mount.rs` 只改了一行文档注释，别的几份改动在 checker 与测试里，没核它们会不会改变这些历史的结局。
 - 所有历史都在两块单元区 384 槽的小盘上，每一段在撞墙之前根环都已转过一圈，拒绝与「挂载内不回收」混在一起（0.2 已写明）；4 GiB 的盘上几百步走不到墙。
 - 计数模型每次发布的固定点是常数 c_E，没有建多层树、分裂与释放链（W1 那一格）；「拆」按理想的任意两份算，比按事务拆宽松。
 - 1.1（预留在失败之前被默默吃光）与 2.3 表第 5、6 行、2.4 表最后一行是按条款与代码推的，没有装置。

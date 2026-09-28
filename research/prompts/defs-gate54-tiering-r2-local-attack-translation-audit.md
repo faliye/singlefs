@@ -1,4 +1,4 @@
-# 转述核对表：defs-gate54-tiering-r2-local-attack（2026-09-24 UTC）
+# 转述核对表：defs-gate54-tiering-r2-local-attack（2026-09-24）
 
 逐条核对 `research/prompts/defs-gate54-tiering-r2-local-attack.md`（本地攻方：V3、V4 逐格填表）
 里每一条 FACT 与真实脚本行为。这一轮的英文事实不是逐句翻译某一句中文，而是对着

@@ -6,11 +6,11 @@
 开工快照核对（对 105 份文件跑 sha256sum -c）：
 
 ```
-$ cd /home/fy5090/code/singlefs && sha256sum -c research/prompts/gate-fix-forks-r3-snapshot/sha256sums.txt --quiet
+$ cd <仓根> && sha256sum -c research/prompts/gate-fix-forks-r3-snapshot/sha256sums.txt --quiet
 （无输出，退出码 0）
 ```
 
-现查时刻：本机 UTC 时间见各命令 `date -u` 输出；本报告下文命令按 nice -n 19 跑，行号均为现查所得（`grep -n` / `awk 'NR==N'`），不从背景材料数。
+现查时刻：见各命令 `date -u` 输出；本报告下文命令按 nice -n 19 跑，行号均为现查所得（`grep -n` / `awk 'NR==N'`），不从背景材料数。
 
 ## 问题一：T1、T3、T8 的暂定形态与条款、登记表逐字对得上吗
 
@@ -92,7 +92,7 @@ T1 暂定形态（背景材料正文第 25 行）：「75 号 ⑤ 后一半：�
 **对门禁 71、72 号的判据——71 号现查不到对象**：
 
 ```
-$ cd /home/fy5090/code/singlefs && find . -iname '71-*.sh' 2>/dev/null
+$ cd <仓根> && find . -iname '71-*.sh' 2>/dev/null
 （零命中）
 $ git ls-tree -r HEAD --name-only -- .claude/gate.d/ | grep '^\.claude/gate\.d/71-'
 （零命中，exit 1）
@@ -152,7 +152,7 @@ $ git ls-tree -r HEAD --name-only -- .claude/gate.d/ | grep '^\.claude/gate\.d/7
 **一处 T8 四句话没有覆盖到的行为差异（现查代码得出，非条款冲突）**：`not_number_tokens()`（`.claude/scripts/gen-decision-items.py:61-70`）用 `handle.read()` 对整份文件做正则扫描，**没有跳过代码围栏**；而 `doc-lint.sh` 自己读同一种标记时显式跳过围栏（`.claude/singlefs-ai-sop/scripts/doc-lint.sh:795-796`，`grep -n` 现取：`awk '/^[ \t]*```/ { fence = !fence; next } fence { next }'` `/<!-- *doc-lint:not-numbers/ { print }'`，注释写着「读豁免声明也要认围栏：别处所有扫描都认，只有这里不认，于是在 \`\`\`markdown 块里「举例」写一行声明就能把豁免真的打开」）。现验：
 
 ```
-$ cd /home/fy5090/code/singlefs && python3 -c "
+$ cd <仓根> && python3 -c "
 import re
 src = open('.claude/scripts/gen-decision-items.py', encoding='utf-8').read()
 m = re.search(r'def not_number_tokens.*?(?=\ndef |\Z)', src, re.S)
@@ -174,7 +174,7 @@ has fence check: False
 **现跑我自己写的复现脚本**（先找每份阶段脚本里第一处 `cd "$ROOT"` 或 `cd "${1:-…}"` 形态的行号，再看这一行之后有没有出现 `$(dirname "$0")`）：
 
 ```
-$ cd /home/fy5090/code/singlefs && nice -n 19 python3 - <<'PY'
+$ cd <仓根> && nice -n 19 python3 - <<'PY'
 import re, glob
 files = sorted(glob.glob('.claude/gate.d/*.sh'))
 hits = []
@@ -244,7 +244,7 @@ $ git show HEAD:.claude/gate.d/52-segment-registry.sh | grep -n 'cd \|dirname "\
 **先数样本总数（纯文件系统枚举，不执行任何阶段脚本）**：
 
 ```
-$ cd /home/fy5090/code/singlefs && nice -n 19 find .claude/gate.d/fixtures -mindepth 2 -maxdepth 2 -type d \( -name red -o -name green \) -exec test -f {}/expect \; -print 2>/dev/null | wc -l
+$ cd <仓根> && nice -n 19 find .claude/gate.d/fixtures -mindepth 2 -maxdepth 2 -type d \( -name red -o -name green \) -exec test -f {}/expect \; -print 2>/dev/null | wc -l
 143
 ```
 
@@ -295,7 +295,7 @@ $ grep -c '✗' /tmp/claude-1000/gate-fix-forks-r3-sonnet/stage-selftest-filtere
 **先数 `LIB_CHANGED_PATHS_BREAK` 在 `research/scripts/changed-paths.sh` 里出现过的取值**（`grep -noE` 现取）：
 
 ```
-$ cd /home/fy5090/code/singlefs && nice -n 19 grep -noE 'LIB_CHANGED_PATHS_BREAK[^)]*?[=!]=\s*"?[a-zA-Z-]+"?' research/scripts/changed-paths.sh
+$ cd <仓根> && nice -n 19 grep -noE 'LIB_CHANGED_PATHS_BREAK[^)]*?[=!]=\s*"?[a-zA-Z-]+"?' research/scripts/changed-paths.sh
 48:LIB_CHANGED_PATHS_BREAK:-}" != fallback
 52:LIB_CHANGED_PATHS_BREAK:-}" == empty-merge-base
 68:LIB_CHANGED_PATHS_BREAK:-}" == quotepath
@@ -344,7 +344,7 @@ binary: exit=1
 r2 判决 T8 一节（背景材料附录，`gate-fix-forks-r2-main-verification.md:959` 行原句）只写「十九格手写用例全对」，没有逐格列出用例。按 r3 正文第 63 行给的五类（截断停在登记词之后、登记词里带连字符或小数点、截断落在词中间、截断落在登记词中间、截断后尾巴是真编号而它的简称被截掉）自己设计 19 格，直接调用现读的 `clip()` 源码（不整份 import 模块——该文件顶层有无 `__main__` 守卫的散文代码，import 会连带打印全部决策分项；改成只 `exec` `clip` 与 `not_number_tokens` 两段函数定义，`_NOT_NUMBER_TOKENS` 手动设成 `{"SHA256", "RAID5", "AES-256", "SHA-256", "Q1.1"}` 五个固定值，不读真实 kb，避免结果随 kb 内容漂移）：
 
 ```
-$ cd /home/fy5090/code/singlefs && nice -n 19 python3 - <<'PY'
+$ cd <仓根> && nice -n 19 python3 - <<'PY'
 import re
 src = open('.claude/scripts/gen-decision-items.py', encoding='utf-8').read()
 clip_src = re.search(r'^def clip.*?(?=\n_NOT_NUMBER_TOKENS)', src, re.S | re.M).group(0)
@@ -401,7 +401,7 @@ PY
 **现跑验证「各关一条红样本都判错」**：把 `64-change-range-single-source.sh` 拷到草稿目录，分别只屏蔽三条判据里的一条（把对应的 `*_hits.append(...)` 换成 `pass`，其余代码不动），逐个对着仓里现成的红样本（`.claude/gate.d/fixtures/64-change-range-single-source.sh/red/`）跑，按 `stage-selftest.sh` 自己的判法（退出码要对、`expect` 里每条 `want=` 都要在输出里找到）现判：
 
 ```
-$ cd /home/fy5090/code/singlefs
+$ cd <仓根>
 $ EXPECT=.claude/gate.d/fixtures/64-change-range-single-source.sh/red/expect
 $ for variant in baseline disable-1 disable-2 disable-3; do
     work=$(mktemp -d)

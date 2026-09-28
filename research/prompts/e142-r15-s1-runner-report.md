@@ -1,6 +1,6 @@
 # E142 第 15 次跑（按位置寻址）— 执行员报告
 
-开工 2026-09-25 09:05 JST。跑前登记 `research/prompts/e142-r15-prereg.md`（sha256 待核）。
+开工 2026-09-25。跑前登记 `research/prompts/e142-r15-prereg.md`（sha256 待核）。
 
 ## 一、这一轮做了什么、没做什么（先给结论）
 
@@ -132,8 +132,8 @@ $ sha256sum research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs re
 # 与第二节「开工前」现查的两个值逐字节相同——这一轮没有用 Edit/Write 碰过这两个文件。
 $ ls crates/singlefs-harness/src/bin/e142_first_transaction_write_dump.rs
 ls: cannot access …: No such file or directory   # 没建
-$ find research/results -iname '*e142*' -newermt '2026-09-25 00:05:00'
-（无输出——开工时刻 00:05 UTC 之后没有任何 e142 产物文件被新建或改动）
+$ find research/results -iname '*e142*' -newermt '2026-09-25'
+（无输出——开工时刻之后没有任何 e142 产物文件被新建或改动）
 $ git diff --stat -- .claude/kb/experiments.md ".claude/kb/experiments/142-第一个事务的干跑.md"
  .claude/kb/experiments.md                                       |  19 ++--
  .claude/kb/experiments/142-第一个事务的干跑.md                    | 114 +++++++++++++--------
@@ -168,7 +168,7 @@ $ git diff --stat -- .claude/kb/experiments.md ".claude/kb/experiments/142-第�
 派发提示要求交回前把这份报告拷一份到 `research/prompts/e142-r15-runner-report.md`；试了一次 `Write`，被写范围闸拒绝：
 
 ```
-✗ experiment-runner 的写范围不含 /home/fy5090/code/singlefs/research/prompts/e142-r15-runner-report.md
+✗ experiment-runner 的写范围不含 research/prompts/e142-r15-runner-report.md
 → 它的写范围：…research/prompts/e*-preregistration.md…research/prompts/e*-r*-prereg.md…/tmp/claude-1000/**（.claude/hooks/agent-write-scope.tsv）
 ```
 

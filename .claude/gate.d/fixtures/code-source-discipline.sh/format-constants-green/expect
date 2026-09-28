@@ -1,0 +1,6 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：format-constants
+want=格式常量同步
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=format-constants：绿
+want=code-source-discipline.sh：1 格里 1 格绿（format-constants），0 格本次未跑（无）

@@ -1,4 +1,4 @@
-# 实审 B3a-2 报告（implementation-writer，2026-09-26 UTC 写）
+# 实审 B3a-2 报告（implementation-writer，2026-09-26 写）
 
 ## 一、结论
 

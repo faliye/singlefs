@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：term-renames
+want=── term-renames：登记过改名的术语不再出现旧名
+want=登记过的术语改名，仓里还有地方用着旧名
+want=旧名
+want=── 汇总：doc-text.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=  term-renames：红（退出 1）
+want=doc-text.sh：1 格里 1 格红（term-renames）
+want=→ term-renames：python3 research/scripts/sweep-term.py --apply 一次换完

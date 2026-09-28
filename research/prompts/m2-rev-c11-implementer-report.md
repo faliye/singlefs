@@ -1,6 +1,6 @@
 # 实审 C11 交回：码 2 头宽改成三方各算一份 + 交叉断言（代码审阅第 11 条）
 
-时刻：2026-09-26 22:52 UTC 起做（JST 2026-09-27 07:52 起）。交法：**交补丁**。改动都在仓副本 `/tmp/claude-1000/impl-rev-c11/repo` 里，主工作区一个字没碰；补丁目录 `/tmp/claude-1000/impl-rev-c11/patch/`。
+日期：2026-09-27 起做。交法：**交补丁**。改动都在仓副本 `/tmp/claude-1000/impl-rev-c11/repo` 里，主工作区一个字没碰；补丁目录 `/tmp/claude-1000/impl-rev-c11/patch/`。
 
 ## 结论
 
@@ -220,4 +220,4 @@ singlefs-harness_--test_index_node_header_width_computed_three_ways_agrees_for_e
 - 整个工作区的 clippy 与 fmt 都红在别人的文件上，没修；只证了我动到的目标干净。
 - 92 号、89 号退 77，本次没判；74 号红，但基线同样红，照写。
 - 草稿收尾：删了仓副本 `/tmp/claude-1000/impl-rev-c11/repo`（15G，几乎都是它的 target），也删了从 HEAD 拷出来的 `capped-head.sh`。没删、留给主 agent 核的，都在 `/tmp/claude-1000/impl-rev-c11/` 下，合计 1.6M：补丁目录 `patch/`，原件 `orig/`，终版 `final/`（sha256 记在 `final.sha256`），各次日志，证红日志 `prove-logs/`，整二进制变异跑的 `whole-binary/`，`progress.md`。
-- 这一轮用过的 capped.sh：主工作区的 `research/scripts/capped.sh` 22:52Z 前后有 bash 语法错（别的会话插坏了）。副本的第一次 build、五个二进制首跑、prove-red 这三批，是用 HEAD 版拷到草稿目录的那份设线程上限跑的；收到主 agent 消息说修好之后，改回用仓里那份。
+- 这一轮用过的 capped.sh：主工作区的 `research/scripts/capped.sh` 途中有一阵有 bash 语法错（别的会话插坏了）。副本的第一次 build、五个二进制首跑、prove-red 这三批，是用 HEAD 版拷到草稿目录的那份设线程上限跑的；收到主 agent 消息说修好之后，改回用仓里那份。

@@ -1,0 +1,11 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.10s
+     Running tests/crash_image_journal_hint_matches_the_full_ring_scan.rs (target/debug/deps/crash_image_journal_hint_matches_the_full_ring_scan-a317c359d9d1cbcf)
+
+running 3 tests
+test one_write_covering_two_record_slots_hands_both_slots_to_the_scan ... ok
+test a_record_written_off_the_record_slot_grid_is_read_by_neither_scan ... ok
+test on_the_first_transaction_stream_the_hint_finds_what_the_full_ring_scan_finds_in_every_compared_state ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.42s
+

@@ -15,7 +15,7 @@
 
 这一轮攻的是写好的代码、它的测试和定义文字。问的是它们做的是不是条款说的，不重判设计。三种结论，每格只能落一种。共用问句与三种结论的定义照第一轮正文 `research/prompts/_m2-final-code-r1-body.md` 第一节，逐字适用。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-25 04:40 JST 现查）
+## 二、实现今天的样子（主 agent 的观测，2026-09-25 现查）
 
 - **冻结副本**：腿读代码一律读 `/tmp/claude-1000/m2-final-code-r2/tree/crates/`，别读主工作区——实二一正在主工作区里改 `allocator.rs`、`transaction.rs`、`lib.rs`、`singlefs-format/src/lib.rs`，新建 `allocation_record_tree.rs`、`extent_tree.rs`。
   - 冻结副本就是实二二三合入时的整棵树，比主工作区只少实二一的改动。

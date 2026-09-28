@@ -251,10 +251,10 @@ EXIT=0
 EXIT=77
 == 70-citations.sh ==
 ══ 外部引用复核 ══
-  refs-linux（固定点）根：/home/fy5090/code/fs-refs/linux-6.17
-  refs-zfs（固定点）根：/home/fy5090/code/fs-refs/zfs
-  refs-docs（固定点）根：/home/fy5090/code/fs-refs/docs
-  host-kernel（非固定点）根：/home/fy5090/kbuild/linux-om
+  refs-linux（固定点）根：~/code/fs-refs/linux-6.17
+  refs-zfs（固定点）根：~/code/fs-refs/zfs
+  refs-docs（固定点）根：~/code/fs-refs/docs
+  host-kernel（非固定点）根：~/kbuild/linux-om
 
 ── bcachefs（Linux 6.17）──
   ✓ D8     btree 树数（21）
@@ -358,12 +358,12 @@ EXIT=77
   ✓ D10    FAST17：老化的 BetrFS 胜过别家未老化
 
 ══ 按每条引用依赖的那棵树分组 ══
-  refs-linux（固定点） 20 条：命中 20，未命中 0  根：/home/fy5090/code/fs-refs/linux-6.17
-  refs-zfs（固定点） 15 条：命中 15，未命中 0  根：/home/fy5090/code/fs-refs/zfs
-  refs-docs（固定点） 16 条：命中 16，未命中 0  根：/home/fy5090/code/fs-refs/docs
-  host-kernel（非固定点） 38 条：命中 38，未命中 0  根：/home/fy5090/kbuild/linux-om
+  refs-linux（固定点） 20 条：命中 20，未命中 0  根：~/code/fs-refs/linux-6.17
+  refs-zfs（固定点） 15 条：命中 15，未命中 0  根：~/code/fs-refs/zfs
+  refs-docs（固定点） 16 条：命中 16，未命中 0  根：~/code/fs-refs/docs
+  host-kernel（非固定点） 38 条：命中 38，未命中 0  根：~/kbuild/linux-om
   没标树来源：0 条
-  ⚠️ host-kernel 上的 38 条核的不是固定点：/home/fy5090/kbuild/linux-om 不在 fetch-refs.sh 的固定点里，
+  ⚠️ host-kernel 上的 38 条核的不是固定点：~/kbuild/linux-om 不在 fetch-refs.sh 的固定点里，
      随时会被升级、改动或删掉 ⇒ 这一批的「已核实」只在这台机器的今天成立。
 
 ══ 结果：89 条命中，0 条未命中；分组合计 89 条，与断言总数一致 ══

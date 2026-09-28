@@ -2,9 +2,9 @@
 
 你交的是观测，不是判决：核对表里的 ✗ 不免除主 agent 对推论的逐条现查。
 
-写于 2026-09-24（UTC 01:50 开工；JST 10:50）。草稿目录 `/tmp/claude-1000/m2-wave3-verifier/`。
+写于 2026-09-24（开工）。草稿目录 `/tmp/claude-1000/m2-wave3-verifier/`。
 
-输入：轮名 `m2-wave3-code-r1`；三条腿报告——云端攻方 `research/prompts/m2-wave3-code-r1-opus-output.md`（给定 sha256 `dc92dc659f4d74641ec3c393545a3692a593a33cd4de8d38a8662661d463bb55`，模型目录 `research/prompts/m2-wave3-code-r1-opus-model/`）、云端正推 `research/prompts/m2-wave3-code-r1-sonnet-output.md`（给定 sha256 `023fbb235bbe3f071f001491120dcf3ad6f32faaf1dbf16f940954a8cfa5c91d`）、本地攻方 `research/prompts/m2-wave3-code-r1-local-attack.md` + `-translation-audit.md` + `-runlog.md` + `-output-s1.md` + `-output-s2.md`（`-output-void1.md` 作废）；背景材料 `research/prompts/_m2-wave3-code-r1-background.md`；开工快照 `research/prompts/m2-wave3-code-r1-snapshot/sha256sums.txt`（36 份，00:50:44 UTC）。
+输入：轮名 `m2-wave3-code-r1`；三条腿报告——云端攻方 `research/prompts/m2-wave3-code-r1-opus-output.md`（给定 sha256 `dc92dc659f4d74641ec3c393545a3692a593a33cd4de8d38a8662661d463bb55`，模型目录 `research/prompts/m2-wave3-code-r1-opus-model/`）、云端正推 `research/prompts/m2-wave3-code-r1-sonnet-output.md`（给定 sha256 `023fbb235bbe3f071f001491120dcf3ad6f32faaf1dbf16f940954a8cfa5c91d`）、本地攻方 `research/prompts/m2-wave3-code-r1-local-attack.md` + `-translation-audit.md` + `-runlog.md` + `-output-s1.md` + `-output-s2.md`（`-output-void1.md` 作废）；背景材料 `research/prompts/_m2-wave3-code-r1-background.md`；开工快照 `research/prompts/m2-wave3-code-r1-snapshot/sha256sums.txt`（36 份）。
 
 ## sha256 核对（腿报告文件）
 
@@ -253,7 +253,7 @@ $ grep -n "^fn \|^#\[test\]" crates/singlefs-harness/tests/second_transaction_su
 | `fixD-tests.log`（改法 D 回归：`checker_known_bad_images` 23、`second_transaction_step_four_rollback` 11） | — | **✓**：本次复跑两条测试套件仍分别 23 passed / 11 passed，用时 64.06s / 45.03s（比留存的 1039.53s / 668.32s 快得多，机器负载忽高忽低，属正常波动） |
 | `fixD-y1.log`（改法 D 之下 Y1-a 130 格清零） | 36351 | **✓ 独立复跑坐实**：排序后 0 差异，288 行 `violations=0`，全绿 |
 | `fixE-mutY4.log`（改法 E 之下 Y4 变异 k=78..80 由漏变红） | 12324 | **✓ 独立复跑坐实**：排序后 0 差异 |
-| `fixE-y3.log`（改法 E 不引入误报：候选 b + C533 两条扫描判定不变） | 88925 | **✓ 独立复跑坐实**（交回 SubagentHandback 之后后台任务继续跑完，02:30 完成，89092 字节）：剥掉两边各自的时序噪音（cargo「running for over 60 seconds」慢测试提示、随机线程 PID）后排序比对 0 差异 |
+| `fixE-y3.log`（改法 E 不引入误报：候选 b + C533 两条扫描判定不变） | 88925 | **✓ 独立复跑坐实**（交回 SubagentHandback 之后后台任务继续跑完，89092 字节）：剥掉两边各自的时序噪音（cargo「running for over 60 seconds」慢测试提示、随机线程 PID）后排序比对 0 差异 |
 | `fixD-m356.log`（改法 D 之下变异 356 仍红） | 2404 | **✓ 独立复跑坐实**（同一批后台任务跑完，2322 字节）：同一条用例仍然 `FAILED`（`test after_rolling_back_to_a_warm_up_root_the_ring_watermark_outlives_the_file_version_roots_leaving_the_ring ... FAILED`，`0 passed; 1 failed; ...`），剥掉线程 PID 差异后与留存产物一致——改法 D 没有把变异 356 的判别力拿掉 |
 
 **已经坐实的核心结论**：主 agent 点名的两个「重点复跑」目标——Y1-a 的 130 格与 Y4-a 的 k=78..80 三格——**都已经在与腿完全独立的重新编译、重新跑一遍里逐字符复现**，不依赖信任腿留存的日志。改法 D、改法 E 各自涉及的全部 6 段产物（`fixD-tests.log`、`fixD-y1.log`、`fixD-m356.log`、`fixE-mutY4.log`、`fixE-y3.log`，加上前面的 `y1-run1.log`、`y3-formatted.log`、`mutY4-run2.log`）**8 段全部独立复跑坐实**，run.sh 里没有一段是靠信任留存日志过关的。唯一记 ✗ 的是 `y3-run1.log` 的日志/命令对不上，这是本报告发现的一处新问题，与改法 D/E 本身的正确性无关，也不影响候选 b 与 I-3.10 的判定内容。
@@ -273,7 +273,7 @@ $ grep -n "^fn \|^#\[test\]" crates/singlefs-harness/tests/second_transaction_su
 - 不判 Y1/Y3/Y4/Y2/Y5 各条推论本身的设计对不对（是不是该收窄、改法 D/E 好不好），只核引用、产物与复跑。
 - 没有重新审阅背景材料 `_m2-wave3-code-r1-background.md`、`_m2-wave3-code-r1-appendix.md`、`_m2-wave3-code-r1-checklist.md`、`_m2-wave3-code-r1-body.md` 本身的完整性（三条腿都没有直接引用它们的行号或内容当证据，只有 Sonnet 那处误引的行号巧合落在背景材料里，见「decisions/22:725」那一条）。
 - 没有核 `crates/mutations.tsv` 除本地攻方提示点名的那七行、以及本报告顺手核对的那几个标识符匹配之外的其余全部 379 行内容。
-- （2026-09-24 02:30 UTC 补记）`fixE-y3.log`、`fixD-m356.log` 两段复跑在本报告初次落盘时仍在后台进行；后台任务已在交回之后跑完，两段结果已补进「复跑最终结果」，均为 ✓。比对脚本 `/tmp/claude-1000/m2-wave3-verifier/compare-log.sh` 与全部产物留在草稿目录。
+- （2026-09-24 补记）`fixE-y3.log`、`fixD-m356.log` 两段复跑在本报告初次落盘时仍在后台进行；后台任务已在交回之后跑完，两段结果已补进「复跑最终结果」，均为 ✓。比对脚本 `/tmp/claude-1000/m2-wave3-verifier/compare-log.sh` 与全部产物留在草稿目录。
 - 没有核 Opus/Sonnet 报告里标为「推测，没跑」「没验」「只推」的那些格（如 Y1 的「瞬时读错拉低水位」、Y3 的「④ 成立而多并一版把真泄漏藏住」），这些格两条腿自己已声明没做，不在核查范围。
 - 没有对本地腿另外两个建议表述之外的判断词（yes/no/unknown）逐格与源码重新对答一遍——除 Row 6 与 Question 4 Column A 那两格因为前提被证伪而重点核之外，其余 12 题 × 4 列的具体作答内容是否与（假设前提为真时）代码事实相符，本报告没有逐格重算，只核了提示本身给的「事实」对不对。
 

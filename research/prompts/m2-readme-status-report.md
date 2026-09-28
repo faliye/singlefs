@@ -1,12 +1,12 @@
 # README 与分片模板：报告
 
-草稿目录 `/tmp/claude-1000/readme-status/`。改动前的 README 备份在 `README.before.md`（sha256 7f0923b2…418e，与动手前仓里的一致，那时 `git diff README.md` 只有「层 0 全量分到两台机器上跑（可选）」一节 18 行新增，是这一批的）。逐处替换的旧串 / 新串在 `edits/e01`–`e18`，都经 `research/scripts/replace-once.py` 定点替换、各命中 1 次。时刻都是 UTC（JST = UTC+9）。
+草稿目录 `/tmp/claude-1000/readme-status/`。改动前的 README 备份在 `README.before.md`（sha256 7f0923b2…418e，与动手前仓里的一致，那时 `git diff README.md` 只有「层 0 全量分到两台机器上跑（可选）」一节 18 行新增，是这一批的）。逐处替换的旧串 / 新串在 `edits/e01`–`e18`，都经 `research/scripts/replace-once.py` 定点替换、各命中 1 次。
 
-## 一、仓根 `layer0-shard.env.example`
+## 一、仓根 `multi-host.env.example`
 
-- 两份来源逐字节相同：`diff /tmp/claude-1000/gate-batch-m2-g2/layer0-shard.env.example /tmp/claude-1000/impl-shard-1/deliver/layer0-shard.env.example` 退 0；两份 sha256 都是 `72ae03d4a01a49ccc069dc27c62a03e31d42dc420e52a879fa67bd4c2c458bd4`。
-- 用 `set -o noclobber; cat <G2 那份> > layer0-shard.env.example` 排他新建，仓里那份 sha256 同上（20 行）。
-- 两份脚本在仓里（未跟踪）。⚠️ 它们在 23:34 UTC 被 G2 又改过一次（mtime 23:34:12 / 23:34:13），键比对按改后的这一版重做：`layer0-shard-run.sh` 4afc1b9c…952e、`layer0-shard-configuration-check.sh` 12d95b63…4f75，与 G2 `dev/research/scripts/` 下同名文件逐字节相同（`diff` 空）。配置检查这一次只改了 preflight 的 source 行，键表没动。
+- 两份来源逐字节相同：`diff /tmp/claude-1000/gate-batch-m2-g2/multi-host.env.example /tmp/claude-1000/impl-shard-1/deliver/multi-host.env.example` 退 0；两份 sha256 都是 `72ae03d4a01a49ccc069dc27c62a03e31d42dc420e52a879fa67bd4c2c458bd4`。
+- 用 `set -o noclobber; cat <G2 那份> > multi-host.env.example` 排他新建，仓里那份 sha256 同上（20 行）。
+- 两份脚本在仓里（未跟踪）。⚠️ 它们被 G2 又改过一次，键比对按改后的这一版重做：`layer0-shard-run.sh` 4afc1b9c…952e、`layer0-shard-configuration-check.sh` 12d95b63…4f75，与 G2 `dev/research/scripts/` 下同名文件逐字节相同（`diff` 空）。配置检查这一次只改了 preflight 的 source 行，键表没动。
 - 七个键逐字对上：
 
 | 键 | 模板 | 配置检查 `LAYER0_SHARD_CONFIGURATION_KEYS`（第 24–25 行） | 驱动里用到的行 |
@@ -20,20 +20,20 @@
 | QUIESCE_STARTED_CHECK_COMMAND | 有 | 有 | 99、100、102 |
 
   驱动经配置检查的 `--emit-assignments` 取值（`layer0-shard-run.sh` 第 72 行调、第 76 行 `eval`），配置检查把七个键全打出来。
-- 模板能被判法读通（在改前那一版配置检查上跑的，改后键表与解析段没变）：`SINGLEFS_LAYER0_SHARD_CONFIG=$PWD/layer0-shard.env.example SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1 bash research/scripts/layer0-shard-configuration-check.sh --emit-assignments` 退 0，打出七个键（前三个是占位值，四条清场命令是 `''`）。用了只供测试的开关，没连 ssh。
-- 模板里没有真实值：`grep -nE 'faliye|jplife|fy5090|/home/|vllm|tts|192\.168|10\.[0-9]+\.' <模板>` 零命中（退 1）；值只有 `peer-machine-alias`、`/absolute/path/on/the/peer/...` 与空串。仓根的 `layer0-shard.env` 没读、没改、没拷（只 `git check-ignore -v` 了它的路径）。
+- 模板能被判法读通（在改前那一版配置检查上跑的，改后键表与解析段没变）：`SINGLEFS_MULTI_HOST_CONFIG=$PWD/multi-host.env.example SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1 bash research/scripts/layer0-shard-configuration-check.sh --emit-assignments` 退 0，打出七个键（前三个是占位值，四条清场命令是 `''`）。用了只供测试的开关，没连 ssh。
+- 模板里没有真实值：`grep -nE 'faliye|<主机名片段>|fy5090|/home/|<本地模型服务>|tts|192\.168|10\.[0-9]+\.' <模板>` 零命中（退 1）；值只有 `peer-machine-alias`、`/absolute/path/on/the/peer/...` 与空串。仓根的 `multi-host.env` 没读、没改、没拷（只 `git check-ignore -v` 了它的路径）。
 - 忽略规则：
 
 ```
-$ git check-ignore -v layer0-shard.env.example; echo rc=$?
+$ git check-ignore -v multi-host.env.example; echo rc=$?
 rc=1
-$ git check-ignore -v layer0-shard.env
-.gitignore:19:/layer0-shard.env	layer0-shard.env
-$ git status --short layer0-shard.env.example
-?? layer0-shard.env.example
+$ git check-ignore -v multi-host.env
+.gitignore:19:/multi-host.env	multi-host.env
+$ git status --short multi-host.env.example
+?? multi-host.env.example
 ```
 
-  `.gitignore` 里与分片有关的只有第 18 行注释与第 19 行 `/layer0-shard.env`（`grep -n layer0 .gitignore` 两行）；第 16 行的 `.env` 只配名叫 `.env` 的文件，不配这两个名字。
+  `.gitignore` 里与分片有关的只有第 18 行注释与第 19 行 `/multi-host.env`（`grep -n layer0 .gitignore` 两行）；第 16 行的 `.env` 只配名叫 `.env` 的文件，不配这两个名字。
 
 ## 二、README 缺描述的地方（一处一行，都已补）
 
@@ -44,7 +44,7 @@ $ git status --short layer0-shard.env.example
 | 3 | 分片一节没说分片怎么跑、怎么并（0/2、1/2、`merge/2`，merge 那趟照单机判法判、写同一格标记）与被杀后续跑 | 同上 |
 | 4 | 分片一节没说两台的前提：同一个 rustup 工具链（`rustc -Vv` 前三行与 host 行、`cargo -V` 逐字相同），本机 `rsync` / `ssh`，第二台 `python3` / `git` | 分片一节第 5 段 |
 | 5 | 驱动脚本怎么单独调、`--selftest` 做什么、它是重型只在提交时或用户要求时跑 | 分片一节第 6 段 |
-| 6 | 目录表没列仓根模板 `layer0-shard.env.example` | 目录表新行 |
+| 6 | 目录表没列仓根模板 `multi-host.env.example` | 目录表新行 |
 | 7 | 目录表没列 `.claude/rules/` | 目录表新行 |
 | 8 | 目录表没列 `.claude/agents/`（连同 `agent-common.md`、`main-agent.md`） | 目录表新行 |
 | 9 | 目录表没列 `.claude/hooks/` | 目录表新行 |
@@ -76,7 +76,7 @@ $ git status --short layer0-shard.env.example
 | S6 | 无 | 代码审阅提出的 38 条正分批在这个里程碑里修 | 同上第 205 行「代码审阅 38 条：…分批「照分批全在里程碑二修」」；之后第 206–229 行多数是这批（实审 A / B / C）的交回与开工 |
 | S7 | 无 | C554（崩溃恢复抛弃的根暂时读不出时影子账算不到）那一形用户定了要改 | 同上第 196 行「C554 用户定案：不许认，要改」；简称照 `.claude/kb/checks-owed.md:475` |
 | S8 | 无 | 这一版的简报等收尾时写 | 十步表第 9 步；`ls briefs/` |
-| S9 | 无 | 下一个里程碑十项设想是草稿、等这个里程碑收口才开工；第六项双机分片用户定了提前做、已接进门禁 54 号 | `03-third-txn.md:1,3`；`records/…收尾调度.md:199`「用户 23:4x JST 指示把里程碑三第六项…提前到现在做」；`.claude/gate.d/54-layer0-replay.sh` 文件头「双机分片（里程碑三第六项，用户 2026-09-27 定默认不分片）」一段 |
+| S9 | 无 | 下一个里程碑十项设想是草稿、等这个里程碑收口才开工；第六项双机分片用户定了提前做、已接进门禁 54 号 | `03-third-txn.md:1,3`；`records/…收尾调度.md:199`「用户指示把里程碑三第六项…提前到现在做」；`.claude/gate.d/54-layer0-replay.sh` 文件头「双机分片（里程碑三第六项，用户 2026-09-27 定默认不分片）」一段 |
 | S10 | 无 | 不能挂到系统里用：没有 FUSE、内核模块、目录与 POSIX 接口；快照、加密、压缩不在这个里程碑；别存数据；格式是软的 | `02-second-txn.md:26-28`「不在里面：目录与 POSIX 面、FUSE…快照与克隆、加密、压缩」；`grep -rnwiE 'fuse\|readdir\|DirectoryEntry\|directory_entry\|dirent\|posix' crates --include=*.rs` 零命中；`briefs/2026-09-14.md:6-7`；`.claude/rules/format-evolution.md` 开头 |
 | S11 | 无 | 验证表「崩溃点重放」一行：两条流、登记的崩溃枚举用例逐条跑逐条记标记、固定脚本那条流重写重跑之前不作数、「门禁全绿只构成第一个事务在模型层的崩溃一致性证据」 | `CLAUDE.md:110`（「一句话版本」最后一条，限定词「层 0 用例只改到编得过、下游钉的值没有重核」照抄）；`.claude/gate.d/stage-inputs.tsv` 五行 `crash-case:`；54 号文件头 `--full` 一段 |
 | S12 | 无 | 「在用的 79 条不变量里判 46 条」 | `grep -c '^\| I-.*已实现' .claude/kb/invariants.md` → `46`；`.claude/kb/invariants.md:17`「现共 79 条在用」 |
@@ -112,8 +112,8 @@ $ git status --short layer0-shard.env.example
 ## 五、没做什么
 
 - 没跑 `layer0-shard-run.sh` 与它的 `--selftest`，没连第二台；模板只用配置检查加只供测试的开关读过一遍。
-- `layer0-shard.env.example` 未跟踪（`??`）：README 目录表与分片一节指向它，要随提交一起进仓。没做任何 git 写操作。
-- 两份分片脚本在我干活时（23:34 UTC）被 G2 改过一次；README 按改后那一版写。G2 再改的话，分片一节第 4–6 段要对一遍。
+- `multi-host.env.example` 未跟踪（`??`）：README 目录表与分片一节指向它，要随提交一起进仓。没做任何 git 写操作。
+- 两份分片脚本在我干活时被 G2 改过一次；README 按改后那一版写。G2 再改的话，分片一节第 4–6 段要对一遍。
 - 看到但不归这件活、没动的：
   - `.claude/gate.d/74-model-differential.sh:4` 的 gate-stage 行写「随机历史快档与三个取样点」，同一文件第 38 行 `SECTIONS` 是快档加五个取样点；README 照 `SECTIONS` 写。
   - `.claude/kb/milestone/02-second-txn.md:476` 并行线一现状说多于一个数据单元被 `UndecidedClauseBlockingMoreThanOneDataUnit` 拒，`grep -rn UndecidedClauseBlockingMoreThanOneDataUnit crates --include=*.rs | wc -l` 为 0，且有 `crates/singlefs-harness/tests/second_transaction_parallel_line_one_multi_unit_file.rs`：那一句多半过时，README 没引它。

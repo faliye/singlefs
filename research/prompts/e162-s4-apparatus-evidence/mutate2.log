@@ -1,0 +1,17 @@
+mutate: 这一轮开 2 个工作进程（各项取最小、至少 1）：核数 32 的一半、至多 16，给 16 个；MUTATE_JOBS 给 2 个；表里 11 条。卡在「MUTATE_JOBS」这一项；每个 cargo 编译并行度 5（MUTATE_CARGO_JOBS）
+mutate: e162-verdict-store-power-cut 在 e7-index-bench/src/bin/../../Cargo.toml 里挂了 required-features，每次 cargo test 带 --features e7-index-bench/e162-block-stores
+基线：全绿
+✅ [M16_重放把FLUSH当没有U-drop退化成U-keep] 红：tests::forced_unit_access_write_after_the_last_flush_survives_drop_unflushed,tests::replay_images_match_the_registered_synthetic_log_digests,tests::write_cache_model_on_the_synthetic_log_gives_the_registered_counts,tests::every_registered_anchor_matches_the_independent_script
+✅ [M17_重放把FLUSH之前的写也当可丢] 红：tests::forced_unit_access_write_after_the_last_flush_survives_drop_unflushed,tests::replay_images_match_the_registered_synthetic_log_digests,tests::write_cache_model_on_the_synthetic_log_gives_the_registered_counts,tests::every_registered_anchor_matches_the_independent_script
+✅ [M18_断电点上的已确认拿B标记算] 红：tests::in_flight_block_between_its_markers_is_not_counted_as_confirmed
+✅ [M19_U-tear不截] 红：tests::replay_images_match_the_registered_synthetic_log_digests,tests::every_registered_anchor_matches_the_independent_script
+✅ [M20_U-rand取输出的最低位] 红：tests::subset_generator_matches_the_registered_keep_patterns,tests::replay_images_match_the_registered_synthetic_log_digests,tests::write_cache_model_on_the_synthetic_log_gives_the_registered_counts,tests::every_registered_anchor_matches_the_independent_script
+✅ [M21_写入调用返回之前就发C标记] 红：tests::write_loop_emits_the_confirm_marker_only_after_the_write_call_returns
+✅ [M22_核对不枚举键只按块读] 红：tests::untouched_library_verifies_clean_on_every_candidate,tests::phantom_key_positive_control_finds_exactly_one_phantom_on_every_candidate
+✅ [M23_核对只比块值前4096字节] 红：tests::silent_corruption_positive_control_finds_block_seven_on_every_candidate
+✅ [M24_开库失败时新建空库接着核] 红：tests::open_breaking_positive_control_fails_to_open_on_every_candidate
+✅ [M25_日志解析不认声明的条目数] 红：tests::parser_stops_at_the_declared_entry_count_when_a_stale_entry_follows,tests::every_registered_anchor_matches_the_independent_script
+✅ [M26_对照形态K-nosync仍同步写] 红：tests::every_control_form_differs_from_its_correct_form_in_exactly_the_registered_setting,tests::every_registered_anchor_matches_the_independent_script
+计数：内存撞顶 0 条（上限 16G）、超时 0 条
+已还原，基线仍全绿
+exit=0

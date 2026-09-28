@@ -1,0 +1,6 @@
+exit=1
+want=本次新增了「已定」小节，而这条未定项一个字都没动
+want=980-样本.md:7 本次新增了「已定」小节，而这条未定项一个字都没动
+want=decisions.md:8 本次有决策定案，而这一节「待议」一个字都没动
+want=  settled-same-file：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（settled-same-file）

@@ -1,16 +1,16 @@
 # 实现员接手报告：impl-m2-mountfix（收口表第 27 行 C503、第 52 行 C502、第 5 行 C516 / C517 / C518）
 
-时刻一律 UTC。接手自子 agent ad8f30e7660714e3d（交接摘要 `/tmp/claude-1000/handover/ad8f30e7660714e3d.md`）。
+接手自子 agent ad8f30e7660714e3d（交接摘要 `/tmp/claude-1000/handover/ad8f30e7660714e3d.md`）。
 
 ## 一、交付物
 
 | 样 | 路径 | 说明 |
 |---|---|---|
-| 补丁 | `/tmp/claude-1000/impl-m2-mountfix/impl-m2-mountfix.patch` | 只含 `crates/`（14 个文件），不含 `crates/mutations.tsv`、不含 `litmus/`；04:25:34 在主工作区 `git apply --check` 退出 0 |
+| 补丁 | `/tmp/claude-1000/impl-m2-mountfix/impl-m2-mountfix.patch` | 只含 `crates/`（14 个文件），不含 `crates/mutations.tsv`、不含 `litmus/`；交回前在主工作区 `git apply --check` 退出 0 |
 | 新变异行 | `/tmp/claude-1000/impl-m2-mountfix/mutations-append.tsv` | 16 行整行；补丁打上之后每行原文恰好命中一次（对 repo3 逐行数过） |
 | 报告 | `/tmp/claude-1000/impl-m2-mountfix/report.md` | 本文件 |
 
-补丁的 `git apply --stat`（主工作区上跑，04:25）：
+补丁的 `git apply --stat`（主工作区上跑，交回前）：
 
 ```
  crates/singlefs-core/src/allocator.rs              |  355 ++++++++++++++++++++
@@ -50,7 +50,7 @@
 
 ## 三、每条新测试「改坏哪一行 → 哪条断言红」
 
-两轮：① 03:32–04:05 在 repo2（补丁 + 03:27 的主工作区）上改坏一处、跑那条测试所在的**整个测试二进制**，记同时红了哪些；② 04:18–04:24 在 repo3（补丁 + 04:11 的主工作区）上按 `mutations-append.tsv` 的每一行（带过滤的参数，与门禁 59 号同一跑法）再跑一遍，16 行全红。基线红集：两份不改坏的副本上把动到的二进制整份跑过，一条都没红（repo3：`singlefs-core --lib` 91 过、`checker_known_bad_images` 25 过、`step_five_reuse` 13 过、`three_random_history` 20 过 2 忽略、`commit_generated_fallback` 5 过、`root_ring_turn_in_one_mount` 3 过、`unreadable_abandoned_root_slot` 3 过）。被改坏的代码里没有 `debug_assert`，每一格红在测试断言上。行号是 repo3 里的。
+两轮：① 先在 repo2（补丁 + 第一次重放用的主工作区）上改坏一处、跑那条测试所在的**整个测试二进制**，记同时红了哪些；② 再在 repo3（补丁 + 第二次重放用的主工作区）上按 `mutations-append.tsv` 的每一行（带过滤的参数，与门禁 59 号同一跑法）再跑一遍，16 行全红。基线红集：两份不改坏的副本上把动到的二进制整份跑过，一条都没红（repo3：`singlefs-core --lib` 91 过、`checker_known_bad_images` 25 过、`step_five_reuse` 13 过、`three_random_history` 20 过 2 忽略、`commit_generated_fallback` 5 过、`root_ring_turn_in_one_mount` 3 过、`unreadable_abandoned_root_slot` 3 过）。被改坏的代码里没有 `debug_assert`，每一格红在测试断言上。行号是 repo3 里的。
 
 | 改坏哪一行 | 红的断言（原样） | 同一二进制里同时红的 |
 |---|---|---|
@@ -70,7 +70,7 @@
 
 `mutations-append.tsv` 的 16 行：第 1–13 行对应上表前十格（第一格拆成四行各点一条测试）；第 14 行是主工作区第 182 行换了必须红的测试；第 15 行是第 288 行（原第 27 行 ④「隔离位不挡分配」）换到改名后的 C503 用例；第 16 行是第 171 行换到新用例。
 
-## 四、`crates/mutations.tsv` 里要主 agent 处置的已有行（行号是主工作区 04:25 那一版的）
+## 四、`crates/mutations.tsv` 里要主 agent 处置的已有行（行号是主工作区交回前那一版的）
 
 补丁打上之后这四行不再成立，只追加、不改别人的行，所以列在这里：
 
@@ -82,11 +82,11 @@
 | 288「增补 2 收口第 27 行 ④：隔离位不挡分配（is_free 不看隔离位）」 | 点名的 `the_isolation_bits_of_an_abandoned_root_survive_…` 随 C503 改写成「清掉」那一条 | 删；追加的第 15 行点改名后的用例（红） |
 
 第 45 行（「步 4：普通重开不隔离被抛弃根引用的槽」，原文 `&|_| false,\n        ShadowLedger::On,\n    );`）：前任加的 `first_txg` 参数排在最后会把这个锚点改掉，我把参数挪到 `previous` 后面，锚点照旧恰好命中一次。
-主工作区 04:25 那一版的表共 468 行（含注释），补丁打上之后逐行数锚点：只有第 56 行命中 0 次，其余每行恰好 1 次；追加的 16 行也都恰好 1 次。
+主工作区交回前那一版的表共 468 行（含注释），补丁打上之后逐行数锚点：只有第 56 行命中 0 次，其余每行恰好 1 次；追加的 16 行也都恰好 1 次。
 
 ## 五、`check.sh`
 
-在 repo3 上跑（补丁 + 04:11 的主工作区；`e156_allocation_basis_counts.rs`、`e158_root_choice_repair.rs` 两个文件用 04:11 那一版，因为主工作区 04:25 那一版 e158 编不过、两份都不合 rustfmt，那是别的会话正在改的文件、不在补丁里）。`nice -n 19 bash .claude/scripts/check.sh` 末尾原样：
+在 repo3 上跑（补丁 + 第二次重放用的主工作区；`e156_allocation_basis_counts.rs`、`e158_root_choice_repair.rs` 两个文件用第二次重放用的那一版，因为主工作区交回前那一版 e158 编不过、两份都不合 rustfmt，那是别的会话正在改的文件、不在补丁里）。`nice -n 19 bash .claude/scripts/check.sh` 末尾原样：
 
 ```
 error: could not compile `singlefs-harness` (bin "e158_root_choice_repair" test) due to 1 previous error
@@ -98,7 +98,7 @@ warning: build failed, waiting for other jobs to finish...
 exit=1
 ```
 
-- fmt 那一段过了（「✓ 格式通过」）；clippy 唯一一处红是 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs:1672` 的 `items_after_test_module`，不在补丁里：同一条在不带补丁的主工作区副本上照样红（`/tmp/claude-1000/impl-m2-mountfix/mainclean-clippy.log`，03:5x 拷的主工作区，`--keep-going` 之下全仓只有这一处）。带补丁的 repo3 上 `--keep-going` 跑 clippy，报出的也只有 e158 那几处（`repo3-clippy.log`）。
+- fmt 那一段过了（「✓ 格式通过」）；clippy 唯一一处红是 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs:1672` 的 `items_after_test_module`，不在补丁里：同一条在不带补丁的主工作区副本上照样红（`/tmp/claude-1000/impl-m2-mountfix/mainclean-clippy.log` 拷的主工作区，`--keep-going` 之下全仓只有这一处）。带补丁的 repo3 上 `--keep-going` 跑 clippy，报出的也只有 e158 那几处（`repo3-clippy.log`）。
 - clippy 红了 `check.sh` 就停，后面的 `cargo build --all-targets`、`cargo test --all` 没跑到。另跑的：repo3 上 `cargo build --all-targets` 退出 0；动到的七个测试二进制全过（数见第三节开头）。`cargo test --all` 整份没跑（按主 agent「只跑动到的测试二进制」）。
 - 登记给我的门禁阶段：按主 agent 要求留到最后统一跑，这一次没跑。
 
@@ -112,21 +112,21 @@ exit=1
 
 ## 七、已有变异行复跑
 
-- repo3 上（补丁 + 04:11 的主工作区）：点名这几个动到的二进制的已有行（`three_random_history`、`unreadable_abandoned_root_slot`、`commit_generated_fallback`、`step_five_reuse`、`root_ring_turn_in_one_mount`）加第 342 行（checker 第 ④ 条，点名改写过的那条 `checker_known_bad_images` 用例），除去第四节要删的 56、171、182、288，共 54 行，**54 行全红**。行号：39 40 41 42 43 46 48 52 53 54 55 57 62 63 70 90 91 92 93 109 128 129 138 139 140 142 143 144 145 146 147 148 155 156 159 160 161 165 167 168 169 172 173 187 216 220 222 286 287 296 342 353 413 468。结果在 `/tmp/claude-1000/impl-m2-mountfix/mutation-proofs/existing-rows-replay-repo3.out`，每行的 cargo 原样输出在同目录 `logs-existing-repo3/`。
-- 更早在 repo2（补丁 + 03:27 的主工作区）上复跑 55 行：54 红、第 171 行没红（第四节）。
+- repo3 上（补丁 + 第二次重放用的主工作区）：点名这几个动到的二进制的已有行（`three_random_history`、`unreadable_abandoned_root_slot`、`commit_generated_fallback`、`step_five_reuse`、`root_ring_turn_in_one_mount`）加第 342 行（checker 第 ④ 条，点名改写过的那条 `checker_known_bad_images` 用例），除去第四节要删的 56、171、182、288，共 54 行，**54 行全红**。行号：39 40 41 42 43 46 48 52 53 54 55 57 62 63 70 90 91 92 93 109 128 129 138 139 140 142 143 144 145 146 147 148 155 156 159 160 161 165 167 168 169 172 173 187 216 220 222 286 287 296 342 353 413 468。结果在 `/tmp/claude-1000/impl-m2-mountfix/mutation-proofs/existing-rows-replay-repo3.out`，每行的 cargo 原样输出在同目录 `logs-existing-repo3/`。
+- 更早在 repo2（补丁 + 第一次重放用的主工作区）上复跑 55 行：54 红、第 171 行没红（第四节）。
 - 别的二进制上的已有行（崩溃注入、坏盘输入、故障注入等里也有历史转过根环的）没复跑：C518 改了一次挂载里转环之后的分配，按取样判红的那些行可能跟着变，门禁 59 号整表复跑归 crash-verifier。
 
 ## 八、写过的文件
 
 补丁里 14 个（`crates/` 下，路径见第一节 stat）：`singlefs-core/src/{allocator,mount,recovery,root_ring,transaction}.rs`；`singlefs-harness/src/{history,model,model_comparison}.rs`；`singlefs-harness/tests/` 下 `checker_known_bad_images.rs`、`second_transaction_step_five_reuse.rs`、`second_transaction_supplement_three_random_history.rs`、`second_transaction_supplement_two_commit_generated_fallback.rs`、`second_transaction_supplement_two_unreadable_abandoned_root_slot.rs`，新建 `second_transaction_supplement_two_root_ring_turn_in_one_mount.rs`。`crates/mutations.tsv` 没碰，追加的 16 行在 `mutations-append.tsv`（变异名见那份文件第一列）。
 
-接手之后我在前任的基础上改的：随机历史里三条逼近分配记录墙的写死用例重新设计（前任走到一半，四条在带补丁的副本上红）；已知红第 0 条那条复现拆成两条（一次挂载里跑完、mkfs 那条会话里照旧第 0 条）；加 `the_continuing_checker_notes_…`；`history.rs` 第 0 条的说明；删 `note_rollback_floor_took_effect`、挂载内回收门槛改用 `mount::reclaim_floor`；`rebuilt_allocator` 的 `first_txg` 参数挪位（保第 45 行锚点）；`clear_isolation_of_slot` 的注释改成只管影子账那一套隔离（主工作区新加了释放核校验和的第二套隔离）；按实七 / 实四之后主工作区的现状把补丁重放两次（03:27、04:18），第二次 `transaction.rs` 一处补记调用换到 `publish_version_of_trees_holding_one_data_unit` 前面、两条测试的 `TransactionUnit::Data` 改成 `TransactionUnit::Data(DataUnitIndexInFile::FIRST)`。
+接手之后我在前任的基础上改的：随机历史里三条逼近分配记录墙的写死用例重新设计（前任走到一半，四条在带补丁的副本上红）；已知红第 0 条那条复现拆成两条（一次挂载里跑完、mkfs 那条会话里照旧第 0 条）；加 `the_continuing_checker_notes_…`；`history.rs` 第 0 条的说明；删 `note_rollback_floor_took_effect`、挂载内回收门槛改用 `mount::reclaim_floor`；`rebuilt_allocator` 的 `first_txg` 参数挪位（保第 45 行锚点）；`clear_isolation_of_slot` 的注释改成只管影子账那一套隔离（主工作区新加了释放核校验和的第二套隔离）；按实七 / 实四之后主工作区的现状把补丁重放两次，第二次 `transaction.rs` 一处补记调用换到 `publish_version_of_trees_holding_one_data_unit` 前面、两条测试的 `TransactionUnit::Data` 改成 `TransactionUnit::Data(DataUnitIndexInFile::FIRST)`。
 
 ## 九、负载与经过里要记的
 
-- 03:09 核现场：前任起的后台任务都已结束（`ps` 里没有 cargo）；副本 repo2 与日志都在。
-- 03:29 `ps` 看到性能测量在跑：pid 4066033 `bash research/scripts/vm-bench.sh …e159-fsync-wait-group-commit…`、pid 4066354 `qemu-system-x86_64`；新的编译停下等 pid 4066033 退出，03:31:38 退出，等了 1 分 45 秒。别的会话的 cargo（pid 3996240、4042469）同时在跑，没等锁。
-- 04:26 起过一轮复跑时主工作区的 e158 编不过（别的会话在改），那一轮 47 行判「编不过」作废（`existing-rows-replay-repo3-broken-e158.out`），换回 04:11 那一版 e158 之后重跑。
+- 开工先核现场：前任起的后台任务都已结束（`ps` 里没有 cargo）；副本 repo2 与日志都在。
+- 随后 `ps` 看到性能测量在跑：pid 4066033 `bash research/scripts/vm-bench.sh …e159-fsync-wait-group-commit…`、pid 4066354 `qemu-system-x86_64`；新的编译停下等 pid 4066033 退出，等了 1 分 45 秒。别的会话的 cargo（pid 3996240、4042469）同时在跑，没等锁。
+- 交回前起过一轮复跑时主工作区的 e158 编不过（别的会话在改），那一轮 47 行判「编不过」作废（`existing-rows-replay-repo3-broken-e158.out`），换回第二次重放用的那一版 e158 之后重跑。
 
 ## 十、没做什么
 

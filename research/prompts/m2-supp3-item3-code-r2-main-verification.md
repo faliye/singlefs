@@ -2,7 +2,7 @@
 
 <!-- doc-lint:not-numbers K1 K2 K3 K4 K5 K6 -->
 
-正文 `research/prompts/_m2-supp3-item3-code-r2-body.md`（49 行），背景材料 `-background.md`（490 行 = 正文 + 小节清单 210 行 + 附录 182 行），被判的改动 `-diff.md`（1386 行：第一轮判过的 `crash_injection.rs` 1040 行版到工作区 1415 行版的 diff，加 `crates/mutations.tsv` 这一轮新增的 37 行）。开工快照 `m2-supp3-item3-code-r2-start-snapshot.sha256`（16 个文件，08:17 UTC 记）。
+正文 `research/prompts/_m2-supp3-item3-code-r2-body.md`（49 行），背景材料 `-background.md`（490 行 = 正文 + 小节清单 210 行 + 附录 182 行），被判的改动 `-diff.md`（1386 行：第一轮判过的 `crash_injection.rs` 1040 行版到工作区 1415 行版的 diff，加 `crates/mutations.tsv` 这一轮新增的 37 行）。开工快照 `m2-supp3-item3-code-r2-start-snapshot.sha256`（16 个文件）。
 
 **为什么有这一轮**：第一轮判决 `research/prompts/m2-supp3-item3-code-r1-main-verification.md` 第四节第 7 题的候选 ① 是「先按这一轮的判决修 1、3、4、6，再开第二轮攻新形态」。那几题 2026-09-20 由用户定案、改法落地（`crates/mutations.tsv` 第 181–192 行按「用户 2026-09-20 定案第 N 条」各留一条会红的变异），第二轮一直没开——门禁 56 号 2026-09-21 判红点的就是这笔欠账。这一轮攻的是那几条改法本身：按 `.claude/rules/three-way-inference.md`「攻方腿自己提的收严，只在它自己的模型上量过，算没被攻过」，第一轮攻方提的四条改法与本地腿提的已知红两个方向的修法，全部被攻过零轮。
 

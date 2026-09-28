@@ -1,6 +1,6 @@
 # 实现员续做交回：C511（I-9.14 收窄）+ C512（根记录加一项）
 
-2026-09-23，时刻一律本机 UTC（东京 JST = UTC+9）。接的是被限额打断的那条腿（adc7ceca482b55e2f）。它的 13 个文件在盘上，sha256 与交接摘要逐个相同，改动都还在（逐条对过它 75 次 Edit 的新文本）。
+2026-09-23。接的是被限额打断的那条腿（adc7ceca482b55e2f）。它的 13 个文件在盘上，sha256 与交接摘要逐个相同，改动都还在（逐条对过它 75 次 Edit 的新文本）。
 
 ## 〇、一览
 
@@ -69,10 +69,10 @@ PROBE[two] checker I-9.14 => Violated("树 11 的树表条目诞生 txg 跨根�
 
 - one：建池 → 回退到暖机根 (1, 2) → 再发第一个文件版本。旧文件根 (1, 3) 被回退行判出局，I-9.14 不适用。
 - three：回退 → 退出 → 重开（C512 之前这一步撞 R8）→ 再发 → 再覆盖写一次。新线上有两片树表，**I-9.14 真比了、成立**。
-- two：同 one，只是再发那一次照抄 **mkfs 那一片**实例表。这是 04:43 之前实现的样子：`git show HEAD:crates/singlefs-core/src/transaction.rs` 里是 `InstanceTablePlan::Carry(genesis.instance_table)`，今天是 `transaction.rs:1980` 的 `Carry(version_to_build_on.instance_table)`。
+- two：同 one，只是再发那一次照抄 **mkfs 那一片**实例表。这是修好之前实现的样子：`git show HEAD:crates/singlefs-core/src/transaction.rs` 里是 `InstanceTablePlan::Carry(genesis.instance_table)`，今天是 `transaction.rs:1980` 的 `Carry(version_to_build_on.instance_table)`。
   这样回退行就丢了，(1, 3) 重回候选集。**I-9.14 / I-9.10 / I-3.1 一起红，正是 C511 登记那三份红的形态**
-  （`/tmp/claude-1000/-home-fy5090-code-singlefs/d16a74c5-453c-44d5-8a19-7e71d116de72/scratchpad/ci-fast.log` 第 65–84 行，04:04 那一次：三份都是 I-9.10 + I-9.14，第一份另带 I-8.7，第三份另带 I-3.1）。
-  03:01 的副本 `copy-c504` 里还是 `genesis`，04:43 的 `baseline` 里已是 `version_to_build_on`。
+  （`/tmp/claude-1000/-home-fy5090-code-singlefs/d16a74c5-453c-44d5-8a19-7e71d116de72/scratchpad/ci-fast.log` 第 65–84 行：三份都是 I-9.10 + I-9.14，第一份另带 I-8.7，第三份另带 I-3.1）。
+  早先的副本 `copy-c504` 里还是 `genesis`，后来的 `baseline` 里已是 `version_to_build_on`。
 ⇒ C511 那三份红是「回退行丢了」这个已修的 bug 的症状，不是候选集框不住。推翻条件：在今天的树上（去掉拒绝）复现出旧线的根进候选集。
 
 ### 4. ⚠️ 新发现：拿掉那道拒绝会把 I-7.8 判红（这一处我不定，交主 agent）
@@ -235,9 +235,9 @@ assertion `left == right` failed: 判红的该只有 I-9.14：[("I-1.1", Holds),
    做法：先在同一个 python 里核对表恰好 319 行、要删的就是那几行原文，**只删这条线自己的那几行**，再逐行 `printf … >>` 追加回去。
    结果：C512 两行从 315、316 挪到 318、319，只改了第 5、6 段（测试过滤串与测试名），变异名、文件、原文、替换文逐字未变。
    别人的行一个字没动，前 314 行逐字不变。这一步违背了「只许追加」的字面要求，理由是被改的都是这条线自己的行，照实报。
-3. 前一条腿当时发现 `\&\&` 转义错了，用 `sed -i '317d'` 删过一次它自己的行（交接摘要 11:28:04 那条），这里一并报。
+3. 前一条腿当时发现 `\&\&` 转义错了，用 `sed -i '317d'` 删过一次它自己的行（交接摘要里那条），这里一并报。
 
-**门禁 59 号，只跑这 5 行**：副本 `/tmp/claude-1000/impl-c511-c512-resume/gate59-copy`，表只留表头 3 行 + 这 5 行；`SINGLEFS_GATE_FULL=1 GATE_MUTATION_TARGET_DIR=…/gate59-target`。13:33:18 UTC 起跑，原样：
+**门禁 59 号，只跑这 5 行**：副本 `/tmp/claude-1000/impl-c511-c512-resume/gate59-copy`，表只留表头 3 行 + 这 5 行；`SINGLEFS_GATE_FULL=1 GATE_MUTATION_TARGET_DIR=…/gate59-target`。起跑，原样：
 
 ```
   ✓ C511（2026-09-23 用户定案，I-9.14 射程收窄的那一条）：候选集不再把被回退行判出局的根剔掉（被抛弃时间线的根又进了遍历与并集）：rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_row_and_cold_start_reads_the_first_content 红了
@@ -250,7 +250,7 @@ assertion `left == right` failed: 判红的该只有 I-9.14：[("I-1.1", Holds),
 ```
 
 **三个数：抓到 5、无效 0（5 行原文各命中一次）、没红 0。**
-各行红在哪条断言：316、317 见第二节表格（最终树的副本上逐条跑过）；315 的原样在交接摘要 11:27:12（`second_transaction_step_four_rollback.rs:304`、I-3.1）。
+各行红在哪条断言：316、317 见第二节表格（最终树的副本上逐条跑过）；315 的原样在交接摘要里（`second_transaction_step_four_rollback.rs:304`、I-3.1）。
 318、319 两行我在最终树的副本上逐条跑过（`…/final-318`、`…/final-319`，`second_transaction_step_three_formatted_pool` 整个二进制）：
 - 318：`the_third_writable_mount_keeps_…` 红在 `…formatted_pool.rs:527:5`（`assert_ne!` 失败，消息原样「写行那次发布把分配记录树的根写进了根记录」，left 与 right 都是全零指针）；同时红 `a_formatted_pool_mounted_twice_…` 于 `:985:5`（`left: [Placement { slot: SlotNumber(50178), span: 1 }, Placement { slot: SlotNumber(50242), span: 1 }]`，`right: [Placement { slot: SlotNumber(50178), span: 1 }, Placement { slot: SlotNumber(0), span: 1 }]`）；8 passed; 2 failed。
 - 319：只红 `the_third_writable_mount_keeps_…`，在 `:560:5`（`两盘各一条记录罩着被换下的那一片` `left: 0` / `right: 2`）；9 passed; 1 failed。
@@ -270,7 +270,7 @@ PROBE checker I-7.4 => Violated("候选根 txg 0 引用的单元已被复用或�
 
 ## 五、跑过的门禁与 check.sh（最终状态，原样）
 
-`nice -n 19 bash .claude/scripts/check.sh`（13:36 起，约 9 分钟；全文 `…/check-sh-final.log` 1520 行）。四段各自的结果行：
+`nice -n 19 bash .claude/scripts/check.sh`（约 9 分钟；全文 `…/check-sh-final.log` 1520 行）。四段各自的结果行：
 ```
 ══ cargo fmt --check ══
   ✓ 格式通过
@@ -285,7 +285,7 @@ check.sh 退出码=0
 日志里 `test result: ok` 51 行，`test result: FAILED` 0 行。
 （同一轮更早一次跑在 clippy 上红过：`mut devices` shadows a previous, unrelated binding，是我新写的建镜像函数里两处 `let mut devices`，已改名修掉，见第七节。）
 
-`bash .claude/gate.d/33-mutation-tables.sh`（13:44 UTC，表的最终状态）：
+`bash .claude/gate.d/33-mutation-tables.sh`（表的最终状态）：
 ```
   ✓ 145 个实验二进制都有成形的变异表，1536 条变异的原文各命中源码一次；crates/mutations.tsv 314 条的原文各命中源码一次（本阶段不跑变异，只验装置在、锚点对得上、两段里没有 \n 以外的反斜杠转义、crates 那张表里没有两行重复——重复按「文件 + 原文 + 替换文 + 点名的测试」四项认，变异名另判）
 33 退出码=0
@@ -365,7 +365,7 @@ check.sh 退出码=0
 - 这一轮的探针与抽样产物都在 `/tmp/claude-1000/impl-c511-c512-resume/`：
   `probe-run.log`、`sampling-summary.txt`、`ci-fast.log`、`rh-fast.log`、`rh-large-rollback.log`、`ci-large-rollback.log`、`base-rh-large-rollback.log`、`base-ci-large-rollback.log`、`m-*.log`、`final-*.log`、`revert-bdi.log`，探针副本 `probe-no-refusal/`、`c512-discrimination/`。
   没入 `research/results/`：我的写范围不含 research/。I-7.8 那批要不要留、留在哪，由主 agent 定；整个目录 17G（`du -sh`，大头是各副本的 target），拷之前先挑。
-- 负载：13:03 与 13:15 两次开跑前 `ps` 一个 cargo / 门禁 / qemu / fio 都没有；之后几次看到别的会话的 `cargo test --release -p singlefs-harness --test w2_probe`（先后 pid 4074659、260931）。一直没有性能测量在跑，照 `nice -n 19` 跑，没有等锁。
+- 负载：两次开跑前 `ps` 一个 cargo / 门禁 / qemu / fio 都没有；之后几次看到别的会话的 `cargo test --release -p singlefs-harness --test w2_probe`（先后 pid 4074659、260931）。一直没有性能测量在跑，照 `nice -n 19` 跑，没有等锁。
 - 前一条腿交接时说的「`check.sh` 全绿」当时没有落地的结果（它等的后台任务没回来就断了）。第五节是我这一轮在最终状态上重跑的。
 
 ## 七、这一轮写过的文件（我自己列；别的线同时在改 `crates/`，`git diff --stat` 分不出谁的）
@@ -380,7 +380,7 @@ check.sh 退出码=0
 
 前一条腿的 13 个文件，除上表列出的 `walk.rs`、`mount.rs`、`…formatted_pool.rs` 之外我一个字没动。
 
-`git diff --stat -- crates litmus`（13:45:19 UTC 取，原样）：
+`git diff --stat -- crates litmus`（原样）：
 
 ```
  crates/mutations.tsv                               |  175 +-

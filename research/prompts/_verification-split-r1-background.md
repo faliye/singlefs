@@ -8,7 +8,7 @@
 
 主 agent 自己做的全部改动（用户定不派实现员），diff 在 `research/prompts/_verification-split-r1-diff.md`（`git diff HEAD -M`，只含这一轮的路径，39 个文件、+524 / −226）。
 
-## 二、实现今天的样子（主 agent 的观测，开工快照 `refs/sop/verification-split-r1-snapshot`，时刻在 `research/prompts/verification-split-r1-snapshot/dispatched-at-utc.txt`）
+## 二、实现今天的样子（主 agent 的观测，开工快照 `refs/sop/verification-split-r1-snapshot`，时刻在 `research/prompts/verification-split-r1-snapshot/dispatch-date.txt`）
 
 腿读代码一律读那棵快照树（`git show refs/sop/verification-split-r1-snapshot:<路径>`），它是工作区整份，含别的会话未提交的改动；被判文件的 sha256 在 `research/prompts/verification-split-r1-snapshot/judged-files-sha256.txt`。
 
@@ -547,7 +547,7 @@ herd7 / LKMM 与 QEMU 不归上游 singlefs-ai-sop 管：相关的脚本、样�
 ```markdown
 # 验证代码分两档：harness 日常测试 / checker 提交时验证（singlefs-8b，用户定案）
 
-来源：用户 2026-09-27 JST 18:2x–18:5x 在会话 singlefs-8b 里的定案，主 agent 自己做全部改动，不派 subagent（用户原话「这个任务你不要排subagent了 全部你来做」），改完之后派三方腿验证（用户随后补「三方腿都是 subagent， 改完后可以走三方腿验证」）。
+来源：用户 2026-09-27 在会话 singlefs-8b 里的定案，主 agent 自己做全部改动，不派 subagent（用户原话「这个任务你不要排subagent了 全部你来做」），改完之后派三方腿验证（用户随后补「三方腿都是 subagent， 改完后可以走三方腿验证」）。
 
 ```
 
@@ -601,7 +601,7 @@ herd7 / LKMM 与 QEMU 不归上游 singlefs-ai-sop 管：相关的脚本、样�
 | 实验二进制 24494 行占 harness 编译时间 | 这一轮不动；要动另立一题 |
 | 层 1、层 2 没有阶段 | 照旧记在 D13（验证路线） 已定项 9 的欠 |
 | 位置寻址那条放量用例没登记成 crash-case | 这一轮补登记 |
-| 三方审核 | 改完之后走一轮（代码轮与定义轮合一），用户 18:5x 补充「我刚才的说明有点过了 三方腿都是 subagent， 改完后可以走三方腿验证」；56 号与 72 号由那一轮的判决点名满足，不走豁免表 |
+| 三方审核 | 改完之后走一轮（代码轮与定义轮合一），用户补充「我刚才的说明有点过了 三方腿都是 subagent， 改完后可以走三方腿验证」；56 号与 72 号由那一轮的判决点名满足，不走豁免表 |
 
 ```
 

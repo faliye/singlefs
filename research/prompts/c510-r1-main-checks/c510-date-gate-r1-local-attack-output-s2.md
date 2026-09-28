@@ -37,7 +37,7 @@ This would be refuted by: The generic function correctly returning the first com
 CATEGORY_E.shape There is no concrete filename or directory that could cause a timezone-related rejection of a genuine today's date  
 This would be refuted by: A date that is confirmed to be the current date in some time zone being rejected by the check because it falls outside the allowed window.  
 
-CATEGORY_E.legitimacy The check's upper bound calculation accounts for all time zones by using UTC+14, and the lower bound is a fixed date unaffected by time zones.  
+CATEGORY_E.legitimacy The check's upper bound calculation accounts for all time zones by using ……, and the lower bound is a fixed date unaffected by time zones.  
 This would be refuted by: A date that is confirmed to be the current date in some time zone being rejected by the check because it falls outside the allowed window.  
 
 CATEGORY_E.today not applicable  

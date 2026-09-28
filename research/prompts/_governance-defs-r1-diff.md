@@ -1,4 +1,4 @@
-# 附录二：governance-defs-r1 十五份定义改动（`git diff HEAD -- .claude/main-agent.md .claude/agent-common.md .claude/agents/` 原样；基准 HEAD 802fcc1，生成于 2026-09-26 13:48 UTC）
+# 附录二：governance-defs-r1 十五份定义改动（`git diff HEAD -- .claude/main-agent.md .claude/agent-common.md .claude/agents/` 原样；基准 HEAD 802fcc1，生成于 2026-09-26）
 
 这一轮的改动没有提交点，是工作区对 HEAD（提交 802fcc1，当前 HEAD 25a1abe 只在 802fcc1 之上加了正文与开工快照两个文件，没有碰下面这批路径）的改动。15 份文件的改后全文不附，各腿直接读工作区。
 

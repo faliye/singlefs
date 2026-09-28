@@ -4,7 +4,7 @@
 #   冻结副本根默认 /tmp/claude-1000/l0scale-r1-frozen（133 个文件的 sha256 在 /tmp/claude-1000/l0scale-r1-frozen-sha256.txt）
 #   草稿目录默认 /tmp/claude-1000/m2-layer0-scale-r1-opus-rerun（每一格一个副本：base、m304、msl、l7；日志落在草稿目录）
 # 环境变量：THREADS（线程上限，默认 10）。只跑本目录的探针二进制 opus_scale_probe，不跑名字带 layer0 的目标、不跑 54 号。
-# 挂钟（2026-09-26 JST 本机、10 线程、nice 19 量的）：p7 三格合计约 24 分钟，p11 约 20 分钟，其余每格不到 3 分钟。
+# 挂钟（2026-09-26 本机、10 线程、nice 19 量的）：p7 三格合计约 24 分钟，p11 约 20 分钟，其余每格不到 3 分钟。
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$here/../../.." && pwd)"

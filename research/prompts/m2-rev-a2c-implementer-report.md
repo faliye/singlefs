@@ -1,6 +1,6 @@
 # 实审 A2c 实现员报告：审阅第 15 条后一半、第 26、34、36 条，A1b 的 Q5 与管理员回退入口
 
-时刻：交回于 2026-09-27 JST 上午（本机 UTC 2026-09-26 23 点后）。规格 `/tmp/claude-1000/impl-rev-a2c/spec.md`。派发要求不改 `crates/mutations.tsv`：变异行在草稿目录，见「变异行放在哪」。
+日期：交回于 2026-09-27。规格 `/tmp/claude-1000/impl-rev-a2c/spec.md`。派发要求不改 `crates/mutations.tsv`：变异行在草稿目录，见「变异行放在哪」。
 
 ## 结论
 
@@ -139,7 +139,7 @@
 
 ## 变异行放在哪（主 agent 追加 / 替换；主表我没动）
 
-- **阶段 A（主工作区现在就要）**：`/tmp/claude-1000/impl-rev-a2c/mutations-append.tsv`（12 行追加，名字以「实审 A2c 第 15 条：」「实审 A2c 第 34 条：」起头，与交回时主表的名字逐个比过、不撞）与 `/tmp/claude-1000/impl-rev-a2c/mutations-replacements.tsv`（2 行整行替换：主表第 430 行「C503（隔离位清零的时机条文与实现说反话）：轮转覆写被抛弃根的根槽时不清隔离位」、第 436 行「增补 2 收口第 27 行 ④：隔离位不挡分配…」，锚点里的 `Self::index(slot)` 改成 `self.index(slot)`，主 agent 22:37Z 点名的那两行）。同一份另放在 `/tmp/claude-1000/impl-rev-a2c/patch-phase-a/`（没有 crates.patch），`apply-writer-patch.py` 可以直接打。
+- **阶段 A（主工作区现在就要）**：`/tmp/claude-1000/impl-rev-a2c/mutations-append.tsv`（12 行追加，名字以「实审 A2c 第 15 条：」「实审 A2c 第 34 条：」起头，与交回时主表的名字逐个比过、不撞）与 `/tmp/claude-1000/impl-rev-a2c/mutations-replacements.tsv`（2 行整行替换：主表第 430 行「C503（隔离位清零的时机条文与实现说反话）：轮转覆写被抛弃根的根槽时不清隔离位」、第 436 行「增补 2 收口第 27 行 ④：隔离位不挡分配…」，锚点里的 `Self::index(slot)` 改成 `self.index(slot)`，主 agent 途中点名的那两行）。同一份另放在 `/tmp/claude-1000/impl-rev-a2c/patch-phase-a/`（没有 crates.patch），`apply-writer-patch.py` 可以直接打。
 - **阶段 B（打补丁时一起）**：`/tmp/claude-1000/impl-rev-a2c/patch/` 里 `crates.patch`、`mutations-append.tsv`（20 行，「实审 A2c 第 26 条 / 第 36 条 / 回退入口 / Q5：」起头）、`mutations-replacements.tsv`（4 行：主表第 64 行「步 3：第一个文件版本的 txg 写死 3…」、第 451 行「P6 后一半：本次发布内序号从 0 起」、第 887 行「实审A1 第23条：可写挂载推抬 F 报的错当成推满仍不够…」、第 942 行「实审A1b Q3：挂着之后的入口不查盘表里重复的设备身份」——补丁改的代码让这四行锚点命中 0 次，不打补丁就不要换）、`report.md`（本报告的拷贝）。
 - 行号是交回这一刻主表的；主表别的会话还在写，按第一段的名字找。
 
@@ -189,7 +189,7 @@ harness 的 clippy 要先编过 checker，而主工作区的 `crates/singlefs-ch
 ```text
 == cargo fmt --all -- --check
 exit=1
-     67 Diff in /home/fy5090/code/singlefs/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs
+     67 Diff in crates/singlefs-harness/src/bin/e158_root_choice_repair.rs
 == rustfmt --check 我的四份
 exit=0
 == cargo clippy --all-targets --all-features（check.sh 那一套）
@@ -362,6 +362,6 @@ script exit=0
 - 第 15 条挂载一侧没切（「停下交主 agent 的」第 1 条），`mount.rs` 的 `format_time_allocator` / `rebuilt_allocator` 一行没动。
 - 零单元发布不判记录条数上限、`acquire_instance` 的实例代号到顶仍 panic（第 4、5 条）。
 - `first_transaction_on_device.rs` 对 Q5 新成员不描写窗口账（第 7 条）；这个二进制没跑（要真设备）。
-- 全仓 fmt / clippy 红在别人的文件上，没修；`research/scripts/capped.sh` 在 22:52Z 前后被别的会话插坏过一阵（第 22 行语法错），那一段我改用开工快照里的那一份起命令，没修它（主 agent 后来说已修好）。
+- 全仓 fmt / clippy 红在别人的文件上，没修；`research/scripts/capped.sh` 途中被别的会话插坏过一阵（第 22 行语法错），那一段我改用开工快照里的那一份起命令，没修它（主 agent 后来说已修好）。
 - 模型对拍（74 号）里那两条红照旧，没处理（主 agent 说归 C554）。
 - 故障注入、崩溃注入的随机档没跑：阶段 A 不改默认环下的落点、阶段 B 只加写之前的拒绝与改错的形态，按注入序号摆点的用例理应不挪位（推的，没跑）。

@@ -7,7 +7,7 @@
     stale-candidates.py --changes --base 提交 [--target 提交] --out 变更清单.md
         列出这一阶段在 kb 各文件「## 历史版本」节里新加的每一条变更记录（编号 H1、H2……），以及每个被改过的现状载体
         里删改前后的差异片段——写事实表的原料
-    stale-candidates.py --check-facts 事实表.tsv --base 提交 [--target 提交]
+    stale-candidates.py --check-facts 事实表.tsv --base 提交 [--target 提交] [--scope 清单]
         核事实表罩没罩全：每条 H 编号都要出现在某一行的「出处」列里；每行的检索词要是合法的正则，
         而且在基准那一版的现状句里至少命中一行（旧说法当时就在那里）；新立事项反过来，检索词在基准那一版要零命中
     stale-candidates.py --facts 事实表.tsv --base 提交 [--target 提交] --out 候选.tsv
@@ -15,6 +15,9 @@
     stale-candidates.py --check-report 候选.tsv 报告.md [报告.md …] [--groups F1-F12]
         核报告有没有判到候选表里（分到的组里）的每一行
     stale-candidates.py --benchmark     拿仓里一段真实历史与一份盲写的事实表当阳性对照
+    --scope 清单（--changes、--check-facts、--facts 都认）：一行一个从仓根起的路径（空行与 # 开头的行不算），
+        「这一阶段改过哪些文件」只在清单里算——几个会话共写一个仓时，别的会话的改动不算进这一批的变更记录与差异片段；
+        候选照旧搜全部现状载体。清单里的路径必须在 --base 到结束之间真的改过，有一个不在就退 2（清单写旧了、写错了，范围会悄悄变窄）
     stale-candidates.py --selftest
 
 事实表（制表符分隔，首行是表头）：
@@ -165,11 +168,30 @@ def all_paths(repository_root, revision):
     return sorted({path for path in paths if path})
 
 
-def changed_paths(repository_root, base, target):
+CHANGE_SCOPE = None  # --scope 读进来的路径集合；None 表示整棵树
+
+
+def read_change_scope(scope_path):
+    with open(scope_path, encoding='utf-8') as handle:
+        paths = {line.strip() for line in handle if line.strip() and not line.strip().startswith('#')}
+    if not paths:
+        raise ValueError(f'--scope 清单 {scope_path} 一个路径都没有')
+    return paths
+
+
+def unchanged_scope_paths(repository_root, base, target, scope):
+    changed = set(changed_paths(repository_root, base, target, apply_scope=False))
+    return sorted(scope - changed)
+
+
+def changed_paths(repository_root, base, target, apply_scope=True):
     paths = run_git(['diff', '--name-only', base] + ([target] if target else []), repository_root).split('\n')
     if target is None:
         paths += run_git(['ls-files', '--others', '--exclude-standard'], repository_root).split('\n')
-    return sorted({path for path in paths if path})
+    paths = {path for path in paths if path}
+    if apply_scope and CHANGE_SCOPE is not None:
+        paths &= CHANGE_SCOPE
+    return sorted(paths)
 
 
 def current_state_lines(text):
@@ -599,6 +621,15 @@ def selftest():
         worktree_locations = [row[3] for row in build_candidates(directory, None, read_fact_table(os.path.join(directory, 'facts-good.tsv')))]
         if 'records/2026-01-02-draft.md:1' not in worktree_locations:
             failures.append('结束在工作区时，没进 git 的新文件没进候选')
+        global CHANGE_SCOPE
+        CHANGE_SCOPE = {'CLAUDE.md'}
+        if new_change_entries(directory, 'HEAD~1', 'HEAD') != []:
+            failures.append('--scope 只列 CLAUDE.md 时，范围外 checks-owed.md 的变更记录还被算进来')
+        if changed_paths(directory, 'HEAD~1', 'HEAD') != ['CLAUDE.md']:
+            failures.append('--scope 只列 CLAUDE.md 时，改过的文件没有正好剩下 CLAUDE.md')
+        CHANGE_SCOPE = None
+        if unchanged_scope_paths(directory, 'HEAD~1', 'HEAD', {'CLAUDE.md', 'README-never-changed.md'}) != ['README-never-changed.md']:
+            failures.append('--scope 里写了这一阶段没改过的路径，没被认出来')
         if parse_group_ranges('F1-F2') != {'F1', 'F2'}:
             failures.append('组号区间没把两端都算进去')
         for bad_range in ('F2-F1', 'F1-G2'):
@@ -633,7 +664,8 @@ def selftest():
         return 5
     print('  ✓ stale-candidates 自证通过：变更记录（含改名）与差异片段认对；事实表八种写法各判红、写对的判绿、超上限判红；'
           '候选收 records/ 与没进 git 的文件、同一行两件事实各占一行、只改措辞不出候选、历史版本节不进；'
-          '组号区间含两端、倒写与跨字母拒绝、写了不存在的组拒绝；报告漏判、判定不认得、理由太短、理由没引原话都判红，--facts 命令写出的表与函数结果一致（27 格）')
+          '组号区间含两端、倒写与跨字母拒绝、写了不存在的组拒绝；报告漏判、判定不认得、理由太短、理由没引原话都判红，--facts 命令写出的表与函数结果一致；'
+          '--scope 把范围外的变更记录挡在外面、范围内的照算、写了没改过的路径认得出（30 格）')
     return 0
 
 
@@ -647,6 +679,7 @@ def main():
     parser.add_argument('--facts', metavar='事实表')
     parser.add_argument('--check-report', nargs='+', metavar='文件')
     parser.add_argument('--groups')
+    parser.add_argument('--scope', metavar='清单')
     parser.add_argument('--benchmark', action='store_true')
     parser.add_argument('--selftest', action='store_true')
     arguments = parser.parse_args()
@@ -666,6 +699,15 @@ def main():
             print('  ✗ 缺 --base')
             print('     → 怎么办：给阶段开始之前的提交，例：--base b1c8cef~1；用法见本脚本文件头')
             return 2
+        if arguments.scope:
+            global CHANGE_SCOPE
+            scope = read_change_scope(arguments.scope)
+            stale = unchanged_scope_paths(repository_root, arguments.base, arguments.target, scope)
+            if stale:
+                print(f'  ✗ --scope 清单里有 {len(stale)} 个路径在 {arguments.base} 到结束之间没改过：' + '、'.join(stale[:20]))
+                print('     → 怎么办：清单只列这一批真改过（含新建、删除）的文件；写错了路径或清单是旧的，改清单再跑')
+                return 2
+            CHANGE_SCOPE = scope
         if arguments.check_facts:
             return check_facts(repository_root, arguments.base, arguments.target, arguments.check_facts)
         if not arguments.out:

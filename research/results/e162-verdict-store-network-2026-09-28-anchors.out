@@ -1,0 +1,22 @@
+E7RESULT name=anchor id=A1 value=0xe220a8397b1dcdaf,0x6e789e6aa1b965f4,0x06c45d188009454f matches_registration=true
+E7RESULT name=anchor id=A2 value=0xe3069283 matches_registration=true
+E7RESULT name=anchor id=A3_j0 value=76020f1b59444d587a6607195c0f8fed/8351809/0x08eefd5c matches_registration=true
+E7RESULT name=anchor id=A3_j12345 value=b3c1f0df0c77c9e98c9df5b21d0395bf/8321879/0x565d4801 matches_registration=true
+E7RESULT name=anchor id=A3b value=76020f1b59444d587a6607195c0f8fed/131533 matches_registration=true
+E7RESULT name=anchor id=A4_j0 value=267/32629 matches_registration=true
+E7RESULT name=anchor id=A4_j12345 value=245/28761 matches_registration=true
+E7RESULT name=anchor id=A5 value=7299025377b7594e92ceeb8a1c3cbeac matches_registration=true
+E7RESULT name=anchor id=A6_j0 value=000000000000000000000000000000007299025377b7594e92ceeb8a1c3cbeac matches_registration=true
+E7RESULT name=anchor id=A6_j1 value=000000000000000100000000000000007299025377b7594e92ceeb8a1c3cbeac matches_registration=true
+E7RESULT name=anchor id=A6_j63 value=000000070000000700000000000000007299025377b7594e92ceeb8a1c3cbeac matches_registration=true
+E7RESULT name=anchor id=A6_j64 value=000000000000000000000000000100007299025377b7594e92ceeb8a1c3cbeac matches_registration=true
+E7RESULT name=anchor id=A6_j12345 value=00000007000000010000000000c000007299025377b7594e92ceeb8a1c3cbeac matches_registration=true
+E7RESULT name=anchor id=A6_j99999 value=000000030000000700000000061a00007299025377b7594e92ceeb8a1c3cbeac matches_registration=true
+E7RESULT name=anchor id=A6b value=000000070000000100000000000300007299025377b7594e92ceeb8a1c3cbeac matches_registration=true
+E7RESULT name=anchor id=A11_frame value=65580 matches_registration=true
+E7RESULT name=anchor id=B10 value=10.050251256281408/9.049773755656108 matches_registration=true
+E7RESULT name=anchor id=B10b value=3279000000/4197120/16788480 matches_registration=true
+E7RESULT name=anchor id=A11_file value=65584 matches_registration=true
+E7RESULT name=anchor id=A10 value=6553600000/102400000 matches_registration=true
+E7RESULT name=verdict part=anchors anchors_checked=20 anchor_mismatches=0
+E7RESULT name=done emitted=22

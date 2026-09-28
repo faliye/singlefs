@@ -1,4 +1,4 @@
-# 附录二：定义收尾第二轮的改动依据（两份 diff：修定义 agent 交回的 `my-changes-final.diff` + 这一轮现跑的 `git diff HEAD`；生成于 2026-09-26 02:03 UTC / 11:03 JST）
+# 附录二：定义收尾第二轮的改动依据（两份 diff：修定义 agent 交回的 `my-changes-final.diff` + 这一轮现跑的 `git diff HEAD`；生成于 2026-09-26 /）
 
 ## 一、`my-changes-final.diff`（修定义的 agent 原样交回，287 行；比的是开工时 `cp -p` 的备份 `/tmp/claude-1000/defs-closeout-r1-fixes/before/`，不是 HEAD）
 
@@ -292,7 +292,7 @@
      exit 1
 ```
 
-## 二、`git diff HEAD -- .claude/agents .claude/agent-common.md .claude/main-agent.md .claude/rules/implementation-workflow.md .claude/hooks/ask-user-claim-guard.sh .claude/gate.d/74-model-differential.sh .claude/gate.d/stage-owners.tsv`（现跑，基准 HEAD `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`，生成于 2026-09-26 02:03 UTC / 11:03 JST；给腿看两轮合起来的总改动，377 行）
+## 二、`git diff HEAD -- .claude/agents .claude/agent-common.md .claude/main-agent.md .claude/rules/implementation-workflow.md .claude/hooks/ask-user-claim-guard.sh .claude/gate.d/74-model-differential.sh .claude/gate.d/stage-owners.tsv`（现跑，基准 HEAD `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`，生成于 2026-09-26 /；给腿看两轮合起来的总改动，377 行）
 
 ```diff
 diff --git a/.claude/agent-common.md b/.claude/agent-common.md

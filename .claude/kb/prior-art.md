@@ -4,13 +4,13 @@
 星数/提交数是页面当时显示的值（2026-08-25）。
 
 **来源固定点与复核机制（2026-08-29 起）**：承重引用的源码与文献固定在本机
-`/home/fy5090/code/fs-refs/`——`linux-6.17/fs/bcachefs/`（kernel.org 的 `linux-6.17.tar.xz`，260 个文件）、
+`~/code/fs-refs/`——`linux-6.17/fs/bcachefs/`（kernel.org 的 `linux-6.17.tar.xz`，260 个文件）、
 `zfs/`（OpenZFS master，`git log -1` = `58d73c9`，2026-08-27）、
 `docs/` 下 7 份文献（RFC 8439、NIST SP 800-38B / 800-38D、DJB *Cryptography in NaCl*、
 OSTEP 第 45 章、BetrFS FAST 2017 / 2018、NetApp FAST'20；取回方式与 sha256 见
 `research/scripts/fetch-refs.sh`，抽取器 `research/scripts/pdf-text.py`）。
 **89 条**承重引用做成了可重跑的逐字断言（`research/scripts/verify-citations.sh`，这个数由它自己末行报出来：`bash research/scripts/verify-citations.sh` 的「结果：N 条命中」，别手数——源码里 `^(ck|ckn|ckdoc|ckdocn)` 的行还含 11 条只在 `--selftest` 里跑的合成断言）；其中 38 条核的是本机内核树、不是固定点树（C44（引用核到的不是固定点树）），
-挂在门禁阶段「外部引用还核得动吗」（`.claude/gate.d/70-citations.sh`）——**源码树不在也判红**，
+挂在门禁阶段「外部引用还核得动吗」（`.claude/gate.d/doc-registries.sh` 的 citations 格）——**源码树不在也判红**，
 「跳过」正是让上一批文献无声蒸发的那个行为。
 ⚠️ **ZFS On-Disk Specification 没收**：它用 CID 双字节字体，`pdf-text.py` 抽出乱码 ⇒
 按该脚本自己的规矩算**抽取失败**，不算「原文没这句」；引它的几条改从已固定的 OpenZFS 源码树核。
@@ -618,7 +618,7 @@ write buffer 对 accounting 与普通 key 在入 buffer、flush 去重、落 btr
 
 ## 八、根环槽宽与「长时间消费者怎么跟发布赛跑」这两件事，现役实现怎么做
 
-**2026-09-08 在本机固定点 `/home/fy5090/code/fs-refs` 现查逐字抄出。均未在本项目验证。**
+**2026-09-08 在本机固定点 `~/code/fs-refs` 现查逐字抄出。均未在本项目验证。**
 它们回答的是 D2（RAID 条带策略） 已定项 15（「生命周期不同的对象」的通用判据）
 与 [checks-owed.md](checks-owed.md) C214（遍历跳的窗口余量没人守）。
 
@@ -755,48 +755,50 @@ D21（权威态与派生态的分界） 已定项 3 ③ 逐字「用户要求的
   该错误只在工作笔记里，未进过任何决策，喂给三方论证的背景材料也把它写成「待攻击的提案」
   而非 fscrypt 的做法——**三条腿没有继承这个错误**。
 
-### 2026-08-26（其七）
-- 补 7.11：bcachefs 的记账验证有一处自我作废——checker 与运行时共用同一行加减代码
-  （`disk_accounting.h:208`，只差 gc 下标），因此抓不到「加减语义本身写错」。
-  这是 evidence-discipline 那条规则在真实系统里已经被违反并产生盲区的实例，不是推测。
-  同批核实了 accounting 的 delta 形态与它派生出的成本清单。
+### 2026-08-26
 
-### 2026-08-26（其六）
-- 补 7.10：bcachefs 官方文档现查补录六条，含 bucket gen 限定为缓存数据、
-  gen 绕回机制已被反向索引取代（`need_gc_gens` 标为 legacy）、copygc 预留 8%、
-  以及 `nocow` 数据在加密文件系统上明文存储这条硬不兼容。
-  同时明说一条**未找到**：没有一手材料用散文说「无密钥时后台任务不能跑」，那是推论。
+#### （其一）
+- 补第五节：D8（核心索引结构） 索引结构专项调查。读了 bcachefs Principles of Operation
+  Rev 1.39.2（2026-08-25）原文，含 28 棵树的清单、write buffer 的代价、
+  日志结构节点的三条性质、bucket 分配器的演进；另加 XFS rmapbt 成本量级
+  与 BetrFS 的改名教训。
 
-### 2026-08-26（其五）
-- 7.1 与 7.5 删掉「每事务发布新根」这个说法。它曾经被当成本工程的既有承诺写进正文，
-  实际上项目里从来没有这条：litmus 只钉一次发布事件内部的顺序，
-  decisions.md / CLAUDE.md / rules/fs-design.md 全文无此表述（逐文件 grep 核实）。
-  改动依据：它是一个未经审查的默认假设，而基于它做出的「Bε 收益在本工程会缩水」的推理
-  因此站不住——发布频率是自由变量，checkpoint 语义下批量是免费的。
+#### （其二）
+- 补第六节：D9（加密） 加密专项调查。读了 bcachefs Encryption 设计文档与 OpenZFS
+  `zio_crypt.c` 设计注释原文，记下三种加密边界的取舍、ZFS 与 bcachefs 在
+  「无 key 能否维护」上的分岔、nonce 被迫进格式的那个字段，以及四条公开的坑。
 
-### 2026-08-26（其四）
-- 7.1 补核实结果：BetrFS 的持久化是 redo log + 每 5 秒 checkpoint、节点 copy-on-write、
-  全文无 checksum。核实经过：本地提取 FAST 2018 论文 PDF 文本后逐词检索。
-  据此给那组随机写数字加了「能证明什么 / 不能证明什么」的分界。
-  起因是一次三方论证里有一条腿断言「那个数字来自没有 COW 的系统」，核实后该断言不成立。
-
-### 2026-08-26（其三）
+#### （其三）
 - 补第七节：2012–2026 学术成果扫描，只收「可能推翻既有决策前提」的条目，共 8 小节。
 - 5.6 改写：曾经写作「BetrFS 用全路径索引，改名代价高到不可接受……按路径编 key 就会继承这个坑」，
   现在写作「BetrFS 0.4（FAST 2018）用 lifted Bε-tree 把改名代价从子树大小降到子树深度」。
   改动依据：读了 FAST 2018 论文原文，复杂度一节明写被切分或合并的节点数
   「at most proportional to the height of the tree」。旧写法把 BetrFS 0.3 的状态当成了现状。
 
-### 2026-08-26（其二）
-- 补第六节：D9（加密） 加密专项调查。读了 bcachefs Encryption 设计文档与 OpenZFS
-  `zio_crypt.c` 设计注释原文，记下三种加密边界的取舍、ZFS 与 bcachefs 在
-  「无 key 能否维护」上的分岔、nonce 被迫进格式的那个字段，以及四条公开的坑。
+#### （其四）
+- 7.1 补核实结果：BetrFS 的持久化是 redo log + 每 5 秒 checkpoint、节点 copy-on-write、
+  全文无 checksum。核实经过：本地提取 FAST 2018 论文 PDF 文本后逐词检索。
+  据此给那组随机写数字加了「能证明什么 / 不能证明什么」的分界。
+  起因是一次三方论证里有一条腿断言「那个数字来自没有 COW 的系统」，核实后该断言不成立。
 
-### 2026-08-26
-- 补第五节：D8（核心索引结构） 索引结构专项调查。读了 bcachefs Principles of Operation
-  Rev 1.39.2（2026-08-25）原文，含 28 棵树的清单、write buffer 的代价、
-  日志结构节点的三条性质、bucket 分配器的演进；另加 XFS rmapbt 成本量级
-  与 BetrFS 的改名教训。
+#### （其五）
+- 7.1 与 7.5 删掉「每事务发布新根」这个说法。它曾经被当成本工程的既有承诺写进正文，
+  实际上项目里从来没有这条：litmus 只钉一次发布事件内部的顺序，
+  decisions.md / CLAUDE.md / rules/fs-design.md 全文无此表述（逐文件 grep 核实）。
+  改动依据：它是一个未经审查的默认假设，而基于它做出的「Bε 收益在本工程会缩水」的推理
+  因此站不住——发布频率是自由变量，checkpoint 语义下批量是免费的。
+
+#### （其六）
+- 补 7.10：bcachefs 官方文档现查补录六条，含 bucket gen 限定为缓存数据、
+  gen 绕回机制已被反向索引取代（`need_gc_gens` 标为 legacy）、copygc 预留 8%、
+  以及 `nocow` 数据在加密文件系统上明文存储这条硬不兼容。
+  同时明说一条**未找到**：没有一手材料用散文说「无密钥时后台任务不能跑」，那是推论。
+
+#### （其七）
+- 补 7.11：bcachefs 的记账验证有一处自我作废——checker 与运行时共用同一行加减代码
+  （`disk_accounting.h:208`，只差 gc 下标），因此抓不到「加减语义本身写错」。
+  这是 evidence-discipline 那条规则在真实系统里已经被违反并产生盲区的实例，不是推测。
+  同批核实了 accounting 的 delta 形态与它派生出的成本清单。
 
 ### 2026-08-25
 - 建档。记账四模型、bcachefs 六点、Rust 轮子六个、内核 Rust fs 现状。

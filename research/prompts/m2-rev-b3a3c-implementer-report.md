@@ -1,6 +1,6 @@
 # 实审 B3a-3c 报告（implementation-writer）：四份层 0 文件的流重新布置，position_addressed 的打印溢出
 
-时刻都是 UTC（本机时钟），JST = UTC + 9。开工 2026-09-26T23:15Z（JST 09-27 08:15）。规格 `/tmp/claude-1000/impl-rev-b3a3c/spec.md`。
+开工 2026-09-27。规格 `/tmp/claude-1000/impl-rev-b3a3c/spec.md`。
 
 ## 一、结论
 
@@ -39,7 +39,7 @@
 **做法**：三棵树各放一个探针目标 `tests/probe_b3a3c_first_file_units.rs`（源码 `draft/probe_b3a3c_first_file_units.rs`）。探针只做 `common::build_pool`，再打 `pool.output.rewritten` 与 mkfs 之后的段序列，不枚举。三棵树是：
 - `git archive a1f4691`（上一次还钉 16 的那次提交，`first_transaction_step_five_publish.rs` 第 362 行 `(39, "2+2+1+2+2+1+18+2+1+2", 262_165)`）；
 - `git archive HEAD`；
-- 工作区副本（23:16:08Z 取）。
+- 工作区副本（开工时取）。
 
 每棵树用自己的 target，经 `run-with-memory-cap.sh 8G`、`capped.sh 5`。日志是 `logs/history-probe-{a1f4691,head,copy}.log`，原样：
 ```text
@@ -68,8 +68,8 @@ PROBE_HISTORY writes=41 sizes=[2, 2, 1, 2, 2, 1, 26, 2, 1, 2]
 
 **定案**（原文现查）：
 - D8 已定项 14「两棵派生树的结构」与「实现取值」（`.claude/kb/decisions/08-核心索引结构.md` 第 372 行起）。第 396 行：`    - 根罩整个 key 空间、按盘分流；根层取最小的 R ≥ 1，使 Σ_盘 ⌈盘上槽数 ÷ (W × 169^(R−1))⌉ ≤ 169。4 GiB × 2 时根在第 2 层、树高 3。`
-- 调度表第 108 行「派生树不分裂」、第 109 行「D8 已定项 14 改成允许异构」、第 125 行「key 空间四项」（K1–K4，用户 2026-09-24 JST 23 点前后）。
-- 调度表第 140 行「实二一交回的十四条」（主 agent 2026-09-25 JST 07:4x）：
+- 调度表第 108 行「派生树不分裂」、第 109 行「D8 已定项 14 改成允许异构」、第 125 行「key 空间四项」（K1–K4，用户 2026-09-24）。
+- 调度表第 140 行「实二一交回的十四条」（主 agent 2026-09-25）：
   - ① W = 812、根按盘分流，写成实现取值；
   - ⑨「已有层 0 流钉着旧布局：提交时崩溃验证员跑，红了派实现员重钉」；
   - ⑩「第一个事务从 8 个单元变 12 个」。
@@ -218,8 +218,8 @@ CentralMappingRootLowered before=[c1t11g3,c2t11g3,c2t12g3,c2t13g3,c2t13g3] [c2t1
 ## 七、探针（钉值怎么算的；没有跑层 0）
 
 - **副本**：
-  - 第一份 `/tmp/claude-1000/impl-rev-b3a3c/copy`，23:16:08Z 用 `rsync -a --exclude target --exclude .git` 从主工作区取，用它自己的 target。取之前记了 18 份文件的 sha256，副本里逐份相同（`logs/sha-at-start.txt`）：13 份在改文件与我这 5 份。
-  - 开工之后别的会话改了 9 份在改文件：`mount.rs`、`transaction.rs`、`journal.rs`、`unit.rs`、`history.rs`、`model.rs`、`first_transaction_on_device.rs`、format `lib.rs`、checker `lib.rs`。所以 23:44:24Z 又取了第二份 `copy2`，sha 记在 `logs/sha-at-copy2.txt`、逐份相同，那时主树编得过。
+  - 第一份 `/tmp/claude-1000/impl-rev-b3a3c/copy`，用 `rsync -a --exclude target --exclude .git` 从主工作区取，用它自己的 target。取之前记了 18 份文件的 sha256，副本里逐份相同（`logs/sha-at-start.txt`）：13 份在改文件与我这 5 份。
+  - 开工之后别的会话改了 9 份在改文件：`mount.rs`、`transaction.rs`、`journal.rs`、`unit.rs`、`history.rs`、`model.rs`、`first_transaction_on_device.rs`、format `lib.rs`、checker `lib.rs`。所以又取了第二份 `copy2`，sha 记在 `logs/sha-at-copy2.txt`、逐份相同，那时主树编得过。
 - **做法**：
   - 5 份改后的层 0 文件各整份拷成名字不含 layer0 的目标 `tests/probe_b3a3c_*.rs`，摘掉 `#[test]` / `#[ignore]`，末尾接一条探针用例。生成器是 `draft/probe/make_probes.py`（copy2 用 `make_probes_copy2.py`）。
   - 探针只调 `prepare`（文件里的形状断言照跑），再调状态数函数，拿文件里钉的算式比，不枚举。
@@ -286,11 +286,11 @@ mf: test result: ok. 1 passed（见第十节 G3，这一条没进追加表）
 - **动到的测试二进制**：5 个都是名字带 layer0 的，按定义一个都不跑。它们的比较与钉值交提交时的层 0 验证（第十一节）。探针（第七节）核的是同一份 `prepare` 与钉值的算式。
 - `cargo build --offline --all-targets`（主树，最后一次改文件之后）：退出 0。末行 `    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.22s`，日志里 warning 0 条。
   - 这一趟快，是因为别的会话在我改完之后已经编过。
-  - 我核了主树 `target/debug/deps` 里这 5 个层 0 测试二进制的修改时间都晚于各自源文件：源 23:28:46 / 23:35:43 / 23:33:36 / 23:42:53 / 23:42:09，二进制 23:42:40 / 23:42:40 / 23:42:40 / 23:46:23 / 23:42:40。
+  - 我核了主树 `target/debug/deps` 里这 5 个层 0 测试二进制的修改时间都晚于各自源文件。
 - `rustfmt --edition 2021 --check` 逐个查我这 5 份：都退出 0，输出 0 字节。第一次查时 `position_addressed` 的一处 `use` 换行不合格式，改了再查。
   - `cargo fmt --all -- --check`（主树）：退出 1。`Diff in` 67 处，全在 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`，不是我的。
 - clippy（check.sh 那套：`-D warnings` 加 7 条）：
-  - 只查我这 5 个目标（`-p singlefs-harness --no-deps --all-features` 加 5 个 `--test`）：退出 0，末两行 `    Checking singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)` / `    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.97s`。
+  - 只查我这 5 个目标（`-p singlefs-harness --no-deps --all-features` 加 5 个 `--test`）：退出 0，末两行 `    Checking singlefs-harness v0.1.0 (crates/singlefs-harness)` / `    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.97s`。
   - 整个工作区 `--all-targets --all-features --keep-going`：退出 101。`could not compile` 的是 `checker_narrow_invariants_and_abandoned_roots`（test）、`e158_root_choice_repair`（bin 与 bin test）、`e156_allocation_basis_counts`（bin 与 bin test），`-->` 点名的也只有这三份文件。日志里我这 5 个目标的名字出现 0 次。
 - 命名检查（不归我，顺手跑的）：`naming-lint.sh .` 退出 1，输出里我这 5 份文件名出现 0 次。
 - 登记给我的门禁阶段（主树，经 `capped.sh 5`），退出码与判定行原样：
@@ -366,8 +366,8 @@ checker（`crates/singlefs-checker/src/`）没动，按定义这一节可以不�
 ## 十三、草稿目录删了什么、留了什么
 
 - **删了**（都是我这一轮建的，里面各有自己的 target）：
-  - 仓副本 `/tmp/claude-1000/impl-rev-b3a3c/copy`（2.7G，23:16:08Z 建）；
-  - `/tmp/claude-1000/impl-rev-b3a3c/copy2`（2.1G，23:44:24Z 建）；
+  - 仓副本 `/tmp/claude-1000/impl-rev-b3a3c/copy`（2.7G）；
+  - `/tmp/claude-1000/impl-rev-b3a3c/copy2`（2.1G）；
   - 两份 `git archive` 展开的树 `/tmp/claude-1000/impl-rev-b3a3c/history/a1f4691`（780M）与 `history/head`（1.2G），连同 `history/` 目录。
   - 删之前把副本里生成的探针源码拷进了 `draft/probe/generated/`。
 - **留着**，都在 `/tmp/claude-1000/impl-rev-b3a3c/` 下，共 1.2M，没有仓副本与编译目录：

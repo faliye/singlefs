@@ -1,17 +1,17 @@
-- 2026-09-27 21:14 JST 开工：读完共用约束、定义要读的规则与 spec
-- 21:15 JST 建副本 base/（原样）、work/（改）
-- 21:18 JST 4 份挪走文件：3 份照 crates-moved.patch 打上（fuzz），崩溃注入那份 1 块 use 行拒，待编译时手改
-- 21:31 JST 改成可重放脚本 edits/apply-all.sh；base/ 与 work/ 重取主工作区后重放成功
-- 21:38 JST 第 1 件 src（入口核三样）、第 2 件（325/371）、第 3 件 src（D16 全句）编得过；unit_area_start 23 条绿（含新加 D16 两条、水位瞬时读坏、Y4 五格）
-- 21:41 JST 收到主 agent 消息：并进 fsync_drop:1556 两条改钉乙成员 + 盘上不变断言；warm_up_counter c366 不改（待 C579）
-- 21:50 JST 收到主 agent 消息：C579 已定，c366 改钉（可写被拒、乙成员、盘上不变、只读择 (1,4)），并进这一批
-- 21:58 JST 新测试 entries_after_mount_refuse_swapped_or_behind_devices 10 条绿（扫的 16 格并行，117 s）；收到消息：第 7 件只改钉 35、不罩新两份 litmus
-- 22:02 JST 收到口径更正：singlefs-checker-tier 一律只静态改；停了 run1（两步都卡在内存排队，没跑出结果），重写 run-all 去掉 checker-tier 的 bin
-- 22:13 JST 已写改钉脚本：11 step_four/five（改钉拒）、12 fsync_drop、13 first_transaction_on_device（静态）、14 c366；小盘探针 zz_probe_small_disks 在跑（不交付）；run1 在跑（内存排队慢）
-- 例行询问答复（UTC 13:4x / JST 22:4x）：
+- 2026-09-27 开工：读完共用约束、定义要读的规则与 spec
+- 建副本 base/（原样）、work/（改）
+- 4 份挪走文件：3 份照 crates-moved.patch 打上（fuzz），崩溃注入那份 1 块 use 行拒，待编译时手改
+- 改成可重放脚本 edits/apply-all.sh；base/ 与 work/ 重取主工作区后重放成功
+- 第 1 件 src（入口核三样）、第 2 件（325/371）、第 3 件 src（D16 全句）编得过；unit_area_start 23 条绿（含新加 D16 两条、水位瞬时读坏、Y4 五格）
+- 收到主 agent 消息：并进 fsync_drop:1556 两条改钉乙成员 + 盘上不变断言；warm_up_counter c366 不改（待 C579）
+- 收到主 agent 消息：C579 已定，c366 改钉（可写被拒、乙成员、盘上不变、只读择 (1,4)），并进这一批
+- 新测试 entries_after_mount_refuse_swapped_or_behind_devices 10 条绿（扫的 16 格并行，117 s）；收到消息：第 7 件只改钉 35、不罩新两份 litmus
+- 收到口径更正：singlefs-checker-tier 一律只静态改；停了 run1（两步都卡在内存排队，没跑出结果），重写 run-all 去掉 checker-tier 的 bin
+- 已写改钉脚本：11 step_four/five（改钉拒）、12 fsync_drop、13 first_transaction_on_device（静态）、14 c366；小盘探针 zz_probe_small_disks 在跑（不交付）；run1 在跑（内存排队慢）
+- 例行询问答复（/）：
   - 在做：第 5 件小盘钉值（草稿探针 zz_probe_small_disks / zz_probe_two 在新几何上现跑，探针一的结果已出、探针二在跑）；同时 run1（harness 档全部目标逐个跑）在跑，已跑完 15 个目标、红 2 个（都是小盘钉值那两份，预期内）。
   - 七件进度：第 1 件（入口核三样，src + 新测试 10 条绿）、第 2 件（325/371，src + Y4 五格用例绿）、第 3 件（D16 全句，src + 新用例绿；step_four / step_five 两条改钉拒，已编过、待 run1 跑到）做完；第 4 件 first_transaction_on_device 两条静态改钉、编过（checker 档不跑）；第 5 件：四份挪走文件已静态改、fsync_drop 两条与 c366 已改钉编过，小盘几份改钉进行中（a_floor_raise 第 1 条、admission_formula 第 1 条已有新数），random_history 两条、step_three :661、双故障两条待 run1 结果；sharded 金样只报推的值；第 6 件 13 行证红没开（跑完 run1 之后在副本上起 prove-red）；第 7 件主工作区已是 35，待 run1 核绿。
   - 等的进程：run1 每个目标经 run-with-memory-cap.sh 8G 排队（slice 被 E161 装置约 25 GB 与另外两条 24G 的 cargo test 占着，前面几个目标各排了几分钟）；探针二同样经 8G 包装。
   - 预计：run1 全部目标再 1.5–2 小时；证红 40 来行约 1 小时；合计 3 小时左右交回（推的）。
-  - 更正：上一条答复的时刻是 UTC 13:19 / JST 22:19（不是 13:4x）。
-- 22:31 JST 叫停收尾：补丁出好（apply --check 0），删了 work/ 与 base/，报告写完
+  - 更正：上一条答复的时刻是 /。
+- 叫停收尾：补丁出好（apply --check 0），删了 work/ 与 base/，报告写完

@@ -1,6 +1,6 @@
 # E142 重跑登记（第 17 次）：阳性对照在按位置寻址的写清单上该有几个违例、分不分得出差别；层 0 整轮的违例数与三个计数；产物里的角色名与文本里的数
 
-写于 2026-09-25 22:52 JST 起（本机 UTC 2026-09-25 13:52 起），装置改之前、这一次的任何产物之前。判据、门槛、作废与停机条款在这里写死；跑出数之后要改，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」三步走，不在这里回改。
+写于 2026-09-25 起，装置改之前、这一次的任何产物之前。判据、门槛、作废与停机条款在这里写死；跑出数之后要改，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」三步走，不在这里回改。
 
 **文件名取 `r17`**：`research/prompts/e142-r16-prereg.md` 是第 16 次跑的登记，这一次是第 17 次。
 
@@ -118,7 +118,7 @@
 
 **依据**：
 
-- 无实验：一套 btree 实现配多 keyspace 的形态没有可量的量，依据是 2026-08-29 现查 `linux-6.17/fs/bcachefs/bcachefs_format.h` 的 `BCH_BTREE_IDS()` 宏（数 `x(` 行与带 `BTREE_IS_write_buffer` 的行，源码固定在 `/home/fy5090/code/fs-refs/`）：bcachefs 用**一套 btree 实现 + 21 棵树**，其中 **5 棵**走 write buffer（`lru` / `backpointers` / `deleted_inodes` / `rebalance_work` / `accounting`）；比「按访问模式选不同结构」好在**只有一套结构要调对**——异构方案意味着 N 套实现、N 套崩溃一致性 bug、N 套 checker。prior-art.md 的 bcachefs 那一行以这一段为准。
+- 无实验：一套 btree 实现配多 keyspace 的形态没有可量的量，依据是 2026-08-29 现查 `linux-6.17/fs/bcachefs/bcachefs_format.h` 的 `BCH_BTREE_IDS()` 宏（数 `x(` 行与带 `BTREE_IS_write_buffer` 的行，源码固定在 `~/code/fs-refs/`）：bcachefs 用**一套 btree 实现 + 21 棵树**，其中 **5 棵**走 write buffer（`lru` / `backpointers` / `deleted_inodes` / `rebalance_work` / `accounting`）；比「按访问模式选不同结构」好在**只有一套结构要调对**——异构方案意味着 N 套实现、N 套崩溃一致性 bug、N 套 checker。prior-art.md 的 bcachefs 那一行以这一段为准。
 - 用户定案 2026-09-24：派生树可以异构（原话在变更史）；多出来的那套实现、崩溃一致性与 checker 由层 0 流与 checker 各自覆盖，不再拿「只有一套结构要调对」挡。
 - 无实验：三方原型（`research/prompts/m2-keyspace-r1-opus-model/`）在同一批历史与代价模型上量过，没立实验号，选哪一个由用户定，判决 `research/prompts/m2-keyspace-r1-main-verification.md`。
 - 用户定案 2026-09-24：K1、K2、K4（原话在变更史）。
@@ -290,7 +290,7 @@ FUA 的口径：D13（验证路线） 已定项 4 只说「屏障切段」，没
 
 ## 三、实现今天的样子
 
-### 3.1 `crates/`（2026-09-25 22:52–23:05 JST 之间现查；`git status --short crates/ | wc -l` 为 0，行号只是那一刻的）
+### 3.1 `crates/`（2026-09-25 现查；`git status --short crates/ | wc -l` 为 0，行号只是那一刻的）
 
 这一次不改、不跑 `crates/` 的任何东西；只为「实现里有没有同一件事、钉的是什么数」读了下面几处的 `grep` 命中与两小段。
 
@@ -325,7 +325,7 @@ FUA 的口径：D13（验证路线） 已定项 4 只说「屏障切段」，没
 
 ## 四、跑之前已经存在的数
 
-读条款、读装置、读前例、判问法时已经撞见或自己推出来的，照实列，不删。第五、六、八至十一节的判据草稿在 2026-09-25 13:56–14:01 UTC（22:56–23:01 JST）写完（草稿文件修改时刻在第十三节），14:02 UTC 才跑第七节命令一；判定以产物为准，不以下表为准。
+读条款、读装置、读前例、判问法时已经撞见或自己推出来的，照实列，不删。第五、六、八至十一节的判据草稿在 2026-09-25 写完（草稿的修改记录在第十三节），之后才跑第七节命令一；判定以产物为准，不以下表为准。
 
 | # | 数 / 话 | 出处 | 对判据的影响 |
 |---|---|---|---|
@@ -451,7 +451,7 @@ Q142.23、Q142.24、Q142.36 是「checker 与预言器互比」、S13 是「模�
 
 ### 7.2 独立算出、用命令核过的（第十三节命令一；不符 ⇒ 作废 V11）
 
-命令一 `anchors_e142_r17.py` 在第五、六、八至十一节的草稿写完之后跑（草稿修改时刻见第十三节），输出原样在第十三节。它照 7.1 的规则另写一个逐态预言器，在一盘各点上逐态枚举，在主臂上除 26 次写那一段之外逐态枚举（那一段用 3 个单元的同形流逐态核过「全是 `legal_no_file`、查不查 journal 都一样」再按个数补上）。
+命令一 `anchors_e142_r17.py` 在第五、六、八至十一节的草稿写完之后跑（草稿的修改记录见第十三节），输出原样在第十三节。它照 7.1 的规则另写一个逐态预言器，在一盘各点上逐态枚举，在主臂上除 26 次写那一段之外逐态枚举（那一段用 3 个单元的同形流逐态核过「全是 `legal_no_file`、查不查 journal 都一样」再按个数补上）。
 
 | # | 断言 | 值（命令一的输出行） |
 |---|---|---|
@@ -597,7 +597,7 @@ Q142.23、Q142.24、Q142.36 是「checker 与预言器互比」、S13 是「模�
 
 ## 十三、读过的文件与跑过的命令
 
-下面列的是这一次派发里读过的全部文件。行号是读的那一刻（2026-09-25 22:52–23:10 JST）的行号。`research/results/` 下的产物一份都没读（只 `ls | grep e142` 看过文件名）；`.claude/kb/experiments/` 下只看了 E142 实验页的节名（`grep -n '^#'`），正文没读；`/tmp/claude-1000/layout01-spec/spec.md` 没读。草稿目录：`/tmp/claude-1000/e142-r17-design/`（派发提示给的）。`.claude/singlefs-ai-sop/CLAUDE.md` 与它 `@` 的共享规则整份在会话上下文里（运行环境载入的，不是这一次用工具读的）。
+下面列的是这一次派发里读过的全部文件。行号是读的那一刻（2026-09-25）的行号。`research/results/` 下的产物一份都没读（只 `ls | grep e142` 看过文件名）；`.claude/kb/experiments/` 下只看了 E142 实验页的节名（`grep -n '^#'`），正文没读；`/tmp/claude-1000/layout01-spec/spec.md` 没读。草稿目录：`/tmp/claude-1000/e142-r17-design/`（派发提示给的）。`.claude/singlefs-ai-sop/CLAUDE.md` 与它 `@` 的共享规则整份在会话上下文里（运行环境载入的，不是这一次用工具读的）。
 
 ### 13.1 规则、共用约束、钩子、门禁与脚本
 
@@ -648,9 +648,9 @@ Q142.23、Q142.24、Q142.36 是「checker 与预言器互比」、S13 是「模�
 ### 13.6 跑过的命令（原样；读文件的 `sed` / `awk` / `grep -n` / Read 在上面按行列过，不重列）
 
 ```
-$ date -u '+%F %T UTC'; TZ=Asia/Tokyo date '+%F %T JST'
-2026-09-25 13:52:29 UTC
-2026-09-25 22:52:29 JST
+$ date -u '+%F'; TZ=Asia/Tokyo date '+%F'
+2026-09-25
+2026-09-25
 $ mkdir -p /tmp/claude-1000/e142-r17-design/{quotes,sections}
 $ set -o noclobber; git show 3cff909^:research/prompts/e142-preregistration.md > <草稿>/quotes/e142-original-prereg-3cff909-parent.md
 $ nice -n 19 python3 research/scripts/quote-kb.py <草稿>/quotes/e142-r17-question.md 'research/prompts/m2-keyspace-rerun-questions.md:11-12' 'research/prompts/m2-keyspace-rerun-questions.md:18-20'
@@ -681,9 +681,9 @@ f546b3242e601af79e5420a793c32823506d358b4c061a3e4e866fa17a7cc3ea  …/quotes/e14
 $ sha256sum <草稿>/quotes/e142-r17-original-criteria-relative.md "<草稿>/quotes/git-show-3cff909^-research-prompts-e142-preregistration.md"
 62c4406849c9f47cf42b7c3a2afcd696d0aa62104ee067dbf5e7c7cb92149aab  …/quotes/e142-r17-original-criteria-relative.md
 d10252a2446aee252932d088d29051fa2b55d5619293efee07a48d8aa7ff2591  …/quotes/git-show-3cff909^-research-prompts-e142-preregistration.md
-$ ls -l --time-style=+%H:%M:%S <草稿>/sections/          # 跑命令一之前各判据草稿的 UTC 修改时刻：
-  s05 13:56:33 起稿、13:58:07 改措辞；s06 13:57:57 起稿、13:58:07 改编号；s06b 13:58:35；s08 13:59:08；s09 13:59:36 起稿、13:59:46 改 M152；s10 14:00:58；s11 14:00:58 起稿、14:01:10 改 S13 引的 `crates/` 行号
-$ cd <草稿> && nice -n 19 python3 anchors_e142_r17.py > anchors_e142_r17.out; echo "rc=$?"      # 14:02:45 UTC
+$ ls -l --time-style=+%H:%M:%S <草稿>/sections/          # 跑命令一之前各判据草稿的修改记录：
+  s05 起稿、改措辞；s06 起稿、改编号；s06b；s08；s09 起稿、改 M152；s10；s11 起稿、改 S13 引的 `crates/` 行号
+$ cd <草稿> && nice -n 19 python3 anchors_e142_r17.py > anchors_e142_r17.out; echo "rc=$?"
 rc=0
 $ cd <草稿> && nice -n 19 python3 check_mutation_predictions.py      # 草稿，只核第九节 M150、M151、M154 的预言，不是锚点
 M154 G7: [12, 1] 4097 violations 2046
@@ -697,7 +697,7 @@ bfd2b7a27866522f2aced6155c00f7cdcfa5ab03ca1dc3f8fe5cdc386d9fb481  anchors_e142_r
 bdd59de8a730fe493d6353a8bb87e9cfc811e258e29643b6d233c57a4a26734a  check_mutation_predictions.py
 ```
 
-**跑命令一之后对判据草稿动过的地方（照实列）**：14:03:10 UTC，第九节 M154 那一行与第八节判别力自证第 2 条：原稿写「阳性对照（FUA 不切段）、G6（FUA 之前本来就有屏障）不变」「违例从 0 改成正数」，`check_mutation_predictions.py` 把「FUA 并进前一段」的切法对 G6 也用了一次、得 1027，查下来 G6 本来就不按 FUA 切段（`fua_is_boundary = false`），那一行输出对 G6 不适用；改成「阳性对照与 G6 不按 FUA 切段，不变」，G7 的违例写成 2046——改的是「这条变异在哪个点上改输出」的说明，不是判据或门槛。14:07–14:08 UTC，第九节「已有的」那一段补上 `grep` 命中的 M88、M90。第一至四节、第七节、第十二、十三节是跑命令一之后写的（第七节本来就要引命令一的输出）。
+**跑命令一之后对判据草稿动过的地方（照实列）**：第九节 M154 那一行与第八节判别力自证第 2 条：原稿写「阳性对照（FUA 不切段）、G6（FUA 之前本来就有屏障）不变」「违例从 0 改成正数」，`check_mutation_predictions.py` 把「FUA 并进前一段」的切法对 G6 也用了一次、得 1027，查下来 G6 本来就不按 FUA 切段（`fua_is_boundary = false`），那一行输出对 G6 不适用；改成「阳性对照与 G6 不按 FUA 切段，不变」，G7 的违例写成 2046——改的是「这条变异在哪个点上改输出」的说明，不是判据或门槛。第九节「已有的」那一段补上 `grep` 命中的 M88、M90。第一至四节、第七节、第十二、十三节是跑命令一之后写的（第七节本来就要引命令一的输出）。
 
 #### 命令一：E142 的独立锚点（`anchors_e142_r17.py`，197 行，全文分两块，按次序拼起来就是整份；sha256 见 13.6）
 
@@ -926,4 +926,4 @@ B22 pc2 units = 12  caught = 12  all_persisted = legal_file_read
 B23 labels: units = t1..t12  journal_record = t13  root = t14  system_configuration = t15
 ```
 
-**收尾时刻**：2026-09-25 23:13 JST（本机 2026-09-25 14:13 UTC）。这一次没有编译、没有跑装置、没有跑任何产物；草稿目录里只有抄条款与问题单的出口文件、原登记的 `git show` 存档、锚点脚本与它的输出、核变异预言的草稿脚本、各节草稿与拼好的分块。
+**收尾日期**：2026-09-25。这一次没有编译、没有跑装置、没有跑任何产物；草稿目录里只有抄条款与问题单的出口文件、原登记的 `git show` 存档、锚点脚本与它的输出、核变异预言的草稿脚本、各节草稿与拼好的分块。

@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running tests/checker_judges_reserved_bytes_and_widths_it_used_to_skip.rs (/tmp/claude-1000/impl-r2-fixes-a/target/debug/deps/checker_judges_reserved_bytes_and_widths_it_used_to_skip-19c9f2049810bc23)
+
+running 1 test
+test a_pool_where_one_system_configuration_slot_carries_a_refused_value_is_reported_and_not_vouched_for ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.15s
+

@@ -308,7 +308,7 @@ pub enum ModelRefusalReason {
     VersionWithoutFileNotWrittenByMakeFilesystem,
     /// 要抬的 F 超过上限（D16（发布语义） 已定项 1「抬 F 的上限」）。
     FloorAboveCeiling,
-    /// 可写挂载读到的样子里有比所选那一版新的发布读不出、系统配置见证过它，重读一次仍读不出（C554 乙：用户 2026-09-27 JST 09:07 定
+    /// 可写挂载读到的样子里有比所选那一版新的发布读不出、系统配置见证过它，重读一次仍读不出（C554 乙：用户 2026-09-27 定
     /// 「乙 重读后再判」，`research/prompts/c554-fix-forks.md` 第 1 行；重读次数取自 D16（发布语义） 已定项 1「根槽这一次读坏」那一行的
     /// 「重读一次」，挂进 D23（journal 的角色与格式） 已定项 14）：取号之前拒，盘上逐字节不变。
     NewerPublishWitnessedBySystemConfigurationStillUnreadableAfterOneReread,
@@ -545,7 +545,7 @@ pub enum ObservedOutcome {
         wrote_anything: bool,
         /// 实现报的上限（抬 F 被上限拒时）。
         reported_ceiling: Option<ModelCheckpointTxg>,
-        /// 实现报「算抬 F 的上限时这个知道住着根的根环槽读坏、重读仍坏」时点名的那个槽
+        /// 实现报「算抬 F 的上限、或挂着时回退判候选集时这个知道住着根的根环槽读坏、重读仍坏」时点名的那个槽
         /// （D16（发布语义） 已定项 1「根槽这一次读坏」那一行）；别的拒绝都是 None。
         reported_root_ring_slot_still_bad_after_one_reread: Option<ModelRingPosition>,
     },
@@ -609,7 +609,8 @@ pub struct ModelDisagreement {
     /// 对不上的是抬 F 的上限（[`ModelDisagreementAspect::RollbackFloorCeiling`]）时实现报的那个数；别的格都是 None。
     /// 故障注入按它比「模型去掉被吞的根之后重算的上限」（实七，主 agent 2026-09-26 定的按注入点认）。
     pub implementation_reported_ceiling: Option<ModelCheckpointTxg>,
-    /// 对不上的是「模型说该成、实现拒了」或「拒绝的理由」，而实现拒的是「根环槽读坏、重读仍坏」时它点名的那个槽；别的格都是 None。
+    /// 对不上的是「模型说该成、实现拒了」或「拒绝的理由」，而实现拒的是「根环槽读坏、重读仍坏」（抬 F 算上限、挂着时回退判候选集都算）
+    /// 时它点名的那个槽；别的格都是 None。
     /// 故障注入按它比「被吞的根槽写落在哪个槽」（实八，D16（发布语义） 已定项 1「根槽这一次读坏」那一行）。
     pub implementation_reported_root_ring_slot_still_bad_after_one_reread:
         Option<ModelRingPosition>,
@@ -1265,7 +1266,7 @@ impl IdealModel {
 
     /// 崩溃恢复抛弃根（执行器的 `HistoryOperation::CrashRecoveryAbandoningTheNewestRoot`）：挂载期间环里最新那条根的根槽与它那次发布
     /// 点名的单元整次挂载读回全 0。那条根是这个进程发的，系统配置在它的根槽 FUA 之后轮换（D16（发布语义） 已定项 7），见证着它；
-    /// 读阶段落到它前一条根、判出系统配置见证过比所选那一版新的发布，重读一次仍全 0，取号之前拒可写（C554 乙，用户 2026-09-27 JST 09:07 定，
+    /// 读阶段落到它前一条根、判出系统配置见证过比所选那一版新的发布，重读一次仍全 0，取号之前拒可写（C554 乙，用户 2026-09-27 定，
     /// `research/prompts/c554-fix-forks.md` 第 1 行；重读一次取自 D16（发布语义） 已定项 1「根槽这一次读坏」那一行）：一个字节都不写，
     /// 模型状态不变（会话照旧关着，根环、F、取过的号都不动）。系统配置没见证到最新那条根的那一形（它那次发布的轮换没落盘）乙罩不到、
     /// 照旧抛弃它，这一步造不出，模型不答。调之前先 `close_session`。

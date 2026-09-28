@@ -1,4 +1,4 @@
-# 附录二：2026-09-23 四份补丁对主工作区现状的改动（材料员生成，2026-09-24 00:35 UTC / 09:35 JST）
+# 附录二：2026-09-23 四份补丁对主工作区现状的改动（材料员生成，2026-09-24 /）
 
 三份有独立补丁（harness、checker、watermark），一、三、五节各放补丁原样，二、四、六节各放它追加、还没合并进 `crates/mutations.tsv` 的变异名（原样）。
 第四组（C511 收窄 + C512 根记录加一项）没有单独补丁：七节是 `crates/singlefs-core/src/root_record.rs` 的 `git diff HEAD` 全文，
@@ -7,7 +7,7 @@
 
 ## 一、harness 那一组：`/tmp/claude-1000/impl-harness-batch/harness.patch`（原样拷 `research/prompts/m2-wave3-code-r1-patches/harness.patch`）
 
-基准：主工作区 2026-09-23 22:55 UTC 现状（HEAD `3b60f098e97dc4c4f3ed9c6355422b607db1c34c` + 当时的未提交改动，`diff -rq` 现查过同步之后没再变过）；
+基准：主工作区 2026-09-24 现状（HEAD `3b60f098e97dc4c4f3ed9c6355422b607db1c34c` + 当时的未提交改动，`diff -rq` 现查过同步之后没再变过）；
 `research/prompts/m2-wave3-harness-implementer-report.md` 第八节 `git apply --check` 在主工作区原样跑，9 个文件全部 `Checking patch … ` 后 `git apply --check exit 0`。
 `sha256sum harness.patch` = `466e22de873f5570320814dcee1e2ffce9cfd9913f9940fdc9289fc0be3ac973`（与 `m2-wave3-code-r1-patches/harness.patch` 一致，已核对）。
 
@@ -1524,8 +1524,8 @@ C378（认了）：取号之后写行或暖机报块设备错时把系统配置�
 
 ## 三、checker 那一组：`/tmp/claude-1000/impl-checker-batch/checker.patch`（原样拷 `research/prompts/m2-wave3-code-r1-patches/checker.patch`）
 
-基准：主工作区 2026-09-23 22:57 UTC 现状（HEAD `3b60f098e97dc4c4f3ed9c6355422b607db1c34c` + 当时的未提交改动）；
-`research/prompts/m2-wave3-checker-implementer-report.md` 第九节 2026-09-23 23:21:12 UTC 在主工作区原样跑 `git apply --check`，6 个文件全部 `Checking patch …` 后 `apply-check exit 0`。
+基准：主工作区 2026-09-24 现状（HEAD `3b60f098e97dc4c4f3ed9c6355422b607db1c34c` + 当时的未提交改动）；
+`research/prompts/m2-wave3-checker-implementer-report.md` 第九节 2026-09-24 在主工作区原样跑 `git apply --check`，6 个文件全部 `Checking patch …` 后 `apply-check exit 0`。
 `sha256sum checker.patch` = `3e8e99daf65c5350d0041851e20de5bebead15c5d4ba830105a9825eea7116cc`（与 `m2-wave3-code-r1-patches/checker.patch` 一致，已核对）。
 
 ```diff
@@ -2791,8 +2791,8 @@ sha256sum：`5be561c8d819ebe55c3f754110078659161ce3a71c0f6b8e4f14b596b667f78f`�
 
 ## 五、watermark 那一组：`/tmp/claude-1000/impl-watermark/watermark.patch`（原样拷 `research/prompts/m2-wave3-code-r1-patches/watermark.patch`）
 
-基准：主工作区 2026-09-23 23:26:40 UTC 的 `crates/` 快照（`/tmp/claude-1000/impl-watermark/base-crates-3/`，HEAD 仍是 `3b60f098e97dc4c4f3ed9c6355422b607db1c34c` + 当时的未提交改动）；
-`research/prompts/m2-wave3-watermark-implementer-report.md` 摘要一节：23:46:40 UTC 对主工作区现状 `git apply --check` 退出 0，那一刻主工作区 `crates/` 与该快照逐文件相同（`diff -rq … | wc -l` → `0`）。
+基准：主工作区 2026-09-24 的 `crates/` 快照（`/tmp/claude-1000/impl-watermark/base-crates-3/`，HEAD 仍是 `3b60f098e97dc4c4f3ed9c6355422b607db1c34c` + 当时的未提交改动）；
+`research/prompts/m2-wave3-watermark-implementer-report.md` 摘要一节：对主工作区现状 `git apply --check` 退出 0，那一刻主工作区 `crates/` 与该快照逐文件相同（`diff -rq … | wc -l` → `0`）。
 `sha256sum watermark.patch`（本次现查）= `3a9b91313ce46dc6b1386e256980075db720f79f9860a75dacaa335069836dfc`（与 `m2-wave3-code-r1-patches/watermark.patch` 一致）。
 这一组同时把 `crates/mutations.tsv` 里守旧行为「回退到无文件那一版时若环里还有带文件的根，写之前拒绝」的 5 行删掉（报告第二节「二、这一轮写过的文件」：只删不加），新行为的变异改放六节的 `mutations-append.tsv`。
 

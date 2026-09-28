@@ -15,7 +15,7 @@
 - **共用问句与三种结论**：照 `research/prompts/_m2-final-code-r1-body.md` 第一节。
 - **欢迎攻的**：实二五自己取的读法（报告第六节 Q1–Q5）已由主 agent 认下、写成条款，都被攻过零轮，这几格打中照常算。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-25 10:1x JST 现查）
+## 二、实现今天的样子（主 agent 的观测，2026-09-25 现查）
 
 - **冻结副本**：腿读代码一律读 `/tmp/claude-1000/m2-final-code-r4/tree/crates/`，那是实二五交回那一刻的整棵树。
   - 哈希在 `crates-src-sha256.txt`、`crates-tests-sha256.txt`。

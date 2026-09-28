@@ -1,0 +1,5 @@
+exit=1
+want=research 的构建或单测没过（cargo test 退出码 101）
+want=adds_two_and_two_to_five
+want=── 汇总：checker-tier-research-build-and-replay.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=checker-tier-research-build-and-replay.sh：1 格里 1 格红（research-unit-tests）

@@ -1,0 +1,23 @@
+# E164（崩溃放量新设计的小范围功能测试）的变异表：跑前登记第九节 M1–M22。M22（闭包不算 dev-dependencies）开跑前核得取样点不敏感（产物 w5_nodes 行 nodes_whose_closure_needs_development_dependencies=0），照 .claude/rules/mutation-sampling.md 第三类换成 M22b。
+M1_写表哈希丙去掉步内段号	                        operation.content_sha256,\n                        segment\n	                        operation.content_sha256,\n                        0\n
+M2_写表哈希丙不记种类	                        operation.device,\n                        operation.kind.serialized_name(),\n                        operation.offset_in_bytes,	                        operation.device,\n                        "write",\n                        operation.offset_in_bytes,
+M3_切段时FUA不关段	                    writes_in_current_segment += 1;\n                    unreleased_devices.remove(&operation.device);\n                    unreleased_devices.is_empty()	                    writes_in_current_segment += 1;\n                    false
+M4_同一块盘上连着的屏障不合并	if operation.kind == OperationKind::Barrier && this_device_already_in_the_trailing_barriers {	if false && this_device_already_in_the_trailing_barriers {
+M5_一块盘的屏障就关段	                    writes_in_current_segment > 0 && unreleased_devices.is_empty()	                    writes_in_current_segment > 0
+M6_闭式里少减一	1 + counts.iter().map(|writes| (1u128 << writes) - 1).sum::<u128>()	1 + counts.iter().map(|writes| (1u128 << writes)).sum::<u128>()
+M7_词法摘要留下行注释	            if current == '/' && next == Some('/') {	            if current == '/' && next == Some('/') && false {
+M8_词法摘要把文档注释当代码留下	            if current == '/' && next == Some('/') {	            if current == '/' && next == Some('/') && characters.get(position + 2) != Some(&'/') {
+M9_词法摘要不看字面量的值	                text: characters[token_start..position].iter().collect(),	                text: if current.is_ascii_digit() { "<literal>".to_string() } else { characters[token_start..position].iter().collect() },
+M10_按函数取时把fn之外的项也收进来	        non_test_function_items(&lexical_tokens(source))\n            .iter()\n            .map(|item| token_text(item))	        vec![lexical_tokens(source)]\n            .iter()\n            .map(|item| token_text(item))
+M11_按走到的文件取时把没有非测试fn的文件也收进来	        !non_test_function_items(&lexical_tokens(source)).is_empty()	        true || !non_test_function_items(&lexical_tokens(source)).is_empty()
+M12_输出比对连消息一起去掉	                None => field.to_string(),	                None => String::new(),
+M13_读自己原文的认法漏掉include_str	    const OWN_SOURCE_READS_INCLUDE_STR: bool = true;	    const OWN_SOURCE_READS_INCLUDE_STR: bool = false;
+M14_F7做臂的输入取父身份	                RecordingArm::WithBarriersAndParentOutput => with_barriers_same && parent_same,	                RecordingArm::WithBarriersAndParentOutput => with_barriers_same,
+M15_最强形里核对方先写已核对标记再写结果	        check_order: CheckOrder::AtomicBatchKeyed,\n        flag_records_digest: true,	        check_order: CheckOrder::FlagBeforeResult,\n        flag_records_digest: true,
+M16_最强形里标记记布尔	        check_order: CheckOrder::AtomicBatchKeyed,\n        flag_records_digest: true,	        check_order: CheckOrder::AtomicBatchKeyed,\n        flag_records_digest: false,
+M17_带租期那一形里迟到的卡按追加写结果	        late_writer_appends: false,	        late_writer_appends: true,
+M18_带租期那一形里租期永不到期	        lease_can_expire: true,\n    };	        lease_can_expire: false,\n    };
+M19_F13做臂把term与net也收进指纹	const CONFIGURATION_KEYS_THAT_CHANGE_CODE: &[&str] = &["build.rustflags",	const CONFIGURATION_KEYS_THAT_CHANGE_CODE: &[&str] = &["term.color", "net.offline", "build.rustflags",
+M20_F13做臂漏收RUSTFLAGS	"RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS",	"CARGO_ENCODED_RUSTFLAGS",
+M21_W3只扫crates下的路径	git_text(root, &["rev-list", "--all"]).lines()	git_text(root, &["rev-list", "--all", "--", "crates"]).lines()
+M22b_W5不算节点自己的目标文件改动	!closure.is_disjoint(touched_packages) || target_file.is_some_and(|file| changed_files.iter().any(|changed| changed == file))	!closure.is_disjoint(touched_packages)

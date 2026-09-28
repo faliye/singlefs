@@ -29,8 +29,8 @@ set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
-REFS="${FS_REFS:-/home/fy5090/code/fs-refs}"
-KERN="${KERNEL_TREE:-/home/fy5090/kbuild/linux-om}"
+REFS="${FS_REFS:-$HOME/code/fs-refs}"
+KERN="${KERNEL_TREE:-$HOME/kbuild/linux-om}"
 
 # ── 树登记表：一行一棵树，树名 | 根路径 | 固定点还是非固定点 ──────────────
 # 固定点＝research/scripts/fetch-refs.sh 按 URL + sha256 取回、放在 $FS_REFS 底下的那一份。

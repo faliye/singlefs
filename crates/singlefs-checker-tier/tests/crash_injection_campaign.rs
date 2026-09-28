@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::io::Write as _;
 
 use singlefs_checker::walk::InstanceTableOfRootRecord;
-use singlefs_checker_tier::crash::{check_records, check_records_against};
+use singlefs_checker_tier::crash::check_records;
 use singlefs_checker_tier::crash_injection::{
     inject_crashes_into_history, run_crash_injection_campaign, CrashInjectionCampaign,
     CrashInjectionReport, CrashInjectionWorkerThreads, CrashPoint, CrashPointDraw,
@@ -26,11 +26,11 @@ use singlefs_harness::history::{
     execute_history_with, generate_history, generate_history_with_weights, ContentChoice,
     ContentLength, FloorTargetChoice, GeneratedHistory, GenerationWeights, HistoryDeviceWidth,
     HistoryEnding, HistoryExecution, HistoryOperation, HistoryOperationKind, HistorySeed,
-    HistoryStartingPoint, PerStepChecker, RollbackTargetChoice,
+    HistoryStartingPoint, PerStepChecker, RollbackTargetChoice, StepOutcome,
 };
 use singlefs_harness::memory_pool::{
     root_identity_written_by, writes_and_segments, CrashImage, MemoryPool, RecordCheck,
-    RecordStreamContinuity, RetainedWrite,
+    RetainedWrite,
 };
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::SharedStream;
@@ -553,6 +553,15 @@ fn unit_write_is_still_on_disk(image: &CrashImage<'_>, write: &RetainedWrite) ->
 /// （行 (1, 3) 且 4 > 3，D23（journal 的角色与格式） 已定项 14），(1, 4) 写出的单元不算「该在」，记录核对器不判红。
 /// 判别力的两半：同一条流上把没被抛弃的发布的一个单元的两份都扣下，照判红——一次是 (1, 3)（行 (1, 3) 的边上，T = Ti 不算被抛弃），
 /// 一次是最后那次覆盖写。
+///
+/// **C554 乙之后「崩溃恢复抛弃根」这一步造不出被抛弃的根**（合入后验证一，主 agent 2026-09-27 定改钉「这一形不可达」）：(1, 4) 是这个会话发的，
+/// 系统配置见证过它；这一步让它的根槽与单元读回全 0 之后，可写挂载读阶段判据 N-配置 为真、重读一次仍为真，按 C554 乙拒
+/// （`MountError::NewerStateStillUnreadableAfterOneReread`，`history.rs` 的 `apply_crash_recovery_abandoning_the_newest_root` 文档写着），
+/// 不开新实例、不写抛弃行，后面三次覆盖写没有可写会话、都不适用。第一轮快照（`refs/sop/m2-closeout-code-r1-snapshot`，C554 乙合入之前）上这一条绿，
+/// 今天的底座上把 C577 那道屏障去掉它照样造不出（探针量过，合入后验证一报告）：不可达是 C554 乙定的，不是 C577。
+/// 这一条保留原来的构造（同一串步），改钉今天的样子：整条流都落了盘的那个状态上恢复落到 (1, 4)（实例 1），流里没有实例 2 的发布，
+/// 记录核对器不判红；判别力那两次扣单元照旧，扣的是 (1, 3) 与流里最后一次发布 (1, 4)。把 C554 乙那一判关掉，挂载照旧做成、落到实例 2，
+/// 红在「落到实例 1」那一条（`crates/mutations.tsv`）。
 #[test]
 fn units_of_a_publish_the_landed_version_abandons_are_not_required_while_a_kept_publish_missing_a_unit_is_still_red(
 ) {
@@ -599,27 +608,19 @@ fn units_of_a_publish_the_landed_version_abandons_are_not_required_while_a_kept_
         persisted: vec![true; writes.len()],
     };
     let report = recover(&every_write_landed, JournalPolicy::Consult);
-    let (landed_instance, landed_txg) = report.effective_root.expect("恢复落到了一版");
     assert_eq!(
-        landed_instance,
-        InstanceGeneration(2),
-        "落到实例 2 的最新那一版"
+        report.effective_root,
+        Some((InstanceGeneration(1), CheckpointTxg(4))),
+        "C554 乙之后崩溃恢复抛弃根那一步的可写挂载被拒：落到实例 1 的 (1, 4)，没有实例 2（C554 乙之前落到实例 2、比 (1, 4) 新的一版）"
     );
     assert!(
-        landed_txg > CheckpointTxg(4),
-        "落到的那一版比被抛弃的 (1, 4) 新"
-    );
-    let abandoned_units = units_of((1, 4));
-    assert!(
-        abandoned_units
-            .iter()
-            .any(|unit| !unit_write_is_still_on_disk(&every_write_landed, &writes[*unit])),
-        "(1, 4) 写出的单元有被后来的发布复用盖掉的（这一条要罩的就是这一形）"
+        publishes.iter().all(|((instance, _), _)| *instance <= 1),
+        "流里只有 mkfs（实例 0）与实例 1 的发布、没有实例 2 的：{publishes:?}"
     );
     assert_eq!(
         check_records(&every_write_landed, report.effective_root),
         RecordCheck::default(),
-        "被抛弃的 (1, 4) 的单元不算「该在」，记录核对器一条都不判红"
+        "整条流都落了盘：记录核对器一条都不判红"
     );
 
     let last_overwrite = publishes.last().expect("流里至少一次发布").0;
@@ -686,82 +687,42 @@ fn history_with_a_crash_state_landing_on_a_version_rebuilt_from_records() -> Gen
     )
 }
 
-/// 一个恢复落到由 journal 记录重建的一版上的崩溃状态（调查报告第 1 条那一形），按崩溃注入重建镜像的那种摆法拆开：
-/// 整条历史录制流的写表、崩溃点所在的段与段内持久了哪几个写、落到的那一版与它在整条流里的根槽写（在这一段之后）、
-/// 被那一版的实例表抛弃而单元已被后来的发布复用盖掉的那次发布。
-struct CrashStateLandingOnAVersionRebuiltFromRecords {
-    writes: Vec<RetainedWrite>,
-    device_bytes: u64,
-    first_write_of_the_segment: usize,
-    persisted_within_the_segment: Vec<bool>,
-    landed_version: (InstanceGeneration, CheckpointTxg),
-    root_write_of_the_landed_version: usize,
-    abandoned_publish_with_a_unit_overwritten: (u32, u64),
+/// C554 乙之后崩溃恢复抛弃根那一步的结局：可写挂载读阶段判据 N-配置 为真、重读一次仍为真，拒可写（`history.rs` 的
+/// `apply_crash_recovery_abandoning_the_newest_root`）。
+const CRASH_RECOVERY_REFUSED_BY_THE_WITNESS: &str =
+    "MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)";
+
+/// `history` 在崩溃注入那一种执行下，每一步「崩溃恢复抛弃根」的结局，按次序。
+fn outcomes_of_the_crash_recovery_steps(history: &GeneratedHistory) -> Vec<StepOutcome> {
+    let run = execute_history_with(
+        history,
+        UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        &SharedStream::new(),
+        &mut |_| {},
+    );
+    history
+        .operations
+        .iter()
+        .zip(run.outcomes)
+        .filter(|(operation, _)| {
+            matches!(
+                operation,
+                HistoryOperation::CrashRecoveryAbandoningTheNewestRoot
+            )
+        })
+        .map(|(_, outcome)| outcome)
+        .collect()
 }
 
-impl CrashStateLandingOnAVersionRebuiltFromRecords {
-    fn end_of_the_segment(&self) -> usize {
-        self.first_write_of_the_segment + self.persisted_within_the_segment.len()
-    }
-
-    /// 崩溃注入交给记录核对器的那一种持久集合，另扣下 `withheld_earlier_writes`（[`persisted_over_the_whole_stream`]）。
-    fn persisted_over_the_whole_stream(&self, withheld_earlier_writes: &[usize]) -> Vec<bool> {
-        persisted_over_the_whole_stream(
-            self.writes.len(),
-            self.first_write_of_the_segment,
-            &self.persisted_within_the_segment,
-            withheld_earlier_writes,
-        )
-    }
-
-    fn base_pool(&self, persisted: &[bool]) -> MemoryPool {
-        pool_of_the_persisted_writes_before_the_segment(
-            &self.writes[..self.first_write_of_the_segment],
-            persisted,
-            self.device_bytes,
-        )
-    }
-
-    /// 基线加上崩溃点所在段里持久了的写（崩溃注入重建镜像的同一种摆法）。
-    fn crash_image<'base>(&'base self, base: &'base MemoryPool) -> CrashImage<'base> {
-        CrashImage {
-            base,
-            writes: &self.writes[self.first_write_of_the_segment..self.end_of_the_segment()],
-            persisted: self.persisted_within_the_segment.clone(),
-        }
-    }
-
-    /// 落到的那一版的实例表，从 `image` 上按它在整条流里那次根槽写带的指针读。
-    fn instance_table_of_the_landed_version(
-        &self,
-        image: &CrashImage<'_>,
-    ) -> Option<InstanceTableOfRootRecord> {
-        InstanceTableOfRootRecord::read(
-            image,
-            self.writes[self.root_write_of_the_landed_version]
-                .bytes()
-                .expect("根槽写带着字节"),
-        )
-    }
-}
-
-/// 与整条流（`write_count` 个写）逐条对应的持久集合：崩溃点所在段之前整段持久（`withheld_earlier_writes` 里的除外）、
+/// 与整条流（`write_count` 个写）逐条对应的持久集合：崩溃点所在段之前整段持久、
 /// 这一段按崩溃点的子集、之后的一个都没持久——崩溃注入交给记录核对器的那一种。
 fn persisted_over_the_whole_stream(
     write_count: usize,
     first_write_of_the_segment: usize,
     persisted_within_the_segment: &[bool],
-    withheld_earlier_writes: &[usize],
 ) -> Vec<bool> {
     let mut persisted = vec![false; write_count];
     persisted[..first_write_of_the_segment].fill(true);
-    for withheld in withheld_earlier_writes {
-        assert!(
-            *withheld < first_write_of_the_segment,
-            "另扣下的只能是崩溃点所在段之前的写（写表下标 {withheld}）"
-        );
-        persisted[*withheld] = false;
-    }
     persisted[first_write_of_the_segment
         ..first_write_of_the_segment + persisted_within_the_segment.len()]
         .copy_from_slice(persisted_within_the_segment);
@@ -786,13 +747,11 @@ fn pool_of_the_persisted_writes_before_the_segment(
 /// 在 `history` 的整条录制流上，按 `crash_points`（这段历史上崩溃注入摆出来的那几个）逐个重建崩溃镜像、跑恢复，
 /// 挑出第一个这样的崩溃状态：恢复施加过 journal 记录、落到的那一版的根槽写不在到这一段为止的前缀里（在更晚的段），
 /// 那一版的实例表读得出、抛弃了更早的一次发布，而那次发布写在某个偏移上的单元每一份都已不在盘上（被后来的发布复用盖掉）。
-///
-/// # Panics
-/// 一个这样的崩溃状态都没有：种子基、切段或这段历史怎么跑变了，这一形不在这几个崩溃状态里，靠它的用例要换一段摆得出它的历史。
+/// 交回落到的那一版与被它的实例表抛弃的那次发布；一个这样的崩溃状态都没有时 `None`（C554 乙之后这一形不可达，见用到它的两条用例）。
 fn crash_state_landing_on_a_version_rebuilt_from_records(
     history: &GeneratedHistory,
     crash_points: &[CrashPoint],
-) -> CrashStateLandingOnAVersionRebuiltFromRecords {
+) -> Option<((InstanceGeneration, CheckpointTxg), (u32, u64))> {
     let execution = UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES;
     let stream = SharedStream::retaining_contents();
     execute_history_with(history, execution, &stream, &mut |_| {});
@@ -802,7 +761,7 @@ fn crash_state_landing_on_a_version_rebuilt_from_records(
     );
     let publishes = unit_writes_of_each_publish(&writes);
     let device_bytes = execution.device_width.device_bytes();
-    let found = crash_points.iter().find_map(|crash_point| {
+    crash_points.iter().find_map(|crash_point| {
         let segment = &segments[crash_point.segment_index];
         assert_eq!(
             segment.len(),
@@ -816,7 +775,6 @@ fn crash_state_landing_on_a_version_rebuilt_from_records(
             writes.len(),
             first_write_of_the_segment,
             &crash_point.persisted_within_the_segment,
-            &[],
         );
         let base = pool_of_the_persisted_writes_before_the_segment(
             &writes[..first_write_of_the_segment],
@@ -866,43 +824,21 @@ fn crash_state_landing_on_a_version_rebuilt_from_records(
                                 .all(|copy| !unit_write_is_still_on_disk(&image, &writes[*copy]))
                         })
                 })?;
-        Some((
-            first_write_of_the_segment,
-            crash_point.persisted_within_the_segment.clone(),
-            landed_version,
-            root_write_of_the_landed_version,
-            *abandoned_publish_with_a_unit_overwritten,
-        ))
-    });
-    let (
-        first_write_of_the_segment,
-        persisted_within_the_segment,
-        landed_version,
-        root_write_of_the_landed_version,
-        abandoned_publish_with_a_unit_overwritten,
-    ) = found.unwrap_or_else(|| {
-        panic!(
-            "种子 {:?} 的崩溃状态 {crash_points:#?} 里没有「恢复落到由记录重建的一版、它的根槽写在更晚的段、它的实例表抛弃的发布有单元已被复用盖掉」那一形：\
-             种子基、切段或这段历史怎么跑变了，要换一段摆得出这一形的历史",
-            history.seed
-        )
-    });
-    CrashStateLandingOnAVersionRebuiltFromRecords {
-        writes,
-        device_bytes,
-        first_write_of_the_segment,
-        persisted_within_the_segment,
-        landed_version,
-        root_write_of_the_landed_version,
-        abandoned_publish_with_a_unit_overwritten,
-    }
+        Some((landed_version, *abandoned_publish_with_a_unit_overwritten))
+    })
 }
 
-/// 调查报告 `research/prompts/m2-investigate-crash-injection-reds-report.md` 第 1 条（装置错）：种子基 + 2 那段历史上摆出来的一个崩溃状态，
+/// 调查报告 `research/prompts/m2-investigate-crash-injection-reds-report.md` 第 1 条（装置错）那一形：种子基 + 2 那段历史上摆出来的一个崩溃状态，
 /// 扣下一份 journal 记录、留下另一份，恢复施加记录落到由记录重建的那一版，那一版的根槽写在更晚的段里（D23（journal 的角色与格式） 已定项 15）；
-/// 那一版的实例表抛弃了更早的一次发布，那次发布的单元已被后来的发布复用盖掉。记录核对器按落到的那一版的实例表豁免它（实八），
-/// 前提是交给它的写表里找得到那一版的根槽写：崩溃注入交整条流（与层 0 同一种交法），这段历史上的崩溃状态一条「恢复自称新态而单元缺席」都不判。
-/// 只交到崩溃点所在段为止的前缀时，那一版的实例表读不出、豁免整条落空，这一条判红。
+/// 那一版的实例表抛弃了更早的一次发布，那次发布的单元已被后来的发布复用盖掉。那时记录核对器按落到的那一版的实例表豁免它（实八），
+/// 前提是交给它的写表里找得到那一版的根槽写（崩溃注入交整条流）。
+///
+/// **C554 乙之后这一形不可达**（合入后验证一，主 agent 2026-09-27 定改钉「这一形不可达」）：实例表抛弃一次发布要崩溃恢复抛弃根
+/// （`CrashRecoveryAbandoningTheNewestRoot`），而那条根是这个会话发的、系统配置见证过它，下一次可写挂载读不出它时按 C554 乙拒
+/// （`MountError::NewerStateStillUnreadableAfterOneReread`），没有新实例、没有抛弃行。第一轮快照（C554 乙合入之前）上这一条绿；
+/// 今天的底座上把 C577 那道屏障去掉照样摆不出来，不可达是 C554 乙定的。
+/// 这一条保留原来的构造（同一段历史、同一批崩溃状态），改钉：这批崩溃状态里一个这样的都没有，记录核对器一条都不判。
+/// 把 C554 乙那一判关掉，这一形回来，第一条断言红（`crates/mutations.tsv`）。
 #[test]
 fn crash_state_landing_on_a_version_rebuilt_from_records_exempts_the_publishes_its_instance_table_abandons(
 ) {
@@ -913,17 +849,24 @@ fn crash_state_landing_on_a_version_rebuilt_from_records_exempts_the_publishes_i
         FAST_TIER_DRAW,
         None,
     );
-    let state =
-        crash_state_landing_on_a_version_rebuilt_from_records(&history, &injection.crash_points);
     print_uncaptured(&format!(
-        "── 崩溃注入：恢复落到由记录重建的 {:?}（根槽写在写表第 {} 项，崩溃点所在段 [{}, {})），它的实例表抛弃 {:?} ──\n{}",
-        state.landed_version,
-        state.root_write_of_the_landed_version,
-        state.first_write_of_the_segment,
-        state.end_of_the_segment(),
-        state.abandoned_publish_with_a_unit_overwritten,
+        "── 崩溃注入：种子基 + 2 那段历史，C554 乙之后找「恢复落到由记录重建的一版、它的实例表抛弃了单元被复用的发布」那一形 ──\n{}",
         injection.tally.render()
     ));
+    let crash_recovery_outcomes = outcomes_of_the_crash_recovery_steps(&history);
+    assert!(
+        !crash_recovery_outcomes.is_empty()
+            && crash_recovery_outcomes.iter().all(|outcome| *outcome
+                == StepOutcome::Refused {
+                    member: CRASH_RECOVERY_REFUSED_BY_THE_WITNESS.to_string()
+                }),
+        "这段历史里的崩溃恢复抛弃根每一步都被 C554 乙拒、一个被抛弃的根都没造出来：{crash_recovery_outcomes:?}"
+    );
+    assert_eq!(
+        crash_state_landing_on_a_version_rebuilt_from_records(&history, &injection.crash_points),
+        None,
+        "C554 乙之后崩溃恢复抛弃根那一步被拒、造不出被抛弃的根：这批崩溃状态里不该有落到由记录重建、实例表抛弃了单元被复用的发布的那一版"
+    );
     assert_eq!(
         injection.tally.record_checks,
         u64::try_from(injection.crash_points.len()).expect("崩溃状态数装得进 u64"),
@@ -931,8 +874,7 @@ fn crash_state_landing_on_a_version_rebuilt_from_records_exempts_the_publishes_i
     );
     assert_eq!(
         injection.tally.record_claimed_state_missing_unit, 0,
-        "被落到的那一版的实例表抛弃的 {:?} 的单元不算「该在」：记录核对器要在交给它的写表里找得到那一版的根槽写（写表第 {} 项）",
-        state.abandoned_publish_with_a_unit_overwritten, state.root_write_of_the_landed_version
+        "这段历史上的崩溃状态一条「恢复自称新态而单元缺席」都不判"
     );
     assert_eq!(
         injection.tally.record_root_without_record, 0,
@@ -940,10 +882,11 @@ fn crash_state_landing_on_a_version_rebuilt_from_records_exempts_the_publishes_i
     );
 }
 
-/// 判别力（调查报告第 1 条「推翻条件与造它的那一次」第 2 次）：同一个崩溃状态、同样交整条流，先不另扣——一条不判（对照）；
-/// 再把落到的那一版在它实例里的前一版（没被抛弃）写在某个偏移上的单元两份都扣下，照判红：整条流让那一版的实例表读得出、豁免生效之后，
-/// 没被抛弃的发布缺单元照样判。只算干净的扣法——扣下之后恢复仍落到同一版、那一版的实例表仍读得出且仍抛弃单元被复用的那次发布
-/// （扣下实例表那一片会把豁免又关掉，那样判红说明不了判别力）；干净的扣法至少一个，每个都判红。
+/// 判别力那一半（调查报告第 1 条「推翻条件与造它的那一次」第 2 次）原来在上一条那一形上做：落到的那一版在它实例里的前一版（没被抛弃）
+/// 写在某个偏移上的单元两份都扣下，照判红。**C554 乙之后那一形不可达**（见上一条），这一条改钉：用快档的崩溃状态与同一段历史，
+/// 一个那样的崩溃状态都摆不出来。「没被抛弃的发布缺单元照样判红」那一半由
+/// [`units_of_a_publish_the_landed_version_abandons_are_not_required_while_a_kept_publish_missing_a_unit_is_still_red`] 的扣单元那两次守着。
+/// 把 C554 乙那一判关掉，这一形回来，这一条红（`crates/mutations.tsv`）。
 #[test]
 fn on_the_whole_stream_a_kept_publish_missing_a_unit_under_a_version_rebuilt_from_records_is_still_red(
 ) {
@@ -954,91 +897,19 @@ fn on_the_whole_stream_a_kept_publish_missing_a_unit_under_a_version_rebuilt_fro
         FAST_TIER_DRAW,
         None,
     );
-    let state =
-        crash_state_landing_on_a_version_rebuilt_from_records(&history, &injection.crash_points);
-    let (landed_instance, landed_txg) = state.landed_version;
-    let (abandoned_instance, abandoned_txg) = state.abandoned_publish_with_a_unit_overwritten;
-
-    let nothing_else_withheld = state.persisted_over_the_whole_stream(&[]);
-    let base = state.base_pool(&nothing_else_withheld);
-    let image = state.crash_image(&base);
-    assert_eq!(
-        check_records_against(
-            &image,
-            &image,
-            &state.writes,
-            &nothing_else_withheld,
-            RecordStreamContinuity::OneRecording,
-            Some(state.landed_version)
-        ),
-        RecordCheck::default(),
-        "对照：整条流、不另扣，被抛弃的 {:?} 豁免，一条不判",
-        state.abandoned_publish_with_a_unit_overwritten
-    );
-
-    let publishes = unit_writes_of_each_publish(&state.writes);
-    let (kept_publish, kept_units) = publishes
-        .iter()
-        .rev()
-        .find(|((instance, checkpoint_txg), units)| {
-            *instance == landed_instance.0
-                && *checkpoint_txg < landed_txg.0
-                && !units.is_empty()
-                && units
-                    .iter()
-                    .all(|unit| *unit < state.first_write_of_the_segment)
-        })
-        .unwrap_or_else(|| {
-            panic!(
-                "落到的那一版 {:?} 在它实例里有前一版，写过单元",
-                state.landed_version
-            )
-        });
-    let mut copies_by_offset: BTreeMap<u64, Vec<usize>> = BTreeMap::new();
-    for unit in kept_units {
-        copies_by_offset
-            .entry(state.writes[*unit].offset.0)
-            .or_default()
-            .push(*unit);
-    }
-    let mut clean_withholdings = 0usize;
-    for (offset, copies) in &copies_by_offset {
-        let persisted = state.persisted_over_the_whole_stream(copies);
-        let base_with_the_unit_withheld = state.base_pool(&persisted);
-        let image_with_the_unit_withheld = state.crash_image(&base_with_the_unit_withheld);
-        let recovery = recover(&image_with_the_unit_withheld, JournalPolicy::Consult);
-        let still_abandons_the_overwritten_publish = state
-            .instance_table_of_the_landed_version(&image_with_the_unit_withheld)
-            .is_some_and(|table| table.abandons(abandoned_instance, abandoned_txg));
-        if recovery.effective_root != Some(state.landed_version)
-            || !still_abandons_the_overwritten_publish
-        {
-            continue;
-        }
-        clean_withholdings += 1;
-        assert!(
-            check_records_against(
-                &image_with_the_unit_withheld,
-                &image_with_the_unit_withheld,
-                &state.writes,
-                &persisted,
-                RecordStreamContinuity::OneRecording,
-                recovery.effective_root
-            )
-            .claimed_state_missing_unit,
-            "{kept_publish:?} 没被落到的那一版 {:?} 抛弃，它写在偏移 {offset} 上的单元两份（写表第 {copies:?} 项）都扣下，照判红",
-            state.landed_version
-        );
-    }
-    print_uncaptured(&format!(
-        "── 崩溃注入：落到 {:?}，扣下 {kept_publish:?} 的单元：{} 个偏移里干净的扣法 {clean_withholdings} 个，都判红 ──\n",
-        state.landed_version,
-        copies_by_offset.len()
-    ));
+    let crash_recovery_outcomes = outcomes_of_the_crash_recovery_steps(&history);
     assert!(
-        clean_withholdings >= 1,
-        "{kept_publish:?} 写出的 {} 个偏移里一个干净的扣法都没有（扣哪一个恢复都换了一版，或那一版的实例表读不出）：判别力这一半没验到",
-        copies_by_offset.len()
+        !crash_recovery_outcomes.is_empty()
+            && crash_recovery_outcomes.iter().all(|outcome| *outcome
+                == StepOutcome::Refused {
+                    member: CRASH_RECOVERY_REFUSED_BY_THE_WITNESS.to_string()
+                }),
+        "这段历史里的崩溃恢复抛弃根每一步都被 C554 乙拒、一个被抛弃的根都没造出来：{crash_recovery_outcomes:?}"
+    );
+    assert_eq!(
+        crash_state_landing_on_a_version_rebuilt_from_records(&history, &injection.crash_points),
+        None,
+        "C554 乙之后这一形不可达：判别力那一半没有可做的崩溃状态"
     );
 }
 

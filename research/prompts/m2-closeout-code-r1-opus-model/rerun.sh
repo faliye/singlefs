@@ -2,7 +2,7 @@
 # 复跑：在快照 refs/sop/m2-closeout-code-r1-snapshot 的副本上加这几份用例跑（不动主工作区）。用法：bash rerun.sh <草稿目录>
 set -euo pipefail
 S=${1:?草稿目录}
-R=/home/fy5090/code/singlefs
+R=<仓根>
 M=$R/research/prompts/m2-closeout-code-r1-opus-model
 mkdir -p "$S/tree"
 git -C "$R" archive refs/sop/m2-closeout-code-r1-snapshot crates Cargo.toml Cargo.lock | tar -x -C "$S/tree"

@@ -1,0 +1,7 @@
+exit=1
+want=  field-refs：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（field-refs）
+want=已定项 7
+want=指向了不存在的分项
+want=01-first-txn.md:6 指向 D323（323-样本嵌套简称.md）的「已定项 3」，而那张表里没有这一条
+want=01-first-txn.md:7 指向 D322（322-样本缺分项.md）的「已定项 5」，而那张表里没有这一条

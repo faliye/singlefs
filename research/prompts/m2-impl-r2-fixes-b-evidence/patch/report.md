@@ -1,6 +1,6 @@
 # 第二轮改法 B + 合入后验证一没做完的那一半：实现员报告（上下文到线停下，没做完）
 
-写于 2026-09-27 JST 22:5x（UTC 13:5x）。规格 `/tmp/claude-1000/impl-r2-fixes-b/spec.md`；途中收到主 agent 四条消息（fsync_drop / c366 并进来、C579 定案、第 7 件只改钉 35、singlefs-checker-tier 一律只静态改、线程上限改 10、上下文到线叫停），都在下文对应处。
+写于 2026-09-27。规格 `/tmp/claude-1000/impl-r2-fixes-b/spec.md`；途中收到主 agent 四条消息（fsync_drop / c366 并进来、C579 定案、第 7 件只改钉 35、singlefs-checker-tier 一律只静态改、线程上限改 10、上下文到线叫停），都在下文对应处。
 
 ## 一、结论
 
@@ -57,7 +57,7 @@
 
 ## 六、原样输出
 
-最终副本（主工作区 UTC 13:4x 的拷贝 + 重放全部脚本）上：
+最终副本（主工作区的拷贝 + 重放全部脚本）上：
 ```
 $ cargo clippy --offline --all-targets --all-features -- -D warnings <七条纪律 lint>   # capped.sh 10
     Checking singlefs-checker-tier v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-checker-tier)

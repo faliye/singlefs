@@ -1,0 +1,13 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.53s
+     Running tests/model_comparison_judges_the_instance_table_and_allocation_generations_of_a_version_without_a_file.rs (target/debug/deps/model_comparison_judges_the_instance_table_and_allocation_generations_of_a_version_without_a_file-7c8f1858e09e484f)
+
+running 5 tests
+test a_row_publish_that_hands_in_no_page_of_the_instance_table_is_reported ... ok
+test a_wrong_allocation_generation_of_the_tree_table_the_row_publish_did_not_rewrite_is_reported ... ok
+test a_wrong_allocation_generation_of_the_instance_table_written_by_the_row_publish_is_reported ... ok
+test a_wrong_row_in_the_instance_table_written_by_the_row_publish_is_reported ... ok
+test the_row_publish_on_a_version_without_a_file_is_compared_by_its_whole_instance_table_and_every_role_both_ways ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.06s
+

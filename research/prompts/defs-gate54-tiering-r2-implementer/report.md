@@ -11,7 +11,7 @@
 
 副本：`rsync -a --exclude /target` 主工作区（含 `.git`）到 `/tmp/claude-1000/defs54-r2-impl/repo`，删掉副本里被 `.gitignore` 挡着的 `research/target/`（7.7G，只删副本）。原样两份另存 `orig/`，补丁用 `diff -u --label a/… --label b/…` 从 `orig/` 对 `repo/` 生成；把补丁套回 `orig/` 的拷贝，两份 sha256 与上表改后一栏相同。收尾时主工作区两份 sha256 仍是起点那两个。
 
-真仓 git common-dir（`/home/fy5090/code/singlefs/.git`）里 `singlefs-layer0*`：开工 0 个，收尾 0 个（`find … -maxdepth 1 -name 'singlefs-layer0*' | wc -l`）。
+真仓 git common-dir（`.git`）里 `singlefs-layer0*`：开工 0 个，收尾 0 个（`find … -maxdepth 1 -name 'singlefs-layer0*' | wc -l`）。
 
 ## 每一处改了什么（54 号）
 
@@ -130,17 +130,17 @@ fix-arms 退出码 0
 ════════════════ 54 号 old（232c8c0de11bf656…）
 ──── 准备：--full 全绿，写这批输入那一格
 $ bash .claude/gate.d/54-layer0-replay.sh --full
-  · --full 开跑（2026-09-24T02:28:55Z）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 2175faa5f77d0325…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
+  · --full 开跑（2026-09-24）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 2175faa5f77d0325…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
   ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 viol
   ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
   ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persist
-  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-impl/selftest/repo-old/.git/singlefs-layer0-full-green.2175faa5f77d03252ed4337b11d24680823c2e45af1db92507418403fed5561c（输入哈希 2175faa5f77d0325…，3 个文件；开跑 2026-09-24T02:28:55Z，跑完 
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-impl/selftest/repo-old/.git/singlefs-layer0-full-green.2175faa5f77d03252ed4337b11d24680823c2e45af1db92507418403fed5561c（输入哈希 2175faa5f77d0325…，3 个文件；开跑 2026-09-24，跑完 
 [退出码 0]
     [格] 2175faa5f77d03252e
 ──── 基线：快档（SINGLEFS_GATE_FULL=1 越过两问）⇒ 判绿
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2175faa5f77d0325…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T02:28:59Z，标记里的计数�
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2175faa5f77d0325…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数�
 [退出码 0]
     [格] 2175faa5f77d03252e
 ════ h1：标记里 LAYER0 抄两遍、没有 LAYER0B
@@ -151,13 +151,13 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
 ──── h1 红：快档读改过的标记
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2175faa5f77d0325…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T02:28:59Z，标记里的计数�
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2175faa5f77d0325…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数�
 [退出码 0]
     [格] 2175faa5f77d03252e
 ──── h1 改回：标记还原 ⇒ 快档判绿
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2175faa5f77d0325…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T02:28:59Z，标记里的计数�
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2175faa5f77d0325…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数�
 [退出码 0]
     [格] 2175faa5f77d03252e
 ════ h2-a：登记的三条路径全写错，这一批又改了 crates/
@@ -188,7 +188,7 @@ $ bash .claude/gate.d/54-layer0-replay.sh
 ──── h2 改回：登记表与 Cargo.lock 还原 ⇒ 快档判绿（SINGLEFS_GATE_FULL=1）
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2175faa5f77d0325…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T02:28:59Z，标记里的计数�
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2175faa5f77d0325…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数�
 [退出码 0]
     [格] 2175faa5f77d03252e
 ──── h2 改回：不设 SINGLEFS_GATE_FULL ⇒ 干净工作树，改动范围那一问答「没碰」退 77
@@ -201,32 +201,32 @@ $ bash .claude/gate.d/54-layer0-replay.sh
 ──── g1 红：快档
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2175faa5f77d0325…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T02:28:59Z，标记里的计数�
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2175faa5f77d0325…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数�
 [退出码 0]
     [格] 2175faa5f77d03252e
 ──── g1 改回：54 号还原 ⇒ 快档判绿
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2175faa5f77d0325…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T02:28:59Z，标记里的计数�
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2175faa5f77d0325…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数�
 [退出码 0]
     [格] 2175faa5f77d03252e
 ════ g2：只换工具链（假 cargo -V 从 toolchain 1 变成 2），仓里一个字节不动
 ──── g2 红：快档
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2175faa5f77d0325…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T02:28:59Z，标记里的计数�
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2175faa5f77d0325…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数�
 [退出码 0]
     [格] 2175faa5f77d03252e
 ──── g2 改回：工具链回到 1 ⇒ 快档判绿
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2175faa5f77d0325…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T02:28:59Z，标记里的计数�
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2175faa5f77d0325…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数�
 [退出码 0]
     [格] 2175faa5f77d03252e
 ════ g4：--full 跑到第二条流时 crates/ 里一个文件被追加一个字节（这批输入那一格已在）
 ──── g4：--full，跑的过程中输入变了 ⇒ 判红
 $ env FAKE_CARGO_TOUCH_DURING_SECOND=/tmp/claude-1000/defs54-r2-impl/selftest/repo-old/crates/singlefs-harness/src/lib.rs bash .claude/gate.d/54-layer0-replay.sh --full
-  · --full 开跑（2026-09-24T02:29:06Z）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 2175faa5f77d0325…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
+  · --full 开跑（2026-09-24）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 2175faa5f77d0325…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
   ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 viol
   ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
   ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persist
@@ -244,7 +244,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
     [格] 一格都没有
 ──── 对照：--full 里 cargo 判红（输入没变）⇒ 判红、照旧删这批输入那一格
 $ env FAKE_CARGO_FAIL=1 bash .claude/gate.d/54-layer0-replay.sh --full
-  · --full 开跑（2026-09-24T02:29:06Z）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 2175faa5f77d0325…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
+  · --full 开跑（2026-09-24）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 2175faa5f77d0325…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
   ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
      → 怎么办：单跑看细节：cargo test --release -p singlefs-harness --test first_transaction_step_seven_layer0 -- --include-ignored --nocapture
 [退出码 1]
@@ -259,17 +259,17 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
 ════════════════ 54 号 new（f845fcd011526c97…）
 ──── 准备：--full 全绿，写这批输入那一格
 $ bash .claude/gate.d/54-layer0-replay.sh --full
-  · --full 开跑（2026-09-24T02:29:06Z）：不删任何一格，这一趟判红才删这批输入那一格（跑的过程中输入变了的那一种红不删）；这一道的输入哈希 ff7c9ca4e8c6ca9d…（3 个文件，登记路径 crates/ Cargo.toml 
+  · --full 开跑（2026-09-24）：不删任何一格，这一趟判红才删这批输入那一格（跑的过程中输入变了的那一种红不删）；这一道的输入哈希 ff7c9ca4e8c6ca9d…（3 个文件，登记路径 crates/ Cargo.toml 
   ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 viol
   ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
   ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persist
-  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-impl/selftest/repo-new/.git/singlefs-layer0-full-green.ff7c9ca4e8c6ca9dbf96f70c2136cf94a36c2abcef78c83e89f8333d5abf3ed2（输入哈希 ff7c9ca4e8c6ca9d…，3 个文件；开跑 2026-09-24T02:29:06Z，跑完 
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-impl/selftest/repo-new/.git/singlefs-layer0-full-green.ff7c9ca4e8c6ca9dbf96f70c2136cf94a36c2abcef78c83e89f8333d5abf3ed2（输入哈希 ff7c9ca4e8c6ca9d…，3 个文件；开跑 2026-09-24，跑完 
 [退出码 0]
     [格] ff7c9ca4e8c6ca9dbf
 ──── 基线：快档（SINGLEFS_GATE_FULL=1 越过两问）⇒ 判绿
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（ff7c9ca4e8c6ca9d…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T02:29:06Z，标记里的计数�
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（ff7c9ca4e8c6ca9d…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数�
 [退出码 0]
     [格] ff7c9ca4e8c6ca9dbf
 ════ h1：标记里 LAYER0 抄两遍、没有 LAYER0B
@@ -286,7 +286,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
 ──── h1 改回：标记还原 ⇒ 快档判绿
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（ff7c9ca4e8c6ca9d…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T02:29:06Z，标记里的计数�
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（ff7c9ca4e8c6ca9d…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数�
 [退出码 0]
     [格] ff7c9ca4e8c6ca9dbf
 ════ h2-a：登记的三条路径全写错，这一批又改了 crates/
@@ -317,7 +317,7 @@ $ bash .claude/gate.d/54-layer0-replay.sh
 ──── h2 改回：登记表与 Cargo.lock 还原 ⇒ 快档判绿（SINGLEFS_GATE_FULL=1）
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（ff7c9ca4e8c6ca9d…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T02:29:06Z，标记里的计数�
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（ff7c9ca4e8c6ca9d…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数�
 [退出码 0]
     [格] ff7c9ca4e8c6ca9dbf
 ──── h2 改回：不设 SINGLEFS_GATE_FULL ⇒ 干净工作树，改动范围那一问答「没碰」退 77
@@ -338,7 +338,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
 ──── g1 改回：54 号还原 ⇒ 快档判绿
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（ff7c9ca4e8c6ca9d…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T02:29:06Z，标记里的计数�
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（ff7c9ca4e8c6ca9d…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数�
 [退出码 0]
     [格] ff7c9ca4e8c6ca9dbf
 ════ g2：只换工具链（假 cargo -V 从 toolchain 1 变成 2），仓里一个字节不动
@@ -354,13 +354,13 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
 ──── g2 改回：工具链回到 1 ⇒ 快档判绿
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（ff7c9ca4e8c6ca9d…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T02:29:06Z，标记里的计数�
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（ff7c9ca4e8c6ca9d…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数�
 [退出码 0]
     [格] ff7c9ca4e8c6ca9dbf
 ════ g4：--full 跑到第二条流时 crates/ 里一个文件被追加一个字节（这批输入那一格已在）
 ──── g4：--full，跑的过程中输入变了 ⇒ 判红
 $ env FAKE_CARGO_TOUCH_DURING_SECOND=/tmp/claude-1000/defs54-r2-impl/selftest/repo-new/crates/singlefs-harness/src/lib.rs bash .claude/gate.d/54-layer0-replay.sh --full
-  · --full 开跑（2026-09-24T02:29:11Z）：不删任何一格，这一趟判红才删这批输入那一格（跑的过程中输入变了的那一种红不删）；这一道的输入哈希 ff7c9ca4e8c6ca9d…（3 个文件，登记路径 crates/ Cargo.toml 
+  · --full 开跑（2026-09-24）：不删任何一格，这一趟判红才删这批输入那一格（跑的过程中输入变了的那一种红不删）；这一道的输入哈希 ff7c9ca4e8c6ca9d…（3 个文件，登记路径 crates/ Cargo.toml 
   ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 viol
   ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
   ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persist
@@ -373,12 +373,12 @@ $ env FAKE_CARGO_TOUCH_DURING_SECOND=/tmp/claude-1000/defs54-r2-impl/selftest/re
 ──── g4 之后：那个字节改回，快档读开跑那一批那一格
 $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（ff7c9ca4e8c6ca9d…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T02:29:06Z，标记里的计数�
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（ff7c9ca4e8c6ca9d…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数�
 [退出码 0]
     [格] ff7c9ca4e8c6ca9dbf
 ──── 对照：--full 里 cargo 判红（输入没变）⇒ 判红、照旧删这批输入那一格
 $ env FAKE_CARGO_FAIL=1 bash .claude/gate.d/54-layer0-replay.sh --full
-  · --full 开跑（2026-09-24T02:29:11Z）：不删任何一格，这一趟判红才删这批输入那一格（跑的过程中输入变了的那一种红不删）；这一道的输入哈希 ff7c9ca4e8c6ca9d…（3 个文件，登记路径 crates/ Cargo.toml 
+  · --full 开跑（2026-09-24）：不删任何一格，这一趟判红才删这批输入那一格（跑的过程中输入变了的那一种红不删）；这一道的输入哈希 ff7c9ca4e8c6ca9d…（3 个文件，登记路径 crates/ Cargo.toml 
   ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
      → 怎么办：单跑看细节：cargo test --release -p singlefs-harness --test first_transaction_step_seven_layer0 -- --include-ignored --nocapture
 [退出码 1]

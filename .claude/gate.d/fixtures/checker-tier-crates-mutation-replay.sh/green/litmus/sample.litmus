@@ -1,0 +1,5 @@
+C sample
+(* 门禁 checker-tier-crates-mutation-replay 的判别力样本：litmus/ 登记进 checker-tier-crates-mutation-replay 的拷贝范围之后，变异表可以改这里的文件，点名的测试在副本里读得到它 *)
+{}
+P0(int *x) { WRITE_ONCE(*x, 1); }
+exists (x=1)

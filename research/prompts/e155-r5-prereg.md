@@ -1,6 +1,6 @@
 # E155 重跑登记（第 5 次，记录头 307 → 311）：四份装置在头 311 下还判不判出原来的结论
 
-写于 2026-09-24 21:20 JST，四份装置改之前、这一次的任何产物之前。
+写于 2026-09-24，四份装置改之前、这一次的任何产物之前。
 
 **文件名取 `r5`，不取派发提示给的 `r1`**：派发提示的前提是「仓里都还没有 `e<号>-r<n>-prereg.md`」，工作区里确实没有，但 git 历史里 E155 已有第 2、3、4 次的登记（`research/prompts/e155-r2-prereg.md`、`e155-r3-prereg.md` 删于提交 `3cff909` 与 `8186d5b`，`e155-r4-prereg.md` 删于 `8186d5b`），第 1 次是 `e155-preregistration.md`（删于 `3cff909`）。四份装置正是这四次跑各自的装置。仓里「`r<n>` = 第 n 次」（`e156-r2-prereg.md` 标题「第 2 次」），这一次是第 5 次。要不要改回 `r1` 由主 agent 定，正文不自引文件名。
 
@@ -287,7 +287,7 @@ M10 把 `NAMED_ITEMS_PER_RECORD_MAIN` 改成 71 之后 `4096 − 311 − 71 × 5
 
 ## 十三、读过的文件与跑过的命令
 
-五份头 311 重跑登记（E43、E116、E155、E157、E159）是同一次派发里一起写的，这一节五份相同：列的是这一次派发里读过的全部文件，不只这一份用到的。行号是读的那一刻（2026-09-24 20:37–21:50 JST）的行号。`research/results/` 下的产物一份都没读（只在 `git log --all --name-only` 的输出里看到过文件名）。
+五份头 311 重跑登记（E43、E116、E155、E157、E159）是同一次派发里一起写的，这一节五份相同：列的是这一次派发里读过的全部文件，不只这一份用到的。行号是读的那一刻（2026-09-24）的行号。`research/results/` 下的产物一份都没读（只在 `git log --all --name-only` 的输出里看到过文件名）。
 
 ### 13.1 规则、共用约束、门禁与脚本
 
@@ -371,7 +371,7 @@ $ nice -n 19 python3 research/scripts/quote-kb.py <草稿目录>/orig-e116.md 'r
 $ grep -rn 'extension_point\|扩展点\|ExtensionPoint' crates/ --include=*.rs          # 2 行：system_configuration.rs:348、model.rs:251
 $ grep -rn 'settle\|整理\|compaction\|搬迁\|repack' crates/ --include=*.rs           # 水位字段、恢复注释、测试注释，没有搬迁写路径
 $ ls research/scripts | grep e159                                                    # 零命中
-$ TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M JST'                                          # 2026-09-24 20:47 JST（开写前）
+$ TZ=Asia/Tokyo date +%F                                                              # 2026-09-24（开写前）
 ```
 
 `<草稿目录>` 是派发提示给的那个目录；命令二的两个脚本全文与原样输出在下面，执行员要复核时可以原样拷进 `research/` 下重跑。

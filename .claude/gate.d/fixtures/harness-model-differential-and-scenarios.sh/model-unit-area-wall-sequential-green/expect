@@ -1,0 +1,4 @@
+exit=0
+want=随机历史：小盘上逼近单元区墙的取样点：模型对拍 4749 步
+want=样本只跑 .gate-cells 点名的格：model-unit-area-wall
+want=model-unit-area-wall：绿

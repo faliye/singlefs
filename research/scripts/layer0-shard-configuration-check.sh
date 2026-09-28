@@ -1,18 +1,29 @@
 #!/usr/bin/env bash
 # 层 0 崩溃重放双机分片（里程碑三第六项，.claude/kb/milestone/03-third-txn.md 第六节）的本地配置：在不在、键齐不齐、写得对不对、
-# 第二台连不连得上、它上面有没有 cargo。门禁 54 号 --full 拿它定走不走分片；research/scripts/layer0-shard-run.sh 拿它当运行条件。
+# 第二台连不连得上、它上面有没有 cargo，双机与 GPU 两个开关开没开。门禁 54 号 --full 拿它定走不走分片；research/scripts/layer0-shard-run.sh 拿它当运行条件；
+# 门禁 checker-tier-crates-mutation-replay 的双机驱动 research/scripts/mutation-shard-run.sh 与通用跨机脚本 research/scripts/multi-host-run.sh --peer 读同一份。
 # PEER_MEMORY_CAP 是第二台那一片的内存上限（驱动脚本在第二台上经 research/scripts/run-with-memory-cap.sh 起那一片；本机那一片由起 54 号的那一层包装管），
 # 写法照 run-with-memory-cap.sh：正整数加 K / M / G / T，单位必写。
 #
 #   layer0-shard-configuration-check.sh [<仓根>]
-#       退 0 能分片（stdout 一句：配置在哪、第二台是谁）；退 1 不能（stdout 一句原因，下一行是出路）。
+#       退 0 双机：开（stdout 一句：双机与 GPU 开没开、配置在哪、第二台是谁）；退 3 双机：关（配置判得过，但 ENABLE_ACROSS_MACHINES 不是 1：
+#       调用方照单机跑；stdout 一句「双机：关」与怎么打开，不连第二台）；退 1 判不过（stdout 一句原因，下一行是出路）。
 #   layer0-shard-configuration-check.sh --emit-assignments [<仓根>]
-#       判法同上；能分片时 stdout 改打配置里每个键的 bash 赋值（printf %q，调用方 eval），不打那一句。
+#       判法同上；双机开着时 stdout 改打配置里每个键的 bash 赋值（printf %q，调用方 eval；两个开关键没写的打成 0），不打那一句；
+#       双机关着时照样打「双机：关」那一句、退 3，不打赋值。
 #
-# 配置文件：${SINGLEFS_LAYER0_SHARD_CONFIG:-<主工作树的根>/layer0-shard.env}。主工作树的根按 git common-dir 取（在 HEAD + 暂存区的
-# 临时 worktree 里跑也读主工作树那一份）；文件 git 忽略、不进仓，模板是仓根的 layer0-shard.env.example。
+# 两个开关键只在这一份里定义（别处照这里读，不另写一份）：
+#   ENABLE_ACROSS_MACHINES  双机：写 1 才开；没写或写 0 算关（用户 2026-09-28 定：不设参数不主动开）。关着时不连第二台、退 3。
+#   ENABLE_GPU              GPU：写 1 算开，没写或写 0 算关；这里只判写法、报开没开，用不用它归各调用方。
+#   两个键只许写 0 或 1，写别的值判不过（退 1，说清是哪个键）。别的键缺一个都判不过，与开关开没开无关。
+#
+# 配置文件：${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}。主工作树的根按 git common-dir 取（在 HEAD + 暂存区的
+# 临时 worktree 里跑也读主工作树那一份）；文件 git 忽略、不进仓，模板是仓根的 multi-host.env.example。
 # 写法：一行一个 KEY=值（值不做 shell 展开；两头成对的单引号或双引号去掉一层），# 起头的行与空行不算；认不出的行、不认得的键、
-# 缺键都判不能分片。键与各自的意思见 layer0-shard.env.example。
+# 缺键都判不能分片。八个必写键的意思见 multi-host.env.example；两个开关键见上。
+# 弄坏开关 MULTI_HOST_CONFIGURATION_BREAK=<项>（只给证红用；research/scripts/layer0-shard-run.sh --selftest 里对应那一格判错）：
+#   switch-off-is-on        ENABLE_ACROSS_MACHINES 没写或写 0 也按开判（「没写开关 ⇒ 双机：关」判错）
+#   switch-value-unchecked  两个开关键写了 0、1 之外的值也不报错（「开关写了别的值 ⇒ 判不过」判错）
 # 只供测试的开关：SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1 时不连第二台、不查它的 cargo（layer0-shard-run.sh --selftest 用，
 # 那时「第二台」是本机上的另一个目录）。
 #
@@ -25,6 +36,8 @@ layer0_shard_check_script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pw
 
 LAYER0_SHARD_CONFIGURATION_KEYS=(PEER_SSH_HOST PEER_REPOSITORY_DIRECTORY PEER_CARGO_BIN_DIRECTORY PEER_MEMORY_CAP
   QUIESCE_STOP_COMMAND QUIESCE_STOPPED_CHECK_COMMAND QUIESCE_START_COMMAND QUIESCE_STARTED_CHECK_COMMAND)
+MULTI_HOST_SWITCH_KEYS=(ENABLE_ACROSS_MACHINES ENABLE_GPU)  # 可以不写，不写算 0
+configuration_break="${MULTI_HOST_CONFIGURATION_BREAK:-}"
 
 emit_assignments=0
 if [[ "${1:-}" == --emit-assignments ]]; then emit_assignments=1; shift; fi
@@ -32,17 +45,17 @@ repository_root="${1:-$layer0_shard_check_script_directory/../..}"
 
 refuse() { # refuse <原因>：打原因与出路，退 1
   echo "  ✗ 双机分片不能用：$1"
-  echo "     → 怎么办：照仓根 layer0-shard.env.example 建本地配置 layer0-shard.env（git 忽略），或设 SINGLEFS_LAYER0_SHARD_CONFIG 指到它；第二台连不上先修 ssh 免密登录"
+  echo "     → 怎么办：照仓根 multi-host.env.example 建本地配置 multi-host.env（git 忽略），或设 SINGLEFS_MULTI_HOST_CONFIG 指到它；第二台连不上先修 ssh 免密登录"
   exit 1
 }
 
-if [[ -n "${SINGLEFS_LAYER0_SHARD_CONFIG:-}" ]]; then
-  configuration_file="$SINGLEFS_LAYER0_SHARD_CONFIG"
+if [[ -n "${SINGLEFS_MULTI_HOST_CONFIG:-}" ]]; then
+  configuration_file="$SINGLEFS_MULTI_HOST_CONFIG"
 else
   if ! common_directory="$(git -C "$repository_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || [[ -z "$common_directory" ]]; then
     refuse "$repository_root 不是 git 工作树，找不到主工作树的根（配置默认在那里）"
   fi
-  configuration_file="$(dirname "$common_directory")/layer0-shard.env"
+  configuration_file="$(dirname "$common_directory")/multi-host.env"
 fi
 [[ -f "$configuration_file" ]] || refuse "没有配置文件 $configuration_file"
 
@@ -56,8 +69,8 @@ while IFS= read -r configuration_line || [[ -n "$configuration_line" ]]; do
   configuration_value="${BASH_REMATCH[2]}"
   if [[ "$configuration_value" =~ ^\'(.*)\'$ || "$configuration_value" =~ ^\"(.*)\"$ ]]; then configuration_value="${BASH_REMATCH[1]}"; fi
   known_key=0
-  for expected_key in "${LAYER0_SHARD_CONFIGURATION_KEYS[@]}"; do [[ "$expected_key" == "$configuration_key" ]] && known_key=1; done
-  (( known_key )) || refuse "$configuration_file 第 $line_number 行的键 $configuration_key 不认得（认的是 ${LAYER0_SHARD_CONFIGURATION_KEYS[*]}）"
+  for expected_key in "${LAYER0_SHARD_CONFIGURATION_KEYS[@]}" "${MULTI_HOST_SWITCH_KEYS[@]}"; do [[ "$expected_key" == "$configuration_key" ]] && known_key=1; done
+  (( known_key )) || refuse "$configuration_file 第 $line_number 行的键 $configuration_key 不认得（认的是 ${LAYER0_SHARD_CONFIGURATION_KEYS[*]} ${MULTI_HOST_SWITCH_KEYS[*]}）"
   [[ -z "${configuration[$configuration_key]+set}" ]] || refuse "$configuration_file 里 $configuration_key 写了两遍"
   configuration[$configuration_key]="$configuration_value"
 done < "$configuration_file"
@@ -82,6 +95,21 @@ if [[ -n "${configuration[QUIESCE_STOP_COMMAND]}" && -z "${configuration[QUIESCE
   refuse "写了 QUIESCE_STOP_COMMAND 就要写 QUIESCE_START_COMMAND：清了场要复原"
 fi
 
+# 两个开关：没写算 0；只许 0 或 1
+for switch_key in "${MULTI_HOST_SWITCH_KEYS[@]}"; do
+  [[ -n "${configuration[$switch_key]+set}" ]] || configuration[$switch_key]=0
+  if [[ "${configuration[$switch_key]}" != 0 && "${configuration[$switch_key]}" != 1 && "$configuration_break" != switch-value-unchecked ]]; then
+    refuse "$configuration_file 里 $switch_key 只许写 0 或 1（不写算 0），读到「${configuration[$switch_key]}」"
+  fi
+done
+gpu_text="GPU：关"
+[[ "${configuration[ENABLE_GPU]}" == 1 ]] && gpu_text="GPU：开"
+if [[ "${configuration[ENABLE_ACROSS_MACHINES]}" != 1 && "$configuration_break" != switch-off-is-on ]]; then
+  # 双机关着：配置判得过，不连第二台；调用方照单机跑
+  echo "双机：关（配置 $configuration_file 里 ENABLE_ACROSS_MACHINES 没写或不是 1；要开就在里面写一行 ENABLE_ACROSS_MACHINES=1），${gpu_text}"
+  exit 3
+fi
+
 peer_description="第二台 ${configuration[PEER_SSH_HOST]}"
 if [[ "${SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE:-0}" == 1 ]]; then
   peer_description="第二台是本机（只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1）"
@@ -93,10 +121,10 @@ else
 fi
 
 if (( emit_assignments )); then
-  for expected_key in "${LAYER0_SHARD_CONFIGURATION_KEYS[@]}"; do
+  for expected_key in "${LAYER0_SHARD_CONFIGURATION_KEYS[@]}" "${MULTI_HOST_SWITCH_KEYS[@]}"; do
     printf '%s=%q\n' "$expected_key" "${configuration[$expected_key]}"
   done
   printf 'LAYER0_SHARD_CONFIGURATION_FILE=%q\n' "$configuration_file"
 else
-  echo "配置 $configuration_file，$peer_description"
+  echo "双机：开，${gpu_text}；配置 $configuration_file，$peer_description"
 fi

@@ -1,0 +1,434 @@
+ARM mutated(no-1058)
+CLASS 0A candidates=10
+CLASS 0B candidates=20
+CLASS 0O candidates=35
+CLASS 0R candidates=132
+CLASS 0S candidates=1
+CLASS 1 candidates=6
+CLASS 2 candidates=67
+PICK 0A #0
+PICK 0B #0
+PICK 0O #0
+PICK 0R #0
+PICK 0S #0
+LAYER0_PARALLEL_START states=1053 slices=66 states_per_slice=16 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=66
+LAYER0_PROGRESS slice=6/66 states=[80,96) segments=1..=1 finished_slices=1/66 finished_states=16/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=8/66 states=[112,128) segments=1..=1 finished_slices=2/66 finished_states=32/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=5/66 states=[64,80) segments=1..=1 finished_slices=3/66 finished_states=48/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=10/66 states=[144,160) segments=1..=1 finished_slices=4/66 finished_states=64/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=3/66 states=[32,48) segments=1..=1 finished_slices=5/66 finished_states=80/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=1/66 states=[0,16) segments=0..=1 finished_slices=6/66 finished_states=96/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_FINDING event=new finding=1 pass=pool_checker violated=I-3.10 segment=1 publish=instance2_txg4_root_write12 first_state=9 first_violation=I-3.10：盘 0 槽 1472 的分配记录（未释放、跨 1 槽）分配代 3，它罩住的单元头里的诞生代号是 4
+LAYER0_PROGRESS slice=4/66 states=[48,64) segments=1..=1 finished_slices=7/66 finished_states=112/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=2/66 states=[16,32) segments=1..=1 finished_slices=8/66 finished_states=128/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_FINDING event=threshold finding=1 pass=pool_checker violated=I-3.10 segment=1 publish=instance2_txg4_root_write12 states_at_least=10
+LAYER0_PROGRESS slice=7/66 states=[96,112) segments=1..=1 finished_slices=9/66 finished_states=144/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_FINDING event=threshold finding=1 pass=pool_checker violated=I-3.10 segment=1 publish=instance2_txg4_root_write12 states_at_least=100
+LAYER0_PROGRESS slice=9/66 states=[128,144) segments=1..=1 finished_slices=10/66 finished_states=160/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=11/66 states=[160,176) segments=1..=1 finished_slices=11/66 finished_states=176/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=12/66 states=[176,192) segments=1..=1 finished_slices=12/66 finished_states=192/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=14/66 states=[208,224) segments=1..=1 finished_slices=13/66 finished_states=208/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=13/66 states=[192,208) segments=1..=1 finished_slices=14/66 finished_states=224/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=15/66 states=[224,240) segments=1..=1 finished_slices=15/66 finished_states=240/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=16/66 states=[240,256) segments=1..=1 finished_slices=16/66 finished_states=256/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=20/66 states=[304,320) segments=1..=1 finished_slices=17/66 finished_states=272/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=17/66 states=[256,272) segments=1..=1 finished_slices=18/66 finished_states=288/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=18/66 states=[272,288) segments=1..=1 finished_slices=19/66 finished_states=304/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=19/66 states=[288,304) segments=1..=1 finished_slices=20/66 finished_states=320/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=22/66 states=[336,352) segments=1..=1 finished_slices=21/66 finished_states=336/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=21/66 states=[320,336) segments=1..=1 finished_slices=22/66 finished_states=352/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=23/66 states=[352,368) segments=1..=1 finished_slices=23/66 finished_states=368/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=24/66 states=[368,384) segments=1..=1 finished_slices=24/66 finished_states=384/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=27/66 states=[416,432) segments=1..=1 finished_slices=25/66 finished_states=400/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=25/66 states=[384,400) segments=1..=1 finished_slices=26/66 finished_states=416/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=26/66 states=[400,416) segments=1..=1 finished_slices=27/66 finished_states=432/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=29/66 states=[448,464) segments=1..=1 finished_slices=28/66 finished_states=448/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=28/66 states=[432,448) segments=1..=1 finished_slices=29/66 finished_states=464/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=30/66 states=[464,480) segments=1..=1 finished_slices=30/66 finished_states=480/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=31/66 states=[480,496) segments=1..=1 finished_slices=31/66 finished_states=496/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=32/66 states=[496,512) segments=1..=1 finished_slices=32/66 finished_states=512/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=33/66 states=[512,528) segments=1..=1 finished_slices=33/66 finished_states=528/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=35/66 states=[544,560) segments=1..=1 finished_slices=34/66 finished_states=544/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=34/66 states=[528,544) segments=1..=1 finished_slices=35/66 finished_states=560/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=36/66 states=[560,576) segments=1..=1 finished_slices=36/66 finished_states=576/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=37/66 states=[576,592) segments=1..=1 finished_slices=37/66 finished_states=592/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=38/66 states=[592,608) segments=1..=1 finished_slices=38/66 finished_states=608/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=39/66 states=[608,624) segments=1..=1 finished_slices=39/66 finished_states=624/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=40/66 states=[624,640) segments=1..=1 finished_slices=40/66 finished_states=640/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=41/66 states=[640,656) segments=1..=1 finished_slices=41/66 finished_states=656/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=42/66 states=[656,672) segments=1..=1 finished_slices=42/66 finished_states=672/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=43/66 states=[672,688) segments=1..=1 finished_slices=43/66 finished_states=688/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=44/66 states=[688,704) segments=1..=1 finished_slices=44/66 finished_states=704/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=45/66 states=[704,720) segments=1..=1 finished_slices=45/66 finished_states=720/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=46/66 states=[720,736) segments=1..=1 finished_slices=46/66 finished_states=736/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=50/66 states=[784,800) segments=1..=1 finished_slices=47/66 finished_states=752/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=47/66 states=[736,752) segments=1..=1 finished_slices=48/66 finished_states=768/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=48/66 states=[752,768) segments=1..=1 finished_slices=49/66 finished_states=784/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=49/66 states=[768,784) segments=1..=1 finished_slices=50/66 finished_states=800/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=51/66 states=[800,816) segments=1..=1 finished_slices=51/66 finished_states=816/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=52/66 states=[816,832) segments=1..=1 finished_slices=52/66 finished_states=832/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=53/66 states=[832,848) segments=1..=1 finished_slices=53/66 finished_states=848/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=54/66 states=[848,864) segments=1..=1 finished_slices=54/66 finished_states=864/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=57/66 states=[896,912) segments=1..=1 finished_slices=55/66 finished_states=880/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=55/66 states=[864,880) segments=1..=1 finished_slices=56/66 finished_states=896/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=56/66 states=[880,896) segments=1..=1 finished_slices=57/66 finished_states=912/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=59/66 states=[928,944) segments=1..=1 finished_slices=58/66 finished_states=928/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=58/66 states=[912,928) segments=1..=1 finished_slices=59/66 finished_states=944/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=60/66 states=[944,960) segments=1..=1 finished_slices=60/66 finished_states=960/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=61/66 states=[960,976) segments=1..=1 finished_slices=61/66 finished_states=976/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=62/66 states=[976,992) segments=1..=1 finished_slices=62/66 finished_states=992/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=63/66 states=[992,1008) segments=1..=1 finished_slices=63/66 finished_states=1008/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=64/66 states=[1008,1024) segments=1..=1 finished_slices=64/66 finished_states=1024/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_FINDING event=threshold finding=1 pass=pool_checker violated=I-3.10 segment=1 publish=instance2_txg4_root_write12 states_at_least=1000
+LAYER0_PROGRESS slice=65/66 states=[1024,1040) segments=1..=3 finished_slices=65/66 finished_states=1040/1053 resumed_slices=0 elapsed_seconds=0.2
+LAYER0_FINDING event=new finding=2 pass=pool_checker violated=I-3.10 segment=2 publish=instance2_txg4_root_write12 first_state=1031 first_violation=I-3.10：盘 1 槽 1472 的分配记录（未释放、跨 1 槽）分配代 3，它罩住的单元头里的诞生代号是 4
+LAYER0_FINDING event=new finding=3 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=3 publish=instance2_txg5_root_write17 first_state=1032 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua）
+LAYER0_FINDING event=new finding=4 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=3 publish=instance2_txg5_root_write17 first_state=1032 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_PROGRESS slice=66/66 states=[1040,1053) segments=4..=all_persisted finished_slices=66/66 finished_states=1053/1053 resumed_slices=0 elapsed_seconds=0.2
+LAYER0_FINDING event=new finding=5 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=4 publish=instance2_txg5_root_write17 first_state=1040 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot）
+LAYER0_FINDING event=new finding=6 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=4 publish=instance2_txg5_root_write17 first_state=1040 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=7 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg5_root_write17 first_state=1043 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|journal_record|journal_record）
+LAYER0_FINDING event=new finding=8 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg5_root_write17 first_state=1043 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=9 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=6 publish=after_the_last_root first_state=1044 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|journal_record|journal_record|root_record_fua）
+LAYER0_FINDING event=new finding=10 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=6 publish=after_the_last_root first_state=1044 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=11 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=all_persisted publish=every_write_persisted first_state=1052 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot）
+LAYER0_FINDING event=new finding=12 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=all_persisted publish=every_write_persisted first_state=1052 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDINGS signatures=12 red_states=1029 states=1053
+LAYER0_PARALLEL_FINISHED states=1053 slices=66 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=66 progress_file_after_completion=none elapsed_seconds=0.2
+LAYER0_PARALLEL_START states=1053 slices=66 states_per_slice=16 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=66
+LAYER0_PROGRESS slice=8/66 states=[112,128) segments=1..=1 finished_slices=1/66 finished_states=16/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=9/66 states=[128,144) segments=1..=1 finished_slices=2/66 finished_states=32/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=6/66 states=[80,96) segments=1..=1 finished_slices=3/66 finished_states=48/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=1/66 states=[0,16) segments=0..=1 finished_slices=4/66 finished_states=64/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_FINDING event=new finding=1 pass=pool_checker violated=I-3.10 segment=1 publish=instance2_txg4_root_write12 first_state=9 first_violation=I-3.10：盘 0 槽 1472 的分配记录（未释放、跨 1 槽）分配代 3，它罩住的单元头里的诞生代号是 4
+LAYER0_PROGRESS slice=3/66 states=[32,48) segments=1..=1 finished_slices=5/66 finished_states=80/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=5/66 states=[64,80) segments=1..=1 finished_slices=6/66 finished_states=96/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=4/66 states=[48,64) segments=1..=1 finished_slices=7/66 finished_states=112/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=10/66 states=[144,160) segments=1..=1 finished_slices=8/66 finished_states=128/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=7/66 states=[96,112) segments=1..=1 finished_slices=9/66 finished_states=144/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=2/66 states=[16,32) segments=1..=1 finished_slices=10/66 finished_states=160/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_FINDING event=threshold finding=1 pass=pool_checker violated=I-3.10 segment=1 publish=instance2_txg4_root_write12 states_at_least=10
+LAYER0_FINDING event=threshold finding=1 pass=pool_checker violated=I-3.10 segment=1 publish=instance2_txg4_root_write12 states_at_least=100
+LAYER0_PROGRESS slice=11/66 states=[160,176) segments=1..=1 finished_slices=11/66 finished_states=176/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=12/66 states=[176,192) segments=1..=1 finished_slices=12/66 finished_states=192/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=13/66 states=[192,208) segments=1..=1 finished_slices=13/66 finished_states=208/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=15/66 states=[224,240) segments=1..=1 finished_slices=14/66 finished_states=224/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=16/66 states=[240,256) segments=1..=1 finished_slices=15/66 finished_states=240/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=17/66 states=[256,272) segments=1..=1 finished_slices=16/66 finished_states=256/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=14/66 states=[208,224) segments=1..=1 finished_slices=17/66 finished_states=272/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=18/66 states=[272,288) segments=1..=1 finished_slices=18/66 finished_states=288/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=19/66 states=[288,304) segments=1..=1 finished_slices=19/66 finished_states=304/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=20/66 states=[304,320) segments=1..=1 finished_slices=20/66 finished_states=320/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=21/66 states=[320,336) segments=1..=1 finished_slices=21/66 finished_states=336/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=22/66 states=[336,352) segments=1..=1 finished_slices=22/66 finished_states=352/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=23/66 states=[352,368) segments=1..=1 finished_slices=23/66 finished_states=368/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=25/66 states=[384,400) segments=1..=1 finished_slices=24/66 finished_states=384/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=26/66 states=[400,416) segments=1..=1 finished_slices=25/66 finished_states=400/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=24/66 states=[368,384) segments=1..=1 finished_slices=26/66 finished_states=416/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=28/66 states=[432,448) segments=1..=1 finished_slices=27/66 finished_states=432/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=27/66 states=[416,432) segments=1..=1 finished_slices=28/66 finished_states=448/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=29/66 states=[448,464) segments=1..=1 finished_slices=29/66 finished_states=464/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=30/66 states=[464,480) segments=1..=1 finished_slices=30/66 finished_states=480/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=31/66 states=[480,496) segments=1..=1 finished_slices=31/66 finished_states=496/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=32/66 states=[496,512) segments=1..=1 finished_slices=32/66 finished_states=512/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=33/66 states=[512,528) segments=1..=1 finished_slices=33/66 finished_states=528/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=34/66 states=[528,544) segments=1..=1 finished_slices=34/66 finished_states=544/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=35/66 states=[544,560) segments=1..=1 finished_slices=35/66 finished_states=560/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=40/66 states=[624,640) segments=1..=1 finished_slices=36/66 finished_states=576/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=36/66 states=[560,576) segments=1..=1 finished_slices=37/66 finished_states=592/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=37/66 states=[576,592) segments=1..=1 finished_slices=38/66 finished_states=608/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=39/66 states=[608,624) segments=1..=1 finished_slices=39/66 finished_states=624/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=38/66 states=[592,608) segments=1..=1 finished_slices=40/66 finished_states=640/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=42/66 states=[656,672) segments=1..=1 finished_slices=41/66 finished_states=656/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=41/66 states=[640,656) segments=1..=1 finished_slices=42/66 finished_states=672/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=43/66 states=[672,688) segments=1..=1 finished_slices=43/66 finished_states=688/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=46/66 states=[720,736) segments=1..=1 finished_slices=44/66 finished_states=704/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=44/66 states=[688,704) segments=1..=1 finished_slices=45/66 finished_states=720/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=45/66 states=[704,720) segments=1..=1 finished_slices=46/66 finished_states=736/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=47/66 states=[736,752) segments=1..=1 finished_slices=47/66 finished_states=752/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=49/66 states=[768,784) segments=1..=1 finished_slices=48/66 finished_states=768/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=50/66 states=[784,800) segments=1..=1 finished_slices=49/66 finished_states=784/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=48/66 states=[752,768) segments=1..=1 finished_slices=50/66 finished_states=800/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=51/66 states=[800,816) segments=1..=1 finished_slices=51/66 finished_states=816/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=52/66 states=[816,832) segments=1..=1 finished_slices=52/66 finished_states=832/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=53/66 states=[832,848) segments=1..=1 finished_slices=53/66 finished_states=848/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=54/66 states=[848,864) segments=1..=1 finished_slices=54/66 finished_states=864/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=55/66 states=[864,880) segments=1..=1 finished_slices=55/66 finished_states=880/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=56/66 states=[880,896) segments=1..=1 finished_slices=56/66 finished_states=896/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=57/66 states=[896,912) segments=1..=1 finished_slices=57/66 finished_states=912/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=60/66 states=[944,960) segments=1..=1 finished_slices=58/66 finished_states=928/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=58/66 states=[912,928) segments=1..=1 finished_slices=59/66 finished_states=944/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=59/66 states=[928,944) segments=1..=1 finished_slices=60/66 finished_states=960/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=61/66 states=[960,976) segments=1..=1 finished_slices=61/66 finished_states=976/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=62/66 states=[976,992) segments=1..=1 finished_slices=62/66 finished_states=992/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=63/66 states=[992,1008) segments=1..=1 finished_slices=63/66 finished_states=1008/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=64/66 states=[1008,1024) segments=1..=1 finished_slices=64/66 finished_states=1024/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_FINDING event=threshold finding=1 pass=pool_checker violated=I-3.10 segment=1 publish=instance2_txg4_root_write12 states_at_least=1000
+LAYER0_PROGRESS slice=65/66 states=[1024,1040) segments=1..=3 finished_slices=65/66 finished_states=1040/1053 resumed_slices=0 elapsed_seconds=0.2
+LAYER0_FINDING event=new finding=2 pass=pool_checker violated=I-3.10 segment=2 publish=instance2_txg4_root_write12 first_state=1031 first_violation=I-3.10：盘 1 槽 1472 的分配记录（未释放、跨 1 槽）分配代 3，它罩住的单元头里的诞生代号是 4
+LAYER0_FINDING event=new finding=3 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=3 publish=instance2_txg5_root_write17 first_state=1032 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua）
+LAYER0_FINDING event=new finding=4 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=3 publish=instance2_txg5_root_write17 first_state=1032 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_PROGRESS slice=66/66 states=[1040,1053) segments=4..=all_persisted finished_slices=66/66 finished_states=1053/1053 resumed_slices=0 elapsed_seconds=0.2
+LAYER0_FINDING event=new finding=5 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=4 publish=instance2_txg5_root_write17 first_state=1040 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot）
+LAYER0_FINDING event=new finding=6 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=4 publish=instance2_txg5_root_write17 first_state=1040 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=7 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg5_root_write17 first_state=1043 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|journal_record|journal_record）
+LAYER0_FINDING event=new finding=8 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg5_root_write17 first_state=1043 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=9 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=6 publish=after_the_last_root first_state=1044 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|journal_record|journal_record|root_record_fua）
+LAYER0_FINDING event=new finding=10 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=6 publish=after_the_last_root first_state=1044 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=11 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=all_persisted publish=every_write_persisted first_state=1052 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot）
+LAYER0_FINDING event=new finding=12 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=all_persisted publish=every_write_persisted first_state=1052 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDINGS signatures=12 red_states=1029 states=1053
+LAYER0_PARALLEL_FINISHED states=1053 slices=66 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=66 progress_file_after_completion=none elapsed_seconds=0.2
+LAYER0_PARALLEL_START states=1053 slices=66 states_per_slice=16 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=66
+LAYER0_PROGRESS slice=8/66 states=[112,128) segments=1..=1 finished_slices=1/66 finished_states=16/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=9/66 states=[128,144) segments=1..=1 finished_slices=2/66 finished_states=32/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=5/66 states=[64,80) segments=1..=1 finished_slices=3/66 finished_states=48/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=4/66 states=[48,64) segments=1..=1 finished_slices=4/66 finished_states=64/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=10/66 states=[144,160) segments=1..=1 finished_slices=5/66 finished_states=80/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=7/66 states=[96,112) segments=1..=1 finished_slices=6/66 finished_states=96/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=2/66 states=[16,32) segments=1..=1 finished_slices=7/66 finished_states=112/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=1/66 states=[0,16) segments=0..=1 finished_slices=8/66 finished_states=128/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=6/66 states=[80,96) segments=1..=1 finished_slices=9/66 finished_states=144/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=3/66 states=[32,48) segments=1..=1 finished_slices=10/66 finished_states=160/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=11/66 states=[160,176) segments=1..=1 finished_slices=11/66 finished_states=176/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=12/66 states=[176,192) segments=1..=1 finished_slices=12/66 finished_states=192/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=13/66 states=[192,208) segments=1..=1 finished_slices=13/66 finished_states=208/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=14/66 states=[208,224) segments=1..=1 finished_slices=14/66 finished_states=224/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=15/66 states=[224,240) segments=1..=1 finished_slices=15/66 finished_states=240/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=16/66 states=[240,256) segments=1..=1 finished_slices=16/66 finished_states=256/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=17/66 states=[256,272) segments=1..=1 finished_slices=17/66 finished_states=272/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=18/66 states=[272,288) segments=1..=1 finished_slices=18/66 finished_states=288/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=19/66 states=[288,304) segments=1..=1 finished_slices=19/66 finished_states=304/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=20/66 states=[304,320) segments=1..=1 finished_slices=20/66 finished_states=320/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=21/66 states=[320,336) segments=1..=1 finished_slices=21/66 finished_states=336/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=22/66 states=[336,352) segments=1..=1 finished_slices=22/66 finished_states=352/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=23/66 states=[352,368) segments=1..=1 finished_slices=23/66 finished_states=368/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=24/66 states=[368,384) segments=1..=1 finished_slices=24/66 finished_states=384/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=25/66 states=[384,400) segments=1..=1 finished_slices=25/66 finished_states=400/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=26/66 states=[400,416) segments=1..=1 finished_slices=26/66 finished_states=416/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=27/66 states=[416,432) segments=1..=1 finished_slices=27/66 finished_states=432/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=28/66 states=[432,448) segments=1..=1 finished_slices=28/66 finished_states=448/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=29/66 states=[448,464) segments=1..=1 finished_slices=29/66 finished_states=464/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=30/66 states=[464,480) segments=1..=1 finished_slices=30/66 finished_states=480/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=31/66 states=[480,496) segments=1..=1 finished_slices=31/66 finished_states=496/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=32/66 states=[496,512) segments=1..=1 finished_slices=32/66 finished_states=512/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=34/66 states=[528,544) segments=1..=1 finished_slices=33/66 finished_states=528/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=33/66 states=[512,528) segments=1..=1 finished_slices=34/66 finished_states=544/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=35/66 states=[544,560) segments=1..=1 finished_slices=35/66 finished_states=560/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=36/66 states=[560,576) segments=1..=1 finished_slices=36/66 finished_states=576/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=37/66 states=[576,592) segments=1..=1 finished_slices=37/66 finished_states=592/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=39/66 states=[608,624) segments=1..=1 finished_slices=38/66 finished_states=608/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=38/66 states=[592,608) segments=1..=1 finished_slices=39/66 finished_states=624/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=40/66 states=[624,640) segments=1..=1 finished_slices=40/66 finished_states=640/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=42/66 states=[656,672) segments=1..=1 finished_slices=41/66 finished_states=656/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=41/66 states=[640,656) segments=1..=1 finished_slices=42/66 finished_states=672/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=43/66 states=[672,688) segments=1..=1 finished_slices=43/66 finished_states=688/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=44/66 states=[688,704) segments=1..=1 finished_slices=44/66 finished_states=704/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=45/66 states=[704,720) segments=1..=1 finished_slices=45/66 finished_states=720/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=46/66 states=[720,736) segments=1..=1 finished_slices=46/66 finished_states=736/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=47/66 states=[736,752) segments=1..=1 finished_slices=47/66 finished_states=752/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=48/66 states=[752,768) segments=1..=1 finished_slices=48/66 finished_states=768/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=49/66 states=[768,784) segments=1..=1 finished_slices=49/66 finished_states=784/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=50/66 states=[784,800) segments=1..=1 finished_slices=50/66 finished_states=800/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=51/66 states=[800,816) segments=1..=1 finished_slices=51/66 finished_states=816/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=52/66 states=[816,832) segments=1..=1 finished_slices=52/66 finished_states=832/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=53/66 states=[832,848) segments=1..=1 finished_slices=53/66 finished_states=848/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=54/66 states=[848,864) segments=1..=1 finished_slices=54/66 finished_states=864/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=55/66 states=[864,880) segments=1..=1 finished_slices=55/66 finished_states=880/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=56/66 states=[880,896) segments=1..=1 finished_slices=56/66 finished_states=896/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=57/66 states=[896,912) segments=1..=1 finished_slices=57/66 finished_states=912/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=58/66 states=[912,928) segments=1..=1 finished_slices=58/66 finished_states=928/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=59/66 states=[928,944) segments=1..=1 finished_slices=59/66 finished_states=944/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=60/66 states=[944,960) segments=1..=1 finished_slices=60/66 finished_states=960/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=61/66 states=[960,976) segments=1..=1 finished_slices=61/66 finished_states=976/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=62/66 states=[976,992) segments=1..=1 finished_slices=62/66 finished_states=992/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=63/66 states=[992,1008) segments=1..=1 finished_slices=63/66 finished_states=1008/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=64/66 states=[1008,1024) segments=1..=1 finished_slices=64/66 finished_states=1024/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=65/66 states=[1024,1040) segments=1..=3 finished_slices=65/66 finished_states=1040/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_FINDING event=new finding=1 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=3 publish=instance2_txg5_root_write17 first_state=1032 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua）
+LAYER0_FINDING event=new finding=2 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=3 publish=instance2_txg5_root_write17 first_state=1032 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_PROGRESS slice=66/66 states=[1040,1053) segments=4..=all_persisted finished_slices=66/66 finished_states=1053/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_FINDING event=new finding=3 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=4 publish=instance2_txg5_root_write17 first_state=1040 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot）
+LAYER0_FINDING event=new finding=4 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=4 publish=instance2_txg5_root_write17 first_state=1040 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=5 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg5_root_write17 first_state=1043 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|journal_record|journal_record）
+LAYER0_FINDING event=new finding=6 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg5_root_write17 first_state=1043 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=7 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=6 publish=after_the_last_root first_state=1044 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|journal_record|journal_record|root_record_fua）
+LAYER0_FINDING event=new finding=8 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=6 publish=after_the_last_root first_state=1044 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=9 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=all_persisted publish=every_write_persisted first_state=1052 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot）
+LAYER0_FINDING event=new finding=10 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=all_persisted publish=every_write_persisted first_state=1052 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDINGS signatures=10 red_states=21 states=1053
+LAYER0_PARALLEL_FINISHED states=1053 slices=66 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=66 progress_file_after_completion=none elapsed_seconds=0.1
+LAYER0_PARALLEL_START states=1053 slices=66 states_per_slice=16 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=66
+LAYER0_PROGRESS slice=1/66 states=[0,16) segments=0..=1 finished_slices=1/66 finished_states=16/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=6/66 states=[80,96) segments=1..=1 finished_slices=2/66 finished_states=32/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=10/66 states=[144,160) segments=1..=1 finished_slices=3/66 finished_states=48/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=9/66 states=[128,144) segments=1..=1 finished_slices=4/66 finished_states=64/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=2/66 states=[16,32) segments=1..=1 finished_slices=5/66 finished_states=80/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=3/66 states=[32,48) segments=1..=1 finished_slices=6/66 finished_states=96/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=4/66 states=[48,64) segments=1..=1 finished_slices=7/66 finished_states=112/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=7/66 states=[96,112) segments=1..=1 finished_slices=8/66 finished_states=128/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=8/66 states=[112,128) segments=1..=1 finished_slices=9/66 finished_states=144/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=5/66 states=[64,80) segments=1..=1 finished_slices=10/66 finished_states=160/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=11/66 states=[160,176) segments=1..=1 finished_slices=11/66 finished_states=176/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=13/66 states=[192,208) segments=1..=1 finished_slices=12/66 finished_states=192/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=12/66 states=[176,192) segments=1..=1 finished_slices=13/66 finished_states=208/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=14/66 states=[208,224) segments=1..=1 finished_slices=14/66 finished_states=224/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=16/66 states=[240,256) segments=1..=1 finished_slices=15/66 finished_states=240/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=15/66 states=[224,240) segments=1..=1 finished_slices=16/66 finished_states=256/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=17/66 states=[256,272) segments=1..=1 finished_slices=17/66 finished_states=272/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=18/66 states=[272,288) segments=1..=1 finished_slices=18/66 finished_states=288/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=19/66 states=[288,304) segments=1..=1 finished_slices=19/66 finished_states=304/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=20/66 states=[304,320) segments=1..=1 finished_slices=20/66 finished_states=320/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=21/66 states=[320,336) segments=1..=1 finished_slices=21/66 finished_states=336/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=22/66 states=[336,352) segments=1..=1 finished_slices=22/66 finished_states=352/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=23/66 states=[352,368) segments=1..=1 finished_slices=23/66 finished_states=368/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=24/66 states=[368,384) segments=1..=1 finished_slices=24/66 finished_states=384/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=25/66 states=[384,400) segments=1..=1 finished_slices=25/66 finished_states=400/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=26/66 states=[400,416) segments=1..=1 finished_slices=26/66 finished_states=416/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=27/66 states=[416,432) segments=1..=1 finished_slices=27/66 finished_states=432/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=28/66 states=[432,448) segments=1..=1 finished_slices=28/66 finished_states=448/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=29/66 states=[448,464) segments=1..=1 finished_slices=29/66 finished_states=464/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=30/66 states=[464,480) segments=1..=1 finished_slices=30/66 finished_states=480/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=31/66 states=[480,496) segments=1..=1 finished_slices=31/66 finished_states=496/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=32/66 states=[496,512) segments=1..=1 finished_slices=32/66 finished_states=512/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=34/66 states=[528,544) segments=1..=1 finished_slices=33/66 finished_states=528/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=33/66 states=[512,528) segments=1..=1 finished_slices=34/66 finished_states=544/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=35/66 states=[544,560) segments=1..=1 finished_slices=35/66 finished_states=560/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=37/66 states=[576,592) segments=1..=1 finished_slices=36/66 finished_states=576/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=36/66 states=[560,576) segments=1..=1 finished_slices=37/66 finished_states=592/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=38/66 states=[592,608) segments=1..=1 finished_slices=38/66 finished_states=608/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=39/66 states=[608,624) segments=1..=1 finished_slices=39/66 finished_states=624/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=40/66 states=[624,640) segments=1..=1 finished_slices=40/66 finished_states=640/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=41/66 states=[640,656) segments=1..=1 finished_slices=41/66 finished_states=656/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=43/66 states=[672,688) segments=1..=1 finished_slices=42/66 finished_states=672/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=44/66 states=[688,704) segments=1..=1 finished_slices=43/66 finished_states=688/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=42/66 states=[656,672) segments=1..=1 finished_slices=44/66 finished_states=704/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=46/66 states=[720,736) segments=1..=1 finished_slices=45/66 finished_states=720/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=45/66 states=[704,720) segments=1..=1 finished_slices=46/66 finished_states=736/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=47/66 states=[736,752) segments=1..=1 finished_slices=47/66 finished_states=752/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=48/66 states=[752,768) segments=1..=1 finished_slices=48/66 finished_states=768/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=49/66 states=[768,784) segments=1..=1 finished_slices=49/66 finished_states=784/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=50/66 states=[784,800) segments=1..=1 finished_slices=50/66 finished_states=800/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=51/66 states=[800,816) segments=1..=1 finished_slices=51/66 finished_states=816/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=52/66 states=[816,832) segments=1..=1 finished_slices=52/66 finished_states=832/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=53/66 states=[832,848) segments=1..=1 finished_slices=53/66 finished_states=848/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=54/66 states=[848,864) segments=1..=1 finished_slices=54/66 finished_states=864/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=55/66 states=[864,880) segments=1..=1 finished_slices=55/66 finished_states=880/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=56/66 states=[880,896) segments=1..=1 finished_slices=56/66 finished_states=896/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=58/66 states=[912,928) segments=1..=1 finished_slices=57/66 finished_states=912/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=57/66 states=[896,912) segments=1..=1 finished_slices=58/66 finished_states=928/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=59/66 states=[928,944) segments=1..=1 finished_slices=59/66 finished_states=944/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=60/66 states=[944,960) segments=1..=1 finished_slices=60/66 finished_states=960/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=61/66 states=[960,976) segments=1..=1 finished_slices=61/66 finished_states=976/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=62/66 states=[976,992) segments=1..=1 finished_slices=62/66 finished_states=992/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=63/66 states=[992,1008) segments=1..=1 finished_slices=63/66 finished_states=1008/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=64/66 states=[1008,1024) segments=1..=1 finished_slices=64/66 finished_states=1024/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=65/66 states=[1024,1040) segments=1..=3 finished_slices=65/66 finished_states=1040/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_FINDING event=new finding=1 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=3 publish=instance2_txg5_root_write17 first_state=1032 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua）
+LAYER0_FINDING event=new finding=2 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=3 publish=instance2_txg5_root_write17 first_state=1032 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_PROGRESS slice=66/66 states=[1040,1053) segments=4..=all_persisted finished_slices=66/66 finished_states=1053/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_FINDING event=new finding=3 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=4 publish=instance2_txg5_root_write17 first_state=1040 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot）
+LAYER0_FINDING event=new finding=4 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=4 publish=instance2_txg5_root_write17 first_state=1040 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=5 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg5_root_write17 first_state=1043 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|journal_record|journal_record）
+LAYER0_FINDING event=new finding=6 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg5_root_write17 first_state=1043 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=7 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=6 publish=after_the_last_root first_state=1044 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|journal_record|journal_record|root_record_fua）
+LAYER0_FINDING event=new finding=8 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=6 publish=after_the_last_root first_state=1044 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=9 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=all_persisted publish=every_write_persisted first_state=1052 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot）
+LAYER0_FINDING event=new finding=10 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=all_persisted publish=every_write_persisted first_state=1052 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDINGS signatures=10 red_states=21 states=1053
+LAYER0_PARALLEL_FINISHED states=1053 slices=66 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=66 progress_file_after_completion=none elapsed_seconds=0.1
+LAYER0_PARALLEL_START states=1053 slices=66 states_per_slice=16 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=66
+LAYER0_PROGRESS slice=9/66 states=[128,144) segments=1..=1 finished_slices=1/66 finished_states=16/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=6/66 states=[80,96) segments=1..=1 finished_slices=2/66 finished_states=32/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=5/66 states=[64,80) segments=1..=1 finished_slices=3/66 finished_states=48/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=2/66 states=[16,32) segments=1..=1 finished_slices=4/66 finished_states=64/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=3/66 states=[32,48) segments=1..=1 finished_slices=5/66 finished_states=80/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=1/66 states=[0,16) segments=0..=1 finished_slices=6/66 finished_states=96/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=4/66 states=[48,64) segments=1..=1 finished_slices=7/66 finished_states=112/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=10/66 states=[144,160) segments=1..=1 finished_slices=8/66 finished_states=128/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=7/66 states=[96,112) segments=1..=1 finished_slices=9/66 finished_states=144/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=8/66 states=[112,128) segments=1..=1 finished_slices=10/66 finished_states=160/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=11/66 states=[160,176) segments=1..=1 finished_slices=11/66 finished_states=176/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=12/66 states=[176,192) segments=1..=1 finished_slices=12/66 finished_states=192/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=13/66 states=[192,208) segments=1..=1 finished_slices=13/66 finished_states=208/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=14/66 states=[208,224) segments=1..=1 finished_slices=14/66 finished_states=224/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=18/66 states=[272,288) segments=1..=1 finished_slices=15/66 finished_states=240/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=16/66 states=[240,256) segments=1..=1 finished_slices=16/66 finished_states=256/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=15/66 states=[224,240) segments=1..=1 finished_slices=17/66 finished_states=272/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=17/66 states=[256,272) segments=1..=1 finished_slices=18/66 finished_states=288/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=19/66 states=[288,304) segments=1..=1 finished_slices=19/66 finished_states=304/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=20/66 states=[304,320) segments=1..=1 finished_slices=20/66 finished_states=320/1053 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=21/66 states=[320,336) segments=1..=1 finished_slices=21/66 finished_states=336/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=22/66 states=[336,352) segments=1..=1 finished_slices=22/66 finished_states=352/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=23/66 states=[352,368) segments=1..=1 finished_slices=23/66 finished_states=368/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=25/66 states=[384,400) segments=1..=1 finished_slices=24/66 finished_states=384/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=27/66 states=[416,432) segments=1..=1 finished_slices=25/66 finished_states=400/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=24/66 states=[368,384) segments=1..=1 finished_slices=26/66 finished_states=416/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=28/66 states=[432,448) segments=1..=1 finished_slices=27/66 finished_states=432/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=26/66 states=[400,416) segments=1..=1 finished_slices=28/66 finished_states=448/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=29/66 states=[448,464) segments=1..=1 finished_slices=29/66 finished_states=464/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=30/66 states=[464,480) segments=1..=1 finished_slices=30/66 finished_states=480/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=31/66 states=[480,496) segments=1..=1 finished_slices=31/66 finished_states=496/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=32/66 states=[496,512) segments=1..=1 finished_slices=32/66 finished_states=512/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=33/66 states=[512,528) segments=1..=1 finished_slices=33/66 finished_states=528/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=34/66 states=[528,544) segments=1..=1 finished_slices=34/66 finished_states=544/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=35/66 states=[544,560) segments=1..=1 finished_slices=35/66 finished_states=560/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=36/66 states=[560,576) segments=1..=1 finished_slices=36/66 finished_states=576/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=37/66 states=[576,592) segments=1..=1 finished_slices=37/66 finished_states=592/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=38/66 states=[592,608) segments=1..=1 finished_slices=38/66 finished_states=608/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=39/66 states=[608,624) segments=1..=1 finished_slices=39/66 finished_states=624/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=40/66 states=[624,640) segments=1..=1 finished_slices=40/66 finished_states=640/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=42/66 states=[656,672) segments=1..=1 finished_slices=41/66 finished_states=656/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=41/66 states=[640,656) segments=1..=1 finished_slices=42/66 finished_states=672/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=43/66 states=[672,688) segments=1..=1 finished_slices=43/66 finished_states=688/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=44/66 states=[688,704) segments=1..=1 finished_slices=44/66 finished_states=704/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=45/66 states=[704,720) segments=1..=1 finished_slices=45/66 finished_states=720/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=46/66 states=[720,736) segments=1..=1 finished_slices=46/66 finished_states=736/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=47/66 states=[736,752) segments=1..=1 finished_slices=47/66 finished_states=752/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=48/66 states=[752,768) segments=1..=1 finished_slices=48/66 finished_states=768/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=49/66 states=[768,784) segments=1..=1 finished_slices=49/66 finished_states=784/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=50/66 states=[784,800) segments=1..=1 finished_slices=50/66 finished_states=800/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=51/66 states=[800,816) segments=1..=1 finished_slices=51/66 finished_states=816/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=52/66 states=[816,832) segments=1..=1 finished_slices=52/66 finished_states=832/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=53/66 states=[832,848) segments=1..=1 finished_slices=53/66 finished_states=848/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=54/66 states=[848,864) segments=1..=1 finished_slices=54/66 finished_states=864/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=55/66 states=[864,880) segments=1..=1 finished_slices=55/66 finished_states=880/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=56/66 states=[880,896) segments=1..=1 finished_slices=56/66 finished_states=896/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=57/66 states=[896,912) segments=1..=1 finished_slices=57/66 finished_states=912/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=58/66 states=[912,928) segments=1..=1 finished_slices=58/66 finished_states=928/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=59/66 states=[928,944) segments=1..=1 finished_slices=59/66 finished_states=944/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=60/66 states=[944,960) segments=1..=1 finished_slices=60/66 finished_states=960/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=61/66 states=[960,976) segments=1..=1 finished_slices=61/66 finished_states=976/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=62/66 states=[976,992) segments=1..=1 finished_slices=62/66 finished_states=992/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=63/66 states=[992,1008) segments=1..=1 finished_slices=63/66 finished_states=1008/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=64/66 states=[1008,1024) segments=1..=1 finished_slices=64/66 finished_states=1024/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=65/66 states=[1024,1040) segments=1..=3 finished_slices=65/66 finished_states=1040/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_FINDING event=new finding=1 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=3 publish=instance2_txg5_root_write17 first_state=1032 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua）
+LAYER0_FINDING event=new finding=2 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=3 publish=instance2_txg5_root_write17 first_state=1032 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_PROGRESS slice=66/66 states=[1040,1053) segments=4..=all_persisted finished_slices=66/66 finished_states=1053/1053 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_FINDING event=new finding=3 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=4 publish=instance2_txg5_root_write17 first_state=1040 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot）
+LAYER0_FINDING event=new finding=4 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=4 publish=instance2_txg5_root_write17 first_state=1040 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=5 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg5_root_write17 first_state=1043 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|journal_record|journal_record）
+LAYER0_FINDING event=new finding=6 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg5_root_write17 first_state=1043 first_violation=走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=7 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=6 publish=after_the_last_root first_state=1044 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|journal_record|journal_record|root_record_fua）
+LAYER0_FINDING event=new finding=8 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=6 publish=after_the_last_root first_state=1044 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=9 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=all_persisted publish=every_write_persisted first_state=1052 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot）
+LAYER0_FINDING event=new finding=10 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=all_persisted publish=every_write_persisted first_state=1052 first_violation=走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDINGS signatures=10 red_states=21 states=1053
+LAYER0_PARALLEL_FINISHED states=1053 slices=66 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=66 progress_file_after_completion=none elapsed_seconds=0.1
+MOUNT 5 rank0 landed=Some((1, 2)) vfail=1 mounted eff=(1, 2) instance=2
+SIG 5 after-mount-rank0 eff=Some((2, 5)) NoFile vfail=0 applied=0 below_floor=false oracle=NoFileWhereAnOlderRootHasOne checker=[] record=(false,false)
+SIG 5160 crash1-rank0 eff=Some((1, 2)) NoFile vfail=1 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 45 crash1-rank0 eff=Some((2, 4)) NoFile vfail=0 applied=0 below_floor=false oracle=NoFileWhereAnOlderRootHasOne checker=[] record=(false,false)
+SIG 45 crash1-rank0 eff=Some((2, 5)) NoFile vfail=0 applied=0 below_floor=false oracle=NoFileWhereAnOlderRootHasOne checker=[] record=(false,false)
+SIG 15 crash1-rank0 eff=Some((2, 5)) NoFile vfail=0 applied=1 below_floor=false oracle=NoFileWhereAnOlderRootHasOne checker=[] record=(false,false)
+SIG 215 suffix-publish-rank0 seg0 eff=Some((2, 5)) NoFile vfail=0 applied=0 below_floor=false oracle=NoFileWhereAnOlderRootHasOne checker=[] record=(false,false)
+SIG 129 suffix-publish-rank0 seg0 eff=Some((2, 5)) NoFile vfail=1 applied=0 below_floor=false oracle=NoFileWhereAnOlderRootHasOne checker=["I-3.10"] record=(false,false)
+SIG 501 suffix-publish-rank0 seg0 eff=Some((2, 5)) NoFile vfail=1 applied=0 below_floor=false oracle=NoFileWhereAnOlderRootHasOne checker=[] record=(false,false)
+SIG 10 suffix-publish-rank0 seg0 eff=Some((2, 6)) FileRead(2,6) vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 5 suffix-publish-rank0 seg1 eff=Some((2, 6)) FileRead(2,6) vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 15 suffix-publish-rank0 seg2 eff=Some((2, 6)) FileRead(2,6) vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+TALLY first-third-cut states=5265 violations=105 ignored_violations=105 checker_violated={"I-3.10": 2016} record_root_without_record=0 record_claimed_state_missing_unit=0 verification_failed_states=5160 root_persisted_states=105 failed_states=0 first_violation=Some("走到实例 2 第 4 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua）")
+TALLY first-suffix-publish states=875 violations=845 ignored_violations=860 checker_violated={"I-3.10": 129} record_root_without_record=0 record_claimed_state_missing_unit=0 verification_failed_states=630 root_persisted_states=15 failed_states=0 first_violation=Some("走到实例 2 第 5 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：）")
+CRASH1_STATES 5 per_rank={0: 5} budget_left=994735 ELAPSED 5.3s
+WALL 5s rc=0

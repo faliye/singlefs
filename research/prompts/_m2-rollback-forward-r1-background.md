@@ -32,14 +32,14 @@
 
 **共用问句**：每个候选都要回答「崩在回退那次发布的任何一点、崩在卸载那一串的任何一点、之后最新的根读不出，恢复落在哪一版，那一版引用的块有没有被复用」；答案要量，不许推。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-25 18:2x JST 现查；冻结副本在派腿之前取，材料员记快照）
+## 二、实现今天的样子（主 agent 的观测，2026-09-25 现查；冻结副本在派腿之前取，材料员记快照）
 
 - **回退挂载**：`crates/singlefs-core/src/mount.rs` 的 `mount_rollback`（第 2437 行）、`mount_rollback_with_space_admission`（第 2456 行），回退 = 一次恢复：取号 → 写行（实例表加回退行）→ 系统配置轮换（见证随这一次写）→ 暖机。
 - **回退见证**：`crates/singlefs-core/src/rollback_witness.rs`（314 行）；`mount.rs` 的 `rollback_witness_entries_still_needed`（第 1791 行）、`rollback_witness_entries_not_covered_by_another`（第 1814 行）、`rollback_witness_entries_recovered_from_the_instance_table`（第 1842 行）、`rollback_witness_tables_of_this_mount`（第 1879 行）；格式常量 `crates/singlefs-format/src/lib.rs` 第 262–278 行（系统配置槽里偏移 481 起 753 字节、47 条）；checker `crates/singlefs-checker/src/lib.rs` 第 160 行起。
 - **被抛弃的根**：`mount.rs` 的 `abandoned_by_table`（第 559 行）、`isolate_slots_referenced_only_by_abandoned_roots`（第 594 行，影子账）、`ShadowLedger`（第 253 行）；择根 `crates/singlefs-core/src/recovery.rs` 的 `choose_root`（第 669 行，跳过被见证抛弃的根）。
 - **F**：`mount.rs` 的 `reclaim_floor`（第 550 行）、`rollback_floor_ceiling`（第 958 行）、`raise_rollback_floor`（第 1078 行）、`rehearse_the_publishes_raising_the_floor`（第 1326 行）。
 - **卸载**：`crates/` 里没有卸载 / 关闭这个操作——`grep -n "fn .*unmount\|fn .*close\|fn .*shutdown" crates/singlefs-core/src/*.rs` 零命中（只命中两个测试函数名）。D23（journal 的角色与格式） 已定项 14 写着第一版没有干净关闭标记、每次挂载一律走恢复。
-- 行号是 2026-09-25 18:2x JST 主树的；实二八此刻在改 `mount.rs`（加「可写设备数低于下限」那一判），材料员取快照时以冻结副本为准、行号照冻结副本现查。
+- 行号是 2026-09-25 主树的；实二八此刻在改 `mount.rs`（加「可写设备数低于下限」那一判），材料员取快照时以冻结副本为准、行号照冻结副本现查。
 
 ## 三、条款（材料员整段抄进附录）
 
@@ -642,7 +642,7 @@ D8（核心索引结构） 管核心索引长什么样：一套 btree 实现配�
 
 **依据**：
 
-- 无实验：一套 btree 实现配多 keyspace 的形态没有可量的量，依据是 2026-08-29 现查 `linux-6.17/fs/bcachefs/bcachefs_format.h` 的 `BCH_BTREE_IDS()` 宏（数 `x(` 行与带 `BTREE_IS_write_buffer` 的行，源码固定在 `/home/fy5090/code/fs-refs/`）：bcachefs 用**一套 btree 实现 + 21 棵树**，其中 **5 棵**走 write buffer（`lru` / `backpointers` / `deleted_inodes` / `rebalance_work` / `accounting`）；比「按访问模式选不同结构」好在**只有一套结构要调对**——异构方案意味着 N 套实现、N 套崩溃一致性 bug、N 套 checker。prior-art.md 的 bcachefs 那一行以这一段为准。
+- 无实验：一套 btree 实现配多 keyspace 的形态没有可量的量，依据是 2026-08-29 现查 `linux-6.17/fs/bcachefs/bcachefs_format.h` 的 `BCH_BTREE_IDS()` 宏（数 `x(` 行与带 `BTREE_IS_write_buffer` 的行，源码固定在 `~/code/fs-refs/`）：bcachefs 用**一套 btree 实现 + 21 棵树**，其中 **5 棵**走 write buffer（`lru` / `backpointers` / `deleted_inodes` / `rebalance_work` / `accounting`）；比「按访问模式选不同结构」好在**只有一套结构要调对**——异构方案意味着 N 套实现、N 套崩溃一致性 bug、N 套 checker。prior-art.md 的 bcachefs 那一行以这一段为准。
 - 用户定案 2026-09-24：派生树可以异构（原话在变更史）；多出来的那套实现、崩溃一致性与 checker 由层 0 流与 checker 各自覆盖，不再拿「只有一套结构要调对」挡。
 - 无实验：三方原型（`research/prompts/m2-keyspace-r1-opus-model/`）在同一批历史与代价模型上量过，没立实验号，选哪一个由用户定，判决 `research/prompts/m2-keyspace-r1-main-verification.md`。
 - 用户定案 2026-09-24：K1、K2、K4（原话在变更史）。
@@ -1393,7 +1393,7 @@ G0（主几何点）、P331（打中判据）、P332（违例判据） 是本页
 
 - **正文与材料**：正文 `research/prompts/_m2-safety-r1-body.md`；材料 `_m2-safety-r1-background.md`、`-checklist.md`、`-appendix.md`。
 - **开工快照**：`research/prompts/m2-safety-r1-snapshot/`（`crates-sha256.txt` 122 个文件、`kb-sha256.txt` 5 个文件）。派核查员前在冻结副本 `/tmp/claude-1000/m2-safety-r1/` 下 `sha256sum -c`，两份全对得上；腿与核查员读的都是冻结副本。
-- **腿跑着的时候主树被改过（主 agent 自己的失误）**：书记十六（2026-09-25 JST 14:5x 派、15:3x 交回）改了快照里的 `.claude/kb/checks-owed.md`（C120 补一句、C546 状态列、C552 挪进已还清、新立 C553）与 `.claude/kb/decisions/18-块里携带什么信息.md`（已定项 11 加「取号之前逐盘核」一条子项）；实二七在开工之后改了快照里的 `crates/singlefs-core/src/mount.rs`。腿引的行一律对冻结副本核，核查员没有一处落在这些改动上。这条纪律已做成派发闸（`records/2026-09-16-subagent拆分提案.md` 第四十节第 27 行）。
+- **腿跑着的时候主树被改过（主 agent 自己的失误）**：书记十六（2026-09-25 派出并交回）改了快照里的 `.claude/kb/checks-owed.md`（C120 补一句、C546 状态列、C552 挪进已还清、新立 C553）与 `.claude/kb/decisions/18-块里携带什么信息.md`（已定项 11 加「取号之前逐盘核」一条子项）；实二七在开工之后改了快照里的 `crates/singlefs-core/src/mount.rs`。腿引的行一律对冻结副本核，核查员没有一处落在这些改动上。这条纪律已做成派发闸（`records/2026-09-16-subagent拆分提案.md` 第四十节第 27 行）。
 - **腿与核对表**：
   - 云端攻方（Opus，S1–S3）`m2-safety-r1-opus-output.md`，模型 `m2-safety-r1-opus-model/`；
   - 云端正推（Sonnet，S4、S5）`m2-safety-r1-sonnet-output.md`，模型 `m2-safety-r1-sonnet-model/`（交回之后主 agent 改过第 108 行一处路径，门禁 69 号要求，内容不动）；
@@ -1411,7 +1411,7 @@ G0（主几何点）、P331（打中判据）、P332（违例判据） 是本页
 
 - 攻方量到（冻结副本的拷贝上）：今天的代码比 C542 欠账写的又重一步——产品路径 4 GiB 盘写 / 屏障失败 320 段里 17 段离环、重试 `NotInRing`，其中 16 段再坏 1 条根池连只读都挂不上。
 - 候选里只有乙「这次挂载写的根一个都不落在目标所在的根环槽上（txg 往后跳）」三类失败全修：离环 0 段、故障消失之后同一条回退重试全做成、失败之后三份镜像 checker 960 次全绿；代价是准入关掉的 312 槽小盘上回退到最旧两条根改成取号前拒（15 段），理想模型要跟着「第一个新根 txg 可以跳号」改。甲（预演也读盘核）只修持久读错；丁、戊不修离环。
-- **判：不采纳、不实现，挂起。** 用户 2026-09-25 JST 17:0x 定开一轮评估「管理员回退 = 一次向前发布」（调度记录第三节「回退改成向前发布」那一行），那一形态下回退不再抛弃更新的代、S1 这一格整格消失。评估结论是「维持今天的回退形态」时，S1 取乙（被攻过零轮），甲不要。
+- **判：不采纳、不实现，挂起。** 用户 2026-09-25 定开一轮评估「管理员回退 = 一次向前发布」（调度记录第三节「回退改成向前发布」那一行），那一形态下回退不再抛弃更新的代、S1 这一格整格消失。评估结论是「维持今天的回退形态」时，S1 取乙（被攻过零轮），甲不要。
 
 ### S2　见证补写的回归（Z21-B）
 
@@ -1460,7 +1460,7 @@ S1 乙、S2 丙、S3 丙都是攻方自己提的，被攻过零轮。
 ### 四·二 `research/prompts/seed540096-investigation/report.md`（S6）
 
 ````markdown
-# 种子 540096 的 I-8.6 红：查因报告（2026-09-25 UTC 08:10 前后）
+# 种子 540096 的 I-8.6 红：查因报告（2026-09-25）
 
 调查 agent 交回的正文，主 agent 原样落盘（它写报告文件被工具拦下，改成交回消息）。产物在同一目录：`seed540096_trace.rs`、`probe-journal-max.patch`、`main-crates-sha256.txt`、`logs/`。编译与运行都在 `/tmp/claude-1000/seed540096/` 的副本里，主工作区的 `crates/` 与 kb 没动，没跑重型测试。
 
@@ -1475,7 +1475,7 @@ S1 乙、S2 丙、S3 丙都是攻方自己提的，被攻过零轮。
 
 - 前任的 4 个后台任务（b1qjpee27 / b4wh3k0r0 / b32posxoa / b00b39pbb）都已退出，退出码 0，输出和 `logs/` 都在。
 - 冻结副本 `frozen/`：源树 `/tmp/claude-1000/m2-safety-r1/` 按 `crates-sha256.txt` 做 `sha256sum -c` 全过；副本只差 `copy-only.patch` 改的 3 个文件，加放进去的两个测试文件。
-- 主树副本 `main/`：主工作区 `crates/` 的拷贝（HEAD e980a21 加工作区未提交改动），08:08 UTC 按 129 个文件重核 sha256 全等（`main-crates-sha256.txt`）；副本里 `devices_without_the_selected_version`（实二七）有 3 处，冻结副本里 0 处。
+- 主树副本 `main/`：主工作区 `crates/` 的拷贝（HEAD e980a21 加工作区未提交改动）按 129 个文件重核 sha256 全等（`main-crates-sha256.txt`）；副本里 `devices_without_the_selected_version`（实二七）有 3 处，冻结副本里 0 处。
 - 两棵树逐字相同的函数：`instance_generation_to_acquire`、`highest_system_configuration_instance`、`write_acquired_instance`、`highest_root_instance`、`first_txg_of_new_instance`，以及 checker 的 `judge_journal_back_chain`。
 - 接着做的：`seed540096_trace.rs` 末尾加单点读数用例 `seed540096_minimal_one`（环境变量 MIN_K、MIN_MODE）；另拷一份 `probe/` 打只用来校验机理的补丁（第五节）；三棵树都重编，0 个 warning。
 
@@ -1586,9 +1586,9 @@ FINAL 之后的原样：`I-8.6: 盘 0 journal 环槽 11 的记录（实例 4、�
 
 ---
 
-## 五、正文第二节行号核对（冻结副本 vs 主树 2026-09-25 18:2x JST）
+## 五、正文第二节行号核对（冻结副本 vs 主树 2026-09-25）
 
-冻结副本：`/tmp/claude-1000/m2-rollback-forward-r1/tree/crates/`，取自主树 2026-09-25（本机 UTC 09:31，JST 18:31）。实二八此刻在改 `mount.rs`（加「可写设备数低于下限」那一判），冻结副本比正文观测时又多了插入。逐项现查：
+冻结副本：`/tmp/claude-1000/m2-rollback-forward-r1/tree/crates/`，取自主树 2026-09-25。实二八此刻在改 `mount.rs`（加「可写设备数低于下限」那一判），冻结副本比正文观测时又多了插入。逐项现查：
 
 | 正文写的 | 冻结副本现查 | 差 |
 |---|---|---|

@@ -1,0 +1,27 @@
+## 一、结论
+
+- 规格表六行都做了：每处先造坏镜像看改之前 panic（或静默收下），再改成带名字的成员往上交；新测试文件 31 条用例、core 单测 1 条，每条一行变异，副本里逐条证红（第六节）。
+- 第 33 / 24 条照用户定案「重建时把已经读到的节点照冷走读那套判全」：`recovery::rebuild_version` 与 `walk_to_file` 调同一组判定函数（从 `walk_to_file` 里抽出来的 12 个，一处定义），四棵树与中央映射树都按 `EveryHeaderAgainstItsReference` 读。不多读一个单元。
+- 另坐实 C476 普查「缺口」表里 `pointer.rs` 那一行（I-2.5 升序断言）**走得到**：树表条目或第 0 代根里一条逆序的指针，可写挂载在 `NodePointer::write_to` 的断言上 panic（副本里探针实测，第三节 C476 那一格）；改成重建时按 I-2.5 判。
+- **判全带来三处别人的测试要跟着改**（不在我的清单里，没改，第七节给原文）：`second_transaction_supplement_two_tree_split` 1 条、`second_transaction_supplement_three_bad_disk_input` 1 条的期望成员变了（可写挂载现在报的与冷走读相同，都在任何写之前拒）；变异表里 252、256 两行（`records.rs` / `transaction.rs` 的锚点）经这条测试再也红不了，要重定向或删。`second_transaction_step_three_second_instance` 那一条红在基线副本上同样红，不是这一件带来的。
+- `lib.rs` 不用加导出行（各模块本来就 `pub mod`）；新成员让 `singlefs-harness/src/history.rs` 的穷举 match 编不过，要加的两臂原文在第八节。
+
+**什么现象会推翻**：主工作区打上补丁、补上第八节两臂之后，第六节任一行在门禁 59 号里没红；或者某条合法历史（层 0、崩溃注入、随机历史）的可写挂载被这一件新加的判定拒掉（那说明冷走读的某条判定对重建那一版不成立，要回头看是判定错还是重建错）。
+
+## 二、这一轮写过的文件
+
+补丁 `crates.patch` 里（相对快照 28ef00a，快照取自主工作区 2026-09-27；主工作区这七份源文件此刻的 sha256 与快照相同，见第十节）：
+
+- `crates/singlefs-core/src/pointer.rs`：`PointerHeadFieldOutsideTheFirstVersion`、三种指针的 `read_judging_the_encryption_and_compression_fields_from`；`LocationEntriesNotAscendingByDevice`、`location_entries_ascend_by_device` 与 `NodePointer::location_entries_ascend_by_device`；两处升序断言消息改写。
+- `crates/singlefs-core/src/unit.rs`：`UnitError::EncryptionReservedBytesNotZero` 与三个解析器的预留位判；条目宽 / 记录宽 0 而条数非 0 判结构错（`ENTRY_WIDTH_ZERO_WITH_ENTRIES`、`RECORD_WIDTH_ZERO_WITH_RECORDS`）。
+- `crates/singlefs-core/src/code_two_tree.rs`：`parse_internal_entry` 交 `Result<_, InternalEntryRefusal>`、子指针头部判；`MULTI_LEVEL_CODE_TWO_TREE_CHILD_POINTER_HEAD_OUTSIDE_THE_FIRST_VERSION`；`OnlyWhatTheShapeNeeds` 的文档改成今天谁在用；规划拒绝那一格补单测 `a_previous_shape_whose_separator_hides_a_key_is_refused_by_the_planner`。
+- `crates/singlefs-core/src/journal.rs`：新根段两条指针按判的读法读；`record_offset` 的 expect 消息指到读者一侧的环长下界。
+- `crates/singlefs-core/src/allocator.rs`：`DeviceEndsBeforeTheUnitAreaStart`；`unit_area_slots_of_device_starting_at` 改 `checked_sub` 交 `Result`；`unit_area_slots_of_device`、`with_unit_area_start` 的 expect 与 `index` / `isolate` 的消息写明入口判过什么。
+- `crates/singlefs-core/src/recovery.rs`：`RecoveryFailure::SystemConfigurationValueRefused` / `DeviceEndsBeforeTheUnitAreaStart`，`SystemConfigurationValueOutsideWhatThisReaderAccepts`；`placement_lies_in_the_unit_area_of_its_device`、`every_device_reaches_the_unit_area_start`；冷走读与重建共用的 12 个判定函数；重建判全、I-2.5 判；`allocation_records_of_version_without_file` 判全。
+- `crates/singlefs-core/src/mount.rs`：挂载入口判盘容量；影子账的指针槽号判在单元区；`format_time_allocator` 的两个落点过几何判。
+- `crates/singlefs-harness/tests/corrupt_on_disk_content_is_refused_instead_of_panicking.rs`：新建，31 条用例。
+
+补丁之外：`mutations-append.tsv` 追加 31 行（名字全以「A3a」起头，第六节逐行列）；`mutations-replacements.tsv` 换 7 行（第六节末）。
+
+副本里改过、**不进补丁**的：`crates/singlefs-harness/src/history.rs` 补两臂（第八节原文，只为副本编得过）。副本里临时加过又删掉的两份探针测试文件（`zz_scratch_probe_*.rs`），不在补丁里。
+

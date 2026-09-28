@@ -32,7 +32,7 @@ B1	detector	three-way-attack	rib	exit=0
 B2	detector	three-way-attack	rib	exit=0	
 B3	detector	three-way-attack	fg	exit=0	
 B4	detector	three-way-attack	rib	exit=0	
-# detection: {"command": "nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test second_transaction_step_three_acquisition_barrier_layer0 -- --nocapture"}
+# detection: {"command": "nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test second_transaction_step_three_acquisition_barrier_layer0 -- --nocapture"}
 # detections: 1 line(s) in /tmp/claude-1000/defs-m2-closeout-r2-opus/probe-detections-smmskuqn.jsonl
 == probe cases-dispatch.json
 D1	dispatch	three-way-attack	fg	exit=2	✗ 派 three-way-attack 的提示要它跑「层 0」：「照定义第 3b 步，在原型里调 `enumerate_layer0` 跑小流，每次不超过约 10⁶ 个状态」

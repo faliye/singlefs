@@ -1,4 +1,4 @@
-# 运行记录：m2-keyspace-r1-local-attack（S6 算术表，2026-09-24 UTC）
+# 运行记录：m2-keyspace-r1-local-attack（S6 算术表，2026-09-24）
 
 提示文件（四份，按「树 × 候选内部条目宽」拆分，拆分理由见
 `research/prompts/m2-keyspace-r1-local-attack-translation-audit.md`「四份文件的拆分理由」一节）：

@@ -1,6 +1,6 @@
 # E162 跑前登记：崩溃放量判定块存储选型
 
-写于 2026-09-27 12:17 JST，装置写之前。
+写于 2026-09-27，装置写之前。
 
 ## 一、问题
 
@@ -229,7 +229,7 @@
 | t_state（主） | E161（崩溃放量的去重与分段耗时） 第一段交回的全域每状态时长：Σ_段（该段取样状态的 ΣT_state 均值 × 该段状态数）÷ Σ_段 状态数，两条流合起来，默认线程数那一次（`E161_THREADS` 没设，本机 32 线程）。ΣT_state 是 E161 G3 照跑那一遍「外面那一对 Instant」的线程内时长（口径见 `research/prompts/e161-preregistration.md:297`、`:303`、`:307`）。单位：线程·秒 / 状态。E161 只按流交回时按状态数加权合起来。执行员把用到的 E161 结果行整行抄进报告 | 报 Q2f 回本值，S2 标「等 E161」 |
 | t_state_1（敏感性） | E161 线程数 1 那一次（D1-stride 第一条流 65 338 个状态）的 ΣT_state ÷ 65 338。没有 SMT 争用，比 t_state 小，给出更严的门槛 | 第八节那一行标「缺」 |
 | P_A | 跑时本机 `nproc` | — |
-| P_B | 跑时 `ssh -o BatchMode=yes <PEER_SSH_HOST> nproc`，主机名取本地配置 `layer0-shard.env`（与 `research/scripts/layer0-shard-run.sh:155` 同一个取法）；命令与原样输出抄进报告 | 报回本值，S2、S3 标「等 P_B」 |
+| P_B | 跑时 `ssh -o BatchMode=yes <PEER_SSH_HOST> nproc`，主机名取本地配置 `multi-host.env`（与 `research/scripts/layer0-shard-run.sh:155` 同一个取法）；命令与原样输出抄进报告 | 报回本值，S2、S3 标「等 P_B」 |
 | R_AB = (P_A + P_B) ÷ t_state；R_B = P_B ÷ t_state | 状态 / 秒 | — |
 
 门槛全部来自 E161 与两机核数，不来自任何一条臂的定义。
@@ -419,7 +419,7 @@ S3 的帧：魔数 `SFBK`（4）｜块键（32）｜块值长度 u32 小端（4�
 
 （留空。装置写之后、产物之前由执行员写，只许收严或补臂；每条写明改了什么、依据哪个单测读数、时点在产物之前，原判据原样保留。）
 
-执行员 2026-09-27 13:20 JST 写，装置单测 23 个三遍全绿之后、任何产物之前。第六、七、九节的判据一条没动；下面每条只补写法或加一个更严的读数。
+执行员 2026-09-27 写，装置单测 23 个三遍全绿之后、任何产物之前。第六、七、九节的判据一条没动；下面每条只补写法或加一个更严的读数。
 
 | # | 改了什么 | 依据 | 原判据 |
 |---|---|---|---|
@@ -427,10 +427,10 @@ S3 的帧：魔数 `SFBK`（4）｜块键（32）｜块值长度 u32 小端（4�
 | 修订二 | PC-L 另报一个更严的读数 `write_kills_with_new_q1a`：写中途的杀里，这一次核查出此前没丢过的块的次数 | 单测 `redb_registered_write_path_keeps_every_confirmed_block_across_sigkill`：R-None 杀一次就丢块；已丢的块之后每次核都会再数一遍，所以「Q1a ≥ 1 的次数」在第一次丢块之后逢杀必涨 | 照判「18 次写中途的杀里 ≥ 10 次 Q1a ≥ 1」 |
 | 修订三 | Q2e 的占用由父进程在写入子进程每报满 1 000 块时并行量（写入子进程不停、计时区间不含量占用的时间），每个样本报走目录之前与走完之后两个已写块数；比值报两个：`ratio_high`（分母用走之前的块数）与 `ratio_low`（分母用走完的块数）；Q2e 的判定用 `ratio_high` 的峰值，`ratio_low` 另报 | 不是单测读数：F 臂 10⁵ 个文件走一遍目录要时间，放在写入进程里量就落进 Q2a 的计时区间；并行量的时候走目录期间写入还在涨，取偏大的那个比值 | 照判「峰值 × 1.9 × 10¹⁰ 对 开跑时可用字节」 |
 | 修订四 | Q2c 在 t_state 没到时报「按实测 Q2a 的 50%、75%、90%、100% 匀速产出」各自的最大积压，另把 100 窗各自的结束时刻（微秒）整列进产物，R_AB 到了之后按窗粒度现算 | Q2c 只报数、不判翻面；单测 `timing_summary_pins_rate_windows_and_backlog` 钉了积压算法（按实测速率产出时积压恒为 1 块，按一半速率时峰值 512 个状态、落在第 1 块） | 只报数 |
-| 修订六 | 这一轮只跑可行性档：S1 每条臂杀 20 次（杀点计划前 20 行，含 2 次打开中途；不是 200 次），四条臂都跑；S2 每条臂写 10⁴ 块（不是 10⁵），报持续写入速率与随机读时延；S1-large、G-bs10、G-batch16、G-sparse、G-random 不跑；S3 不跑。次数与块数各缩十倍，阳性对照 PC-L、PC-S、PC-P、PC-O、PC-T、PC-rate、PC-read、PC-space 照登记跑（PC-T 前 20 行没看到读报错时不再补跑到 200 行）；V6 的门槛是对 180 次写中途的杀写的，可行性档只报杀在提交中间的次数、不判；A-S1 的确认数下界按用到的前 20 行 n_i 之和算。S1、S2 一律记「未判（只跑了可行性档）」，不写够判的结论；某条臂在这 20 次里就丢块或坏块照实报，那是有效观测。时点：2026-09-27 13:45 JST，在任何计时产物之前（此前只有确定性的 anchors 产物） | 派发提示（主 agent 2026-09-27 转用户原话）：「用户 2026-09-27 定：这一轮只验可行性（能跑、能用），不要量到够判」「S1 每条臂杀进程 20 次（不是 200 次），四条臂都跑；S2 每条臂写 10⁴ 块（不是 10⁵），报持续写入速率与随机读时延；几何敏感性那几格不跑；S3 不跑」 | 第六节的判据与门槛原样留着，这一轮不拿它们判 |
+| 修订六 | 这一轮只跑可行性档：S1 每条臂杀 20 次（杀点计划前 20 行，含 2 次打开中途；不是 200 次），四条臂都跑；S2 每条臂写 10⁴ 块（不是 10⁵），报持续写入速率与随机读时延；S1-large、G-bs10、G-batch16、G-sparse、G-random 不跑；S3 不跑。次数与块数各缩十倍，阳性对照 PC-L、PC-S、PC-P、PC-O、PC-T、PC-rate、PC-read、PC-space 照登记跑（PC-T 前 20 行没看到读报错时不再补跑到 200 行）；V6 的门槛是对 180 次写中途的杀写的，可行性档只报杀在提交中间的次数、不判；A-S1 的确认数下界按用到的前 20 行 n_i 之和算。S1、S2 一律记「未判（只跑了可行性档）」，不写够判的结论；某条臂在这 20 次里就丢块或坏块照实报，那是有效观测。时点：2026-09-27，在任何计时产物之前（此前只有确定性的 anchors 产物） | 派发提示（主 agent 2026-09-27 转用户原话）：「用户 2026-09-27 定：这一轮只验可行性（能跑、能用），不要量到够判」「S1 每条臂杀进程 20 次（不是 200 次），四条臂都跑；S2 每条臂写 10⁴ 块（不是 10⁵），报持续写入速率与随机读时延；几何敏感性那几格不跑；S3 不跑」 | 第六节的判据与门槛原样留着，这一轮不拿它们判 |
 | 修订五 | V15 的「重跑，最多三次」按「最多重跑三次」读（一格至多跑四遍）；每遍开跑之前先等干扰进程散去，每 30 秒看一次、最多等 20 分钟，等完照样按开始、结束两刻判；PC-rate、PC-read 的两遍也照这一条等、照这一条重跑 | 单测 `commit_timing_includes_the_injected_five_millisecond_sleep` 与别的碰盘单测并行跑时一次读数「两遍中位数之差 2126 µs」（< 4.5 ms，红），单独跑三遍都绿：盘上同时有别的 fsync 时，PC-rate 的差会被压小 | V7、V15 照判 |
 
-### 补登：S3 跨机与 S4 掉电（设计员 2026-09-27 18:06 JST 起写，任何 S3、S4 的代码与产物之前）
+### 补登：S3 跨机与 S4 掉电（设计员 2026-09-27 起写，任何 S3、S4 的代码与产物之前）
 
 这一段是跑前修订：只补臂、补格、补取样点、补判据，前面各节一个字不改，前面的判据照旧管它们各自的格（S3 回环那一套：5.3 的 PC3-drop、PC3-torn、PC3-rate，6.3 的 Q3a–Q3i，F5、F6、V11–V14、M14、M15 原样有效）。S1 够判档的执行员此刻在跑 R1 臂，它在第十二节上面的段落与它在改的源文件 `research/e7-index-bench/src/bin/e162_crash_verdict_block_store.rs` 这一段都不碰。写之前现查：`ls research/e7-index-bench/src/bin | grep e162` 只有那一个源文件，`ls research/mutations | grep e162` 只有 `e162_crash_verdict_block_store.tsv`，S3、S4 还没有代码；`research/results/e162-*` 与 E162 实验页在这次派发的禁读清单里，没读、没列。
 
@@ -440,21 +440,21 @@ S3 的帧：魔数 `SFBK`（4）｜块键（32）｜块值长度 u32 小端（4�
 
 **主 agent 给的问题（这一段的派发原文，逐字）**：S3——库在本机时，另一台（与本机回环）经网络送块的持续吞吐跟不跟得上那一台 CPU 的判定产出速率、断线重连后库里的块与送出的块一致不一致；S4——三个候选各按自己声明的持久化路径，断电之后已确认提交的块丢不丢、坏不坏、库打不打得开。
 
-派发途中主 agent 更正（整条逐字）：「主 agent 更正：派发提示与岔路单里「2026-09-27 JST 18:1x」的时刻写错了，岔路单已改成 17:4x（现取）。写进登记修订的一律用 17:4x。其余不变，接着做。」
+派发途中主 agent 更正（整条逐字）：「主 agent 更正：派发提示与岔路单里「2026-09-27」的时刻写错了，岔路单已改成（现取）。写进登记修订的一律用。其余不变，接着做。」
 
-**问题单这两行（逐行照抄；`research/prompts/m2-crash-store-r1-forks.md`，sha256 `8e5f55b354ee79c6399eee66a8895eb299124b4a0d03dcaec99dfad22ae55c2c`，S3 加了跨机那一格、S4 新加、时刻改成 17:4x 的那一版）**：
+**问题单这两行（逐行照抄；`research/prompts/m2-crash-store-r1-forks.md`，sha256 `8e5f55b354ee79c6399eee66a8895eb299124b4a0d03dcaec99dfad22ae55c2c`，S3 加了跨机那一格、S4 新加、时刻改过的那一版）**：
 
 | # | 问题 | 候选（各自的定义） | 翻面观测 | 够判条件 | 状态 |
 |---|---|---|---|---|---|
-| S3 | 两台机器怎么写 | 两机共用一个库（用户 2026-09-27 定「两机公用」）。剩下的问题：**库所在的机器本地写、另一台经网络把块送过来**，送块的吞吐跟不跟得上 | 另一台送块的持续吞吐低于那一台 CPU 的判定产出速率；或网络中断重连后库里的块与送出的块不一致 | 本机起两个写入方（一个直写、一个经本机回环网络送块）各写 S2 块数的一半，报经网络那一路的持续吞吐与逐块核的不一致数；跨机那一格（库在本机、另一台 faliye-jplife 经网络送块，用户 2026-09-27 JST 17:4x 弹窗定「做 S3 跨机」）同样报这两个数 | 用户已定（2026-09-27），细节开着 |
-| S4 | 掉电之后判定块还在不在（用户 2026-09-27 JST 17:4x 弹窗定「做掉电测试」；杀进程量不到这一格，`research/prompts/e162-preregistration.md` 第 22 行） | 同 S1 三个候选，各按自己声明的持久化路径（redb 的提交、RocksDB 的 WAL 同步、加固的文件的 fsync + 改名 + 目录 fsync） | 某个候选在虚机里写入中途被断电（页缓存与虚拟盘写缓存里没落盘的都丢）之后重开，已确认提交的块丢了、或读回的块与写入时不同、或库打不开 | 每个候选在 QEMU 虚机的真块设备上被断电若干次（次数与断电时刻的分布由设计员定、写明为什么够），每次重开逐块核，三个候选各报「丢确认块 / 坏块 / 打不开」三个计数 | 开着 |
+| S3 | 两台机器怎么写 | 两机共用一个库（用户 2026-09-27 定「两机公用」）。剩下的问题：**库所在的机器本地写、另一台经网络把块送过来**，送块的吞吐跟不跟得上 | 另一台送块的持续吞吐低于那一台 CPU 的判定产出速率；或网络中断重连后库里的块与送出的块不一致 | 本机起两个写入方（一个直写、一个经本机回环网络送块）各写 S2 块数的一半，报经网络那一路的持续吞吐与逐块核的不一致数；跨机那一格（库在本机、另一台 第二台 经网络送块，用户 2026-09-27 弹窗定「做 S3 跨机」）同样报这两个数 | 用户已定（2026-09-27），细节开着 |
+| S4 | 掉电之后判定块还在不在（用户 2026-09-27 弹窗定「做掉电测试」；杀进程量不到这一格，`research/prompts/e162-preregistration.md` 第 22 行） | 同 S1 三个候选，各按自己声明的持久化路径（redb 的提交、RocksDB 的 WAL 同步、加固的文件的 fsync + 改名 + 目录 fsync） | 某个候选在虚机里写入中途被断电（页缓存与虚拟盘写缓存里没落盘的都丢）之后重开，已确认提交的块丢了、或读回的块与写入时不同、或库打不开 | 每个候选在 QEMU 虚机的真块设备上被断电若干次（次数与断电时刻的分布由设计员定、写明为什么够），每次重开逐块核，三个候选各报「丢确认块 / 坏块 / 打不开」三个计数 | 开着 |
 
 **读法写死**（1.1 没写到的词）：
 
 | 词 | 这一段里的意思 |
 |---|---|
-| A、B（跨机格） | A = 本机（库所在）；B = ssh 别名 `faliye-jplife`（问题单 S3 行点名；本机仓根 `layer0-shard.env` 的 `PEER_SSH_HOST` 也是它，6.0 取 P_B 用的是同一台） |
-| 经网络送块（跨机格） | B 上的送块进程把 6.3 末段那种帧经 **ssh 通道**送到 A 上的库进程：库进程自己起子进程 `ssh -o BatchMode=yes faliye-jplife <B 上的中继>`，帧走这个子进程的标准输出、确认帧走它的标准输入；B 上的中继把这对管道接到送块进程的 Unix 套接字上。不开 TCP 端口、不用端口转发、不改任何 ssh 配置 |
+| A、B（跨机格） | A = 本机（库所在）；B = ssh 别名 `<第二台>`（问题单 S3 行点名；本机仓根 `multi-host.env` 的 `PEER_SSH_HOST` 也是它，6.0 取 P_B 用的是同一台） |
+| 经网络送块（跨机格） | B 上的送块进程把 6.3 末段那种帧经 **ssh 通道**送到 A 上的库进程：库进程自己起子进程 `ssh -o BatchMode=yes <第二台> <B 上的中继>`，帧走这个子进程的标准输出、确认帧走它的标准输入；B 上的中继把这对管道接到送块进程的 Unix 套接字上。不开 TCP 端口、不用端口转发、不改任何 ssh 配置 |
 | 网络中断（跨机格） | 库进程在自己回出第 a_k 个确认之后，对自己起的那个 ssh 客户端子进程的 pid 发 SIGKILL，停 u_k × 200 ms 再起一个新的；a_k、u_k 与回环格同一份（seed_NET，6.3 末段） |
 | 断电 | 问题单 S4 翻面观测括号里那句的字面：页缓存与虚拟盘写缓存里没落盘的都丢。落到设备侧日志上：断电点 k（日志前 k 个条目已送到虚拟盘）的盘面 = k 之前最后一个 FLUSH 条目之前的写全在，这个 FLUSH 之后、k 之前的写（下称 U(k)）全丢，记作 **U-drop**，S4 的判定用它 |
 | 页缓存那一半怎么丢 | 设备侧日志只记来宾真发到盘上的写；断电点之后才回写的脏页不在前 k 个条目里，重放出的盘面上自然没有 |
@@ -494,7 +494,7 @@ S3、S4 都不重写 `crates/` 里的路径：块是装置按种子造的，被�
 | 4.14 | RocksDB 11.8.1 默认：`write_buffer_size = 64 << 20`、`level0_file_num_compaction_trigger = 4`、`max_write_buffer_number = 2`、`use_fsync = false`、`wal_recovery_mode = kPointInTimeRecovery` | 本机 cargo 缓存 `librocksdb-sys-0.19.0+11.8.1/rocksdb/include/rocksdb/options.h:191`、`:255`、`:841`、`:1480`，`advanced_options.h:271` | 定 S4 每条主臂写 6 000 块：按 64 MiB ÷ 65 568 字节算约每 1 023 块落盘一次，6 000 块里约 5 次、第 4 次之后一次合并（B9，推的，没量过）；V25 跑时核 |
 | 4.15 | 本机两份内核配置（`6.17.0-1028-oem`、`6.17.0-lockdep`）里 `EXT4_FS`、`JBD2`、`BLK_DEV_LOOP`、`MSDOS_PARTITION`、`VIRTIO_BLK`、`TMPFS`、`DEVTMPFS` 都是 `y`；lockdep 那份另有 `LOCKDEP`、`PROVE_LOCKING` | `grep` `/boot/config-*`（2026-09-27 现查） | 来宾不加载模块就能分区、挂 ext4、用 loop；S4 只数不计时，两份内核都能用 |
 | 4.16 | 本机：mke2fs 1.47.0、`sfdisk`、busybox-static 1.36.1（带 `losetup`、`mount`、`umount`、`blockdev`、`mdev`、`dd`、`sync`、`poweroff`）、cpio、qemu-system-x86 8.2.2；Rust 目标 gnu 与 musl 都装了；`musl-gcc`、`x86_64-linux-musl-g++` 都没有；glibc 2.39；内存 60 GB、32 个逻辑 CPU | `which`、`dpkg-query -W`、`rustup target list --installed`、`busybox --list`、`free -g`、`nproc`（2026-09-27 现查） | S4 的来宾二进制带 RocksDB，走「glibc 动态链接 + 附加根带库」；送块二进制不带存储依赖，编成 musl 静态送去 B |
-| 4.17 | 本机仓根 `layer0-shard.env` 里 `PEER_SSH_HOST=faliye-jplife`；另有 `PEER_REPOSITORY_DIRECTORY`、`PEER_CARGO_BIN_DIRECTORY`、`QUIESCE_STOP_COMMAND`、`QUIESCE_START_COMMAND` 几个键（值没读） | `grep -o '^[A-Z_]*=' layer0-shard.env`、`grep -n '^PEER_SSH_HOST' layer0-shard.env` | 跨机格的 B 与 6.0 取 P_B 的是同一台；B 上有没有 Rust、核数、内存都没查（补 5.3 前提格由主 agent 现查） |
+| 4.17 | 本机仓根 `multi-host.env` 里 `PEER_SSH_HOST=<第二台>`；另有 `PEER_REPOSITORY_DIRECTORY`、`PEER_CARGO_BIN_DIRECTORY`、`QUIESCE_STOP_COMMAND`、`QUIESCE_START_COMMAND` 几个键（值没读） | `grep -o '^[A-Z_]*=' multi-host.env`、`grep -n '^PEER_SSH_HOST' multi-host.env` | 跨机格的 B 与 6.0 取 P_B 的是同一台；B 上有没有 Rust、核数、内存都没查（补 5.3 前提格由主 agent 现查） |
 | 4.18 | D13 已定项 9：「分桶而不是均匀随机」 | `.claude/kb/decisions/13-验证路线.md:178`（grep「掉电\|断电」命中之后读了 `:168-184`） | S4 的断电点按桶取（补 5.2），不全用均匀随机 |
 | 4.19 | 锚点脚本算出的：检出力 1 − (1 − p)^n（n = 200、p = 1.5% 时 0.9513；n = 60、p = 5% 时 0.9539）；PC4-C 的 U-rand 恰好丢 47 个；PC3-rate-X 的上下界 10.0503、9.0498 块/秒 | 补 13 锚点脚本的输出 | 只是次数与锚点，不是答案 |
 | 4.20 | grep 顺带读到的无关行：`.claude/kb/decisions/02-RAID条带策略.md:274`、`:289`，`20-承重面单元的原子性与自包含.md:134`，`23-journal的角色与格式.md:252`（本机盘没有掉电保护），`.claude/kb/invariants.md:72`、`:168`、`:533`、`:536`、`:542`，`research/scripts/e129-thin-neighbour.sh:6` | grep「掉电\|断电」 | 说的都是 singlefs 自己的格式与设备语义，不是存储候选；「断电后丢确认块」这个量仓里没有别的口径（`.claude/rules/mutation-sampling.md` 第五类查过）。宿主盘没有掉电保护与 S4 无关：S4 断的是虚拟盘，宿主不掉电 |
@@ -506,7 +506,7 @@ S3、S4 都不重写 `crates/` 里的路径：块是装置按种子造的，被�
 | 源文件 | bin 名 | 特性 | 角色 |
 |---|---|---|---|
 | `e162_verdict_store_sender.rs` | `e162-verdict-store-sender` | 不要 `e162-block-stores`；编成 `x86_64-unknown-linux-musl` 静态 | 送块进程（回环：`--connect tcp:127.0.0.1:<端口>`，断了每 10 ms 重连、最多 30 秒；跨机：`--listen unix:<路径>`，断了等下一个连接、最多 30 秒）；跨机格的中继（`--relay unix:<路径>`，把标准输入输出接到那个套接字）；两种接法的重发规则同 6.3 末段 |
-| `e162_verdict_store_network.rs` | `e162-verdict-store-network` | `required-features = ["e162-block-stores"]` | 库进程（直写线程 + 收块线程）、回环转发进程、`--role s3-drive`（回环格）、`--role s3x-drive`（跨机格，含 B 上放文件与收尾删除）、收尾核；`--peer-command '<命令>'` 让单测把「`ssh -o BatchMode=yes faliye-jplife`」换成本机命令，单测不连 B |
+| `e162_verdict_store_network.rs` | `e162-verdict-store-network` | `required-features = ["e162-block-stores"]` | 库进程（直写线程 + 收块线程）、回环转发进程、`--role s3-drive`（回环格）、`--role s3x-drive`（跨机格，含 B 上放文件与收尾删除）、收尾核；`--peer-command '<命令>'` 让单测把「`ssh -o BatchMode=yes <第二台>`」换成本机命令，单测不连 B |
 | `e162_verdict_store_power_cut.rs` | `e162-verdict-store-power-cut` | `required-features = ["e162-block-stores"]`；来宾里跑 glibc 动态链接的这一份 | S4 全部角色（补 5.2） |
 
 变异表：`research/mutations/e162_verdict_store_network.tsv`（送块二进制的变异也进这一张）、`research/mutations/e162_verdict_store_power_cut.tsv`。候选的读写路径照 5.2 逐字实现（可以从 S1 那份源文件拷，拷来的段落在第十二节写明出处行号）；7.2 的锚点 A1–A6 与补 7 的 B 系列锚点在每个 bin 启动时自检，对不上 → V10。种子常量一律写成完整的十六进制字面量（例 `0xE16200000000000A`），不写成「某个带 seed 的名字 `|` 小数」的样子（门禁 96 号①）。
@@ -537,8 +537,8 @@ S3、S4 都不重写 `crates/` 里的路径：块是装置按种子造的，被�
 **真实基线（附带，够判后不跑）**：S3X-raw——同 S3X-T 的通道，库进程收帧、校验 CRC 之后不写库、直接回确认；它是「ssh 通道 + 协议」这一段的上界，Q3a-X 低于 R_B 时拿它分「通道在限」还是「库在限」。回环格同样补一个 S3-raw（附带）。
 
 **B 上放什么、放哪、怎么删**：
-- 只放一个文件：`e162-verdict-store-sender` 的 musl 静态二进制（`file` 报 `statically linked` 才送）。目录 `/tmp/e162-s3x-<A 上 s3x-drive 进程的 pid>/`，由 `ssh -o BatchMode=yes faliye-jplife "mkdir -m 700 '/tmp/e162-s3x-<pid>'"` 建（已存在就停，不复用）；`scp -q -o BatchMode=yes` 送过去，送完 `ssh … sha256sum <文件>` 与本地比，不同 → V27。目录里另外只有送块进程自己建的 `s.sock`。不在 B 上装包、不改 B 的任何配置、不写这个目录以外的地方、不在 B 上编译。
-- 送块进程由 A 经一条控制 ssh 起（`ssh -o BatchMode=yes faliye-jplife '/tmp/e162-s3x-<pid>/e162-verdict-store-sender --listen unix:/tmp/e162-s3x-<pid>/s.sock …'`），第一行报自己的 pid（`P <pid>`）；它自己用 `Instant` 计的吞吐、分窗、重连与重发计数写进它的结果行，也从这条控制通道回来。A 把控制通道读到 EOF 再解析，不给行打时间戳（`.claude/kb/vm-harness.md`「计时不在转发输出的循环里打时间戳」）。中断只杀数据通道那个 ssh 客户端，不碰控制通道。
+- 只放一个文件：`e162-verdict-store-sender` 的 musl 静态二进制（`file` 报 `statically linked` 才送）。目录 `/tmp/e162-s3x-<A 上 s3x-drive 进程的 pid>/`，由 `ssh -o BatchMode=yes <第二台> "mkdir -m 700 '/tmp/e162-s3x-<pid>'"` 建（已存在就停，不复用）；`scp -q -o BatchMode=yes` 送过去，送完 `ssh … sha256sum <文件>` 与本地比，不同 → V27。目录里另外只有送块进程自己建的 `s.sock`。不在 B 上装包、不改 B 的任何配置、不写这个目录以外的地方、不在 B 上编译。
+- 送块进程由 A 经一条控制 ssh 起（`ssh -o BatchMode=yes <第二台> '/tmp/e162-s3x-<pid>/e162-verdict-store-sender --listen unix:/tmp/e162-s3x-<pid>/s.sock …'`），第一行报自己的 pid（`P <pid>`）；它自己用 `Instant` 计的吞吐、分窗、重连与重发计数写进它的结果行，也从这条控制通道回来。A 把控制通道读到 EOF 再解析，不给行打时间戳（`.claude/kb/vm-harness.md`「计时不在转发输出的循环里打时间戳」）。中断只杀数据通道那个 ssh 客户端，不碰控制通道。
 - 收尾（正常、出错、panic 都走，Drop 守卫）：① 送块进程还活着 → `ssh … "grep -qa '/tmp/e162-s3x-<pid>' /proc/<它自报的 pid>/cmdline && kill <它自报的 pid>"`（只按它自报的 pid、先核命令行里有这个目录）；② 核路径合 `^/tmp/e162-s3x-[0-9]+$` 之后 `ssh … "rm -rf -- '/tmp/e162-s3x-<pid>'"`；③ `ssh … "test ! -e '/tmp/e162-s3x-<pid>' && echo gone"` 回读。三步的命令与原样输出进产物；任何一步没成 → H12。
 - A 上的库照 5.5 放在 `${TMPDIR:-/tmp}/e162-<装置 pid>/`，同样退出即删。
 
@@ -602,13 +602,13 @@ PC4-L 与 PC4-NB 分别管断电定义里的两半：前者证「页缓存里没
 
 | 项 | 怎么查（主 agent 在派发跨机格或起 S4 之前现查，命令与原样输出写进派发提示或产物） | 用在哪 | 不满足 |
 |---|---|---|---|
-| ssh 别名免密可用 | `ssh -o BatchMode=yes faliye-jplife true` 退 0 | 全部 S3X | 不跑 S3X（H11），不改 ssh 配置 |
+| ssh 别名免密可用 | `ssh -o BatchMode=yes <第二台> true` 退 0 | 全部 S3X | 不跑 S3X（H11），不改 ssh 配置 |
 | B 的架构与内核 | `ssh … 'uname -m; uname -r'`，要 `x86_64` | musl 静态二进制能不能在 B 上跑 | H11 |
 | P_B | `ssh … nproc` | R_B、S3X-busy 的空转线程数 | 报回本值，标「等 P_B」 |
 | B 的内存 | `ssh … 'free -b'` | 送块进程窗口占 W × 65 580 字节（W = 256 时 16 788 480，B10b），只记 | — |
 | B 有没有 Rust 工具链 | `ssh … 'command -v cargo rustc'` | 用不上（送去的是静态二进制），只记 | — |
 | B 的 `/tmp` 可写与可用空间 | `ssh … 'df -B1 /tmp'` | 放一个二进制 | H11 |
-| B 此刻的负载 | `ssh … 'cat /proc/loadavg; ps -o pid,args -u "$(id -u)"'`，看有没有层 0 分片、`cargo`、`rustc`、`qemu-system`、E16x 装置 | V29 | 等，或交用户；本机 `layer0-shard.env` 有清场用的 `QUIESCE_*` 键，清不清由主 agent 定 |
+| B 此刻的负载 | `ssh … 'cat /proc/loadavg; ps -o pid,args -u "$(id -u)"'`，看有没有层 0 分片、`cargo`、`rustc`、`qemu-system`、E16x 装置 | V29 | 等，或交用户；本机 `multi-host.env` 有清场用的 `QUIESCE_*` 键，清不清由主 agent 定 |
 | A 与 B 之间是什么链路 | 主 agent 知道的（有线、无线、隧道），外加 `ssh … true` 的挂钟 | 只用来解释 Q3a-X | 只记 |
 | S4：KVM、内核、busybox、cpio | `.claude/kb/vm-harness.md`「三个前置」与「跑之前先做卫生检查」两节 | 全部 S4 | 不起 |
 | S4：宿主资源 | `free -g` 可用 ≥ 16 GiB（验盘开机 `VM_MEM=12288`）；`df -B1 ${TMPDIR:-/tmp}` 可用 ≥ 40 GiB；`ps` 里没有别的虚机、性能测量 | 全部 S4 | 等 |
@@ -804,7 +804,7 @@ PC4-L 与 PC4-NB 分别管断电定义里的两半：前者证「页缓存里没
 | 文件 | 行 |
 |---|---|
 | `.claude/agent-common.md` | 1-97 |
-| `research/prompts/m2-crash-store-r1-forks.md` | 1-12 读了两版：派发时一版（S3、S4 写「18:1x」）；主 agent 更正之后一版（sha256 `8e5f55b3…ae55c2c`，写「17:4x」），另 `sed -n '11,12p'` 回读 |
+| `research/prompts/m2-crash-store-r1-forks.md` | 1-12 读了两版：派发时一版（S3、S4 写的是被更正前的时刻）；主 agent 更正之后一版（sha256 `8e5f55b3…ae55c2c`，写更正后的时刻），另 `sed -n '11,12p'` 回读 |
 | `research/prompts/e162-preregistration.md` | 标题行；1-616 整份（分三次读）；52-88 另 `cmp` |
 | `.claude/singlefs-ai-sop/rules/test-discipline.md` | 标题行；44-153 |
 | `.claude/rules/three-way-inference.md` | 标题行；129-148 |
@@ -816,7 +816,7 @@ PC4-L 与 PC4-NB 分别管断电定义里的两半：前者证「页缓存里没
 | `research/scripts/vm-bench.sh` | 1-311 整份；grep 命中 21、55、86、100、120、121 |
 | `research/scripts/e152-stage-root.sh` | 1-143 整份；grep 命中 59、75、88、121、133、135 |
 | `research/scripts/layer0-shard-run.sh` | grep 命中 30、121-127、139、144、147、160、196、197 |
-| 仓根 `layer0-shard.env.example` | 整份；本地 `layer0-shard.env` 只读了键名与第 3 行 `PEER_SSH_HOST` |
+| 仓根 `multi-host.env.example` | 整份；本地 `multi-host.env` 只读了键名与第 3 行 `PEER_SSH_HOST` |
 | `crates/singlefs-harness/src/device_log.rs` | 1-146；grep 命中 1、13-20、39、60、70、109、132、136、147、151、198、226、286、298、300、302、306、307、309、335、340、360、362、386、390、428、435、448、456、472、485 |
 | `crates/singlefs-harness/src/bin/first_transaction_device_log_check.rs` | 1-28；grep 命中 29、449 |
 | `research/e7-index-bench/Cargo.toml` | `^\[` 的前 20 个命中；`[dependencies]` 一段；450-480；grep 命中 452、454、456、457、461、466、471-473、476 |
@@ -834,7 +834,7 @@ PC4-L 与 PC4-NB 分别管断电定义里的两半：前者证「页缓存里没
 **跑过的命令**（原样；工作目录是仓根，除非写了 `cd`；Read 工具读的文件不在这里，在上表）：
 
 ```bash
-cat /home/fy5090/code/singlefs/.claude/agent-common.md | head -300; wc -l /home/fy5090/code/singlefs/.claude/agent-common.md
+cat .claude/agent-common.md | head -300; wc -l .claude/agent-common.md
 wc -l research/prompts/m2-crash-store-r1-forks.md research/prompts/e162-preregistration.md; ls /tmp/claude-1000/e162-s3-s4-designer/ 2>&1; ls research/prompts/ | grep -i e162; ls research/prompts | grep m2-crash-store
 grep -n '^#' research/prompts/e162-preregistration.md
 for f in .claude/singlefs-ai-sop/rules/test-discipline.md .claude/rules/three-way-inference.md .claude/singlefs-ai-sop/rules/evidence-discipline.md .claude/rules/mutation-sampling.md .claude/rules/implementation-first.md .claude/kb/vm-harness.md; do echo "== $f $(wc -l < $f)"; grep -n '^#' "$f"; done
@@ -852,23 +852,23 @@ grep -ln 'research/mutations' .claude/gate.d/*.sh | head; echo ---; grep -n 'e\[
 sed -n '1,40p' .claude/gate.d/96-experiment-source-discipline.sh | cut -c1-250
 uname -r; ls -l /boot/ | head -20; for c in /boot/config-$(uname -r) /boot/config-6.17.0-lockdep; do echo "== $c"; [ -r "$c" ] && grep -E '^CONFIG_(EXT4_FS|BLK_DEV_LOOP|MSDOS_PARTITION|EFI_PARTITION|VIRTIO_BLK|TMPFS|BLK_DEV_WRITE_MOUNTED|JBD2|DEVTMPFS|LOCKDEP|PROVE_LOCKING)=' "$c"; done
 which mkfs.ext4 sfdisk busybox cpio qemu-system-x86_64 musl-gcc x86_64-linux-musl-g++ x86_64-linux-musl-gcc 2>&1; rustup target list --installed 2>&1; busybox --list 2>/dev/null | grep -xE 'losetup|mount|umount|sync|poweroff|blockdev|mdev|fdisk|dd' | tr '\n' ' '; echo; mkfs.ext4 -V 2>&1 | head -2; ls /usr/lib/gcc/x86_64-linux-gnu/*/libstdc++.a 2>&1 | head -3; getconf GNU_LIBC_VERSION; free -g | head -2; nproc
-grep -n 'layer0-shard.env\|PEER_SSH_HOST' research/scripts/layer0-shard-run.sh | head -12; ls -la research/scripts/layer0-shard.env* 2>&1 | head; git check-ignore -v research/scripts/layer0-shard.env 2>&1 | head -2
-ls -la layer0-shard.env layer0-shard.env.example 2>&1; grep -n 'PEER_SSH_HOST\|PEER_' layer0-shard.env.example 2>/dev/null | head; grep -n '^PEER_SSH_HOST' layer0-shard.env 2>/dev/null
-grep -o '^[A-Z_]*=' layer0-shard.env
-cat layer0-shard.env.example; grep -n 'QUIESCE' research/scripts/layer0-shard-run.sh | head -8
+grep -n 'multi-host.env\|PEER_SSH_HOST' research/scripts/layer0-shard-run.sh | head -12; ls -la research/scripts/multi-host.env* 2>&1 | head; git check-ignore -v research/scripts/multi-host.env 2>&1 | head -2
+ls -la multi-host.env multi-host.env.example 2>&1; grep -n 'PEER_SSH_HOST\|PEER_' multi-host.env.example 2>/dev/null | head; grep -n '^PEER_SSH_HOST' multi-host.env 2>/dev/null
+grep -o '^[A-Z_]*=' multi-host.env
+cat multi-host.env.example; grep -n 'QUIESCE' research/scripts/layer0-shard-run.sh | head -8
 grep -n 'qemu\|vm-bench\|QEMU\|ssh' .claude/hooks/heavy-test-guard.sh .claude/hooks/lib_heavy_tests.py | cut -c1-220 | head -30
-mkdir -p /tmp/claude-1000/e162-s3-s4-designer && cd /home/fy5090/code/singlefs && sed -n '1,45p' research/scripts/quote-kb.py | head -45
+mkdir -p /tmp/claude-1000/e162-s3-s4-designer && cd <仓根> && sed -n '1,45p' research/scripts/quote-kb.py | head -45
 nice -n 19 python3 research/scripts/quote-kb.py /tmp/claude-1000/e162-s3-s4-designer/section2-requote.md '.claude/kb/milestone/03-third-txn.md@## 十一　崩溃放量的过程与结果怎么存、怎么快速读写' '.claude/kb/decisions/13-验证路线.md~^\| 4 \| \*\*崩溃点重放的崩溃状态集合怎么定义\*\*' '.claude/kb/decisions/13-验证路线.md@#### 已定项 4：崩溃点重放只枚举整写子集' 2>&1 | tail -3; wc -l /tmp/claude-1000/e162-s3-s4-designer/section2-requote.md; grep -n '出处' /tmp/claude-1000/e162-s3-s4-designer/section2-requote.md
 #   ✓ 3 段整抄进 /tmp/claude-1000/e162-s3-s4-designer/section2-requote.md，回读逐字节一致；37 行；出处行 :91-97、:12-12、:69-83
 sed -n '52,88p' research/prompts/e162-preregistration.md | cmp - /tmp/claude-1000/e162-s3-s4-designer/section2-requote.md && echo "section 2 (prereg lines 52-88) identical to fresh extraction (37 lines)"; sha256sum /tmp/claude-1000/e162-s3-s4-designer/section2-requote.md
 #   section 2 (prereg lines 52-88) identical to fresh extraction (37 lines)；295b2e267f96d8212b5b83544d8f310df55f428a48dd252f9d2efa99f8ba007e
 sha256sum research/prompts/m2-crash-store-r1-forks.md && sed -n '11,12p' research/prompts/m2-crash-store-r1-forks.md
 d=$(ls -d ~/.cargo/registry/src/*/librocksdb-sys-0.19.0+11.8.1 2>/dev/null | head -1); echo "$d"; [ -n "$d" ] && { grep -n 'write_buffer_size = \|level0_file_num_compaction_trigger = \|max_write_buffer_number = ' "$d/rocksdb/include/rocksdb/options.h" "$d/rocksdb/include/rocksdb/advanced_options.h" 2>/dev/null | head; grep -n 'WALRecoveryMode wal_recovery_mode = \|bool use_fsync = ' "$d/rocksdb/include/rocksdb/options.h" | head; }
-dpkg-query -W -f='${Package} ${Version}\n' qemu-system-x86 busybox-static e2fsprogs 2>&1; ls -l /boot/vmlinuz-6.17.0-lockdep 2>&1; ls research/e7-index-bench/src/bin/ 2>/dev/null | grep -i e162; ls /home/fy5090/code/singlefs/research/e7-index-bench/src/bin/ | grep -i e162; grep -n 'e162' /home/fy5090/code/singlefs/research/e7-index-bench/Cargo.toml; ls /home/fy5090/code/singlefs/research/mutations/ | grep -i e162
+dpkg-query -W -f='${Package} ${Version}\n' qemu-system-x86 busybox-static e2fsprogs 2>&1; ls -l /boot/vmlinuz-6.17.0-lockdep 2>&1; ls research/e7-index-bench/src/bin/ 2>/dev/null | grep -i e162; ls research/e7-index-bench/src/bin/ | grep -i e162; grep -n 'e162' research/e7-index-bench/Cargo.toml; ls research/mutations/ | grep -i e162
 cd research/e7-index-bench; grep -n '^\[' Cargo.toml | head -20; awk '/^\[dependencies\]/,/^\[\[bin\]\]/' Cargo.toml | head -40; sed -n '450,480p' Cargo.toml
 grep -rn 'parse_device_log' crates/ --include=*.rs | cut -c1-160; echo "---replay-onto-image grep:"; grep -rn 'fn replay_device_log\|fn crash_image_from_device_log\|LOG_FLUSH_FLAG' crates/ --include=*.rs | grep -v 'device_log.rs' | wc -l
 sed -n '1,28p' crates/singlefs-harness/src/bin/first_transaction_device_log_check.rs | cut -c1-200
-TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M JST'; date -u '+%H:%M UTC'      # 2026-09-27 18:06 JST / 09:06 UTC
+TZ=Asia/Tokyo date +%F      # 2026-09-27
 grep -rln --exclude-dir=experiments --exclude-dir=results --exclude-dir=prompts --exclude-dir=target --exclude=experiments.md --exclude=experiments-history.md -E '掉电|断电|power.?cut|power.?loss' .claude/kb research/scripts crates research/e7-index-bench/src 2>/dev/null | head -20; echo ---; grep -rn --exclude-dir=experiments --exclude-dir=results --exclude-dir=prompts --exclude-dir=target --exclude=experiments.md --exclude=experiments-history.md -E '掉电|断电' .claude/kb research/scripts crates 2>/dev/null | cut -c1-200 | head -12
 grep -n '^#' '.claude/kb/decisions/13-验证路线.md' | awk -F: '$1>=100 && $1<=260'; awk 'NR>=170 && NR<=184 {print NR": "$0}' '.claude/kb/decisions/13-验证路线.md' | cut -c1-400
 grep -n 'install_binary_with_libraries() \|^}$\|mke2fs.conf\|STAGED_LOADER=\|staged_version=' research/scripts/e152-stage-root.sh | head; grep -n 'VM_TIMEOUT=\|VM_EXTRA_ROOT:-}" \]\] && cp\|cat > "$ird/init"\|^INIT$\|VM_BLKLOGWRITES_DIR:-}" \]\]; then\|virtio-blk-pci,drive=logwrites\|log-sector-size=512' research/scripts/vm-bench.sh; grep -n 'E162\|dependencies.redb\|dependencies.rocksdb\|e162-block-stores\|BINDGEN' research/e7-index-bench/Cargo.toml; grep -n 'ssh -o BatchMode=yes\|peer_cores=' research/scripts/layer0-shard-run.sh
@@ -1034,6 +1034,81 @@ B10b S3X-T network bytes = 5e4 x 65580 = 3279000000 ; window bytes W=64: 4197120
 ```
 
 （补登到这里为止；第十二节上面几段与第十三节原样不动。）
+
+#### 补 14　主 agent 跑前认定（2026-09-27，任何 S3、S4 代码与产物之前）
+
+设计员报告 `research/prompts/e162-s3-s4-designer-report.md`「待主 agent 认的项」八条，逐条去向：
+
+| # | 项 | 认定 |
+|---|---|---|
+| 1 | 另起三个 bin 与英文名（补 5 开头） | 认 |
+| 2 | S4 跑哪几条臂、内核用哪个 | 第五段起之前由主 agent 按第一段交回点名、现查内核后定，写进第五段那条命令；第三、四段不受影响 |
+| 3 | 补 5.3 前提格 | 第三段③跨机格开跑之前由主 agent 现查，结果进派发提示；用户 2026-09-27 认 ssh 到另一台只读现查、跑时在 `/tmp/e162-s3x-<pid>/` 放静态二进制并收尾 |
+| 4 | S3X-busy 让另一台全部逻辑 CPU 空转一趟 | 用户同时认，附条件：这一格开跑之前弹窗告诉用户，用户点头才跑 |
+| 5 | 跨机吞吐对照换成钉绝对值的 PC3-rate-X | 认 |
+| 6 | F12：某条臂只在取样点上翻算不算出局 | 不算出局：判定读法是 U-drop；只在 U-rand、U-tear、U-keep 或 S4-bs10 上翻的，那条臂在岔路表里照记「只在 … 上翻」作限定词，逐格列出翻的点与读法，不改判定 |
+| 7 | 补 1 整条引文里的「」 | 留着：那是被更正的原文，整条引不删字 |
+| 8 | 门禁 86 号 | 现跑绿：`✓ research 里的实验号在 kb 里都有正文（157 个）` |
+
+#### 修订（第四段 S4 装置，执行员 2026-09-27 写：装置单测 23 个五遍全绿、变异 M16–M26 第一遍 11 条全抓之后，任何 S4 产物之前）
+
+补 5–补 11 的判据、门槛、臂、对照、作废与停机条款一条没动；第六、七、九节与补 6、补 7、补 9 的去留不动。下面只补写法（登记没写死、装置得选一种的地方）与两处为让登记的读法落得了地而加的动作。源文件 `research/e7-index-bench/src/bin/e162_verdict_store_power_cut.rs`。
+
+| # | 改了什么 | 依据 | 原判据 |
+|---|---|---|---|
+| S4-修订一 | PC4-C 来宾在后 100 个写之后、写盘开机末尾再各补一次 fdatasync（主臂在 umount 之后对 /dev/vda 整盘 fsync 一次）。断电点 k 仍取「第 200 个写条目下标 + 1」，补的 FLUSH 在 k 之后，不进任何断电盘面 | 补 5.2「设备侧日志的读法」写死「系统配置在时条目数封顶在它声明的数」；单测 `parser_stops_at_the_declared_entry_count_when_a_stale_entry_follows` 钉了这个封顶（声明 6 个、躺着第 7 个时读 6 个）。末尾没有 FLUSH 时，声明数可能停在最后一个 FLUSH 那一刻，封顶会把后 100 个写截掉，PC4-C 找不齐 200 个写（推的，没在虚机上量过；`.claude/kb/vm-harness.md`「设备侧独立录制」一节记着关机时本来就补一个 FLUSH） | V17、PC4-C 的四个计数照判 |
+| S4-修订二 | 中位数取下中位（排序后第 ⌈n/2⌉ 个，与 S1 源文件 `median_of` 同一写法）；C-commit 一块多于 64 个边界时第 s 个点取第 ⌊s × (n − 1) ÷ 63⌋ 个边界 | 单测 `bucket_pools_split_windows_and_gaps_on_a_synthetic_marker_layout`、`commit_window_boundaries_keep_both_ends_and_cap_at_sixty_four` | 长窗「> 中位数 4 倍」、C-commit「包含两端的 64 个等距点」照旧 |
+| S4-修订三 | S4-bs10 只有 C-strat 100 点（U-drop、U-rand），没有 C-commit；PC4-S/P/O 只在主格做，断电点取这次写盘开机的条目总数（U-keep） | 补 5.2 生成器下标只给 S4-bs10 列「0–99」、没给 10 000 起的 C-commit 下标；「全部条目重放出的盘面」。单测 `main_arm_plan_has_the_registered_item_counts` | 同上 |
+| S4-修订四 | F-nofsync 同时拿掉建节点、段目录时的两次目录 fsync；F-nodirsync 只拿掉改名之后的父目录 fsync，建目录时的 fsync 留着；R-None 同时照臂保留 quick-repair 设定 | 补 5.2 PC4-L「写临时文件不 sync_all、改名、不 fsync 目录」、PC4-FD「只拿掉『打开父目录 sync_all』」；单测 `every_control_form_differs_from_its_correct_form_in_exactly_the_registered_setting`（每个对照形态与正确形态恰好差登记的那一处，M26） | V18、V20 照判 |
+| S4-修订五 | 日志解析遇到带数据的 FLUSH 条目、MARK / METADATA 标志或不认识的标志位，整份判 H9，不猜读法；DISCARD 条目重放时不动盘面（S 与 E 之间出现照 H14 停机）；带 FUA 的写不进 U(k) | 补 5.2 FUA 那一句、H9、H14；单测 `parser_rejects_flush_with_data_and_unknown_flags`、`forced_unit_access_write_after_the_last_flush_survives_drop_unflushed` | H9、H14 照判 |
+| S4-修订六 | 核对子进程崩掉（没交回结果行也不是超时）记「check=crashed」、算「未判的点」单列，不并进 Q4f；loop 或 tmpfs 镜像造不出记 H8 停机 | Q4f 登记的只有「开库返回 Err」与「3 600 秒没交回」两种；H8 列了 losetup 与 tmpfs | Q4f、H8 照判 |
+| S4-修订七 | V25 的「翻倍重做」由 s4-drive 自己做（6 000 → 12 000 → 24 000，产物里每次一行 `name=v25_redo`）；第六段执行员照产物里的 `v25_redo` 行在这一节补修订行 | 补 11 V25「每做一次在第十二节写一行修订」，而第五段由主 agent 起、中途没有执行员 | V25 照判 |
+| S4-修订八 | 补 12 第五段命令里的二进制路径写成 `research/target/release/e162-verdict-store-power-cut`（research 工作区的编译目录在 `research/target/`，`research/e7-index-bench/target/` 不存在） | `research/Cargo.toml` 是工作区根；`research/scripts/replay.sh` 的 E162 驱动用 `./target/release/…`（工作目录 `research/`） | 无 |
+| S4-修订十 | `--role s4-stage` 装进附加根的 S4 二进制拷完之后跑一次 `strip --strip-debug`（只拿掉调试信息），搭完照补 5.2 用搭好的加载器实跑 `--role selftest` | `research/Cargo.toml` 的 release 配置 `debug = true`，本机编出来的二进制 456 766 512 字节（`ls -la research/target/release/e162-verdict-store-power-cut`）；附加根整份进 initramfs，验盘开机还要带设备侧日志（H10「附加根大小」） | 无 |
+| S4-修订九 | 拷自 S1 源文件（sha256 `38f1d92e9552519e4880366c56578f73c69124a9f47cb90f978adecf51c7c0af`）的段落：192–251（SplitMix64、CRC-32C）、253–338（块值、指纹、块键）、388–390、397–433（preflight）、471–490（产物行，改成可丢弃）、592–615（Candidate 的一部分）、673–866（候选读写，写法改成按 WriteSettings）、868–1203（F，拿掉 lazy-rename、direct 与单测用的截步，加 FileSyncSteps）、1223–1427（逐块核，核全部 N_W 块）、1558–1571（中位数）、1924–1945（盘上位置）、2649–2659（PC-O 的毁法，改成返回 Result） | 补 5 开头「拷来的段落在第十二节写明出处行号」 | 无 |
+
+#### 修订（第三段 S3 回环，执行员写：sender、network 两个 bin 的单测五遍全绿之后、任何 S3 产物之前；前一个执行员 2026-09-27 起草，接手的执行员 2026-09-28 逐条核过、补了第十条写进这里）
+
+第六、七、九节与补 6–补 11 的判据、门槛、臂、对照、作废与停机条款一条没动，去留与报告方式没动；下面每条只补写法（登记没写死、装置得选一种的地方）或收严。源文件 `research/e7-index-bench/src/bin/e162_verdict_store_sender.rs`、`research/e7-index-bench/src/bin/e162_verdict_store_network.rs`。
+
+| # | 改了什么 | 依据 | 原判据 |
+|---|---|---|---|
+| S3-修订一 | 确认帧的 CRC-32C 只覆盖块键（6.3 末段只写了「CRC-32C（4）」没写覆盖什么；块帧的「覆盖键、长度与块值」照登记）；送块进程只数每块的第一个确认（`A <n>` 的 n 与 Q3a 的分子都是「收到过确认的不同块数」），同一块的第二个确认记 `duplicate_acknowledgements` | 单测 `acknowledgement_frame_round_trips_and_rejects_a_flipped_byte_or_wrong_magic`（翻一个字节、改魔数都认不出） | Q3a、Q3d 照判 |
+| S3-修订二 | 中断点的取法写死：SplitMix64(seed_NET) 每个中断先后取 r1、r2，a_k = 1 + r1 mod (网络块数 − 1)，u_k = (r2 >> 11) ÷ 2⁵³，按 a_k 稳定排序；网络块数 5 × 10⁴ 时区间就是登记的 [1, 5 × 10⁴)；V12、V14 加到 200 次用同一个生成器取 200 个。PC3-drop 另起一个 SplitMix64(seed_NET)，第 w 个 1 000 帧（按 CRC 对的完整帧计）挑第 w 个输出 mod 1 000 那一帧 | 单测 `interruption_plan_pins_first_thresholds_and_pauses_and_is_sorted`、`drop_control_picks_one_offset_below_a_thousand_per_window_and_pins_the_first_three` 钉的值由另写的 python（整份在这一节末尾，不取装置输出）独立算出：`first5 thresholds [18, 114, 463, 950, 1132]`、`last threshold 49349`、`first pause fraction 0.5665882453311935`、`drop picks first3 [541, 117, 338]` | 6.3 末段、5.3 PC3-drop 照判 |
+| S3-修订三 | 送块进程连着而 120 秒没有新确认就停、报 `ending=acknowledgements_stalled`（悬挂保护，不是性能门槛；登记只写了断线重连最多 30 秒）；所有 TCP 连接设 `TCP_NODELAY`（库进程 40 字节的确认不等 Nagle） | 单测 `sender_that_never_hears_an_acknowledgement_stops_after_the_stall_limit_with_the_window_outstanding`（1 秒上限、窗口 8，停下时未确认 8 帧） | Q3a 照判；停了的那一格 `sender_complete=false` 照报 |
+| S3-修订四 | PC3-rate 两遍只开网络那一路（直写 0 块、各送 2 000 块、窗口 64）；PC3-drop、PC3-torn 与 S3-C 同形（两路各 5 × 10⁴ 块，PC3-drop 不中断）；S3-raw 的直写线程照 S3-T 开着，只是收块线程校验 CRC 之后不写库、直接回确认 | 单测 `acknowledge_without_writing_receiver_leaves_the_library_empty`、`sleep_before_commit_receiver_spends_at_least_five_milliseconds_per_frame`（20 帧 ≥ 100 ms）、`drop_control_run_loses_exactly_the_frames_the_library_recorded`（2 000 帧丢恰好 2 块 = 库进程记的 2） | 5.3 PC3-rate、PC3-drop 照判 |
+| S3-修订五 | 送块二进制的变异（M27、M29）进它自己的表 `research/mutations/e162_verdict_store_sender.tsv`，库一侧的 M28 进 `research/mutations/e162_verdict_store_network.tsv`（补 5 写的是「送块二进制的变异也进这一张」） | 门禁 33 号的判据「`research/e7-index-bench/src/bin/` 下每个 `*.rs` 在 `research/mutations/` 下都要有同名 `.tsv`」；`research/scripts/mutate.sh` 只跑点名的那个 bin 的测试。依据是门禁，不是单测读数 | 四条变异（M27、M28、M29 与 S3-修订十那一条）照跑、照报 |
+| S3-修订六 | 回环格的 M14、M15 与跨机格的 M27、M28 各是同一处代码改动，表里各一行（`M27_M14_…`、`M28_M15_…`）；单测取样点：M27/M14 是送块二进制的两个断线单测（TCP 接法断 5 次、Unix 监听接法杀中继 5 次），M28/M15 是库进程收块的逐帧单测；回环格上 M14、M15 的「S3-C 的 Q3d / Q3e 从 0 变 ≥ 1」由产物里的 PC3-torn 与 S3-C 两格对照着读，不另跑变异版的整格 | 单测 `tcp_sender_resends_unacknowledged_frames_after_each_of_five_disconnects`、`unix_listening_sender_resends_after_its_relay_is_killed_five_times`、`registered_receiver_drops_a_bad_checksum_frame_and_a_half_frame_and_acknowledges_the_rest` | 第九节 M14、M15，补 9 M27、M28 照判 |
+| S3-修订七 | 候选 F 两个线程（直写与收块）撞上同一个节点或段目录：`create_dir` 报 AlreadyExists 当作已建好，照样对它与它的父目录各 `sync_all`（比登记多 fsync，收严）；R1、R0 两个线程共用一个 `redb::Database`（`Arc`），K 两个线程共用一个 `rocksdb::DB`（`Arc`）；候选的读写路径从 `research/e7-index-bench/src/bin/e162_crash_verdict_block_store.rs`（sha256 `38f1d92e9552519e4880366c56578f73c69124a9f47cb90f978adecf51c7c0af`）第 734–747 行（`rocksdb_options`）、774–863 行（`BlockStore` 的读写与枚举）、868–1218 行（`FileLibrary`）拷来，只留登记的写法 | 单测 `every_arm_keeps_both_paths_through_a_small_loopback_run`（四条臂各 96 + 128 块、两路都在、零丢零坏零幽灵） | 5.2 的臂定义照旧 |
+| S3-修订八 | 「重发时库里已有的块数」（Q3h）= 收块线程收到的完整帧里，键已被这个收块线程写进库的帧数（库进程在一格里不重起，按内存里的键集判，不读库）；Q3f = 已确认块读报错 + 在途与未开始块读报错 | 单测 `registered_receiver_rewrites_a_resent_frame_with_the_same_value_and_counts_it_as_already_stored`（同键两帧：写两遍、`frames_already_stored` = 1） | Q3f、Q3h 照报 |
+| S3-修订九 | 这一段 network bin 只有回环格的角色（`s3`、`library`、`forward`、`verify`、`discrimination`、`anchors`）；补 5 表里的 `--role s3x-drive`、B 上放文件与收尾三步这一段没写，跨机格开之前另写、另跑单测与变异 | 派发提示「③ 跨机格不开：不 ssh、不往另一台放东西，停在 ② 交回」 | 补 5.1、补 6、补 11 的跨机格条款原样留着，这一段不判 |
+| S3-修订十 | Q3h 的「重连次数」照送块进程的 `R` 行原样数：杀一次转发进程至少逼出一次重连，送块进程还可能在被杀进程退出的那几十微秒里连上它还没关的监听口、重发一段之后再断一次，所以一次中断记一到两次重连，`resent_frames` 也连这一次的重发一起算；产物照报，不去重。多算会让 V14 的「重发的帧数 = 0」更难打中（放宽），所以 V14 另加一个收严的读法：同一格库进程 `name=library` 行的 `connections` ≥ 2（至少一次重连真把帧送进了库；连上正在退出的转发进程的那一次到不了库，不进这个数），判决行的 `disconnect_paths_reached` 要两个读法都过，`half_frames_dropped`、`resent_frames`、`library_connections` 三个数都进判决行，任一个读法没过就按 V14 办（加到 200 次中断再跑）；每次中断的 `R` 行整列进产物 | 单测 `loopback_run_with_five_forwarder_kills_resends_and_keeps_every_block` 的一次读数：5 次中断、8 行 `R`，其中 3 行重连用时 54、60、72 微秒，且与紧接着的下一行 `acknowledged_at_disconnect` 相同；这个单测原来断言「重连恰好 5 次」，改成「5 到 10 次」之后五遍全绿；收严的读法写在 `disconnect_paths_reached`，单测 `disconnect_paths_need_a_half_frame_a_resend_and_a_second_library_connection`（库进程只收过一条连接时判没走到），变异表 `research/mutations/e162_verdict_store_network.tsv` 另加一行盯它 | V14 原读法照判，另加这一条更严的读法；Q3h 照报 |
+
+S3-修订二用的独立算法（python3 跑，输出就是那一格引的四行）：
+
+```python
+M = (1 << 64) - 1
+class SplitMix64:
+    def __init__(self, state): self.state = state & M
+    def next(self):
+        self.state = (self.state + 0x9E3779B97F4A7C15) & M
+        z = self.state
+        z = ((z ^ (z >> 30)) * 0xBF58476D1CE4E5B9) & M
+        z = ((z ^ (z >> 27)) * 0x94D049BB133111EB) & M
+        return z ^ (z >> 31)
+SEED_NET = 0xE162000000000009
+g = SplitMix64(SEED_NET)
+plan = []
+for k in range(50):
+    r1 = g.next(); r2 = g.next()
+    plan.append((1 + r1 % (50000 - 1), (r2 >> 11) / float(1 << 53)))
+plan.sort(key=lambda item: item[0])
+print('first5 thresholds', [a for a, _ in plan[:5]])
+print('last threshold', plan[-1][0])
+print('first pause fraction', repr(plan[0][1]))
+g = SplitMix64(SEED_NET)
+print('drop picks first3', [g.next() % 1000 for _ in range(3)])
+```
 
 ## 十三、读过的文件与跑过的命令
 

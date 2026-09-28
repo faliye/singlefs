@@ -1,0 +1,18 @@
+# PC-c
+picked_line=390 steps=[29, 30] region_offset=6 old_byte=02 new_byte=03
+synthetic_sha256=c7a807ae88685d502ba3ab7a6345a5ec2a2a2348e855ead80dd00a895e8ae7f7
+E7RESULT name=old_new_independent_summary new_regions=29 old_regions=29 matched=29 changed=1 unchanged=28 unmatched_new=0 unmatched_old=0 mapped_regions=0 unmapped_regions=1
+E7RESULT name=old_new_independent_summary new_regions=29 old_regions=29 matched=29 changed=0 unchanged=29 unmatched_new=0 unmatched_old=0 mapped_regions=0 unmapped_regions=0
+# PC-a PC-b P2 self-proof
+name=pc_a_i real_extract="name=extract triples=5 kinds=5 full_three_state=1 tearable=1" differing_fields=3 line5.kinds line6.closed_form line7.closed_form_three_state ok=true
+name=pc_a_ii arm=N19C self_cells=22 self_equal=22 mutated_equal=19 mutated_unequal=path=transaction field=kinds;path=post_mkfs_stream field=closed_form;path=post_mkfs_stream field=closed_form_three_state; ok=true
+name=pc_a_ii arm=N18 self_cells=20 self_equal=20 mutated_equal=18 mutated_unequal=path=transaction field=kinds;path=post_mkfs_stream field=closed_form; three_state_cell=absent_in_arm_n18 ok=true
+name=pc_b arm=N19C copy_sha256=22ac278ddd4693582fbbb7f4cb2e29f8df2166abc24c81ed5c350856bbbbb0c9 deleted=2 added=2 segments_transaction_lines=2 device_region_bytes_lines=2 e7input_lines=0 ok=true
+name=pc_b arm=N18 copy_sha256=c161ab2a5f03bb2f698ad4e5734132fb71e7b196691bad6cfeec35d2d1c31cb3 deleted=2 added=2 segments_transaction_lines=2 device_region_bytes_lines=2 e7input_lines=0 ok=true
+name=p2 arm=e142-new-pool-file-creation-dry-run-2026-09-28-r19-main.out 4 rows; ok_rows=4
+name=p2 arm=e142-new-pool-file-creation-dry-run-2026-09-28-r19-arm-n18.out 4 rows; ok_rows=4
+name=self_proof n=1 unequal_cells=2 name=q57 point=G10a path=transaction field=segments;name=q57 point=G10a path=post_mkfs_stream field=segments;
+name=self_proof n=2 unequal_cells=2 name=q48 arm=N19C path=mkfs field=in_place_per_segment;name=q47 arm=N19C path=mkfs field=in_place_per_segment;
+name=self_proof n=3 unequal_cells=1 name=q60 point=G11 path=post_mkfs_stream field=segments;
+name=self_proof n=4 unequal_cells=4 name=q48 arm=N19C path=post_mkfs_stream field=segments;name=q48 arm=N19C path=post_mkfs_stream field=closed_form;name=q47 arm=N19C path=post_mkfs_stream field=closed_form_three_state;name=c12 arm=N19C row=layer0 field=segments;
+name=self_proof n=0_restored unequal_cells=0

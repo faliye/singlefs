@@ -1,0 +1,4 @@
+exit=1
+want=file-overwrite 盘 0：盘上收到的写（23）没有多于新池新建文件那段（23）
+want=这一档该在新池新建文件之后再发布一次
+want=checker-tier-qemu-device-streams.sh：1 格里 1 格红（device-streams）

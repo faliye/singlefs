@@ -1,0 +1,14 @@
+exit=1
+want=1 个触发文件没登记进这一批的范围
+want=      research/scripts/sneak.py
+want=2 个登记的路径不是这一批的触发文件
+want=.claude/batch-scope:4：.claude/agents/gone.md
+want=1 行登记没写理由
+want=.claude/batch-scope:5：research/scripts/kept.py 后面没写为什么这一批要碰它
+want=1 行登记的路径不是从仓库根起写的
+want=.claude/batch-scope:6：./research/scripts/kept.py 不是从仓库根起写的
+want=样本只跑 .gate-cells 点名的格：batch-scope
+want=── 汇总：doc-process-records.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-process-records.sh：1 格里 1 格红（batch-scope）
+want=→ batch-scope：没登记的触发文件先问它挡不挡着本轮课题
+want=bash .claude/gate.d/doc-process-records.sh --check batch-scope

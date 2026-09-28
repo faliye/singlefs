@@ -1,0 +1,78 @@
+--- a/crates/singlefs-core/src/mount.rs	2026-09-27
++++ b/crates/singlefs-core/src/mount.rs	2026-09-27
+@@ -2160,6 +2160,17 @@
+         system_configuration,
+         parameters_of_the_pool,
+     } = caller_inputs_agreeing_with_the_disk(parameters, devices)?;
++    // 【攻方腿原型】本盘设备号与落后支。
++    let swapped_or_behind = devices_swapped_or_behind_the_current_version(&**devices, &parameters_of_the_pool, current);
++    if !swapped_or_behind.is_empty() {
++        return Err(MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration {
++            disagreeing_fields: Vec::new(),
++            disagreeing_device_table: swapped_or_behind
++                .into_iter()
++                .map(|identity_handed_in| DeviceTableDisagreement::NoSelfVerifiedSystemConfigurationOnTheDeviceHandedIn { identity_handed_in })
++                .collect(),
++        });
++    }
+     // 候选集按现行那一版的实例表判：从它的根指着的第 0 片沿链真读出来、解出来（C502（抬 F 时现行版本里没有实例表单元）；
+     // D18（块里携带什么信息） 已定项 11：一张表可以不止一片）。不看 `TransactionOutput::units`——那是这个进程内存里的角色列表，
+     // 第一个文件版本那一版起就不带实例表单元，mkfs 同一个进程里后面发多少次都一样，而表就在根指针后面、读得出也解得开。
+@@ -3019,6 +3030,43 @@
+     )
+ }
+ 
++/// 【攻方腿原型，m2-closeout-code-r2 Y2，只在攻方副本上】挂着之后的入口与会话在「可见」之外再核两样：
++/// 每块盘自证过的系统配置槽里的本盘设备号是不是盘表给它的身份；这块盘是不是落后于现行那一版、又缺它的单元
++/// （与可写挂载取号之前逐盘核的第二支同一判，`devices_without_the_selected_version`，只是「所选那一版」换成现行那一版）。
++/// 交回有问题的盘的身份。只读盘。
++pub(crate) fn devices_swapped_or_behind_the_current_version<Reader: PoolReader + ?Sized>(
++    reader: &Reader,
++    parameters_of_the_pool: &MakeFilesystemParameters,
++    current: &TransactionOutput,
++) -> Vec<DeviceIdentity> {
++    let spacing = u64::from(parameters_of_the_pool.geometry.fixed_structure_slot_spacing);
++    let mut flagged = Vec::new();
++    for device in reader.device_identities() {
++        let slots = verified_system_configuration_slots(reader, device, spacing, &parameters_of_the_pool.filesystem_identifier);
++        if slots.iter().any(|slot| slot.immutable.this_device != device) {
++            flagged.push(device);
++            continue;
++        }
++        let Some(newest) = slots.iter().max_by_key(|slot| slot.quantities.slot_generation) else {
++            continue;
++        };
++        let position = JournalSequenceNumber { instance_generation: newest.quantities.journal_instance, counter: newest.quantities.journal_tail };
++        let current_position = JournalSequenceNumber { instance_generation: current.record.instance, counter: current.record.counter };
++        if position >= current_position {
++            continue;
++        }
++        let missing = current
++            .units
++            .iter()
++            .filter(|unit| !unit.bytes.is_empty())
++            .any(|unit| !reader.read(device, unit.slot.to_device_offset(), unit.bytes.len()).is_some_and(|bytes| bytes == unit.bytes));
++        if missing {
++            flagged.push(device);
++        }
++    }
++    flagged
++}
++
+ /// 交进来的盘里不「可见」的那几块（两个系统配置槽一份本池自证过的都没有，[`self_verified_system_configuration_slots_of_the_pool`]），
+ /// 按交进来的次序（代码三方 m2-closeout-code-r1 Z3-A 乙：挂着之后每个收盘表的入口都逐盘核，含会话发布；用户 2026-09-27 定）。
+ /// 挂着之后收盘表的入口在 [`caller_inputs_agreeing_with_the_disk`] 里调，会话在每次发布之前调（`mounted_session`）。
+--- a/crates/singlefs-core/src/mounted_session.rs	2026-09-27
++++ b/crates/singlefs-core/src/mounted_session.rs	2026-09-27
+@@ -247,6 +247,11 @@
+                 },
+             );
+         }
++        // 【攻方腿原型】本盘设备号与落后支（借用「不可见」那个成员报）。
++        let swapped_or_behind = crate::mount::devices_swapped_or_behind_the_current_version(devices.as_slice(), parameters, current_file_version);
++        if !swapped_or_behind.is_empty() {
++            return Err(UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { devices: swapped_or_behind });
++        }
+         let mut floor_raises: Vec<RaisedFloor> = Vec::new();
+         let mut refusals_that_pushed_the_floor_raises: Vec<PublishError> = Vec::new();
+         let mut publishes_pushed = 0;

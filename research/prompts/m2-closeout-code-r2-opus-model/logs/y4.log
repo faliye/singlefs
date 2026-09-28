@@ -1,0 +1,36 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/three-way-attack-r2/snapshot/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running tests/opus_r2_y4_system_configuration_fields_core_and_checker_read_differently.rs (/tmp/claude-1000/three-way-attack-r2/target/debug/deps/opus_r2_y4_system_configuration_fields_core_and_checker_read_differently-60ba95dfabe713ae)
+
+running 2 tests
+test make_filesystem_with_a_ring_length_that_is_not_a_multiple_of_the_block_size ... Y4 mkfs ring=1048476 ok=false err=Some("BlockDevice(Unaligned { offset: DeviceOffsetInBytes(16777216), length: 1048476, physical_block_size: 512 })") written_sectors=[0, 0]
+Y4 mkfs ring=1048064 ok=true err=None written_sectors=[114, 113]
+Y4 mkfs ring=1046528 ok=true err=None written_sectors=[114, 113]
+ok
+test system_configuration_fields_read_by_the_checker_but_not_by_core ... Y4 baseline core_read_only ok chosen=(1,3)
+Y4 baseline core_writable ok instance=2
+Y4 baseline checker_violations=0 list=[]
+Y4 A unit_area_start 50176 -> 50240
+Y4 A_unit_area_start_plus_64 core_read_only err=Recovery(SystemConfigurationValueRefused { device: DeviceIdentity(0), value: UnitAreaStartNotTheSlotAfterTheJournalRing { recorded_unit_area_start_slot: SlotNumber(50240), slot_after_the_journal_ring: SlotNumber(50176) } })
+Y4 A_unit_area_start_plus_64 core_writable err=Recovery(SystemConfigurationValueRefused { device: DeviceIdentity(0), value: UnitAreaStartNotTheSlotAfterTheJournalRing { recorded_unit_area_start_slot: SlotNumber(50240), slot_after_the_journal_ring: SlotNumber(50176) } })
+Y4 A_unit_area_start_plus_64 checker_violations=1 list=["I-5.2: 盘 0：空闲 Some(3472605184) + 已分配 Some(278528) ≠ 单元区 Some(3471835136)"]
+Y4 B journal_ring_start 1024 -> 1023
+Y4 B_journal_ring_start_1023 core_read_only ok chosen=(1,3)
+Y4 B_journal_ring_start_1023 core_writable ok instance=2
+Y4 B_journal_ring_start_1023 checker_violations=0 list=[]
+Y4 C root_ring_base 64 -> 65
+Y4 C_root_ring_base_65 core_read_only ok chosen=(1,3)
+Y4 C_root_ring_base_65 core_writable ok instance=2
+Y4 C_root_ring_base_65 checker_violations=1 list=["I-7.1: 根环里一条自证过的根都没有"]
+Y4 E root_ring_base 64 -> 0
+Y4 E_root_ring_base_0 core_read_only ok chosen=(1,3)
+Y4 E_root_ring_base_0 core_writable ok instance=2
+Y4 E_root_ring_base_0 checker_violations=1 list=["I-7.13: 盘 0 偏移 0 的系统配置槽自证过，而池级字段越出这一版读者收的范围（FixedStructureSlotSpacingOutsideTheFormatRange）：实现整池拒绝挂载"]
+Y4 D ring 805289984 unit_area_start 50176 -> 50175
+Y4 D_ring_off_the_segment_boundary core_read_only err=Recovery(SystemConfigurationValueRefused { device: DeviceIdentity(0), value: UnitAreaStartOffTheClusterSegmentBoundaryUnsupported { unit_area_start_slot: SlotNumber(50175) } })
+Y4 D_ring_off_the_segment_boundary core_writable err=Recovery(SystemConfigurationValueRefused { device: DeviceIdentity(0), value: UnitAreaStartOffTheClusterSegmentBoundaryUnsupported { unit_area_start_slot: SlotNumber(50175) } })
+Y4 D_ring_off_the_segment_boundary checker_violations=1 list=["I-5.2: 盘 0：空闲 Some(3472605184) + 已分配 Some(278528) ≠ 单元区 Some(3472900096)"]
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.90s
+

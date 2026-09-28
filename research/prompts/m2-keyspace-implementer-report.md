@@ -1,6 +1,6 @@
 # 实二一 交回：分配记录树与 extent 树按 key 空间定形状（D8 已定项 14，K1–K4）
 
-实现员（implementation-writer），2026-09-24，时刻 UTC。改动直接落在主工作区 `crates/` 里（没有另开副本，所以没有单独的补丁可 `git apply --check`：
+实现员（implementation-writer），2026-09-24。改动直接落在主工作区 `crates/` 里（没有另开副本，所以没有单独的补丁可 `git apply --check`：
 主工作区现状就是结果；这一轮 `crates/` 没有别的实现员在改，E158 执行员的 `e158_root_choice_repair.rs` 我没碰）。
 
 ## 四条验收各到哪
@@ -31,7 +31,7 @@
 
 本轮之前就红、不是这一轮造成的（照原样留着）：
 - `second_transaction_step_three_formatted_pool.rs::transient_system_configuration_read_errors_between_the_refusal_and_the_acquisition_refuse_before_any_write`：
-  回退见证（`recovery::replay_journal` 里 `choose_system_configuration`，别的会话 18:55 UTC）多读一次系统配置槽 0，「第 2 次读」落到了别处。
+  回退见证（`recovery::replay_journal` 里 `choose_system_configuration`，别的会话）多读一次系统配置槽 0，「第 2 次读」落到了别处。
 - `checker_known_bad_images.rs::the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target`：checker 清单多了 I-7.10 / I-7.11（回退见证），
   坏镜像语料没跟上。
 - `second_transaction_step_four_rollback.rs` 两条回落到 C 的用例：回退见证那一格，`choose_root` 交回 (1, 3) 而 (2, 8) 读得出。
@@ -382,11 +382,11 @@
 
 `cargo fmt --all --check`（exit 1；diff 只在 `e158_root_choice_repair.rs` 五处，E158 执行员的文件，我没碰）：
 ```
-Diff in /home/fy5090/code/singlefs/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs:1927:
-Diff in /home/fy5090/code/singlefs/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs:2370:
-Diff in /home/fy5090/code/singlefs/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs:3628:
-Diff in /home/fy5090/code/singlefs/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs:5988:
-Diff in /home/fy5090/code/singlefs/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs:6039:
+Diff in crates/singlefs-harness/src/bin/e158_root_choice_repair.rs:1927:
+Diff in crates/singlefs-harness/src/bin/e158_root_choice_repair.rs:2370:
+Diff in crates/singlefs-harness/src/bin/e158_root_choice_repair.rs:3628:
+Diff in crates/singlefs-harness/src/bin/e158_root_choice_repair.rs:5988:
+Diff in crates/singlefs-harness/src/bin/e158_root_choice_repair.rs:6039:
          assert!(
              error.contains("level=1"),
              "错误信息要点名是哪个 level 拦下的，实际: {error}"
@@ -394,14 +394,14 @@ Diff in /home/fy5090/code/singlefs/crates/singlefs-harness/src/bin/e158_root_cho
 
 `cargo clippy --offline --all-targets --all-features -- -D warnings` 加 check.sh 那七条 `-D clippy::…`（exit 0）：
 ```
-    Checking singlefs-core v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-core)
-    Checking singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+    Checking singlefs-core v0.1.0 (crates/singlefs-core)
+    Checking singlefs-harness v0.1.0 (crates/singlefs-harness)
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.36s
 ```
 
 `cargo build --offline --all-targets`（exit 0，0 条告警）：
 ```
-   Compiling singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+   Compiling singlefs-harness v0.1.0 (crates/singlefs-harness)
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.31s
 ```
 

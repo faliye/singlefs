@@ -1,6 +1,6 @@
 # 严查第三轮（确认轮）·乙组报告：.claude/agents/*.md 与 .claude/agent-def-review-exempt
 
-分支 claude/exciting-bohr-4olowk，HEAD d6a3bcb，基准 73ba4a4。时刻 UTC 2026-09-26。行号都是那份文件自己的（`cat -n` / `grep -n` 现取）。钩子判定用合成 PreToolUse JSON 喂 `.claude/hooks/*.sh`，`AGENT_HOOK_DETECTIONS` 指到草稿 `…/scratchpad/review3/B/`。没改仓里任何文件，没做 git 写。
+分支 claude/exciting-bohr-4olowk，HEAD d6a3bcb，基准 73ba4a4。日期 2026-09-26。行号都是那份文件自己的（`cat -n` / `grep -n` 现取）。钩子判定用合成 PreToolUse JSON 喂 `.claude/hooks/*.sh`，`AGENT_HOOK_DETECTIONS` 指到草稿 `…/scratchpad/review3/B/`。没改仓里任何文件，没做 git 写。
 已处置的（r1、r2 报告与 defs-r2、defs-r3 判决）不重报；defs-r3 第四节交用户的两项不重报。
 
 ## 逐条

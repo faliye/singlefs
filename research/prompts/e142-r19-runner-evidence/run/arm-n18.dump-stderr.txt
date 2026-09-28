@@ -1,0 +1,3 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 32.1 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排队（已等 60 秒，至多 3600 秒）：slice 已占 32.2 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排了 88 秒，起跑（singlefs-memory-cap-1358952-2987217719）

@@ -1,4 +1,4 @@
-# E158 第 4 次跑 第一段 执行员报告（2026-09-27 JST）
+# E158 第 4 次跑 第一段 执行员报告（2026-09-27）
 
 ## 一、结论
 
@@ -22,7 +22,7 @@
 
 - 负载：开跑前 `ps` 看到别的会话在跑 `gate.sh` 与 `cargo test`、`cargo build`，没有 qemu / vm-bench / e152 / fio。内存包装 `--status` 显示 slice 上限 40.1 GiB，账上有 2 条。各臂都没有排队等待，也没有撞内存顶，退出码都是 0，stderr 都是空的。
 - 命令：每一臂在各自的 `/tmp/claude-1000/e158-r4-device/arms/<臂>/` 下执行。环境变量与派发提示给的相同，经 `capped.sh 3 … run-with-memory-cap.sh 10G ./target/release/e158_root_choice_repair r4-seg1` 跑；用 `xargs -P 3` 同时跑三臂（装置是单线程，grep 里没有 `thread::` / `rayon`）。compare 在仓根执行：`… run-with-memory-cap.sh 10G /tmp/claude-1000/e158-r4-device/arms/today/target/release/e158_root_choice_repair r4-compare research/results/e158-root-choice-repair-2026-09-27-r4-seg1`，退出码 0。
-- 时长：10:22:27 JST 开跑，10:23:42 JST 全部跑完。单臂 1–39 秒，逐臂的数在 `/tmp/claude-1000/e158-r4-seg1/progress.md`。这一段是 H1d 全部断点，之前没有实测过，现在量到了：乙-槽 这一臂最长，39 秒。
+- 时长：从开跑到全部跑完 75 秒。单臂 1–39 秒，逐臂的数在 `/tmp/claude-1000/e158-r4-seg1/progress.md`。这一段是 H1d 全部断点，之前没有实测过，现在量到了：乙-槽 这一臂最长，39 秒。
 - 产物（行数 / sha256 前 16 位）：
 
 | 文件（`research/results/e158-root-choice-repair-2026-09-27-r4-seg1-` 后缀） | 行 | sha256 |

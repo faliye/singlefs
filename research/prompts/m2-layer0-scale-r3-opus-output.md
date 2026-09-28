@@ -2,7 +2,7 @@
 
 <!-- doc-lint:not-numbers N1 N2 N3 R1 R2 R3 R4 R5 M1 S0 S1 S2 S3 S4 S5 S6 S7 S8 -->
 
-写于 2026-09-26（JST）。攻击面：背景材料 `research/prompts/_m2-layer0-scale-r3-background.md` 第一节 N2 的三样零轮形态。前几轮判决：`research/prompts/m2-layer0-scale-r1-main-verification.md`、`research/prompts/m2-layer0-scale-r2-main-verification.md`。全部数出自冻结副本 `/tmp/claude-1000/l0scale-r1-frozen/`（开工时 `sha256sum -c` 133 个 OK）的拷贝，是副本上的数、不是入库装置；要引须在入库装置上重做。
+写于 2026-09-26。攻击面：背景材料 `research/prompts/_m2-layer0-scale-r3-background.md` 第一节 N2 的三样零轮形态。前几轮判决：`research/prompts/m2-layer0-scale-r1-main-verification.md`、`research/prompts/m2-layer0-scale-r2-main-verification.md`。全部数出自冻结副本 `/tmp/claude-1000/l0scale-r1-frozen/`（开工时 `sha256sum -c` 133 个 OK）的拷贝，是副本上的数、不是入库装置；要引须在入库装置上重做。
 
 复跑（在仓根下）：
 
@@ -254,6 +254,6 @@ SCENARIO S8_back_to_baseline toolchain=[cargo 1.98.0 (797e8a9bc 2026-08-05);rust
 - 第二节：实六的续跑键里已经有枚举身份的哈希，片行带了环境指纹，读回时核字段是否写全，第一条流的全量用例续跑之后绿。
 - 第三节：54 号 `--full` 用 `env -i` 起、把上层目录的配置读进标记，或者 cargo 的配置查找不再往仓根以上走。
 
-## 九、交回前删掉的草稿（2026-09-26 JST）
+## 九、交回前删掉的草稿（2026-09-26）
 
 两份仓副本（`/tmp/claude-1000/m2-layer0-scale-r3-opus/repo` 800M，`…/rerun/repo` 800M），两份 ③ 的副本（`…/cfgprobe/repo3` 与 `…/rerun/cfgprobe/repo3`，各 34M），六个空的 target 目录（`target-s0`、`target-s4`、`target-s5` 各两份，各 7.1M），两个 `cargohome`（各 64K）与 `symlinkprobe`（20K），都已删掉。上层目录的 `.cargo/config.toml` 每次跑完场景当场就删了（脚本里的 `rm`）。草稿目录里只剩日志与包装脚本。

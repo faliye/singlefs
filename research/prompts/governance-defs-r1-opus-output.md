@@ -1,6 +1,6 @@
 # governance-defs-r1 云端攻方（Opus）报告
 
-写于 2026-09-26 14:10 UTC（东京 23:10）。被判对象：工作区里 15 份定义相对 HEAD 的改动（`research/prompts/_governance-defs-r1-diff.md`）。攻击面：G1、G2、G3、G5 为主，G4、G6 余力。本地腿缺席（正文第四节），攻击面不与它分。
+写于 2026-09-26。被判对象：工作区里 15 份定义相对 HEAD 的改动（`research/prompts/_governance-defs-r1-diff.md`）。攻击面：G1、G2、G3、G5 为主，G4、G6 余力。本地腿缺席（正文第四节），攻击面不与它分。
 
 ## 复跑
 

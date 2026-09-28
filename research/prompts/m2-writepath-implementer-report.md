@@ -1,28 +1,28 @@
 # 实现员 impl-m2-writepath 报告：收口表第 13 行（C394 N1、N3）、第 5 行（C515）、第 38 行（实例表第二片写路径）
 
-时刻一律 UTC（本机时钟），东京 = UTC+9。这一轮由两个实现员接力做完：前任（子 agent aa5f8a536cc664e40）05:3x–10:44 写完全部功能代码、测试、变异行与报告草稿，
-进程退出时有几批验证没跑完；接手者（我）10:48 起核现场、补跑，主工作区其间又变了两次（13:10、14:50），我在副本里按现状三方合并了两次，
+这一轮由两个实现员接力做完：前任（子 agent aa5f8a536cc664e40）写完全部功能代码、测试、变异行与报告草稿，
+进程退出时有几批验证没跑完；接手者（我）接着核现场、补跑，主工作区其间又变了两次，我在副本里按现状三方合并了两次，
 合并时补了一处语义冲突（第三节末），并成这一份。活全在副本里做，主工作区一个字没动。
 
-**交付的补丁是 `work5/crates` 对 `base5-crates/`（14:49 主工作区 `crates/` 原样，14:52 核过与主工作区逐文件相同）的差。** 下文行号除特别注明外都是 `work5/` 里现取的。
+**交付的补丁是 `work5/crates` 对 `base5-crates/`（第二次变动之后主工作区 `crates/` 原样，之后核过与主工作区逐文件相同）的差。** 下文行号除特别注明外都是 `work5/` 里现取的。
 
 **读数归属：**
 
 | 读数 | 谁跑的 | 在哪个树上 | 日志（都在 `logs/`） |
 |---|---|---|---|
-| 10 条变异全红（`mount.rs` 那 5 条重跑 + 新加 5 条） | 接手者，14:52–15:38 | `work5/`（交付的那一底） | `mutations-worker9/` |
-| 同样 10 条全红 | 接手者，13:48–14:50 | `work4/`（13:32 主工作区 + 补丁） | `mutations-worker8/` |
-| 前任交的 34 条全红 | 接手者，10:54–13:29 | `work2/`（10:0x 主工作区 + 补丁） | `mutations-worker{5a,5b,5c,6,7}/` |
-| 同样 34 条在旧底上全红（其中 11 条是 Q2 停下之前的版本） | 前任，06:28–08:14、09:5x | `work/`（05:3x 底） | `mutations-worker{1..4}/` |
-| fmt、clippy（check.sh 同一张 lint 表）、`cargo build --all-targets` 全绿 | 接手者，14:52 | `work5/` | `check-first-three-work5.log` |
-| 动到的测试二进制全绿（不带层 0） | 接手者，14:52 起 | `work5/` | `work5-touched-binaries.log` |
-| 动到的测试二进制 + 层 0 五个流的快档全绿 | 前任 10:07–10:43（7 个）、接手者 10:53–13:30（其余 21 个与 core / checker lib） | `work2/` | `rebased-touched-binaries.log`、`rebased-touched-binaries-part2.log` |
-| fmt / clippy / build 全绿 | 接手者，13:09–13:22、13:38–13:40 | `work3/`（13:08 主工作区 + 补丁）、`work4/` | `check-first-three-work3.log`、`check-first-three-work4.log` |
-| check.sh 两次（红在别人的 e158） | 前任，09:53、10:02 | `work/`、`work2/` | `check-sh.log`、`check-sh-rebased.log` |
-| 探针（Q1）、故障注入打中 Q2 的全量测试、基线全量 | 前任，06:1x–09:36 | `probe/`、`work/`、`pristine/` | `probe-*.log`、`modified-test.log`、`baseline-test.log` |
+| 10 条变异全红（`mount.rs` 那 5 条重跑 + 新加 5 条） | 接手者 | `work5/`（交付的那一底） | `mutations-worker9/` |
+| 同样 10 条全红 | 接手者 | `work4/`（第一次变动之后的主工作区 + 补丁） | `mutations-worker8/` |
+| 前任交的 34 条全红 | 接手者 | `work2/`（主工作区 + 补丁） | `mutations-worker{5a,5b,5c,6,7}/` |
+| 同样 34 条在旧底上全红（其中 11 条是 Q2 停下之前的版本） | 前任 | `work/`（底） | `mutations-worker{1..4}/` |
+| fmt、clippy（check.sh 同一张 lint 表）、`cargo build --all-targets` 全绿 | 接手者 | `work5/` | `check-first-three-work5.log` |
+| 动到的测试二进制全绿（不带层 0） | 接手者 | `work5/` | `work5-touched-binaries.log` |
+| 动到的测试二进制 + 层 0 五个流的快档全绿 | 前任（7 个）、接手者（其余 21 个与 core / checker lib） | `work2/` | `rebased-touched-binaries.log`、`rebased-touched-binaries-part2.log` |
+| fmt / clippy / build 全绿 | 接手者 | `work3/`（第一次变动之前的主工作区 + 补丁）、`work4/` | `check-first-three-work3.log`、`check-first-three-work4.log` |
+| check.sh 两次（红在别人的 e158） | 前任 | `work/`、`work2/` | `check-sh.log`、`check-sh-rebased.log` |
+| 探针（Q1）、故障注入打中 Q2 的全量测试、基线全量 | 前任 | `probe/`、`work/`、`pristine/` | `probe-*.log`、`modified-test.log`、`baseline-test.log` |
 
-没跑的（主 agent 定）：`cargo test --all`（check.sh 第四步，13:1x 定，留给全部代码落定之后统一跑）；层 0 快档（13:47 定，留给最后统一跑的层 0 全量，`work4` / `work5` 上都没跑）。
-接手者 12:31 起按主 agent 的「线程上限：4」用 `research/scripts/capped.sh 4` 起每条编译、测试、变异命令；那之前已在跑的变异与测试批是按整机并行度跑的。
+没跑的（主 agent 定）：`cargo test --all`（check.sh 第四步，留给全部代码落定之后统一跑）；层 0 快档（留给最后统一跑的层 0 全量，`work4` / `work5` 上都没跑）。
+接手者收到主 agent 的「线程上限：4」之后用 `research/scripts/capped.sh 4` 起每条编译、测试、变异命令；那之前已在跑的变异与测试批是按整机并行度跑的。
 副本、日志、脚本都在 `/tmp/claude-1000/impl-m2-writepath/` 下；逐步经过在 `drafts/progress-successor.md`，整点答复在 `progress.md`。
 
 ## 一、结论
@@ -51,7 +51,7 @@
 6. **没替条款定的**：记录留在已分配之后池级 checker 的 I-3.11 当场红、I-3.1 之后会红（探针实测，第六节 Q1）；只一部分副本对不上那一格（Q2）；
    位置项指的盘不在池里（Q3，另一个成员 `ReleaseChecksumLocationOnADeviceOutsideThePoolWhoseHandlingIsUndecided`，第 2094 行）。
 
-7. **合并新底时补了一处**（接手者）：13:10 打进主工作区的「取号之前在分配器拷贝上走一遍那一串、发完断言与真发相同」按一片写死，写多片时那条断言当场 panic；
+7. **合并新底时补了一处**（接手者）：第一次变动打进主工作区的「取号之前在分配器拷贝上走一遍那一串、发完断言与真发相同」按一片写死，写多片时那条断言当场 panic；
    按多片改了（`mount.rs` 第 1258、1353 行，第三节末），配 4 条新变异（A15–A18）与 1 条替代行（R529），全红。
 8. **验证**（交付那一底 `work5/`）：fmt、clippy、`cargo build --all-targets` 全绿；动到的测试二进制全绿（第五节）；`mount.rs` 那 5 条与新加 5 条变异全红，
    前任交的 34 条在 `work2/` 上全红（第四节）。`cargo test --all` 与层 0 快档按主 agent 定留给最后统一跑。主表要删的 4 行、替代的 12 行按变异名给（第四节末），
@@ -66,14 +66,14 @@
 
 交付（都在 `/tmp/claude-1000/impl-m2-writepath/`）：
 - `impl-m2-writepath.patch`（sha256 `bd66237a76eea9bff422e0409d243b23a55946221b83e1b047eb54c1b7c5a745`）：`work5/crates` 对 `base5-crates/` 的差，只含 `crates/`，24 个文件，
-  `crates/mutations.tsv` 不在里面。16:10:06 UTC 对主工作区现状 `git apply --check` exit=0（第五节末）。
-  前任 10:06 生成的旧底补丁改名留着：`impl-m2-writepath-predecessor-work2-1006.patch`（对今天的主工作区打不上，不要用）。
+  `crates/mutations.tsv` 不在里面。对主工作区现状 `git apply --check` exit=0（第五节末）。
+  前任生成的旧底补丁改名留着：`impl-m2-writepath-predecessor-work2-1006.patch`（对今天的主工作区打不上，不要用）。
 - 变异表三件，**全部按变异名认、不按行号**：
   - `mutations-replacements.tsv`（sha256 `8298d0e850b1b394e7ee317892fe29e8e2341ef26585f7a6c07fc1fe190e211f`）：12 行整行替代，第一段是主表里现在那一行的变异名，其后六段是替代它的整行；
   - `mutations-delete.txt`（sha256 `5d8bb336c41e17c1f5c999238f0d61872739bd7bae1fcd74d7688a4f193d77f8`）：要整行删掉的 4 行的变异名；
   - `mutations-append.tsv`（sha256 `735af9f9fc19410e96b6b6bcc14fec3517bc5e8cdf2c79c7343df52bc81841a4`）：21 行追加到主表末尾（前任的 17 行 A01–A14、U01–U03，接手者的 4 行 A15–A18）。
   前任那两份按行号给的改名留着（`mutations-replacements-by-line-predecessor.tsv`、`mutations-append-predecessor-17.tsv`），行号已过时，不要用。
-- 这份报告 `report.md`；前任 09:52 那一版改名 `report-predecessor-0952.md`。
+- 这份报告 `report.md`；前任那一版改名 `report-predecessor-0952.md`。
 
 补丁里的 24 个文件（`git apply --stat` 原样）：
 
@@ -109,7 +109,7 @@
 `first_transaction_on_device.rs` / `history.rs` / `model_comparison.rs` 的穷举臂——都在 `work4/` 里改、`work5/` 合并带过去。新文件只有一个：
 `crates/singlefs-harness/tests/second_transaction_supplement_two_instance_table_second_page_write.rs`（集成测试，`tests/` 下自动进编译，不靠 `Cargo.toml` 的 `[[test]]`）。
 
-主工作区 `git diff --stat -- crates litmus`（16:1x UTC 原样；**这些都不是这一轮的**，是别的会话打进主工作区还没提交的改动，这份补丁没打进主工作区）：
+主工作区 `git diff --stat -- crates litmus`（原样；**这些都不是这一轮的**，是别的会话打进主工作区还没提交的改动，这份补丁没打进主工作区）：
 
 ```
  crates/mutations.tsv                               |   64 +-
@@ -168,7 +168,7 @@
 
 - 分配器（`allocator.rs`）：删掉实九那一套只住内存的隔离位（字段、计数、两个方法、三处空闲判定里的那一项）；`release`（第 901 行）改成
   调新方法 `release_leaving_the_record_allocated_on(placement, 释放代, 留在已分配的那几块盘)`（第 909 行），名单里的盘上那条记录一个字节都不动，
-  别的盘照旧改写成已释放 + 释放代、进 defer。`crates/mutations.tsv` 里压着 `release` 与分配器释放那几行（10:0x UTC 那一版的第 24、237、238 行）原样留着。
+  别的盘照旧改写成已释放 + 释放代、进 defer。`crates/mutations.tsv` 里压着 `release` 与分配器释放那几行（那一版的第 24、237、238 行）原样留着。
 - 发布（`transaction.rs` 第 3541–3552 行）：对每个要释放的落点，取读盘核交回的清单里同一个落点的那几块盘，交给上面那个方法。
   `released` 仍列逻辑上释放了的全部落点（映射条目这次不再写它们），`quarantined_after_release_checksum_mismatch` 列记录留在已分配的那几份。
 - 跨重挂：不另写一位，盘上那棵分配记录树里那条就是已分配；重挂时 `rebuild_from_records` 照已分配标位，回收谓词只看已释放的记录，它永远不被回收。
@@ -191,7 +191,7 @@
 - **角色**：第 0 片仍是 `TransactionUnit::InstanceTable`（根记录持有它），第 1 片起是新成员 `InstanceTablePageAfterTheFirst(片序号)`；
   `TransactionUnit::of_instance_table_page` 按片序号分。没有把 `InstanceTable` 改成带片序号的元组成员，理由：实验装置
   `crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs` 第 160 行 `matches!(unit.identity, TransactionUnit::InstanceTable)` 在那种改法下编译不过，
-  而 e156 是实验装置、这一轮不该动它；另外 `crates/mutations.tsv` 里有几行（10:0x UTC 那一版的第 67、76、383、469 行）的替换文写着 `TransactionUnit::InstanceTable` 这个值。
+  而 e156 是实验装置、这一轮不该动它；另外 `crates/mutations.tsv` 里有几行（那一版的第 67、76、383、469 行）的替换文写着 `TransactionUnit::InstanceTable` 这个值。
   代价：「一张表的一片」这一个概念在枚举里分成两个成员（第 0 片由根记录持有、第 k 片由上一片的链指针记录持有，释放取指针的来路确实不同）。
 - **分片**：`instance_table_rows_of_each_page`（`instance_table.rs` 第 140 行）按 369 行一片 `chunks`，0 行也是一片（空的那一片）；
   片数与 `instance_table_pages_for_rows` 同一个数（单测钉住）。一片的记录 = 这一片的行 + 末尾链指针记录（第 152 行 `instance_table_page_records`）；
@@ -205,7 +205,7 @@
   从盘上重建的上一版、第一个文件版本那一版都不带它们。所以 `InstanceTableRewrite` 带着 `replaced_chain`（挂载时
   `instance_table_chain_of_root` 沿链读出来的 `page_pointers`，与接行读的是同一份），`instance_table_chain_to_release` 对每一片走
   `placement_to_release_after_checking_every_device`（两条位置条目同槽、每块盘在册、没释放过、跨度对得上）。`placements_to_release_via_mapping`
-  从此跳过实例表的各片，`crates/mutations.tsv` 里压着那一行调用的两行（10:0x UTC 那一版的第 11、19 行）原样留着；旧链排在释放清单最前（与 bump 次序同序）。
+  从此跳过实例表的各片，`crates/mutations.tsv` 里压着那一行调用的两行（那一版的第 11、19 行）原样留着；旧链排在释放清单最前（与 bump 次序同序）。
   计划带着的旧链第 0 片必须就是上一版根记录指着的那一片（两处 `assert_eq!`，为什么走不到见第六节末）。
 - **取号之前的准入**（`mount.rs` 第 1153 行起）：删掉「这一版已多于一片」「这次之后多于一片」两道拒绝；写行那次的形状改成
   `PublishShape::row_publish_rewriting_instance_table_pages(这次之后的片数)`（`PublishShape::ROW_PUBLISH` 留作一片时的常量，用例在用）；
@@ -216,9 +216,9 @@
   现算片数（模型自己的 `instance_table_pages_for_rows`，第 116 行，不调实现的），多出来的几片进分配记录与占槽的上界。
 
 
-### 合并新底时补的一处（接手者，13:3x UTC；不是前任的代码）
+### 合并新底时补的一处（接手者；不是前任的代码）
 
-主工作区 13:10 打进的补丁在 `mount.rs` 里加了「取号之前在分配器的一份拷贝上把取号之后那一串（写行一次、暖机几次）逐次取一遍落点」
+主工作区第一次变动打进的补丁在 `mount.rs` 里加了「取号之前在分配器的一份拷贝上把取号之后那一串（写行一次、暖机几次）逐次取一遍落点」
 （`placements_of_the_publishes_after_acquisition_on_a_copy`，第 1258 行），发完之后 `establish_instance` 断言拷贝上取的与真发的逐次相同（第 1644 行起那条注释下的 `assert_eq!`）。
 它按一片写死：带文件的一版上写行按 `PublishShape::ROW_PUBLISH` 取角色、树表 0 条的一版上写行按「实例表、分配记录树节点」两个角色，真取到的也只从根记录读这两条指针。
 这份补丁让写行能写多片之后，不改它的话：370 行起那条断言当场 panic（变异 A15–A17 就是把我的改动退回去，三条都红在它上面）。改了三处，都照发布路径本身：
@@ -234,7 +234,7 @@
 - 新底同一处还有一个变异行（主表里名为「增补 2 收口表第 39 行那一族：取号之前在拷贝上走那一串时，树表 0 条那一版上写行只取实例表、漏了分配记录树节点…」那一行）
   的原文被我改掉了，给了整行替代（`mutations-replacements.tsv` 最后一行，变异 R529，红在它原来点名的用例上）。
 
-14:50 打进的实二十与这份补丁三方合并零冲突；合并之后我核过的交叉点：树表 0 条那一路我改写过的那条 `JournalRecord` 字面量带上了实二十加的
+第二次变动打进的实二十与这份补丁三方合并零冲突；合并之后我核过的交叉点：树表 0 条那一路我改写过的那条 `JournalRecord` 字面量带上了实二十加的
 `place_in_publish: LastRecordOfThePublish`（`transaction.rs` 第 1031 行）；实二十删掉的 `MoreNamedUnitsThanOneJournalRecordHolds` 在合并后的 `crates/` 里零命中。
 没接上的一格见第六节 Q7。
 
@@ -275,9 +275,9 @@
 
 | 批 | 树 | 条数 | 基线 | 结果 |
 |---|---|---|---|---|
-| worker5a/5b/5c/6/7 | `work2/`（10:0x 主工作区 + 补丁） | 34 条：前任交的全部行 | 各二进制先跑不改动的，17 条 `BASELINE` 行全是 `failed=[]` | 34 红 |
-| worker8 | `work4/`（13:32 主工作区 + 补丁，合并时补了 mount.rs 那一处） | 10 条：`mount.rs` 里的 5 条重跑（R25、R68、R105、R109、R421）+ 新加 5 条（R529、A15–A18） | 与同一树上不改动的测试批同时跑，先按空基线判；那一批被我在第 10 个二进制停掉（第五节），前 9 个全绿，这 10 条点名的二进制有 5 个在那 9 个之外 | 10 红 |
-| worker9 | `work5/`（14:49 主工作区 + 补丁，交付的就是它） | 同 worker8 那 10 条（主 agent 定：只跑 mount.rs 那几条与新加的几条） | 与第五节 `work5` 那一批同时跑，先按空基线判，那一批零 FAILED 之后成立 | 见下 |
+| worker5a/5b/5c/6/7 | `work2/`（主工作区 + 补丁） | 34 条：前任交的全部行 | 各二进制先跑不改动的，17 条 `BASELINE` 行全是 `failed=[]` | 34 红 |
+| worker8 | `work4/`（第一次变动之后的主工作区 + 补丁，合并时补了 mount.rs 那一处） | 10 条：`mount.rs` 里的 5 条重跑（R25、R68、R105、R109、R421）+ 新加 5 条（R529、A15–A18） | 与同一树上不改动的测试批同时跑，先按空基线判；那一批被我在第 10 个二进制停掉（第五节），前 9 个全绿，这 10 条点名的二进制有 5 个在那 9 个之外 | 10 红 |
+| worker9 | `work5/`（第二次变动之后的主工作区 + 补丁，交付的就是它） | 同 worker8 那 10 条（主 agent 定：只跑 mount.rs 那几条与新加的几条） | 与第五节 `work5` 那一批同时跑，先按空基线判，那一批零 FAILED 之后成立 | 见下 |
 
 `-p singlefs-core --lib` 那一行 BASELINE 脚本数出 `passed=94`，cargo 自己的 `test result` 是 95 passed——脚本的正则不认带 `- should panic` 的那一行，不是少跑。
 worker5 那 34 条逐条与交付的变异行逐字段相同，worker8 / worker9 那 10 条也是（脚本核过）。编号：R / E 后面的数是前任起名时主表的行号，只作编号用；交付物按变异名认。
@@ -288,7 +288,7 @@ worker5 那 34 条逐条与交付的变异行逐字段相同，worker8 / worker9
 
 ### 最后那一底（`work5/`，交付的就是它）上的 10 条：全红
 
-`grep -cE '^[RAEU][0-9]+\s+RED' logs/mutations-worker9/summary.txt` 数出 10，SURVIVED 0（14:52–15:38 UTC；`work4/` 上 worker8 同样 10 条也全红，`logs/mutations-worker8/`）：
+`grep -cE '^[RAEU][0-9]+\s+RED' logs/mutations-worker9/summary.txt` 数出 10，SURVIVED 0（`work4/` 上 worker8 同样 10 条也全红，`logs/mutations-worker8/`）：
 
 | # | 交付物里 | 结果 | 变异（改坏哪一处） | 必须红的用例：红在哪条断言（原文，截断） | 同一二进制里一起红的 |
 |---|---|---|---|---|---|
@@ -314,7 +314,7 @@ A18 红在新底自带的用例 `rolling_back_to_the_oldest_ring_root_reuses_wha
 
 `grep -chE '^[RAEU][0-9]+\s+RED' logs/mutations-worker{5a,5b,5c,6,7}/summary.txt` 五个数加起来 4 + 4 + 3 + 14 + 9 = 34，SURVIVED 0：
 
-| # | 10:0x 那一版主表的行号（只作参照，交付物按名字） | worker | 结果 | 变异（改坏哪一处） | 必须红的用例：红在哪条断言（原文，截断） | 同一二进制里一起红的 |
+| # | 那一版主表的行号（只作参照，交付物按名字） | worker | 结果 | 变异（改坏哪一处） | 必须红的用例：红在哪条断言（原文，截断） | 同一二进制里一起红的 |
 |---|---|---|---|---|---|---|
 | R25 | 第 25 行（替代） | 6 | RED | 步 3：不写行（实例表照抄） | `remount_takes_instance_two_writes_the_ro…` 红在 second_transaction_step_three_second_instance.rs:138:5：assertion `left == right` failed: 写行发布重写实例表 + 四个固定点单元（记账树已存在 ⇒ 空发布也重写，D16 已定项 9） / left: [AllocationTree, AccountingTree, MappingTree, TreeTable] / right: [InstanceTable, AllocationTree, AccountingTree, MappingTree, TreeTable] | 0 条 |
 | R68 | 第 68 行（替代） | 6 | RED | 步 3：写行时这次要写的行没接进重写出去的那条实例表链（带文件的一版与树表 0 条的一版共用这一处拼法） | `a_formatted_pool_mounted_twice_writes_th…` 红在 second_transaction_step_three_formatted_pool.rs:1271:5：assertion `left == right` failed: 写行那一条还在：第一个文件版本照抄的是写行之后那一版的指针 / left: [] / right: [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(2), applied_transaction_high_water: 0, is_rollback: false }] | 2 条：rolling_back_to_a_warm_up_root_before_an…、writable_mount_after_a_crash_right_after… |
@@ -363,29 +363,29 @@ A09 红在用例自己第 123 行的 `expect("那一片按第几片解得开")`�
   「Z1-a：实例表准入按每次挂载只写一行算」）。它们钉的是「一片装不下就在取号之前拒」，这一轮那道拒绝删了：其中 3 行的原文在 `mount.rs` 里命中 0 次，
   4 行点名的两条用例都已改名（第四节表里 P1、P2）。不删门禁 59 号会红。
 - `mutations-append.tsv`：21 行追加到主表末尾（前任的 17 行 A01–A14、U01–U03，接手者的 4 行 A15–A18）。
-- 核法：脚本 `check-anchors-by-name.py` 把主表（14:49 那一版，564 行变异）按名字打上 12 行替代、删掉 4 行、接上 21 行之后逐行核「原文在 `work5/` 里恰好命中一次、
+- 核法：脚本 `check-anchors-by-name.py` 把主表（第二次变动之后那一版，564 行变异）按名字打上 12 行替代、删掉 4 行、接上 21 行之后逐行核「原文在 `work5/` 里恰好命中一次、
   替换文不同于原文、点名的测试 `fn` 在 `crates/` 里有」：581 行零问题；12 个替代名与 4 个删除名在主表里都恰好找得到（主表 564 个变异名没有重名）。
 
 ## 五、测试结果
 
-### 交付那一底 `work5/`（接手者，14:52–16:09 UTC，上限 4，`logs/work5-touched-binaries.log`）
+### 交付那一底 `work5/`（接手者，上限 4，`logs/work5-touched-binaries.log`）
 
 fmt / clippy / build（`logs/check-first-three-work5.log`，check.sh 前三步同一条命令与 lint 表，末尾原样）：
 
 ```
-== cargo fmt --check 14:52:09
+== cargo fmt --check
 fmt exit=0
-== cargo clippy 14:52:10
+== cargo clippy
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.99s
 clippy exit=0
-== cargo build --all-targets 14:52:11
+== cargo build --all-targets
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.30s
 build exit=0
-== done 14:52:19
+== done
 script exit=0
 ```
 
-（这一遍几秒就完是因为 14:51 那一遍已经编过，那一遍红在别的会话正在改的 `e158_root_choice_repair.rs` 上——我拷的是 14:49:49 那一版、别人 14:50:04 又改了；
+（这一遍几秒就完是因为前一遍已经编过，那一遍红在别的会话正在改的 `e158_root_choice_repair.rs` 上——我拷的那一版之后别人又改了；
 重拷主工作区那一版之后这一遍全绿。）
 
 测试：26 个 harness 集成测试二进制 + harness lib + 两个 bin 的单测 + core lib + checker lib，全部 `ok`、0 failed、日志里 `FAILED` / `panicked` 零命中
@@ -469,21 +469,21 @@ checker exit=0
 
 ### 之前那几底上的读数（留作「合并之前也绿」的证据）
 
-- `work2/`（10:0x 主工作区 + 补丁）：前任 10:07–10:43 跑完 7 个（harness lib 68、两个 bin 12 / 0、`checker_known_bad_images` 28、`first_transaction_step_five_publish` 8、
-  `first_transaction_step_two_data_unit` 3、`second_transaction_mapping_node_admission` 4，全 ok，`logs/rebased-touched-binaries.log`）；接手者 10:53–13:30 跑完其余 16 个与
+- `work2/`（主工作区 + 补丁）：前任跑完 7 个（harness lib 68、两个 bin 12 / 0、`checker_known_bad_images` 28、`first_transaction_step_five_publish` 8、
+  `first_transaction_step_two_data_unit` 3、`second_transaction_mapping_node_admission` 4，全 ok，`logs/rebased-touched-binaries.log`）；接手者跑完其余 16 个与
   **层 0 五个流的快档**（`first_transaction_step_seven_layer0` 5 passed / 1 ignored、`second_transaction_parallel_line_one_layer0` 1 / 1、
   `second_transaction_step_three_acquisition_barrier_layer0` 1、`second_transaction_step_three_formatted_pool_layer0` 3、`second_transaction_step_zero_layer0` 8 / 1），
   core lib 95、checker lib 3，全 ok（`logs/rebased-touched-binaries-part2.log`）。那时主 agent 还没定层 0 快档不跑。
-- `work3/`（13:08 主工作区 + 补丁）：fmt / clippy / build 全绿（`logs/check-first-three-work3.log`）。
-- `work4/`（13:32 主工作区 + 补丁）：fmt / clippy / build 全绿；动到的测试二进制跑到第 10 个（前 9 个全 ok）时被我停掉——主工作区 14:50 又变了，
+- `work3/`（第一次变动之前的主工作区 + 补丁）：fmt / clippy / build 全绿（`logs/check-first-three-work3.log`）。
+- `work4/`（第一次变动之后的主工作区 + 补丁）：fmt / clippy / build 全绿；动到的测试二进制跑到第 10 个（前 9 个全 ok）时被我停掉——主工作区又有了第二次变动，
   这一底的读数不再服务于交付（`logs/work4-touched-binaries-stopped-on-rebase.log`）。更早一次带层 0 的那一批在主 agent 定「层 0 快档不跑」之后停掉
   （`logs/work4-touched-binaries-aborted-with-layer0.log`）。两次都是连子 shell、cargo 与正在跑的测试进程按写死的 pid 一起停，事后核过没有留下的进程。
 
 ### 补丁对主工作区现状
 
-`git apply --check`（16:10:06 UTC，`e980a21` 之上的主工作区）exit=0。那一刻主工作区 `crates/` 与 `base5-crates/` 逐文件比（sha256），只差别的会话在改的
+`git apply --check`（`e980a21` 之上的主工作区）exit=0。那一刻主工作区 `crates/` 与 `base5-crates/` 逐文件比（sha256），只差别的会话在改的
 `crates/mutations.tsv`（又追加了几行）与 `e158_root_choice_repair.rs`，补丁都不碰。拿那一刻的主表与 e158 核变异交付物：583 行里只有 1 行问题，
-是 E158 那一族一行（原文在 16:06 被别的会话改过的 `e158_root_choice_repair.rs` 里命中 0 次），不在这份补丁碰的文件里、不是这一轮的。
+是 E158 那一族一行（原文在被别的会话改过的 `e158_root_choice_repair.rs` 里命中 0 次），不在这份补丁碰的文件里、不是这一轮的。
 
 ## 六、停下交主 agent 的设计问题
 
@@ -524,7 +524,7 @@ checker exit=0
 
 **Q5 取号之前的准入没罩到的一格（多片之后才走得到，前任没做）。** 树表 0 条的一版上写行，分配记录树节点那一条的释放核与分配记录条数准入
 仍在取号之后（`publish_instance_table_on_version_without_file` 里），多片只让条数多几条，是旧缺口。
-前任原写的另一格「写行那次末条要点名的项多于 67 就返回 `MoreNamedUnitsThanOneJournalRecordHolds`、号会烧」已不成立：实二十 14:50 UTC 打进主工作区，
+前任原写的另一格「写行那次末条要点名的项多于 67 就返回 `MoreNamedUnitsThanOneJournalRecordHolds`、号会烧」已不成立：实二十打进主工作区，
 那个成员删了，带文件的一版上最后一个事务装不下一条记录时再跨记录（`roles_named_by_each_record_of_the_publish`，`transaction.rs` 第 3130 行）。
 
 **Q7（接手者合并实二十时看到的；走得到、会 panic、我没处理）树表 0 条的一版上写行只写一条记录，点名项 = 片数 + 1，多于 67 项时这一条写不下。**
@@ -560,7 +560,7 @@ checker exit=0
 - 没有新的 trait 实现；`history.rs`、`model_comparison.rs`、`write_accounting.rs`、两份用例里补的臂是穷举 `match` 逼出来的。
 
 
-## 七、N4（C515）要跟着改、我们不改的几处（行号前任开工时现查，接手者 14:5x UTC 在主工作区重查过，没变）
+## 七、N4（C515）要跟着改、我们不改的几处（行号前任开工时现查，接手者在主工作区重查过，没变）
 
 - `.claude/gate.d/55-qemu-first-transaction.sh` 第 183 行：期望串 `name=transaction policy_mismatches=0 key_order_mismatches=0 root_txg=3 back_chain=$EXPECTED_BACK_CHAIN`
   删成 `name=transaction key_order_mismatches=0 root_txg=3 back_chain=$EXPECTED_BACK_CHAIN`——真设备二进制那一行现在打的就是
@@ -578,28 +578,28 @@ checker exit=0
 
 ## 八、主工作区中途变了三次：怎么同步的
 
-1. **10:0x（前任）**：开工时的底 `base-crates/`（05:3x）到 10:0x 主工作区 `crates/` 变了 24 个文件，旧底补丁在 `allocator.rs`、`mount.rs`、`transaction.rs` 打不上。
+1. **（前任）**：开工时的底 `base-crates/`到主工作区 `crates/` 变了 24 个文件，旧底补丁在 `allocator.rs`、`mount.rs`、`transaction.rs` 打不上。
    前任把主工作区当时的样子拷成 `work2/`、`crates/` 另存 `base2-crates/`，改过的每个文件用 `git merge-file <新底> <旧底> <我的>` 三方合并，冲突 5 处
    （`mount.rs` 3 处、`allocator.rs` 1 处、`transaction.rs` 1 处，都是导入行、文档注释与写行两臂的新形状），`first_transaction_on_device.rs` 多删一臂。
-2. **13:10–13:11（接手者处理）**：主工作区又打进两份补丁（13:32 时主工作区 `crates/` 相对 HEAD 有 20 个文件改动，含 `mount.rs`、`recovery.rs`、`walk.rs`），13:32 核 `git apply --check` 打不上
+2. **第一次变动（接手者处理）**：主工作区又打进两份补丁（随后主工作区 `crates/` 相对 HEAD 有 20 个文件改动，含 `mount.rs`、`recovery.rs`、`walk.rs`），随后核 `git apply --check` 打不上
    （`walk.rs`、`mount.rs`、`first_transaction_on_device.rs`、`history.rs`、`model_comparison.rs`）。拷成 `work4/`、`base3-crates/`，按 `<base3> <base2> <work2>` 三方合并：
    冲突 5 个文件 6 处——`walk.rs` 导入行（取并集：新底的 `check_unit` 与我的 `packed_unit_view`）、`mount.rs` 导入行（取并集）与 `MountError` 成员
    （留新底新加的 `PlacementRefusedBeforeAcquisitionMountAdmissionUndecided`、删这份补丁删的 `InstanceTableChainLongerThanOnePageUndecided`）、
    `first_transaction_on_device.rs` / `history.rs` / `model_comparison.rs` 的穷举臂（同样留新成员、删旧成员）。另有一处不是文本冲突、是语义冲突：
    新底取号之前在分配器拷贝上走一遍那一串的代码按一片写死，按多片改了（第三节末「合并新底时补的一处」）。
-3. **14:49–14:50（接手者处理）**：实二十打进主工作区（21 个文件，含 `transaction.rs`、`journal.rs`、`mount.rs`、`recovery.rs`、`walk.rs`，`crates/mutations.tsv` 删 3 行、追加 28 行）。
-   拷成 `work5/`、`base5-crates/`，按 `<base5> <base3> <work4>` 三方合并：零冲突。别的会话 14:50:04 又改了 `e158_root_choice_repair.rs`（我拷的是 14:49:49 那一版，编不过），
-   重拷之后 `base5-crates/` 与主工作区逐文件相同（14:52:09 UTC，sha256 全表比对）。交付的补丁就是 `work5/crates` 对 `base5-crates/` 的差。
+3. **第二次变动（接手者处理）**：实二十打进主工作区（21 个文件，含 `transaction.rs`、`journal.rs`、`mount.rs`、`recovery.rs`、`walk.rs`，`crates/mutations.tsv` 删 3 行、追加 28 行）。
+   拷成 `work5/`、`base5-crates/`，按 `<base5> <base3> <work4>` 三方合并：零冲突。别的会话随后又改了 `e158_root_choice_repair.rs`（我拷的是改之前那一版，编不过），
+   重拷之后 `base5-crates/` 与主工作区逐文件相同（sha256 全表比对）。交付的补丁就是 `work5/crates` 对 `base5-crates/` 的差。
 - 核对：补丁碰的仍是同样 24 个文件（`work5` 对 `base5` 的逐文件 sha256 差集与 `work4` 对 `base3` 的相同）；「我的差」在其中 20 个文件上三个底逐行相同，另 4 个见第四节。
-- 变异表：交付物改成按变异名认（主 agent 14:5x 要求），不再给行号。
+- 变异表：交付物改成按变异名认（主 agent 要求），不再给行号。
 
 ## 九、没做什么
 
 - 没走三方对抗；层 0 全量、崩溃注入与故障注入的大档、QEMU、herd7、`crates/mutations.tsv` 整表（门禁 59 号）归 `crash-verifier`，都没跑。
   写行路径多片之后的层 0 流一条都没加（现有的流都到不了 370 行，要写多片的流得先把表推过一片，哪几步、哪几个崩溃点值得枚举交 crash-verifier 定）。
-- **层 0 快档留给全部代码落定之后统一跑**（主 agent 13:47 定）。按这条定之前，接手者 10:53 在 `work2/` 上那一批里跑过层 0 五个流的快档（全绿，第五节），
+- **层 0 快档留给全部代码落定之后统一跑**（主 agent 定）。按这条定之前，接手者在 `work2/` 上那一批里跑过层 0 五个流的快档（全绿，第五节），
   `work4` / `work5` 上没跑；`work5` 上起测试时项目 hook（`heavy-test-guard.sh`）拒了一次不挑目标的写法，改成逐个 `--test` 点名之后才起。
-- **`cargo test --all`（check.sh 第四步）没跑**，留给全部代码落定之后统一跑（主 agent 13:1x 定）；check.sh 的前三步照跑（第五节）。
+- **`cargo test --all`（check.sh 第四步）没跑**，留给全部代码落定之后统一跑（主 agent 定）；check.sh 的前三步照跑（第五节）。
 - 登记给我的门禁阶段按原派发没跑。
 - 没动主工作区、没提交；`crates/mutations.tsv` 没改（要替代 / 删 / 追加的在三个交付文件里，按变异名给）。
 - kb、`research/`、门禁 55 号与它的 fixture 一个字没写（第七节写了要改成什么）。

@@ -1,0 +1,10 @@
+--- a/crates/singlefs-core/src/allocator.rs
++++ b/crates/singlefs-core/src/allocator.rs
+@@ -343,6 +343,7 @@
+ }
+ 
+ impl DeviceFreeMap {
++    // 攻方副本：只多这一行注释（挪行），别的一个字不动。
+     /// 单元区从默认环长下的起点（[`UnitAreaStart::of_the_default_journal_ring`]，槽 50176）起到设备末尾；mkfs 占的槽由调用方标上。
+     /// 实例表、树表的落点（`make_filesystem::INSTANCE_TABLE_SLOT`）、恢复判分配记录落点、系统配置里写的单元区起点今天都还按这个数，
+     /// 挂载与 mkfs 建空闲图都走这里（C475（非默认环长下单元区起点取编译期常量） 那一半还开着）。

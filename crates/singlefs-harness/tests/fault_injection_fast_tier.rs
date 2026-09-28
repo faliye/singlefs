@@ -209,6 +209,19 @@ fn assert_every_fault_injection_path_was_exercised(report: &FaultInjectionReport
     );
 }
 
+/// 大档没设环境变量时每段几步、注入几次（大档撞出的单段回归用例照同一组规模重放那一段）。
+const LARGE_TIER_OPERATIONS_PER_HISTORY: u64 = 30;
+const LARGE_TIER_FAULTS_PER_HISTORY: u64 = 6;
+
+/// 大档注入之后这段历史怎么跑：每一步之后跑池级 checker、空间准入按公式判，盘宽由调用方给（大档从环境变量取）。
+fn large_tier_execution(device_width: HistoryDeviceWidth) -> HistoryExecution {
+    HistoryExecution {
+        per_step_checker: PerStepChecker::Run,
+        device_width,
+        space_admission: SpaceAdmission::JudgedByTheFormula,
+    }
+}
+
 /// 大档：规模从环境变量取，后台跑（`cargo test --release -p singlefs-harness --test
 /// fault_injection_fast_tier -- --ignored --nocapture`）。
 #[test]
@@ -221,12 +234,12 @@ fn fault_injection_large_tier_from_the_environment() {
     let seed_count = number_from_environment("SINGLEFS_FAULT_INJECTION_SEEDS", 512);
     let operations_per_history = usize::try_from(number_from_environment(
         "SINGLEFS_FAULT_INJECTION_OPERATIONS",
-        30,
+        LARGE_TIER_OPERATIONS_PER_HISTORY,
     ))
     .expect("步数");
     let faults_per_history = usize::try_from(number_from_environment(
         "SINGLEFS_FAULT_INJECTION_FAULTS",
-        6,
+        LARGE_TIER_FAULTS_PER_HISTORY,
     ))
     .expect("注入次数");
     let device_width = match std::env::var("SINGLEFS_FAULT_INJECTION_DEVICE_WIDTH").as_deref() {
@@ -244,11 +257,7 @@ fn fault_injection_large_tier_from_the_environment() {
         operations_per_history,
         faults_per_history,
         weights: GenerationWeights::BROAD,
-        execution: HistoryExecution {
-            per_step_checker: PerStepChecker::Run,
-            device_width,
-            space_admission: SpaceAdmission::JudgedByTheFormula,
-        },
+        execution: large_tier_execution(device_width),
         worker_threads: FaultInjectionWorkerThreads::from_the_environment(),
     });
     let rendered = report.render();
@@ -304,6 +313,55 @@ fn swallowed_write_after_which_the_checker_flags_only_the_allocated_statistic_in
         Some(&2),
         "这一段里被吞掉的那一次写之后只判红 I-3.1，记进说谎那一格——带着注入跑的那一遍里每一步之后的池级 checker 判红那一处、\
          注入之后的镜像上再跑的那一遍，各记一次：\n{rendered}"
+    );
+}
+
+/// 大档（这个测试周期的种子基起 512 段）撞出的一段，单独跑：种子 7463871032432355397，规模与执行方式与大档没设环境变量时逐项相同。
+/// 抽出的 6 个注入点里有一次被吞掉的写（`write_is_swallowed`，整池第 471 次写调用，第 17 步覆盖写那次发布的根槽写，落在根环区域 0 槽 6）；
+/// 第 18 步挂着时回退判候选集读根环，这个进程知道住着根的区域 0 槽 6 读坏、重读仍坏，拒在任何写之前
+/// （`RollbackError::CandidateJudgementStillUnreadableAfterOneReread(RootRingSlotKnownToHoldARoot)`，D16（发布语义） 已定项 1
+/// 「根槽这一次读坏」那一行的读法）。模型不知道根槽没落、说该成；回退点名的槽正是被吞那次写的槽，要记进说谎那一格，不算新发现。
+/// 回退路径不把点名的槽交给模型比对时（`crates/mutations.tsv` 钉着的那一格），这一格判不出是说谎的设备留下的，照报新发现。
+#[test]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+fn rollback_refused_on_the_root_ring_slot_whose_write_the_lying_device_swallowed_is_excused_as_what_the_lying_device_may_leave(
+) {
+    let report = run_fault_injection_campaign(&FaultInjectionCampaign {
+        first_seed: 7_463_871_032_432_355_397,
+        seed_count: 1,
+        operations_per_history: usize::try_from(LARGE_TIER_OPERATIONS_PER_HISTORY).expect("步数"),
+        faults_per_history: usize::try_from(LARGE_TIER_FAULTS_PER_HISTORY).expect("注入次数"),
+        weights: GenerationWeights::BROAD,
+        execution: large_tier_execution(HistoryDeviceWidth::FourGibibytes),
+        worker_threads: FaultInjectionWorkerThreads::from_the_environment(),
+    });
+    let rendered = report.render();
+    assert_eq!(
+        report.tally.faults_that_panicked,
+        0,
+        "注入之后 core panic 了；{}\n{rendered}",
+        how_to_replay(&report)
+    );
+    assert!(
+        report.new_findings.is_empty(),
+        "回退拒在被吞根槽写的那个槽上要记进说谎那一格，不算新发现；{}\n{rendered}",
+        how_to_replay(&report)
+    );
+    assert_eq!(
+        report
+            .tally
+            .faults_by_injection_point
+            .get("PublishOverwrite/root_record_fua"),
+        Some(&1),
+        "这一段抽出的注入点里要有那一次被吞的覆盖写根槽写：\n{rendered}"
+    );
+    assert_eq!(
+        report
+            .tally
+            .lying_device_signatures
+            .get("ModelDisagreement { aspect: \"模型说该成、实现拒了\" }"),
+        Some(&1),
+        "回退那一次「模型说该成、实现拒了」要按点名的槽等于被吞根槽写的槽放过、记进说谎那一格，只这一次：\n{rendered}"
     );
 }
 

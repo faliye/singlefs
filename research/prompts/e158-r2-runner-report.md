@@ -1,4 +1,4 @@
-# E158（择根与修复四岔路） 第 2 次跑第一段：执行员报告（2026-09-26，UTC 15:4x 写）
+# E158（择根与修复四岔路） 第 2 次跑第一段：执行员报告（2026-09-26 写）
 
 ## 一、结论
 
@@ -10,16 +10,16 @@
 
 ## 二、现场核对（接手）
 
-- 上一任建的 `snapshot/`（14:03 UTC）与 `probe/` 已删；它们之后实八改了 harness 四个文件：
+- 上一任建的 `snapshot/`与 `probe/` 已删；它们之后实八改了 harness 四个文件：
 
 ```
 $ diff <(grep -v '/target/' snapshot-crates-sha256.txt) now-crates-sha256.txt   # 摘 4 个不同文件名
 crates/singlefs-harness/src/fault_injection.rs、history.rs、model.rs、model_comparison.rs（core、format、checker 无差）
 ```
 
-  按 S4「全部副本从同一次快照派生」重取 `snapshot2`：时刻 `2026-09-26 23:28:50 JST`，`HEAD` = `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`，`git status --porcelain crates/` 91 行（`snapshot2-status.txt`），`crates/` 全部文件 sha256 汇总的 sha256 = `574f31c7a55d4b9495a767e20444085030c269a682c6eb67db51f054290ad98e`，取时与工作树逐文件相同（`same-as-worktree`）。
+  按 S4「全部副本从同一次快照派生」重取 `snapshot2`：时刻 `2026-09-26`，`HEAD` = `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`，`git status --porcelain crates/` 91 行（`snapshot2-status.txt`），`crates/` 全部文件 sha256 汇总的 sha256 = `574f31c7a55d4b9495a767e20444085030c269a682c6eb67db51f054290ad98e`，取时与工作树逐文件相同（`same-as-worktree`）。
 - 开工时装置单测：`test result: FAILED. 42 passed; 1 failed`（红的就是 `mount_writable_trajectory_distinguishes_persistent_from_transient_faults`，与问题单第四节一致）。
-- 负载：开工与各次编译前 `ps` 只见别的会话的 `claude` 进程与一次别人的 `gate.sh --staged`（pid 1821532，14:22 UTC），没有 qemu / vm-bench / e152 / fio；没等锁。线程上限 10 全程经 `research/scripts/capped.sh 10`，跑编译出的代码全程经 `run-with-memory-cap.sh 8G`（取 `replay.sh` 的 `REPLAY_MEMORY_CAP` 默认），没有 250–254 的结局。
+- 负载：开工与各次编译前 `ps` 只见别的会话的 `claude` 进程与一次别人的 `gate.sh --staged`（pid 1821532），没有 qemu / vm-bench / e152 / fio；没等锁。线程上限 10 全程经 `research/scripts/capped.sh 10`，跑编译出的代码全程经 `run-with-memory-cap.sh 8G`（取 `replay.sh` 的 `REPLAY_MEMORY_CAP` 默认），没有 250–254 的结局。
 
 ## 三、停机条款
 
@@ -164,25 +164,25 @@ H1d 800 格 = n1 = 0：4 个基准 × 41 格；n1 = 1、2、3：各 4 个基准 
 1. **重跑登记里没有一条臂能量用户同日要改的那一形的修法**：岔路单第 2 行六臂（含乙F-留环）都只改新实例第一次发布的 txg，H1d 的覆盖发生在写行根落盘之前、是分配器从所选根的账里把被藏根的单元发出去，与 txg 无关，所以六臂与今天逐格相同是定义的直接后果。「系统配置（或别处）说有更新的根时拒可写挂载 / 不复用它的单元」这种形状的臂要不要补、补成什么，交主 agent（补臂要走修订，且在那一段产物之前）。
 2. H1d 的覆盖只在 n1 = 0（被藏的是首个文件、它前一条根的树表 0 条）时发生；n1 ≥ 1 时写行那次发布开更高的新段、碰不到。实七两段历史都是这一形（第 1 步 / 第 3 步就抛弃根）。n1 ≥ 1 而中间夹过一次重挂载（开新段）的历史这一段没造，覆盖在那里会不会出现没量。
 3. 实七那两段历史在 A1、甲-txg、乙F-留环上走岔（harness 的模型按今天的规则答第一次发布的 txg），没罩住；这三臂的 H1d 只能看装置那张表。
-4. 工作树的 `crates/` 在快照之后又被改过两次：harness 的记录核对器（崩溃注入那一段在工作树上少一条 `claimed_state_missing_unit`），以及 15:28 / 15:32 UTC 的 `mount.rs`、`transaction.rs`（写行根之前多了屏障）。后者让登记在 `E158` 下的 `r2-all` 那一行复跑对不上（H1d 800 → 832 格，三格计数除「读回最后确认」664 → 696 外不变）。按新代码重出、改指登记行，还是等 `crates/` 落定，交主 agent。
+4. 工作树的 `crates/` 在快照之后又被改过两次：harness 的记录核对器（崩溃注入那一段在工作树上少一条 `claimed_state_missing_unit`），以及 `mount.rs`、`transaction.rs`（写行根之前多了屏障）。后者让登记在 `E158` 下的 `r2-all` 那一行复跑对不上（H1d 800 → 832 格，三格计数除「读回最后确认」664 → 696 外不变）。按新代码重出、改指登记行，还是等 `crates/` 落定，交主 agent。
 5. 甲-txg 产物里两行 `verdict=fail`（PC1 在那一臂上摆不出）该不该改成别的判定词，交主 agent。
 6. `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs` 改了（不是新 bin）：代码轮判决的点名清单若按「本轮改过的入库装置」算，要点它（门禁 56 号）。
 7. 问题单 `research/prompts/e158-r2-questions.md:24` 引了 `/tmp/claude-1000/impl-rbf-4a/report.md`，门禁 69 号报它；不在我的写范围，没动。
 
 ## 十二、登记修订、写过的文件
 
-- 重跑登记 `research/prompts/e158-r2-prereg.md` 第十二节新增 12.1（7 条，写于 2026-09-27 00:0x JST、任何产物之前；原判据与原臂一条没改，第六、七、九节的去留一条没动）：① b 补一支 unit_first_copy（依据单测 `replay_stops_at_the_first_copy_of_a_named_unit_so_the_second_copy_is_never_read`）；② H1d 的操作化（n1 从 0 起，依据单测 `the_row_publish_before_its_root_overwrites_the_hidden_newest_root_only_when_it_is_the_first_file`；崩溃只取前缀；(b)(c) 从计数推）；③ 读落点被这次调用写过之后不再拦；④ PC1-c 的历史收严到「只有一条被抛弃根」；⑤ 实七两段历史的参数；⑥ 臂表整张重写、PC 开关这一段没加；⑦ 第一节处理表的删与改这一段没做。
+- 重跑登记 `research/prompts/e158-r2-prereg.md` 第十二节新增 12.1（7 条，写于 2026-09-27、任何产物之前；原判据与原臂一条没改，第六、七、九节的去留一条没动）：① b 补一支 unit_first_copy（依据单测 `replay_stops_at_the_first_copy_of_a_named_unit_so_the_second_copy_is_never_read`）；② H1d 的操作化（n1 从 0 起，依据单测 `the_row_publish_before_its_root_overwrites_the_hidden_newest_root_only_when_it_is_the_first_file`；崩溃只取前缀；(b)(c) 从计数推）；③ 读落点被这次调用写过之后不再拦；④ PC1-c 的历史收严到「只有一条被抛弃根」；⑤ 实七两段历史的参数；⑥ 臂表整张重写、PC 开关这一段没加；⑦ 第一节处理表的删与改这一段没做。
 - 写过的文件：`crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`（加第 2 次跑那一节、main 里一处分派、改两条沿用单测、加 14 条单测；sha256 `3f709e69b34bc094de9856b52875513384d0737e46ec69e005f1e18905bd98e2`）；`crates/mutations.tsv` 末尾 17 行；`research/mutations/e158_arms.tsv`（整张重写，31 行；用它在快照上重套七臂，与实际跑的副本 `crates/` 逐文件相同）；`research/prompts/e158-r2-prereg.md` 12.1；`research/scripts/replay.sh`（加 `E158R2` 一行与 `driver_e158_r2_all`，旧的 E158 各行没动）；`research/results/` 九份新产物；`.claude/kb/experiments/158-择根与修复四岔路.md`（标题括注、正文最前「2026-09-26：第 2 次跑第一段」一节、影响的决策表五行回看、历史版本 2026-09-26 一条）；`.claude/kb/experiments.md` E158 那一行（状态列与结论列）；`.claude/kb/experiments-history.md` 2026-09-26 一条。
 - 实验页的「影响的决策」表：五行（D16 已定项 6、D23 已定项 14、D22 已定项 9、D8 已定项 8、D28 已定项 3）都重新 `grep -c "E158（"` 那条决策文件，都得 0，依据段都没引这个实验 ⇒ 都仍写备料、回看日期改成 2026-09-26；没有一格该升成支撑 / 推翻。都不在 `.claude/decision-links-pending` 里。
-- `replay.sh`：新行先以编号 `E158R2` 登记，`bash research/scripts/replay.sh E158R2`（15:1x UTC）→ `字节一致 1 ／ 仅计时不同 0 ／ 对不上 0 ／ 跑不了 0 ／ 结论断言不中 0 ／ 产物已归档 0 ／ 输入没变没跑 0`（退出 0）。之后门禁 88 号（15:25 UTC 被别的会话改过）只认 `E<数字>|` 形状的登记行，改登记到 `E158` 下（`E158|@driver_e158_r2_all||e158-root-choice-repair-2026-09-26-r2-all-today.out|exact`）。`replay.sh E158`（含第一次跑的 14 行）：第一次跑那 14 行里跑完的 11 行全「对不上」（`local_value=481` → `489`、挂载时回退删除带来的结构性差异，与这一段无关），另 3 行（`q3-1-s4`、`q2-1-g0` 两行，各跑 15 分钟以上）被我停掉（`proc.py stop` 734920、735061、735152，链随之退出；判「跑不了 3」），汇总 `字节一致 0 ／ 仅计时不同 0 ／ 对不上 11 ／ 跑不了 3`。
-- ⚠️ 产物之后 `crates/singlefs-core/src/mount.rs`（15:28 UTC）、`transaction.rs`（15:32 UTC）被别的会话改了：15:4x UTC 在工作树上重跑 `r2-all`，与登记产物 121 行不同——H1d 从 800 格变 832 格（写行根之前的屏障每个基准 6 → 8 次），`cell1_overwritten_cases=128`、K3 120 不变，读回最后确认那一版 664 → 696；Q1-0、PC1 行不变（草稿 `recheck-after-core-change.out`）。登记产物没重出，交主 agent 定；实验页复跑一段写明了。装置对新代码照样编得过。
+- `replay.sh`：新行先以编号 `E158R2` 登记，`bash research/scripts/replay.sh E158R2`→ `字节一致 1 ／ 仅计时不同 0 ／ 对不上 0 ／ 跑不了 0 ／ 结论断言不中 0 ／ 产物已归档 0 ／ 输入没变没跑 0`（退出 0）。之后门禁 88 号（被别的会话改过）只认 `E<数字>|` 形状的登记行，改登记到 `E158` 下（`E158|@driver_e158_r2_all||e158-root-choice-repair-2026-09-26-r2-all-today.out|exact`）。`replay.sh E158`（含第一次跑的 14 行）：第一次跑那 14 行里跑完的 11 行全「对不上」（`local_value=481` → `489`、挂载时回退删除带来的结构性差异，与这一段无关），另 3 行（`q3-1-s4`、`q2-1-g0` 两行，各跑 15 分钟以上）被我停掉（`proc.py stop` 734920、735061、735152，链随之退出；判「跑不了 3」），汇总 `字节一致 0 ／ 仅计时不同 0 ／ 对不上 11 ／ 跑不了 3`。
+- ⚠️ 产物之后 `crates/singlefs-core/src/mount.rs`、`transaction.rs`被别的会话改了：在工作树上重跑 `r2-all`，与登记产物 121 行不同——H1d 从 800 格变 832 格（写行根之前的屏障每个基准 6 → 8 次），`cell1_overwritten_cases=128`、K3 120 不变，读回最后确认那一版 664 → 696；Q1-0、PC1 行不变（草稿 `recheck-after-core-change.out`）。登记产物没重出，交主 agent 定；实验页复跑一段写明了。装置对新代码照样编得过。
 
-## 十三、门禁（登记给 experiment-runner 的阶段，最后一次 15:5x UTC，末行原样摘、退出码）
+## 十三、门禁（登记给 experiment-runner 的阶段，最后一次，末行原样摘、退出码）
 
 | 阶段 | 退出码 | 末行 / 红在哪 |
 |---|---|---|
 | 27 | 0 | `✓ 格式常量同步（41 个已登记，41 个在源码里被钉住）` |
-| 33 | 1 | 红的是 `crates/mutations.tsv` 第 301、690、692、714 行（C378、实二八、实二），15:28 / 15:32 UTC 别的会话改 `mount.rs`、`transaction.rs` 之后锚点失配；我加的 17 行不在内。15:1x UTC 那一次是 `✓ … crates/mutations.tsv 859 条的原文各命中源码一次` |
+| 33 | 1 | 红的是 `crates/mutations.tsv` 第 301、690、692、714 行（C378、实二八、实二），别的会话改 `mount.rs`、`transaction.rs` 之后锚点失配；我加的 17 行不在内。那一次是 `✓ … crates/mutations.tsv 859 条的原文各命中源码一次` |
 | 34 | 0 | `✓ 实验索引行与正文标题一致（索引 159 行、正文 159 份）` |
 | 40 | 1 | 红的是 E142 两份、E156 `…-2026-09-26-r2.out`、两份 gate69 日志；E158 只出现在「没判的」清单里（历史点名）。E158 开工时报的 4 份旧产物已在实验页历史节点名 |
 | 52 | 0 | `✓ 比对了 4 处登记 …` |

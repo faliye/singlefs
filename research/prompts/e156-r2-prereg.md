@@ -1,6 +1,6 @@
 # E156 重跑登记（第 2 次）：岔路 1、3、7 的代价数
 
-写于 2026-09-23 22:23 JST，装置改写之前、第 2 次的任何产物之前。原登记 `research/prompts/e156-preregistration.md`（第一、二段按它跑过；岔路 2 已够判）。**这一份只覆盖岔路单第 9、11、12 行（岔路 1、3、7）**；原登记里只为岔路 2 而量的 Q2a / Q2b / Q2c、PC-命令、M18 不重跑。
+写于 2026-09-23，装置改写之前、第 2 次的任何产物之前。原登记 `research/prompts/e156-preregistration.md`（第一、二段按它跑过；岔路 2 已够判）。**这一份只覆盖岔路单第 9、11、12 行（岔路 1、3、7）**；原登记里只为岔路 2 而量的 Q2a / Q2b / Q2c、PC-命令、M18 不重跑。
 
 判据、门槛、作废条款在这里写死；跑出数之后要改，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」那三步走，不在这里回改。岔路单那三行的候选定义、翻面观测、够判条件一个字不改（「一」整行抄）。
 
@@ -655,7 +655,7 @@
    | `crates/singlefs-harness/src/crash.rs` | `331ad4ad9188ef0c1e7cb3fbef4a7cd53ada99e0` | `6241f28b996e1928d2e686cbf45070da115bade2` | 变了 |
    | `crates/singlefs-harness/src/crash_injection.rs` | `bdb2415ae806cab9d6b2e51de3ed265b029282ba` | `bdb2415ae806cab9d6b2e51de3ed265b029282ba` | 没变 |
 
-   按 S1/S3 的字面本该「停，交主 agent 定基线用哪一版」；这一份记的不是自主豁免这一步，而是主 agent 在这一段派发提示里已经指名要做的替代路径——**逐字节复跑对拍**：把 `research/results/e156-alloc-basis-counts-2026-09-24-stage2.out`（生成于 01:02，早于这批补丁）里全部 329 行「格式在这一段没被改动」的行（K1、`legal_state`、`s1d_step`、Q7a–Q7f、PC-检查三条、HK/H0/HR 构造、`q3a_d_rel_g7`/`q3b_d_rel_f_kou`/`q3c_diff`/`q3e_x8a`/`k9_newest_batch_d_rel_non_empty` 单格历史）与今天用当前 `crates/` 重新跑出来的同名行逐行比对，**逐字节相同**（差异集合为空；命令与输出见交回报告）；`q1_hh`/`q1d_*` 三格（S = 8、holes = 0/1/2）虽然这一段改了行的格式（加了 `s=` 字段），但 `delta`/`h_missing` 这些数值字段本身也与 stage2.out 里的原值逐一相符（20/70/120，0/8/14）。**结论**：这批并发补丁（读 diff：`allocator.rs` 加了「释放前校验和不符则隔离」的新分支，`transaction.rs`/`recovery.rs` 改了导入与 `tree_identifier_watermark` 相关的少量结构，`format/lib.rs` 新增了几个索引节点头常量）没有改到 E156 这几条历史实际触达的代码路径——**这是复跑实测出来的事实，不是「没读 diff 就假定无关」**。是否要因此正式豁免 S3、要不要把这份对拍结果当成本段的基线确认，交主 agent 定（见交回报告岔路表）。
+   按 S1/S3 的字面本该「停，交主 agent 定基线用哪一版」；这一份记的不是自主豁免这一步，而是主 agent 在这一段派发提示里已经指名要做的替代路径——**逐字节复跑对拍**：把 `research/results/e156-alloc-basis-counts-2026-09-24-stage2.out`（生成于这批补丁之前）里全部 329 行「格式在这一段没被改动」的行（K1、`legal_state`、`s1d_step`、Q7a–Q7f、PC-检查三条、HK/H0/HR 构造、`q3a_d_rel_g7`/`q3b_d_rel_f_kou`/`q3c_diff`/`q3e_x8a`/`k9_newest_batch_d_rel_non_empty` 单格历史）与今天用当前 `crates/` 重新跑出来的同名行逐行比对，**逐字节相同**（差异集合为空；命令与输出见交回报告）；`q1_hh`/`q1d_*` 三格（S = 8、holes = 0/1/2）虽然这一段改了行的格式（加了 `s=` 字段），但 `delta`/`h_missing` 这些数值字段本身也与 stage2.out 里的原值逐一相符（20/70/120，0/8/14）。**结论**：这批并发补丁（读 diff：`allocator.rs` 加了「释放前校验和不符则隔离」的新分支，`transaction.rs`/`recovery.rs` 改了导入与 `tree_identifier_watermark` 相关的少量结构，`format/lib.rs` 新增了几个索引节点头常量）没有改到 E156 这几条历史实际触达的代码路径——**这是复跑实测出来的事实，不是「没读 diff 就假定无关」**。是否要因此正式豁免 S3、要不要把这份对拍结果当成本段的基线确认，交主 agent 定（见交回报告岔路表）。
 
 以下四条是这一段（`e156-s4` 续派，主 agent 消息「接着做 E156 这一段，岔路表里还开着两行」）新加的，产物见 `research/results/e156-alloc-basis-counts-2026-09-24-stage4.out`。
 

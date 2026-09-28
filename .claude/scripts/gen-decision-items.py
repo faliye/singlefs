@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-# admission: always 判的是此刻 decisions/ 下的正文，门禁 21 号每一轮都拿它的输出与索引页现比
+# admission: always 判的是此刻 decisions/ 下的正文，门禁 doc-decisions 格「决策分项清单与正文同步」每一轮都拿它的输出与索引页现比
 # run-condition: none 只读仓里的决策正文，除了 python3 之外没有环境要求
 """从 decisions/ 下的正文抽出每条决策的分项清单，打印成 markdown。
 
 **它存在的唯一理由是「同一个事实只许一处权威记录」**：分项的权威记录是各决策正文，
 索引页只是它的投影。手抄一份就会漂，而漂了没有任何东西会发现——
-`.claude/gate.d/21-decision-items-sync.sh` 拿本脚本的输出与索引页比对，不一致判红。
+`.claude/gate.d/doc-decisions.sh` 的格「决策分项清单与正文同步」拿本脚本的输出与索引页比对，不一致判红。
 
 **每条决策的分项只有一套编号，分住两个小节**：`### 已定项` 与 `### 未定项`。
 状态由**它住在哪一节**决定，不由行内文字决定——正文里一句「与 D16（发布语义） 已定的
@@ -15,7 +15,7 @@ checkpoint 序号怎么共存」曾让按行内关键字判状态的老版本把
 
 | 怎么跑 | 打印什么 | 谁消费 |
 |---|---|---|
-| 不带参数 | 索引页那段 `<!-- gen:decision-items -->` 生成块 | `.claude/gate.d/21-decision-items-sync.sh` |
+| 不带参数 | 索引页那段 `<!-- gen:decision-items -->` 生成块 | `.claude/gate.d/doc-decisions.sh` 的格「决策分项清单与正文同步」与格「未定项判过改不改新池新建文件的字节」 |
 | `--status-cells` | 每行 `D<n>\t<状态列该写什么>` | 同上，用来写回决策索引表的「状态」列 |
 
 **状态列写的是分项计数**（`已定 6 项 / 未定 0 项`），不是三态词——
@@ -145,8 +145,8 @@ for f in sorted(glob.glob('.claude/kb/decisions/*.md')):
     title = s.split('\n', 1)[0]
     # 破折号前有没有空格两种都有（D14 没有），不能只认一种
     mm = re.match(r'## (D\d+) (.+?)\s*—— *(.+)$', title)
-    # 首行读不出就报错，不许跳过：跳过的那条决策从分项清单里整条消失，21 号只会报一句
-    # 「索引表里有行而 decisions/ 下没有它的正文」，31 号则一条未定项都不替它查。
+    # 首行读不出就报错，不许跳过：跳过的那条决策从分项清单里整条消失，doc-decisions 格「决策分项清单与正文同步」只会报一句
+    # 「索引表里有行而 decisions/ 下没有它的正文」，格「未定项判过改不改新池新建文件的字节」则一条未定项都不替它查。
     if not mm:
         raise SystemExit(
             f"  ✗ {f} 首行读不出 `## D<n> 简称 —— 状态`：{title[:40]!r}\n"

@@ -1,0 +1,24 @@
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/impl-r2-fixes-a/copy/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-a/copy/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.58s
+     Running tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs (/tmp/claude-1000/impl-r2-fixes-a/target/debug/deps/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error-b68cc66380e8aa36)
+
+running 2 tests
+test a_zero_unit_publish_whose_post_rotation_barrier_fails_is_not_frozen_and_the_whole_mount_returns_the_error ... FAILED
+test the_rotation_barrier_litmus_writer_follows_the_last_three_steps_of_every_recorded_publish ... ok
+
+failures:
+
+---- a_zero_unit_publish_whose_post_rotation_barrier_fails_is_not_frozen_and_the_whole_mount_returns_the_error stdout ----
+
+thread 'a_zero_unit_publish_whose_post_rotation_barrier_fails_is_not_frozen_and_the_whole_mount_returns_the_error' (196594) panicked at crates/singlefs-harness/tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs:146:24:
+盘 1 上零单元发布轮换之后那道屏障报错：挂载不许做成（今天不冻结、不重发），得到实例 InstanceGeneration(1)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_zero_unit_publish_whose_post_rotation_barrier_fails_is_not_frozen_and_the_whole_mount_returns_the_error
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.01s
+
+error: test failed, to rerun pass `-p singlefs-harness --test a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error`

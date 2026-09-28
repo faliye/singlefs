@@ -1,83 +1,97 @@
-# 门禁阶段归属：每个项目本地阶段先由哪个 agent 在干完自己的活之后跑。提交前的整轮门禁（gate-triage）照旧跑全部阶段。
-# 三列用制表符分隔：阶段文件名、agent 名（逗号分隔，每个名字要有 .claude/agents/<名字>.md）、为什么归它。
-# 表与目录、定义逐项一致由 62-stage-owners.sh 判；各 agent 怎么从表里取自己的阶段，见 .claude/agent-common.md「门禁」。
-10-kb-rot.sh	kb-scribe	kb 内部的引用、结论与条数
-11-batch-scope.sh	gate-triage	这一批的触发文件有没有登记进 .claude/batch-scope：判据是暂存区，而暂存与提交归主 agent，跑整轮门禁的分诊先替它看一眼
-12-no-prime-marks.sh	gate-triage	全仓不许用角标写法给变体起名：谁写文件都可能写进一撇，收尾跑整轮门禁时一并判
-13-vague-names.sh	gate-triage	函数名与类型名不许只由空泛词拼成：谁写 .rs 都可能起出 run_cell 这种名字，收尾跑整轮门禁时一并判
-15-research-build.sh	gate-triage	research 构建与单测（全工作区十几分钟，2026-09-17 从 experiment-runner 挪到收尾：执行员前台等它会让缓存过期、整份上下文重写）
-16-freeze-layer-membership.sh	kb-scribe	冻结层归属登记表是 kb：每个结构的行、态别与退不退出冻结、依据分项都由书记员写回，写完就跑
-19-verdict-names-local-samples.sh	gate-triage	判决文件由主 agent 写，提交前核它按路径点名了那一轮本地腿的每一份样本（与 72 号同归整轮门禁）
-20-kb-shape.sh	kb-scribe	kb 用词、指代、链接、条数与标题
-21-decision-items-sync.sh	kb-scribe	决策分项清单与正文
-22-item-ref-status.sh	kb-scribe	分项引用写的状态
-24-status-redundancy.sh	kb-scribe	分项状态重复标注
-27-format-constants.sh	kb-scribe,experiment-runner	kb 登记的格式常量与实验源码两边
-28-cross-decision-status.sh	kb-scribe	跨决策的未定说法
-29-settled-item-self-open.sh	kb-scribe	已定分项自称没定
-30-decision-history.sh	kb-scribe	决策变更留痕
-31-blocking-verdict.sh	kb-scribe	未定项两把尺判没判过：挡不挡新池新建文件、动不动格式
-32-new-pool-file-creation-fields.sh	kb-scribe	字节表字段指向真实分项
-33-mutation-tables.sh	experiment-runner,kb-scribe,implementation-writer	实验二进制有同名变异表；relabel-item.py 改写实验源码之后锚点会腐化，书记员也跑；crates/mutations.tsv 的锚点也归它数，改 crates/ 的实现员改完就跑（59 号要几个钟头，实现员不跑）
-34-experiment-index-sync.sh	experiment-runner	实验索引行与正文标题
-35-user-verdict-owed.sh	kb-scribe	动了用户定案要记欠账
-36-invariant-count-cross-file.sh	kb-scribe	不变量条数跨文件
-37-decision-summary-width.sh	kb-scribe	决策索引结论列宽度
-38-field-table-projection.sh	kb-scribe	决策里定的字段投影进字节表
-39-field-table-sum.sh	kb-scribe	字段表合计、表前说明句里的总宽与增量、字节布局表里结构总宽的登记：都是 kb 正文里的数，写回的人改完就跑
-40-results-cited.sh	experiment-runner	实验产物写回
-42-new-pool-file-creation-trio.sh	kb-scribe	字节表、里程碑、决策索引三份互相挂钩
-43-owed-table-shape.sh	kb-scribe	欠账表行形状
-44-settled-ref-says-open.sh	kb-scribe	已定项引用紧跟着说没定
-47-research-script-selftests.sh	three-way-materials	材料员用的抽取脚本与本地腿脚本的自证
-48-history-month-file.sh	kb-scribe	变更史条目住在所在月
-49-history-brief.sh	kb-scribe	变更史快查与原文
-50-rules-manifest.sh	gate-triage	看 CLAUDE.md 的规则引用
-51-admission-terms-covered.sh	kb-scribe	准入不等式各项有人维护
-52-segment-registry.sh	kb-scribe,experiment-runner	字节表段序列登记与 E142 产物两边
-53-format-const-placeholders.sh	implementation-writer,kb-scribe	crates 常量文件的占位与 kb 分项两边
-54-layer0-replay.sh	crash-verifier	层 0 崩溃点重放与 stage-inputs.tsv 里登记的崩溃枚举用例（crash-case: 行，逐条按输入复用、只重跑输入变了的）：提交时在 HEAD + 暂存区的 worktree 里跑 --full
-55-qemu-device-streams.sh	crash-verifier	QEMU 真设备
-56-crates-adversarial-review.sh	gate-triage	判决文件由主 agent 写，提交前核点名
-57-lkmm.sh	crash-verifier	herd7 内存序
-58-implementation-premise.sh	three-way-materials	三方正文是材料员的输入
-59-crates-mutation-replay.sh	crash-verifier	crates 变异表复跑
-60-stale-open-items.sh	kb-scribe	未定项被别处定了
-61-settled-same-file.sh	kb-scribe	定了新东西之后回看同文件未定项
-62-stage-owners.sh	gate-triage	本表与门禁目录、agent 定义
-70-citations.sh	kb-scribe,prior-art	外部引用还核得动；写进 kb 的是书记员，查源码树的是调研员
-80-absolute-assertions.sh	experiment-runner	实验钉绝对值的断言
-84-verdict-false-named.sh	experiment-runner	实验产物判决行里的 false 字段要被实验页点名：判决行由执行员交回之前逐行读、实验页由它写，写完就跑
-85-repro-command.sh	experiment-runner	实验复跑命令
-86-experiment-orphans.sh	experiment-runner	实验号在 kb 里有正文
-87-replay.sh	gate-triage	入库实验复现（全部实验复跑十几分钟，2026-09-17 从 experiment-runner 挪到收尾，理由同 15 号；执行员只跑自己那一个实验的 replay.sh）
-88-quoted-result-lines.sh	experiment-runner	正文整行抄的产物行
-63-agent-write-scope.sh	gate-triage	看项目 settings 里的写范围闸与写范围表
-64-change-range-single-source.sh	gate-triage	门禁阶段自己算 diff 基准、列路径不带 quotepath：谁改门禁阶段都可能再抄一份取法，提交前核
-66-abandoned-rounds.sh	gate-triage	判决文件与撂下登记都由主 agent 写；三方轮次在跑时本来就没有判决，材料员与腿跑它只会红，提交前核
-67-milestone-closeout-owed.sh	kb-scribe	里程碑文件与欠账表都由书记员照规格写回：新立的欠账被里程碑点名、欠账挪进已还清、收口表改了行或改了行号（改号连带改全仓引用），都在它手上变红
-68-knowledge-sync.sh	gate-triage	同步记录由主 agent 在阶段收尾时写；提交前核
-69-evidence-in-repo.sh	experiment-runner,kb-scribe,gate-triage	两半各归一个：装置与变异表改了要有产物，是执行员跑完自己那一个实验就该核的（与 40、85、88 同一批）；kb 里把依据写成 /tmp 路径，是书记员写回时该核的；research/prompts/ 那一半（提示、报告与判决）由主 agent 写，提交前核
-72-agent-def-adversarial-review.sh	gate-triage	判决文件由主 agent 写，提交前核点名（形态照 56 号）
-73-research-gate-lint.sh	gate-triage	研究脚本与 hook 由主 agent 与各执行员改，没有哪个 agent 专管它们；提交前核
-75-decision-experiment-links.sh	kb-scribe,experiment-runner	决策与实验双向登记、实验变了之后的回看（两边都写这张表）
-74-model-differential.sh	implementation-writer,crash-verifier	模型对拍：改 crates/ 的实现员改完先跑（release 下单跑一个测试二进制，几秒）；崩溃验证员跑重阶段时一起跑
-76-overwrite-release-rollback-reuse-hooks.sh	kb-scribe	覆盖写、释放、回退与复用的 layout/02 登记表、里程碑各步「写出的字节」、layout/01 段序列登记表三处互相挂钩
-77-test-environment.sh	crash-verifier,gate-triage	跑完测试之后机器还干不干净：崩溃验证员跑完重阶段、门禁分诊提交前各跑一次
-78-owed-cited-tests.sh	kb-scribe,gate-triage	已还清的欠账行里点名的测试名还在不在：书记员改完欠账表、门禁分诊提交前各跑一次
-90-term-renames.sh	sweep	全仓术语改名的残余归回扫员：它本来就是「撤回一个数、改一个格式常量、新立一条判据之后全仓找还在引旧值的地方」那类活
-91-archive-past-rounds.sh	sweep	上一轮实验记录的归档属于回扫：与「撤回一个数之后全仓找还在引它的地方」同类
-92-layout-checker-sync.sh	implementation-writer,kb-scribe	布局的格式常量变了 checker 判定路径要跟：格式定义两侧一边是 crates/singlefs-format（实现员改），一边是 kb 的字节布局表（书记员改），改完各自就跑
-94-checker-implementation-disjoint.sh	implementation-writer,crash-verifier	checker 与实现只许共享常量模块：两边的代码都由实现员改，记账对账那一格归崩溃一致性验证员，改完各自就跑
-95-fixture-claims.sh	gate-triage	阶段头部声称的判别力样本与 fixtures 目录对不对得上：谁加门禁阶段都可能写下一句对不上的声称，收尾跑整轮门禁时一并判
-96-experiment-source-discipline.sh	experiment-runner,mutation-triage	实验源码的种子折叠（C59）与恒为字面量 0 的读数（C60）：research/e7-index-bench/src/bin/ 下的源码由实验执行员写，写完就跑；变异分诊读同一批源码判抓到 / 无效 / 没红，恒定读数会让那几条变异永远抓不到
-97-invariant-field-anchors.sh	kb-scribe	新写的不变量要点名字段落点：不变量清单归书记员写，写完就跑
-98-kb-registry.sh	kb-scribe	kb 目录与 CLAUDE.md 那张职责表逐项一致：建 kb 文件的是书记员，建完就跑
-93-feature-bits.sh	kb-scribe,implementation-writer	feature bit 位号三处一致：记账表与 D15 已定项 4 登记表都是 kb（书记员改），crates/ 里的位掩码常量是实现员改，改完各自就跑
-
-99-multipath-registry.sh	experiment-runner	多条路径互证的登记：路径、源码落点与共用项由跑实验的人写，写完就跑
-79-tree-table-reserve.sh	kb-scribe	树表预留 76 字节的认购表：认购者与出处都住在决策正文里，定案之后写回 kb 的那一步就该把它带上
-89-closeout-row27-preconditions.sh	implementation-writer	收口表第 27 行那几笔的前置探针：探针盯的是 crates/ 里那几段代码的形态，动它们的就是实现员
-81-audit-contradictions.sh	kb-scribe,gate-triage	最近一次总审核第五节每行都有去向：跨 records/ 与 checks-owed 的回扫闸，归提交前跑整轮的那一位；「已改」行要引今天正文的原文，书记员改决策正文可能删掉被引的那句，写完也跑
-82-clause-enum-pairs.sh	kb-scribe	条文列的集合与代码里的枚举逐个对上：改分项正文是决策变更，归写回 kb 的那一位
-14-test-granularity.sh	gate-triage	用例的归属与粒度：改了 crates/ 下测试的人交回前先跑，门禁分诊员在整轮里再判
+# 门禁归属，按格一行：提交前整轮门禁（gate-triage 跑的 research/scripts/gate-staged.sh）判这一格红时先派给谁修。不是谁在干完活之后跑：交回前各 agent 都不跑门禁。
+# 四列用制表符分隔：门禁文件名、格名（那道门禁文件头的 # gate-cell: 行，--list 打的就是它）、判红时派给谁修（agent 名，逗号分隔，每个名字要有 .claude/agents/<名字>.md）、为什么派给它。
+# 派给谁照合并之前那一道的归属（旧名到今天门禁的对照：records/2026-09-28-门禁59号提速与双机分片.md「旧编号与现在的门禁」）；合并之后新加的格写明没有旧归属。
+# 表与门禁目录、格名表、定义逐格一致由 code-tooling 的 stage-owners 格判。
+54-layer0-replay.sh	layer0-replay	crash-verifier	层 0 崩溃点重放与 stage-inputs.tsv 里登记的崩溃枚举用例（crash-case: 行，逐条按输入复用）：提交时在 HEAD 加暂存区的 worktree 里跑，红了归崩溃一致性验证员看
+checker-independence-and-sync.sh	checker-implementation-disjoint	implementation-writer,crash-verifier	checker 与实现只许共享常量模块：两边的代码都由实现员改，记账对账那一处归崩溃一致性验证员
+checker-independence-and-sync.sh	layout-checker-sync	implementation-writer,kb-scribe	布局的格式常量变了 checker 判定路径要跟：格式定义一边是 crates/singlefs-format（实现员改），一边是 kb 的字节布局表（书记员改）
+checker-tier-crates-mutation-replay.sh	crates-mutation-rows	crash-verifier	crates 变异表复跑，提交时由崩溃一致性验证员跑、红了归它看
+checker-tier-lkmm.sh	litmus-verdicts	crash-verifier	herd7 内存序，提交时由崩溃一致性验证员跑、红了归它看
+checker-tier-qemu-device-streams.sh	device-streams	crash-verifier	QEMU 真设备，提交时由崩溃一致性验证员跑、红了归它看
+checker-tier-research-build-and-replay.sh	research-unit-tests	gate-triage	research 构建与单测（全工作区十几分钟），收尾跑整轮门禁时判，红了先由门禁分诊员分派
+checker-tier-research-build-and-replay.sh	experiment-replay	gate-triage	入库实验复现（全部实验复跑十几分钟），收尾跑整轮门禁时判，红了先由门禁分诊员分派；执行员只管自己那一个实验
+code-source-discipline.sh	vague-names	gate-triage	函数名与类型名不许只由空泛词拼成：谁写 .rs 都可能起出 run_cell 这种名字，收尾跑整轮门禁时一并判
+code-source-discipline.sh	test-file-names	gate-triage	测试文件不按里程碑起名：谁改 crates/ 下测试都可能起错，收尾跑整轮门禁时一并判
+code-source-discipline.sh	format-constants	kb-scribe,experiment-runner	kb 登记的格式常量与实验源码两边：kb 那一边书记员改，实验源码那一边执行员改
+code-source-discipline.sh	clause-enums	kb-scribe	条文列的集合与代码里的枚举逐个对上：改分项正文是决策变更，归写回 kb 的那一位
+code-source-discipline.sh	feature-bits	kb-scribe,implementation-writer	feature bit 位号三处一致：记账表与 D15 已定项 4 登记表都是 kb（书记员改），crates/ 里的位掩码常量是实现员改
+code-source-discipline.sh	mutation-tables	experiment-runner,kb-scribe,implementation-writer	实验二进制有同名变异表；relabel-item.py 改写实验源码之后锚点会腐化，书记员也要修；crates/mutations.tsv 的锚点也归它数，改 crates/ 的实现员修
+code-source-discipline.sh	absolute-assertions	experiment-runner	实验钉绝对值的断言，实验源码由执行员写
+code-source-discipline.sh	reading-discipline	experiment-runner,mutation-triage	实验源码的种子折叠（C59）与恒为字面量 0 的读数（C60）：research/e7-index-bench/src/bin/ 下的源码由实验执行员写；变异分诊读同一批源码
+code-tooling.sh	research-script-selftests	three-way-materials	材料员用的抽取脚本与本地腿脚本的自证
+code-tooling.sh	research-script-selftest-coverage	three-way-materials	研究脚本实现了 --selftest 就要有门禁在跑它，材料员的抽取脚本与本地腿脚本最常新加
+code-tooling.sh	rules-manifest	gate-triage	看 CLAUDE.md 的规则引用，收尾跑整轮门禁时一并判
+code-tooling.sh	stage-owners	gate-triage	本表与门禁目录、格名表、agent 定义，收尾跑整轮门禁时一并判
+code-tooling.sh	agent-write-scope	gate-triage	看项目 settings 里的写范围闸与写范围表，收尾跑整轮门禁时一并判
+code-tooling.sh	change-range-single-source	gate-triage	门禁自己算 diff 基准、列路径不带 quotepath：谁改门禁都可能再抄一份取法，提交前核
+code-tooling.sh	research-gate-lint	gate-triage	研究脚本与钩子由主 agent 与各执行员改，没有哪个 agent 专管它们；提交前核
+code-tooling.sh	fixture-claims	gate-triage	门禁头部声称的判别力样本与 fixtures 目录对不对得上、每一格有没有一红一绿：谁加门禁都可能漏，收尾跑整轮门禁时一并判
+code-tooling.sh	kb-registry	kb-scribe	kb 目录与 CLAUDE.md 那张职责表逐项一致：建 kb 文件的是书记员
+code-tooling.sh	gate-structure	tooling-writer	合并之后新加的格，没有旧归属：格名表、--list、--check 是门禁文件自己的结构，门禁由工具实现员改
+code-tooling.sh	stage-order	tooling-writer	合并之后新加的格，没有旧归属：环境检查那一道排在跑测试的门禁之后靠门禁文件名，门禁由工具实现员改
+doc-decisions.sh	kb-shape	kb-scribe	kb 用词、指代、链接、条数与标题，归写 kb 的书记员
+doc-decisions.sh	item-ref-status	kb-scribe	分项引用写的状态与正文分项表相符，归写 kb 的书记员
+doc-decisions.sh	status-redundancy	kb-scribe	分项状态别重复标注，归写 kb 的书记员
+doc-decisions.sh	cross-decision-status	kb-scribe	跨决策的未定说法与那条决策的状态行一致，归写 kb 的书记员
+doc-decisions.sh	settled-item-self-open	kb-scribe	已定分项不许自称没定，归写 kb 的书记员
+doc-decisions.sh	settled-ref-says-open	kb-scribe	引用写已定紧跟说没定，归写 kb 的书记员
+doc-decisions.sh	stale-open-items	kb-scribe	未定项点名的决策状态变了要回看，归写 kb 的书记员
+doc-decisions.sh	settled-same-file	kb-scribe	同一份决策里新定了东西要回看同文件的未定项，归写 kb 的书记员
+doc-decisions.sh	freeze-layer-membership	kb-scribe	冻结层归属登记表是 kb：每个结构的行、态别与退不退出冻结、依据分项都由书记员写回
+doc-decisions.sh	decision-items-sync	kb-scribe	决策分项清单与正文，归写 kb 的书记员
+doc-decisions.sh	blocking-verdict	kb-scribe	未定项两把尺判没判过：挡不挡新池新建文件、动不动格式，归写 kb 的书记员
+doc-decisions.sh	user-verdict-owed	kb-scribe	动了用户定案要记欠账，欠账表归书记员写
+doc-decisions.sh	decision-summary-width	kb-scribe	决策索引结论列宽度，归写 kb 的书记员
+doc-decisions.sh	write-frequency	kb-scribe	决策正文里的频率断言与写频率登记表不说反话，两边都是 kb
+doc-decisions.sh	entry-added	kb-scribe	决策正文改了要在变更史留条目，归写 kb 的书记员
+doc-decisions.sh	shape	kb-scribe	变更史的形状，归写 kb 的书记员
+doc-decisions.sh	status-sync	kb-scribe	变更史各节现状与索引表同步，归写 kb 的书记员
+doc-experiments.sh	index-sync	experiment-runner	实验索引行与正文标题，实验页由执行员写
+doc-experiments.sh	results-cited	experiment-runner	实验产物写回，归跑实验的执行员
+doc-experiments.sh	evidence-in-repo	experiment-runner,kb-scribe,gate-triage	两半各归一个：装置与变异表改了要有产物，归执行员；kb 里把依据写成 /tmp 路径，归书记员；这一轮新写的提示由主 agent 写，分诊员先替它看
+doc-experiments.sh	decision-links	kb-scribe,experiment-runner	决策与实验双向登记、实验变了之后的回看（两边都写这张表）
+doc-experiments.sh	verdict-false-named	experiment-runner	实验产物判决行里的 false 字段要被实验页点名：判决行与实验页都由执行员写
+doc-experiments.sh	repro-command	experiment-runner	实验复跑命令，实验页由执行员写
+doc-experiments.sh	experiment-orphans	experiment-runner	实验号在 kb 里有正文，实验页由执行员写
+doc-experiments.sh	quoted-result-lines	experiment-runner	正文整行抄的产物行，归写实验页的执行员
+doc-experiments.sh	archive-past-rounds	sweep	上一轮实验记录的归档属于回扫：与「撤回一个数之后全仓找还在引它的地方」同类
+doc-experiments.sh	multipath-registry	experiment-runner	多条路径互证的登记：路径、源码落点与共用项由跑实验的人写
+doc-process-records.sh	batch-scope	gate-triage	这一批的触发文件有没有登记进 .claude/batch-scope：判据是暂存区，而暂存与提交归主 agent，跑整轮门禁的分诊先替它看一眼
+doc-process-records.sh	verdict-names-local-samples	gate-triage	判决文件由主 agent 写，提交前核它按路径点名了那一轮本地腿的每一份样本
+doc-process-records.sh	crates-adversarial-review	gate-triage	判决文件由主 agent 写，提交前核点名
+doc-process-records.sh	implementation-premise	three-way-materials	三方正文是材料员的输入
+doc-process-records.sh	abandoned-rounds	gate-triage	判决文件与撂下登记都由主 agent 写；三方轮次在跑时本来就没有判决，提交前核
+doc-process-records.sh	knowledge-sync	gate-triage	同步记录由主 agent 在阶段收尾时写；提交前核
+doc-process-records.sh	agent-def-adversarial-review	gate-triage	判决文件由主 agent 写，提交前核点名（形态同 crates-adversarial-review 那一格）
+doc-registries.sh	field-refs	kb-scribe	字节表字段指向真实分项，归写 kb 的书记员
+doc-registries.sh	field-projection	kb-scribe	决策里定的字段投影进字节表，归写 kb 的书记员
+doc-registries.sh	field-table-sums	kb-scribe	字段表合计、表前说明句里的总宽与增量、字节布局表里结构总宽的登记：都是 kb 正文里的数，归写回的书记员
+doc-registries.sh	first-txn-hooks	kb-scribe	字节表、里程碑、决策索引三份互相挂钩，都是 kb
+doc-registries.sh	admission-terms	kb-scribe	准入不等式各项有人维护，归写 kb 的书记员
+doc-registries.sh	segment-registry	kb-scribe,experiment-runner	字节表段序列登记与 E142 产物两边：登记归书记员，产物归执行员
+doc-registries.sh	format-const-placeholders	implementation-writer,kb-scribe	crates 常量文件的占位与 kb 分项两边：常量文件归实现员，分项归书记员
+doc-registries.sh	second-txn-hooks	kb-scribe	覆盖写、释放、回退与复用的 layout/02 登记表、里程碑各步「写出的字节」、layout/01 段序列登记表三处互相挂钩，都是 kb
+doc-registries.sh	tree-table-reserve	kb-scribe	树表预留字节的认购表：认购者与出处都住在决策正文里，定案之后写回 kb 的那一步就该把它带上
+doc-registries.sh	table-shape	kb-scribe	欠账表行形状，欠账表归书记员写
+doc-registries.sh	closeout-collects-open	kb-scribe	里程碑文件与欠账表都由书记员照规格写回：新立的欠账被里程碑点名、欠账挪进已还清、收口表改了行或行号，都在它手上变红
+doc-registries.sh	paid-cited-tests	kb-scribe,gate-triage	已还清的欠账行里点名的测试名还在不在：欠账表归书记员，测试改名的人不一定是它，分诊员提交前先看
+doc-registries.sh	audit-contradictions	kb-scribe,gate-triage	最近一次总审核第五节每行都有去向：跨 records/ 与欠账表的回扫闸，归提交前跑整轮的那一位；「已改」行要引今天正文的原文，书记员改决策正文时顺带
+doc-registries.sh	closeout-row27-preconditions	implementation-writer	收口表第 27 行那几笔的前置探针：探针盯的是 crates/ 里那几段代码的形态，动它们的就是实现员
+doc-registries.sh	experiment-refs	kb-scribe	kb 内部引用的实验号指得到正文，归写 kb 的书记员
+doc-registries.sh	decision-refs	kb-scribe	kb 内部引用的决策号指得到正文，归写 kb 的书记员
+doc-registries.sh	declared-counts	kb-scribe	kb 里写的条数与实数相符，归写 kb 的书记员
+doc-registries.sh	governance-refs	kb-scribe	治理文档与 kb 里点名的门禁、格、路径与小节指得到东西、不用旧编号称呼门禁；kb 那一侧归书记员（规则与定义的改动由主 agent 派工具实现员）
+doc-registries.sh	invariant-count-elsewhere	kb-scribe	不变量条数跨文件，归写 kb 的书记员
+doc-registries.sh	citations	kb-scribe,prior-art	外部引用还核得动；写进 kb 的是书记员，查源码树的是调研员
+doc-registries.sh	invariant-anchors	kb-scribe	新写的不变量要点名字段落点：不变量清单归书记员写
+doc-text.sh	prime-marks	gate-triage	全仓不许用撇号类角标给变体起名：谁写文件都可能写进一撇，收尾跑整轮门禁时一并判
+doc-text.sh	clock-times	gate-triage	全仓描述里不许写钟点：谁写文件都可能写进时分，收尾跑整轮门禁时一并判
+doc-text.sh	term-renames	sweep	全仓术语改名的残余归回扫员：它本来就是「撤回一个数、改一个格式常量、新立一条判据之后全仓找还在引旧值的地方」那类活
+harness-model-differential-and-scenarios.sh	one-scenario	gate-triage	用例一条一个场景：谁改 crates/ 下测试都可能写成一条多场景，收尾跑整轮门禁时一并判
+harness-model-differential-and-scenarios.sh	model-fast-tier	implementation-writer,crash-verifier	模型对拍快档：改 crates/ 的实现员修；崩溃一致性验证员跑重门禁时一起看
+harness-model-differential-and-scenarios.sh	model-reuse-sampling	implementation-writer,crash-verifier	模型对拍的复用取样点：改 crates/ 的实现员修；崩溃一致性验证员跑重门禁时一起看
+harness-model-differential-and-scenarios.sh	model-rollback-sampling	implementation-writer,crash-verifier	模型对拍的回退取样点：改 crates/ 的实现员修；崩溃一致性验证员跑重门禁时一起看
+harness-model-differential-and-scenarios.sh	model-allocation-record-wall	implementation-writer,crash-verifier	模型对拍的逼近分配记录墙取样点：改 crates/ 的实现员修；崩溃一致性验证员跑重门禁时一起看
+harness-model-differential-and-scenarios.sh	model-unit-area-wall	implementation-writer,crash-verifier	模型对拍的小盘逼近单元区墙取样点：改 crates/ 的实现员修；崩溃一致性验证员跑重门禁时一起看
+harness-model-differential-and-scenarios.sh	model-unit-area-wall-admission-judged	implementation-writer,crash-verifier	模型对拍的单元区墙准入判定取样点：改 crates/ 的实现员修；崩溃一致性验证员跑重门禁时一起看
+harness-test-environment.sh	machine-clean	crash-verifier,gate-triage	跑完测试之后机器还干不干净：崩溃一致性验证员跑完重门禁、门禁分诊员提交前各看一次

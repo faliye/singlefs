@@ -1,6 +1,6 @@
 # D18（块里携带什么信息） 未定项 15（码 2 的择版本规则）·第二轮·主 agent 核实与判决
 
-**口径**：2026-09-12（JST）主 agent 写。材料 `_d18-item15-r2-background.md`；正推 Sonnet、反推 Opus、反例本地。三条臂与共同底座的定义以 `d18-item15-r1-opus-output.md` 第 21–96 行为准。
+**口径**：2026-09-12 主 agent 写。材料 `_d18-item15-r2-background.md`；正推 Sonnet、反推 Opus、反例本地。三条臂与共同底座的定义以 `d18-item15-r1-opus-output.md` 第 21–96 行为准。
 
 | 腿 | 文件 | 状况 |
 |---|---|---|

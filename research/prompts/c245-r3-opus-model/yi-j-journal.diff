@@ -1,0 +1,12 @@
+--- a/crates/singlefs-core/src/journal.rs	2026-09-27 15:26:43.802848323 +0000
++++ b/crates/singlefs-core/src/journal.rs	2026-09-28 07:02:52.072546318 +0000
+@@ -192,6 +192,9 @@
+ /// 环短于一条记录（环槽数 0）：mkfs 拒这种环长（`make_filesystem` 的 `JournalRingShorterThanOneRecord`），读者一侧择系统配置时
+ /// 拒装不下 F 条记录的环长（`recovery::choose_system_configuration` 报 `SystemConfigurationValueRefused`，代码审阅第 38 条）；
+ /// 发布写记录那一步拿的环长是 `PoolWriter` 的参数，可写挂载按择到的那份系统配置建它，与读者判过的是同一个值。
++/// c245-r3 攻方腿原型用。
++pub const JOURNAL_RECORD_BYTES_FOR_PROBE: u64 = JOURNAL_RECORD_BYTES;
++
+ #[must_use]
+ pub fn record_offset(counter: u64, ring_bytes: u64) -> DeviceOffsetInBytes {
+     let ring_slots = ring_bytes / JOURNAL_RECORD_BYTES;

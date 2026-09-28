@@ -1,4 +1,4 @@
-# 门禁 13 号还没改完名的文件：一行一条 <从仓根起的路径>  # 为什么先不改。排除只缩不涨：改完一个删一行；
+# 门禁 code-source-discipline 的 vague-names 格还没改完名的文件：一行一条 <从仓根起的路径>  # 为什么先不改。排除只缩不涨：改完一个删一行；
 # 指向不存在的文件、或那份文件里已经一个空泛名都没有了，都判红（不起作用的排除项会让人以为那些名字已经被绕开了）。
 research/e7-index-bench/src/bin/e111_stripe_table_key.rs  # 实验装置：函数或类型名只由空泛词拼成；改名要连同 research/mutations 的锚点与 replay.sh 复跑产物一起核，归这个实验下一次重跑时改
 research/e7-index-bench/src/bin/e112_old_writer_unknown_tree.rs  # 实验装置：函数或类型名只由空泛词拼成；改名要连同 research/mutations 的锚点与 replay.sh 复跑产物一起核，归这个实验下一次重跑时改

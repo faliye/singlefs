@@ -48,6 +48,8 @@ failed / killed / stopped（stopped：上一个 Claude 进程退出时它还没�
 --ack 进程:PID 确认。2026-09-24 查到两条交回之后丢下的 `until … do sleep` 跑了 5 个多小时，看门狗只盯没交回的，没人报。
 被看的子 agent 全部交回时照旧退出，但退出前查一遍这一类；只剩宽限里的，等宽限过了再查一次才退。
 只认会话记录里写着输出文件路径的后台任务：命令里自己用 `&`、`nohup` 放出去又改了输出去向的进程，与子 agent 之间没有可认的联系，这里认不出。
+交回那一刻由交回闸 .claude/hooks/handback-guard.sh ④ 拦（同一套认法，从这里导入 background_start_in_result 与 own_background_tasks_still_running）：
+交回时自己起的后台任务还有进程开着输出文件就拒交回；这里报的是闸管不到的（被停、失败，交回闸找不到会话记录或导入失败放行的）。
 
 「跑满 N 小时要主 agent 问一次」：还没交回、没被停（任务通知也不是 failed / killed / stopped）的子 agent，从派发（它会话记录的第一条）起
 每跑满 --ask-every-minutes（默认 60 分钟，即每个整点）报一次，N 是已跨过的最近那一格；主 agent 中途发的消息不重新计时。
@@ -64,15 +66,17 @@ queued_command），与主会话记录里 SendMessage 发给它的成功结果�
 没带前缀、底下却有带前缀的重型进程的不报（`timeout 600 env SINGLEFS_HEAVY_TESTS=commit …` 里的 timeout）；一条链上只报最上面那个，
 下一步给整棵子树从最底层往上逐个停的次序。归属照「交回之后后台还在跑」那套：它或它的上层开着哪个子 agent（或主 agent）后台任务的输出文件，
 认不出写认不出。读不到 cmdline、cwd、environ 的（进程刚退出、权限不够）跳过不报；lib_heavy_tests.py 导入失败时报告里写明这一类没查。
---ack 进程:PID 确认。射程之外：在同一个 shell 里 source 进来跑、不另起进程的。2026-09-24 实十九把重型测试写进 run-chain.sh，
+--ack 进程:PID 确认。双机分片的驱动脚本 layer0-shard-run.sh 按它参数里树根下键那一行登记判（lib_heavy_tests.py 文件头）：
+驱动自检（research/scripts/layer0-shard-run-selftest.sh）在临时仓里登记 harness 档包的替身用例，它一趟趟起的驱动与假 cargo 不报。
+样本自检底下不判：一个进程的参数里有一个是 stage-selftest.sh（按文件名认）或恰好是 --selftest，它自己照判，它底下整棵不判
+（stage-selftest.sh 在临时目录里带 --force 拿样本起 54 号与 checker-tier-lkmm.sh、checker-tier-crates-mutation-replay.sh 这些重型阶段，
+--selftest 建的临时仓里起 gate.sh）；报告那一行写出不判了几个。门禁阶段按文件名认（lib_heavy_tests.py 的 STAGE_KIND：54-layer0-replay.sh 与
+去了编号的 checker-tier-* 四道；checker-tier-research-build-and-replay.sh 只在跑复跑那一格时算重型，--check research-unit-tests 只跑单测那一格的不算）。
+lib_heavy_tests.py 另认的一类「提交时才跑的检查」（COMMIT_CHECK_KINDS：不重型的门禁阶段、上游几道 lint 与样本自检、研究脚本与钩子的 --selftest）
+这里不报：执行前的闸拒它们，收工钩子 gate-reuse-check.sh 每次收工起的 gate-overlap.py 也在这一类，报了就是每次收工叫醒一次。
+AGENT_WATCH_BREAK=heavycommitcheck 把这一类照重型报，自检里「不重型的门禁阶段不报」那一格必须判错。
+执行前的闸 heavy-test-guard.sh 不看上层进程，判法不变。射程之外：在同一个 shell 里 source 进来跑、不另起进程的。2026-09-24 实十九把重型测试写进 run-chain.sh，
 执行前的闸看不进脚本（records/2026-09-16-subagent拆分提案.md 第四十节第 16 行）。
-
-「书记员攒下的没跟上检出」：kb-scribe-followup.sh 写的「书记官写入之后相关记录没跟上」检出，出自还没交回的 kb-scribe 时不叫醒，按书记员攒着；
-它交回、被停或失败时报一条汇总（哪几道门禁各几次、最后一次几点、涉及哪些文件），主 agent 对着它的交回报告核那几道门禁跑没跑。
-看门狗起的时候把被看的书记员此前的这一类检出从检出记录开头重读一遍（上一个看门狗退出时还没报的接得上）；
-记录里没有 agent 号、或它的会话记录找不到的认不出是哪一个：那个会话里还有书记员在跑就攒着，一个都不在跑了才报。
-书记员的别的类别检出照旧立刻叫醒。--ack <书记员 agent 号>:书记员攒下的没跟上检出 确认。2026-09-24 书记员写到一半每写一处就叫醒一次主 agent，
-一小时里十来次（同一张表第 6、16 行）。
 
 「进程常驻内存过线」：这个 Claude 实例底下整棵子树（不只跑得久的叶子；看门狗自己那一支、别的看门狗与它的自检整棵不看）任一进程的常驻内存
 （/proc/<pid>/statm 第二列乘页大小）超过 --process-rss-gibibytes（默认 8 GiB，依据见那个选项；写 0 不查）就报，叫醒主 agent：
@@ -172,11 +176,6 @@ HEAVY_TEST_STOP_ORDER_SHOWN = 24   # 下一步里列出的停止次序最多这�
 MEMORY_ALERT = "进程常驻内存过线"
 PAGE_SIZE_BYTES = os.sysconf("SC_PAGE_SIZE")
 BYTES_PER_GIBIBYTE = 1024 ** 3
-# 「书记员攒下的没跟上检出」：kb-scribe-followup.sh 写的检出（findings 每条都以这句开头）
-SCRIBE_AGENT_TYPE = "kb-scribe"
-SCRIBE_FOLLOWUP_FINDING_PREFIX = "书记官写入之后相关记录没跟上"
-SCRIBE_FOLLOWUP_ALERT = "书记员攒下的没跟上检出"
-SCRIBE_FOLLOWUP_FILES_SHOWN = 8
 # 「该交接」：只对这两类报、到 --context-tokens（默认 70 万，推的）报一次；别的类型上下文多大都不叫醒（主 agent 的规矩是上下文大小不是停它的理由）
 HANDOVER_AGENT_TYPES = {"implementation-writer", "experiment-runner"}
 HANDOVER_ALERT = "该交接"
@@ -189,9 +188,7 @@ SCRATCH_PATH_MENTION = re.compile(r"/tmp/claude-\d+/[^\s`'\"，。；：、（�
 # 一个会话一个看门狗（--discover）：锁、确认过的告警与见过没结束的子 agent 都放在这个会话的状态目录里
 STATE_ROOT = os.environ.get("AGENT_WATCH_STATE_ROOT") or f"/tmp/claude-{os.getuid()}/watch-state"
 SINGLE_INSTANCE_EXIT = 5
-EVENT_ALERT_NAMES = {"hook 检出", SCRIBE_FOLLOWUP_ALERT}   # 事件类告警：确认之后到那个子 agent 结束都不再叫醒；别的是条件类，条件消失就作废
-SCRIBE_FOLLOWUP_NEXT_STEP = ("主 agent 对着它的交回报告核这几道门禁它最后跑没跑、判没判绿：报告里写了绿的，自己再跑一次那几道核实（都是轻阶段，谁都能跑）；"
-                             "报告里没写或写了红的，派 kb-scribe 补，或者自己补")
+EVENT_ALERT_NAMES = {"hook 检出"}   # 事件类告警：确认之后到那个子 agent 结束都不再叫醒；别的是条件类，条件消失就作废
 
 
 def parse_timestamp(text):
@@ -444,14 +441,12 @@ class AgentTranscript:
                     for block in content:
                         if block.get("type") == "tool_result":
                             pending_by_id.pop(block.get("tool_use_id"), None)
-                            plain_result_text = block.get("content") if isinstance(block.get("content"), str) else ""
-                            started = BACKGROUND_STARTED.match(plain_result_text) or (
-                                BACKGROUND_MOVED.match(plain_result_text) if BROKEN_DETECTION != "movedbackground" else None)
+                            started = background_start_in_result(block.get("content"))
                             if started:
-                                self.background_started.append(started.group(1))
-                                output_path = BACKGROUND_OUTPUT_PATH.search(block.get("content"))
+                                task_id, output_path = started
+                                self.background_started.append(task_id)
                                 if output_path:
-                                    self.background_output_paths[started.group(1)] = output_path.group(1)
+                                    self.background_output_paths[task_id] = output_path
                             if block.get("tool_use_id") in handback_tool_ids:
                                 result_text = json.dumps(block.get("content"), ensure_ascii=False).replace("\\", "").replace(" ", "")
                                 if '"success":true' in result_text:
@@ -483,7 +478,7 @@ class AgentTranscript:
             }
         self.pending_tool = max(pending_by_id.values(), key=lambda item: item[0]) if pending_by_id else None
         # 最后一条是纯文字、stop_reason 为空：流式写入时同一条消息后面还会接工具调用，几秒之内就会落下来；
-        # 过了 TEXT_SETTLE_SECONDS 还没接任何记录，就是结束本轮了（2026-09-19 c381-r1 攻方腿 10:57 写一句「等 phase B」就等后台任务，
+        # 过了 TEXT_SETTLE_SECONDS 还没接任何记录，就是结束本轮了（2026-09-19 c381-r1 攻方腿写一句「等 phase B」就等后台任务，
         # 最后两条记录 stop_reason 都是空的，看门狗判成「思考中」，12 分钟后报「无动静」）。
         if (last_kind == "text" and last_text_timestamp is not None and BROKEN_DETECTION != "settle"
                 and (datetime.now(timezone.utc) - last_text_timestamp).total_seconds() >= TEXT_SETTLE_SECONDS):
@@ -572,6 +567,64 @@ class AgentTranscript:
                 and (self.last_timestamp is None or (self.last_timestamp - notified_at).total_seconds() <= STOP_AFTER_LAST_RECORD_SECONDS)):
             return f"任务通知 {status}", notified_at
         return None
+
+
+def background_start_in_result(content):
+    """一条工具结果里起了后台任务的（run_in_background 的「Command running in background with ID: …」，或前台跑满超时被挪进后台的写法）：
+    交 (任务 id, 输出文件或 None)；不是交 None。AgentTranscript 与交回闸（own_background_tasks_still_running）共用这一个认法。"""
+    text = content if isinstance(content, str) else ""
+    started = BACKGROUND_STARTED.match(text) or (BACKGROUND_MOVED.match(text) if BROKEN_DETECTION != "movedbackground" else None)
+    if not started:
+        return None
+    output_path = BACKGROUND_OUTPUT_PATH.search(text)
+    return started.group(1), (output_path.group(1) if output_path else None)
+
+
+def own_background_tasks_still_running(transcript_path):
+    """交回闸（.claude/hooks/handback-guard.sh ④）用：这份子 agent 会话记录里它自己起过的后台任务，此刻还有进程开着输出文件的
+    （与「交回之后后台还在跑」同一套认法：输出文件还有进程开着就是还在跑，不看完成通知）。
+    交 [(任务 id, 输出文件, [(最上层的进程号, 已跑秒数, 命令, 从最底层往上的停止次序)])]，按任务 id 排；会话记录读不了抛 OSError。"""
+    outputs = {}
+    with open(transcript_path, encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if "Output is being written to" not in line:
+                continue
+            try:
+                record = json.loads(line)
+            except ValueError:
+                continue
+            message = record.get("message") if isinstance(record, dict) else None
+            content = message.get("content") if isinstance(message, dict) and message.get("role") == "user" else None
+            for block in content if isinstance(content, list) else []:
+                started = background_start_in_result(block.get("content")) if isinstance(block, dict) and block.get("type") == "tool_result" else None
+                if started and started[1]:
+                    outputs[started[0]] = started[1]
+    if not outputs:
+        return []
+    holders_by_file = output_files_held_open()
+    held = {task_id: holders_by_file[os.path.realpath(path)] for task_id, path in outputs.items() if os.path.realpath(path) in holders_by_file}
+    if not held:
+        return []
+    table = process_table()
+    children = {}
+    for pid, info in table.items():
+        children.setdefault(info["parent"], []).append(pid)
+
+    def bottom_up(pid):
+        order = []
+        for child in sorted(children.get(pid, [])):
+            order += bottom_up(child)
+        return order + ([pid] if table[pid]["state"] not in EXITED_PROCESS_STATES else [])
+
+    ticks_per_second = os.sysconf("SC_CLK_TCK")
+    uptime_seconds = float(open("/proc/uptime").read().split()[0])
+    found = []
+    for task_id in sorted(held):
+        holders = {pid for pid in held[task_id] if pid in table}
+        tops = sorted(pid for pid in holders if table[pid]["parent"] not in holders)
+        found.append((task_id, outputs[task_id], [(pid, uptime_seconds - table[pid]["start_ticks"] / ticks_per_second, command_for_display(table[pid]["command"]),
+                                                   bottom_up(pid)) for pid in tops]))
+    return [item for item in found if item[2]]
 
 
 def files_held_open_by_any_process():
@@ -794,7 +847,7 @@ def progress_note(transcript, now):
         return "；派发提示点名的草稿目录下没有 progress.md"
     modified = datetime.fromtimestamp(os.path.getmtime(path), timezone.utc)
     lines = [line.strip() for line in open(path, encoding="utf-8", errors="replace").read().splitlines() if line.strip()][-PROGRESS_TAIL_LINES:]
-    return (f"；{path} 改于 {modified.astimezone(ZoneInfo('Asia/Tokyo')).strftime('%H:%M')} JST（{format_duration((now - modified).total_seconds())} 前），"
+    return (f"；{path} 改于 {format_duration((now - modified).total_seconds())} 前，"
             f"末 {len(lines)} 行：{' ｜ '.join(line[:120] for line in lines) or '（空）'}")
 
 
@@ -816,12 +869,11 @@ def routine_inquiry_alert(transcript, now, thresholds):
     if last_message is not None and last_message >= mark_reached_at:
         return None   # 这一格之后主 agent 发过消息：问过了
     label = elapsed_mark_label(marks_crossed * thresholds.ask_every_minutes)
-    tokyo = ZoneInfo("Asia/Tokyo")
     message_text = (f"主 agent 上一次给它发消息在 {format_duration((now - last_message).total_seconds())} 以前，早于这一格"
                     if last_message is not None else "派发之后主 agent 一次都没给它发过消息")
     return (f"{ROUTINE_INQUIRY_ALERT_PREFIX}{label}{ROUTINE_INQUIRY_ALERT_SUFFIX}",
-            f"从派发（{transcript.first_timestamp.astimezone(tokyo).strftime('%H:%M')} JST）起已跑 "
-            f"{format_duration((now - transcript.first_timestamp).total_seconds())}，{mark_reached_at.astimezone(tokyo).strftime('%H:%M')} JST 跑满 {label}；"
+            f"从派发起已跑 {format_duration((now - transcript.first_timestamp).total_seconds())}，"
+            f"{format_duration((now - mark_reached_at).total_seconds())} 前跑满 {label}；"
             f"{message_text}（只是慢、这一格不问就 --ack '{transcript.agent_id}:{ROUTINE_INQUIRY_ALERT_PREFIX}{label}'，只确认这一格）"
             f"{progress_note(transcript, now)}",
             ROUTINE_INQUIRY_NEXT_STEP)
@@ -1203,6 +1255,12 @@ def is_watchdog_process(arguments):
     return os.path.basename(script) == "agent-watch.py"
 
 
+def is_sample_selftest_process(arguments):
+    """样本自检：参数里有一个是 stage-selftest.sh（按文件名认），或有一个恰好是 --selftest。它自己照判，它底下整棵不判：
+    stage-selftest.sh 在临时目录里带 --force 拿样本起 54 号与 checker-tier-* 那几道重型阶段，`--selftest` 建的临时仓里起 gate.sh，都不是真在跑的重型测试。"""
+    return any(argument == "--selftest" or os.path.basename(argument) == "stage-selftest.sh" for argument in arguments)
+
+
 def is_shell_code_string_process(library, arguments):
     """`bash -c '…'` 这一层：前缀写在代码串里、不在这个 shell 自己的环境里，它起的命令各自是一个进程，各判各的。"""
     shell_words = library.shell_words
@@ -1267,22 +1325,32 @@ def heavy_test_report(root_pid, excluded_pids, session_dirs):
     for pid, info in table.items():
         children.setdefault(info["parent"], []).append(pid)
     flagged, judgement_errors = {}, []   # flagged：进程号 → (认出的重型用法, SINGLEFS_HEAVY_TESTS 的值)
-    examined, shell_layers, frontier = 0, 0, [root_pid]
+    # frontier 里每项是 (进程号, 它或它的上层是不是样本自检)：样本自检底下的进程不判（判法见文件头「重型测试没带前缀」）
+    examined, shell_layers, under_sample_selftest, frontier = 0, 0, 0, [(root_pid, False)]
     while frontier:
-        for child in sorted(children.get(frontier.pop(), [])):
+        parent, below_sample_selftest = frontier.pop()
+        for child in sorted(children.get(parent, [])):
             arguments = process_arguments(child)
             if arguments and is_watchdog_process(arguments) and BROKEN_DETECTION != "heavywatchdog":
                 continue   # 别的看门狗与它的自检：整棵不扫
-            frontier.append(child)
+            frontier.append((child, below_sample_selftest or (bool(arguments) and is_sample_selftest_process(arguments)
+                                                              and BROKEN_DETECTION != "heavysampleselftest")))
             if child in excluded_pids or table[child]["state"] in EXITED_PROCESS_STATES or not arguments:
                 continue
             examined += 1
+            if below_sample_selftest:
+                under_sample_selftest += 1
+                continue
             if is_shell_code_string_process(library, arguments) and BROKEN_DETECTION != "heavywrapper":
                 shell_layers += 1
                 continue
             try:
                 directory = os.readlink(f"/proc/{child}/cwd")
                 tests = library.classify_process(arguments, directory)
+                # 「提交时才跑的检查」（不重型的门禁阶段、上游几道 lint、研究脚本与钩子的自证）不在进程这一层报：执行前的闸 heavy-test-guard.sh 拒，
+                # 收工钩子 gate-reuse-check.sh 每次收工起的 gate-overlap.py 也是这一类，在这里报就是每次收工叫醒一次（文件头「重型测试没带前缀」）
+                if BROKEN_DETECTION != "heavycommitcheck":
+                    tests = [test for test in tests if test.kind not in getattr(library, "COMMIT_CHECK_KINDS", frozenset())]
                 if tests:
                     flagged[child] = (tests, heavy_test_occasion(child))
             except OSError:
@@ -1346,7 +1414,8 @@ def heavy_test_report(root_pid, excluded_pids, session_dirs):
                        f"主 agent 判断：是该跑的（提交流程里、用户要求的）只是前缀漏了，还是子 agent 越界、或绕过了执行前的闸（写进脚本、python、make 起的）；"
                        f"要停就从最底层往上逐个停整棵子进程，按这个次序逐个跑 `{PROCESS_STOP_COMMAND} <进程号>`：{shown}；"
                        f"或者给归属的那个子 agent 发消息让它自己停；判定接着跑就 --ack 进程:{pid}"))
-    summary = (f"{HEAVY_TEST_ALERT}：查了这个 Claude 实例底下 {examined} 个进程（其中 bash -c 那一层 {shell_layers} 个不单判），"
+    summary = (f"{HEAVY_TEST_ALERT}：查了这个 Claude 实例底下 {examined} 个进程（其中 bash -c 那一层 {shell_layers} 个不单判，"
+               f"样本自检底下 {under_sample_selftest} 个不判），"
                f"认出重型 {len(flagged)} 个、带前缀的 {len(prefixed)} 个，报 {len(alerts)} 条")
     return [summary, *judgement_errors], alerts
 
@@ -1593,30 +1662,16 @@ def session_id_of(transcript_path):
     return os.path.basename(os.path.dirname(os.path.dirname(transcript_path)))
 
 
-def is_scribe_followup(entry):
-    """kb-scribe-followup.sh 写的「书记官写入之后相关记录没跟上」：出自 kb-scribe，findings 每条都是这一类。"""
-    findings = [str(finding) for finding in (entry.get("findings") or [])]
-    if BROKEN_DETECTION == "scribeallfindings":
-        return entry.get("agent_type") == SCRIBE_AGENT_TYPE
-    return (entry.get("agent_type") == SCRIBE_AGENT_TYPE and bool(findings)
-            and all(finding.startswith(SCRIBE_FOLLOWUP_FINDING_PREFIX) for finding in findings))
-
-
-def read_detections(detections_path, start_offset, session_ids, watched_agent_ids=(), alert_from_offset=None):
-    """从 start_offset 往后读检出记录，返回 (新的偏移, [属于这些会话、被看的子 agent 或主 agent 的告警], [只进报告的记录], [书记员写到一半的检出])。
-    书记员写到一半的检出（is_scribe_followup）不进告警，交给调用方按书记员攒着（scribe_followup_report）。
-    给了 alert_from_offset 时，它之前那一段只捡书记员写到一半、认得出是哪个书记员的检出：看门狗起的时候重读一遍，接上一个看门狗退出时还没报的；
-    别的类别在那一段里上一个看门狗已经报过，不再报。"""
-    alerts, notes, scribe_entries = [], [], []
+def read_detections(detections_path, start_offset, session_ids, watched_agent_ids=()):
+    """从 start_offset 往后读检出记录，返回 (新的偏移, [属于这些会话、被看的子 agent 或主 agent 的告警], [只进报告的记录])。"""
+    alerts, notes = [], []
     if not os.path.isfile(detections_path):
-        return start_offset, alerts, notes, scribe_entries
+        return start_offset, alerts, notes
     position = start_offset
     with open(detections_path, "rb") as handle:
         handle.seek(start_offset)
         for raw_line in handle:
-            line_start = position
             position += len(raw_line)
-            in_history = alert_from_offset is not None and line_start < alert_from_offset
             try:
                 entry = json.loads(raw_line.decode("utf-8", "replace"))
             except ValueError:
@@ -1628,12 +1683,6 @@ def read_detections(detections_path, start_offset, session_ids, watched_agent_id
             if (watched_agent_ids and entry.get("agent_id") and entry.get("agent_id") not in watched_agent_ids
                     and BROKEN_DETECTION != "otheragent"):
                 continue   # 同一会话里别的子 agent 的检出归盯它的那个看门狗（2026-09-19：盯攻方腿的看门狗被上游那个 agent 的检出叫醒）
-            if is_scribe_followup(entry) and BROKEN_DETECTION != "scribedefer":
-                if not in_history or entry.get("agent_id"):
-                    scribe_entries.append(entry)
-                continue
-            if in_history:
-                continue
             findings = [str(finding) for finding in (entry.get("findings") or [])]
             if findings and all(finding.startswith("没有 timeout 的等待循环") for finding in findings) and BROKEN_DETECTION != "loopnoise":
                 # 只检出等待循环的不立刻叫醒：正常等编译、等全量跑也是这个形状。会话记录那一路在它跑满 --wait-loop-minutes 时再报。
@@ -1651,101 +1700,12 @@ def read_detections(detections_path, start_offset, session_ids, watched_agent_id
                            ("这次写被 hook 拒了、没写进去；主 agent 判断是不是该写的，再决定发消息让它改、自己改、还是派该写的 agent"
                             if any(str(finding).startswith("写被拒") for finding in (entry.get("findings") or []))
                             else "检出 hook 只记不拦，命令照常在跑；主 agent 判断它会不会出问题，再决定接着盯、发消息让它改、还是处理")))
-    return position, alerts, notes, scribe_entries
-
-
-def add_scribe_followups(pool, entries):
-    """书记员写到一半的检出按 (会话 id, 书记员 agent 号或 None) 攒进 pool。"""
-    for entry in entries:
-        pool.setdefault((entry.get("session_id"), entry.get("agent_id") or None), []).append(entry)
-
-
-def session_directory_for(session_id, known_session_dirs, entries):
-    """检出记录里的会话 id → 会话目录：先找看门狗已知的，再用记录里的 transcript_path（<会话目录>.jsonl），最后在 PROJECTS_ROOT 下找。"""
-    for directory in sorted(known_session_dirs):
-        if os.path.basename(os.path.normpath(directory)) == session_id:
-            return os.path.normpath(directory)
-    for entry in entries:
-        transcript_path = entry.get("transcript_path") or ""
-        if transcript_path.endswith(".jsonl") and os.path.isdir(transcript_path[: -len(".jsonl")]):
-            return transcript_path[: -len(".jsonl")]
-    matches = sorted(glob.glob(os.path.join(PROJECTS_ROOT, "*", session_id))) if session_id else []
-    return matches[0] if matches else None
-
-
-def running_scribes(session_dir):
-    """这个会话里还没交回、没被停、没失败的书记员的 agent 号。"""
-    if not session_dir:
-        return []
-    running = []
-    notifications = session_task_events(os.path.normpath(session_dir) + ".jsonl")[1]
-    for transcript_path in sorted(glob.glob(os.path.join(session_dir, "subagents", "agent-*.jsonl"))):
-        if agent_meta(transcript_path)[0] != SCRIBE_AGENT_TYPE:
-            continue
-        agent_id = os.path.basename(transcript_path)[len("agent-"):-len(".jsonl")]
-        if AgentTranscript(agent_id, transcript_path).ended(notifications) is None:
-            running.append(agent_id)
-    return running
-
-
-def scribe_followup_summary(entries):
-    """一个书记员名下攒下的检出：几次、按门禁分各几次与最后一次几点（JST）、涉及哪些文件。"""
-    tokyo = ZoneInfo("Asia/Tokyo")
-    by_stage, files = {}, []
-    for entry in entries:
-        try:
-            moment = datetime.fromisoformat(str(entry.get("time"))).astimezone(tokyo).strftime("%H:%M")
-        except ValueError:
-            moment = "?"
-        for finding in entry.get("findings") or []:
-            stage = str(finding).split("：", 1)[1].strip() if "：" in str(finding) else str(finding)
-            count, _ = by_stage.get(stage, (0, None))
-            by_stage[stage] = (count + 1, moment)
-        for path in (entry.get("command") or "").split()[1:]:   # 写法是「工具名 路径 路径 …」
-            if path not in files:
-                files.append(path)
-    stage_text = "、".join(f"{stage}（{count} 次，最后一次 {moment} JST）" for stage, (count, moment) in by_stage.items())
-    files_text = "、".join(files[:SCRIBE_FOLLOWUP_FILES_SHOWN]) + (f" 等 {len(files)} 份" if len(files) > SCRIBE_FOLLOWUP_FILES_SHOWN else "")
-    return (f"写的过程中 hook 记了 {len(entries)} 次「{SCRIBE_FOLLOWUP_FINDING_PREFIX}」，按门禁分：{stage_text or '记录里没写'}；"
-            f"涉及的文件：{files_text or '记录里没写'}")
-
-
-def scribe_followup_report(pool, known_session_dirs):
-    """攒下的书记员写到一半的检出：返回 (报告行, [(主体, 告警名, 说明, 下一步)])。判法见文件头「书记员攒下的没跟上检出」。
-    认得出是哪个书记员的：它交回、被停或失败了报一条汇总，还在跑只记一行；认不出的：那个会话里还有书记员在跑就只记一行，一个都不在跑了才报。"""
-    lines, alerts, unattributed = [], [], {}
-    tokyo = ZoneInfo("Asia/Tokyo")
-    for (session_id, agent_id), entries in sorted(pool.items(), key=lambda item: (str(item[0][0]), str(item[0][1]))):
-        session_dir = session_directory_for(session_id, known_session_dirs, entries)
-        transcript_path = os.path.join(session_dir, "subagents", f"agent-{agent_id}.jsonl") if session_dir and agent_id else None
-        if transcript_path is None or not os.path.isfile(transcript_path):
-            unattributed.setdefault(session_id, []).extend(entries)
-            continue
-        transcript = AgentTranscript(agent_id, transcript_path)
-        ended = transcript.ended(session_task_events(transcript.parent_transcript_path)[1])
-        if ended is None or BROKEN_DETECTION == "scribesummary":
-            lines.append(f"书记员 {agent_id}「{transcript.description}」还在写，先攒着不叫醒：{scribe_followup_summary(entries)}；它交回、被停或失败时一起报")
-            continue
-        how_it_ended, ended_at = ended
-        alerts.append((agent_id, SCRIBE_FOLLOWUP_ALERT,
-                       f"书记员「{transcript.description}」{how_it_ended}（{ended_at.astimezone(tokyo).strftime('%H:%M')} JST）；"
-                       f"{scribe_followup_summary(entries)}（看过了、不用再报就 --ack {agent_id}:{SCRIBE_FOLLOWUP_ALERT}）",
-                       SCRIBE_FOLLOWUP_NEXT_STEP))
-    for session_id, entries in sorted(unattributed.items(), key=lambda item: str(item[0])):
-        still_running = running_scribes(session_directory_for(session_id, known_session_dirs, entries))
-        if still_running and BROKEN_DETECTION != "scribeanyrunning":
-            lines.append(f"认不出是哪个书记员的「{SCRIBE_FOLLOWUP_FINDING_PREFIX}」检出 {len(entries)} 条，会话里还有书记员在跑（{', '.join(still_running)}），"
-                         f"先攒着，最后一个交回、被停或失败时一起报：{scribe_followup_summary(entries)}")
-            continue
-        alerts.append((f"{SCRIBE_AGENT_TYPE}（认不出是哪一个）", SCRIBE_FOLLOWUP_ALERT,
-                       f"会话 {session_id} 里的书记员都已交回、被停或失败；{scribe_followup_summary(entries)}",
-                       SCRIBE_FOLLOWUP_NEXT_STEP + "；记录里没有 agent 号，按涉及的文件与时刻对是哪一个书记员的报告"))
-    return lines, alerts
+    return position, alerts, notes
 
 
 def print_report(lines, alerts):
     now = datetime.now(timezone.utc)
-    print(f"[agent-watch {now.strftime('%H:%M:%S')} UTC / {now.astimezone(ZoneInfo('Asia/Tokyo')).strftime('%H:%M:%S')} JST]")
+    print(f"[agent-watch {now.astimezone(ZoneInfo('Asia/Tokyo')).strftime('%Y-%m-%d')}]")
     for line in lines:
         print(line)
     for owner, name, explanation, next_step in alerts:
@@ -1810,7 +1770,7 @@ def acquire_single_instance(state_dir):
         return None, holder
     handle.seek(0)
     handle.truncate()
-    handle.write(f"pid {os.getpid()} 起于 {datetime.now(ZoneInfo('Asia/Tokyo')).strftime('%m-%d %H:%M:%S')} JST")
+    handle.write(f"pid {os.getpid()} 起于 {datetime.now(ZoneInfo('Asia/Tokyo')).strftime('%Y-%m-%d')}")
     handle.flush()
     return handle, None
 
@@ -1845,7 +1805,7 @@ def alert_keys(alert):
 
 
 def pruned_acks(acks, alerts, unfinished_agent_ids):
-    """条件类告警的确认在条件消失（这一次整查没有它）时作废；事件类（hook 检出、书记员汇总）的确认到那个子 agent 结束才作废。"""
+    """条件类告警的确认在条件消失（这一次整查没有它）时作废；事件类（hook 检出）的确认到那个子 agent 结束才作废。"""
     present = set().union(*(alert_keys(alert) for alert in alerts)) if alerts else set()
     kept = set()
     for key in acks:
@@ -1937,9 +1897,6 @@ def run(arguments):
     detections_offset = os.path.getsize(detections_path) if (arguments.mode == "watch" and os.path.isfile(detections_path)) else 0
     report_deadline = watch_started + arguments.max_minutes * 60
     detection_notes = []
-    scribe_followups = {}   # (会话 id, 书记员 agent 号或 None) → 攒着的「书记官写入之后相关记录没跟上」检出
-    # 第一次读检出记录时，被看的书记员此前的这一类检出从文件开头重读（上一个看门狗退出时还没报的接得上）；只给 --session-dir 时不重读，免得把早已交回的书记员翻出来再报
-    history_start = 0 if (agent_ids and BROKEN_DETECTION != "scriberescan") else detections_offset
     def acknowledgements():
         return set(arguments.ack or []) | (read_acks(state_dir) if discover else set())
     while True:
@@ -1949,22 +1906,13 @@ def run(arguments):
             agent_ids, arguments.session_dir, arguments, watch_started, excluded_pids, process_root_pid)
         watched_transcripts = [path for path in (find_transcript(agent_id, arguments.session_dir) for agent_id in agent_ids) if path]
         session_ids = {session_id_of(path) for path in watched_transcripts}
-        known_session_dirs = {os.path.dirname(os.path.dirname(path)) for path in watched_transcripts}
         if arguments.session_dir:
             session_ids.add(os.path.basename(os.path.normpath(arguments.session_dir)))
-            known_session_dirs.add(os.path.normpath(arguments.session_dir))
-        if history_start is not None:
-            detections_offset, detection_alerts, new_notes, new_scribe_entries = read_detections(
-                detections_path, history_start, session_ids, set(agent_ids), alert_from_offset=detections_offset)
-            history_start = None
-        else:
-            detections_offset, detection_alerts, new_notes, new_scribe_entries = read_detections(
-                detections_path, detections_offset, session_ids, set(agent_ids))
-        add_scribe_followups(scribe_followups, new_scribe_entries)
+        detections_offset, detection_alerts, new_notes = read_detections(
+            detections_path, detections_offset, session_ids, set(agent_ids))
         detection_notes += new_notes
-        scribe_lines, scribe_alerts = scribe_followup_report(scribe_followups, known_session_dirs)
-        lines += detection_notes + scribe_lines
-        alerts += detection_alerts + scribe_alerts
+        lines += detection_notes
+        alerts += detection_alerts
         if discover:
             write_acks(state_dir, pruned_acks(acknowledgements(), alerts, set(agent_ids)))
         alerts, acknowledged = split_acknowledged(alerts, acknowledgements())
@@ -1994,19 +1942,16 @@ def run(arguments):
             next_full_check = min(next_full_check, leftover_pending_until.timestamp() + 1)
         while time.time() < next_full_check:
             time.sleep(min(arguments.detection_poll_seconds, max(next_full_check - time.time(), 0)))
-            detections_offset, detection_alerts, new_notes, new_scribe_entries = read_detections(
+            detections_offset, detection_alerts, new_notes = read_detections(
                 detections_path, detections_offset, session_ids, set(agent_ids))
-            add_scribe_followups(scribe_followups, new_scribe_entries)   # 书记员写到一半的不叫醒：攒着，下一次整查时看它交没交回
             detection_notes += new_notes
             # 常驻内存过线等不到下一次整查：单查到了就同检出一样马上整查一次（整查的报告里带着内存一节），有没确认的告警就退 3
             if detection_alerts or memory_alarm_between_checks(process_root_pid, excluded_pids, arguments):
                 lines, alerts, _, active_lists, _ = build_report(agent_ids, arguments.session_dir, arguments, watch_started, excluded_pids, process_root_pid)
-                # 这一次退出之后攒着的就没人接了（书记员已交回的不在下一个看门狗的名单里）：交回了的这里一起报，还在写的写进报告
-                scribe_lines, scribe_alerts = scribe_followup_report(scribe_followups, known_session_dirs)
-                alerts, acknowledged = split_acknowledged(alerts + detection_alerts + scribe_alerts, acknowledgements())
+                alerts, acknowledged = split_acknowledged(alerts + detection_alerts, acknowledgements())
                 if alerts:
-                    lines = lines + detection_notes + scribe_lines + [f"已确认接着盯（--ack {subject}:{name}）：{explanation}"
-                                                                      for subject, name, explanation, _ in acknowledged]
+                    lines = lines + detection_notes + [f"已确认接着盯（--ack {subject}:{name}）：{explanation}"
+                                                       for subject, name, explanation, _ in acknowledged]
                     print_report(lines, alerts)
                     print_active_list(*active_lists)
                     return 3
@@ -2237,7 +2182,10 @@ def selftest_heavy_tests(work, failures, probed_processes, watch_runs):
     """「重型测试没带前缀」的自检：拿自检进程当 Claude 实例，起几个假的重型进程（名字照 cargo 编出来的 checker 档包 singlefs-checker-tier 的测试二进制，里面只是睡）。
     没带前缀的、带别的值的报，带 commit / user-request 的不报；bash -c 里写着带前缀的重型命令、那条命令还没起的不报；
     timeout 包着带前缀的不报，timeout 包着没带前缀的只报 timeout 那一个、下一步给整棵子树从最底层往上的停止次序；
-    后台起、开着一个子 agent 后台任务输出文件的，归属报出那个子 agent。返回起了几个假进程。"""
+    后台起、开着一个子 agent 后台任务输出文件的，归属报出那个子 agent；stage-selftest.sh 与带 --selftest 的脚本底下起的 checker-tier-crates-mutation-replay 不报，
+    同一个 checker-tier-crates-mutation-replay 不经它们直接起照报（AGENT_WATCH_BREAK=heavysampleselftest 去掉这条放行，前一格必须判错）；checker-tier-crates-mutation-replay 用去了编号的新名字
+    checker-tier-crates-mutation-replay.sh。不带前缀直接起的不重型门禁阶段（提交时才跑的检查）不报（AGENT_WATCH_BREAK=heavycommitcheck 下照报，判错）。
+    返回起了几个假进程。"""
     deps = os.path.join(work, "heavy", "target", "release", "deps")
     os.makedirs(deps, exist_ok=True)
     fake_binary = os.path.join(deps, "crash_enumeration_new_pool_file_creation_stream-0123456789abcdef")   # python 顶着这个 argv[0] 睡，不用真的编
@@ -2252,6 +2200,30 @@ def selftest_heavy_tests(work, failures, probed_processes, watch_runs):
         handle.write("import subprocess, sys, time\n"
                      "subprocess.Popen([sys.argv[1], '-c', 'import time\\ntime.sleep(60)\\n'], executable=sys.executable)\n"
                      "time.sleep(60)\n")
+    # 双机分片的驱动脚本（layer0-shard-run.sh，这里只是睡）在两棵树里各起一趟：驱动自检那样的临时仓登记的是 harness 档包的替身用例（不报），
+    # 真跑的树登记的是 checker 档包、带 shard=across-machines（没带前缀照报）。lib_heavy_tests.py 按参数里树根下键那一行判
+    driver_trees = {}
+    for label, key, package in (("驱动自检的临时仓", "crash-case:sharded-selftest", "singlefs-harness"), ("真跑的树", "crash-case:layer0-sample", "singlefs-checker-tier")):
+        tree = os.path.join(work, "driver-trees", key.split(":")[1], "repository")
+        os.makedirs(os.path.join(tree, ".claude", "gate.d"))
+        os.makedirs(os.path.join(tree, "research", "scripts"))
+        with open(os.path.join(tree, ".claude", "gate.d", "stage-inputs.tsv"), "w") as handle:
+            handle.write(f"{key}\tcrates/\ttest={package}:a_target:a_case shard=across-machines\t# 看门狗自检的样本\n")
+        with open(os.path.join(tree, "research", "scripts", "layer0-shard-run.sh"), "w") as handle:
+            handle.write("sleep 60\n")
+        driver_trees[label] = (key, tree)
+    # 样本自检：假的 stage-selftest.sh 与带 --selftest 的假脚本各在底下起一个 crates 变异表那一道（checker-tier-crates-mutation-replay，这里只是睡），都不报；
+    # 同一道不经它们直接起，照报。不重型的门禁阶段（提交时才跑的检查）不带前缀直接起也不报（AGENT_WATCH_BREAK=heavycommitcheck 下照报，判错）
+    sample_tree = os.path.join(work, "sample-selftest-tree")
+    sample_stage = os.path.join(sample_tree, ".claude", "gate.d", "checker-tier-crates-mutation-replay.sh")
+    sample_light_stage = os.path.join(sample_tree, ".claude", "gate.d", "doc-sample.sh")
+    sample_runner = os.path.join(sample_tree, ".claude", "singlefs-ai-sop", "scripts", "stage-selftest.sh")
+    selftest_runner = os.path.join(sample_tree, "research", "scripts", "some-script.sh")
+    for path, text in ((sample_stage, "sleep 60\n"), (sample_light_stage, "sleep 60\n"), (sample_runner, 'bash "$1" "$2" --force\nexit 0\n'),
+                       (selftest_runner, 'bash "$2"\nexit 0\n')):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as handle:
+            handle.write(text)
     heavy_session = os.path.join(work, "heavy-session")
     owned_output = os.path.join(work, "heavyowner.output")
     write_transcript(heavy_session, "heavyowner", [
@@ -2280,6 +2252,12 @@ def selftest_heavy_tests(work, failures, probed_processes, watch_runs):
         start("timeout 包着带前缀的", ["timeout", "60", "env", f"{HEAVY_TEST_VARIABLE}=commit", fake_script])
         start("timeout 包着没带前缀的", ["timeout", "60", fake_script])
         start("另一个看门狗的自检底下没带前缀的", [sys.executable, fake_watchdog, fake_binary])
+        for label, (key, tree) in driver_trees.items():
+            start(f"{label}里起的双机分片驱动", ["bash", os.path.join(tree, "research", "scripts", "layer0-shard-run.sh"), key, tree])
+        start("stage-selftest.sh 拿样本起的 checker-tier-crates-mutation-replay", ["bash", sample_runner, sample_stage, sample_tree])
+        start("带 --selftest 的脚本底下起的 checker-tier-crates-mutation-replay", ["bash", selftest_runner, "--selftest", sample_stage])
+        start("不带前缀直接起的 checker-tier-crates-mutation-replay", ["bash", sample_stage, sample_tree])
+        start("不带前缀直接起的不重型门禁阶段", ["bash", sample_light_stage, sample_tree])
         time.sleep(1.5)   # 等 timeout 起子进程、sh 起 sleep、假看门狗起它的假重型进程
         table = process_table()
 
@@ -2295,11 +2273,14 @@ def selftest_heavy_tests(work, failures, probed_processes, watch_runs):
             reported = re.match(r"进程 (\d+) ", explanation)
             if name == HEAVY_TEST_ALERT and reported:
                 alerted[int(reported.group(1))] = (explanation, next_step)
-        wanted = {started["没带前缀"].pid: "没带前缀", started["带别的值"].pid: "带别的值", timeout_pid: "timeout 包着没带前缀的"}
+        wanted = {started["没带前缀"].pid: "没带前缀", started["带别的值"].pid: "带别的值", timeout_pid: "timeout 包着没带前缀的",
+                  started["真跑的树里起的双机分片驱动"].pid: "真跑的树里起的双机分片驱动",
+                  started["不带前缀直接起的 checker-tier-crates-mutation-replay"].pid: "不带前缀直接起的 checker-tier-crates-mutation-replay"}
         if set(alerted) != set(wanted):
             failures.append(f"「{HEAVY_TEST_ALERT}」应当只报 {sorted(wanted.values())} 这 {len(wanted)} 个（进程号 {sorted(wanted)}），"
                             f"带 commit / user-request 的、bash -c 里带前缀还没起的、timeout 包着带前缀的、timeout 底下那个 sh、"
-                            f"另一个看门狗的自检底下的都不报；"
+                            f"另一个看门狗的自检底下的、驱动自检的临时仓里起的双机分片驱动（登记的是 harness 档包）、"
+                            f"stage-selftest.sh 拿样本起的与带 --selftest 的脚本底下起的 checker-tier-crates-mutation-replay、不带前缀直接起的不重型门禁阶段都不报；"
                             f"实际报了 {sorted(alerted)}（{[started_label for started_label, process in started.items() if process.pid in alerted]}），报告：{lines}")
         unprefixed_explanation = alerted.get(started["没带前缀"].pid, ("", ""))[0]
         if not all(part in unprefixed_explanation for part in ("层 0", f"没带 {HEAVY_TEST_VARIABLE}=commit", "子 agent heavyowner", "heavyowner.output")):
@@ -2316,7 +2297,9 @@ def selftest_heavy_tests(work, failures, probed_processes, watch_runs):
                             f"停的命令与 --ack 进程:{timeout_pid}；实际说明：{timeout_explanation or '没报'}，下一步：{timeout_next_step}")
         if not any(line.startswith(f"{HEAVY_TEST_ALERT}：查了") and f"报 {len(wanted)} 条" in line for line in lines):
             failures.append(f"报告里应当有一行「{HEAVY_TEST_ALERT}：查了 … 报 {len(wanted)} 条」，实际 {lines}")
-        # 走看门狗：--processes-only 与 --agents 两条路都报、退 3；三个都 --ack 进程:<pid> 之后不叫醒，到点退 4
+        if not any(re.search(r"样本自检底下 [1-9]\d* 个不判", line) for line in lines):
+            failures.append(f"报告那一行应当写出样本自检底下不判的进程数（这里至少 1 个），实际 {lines}")
+        # 走看门狗：--processes-only 与 --agents 两条路都报、退 3；报的那几个都 --ack 进程:<pid> 之后不叫醒，到点退 4
         wanted_alert_line = f"⚠️ {HEAVY_TEST_ALERT}（进程）：进程 {started['没带前缀'].pid} "
         base = [sys.executable, os.path.abspath(__file__), "watch", "--process-root-pid", str(os.getpid()), "--session-dir", heavy_session,
                 "--interval-seconds", "1", "--max-minutes", "0.1"]
@@ -2330,7 +2313,7 @@ def selftest_heavy_tests(work, failures, probed_processes, watch_runs):
         acknowledged_run = subprocess.run(base + ["--processes-only"] + [argument for pid in wanted for argument in ("--ack", f"进程:{pid}")],
                                           capture_output=True, text=True, timeout=120)
         if acknowledged_run.returncode != 4 or "已确认接着盯（--ack 进程:" not in acknowledged_run.stdout:
-            failures.append(f"「{HEAVY_TEST_ALERT}」的三个进程都 --ack 进程:<pid> 之后看门狗不该叫醒：应当到点退出码 4 并写「已确认接着盯」，"
+            failures.append(f"「{HEAVY_TEST_ALERT}」的 {len(wanted)} 个进程都 --ack 进程:<pid> 之后看门狗不该叫醒：应当到点退出码 4 并写「已确认接着盯」，"
                             f"实际退出码 {acknowledged_run.returncode}，输出：{acknowledged_run.stdout[-500:]}")
     finally:
         # timeout 与 bash -c 起的子孙（sh、sleep）不随父进程一起死：停之前先记下这几棵子树的进程号，子孙先停
@@ -2457,91 +2440,6 @@ def selftest_memory(work, failures, probed_processes, watch_runs):
     return len(started)
 
 
-def selftest_scribe_followups(work, failures, watch_runs):
-    """「书记员攒下的没跟上检出」的自检：另起会话目录与检出记录。书记员还在写时这一类检出不叫醒、到点退 4；
-    看门狗盯着的时候它交回，报一条汇总退 3；看门狗起之前攒下、它已交回的，起的时候重读出来报；书记员别的类别的检出照旧立刻叫醒；
-    认不出是哪个书记员的，会话里还有书记员在跑就攒着，一个都不在跑了才报。返回查了几个书记员。"""
-    session_id = "scribe-session"
-    scribe_session = os.path.join(work, session_id)
-    detections = os.path.join(work, "scribe-detections.jsonl")
-    writing_records = [bash_use(0.2, "t1", "python3 research/scripts/replace-once.py .claude/kb/decisions/23-样本.md 旧 新", "m1")]
-
-    def scribe_meta(description):
-        return {"agentType": SCRIBE_AGENT_TYPE, "description": description}
-
-    write_transcript(scribe_session, "scriberunning", writing_records, scribe_meta("一直在写"))
-    write_transcript(scribe_session, "scribelater", writing_records, scribe_meta("看门狗盯着的时候交回"))
-    handed_back_records = [bash_use(3, "t1", "ls", "m1"), bash_result(2.9, "t1"), *handback_records(1, "h1", "m2"),
-                           record_at(0.9, "assistant", [{"type": "text", "text": "交回了"}], stop_reason="end_turn", message_id="m3")]
-    write_transcript(scribe_session, "scribedone", handed_back_records, scribe_meta("看门狗起之前就交回了"))
-
-    def detection(agent_id, stage, paths, finding=None):
-        return {"time": datetime.now(timezone.utc).isoformat(), "session_id": session_id, "agent_id": agent_id, "agent_type": SCRIBE_AGENT_TYPE,
-                "transcript_path": scribe_session + ".jsonl", "command": f"Bash {' '.join(paths)}",
-                "findings": [finding or f"{SCRIBE_FOLLOWUP_FINDING_PREFIX}：{stage}"]}
-
-    def append_detection(entry):
-        with open(detections, "a", encoding="utf-8") as handle:
-            handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
-    def run_scribe_watch(agents, max_minutes, later_steps=()):
-        """起看门狗盯这几个书记员；later_steps 是 [(起之后等几秒, 要做的事, 说明)]，按次序做。返回 (退出码, 标准输出)。"""
-        watch_runs.append(["scribe", agents, *[label for _, _, label in later_steps]])
-        watcher = subprocess.Popen([sys.executable, os.path.abspath(__file__), "watch", "--agents", agents, "--session-dir", scribe_session,
-                                    "--process-root-pid", "0", "--interval-seconds", "1", "--detection-poll-seconds", "0.3",
-                                    "--max-minutes", str(max_minutes), "--detections-file", detections],
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        for delay_seconds, action, _ in later_steps:
-            time.sleep(delay_seconds)
-            action()
-        output, _ = watcher.communicate(timeout=120)
-        return watcher.returncode, output
-
-    open(detections, "w").close()
-    # 看门狗起之前攒下的：scribedone 名下两道门禁各一条
-    append_detection(detection("scribedone", "30-decision-history.sh", [".claude/kb/decisions/23-样本.md", ".claude/kb/decisions-history/2026-09.md"]))
-    append_detection(detection("scribedone", "75-decision-experiment-links.sh", [".claude/kb/experiments/156-样本.md"]))
-    summary_head = f"⚠️ {SCRIBE_FOLLOWUP_ALERT}（scribedone）："
-    exit_code, output = run_scribe_watch("scribedone", 0.2)
-    if (exit_code != 3 or summary_head not in output or "30-decision-history.sh（1 次" not in output
-            or "75-decision-experiment-links.sh（1 次" not in output or ".claude/kb/decisions/23-样本.md" not in output
-            or f"   → 怎么办：{SCRIBE_FOLLOWUP_NEXT_STEP}" not in output):
-        failures.append(f"看门狗起之前攒下、书记员已交回的「{SCRIBE_FOLLOWUP_FINDING_PREFIX}」应当在起的时候重读出来报一条汇总「{summary_head}…」"
-                        f"（两道门禁各 1 次、涉及的文件、出路）并退出码 3，实际退出码 {exit_code}，输出：{output[-600:]}")
-    # 书记员还在写：这一类检出不叫醒，攒着写进报告，到点退 4
-    exit_code, output = run_scribe_watch("scriberunning", 0.1, [(1.0, lambda: append_detection(
-        detection("scriberunning", "75-decision-experiment-links.sh", [".claude/kb/decisions/25-样本.md"])), "写到一半记一条")])
-    if exit_code != 4 or "hook 检出" in output or "书记员 scriberunning「一直在写」还在写，先攒着不叫醒" not in output:
-        failures.append(f"书记员还在写时「{SCRIBE_FOLLOWUP_FINDING_PREFIX}」不该叫醒：应当到点退出码 4、报告里记一行「还在写，先攒着不叫醒」、没有「hook 检出」，"
-                        f"实际退出码 {exit_code}，输出：{output[-600:]}")
-    # 看门狗盯着的时候：写到一半记一条（不叫醒），接着它交回（叫醒一次，报汇总）
-    def hand_back_later():
-        write_transcript(scribe_session, "scribelater", [*writing_records, *handback_records(0.01, "h1", "m2")], scribe_meta("看门狗盯着的时候交回"))
-
-    exit_code, output = run_scribe_watch("scribelater", 0.3, [
-        (1.0, lambda: append_detection(detection("scribelater", "30-decision-history.sh", [".claude/kb/decisions/08-样本.md"])), "写到一半记一条"),
-        (1.5, hand_back_later, "交回")])
-    if exit_code != 3 or "hook 检出" in output or f"⚠️ {SCRIBE_FOLLOWUP_ALERT}（scribelater）：" not in output or "30-decision-history.sh（1 次" not in output:
-        failures.append(f"书记员写到一半记的「{SCRIBE_FOLLOWUP_FINDING_PREFIX}」不该当场叫醒、它交回时报一条汇总并退出码 3，"
-                        f"实际退出码 {exit_code}，输出：{output[-600:]}")
-    # 书记员别的类别的检出照旧立刻叫醒
-    exit_code, output = run_scribe_watch("scriberunning", 0.2, [(1.0, lambda: append_detection(
-        detection("scriberunning", "", [".claude/kb/decisions/25-样本.md"], finding="写被拒：越出写范围")), "写被拒")])
-    if exit_code != 3 or "hook 检出" not in output or "写被拒：越出写范围" not in output:
-        failures.append(f"书记员「写被拒」这类检出应当照旧立刻叫醒（退出码 3、报「hook 检出」），实际退出码 {exit_code}，输出：{output[-600:]}")
-    # 认不出是哪个书记员的：会话里还有书记员在跑（scriberunning）就攒着；另一个会话里书记员都交回了就报
-    unattributed = detection(None, "30-decision-history.sh", [".claude/kb/decisions/23-样本.md"])
-    lines, found = scribe_followup_report({(session_id, None): [unattributed]}, {scribe_session})
-    if found or not any("认不出是哪个书记员" in line and "scriberunning" in line for line in lines):
-        failures.append(f"认不出是哪个书记员的检出，会话里还有书记员 scriberunning 在跑时应当攒着、报告里记一行，实际告警 {found}，报告 {lines}")
-    ended_session = os.path.join(work, "scribe-ended-session")
-    write_transcript(ended_session, "scribedone", handed_back_records, scribe_meta("已交回"))
-    lines, found = scribe_followup_report({("scribe-ended-session", None): [dict(unattributed, session_id="scribe-ended-session")]}, {ended_session})
-    if [(owner, name) for owner, name, _, _ in found] != [(f"{SCRIBE_AGENT_TYPE}（认不出是哪一个）", SCRIBE_FOLLOWUP_ALERT)]:
-        failures.append(f"认不出是哪个书记员的检出，会话里书记员都交回了应当报一条「{SCRIBE_FOLLOWUP_ALERT}」，实际告警 {found}，报告 {lines}")
-    return 3
-
-
 def selftest_session_watch(work, thresholds, failures, watch_runs):
     """这一轮加的几样：「该交接」只报两类、「进度文件不涨」、整点询问附进度、hook 检出主体是 agent 号、--discover 单例与确认落文件。返回查了几格。"""
     session = os.path.join(work, "session-discover")
@@ -2586,7 +2484,7 @@ def selftest_session_watch_in(work, session, scratch, thresholds, failures, watc
     detections = os.path.join(work, "detections-subject.jsonl")
     open(detections, "w", encoding="utf-8").write(json.dumps({"session_id": "s1", "agent_type": "implementation-writer", "agent_id": "a1",
                                                               "command": "until x; do sleep 1; done", "findings": ["写被拒"]}, ensure_ascii=False) + "\n")
-    _, detection_alerts, _, _ = read_detections(detections, 0, {"s1"}, set())
+    _, detection_alerts, _ = read_detections(detections, 0, {"s1"}, set())
     checks += 1
     if [alert[0] for alert in detection_alerts] != ["a1"]:
         failures.append(f"hook 检出的主体应当是 agent 号 a1（--ack a1:hook 检出 只压它），实际 {[alert[0] for alert in detection_alerts]}")
@@ -3049,7 +2947,6 @@ def selftest_in(work):
     leftover_cases_checked = selftest_leftover_background(work, thresholds, failures, watch_runs, probed_processes)
     heavy_processes_started = selftest_heavy_tests(work, failures, probed_processes, watch_runs)
     memory_processes_started = selftest_memory(work, failures, probed_processes, watch_runs)
-    scribes_checked = selftest_scribe_followups(work, failures, watch_runs)
     session_watch_checks = selftest_session_watch(work, thresholds, failures, watch_runs)
     for mixed in (["watch", "--processes-only", "--agents", "healthy"], ["cost", "--processes-only"]):
         mixed_run = subprocess.run([sys.executable, os.path.abspath(__file__), *mixed], capture_output=True, text=True, timeout=30)
@@ -3064,7 +2961,7 @@ def selftest_in(work):
     for failure in failures:
         print(f"  ✗ 自检：{failure}")  # gate-lint:detail
     if failures:
-        print("    → 看 agent_alerts() / process_alerts() / heavy_test_report() / memory_report() / read_detections() / scribe_followup_report() / run() 的判法；"
+        print("    → 看 agent_alerts() / process_alerts() / heavy_test_report() / memory_report() / read_detections() / run() 的判法；"
               "AGENT_WATCH_BREAK 设着的话这里本来就该红")
         return 1
     print(f"  ✓ agent-watch 自检通过：等待循环、工具过长、同一命令反复且输出不变、禁用命令、无动静、进程无输出六种告警都报得出，"
@@ -3079,14 +2976,12 @@ def selftest_in(work):
           f"交回、被 TaskStop 停掉、最近一次任务通知是 failed 的子 agent 过了宽限还有进程开着它后台任务的输出文件报「交回之后后台还在跑」（交回不到宽限、没交回还在等、"
           f"stopped 之后又被续做的不报，进程没了不报，--ack 进程:<pid> 不叫醒），被看的全部交回时退出前也报、只剩宽限里的等宽限过了再查，--processes-only 带 --session-dir 也报、不带就写明没查；"
           f"checker 档包 singlefs-checker-tier 的测试二进制在跑而环境里没有 {HEAVY_TEST_VARIABLE}=commit / =user-request 的报「{HEAVY_TEST_ALERT}」（带别的值照报，带这两个值的、"
-          f"bash -c 里写着带前缀而还没起的、timeout 包着带前缀的不报，另一个看门狗的自检那一支整棵不扫，一条链只报最上面那个、下一步给从最底层往上的停止次序，归属认出开着输出文件的子 agent），"
+          f"bash -c 里写着带前缀而还没起的、timeout 包着带前缀的不报，另一个看门狗的自检那一支整棵不扫，stage-selftest.sh 与带 --selftest 的脚本底下起的 checker-tier-crates-mutation-replay 不报、直接起的照报，不重型的门禁阶段（提交时才跑的检查）不报，一条链只报最上面那个、下一步给从最底层往上的停止次序，归属认出开着输出文件的子 agent），"
           f"--processes-only 与 --agents 两条路都报、--ack 进程:<pid> 不叫醒；常驻内存过阈值的进程报「{MEMORY_ALERT}」（写常驻内存、阈值、归属与出路，"
-          f"只睡的小进程不报，阈值 0 不查），两条路整查都报、--ack 进程:<pid> 不叫醒，看门狗起了之后才过线的由两次整查之间的单查几秒内叫醒（{memory_processes_started} 个进程）；"
-          f"书记员还在写时「{SCRIBE_FOLLOWUP_FINDING_PREFIX}」不叫醒、交回时报一条汇总，"
-          f"看门狗起之前攒下的起的时候重读出来，书记员别的类别照旧立刻叫醒，认不出是哪个书记员的等会话里书记员都不在跑了再报"
+          f"只睡的小进程不报，阈值 0 不查），两条路整查都报、--ack 进程:<pid> 不叫醒，看门狗起了之后才过线的由两次整查之间的单查几秒内叫醒（{memory_processes_started} 个进程）"
           f"；上下文过线只对实现员与执行员报「该交接」并列出吃上下文最多的工具输出，等后台任务时 progress.md 久没改报「进度文件不涨」、整点询问附 progress.md 末几行，"
           f"hook 检出的主体是 agent 号；--discover 一个会话一个看门狗（自己找没结束的子 agent、已有一个在盯就退 5）、--ack 落文件下一次读回、条件消失的确认作废（{session_watch_checks} 格）"
-          f"（查了 {len(expectations) + 1 + leftover_cases_checked + 1 + scribes_checked} 个子 agent、{len(probed_processes)} 个进程"
+          f"（查了 {len(expectations) + 1 + leftover_cases_checked + 1} 个子 agent、{len(probed_processes)} 个进程"
           f"（其中假的重型进程 {heavy_processes_started} 个）、{len(watch_runs)} 次看门狗）")
     return 0
 

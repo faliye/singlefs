@@ -1,0 +1,101 @@
+diff -ruN '--exclude=r1-opus-crash-proto' '--exclude=c331_candidates_grid.rs' '--exclude=c393_candidates_grid.rs' '--exclude=c331_newer_instance_roots_unreadable_then_readable_again.rs' '--exclude=c393_abandoned_root_account_unreadable_at_remount.rs' '--exclude=mod.rs' tree/crates/singlefs-core/src/mount.rs opus/d/crates/singlefs-core/src/mount.rs
+--- tree/crates/singlefs-core/src/mount.rs
++++ opus/d/crates/singlefs-core/src/mount.rs
+@@ -1227,6 +1227,7 @@
+     is_abandoned: &dyn Fn(&RootRecord) -> bool,
+     floor: CheckpointTxg,
+     current_records: &[AllocationRecord],
++    system_configuration: &crate::system_configuration::SystemConfiguration,
+ ) -> ShadowLedgerComputed {
+     let mut referenced_by_candidates: BTreeSet<(u32, u64)> = current_records
+         .iter()
+@@ -1249,9 +1250,19 @@
+     let mut unreadable = 0;
+     let mut placements_referenced_by_abandoned_root = BTreeMap::new();
+     for root in roots.iter().filter(|root| is_abandoned(root)) {
+-        let Some(placements) = placements_referenced_by_root(devices, unit_area_start, root) else {
+-            unreadable += 1;
+-            continue;
++        // 候选 (d)（unreadable-at-mount-r1）：账读不出时，把这条根所在实例在环里读得出的每条记录点名过的单元落点（两份）当成它引用的，
++        // 照样隔离、照样记进根环表（这条根离开根环时清）；计数照旧加一。
++        let placements = match placements_referenced_by_root(devices, unit_area_start, root) {
++            Some(placements) => placements,
++            None => {
++                unreadable += 1;
++                placements_named_by_the_records_of_the_instance(
++                    devices,
++                    unit_area_start,
++                    system_configuration,
++                    root.instance,
++                )
++            }
+         };
+         for (device, slot, span_slots) in placements.iter().copied() {
+             let key = (device.0, slot.0);
+@@ -1274,6 +1285,50 @@
+     }
+ }
+ 
++/// 候选 (d)（unreadable-at-mount-r1）：「被抛弃根所在实例写过的槽」取自 journal 环：这个实例读得出的每条记录点名的每个单元的两条位置条目。
++/// 读不出的记录、被环绕掉的记录点名的单元不在其内。
++#[allow(
++    clippy::ptr_arg,
++    reason = "scan_journal 走 &dyn PoolReader，要一个有大小的读者：Vec 实现了它、切片不能转成 dyn"
++)]
++fn placements_named_by_the_records_of_the_instance<Device: BlockDevice>(
++    devices: &Vec<(DeviceIdentity, Device)>,
++    unit_area_start: UnitAreaStart,
++    system_configuration: &crate::system_configuration::SystemConfiguration,
++    instance: InstanceGeneration,
++) -> Vec<(DeviceIdentity, crate::address::SlotNumber, u64)> {
++    let mut seen: BTreeSet<(u32, u64)> = BTreeSet::new();
++    let mut placements = Vec::new();
++    for record in scan_journal(devices, system_configuration)
++        .values()
++        .filter(|record| record.instance == instance)
++    {
++        for named in &record.named {
++            let span_slots = match named.unit_class {
++                crate::unit::UNIT_CLASS_DATA | crate::unit::UNIT_CLASS_PACKED => 2,
++                _ => 1,
++            };
++            for location in &named.locations {
++                if placement_lies_in_the_unit_area_of_its_device(
++                    devices,
++                    unit_area_start,
++                    location.device,
++                    location.slot,
++                    span_slots,
++                )
++                .is_err()
++                {
++                    continue;
++                }
++                if seen.insert((location.device.0, location.slot.0)) {
++                    placements.push((location.device, location.slot, span_slots));
++                }
++            }
++        }
++    }
++    placements
++}
++
+ /// 一条根引用着的落点，逐盘：带文件的一版从它那一版的分配记录里取（账里已释放的是它换下的上一版的，不算它引用）；
+ /// **树表 0 条的一版**引用的就是根记录直接指着的那几个单元——实例表（连同链上后面各片）、树表，写过行的一版还有它自己那片
+ /// 分配记录树节点（根指针住根记录那一项，C512（树表 0 条的一版上被换下的单元记在哪））——两盘同槽，不读分配记录树：
+@@ -1443,6 +1498,7 @@
+             &is_abandoned,
+             effective_floor,
+             &current_records,
++            system_configuration,
+         ),
+         ShadowLedger::Off => ShadowLedgerComputed {
+             abandoned_roots_unreadable: 0,
+@@ -2359,6 +2415,7 @@
+             &|root| abandoned_by_table(root, &table),
+             new_floor,
+             &current.allocation_records,
++            &system_configuration,
+         )
+         .abandoned_roots_unreadable
+     } else {

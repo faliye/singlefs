@@ -6,7 +6,7 @@
 13 个 kb 文件的 sha256 与 `git show e980a21:<路径>` 逐字相同（`diff` 退出码 0）——kb 引文一律按
 e980a21 核。`crates/` 不一样：`allocator.rs`、`make_filesystem.rs`、`transaction.rs` 三个文件的快照哈希
 **不等于** e980a21（`unit.rs`、`singlefs-format/src/lib.rs`、`singlefs-checker/src/lib.rs` 三个不变）；
-云端攻方（Opus）留在磁盘上的副本 `/tmp/claude-1000/m2-keyspace-opus/repo`（08:28:40 rsync）这三个文件的
+云端攻方（Opus）留在磁盘上的副本 `/tmp/claude-1000/m2-keyspace-opus/repo`（开工时 rsync）这三个文件的
 哈希与快照逐字相同，即开工时 `crates/` 确实处于一个与 e980a21 不同的已打补丁状态；现在主树这三个文件的
 哈希又等于 e980a21（`git status` 干净，无提交触达这三个文件）——即中途又被别的会话撤回到 e980a21 状态。
 `crates/` 引文因此按各条自己的时间与版本判，见下方三张表逐条注明。
@@ -54,7 +54,7 @@ e980a21 核。`crates/` 不一样：`allocator.rs`、`make_filesystem.rs`、`tra
 | `transaction.rs:2618` 注释与 `MoreNamedUnitsThanOneJournalRecordHolds` | ✓（对 e980a21，注释块起始行与紧随的错误变体名都对得上） | `sed -n '2615,2630p'` |
 
 **发现（不计入 ✗，单独记）**：报告开头第 3 行自称「引 kb 与代码的行号照 e980a21 查（与开工时读的逐字相同）」，
-这句话对 `allocator.rs`/`make_filesystem.rs`/`transaction.rs` 不成立——开工时（08:28:40 拷贝、经开工快照核过）
+这句话对 `allocator.rs`/`make_filesystem.rs`/`transaction.rs` 不成立——开工时（拷贝经开工快照核过）
 这三个文件已经与 e980a21 不同（见页首版本口径）。但报告里每一条具体引文确实是照 e980a21 抄的、且全部对得上，
 所以这处只是「自称的版本关系不准确」，不构成任何一条引文的 ✗。
 
@@ -141,7 +141,7 @@ Sonnet 报告没有产物/模型目录（S3/S5 是纯 kb 推导），没有复�
 | FACT 5（inode） | `lib.rs:104`-`:105`；同一登记 `08-核心索引结构.md:162` | ✓（两处都对） |
 | FACT 5/6（extent 已定案） | `08-核心索引结构.md:321`,`:330` | ✓（含引号内短句「extent 树内部节点的条目：key 24 + 子指针 86 = 110 字节。分配记录树、记账树、中央映射树的内部条目还没有条款」逐字比对） |
 | FACT 7/8 | `unit.rs:124`,`:126`-`:131` | ✓ |
-| FACT 9（AR） | `lib.rs:230`-`:231`；`allocator.rs:1464`-`:1470` | `lib.rs` 两行 ✓；`allocator.rs` 那五行 ✓**但只对快照时刻的版本**（`/tmp/claude-1000/m2-keyspace-opus/repo` 那份副本），对现在的主树（=e980a21）这五行是另一段代码（`t1@50180` 那条断言）。本地腿运行时刻在 08:41–09:12，晚于快照（08:27）早于主树被撤回补丁的时刻，判定：**这条引用对它自己运行时读到的版本成立**，不判 ✗，按页首版本口径单列 |
+| FACT 9（AR） | `lib.rs:230`-`:231`；`allocator.rs:1464`-`:1470` | `lib.rs` 两行 ✓；`allocator.rs` 那五行 ✓**但只对快照时刻的版本**（`/tmp/claude-1000/m2-keyspace-opus/repo` 那份副本），对现在的主树（=e980a21）这五行是另一段代码（`t1@50180` 那条断言）。本地腿运行在快照之后、主树被撤回补丁之前，判定：**这条引用对它自己运行时读到的版本成立**，不判 ✗，按页首版本口径单列 |
 | FACT 9（EX） | `lib.rs:17`-`:18`,`:32`-`:33`,`:29`-`:30`；`unit.rs:215`-`:221` | ✓ |
 
 **计数**：核了 14 行（覆盖约 30 处独立文件:行指向），✓ 14 行（其中 1 行需按快照版本而非 e980a21 核，已单列，不算 ✗）。

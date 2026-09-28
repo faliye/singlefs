@@ -119,7 +119,7 @@ $ grep -n "分片\|shard\|双机\|第二台" .claude/agents/crash-verifier.md
 2. `crash-verifier.md`「输入（主 agent 必须给）」一节（`.claude/agents/crash-verifier.md:17-24`）列的五项输入（改动范围、提交还是
    用户要求、三道的内存上限、54 号在哪棵 worktree 跑、报告路径）里**没有一项覆盖「第二台机器」**：
    分片开不开是 `research/scripts/layer0-shard-configuration-check.sh` 在跑的那一刻自动判的
-   （本地配置文件 `layer0-shard.env` 在不在、第二台 ssh 连不连得上），不需要主 agent 显式告诉
+   （本地配置文件 `multi-host.env` 在不在、第二台 ssh 连不连得上），不需要主 agent 显式告诉
    crash-verifier「这次要不要分片」——这一点是自动的，不算缺；**但内存上限这一项缺了跨机的一半**：
    `.claude/agents/crash-verifier.md:21` 只要求 54、57 号的内存上限「写明是量过的...还是推的」，而 54 号 `--full`
    分片开着时会经 `run_crash_case_in_two_shards` 把一片交给 `research/scripts/layer0-shard-run.sh`，
@@ -137,7 +137,7 @@ $ grep -n "分片\|shard\|双机\|第二台" .claude/agents/crash-verifier.md
    上限」。这是条款没跟上代码的一处实缺：不是判法错了，是「跑重型测试要包内存」这条规矩在双机分片下
    只包了一半，两份被判条款都没提这件事。
 
-**推翻条件**：这一条会被下面任何一样推翻——① `layer0-shard.env.example` 或 `PEER_*` 配置键里其实有
+**推翻条件**：这一条会被下面任何一样推翻——① `multi-host.env.example` 或 `PEER_*` 配置键里其实有
 内存相关的键（我读过 `research/scripts/layer0-shard-configuration-check.sh:24-25` 的
 `LAYER0_SHARD_CONFIGURATION_KEYS`，只有 `PEER_SSH_HOST PEER_REPOSITORY_DIRECTORY PEER_CARGO_BIN_DIRECTORY
 QUIESCE_STOP_COMMAND QUIESCE_STOPPED_CHECK_COMMAND QUIESCE_START_COMMAND QUIESCE_STARTED_CHECK_COMMAND`
@@ -283,7 +283,7 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 
 ```
 $ ls -la /tmp/claude-1000/gate-batch-m2-r1-fixes/backup/research/scripts/admission.py
--rwxrwxr-x 1 fy5090 fy5090 188978 Sep 26 12:08 /tmp/claude-1000/gate-batch-m2-r1-fixes/backup/research/scripts/admission.py
+-rwxrwxr-x 1 fy5090 fy5090 188978 Sep 26 /tmp/claude-1000/gate-batch-m2-r1-fixes/backup/research/scripts/admission.py
 ```
 r2 攻方留下的、K4 探针默认对照的那份备份文件今天仍在，用它核对过第六节「判法摘要相同」那句。
 
@@ -311,7 +311,7 @@ r2 攻方留下的、K4 探针默认对照的那份备份文件今天仍在，�
   按共用约束属于自证脚本，不在重型测试清单里，跑的都是这两条自证（一次前台、一次因超时被移到后台，
   见正文第二节命令与输出）。
 - 双机分片的「第二台内存没有上限」这条发现只核了脚本正文（`layer0-shard-run.sh`、
-  `layer0-shard-configuration-check.sh`、`layer0-shard.env.example`），没有第二台机器可实测，标「复核不了：
+  `layer0-shard-configuration-check.sh`、`multi-host.env.example`），没有第二台机器可实测，标「复核不了：
   没有第二台环境」。
 - K4 数字里 3194 与我重建出的 3202 行的 8 行落差没能查清具体原因，标「未核实」（不影响判法摘要本身逐字节
   相同这条独立证据）。

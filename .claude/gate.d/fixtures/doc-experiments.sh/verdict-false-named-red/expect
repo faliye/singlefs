@@ -1,0 +1,11 @@
+exit=1
+want=bar_ok=false
+want=没有点名
+want=baz_ok=false
+want=那是上一次跑留下的，不算点名这一次的 false
+want=qux_ok=false
+want=样本只跑 .gate-cells 点名的格：verdict-false-named
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（verdict-false-named）
+want=→ verdict-false-named：在实验页那一次跑的历史条目里点名
+want=bash .claude/gate.d/doc-experiments.sh --check verdict-false-named

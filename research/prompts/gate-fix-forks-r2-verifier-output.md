@@ -2,7 +2,7 @@
 
 本核查不判一条打中成不成立、该不该采纳；核对表里的 ✗ 不免除主 agent 对推论的逐条现查。
 
-写于 2026-09-23 16:20–16:35 UTC（东京 2026-09-24 01:20–01:35 JST）。
+写于 2026-09-23（东京 2026-09-24）。
 
 ## 判别力自证
 
@@ -39,7 +39,7 @@ Opus 的 T5 C8 与 T1 最后一格都引了 `.claude/gate.d/{11,56,68,69,72,75,9
 | 75-decision-experiment-links.sh:53 | 无 `\|\|`（快照树核实：真是无） | 主树现有 `\|\| {` | 分不清（对快照 ✓，对主树已变） |
 | 97-invariant-field-anchors.sh:36 | 无 `\|\|` | 现有 `\|\| {` | 分不清 |
 
-`stat` 证据：11/56/68/69/75/97 六份文件 mtime 全在 `2026-09-23 16:19:04 UTC` 附近，晚于 Opus 报告落盘时刻 `16:12:49 UTC`；72-agent-def-adversarial-review.sh 的 mtime 是 `15:31:30 UTC`，早于报告、且内容至今未变。二次抽查时 72 号又在 `16:21:54 UTC` 被改过一次（补上了 `\|\| {`，但那次抽查窗口之后我没有再复核）。这与快照树上重跑 `t5-added-lines.sh` 的 C8 一致：**对快照树**（frozen at leg start）grep `^\s*[a-z_]+="\$\(gate_changed_paths .*\)"\s*$` 命中的只有 `75-decision-experiment-links.sh:53` 一处，与 Opus 报告在快照时点的说法完全一致；**对当前主树**同一条 grep 现在零命中——即除 72 号外全部被修过。
+`stat` 证据：11/56/68/69/75/97 六份文件 mtime 全在 2026-09-24，晚于 Opus 报告落盘的那一刻；72-agent-def-adversarial-review.sh 的 mtime 早于报告、且内容至今未变。二次抽查时 72 号又被改过一次（补上了 `\|\| {`，但那次抽查窗口之后我没有再复核）。这与快照树上重跑 `t5-added-lines.sh` 的 C8 一致：**对快照树**（frozen at leg start）grep `^\s*[a-z_]+="\$\(gate_changed_paths .*\)"\s*$` 命中的只有 `75-decision-experiment-links.sh:53` 一处，与 Opus 报告在快照时点的说法完全一致；**对当前主树**同一条 grep 现在零命中——即除 72 号外全部被修过。
 
 ⇒ **Opus 的 T5 C8 与 T1「75:53 吞退出码」这两条「打中」，对快照那一刻的仓库状态成立（本核查独立复核过：静态 grep 与端到端场景重跑 `t1-scenes.sh` 两条路都指向同一结论），但主树里对应的问题目前只剩 72-agent-def-adversarial-review.sh 两处还成立**，其余 8 处看起来已被在场修补。这不是报告的错，是主树在核查期间被继续编辑；主 agent 判决时需要知道这一点，不能直接照抄报告里「十处都不判」这句话去交用户。
 
@@ -234,7 +234,7 @@ PY
 
 | 行 | 提示claim | 主树现查 | 判定 |
 |---|---|---|---|
-| Row 1 doc comment | 「E156 first stage: the cost numbers for the four alloc-basis forks…」 | 主树现在的头三行是「E156 重跑（第 2 次）第一段：alloc-basis 四条岔路的代价数，只做岔路 7…」——**完全不同的一段话** | **分不清**：`crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs` 现在是 `git status` 里的 `??`（未跟踪，不在这一轮改动范围内），`stat` 显示 mtime `2026-09-23 16:28:32 UTC`，晚于本地腿三次调用（15:57–16:16 UTC）与两条云端腿报告落盘的时刻；像是另一个并发会话在重跑 E156（文件名本身写着「重跑（第 2 次）」）留下的未提交版本。不算提示写错，是清单外文件被并发会话改动的又一例 |
+| Row 1 doc comment | 「E156 first stage: the cost numbers for the four alloc-basis forks…」 | 主树现在的头三行是「E156 重跑（第 2 次）第一段：alloc-basis 四条岔路的代价数，只做岔路 7…」——**完全不同的一段话** | **分不清**：`crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs` 现在是 `git status` 里的 `??`（未跟踪，不在这一轮改动范围内），`stat` 显示 mtime `2026-09-24`，晚于本地腿三次调用与两条云端腿报告落盘的时刻；像是另一个并发会话在重跑 E156（文件名本身写着「重跑（第 2 次）」）留下的未提交版本。不算提示写错，是清单外文件被并发会话改动的又一例 |
 | Row 1 assert 总数 9 | — | 主树现在是 30 处 | 分不清（同上，随文件改写一起变了） |
 | Row 2 doc comment 首行 | 「Host side: take the two device-side logs…」 | 主树逐字一致 | ✓ |
 | Row 2 assert 总数 0 | — | 主树现查 0 | ✓ |

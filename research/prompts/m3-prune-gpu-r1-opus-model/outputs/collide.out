@@ -1,0 +1,2 @@
+E7RESULT name=attack_digest_collision length=16384 differing_bytes=16 first_digest=91bb1b2affa83a939d4dd75c9917dd09 second_digest=91bb1b2affa83a939d4dd75c9917dd09 digests_equal=true rho_attempts=1 seconds=40.7 crc32c_first=1ec1ebae crc32c_second=d30c8dc9 must_be_nonzero=1
+E7RESULT name=done emitted=2

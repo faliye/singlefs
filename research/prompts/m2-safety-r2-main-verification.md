@@ -7,7 +7,7 @@
 - **正文与材料**：正文 `research/prompts/_m2-safety-r2-body.md`；材料 `_m2-safety-r2-background.md`、`-checklist.md`、`-appendix.md`。
 - **开工快照**：`research/prompts/m2-safety-r2-snapshot/`。核查员在冻结副本下 `sha256sum -c`：代码 125 个、kb 5 个全 OK。两份云端腿报告的 sha256 与交回时给的一致。
 - **腿**：
-  - 云端正推（Sonnet）`m2-safety-r2-sonnet-output.md`，模型 `m2-safety-r2-sonnet-model/`。这个目录没有 `SHA256SUMS`，缺定义要的一样。这条腿跑到一半，被 2026-09-25 11:12 UTC 那一轮 TERM 打断（别的 agent 的自测，调度记录第三节），是接手的那一任交的。它重跑的 `s4-r2-candidates-run2.log` 末尾，紧跟着 `run-with-memory-cap.sh` 的一行语法错误：报在第 1006 行，而同一句话今天在第 991 行。核查员据此坐实了这个脚本在跑着的时候被原地改过；日志里的数据行都写在这行报错之前，与 run1 以及核查员自己的独立复跑逐字一致。
+  - 云端正推（Sonnet）`m2-safety-r2-sonnet-output.md`，模型 `m2-safety-r2-sonnet-model/`。这个目录没有 `SHA256SUMS`，缺定义要的一样。这条腿跑到一半，被 2026-09-25 那一轮 TERM 打断（别的 agent 的自测，调度记录第三节），是接手的那一任交的。它重跑的 `s4-r2-candidates-run2.log` 末尾，紧跟着 `run-with-memory-cap.sh` 的一行语法错误：报在第 1006 行，而同一句话今天在第 991 行。核查员据此坐实了这个脚本在跑着的时候被原地改过；日志里的数据行都写在这行报错之前，与 run1 以及核查员自己的独立复跑逐字一致。
   - 云端攻方（Opus）`m2-safety-r2-opus-output.md`，模型 `m2-safety-r2-opus-model/`。
   - 本地攻方：干净样本 `-local-attack-output-s2.md`、`-s3.md`；`-s1.md` 人工判带损坏（`refuteail`），`-void1.md` 被损坏闸判红作废。
 - **核查员** `m2-safety-r2-verifier-output.md`：一共核了 77 处，74 ✓、2 ✗、1 处核不动。

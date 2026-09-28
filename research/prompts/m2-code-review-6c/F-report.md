@@ -1,7 +1,7 @@
 # checker 逐行审阅报告（crates/singlefs-checker）
 
-口径：只读审阅，没跑 cargo / 脚本 / 门禁。行号取自 2026-09-26 14:32 UTC 的工作区快照（walk.rs sha256 `c3add14d…c47c`，5143 行）。
-⚠️ 审阅中途 walk.rs 被别的会话改过一次（mtime 14:28:42 UTC，5118 → 5143 行）：只是在 2951–2975 行插入了一个 `InstanceTableOfRootRecord`（给 harness 用），其后的行整体 +25，逻辑没变；下面引用的行号都是改后的。lib.rs / image.rs / position_addressed.rs 在审阅期间没动。
+口径：只读审阅，没跑 cargo / 脚本 / 门禁。行号取自 2026-09-26 的工作区快照（walk.rs sha256 `c3add14d…c47c`，5143 行）。
+⚠️ 审阅中途 walk.rs 被别的会话改过一次（mtime，5118 → 5143 行）：只是在 2951–2975 行插入了一个 `InstanceTableOfRootRecord`（给 harness 用），其后的行整体 +25，逻辑没变；下面引用的行号都是改后的。lib.rs / image.rs / position_addressed.rs 在审阅期间没动。
 checker 不从 singlefs-core 引任何东西：`Cargo.toml` 只依赖 `singlefs-format`，src 里 `singlefs_core` 只出现在 lib.rs:126 的一行注释里（已核）。
 `IMPLEMENTED_INVARIANTS`（image.rs:37-43）与 kb 里标「已实现」的 45 条逐个相同（排序后 diff 为空）。
 

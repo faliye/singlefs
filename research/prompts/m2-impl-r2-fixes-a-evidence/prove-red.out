@@ -1,0 +1,11 @@
+Y4-a I-7.13：checker 不判单元区起始槽号等于环长现算的那个槽（A 格 417 +64 漏过）	抓到	each_system_configuration_geometry_field_the_reader_refuses_reddens_only_its_own_invariant_naming_the_refused_field 红了（日志 /tmp/claude-1000/impl-r2-fixes-a/prove-red-logs/001.log）
+Y4-a I-7.13：checker 不判单元区起始槽号落在聚簇段边界上（D 格环长少一槽漏过）	抓到	each_system_configuration_geometry_field_the_reader_refuses_reddens_only_its_own_invariant_naming_the_refused_field 红了（日志 /tmp/claude-1000/impl-r2-fixes-a/prove-red-logs/002.log）
+Y4-a I-7.13：checker 不判 journal 环起点等于第一版常量 1024（B 格 325 写 1023 报成单元区起点）	抓到	each_system_configuration_geometry_field_the_reader_refuses_reddens_only_its_own_invariant_naming_the_refused_field 红了（日志 /tmp/claude-1000/impl-r2-fixes-a/prove-red-logs/003.log）
+Y4-a I-7.13：checker 不判根环起点等于第一版常量 64（C 格 371 写 65 漏过、E 格报成槽距）	抓到	each_system_configuration_geometry_field_the_reader_refuses_reddens_only_its_own_invariant_naming_the_refused_field 红了（日志 /tmp/claude-1000/impl-r2-fixes-a/prove-red-logs/004.log）
+Y4-a I-7.13：几何那四个新成员不认成「读者不收的值」、退成这一槽不可择（别的槽照判、照作保）	抓到	each_system_configuration_geometry_field_the_reader_refuses_reddens_only_its_own_invariant_naming_the_refused_field 红了（日志 /tmp/claude-1000/impl-r2-fixes-a/prove-red-logs/005.log）
+Y2-b 越格线索 I-7.14：本盘设备号与盘在池里的身份不比（判定恒真，盘体对调 0 违例）	抓到	devices_whose_own_device_numbers_are_swapped_redden_only_the_own_device_number_invariant 红了（日志 /tmp/claude-1000/impl-r2-fixes-a/prove-red-logs/006.log）
+Y2-b 越格线索 I-7.14：池级走读不调这一判（干净镜像上 I-7.14 报不适用、不报成立）	抓到	the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target 红了（日志 /tmp/claude-1000/impl-r2-fixes-a/prove-red-logs/007.log）
+I-7.14 坏镜像（checker_known_bad_images）：本盘设备号照原样写回，坏镜像退成干净镜像	抓到	the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target 红了（日志 /tmp/claude-1000/impl-r2-fixes-a/prove-red-logs/008.log）
+C577 结清 ③：零单元发布落盘失败时原样重发一次（冻结再重发的形态），轮换之后那道屏障报错一次时挂载照常做成	抓到	a_zero_unit_publish_whose_post_rotation_barrier_fails_is_not_frozen_and_the_whole_mount_returns_the_error 红了（日志 /tmp/claude-1000/impl-r2-fixes-a/prove-red-logs/009.log）
+✓ 点名 9 条：跑了 9 条，跳过 0 条，跑的都抓到了
+exit=0

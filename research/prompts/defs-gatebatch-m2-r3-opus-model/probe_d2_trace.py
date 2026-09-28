@@ -57,7 +57,7 @@ RUNS = [["crash-case-command", work, "crash-case:own", fingerprint],
         ["crash-case-judge", work, "crash-case:own", os.path.join(work, "single.log"), os.path.join(work, "judged"), *THREADS],
         ["crash-case-judge", work, "crash-case:own", os.path.join(work, "merge.log"), os.path.join(work, "judged"), *THREADS],
         ["crash-case-record", work, "crash-case:own", fingerprint, manifest, os.path.join(work, "judged"), "--files", "4", "--excluded", "0",
-         "--started", "2026-09-27T00:00:00Z", "--judged-root", work, *THREADS],
+         "--started", "2026-09-27T00:00:00Z", "--judged-root", work, *THREADS],  # clock-times:allow 传给被测脚本的开跑时间戳参数
         ["crash-case-marker-check", work, "crash-case:own", fingerprint, manifest],
         ["crash-case-marker-path", work, "crash-case:own", fingerprint],
         ["crash-case-shardable", work, "crash-case:own"]]

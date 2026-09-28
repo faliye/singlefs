@@ -2,8 +2,8 @@
 
 每条决策的状态只有三种：**已定** / **半定**（方向定了，细节未定）/ **待定**，
 它写在各决策正文首行 `## D<n> 简称 —— 状态` 那一行，那里是它唯一的权威记录。
-正文长什么样（每个已定项分定案 / 射程 / 依据 / 欠四块，依据只写指针，有实验才有决策）见 `.claude/rules/format-evolution.md`「决策正文只写现状，依据写成指针；决策与实验双向登记」，门禁 75 号判。
-推翻某条决策时，直接改正文；改前、改后与依据写进当月的 `decisions-history/<年-月>.md`，写法见 [decisions-history.md](decisions-history.md)「怎么加一条」。decisions.md 与各决策正文文末的「历史版本」只放一句指路，不写条目。
+正文长什么样（每个已定项分定案 / 射程 / 依据 / 欠四块，依据只写指针，有实验才有决策）见 `.claude/rules/format-evolution.md`「决策正文只写现状，依据写成指针；决策与实验双向登记」，门禁 doc-experiments 的 decision-links 格判。
+推翻某条决策时，直接改正文；改前、改后与依据写进 [decisions-history.md](decisions-history.md) 对应决策的 `## D<n>（简称）` 节里，组织形态见 `.claude/rules/changelog-format.md`。decisions.md 与各决策正文文末的「历史版本」只放一句指路，不写条目。
 
 ## 决策索引
 
@@ -11,7 +11,7 @@
 编号的登记位是各正文文件里那行 `## D<n> 简称 —— 状态` 标题。
 
 ⚠️ **「结论」列一律 200 字以内**，写那条决策**定了什么**，不写它为什么定、也不写还欠什么。
-上限由门禁阶段「决策索引结论列的宽度」（`.claude/gate.d/37-decision-summary-width.sh`）判红；那个数的权威记录就是「「结论」列一律 N 字以内」这句话里的 N，门禁从它读，改限只改那里。
+上限由门禁阶段「决策索引结论列的宽度」（`.claude/gate.d/doc-decisions.sh` 的 decision-summary-width 格）判红；那个数的权威记录就是「「结论」列一律 N 字以内」这句话里的 N，门禁从它读，改限只改那里。
 展开与依据一律在正文；分项在各正文的「已定项」/「未定项」两个小节里，按状态分住，编号连号不重排。
 
 ⚠️ **「状态」列写的是分项计数**，形如 `已定 6 项 / 未定 0 项`：一条决策拆了几个分项、
@@ -20,11 +20,11 @@
 这一列是各正文两个小节的投影，由 `.claude/scripts/gen-decision-items.py` 生成，**不许手改**：
 
 ```bash
-bash .claude/gate.d/21-decision-items-sync.sh --write   # 状态列与分项清单一起重新生成
+bash .claude/gate.d/doc-decisions.sh --write   # 状态列与分项清单一起重新生成
 ```
 
 门禁两处判它，走的是两条不同的路：21 阶段拿生成器的输出与索引表逐字比对；
-门禁阶段「kb 形状」（`.claude/gate.d/20-kb-shape.sh`）第 7 段**自己去数一遍正文**再比——
+门禁阶段「kb 形状」（`.claude/gate.d/doc-decisions.sh` 的 kb-shape 格）第 7 段**自己去数一遍正文**再比——
 生成器自己数错时，前者两边一起错，只有后者会红。
 
 | 决策 | 状态 | 结论（简报） | 正文 |
@@ -63,15 +63,15 @@ bash .claude/gate.d/21-decision-items-sync.sh --write   # 状态列与分项清�
 ## 分项清单（自动生成，不许手改）
 
 **这张清单由 `.claude/scripts/gen-decision-items.py` 从 `decisions/` 下的正文抽出来**，
-门禁阶段「决策分项清单与正文同步」（`.claude/gate.d/21-decision-items-sync.sh`）逐字比对，
+门禁阶段「决策分项清单与正文同步」（`.claude/gate.d/doc-decisions.sh` 的 decision-items-sync 格）逐字比对，
 **手改它、或改了正文不重新生成，都会判红**。
 
 ⚠️ **权威记录是各决策正文，本清单是它的投影**（`.claude/singlefs-ai-sop/rules/kb-discipline.md`
 第 4 条：同一个事实只许一处权威记录）。要改一条分项的状态，**改正文然后重新生成**：
 
 ```bash
-bash .claude/gate.d/21-decision-items-sync.sh --write   # 重新生成并写回
-bash .claude/gate.d/21-decision-items-sync.sh           # 只比对，不一致打印 diff
+bash .claude/gate.d/doc-decisions.sh --write   # 重新生成并写回
+bash .claude/gate.d/doc-decisions.sh --check decision-items-sync           # 只比对，不一致打印 diff
 ```
 
 ⚠️ **「分项」= 各正文「### 已定项」与「### 未定项」两个小节的索引表里那一层编号项**，
@@ -80,7 +80,7 @@ bash .claude/gate.d/21-decision-items-sync.sh           # 只比对，不一致�
 ⚠️ **一条决策的分项只有一套编号，按状态分住两节，编号连号、不重排。**
 所以「### 已定项」里出现 2、5，「### 未定项」里出现 1、3 是正常的——
 编号是分项的身份，节名是它当前的状态。**引用时必须写成「D<n>（简称） 已定项 k」**，
-状态与正文不符由门禁阶段「分项引用的状态与正文相符」（`.claude/gate.d/22-item-ref-status.sh`）判红。
+状态与正文不符由门禁阶段「分项引用的状态与正文相符」（`.claude/gate.d/doc-decisions.sh` 的 item-ref-status 格）判红。
 
 ⚠️ 一条决策标着「已定」而分项里仍有未定项是**正常的**——状态说的是主结论，分项说的是细节。
 
@@ -243,8 +243,8 @@ bash .claude/gate.d/21-decision-items-sync.sh           # 只比对，不一致�
   - 7. O2（独立解析器 + checker） 判什么 —— 已定
   - 8. 自研的两样 —— 已定
   - 9. 崩溃点重放怎么分层 —— 已定
-  - 10. 层 1 抽样乘的 N 是什么 —— 已定
-  - 11. 层 1 抽样怎么调度 —— 已定
+  - 10. 真正必须精确覆盖的 N 是什么 —— 已定
+  - 11. ignore 的节点什么时候开 —— 已定
   - 12. 冲突 1：checker 即规范与校验路径不许共享工具 —— 已定
   - 13. 冲突 2：refinement 的 spec 与对拍的 model —— 已定
   - 14. 与其他决策的连锁 —— 已定
@@ -468,4 +468,4 @@ bash .claude/gate.d/21-decision-items-sync.sh           # 只比对，不一致�
 
 ## 历史版本
 
-decisions.md 与全部决策的变更史，原文按月住在 `decisions-history/<年-月>.md`，按决策的汇总与「怎么加一条」在 [decisions-history.md](decisions-history.md)；各决策正文文末只放指路。
+decisions.md 与全部决策的变更史，原文按决策分节住在 [decisions-history.md](decisions-history.md)，组织形态见 `.claude/rules/changelog-format.md`；各决策正文文末只放指路。

@@ -37,12 +37,28 @@ qemu-system-*、herd7，以及直接执行的测试二进制 `<target 目录>/[<
 checker 档包 singlefs-checker-tier（-p 点名它，-p 的值认光名字、name@version、pkgid URL 与通配；不挑包而范围含它；当前目录在它里面裸跑），
 不管挑哪个目标（--lib、--doc、--bin、--test、--tests 都算：整个包都是 checker 档，库单测与装置二进制的内联单测也在内），算重型；
 直接执行它的测试二进制（名字是它 tests/ 下的测试目标、src/bin/ 下的装置、或库本身 singlefs_checker_tier）也算。
+双机分片的驱动脚本 research/scripts/layer0-shard-run.sh（--selftest 不算重型，算提交时才跑的检查）按它开跑要读的那一行登记判（shard_driver_runs_checker_tier）：参数里的树根下
+.claude/gate.d/stage-inputs.tsv 里键那一行登记的包是 checker 档包、带 shard=across-machines 的算 checker 档；登记的是别的包的不算
+（驱动自检 research/scripts/layer0-shard-run-selftest.sh 在 mktemp 建的临时仓里登记的替身用例是 harness 档包，自检一趟趟起的驱动与假 cargo 都不算）；
+树根里没有这一行、没登记分片的不算（驱动开跑就拒，什么都不跑）；键不是字面写的 crash-case:<名>、树根解不出或登记读不了的照算。
+门禁 checker-tier-crates-mutation-replay.sh 的双机分片驱动 research/scripts/mutation-shard-run.sh（--selftest 不算重型，算提交时才跑的检查）直接起就算重型，
+与那一道同一类（crates-mutation-stage）：它在两台各跑一趟那一道；只由那一道调，那一道本身已按名字算。
+不按「只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE」判：执行前的闸看不见进程环境，开着它也能拿登记成 checker 档的用例在本机真跑两片。
 harness 档（singlefs-harness）、core、format、池级 checker（singlefs-checker）的测试随时跑，不算重型；工作区全量（--workspace / --all、
 工作区根裸跑、范围是全部成员）算「全量测试」。
 别名：--config 里 alias.<名> 或环境变量 CARGO_ALIAS_<名> 定的、子命令就是它的，看得到值就展开再判；值读不出（TOML 写坏了）按 checker 档算。
 libtest 参数里 --list 当选项出现的（只列用例、一条都不跑）不算重型；跟在带一个值的 libtest 选项（--skip、--logfile、
 --test-threads、--format、--color、-Z、--shuffle-seed：LIBTEST_OPTIONS_WITH_VALUE）后面的 --list 是那个选项的值，照样全跑，不算只列；
 libtest 在 `--` 处停止认选项，`--` 之后的 --list 是过滤词，照样全跑，不算只列。
+门禁阶段按文件名认（.claude/gate.d/ 顶层的 *.sh，lib-*.sh 与 lib/ 底下的共用库不是阶段；STAGE_KIND）：重型的是 54-layer0-replay.sh 与去了编号的
+checker-tier-qemu-device-streams.sh、checker-tier-lkmm.sh、checker-tier-crates-mutation-replay.sh、checker-tier-research-build-and-replay.sh；
+最后那一道（research 构建与单测、实验复跑两道合成）只有复跑那一格是重型：--check 只点名 research-unit-tests 的不算全部实验复跑。带 --list 或 --list-items 的（只打格名表、
+逐项点名的清单）哪一道都不算；带 --write 的（生成）不算。
+另一类「提交时才跑的检查」（COMMIT_CHECK_KINDS，类名 COMMIT_CHECK_CATEGORY；用户 2026-09-28 定：扫仓的门禁与各道 lint、自证只在提交前由 gate-triage 跑的
+research/scripts/gate-staged.sh 跑）：不重型的门禁阶段；.claude/singlefs-ai-sop/scripts/ 下的 doc-lint.sh、gate-lint.sh、shell-lint.sh、preflight-lint.py、
+gate-overlap.py（--list 查清单不算）、rules-lint.sh、hooks-registered.sh、stage-selftest.sh；research/scripts/gate-structure-check.py；
+research/scripts/、.claude/hooks/ 下脚本的 --selftest（vm-bench.sh --selftest 起虚机，照旧算 QEMU）；.claude/gate.d/lib/ 下共用库的直接执行（就是跑它的自证）。
+谁能跑这一类由 heavy-test-guard.sh 定（与重型同一套放行）；看门狗 research/scripts/agent-watch.py 在进程这一层不报这一类。
 看不见的：.cargo/config.toml 与 `--config <文件>` 里定的别名；拷走改名的 checker 档测试二进制；systemd-run -p EnvironmentFile= 指到读不了的文件时里面定没定别名；
 cargo mutants -d 指到别处的树。
 弄坏开关（只给自证用，证明那几格会红）：LIB_HEAVY_TESTS_BREAK 设成下面一个或几个（逗号分隔），--selftest 与 heavy-test-guard.sh --selftest 都必须判红：
@@ -50,7 +66,11 @@ cargo mutants -d 指到别处的树。
   list-by-presence（见到 --list 这个词就算只列）、strace-drops-env（strace -E / --env 设的变量不带进里面那条命令）、
   launcher-long-options-partial（要值的长选项照补全之前的表、不认前缀）、alias-not-expanded（--config / CARGO_ALIAS_ 定的别名看得到值也不展开）、
   package-specification-literal（-p 的值只按字面名比，不认通配、@版本、pkgid URL）、launcher-drops-property-environment（systemd-run -p Environment= /
-  EnvironmentFile= 设的变量不带进里面那条命令）、list-past-separator（找 --list 时见到 `--` 不停）、configuration-before-subcommand-only（只收子命令之前的 --config）、mutants-configuration-ignored（cargo mutants 不看 --test-package、--test-workspace 与 .cargo/mutants.toml 的 test_workspace）、no-run-counted-as-running（`--no-run` 只编译也按跑了算）。
+  EnvironmentFile= 设的变量不带进里面那条命令）、list-past-separator（找 --list 时见到 `--` 不停）、configuration-before-subcommand-only（只收子命令之前的 --config）、mutants-configuration-ignored（cargo mutants 不看 --test-package、--test-workspace 与 .cargo/mutants.toml 的 test_workspace）、no-run-counted-as-running（`--no-run` 只编译也按跑了算）、
+  shard-driver-by-name（双机分片的驱动脚本只按名字判、不读树根里的登记行，驱动自检起的那几趟也报）、
+  stage-by-number（门禁阶段照旧按两位数编号认，去了编号的重型那几道认不出）、commit-checks-ignored（提交时才跑的检查这一类一样都不认）、
+  replay-cells-ignored（research 构建与复跑那一道不分格，只跑单测那一格也算全部实验复跑）。
+切词那一份的弄坏开关 LIB_SHELL_WORDS_BREAK=arguments-as-executed（lib_shell_words.py：`python3 -` 后面的词、`bash -n` 的目标当被执行的脚本）下这里的自检同样必须判红。
 """
 import fnmatch, functools, glob, importlib.util, os, re, shlex, shutil, sys, tempfile, tomllib
 from typing import NamedTuple
@@ -83,15 +103,36 @@ KIND_CATEGORY = {
     "gate-sh": "整轮门禁", "gate-staged": "整轮门禁", "replay-all-stage": "全部实验复跑",
     "e152": "E152 装置",
 }
-# 只有这几道阶段是重型；.claude/gate.d/ 下其余阶段谁都能跑
-STAGE_KIND = {"54": "layer0-stage", "55": "qemu-stage", "57": "herd7-stage", "59": "crates-mutation-stage", "87": "replay-all-stage"}
+# 提交时才跑的检查（用户 2026-09-28 定「现在改到提交时候才验证的部分 都删掉」「门禁是靠 脚本和 hook来解决的」）：
+# 扫仓的门禁阶段、上游的几道 lint、样本自检与阶段结构判法、研究脚本与钩子的 --selftest，都归提交前 gate-triage 跑的 research/scripts/gate-staged.sh
+COMMIT_CHECK_CATEGORY = "提交时才跑的检查"
+KIND_CATEGORY.update({"commit-check-stage": COMMIT_CHECK_CATEGORY, "commit-check-lint": COMMIT_CHECK_CATEGORY,
+                      "commit-check-selftest": COMMIT_CHECK_CATEGORY, "commit-check-structure": COMMIT_CHECK_CATEGORY})
+COMMIT_CHECK_KINDS = frozenset(kind for kind, category in KIND_CATEGORY.items() if category == COMMIT_CHECK_CATEGORY)
+# 上游规范副本里的几道：按名字、又落在 .claude/singlefs-ai-sop/scripts/ 下才算（gate.sh 按名字在别处已算整轮门禁）
+COMMIT_CHECK_SOP_DIRECTORY = ".claude/singlefs-ai-sop/scripts"
+COMMIT_CHECK_SOP_SCRIPTS = frozenset({"doc-lint.sh", "gate-lint.sh", "shell-lint.sh", "preflight-lint.py", "gate-overlap.py", "rules-lint.sh",
+                                      "hooks-registered.sh", "stage-selftest.sh"})
+# 这几个目录下的脚本带 --selftest 跑，是提交时才跑的自证；.claude/gate.d/lib/ 下的共用库直接执行就是跑自证，带不带 --selftest 都算
+COMMIT_CHECK_SELFTEST_DIRECTORIES = ("research/scripts", ".claude/hooks", ".claude/gate.d/lib")
+GATE_LIBRARY_DIRECTORY = ".claude/gate.d/lib"
+# 只查清单、不判的参数：阶段的 --list（格名表）与 --list-items（重型逐项点名的清单）、gate-overlap.py --list
+STAGE_QUERY_ARGUMENTS = frozenset({"--list", "--list-items"})
+# 重型的那几道阶段，按阶段文件名认（54 号名字没改，别的去了编号）；.claude/gate.d/ 下其余阶段是提交时才跑的检查
+STAGE_KIND = {"54-layer0-replay.sh": "layer0-stage", "checker-tier-qemu-device-streams.sh": "qemu-stage", "checker-tier-lkmm.sh": "herd7-stage",
+              "checker-tier-crates-mutation-replay.sh": "crates-mutation-stage", "checker-tier-research-build-and-replay.sh": "replay-all-stage"}
+# research 构建与单测、实验复跑两道合成的那一道只有复跑那一格是重型：--check 只点名单测那一格的，算提交时才跑的检查；不给 --check、或点名里有复跑那一格的，算全部实验复跑
+RESEARCH_BUILD_AND_REPLAY_STAGE = "checker-tier-research-build-and-replay.sh"
+RESEARCH_UNIT_TESTS_CELL = "research-unit-tests"
+# 弄坏开关 stage-by-number 用的旧认法（按两位数编号认，认不出去了编号的新名字）
+STAGE_KIND_BY_NUMBER = {"54": "layer0-stage", "55": "qemu-stage", "57": "herd7-stage", "59": "crates-mutation-stage", "87": "replay-all-stage"}
 # 按名字判的仓内脚本：名字 → 它在仓里的位置。命令词是这个名字、又落在这个位置上，judged_by_name 为真
 KNOWN_SCRIPT_LOCATIONS = {
     "gate.sh": ".claude/scripts/gate.sh", "check.sh": ".claude/scripts/check.sh", "lkmm.sh": ".claude/scripts/lkmm.sh",
     "gate-staged.sh": "research/scripts/gate-staged.sh", "mutate.sh": "research/scripts/mutate.sh",
     "vm-bench.sh": "research/scripts/vm-bench.sh", "e152-run.sh": "research/scripts/e152-run.sh",
     "capped.sh": "research/scripts/capped.sh", "run-with-memory-cap.sh": "research/scripts/run-with-memory-cap.sh",
-    "layer0-shard-run.sh": "research/scripts/layer0-shard-run.sh",
+    "layer0-shard-run.sh": "research/scripts/layer0-shard-run.sh", "mutation-shard-run.sh": "research/scripts/mutation-shard-run.sh",
 }
 
 
@@ -531,16 +572,80 @@ def cargo_use(arguments, directory, environment=None):
     return None
 
 
-GATE_STAGE_PATH = re.compile(r"(?:^|/)\.claude/gate\.d/(\d+)-[^/]+\.sh$")
+# 门禁阶段：.claude/gate.d/ 顶层的 *.sh（lib-*.sh 是共用库、lib/ 底下的不是阶段），按文件名认，不按编号认
+GATE_STAGE_PATH = re.compile(r"(?:^|/)\.claude/gate\.d/([^/]+\.sh)$")
+GATE_STAGE_NUMBER_PATH = re.compile(r"(?:^|/)\.claude/gate\.d/(\d+)-[^/]+\.sh$")
 # cargo 编出来的测试二进制：<target 目录>/[<目标三元组>/]<profile>/deps/<名字>-<16 位十六进制的元数据哈希>，名字里的 - 已换成 _
 TEST_BINARY_PATH = re.compile(r"(?:^|/)deps/([A-Za-z0-9_]+)-[0-9a-f]{16}$")
 
 
-def gate_stage_number(word, directory):
+def gate_stage_name(word, directory):
+    """命令词是 .claude/gate.d/ 顶层的一道阶段时交回它的文件名，不是交 None。"""
     for candidate in (word, shell_words.resolve_path(directory, word) or ""):
         match = GATE_STAGE_PATH.search(candidate)
-        if match:
+        if match and not match.group(1).startswith("lib-"):
             return match.group(1)
+    return None
+
+
+def located_in(word, directory, relative_directory):
+    """命令词（照写的样子，或按当前目录解开之后）是不是正好落在 relative_directory 这一层（相对仓根的写法，按路径尾部比）。"""
+    for candidate in (os.path.normpath(word), shell_words.resolve_path(directory, word) or ""):
+        parent = os.path.dirname(candidate)
+        if parent == relative_directory or parent.endswith("/" + relative_directory):
+            return True
+    return False
+
+
+def checked_cells(arguments):
+    """阶段参数里 --check 点名的格（--check <格>[,<格>…] 与 --check=<…>，给几次取并集）；没给 --check 交 None（全跑）。"""
+    cells, given, position = set(), False, 0
+    while position < len(arguments):
+        argument = arguments[position]
+        if argument == "--check" and position + 1 < len(arguments):
+            cells.update(filter(None, arguments[position + 1].split(",")))
+            given, position = True, position + 2
+            continue
+        if argument.startswith("--check="):
+            cells.update(filter(None, argument[len("--check="):].split(",")))
+            given = True
+        position += 1
+    return cells if given else None
+
+
+def classify_gate_stage(stage, arguments):
+    """一道门禁阶段（按文件名）：只查清单的（--list、--list-items）与生成的（--write）不算；重型的那几道按 STAGE_KIND；其余是提交时才跑的检查。"""
+    if break_is_set("stage-by-number"):
+        match = GATE_STAGE_NUMBER_PATH.search(".claude/gate.d/" + stage)
+        kind = STAGE_KIND_BY_NUMBER.get(match.group(1)) if match else None
+        return heavy_test(kind, f"门禁 {stage}") if kind else None
+    if STAGE_QUERY_ARGUMENTS.intersection(arguments):
+        return None
+    kind = STAGE_KIND.get(stage)
+    if (stage == RESEARCH_BUILD_AND_REPLAY_STAGE and not break_is_set("replay-cells-ignored")
+            and checked_cells(arguments) == {RESEARCH_UNIT_TESTS_CELL}):
+        kind = None   # 只跑单测那一格：不是全部实验复跑，落到下面「提交时才跑的检查」
+    if kind:
+        return heavy_test(kind, f"门禁 {stage}")
+    if "--write" in arguments or break_is_set("commit-checks-ignored"):
+        return None
+    return heavy_test("commit-check-stage", f"门禁阶段 {stage}（扫仓的门禁归提交前 gate-triage 跑的 research/scripts/gate-staged.sh）")
+
+
+def classify_commit_check(name, word, arguments, directory):
+    """上游规范副本里的几道 lint 与样本自检、阶段结构判法、研究脚本 / 钩子 / 门禁共用库的自证：是就交 HeavyTest（提交时才跑的检查），不是交 None。"""
+    if break_is_set("commit-checks-ignored"):
+        return None
+    if name in COMMIT_CHECK_SOP_SCRIPTS and located_in(word, directory, COMMIT_CHECK_SOP_DIRECTORY):
+        if name == "gate-overlap.py" and "--list" in arguments:
+            return None   # 查已有门禁与钩子的清单，不判
+        return heavy_test("commit-check-lint", f"{COMMIT_CHECK_SOP_DIRECTORY}/{name}")
+    if name == "gate-structure-check.py" and located_in(word, directory, "research/scripts"):
+        return heavy_test("commit-check-structure", "research/scripts/gate-structure-check.py（门禁阶段的结构）")
+    if located_in(word, directory, GATE_LIBRARY_DIRECTORY):
+        return heavy_test("commit-check-selftest", f"{GATE_LIBRARY_DIRECTORY}/{name}（直接执行就是跑它的自证）")
+    if "--selftest" in arguments and any(located_in(word, directory, place) for place in COMMIT_CHECK_SELFTEST_DIRECTORIES):
+        return heavy_test("commit-check-selftest", f"{word} --selftest")
     return None
 
 
@@ -749,12 +854,39 @@ def command_under_launcher(words):
     return (assignments + words[position:], working_directory) if position < len(words) else None
 
 
+SHARD_DRIVER_CASE_KEY = re.compile(r"^crash-case:[\w.-]+$")
+SHARD_DRIVER_REGISTRATION = os.path.join(".claude", "gate.d", "stage-inputs.tsv")
+
+
+def shard_driver_runs_checker_tier(arguments, directory):
+    """research/scripts/layer0-shard-run.sh 的参数（`<键> <树根>` 或 `--merged-log <键> <树根> …`）：按它开跑要读的那一行登记判这一趟跑不跑 checker 档
+    （树根的 .claude/gate.d/stage-inputs.tsv 里键那一行，与驱动脚本同一处、同一个键）。
+    True：登记的包是 checker 档包、带 shard=across-machines；False：登记的是别的包（驱动自检在临时仓里登记的替身用例），或树根里没有这一行、
+    没登记 shard=across-machines（驱动开跑就拒，什么都不跑）；None：参数形态认不出、键不是字面写的、树根解不出或那份登记读不了（调用方照重型算）。"""
+    positional = arguments[1:] if arguments[:1] == ["--merged-log"] else arguments
+    if len(positional) < 2 or not SHARD_DRIVER_CASE_KEY.match(positional[0]):
+        return None
+    tree_root = shell_words.resolve_path(directory, os.path.expanduser(positional[1]))
+    if tree_root is None:
+        return None
+    try:
+        with open(os.path.join(tree_root, SHARD_DRIVER_REGISTRATION), encoding="utf-8") as handle:
+            row = next((line.rstrip("\n").split("\t") for line in handle if line.split("\t", 1)[0] == positional[0]), None)
+    except (OSError, UnicodeDecodeError):
+        return None
+    if row is None or len(row) < 3:
+        return False
+    tokens = row[2].split()
+    package = next((token[len("test="):].split(":", 1)[0] for token in tokens if token.startswith("test=")), "")
+    return "shard=across-machines" in tokens and package == CHECKER_PACKAGE_NAME
+
+
 def classify(words, directory, environment=None):
     """一条已经剥掉前缀与包装的命令：返回 HeavyTest 或 None。environment 是这条命令看得到的变量（认 runner 与别名）。"""
     name, arguments = os.path.basename(words[0]), words[1:]
-    stage = gate_stage_number(words[0], directory)
+    stage = gate_stage_name(words[0], directory)
     if stage is not None:
-        return heavy_test(STAGE_KIND[stage], f"门禁 {stage} 号（{name}）") if stage in STAGE_KIND else None
+        return classify_gate_stage(stage, arguments)
     binary = test_binary_name(words[0])
     if binary is not None:
         if libtest_lists_only(arguments):
@@ -766,6 +898,9 @@ def classify(words, directory, environment=None):
         return heavy_test("qemu-system", name)
     if name == "vm-bench.sh":
         return heavy_test("vm-bench", "research/scripts/vm-bench.sh（--selftest 也起虚机）")
+    commit_check = classify_commit_check(name, words[0], arguments, directory)
+    if commit_check is not None:
+        return commit_check
     if name == "lkmm.sh":
         return heavy_test("lkmm", ".claude/scripts/lkmm.sh")
     if name == "herd7":
@@ -783,8 +918,13 @@ def classify(words, directory, environment=None):
     if name == "gate-staged.sh":
         return None if "--selftest" in arguments else heavy_test("gate-staged", "research/scripts/gate-staged.sh（跑 gate.sh --staged）")
     if name == "layer0-shard-run.sh":
-        return None if "--selftest" in arguments else heavy_test(
+        if "--selftest" in arguments or (not break_is_set("shard-driver-by-name") and shard_driver_runs_checker_tier(arguments, directory) is False):
+            return None
+        return heavy_test(
             "checker-tier-cargo", "research/scripts/layer0-shard-run.sh（两台各跑一片 checker 档登记的崩溃枚举用例、带 --include-ignored，再本机 merge）")
+    if name == "mutation-shard-run.sh":
+        return None if "--selftest" in arguments else heavy_test(
+            "crates-mutation-stage", "research/scripts/mutation-shard-run.sh（门禁 checker-tier-crates-mutation-replay.sh 的双机分片驱动：两台各跑一趟那一道、判 crates/mutations.tsv 的一部分）")
     if name in ("e152-file-system-benchmark", "e152-run.sh"):
         return heavy_test("e152", name)
     if name == "cargo":
@@ -823,7 +963,7 @@ def classify_process(argv, cwd):
 
 def judged_by_name(word, directory):
     """按名字判的仓内脚本（门禁阶段、KNOWN_SCRIPT_LOCATIONS 里的脚本在仓内位置上）：判定在名字那一格做完，不再读脚本正文。"""
-    if gate_stage_number(word, directory) is not None:
+    if gate_stage_name(word, directory) is not None:
         return True
     location = KNOWN_SCRIPT_LOCATIONS.get(os.path.basename(word))
     if location is None:
@@ -862,6 +1002,12 @@ def build_sample_workspace(work):
     write("mutants-sample/mutated/Cargo.toml", '[package]\nname = "mutated"\nversion = "0.0.0"\n')
     write("mutants-sample/other/Cargo.toml", '[package]\nname = "other"\nversion = "0.0.0"\n')
     write("mutants-sample/.cargo/mutants.toml", "# 样本：cargo mutants 每次测整个工作区\ntest_workspace = true\n")
+    # 双机分片的驱动脚本读的登记表：驱动自检在临时仓里登记的那种（harness 档包的替身用例）、真跑的那种（checker 档包）、没登记分片的（驱动开跑就拒）
+    write(".claude/gate.d/stage-inputs.tsv",
+          "# 样本：layer0-shard-run.sh 按树根里键那一行判重不重型\n"
+          "crash-case:sharded-selftest\tcrates/\ttest=singlefs-harness:overwrite_in_one_instance:a_daily_case shard=across-machines\t# 驱动自检那样的替身用例\n"
+          "crash-case:sharded-checker\tcrates/\ttest=singlefs-checker-tier:crash_enumeration_new_pool_file_creation_stream:the_full_case shard=across-machines\t# 真跑的那种\n"
+          "crash-case:single-machine\tcrates/\ttest=singlefs-checker-tier:crash_enumeration_new_pool_file_creation_stream:the_full_case\t# 没登记分片\n")
 
 
 def selftest():
@@ -951,9 +1097,77 @@ def selftest():
             # 按名字认的脚本与门禁阶段
             ("bash 起 54 号", ["bash", ".claude/gate.d/54-layer0-replay.sh", "--full", "/tmp/wt"], work, "layer0-stage"),
             ("bash 起双机分片的驱动脚本", ["bash", "research/scripts/layer0-shard-run.sh", "crash-case:sample", "/tmp/wt"], work, "checker-tier-cargo"),
-            ("双机分片的驱动脚本 --selftest 不重型", ["bash", "research/scripts/layer0-shard-run.sh", "--selftest"], work, None),
+            ("双机分片的驱动脚本 --selftest 不重型，是提交时才跑的检查", ["bash", "research/scripts/layer0-shard-run.sh", "--selftest"], work, "commit-check-selftest"),
+            # 驱动按树根里键那一行判（shard_driver_runs_checker_tier）：驱动自检在临时仓里起的那几趟（登记的是 harness 档包）不重型，真跑（checker 档包、带 shard=across-machines）照算
+            ("驱动自检那样：树根里登记的分片用例是 harness 档包", ["bash", os.path.join(work, "research", "scripts", "layer0-shard-run.sh"), "crash-case:sharded-selftest", work],
+             "/", None),
+            ("驱动自检那样 --merged-log，树根相对当前目录写", ["bash", "research/scripts/layer0-shard-run.sh", "--merged-log", "crash-case:sharded-selftest", ".", "0123", "/tmp/m.log"],
+             work, None),
+            ("真跑没带前缀：树根里登记的分片用例是 checker 档包", ["bash", "research/scripts/layer0-shard-run.sh", "crash-case:sharded-checker", work], work, "checker-tier-cargo"),
+            ("真跑 --merged-log（54 号调的那一条）", ["bash", "research/scripts/layer0-shard-run.sh", "--merged-log", "crash-case:sharded-checker", work, "0123", "/tmp/m.log"],
+             work, "checker-tier-cargo"),
+            ("树根里这条没登记分片（驱动开跑就拒）", ["bash", "research/scripts/layer0-shard-run.sh", "crash-case:single-machine", work], work, None),
+            ("树根里没有这一行（驱动开跑就拒）", ["bash", "research/scripts/layer0-shard-run.sh", "crash-case:nowhere", work], work, None),
+            ("键是没展开的变量照算", ["bash", "research/scripts/layer0-shard-run.sh", "$case_key", work], work, "checker-tier-cargo"),
+            ("bash 起 checker-tier-crates-mutation-replay 的双机分片驱动", ["bash", "research/scripts/mutation-shard-run.sh", work], work, "crates-mutation-stage"),
+            ("checker-tier-crates-mutation-replay 的双机分片驱动经 nice 与绝对路径起", ["nice", "-n", "19", "bash", os.path.join(work, "research", "scripts", "mutation-shard-run.sh"), "/tmp/wt"], "/",
+             "crates-mutation-stage"),
+            ("checker-tier-crates-mutation-replay 的双机分片驱动 --selftest 不重型，是提交时才跑的检查", ["bash", "research/scripts/mutation-shard-run.sh", "--selftest"], work, "commit-check-selftest"),
             ("cargo run E152", ["cargo", "run", "--release", "--bin", "e152-file-system-benchmark"], os.path.join(work, "research"), "e152"),
-            ("bash 起轻阶段 12 号", ["bash", ".claude/gate.d/12-no-prime-marks.sh"], work, None),
+            # 门禁阶段按文件名认（开关 stage-by-number 下去了编号的那四格红）；不重型的阶段是提交时才跑的检查（开关 commit-checks-ignored 下这一类各格红）
+            ("bash 起轻阶段 doc-text：提交时才跑的检查", ["bash", ".claude/gate.d/doc-text.sh"], work, "commit-check-stage"),
+            ("去了编号的轻阶段 --check 一格：提交时才跑的检查", ["bash", ".claude/gate.d/code-tooling.sh", "--check", "agent-write-scope"], work, "commit-check-stage"),
+            ("QEMU 那一道（去了编号）", ["bash", ".claude/gate.d/checker-tier-qemu-device-streams.sh"], work, "qemu-stage"),
+            ("herd7 那一道（去了编号）经 nice 与绝对路径起", ["nice", "-n", "19", "bash", os.path.join(work, ".claude", "gate.d", "checker-tier-lkmm.sh")], "/", "herd7-stage"),
+            ("crates 变异表那一道（去了编号）按变异名点名", ["bash", ".claude/gate.d/checker-tier-crates-mutation-replay.sh", "--item", "加改成减"], work,
+             "crates-mutation-stage"),
+            ("research 构建与复跑那一道整道跑", ["bash", ".claude/gate.d/checker-tier-research-build-and-replay.sh"], work, "replay-all-stage"),
+            ("research 构建与复跑那一道只跑复跑那一格、按实验点名", ["bash", ".claude/gate.d/checker-tier-research-build-and-replay.sh", "--check", "experiment-replay",
+                                                            "--item", "E142"], work, "replay-all-stage"),
+            ("research 构建与复跑那一道两格一起点名", ["bash", ".claude/gate.d/checker-tier-research-build-and-replay.sh", "--check",
+                                                  "research-unit-tests,experiment-replay"], work, "replay-all-stage"),
+            # 只跑单测那一格不是全部实验复跑（开关 replay-cells-ignored 下这两格红）
+            ("research 构建与复跑那一道只跑单测那一格：提交时才跑的检查", ["bash", ".claude/gate.d/checker-tier-research-build-and-replay.sh", "--check",
+                                                                "research-unit-tests"], work, "commit-check-stage"),
+            ("research 构建与复跑那一道 --check=research-unit-tests", ["bash", ".claude/gate.d/checker-tier-research-build-and-replay.sh",
+                                                                  "--check=research-unit-tests", "/tmp/wt"], work, "commit-check-stage"),
+            # 只查清单、只生成的不算
+            ("重型那一道 --list 只打格名表", ["bash", ".claude/gate.d/checker-tier-crates-mutation-replay.sh", "--list"], work, None),
+            ("54 号 --list-items 只列崩溃枚举用例", ["bash", ".claude/gate.d/54-layer0-replay.sh", "--list-items"], work, None),
+            ("轻阶段 --list", ["bash", ".claude/gate.d/code-tooling.sh", "--list"], work, None),
+            ("轻阶段 --write 是生成", ["bash", ".claude/gate.d/doc-decisions.sh", "--write"], work, None),
+            # 上游规范副本里的几道 lint 与样本自检、阶段结构判法、研究脚本与钩子的自证（开关 commit-checks-ignored 下这一类各格红）
+            ("doc-lint.sh", ["bash", ".claude/singlefs-ai-sop/scripts/doc-lint.sh", "."], work, "commit-check-lint"),
+            ("gate-lint.sh 经 env 设变量", ["env", "GATE_LINT_DIR=research/scripts", "bash", ".claude/singlefs-ai-sop/scripts/gate-lint.sh"], work, "commit-check-lint"),
+            ("shell-lint.sh", ["bash", ".claude/singlefs-ai-sop/scripts/shell-lint.sh"], work, "commit-check-lint"),
+            ("preflight-lint.py", ["python3", ".claude/singlefs-ai-sop/scripts/preflight-lint.py", "."], work, "commit-check-lint"),
+            ("gate-overlap.py 判", ["python3", ".claude/singlefs-ai-sop/scripts/gate-overlap.py", "."], work, "commit-check-lint"),
+            ("gate-overlap.py --list 查清单", ["python3", ".claude/singlefs-ai-sop/scripts/gate-overlap.py", "--list"], work, None),
+            ("rules-lint.sh", ["bash", ".claude/singlefs-ai-sop/scripts/rules-lint.sh", "."], work, "commit-check-lint"),
+            ("hooks-registered.sh", ["bash", ".claude/singlefs-ai-sop/scripts/hooks-registered.sh", "."], work, "commit-check-lint"),
+            ("stage-selftest.sh 喂样本", ["nice", "-n", "19", "bash", ".claude/singlefs-ai-sop/scripts/stage-selftest.sh", "/tmp/d/.claude/gate.d"], work,
+             "commit-check-lint"),
+            ("规范副本的 gate.sh 是整轮门禁", ["bash", ".claude/singlefs-ai-sop/scripts/gate.sh"], work, "gate-sh"),
+            ("仓外同名的 doc-lint.sh 不算", ["bash", "/tmp/claude-1000/elsewhere/doc-lint.sh"], work, None),
+            ("研究脚本 --selftest", ["python3", "research/scripts/admission.py", "--selftest"], work, "commit-check-selftest"),
+            ("从 research 里相对着写的研究脚本 --selftest", ["bash", "scripts/stage-must-run.sh", "--selftest"], os.path.join(work, "research"),
+             "commit-check-selftest"),
+            ("钩子 --selftest", ["bash", ".claude/hooks/heavy-test-guard.sh", "--selftest"], work, "commit-check-selftest"),
+            ("门禁共用库直接执行（就是跑它的自证）", ["bash", ".claude/gate.d/lib/stage-cells.sh"], work, "commit-check-selftest"),
+            ("gate-staged.sh --selftest", ["bash", "research/scripts/gate-staged.sh", "--selftest"], work, "commit-check-selftest"),
+            ("run-with-memory-cap.sh --selftest（包装认不出上限，当它自己跑）", ["bash", "research/scripts/run-with-memory-cap.sh", "--selftest"], work,
+             "commit-check-selftest"),
+            ("gate-structure-check.py", ["python3", "research/scripts/gate-structure-check.py"], work, "commit-check-structure"),
+            ("研究脚本不带 --selftest 照常用", ["python3", "research/scripts/replace-once.py", "a.md", "x", "y"], work, None),
+            ("仓外的 --selftest 不算", ["python3", "/tmp/claude-1000/elsewhere/tool.py", "--selftest"], work, None),
+            # 只有脚本位上的词算被执行：`python3 -` 后面的门禁文件名是给标准输入那段程序的参数、`bash -n` 只查语法、读文件的命令只读
+            # （lib_shell_words.py 的开关 LIB_SHELL_WORDS_BREAK=arguments-as-executed 下前两格红）
+            ("python3 - 后面的门禁文件名是参数（门禁目录里跑）", ["python3", "-", "doc-text.sh", "doc-process-records.sh", "doc-experiments.sh"],
+             os.path.join(work, ".claude", "gate.d"), None),
+            ("bash -n 只查门禁的语法", ["bash", "-n", ".claude/gate.d/code-tooling.sh"], work, None),
+            ("grep 读门禁文件", ["grep", "-n", "gate-cell", ".claude/gate.d/checker-tier-lkmm.sh"], work, None),
+            ("python3 起的门禁共用库以外的脚本、门禁文件名只当它的参数", ["python3", "research/scripts/replace-once.py", ".claude/gate.d/code-tooling.sh", "a", "b"],
+             work, None),
         ]
         # lib_shell_words 前缀表之外、包在命令外面照样起那条命令的程序（command_under_launcher）
         launcher_cases = [
@@ -1047,9 +1261,13 @@ def selftest():
             found = classify_process(argv, cwd)
             results.append((label, want, found[0].kind if found else None))
         name_cases = [
-            ("门禁阶段按名字判", ".claude/gate.d/12-no-prime-marks.sh", work, True),
+            ("门禁阶段按名字判", ".claude/gate.d/doc-text.sh", work, True),
+            ("去了编号的门禁阶段按名字判", ".claude/gate.d/checker-tier-lkmm.sh", work, True),
+            ("门禁目录顶层的共用库 lib-*.sh 不是阶段", ".claude/gate.d/lib-sample.sh", work, False),
+            ("lib/ 底下的共用库不是阶段", ".claude/gate.d/lib/stage-cells.sh", work, False),
             ("仓内位置上的 gate-staged.sh 按名字判", "research/scripts/gate-staged.sh", work, True),
             ("仓内位置上的 layer0-shard-run.sh 按名字判", "research/scripts/layer0-shard-run.sh", work, True),
+            ("仓内位置上的 mutation-shard-run.sh 按名字判", "research/scripts/mutation-shard-run.sh", work, True),
             ("从 research 里相对着写的 mutate.sh", "scripts/mutate.sh", os.path.join(work, "research"), True),
             ("仓外的同名 mutate.sh 不按名字判", "/tmp/claude-1000/somewhere/mutate.sh", work, False),
             ("没登记的脚本", "run-chain.sh", work, False),

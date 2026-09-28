@@ -1,0 +1,1 @@
+  ✓ 放行 E142：输入自 research/results/e142-first-txn-dry-run-2026-09-26-r18-main.out 以来变了（那一份 f62e18e1695d，今天 0c63a9f36181）

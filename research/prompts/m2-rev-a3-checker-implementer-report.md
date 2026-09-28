@@ -1,6 +1,6 @@
 # 实审 A3-checker 实现员报告：checker 那一侧与 core 同漏的几处判定（代码审阅第 29、38 条）
 
-写于 2026-09-27（时刻都是 UTC；东京 JST = UTC + 9）。规格 `/tmp/claude-1000/impl-rev-a3-checker/spec.md`。底座是主工作区 2026-09-27T04:24:51Z 的快照（`snapshot-sha256.txt`：checker `lib.rs` 6223df4d…、`image.rs` 1ac23367…、`walk.rs` 07ec2b47…）；在副本 `b/` 里改，交补丁 `patch/`。
+写于 2026-09-27。规格 `/tmp/claude-1000/impl-rev-a3-checker/spec.md`。底座是主工作区 2026-09-27 的快照（`snapshot-sha256.txt`：checker `lib.rs` 6223df4d…、`image.rs` 1ac23367…、`walk.rs` 07ec2b47…）；在副本 `b/` 里改，交补丁 `patch/`。
 
 ## 一、结论
 
@@ -51,7 +51,7 @@
 
 ## 四、停下交主 agent 的几处
 
-1. **规格第 3 项（指针头部 MAC 16 / nonce 12 在加密关着时恒 0）没做。** 条款今天有了：D19（块指针的结构与宽度预算） 已定项 3 射程（`.claude/kb/decisions/19-块指针的结构与宽度预算.md:64`，主 agent 第五批写回 04:3x UTC 加的）「加密关着时 MAC 16、nonce 12 恒 0，读者遇到非 0 判该指针所在的结构损坏，同 I-2.4（头校验和覆盖范围） 给单元头 29 字节的读法」。卡在两处：
+1. **规格第 3 项（指针头部 MAC 16 / nonce 12 在加密关着时恒 0）没做。** 条款今天有了：D19（块指针的结构与宽度预算） 已定项 3 射程（`.claude/kb/decisions/19-块指针的结构与宽度预算.md:64`，主 agent 第五批写回加的）「加密关着时 MAC 16、nonce 12 恒 0，读者遇到非 0 判该指针所在的结构损坏，同 I-2.4（头校验和覆盖范围） 给单元头 29 字节的读法」。卡在两处：
    - **调用点在 `walk.rs`**：checker 解指针的是 `image.rs:378` `parse_node_pointer` / `:391` `parse_data_pointer`，只交 `PointerView`、不交判定；每条被跟随的指针在 `walk.rs` 里判（`judge_location_order` 的 11 个调用点，另有根记录四条指针、journal 新根段两条、树表条目根指针）。`walk.rs` 不在这一件的文件清单里。
    - **报在哪条不变量下没定**：`Judgements::judge` 只收 `IMPLEMENTED_INVARIANTS` 里的编号（`image.rs:102` 起那一段断言）。「判该指针所在的结构损坏」在 checker 里没有对应的一条：借 I-2.4 就要把 I-2.4 的射程从「单元头」扩到「指针头部」（`invariants.md` 第 122 行要改），另立一条就要加 `IMPLEMENTED_INVARIANTS` 并让 `invariants.md` 的「已实现」计数跟着加 1。这是 kb 的事，不归我。
    - 建议的改法（交下一件）：`PointerView` 加一个成员记 MAC 16 + nonce 12 是否全 0（`parse_*` 里填，`image.rs`）；`walk.rs` 在上面那些调用点按主 agent 定的编号判；D9 已定项 10 射程那句「池级 checker 仍不判这些字段」随之改。
@@ -127,7 +127,7 @@ exit 0
 
 | 阶段 | 退出码 | 末行原样（截到 300 字） |
 |---|---|---|
-| 33-mutation-tables | 1 | `crates/mutations.tsv:659 E158 root_choice_repair session s10：…原文在 crates/singl…`——红在第 659 行 E158 那一行（副本快照里的 E158 bin 比主工作区 14:1x JST 打上的旧），不是我的行；我那 14 行没被点名 |
+| 33-mutation-tables | 1 | `crates/mutations.tsv:659 E158 root_choice_repair session s10：…原文在 crates/singl…`——红在第 659 行 E158 那一行（副本快照里的 E158 bin 比主工作区打上的旧），不是我的行；我那 14 行没被点名 |
 | 53-format-const-placeholders | 0 | `✓ 格式常量文件里的占位都指得到分项或欠账（4 个占位：…）` |
 | 74-model-differential | 1 | `✗ 随机历史的测试二进制判红`；`test result: FAILED. 21 passed; 3 failed; 2 ignored`——三条红与改后目标那一轮同名，基线见第八节 |
 | 89-closeout-row27-preconditions | 77 | 本次未跑：`「alloc-basis 第三轮转来的」那一笔第 27 行写 4 条，这里探针与清单合计 3 条，对不上…`，与这一件无关 |
@@ -166,7 +166,7 @@ exit 0
 | second_transaction_supplement_two_fsync_drop_and_devices_without_the_selected_version | FAILED. 15 passed; 2 failed | FAILED. 15 passed; 2 failed |
 | second_transaction_supplement_two_tree_split | FAILED. 4 passed; 1 failed | FAILED. 4 passed; 1 failed |
 
-这些红出在快照那一刻的 core / harness 上（多是可写挂载报 `NewerStateStillUnreadableAfterOneReread`、`InvariantViolated`，或模型说该成、实现拒了；tree_split、bad_disk_input 那两条是 A3a 报告第七节点名要跟着改的），与 checker 这一件无关；主工作区 15:0x JST 之后又打了乙-配置续与模型跟上乙，今天的红集可能已经不同，我没在主工作区现状上重跑。同名同结局只比到「每条测试红没红」，没逐条比红的说明文字。
+这些红出在快照那一刻的 core / harness 上（多是可写挂载报 `NewerStateStillUnreadableAfterOneReread`、`InvariantViolated`，或模型说该成、实现拒了；tree_split、bad_disk_input 那两条是 A3a 报告第七节点名要跟着改的），与 checker 这一件无关；主工作区之后又打了乙-配置续与模型跟上乙，今天的红集可能已经不同，我没在主工作区现状上重跑。同名同结局只比到「每条测试红没红」，没逐条比红的说明文字。
 
 ## 九、补丁与打法
 

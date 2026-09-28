@@ -1,0 +1,9 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs (target/release/deps/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error-1ed0ba1844ba916d)
+
+running 2 tests
+test the_rotation_barrier_litmus_writer_follows_the_last_three_steps_of_every_recorded_publish ... ok
+test a_zero_unit_publish_whose_post_rotation_barrier_fails_is_not_frozen_and_the_whole_mount_returns_the_error ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.81s
+

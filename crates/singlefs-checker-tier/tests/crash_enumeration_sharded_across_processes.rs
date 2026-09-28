@@ -819,11 +819,15 @@ fn print_the_unsharded_enumerations_for_the_golden_comparison() {
     }
 }
 
-/// [`run_the_unsharded_enumerations_for_the_golden_comparison`] 打出的行：以 `LAYER0_` / `GOLDEN_` 起头的 67 行，
+/// [`run_the_unsharded_enumerations_for_the_golden_comparison`] 打出的行：以 `LAYER0_` / `GOLDEN_` 起头的 58 行，
 /// 进度目录换成 `<directory>`、`elapsed_seconds=` 的值换成 `<elapsed>`，每行带换行拼起来的 SHA-256。
-/// 67 行 = 第一趟（片长按线程数定，每片 16 个状态）`LAYER0_PARALLEL_START` + ⌈54 / 16⌉ = 4 行 `LAYER0_PROGRESS` +
-/// `LAYER0_FINDINGS` + `LAYER0_PARALLEL_FINISHED` + `GOLDEN_TALLY` 共 8 行，第二趟（每片 1 个状态）`LAYER0_RESUME` +
-/// `LAYER0_PARALLEL_START` + 54 行 `LAYER0_PROGRESS` + `LAYER0_FINDINGS` + `LAYER0_PARALLEL_FINISHED` + `GOLDEN_TALLY` 共 59 行。
+/// 58 行 = 第一趟（片长按线程数定，每片 16 个状态）`LAYER0_PARALLEL_START` + ⌈46 / 16⌉ = 3 行 `LAYER0_PROGRESS` +
+/// `LAYER0_FINDINGS` + `LAYER0_PARALLEL_FINISHED` + `GOLDEN_TALLY` 共 7 行，第二趟（每片 1 个状态）`LAYER0_RESUME` +
+/// `LAYER0_PARALLEL_START` + 46 行 `LAYER0_PROGRESS` + `LAYER0_FINDINGS` + `LAYER0_PARALLEL_FINISHED` + `GOLDEN_TALLY` 共 51 行。
+/// C577（系统配置没见证到的最新根，乙罩不到）那道发布返回之前的屏障加上之后甲二那一段 54 → 46 个状态（`crash_enumeration_findings_log_dedupes_by_signature_and_survives_resume.rs` 文件头），
+/// 行数与进度文件行数照这个数静态改（合入后验证二，改法 B 报告第四节第 5 条推的，没跑）；池级 checker 多一条 I-7.14 之后
+/// 打印的计数行与进度文件内容也跟着变。**两个 SHA-256 与进度文件名里的计划哈希留原值，待第五步 54 号跑出来重录**
+/// （checker 档，子 agent 不跑）。
 ///
 /// 钉值的来历：头一版取自加分片之前的代码（`crash.rs` 与 `layer0_progress.rs` 加分片之前那一版：38 行、SHA-256 `6deeb48f…`，
 /// 进度文件计划哈希 `a1d502a7…`、内容 `798bef3c…`），证的是加分片没改不分片那条路。实审 B3a-2 按设备记屏障、原地覆写补第三态之后
@@ -833,10 +837,10 @@ fn print_the_unsharded_enumerations_for_the_golden_comparison() {
 /// `LAYER0_FINDINGS signatures=0 red_states=0 states=54`、进度文件格式号 1 → 2 且每行片行多一个 `findings=none`，在那一版上重取
 /// （同一棵树上加发现日志之前是 65 行 `8e1ca03b…`、进度文件 `6ec51601…`，→ 下面的值）：重取之前逐行对过，打的行只多出那两行
 /// `LAYER0_FINDINGS`，进度文件去掉每行的校验和、`findings=none` 与格式号之后逐字节相同，进度文件名（计划哈希）不变。
-const GOLDEN_PRINTED_LINE_COUNT: usize = 67;
+const GOLDEN_PRINTED_LINE_COUNT: usize = 58;
 const GOLDEN_PRINTED_LINES_SHA256: &str =
     "15867e366db44d88e7de85fafe40ab6940310fc9cfe1a75787846c39b1024212";
-/// 同一趟留下的进度文件：名字（带计划哈希）与整份内容的 SHA-256（55 行：文件头 + 54 行片行）。
+/// 同一趟留下的进度文件：名字（带计划哈希）与整份内容的 SHA-256（47 行：文件头 + 46 行片行；两个值都待第五步 54 号重录，见上）。
 const GOLDEN_PROGRESS_FILE_NAME: &str = "layer0-progress-golden_new_pool_file_creation_stream-fingerprint0-5026593803c5654d562ab1858215ddd4a5be477116564e882947660016a1eb5e.txt";
 const GOLDEN_PROGRESS_FILE_SHA256: &str =
     "6a153e1e268f829997ed67198ce0d125a450d0b12c4cdfbf5e6c1024ad8d5cd8";

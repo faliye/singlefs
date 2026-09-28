@@ -1,0 +1,4 @@
+
+thread 'main' (3060297) panicked at crates/r2-opus-trajectory-proto/src/../../singlefs-harness/tests/common/mod.rs:510:10:
+最新那条根与它的数据单元读不出：择根落到前一条根，照常可写挂载: NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(7) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: Undecidable } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(7) }, witness: NewerPublishWitness { witnessed_journal_counter: 7, comparison: Undecidable } } })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

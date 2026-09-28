@@ -1,0 +1,6 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：vague-names
+want=扫了 2 份 .rs，词表 3 个词，排除 0 份还没改完的文件
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=vague-names：绿
+want=code-source-discipline.sh：1 格里 1 格绿（vague-names），0 格本次未跑（无）

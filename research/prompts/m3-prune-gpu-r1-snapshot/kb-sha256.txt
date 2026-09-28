@@ -1,0 +1,7 @@
+5a558a38d5ead30d7dcedacb22bf7bf747af61408a551ffc4d5d4237a9c16532  .claude/kb/decisions/13-验证路线.md
+e71e6f87bbfb7784b9dec9a32dc84fd99038a639bd2faec7de152950124bbee7  .claude/kb/decisions/24-后台重活能不能卸给GPU.md
+dbc97e9b04e83c1f6b9b7973a041d27aefdaa6060a83cf3f111d217a514b59f7  .claude/kb/milestone/03-third-txn.md
+d766be308745d3568a668aebf8c34a8f0454d4a9103e93969f7b4bcad1c33a0e  .claude/kb/experiments/161-崩溃放量的去重与分段耗时.md
+76afc00960ecbab263faa13c6ec2e1ac72ea927f489e37ec259546ee68d3c5ff  .claude/kb/experiments/162-崩溃放量判定块存储选型.md
+aa763af2e6639433c6c4388d9c3e3d270392c88a560f290c846059733a9d9992  .claude/kb/experiments/163-GPU多卡算单元校验和.md
+42d29434ca626693ba0e48ed6da6f4721e5d934d85c878a2fcaaabb3f146d5d0  .claude/kb/checks-owed.md

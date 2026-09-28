@@ -1,6 +1,6 @@
 # E157 跑前登记：并行线一两条条款的计数模型
 
-写于 2026-09-23 08:00 JST，装置写之前。
+写于 2026-09-23，装置写之前。
 
 > **主 agent 2026-09-22 定：两种都要**（时点在任何产物之前，这一轮一个数都还没跑）。理由：岔路单第 2 行 ③ 写的就是「盘上已落的数据单元里有多少条没有任何记录点名」，而「数据单元」在这一格有两种读法；删掉一种等于替这条岔路先选了读法，而选哪种读法本身就是要判的东西之一。
 >
@@ -712,7 +712,7 @@ exit=1
 $ bash research/scripts/claim-experiment.sh --next
 E157
 $ bash research/scripts/claim-experiment.sh E157 并行线一两条条款的计数模型
-  ✓ 占住 E157：/home/fy5090/code/singlefs/research/prompts/e157-preregistration.md
+  ✓ 占住 E157：research/prompts/e157-preregistration.md
 ```
 
 **命令六**（第二节的整段抄，三次都退出码 0、回读逐字节一致）：

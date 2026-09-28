@@ -43,7 +43,7 @@
 12	6	1	2	[0,18)	12	6	0	17	12
 12	6	2	3	[0,18)	12	6	0	17	12
 
-thread 'main' (2455779) panicked at /home/fy5090/code/singlefs/research/prompts/c355-c363-r3-opus-model/w2_count.rs:109:17:
+thread 'main' (2455779) panicked at research/prompts/c355-c363-r3-opus-model/w2_count.rs:109:17:
 assertion `left == right` failed
   left: 9
  right: 5

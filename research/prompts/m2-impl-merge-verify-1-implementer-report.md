@@ -1,6 +1,6 @@
 # 合入后验证一 实现员报告（未做完，上下文到线交回）
 
-写于 2026-09-27 JST 21:xx（本机 UTC 12:xx）。规格 `/tmp/claude-1000/impl-merge-verify-1/spec.md`。底座 = 主工作区 crates/（与 `refs/sop/m2-closeout-code-r2-snapshot` 逐字相同，开工时 `git diff --stat refs/sop/m2-closeout-code-r2-snapshot -- crates litmus` 空）。副本 `work/`（改动与复跑）、`edit/`（静态改与 clippy、探针）。主 agent 20:xx JST 叫停（上下文过 600k），停在编得过的点：`edit/` 上 fmt 与 clippy（带 CODE_DISCIPLINE_LINTS 七条）退出码 0，改动已同步回 `work/`，补丁从 `work/` 出。
+写于 2026-09-27。规格 `/tmp/claude-1000/impl-merge-verify-1/spec.md`。底座 = 主工作区 crates/（与 `refs/sop/m2-closeout-code-r2-snapshot` 逐字相同，开工时 `git diff --stat refs/sop/m2-closeout-code-r2-snapshot -- crates litmus` 空）。副本 `work/`（改动与复跑）、`edit/`（静态改与 clippy、探针）。主 agent 叫停（上下文过 600k），停在编得过的点：`edit/` 上 fmt 与 clippy（带 CODE_DISCIPLINE_LINTS 七条）退出码 0，改动已同步回 `work/`，补丁从 `work/` 出。
 
 ## 一、结论（一句话）
 
@@ -177,7 +177,7 @@ writable_mount_refuses_a_device_identity_handed_in_twice 0
 writable_mount_refuses_a_device_table_disagreeing_with_the_system_configuration 0
 writable_mount_refuses_caller_parameters_disagreeing_with_the_system_configuration_on_disk 0
 zero_unit_publishes_are_compared_with_what_the_row_publish_of_the_same_mount_handed_in 0
-ALL-DONE 2026-09-27T11:59:51Z
+ALL-DONE 2026-09-27
 ```
 
 ## 五、21 个红目标逐个：改了什么、验到哪一步

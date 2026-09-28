@@ -6,7 +6,7 @@
 
 第二轮判决 `research/prompts/defs-gatebatch-m2-r2-main-verification.md` 第二节给了改法 P1–P7、P4b、P9、P10、D2 与「标记字段」（被攻过零轮），第四节写死第三轮只攻三样：这几条改法的改后代码；实分一（层 0 双机分片）带进这几份文件的分片判法；前两轮站住的形态（Y1、K3 floor-raise、J1-c）撑不撑得住。第三轮之后停，这一轮新冒出来的零轮形态写进判决的交用户表。
 
-改法由 G1 做完（报告 `research/prompts/defs-gatebatch-m2-r2-fixes-report.md`，diff `research/prompts/defs-gatebatch-m2-r2-fixes.diff`，1630 行，sha256 `a4c1ffecf1f7cf1a…`），实分一与第二轮判决余项由 G2 接进来（报告 `research/prompts/defs-gatebatch-m2-g2-report.md`，diff `research/prompts/defs-gatebatch-m2-g2-changes.diff`，1498 行，sha256 `d2a94fafe7b200bf…`），两批 2026-09-27 00:32 UTC 一起进了提交 ecdf8465。被判的就是这两批 diff 落在今天文件里的样子。攻击面不重复前两轮（第一轮：54 号范围、判法进不进指纹、排除法漏认与减得太少、构建输入、闸的绕法与误拒、文字矛盾；第二轮：Y1–Y8 修补本身、改法的证红办法、第 36、37 行两条用例的判法字段、指纹变了之后的处置、第一轮判决自身）。
+改法由 G1 做完（报告 `research/prompts/defs-gatebatch-m2-r2-fixes-report.md`，diff `research/prompts/defs-gatebatch-m2-r2-fixes.diff`，1630 行，sha256 `a4c1ffecf1f7cf1a…`），实分一与第二轮判决余项由 G2 接进来（报告 `research/prompts/defs-gatebatch-m2-g2-report.md`，diff `research/prompts/defs-gatebatch-m2-g2-changes.diff`，1498 行，sha256 `d2a94fafe7b200bf…`），两批 2026-09-27 一起进了提交 ecdf8465。被判的就是这两批 diff 落在今天文件里的样子。攻击面不重复前两轮（第一轮：54 号范围、判法进不进指纹、排除法漏认与减得太少、构建输入、闸的绕法与误拒、文字矛盾；第二轮：Y1–Y8 修补本身、改法的证红办法、第 36、37 行两条用例的判法字段、指纹变了之后的处置、第一轮判决自身）。
 
 | 格 | 被攻的 | 问题 |
 |---|---|---|
@@ -16,9 +16,9 @@
 
 **共用问句**：照今天的字面与代码，哪一步会做错、放过、或误拒；给具体的命令、改动或派发情形；能在临时拷贝上量的量出来。
 
-**不归这一轮的**：54 号与 `research/scripts/layer0-shard-run.sh` 里读层 0 发现日志的那几段（2026-09-27 JST 11:4x 工具员加的，报告 `research/prompts/defs-gate54-findings-report.md`；工作区里还没提交），与写发现日志的 `crates/singlefs-harness/src/crash.rs` 一起归代码第二轮三方；这一轮的腿读得到它们，不攻、不列。
+**不归这一轮的**：54 号与 `research/scripts/layer0-shard-run.sh` 里读层 0 发现日志的那几段（2026-09-27 工具员加的，报告 `research/prompts/defs-gate54-findings-report.md`；工作区里还没提交），与写发现日志的 `crates/singlefs-harness/src/crash.rs` 一起归代码第二轮三方；这一轮的腿读得到它们，不攻、不列。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-27 JST 12:3x）
+## 二、实现今天的样子（主 agent 的观测，2026-09-27）
 
 - 自证现跑（原样末行，日志在主 agent 草稿目录，腿自己复跑为准）：
   - `SINGLEFS_GATE_FULL=1 python3 research/scripts/admission.py --selftest` → `✓ admission.py 自证通过：232 格都对（含弄坏开关 skip-unchanged、…）`，rc=0

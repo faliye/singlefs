@@ -1,7 +1,7 @@
 # m2-lines234-code-r1　云端攻方（Opus）：X1 / X2 / X6
 
 立场：找代码与条款的反话，以及没被钉住的选择。攻击面 X1、X2、X6（与本地攻方的「22 个文件的测试覆盖」不重叠）。
-时刻：2026-09-22 23:5x–2026-09-23 0x:xx UTC（= JST +9）。前几轮判决：无（第一轮）。
+日期：2026-09-22–2026-09-23。前几轮判决：无（第一轮）。
 
 ## 开工快照核对
 
@@ -23,7 +23,7 @@
 仓副本：`/tmp/claude-1000/lines234-opus/repo`（`rsync -a --exclude target --exclude .git`），
 `CARGO_TARGET_DIR=/tmp/claude-1000/lines234-opus/target`。**副本上量出来的数不算入库装置上的数**。
 
-开跑前负载（2026-09-22 23:53 UTC 现查）：`ps -o pid,args -u "$(id -u)"` 里没有 `qemu-system` / `vm-bench.sh` /
+开跑前负载（2026-09-23 现查）：`ps -o pid,args -u "$(id -u)"` 里没有 `qemu-system` / `vm-bench.sh` /
 `e152-file-system-benchmark` / `fio` / `cargo` / `gate.sh`；`uptime` 报 `load average: 1.58, 10.32, 14.25`，`nproc` 32。
 全部 `cargo` 加 `nice -n 19 -j 6`，没等过锁。
 

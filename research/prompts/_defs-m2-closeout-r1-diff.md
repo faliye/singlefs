@@ -1,4 +1,4 @@
-# 附录二：里程碑二收尾定义改动（`git diff` / `git show` 原样；生成于 2026-09-26 00:20 UTC）
+# 附录二：里程碑二收尾定义改动（`git diff` / `git show` 原样；生成于 2026-09-26）
 
 基准：`HEAD` = `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`。这一轮是定义轮，不是 `crates/` 代码轮：两段 diff 里都没有新建文件，因此各自都没有「新文件全文」小节。
 
@@ -227,7 +227,7 @@ index f59d2ba..186a4da 100644
 ```diff
 commit 97f5904b44cd0bb96c4a99706207324d109e6118
 Author: faliye <faliye@ymail.ne.jp>
-Date:   Fri Sep 25 13:31:28 2026 +0000
+Date:   Fri Sep 25 2026
 
     里程碑二收尾：agent 定义、门禁、hook、项目规则
     
@@ -257,7 +257,7 @@ index f2f9cf7..f42993c 100644
 @@ -18,6 +18,7 @@
  - 每个定义都照守、不再写进各自「开工先读：」一行的三处：跑命令照 `.claude/singlefs-ai-sop/rules/command-safety.md`「退不回去的操作，动手前先想一遍」「`pkill -f` / `killall` 一律禁用」两节；
    给人看的文字照 `.claude/singlefs-ai-sop/rules/writing-discipline.md`「说人话」一节；说外部状态之前现查（`.claude/singlefs-ai-sop/rules/verify-before-claiming.md` 开头一节）。
- - 本机时钟是 UTC，人在东京（JST，UTC+9）；报告里的时刻写清是哪个时区。
+ - ……；报告里的时刻写清是哪个时区。
 +- 候选、臂、方案、判据、提问编号有了变体，起一个新名字（那一族里下一个没用过的号，或一个短的描述性名字），不在原名后面加撇号类角标（U+2032、U+2033、U+2034、U+02B9、U+02BA）；全仓由门禁 12 号判，写法见 `.claude/rules/path-moves.md`「变体起新名字，不用角标」。
  - 派发提示里没给、定义里也没写的项目事实（某份 kb 在哪、某条决策的原文），去仓里现查，不凭印象补。
  - **找不到历史实验的数据、提示或产物，去 `git log` 里看。** 上一轮及更早的实验记录不留在工作区：
@@ -639,10 +639,10 @@ bash-command-detector	旁：sed -i 改脚本	exit=0
 `write-guard.sh`（原样）：
 
 ```
-write-guard	一 Write 覆盖未跟踪已有文件	exit=2	✗ 拒绝用 Write 整份覆盖 /home/fy5090/code/singlefs/research/results/e142-first-txn-dry-run-2026-09-25-r17-main.out：它已存在而且没进 git
+write-guard	一 Write 覆盖未跟踪已有文件	exit=2	✗ 拒绝用 Write 整份覆盖 research/results/e142-first-txn-dry-run-2026-09-25-r17-main.out：它已存在而且没进 git
 write-guard	一 Write 新文件（对照放行）	exit=0	
-write-guard	二 子 agent 越出写范围	exit=2	✗ experiment-runner 的写范围不含 /home/fy5090/code/singlefs/.claude/main-agent.md
-write-guard	二 未登记的项目 agent	exit=2	✗ gate-triage 在写范围表里没有登记，按拒绝处理：/home/fy5090/code/singlefs/README.md
+write-guard	二 子 agent 越出写范围	exit=2	✗ experiment-runner 的写范围不含 .claude/main-agent.md
+write-guard	二 未登记的项目 agent	exit=2	✗ gate-triage 在写范围表里没有登记，按拒绝处理：README.md
 write-guard	三 Edit 写进撇号角标	exit=2	✗ 写进去的内容里有撇号类角标 （U+2032）在「…A…」（/tmp/claude-1000/x.md，这次写的内容里共 1 处）
 write-guard	三 Write 写进撇号角标	exit=2	✗ 写进去的内容里有撇号类角标 （U+02B9）在「…B…」（/tmp/claude-1000/probe-new-xyz.md，这次写的内容里共 1 处）
 ```
@@ -739,10 +739,10 @@ bash-command-detector	⑦ python open w	exit=2	✗ 要在同一个 inode 上改�
 bash-command-detector	⑦ mv 换上（对照放行）	exit=0	
 bash-command-detector	⑦ >> 追加（对照放行）	exit=0	
 bash-command-detector	旁：sed -i 改脚本	exit=0	
-write-guard	一 Write 覆盖未跟踪已有文件	exit=2	✗ 拒绝用 Write 整份覆盖 /home/fy5090/code/singlefs/research/results/e142-first-txn-dry-run-2026-09-25-r17-main.out：它已存在而且没进 git
+write-guard	一 Write 覆盖未跟踪已有文件	exit=2	✗ 拒绝用 Write 整份覆盖 research/results/e142-first-txn-dry-run-2026-09-25-r17-main.out：它已存在而且没进 git
 write-guard	一 Write 新文件（对照放行）	exit=0	
-write-guard	二 子 agent 越出写范围	exit=2	✗ experiment-runner 的写范围不含 /home/fy5090/code/singlefs/.claude/main-agent.md
-write-guard	二 未登记的项目 agent	exit=2	✗ gate-triage 在写范围表里没有登记，按拒绝处理：/home/fy5090/code/singlefs/README.md
+write-guard	二 子 agent 越出写范围	exit=2	✗ experiment-runner 的写范围不含 .claude/main-agent.md
+write-guard	二 未登记的项目 agent	exit=2	✗ gate-triage 在写范围表里没有登记，按拒绝处理：README.md
 write-guard	三 Edit 写进撇号角标	exit=2	✗ 写进去的内容里有撇号类角标 ′（U+2032）在「…A′…」（/tmp/claude-1000/x.md，这次写的内容里共 1 处）
 write-guard	三 Write 写进撇号角标	exit=2	✗ 写进去的内容里有撇号类角标 ʹ（U+02B9）在「…Bʹ…」（/tmp/claude-1000/probe-new-xyz.md，这次写的内容里共 1 处）
 pattern-process-guard	pgrep -f foo	exit=2
@@ -769,7 +769,7 @@ heavy-test-guard	implementation-writer	"bash research/scripts/run-with-memory-ca
 heavy-test-guard	implementation-writer	"bash research/scripts/run-with-memory-cap.sh 8G bash -c 'cargo test -p singlefs-core --lib'"	exit=0	
 ```
 
-## 五、两份 hook 的判定函数位置（材料员现查，2026-09-26 UTC，主工作区）
+## 五、两份 hook 的判定函数位置（材料员现查，2026-09-26，主工作区）
 
 `.claude/hooks/bash-command-detector.sh` 的 `main()` 第 2339 行起。七种拒绝对应的 `return 2` 行号（`awk 'NR>=2339 && NR<=2460 && /return 2$/{print NR}' .claude/hooks/bash-command-detector.sh` 现查）：
 

@@ -149,6 +149,19 @@ pub enum Verdict {
     /// 系统配置自述的 journal 环长装不下 F 条记录（在飞记录数上限 = 环槽数 ÷ F 是 0，D23（journal 的角色与格式） 已定项 18），
     /// 或环的末端越过同一槽自述的单元区起点（已定项 19 ③：单元区起始槽号随环长走）。
     JournalRingBytesOutsideTheSupportedRange,
+    /// 系统配置偏移 325 自述的 journal 环起点不是第一版的格式常量 `JOURNAL_RING_START_SLOT`（D23（journal 的角色与格式） 已定项 2：
+    /// 环从槽 1024 起）。实现按这个常量写记录、扫环（实审 Y4，用户 2026-09-27 定「读字段，不等于常量就整池拒」）：
+    /// checker 若按字段扫一个错位的环，判的是另一个环。
+    JournalRingStartSlotNotTheFirstVersionConstant,
+    /// 系统配置偏移 371 自述的根环起点不是第一版的格式常量 `ROOT_RING_BASE_SLOT`（D22（单元原子性怎么合成） 已定项 16 第 1 句：
+    /// 基址 = 该字段 × 16384，第一版取 64）。同一条用户定案：实现按常量写根，checker 若按字段读就读另一个根环。
+    RootRingBaseSlotNotTheFirstVersionConstant,
+    /// 系统配置偏移 417 自述的单元区起始槽号不是 journal 环末尾的下一个槽（同一槽的环起点 + 环长向上取整到槽，
+    /// D3（空间分配） 已定项 10 ④、D23（journal 的角色与格式） 已定项 19 ③「单元区起始槽号随环长走」）。
+    UnitAreaStartNotTheSlotAfterTheJournalRing,
+    /// 系统配置偏移 417 自述的单元区起始槽号不落在聚簇段边界上（不是 `CLUSTER_SEGMENT_SLOTS` 的整数倍，D3（空间分配） 已定项 10 ①）：
+    /// 这样的单元区怎么分段条款没写，第一版不支持。
+    UnitAreaStartOffTheClusterSegmentBoundary,
 }
 
 /// 系统配置槽解出来的几个要紧字段。
@@ -356,6 +369,47 @@ pub fn index_node_header_bytes(key_width_byte_at_offset_51: u8) -> usize {
     .expect("key 宽至多 255，头宽至多 86 + 2 × 255 + 29 = 625，装得进 usize")
 }
 
+/// 一个单元两道校验和各罩哪段字节：头校验和罩 `[0, header_end)`（字段在 [`UNIT_HEADER_CHECKSUM_BYTE_OFFSET`]，算时那 32 字节当 0），
+/// 载荷 CRC 罩 `[header_end, 单元末尾)`、存在 `payload_crc_offset`。类标签（第 6 字节）不认得、或单元短到读不出类与 key 宽时交回 None。
+/// [`check_unit`] 与崩溃放量的 GPU 核对（`singlefs_checker_tier::gpu_unit_checks`）都按这一份取字节。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UnitChecksumLayout {
+    pub header_end: usize,
+    pub expected_length_in_bytes: u64,
+    pub payload_crc_offset: usize,
+}
+
+/// 头校验和字段的偏移（与 [`check_unit`] 用的同一个常量）。
+pub const UNIT_HEADER_CHECKSUM_BYTE_OFFSET: usize = UNIT_HEADER_CHECKSUM_OFFSET;
+
+#[must_use]
+pub fn unit_checksum_layout(unit: &[u8]) -> Option<UnitChecksumLayout> {
+    let unit_class = *unit.get(6)?;
+    let layout = match unit_class {
+        1 => UnitChecksumLayout {
+            header_end: usize::try_from(DATA_UNIT_HEADER_BYTES).expect("105"),
+            expected_length_in_bytes: DATA_UNIT_BYTES,
+            payload_crc_offset: 101,
+        },
+        2 => {
+            let header_end = index_node_header_bytes(*unit.get(51)?)
+                - usize::try_from(NONCE_MAC_ALGORITHM_RESERVED_BYTES).expect("29");
+            UnitChecksumLayout {
+                header_end,
+                expected_length_in_bytes: NODE_BYTES,
+                payload_crc_offset: header_end - 10,
+            }
+        }
+        3 => UnitChecksumLayout {
+            header_end: usize::try_from(PACKED_UNIT_HEADER_BYTES).expect("107"),
+            expected_length_in_bytes: DATA_UNIT_BYTES,
+            payload_crc_offset: 89,
+        },
+        _ => return None,
+    };
+    Some(layout)
+}
+
 /// 判一个单元的头：magic、flags、类标签合法（1 / 2 / 3）、头校验和、载荷 CRC，再判格式版本认得、
 /// 类身份段之后那 29 字节 nonce / MAC / 算法类型预留位恒 0（I-2.4（头校验和覆盖范围））；返回类标签。
 pub fn check_unit(unit: &[u8]) -> Result<u8, Verdict> {
@@ -369,23 +423,13 @@ pub fn check_unit(unit: &[u8]) -> Result<u8, Verdict> {
         return Err(Verdict::NonZeroFlags);
     }
     let unit_class = unit[6];
-    let (header_end, expected_length_in_bytes, payload_crc_offset) = match unit_class {
-        1 => (
-            usize::try_from(DATA_UNIT_HEADER_BYTES).expect("105"),
-            DATA_UNIT_BYTES,
-            101,
-        ),
-        2 => {
-            let header_end = index_node_header_bytes(unit[51])
-                - usize::try_from(NONCE_MAC_ALGORITHM_RESERVED_BYTES).expect("29");
-            (header_end, NODE_BYTES, header_end - 10)
-        }
-        3 => (
-            usize::try_from(PACKED_UNIT_HEADER_BYTES).expect("107"),
-            DATA_UNIT_BYTES,
-            89,
-        ),
-        _ => return Err(Verdict::BadMagic),
+    let Some(UnitChecksumLayout {
+        header_end,
+        expected_length_in_bytes,
+        payload_crc_offset,
+    }) = unit_checksum_layout(unit)
+    else {
+        return Err(Verdict::BadMagic);
     };
     if unit.len() != usize::try_from(expected_length_in_bytes).expect("单元长度") {
         return Err(Verdict::TooShort);

@@ -1,5 +1,5 @@
 E163（GPU多卡算单元校验和）R1：单机两张 NVIDIA 独显卡各算一片，合并与 CPU 参照比对（M1）。
-跑于 2026-09-27（JST），本机（RTX 5090 + RTX 5060 Ti）。
+跑于 2026-09-27，本机（RTX 5090 + RTX 5060 Ti）。
 装置：research/e7-index-bench/src/bin/e163_gpu_multicard_crc32c.rs，bin e163-gpu-multicard-crc32c，特性 e163-gpu。
 编译：cd research && cargo build --release -p e7-index-bench --features e163-gpu --bin e163-gpu-multicard-crc32c
 输入：gen-input --units 2560 --seed 0xE163092700000001，sha256=3b4c64dab3c785e9b7a52f03da9d4931bb3926bf3335522b81134a21acd5b78e

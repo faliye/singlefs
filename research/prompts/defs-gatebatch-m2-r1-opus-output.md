@@ -1,6 +1,6 @@
 # defs-gatebatch-m2-r1 云端攻方（Opus）报告：J1–J4
 
-- 腿：云端攻方（Opus），攻击面 J1、J2、J3、J4（正文第一节表）。写于 2026-09-26，UTC 13:0x–13:3x（JST 22:0x–22:3x）。
+- 腿：云端攻方（Opus），攻击面 J1、J2、J3、J4（正文第一节表）。写于 2026-09-26。
 - 被判对象：开工时拿 `research/prompts/defs-gatebatch-m2-r1-snapshot/sha256sums.txt` 核过，11 个文件 `sha256sum -c` 全 OK（54 号、admission.py、stage-inputs.tsv、lib_heavy_tests.py、heavy-test-guard.sh 等与快照相同）。
 - 执行了什么：三份自证各在临时拷贝上跑一次（原样：admission.py 140 格、lib_heavy_tests 55 种、heavy-test-guard 580 种，全过，日志在模型目录 `outputs/selftest-*-original.log`）；四个探针。没有执行 54 号本身、没有执行任何重型测试、没有枚举任何崩溃状态（本腿原型跑的崩溃状态数 = 0）；闸只喂 JSON、只看退出码。唯一编过的 Rust 是草稿目录里一个 5 行的 `rustc --test` 小文件（经内存包装），只为核 libtest 认不认缩写的参数。
 

@@ -234,5 +234,5 @@ error: test failed, to rerun pass `-p singlefs-harness --test s4_r2_candidates`
 
 Caused by:
   process didn't exit successfully: `/tmp/claude-1000/m2-safety-r2-sonnet/tree/target/debug/deps/s4_r2_candidates-6d293d50af15faa1 --nocapture --test-threads 1` (signal: 15, SIGTERM: termination signal)
-/home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh: line 1006: syntax error near unexpected token `<'
-/home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh: line 1006: `    reject_usage "没给上限与命令" "写成 run-with-memory-cap.sh <上限> <命令> [参数…]，上限例 16G" ;;'
+research/scripts/run-with-memory-cap.sh: line 1006: syntax error near unexpected token `<'
+research/scripts/run-with-memory-cap.sh: line 1006: `    reject_usage "没给上限与命令" "写成 run-with-memory-cap.sh <上限> <命令> [参数…]，上限例 16G" ;;'

@@ -1,6 +1,6 @@
 # 实审 B3c-3 报告（implementation-writer）：树表 0 条的一版上写行那一版的对拍比实例表与分配代
 
-时刻：JST（UTC+9）；底座与各文件的 sha256 见第二节。交补丁，主工作区一个字没改。
+底座与各文件的 sha256 见第二节。交补丁，主工作区一个字没改。
 
 ## 一、结论
 
@@ -11,9 +11,9 @@
 
 ## 二、底座
 
-- 第一份副本：主工作区 2026-09-27 01:50:28 UTC（10:50 JST）拷的，C554 乙补丁落在 01:48:31 UTC 之后。证红（第五节）在它上面做。
-- 协调消息说 Z3-A 乙又改了 `history.rs` 等：02:28:16 UTC（11:28 JST）整份重拷主工作区为 `rebased/`，套上同一份补丁（`git apply` 过），变异表按名字合并；fmt / clippy / build / 动到的测试二进制与门禁阶段在 `rebased/` 上跑（第六节）。补丁本身不动 `history.rs`（胶水改动只落在 `model_comparison.rs` 就够，`history.rs` 调的是同名函数），两份底座生成的补丁逐字节相同（`cmp` 过）。
-- 02:28 UTC 那份底座里的 sha256（交回时再对主工作区核一次，见第九节）：
+- 第一份副本：主工作区 2026-09-27 拷的，拷在 C554 乙补丁落地之后。证红（第五节）在它上面做。
+- 协调消息说 Z3-A 乙又改了 `history.rs` 等：整份重拷主工作区为 `rebased/`，套上同一份补丁（`git apply` 过），变异表按名字合并；fmt / clippy / build / 动到的测试二进制与门禁阶段在 `rebased/` 上跑（第六节）。补丁本身不动 `history.rs`（胶水改动只落在 `model_comparison.rs` 就够，`history.rs` 调的是同名函数），两份底座生成的补丁逐字节相同（`cmp` 过）。
+- 那份底座里的 sha256（交回时再对主工作区核一次，见第九节）：
 
 ```text
 c943101565c90b5549996dfb73450371955064a56acf08b9cc0d49aee187cbf8  crates/singlefs-core/src/transaction.rs
@@ -89,7 +89,7 @@ b17ccb76531667b13df5755ee44fee71e140755823e7b06275e3f209d9440b43  crates/singlef
 
 **等价、没单独证的一处**：写行那一版胶水把「`units` 里一片实例表都没有 / 链接不上」判成 `Undecodable` 而不是 `NotInTheOutput`——换成后者，模型的新闸照样判「这一版的实例表」，两种写法对拍结果相同，所以没给它挂变异。
 
-## 六、交回前的验证（都在 02:28 UTC 那份底座 `rebased/` 上，自己的 target，`capped.sh 4`，跑编出来的代码经 `run-with-memory-cap.sh 8G`）
+## 六、交回前的验证（都在那份底座 `rebased/` 上，自己的 target，`capped.sh 4`，跑编出来的代码经 `run-with-memory-cap.sh 8G`）
 
 负载：开跑前 `ps` 只看到别的实现员（`impl-rev-a4e`）的 `cargo build`，没有 qemu / fio / vm-bench / e152；没等锁。
 
@@ -102,7 +102,7 @@ b17ccb76531667b13df5755ee44fee71e140755823e7b06275e3f209d9440b43  crates/singlef
 | `-p singlefs-core --lib` | `test result: ok. 130 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.45s` |
 | `-p singlefs-harness --lib` | `test result: FAILED. 89 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 426.95s`——红的那一条是基线红（见下） |
 
-**基线红集**（同一份底座、不打补丁的副本上跑的）：`--lib` 里只有 `model_comparison::tests::every_published_version_is_compared_by_content_instance_table_and_every_role_both_ways`，基线 `89 passed; 1 failed`，打补丁之后同一条、同一处红：`种子 0：NewFinding { signature: ModelDisagreement { aspect: "模型说该成、实现拒了" }, observation: FailureObservation { position: Operation(15), operation_kind: Some(CrashRecoveryAbandoningTheNewestRoot)`，实现拒的是 `MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)`——C554 乙（挂载重读一次）带进来的，不是这一件。第一份副本（01:50 UTC）上基线也是这一条红。
+**基线红集**（同一份底座、不打补丁的副本上跑的）：`--lib` 里只有 `model_comparison::tests::every_published_version_is_compared_by_content_instance_table_and_every_role_both_ways`，基线 `89 passed; 1 failed`，打补丁之后同一条、同一处红：`种子 0：NewFinding { signature: ModelDisagreement { aspect: "模型说该成、实现拒了" }, observation: FailureObservation { position: Operation(15), operation_kind: Some(CrashRecoveryAbandoningTheNewestRoot)`，实现拒的是 `MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)`——C554 乙（挂载重读一次）带进来的，不是这一件。第一份副本上基线也是这一条红。
 
 **登记给我的门禁阶段**（`stage-owners.tsv` 里 implementation-writer 那几道，`SINGLEFS_GATE_FULL=1`，在 `rebased/` 上跑）：
 
@@ -131,7 +131,7 @@ b17ccb76531667b13df5755ee44fee71e140755823e7b06275e3f209d9440b43  crates/singlef
 
 ## 八、B3b 第二节第 2 条第 2 小条（这一件不做）：现状与要改哪里
 
-行号是主工作区 02:28 UTC 那一版（不打这份补丁）的。
+行号是主工作区那一版（不打这份补丁）的。
 
 - **带文件的一版、mkfs 之后第一次重写实例表之前**：`crates/singlefs-core/src/transaction.rs:6444` `(InstanceTablePlan::Carry(_), None) => {}`——第一个文件版本（`publish_first_file`，`:4437`）没有上一版的 `TransactionOutput`，照抄实例表时 `units` 里一片都不放；胶水 `crates/singlefs-harness/src/model_comparison.rs:197` 交回 `NotInTheOutput`，模型照计数。要比，得让第一个文件版本拿到它下面那一版实例表的字节：那一版是树表 0 条的 mkfs 那一片（`MakeFilesystemOutput::instance_table_unit`）或写行那次写出的链（这份补丁之后在 `VersionWithoutFilePublishOutput::units` 里）。改法落在 `publish_first_file` 的入参（交上一版树表 0 条的输出或 mkfs 那一片的字节）与 `:6444` 那一臂；调用方（`grep -rlE '\bpublish_first_file\(' crates --include=*.rs`，`transaction.rs` 之外）：`history.rs`、`scenario.rs`、`crash_injection.rs`、三个装置（`e156`、`e158`、`first_transaction_on_device`）与 22 份测试。与第七节第 1 条的甲同一类改动，可以一起定。
 - **从盘上重建、实例表多于一片的一版**：`crates/singlefs-core/src/recovery.rs:1816` 重建带文件的一版时 `units` 里只放第 0 片（`TransactionUnit::InstanceTable`，字节取根记录指着的那一片）；胶水 `model_comparison.rs:205` 链指着第 1 片而 `units` 里没有，交回 `NotInTheOutput`。要比，重建时沿链读完（`recovery.rs:1298` 的 `instance_table_chain_of_root` 已经会沿链读）、把第 1 片起各片按 `TransactionUnit::InstanceTablePageAfterTheFirst(k)` 放进 `units`。`recovery.rs` 这一轮归 C554 乙，不在我的文件单里。
@@ -140,7 +140,7 @@ b17ccb76531667b13df5755ee44fee71e140755823e7b06275e3f209d9440b43  crates/singlef
 
 补丁目录 `/tmp/claude-1000/impl-rev-b3c3/patch/`：`crates.patch`、`mutations-append.tsv`（13 行）、`mutations-delete.txt`（1 行）、`report.md`（本报告的拷贝）。没有 `mutations-replacements.tsv`。`crates.patch` 由 `make-patch.sh` 从底座原件与副本逐文件 `diff -u` 生成（新文件带 `new file mode 100644`），不含 `crates/mutations.tsv`。
 
-交回前 02:40:25 UTC（11:40 JST）在主工作区核的（原样）：
+交回前在主工作区核的（原样）：
 
 ```text
 crates/singlefs-core/src/transaction.rs: OK
@@ -157,7 +157,7 @@ d93b873149397edaee2241b96f6cf048ea364f4dac74cc1ef53124a89054511e  /tmp/claude-10
 f0c879e2adfd5a4c5cf7a937be8ff6890a0973999980774e0d3710acf7f0d237  /tmp/claude-1000/impl-rev-b3c3/patch/mutations-delete.txt
 ```
 
-（前六行是主工作区对 02:28 UTC 底座 sha256 的核对，也就是交回那一刻主工作区的 `history.rs`、`model_comparison.rs` 与我验证用的底座逐字节相同；`delete-hits` 是要删的名字在今天表里命中几行。）
+（前六行是主工作区对底座 sha256 的核对，也就是交回那一刻主工作区的 `history.rs`、`model_comparison.rs` 与我验证用的底座逐字节相同；`delete-hits` 是要删的名字在今天表里命中几行。）
 
 ## 十、草稿目录删了什么、留了什么
 

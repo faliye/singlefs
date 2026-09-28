@@ -1,0 +1,4 @@
+  ── evidence-in-repo：跑出来的产物与引来的依据都要落在仓里，不许只留在 /tmp
+  ! /tmp/claude-1000/gate-shrink-r1-opus/m1-tmp/m3-work.Z65Ovx/staged 是链接 worktree（--staged 的临时 worktree 就是这种），文件的时间戳全是检出那一刻写的，分不出装置与产物谁新，这一格未跑（不记通过）
+    不带 --staged 在工作区里跑一遍 bash .claude/scripts/gate.sh 才判得了这一格。
+  ⊘ 本次无对象可判：跑了 1 格，都报这一轮无对象可判（evidence-in-repo），原因见上方各格的输出

@@ -1,0 +1,14 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.42s
+     Running tests/first_transaction_step_six_recovery.rs (target/debug/deps/first_transaction_step_six_recovery-363a7678ebb0659d)
+
+running 6 tests
+test a_stale_tail_does_not_hide_the_record_above_it_that_recovery_must_apply ... ok
+test named_unit_verification_keeps_a_damaged_transaction_out_of_the_rebuilt_root ... ok
+test probes_behave_as_milestone_step_six_expects ... ok
+test cold_start_reopens_the_images_and_reads_the_file_back_choosing_instance_one_txg_three ... ok
+test torn_journal_record_truncates_the_prefix_but_recovery_still_completes ... ok
+test the_named_unit_verification_switch_shows_up_in_the_runtime_counter ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.79s
+

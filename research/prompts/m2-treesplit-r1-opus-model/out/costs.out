@@ -1,4 +1,4 @@
-2026-09-24T06:39:47Z
+2026-09-24
    Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-treesplit-opus/repo/crates/singlefs-harness)
     Finished `release` profile [optimized + debuginfo] target(s) in 3m 17s
      Running tests/treesplit_opus_costs.rs (/tmp/claude-1000/m2-treesplit-opus/target/release/deps/treesplit_opus_costs-732cd5159e062776)
@@ -50,4 +50,4 @@ ok
 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 105.56s
 
 exit=0
-2026-09-24T06:44:50Z
+2026-09-24

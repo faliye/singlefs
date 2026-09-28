@@ -1,0 +1,13 @@
+E7RESULT name=r2_state_budget world=healthy_first_stream closed_form_state_count=16777240 enumerated_with_torn=45 writes=41 segments=11
+E7RESULT name=r2_b2_downstream world=healthy_first_stream compared_states=33 states_whose_status_differs_full_versus_prefix=0 states_whose_full_digest_differs=0 in_segments={} skipped_segments_without_a_root_in_the_prefix=[0, 1] example=None must_be_nonzero=0
+E7RESULT name=r2_state_budget world=healthy_first_plus_overwrite closed_form_state_count=33554462 enumerated_with_torn=57 writes=70 segments=15
+E7RESULT name=r2_b2_downstream world=healthy_first_plus_overwrite compared_states=45 states_whose_status_differs_full_versus_prefix=0 states_whose_full_digest_differs=0 in_segments={} skipped_segments_without_a_root_in_the_prefix=[0, 1] example=None must_be_nonzero=0
+E7RESULT name=r2_state_budget world=barrier_after_20_of_24_units closed_form_state_count=1048660 enumerated_with_torn=105 writes=41 segments=11
+E7RESULT name=r2_b2_downstream world=barrier_after_20_of_24_units compared_states=93 states_whose_status_differs_full_versus_prefix=0 states_whose_full_digest_differs=0 in_segments={} skipped_segments_without_a_root_in_the_prefix=[0, 1] example=None must_be_nonzero=0
+E7RESULT name=r2_state_budget world=root_before_records_last_publish closed_form_state_count=16777240 enumerated_with_torn=45 writes=41 segments=11
+E7RESULT name=r2_b2_downstream world=root_before_records_last_publish compared_states=33 states_whose_status_differs_full_versus_prefix=0 states_whose_full_digest_differs=0 in_segments={} skipped_segments_without_a_root_in_the_prefix=[0, 1] example=None must_be_nonzero=0
+E7RESULT name=r2_state_budget world=root_before_records_then_txg4 closed_form_state_count=33554462 enumerated_with_torn=57 writes=70 segments=15
+E7RESULT name=r2_b2_downstream world=root_before_records_then_txg4 compared_states=45 states_whose_status_differs_full_versus_prefix=0 states_whose_full_digest_differs=0 in_segments={} skipped_segments_without_a_root_in_the_prefix=[0, 1] example=None must_be_nonzero=0
+E7RESULT name=r2_state_budget world=premature_reuse_of_the_txg3_data_unit closed_form_state_count=33554468 enumerated_with_torn=63 writes=74 segments=17
+E7RESULT name=r2_b2_downstream world=premature_reuse_of_the_txg3_data_unit compared_states=51 states_whose_status_differs_full_versus_prefix=0 states_whose_full_digest_differs=0 in_segments={} skipped_segments_without_a_root_in_the_prefix=[0, 1] example=None must_be_nonzero=0
+E7RESULT name=done emitted=13

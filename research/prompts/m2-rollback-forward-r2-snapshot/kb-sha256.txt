@@ -1,4 +1,4 @@
-# .claude/kb/ 快照 sha256 清单（只含正文第三节点名的 7 份：5 份决策 + invariants.md + checks-owed.md），取自 /tmp/claude-1000/m2-rollback-forward-r2/kb-snapshot/，2026-09-25 21:57 JST 拷贝，保持 .claude/kb/… 的相对路径。
+# .claude/kb/ 快照 sha256 清单（只含正文第三节点名的 7 份：5 份决策 + invariants.md + checks-owed.md），取自 /tmp/claude-1000/m2-rollback-forward-r2/kb-snapshot/，2026-09-25 拷贝，保持 .claude/kb/… 的相对路径。
 # 核验：cd /tmp/claude-1000/m2-rollback-forward-r2/kb-snapshot && sha256sum -c research/prompts/m2-rollback-forward-r2-snapshot/kb-sha256.txt（或把本文件拷到该目录下用相对路径核）。
 d66ad7c3cc77b24e2376caa9456ff56a2553fa992bc508acb60808ae0f7ea243  .claude/kb/checks-owed.md
 eb9402857f4c959fa29fa11773f0353525ab4da590d0a0ffa68a170b0c13a8ac  .claude/kb/decisions/05-快照-空间记账机制.md

@@ -1,0 +1,4 @@
+exit=1
+want=1 道门禁有格缺红或缺绿样本
+want=cells-uncovered.sh：alpha 缺绿；beta 缺红；gamma 缺绿；gamma-green 的 not-green-by-design=gamma 理由不到 8 个字
+want=  fixture-claims：红（退出 1）

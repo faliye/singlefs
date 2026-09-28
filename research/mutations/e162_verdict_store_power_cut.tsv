@@ -1,0 +1,11 @@
+M16_重放把FLUSH当没有U-drop退化成U-keep	ReplayVariant::DropUnflushed => false,	ReplayVariant::DropUnflushed => true,
+M17_重放把FLUSH之前的写也当可丢	let is_unflushed = last_flush_entry.is_none_or(|flush| entry_index > flush) && !is_forced_unit_access;	let is_unflushed = !is_forced_unit_access;
+M18_断电点上的已确认拿B标记算	let confirmed_end = windows.confirm_entries.iter().filter(|&&entry| entry < point).count();	let confirmed_end = windows.begin_entries.iter().filter(|&&entry| entry < point).count();
+M19_U-tear不截	subset.torn.map_or(sector_count, |torn| torn.sectors_kept)	sector_count
+M20_U-rand取输出的最低位	generator.next_output() >> 63 == 1	generator.next_output() & 1 == 1
+M21_写入调用返回之前就发C标记	let write_outcome = store.put_block(&key, &value);	sink.emit(MarkerKind::Confirm, Some(block_index))?;\n        let write_outcome = store.put_block(&key, &value);
+M22_核对不枚举键只按块读	match store.enumerate_keys_with_value_lengths() {	match Ok::<Vec<(Vec<u8>, u64)>, StoreError>(Vec::new()) {
+M23_核对只比块值前4096字节	found.len() == expected.len() && found == expected	found[..4096.min(found.len())] == expected[..4096.min(expected.len())]
+M24_开库失败时新建空库接着核	Err(open_error) => match record_open_failure_then_try_repair(candidate, library, open_error, &mut report) {	Err(_open_error) => match open_store_for_writing(candidate, WriteSettings::registered_for(candidate), &library.join("recreated-after-open-failure")).ok() {
+M25_日志解析不认声明的条目数	if handling == DeclaredCountHandling::StopAtDeclared && declared_entry_count.is_some_and(|declared| parsed_count >= declared) {	if handling == DeclaredCountHandling::StopAtDeclared && declared_entry_count.is_some_and(|declared| parsed_count >= declared) && parsed_count == u64::MAX {
+M26_对照形态K-nosync仍同步写	PowerCutArm::RocksDatabaseWithoutSync => WriteSettings { rocksdb_write_sync: RocksDatabaseWriteSync::NoSync, ..registered },	PowerCutArm::RocksDatabaseWithoutSync => WriteSettings { rocksdb_write_sync: RocksDatabaseWriteSync::SyncEachWrite, ..registered },

@@ -1,6 +1,6 @@
 # m2-rollback-forward-r2 云端攻方腿（Opus）报告
 
-轮名 m2-rollback-forward-r2（设计轮第二轮）；攻击面：正文第一节 G1–G5（挂着的时候向前回退、C419 取最大值、卸载 B1、删掉回退行 / 截断 / 见证 / 挂载时回退之后）。写于 2026-09-25（UTC 12:50–15:10，JST +9）。冻结副本 `/tmp/claude-1000/m2-rollback-forward-r2/tree/` 交回前按 `research/prompts/m2-rollback-forward-r2-snapshot/crates-sha256.txt` 核过，`sha256sum -c` 全 OK。
+轮名 m2-rollback-forward-r2（设计轮第二轮）；攻击面：正文第一节 G1–G5（挂着的时候向前回退、C419 取最大值、卸载 B1、删掉回退行 / 截断 / 见证 / 挂载时回退之后）。写于 2026-09-25。冻结副本 `/tmp/claude-1000/m2-rollback-forward-r2/tree/` 交回前按 `research/prompts/m2-rollback-forward-r2-snapshot/crates-sha256.txt` 核过，`sha256sum -c` 全 OK。
 
 ## 〇、复跑命令与文件
 

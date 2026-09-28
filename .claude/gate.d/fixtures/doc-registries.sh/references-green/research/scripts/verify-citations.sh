@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# 样本替身：真 verify-citations.sh 读本机绝对路径下的源码树，装不进样本；这一份只交一个退出码 0 与一行结果，
+# 让门禁 doc-registries 的 citations 那一格判「脚本在就跑它、按它的退出码判」那一半。
+echo "  ✓ 样本替身：3 条命中，0 条未命中"
+exit 0

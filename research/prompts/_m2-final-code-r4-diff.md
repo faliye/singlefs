@@ -1,4 +1,4 @@
-# 附录二：第三轮冻结树到第四轮冻结树的 crates 改动，加第三轮之后的定义/检测器 diff 与两道门禁相对 HEAD 的 diff（生成于 2026-09-25 10:35 JST / 2026-09-25 01:35 UTC）
+# 附录二：第三轮冻结树到第四轮冻结树的 crates 改动，加第三轮之后的定义/检测器 diff 与两道门禁相对 HEAD 的 diff（生成于 2026-09-25）
 
 基准：第三轮冻结副本 `/tmp/claude-1000/m2-final-code-r3/tree/crates/` 到本轮冻结副本 `/tmp/claude-1000/m2-final-code-r4/tree/crates/`（腿读代码一律读本轮冻结副本 `/tmp/claude-1000/m2-final-code-r4/tree/crates/`，不读主工作区——主工作区此刻有 E156、E158 两个执行员在改各自的装置，E142 执行员随后要新建一个导出二进制）。
 
@@ -13,8 +13,8 @@ diff 原始文件（三份，均由主 agent 给出，材料员未重新生成�
 
 ```diff
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/mutations.tsv tree/crates/mutations.tsv
---- /tmp/claude-1000/m2-final-code-r3/tree/crates/mutations.tsv	2026-09-24 22:40:06.357335347 +0000
-+++ tree/crates/mutations.tsv	2026-09-25 00:43:55.241777657 +0000
+--- /tmp/claude-1000/m2-final-code-r3/tree/crates/mutations.tsv	2026-09-25
++++ tree/crates/mutations.tsv	2026-09-25
 @@ -27,7 +27,7 @@
  步 4：回退行不带回退位	crates/singlefs-core/src/mount.rs	        applied_transaction_high_water: 0,\n        is_rollback: true,	        applied_transaction_high_water: 0,\n        is_rollback: false,	-p singlefs-harness --test second_transaction_step_four_rollback -- rolling_back_to_the_first_root	rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_row_and_cold_start_reads_the_first_content
  步 4：只写被退回的实例那一行、不写中间实例行	crates/singlefs-core/src/mount.rs	    (first_row_instance..instance_to_acquire.0)	    (first_row_instance..first_row_instance + 1)	-p singlefs-harness --test second_transaction_step_four_rollback -- rolling_back_to_the_first_root	rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_row_and_cold_start_reads_the_first_content
@@ -129,8 +129,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/mutations.tsv 
 +E156 M31（第 3 次重跑登记第九节）：K1-1 第 1 项的登记值退回 13	crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs	assert_eq!(allocated, 17, "K1-1 第 1 项");	assert_eq!(allocated, 13, "K1-1 第 1 项");	-p singlefs-harness --bin e156_allocation_basis_counts	accounting_after_first_transaction_matches_the_registered_anchor$
 +E156 M32（第 3 次重跑登记第九节）：S1(c) 的隔离槽数退回 34	crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs	vec![(DeviceIdentity(0), 54), (DeviceIdentity(1), 54)],	vec![(DeviceIdentity(0), 34), (DeviceIdentity(1), 34)],	-p singlefs-harness --bin e156_allocation_basis_counts	rollback_isolation_scenario_matches_the_new_layout$
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-core/src/admission.rs tree/crates/singlefs-core/src/admission.rs
---- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-core/src/admission.rs	2026-09-24 03:51:41.943258819 +0000
-+++ tree/crates/singlefs-core/src/admission.rs	2026-09-24 23:55:14.650113749 +0000
+--- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-core/src/admission.rs	2026-09-24
++++ tree/crates/singlefs-core/src/admission.rs	2026-09-25
 @@ -6,15 +6,25 @@
  //!
  //! 全是只读的纯函数：不动分配器、不发一个写。
@@ -329,8 +329,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-core/
  mod tests {
      use super::*;
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-core/src/allocator.rs tree/crates/singlefs-core/src/allocator.rs
---- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-core/src/allocator.rs	2026-09-24 19:23:04.554198476 +0000
-+++ tree/crates/singlefs-core/src/allocator.rs	2026-09-24 23:55:14.659113469 +0000
+--- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-core/src/allocator.rs	2026-09-25
++++ tree/crates/singlefs-core/src/allocator.rs	2026-09-25
 @@ -17,6 +17,7 @@
  use std::collections::{BTreeMap, BTreeSet};
  
@@ -389,8 +389,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-core/
      #[must_use]
      pub fn frozen_publish(&self) -> Option<&FrozenPublish> {
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-core/src/mount.rs tree/crates/singlefs-core/src/mount.rs
---- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-core/src/mount.rs	2026-09-24 21:35:39.449983013 +0000
-+++ tree/crates/singlefs-core/src/mount.rs	2026-09-24 23:55:14.671113097 +0000
+--- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-core/src/mount.rs	2026-09-25
++++ tree/crates/singlefs-core/src/mount.rs	2026-09-25
 @@ -4,6 +4,10 @@
  //! 第一版没有干净关闭标记，重开一律走恢复。
  
@@ -821,8 +821,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-core/
      )
  }
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-core/src/transaction.rs tree/crates/singlefs-core/src/transaction.rs
---- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-core/src/transaction.rs	2026-09-24 22:04:35.929349323 +0000
-+++ tree/crates/singlefs-core/src/transaction.rs	2026-09-24 23:55:14.709111916 +0000
+--- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-core/src/transaction.rs	2026-09-25
++++ tree/crates/singlefs-core/src/transaction.rs	2026-09-25
 @@ -23,6 +23,10 @@
      CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
      SlotNumber, TreeIdentifier,
@@ -946,8 +946,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-core/
      // 读不到就在动分配器、发任何一个写之前返回。第一个文件版本换下的 mkfs 那片树表与树表 0 条那一版的分配记录树节点不经映射，不核。
      let quarantine = match (previous, release_checksum_check) {
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs tree/crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs
---- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs	2026-09-24 21:36:05.371480421 +0000
-+++ tree/crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs	2026-09-25 00:46:12.032594828 +0000
+--- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs	2026-09-25
++++ tree/crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs	2026-09-25
 @@ -13,12 +13,12 @@
  //! 统计量行），不读内存里的 `PoolAllocator`；`allocated_minus_deferred_matches_referenced` 保留成内存读法，
  //! 只给 U8 的变异反面用（`crates/mutations.tsv` M21）。
@@ -1738,8 +1738,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harne
 +    }
  }
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harness/src/bin/first_transaction_on_device.rs tree/crates/singlefs-harness/src/bin/first_transaction_on_device.rs
---- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harness/src/bin/first_transaction_on_device.rs	2026-09-24 17:28:54.669972875 +0000
-+++ tree/crates/singlefs-harness/src/bin/first_transaction_on_device.rs	2026-09-24 23:14:43.842797206 +0000
+--- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harness/src/bin/first_transaction_on_device.rs	2026-09-25
++++ tree/crates/singlefs-harness/src/bin/first_transaction_on_device.rs	2026-09-25
 @@ -16,7 +16,8 @@
  //! `raise-rollback-floor`：`second-instance` 那条路走完，同一次挂载里再覆盖写一次（发布 D，第 4 新的非空有效根落到 A 上），接着把 F 抬到上限
  //! （里程碑「第二个事务」增补 2 收口表第 58 行：抬 F 那一串发布的账在二进制这一侧与设备一层判相等）；发布 D 与发布 C 同样打一行、一行
@@ -1909,8 +1909,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harne
      /// 挂载与发布 C 那几行照打在前面，失败账 4 次写与设备一层（重开之后那个注入计划数的）逐项相等；发布 D 没做成就不抬 F。
      #[test]
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harness/src/fault_injection.rs tree/crates/singlefs-harness/src/fault_injection.rs
---- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harness/src/fault_injection.rs	2026-09-24 13:10:11.115713920 +0000
-+++ tree/crates/singlefs-harness/src/fault_injection.rs	2026-09-24 23:49:34.040476097 +0000
+--- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harness/src/fault_injection.rs	2026-09-24
++++ tree/crates/singlefs-harness/src/fault_injection.rs	2026-09-25
 @@ -1782,6 +1782,7 @@
      let measurement_execution = HistoryExecution {
          per_step_checker: PerStepChecker::Skipped,
@@ -1920,8 +1920,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harne
      let measurement_plan = SharedFaultPlan::unarmed(geometry);
      let measurement_stream = SharedStream::new();
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harness/src/history.rs tree/crates/singlefs-harness/src/history.rs
---- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harness/src/history.rs	2026-09-24 20:56:53.151716323 +0000
-+++ tree/crates/singlefs-harness/src/history.rs	2026-09-24 23:55:14.731111232 +0000
+--- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harness/src/history.rs	2026-09-25
++++ tree/crates/singlefs-harness/src/history.rs	2026-09-25
 @@ -25,6 +25,7 @@
  };
  use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
@@ -2066,8 +2066,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harne
              fault_plan,
          );
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harness/src/model_comparison.rs tree/crates/singlefs-harness/src/model_comparison.rs
---- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harness/src/model_comparison.rs	2026-09-24 20:07:28.373234637 +0000
-+++ tree/crates/singlefs-harness/src/model_comparison.rs	2026-09-24 23:12:53.152121378 +0000
+--- /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harness/src/model_comparison.rs	2026-09-25
++++ tree/crates/singlefs-harness/src/model_comparison.rs	2026-09-25
 @@ -191,6 +191,8 @@
          PublishError::PlacementRefused { refusal, .. } => {
              refusal_reason_of_placement_refusal(refusal)
@@ -2123,8 +2123,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harne
 ## 四、定义与检测器相对第三轮冻结的 diff（`defs-r3-to-r4.diff`，3 个文件，整段进）
 
 ```diff
---- /tmp/claude-1000/m2-final-code-r3/defs/.claude/agent-common.md	2026-09-24 22:47:56.775221502 +0000
-+++ defs/.claude/agent-common.md	2026-09-25 00:58:10.306815767 +0000
+--- /tmp/claude-1000/m2-final-code-r3/defs/.claude/agent-common.md	2026-09-25
++++ defs/.claude/agent-common.md	2026-09-25
 @@ -54,7 +54,7 @@
  - 本机常有别的会话在同一个仓里干活：只动这一轮自己的文件；看到别人没提交的改动不碰、不修。
  - 长活可以等，不给它设超时、不自己中途杀掉：编译、变异表、复跑这类长活用 Bash 的 `run_in_background` 起，起完结束本轮，完成时会通知你。交给它的命令要一直跑到真正的活结束才退出：不在里面再把活放到后台——不用 `disown`、`coproc`、`setsid -f`、`nohup … &`、`tmux`/`screen` 的分离模式、`systemd-run`，子 shell 或 `$( … )` 里也不写 `&`；`&` 只在同一条命令随后用不带参数的 `wait` 等齐时用。结束本轮就是这一条回复只写一句在等什么、不再调工具；前台命令的 `timeout` 不超过 240000 毫秒。
@@ -2134,8 +2134,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harne
  
  ## 门禁
  
---- /tmp/claude-1000/m2-final-code-r3/defs/.claude/main-agent.md	2026-09-24 22:47:56.776427505 +0000
-+++ defs/.claude/main-agent.md	2026-09-25 00:58:10.307819614 +0000
+--- /tmp/claude-1000/m2-final-code-r3/defs/.claude/main-agent.md	2026-09-25
++++ defs/.claude/main-agent.md	2026-09-25
 @@ -26,7 +26,7 @@
  
  ## 派出去之后
@@ -2145,8 +2145,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r3/tree/crates/singlefs-harne
  
  改了定义、共用约束或规则之后，当场给每个在跑的子 agent 发消息：写明改了哪一条、它手上哪一步要停掉或改做。
  
---- /tmp/claude-1000/m2-final-code-r3/defs/.claude/hooks/bash-command-detector.sh	2026-09-24 22:47:56.779714661 +0000
-+++ defs/.claude/hooks/bash-command-detector.sh	2026-09-25 00:58:10.308837971 +0000
+--- /tmp/claude-1000/m2-final-code-r3/defs/.claude/hooks/bash-command-detector.sh	2026-09-25
++++ defs/.claude/hooks/bash-command-detector.sh	2026-09-25
 @@ -1,5 +1,5 @@
  #!/usr/bin/env bash
 -# PreToolUse hook（Bash）：检出可能出问题的命令，记下来交给主 agent 判断；起看门狗的错误写法、前台没超时的等待循环、把活放出追踪的写法与 run_in_background 里后面没有 wait 的单独 `&` 在执行前拒绝，其余只记不拦，不停任何在跑的命令与脚本。

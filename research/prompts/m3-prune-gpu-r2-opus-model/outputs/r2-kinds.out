@@ -1,0 +1,2 @@
+E7RESULT name=r2_kinds_regression overwrites=30 publishes=33 identities_by_kind_string=3 kind_strings_merging_conditions=1 identities_by_kind_string_plus_signature=5 identities_merging_conditions=0 must_be_nonzero=-
+E7RESULT name=done emitted=2

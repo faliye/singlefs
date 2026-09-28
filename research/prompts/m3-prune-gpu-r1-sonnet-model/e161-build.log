@@ -1,0 +1,6 @@
+   Compiling singlefs-format v0.1.0 (/tmp/claude-1000/m3-prune-gpu-r1-sonnet/repo/crates/singlefs-format)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-prune-gpu-r1-sonnet/repo/crates/singlefs-core)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m3-prune-gpu-r1-sonnet/repo/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-prune-gpu-r1-sonnet/repo/crates/singlefs-harness)
+   Compiling singlefs-checker-tier v0.1.0 (/tmp/claude-1000/m3-prune-gpu-r1-sonnet/repo/crates/singlefs-checker-tier)
+    Finished `release` profile [optimized + debuginfo] target(s) in 2m 09s

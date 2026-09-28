@@ -1,7 +1,7 @@
 # checkpoint-trigger-r1 云端攻方腿（Opus）：K2 与 K4
 
 攻击面：**K2 第三支会不会自己造出新的坏情形**、**K4 甲今天真的不成立吗**。
-不碰 K1（第三支量得出来吗）与 K3（三支之间打不打架）。时刻一律 UTC（本机时钟），2026-09-22。
+不碰 K1（第三支量得出来吗）与 K3（三支之间打不打架）。日期 2026-09-22。
 
 ## 复跑
 
@@ -496,7 +496,7 @@ E 让后面几轮引「一个 checkpoint 间隔」时不再指着两个量。B �
   （输出为空，退出码 0。）
 - **主工作区一个字没动**：没 `rsync` 仓副本（不需要编译）、没改 `crates/`、没做任何 git 写操作。
   这一轮我写的文件只有两个：本报告与 `research/prompts/checkpoint-trigger-r1-opus-model/ring-headroom.py`。
-- **没编译、没跑 harness、没造镜像。** 开跑前看过负载（`ps -o pid,args -u $(id -u)`）：有 vllm / ray 在跑，
+- **没编译、没跑 harness、没造镜像。** 开跑前看过负载（`ps -o pid,args -u $(id -u)`）：有本地模型服务 / ray 在跑，
   没有 `qemu-system`、`vm-bench.sh`、`e152-file-system-benchmark`、`fio`，探针加了 `nice -n 19`。
 - **草稿产物**：`/tmp/claude-1000/checkpoint-trigger-r1-opus/ring-headroom.out` 是探针这一次的原样输出
   （与报告里贴的几段一致）。没入 `research/results/`：这一轮是设计轮、探针是纯算术模型不是实验产物，

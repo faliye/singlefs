@@ -1,4 +1,4 @@
-CONTROL	holds	基线：--full 头一趟三条逐条跑、各写一格，退 0	退 0，跑了 ['first_transaction_step_seven_layer0', 'second_transaction_step_zero_layer0', 'case_c']；末行「✓ --full 跑完（开跑 2026-09-26T13:22:39Z，跑完 2026-09-26T13:22:40Z）：3 条崩溃枚举用例，这一趟跑了判绿 3 条（crash-case:stream-a crash-case:stream-b crash-case:case-c），复用 0 条（无）」
+CONTROL	holds	基线：--full 头一趟三条逐条跑、各写一格，退 0	退 0，跑了 ['first_transaction_step_seven_layer0', 'second_transaction_step_zero_layer0', 'case_c']；末行「✓ --full 跑完（开跑 2026-09-26，跑完 2026-09-26）：3 条崩溃枚举用例，这一趟跑了判绿 3 条（crash-case:stream-a crash-case:stream-b crash-case:case-c），复用 0 条（无）」
 CONTROL	holds	基线：干净工作树上快档退 77（文件头写明的「没碰」）	退 77；末行「→ 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crates/ Cargo.toml，判据见 research/scripts/change-touches-crates.sh。」
 CONTROL	holds	A0 改 crates/ 下的 src/lib.rs ⇒ 快档不退 77、判红（缺这批输入的标记）	退 1；末行「bash "$layer0_full_base/tree/.claude/gate.d/54-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"」
 ATTACK	BROKEN	A1 只改登记表：新登记一条用例 crash-case:case-d（它的测试目标 case_d.rs 早已提交） ⇒ 快档应当核这条用例的标记，不该退 77	退 77；末行「→ 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crates/ Cargo.toml，判据见 research/scripts/change-touches-crates.sh。」
@@ -8,9 +8,9 @@ CONTROL	holds	A2 只改 stream-b 那一行的第三列（去掉 exhaustive=LAYER
 ATTACK	BROKEN	A3 只改 54 号自己（加一行注释；它按「判它的 54 号」进每条用例的指纹） ⇒ 快档应当核这条用例的标记，不该退 77	退 77；末行「→ 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crates/ Cargo.toml，判据见 research/scripts/change-touches-crates.sh。」
 CONTROL	holds	A3 只改 54 号自己（加一行注释；它按「判它的 54 号」进每条用例的指纹），带 SINGLEFS_GATE_FULL=1 ⇒ 快档判红并点名 crash-case:stream-a	退 1；末行「bash "$layer0_full_base/tree/.claude/gate.d/54-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"」
 CONTROL	holds	A4 能造出旧判法（被判的 admission.py 里判工作线程那一句恰好一处）	命中 1 处
-CONTROL	holds	A4 旧判法下 --full：stream-b 的日志 64 片只起 1 个线程，旧判法判绿、写那一格	退 0，跑了 ['second_transaction_step_zero_layer0']；末行「✓ --full 跑完（开跑 2026-09-26T13:22:44Z，跑完 2026-09-26T13:22:44Z）：3 条崩溃枚举用例，这一趟跑了判绿 1 条（crash-case:stream-b），复用 2 条（crash-case:stream-a crash-case:case-c）」
+CONTROL	holds	A4 旧判法下 --full：stream-b 的日志 64 片只起 1 个线程，旧判法判绿、写那一格	退 0，跑了 ['second_transaction_step_zero_layer0']；末行「✓ --full 跑完（开跑 2026-09-26，跑完 2026-09-26）：3 条崩溃枚举用例，这一趟跑了判绿 1 条（crash-case:stream-b），复用 2 条（crash-case:stream-a crash-case:case-c）」
 ATTACK	BROKEN	A4 提交了修好的判法 ⇒ stream-b 的输入指纹应当变（判它的 admission.py 进指纹）	旧 639097891a56ec19…，新 639097891a56ec19…
-ATTACK	BROKEN	A4 修好判法之后 --full ⇒ 旧判法写的那一格不该复用，stream-b 应当重跑	退 0，跑了 []；末行「✓ --full 跑完（开跑 2026-09-26T13:22:45Z，跑完 2026-09-26T13:22:45Z）：3 条崩溃枚举用例，这一趟跑了判绿 0 条（无），复用 3 条（crash-case:stream-a crash-case:stream-b crash-case:case-c）」
-ATTACK	BROKEN	A4 修好判法之后快档（SINGLEFS_GATE_FULL=1）⇒ 不该判绿	退 0；末行「crash-case:case-c：那一格跑完于 2026-09-26T13:22:40Z（这批输入的指纹 0b363f7dfb8c8ea5…，4 个文件，减去别的测试目标独占的 3 个）」
+ATTACK	BROKEN	A4 修好判法之后 --full ⇒ 旧判法写的那一格不该复用，stream-b 应当重跑	退 0，跑了 []；末行「✓ --full 跑完（开跑 2026-09-26，跑完 2026-09-26）：3 条崩溃枚举用例，这一趟跑了判绿 0 条（无），复用 3 条（crash-case:stream-a crash-case:stream-b crash-case:case-c）」
+ATTACK	BROKEN	A4 修好判法之后快档（SINGLEFS_GATE_FULL=1）⇒ 不该判绿	退 0；末行「crash-case:case-c：那一格跑完于 2026-09-26（这批输入的指纹 0b363f7dfb8c8ea5…，4 个文件，减去别的测试目标独占的 3 个）」
 CONTROL	holds	A4 修好的判法拿同一份日志判 ⇒ 红（只起了 1 个工作线程）	退 1；「本机 32 核、线程数没显式设成 1，这一趟跑了 64 片却只起了 1 个工作线程（多半是线程数没传进去）：LAYER0_PARALLEL_FINISHED states=100 slices=64 worker_threads=1 configured_worker_threads=32 worker_threads」
 SUMMARY J1 54 号: cells=15 attack_cells_broken=6 control_cells_broken=0

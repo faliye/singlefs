@@ -1,6 +1,6 @@
 # 同步合并后补回的本地腿两份定义：第一轮判决（2026-09-27）
 
-被判：`.claude/agents/three-way-local-attack.md`、`.claude/agents/three-way-local-defense.md`。正文 `research/prompts/_sync-local-legs-r1-body.md`，背景材料 `research/prompts/_sync-local-legs-r1-background.md`，开工快照 `research/prompts/sync-local-legs-r1-snapshot/defs-sha256.txt`（腿开工 2026-09-27T01:17:07Z；腿交齐后 `sha256sum -c` 十个文件全 OK，没有被别的会话改过的）。用户弹窗定「走一轮三方」，这一轮只开一轮。
+被判：`.claude/agents/three-way-local-attack.md`、`.claude/agents/three-way-local-defense.md`。正文 `research/prompts/_sync-local-legs-r1-body.md`，背景材料 `research/prompts/_sync-local-legs-r1-background.md`，开工快照 `research/prompts/sync-local-legs-r1-snapshot/defs-sha256.txt`（腿开工 2026-09-27；腿交齐后 `sha256sum -c` 十个文件全 OK，没有被别的会话改过的）。用户弹窗定「走一轮三方」，这一轮只开一轮。
 
 ## 一、这一轮交了什么
 

@@ -1,0 +1,5 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：term-renames
+want=全仓搜不出登记过的旧名了
+want=── 汇总：doc-text.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-text.sh：1 格里 1 格绿（term-renames），0 格本次未跑（无）

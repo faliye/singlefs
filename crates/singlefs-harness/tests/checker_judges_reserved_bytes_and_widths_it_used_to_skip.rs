@@ -462,9 +462,11 @@ fn a_journal_ring_that_holds_fewer_than_the_safety_factor_records_or_ends_past_t
     let image = first_file_version_pool().memory_pool();
     for (journal_ring_bytes, expected) in [
         (JOURNAL_RING_BYTES_OF_THE_POOL, Ok(())),
+        // 装得下 F 条记录的最短环过得了环长那一判；单元区起始槽号照旧 50176、不是这个环长现算的槽 1025，
+        // 报的是单元区起点那个成员（实审 Y4-a：checker 与实现收同一张表）。
         (
             SMALLEST_JOURNAL_RING_BYTES_HOLDING_THE_SAFETY_FACTOR_RECORDS,
-            Ok(()),
+            Err(Verdict::UnitAreaStartNotTheSlotAfterTheJournalRing),
         ),
         (
             SMALLEST_JOURNAL_RING_BYTES_HOLDING_THE_SAFETY_FACTOR_RECORDS - 1,

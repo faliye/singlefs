@@ -23,7 +23,7 @@
 
 **不归这一轮的**：`experiment-runner.md` 里别的会话同一天没提交的改动（第 2 步前半段的英文名与 bin 名规矩、第 5 步复跑驱动那一句）；`mutate.sh` 不带 `--features` 的缺口（已交里程碑二收尾会话）。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-27 JST 16:4x）
+## 二、实现今天的样子（主 agent 的观测，2026-09-27）
 
 - 入库装置今天在 `crates/singlefs-harness/src/bin/` 下（`e158_root_choice_repair.rs`、`e161_crash_state_dedup_and_time_split.rs` 等），harness 带 `--all-targets` 连带编它们（singlefs-99 两次报的原样错误：`error[E0425]: cannot find value unit_check_fields`，`e161_crash_state_dedup_and_time_split.rs:5062` 等 5 处）。
 - 自证现跑（原样末行）：

@@ -1,0 +1,235 @@
+ARM control(with-1058)
+CLASS 1 candidates=6
+CLASS 2 candidates=67
+PICK 1 #0
+PICK 2 #0
+PICK 1 #1
+PICK 2 #10
+PICK 1 #2
+PICK 2 #20
+PICK 1 #3
+CRASH1 #1 rank1 seg1 kinds=rr mask=10 landed=Some((1, 3))
+LAYER0_PARALLEL_START states=288 slices=18 states_per_slice=16 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=18
+LAYER0_PROGRESS slice=9/18 states=[128,144) segments=1..=1 finished_slices=1/18 finished_states=16/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=7/18 states=[96,112) segments=1..=1 finished_slices=2/18 finished_states=32/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=6/18 states=[80,96) segments=1..=1 finished_slices=3/18 finished_states=48/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=4/18 states=[48,64) segments=1..=1 finished_slices=4/18 finished_states=64/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=5/18 states=[64,80) segments=1..=1 finished_slices=5/18 finished_states=80/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=3/18 states=[32,48) segments=1..=1 finished_slices=6/18 finished_states=96/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=2/18 states=[16,32) segments=1..=1 finished_slices=7/18 finished_states=112/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=8/18 states=[112,128) segments=1..=1 finished_slices=8/18 finished_states=128/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=10/18 states=[144,160) segments=1..=1 finished_slices=9/18 finished_states=144/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=1/18 states=[0,16) segments=0..=1 finished_slices=10/18 finished_states=160/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_FINDING event=new finding=1 pass=journal_consulted_oracle violated=file_read_where_this_root_has_none segment=0 publish=instance2_txg4_root_write12 first_state=0 first_violation=第 3 代根下面没有文件却读出了内容（持久的写：）
+LAYER0_FINDING event=new finding=2 pass=journal_consulted_oracle violated=file_read_where_this_root_has_none segment=1 publish=instance2_txg4_root_write12 first_state=8 first_violation=第 3 代根下面没有文件却读出了内容（持久的写：system_configuration_slot|system_configuration_slot）
+LAYER0_FINDING event=new finding=3 pass=pool_checker violated=I-3.10 segment=1 publish=instance2_txg4_root_write12 first_state=9 first_violation=I-3.10：盘 0 槽 1472 的分配记录（未释放、跨 1 槽）分配代 3，它罩住的单元头里的诞生代号是 4
+LAYER0_FINDING event=threshold finding=3 pass=pool_checker violated=I-3.10 segment=1 publish=instance2_txg4_root_write12 states_at_least=10
+LAYER0_FINDING event=threshold finding=3 pass=pool_checker violated=I-3.10 segment=1 publish=instance2_txg4_root_write12 states_at_least=100
+LAYER0_PROGRESS slice=11/18 states=[160,176) segments=1..=1 finished_slices=11/18 finished_states=176/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=12/18 states=[176,192) segments=1..=1 finished_slices=12/18 finished_states=192/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=14/18 states=[208,224) segments=1..=1 finished_slices=13/18 finished_states=208/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=15/18 states=[224,240) segments=1..=1 finished_slices=14/18 finished_states=224/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=13/18 states=[192,208) segments=1..=1 finished_slices=15/18 finished_states=240/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=16/18 states=[240,256) segments=1..=1 finished_slices=16/18 finished_states=256/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=17/18 states=[256,272) segments=1..=4 finished_slices=17/18 finished_states=272/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_FINDING event=new finding=4 pass=pool_checker violated=I-3.10 segment=2 publish=instance2_txg4_root_write12 first_state=263 first_violation=I-3.10：盘 1 槽 1472 的分配记录（未释放、跨 1 槽）分配代 3，它罩住的单元头里的诞生代号是 4
+LAYER0_FINDING event=new finding=5 pass=pool_checker violated=I-3.10 segment=3 publish=instance2_txg4_root_write12 first_state=266 first_violation=I-3.10：盘 1 槽 1472 的分配记录（未释放、跨 1 槽）分配代 3，它罩住的单元头里的诞生代号是 4
+LAYER0_PROGRESS slice=18/18 states=[272,288) segments=4..=all_persisted finished_slices=18/18 finished_states=288/288 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_FINDINGS signatures=5 red_states=264 states=288
+LAYER0_PARALLEL_FINISHED states=288 slices=18 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=18 progress_file_after_completion=none elapsed_seconds=0.1
+CRASH1 #2 rank2 seg0 kinds=uuuuuuuuuuuuuuuuuuuu mask=00000000000000000000 landed=Some((1, 2))
+LAYER0_PARALLEL_START states=288 slices=18 states_per_slice=16 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=18
+LAYER0_PROGRESS slice=6/18 states=[80,96) segments=1..=1 finished_slices=1/18 finished_states=16/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=9/18 states=[128,144) segments=1..=1 finished_slices=2/18 finished_states=32/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=5/18 states=[64,80) segments=1..=1 finished_slices=3/18 finished_states=48/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=2/18 states=[16,32) segments=1..=1 finished_slices=4/18 finished_states=64/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=4/18 states=[48,64) segments=1..=1 finished_slices=5/18 finished_states=80/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=3/18 states=[32,48) segments=1..=1 finished_slices=6/18 finished_states=96/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=10/18 states=[144,160) segments=1..=1 finished_slices=7/18 finished_states=112/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=7/18 states=[96,112) segments=1..=1 finished_slices=8/18 finished_states=128/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=1/18 states=[0,16) segments=0..=1 finished_slices=9/18 finished_states=144/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=8/18 states=[112,128) segments=1..=1 finished_slices=10/18 finished_states=160/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=11/18 states=[160,176) segments=1..=1 finished_slices=11/18 finished_states=176/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=13/18 states=[192,208) segments=1..=1 finished_slices=12/18 finished_states=192/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=12/18 states=[176,192) segments=1..=1 finished_slices=13/18 finished_states=208/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=15/18 states=[224,240) segments=1..=1 finished_slices=14/18 finished_states=224/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=16/18 states=[240,256) segments=1..=1 finished_slices=15/18 finished_states=240/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=14/18 states=[208,224) segments=1..=1 finished_slices=16/18 finished_states=256/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=17/18 states=[256,272) segments=1..=4 finished_slices=17/18 finished_states=272/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=18/18 states=[272,288) segments=4..=all_persisted finished_slices=18/18 finished_states=288/288 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_FINDINGS signatures=0 red_states=0 states=288
+LAYER0_PARALLEL_FINISHED states=288 slices=18 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=18 progress_file_after_completion=none elapsed_seconds=0.1
+CRASH1 #3 rank1 seg1 kinds=rr mask=01 landed=Some((1, 3))
+LAYER0_PARALLEL_START states=288 slices=18 states_per_slice=16 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=18
+LAYER0_PROGRESS slice=10/18 states=[144,160) segments=1..=1 finished_slices=1/18 finished_states=16/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=3/18 states=[32,48) segments=1..=1 finished_slices=2/18 finished_states=32/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=5/18 states=[64,80) segments=1..=1 finished_slices=3/18 finished_states=48/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=4/18 states=[48,64) segments=1..=1 finished_slices=4/18 finished_states=64/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=7/18 states=[96,112) segments=1..=1 finished_slices=5/18 finished_states=80/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=8/18 states=[112,128) segments=1..=1 finished_slices=6/18 finished_states=96/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=2/18 states=[16,32) segments=1..=1 finished_slices=7/18 finished_states=112/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=9/18 states=[128,144) segments=1..=1 finished_slices=8/18 finished_states=128/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=6/18 states=[80,96) segments=1..=1 finished_slices=9/18 finished_states=144/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=1/18 states=[0,16) segments=0..=1 finished_slices=10/18 finished_states=160/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_FINDING event=new finding=1 pass=journal_consulted_oracle violated=file_read_where_this_root_has_none segment=0 publish=instance2_txg4_root_write12 first_state=0 first_violation=第 3 代根下面没有文件却读出了内容（持久的写：）
+LAYER0_FINDING event=new finding=2 pass=journal_consulted_oracle violated=file_read_where_this_root_has_none segment=1 publish=instance2_txg4_root_write12 first_state=8 first_violation=第 3 代根下面没有文件却读出了内容（持久的写：system_configuration_slot|system_configuration_slot）
+LAYER0_FINDING event=new finding=3 pass=pool_checker violated=I-3.10 segment=1 publish=instance2_txg4_root_write12 first_state=9 first_violation=I-3.10：盘 0 槽 1472 的分配记录（未释放、跨 1 槽）分配代 3，它罩住的单元头里的诞生代号是 4
+LAYER0_FINDING event=threshold finding=3 pass=pool_checker violated=I-3.10 segment=1 publish=instance2_txg4_root_write12 states_at_least=10
+LAYER0_FINDING event=threshold finding=3 pass=pool_checker violated=I-3.10 segment=1 publish=instance2_txg4_root_write12 states_at_least=100
+LAYER0_PROGRESS slice=11/18 states=[160,176) segments=1..=1 finished_slices=11/18 finished_states=176/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=16/18 states=[240,256) segments=1..=1 finished_slices=12/18 finished_states=192/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=12/18 states=[176,192) segments=1..=1 finished_slices=13/18 finished_states=208/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=13/18 states=[192,208) segments=1..=1 finished_slices=14/18 finished_states=224/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=14/18 states=[208,224) segments=1..=1 finished_slices=15/18 finished_states=240/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=15/18 states=[224,240) segments=1..=1 finished_slices=16/18 finished_states=256/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=17/18 states=[256,272) segments=1..=4 finished_slices=17/18 finished_states=272/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_FINDING event=new finding=4 pass=pool_checker violated=I-3.10 segment=2 publish=instance2_txg4_root_write12 first_state=263 first_violation=I-3.10：盘 1 槽 1472 的分配记录（未释放、跨 1 槽）分配代 3，它罩住的单元头里的诞生代号是 4
+LAYER0_FINDING event=new finding=5 pass=pool_checker violated=I-3.10 segment=3 publish=instance2_txg4_root_write12 first_state=266 first_violation=I-3.10：盘 1 槽 1472 的分配记录（未释放、跨 1 槽）分配代 3，它罩住的单元头里的诞生代号是 4
+LAYER0_PROGRESS slice=18/18 states=[272,288) segments=4..=all_persisted finished_slices=18/18 finished_states=288/288 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_FINDINGS signatures=5 red_states=264 states=288
+LAYER0_PARALLEL_FINISHED states=288 slices=18 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=18 progress_file_after_completion=none elapsed_seconds=0.1
+CRASH1 #4 rank2 seg0 kinds=uuuuuuuuuuuuuuuuuuuu mask=01001110101011011100 landed=Some((1, 2))
+LAYER0_PARALLEL_START states=288 slices=18 states_per_slice=16 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=18
+LAYER0_PROGRESS slice=6/18 states=[80,96) segments=1..=1 finished_slices=1/18 finished_states=16/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=5/18 states=[64,80) segments=1..=1 finished_slices=2/18 finished_states=32/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=2/18 states=[16,32) segments=1..=1 finished_slices=3/18 finished_states=48/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=4/18 states=[48,64) segments=1..=1 finished_slices=4/18 finished_states=64/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=8/18 states=[112,128) segments=1..=1 finished_slices=5/18 finished_states=80/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=7/18 states=[96,112) segments=1..=1 finished_slices=6/18 finished_states=96/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=10/18 states=[144,160) segments=1..=1 finished_slices=7/18 finished_states=112/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=9/18 states=[128,144) segments=1..=1 finished_slices=8/18 finished_states=128/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=1/18 states=[0,16) segments=0..=1 finished_slices=9/18 finished_states=144/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=3/18 states=[32,48) segments=1..=1 finished_slices=10/18 finished_states=160/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=11/18 states=[160,176) segments=1..=1 finished_slices=11/18 finished_states=176/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=12/18 states=[176,192) segments=1..=1 finished_slices=12/18 finished_states=192/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=16/18 states=[240,256) segments=1..=1 finished_slices=13/18 finished_states=208/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=14/18 states=[208,224) segments=1..=1 finished_slices=14/18 finished_states=224/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=13/18 states=[192,208) segments=1..=1 finished_slices=15/18 finished_states=240/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=15/18 states=[224,240) segments=1..=1 finished_slices=16/18 finished_states=256/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=17/18 states=[256,272) segments=1..=4 finished_slices=17/18 finished_states=272/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=18/18 states=[272,288) segments=4..=all_persisted finished_slices=18/18 finished_states=288/288 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_FINDINGS signatures=0 red_states=0 states=288
+LAYER0_PARALLEL_FINISHED states=288 slices=18 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=18 progress_file_after_completion=none elapsed_seconds=0.1
+CRASH1 #5 rank1 seg2 kinds=R mask=0 landed=Some((1, 3))
+LAYER0_PARALLEL_START states=288 slices=18 states_per_slice=16 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=18
+LAYER0_PROGRESS slice=10/18 states=[144,160) segments=1..=1 finished_slices=1/18 finished_states=16/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=8/18 states=[112,128) segments=1..=1 finished_slices=2/18 finished_states=32/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=6/18 states=[80,96) segments=1..=1 finished_slices=3/18 finished_states=48/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=5/18 states=[64,80) segments=1..=1 finished_slices=4/18 finished_states=64/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=9/18 states=[128,144) segments=1..=1 finished_slices=5/18 finished_states=80/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=4/18 states=[48,64) segments=1..=1 finished_slices=6/18 finished_states=96/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=3/18 states=[32,48) segments=1..=1 finished_slices=7/18 finished_states=112/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=2/18 states=[16,32) segments=1..=1 finished_slices=8/18 finished_states=128/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=7/18 states=[96,112) segments=1..=1 finished_slices=9/18 finished_states=144/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=1/18 states=[0,16) segments=0..=1 finished_slices=10/18 finished_states=160/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_FINDING event=new finding=1 pass=journal_consulted_oracle violated=file_read_where_this_root_has_none segment=0 publish=instance2_txg4_root_write12 first_state=0 first_violation=第 3 代根下面没有文件却读出了内容（持久的写：）
+LAYER0_FINDING event=new finding=2 pass=journal_consulted_oracle violated=file_read_where_this_root_has_none segment=1 publish=instance2_txg4_root_write12 first_state=8 first_violation=第 3 代根下面没有文件却读出了内容（持久的写：system_configuration_slot|system_configuration_slot）
+LAYER0_FINDING event=new finding=3 pass=pool_checker violated=I-3.10 segment=1 publish=instance2_txg4_root_write12 first_state=9 first_violation=I-3.10：盘 0 槽 1472 的分配记录（未释放、跨 1 槽）分配代 3，它罩住的单元头里的诞生代号是 4
+LAYER0_FINDING event=threshold finding=3 pass=pool_checker violated=I-3.10 segment=1 publish=instance2_txg4_root_write12 states_at_least=10
+LAYER0_FINDING event=threshold finding=3 pass=pool_checker violated=I-3.10 segment=1 publish=instance2_txg4_root_write12 states_at_least=100
+LAYER0_PROGRESS slice=11/18 states=[160,176) segments=1..=1 finished_slices=11/18 finished_states=176/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=12/18 states=[176,192) segments=1..=1 finished_slices=12/18 finished_states=192/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=13/18 states=[192,208) segments=1..=1 finished_slices=13/18 finished_states=208/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=15/18 states=[224,240) segments=1..=1 finished_slices=14/18 finished_states=224/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=14/18 states=[208,224) segments=1..=1 finished_slices=15/18 finished_states=240/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=16/18 states=[240,256) segments=1..=1 finished_slices=16/18 finished_states=256/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=17/18 states=[256,272) segments=1..=4 finished_slices=17/18 finished_states=272/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_FINDING event=new finding=4 pass=pool_checker violated=I-3.10 segment=2 publish=instance2_txg4_root_write12 first_state=263 first_violation=I-3.10：盘 1 槽 1472 的分配记录（未释放、跨 1 槽）分配代 3，它罩住的单元头里的诞生代号是 4
+LAYER0_FINDING event=new finding=5 pass=pool_checker violated=I-3.10 segment=3 publish=instance2_txg4_root_write12 first_state=266 first_violation=I-3.10：盘 1 槽 1472 的分配记录（未释放、跨 1 槽）分配代 3，它罩住的单元头里的诞生代号是 4
+LAYER0_PROGRESS slice=18/18 states=[272,288) segments=4..=all_persisted finished_slices=18/18 finished_states=288/288 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_FINDINGS signatures=5 red_states=264 states=288
+LAYER0_PARALLEL_FINISHED states=288 slices=18 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=18 progress_file_after_completion=none elapsed_seconds=0.1
+CRASH1 #6 rank2 seg0 kinds=uuuuuuuuuuuuuuuuuuuu mask=10100101101010001001 landed=Some((1, 2))
+LAYER0_PARALLEL_START states=288 slices=18 states_per_slice=16 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=18
+LAYER0_PROGRESS slice=5/18 states=[64,80) segments=1..=1 finished_slices=1/18 finished_states=16/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=2/18 states=[16,32) segments=1..=1 finished_slices=2/18 finished_states=32/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=8/18 states=[112,128) segments=1..=1 finished_slices=3/18 finished_states=48/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=3/18 states=[32,48) segments=1..=1 finished_slices=4/18 finished_states=64/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=6/18 states=[80,96) segments=1..=1 finished_slices=5/18 finished_states=80/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=1/18 states=[0,16) segments=0..=1 finished_slices=6/18 finished_states=96/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=10/18 states=[144,160) segments=1..=1 finished_slices=7/18 finished_states=112/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=4/18 states=[48,64) segments=1..=1 finished_slices=8/18 finished_states=128/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=9/18 states=[128,144) segments=1..=1 finished_slices=9/18 finished_states=144/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=7/18 states=[96,112) segments=1..=1 finished_slices=10/18 finished_states=160/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=11/18 states=[160,176) segments=1..=1 finished_slices=11/18 finished_states=176/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=12/18 states=[176,192) segments=1..=1 finished_slices=12/18 finished_states=192/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=14/18 states=[208,224) segments=1..=1 finished_slices=13/18 finished_states=208/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=15/18 states=[224,240) segments=1..=1 finished_slices=14/18 finished_states=224/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=13/18 states=[192,208) segments=1..=1 finished_slices=15/18 finished_states=240/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=16/18 states=[240,256) segments=1..=1 finished_slices=16/18 finished_states=256/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=17/18 states=[256,272) segments=1..=4 finished_slices=17/18 finished_states=272/288 resumed_slices=0 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=18/18 states=[272,288) segments=4..=all_persisted finished_slices=18/18 finished_states=288/288 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_FINDINGS signatures=0 red_states=0 states=288
+LAYER0_PARALLEL_FINISHED states=288 slices=18 worker_threads=10 configured_worker_threads=10 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=18 progress_file_after_completion=none elapsed_seconds=0.1
+CRASH1 #7 rank1 seg3 kinds=ss mask=00 landed=Some((1, 3))
+MOUNT 3 rank1 landed=Some((1, 3)) vfail=0 mounted eff=(1, 2) instance=2
+MOUNT 1 rank1 landed=Some((1, 3)) vfail=0 refused WritableMountRefusedByDevicesWithoutTheSelectedVersion { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, selected_version_journal_position: JournalSequenceNumber { instance_generation: InstanceGeneration(1), counter: 3 }, devices: [DeviceWithoutTheSelectedVersion { device: DeviceIdentity(0), lacking: BehindTheSelectedVersionAndMissingItsUnits { newest_system_configuration_journal_tail: JournalSequenceNumber { instance_generation: InstanceGeneration(1), counter: 2 }, units_missing: [(Data(DataUnitIndexInFile(0)), SlotNumber(1412))] } }] }
+MOUNT 3 rank2 landed=Some((1, 2)) vfail=0 mounted eff=(1, 2) instance=2
+SIG 1 after-mount-#1-rank1 eff=Some((2, 5)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 after-mount-#2-rank2 eff=Some((2, 4)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 after-mount-#3-rank1 eff=Some((2, 5)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 after-mount-#4-rank2 eff=Some((2, 4)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 after-mount-#5-rank1 eff=Some((2, 5)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 after-mount-#6-rank2 eff=Some((2, 4)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 after-mount-#7-rank1 eff=Some((1, 3)) FileRead(1,3) vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 258 crash1-#1-rank1 eff=Some((1, 2)) NoFile vfail=1 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 9 crash1-#1-rank1 eff=Some((1, 3)) FileRead<unknown-content> vfail=0 applied=1 below_floor=false oracle=FileReadWhereThisRootHasNone checker=[] record=(false,false)
+SIG 9 crash1-#1-rank1 eff=Some((2, 4)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 9 crash1-#1-rank1 eff=Some((2, 5)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 3 crash1-#1-rank1 eff=Some((2, 5)) NoFile vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 267 crash1-#2-rank2 eff=Some((1, 2)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 9 crash1-#2-rank2 eff=Some((2, 3)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 9 crash1-#2-rank2 eff=Some((2, 4)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 3 crash1-#2-rank2 eff=Some((2, 4)) NoFile vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 258 crash1-#3-rank1 eff=Some((1, 2)) NoFile vfail=1 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 9 crash1-#3-rank1 eff=Some((1, 3)) FileRead<unknown-content> vfail=0 applied=1 below_floor=false oracle=FileReadWhereThisRootHasNone checker=[] record=(false,false)
+SIG 9 crash1-#3-rank1 eff=Some((2, 4)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 9 crash1-#3-rank1 eff=Some((2, 5)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 3 crash1-#3-rank1 eff=Some((2, 5)) NoFile vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 267 crash1-#4-rank2 eff=Some((1, 2)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 9 crash1-#4-rank2 eff=Some((2, 3)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 9 crash1-#4-rank2 eff=Some((2, 4)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 3 crash1-#4-rank2 eff=Some((2, 4)) NoFile vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 258 crash1-#5-rank1 eff=Some((1, 2)) NoFile vfail=1 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 9 crash1-#5-rank1 eff=Some((1, 3)) FileRead<unknown-content> vfail=0 applied=1 below_floor=false oracle=FileReadWhereThisRootHasNone checker=[] record=(false,false)
+SIG 9 crash1-#5-rank1 eff=Some((2, 4)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 9 crash1-#5-rank1 eff=Some((2, 5)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 3 crash1-#5-rank1 eff=Some((2, 5)) NoFile vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 267 crash1-#6-rank2 eff=Some((1, 2)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 9 crash1-#6-rank2 eff=Some((2, 3)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 9 crash1-#6-rank2 eff=Some((2, 4)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 3 crash1-#6-rank2 eff=Some((2, 4)) NoFile vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 42 suffix-publish-#1-rank1 seg0 eff=Some((2, 5)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 suffix-publish-#1-rank1 seg1 eff=Some((2, 5)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 2 suffix-publish-#1-rank1 seg1 eff=Some((2, 6)) FileRead(2,6) vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 suffix-publish-#1-rank1 seg2 eff=Some((2, 6)) FileRead(2,6) vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 3 suffix-publish-#1-rank1 seg3 eff=Some((2, 6)) FileRead(2,6) vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 42 suffix-publish-#2-rank2 seg0 eff=Some((2, 4)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 suffix-publish-#2-rank2 seg1 eff=Some((2, 4)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 2 suffix-publish-#2-rank2 seg1 eff=Some((2, 5)) FileRead(2,5) vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 suffix-publish-#2-rank2 seg2 eff=Some((2, 5)) FileRead(2,5) vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 3 suffix-publish-#2-rank2 seg3 eff=Some((2, 5)) FileRead(2,5) vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 42 suffix-publish-#3-rank1 seg0 eff=Some((2, 5)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 suffix-publish-#3-rank1 seg1 eff=Some((2, 5)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 2 suffix-publish-#3-rank1 seg1 eff=Some((2, 6)) FileRead(2,6) vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 suffix-publish-#3-rank1 seg2 eff=Some((2, 6)) FileRead(2,6) vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 3 suffix-publish-#3-rank1 seg3 eff=Some((2, 6)) FileRead(2,6) vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 42 suffix-publish-#4-rank2 seg0 eff=Some((2, 4)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 suffix-publish-#4-rank2 seg1 eff=Some((2, 4)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 2 suffix-publish-#4-rank2 seg1 eff=Some((2, 5)) FileRead(2,5) vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 suffix-publish-#4-rank2 seg2 eff=Some((2, 5)) FileRead(2,5) vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 3 suffix-publish-#4-rank2 seg3 eff=Some((2, 5)) FileRead(2,5) vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 42 suffix-publish-#5-rank1 seg0 eff=Some((2, 5)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 suffix-publish-#5-rank1 seg1 eff=Some((2, 5)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 2 suffix-publish-#5-rank1 seg1 eff=Some((2, 6)) FileRead(2,6) vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 suffix-publish-#5-rank1 seg2 eff=Some((2, 6)) FileRead(2,6) vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 3 suffix-publish-#5-rank1 seg3 eff=Some((2, 6)) FileRead(2,6) vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 42 suffix-publish-#6-rank2 seg0 eff=Some((2, 4)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 suffix-publish-#6-rank2 seg1 eff=Some((2, 4)) NoFile vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 2 suffix-publish-#6-rank2 seg1 eff=Some((2, 5)) FileRead(2,5) vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 suffix-publish-#6-rank2 seg2 eff=Some((2, 5)) FileRead(2,5) vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 3 suffix-publish-#6-rank2 seg3 eff=Some((2, 5)) FileRead(2,5) vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+TALLY first-third-cut states=1728 violations=27 ignored_violations=0 checker_violated={"I-3.10": 765} record_root_without_record=0 record_claimed_state_missing_unit=0 verification_failed_states=774 root_persisted_states=126 failed_states=0 first_violation=Some("第 3 代根下面没有文件却读出了内容（持久的写：）")
+TALLY first-suffix-publish states=294 violations=0 ignored_violations=0 checker_violated={} record_root_without_record=0 record_claimed_state_missing_unit=0 verification_failed_states=0 root_persisted_states=18 failed_states=0 first_violation=None
+CRASH1_STATES 7 per_rank={1: 4, 2: 3} budget_left=998272 ELAPSED 1.9s
+WALL 2s rc=0

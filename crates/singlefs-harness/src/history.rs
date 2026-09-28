@@ -66,6 +66,7 @@ use crate::model_comparison::{
     observed_root_of_version_without_file_carrying, refusal_reason_of_mount_error,
     refusal_reason_of_publish_error, refusal_reason_of_rollback_error,
     reported_ceiling_of_mount_error, root_ring_slot_still_bad_after_one_reread_of_mount_error,
+    root_ring_slot_still_bad_after_one_reread_of_rollback_error,
     ContentsCarriedToZeroUnitPublishes,
 };
 use crate::scenario::{e142_parameters, first_file_content, FIXED_WRITE_TIME_SECONDS};
@@ -2387,6 +2388,9 @@ fn mount_error_member(error: &MountError) -> String {
         MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. } => {
             "CallerParametersDisagreeWithTheSelectedSystemConfiguration"
         }
+        MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. } => {
+            "DevicesBehindTheCurrentVersionAndMissingItsUnits"
+        }
         MountError::SequenceNumberPastTheTopOfItsRange(_) => "SequenceNumberPastTheTopOfItsRange",
         MountError::FloorRaiseFailedAfterTheMountsPublishes(failed) => {
             return format!(
@@ -2420,6 +2424,7 @@ fn still_unreadable_after_one_reread_member(
         StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot { .. } => {
             "RootRingSlotKnownToHoldARoot"
         }
+        StillUnreadableAfterOneReread::AccountOfAnAbandonedRoot { .. } => "AccountOfAnAbandonedRoot",
     }
 }
 
@@ -2824,7 +2829,9 @@ fn settle_user_change(
         Err(
             UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount { .. }
             | UserChangeRefused::NoFileVersionToChange
-            | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. },
+            | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. }
+            | UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable { .. }
+            | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. },
         ) => &[],
         Err(UserChangeRefused::Publish { floor_raises, .. }) => floor_raises,
         Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(refused)) => &refused.floor_raises,
@@ -2905,6 +2912,15 @@ fn settle_user_change(
         // 执行器交的是整池那两块盘、没换过盘（Z3-A 乙那一判）：走不到，走到了就按说不出理由的拒绝判。
         UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. } => (
             "UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration".to_string(),
+            ObservedRefusalReason::Unexplained,
+        ),
+        // 执行器交的盘体各在自己的身份上、没换过旧快照（代码三方 m2-closeout-code-r2 那两判）：走不到，走到了就按说不出理由的拒绝判。
+        UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable { .. } => (
+            "UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable".to_string(),
+            ObservedRefusalReason::Unexplained,
+        ),
+        UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. } => (
+            "UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits".to_string(),
             ObservedRefusalReason::Unexplained,
         ),
         UserChangeRefused::Publish { cause, .. } => (
@@ -3575,7 +3591,7 @@ fn apply_rollback_while_mounted(
                     stream_length_before,
                     stream,
                     None,
-                    None,
+                    root_ring_slot_still_bad_after_one_reread_of_rollback_error(&error),
                 ),
             );
             AppliedStep::judged_by_outcome_and_model(StepOutcome::Refused { member }, verdict)

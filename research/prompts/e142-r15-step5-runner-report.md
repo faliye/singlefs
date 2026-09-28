@@ -73,7 +73,7 @@ crates 侧新导出 bin（`e142_first_transaction_write_dump_one_device`）不�
 | `research/results/e142-first-txn-dry-run-2026-09-25-q142-1v-combined.out`（模型输出 922 行 + crates 导出 35 行，`replay.sh:157` 改指它） | 957 | 两段各自的 `E7RESULT name=done` 都在（`emitted=922`、`emitted=35`） |
 | `crates/singlefs-harness/src/bin/e142_first_transaction_write_dump_one_device.rs`（G4 新建入库装置，只驱动只观测） | 267 | 跑起来在 `crates/singlefs-core/src/make_filesystem.rs:194` panic（预期内，见「五、G4」） |
 
-`research/results/e142-r15-crates-write-dump-2026-09-25.out`（crates 导出，02:55:56 UTC 采集，上一段落盘）**不重采、原样复用**：现场重跑
+`research/results/e142-r15-crates-write-dump-2026-09-25.out`（crates 导出采集，上一段落盘）**不重采、原样复用**：现场重跑
 `cargo run --release -p singlefs-harness --bin e142_first_transaction_write_dump` 与它逐字节相同（`diff` 命中 0 行），确认 `crates/` 这一侧
 对第一个事务窗口仍是同一份字节，重采不会改变任何结论。
 

@@ -1,0 +1,204 @@
+══ 引用与不变量 ══
+
+── 1. 实验号引用是否都有定义（experiment-refs）──
+  ✓ 实验号引用全部有定义：162 个不同的实验号（扫 210 份 kb 文件、9 份规则）
+
+── 2. 决策号引用是否都有定义（decision-refs）──
+  ✓ 决策号引用全部有定义：28 个不同的决策号（扫 210 份 kb 文件、9 份规则）
+
+── 3. 正文写死的条数 vs 实际条数（declared-counts）──
+  ✓ 不变量条数一致：正文声称 82 条在用，表里在用 82 条（总行 88，退役 6）
+  ✓ 欠检查 452 条、已还清 116 条（checks-owed.md）
+
+── 4. 治理文档里的指向（governance-refs）──
+  ✗ .claude/agent-common.md:28: `.claude/gate.d/91-archive-past-rounds.sh` 里的 .claude/gate.d/91-archive-past-rounds.sh 在仓里不存在
+  ✗ .claude/agent-common.md:99: 「69 号」在门禁目录里没有 69-*.sh
+  ✗ .claude/agents/experiment-designer.md:30: `.claude/kb/decisions-history/` 里的 .claude/kb/decisions-history/ 在仓里不存在
+  ✗ .claude/agents/experiment-designer.md:62: 「86 号」在门禁目录里没有 86-*.sh
+  ✗ .claude/agents/experiment-runner.md:36: 「40 号」在门禁目录里没有 40-*.sh
+  ✗ .claude/agents/experiment-runner.md:37: 「86 号」在门禁目录里没有 86-*.sh
+  ✗ .claude/agents/experiment-runner.md:39: 「75 号」在门禁目录里没有 75-*.sh
+  ✗ .claude/agents/kb-scribe.md:22: 「31 号」在门禁目录里没有 31-*.sh
+  ✗ .claude/agents/kb-scribe.md:22: 「75 号」在门禁目录里没有 75-*.sh
+  ✗ .claude/agents/kb-scribe.md:25: 「75 号」在门禁目录里没有 75-*.sh
+  ✗ .claude/agents/kb-scribe.md:32: `bash .claude/gate.d/21-decision-items-sync.sh --write` 里的 .claude/gate.d/21-decision-items-sync.sh 在仓里不存在
+  ✗ .claude/agents/kb-scribe.md:34: `bash .claude/gate.d/21-decision-items-sync.sh --write` 里的 .claude/gate.d/21-decision-items-sync.sh 在仓里不存在
+  ✗ .claude/agents/kb-spec-drafter.md:30: 「31 号」在门禁目录里没有 31-*.sh
+  ✗ .claude/agents/sweep.md:35: `.claude/gate.d/27-format-constants.sh` 里的 .claude/gate.d/27-format-constants.sh 在仓里不存在
+  ✗ .claude/agents/tooling-writer.md:31: `.claude/gate.d/63-agent-write-scope.sh` 里的 .claude/gate.d/63-agent-write-scope.sh 在仓里不存在
+  ✗ .claude/agents/tooling-writer.md:31: `.claude/gate.d/47-research-script-selftests.sh` 里的 .claude/gate.d/47-research-script-selftests.sh 在仓里不存在
+  ✗ .claude/agents/tooling-writer.md:34: 「63 号」在门禁目录里没有 63-*.sh
+  ✗ .claude/main-agent.md:27: 「21 号」在门禁目录里没有 21-*.sh
+  ✗ .claude/main-agent.md:65: 「75 号」在门禁目录里没有 75-*.sh
+  ✗ .claude/rules/path-moves.md:33: 「21 号」在门禁目录里没有 21-*.sh
+  ✗ .claude/rules/path-moves.md:34: 「75 号」在门禁目录里没有 75-*.sh
+  ✗ .claude/rules/path-moves.md:36: 「40 号」在门禁目录里没有 40-*.sh
+  ✗ .claude/rules/path-moves.md:36: 「88 号」在门禁目录里没有 88-*.sh
+  ✗ .claude/rules/path-moves.md:38: `.claude/kb/decisions-history/` 里的 .claude/kb/decisions-history/ 在仓里不存在
+  ✗ .claude/rules/verification.md:81: 「62 号」在门禁目录里没有 62-*.sh
+  ✗ CLAUDE.md:79: 「93 号」在门禁目录里没有 93-*.sh
+  ✗ CLAUDE.md:80: 「90 号」在门禁目录里没有 90-*.sh
+  ✗ CLAUDE.md:81: 「16 号」在门禁目录里没有 16-*.sh
+     → 怎么办：门禁号改成现存的号或共享 gate.sh 里那一道的名字；路径改成现存的，已归档的写裸文件名；小节按那份文件今天的标题改。
+  没判的：.claude/agent-common.md:24: `TZ=Asia/Tokyo` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/agents/experiment-designer.md:66: evidence-discipline.md「臂的定义也在「跑前写死」 的文件在四个解析基准下都找不到，小节没判
+  没判的：.claude/agents/experiment-runner.md:36: gate.sh「转发计时」 的文件在四个解析基准下都找不到，小节没判
+  没判的：.claude/agents/implementation-writer.md:43: `"../../singlefs-harness/tests/common/mod.rs"]` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/agents/sweep.md:36: evidence-discipline.md「撤回一个数或一条结论，同样要当场回扫谁在引它」 的文件在四个解析基准下都找不到，小节没判
+  没判的：.claude/agents/sweep.md:37: evidence-discipline.md「新立一条判据，当场拿它回扫已有的条目」 的文件在四个解析基准下都找不到，小节没判
+  没判的：.claude/agents/tooling-writer.md:34: `"$d/.claude/gate.d";` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/agents/tooling-writer.md:34: `.claude|.git|.claude/gate.d)` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/agents/tooling-writer.md:34: `"$PWD/$x"` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/agents/tooling-writer.md:34: `"$d/$x";;` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/agents/tooling-writer.md:34: `"$PWD/$x"` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/agents/tooling-writer.md:34: `"$d/$x";;` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/agents/tooling-writer.md:34: `"$PWD/.claude/gate.d/$s"` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/agents/tooling-writer.md:34: `"$d/.claude/gate.d/$s";` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/agents/tooling-writer.md:34: `"$d/.claude/gate.d"` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/agents/tooling-writer.md:34: `RULES_LINT_DIR=.claude/rules` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/agents/tooling-writer.md:34: `.claude/main-agent.md"` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/rules/format-evolution.md:25: `.claude/kb/decisions/NN-简称.md` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/rules/implementation-workflow.md:22: show-me-test.md「新增的测试必须先证明它会红」 的文件在四个解析基准下都找不到，小节没判
+  没判的：.claude/rules/path-moves.md:10: gate.sh「链接指向」 的文件在四个解析基准下都找不到，小节没判
+  没判的：.claude/rules/path-moves.md:30: gate.sh「编号与简称」 的文件在四个解析基准下都找不到，小节没判
+  没判的：.claude/rules/path-moves.md:32: gate.sh「链接指向」 的文件在四个解析基准下都找不到，小节没判
+  没判的：.claude/rules/verification.md:40: `'^//!` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/rules/verification.md:43: `"../../singlefs-harness/tests/common/mod.rs"]` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/skills/crash-test/SKILL.md:33: `"../../singlefs-harness/tests/common/mod.rs"]` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  没判的：.claude/skills/decide/SKILL.md:12: `.claude/kb/decisions/NN-简称.md` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判
+  扫 33 份治理文档：门禁号 260 处、路径 505 处、小节 120 处；没判 26 处；跳过 222 处（被 .gitignore 挡着 87、不像仓内路径 3、仓外或带占位 132）
+  ✗ 治理文档里有指不到的指向（上面逐条列出）
+     → 怎么办： 门禁号：阶段被删或收归上游的，改成共享 gate.sh 里那一道的名字（「链接指向」这类）或现存的号；
+                路径：搬了家的改成新路径，已删的改指现存的做法，已归档的写裸文件名并指到取法（.claude/agent-common.md「找不到历史实验的数据」那一条）；
+                小节：按那份文件今天的标题改。改 agent 定义与共用约束照走门禁 72 号那一条。
+
+── 5. 不变量条数在 invariants.md 之外也要对（invariant-count-elsewhere）──
+  ! 本次无对象可判：扫了 207 份 kb 文件（invariants.md 与变更史之外），没有一处写「N 条在用」的声明
+
+── 6. 外部引用还核得动吗（citations）──
+══ 外部引用复核 ══
+  refs-linux（固定点）根：/home/fy5090/code/fs-refs/linux-6.17
+  refs-zfs（固定点）根：/home/fy5090/code/fs-refs/zfs
+  refs-docs（固定点）根：/home/fy5090/code/fs-refs/docs
+  host-kernel（非固定点）根：/home/fy5090/kbuild/linux-om
+
+── bcachefs（Linux 6.17）──
+  ✓ D8     btree 树数（21）
+  ✓ D19    bch_extent_ptr 是 offset:44/dev:8/gen:8
+  ✓ D19    crc128 的 offset 是 13 位
+  ✓ D9     crc64 的 80 位由 csum_hi:16 + csum_lo 拼出
+  ✓ D9     对 crypto_aead/setauthsize 零命中（0）
+  ✓ D9     MAC 截断靠 memcpy bch_crc_bytes
+  ✓ D9     元数据加密时恒用 128 位
+  ✓ D11    accounting 树格式级绑 write buffer
+  ✓ D11    记账更新是 delta
+  ✓ D11    运行时与 GC 重建共用同一行
+  ✓ D11    btree_gc 自陈重建侧不幂等
+  ✓ D18    BTREE_NODE_SEQ 判谁覆盖谁
+  ✓ D22    btree 指针不带校验和
+  ✓ D12    bucket 寻址显式带设备
+  ✓ D1     BUCKET_GC_GEN_MAX 是 96
+
+── OpenZFS master ──
+  ✓ D4     blkptr_t 是 128 字节
+  ✓ D18    预留区是 blk_prop2 + blk_pad
+  ✓ D18    BP_GET_REWRITE 用 blk_prop2 最高位
+  ✓ D9     密文校验和不论密钥在不在都能查损坏
+  ✓ D4     加密块最多 2 副本
+  ✓ D9     ZIO_DATA_MAC_LEN 是 16
+  ✓ D5     deadlist 并到更新的那一侧
+  ✓ D5     分叉点快照不许销毁
+  ✓ D16    TXG_DEFER_SIZE 是 2
+  ✓ D17    vdev 后端签名里带 txg
+  ✓ D20    ZFS 自陈设备不做单扇区原子覆写
+  ✓ D20    ZFS 的 4 个 label
+  ✓ D20    ZFS 的 128 KiB uberblock 环
+  ✓ D20    ZFS 槽号 = txg % 槽数（轮换）
+  ✓ D23    ZIL 有 zh_claim_txg
+
+── btrfs（Linux 6.17）──
+  ✓ D17    btrfs_is_zoned 的文件数（22）
+  ✓ D17    btrfs_is_zoned 的总处数（93）
+  ✓ D17    其中落在事务日志路径的（5）
+  ✓ D17    其中落在 ENOSPC 准入的（6）
+
+── 外部文献（已重新固定的）──
+  ✓ D9     RFC 8439 的 Tag truncation MUST NOT
+  ✓ D9     RFC 8439 的 2\^128 possible tags
+
+── 本机内核树（7.2）──
+  ✓ D2     io_min 取 phys_bs，与 physical_block_size 不同
+  ✓ D2     physical_block_size 取 min(phys_bs, atomic_bs)
+  ✓ D20    原子宽度要 ATOMICS 位且 nawupf 非零
+  ✓ D9     MaxInvalids 全内核零命中（0）
+  ✓ D9     dm-integrity 的 number_of_mismatches 只自增不比阈值
+  ✓ D9     dm-integrity 的 recalc_sector 可被清零
+  ✓ D9     fscrypt 明写不防离线篡改
+  ✓ D17    dm-verity 的信任锚
+  ✓ D22    dm-flakey 造不出撕裂
+  ✓ D23    XFS_MIN_LOG_FACTOR 存在
+  ✓ D23    XLOG_MAX_ICLOGS 存在
+  ✓ D23    XFS 的 h_prev_block 是 32 位块号
+  ✓ D23    XFS 用 h_cycle 分辨圈次
+  ✓ D23    XFS 每个基本块带 cycle 戳
+  ✓ D23    XFS 恢复靠 cycle 跃变找头
+  ✓ D23    jbd2 恢复后号跳过断点
+  ✓ D23    XFS 的事务可跨多条记录
+  ✓ D23    XFS 用 END_TRANS 标事务末条
+  ✓ D23    XFS 自陈单个 region 装不下就拆
+  ✓ D23    jbd2 的事务由多块拼成
+  ✓ D23    XFS 的 CRC 覆盖载荷
+  ✓ D23    jbd2 每个数据块自带校验和
+  ✓ D23    XFS 默认 iclog 32 KiB
+  ✓ D23    jbd2 描述块塞满 tag 为止
+  ✓ D23    bcachefs 的 csum 是 jset 首字段
+  ✓ D22    XFS 日志下限 10 MiB / 512 块
+  ✓ D22    XFS 日志上限 2 GiB
+  ✓ D22    jbd2 日志下限 1024 块
+  ✓ D12    btrfs 的 zoned incompat 位
+  ✓ D12    XFS 的 zoned incompat 位
+  ✓ D12    md/raid0 的布局 feature bit
+  ✓ D14    erofs 无条件只读
+  ✓ D14    btrfs 的默认内联上限
+  ✓ D18    btrfs 用 transid 抓丢写/错向写
+  ✓ D18    f2fs 把 checkpoint CRC 塞进 cp_ver
+  ✓ D18    ocfs2 的 metaecc
+  ✓ D19    btrfs 的 sys_chunk_array 定长
+  ✓ D9     ext4 把 uuid 折进 s_csum_seed
+  ✓ D13    iomap 契约里没有事务概念
+
+══ 外部文献逐字 ══
+  ✓ D18    OSTEP §45.6：身份校验抓不到丢失写
+  ✓ D18    NetApp FAST.20：lost write 占 13.54%
+  ✓ D18    NetApp FAST.20：靠 WAFL 块签名发现
+  ✓ D9     NaCl §9：一次伪造即可解出 r
+  ✓ D9     SP 800-38D §5.2.1.2 的五个 t 取值
+  ✓ D9     SP 800-38D 的 shall not（七选一）
+  ✓ D9     MaxInvalids 属 38B 不属 38D（38B 侧）（2 次）
+  ✓ D9     MaxInvalids 属 38B 不属 38D（38D 侧）（0 次）
+  ✓ D8     FAST18：全路径索引的 Achilles heel
+  ✓ D8     FAST18：改名代价从子树大小降到深度
+  ✓ D8     FAST18 全文无 checksum（0 次）
+  ✓ D10    FAST18：git 负载把 ext4 scan 退化 15 倍
+  ✓ D10    FAST17：老化用连续 git checkout 内核树
+  ✓ D10    FAST17：老化的 BetrFS 胜过别家未老化
+
+══ 按每条引用依赖的那棵树分组 ══
+  refs-linux（固定点） 20 条：命中 20，未命中 0  根：/home/fy5090/code/fs-refs/linux-6.17
+  refs-zfs（固定点） 15 条：命中 15，未命中 0  根：/home/fy5090/code/fs-refs/zfs
+  refs-docs（固定点） 16 条：命中 16，未命中 0  根：/home/fy5090/code/fs-refs/docs
+  host-kernel（非固定点） 38 条：命中 38，未命中 0  根：/home/fy5090/kbuild/linux-om
+  没标树来源：0 条
+  ⚠️ host-kernel 上的 38 条核的不是固定点：/home/fy5090/kbuild/linux-om 不在 fetch-refs.sh 的固定点里，
+     随时会被升级、改动或删掉 ⇒ 这一批的「已核实」只在这台机器的今天成立。
+
+══ 结果：89 条命中，0 条未命中；分组合计 89 条，与断言总数一致 ══
+  ✓ 全部命中（89 条，按树分组： refs-linux 20 refs-zfs 15 refs-docs 16 host-kernel 38）
+
+── 7. 新写的不变量要点名它判的字段住在哪条已定分项（invariant-anchors）──
+  ✓ 这次改动新写或改写的 10 行不变量都点名了已定分项（基准 973e1f585703da8100c2df8a1f1f292f93a11704）；存量 82 行里 34 行还点不出，那笔账记在 C69（已定不变量没有字段可判）
+
+  ✗ 引用与不变量：1 格判红（governance-refs）；判绿 5 格，本次无对象可判 1 格
+     → 怎么办：逐格按那一格里写的出路处理；kb 与治理文档里的，二选一——按现状改正文，
+               或者在那一条旁边写明为什么现在不用改（带日期和依据）。放着不动会让下一轮再审一遍同样的东西。
+               只重跑一格：bash .claude/gate.d/10-references-and-invariants.sh [项目根] --check <格名>。

@@ -1,0 +1,23 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -3167,6 +3167,20 @@
+         .max_by_key(|slot| slot.quantities.slot_generation) else {
+             continue;
+         };
++        // 原型 B（opus r3，只在副本上）：D18 已定项 11 第 314 行字面「不落后」——落后就拒，不看单元在不在。
++        let newest_system_configuration_journal_tail = JournalSequenceNumber {
++            instance_generation: newest_self_verified.quantities.journal_instance,
++            counter: newest_self_verified.quantities.journal_tail,
++        };
++        if newest_system_configuration_journal_tail < current_version_journal_position {
++            devices_behind.push(DeviceBehindTheCurrentVersion {
++                device,
++                newest_system_configuration_journal_tail,
++                current_version_journal_position,
++                units_missing: Vec::new(),
++            });
++            continue;
++        }
+         if let Some((newest_system_configuration_journal_tail, units_missing)) =
+             units_of_the_version_missing_on_a_device_behind_it(
+                 reader,

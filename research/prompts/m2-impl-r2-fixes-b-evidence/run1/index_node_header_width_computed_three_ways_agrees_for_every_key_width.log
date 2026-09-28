@@ -1,0 +1,10 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running tests/index_node_header_width_computed_three_ways_agrees_for_every_key_width.rs (target/debug/deps/index_node_header_width_computed_three_ways_agrees_for_every_key_width-c282238401b52e0f)
+
+running 2 tests
+test core_checker_and_model_compute_the_same_index_node_header_width_for_every_key_width_byte ... ok
+test each_tree_registered_index_node_header_width_equals_all_three_formulas_at_that_tree_key_width ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

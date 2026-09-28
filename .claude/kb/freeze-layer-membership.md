@@ -89,7 +89,7 @@
 
 ## 门禁判哪三条
 
-`.claude/gate.d/16-freeze-layer-membership.sh` 判 C45（四层图里每个结构的态别没有登记） 的「怎么拦」那一列写死的三条：
+`.claude/gate.d/doc-decisions.sh` 的 freeze-layer-membership 格判 C45（四层图里每个结构的态别没有登记） 的「怎么拦」那一列写死的三条：
 
 | # | 判什么 | 清单从哪来 |
 |---|---|---|

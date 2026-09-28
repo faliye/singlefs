@@ -1,4 +1,4 @@
-# 调查：E158 第 4 次跑第二段，-配置 各臂实七-乙 `crash0`–`crash2` 的 `content_differs_from_the_ledger`（2026-09-27 JST）
+# 调查：E158 第 4 次跑第二段，-配置 各臂实七-乙 `crash0`–`crash2` 的 `content_differs_from_the_ledger`（2026-09-27）
 
 ## 一、结论
 
@@ -15,14 +15,14 @@
 
 ## 二、原样复现
 
-- 负载（JST 12:05 前后）：`ps` 看到别的会话有 `cargo test --offline -p singlefs-harness --test second_transaction_supplement_three_fault_injection`、`--test crash_enumeration_sharded_across_processes`、`--lib`，没有 qemu、vm-bench、e152、fio。没有等锁。
+- 负载：`ps` 看到别的会话有 `cargo test --offline -p singlefs-harness --test second_transaction_supplement_three_fault_injection`、`--test crash_enumeration_sharded_across_processes`、`--lib`，没有 qemu、vm-bench、e152、fio。没有等锁。
 - 臂副本 bin 的 sha256：yi-cfg 与今天两份都是 `12b82f491453e4f598f8262632dc949967508a8a1cae745a1b4db078499fb148`，与执行员报告一致。
 - 做法：`cp -a` 两份臂副本（连 target）到草稿目录的 `yi-cfg-repro`、`today-repro`，用草稿脚本 `/tmp/claude-1000/investigate-e158-seg2-ledger/run_one.sh` 跑。环境变量照 `run_arm.sh`，外加 `capped.sh 1` 与 `run-with-memory-cap.sh 10G`，两条并行，合计 2 个线程。
 - 结果（`progress.md` 原样）：
 
 ```
-12:10:12 JST repro-today rc=0 用时 193 秒 行数 1834
-12:12:13 JST repro-yi-cfg rc=0 用时 314 秒 行数 1752
+repro-today rc=0 用时 193 秒 行数 1834
+repro-yi-cfg rc=0 用时 314 秒 行数 1752
 ```
 
 - 与产物逐字节比：`cmp $S/repro-yi-cfg.out $R-yi-cfg.out && echo yi-cfg_identical` 输出 `yi-cfg_identical`，今天那一臂输出 `today_identical`。**原现象复现出来了，而且确定性地一样。**
@@ -74,7 +74,7 @@ diag-today: main_ledger_all_keys={(0, 0): 0, (1, 1): 0, (1, 2): 0, (1, 3): 1, (2
 bash $S/run_one.sh yi-cfg-diag yi-cfg min-yi-cfg E158_INVESTIGATE_ONLY_FAMILY=seventh-crash
 ```
 
-`progress.md` 原样 `12:24:53 JST min-yi-cfg rc=0 用时 5 秒 行数 105`。3 格读数（`grep -o` 抽字段，`paste` 拼行；`cell=false` 是 `overwrite_cell=false` 被截出的尾巴）：
+`progress.md` 原样 `min-yi-cfg rc=0 用时 5 秒 行数 105`。3 格读数（`grep -o` 抽字段，`paste` 拼行；`cell=false` 是 `overwrite_cell=false` 被截出的尾巴）：
 
 ```
 cell=crash0:crash@0	cell=false	after_mount_read_back=failed:content_differs_from_the_ledger	after_mount_read_back_root=2:4	after_mount_read_back_content=1
@@ -104,7 +104,7 @@ q3_lost_cells=0
 
 **这 3 格变成 `last_confirmed`，内容号 0，不丢写；yi-cfg 实七-乙 3/6 → 0/6。**
 
-两条臂整条改用自己的账重跑（`E158_INVESTIGATE_OWN_LEDGER=1`，不限族），拿产物逐字段比（草稿脚本 `fielddiff.py`：按 `key=value` 逐行比，只打出变了的行与字段）。`progress.md` 原样：`12:21:33 JST own-today rc=0 用时 200 秒 行数 1834`、`12:23:46 JST own-yi-cfg rc=0 用时 333 秒 行数 1752`。`python3 $S/fielddiff.py $R-<臂>.out $S/own-<臂>.out` 原样输出：
+两条臂整条改用自己的账重跑（`E158_INVESTIGATE_OWN_LEDGER=1`，不限族），拿产物逐字段比（草稿脚本 `fielddiff.py`：按 `key=value` 逐行比，只打出变了的行与字段）。`progress.md` 原样：` own-today rc=0 用时 200 秒 行数 1834`、` own-yi-cfg rc=0 用时 333 秒 行数 1752`。`python3 $S/fielddiff.py $R-<臂>.out $S/own-<臂>.out` 原样输出：
 
 ```
 == yi-cfg

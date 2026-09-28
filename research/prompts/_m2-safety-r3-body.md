@@ -27,7 +27,7 @@ P1、P2 是对照臂：P3 与 P1 比，量出 ND+A1n 在 C283 之上多换来什
 
 **共用问句**：每条臂都答「这条合法历史走完之后，池还能不能写、删文件能不能腾出空间再写」，答案要量，不许推；不许用「拒绝」换「安全」而把池永远卡在只读，除非说得出用户手里还有哪一步能让它重新可写；`.claude/rules/fs-design.md`「释放空间这个操作本身不需要申请空间」与 D3（空间分配） 已定项 9 逐句核。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-26 JST 13:xx；冻结副本 `/tmp/claude-1000/safety-r3-frozen/`，实一至实四乙之后、没提交，开工快照 `research/prompts/m2-safety-r3-snapshot/`）
+## 二、实现今天的样子（主 agent 的观测，2026-09-26；冻结副本 `/tmp/claude-1000/safety-r3-frozen/`，实一至实四乙之后、没提交，开工快照 `research/prompts/m2-safety-r3-snapshot/`）
 
 - **准入**：`crates/singlefs-core/src/admission.rs`：`available_on_each_device`（`own_terms` 五项加池级三项），`admit_on_every_device` 逐盘合取，`demand_of_the_roles_on_each_device` 只算 `Demand` 那一类角色，`admission_reading_before_a_publish` 发布与可写挂载共用；拒绝类型 `AdmissionRefusedOnSomeDevices` 的注释写明「先推空发布抬 F 再判一次是调用方的事，这里不做」。发布路径在 `crates/singlefs-core/src/transaction.rs` 调它（`PublishError::SpaceAdmissionRefused`），挂载路径在 `crates/singlefs-core/src/mount.rs`（`MountError::SpaceAdmissionRefusedBeforeAcquisition`）。
 - **C283 没实现**：`mount.rs` 的 `raise_rollback_floor` 注释写「今天只有测试入口，没有产品路径」，准入拒绝之后没有一处调它。抬 F 那一串（准入与卸载共用）是 `mount.rs` 的 `raise_the_floor_through`，入口 `RaiseFloorEntry::Admission` 判上限、`RaiseFloorEntry::Unmount` 不判。

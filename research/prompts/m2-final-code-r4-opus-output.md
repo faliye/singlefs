@@ -1,4 +1,4 @@
-# m2-final-code-r4 云端攻方（Opus）：Z19、Z21、Z22 找反例（2026-09-25 03:29 UTC / 12:29 JST）
+# m2-final-code-r4 云端攻方（Opus）：Z19、Z21、Z22 找反例（2026-09-25 /）
 
 读的代码是冻结副本 `/tmp/claude-1000/m2-final-code-r4/tree/crates/`（改后）与 `/tmp/claude-1000/m2-final-code-r3/tree/crates/`（改前）；kb 引文与行号取 `/tmp/claude-1000/m2-final-code-r4/kb-snapshot/.claude/kb/` 里那份文件自己的行号（D18 不在快照里，取主工作区那份，已注明）。代码行号取冻结副本。副本上跑出来的数一律是副本上的数，不是入库装置上的数。
 

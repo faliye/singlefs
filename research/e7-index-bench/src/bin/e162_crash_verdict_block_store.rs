@@ -2895,10 +2895,10 @@ fn run_segment_one_crash_question(output: &mut ProductLines, remaining: &[String
 
 // ============================== 第一段：S2 与几何敏感性 ==============================
 
-/// P_B：`ssh -o BatchMode=yes <PEER_SSH_HOST> nproc`，主机名取仓根 `layer0-shard.env`（与 layer0-shard-run.sh:155 同一个取法）。
+/// P_B：`ssh -o BatchMode=yes <PEER_SSH_HOST> nproc`，主机名取仓根 `multi-host.env`（与 layer0-shard-run.sh 的 run_on_peer 函数同一个取法）。
 fn peer_logical_processors() -> (String, String) {
     let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let configuration = fs::read_to_string(repository_root.join("layer0-shard.env")).unwrap_or_default();
+    let configuration = fs::read_to_string(repository_root.join("multi-host.env")).unwrap_or_default();
     let host = configuration
         .lines()
         .find_map(|line| line.trim().strip_prefix("PEER_SSH_HOST="))

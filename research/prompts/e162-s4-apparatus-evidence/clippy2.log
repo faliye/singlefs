@@ -1,0 +1,9 @@
+    Checking e7-index-bench v0.1.0 (research/e7-index-bench)
+error[E0463]: can't find crate for `e7_index_bench`
+  --> e7-index-bench/src/bin/e162_verdict_store_power_cut.rs:29:5
+   |
+29 | use e7_index_bench::Emitter;
+   |     ^^^^^^^^^^^^^^ can't find crate
+
+For more information about this error, try `rustc --explain E0463`.
+error: could not compile `e7-index-bench` (bin "e162-verdict-store-power-cut") due to 1 previous error

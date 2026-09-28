@@ -1,6 +1,6 @@
 # I-7.13 坏镜像补齐（checker_known_bad_images）实现员报告
 
-写于 2026-09-27（时刻 UTC；JST = UTC + 9）。底座是主工作区 2026-09-27T08:08:28Z 的现状（`snapshot-sha256.txt`：`checker_known_bad_images.rs` e3734906…、checker `image.rs` 3e780e8b…、`walk.rs` b32f0b02…、`crates/mutations.tsv` fae2eee2…）。改动在副本 `work/` 里做，交的是 `patch/`。线程上限 4，内存上限 8G。
+写于 2026-09-27。底座是主工作区 2026-09-27 的现状（`snapshot-sha256.txt`：`checker_known_bad_images.rs` e3734906…、checker `image.rs` 3e780e8b…、`walk.rs` b32f0b02…、`crates/mutations.tsv` fae2eee2…）。改动在副本 `work/` 里做，交的是 `patch/`。线程上限 4，内存上限 8G。
 
 ## 一、结论
 
@@ -29,7 +29,7 @@
 
 ## 三、先红与转绿（整个测试二进制，都经 `capped.sh 4` 与 `run-with-memory-cap.sh 8G`）
 
-**先红**：在主工作区原样副本 `base/` 上跑（08:08:28Z 拷的，四份文件的 sha256 与底座逐一核过都是 `OK`）。`cargo test --offline -p singlefs-harness --test checker_known_bad_images`，日志 `baseline-kept.log`。原样摘录：
+**先红**：在主工作区原样副本 `base/` 上跑（拷的，四份文件的 sha256 与底座逐一核过都是 `OK`）。`cargo test --offline -p singlefs-harness --test checker_known_bad_images`，日志 `baseline-kept.log`。原样摘录：
 
 ```
 test an_allocation_generation_past_its_unit_birth_in_the_version_only_its_journal_record_carries_reddens_the_allocation_generation_invariant_before_the_mount ... FAILED
@@ -165,7 +165,7 @@ build exit 0
 - 删了 `/tmp/claude-1000/impl-i713-bad-image/work`（改动副本，删前 `du -sh` 18G），改动都在 `patch/` 里。
 - 留着：`report.md`、`progress.md`、`patch/`、`snapshot-sha256.txt`，以及日志 `baseline*.log`、`after.log`、`prove-red.log`、`prove-red-logs/`、`clippy.log`、`build.log`、`gate-*.log`、`draft.diff`，都是给主 agent 核的材料。
 
-`apply-writer-patch.py --dry-run` 原样输出（在主工作区上，08:2x UTC）：
+`apply-writer-patch.py --dry-run` 原样输出（在主工作区上）：
 
 ```
 ✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 1323 行

@@ -1,0 +1,8 @@
+E7RESULT name=r3_pipeline variant=strongest reachable_states=167 terminal_states=2 missing_result=0 wrong_input=0 double_tally=0 stale_after_change=0 stuck=0 must_be_nonzero=-
+E7RESULT name=r3_pipeline variant=record_flag_before_data reachable_states=197 terminal_states=16 missing_result=0 wrong_input=14 double_tally=0 stale_after_change=0 stuck=0 must_be_nonzero=14
+E7RESULT name=r3_pipeline variant=checked_flag_before_result reachable_states=36 terminal_states=4 missing_result=2 wrong_input=0 double_tally=0 stale_after_change=0 stuck=0 must_be_nonzero=2
+E7RESULT name=r3_pipeline variant=result_then_flag_with_appended_tally reachable_states=48 terminal_states=4 missing_result=0 wrong_input=0 double_tally=2 stale_after_change=0 stuck=0 must_be_nonzero=2
+E7RESULT name=r3_pipeline variant=checked_flag_is_a_boolean reachable_states=25 terminal_states=2 missing_result=0 wrong_input=0 double_tally=0 stale_after_change=2 stuck=0 must_be_nonzero=2
+E7RESULT name=r3_pipeline variant=batch_larger_than_backlog_cap_without_flush reachable_states=2 terminal_states=1 missing_result=0 wrong_input=0 double_tally=0 stale_after_change=0 stuck=1 must_be_nonzero=1
+E7RESULT name=r3_pipeline variant=claims_persisted_without_lease_and_a_card_drops reachable_states=46 terminal_states=5 missing_result=0 wrong_input=0 double_tally=0 stale_after_change=0 stuck=4 must_be_nonzero=4
+E7RESULT name=r3_pipeline variant=claims_in_memory_and_a_card_drops reachable_states=80 terminal_states=3 missing_result=0 wrong_input=0 double_tally=0 stale_after_change=0 stuck=0 must_be_nonzero=-

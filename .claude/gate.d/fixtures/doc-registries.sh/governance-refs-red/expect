@@ -1,0 +1,15 @@
+exit=1
+want=.claude/agents/sample.md:7: 「门禁 doc-kb」不是门禁目录里的门禁（也不是上游共享门禁的脚本）
+want=.claude/agents/sample.md:7: 「doc-registries 的 no-such-cell 格」：doc-registries 的格名表里没有 no-such-cell
+want=.claude/kb/tooling.md:3: 用旧编号称呼门禁
+want=：11 号今天是门禁 doc-process-records 的 batch-scope 格
+want=：91 号今天是门禁 doc-experiments 的 archive-past-rounds 格
+want=：47 号今天是门禁 code-tooling 的 research-script-selftests、research-script-selftest-coverage 格
+want=：55 号今天是门禁 checker-tier-qemu-device-streams 的 device-streams 格
+want=.claude/kb/tooling.md:4: `bash .claude/gate.d/doc-registries.sh --check no-such-cell`：doc-registries 的格名表里没有 no-such-cell
+want=README.md:3: 用旧编号称呼门禁
+want=：59 号今天是门禁 checker-tier-crates-mutation-replay 的 crates-mutation-rows 格
+want=README.md:4: 「checker-tier-lkmm 的 no-such-cell 格」：checker-tier-lkmm 的格名表里没有 no-such-cell
+want=扫 3 份现状文字（治理文档、kb 与仓根 README.md，历史版本节与变更史除外）：门禁全名 3 处、格名 4 处、旧编号 5 处
+want=治理文档与 kb 里有指不到的指向（上面逐条列出）
+want=  governance-refs：红（退出 1）

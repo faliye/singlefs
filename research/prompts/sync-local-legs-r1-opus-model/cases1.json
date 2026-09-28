@@ -27,7 +27,7 @@ false,
 "C5 cd abs",
 "three-way-local-attack",
 false,
-"cd /home/fy5090/code/singlefs && nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/ask-local.sh /home/fy5090/code/singlefs/research/prompts/zz-probe-r1-local-attack.md > /home/fy5090/code/singlefs/research/prompts/zz-probe-r1-local-attack-output-s3.md"
+"cd <仓根> && nice -n 19 bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s3.md"
 ],
 [
 "C6 var n",
@@ -117,7 +117,7 @@ true,
 "C5 cd abs",
 "three-way-local-attack",
 true,
-"cd /home/fy5090/code/singlefs && nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/ask-local.sh /home/fy5090/code/singlefs/research/prompts/zz-probe-r1-local-attack.md > /home/fy5090/code/singlefs/research/prompts/zz-probe-r1-local-attack-output-s3.md"
+"cd <仓根> && nice -n 19 bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-attack.md > research/prompts/zz-probe-r1-local-attack-output-s3.md"
 ],
 [
 "C6 var n",
@@ -207,7 +207,7 @@ false,
 "C5 cd abs",
 "three-way-local-defense",
 false,
-"cd /home/fy5090/code/singlefs && nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/ask-local.sh /home/fy5090/code/singlefs/research/prompts/zz-probe-r1-local-defense.md > /home/fy5090/code/singlefs/research/prompts/zz-probe-r1-local-defense-output-s3.md"
+"cd <仓根> && nice -n 19 bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s3.md"
 ],
 [
 "C6 var n",
@@ -297,7 +297,7 @@ true,
 "C5 cd abs",
 "three-way-local-defense",
 true,
-"cd /home/fy5090/code/singlefs && nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/ask-local.sh /home/fy5090/code/singlefs/research/prompts/zz-probe-r1-local-defense.md > /home/fy5090/code/singlefs/research/prompts/zz-probe-r1-local-defense-output-s3.md"
+"cd <仓根> && nice -n 19 bash research/scripts/ask-local.sh research/prompts/zz-probe-r1-local-defense.md > research/prompts/zz-probe-r1-local-defense-output-s3.md"
 ],
 [
 "C6 var n",

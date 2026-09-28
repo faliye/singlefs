@@ -34,14 +34,15 @@ use singlefs_core::block_device::{
 use singlefs_core::mount::{
     is_a_user_visible_unit, mount_writable, mount_writable_with_test_only_switches,
     roll_back_by_a_forward_publish, Mounted, RollbackCandidateExclusion, RollbackError,
-    RollbackTarget, RolledBack, ShadowLedger,
+    RollbackTarget, RolledBack, ShadowLedger, StillUnreadableAfterOneReread,
 };
 use singlefs_core::pointer::LocationEntry;
 use singlefs_core::records::TREE_KIND_ALLOCATION;
 use singlefs_core::recovery::{
     allocation_records_under_root, choose_system_configuration,
     highest_tree_identifier_watermark_in_the_ring, readable_roots, recover, scan_journal,
-    user_visible_tree_root_pointers, walk_to_file, JournalPolicy, RecoveryFailure, RecoveryOutcome,
+    user_visible_tree_root_pointers, walk_to_file, BadRootRingSlotReading, JournalPolicy,
+    RecoveryFailure, RecoveryOutcome,
 };
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
 use singlefs_core::transaction::{
@@ -816,12 +817,19 @@ fn refusal_before_any_write_leaves_the_disk_the_allocator_and_the_current_versio
     );
 }
 
-/// 验收「水位」：C 那一版新建了三个 inode（号 2、3、4，水位 5），回退那一刻 C 的根槽读不出——环里读得出的根带的 inode 号水位都是 2；
-/// D 的 inode 号水位取 max(C 内存里的 5, 环里的 2) = 5，D 之后再新建的 inode 从 5 起、不重发 2–4。树 ID 水位同一个取法。
-/// 只取环里读得出的根时 D 的水位是 2——`crates/mutations.tsv` 里那一行证这条断言红。
+/// C 那一版新建了三个 inode（号 2、3、4，水位 5），回退那一刻 C 的根槽被改成全 0（自证不过）。C 的根是这个进程写过、FUA 返回过的，
+/// 它住的槽在这个进程的根环表里：D16（发布语义） 已定项 1「根槽这一次读坏」那一行全句——读不出或自证不过就重读一次，仍坏就拒——
+/// 管理员回退判候选读根环时拒成 `CandidateJudgementStillUnreadableAfterOneReread(RootRingSlotKnownToHoldARoot { 自证不过, 自证不过 })`，
+/// 在任何写之前：盘上逐字节不变、现行版本与分配器不动。根槽改回原样之后回退照做：D 的 inode 号水位 5，D 之后再新建的 inode 从 5 起、
+/// 不重发 2–4；树 ID 水位同一个取法。
+/// 这一条原来钉的是「C 的根槽读不出、回退照做、水位取内存里的」（合入后验证一只管「读不出」时自证不过当没有根）；照全句之后那一形在
+/// 判候选时就拒（代码三方第二轮之后的规格第 3 条：已知根被改坏之后回退，改钉拒）。「水位取 max(内存里的, 环里读得出的)」那一判挪到
+/// `unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs` 的
+/// `the_rollback_takes_the_inode_number_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_its_root`
+/// （判候选两遍读得出、算水位那一遍瞬时读不出），`crates/mutations.tsv` 里实三「水位」那一行跟着换靶。
 #[test]
 #[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
-fn the_rollback_takes_the_watermarks_from_the_current_version_in_memory_when_its_root_is_unreadable(
+fn rolling_back_while_a_root_slot_this_process_wrote_reads_not_self_verified_is_refused_before_any_write(
 ) {
     let mut pool = build_pool("step-four-forward-watermark");
     let _second = overwrite_in_process(&mut pool, &second_content(), InstanceGeneration(1));
@@ -858,11 +866,47 @@ fn the_rollback_takes_the_watermarks_from_the_current_version_in_memory_when_its
         write_root_slot(open_devices, third_root_slot, &vec![0u8; root_slot_bytes()]);
         saved
     };
-    roll_back(&mut pool, first_root()).expect("回退到 A：C 的根读不出不碍事，候选与账都读得出");
+    let before = disk_snapshot(&pool.memory_pool(), &pool.stream);
+    let current_before = pool.output.clone();
+    let records_before = pool.allocator.records().to_vec();
+    let refused = roll_back(&mut pool, first_root());
+    assert!(
+        matches!(
+            &refused,
+            Err(RollbackError::CandidateJudgementStillUnreadableAfterOneReread(still_bad))
+                if **still_bad
+                    == StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot {
+                        ring_slot: target_for_publish(
+                            CheckpointTxg(8),
+                            parameters().geometry.root_ring_slots_per_region,
+                        ),
+                        first_reading: BadRootRingSlotReading::NotSelfVerified,
+                        reread: BadRootRingSlotReading::NotSelfVerified,
+                    }
+        ),
+        "C 的根槽是这个进程写过的，自证不过重读仍坏：{:?}",
+        refused.as_ref().err()
+    );
+    assert_eq!(
+        disk_snapshot(&pool.memory_pool(), &pool.stream),
+        before,
+        "拒在任何写之前"
+    );
+    assert_eq!(pool.output, current_before, "现行版本不动");
+    assert_eq!(
+        pool.allocator.records(),
+        records_before.as_slice(),
+        "分配器不动"
+    );
+    {
+        let open_devices = pool.devices.as_mut().expect("镜像还开着");
+        write_root_slot(open_devices, third_root_slot, &saved_third_root_slot);
+    }
+    roll_back(&mut pool, first_root()).expect("C 的根槽改回原样之后回退到 A");
     assert_eq!(
         pool.output.inode_number_watermark(),
         5,
-        "D 的 inode 号水位 = max(C 内存里的 5, 环里读得出的根的 2)"
+        "D 的 inode 号水位 = max(C 内存里的 5, 环里读得出的根的)"
     );
     assert_eq!(
         pool.output.root.tree_identifier_watermark, third.root.tree_identifier_watermark,
@@ -893,10 +937,6 @@ fn the_rollback_takes_the_watermarks_from_the_current_version_in_memory_when_its
         BTreeSet::from([1, 5, 6]),
         "D 之后新建的号从 5 起：C 发过的 2–4 不重发"
     );
-    {
-        let open_devices = pool.devices.as_mut().expect("镜像还开着");
-        write_root_slot(open_devices, third_root_slot, &saved_third_root_slot);
-    }
     let verdicts = verdicts_without_any_violation(&pool.memory_pool(), "D、新建两个 inode 之后");
     assert_judged_and_holding(&verdicts, &["I-9.6"], "D、新建两个 inode 之后");
 }
@@ -1045,8 +1085,9 @@ fn the_plain_remount_after_a_recovery_that_abandoned_roots_keeps_the_isolation()
     }
 }
 
-/// 被抛弃根 C 的树表单元在两块盘上都改坏：影子账罩不到 C，挂载照样成功、只计数一条读不出的被抛弃根，只被 C 引用的 14 个槽罩不到
-/// （步 4 / 步 5 代码三方第二轮云端攻方腿打中：一条被抛弃根的树表撕裂不能让每次挂载都失败）。
+/// 被抛弃根 C 的树表单元在两块盘上都改坏：挂载照样成功（步 4 / 步 5 代码三方第二轮云端攻方腿打中：一条被抛弃根的树表撕裂不能让每次挂载都失败），
+/// 计数一条读不出的被抛弃根往上报，C 引用的落点从中央映射现算，只被 C 引用的 14 个槽照样隔离（与 C 读得出时同，见上一条用例；
+/// C393（被抛弃根的账读不出时修复没有条款） 取 (b)-从映射现算，用户 2026-09-28 定）。
 #[test]
 #[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn torn_tree_table_of_an_abandoned_root_is_counted_and_does_not_fail_the_mount() {
@@ -1065,13 +1106,13 @@ fn torn_tree_table_of_an_abandoned_root_is_counted_and_does_not_fail_the_mount()
     assert_eq!(remounted.output.abandoned_roots_unreadable, 1, "C 读不出");
     assert_eq!(
         remounted.output.isolated_slots_per_device,
-        vec![(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)],
-        "只被 C 引用的 14 个槽罩不到（C 读得出时隔离 14，见上一条用例）"
+        vec![(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)],
+        "从中央映射现算，只被 C 引用的 14 个槽照样隔离（与 C 读得出时同，见上一条用例）"
     );
 }
 
 /// 被抛弃根 C 那棵账最左那片叶的第一条分配记录改成「起点贴着单元区末尾、跨度 32767 槽」，链上校验和逐道重算（panic 面普查 R7）：
-/// 挂载不 panic，C 计成一条读不出的被抛弃根，只被 C 引用的槽罩不到。
+/// 挂载不 panic，C 计成一条读不出的被抛弃根，引用的落点从中央映射现算，只被 C 引用的槽照样隔离。
 #[test]
 #[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn an_abandoned_roots_allocation_record_whose_span_runs_past_the_unit_area_is_counted_and_does_not_panic(
@@ -1175,8 +1216,8 @@ fn an_abandoned_roots_allocation_record_whose_span_runs_past_the_unit_area_is_co
     assert_eq!(remounted.output.abandoned_roots_unreadable, 1, "{what}");
     assert_eq!(
         remounted.output.isolated_slots_per_device,
-        vec![(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)],
-        "只被 C 引用的 14 个槽罩不到，与树表撕裂那一条同一个数"
+        vec![(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)],
+        "账解不开也从中央映射现算，只被 C 引用的 14 个槽照样隔离，与树表撕裂那一条同一个数（C393（被抛弃根的账读不出时修复没有条款） 取 (b)-从映射现算，用户 2026-09-28 定）"
     );
 }
 

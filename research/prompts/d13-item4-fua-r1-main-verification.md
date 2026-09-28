@@ -16,7 +16,7 @@
 
 `crates/singlefs-core/src/block_device.rs` 两份 `BlockDevice` 实现里，`WriteDurability::ForceUnitAccess`（`:245`、`:449`）与 `barrier()`（`:251`、`:455`）调的是**同一个** `file.sync_data()`。而 `write_all_at` 走 `pwrite`，不设 `REQ_FUA`。
 
-块设备 fd 上 `sync_data` 的去向（本机 `/home/fy5090/linux-bug-fix/linux`，`git describe` 报 v7.3-rc1）：
+块设备 fd 上 `sync_data` 的去向（本机 `~/linux-bug-fix/linux`，`git describe` 报 v7.3-rc1）：
 
 ```
 block/fops.c:590   blkdev_fsync

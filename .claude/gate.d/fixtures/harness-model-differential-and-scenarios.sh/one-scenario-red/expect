@@ -1,0 +1,6 @@
+exit=1
+want=several_sizes：循环里每一轮新建一个池
+want=one-scenario（harness 档一条用例一个场景）：查了 3 项，1 处不对
+want=harness 用例粒度：crash-case-check --only one-scenario 退 1
+want=样本只跑 .gate-cells 点名的格：one-scenario
+want=one-scenario：红（退出 1）

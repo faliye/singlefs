@@ -1,4 +1,4 @@
-# 实审 B3a 报告（implementation-writer，2026-09-26 UTC 写）
+# 实审 B3a 报告（implementation-writer，2026-09-26 写）
 
 ## 一、结论
 
@@ -132,7 +132,7 @@ exit=0
 ```
 - `cargo build --offline --all-targets -p singlefs-harness`：
 ```text
-   Compiling singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+   Compiling singlefs-harness v0.1.0 (crates/singlefs-harness)
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.79s
 exit=0
 ```

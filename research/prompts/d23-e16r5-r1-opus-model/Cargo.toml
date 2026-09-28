@@ -1,0 +1,15 @@
+[package]
+name = "d23-e16r5-r1-opus-model"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# 独立工作区：不进仓根工作区，不依赖 research/e7-index-bench（Emitter 换成本文件里的行计数）。
+[workspace]
+
+[[bin]]
+name = "d23-e16r5-r1-opus-model"
+path = "src/main.rs"
+
+[profile.release]
+debug-assertions = false

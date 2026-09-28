@@ -1,0 +1,160 @@
+  ✗ 有实验产物没被 experiments.md 点名——跑过但没写回，或写回了却无法复核：
+     research/results/e142-first-txn-dry-run-2026-09-27-r19-arm-n18.out
+     research/results/e142-r19-crates-sha256-a-2026-09-27.txt
+     research/results/e142-r19-crates-status-2026-09-27.txt
+     research/results/e142-r19-diff-r18-to-arm-n18-2026-09-27.txt
+     research/results/e162-crash-verdict-block-store-mutate-2026-09-27-features.log
+     research/results/gate69-refresh-replay-e155-e157-e159-2026-09-25.log
+     research/results/gate69-refresh-replay-e155-e157-e159-postupdate-2026-09-25.log
+     → 怎么办：把结论写进 experiments.md 对应实验的正文，
+               并在口径段点名这份原始输出；确实是废弃产物就删掉它。
+  ✓ 这次改动（基准 61b40787cb9fbe2de2eba582af4176abb011e814）新增或改写的行点名的 4 份产物在树里或版本库历史里都找得到
+     第三道没判的 322 份：不在这次改动新增或改写的行里的点名，按实验列：
+       E6：e6-multicore-2026-08-28.out e6-units-2026-08-31.out
+       E7：e7-index-2026-08-29-file.out e7-index-2026-08-29-vm.out
+       E8：e8-split-2026-08-28.out
+       E9：e9-keylayout-2026-08-28.out
+       E14：e14-discrimination-2026-08-29.out
+       E16：e16-bytes-2026-09-03.out e16-journal-2026-08-28.out e16-journal-2026-08-31.out e16-sweep-2026-08-28.out
+       E17：e17-merge-2026-08-28.out e17-merge-2026-08-29-repro.out e17-merge-2026-08-31-repro.out
+       E18：e18-branch-2026-08-28.out
+       E19：e19-defer-2026-08-28.out
+       E20：e20-fanout-2026-08-28.out e20-fanout-2026-08-29-repro.out e20-fanout-2026-08-31-repro.out e20-poscontrol-2026-08-29.out e20-sweep-2026-08-29.out
+       E21：e21-cpu-2026-08-28.out
+       E24：e24-recovery-2026-08-29.out
+       E25：e25-journal-reserve-2026-08-29.out
+       E26：e26-accounting-2026-08-29.out
+       E27：e27-d5-paths-2026-08-29.out
+       E28：e28-map-rebuild-2026-08-29.out
+       E29：e29-blast-radius-2026-08-29.out
+       E30：e30-range-rebuild-2026-08-29.out
+       E31：e31-aad-snapshot-2026-08-29.out
+       E32：e32-journal-timeline-2026-08-29.out
+       E33：e33-pin-rules-2026-08-29.out
+       E34：e34-iomin-probe-2026-09-02.out e34-ring-iomin-2026-09-01.out e34-rootring-local.out
+       E35：e35-head-forms-2026-08-29.out
+       E36：e36-slot-mapping-2026-08-29.out
+       E37：e37-log-epoch-2026-08-29.out
+       E38：e38-accounting-cow-2026-08-29.out
+       E39：e39-back-chain-2026-08-29.out
+       E40：e40-csum-width-2026-08-30.out
+       E41：e41-root-ring-geom-2026-08-30.out
+       E42：e42-txn-records-2026-08-29.out
+       E43：e43-ext-budget-2026-08-30.out e43-ext-budget-2026-08-31.out e43-ext-budget-2026-09-02.out e43-ext-budget-2026-09-06.out e43-ext-budget-2026-09-13-hdr277.out e43-ext-budget-2026-09-13.out e43-ext-budget-2026-09-14-round2.out e43-ext-budget-2026-09-24-h311.out
+       E44：e44-jsn-width-2026-08-30.out
+       E45：e23-journal-geom-2026-08-29.out e45-span-ring-cost-2026-08-30.out
+       E46：e46-region-spacing-2026-08-30.out
+       E47：e47-ring-loss-2026-08-30.out
+       E48：e48-ring-placement-2026-08-30.out
+       E49：e49-chain-width-2026-09-25.out
+       E50：e50-ring-slots-2026-08-30.out
+       E51：e51-chain-chances-2026-08-30.out
+       E52：e52-head-mechanisms-2026-08-30.out
+       E53：e53-ring-failure-2026-08-30.out
+       E54：e54-accounting-gen-2026-08-30.out
+       E55：e55-stripe-map-2026-08-30.out
+       E56：e56-epsilon-2026-08-31.out e56-epsilon-h3-2026-08-31.out e56-epsilon-local.out e56-epsilon-vm-2026-08-31.out e56-epsilon-vm-nodirect-2026-08-31.out
+       E57：e57-field-authority-2026-08-31.out
+       E58：e58-csum-grain-2026-08-31.out e58-csum-grain-nodirect-2026-08-31.out e58-csum-grain-ops16k-2026-08-31.out e58-csum-grain-repro-2026-08-31.out e58-csum-grain-repro-2026-09-16.out
+       E59：e59-msg-recompute-2026-08-31.out
+       E60：e60-rebalance-2026-08-31.out
+       E61：e61-chain-hash-2026-08-31.out
+       E62：e62-ring-home-2026-08-31.out
+       E63：e63-width-rule-2026-08-31.out
+       E65：e65-write-grain-2026-08-31.out
+       E66：e66-small-files-2026-08-31.out
+       E67：e67-device-subset-2026-08-31.out
+       E68：e68-inline-threshold-2026-08-31.out
+       E69：e69-backref-cost-2026-08-31.out
+       E70：e70-ckpt-thresholds-2026-08-31.out
+       E71：e71-accounting-keys-2026-09-01.out
+       E72：e72-devtable-probe-2026-09-02.out
+       E73：e73-key-range-2026-09-07.out
+       E74：e74-alloc-records-2026-09-01.out
+       E75：e75-record-size-2026-09-01.out
+       E76：e76-payload-csum-2026-09-01.out
+       E77：e77-publish-order-2026-09-02.out
+       E78：e78-replay-start-2026-09-02.out
+       E79：e79-root-record-2026-09-02.out e79-root-record-2026-09-06.out
+       E80：e80-partial-stripe-2026-09-02.out
+       E81：e81-commit-fixpoint-2026-09-02.out
+       E82：e82-admission-overlay-2026-09-02.out
+       E83：e83-tombstone-grain-2026-09-02.out e83-tombstone-grain-2026-09-03.out
+       E84：e84-tombstone-pinning-2026-09-02.out e84-tombstone-pinning-2026-09-03.out
+       E85：e85-unit-header-2026-09-02.out
+       E86：e86-scan-step-2026-09-02.out
+       E87：e87-fixed-placement-2026-09-02.out
+       E88：e88-impostor-orphan-2026-09-02.out
+       E89：e89-interval-frontier-2026-09-03.out
+       E90：e90-tree-aad-2026-09-03.out
+       E91：e91-ring-admission-2026-09-03.out
+       E92：e92-reuse-requirement-2026-09-08.out
+       E93：e93-aging-placement-2026-09-03.out
+       E94：e94-move-touchset-2026-09-03.out
+       E95：e95-node-layout-arms-2026-09-09.out
+       E96：e96-hybrid-consistency-2026-09-03.out
+       E97：e97-entry-encoding-2026-09-07.out
+       E98：e98-inode-record-2026-09-07.out
+       E99：e99-writebuffer-seq-2026-09-03.out
+       E100：e100-system-configuration-slot-2026-09-03.out
+       E101：e101-node-tag-reserve-2026-09-03.out
+       E102：e102-unit-class-registry-2026-09-12.out
+       E103：e103-inode-update-cost-2026-09-14-round2.out
+       E104：e104-current-version-2026-09-05.out
+       E105：e105-extent-leaf-packed-2026-09-12.out
+       E106：e106-stripe-member-table-2026-09-12.out
+       E107：e107-stripe-table-wa-2026-09-06.out
+       E108：e108-plaintext-layer-cost-2026-09-06.out
+       E109：e109-position-authority-2026-09-06.out
+       E110：e110-stripe-table-steady-2026-09-06.out
+       E111：e111-stripe-table-key-2026-09-06.out
+       E112：e112-old-writer-unknown-tree-2026-09-06.out
+       E113：e113-unknown-tree-full-arms-2026-09-06.out
+       E114：e114-pack-ledger-2026-09-12.out
+       E115：e115-system-configuration-completeness-2026-09-07.out
+       E116：e116-pack-settle-2026-09-13-hdr277.out e116-pack-settle-2026-09-13.out e116-pack-settle-2026-09-14-round2.out e116-pack-settle-2026-09-24-h311.out
+       E117：e117-reserved-header-2026-09-12.out
+       E118：e118-single-disk-recovery-2026-09-07.out
+       E119：e119-slot-tiers-2026-09-12.out
+       E120：e120-tier-ratio-2026-09-12.out
+       E121：e121-cap-tiers-2026-09-12.out
+       E122：e122-dir-locality-2026-09-07.out
+       E123：e123-k-fork-cost-2026-09-09.out
+       E124：e124-system-configuration-recompute-2026-09-09.out
+       E125：e125-zoned-wp-2026-09-09.out e125-zoned-wp-rounds-2026-09-09.out
+       E126：e126-system-configuration-slot-width-2026-09-09.out
+       E127：e127-group-identity-under-split-merge-2026-09-13-knobs.out e127-group-identity-under-split-merge-2026-09-13.out
+       E128：e128-pointer-birth-cost-2026-09-10.out e128-pointer-birth-cost-2026-09-10-rerun4.out
+       E129：e129-tear-injector-2026-09-10.out e129-thin-neighbour-2026-09-10.out e129-thin-rmw-2026-09-10.out
+       E130：e130-livelist-bounded-destroy-2026-09-10.out
+       E131：e131-livelist-carrier-2026-09-10.out e131-livelist-carrier-2026-09-16.out
+       E132：e132-livelist-carrier-recount-2026-09-10.out e132-livelist-carrier-recount-2026-09-16.out
+       E133：e133-map-key-format-cost-2026-09-11.out
+       E134：e134-map-key-slot-baselines-2026-09-11.out
+       E135：e135-rollback-floor-2026-09-11.out
+       E136：e136-fork-cost-rows-2026-09-11.out
+       E137：e137-map-key-performance-2026-09-11.out
+       E138：e138-per-disk-floor-2026-09-11.out
+       E139：e139-tightened-floor-2026-09-12.out e139-tightened-floor-2026-09-12-reserve-sweep-windows.out e139-tightened-floor-2026-09-12-run1.out
+       E140：e140-header-alignment-2026-09-12.out e140-header-alignment-nodirect-2026-09-12.out e140-header-alignment-nodirect-2026-09-13.out e140-header-alignment-r2-2026-09-12.out e140-header-alignment-r2-2026-09-13.out e140-header-alignment-r3-2026-09-13.out e140-header-alignment-repro-2026-09-12.out e140-header-alignment-repro-2026-09-13.out
+       E141：e141-switch-reserve-mount-admission-2026-09-13-warmup.out e141-switch-reserve-mount-admission-2026-09-14-row-writing.out
+       E142：e142-first-txn-dry-run-2026-09-13-featurebit.out e142-first-txn-dry-run-2026-09-13-kinds.out e142-first-txn-dry-run-2026-09-13.out e142-first-txn-dry-run-2026-09-13-settled6.out e142-first-txn-dry-run-2026-09-13-settled.out e142-first-txn-dry-run-2026-09-13-warmup.out e142-first-txn-dry-run-2026-09-16-instance-boundary.out e142-first-txn-dry-run-2026-09-17-genesis-tree-table-released.out e142-first-txn-dry-run-2026-09-18-change-count-three.out e142-first-txn-dry-run-2026-09-22-mkfs-zero-fill-resync.out e142-first-txn-dry-run-2026-09-23-decisions-catchup.out e142-first-txn-dry-run-2026-09-25-header311-last-flag-arm-o.out e142-first-txn-dry-run-2026-09-25-header311-last-flag.out e142-first-txn-dry-run-2026-09-25-position-addressed-comparison.out e142-first-txn-dry-run-2026-09-25-r16-arm-n15.out e142-first-txn-dry-run-2026-09-25-r16-main.out e142-first-txn-dry-run-2026-09-25-r17-arm-n16.out e142-first-txn-dry-run-2026-09-25-r17-s2prep-reverify.out e142-first-txn-dry-run-2026-09-26-r18-arm-n17.out e142-first-txn-dry-run-2026-09-26-r18-main-2.out e142-r16-crates-dump-2026-09-25.out e142-region-diff-independent-2026-09-25-r16.out e142-region-diff-independent-2026-09-26-r18.out
+       E143：e143-one-unit-per-txn-journal-2026-09-13.out
+       E144：e144-header-checksum-cost-2026-09-13.out
+       E145：e145-self-describing-node-header-2026-09-14-round2.out e145-self-describing-node-header-2026-09-16-tree-table-200.out
+       E146：e146-livelist-entry-width-2026-09-14-round2.out e146-livelist-entry-width-2026-09-16-tree-table-200.out
+       E147：e147-system-configuration-recompute-from-layout-2026-09-13.out
+       E148：e148-commit-fixpoint-two-record-trees-2026-09-13.out
+       E149：e149-pack-container-repair-options-2026-09-13.out
+       E150：e150-rollback-reuse-of-abandoned-roots-2026-09-13-admission.out
+       E151：e151-arrival-and-container-arms-2026-09-13-region.out
+       E152：e142-first-txn-dry-run-2026-09-14-round2-slot4096.out e152-file-system-benchmark-2026-09-15.out e152-file-system-benchmark-second-transaction-2026-09-17.out e152-file-system-benchmark-second-transaction-final-2026-09-17.out e152-file-system-benchmark-second-transaction-relay-in-loop-control-2026-09-19.out e152-file-system-benchmark-second-transaction-relay-timing-2026-09-19.out e152-file-system-benchmark-second-transaction-relay-timing-vcpu1-2026-09-19.out
+       E153：e153-ledger-shape-and-ring-holes-2026-09-17-stage3.out e153-ledger-shape-and-ring-holes-2026-09-17-stage4.out e153-ledger-shape-and-ring-holes-2026-09-17-stage5.out e153-ledger-shape-and-ring-holes-2026-09-24-rename.out e153-s1-crates-alignment-2026-09-17.out e153-s1-crates-alignment-2026-09-17-stage3.out
+       E154：e154-two-gates-serial-rejudge-and-reclaim-timing-2026-09-17-stage2.out e154-two-gates-serial-rejudge-and-reclaim-timing-2026-09-17-stage4.out e154-two-gates-serial-rejudge-and-reclaim-timing-2026-09-24-rename.out
+       E155：e155-fourth-run-group-commit-concurrency-2026-09-21.out e155-fsync-write-volume-2026-09-17-stage2.out e155-fsync-write-volume-2026-09-17-stage4.out e155-fsync-write-volume-2026-09-24-rename.out e155-second-run-fsync-write-volume-2026-09-19-stage2.out e155-third-run-release-cascade-2026-09-20-stage1.out
+       E156：e156-alloc-basis-counts-2026-09-22-stage1.out e156-alloc-basis-counts-2026-09-23-stage1.out e156-alloc-basis-counts-2026-09-24-stage2.out e156-alloc-basis-counts-2026-09-24-stage3.out e156-alloc-basis-counts-2026-09-24-stage4.out e156-alloc-basis-counts-2026-09-25-fork7-selfproof.out e156-alloc-basis-counts-2026-09-25-r3.out e157-parallel-line-one-clauses-2026-09-22.out
+       E158：e158-root-choice-repair-2026-09-23-segment1.out e158-root-choice-repair-2026-09-23-segment1-run-record.out e158-root-choice-repair-2026-09-23-segment1-tests.out e158-root-choice-repair-2026-09-24-hc2-ding-only-configuration.out e158-root-choice-repair-2026-09-24-hc2-ding-ring-retained.out e158-root-choice-repair-2026-09-24-hc2-yi-ring-retained.out e158-root-choice-repair-2026-09-24-pc2-configuration-published-txg.out e158-root-choice-repair-2026-09-24-pc2-ding-only-configuration.out e158-root-choice-repair-2026-09-24-pc2-ding-ring-retained.out e158-root-choice-repair-2026-09-24-pc2-root-ring-txg-only.out e158-root-choice-repair-2026-09-24-pc2-today.out e158-root-choice-repair-2026-09-24-pc2-yi-ring-retained.out e158-root-choice-repair-2026-09-24-q1-g0-a1-arm.out e158-root-choice-repair-2026-09-24-q1-g0-today.out e158-root-choice-repair-2026-09-24-q1-s16.out e158-root-choice-repair-2026-09-24-q1-s4.out e158-root-choice-repair-2026-09-24-q2-1-g0-configuration-evidence-ding-only-configuration.out e158-root-choice-repair-2026-09-24-q2-1-g0-configuration-evidence-ding-ring-retained.out e158-root-choice-repair-2026-09-24-q2-1-g0-configuration-evidence-yi-ring-retained.out e158-root-choice-repair-2026-09-24-q2-1-g0-ding-only-configuration.out e158-root-choice-repair-2026-09-24-q2-1-g0-ding-ring-retained.out e158-root-choice-repair-2026-09-24-q2-1-g0-jia-txg-arm.out e158-root-choice-repair-2026-09-24-q2-1-g0-root-ring-txg-only-session-s5.out e158-root-choice-repair-2026-09-24-q2-1-g0-today.out e158-root-choice-repair-2026-09-24-q2-1-g0-today-session-s5.out e158-root-choice-repair-2026-09-24-q2-1-g0-yi-ring-retained.out e158-root-choice-repair-2026-09-24-q2-1-hc1-lower-bound.out e158-root-choice-repair-2026-09-24-q2-1-hc1.out e158-root-choice-repair-2026-09-24-q2-2a-g0-ding-only-configuration.out e158-root-choice-repair-2026-09-24-q2-2a-g0-ding-ring-retained.out e158-root-choice-repair-2026-09-24-q2-2a-g0-jia-txg-arm.out e158-root-choice-repair-2026-09-24-q2-2a-g0-today.out e158-root-choice-repair-2026-09-24-q3-1-g0.out e158-root-choice-repair-2026-09-24-segment1-rerun.out e158-root-choice-repair-2026-09-25-q1-g0-today.out e158-root-choice-repair-2026-09-25-q1-s16.out e158-root-choice-repair-2026-09-25-q1-s4.out e158-root-choice-repair-2026-09-25-q2-2a-g0-today.out e158-root-choice-repair-2026-09-25-q3-1-g0.out e158-root-choice-repair-2026-09-25-q3-1-s16.out e158-root-choice-repair-2026-09-25-q3-1-s4.out e158-root-choice-repair-2026-09-25-q3-1-small-ring.out e158-root-choice-repair-2026-09-25-s10-crates-sha256-final.out e158-root-choice-repair-2026-09-25-s10-crates-sha256.out e158-root-choice-repair-2026-09-25-segment1-rerun.out e158-root-choice-repair-2026-09-26-r2-all-today.out e158-root-choice-repair-2026-09-26-r2-all-yi-keep-ring.out e158-root-choice-repair-2026-09-27-r2-all-today.out e158-root-choice-repair-2026-09-27-r3-seg1-bing-cfg-carry.out e158-root-choice-repair-2026-09-27-r4-seg1-bing-cfg-carry.out e158-root-choice-repair-2026-09-27-r4-seg2b-bing-cfg-carry.out e158-root-choice-repair-2026-09-27-r4-seg2b-compare.out e158-root-choice-repair-2026-09-27-r4-seg2-bing-cfg-carry.out e158-root-choice-repair-2026-09-27-r4-seg3-bing-cfg-carry.out e158-root-choice-repair-2026-09-27-r4-seg4-bing-cfg-carry.out e158-root-choice-repair-2026-09-27-r4-seg5-bing-cfg-carry.out
+       E159：e159-fsync-wait-group-commit-2026-09-24-anchors.out e159-fsync-wait-group-commit-2026-09-24-smoke.out
+       E160：e160-e152-input-mirror-2026-09-15.out e160-e152-input-single-2026-09-15.out e160-random-small-read-share-segment1-2026-09-24.out e160-random-small-read-share-segment1-2026-09-24-realweight.out
+       E162：e161-crash-state-dedup-and-time-split-feasibility-2026-09-27.out e162-crash-verdict-block-store-2026-09-27-anchors.out e162-crash-verdict-block-store-2026-09-27-s1-F-decisive.out e162-crash-verdict-block-store-2026-09-27-s1-F-feasibility.out e162-crash-verdict-block-store-2026-09-27-s1-K-decisive.out e162-crash-verdict-block-store-2026-09-27-s1-K-feasibility.out e162-crash-verdict-block-store-2026-09-27-s1-R0-decisive.out e162-crash-verdict-block-store-2026-09-27-s1-R0-feasibility.out e162-crash-verdict-block-store-2026-09-27-s1-R1-decisive.out e162-crash-verdict-block-store-2026-09-27-s1-R1-feasibility.out e162-crash-verdict-block-store-2026-09-27-s2-F-feasibility.out e162-crash-verdict-block-store-2026-09-27-s2-K-feasibility.out e162-crash-verdict-block-store-2026-09-27-s2-R0-feasibility.out e162-crash-verdict-block-store-2026-09-27-s2-R1-feasibility.out
+       E163：e163-gpu-multicard-crc32c-2026-09-27-r1-merge.out e163-gpu-multicard-crc32c-2026-09-27-r1.out

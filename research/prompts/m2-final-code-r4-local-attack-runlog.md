@@ -1,4 +1,4 @@
-Run log: m2-final-code-r4-local-attack (2026-09-25 UTC)
+Run log: m2-final-code-r4-local-attack (2026-09-25)
 
 Prompt: research/prompts/m2-final-code-r4-local-attack.md (English, no markdown emphasis, 19
 numbered facts plus 4 numbered items, each item a row-by-row worksheet closing with "This would

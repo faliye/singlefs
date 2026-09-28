@@ -1,4 +1,4 @@
-# 运行记录：m2-final-code-r2-local-attack（2026-09-25 UTC）
+# 运行记录：m2-final-code-r2-local-attack（2026-09-25）
 
 提示文件：`research/prompts/m2-final-code-r2-local-attack.md`（10 格：W.max_s、W.table_bytes、
 W.fits_in_slot、AC.leaf_cap、AC.internal_cap、MP.leaf_cap、MP.internal_cap、ROWS.height_at_15、

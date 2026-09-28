@@ -1,6 +1,6 @@
 # 实审 B3a-3b 报告（implementation-writer）：层 0 七份测试文件跟上按设备切段 / 第三态，映射 key 新不变量归类
 
-时刻都是 UTC（本机时钟），JST = UTC + 9。开工 2026-09-26T22:44Z。规格 `/tmp/claude-1000/impl-rev-b3a3b/spec.md`。
+开工 2026-09-27。规格 `/tmp/claude-1000/impl-rev-b3a3b/spec.md`。
 
 ## 一、结论
 
@@ -149,7 +149,7 @@ PROBE_NOT_APPLICABLE case=every_write_persisted count=4 ["I-7.9", "I-8.7", "I-8.
 
 ## 五、探针（怎么算的钉值）
 
-- 副本：`/tmp/claude-1000/impl-rev-b3a3b/copy`，22:44:20Z 用 `rsync -a --exclude target --exclude .git` 从主工作区取，用它自己的 target。
+- 副本：`/tmp/claude-1000/impl-rev-b3a3b/copy`，用 `rsync -a --exclude target --exclude .git` 从主工作区取，用它自己的 target。
   - 取之前记了 13 份文件的 sha256（`logs/sha-at-start.txt`），包括 A2b / A2c / A4b 在改的 core 文件与 `crash.rs`、`walk.rs`、`image.rs`；副本里逐份相同。
   - 副本的 core 编得过，没有拿 `impl-rev-a2b/orig`、`impl-rev-a2c/orig` 顶任何文件。
 - 探针的做法：
@@ -260,7 +260,7 @@ PROBE VersionWithoutFileRowPublishWithItsOwnTree … two_state_selected=18 three
 
 - **动到的测试二进制**：7 个都是名字带 layer0 的，按定义一个都不跑。它们的比较与钉值交提交时的层 0 验证（第九节）。
 - `cargo build --offline --all-targets`：
-  - 主树退出 0，末行 `    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s`。这 7 个层 0 二进制在主树 target 里的时间戳是 23:01:55–56Z，晚于我最后一次改文件的 23:00:33Z。
+  - 主树退出 0，末行 `    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s`。这 7 个层 0 二进制在主树 target 里的时间戳晚于我最后一次改文件的时刻。
   - 副本（开工快照 + 我这 7 份 + 探针）退出 0，末行 `    Finished `dev` profile [unoptimized + debuginfo] target(s) in 18.88s`，警告与错误 0 条（`grep -c '^warning\|^error'` 得 0）。
 - `cargo fmt --all -- --check`（主树）：退出 1。`Diff in` 点名的是 `singlefs-core/src/allocator.rs`（A2c 的）、`singlefs-harness/src/bin/e158_root_choice_repair.rs`、`tests/core_review_unit_area_start_and_publish_limits.rs`（A4b 的），都不是我的。我这 7 份逐个 `rustfmt --edition 2021 --check`，退出 0。
 - clippy（check.sh 那套：`-D warnings` 加 7 条）：
@@ -294,7 +294,7 @@ PROBE VersionWithoutFileRowPublishWithItsOwnTree … two_state_selected=18 three
 
 **F3：主表第 23、289、474 行点名的用例在 `step_seven` 里已经改名**。替换行在 `mutations-replacements.tsv`（第六节）。不是这一轮改的名，是这一轮按规格「找点名它的同形行」找出来的。
 
-**F4：`research/scripts/capped.sh` 有一段时间是坏的**。22:52:25Z 被别的会话改过：第 22 行语法错，preflight 两行插进了 `variable_names` 数组。我第二趟探针 7 条都退 2，没跑；之后改用副本里与 HEAD 逐字相同的那份跑了第三趟和变异旁证。约 23:03Z 我复查时主树那份已经好了，之后的 build、clippy、74 号都经主树那份跑。主 agent 中途的消息说的就是这件事，在第三节写完之后收到，没改我做的任何东西。
+**F4：`research/scripts/capped.sh` 有一段时间是坏的**：被别的会话改过：第 22 行语法错，preflight 两行插进了 `variable_names` 数组。我第二趟探针 7 条都退 2，没跑；之后改用副本里与 HEAD 逐字相同的那份跑了第三趟和变异旁证。约十分钟后我复查时主树那份已经好了，之后的 build、clippy、74 号都经主树那份跑。主 agent 中途的消息说的就是这件事，在第三节写完之后收到，没改我做的任何东西。
 
 **F5：没有停在「条款没写」的分支上**。这一轮只改测试里的比较与钉值，没加错误成员、`todo!`、`assert!`。
 
@@ -328,7 +328,7 @@ checker（`crates/singlefs-checker/src/`）没动，按定义这一节可以不�
 
 ## 十一、草稿目录删了什么、留了什么
 
-- **删了**：仓副本 `/tmp/claude-1000/impl-rev-b3a3b/copy`。删之前 `du -sh` 整份 14G，其中 `copy/target` 14G。它是我在 22:44:20Z 用 rsync 建的，自己的 target 也在里面。
+- **删了**：仓副本 `/tmp/claude-1000/impl-rev-b3a3b/copy`。删之前 `du -sh` 整份 14G，其中 `copy/target` 14G。它是我用 rsync 建的，自己的 target 也在里面。
 - **留着**，都在 `/tmp/claude-1000/impl-rev-b3a3b/` 下，共 1.2M，没有仓副本与编译目录：
   - 报告 `report.md`；
   - 变异行 `mutations-append.tsv`、`mutations-replacements.tsv`，主 agent 用 `apply-writer-patch.py` 写回；

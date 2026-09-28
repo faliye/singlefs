@@ -1,6 +1,6 @@
 diff -ruN -x target -x 'r4_opus_*' /tmp/claude-1000/m2-final-code-r4/tree/crates/singlefs-core/src/admission.rs tree/crates/singlefs-core/src/admission.rs
---- /tmp/claude-1000/m2-final-code-r4/tree/crates/singlefs-core/src/admission.rs	2026-09-24 23:55:14.650113749 +0000
-+++ tree/crates/singlefs-core/src/admission.rs	2026-09-25 03:09:53.178568544 +0000
+--- /tmp/claude-1000/m2-final-code-r4/tree/crates/singlefs-core/src/admission.rs	2026-09-25
++++ tree/crates/singlefs-core/src/admission.rs	2026-09-25
 @@ -363,10 +363,16 @@
          self.per_device
              .iter()
@@ -20,8 +20,8 @@ diff -ruN -x target -x 'r4_opus_*' /tmp/claude-1000/m2-final-code-r4/tree/crates
                      terms.abandoned_root_exclusive,
                  ]
 diff -ruN -x target -x 'r4_opus_*' /tmp/claude-1000/m2-final-code-r4/tree/crates/singlefs-core/src/mount.rs tree/crates/singlefs-core/src/mount.rs
---- /tmp/claude-1000/m2-final-code-r4/tree/crates/singlefs-core/src/mount.rs	2026-09-24 23:55:14.671113097 +0000
-+++ tree/crates/singlefs-core/src/mount.rs	2026-09-25 01:56:47.336952218 +0000
+--- /tmp/claude-1000/m2-final-code-r4/tree/crates/singlefs-core/src/mount.rs	2026-09-25
++++ tree/crates/singlefs-core/src/mount.rs	2026-09-25
 @@ -1640,10 +1640,19 @@
      let with_the_recovered_entries: BTreeSet<RollbackWitnessEntry> = witness
          .entries()
@@ -47,8 +47,8 @@ diff -ruN -x target -x 'r4_opus_*' /tmp/claude-1000/m2-final-code-r4/tree/crates
      let every_ring_root = every_root_ring_slot_holds_a_root(devices, system_configuration);
      let still_needed = rollback_witness_entries_still_needed(
 diff -ruN -x target -x 'r4_opus_*' /tmp/claude-1000/m2-final-code-r4/tree/crates/singlefs-core/src/transaction.rs tree/crates/singlefs-core/src/transaction.rs
---- /tmp/claude-1000/m2-final-code-r4/tree/crates/singlefs-core/src/transaction.rs	2026-09-24 23:55:14.709111916 +0000
-+++ tree/crates/singlefs-core/src/transaction.rs	2026-09-25 01:52:54.042167482 +0000
+--- /tmp/claude-1000/m2-final-code-r4/tree/crates/singlefs-core/src/transaction.rs	2026-09-25
++++ tree/crates/singlefs-core/src/transaction.rs	2026-09-25
 @@ -564,6 +564,11 @@
      expected: InstanceGeneration,
  ) -> Result<InstanceGeneration, ExpectedInstanceAcquisitionFailed> {

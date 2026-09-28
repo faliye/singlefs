@@ -2,7 +2,7 @@
 # 其余文件——它们是另一条并行线（dispatch 点名「实二一、实二五」）此刻正在改、还没提交的中间状态）。
 # 命令：find crates -type f | sort | xargs sha256sum；下方逐文件哈希之后，再对这份哈希列表整体
 # sha256sum 一次得到 crates_sha256_of_sha256s（与 session s7/s8/s9 的 SNAPSHOT.txt 同一种算法）。
-snapshot_time_jst=2026-09-25 10:22:11 JST
+snapshot_time_jst=2026-09-25
 git_head=e980a219f1834c638cd2fae18b25a60525a6bd52
 git_status_crates_lines=84
 crates_sha256_of_sha256s=48dd4f273289ee6c47d84cae8704c52dd7eb1f0bebf80ca95b63b1e0bb3466ff

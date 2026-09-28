@@ -14,7 +14,7 @@
 
 **共用问句**：照改后的字面干活，哪一步会做错或做不了；举出具体的派发情形或命令。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-26 JST 11:xx）
+## 二、实现今天的样子（主 agent 的观测，2026-09-26）
 
 - 被判的改动：修定义的 agent 报告 `research/prompts/defs-closeout-r1-fixes-tmp-evidence/report.md` 第一节逐条表，与它的 `my-changes-final.diff`（287 行，比的是开工时 `cp -p` 的备份）；材料员把 diff 原样放进附录二，把报告第一至六节抄进附录。开工快照 `research/prompts/defs-m2-closeout-r2-snapshot/sha256sums.txt`。
 - 这一轮新被改的文件，门禁 72 号管的：`.claude/agents/three-way-attack.md`、`three-way-local-defense.md`、`experiment-runner.md`、`crash-verifier.md`、`gate-triage.md`、`implementation-writer.md`、`mutation-triage.md`，`.claude/agent-common.md`，`.claude/main-agent.md`；另外改了 `.claude/rules/implementation-workflow.md`（重型清单）、`.claude/hooks/ask-user-claim-guard.sh`（F13，自证 23 → 30 种）、`.claude/gate.d/74-model-differential.sh`（F10，只改建议命令）。
@@ -675,7 +675,7 @@ agent 定义与 skill 正文同规矩，检查各自另立。
 **出处 `research/prompts/_defs-m2-closeout-r1-background.md:1-517`（整段抄，未转述）**
 
 `````markdown
-# 背景材料：defs-m2-closeout-r1（正文 + 清单 + 附录；生成于 2026-09-26 00:20 UTC）
+# 背景材料：defs-m2-closeout-r1（正文 + 清单 + 附录；生成于 2026-09-26）
 
 顺序固定：正文、清单、附录。附录二（`_defs-m2-closeout-r1-diff.md`）不并进这份背景材料，各腿按正文里写的路径去读。
 
@@ -693,12 +693,12 @@ agent 定义与 skill 正文同规矩，检查各自另立。
 |---|---|---|
 | D1 | **第一批**：`three-way-local-attack.md`、`three-way-local-defense.md` 写范围与产出一致；`three-way-attack.md` 第 3b 步取样（内存稀疏盘、每个起点只建一次池、超过 40 分钟缩历史 / 候选 / 几何的取样而崩溃点不缩、checker 判结束状态、随机跑批小批量限时）；`experiment-runner.md` 第 4c 步逐行读 `name=verdict` 判决行、false 与 not_run 点名 | 照这几步干活会不会与别的定义、共用约束或 `.claude/singlefs-ai-sop/rules/` 冲突；起草者自己加的两处（「崩溃点不缩」与共用约束「崩溃点…不为省时间缩范围」怎么对上，段内整段子集枚举算不算崩溃点；「checker 判结束状态」是每段历史判一次还是每个崩溃状态判一次）站不站得住 |
 | D2 | **第二批**：`agent-common.md` 新加「跑编译出来的代码经内存包装」与「执行前拒绝的写法」两条，`experiment-runner.md`、`crash-verifier.md`、`gate-triage.md`、`implementation-writer.md` 各一个第 1b 步指过去；`three-way-attack.md` 第 3c 步「内存与进程」；`.claude/gate.d/stage-owners.tsv` 登记 84 号给 `experiment-runner` | 拒绝清单与 `.claude/hooks/` 里四份 hook 今天实际拒的逐项对得上吗（多写、漏写、写反）；「外面不再包」的嵌套理由（推的，没量过）；崩溃验证员派发没给上限时默认 8G 够不够（第四十节第 30 行写着三道要多少内存都没量过）；门禁分诊员不包 `gate.sh` 之后，`check.sh`、15 号、74 号起的 cargo 不在任何包装里；攻方第 3c 步要求 `cargo build` 也经包装、比共用约束严，要不要统一 |
-| D3 | **97f5904 里没被判到的几块，与主 agent 2026-09-26 JST 09:1x 的四处小改**：`main-agent.md` 第 5 条「弹窗问用户之前…出处」与随它顺延的编号、「禁止」一节重型清单改成「以 `implementation-workflow.md` 那张清单为准」、第 3 条同、「派出去之后」拒绝清单改成指到共用约束、「暂存之后、提交之前跑门禁」那一行层 0 全量写明整条经内存包装；`agent-common.md` 停进程那一句的 `proc.py` 路径；`implementation-writer.md` 第 4 步变异表名改成 `crates/mutations.tsv`、删掉末尾打补丁交法留下的 `git apply --check`；第一批报告第五、六节列的「只被通查扫过」的各块 | 每一块照字面做，会不会让派出去的 agent 做错、做不了、或与另一处矛盾；「以那张清单为准」这类指过去的写法，被指的那一处真的列全了吗 |
+| D3 | **97f5904 里没被判到的几块，与主 agent 2026-09-26 的四处小改**：`main-agent.md` 第 5 条「弹窗问用户之前…出处」与随它顺延的编号、「禁止」一节重型清单改成「以 `implementation-workflow.md` 那张清单为准」、第 3 条同、「派出去之后」拒绝清单改成指到共用约束、「暂存之后、提交之前跑门禁」那一行层 0 全量写明整条经内存包装；`agent-common.md` 停进程那一句的 `proc.py` 路径；`implementation-writer.md` 第 4 步变异表名改成 `crates/mutations.tsv`、删掉末尾打补丁交法留下的 `git apply --check`；第一批报告第五、六节列的「只被通查扫过」的各块 | 每一块照字面做，会不会让派出去的 agent 做错、做不了、或与另一处矛盾；「以那张清单为准」这类指过去的写法，被指的那一处真的列全了吗 |
 | D4 | **第四十节第 40 行**：重型测试闸遇到 55、57、59 号不起虚机、不起 herd7、不跑变异的静态分支怎么判（今天靠根目录的标记文件选分支：55 号认 `.qemu-prerecorded`、57 号认 `.lkmm-static-only`，59 号没有静态分支）。两种判法：甲，参数白名单（钩子这一侧认）；乙，阶段自报（阶段自己声明，钩子读声明） | 两种判法各会误放、误拒哪些调用（举具体命令）；乙要改 54 号的话层 0 全绿标记全部作废，这个代价是不是必然的；有没有第三条路；`herd7 -version` 这类只取版本号的裸调用各怎么判 |
 
 **共用问句**：每一格都要回答「按改后的字面干活，哪一步会做错或做不了」，举出具体的派发情形或命令，不许只说「可能有歧义」。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-26 JST 09:1x）
+## 二、实现今天的样子（主 agent 的观测，2026-09-26）
 
 - 被判的 9 份定义与 1 份阶段归属表，工作区相对 HEAD 的改动：`git diff HEAD -- .claude/agents .claude/agent-common.md .claude/main-agent.md .claude/gate.d/stage-owners.tsv`（10 个文件，41 行加、11 行删；材料员整份放进附录二）。开工快照 `research/prompts/defs-m2-closeout-r1-snapshot/sha256sums.txt`。
 - `97f5904` 里 7 份定义的改动：`git show 97f5904 -- .claude/agent-common.md .claude/agents/crash-verifier.md .claude/agents/experiment-runner.md .claude/agents/gate-triage.md .claude/agents/implementation-writer.md .claude/agents/mutation-triage.md .claude/main-agent.md`；哪几块被 `research/prompts/defs-gate54-tiering-r1/r2-main-verification.md`、`m2-final-code-r2/r3/r4-main-verification.md` 判到过，见第一批起草报告第五节的覆盖表。
@@ -819,7 +819,7 @@ agent 定义与 skill 正文同规矩，检查各自另立。
 | ## 九、用户定案 | 不抄 | 正文只点名第四十节，这一节与本轮无关 |
 | ## 十、这份提案没做的 | 不抄 | 正文只点名第四十节，这一节与本轮无关 |
 | ## 十一、第一轮查出、还没做的欠账 | 不抄 | 正文只点名第四十节，这一节与本轮无关 |
-| ## 十二、第 0 步实测（2026-09-16 UTC 22:31 与 23:05–23:30，东京 09-17 07:31 与 08:05–08:30） | 不抄 | 正文只点名第四十节，这一节与本轮无关 |
+| ## 十二、第 0 步实测（2026-09-17） | 不抄 | 正文只点名第四十节，这一节与本轮无关 |
 | ## 十三、定义的静态核实（2026-09-17） | 不抄 | 正文只点名第四十节，这一节与本轮无关 |
 | ## 十四、CLAUDE.md 与规则做减法的次序 | 不抄 | 正文只点名第四十节，这一节与本轮无关 |
 | ## 十五、门禁阶段归属与 `crash-verifier`（2026-09-17） | 不抄 | 正文只点名第四十节，这一节与本轮无关 |
@@ -1160,31 +1160,31 @@ pid 没记下来的，用 `scripts/proc.py find 可执行文件名 [--argument �
 **出处 `records/2026-09-16-subagent拆分提案.md:912-912`（整段抄，未转述）**
 
 ```markdown
-| 1 | `.claude/agents/three-way-local-attack.md` | 「写范围」一节写「提示文件、核对表、样本文件……除此之外不写」，「产出」一节却要它写 `research/prompts/<轮>-local-attack-runlog.md`；两节互相矛盾，照写范围做就交不出运行记录 | 定义已改、待定义三方（2026-09-26 JST）：`three-way-local-attack.md`「写范围」一节加上「产出」一节的运行记录与草稿目录；`three-way-local-defense.md` 开头改成读本地攻方的「做什么」「写范围」「产出」三节，「文件名形态」一行写明两节里的文件名照它换 |
+| 1 | `.claude/agents/three-way-local-attack.md` | 「写范围」一节写「提示文件、核对表、样本文件……除此之外不写」，「产出」一节却要它写 `research/prompts/<轮>-local-attack-runlog.md`；两节互相矛盾，照写范围做就交不出运行记录 | 定义已改、待定义三方（2026-09-26）：`three-way-local-attack.md`「写范围」一节加上「产出」一节的运行记录与草稿目录；`three-way-local-defense.md` 开头改成读本地攻方的「做什么」「写范围」「产出」三节，「文件名形态」一行写明两节里的文件名照它换 |
 ```
 
 **出处 `records/2026-09-16-subagent拆分提案.md:940-940`（整段抄，未转述）**
 
 ```markdown
-| 29 | 攻方腿的取样规模与建池方式没有规矩，每条腿各写一套、每段历史都在磁盘上重建大镜像 | 2026-09-25 m2-safety-r1 云端攻方腿（JST 13:12–16:47）194 次 Bash、没跑层 0；约 1.5 小时耗在重跑：自己的判别装置错一次、S2/S3 第二遍被磁盘读写拖到每个候选 70 分钟以上（主 agent 同时派了 E142 执行员抢同一块磁盘）。它的用例每段历史都在临时目录新建 4 GiB 稀疏文件、mkfs 清 journal 环（`research/prompts/m2-safety-r1-opus-model/tests/s_opus_s23.rs` 第 51 行注释），改成每个起点只建一次、内存里拷之后每个候选 3.3 分钟；S1 六个候选各在 4 GiB 盘上跑几千段，其中大部分格子与盘大小无关。harness 已有内存稀疏盘与录制写流、按崩溃点截断重放的装置（`crates/singlefs-harness/src/crash.rs` 的 `SparseBlockDevice` 与层 0 用的那一套），攻方腿没用。用户 2026-09-25 JST 19:2x 问「这种攻击方 需要每个在 4 GiB 盘和几种小盘上各跑几千段历史，每段都跑池级 checker 吗」「那么每次都重建镜像吗」 | ① harness 加公用工具：起点历史只建一次池、内存里拷；崩溃点用录制写流截断重放——改 `crates/`，等回退改形态那一轮判完并进实现员；② 攻方腿定义写明：用内存盘与这个工具、先跑一小段估时长超过 40 分钟就缩取样、崩溃点按那一串写穷举、checker 判结束状态、随机跑批小批量限时——定义已改、待定义三方（2026-09-26 JST，先于 ① 做）：`three-way-attack.md`「做什么」加第 3b 步，内存盘与崩溃点指今天已有的 `SparseBlockDevice` 与层 0 那一套，① 做出来之后再改指公用工具；「超过 40 分钟就缩」只缩历史、候选与几何，崩溃点照共用约束不缩；`three-way-local-attack.md` 不加（它不建池、不跑模型）。这一轮（m2-rollback-forward-r1）的攻方腿已在派发提示里写了限时与只建一次池 |
+| 29 | 攻方腿的取样规模与建池方式没有规矩，每条腿各写一套、每段历史都在磁盘上重建大镜像 | 2026-09-25 m2-safety-r1 云端攻方腿194 次 Bash、没跑层 0；约 1.5 小时耗在重跑：自己的判别装置错一次、S2/S3 第二遍被磁盘读写拖到每个候选 70 分钟以上（主 agent 同时派了 E142 执行员抢同一块磁盘）。它的用例每段历史都在临时目录新建 4 GiB 稀疏文件、mkfs 清 journal 环（`research/prompts/m2-safety-r1-opus-model/tests/s_opus_s23.rs` 第 51 行注释），改成每个起点只建一次、内存里拷之后每个候选 3.3 分钟；S1 六个候选各在 4 GiB 盘上跑几千段，其中大部分格子与盘大小无关。harness 已有内存稀疏盘与录制写流、按崩溃点截断重放的装置（`crates/singlefs-harness/src/crash.rs` 的 `SparseBlockDevice` 与层 0 用的那一套），攻方腿没用。用户 2026-09-25 问「这种攻击方 需要每个在 4 GiB 盘和几种小盘上各跑几千段历史，每段都跑池级 checker 吗」「那么每次都重建镜像吗」 | ① harness 加公用工具：起点历史只建一次池、内存里拷；崩溃点用录制写流截断重放——改 `crates/`，等回退改形态那一轮判完并进实现员；② 攻方腿定义写明：用内存盘与这个工具、先跑一小段估时长超过 40 分钟就缩取样、崩溃点按那一串写穷举、checker 判结束状态、随机跑批小批量限时——定义已改、待定义三方（2026-09-26，先于 ① 做）：`three-way-attack.md`「做什么」加第 3b 步，内存盘与崩溃点指今天已有的 `SparseBlockDevice` 与层 0 那一套，① 做出来之后再改指公用工具；「超过 40 分钟就缩」只缩历史、候选与几何，崩溃点照共用约束不缩；`three-way-local-attack.md` 不加（它不建池、不跑模型）。这一轮（m2-rollback-forward-r1）的攻方腿已在派发提示里写了限时与只建一次池 |
 ```
 
 **出处 `records/2026-09-16-subagent拆分提案.md:941-941`（整段抄，未转述）**
 
 ```markdown
-| 30 | 派发重活之前不判内存量：`research/scripts/run-with-memory-cap.sh` 只给每条定上限，门禁 59 号按可用内存收工作进程数，子 agent 直接跑 `cargo test` 没人拦 | 第 28 行之后，每条命令有了自己的上限，几条合起来没人管：各 agent 各经包装、各报各的上限，合起来照样能超整机；59 号「可用内存 ÷ 每条上限」只看得见开跑那一刻，看不见别的重活同时来抢；子 agent 不经包装直接跑 `cargo test`、`cargo run`、实验二进制，执行前没有东西拦。用户 2026-09-25 JST 19:4x：「进程数不是问题 问题是要派发脚本的时候防止过大了」「改进程数 治标不治本 要先判断内存量」，对主 agent 的方案回「对 你这个想法是对的 改吧」 | 已做（2026-09-25，前一个子 agent 做到一半会话断了，接手的子 agent 做完；报告 `research/prompts/process-safety-tmp-evidence/report.md`）：① 总量兜底：包装起的每个 scope 挂进 `singlefs-heavy.slice`，总上限 = MemTotal − 余量（`RUN_WITH_MEMORY_CAP_RESERVE`，默认 20G：那时 slice 外面回收不掉的合计 13.4 GiB，其中 vllm-prod anon + shmem 8.0 GiB、user.slice anon 2.4 GiB，其余是内核；`--status` 现量这几项），本机约 40.1 GiB；set-property / start 失败、cgroup 里读回的 memory.max 不对、余量比整机还大，都退 251、命令不跑，不退回无总上限。② 起跑前判内存量：同一把 flock 里算「slice 回收不掉的用量 + 账上放行了还没涨到量的 + 这一条要的」，不超过总上限才起，否则排队；等满 `RUN_WITH_MEMORY_CAP_WAIT_SECONDS`（默认 3600）退 252、列出占着的，要的量比总上限还大的不等、直接退 252。要的量取峰值表 `research/scripts/memory-peaks.tsv` 里这条命令上一次的峰值（scope 里的外壳在命令退出之后读 memory.peak，含页缓存；一行一条，文件头写口径），表里没有的按它的上限算。这张表不进 git（`.gitignore`）：59 号跑的时候每条都写它，跟踪着会让 gate.sh 开跑与收尾的工作区指纹对不上（`lib.sh` 的 `worktree_fingerprint` 用 `git add -A` 算），数也只在本机成立。slice 的用量减掉 active_file 与 inactive_file：结束了的 scope 的页缓存挂回 slice（实测 scope 里 dd 写 120 MiB 退出之后，slice 的 memory.current 还是 131 MiB）。顺带加两种结局：被总上限挤掉的退 254（scope 自己的 oom 计数是 0、oom_kill 不是 0），`RUN_WITH_MEMORY_CAP_TIME_LIMIT` 用 RuntimeMaxSec 限时、退 253（不算排队的时间）。scope 里的外壳在命令退出之后改成忽略 TERM、只用 bash 内建的 read / printf 写峰值文件：systemd 停 scope 时给 scope 里每个进程发 TERM，外壳那时起的 cut / cat 被杀，峰值没记下，被总上限挤掉的那条就报成撞了自己的上限（门禁 47 号里撞上过一次）；新加一例「scope 里一直收 TERM 时峰值照记」，改前那一版外壳 5 次都红。那一例的第一版在弄坏开关 nocap 下打掉了 SSH 会话，守卫与证法见第 32 行。自检 29 项全过（再加一项：slice 名不是 singlefs 开头退 2，见第 32 行），每一例都在自己的临时 slice 里（总上限 256M 或 512M），跑完不留 slice；弄坏开关（2026-09-25 UTC 12:3x，风暴守卫证过之后跑）各红 nocap 21、fallback 1、exitcode 4、noresult 3、noslice 11、slicefallback 3、nolock 1、noledger 3、nodefault 4、ignoretable 3、noslicehit 1、notimelimit 1、keepstale 2 项；第 28 行那一版包装跑新的自证红 15 项，其中「slice 设不上」「余量比整机还大」「scope 挂在 slice 底下」4 项、「两条同时判放得下」「前一条还没涨到量」2 项、「峰值表里没有这条」1 项。③ 59 号撤掉按内存收进程数（「可用内存按每个 1.5 GiB 估」「⌊(MemAvailable − 余量) ÷ 每条上限⌋」两项与余量），工作进程数回到 min(核数的一半、至多 16，表里的条数)，每条经包装排队；限时改交包装（套在包装外面的 timeout 会把排队的时间算进限时），加「被总上限挤掉」「排不上没跑」两栏。绿样本留一行撤掉的余量写法，要开 2 个、卡在「表里的条数」；经 `stage-selftest.sh` 喂，改前的 59 号在新样本上两个都判错（绿样本开 1 个，找不到 4 条 want），改后红绿都判对（22 秒；2026-09-25 UTC 12:3x 复跑 21 秒，仍判对）。门禁 47 号（UTC 12:4x，150 秒）里包装与 `mutate.sh` 的自证都过，只红 `check-segment-registry.py --selftest`（kb 段序列 `16+2+1+2` 对产物 `24+2+1+2`，是别的会话的 kb 与产物）。④ `.claude/hooks/heavy-test-guard.sh` 加一道：子 agent 跑 cargo test / t / run / r / bench（带 --no-run 的不算）、或直接执行 cargo 编出来的二进制，不经包装的拒，出路写经 `bash research/scripts/run-with-memory-cap.sh <上限> <命令>` 跑；`lib_shell_words.py` 的 `memory_capped` 顺着 bash -c 与它起的脚本往里传，`lib_heavy_tests.runs_compiled_code` 认命令。自检 562 种（该拒 98 种），`HEAVY_TEST_GUARD_IGNORE_MEMORY_CAP=1` 红 14 种；实现员跑 `cargo test -p singlefs-core --lib`，改前那一份 hook 退 0，改后退 2。54、55、57 号不改，整条经包装跑（例 `SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash <根>/.claude/gate.d/54-layer0-replay.sh --full <根>`），闸放行、自检里有这几例。不改的原因：改 54 号会换它的 sha256，作废层 0 全量的全绿标记；三道要多少内存都没量过（层 0、QEMU、herd7 不能跑），写进脚本就是拍的数。定义已改、待定义三方（2026-09-26 JST）：`agent-common.md`「不做」一节加「跑编译出来的代码经内存包装」一条（`cargo test` / `run` / `bench` 与 cargo 编出来的二进制一律经 `run-with-memory-cap.sh`，写进自己脚本的整条经它；上限取派发提示给的、没给取 `replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值；`mutate.sh`、`replay.sh`、59 号在里面套了、外面不再包；退出码 250–254 的那一次不算结果；`cargo build` / `clippy` / `fmt` 不要求），执行员、崩溃验证员、门禁分诊员、实现员四份定义「做什么」的第 1b 步都指过去：`experiment-runner.md` 第 1b 步改成指到这一条、上限先取跑前登记给的；`crash-verifier.md` 加第 1b 步，54、55、57 号整条经包装跑、59 号直接跑；`gate-triage.md` 加第 1b 步，自己单跑的 `cargo test`、测试二进制经包装，`gate.sh` 与单跑的门禁阶段直接跑；`implementation-writer.md` 加第 1b 步，第 3 步证红与第 4 步动到的测试二进制经包装，fmt、clippy、build 不经。欠：`research/scripts/mutate.sh` 每条变异外面套 `timeout`，排队的时间会算进 120 秒，也没认 252、253、254（归正在改 mutate.sh 的那个 agent）；按名字判的门禁阶段（15、74 号这些）里起的 cargo 不在闸的射程里；slice 外面涨过余量挡不住；装新包装时还在跑的两条老包装（rbf_attack，各 20G）不在 slice 里 |
+| 30 | 派发重活之前不判内存量：`research/scripts/run-with-memory-cap.sh` 只给每条定上限，门禁 59 号按可用内存收工作进程数，子 agent 直接跑 `cargo test` 没人拦 | 第 28 行之后，每条命令有了自己的上限，几条合起来没人管：各 agent 各经包装、各报各的上限，合起来照样能超整机；59 号「可用内存 ÷ 每条上限」只看得见开跑那一刻，看不见别的重活同时来抢；子 agent 不经包装直接跑 `cargo test`、`cargo run`、实验二进制，执行前没有东西拦。用户 2026-09-25：「进程数不是问题 问题是要派发脚本的时候防止过大了」「改进程数 治标不治本 要先判断内存量」，对主 agent 的方案回「对 你这个想法是对的 改吧」 | 已做（2026-09-25，前一个子 agent 做到一半会话断了，接手的子 agent 做完；报告 `research/prompts/process-safety-tmp-evidence/report.md`）：① 总量兜底：包装起的每个 scope 挂进 `singlefs-heavy.slice`，总上限 = MemTotal − 余量（`RUN_WITH_MEMORY_CAP_RESERVE`，默认 20G：那时 slice 外面回收不掉的合计 13.4 GiB，其中本机本地模型服务 anon + shmem 8.0 GiB、user.slice anon 2.4 GiB，其余是内核；`--status` 现量这几项），本机约 40.1 GiB；set-property / start 失败、cgroup 里读回的 memory.max 不对、余量比整机还大，都退 251、命令不跑，不退回无总上限。② 起跑前判内存量：同一把 flock 里算「slice 回收不掉的用量 + 账上放行了还没涨到量的 + 这一条要的」，不超过总上限才起，否则排队；等满 `RUN_WITH_MEMORY_CAP_WAIT_SECONDS`（默认 3600）退 252、列出占着的，要的量比总上限还大的不等、直接退 252。要的量取峰值表 `research/scripts/memory-peaks.tsv` 里这条命令上一次的峰值（scope 里的外壳在命令退出之后读 memory.peak，含页缓存；一行一条，文件头写口径），表里没有的按它的上限算。这张表不进 git（`.gitignore`）：59 号跑的时候每条都写它，跟踪着会让 gate.sh 开跑与收尾的工作区指纹对不上（`lib.sh` 的 `worktree_fingerprint` 用 `git add -A` 算），数也只在本机成立。slice 的用量减掉 active_file 与 inactive_file：结束了的 scope 的页缓存挂回 slice（实测 scope 里 dd 写 120 MiB 退出之后，slice 的 memory.current 还是 131 MiB）。顺带加两种结局：被总上限挤掉的退 254（scope 自己的 oom 计数是 0、oom_kill 不是 0），`RUN_WITH_MEMORY_CAP_TIME_LIMIT` 用 RuntimeMaxSec 限时、退 253（不算排队的时间）。scope 里的外壳在命令退出之后改成忽略 TERM、只用 bash 内建的 read / printf 写峰值文件：systemd 停 scope 时给 scope 里每个进程发 TERM，外壳那时起的 cut / cat 被杀，峰值没记下，被总上限挤掉的那条就报成撞了自己的上限（门禁 47 号里撞上过一次）；新加一例「scope 里一直收 TERM 时峰值照记」，改前那一版外壳 5 次都红。那一例的第一版在弄坏开关 nocap 下打掉了 SSH 会话，守卫与证法见第 32 行。自检 29 项全过（再加一项：slice 名不是 singlefs 开头退 2，见第 32 行），每一例都在自己的临时 slice 里（总上限 256M 或 512M），跑完不留 slice；弄坏开关（2026-09-25，风暴守卫证过之后跑）各红 nocap 21、fallback 1、exitcode 4、noresult 3、noslice 11、slicefallback 3、nolock 1、noledger 3、nodefault 4、ignoretable 3、noslicehit 1、notimelimit 1、keepstale 2 项；第 28 行那一版包装跑新的自证红 15 项，其中「slice 设不上」「余量比整机还大」「scope 挂在 slice 底下」4 项、「两条同时判放得下」「前一条还没涨到量」2 项、「峰值表里没有这条」1 项。③ 59 号撤掉按内存收进程数（「可用内存按每个 1.5 GiB 估」「⌊(MemAvailable − 余量) ÷ 每条上限⌋」两项与余量），工作进程数回到 min(核数的一半、至多 16，表里的条数)，每条经包装排队；限时改交包装（套在包装外面的 timeout 会把排队的时间算进限时），加「被总上限挤掉」「排不上没跑」两栏。绿样本留一行撤掉的余量写法，要开 2 个、卡在「表里的条数」；经 `stage-selftest.sh` 喂，改前的 59 号在新样本上两个都判错（绿样本开 1 个，找不到 4 条 want），改后红绿都判对（22 秒；2026-09-25 复跑 21 秒，仍判对）。门禁 47 号（150 秒）里包装与 `mutate.sh` 的自证都过，只红 `check-segment-registry.py --selftest`（kb 段序列 `16+2+1+2` 对产物 `24+2+1+2`，是别的会话的 kb 与产物）。④ `.claude/hooks/heavy-test-guard.sh` 加一道：子 agent 跑 cargo test / t / run / r / bench（带 --no-run 的不算）、或直接执行 cargo 编出来的二进制，不经包装的拒，出路写经 `bash research/scripts/run-with-memory-cap.sh <上限> <命令>` 跑；`lib_shell_words.py` 的 `memory_capped` 顺着 bash -c 与它起的脚本往里传，`lib_heavy_tests.runs_compiled_code` 认命令。自检 562 种（该拒 98 种），`HEAVY_TEST_GUARD_IGNORE_MEMORY_CAP=1` 红 14 种；实现员跑 `cargo test -p singlefs-core --lib`，改前那一份 hook 退 0，改后退 2。54、55、57 号不改，整条经包装跑（例 `SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash <根>/.claude/gate.d/54-layer0-replay.sh --full <根>`），闸放行、自检里有这几例。不改的原因：改 54 号会换它的 sha256，作废层 0 全量的全绿标记；三道要多少内存都没量过（层 0、QEMU、herd7 不能跑），写进脚本就是拍的数。定义已改、待定义三方（2026-09-26）：`agent-common.md`「不做」一节加「跑编译出来的代码经内存包装」一条（`cargo test` / `run` / `bench` 与 cargo 编出来的二进制一律经 `run-with-memory-cap.sh`，写进自己脚本的整条经它；上限取派发提示给的、没给取 `replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值；`mutate.sh`、`replay.sh`、59 号在里面套了、外面不再包；退出码 250–254 的那一次不算结果；`cargo build` / `clippy` / `fmt` 不要求），执行员、崩溃验证员、门禁分诊员、实现员四份定义「做什么」的第 1b 步都指过去：`experiment-runner.md` 第 1b 步改成指到这一条、上限先取跑前登记给的；`crash-verifier.md` 加第 1b 步，54、55、57 号整条经包装跑、59 号直接跑；`gate-triage.md` 加第 1b 步，自己单跑的 `cargo test`、测试二进制经包装，`gate.sh` 与单跑的门禁阶段直接跑；`implementation-writer.md` 加第 1b 步，第 3 步证红与第 4 步动到的测试二进制经包装，fmt、clippy、build 不经。欠：`research/scripts/mutate.sh` 每条变异外面套 `timeout`，排队的时间会算进 120 秒，也没认 252、253、254（归正在改 mutate.sh 的那个 agent）；按名字判的门禁阶段（15、74 号这些）里起的 cargo 不在闸的射程里；slice 外面涨过余量挡不住；装新包装时还在跑的两条老包装（rbf_attack，各 20G）不在 slice 里 |
 ```
 
 **出处 `records/2026-09-16-subagent拆分提案.md:944-944`（整段抄，未转述）**
 
 ```markdown
-| 33 | 实验产物的判决行里有字段判 false，执行员交回时没报、主 agent 读交回时也没看见 | 2026-09-25 E142 第十六次跑第一段的产物 `research/results/e142-first-txn-dry-run-2026-09-25-r16-combined.out` 第 683 行 `E7RESULT name=verdict … control_states_ok=true control_violations_ok=false …`，第 632 行阳性对照 `violations=4092 expected_violations=4080`；执行员的交回与实验页「第十六次跑第一段」那一条都没提，主 agent 据交回判第 4、5 行够判；`layout/01` 规格起草员逐行读产物时才发现。`replay.sh` 的 exact 比对只核产物复跑得出来，不核产物自己的判决字段是不是 true | 欠：① 执行员定义写明交回之前逐行读产物的 `name=verdict` 行，任何字段是 false 都在报告里点名（定义已改、待定义三方（2026-09-26 JST）：`experiment-runner.md`「做什么」加第 4c 步、「产出」一节加判决行的点名，`false` 之外连 `not_run` 一起点名）；② 一道门禁：`replay.sh` 登记的产物里 `name=verdict` 行有字段是 false，而实验页最新那一条没有点名这一行，判红。E142 这一次的去向：问题单 `research/prompts/m2-keyspace-rerun-questions.md` 第 6 行，第十七次跑的登记写进了第 ① 条；② 已做（2026-09-25）：门禁 `.claude/gate.d/84-verdict-false-named.sh`——被扫集合是 `replay.sh` 登记表里每一行登记的入库产物，找 `E7RESULT name=verdict ` 行（现查过全仓产物，只有这一种字面形式），任何字段是 false 就要在对应实验页「## 历史版本」下最新一条或正文里、与字面 `false` 同一行点名字段名，否则判红；真仓上跑：登记 150 行、37 份文件在 research/results 下找到、113 份已归档，4 行判决、1 个 false 字段（E142 的 `control_violations_ok`）未点名，判红退出 1；fixtures 红绿样本判得对，弄坏开关 `GATE_VERDICT_FALSE_SKIP_NAMED_CHECK=1` 下红转绿，证明检查有判别力 |
+| 33 | 实验产物的判决行里有字段判 false，执行员交回时没报、主 agent 读交回时也没看见 | 2026-09-25 E142 第十六次跑第一段的产物 `research/results/e142-first-txn-dry-run-2026-09-25-r16-combined.out` 第 683 行 `E7RESULT name=verdict … control_states_ok=true control_violations_ok=false …`，第 632 行阳性对照 `violations=4092 expected_violations=4080`；执行员的交回与实验页「第十六次跑第一段」那一条都没提，主 agent 据交回判第 4、5 行够判；`layout/01` 规格起草员逐行读产物时才发现。`replay.sh` 的 exact 比对只核产物复跑得出来，不核产物自己的判决字段是不是 true | 欠：① 执行员定义写明交回之前逐行读产物的 `name=verdict` 行，任何字段是 false 都在报告里点名（定义已改、待定义三方（2026-09-26）：`experiment-runner.md`「做什么」加第 4c 步、「产出」一节加判决行的点名，`false` 之外连 `not_run` 一起点名）；② 一道门禁：`replay.sh` 登记的产物里 `name=verdict` 行有字段是 false，而实验页最新那一条没有点名这一行，判红。E142 这一次的去向：问题单 `research/prompts/m2-keyspace-rerun-questions.md` 第 6 行，第十七次跑的登记写进了第 ① 条；② 已做（2026-09-25）：门禁 `.claude/gate.d/84-verdict-false-named.sh`——被扫集合是 `replay.sh` 登记表里每一行登记的入库产物，找 `E7RESULT name=verdict ` 行（现查过全仓产物，只有这一种字面形式），任何字段是 false 就要在对应实验页「## 历史版本」下最新一条或正文里、与字面 `false` 同一行点名字段名，否则判红；真仓上跑：登记 150 行、37 份文件在 research/results 下找到、113 份已归档，4 行判决、1 个 false 字段（E142 的 `control_violations_ok`）未点名，判红退出 1；fixtures 红绿样本判得对，弄坏开关 `GATE_VERDICT_FALSE_SKIP_NAMED_CHECK=1` 下红转绿，证明检查有判别力 |
 ```
 
 **出处 `records/2026-09-16-subagent拆分提案.md:951-951`（整段抄，未转述）**
 
 ```markdown
-| 40 | `.claude/hooks/heavy-test-guard.sh` | 按阶段文件名拒子 agent 跑 `.claude/gate.d/55-*`、`57-*`、`59-*`，不看调用走的是不是预录档、`--static-only` 这类不起虚机、不起 herd7、不跑变异的静态分支；`herd7 -version` 这种只取版本号的调用同样被拒。2026-09-26 JST 05:xx 迁 54、55、57、59 接准入的 agent 因此改 55、57 号时只能用 diff 证样本分支没动、新判法用桩核，样本的逐字 stdout 留给提交时（第 39 行那件活） | 未改：要改得先定「静态分支」怎么从命令行判（参数白名单还是阶段自报），走定义三方 |
+| 40 | `.claude/hooks/heavy-test-guard.sh` | 按阶段文件名拒子 agent 跑 `.claude/gate.d/55-*`、`57-*`、`59-*`，不看调用走的是不是预录档、`--static-only` 这类不起虚机、不起 herd7、不跑变异的静态分支；`herd7 -version` 这种只取版本号的调用同样被拒。2026-09-26 迁 54、55、57、59 接准入的 agent 因此改 55、57 号时只能用 diff 证样本分支没动、新判法用桩核，样本的逐字 stdout 留给提交时（第 39 行那件活） | 未改：要改得先定「静态分支」怎么从命令行判（参数白名单还是阶段自报），走定义三方 |
 ```
 
 **出处 `.claude/kb/checks-owed.md:394-394`（整段抄，未转述）**
@@ -1275,7 +1275,7 @@ pid 没记下来的，用 `scripts/proc.py find 可执行文件名 [--argument �
 ````markdown
 # defs-m2-closeout-r1 改法 F1–F16 落地报告
 
-写于 2026-09-26 01:4x UTC（JST 10:4x）。依据：`research/prompts/defs-m2-closeout-r1-main-verification.md` 第二、三节；原文、行号与探针取自 `research/prompts/defs-m2-closeout-r1-opus-output.md`（O1–O15）与 `research/prompts/defs-m2-closeout-r1-sonnet-output.md`（D2-e、D3-b）。
+写于 2026-09-26。依据：`research/prompts/defs-m2-closeout-r1-main-verification.md` 第二、三节；原文、行号与探针取自 `research/prompts/defs-m2-closeout-r1-opus-output.md`（O1–O15）与 `research/prompts/defs-m2-closeout-r1-sonnet-output.md`（D2-e、D3-b）。
 改前备份：`/tmp/claude-1000/defs-closeout-r1-fixes/before/`（12 份，开工时 `cp -p`）；改后全量 diff：`/tmp/claude-1000/defs-closeout-r1-fixes/my-changes-final.diff`（287 行，本报告末尾原样附上）；改前 / 改后 sha256：同目录 `start-sha256.txt`、`end-sha256.txt`。
 只动了放行的 12 个文件；没 checkout / restore / reset / clean，没提交。两个脚本（74 号、弹窗闸）都是写同目录临时文件、`chmod --reference`、`mv` 换上。
 
@@ -1381,9 +1381,9 @@ A1、A3 改前是 exit=2（攻方报告 D3 节原样）。A5 是「拆分提案�
 K1	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K2	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：qemu-system-x86_64（QEMU）：主 agent 跑「QEMU」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K3	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：直接执行名字含 layer0 的测试二进制（second_transaction_step_zero_layer0）（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
-K4	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（/home/fy5090/code/singlefs）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-req
-K5	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（/home/fy5090/code/singlefs/research）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 
-K6	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test 不挑目标，而包的范围是整个工作区（/home/fy5090/code/singlefs/research 的全部 1 个成员），等于全量（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-r
+K4	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（<仓根>）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-req
+K5	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（research）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 
+K6	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test 不挑目标，而包的范围是整个工作区（research 的全部 1 个成员），等于全量（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-r
 K7	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K8	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：research/scripts/mutate.sh 跑 crates/mutations.tsv 整表（crates 变异整表）：主 agent 跑「crates 变异整表」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K9	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：.claude/scripts/lkmm.sh（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
@@ -1394,7 +1394,7 @@ K13	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo run --bin e152-file
 K14	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：e152-run.sh（E152 装置）：主 agent 跑「E152 装置」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K15	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test 不挑目标，会跑到名字含 layer0 的测试二进制（first_transaction_step_seven_layer0、second_transaction_parallel_line_one_layer0、second_transaction_paral
 K16	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test --test second_transaction_step_zero_* 命中名字含 layer0 的测试二进制（second_transaction_step_zero_layer0）（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAV
-K17	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：脚本 /home/fy5090/code/singlefs/.claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request
+K17	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：脚本 .claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request
 K18	heavy	主 agent	fg	exit=0	
 K19	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：check.sh（里面是全量 cargo test）（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K20	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：门禁 87 号（87-replay.sh）（全部实验复跑）：主 agent 跑「全部实验复跑」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
@@ -1454,175 +1454,175 @@ F1-old-3c	detector	three-way-attack	rib	exit=0
 "id": "K1",
 "hook": "heavy",
 "command": "herd7 -version",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K2",
 "hook": "heavy",
 "command": "qemu-system-x86_64 --version",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K3",
 "hook": "heavy",
 "command": "./target/release/deps/second_transaction_step_zero_layer0-0123456789abcdef",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K4",
 "hook": "heavy",
 "command": "cargo test",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K5",
 "hook": "heavy",
 "command": "cargo test",
-"cwd": "/home/fy5090/code/singlefs/research"
+"cwd": "research"
 },
 {
 "id": "K6",
 "hook": "heavy",
 "command": "cargo test",
-"cwd": "/home/fy5090/code/singlefs/research/e7-index-bench"
+"cwd": "research/e7-index-bench"
 },
 {
 "id": "K7",
 "hook": "heavy",
 "command": "cargo t --workspace",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K8",
 "hook": "heavy",
 "command": "bash research/scripts/mutate.sh singlefs-harness crates/singlefs-core/src/lib.rs crates/mutations.tsv",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K9",
 "hook": "heavy",
 "command": "bash .claude/scripts/lkmm.sh --herd7-version",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K10",
 "hook": "heavy",
 "command": "bash .claude/scripts/gate.sh --selftest",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K11",
 "hook": "heavy",
 "command": "bash research/scripts/gate-staged.sh --selftest",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K12",
 "hook": "heavy",
 "command": "bash research/scripts/vm-bench.sh --selftest",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K13",
 "hook": "heavy",
 "command": "cargo run --release --bin e152-file-system-benchmark",
-"cwd": "/home/fy5090/code/singlefs/research"
+"cwd": "research"
 },
 {
 "id": "K14",
 "hook": "heavy",
 "command": "bash research/scripts/e152-run.sh",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K15",
 "hook": "heavy",
 "command": "cargo test -p singlefs-harness --tests",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K16",
 "hook": "heavy",
 "command": "cargo test -p singlefs-harness --test 'second_transaction_step_zero_*'",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K17",
 "hook": "heavy",
 "command": "bash .claude/scripts/fetch-deps.sh --check",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K18",
 "hook": "heavy",
 "command": "cargo test -p singlefs-harness --lib",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K19",
 "hook": "heavy",
 "command": "bash .claude/scripts/check.sh",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K20",
 "hook": "heavy",
 "command": "bash .claude/gate.d/87-replay.sh",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K21",
 "hook": "heavy",
 "command": "cargo test -p singlefs-harness --test second_transaction_step_zero_layer0",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K22",
 "hook": "heavy",
 "command": "bash .claude/gate.d/54-layer0-replay.sh",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K23",
 "hook": "heavy",
 "command": "bash .claude/gate.d/57-lkmm.sh",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K24",
 "hook": "heavy",
 "command": "bash .claude/gate.d/59-crates-mutation-replay.sh",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K25",
 "hook": "heavy",
 "command": "bash .claude/gate.d/55-qemu-first-transaction.sh",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K26",
 "hook": "heavy",
 "command": "cargo test --all",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K27",
 "hook": "heavy",
 "command": "bash research/scripts/gate-staged.sh",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K28",
 "hook": "heavy",
 "command": "cargo test -p singlefs-harness",
-"cwd": "/home/fy5090/code/singlefs"
+"cwd": "<仓根>"
 },
 {
 "id": "K29",
 "hook": "heavy",
 "command": "cargo test -p e7-index-bench --lib",
-"cwd": "/home/fy5090/code/singlefs/research"
+"cwd": "research"
 }
 ]
 ```
@@ -1633,9 +1633,9 @@ F1-old-3c	detector	three-way-attack	rib	exit=0
 K1	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K2	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：qemu-system-x86_64（QEMU）：主 agent 跑「QEMU」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K3	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：直接执行名字含 layer0 的测试二进制（second_transaction_step_zero_layer0）（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
-K4	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（/home/fy5090/code/singlefs）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-req
-K5	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（/home/fy5090/code/singlefs/research）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 
-K6	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test 不挑目标，而包的范围是整个工作区（/home/fy5090/code/singlefs/research 的全部 1 个成员），等于全量（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-r
+K4	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（<仓根>）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-req
+K5	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（research）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 
+K6	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test 不挑目标，而包的范围是整个工作区（research 的全部 1 个成员），等于全量（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-r
 K7	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K8	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：research/scripts/mutate.sh 跑 crates/mutations.tsv 整表（crates 变异整表）：主 agent 跑「crates 变异整表」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K9	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：.claude/scripts/lkmm.sh（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
@@ -1646,7 +1646,7 @@ K13	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo run --bin e152-file
 K14	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：e152-run.sh（E152 装置）：主 agent 跑「E152 装置」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K15	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test 不挑目标，会跑到名字含 layer0 的测试二进制（first_transaction_step_seven_layer0、second_transaction_parallel_line_one_layer0、second_transaction_paral
 K16	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test --test second_transaction_step_zero_* 命中名字含 layer0 的测试二进制（second_transaction_step_zero_layer0）（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAV
-K17	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：脚本 /home/fy5090/code/singlefs/.claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request
+K17	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：脚本 .claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request
 K18	heavy	主 agent	fg	exit=0	
 K19	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：check.sh（里面是全量 cargo test）（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K20	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：门禁 87 号（87-replay.sh）（全部实验复跑）：主 agent 跑「全部实验复跑」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带

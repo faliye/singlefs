@@ -13,7 +13,7 @@ use common_tree_split::{
     write_unit_to_the_same_slot_on_both_devices, TreeSplitPool, ACCOUNTING_OF_THE_NODE_FORMAT,
     CENTRAL_MAPPING_OF_THE_NODE_FORMAT,
 };
-use singlefs_checker::image::{InvariantVerdict, MAPPING_KEY_MATCHES_THE_UNIT_HEADER};
+use singlefs_checker::image::{ImageReader, InvariantVerdict, MAPPING_KEY_MATCHES_THE_UNIT_HEADER};
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
 use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
@@ -483,6 +483,9 @@ const SYSTEM_CONFIGURATION_SLOT_SPACING_OFFSET: usize = 429;
 
 /// 两块盘各两个系统配置槽里的单元区起点都改成 2^40（4 GiB 的盘只有 2^18 个槽），自证校验和重封：
 /// 改之前 checker 拿「盘上槽数 − 单元区起点」算单元区容量，u64 下溢，当场 panic。起点越过盘末，单元区没有容量可比，I-5.2 判红。
+/// 代码三方第二轮改法 A（I-7.13 与 core 收同一张表，用户 2026-09-27 定）之后 checker 先判单元区起始槽号等不等环长现算的那个槽：
+/// 2^40 不是 50176，I-7.13 判违例、整池不作保，别的每一条报不适用，走不到算容量那一步——这一条改钉「不 panic、只红 I-7.13、
+/// 点名 `UnitAreaStartNotTheSlotAfterTheJournalRing`」（合入后验证二，照改法 A 报告「停下交主 agent 的」第 1 条同一个算法）。
 #[test]
 fn a_system_configuration_whose_unit_area_starts_past_the_device_end_is_judged_without_a_panic() {
     let pool = product_capacity_pool();
@@ -526,9 +529,77 @@ fn a_system_configuration_whose_unit_area_starts_past_the_device_end_is_judged_w
         }
     }
     let red = violations(&image);
+    assert_eq!(
+        violated_names(&red),
+        vec!["I-7.13"],
+        "单元区起点越过盘末：先被 I-7.13 的表拦下，只红 I-7.13：{red:?}"
+    );
     assert!(
-        violated_names(&red).contains(&"I-5.2"),
-        "单元区起点越过盘末：I-5.2 红：{red:?}"
+        red[0]
+            .1
+            .contains("UnitAreaStartNotTheSlotAfterTheJournalRing"),
+        "I-7.13 的说明点名单元区起始槽号不是环长现算的那个槽：{red:?}"
+    );
+}
+
+/// 一份镜像，其中一块盘自报的字节数换成 `reported_device_bytes`，读照原样：盘上的内容一个字节不动，只是 checker 问盘多大时拿到一个
+/// 比单元区起点还小的数。
+struct ImageWithOneDeviceReportingFewerBytes<'image> {
+    image: &'image MemoryPool,
+    device: u32,
+    reported_device_bytes: u64,
+}
+
+impl ImageReader for ImageWithOneDeviceReportingFewerBytes<'_> {
+    fn devices(&self) -> Vec<u32> {
+        ImageReader::devices(self.image)
+    }
+    fn device_bytes(&self, device: u32) -> Option<u64> {
+        if device == self.device {
+            return Some(self.reported_device_bytes);
+        }
+        ImageReader::device_bytes(self.image, device)
+    }
+    fn read(&self, device: u32, offset: u64, length: usize) -> Option<Vec<u8>> {
+        ImageReader::read(self.image, device, offset, length)
+    }
+    fn candidate_unit_slots(&self, device: u32) -> Option<Vec<u64>> {
+        ImageReader::candidate_unit_slots(self.image, device)
+    }
+    fn candidate_journal_slots(&self, device: u32) -> Option<Vec<u64>> {
+        ImageReader::candidate_journal_slots(self.image, device)
+    }
+}
+
+/// 同一族的另一个取样点：系统配置几何字段全照原样（I-7.13 的表放行），盘 1 自报 512 MiB（32768 个槽）、读照原样——
+/// 单元区起点 50176 越过它自报的盘末，记账行照样读得到。改法 A 之后上一条在 I-7.13 那一判就被拦下、走不到算单元区容量那一步，
+/// 那一步的下溢由这一条钉：起点越过盘末，单元区没有容量可比，盘 1 的 I-5.2 判红，不 panic
+/// （合入后验证二，`crates/mutations.tsv` 实审 B1 第 6 条那一行换靶到这里）。
+#[test]
+fn a_device_reporting_an_end_before_the_unit_area_start_is_judged_without_a_panic() {
+    let pool = product_capacity_pool();
+    let image = pool.memory_pool();
+    let short = ImageWithOneDeviceReportingFewerBytes {
+        image: &image,
+        device: 1,
+        reported_device_bytes: 512 * 1024 * 1024,
+    };
+    let red: Vec<(&'static str, String)> = check_pool_image(&short)
+        .into_iter()
+        .filter_map(|(invariant, verdict)| match verdict {
+            InvariantVerdict::Violated(detail) => Some((invariant, detail)),
+            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+        })
+        .collect();
+    assert!(
+        red.iter().any(|(invariant, detail)| *invariant == "I-5.2"
+            && detail.contains("盘 1")
+            && detail.contains("单元区 None")),
+        "盘 1 自报的盘末在单元区起点之前：盘 1 的 I-5.2 红、单元区容量 None：{red:?}"
+    );
+    assert!(
+        !violated_names(&red).contains(&"I-7.13"),
+        "几何字段没动，I-7.13 的表放行：{red:?}"
     );
 }
 

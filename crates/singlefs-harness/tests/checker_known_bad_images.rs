@@ -11,6 +11,7 @@ use common::{
 };
 use singlefs_checker::image::{
     InvariantVerdict, SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS,
+    SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
 };
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{
@@ -34,6 +35,7 @@ use singlefs_core::transaction::{
     ZeroUnitPublishPlan,
 };
 use singlefs_format::{ALLOCATION_RECORD_TREE_LEAF_SLOTS, NODE_BYTES, TREE_IDENTIFIER_EXTENT};
+use singlefs_harness::history::{allocation_statistic_mechanism, AllocationStatisticMechanism};
 use singlefs_harness::memory_pool::MemoryPool;
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::{RetainedOperation, SharedStream};
@@ -416,6 +418,21 @@ const ENCRYPTION_TYPE_THE_FIRST_VERSION_DOES_NOT_READ: u8 = 1;
 /// I-7.13（系统配置池级字段在读者收的范围里） 那份坏镜像改的那一槽：盘 1 的槽 0。
 const DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT: u32 = 1;
 const OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT: u64 = 0;
+/// 系统配置字段表（`.claude/kb/layout/01-first-txn.md` 一）几何段里几个 16 KiB 槽号与环长的偏移：journal 环起点 325、环长 333、
+/// 根环起点 371、单元区起始槽号 417。checker 与实现今天各自按这几个偏移读；这里照字段表各写一份。
+const SYSTEM_CONFIGURATION_JOURNAL_RING_START_SLOT_OFFSET: usize = 325;
+const SYSTEM_CONFIGURATION_JOURNAL_RING_BYTES_OFFSET: usize = 333;
+const SYSTEM_CONFIGURATION_ROOT_RING_BASE_SLOT_OFFSET: usize = 371;
+const SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET: usize = 417;
+/// 系统配置自举头里的本盘设备号（4 字节）：fsid（偏移 102，宽 16）之后 20 字节、再 1 字节之后，偏移 139。
+const SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_OFFSET: usize = 139;
+/// 第一版 mkfs 写进这几格的值（字段表那一列）：journal 环从槽 1024 起、默认环长 768 MiB、根环从槽 64 起、单元区从槽 50176 起。
+const JOURNAL_RING_START_SLOT_OF_THE_POOL: u64 = 1024;
+const JOURNAL_RING_BYTES_OF_THE_POOL: u64 = 805_306_368;
+const ROOT_RING_BASE_SLOT_OF_THE_POOL: u64 = 64;
+const UNIT_AREA_START_SLOT_OF_THE_POOL: u64 = 50176;
+/// 聚簇段 64 槽（D3（空间分配） 已定项 10 ①）：单元区起始槽号要落在它的整数倍上。
+const CLUSTER_SEGMENT_SLOTS_OF_THE_POOL: u64 = 64;
 
 /// 系统配置槽重封：自证校验和在 155，罩整槽 4096。
 fn mutate_system_configuration_slot(
@@ -436,6 +453,99 @@ fn set_u64(bytes: &mut [u8], offset: usize, value: u64) {
 }
 fn set_u16(bytes: &mut [u8], offset: usize, value: u16) {
     bytes[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
+}
+fn set_u32(bytes: &mut [u8], offset: usize, value: u32) {
+    bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+}
+
+/// 两块盘对调盘体：每块盘两个系统配置槽里的本盘设备号改成另一块盘的身份（盘 0 的两槽写 1、盘 1 的两槽写 0），整槽重封，
+/// 别的字节不动。与盘体真对调不同的只有这一格：根环区域、单元都还在原来的盘上，所以别的不变量照判成立。
+fn swap_the_own_device_numbers_of_the_two_devices(image: &mut MemoryPool) {
+    let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
+    for (device, own_device_number_written) in [(0u32, 1u32), (1, 0)] {
+        for slot_offset in [0, spacing] {
+            mutate_system_configuration_slot(image, device, slot_offset, |bytes| {
+                set_u32(
+                    bytes,
+                    SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_OFFSET,
+                    own_device_number_written,
+                );
+            });
+        }
+    }
+}
+
+/// I-7.13（系统配置池级字段在读者收的范围里） 的几何那五格（实审 Y4 的 A、B、C、D、E，用户 2026-09-27 定「读字段，不等于常量就整池拒」）：
+/// 盘 1 槽 0 的一个几何字段改掉、整槽重封，别的三槽照原样。每项带 checker 该报的那个 `Verdict` 成员名（违例说明里带着它）。
+fn known_bad_images_of_the_system_configuration_geometry() -> Vec<(&'static str, Mutation)> {
+    let on_the_refused_slot = |change: fn(&mut Vec<u8>)| -> Mutation {
+        Box::new(move |image: &mut MemoryPool| {
+            mutate_system_configuration_slot(
+                image,
+                DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT,
+                OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT,
+                change,
+            );
+        })
+    };
+    vec![
+        // A：单元区起始槽号往后挪一段（50176 → 50240），环长不动：不是环长现算的那个槽。
+        (
+            "UnitAreaStartNotTheSlotAfterTheJournalRing",
+            on_the_refused_slot(|bytes| {
+                set_u64(
+                    bytes,
+                    SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET,
+                    UNIT_AREA_START_SLOT_OF_THE_POOL + CLUSTER_SEGMENT_SLOTS_OF_THE_POOL,
+                );
+            }),
+        ),
+        // D：环长少一槽（768 MiB − 16 KiB），单元区起始槽号跟着改成它现算的 50175（两者自洽）：不在聚簇段边界上。
+        (
+            "UnitAreaStartOffTheClusterSegmentBoundary",
+            on_the_refused_slot(|bytes| {
+                set_u64(
+                    bytes,
+                    SYSTEM_CONFIGURATION_JOURNAL_RING_BYTES_OFFSET,
+                    JOURNAL_RING_BYTES_OF_THE_POOL - SLOT,
+                );
+                set_u64(
+                    bytes,
+                    SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET,
+                    UNIT_AREA_START_SLOT_OF_THE_POOL - 1,
+                );
+            }),
+        ),
+        // B：journal 环起点写 1023：实现按常量 1024 写记录、扫环，按字段扫的读者判的是错位 16 KiB 的另一个环。
+        (
+            "JournalRingStartSlotNotTheFirstVersionConstant",
+            on_the_refused_slot(|bytes| {
+                set_u64(
+                    bytes,
+                    SYSTEM_CONFIGURATION_JOURNAL_RING_START_SLOT_OFFSET,
+                    JOURNAL_RING_START_SLOT_OF_THE_POOL - 1,
+                );
+            }),
+        ),
+        // C：根环起点写 65：实现按常量 64 写根，按字段读的读者读的是另一个根环。
+        (
+            "RootRingBaseSlotNotTheFirstVersionConstant",
+            on_the_refused_slot(|bytes| {
+                set_u64(
+                    bytes,
+                    SYSTEM_CONFIGURATION_ROOT_RING_BASE_SLOT_OFFSET,
+                    ROOT_RING_BASE_SLOT_OF_THE_POOL + 1,
+                );
+            }),
+        ),
+        // E：根环起点写 0：先于槽距判，报起点、不报「槽 1 不在根环起点之前」。
+        (
+            "RootRingBaseSlotNotTheFirstVersionConstant",
+            on_the_refused_slot(|bytes| {
+                set_u64(bytes, SYSTEM_CONFIGURATION_ROOT_RING_BASE_SLOT_OFFSET, 0);
+            }),
+        ),
+    ]
 }
 
 /// 树表单元里第 index 条条目（条目区从 115 + 2 × 8 = 131 起，每条 200）。
@@ -824,6 +934,11 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
                     },
                 )
             }),
+        ),
+        // 两块盘四个系统配置槽里的本盘设备号互换、整槽重封（实审 Y2-b 越格线索：盘体对调之后的池可写挂载因本盘设备号拒）。
+        (
+            SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
+            Box::new(swap_the_own_device_numbers_of_the_two_devices),
         ),
         // C322（取号那一步的屏障怎么放没有条款） 的撞号镜像：没人引用的槽 50302 上放一份写序实例代号 2 的数据单元（头与载荷
         // 校验和都过），两盘系统配置都还是实例 1 ⇒ ① 红（旧的「各盘相等且 ≥ 根环」在这里判成立）。
@@ -2380,6 +2495,93 @@ fn a_system_configuration_slot_whose_encryption_type_is_on_reddens_only_its_own_
     }
 }
 
+/// I-7.13（系统配置池级字段在读者收的范围里） 的几何那五格（[`known_bad_images_of_the_system_configuration_geometry`]）各**只**红 I-7.13，
+/// 红在盘 1 偏移 0 那一槽、说明里带该报的那个 `Verdict` 成员；别的每一条都报不适用（实现整池拒绝挂载，checker 不替这个池作保）。
+/// 改之前 checker 不判 417 = 环长现算、不判段边界、按字段读 325 与 371：A、B、C、D 四格 I-7.13 不红（A、D 红的是 I-5.2，
+/// C 红的是 I-7.1），E 格红的是槽距那个成员。
+#[test]
+fn each_system_configuration_geometry_field_the_reader_refuses_reddens_only_its_own_invariant_naming_the_refused_field(
+) {
+    let clean = build_pool("known-bad-refused-system-configuration-geometry").memory_pool();
+    let cases = known_bad_images_of_the_system_configuration_geometry();
+    assert_eq!(cases.len(), 5, "实审 Y4 的 A、B、C、D、E 五格");
+    for (refused_member, mutation) in cases {
+        let mut image = clean.clone();
+        mutation(&mut image);
+        let verdicts = check_pool_image(&image);
+        assert!(
+            verdicts.iter().any(|(judged, _)| *judged
+                == SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS),
+            "I-7.13 在判定清单里：{verdicts:?}"
+        );
+        for (judged, found) in &verdicts {
+            if *judged == SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS {
+                match found {
+                    InvariantVerdict::Violated(detail) => {
+                        assert!(
+                            detail.contains(&format!(
+                                "盘 {DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT} 偏移 {OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT}"
+                            )),
+                            "{refused_member}：违例要点名被改的那一槽：{detail}"
+                        );
+                        assert!(
+                            detail.contains(refused_member),
+                            "{refused_member}：违例说明里要是这个成员：{detail}"
+                        );
+                    }
+                    other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
+                        panic!("{refused_member}：这一槽自证过而带这一版读者不收的值，I-7.13 要判违例，得到 {other:?}")
+                    }
+                }
+            } else {
+                assert!(
+                    matches!(found, InvariantVerdict::NotApplicable(_)),
+                    "{refused_member}：这个池挂不上，{judged} 要报不适用，得到 {found:?}"
+                );
+            }
+        }
+    }
+}
+
+/// I-7.14（本盘设备号等于盘在池里的身份，暂立） 那份坏镜像（两块盘四个系统配置槽的本盘设备号互换）**只**红 I-7.14，
+/// 说明里点名盘 0 上自述 1 的那一槽；别的每一条与干净镜像上的判定逐条相同。改之前 checker 读本盘设备号而不拿它比盘的身份，
+/// 这份镜像上 0 条违例（实审 Y2-b 越格线索）。
+#[test]
+fn devices_whose_own_device_numbers_are_swapped_redden_only_the_own_device_number_invariant() {
+    let clean = build_pool("known-bad-swapped-own-device-numbers").memory_pool();
+    let clean_verdicts = check_pool_image(&clean);
+    let mut image = clean.clone();
+    swap_the_own_device_numbers_of_the_two_devices(&mut image);
+    let verdicts = check_pool_image(&image);
+    assert_eq!(
+        violated_invariants(&verdicts),
+        vec![SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY],
+        "只红 I-7.14：{verdicts:?}"
+    );
+    let detail = match verdict(
+        &image,
+        SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
+    ) {
+        InvariantVerdict::Violated(detail) => detail,
+        other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
+            panic!("本盘设备号互换，I-7.14 要判违例，得到 {other:?}")
+        }
+    };
+    assert!(
+        detail.contains("盘 0 上") && detail.contains("本盘设备号 1"),
+        "第一处违例是盘 0 上自述 1 的那一槽：{detail}"
+    );
+    assert_eq!(
+        verdicts_that_differ_outside(
+            &verdicts,
+            &clean_verdicts,
+            &[SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY]
+        ),
+        Vec::new(),
+        "除 I-7.14 之外每一条与干净镜像上的判定逐条相同"
+    );
+}
+
 #[test]
 fn the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target() {
     let clean = build_pool("known-bad").memory_pool();
@@ -3283,6 +3485,40 @@ fn known_bad_images_of_a_pure_leak() -> Vec<(&'static str, Mutation)> {
 /// Z3-A 只抬「已分配」、defer 行没动 ⇒ 已分配减 defer 比最新根走读多一槽，I-3.11（已分配减 defer 等于最新根走读） 跟着红——
 /// 这一形本来就在它的射程里；Z3-B 的 defer 行跟着抬了同一槽 ⇒ 那个差不变，I-3.11 照旧成立，只红 I-3.1。
 const INVARIANTS_EACH_PURE_LEAK_REDDENS: [&[&str]; 2] = [&["I-3.1", "I-3.11"], &["I-3.1"]];
+
+/// I-3.1（已分配统计对得上） 判红时 checker 在说明文字里带的机理标识，每一项都读得回来
+/// （`singlefs_harness::history::allocation_statistic_mechanism`）：「已知红」清单按它分辨机理，少写一项（比如回退下界 F 那一项）
+/// 那一段就读不出来，清单那一形就归成新发现。原来读这段真文字的是 `reuse_after_raising_the_floor.rs` 里收口表第 43 行那一形的用例，
+/// 它改钉成双故障形（C583（双故障形：每盘一槽系统配置坏加最新根一时读不出），抬 F 之前已经 I-7.4 红）之后这段文字由这一条钉。
+/// 镜像：写完新池新建文件那份干净镜像上记账盘 0 纯泄漏一槽（Z3-A）；环里 mkfs、两次暖机与 A 四条根（txg 0–3）全走到，
+/// 没抬过 F，F 是 0、没有根被 F 挡掉。
+#[test]
+fn the_allocated_statistic_violation_carries_every_mechanism_field_the_known_red_forms_read() {
+    let mut image = build_pool("known-bad-allocated-statistic-mechanism").memory_pool();
+    mutate_unit(
+        &mut image,
+        ACCOUNTING_ROOT,
+        |bytes| leak_one_slot_keeping_free_plus_allocated(bytes, false),
+        true,
+    );
+    let InvariantVerdict::Violated(detail) = verdict(&image, "I-3.1") else {
+        panic!("纯泄漏一槽：I-3.1 要红");
+    };
+    assert_eq!(
+        allocation_statistic_mechanism(&detail),
+        Some(AllocationStatisticMechanism {
+            root_ring_slot_count: 24,
+            newest_root_txg: 3,
+            readable_root_slot_count: 4,
+            oldest_readable_root_txg: 0,
+            walked_root_slot_count: 4,
+            root_slots_dropped_as_abandoned: 0,
+            rollback_floor: 0,
+            root_slots_dropped_below_floor: 0,
+        }),
+        "I-3.1 的说明文字里机理标识每一项都读得回来：{detail}"
+    );
+}
 
 /// 候选 b（回退候选集补上「由记录施加出来、根槽从没落盘的那一版」，2026-09-23 用户定）不放宽 I-3.1 的等式、只补等式右边：
 /// 纯泄漏的两份坏镜像照样都红 I-3.1，别的判定除 `INVARIANTS_EACH_PURE_LEAK_REDDENS` 登记的之外与干净镜像逐项相同

@@ -115,7 +115,7 @@ fn acquire(
     let mut pool = PoolWriter::new(&parameters, devices);
     acquire_instance(&mut pool).map_err(|failure| match failure {
         InstanceAcquisitionFailed::Acquisition(acquisition) => acquisition,
-        InstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness {
+        InstanceAcquisitionFailed::DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness {
             device,
         } => panic!("这条用例里每块盘两槽都读得出自证过的系统配置，取号不该拒在见证值那一核：{device:?}"),
     })

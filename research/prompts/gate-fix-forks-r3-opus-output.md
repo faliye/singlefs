@@ -2,7 +2,7 @@
 
 <!-- doc-lint:not-numbers T1 T3 T4 T5 T6 T7 T8 T11 M0 M1 M2 M3 M4 M5 M6 M7 M8 N1 N2 N3 N4 N5 N6 N7 N8 N9 N10 -->
 
-写于 2026-09-24 02:25 JST（2026-09-23 17:25 UTC）。只攻正文第四节分给这条腿的四格（T1、T5、T6、T7），攻的是改法自己引入的放过与误拦；T3、T4、T8 与第二轮判决的数没碰。被判的代码一律按快照树 `/tmp/claude-1000/gate-fix-forks-r3-snapshot-tree/` 读（105 份，开工时对 `research/prompts/gate-fix-forks-r3-snapshot/sha256sums.txt` 全部 OK），行号取自快照树。
+写于 2026-09-24。只攻正文第四节分给这条腿的四格（T1、T5、T6、T7），攻的是改法自己引入的放过与误拦；T3、T4、T8 与第二轮判决的数没碰。被判的代码一律按快照树 `/tmp/claude-1000/gate-fix-forks-r3-snapshot-tree/` 读（105 份，开工时对 `research/prompts/gate-fix-forks-r3-snapshot/sha256sums.txt` 全部 OK），行号取自快照树。
 
 ## 复跑
 
@@ -23,7 +23,7 @@ nice -n 19 bash    $M/t7-invocations.sh $S . $R/t7     # T7：九种调用方式
 nice -n 19 bash    $M/t-fix.sh          $S . $R/fix    # 本腿提的改法打在快照树的副本上，重跑 t1-scenes、t5-config-amend、t5-states 与样本自检
 ```
 
-各 `.out` 是照上面命令跑的原样输出（2026-09-23 17:22–17:25 UTC）。sha256：
+各 `.out` 是照上面命令跑的原样输出（2026-09-23）。sha256：
 
 ```
 d7d168153baacd8f53d89da481cb29c1fdf05e8cb97611eec615993136971b78  t1-scenes.out
@@ -50,7 +50,7 @@ c41be95c11f46320dfd9bdf9b15d15a5aae3b2e5036e64f974de394151650411  t7-invocations
 d8c5e38925c04f3754b9c32d4741ae6a6b5b65e749f0877e9cd766d0174a8e40  t-fix.sh
 ```
 
-**快照漂移**：收工时（17:25 UTC）主树对快照清单 `sha256sum -c` 有 3 份 FAILED：`.claude/rules/implementation-workflow.md`、`.claude/scripts/gen-decision-items.py`、`research/scripts/replay.sh`。模型没读主树的这三份：t6 的 `replay.sh` 与 E142 产物名取快照树（`from()` 先找快照），t7 用的生成器是快照树的拷贝；本报告引的行号也都取快照树。t6 从主树拷的 E142 产物与第八节点名的 4 份 `.rs` 不在快照清单里（别的会话正在改 `crates/`），它们在跑那一刻的 sha256 印在 `t6-mutants.out` 开头。
+**快照漂移**：收工时主树对快照清单 `sha256sum -c` 有 3 份 FAILED：`.claude/rules/implementation-workflow.md`、`.claude/scripts/gen-decision-items.py`、`research/scripts/replay.sh`。模型没读主树的这三份：t6 的 `replay.sh` 与 E142 产物名取快照树（`from()` 先找快照），t7 用的生成器是快照树的拷贝；本报告引的行号也都取快照树。t6 从主树拷的 E142 产物与第八节点名的 4 份 `.rs` 不在快照清单里（别的会话正在改 `crates/`），它们在跑那一刻的 sha256 印在 `t6-mutants.out` 开头。
 
 ## 各格判定一览
 

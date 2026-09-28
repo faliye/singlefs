@@ -2,7 +2,7 @@
 # 2026-09-25-s10-crates-sha256.out 那份重出产物之前的快照做对比，逐份点名对得上对不上）。
 # 命令：find crates -type f | sort | xargs sha256sum；下方逐文件哈希之后，再对这份哈希列表整体
 # sha256sum 一次得到 crates_sha256_of_sha256s。
-snapshot_time_jst=2026-09-25 11:50:20 JST
+snapshot_time_jst=2026-09-25
 git_head=e980a219f1834c638cd2fae18b25a60525a6bd52
 git_status_crates_lines=85
 crates_sha256_of_sha256s=bd409777db50c062ac560da397da365afbc9f06a427dc24602d012dfcd079beb

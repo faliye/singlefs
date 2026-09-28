@@ -1,6 +1,6 @@
 # 云端攻方（Opus）：Z3、Z4 —— 攻候选改法
 
-轮名 `m2-placement-falsepositive-r1`。立场：攻候选改法，不攻现状。时刻一律 UTC（本机时钟）；跑在 2026-09-23 UTC。
+轮名 `m2-placement-falsepositive-r1`。立场：攻候选改法，不攻现状。跑在 2026-09-23。
 
 ## 〇、各格判定一览
 
@@ -18,7 +18,7 @@
 
 ## 一、复跑
 
-副本（不入库）：`/tmp/claude-1000/placement-opus/repo`，由 `rsync -a --exclude target --exclude .git` 从 `/home/fy5090/code/singlefs` 拷出。
+副本（不入库）：`/tmp/claude-1000/placement-opus/repo`，由 `rsync -a --exclude target --exclude .git` 从 `<仓根>` 拷出。
 `export CARGO_TARGET_DIR=/tmp/claude-1000/placement-opus/target`，一律 `nice -n 19 cargo test -j 8`（开跑前 `ps -o pid,args -u "$(id -u)"` 没有 `qemu-system` / `vm-bench.sh` / `e152-file-system-benchmark` / `fio`；没等过锁）。
 
 ```

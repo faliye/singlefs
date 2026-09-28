@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Feed a PreToolUse Bash JSON to the three registered Bash hooks (read-only repo), detections go to a scratch file."""
 import json, os, subprocess, sys
-REPO = "/home/fy5090/code/singlefs"
+REPO = "<仓根>"
 DRAFT = os.environ.get("ATTACK_DRAFT", "/tmp/claude-1000/sync-local-legs-r1-attack")
 DET = os.path.join(DRAFT, "detections.jsonl")
 HOOKS = [

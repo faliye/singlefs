@@ -1,0 +1,7 @@
+exit=1
+want=机器上还有测试残留或宿主盘异常（判红 1 类
+want=临时目录残留
+want=clean 看计划
+want=环境检查有 1 类没查成，分不出机器那几样干不干净
+want=样本只跑 .gate-cells 点名的格：machine-clean
+want=machine-clean：红（退出 1）

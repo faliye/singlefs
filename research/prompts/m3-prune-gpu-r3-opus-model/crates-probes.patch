@@ -1,0 +1,125 @@
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ -4,6 +4,15 @@
+ //! 它们引用的单元仍占着空间（I-3.1 与 I-5.1 的这一读法 2026-09-14 用户收尾弹窗定甲，见 records 2026-09-13-总审核 十一·七）。
+ 
+ use std::cmp::Ordering;
++
++thread_local! {
++    /// 攻方原型（只在草稿副本）：扫描方向三处聚合的输入摘要，P7 键用。
++    pub static ATTACK_SCAN_SUMMARY: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
++}
++
++fn attack_push_scan_summary(line: String) {
++    ATTACK_SCAN_SUMMARY.with(|summary| summary.borrow_mut().push(line));
++}
+ use std::collections::{BTreeMap, BTreeSet};
+ 
+ use singlefs_format::{
+@@ -2429,6 +2438,7 @@
+             }
+         }
+     }
++    attack_push_scan_summary(format!("i78_scanned_max={:?}", identifiers.iter().max()));
+     identifiers
+ }
+ 
+@@ -2516,6 +2526,7 @@
+                 carriers.push((format!("盘 {device} 槽 {slot} 的单元写序"), instance));
+             }
+         }
++        attack_push_scan_summary(format!("i77_unit_carrier_max_device{device}={:?}", carriers.iter().filter(|(name, _)| name.contains("单元写序") && name.starts_with(&format!("盘 {device} "))).map(|(_, instance)| *instance).max()));
+     }
+     InstanceCarriersOnDisk {
+         carriers,
+@@ -5998,6 +6009,31 @@
+     };
+     let content_units =
+         scanned_content_units(reader, &geometry, filesystem_identifier_low, &published);
++    {
++        let mut groups: BTreeMap<&Vec<u8>, Vec<&ScannedContentUnit>> = BTreeMap::new();
++        for unit in &content_units {
++            groups.entry(&unit.merge_key).or_default().push(unit);
++        }
++        let mut merged: Vec<String> = Vec::new();
++        for (merge_key, members) in &groups {
++            if members.len() < 2 {
++                continue;
++            }
++            let checksums: BTreeSet<u32> = members.iter().map(|member| member.payload_checksum).collect();
++            let readable: BTreeSet<u32> = if checksums.len() > 1 {
++                members.iter().filter(|member| payload_checksum_holds_on_disk(reader, member)).map(|member| member.payload_checksum).collect()
++            } else {
++                BTreeSet::new()
++            };
++            merged.push(format!("{merge_key:02x?}:{}:{checksums:?}:{readable:?}", members.len()));
++        }
++        let mut by_object: BTreeMap<&Vec<u8>, BTreeSet<(Vec<u8>, String)>> = BTreeMap::new();
++        for unit in &content_units {
++            by_object.entry(&unit.object_key).or_default().insert((unit.merge_key.clone(), format!("{:?}", unit.total_order_key)));
++        }
++        let ordered: Vec<String> = by_object.iter().filter(|(_, groups)| groups.len() > 1).map(|(object, groups)| format!("{object:02x?}:{groups:02x?}")).collect();
++        attack_push_scan_summary(format!("i18_merged={merged:?} i18_ordered={ordered:?}"));
++    }
+     if judge_merged_version_total_order(reader, &content_units, &mut judgements) == 0 {
+         judgements.not_applicable(
+             "I-1.8",
+--- a/crates/singlefs-checker-tier/src/crash.rs
++++ b/crates/singlefs-checker-tier/src/crash.rs
+@@ -2362,6 +2362,56 @@
+     singlefs_harness::sha256::sha256_hexadecimal(&message)
+ }
+ 
++/// 攻方原型（只在草稿副本）：记录核对器第二条判据里「这次更晚的写过不过回收谓词」那一步（写表下标 `copy` 那份单元副本，被下标 `later_index` 的写盖掉）。
++#[must_use]
++pub fn attack_later_write_passes_the_reclaim_predicate(writes: &[RetainedWrite], copy: usize, later_index: usize) -> bool {
++    reuse_is_not_proven_illegal_by_the_reclaim_predicate(
++        writes,
++        checkpoint_txg_of_the_publish_that_made_the_write(writes, copy),
++        later_index,
++    )
++}
++
++/// 攻方原型（只在草稿副本）：按给的切法、续跑方式、观察者与分片算层 0 的计划哈希（与 `enumerate_layer0_in_state_slices_or_one_shard` 同一串）。
++#[allow(clippy::too_many_arguments, reason = "攻方原型")]
++#[must_use]
++pub fn attack_layer0_plan_hash(
++    base: &MemoryPool,
++    writes: &[RetainedWrite],
++    segments: &[Vec<usize>],
++    judged_root_index: usize,
++    versions: &[PublishedVersion],
++    expand: &dyn Fn(usize, &[usize]) -> bool,
++    parallelism: Layer0Parallelism,
++    slicing_independent_of_worker_threads: bool,
++    has_observer: bool,
++    shard: Option<Layer0ShardOfShards>,
++) -> (String, u64, usize) {
++    let tearable = TearableInPlaceOverwrites::of(base, writes);
++    let writes_with_torn_images = WritesWithTornImages::of(base, writes, segments, &tearable);
++    let plan = Layer0StatePlan::new(
++        writes,
++        segments,
++        &|segment_index, segment| expansion_of_the_yes_or_no_choice(expand(segment_index, segment)),
++        &tearable,
++        &writes_with_torn_images,
++    );
++    let slicing = if slicing_independent_of_worker_threads {
++        Layer0Parallelism {
++            slice_length: Layer0SliceLength::StatesPerSlice(states_per_slice_independent_of_worker_threads(plan.state_count)),
++            ..parallelism
++        }
++    } else {
++        parallelism
++    };
++    let slices = state_slices(plan.state_count, &slicing);
++    (
++        layer0_plan_hash(base, writes_with_torn_images.writes.as_slice(), &plan, judged_root_index, versions, &slices, has_observer, shard),
++        plan.state_count,
++        slices.len(),
++    )
++}
++
+ /// 并片时报发现：每并进一片之前，这一片带来的新签名、跨台阶各打一行 `LAYER0_FINDING`（标准输出），开了发现日志的另追加进这一节；
+ /// 跑完打一行 `LAYER0_FINDINGS`，把发现日志里这一节换成定稿（`layer0_progress::findings_log_final_lines`）。
+ struct Layer0FindingsReporter {

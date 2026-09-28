@@ -16,5 +16,5 @@
 
 ## 门禁管哪一半
 
-`.claude/gate.d/58-implementation-premise.sh` 查第 3 条的形式：标题日期在 `2026-09-17` 及以后的三方论证正文（`research/prompts/_*-body.md`）必须出现 `crates/`。
+门禁 doc-process-records（`.claude/gate.d/doc-process-records.sh`）的 implementation-premise 格（单跑：`--check implementation-premise`）查第 3 条的形式：标题日期在 `2026-09-17` 及以后的三方论证正文（`research/prompts/_*-body.md`）必须出现 `crates/`。
 **它管不到的**：读没读对、改法是不是真按实现写的、实验跑前登记里的模型该不该复用实现——这几样靠人与三方论证的攻方腿。

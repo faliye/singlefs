@@ -9,7 +9,7 @@
 
 ```
 bash research/prompts/m2-supp3-item4-code-r1-opus-model/reproduce.sh \
-     /home/fy5090/code/singlefs /tmp/claude-1000/m2s3i4-r1-opus/repo
+     <仓根> /tmp/claude-1000/m2s3i4-r1-opus/repo
 ```
 
 | 文件 | sha256 |

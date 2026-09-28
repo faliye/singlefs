@@ -1,6 +1,6 @@
 # gate-fix-forks-r2 云端攻方（Opus）：T1、T5、T6、T11
 
-写于 2026-09-24 01:10 JST（2026-09-23 16:10 UTC）。只攻正文第四节分给这条腿的四格；T3、T4、T7、T8 与辩方的复核没碰。攻的是工作区里写好的代码与样本，不是正文的转述。
+写于 2026-09-24。只攻正文第四节分给这条腿的四格；T3、T4、T7、T8 与辩方的复核没碰。攻的是工作区里写好的代码与样本，不是正文的转述。
 
 开工快照：`sha256sum -c research/prompts/gate-fix-forks-r2-snapshot/sha256sums.txt` 78 份全部 OK（`grep -v ': OK$'` 零行）；收工前再核一次，结果写在末尾「这条腿自己的限度」。
 
@@ -375,7 +375,7 @@ t11-bases.sh 原样（三个提交 c1–c3，提交名是提交说明；`diff_ba
 
 ## 这条腿自己的限度
 
-- **收工时的快照复核**（2026-09-23 16:11 UTC）：`sha256sum -c` 78 份里 1 份对不上：`.claude/rules/implementation-workflow.md: FAILED`。那是 T3 的文件，不归这条腿；我的模型没读它，报告里也没引它。
+- **收工时的快照复核**（2026-09-24）：`sha256sum -c` 78 份里 1 份对不上：`.claude/rules/implementation-workflow.md: FAILED`。那是 T3 的文件，不归这条腿；我的模型没读它，报告里也没引它。
 - 开跑前与收工时 `ps` 看到的：开工时一个别的会话在逐个跑 22、44、10、36 号与 doc-lint（pid 3395268）；收工时 `ask-local.sh research/prompts/gate-fix-forks-r2-local-attack.md` 在跑（本地攻方，pid 2439515）。没有 qemu、vm-bench、e152、fio，也没看到 cargo。模型全加了 `nice -n 19`。
 - 「认」那一臂是拿 `GATE_BASE="$(diff_base)"` 跑真阶段模拟的，不是改了共用脚本再跑（t11-leak 那一段才是补丁后的副本）。两者在「GATE_BASE 不设」时取到同一个提交；GATE_BASE 被人指定时两者不同，那一格没跑。
 - T5 的 HEAD 版阶段是 `git show HEAD:` 取出来放在草稿目录里跑的，它们的 `$(dirname "$0")` 指向草稿目录——这三份 HEAD 版不 source 任何东西，不受影响。

@@ -19,7 +19,7 @@ expect() { # <期望退出码> <说明> <环境赋值…>
   local want="$1" what="$2"; shift 2
   local out rc
   checked=$((checked + 1))
-  out="$(env "$@" bash "$PREDICATE" "$work" 59-demo.sh 2>&1)"; rc=$?
+  out="$(env "$@" bash "$PREDICATE" "$work" demo-stage.sh 2>&1)"; rc=$?
   if [[ "$rc" == "$want" ]]; then
     note "✓" "$what（退出码 $rc）"
   else
@@ -34,7 +34,7 @@ mkdir -p "$work/.claude/gate.d" "$work/crates/demo/src" "$work/records"
 printf 'pub fn one() -> u32 { 1 }\n' > "$work/crates/demo/src/lib.rs"
 printf '[workspace]\n' > "$work/Cargo.toml"
 printf '# lock\n' > "$work/Cargo.lock"
-printf '# 清单\n59-demo.sh\tcrates/ Cargo.toml Cargo.lock\t# 跑 crates 里的东西\n' > "$work/.claude/gate.d/stage-inputs.tsv"
+printf '# 清单\ndemo-stage.sh\tcrates/ Cargo.toml Cargo.lock\t# 跑 crates 里的东西\n' > "$work/.claude/gate.d/stage-inputs.tsv"
 git -C "$work" add -A && git -C "$work" commit -qm base
 
 tree_now() { git -C "$work" write-tree; }
@@ -62,23 +62,23 @@ printf '改了一行文档\n' > "$work/records/note.md"
 git -C "$work" add -A
 expect 1 "只改清单外的文件仍判可跳过" SINGLEFS_STAGED_TREE="$(tree_now)"
 # ⑥ 清单自己少写一条 ⇒ 要跑（不然那条输入永远不会让它重跑）
-printf '# 清单\n59-demo.sh\tcrates/\t# 少写了 Cargo.toml 与 Cargo.lock\n' > "$work/.claude/gate.d/stage-inputs.tsv"
+printf '# 清单\ndemo-stage.sh\tcrates/\t# 少写了 Cargo.toml 与 Cargo.lock\n' > "$work/.claude/gate.d/stage-inputs.tsv"
 git -C "$work" add -A
 expect 0 "清单自己变了就判要跑" SINGLEFS_STAGED_TREE="$(tree_now)"
-printf "# 清单\\n59-demo.sh\\tcrates/ Cargo.toml Cargo.lock\\t# 跑 crates 里的东西\\n" > "$work/.claude/gate.d/stage-inputs.tsv" && git -C "$work" add -A
+printf "# 清单\\ndemo-stage.sh\\tcrates/ Cargo.toml Cargo.lock\\t# 跑 crates 里的东西\\n" > "$work/.claude/gate.d/stage-inputs.tsv" && git -C "$work" add -A
 # ⑦ 复用上限到点 ⇒ 要跑；把上限调回去必须又变可跳过（同一棵树，只换上限）
 expect 0 "到了复用上限就强制跑" SINGLEFS_STAGED_TREE="$base_tree" SINGLEFS_REUSE_HOURS=0
 expect 1 "上限没到时照旧可跳过" SINGLEFS_STAGED_TREE="$base_tree" SINGLEFS_REUSE_HOURS=9999
 # ⑧ 强制全跑
 expect 0 "SINGLEFS_GATE_FULL=1 强制跑" SINGLEFS_STAGED_TREE="$base_tree" SINGLEFS_GATE_FULL=1
 # ⑨ 只改阶段脚本自己 ⇒ 要跑（判据本身变了，上一次的判定不再作数；清单里没登记它也一样）
-printf '#!/usr/bin/env bash\nexit 0\n' > "$work/.claude/gate.d/59-demo.sh"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$work/.claude/gate.d/demo-stage.sh"
 git -C "$work" add -A
 expect 0 "只改阶段脚本自己也判要跑" SINGLEFS_STAGED_TREE="$(tree_now)"
-rm -f "${work:?}/.claude/gate.d/59-demo.sh" && git -C "$work" add -A
+rm -f "${work:?}/.claude/gate.d/demo-stage.sh" && git -C "$work" add -A
 # ⑩ 同一道阶段在清单里写了两行 ⇒ 两行的路径都要进比对；只动第二行登记的路径也判要跑
 mkdir -p "$work/docs" && printf 'v1\n' > "$work/docs/d.md"
-printf "# 清单\n59-demo.sh\tcrates/ Cargo.toml Cargo.lock\t# 第一行\n59-demo.sh\tdocs/\t# 第二行\n" > "$work/.claude/gate.d/stage-inputs.tsv"
+printf "# 清单\ndemo-stage.sh\tcrates/ Cargo.toml Cargo.lock\t# 第一行\ndemo-stage.sh\tdocs/\t# 第二行\n" > "$work/.claude/gate.d/stage-inputs.tsv"
 git -C "$work" add -A && set_green "$(tree_now)"
 expect 1 "两行登记的路径都没变时可跳过" SINGLEFS_STAGED_TREE="$(tree_now)"
 printf 'v2\n' > "$work/docs/d.md" && git -C "$work" add -A

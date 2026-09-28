@@ -1,6 +1,6 @@
 # E142 重跑登记（第 16 次，照 kb 书记十六写回的三格）：第一个事务写出的每个区域与 `crates/` 逐字节比对、不等时逐字段归因，新写清单能不能整行抄进字节表
 
-写于 2026-09-25 15:05–（收尾时刻见第十三节）JST（本机 UTC 2026-09-25 06:05 起），装置改之前、这一次的任何产物之前。判据、门槛、作废与停机条款在这里写死；跑出数之后要改，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」三步走，不在这里回改。
+写于 2026-09-25，装置改之前、这一次的任何产物之前。判据、门槛、作废与停机条款在这里写死；跑出数之后要改，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」三步走，不在这里回改。
 
 **文件名取 `r16`**：`research/prompts/e142-r15-prereg.md` 是第 15 次跑的登记，这一次是第 16 次。
 
@@ -120,7 +120,7 @@
 
 **依据**：
 
-- 无实验：一套 btree 实现配多 keyspace 的形态没有可量的量，依据是 2026-08-29 现查 `linux-6.17/fs/bcachefs/bcachefs_format.h` 的 `BCH_BTREE_IDS()` 宏（数 `x(` 行与带 `BTREE_IS_write_buffer` 的行，源码固定在 `/home/fy5090/code/fs-refs/`）：bcachefs 用**一套 btree 实现 + 21 棵树**，其中 **5 棵**走 write buffer（`lru` / `backpointers` / `deleted_inodes` / `rebalance_work` / `accounting`）；比「按访问模式选不同结构」好在**只有一套结构要调对**——异构方案意味着 N 套实现、N 套崩溃一致性 bug、N 套 checker。prior-art.md 的 bcachefs 那一行以这一段为准。
+- 无实验：一套 btree 实现配多 keyspace 的形态没有可量的量，依据是 2026-08-29 现查 `linux-6.17/fs/bcachefs/bcachefs_format.h` 的 `BCH_BTREE_IDS()` 宏（数 `x(` 行与带 `BTREE_IS_write_buffer` 的行，源码固定在 `~/code/fs-refs/`）：bcachefs 用**一套 btree 实现 + 21 棵树**，其中 **5 棵**走 write buffer（`lru` / `backpointers` / `deleted_inodes` / `rebalance_work` / `accounting`）；比「按访问模式选不同结构」好在**只有一套结构要调对**——异构方案意味着 N 套实现、N 套崩溃一致性 bug、N 套 checker。prior-art.md 的 bcachefs 那一行以这一段为准。
 - 用户定案 2026-09-24：派生树可以异构（原话在变更史）；多出来的那套实现、崩溃一致性与 checker 由层 0 流与 checker 各自覆盖，不再拿「只有一套结构要调对」挡。
 - 无实验：三方原型（`research/prompts/m2-keyspace-r1-opus-model/`）在同一批历史与代价模型上量过，没立实验号，选哪一个由用户定，判决 `research/prompts/m2-keyspace-r1-main-verification.md`。
 - 用户定案 2026-09-24：K1、K2、K4（原话在变更史）。
@@ -267,7 +267,7 @@ m2（树表单元第 0 版）被 COW 之后仍被第 0 代根引用，但条目�
 ```
 ## 三、实现今天的样子
 
-### 3.1 `crates/`（2026-09-25 15:10–15:15 JST 现查；`git status --short crates/ | wc -l` 为 88，行号只是那一刻的）
+### 3.1 `crates/`（2026-09-25 现查；`git status --short crates/ | wc -l` 为 88，行号只是那一刻的）
 
 **这一节只为「比对侧怎么接」与「实现里有没有这几样」而读；按派发提示，模型不读 `crates/` 的实现。按位置寻址的实现文件只跑了 `grep -n` 列函数签名，没读函数体；签名里撞见的名字列进第四节。**
 
@@ -306,7 +306,7 @@ m2（树表单元第 0 版）被 COW 之后仍被第 0 代根引用，但条目�
 
 ## 四、跑之前已经存在的数
 
-读条款、读装置、读前例、判问法时已经撞见或自己推出来的，照实列，不删。第五、六、八至十一节的判据在 2026-09-25 15:17–15:21 JST 写完草稿（草稿文件的修改时刻在第十三节），15:22 JST 才跑第七节命令一；判定以产物为准，不以下表为准。
+读条款、读装置、读前例、判问法时已经撞见或自己推出来的，照实列，不删。第五、六、八至十一节的判据在 2026-09-25 写完草稿（跑命令一之前已有的草稿列在第十三节），之后才跑第七节命令一；判定以产物为准，不以下表为准。
 
 | # | 数 / 话 | 出处 | 对判据的影响 |
 |---|---|---|---|
@@ -432,7 +432,7 @@ Q142.11、Q142.19 是「两份实现比」「两臂比」；两边一起错（�
 
 ### 7.2 独立算出、用命令核过的（第十三节命令一；不符 ⇒ 作废 V5）
 
-命令一 `anchors_e142_r16.py` 在第五、六、八至十一节的草稿写完之后跑（草稿文件修改时刻见第十三节），输出原样在第十三节。
+命令一 `anchors_e142_r16.py` 在第五、六、八至十一节的草稿写完之后跑（跑命令一之前已有的草稿见第十三节），输出原样在第十三节。
 
 | # | 断言 | 值（命令一的输出行） |
 |---|---|---|
@@ -583,7 +583,7 @@ Q142.11、Q142.19 是「两份实现比」「两臂比」；两边一起错（�
 
 ## 十三、读过的文件与跑过的命令
 
-下面列的是这一次派发里读过的全部文件。行号是读的那一刻（2026-09-25 15:05–15:35 JST）的行号。`research/results/` 下的产物一份都没读；`.claude/kb/experiments/` 下的实验页一页都没读。草稿目录：`/tmp/claude-1000/e142-r16-design/`（派发提示给的）。
+下面列的是这一次派发里读过的全部文件。行号是读的那一刻（2026-09-25）的行号。`research/results/` 下的产物一份都没读；`.claude/kb/experiments/` 下的实验页一页都没读。草稿目录：`/tmp/claude-1000/e142-r16-design/`（派发提示给的）。
 
 ### 13.1 规则、共用约束、定义、门禁与脚本
 
@@ -630,7 +630,7 @@ Q142.11、Q142.19 是「两份实现比」「两臂比」；两边一起错（�
 ### 13.6 跑过的命令（原样；读文件的 `sed` / `awk` / `grep -n` / Read 在上面按行列过，不重列）
 
 ```
-$ date -u '+%F %T UTC'; TZ=Asia/Tokyo date '+%F %T JST'       # 开工后第一次：06:07:10 UTC / 15:07:10 JST；写判据草稿之前：06:17:31 UTC
+$ TZ=Asia/Tokyo date +%F       # 开工后与写判据草稿之前各跑一次，两次都是 2026-09-25
 $ sha256sum research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs research/mutations/e142_first_transaction_dry_run.tsv crates/singlefs-harness/src/bin/e142_first_transaction_write_dump*.rs
 32f77ab5d9d4cb0751666124fca828a30730a24dda5719dfb0af69afeeb499cc  research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs
 c049a31cc75c6ff9d369634a4d227c2f3e407d98f443d6f49cfb095e7ac1c9bf  research/mutations/e142_first_transaction_dry_run.tsv
@@ -657,15 +657,15 @@ $ nice -n 19 python3 research/scripts/quote-kb.py <草稿>/quotes/e142-r16-claus
 $ sha256sum <草稿>/quotes/*.md
 69b49545390a9b34299b79f490242df0940bfa6cc3ea9bc19c7ec1e23e90ce2b  …/quotes/e142-r16-clauses.md
 f226c04b06bbb605b0d20d4461a6612ed47b525aa97ca1922ffb3ce3789f5ec2  …/quotes/e142-r16-question.md
-$ ls -l --time-style=+%H:%M:%S <草稿>/sections/                # 判据草稿的 UTC 修改时刻（跑命令一之前那一次）：
-  s05a 06:17:50、s05b 06:18:19、s05c 06:18:42、s05d 06:19:00、s06 06:19:35、s08 06:20:26、s09 06:20:52、s10 06:21:26、s11 06:21:26
-$ cd <草稿> && nice -n 19 python3 anchors_e142_r16.py > anchors_e142_r16.out     # 06:22:09 UTC，rc=0；全文与输出见下
+$ ls -l --time-style=+%H:%M:%S <草稿>/sections/                # 跑命令一之前已有的判据草稿：
+  s05a、s05b、s05c、s05d、s06、s08、s09、s10、s11
+$ cd <草稿> && nice -n 19 python3 anchors_e142_r16.py > anchors_e142_r16.out     # rc=0；全文与输出见下
 $ sha256sum anchors_e142_r16.py anchors_e142_r16.out
 989f87000d18eddb992d9b912fbb391e185c22d1a777c3b3ae43497f84fd0259  anchors_e142_r16.py
 99979d51b09ff07bd042cc62578cf4b90ffac9ed165dbcfb3cdc009b8f86f135  anchors_e142_r16.out
 ```
 
-**跑命令一之后对判据草稿动过的地方（照实列，都不依赖命令一的数）**：06:23:25 UTC，第六节 Q142.12 加「两边条目数或条目宽不同的区域按条目 key 配对」一句与 `layout_fields_differ=` 字段、第五节 P7 的「该看到」改写成 B15 ② 的分法（原稿写「标直接字段的恰是 B16 那几类、其余全部传过去」，推 N15 对 N16 的层级 1 节点时发现条目数不同、按偏移比会把错位的子指针校验和归错，改成先配对再比），锚点编号 B16 → B15；06:24 UTC，第十一节 V6、S2 两格的措辞随 P7 改；06:25 UTC，第三节主导出 bin 的 sha256 草稿里先写了一个不是命令输出的值（当场标了「待核」），重跑 `sha256sum` 之后换成上面的原样值，并补上一盘导出的 sha256；06:30 UTC 前后，第五节 P2 的「对哪条臂」删掉「以及 N15」、写明 N15 为什么不单跑 P2；06:28 UTC，第十一节 S5 加「去掉 `**出处` 行再比」、第一节 R8 把「对得上」拆成区域级与字段级两条路、第五节 5.5 第一段加产物入库与 `replay.sh` 那一句。第七节、第一至四节与第十二、十三节是跑命令一之后写的（第七节本来就要引命令一的输出）。
+**跑命令一之后对判据草稿动过的地方（照实列，都不依赖命令一的数）**：第六节 Q142.12 加「两边条目数或条目宽不同的区域按条目 key 配对」一句与 `layout_fields_differ=` 字段、第五节 P7 的「该看到」改写成 B15 ② 的分法（原稿写「标直接字段的恰是 B16 那几类、其余全部传过去」，推 N15 对 N16 的层级 1 节点时发现条目数不同、按偏移比会把错位的子指针校验和归错，改成先配对再比），锚点编号 B16 → B15，第十一节 V6、S2 两格的措辞随 P7 改，第三节主导出 bin 的 sha256 草稿里先写了一个不是命令输出的值（当场标了「待核」），重跑 `sha256sum` 之后换成上面的原样值，并补上一盘导出的 sha256，第五节 P2 的「对哪条臂」删掉「以及 N15」、写明 N15 为什么不单跑 P2，第十一节 S5 加「去掉 `**出处` 行再比」、第一节 R8 把「对得上」拆成区域级与字段级两条路、第五节 5.5 第一段加产物入库与 `replay.sh` 那一句。第七节、第一至四节与第十二、十三节是跑命令一之后写的（第七节本来就要引命令一的输出）。
 
 #### 命令一：E142 的独立锚点（`anchors_e142_r16.py`，全文；第七节 7.2 用）
 
@@ -798,4 +798,4 @@ B13 half_slot devices=2 device_bytes=188860866560 slots=11527152 R=2 R_if_ceil=3
 B14 allocated_bytes = 278528  free_bytes = 3472605184  runs = [[50179, 50179], [50182, 50239], [50241, 50241], [50253, 'unit_area_end']]  empty_segments = 3310  defer_bytes = 16384
 ```
 
-**收尾时刻**：2026-09-25 15:31 JST（本机 2026-09-25 06:31 UTC）。这一轮没有编译、没有跑装置、没有跑任何产物；草稿目录里只有抄条款与问题单的两个出口文件、锚点脚本与它的输出、各节草稿。
+**收尾日期**：2026-09-25。这一轮没有编译、没有跑装置、没有跑任何产物；草稿目录里只有抄条款与问题单的两个出口文件、锚点脚本与它的输出、各节草稿。

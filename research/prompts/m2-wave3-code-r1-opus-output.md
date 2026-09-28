@@ -1,6 +1,6 @@
 # m2-wave3-code-r1 云端攻方腿（Opus）：Y1、Y3、Y4
 
-写于 2026-09-24（UTC 00:47 开工、01:45 前后落盘；JST 09:47 / 10:45）。副本在 `/tmp/claude-1000/m2-wave3-opus/`，开工时对 `research/prompts/m2-wave3-code-r1-snapshot/sha256sums.txt` 逐文件核过（不 OK 0 条）。**这里所有数都是副本上的数**，不是入库装置上的数。
+写于 2026-09-24。副本在 `/tmp/claude-1000/m2-wave3-opus/`，开工时对 `research/prompts/m2-wave3-code-r1-snapshot/sha256sums.txt` 逐文件核过（不 OK 0 条）。**这里所有数都是副本上的数**，不是入库装置上的数。
 
 ## 复跑
 
@@ -310,7 +310,7 @@ $ sha256sum -c research/prompts/m2-wave3-code-r1-snapshot/sha256sums.txt | grep 
 2
 ```
 
-快照核对不 OK 的两条是 `.claude/kb/checks-owed.md` 与 `.claude/kb/milestone/02-second-txn.md`（开工之后别的会话改的；`crates/` 下 0 条变，这份报告引的代码行号都在副本与主工作区上一致）。开工时（00:47 UTC）同一条命令是 0。
+快照核对不 OK 的两条是 `.claude/kb/checks-owed.md` 与 `.claude/kb/milestone/02-second-txn.md`（开工之后别的会话改的；`crates/` 下 0 条变，这份报告引的代码行号都在副本与主工作区上一致）。开工时同一条命令是 0。
 
 ## 附录 B　改法 D 副本上的测试
 

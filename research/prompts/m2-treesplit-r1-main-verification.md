@@ -2,7 +2,7 @@
 
 <!-- doc-lint:not-numbers T1 T2 T3 T4 T5 T6 L1 L2 L3 L4 L5 L6 L7 L8 -->
 
-正文 `research/prompts/_m2-treesplit-r1-body.md`，背景材料 `_m2-treesplit-r1-background.md`，开工快照 `m2-treesplit-r1-snapshot/sha256sums.txt`（05:58 UTC）。岔路单 `research/prompts/m2-treesplit-r1-forks.md`。判决只引产物与文件原文，腿的结论句当线索。
+正文 `research/prompts/_m2-treesplit-r1-body.md`，背景材料 `_m2-treesplit-r1-background.md`，开工快照 `m2-treesplit-r1-snapshot/sha256sums.txt`。岔路单 `research/prompts/m2-treesplit-r1-forks.md`。判决只引产物与文件原文，腿的结论句当线索。
 
 ## 一、这一轮交了什么
 

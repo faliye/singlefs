@@ -1,14 +1,14 @@
 # 实现员报告：impl-m2-followups2（增补 2 收口表第 58 行 `raise_rollback_floor` 同形、第 39 行那一族「取号之前的准入不算落点」、主表第 211 行变异）
 
-时刻一律 UTC（东京 = UTC+9）。仓副本 `repo/`（08:52 从主工作区 rsync，快照 `base-crates/`）；证红在 `pv-dbg/`、`pv-rel/`、`m208*/`；最后一轮在 `final/`（10:48 从已提交成 `a1f4691` 等五个提交的主工作区重新 rsync，打补丁，追加 8 行变异）。主工作区一个字没动。续会话之后（10:48 起）核过现场：各证红日志都有 `exit=` 行；两次 `cargo test --all`（`base-test-all.log` 停在第 29 个二进制、`final-test-all.log` 停在第 12 个）随旧进程退出没跑完、各自已跑的部分无红；`final/` 上重起的那一次按主 agent 转达的用户定案在 13:08 停掉，全量留给最后统一跑（第八节）。
+仓副本 `repo/`（开工时从主工作区 rsync，快照 `base-crates/`）；证红在 `pv-dbg/`、`pv-rel/`、`m208*/`；最后一轮在 `final/`（续会话之后从已提交成 `a1f4691` 等五个提交的主工作区重新 rsync，打补丁，追加 8 行变异）。主工作区一个字没动。续会话之后核过现场：各证红日志都有 `exit=` 行；两次 `cargo test --all`（`base-test-all.log` 停在第 29 个二进制、`final-test-all.log` 停在第 12 个）随旧进程退出没跑完、各自已跑的部分无红；`final/` 上重起的那一次按主 agent 转达的用户定案停掉，全量留给最后统一跑（第八节）。
 
 ## 一、交付物
 
 | 样 | 路径 | 说明 |
 |---|---|---|
-| 补丁 | `/tmp/claude-1000/impl-m2-followups2/impl-m2-followups2.patch` | 只含 `crates/`，8 个文件，不含 `crates/mutations.tsv`；10:48 与 13:09 两次在主工作区（HEAD `e980a21`）`git apply --check` 退出 0 |
+| 补丁 | `/tmp/claude-1000/impl-m2-followups2/impl-m2-followups2.patch` | 只含 `crates/`，8 个文件，不含 `crates/mutations.tsv`；续会话之后与收尾时两次在主工作区（HEAD `e980a21`）`git apply --check` 退出 0 |
 | 追加变异行 | `/tmp/claude-1000/impl-m2-followups2/mutations-append.tsv` | 8 行整行；`final/` 上追加在主工作区 519 行之后，逐行原文恰好命中一次 |
-| 第 211 行替代行 | `/tmp/claude-1000/impl-m2-followups2/row-208-replacement.tsv` | 1 行整行。派发说的「第 211 行」是实十五按 08:46 那一版表数的；今天主工作区的表里它在**第 208 行**（原文 `增补 3 第 4 件（用户 2026-09-21 定的收严）：说谎的设备许可留下的盘面不一致白名单里去掉 ["I-3.1"] 那一组`，`grep -n` 现取） |
+| 第 211 行替代行 | `/tmp/claude-1000/impl-m2-followups2/row-208-replacement.tsv` | 1 行整行。派发说的「第 211 行」是实十五按它那时那一版表数的；今天主工作区的表里它在**第 208 行**（原文 `增补 3 第 4 件（用户 2026-09-21 定的收严）：说谎的设备许可留下的盘面不一致白名单里去掉 ["I-3.1"] 那一组`，`grep -n` 现取） |
 | 报告 | `/tmp/claude-1000/impl-m2-followups2/report.md` | 本文件 |
 
 补丁自己的 stat（主工作区上 `git apply --stat`，原样）：
@@ -25,14 +25,14 @@
  8 files changed, 676 insertions(+), 68 deletions(-)
 ```
 
-主工作区（HEAD `e980a21`）`git diff --stat -- crates litmus`，10:50 现跑，原样：
+主工作区（HEAD `e980a21`）`git diff --stat -- crates litmus`，续会话之后现跑，原样：
 
 ```
  crates/singlefs-harness/src/bin/e158_root_choice_repair.rs | 14 +++++++++-----
  1 file changed, 9 insertions(+), 5 deletions(-)
 ```
 
-那是别的会话在改的实验装置，不是我的；我的改动只在补丁里、不在主工作区。开工时（08:52，提交之前）那一版是 60 个文件，原样在 `main-diff-stat.txt`。
+那是别的会话在改的实验装置，不是我的；我的改动只在补丁里、不在主工作区。开工时（提交之前）那一版是 60 个文件，原样在 `main-diff-stat.txt`。
 
 ## 二、三件做成了什么（行号是 `final/` 的，= 主工作区 + 补丁）
 
@@ -104,7 +104,7 @@
 
 ## 六、主表第 211 行（今天第 208 行）变异：分类与处置
 
-**分类：取样点不敏感（`.claude/rules/mutation-sampling.md`「三类，判据不同」表第三行）。** 依据，全在不打补丁的主工作区副本上量（`m208/`、`m208-mut/`，08:52 那一版，第 208 行涉及的文件与今天的提交逐字节相同）：
+**分类：取样点不敏感（`.claude/rules/mutation-sampling.md`「三类，判据不同」表第三行）。** 依据，全在不打补丁的主工作区副本上量（`m208/`、`m208-mut/`，开工时那一版，第 208 行涉及的文件与今天的提交逐字节相同）：
 
 - 不是锚点走不到：白名单那一判对每一次「说谎的设备留下盘面不一致」都判。大档（不改动，`--release`，这个测试周期的种子基起 512 段、每段 30 步、注入 6 次，174.1 秒，`logs/m208-large-tier-unmutated.log`）原样：`说谎的设备丢掉一份内容之后盘面不一致：550 次（设备丢的，不算新发现）`、`CheckerViolations { invariants: ["I-2.1", "I-4.8", "I-7.4"] }：524 次`、`CheckerViolations { invariants: ["I-3.1"] }：26 次`。
 - 不是等价变异：`["I-3.1"]` 那一组在真抽出来的注入上出现（上面 26 次；在一份只加了 `eprintln` 的副本上逐个记下是 13 个注入点，`logs/m208/probe-i31-seeds.txt`，全是 `WriteIsSwallowed`；26 = 13 × 2，逐一核过的那一段是每个注入点记两次——带注入跑的那一遍每步之后的 checker 与注入之后的镜像上那一遍各一次）。去掉这一组，这 13 处都会变成新发现。
@@ -152,7 +152,7 @@ mutations.tsv:471: 命中 0 次：C516（抬 F 那一串发布被拒时前面几
 
 ## 八、`check.sh` 与测试二进制
 
-`check.sh` 在 `final/`（10:48 的主工作区 `e980a21` + 补丁 + 追加 8 行）上跑，10:48:49 起，`nice -n 19 bash .claude/scripts/check.sh` 末尾原样：
+`check.sh` 在 `final/`（续会话之后的主工作区 `e980a21` + 补丁 + 追加 8 行）上跑，`nice -n 19 bash .claude/scripts/check.sh` 末尾原样：
 
 ```
 error: could not compile `singlefs-harness` (bin "e158_root_choice_repair") due to 3 previous errors
@@ -165,9 +165,9 @@ error: could not compile `singlefs-harness` (bin "e158_root_choice_repair" test)
 exit=1
 ```
 
-- `cargo fmt --check` 那一段过（`✓ 格式通过`）。clippy 报的错全在 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`（`-->` 指到的 3 处都在这个文件），补丁动过的 8 个文件一处都没有。e158 是别的会话在改的实验装置（10:50 主工作区 `git diff --stat -- crates litmus` 只有它一个文件），照实写。`check.sh` 停在 clippy，build / test 两段没走到。
-- `cargo build --all-targets`：在 `final/` 上 10:27 那一版（主工作区提交之前 + 补丁）退出 0（`logs/final-build.log`）。
-- **全量测试留给最后统一跑**（主 agent 13:07 之后转达用户的定：全部代码落定之后统一跑一次）。`final/` 上 10:48:57 起的 `cargo test --all --no-fail-fast` 在 13:08 按主 agent 的指示停掉（`proc.py stop` 停了 cargo pid 2051691 与正在跑的测试二进制 pid 3875651 `second_transaction_step_five_reuse`；外层 bash 随之退出，日志末行 `exit=143`）。停之前跑完的 25 个测试目标无失败，逐个（`logs/final2-test-all.log`）：`singlefs-checker` lib 3 过；`singlefs-core` lib 94 过；`singlefs-format` lib 5 过；`singlefs-harness` lib 67 过；bin `e156_allocation_basis_counts` 6 过；bin `e158_root_choice_repair` 28 过；bin `first_transaction_device_log_check` 4 过；bin `first_transaction_on_device` 13 过；bin `first_transaction_region_bytes` 0 个；`checker_known_bad_images` 27 过；`first_transaction_region_bytes` 4 过；`first_transaction_step_five_publish` 8 过；`first_transaction_step_one_mkfs` 9 过；`first_transaction_step_seven_layer0` 5 过 1 忽略；`first_transaction_step_six_recovery` 6 过；`first_transaction_step_two_data_unit` 3 过；`instance_acquisition` 4 过；`parallel_line_one_sequential_write` 3 过；`publish_order_matches_litmus` 1 过；`second_transaction_mapping_node_admission` 4 过；`second_transaction_parallel_line_one_layer0` 1 过 1 忽略；`second_transaction_parallel_line_one_multi_unit_file` 7 过；`second_transaction_parallel_line_one_sequential_write` 3 过；`second_transaction_parallel_line_three_many_inodes` 4 过；`second_transaction_parallel_line_two_mounted_read` 11 过。
+- `cargo fmt --check` 那一段过（`✓ 格式通过`）。clippy 报的错全在 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`（`-->` 指到的 3 处都在这个文件），补丁动过的 8 个文件一处都没有。e158 是别的会话在改的实验装置（续会话之后主工作区 `git diff --stat -- crates litmus` 只有它一个文件），照实写。`check.sh` 停在 clippy，build / test 两段没走到。
+- `cargo build --all-targets`：在 `final/` 上续会话之前那一版（主工作区提交之前 + 补丁）退出 0（`logs/final-build.log`）。
+- **全量测试留给最后统一跑**（主 agent 转达用户的定：全部代码落定之后统一跑一次）。`final/` 上续会话之后起的 `cargo test --all --no-fail-fast` 按主 agent 的指示停掉（`proc.py stop` 停了 cargo pid 2051691 与正在跑的测试二进制 pid 3875651 `second_transaction_step_five_reuse`；外层 bash 随之退出，日志末行 `exit=143`）。停之前跑完的 25 个测试目标无失败，逐个（`logs/final2-test-all.log`）：`singlefs-checker` lib 3 过；`singlefs-core` lib 94 过；`singlefs-format` lib 5 过；`singlefs-harness` lib 67 过；bin `e156_allocation_basis_counts` 6 过；bin `e158_root_choice_repair` 28 过；bin `first_transaction_device_log_check` 4 过；bin `first_transaction_on_device` 13 过；bin `first_transaction_region_bytes` 0 个；`checker_known_bad_images` 27 过；`first_transaction_region_bytes` 4 过；`first_transaction_step_five_publish` 8 过；`first_transaction_step_one_mkfs` 9 过；`first_transaction_step_seven_layer0` 5 过 1 忽略；`first_transaction_step_six_recovery` 6 过；`first_transaction_step_two_data_unit` 3 过；`instance_acquisition` 4 过；`parallel_line_one_sequential_write` 3 过；`publish_order_matches_litmus` 1 过；`second_transaction_mapping_node_admission` 4 过；`second_transaction_parallel_line_one_layer0` 1 过 1 忽略；`second_transaction_parallel_line_one_multi_unit_file` 7 过；`second_transaction_parallel_line_one_sequential_write` 3 过；`second_transaction_parallel_line_three_many_inodes` 4 过；`second_transaction_parallel_line_two_mounted_read` 11 过。
 - 动到的测试二进制在打着补丁的副本上都跑完、全绿（第五节的基线那一遍）：`first_transaction_on_device` 13 过、`second_transaction_supplement_two_commit_generated_fallback` 5 过、`second_transaction_step_three_formatted_pool` 13 过（debug，`pv-dbg/`）；`second_transaction_supplement_three_random_history` 21 过 2 忽略、`second_transaction_supplement_three_fault_injection` 9 过 1 忽略、`singlefs-harness --lib` 67 过（`--release`，`pv-rel/`）。这两份副本与 `final/` 在补丁动过的文件上只差两处文档注释（`src/fault_injection.rs` 白名单上那段、故障注入用例文件里新用例上那段，都是证红之后改的，代码逐字节相同）；`pv-dbg` 同步时故障注入那条新用例还没写，它跑的三个二进制不含那个文件。
 - 补丁每一次挂载都多走一遍拷贝与一条断言（第二节第 2 件），挂载的二进制差不多就是全部；没跑到的那一半（`second_transaction_step_five_reuse` 起约 40 个）留给统一那一次。
 - 登记给我的门禁阶段按派发没跑。
@@ -178,8 +178,8 @@ exit=1
 
 ## 十、负载与经过里要记的
 
-- 每次开跑前 `ps` 看过，没有 `qemu-system` / `vm-bench.sh` / `e152-file-system-benchmark` / `fio`。别的会话的进程一直占着核：`/tmp/claude-1000/m2-keyspace-opus/bin-scan3 scan_candidates`（09:45 时 1167% CPU、10:48 时 1276%）、`bin-final`、两个 `ray::RayWorkerProc`、别的会话的 `cargo test`（`impl-m2-writepath`、`impl-m2-checker3` 副本里的测试二进制）与 gate 阶段；09:45 负载 32（32 核）。各副本用各自的 target，没等锁。
-- 旧会话进程在 10:43（两份日志最后一次写入的时刻）之后退出，两次 `cargo test --all` 没跑完（`base-test-all.log` 第 29 个二进制、`final-test-all.log` 第 12 个，已跑的部分无红），各证红日志都完整（有 `exit=`）。续上之后只补了 `final/` 上那一次：10:48 从已提交的主工作区重新 rsync、打补丁、追加 8 行，`check.sh` 与 `cargo test --all` 在它上面跑（第八节）。
+- 每次开跑前 `ps` 看过，没有 `qemu-system` / `vm-bench.sh` / `e152-file-system-benchmark` / `fio`。别的会话的进程一直占着核：`/tmp/claude-1000/m2-keyspace-opus/bin-scan3 scan_candidates`（先后两次看是 1167% CPU、1276%）、`bin-final`、两个 `ray::RayWorkerProc`、别的会话的 `cargo test`（`impl-m2-writepath`、`impl-m2-checker3` 副本里的测试二进制）与 gate 阶段；第一次看时负载 32（32 核）。各副本用各自的 target，没等锁。
+- 旧会话进程在两份日志最后一次写入之后退出，两次 `cargo test --all` 没跑完（`base-test-all.log` 第 29 个二进制、`final-test-all.log` 第 12 个，已跑的部分无红），各证红日志都完整（有 `exit=`）。续上之后只补了 `final/` 上那一次：从已提交的主工作区重新 rsync、打补丁、追加 8 行，`check.sh` 与 `cargo test --all` 在它上面跑（第八节）。
 - 探针：`shrink_to_reproduction` 收缩 240 槽那个种子（`logs/explore-240.log`）；回退到环里最旧的根那 465 格的扫描（`logs/probe-grid-*.txt`）；大档里 `["I-3.1"]` 那几处注入点的记录（`logs/m208/probe-i31-seeds.txt`，副本里临时加了一行 `eprintln`）。
 
 ## 十一、没做什么

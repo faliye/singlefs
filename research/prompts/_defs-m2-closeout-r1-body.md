@@ -10,12 +10,12 @@
 |---|---|---|
 | D1 | **第一批**：`three-way-local-attack.md`、`three-way-local-defense.md` 写范围与产出一致；`three-way-attack.md` 第 3b 步取样（内存稀疏盘、每个起点只建一次池、超过 40 分钟缩历史 / 候选 / 几何的取样而崩溃点不缩、checker 判结束状态、随机跑批小批量限时）；`experiment-runner.md` 第 4c 步逐行读 `name=verdict` 判决行、false 与 not_run 点名 | 照这几步干活会不会与别的定义、共用约束或 `.claude/singlefs-ai-sop/rules/` 冲突；起草者自己加的两处（「崩溃点不缩」与共用约束「崩溃点…不为省时间缩范围」怎么对上，段内整段子集枚举算不算崩溃点；「checker 判结束状态」是每段历史判一次还是每个崩溃状态判一次）站不站得住 |
 | D2 | **第二批**：`agent-common.md` 新加「跑编译出来的代码经内存包装」与「执行前拒绝的写法」两条，`experiment-runner.md`、`crash-verifier.md`、`gate-triage.md`、`implementation-writer.md` 各一个第 1b 步指过去；`three-way-attack.md` 第 3c 步「内存与进程」；`.claude/gate.d/stage-owners.tsv` 登记 84 号给 `experiment-runner` | 拒绝清单与 `.claude/hooks/` 里四份 hook 今天实际拒的逐项对得上吗（多写、漏写、写反）；「外面不再包」的嵌套理由（推的，没量过）；崩溃验证员派发没给上限时默认 8G 够不够（第四十节第 30 行写着三道要多少内存都没量过）；门禁分诊员不包 `gate.sh` 之后，`check.sh`、15 号、74 号起的 cargo 不在任何包装里；攻方第 3c 步要求 `cargo build` 也经包装、比共用约束严，要不要统一 |
-| D3 | **97f5904 里没被判到的几块，与主 agent 2026-09-26 JST 09:1x 的四处小改**：`main-agent.md` 第 5 条「弹窗问用户之前…出处」与随它顺延的编号、「禁止」一节重型清单改成「以 `implementation-workflow.md` 那张清单为准」、第 3 条同、「派出去之后」拒绝清单改成指到共用约束、「暂存之后、提交之前跑门禁」那一行层 0 全量写明整条经内存包装；`agent-common.md` 停进程那一句的 `proc.py` 路径；`implementation-writer.md` 第 4 步变异表名改成 `crates/mutations.tsv`、删掉末尾打补丁交法留下的 `git apply --check`；第一批报告第五、六节列的「只被通查扫过」的各块 | 每一块照字面做，会不会让派出去的 agent 做错、做不了、或与另一处矛盾；「以那张清单为准」这类指过去的写法，被指的那一处真的列全了吗 |
+| D3 | **97f5904 里没被判到的几块，与主 agent 2026-09-26 的四处小改**：`main-agent.md` 第 5 条「弹窗问用户之前…出处」与随它顺延的编号、「禁止」一节重型清单改成「以 `implementation-workflow.md` 那张清单为准」、第 3 条同、「派出去之后」拒绝清单改成指到共用约束、「暂存之后、提交之前跑门禁」那一行层 0 全量写明整条经内存包装；`agent-common.md` 停进程那一句的 `proc.py` 路径；`implementation-writer.md` 第 4 步变异表名改成 `crates/mutations.tsv`、删掉末尾打补丁交法留下的 `git apply --check`；第一批报告第五、六节列的「只被通查扫过」的各块 | 每一块照字面做，会不会让派出去的 agent 做错、做不了、或与另一处矛盾；「以那张清单为准」这类指过去的写法，被指的那一处真的列全了吗 |
 | D4 | **第四十节第 40 行**：重型测试闸遇到 55、57、59 号不起虚机、不起 herd7、不跑变异的静态分支怎么判（今天靠根目录的标记文件选分支：55 号认 `.qemu-prerecorded`、57 号认 `.lkmm-static-only`，59 号没有静态分支）。两种判法：甲，参数白名单（钩子这一侧认）；乙，阶段自报（阶段自己声明，钩子读声明） | 两种判法各会误放、误拒哪些调用（举具体命令）；乙要改 54 号的话层 0 全绿标记全部作废，这个代价是不是必然的；有没有第三条路；`herd7 -version` 这类只取版本号的裸调用各怎么判 |
 
 **共用问句**：每一格都要回答「按改后的字面干活，哪一步会做错或做不了」，举出具体的派发情形或命令，不许只说「可能有歧义」。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-26 JST 09:1x）
+## 二、实现今天的样子（主 agent 的观测，2026-09-26）
 
 - 被判的 9 份定义与 1 份阶段归属表，工作区相对 HEAD 的改动：`git diff HEAD -- .claude/agents .claude/agent-common.md .claude/main-agent.md .claude/gate.d/stage-owners.tsv`（10 个文件，41 行加、11 行删；材料员整份放进附录二）。开工快照 `research/prompts/defs-m2-closeout-r1-snapshot/sha256sums.txt`。
 - `97f5904` 里 7 份定义的改动：`git show 97f5904 -- .claude/agent-common.md .claude/agents/crash-verifier.md .claude/agents/experiment-runner.md .claude/agents/gate-triage.md .claude/agents/implementation-writer.md .claude/agents/mutation-triage.md .claude/main-agent.md`；哪几块被 `research/prompts/defs-gate54-tiering-r1/r2-main-verification.md`、`m2-final-code-r2/r3/r4-main-verification.md` 判到过，见第一批起草报告第五节的覆盖表。

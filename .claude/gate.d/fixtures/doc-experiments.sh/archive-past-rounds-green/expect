@@ -1,0 +1,6 @@
+exit=0
+want=没有上一轮留下的实验记录
+want=取法同门禁 doc-process-records 的 knowledge-sync 格：changed-paths.sh 的 gate_diff_base gate
+want=样本只跑 .gate-cells 点名的格：archive-past-rounds
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格绿（archive-past-rounds），0 格本次未跑（无）

@@ -1,0 +1,7 @@
+run base c393_candidates_grid exit=0 seconds=10
+run a c393_candidates_grid exit=0 seconds=8
+run b c393_candidates_grid exit=0 seconds=9
+run base c331_candidates_grid exit=0 seconds=150
+run jia c331_candidates_grid exit=0 seconds=209
+run jiaeio c331_candidates_grid exit=0 seconds=183
+done

@@ -1,0 +1,5 @@
+E7RESULT name=attack_state_budget world=p5_control closed_form_state_count=81 enumerated_with_torn=96 writes=18 segments=8
+E7RESULT name=attack_p5 world=p5_control enumerated_states=96 unit_segment=7 states_in_unit_segment=63 red_states_in_unit_segment=0 red_by_name={} segment_first_state_red=Some(false) all_persisted_state_red=false example_red_landings_in_segment_order=None tally_checker_violated={} walk_key_classes=1 walk_key_inconsistent=0 full_key_classes=32 full_key_inconsistent=0 must_be_nonzero=0
+E7RESULT name=attack_state_budget world=p5_mutant closed_form_state_count=81 enumerated_with_torn=96 writes=18 segments=8
+E7RESULT name=attack_p5 world=p5_mutant enumerated_states=96 unit_segment=7 states_in_unit_segment=63 red_states_in_unit_segment=16 red_by_name={"checker:I-7.8": 16} segment_first_state_red=Some(false) all_persisted_state_red=false example_red_landings_in_segment_order=Some([true, false, false, false, false, false]) tally_checker_violated={"I-7.8": 16} walk_key_classes=1 walk_key_inconsistent=16 full_key_classes=48 full_key_inconsistent=0 must_be_nonzero=16
+E7RESULT name=done emitted=5

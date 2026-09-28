@@ -1,0 +1,7 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：prime-marks
+want=查了 13 份文本文件，没有角标写法
+want=没扫的：上游副本 .claude/singlefs-ai-sop/ 下 1 份
+want=二进制 0 份、列出了却不是普通文件 0 份
+want=── 汇总：doc-text.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-text.sh：1 格里 1 格绿（prime-marks），0 格本次未跑（无）

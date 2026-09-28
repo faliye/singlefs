@@ -2,7 +2,7 @@
 
 这里交的是观测，不是判决：核对表里的 ✗ 不免除主 agent 对推论的逐条现查。
 
-写于 2026-09-26（JST）。核查对象：`m2-layer0-scale-r2-sonnet-output.md`（辩方复核）、
+写于 2026-09-26。核查对象：`m2-layer0-scale-r2-sonnet-output.md`（辩方复核）、
 `m2-layer0-scale-r2-opus-output.md`（云端攻方）、`m2-layer0-scale-r2-local-attack-*`（本地攻方）。
 草稿目录：`/tmp/claude-1000/m2-layer0-scale-r2-verifier/`。
 
@@ -32,8 +32,8 @@ $ awk 'NR==707' selftest/crash.rs
 ## 二、kb 文件在这一轮核查期间被并发改动——记「分不清」的三处
 
 `.claude/kb/checks-owed.md`、`.claude/kb/decisions/23-journal的角色与格式.md` 两份文件
-`git status --short` 显示 `M`（有未提交改动），且 mtime 均为 `2026-09-26 02:57:33 UTC`——
-晚于 sonnet 报告文件的 mtime（`02:02:26 UTC`）。这是另一个会话在核查期间正在改写这两份 kb 文件
+`git status --short` 显示 `M`（有未提交改动），且 mtime 均为 `2026-09-26`——
+晚于 sonnet 报告文件的 mtime。这是另一个会话在核查期间正在改写这两份 kb 文件
 （`git diff` 显示 C554/C555/C558/C560 等行是这次 diff 里新增的 `+` 行，说明 sonnet 写报告时读到的是
 改写前那一版的行号）。据此，以下三处按「kb 照设计轮对主树核，行号对不上记分不清」处理，不计 ✗：
 

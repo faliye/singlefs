@@ -15,7 +15,7 @@
   → 两份报告都不落「分不清：报告在腿交回之后被改过」。
 - Opus 腿的 `run-all.out` 现有 sha256 `659a816fccf1db87973e1d53783b29345c560f564a519b0c8e903c6bccf92451`，与主 agent 给的一致。
 - 这一轮是设计/治理轮（判 agent 定义与规则），不是代码轮：`.claude/rules/implementation-workflow.md`「代码轮派腿之前记一份开工快照」限定在代码轮，Sonnet 报告 G4#5 也这样判过，我复核同意。但主 agent 这次仍给了快照（罩被判的定义文件），所以本报告按「给了快照」的路径核，不落「没给快照的设计轮，对不上记分不清」。
-- 腿开工时刻 2026-09-26T15:30:00Z 前后：用于第 2 步核对不在快照清单里的文件（`.claude/gate.d/55-qemu-first-transaction.sh`、`.claude/scripts/lkmm.sh`、`.claude/gate.d/57-lkmm.sh`、`.claude/gate.d/87-replay.sh`）——`git log --since=2026-09-26T15:30:00Z` 与 `git status --short` 对这四个文件均无输出，判定它们在腿开工之后未被改动，可以对主树核（不落「被改过」）。
+- 腿开工于 2026-09-27：用于第 2 步核对不在快照清单里的文件（`.claude/gate.d/55-qemu-first-transaction.sh`、`.claude/scripts/lkmm.sh`、`.claude/gate.d/57-lkmm.sh`、`.claude/gate.d/87-replay.sh`）——`git log --since=2026-09-27` 与 `git status --short` 对这四个文件均无输出，判定它们在腿开工之后未被改动，可以对主树核（不落「被改过」）。
 
 ## 复跑
 

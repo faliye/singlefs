@@ -22,7 +22,7 @@ E159  e159-fsync-wait-group-commit 字节一致 e159-fsync-wait-group-commit-202
 ```
 全文见 `research/results/gate69-refresh-replay-e155-e157-e159-2026-09-25.log`。
 
-六份都与 `replay.sh` 当时登记的产物逐字节一致（`diff -q` 无输出）。这六份登记产物的 mtime（Sep 23–24）早于对应装置源码改到 311 的 mtime（Sep 24 13:35–14:09），门禁 69 号判据一因此判红——重跑得出的字节与登记产物相同，但没有落进 `research/results/` 的新产物，`replay.sh` 也没有指到一份不比源码旧的文件。
+六份都与 `replay.sh` 当时登记的产物逐字节一致（`diff -q` 无输出）。这六份登记产物的 mtime（Sep 23–24）早于对应装置源码改到 311 的 mtime（Sep 24），门禁 69 号判据一因此判红——重跑得出的字节与登记产物相同，但没有落进 `research/results/` 的新产物，`replay.sh` 也没有指到一份不比源码旧的文件。
 
 处置（登记里「相同：把 replay.sh 的登记行指到新文件，旧文件留着」）：把 `$OUT_DIR` 里六份现跑产物逐一 `cmp` 确认与旧登记产物逐字节相同后，另存新文件（旧文件原样留着，未删）：
 
@@ -61,9 +61,9 @@ e159-fsync-wait-group-commit: 55 passed
 
 ## 2. E142 变异表整表复跑
 
-`research/mutations/e142_first_transaction_dry_run.tsv` 最后一次改动在 2026-09-24 17:32:40 UTC（`git diff` 确认：M23 锚点从 307 改到 311、新增 M80–M93 共 13 条），晚于此前两份变异日志（`research/results/e142_first_transaction_dry_run-mutate-2026-09-25-header311-last-flag.log`、`…-header311-last-flag-reverify5.log`，均 17:29:22 UTC），后者只覆盖 87 条 + 单独复核 5 条，两次都不是今天这份 92 行 tsv 的整表一次性重跑。
+`research/mutations/e142_first_transaction_dry_run.tsv` 最后一次改动在 2026-09-25（`git diff` 确认：M23 锚点从 307 改到 311、新增 M80–M93 共 13 条），晚于此前两份变异日志（`research/results/e142_first_transaction_dry_run-mutate-2026-09-25-header311-last-flag.log`、`…-header311-last-flag-reverify5.log`），后者只覆盖 87 条 + 单独复核 5 条，两次都不是今天这份 92 行 tsv 的整表一次性重跑。
 
-装置源码 `research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs` 本轮未改（mtime 17:17:45，早于两份日志与 tsv 最后一次改动，确认基线未变）。
+装置源码 `research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs` 本轮未改（mtime 早于两份日志与 tsv 最后一次改动，确认基线未变）。
 
 跑前登记 `research/prompts/e142-r14-prereg.md`（沿用，未改一字，本轮不涉及它写死的判据）；实验页登记的变异命令（`Cargo.toml:377-378` 的 bin 名 `e142-first-txn-dry-run`）：
 

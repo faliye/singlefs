@@ -1,0 +1,4 @@
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/impl-r2-fixes-a/copy/crates/singlefs-core)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/impl-r2-fixes-a/copy/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-a/copy/crates/singlefs-harness)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 52.84s

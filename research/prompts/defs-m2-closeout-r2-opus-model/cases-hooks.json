@@ -4,21 +4,21 @@
   "hook": "heavy",
   "agent": "three-way-attack",
   "cwd": "@COPY@",
-  "command": "nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test proto_acquisition_barrier -- --nocapture"
+  "command": "nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test proto_acquisition_barrier -- --nocapture"
  },
  {
   "id": "P2",
   "hook": "heavy",
   "agent": "three-way-attack",
   "cwd": "@COPY@",
-  "command": "nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test second_transaction_step_three_acquisition_barrier_layer0 -- --nocapture"
+  "command": "nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test second_transaction_step_three_acquisition_barrier_layer0 -- --nocapture"
  },
  {
   "id": "P3",
   "hook": "heavy",
   "agent": "three-way-attack",
   "cwd": "@COPY@",
-  "command": "nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test proto_step_zero -- --nocapture"
+  "command": "nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test proto_step_zero -- --nocapture"
  },
  {
   "id": "T1",

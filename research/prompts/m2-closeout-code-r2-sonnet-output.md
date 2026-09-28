@@ -128,7 +128,7 @@ I-7.13 的条款原文明写：「任一盘任一槎不满足其中一项即判�
 另有六条退役，编号不回收）」（`.claude/kb/invariants.md:17`），全文档 `grep -n I-9.16` 零命中于该文件；但代码里
 `IMPLEMENTED_INVARIANTS` 已经是 48 项、含 `"I-9.16"`（`crates/singlefs-checker/src/image.rs:57` 起，`pub const IMPLEMENTED_INVARIANTS: [&str; 48]`,
 第 105 行是 `"I-9.16",`），`recovery.rs` 也已把这个字符串当不变量名用（`pub const TREE_TABLE_ENTRIES_ORDERING_CONTRACT: &str = "I-9.16";`
-`crates/singlefs-core/src/recovery.rs:1865`）。实现员报告自己交代「立号来由：实审 A3b Q2……用户 2026-09-27 JST 17:4x 弹窗定「立不变量并同步」」，
+`crates/singlefs-core/src/recovery.rs:1865`）。实现员报告自己交代「立号来由：实审 A3b Q2……用户 2026-09-27 弹窗定「立不变量并同步」」，
 「不变量原句（交 kb 第八批，我没写 kb）」（`research/prompts/m2-rev-tree-table-ordering-implementer-report.md` 第 30-34 行）——
 这是用户已经批准要立、但 kb-scribe 那一批还没写回的中间状态，不是代码在没有批准的情况下自行加了一个不变量；不算「与条款说反话」，
 但在「invariants.md 每加一条，checker 就要加一个检查……两者不同步的 commit 一律不收」（`.claude/kb/invariants.md:3-4`）这条纪律下，
@@ -226,7 +226,7 @@ D13（验证路线） 已定项 4 的射程句：「checker 在 `crates/singlefs
 
 ## 引文核对说明
 
-交回前跑 `python3 research/scripts/cite-check.py research/prompts/m2-closeout-code-r2-sonnet-output.md --root /tmp/claude-1000/three-way-forward-r2/snapshot --root /home/fy5090/code/singlefs`：
+交回前跑 `python3 research/scripts/cite-check.py research/prompts/m2-closeout-code-r2-sonnet-output.md --root /tmp/claude-1000/three-way-forward-r2/snapshot --root <仓根>`：
 
 ```
 ✓ 核了 3 处引文，对上 3 处，没判 0 处（逐处列在上面）

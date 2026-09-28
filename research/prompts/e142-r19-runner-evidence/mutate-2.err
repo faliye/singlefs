@@ -1,0 +1,1 @@
+mutate: 这一轮开 2 个工作进程（各项取最小、至少 1）：核数 32 的一半、至多 16，给 16 个；MUTATE_JOBS 给 2 个；表里 180 条。卡在「MUTATE_JOBS」这一项；每个 cargo 编译并行度 2（调用方的 CARGO_BUILD_JOBS）

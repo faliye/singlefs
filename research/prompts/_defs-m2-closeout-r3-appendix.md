@@ -421,8 +421,8 @@ exit=0
   ✓ research 构建通过，2 个测试批次、共 2 个单测全绿
 exit=0
 == peaks
-9437184	2026-09-26T03:13:52Z	8G	cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
-28311552	2026-09-26T03:13:52Z	8G	gate 15-research-build: cargo test --release (research)
+9437184	2026-09-26	8G	cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
+28311552	2026-09-26	8G	gate 15-research-build: cargo test --release (research)
 ```
 
 私有峰值表里两行的上限列都是 8G、键是设计的那两个：两条 cargo 确实在包装里、按默认上限跑的。
@@ -496,7 +496,7 @@ exit=1
 **出处 `research/prompts/defs-closeout-r2-fixes-tmp-evidence/report.md:201-214`（整段抄，未转述）**
 
 ```markdown
-## 四、门禁判定行（原样；03:17:33–03:21:35 UTC 逐道跑，都在最后一处改动之后，`nice -n 19`；日志在 `gates/`）
+## 四、门禁判定行（原样，逐道跑，都在最后一处改动之后，`nice -n 19`；日志在 `gates/`）
 
 | 门禁 | 原样判定行 | 退出码 |
 |---|---|---|

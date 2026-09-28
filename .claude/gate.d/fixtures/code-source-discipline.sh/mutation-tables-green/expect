@@ -1,0 +1,9 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：mutation-tables
+want=✓ 4 个实验二进制都有成形的变异表，4 条变异的原文各命中源码一次
+want=crates/mutations.tsv 5 条的原文各命中源码一次
+want=变异表 5 行改的文件都在里面
+want=逃出 crates/ 的相对路径字面量 1 处都在里面
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=mutation-tables：绿
+want=code-source-discipline.sh：1 格里 1 格绿（mutation-tables），0 格本次未跑（无）

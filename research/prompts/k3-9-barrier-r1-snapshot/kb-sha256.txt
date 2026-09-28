@@ -1,0 +1,4 @@
+5750f2c743cb7e6b1d00401d408af9deec1c558db6106d0114c67992a11e1ac7  .claude/kb/decisions/16-发布语义.md
+4378d2e923dbe97baa3144d9d14c5304814ff4053bb63330021e1a3af0cb54c3  .claude/kb/decisions/23-journal的角色与格式.md
+d28623cca673ac096dc05f0e4a27fdaabec9cb2a1d059fdefd290ca24344d276  .claude/kb/experiments/77-发布的持久顺序.md
+2869f4709aadff71a0ea0c5b51a1cbc75f3b74c8d1eb8b195175403f9f86ced5  .claude/kb/checks-owed.md

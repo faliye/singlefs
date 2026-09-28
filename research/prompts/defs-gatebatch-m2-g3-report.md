@@ -1,6 +1,6 @@
 # G3 门禁批第三轮改法：续做报告（tooling-writer，接手撞限额的上一任）
 
-写于 2026-09-27 JST 14:5x。关的是 `research/prompts/defs-gatebatch-m2-r3-main-verification.md` 第二节改法表十二条（F1、F2、F3、F5、F10、F4、F6、F9、FD2、FD3、FM、R1）。
+写于 2026-09-27。关的是 `research/prompts/defs-gatebatch-m2-r3-main-verification.md` 第二节改法表十二条（F1、F2、F3、F5、F10、F4、F6、F9、FD2、FD3、FM、R1）。
 
 ## 结论
 
@@ -10,12 +10,12 @@
 - 54 号样本没改：FD3 只改了 54 号调 `crash-case-judge` / `crash-case-record` 的参数（不再转 `--machine-cores/--threads/--threads-origin`），没改它的判法；两个样本不走线程判定，改前改后 stage-selftest 都是 2 格判对。「转过来的线程参数翻不了判定」这一格放在 admission 自证里，由开关 `judge-takes-forwarded-threads` 证红。
 - 推翻条件：换进仓的任何一份被别的会话再改，下面的 `cmp` 与自证行就不再作数；`sha256sum` 对不上下一节的值，就要重跑。
 
-## 核现场（接手时，JST 14:3x）
+## 核现场（接手时）
 
 - 草稿 `base/` 存着开工时的 11 份原样。仓里 8 份代码与登记表跟 `base/` 相同（接手时与换进前各 `cmp` 了一次），也就是没有别的会话动过。
 - `.claude/rules/implementation-workflow.md` 与 `.claude/agents/crash-verifier.md` 和 `base/` 不同，差异是上一任在仓里直接做的 Edit（会话记录里 4 次加 3 次，逐条对得上）。另外，`crash-verifier.md` 第 5 行 `model: opus` → `model: sonnet` 不是上一任改的（它的 Edit 里没有这一处），应是别的会话改的，我没碰。
-- `.claude/main-agent.md` 从 00:38 UTC 起没动过，这一轮不涉及它。
-- 负载（`ps`，JST 14:33）：别的会话的 `cargo test` 在跑（second_transaction_* 几个、e163-gpu、e161），没有 qemu、vm-bench、e152、fio，所以加了 `nice -n 19` 照跑。load 53。
+- `.claude/main-agent.md` 早先改过之后就没动过，这一轮不涉及它。
+- 负载（`ps`）：别的会话的 `cargo test` 在跑（second_transaction_* 几个、e163-gpu、e161），没有 qemu、vm-bench、e152、fio，所以加了 `nice -n 19` 照跑。load 53。
 
 ## 改过的文件（这一轮的差，相对 `base/`，`git diff --no-index --numstat`）
 
@@ -67,7 +67,7 @@
 
 ## 每条改法：改前红、改后绿、弄坏开关判红
 
-改前 = 攻方探针（`research/prompts/defs-gatebatch-m2-r3-opus-model/`，另有 `/tmp/claude-1000/gate-batch-m2-g3/myprobes/` 下三份改写）判仓里改前那一份（草稿 `probes-before/`）；改后 = 同一探针判草稿副本（`probes-after/`）；开关 = 仓里换进之前，草稿副本上 `rerun/` 那一批重跑（JST 14:3x–14:4x）。
+改前 = 攻方探针（`research/prompts/defs-gatebatch-m2-r3-opus-model/`，另有 `/tmp/claude-1000/gate-batch-m2-g3/myprobes/` 下三份改写）判仓里改前那一份（草稿 `probes-before/`）；改后 = 同一探针判草稿副本（`probes-after/`）；开关 = 仓里换进之前，草稿副本上 `rerun/` 那一批重跑。
 
 | 改法 | 改前红的格 | 弄坏开关（自证） |
 |---|---|---|
@@ -112,7 +112,7 @@ CONTROL	BROKEN	I3 只有 include! 进来的一份（测试目标里没有字面�
 CONTROL	BROKEN	I3 只有 include! 进来的一份（测试目标里没有字面的 fn the_case(）：判不出，按没标算（P5）：crash-cases 自查 ⇒ 应当退 2	自查退 0：crash-case:own	pkg	own_case	the_case
 ```
 
-- T9：F3 定下的代价，`-- --ignored -- --list` 多拒了，判决第四节第 2 条与用户 JST 14:0x 已接受。
+- T9：F3 定下的代价，`-- --ignored -- --list` 多拒了，判决第四节第 2 条与用户已接受。
 - I3：include! 进来的那一份标了 `#[ignore]`；F4 顺着 include! 读到了它，放行是对的。攻方写的「判不出，按没标算」是改前的预期。
 - P9b（l1-manifest 那一格）：攻方探针先设 runner 环境变量再 pop 掉，这个变量其实没带进准入模块。改写成只设不 drop 的 `myprobes/probe_p9b_g3.py` 改前 BROKEN、改后 holds（上面 p9b-g3 那两行）。
 
@@ -170,7 +170,7 @@ CONTROL	BROKEN	I3 只有 include! 进来的一份（测试目标里没有字面�
   ✓ layer0-shard-run.sh 自证通过：13 格都对（假 cargo（真 cargo 那一趟本次未跑：带 SINGLEFS_HEAVY_TESTS=commit 或 user-request 才跑）；第二台是本机上的另一个目录，没碰真的第二台）
 ```
 
-## 出口：换进仓之后的自证与门禁（仓里跑，JST 14:4x，`nice -n 19`，每件退出码进自己的文件，16 件对上 16 个文件）
+## 出口：换进仓之后的自证与门禁（仓里跑，`nice -n 19`，每件退出码进自己的文件，16 件对上 16 个文件）
 
 命令见 `research/prompts/gate-batch-m2-g3-tmp-evidence/final.sh`：54 号样本用 `bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh <只放 54 号、它的样本与 stage-inputs.tsv 的临时 gate.d>` 跑，没直接起 54 号。登记给 tooling-writer 的阶段是 47、62、63、72、73。
 
@@ -255,8 +255,8 @@ CONTROL	BROKEN	I3 只有 include! 进来的一份（测试目标里没有字面�
 
 ## 交给主 agent 的
 
-- 仓根 `layer0-shard.env.example` 要加内存键：成品在 `/tmp/claude-1000/gate-batch-m2-g3/deliver/layer0-shard.env.example`，请主 agent 换进去（与仓里那一份的差是「七个键」改成「八个键」，加两行说明与 `PEER_MEMORY_CAP=24G`）。
-- 本机的 `layer0-shard.env`（git 忽略）现在有 5 个键。换进仓之前它就缺 `QUIESCE_STOPPED_CHECK_COMMAND`、`QUIESCE_STARTED_CHECK_COMMAND`，配置检查已经在拒（接手时现跑的原样：「✗ 双机分片不能用：/home/fy5090/code/singlefs/layer0-shard.env 缺键 QUIESCE_STOPPED_CHECK_COMMAND QUIESCE_STARTED_CHECK_COMMAND（不清场的两对写成空串，键照样要写）」）。现在又多缺一个 `PEER_MEMORY_CAP`。要走双机分片，得由用户补这三个键；不补，54 号 `--full` 就照单机跑。
+- 仓根 `multi-host.env.example` 要加内存键：成品在 `/tmp/claude-1000/gate-batch-m2-g3/deliver/multi-host.env.example`，请主 agent 换进去（与仓里那一份的差是「七个键」改成「八个键」，加两行说明与 `PEER_MEMORY_CAP=24G`）。
+- 本机的 `multi-host.env`（git 忽略）现在有 5 个键。换进仓之前它就缺 `QUIESCE_STOPPED_CHECK_COMMAND`、`QUIESCE_STARTED_CHECK_COMMAND`，配置检查已经在拒（接手时现跑的原样：「✗ 双机分片不能用：multi-host.env 缺键 QUIESCE_STOPPED_CHECK_COMMAND QUIESCE_STARTED_CHECK_COMMAND（不清场的两对写成空串，键照样要写）」）。现在又多缺一个 `PEER_MEMORY_CAP`。要走双机分片，得由用户补这三个键；不补，54 号 `--full` 就照单机跑。
 - `crash-verifier.md` 的逐份豁免登记（`.claude/agent-def-review-exempt`）由主 agent 做。另外，这份文件第 5 行 `model: opus` → `sonnet` 是别的会话改的，不在这一轮里。
 - 判决第三节第 3 条：FD2、FD3、FM 改了准入模块的判法，崩溃枚举用例的指纹因此都变了，下一趟 `--full`（提交时）要全跑。
 
@@ -273,4 +273,4 @@ CONTROL	BROKEN	I3 只有 include! 进来的一份（测试目标里没有字面�
 - 没修出口里红的 47、72、doc-lint、gate-lint、shell-lint、preflight-lint：点名的文件都不在这一轮的改动里。
 - 72 号那一道（规格出口列了）已跑，结果见上。
 - R1 里「输入指纹两台不同」与「第二台退 250–254」两支没有自证格，驱动的这两支没造红输入。条款里照实写了「没有自证格」。
-- 没改 `layer0-shard.env.example`（在仓根，不在写范围里；成品见 deliver/）与 `layer0-shard.env`。
+- 没改 `multi-host.env.example`（在仓根，不在写范围里；成品见 deliver/）与 `multi-host.env`。

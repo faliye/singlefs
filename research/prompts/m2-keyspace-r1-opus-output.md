@@ -1,6 +1,6 @@
 # m2-keyspace-r1 云端攻方（Opus）：S1、S2、S4
 
-2026-09-24，时刻都是 UTC。引 kb 与代码的行号照 `git show e980a21:<路径>` 那一版查（与开工时读的逐字相同），引文都用 `research/scripts/quote-kb.py` 抽、回读逐字节比过，整段放在文末「附录：引文」，正文写「附录第 n 段」。副本 `/tmp/claude-1000/m2-keyspace-opus/repo`，08:28:40 从主工作区拷（`rsync -a --exclude target --exclude .git`），拷完对开工快照 `research/prompts/m2-keyspace-r1-snapshot/sha256sums.txt` 的 61 个文件逐个 `sha256sum -c --quiet`，只有一行不符：`crates/singlefs-harness/src/bin/e158_root_choice_repair.rs: FAILED`（上一轮也是它，E158 执行员在改；这条腿不引它）。**这里所有数都是副本上量的，不是入库装置上的数。**
+2026-09-24。引 kb 与代码的行号照 `git show e980a21:<路径>` 那一版查（与开工时读的逐字相同），引文都用 `research/scripts/quote-kb.py` 抽、回读逐字节比过，整段放在文末「附录：引文」，正文写「附录第 n 段」。副本 `/tmp/claude-1000/m2-keyspace-opus/repo`，从主工作区拷（`rsync -a --exclude target --exclude .git`），拷完对开工快照 `research/prompts/m2-keyspace-r1-snapshot/sha256sums.txt` 的 61 个文件逐个 `sha256sum -c --quiet`，只有一行不符：`crates/singlefs-harness/src/bin/e158_root_choice_repair.rs: FAILED`（上一轮也是它，E158 执行员在改；这条腿不引它）。**这里所有数都是副本上量的，不是入库装置上的数。**
 
 ## 复跑
 
@@ -437,7 +437,7 @@ S2-GlobalRadixInline-4G manyfiles publishes=30000 ext_nodes_on_disk_at_end=208 o
 
 ## 模型目录的 sha256
 
-`research/prompts/m2-keyspace-r1-opus-model/` 下（2026-09-24T13:53:03Z 算）：
+`research/prompts/m2-keyspace-r1-opus-model/` 下（2026-09-24 算）：
 
 ```
 a86725949b7dc673c3a13abd8c0d141a73f4787c0341b6825928f0d9f154718c  ./keyspace_opus_model.rs
@@ -453,4 +453,4 @@ a86725949b7dc673c3a13abd8c0d141a73f4787c0341b6825928f0d9f154718c  ./keyspace_opu
 cb167180d3278dd345e3b31e98727e355be6ae125141bb095291bf454f825afd  ./run.sh
 ```
 
-补跑 GlobalRadix / GlobalRadixInline 的那一份（`/tmp/claude-1000/m2-keyspace-opus/out/scan-radix.out`，pid 931369，4 线程，13:49:52 起）写这份报告时还在跑，结果不在这份报告里，也还没拷进模型目录；进度记在 `/tmp/claude-1000/m2-keyspace-opus/progress.md`。
+补跑 GlobalRadix / GlobalRadixInline 的那一份（`/tmp/claude-1000/m2-keyspace-opus/out/scan-radix.out`，pid 931369，4 线程）写这份报告时还在跑，结果不在这份报告里，也还没拷进模型目录；进度记在 `/tmp/claude-1000/m2-keyspace-opus/progress.md`。

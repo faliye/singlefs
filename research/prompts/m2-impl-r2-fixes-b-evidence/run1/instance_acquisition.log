@@ -1,0 +1,14 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.41s
+     Running tests/instance_acquisition.rs (target/debug/deps/instance_acquisition-047f386b6a3de6a6)
+
+running 6 tests
+test barrier_failing_again_before_the_rollback_writes_leaves_the_new_number_and_it_is_never_handed_out_again ... ok
+test failed_barrier_before_the_acquisition_writes_writes_nothing_and_the_number_is_handed_out_later ... ok
+test failed_barrier_after_acquisition_rolls_both_disks_back_and_the_skipped_number_is_never_handed_out_again ... ok
+test barrier_right_after_the_acquisition_barrier_is_not_sent_to_the_devices ... ok
+test failed_system_configuration_write_on_the_second_disk_rolls_the_first_disk_back_and_leaves_the_second_untouched ... ok
+test second_acquisition_writes_generation_six_on_both_disks_and_the_next_acquisition_gets_three ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.34s
+

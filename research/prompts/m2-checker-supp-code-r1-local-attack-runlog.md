@@ -1,4 +1,4 @@
-# 运行记录：m2-checker-supp-code-r1-local-attack（2026-09-21 UTC / 2026-09-22 JST）
+# 运行记录：m2-checker-supp-code-r1-local-attack（2026-09-22）
 
 提示文件：`research/prompts/m2-checker-supp-code-r1-local-attack.md`（英文；K4 全面 + K3 里
 「实现与判据原文逐字对不对得上」那几格；16 条 Fact，5 道 Judgment，各 3 项子答复，合计 15 格，

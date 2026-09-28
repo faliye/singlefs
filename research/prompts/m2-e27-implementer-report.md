@@ -160,9 +160,9 @@ exit=0
 `cargo fmt --check`（红，红的三个文件都不是我改的：两个 E142 装置二进制与 e156；我的六个文件没有差异）：
 
 ```text
-     16 Diff in /home/fy5090/code/singlefs/crates/singlefs-harness/src/bin/e142_first_transaction_write_dump_one_device.rs
-      8 Diff in /home/fy5090/code/singlefs/crates/singlefs-harness/src/bin/e142_first_transaction_write_dump.rs
-     10 Diff in /home/fy5090/code/singlefs/crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs
+     16 Diff in crates/singlefs-harness/src/bin/e142_first_transaction_write_dump_one_device.rs
+      8 Diff in crates/singlefs-harness/src/bin/e142_first_transaction_write_dump.rs
+     10 Diff in crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs
 exit=1
 ```
 
@@ -177,14 +177,14 @@ exit=101
 `cargo build --offline --all-targets`：
 
 ```text
-   Compiling singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+   Compiling singlefs-harness v0.1.0 (crates/singlefs-harness)
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.05s
 exit=0
 ```
 
 `git apply --check --reverse /tmp/claude-1000/impl-m2-e27/mine.patch`（主工作区）：退出码 0。
 
-负载：开跑前 `ps` 看到别的会话的 `cargo test -q -p singlefs-harness --test s4_z19b_rerun`（pid 3995569）与 `cargo test --release --bin e142-first-txn-dry-run`（pid 4066304），没有性能测量在跑；没遇到等锁。线程上限 8，每条 cargo 都经 `research/scripts/capped.sh 8`。时刻（UTC）：开工约 04:25，交回约 05:10。
+负载：开跑前 `ps` 看到别的会话的 `cargo test -q -p singlefs-harness --test s4_z19b_rerun`（pid 3995569）与 `cargo test --release --bin e142-first-txn-dry-run`（pid 4066304），没有性能测量在跑；没遇到等锁。线程上限 8，每条 cargo 都经 `research/scripts/capped.sh 8`。
 
 clippy 红的位置原样：
 

@@ -18,7 +18,7 @@
 #   不带的话 cargo 不编这个 bin、直接退 101，基线停在「基线就是红的」，一条变异都没跑。
 #   那几个 feature 的依赖要的环境（E162 的 rocksdb 要 BINDGEN_EXTRA_CLANG_ARGS）由调用方设，原样传给 cargo。
 #
-# 并行（command-safety.md「一个脚本里的检测项，能并行就并行」，形态照 .claude/gate.d/59-crates-mutation-replay.sh）：
+# 并行（command-safety.md「一个脚本里的检测项，能并行就并行」，形态照 .claude/gate.d/checker-tier-crates-mutation-replay.sh）：
 #   每个工作进程一份被测装置的副本（research/ 里编译要用的那部分）、一个自己的 CARGO_TARGET_DIR，不在同一份源码上并发改：
 #   第 1 个用 MUTATE_TARGET_DIR（跨轮热着），第 i 个用它后面加 -w<i>（跨轮复用，第一次要冷编译）。
 #   工作进程数取 min(核数的一半且至多 16、表里的条数)，至少 1；MUTATE_JOBS 只能压小、不能加大（设成 1 就是原来的串行跑法）。
@@ -38,7 +38,7 @@
 # 每次 cargo test（基线、每条变异、还原之后那一次）都放进内存上限里跑（research/scripts/run-with-memory-cap.sh：systemd 的临时 scope，
 # MemoryMax=<上限>、MemorySwapMax=0），撞上限只杀这一次 cargo test 里的进程，不把整机拖进 OOM
 # （2026-09-25 两次整机 OOM 连带杀掉本地模型服务与 Claude Code 会话，records/2026-09-16-subagent拆分提案.md 第四十节第 28 行）。
-#   MUTATE_MEMORY_MAX  上限，systemd 写法，默认 16G。依据：本机 60 GiB 内存，本地模型服务（vllm 与 ray）连同会话常驻约 12 GiB
+#   MUTATE_MEMORY_MAX  上限，systemd 写法，默认 16G。依据：本机 60 GiB 内存，本地模型服务连同会话常驻约 12 GiB
 #                      （2026-09-25 `free -g` 的 used 列是 12），同时可能有 3 件重活 ⇒ 每件 (60 − 12) ÷ 3 = 16 GiB；
 #                      一条变异按一件重活的份额给；同时跑几条时合计由 run-with-memory-cap.sh 管（见「并行」那一段）。换机器、同时跑的重活变多都要重算（这些数只在本机成立）。
 #   撞了上限记「内存撞顶」，与「超时」同一类：这条破坏让被测代码无界分配，不是「没抓到」，也不算「抓到」；整轮判失败，收尾单列计数。
@@ -57,7 +57,7 @@ MEMORY_CAP_HIT_EXIT=250          # run-with-memory-cap.sh：撞了上限
 MEMORY_CAP_UNAVAILABLE_EXIT=251  # run-with-memory-cap.sh：带上限的 scope 起不来
 MEMORY_MAX="${MUTATE_MEMORY_MAX:-16G}"
 BROKEN_JUDGEMENT="${MUTATE_BREAK:-}"
-MAXIMUM_WORKERS_BY_PROCESSOR=16  # 核数那一项的上限，与 59 号的 worker_count_for 相同
+MAXIMUM_WORKERS_BY_PROCESSOR=16  # 核数那一项的上限，与 checker-tier-crates-mutation-replay 的 worker_count_for 相同
 COLLECTION_POLL_SECONDS=0.5      # 父进程隔这么久看一次哪几条判完了，按表序接着往 stdout 打
 
 is_broken() { [[ ",$BROKEN_JUDGEMENT," == *",$1,"* ]]; }
@@ -351,7 +351,7 @@ if ! is_broken nofeatures; then
 fi
 
 # ⚠️ **变异只改副本，不碰工作区里的源文件**（2026-09-12 改）。此前是就地改 $SRC 再还原：一轮变异要几分钟，
-# 这几分钟里仓里那份源码是坏的——几个会话共写一个仓时，别的会话此刻跑门禁（15 号阶段会编译并跑 research 的全部单测）
+# 这几分钟里仓里那份源码是坏的——几个会话共写一个仓时，别的会话此刻跑门禁（checker-tier-research-build-and-replay 阶段会编译并跑 research 的全部单测）
 # 就编到被改坏的源码，红得莫名其妙、还可能当成自己改坏的；此刻有人整份提交这个文件，提交进去的就是变异。
 # ⇒ 把 research/ 里编译要用的部分（workspace、crate 源码、include_str! 读的 results/、data/）拷到临时目录，
 #   在那里改、在那里编；CARGO_TARGET_DIR 单独一份，不碰 research/target 里别人要用的二进制。跑完删掉副本。

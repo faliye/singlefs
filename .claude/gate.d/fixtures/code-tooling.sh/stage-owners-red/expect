@@ -1,0 +1,16 @@
+exit=1
+want=这些行不是四列、或有一列是空的：
+want=第 7 行：20-b.sh
+want=这些门禁列不出自己的格，它们的格登没登记判不了：
+want=50-d.sh：--list 退 1
+want=a-f.sh：文件头没有格名表
+want=这些格在表里没有登记——判红时不知道派给谁修：
+want=     10-a.sh 的 a2
+want=这些格在表里登记了不止一行：
+want=10-a.sh a1（第 2, 3 行）
+want=20-b.sh b9（第 5 行，那道门禁没有这一格）
+want=40-gone.sh g1（第 6 行，门禁目录里没有这道门禁）
+want=这些 agent 名在 .claude/agents/ 里没有定义：
+want=第 4 行 20-b.sh b1：ghost
+want=这些阶段不认第一个参数当项目根
+want=     30-c.sh

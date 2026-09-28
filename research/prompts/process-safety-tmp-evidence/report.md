@@ -1,12 +1,12 @@
-# 进程安全闸 + 接手内存准入：交回报告（2026-09-25 JST 21:38 / UTC 12:38）
+# 进程安全闸 + 接手内存准入：交回报告（2026-09-25 /）
 
 ## 先看这一条：这一轮自己踩出来的一处，结局判不了
-- `research/scripts/run-with-memory-cap.sh` 我用 `replace-once.py` 原地改（同一个 inode）。改的那一刻（约 UTC 12:18）别的 agent 正经它跑 `cargo test -p singlefs-harness --test s4_r2_candidates`（进程 2965927，上限 10G，UTC 11:57 起）。`/proc/2965927/fdinfo/255` 读到 `pos: 67774`：bash 按文件偏移往下读，它的命令跑完会从改后文件的第 67774 字节接着读——落在自检成功那句 echo 的中间，不是原来的 `exit $?`。
-- 我想把原字节原地写回那个 inode，被权限分类器拒了（Irreversible Local Destruction），之后没再碰。UTC 12:38 查 `ps -p 2965927` 已经没有这个进程：**那一条 cargo test 的退出码与输出不可信，交主 agent 让它的属主重跑**。按我自己写的那几行推（没量过）：之后读到的是自检说明文字与 case 分派，没有 kill；最坏是报错退出、或把 run_capped 再跑一遍。
+- `research/scripts/run-with-memory-cap.sh` 我用 `replace-once.py` 原地改（同一个 inode）。改的那一刻别的 agent 正经它跑 `cargo test -p singlefs-harness --test s4_r2_candidates`（进程 2965927，上限 10G 起）。`/proc/2965927/fdinfo/255` 读到 `pos: 67774`：bash 按文件偏移往下读，它的命令跑完会从改后文件的第 67774 字节接着读——落在自检成功那句 echo 的中间，不是原来的 `exit $?`。
+- 我想把原字节原地写回那个 inode，被权限分类器拒了（Irreversible Local Destruction），之后没再碰。查 `ps -p 2965927` 已经没有这个进程：**那一条 cargo test 的退出码与输出不可信，交主 agent 让它的属主重跑**。按我自己写的那几行推（没量过）：之后读到的是自检说明文字与 case 分派，没有 kill；最坏是报错退出、或把 run_capped 再跑一遍。
 - 根因是流程：正在跑的 bash 脚本不能原地改，要写临时文件再改名换 inode（前任装 v2–v4 都是 cp + mv）。`replace-once.py` 与会话里的原地改法没有闸，记在提案第四十节第 32 行「欠」里，交主 agent 定要不要立规矩或改 replace-once.py（我没改，超出这一轮）。
 
 ## 第 1 步：进程安全闸（做完、证过）
-1. 钩子：追加进 `.claude/hooks/bash-command-detector.sh`，当拒绝 ⑥（上游 `pattern-process-guard.sh` 管同类但不许就地改；`heavy-test-guard.sh` 管重型测试）。拒的写法与出路写在文件头 ⑥；拒绝信息出路是「记下它的 pid（`$!`）或任务号，一次停一个，单独 `python3 .claude/singlefs-ai-sop/scripts/proc.py stop <pid>`」。覆盖派发提示列的全部写法，外加补来的用户规矩（`kill $(pgrep …)`、`kill $(jobs -p)`、整批展开、`xargs kill` / `xargs -n1 kill`、`for … kill` 循环、`systemctl --user stop|kill` 带通配、`proc.py stop` 一次多个）。写死的进程号现读进程表：自己会话的祖先、pid 1、sshd/systemd/dbus/logind/claude、命令行带 `.vscode-server` 或 vllm、祖先里有另一个 Claude 会话的都拒。python -c 与喂给 python 的 heredoc 也判；shell 函数包着的 `bash -c` 递归判。
+1. 钩子：追加进 `.claude/hooks/bash-command-detector.sh`，当拒绝 ⑥（上游 `pattern-process-guard.sh` 管同类但不许就地改；`heavy-test-guard.sh` 管重型测试）。拒的写法与出路写在文件头 ⑥；拒绝信息出路是「记下它的 pid（`$!`）或任务号，一次停一个，单独 `python3 .claude/singlefs-ai-sop/scripts/proc.py stop <pid>`」。覆盖派发提示列的全部写法，外加补来的用户规矩（`kill $(pgrep …)`、`kill $(jobs -p)`、整批展开、`xargs kill` / `xargs -n1 kill`、`for … kill` 循环、`systemctl --user stop|kill` 带通配、`proc.py stop` 一次多个）。写死的进程号现读进程表：自己会话的祖先、pid 1、sshd/systemd/dbus/logind/claude、命令行带 `.vscode-server` 或 <本地模型服务>、祖先里有另一个 Claude 会话的都拒。python -c 与喂给 python 的 heredoc 也判；shell 函数包着的 `bash -c` 递归判。
 2. 脚本 lint：同一份判定经 `bash-command-detector.sh --scan-scripts <仓根> <目录>…` 交门禁 73 号，扫 research/scripts、.claude/hooks、.claude/scripts，另加 .claude/gate.d（样本目录不扫），按行号报。确实要按 cgroup 批量发的，那一行写 `# process-safety:own-scope <怎么核的>` 且往上 40 行有 `singlefs-memory-cap-*.scope` 的核对；只放行循环与按 cgroup 挑两类；标了却没东西可放行的判红；反引号里、写进文件的 heredoc、python 字符串里的标注不算。动不了的登记 `.claude/process-safety-pending`（指向不存在或一处没排到的判红）。
 3. `run-with-memory-cap.sh` 逐处过、写进文件头「发信号的地方」：撞顶/超时由 systemd 停自己的 scope、reset-failed 自己的 unit、trap 只收不发、`kill -9 $$` 停自己。改了两处：风暴守卫改成核整条路径 `*/"$1"/singlefs-memory-cap-*.scope`（slice 名经 $1 传入；只核最后一段名字时，外面包着一层别的 singlefs-memory-cap scope 会打到外层）；slice 名只许 `^singlefs[-_A-Za-z0-9]*\.slice$`，别的退 2（自检加一项）。`research/scripts/check-staged.sh` 的 `kill -INT -- -"$job"` 改成 `kill -INT %1`（set -m 下按任务号发给那一组）。
 4. 自证（字面输入只交给 hook 判，一条都不执行）：

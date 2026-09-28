@@ -2,7 +2,7 @@
 
 只读审阅，没跑 cargo、脚本、门禁与任何测试二进制。
 
-**行号口径**：审阅途中另一个会话在改 `crash.rs`（mtime 2026-09-26 14:29:41 UTC，3087 → 3120 行）、`model.rs` 与 `model_comparison.rs`（mtime 14:35:37 UTC）。下文五个文件的行号一律指 14:36 UTC 拷下的快照（本草稿目录 `G-snap-*.rs`），sha256：
+**行号口径**：审阅途中另一个会话在改 `crash.rs`（mtime 2026-09-26，3087 → 3120 行）、`model.rs` 与 `model_comparison.rs`（mtime）。下文五个文件的行号一律指拷下的快照（本草稿目录 `G-snap-*.rs`），sha256：
 
 | 文件 | 行数 | sha256 前 16 位 |
 |---|---|---|
@@ -12,9 +12,9 @@
 | `crates/singlefs-harness/src/model.rs` | 2395 | fa4cd433d608285e |
 | `crates/singlefs-harness/src/model_comparison.rs` | 610 | fa50cf5c1524f767 |
 
-快照之后 `crash.rs` 又被改到 3454 行（14:45 UTC 核的）：导入多了两行（快照第 29 行之后的行号在现行文件里整体 +2），并新加了双机分片枚举与账本合并（`enumerate_layer0_in_state_slices_or_one_shard`、`Layer0Resume::RunOneShardKeepingProgressFile` / `MergeShardLedgers`）。分片与账本合并这部分**没有审**。`diff` 的改动块全在快照 1874–2418 行（切片、计划哈希、并片与进度文件）与第 28–29 行；「问题」各条引用的快照行都在这一段之外，不受影响；「查过、没发现问题的几格」里「并行合并的确定性」与「状态评估时 panic」两格读的是快照上的这一段，要按现行文件重核。
+快照之后 `crash.rs` 又被改到 3454 行（核的）：导入多了两行（快照第 29 行之后的行号在现行文件里整体 +2），并新加了双机分片枚举与账本合并（`enumerate_layer0_in_state_slices_or_one_shard`、`Layer0Resume::RunOneShardKeepingProgressFile` / `MergeShardLedgers`）。分片与账本合并这部分**没有审**。`diff` 的改动块全在快照 1874–2418 行（切片、计划哈希、并片与进度文件）与第 28–29 行；「问题」各条引用的快照行都在这一段之外，不受影响；「查过、没发现问题的几格」里「并行合并的确定性」与「状态评估时 panic」两格读的是快照上的这一段，要按现行文件重核。
 
-14:29 那次改动在 `crash.rs` 里新加了「第二条判据不罩被抛弃时间线上的发布」（`check_records_against` 707–764、`instance_table_of_the_effective_root` 766–783）。改动前我读到的版本在这一格按 txg 比、不看实例，已经被这次改动补上，下文不再报。
+审阅途中有一次改动在 `crash.rs` 里新加了「第二条判据不罩被抛弃时间线上的发布」（`check_records_against` 707–764、`instance_table_of_the_effective_root` 766–783）。改动前我读到的版本在这一格按 txg 比、不看实例，已经被这次改动补上，下文不再报。
 
 ## 问题（按严重度）
 

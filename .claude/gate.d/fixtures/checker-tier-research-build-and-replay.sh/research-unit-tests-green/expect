@@ -1,0 +1,7 @@
+exit=0
+want=research 构建通过，1 个测试批次、共 1 个单测全绿
+want=  ✓ stage-mine.py 替身自证：只认 --selftest
+want=  ✓ claim-experiment.sh 替身自证：只认 --selftest
+want=research 构建与单测全绿，研究脚本的自证过了 4 份
+want=── 汇总：checker-tier-research-build-and-replay.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=research-unit-tests：绿

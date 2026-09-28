@@ -1,0 +1,5 @@
+exit=0
+want=实验页 4 个（待回填 1）、决策 3 条（待回填 1）、已瘦身决策的已定项 2 个（其中写「无实验」的 1 个）、表行 4 行、这次改动触发回看 3 处、改成已跑而引了它的决策 0 条
+want=样本只跑 .gate-cells 点名的格：decision-links
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格绿（decision-links），0 格本次未跑（无）

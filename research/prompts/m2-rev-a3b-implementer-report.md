@@ -1,6 +1,6 @@
 # 实审 A3b 实现员报告：单元区起点随环长；重建判树表排序契约；mkfs 在飞上限 4 字节；读不出不无声放过的两处
 
-写于 2026-09-27 JST（本机 UTC）。规格 `/tmp/claude-1000/impl-rev-a3b/spec.md`。在副本 `/tmp/claude-1000/impl-rev-a3b/work/` 里改，交 `patch/`。
+写于 2026-09-27。规格 `/tmp/claude-1000/impl-rev-a3b/spec.md`。在副本 `/tmp/claude-1000/impl-rev-a3b/work/` 里改，交 `patch/`。
 
 ## 一、结论
 

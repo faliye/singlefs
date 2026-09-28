@@ -1,6 +1,6 @@
 # 严查第二轮·乙组报告：.claude/agents/*.md 与 .claude/agent-def-review-exempt（分支 claude/exciting-bohr-4olowk，HEAD 1c58cfa，基准 73ba4a4）
 
-时刻 UTC 2026-09-26。行号都是那份文件自己的，用 `grep -n` 现取。钩子判定用合成 PreToolUse JSON 真喂三道 Bash 钩子（pattern-process-guard、bash-command-detector、heavy-test-guard），`AGENT_HOOK_DETECTIONS` 指到草稿 `review2/hk/`，辅助脚本 `review2/hk.sh`。第一轮（report-A/B/C、r1-sync）与 defs-r2 判决里已处置的不重报；第 1 条是 defs-r2 判决 B1 写回之后新引入的错。
+日期 2026-09-26。行号都是那份文件自己的，用 `grep -n` 现取。钩子判定用合成 PreToolUse JSON 真喂三道 Bash 钩子（pattern-process-guard、bash-command-detector、heavy-test-guard），`AGENT_HOOK_DETECTIONS` 指到草稿 `review2/hk/`，辅助脚本 `review2/hk.sh`。第一轮（report-A/B/C、r1-sync）与 defs-r2 判决里已处置的不重报；第 1 条是 defs-r2 判决 B1 写回之后新引入的错。
 
 ## 逐条
 

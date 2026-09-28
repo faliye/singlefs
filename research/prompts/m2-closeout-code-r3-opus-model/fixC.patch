@@ -1,0 +1,43 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -3182,6 +3182,40 @@
+                 current_version_journal_position,
+                 units_missing,
+             });
++            continue;
++        }
++        // 原型 C（opus r3，只在副本上）：落后、单元都在，再看现行那一版的根若写在这块盘上，这块盘的那个根环槽里是不是它；不是就同样拒。
++        let newest_system_configuration_journal_tail = JournalSequenceNumber {
++            instance_generation: newest_self_verified.quantities.journal_instance,
++            counter: newest_self_verified.quantities.journal_tail,
++        };
++        if newest_system_configuration_journal_tail < current_version_journal_position {
++            let ring_slot = target_for_publish(
++                current.root.checkpoint_txg,
++                parameters_of_the_pool.geometry.root_ring_slots_per_region,
++            );
++            let root_device =
++                parameters_of_the_pool.region_devices[usize::try_from(ring_slot.region).expect("区域号")];
++            let holds_the_current_root = matches!(
++                read_root_ring_slot(
++                    reader,
++                    &parameters_of_the_pool.region_devices,
++                    &parameters_of_the_pool.geometry,
++                    &parameters_of_the_pool.filesystem_identifier,
++                    ring_slot,
++                ),
++                RootRingSlotReading::SelfVerified(root)
++                    if root.instance == current.root.instance
++                        && root.checkpoint_txg == current.root.checkpoint_txg
++            );
++            if root_device == device && !holds_the_current_root {
++                devices_behind.push(DeviceBehindTheCurrentVersion {
++                    device,
++                    newest_system_configuration_journal_tail,
++                    current_version_journal_position,
++                    units_missing: Vec::new(),
++                });
++            }
+         }
+     }
+     devices_behind

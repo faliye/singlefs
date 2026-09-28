@@ -1,0 +1,8 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 4.63s
+     Running tests/checker_known_bad_images.rs (target/release/deps/checker_known_bad_images-0629e6844a1bbb55)
+
+running 1 test
+test an_allocation_generation_past_its_unit_birth_in_the_version_only_its_journal_record_carries_reddens_the_allocation_generation_invariant_before_the_mount ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 0.91s
+

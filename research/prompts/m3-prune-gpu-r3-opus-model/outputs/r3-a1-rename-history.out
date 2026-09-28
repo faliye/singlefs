@@ -1,0 +1,1 @@
+E7RESULT name=r3_a1_rename_history crates_history=2026-09-14..2026-09-27 renamed_files=103 of_which_test_files=83 current_test_files=114 rename_days=2026-09-27, rename_commits=973e1f58,bc57af7a, old_names_now_taken_again=0 test_function_names_gone=27 test_function_names_new=47 must_be_nonzero=83

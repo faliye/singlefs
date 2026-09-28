@@ -2,7 +2,7 @@
 
 立场：找反例。代码一律读冻结副本 `/tmp/claude-1000/m2-final-code-r3/tree/crates/`，kb 一律读 `/tmp/claude-1000/m2-final-code-r3/kb-snapshot/`，行号取那份文件自己的。
 副本工作区 `/tmp/claude-1000/m2-final-code-r3-opus/`（`tree/` 是冻结副本的拷贝，`target/` 在旁边）；用例与模型最后放 `research/prompts/m2-final-code-r3-opus-model/`。
-开工 2026-09-24 23:4x UTC（2026-09-25 08:4x JST）。开工时 `ps` 看到另一个会话的 `cargo test … second_transaction_supplement_three_random_history`（pid 2244926），没有性能测量在跑。
+开工 2026-09-25。开工时 `ps` 看到另一个会话的 `cargo test … second_transaction_supplement_three_random_history`（pid 2244926），没有性能测量在跑。
 
 （「各格判定一览」在全部跑完之后追加在文末「各格判定一览（汇总）」一节；分段落盘，先写的在前。）
 
@@ -14,7 +14,7 @@
 D3 已定项 10 ⑤ 的 bump 次序（kb 快照 `03-空间分配.md` 第 200 行）、D8 已定项 14 的实现取值（`08-核心索引结构.md` 第 385、390、394、395 行）、D3 已定项 7 的「释放只改写不删」。
 两块盘对称（同槽两份），分配记录树重写集照条款走固定点（只重写内容变了的叶与全部祖先）。复跑：`python3 z17_independent.py`（纯算，1 秒内）。
 
-**原样输出**（2026-09-24 23:5x UTC 这一次）：
+**原样输出**（2026-09-25 这一次）：
 
 ```
 根层（4 GiB × 2）	2

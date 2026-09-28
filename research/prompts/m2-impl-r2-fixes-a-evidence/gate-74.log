@@ -1,0 +1,45 @@
+  I-7.1：判绿 4155 次、不适用 0 次
+  I-7.2：判绿 4155 次、不适用 0 次
+  I-7.3：判绿 4155 次、不适用 0 次
+  I-7.4：判绿 4155 次、不适用 0 次
+  I-7.6：判绿 4155 次、不适用 0 次
+  I-7.7：判绿 4155 次、不适用 0 次
+  I-7.8：判绿 4155 次、不适用 0 次
+  I-7.9：判绿 1869 次、不适用 2286 次
+  I-7.12：判绿 4155 次、不适用 0 次
+  I-7.13：判绿 4155 次、不适用 0 次
+  I-7.14：判绿 4155 次、不适用 0 次
+  I-8.6：判绿 4155 次、不适用 0 次
+  I-8.7：判绿 4107 次、不适用 48 次
+  I-8.8：判绿 0 次、不适用 4155 次
+  I-8.9：判绿 4155 次、不适用 0 次
+  I-9.1：判绿 4155 次、不适用 0 次
+  I-9.2：判绿 4155 次、不适用 0 次
+  I-9.4：判绿 4155 次、不适用 0 次
+  I-9.6：判绿 4155 次、不适用 0 次
+  I-9.7：判绿 4155 次、不适用 0 次
+  I-9.10：判绿 4155 次、不适用 0 次
+  I-9.12：判绿 4155 次、不适用 0 次
+  I-9.13：判绿 4155 次、不适用 0 次
+  I-9.14：判绿 4123 次、不适用 32 次
+  I-9.15：判绿 4155 次、不适用 0 次
+  I-9.16：判绿 4155 次、不适用 0 次
+已知红第 0 条（增补 2 收口表第 43 行）：0 段；前几个种子 []
+用时 116.9 秒
+test allocation_record_sampling_with_the_checker_goes_past_the_812_records_of_the_former_one_node_wall ... ok
+
+failures:
+
+failures:
+    crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43
+    seed_4000000204_raising_the_floor_on_narrow_devices_is_refused_before_any_write_instead_of_leaving_the_new_floor_on_one_device
+    writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquisition_with_the_disk_unchanged
+
+test result: FAILED. 21 passed; 3 failed; 2 ignored; 0 measured; 0 filtered out; finished in 116.94s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_three_random_history`
+  ✗ 随机历史的测试二进制判红（上面是 cargo test 的尾部）
+     → 怎么办：单跑看细节（经内存包装，上限同这一道）：
+                bash research/scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
+                签名是 ModelDisagreement 的，是实现与理想模型对某一步的结局答得不一样：先看模型那一格引的条款，再判改实现还是改模型。
+exit=1

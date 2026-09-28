@@ -4,9 +4,10 @@
 use std::collections::BTreeMap;
 
 use singlefs_format::{
-    FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_SAFETY_FACTOR,
-    ROOT_RECORD_BYTES, ROOT_RING_SLOTS_PER_REGION_MAXIMUM, ROOT_RING_SLOTS_PER_REGION_MINIMUM,
-    SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
+    CLUSTER_SEGMENT_SLOTS, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES, JOURNAL_RECORD_BYTES,
+    JOURNAL_RING_START_SLOT, JOURNAL_SAFETY_FACTOR, ROOT_RECORD_BYTES, ROOT_RING_BASE_SLOT,
+    ROOT_RING_SLOTS_PER_REGION_MAXIMUM, ROOT_RING_SLOTS_PER_REGION_MINIMUM, SLOT_BYTES,
+    SYSTEM_CONFIGURATION_SLOT_BYTES,
 };
 
 use crate::{
@@ -41,9 +42,19 @@ pub const MAPPING_KEY_MATCHES_THE_UNIT_HEADER: &str = "I-1.11";
 /// 「自证过的系统配置槽里，池级字段都在这一版读者收的范围里」那一条（实审 A3-checker-2，用户 2026-09-27 定系统配置越界整池拒）：
 /// 格式版本 = 1、加密类型 = 0（关）、固定结构槽距、`physical_block_size`、journal 环长在各自的上下界里（[`crate::Verdict`] 的
 /// `FormatVersionNotRecognized` / `EncryptionTypeNotOff` / `FixedStructureSlotSpacingOutsideTheFormatRange` /
-/// `PhysicalBlockSizeOutsideTheRootSlotBounds` / `JournalRingBytesOutsideTheSupportedRange`）。`invariants.md` 今天没有一条罩得住它，
-/// **编号是暂立的，待 kb 第六批登记时定**；改号只改这一处。
+/// `PhysicalBlockSizeOutsideTheRootSlotBounds` / `JournalRingBytesOutsideTheSupportedRange`）；journal 环起点（偏移 325）与根环起点
+/// （偏移 371）是第一版的格式常量、单元区起始槽号（偏移 417）是环长现算的那个槽且落在聚簇段边界上
+/// （`JournalRingStartSlotNotTheFirstVersionConstant` / `RootRingBaseSlotNotTheFirstVersionConstant` /
+/// `UnitAreaStartNotTheSlotAfterTheJournalRing` / `UnitAreaStartOffTheClusterSegmentBoundary`；实审 Y4-a，用户 2026-09-27 定
+/// 「读字段，不等于常量就整池拒」，与实现收同一张表）。**编号是暂立的，待 kb 第六批登记时定**；改号只改这一处。
 pub const SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS: &str = "I-7.13";
+
+/// 「每块盘每个自证过的系统配置槽里的本盘设备号，等于这块盘在池里的身份」那一条（实审 Y2-b 越格线索：盘体对调之后的池
+/// 可写挂载因本盘设备号拒，而 checker 读本盘设备号却没有一条不变量拿它比盘的身份，0 违例）。实现那一侧是
+/// `crates/singlefs-core/src/mount.rs` 的 `device_table_disagreeing_with`（`OwnDeviceNumberDiffersFromTheIdentityHandedIn`），
+/// checker 自己按字段表读一份（[`judge_own_device_number_is_the_device_identity`]）。编号 I-7.14，登记在 `.claude/kb/invariants.md`；
+/// 改号只改这一处。
+pub const SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY: &str = "I-7.14";
 
 /// 第一版 checker 判的不变量，按这个次序报；每次都全部报出来，没评估到的报「不适用」。
 ///
@@ -52,9 +63,9 @@ pub const SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS: &str = "I
 /// 29 字节预留位全 0（`walk` 的 `judge_unit_header`），在每条跟随的指针上判头部 MAC 16 + nonce 12 全 0
 /// （[`judge_pointer_mac_and_nonce_are_zero`]，D19（块指针的结构与宽度预算） 已定项 3 射程）。
 ///
-/// I-9.16（树表条目按树 ID 严格升序且合发号次序）：实审 A3b Q2 交上来，用户 2026-09-27 JST 17:4x 定「立不变量并同步」；
+/// I-9.16（树表条目按树 ID 严格升序且合发号次序）：实审 A3b Q2 交上来，用户 2026-09-27 定「立不变量并同步」；
 /// `invariants.md` 那一行由 kb 第八批写。池级走读每读一版的树表判一次（`walk` 的 `judge_tree_table_entries_ordering`）。
-pub const IMPLEMENTED_INVARIANTS: [&str; 48] = [
+pub const IMPLEMENTED_INVARIANTS: [&str; 49] = [
     "I-1.1",
     "I-1.2",
     "I-1.3",
@@ -88,6 +99,7 @@ pub const IMPLEMENTED_INVARIANTS: [&str; 48] = [
     "I-7.9",
     "I-7.12",
     SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS,
+    SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
     "I-8.6",
     "I-8.7",
     "I-8.8",
@@ -222,6 +234,10 @@ pub const REGION_DEVICE_FIELDS_IN_THE_SYSTEM_CONFIGURATION: usize = 3;
 /// `journal_ring_bytes_lie_in_the_supported_range`），越界各报一个成员。这三个成员与 R、S 那两个处置不同：池级读法把它们认成
 /// 「带这一版读者不收的值」（[`value_refused_by_this_reader`]），报违例、整池不作保（用户 2026-09-27 定系统配置越界整池拒）；
 /// R、S 越界照旧是这一槽不可择。槽距先判：它是根槽宽的上界。
+///
+/// journal 环起点（325）、根环起点（371）不等于第一版的格式常量，单元区起始槽号（417）不是环长现算的那个槽或不在聚簇段边界上，
+/// 同样各报一个成员、同样认成「带这一版读者不收的值」（实审 Y4-a，用户 2026-09-27 定「读字段，不等于常量就整池拒」）。
+/// 两个起点先于槽距判：槽距的上界按同一槽自述的根环起点算，起点不对时报起点、不报槽距。
 pub fn geometry_of(
     slot: &[u8],
     view: &SystemConfigurationView,
@@ -243,6 +259,12 @@ pub fn geometry_of(
     let base_slot = read_u64(slot, 371);
     let unit_area_start_slot = read_u64(slot, 417);
     let slot_spacing = read_u32(slot, 429);
+    if journal_ring_start_slot != JOURNAL_RING_START_SLOT {
+        return Err(crate::Verdict::JournalRingStartSlotNotTheFirstVersionConstant);
+    }
+    if base_slot != ROOT_RING_BASE_SLOT {
+        return Err(crate::Verdict::RootRingBaseSlotNotTheFirstVersionConstant);
+    }
     if !fixed_structure_slot_spacing_lies_in_the_format_range(slot_spacing, base_slot) {
         return Err(crate::Verdict::FixedStructureSlotSpacingOutsideTheFormatRange);
     }
@@ -255,6 +277,16 @@ pub fn geometry_of(
         unit_area_start_slot,
     ) {
         return Err(crate::Verdict::JournalRingBytesOutsideTheSupportedRange);
+    }
+    if !unit_area_start_slot_is_the_slot_after_the_journal_ring(
+        journal_ring_start_slot,
+        journal_ring_bytes,
+        unit_area_start_slot,
+    ) {
+        return Err(crate::Verdict::UnitAreaStartNotTheSlotAfterTheJournalRing);
+    }
+    if !unit_area_start_slot.is_multiple_of(CLUSTER_SEGMENT_SLOTS) {
+        return Err(crate::Verdict::UnitAreaStartOffTheClusterSegmentBoundary);
     }
     Ok(PoolGeometry {
         filesystem_identifier: view.filesystem_identifier,
@@ -319,6 +351,22 @@ fn journal_ring_bytes_lie_in_the_supported_range(
         })
 }
 
+/// 单元区起始槽号是 journal 环末尾的下一个槽：同一槽自述的环起点 + 环长向上取整到 16 KiB 槽（D3（空间分配） 已定项 10 ④
+/// 「第一版 = journal 环末尾的下一个槽」；D23（journal 的角色与格式） 已定项 19 ③「单元区起始槽号随环长走」）。
+/// checker 自己按条款算一份，不引实现的 `journal::slot_after_the_journal_ring`（门禁 94 号）。环长是盘上读来的 8 字节：
+/// 槽数不超过 2⁶⁴ ÷ 16384，加环起点溢出时算不相等。
+fn unit_area_start_slot_is_the_slot_after_the_journal_ring(
+    journal_ring_start_slot: u64,
+    journal_ring_bytes: u64,
+    unit_area_start_slot: u64,
+) -> bool {
+    journal_ring_start_slot
+        .checked_add(journal_ring_bytes.div_ceil(SLOT_BYTES))
+        .is_some_and(|slot_after_the_journal_ring| {
+            unit_area_start_slot == slot_after_the_journal_ring
+        })
+}
+
 /// 一个系统配置槽读下来是什么样。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SystemConfigurationSlotReading {
@@ -346,7 +394,11 @@ pub const fn value_refused_by_this_reader(verdict: &crate::Verdict) -> bool {
         | crate::Verdict::EncryptionTypeNotOff
         | crate::Verdict::FixedStructureSlotSpacingOutsideTheFormatRange
         | crate::Verdict::PhysicalBlockSizeOutsideTheRootSlotBounds
-        | crate::Verdict::JournalRingBytesOutsideTheSupportedRange => true,
+        | crate::Verdict::JournalRingBytesOutsideTheSupportedRange
+        | crate::Verdict::JournalRingStartSlotNotTheFirstVersionConstant
+        | crate::Verdict::RootRingBaseSlotNotTheFirstVersionConstant
+        | crate::Verdict::UnitAreaStartNotTheSlotAfterTheJournalRing
+        | crate::Verdict::UnitAreaStartOffTheClusterSegmentBoundary => true,
         crate::Verdict::Valid
         | crate::Verdict::BadMagic
         | crate::Verdict::ChecksumMismatch
@@ -488,6 +540,30 @@ pub fn judge_system_configuration_values_the_reader_accepts(
         }
     }
     any_slot_carries_a_refused_value
+}
+
+/// [`SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY`]：每块盘两槽里每个自证过、属于本池（fsid 相同）的系统配置槽，
+/// 自述的本盘设备号等于这块盘在池里的身份（`ImageReader::devices` 给的那个号），每槽判一次。读法与实现可写挂载比盘表时同一个：
+/// 自证过的槽、fsid 与择到的那份相同的槽（`crates/singlefs-core/src/mount.rs` 的 `device_table_disagreeing_with`）；
+/// 别的池的槽归 I-1.4 判，不在这里。盘体对调（身份 0 的位置上装着自述 1 的盘）时两块盘各红一处。
+pub fn judge_own_device_number_is_the_device_identity(
+    verified_system_configurations_of_this_pool: &[(u32, Vec<crate::SystemConfigurationView>)],
+    judgements: &mut Judgements,
+) {
+    for (device_identity, slots) in verified_system_configurations_of_this_pool {
+        for view in slots {
+            judgements.judge(
+                SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
+                view.this_device == *device_identity,
+                || {
+                    format!(
+                        "盘 {device_identity} 上世代 {} 的系统配置槽自述本盘设备号 {}：与这块盘在池里的身份不同",
+                        view.slot_generation, view.this_device
+                    )
+                },
+            );
+        }
+    }
 }
 
 /// 每盘择一个系统配置：两槽里世代号大的那一份（相等取槽 0）。

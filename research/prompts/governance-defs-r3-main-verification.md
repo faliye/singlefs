@@ -1,6 +1,6 @@
 # 严查第二轮之后的七份定义改动：第一轮判决（2026-09-26）
 
-正文 `research/prompts/_governance-defs-r3-body.md`；背景材料 `research/prompts/_governance-defs-r3-background.md`；附录二 `research/prompts/_governance-defs-r3-diff.md`；开工快照 `research/prompts/governance-defs-r3-snapshot/sha256sums.txt`（41 行，腿交齐后 `sha256sum -c` 全部 OK）；派腿时刻 2026-09-26T22:20:01Z。
+正文 `research/prompts/_governance-defs-r3-body.md`；背景材料 `research/prompts/_governance-defs-r3-background.md`；附录二 `research/prompts/_governance-defs-r3-diff.md`；开工快照 `research/prompts/governance-defs-r3-snapshot/sha256sums.txt`（41 行，腿交齐后 `sha256sum -c` 全部 OK）；派腿于 2026-09-27。
 
 被判的 7 份：`.claude/main-agent.md`、`.claude/agent-common.md`、`.claude/agents/crash-verifier.md`、`.claude/agents/experiment-runner.md`、`.claude/agents/kb-scribe.md`、`.claude/agents/mutation-triage.md`、`.claude/agents/three-way-verifier.md`。
 

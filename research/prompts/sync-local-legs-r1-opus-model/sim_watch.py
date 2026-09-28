@@ -3,7 +3,7 @@
 import importlib.util, json, os, shutil, sys, tempfile
 from datetime import datetime, timezone
 from types import SimpleNamespace
-WATCH = sys.argv[1] if len(sys.argv) > 1 else "/home/fy5090/code/singlefs/research/scripts/agent-watch.py"
+WATCH = sys.argv[1] if len(sys.argv) > 1 else "research/scripts/agent-watch.py"
 spec = importlib.util.spec_from_file_location("agent_watch", WATCH); aw = importlib.util.module_from_spec(spec); spec.loader.exec_module(aw)
 TH = SimpleNamespace(tool_minutes=8, wait_loop_minutes=3, idle_minutes=10, repeat_count=3, context_tokens=700_000,
                      progress_stale_minutes=30, ask_every_minutes=60, interval_seconds=240)

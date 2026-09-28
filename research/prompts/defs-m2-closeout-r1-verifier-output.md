@@ -2,7 +2,7 @@
 
 本报告是观测，不是判决：核对表里的 ✗ 不免除主 agent 对推论的逐条现查。
 
-时区：本机 UTC；引用材料里标 JST 的照抄标注。轮名：`defs-m2-closeout-r1`。三条腿（正推 Sonnet、云端攻方 Opus、本地攻方 3 次抽样）均已交齐。
+轮名：`defs-m2-closeout-r1`。三条腿（正推 Sonnet、云端攻方 Opus、本地攻方 3 次抽样）均已交齐。
 
 ## 输入核对
 
@@ -103,7 +103,7 @@ Opus 报告末尾自带「引文原行」附录（`awk 'NR==行号'` 现取）�
 | O5：判决字段值分布（`true`213/`not_run`51/`false`41/`0`30） | ✓ 前四行逐字match | `grep -rhoE 'name=verdict.*' research/results/ \| tr ' ' '\n' \| grep '=' \| sed 's/^[^=]*=//' \| sort \| uniq -c \| sort -rn` |
 | O5：门禁 84 号「点名 3 个」、退出 0 | ✓ 复跑逐字match（见下） | `bash .claude/gate.d/84-verdict-false-named.sh` |
 | O8：`research/scripts/memory-peaks.tsv` 含 `gate.d/54`\\`55`\\`57` 键的行数 | ✓ 核心断言（0 行）成立 | `grep -c 'gate.d/54\|gate.d/55\|gate.d/57' research/scripts/memory-peaks.tsv` → 0 |
-| O8：`memory-peaks.tsv` 总行数「781 行」 | **分不清：该文件不进 git（`.gitignore:14`），是本机随其他会话跑内存包装命令持续追加的活文件，不在快照范围内**；此刻现查为 800 行，比报告写作时（00:4x UTC）多 19 行，判断为期间别的会话新增的记账行，不算 Opus 引用有误 | `git check-ignore -v research/scripts/memory-peaks.tsv`；`grep -c . research/scripts/memory-peaks.tsv` → 800 |
+| O8：`memory-peaks.tsv` 总行数「781 行」 | **分不清：该文件不进 git（`.gitignore:14`），是本机随其他会话跑内存包装命令持续追加的活文件，不在快照范围内**；此刻现查为 800 行，比报告写作时多 19 行，判断为期间别的会话新增的记账行，不算 Opus 引用有误 | `git check-ignore -v research/scripts/memory-peaks.tsv`；`grep -c . research/scripts/memory-peaks.tsv` → 800 |
 
 **复跑**：`bash research/prompts/defs-m2-closeout-r1-opus-model/rerun.sh /tmp/claude-1000/defs-m2-closeout-r1-verifier/opus-rerun`，退出码 0，输出 61 行。与模型目录里 `probe-output.txt`（61 行）逐字段比对（检出文件路径这一类嵌临时路径的字段按存在与否比，不按整份哈希判 ✗）：**0 处不符**。
 

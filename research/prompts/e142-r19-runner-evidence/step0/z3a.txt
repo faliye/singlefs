@@ -1,0 +1,36 @@
+## 一、结论
+
+- 挂着之后收盘表的五个入口（正常卸载、管理员回退、抬 F、准入抬 F、一次准入里再推一串）共用的 `caller_inputs_agreeing_with_the_disk` 在参数与盘表核过之后，
+  逐盘核「可见」：两个系统配置槽里一份本池自证过的（整槽校验和过、fsid 与本池相同）都没有就拒，报在已有的
+  `MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration` / `RollbackError::CallerInputsDisagreeWithTheDisk(ParametersOrDeviceTable…)`
+  的 `disagreeing_device_table` 里，新成员 `DeviceTableDisagreement::NoSelfVerifiedSystemConfigurationOnTheDeviceHandedIn { identity_handed_in }`。
+- 会话每次 `publish_user_change` 在身份比对与「有没有带文件的版本」之后、任何写之前读每块盘两槽核一遍，不可见就拒成新成员
+  `UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { devices }`。
+- 「同一判」：可写挂载取号之前的逐盘核第一支（`devices_without_the_selected_version`）、挂着之后的入口、会话三处都经同一个读法
+  `self_verified_system_configuration_slots_of_the_pool`（补丁后 `crates/singlefs-core/src/mount.rs:2927`），可写挂载那一处只是改成调它，行为不变，报的仍是 D18 已定项 11 点名的 `WritableMountRefusedByDevicesWithoutTheSelectedVersion`。
+- 验收（规格表第 1–4 行）：三形（卸载、回退到现行那一版、会话发布）都拒、两块盘逐字节不变、录制流一步都没有；抬 F 三个入口同样拒；
+  别的池的盘换进来，挂着之后的入口照旧被择系统配置拒（`Recovery(SystemConfigurationsDisagree)`，对照），会话不择系统配置、由这一判拒；
+  一块盘两槽坏一槽仍可见（边界）。改前改后 60 次会话发布每块盘各多读 120 次（每次发布每盘 2 次），见第六节。每处改法各有「改回去它就红」的变异，8 行 prove-red 全抓到。
+- **补丁单独打上去编不过**：新会话成员让两处穷举 match 缺分支——`crates/singlefs-harness/src/history.rs`（B3c-3 在改，2 处）与
+  `crates/singlefs-harness/tests/common_admission/mod.rs`（不在这一件的文件清单里，1 处）。要加的分支原文在第七节，已做成两份 diff；
+  我的副本里加了这两处才编得过、跑得了，补丁里没有。
+- 推翻条件：主工作区打上补丁与第七节两处分支之后，新测试二进制
+  `entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration` 有一条红；或把第五节任一行变异施加上去、点名的测试不红；
+  或盘 1 换成空盘时 `unmount` / `roll_back_by_a_forward_publish` / `publish_user_change` 任一返回 `Ok`、或录制流里有一步。
+
+## 二、这一轮写过的文件
+
+补丁里（从仓根起）：
+
+| 文件 | 改了什么 |
+|---|---|
+| `crates/singlefs-core/src/mount.rs` | `DeviceTableDisagreement` 加第三个成员（补丁后第 506 行）并改它与 `CallerParametersDisagreeWithTheSelectedSystemConfiguration` 的文档；新函数 `self_verified_system_configuration_slots_of_the_pool`（第 2927 行，私有）与 `devices_without_a_self_verified_system_configuration`（第 2946 行，`pub(crate)`，会话也调）；`devices_without_the_selected_version` 第一支改调前者（第 2873、2876 行，行为不变）；`caller_inputs_agreeing_with_the_disk`（第 3179 行）在参数与盘表核过之后加这一判（第 3195–3210 行）并改文档 |
+| `crates/singlefs-core/src/mounted_session.rs` | `UserChangeRefused` 加成员（补丁后第 84 行）；`publish_user_change` 在第 242–250 行加这一判；模块、枚举、方法文档跟着改（「五种」→「六种」） |
+| `crates/singlefs-harness/tests/entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration.rs` | 新测试文件，8 条（第四节） |
+| `crates/mutations.tsv` | 只在末尾追加 8 行（`patch/mutations-append.tsv`），变异名见第五节 |
+
+`crates/singlefs-core/src/lib.rs` 不用动：新成员都在已导出的枚举里，新函数是 `pub(crate)`。
+补丁里没有、只在我的副本 `/tmp/claude-1000/impl-z3a-yi/work/` 里为了编译加的：`crates/singlefs-harness/src/history.rs` 两处、`crates/singlefs-harness/tests/common_admission/mod.rs` 一处（第七节）。
+
+`crates.patch` 对主工作区 `git apply --check` 退 0（2026-09-27 先核一次、交回前再核一次，交回前那次的输出在第八节）。补丁的 diffstat（主工作区没打，`git diff --stat -- crates litmus` 看不到它，这里贴补丁自己的）在第八节。
+

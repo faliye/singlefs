@@ -1,6 +1,6 @@
 # 实审 A1b 实现员报告（A1 交回的 Q1–Q5；Q6、Q7 照 A1 的做法认）
 
-时刻：交回于 2026-09-26 UTC（JST 2026-09-27）。规格 `/tmp/claude-1000/impl-rev-a1b/spec.md`。
+日期：交回于 2026-09-27。规格 `/tmp/claude-1000/impl-rev-a1b/spec.md`。
 
 ## 结论一览
 
@@ -27,7 +27,7 @@
 - `crates/singlefs-harness/src/history.rs`（`WritableSession` 持池；起点那条会话读盘造池，读错交回新的起点步 `StartingPointStep::ReadThePoolForTheSession`；覆盖写不再交参数；两处穷举 match 补新成员）
 - `crates/singlefs-harness/tests/common_admission/mod.rs`（mkfs 同一个进程那条会话读盘造池；`publish_user_change` 新签名；match 补成员）
 - `crates/singlefs-harness/tests/writable_mount_refuses_caller_parameters_disagreeing_with_the_system_configuration_on_disk.rs`（A1 那两条跟着新字段解构，多钉一句「盘表那张清单是空的」）
-- `crates/singlefs-harness/tests/second_transaction_step_three_formatted_pool.rs`：`DECISION_READ_OF_SYSTEM_CONFIGURATION_SLOT_ZERO_IN_A_WRITABLE_MOUNT` 3 → 4 与两句文档（Q4 在择系统配置之后多读每块盘两槽一次，判定那一读顺延一位）。⚠️ 这份不在派发列的「调用挂着之后入口的用例」之内，是 Q4 多读一次直接带红的；它的 mtime 是 2026-09-26 03:23 UTC，开工时没人在改，我只动了这三行，主 agent 核一下是不是 B3a-2 的「几份测试」之一
+- `crates/singlefs-harness/tests/second_transaction_step_three_formatted_pool.rs`：`DECISION_READ_OF_SYSTEM_CONFIGURATION_SLOT_ZERO_IN_A_WRITABLE_MOUNT` 3 → 4 与两句文档（Q4 在择系统配置之后多读每块盘两槽一次，判定那一读顺延一位）。⚠️ 这份不在派发列的「调用挂着之后入口的用例」之内，是 Q4 多读一次直接带红的；它的 mtime 是 2026-09-26，开工时没人在改，我只动了这三行，主 agent 核一下是不是 B3a-2 的「几份测试」之一
 - `crates/mutations.tsv`：末尾追加 11 行（第 934–944 行），用 `research/scripts/insert-row.py` 逐行插，名字见证红表
 - `crates/singlefs-core/src/transaction.rs`、`crates/singlefs-core/src/lib.rs` 没动（新类型都在 `mount` / `mounted_session` 模块里）
 
@@ -74,14 +74,14 @@
 
 ## 交回前的验证（末尾原样）
 
-跑的地方有两处：`/tmp/claude-1000/impl-rev-a1b/work/`（开工时 16:34 UTC 的整仓快照 + 这一轮我改的 9 份文件，自己的 target），与主工作区。主工作区这段时间里别的会话一直在改（checker 的 `walk.rs`、`image.rs` 17:05 UTC 改过；`admission_checkpoint_cost_per_device_paths.rs` 17:17 UTC 新建、未跟踪；`e158_root_choice_repair.rs` 在改），所以两处分开报。收尾时核过：这 9 份文件在副本与主工作区逐字节相同（`cmp`）。
+跑的地方有两处：`/tmp/claude-1000/impl-rev-a1b/work/`（开工时的整仓快照 + 这一轮我改的 9 份文件，自己的 target），与主工作区。主工作区这段时间里别的会话一直在改（checker 的 `walk.rs`、`image.rs` 改过；`admission_checkpoint_cost_per_device_paths.rs` 新建、未跟踪；`e158_root_choice_repair.rs` 在改），所以两处分开报。收尾时核过：这 9 份文件在副本与主工作区逐字节相同（`cmp`）。
 
 **测试二进制**（副本，`run-with-memory-cap.sh 8G`、`capped.sh 4`；名字都不含 layer0）：
 
 - 新的三个：`a_floor_raise_refused_for_space_counts_as_short_of_space` `test result: ok. 2 passed; 0 failed`；`writable_mount_refuses_a_device_table_disagreeing_with_the_system_configuration` `test result: ok. 2 passed; 0 failed`；`entries_after_a_writable_mount_refuse_other_parameters_and_device_tables_before_any_write` `test result: ok. 6 passed; 0 failed`（主工作区上同样三行 ok，外加 `writable_mount_refuses_caller_parameters_disagreeing_with_the_system_configuration_on_disk` `test result: ok. 2 passed; 0 failed`）。
 - 调到改动的其余 19 个（`scratch/affected-summary.txt`、`affected-summary-2.txt`、`run2.log`，逐个一行）：`a_block_device_error_while_raising_the_floor_for_space_is_handed_up_as_is` 2 passed；`writable_mount_refuses_a_device_identity_handed_in_twice` 1 passed；`rollback_floor_written_into_the_system_configuration_first_and_normal_unmount` 11 passed；`second_transaction_admission_raises_the_floor_before_refusing` 10 passed；`second_transaction_crash_inside_the_floor_raise_pushed_by_the_session` 0 passed 1 ignored；`system_configuration_slot_is_overwritten_only_after_a_barrier` 3 passed；`second_transaction_step_three_formatted_pool` 13 passed（改常量之后；改之前 12 passed 1 failed，见上一节）；`second_transaction_step_four_rollback` 15 passed；`second_transaction_step_five_reuse` 14 passed；`second_transaction_supplement_two_commit_generated_fallback` 7 passed；`…release_checksum_quarantine` 14 passed；`…presumed_clause_checks` 3 passed；`…fsync_drop_and_devices_without_the_selected_version` 17 passed；`record_checker_judges_absence_by_the_persisted_set` 6 passed 1 ignored；`checker_known_bad_images` 36 passed；`instance_acquisition` 6 passed；`second_transaction_supplement_three_fault_injection` 13 passed 1 ignored；`…bad_disk_input` 9 passed 1 ignored；`…admission_formula` 3 passed；`…root_ring_turn_in_one_mount` 3 passed；`crash_injection_writable_mount_after_the_crash` 1 passed；release 下 `second_transaction_supplement_three_random_history` `test result: ok. 24 passed; 0 failed; 2 ignored`——Q1 那条 `unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device ... ok`。
 - 红的一个，不是这一轮带出来的：`second_transaction_supplement_three_crash_injection` `test result: FAILED. 7 passed; 1 failed; 1 ignored`，红的是快档 `crash_injection_fast_tier_recovers_only_into_versions_the_model_committed`（种子 …115 第 56 段 `RecordCheck claimed_state_missing_unit`、种子 …136 第 91 段 `CheckerViolations I-3.1`，与 A1 报告里那两粒相同）。开工快照 `base/`（没有我的改动）上同一条单跑：`test result: FAILED. 0 passed; 1 failed; … 8 filtered out`，新发现逐字相同（`scratch/base-crash-injection-fast.log`）。
-- 主工作区上 `second_transaction_step_three_formatted_pool` `test result: FAILED. 10 passed; 3 failed`：三条红在 checker 的判定上（`写行那次发布之后：I-3.9 该报不适用：Holds`、`卸载之后：I-7.4 判红`、`mkfs 之后：I-MAPPING-KEY 要真被评估过且成立 left: NotApplicable`），同一份测试在副本（快照的 checker + 我的改动）上 13 passed：推的是别的会话 17:05 改的 checker 带出来的，我没追。
+- 主工作区上 `second_transaction_step_three_formatted_pool` `test result: FAILED. 10 passed; 3 failed`：三条红在 checker 的判定上（`写行那次发布之后：I-3.9 该报不适用：Holds`、`卸载之后：I-7.4 判红`、`mkfs 之后：I-MAPPING-KEY 要真被评估过且成立 left: NotApplicable`），同一份测试在副本（快照的 checker + 我的改动）上 13 passed：推的是别的会话改的 checker 带出来的，我没追。
 
 **门禁阶段**（登记给 implementation-writer 的 7 道，主工作区跑）：
 
@@ -97,7 +97,7 @@
 
 - `cargo fmt --check`：副本 `work fmt exit=0`；主工作区 `exit=1`，67 处全在 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`（E158 执行员那份）。
 - clippy（`check.sh` 那一套 lint：`-D warnings` 加七条编码纪律）：副本上 `-p singlefs-core -p singlefs-checker -p singlefs-format --all-targets` `exit=0`；`-p singlefs-harness --lib --test '*'` `exit=0`（`Finished`）；`--all-targets` 整跑 `exit=101`，错只在两个 bin：`e156_allocation_basis_counts.rs:3312:13`、`:3880:54`、`:3882:54`（`shadow_unrelated`）与 `e158_root_choice_repair.rs` 4 处——e156 与开工快照逐字节相同（`cmp`），不是这一轮改的。
-- `cargo build --offline --all-targets`：副本 `exit=0`、0 条 warning（`Finished dev profile … in 18.71s`）；主工作区 `exit=101`，错只在别的会话 17:17 UTC 新建、未跟踪的 `crates/singlefs-harness/tests/admission_checkpoint_cost_per_device_paths.rs`（4 处 E0425 / E0061 / E0308）。
+- `cargo build --offline --all-targets`：副本 `exit=0`、0 条 warning（`Finished dev profile … in 18.71s`）；主工作区 `exit=101`，错只在别的会话新建、未跟踪的 `crates/singlefs-harness/tests/admission_checkpoint_cost_per_device_paths.rs`（4 处 E0425 / E0061 / E0308）。
 
 ## 仓副本与编译目录
 

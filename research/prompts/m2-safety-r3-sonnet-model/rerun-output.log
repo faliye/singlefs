@@ -1,14 +1,14 @@
-==> 从 /home/fy5090/code/singlefs 拷贝 crates/ 到 /tmp/claude-1000/m2-safety-r3-sonnet-rerun2
+==> 从 <仓根> 拷贝 crates/ 到 /tmp/claude-1000/m2-safety-r3-sonnet-rerun2
 ==> 打补丁（diff/ 下四个文件的改动：admission.rs 加 S4Candidate{Baseline,A1,A3,A4}；allocator.rs 挂上候选字段；
     transaction.rs 把发布路径的准入判法换成候选版并喂 A1 要的“这次自己的释放”；mount.rs 把挂载路径的准入判法换成候选版，
     加 A4 专用的挂载准入，并加本文件自己实现的 C283——mount_writable_with_admission_candidate_and_c283）
-  -- /home/fy5090/code/singlefs/research/prompts/m2-safety-r3-sonnet-model/diff/diff-admission.rs.patch
+  -- research/prompts/m2-safety-r3-sonnet-model/diff/diff-admission.rs.patch
 patching file crates/singlefs-core/src/admission.rs
-  -- /home/fy5090/code/singlefs/research/prompts/m2-safety-r3-sonnet-model/diff/diff-allocator.rs.patch
+  -- research/prompts/m2-safety-r3-sonnet-model/diff/diff-allocator.rs.patch
 patching file crates/singlefs-core/src/allocator.rs
-  -- /home/fy5090/code/singlefs/research/prompts/m2-safety-r3-sonnet-model/diff/diff-mount.rs.patch
+  -- research/prompts/m2-safety-r3-sonnet-model/diff/diff-mount.rs.patch
 patching file crates/singlefs-core/src/mount.rs
-  -- /home/fy5090/code/singlefs/research/prompts/m2-safety-r3-sonnet-model/diff/diff-transaction.rs.patch
+  -- research/prompts/m2-safety-r3-sonnet-model/diff/diff-transaction.rs.patch
 patching file crates/singlefs-core/src/transaction.rs
 ==> 放进对拍测试（不经 history.rs 的模型对拍机器：候选与 C283 都是这一轮新加的分支，模型不认得）
 ==> 编译 + 跑（按项目纪律套内存与线程上限；这两个数按跑的人的机器调）

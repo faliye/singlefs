@@ -1,5 +1,5 @@
---- m2-safety-r2/tree/crates/singlefs-core/src/admission.rs	2026-09-25 10:02:06.368338888 +0000
-+++ m2-safety-r2-opus/tree/crates/singlefs-core/src/admission.rs	2026-09-25 10:39:34.551238165 +0000
+--- m2-safety-r2/tree/crates/singlefs-core/src/admission.rs	2026-09-25
++++ m2-safety-r2-opus/tree/crates/singlefs-core/src/admission.rs	2026-09-25
 @@ -597,6 +597,131 @@
      )
  }
@@ -132,8 +132,8 @@
  #[cfg(test)]
  mod tests {
      use super::*;
---- m2-safety-r2/tree/crates/singlefs-core/src/transaction.rs	2026-09-25 10:02:06.368630007 +0000
-+++ m2-safety-r2-opus/tree/crates/singlefs-core/src/transaction.rs	2026-09-25 10:39:34.878984986 +0000
+--- m2-safety-r2/tree/crates/singlefs-core/src/transaction.rs	2026-09-25
++++ m2-safety-r2-opus/tree/crates/singlefs-core/src/transaction.rs	2026-09-25
 @@ -4568,11 +4568,73 @@
          SpaceAdmission::SkippedByTheTestOnlySwitch => false,
      };
@@ -213,8 +213,8 @@
      }
      // 经映射核到的那几个单元，释放之前再按位置项读盘核一次校验和（D19（块指针的结构与宽度预算） 已定项 5 硬规则 1）：只读，
      // 读不到就在动分配器、发任何一个写之前返回。第一个文件版本换下的 mkfs 那片树表与树表 0 条那一版的分配记录树节点不经映射，不核。
---- m2-safety-r2/tree/crates/singlefs-core/src/mount.rs	2026-09-25 10:02:06.368497388 +0000
-+++ m2-safety-r2-opus/tree/crates/singlefs-core/src/mount.rs	2026-09-25 10:25:38.944383641 +0000
+--- m2-safety-r2/tree/crates/singlefs-core/src/mount.rs	2026-09-25
++++ m2-safety-r2-opus/tree/crates/singlefs-core/src/mount.rs	2026-09-25
 @@ -2096,11 +2096,52 @@
                      bytes: BytesOnOneDevice::ZERO,
                  })

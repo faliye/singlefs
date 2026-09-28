@@ -243,7 +243,7 @@ run the same way as row D5: no "not found" text at all; instead it found and tri
 run /some/other/directory's own .claude/scripts/gen-decision-items.py stub file, and
 reported a Python Syntax Error from that stub file, exit code 1.
 Row D7, stage 52, today's code, run with an absolute path to the script itself (bash
-/home/fy5090/code/singlefs/.claude/gate.d/52-segment-registry.sh /some/other/directory):
+.claude/gate.d/52-segment-registry.sh /some/other/directory):
 no "not found" mentioning check-segment-registry.py; the script lookup itself succeeded
 (it resolved to the real repository's own copy of check-segment-registry.py, and that
 copy actually ran); the run then failed for an unrelated reason, "not found

@@ -1,17 +1,15 @@
 # impl-m2-lastflag 报告（实二十：末条再跨记录、记录标志位 0「本次发布末条」、读法乙锚点、I-8.9、层 0 流 L8）
 
-时刻一律 UTC（东京 = UTC+9）。
-
 ## 一、交付
 
 | 东西 | 路径 | 说明 |
 |---|---|---|
-| 补丁（只含 `crates/`，不含 `crates/mutations.tsv`） | `/tmp/claude-1000/impl-m2-lastflag/impl-m2-lastflag.patch` | 对着 13:51:46Z 拍的主工作区现状（`base2/`）生成；主工作区上 `git apply --check` 退出码 0（14:4x 现跑，第五节）。21 个文件，新增 2 个测试文件 |
+| 补丁（只含 `crates/`，不含 `crates/mutations.tsv`） | `/tmp/claude-1000/impl-m2-lastflag/impl-m2-lastflag.patch` | 对着第二次拍的主工作区现状（`base2/`）生成；主工作区上 `git apply --check` 退出码 0（现跑，第五节）。21 个文件，新增 2 个测试文件 |
 | 变异追加行 | `/tmp/claude-1000/impl-m2-lastflag/mutations-append.tsv` | 28 行，六段制表符分隔；第四节逐行说明证过哪几行、哪几行留给门禁 59 号 |
-| 要删的主表行 | 主表 `crates/mutations.tsv` 第 438、440、441 行（主工作区 13:51Z 现状的行号，三行名字以「并行线一：P6 / C365：链首锚点取…」「并行线一：末条要点名的项多于 67 也照写…」「并行线一：点名项上限按整次发布的角色数判…」打头） | 打上补丁后原文命中 0 次；替代行是追加表第 12、8、7 行 |
-| 草稿 | `repo/`（11:37Z 拍的底 + 改动，测试与变异都在它和它的两份副本上跑）、`rebased/`（`base2/` + 补丁，冲突手合过）、`mutant/`、`mutant2/`、`mutation-logs/`、`repo-tests-1/`、`tools/`、`progress.md` | 都在 `/tmp/claude-1000/impl-m2-lastflag/` 下 |
+| 要删的主表行 | 主表 `crates/mutations.tsv` 第 438、440、441 行（`base2/` 那份主工作区现状的行号，三行名字以「并行线一：P6 / C365：链首锚点取…」「并行线一：末条要点名的项多于 67 也照写…」「并行线一：点名项上限按整次发布的角色数判…」打头） | 打上补丁后原文命中 0 次；替代行是追加表第 12、8、7 行 |
+| 草稿 | `repo/`（拍的底 + 改动，测试与变异都在它和它的两份副本上跑）、`rebased/`（`base2/` + 补丁，冲突手合过）、`mutant/`、`mutant2/`、`mutation-logs/`、`repo-tests-1/`、`tools/`、`progress.md` | 都在 `/tmp/claude-1000/impl-m2-lastflag/` 下 |
 
-**补丁是两段底合出来的**：实现与测试写在 `repo/`（底 = 11:37:41Z 的主工作区，`base/`）。13:5x 发现主工作区又打进了别人的改动（实十四等：`image.rs` 多了 I-7.9、I-9.15，`formatted_pool.rs` 的四张不适用表，`walk.rs`、`recovery.rs`、`e158_root_choice_repair.rs` 等），原补丁在 `image.rs` 与 `second_transaction_step_three_formatted_pool.rs` 两处冲突。于是另拍 `base2/`，把原补丁打到它的副本 `rebased/` 上：两处冲突手合（`IMPLEMENTED_INVARIANTS` 43 → 44，I-8.9 排在 I-8.8 之后；`NOT_APPLICABLE_RIGHT_AFTER_MKFS` 21 → 22 加 I-8.9、注释「其余 23 条」→「其余 24 条」），`e158_root_choice_repair.rs` 里新出现的一处 `replay_journal` 调用加 `.expect`。交的补丁 = `base2/` 对 `rebased/` 的差。**测试与变异证红都是在 `repo/`（旧底）上跑的**，`rebased/` 上只跑了 fmt、clippy、`cargo build --all-targets` 与 `cargo check`；新底上的测试留给最后统一跑（主 agent 定）。
+**补丁是两段底合出来的**：实现与测试写在 `repo/`（底 = 最初取的主工作区，`base/`）。之后发现主工作区又打进了别人的改动（实十四等：`image.rs` 多了 I-7.9、I-9.15，`formatted_pool.rs` 的四张不适用表，`walk.rs`、`recovery.rs`、`e158_root_choice_repair.rs` 等），原补丁在 `image.rs` 与 `second_transaction_step_three_formatted_pool.rs` 两处冲突。于是另拍 `base2/`，把原补丁打到它的副本 `rebased/` 上：两处冲突手合（`IMPLEMENTED_INVARIANTS` 43 → 44，I-8.9 排在 I-8.8 之后；`NOT_APPLICABLE_RIGHT_AFTER_MKFS` 21 → 22 加 I-8.9、注释「其余 23 条」→「其余 24 条」），`e158_root_choice_repair.rs` 里新出现的一处 `replay_journal` 调用加 `.expect`。交的补丁 = `base2/` 对 `rebased/` 的差。**测试与变异证红都是在 `repo/`（旧底）上跑的**，`rebased/` 上只跑了 fmt、clippy、`cargo build --all-targets` 与 `cargo check`；新底上的测试留给最后统一跑（主 agent 定）。
 
 ## 二、做了什么（按条款）
 
@@ -28,7 +26,7 @@
 
 ## 三、新测试与「证明会红」
 
-变异在 `repo/` 的两份副本 `mutant/`、`mutant2/` 上跑（各自的 target，没有共用 `CARGO_TARGET_DIR`；每条命令 `capped.sh 4`，同时至多两份）。照主 agent 14:4x 前收窄的做法：**每条新测试挑一行能让它红的变异证一次；同一个测试二进制里互不重叠的几行一次改坏、跑一次整个二进制**（不带过滤，`--no-fail-fast`，debug）；跑完从 `repo/` 拷回原件并 `touch`，最后 `diff -rq repo/crates mutant*/crates` 为空。组、行、退出码、FAILED 的测试、起止时刻在 `mutation-logs/summary.tsv`，原样日志 `mutation-logs/<组>.log`。**基线红集**：同一份代码在 `repo/` 上先整二进制跑过（`repo-tests-1/summary.txt`，12:20–13:37Z，十个二进制全绿；core / checker / format 单测 13:3xZ 全绿），基线红集为空；`mutant*/` 与 `repo/` 逐字节相同（`diff -rq` 为空）。其中前五个二进制跑在两处纯改名之前（`transaction.rs` 单测里两个局部变量、`…many_inodes.rs` 里两个 `report` 局部变量，为过 clippy `shadow_unrelated`，行为不变），后五个与单测跑在改名之后。被改坏的几个文件里没有 `debug_assert`（`grep -n debug_assert` 零命中），红的都是测试断言。
+变异在 `repo/` 的两份副本 `mutant/`、`mutant2/` 上跑（各自的 target，没有共用 `CARGO_TARGET_DIR`；每条命令 `capped.sh 4`，同时至多两份）。照主 agent 前收窄的做法：**每条新测试挑一行能让它红的变异证一次；同一个测试二进制里互不重叠的几行一次改坏、跑一次整个二进制**（不带过滤，`--no-fail-fast`，debug）；跑完从 `repo/` 拷回原件并 `touch`，最后 `diff -rq repo/crates mutant*/crates` 为空。组、行、退出码、FAILED 的测试、起止时刻在 `mutation-logs/summary.tsv`，原样日志 `mutation-logs/<组>.log`。**基线红集**：同一份代码在 `repo/` 上先整二进制跑过（`repo-tests-1/summary.txt`，十个二进制全绿；core / checker / format 单测Z 全绿），基线红集为空；`mutant*/` 与 `repo/` 逐字节相同（`diff -rq` 为空）。其中前五个二进制跑在两处纯改名之前（`transaction.rs` 单测里两个局部变量、`…many_inodes.rs` 里两个 `report` 局部变量，为过 clippy `shadow_unrelated`，行为不变），后五个与单测跑在改名之后。被改坏的几个文件里没有 `debug_assert`（`grep -n debug_assert` 零命中），红的都是测试断言。
 
 | 新测试（文件） | 证它会红的行（追加表行号，组） | 改坏哪一行 → 哪条断言红（原样摘自日志） |
 |---|---|---|
@@ -56,7 +54,7 @@ old_layout positive_control w4_back_chain_recomputed=823937809 on_disk=823937809
 new_layout w4_back_chain=699178990 t9_back_chain=3937788698
 ```
 
-新代码上钉 3937788698 的那条用例全绿（`repo-tests-1`，12:38–12:48Z）——实现写出来的与独立换算一致。E142 产物第 37 行要等实验执行员按新代码重跑才会是这个数。
+新代码上钉 3937788698 的那条用例全绿（`repo-tests-1`）——实现写出来的与独立换算一致。E142 产物第 37 行要等实验执行员按新代码重跑才会是这个数。
 
 ## 四、`mutations-append.tsv`（28 行）与主表要删的三行
 
@@ -100,15 +98,15 @@ new_layout w4_back_chain=699178990 t9_back_chain=3937788698
 
 ## 五、验证
 
-**跑了的**（负载：12:2x 起机器 load 58–80、别的会话同时有多条 cargo；12:54Z 收到线程上限 4 之后每条重命令都经 `research/scripts/capped.sh 4`，之前起的那一串没加）：
+**跑了的**（负载：跑的时候机器 load 58–80、别的会话同时有多条 cargo；收到线程上限 4 之后每条重命令都经 `research/scripts/capped.sh 4`，之前起的那一串没加）：
 
 - 动到的十个测试二进制，`repo/` 上整二进制各跑一次（`repo-tests-1/summary.txt` 原样，节选末段）：
   `second_transaction_parallel_line_one_last_record_flag … exit=0 test result: ok. 6 passed`、`…three_many_inodes … 4 passed`、`…three_spill_over_layer0 … 1 passed`、`first_transaction_step_five_publish … 8 passed`、`checker_known_bad_images … 29 passed`、`…one_multi_unit_file … 7 passed`、`…step_three_formatted_pool … 13 passed`、`…step_four_rollback … 12 passed`、`…c533_row_publish_record_without_its_root … 1 passed`、`first_transaction_step_seven_layer0 … 5 passed; 0 failed; 1 ignored`。
 - `singlefs-core` / `singlefs-checker` / `singlefs-format` 单测（capped，`repo-tests-2-core.log`）：checker 3 passed、core 98 passed、format 5 passed（另有文档测试 1 passed）。
-- 层 0 快档：第一条流（`first_transaction_step_seven_layer0`，上面那条）与 `second_transaction_step_zero_layer0`（13:39–13:48Z，`8 passed; 0 failed; 1 ignored`）绿；其余三条（`parallel_line_one_layer0`、`acquisition_barrier_layer0`、`formatted_pool_layer0`）照主 agent 13:4x 的指示停掉、没跑完，留给最后统一验证。
-- **层 0 流 L8（全量）**：`every_crash_state_of_a_publish_whose_one_transaction_spills_over_two_records_applies_it_whole_or_not_at_all` 绿（12:32–12:38Z）。它自己钉的数：20 个状态 = 记录段 15 + 根槽 1 + 系统配置槽 3 + 全部持久 1；逐状态按两条记录落没落核发布边界，计数 `{ no_record: 1, only_one_of_the_two_records: 6, both_records_without_the_root: 9, root_persisted: 4 }`；每个状态两遍恢复 + 多版本 oracle、池级 checker（全部不变量违例 0，I-8.8、I-8.9 都真被评估过）、记录核对器，全部零违例。`LAYER0_SPILL_OVER` 计数行在 `--nocapture` 下才打，这一轮没带，逐条不变量的评估 / 不适用数没取。
-- `rebased/`（交的补丁那棵树）：`cargo fmt --all -- --check` 0、clippy（check.sh 那一串 `-D` 全带上，capped）0、`cargo build --offline --all-targets`（capped）0，`rebased-fmt-clippy-build.log` 末行原样 `BUILD 0 end 2026-09-24T14:41:51Z`；`cargo check --all-targets` 0。
-- `git apply --check /tmp/claude-1000/impl-m2-lastflag/impl-m2-lastflag.patch`（主工作区，14:4xZ）退出码 0。
+- 层 0 快档：第一条流（`first_transaction_step_seven_layer0`，上面那条）与 `second_transaction_step_zero_layer0`（`8 passed; 0 failed; 1 ignored`）绿；其余三条（`parallel_line_one_layer0`、`acquisition_barrier_layer0`、`formatted_pool_layer0`）照主 agent 的指示停掉、没跑完，留给最后统一验证。
+- **层 0 流 L8（全量）**：`every_crash_state_of_a_publish_whose_one_transaction_spills_over_two_records_applies_it_whole_or_not_at_all` 绿。它自己钉的数：20 个状态 = 记录段 15 + 根槽 1 + 系统配置槽 3 + 全部持久 1；逐状态按两条记录落没落核发布边界，计数 `{ no_record: 1, only_one_of_the_two_records: 6, both_records_without_the_root: 9, root_persisted: 4 }`；每个状态两遍恢复 + 多版本 oracle、池级 checker（全部不变量违例 0，I-8.8、I-8.9 都真被评估过）、记录核对器，全部零违例。`LAYER0_SPILL_OVER` 计数行在 `--nocapture` 下才打，这一轮没带，逐条不变量的评估 / 不适用数没取。
+- `rebased/`（交的补丁那棵树）：`cargo fmt --all -- --check` 0、clippy（check.sh 那一串 `-D` 全带上，capped）0、`cargo build --offline --all-targets`（capped）0，`rebased-fmt-clippy-build.log` 末行原样 `BUILD 0 end 2026-09-24`；`cargo check --all-targets` 0。
+- `git apply --check /tmp/claude-1000/impl-m2-lastflag/impl-m2-lastflag.patch`（主工作区Z）退出码 0。
 - 登记给 implementation-writer 的七个门禁阶段（`stage-owners.tsv`），对着 `rebased/` 跑（33 号对着 `gatecheck/`）：
 
 | 阶段 | 退出码 | 末行原样 |
@@ -144,7 +142,7 @@ new_layout w4_back_chain=699178990 t9_back_chain=3937788698
 
 ## 八、这一轮写过的文件
 
-补丁里的 21 个（`b/` = `rebased/`；新建 2 个：`crates/singlefs-harness/tests/second_transaction_parallel_line_one_last_record_flag.rs`、`crates/singlefs-harness/tests/second_transaction_parallel_line_three_spill_over_layer0.rs`）。`crates/mutations.tsv` 没改，追加的 28 行在 `mutations-append.tsv`（变异名见第四节表）。我在副本里改、没碰主工作区，主工作区的 `git diff --stat -- crates litmus` 只会列别的会话的改动，所以这里附的是补丁对着主工作区的 `git apply --stat`（14:45:35Z 现跑）原样：
+补丁里的 21 个（`b/` = `rebased/`；新建 2 个：`crates/singlefs-harness/tests/second_transaction_parallel_line_one_last_record_flag.rs`、`crates/singlefs-harness/tests/second_transaction_parallel_line_three_spill_over_layer0.rs`）。`crates/mutations.tsv` 没改，追加的 28 行在 `mutations-append.tsv`（变异名见第四节表）。我在副本里改、没碰主工作区，主工作区的 `git diff --stat -- crates litmus` 只会列别的会话的改动，所以这里附的是补丁对着主工作区的 `git apply --stat`（现跑）原样：
 
 ```
  crates/singlefs-checker/src/image.rs               |    6 
@@ -170,7 +168,7 @@ new_layout w4_back_chain=699178990 t9_back_chain=3937788698
  ...two_c533_row_publish_record_without_its_root.rs |    3 
  21 files changed, 1857 insertions(+), 149 deletions(-)
 apply-check exit 0
-2026-09-24T14:45:35Z
+2026-09-24
 ```
 
 草稿目录里另写的：`base/`、`base2/`、`repo/`、`rebased/`、`mutant/`、`mutant2/`、`dump/`、`gatecheck/`（仓副本）、`a`、`b`（生成补丁用的软链接）、`tools/`（`back_chain_with_last_record_flag.py`、`mutation_rows.py`、`anchor_hits.py`、`run_binaries.sh`、`run_mutations.py`、`run_mutation_group.py`、拼接用的几段 `.rs`）、`dump-records/`、`back-chain-recompute.out`、`repo-tests-1/`、`repo-tests-2/`、`mutation-logs/`、`gatelogs/`、`clippy*.log`、`rebased-*.log`、`progress.md`、`impl-m2-lastflag.patch`、`mutations-append.tsv`、`patch-stat.txt`、本报告。

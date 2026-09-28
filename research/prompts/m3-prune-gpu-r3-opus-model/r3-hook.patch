@@ -1,0 +1,26 @@
+diff -ru a/crates/singlefs-checker-tier/e161_attack/attack.rs b/crates/singlefs-checker-tier/e161_attack/attack.rs
+--- a/crates/singlefs-checker-tier/e161_attack/attack.rs
++++ b/crates/singlefs-checker-tier/e161_attack/attack.rs
+@@ -34,6 +34,7 @@
+         Some("collide") => world_digest_collision(output),
+         Some("reuse") => world_u4_materialized_record_stream_misses_premature_reuse(output),
+         Some(name) if name.starts_with("r2-") => r2::run(output, arguments),
++        Some(name) if name.starts_with("r3-") => r2::run_r3(output, arguments),
+         _ => {
+             eprintln!("用法：attack shape|p5|p6 [k]|t4|torn|small|order");
+             2
+diff -ru a/crates/singlefs-checker-tier/e161_attack/r2.rs b/crates/singlefs-checker-tier/e161_attack/r2.rs
+--- a/crates/singlefs-checker-tier/e161_attack/r2.rs
++++ b/crates/singlefs-checker-tier/e161_attack/r2.rs
+@@ -1996,3 +1996,11 @@
+     ));
+     0
+ }
++
++#[path = "r3.rs"]
++mod r3;
++
++/// 第三轮攻方原型的入口（r3.rs 是 r2 的子模块，直接用 r2 与 attack.rs 的历史与判定）。
++pub(super) fn run_r3(output: &mut ResultLines, arguments: &[String]) -> i32 {
++    r3::run(output, arguments)
++}

@@ -1,0 +1,7 @@
+# 六段录好的输出都在这一份里，六格一起判
+model-fast-tier
+model-reuse-sampling
+model-rollback-sampling
+model-allocation-record-wall
+model-unit-area-wall
+model-unit-area-wall-admission-judged

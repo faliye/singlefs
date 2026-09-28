@@ -1,0 +1,22 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running tests/second_transaction_supplement_two_warm_up_counter.rs (target/debug/deps/second_transaction_supplement_two_warm_up_counter-a2bbced92b3fae35)
+
+running 2 tests
+test warm_up_after_a_journal_counter_other_than_zero_counts_records_on_from_it_while_txg_stays_one_and_two ... ok
+test c366_when_the_chosen_root_own_record_is_unreadable_the_new_instance_numbers_records_and_tail_from_the_highest_readable_record ... FAILED
+
+failures:
+
+---- c366_when_the_chosen_root_own_record_is_unreadable_the_new_instance_numbers_records_and_tail_from_the_highest_readable_record stdout ----
+
+thread 'c366_when_the_chosen_root_own_record_is_unreadable_the_new_instance_numbers_records_and_tail_from_the_highest_readable_record' (3982874) panicked at crates/singlefs-harness/tests/second_transaction_supplement_two_warm_up_counter.rs:231:63:
+可写挂载: NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }, witness: NewerPublishWitness { witnessed_journal_counter: 4, comparison: Undecidable } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }, witness: NewerPublishWitness { witnessed_journal_counter: 4, comparison: Undecidable } } })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    c366_when_the_chosen_root_own_record_is_unreadable_the_new_instance_numbers_records_and_tail_from_the_highest_readable_record
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.87s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_two_warm_up_counter`

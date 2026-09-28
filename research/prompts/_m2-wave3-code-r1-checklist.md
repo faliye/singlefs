@@ -1,4 +1,4 @@
-# 小节清单：`m2-wave3-code-r1`（材料员生成，2026-09-24 00:40 UTC / 09:40 JST）
+# 小节清单：`m2-wave3-code-r1`（材料员生成，2026-09-24 /）
 
 `python3 research/scripts/kb-sections.py` 全量生成，未再过滤（10 份文件：正文里提到的 8 份 kb / 决策 / 里程碑文件 + 正文点名的判决文件 + 材料员现查加的 `.claude/rules/fs-design.md`，理由见下）。
 

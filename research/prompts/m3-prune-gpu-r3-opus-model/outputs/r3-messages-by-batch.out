@@ -1,0 +1,3 @@
+E7RESULT name=r2_state_budget world=messages_by_batch closed_form_state_count=81 enumerated_with_torn=96 writes=18 segments=8
+E7RESULT name=r3_text_from_representative states=63 p7_classes=6 distinct_texts=3 wrong_text_single_machine_one_batch=16 wrong_text_single_machine_batches_of_32=16 wrong_text_two_machines_interleaved_blocks=16 text_differs_single_versus_two_machines=0 wrong_status_single=0 wrong_status_two_machines=0 must_be_nonzero=16
+E7RESULT name=done emitted=3

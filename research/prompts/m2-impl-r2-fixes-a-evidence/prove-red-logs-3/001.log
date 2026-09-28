@@ -1,0 +1,23 @@
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/impl-r2-fixes-a/copy/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-a/copy/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.20s
+     Running tests/checker_judges_reserved_bytes_and_widths_it_used_to_skip.rs (/tmp/claude-1000/impl-r2-fixes-a/target/debug/deps/checker_judges_reserved_bytes_and_widths_it_used_to_skip-19c9f2049810bc23)
+
+running 1 test
+test a_pool_where_one_system_configuration_slot_carries_a_refused_value_is_reported_and_not_vouched_for ... FAILED
+
+failures:
+
+---- a_pool_where_one_system_configuration_slot_carries_a_refused_value_is_reported_and_not_vouched_for stdout ----
+
+thread 'a_pool_where_one_system_configuration_slot_carries_a_refused_value_is_reported_and_not_vouched_for' (257694) panicked at crates/singlefs-harness/tests/checker_judges_reserved_bytes_and_widths_it_used_to_skip.rs:943:91:
+只有盘 1 偏移 0 那一槽是「环长越过单元区起点一条记录」：实现整池拒绝挂载，checker 要报违例，得到 Holds
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_pool_where_one_system_configuration_slot_carries_a_refused_value_is_reported_and_not_vouched_for
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.23s
+
+error: test failed, to rerun pass `-p singlefs-harness --test checker_judges_reserved_bytes_and_widths_it_used_to_skip`

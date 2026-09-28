@@ -75,7 +75,7 @@
 
 材料：正文 `research/prompts/_gate-fix-forks-r1-body.md`，清单 `_gate-fix-forks-r1-checklist.md`、附录 `_gate-fix-forks-r1-appendix.md`，拼成 `_gate-fix-forks-r1-background.md`。这是第一轮：打中的先挂起，下面「暂定」的形态进第二轮再攻。
 
-**开工快照漂移**（`gate-fix-forks-r1-snapshot/sha256sums.txt`，2026-09-23 23:09 JST 记，20 份）：变了 1 份。`.claude/gate.d/47-research-script-selftests.sh` 在腿跑着的时候被 singlefs-ca 会话定点插进 1 行（第 29 行 `"bash research/scripts/watch.sh --selftest" \`）。倒推出快照时的原样存为 `gate-fix-forks-r1-snapshot/47-research-script-selftests.sh.at-snapshot`，sha256 与快照一致；经过写在同目录 `changed-during-legs.md`。攻方引的 `47:42` 落在副本第 42 行、主树第 43 行。
+**开工快照漂移**（`gate-fix-forks-r1-snapshot/sha256sums.txt`，2026-09-23 记，20 份）：变了 1 份。`.claude/gate.d/47-research-script-selftests.sh` 在腿跑着的时候被 singlefs-ca 会话定点插进 1 行（第 29 行 `"bash research/scripts/watch.sh --selftest" \`）。倒推出快照时的原样存为 `gate-fix-forks-r1-snapshot/47-research-script-selftests.sh.at-snapshot`，sha256 与快照一致；经过写在同目录 `changed-during-legs.md`。攻方引的 `47:42` 落在副本第 42 行、主树第 43 行。
 
 **本地攻方提示的一条事实写错了**：fact 8-3 说截断点落在六字符算法名中间、剪成头两个字符。主 agent 拿生成器现跑（`.claude/scripts/gen-decision-items.py` 的 `clip`）：截在中间（`校验和算法取 SHA`，n=10）原样留着；剪成 `SH` 的是截断点**正好停在整词之后**（`校验和算法取 SHA256`，n=13 → `校验和算法取 SH`；`条带冗余按 RAID5`，n=11 → `条带冗余按 RAI`），剥尾正则 `[A-Z]-?\d+` 从词中间咬走 `A256` / `D5`。两份样本 T8 第 8、9 题建在这条错的事实上，作废；第 10 题不依赖它，照判。
 

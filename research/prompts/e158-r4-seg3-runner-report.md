@@ -1,8 +1,8 @@
-# E158（择根与修复四岔路） 第 4 次跑第三段：执行员报告（2026-09-27 JST）
+# E158（择根与修复四岔路） 第 4 次跑第三段：执行员报告（2026-09-27）
 
 ## 一、结论
 
-- 第三段（`r4-seg3` = H1f + H1g，G0，主族 12 条臂）全部跑完，12 份臂产物加 1 份 `r4-compare`，都以 `name=done` 收尾，没有一份打 `name=stop`。每条命令退出码 0，内存包装没撞顶。开跑时 10:23:14 JST，最后一条臂 10:27:34 JST 跑完。
+- 第三段（`r4-seg3` = H1f + H1g，G0，主族 12 条臂）全部跑完，12 份臂产物加 1 份 `r4-compare`，都以 `name=done` 收尾，没有一份打 `name=stop`。每条命令退出码 0，内存包装没撞顶。从开跑到最后一条臂跑完约 4 分 20 秒。
 - 开跑检查全过：`r4_local_constant_check` 与 `r4_arm_code_check` 没有一行不是 `verdict=pass`，7.2 锚点 168/168 行 pass，含每臂「H1f 前缀数 8」「H1g 格数 32」「h1g 每种时长的格数 W 32」三行。
 - **丢写格**（`r4-compare` 的 `r4_loss` 行，G0）：
   - H1f 上 -配置 与 -配置续 的 8 条臂（甲、乙、乙-窄读、丙 各两条）都是 0。
@@ -23,12 +23,12 @@
 
 ## 二、跑了什么、怎么跑的
 
-- 负载：开跑前（10:21 JST）`ps` 看到别的会话在跑 `gate.sh`、几条 `cargo test` / `clippy` / `check`，没有性能测量（qemu、vm-bench、e152、fio）。照常 `nice -n 19` 跑。
+- 负载：开跑前`ps` 看到别的会话在跑 `gate.sh`、几条 `cargo test` / `clippy` / `check`，没有性能测量（qemu、vm-bench、e152、fio）。照常 `nice -n 19` 跑。
   - jia-slot 那条的包装在账上排了 5 秒才起跑（`stderr-jia-slot.log`：「slice 已占 31.8 GiB……排了 5 秒，起跑」）。
 - 每条臂的命令照派发提示：进 `arms/<臂>`，带三个环境变量，`capped.sh 3` 套 `run-with-memory-cap.sh 10G`，跑 `./target/release/e158_root_choice_repair r4-seg3`，输出重定向到 `research/results/e158-root-choice-repair-2026-09-27-r4-seg3-<臂>.out`（`noclobber`）。
   - 装置单线程（源码里没有线程变量）。三条道并行，每道依次跑 4 条臂，同时在跑的装置进程不超过 3 个。
   - 脚本 `/tmp/claude-1000/e158-r4-seg3/run_lane.sh`，进度 `progress.md`。
-- compare：在 today 副本上跑 `r4-compare /home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg3`（传绝对前缀），写 `…-r4-seg3-compare.out`，rc=0，254 行。
+- compare：在 today 副本上跑 `r4-compare research/results/e158-root-choice-repair-2026-09-27-r4-seg3`（传绝对前缀），写 `…-r4-seg3-compare.out`，rc=0，254 行。
 - 副本里的 bin 源码 sha256 前 16 位全是 `37a8a312cf9c2d3b`，与主工作区那份 bin 相同（12 份逐个核过）。
 
 | 臂 | 耗时（秒） | 行数 | sha256 前 16 位 |
@@ -178,7 +178,7 @@
 
 岔路单状态栏写着「乙在实七、实八或 H-随上丢写 > 0，就带数再问用户」。这一段量的是 H1f、H1g，不在那三族里。但 **yi-cfg（乙-配置）在 H1g 上丢写 16/32**，yi-cfg-carry（乙-配置续）是 0。用户定的「-配置 一族」同时罩着这两条 N，要不要拿这个数去问用户，交主 agent 定。
 
-## 九、门禁（登记给 experiment-runner 的阶段，主工作区，10:3x JST；日志在草稿目录 `gate-*.log`）
+## 九、门禁（登记给 experiment-runner 的阶段，主工作区；日志在草稿目录 `gate-*.log`）
 
 这一次不写实验页，所以读实验页的几道也在这一步跑。各阶段的原样末行（截到 250 字）与退出码：
 

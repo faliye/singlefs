@@ -1,0 +1,9 @@
+exit=1
+want=crates 改动里 2 个文件没有三方判决点名
+want=      crates/demo/src/lib.rs
+want=      crates/demo/src/other.rs
+want=样本只跑 .gate-cells 点名的格：crates-adversarial-review
+want=── 汇总：doc-process-records.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-process-records.sh：1 格里 1 格红（crates-adversarial-review）
+want=→ crates-adversarial-review：提交之前走一轮三方
+want=bash .claude/gate.d/doc-process-records.sh --check crates-adversarial-review

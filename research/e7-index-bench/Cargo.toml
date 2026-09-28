@@ -507,3 +507,13 @@ required-features = ["e162-block-stores"]
 name = "e162-verdict-store-power-cut"
 path = "src/bin/e162_verdict_store_power_cut.rs"
 required-features = ["e162-block-stores"]
+
+# E16 第五次跑（今天单元宽度下的峰值落点、预测式误差、适用范围句）：独立手写计数模型，不与 crates/ 共用代码。
+[[bin]]
+name = "e16-fifth-run-peak-under-today-widths"
+path = "src/bin/e16_fifth_run_peak_under_today_widths.rs"
+
+# E164（崩溃放量新设计的小范围功能测试）：跑前登记 research/prompts/e164-preregistration.md。不依赖 crates/，只在仓副本上起白名单子进程。
+[[bin]]
+name = "e164-crash-amplification-design-function-test"
+path = "src/bin/e164_crash_amplification_design_function_test.rs"

@@ -1,4 +1,0 @@
-exit=0
-want=✓ 新写的判决 2 份：1 份逐份点名了那一轮本地腿的 3 份样本，1 份那一轮没有本地腿样本
-want=没有本地腿样本的：research/prompts/nolocal-r1-main-verification.md
-want=0 字节样本跳过 1 份：research/prompts/demo-r1-local-attack-output-s2.md

@@ -1,0 +1,4 @@
+  ✗ CLAUDE.md:3: 「98 号」在门禁目录里没有 98-*.sh
+  ✗ CLAUDE.md:4: `.claude/gate.d/doc-decisions.sh` 里的 .claude/gate.d/doc-decisions.sh 在仓里不存在
+     → 怎么办：门禁号改成现存的号或共享 gate.sh 里那一道的名字；路径改成现存的，已归档的写裸文件名；小节按那份文件今天的标题改。
+  扫 1 份治理文档：门禁号 1 处、路径 1 处、小节 0 处；没判 0 处；跳过 0 处（被 .gitignore 挡着 0、不像仓内路径 0、仓外或带占位 0）

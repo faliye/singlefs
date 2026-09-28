@@ -1,0 +1,1780 @@
+diff -ruN -x target a/singlefs-checker/src/walk.rs b/singlefs-checker/src/walk.rs
+--- a/singlefs-checker/src/walk.rs	2026-09-27 17:00:47.792895398 +0000
++++ b/singlefs-checker/src/walk.rs	2026-09-28 08:11:10.263106918 +0000
+@@ -5846,8 +5846,9 @@
+     // 只读根上的 F 时，带新 F 的根全坏、系统配置里的新 F 还在的合法镜像上，F 之下、单元已被合法复用的根会被当成候选，
+     // I-7.4（近 K 代块未被复用） 等按候选集判的几条误红（C556（checker 与层 0 不读系统配置里的 F））。
+     let mut newest_valid_root_on_each_device: BTreeMap<u32, &crate::RootView> = BTreeMap::new();
++    let row43_experiment = std::env::var("ROW43_EXPERIMENT").unwrap_or_default();
+     for (region, _, root) in &roots {
+-        if abandoned_by_the_newest_roots_table(root) {
++        if abandoned_by_the_newest_roots_table(root) && row43_experiment != "abandoned_floor_counts" {
+             continue;
+         }
+         let device = geometry.region_devices[usize::try_from(*region).expect("区域号")];
+@@ -5868,10 +5869,21 @@
+         .map(|root| root.rollback_floor)
+         .max()
+         .unwrap_or(0);
++    // AF（abandoned-floor-r1 攻方副本）：AF_ABANDONED_F=count 时被抛弃根带的 F 也算进 F_生效（第 ② 行「算进」）。
++    let af_highest_floor_on_abandoned_roots = if std::env::var("AF_ABANDONED_F").unwrap_or_default() == "count" {
++        roots
++            .iter()
++            .filter(|(_, _, root)| abandoned_by_the_newest_roots_table(root))
++            .map(|(_, _, root)| root.rollback_floor)
++            .max()
++            .unwrap_or(0)
++    } else {
++        0
++    };
+     let effective_rollback_floor = verified_system_configurations_of_this_pool
+         .iter()
+         .flat_map(|(_, slots)| slots.iter().map(|view| view.rollback_floor))
+-        .fold(highest_floor_on_the_newest_valid_roots, u64::max);
++        .fold(highest_floor_on_the_newest_valid_roots.max(af_highest_floor_on_abandoned_roots), u64::max);
+     // 掉出遍历的根槽按理由各记一次（两样都占的两边都记）：I-3.1 判红时这几个数就是「遍历为什么少算」的机理标识。
+     let mut root_slots_dropped_as_abandoned = 0u64;
+     let mut root_slots_dropped_below_floor = 0u64;
+@@ -5880,8 +5892,21 @@
+         .enumerate()
+         .filter(|(index, (_, _, root))| {
+             // 被抛弃：按最新根指着的实例表判（D23（journal 的角色与格式） 已定项 14 候选集）。
+-            let abandoned = abandoned_by_the_newest_roots_table(root);
+-            let below_floor = root.checkpoint_txg < effective_rollback_floor;
++            let abandoned = abandoned_by_the_newest_roots_table(root)
++                && row43_experiment != "walk_abandoned";
++            let nearest_valid_txg_at_or_below_floor = roots
++                .iter()
++                .filter(|(_, _, other)| !abandoned_by_the_newest_roots_table(other) && other.checkpoint_txg <= effective_rollback_floor)
++                .map(|(_, _, other)| other.checkpoint_txg)
++                .max()
++                .unwrap_or(0);
++            let below_floor = if row43_experiment == "walk_nearest_root_below_floor"
++                || std::env::var("AF_CANDIDATE").unwrap_or_default() == "jia"
++            {
++                root.checkpoint_txg < nearest_valid_txg_at_or_below_floor
++            } else {
++                root.checkpoint_txg < effective_rollback_floor
++            };
+             let walked = *index == newest_index || (!abandoned && !below_floor);
+             if !walked {
+                 if abandoned {
+@@ -6156,6 +6181,164 @@
+     // 它的「已分配」还算着 F 生效值之下那些根引用的槽，与按 F 生效值取的候选集并集不可比，I-3.1 这一格报不适用（实二的读法，交主 agent）。
+     let accounting_was_written_under_the_effective_floor =
+         roots[newest_index].2.rollback_floor == effective_rollback_floor;
++    if std::env::var_os("ROW43_DUMP").is_some() {
++        eprintln!(
++            "ROW43-DUMP F_eff={effective_rollback_floor} newest=(inst {}, txg {}, F {})",
++            roots[newest_index].2.instance, newest_txg, roots[newest_index].2.rollback_floor
++        );
++        let mut per_root: Vec<((u32, u64), BTreeSet<(u32, u64)>)> = Vec::new();
++        for (region, _, root) in &roots {
++            eprintln!(
++                "ROW43-DUMP root region={region} inst={} txg={} F={} abandoned={} below_floor={}",
++                root.instance,
++                root.checkpoint_txg,
++                root.rollback_floor,
++                abandoned_by_the_newest_roots_table(root),
++                root.checkpoint_txg < effective_rollback_floor
++            );
++            let mut single = Walk::starting_with(
++                reader,
++                Judgements::default(),
++                filesystem_identifier_low,
++                root.instance,
++                root.checkpoint_txg,
++            );
++            single.walk_root(&root.record_bytes, false);
++            per_root.push((
++                (root.instance, root.checkpoint_txg),
++                single.references.keys().map(|(device, slot, _)| (*device, *slot)).collect(),
++            ));
++        }
++        let newest_view = &roots[newest_index].2;
++        let tree_table_pointer = parse_node_pointer(&newest_view.record_bytes[36..122]);
++        let mut dump_cache = IndexNodeCache::new();
++        if let Some(tree_table) = read_index_node_without_judging(reader, &tree_table_pointer, &mut dump_cache) {
++            for entry in &tree_table.entries {
++                if entry.len() < tree_table_entry_bytes() || read_u16(entry, 10) != TREE_KIND_ALLOCATION {
++                    continue;
++                }
++                let allocation_root = parse_node_pointer(&entry[14..100]);
++                if allocation_root.all_zero {
++                    continue;
++                }
++                let Some((_, records)) = allocation_record_tree_without_judging(reader, &allocation_root, &mut dump_cache) else {
++                    continue;
++                };
++                let mut released_in_records = 0u64;
++                for record in &records {
++                    if record.is_released {
++                        released_in_records += record.span_slots;
++                    }
++                    if start_slots_referenced_by_every_walked_version.contains(&(record.device, record.slot)) {
++                        continue;
++                    }
++                    let referencing_roots: Vec<(u32, u64)> = per_root
++                        .iter()
++                        .filter(|(_, slots)| slots.contains(&(record.device, record.slot)))
++                        .map(|(key, _)| *key)
++                        .collect();
++                    eprintln!(
++                        "ROW43-DUMP unwalked record dev={} slot={} span={} gen={} released={} referenced_by_ring_roots={referencing_roots:?}",
++                        record.device, record.slot, record.span_slots, record.generation, record.is_released
++                    );
++                }
++                eprintln!("ROW43-DUMP records={} released_span_total={released_in_records}", records.len());
++            }
++        }
++    }
++    // AF（abandoned-floor-r1 攻方副本）：丁的几种读法，只加到 I-3.1 的「遍历」一边。
++    let af_candidate = std::env::var("AF_CANDIDATE").unwrap_or_default();
++    let mut af_extra_slots_per_device: BTreeMap<u32, u64> = BTreeMap::new();
++    if af_candidate.starts_with("ding") {
++        let walked_slots: BTreeSet<(u32, u64)> = walk
++            .references
++            .keys()
++            .flat_map(|(device, start, span)| (*start..*start + *span).map(move |slot| (*device, slot)))
++            .collect();
++        let references_of_root = |root: &crate::RootView| -> BTreeSet<(u32, u64)> {
++            let mut single = Walk::starting_with(
++                reader,
++                Judgements::default(),
++                filesystem_identifier_low,
++                root.instance,
++                root.checkpoint_txg,
++            );
++            single.walk_root(&root.record_bytes, false);
++            single
++                .references
++                .keys()
++                .flat_map(|(device, start, span)| (*start..*start + *span).map(move |slot| (*device, slot)))
++                .collect()
++        };
++        // 最新根分配记录树里的记录：(设备, 槽) → (已释放, 释放代或分配代)。
++        let mut record_of_slot: BTreeMap<(u32, u64), (bool, u64)> = BTreeMap::new();
++        let newest_view = &roots[newest_index].2;
++        let tree_table_pointer = parse_node_pointer(&newest_view.record_bytes[36..122]);
++        let mut af_cache = IndexNodeCache::new();
++        if let Some(tree_table) = read_index_node_without_judging(reader, &tree_table_pointer, &mut af_cache) {
++            for entry in &tree_table.entries {
++                if entry.len() < tree_table_entry_bytes() || read_u16(entry, 10) != TREE_KIND_ALLOCATION {
++                    continue;
++                }
++                let allocation_root = parse_node_pointer(&entry[14..100]);
++                if allocation_root.all_zero {
++                    continue;
++                }
++                if let Some((_, records)) = allocation_record_tree_without_judging(reader, &allocation_root, &mut af_cache) {
++                    for record in &records {
++                        for slot in record.slot..record.slot + record.span_slots {
++                            record_of_slot.insert((record.device, slot), (record.is_released, record.generation));
++                        }
++                    }
++                }
++            }
++        }
++        let mut extra: BTreeSet<(u32, u64)> = BTreeSet::new();
++        match af_candidate.as_str() {
++            // 丁1：并上影子账隔离集（被抛弃根引用 − 候选根引用 − 当前账里仍分配的）；ding_isolated_released 只取其中账里是已释放记录的。
++            "ding_isolated" | "ding_isolated_released" => {
++                for (_, _, root) in roots.iter().filter(|(_, _, root)| abandoned_by_the_newest_roots_table(root)) {
++                    for key in references_of_root(root) {
++                        if walked_slots.contains(&key) {
++                            continue;
++                        }
++                        let unreleased_in_current = matches!(record_of_slot.get(&key), Some((false, _)));
++                        if unreleased_in_current {
++                            continue;
++                        }
++                        if af_candidate == "ding_isolated_released" && !matches!(record_of_slot.get(&key), Some((true, _))) {
++                            continue;
++                        }
++                        extra.insert(key);
++                    }
++                }
++            }
++            // 丁2：并上 F 之下（没被抛弃）的根引用、仍在 defer 里（已释放、释放代 > F_生效）的记录的槽。
++            "ding_defer_below_floor" => {
++                for (_, _, root) in roots.iter().filter(|(_, _, root)| {
++                    !abandoned_by_the_newest_roots_table(root) && root.checkpoint_txg < effective_rollback_floor
++                }) {
++                    for key in references_of_root(root) {
++                        if walked_slots.contains(&key) {
++                            continue;
++                        }
++                        if let Some((true, generation)) = record_of_slot.get(&key) {
++                            if *generation > effective_rollback_floor {
++                                extra.insert(key);
++                            }
++                        }
++                    }
++                }
++            }
++            _ => {}
++        }
++        for (device, _) in &extra {
++            *af_extra_slots_per_device.entry(*device).or_insert(0) += 1;
++        }
++        if std::env::var_os("AF_DUMP").is_some() {
++            eprintln!("AF-DUMP ding={af_candidate} extra_slots={:?}", af_extra_slots_per_device);
++        }
++    }
+     if accounting_seen {
+         for device in &devices {
+             let quarantined_exempted = quarantined_exempted_against_every_walked_version
+@@ -6163,15 +6346,19 @@
+                 .copied()
+                 .unwrap_or(0)
+                 * SLOT_BYTES;
+-            let walked = slots_referenced_by_every_walked_version
++            let walked = (slots_referenced_by_every_walked_version
+                 .get(device)
+                 .copied()
+                 .unwrap_or(0)
++                + af_extra_slots_per_device.get(device).copied().unwrap_or(0))
+                 * SLOT_BYTES
+                 + quarantined_exempted;
+             let allocated = accounting
+                 .get(&(STATISTIC_ALLOCATED_BYTES, *device))
+                 .copied();
++            if std::env::var_os("ROW43_DUMP").is_some() {
++                eprintln!("ROW43-DUMP device={device} allocated={allocated:?} walked={walked} quarantined_exempted={quarantined_exempted} defer={:?} empty_cluster_segments_row={:?}", accounting.get(&(STATISTIC_DEFER_QUEUE_BYTES, *device)), accounting.get(&(11u16, *device)));
++            }
+             if accounting_was_written_under_the_effective_floor {
+                 judgements.judge("I-3.1", allocated == Some(walked), || {
+                     format!(
+diff -ruN -x target a/singlefs-core/src/mount.rs b/singlefs-core/src/mount.rs
+--- a/singlefs-core/src/mount.rs	2026-09-27 18:03:17.342235235 +0000
++++ b/singlefs-core/src/mount.rs	2026-09-28 08:11:10.278625590 +0000
+@@ -1430,8 +1430,21 @@
+         .filter(|root| !is_abandoned(root))
+         .map(|root| root.checkpoint_txg)
+         .min();
++    let af_mount_reclaim_threshold = if std::env::var("AF_CANDIDATE").unwrap_or_default() == "bing_all" {
++        roots
++            .iter()
++            .filter(|root| !is_abandoned(root) && root.checkpoint_txg >= effective_floor)
++            .map(|root| root.checkpoint_txg)
++            .min()
++            .map_or(effective_floor, |lowest_candidate| lowest_candidate.max(effective_floor))
++    } else {
++        effective_floor
++    };
++    if std::env::var_os("AF_DUMP").is_some() {
++        eprintln!("AF-DUMP mount effective_floor={} reclaim_threshold={} oldest_valid_root={:?}", effective_floor.0, af_mount_reclaim_threshold.0, oldest_valid_root.map(|t| t.0));
++    }
+     allocator.reclaim_released_up_to(
+-        reclaim_floor(effective_floor, oldest_valid_root),
++        reclaim_floor(af_mount_reclaim_threshold, oldest_valid_root),
+         ReclaimedReuse::Immediately,
+     );
+     let shadow_ledger_computed = match shadow_ledger {
+@@ -2348,6 +2361,57 @@
+         .filter(|root| !abandoned_by_table(root, &table))
+         .map(|root| root.checkpoint_txg)
+         .min();
++    // AF（abandoned-floor-r1 攻方副本）：候选乙（抬 F 不许落进空档）与丙（抬 F 时记账放掉）。
++    let af_candidate = std::env::var("AF_CANDIDATE").unwrap_or_default();
++    let mut new_floor = new_floor;
++    if af_candidate == "yi_adjust" || af_candidate == "yi_refuse" {
++        let roots_at_the_floor: Vec<&RootRecord> = roots
++            .iter()
++            .filter(|root| root.checkpoint_txg == new_floor)
++            .collect();
++        if !roots_at_the_floor.is_empty()
++            && roots_at_the_floor.iter().all(|root| abandoned_by_table(root, &table))
++        {
++            if af_candidate == "yi_refuse" {
++                return Err(MountError::RollbackFloorAboveCeiling {
++                    requested: new_floor,
++                    ceiling: CheckpointTxg(u64::MAX),
++                });
++            }
++            let next_txg_not_all_abandoned = roots
++                .iter()
++                .filter(|root| root.checkpoint_txg > new_floor && !abandoned_by_table(root, &table))
++                .map(|root| root.checkpoint_txg)
++                .min();
++            match next_txg_not_all_abandoned {
++                Some(next) if ceiling_judged_by_the_admission.is_none_or(|ceiling| next <= ceiling) => {
++                    if std::env::var_os("AF_DUMP").is_some() {
++                        eprintln!("AF-DUMP yi_adjust {} -> {}", new_floor.0, next.0);
++                    }
++                    new_floor = next;
++                }
++                _ => {
++                    return Err(MountError::RollbackFloorAboveCeiling {
++                        requested: new_floor,
++                        ceiling: CheckpointTxg(u64::MAX - 1),
++                    });
++                }
++            }
++        }
++    }
++    let af_reclaim_threshold = if af_candidate.starts_with("bing") {
++        roots
++            .iter()
++            .filter(|root| !abandoned_by_table(root, &table) && root.checkpoint_txg >= new_floor)
++            .map(|root| root.checkpoint_txg)
++            .min()
++            .map_or(new_floor, |lowest_candidate| lowest_candidate.max(new_floor))
++    } else {
++        new_floor
++    };
++    if std::env::var_os("AF_DUMP").is_some() {
++        eprintln!("AF-DUMP raise new_floor={} reclaim_threshold={} oldest_valid_root={:?}", new_floor.0, af_reclaim_threshold.0, oldest_valid_root.map(|t| t.0));
++    }
+     // 候选集按新 F 缩小，只被被抛弃根引用的槽会变多（一个槽此前靠一条低于新 F 的根豁免），回收之前先按新 F 重算影子账，
+     // 不然那个槽回收之后就发得出去（步 4 / 步 5 代码三方第二轮辩方腿：窄读法要按每次挂载与每次抬 F 的候选集现算）。
+     let abandoned_roots_unreadable = if shadow_ledger == ShadowLedger::On {
+@@ -2365,7 +2429,7 @@
+         0
+     };
+     let reclaimed = allocator.reclaim_released_up_to(
+-        reclaim_floor(new_floor, oldest_valid_root),
++        reclaim_floor(af_reclaim_threshold, oldest_valid_root),
+         ReclaimedReuse::HeldUntilFloorTakesEffect,
+     );
+     let publishes_in_the_sequence = planned_txgs.len();
+diff -ruN -x target a/singlefs-core/src/recovery.rs b/singlefs-core/src/recovery.rs
+--- a/singlefs-core/src/recovery.rs	2026-09-27 18:03:17.391550193 +0000
++++ b/singlefs-core/src/recovery.rs	2026-09-28 08:11:10.279555428 +0000
+@@ -1713,9 +1713,20 @@
+             *newest_on_this_device = *root;
+         }
+     }
++    // AF（abandoned-floor-r1 攻方副本）：AF_ABANDONED_F=count 时被抛弃根带的 F 也算进 F_生效（第 ② 行「算进」）。
++    let af_highest_on_abandoned_roots = if std::env::var("AF_ABANDONED_F").unwrap_or_default() == "count" {
++        roots_with_ring_slots
++            .iter()
++            .filter(|(_, root)| newest_roots_table.is_some_and(|table| root_is_abandoned_by_the_instance_table(root, table)))
++            .map(|(_, root)| root.rollback_floor)
++            .max()
++    } else {
++        None
++    };
+     let highest_on_the_roots = newest_valid_root_on_each_device
+         .values()
+         .map(|root| root.rollback_floor)
++        .chain(af_highest_on_abandoned_roots)
+         .max();
+     let slot_spacing_in_bytes = u64::from(immutable_sizes.fixed_structure_slot_spacing);
+     let highest_in_the_system_configurations = reader
+diff -ruN -x target a/singlefs-harness/src/history.rs b/singlefs-harness/src/history.rs
+--- a/singlefs-harness/src/history.rs	2026-09-27 20:20:00.469148747 +0000
++++ b/singlefs-harness/src/history.rs	2026-09-28 07:58:35.599190701 +0000
+@@ -4036,6 +4036,14 @@
+             } else {
+                 let image_before_this_step = std::mem::replace(&mut image, pool.image());
+                 checked_stream_length = stream_length;
++                // ROW43-PROBE（调查员副本）：每次做成的抬 F 都算一次「F 落在空档里」；每一步之后看环里有没有被抛弃的根。
++                if let Some(new_floor) = raised_floor {
++                    let probe = raised_floor_lands_only_on_abandoned_roots(&image_before_this_step, new_floor);
++                    eprintln!("ROW43-PROBE raise seed={} step={} floor={} lands_only_on_abandoned={probe:?}", history.seed.0, step_index, new_floor.0);
++                }
++                if row43_probe_any_ring_root_abandoned(&image) == Some(true) {
++                    eprintln!("ROW43-PROBE abandoned_present seed={} step={}", history.seed.0, step_index);
++                }
+                 if per_step_checker.runs_the_checker() {
+                     violations = violations_on(&image, &mut tally);
+                 }
+@@ -4205,6 +4213,26 @@
+         newest_table
+             .rows
+             .iter()
++            .any(|row| row.instance == root.instance && root.checkpoint_txg > row.selected_root_txg)
++    }))
++}
++
++/// ROW43-PROBE（调查员副本）：环里有没有按最新根的实例表判被抛弃的根。
++#[must_use]
++pub fn row43_probe_any_ring_root_abandoned(image: &dyn PoolReader) -> Option<bool> {
++    let system_configuration = choose_system_configuration(image).ok()?;
++    let roots: Vec<RootRecord> = readable_roots(
++        image,
++        &system_configuration.immutable.region_devices,
++        &system_configuration.immutable.sizes,
++        &system_configuration.immutable.filesystem_identifier,
++    );
++    let newest_root = choose_root(image, &system_configuration)?;
++    let newest_table = instance_table_of_root(image, &newest_root)?;
++    Some(roots.iter().any(|root| {
++        newest_table
++            .rows
++            .iter()
+             .any(|row| row.instance == root.instance && root.checkpoint_txg > row.selected_root_txg)
+     }))
+ }
+diff -ruN -x target a/singlefs-harness/tests/abandoned_floor_candidates.rs b/singlefs-harness/tests/abandoned_floor_candidates.rs
+--- a/singlefs-harness/tests/abandoned_floor_candidates.rs	1970-01-01 00:00:00.000000000 +0000
++++ b/singlefs-harness/tests/abandoned_floor_candidates.rs	2026-09-28 09:10:48.640107528 +0000
+@@ -0,0 +1,1076 @@
++//! abandoned-floor-r1 攻方腿（Opus）的副本用例：把第 43 行各候选（环境变量 AF_CANDIDATE）放到复现与相邻历史上跑。
++//! 只在攻方副本里；池全在内存稀疏盘上，崩溃状态按录制流前缀取。
++mod common;
++
++use common::{memory_pool_of_sparse_devices, parameters, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES};
++use singlefs_checker::image::InvariantVerdict;
++use singlefs_checker::walk::check_pool_image;
++use singlefs_core::address::{CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration};
++use singlefs_core::block_device::{BlockDevice, PhysicalBlockSizeInBytes, WriteDurability};
++use singlefs_core::make_filesystem::{allocator_after_make_filesystem, make_filesystem};
++use singlefs_core::mount::{
++    mount_writable, raise_rollback_floor, raise_rollback_floor_to_the_admission_ceiling,
++    roll_back_by_a_forward_publish, unmount, RaiseToTheAdmissionCeiling, RollbackTarget,
++    ShadowLedger, Unmounted,
++};
++use singlefs_core::allocator::PoolAllocator;
++use singlefs_core::recovery::{
++    choose_root, choose_system_configuration, effective_rollback_floor, instance_table_of_root,
++    readable_roots,
++};
++use singlefs_core::transaction::{
++    acquire_instance, publish_first_file, publish_overwrite, warm_up, FirstFile, PoolVersion,
++    PoolWriter, TransactionOutput,
++};
++use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
++use singlefs_harness::{RecordedOperationKind, RecordingBlockDevice, RetainedOperation, SharedStream};
++
++type Device = RecordingBlockDevice<SparseBlockDevice>;
++
++fn content_seeded_by(length: usize, seed: usize) -> Vec<u8> {
++    (0..length)
++        .map(|index| u8::try_from((index * 7 + seed) % 253).expect("小于 256"))
++        .collect()
++}
++
++fn devices_of_image(image: &MemoryPool, stream: &SharedStream) -> Vec<(DeviceIdentity, Device)> {
++    image
++        .devices
++        .iter()
++        .map(|(identity, sparse)| {
++            let mut device = SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512));
++            device.image = sparse.clone();
++            (*identity, RecordingBlockDevice::with_shared_stream(*identity, device, stream.clone()))
++        })
++        .collect()
++}
++
++/// 一个池：内存盘、这个进程的分配器与现行版本、实例号。
++struct Pool {
++    devices: Vec<(DeviceIdentity, Device)>,
++    stream: SharedStream,
++    allocator: PoolAllocator,
++    output: TransactionOutput,
++    instance: InstanceGeneration,
++    seed_counter: usize,
++}
++
++/// 一次运行里挑出来的一格结局。
++#[derive(Clone, Debug)]
++struct Verdicts {
++    violated: Vec<(String, String)>,
++    not_applicable_i31_or_i74: Vec<String>,
++}
++
++impl Verdicts {
++    fn names(&self) -> String {
++        let mut names: Vec<String> = self.violated.iter().map(|(name, detail)| {
++            if name == "I-7.4" && detail.contains("被抛弃的根") { "I-7.4(abandoned-half)".to_string() } else { name.clone() }
++        }).collect();
++        names.sort();
++        names.dedup();
++        let mut text = format!("[{}]", names.join(","));
++        if !self.not_applicable_i31_or_i74.is_empty() {
++            text.push_str(&format!(" NA[{}]", self.not_applicable_i31_or_i74.join(",")));
++        }
++        text
++    }
++}
++
++fn verdicts_on(image: &MemoryPool) -> Verdicts {
++    let mut violated = Vec::new();
++    let mut not_applicable = Vec::new();
++    for (invariant, verdict) in check_pool_image(image) {
++        match verdict {
++            InvariantVerdict::Violated(detail) => violated.push((invariant.to_string(), detail)),
++            InvariantVerdict::NotApplicable(_) if invariant == "I-3.1" || invariant == "I-7.4" => {
++                not_applicable.push(invariant.to_string());
++            }
++            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => {}
++        }
++    }
++    Verdicts { violated, not_applicable_i31_or_i74: not_applicable }
++}
++
++/// 环里每条读得出的根：(实例, txg, 带的 F, 按最新根的实例表判被抛弃)。
++fn ring_roots(image: &MemoryPool) -> Vec<(u64, u64, u64, bool)> {
++    let Ok(system_configuration) = choose_system_configuration(image) else { return Vec::new() };
++    let roots = readable_roots(
++        image,
++        &system_configuration.immutable.region_devices,
++        &system_configuration.immutable.sizes,
++        &system_configuration.immutable.filesystem_identifier,
++    );
++    let table = choose_root(image, &system_configuration).and_then(|newest| instance_table_of_root(image, &newest));
++    let mut listed: Vec<(u64, u64, u64, bool)> = roots
++        .iter()
++        .map(|root| {
++            let abandoned = table.as_ref().is_some_and(|table| {
++                table.rows.iter().any(|row| row.instance == root.instance && root.checkpoint_txg > row.selected_root_txg)
++            });
++            (u64::from(root.instance.0), root.checkpoint_txg.0, root.rollback_floor.0, abandoned)
++        })
++        .collect();
++    listed.sort_by_key(|(instance, txg, _, _)| (*txg, *instance));
++    listed
++}
++
++fn implementation_effective_floor(image: &MemoryPool) -> u64 {
++    let system_configuration = choose_system_configuration(image).expect("系统配置");
++    effective_rollback_floor(
++        image,
++        &system_configuration.immutable.region_devices,
++        &system_configuration.immutable.sizes,
++        &system_configuration.immutable.filesystem_identifier,
++    )
++    .0
++}
++
++/// 抬 F 目标 txg 上的根：(有几条, 全属于被抛弃实例)。
++fn roots_at_txg(image: &MemoryPool, txg: u64) -> (usize, bool) {
++    let at: Vec<_> = ring_roots(image).into_iter().filter(|(_, root_txg, _, _)| *root_txg == txg).collect();
++    let all_abandoned = !at.is_empty() && at.iter().all(|(_, _, _, abandoned)| *abandoned);
++    (at.len(), all_abandoned)
++}
++
++const SYSTEM_CONFIGURATION_REGION_END: u64 = 2 * 4096;
++
++/// 一次操作在录制流里的那一段：从哪一步起、到哪一步止（不含）。
++struct OperationSpan {
++    image_before: MemoryPool,
++    operations: Vec<RetainedOperation>,
++}
++
++impl OperationSpan {
++    /// 第 n 条根槽 FUA（长 512 的 write_fua）在这一段里的下标。
++    fn root_force_unit_access_indexes(&self) -> Vec<usize> {
++        self.operations
++            .iter()
++            .enumerate()
++            .filter(|(_, retained)| {
++                retained.operation.kind == RecordedOperationKind::WriteForceUnitAccess && retained.operation.length == 512
++            })
++            .map(|(index, _)| index)
++            .collect()
++    }
++    /// 崩溃状态：这一段里到下标 `last_persisted`（含）为止的操作都持久、之后的都没有。
++    fn crash_image_through(&self, last_persisted: usize) -> MemoryPool {
++        let mut image = self.image_before.clone();
++        image.apply(&self.operations[..=last_persisted]);
++        image
++    }
++    /// 下标区间里的写：(盘, 偏移, 长度)，分系统配置槽与别的。
++    fn writes_in(&self, range: std::ops::Range<usize>) -> (Vec<(DeviceIdentity, u64, u64)>, Vec<(DeviceIdentity, u64, u64)>) {
++        let mut system_configuration = Vec::new();
++        let mut other = Vec::new();
++        for retained in &self.operations[range] {
++            let operation = &retained.operation;
++            if operation.kind == RecordedOperationKind::Barrier {
++                continue;
++            }
++            let entry = (operation.device, operation.offset.0, operation.length);
++            if operation.offset.0 < SYSTEM_CONFIGURATION_REGION_END {
++                system_configuration.push(entry);
++            } else {
++                other.push(entry);
++            }
++        }
++        (system_configuration, other)
++    }
++}
++
++impl Pool {
++    fn new() -> Pool {
++        let parameters = parameters();
++        let stream = SharedStream::retaining_contents();
++        let mut devices: Vec<(DeviceIdentity, Device)> = [DeviceIdentity(0), DeviceIdentity(1)]
++            .into_iter()
++            .map(|identity| {
++                (
++                    identity,
++                    RecordingBlockDevice::with_shared_stream(
++                        identity,
++                        SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
++                        stream.clone(),
++                    ),
++                )
++            })
++            .collect();
++        let genesis = make_filesystem(&parameters, &mut devices).expect("mkfs");
++        let mut allocator = allocator_after_make_filesystem(&parameters, &devices, &genesis);
++        let (instance, output) = {
++            let mut writer = PoolWriter::new(&parameters, &mut devices);
++            let instance = acquire_instance(&mut writer).expect("取号");
++            let warmed = warm_up(&mut writer, &genesis.root, instance).expect("暖机");
++            let output = publish_first_file(
++                &mut writer,
++                &mut allocator,
++                warmed.roots.last().expect("暖机两代根"),
++                FirstFile { content: &content_seeded_by(3000, 1), write_time_seconds: FIXED_WRITE_TIME_SECONDS },
++                instance,
++                &warmed.last_record_bytes,
++            )
++            .expect("第一个文件");
++            (instance, output)
++        };
++        Pool { devices, stream, allocator, output, instance, seed_counter: 0 }
++    }
++
++    fn image(&self) -> MemoryPool {
++        memory_pool_of_sparse_devices(&self.devices)
++    }
++
++    fn fork(&self) -> Pool {
++        let stream = SharedStream::retaining_contents();
++        Pool {
++            devices: devices_of_image(&self.image(), &stream),
++            stream,
++            allocator: self.allocator.clone(),
++            output: self.output.clone(),
++            instance: self.instance,
++            seed_counter: self.seed_counter,
++        }
++    }
++
++    fn verdicts(&self) -> Verdicts {
++        verdicts_on(&self.image())
++    }
++
++    fn overwrite(&mut self) -> Result<TransactionOutput, String> {
++        self.seed_counter += 1;
++        let seed = 17 + 2 * self.seed_counter;
++        let parameters = parameters();
++        let mut writer = PoolWriter::new(&parameters, self.devices.as_mut_slice());
++        let output = publish_overwrite(
++            &mut writer,
++            &mut self.allocator,
++            &self.output,
++            FirstFile { content: &content_seeded_by(2500 + seed, seed), write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60 },
++            self.instance,
++        )
++        .map_err(|error| format!("overwrite:{error:?}"))?;
++        self.output = output.clone();
++        Ok(output)
++    }
++
++    /// 录下一次操作在流里的那一段。
++    fn recorded<Result_>(&mut self, operation: impl FnOnce(&mut Pool) -> Result_) -> (Result_, OperationSpan) {
++        let image_before = self.image();
++        let start = self.stream.operation_count();
++        let result = operation(self);
++        let operations = self.stream.retained_operations()[start..].to_vec();
++        (result, OperationSpan { image_before, operations })
++    }
++
++    /// 进程重开：在 `image` 上可写挂载，`hidden` 里的范围在挂载期间读回全 0，挂载交回之后仍是全 0 的写回原样（挂载写过的不动）。
++    fn recover_from(image: &MemoryPool, hidden: &[(DeviceIdentity, u64, u64)], seed_counter: usize) -> Result<(Pool, String), String> {
++        let stream = SharedStream::retaining_contents();
++        let mut devices = devices_of_image(image, &stream);
++        let mut saved = Vec::new();
++        for (identity, offset, length) in hidden {
++            let index = devices.iter().position(|(candidate, _)| candidate == identity).expect("盘");
++            let mut bytes = vec![0u8; usize::try_from(*length).expect("长度")];
++            devices[index].1.read_at(DeviceOffsetInBytes(*offset), &mut bytes).expect("暂存");
++            devices[index].1.write_at(DeviceOffsetInBytes(*offset), &vec![0u8; bytes.len()], WriteDurability::Plain).expect("清零");
++            saved.push((index, *offset, bytes));
++        }
++        let mounted = mount_writable(&parameters(), &mut devices);
++        let mut rewritten_by_the_mount = 0;
++        for (index, offset, bytes) in &saved {
++            let mut now = vec![0u8; bytes.len()];
++            devices[*index].1.read_at(DeviceOffsetInBytes(*offset), &mut now).expect("读回");
++            if now.iter().all(|byte| *byte == 0) {
++                devices[*index].1.write_at(DeviceOffsetInBytes(*offset), bytes, WriteDurability::Plain).expect("写回");
++            } else {
++                rewritten_by_the_mount += 1;
++            }
++        }
++        let mounted = mounted.map_err(|error| format!("mount:{error:?}"))?;
++        let summary = format!(
++            "chosen txg {} new instance {} row txg {} isolated {:?} rewritten_hidden {}",
++            mounted.output.effective_root.checkpoint_txg.0,
++            mounted.output.instance.0,
++            mounted.output.row_publish.root().checkpoint_txg.0,
++            mounted.output.isolated_slots_per_device.iter().map(|(_, slots)| *slots).collect::<Vec<_>>(),
++            rewritten_by_the_mount
++        );
++        let output = mounted.current.file_version().ok_or("mount:没有带文件的现行版本")?.clone();
++        Ok((
++            Pool { devices, stream, allocator: mounted.allocator, output, instance: mounted.output.instance, seed_counter },
++            summary,
++        ))
++    }
++
++    fn remount(&mut self) -> Result<String, String> {
++        let (pool, summary) = Pool::recover_from(&self.image(), &[], self.seed_counter)?;
++        *self = pool;
++        Ok(summary)
++    }
++
++    fn raise_forced(&mut self, floor: u64) -> Result<String, String> {
++        let raised = raise_rollback_floor(
++            &parameters(),
++            &mut self.devices,
++            &mut self.allocator,
++            &mut self.output,
++            CheckpointTxg(floor),
++            ShadowLedger::On,
++        )
++        .map_err(|error| format!("raise:{}", short_error(&format!("{error:?}"))))?;
++        Ok(format!("ok(F={} reclaimed {} ceiling {})", self.output.root.rollback_floor.0, raised.reclaimed.len(), raised.ceiling.0))
++    }
++
++    fn raise_admission(&mut self) -> Result<String, String> {
++        let raised = raise_rollback_floor_to_the_admission_ceiling(
++            &parameters(),
++            &mut self.devices,
++            &mut self.allocator,
++            &mut self.output,
++            ShadowLedger::On,
++        )
++        .map_err(|error| format!("admission-raise:{}", short_error(&format!("{error:?}"))))?;
++        Ok(match raised {
++            RaiseToTheAdmissionCeiling::Raised(raised) => format!("ok(F={} reclaimed {})", self.output.root.rollback_floor.0, raised.reclaimed.len()),
++            RaiseToTheAdmissionCeiling::FloorAlreadyAtTheCeiling { floor, ceiling } => format!("at-ceiling(F={} ceiling {})", floor.0, ceiling.0),
++        })
++    }
++
++    /// 正常卸载，再可写挂载（新进程）。
++    fn unmount_and_remount(&mut self) -> Result<String, String> {
++        let mut current = PoolVersion::WithFile(self.output.clone());
++        let unmounted = unmount(&parameters(), &mut self.devices, &mut self.allocator, &mut current, ShadowLedger::On)
++            .map_err(|error| format!("unmount:{}", short_error(&format!("{error:?}"))))?;
++        let floor = match unmounted {
++            Unmounted::FloorRaisedToTheCurrentVersion(raised) => raised.rollback_floor.0,
++            Unmounted::NothingWrittenOnAVersionWithoutFile { .. } => 0,
++        };
++        let summary = self.remount()?;
++        Ok(format!("unmount(F={floor}) {summary}"))
++    }
++
++    fn roll_back_to(&mut self, instance: u64, txg: u64) -> Result<String, String> {
++        roll_back_by_a_forward_publish(
++            &parameters(),
++            &mut self.devices,
++            &mut self.allocator,
++            &mut self.output,
++            RollbackTarget { instance: InstanceGeneration(u32::try_from(instance).expect("实例号")), checkpoint_txg: CheckpointTxg(txg) },
++        )
++        .map_err(|error| format!("rollback:{}", short_error(&format!("{error:?}"))))?;
++        Ok(format!("rolled back to (inst {instance}, txg {txg})"))
++    }
++}
++
++fn short_error(text: &str) -> String {
++    text.split(['{', '(']).next().unwrap_or(text).trim().to_string()
++        + &text.find("requested").map(|at| format!("[{}]", &text[at..text.len().min(at + 90)])).unwrap_or_default()
++}
++
++/// 一次发布的根槽与数据单元（「一时读不出」要藏的地方）。
++fn root_slot_and_data_units_of(version: &TransactionOutput) -> Vec<(DeviceIdentity, u64, u64)> {
++    let publish_parameters = parameters();
++    let target = singlefs_core::root_ring::target_for_publish(version.root.checkpoint_txg, publish_parameters.geometry.root_ring_slots_per_region);
++    let root_slot_device = publish_parameters.region_devices[usize::try_from(target.region).expect("区域号")];
++    let root_slot_offset = singlefs_core::root_ring::slot_offset(target, publish_parameters.geometry.fixed_structure_slot_spacing);
++    let data_unit_bytes = singlefs_format::DATA_UNIT_BYTES;
++    std::iter::once((root_slot_device, root_slot_offset.0, u64::from(publish_parameters.geometry.physical_block_size)))
++        .chain(
++            version
++                .data_pointers
++                .iter()
++                .flat_map(|pointer| pointer.locations)
++                .map(|location| (location.device, location.slot.to_device_offset().0, data_unit_bytes)),
++        )
++        .collect()
++}
++
++fn candidate() -> String {
++    std::env::var("AF_CANDIDATE").unwrap_or_else(|_| "today".to_string())
++}
++fn abandoned_floor_mode() -> String {
++    std::env::var("AF_ABANDONED_F").unwrap_or_else(|_| "not-counted".to_string())
++}
++fn cell(experiment: &str, text: &str) {
++    eprintln!("AF-CELL cand={} abF={} exp={experiment} {text}", candidate(), abandoned_floor_mode());
++}
++fn verdict_text(result: &Result<String, String>, pool: &Pool) -> String {
++    match result {
++        Ok(summary) => format!("{summary}=>{}", pool.verdicts().names()),
++        Err(error) => format!("{error}=>{}", pool.verdicts().names()),
++    }
++}
++
++/// 抬 F 之后由用户决定的几段后缀，各从同一份抬后的盘面分叉。
++fn post_actions(after_raise: &Pool) -> String {
++    let mut texts = Vec::new();
++    {
++        let mut pool = after_raise.fork();
++        let first = pool.overwrite().map(|_| "ow".to_string());
++        let one = verdict_text(&first, &pool);
++        let second = pool.overwrite().map(|_| "ow".to_string());
++        texts.push(format!("ow2:{one}>{}", verdict_text(&second, &pool)));
++    }
++    {
++        let mut pool = after_raise.fork();
++        let remounted = pool.remount();
++        let one = verdict_text(&remounted, &pool);
++        if remounted.is_ok() {
++            let first = pool.overwrite().map(|_| "ow".to_string());
++            let two = verdict_text(&first, &pool);
++            let second = pool.overwrite().map(|_| "ow".to_string());
++            texts.push(format!("remount_ow2:{one}>{two}>{}", verdict_text(&second, &pool)));
++        } else {
++            texts.push(format!("remount_ow2:{one}"));
++        }
++    }
++    {
++        let mut pool = after_raise.fork();
++        let unmounted = pool.unmount_and_remount();
++        let one = verdict_text(&unmounted, &pool);
++        if unmounted.is_ok() {
++            let first = pool.overwrite().map(|_| "ow".to_string());
++            texts.push(format!("unmount_remount_ow1:{one}>{}", verdict_text(&first, &pool)));
++        } else {
++            texts.push(format!("unmount_remount_ow1:{one}"));
++        }
++    }
++    {
++        // 回退到环里每条没被抛弃、带文件、低于现行那一版的根（带文件与否由回退自己判，拒了照记）。
++        let targets: Vec<(u64, u64)> = ring_roots(&after_raise.image())
++            .into_iter()
++            .filter(|(_, txg, _, abandoned)| !abandoned && *txg >= 3 && *txg < after_raise.output.root.checkpoint_txg.0)
++            .map(|(instance, txg, _, _)| (instance, txg))
++            .collect();
++        for (instance, txg) in targets {
++            let mut pool = after_raise.fork();
++            let rolled = pool.roll_back_to(instance, txg);
++            let one = verdict_text(&rolled, &pool);
++            if rolled.is_ok() {
++                let first = pool.overwrite().map(|_| "ow".to_string());
++                texts.push(format!("rb{txg}_ow1:{one}>{}", verdict_text(&first, &pool)));
++            } else {
++                texts.push(format!("rb{txg}:{}", rolled.err().unwrap_or_default()));
++            }
++        }
++    }
++    texts.join(" | ")
++}
++
++fn raise_cell(experiment: &str, keys: &str, base: &Pool, floor: u64, with_post_actions: bool) {
++    let mut pool = base.fork();
++    let image_before = pool.image();
++    let before = verdicts_on(&image_before).names();
++    let (roots_at_floor, all_abandoned) = roots_at_txg(&image_before, floor);
++    let raised = pool.raise_forced(floor);
++    let after = verdict_text(&raised, &pool);
++    let posts = if with_post_actions && raised.is_ok() { post_actions(&pool) } else { String::new() };
++    cell(
++        experiment,
++        &format!(
++            "{keys} F={floor} txg_before={} roots_at_F={roots_at_floor} all_abandoned={all_abandoned} before={before} raise={after} post=[{posts}]",
++            base.output.root.checkpoint_txg.0
++        ),
++    );
++}
++
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++enum Variant {
++    /// C 的系统配置轮换没落盘就崩（录制流前缀到 C 的根槽 FUA 为止）；可写挂载时 C 的根槽与数据单元一时读不出。
++    CrashBeforeRotation,
++    /// C 整次发布落盘；可写挂载时 C 的根槽、数据单元与见证 C 的系统配置槽（每盘一槽）一时读不出。
++    DoubleFault,
++}
++
++/// A（txg 3）→ B（4）→ C（5）→ 按变体崩溃、可写挂载时 C 一时读不出：落到 B、实例 2。
++fn abandon_c(variant: Variant, overwrites_before_b: usize) -> (Pool, String) {
++    let mut pool = Pool::new();
++    for _ in 0..overwrites_before_b {
++        pool.overwrite().expect("预填覆盖写");
++    }
++    pool.overwrite().expect("B");
++    let (third, span) = pool.recorded(|pool| pool.overwrite());
++    let third = third.expect("C");
++    let root_index = *span.root_force_unit_access_indexes().last().expect("C 的根槽 FUA");
++    let (system_configuration_after, other_after) = span.writes_in(root_index + 1..span.operations.len());
++    assert!(other_after.is_empty(), "根槽 FUA 之后只有系统配置槽写：{other_after:?}");
++    let mut hidden = root_slot_and_data_units_of(&third);
++    let image = match variant {
++        Variant::CrashBeforeRotation => span.crash_image_through(root_index),
++        Variant::DoubleFault => {
++            hidden.extend(system_configuration_after.iter().copied());
++            span.crash_image_through(span.operations.len() - 1)
++        }
++    };
++    let (recovered, summary) = Pool::recover_from(&image, &hidden, pool.seed_counter).expect("可写挂载");
++    (recovered, format!("C=txg {} {summary}", third.root.checkpoint_txg.0))
++}
++
++fn run_e1(variant: Variant, remount: bool) {
++    let (mut base, summary) = abandon_c(variant, 0);
++    let remount_summary = if remount { base.remount().expect("再可写挂载") } else { String::new() };
++    cell("E1-setup", &format!("variant={variant:?} remount={remount} {summary} | {remount_summary} ring={:?}", ring_roots(&base.image())));
++    for overwrites_after in 0..=6 {
++        for floor in 3..=9 {
++            raise_cell("E1", &format!("variant={variant:?} remount={remount} k={overwrites_after}"), &base, floor, true);
++        }
++        base.overwrite().expect("覆盖写");
++    }
++}
++
++#[test]
++fn e1_crash_before_rotation_no_remount() { run_e1(Variant::CrashBeforeRotation, false); }
++#[test]
++fn e1_crash_before_rotation_remount() { run_e1(Variant::CrashBeforeRotation, true); }
++#[test]
++fn e1_double_fault_no_remount() { run_e1(Variant::DoubleFault, false); }
++#[test]
++fn e1_double_fault_remount() { run_e1(Variant::DoubleFault, true); }
++
++/// 同一份盘面上不抬 F、直接走后缀（回退、卸载、覆盖写）：给「抬 F 之前就红没红」「回退得了哪几条」做对照。
++fn no_raise_cell(experiment: &str, keys: &str, base: &Pool) {
++    let pool = base.fork();
++    let before = pool.verdicts().names();
++    let posts = post_actions(&pool);
++    cell(experiment, &format!("{keys} F=none txg_before={} F_eff_impl={} before={before} post=[{posts}]", base.output.root.checkpoint_txg.0, implementation_effective_floor(&pool.image())));
++}
++
++/// A（3）→ B（4）→ C（5）→ D（6）→ E（7）：E 的系统配置轮换没落盘就崩；可写挂载时 D、E 的根槽与数据单元、见证 D 的系统配置槽（每盘一槽）一时读不出。
++/// 系统配置里读得出的只剩见证 C 的那一槽：落到 C，D、E 两条根属于被抛弃的实例 1。
++fn abandon_d_and_e() -> (Pool, String) {
++    let mut pool = Pool::new();
++    pool.overwrite().expect("B");
++    pool.overwrite().expect("C");
++    let (fourth, span_d) = pool.recorded(|pool| pool.overwrite());
++    let fourth = fourth.expect("D");
++    let (fifth, span_e) = pool.recorded(|pool| pool.overwrite());
++    let fifth = fifth.expect("E");
++    let d_root = *span_d.root_force_unit_access_indexes().last().expect("D 根槽");
++    let (d_rotation, _) = span_d.writes_in(d_root + 1..span_d.operations.len());
++    let e_root = *span_e.root_force_unit_access_indexes().last().expect("E 根槽");
++    let (_, e_other_after) = span_e.writes_in(e_root + 1..span_e.operations.len());
++    assert!(e_other_after.is_empty(), "E 根槽 FUA 之后只有系统配置槽写");
++    let mut hidden = root_slot_and_data_units_of(&fourth);
++    hidden.extend(root_slot_and_data_units_of(&fifth));
++    hidden.extend(d_rotation.iter().copied());
++    let image = span_e.crash_image_through(e_root);
++    let (recovered, summary) = Pool::recover_from(&image, &hidden, pool.seed_counter).expect("可写挂载");
++    (recovered, format!("D=txg {} E=txg {} {summary}", fourth.root.checkpoint_txg.0, fifth.root.checkpoint_txg.0))
++}
++
++fn run_e3(remount: bool) {
++    let (mut base, summary) = abandon_d_and_e();
++    let remount_summary = if remount { base.remount().expect("再可写挂载") } else { String::new() };
++    cell("E3-setup", &format!("remount={remount} {summary} | {remount_summary} ring={:?}", ring_roots(&base.image())));
++    for overwrites_after in 0..=6 {
++        no_raise_cell("E3", &format!("remount={remount} k={overwrites_after}"), &base);
++        for floor in 3..=11 {
++            raise_cell("E3", &format!("remount={remount} k={overwrites_after}"), &base, floor, true);
++        }
++        base.overwrite().expect("覆盖写");
++    }
++}
++
++#[test]
++fn e3_two_abandoned_roots_remount() { run_e3(true); }
++#[test]
++fn e3_two_abandoned_roots_no_remount() { run_e3(false); }
++
++#[derive(Clone, Copy, Debug)]
++enum RaiseInTheAbandonedInstance {
++    /// 只供测试强制进入的那一档，抬到给定的 F。
++    Forced(u64),
++    /// 正常卸载那一串（F 抬到现行那一版的 txg）。
++    Unmount,
++}
++
++/// 实例 1：A（3）→ 三次预填（4、5、6）→ B（7）→ C（8），在 C 上抬 F（强制到给定值，或正常卸载抬到 8）：先写系统配置（SysPre）再发第一次带新 F 的空发布（txg 9）；
++/// 崩在那次发布的根槽 FUA 之后、它的轮换之前。可写挂载时那次发布写下的单元、journal 与根槽一时读不出；
++/// `hide_the_raised_floor_in_the_system_configuration` 时 SysPre 写的系统配置槽（每盘一槽）也一时读不出——挂载的取号写落回那一槽，新 F 从系统配置里没了，
++/// 只剩被抛弃的根 txg 9 带着它。
++fn abandon_the_first_raise_publish(mode: RaiseInTheAbandonedInstance, hide_the_raised_floor_in_the_system_configuration: bool) -> Result<(Pool, String), String> {
++    let mut pool = Pool::new();
++    for _ in 0..3 {
++        pool.overwrite().expect("预填");
++    }
++    pool.overwrite().expect("B");
++    pool.overwrite().expect("C");
++    let (raised, span) = pool.recorded(|pool| match mode {
++        RaiseInTheAbandonedInstance::Forced(floor) => pool.raise_forced(floor),
++        RaiseInTheAbandonedInstance::Unmount => {
++            let mut current = PoolVersion::WithFile(pool.output.clone());
++            unmount(&parameters(), &mut pool.devices, &mut pool.allocator, &mut current, ShadowLedger::On)
++                .map(|_| "unmount ok".to_string())
++                .map_err(|error| format!("unmount:{}", short_error(&format!("{error:?}"))))
++        }
++    });
++    let raised = raised?;
++    let first_root = *span.root_force_unit_access_indexes().first().expect("第一次空发布的根槽");
++    if std::env::var_os("AF_STREAM").is_some() {
++        for (index, retained) in span.operations.iter().enumerate() {
++            eprintln!("AF-STREAM mode={mode:?} #{index}: {}", retained.operation.to_stream_line());
++        }
++    }
++    let (system_configuration_before, other_before) = span.writes_in(0..first_root + 1);
++    // journal 记录不藏：藏了它，新实例看不见 txg 9 被用过，写行就落在 txg 9、盖掉那条根槽（试跑看到的，AF-CELL E4-setup rewritten_hidden）。
++    let journal_start = singlefs_format::JOURNAL_RING_START_SLOT * singlefs_format::SLOT_BYTES;
++    let journal_end = journal_start + parameters().geometry.journal_ring_bytes;
++    let journal_writes = other_before.iter().filter(|(_, offset, _)| *offset >= journal_start && *offset < journal_end).count();
++    let mut hidden: Vec<(DeviceIdentity, u64, u64)> = other_before
++        .into_iter()
++        .filter(|(_, offset, _)| !(*offset >= journal_start && *offset < journal_end))
++        .collect();
++    if std::env::var_os("AF_STREAM").is_some() {
++        eprintln!("AF-STREAM mode={mode:?} journal_writes_kept_readable={journal_writes} hidden={hidden:?}");
++    }
++    if hide_the_raised_floor_in_the_system_configuration {
++        hidden.extend(system_configuration_before.iter().copied());
++    }
++    let image = span.crash_image_through(first_root);
++    let (recovered, summary) = Pool::recover_from(&image, &hidden, pool.seed_counter)?;
++    Ok((recovered, format!("raise(instance 1)={raised} syspre_writes={} {summary}", system_configuration_before.len())))
++}
++
++fn run_e4(mode: RaiseInTheAbandonedInstance, hide: bool) {
++    let (mut base, summary) = match abandon_the_first_raise_publish(mode, hide) {
++        Ok(built) => built,
++        Err(error) => {
++            cell("E4-setup", &format!("mode={mode:?} hide_syspre={hide} FAILED {error}"));
++            return;
++        }
++    };
++    let remount_summary = base.remount().map_or_else(|error| error, |summary| summary);
++    cell("E4-setup", &format!("mode={mode:?} hide_syspre={hide} {summary} | {remount_summary} F_eff_impl={} ring={:?}", implementation_effective_floor(&base.image()), ring_roots(&base.image())));
++    for overwrites_after in 0..=4 {
++        let keys = format!("mode={mode:?} hide_syspre={hide} k={overwrites_after}");
++        no_raise_cell("E4", &keys, &base);
++        {
++            let mut pool = base.fork();
++            let raised = pool.raise_admission();
++            let text = verdict_text(&raised, &pool);
++            let posts = if raised.as_ref().is_ok_and(|text| text.starts_with("ok")) { post_actions(&pool) } else { String::new() };
++            cell("E4", &format!("{keys} F=admission txg_before={} raise={text} post=[{posts}]", base.output.root.checkpoint_txg.0));
++        }
++        for floor in 3..=12 {
++            raise_cell("E4", &keys, &base, floor, true);
++        }
++        base.overwrite().expect("覆盖写");
++    }
++}
++
++#[test]
++fn e4_forced_four_hidden() { run_e4(RaiseInTheAbandonedInstance::Forced(4), true); }
++#[test]
++fn e4_forced_five_hidden() { run_e4(RaiseInTheAbandonedInstance::Forced(5), true); }
++#[test]
++fn e4_unmount_hidden() { run_e4(RaiseInTheAbandonedInstance::Unmount, true); }
++#[test]
++fn e4_forced_five_not_hidden() { run_e4(RaiseInTheAbandonedInstance::Forced(5), false); }
++#[test]
++fn e4_unmount_not_hidden() { run_e4(RaiseInTheAbandonedInstance::Unmount, false); }
++
++/// C379 的两个口径：记账行的全空聚簇段数（`empty_segments`，只看分配位）与分配器能开的段（还看隔离位与扣住位）；
++/// 「只按分配位算空、却开不出来」的段数与其中整段 64 槽都被挡的段数。
++fn segment_accounting(pool: &Pool) -> String {
++    let per_segment = 64u64;
++    pool.allocator
++        .devices
++        .iter()
++        .map(|device_map| {
++            let start = device_map.unit_area_start().slot().0;
++            let segments = device_map.unit_area_slots() / per_segment;
++            let mut empty_but_blocked = 0u64;
++            let mut empty_and_wholly_blocked = 0u64;
++            let mut blocked_segment_numbers = Vec::new();
++            for segment in 0..segments {
++                if !device_map.segment_is_empty(usize::try_from(segment).expect("段号")) {
++                    continue;
++                }
++                let blocked = (0..per_segment)
++                    .filter(|offset| !device_map.is_free(singlefs_core::address::SlotNumber(start + segment * per_segment + offset)))
++                    .count();
++                if blocked > 0 {
++                    empty_but_blocked += 1;
++                    if blocked == 64 {
++                        empty_and_wholly_blocked += 1;
++                    }
++                    if blocked_segment_numbers.len() < 4 {
++                        blocked_segment_numbers.push(format!("{}:{blocked}", start + segment * per_segment));
++                    }
++                }
++            }
++            format!(
++                "dev{} row_empty_segments={} lowest_openable={:?} empty_but_blocked={empty_but_blocked} wholly_blocked={empty_and_wholly_blocked} isolated={} examples={:?}",
++                device_map.device.0,
++                device_map.empty_segments(),
++                device_map.lowest_empty_segment().map(|slot| slot.0),
++                device_map.isolated_slots(),
++                blocked_segment_numbers
++            )
++        })
++        .collect::<Vec<_>>()
++        .join(" ; ")
++}
++
++/// C 写多大的文件、C 之前预填几次：C 那一版独占的单元能不能自然占满一整段（不注入）。
++fn abandon_c_with_file_bytes(variant: Variant, prefill: usize, c_file_bytes: usize) -> Result<(Pool, String), String> {
++    let mut pool = Pool::new();
++    for _ in 0..prefill {
++        pool.overwrite()?;
++    }
++    pool.overwrite()?;
++    let parameters = parameters();
++    let (third, span) = pool.recorded(|pool| {
++        let mut writer = PoolWriter::new(&parameters, pool.devices.as_mut_slice());
++        publish_overwrite(
++            &mut writer,
++            &mut pool.allocator,
++            &pool.output,
++            FirstFile { content: &content_seeded_by(c_file_bytes, 97), write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60 },
++            pool.instance,
++        )
++        .map_err(|error| format!("C:{}", short_error(&format!("{error:?}"))))
++    });
++    let third = third?;
++    let root_index = *span.root_force_unit_access_indexes().last().expect("C 的根槽 FUA");
++    let (system_configuration_after, other_after) = span.writes_in(root_index + 1..span.operations.len());
++    assert!(other_after.is_empty(), "根槽 FUA 之后只有系统配置槽写");
++    let mut hidden = root_slot_and_data_units_of(&third);
++    let image = match variant {
++        Variant::CrashBeforeRotation => span.crash_image_through(root_index),
++        Variant::DoubleFault => {
++            hidden.extend(system_configuration_after.iter().copied());
++            span.crash_image_through(span.operations.len() - 1)
++        }
++    };
++    let data_units = third.data_pointers.len();
++    let (recovered, summary) = Pool::recover_from(&image, &hidden, pool.seed_counter)?;
++    Ok((recovered, format!("C=txg {} data_units={data_units} {summary}", third.root.checkpoint_txg.0)))
++}
++
++fn run_e5(variant: Variant, c_file_bytes: usize) {
++    {
++        for prefill in 0usize..=45 {
++            let keys = format!("variant={variant:?} c_bytes={c_file_bytes} prefill={prefill}");
++            match abandon_c_with_file_bytes(variant, prefill, c_file_bytes) {
++                Err(error) => cell("E5", &format!("{keys} FAILED {error}")),
++                Ok((mut pool, summary)) => {
++                    let after_first_mount = segment_accounting(&pool);
++                    let first_verdicts = pool.verdicts().names();
++                    let remount = pool.remount().map_or_else(|error| error, |summary| summary);
++                    let after_remount = segment_accounting(&pool);
++                    let remount_verdicts = pool.verdicts().names();
++                    let written = pool.overwrite().map(|_| "ow".to_string());
++                    let after_write = segment_accounting(&pool);
++                    let write_verdicts = verdict_text(&written, &pool);
++                    cell("E5", &format!("{keys} {summary} | first_mount: {after_first_mount} v={first_verdicts} | remount {remount}: {after_remount} v={remount_verdicts} | after_ow: {after_write} v={write_verdicts}"));
++                }
++            }
++        }
++    }
++}
++
++#[test]
++fn e5_crash_before_rotation_small_file() { run_e5(Variant::CrashBeforeRotation, 2_500); }
++#[test]
++fn e5_crash_before_rotation_full_data_unit() { run_e5(Variant::CrashBeforeRotation, 30_000); }
++#[test]
++fn e5_double_fault_small_file() { run_e5(Variant::DoubleFault, 2_500); }
++#[test]
++fn e5_double_fault_full_data_unit() { run_e5(Variant::DoubleFault, 30_000); }
++
++/// 产品入口：准入抬 F（抬到上限）与正常卸载，在各条被抛弃实例的历史上 F 落在哪。
++fn product_entry_cells(experiment: &str, keys_prefix: &str, base: &Pool) {
++    let mut pool = base.fork();
++    let image_before = pool.image();
++    let raised = pool.raise_admission();
++    let landed = pool.output.root.rollback_floor.0;
++    let (roots_at_floor, all_abandoned) = roots_at_txg(&image_before, landed);
++    let text = verdict_text(&raised, &pool);
++    let posts = if raised.as_ref().is_ok_and(|text| text.starts_with("ok")) { post_actions(&pool) } else { String::new() };
++    cell(experiment, &format!("{keys_prefix} entry=admission txg_before={} landed_F={landed} roots_at_F={roots_at_floor} all_abandoned={all_abandoned} raise={text} post=[{posts}]", base.output.root.checkpoint_txg.0));
++    let mut pool = base.fork();
++    let unmounted = pool.unmount_and_remount();
++    cell(experiment, &format!("{keys_prefix} entry=unmount txg_before={} result={}", base.output.root.checkpoint_txg.0, verdict_text(&unmounted, &pool)));
++}
++
++fn run_e6(label: &str, mut base: Pool) {
++    cell("E6-setup", &format!("base={label} ring={:?}", ring_roots(&base.image())));
++    for overwrites_after in 0..=12 {
++        product_entry_cells("E6", &format!("base={label} k={overwrites_after}"), &base);
++        base.overwrite().expect("覆盖写");
++    }
++}
++
++#[test]
++fn e6_product_entries_after_crash_before_rotation_remount() {
++    let (mut base, _) = abandon_c(Variant::CrashBeforeRotation, 0);
++    base.remount().expect("再挂载");
++    run_e6("E1-CBR-remount", base);
++}
++#[test]
++fn e6_product_entries_after_crash_before_rotation_no_remount() {
++    let (base, _) = abandon_c(Variant::CrashBeforeRotation, 0);
++    run_e6("E1-CBR-noremount", base);
++}
++#[test]
++fn e6_product_entries_after_two_abandoned_roots() {
++    let (mut base, _) = abandon_d_and_e();
++    base.remount().expect("再挂载");
++    run_e6("E3-remount", base);
++}
++#[test]
++fn e6_product_entries_after_abandoned_raise() {
++    let (mut base, _) = abandon_the_first_raise_publish(RaiseInTheAbandonedInstance::Unmount, true).expect("E4 起点");
++    base.remount().expect("再挂载");
++    run_e6("E4-unmount-hidden-remount", base);
++}
++
++#[derive(Clone, Copy, Debug)]
++enum UnreadableC {
++    /// 只有 C 的根槽一直读不出。
++    RootSlot,
++    /// C 的根槽与 C 那次发布的 journal 记录一直读不出。
++    RootSlotAndJournalRecord,
++    /// C 的根槽与 C 的数据单元（两份）一直读不出（记录施加前验点名单元失败）。
++    RootSlotAndDataUnits,
++}
++
++/// 不被抛弃、只是读不出的根也可能留下空档：A（3）→ B（4）→ C（5）→ D（6），C 的某几处之后一直读不出（清零、不写回），再可写挂载（落到 D）。
++fn permanently_unreadable_c(what: UnreadableC) -> (Pool, String) {
++    let mut pool = Pool::new();
++    pool.overwrite().expect("B");
++    let (third, span) = pool.recorded(|pool| pool.overwrite());
++    let third = third.expect("C");
++    pool.overwrite().expect("D");
++    let journal_start = singlefs_format::JOURNAL_RING_START_SLOT * singlefs_format::SLOT_BYTES;
++    let journal_end = journal_start + parameters().geometry.journal_ring_bytes;
++    let (_, other) = span.writes_in(0..span.operations.len());
++    let root_and_data = root_slot_and_data_units_of(&third);
++    let zeroed: Vec<(DeviceIdentity, u64, u64)> = match what {
++        UnreadableC::RootSlot => vec![root_and_data[0]],
++        UnreadableC::RootSlotAndJournalRecord => std::iter::once(root_and_data[0])
++            .chain(other.iter().copied().filter(|(_, offset, _)| *offset >= journal_start && *offset < journal_end))
++            .collect(),
++        UnreadableC::RootSlotAndDataUnits => root_and_data,
++    };
++    for (identity, offset, length) in &zeroed {
++        let index = pool.devices.iter().position(|(candidate, _)| candidate == identity).expect("盘");
++        pool.devices[index].1.write_at(DeviceOffsetInBytes(*offset), &vec![0u8; usize::try_from(*length).expect("长度")], WriteDurability::Plain).expect("清零");
++    }
++    let summary = pool.remount().expect("可写挂载");
++    (pool, format!("zeroed={} {summary}", zeroed.len()))
++}
++
++fn run_e7(what: UnreadableC) {
++    let (mut base, summary) = permanently_unreadable_c(what);
++    cell("E7-setup", &format!("what={what:?} {summary} ring={:?}", ring_roots(&base.image())));
++    for overwrites_after in 0..=6 {
++        let keys = format!("what={what:?} k={overwrites_after}");
++        no_raise_cell("E7", &keys, &base);
++        for floor in 3..=9 {
++            raise_cell("E7", &keys, &base, floor, true);
++        }
++        base.overwrite().expect("覆盖写");
++    }
++}
++
++#[test]
++fn e7_unreadable_root_slot() { run_e7(UnreadableC::RootSlot); }
++#[test]
++fn e7_unreadable_root_slot_and_journal_record() { run_e7(UnreadableC::RootSlotAndJournalRecord); }
++#[test]
++fn e7_unreadable_root_slot_and_data_units() { run_e7(UnreadableC::RootSlotAndDataUnits); }
++
++/// 根环转圈：B（txg 4）与 C（txg 5）离开根环前后，F 抬到 5 或 6。
++#[test]
++fn e8_ring_rotation() {
++    let (mut base, _) = abandon_c(Variant::CrashBeforeRotation, 0);
++    base.remount().expect("再挂载");
++    for overwrites_after in 0..=34 {
++        for floor in [5u64, 6] {
++            let keys = format!("k={overwrites_after}");
++            let mut pool = base.fork();
++            let image_before = pool.image();
++            let before = verdicts_on(&image_before).names();
++            let (roots_at_floor, all_abandoned) = roots_at_txg(&image_before, floor);
++            let raised = pool.raise_forced(floor);
++            let after = verdict_text(&raised, &pool);
++            let mut posts = String::new();
++            if raised.is_ok() {
++                let mut remounted = pool.fork();
++                let one = remounted.remount().map_or_else(|error| error, |summary| summary);
++                let one_verdicts = remounted.verdicts().names();
++                let written = remounted.overwrite().map(|_| "ow".to_string());
++                posts = format!("remount_ow1:{one}=>{one_verdicts}>{}", verdict_text(&written, &remounted));
++            }
++            cell("E8", &format!("{keys} F={floor} txg_before={} roots_at_F={roots_at_floor} all_abandoned={all_abandoned} ring_min_txg={:?} before={before} raise={after} post=[{posts}]", base.output.root.checkpoint_txg.0, ring_roots(&image_before).first().map(|root| root.1)));
++        }
++        base.overwrite().expect("覆盖写");
++    }
++}
++
++/// 空档里一条根都没有：A（3）→ B（4）→ C（5）崩在 C 的根槽 FUA 之前（录制流前缀到根槽 FUA 的前一步：C 的单元与 journal 记录都落了盘），
++/// 可写挂载时 C 的数据单元一时读不出（记录施加前验点名单元失败、不施加）：落到 B，txg 5 只有一条不施加的记录、没有根槽。
++fn c_without_a_root_slot(hide_data_units: bool) -> (Pool, String) {
++    let mut pool = Pool::new();
++    pool.overwrite().expect("B");
++    let (third, span) = pool.recorded(|pool| pool.overwrite());
++    let third = third.expect("C");
++    let root_index = *span.root_force_unit_access_indexes().last().expect("C 的根槽 FUA");
++    let image = span.crash_image_through(root_index - 1);
++    let hidden: Vec<(DeviceIdentity, u64, u64)> = if hide_data_units { root_slot_and_data_units_of(&third).into_iter().skip(1).collect() } else { Vec::new() };
++    let (recovered, summary) = Pool::recover_from(&image, &hidden, pool.seed_counter).expect("可写挂载");
++    (recovered, format!("C=txg {} (no root slot, data units hidden {hide_data_units}) {summary}", third.root.checkpoint_txg.0))
++}
++
++fn run_e9(remount: bool, hide_data_units: bool) {
++    let (mut base, summary) = c_without_a_root_slot(hide_data_units);
++    let remount_summary = if remount { base.remount().expect("再可写挂载") } else { String::new() };
++    cell("E9-setup", &format!("remount={remount} hide_data={hide_data_units} {summary} | {remount_summary} ring={:?}", ring_roots(&base.image())));
++    for overwrites_after in 0..=6 {
++        let keys = format!("remount={remount} hide_data={hide_data_units} k={overwrites_after}");
++        no_raise_cell("E9", &keys, &base);
++        for floor in 3..=9 {
++            raise_cell("E9", &keys, &base, floor, true);
++        }
++        {
++            let mut pool = base.fork();
++            let image_before = pool.image();
++            let raised = pool.raise_admission();
++            let landed = pool.output.root.rollback_floor.0;
++            let (roots_at_floor, all_abandoned) = roots_at_txg(&image_before, landed);
++            cell("E9", &format!("{keys} F=admission landed_F={landed} roots_at_F={roots_at_floor} all_abandoned={all_abandoned} raise={}", verdict_text(&raised, &pool)));
++        }
++        base.overwrite().expect("覆盖写");
++    }
++}
++
++#[test]
++fn e9_gap_without_a_root_slot_remount() { run_e9(true, true); }
++#[test]
++fn e9_gap_without_a_root_slot_no_remount() { run_e9(false, true); }
++#[test]
++fn e9_version_applied_only_by_its_record_remount() { run_e9(true, false); }
++#[test]
++fn e9_version_applied_only_by_its_record_no_remount() { run_e9(false, false); }
++
++/// 候选根一时读不出时抬 F：E1 的起点（崩在 C 的轮换之前、落到 B、实例 2 写行 6 暖机 7）之后进程重开，
++/// 这一次可写挂载与之后的覆盖写、抬 F 期间，txg `hidden_txg`（实例 2 的一条有效根，F 之上）的根槽读回全 0；抬完之后读得出了。
++fn run_e10(hidden_txg: u64) {
++    let (base, summary) = abandon_c(Variant::CrashBeforeRotation, 0);
++    cell("E10-setup", &format!("hidden_txg={hidden_txg} {summary} ring={:?}", ring_roots(&base.image())));
++    let publish_parameters = parameters();
++    let target = singlefs_core::root_ring::target_for_publish(CheckpointTxg(hidden_txg), publish_parameters.geometry.root_ring_slots_per_region);
++    let device = publish_parameters.region_devices[usize::try_from(target.region).expect("区域号")];
++    let offset = singlefs_core::root_ring::slot_offset(target, publish_parameters.geometry.fixed_structure_slot_spacing).0;
++    let length = u64::from(publish_parameters.geometry.physical_block_size);
++    for overwrites_after in 3..=6 {
++        for floor in [5u64, 6, 7] {
++            let keys = format!("hidden_txg={hidden_txg} k={overwrites_after} F={floor}");
++            let stream = SharedStream::retaining_contents();
++            let mut devices = devices_of_image(&base.image(), &stream);
++            let index = devices.iter().position(|(candidate, _)| *candidate == device).expect("盘");
++            let mut saved = vec![0u8; usize::try_from(length).expect("长度")];
++            devices[index].1.read_at(DeviceOffsetInBytes(offset), &mut saved).expect("暂存");
++            devices[index].1.write_at(DeviceOffsetInBytes(offset), &vec![0u8; saved.len()], WriteDurability::Plain).expect("清零");
++            let mounted = match mount_writable(&parameters(), &mut devices) {
++                Ok(mounted) => mounted,
++                Err(error) => {
++                    cell("E10", &format!("{keys} mount:{}", short_error(&format!("{error:?}"))));
++                    continue;
++                }
++            };
++            let output = mounted.current.file_version().expect("带文件").clone();
++            let mut pool = Pool { devices, stream, allocator: mounted.allocator, output, instance: mounted.output.instance, seed_counter: base.seed_counter };
++            let mut steps = Vec::new();
++            for _ in 0..overwrites_after {
++                if let Err(error) = pool.overwrite() {
++                    steps.push(error);
++                }
++            }
++            let raised = pool.raise_forced(floor);
++            let raise_text = match &raised { Ok(text) => text.clone(), Err(error) => error.clone() };
++            let after_raise_hidden = pool.verdicts().names();
++            let mut suffix = Vec::new();
++            for _ in 0..3 {
++                let written = pool.overwrite().map(|_| "ow".to_string());
++                suffix.push(match written { Ok(_) => "ow".to_string(), Err(error) => error });
++            }
++            let hidden_verdicts = pool.verdicts().names();
++            let mut now = vec![0u8; saved.len()];
++            pool.devices[index].1.read_at(DeviceOffsetInBytes(offset), &mut now).expect("读回");
++            let restored = now.iter().all(|byte| *byte == 0);
++            if restored {
++                pool.devices[index].1.write_at(DeviceOffsetInBytes(offset), &saved, WriteDurability::Plain).expect("写回");
++            }
++            let readable_again = pool.verdicts().names();
++            let remounted = pool.remount();
++            let after_remount = verdict_text(&remounted, &pool);
++            cell("E10", &format!("{keys} instance={} steps={steps:?} raise={raise_text} after_raise_while_hidden={after_raise_hidden} after_3ow_while_hidden={hidden_verdicts} suffix={suffix:?} restored={restored} readable_again={readable_again} remount={after_remount}", pool.instance.0));
++        }
++    }
++}
++
++#[test]
++fn e10_candidate_root_six_unreadable_during_the_raise() { run_e10(6); }
++#[test]
++fn e10_candidate_root_seven_unreadable_during_the_raise() { run_e10(7); }
++
++/// C379 自然历史第二形：被抛弃根的单元只隔离了段里的一部分，同段里别的单元之后被释放、回收——段在分配位上全空（记账行数它），
++/// 分配器因为隔离位不开它。起点：C 被抛弃、再可写挂载（影子账隔离 C 的单元）；之后覆盖写 k 次，产品入口抬 F（准入抬到上限），再覆盖写 j 次。
++fn run_e11(variant: Variant, remount_first: bool) {
++    let (mut base, summary) = abandon_c(variant, 0);
++    if remount_first {
++        base.remount().expect("再挂载");
++    }
++    cell("E11-setup", &format!("variant={variant:?} remount={remount_first} {summary} | {}", segment_accounting(&base)));
++    for overwrites_after in 0..=14 {
++        let mut pool = base.fork();
++        let raised = pool.raise_admission();
++        let after_raise = segment_accounting(&pool);
++        let after_raise_verdicts = pool.verdicts().names();
++        let mut after_writes = Vec::new();
++        for _ in 0..3 {
++            let written = pool.overwrite();
++            after_writes.push(format!("{}:{}", if written.is_ok() { "ow" } else { "ow-err" }, segment_accounting(&pool)));
++        }
++        let remounted = pool.remount().map_or_else(|error| error, |summary| summary);
++        cell(
++            "E11",
++            &format!(
++                "variant={variant:?} remount={remount_first} k={overwrites_after} raise={} v={after_raise_verdicts} | after_raise: {after_raise} | {} | remount {remounted}: {} v={}",
++                raised.map_or_else(|error| error, |text| text),
++                after_writes.join(" | "),
++                segment_accounting(&pool),
++                pool.verdicts().names()
++            ),
++        );
++        base.overwrite().expect("覆盖写");
++    }
++}
++
++#[test]
++fn e11_c379_partial_isolation_crash_before_rotation_remount() { run_e11(Variant::CrashBeforeRotation, true); }
++#[test]
++fn e11_c379_partial_isolation_double_fault_remount() { run_e11(Variant::DoubleFault, true); }
++#[test]
++fn e11_c379_partial_isolation_crash_before_rotation_no_remount() { run_e11(Variant::CrashBeforeRotation, false); }
++#[test]
++fn e11_c379_partial_isolation_two_abandoned_roots() {
++    let (mut base, summary) = abandon_d_and_e();
++    base.remount().expect("再挂载");
++    cell("E11-setup", &format!("two_abandoned {summary} | {}", segment_accounting(&base)));
++    for overwrites_after in 0..=14 {
++        let mut pool = base.fork();
++        let raised = pool.raise_admission();
++        let after_raise = segment_accounting(&pool);
++        let mut after_writes = Vec::new();
++        for _ in 0..3 {
++            let written = pool.overwrite();
++            after_writes.push(format!("{}:{}", if written.is_ok() { "ow" } else { "ow-err" }, segment_accounting(&pool)));
++        }
++        let remounted = pool.remount().map_or_else(|error| error, |summary| summary);
++        cell("E11", &format!("two_abandoned k={overwrites_after} raise={} | after_raise: {after_raise} | {} | remount {remounted}: {} v={}", raised.map_or_else(|error| error, |text| text), after_writes.join(" | "), segment_accounting(&pool), pool.verdicts().names()));
++        base.overwrite().expect("覆盖写");
++    }
++}
+diff -ruN -x target a/singlefs-harness/tests/row43_probe.rs b/singlefs-harness/tests/row43_probe.rs
+--- a/singlefs-harness/tests/row43_probe.rs	1970-01-01 00:00:00.000000000 +0000
++++ b/singlefs-harness/tests/row43_probe.rs	2026-09-28 07:58:35.600386498 +0000
+@@ -0,0 +1,287 @@
++//! 调查员副本：只靠崩溃恢复造被抛弃实例，再把 F 抬进它留下的空档（增补 2 收口表第 43 行复查）。
++mod common;
++
++use common::{
++    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before, build_pool, parameters,
++    publish_overwrite_in_process, BuiltPool, FIXED_WRITE_TIME_SECONDS,
++};
++use singlefs_checker::image::InvariantVerdict;
++use singlefs_checker::walk::check_pool_image;
++use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
++use singlefs_core::block_device::{BlockDevice, WriteDurability};
++use singlefs_core::mount::{mount_writable, raise_rollback_floor, ShadowLedger};
++use singlefs_core::transaction::TransactionOutput;
++use singlefs_harness::history::{
++    classify_failure, raised_floor_lands_only_on_abandoned_roots,
++    row43_probe_any_ring_root_abandoned, FailureObservation, HistoryEnding,
++    HistoryOperationKind, StepPosition,
++};
++use singlefs_harness::memory_pool::{MemoryPool, RecordCheck};
++
++fn content_seeded_by(length: usize, seed: usize) -> Vec<u8> {
++    (0..length)
++        .map(|index| u8::try_from((index * 7 + seed) % 253).expect("小于 256"))
++        .collect()
++}
++
++fn overwrite(pool: &mut BuiltPool, content: &[u8], instance: InstanceGeneration) -> TransactionOutput {
++    let previous = pool.output.clone();
++    let output = publish_overwrite_in_process(pool, &previous, content, FIXED_WRITE_TIME_SECONDS + 60, instance)
++        .expect("覆盖写");
++    pool.output = output.clone();
++    output
++}
++
++fn violations_on(image: &MemoryPool) -> Vec<(&'static str, String)> {
++    check_pool_image(image)
++        .into_iter()
++        .filter_map(|(invariant, verdict)| match verdict {
++            InvariantVerdict::Violated(detail) => Some((invariant, detail)),
++            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
++        })
++        .collect()
++}
++
++fn not_applicable_on(image: &MemoryPool, wanted: &str) -> Option<String> {
++    check_pool_image(image).into_iter().find_map(|(invariant, verdict)| match verdict {
++        InvariantVerdict::NotApplicable(reason) if invariant == wanted => Some(reason.to_string()),
++        _ => None,
++    })
++}
++
++/// 系统配置槽的偏移：每块盘两槽，槽 k 在 k × 间距。
++fn system_configuration_slot_offsets() -> Vec<u64> {
++    let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
++    (0..singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE).map(|slot| slot * spacing).collect()
++}
++
++/// 变体乙：第三版 C 的根槽 FUA 持久、系统配置轮换没持久就崩（C 的轮换写全部退回崩溃前的字节），下一次可写挂载时 C 的根槽与数据单元
++/// 在重读一次之后仍读不出；挂载交回之后原样写回。系统配置不坏任何一槽。
++fn abandon_the_third_version_by_a_crash_before_its_rotation(pool: &mut BuiltPool, third: &TransactionOutput, saved_system_configuration: &[(usize, u64, Vec<u8>)]) -> singlefs_core::mount::Mounted {
++    let publish_parameters = parameters();
++    let target = singlefs_core::root_ring::target_for_publish(third.root.checkpoint_txg, publish_parameters.geometry.root_ring_slots_per_region);
++    let root_slot_device = publish_parameters.region_devices[usize::try_from(target.region).expect("区域号")];
++    let root_slot_offset = singlefs_core::root_ring::slot_offset(target, publish_parameters.geometry.fixed_structure_slot_spacing);
++    let root_slot_bytes = usize::try_from(publish_parameters.geometry.physical_block_size).expect("根槽宽");
++    let data_unit_bytes = usize::try_from(singlefs_format::DATA_UNIT_BYTES).expect("32768");
++    let mut devices = pool.reopen_recorded();
++    // 崩溃：C 的系统配置轮换没落盘。
++    for (index, offset, bytes) in saved_system_configuration {
++        devices[*index].1.write_at(singlefs_core::address::DeviceOffsetInBytes(*offset), bytes, WriteDurability::Plain).expect("退回轮换之前的字节");
++    }
++    let places_to_hide = std::iter::once((root_slot_device, root_slot_offset, root_slot_bytes)).chain(
++        third.data_pointers.iter().flat_map(|pointer| pointer.locations).map(|location| (location.device, location.slot.to_device_offset(), data_unit_bytes)),
++    );
++    let mut saved = Vec::new();
++    for (identity, offset, length) in places_to_hide {
++        let index = devices.iter().position(|(candidate, _)| *candidate == identity).expect("池里有这块盘");
++        let mut bytes = vec![0u8; length];
++        devices[index].1.read_at(offset, &mut bytes).expect("暂存");
++        devices[index].1.write_at(offset, &vec![0u8; length], WriteDurability::Plain).expect("清零");
++        saved.push((index, offset, bytes));
++    }
++    let mounted = mount_writable(&publish_parameters, &mut devices);
++    for (index, offset, bytes) in &saved {
++        devices[*index].1.write_at(*offset, bytes, WriteDurability::Plain).expect("原样写回");
++    }
++    let mounted = mounted.expect("变体乙：可写挂载");
++    pool.devices = Some(devices);
++    pool.allocator = mounted.allocator.clone();
++    pool.output = mounted.current.file_version().expect("落到的那一版带文件").clone();
++    mounted
++}
++
++#[derive(Clone, Copy, Debug)]
++enum Variant {
++    /// 变体甲：`tests/common` 的造法（见证 C 的系统配置槽每盘坏一槽，C583 那一形）。
++    DoubleFault,
++    /// 变体乙：C 的轮换没落盘就崩，加 C 的根槽与数据单元一时读不出。
++    CrashBeforeRotation,
++}
++
++fn pool_after_abandoning(variant: Variant, tag: &str) -> (BuiltPool, TransactionOutput) {
++    let mut pool = build_pool(tag);
++    overwrite(&mut pool, &content_seeded_by(4100, 3), InstanceGeneration(1));
++    let saved_system_configuration: Vec<(usize, u64, Vec<u8>)> = {
++        let devices = pool.devices.as_ref().expect("镜像开着");
++        let mut saved = Vec::new();
++        for (index, (_, device)) in devices.iter().enumerate() {
++            for offset in system_configuration_slot_offsets() {
++                let mut bytes = vec![0u8; usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096")];
++                device.read_at(singlefs_core::address::DeviceOffsetInBytes(offset), &mut bytes).expect("读系统配置槽");
++                saved.push((index, offset, bytes));
++            }
++        }
++        saved
++    };
++    let stream_before_third = pool.stream.operation_count();
++    let third = overwrite(&mut pool, &content_seeded_by(2500, 11), InstanceGeneration(1));
++    if std::env::var_os("ROW43_STREAM").is_some() {
++        let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
++        for (index, operation) in pool.stream.operations().iter().enumerate().skip(stream_before_third) {
++            let marker = if operation.offset.0 < 2 * spacing && operation.kind != singlefs_harness::RecordedOperationKind::Barrier { " <- 系统配置槽" } else { "" };
++            eprintln!("ROW43-STREAM C 那次发布 #{index}: {}{marker}", operation.to_stream_line());
++        }
++        let target = singlefs_core::root_ring::target_for_publish(third.root.checkpoint_txg, parameters().geometry.root_ring_slots_per_region);
++        eprintln!("ROW43-STREAM C 的根槽：区域 {} 偏移 {}", target.region, singlefs_core::root_ring::slot_offset(target, parameters().geometry.fixed_structure_slot_spacing).0);
++    }
++    let mounted = match variant {
++        Variant::DoubleFault => abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(&mut pool, &third),
++        Variant::CrashBeforeRotation => abandon_the_third_version_by_a_crash_before_its_rotation(&mut pool, &third, &saved_system_configuration),
++    };
++    eprintln!(
++        "ROW43 {variant:?}: C=(inst {}, txg {}); recovery lands on txg {}, new instance {}, row txg {}, current txg {}",
++        third.root.instance.0, third.root.checkpoint_txg.0,
++        mounted.output.effective_root.checkpoint_txg.0, mounted.output.instance.0,
++        mounted.output.row_publish.root().checkpoint_txg.0, pool.output.root.checkpoint_txg.0
++    );
++    (pool, third)
++}
++
++fn raise_and_classify(variant: Variant, overwrites_after: usize, floor: u64) -> HistoryEnding {
++    raise_and_classify_with(variant, false, overwrites_after, floor)
++}
++
++fn raise_and_classify_with(variant: Variant, remount_before_overwrites: bool, overwrites_after: usize, floor: u64) -> HistoryEnding {
++    let (mut pool, _third) = pool_after_abandoning(variant, &format!("row43-{variant:?}-{remount_before_overwrites}-{overwrites_after}-{floor}"));
++    let mut instance = InstanceGeneration(2);
++    if remount_before_overwrites {
++        let mut devices = pool.reopen_recorded();
++        let mounted = mount_writable(&parameters(), &mut devices).expect("再可写挂载");
++        eprintln!("ROW43 remount: instance {}, row txg {}, current txg {}", mounted.output.instance.0, mounted.output.row_publish.root().checkpoint_txg.0, mounted.current.file_version().expect("带文件").root.checkpoint_txg.0);
++        instance = mounted.output.instance;
++        pool.devices = Some(devices);
++        pool.allocator = mounted.allocator.clone();
++        pool.output = mounted.current.file_version().expect("带文件").clone();
++    }
++    for seed in [17usize, 19, 23, 29, 31, 37].into_iter().take(overwrites_after) {
++        overwrite(&mut pool, &content_seeded_by(3000 + seed, seed), instance);
++    }
++    let image_before = pool.memory_pool();
++    let violations_before = violations_on(&image_before);
++    let lands = raised_floor_lands_only_on_abandoned_roots(&image_before, CheckpointTxg(floor));
++    let abandoned_present = row43_probe_any_ring_root_abandoned(&image_before);
++    let current_txg = pool.output.root.checkpoint_txg.0;
++    let raised = raise_rollback_floor(
++        &parameters(),
++        pool.devices.as_mut().expect("镜像开着"),
++        &mut pool.allocator,
++        &mut pool.output,
++        CheckpointTxg(floor),
++        ShadowLedger::On,
++    );
++    let raised_summary = match &raised {
++        Ok(raised) => format!("Ok(publishes {}, reclaimed {}, ceiling {}, abandoned_roots_unreadable {})", raised.publishes.len(), raised.reclaimed.len(), raised.ceiling.0, raised.abandoned_roots_unreadable),
++        Err(error) => format!("Err({error:?})"),
++    };
++    let image_after = pool.memory_pool();
++    let violations_after = violations_on(&image_after);
++    let i31_not_applicable = not_applicable_on(&image_after, "I-3.1");
++    let (newest_ring_root_txg, root_ring_slot_count) = singlefs_harness::history::newest_ring_root_and_slot_count(&image_after);
++    let ending = if violations_after.is_empty() {
++        HistoryEnding::Completed
++    } else {
++        classify_failure(FailureObservation {
++            position: StepPosition::Operation(overwrites_after),
++            operation_kind: Some(HistoryOperationKind::RaiseRollbackFloor),
++            violations: violations_after.clone(),
++            panic: None,
++            newest_ring_root_txg,
++            root_ring_slot_count,
++            harness_judgement: None,
++            model_disagreement: None,
++            raised_floor_lands_only_on_abandoned_roots: lands,
++            record_check: RecordCheck::default(),
++        })
++    };
++    let ending_kind = match &ending {
++        HistoryEnding::Completed => "Completed".to_string(),
++        HistoryEnding::KnownRed { form, .. } => format!("KnownRed(form {form})"),
++        HistoryEnding::NewFinding { signature, .. } => format!("NewFinding({signature:?})"),
++    };
++    eprintln!(
++        "ROW43-RESULT variant={variant:?} remount={remount_before_overwrites} overwrites_after={overwrites_after} current_txg_before_raise={current_txg} floor={floor} abandoned_present_before={abandoned_present:?} lands_only_on_abandoned={lands:?}\n  violations_before={violations_before:?}\n  raise={raised_summary}\n  violations_after={violations_after:?}\n  i31_not_applicable_after={i31_not_applicable:?}\n  ending={ending_kind}"
++    );
++    ending
++}
++
++#[test]
++fn row43_sweep_double_fault() {
++    for overwrites_after in 0..=4 {
++        for floor in 3..=7 {
++            let _ = raise_and_classify(Variant::DoubleFault, overwrites_after, floor);
++        }
++    }
++}
++
++#[test]
++fn row43_sweep_crash_before_rotation() {
++    for overwrites_after in 0..=4 {
++        for floor in 3..=7 {
++            let _ = raise_and_classify(Variant::CrashBeforeRotation, overwrites_after, floor);
++        }
++    }
++}
++
++#[test]
++fn row43_sweep_remount_before_overwrites() {
++    for variant in [Variant::DoubleFault, Variant::CrashBeforeRotation] {
++        for overwrites_after in 0..=6 {
++            for floor in 3..=9 {
++                let _ = raise_and_classify_with(variant, true, overwrites_after, floor);
++            }
++        }
++    }
++}
++
++/// 最小复现：第一个文件 A（txg 3）→ 覆盖写 B（4）、C（5）→ C 的系统配置轮换没落盘就崩 → 下一次可写挂载时 C 的根槽与数据单元一时读不出
++/// （重读一次仍读不出）：择根落到 B、实例 2 写行 6、暖机 7，C 按实例 2 的表判被抛弃 → 再可写挂载（实例 3，8–10）→ 覆盖写四次（11–14）
++/// → 抬 F 到 5（C 那个 txg，空档）：只有 I-3.1 红，按「已知红」清单归到第 0 条。
++#[test]
++fn row43_minimal_crash_before_rotation_remount_four_overwrites_raise_into_the_gap() {
++    let ending = raise_and_classify_with(Variant::CrashBeforeRotation, true, 4, 5);
++    assert!(matches!(ending, HistoryEnding::KnownRed { form: 0, .. }), "归到已知红第 0 条");
++}
++
++fn print_segments(label: &str, pool: &BuiltPool) {
++    for device_map in &pool.allocator.devices {
++        eprintln!(
++            "ROW43-C379 {label}: 盘 {} empty_segments={} lowest_empty_segment={:?} isolated_slots={} allocated_slots={}",
++            device_map.device.0,
++            device_map.empty_segments(),
++            device_map.lowest_empty_segment().map(|slot| slot.0),
++            device_map.isolated_slots(),
++            device_map.allocated_slots()
++        );
++    }
++}
++
++/// C379：最小复现那条池（再挂载之后影子账隔离了 C 的单元）上，把每块盘最低的全空段整段交给影子账隔离（攻方探针的造法，
++/// `PoolAllocator::isolate_abandoned`），再覆盖写一次让记账行落盘；比记账行「全空聚簇段数」与分配器能开的最低段。
++#[test]
++fn row43_c379_whole_segment_isolated() {
++    let (mut pool, _third) = pool_after_abandoning(Variant::CrashBeforeRotation, "row43-c379");
++    let mut devices = pool.reopen_recorded();
++    let mounted = mount_writable(&parameters(), &mut devices).expect("再可写挂载");
++    let instance = mounted.output.instance;
++    pool.devices = Some(devices);
++    pool.allocator = mounted.allocator.clone();
++    pool.output = mounted.current.file_version().expect("带文件").clone();
++    print_segments("再挂载之后（影子账只隔离了 C 的单元）", &pool);
++    let isolate_whole_segment = std::env::var_os("ROW43_C379_NO_ISOLATION").is_none();
++    if isolate_whole_segment {
++        let targets: Vec<_> = pool
++            .allocator
++            .devices
++            .iter()
++            .map(|device_map| (device_map.device, device_map.lowest_empty_segment().expect("有全空段")))
++            .collect();
++        for (device, segment) in targets {
++            pool.allocator.isolate_abandoned(device, segment, 64);
++        }
++        print_segments("整段隔离之后", &pool);
++    }
++    overwrite(&mut pool, &content_seeded_by(3001, 41), instance);
++    print_segments("覆盖写一次之后（记账行落盘）", &pool);
++    let _ = violations_on(&pool.memory_pool());
++}

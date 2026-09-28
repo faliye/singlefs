@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
-# run-condition: none 起不了 user systemd scope 时它自己退 251，调用方（59 号、check.sh 的前缀）按这个码分流；这里拒绝退 78 会让它们认错结局
+# run-condition: none 起不了 user systemd scope 时它自己退 251，调用方（checker-tier-crates-mutation-replay、check.sh 的前缀）按这个码分流；这里拒绝退 78 会让它们认错结局
 # 给一条命令定内存上限，起跑之前先判整机放不放得下、放不下就排队（records/2026-09-16-subagent拆分提案.md 第四十节第 28、30 行）。三层：
 #   ① 这一条的上限：放进 systemd 的临时 scope（MemoryMax=<上限>、MemorySwapMax=0、OOMPolicy=stop），撞上限只杀这个 scope 里的进程；
 #   ② 总量兜底：每个 scope 都挂进同一个 slice（默认 singlefs-heavy.slice），slice 的 MemoryMax = 整机内存 − 余量。几条合起来撞顶也只在 slice 里杀，
-#      杀不到 slice 外面的本地模型服务 vllm-prod 与 Claude Code 会话。slice 设不上就报错退出，不退回无总上限；
+#      杀不到 slice 外面的本地模型服务与 Claude Code 会话。slice 设不上就报错退出，不退回无总上限；
 #   ③ 起跑前判内存量：拿一把锁，算「slice 里已占的 + 这一条要的」，不超过总上限才起；放不下就放锁、隔一会儿再判，等满上限报「排不上」退出。
-# 变异跑道 research/scripts/mutate.sh 与门禁 59 号每条变异都经它跑；子 agent 跑 cargo test / cargo run / 实验二进制也要经它
+# 变异跑道 research/scripts/mutate.sh 与门禁 checker-tier-crates-mutation-replay 每条变异都经它跑；子 agent 跑 cargo test / cargo run / 实验二进制也要经它
 # （.claude/hooks/heavy-test-guard.sh 在执行前拒不经它的）。提交时的重阶段整条经它跑，例：
 #   SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash <根>/.claude/gate.d/54-layer0-replay.sh --full <根>
 #
 #   run-with-memory-cap.sh <上限> <命令> [参数…]   排队，在上限里跑那条命令；退出码见下
+#   run-with-memory-cap.sh auto <命令> [参数…]     上限取峰值表里这条命令实测峰值的 1.5 倍（按 MiB 向上取整）；表里没有这条按用法错退 251
 #   run-with-memory-cap.sh --check <上限>          只试 slice 的总上限设不设得上、带同样上限的 scope 起不起得来（在 slice 里跑 true，不排队）；起不来退 251
 #   run-with-memory-cap.sh --status                现量：整机内存、余量、slice 总上限与已占、账上在跑的每一条、slice 外面的用量
 #   run-with-memory-cap.sh --selftest              自证（每一例在自己的临时 slice 里，总上限几百 M，吃不满机器）
@@ -20,7 +21,7 @@
 #   0–249  那条命令自己的退出码（cargo 只退 0、101、126、127 与 128 + 信号号，碰不到 250–254）；包装自己的结局一个都不落在这一段，用法错也不落（退 251）；
 #   250    撞了这一条自己的上限：scope 的 Result 是 oom-kill，scope 自己的 memory.events 里 oom 不为 0（或读不到）。
 #          只认 Result、不认退出码：被杀的是 cargo 起的测试二进制时 cargo 退 101 或被停时退 143，被杀的是命令本身时退 137，外面 kill -9 同样退 137；
-#   251    用法错（上限、余量、总上限不是 正整数加 K / M / G / T 的写法或没写单位，限时、等待上限不是整数秒，slice 名不是 singlefs 开头，没给命令），
+#   251    用法错（上限超过峰值表里这条命令实测峰值的 2 倍而没给理由、上限写 auto 而表里没有这条，上限、余量、总上限不是 正整数加 K / M / G / T 的写法或没写单位，限时、等待上限不是整数秒，slice 名不是 singlefs 开头，没给命令），
 #          slice 的总上限设不上、systemd-run 起不来（没有用户级 systemd、D-Bus 连不上、上限写法 systemd 不认）、账与锁的目录建不了，或查不到 scope 的结局：
 #          那条命令一行都没跑（或结局判不了），不退回无上限、无总上限去跑——那正是要防的事；
 #   252    内存不够排不上：等满 RUN_WITH_MEMORY_CAP_WAIT_SECONDS 秒还放不下，或这一条要的量比总上限还大（等多久都放不下，不等）。命令一行都没跑；
@@ -28,12 +29,17 @@
 #   254    被总上限挤掉：scope 的 Result 是 oom-kill，而 scope 自己的 oom 计数是 0、oom_kill 不为 0——整个 slice 满了，内核在 slice 里挑了这一条杀，
 #          不是它自己撞了它的上限；它的结果不算数，重跑它。
 #
-# 余量（RUN_WITH_MEMORY_CAP_RESERVE，默认 20G）留给 slice 外面：本地模型服务 vllm-prod、各个 Claude Code 会话与它们起的工具、门禁在包装外面的进程、内核。
-#   2026-09-25 10:1x UTC 量的（只在本机成立；换机器、vllm 换模型或换并行度都要重量）：MemTotal 60.1 GiB；slice 外面回收不掉的合计 13.4 GiB
-#   （MemTotal − MemAvailable，那时 slice 里几乎是空的），其中 vllm-prod 7.4 GiB anon + 0.6 GiB shmem（它 cgroup 的 memory.stat；
-#   `systemctl status vllm-prod` 报的 Memory 37.9G 里 30.3 GiB 是模型文件的页缓存，回收得掉），user.slice 2.4 GiB anon（Claude Code 会话与它们起的进程），
-#   其余约 3 GiB 是内核（Slab 1.9 GiB、页表）与别的服务。20G 比 13.4 GiB 多约 6.6 GiB，给会话变多、vllm 在负载下涨、门禁在包装外面的 python 进程留着；
+# 余量（RUN_WITH_MEMORY_CAP_RESERVE，默认 20G）留给 slice 外面：本地模型服务、各个 Claude Code 会话与它们起的工具、门禁在包装外面的进程、内核。
+#   2026-09-25 量的（只在本机成立；换机器、本地模型服务换模型或换并行度都要重量）：MemTotal 60.1 GiB；slice 外面回收不掉的合计 13.4 GiB
+#   （MemTotal − MemAvailable，那时 slice 里几乎是空的），其中本地模型服务 7.4 GiB anon + 0.6 GiB shmem（它 cgroup 的 memory.stat；
+#   systemctl status 报它的 Memory 37.9G，其中 30.3 GiB 是模型文件的页缓存，回收得掉），user.slice 2.4 GiB anon（Claude Code 会话与它们起的进程），
+#   其余约 3 GiB 是内核（Slab 1.9 GiB、页表）与别的服务。20G 比 13.4 GiB 多约 6.6 GiB，给会话变多、本地模型服务在负载下涨、门禁在包装外面的 python 进程留着；
 #   本机 slice 总上限因此约 40 GiB。怎么现量：bash research/scripts/run-with-memory-cap.sh --status 打出上面每一项此刻的数。
+#   本地模型服务的 cgroup 不写进仓（单元名是本机的私有信息）：--status 从仓外的私有配置读，文件是 RUN_WITH_MEMORY_CAP_PRIVATE_CONFIG，
+#   默认 ${XDG_CONFIG_HOME:-~/.config}/singlefs/run-with-memory-cap.env；一行一条「键=值」，# 起头的行与空行不看，不 source。
+#   读的键是 OUTSIDE_SERVICE_CGROUP=<它的 cgroup，相对 cgroup 根，形如 system.slice/<单元名>.service>，读那里 memory.stat 的 anon + shmem。
+#   文件不在或没有这个键，--status 里这一项报「没配」、其余照算、退出码不受影响；配了而读不到 memory.stat 报「读不到」。
+#   这一项只进 --status 的明细，排队与总上限都不用它。--status 不打印配的值。
 #   slice 外面涨过了余量，总上限挡不住那一部分，整机照样可能被外面涨满：那一类靠看门狗的常驻内存告警与 .claude/hooks/session-start.sh 的 OOM 报告。
 #
 # 排队（第 ③ 层）怎么算，判与记账在同一把锁（${状态目录}/lock，flock）里，几条同时来的一条一条判：
@@ -45,7 +51,7 @@
 #   放行那一刻读不到包装的起始时刻（包装已经不在）就不记、不放行，排队那一步退出。
 #   包装被 KILL、没删掉的那一笔，下一次判的时候按进程号与起始时刻认出来删掉：此刻读不到它的起始时刻、账上记的起始时刻是空的、两者对不上，都算死账。
 #   放不下就放锁、隔 ADMISSION_POLL_SECONDS 秒再判，第一次等与之后每 WAITING_REPORT_EVERY_SECONDS 秒往 stderr 报一行在等什么；
-#   等满 RUN_WITH_MEMORY_CAP_WAIT_SECONDS（默认 3600）秒还放不下，列出账上占着的每一条，退 252。默认 3600 秒的依据：门禁 59 号一条变异限时 1800 秒，
+#   等满 RUN_WITH_MEMORY_CAP_WAIT_SECONDS（默认 3600）秒还放不下，列出账上占着的每一条，退 252。默认 3600 秒的依据：门禁 checker-tier-crates-mutation-replay 一条变异限时 1800 秒，
 #   排在后面的一般等前面一条跑完就轮到；再宽一倍，给别的重活占着 slice 的时候。
 #   排队时包装被 TERM / INT 停（只停包装进程本身、不停它的进程组也一样）：排队那一步的子进程跟着停、调用方的管道随之关上，账上不留这一笔，
 #   命令没跑，退 143 / 130（stop_queued_admission）。
@@ -56,13 +62,26 @@
 #   由这个脚本建、读、写（写在同一把锁里，先写临时文件再改名；按 MiB 向上取整，与表里记的相同就不写）。口径：scope 里那个外壳 bash 在命令退出之后读自己 cgroup 的 memory.peak（字节）。
 #   外壳不 exec 命令、留下来读，是因为 scope 一收尾它的 cgroup 就删了、systemd 也不留（2026-09-25 实测命令退出之后 MemoryPeak=[not set]）。
 #   含页缓存（cargo 写编译产物的那些）与外壳 bash 自己，偏大不偏小。撞了这一条自己的上限记成上限；超时、被停、被总上限挤掉的不记（量到的是半截）。
-#   不进 git（.gitignore）：数只在本机成立；而且门禁 59 号跑的时候每条都写它，放在被跟踪的地方，gate.sh 开跑与收尾的工作区指纹就对不上、整轮判红
+#   不进 git（.gitignore）：数只在本机成立；而且门禁 checker-tier-crates-mutation-replay 跑的时候每条都写它，放在被跟踪的地方，gate.sh 开跑与收尾的工作区指纹就对不上、整轮判红
 #   （.claude/singlefs-ai-sop/scripts/lib.sh 的 worktree_fingerprint 用 git add -A 算，被忽略的文件不算）。
 #   键：RUN_WITH_MEMORY_CAP_KEY 给了就用它；不给就把命令的各个词用空格接起来（制表符、换行换成空格，测试二进制名里 -<16 位十六进制> 的哈希去掉，截到 300 字）。
 #   线程数（第五列）：命令里经 capped.sh <N> 跑的记 N（它把线程变量一律设成 N，盖过外面的）；否则看包装自己环境里 capped.sh 设的那几个线程变量
 #   （名单取 capped.sh --print）：设了的都相同记那个数，不同就逐个记「名=值」，一个都没设记「未设（整机 N 核）」。「量过的」上限只认线程数相同的那一行
 #   （.claude/agents/crash-verifier.md「输入」一节）；排队照旧只按键取峰值。加这一列之前记的行照原样留四列写回：只认四列的旧包装还在跑时读得到它们，
 #   它收尾时写回的表里没有五列的行，那几条下一次按上限排队、重新记。
+#
+# 上限对实测峰值（用户 2026-09-28 定：上限按实测峰值给，不拍）：峰值表里有这条命令（键同排队）时，给的上限超过它实测峰值的 2 倍就按用法错退 251、
+#   命令一行都没跑，报出实测峰值与 auto 会取的上限；确有理由要更大（输入变大、换了线程数）就设 RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON=<至少 8 个字的理由>，
+#   理由打进 stderr。表里没有这条的照旧按给的上限跑，跑完峰值记进表里。这一变量与 _KEY 等同样在传进命令之前清掉。
+#   带 SINGLEFS_HEAVY_TESTS（=commit / =user-request，提交时与用户要求的重阶段，崩溃验证员与门禁分诊员跑的）的不判这一条：它们的上限照
+#   .claude/agents/crash-verifier.md「输入」一节给（量过的或推的），调用方脚本里写死的上限（例 .claude/cargo-command-prefix 的 24G）也不在这里改；
+#   这一条管的是日常随手起的那些。auto 照常认。
+#
+# 日常一条（用户 2026-09-28 定：日常一条一条跑、合起来超额度就拒、不悄悄排队）：从 Claude Code 会话里起（环境里有 CLAUDE_CODE_SESSION_ID）、
+#   不带 SINGLEFS_HEAVY_TESTS 的算日常。① 同一个会话（按 CLAUDE_CODE_SESSION_ID，主 agent 与它派的子 agent 同一个会话）账上已有一条日常的在跑，
+#   这一条退 252、命令没跑、列出在跑的那一条；确是派出去的几个 agent 各跑各的，设 RUN_WITH_MEMORY_CAP_PARALLEL_REASON=<至少 8 个字的理由> 放行
+#   （派发提示里写这一句）。② 日常一条默认不排队（RUN_WITH_MEMORY_CAP_WAIT_SECONDS 默认 0）：此刻 slice 放不下就退 252、列出占着的，
+#   不在后台悄悄等；明写了 RUN_WITH_MEMORY_CAP_WAIT_SECONDS 的照它等。账上每一笔记下会话与是不是日常。提交时与用户要求的重阶段（带前缀）照旧排队。
 #
 # 限时（RUN_WITH_MEMORY_CAP_TIME_LIMIT，秒；不设不限）：给 scope 设 RuntimeMaxSec，从起跑算、不算排队的时间；到点 systemd 给 scope 里每个进程发 TERM，
 #   RUN_WITH_MEMORY_CAP_KILL_GRACE（默认 30）秒还不退再发 KILL，退 253。要限时就用这个变量，别在包装外面套 timeout：套在外面的把排队的时间也算进去。
@@ -75,12 +94,14 @@
 #   RUN_WITH_MEMORY_CAP_CGROUP_ROOT    cgroup v2 挂在哪，默认 /sys/fs/cgroup
 #   RUN_WITH_MEMORY_CAP_SELFTEST_ADMIT_PAUSE  判完放得下、记账之前停这么多秒：只给自证把「几条同时来」的竞态撑开
 #   RUN_WITH_MEMORY_CAP_SELFTEST_TARGET       --selftest 测哪一份包装，默认自己：拿改前那一份跑新的自证，看它判错
-# 包装里再经包装跑的（整条 gate.sh 经它跑，里面 59 号的每条再经它）：里层另起一个 scope、挪出外层，挂在同一个 slice 里各排各的队；外层照它要的量占着账。
+# 包装里再经包装跑的（整条 gate.sh 经它跑，里面 checker-tier-crates-mutation-replay 的每条再经它）：里层另起一个 scope、挪出外层，挂在同一个 slice 里各排各的队；外层照它要的量占着账。
 #
 # 弄坏开关 RUN_WITH_MEMORY_CAP_BREAK（只给 --selftest 证明它会红用）：nocap 不进 scope 直接跑（第一版之前的跑法）、fallback systemd-run 起不来时退回无上限跑、
 #   exitcode 按退出码 137 / 143 判撞顶、noresult 不认 Result、noslice 不挂 slice 也不排队（加总上限之前的跑法）、slicefallback slice 设不上时不挂 slice 照跑、
 #   nolock 判与记账不拿锁、noledger 已占只看 slice 的用量不算账上还没涨到量的、nodefault 峰值表里没有的按 0 算、ignoretable 不看峰值表一律按上限算、
-#   noslicehit 被总上限挤掉的也报成撞了自己的上限、notimelimit 不设限时、keepstale 账上包装已经死了的那一笔不删。
+#   noslicehit 被总上限挤掉的也报成撞了自己的上限、notimelimit 不设限时、keepstale 账上包装已经死了的那一笔不删、
+#   noprivate --status 不读私有配置、本地模型服务那一项一律当没配、nopeakcheck 不拿上限对峰值表里的实测峰值、
+#   noonejob 同一个会话的日常一条不判「已有一条在跑」、queuedaily 日常一条照旧排队（等 4 秒，自证里测得出而不拖一小时）。
 #
 # 发信号的地方，每一处只打得到这一条自己起的进程（用户 2026-09-25 定「后面的脚本不能终止前面的脚本」「不能动 ssh」；
 # records/2026-09-16-subagent拆分提案.md 第四十节第 32 行）：
@@ -115,13 +136,22 @@ CGROUP_ROOT="${RUN_WITH_MEMORY_CAP_CGROUP_ROOT:-/sys/fs/cgroup}"
 STATE_DIRECTORY="${RUN_WITH_MEMORY_CAP_STATE_DIR:-${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/singlefs-heavy-admission}"
 TIME_LIMIT_SECONDS="${RUN_WITH_MEMORY_CAP_TIME_LIMIT:-}"
 KILL_GRACE_SECONDS="${RUN_WITH_MEMORY_CAP_KILL_GRACE:-$DEFAULT_KILL_GRACE_SECONDS}"
+# 日常一条（从 Claude Code 会话里起、不带 SINGLEFS_HEAVY_TESTS）默认不排队（文件头「日常一条」一段）
+if [[ -z "${SINGLEFS_HEAVY_TESTS:-}" && -n "${CLAUDE_CODE_SESSION_ID:-}" ]]; then
+  DAILY_RUN=1
+  if [[ "$BROKEN_JUDGEMENT" == "queuedaily" ]]; then DEFAULT_WAIT_SECONDS=4; else DEFAULT_WAIT_SECONDS=0; fi
+else
+  DAILY_RUN=0
+fi
 WAIT_SECONDS="${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-$DEFAULT_WAIT_SECONDS}"
+OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-}"
+PRIVATE_CONFIG="${RUN_WITH_MEMORY_CAP_PRIVATE_CONFIG:-${XDG_CONFIG_HOME:-${HOME:-}/.config}/singlefs/run-with-memory-cap.env}"   # 文件头「余量」一段
 # 在 scope 里跑的外壳：命令不 exec，跑完读自己 cgroup 的 memory.peak 与 memory.events 写进峰值文件（scope 一收尾 cgroup 就删了）。
 # TERM / INT 设成记一笔的处理函数而不是忽略：忽略会被命令继承（exec 之后忽略的信号仍忽略），处理函数不会；
 # 撞顶之后 systemd 停 scope 发的 TERM 于是只打断命令，外壳读完、写完再退，退出码照传命令的。
 # 命令退出之后改成忽略 TERM / INT（后面不再起子进程，没有谁会继承它），只用 bash 的内建命令读、写（read、printf），不起 cut / cat / grep / mv：
 # systemd 停 scope 时给 scope 里每个进程都发 TERM，那一刻正在跑的外部命令会被它杀掉、内建的 read 会被打断，峰值文件就写不全，
-# 被总上限挤掉的那一条会被报成撞了自己的上限（2026-09-25 门禁 47 号里撞上过一次）。
+# 被总上限挤掉的那一条会被报成撞了自己的上限（2026-09-25 门禁 code-tooling 里撞上过一次）。
 # 外壳自己的 stderr 指到 /dev/null、命令的 stderr 经 fd 4 接回原处：命令被信号杀掉时 bash 会补一行「line 6: … Killed "$@"」，那一行不是命令的输出。
 SCOPE_HOLDER='trap "stop_requested=1" TERM INT
 : > "$1"
@@ -311,7 +341,7 @@ stop_queued_admission() { # stop_queued_admission <退出码>
 # 由 admit 每轮核自己的父进程还是不是包装（第 41 行），所以 admit 必须由包装进程自己起，不能放进子 shell。finish、status 照旧在前台跑。
 admission() {
   local admission_exit
-  local -a python_command=(env RUN_WITH_MEMORY_CAP_STATE_DIR_RESOLVED="$STATE_DIRECTORY" RUN_WITH_MEMORY_CAP_PEAKS_RESOLVED="$PEAK_TABLE"
+  local -a python_command=(env RUN_WITH_MEMORY_CAP_STATE_DIR_RESOLVED="$STATE_DIRECTORY" RUN_WITH_MEMORY_CAP_PEAKS_RESOLVED="$PEAK_TABLE" RUN_WITH_MEMORY_CAP_DAILY_RUN_RESOLVED="$DAILY_RUN"
                            RUN_WITH_MEMORY_CAP_WAIT_SECONDS_RESOLVED="$WAIT_SECONDS" RUN_WITH_MEMORY_CAP_THREADS_RESOLVED="${command_threads_text:-}"
                            python3 /dev/fd/3 "$@")
   {
@@ -344,7 +374,7 @@ PEAK_TABLE_HEADER = [
     "# 每条命令上一次实测的内存峰值：research/scripts/run-with-memory-cap.sh 建、读、写（排队时按它算「这条要的量」），别手改。",
     "# 口径：scope 里的外壳 bash 在命令退出之后读自己 cgroup 的 memory.peak，按 MiB 向上取整的字节数；含页缓存（cargo 写编译产物的那些）与外壳 bash 自己，偏大不偏小。",
     "#   撞了这一条自己的上限的记成上限；超时、被停、被总上限挤掉的不记（量到的是半截）。只在本机成立，换机器要重量，所以不进 git（.gitignore）。",
-    "# 列（制表符分隔）：峰值字节、量的时刻（UTC）、那一次的上限、键（命令的各个词用空格接起来，测试二进制名里的 16 位哈希去掉；RUN_WITH_MEMORY_CAP_KEY 可以指定）、"
+    "# 列（制表符分隔）：峰值字节、量的时刻（ISO 8601，Z 结尾）、那一次的上限、键（命令的各个词用空格接起来，测试二进制名里的 16 位哈希去掉；RUN_WITH_MEMORY_CAP_KEY 可以指定）、"
     "线程数（命令里 capped.sh 的 N，否则包装环境里 capped.sh 那几个线程变量的值，都没设写「未设（整机 N 核）」；加这一列之前记的行没有这一列）。",
 ]
 
@@ -489,6 +519,20 @@ def admit(unit, cap_bytes, cap_text, total_bytes, slice_directory, key, wrapper_
         return MEMORY_ADMISSION_REFUSED_EXIT
     started = time.monotonic()
     last_report = None
+    daily_run = os.environ.get("RUN_WITH_MEMORY_CAP_DAILY_RUN_RESOLVED") == "1"
+    session = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
+    parallel_reason = os.environ.get("RUN_WITH_MEMORY_CAP_PARALLEL_REASON", "")
+    if daily_run and broken != "noonejob":
+        with admission_lock():
+            same_session = [entry for entry in live_ledger_entries() if entry.get("session") == session and entry.get("daily")]
+        if same_session and len(parallel_reason) < 8:
+            print(f"  ✗ 这个会话（{session}）已经有一条日常的在跑，同一个会话同时只许一条；命令没跑。在跑的：", file=sys.stderr)
+            for entry in same_session:
+                print(f"    {entry['unit']}：上限 {entry['cap']}、要 {human(entry['need'])}、{entry['admitted_at']} 放行、键「{entry['key'][:120]}」", file=sys.stderr)   # gate-lint:detail
+            print("  → 怎么办：等上面那一条跑完再起这一条（一条跑完再起下一条）；确是派出去的几个 agent 各跑各的，给这一条设 RUN_WITH_MEMORY_CAP_PARALLEL_REASON=<至少 8 个字的理由>", file=sys.stderr)
+            return MEMORY_ADMISSION_REFUSED_EXIT
+        if same_session:
+            print(f"run-with-memory-cap: 这个会话已有 {len(same_session)} 条日常的在跑，照理由并行：{parallel_reason}", file=sys.stderr)
     while True:
         if os.getppid() != wrapper_pid:
             return leave_because_wrapper_gone(wrapper_pid, f"排队这一步的父进程成了 {os.getppid()}")
@@ -509,7 +553,8 @@ def admit(unit, cap_bytes, cap_text, total_bytes, slice_directory, key, wrapper_
                 if wrapper_start_time is None:
                     return leave_because_wrapper_gone(wrapper_pid, "放行那一刻读不到它的起始时刻")
                 entry = {"unit": unit, "pid": wrapper_pid, "pid_start_time": wrapper_start_time, "need": need, "cap": cap_text,
-                         "key": key, "admitted_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+                         "key": key, "admitted_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                         "session": session, "daily": daily_run}
                 temporary = os.path.join(ledger_directory, f".{unit}.partial")
                 with open(temporary, "w", encoding="utf-8") as handle:
                     json.dump(entry, handle, ensure_ascii=False)
@@ -574,7 +619,28 @@ def cgroup_stat(path, names):
         return None
 
 
-def status(slice_name, total_text, reserve_text, slice_directory, cgroup_root):
+def private_setting(config_path, key):
+    """私有配置里 key 的值；文件不在、读不了、没有这个键都返回 (None, 为什么没配)。"""
+    if broken == "noprivate":
+        return None, "弄坏开关 noprivate 设着"
+    try:
+        with open(config_path, encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except FileNotFoundError:
+        return None, "私有配置文件不在"
+    except (OSError, UnicodeDecodeError) as error:
+        return None, f"私有配置文件读不了（{type(error).__name__}）"
+    for line in lines:
+        name, separator, value = line.strip().partition("=")
+        if line.strip().startswith("#") or not separator or name.strip() != key:
+            continue
+        value = value.strip().strip("'\"")
+        if value:
+            return value, ""
+    return None, f"私有配置里没有 {key}"
+
+
+def status(slice_name, total_text, reserve_text, slice_directory, cgroup_root, private_config):
     memory = meminfo()
     total_memory, available = memory["MemTotal"], memory["MemAvailable"]
     print(f"  … 整机内存 {human(total_memory)}（/proc/meminfo 的 MemTotal），此刻 MemAvailable {human(available)}")
@@ -587,10 +653,15 @@ def status(slice_name, total_text, reserve_text, slice_directory, cgroup_root):
     for line in occupants_text(entries, slice_directory) if entries else []:
         print(line)
     outside = total_memory - available - (slice_used or 0)
-    vllm = cgroup_stat(os.path.join(cgroup_root, "system.slice/vllm-prod.service/memory.stat"), ("anon", "shmem"))
+    service_cgroup, why_unset = private_setting(private_config, "OUTSIDE_SERVICE_CGROUP")
+    if service_cgroup is None:
+        service_text = f"没配（{why_unset}；配法见文件头「余量」一段）"
+    else:
+        service = cgroup_stat(os.path.join(cgroup_root, service_cgroup.lstrip("/"), "memory.stat"), ("anon", "shmem"))
+        service_text = human(service) if service is not None else "读不到（私有配置里的 OUTSIDE_SERVICE_CGROUP 底下没有可读的 memory.stat）"
     user = cgroup_stat(os.path.join(cgroup_root, "user.slice/memory.stat"), ("anon",))
-    print(f"  … slice 外面回收不掉的合计约 {human(outside)}（MemTotal − MemAvailable − slice 里的用量），其中 vllm-prod 的 anon + shmem "
-          f"{human(vllm) if vllm is not None else '读不到'}、user.slice 的 anon {human(user) if user is not None else '读不到'}")
+    print(f"  … slice 外面回收不掉的合计约 {human(outside)}（MemTotal − MemAvailable − slice 里的用量），其中本地模型服务的 anon + shmem "
+          f"{service_text}、user.slice 的 anon {human(user) if user is not None else '读不到'}")
     if total_bytes is not None:
         reserve_bytes = total_memory - total_bytes
         if outside > reserve_bytes:
@@ -647,6 +718,44 @@ peak_file_value() { # peak_file_value <峰值文件> <名字> → 那一行的�
 }
 
 # run_capped <上限> <run|check> <命令…>：check 只试起不起得来，不排队、不记峰值、不限时
+recorded_peak_bytes() { # recorded_peak_bytes <键> → 峰值表里这条命令的实测峰值（字节）；没有就空
+  python3 -c '
+import sys
+try:
+    lines = open(sys.argv[1], encoding="utf-8").read().splitlines()
+except FileNotFoundError:
+    sys.exit(0)
+for line in lines:
+    fields = line.split("\t")
+    if not line.startswith("#") and len(fields) in (4, 5) and fields[0].isdigit() and fields[3] == sys.argv[2]:
+        print(fields[0])
+' "$PEAK_TABLE" "$1"
+}
+
+cap_judged_against_the_recorded_peak() { # cap_judged_against_the_recorded_peak <上限写法> <命令…> → 这一次用的上限写法（文件头「上限对实测峰值」一段）
+  local cap="$1" key peak peak_mebibytes cap_bytes
+  shift
+  key="$(command_key "$@")"
+  peak="$(recorded_peak_bytes "$key")"
+  if [[ "$cap" == auto ]]; then
+    [[ -n "$peak" ]] || reject_usage "上限写 auto，而峰值表 $PEAK_TABLE 里没有这条命令（键「$key」）" \
+      "第一次跑写明上限（例 16G），跑完峰值记进表里，之后再写 auto"
+    printf '%sM' $(( (peak * 3 / 2 + MEBIBYTE - 1) / MEBIBYTE ))
+    return
+  fi
+  check_size_syntax "$cap" "内存上限"
+  cap_bytes="$(size_in_bytes "$cap")" || reject_usage "内存上限 $cap 太大，换成字节超过 64 位" "写成真要的量，例 16G"
+  if [[ -n "$peak" && -z "${SINGLEFS_HEAVY_TESTS:-}" && "$BROKEN_JUDGEMENT" != "nopeakcheck" ]] && (( cap_bytes > 2 * peak )); then
+    peak_mebibytes=$(( (peak + MEBIBYTE - 1) / MEBIBYTE ))
+    if (( ${#OVER_PEAK_REASON} < 8 )); then
+      reject_usage "上限 $cap 超过峰值表里这条命令实测峰值 ${peak_mebibytes}M 的 2 倍（键「$key」），命令一行都没跑" \
+        "写 auto（取实测峰值的 1.5 倍，$(( (peak * 3 / 2 + MEBIBYTE - 1) / MEBIBYTE ))M），或写不超过 $(( peak_mebibytes * 2 ))M 的上限；确有理由要更大，设 RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON=<至少 8 个字的理由>"
+    fi
+    echo "run-with-memory-cap: 上限 $cap 超过实测峰值 ${peak_mebibytes}M 的 2 倍，照理由放行：$OVER_PEAK_REASON" >&2
+  fi
+  printf '%s' "$cap"
+}
+
 run_capped() {
   local cap="$1" mode="$2" cap_bytes unit started_marker peak_file key command_threads_text exit_code result use_slice=1 admission_status
   local peak_bytes own_oom_count oom_kill_count scope_properties
@@ -698,7 +807,7 @@ run_capped() {
   # 外壳里先建标记再跑命令：标记在，说明命令确实是在上限里起的；不在，说明 systemd-run 自己没起来。
   # 外面那层把本 shell 的 stderr 临时指到 /dev/null：外壳被 SIGKILL 时 bash 会补一行「… Killed  systemd-run …」，那一行不是命令的输出；
   # 命令自己的 stderr 经 fd 3 照旧接回原来的 stderr。只管这一条的三个变量在这里清掉，不传进命令
-  { env -u RUN_WITH_MEMORY_CAP_KEY -u RUN_WITH_MEMORY_CAP_TIME_LIMIT -u RUN_WITH_MEMORY_CAP_WAIT_SECONDS \
+  { env -u RUN_WITH_MEMORY_CAP_KEY -u RUN_WITH_MEMORY_CAP_TIME_LIMIT -u RUN_WITH_MEMORY_CAP_WAIT_SECONDS -u RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON -u RUN_WITH_MEMORY_CAP_PARALLEL_REASON \
       systemd-run --user --scope --unit="$unit" "${scope_properties[@]}" --quiet \
       bash -c "$SCOPE_HOLDER" run-with-memory-cap "$started_marker" "$peak_file" "$CGROUP_ROOT" "$@" 2>&3 3>&-; } 3>&2 2>/dev/null
   exit_code=$?
@@ -762,7 +871,7 @@ show_status() {
   total="$(slice_total_bytes)" || total="unknown"
   cgroup_path="$(systemctl --user show -p ControlGroup --value "$SLICE" 2>/dev/null)"
   [[ -n "$cgroup_path" ]] && slice_directory="$CGROUP_ROOT$cgroup_path"
-  admission status "$SLICE" "$total" "$RESERVE" "$slice_directory" "$CGROUP_ROOT"
+  admission status "$SLICE" "$total" "$RESERVE" "$slice_directory" "$CGROUP_ROOT" "$PRIVATE_CONFIG"
 }
 
 # ── 自证 ──
@@ -785,6 +894,7 @@ run_selftest() {
   local failures=0 checked=0 scratch output status marker hog_code job_code target slice_counter=0 slice context_directory
   local first_pid second_pid first_status second_status started_seconds elapsed_seconds
   local -a selftest_slices=() context=()
+  local selftest_admitted_at='2026-09-25T00:00:00Z'   # clock-times:allow 自检造的账本与峰值表时刻，格式照真账本
   target="${RUN_WITH_MEMORY_CAP_SELFTEST_TARGET:-$SELF_PATH}"
   scratch="$(mktemp -d "${TMPDIR:-/tmp}/run-with-memory-cap-selftest-XXXXXX")"
   hog_code="$(bounded_memory_hog_code)"
@@ -797,7 +907,7 @@ run_selftest() {
     selftest_slices+=("$slice")
     context_directory="$scratch/context-$slice_counter"
     mkdir -p "$context_directory"
-    context=(RUN_WITH_MEMORY_CAP_SLICE="$slice" RUN_WITH_MEMORY_CAP_SLICE_TOTAL="$1" RUN_WITH_MEMORY_CAP_STATE_DIR="$context_directory/state"
+    context=(-u SINGLEFS_HEAVY_TESTS -u CLAUDE_CODE_SESSION_ID RUN_WITH_MEMORY_CAP_SLICE="$slice" RUN_WITH_MEMORY_CAP_SLICE_TOTAL="$1" RUN_WITH_MEMORY_CAP_STATE_DIR="$context_directory/state"
              RUN_WITH_MEMORY_CAP_PEAKS="$context_directory/peaks.tsv")
   }
   in_context() { env "${context[@]}" "$@"; }
@@ -806,7 +916,7 @@ run_selftest() {
   }
   all_exist() { local path; for path in "$@"; do [[ -f "$path" ]] || return 1; done; }
   seed_peak() { # seed_peak <键> <字节>：往这一例的峰值表里写一行
-    printf '%s\t%s\t%s\t%s\n' "$2" "2026-09-25T00:00:00Z" "200M" "$1" >> "$context_directory/peaks.tsv"
+    printf '%s\t%s\t%s\t%s\n' "$2" "$selftest_admitted_at" "200M" "$1" >> "$context_directory/peaks.tsv"
   }
 
   fresh_context 512M
@@ -841,6 +951,57 @@ run_selftest() {
     if in_context bash "$target" 64M bash -c "exit $wanted"; then status=0; else status=$?; fi
     [[ $status -eq $wanted ]] || fail "命令退 $wanted 时应当原样传回 $wanted，实际 $status"
   done
+
+  # 上限对实测峰值（文件头「上限对实测峰值」一段）：表里这条实测 10M，给 64M（超过 2 倍）拒、退 251、命令没跑；设了理由放行；
+  # auto 取 1.5 倍（15M，scope 的 memory.max 读得到 15728640）；表里没有这条时 auto 按用法错拒
+  marker="$scratch/ran-over-peak"
+  seed_peak "bash -c : > \"\$1\" touch-marker $marker" 10485760
+  checked=$((checked + 1))
+  if in_context bash "$target" 64M bash -c ': > "$1"' touch-marker "$marker" 2>"$scratch/overpeak.err"; then status=0; else status=$?; fi
+  if [[ $status -ne $MEMORY_CAP_UNAVAILABLE_EXIT || -e "$marker" ]] || ! grep -q '实测峰值 10M 的 2 倍' "$scratch/overpeak.err"; then
+    fail "上限 64M 超过实测峰值 10M 的 2 倍时应当退 $MEMORY_CAP_UNAVAILABLE_EXIT、报实测峰值、命令不跑，实际退 $status、命令$([[ -e "$marker" ]] && echo '跑了' || echo '没跑')：$(cat "$scratch/overpeak.err")"
+  fi
+  checked=$((checked + 1))
+  if in_context env RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='输入翻倍，旧峰值不作数' bash "$target" 64M bash -c ': > "$1"' touch-marker "$marker" 2>"$scratch/overpeak-reason.err"; then status=0; else status=$?; fi
+  if [[ $status -ne 0 || ! -e "$marker" ]] || ! grep -q '照理由放行：输入翻倍' "$scratch/overpeak-reason.err"; then
+    fail "设了 RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON 时应当照理由放行、命令跑、stderr 打出理由，实际退 $status：$(cat "$scratch/overpeak-reason.err")"
+  fi
+  seed_peak 'bash -c group="/sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup)"; cat "$group/memory.max"' 10485760
+  checked=$((checked + 1))
+  output="$(in_context bash "$target" auto bash -c 'group="/sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup)"; cat "$group/memory.max"' 2>&1)"
+  [[ "$output" == "15728640" ]] || fail "auto 应当取实测峰值 10M 的 1.5 倍（15M，memory.max 15728640），实际「$output」"
+  checked=$((checked + 1))
+  if in_context bash "$target" auto bash -c 'exit 0' auto-without-a-recorded-peak 2>"$scratch/auto-unknown.err"; then status=0; else status=$?; fi
+  if [[ $status -ne $MEMORY_CAP_UNAVAILABLE_EXIT ]] || ! grep -q '峰值表 .* 里没有这条命令' "$scratch/auto-unknown.err"; then
+    fail "峰值表里没有这条时 auto 应当按用法错退 $MEMORY_CAP_UNAVAILABLE_EXIT，实际退 $status：$(cat "$scratch/auto-unknown.err")"
+  fi
+
+  # 日常一条（文件头「日常一条」一段）：同一个会话已有一条日常的在跑，第二条退 252、命令没跑；设了并行理由放行；
+  # 另一个会话的日常一条此刻放不下（两条合起来 400M 超总上限 256M）当场退 252、不排队
+  fresh_context 256M
+  marker="$scratch/second-daily-ran"
+  in_context env CLAUDE_CODE_SESSION_ID=selftest-session-one RUN_WITH_MEMORY_CAP_KEY=selftest-daily-first bash "$target" 200M bash -c 'sleep 4' 2>"$scratch/daily-first.err" &
+  first_pid=$!
+  sleep 1.5
+  checked=$((checked + 1))
+  if in_context env CLAUDE_CODE_SESSION_ID=selftest-session-one RUN_WITH_MEMORY_CAP_KEY=selftest-daily-second bash "$target" 16M bash -c ': > "$1"' touch-marker "$marker" 2>"$scratch/daily-second.err"; then status=0; else status=$?; fi
+  if [[ $status -ne $MEMORY_ADMISSION_REFUSED_EXIT || -e "$marker" ]] || ! grep -q '同一个会话同时只许一条' "$scratch/daily-second.err"; then
+    fail "同一个会话已有一条日常的在跑时第二条应当退 $MEMORY_ADMISSION_REFUSED_EXIT、命令不跑，实际退 $status、命令$([[ -e "$marker" ]] && echo '跑了' || echo '没跑')：$(cat "$scratch/daily-second.err")"
+  fi
+  checked=$((checked + 1))
+  if in_context env CLAUDE_CODE_SESSION_ID=selftest-session-one RUN_WITH_MEMORY_CAP_KEY=selftest-daily-parallel RUN_WITH_MEMORY_CAP_PARALLEL_REASON='派出去的两个实现员各跑各的' bash "$target" 16M bash -c ': > "$1"' touch-marker "$marker" 2>"$scratch/daily-parallel.err"; then status=0; else status=$?; fi
+  if [[ $status -ne 0 || ! -e "$marker" ]] || ! grep -q '照理由并行' "$scratch/daily-parallel.err"; then
+    fail "设了 RUN_WITH_MEMORY_CAP_PARALLEL_REASON 时同一个会话的第二条应当照理由放行，实际退 $status：$(cat "$scratch/daily-parallel.err")"
+  fi
+  checked=$((checked + 1))
+  started_seconds=$SECONDS
+  if in_context env CLAUDE_CODE_SESSION_ID=selftest-session-two RUN_WITH_MEMORY_CAP_KEY=selftest-daily-other bash "$target" 200M bash -c 'exit 0' 2>"$scratch/daily-full.err"; then status=0; else status=$?; fi
+  elapsed_seconds=$((SECONDS - started_seconds))
+  if [[ $status -ne $MEMORY_ADMISSION_REFUSED_EXIT || $elapsed_seconds -gt 2 ]]; then
+    fail "另一个会话的日常一条此刻放不下时应当当场退 $MEMORY_ADMISSION_REFUSED_EXIT、不排队，实际退 $status、用了 $elapsed_seconds 秒：$(cat "$scratch/daily-full.err")"
+  fi
+  wait "$first_pid" || true   # shell-lint:exit-collected 第一条只是占着位置，它自己的退出码不判
+  fresh_context 512M
 
   # 上限真的设上了：scope 里读自己 cgroup 的 memory.max 与 memory.swap.max
   checked=$((checked + 1))
@@ -957,17 +1118,17 @@ run_selftest() {
   # 之后两条同样的同时来，各按记下的量算，都放得下、同时在跑
   fresh_context 256M
   checked=$((checked + 1))
-  if in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-small bash "$target" 200M python3 -c "$job_code" "$scratch/small-0.start" "$scratch/small-0.end" 0 30 0 \
+  if in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-small RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='自检排队这一例故意上限远大于峰值' bash "$target" 200M python3 -c "$job_code" "$scratch/small-0.start" "$scratch/small-0.end" 0 30 0 \
       2>"$scratch/small-0.err"; then status=0; else status=$?; fi
   output="$(awk -F '\t' '$4 == "selftest-small" {print $1}' "$context_directory/peaks.tsv" 2>/dev/null)"
   if [[ $status -ne 0 || ! "$output" =~ ^[0-9]+$ ]] || ((output < 30 * MEBIBYTE || output > 200 * MEBIBYTE)); then
     fail "跑完一条拿 30 MiB 的，峰值表里 selftest-small 应当记下 30 MiB 到 200M 之间的峰值，实际退 $status、记的是「$output」：$(cat "$scratch/small-0.err")"
   fi
   checked=$((checked + 1))
-  in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-small bash "$target" 200M python3 -c "$job_code" "$scratch/small-1.start" "$scratch/small-1.end" 0 30 1.2 \
+  in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-small RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='自检排队这一例故意上限远大于峰值' bash "$target" 200M python3 -c "$job_code" "$scratch/small-1.start" "$scratch/small-1.end" 0 30 1.2 \
     >/dev/null 2>"$scratch/small-1.err" &
   first_pid=$!
-  in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-small bash "$target" 200M python3 -c "$job_code" "$scratch/small-2.start" "$scratch/small-2.end" 0 30 1.2 \
+  in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-small RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='自检排队这一例故意上限远大于峰值' bash "$target" 200M python3 -c "$job_code" "$scratch/small-2.start" "$scratch/small-2.end" 0 30 1.2 \
     >/dev/null 2>"$scratch/small-2.err" &
   second_pid=$!
   wait "$first_pid"; first_status=$?
@@ -979,7 +1140,7 @@ run_selftest() {
   # 外壳写峰值那一步挨得住 systemd 停 scope 时发给 scope 里每个进程的 TERM：命令在 scope 里留一个进程，等命令退出之后 1 到 2 秒里
   # 不停地（不 sleep）给 scope 里除它以外的每个进程发 TERM——外壳那时起的任何外部命令活不过一轮；峰值照样要记进表。
   # 只在这一例自己开的 scope 里发：cgroup 路径要是 …/<这一例的 slice>/singlefs-memory-cap-*.scope（slice 名经 $1 传进去），不对就不发信号、退 0。
-  # 不开 scope 的路径（弄坏开关 nocap）下命令就在调用方的 cgroup 里：2026-09-25 UTC 11:12 在 SSH 会话的 session-1.scope 里发过一轮 TERM，
+  # 不开 scope 的路径（弄坏开关 nocap）下命令就在调用方的 cgroup 里：2026-09-25 在 SSH 会话的 session-1.scope 里发过一轮 TERM，
   # 打掉了 VSCode 扩展宿主与 Claude 会话；只核最后一段名字时，外面包着一层别的 singlefs-memory-cap scope（整条门禁经包装跑）会打到外层那一整条
   fresh_context 256M
   checked=$((checked + 1))
@@ -1005,10 +1166,10 @@ run_selftest() {
   fresh_context 256M
   checked=$((checked + 1))
   seed_peak selftest-underrecorded $((10 * MEBIBYTE))
-  in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-underrecorded bash "$target" 200M python3 -c "$job_code" "$scratch/squeeze-1.start" "$scratch/squeeze-1.end" 0.3 150 1.5 \
+  in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-underrecorded RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='自检排队这一例故意上限远大于峰值' bash "$target" 200M python3 -c "$job_code" "$scratch/squeeze-1.start" "$scratch/squeeze-1.end" 0.3 150 1.5 \
     >/dev/null 2>"$scratch/squeeze-1.err" &
   first_pid=$!
-  in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-underrecorded bash "$target" 200M python3 -c "$job_code" "$scratch/squeeze-2.start" "$scratch/squeeze-2.end" 0.3 150 1.5 \
+  in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-underrecorded RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='自检排队这一例故意上限远大于峰值' bash "$target" 200M python3 -c "$job_code" "$scratch/squeeze-2.start" "$scratch/squeeze-2.end" 0.3 150 1.5 \
     >/dev/null 2>"$scratch/squeeze-2.err" &
   second_pid=$!
   wait "$first_pid"; first_status=$?
@@ -1030,7 +1191,7 @@ run_selftest() {
   # 账上包装已经死了的那一笔（进程号是 pid_max，这台机器上不会有这个进程）不算：记着要 250M 的死账不挡一条要 200M 的
   checked=$((checked + 1))
   mkdir -p "$context_directory/state/ledger"
-  printf '{"unit": "singlefs-memory-cap-dead", "pid": %s, "pid_start_time": "1", "need": %s, "cap": "250M", "key": "dead", "admitted_at": "2026-09-25T00:00:00Z"}' \
+  printf '{"unit": "singlefs-memory-cap-dead", "pid": %s, "pid_start_time": "1", "need": %s, "cap": "250M", "key": "dead", "admitted_at": "'"$selftest_admitted_at"'"}' \
     "$(cat /proc/sys/kernel/pid_max)" $((250 * MEBIBYTE)) > "$context_directory/state/ledger/singlefs-memory-cap-dead.json"
   if in_context env RUN_WITH_MEMORY_CAP_WAIT_SECONDS=1 bash "$target" 200M true 2>"$scratch/stale.err"; then status=0; else status=$?; fi
   if [[ $status -ne 0 || -e "$context_directory/state/ledger/singlefs-memory-cap-dead.json" ]]; then
@@ -1057,7 +1218,7 @@ run_selftest() {
     local queued_child_pid="" queued_child_start="" queued_line_seen=0 child_exited=0 end_of_file_seen=0
     local -a child_pids=()
     mkdir -p "$case_directory" "$context_directory/state/ledger"
-    printf '{"unit": "singlefs-memory-cap-selftest-blocker", "pid": %s, "pid_start_time": "%s", "need": %s, "cap": "250M", "key": "blocker", "admitted_at": "2026-09-25T00:00:00Z"}' \
+    printf '{"unit": "singlefs-memory-cap-selftest-blocker", "pid": %s, "pid_start_time": "%s", "need": %s, "cap": "250M", "key": "blocker", "admitted_at": "'"$selftest_admitted_at"'"}' \
       "$$" "$(start_time_of_live_process "$$")" $((250 * MEBIBYTE)) > "$context_directory/state/ledger/singlefs-memory-cap-selftest-blocker.json"
     mkfifo "$case_directory/pipe"
     { cat "$case_directory/pipe" > "$case_directory/output"; : > "$case_directory/end-of-file"; } &
@@ -1170,9 +1331,9 @@ run_selftest() {
   fresh_context 256M
   checked=$((checked + 1))
   mkdir -p "$context_directory/state/ledger"
-  printf '{"unit": "singlefs-memory-cap-null-start", "pid": %s, "pid_start_time": null, "need": %s, "cap": "250M", "key": "null-start", "admitted_at": "2026-09-25T00:00:00Z"}' \
+  printf '{"unit": "singlefs-memory-cap-null-start", "pid": %s, "pid_start_time": null, "need": %s, "cap": "250M", "key": "null-start", "admitted_at": "'"$selftest_admitted_at"'"}' \
     "$(cat /proc/sys/kernel/pid_max)" $((250 * MEBIBYTE)) > "$context_directory/state/ledger/singlefs-memory-cap-null-start.json"
-  printf '{"unit": "singlefs-memory-cap-selftest-live", "pid": %s, "pid_start_time": "%s", "need": %s, "cap": "20M", "key": "live", "admitted_at": "2026-09-25T00:00:00Z"}' \
+  printf '{"unit": "singlefs-memory-cap-selftest-live", "pid": %s, "pid_start_time": "%s", "need": %s, "cap": "20M", "key": "live", "admitted_at": "'"$selftest_admitted_at"'"}' \
     "$$" "$(start_time_of_live_process "$$")" $((20 * MEBIBYTE)) > "$context_directory/state/ledger/singlefs-memory-cap-selftest-live.json"
   if in_context env RUN_WITH_MEMORY_CAP_WAIT_SECONDS=1 bash "$target" 200M true 2>"$scratch/null-start.err"; then status=0; else status=$?; fi
   if [[ $status -ne 0 || -e "$context_directory/state/ledger/singlefs-memory-cap-null-start.json" || ! -e "$context_directory/state/ledger/singlefs-memory-cap-selftest-live.json" ]]; then
@@ -1217,6 +1378,29 @@ null 那一笔$([[ -e "$context_directory/state/ledger/singlefs-memory-cap-null-
   done
   [[ -z "$output" ]] || fail "跑完应当不留账、不留 scope，实际：$output"
 
+  # --status 的本地模型服务那一项：私有配置里配了 OUTSIDE_SERVICE_CGROUP 就读那里的 memory.stat；文件不在、没有这个键都报「没配」、不读、退出码照旧。
+  # cgroup 根指到这一例自己造的假目录，私有配置写在 scratch 里；失败信息不贴 --status 的整段输出（改前那一份会在里面打出单元名）
+  fresh_context 256M
+  local fake_cgroup_root="$scratch/fake-cgroup" private_case private_config expected_text
+  mkdir -p "$fake_cgroup_root/system.slice/selftest-outside.service" "$fake_cgroup_root/user.slice"
+  printf 'anon %s\nshmem %s\nfile %s\n' $((3 * MEBIBYTE)) $((2 * MEBIBYTE)) $((900 * MEBIBYTE)) > "$fake_cgroup_root/system.slice/selftest-outside.service/memory.stat"
+  printf 'anon %s\n' $((7 * MEBIBYTE)) > "$fake_cgroup_root/user.slice/memory.stat"
+  printf '%s\n' "# 自证用的私有配置" "OTHER_KEY=system.slice/other.service" "OUTSIDE_SERVICE_CGROUP=system.slice/selftest-outside.service" > "$scratch/private-set.env"
+  printf '%s\n' "# 自证用的私有配置，没有 OUTSIDE_SERVICE_CGROUP" "OTHER_KEY=system.slice/selftest-outside.service" > "$scratch/private-keyless.env"
+  for private_case in "set|$scratch/private-set.env|本地模型服务的 anon + shmem 5 MiB、" \
+      "absent|$scratch/private-absent.env|本地模型服务的 anon + shmem 没配（" \
+      "keyless|$scratch/private-keyless.env|本地模型服务的 anon + shmem 没配（"; do
+    IFS='|' read -r private_case private_config expected_text <<< "$private_case"
+    checked=$((checked + 1))
+    if in_context env RUN_WITH_MEMORY_CAP_CGROUP_ROOT="$fake_cgroup_root" RUN_WITH_MEMORY_CAP_PRIVATE_CONFIG="$private_config" bash "$target" --status \
+        >"$scratch/private-$private_case.out" 2>&1; then status=0; else status=$?; fi
+    if [[ $status -ne 0 ]] || ! grep -qF -- "$expected_text" "$scratch/private-$private_case.out" \
+        || { [[ "$private_case" != set ]] && grep -qF -- "5 MiB、" "$scratch/private-$private_case.out"; }; then
+      fail "--status 私有配置 $private_case 那一例应当退 0、「slice 外面」那一行含「$expected_text」$([[ "$private_case" != set ]] && echo '、不含假 cgroup 里的 5 MiB')，\
+实际退 $status、$(grep -qF -- "$expected_text" "$scratch/private-$private_case.out" && echo '含' || echo '不含')那一句（整段输出不贴：改前那一份会在里面打出单元名）"
+    fi
+  done
+
   # 用法错退 $MEMORY_CAP_UNAVAILABLE_EXIT（「命令一行都没跑」那一类），不落在 0–249 里与命令自己的退出码混在一起
   checked=$((checked + 1))
   if bash "$target" abc true 2>/dev/null; then status=0; else status=$?; fi
@@ -1249,7 +1433,7 @@ null 那一笔$([[ -e "$context_directory/state/ledger/singlefs-memory-cap-null-
   rm -rf -- "${scratch:?}"
   if ((failures)); then
     echo "  ✗ run-with-memory-cap.sh 自检 $failures 处不对（查了 $checked 项；测的是 $target）"
-    echo "  → 怎么办：照上面逐条改 run_capped / ensure_slice / scope_result / admission / check_size_syntax / reject_usage / command_threads；RUN_WITH_MEMORY_CAP_BREAK 设着、或 RUN_WITH_MEMORY_CAP_SELFTEST_TARGET 指着改前那一份的话这里本来就该红"
+    echo "  → 怎么办：照上面逐条改 run_capped / ensure_slice / scope_result / admission / check_size_syntax / reject_usage / command_threads / private_setting；RUN_WITH_MEMORY_CAP_BREAK 设着、或 RUN_WITH_MEMORY_CAP_SELFTEST_TARGET 指着改前那一份的话这里本来就该红"
     exit 1
   fi
   echo "  ✓ run-with-memory-cap.sh 自检通过（查了 $checked 项：--check 起得来、64M 上限里分配 512 MiB 的探针与它当孙进程时都判撞顶退 $MEMORY_CAP_HIT_EXIT、\
@@ -1260,6 +1444,7 @@ slice 设不上与余量比整机还大时退 $MEMORY_CAP_UNAVAILABLE_EXIT 且�
 排队中给包装本身发 TERM / INT / KILL / HUP 时排队那一步 5 秒内跟着退、调用方管道读到 EOF、包装退 143 / 130 / 137 / 129、命令没跑、账上与 --status 里没有这一条、\
 判完放得下而记账之前包装被 KILL 并回收时不记账且命令没跑、账上起始时刻是 null 的死账不挡路且被删、起始时刻是字符串而包装活着的那一笔不被当成死账、跑完不留账不留 scope、\
 峰值表的线程数一列（经 capped.sh N 跑、环境里线程变量相同、不同、都没设四种各记对）且加这一列之前的四列行照原样留四列、\
+--status 私有配置里配了本地模型服务的 cgroup 就读它、文件不在与没有这个键都报没配且退 0、\
 上限写错、上限不带单位、没给命令与 slice 名不是 singlefs 开头都按用法错退 $MEMORY_CAP_UNAVAILABLE_EXIT、不带单位的那一例命令没跑）"
 }
 
@@ -1288,6 +1473,9 @@ esac
 
 cap="$1"
 shift
+[[ $# -gt 0 ]] || reject_usage "没给要在上限里跑的命令" "写成 run-with-memory-cap.sh $cap <命令> [参数…]"
+PEAK_TABLE="${RUN_WITH_MEMORY_CAP_PEAKS:-$(default_peak_table)}"
+cap="$(cap_judged_against_the_recorded_peak "$cap" "$@")" || exit $?
 check_size_syntax "$cap" "内存上限"
 size_in_bytes "$cap" >/dev/null || reject_usage "内存上限 $cap 太大，换成字节超过 64 位" "写成真要的量，例 16G"
 check_size_syntax "$RESERVE" "余量 RUN_WITH_MEMORY_CAP_RESERVE "

@@ -1,4 +1,4 @@
-# 附录二：defs-m2-closeout-r3 的两份 diff（原样放；生成于 2026-09-26 12:48 JST，HEAD 73ba4a4）
+# 附录二：defs-m2-closeout-r3 的两份 diff（原样放；生成于 2026-09-26，HEAD 73ba4a4）
 
 ## 一、`/tmp/claude-1000/defs-closeout-r2-fixes/my-changes-final.diff`（整份原样；比的是开工时 `cp -p` 的备份，不是 git 基准）
 

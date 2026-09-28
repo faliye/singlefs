@@ -2441,7 +2441,7 @@ fn tree_table_crates_has_a_path(
 /// 树是为了服务文件读，与「占用集合」这个问题不是同一件事——占用靠中央映射，不靠 extent/inode）；
 /// 有快照、多版本共享落点的情形没有覆盖（第一版这批历史都不产生快照，见交回报告）。
 ///
-/// **只读一层、把根当叶解**——实十九（2026-09-24 16:50 UTC 前后落地）之后，中央映射树条目数一旦
+/// **只读一层、把根当叶解**——实十九（2026-09-24 落地）之后，中央映射树条目数一旦
 /// 超过单节点叶容量（`transaction.rs` 第 1334 行「中央映射树叶 294」）就会长成多层，那时根节点是
 /// 内部节点（`level > 0`），装着的是子节点指针、不是 `parse_mapping_entry` 认得的叶条目格式。
 /// 这里显式核 `level == 0` 再往下解，不靠「宽度不够、`parse_mapping_entry` 自然读不出」这种隐式失败
@@ -5012,7 +5012,7 @@ fn run_fixed_publication_byte_script(geometry: &Geometry) {
 
 // ============================================================================
 // 十、第 2 次跑（`research/prompts/e158-r2-prereg.md`）：5.6 常量回比与第七节锚点（第 2 次跑那一份）、
-//    H1d（5.5 末尾主 agent 22:5x 跑前修订加的历史族）、Q1-0（H1c 的抛弃步，前提 1 在装置上的读数）、
+//    H1d（5.5 末尾主 agent 跑前修订加的历史族）、Q1-0（H1c 的抛弃步，前提 1 在装置上的读数）、
 //    实七两段复现历史。这一节只加：第一次跑的各模式（上面一至九）原样留着，它们的旧产物由
 //    `research/scripts/replay.sh` 里 E158 那几行复跑；第一节处理表里的删与改归后面的段。
 // ============================================================================
@@ -19081,7 +19081,9 @@ mod fourth_run_segment_two {
                 Err(
                     UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount { .. }
                     | UserChangeRefused::NoFileVersionToChange
-                    | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. },
+                    | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. }
+                    | UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable { .. }
+                    | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. },
                 ) => &[],
                 Err(UserChangeRefused::Publish { floor_raises, .. }) => floor_raises,
                 Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(refused_change)) => {
@@ -23619,7 +23621,7 @@ mod tests {
         assert_eq!(deduplicated.len(), 2, "两条根不应该解到同一个 (设备, 偏移)");
     }
 
-    /// session s9（实十九提醒，2026-09-24 16:50 UTC 前后落地）：中央映射树条目数超过单节点叶容量
+    /// session s9（实十九提醒，2026-09-24 落地）：中央映射树条目数超过单节点叶容量
     /// （`transaction.rs` 第 1334 行「中央映射树叶 294」）会长成多层，根节点变成内部节点
     /// （`level > 0`）。这里手工构造一个合法但 `level=1` 的假节点，覆盖真实中央映射树根的两份物理
     /// 拷贝，验证 `allocation_record_tree_reachable_placements_via_central_mapping` 显式拦下它——

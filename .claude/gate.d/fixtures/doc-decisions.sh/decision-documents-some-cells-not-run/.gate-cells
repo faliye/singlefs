@@ -1,0 +1,15 @@
+# 决策文档组十四格一起跑：七格无对象可判退 77，整道退 0 而那七格逐格报本次未跑
+kb-shape
+item-ref-status
+status-redundancy
+cross-decision-status
+settled-item-self-open
+settled-ref-says-open
+stale-open-items
+settled-same-file
+freeze-layer-membership
+decision-items-sync
+blocking-verdict
+user-verdict-owed
+decision-summary-width
+write-frequency

@@ -2,7 +2,7 @@
 
 <!-- doc-lint:not-numbers Y1 Y2 Y3 Y4 Y5 Y6 -->
 
-正文 `research/prompts/_m2-wave3-code-r1-body.md`，背景材料 `_m2-wave3-code-r1-background.md`，diff `_m2-wave3-code-r1-diff.md`，开工快照 `m2-wave3-code-r1-snapshot/sha256sums.txt`（36 份，00:50:44 UTC）。判决只引产物与代码，腿的结论句当线索。
+正文 `research/prompts/_m2-wave3-code-r1-body.md`，背景材料 `_m2-wave3-code-r1-background.md`，diff `_m2-wave3-code-r1-diff.md`，开工快照 `m2-wave3-code-r1-snapshot/sha256sums.txt`（36 份）。判决只引产物与代码，腿的结论句当线索。
 
 被判的 `crates/` 文件（门禁 56 号按路径点名）：`crates/singlefs-core/src/transaction.rs`、`crates/singlefs-core/src/mount.rs`、`crates/singlefs-core/src/recovery.rs`、`crates/singlefs-core/src/mounted_read.rs`、`crates/singlefs-core/src/root_record.rs`、`crates/singlefs-core/src/make_filesystem.rs`、`crates/singlefs-core/src/allocator.rs`、`crates/singlefs-checker/src/walk.rs`、`crates/singlefs-checker/src/image.rs`、`crates/singlefs-harness/src/crash.rs`、`crates/singlefs-harness/src/bad_disk_input.rs`、`crates/singlefs-harness/src/fault_injection.rs`、`crates/singlefs-harness/src/history.rs`、`crates/singlefs-harness/src/model.rs`、`crates/singlefs-harness/src/model_comparison.rs`。`make_filesystem.rs` 与 `allocator.rs` 在四份补丁里被引用、没有自己的 diff 块，材料员的小节清单与本地腿的覆盖表都没给它们单列一行；这里点名，覆盖由第三节 Y5 与 Y6 那两格一起判。
 

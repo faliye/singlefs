@@ -1,6 +1,6 @@
 # D18（块里携带什么信息） 未定项 15（码 2 的择版本规则）·第一轮·主 agent 核实与判决
 
-**口径**：2026-09-12（JST）主 agent 写。材料 `_d18-item15-r1-background.md`；正推 Opus、反推 Sonnet、反例本地。
+**口径**：2026-09-12 主 agent 写。材料 `_d18-item15-r1-background.md`；正推 Opus、反推 Sonnet、反例本地。
 
 | 腿 | 文件 | 状况 |
 |---|---|---|

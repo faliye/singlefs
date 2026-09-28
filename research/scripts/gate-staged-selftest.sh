@@ -22,7 +22,7 @@ preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT
 export GIT_AUTHOR_NAME=selftest GIT_AUTHOR_EMAIL=selftest@example.invalid GIT_COMMITTER_NAME=selftest GIT_COMMITTER_EMAIL=selftest@example.invalid
 # 用户自己的全局配置（签名提交、默认分支名、钩子路径）不许影响临时仓里的判定
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
-# 门禁 47 号跑这份自证时，外层多半就是一趟 gate-staged.sh，环境里已经导出了 SINGLEFS_STAGED_TREE；
+# 门禁 code-tooling 跑这份自证时，外层多半就是一趟 gate-staged.sh，环境里已经导出了 SINGLEFS_STAGED_TREE；
 # 留着它，被测脚本漏了 export 也照样传得下去，「暂存树不交给门禁」那一条改坏就抓不到。
 unset SINGLEFS_STAGED_TREE FAKE_GATE_RECORD FAKE_GATE_EXIT FAKE_GATE_TOUCH_INDEX
 

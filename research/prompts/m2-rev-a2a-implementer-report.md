@@ -1,6 +1,6 @@
 # 实审 A2a 报告：代码审阅第 15、16、21、25、37 条
 
-时刻：2026-09-26 UTC（本机时钟）。规格 `/tmp/claude-1000/impl-rev-a2a/spec.md`；派发提示要求不改 `crates/mutations.tsv`，变异行在 `/tmp/claude-1000/impl-rev-a2a/mutations-append.tsv`（17 行，六段，与表同格式）。
+日期：2026-09-26。规格 `/tmp/claude-1000/impl-rev-a2a/spec.md`；派发提示要求不改 `crates/mutations.tsv`，变异行在 `/tmp/claude-1000/impl-rev-a2a/mutations-append.tsv`（17 行，六段，与表同格式）。
 
 ## 结论
 

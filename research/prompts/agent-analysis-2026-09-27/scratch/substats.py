@@ -1,5 +1,5 @@
 import json,os,glob,collections,pickle,datetime,re
-d='/home/fy5090/.claude/projects/-home-fy5090-code-singlefs/d16a74c5-453c-44d5-8a19-7e71d116de72/subagents/'
+d='~/.claude/projects/-home-fy5090-code-singlefs/d16a74c5-453c-44d5-8a19-7e71d116de72/subagents/'
 out='/tmp/claude-1000/agent-analysis/scratch/'
 stats={}
 for f in glob.glob(d+'agent-*.jsonl'):

@@ -1,0 +1,28 @@
+715,716c715,716
+< E7RESULT name=impl_config devices=2 image_bytes=4294967296 physical_block_size=512 minimum_input_output_bytes=512 region_device_0=0 region_device_1=1 region_device_2=0 slots_per_region=8 journal_ring_bytes=805306368 file_bytes=3000 write_time_seconds=1788000000 filesystem_identifier=5f5346532d453134322d303030312d00 checkpoint_txg=3 mkfs_operations=21
+< E7RESULT name=before_window_summary operations=37 writes=31 last_five=device0@16781312+4096,device1@16781312+4096,device0@7340032+512,device0@0+4096,device1@0+4096
+---
+> E7RESULT name=impl_config devices=2 image_bytes=4294967296 physical_block_size=512 minimum_input_output_bytes=512 region_device_0=0 region_device_1=1 region_device_2=0 slots_per_region=8 journal_ring_bytes=805306368 file_bytes=3000 write_time_seconds=1788000000 filesystem_identifier=5f5346532d453134322d303030312d00 checkpoint_txg=3 mkfs_operations=23
+> E7RESULT name=before_window_summary operations=45 writes=31 last_five=device0@16781312+4096,device1@16781312+4096,device0@7340032+512,device0@0+4096,device1@0+4096
+742,749c742,753
+< E7RESULT name=device_region_bytes step=25 device=0 offset=16785408 length=4096 kind=write sha256=6a51dfab3dd5f55da72a0d5531fe6c34a1661366d954d06fe1c2c035d748f6da hexadecimal_sha256=5befceb8808e6678f1eea18ab74dbf4599e9d56958d55de760e10dae23a637a6
+< E7RESULT name=device_region_bytes step=26 device=1 offset=16785408 length=4096 kind=write sha256=6a51dfab3dd5f55da72a0d5531fe6c34a1661366d954d06fe1c2c035d748f6da hexadecimal_sha256=5befceb8808e6678f1eea18ab74dbf4599e9d56958d55de760e10dae23a637a6
+< E7RESULT name=window_barrier step=27 device=0
+< E7RESULT name=device_region_bytes step=28 device=0 offset=1052672 length=512 kind=write_fua sha256=78481a1acb457a64c793b5909d131f9b45769be65a8b541f14d7f8325b58af7f hexadecimal_sha256=de71336691ac59c24c8cb5becb6cb7ed8e772d9f3bb55fc26ce77a8316d269a6
+< E7RESULT name=device_region_bytes step=29 device=0 offset=4096 length=4096 kind=write sha256=e305c8810ee77e4ab706c42297d958ba21d2e225e11b4f0b147394767ab0d39e hexadecimal_sha256=54f97bda2b4885f95fe7f1681de822d7e0ac86461a0fd8f535db164f0e63eff2
+< E7RESULT name=device_region_bytes step=30 device=1 offset=4096 length=4096 kind=write sha256=5dc1f792b1d2c39a0291ebbe9a7a39045423787534e33eabbf7a138f1852dadc hexadecimal_sha256=c8bbe87e50ce205ef154a4511c121c9dbeebb266cb7f51a838ec1e5f0071ee07
+< E7RESULT name=device_region_bytes_summary window_operations=31 writes=29 barriers=2
+< E7RESULT name=done emitted=35
+---
+> E7RESULT name=window_barrier step=25 device=1
+> E7RESULT name=device_region_bytes step=26 device=0 offset=16785408 length=4096 kind=write sha256=6a51dfab3dd5f55da72a0d5531fe6c34a1661366d954d06fe1c2c035d748f6da hexadecimal_sha256=5befceb8808e6678f1eea18ab74dbf4599e9d56958d55de760e10dae23a637a6
+> E7RESULT name=device_region_bytes step=27 device=1 offset=16785408 length=4096 kind=write sha256=6a51dfab3dd5f55da72a0d5531fe6c34a1661366d954d06fe1c2c035d748f6da hexadecimal_sha256=5befceb8808e6678f1eea18ab74dbf4599e9d56958d55de760e10dae23a637a6
+> E7RESULT name=window_barrier step=28 device=0
+> E7RESULT name=window_barrier step=29 device=1
+> E7RESULT name=device_region_bytes step=30 device=0 offset=1052672 length=512 kind=write_fua sha256=78481a1acb457a64c793b5909d131f9b45769be65a8b541f14d7f8325b58af7f hexadecimal_sha256=de71336691ac59c24c8cb5becb6cb7ed8e772d9f3bb55fc26ce77a8316d269a6
+> E7RESULT name=device_region_bytes step=31 device=0 offset=4096 length=4096 kind=write sha256=e305c8810ee77e4ab706c42297d958ba21d2e225e11b4f0b147394767ab0d39e hexadecimal_sha256=54f97bda2b4885f95fe7f1681de822d7e0ac86461a0fd8f535db164f0e63eff2
+> E7RESULT name=device_region_bytes step=32 device=1 offset=4096 length=4096 kind=write sha256=5dc1f792b1d2c39a0291ebbe9a7a39045423787534e33eabbf7a138f1852dadc hexadecimal_sha256=c8bbe87e50ce205ef154a4511c121c9dbeebb266cb7f51a838ec1e5f0071ee07
+> E7RESULT name=window_barrier step=33 device=0
+> E7RESULT name=window_barrier step=34 device=1
+> E7RESULT name=device_region_bytes_summary window_operations=35 writes=29 barriers=6
+> E7RESULT name=done emitted=39

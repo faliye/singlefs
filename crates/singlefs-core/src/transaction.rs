@@ -93,6 +93,7 @@ use crate::root_ring::{slot_offset, target_for_publish};
 use crate::system_configuration::{
     journal_in_flight_record_limit, SystemConfiguration, SystemImmutableConfiguration,
     SystemMutableConfiguration, SystemRuntimeConfiguration, SystemRuntimeQuantities,
+    JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION, ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
 };
 use crate::unit::{
     build_data_unit, build_index_node, build_packed_unit, data_unit_payload_capacity,
@@ -389,6 +390,8 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
                 device_count: u32::try_from(self.devices.len()).expect("设备数"),
                 region_devices: self.parameters.region_devices,
                 sizes: self.parameters.geometry,
+                journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
+                root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
             },
             mutable: SystemMutableConfiguration,
             runtime: SystemRuntimeConfiguration,
@@ -433,7 +436,7 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
 
     /// 取号全或无失败：已写出的那几份回卷成旧代号（D18（块里携带什么信息） 已定项 11），回卷写发生在任何单元之前。
     /// 回卷写带的 tail 是取号那一写带的同一个见证值（`witnessed_journal_tail`，取号那一刻读的那一次）：回卷是「像没取过号」，
-    /// 取号之前盘上的见证值是它，不退回 0（C554 乙-配置续，用户 2026-09-27 JST 12:08 定）。
+    /// 取号之前盘上的见证值是它，不退回 0（C554 乙-配置续，用户 2026-09-27 定）。
     fn roll_back_acquisition(
         &mut self,
         written: &[usize],
@@ -633,7 +636,7 @@ const JOURNAL_TAIL_WITNESSED_BY_NO_SYSTEM_CONFIGURATION: u64 = 0;
 /// 不拒的话见证值取别的盘的，这块盘上自证过的槽里见证的那次发布就漏在见证值之外。
 ///
 /// # Errors
-/// 按盘表次序第一块一份都读不出的盘 ⇒ [`InstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness`]。
+/// 按盘表次序第一块有一槽读不出或自证不过的盘 ⇒ [`InstanceAcquisitionFailed::DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness`]。
 fn self_verified_system_configurations_of_every_device<Device: BlockDevice>(
     pool: &PoolWriter<'_, Device>,
 ) -> Result<Vec<Vec<SystemConfiguration>>, InstanceAcquisitionFailed> {
@@ -648,9 +651,12 @@ fn self_verified_system_configurations_of_every_device<Device: BlockDevice>(
                 spacing,
                 &filesystem_identifier,
             );
-            if slots_of_this_device.is_empty() {
+            // C331（择根倒挂压过已确认的写） 取甲（用户 2026-09-28 定）：有一槽读不出或自证不过，见证值就缺了那一槽，取不了值。
+            if u64::try_from(slots_of_this_device.len()).expect("每块盘的系统配置槽数装得进 u64")
+                < SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE
+            {
                 return Err(
-                    InstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness {
+                    InstanceAcquisitionFailed::DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness {
                         device: *identity,
                     },
                 );
@@ -660,7 +666,7 @@ fn self_verified_system_configurations_of_every_device<Device: BlockDevice>(
         .collect()
 }
 
-/// 取号那一刻的见证值 c_见证（C554 乙-配置续，用户 2026-09-27 JST 12:08 定；定义取自 `research/prompts/e158-r3-prereg.md`
+/// 取号那一刻的见证值 c_见证（C554 乙-配置续，用户 2026-09-27 定；定义取自 `research/prompts/e158-r3-prereg.md`
 /// 第 348 行「N-配置续」与 `research/prompts/e158-r4-prereg.md` 第 413 行）：每块盘两槽里全部自证过的系统配置的 journal tail 的最大值，
 /// 与可写挂载判 N-配置 同一取法（`mount.rs` 的 `newer_publish_witness`）。`slots_of_every_device` 是
 /// [`self_verified_system_configurations_of_every_device`] 那一次读到的（每块盘至少一份）；盘表为空时
@@ -728,11 +734,11 @@ pub fn instance_generation_to_acquire<Device: BlockDevice>(
 /// ⚠️ D18（块里携带什么信息） 已定项 11 的「重试到 T_retry 用尽才算失败」这里没有做：
 /// 块设备报的第一个错就判失败（写路径上的重试全仓都还没有）。
 ///
-/// 前面没有可写挂载那一道逐盘核（mkfs 同一个进程里那条流、用例与装置在调）：取号那一刻读见证值时某块盘两槽一份本池自证过的都读不出，
-/// 同样在第一个取号写之前拒（[`InstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness`]）。
+/// 前面没有可写挂载那一道逐盘核（mkfs 同一个进程里那条流、用例与装置在调）：取号那一刻读见证值时某块盘有一槽读不出或本池自证不过，
+/// 同样在第一个取号写之前拒（[`InstanceAcquisitionFailed::DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness`]）。
 ///
 /// # Errors
-/// 某块盘读不出自证过的系统配置 ⇒ `DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness`（一个字节没写）；
+/// 某块盘有一槽系统配置读不出或自证不过 ⇒ `DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness`（一个字节没写）；
 /// 屏障或取号写报错 ⇒ `Acquisition`（回卷的结局在里面）。
 ///
 /// # Panics
@@ -748,9 +754,11 @@ pub fn acquire_instance<Device: BlockDevice>(
 /// 取号没做成（[`acquire_instance`]、取号的写那一半）。
 #[derive(Debug)]
 pub enum InstanceAcquisitionFailed {
-    /// 取号那一刻读见证值时，`device` 两槽里一份本池自证过的系统配置都读不出（C554 乙-配置续 Q1；D18（块里携带什么信息） 已定项 11
-    /// 「可见」）：一个字节都没写。第一道屏障之前就读不出时连屏障都没发；屏障之后重读才读不出时发了那一道屏障、没有写。
-    DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness { device: DeviceIdentity },
+    /// 取号那一刻读见证值时，`device` 两槽里有一槽读不出或本池自证不过（C554 乙-配置续 Q1；D18（块里携带什么信息） 已定项 11
+    /// 「可见」；C331（择根倒挂压过已确认的写） 取甲，用户 2026-09-28 定，从「一份都没有」收严成「缺一槽」）：一个字节都没写。第一道屏障之前就读不出时连屏障都没发；屏障之后重读才读不出时发了那一道屏障、没有写。
+    DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness {
+        device: DeviceIdentity,
+    },
     /// 屏障或取号写报错（回卷的结局在里面）。
     Acquisition(AcquisitionFailed),
 }
@@ -771,9 +779,9 @@ pub enum ExpectedInstanceAcquisitionFailed {
     },
     /// 写之前重算时盘上最大的实例代号已是 `u32::MAX`（两次读之间瞬时读错才会与判定时不同）：一个字节都没写。
     InstanceGenerationPastTheTopOfItsRange(InstanceGenerationPastTheTopOfItsRange),
-    /// 同 [`InstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness`]：可写挂载取号之前的逐盘核读得出、
-    /// 取号那一刻读见证值时这块盘两槽都读不出（两次读之间一次瞬时读错就够）。一个字节都没写。
-    DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness {
+    /// 同 [`InstanceAcquisitionFailed::DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness`]：可写挂载取号之前的逐盘核读得出、
+    /// 取号那一刻读见证值时这块盘有一槽读不出或自证不过（两次读之间一次瞬时读错就够）。一个字节都没写。
+    DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness {
         device: DeviceIdentity,
     },
     Acquisition(AcquisitionFailed),
@@ -785,7 +793,7 @@ pub enum ExpectedInstanceAcquisitionFailed {
 ///
 /// # Errors
 /// 重算的号不同 ⇒ `InstanceGenerationChangedBeforeWrite`；读见证值时某块盘两槽都读不出 ⇒
-/// `DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness`；取号写或屏障报错 ⇒ `Acquisition`（与 `acquire_instance` 同）。
+/// `DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness`；取号写或屏障报错 ⇒ `Acquisition`（与 `acquire_instance` 同）。
 pub fn acquire_expected_instance<Device: BlockDevice>(
     pool: &mut PoolWriter<'_, Device>,
     expected: InstanceGeneration,
@@ -801,9 +809,9 @@ pub fn acquire_expected_instance<Device: BlockDevice>(
         );
     }
     write_acquired_instance(pool, recomputed).map_err(|failure| match failure {
-        InstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness {
+        InstanceAcquisitionFailed::DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness {
             device,
-        } => ExpectedInstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness {
+        } => ExpectedInstanceAcquisitionFailed::DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness {
             device,
         },
         InstanceAcquisitionFailed::Acquisition(acquisition) => {
@@ -834,7 +842,7 @@ fn write_acquired_instance<Device: BlockDevice>(
         }
         .into());
     }
-    // 取号那一写带的 tail 是这一刻的见证值（C554 乙-配置续，用户 2026-09-27 JST 12:08 定），不是 0：连着几次取号之后崩溃、中间没有
+    // 取号那一写带的 tail 是这一刻的见证值（C554 乙-配置续，用户 2026-09-27 定），不是 0：连着几次取号之后崩溃、中间没有
     // 发布轮换，两槽都换成了取号写，写 0 就把上一次轮换见证的那次发布抹掉，下一次可写挂载的 N-配置 判不出、会抛弃暂时读不出的最新根。
     // 第一道屏障之后、第一个取号写之前另读每块盘两槽一次（E158 第 4 次跑登记第 413 行）；逐盘取号写与回卷写都用这一次读到的。
     // 屏障前那一核与这一次读之间又有一块盘读不出，就不写（判定与写读同一份输入：写之前重算、对不上不写）。
@@ -1190,7 +1198,7 @@ pub fn resend_the_frozen_publish<Device: BlockDevice>(
 /// 三条发布路径（带单元的、零单元的、树表 0 条上只写实例表的）与重发冻结的那一次共用这一处，不各抄一份——
 /// 抄出来的几份会分叉，而「根槽在系统配置槽之前」「轮换持久之后才返回」正是崩溃窗口那几格的前提。
 ///
-/// 末尾那道屏障（C577（系统配置没见证到的最新根，乙罩不到），用户 2026-09-27 JST 15:1x 定「发布返回前加屏障」）：
+/// 末尾那道屏障（C577（系统配置没见证到的最新根，乙罩不到），用户 2026-09-27 定「发布返回前加屏障」）：
 /// 没有它，发布返回时轮换还可能在写缓存里，崩溃之后系统配置只见证到上一次发布；这次的根槽一时读不出，可写挂载的见证判据
 /// （D23（journal 的角色与格式） 已定项 14「可写挂载读到的更新状态读不出」）就看不出有更新的状态、把这次发布当被抛弃，
 /// 它引用的单元再发出去。屏障报错与轮换报错同一格：这次发布失败，由调用方冻结或整个挂载返回错误

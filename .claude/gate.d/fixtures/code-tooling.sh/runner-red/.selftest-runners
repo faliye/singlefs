@@ -1,0 +1,5 @@
+# 样本的 runner 表（换掉这一道的 SELFTEST_RUNNERS）：四条，第二条必红
+bash research/scripts/sample-pass-a.sh --selftest
+bash research/scripts/sample-fail-b.sh --selftest
+python3 research/scripts/sample-pass-c.py --selftest
+bash research/scripts/sample-pass-d.sh --selftest

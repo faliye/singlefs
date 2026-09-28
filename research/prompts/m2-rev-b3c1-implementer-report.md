@@ -1,6 +1,6 @@
 # 实审 B3c-1 报告（implementation-writer）：崩溃注入第一截交记录核对器整条流、快档标 ignore 加小快档
 
-时刻都是 UTC（本机时钟），JST = UTC + 9。开工 2026-09-26T17:03Z。
+开工 2026-09-27。
 
 ## 一、结论
 
@@ -21,7 +21,7 @@
 ## 三、改法与依据
 
 - 条款：D13（验证路线） 已定项 7（`.claude/kb/decisions/13-验证路线.md:124` 小节标题「已定项 7：O2（独立解析器 + checker） 判的是**一个**镜像」，第 15 行表里写了需要第二个输入的核对归记录核对器）；D23（journal 的角色与格式） 已定项 15（`.claude/kb/decisions/23-journal的角色与格式.md:433`「已定项 15：崩在记录持久之后、根槽持久之前，恢复由记录重建那次发布的根」）。
-- 整条流比前缀多出来的，只有根槽写落在崩溃点之后的那几次发布。按 `crash.rs` 今天的判据（`check_records_against`，我读的那一版是 17:05 前后的工作区）逐条过了一遍：
+- 整条流比前缀多出来的，只有根槽写落在崩溃点之后的那几次发布。按 `crash.rs` 今天的判据（`check_records_against`，我读的那一版是开工后的工作区）逐条过了一遍：
   - 「根在而记录一条都不在」要求根槽写在盘上。崩溃点之后的根槽写都没持久，根记录又带着 txg，不会与盘上的旧字节逐字相同，所以判不出新红。
   - 「恢复自称新态而单元缺席」只罩 txg ≤ 恢复落到那一版的发布。txg 全程单调：新实例的第一次发布取环里与记录里的最大 txg 加 1（`crates/singlefs-core/src/mount.rs:740-759`），回退取现行版加 1（`mount.rs:3990`）。所以崩溃点之后发起的发布 txg 都更大，进不了这一条；能进来的只有「记录已持久、根槽没持久、恢复就落在它身上」的那一次在飞发布。它的单元写在它的记录之前的段里（整段持久），按条款本来就该在。前缀交法把这一次整个漏掉了，整条流把它补上，是收严。
   - 缺席判定里，只有「更晚、在持久集合里、过了回收谓词」的写才算解释。崩溃点之后的写全不持久，所以解释集合与前缀交法相同。
@@ -29,7 +29,7 @@
 
 ## 四、新用例与证红
 
-证红一律在仓副本 `/tmp/claude-1000/impl-rev-b3c1/copy` 上跑（取于 2026-09-26T17:10:23Z，`rsync -a --exclude target --exclude .git`，另删了 `research/target`；那一刻主工作区 `crash.rs` 的 sha256 是 `f689915b…`，`walk.rs` 是 `9b636aa8…`，都已进副本）。用的是 `bash research/scripts/capped.sh 4 bash research/scripts/prove-red.sh --copy <副本> singlefs-harness <名…>`，变异行先追加进副本的 `crates/mutations.tsv`。副本用它自己的 target。
+证红一律在仓副本 `/tmp/claude-1000/impl-rev-b3c1/copy` 上跑（取于 2026-09-27，`rsync -a --exclude target --exclude .git`，另删了 `research/target`；那一刻主工作区 `crash.rs` 的 sha256 是 `f689915b…`，`walk.rs` 是 `9b636aa8…`，都已进副本）。用的是 `bash research/scripts/capped.sh 4 bash research/scripts/prove-red.sh --copy <副本> singlefs-harness <名…>`，变异行先追加进副本的 `crates/mutations.tsv`。副本用它自己的 target。
 
 **基线红集**（副本上不改动、整个二进制跑一遍，debug，`capped.sh 4`，`logs/copy-baseline-whole-binary.log`）原样：
 
@@ -87,14 +87,14 @@ crash-case:crash-injection-fast-tier	crates/ Cargo.toml Cargo.lock	test=singlefs
 
 - 小快档跑一次的用时（debug，`capped.sh 4`，4 段 4 个工作线程，报告里的「用时」）：主工作区上 11.4 秒，副本上 11.6 秒。这比派发要的「几秒内」长。按段数缩短不了：4 段已经各占一个线程，墙钟由最慢的一段历史定（24 步、4 个崩溃状态、每个都起挂载加三个二次崩溃）。要再短，得缩每段步数或每段崩溃状态数，那样就不再是「快档的头几段」。我没缩，交主 agent 定。
 - 变异行（都在草稿目录，六段，格式同 `crates/mutations.tsv`，名字表里现有的都没有）：
-  - `mutations-append.tsv` 三行：M1「实审 B3c-1：崩溃注入第一截交给记录核对器的写表退回崩溃点所在段为止的前缀（恢复落到由记录重建的一版时找不到它的根槽写、读不出它的实例表，被它抛弃的发布的豁免落空）」，**证过**；M2「实审 B3c-1：记录核对器在实例表读得出时把每次发布都当被抛弃（整条流让由记录重建的那一版的实例表读得出之后，没被抛弃的前一版缺单元不再判红）」，**证过**；M3「实审 B3c-1：崩溃注入第一截交给记录核对器的写表退回崩溃点所在段为止的前缀（小快档：头 4 段里种子基 + 2 那一段判红）」，**没证**（小快档在基线红集里）。三行都用 `-p singlefs-harness --test second_transaction_supplement_three_crash_injection -- <过滤>`，跟表里这个二进制已有的行一样按名字过滤。M2 的文件是 `crash.rs`，原文在 17:10 的副本里恰好命中 1 次（`crash.rs:816`）。B3a-2 还在改这份文件，追加之前请再核一次命中数。
+  - `mutations-append.tsv` 三行：M1「实审 B3c-1：崩溃注入第一截交给记录核对器的写表退回崩溃点所在段为止的前缀（恢复落到由记录重建的一版时找不到它的根槽写、读不出它的实例表，被它抛弃的发布的豁免落空）」，**证过**；M2「实审 B3c-1：记录核对器在实例表读得出时把每次发布都当被抛弃（整条流让由记录重建的那一版的实例表读得出之后，没被抛弃的前一版缺单元不再判红）」，**证过**；M3「实审 B3c-1：崩溃注入第一截交给记录核对器的写表退回崩溃点所在段为止的前缀（小快档：头 4 段里种子基 + 2 那一段判红）」，**没证**（小快档在基线红集里）。三行都用 `-p singlefs-harness --test second_transaction_supplement_three_crash_injection -- <过滤>`，跟表里这个二进制已有的行一样按名字过滤。M2 的文件是 `crash.rs`，原文在那份副本里恰好命中 1 次（`crash.rs:816`）。B3a-2 还在改这份文件，追加之前请再核一次命中数。
   - `mutations-replacements.tsv` 两行（按第一段的名字整行替换）：
     - 「增补 3 第 3 件（用户 2026-09-20 定案第 3 条）：崩溃状态上不跑记录核对器」（现第 155 行）：旧原文是第一截那段前缀调用，被这次改动改没了（门禁 33 号原样：`crates/mutations.tsv:155 增补 3 第 3 件（用户 2026-09-20 定案第 3 条）：崩溃状态上不跑记录核对器：原文在 crates/singlefs-harness/src/crash_injection.rs 里命中 0 次`）。新原文是 `        let record_check =\n            check_records_against(&image, &writes, &persisted, report.effective_root);\n        tally.record_checks += 1;`，在主工作区命中 1 次；替换文、参数、必须红的测试都不变。**证过**（第四节第二次 prove-red）。
     - 「增补 3 第 3 件：判崩溃点时取择根而不是施加记录前缀之后实际走的那条根（记录已写、根槽未写那一格内容与根身份配不上）」（现第 152 行）：它的参数 `-- crash_injection_fast_tier`、必须红的是快档。快档标 ignore 之后，这样跑一条都跑不到，59 号会判它没红。替换行把参数改成 `-- crash_injection_small_fast_tier`，必须红的改成小快档，原文与替换文不变。**没证**：理由同 M3。另一条路是保留点快档、参数加 `--include-ignored`，那样 59 号每复跑一次这一行都要跑一遍快档，交主 agent 挑。
 
 ## 六、交主 agent 的问题与发现
 
-1. **小快档在当前工作区上红，红因不在我这两份文件里**。红的是种子 7463871032432355115 第 29 段那个崩溃状态上的 I-7.4，五截都判（第四节那张原样表）。第一截判它的是 `checker_violations_on`，它只跑池级 checker、不读记录核对器的结论；所以它与这次改的交法无关，是由 `check_pool_image` 的结构推出来的。这条消息的原样（主工作区 17:09 那一趟，`/tmp/claude-1000/impl-rev-b3c1/run-new-tests-1.log`）：`I-7.4：被抛弃的根（实例 1、txg 4）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：数据单元 在盘 0 槽 50182 的那一份与位置条目里的校验和对不上；数据单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的`。调查员 16:30 的快照上快档没有这一条（调查报告第一节的三条里没有它），同一个种子、同样摆 4 个崩溃状态，快档本来就跑得到这一格。那之后 `crates/singlefs-checker/src/walk.rs`、`image.rs`（17:05）、`crates/singlefs-core/src/` 下几份（16:45–16:51）、`history.rs`（16:47）都被别的会话改过；是哪一处带进来的，我没查。
+1. **小快档在当前工作区上红，红因不在我这两份文件里**。红的是种子 7463871032432355115 第 29 段那个崩溃状态上的 I-7.4，五截都判（第四节那张原样表）。第一截判它的是 `checker_violations_on`，它只跑池级 checker、不读记录核对器的结论；所以它与这次改的交法无关，是由 `check_pool_image` 的结构推出来的。这条消息的原样（主工作区那一趟，`/tmp/claude-1000/impl-rev-b3c1/run-new-tests-1.log`）：`I-7.4：被抛弃的根（实例 1、txg 4）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：数据单元 在盘 0 槽 50182 的那一份与位置条目里的校验和对不上；数据单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的`。调查员的快照上快档没有这一条（调查报告第一节的三条里没有它），同一个种子、同样摆 4 个崩溃状态，快档本来就跑得到这一格。那之后 `crates/singlefs-checker/src/walk.rs`、`image.rs`、`crates/singlefs-core/src/` 下几份、`history.rs` 都被别的会话改过；是哪一处带进来的，我没查。
    - 这一条同样会让标了 ignore 的快档红（种子 …115 在快档的 24 段里），崩溃验证员在提交时会看到它。
    - 我**没有**为了让小快档绿去挑别的种子：头 4 段是照「快档的头几段」定的；换成现在碰巧干净的种子，等于把这一格从普通 `cargo test` 里藏起来。要换就请主 agent 定。
    - 小快档绿了之后，M3 与第 152 行的替换行才证得了红（`prove-red.sh` 在基线红时停）。
@@ -113,9 +113,9 @@ crash-case:crash-injection-fast-tier	crates/ Cargo.toml Cargo.lock	test=singlefs
 
 开跑前 `ps` 看到的：别的会话的 `cargo test`（`second_transaction_step_three_formatted_pool` 一组、`second_transaction_supplement_three_fault_injection`、`first_transaction_step_five…`），没有 qemu / vm-bench / e152 / fio。cargo 自己排队，我没记等锁的时长。都跑在 `nice -n 19`、`capped.sh 4` 下；跑编出来的测试时经 `run-with-memory-cap.sh 8G`，没有撞到包装的 250–254。
 
-- 主工作区 `cargo test -p singlefs-harness --lib`（17:18–17:21Z，`logs/main-lib.log`）：
+- 主工作区 `cargo test -p singlefs-harness --lib`（`logs/main-lib.log`）：
   `test result: ok. 89 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 127.13s`
-- 主工作区整个 `--test second_transaction_supplement_three_crash_injection`（17:21–17:23Z，`logs/main-crash-injection-binary.log`），红因与副本基线相同，都是小快档上种子 …115 第 29 段的 I-7.4，五截各 2 次：
+- 主工作区整个 `--test second_transaction_supplement_three_crash_injection`（`logs/main-crash-injection-binary.log`），红因与副本基线相同，都是小快档上种子 …115 第 29 段的 I-7.4，五截各 2 次：
   `test result: FAILED. 9 passed; 1 failed; 2 ignored; 0 measured; 0 filtered out; finished in 223.15s`
   这一趟里小快档报告的两行记录核对器读数原样（第 106、207 行）：`崩溃状态上 checker 跑了 16 次；记录核对器跑了 16 次：根在而记录一条都不在 0 次、恢复自称新态而单元缺席 0 次`；小快档「用时 12.0 秒」。
 - `cargo fmt --all -- --check`（`logs/fmt-check.log`）：退出 1。`Diff in` 点名的四份文件是 `e158_root_choice_repair.rs`、`admission_checkpoint_cost_per_device_paths.rs`、`entries_after_a_writable_mount_refuse_other_parameters_and_device_tables_before_any_write.rs`、`writable_mount_refuses_a_device_table_disagreeing_with_the_system_configuration.rs`，都不是我的。我这两份单独 `rustfmt --check --edition 2021` 退出 0。
@@ -135,7 +135,7 @@ crash-case:crash-injection-fast-tier	crates/ Cargo.toml Cargo.lock	test=singlefs
   - 94 号：退出 0，`✓ checker 与实现只共享常量模块 `singlefs-format`（…）`
   - 89 号：退出 77，`⊘ 本次未跑：收口表第 27 行那几笔的前置一个都没进来，今天无对象可判（5 条逐字探针、覆盖 4 笔，逐条对上今天的值）`，这是没跑，不是通过。
 - `research/scripts/crash-case-check.py`：退出 1，点名的是 `crash_enumeration_resumes_from_its_progress_file.rs:383` 等，不是这份测试文件（快档不调 `enumerate_layer0` 一族，它不判）。
-- `git diff --stat -- crates litmus`（17:24Z，原样末行，全份在 `logs/git-diff-stat.txt`）：`87 files changed, 28974 insertions(+), 11040 deletions(-)`；我这两份的那两行：`crates/singlefs-harness/src/crash_injection.rs     |  821 ++-`、`...transaction_supplement_three_crash_injection.rs |  658 +-`（含开工前别人已有的改动）。
+- `git diff --stat -- crates litmus`（原样末行，全份在 `logs/git-diff-stat.txt`）：`87 files changed, 28974 insertions(+), 11040 deletions(-)`；我这两份的那两行：`crates/singlefs-harness/src/crash_injection.rs     |  821 ++-`、`...transaction_supplement_three_crash_injection.rs |  658 +-`（含开工前别人已有的改动）。
 
 ## 八、草稿目录里删了什么、留了什么
 

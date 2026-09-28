@@ -1,0 +1,36 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_r3_x1_single_fault_leaves_the_pool_read_only.rs (target/release/deps/opus_r3_x1_single_fault_leaves_the_pool_read_only-de458b65fcd665c3)
+
+running 2 tests
+test a_power_loss_after_the_row_publish_and_one_bad_root_slot_refuse_every_writable_mount ... MOUNT instance=2 chosen=(1,4) warm_ups=2
+CASE after_the_row_publish cut=30 newest_root=(2,5) on_device=0 offset=7344128 read=FileRead root=(2,5) len=2999
+CASE after_the_row_publish fault=none writable=Ok(3)
+CASE after_the_row_publish fault=root_slot_not_self_verified attempt=0 writable=Err("NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }, wi") disk_unchanged=true read_only=FileRead root=(1,4) len=2999
+CASE after_the_row_publish fault=root_slot_not_self_verified attempt=1 writable=Err("NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }, wi") disk_unchanged=true read_only=FileRead root=(1,4) len=2999
+CASE after_the_row_publish fault=root_slot_not_self_verified attempt=2 writable=Err("NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }, wi") disk_unchanged=true read_only=FileRead root=(1,4) len=2999
+CASE after_the_row_publish fault=root_sector_unreadable attempt=0 writable=Err("NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }, wi")
+CASE after_the_row_publish fault=root_sector_unreadable attempt=1 writable=Err("NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }, wi")
+CASE after_the_first_warm_up cut=53 newest_root=(2,6) on_device=0 offset=1056768 read=FileRead root=(2,6) len=2999
+CASE after_the_first_warm_up fault=none writable=Ok(3)
+CASE after_the_first_warm_up fault=root_slot_not_self_verified attempt=0 writable=Ok((3, 5)) disk_unchanged=false read_only=FileRead root=(2,5) len=2999
+CASE after_the_first_warm_up fault=root_slot_not_self_verified attempt=1 writable=Ok((3, 5)) disk_unchanged=false read_only=FileRead root=(2,5) len=2999
+CASE after_the_first_warm_up fault=root_slot_not_self_verified attempt=2 writable=Ok((3, 5)) disk_unchanged=false read_only=FileRead root=(2,5) len=2999
+CASE after_the_first_warm_up fault=root_sector_unreadable attempt=0 writable=Ok((3, 5))
+CASE after_the_first_warm_up fault=root_sector_unreadable attempt=1 writable=Ok((3, 5))
+CASE after_the_last_warm_up cut=76 newest_root=(2,7) on_device=1 offset=4202496 read=FileRead root=(2,7) len=2999
+CASE after_the_last_warm_up fault=none writable=Ok(3)
+CASE after_the_last_warm_up fault=root_slot_not_self_verified attempt=0 writable=Ok((3, 6)) disk_unchanged=false read_only=FileRead root=(2,6) len=2999
+CASE after_the_last_warm_up fault=root_slot_not_self_verified attempt=1 writable=Ok((3, 6)) disk_unchanged=false read_only=FileRead root=(2,6) len=2999
+CASE after_the_last_warm_up fault=root_slot_not_self_verified attempt=2 writable=Ok((3, 6)) disk_unchanged=false read_only=FileRead root=(2,6) len=2999
+CASE after_the_last_warm_up fault=root_sector_unreadable attempt=0 writable=Ok((3, 6))
+CASE after_the_last_warm_up fault=root_sector_unreadable attempt=1 writable=Ok((3, 6))
+ok
+test the_same_shape_on_a_pool_that_only_went_through_mkfs ... FORMATTED instance=1 warm_ups=1
+FORMATTED newest_root=(1,1) fault=none writable=Ok(2)
+FORMATTED fault=root_slot_not_self_verified attempt=0 writable=Err("NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, wi") read_only=NoFile root=(0,0)
+FORMATTED fault=root_slot_not_self_verified attempt=1 writable=Err("NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, wi") read_only=NoFile root=(0,0)
+FORMATTED fault=root_slot_not_self_verified attempt=2 writable=Err("NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, wi") read_only=NoFile root=(0,0)
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+

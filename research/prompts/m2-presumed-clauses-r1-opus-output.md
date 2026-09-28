@@ -1,6 +1,6 @@
 # m2-presumed-clauses-r1 云端攻方（Opus）：K2（P3）与 K4（P6）
 
-2026-09-23，时刻按 UTC 记（东京 JST = UTC+9）。前一条同立场的腿没落任何文件，这一份从头做。禁读的两份没读。
+2026-09-23。前一条同立场的腿没落任何文件，这一份从头做。禁读的两份没读。
 
 ## 复跑
 
@@ -14,7 +14,7 @@
 cd /tmp/claude-1000/presumed-r1-opus/repo
 export CARGO_TARGET_DIR=/tmp/claude-1000/presumed-r1-opus/target TMPDIR=/tmp/claude-1000/presumed-r1-opus/tmp
 nice -n 19 cargo test --release -p singlefs-harness --test presumed_r1_opus_k2 --test presumed_r1_opus_k4 --no-run
-bash /tmp/claude-1000/presumed-r1-opus/run-k2-arms.sh          # K2 七条臂并行，约 13 分钟（UTC 15:30–15:43）
+bash /tmp/claude-1000/presumed-r1-opus/run-k2-arms.sh          # K2 七条臂并行，约 13 分钟
 for arm in "" max stop max-stop; do env ${arm:+PRESUMED_R1_CHAIN_HEAD=$arm} nice -n 19 target/release/deps/presumed_r1_opus_k4-* --nocapture --test-threads=1; done
 rustc -O --edition 2021 <模型目录>/presumed_r1_opus_model.rs -o /tmp/claude-1000/presumed-r1-opus/model && /tmp/claude-1000/presumed-r1-opus/model
 ```
@@ -331,7 +331,7 @@ K4：
 - 没派本地腿，没重复抽样（这是云端单次观测；「没打中」那几条按规则一次不算数）。
 - 副本、构建目录与没压缩的日志留在 `/tmp/claude-1000/presumed-r1-opus/`（`repo/`、`target/`、`k2-arms/`、`k4-*.log`），没入库，因为写范围只到模型目录；压缩过的日志已拷进模型目录 `logs/`。
 
-## 附录：引到的 kb 原文（整行抄，行号是 kb 文件自己的行号，2026-09-23 UTC 15:5x 重取——同一天别的会话在改这两份 kb，行号在这一轮里漂过一次）
+## 附录：引到的 kb 原文（整行抄，行号是 kb 文件自己的行号，2026-09-24 重取——同一天别的会话在改这两份 kb，行号在这一轮里漂过一次）
 
 **A1** `.claude/kb/decisions/16-发布语义.md` 第 147 行：
 

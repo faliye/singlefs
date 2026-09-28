@@ -1,6 +1,6 @@
 # 实十九（收口表第 28 行：记账树与中央映射树的分裂）实现员报告
 
-时刻一律 UTC。草稿目录 `/tmp/claude-1000/impl-m2-treesplit/`。交付：`impl-m2-treesplit.patch`（只含 `crates/`，21 个文件）、`mutations-append.tsv`（48 行）、本报告。
+草稿目录 `/tmp/claude-1000/impl-m2-treesplit/`。交付：`impl-m2-treesplit.patch`（只含 `crates/`，21 个文件）、`mutations-append.tsv`（48 行）、本报告。
 
 ## 一、结论
 
@@ -35,7 +35,7 @@
 
 ## 二、这一轮写过的文件
 
-补丁对 16:15:53 UTC 的主工作区快照（已打进实二十 14:50Z、实十六接续 16:15Z 那一批；之后到交回主工作区只动了 `mutations.tsv` 与 `e158_root_choice_repair.rs`，都不在补丁里）生成，`git apply --check` 结果见第七节。21 个文件：
+补丁对最后一次同步的主工作区快照（已打进实二十、实十六接续那一批；之后到交回主工作区只动了 `mutations.tsv` 与 `e158_root_choice_repair.rs`，都不在补丁里）生成，`git apply --check` 结果见第七节。21 个文件：
 
 - 新建：`crates/singlefs-core/src/code_two_tree.rs`、`crates/singlefs-harness/tests/common_tree_split/mod.rs`（两份新用例共用的内存盘搭建与容量开关）、
   `crates/singlefs-harness/tests/second_transaction_supplement_two_tree_split.rs`、`crates/singlefs-harness/tests/second_transaction_supplement_two_tree_split_layer0.rs`。
@@ -66,9 +66,9 @@
 
 ## 三、每条新测试的证红与变异表
 
-**做法**：副本 `mutation/work3`（合并实十六接续 16:15Z 那一批之前的那棵树 rebase2 rsync 出来，自带 target，debug 构建；合并时我的代码只动了 mount.rs 拷贝上那一串与两处穷举臂，#43 在合并后的树上另证一次，见表后），先把涉及的 7 个测试二进制各跑一遍不改动的基线，**基线红集全空**
+**做法**：副本 `mutation/work3`（合并实十六接续那一批之前的那棵树 rebase2 rsync 出来，自带 target，debug 构建；合并时我的代码只动了 mount.rs 拷贝上那一串与两处穷举臂，#43 在合并后的树上另证一次，见表后），先把涉及的 7 个测试二进制各跑一遍不改动的基线，**基线红集全空**
 （核心库单测 104、格式库单测 5、mapping_node_admission 3、parallel_line_two 12、accounting_node_full 2、tree_nodes_and_central_mapping 9、tree_split 5，全绿）。
-每行改坏一处 → 跑那条测试所在的整个二进制 → 从原件拷回并 touch。结果 `mutation/logs6/results.tsv`（16:06:16 跑完），逐行日志 `row-0.log`…`row-19.log`、
+每行改坏一处 → 跑那条测试所在的整个二进制 → 从原件拷回并 touch。结果 `mutation/logs6/results.tsv`，逐行日志 `row-0.log`…`row-19.log`、
 `format-baseline.log`、`format-row-a.log`、`format-row-b.log`。下表的「#」是 `mutations-append.tsv` 的行号。22 行证过，22 条点名测试全红。
 
 | 新测试（所在二进制） | # 改坏哪一行 | 哪条断言红 | 同时红的（基线之外） |
@@ -96,7 +96,7 @@
 
 被测代码里没有 `debug_assert`，四处「红在 expect」的在 release 下同样红在那里（expect 不随构建档变），没有另跑 `--release`。
 
-**合并后重证 #43**（`mutation/work4` = 合并后的树 rebase3，自带 target，debug；结果 `mutation/logs7/results.tsv`，16:46:55）：基线 tree_split 5/5 绿、基线红集空；
+**合并后重证 #43**（`mutation/work4` = 合并后的树 rebase3，自带 target，debug；结果 `mutation/logs7/results.tsv`）：基线 tree_split 5/5 绿、基线红集空；
 改坏 mount.rs 拷贝上那一串的 `rewritten_roles_of_a_publish_without_content(*shape, &nodes.rewritten_roles)` → `{ let _ = nodes; shape.rewritten_roles() }`，
 点名的 `a_pool_with_multi_level_trees_mounts_writable_and_the_row_and_warm_up_publishes_carry_on` 红在 mount.rs:1440 expect「那一次重写的节点在那一次取到了落点」，同二进制别的都不红。
 
@@ -104,10 +104,10 @@
 - 点名的测试在 `second_transaction_supplement_two_tree_split_layer0` 二进制里、子 agent 不跑的 2 行：#24「树分裂 层 0：冷走读核映射条目数时记账树按一个节点算（多层记账树的镜像走读失败）」、
   #25「树分裂 树高从根节点头读成层级（不加一，D8 已定项 11 ⑤ / D28 已定项 4）」。
 - 同一条测试已由别的行证过、多加的 5 行：#9、#12、#13、#14、#15。
-- 旧行换锚点（原行的原文在补丁后的树上命中 0 次，删掉、以新名字重加）19 行：#26–#40、#42、#46–#48（#46–#48 是实十六接续 16:15Z 新加、锚在
-  `placements_of_the_publishes_after_acquisition_on_a_copy` 里的三行，那一段合并时按两棵树重排过；#30、#42 按 16:15Z 之后的主工作区又换了一次锚）。
+- 旧行换锚点（原行的原文在补丁后的树上命中 0 次，删掉、以新名字重加）19 行：#26–#40、#42、#46–#48（#46–#48 是实十六接续那一批新加、锚在
+  `placements_of_the_publishes_after_acquisition_on_a_copy` 里的三行，那一段合并时按两棵树重排过；#30、#42 按实十六接续之后的主工作区又换了一次锚）。
 
-**`crates/mutations.tsv` 要删的 25 行**（按行名；16:17 的主工作区里每个名字恰好一行；它们的原文在补丁后的树上都命中 0 次。第 7、17、22 行实十六接续 16:15Z 按名字换过锚，换过的原文在补丁后的树上同样命中 0 次，照删）：
+**`crates/mutations.tsv` 要删的 25 行**（按行名；当时的主工作区里每个名字恰好一行；它们的原文在补丁后的树上都命中 0 次。第 7、17、22 行实十六接续那一批按名字换过锚，换过的原文在补丁后的树上同样命中 0 次，照删）：
 1. 释放退回按提示 —— 换锚点重加为 #26
 2. 步 1 变异：不释放旧落点 —— #27
 3. 步 1 变异：defer 行写 0 —— #28
@@ -134,10 +134,10 @@
 24. 实例表第二片 × 增补 2 收口表第 39 行那一族：取号之前在拷贝上走那一串时，树表 0 条那一版上写行只按一片取实例表角色（多于一片时拷贝上取的与真发的不同，挂载自己的断言判出） —— #47
 25. 实例表第二片 × 增补 2 收口表第 39 行那一族：取号之前在拷贝上走那一串时，带文件的一版上写行不释放被换下的那条实例表旧链（经映射那一路从这一轮起跳过实例表；回退到环里最旧的根时写行当场回收的那一片拷贝上看不见） —— #48
 
-全文行名在 `/tmp/claude-1000/impl-m2-treesplit/rows-to-delete.txt`（一行一个，25 行）。按 16:47 的主工作区 `crates/mutations.tsv`（586 行，E158 那一路 16:36 又加了 2 行）删 25、加 48 之后整表 609 行，
-在补丁后的树上（`e158_root_choice_repair.rs` 取 16:47 的主工作区那一份）逐行核「原文恰好命中一次」全过；变异名不重复；「文件 + 原文 + 替换文 + 点名的测试」四项不重复
-（门禁 33 号 16:25 在同一棵树、当时 607 行的表上跑过，见第七节）。
-（16:09 时主工作区自己的「E158 root_choice_repair 候选 (b) …交回之前清空集合」一行原文命中 0 次，16:17 主工作区已改好，与我的补丁无关。）
+全文行名在 `/tmp/claude-1000/impl-m2-treesplit/rows-to-delete.txt`（一行一个，25 行）。按交回前最后一次看的主工作区 `crates/mutations.tsv`（586 行，E158 那一路中途又加了 2 行）删 25、加 48 之后整表 609 行，
+在补丁后的树上（`e158_root_choice_repair.rs` 取同一刻的主工作区那一份）逐行核「原文恰好命中一次」全过；变异名不重复；「文件 + 原文 + 替换文 + 点名的测试」四项不重复
+（门禁 33 号在同一棵树、当时 607 行的表上跑过，见第七节）。
+（先前一次看时主工作区自己的「E158 root_choice_repair 候选 (b) …交回之前清空集合」一行原文命中 0 次，后来主工作区已改好，与我的补丁无关。）
 
 ## 四、层 0：七条新流（交提交时由崩溃验证员跑，这一轮最终的树上没跑）
 
@@ -157,15 +157,15 @@
 | `AccountingRootSplit` | 空发布，记账叶容量 14 | 记账 `L15` → `L8 L7 I2`（根分裂，树高 1 → 2；映射多两条） | 分配记录树、记账两片叶 + 新根、映射一个节点、树表 = 6 | 4103 |
 | `AccountingLeafSplit` | 空发布，记账叶容量 14 → 8 | 记账 `L8 L7 I2` → `L5 L5 L5 I3`（叶多一片，树高不变） | 分配记录树、记账三片叶 + 根、映射一个节点、树表 = 7 | 16391 |
 
-**各流罩住的写序**（七条同一个形状，只差单元数 N）：单元写段 2 × N 次写（N 见上表第四列：`CentralMappingRootSplit` 6、`CentralMappingLeafSplit` 6、`CentralMappingTwoLevelsSplitInARow` 8、`CentralMappingEmptyLeafDropped` 8、`CentralMappingRootLowered` 8、`AccountingRootSplit` 6、`AccountingLeafSplit` 7；每个单元两盘各一次，段内不排序，全量枚举段内任意子集）→ 记录段 2 次 → 根槽 FUA 1 次 → 两盘系统配置槽 2 次；全量状态数 = 1 + Σ(2^|段| − 1)。新层 0 流只保证编得过、没跑（主 agent 15:1x 的指示）；快档、全量两个用例名见上。
+**各流罩住的写序**（七条同一个形状，只差单元数 N）：单元写段 2 × N 次写（N 见上表第四列：`CentralMappingRootSplit` 6、`CentralMappingLeafSplit` 6、`CentralMappingTwoLevelsSplitInARow` 8、`CentralMappingEmptyLeafDropped` 8、`CentralMappingRootLowered` 8、`AccountingRootSplit` 6、`AccountingLeafSplit` 7；每个单元两盘各一次，段内不排序，全量枚举段内任意子集）→ 记录段 2 次 → 根槽 FUA 1 次 → 两盘系统配置槽 2 次；全量状态数 = 1 + Σ(2^|段| − 1)。新层 0 流只保证编得过、没跑（主 agent 的指示）；快档、全量两个用例名见上。
 
 合计 225329 个状态。**比已有的流多罩了什么**：已有五条层 0 流里两棵树恒是根兼叶，一次发布写一个记账节点、一个映射节点；这七条里一次发布写出 2–5 个映射树节点或 3–4 个记账树节点，
 它们与别的单元同一段（已定项 11 ①），单元写段里第一次有「新叶落了、新根没落」「新根落了、某片新叶没落」「照抄的叶之外全落了」这一类子集；
 根降高那一条里记录的新根段指着一个节点的映射树、上一版是三个节点；摘空节点那一条里上一版被摘掉的叶与新叶同时在盘上。多跑的一步只有恢复本身（没有重开、挂载），
 与已有流的基线镜像、写表、段序列都不同，各自全量。
-**跑过的（只作参考，不是这一轮最终的树）**：13:3x UTC 在对齐主工作区之前的副本上 release 全量跑过一次，七条流 225329 个状态零违例（oracle、不看 journal 那一遍、走读失败、
+**跑过的（只作参考，不是这一轮最终的树）**：在对齐主工作区之前的副本上 release 全量跑过一次，七条流 225329 个状态零违例（oracle、不看 journal 那一遍、走读失败、
 记录核对器、checker 各条全 0；`LAYER0_TREE_SPLIT` 行在 `/tmp/claude-1000/impl-m2-treesplit/logs/layer0-full-1.log`）。之后读树改了一处（叶条目宽不在读树时判）、三次对齐主工作区，
-按主 agent 15:1x 的指示最终的树上不跑层 0：这个二进制只保证编得过（clippy --all-targets 过）。
+按主 agent 的指示最终的树上不跑层 0：这个二进制只保证编得过（clippy --all-targets 过）。
 
 ## 五、实做时定下的、交主 agent 的设计问题
 
@@ -188,7 +188,7 @@
   容量叶 ≥ 1 / 内部 ≥ 2（开关 setter 先判过）；装单元时断言计划里叶的 key 与装出来的条目 key 是同一个集合、映射 key 与 `resolve` 预先算的逐项相等（发布路径自己的不变量）；
   mount.rs 里取号之前在拷贝上推两棵树 `expect`「准入刚按同样输入推过、没拒」。模型（harness `model.rs`）只罩单节点树：写记账行时行数装不下一个节点就断言（今天的随机历史两块盘，走不到）。
 - **B8 条款没写、没加的**：`CodeTwoTreeKey` 等只加了用得到的 derive；没给多层树加「低于一半合并」「借条目」（已定项 11 ③ 明写不做）；extent 树、分配记录树、inode 根的内部节点这一轮不碰。
-- **B9 依赖实二十**：一次发布分裂多出来的节点增加点名项；实二十（末条再跨记录）已在 14:50Z 打进主工作区，我的补丁建在它之上，发布路径里不再有「点名项多于 67 就拒」那一判。
+- **B9 依赖实二十**：一次发布分裂多出来的节点增加点名项；实二十（末条再跨记录）已打进主工作区，我的补丁建在它之上，发布路径里不再有「点名项多于 67 就拒」那一判。
   我的用例都在 67 项以内（最大的是两棵树都压小的第一个文件版本，24 个角色）。
 
 ## 六、不变量条文草稿与要跟着改的 kb（交书记员）
@@ -212,13 +212,13 @@ checker 这一轮把新判定放在已有编号下（I-1.1、I-1.10），免得�
 - 里程碑收口表第 28 行：记账树与中央映射树的分裂落地（这一份），分配记录树与 extent 树仍等 `m2-keyspace-r1`；C478（码 2 头 key 区间取子树覆盖）在这两棵树上已按覆盖区间写与判，inode 树根仍是首末分隔 key。
 - 错误成员：`AccountingEntriesExceedOneNode`、`MappingEntriesExceedOneNode` 删，`MultiLevelCodeTwoTreeRefused` 新增；`OpenPoolForReadFailure::CentralMappingWithMoreThanOneLevelIsNotSupportedInTheFirstVersion` 删。
 
-## 七、验证（第 4 步那几样；最终的树 = rebase3 = 16:15:53 的主工作区 + 补丁；各贴末尾原样输出）
+## 七、验证（第 4 步那几样；最终的树 = rebase3 = 当时的主工作区 + 补丁；各贴末尾原样输出）
 
-**合了几次主工作区**：三次——14:0x（base2，手合 recovery.rs 三处、walk.rs / mount.rs 导入）、14:50Z 实二十之后（base3，零冲突）、16:15Z 实十六接续之后
+**合了几次主工作区**：三次——第一次（base2，手合 recovery.rs 三处、walk.rs / mount.rs 导入）、实二十之后（base3，零冲突）、实十六接续之后
 （base5，`patch --merge` 冲突 8 处全部手合：walk.rs 导入与 `references_of_root`、mount.rs 导入与拷贝上那一串、transaction.rs 两处、model.rs 两处；
 另补两处穷举臂）。合并之后逐文件核过：主工作区那一边与我这一边各自增删的行都在（按行的多重集比对，只差手合的那几处）。
 
-**`git apply --check`**（对主工作区现状，只读）：`APPLY-CHECK-OK 16:47:18`；补丁在 base5 快照上 `git apply` 之后与 rebase3 逐文件相同。主工作区 16:15:53 之后只动了
+**`git apply --check`**（对主工作区现状，只读）：`APPLY-CHECK-OK`；补丁在 base5 快照上 `git apply` 之后与 rebase3 逐文件相同。主工作区在取 rebase3 之后只动了
 `mutations.tsv` 与 `e158_root_choice_repair.rs`，都不在补丁里。`git apply --stat`：
 ```
  crates/singlefs-checker/src/lib.rs                 |   22 
@@ -265,8 +265,8 @@ clippy-exit=0
 build-exit=0
 ```
 
-**动到的测试二进制**（release，整个二进制，不按名字挑；名字含 layer0 的不跑）：我改过的 15 个 + 主工作区 16:15Z 这一批改过、与补丁同一段代码的 7 个（含新加的
-`instance_table_second_page_write`）；`run-chain3.sh`，16:46:55 跑完：
+**动到的测试二进制**（release，整个二进制，不按名字挑；名字含 layer0 的不跑）：我改过的 15 个 + 主工作区实十六接续这一批改过、与补丁同一段代码的 7 个（含新加的
+`instance_table_second_page_write`）；`run-chain3.sh` 跑完：
 ```
      Running tests/checker_known_bad_images.rs
 test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 360.09s
@@ -328,7 +328,7 @@ exit=0
 
 **第 3 步证红**：见第三节（22 行在合并之前的树上证过，#43 在合并后的树上重证）。
 
-**门禁**（副本 `gatecheck` = rebase3 + 删 25 加 48 之后的表，16:25:39）：
+**门禁**（副本 `gatecheck` = rebase3 + 删 25 加 48 之后的表）：
 ```
 33-mutation-tables.sh
   ✓ 147 个实验二进制都有成形的变异表，1573 条变异的原文各命中源码一次；crates/mutations.tsv 607 条的原文各命中源码一次
@@ -341,7 +341,7 @@ exit=0
 ```
 89、92 号在副本上 exit 77（不是 git 仓），74 号要跑 cargo、没跑。
 
-**主工作区 `git diff --stat -- crates litmus`**（16:47，我没动主工作区；这是别的会话在主工作区里的未提交改动，原样贴，分不出谁改的）：
+**主工作区 `git diff --stat -- crates litmus`**（交回前最后一次看，我没动主工作区；这是别的会话在主工作区里的未提交改动，原样贴，分不出谁改的）：
 ```
  crates/mutations.tsv                               |  114 +-
  crates/singlefs-checker/src/image.rs               |    8 +-
@@ -391,7 +391,7 @@ exit=0
 ## 八、没做什么
 
 - 没跑层 0：七条新流（第四节）在最终的树上一条没跑，`second_transaction_supplement_two_tree_split_layer0` 这个二进制只保证编得过；已有层 0 流的快档、全量都没跑；
-  名字含 layer0 的二进制一律没跑（主 agent 15:1x 的指示）。13:3x 那次全量（225329 个状态零违例）是对齐主工作区之前的副本上跑的，只作参考。
+  名字含 layer0 的二进制一律没跑（主 agent 的指示）。那次全量（225329 个状态零违例）是对齐主工作区之前的副本上跑的，只作参考。
 - 没跑全量 `cargo test --all`、没跑门禁 59 号（整表复跑）、74 号（要跑 cargo）、89 / 92 号（不是 git 仓，副本上 exit 77），留给提交时统一的那一次验证。
   跑过的门禁：33、53、93、94（第七节）。
 - 没走三方对抗；QEMU、herd7 与 crates 变异表整表复跑归崩溃验证员；没提交、没动主工作区（合并只在 `/tmp/claude-1000/impl-m2-treesplit/rebase3` 里做）。

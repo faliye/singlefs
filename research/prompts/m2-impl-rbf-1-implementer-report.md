@@ -1,6 +1,6 @@
 # 实一（回退改形态：格式与系统配置）实现员报告
 
-时刻：2026-09-26 06:13 JST 交回。工作在主工作区；编译一律用自己的 `CARGO_TARGET_DIR`（`/tmp/claude-1000/impl-rbf-1/target-*` 与各副本自己的 `target`），没碰项目的 `target/`。
+时刻：2026-09-26 交回。工作在主工作区；编译一律用自己的 `CARGO_TARGET_DIR`（`/tmp/claude-1000/impl-rbf-1/target-*` 与各副本自己的 `target`），没碰项目的 `target/`。
 
 ## 结论
 

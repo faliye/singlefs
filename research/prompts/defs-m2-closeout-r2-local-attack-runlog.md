@@ -1,4 +1,4 @@
-# 运行记录：defs-m2-closeout-r2-local-attack（2026-09-26 UTC）
+# 运行记录：defs-m2-closeout-r2-local-attack（2026-09-26）
 
 提示文件：`research/prompts/defs-m2-closeout-r2-local-attack.md`（英文，E1 的
 F14 攻击面：把 `implementation-workflow.md` 改后重型清单拆成 28 个写法条目

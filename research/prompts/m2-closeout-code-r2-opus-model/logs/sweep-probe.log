@@ -1,0 +1,17 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_r2_y1_y7_single_fault_ordinal_sweep.rs (/tmp/claude-1000/three-way-attack-r2/target/release/deps/opus_r2_y1_y7_single_fault_ordinal_sweep-4249dbcda21642eb)
+
+running 1 test
+SWEEP base_built seconds=0.01
+SWEEP entry=session_overwrite clean outcome=Ok reads=86 writes=29 barriers=6 seconds=0.00
+SWEEP entry=session_overwrite kind=barrier n=1 fired=Some((Barrier, 1, 0, 0)) outcome=Err Publish { cause: BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" })), floor_raises: [] } writes_before=24 writes_after=0 barriers_after=0 frozen=true resend=Ok checker=0 first=None remount=Ok checker_after_remount=0 first_after=None
+SWEEP entry=session_overwrite kind=barrier n=2 fired=Some((Barrier, 2, 1, 0)) outcome=Err Publish { cause: BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" })), floor_raises: [] } writes_before=24 writes_after=0 barriers_after=0 frozen=true resend=Ok checker=0 first=None remount=Ok checker_after_remount=0 first_after=None
+SWEEP entry=session_overwrite kind=barrier n=3 fired=Some((Barrier, 3, 0, 0)) outcome=Err Publish { cause: BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" })), floor_raises: [] } writes_before=26 writes_after=0 barriers_after=0 frozen=true resend=Ok checker=0 first=None remount=Ok checker_after_remount=0 first_after=None
+SWEEP entry=session_overwrite kind=barrier n=4 fired=Some((Barrier, 4, 1, 0)) outcome=Err Publish { cause: BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" })), floor_raises: [] } writes_before=26 writes_after=0 barriers_after=0 frozen=true resend=Ok checker=0 first=None remount=Ok checker_after_remount=0 first_after=None
+SWEEP entry=session_overwrite kind=barrier n=5 fired=Some((Barrier, 5, 0, 0)) outcome=Err Publish { cause: BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" })), floor_raises: [] } writes_before=29 writes_after=0 barriers_after=0 frozen=true resend=Ok checker=0 first=None remount=Ok checker_after_remount=0 first_after=None
+SWEEP entry=session_overwrite kind=barrier n=6 fired=Some((Barrier, 6, 1, 0)) outcome=Err Publish { cause: BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" })), floor_raises: [] } writes_before=29 writes_after=0 barriers_after=0 frozen=true resend=Ok checker=0 first=None remount=Ok checker_after_remount=0 first_after=None
+SWEEP runs=6 flagged=0 seconds=2.4
+test single_fault_ordinal_sweep_over_the_entries_after_a_writable_mount ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.38s
+

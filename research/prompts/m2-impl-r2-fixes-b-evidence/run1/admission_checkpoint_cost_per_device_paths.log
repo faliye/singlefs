@@ -1,0 +1,13 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.34s
+     Running tests/admission_checkpoint_cost_per_device_paths.rs (target/debug/deps/admission_checkpoint_cost_per_device_paths-e683102b656fdeac)
+
+running 4 tests
+test three_devices_rewrite_at_most_two_leaf_paths_on_each_device_and_the_shared_root ... ok
+test every_empty_publish_under_capped_code_two_tree_capacities_fits_in_the_worst_case_checkpoint_cost_counted_with_them ... ok
+test every_empty_publish_under_the_node_format_capacities_fits_in_the_worst_case_checkpoint_cost_before_it ... ok
+test empty_publishes_of_the_histories_where_one_device_rewrites_more_than_two_leaves_fit_in_the_whole_tree_checkpoint_cost has been running for over 60 seconds
+test empty_publishes_of_the_histories_where_one_device_rewrites_more_than_two_leaves_fit_in_the_whole_tree_checkpoint_cost ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 125.99s
+

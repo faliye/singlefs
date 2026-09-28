@@ -1,0 +1,15 @@
+ARM control(with-1058)
+SEGMENTS floorreuse4 [20:unit_writex20] [2:journal_recordx2] [1:root_record_fuax1] [2:system_configuration_slotx2]
+REUSED unit writes landing on previously written slots: 2
+PLAN segment 0: 20 writes, 66 states, hand-placed
+PLAN segment 1: 2 writes, 3 states, full
+PLAN segment 2: 1 writes, 1 states, full
+PLAN segment 3: 2 writes, 3 states, full
+SIG 66 seg0 eff=Some((1, 10)) FileRead(1,7)|(1,10) vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 seg1 eff=Some((1, 10)) FileRead(1,7)|(1,10) vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 2 seg1 eff=Some((1, 11)) FileRead(1,11) vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 1 seg2 eff=Some((1, 11)) FileRead(1,11) vfail=0 applied=1 below_floor=false oracle=ok checker=[] record=(false,false)
+SIG 3 seg3 eff=Some((1, 11)) FileRead(1,11) vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+TALLY floorreuse4 states=73 violations=0 ignored_violations=0 checker_violated={} record_root_without_record=0 record_claimed_state_missing_unit=0 verification_failed_states=0 root_persisted_states=3 failed_states=0 first_violation=None checker_first_violation={}
+ELAPSED 2.4s states=73
+WALL 2s rc=0

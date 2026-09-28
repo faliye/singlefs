@@ -108,8 +108,8 @@
 #   判不到的：变量里拼出来的命令、eval、`bash x.sh` 起的脚本文件里的写法、xargs 与 `find -exec` 起的 cp、`cp -r` 整目录拷进已有目录时里面逐个文件、
 #   `sed -i`、`sort -o`、`rsync`、`ln -f` 与 python 里 `open(…, 'w')` 这类别的写法；圆括号子 shell 里的 cd 当成对后面的命令也生效；
 #   不看 hook 输入里的 cwd（没有 cd 的相对路径一律按仓库根解析）。
-# ⑥ 终止进程只许点名一个自己起的进程号或任务号，一次一个。用户 2026-09-25 JST 21:0x–21:1x 原话：「后面的脚本不能终止前面的脚本 这是核心」
-#   「另外不能动ssh 这是基本的」「终止要按照任务号 终止 禁止终止所有」。起因：2026-09-25 UTC 11:12 一个子 agent 跑 run-with-memory-cap.sh 的弄坏开关自证，
+# ⑥ 终止进程只许点名一个自己起的进程号或任务号，一次一个。用户 2026-09-25 原话：「后面的脚本不能终止前面的脚本 这是核心」
+#   「另外不能动ssh 这是基本的」「终止要按照任务号 终止 禁止终止所有」。起因：2026-09-25 一个子 agent 跑 run-with-memory-cap.sh 的弄坏开关自证，
 #   自测代码读自己 cgroup 的 cgroup.procs、给里面每个进程发 TERM，而不开 scope 的那一支里它就在 SSH 会话的 session-1.scope 里：
 #   VSCode 服务端、扩展宿主、ptyHost 与 Claude 会话一起断掉（records/2026-09-16-subagent拆分提案.md 第四十节那张表第 32 行）。
 #   前台、run_in_background 一样拒，主 agent 与子 agent 都拒。拒的写法：
@@ -118,27 +118,31 @@
 #   `proc.py stop` 同样一次一个、不在循环里；xargs / parallel / find -exec 把一串进程号喂给 kill 或 proc.py；pkill、killall、skill 按名字挑；fuser -k；
 #   同一条命令里先从 cgroup.procs、/proc 或 pgrep / pidof 挑进程、再发信号；往 cgroup.kill、cgroup.freeze 写；
 #   systemctl 停、杀、重启、改属性（stop、kill、restart 一族、freeze、set-property、disable / mask --now）ssh、sshd、session-*.scope、user@*.service、
-#   user.slice、user-*.slice、vllm-prod、systemd-logind、dbus，或单元带通配、是命令替换；systemctl isolate、poweroff、reboot 一类与 --user exit；
+#   user.slice、user-*.slice、私有配置里登记的本地模型服务单元、systemd-logind、dbus，或单元带通配、是命令替换；systemctl isolate、poweroff、reboot 一类与 --user exit；
 #   loginctl terminate-* / kill-*；reboot、poweroff、halt、shutdown（shutdown -c 不算）；
 #   目标是写死的进程号时现读进程表：是这条命令所在会话自己的祖先（Claude 会话、VSCode 扩展宿主往上）、pid 1、名叫 sshd / systemd / dbus / logind / claude 的、
-#   命令行里带 .vscode-server 或 vllm 的，或它的祖先里有另一个 Claude 会话（别的会话起的）——都拒；读不到那个进程的不拦（kill 自己会报错）。
+#   命令行里带 .vscode-server 或私有配置里登记的本地模型服务标记的，或它的祖先里有另一个 Claude 会话（别的会话起的）——都拒；读不到那个进程的不拦（kill 自己会报错）。
+#   本地模型服务的单元名与进程标记是本机的私有信息，不写进仓：从仓外的私有配置读，文件是 BASH_COMMAND_DETECTOR_PRIVATE_CONFIG，
+#   不设就是 ${XDG_CONFIG_HOME:-~/.config}/singlefs/bash-command-detector.env；一行一个 KEY=值，值按空白或逗号切成几个：
+#   LOCAL_MODEL_SERVICE_UNITS（systemctl 的单元名，不写后缀的按 .service 补上再比）、LOCAL_MODEL_SERVICE_PROCESS_MARKERS（进程命令行里出现就算的片段）。
+#   文件不在、读不了、没有那个键，那一项就不判、不报错（其余照判）。
 #   python3 -c 与喂给 python 的 heredoc 里的代码同样判：os.killpg、os.kill 的目标是 0 或负数、在循环或推导式里调 os.kill、同一个函数里读 cgroup.procs 或 /proc 再 os.kill。
 #   放行：`kill "$!"`、`kill -TERM "$pid"`、`kill %1`、`kill %%` 这样点名一个的；`proc.py stop <一个 pid>`；
 #   systemctl 对任何单元的 status / show / list-units / reset-failed，对自己起的单元（`systemctl --user stop singlefs_memory_selftest_…slice`）的停；
 #   只读 cgroup.procs、只跑 pgrep 不发信号的；引号里当数据写的、写进文件的 heredoc 正文、注释里的。
 #   每一层（`bash -c '…'`、喂给 shell 的 heredoc 正文、命令替换）都判，nice / timeout / env / sudo / builtin 这类前缀、`capped.sh N`、`run-with-memory-cap.sh <上限>`、
 #   `bash 包装脚本` 与 `python3 脚本` 剥开往里找。
-#   同一份判定由门禁 73 号拿去扫 research/scripts/、.claude/hooks/、.claude/scripts/ 与 .claude/gate.d/ 下的脚本（本文件 --scan-scripts，按行号报；
+#   同一份判定由门禁 code-tooling 的 research-gate-lint 格拿去扫 research/scripts/、.claude/hooks/、.claude/scripts/ 与 .claude/gate.d/ 下的脚本（本文件 --scan-scripts，按行号报；
 #   不判「同一条命令里先挑再发」那一条，脚本里靠循环与命令替换两条）。脚本里确实要按 cgroup 批量发信号的（run-with-memory-cap.sh 的 TERM 风暴自测），
 #   先核 cgroup 路径是自己开的 singlefs-memory-cap-*.scope，那一行写 `# process-safety:own-scope <怎么核的>`，往上 40 行里要有核 `singlefs-memory-cap-*.scope` 的那一句；
 #   这个标注只放行循环与按 cgroup 挑进程两类，标了而那一行没有要放行的判红。别人正在改、这一轮动不了的脚本登记进 .claude/process-safety-pending
 #   （一行一个相对仓根的路径、# 后写为什么；指向不存在的、一处都没排到的判红），成功行逐个列名。
-#   判不到的：变量里拼出来的命令、eval、`bash x.sh` 起的脚本文件里的写法（脚本归门禁 73 号）；`kill $pids` 这种不带引号、里面其实放了几个进程号的变量；
+#   判不到的：变量里拼出来的命令、eval、`bash x.sh` 起的脚本文件里的写法（脚本归门禁 code-tooling 的 research-gate-lint 格）；`kill $pids` 这种不带引号、里面其实放了几个进程号的变量；
 #   先把 cgroup.procs 读进文件、下一条命令再读文件 kill；循环里 `bash -c "kill $p"`（里面那一层不知道自己在循环里）；python 里经 subprocess 起的 kill、
 #   Popen 的 terminate / kill；进程号写死而那一刻进程表读不到的。
 # ⑦ 在同一个 inode 上改一个已经存在的脚本（`.sh`、`.py`，或带执行位的文件；在仓里或 /tmp/claude-1000/ 下）：正在跑它的 bash 按文件偏移往下读，
 #   改完会从新内容的同一偏移接着读，读到的是别的东西。2026-09-25 `replace-once.py` 就地改了一个别的 agent 正经 `run-with-memory-cap.sh` 在跑的脚本
-#   （records/2026-09-16-subagent拆分提案.md 第四十节那张表第 32 行）；两个工具改成改名换上之后，用户 2026-09-25 JST 22:1x 要给手敲的就地写也加闸。
+#   （records/2026-09-16-subagent拆分提案.md 第四十节那张表第 32 行）；两个工具改成改名换上之后，用户 2026-09-25 要给手敲的就地写也加闸。
 #   前台、run_in_background 一样拒，主 agent 与子 agent 都拒。拒的写法（每一种都实测过：改之前打开文件的读者接着读到新内容）：
 #   重定向 `>`、`>|`、`&>`、`>& 文件`（带 fd 号的 `2>` 一样）、`cat > 旧`；不带 `-a` / `--append` 的 `tee`；`cp` 的目标（`-f`、`-u`、`-a` 一样，写进已有目录的按 目录/源的文件名算）；
 #   `dd of=`（带不带 `conv=notrunc` 都算）；`truncate` 的文件（这两种 2026-09-25 起 ⑤ 判整份覆盖 `research/results/` 时也认，同一段 `overwrite_steps` 生成，
@@ -154,11 +158,11 @@
 #   Edit / Write 工具本来就换 inode，不经这个 hook。
 #
 # 切词、切简单命令、认命令位置、剥前缀与包装、跟 cd：同目录的 lib_shell_words.py，与 heavy-test-guard.sh 共用一份，按文件路径导入，
-# 这里只留检出与拒绝的判定；那几个函数在 .claude/hooks/ 别的文件里再定义一份，门禁 63 号判红。
+# 这里只留检出与拒绝的判定；那几个函数在 .claude/hooks/ 别的文件里再定义一份，门禁 code-tooling 的 agent-write-scope 格判红。
 # 读不到它时这条命令照常执行，stderr 报一句并记一条检出。
 #
 #   bash-command-detector.sh             # 从 stdin 读 hook 的 JSON；拒绝七种之一退出 2（拒绝），其余退出 0
-#   bash-command-detector.sh --scan-scripts <仓根> <目录>…  # ⑥ 的判定扫目录里的 .sh 与 .py（门禁 73 号调）；有红退出 1
+#   bash-command-detector.sh --scan-scripts <仓根> <目录>…  # ⑥ 的判定扫目录里的 .sh 与 .py（门禁 code-tooling 的 research-gate-lint 格调）；有红退出 1
 #   bash-command-detector.sh --selftest  # 走一遍检出、不检出、拒绝与放行；BASH_COMMAND_DETECTOR_DISABLE_CHECK=1（两种检出、后六种拒绝与 ⑤ 的检出都关）、
 #                                        # BASH_COMMAND_DETECTOR_DISABLE_SELF_BACKGROUND=1（只关第三种）或
 #                                        # BASH_COMMAND_DETECTOR_KEEP_HEREDOC_BODIES=1（前两种不剥 heredoc 正文）或
@@ -171,6 +175,7 @@
 #                                        # BASH_COMMAND_DETECTOR_ALLOW_COMPILE_FIRST_BYPASS=1（⑨ experiment-runner 在 Bash 里写主工作区 crates/ 下的 .rs 也放行）或
 #                                        # BASH_COMMAND_DETECTOR_ALLOW_RESULTS_OVERWRITE=1（整份覆盖 research/results/ 下未跟踪产物也放行、也不记检出）或
 #                                        # BASH_COMMAND_DETECTOR_ALLOW_PROCESS_SIGNALS=1（⑥ 终止进程的写法也放行）或
+#                                        # BASH_COMMAND_DETECTOR_IGNORE_PRIVATE_CONFIG=1（⑥ 不读私有配置，本地模型服务的单元与进程也放行）或
 #                                        # BASH_COMMAND_DETECTOR_ALLOW_SCRIPT_IN_PLACE_WRITE=1（⑦ 在同一个 inode 上改已有脚本也放行）或
 #                                        # BASH_COMMAND_DETECTOR_KEEP_SELFTEST_SCRATCH=1（自证的临时目录走回 mkdtemp 不删；通过、判红、抛异常三格由 lib_selftest_scratch.py 判）或
 #                                        # BASH_COMMAND_DETECTOR_REFUSE_EVERY_WAIT_LOOP=1（外层 timeout 与 run_in_background 都不算，等待循环一律拒）时自检必须判红
@@ -1266,7 +1271,7 @@ def script_in_place_refusal(command, repository_root, scratch_root=SCRIPT_SCRATC
         return []
     return script_in_place_verdict(command, repository_root, scratch_root)
 
-# ⑥ 终止进程只许点名一个自己起的进程号或任务号；同一份判定也交给门禁 73 号扫脚本（--scan-scripts），hook 与门禁不各写一份
+# ⑥ 终止进程只许点名一个自己起的进程号或任务号；同一份判定也交给门禁 code-tooling 的 research-gate-lint 格扫脚本（--scan-scripts），hook 与门禁不各写一份
 BY_NAME_KILLERS = {"pkill", "killall", "killall5", "skill"}           # 按名字挑进程：一次命中一批，谁起的都算
 FAN_OUT_RUNNERS = {"xargs", "parallel"}                                # 把一串进程号逐个喂给后面那条命令
 FIND_EXECUTING_OPTIONS = {"-exec", "-execdir", "-ok", "-okdir"}
@@ -1280,9 +1285,34 @@ SYSTEMCTL_MACHINE_VERBS = {"isolate", "poweroff", "reboot", "halt", "kexec", "su
 SYSTEMCTL_OPTIONS_WITH_VALUE = {"-t", "--type", "-s", "--signal", "-p", "--property", "-P", "-H", "--host", "-M", "--machine",
                                 "-n", "--lines", "-o", "--output", "--kill-whom", "--kill-value", "--job-mode", "--root", "--image",
                                 "--state", "--what", "--timestamp", "--message", "--reboot-argument", "--kill-mode", "--drop-in", "--when"}
-# SSH 会话、登录会话、用户级 systemd、本地模型服务与它们依赖的系统服务；systemctl 不写后缀的单元按 .service 补上再比
+# SSH 会话、登录会话、用户级 systemd 与它们依赖的系统服务；本地模型服务的单元另从私有配置读（private_words）；systemctl 不写后缀的单元按 .service 补上再比
 PROTECTED_UNIT = re.compile(r"^(?:sshd?(?:@[^/]*)?(?:\.service|\.socket)|session-[^/]*\.scope|user@[^/]*\.service|user(?:-[^/]*)?\.slice"
-                            r"|-\.slice|init\.scope|vllm-prod\.service|systemd-logind\.service|dbus(?:-broker)?\.(?:service|socket))$")
+                            r"|-\.slice|init\.scope|systemd-logind\.service|dbus(?:-broker)?\.(?:service|socket))$")
+
+def private_config_path():
+    configured = os.environ.get("BASH_COMMAND_DETECTOR_PRIVATE_CONFIG")
+    return configured or os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config"),
+                                      "singlefs", "bash-command-detector.env")
+
+def private_words(key):
+    """私有配置里 key 的值按空白与逗号切开的词；文件不在、读不了、没有这个键、弄坏开关设着，都交回空表（那一项不判、不报错）。"""
+    if os.environ.get("BASH_COMMAND_DETECTOR_IGNORE_PRIVATE_CONFIG") == "1":
+        return []
+    try:
+        with open(private_config_path(), encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except (OSError, UnicodeDecodeError):
+        return []
+    words = []
+    for line in lines:
+        name, separator, value = line.strip().partition("=")
+        if line.strip().startswith("#") or not separator or name.strip() != key:
+            continue
+        words += [word for word in re.split(r"[\s,]+", value.strip().strip("'\"")) if word]
+    return words
+
+def unit_with_suffix(unit):
+    return unit if "." in os.path.basename(unit) else unit + ".service"
 LOGINCTL_TERMINATING_VERB = re.compile(r"^(?:terminate|kill)-")
 CGROUP_CONTROL_FILES = {"cgroup.kill", "cgroup.freeze"}               # 写进去一次停掉（冻住）那个 cgroup 里的全部进程
 PROCESS_LIST_READING = re.compile(r"cgroup\.(?:procs|threads)|/proc/(?:\*|\[)|\b(?:ls|find)\s+/proc(?:/|\s|$)")
@@ -1404,8 +1434,8 @@ def protected_process_reason(process_id, table, own_ancestors):
         return f"{label}是系统、SSH 或 Claude 会话的进程"
     if ".vscode-server" in information["command_line"]:
         return f"{label}是 VSCode 服务端里的进程（服务端、扩展宿主、ptyHost 或经它起的 Claude）"
-    if "vllm" in information["command_line"]:
-        return f"{label}是本地模型服务 vllm 的进程"
+    if any(marker in information["command_line"] for marker in private_words("LOCAL_MODEL_SERVICE_PROCESS_MARKERS")):
+        return f"{label}是本地模型服务的进程（命令行里有私有配置登记的标记）"
     own_sessions = {ancestor for ancestor in own_ancestors if table.get(ancestor, {}).get("name") == "claude"}
     for ancestor in ancestors_in(table, information["parent"]):
         if table[ancestor]["name"] == "claude" and ancestor not in own_sessions:
@@ -1450,14 +1480,15 @@ def systemctl_findings(words, arguments):
     if not (verb in SYSTEMCTL_STOPPING_VERBS or (verb in SYSTEMCTL_STOPPING_WITH_NOW and "--now" in options)):
         return []
     findings = []
+    private_units = {unit_with_suffix(unit) for unit in private_words("LOCAL_MODEL_SERVICE_UNITS")}
     for unit in units[:1] if verb == "set-property" else units:
         bare = EXPANSION.sub("", unit)
-        named = unit if "." in os.path.basename(unit) else unit + ".service"
+        named = unit_with_suffix(unit)
         if "$(" in unit or "`" in unit or WHOLE_LIST_EXPANSION.search(unit):
             findings.append(TerminationFinding(tuple(words), f"systemctl {verb} 的单元 {unit} 是命令替换或整批展开：一次停一批，是谁的这一刻不知道", "other"))
         elif any(character in bare for character in "*?[") or BRACE_LIST.search(bare):
             findings.append(TerminationFinding(tuple(words), f"systemctl {verb} 的单元 {unit} 带通配：一次命中一批单元，别的会话的也算", "other"))
-        elif PROTECTED_UNIT.match(named):
+        elif PROTECTED_UNIT.match(named) or named in private_units:
             findings.append(TerminationFinding(tuple(words), f"systemctl {verb} {unit}：这是 SSH、登录会话、用户级 systemd、本地模型服务或它们依赖的系统服务", "other"))
     return findings
 
@@ -1607,7 +1638,7 @@ def process_signal_refusal(command, process_table_reader=read_process_table, own
     return list(dict.fromkeys(f"{finding.problem}（{' '.join(finding.words)[:120]}）" if finding.words else finding.problem
                               for finding in termination_findings(command, table, own_ancestors)))
 
-# 扫脚本（门禁 73 号调 --scan-scripts）：同一份判定，按文件里的行号报；own-scope 标注与待改清单
+# 扫脚本（门禁 code-tooling 的 research-gate-lint 格调 --scan-scripts）：同一份判定，按文件里的行号报；own-scope 标注与待改清单
 OWN_SCOPE_ANNOTATION = re.compile(r"(?<!`)#\s*process-safety:own-scope\b[ \t]*(.*)$")   # 反引号里的是说明里举的例子，不算
 OWN_SCOPE_GUARD = re.compile(r"singlefs-memory-cap-\*\.scope")
 OWN_SCOPE_EXEMPTABLE_KINDS = {"loop", "cgroup"}
@@ -1834,7 +1865,7 @@ def selftest_in(hook_dir, work):
         ("前台起、什么都没加", "bash research/scripts/watch.sh a1,a2", False, 1),
         ("前台起 agent-watch.py watch", "python3 research/scripts/agent-watch.py watch --agents a1", False, 1),
         ("run_in_background 起 agent-watch.py watch", "python3 research/scripts/agent-watch.py watch --agents a1", True, 0),
-        ("run_in_background 起、带 --ack 与 cd", "cd /home/fy5090/code/singlefs && bash research/scripts/watch.sh --ack a1:上下文过大 a1", True, 0),
+        ("run_in_background 起、带 --ack 与 cd", "cd ~/code/singlefs && bash research/scripts/watch.sh --ack a1:上下文过大 a1", True, 0),
         ("run_in_background 起却挂 nohup", "nohup bash research/scripts/watch.sh a1", True, 1),
         ("run_in_background 起却挂 setsid", "setsid bash research/scripts/watch.sh --processes", True, 1),
         ("run_in_background 起却跟 disown", "bash research/scripts/watch.sh a1; disown", True, 1),
@@ -2023,10 +2054,17 @@ def selftest_in(hook_dir, work):
         2000: {"parent": 900, "name": "claude", "command_line": "/home/u/.vscode-server/extensions/anthropic.claude-code/native-binary/claude"},
         2100: {"parent": 2000, "name": "bash", "command_line": "/bin/bash -c bash gate.sh"},
         2101: {"parent": 2100, "name": "cargo", "command_line": "cargo test --release"},
-        3000: {"parent": 1, "name": "python3", "command_line": "python3 -m vllm.entrypoints.openai.api_server --model x"},
+        3000: {"parent": 1, "name": "python3", "command_line": "python3 -m selftest_model_server.entrypoints.api_server --model x"},
         4000: {"parent": 1, "name": "sleep", "command_line": "sleep 600"},
     }
     fake_reader = lambda: fake_table  # noqa: E731
+    # 本地模型服务的单元与进程标记走自证自己的私有配置（不读本机那一份）；跑完这一段换回原来的环境
+    private_config = os.path.join(work, "private.env")
+    with open(private_config, "w", encoding="utf-8") as handle:
+        handle.write("# 自证用的私有配置\nOTHER_KEY=selftest-other\nLOCAL_MODEL_SERVICE_UNITS=selftest-model-server, other-model.service\n"
+                     "LOCAL_MODEL_SERVICE_PROCESS_MARKERS='selftest_model_server'\n")
+    private_config_before = os.environ.get("BASH_COMMAND_DETECTOR_PRIVATE_CONFIG")
+    os.environ["BASH_COMMAND_DETECTOR_PRIVATE_CONFIG"] = private_config
     process_signal_cases = [
         ("kill -- 负进程号（进程组）", "kill -- -1234", 1),
         ("kill -TERM 负进程号", "kill -TERM -1234", 1),
@@ -2067,7 +2105,8 @@ def selftest_in(hook_dir, work):
         ("systemctl kill session-1.scope", "systemctl kill session-1.scope", 1),
         ("systemctl stop user@1000.service", "systemctl stop user@1000.service", 1),
         ("systemctl set-property user.slice", "systemctl set-property user.slice MemoryMax=1G", 1),
-        ("systemctl stop vllm-prod", "systemctl stop vllm-prod", 1),
+        ("systemctl stop 私有配置登记的本地模型服务（不写后缀）", "systemctl stop selftest-model-server", 1),
+        ("systemctl restart 私有配置登记的第二个单元", "systemctl restart other-model.service", 1),
         ("systemctl disable --now ssh", "systemctl disable --now ssh", 1),
         ("systemctl --user stop 带通配 singlefs-*", "systemctl --user stop 'singlefs-*'", 1),
         ("systemctl --user kill 带通配 *.scope", "systemctl --user kill '*.scope'", 1),
@@ -2086,7 +2125,7 @@ def selftest_in(hook_dir, work):
         ("写死的进程号是这个会话自己的 Claude", "kill -9 1000", 1),
         ("写死的进程号是另一个 Claude 会话", "kill 2000", 1),
         ("写死的进程号是另一个 Claude 会话起的 cargo", "kill 2101", 1),
-        ("写死的进程号是 vllm", "kill 3000", 1),
+        ("写死的进程号是私有配置登记的本地模型服务", "kill 3000", 1),
         ("kill -HUP 1", "kill -HUP 1", 1),
         ("proc.py stop 写死的 sshd", "python3 .claude/singlefs-ai-sop/scripts/proc.py stop 700", 1),
         ("proc.py stop 一次两个", "python3 .claude/singlefs-ai-sop/scripts/proc.py stop 1100 4000", 1),
@@ -2119,7 +2158,8 @@ def selftest_in(hook_dir, work):
         ("写进文件的 heredoc 正文", "cat > note.md <<'EOF'\nkill 0\nfor p in $(pgrep x); do kill $p; done\nEOF", 0),
         ("git commit 说明里写 kill 0", "git commit -m 'kill 0 的拒绝'", 0),
         ("systemctl --user stop 自己的 slice", "systemctl --user stop singlefs_memory_selftest_123_1.slice", 0),
-        ("systemctl status sshd", "systemctl --user status sshd; systemctl status vllm-prod", 0),
+        ("systemctl status sshd", "systemctl --user status sshd; systemctl status selftest-model-server", 0),
+        ("systemctl stop 私有配置里只在别的键下出现的单元", "systemctl stop selftest-other", 0),
         ("systemctl show 与 set-property 自己的 slice", "systemctl --user show -p ControlGroup --value singlefs-heavy.slice && systemctl --user set-property --runtime singlefs-heavy.slice MemoryMax=40G", 0),
         ("systemctl list-units 带通配", "systemctl --user list-units 'singlefs*'", 0),
         ("systemctl reset-failed 自己的 scope", "systemctl --user reset-failed singlefs-memory-cap-1-2.scope", 0),
@@ -2134,7 +2174,21 @@ def selftest_in(hook_dir, work):
     ]
     for label, command, want in process_signal_cases:
         results.append((f"终止进程:{label}", want, 1 if process_signal_refusal(command, fake_reader, 1001) else 0))
-    # 扫脚本（门禁 73 号那一路）：临时目录里造脚本，走 --scan-scripts 真实入口，看红绿与报的行号
+    # 私有配置不在、没有那两个键：本地模型服务那一项不判、不报错，别的照判
+    with open(os.path.join(work, "private-keyless.env"), "w", encoding="utf-8") as handle:
+        handle.write("# 自证用的私有配置，没有那两个键\nOTHER_KEY=selftest-model-server selftest_model_server\n")
+    for private_case, private_path in (("私有配置文件不在", os.path.join(work, "private-absent.env")),
+                                       ("私有配置里没有那两个键", os.path.join(work, "private-keyless.env"))):
+        os.environ["BASH_COMMAND_DETECTOR_PRIVATE_CONFIG"] = private_path
+        for label, command, want in (("systemctl stop 没登记的单元放行", "systemctl stop selftest-model-server", 0),
+                                     ("写死的进程号没登记标记放行", "kill 3000", 0),
+                                     ("systemctl stop ssh 照拒", "systemctl stop ssh", 1)):
+            results.append((f"终止进程:{private_case}:{label}", want, 1 if process_signal_refusal(command, fake_reader, 1001) else 0))
+    if private_config_before is None:
+        os.environ.pop("BASH_COMMAND_DETECTOR_PRIVATE_CONFIG", None)
+    else:
+        os.environ["BASH_COMMAND_DETECTOR_PRIVATE_CONFIG"] = private_config_before
+    # 扫脚本（门禁 code-tooling 的 research-gate-lint 格那一路）：临时目录里造脚本，走 --scan-scripts 真实入口，看红绿与报的行号
     scan_root = os.path.join(work, "scan-root")
     scan_scripts_directory = os.path.join(scan_root, "research", "scripts")
     os.makedirs(scan_scripts_directory)
@@ -2563,8 +2617,9 @@ def selftest_in(hook_dir, work):
                "前面赋过值的变量代入），>>、&>>、tee -a、新文件名、已跟踪、仓外与 research/results/ 外、2>&1、cp -n / --backup、install -d、同一条命令里先 git add 或 mv 挪走的、"
                "当数据写的放行；目标算不出而对得上未跟踪产物的、git 判不了的只记检出；"
                "终止进程：kill 负进程号、0、$PPID、一次几个目标、命令替换与整批展开、循环里逐个 kill 或 proc.py stop、xargs / find -exec 喂给 kill、pkill、killall、fuser -k、"
-               "先从 cgroup.procs 或 pgrep 挑再发、python 里 os.killpg 与循环里 os.kill、systemctl 停 SSH / 会话 / user@ / user.slice / vllm-prod 或带通配、isolate 与 reboot、"
-               "loginctl terminate / kill、写 cgroup.kill、写死的进程号是 sshd、VSCode、自己的 Claude、别的 Claude 会话或它起的、vllm、pid 1 的都拒（退出码 2、不记检出），"
+               "先从 cgroup.procs 或 pgrep 挑再发、python 里 os.killpg 与循环里 os.kill、systemctl 停 SSH / 会话 / user@ / user.slice / 私有配置登记的本地模型服务单元或带通配、isolate 与 reboot、"
+               "loginctl terminate / kill、写 cgroup.kill、写死的进程号是 sshd、VSCode、自己的 Claude、别的 Claude 会话或它起的、私有配置登记的本地模型服务、pid 1 的都拒（退出码 2、不记检出），"
+               "私有配置不在或没有那两个键时本地模型服务那一项放行、别的照拒，"
                "kill \"$!\"、kill %1、kill -0、kill -l、这个会话起的与没人认领的写死进程号、proc.py stop 一个、自己 slice 的 systemctl stop、只读 cgroup.procs 与当数据写的放行；"
                "扫脚本：进程组、循环 kill、没核 scope 的 own-scope 标注、给进程组标的与不起作用的标注、python 循环 os.kill 与 os.killpg 按行号报红，"
                "核过 singlefs-memory-cap-*.scope 又标了的放行，待改清单里的逐个列名、清单里干净的与不存在的判红；"
@@ -2586,11 +2641,11 @@ def main():
     if len(sys.argv) > 2 and sys.argv[2] == "--scan-scripts":
         if shell_words is None:
             print(f"  ✗ 读不到共用切词模块 {shell_words_library_path(hook_dir)}（{shell_words_error!r}），脚本没扫")
-            print("     → 怎么办：恢复 .claude/hooks/lib_shell_words.py（切词与认命令位置只有那一份），再跑门禁 73 号")
+            print("     → 怎么办：恢复 .claude/hooks/lib_shell_words.py（切词与认命令位置只有那一份），再跑门禁 code-tooling 的 research-gate-lint 格")
             return 1
         if len(sys.argv) < 5:
             print("  ✗ --scan-scripts 要仓根与至少一个目录")
-            print("     → 怎么办：写成 bash .claude/hooks/bash-command-detector.sh --scan-scripts <仓根> <目录>…（门禁 73 号这样调）")
+            print("     → 怎么办：写成 bash .claude/hooks/bash-command-detector.sh --scan-scripts <仓根> <目录>…（门禁 code-tooling 的 research-gate-lint 格这样调）")
             return 2
         return scan_scripts(sys.argv[3], sys.argv[4:])
     try:

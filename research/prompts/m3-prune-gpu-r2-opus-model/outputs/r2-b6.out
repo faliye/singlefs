@@ -1,0 +1,2 @@
+E7RESULT name=r2_b6_collide_regression digest128_equal=true bytes_equal=false sha256_first=c954b0ff3c128c50 sha256_second=2a3ad2e1b9146ad9 sha256_equal=false seconds=28.5 must_be_nonzero=-
+E7RESULT name=done emitted=2

@@ -47,7 +47,7 @@ $ python3 research/scripts/kb-spec-check.py /tmp/claude-1000/kb-batch4-drafter/�
 4. `checks-owed.md` 删掉 C545 行（准入先拒已实现）。
 5. 同文件插入 C545 到「已还清」表，怎么还的照 A4d 报告「三、第 2 件：C545 准入先拒」写（`admission.rs`、`DeviceFreeMap` 新字段、四条新测试名、变异行数）。
 6. 同文件在 C572 行之后插 C573（固定点上界没算普通分配的删插）、C574（落得下判据不核两槽对齐/同槽）、C575（一个错误成员装两种判据的载荷）、C576（三条用例被准入先拒连带红，改法待选）四笔新欠账，均出自 A4d 报告「七、交主 agent 的设计问题」四条。
-7. D23（journal 的角色与格式） 已定项 14 射程两个已知边角（第 400、401 行）各追加一句：影子账留着的理由收窄成「系统配置没见证到」那一形；②那句补「乙-配置续之后只剩这一种」。依据 `m2-impl-c554-yi-implementer-report.md` 第 78–96 行与主 agent 追加消息（乙-配置续，用户 JST 12:08 弹窗）。
+7. D23（journal 的角色与格式） 已定项 14 射程两个已知边角（第 400、401 行）各追加一句：影子账留着的理由收窄成「系统配置没见证到」那一形；②那句补「乙-配置续之后只剩这一种」。依据 `m2-impl-c554-yi-implementer-report.md` 第 78–96 行与主 agent 追加消息（乙-配置续，用户弹窗）。
 8. D23 已定项 14「定案」段插入新段（放在「失败的处置」之前）：写 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙-配置续的判据 N-配置续（挂载读阶段重读一次，仍读不出拒可写）与「续」（取号那一写改写见证值、不再写 0，实现待派，等 A3a 交回）。
 
 **乙（7 条，对 `.claude/kb/decisions/23-journal的角色与格式.md`、`.claude/kb/decisions/16-发布语义.md`、`.claude/kb/checks-owed.md`、`.claude/kb/decisions-history/2026-09.md`、`.claude/kb/decisions/18-块里携带什么信息.md` 五个文件）：**

@@ -11,6 +11,6 @@ grep -n '^## 代码轮派腿之前记一份开工快照' .claude/rules/implement
 echo "这一轮（governance-defs-r3）的快照目录里有什么："
 ls research/prompts/governance-defs-r3-snapshot/
 echo "上一轮核查员用的开工时刻、攻方腿自记的开工时刻、正推腿报告的提交时刻："
-grep -o '腿开工时刻 2026-09-26T15:30:00Z 前后' research/prompts/governance-defs-r2-verifier-output.md
-grep -o '开工 2026-09-26 15:15 UTC' research/prompts/governance-defs-r2-opus-output.md
+grep -o '腿开工于 2026-09-27' research/prompts/governance-defs-r2-verifier-output.md
+grep -o '开工 2026-09-27' research/prompts/governance-defs-r2-opus-output.md
 git log -1 --format='%h %cI %s' 107b79f

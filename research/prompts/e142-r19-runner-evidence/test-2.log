@@ -1,0 +1,106 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 40.1 GiB，这一条要 28 MiB（按峰值表里上一次实测的峰值 28 MiB（2026-09-27 量的）算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排了 8 秒，起跑（singlefs-memory-cap-2263695-214975825）
+   Compiling e7-index-bench v0.1.0 (research/e7-index-bench)
+    Finished `release` profile [optimized + debuginfo] target(s) in 6.39s
+     Running unittests src/bin/e142_first_transaction_dry_run.rs (target/release/deps/e142_first_txn_dry_run-1eeb2b80a4957fc1)
+
+running 95 tests
+test tests::a_pool_barrier_records_one_step_per_device_in_ascending_order ... ok
+test tests::assemble_allocation_cells_only_keeps_positions_with_a_child ... ok
+test tests::allocation_record_tree_shape_matches_the_five_geometry_points ... ok
+test tests::allocation_and_accounting_trees_carry_the_byte_table_numbers ... ok
+test tests::allocation_record_tree_five_nodes_match_the_position_addressed_layout ... ok
+test tests::byte_diff_summary_finds_the_first_differing_byte_and_counts_the_rest ... ok
+test tests::change_count_bullets_are_all_covered_only_when_all_six_offsets_are_hit ... ok
+test tests::back_chain_matches_an_independently_computed_crc_over_311_bytes ... ok
+test tests::compare_paired_write_localizes_the_first_difference_when_sha256_differs ... ok
+test tests::compare_paired_write_reports_equal_when_sha256_matches ... ok
+test tests::before_window_and_window_counts_match_the_registered_anchors ... ok
+test tests::cold_start_reads_the_file_back_and_chooses_instance_one_txg_three ... ok
+test tests::control_expected_violations_three_readings_match_the_written_out_clause ... ok
+test tests::crc32c_matches_the_published_check_value ... ok
+test tests::classify_offset_finds_the_inode_leaf_change_count_field_and_the_root_record_checksum ... ok
+test tests::diff_pools_merges_adjacent_differing_bytes_and_keeps_separated_ones_apart ... ok
+test tests::diff_pools_reports_a_single_byte_segment_when_only_one_byte_changes ... ok
+test tests::diff_pools_detects_a_flipped_byte_at_the_exact_injected_position ... ok
+test tests::explain_inode_root_offset_finds_the_two_location_checksums_that_point_at_the_inode_leaf ... ok
+test tests::explain_journal_record_offset_labels_match_the_311_byte_field_table ... ok
+test tests::explain_unit_offset_finds_the_change_count_field_and_the_checksum_regions_but_not_the_common_prefix ... ok
+test tests::every_index_node_keeps_its_entry_keys_strictly_ascending ... ok
+test tests::extent_upper_leaf_positional_key_range_matches_the_frozen_anchors ... ok
+test tests::find_matching_impl_write_refuses_a_length_mismatch_at_the_same_device_and_offset ... ok
+test tests::find_matching_impl_write_reports_none_when_nothing_matches ... ok
+test tests::find_matching_impl_write_tells_two_devices_at_the_same_offset_apart ... ok
+test tests::extent_upper_leaf_entry_is_113_bytes_with_an_inline_data_pointer_tag ... ok
+test tests::flipping_the_last_header_byte_is_caught_by_the_header_checksum ... ok
+test tests::g11_rows_match_the_anchors_of_the_stream_without_the_trailing_barrier ... ok
+test tests::fua_not_a_boundary_gives_16777249_states_and_134217754_without_the_trailing_barrier ... ok
+test tests::g6_matches_a17_1028_states_zero_violations ... ok
+test tests::header311_flag_diff_segments_all_map_to_a_known_record ... ok
+test tests::header311_geometry_back_chain_absence_has_discriminating_power ... ok
+test tests::header311_record_labels_third_entry_uses_the_dynamic_write_list_label ... ok
+test tests::hex_decode_round_trips_hex_bytes ... ok
+test tests::impl_bytes_equal_reports_true_when_a_synthetic_snapshot_line_has_the_same_sha256 ... ok
+test tests::in_place_overwrite_needs_all_three_conditions_on_synthetic_writes ... ok
+test tests::index_node_header_is_86_plus_twice_the_key_width ... ok
+test tests::inode_record_change_count_bytes_differ_only_in_the_low_byte_between_1_and_3 ... ok
+test tests::instance_table_row_is_88_bytes_and_the_inode_leaf_holds_one_140_byte_record ... ok
+test tests::journal_record_carries_the_new_root_segment_and_the_named_entries_rebuild_the_mapping_keys ... ok
+test tests::g7_fua_merges_with_preceding_unbarriered_writes_not_a18 ... ok
+test tests::control_state_comparison_predictor_matches_checker_on_every_state ... ok
+test tests::layer0_main_arm_boundary_states_agree_with_the_predictor_and_the_checker ... ok
+test tests::layer0_main_arm_verdict_flags_every_threshold_independently ... ok
+test tests::layer0_segment_sizes_and_closed_form_match_the_new_layout ... ok
+test tests::layer0_state_at_index_matches_for_each_layer0_state_on_the_positive_control ... ok
+test tests::layer0_state_count_is_16777240_with_zero_violations ... ignored, 整轮枚举 16777240 个状态（登记 7.4 C12），第十九次跑第二段（R19C-8，重型）才跑；要验时手动 `cargo test -- --ignored layer0_state_count_is_16777240_with_zero_violations`
+test tests::main_arm_transaction_record_is_not_applied_when_a_named_unit_is_missing ... ok
+test tests::main_transaction_dependency_groups_pairs_each_units_by_slot_entry_with_both_devices ... ok
+test tests::control_outcome_matrix_off_diagonal_is_exactly_the_known_instance_boundary_gap ... ok
+test tests::mkfs_seeds_three_generation_zero_roots_readable_from_all_regions ... ok
+test tests::mapping_tree_holds_one_entry_width_and_pads_short_keys_into_the_key_itself ... ok
+test tests::named_instances_header311_and_write_list_agree_and_g22_matches_accounting ... ok
+test tests::original_era_positive_control_predicts_2048_states_1020_violations ... ok
+test tests::model_window_writes_for_parameters_has_thirteen_writes_on_the_one_device_geometry ... ok
+test tests::parse_result_line_reads_key_value_pairs_and_ignores_the_leading_marker ... ok
+test tests::pc2_main_geometry_catches_every_single_unit_dependency ... ok
+test tests::p6_reader_outcomes_match_the_clause_table ... ok
+test tests::primary_reader_does_not_apply_records_from_a_newer_instance_onto_the_genesis_root ... ok
+test tests::primary_reader_rebuilds_the_tree_table_pointer_when_applying_a_record ... ok
+test tests::probes_behave_as_milestone_step_six_expects ... ok
+test tests::publish_group_boundaries_finds_the_three_root_segments_on_the_main_arm ... ok
+test tests::publish_grouping_records_and_merges_independently ... ok
+test tests::registered_segment_sequences_match_every_recorded_path ... ok
+test tests::render_g22_text_fills_in_the_current_accounting_numbers ... ok
+test tests::role_label_self_check_catches_a_contradiction_and_an_undefined_label ... ok
+test tests::root_record_is_457_bytes_and_carries_the_mapping_tree_root ... ok
+test tests::root_record_unmount_marker_round_trips_and_other_flag_bits_are_rejected ... ok
+test tests::run_full_pipeline_matches_the_manually_assembled_pool_for_the_same_change_count ... ok
+test tests::run_full_pipeline_writes_the_requested_change_count_into_the_inode_leaf_record ... ok
+test tests::segment_closing_rule_waits_for_every_device_with_writes ... ok
+test tests::sha256_matches_the_two_standard_test_vectors ... ok
+test tests::sha256_of_the_actual_root_record_bytes_matches_the_crates_side_reference_value ... ok
+test tests::structure_sets_differing_by_one_are_reported_unstable ... ok
+test tests::swallowed_barrier_points_match_the_registered_anchors ... ok
+test tests::system_configuration_is_489_bytes_and_the_slot_checksum_covers_all_4096 ... ok
+test tests::system_configuration_rollback_floor_round_trips_at_absolute_offset_481 ... ok
+test tests::text_number_self_check_catches_a_bound_mismatch_and_an_unclassified_number ... ok
+test tests::the_journal_header_checksum_covers_the_whole_record_including_the_padding ... ok
+test tests::the_key_width_field_sits_at_offset_51_so_the_header_locates_itself ... ok
+test tests::the_parser_refuses_an_entry_width_field_that_contradicts_the_declared_length ... ok
+test tests::the_tree_table_holds_seven_entries_keyed_by_tree_identifier ... ok
+test tests::three_state_rows_match_the_registered_anchors ... ok
+test tests::transaction_issues_29_writes_3_pool_barriers_1_fua_in_the_settled_order ... ok
+test tests::two_data_units_in_one_transaction_share_a_mapping_key ... ok
+test tests::unknown_incompat_bit_or_missing_ssd_line_bit_refuses_to_mount_but_compat_bits_do_not ... ok
+test tests::unmatched_crates_indices_is_empty_when_every_impl_write_was_claimed ... ok
+test tests::unmatched_crates_indices_lists_every_index_the_model_never_claimed ... ok
+test tests::warm_up_writes_two_empty_publishes_covering_both_devices ... ok
+test tests::wide_checksum_is_crc32c_in_four_bytes_then_twenty_eight_zeroes ... ok
+test tests::widths_equal_the_byte_table_and_the_root_record_is_457 ... ok
+test tests::judgment_threshold_between_control_and_g6_discriminates_both_ways ... ok
+test tests::positive_control_without_barriers_has_4092_violations_out_of_8192 ... ok
+test tests::layer0_grouped_enumeration_agrees_between_serial_and_parallel_on_the_positive_control_g6_and_g7 ... ok
+
+test result: ok. 94 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.85s
+
+exit=0

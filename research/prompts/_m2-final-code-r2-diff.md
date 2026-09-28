@@ -1,4 +1,4 @@
-# 附录二：第一轮冻结树到第二轮冻结树的 crates 改动，加 HEAD 之后打进的定义改动 diff（生成于 2026-09-25 04:46 JST / 2026-09-24 19:46 UTC）
+# 附录二：第一轮冻结树到第二轮冻结树的 crates 改动，加 HEAD 之后打进的定义改动 diff（生成于 2026-09-25）
 
 基准：第一轮冻结副本 `/tmp/claude-1000/m2-final-code-r1/tree/crates/` 到本轮冻结副本 `/tmp/claude-1000/m2-final-code-r2/tree/crates/`（腿读代码一律读本轮冻结副本，不读主工作区——主工作区在腿跑着的时候还会被实二一继续改 `allocator.rs`、`transaction.rs`、`lib.rs`、`singlefs-format/src/lib.rs`，并新建 `allocation_record_tree.rs`、`extent_tree.rs`）。
 
@@ -12,8 +12,8 @@ diff 原始文件（两份，均由主 agent 给出，材料员未重新生成�
 
 ```diff
 diff -ruN -x target tree/crates/mutations.tsv
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/mutations.tsv	2026-09-24 16:27:05.398761624 +0000
-+++ tree/crates/mutations.tsv	2026-09-24 18:48:58.254848952 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/mutations.tsv	2026-09-25
++++ tree/crates/mutations.tsv	2026-09-25
 @@ -8,19 +8,15 @@
  空闲不随分配减（I-5.2 要红）	crates/singlefs-core/src/allocator.rs	        self.free_slots -= span;	        // 变异：空闲不减	-p singlefs-harness --test second_transaction_step_one_overwrite -- cold_start	cold_start_reads_the_second_content_and_the_pool_checker_stays_green
  释放时清位图（立即复用）	crates/singlefs-core/src/allocator.rs	        self.deferred_slots += span;\n    }	        self.deferred_slots += span;\n        for index in start..end {\n            self.allocated[index] = false;\n        }\n    }	-p singlefs-harness --test second_transaction_step_one_overwrite -- released_placements	released_placements_are_not_handed_out_again_before_reclaim_exists
@@ -332,8 +332,8 @@ diff -ruN -x target tree/crates/mutations.tsv
 +实二二三 h（D18 已定项 11 第五个合取）：取号之前的预演不查写行那次经映射换下的映射条目的位置项（坏映射条目在取号之后才报，号烧掉）	crates/singlefs-core/src/mount.rs	                        refuse_mapping_entries_that_do_not_name_two_pool_devices(\n                            output,\n                            &released_roles_of_the_row_publish,\n                            &pool_devices,\n                        )?;\n	                        let _ = &pool_devices;\n	-p singlefs-harness --test second_transaction_supplement_two_row_publish_checks_before_acquisition -- a_row_publish_release_check	a_row_publish_release_check_that_fails_on_a_damaged_mapping_entry_refuses_the_mount_before_acquisition
 +实二二三 h（Z4-1）：树表 0 条的一版上写行的释放核与条数准入不在取号之前判（装不下时取号之后才拒，每试一次烧一个号）	crates/singlefs-core/src/mount.rs	    if let (PreviousVersion::WithoutFile { root, .. }, true) =\n        (&start.previous, row_publish_rewrites_the_instance_table)\n	    if let (PreviousVersion::WithoutFile { root, .. }, true) =\n        (&start.previous, false && row_publish_rewrites_the_instance_table)\n	-p singlefs-harness --test second_transaction_supplement_two_row_publish_checks_before_acquisition -- a_row_publish_on_a_version_without_file	a_row_publish_on_a_version_without_file_that_outgrows_the_allocation_node_is_refused_before_acquisition
 diff -ruN -x target tree/crates/singlefs-checker/src/image.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-checker/src/image.rs	2026-09-24 14:49:12.386896006 +0000
-+++ tree/crates/singlefs-checker/src/image.rs	2026-09-24 18:48:58.241379617 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-checker/src/image.rs	2026-09-24
++++ tree/crates/singlefs-checker/src/image.rs	2026-09-25
 @@ -34,12 +34,12 @@
  }
  
@@ -429,8 +429,8 @@ diff -ruN -x target tree/crates/singlefs-checker/src/image.rs
  #[must_use]
  pub fn chosen_system_configurations(
 diff -ruN -x target tree/crates/singlefs-checker/src/lib.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-checker/src/lib.rs	2026-09-24 14:49:12.386896006 +0000
-+++ tree/crates/singlefs-checker/src/lib.rs	2026-09-24 18:48:58.241397937 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-checker/src/lib.rs	2026-09-24
++++ tree/crates/singlefs-checker/src/lib.rs	2026-09-25
 @@ -12,7 +12,9 @@
  use singlefs_format::{
      index_node_header_bytes, DATA_UNIT_BYTES, DATA_UNIT_HEADER_BYTES, JOURNAL_HEADER_BYTES,
@@ -542,8 +542,8 @@ diff -ruN -x target tree/crates/singlefs-checker/src/lib.rs
  
  /// 码 3 打包记录单元解出来的头与记录（D18（块里携带什么信息） 已定项 11 / 已定项 16：记录区从 136 起）。
 diff -ruN -x target tree/crates/singlefs-checker/src/walk.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-checker/src/walk.rs	2026-09-24 16:15:19.532697725 +0000
-+++ tree/crates/singlefs-checker/src/walk.rs	2026-09-24 18:48:58.241408187 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-checker/src/walk.rs	2026-09-25
++++ tree/crates/singlefs-checker/src/walk.rs	2026-09-25
 @@ -8,20 +8,22 @@
  
  use singlefs_format::{
@@ -1428,8 +1428,8 @@ diff -ruN -x target tree/crates/singlefs-checker/src/walk.rs
              );
          }
 diff -ruN -x target tree/crates/singlefs-core/src/allocator.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/allocator.rs	2026-09-24 16:15:19.532697725 +0000
-+++ tree/crates/singlefs-core/src/allocator.rs	2026-09-24 18:48:58.241408187 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/allocator.rs	2026-09-25
++++ tree/crates/singlefs-core/src/allocator.rs	2026-09-25
 @@ -19,6 +19,7 @@
  use crate::address::{CheckpointTxg, DeviceIdentity, SlotNumber};
  use crate::bytes::ByteWriter;
@@ -1484,8 +1484,8 @@ diff -ruN -x target tree/crates/singlefs-core/src/allocator.rs
      pub fn set_reuse_window(&mut self, reuse_window: ReuseWindow) {
          self.reuse_window = reuse_window;
 diff -ruN -x target tree/crates/singlefs-core/src/code_two_tree.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/code_two_tree.rs	1970-01-01 00:00:00.000000000 +0000
-+++ tree/crates/singlefs-core/src/code_two_tree.rs	2026-09-24 16:50:54.714136181 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/code_two_tree.rs	1970-01-01
++++ tree/crates/singlefs-core/src/code_two_tree.rs	2026-09-25
 @@ -0,0 +1,1366 @@
 +//! 多层码 2 树的结构规则（D8（核心索引结构） 已定项 11「多层码 2 树怎么长、怎么收」）：记账树与中央映射树共用这一份，
 +//! 不各写一套（已定项 14：一套 btree 实现管权威态的树与照分裂做的树）。
@@ -2854,8 +2854,8 @@ diff -ruN -x target tree/crates/singlefs-core/src/code_two_tree.rs
 +    }
 +}
 diff -ruN -x target tree/crates/singlefs-core/src/journal.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/journal.rs	2026-09-24 14:49:12.386931846 +0000
-+++ tree/crates/singlefs-core/src/journal.rs	2026-09-24 18:48:58.241495366 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/journal.rs	2026-09-24
++++ tree/crates/singlefs-core/src/journal.rs	2026-09-25
 @@ -245,8 +245,8 @@
          bytes
      }
@@ -2883,8 +2883,8 @@ diff -ruN -x target tree/crates/singlefs-core/src/journal.rs
          // 序号从 1 起（已定项 4）：读到 0 当这条记录损坏。
          if ordinal_within_publish.0 == 0 {
 diff -ruN -x target tree/crates/singlefs-core/src/lib.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/lib.rs	2026-09-24 02:30:54.772147939 +0000
-+++ tree/crates/singlefs-core/src/lib.rs	2026-09-24 18:48:58.241504616 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/lib.rs	2026-09-24
++++ tree/crates/singlefs-core/src/lib.rs	2026-09-25
 @@ -12,6 +12,7 @@
  pub mod block_device;
  pub mod bytes;
@@ -2902,8 +2902,8 @@ diff -ruN -x target tree/crates/singlefs-core/src/lib.rs
  pub mod root_ring;
  pub mod system_configuration;
 diff -ruN -x target tree/crates/singlefs-core/src/make_filesystem.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/make_filesystem.rs	2026-09-24 08:50:33.721227553 +0000
-+++ tree/crates/singlefs-core/src/make_filesystem.rs	2026-09-24 18:48:58.241509386 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/make_filesystem.rs	2026-09-24
++++ tree/crates/singlefs-core/src/make_filesystem.rs	2026-09-25
 @@ -349,6 +349,8 @@
                  journal_tail: 0,
                  journal_instance: instance,
@@ -2914,8 +2914,8 @@ diff -ruN -x target tree/crates/singlefs-core/src/make_filesystem.rs
          let slot = system_configuration.to_slot();
          for slot_index in 0..SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE {
 diff -ruN -x target tree/crates/singlefs-core/src/mounted_read.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/mounted_read.rs	2026-09-24 14:49:12.386988446 +0000
-+++ tree/crates/singlefs-core/src/mounted_read.rs	2026-09-24 16:50:54.714217512 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/mounted_read.rs	2026-09-24
++++ tree/crates/singlefs-core/src/mounted_read.rs	2026-09-25
 @@ -22,12 +22,13 @@
  
  use std::cell::Cell;
@@ -3089,8 +3089,8 @@ diff -ruN -x target tree/crates/singlefs-core/src/mounted_read.rs
      #[must_use]
      pub const fn extent_tree_reads_at_open(&self) -> ExtentTreeReadsAtOpen {
 diff -ruN -x target tree/crates/singlefs-core/src/mount.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/mount.rs	2026-09-24 16:15:19.532769843 +0000
-+++ tree/crates/singlefs-core/src/mount.rs	2026-09-24 18:48:58.241518146 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/mount.rs	2026-09-25
++++ tree/crates/singlefs-core/src/mount.rs	2026-09-25
 @@ -14,24 +14,31 @@
  use crate::pointer::{slot_shared_by_both_location_entries, LocationEntriesOnDifferentSlots};
  use crate::recovery::{
@@ -3810,8 +3810,8 @@ diff -ruN -x target tree/crates/singlefs-core/src/mount.rs
      )
  }
 diff -ruN -x target tree/crates/singlefs-core/src/recovery.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/recovery.rs	2026-09-24 16:15:19.532788812 +0000
-+++ tree/crates/singlefs-core/src/recovery.rs	2026-09-24 18:48:58.241538946 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/recovery.rs	2026-09-25
++++ tree/crates/singlefs-core/src/recovery.rs	2026-09-25
 @@ -14,7 +14,7 @@
      journal_in_flight_record_limit, ACCOUNTING_ENTRY_BYTES, ALLOCATION_RECORD_BYTES,
      DATA_UNIT_BYTES, EXTENT_LEAF_RECORD_BYTES, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
@@ -4522,8 +4522,8 @@ diff -ruN -x target tree/crates/singlefs-core/src/recovery.rs
              mapping_fallbacks,
          )?
 diff -ruN -x target tree/crates/singlefs-core/src/rollback_witness.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/rollback_witness.rs	1970-01-01 00:00:00.000000000 +0000
-+++ tree/crates/singlefs-core/src/rollback_witness.rs	2026-09-24 18:48:58.241559766 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/rollback_witness.rs	1970-01-01
++++ tree/crates/singlefs-core/src/rollback_witness.rs	2026-09-25
 @@ -0,0 +1,314 @@
 +//! 回退见证（D23（journal 的角色与格式） 已定项 14「回退见证」，C332（回退实例两个根都读不出时回退被撤销） 的修法，用户 2026-09-24 定）：
 +//! 管理员回退在系统配置槽里记一张见证表，一个条目记一次回退——新实例代号 N、回退目标 R_old 的实例代号 r_old 与 txg T_old。
@@ -4840,8 +4840,8 @@ diff -ruN -x target tree/crates/singlefs-core/src/rollback_witness.rs
 +    }
 +}
 diff -ruN -x target tree/crates/singlefs-core/src/system_configuration.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/system_configuration.rs	2026-09-23 08:50:42.277021530 +0000
-+++ tree/crates/singlefs-core/src/system_configuration.rs	2026-09-24 18:48:58.241568846 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/system_configuration.rs	2026-09-23
++++ tree/crates/singlefs-core/src/system_configuration.rs	2026-09-25
 @@ -9,6 +9,7 @@
  use singlefs_format::{
      journal_in_flight_record_limit, DATA_UNIT_BYTES, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
@@ -4984,8 +4984,8 @@ diff -ruN -x target tree/crates/singlefs-core/src/system_configuration.rs
      fn system_configuration_is_481_bytes_in_a_4096_slot_and_round_trips() {
          let slot = sample().to_slot();
 diff -ruN -x target tree/crates/singlefs-core/src/transaction.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/transaction.rs	2026-09-24 16:15:19.532814592 +0000
-+++ tree/crates/singlefs-core/src/transaction.rs	2026-09-24 18:48:58.241580116 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/transaction.rs	2026-09-25
++++ tree/crates/singlefs-core/src/transaction.rs	2026-09-25
 @@ -7,18 +7,17 @@
  //! 被换下的八个单元在同一次发布里释放（分配记录改写成已释放 + 释放代，条目不删，D3（空间分配） 已定项 7）。
  //! 每一步都经过块设备接口，录制器挂在那层（D17（实现分层与第三方管道） 已定项 5）。
@@ -8387,8 +8387,8 @@ diff -ruN -x target tree/crates/singlefs-core/src/transaction.rs
          );
      }
 diff -ruN -x target tree/crates/singlefs-core/src/write_accounting.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/write_accounting.rs	2026-09-24 16:15:19.532852641 +0000
-+++ tree/crates/singlefs-core/src/write_accounting.rs	2026-09-24 16:50:54.714292753 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-core/src/write_accounting.rs	2026-09-25
++++ tree/crates/singlefs-core/src/write_accounting.rs	2026-09-25
 @@ -53,8 +53,12 @@
              TransactionUnit::InodeLeafContainer(_) => WrittenStructureKind::InodeTreeLeafContainer,
              TransactionUnit::InodeRoot => WrittenStructureKind::InodeTreeRoot,
@@ -8405,8 +8405,8 @@ diff -ruN -x target tree/crates/singlefs-core/src/write_accounting.rs
              TransactionUnit::InstanceTable | TransactionUnit::InstanceTablePageAfterTheFirst(_) => {
                  WrittenStructureKind::InstanceTableUnit
 diff -ruN -x target tree/crates/singlefs-format/src/lib.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-format/src/lib.rs	2026-09-24 08:24:01.668782064 +0000
-+++ tree/crates/singlefs-format/src/lib.rs	2026-09-24 18:48:58.241580116 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-format/src/lib.rs	2026-09-24
++++ tree/crates/singlefs-format/src/lib.rs	2026-09-25
 @@ -127,6 +127,12 @@
  /// 记账条目一条：key 22 + value 8 + seq 4（D5（快照 / 空间记账机制） 已定项 5；D8（核心索引结构） 已定项 7）。format-const: ACCOUNTING_ENTRY_BYTES
  pub const ACCOUNTING_ENTRY_BYTES: u64 = 34;
@@ -8497,8 +8497,8 @@ diff -ruN -x target tree/crates/singlefs-format/src/lib.rs
      #[test]
      fn system_configuration_fits_in_the_slot_with_room_for_one_more_pointer() {
 diff -ruN -x target tree/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs	2026-09-24 16:27:40.842241332 +0000
-+++ tree/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs	2026-09-24 17:01:54.423058125 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs	2026-09-25
++++ tree/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs	2026-09-25
 @@ -51,7 +51,7 @@
  use singlefs_core::unit::{parse_index_node, unit_filesystem_identifier};
  use singlefs_core::write_accounting::{WritesByStructureKind, WrittenStructureKind};
@@ -8596,7 +8596,7 @@ diff -ruN -x target tree/crates/singlefs-harness/src/bin/e158_root_choice_repair
  /// 树是为了服务文件读，与「占用集合」这个问题不是同一件事——占用靠中央映射，不靠 extent/inode）；
  /// 有快照、多版本共享落点的情形没有覆盖（第一版这批历史都不产生快照，见交回报告）。
 +///
-+/// **只读一层、把根当叶解**——实十九（2026-09-24 16:50 UTC 前后落地）之后，中央映射树条目数一旦
++/// **只读一层、把根当叶解**——实十九（2026-09-25 落地）之后，中央映射树条目数一旦
 +/// 超过单节点叶容量（`transaction.rs` 第 1334 行「中央映射树叶 294」）就会长成多层，那时根节点是
 +/// 内部节点（`level > 0`），装着的是子节点指针、不是 `parse_mapping_entry` 认得的叶条目格式。
 +/// 这里显式核 `level == 0` 再往下解，不靠「宽度不够、`parse_mapping_entry` 自然读不出」这种隐式失败
@@ -8698,7 +8698,7 @@ diff -ruN -x target tree/crates/singlefs-harness/src/bin/e158_root_choice_repair
          assert_eq!(deduplicated.len(), 2, "两条根不应该解到同一个 (设备, 偏移)");
      }
  
-+    /// session s9（实十九提醒，2026-09-24 16:50 UTC 前后落地）：中央映射树条目数超过单节点叶容量
++    /// session s9（实十九提醒，2026-09-25 落地）：中央映射树条目数超过单节点叶容量
 +    /// （`transaction.rs` 第 1334 行「中央映射树叶 294」）会长成多层，根节点变成内部节点
 +    /// （`level > 0`）。这里手工构造一个合法但 `level=1` 的假节点，覆盖真实中央映射树根的两份物理
 +    /// 拷贝，验证 `allocation_record_tree_reachable_placements_via_central_mapping` 显式拦下它——
@@ -8865,8 +8865,8 @@ diff -ruN -x target tree/crates/singlefs-harness/src/bin/e158_root_choice_repair
      /// 显式传 `Some(0)` 时只穷举权重 0 那一档就停（不管这一档打不打中），`stopped_by_weight_ceiling`
      /// 如实反映「还有没搜到的档」；`full_space_subset_count` 恒等于完整证据空间的子集数，不随上限变，
 diff -ruN -x target tree/crates/singlefs-harness/src/bin/first_transaction_device_log_check.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-harness/src/bin/first_transaction_device_log_check.rs	2026-09-24 02:30:54.123358156 +0000
-+++ tree/crates/singlefs-harness/src/bin/first_transaction_device_log_check.rs	2026-09-24 17:28:54.670021224 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-harness/src/bin/first_transaction_device_log_check.rs	2026-09-24
++++ tree/crates/singlefs-harness/src/bin/first_transaction_device_log_check.rs	2026-09-25
 @@ -4,7 +4,8 @@
  //!
  //! 模式就是虚机里那一次 `first_transaction_on_device` 的模式，宿主照它重跑同样几步（`singlefs_harness::on_device_modes`，两边跑同一份）：
@@ -9199,8 +9199,8 @@ diff -ruN -x target tree/crates/singlefs-harness/src/bin/first_transaction_devic
      #[test]
      fn every_position_is_attributed_to_the_window_whose_events_contain_it() {
 diff -ruN -x target tree/crates/singlefs-harness/src/bin/first_transaction_on_device.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-harness/src/bin/first_transaction_on_device.rs	2026-09-24 16:15:19.532852641 +0000
-+++ tree/crates/singlefs-harness/src/bin/first_transaction_on_device.rs	2026-09-24 17:28:54.669972875 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-harness/src/bin/first_transaction_on_device.rs	2026-09-25
++++ tree/crates/singlefs-harness/src/bin/first_transaction_on_device.rs	2026-09-25
 @@ -1,6 +1,6 @@
  //! 虚机档（QEMU/KVM）：在两块真 virtio 盘上跑第一个事务的整条写路，冷重开再恢复读回文件。
  //!
@@ -10259,8 +10259,8 @@ diff -ruN -x target tree/crates/singlefs-harness/src/bin/first_transaction_on_de
  
      /// 宿主检查（`first_transaction_device_log_check`）拿录制流投到每块盘上的事件当「程序的信念」：每个写一件、FUA 写之后一个 FLUSH、
 diff -ruN -x target tree/crates/singlefs-harness/src/history.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-harness/src/history.rs	2026-09-24 16:15:19.532886740 +0000
-+++ tree/crates/singlefs-harness/src/history.rs	2026-09-24 18:48:58.241580116 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-harness/src/history.rs	2026-09-25
++++ tree/crates/singlefs-harness/src/history.rs	2026-09-25
 @@ -1928,8 +1928,7 @@
              )
          }
@@ -10311,8 +10311,8 @@ diff -ruN -x target tree/crates/singlefs-harness/src/history.rs
  }
  
 diff -ruN -x target tree/crates/singlefs-harness/src/model_comparison.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-harness/src/model_comparison.rs	2026-09-24 16:15:19.532944978 +0000
-+++ tree/crates/singlefs-harness/src/model_comparison.rs	2026-09-24 18:48:58.241685305 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-harness/src/model_comparison.rs	2026-09-25
++++ tree/crates/singlefs-harness/src/model_comparison.rs	2026-09-25
 @@ -69,7 +69,15 @@
          }
          TransactionUnit::InodeRoot => ModelUnitRole::InodeRoot,
@@ -10375,8 +10375,8 @@ diff -ruN -x target tree/crates/singlefs-harness/src/model_comparison.rs
      }
  }
 diff -ruN -x target tree/crates/singlefs-harness/src/model.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-harness/src/model.rs	2026-09-24 16:15:19.532924658 +0000
-+++ tree/crates/singlefs-harness/src/model.rs	2026-09-24 16:50:54.714341234 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-harness/src/model.rs	2026-09-25
++++ tree/crates/singlefs-harness/src/model.rs	2026-09-25
 @@ -291,8 +291,6 @@
      FirstFileVersionOnAVersionThatAlreadyHasAFile,
      /// 分配记录树第一版只有一个节点（容量墙，收口表第 39 行：模型答允许拒绝的区间）。
@@ -10436,8 +10436,8 @@ diff -ruN -x target tree/crates/singlefs-harness/src/model.rs
              | ModelRefusalReason::RollbackTargetBelowEffectiveFloor
              | ModelRefusalReason::RollbackTargetOnAbandonedTimeline
 diff -ruN -x target tree/crates/singlefs-harness/src/on_device_modes.rs
---- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-harness/src/on_device_modes.rs	2026-09-24 02:30:54.748746865 +0000
-+++ tree/crates/singlefs-harness/src/on_device_modes.rs	2026-09-24 17:28:54.669972875 +0000
+--- /tmp/claude-1000/m2-final-code-r1/tree/crates/singlefs-harness/src/on_device_modes.rs	2026-09-24
++++ tree/crates/singlefs-harness/src/on_device_modes.rs	2026-09-25
 @@ -1,13 +1,18 @@
 -//! 虚机档 `first_transaction_on_device` 的五个模式，以及第一个事务之后那两次发布（发布 B、可写挂载之后的发布 C）的写路。
 +//! 虚机档 `first_transaction_on_device` 的六个模式，以及第一个事务之后那几步写（发布 B、可写挂载之后的发布 C、
@@ -10718,7 +10718,7 @@ index f2f9cf7..bacea6b 100644
 @@ -18,6 +18,7 @@
  - 每个定义都照守、不再写进各自「开工先读：」一行的三处：跑命令照 `.claude/singlefs-ai-sop/rules/command-safety.md`「退不回去的操作，动手前先想一遍」「`pkill -f` / `killall` 一律禁用」两节；
    给人看的文字照 `.claude/singlefs-ai-sop/rules/writing-discipline.md`「说人话」一节；说外部状态之前现查（`.claude/singlefs-ai-sop/rules/verify-before-claiming.md` 开头一节）。
- - 本机时钟是 UTC，人在东京（JST，UTC+9）；报告里的时刻写清是哪个时区。
+ - 本机时钟与东京差 9 小时；报告里的时刻写清是哪个时区。
 +- 候选、臂、方案、判据、提问编号有了变体，起一个新名字（那一族里下一个没用过的号，或一个短的描述性名字），不在原名后面加撇号类角标（U+2032、U+2033、U+2034、U+02B9、U+02BA）；全仓由门禁 12 号判，写法见 `.claude/rules/path-moves.md`「变体起新名字，不用角标」。
  - 派发提示里没给、定义里也没写的项目事实（某份 kb 在哪、某条决策的原文），去仓里现查，不凭印象补。
  - **找不到历史实验的数据、提示或产物，去 `git log` 里看。** 上一轮及更早的实验记录不留在工作区：

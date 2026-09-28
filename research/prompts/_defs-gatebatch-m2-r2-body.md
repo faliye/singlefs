@@ -16,7 +16,7 @@
 
 **共用问句**：照改后的字面与代码，哪一步会做错、放过、或误拒；给具体的命令、改动或派发情形；能在临时拷贝上量的量出来。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-27 JST 00:2x）
+## 二、实现今天的样子（主 agent 的观测，2026-09-27）
 
 - 改法交回之后主 agent 复跑：`python3 research/scripts/admission.py --selftest` → `✓ admission.py 自证通过：167 格都对`（改前 140 格）；`python3 .claude/hooks/lib_heavy_tests.py --selftest` → `✓ lib_heavy_tests 自检通过（查了 109 种：…）`（改前 55 种）；`bash .claude/hooks/heavy-test-guard.sh --selftest` → `✓ 自检通过（查了 628 种，其中该拒 112 种）`（改前 580 / 101）；62 号 `✓ 阶段归属表与门禁目录一致（76 个阶段，归 9 个 agent）`；63 号绿。
 - 改法自报的证红日志在 `/tmp/claude-1000/gate-batch-m2-r1-fixes/logs/`（`redproof-*.log`、`probe-*.log`、`final/`），改前六份文件的备份在同目录 `backup/`。

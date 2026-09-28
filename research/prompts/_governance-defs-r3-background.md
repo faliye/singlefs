@@ -428,7 +428,7 @@
 - 背景材料路径（用来识别误写成背景材料行号的引用）。
 - 云端腿交回里给的报告 `sha256sum`（有就给）。
 - 腿开工那一刻的快照路径：`sha256sum` 清单，罩这一轮被判的文件与材料点名的 kb 文件（`.claude/rules/implementation-workflow.md`「代码轮派腿之前记一份开工快照」；代码轮必给），腿跑着的时候被别的会话改过的，主 agent 另给倒推出的原样副本（`*.at-snapshot`）。没给快照的代码轮，停下要，不对主树核。没给快照的轮（设计轮）对主树核，腿引的行号与主树对不上时，拿腿开工时刻照第 2 步现查那个文件在腿开工之后有没有被改过：没改过记 ✗，改过或没给开工时刻记「分不清：文件可能在腿开工之后被改过」（第 6 步的「分不清」一栏）。
-- 腿开工时刻（UTC）：第 2 步现查「快照清单里没有的文件」在腿开工之后有没有被改过要用；没给时，快照清单外的文件内容对不上记「分不清：文件可能在腿开工之后被改过」，不记 ✗。
+- 腿开工时刻：第 2 步现查「快照清单里没有的文件」在腿开工之后有没有被改过要用；没给时，快照清单外的文件内容对不上记「分不清：文件可能在腿开工之后被改过」，不记 ✗。
 - 报告路径（形态 `research/prompts/<轮>-verifier-output.md`）、草稿目录。
 
 ```
@@ -575,7 +575,7 @@
 # 每条变异的 cargo test 放进内存上限里跑（research/scripts/run-with-memory-cap.sh：systemd 的临时 scope，MemoryMax=<上限>、MemorySwapMax=0），
 # 撞上限只杀这一条的进程，不把整机拖进 OOM（2026-09-25 一条无界分配的变异两次把整机拖进 OOM，records/2026-09-16-subagent拆分提案.md 第四十节第 28 行）。
 #   上限从三处取，先到先用：变异表里单起一行「# 每条变异的内存上限：<上限>」（判别力样本用它把上限压到 512M）、GATE_MUTATION_MEMORY_MAX、默认 4G。
-#   默认 4G 的依据：本机 60 GiB 内存，本地模型服务（vllm 与 ray）连同会话常驻约 12 GiB（2026-09-25 `free -g` 的 used 列是 12），
+#   默认 4G 的依据：本机 60 GiB 内存，本地模型服务（服务本体与 ray）连同会话常驻约 12 GiB（2026-09-25 `free -g` 的 used 列是 12），
 #   同时可能有 3 件重活 ⇒ 每件 16 GiB；这一道同时开好几个工作进程，4G 给正常的编译与测试留余量。2026-09-25 量过编译那一半：
 #   HEAD 的四个 crate 全部测试目标在 4G 上限、2 个并行编译下从零编得过，匿名内存峰值 0.60 GiB（每 0.2 秒取一次样）；点名的测试跑起来要多少没量，
 #   包装的峰值表（research/scripts/memory-peaks.tsv）跑过一遍之后按条记着。换机器要重算（这些数只在本机成立）。
@@ -1006,7 +1006,7 @@ PY
 # 给一条命令定内存上限，起跑之前先判整机放不放得下、放不下就排队（records/2026-09-16-subagent拆分提案.md 第四十节第 28、30 行）。三层：
 #   ① 这一条的上限：放进 systemd 的临时 scope（MemoryMax=<上限>、MemorySwapMax=0、OOMPolicy=stop），撞上限只杀这个 scope 里的进程；
 #   ② 总量兜底：每个 scope 都挂进同一个 slice（默认 singlefs-heavy.slice），slice 的 MemoryMax = 整机内存 − 余量。几条合起来撞顶也只在 slice 里杀，
-#      杀不到 slice 外面的本地模型服务 vllm-prod 与 Claude Code 会话。slice 设不上就报错退出，不退回无总上限；
+#      杀不到 slice 外面的本机本地模型服务与 Claude Code 会话。slice 设不上就报错退出，不退回无总上限；
 #   ③ 起跑前判内存量：拿一把锁，算「slice 里已占的 + 这一条要的」，不超过总上限才起；放不下就放锁、隔一会儿再判，等满上限报「排不上」退出。
 # 变异跑道 research/scripts/mutate.sh 与门禁 59 号每条变异都经它跑；子 agent 跑 cargo test / cargo run / 实验二进制也要经它
 # （.claude/hooks/heavy-test-guard.sh 在执行前拒不经它的）。提交时的重阶段整条经它跑，例：
@@ -1030,11 +1030,11 @@ PY
 #          不是它自己撞了它的上限；它的结果不算数，重跑它；
 #   2      用法错（上限、余量、总上限不是 正整数[KMGT] 的写法，没给命令）。
 #
-# 余量（RUN_WITH_MEMORY_CAP_RESERVE，默认 20G）留给 slice 外面：本地模型服务 vllm-prod、各个 Claude Code 会话与它们起的工具、门禁在包装外面的进程、内核。
-#   2026-09-25 10:1x UTC 量的（只在本机成立；换机器、vllm 换模型或换并行度都要重量）：MemTotal 60.1 GiB；slice 外面回收不掉的合计 13.4 GiB
-#   （MemTotal − MemAvailable，那时 slice 里几乎是空的），其中 vllm-prod 7.4 GiB anon + 0.6 GiB shmem（它 cgroup 的 memory.stat；
-#   `systemctl status vllm-prod` 报的 Memory 37.9G 里 30.3 GiB 是模型文件的页缓存，回收得掉），user.slice 2.4 GiB anon（Claude Code 会话与它们起的进程），
-#   其余约 3 GiB 是内核（Slab 1.9 GiB、页表）与别的服务。20G 比 13.4 GiB 多约 6.6 GiB，给会话变多、vllm 在负载下涨、门禁在包装外面的 python 进程留着；
+# 余量（RUN_WITH_MEMORY_CAP_RESERVE，默认 20G）留给 slice 外面：本机本地模型服务、各个 Claude Code 会话与它们起的工具、门禁在包装外面的进程、内核。
+#   2026-09-25 量的（只在本机成立；换机器、本地模型服务换模型或换并行度都要重量）：MemTotal 60.1 GiB；slice 外面回收不掉的合计 13.4 GiB
+#   （MemTotal − MemAvailable，那时 slice 里几乎是空的），其中本机本地模型服务 7.4 GiB anon + 0.6 GiB shmem（它 cgroup 的 memory.stat；
+#   `systemctl status <本机本地模型服务>` 报的 Memory 37.9G 里 30.3 GiB 是模型文件的页缓存，回收得掉），user.slice 2.4 GiB anon（Claude Code 会话与它们起的进程），
+#   其余约 3 GiB 是内核（Slab 1.9 GiB、页表）与别的服务。20G 比 13.4 GiB 多约 6.6 GiB，给会话变多、本地模型服务在负载下涨、门禁在包装外面的 python 进程留着；
 #   本机 slice 总上限因此约 40 GiB。怎么现量：bash research/scripts/run-with-memory-cap.sh --status 打出上面每一项此刻的数。
 #   slice 外面涨过了余量，总上限挡不住那一部分，整机照样可能被外面涨满：那一类靠看门狗的常驻内存告警与 .claude/hooks/session-start.sh 的 OOM 报告。
 #
@@ -1264,7 +1264,7 @@ PEAK_TABLE_HEADER = [
     "# 每条命令上一次实测的内存峰值：research/scripts/run-with-memory-cap.sh 建、读、写（排队时按它算「这条要的量」），别手改。",
     "# 口径：scope 里的外壳 bash 在命令退出之后读自己 cgroup 的 memory.peak，按 MiB 向上取整的字节数；含页缓存（cargo 写编译产物的那些）与外壳 bash 自己，偏大不偏小。",
     "#   撞了这一条自己的上限的记成上限；超时、被停、被总上限挤掉的不记（量到的是半截）。只在本机成立，换机器要重量，所以不进 git（.gitignore）。",
-    "# 列（制表符分隔）：峰值字节、量的时刻（UTC）、那一次的上限、键（命令的各个词用空格接起来，测试二进制名里的 16 位哈希去掉；RUN_WITH_MEMORY_CAP_KEY 可以指定）。",
+    "# 列（制表符分隔）：峰值字节、量的时刻、那一次的上限、键（命令的各个词用空格接起来，测试二进制名里的 16 位哈希去掉；RUN_WITH_MEMORY_CAP_KEY 可以指定）。",
 ]
 
 
@@ -1482,10 +1482,10 @@ def status(slice_name, total_text, reserve_text, slice_directory, cgroup_root):
     for line in occupants_text(entries, slice_directory) if entries else []:
         print(line)
     outside = total_memory - available - (slice_used or 0)
-    vllm = cgroup_stat(os.path.join(cgroup_root, "system.slice/vllm-prod.service/memory.stat"), ("anon", "shmem"))
+    <本地模型服务> = cgroup_stat(os.path.join(cgroup_root, "system.slice/<本机本地模型服务>/memory.stat"), ("anon", "shmem"))
     user = cgroup_stat(os.path.join(cgroup_root, "user.slice/memory.stat"), ("anon",))
-    print(f"  … slice 外面回收不掉的合计约 {human(outside)}（MemTotal − MemAvailable − slice 里的用量），其中 vllm-prod 的 anon + shmem "
-          f"{human(vllm) if vllm is not None else '读不到'}、user.slice 的 anon {human(user) if user is not None else '读不到'}")
+    print(f"  … slice 外面回收不掉的合计约 {human(outside)}（MemTotal − MemAvailable − slice 里的用量），其中本机本地模型服务的 anon + shmem "
+          f"{human(<本地模型服务>) if <本地模型服务> is not None else '读不到'}、user.slice 的 anon {human(user) if user is not None else '读不到'}")
     if total_bytes is not None:
         reserve_bytes = total_memory - total_bytes
         if outside > reserve_bytes:
@@ -1695,7 +1695,7 @@ run_selftest() {
   }
   all_exist() { local path; for path in "$@"; do [[ -f "$path" ]] || return 1; done; }
   seed_peak() { # seed_peak <键> <字节>：往这一例的峰值表里写一行
-    printf '%s\t%s\t%s\t%s\n' "$2" "2026-09-25T00:00:00Z" "200M" "$1" >> "$context_directory/peaks.tsv"
+    printf '%s\t%s\t%s\t%s\n' "$2" "2026-09-25" "200M" "$1" >> "$context_directory/peaks.tsv"
   }
 
   fresh_context 512M
@@ -1868,7 +1868,7 @@ run_selftest() {
   # 外壳写峰值那一步挨得住 systemd 停 scope 时发给 scope 里每个进程的 TERM：命令在 scope 里留一个进程，等命令退出之后 1 到 2 秒里
   # 不停地（不 sleep）给 scope 里除它以外的每个进程发 TERM——外壳那时起的任何外部命令活不过一轮；峰值照样要记进表。
   # 只在这一例自己开的 scope 里发：cgroup 路径要是 …/<这一例的 slice>/singlefs-memory-cap-*.scope（slice 名经 $1 传进去），不对就不发信号、退 0。
-  # 不开 scope 的路径（弄坏开关 nocap）下命令就在调用方的 cgroup 里：2026-09-25 UTC 11:12 在 SSH 会话的 session-1.scope 里发过一轮 TERM，
+  # 不开 scope 的路径（弄坏开关 nocap）下命令就在调用方的 cgroup 里：2026-09-25 在 SSH 会话的 session-1.scope 里发过一轮 TERM，
   # 打掉了 VSCode 扩展宿主与 Claude 会话；只核最后一段名字时，外面包着一层别的 singlefs-memory-cap scope（整条门禁经包装跑）会打到外层那一整条
   fresh_context 256M
   checked=$((checked + 1))
@@ -1919,7 +1919,7 @@ run_selftest() {
   # 账上包装已经死了的那一笔（进程号是 pid_max，这台机器上不会有这个进程）不算：记着要 250M 的死账不挡一条要 200M 的
   checked=$((checked + 1))
   mkdir -p "$context_directory/state/ledger"
-  printf '{"unit": "singlefs-memory-cap-dead", "pid": %s, "pid_start_time": "1", "need": %s, "cap": "250M", "key": "dead", "admitted_at": "2026-09-25T00:00:00Z"}' \
+  printf '{"unit": "singlefs-memory-cap-dead", "pid": %s, "pid_start_time": "1", "need": %s, "cap": "250M", "key": "dead", "admitted_at": "2026-09-25"}' \
     "$(cat /proc/sys/kernel/pid_max)" $((250 * MEBIBYTE)) > "$context_directory/state/ledger/singlefs-memory-cap-dead.json"
   if in_context env RUN_WITH_MEMORY_CAP_WAIT_SECONDS=1 bash "$target" 200M true 2>"$scratch/stale.err"; then status=0; else status=$?; fi
   if [[ $status -ne 0 || -e "$context_directory/state/ledger/singlefs-memory-cap-dead.json" ]]; then

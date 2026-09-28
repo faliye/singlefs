@@ -2,7 +2,7 @@
 
 <!-- doc-lint:not-numbers J1 K3 K4 Y1 P1 P2 P3 P4 P5 P6 P7 P9 P10 D2 L1 L2 L3 F1 F2 F3 F4 F5 F6 F9 F10 FD2 FD3 FM G1 G2 G3 -->
 
-正文 `research/prompts/_defs-gatebatch-m2-r3-body.md`；腿：云端攻方 `research/prompts/defs-gatebatch-m2-r3-opus-output.md`（sha256 b3fb28ef…）、云端正推 `research/prompts/defs-gatebatch-m2-r3-sonnet-output.md`（sha256 41aaa135…）、本地攻方两份样本 `research/prompts/defs-gatebatch-m2-r3-local-attack-output-s1.md`、`-s2.md`；核查员 `research/prompts/defs-gatebatch-m2-r3-verifier-output.md`（sha256 f95fb489…）：核了 101 处，✓ 99、✗ 1（正推报告把 `admission.py:1632-1633` 写成 `:1629-1630`，结论不受影响）、核不动 1（正推报告里两条 `--selftest` 没复跑）；攻方 `rerun.sh` 与正推 K4 那一节的复跑逐字吻合。开工快照 `research/prompts/defs-gatebatch-m2-r3-snapshot/sha256sums.txt`（14 个文件）腿开工（2026-09-27T03:38:29Z）与交齐时两次 `sha256sum -c` 全 OK。
+正文 `research/prompts/_defs-gatebatch-m2-r3-body.md`；腿：云端攻方 `research/prompts/defs-gatebatch-m2-r3-opus-output.md`（sha256 b3fb28ef…）、云端正推 `research/prompts/defs-gatebatch-m2-r3-sonnet-output.md`（sha256 41aaa135…）、本地攻方两份样本 `research/prompts/defs-gatebatch-m2-r3-local-attack-output-s1.md`、`-s2.md`；核查员 `research/prompts/defs-gatebatch-m2-r3-verifier-output.md`（sha256 f95fb489…）：核了 101 处，✓ 99、✗ 1（正推报告把 `admission.py:1632-1633` 写成 `:1629-1630`，结论不受影响）、核不动 1（正推报告里两条 `--selftest` 没复跑）；攻方 `rerun.sh` 与正推 K4 那一节的复跑逐字吻合。开工快照 `research/prompts/defs-gatebatch-m2-r3-snapshot/sha256sums.txt`（14 个文件）腿开工（2026-09-27）与交齐时两次 `sha256sum -c` 全 OK。
 
 这是门禁批第三轮，按 `.claude/rules/three-way-inference.md`「第三轮之后停」不开第四轮。
 

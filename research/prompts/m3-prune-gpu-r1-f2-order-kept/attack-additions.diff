@@ -1,0 +1,182 @@
+--- /home/fy5090/code/singlefs/research/prompts/m3-prune-gpu-r1-opus-model/attack.rs
++++ repo/crates/singlefs-checker-tier/e161_attack/attack.rs
+@@ -33,6 +33,9 @@
+         Some("kinds") => world_kind_string_identity_merges_conditions(output, arguments.get(1)),
+         Some("collide") => world_digest_collision(output),
+         Some("reuse") => world_u4_materialized_record_stream_misses_premature_reuse(output),
++        Some("order_min") => investigate_order_minimal(output),
++        Some("order_next") => investigate_order_with_a_next_publish(output),
++        Some("order_impl") => investigate_order_implementation_stream(output),
+         _ => {
+             eprintln!("用法：attack shape|p5|p6 [k]|t4|torn|small|order");
+             2
+@@ -1418,3 +1421,169 @@
+     compare_materialized(output, "premature_reuse_of_the_txg3_data_unit", &history, &small);
+     0
+ }
++
++
++// ───────────────────────────── 调查员加的最小复现（只在草稿副本里） ─────────────────────────────
++
++fn describe_publishes(writes: &[RetainedWrite]) -> String {
++    let publishes = singlefs_harness::memory_pool::publishes_of_one_recording(writes, 0);
++    let mut assigned: BTreeSet<usize> = BTreeSet::new();
++    let mut parts = Vec::new();
++    for publish in &publishes {
++        assigned.extend(publish.units.iter().copied());
++        assigned.extend(publish.records.iter().copied());
++        parts.push(format!("(txg={} root={} units={} records={:?})", publish.checkpoint_txg, publish.root, publish.units.len(), publish.records));
++    }
++    let unassigned_records: Vec<usize> = writes
++        .iter()
++        .enumerate()
++        .filter(|(index, write)| write.kind == StepKind::JournalRecord && !assigned.contains(index))
++        .map(|(index, _)| index)
++        .collect();
++    format!("publishes=[{}] journal_records_in_no_publish={unassigned_records:?}", parts.join(","))
++}
++
++fn judge_verbose(output: &mut ResultLines, label: &str, history: &History, persisted: &[bool]) {
++    let image = CrashImage { base: &history.base, writes: &history.writes, persisted: persisted.to_vec() };
++    let consulted = recover(&image, JournalPolicy::Consult);
++    let ignored = recover(&image, JournalPolicy::Ignore);
++    let describe_outcome = |report: &RecoveryReport| match &report.outcome {
++        RecoveryOutcome::NoFile { root } => format!("NoFile(root={root:?})"),
++        RecoveryOutcome::FileRead { root, content } => format!("FileRead(root={root:?},content_matches_version={})", history.versions.iter().any(|v| v.content == *content)),
++        RecoveryOutcome::Failed { root, failure } => format!("Failed(root={root:?},{failure:?})"),
++    };
++    let records = singlefs_checker_tier::crash::check_records_against(&image, &image, &history.writes, persisted, singlefs_harness::memory_pool::RecordStreamContinuity::OneRecording, consulted.effective_root);
++    let judgment = judge_image(&image, &history.versions);
++    let persisted_kinds: Vec<String> = history.writes.iter().zip(persisted).map(|(w, p)| format!("{}{}", w.kind.name(), if *p { "+" } else { "-" })).collect();
++    output.line(format!(
++        "name=investigate_order_state label={label} recovery_consult={} recovery_ignore={} consult_journal={:?} record_check={records:?} red_all_judgments={:?} tail_write_kinds_persisted={:?}",
++        describe_outcome(&consulted), describe_outcome(&ignored), consulted.journal, judgment.red, &persisted_kinds[persisted_kinds.len().saturating_sub(8)..]
++    ));
++}
++
++fn investigate_order_minimal(output: &mut ResultLines) -> i32 {
++    let full = first_history();
++    let records = full.segments[8].clone();
++    let root = full.segments[9].clone();
++    let system_configuration = full.segments[10].clone();
++    let kinds_of = |indexes: &[usize], writes: &[RetainedWrite]| indexes.iter().map(|i| writes[*i].kind.name()).collect::<Vec<_>>();
++    output.line(format!("name=investigate_order_segments healthy_seg8={:?} seg9={:?} seg10={:?} write_count={}", kinds_of(&records, &full.writes), kinds_of(&root, &full.writes), kinds_of(&system_configuration, &full.writes), full.writes.len()));
++    // 与攻方 order 世界同一个改法：段 8（记录）与段 9（根）在写表里对调。
++    let mut order: Vec<usize> = full.segments[..8].iter().flatten().copied().collect();
++    order.extend(root.iter().copied());
++    order.extend(records.iter().copied());
++    for segment in &full.segments[10..] {
++        order.extend(segment.iter().copied());
++    }
++    let writes: Vec<RetainedWrite> = order.iter().map(|index| full.writes[*index].clone()).collect();
++    let mutant = History { base: full.base.clone(), writes, segments: Vec::new(), versions: full.versions.clone() };
++    output.line(format!("name=investigate_order_publishes stream=healthy {}", describe_publishes(&full.writes)));
++    output.line(format!("name=investigate_order_publishes stream=root_before_records {}", describe_publishes(&mutant.writes)));
++    // 崩溃状态 A：段 0..7 与根持久、两条记录与系统配置都没持久。两张写表各按自己的下标摆同一个持久集合。
++    let absent_in_healthy: BTreeSet<usize> = records.iter().chain(system_configuration.iter()).copied().collect();
++    let healthy_persisted: Vec<bool> = (0..full.writes.len()).map(|index| !absent_in_healthy.contains(&index)).collect();
++    let mutant_persisted: Vec<bool> = order.iter().map(|original| !absent_in_healthy.contains(original)).collect();
++    judge_verbose(output, "A_root_persisted_records_absent_sysconf_absent/healthy_write_order", &full, &healthy_persisted);
++    judge_verbose(output, "A_root_persisted_records_absent_sysconf_absent/root_before_records_write_order", &mutant, &mutant_persisted);
++    // 崩溃状态 B：只有两条记录没持久（系统配置也落了）。
++    let only_records: BTreeSet<usize> = records.iter().copied().collect();
++    let healthy_persisted_b: Vec<bool> = (0..full.writes.len()).map(|index| !only_records.contains(&index)).collect();
++    let mutant_persisted_b: Vec<bool> = order.iter().map(|original| !only_records.contains(original)).collect();
++    judge_verbose(output, "B_only_records_absent/healthy_write_order", &full, &healthy_persisted_b);
++    judge_verbose(output, "B_only_records_absent/root_before_records_write_order", &mutant, &mutant_persisted_b);
++    // 同一个崩溃镜像两张写表下逐字节相同吗：读每条写的位置比。
++    let image_healthy = CrashImage { base: &full.base, writes: &full.writes, persisted: healthy_persisted.clone() };
++    let image_mutant = CrashImage { base: &mutant.base, writes: &mutant.writes, persisted: mutant_persisted.clone() };
++    let differing = full.writes.iter().filter(|w| {
++        let length = usize::try_from(w.length_in_bytes()).expect("写长");
++        PoolReader::read(&image_healthy, w.device, w.offset, length) != PoolReader::read(&image_mutant, w.device, w.offset, length)
++    }).count();
++    output.line(format!("name=investigate_order_same_image write_positions_compared={} positions_with_differing_bytes={differing}", full.writes.len()));
++    0
++}
++
++
++/// 攻方说「根之后的记录归到下一次发布」：在新建文件之后再接一次覆盖写（有下一次发布）的历史上，只把 txg 3 那次发布的根挪到它的两条记录之前。
++fn investigate_order_with_a_next_publish(output: &mut ResultLines) -> i32 {
++    let content = common::file_content();
++    let mut pool = build_first_stream_in_memory(&content);
++    let overwrite_content: Vec<u8> = (0..4100).map(|index| u8::try_from((index * 7 + 3) % 253).expect("字节")).collect();
++    overwrite_in_memory(&mut pool, &overwrite_content);
++    let full = History::of_pool(&pool, Vec::new());
++    let roots: Vec<usize> = full.writes.iter().enumerate().filter(|(_, w)| w.kind == StepKind::RootRecordFua).map(|(i, _)| i).collect();
++    output.line(format!("name=investigate_order_next roots={roots:?} write_count={}", full.writes.len()));
++    let root_txg3 = roots[2];
++    let records_txg3: Vec<usize> = (0..root_txg3).rev().take_while(|i| full.writes[*i].kind == StepKind::JournalRecord).collect();
++    let mut order: Vec<usize> = (0..full.writes.len()).filter(|i| *i != root_txg3 && !records_txg3.contains(i)).collect();
++    let insert_at = order.iter().position(|i| *i > root_txg3).expect("根之后还有写");
++    let mut moved = vec![root_txg3];
++    moved.extend(records_txg3.iter().rev().copied());
++    for (offset, index) in moved.iter().enumerate() {
++        order.insert(insert_at + offset, *index);
++    }
++    let writes: Vec<RetainedWrite> = order.iter().map(|i| full.writes[*i].clone()).collect();
++    output.line(format!("name=investigate_order_next stream=healthy {}", describe_publishes(&full.writes)));
++    output.line(format!("name=investigate_order_next stream=txg3_root_before_its_records {}", describe_publishes(&writes)));
++    let mutant = History { base: full.base.clone(), writes, segments: Vec::new(), versions: Vec::new() };
++    // 状态：txg 3 的根及之前全持久，txg 3 的两条记录与之后的写全没持久。
++    let absent: BTreeSet<usize> = records_txg3.iter().copied().chain((root_txg3 + 1)..full.writes.len()).collect();
++    let persisted: Vec<bool> = order.iter().map(|original| !absent.contains(original)).collect();
++    let image = CrashImage { base: &mutant.base, writes: &mutant.writes, persisted: persisted.clone() };
++    let consulted = recover(&image, JournalPolicy::Consult);
++    let records = singlefs_checker_tier::crash::check_records_against(&image, &image, &mutant.writes, &persisted, singlefs_harness::memory_pool::RecordStreamContinuity::OneRecording, consulted.effective_root);
++    output.line(format!("name=investigate_order_next state=txg3_root_persisted_records_and_later_absent effective_root={:?} record_check={records:?}", consulted.effective_root));
++    0
++}
++
++/// 真实现的改坏（副本里 transaction.rs 的 persist_publish_writes 改成先根后记录）录出的流：逐状态跑五样判定，另按「根之后、下一次根之前」
++/// 的记录认每次发布自己的记录（与 publishes_of_one_recording 不共用），数「根在而它自己的记录一条都不在」的状态。
++fn investigate_order_implementation_stream(output: &mut ResultLines) -> i32 {
++    let history = first_history();
++    let kinds: Vec<String> = history.segments.iter().map(|segment| {
++        let names: Vec<&str> = segment.iter().map(|i| history.writes[*i].kind.name()).collect();
++        format!("{}x{}", names.len(), names.first().copied().unwrap_or(""))
++    }).collect();
++    output.line(format!("name=investigate_order_impl segments={kinds:?} write_count={}", history.writes.len()));
++    output.line(format!("name=investigate_order_impl {}", describe_publishes(&history.writes)));
++    let roots: Vec<usize> = history.writes.iter().enumerate().filter(|(_, w)| w.kind == StepKind::RootRecordFua).map(|(i, _)| i).collect();
++    // 按记录自己的字节认它属于哪次发布：实例代号在偏移 16（4 字节）、checkpoint_txg 在偏移 26（8 字节）（journal.rs 的 to_bytes），与根身份比。
++    let record_identity = |write: &RetainedWrite| {
++        let bytes = write.bytes().expect("记录写带字节");
++        (u32::from_le_bytes(bytes[16..20].try_into().expect("4")), u64::from_le_bytes(bytes[26..34].try_into().expect("8")))
++    };
++    let own_records: Vec<(usize, Vec<usize>)> = roots.iter().map(|root| {
++        let (instance, txg) = root_identity_of_root_write(&history.writes[*root]);
++        (*root, (0..history.writes.len()).filter(|i| history.writes[*i].kind == StepKind::JournalRecord && record_identity(&history.writes[*i]) == (instance.0, txg.0)).collect())
++    }).collect();
++    output.line(format!("name=investigate_order_impl own_records_after_each_root={own_records:?}"));
++    let small = |_: usize, segment: &[usize]| segment.len() < 16;
++    guarded_state_count(output, "implementation_root_before_records", &history, &small);
++    let mut states = 0u64;
++    let mut should_be_red = 0u64;
++    let mut should_be_red_and_red = 0u64;
++    let mut red_by_name: BTreeMap<String, u64> = BTreeMap::new();
++    let mut example: Option<String> = None;
++    enumerate_observing(&history, &small, &mut |image, _report| {
++        states += 1;
++        let judgment = judge_image(image, &history.versions);
++        for name in &judgment.red {
++            *red_by_name.entry(name.clone()).or_insert(0) += 1;
++        }
++        let hole = own_records.iter().any(|(root, records)| {
++            !records.is_empty() && image.persisted[*root] && records.iter().all(|r| !image.persisted[*r])
++        });
++        if hole {
++            should_be_red += 1;
++            if !judgment.red.is_empty() {
++                should_be_red_and_red += 1;
++            }
++            if example.is_none() {
++                example = Some(image.writes.iter().zip(&image.persisted).skip(30).map(|(w, p)| format!("{}{}", w.kind.name(), if *p { "+" } else { "-" })).collect::<Vec<_>>().join(","));
++            }
++        }
++    });
++    output.line(format!(
++        "name=investigate_order_impl states={states} states_root_persisted_own_records_all_absent={should_be_red} of_those_red_by_any_judgment={should_be_red_and_red} red_by_name={red_by_name:?} example_tail_from_write_30={example:?}"
++    ));
++    0
++}

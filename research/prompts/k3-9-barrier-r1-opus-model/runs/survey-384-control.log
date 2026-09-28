@@ -1,0 +1,10 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 25.6 GiB，这一条要 16.0 GiB（峰值表里没有这条，按它的上限 16G 算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排队（已等 60 秒，至多 3600 秒）：slice 已占 25.8 GiB，这一条要 16.0 GiB（峰值表里没有这条，按它的上限 16G 算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排了 83 秒，起跑（singlefs-memory-cap-1648795-965119258）
+ARM control(with-1058)
+SURVEY first width=384 target=(1, 3) floor=(1, 2) segments [20:unit_writex20] [2:journal_recordx2] [1:root_record_fuax1] [2:system_configuration_slotx2] closed_form=1048583
+SURVEY over width=384 target=(1, 4) floor=(1, 3) segments [20:unit_writex20] [2:journal_recordx2] [1:root_record_fuax1] [2:system_configuration_slotx2] closed_form=1048583
+SURVEY seq2 width=384 target=(1, 4) floor=(1, 3) segments [24:unit_writex24] [4:journal_recordx4] [1:root_record_fuax1] [2:system_configuration_slotx2] closed_form=16777235
+SURVEY seq3 width=384 target=(1, 4) floor=(1, 3) segments [26:unit_writex26] [6:journal_recordx6] [1:root_record_fuax1] [2:system_configuration_slotx2] closed_form=67108931
+SURVEY over_i2 width=384 target=(2, 6) floor=(2, 5) segments [20:unit_writex20] [2:journal_recordx2] [1:root_record_fuax1] [2:system_configuration_slotx2] closed_form=1048583
+SURVEY rollback width=384 target=(1, 5) floor=(1, 4) segments [12:unit_writex12] [2:journal_recordx2] [1:root_record_fuax1] [2:system_configuration_slotx2] closed_form=4103

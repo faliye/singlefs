@@ -1,7 +1,7 @@
 # governance-defs-r3 云端攻方（Opus）报告
 
 攻击面：G1、G2、G3 为主，G4、G5 余力（正文 `research/prompts/_governance-defs-r3-body.md` 第四节分工表「云端攻方」一行）。前几轮判决 `research/prompts/governance-defs-r2-main-verification.md`；上一轮攻方 B1–B7 的角度不重复，这一轮攻的是它们的写回本身。
-开工 2026-09-26 约 22:20 UTC（JST 9 月 27 日 07:20）。开工核过快照：`sha256sum -c research/prompts/governance-defs-r3-snapshot/sha256sums.txt` 41 行无一不符；`git diff --stat bfc447e HEAD -- .claude research/scripts crates` 无输出。负载：`ps -o pid,args -u "$(id -u)"` 里 cargo / gate.sh / qemu / fio / vm-bench 0 个。
+开工 2026-09-27。开工核过快照：`sha256sum -c research/prompts/governance-defs-r3-snapshot/sha256sums.txt` 41 行无一不符；`git diff --stat bfc447e HEAD -- .claude research/scripts crates` 无输出。负载：`ps -o pid,args -u "$(id -u)"` 里 cargo / gate.sh / qemu / fio / vm-bench 0 个。
 没跑任何重型测试，没编译；钩子的判定用合成 PreToolUse JSON 喂真钩子；59 号的判档从今天的源文件用 ast 现抽函数再喂合成输出。这个容器里内存包装 `--check` 起不来（slice 总上限设不上），cargo 一条都跑不了，cargo 的输出形状是推的（见 D1）。
 
 ## 复跑
@@ -49,7 +49,7 @@ a09a383f927011fba2a8c4892c066fa6e6b855b9da4e606320e41c685ca9a65e  ./cases/implem
 | D2 | G1 | 「无效」除了编不过、进程被杀还有第三个来源：点名测试那一行没被认出、别的测试或点名测试照常红了，输出只有 `error: test failed, to rerun pass …`，没有 `process didn't exit successfully`。照第 5 步的尾巴读法，分诊员把它读成「替换文编不过」（第八类），出路是改替换文，改错了地方。今天的表里就有 11 行必走这一格：`crates/mutations.tsv` 第 6 列测试名尾巴带 `$`，59 号 `re.escape` 之后永远认不出点名测试红了 | 否：改前改后都把它读成编不过 | 不拿它判这一批（正文第五节末那条）；**11 行是 59 号在下一次真跑时必红的潜伏问题，另记、优先交主 agent** |
 | D3 | G2 | 未跟踪文件那条核对命令三道共用 `crates litmus .lkmm-static-only`：别的会话的实现员起草一条新 litmus（写范围闸放行 `litmus/**`），55、59 两道都停，而它们不读它 | 是：改前按每道自己的输入取，55、59 照跑 | 站不住（照改后的定义做不下去，要等别的会话），后果中 |
 | D4 | G3 | 核查员「没改过记 ✗」靠 `git log --since` 与 `git status --short` 判；`.claude/singlefs-ai-sop/` 整个目录被 `.gitignore` 忽略、一个文件都没跟踪，腿常引的 SOP 规则在开工之后被上游同步改了，两条命令都空，核查员记「没改过」、把对的引文记 ✗ | 部分：改前清单外那一支用同样两条命令但只说「照实写」，改后写死「没改过记 ✗」，并把它推到设计轮 | 站不住（判别子观测不到：被判的现查看不见被忽略的文件） |
-| D5 | G3 | 「腿开工时刻」只有一个数，而各腿派出的时刻不同、续做腿更晚；只有代码轮那一节要求主 agent 记「派腿的时刻」，main-agent.md 与 three-way-inference.md 一处都没有。上一轮核查员用的是「15:30:00Z 前后」，攻方腿自记 15:15 开工：15:15–15:30 之间被改的清单外文件照 D4 同样落 ✗。设计轮不给时刻时，第 1 步判别力自证挑不出合格的那一条，只能停在「核查方法不分辨」 | 部分：改前设计轮一律落「分不清」，自证一样停；改后多了一支，但没人被要求喂它 | 站不住（一步要的输入没人给） |
+| D5 | G3 | 「腿开工时刻」只有一个数，而各腿派出的时刻不同、续做腿更晚；只有代码轮那一节要求主 agent 记「派腿的时刻」，main-agent.md 与 three-way-inference.md 一处都没有。上一轮核查员用的是自己估的开工时刻，攻方腿自记的开工更早：两者之间被改的清单外文件照 D4 同样落 ✗。设计轮不给时刻时，第 1 步判别力自证挑不出合格的那一条，只能停在「核查方法不分辨」 | 部分：改前设计轮一律落「分不清」，自证一样停；改后多了一支，但没人被要求喂它 | 站不住（一步要的输入没人给） |
 | D6 | G4 | 第 5 步照字面「另写一个 `driver_e<号>`」给同一个入库装置的第二份产物写驱动函数：bash 里后定义的盖掉先定义的，第一行登记跑的是第二个函数，没有任何闸查重名 | 是（改后新写的模板） | 轻：同一句又说「照 E156、E158 的先例」，E158 的 13 个驱动函数都带后缀 |
 | D7 | G5 | 共用约束「2 是包装的用法写错，改写法再跑」：包装把被包命令自己的退出码 0–249 原样传出，执行员第 5 步经包装跑的 `replay.sh` 在构建失败、登记表第 4 列写错时自己退 2；照这句，执行员去改包装的写法、重跑，不去看构建为什么失败 | 是（改后新写的一句） | 站不住（两处文件给出相反做法：包装文件头说 0–249 是命令自己的） |
 
@@ -191,7 +191,7 @@ named-test-not-run	failure	（进程跑完了，不适用）	—	点名测试没
 
 被判的句子（`grep -nF` 现查）：
 - `.claude/agents/three-way-verifier.md:21` 含「没改过记 ✗，改过或没给开工时刻记「分不清：文件可能在腿开工之后被改过」」。
-- 同文件 `:22` 起头「- 腿开工时刻（UTC）」；`:27` 含「挑一条文件在快照里、或腿开工之后没被改过的」；`:28` 含「`git log --since=<腿开工时刻> -- <文件>` 与 `git status --short -- <文件>`」。
+- 同文件 `:22` 起头「- 腿开工时刻……」；`:27` 含「挑一条文件在快照里、或腿开工之后没被改过的」；`:28` 含「`git log --since=<腿开工时刻> -- <文件>` 与 `git status --short -- <文件>`」。
 - `.claude/rules/implementation-workflow.md:26` 含「连同派腿的时刻（`date -u`）交核查员当输入」，这一节标题是 `:24` `## 代码轮派腿之前记一份开工快照`。
 
 五种情形各走哪一支（按上面几行推）：给了快照且文件在清单里 → `sha256sum -c`，对得上比主树、对不上只比倒推副本、都没有记分不清；给了快照、文件不在清单里 → 主树加两条 git 现查；没给快照的设计轮 → 同上一支；没给快照的代码轮 → 停下要；报告 sha256 对不上 → 整份分不清；没给开工时刻 → 清单外一律分不清。五支之间没有重叠。落空的是下面两处：两条 git 现查看不见的文件（D4），与「开工时刻」这个输入本身（D5）。另有一处小缺口：核查员的输入里没有「这一轮是代码轮还是设计轮」，代码轮漏给快照时它分不出该停还是该照设计轮核。
@@ -200,17 +200,17 @@ named-test-not-run	failure	（进程跑完了，不适用）	—	点名测试没
 
 `.gitignore:6` `/.claude/singlefs-ai-sop/`；`git ls-files .claude/singlefs-ai-sop | wc -l` → `0`。`.gitignore:14` `/research/scripts/memory-peaks.tsv`。前者装着腿最常引的 SOP 规则与 `gate.sh`、钩子脚本，由上游同步整份换掉（`.singlefs-ai-sop-version` 在 git 里改过 31 次，今天是 `0.0.57`）；后者每跑一次内存包装就被改写。
 
-历史（`g3-git-blind.sh`，临时仓；提交时刻用 `GIT_*_DATE` 写死）：腿甲 15:15 开工、读到四份文件的第 10 行；15:22 别的会话同步上游 SOP、跑了一次包装，各在第 3 行前插一行（被忽略的文件）；15:25 别的会话在一份跟踪着的钩子第 3 行前插一行并提交；腿乙 15:30 才派。`run-all.out` 原样：
+历史（`g3-git-blind.sh`，临时仓；提交时刻用 `GIT_*_DATE` 写死）：腿甲先开工、读到四份文件的第 10 行；之后别的会话同步上游 SOP、跑了一次包装，各在第 3 行前插一行（被忽略的文件）；再之后别的会话在一份跟踪着的钩子第 3 行前插一行并提交；腿乙最后才派。`run-all.out` 原样：
 
 ```
-.claude/singlefs-ai-sop/rules/evidence-discipline.md	T=2026-09-26T15:15:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「rule line 9」
-.claude/singlefs-ai-sop/rules/evidence-discipline.md	T=2026-09-26T15:30:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「rule line 9」
-research/scripts/memory-peaks.tsv	T=2026-09-26T15:15:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「peak 9」
-research/scripts/memory-peaks.tsv	T=2026-09-26T15:30:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「peak 9」
-.claude/hooks/tracked-changed-late.sh	T=2026-09-26T15:15:00Z	git log=[2b38302 ]	git status=[]	改过 ⇒ 分不清	真相：第 10 行已变成「tracked line 9」
-.claude/hooks/tracked-changed-late.sh	T=2026-09-26T15:30:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「tracked line 9」
-.claude/hooks/bash-command-detector.sh	T=2026-09-26T15:15:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行没动
-.claude/hooks/bash-command-detector.sh	T=2026-09-26T15:30:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行没动
+.claude/singlefs-ai-sop/rules/evidence-discipline.md	T=2026-09-27（腿甲开工）	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「rule line 9」
+.claude/singlefs-ai-sop/rules/evidence-discipline.md	T=2026-09-27（腿乙派发）	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「rule line 9」
+research/scripts/memory-peaks.tsv	T=2026-09-27（腿甲开工）	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「peak 9」
+research/scripts/memory-peaks.tsv	T=2026-09-27（腿乙派发）	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「peak 9」
+.claude/hooks/tracked-changed-late.sh	T=2026-09-27（腿甲开工）	git log=[2b38302 ]	git status=[]	改过 ⇒ 分不清	真相：第 10 行已变成「tracked line 9」
+.claude/hooks/tracked-changed-late.sh	T=2026-09-27（腿乙派发）	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「tracked line 9」
+.claude/hooks/bash-command-detector.sh	T=2026-09-27（腿甲开工）	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行没动
+.claude/hooks/bash-command-detector.sh	T=2026-09-27（腿乙派发）	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行没动
 看得见被忽略文件的两种现查（推的改法，不是定义里的）：
 .claude/singlefs-ai-sop/rules/evidence-discipline.md	git status --short --ignored=[!! .claude/singlefs-ai-sop/]	git check-ignore=[.claude/singlefs-ai-sop/rules/evidence-discipline.md]
 research/scripts/memory-peaks.tsv	git status --short --ignored=[!! research/scripts/memory-peaks.tsv]	git check-ignore=[research/scripts/memory-peaks.tsv]
@@ -226,7 +226,7 @@ research/scripts/memory-peaks.tsv	git status --short --ignored=[!! research/scri
 3. 字面：第五节「站不住」那条的「结果错」（对的引文被记 ✗）。
 4. 改法（都没实现，被攻过零轮）：
 
-| 改法 | 修哪一格 | SOP 行、峰值表行 | 跟踪文件 15:25 改过那行（T=15:30） | 量过 / 推的 |
+| 改法 | 修哪一格 | SOP 行、峰值表行 | 跟踪文件被提交改过那行（T=腿乙派发） | 量过 / 推的 |
 |---|---|---|---|---|
 | 丁一：先 `git check-ignore -q -- <文件>` 或 `git ls-files --error-unmatch -- <文件>`；被忽略或没跟踪的，不用两条 git 现查，改用 `stat -c %Y` 与开工时刻比，拿不到就记分不清 | 被忽略文件不再误记 ✗ | 不再中 | 仍中（那是 D5） | 推的（`check-ignore` 那两行输出是量的） |
 | 丁二：快照清单罩进腿会引的 SOP 文件（或整个 `MANIFEST.sha256`） | 把它们挪进「在清单里」那一支 | 不再中（SOP）；峰值表仍中 | 仍中 | 推的 |
@@ -248,13 +248,13 @@ research/scripts/memory-peaks.tsv	git status --short --ignored=[!! research/scri
 这一轮（governance-defs-r3）的快照目录里有什么：
 sha256sums.txt
 上一轮核查员用的开工时刻、攻方腿自记的开工时刻、正推腿报告的提交时刻：
-腿开工时刻 2026-09-26T15:30:00Z 前后
-开工 2026-09-26 15:15 UTC
-107b79f 2026-09-26T15:30:07+00:00 三方 governance-defs-r2：云端正推腿报告
+腿开工于 2026-09-27
+开工 2026-09-27
+107b79f 2026-09-27 三方 governance-defs-r2：云端正推腿报告
 ```
 
 两处落空：
-- **时刻取晚了**：上一轮核查员拿的「15:30:00Z 前后」比攻方腿自记的 15:15 晚一刻钟，与正推腿报告的提交时刻（15:30:07）几乎同时。用它查 `git log --since`，15:15–15:30 之间被提交改过的清单外文件看不出来（上面 D4 表 `tracked-changed-late.sh` 那两行：T=15:15 记分不清，T=15:30 记 ✗，而那一行确实变了）。各腿派出的时刻本来就不同，按「撞了限额……新开一条接着做」接上的续做腿更晚；定义只收一个数，没说取最早的那一个。
+- **时刻取晚了**：上一轮核查员拿的那个时刻比攻方腿自记的开工晚一刻钟，与正推腿报告的提交时刻几乎同时。用它查 `git log --since`，两者之间被提交改过的清单外文件看不出来（上面 D4 表 `tracked-changed-late.sh` 那两行：T=腿甲开工那一行记分不清，T=腿乙派发那一行记 ✗，而那一行确实变了）。各腿派出的时刻本来就不同，按「撞了限额……新开一条接着做」接上的续做腿更晚；定义只收一个数，没说取最早的那一个。
 - **设计轮没人喂**：唯一要求记时刻的是代码轮那一节；这一轮（设计轮）的快照目录里只有 `sha256sums.txt`，派给我的提示里也没有开工时刻。设计轮若连快照也不给（`three-way-inference.md` 没要求设计轮给），第 1 步判别力自证要挑「腿开工之后没被改过的」那条，没有时刻就一条都挑不出；挑任一条加 1 行去核，照 `:21` 只能落「分不清」，判不出 ✗，停在「核查方法不分辨」——而方法本身没毛病。
 
 四问：
@@ -268,7 +268,7 @@ sha256sums.txt
 | 戊一：main-agent.md「派出去之后」或 three-way-inference.md「核查员按轮派」补一句：凡要派核查员的轮，派第一条腿之前 `date -u` 写进这一轮快照目录（例 `dispatched-utc.txt`），续做腿不改它；核查员输入改成「全部腿里最早的派发时刻」 | 两格都修 | 不再中 | 不再中 | 推的 |
 | 戊二：只在核查员定义里写「取最早的那一个」 | 时刻取晚 | 不再中 | 仍中 | 推的 |
 
-推翻条件：主 agent 在某处（记录、派发模板、材料员定义）已经对每一轮记下各腿最早派发时刻，而上一轮的「15:30:00Z 前后」是核查员自己估的、没拿它。
+推翻条件：主 agent 在某处（记录、派发模板、材料员定义）已经对每一轮记下各腿最早派发时刻，而上一轮用的那个时刻是核查员自己估的、没拿它。
 
 （D5 补一条现查：`grep -c '快照'` 在 `.claude/rules/three-way-inference.md`、`.claude/main-agent.md`、`.claude/agents/three-way-materials.md` 三份里都是 `0`。）
 

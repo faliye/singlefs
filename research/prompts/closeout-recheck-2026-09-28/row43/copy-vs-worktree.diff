@@ -1,0 +1,161 @@
+--- crates/singlefs-harness/src/history.rs	2026-09-27 20:20:00.469148747 +0000
++++ /tmp/claude-1000/closeout-recheck-2026-09-28/row43/repo/crates/singlefs-harness/src/history.rs	2026-09-28 06:29:38.751584252 +0000
+@@ -4036,6 +4036,14 @@
+             } else {
+                 let image_before_this_step = std::mem::replace(&mut image, pool.image());
+                 checked_stream_length = stream_length;
++                // ROW43-PROBE（调查员副本）：每次做成的抬 F 都算一次「F 落在空档里」；每一步之后看环里有没有被抛弃的根。
++                if let Some(new_floor) = raised_floor {
++                    let probe = raised_floor_lands_only_on_abandoned_roots(&image_before_this_step, new_floor);
++                    eprintln!("ROW43-PROBE raise seed={} step={} floor={} lands_only_on_abandoned={probe:?}", history.seed.0, step_index, new_floor.0);
++                }
++                if row43_probe_any_ring_root_abandoned(&image) == Some(true) {
++                    eprintln!("ROW43-PROBE abandoned_present seed={} step={}", history.seed.0, step_index);
++                }
+                 if per_step_checker.runs_the_checker() {
+                     violations = violations_on(&image, &mut tally);
+                 }
+@@ -4205,6 +4213,26 @@
+         newest_table
+             .rows
+             .iter()
++            .any(|row| row.instance == root.instance && root.checkpoint_txg > row.selected_root_txg)
++    }))
++}
++
++/// ROW43-PROBE（调查员副本）：环里有没有按最新根的实例表判被抛弃的根。
++#[must_use]
++pub fn row43_probe_any_ring_root_abandoned(image: &dyn PoolReader) -> Option<bool> {
++    let system_configuration = choose_system_configuration(image).ok()?;
++    let roots: Vec<RootRecord> = readable_roots(
++        image,
++        &system_configuration.immutable.region_devices,
++        &system_configuration.immutable.sizes,
++        &system_configuration.immutable.filesystem_identifier,
++    );
++    let newest_root = choose_root(image, &system_configuration)?;
++    let newest_table = instance_table_of_root(image, &newest_root)?;
++    Some(roots.iter().any(|root| {
++        newest_table
++            .rows
++            .iter()
+             .any(|row| row.instance == root.instance && root.checkpoint_txg > row.selected_root_txg)
+     }))
+ }
+--- crates/singlefs-checker/src/walk.rs	2026-09-27 17:00:47.792895398 +0000
++++ /tmp/claude-1000/closeout-recheck-2026-09-28/row43/repo/crates/singlefs-checker/src/walk.rs	2026-09-28 07:06:34.414672097 +0000
+@@ -5846,8 +5846,9 @@
+     // 只读根上的 F 时，带新 F 的根全坏、系统配置里的新 F 还在的合法镜像上，F 之下、单元已被合法复用的根会被当成候选，
+     // I-7.4（近 K 代块未被复用） 等按候选集判的几条误红（C556（checker 与层 0 不读系统配置里的 F））。
+     let mut newest_valid_root_on_each_device: BTreeMap<u32, &crate::RootView> = BTreeMap::new();
++    let row43_experiment = std::env::var("ROW43_EXPERIMENT").unwrap_or_default();
+     for (region, _, root) in &roots {
+-        if abandoned_by_the_newest_roots_table(root) {
++        if abandoned_by_the_newest_roots_table(root) && row43_experiment != "abandoned_floor_counts" {
+             continue;
+         }
+         let device = geometry.region_devices[usize::try_from(*region).expect("区域号")];
+@@ -5880,8 +5881,19 @@
+         .enumerate()
+         .filter(|(index, (_, _, root))| {
+             // 被抛弃：按最新根指着的实例表判（D23（journal 的角色与格式） 已定项 14 候选集）。
+-            let abandoned = abandoned_by_the_newest_roots_table(root);
+-            let below_floor = root.checkpoint_txg < effective_rollback_floor;
++            let abandoned = abandoned_by_the_newest_roots_table(root)
++                && row43_experiment != "walk_abandoned";
++            let nearest_valid_txg_at_or_below_floor = roots
++                .iter()
++                .filter(|(_, _, other)| !abandoned_by_the_newest_roots_table(other) && other.checkpoint_txg <= effective_rollback_floor)
++                .map(|(_, _, other)| other.checkpoint_txg)
++                .max()
++                .unwrap_or(0);
++            let below_floor = if row43_experiment == "walk_nearest_root_below_floor" {
++                root.checkpoint_txg < nearest_valid_txg_at_or_below_floor
++            } else {
++                root.checkpoint_txg < effective_rollback_floor
++            };
+             let walked = *index == newest_index || (!abandoned && !below_floor);
+             if !walked {
+                 if abandoned {
+@@ -6156,6 +6168,71 @@
+     // 它的「已分配」还算着 F 生效值之下那些根引用的槽，与按 F 生效值取的候选集并集不可比，I-3.1 这一格报不适用（实二的读法，交主 agent）。
+     let accounting_was_written_under_the_effective_floor =
+         roots[newest_index].2.rollback_floor == effective_rollback_floor;
++    if std::env::var_os("ROW43_DUMP").is_some() {
++        eprintln!(
++            "ROW43-DUMP F_eff={effective_rollback_floor} newest=(inst {}, txg {}, F {})",
++            roots[newest_index].2.instance, newest_txg, roots[newest_index].2.rollback_floor
++        );
++        let mut per_root: Vec<((u32, u64), BTreeSet<(u32, u64)>)> = Vec::new();
++        for (region, _, root) in &roots {
++            eprintln!(
++                "ROW43-DUMP root region={region} inst={} txg={} F={} abandoned={} below_floor={}",
++                root.instance,
++                root.checkpoint_txg,
++                root.rollback_floor,
++                abandoned_by_the_newest_roots_table(root),
++                root.checkpoint_txg < effective_rollback_floor
++            );
++            let mut single = Walk::starting_with(
++                reader,
++                Judgements::default(),
++                filesystem_identifier_low,
++                root.instance,
++                root.checkpoint_txg,
++            );
++            single.walk_root(&root.record_bytes, false);
++            per_root.push((
++                (root.instance, root.checkpoint_txg),
++                single.references.keys().map(|(device, slot, _)| (*device, *slot)).collect(),
++            ));
++        }
++        let newest_view = &roots[newest_index].2;
++        let tree_table_pointer = parse_node_pointer(&newest_view.record_bytes[36..122]);
++        let mut dump_cache = IndexNodeCache::new();
++        if let Some(tree_table) = read_index_node_without_judging(reader, &tree_table_pointer, &mut dump_cache) {
++            for entry in &tree_table.entries {
++                if entry.len() < tree_table_entry_bytes() || read_u16(entry, 10) != TREE_KIND_ALLOCATION {
++                    continue;
++                }
++                let allocation_root = parse_node_pointer(&entry[14..100]);
++                if allocation_root.all_zero {
++                    continue;
++                }
++                let Some((_, records)) = allocation_record_tree_without_judging(reader, &allocation_root, &mut dump_cache) else {
++                    continue;
++                };
++                let mut released_in_records = 0u64;
++                for record in &records {
++                    if record.is_released {
++                        released_in_records += record.span_slots;
++                    }
++                    if start_slots_referenced_by_every_walked_version.contains(&(record.device, record.slot)) {
++                        continue;
++                    }
++                    let referencing_roots: Vec<(u32, u64)> = per_root
++                        .iter()
++                        .filter(|(_, slots)| slots.contains(&(record.device, record.slot)))
++                        .map(|(key, _)| *key)
++                        .collect();
++                    eprintln!(
++                        "ROW43-DUMP unwalked record dev={} slot={} span={} gen={} released={} referenced_by_ring_roots={referencing_roots:?}",
++                        record.device, record.slot, record.span_slots, record.generation, record.is_released
++                    );
++                }
++                eprintln!("ROW43-DUMP records={} released_span_total={released_in_records}", records.len());
++            }
++        }
++    }
+     if accounting_seen {
+         for device in &devices {
+             let quarantined_exempted = quarantined_exempted_against_every_walked_version
+@@ -6172,6 +6249,9 @@
+             let allocated = accounting
+                 .get(&(STATISTIC_ALLOCATED_BYTES, *device))
+                 .copied();
++            if std::env::var_os("ROW43_DUMP").is_some() {
++                eprintln!("ROW43-DUMP device={device} allocated={allocated:?} walked={walked} quarantined_exempted={quarantined_exempted} defer={:?} empty_cluster_segments_row={:?}", accounting.get(&(STATISTIC_DEFER_QUEUE_BYTES, *device)), accounting.get(&(11u16, *device)));
++            }
+             if accounting_was_written_under_the_effective_floor {
+                 judgements.judge("I-3.1", allocated == Some(walked), || {
+                     format!(

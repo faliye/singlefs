@@ -1,6 +1,6 @@
 # 实审 A2b 报告：审阅第 27、36、37 条与「journal 环短于三条记录 mkfs 拒」
 
-时刻：2026-09-26 UTC 22:08 开工（本机时钟，JST 2026-09-27 07:08）。规格 `/tmp/claude-1000/impl-rev-a2b/spec.md`；派发提示要求不改 `crates/mutations.tsv`，要追加的变异行在 `/tmp/claude-1000/impl-rev-a2b/mutations-append.tsv`（19 行，六段，与表同格式），另有一行要整行替换的在 `/tmp/claude-1000/impl-rev-a2b/mutations-replacements.tsv`（1 行，见「要主 agent 处理的」第 2 条）。
+日期：2026-09-27 开工。规格 `/tmp/claude-1000/impl-rev-a2b/spec.md`；派发提示要求不改 `crates/mutations.tsv`，要追加的变异行在 `/tmp/claude-1000/impl-rev-a2b/mutations-append.tsv`（19 行，六段，与表同格式），另有一行要整行替换的在 `/tmp/claude-1000/impl-rev-a2b/mutations-replacements.tsv`（1 行，见「要主 agent 处理的」第 2 条）。
 
 ## 结论
 
@@ -153,13 +153,13 @@
 792:fn a_journal_ring_holding_fewer_records_than_the_safety_factor_is_refused_before_any_write() {
 ```
 
-主工作区（我这 4 份与证红副本逐字节相同，`cmp` 核过），2026-09-26 UTC 22:47 前后：
+主工作区（我这 4 份与证红副本逐字节相同，`cmp` 核过），2026-09-27：
 
 - 动到的测试二进制 `cargo test --offline -p singlefs-harness --test core_review_tree_table_duplicates_and_slot_one_search`（`main-run-final.log`）：
   `test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s`
 - `cargo test --offline -p singlefs-core --lib`（`main-core-lib-final.log`）：
   `test result: ok. 127 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s`
-- A2a 那个二进制（我的改动让它红，只为核「要主 agent 处理的」第 1 条；22:28 那一跑，`main-a2a-test.log`）：`test result: FAILED. 13 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s`
+- A2a 那个二进制（我的改动让它红，只为核「要主 agent 处理的」第 1 条；`main-a2a-test.log` 那一跑）：`test result: FAILED. 13 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s`
 - `cargo build --offline --all-targets`（`main-build-final.log`）：退 0，`Finished \`dev\` profile [unoptimized + debuginfo] target(s) in 0.87s`
 - `cargo fmt --check`：退 1，出 diff 的文件全是别的会话的（我这 4 份单独 `rustfmt --edition 2021 --check` 退 0）：
   ```
@@ -186,7 +186,7 @@
 
 各阶段完整输出在 `/tmp/claude-1000/impl-rev-a2b/gate-<阶段文件名>.log`。
 
-## `git diff --stat -- crates litmus`（主工作区，2026-09-26 UTC 22:48，原样；别的会话同时在改 crates/，这张表分不出谁改的，我的文件以「这一轮写过的文件」一节为准；新测试文件还没被 git 跟踪，不在表里）
+## `git diff --stat -- crates litmus`（主工作区，2026-09-27，原样；别的会话同时在改 crates/，这张表分不出谁改的，我的文件以「这一轮写过的文件」一节为准；新测试文件还没被 git 跟踪，不在表里）
 
 ```
  crates/mutations.tsv                               |  678 +-

@@ -1,6 +1,6 @@
 # 实审 B3a-3 报告（implementation-writer）：按设备记屏障与第三态带红的清单外测试改期望，`crash.rs` 两处文档注释改成现状
 
-时刻都是 UTC（本机时钟），JST = UTC + 9。开工 2026-09-26T22:08Z。
+开工 2026-09-27。
 
 ## 一、结论
 
@@ -56,7 +56,7 @@
 | floor-raise `:139`、`:177`、`:190` | 观察者只收 `persisted`；挂载那一遍拿 `writes_of_the_raise.iter().zip(persisted)` 叠镜像 | 观察者头一次把 `image.writes`（枚举用的写表）收下来，之后每个状态核一次长度相同；挂载那一遍拿这张表 zip `persisted`；另外断言枚举用的写表比录制流长 | `CrashImage` 的文档（`crash.rs:437–439`）写明，观察者拿到的 `writes` 是枚举用的写表，`persisted` 与它逐条对应，比录制流长。原来的 zip 在录制流末尾截断，撕裂那一态叠出来的镜像等于「这次写没持久」，第三态根本没交给挂载 |
 
 分片那份 golden 的对照：同一棵开工快照树，只把 `crash.rs`、`lib.rs`、`segments.rs`、`device_log.rs` 退回 B3a-2 开工时的快照（`/tmp/claude-1000/impl-rev-b3a2/originals/`），在副本 `copy-old` 上跑同一段打印，结果：
-- `unsharded_enumeration_…` 在这份上照样红，38 行、SHA `34ff1968a072768027942cb5470bfdddb52f71e97129a0242e3fef038bcda2f3`，不是钉的 `6deeb48f…`。所以旧钉值在今天这棵树上本来就对不上：B3a-2 那四份之外，工作区里还有别的改动也让打出来的行变了（B3a-2 开工前还是开工后的改动，我分不出）。旧钉值是 15:24Z 取的，当时的打印原文没留下；这份测试文件也没进 git，我查不出差在哪一处。这一格如实说清：B3a-3 开工时，旧 golden 已经不是「今天的代码减去 B3a-2」打出来的。重取的钉值只证「今天这一版打的就是这样」，不证与加分片之前逐字相同。
+- `unsharded_enumeration_…` 在这份上照样红，38 行、SHA `34ff1968a072768027942cb5470bfdddb52f71e97129a0242e3fef038bcda2f3`，不是钉的 `6deeb48f…`。所以旧钉值在今天这棵树上本来就对不上：B3a-2 那四份之外，工作区里还有别的改动也让打出来的行变了（B3a-2 开工前还是开工后的改动，我分不出）。旧钉值是更早取的，当时的打印原文没留下；这份测试文件也没进 git，我查不出差在哪一处。这一格如实说清：B3a-3 开工时，旧 golden 已经不是「今天的代码减去 B3a-2」打出来的。重取的钉值只证「今天这一版打的就是这样」，不证与加分片之前逐字相同。
 - 退回版与今天版逐项比：每种行的词项名一样（逐行抽出 `key=` 前缀排序再比，`keys identical`）。不同的只有下面几样：随状态数变的计数（`states`、`slices`、`finished_*`、按不变量的 `评估/违例/不适用`、`states_by_publish`、`observed_states`、`observer_counts`、`root_persisted_states` 4 → 9、`file_read` 7 → 12、`no_file` 22 → 42）、第一趟的切片数 2 → 4、进度文件名里的计划哈希。违例、`failed`、`journal_differing` 3、`verification_ran` 6、记录核对器两项都是 0，全没变。这与 B3a-2 报告第七节推的恢复计数一致：根已持久 4 → 9，读出文件 7 → 12。
 
 ## 四、`crash.rs` 两处文档注释（B3c-1 报告第六节第 3 条）
@@ -70,7 +70,7 @@
 
 ## 五、证红与探针
 
-**副本**：`/tmp/claude-1000/impl-rev-b3a3/copy`，22:13:24Z 用 `rsync -a --exclude target --exclude .git` 取的开工快照（那一刻 `crash.rs` 的 sha256 是 `f689915b…`，与 B3c-1 记的同一个），用它自己的 target。我的 5 份改完都拷了进去并 `touch`。
+**副本**：`/tmp/claude-1000/impl-rev-b3a3/copy`，用 `rsync -a --exclude target --exclude .git` 取的开工快照（那一刻 `crash.rs` 的 sha256 是 `f689915b…`，与 B3c-1 记的同一个），用它自己的 target。我的 5 份改完都拷了进去并 `touch`。
 
 **基线红集**（副本上还没放我的改动，逐个跑整个二进制，`run-with-memory-cap.sh 8G` + `capped.sh 4`，日志 `logs/baseline-*.log`）原样：
 ```text

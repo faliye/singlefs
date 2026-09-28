@@ -1,0 +1,20 @@
+warning: function `enumerate_layer0` is never used
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:4093:4
+     |
+4093 | fn enumerate_layer0(base: &Pool, writes: &[WriteRequest], segments: &[Vec<usize>], expected_content: &[u8], reader_mode: ReaderMod...
+     |    ^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `root_index` is never read
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:4583:5
+     |
+4578 | struct SinglePublishFlow {
+     |        ----------------- field in this struct
+...
+4583 |     root_index: usize,
+     |     ^^^^^^^^^^
+
+warning: `e7-index-bench` (bin "e142-first-txn-dry-run") generated 2 warnings
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.04s
+exit=0

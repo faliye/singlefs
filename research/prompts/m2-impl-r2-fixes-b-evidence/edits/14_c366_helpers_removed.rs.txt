@@ -1,0 +1,55 @@
+/// 一次可写挂载写出的发布（写行那次在前、暖机在后），各自的 (txg, jsn)。
+fn txg_and_counter_of_each_publish(mounted: &Mounted) -> Vec<(CheckpointTxg, u64)> {
+    std::iter::once(&mounted.output.row_publish)
+        .chain(mounted.output.warm_up_publishes.iter())
+        .map(|publish| (publish.root().checkpoint_txg, publish.record().counter))
+        .collect()
+}
+
+/// 一段录制流里写出去的系统配置槽（盘、实例代号、tail）与 journal 记录（盘、落点、txg、jsn），按写出的次序。
+struct WrittenJournalPositions {
+    system_configuration_tails: Vec<(DeviceIdentity, InstanceGeneration, u64)>,
+    journal_records: Vec<(DeviceIdentity, DeviceOffsetInBytes, CheckpointTxg, u64)>,
+}
+
+fn written_journal_positions(operations: &[RetainedOperation]) -> WrittenJournalPositions {
+    let filesystem_identifier = unit_filesystem_identifier(&parameters().filesystem_identifier);
+    let mut positions = WrittenJournalPositions {
+        system_configuration_tails: Vec::new(),
+        journal_records: Vec::new(),
+    };
+    for retained in operations {
+        match geometry().classify(&retained.operation) {
+            StepKind::SystemConfigurationSlot => {
+                let slot = SystemConfiguration::parse_slot(
+                    retained.contents.as_deref().expect("录制流开了内容保留"),
+                )
+                .expect("写出去的系统配置槽自证得过");
+                positions.system_configuration_tails.push((
+                    retained.operation.device,
+                    slot.quantities.journal_instance,
+                    slot.quantities.journal_tail,
+                ));
+            }
+            StepKind::JournalRecord => {
+                let record = JournalRecord::parse(
+                    retained.contents.as_deref().expect("录制流开了内容保留"),
+                    filesystem_identifier,
+                )
+                .expect("写出去的记录自证得过");
+                positions.journal_records.push((
+                    retained.operation.device,
+                    retained.operation.offset,
+                    record.checkpoint_txg,
+                    record.counter,
+                ));
+            }
+            StepKind::ZeroFill
+            | StepKind::UnitWrite
+            | StepKind::RootRecordFua
+            | StepKind::Barrier => {}
+        }
+    }
+    positions
+}
+

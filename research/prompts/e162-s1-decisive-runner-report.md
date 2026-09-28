@@ -25,7 +25,7 @@ cd research && BINDGEN_EXTRA_CLANG_ARGS=-I/usr/lib/gcc/x86_64-linux-gnu/13/inclu
 BINDGEN_EXTRA_CLANG_ARGS=-I/usr/lib/gcc/x86_64-linux-gnu/13/include bash scripts/capped.sh 4 bash scripts/run-with-memory-cap.sh 8G cargo run --release -p e7-index-bench --features e162-block-stores --bin e162-crash-verdict-block-store -- s1 <臂>
 ```
 
-跑在后台任务（task bzohwmrxr），F 06:59:44Z→08:05:37Z、R1 08:05:37Z→08:47:01Z、R0 08:47:01Z→08:53:04Z、K 08:53:04Z→09:01:23Z，全部 `exit=0`。F 那一段跑得慢是撞上 V15 干扰重跑上限（`INTERFERENCE_MAXIMUM_RERUNS=3`，本机同期有别的会话在跑 `cargo test`），4 次尝试都记了 `name=timed_attempt`，详情写进了草稿目录 `progress.md`（两次主 agent 例行询问的记录也在那里）。
+跑在后台任务（task bzohwmrxr），F →、R1 →、R0 →、K →，全部 `exit=0`。F 那一段跑得慢是撞上 V15 干扰重跑上限（`INTERFERENCE_MAXIMUM_RERUNS=3`，本机同期有别的会话在跑 `cargo test`），4 次尝试都记了 `name=timed_attempt`，详情写进了草稿目录 `progress.md`（两次主 agent 例行询问的记录也在那里）。
 
 ## 产物与完成标记
 

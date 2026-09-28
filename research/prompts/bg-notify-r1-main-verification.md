@@ -9,7 +9,7 @@
 
 | 格 | 判定 | 依据 |
 |---|---|---|
-| A1① 漏禁 | **打中**：共用约束那句只禁三个词与「末尾的 `&`」，`… & echo …`（X01，事故那条删掉 nohup 与 disown）、子 shell 与命令替换里的 `&`（X02、X06、X07）、`wait $!` / `wait -n`（X04、X05）、`coproc` / `tmux -d` / `screen -dm` / `systemd-run`（X08–X11）照字面都放行而都会脱钩 | Opus 报告 A1①，X06 在真 harness 上端到端量过（15:20:02 报完成、真活 15:20:42 才完）；核查员复跑数据一致 |
+| A1① 漏禁 | **打中**：共用约束那句只禁三个词与「末尾的 `&`」，`… & echo …`（X01，事故那条删掉 nohup 与 disown）、子 shell 与命令替换里的 `&`（X02、X06、X07）、`wait $!` / `wait -n`（X04、X05）、`coproc` / `tmux -d` / `screen -dm` / `systemd-run`（X08–X11）照字面都放行而都会脱钩 | Opus 报告 A1①，X06 在真 harness 上端到端量过（先报完成、真活 40 秒后才完）；核查员复跑数据一致 |
 | A1① 误禁 | **打中一处，形状与腿说的不同**：共用约束那句禁 `setsid`，而裸 `setsid`（不带 `-f`）不 fork，外层照样等 | 主 agent 实测 `bash -c 'setsid sleep 2 …'` 外层 2.0 秒，核查员复现 2.0026 秒；Opus 报告说「误禁的只有 nohup 不带 & 与 setsid -w」隐含裸 setsid 会脱钩，33 条形态里没测过，这句作废（核查员 ✗ 第 2 条） |
 | A1② | **打中，弱**：长活与缓存计时器并进同一条 `… & … & wait`（C13）两句字面都满足，而计时器的叫醒丢了 | Opus 报告 A1② |
 | A1③ | **打中**：交回那种通知的 note 写「fires each time this agent stops with no live background children」，所以「结束本轮、手里没有在跑的后台任务、也没交回」也发 completed，入口那段没写怎么读；看门狗对它与「等后台」报同一个状态 | Opus 报告 A1③；看门狗 `agent-watch.py` 旧版第 214 行 |
@@ -30,7 +30,7 @@
 | 5 | A1③ 在机器那一侧 | `research/scripts/agent-watch.py` 新告警「结束本轮却不会醒」：结束本轮、没交回、起过的后台任务都已收到完成通知（`origin` 为 task-notification 的消息或 `queued_command` 附件）、之后没有新通知，60 秒后报；自检加「当场完了又去等」「通知刚到正要醒」两个样本，`AGENT_WATCH_BREAK=nowake` 判红 | 零轮（主 agent 自己加的） |
 | 6 | A4 | `agent-watch.py`：主会话记录不在时报告里写明「被停只按打断判」；自检加「停了、续做、又停」样本与「主会话记录不在」一格。`research/scripts/check-staged.sh` 自检加「红与 77 混着」一格 | 零轮 |
 
-对 `a339b505557ce905e` 那一段历史（13:53:44 结束本轮时起过六个后台任务，四个当场完了、两个还活着）新告警不报，是对的：那一刻它确实还有东西会叫醒它；脱钩的 `gate.sh` 由 hook 的第三种检出管。
+对 `a339b505557ce905e` 那一段历史（结束本轮时起过六个后台任务，四个当场完了、两个还活着）新告警不报，是对的：那一刻它确实还有东西会叫醒它；脱钩的 `gate.sh` 由 hook 的第三种检出管。
 
 ## 三、交用户（零轮形态）
 

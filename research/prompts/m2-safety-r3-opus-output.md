@@ -2,7 +2,7 @@
 
 <!-- doc-lint:not-numbers S4 S4b S4u S4c S4bu S4bc A1 A1n ND P1 P2 P3 P3pl P3r E0 E1 E2 E3 E4 E5 E5a E5b E6 E7 E8 E9 E10 -->
 
-攻击面：正文第四节分工表云端攻方那一行。冻结副本 `/tmp/claude-1000/safety-r3-frozen/` 开工时核对 130 个文件全 OK，这条腿在它的拷贝上量（冻结副本后来被改过，见「没做什么」末条）。时刻都是 UTC（东京时间 +9）。
+攻击面：正文第四节分工表云端攻方那一行。冻结副本 `/tmp/claude-1000/safety-r3-frozen/` 开工时核对 130 个文件全 OK，这条腿在它的拷贝上量（冻结副本后来被改过，见「没做什么」末条）。
 
 ## 复跑
 
@@ -338,4 +338,4 @@ E1 全部 4 次都在 P1、240 槽、每 3 次覆盖写回退一次那条脚本�
 - 「做满 8 次发布」的那一种 C283 读法、P3r + P3pl 合起来、4.2 与第五节的改法，都没实现。
 - `df` 没有实现，D3（空间分配） 已定项 9 第 1 条（`df` 报出 s 就能写 s）这一轮在 P3 上判不了。
 - 背景材料第二节说的故障注入大档 25 条新发现（「抬 F 的上限」对不上 3 条、冷启动读回对不上 2 条）：这条腿没量到与「抬 F 的上限」有关的反常（E5、E6 的 checker 与候选核对全 0），所以没去对照；那份报告在 `/tmp`，没读。
-- 冻结副本 `/tmp/claude-1000/safety-r3-frozen/` 在这一轮里被改过：开工时 130 个文件全 OK（`sha256sum -c` 输出 130 行 OK），2026-09-26 04:41 UTC 再核时 `admission.rs`、`allocator.rs`、`mount.rs`、`transaction.rs` 四个 FAILED（修改时刻 04:31–04:33 UTC，不是这条腿改的）。这条腿量的拷贝是开工时 rsync 的那一份；补丁里改的三份文件，把补丁倒回去之后与快照的 sha256 逐个相同（`admission`、`mount`、`transaction` 三行 OK），`allocator.rs` 这条腿没改。引的代码行号取自那三份倒回去的文件。
+- 冻结副本 `/tmp/claude-1000/safety-r3-frozen/` 在这一轮里被改过：开工时 130 个文件全 OK（`sha256sum -c` 输出 130 行 OK），2026-09-26 再核时 `admission.rs`、`allocator.rs`、`mount.rs`、`transaction.rs` 四个 FAILED（修改时刻，不是这条腿改的）。这条腿量的拷贝是开工时 rsync 的那一份；补丁里改的三份文件，把补丁倒回去之后与快照的 sha256 逐个相同（`admission`、`mount`、`transaction` 三行 OK），`allocator.rs` 这条腿没改。引的代码行号取自那三份倒回去的文件。

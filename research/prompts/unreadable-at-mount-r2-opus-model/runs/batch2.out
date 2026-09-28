@@ -1,0 +1,6 @@
+batch=2 pieces=5 rc_files=5
+piece=1 item=base:c393_double rc=0
+piece=2 item=a:c393_double rc=0
+piece=3 item=b:c393_double rc=0
+piece=4 item=jiaeio:c393_double rc=0
+piece=5 item=jia:c393_double rc=101

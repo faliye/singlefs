@@ -48,7 +48,7 @@ $ awk 'NR==100' ".claude/kb/decisions/19-块指针的结构与宽度预算.md"
 
 ### 2.2 `crates/` 代码行引用
 
-第四节「今天的两条判据」明写「主工作区 2026-09-24 04:30 UTC 现查」，即引的是**当时的主树**（补丁已打完），不是这条腿自己的副本基线；第十节「主工作区落了正式实现」同样明写是现查主树。这两处按**当前主树**核（与开工快照/倒推树无关，因为它们本来就不是在描述副本基线）：
+第四节「今天的两条判据」明写「主工作区 2026-09-24 现查」，即引的是**当时的主树**（补丁已打完），不是这条腿自己的副本基线；第十节「主工作区落了正式实现」同样明写是现查主树。这两处按**当前主树**核（与开工快照/倒推树无关，因为它们本来就不是在描述副本基线）：
 
 | 引用 | 核的结果 |
 |---|---|
@@ -67,7 +67,7 @@ $ awk 'NR==100' ".claude/kb/decisions/19-块指针的结构与宽度预算.md"
 
 `M/out*/`、`patch*/` 全部 116 个文件，逐文件重算 sha256，与报告第 36–151 行的表**整表比对**（`diff` 后排序结果一致，0 差异）；`baseline-crates.tgz` 解包后 91 个文件的 sha256 与随附的 `baseline-crates.sha256` 逐一比对，0 差异。
 
-`baseline-crates.tgz`（opus 自称基线 2026-09-24 01:22 UTC）与 `reconstruction.md` 倒推出的 00:52 UTC 快照树整体 diff：**除 `mutations.tsv`（opus 自己声明不含）外，仅 3 个文件不同**——`singlefs-format/src/lib.rs`、`e156_allocation_basis_counts.rs`、`e158_root_choice_repair.rs`（与第一节发现的并发会话改动一致，均非 opus 分析涉及的文件），opus 分析用到的 4 个 `singlefs-core` 文件在两份基线里完全相同。
+`baseline-crates.tgz`（opus 自称基线 2026-09-24）与 `reconstruction.md` 倒推出的快照树整体 diff：**除 `mutations.tsv`（opus 自己声明不含）外，仅 3 个文件不同**——`singlefs-format/src/lib.rs`、`e156_allocation_basis_counts.rs`、`e158_root_choice_repair.rs`（与第一节发现的并发会话改动一致，均非 opus 分析涉及的文件），opus 分析用到的 4 个 `singlefs-core` 文件在两份基线里完全相同。
 
 ### 2.4 重点复跑（N1 甲/乙/丙/丁 × F1/F2/F3/F9，N2/N3/准入）
 

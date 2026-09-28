@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 攻方腿的共用装置：造合成仓、仿 gate.sh --staged 只跑 54 号那一段。只读主仓（cp 与 git show），不写主仓、不碰主仓的 git common-dir。
 set -uo pipefail
-MAIN_REPO=/home/fy5090/code/singlefs
+MAIN_REPO=<仓根>
 MODEL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PATH="$MODEL_DIR/fake-bin:$PATH"
 unset SINGLEFS_LAYER0_THREADS SINGLEFS_STAGED_TREE GATE_BASE SINGLEFS_GATE_FULL FAKE_CARGO_SLEEP_FULL FAKE_CARGO_HOOK_BEFORE_SECOND FAKE_CARGO_HOOK_AFTER_SECOND

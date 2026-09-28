@@ -1,0 +1,13 @@
+[package]
+name = "r2-opus-trajectory-proto"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "unreadable-at-mount-r2 云端攻方腿的原型：故障之后连挂 N 次的轨迹（撕裂轮换走层 0 的枚举域，被抛弃根的账持续读不出按设备故障造）。只在仓副本里，不入库"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-harness = { path = "../singlefs-harness" }

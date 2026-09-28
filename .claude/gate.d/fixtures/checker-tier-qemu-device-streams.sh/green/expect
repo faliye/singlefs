@@ -1,0 +1,8 @@
+exit=77
+want=预录档（.qemu-prerecorded，没起虚机）
+want=判了 5 档 direct skip-new-pool-file-creation-barrier page-cache file-overwrite second-instance
+want=样本里没摆的 1 档：raise-rollback-floor
+want=这一档不算真跑过 QEMU
+want=── 汇总：checker-tier-qemu-device-streams.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=device-streams：本次未跑
+not-green-by-design=device-streams 样本是预录档（.qemu-prerecorded），没起虚机不算真跑过 QEMU，绿的一侧只能记本次未跑

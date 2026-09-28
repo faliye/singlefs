@@ -1,5 +1,5 @@
---- /tmp/claude-1000/m2-safety-r1/tree/crates/singlefs-core/src/admission.rs	2026-09-24 23:55:14.650113749 +0000
-+++ /tmp/claude-1000/m2-safety-r1-sonnet/tree/crates/singlefs-core/src/admission.rs	2026-09-25 04:24:25.886440112 +0000
+--- /tmp/claude-1000/m2-safety-r1/tree/crates/singlefs-core/src/admission.rs	2026-09-25
++++ /tmp/claude-1000/m2-safety-r1-sonnet/tree/crates/singlefs-core/src/admission.rs	2026-09-25
 @@ -363,10 +363,15 @@
          self.per_device
              .iter()

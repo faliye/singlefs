@@ -2,7 +2,7 @@
 
 - 核的对象：`.claude/main-agent.md` 工作区版本（含未提交的第 1、4、6、10 条、「禁止」一节第 2 条与派发表三行改动；`git diff --stat .claude/main-agent.md` 为 `15 ++++++++-------`）。行号是这份工作区文件的行号，用 `cat -n` 现取。
 - 对照：`.claude/agent-common.md`、`.claude/rules/implementation-workflow.md`、`.claude/rules/three-way-inference.md`、`.claude/rules/mutation-sampling.md`、`.claude/agents/*.md`、`.claude/hooks/runner-dispatch-guard.sh` 文件头与实现；需要时现查了 `.claude/gate.d/stage-inputs.tsv`、`.claude/gate.d/57-lkmm.sh`、`research/scripts/stage-must-run.sh`、`.claude/gate.d/stage-owners.tsv`。
-- 时刻：2026-09-27 09:28 UTC（18:28 JST）。
+- 时刻：2026-09-27。
 - 用户原则简称：**P1**「分开实验 统一实现 统一测试」；**P2**「前后没有依赖的同类任务要尽量在同时间进行……将原来散列的串行任务合并为大块任务」；**P3**「多个任务要同时规划写入 完成后一起验证」。
 - 只列问题与读法，不提方案。「后果」一栏里没量过的写了「推的」。
 

@@ -1,4 +1,4 @@
-# 门禁 13 号（.claude/gate.d/13-vague-names.sh）的空泛词表：一个函数名或类型名的每一个词都在这张表里，这个名字就什么都没说，判违规。
+# 门禁 code-source-discipline 的 vague-names 格（.claude/gate.d/code-source-discipline.sh）的空泛词表：一个函数名或类型名的每一个词都在这张表里，这个名字就什么都没说，判违规。
 # 一行一个词，# 后面写为什么空泛。只收「放进任何领域都成立」的词；带领域含义的词（state、count、segment、publish……）不收。
 # 判据是 .claude/singlefs-ai-sop/rules/code-discipline.md「名字：光看名字，就说得出它是什么、做什么」：run_cell 说不出跑的是什么、格是什么。
 run  # 没说跑的是什么

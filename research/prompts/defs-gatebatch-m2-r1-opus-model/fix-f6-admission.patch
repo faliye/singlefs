@@ -1,5 +1,5 @@
---- research/scripts/admission.py	2026-09-26 12:08:55.511374321 +0000
-+++ /tmp/claude-1000/defs-gatebatch-r1-opus/fix/admission.py	2026-09-26 13:16:48.412944951 +0000
+--- research/scripts/admission.py	2026-09-26
++++ /tmp/claude-1000/defs-gatebatch-r1-opus/fix/admission.py	2026-09-26
 @@ -1060,8 +1060,14 @@
      function_form = re.compile(r"\bfn\s+" + re.escape(case.function) + r"\s*\(")
      for relative in files:

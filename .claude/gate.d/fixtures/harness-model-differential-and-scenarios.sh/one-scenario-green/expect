@@ -1,0 +1,5 @@
+exit=0
+want=harness 档 3 条用例都是一条一个场景
+want=harness 用例粒度这一格通过（one-scenario，扫了 1 份 harness 档测试文件
+want=样本只跑 .gate-cells 点名的格：one-scenario
+want=one-scenario：绿

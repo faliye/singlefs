@@ -1,6 +1,6 @@
 # 实 C577 报告：发布返回之前，系统配置轮换之后再加一道屏障
 
-写于 2026-09-27 JST 17:5x。主 agent 在 JST 17:0x 到 17:3x 之间两次改派：第一次，8 份钉值文件归 A3b 善后，我不碰；第二次，第 1 条盘点停下，第 4 条不做，补丁只留 transaction.rs、新测试和变异行。这份报告照第二次改派写。
+写于 2026-09-27。主 agent 途中两次改派：第一次，8 份钉值文件归 A3b 善后，我不碰；第二次，第 1 条盘点停下，第 4 条不做，补丁只留 transaction.rs、新测试和变异行。这份报告照第二次改派写。
 
 ## 结论
 
@@ -25,7 +25,7 @@
  2 files changed, 543 insertions(+), 11 deletions(-)
 ```
 
-- 对主工作区跑 `git apply --check /tmp/claude-1000/impl-c577-barrier/patch/crates.patch`，退出码 0。主工作区的 `transaction.rs` 最后一次改动是 06:56 UTC，在我建副本之前，底座就是它。
+- 对主工作区跑 `git apply --check /tmp/claude-1000/impl-c577-barrier/patch/crates.patch`，退出码 0。主工作区的 `transaction.rs` 最后一次改动在我建副本之前，底座就是它。
 - 补丁目录 `/tmp/claude-1000/impl-c577-barrier/patch/` 下有 `crates.patch`、`mutations-append.tsv` 和 `report.md`（这份报告的拷贝）。
 
 ## 新测试怎么判，证红结果
@@ -153,7 +153,7 @@ apply-check=0
 test result: FAILED. 23 passed; 1 failed; 2 ignored; 0 measured; 0 filtered out; finished in 71.03s
 ```
 
-74 号红的只有 `:1082` 那一条，它在抬 F 之前红在 I-7.4。规格写明它改前就红（主 agent 15:0x 现跑）。这一形 C577 罩不住，见上面「`:1082` 那条的看法」。
+74 号红的只有 `:1082` 那一条，它在抬 F 之前红在 I-7.4。规格写明它改前就红（主 agent 现跑）。这一形 C577 罩不住，见上面「`:1082` 那条的看法」。
 
 ## 没做什么
 

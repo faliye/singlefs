@@ -1,0 +1,144 @@
+        if let Some((newest_system_configuration_journal_tail, units_missing)) =
+            units_of_the_version_missing_on_a_device_behind_it(
+                reader,
+                device,
+                &newest_self_verified,
+                selected_version_journal_position,
+                units,
+            )
+        {
+            devices_without.push(DeviceWithoutTheSelectedVersion {
+                device,
+                lacking:
+                    SelectedVersionLackingOnDevice::BehindTheSelectedVersionAndMissingItsUnits {
+                        newest_system_configuration_journal_tail,
+                        units_missing,
+                    },
+            });
+        }
+    }
+    devices_without
+}
+
+/// 落后支的那一判（可写挂载取号之前逐盘核 [`devices_without_the_selected_version`] 与挂着之后收盘表的入口 [`devices_behind_the_current_version`]
+/// 共用这一份）：`newest_self_verified` 是这块盘两槽里本池自证过、世代号最大的那一份系统配置；它的 (实例代号, journal tail) 不落后于
+/// `version_journal_position`（那一版那次发布末条记录的 jsn）就交回 `None`（跟上了这一版的系统配置轮换，不读它的单元）；落后的再逐个读
+/// `units` 在这块盘上的落点，读不出或字节与验得过的那一份不同就记下，一个都没记下也交回 `None`（只落后、单元都在：根落盘之后、轮换之前崩，
+/// 或只剩一槽自证、那一槽停在上一次轮换）；记下了至少一个才交回 (那份的 tail, 缺的单元)。字节是空的单元（提示与映射都读不出的数据单元，
+/// D19（块指针的结构与宽度预算） 已定项 5）没有验得过的一份可比，跳过。只读盘。
+///
+/// 循环：按 `units`（轮数 = 这一版的单元数），跨轮只往缺的清单里追加，没有提前出口。
+fn units_of_the_version_missing_on_a_device_behind_it<Reader: PoolReader + ?Sized>(
+    reader: &Reader,
+    device: DeviceIdentity,
+    newest_self_verified: &crate::system_configuration::SystemConfiguration,
+    version_journal_position: JournalSequenceNumber,
+    units: &[PublishedUnit],
+) -> Option<(JournalSequenceNumber, Vec<(TransactionUnit, SlotNumber)>)> {
+    let newest_system_configuration_journal_tail = JournalSequenceNumber {
+        instance_generation: newest_self_verified.quantities.journal_instance,
+        counter: newest_self_verified.quantities.journal_tail,
+    };
+    if newest_system_configuration_journal_tail >= version_journal_position {
+        return None;
+    }
+    let units_missing: Vec<(TransactionUnit, SlotNumber)> = units
+        .iter()
+        .filter(|unit| !unit.bytes.is_empty())
+        .filter(|unit| {
+            !reader
+                .read(device, unit.slot.to_device_offset(), unit.bytes.len())
+                .is_some_and(|bytes_on_this_device| bytes_on_this_device == unit.bytes)
+        })
+        .map(|unit| (unit.identity, unit.slot))
+        .collect();
+    (!units_missing.is_empty()).then_some((newest_system_configuration_journal_tail, units_missing))
+}
+
+/// 挂着之后收盘表的入口在「可见」之后逐盘核的落后支（D18（块里携带什么信息） 已定项 11「挂着之后收盘表的每个入口……核三样」的第三样，
+/// 用户 2026-09-27 定；代码三方 m2-closeout-code-r2「同池旧快照的盘经入口洗白」）：交进来的每块盘，两槽里本池自证过、世代号最大的那一份
+/// 系统配置落后于调用方持着的现行那一版（`current` 那次发布的末条记录），又缺它的单元，就记下（[`DeviceBehindTheCurrentVersion`]）；
+/// 判法与可写挂载取号之前逐盘核的落后支同一份（[`units_of_the_version_missing_on_a_device_behind_it`]），「所选那一版」换成现行那一版。
+/// 活的会话里每次发布在系统配置轮换落盘之后才返回（`transaction::CommitStep::RotateSystemConfigurationSlots`），现行那一版的盘都跟得上，
+/// 只有被换成旧快照的盘落后；只剩一槽自证、那一槽停在上一次轮换的盘落后而单元都在，不记（不误拒）。
+/// 一份自证过的都没有的盘不在这里判（「可见」那一判先拒了它，[`devices_without_a_self_verified_system_configuration`]）。
+/// 按交进来的次序交回。只读盘：每块盘读两个系统配置槽，落后的那几块再读现行那一版每个单元的落点。
+///
+/// 循环：按交进来的盘逐块（轮数 = 盘数），跨轮只往交回的清单里追加；外层的提前出口一个：一份自证过的都没有（「可见」那一判的事，看下一块）。
+pub(crate) fn devices_behind_the_current_version<Reader: PoolReader + ?Sized>(
+    reader: &Reader,
+    parameters_of_the_pool: &MakeFilesystemParameters,
+    current: &TransactionOutput,
+) -> Vec<DeviceBehindTheCurrentVersion> {
+    let current_version_journal_position = JournalSequenceNumber {
+        instance_generation: current.record.instance,
+        counter: current.record.counter,
+    };
+    let mut devices_behind = Vec::new();
+    for device in reader.device_identities() {
+        let Some(newest_self_verified) =
+            self_verified_system_configuration_slots_of_the_pool(reader, device, parameters_of_the_pool)
+                .into_iter()
+                .max_by_key(|slot| slot.quantities.slot_generation)
+        else {
+            continue;
+        };
+        if let Some((newest_system_configuration_journal_tail, units_missing)) =
+            units_of_the_version_missing_on_a_device_behind_it(
+                reader,
+                device,
+                &newest_self_verified,
+                current_version_journal_position,
+                &current.units,
+            )
+        {
+            devices_behind.push(DeviceBehindTheCurrentVersion {
+                device,
+                newest_system_configuration_journal_tail,
+                current_version_journal_position,
+                units_missing,
+            });
+        }
+    }
+    devices_behind
+}
+
+/// 交进来的每块盘自证过的系统配置槽（本池的 fsid、整槽校验和过，`recovery::verified_system_configuration_slots`，槽距取本池的固定结构槽距）
+/// 里记的本盘设备号不是盘表给它的身份的各一项（一块盘上同一个号只报一次），按交进来的次序（D18（块里携带什么信息） 已定项 11
+/// 「挂着之后收盘表的每个入口……核三样」的第二样）。可写挂载与挂着之后收盘表的入口经 [`device_table_disagreeing_with`] 调它，
+/// 会话在每次用户改动之前调它（`mounted_session`；代码三方 m2-closeout-code-r2「盘体对调的盘表」：会话此前只比身份次序）。
+/// 一份自证过的都没有的盘不在这里报。调用方先判过盘表里没有重复身份（按身份读盘，重复了读的是哪一块说不清）。读每块盘的两个系统配置槽，不写盘。
+///
+/// 循环：按交进来的盘逐块（轮数 = 盘数），每块读两槽；跨轮只往交回的清单里追加，没有提前出口。
+pub(crate) fn own_device_numbers_on_disk_differing_from_the_identities_handed_in<
+    Reader: PoolReader + ?Sized,
+>(
+    reader: &Reader,
+    parameters_of_the_pool: &MakeFilesystemParameters,
+) -> Vec<OwnDeviceNumberOnDiskDifferingFromTheIdentityHandedIn> {
+    let mut differing = Vec::new();
+    for identity_handed_in in reader.device_identities() {
+        let own_device_numbers_on_disk: BTreeSet<DeviceIdentity> =
+            self_verified_system_configuration_slots_of_the_pool(
+                reader,
+                identity_handed_in,
+                parameters_of_the_pool,
+            )
+            .into_iter()
+            .map(|slot| slot.immutable.this_device)
+            .collect();
+        differing.extend(
+            own_device_numbers_on_disk
+                .into_iter()
+                .filter(|own_device_number_on_disk| *own_device_number_on_disk != identity_handed_in)
+                .map(|own_device_number_on_disk| {
+                    OwnDeviceNumberOnDiskDifferingFromTheIdentityHandedIn {
+                        identity_handed_in,
+                        own_device_number_on_disk,
+                    }
+                }),
+        );
+    }
+    differing
+}
+

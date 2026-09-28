@@ -6,6 +6,11 @@
 #   prove-red.sh --copy <仓副本> [--memory <上限>] <crate> <变异名…>
 #   prove-red.sh --selftest            # 用假的 cargo 走一遍；PROVE_RED_BREAK=<项> 时必须判红
 #
+# 弄坏开关 PROVE_RED_BREAK（只给 --selftest 证明它会红用）：any-target 放过不挑目标的参数、main-allowed 放过主工作区、
+#   layer0-run 不跳过 layer0 目标、baseline-ignored 不看基线红没红、never-caught 一条都不记抓到、
+#   no-should-panic 结果行不认「 - should panic」后缀（#[should_panic] 的用例红了被判成无效或没红）、
+#   error-line-invalid 回到「有一行 error: 就算编不过」（cargo 测试红了也打 error: test failed，点名的没红会被判成无效）。
+#
 # 判法与次序：
 #   ① --copy 必须是一份副本：目录在、里面有 crates/mutations.tsv、不是这份脚本所在的主工作区（在主工作区上改坏源码会波及别的会话）；
 #   ② 逐个找变异名对应的行（六段：名、文件、原文、替换文、cargo test 的参数、必须红的测试名）；找不到、或参数里没有 -p <crate>、
@@ -13,13 +18,22 @@
 #   ③ --test 的目标名字里带 layer0 的跳过、逐条列出（层 0 归提交时的崩溃验证员）；
 #   ④ 每组不同的参数先跑一次基线（不改源码），基线红就停（退 2）；
 #   ⑤ 每条变异：原文在文件里恰好命中一次才改，经 research/scripts/run-with-memory-cap.sh <上限> 跑 cargo test <参数>，
-#      输出里有「test …<必须红的测试名> ... FAILED」算抓到，编译失败算无效，其余算没红；跑完把原文件写回并 touch。
+#      输出里有「test <模块路径::>必须红的测试名 ... FAILED」（#[should_panic] 的用例名字与「 ... 」之间多一段「 - should panic」，同样认）算抓到；
+#      没抓到而编不过（有 error[E…] 行或 could not compile，或有 error: 开头的行而一行 test result: 都没有）算无效，其余算没红；
+#      cargo 测试红了也打 error: test failed，所以有 test result: 的 error: 行不算编不过；跑完把原文件写回并 touch。
 # 每条一行判定打到 stdout（名、结局、日志路径）；日志放 ${PROVE_RED_LOG_DIRECTORY:-<副本>/prove-red-logs}。
 # 退出码：0 点名的每条都抓到（跳过的不算失败，照列）；1 有没红或无效；2 用法错、被拒或基线红；250–254 原样转内存包装的结局。
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 副本路径与主仓不同、或 bindgen 的环境变了，librocksdb-sys 的 C++ 会在基线那一次重编；cc 按 cargo 的并行度开编译器，
+# 32 路一起编 RocksDB 撞过 12G 与 16G 的上限（退 250），6 路编过得去。调用方另给 CARGO_BUILD_JOBS 就照它的。
+export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-6}"
+# CARGO_TARGET_DIR 要给证红自己专用的目录，不与别的编译共用：每条变异改坏源码再还原，还原后的文件 mtime 可能比变异那次编出的产物旧，
+# cargo 就把变异产物当成新的接着用——2026-09-28 在共用目录里另一份副本的测试就跑在了「步数不计数」那条变异的库上。
+# 没给就用副本自己的 target。
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$2/target}"
 python3 /dev/fd/3 "$SCRIPT_DIRECTORY" "$@" 3<<'PY'
 import os, re, shutil, subprocess, sys, tempfile
 
@@ -63,6 +77,22 @@ def layer0_target(row):
     arguments = row[4].split()
     return any(argument == "--test" and index + 1 < len(arguments) and "layer0" in arguments[index + 1]
                for index, argument in enumerate(arguments))
+
+
+def named_test_failed(must_red, text):
+    """libtest 的结果行里点名的测试是 FAILED：`test <模块路径::>名 ... FAILED`，#[should_panic] 的用例是 `test <模块路径::>名 - should panic ... FAILED`。"""
+    suffix = "" if BROKEN == "no-should-panic" else r"(?: - should panic)?"
+    return re.search(r"^test (?:\S*::)?" + re.escape(must_red) + suffix + r" \.\.\. FAILED", text, re.M) is not None
+
+
+def failed_to_compile(text):
+    """替换之后编不过：有 error[E…] 行或 could not compile；或有 error: 开头的行而一行 test result: 都没有（测试进程没跑起来）。
+    cargo 测试红了也打 `error: test failed`，那时有 test result: 行，不算编不过。"""
+    if BROKEN == "error-line-invalid":
+        return re.search(r"^error(?:\[E\d+\])?:", text, re.M) is not None or "could not compile" in text
+    if re.search(r"^error\[E\d+\]:", text, re.M) or "could not compile" in text:
+        return True
+    return re.search(r"^error:", text, re.M) is not None and re.search(r"^test result: ", text, re.M) is None
 
 
 def run_cargo(copy, arguments, memory, log_path, cargo):
@@ -123,9 +153,9 @@ def prove(copy, memory, crate, names, cargo="cargo"):
         if 250 <= code <= 254:
             output.append(f"✗ {name}：内存包装的结局，退出码 {code}（日志 {log_path}）")
             failed = True
-        elif re.search(r"^test (?:\S*::)?" + re.escape(must_red) + r" \.\.\. FAILED", text, re.M) and BROKEN != "never-caught":
+        elif named_test_failed(must_red, text) and BROKEN != "never-caught":
             output.append(f"{name}\t抓到\t{must_red} 红了（日志 {log_path}）")
-        elif re.search(r"^error(?:\[E\d+\])?:", text, re.M) or "could not compile" in text:
+        elif failed_to_compile(text):
             output.append(f"✗ {name}\t无效\t替换之后编不过（日志 {log_path}）")
             failed = True
         else:
@@ -146,13 +176,33 @@ def selftest():
         table = ("# 样本\n"
                  "caught\tcrates/demo/src/lib.rs\t{ 42 }\t{ 41 }\t-p demo --lib -- answer\tanswer_is_42\n"
                  "untargeted\tcrates/demo/src/lib.rs\t{ 42 }\t{ 43 }\t-p demo -- answer\tanswer_is_42\n"
-                 "layer\tcrates/demo/src/lib.rs\t{ 42 }\t{ 44 }\t-p demo --test demo_layer0 -- x\tx\n")
+                 "layer\tcrates/demo/src/lib.rs\t{ 42 }\t{ 44 }\t-p demo --test demo_layer0 -- x\tx\n"
+                 "panics\tcrates/demo/src/lib.rs\t{ 42 }\t{ 45 }\t-p demo --lib -- answer\tanswer_panics\n"
+                 "broken\tcrates/demo/src/lib.rs\t{ 42 }\t{ 46 }\t-p demo --lib -- answer\tanswer_is_42\n"
+                 "elsewhere\tcrates/demo/src/lib.rs\t{ 42 }\t{ 47 }\t-p demo --lib -- answer\tanswer_is_42\n")
         open(os.path.join(copy, "crates", "mutations.tsv"), "w").write(table)
         fake_bin = os.path.join(work, "bin")
         os.makedirs(fake_bin)
         fake_cargo = os.path.join(fake_bin, "cargo")
-        open(fake_cargo, "w").write("#!/usr/bin/env bash\nif grep -q '{ 42 }' crates/demo/src/lib.rs; then echo 'test tests::answer_is_42 ... ok'; exit 0; fi\n"
-                                    "echo 'test tests::answer_is_42 ... FAILED'; exit 101\n")
+        # 假 cargo 照源码里那个数打 libtest / cargo 的原样形态：42 基线全绿；45 是 #[should_panic] 的用例没 panic
+        # （结果行在名字与「 ... 」之间多一段「 - should panic」，cargo 收尾还打一行 error: test failed）；46 替换之后编不过；
+        # 47 点名的测试绿、别的测试红（同样带 error: test failed 与 test result: 行）；别的数照旧只打点名的那一行 FAILED。
+        open(fake_cargo, "w").write(
+            "#!/usr/bin/env bash\n"
+            "case \"$(cat crates/demo/src/lib.rs)\" in\n"
+            "*'{ 42 }'*) printf 'running 2 tests\\ntest tests::answer_is_42 ... ok\\ntest tests::answer_panics - should panic ... ok\\n\\n"
+            "test result: ok. 2 passed; 0 failed; 0 ignored\\n'; exit 0 ;;\n"
+            "*'{ 45 }'*) printf 'running 2 tests\\ntest tests::answer_is_42 ... ok\\ntest tests::answer_panics - should panic ... FAILED\\n\\n"
+            "failures:\\n\\n---- tests::answer_panics stdout ----\\nnote: test did not panic as expected at crates/demo/src/lib.rs:9:5\\n\\n"
+            "failures:\\n    tests::answer_panics\\n\\ntest result: FAILED. 1 passed; 1 failed; 0 ignored\\n\\n"
+            "error: test failed, to rerun pass \\x60-p demo --lib\\x60\\n'; exit 101 ;;\n"
+            "*'{ 46 }'*) printf 'error[E0308]: mismatched types\\n --> crates/demo/src/lib.rs:1:22\\n\\n"
+            "error: could not compile \\x60demo\\x60 (lib test) due to 1 previous error\\n'; exit 101 ;;\n"
+            "*'{ 47 }'*) printf 'running 2 tests\\ntest tests::answer_is_42 ... ok\\ntest tests::answer_panics - should panic ... FAILED\\n\\n"
+            "failures:\\n    tests::answer_panics\\n\\ntest result: FAILED. 1 passed; 1 failed; 0 ignored\\n\\n"
+            "error: test failed, to rerun pass \\x60-p demo --lib\\x60\\n'; exit 101 ;;\n"
+            "*) echo 'test tests::answer_is_42 ... FAILED'; exit 101 ;;\n"
+            "esac\n")
         os.chmod(fake_cargo, 0o755)
         fake_wrapper = os.path.join(work, "wrapper.sh")
         open(fake_wrapper, "w").write("#!/usr/bin/env bash\nshift\nexec \"$@\"\n")
@@ -176,6 +226,18 @@ def selftest():
         checked_cases += 1
         if code != 0 or not any("跳过" in line and "layer0" in line for line in lines):
             failures.append(f"目标带 layer0 的应当跳过并列出，实际 {code} {lines}")
+        code, lines = prove(copy, "1G", "demo", ["panics"], cargo=fake_cargo)
+        checked_cases += 1
+        if code != 0 or not any(line.startswith("panics\t抓到\t") for line in lines):
+            failures.append(f"#[should_panic] 的用例红了（结果行带「 - should panic」、收尾有 error: test failed）应当判抓到、退 0，实际 {code} {lines}")
+        code, lines = prove(copy, "1G", "demo", ["broken"], cargo=fake_cargo)
+        checked_cases += 1
+        if code != 1 or not any(line.startswith("✗ broken\t无效\t") for line in lines):
+            failures.append(f"替换之后编不过（error[E…] 与 could not compile）应当判无效、退 1，实际 {code} {lines}")
+        code, lines = prove(copy, "1G", "demo", ["elsewhere"], cargo=fake_cargo)
+        checked_cases += 1
+        if code != 1 or not any(line.startswith("✗ elsewhere\t没红\t") for line in lines):
+            failures.append(f"编过了、别的测试红而点名的没红（有 error: test failed 也有 test result:）应当判没红、不判无效，实际 {code} {lines}")
         code, lines = prove(MAIN_ROOT, "1G", "demo", ["caught"], cargo=fake_cargo)
         checked_cases += 1
         if code != 2 or not any("主工作区" in line for line in lines):
@@ -183,9 +245,9 @@ def selftest():
         for failure in failures:
             print(f"  ✗ 自检：{failure}")  # gate-lint:detail
         if failures:
-            print("  → 看 prove() / refusal_for() / layer0_target() 的判法；PROVE_RED_BREAK 设着的话这里本来就该红")
+            print("  → 看 prove() / refusal_for() / layer0_target() / named_test_failed() / failed_to_compile() 的判法；PROVE_RED_BREAK 设着的话这里本来就该红")
             return 1
-        print(f"  ✓ prove-red 自检通过：会红的抓到并写回源码，不挑目标的整次拒绝，layer0 目标跳过并列出，主工作区拒绝（查了 {checked_cases} 种）")
+        print(f"  ✓ prove-red 自检通过：会红的抓到并写回源码，should_panic 红了抓到，编不过判无效，别的测试红判没红，不挑目标的整次拒绝，layer0 目标跳过并列出，主工作区拒绝（查了 {checked_cases} 种）")
         return 0
     finally:
         shutil.rmtree(work, ignore_errors=True)

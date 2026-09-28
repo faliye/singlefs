@@ -1,0 +1,9 @@
+exit=0
+want=  item-ref-status：本次未跑
+want=  settled-ref-says-open：本次未跑
+want=  stale-open-items：本次未跑
+want=  settled-same-file：本次未跑
+want=  freeze-layer-membership：本次未跑
+want=  user-verdict-owed：本次未跑
+want=  write-frequency：本次未跑
+want=doc-decisions.sh：14 格里 7 格绿（kb-shape status-redundancy cross-decision-status settled-item-self-open decision-items-sync blocking-verdict decision-summary-width），7 格本次未跑（item-ref-status settled-ref-says-open stale-open-items settled-same-file freeze-layer-membership user-verdict-owed write-frequency）

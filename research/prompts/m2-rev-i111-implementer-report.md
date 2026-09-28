@@ -11,7 +11,7 @@
 
 1. `grep -rn 'I-MAPPING-KEY' crates/` 零命中：
 ```
-$ grep -rn "I-MAPPING-KEY" /home/fy5090/code/singlefs/crates/ ; echo "exit:$?"
+$ grep -rn "I-MAPPING-KEY" crates/ ; echo "exit:$?"
 exit:1
 ```
 2. 三份测试二进制全绿：见下一节「动到的测试二进制」。

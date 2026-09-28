@@ -1,6 +1,6 @@
 # m2-treesplit-r1 云端攻方（Opus）：T1、T4、T6
 
-2026-09-24，时刻都是 UTC。副本 `/tmp/claude-1000/m2-treesplit-opus/repo`，06:00:58 从主工作区拷（`rsync -a --exclude target --exclude .git`），拷完对开工快照 `research/prompts/m2-treesplit-r1-snapshot/sha256sums.txt` 的 61 个文件逐个 `sha256sum -c`，没有一个不符（命令只打印不符的行，输出为空）。**这里所有数都是副本上量的，不是入库装置上的数。**
+2026-09-24。副本 `/tmp/claude-1000/m2-treesplit-opus/repo` 从主工作区拷（`rsync -a --exclude target --exclude .git`），拷完对开工快照 `research/prompts/m2-treesplit-r1-snapshot/sha256sums.txt` 的 61 个文件逐个 `sha256sum -c`，没有一个不符（命令只打印不符的行，输出为空）。**这里所有数都是副本上量的，不是入库装置上的数。**
 
 ## 复跑
 
@@ -311,5 +311,5 @@ t6.out：CutPublish 与 Refuse 同样 0 违例；它比 Refuse 多发 639 次发
 - 没读禁读的 `m2-treesplit-r1-sonnet-output.md`、`m2-treesplit-r1-local-attack*`。
 - 没引别家文件系统的分裂算法，候选全部从本工程条款与实现出发（inode 容器的末尾分裂、D8 已定项 6 的分隔 key 与合并纪律、D18 已定项 2 的 key 区间）。
 - 门禁：`stage-owners.tsv` 里没有登记给 three-way-attack 的阶段（awk 输出为空，退出码 0），没跑门禁。
-- 06:18 起的第一次全格扫描在负载 270–340 下 4 分钟没出一格，我按写死的 pid（1064899、1065036、1065055）停了它、改成缓存前缀池与只扫四个前缀后重跑；那一次没有产物。
+- 第一次全格扫描在负载 270–340 下 4 分钟没出一格，我按写死的 pid（1064899、1065036、1065055）停了它、改成缓存前缀池与只扫四个前缀后重跑；那一次没有产物。
 - 副本 `/tmp/claude-1000/m2-treesplit-opus/`（repo、target、out、logs）留着没删；入库的只有模型目录里那九个文件。

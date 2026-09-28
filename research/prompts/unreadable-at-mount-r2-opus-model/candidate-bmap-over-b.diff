@@ -1,0 +1,14 @@
+--- b/crates/singlefs-core/src/mount.rs	2026-09-28 08:24:39.925233603 +0000
++++ bmap/crates/singlefs-core/src/mount.rs	2026-09-28 08:57:46.320183771 +0000
+@@ -1336,9 +1336,8 @@
+     unit_area_start: UnitAreaStart,
+     root: &RootRecord,
+ ) -> Option<Vec<(DeviceIdentity, crate::address::SlotNumber, u64)>> {
+-    if crate::recovery::tree_table_entry_count(devices, root).ok()? == 0 {
+-        return None;
+-    }
++    // 攻方腿的放宽「(b)-从映射现算」（unreadable-at-mount-r2，被攻过零轮）：不读树表，树表自己的落点取根记录里那条指针；
++    // 映射根是空指针（mkfs 第 0 代、树表 0 条的一版）时读映射树失败，照 (a)。
+     let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
+     let mapping_tree = crate::code_two_tree::read_code_two_tree(
+         &root.mapping_root,

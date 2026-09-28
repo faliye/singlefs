@@ -1,7 +1,7 @@
 # governance-defs-r2 云端攻方（Opus）报告
 
 攻击面：G1、G2、G3 为主，G4、G5 余力（背景材料第四节分工表「云端攻方」一行）。前几轮判决：`research/prompts/governance-defs-r1-main-verification.md`，这一轮不重复它 A1–A10 的角度。
-开工 2026-09-26 15:15 UTC 核过快照：`sha256sum -c research/prompts/governance-defs-r2-snapshot/sha256sums.txt` 42 行无一不符。负载：开跑前 `ps -o pid,args -u "$(id -u)"` 里没有 cargo、gate.sh、qemu、fio、vm-bench。
+开工 2026-09-27 核过快照：`sha256sum -c research/prompts/governance-defs-r2-snapshot/sha256sums.txt` 42 行无一不符。负载：开跑前 `ps -o pid,args -u "$(id -u)"` 里没有 cargo、gate.sh、qemu、fio、vm-bench。
 没跑任何重型测试；钩子的判定全用合成的 PreToolUse JSON 喂真钩子，59 号与 `mutate.sh` 的判档逻辑从今天的源文件里按锚点行现抽再喂合成输出。
 
 ## 复跑
@@ -282,7 +282,7 @@ gate-triage--pre-change-row-copied	rc=2	✗ 派 gate-triage 的提示要它跑�
 
 被判的句子：`.claude/agents/experiment-designer.md:28`（第 2 步）「占号之后定一个英文名……写在登记 `## 一、问题` 的第一行「英文名：…」……重跑登记照抄原登记的英文名」；`.claude/agents/experiment-runner.md:27`「源文件、变异表与 bin 名一律用跑前登记 `## 一、问题` 第一行定的英文名」。
 
-现查（2026-09-26 15:29 UTC 前后）：`ls research/prompts/e*-preregistration.md research/prompts/e*-r*-prereg.md | wc -l` → `16`；其中含「英文名」三个字的 `grep -l '英文名' … | wc -l` → `0`。已归档的更早登记同一时期写成，同样没有这一行（没逐份翻 git，推的）。
+现查（2026-09-27）：`ls research/prompts/e*-preregistration.md research/prompts/e*-r*-prereg.md | wc -l` → `16`；其中含「英文名」三个字的 `grep -l '英文名' … | wc -l` → `0`。已归档的更早登记同一时期写成，同样没有这一行（没逐份翻 git，推的）。
 
 历史：主 agent 要重跑 E156（入库装置 `crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs`），派设计员写 `e156-r4-prereg.md`。设计员照第 2 步去原登记 `research/prompts/e156-preregistration.md` 抄英文名——没有；定义没给出路。它自己起一个（例 `alloc_basis_counts`）写进第一行，执行员照第 2 步「一律用……第一行定的英文名」就会去写 `e156_alloc_basis_counts.rs`、`e156_alloc_basis_counts.tsv`，与已入库的源文件名、`replay.sh` 里 `driver_e156` 调的 `--bin e156_allocation_basis_counts` 对不上。
 
@@ -300,7 +300,7 @@ gate-triage--pre-change-row-copied	rc=2	✗ 派 gate-triage 的提示要它跑�
 
 ### B7：「腿开工时刻」没人被要求记；少了它，「文件不在清单里」那一支落 ✗
 
-- 被判的句子：`.claude/agents/three-way-verifier.md:22`「腿开工时刻（UTC）……没给就不查那一支，照实写没查。」与第 2 步（第 28 行）「给了快照、而这个文件不在清单里的，对主树核，并用 `git log --since=<腿开工时刻> -- <文件>` 与 `git status --short -- <文件>` 现查……」。
+- 被判的句子：`.claude/agents/three-way-verifier.md:22`「腿开工时刻……没给就不查那一支，照实写没查。」与第 2 步（第 28 行）「给了快照、而这个文件不在清单里的，对主树核，并用 `git log --since=<腿开工时刻> -- <文件>` 与 `git status --short -- <文件>` 现查……」。
 - 谁给：`grep -n '开工时刻' .claude/main-agent.md .claude/rules/implementation-workflow.md .claude/rules/three-way-inference.md` 零命中；implementation-workflow.md「代码轮派腿之前记一份开工快照」只要求记 `sha256sum` 快照，不要求记时刻。
 - 四种情形各走哪一支：给了快照且在清单里、对得上 ⇒ 主树；对不上 ⇒ 倒推副本，没有就「分不清」；给了快照、不在清单里 ⇒ 主树 + 现查改没改（要开工时刻）；没给快照 ⇒ 代码轮停下要、设计轮对主树核、对不上记「分不清」。每种都有一支，没有落进两支的。
 - 缝在这里：给了快照、文件不在清单里、主 agent 没给开工时刻、内容与腿抄的对不上——「现查」那一半不做，剩下的是第 2 步「对不上时再找原文实际在第几行」，落 ✗；同一处引用若这一轮根本没给快照，落「分不清」。给了快照反而更严。这一轮就是例子：`.claude/scripts/lkmm.sh`、`57-lkmm.sh`、`55-qemu-first-transaction.sh`、`87-replay.sh` 我都引了，都不在这一轮的快照清单里（`grep -qF` 逐个核过）。

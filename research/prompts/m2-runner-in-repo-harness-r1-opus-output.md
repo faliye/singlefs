@@ -1,6 +1,6 @@
 # m2-runner-in-repo-harness-r1 云端攻方（Opus）报告：W1
 
-腿：云端攻方（Opus），分到 W1（入库装置与「不与实现共用代码」）。写于 2026-09-23 02:50 UTC（JST 11:50）。
+腿：云端攻方（Opus），分到 W1（入库装置与「不与实现共用代码」）。写于 2026-09-23。
 开工快照 `research/prompts/m2-runner-in-repo-harness-r1-snapshot/opening.sha256` 四个文件全部 `OK`（本次 `sha256sum -c` 现跑）。
 
 ## 各格判定一览
@@ -14,7 +14,7 @@
 
 ## 复跑
 
-仓副本 `/tmp/claude-1000/runner-harness-opus/repo`（`rsync -a --exclude target --exclude .git`，2026-09-23 02:30 UTC 取），两个变异点跑完已逐字节还原（`diff` 与工作区相同，本次现跑）。
+仓副本 `/tmp/claude-1000/runner-harness-opus/repo`（`rsync -a --exclude target --exclude .git`，2026-09-23 取），两个变异点跑完已逐字节还原（`diff` 与工作区相同，本次现跑）。
 副本上量出的数不入库，下面所有数都标着是副本上的。
 
 ```

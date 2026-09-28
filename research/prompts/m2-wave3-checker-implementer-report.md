@@ -1,18 +1,18 @@
 # 实现员交回：checker 这一批（收口表第 44 行 I-3.10、第 48 行 C504、第 54 行候选 b）
 
-接手的是撞会话额度中断的那一位（交接摘要 `/tmp/claude-1000/impl-checker-batch/handover.md`）。它已落盘的改动没有重做：副本先同步到主工作区 2026-09-23 22:13 UTC 的现状（`crates/` 与 `.claude/` 都同步了，HEAD 同为 3b60f09），再把它的补丁重放上去，全部复核一遍；这之后只改了两处名字（见「接手之后改了什么」），另外补了 5 行变异。22:56 主工作区又变了一批（`crates/mutations.tsv` 末尾多 7 行、`crash.rs`、`bad_disk_input.rs`、`first_transaction_step_seven_layer0.rs`、`second_transaction_step_zero_layer0.rs` 等 9 份改了、新增一份 `second_transaction_step_three_acquisition_barrier_layer0.rs`），22:57 再同步一次、补丁照样重放无冲突，check.sh、门禁 54 号全量加快档、59 号本批 18 行、登记给我的几个阶段、C504 复核都在 22:57 这一版上重跑了一遍（第八节「22:57 那一版上的复跑」）；第四节逐条证明会红那一轮是 22:13 那一版上跑的。时刻都是 UTC。
+接手的是撞会话额度中断的那一位（交接摘要 `/tmp/claude-1000/impl-checker-batch/handover.md`）。它已落盘的改动没有重做：副本先同步到主工作区 2026-09-24 的现状（`crates/` 与 `.claude/` 都同步了，HEAD 同为 3b60f09），再把它的补丁重放上去，全部复核一遍；这之后只改了两处名字（见「接手之后改了什么」），另外补了 5 行变异。之后主工作区又变了一批（`crates/mutations.tsv` 末尾多 7 行、`crash.rs`、`bad_disk_input.rs`、`first_transaction_step_seven_layer0.rs`、`second_transaction_step_zero_layer0.rs` 等 9 份改了、新增一份 `second_transaction_step_three_acquisition_barrier_layer0.rs`），再同步一次、补丁照样重放无冲突，check.sh、门禁 54 号全量加快档、59 号本批 18 行、登记给我的几个阶段、C504 复核都在第二次同步那一版上重跑了一遍（第八节「第二次同步那一版上的复跑」）；第四节逐条证明会红那一轮是第一次同步那一版上跑的。
 
 ## 一、三件逐条
 
 | 件 | 做到没有 | 依据 |
 |---|---|---|
 | 第 44 行 I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号） | **做成套**：池级 checker 判定、只红它的坏镜像、射程 ③ 的用例、8 行变异（第四节第 1–4、14–17 行） | 实现 `crates/singlefs-checker/src/walk.rs` 第 1557 行 `birth_txg_in_a_usable_unit_header`、第 1577 行 `allocation_record_node_pointers_of_the_candidate_versions`、第 1623 行 `judge_allocation_generations_against_unit_births`，第 2936 行接进 `check_pool_image`；`image.rs` 第 37 行 `IMPLEMENTED_INVARIANTS` 39 → 40 条。坏镜像 `checker_known_bad_images.rs` 第 2252 行 `known_bad_images_of_the_allocation_generation`（发布 B 之后 B 的数据单元两盘各一条未释放记录，分配代 4 改回 3，单元不动），用例第 2281 行只红 I-3.10、其余逐项与干净镜像相同 |
-| 第 48 行 C504（树表条目宽在走读里无守卫，今天没坏法打得到） | **这一批开工前主工作区里已经有了，本批没改一行**，只在同步后的副本上复核 | 守卫在 `walk.rs` 第 522 行（`walk_tree_table_entry` 第一步，两处切片之前）；坏法 `crates/singlefs-harness/src/bad_disk_input.rs` 的 `narrow_the_entry_width_of_the_tree_table_unit`；用例 `second_transaction_supplement_three_bad_disk_input.rs` 第 576 行；变异 `crates/mutations.tsv` 第 300 行。这几处都是主工作区未提交的改动（`bad_disk_input.rs` 未跟踪），开工快照 16:28 里就有，是谁改的我查不到。复核结果见第八节「C504 复核」 |
+| 第 48 行 C504（树表条目宽在走读里无守卫，今天没坏法打得到） | **这一批开工前主工作区里已经有了，本批没改一行**，只在同步后的副本上复核 | 守卫在 `walk.rs` 第 522 行（`walk_tree_table_entry` 第一步，两处切片之前）；坏法 `crates/singlefs-harness/src/bad_disk_input.rs` 的 `narrow_the_entry_width_of_the_tree_table_unit`；用例 `second_transaction_supplement_three_bad_disk_input.rs` 第 576 行；变异 `crates/mutations.tsv` 第 300 行。这几处都是主工作区未提交的改动（`bad_disk_input.rs` 未跟踪），开工快照里就有，是谁改的我查不到。复核结果见第八节「C504 复核」 |
 | 第 54 行候选 b（候选集并集补上「由记录施加出来、根槽从没落盘的那一版」） | **做到**：两半验收都有用例 | 实现 `walk.rs` 第 2577 行 `VersionAppliedOnlyByRecords`、第 2610 行 `versions_applied_only_by_records`（四条同时成立才算一版，见第五节）、第 441 行 `walk_version_applied_only_by_records`、第 2854 行起并进遍历并按版本各判一格 I-7.4 / I-4.8；I-3.1 机理标识加一段「并进遍历的由记录施加出来的版本 N 个」（第 3019 行）。残留记录那条流：`second_transaction_step_zero_layer0.rs` 的钉死值从 `[("I-3.1", 12)]` 改成 `[]`，同步后的副本上绿；纯泄漏两份坏镜像（Z3-A、Z3-B）与仓里原有那份 I-3.1 坏镜像照样只红 I-3.1 |
 
 ## 二、写过的文件
 
-补丁 `/tmp/claude-1000/impl-checker-batch/checker.patch` 只含下面 6 份（全部在 `crates/`，没碰 `litmus/`；相对主工作区 22:57 的现状生成。其中 `first_transaction_step_seven_layer0.rs`、`second_transaction_step_zero_layer0.rs` 两份主工作区 22:56 也改过，改的是别的段落，补丁的增删行与 22:13 那一版逐行相同，只是上下文与行号偏了）：
+补丁 `/tmp/claude-1000/impl-checker-batch/checker.patch` 只含下面 6 份（全部在 `crates/`，没碰 `litmus/`；相对主工作区第二次同步时的现状生成。其中 `first_transaction_step_seven_layer0.rs`、`second_transaction_step_zero_layer0.rs` 两份主工作区在两次同步之间也改过，改的是别的段落，补丁的增删行与第一次同步那一版逐行相同，只是上下文与行号偏了）：
 
 ```
 $ git apply --numstat checker.patch   （在主工作区跑）
@@ -41,7 +41,7 @@ $ git apply --numstat checker.patch   （在主工作区跑）
 
 ## 四、每条新测试怎么证明会红
 
-做法：副本 `drafts/prove/repo`（同步到主工作区现状 + 补丁，自带 target）里逐条改坏一处，跑点名测试所在的**整个**测试二进制（`--no-fail-fast`、不加过滤），记红了哪些测试，跑完从原件拷回并 `touch`；每个涉及的二进制先在不改动的副本上跑一遍当基线。脚本 `drafts/scripts/prove_red.py`，结果 `drafts/prove2/prove-results.tsv`，每条的整段输出 `drafts/prove2/prove-red-logs/row-N.log`。三个二进制（`checker_known_bad_images`、`second_transaction_step_zero_layer0`、`second_transaction_step_three_formatted_pool`）的**基线红集都是空的**。`crates/singlefs-checker/src/` 里没有 `debug_assert`（`grep -c` 三份文件都是 0），红的都是测试自己的断言。跑于 22:19–22:38。
+做法：副本 `drafts/prove/repo`（同步到主工作区现状 + 补丁，自带 target）里逐条改坏一处，跑点名测试所在的**整个**测试二进制（`--no-fail-fast`、不加过滤），记红了哪些测试，跑完从原件拷回并 `touch`；每个涉及的二进制先在不改动的副本上跑一遍当基线。脚本 `drafts/scripts/prove_red.py`，结果 `drafts/prove2/prove-results.tsv`，每条的整段输出 `drafts/prove2/prove-red-logs/row-N.log`。三个二进制（`checker_known_bad_images`、`second_transaction_step_zero_layer0`、`second_transaction_step_three_formatted_pool`）的**基线红集都是空的**。`crates/singlefs-checker/src/` 里没有 `debug_assert`（`grep -c` 三份文件都是 0），红的都是测试自己的断言。
 
 「行号」是补丁之后 `walk.rs` 里被改的那一行；「断言」是点名那条测试红在哪一行、消息开头；「同红」是同一个二进制里一起红的测试条数（含点名那条）。
 
@@ -132,7 +132,7 @@ I-7.4（近 K 代块未被复用）、I-4.8（近 K 代根校验和自洽） 两
 
 ## 八、check.sh 与门禁
 
-开跑前 `ps` 看过：没有 `qemu-system`、`vm-bench.sh`、`e152-file-system-benchmark`、`fio`；别的会话的 `cargo test --all`、`cargo test --release --bin e142-first-txn-dry-run` 与另一个实现员的批跑一直在，负载 22:42 时 154（32 核）。本批每一份副本各用自己的 target，没有等锁。
+开跑前 `ps` 看过：没有 `qemu-system`、`vm-bench.sh`、`e152-file-system-benchmark`、`fio`；别的会话的 `cargo test --all`、`cargo test --release --bin e142-first-txn-dry-run` 与另一个实现员的批跑一直在，负载一度 154（32 核）。本批每一份副本各用自己的 target，没有等锁。
 
 **check.sh，在副本 `repo`（主工作区现状 + 补丁）上原样跑**：`exit 1`，停在第一步，末尾原样：
 
@@ -144,7 +144,7 @@ I-7.4（近 K 代块未被复用）、I-4.8（近 K 代根校验和自洽） 两
 
 没排版的只有两份：`crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs`（83 处）与 `e158_root_choice_repair.rs`（32 处），都是主工作区里别的会话未跟踪的实验 bin，不在补丁里。补丁那 6 份 `cargo fmt --check` 不报。
 
-为了让后几步跑得到，另起副本 `drafts/checkcopy/repo`：先只对那两份跑 `rustfmt`，clippy 又在它们身上红（e158 两处 `#[allow]` 没写 reason、一处 items after test module、一处 `ok` 同名遮蔽；e156 一处 `mounted` 同名遮蔽，共 5 处，全在这两份里），于是把这两份挪出去（`drafts/checkcopy/removed-bins/`）再跑。22:15–22:26，`exit 0`，四步原样：
+为了让后几步跑得到，另起副本 `drafts/checkcopy/repo`：先只对那两份跑 `rustfmt`，clippy 又在它们身上红（e158 两处 `#[allow]` 没写 reason、一处 items after test module、一处 `ok` 同名遮蔽；e156 一处 `mounted` 同名遮蔽，共 5 处，全在这两份里），于是把这两份挪出去（`drafts/checkcopy/removed-bins/`）再跑。`exit 0`，四步原样：
 
 ```
 ══ cargo fmt --check ══
@@ -171,7 +171,7 @@ I-7.4（近 K 代块未被复用）、I-4.8（近 K 代根校验和自洽） 两
 | 89-closeout-row27-preconditions.sh | **77（本次未跑，不是通过）** | `      alloc-basis 第三轮 ③：扣住配今天的 checker 放过「扣住位被撤掉」那份坏镜像：扣住位只住内存、盘上没有落点，没有可扫的对象` |
 | 12-no-prime-marks.sh（不归我，因为改了名字顺手跑） | 0 | `     没扫的：二进制 7 份；上游副本 .claude/singlefs-ai-sop/ 下 0 份（只能在上游改）`（上一行是「✓ 查了 1963 份文本文件，没有角标写法」，行尾括号里列着那五个字符，这里不抄） |
 
-**门禁 59 号，只跑本批 18 行**（副本 `drafts/gate59b/repo`，`crates/mutations.tsv` 只留这 18 行，`SINGLEFS_GATE_FULL=1 GATE_MUTATION_WORKERS=4`，22:38:45–22:40:21，`exit 0`），末行原样：
+**门禁 59 号，只跑本批 18 行**（副本 `drafts/gate59b/repo`，`crates/mutations.tsv` 只留这 18 行，`SINGLEFS_GATE_FULL=1 GATE_MUTATION_WORKERS=4`，`exit 0`），末行原样：
 
 ```
   ✓ crates 变异表复跑：18 条变异各自红在点名的测试上（原文都恰好命中一次；工作进程动态领活——谁先跑完谁再领下一条，不按条数预先切片；输出按表的行号排序、与进程数无关）
@@ -179,18 +179,18 @@ I-7.4（近 K 代块未被复用）、I-4.8（近 K 代根校验和自洽） 两
 
 前 18 行逐条「✓ <变异名>：<测试名> 红了」，全文 `drafts/gate59b/gate59.log`。
 
-**门禁 54 号**，在 `drafts/gatecopy/repo` 上先跑 `--full`（22:27:21–22:55:37，`exit 0`）再跑快档（`SINGLEFS_GATE_FULL=1`，`exit 0`）。快档的判定行原样：
+**门禁 54 号**，在 `drafts/gatecopy/repo` 上先跑 `--full`（`exit 0`）再跑快档（`SINGLEFS_GATE_FULL=1`，`exit 0`）。快档的判定行原样：
 
 ```
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 8 条通过、1 条 ignored
-  ✓ 全绿标记与这批输入的内容哈希相同（9a11ec66942f21c9…，93 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T22:55:37Z，标记里的计数行原样：
+  ✓ 全绿标记与这批输入的内容哈希相同（9a11ec66942f21c9…，93 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
 ```
 
 全量两条流都 `violations=0`、`checker_violations=0`、`exhaustive=true`；I-3.10 在第一个事务那条流 `I-3.10=4/0`，两次发布那条流 `I-3.10=1842252/0/262161`（评估过 / 违例 / 不适用；不适用的 262161 个与 I-3.1、I-5.4 同数，是最新根下面还没有分配记录树的那些状态）。全文 `drafts/gatecopy/gate54-full.log`、`gate54-quick.log`。这份全绿标记写在副本自己的 `.git` 里，输入哈希含追加了 18 行的变异表，与主工作区对不上，主工作区的 54 号要主 agent 收尾时自己跑。
 
-**C504 复核**（主表第 300 行，副本 `drafts/prove/repo`，22:13 那一版，22:40–22:46；22:57 那一版上的复跑见本节末尾）：基线上 `second_transaction_supplement_three_bad_disk_input` 9 passed、1 ignored，「清单外的 panic 0 次」；把守卫那一步改成 `if false && …` 之后同一二进制红 3 条，`bad_disk_inputs_never_read_back_an_uncommitted_version_and_panic_only_at_known_sites` 红在 `second_transaction_supplement_three_bad_disk_input.rs:168`（left 11 / right 0，「清单外的 panic 11 次」，都在 `crates/singlefs-checker/src/lib.rs:154`：range start index 10 out of range for slice of length 8），`a_tree_table_narrower_than_a_registered_entry_…` 红在同文件第 598 行。C504「怎么拦」列要的判别力自证（panic 计数由 0 变正）在主工作区现状上成立。
+**C504 复核**（主表第 300 行，副本 `drafts/prove/repo`，第一次同步那一版；第二次同步那一版上的复跑见本节末尾）：基线上 `second_transaction_supplement_three_bad_disk_input` 9 passed、1 ignored，「清单外的 panic 0 次」；把守卫那一步改成 `if false && …` 之后同一二进制红 3 条，`bad_disk_inputs_never_read_back_an_uncommitted_version_and_panic_only_at_known_sites` 红在 `second_transaction_supplement_three_bad_disk_input.rs:168`（left 11 / right 0，「清单外的 panic 11 次」，都在 `crates/singlefs-checker/src/lib.rs:154`：range start index 10 out of range for slice of length 8），`a_tree_table_narrower_than_a_registered_entry_…` 红在同文件第 598 行。C504「怎么拦」列要的判别力自证（panic 计数由 0 变正）在主工作区现状上成立。
 
-**门禁 74 号**（登记给实现员，`drafts/gatecopy/repo`，22:55:52–22:56:17，`exit 0`），末行原样：
+**门禁 74 号**（登记给实现员，`drafts/gatecopy/repo`，`exit 0`），末行原样：
 
 ```
       随机历史：小盘上逼近单元区墙的取样点：模型对拍 4713 步：该拒而拒 643、区间里拒 329、该成而成 3741；比过根 4325 条、分配记录 77196 条、冷启动内容 59 次、抬 F 上限 167 次；回退到 txg = F_生效 > 0 的根做成 0 次；分配记录墙按镜像上的真条数放行 0 次；单元区墙按区间放行 310 次
@@ -198,22 +198,22 @@ I-7.4（近 K 代块未被复用）、I-4.8（近 K 代根校验和自洽） 两
 
 首行是「✓ 模型对拍每一段都判过、实现与模型没有对不上的（查了 5 段）：」，全文 `drafts/gatecopy/gate74.log`。
 
-**22:57 那一版上的复跑**（主工作区 22:56 又变了一批之后，副本重新同步、补丁重放，下面每一样都在这一版上重跑）：
+**第二次同步那一版上的复跑**（主工作区又变了一批之后，副本重新同步、补丁重放，下面每一样都在这一版上重跑）：
 
-| 跑了什么 | 时段 | 结果 |
-|---|---|---|
-| check.sh 原样（`repo`） | 23:19 前后 | `exit 1`，末尾三行与上面逐字相同（`✗ 格式不合规`，仍卡在 e156、e158 两份上：83 处、32 处） |
-| check.sh（`checkcopy`，挪走 e156、e158） | 22:58:25–23:18:30 | `exit 0`，四步 `✓ 格式通过`、`✓ clippy 通过`、`✓ 构建通过`、`✓ 单测通过`；`test result` 51 行全是 ok；`checker_known_bad_images` 22 passed、`second_transaction_step_zero_layer0` 8 passed 1 ignored、`second_transaction_step_three_formatted_pool` 10 passed、`first_transaction_step_seven_layer0` 5 passed 1 ignored、`second_transaction_supplement_three_bad_disk_input` 9 passed 1 ignored、`second_transaction_supplement_three_random_history` 18 passed 2 ignored |
-| 门禁 54 号 `--full` 再快档（`gatecopy`） | 22:58:32–23:15:59 | 两次都 `exit 0`；全量两条流 `states=262165 closed_form=262165`、`states=2104413 closed_form=2104413`，`violations=0`、`checker_violations=0`、`exhaustive=true`，I-3.10 仍是 `4/0` 与 `1842252/0/262161`；快档首行与上面逐字相同，第二行是「✓ 全绿标记与这批输入的内容哈希相同（6ac97033d5b71e01…，94 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:15:44Z，标记里的计数行原样：」 |
-| 门禁 12、33、53、92、93、94、89、74 号（`gatecopy`） | 23:15:59–23:16:59 | 退出码依次 0、0、0、0、0、0、77、0；12、53、92、93、94 号末行与上面逐字相同；33 号末行只差条数：「crates/mutations.tsv 355 条的原文各命中源码一次」；74 号末行与上面逐字相同 |
-| 门禁 59 号，本批 18 行（`gate59b`） | 22:58:38–23:01:12 | `exit 0`，末行与上面逐字相同（「18 条变异各自红在点名的测试上」） |
-| C504 复核（主表第 300 行，`prove`） | 23:18:58–23:19:51 | 基线 9 passed、1 ignored、「清单外的 panic 0 次」；守卫去掉之后红 3 条：`second_transaction_supplement_three_bad_disk_input.rs:204`（left 11 / right 0，「清单外的 panic 11 次」，`crates/singlefs-checker/src/lib.rs:154`：range start index 10 out of range for slice of length 8）、第 634 行、第 446 行 |
+| 跑了什么 | 结果 |
+|---|---|
+| check.sh 原样（`repo`） | `exit 1`，末尾三行与上面逐字相同（`✗ 格式不合规`，仍卡在 e156、e158 两份上：83 处、32 处） |
+| check.sh（`checkcopy`，挪走 e156、e158） | `exit 0`，四步 `✓ 格式通过`、`✓ clippy 通过`、`✓ 构建通过`、`✓ 单测通过`；`test result` 51 行全是 ok；`checker_known_bad_images` 22 passed、`second_transaction_step_zero_layer0` 8 passed 1 ignored、`second_transaction_step_three_formatted_pool` 10 passed、`first_transaction_step_seven_layer0` 5 passed 1 ignored、`second_transaction_supplement_three_bad_disk_input` 9 passed 1 ignored、`second_transaction_supplement_three_random_history` 18 passed 2 ignored |
+| 门禁 54 号 `--full` 再快档（`gatecopy`） | 两次都 `exit 0`；全量两条流 `states=262165 closed_form=262165`、`states=2104413 closed_form=2104413`，`violations=0`、`checker_violations=0`、`exhaustive=true`，I-3.10 仍是 `4/0` 与 `1842252/0/262161`；快档首行与上面逐字相同，第二行是「✓ 全绿标记与这批输入的内容哈希相同（6ac97033d5b71e01…，94 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24，标记里的计数行原样：」 |
+| 门禁 12、33、53、92、93、94、89、74 号（`gatecopy`） | 退出码依次 0、0、0、0、0、0、77、0；12、53、92、93、94 号末行与上面逐字相同；33 号末行只差条数：「crates/mutations.tsv 355 条的原文各命中源码一次」；74 号末行与上面逐字相同 |
+| 门禁 59 号，本批 18 行（`gate59b`） | `exit 0`，末行与上面逐字相同（「18 条变异各自红在点名的测试上」） |
+| C504 复核（主表第 300 行，`prove`） | 基线 9 passed、1 ignored、「清单外的 panic 0 次」；守卫去掉之后红 3 条：`second_transaction_supplement_three_bad_disk_input.rs:204`（left 11 / right 0，「清单外的 panic 11 次」，`crates/singlefs-checker/src/lib.rs:154`：range start index 10 out of range for slice of length 8）、第 634 行、第 446 行 |
 
-第四节那 18 行逐条跑整个二进制的证明没有在 22:57 这一版上重跑；59 号在这一版上把 18 行各自点名的测试都判红了。
+第四节那 18 行逐条跑整个二进制的证明没有在第二次同步那一版上重跑；59 号在这一版上把 18 行各自点名的测试都判红了。
 
 ## 九、补丁对主工作区现状的 `git apply --check`
 
-`checker.patch` 定稿之后在主工作区跑，2026-09-23 23:21:12 UTC，原样：
+`checker.patch` 定稿之后在主工作区跑，2026-09-24，原样：
 
 ```
 Checking patch crates/singlefs-checker/src/image.rs...
@@ -225,14 +225,14 @@ Checking patch crates/singlefs-harness/tests/second_transaction_step_zero_layer0
 apply-check exit 0
 ```
 
-`mutations-append.tsv` 18 行的锚点在「主工作区现状 + 补丁」上各命中一次（`drafts/scripts/check_anchors.py`，「核完，不是恰好一次的 0 行」）；主表 22:57 那一版的 342 行在同一份树上也都恰好一次。补丁与变异表里角标字符 0 个（`grep -cP` 数的）。
+`mutations-append.tsv` 18 行的锚点在「主工作区现状 + 补丁」上各命中一次（`drafts/scripts/check_anchors.py`，「核完，不是恰好一次的 0 行」）；主表第二次同步那一版的 342 行在同一份树上也都恰好一次。补丁与变异表里角标字符 0 个（`grep -cP` 数的）。
 
 ```
 3e8e99daf65c5350d0041851e20de5bebead15c5d4ba830105a9825eea7116cc  /tmp/claude-1000/impl-checker-batch/checker.patch
 5be561c8d819ebe55c3f754110078659161ce3a71c0f6b8e4f14b596b667f78f  /tmp/claude-1000/impl-checker-batch/mutations-append.tsv
 ```
 
-推翻条件：主工作区在 23:21 之后再动这 6 份文件里补丁碰到的那几段，`git apply --check` 会失败，要重放；动 `walk.rs` 里变异表那 18 行锚点所在的行，锚点会失配（门禁 33 号先红）。
+推翻条件：主工作区在交回之后再动这 6 份文件里补丁碰到的那几段，`git apply --check` 会失败，要重放；动 `walk.rs` 里变异表那 18 行锚点所在的行，锚点会失配（门禁 33 号先红）。
 
 ## 十、没做什么
 

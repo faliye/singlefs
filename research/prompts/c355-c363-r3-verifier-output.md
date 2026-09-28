@@ -18,7 +18,7 @@ $ awk 'NR==127' /tmp/claude-1000/c355-r3-verifier/selftest/03-空间分配.md
 
 ## 快照核对
 
-输入给的快照 `research/prompts/c355-c363-r3-snapshot/sha256sums.txt`（2026-09-23 20:35 JST 记）。对当前工作区重算全部 13 个文件的 sha256：
+输入给的快照 `research/prompts/c355-c363-r3-snapshot/sha256sums.txt`（2026-09-23 记）。对当前工作区重算全部 13 个文件的 sha256：
 
 - 与快照**一致**（9 个）：`.claude/kb/decisions/28-挂载期承诺量.md`、`.claude/kb/decisions/05-快照-空间记账机制.md`、`.claude/kb/decisions/03-空间分配.md`、`.claude/kb/decisions/16-发布语义.md`、`.claude/kb/decisions/02-RAID条带策略.md`、`.claude/gate.d/51-admission-terms-covered.sh`、`crates/singlefs-core/src/allocator.rs`、`crates/singlefs-core/src/transaction.rs`、`crates/singlefs-harness/src/model.rs`、`research/prompts/_c355-c363-r3-body.md`。
 - 与快照**不一致**（3 个，与主 agent 给的清单一致）：`.claude/kb/checks-owed.md`、`.claude/kb/invariants.md`、`crates/singlefs-core/src/mount.rs`。
@@ -212,7 +212,7 @@ $ ./w2_count --mutate-split-pays-no-fixed-point ; exit=101（断言 panic）
 
 ## W2 复跑：全量 copy-probe（`run.sh` 全部，在本核查员草稿目录独立重跑，非腿的原目录）
 
-命令：`nice -n 19 bash /tmp/claude-1000/c355-r3-verifier/opus-model/run.sh /home/fy5090/code/singlefs /tmp/claude-1000/c355-r3-verifier/opus-rerun-draft /tmp/claude-1000/c355-r3-verifier/opus-rerun-output`（模型目录先整份拷进草稿目录，`$SRC` 指向入库仓只读 rsync 源，`$DRAFT`/`$OUT` 全部落在本核查员自己的草稿目录，退出码 0，两处 `patch` 均无 fuzz/reject 干净应用）。
+命令：`nice -n 19 bash /tmp/claude-1000/c355-r3-verifier/opus-model/run.sh <仓根> /tmp/claude-1000/c355-r3-verifier/opus-rerun-draft /tmp/claude-1000/c355-r3-verifier/opus-rerun-output`（模型目录先整份拷进草稿目录，`$SRC` 指向入库仓只读 rsync 源，`$DRAFT`/`$OUT` 全部落在本核查员自己的草稿目录，退出码 0，两处 `patch` 均无 fuzz/reject 干净应用）。
 
 `results/summary.txt`（报告里引的全部数字的来源）**与腿原始产物逐字节完全相同**（`diff` 零输出，退出码 0）：
 

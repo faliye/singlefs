@@ -4,7 +4,7 @@
 set -euo pipefail
 WORK=${1:?给一个空的工作目录}
 HERE=$(cd "$(dirname "$0")" && pwd)
-CAP=/home/fy5090/code/singlefs/research/scripts/capped.sh
+CAP=research/scripts/capped.sh
 mkdir -p "$WORK"
 rsync -a --exclude target --exclude .git /tmp/claude-1000/m2-final-code-r2/tree/ "$WORK/tree/"
 (cd "$WORK/tree/crates" && patch -p0 < "$HERE/copy-only-core.patch")

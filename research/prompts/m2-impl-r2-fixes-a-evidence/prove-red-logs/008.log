@@ -1,0 +1,23 @@
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/impl-r2-fixes-a/copy/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-a/copy/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.19s
+     Running tests/checker_known_bad_images.rs (/tmp/claude-1000/impl-r2-fixes-a/target/debug/deps/checker_known_bad_images-89a29090b0bda30e)
+
+running 1 test
+test the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target ... FAILED
+
+failures:
+
+---- the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target stdout ----
+
+thread 'the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target' (4053168) panicked at crates/singlefs-harness/tests/checker_known_bad_images.rs:2640:9:
+I-7.14 那份坏镜像应当判违例，实际 Holds
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 42 filtered out; finished in 19.94s
+
+error: test failed, to rerun pass `-p singlefs-harness --test checker_known_bad_images`

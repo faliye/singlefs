@@ -1,4 +1,4 @@
-# 第二段规格：门禁批三方第二轮判完之后才动的文件（tooling-1 起草，2026-09-27 JST）
+# 第二段规格：门禁批三方第二轮判完之后才动的文件（tooling-1 起草，2026-09-27）
 
 这些文件在 `research/prompts/defs-gatebatch-m2-r2-snapshot/sha256sums.txt` 的开工快照里，第一段一个字没改。每条写：文件、旧串（原文整行或能 `grep -cF` 恰好命中 1 次的片段）、新串、为什么（指到分析报告的节号）。旧串以动手那一刻的文件为准，先 `grep -cF` 核一次。
 
@@ -21,7 +21,7 @@
 - 判据全在 `research/scripts/crash-case-check.py`（第一段已立，自证挂 47 号）：阶段只调 `python3 "$ROOT/research/scripts/crash-case-check.py" "$ROOT"`，原样转它的输出与退出码（2 → 1）。
 - 文件头：`# gate-stage: 直接调全量崩溃枚举的测试函数标了 #[ignore] 并登记成 crash-case`；`# gate-similar: 54-layer0-replay.sh 跑登记了的 crash-case 用例、核全绿标记；这里只判源码里的用例有没有标 ignore、有没有登记，不跑任何测试`；`# gate-similar: 80-absolute-assertions.sh 也扫 crates/*/tests/ 的源码，但判的是断言形态`（先跑 `python3 .claude/singlefs-ai-sop/scripts/gate-overlap.py --list` 复核还有没有更像的）。
 - 样本 `.claude/gate.d/fixtures/41-crash-case-registered.sh/{red,green}/`：green 放一个标了 `#[ignore]`、登记了的用例与一个 `quick_tier` 快档；red 放一个没标没登记的，`expect` 要 `没标 #[ignore]` 与 `没有登记成 crash-case` 两句。
-- ⚠️ 仓里现查红一处（2026-09-27 JST 00:5x 跑 `python3 research/scripts/crash-case-check.py` 的原样行）：
+- ⚠️ 仓里现查红一处（2026-09-27 跑 `python3 research/scripts/crash-case-check.py` 的原样行）：
   `✗ crates/singlefs-harness/tests/crash_enumeration_resumes_from_its_progress_file.rs:383 a_run_that_goes_red_leaves_no_progress_file_behind：直接调全量崩溃枚举，却没标 #[ignore]` 与同一处「没有登记成 crash-case」。
   接阶段之前先派实现员处理那一条：几步的合成流就在测试函数上面加 `// crash-case-check:not-a-crash-case <理由>`；真是全量就标 `#[ignore]` 并在 `stage-inputs.tsv` 登记 `crash-case:` 行（后者动 `stage-inputs.tsv`，同属第二段）。
 

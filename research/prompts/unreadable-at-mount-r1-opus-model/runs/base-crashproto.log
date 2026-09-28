@@ -1,0 +1,49 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running `/tmp/claude-1000/unreadable-at-mount-r1/opus/target-base/release/r1-opus-crash-proto`
+name=crashproto-stream stream=d_publish outcome=[D=(2,8) jsn 8]
+name=crashproto-plan stream=d_publish writes=33 segments=4 closed_form_state_count=268435463 layer0_state_count_with_torn=268435468
+name=crashproto-segment stream=d_publish segment=0 writes=28 kinds=28 writes (0 tearable)
+name=crashproto-segment stream=d_publish segment=1 writes=2 kinds=28:JournalRecord@d0+16805888,29:JournalRecord@d1+16805888
+name=crashproto-segment stream=d_publish segment=2 writes=1 kinds=30:RootRecordFua@d0+7348224
+name=crashproto-segment stream=d_publish segment=3 writes=2 kinds=31:SystemConfigurationSlot@d0+4096:tearable,32:SystemConfigurationSlot@d1+4096:tearable
+name=crashproto-skip stream=d_publish reason=layer0_state_count_over_10^6 layer0_state_count_with_torn=268435468
+name=crashproto-stream stream=d_publish_while_the_newest_slots_are_unreadable outcome=[D=(2,8) jsn 8]
+name=crashproto-plan stream=d_publish_while_the_newest_slots_are_unreadable writes=33 segments=4 closed_form_state_count=268435463 layer0_state_count_with_torn=268435468
+name=crashproto-segment stream=d_publish_while_the_newest_slots_are_unreadable segment=0 writes=28 kinds=28 writes (0 tearable)
+name=crashproto-segment stream=d_publish_while_the_newest_slots_are_unreadable segment=1 writes=2 kinds=28:JournalRecord@d0+16805888,29:JournalRecord@d1+16805888
+name=crashproto-segment stream=d_publish_while_the_newest_slots_are_unreadable segment=2 writes=1 kinds=30:RootRecordFua@d0+7348224
+name=crashproto-segment stream=d_publish_while_the_newest_slots_are_unreadable segment=3 writes=2 kinds=31:SystemConfigurationSlot@d0+0:tearable,32:SystemConfigurationSlot@d1+0:tearable
+name=crashproto-skip stream=d_publish_while_the_newest_slots_are_unreadable reason=layer0_state_count_over_10^6 layer0_state_count_with_torn=268435468
+name=crashproto-stream stream=v4_mount_k_newest_slots_every_read outcome=[Ok instance 3 effective (2,7)] writes=71
+name=crashproto-plan stream=v4_mount_k_newest_slots_every_read writes=71 segments=13 closed_form_state_count=4325398 layer0_state_count_with_torn=4325418
+name=crashproto-segment stream=v4_mount_k_newest_slots_every_read segment=0 writes=2 kinds=0:SystemConfigurationSlot@d0+0:tearable,1:SystemConfigurationSlot@d1+0:tearable
+name=crashproto-segment stream=v4_mount_k_newest_slots_every_read segment=1 writes=22 kinds=22 writes (0 tearable)
+name=crashproto-segment stream=v4_mount_k_newest_slots_every_read segment=2 writes=2 kinds=24:JournalRecord@d0+16805888,25:JournalRecord@d1+16805888
+name=crashproto-segment stream=v4_mount_k_newest_slots_every_read segment=3 writes=1 kinds=26:RootRecordFua@d0+7348224
+name=crashproto-segment stream=v4_mount_k_newest_slots_every_read segment=4 writes=2 kinds=27:SystemConfigurationSlot@d0+0:tearable,28:SystemConfigurationSlot@d1+0:tearable
+name=crashproto-segment stream=v4_mount_k_newest_slots_every_read segment=5 writes=16 kinds=16 writes (0 tearable)
+name=crashproto-segment stream=v4_mount_k_newest_slots_every_read segment=6 writes=2 kinds=45:JournalRecord@d0+16809984,46:JournalRecord@d1+16809984
+name=crashproto-segment stream=v4_mount_k_newest_slots_every_read segment=7 writes=1 kinds=47:RootRecordFua@d0+1060864
+name=crashproto-segment stream=v4_mount_k_newest_slots_every_read segment=8 writes=2 kinds=48:SystemConfigurationSlot@d0+0:tearable,49:SystemConfigurationSlot@d1+0:tearable
+name=crashproto-segment stream=v4_mount_k_newest_slots_every_read segment=9 writes=16 kinds=16 writes (0 tearable)
+name=crashproto-segment stream=v4_mount_k_newest_slots_every_read segment=10 writes=2 kinds=66:JournalRecord@d0+16814080,67:JournalRecord@d1+16814080
+name=crashproto-segment stream=v4_mount_k_newest_slots_every_read segment=11 writes=1 kinds=68:RootRecordFua@d1+4206592
+name=crashproto-segment stream=v4_mount_k_newest_slots_every_read segment=12 writes=2 kinds=69:SystemConfigurationSlot@d0+0:tearable,70:SystemConfigurationSlot@d1+0:tearable
+name=crashproto-skip stream=v4_mount_k_newest_slots_every_read reason=layer0_state_count_over_10^6 layer0_state_count_with_torn=4325418
+name=crashproto-stream stream=v4_mount_k_newest_slots_from_the_5th_read outcome=[Ok instance 3 effective (2,7)] writes=71
+name=crashproto-plan stream=v4_mount_k_newest_slots_from_the_5th_read writes=71 segments=13 closed_form_state_count=4325398 layer0_state_count_with_torn=4325418
+name=crashproto-segment stream=v4_mount_k_newest_slots_from_the_5th_read segment=0 writes=2 kinds=0:SystemConfigurationSlot@d0+0:tearable,1:SystemConfigurationSlot@d1+0:tearable
+name=crashproto-segment stream=v4_mount_k_newest_slots_from_the_5th_read segment=1 writes=22 kinds=22 writes (0 tearable)
+name=crashproto-segment stream=v4_mount_k_newest_slots_from_the_5th_read segment=2 writes=2 kinds=24:JournalRecord@d0+16805888,25:JournalRecord@d1+16805888
+name=crashproto-segment stream=v4_mount_k_newest_slots_from_the_5th_read segment=3 writes=1 kinds=26:RootRecordFua@d0+7348224
+name=crashproto-segment stream=v4_mount_k_newest_slots_from_the_5th_read segment=4 writes=2 kinds=27:SystemConfigurationSlot@d0+0:tearable,28:SystemConfigurationSlot@d1+0:tearable
+name=crashproto-segment stream=v4_mount_k_newest_slots_from_the_5th_read segment=5 writes=16 kinds=16 writes (0 tearable)
+name=crashproto-segment stream=v4_mount_k_newest_slots_from_the_5th_read segment=6 writes=2 kinds=45:JournalRecord@d0+16809984,46:JournalRecord@d1+16809984
+name=crashproto-segment stream=v4_mount_k_newest_slots_from_the_5th_read segment=7 writes=1 kinds=47:RootRecordFua@d0+1060864
+name=crashproto-segment stream=v4_mount_k_newest_slots_from_the_5th_read segment=8 writes=2 kinds=48:SystemConfigurationSlot@d0+0:tearable,49:SystemConfigurationSlot@d1+0:tearable
+name=crashproto-segment stream=v4_mount_k_newest_slots_from_the_5th_read segment=9 writes=16 kinds=16 writes (0 tearable)
+name=crashproto-segment stream=v4_mount_k_newest_slots_from_the_5th_read segment=10 writes=2 kinds=66:JournalRecord@d0+16814080,67:JournalRecord@d1+16814080
+name=crashproto-segment stream=v4_mount_k_newest_slots_from_the_5th_read segment=11 writes=1 kinds=68:RootRecordFua@d1+4206592
+name=crashproto-segment stream=v4_mount_k_newest_slots_from_the_5th_read segment=12 writes=2 kinds=69:SystemConfigurationSlot@d0+0:tearable,70:SystemConfigurationSlot@d1+0:tearable
+name=crashproto-skip stream=v4_mount_k_newest_slots_from_the_5th_read reason=layer0_state_count_over_10^6 layer0_state_count_with_torn=4325418
+name=crashproto-total states_budget=0

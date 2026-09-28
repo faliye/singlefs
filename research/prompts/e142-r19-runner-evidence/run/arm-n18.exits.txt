@@ -1,0 +1,3 @@
+dump_exit=0
+model_exit=0
+product_written=research/results/e142-first-txn-dry-run-2026-09-27-r19-arm-n18.out

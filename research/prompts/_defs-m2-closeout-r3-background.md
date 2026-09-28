@@ -14,7 +14,7 @@
 
 **共用问句**：照改后的字面干活，哪一步会做错或做不了；举出具体的派发情形或命令。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-26 JST 12:xx）
+## 二、实现今天的样子（主 agent 的观测，2026-09-26）
 
 - 被判的改动：修定义的 agent 报告 `research/prompts/defs-closeout-r2-fixes-tmp-evidence/report.md` 与它的 `my-changes-final.diff`（258 行，比的是开工时 `cp -p` 的备份）；材料员把 diff 原样放进附录二，把报告的逐条表、探针与门禁两节抄进附录。开工快照 `research/prompts/defs-m2-closeout-r3-snapshot/sha256sums.txt`。
 - 这一轮被改的文件：`.claude/agents/three-way-attack.md`、`three-way-local-defense.md`、`experiment-runner.md`、`crash-verifier.md`、`gate-triage.md`、`implementation-writer.md`，`.claude/agent-common.md`，`.claude/main-agent.md`，`.claude/hooks/ask-user-claim-guard.sh`（自证 30 → 36 格），`.claude/gate.d/74-model-differential.sh`、`.claude/gate.d/15-research-build.sh`（阶段里的 cargo 经包装），另有主 agent 补的 `.claude/gate.d/stage-inputs.tsv` 74 号那一行（加 `research/scripts/run-with-memory-cap.sh` 与 `research/scripts/capped.sh`）。
@@ -535,8 +535,8 @@ exit=0
   ✓ research 构建通过，2 个测试批次、共 2 个单测全绿
 exit=0
 == peaks
-9437184	2026-09-26T03:13:52Z	8G	cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
-28311552	2026-09-26T03:13:52Z	8G	gate 15-research-build: cargo test --release (research)
+9437184	2026-09-26	8G	cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
+28311552	2026-09-26	8G	gate 15-research-build: cargo test --release (research)
 ```
 
 私有峰值表里两行的上限列都是 8G、键是设计的那两个：两条 cargo 确实在包装里、按默认上限跑的。
@@ -610,7 +610,7 @@ exit=1
 **出处 `research/prompts/defs-closeout-r2-fixes-tmp-evidence/report.md:201-214`（整段抄，未转述）**
 
 ```markdown
-## 四、门禁判定行（原样；03:17:33–03:21:35 UTC 逐道跑，都在最后一处改动之后，`nice -n 19`；日志在 `gates/`）
+## 四、门禁判定行（原样，逐道跑，都在最后一处改动之后，`nice -n 19`；日志在 `gates/`）
 
 | 门禁 | 原样判定行 | 退出码 |
 |---|---|---|

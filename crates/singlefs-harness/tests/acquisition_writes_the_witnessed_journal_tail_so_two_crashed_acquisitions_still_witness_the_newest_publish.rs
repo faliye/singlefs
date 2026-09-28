@@ -1,4 +1,4 @@
-//! C554 乙-配置续（用户 2026-09-27 JST 12:08 定；岔路单 `research/prompts/c554-fix-forks.md` 第 2 行；定义取自 E158 第 3 次跑登记
+//! C554 乙-配置续（用户 2026-09-27 定；岔路单 `research/prompts/c554-fix-forks.md` 第 2 行；定义取自 E158 第 3 次跑登记
 //! `research/prompts/e158-r3-prereg.md` 第 348 行与第 4 次跑登记 `research/prompts/e158-r4-prereg.md` 第 413 行）：取号那一写的 tail
 //! 不写 0，写取号那一刻按判据 N-配置 同一取法读到的见证值 c_见证（每块盘两槽里全部自证过的系统配置槽的 `journal_tail` 取最大，
 //! 一份都没有时 0）；取号失败的回卷写带同一个值。
@@ -340,9 +340,11 @@ fn the_first_acquisition_after_mkfs_still_writes_tail_zero_so_the_new_pool_file_
     }
 }
 
-/// 新池新建文件之后每块盘两槽：世代 4（暖机第二次，tail 2）、世代 5（新池新建文件，tail 3）。盘 `damaged_device` 世代 5 那一槽坏掉（清零），
+/// 新池新建文件之后每块盘两槽：世代 4（暖机第二次，tail 2）、世代 5（新池新建文件，tail 3）。盘 `damaged_device` 世代 5 那一槽退回轮换之前
+/// （崩在新池新建文件那次轮换写完另一块盘、没写到这一块：这一槽还是世代 3 的内容，这里拿世代 4 那一槽改世代号为 3 重新编码写回，两槽都自证得过），
 /// 池里最大的 tail 3 只在另一块盘上读得出：第二次取号写进每块盘的 tail 都是 3——取整池的最大值，不是各盘自己的，也不是最小的。
-fn a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lost_its_newest_slot(
+/// 不清零：C331（择根倒挂压过已确认的写） 取甲之后取号那一刻有一槽读不出就拒（见 `an_acquisition_refuses_a_device_that_lost_only_its_newest_slot`）。
+fn a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lags_one_rotation(
     tag: &str,
     damaged_device: DeviceIdentity,
 ) {
@@ -356,6 +358,16 @@ fn a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lost
     {
         let devices: &mut Vec<(DeviceIdentity, Recorded)> =
             pool.devices.as_mut().expect("新池新建文件写完，盘还开着");
+        let mut generation_three = verified_system_configuration_slots(
+            devices.as_slice(),
+            damaged_device,
+            slot_spacing_in_bytes,
+            &parameters().filesystem_identifier,
+        )
+        .into_iter()
+        .find(|slot| slot.quantities.slot_generation == 4)
+        .expect("世代 4 那一槽自证得过");
+        generation_three.quantities.slot_generation = 3;
         let (_, device) = devices
             .iter_mut()
             .find(|(identity, _)| *identity == damaged_device)
@@ -365,10 +377,10 @@ fn a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lost
                 DeviceOffsetInBytes(
                     (5 % SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE) * slot_spacing_in_bytes,
                 ),
-                &vec![0u8; usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096")],
+                &generation_three.to_slot(),
                 WriteDurability::Plain,
             )
-            .expect("世代 5 那一槽清零");
+            .expect("世代 5 那一槽退回世代 3");
     }
     let before_the_acquisition = pool.memory_pool();
     let tails_on_disk: Vec<(DeviceIdentity, Vec<u64>)> = DISKS
@@ -389,13 +401,13 @@ fn a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lost
             .into_iter()
             .map(|disk| {
                 if disk == damaged_device {
-                    (disk, vec![2])
+                    (disk, vec![2, 2])
                 } else {
                     (disk, vec![2, new_pool_file_creation_counter])
                 }
             })
             .collect::<Vec<_>>(),
-        "坏掉的那块盘只剩世代 4 那一槽（tail 2），另一块两槽 tail 2、3"
+        "落后一次轮换的那块盘两槽 tail 都是 2（世代 3、4），另一块两槽 tail 2、3"
     );
     let largest_tail_of_the_pool = tails_on_disk
         .iter()
@@ -423,18 +435,18 @@ fn a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lost
 }
 
 #[test]
-fn a_later_acquisition_writes_the_largest_tail_of_the_pool_into_every_device_when_the_first_device_lost_its_newest_slot(
+fn a_later_acquisition_writes_the_largest_tail_of_the_pool_into_every_device_when_the_first_device_lags_one_rotation(
 ) {
-    a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lost_its_newest_slot(
+    a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lags_one_rotation(
         "c554-yi-carry-device-zero-damaged",
         DeviceIdentity(0),
     );
 }
 
 #[test]
-fn a_later_acquisition_writes_the_largest_tail_of_the_pool_into_every_device_when_the_second_device_lost_its_newest_slot(
+fn a_later_acquisition_writes_the_largest_tail_of_the_pool_into_every_device_when_the_second_device_lags_one_rotation(
 ) {
-    a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lost_its_newest_slot(
+    a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lags_one_rotation(
         "c554-yi-carry-device-one-damaged",
         DeviceIdentity(1),
     );
@@ -473,7 +485,7 @@ fn a_rolled_back_acquisition_writes_the_witnessed_tail_back_instead_of_zero() {
         let mut writer = PoolWriter::new(&pool_parameters, devices.as_mut_slice());
         match acquire_instance(&mut writer).expect_err("盘 1 的取号写报错，取号必须失败") {
             InstanceAcquisitionFailed::Acquisition(acquisition) => acquisition,
-            InstanceAcquisitionFailed::DeviceWithoutASelfVerifiedSystemConfigurationWhenReadingTheWitness {
+            InstanceAcquisitionFailed::DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness {
                 device,
             } => panic!("这条用例里每块盘两槽都读得出自证过的系统配置，取号不该拒在见证值那一核：{device:?}"),
         }
@@ -513,5 +525,72 @@ fn a_rolled_back_acquisition_writes_the_witnessed_tail_back_instead_of_zero() {
             },
         ],
         "盘 1 一个字节都没写成"
+    );
+}
+
+/// C331（择根倒挂压过已确认的写） 取甲（用户 2026-09-28 定；`research/prompts/unreadable-at-mount-r2-main-verification.md` L2 V4 那一支）：
+/// 取号那一刻读见证值，某块盘两槽里有一槽读不出或自证不过（这里清零世代 5 那一槽，另一槽照样自证得过），就在第一个取号写之前拒，
+/// 两块盘的系统配置槽逐字节不变。改之前（只在一份都没有时拒）这块盘照样取号、见证值缺了那一槽。
+fn an_acquisition_refuses_a_device_that_lost_only_its_newest_slot(tag: &str, damaged_device: DeviceIdentity) {
+    let mut pool = build_pool(tag);
+    let slot_spacing_in_bytes = u64::from(geometry().fixed_structure_slot_spacing);
+    {
+        let devices: &mut Vec<(DeviceIdentity, Recorded)> =
+            pool.devices.as_mut().expect("新池新建文件写完，盘还开着");
+        let (_, device) = devices
+            .iter_mut()
+            .find(|(identity, _)| *identity == damaged_device)
+            .expect("池里有这块盘");
+        device
+            .write_at(
+                DeviceOffsetInBytes(
+                    (5 % SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE) * slot_spacing_in_bytes,
+                ),
+                &vec![0u8; usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096")],
+                WriteDurability::Plain,
+            )
+            .expect("世代 5 那一槽清零");
+    }
+    let before_the_acquisition = pool.memory_pool();
+    let slots_before: Vec<Vec<SlotReading>> = DISKS
+        .into_iter()
+        .map(|disk| slot_readings_of(&before_the_acquisition, disk))
+        .collect();
+    let pool_parameters = parameters();
+    let mut devices = pool.reopen_recorded();
+    let refusal = {
+        let mut writer = PoolWriter::new(&pool_parameters, devices.as_mut_slice());
+        acquire_instance(&mut writer).expect_err("有一槽读不出：取号在任何写之前拒")
+    };
+    pool.devices = Some(devices);
+    assert!(
+        matches!(
+            refusal,
+            InstanceAcquisitionFailed::DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness { device }
+                if device == damaged_device
+        ),
+        "拒因点名坏了一槽的那块盘：{refusal:?}"
+    );
+    let after_the_refusal = pool.memory_pool();
+    let slots_after: Vec<Vec<SlotReading>> = DISKS
+        .into_iter()
+        .map(|disk| slot_readings_of(&after_the_refusal, disk))
+        .collect();
+    assert_eq!(slots_after, slots_before, "拒的时候一个取号写都没写");
+}
+
+#[test]
+fn an_acquisition_refuses_the_first_device_that_lost_only_its_newest_slot_before_writing_anything() {
+    an_acquisition_refuses_a_device_that_lost_only_its_newest_slot(
+        "c331-jia-acquisition-device-zero",
+        DeviceIdentity(0),
+    );
+}
+
+#[test]
+fn an_acquisition_refuses_the_second_device_that_lost_only_its_newest_slot_before_writing_anything() {
+    an_acquisition_refuses_a_device_that_lost_only_its_newest_slot(
+        "c331-jia-acquisition-device-one",
+        DeviceIdentity(1),
     );
 }

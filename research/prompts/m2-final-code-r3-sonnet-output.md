@@ -19,7 +19,7 @@ kb 快照：`/tmp/claude-1000/m2-final-code-r3/kb-snapshot/`；定义快照：`/
 - 复跑证据（真实命令与原样输出）：
 
 ```
-$ cd /tmp/claude-1000/m2-final-code-r3-sonnet/tree && CARGO_TARGET_DIR=/tmp/claude-1000/m2-final-code-r3-sonnet/target bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 cargo test -p singlefs-harness --test second_transaction_parallel_line_one_multi_unit_file -- --nocapture
+$ cd /tmp/claude-1000/m2-final-code-r3-sonnet/tree && CARGO_TARGET_DIR=/tmp/claude-1000/m2-final-code-r3-sonnet/target bash research/scripts/capped.sh 8 cargo test -p singlefs-harness --test second_transaction_parallel_line_one_multi_unit_file -- --nocapture
 running 8 tests
 test the_lower_extent_segment_grows_to_two_levels_past_one_leaf_and_shrinks_back_to_inline ... ok
 test shrinking_a_multi_unit_file_releases_the_data_units_it_no_longer_has ... ok
@@ -83,7 +83,7 @@ test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 - 复跑证据：
 
 ```
-$ cd /tmp/claude-1000/m2-final-code-r3-sonnet/tree && CARGO_TARGET_DIR=/tmp/claude-1000/m2-final-code-r3-sonnet/target bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 cargo test -p singlefs-harness --test second_transaction_parallel_line_two_mounted_read
+$ cd /tmp/claude-1000/m2-final-code-r3-sonnet/tree && CARGO_TARGET_DIR=/tmp/claude-1000/m2-final-code-r3-sonnet/target bash research/scripts/capped.sh 8 cargo test -p singlefs-harness --test second_transaction_parallel_line_two_mounted_read
 running 12 tests
 test a_central_mapping_root_claiming_level_one_over_mapping_entries_is_refused_instead_of_being_read_as_entries ... ok
 test a_file_whose_extent_record_count_does_not_match_its_size_is_refused_instead_of_guessing ... ok

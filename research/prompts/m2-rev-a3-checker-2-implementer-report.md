@@ -1,6 +1,6 @@
 # 实审 A3-checker-2 实现员报告：池级走读补齐 I-2.4（单元头与指针头部）、宽 0 报 I-1.10、系统配置越界报违例
 
-写于 2026-09-27（时刻 UTC；JST = UTC + 9）。规格 `/tmp/claude-1000/impl-rev-a3-checker-2/spec.md`。底座是主工作区 2026-09-27T06:21:29Z 的现状（`snapshot-sha256.txt`：checker `lib.rs` 7d7e4d95…、`image.rs` b3a314d2…、`walk.rs` 07ec2b47…、测试文件 19daca56…；06:5x 复核过没变）。在副本 `b/` 里改，交补丁 `patch/`。
+写于 2026-09-27。规格 `/tmp/claude-1000/impl-rev-a3-checker-2/spec.md`。底座是主工作区 2026-09-27 的现状（`snapshot-sha256.txt`：checker `lib.rs` 7d7e4d95…、`image.rs` b3a314d2…、`walk.rs` 07ec2b47…、测试文件 19daca56…；复核过没变）。在副本 `b/` 里改，交补丁 `patch/`。
 
 ## 一、结论
 
@@ -131,7 +131,7 @@ exit 0
 
 ## 七、点 checker 的非层 0 测试目标：改后 vs 原样副本
 
-目标清单 `checker-targets.txt`：`crates/singlefs-harness/tests/` 里引了 `singlefs_checker`、名字不带 layer0 的 44 份，外加 `-p singlefs-checker --lib`。在 `b/` 上逐个跑（`run-checker-targets.sh`，整条经 `run-with-memory-cap.sh 8G`，线程上限 4），汇总在 `targets-after-change/summary.txt`：45 行里 39 行退 0，6 行退 101。6 个红的目标又在原样副本 `c/` 上重跑（主工作区现状，06:5x UTC 拷的，拷时核过 checker 源码与快照相同），结果在 `targets-baseline/`，逐条比每个测试的 ok / FAILED / ignored：
+目标清单 `checker-targets.txt`：`crates/singlefs-harness/tests/` 里引了 `singlefs_checker`、名字不带 layer0 的 44 份，外加 `-p singlefs-checker --lib`。在 `b/` 上逐个跑（`run-checker-targets.sh`，整条经 `run-with-memory-cap.sh 8G`，线程上限 4），汇总在 `targets-after-change/summary.txt`：45 行里 39 行退 0，6 行退 101。6 个红的目标又在原样副本 `c/` 上重跑（主工作区现状拷的，拷时核过 checker 源码与快照相同），结果在 `targets-baseline/`，逐条比每个测试的 ok / FAILED / ignored：
 
 | 目标 | 改后 | 原样 | 比对 |
 |---|---|---|---|
@@ -159,7 +159,7 @@ exit 0
 
 `patch/` 里有：`crates.patch`（4 个文件）、`mutations-append.tsv`（15 行，六段）、`mutations-delete.txt`（1 行）、`report.md`（本文的拷贝）。没有 `mutations-replacements.tsv`。
 
-- 对主工作区现状核过：`git apply --check patch/crates.patch` 退 0；四份被改文件的 sha256 与底座快照相同（06:5x UTC 复核）。
+- 对主工作区现状核过：`git apply --check patch/crates.patch` 退 0；四份被改文件的 sha256 与底座快照相同（复核）。
 - 这一件依赖的现有变异行，锚点都落在打补丁之后的源码上：第 990 行靠变量名恢复（第五节末）；A3-checker 那 13 行在副本上复证过。
 - `apply-writer-patch.py --dry-run` 的输出见第十一节末。
 

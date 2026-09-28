@@ -1,0 +1,41 @@
+C publish-returns-after-the-rotation-barrier
+
+(*
+ * 发布的最后三步（D16（发布语义） 已定项 7：根槽（FUA）→ 系统配置槽 → 屏障，屏障完成才返回；
+ * 实现在 crates/singlefs-core 的 transaction::persist_the_root_then_rotate_the_system_configuration，三条发布路径与重发共用）。
+ * 坏结果 = 发布已经返回，之后读系统配置槽却看不到这次轮换写的值
+ * （C577（系统配置没见证到的最新根，乙罩不到）：返回那一刻轮换还在写缓存里，崩溃之后系统配置只见证到上一次发布）。
+ *
+ * P0 = 发布：根槽 FUA → 轮换 → 屏障 → 返回（写 returned）。P0 里的写与屏障逐项就是录制流里发布最后三步的次序
+ * （crates/singlefs-harness/tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs 比对）。
+ * 根槽与轮换之间不写屏障：FUA 返回才发轮换，那一段的序不是这条判的（根的序归 new-pool-file-creation-* 两条）；这条只判轮换之后那道屏障。
+ * P1 = 返回之后的读者（崩溃之后的可写挂载读两槽取见证值）：先看到已经返回，再读系统配置槽。
+ * 屏障写成 smp_wmb，读者一侧的先后写成 smp_rmb：herd7 判的是这条屏障形态在 LKMM 下的序，不是块层的 FLUSH；
+ * 块层那一半在录制流上判（crates/singlefs-harness/tests/a_publish_returns_only_after_the_system_configuration_rotation_is_durable.rs）。
+ *
+ * singlefs-expect: Never
+ * singlefs-models: crates/singlefs-core/src/transaction.rs::persist_the_root_then_rotate_the_system_configuration 写者（P0）
+ * singlefs-models: crates/singlefs-core/src/recovery.rs::verified_system_configuration_slots 读者（P1：返回之后读两槽的见证值）
+ *)
+
+{}
+
+P0(int *root, int *configuration, int *returned)
+{
+	WRITE_ONCE(*root, 1);
+	WRITE_ONCE(*configuration, 1);
+	smp_wmb();
+	WRITE_ONCE(*returned, 1);
+}
+
+P1(int *root, int *configuration, int *returned)
+{
+	int r0;
+	int r1;
+
+	r0 = READ_ONCE(*returned);
+	smp_rmb();
+	r1 = READ_ONCE(*configuration);
+}
+
+exists (1:r0=1 /\ 1:r1=0)

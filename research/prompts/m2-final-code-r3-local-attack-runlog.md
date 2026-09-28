@@ -1,4 +1,4 @@
-# 运行记录：m2-final-code-r3-local-attack（2026-09-25 08:55 JST / 2026-09-24 23:55 UTC）
+# 运行记录：m2-final-code-r3-local-attack（2026-09-25）
 
 提示文件：`research/prompts/m2-final-code-r3-local-attack.md`（英文，五道算术题，覆盖派发任务给
 本地攻方的攻击面：① 分配记录树叶宽 W、② 分配记录树内部扇出、③ 根层公式在 240 槽单盘 / 4 GiB × 2 /

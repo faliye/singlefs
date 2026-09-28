@@ -1,0 +1,41 @@
+--- tree/crates/singlefs-harness/tests/common/mod.rs
++++ opus/base/crates/singlefs-harness/tests/common/mod.rs
+@@ -572,6 +572,12 @@
+     OnlyTheFirst,
+     /// 第 n 次起每次都坏（之前那几次照读）。
+     FromTheNthOnward(u64),
++    /// 只有第 n 次坏（C331 复查用：只在某一次读上坏的瞬时读错）。
++    OnlyTheNth(u64),
++    /// 除第 n 次之外每次都坏（C331 复查用：重读那一次读得出、之后又坏）。
++    AllButTheNth(u64),
++    /// 第 n 次到第 m 次（含两端）坏，之前之后照读（unreadable-at-mount-r1 原型用：只罩住两遍见证读的瞬时读错）。
++    NthThroughMth(u64, u64),
+ }
+ 
+ /// 读坏的那一次交回什么。
+@@ -664,6 +670,11 @@
+                 FailingReadsOfARange::FromTheNthOnward(first_failing) => {
+                     *reads_of_this_range >= first_failing
+                 }
++                FailingReadsOfARange::OnlyTheNth(n) => *reads_of_this_range == n,
++                FailingReadsOfARange::AllButTheNth(n) => *reads_of_this_range != n,
++                FailingReadsOfARange::NthThroughMth(n, m) => {
++                    (n..=m).contains(&*reads_of_this_range)
++                }
+             };
+             if *presence == UnreadableRangesPresence::InPlace && fails_this_time {
+                 failing.push(*range);
+@@ -687,6 +698,13 @@
+     ranges: SharedUnreadableRanges,
+ }
+ 
++impl<Inner: singlefs_core::block_device::BlockDevice> DeviceWithUnreadableRanges<Inner> {
++    /// unreadable-at-mount-r1 原型用：挂载途中取这一刻的镜像（「此刻崩溃」）。
++    pub fn inner_device(&self) -> &Inner {
++        &self.inner
++    }
++}
++
+ impl<Inner: singlefs_core::block_device::BlockDevice> singlefs_core::block_device::BlockDevice
+     for DeviceWithUnreadableRanges<Inner>
+ {

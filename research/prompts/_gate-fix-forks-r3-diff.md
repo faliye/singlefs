@@ -1,6 +1,6 @@
-# 附录二：门禁修复留下的岔路第三轮代码改动（跟踪文件用 `git -c core.quotepath=false diff HEAD -- <路径…>` 原样，加未跟踪文件全文；生成于 2026-09-23 16:51 UTC）
+# 附录二：门禁修复留下的岔路第三轮代码改动（跟踪文件用 `git -c core.quotepath=false diff HEAD -- <路径…>` 原样，加未跟踪文件全文；生成于 2026-09-24）
 
-基准：HEAD `3b60f09`（2026-09-22 07:27:29 +0000）。这一批改动没有提交点，全部在工作区（未暂存）。
+基准：HEAD `3b60f09`（2026-09-22 +0000）。这一批改动没有提交点，全部在工作区（未暂存）。
 
 不进本附录（别的会话同时在改，主 agent 明确排除）：`.claude/gate.d/47-research-script-selftests.sh`、`.claude/gate.d/stage-owners.tsv`、`.claude/gate.d/72-agent-def-adversarial-review.sh`、`research/scripts/check-segment-registry.py`。
 

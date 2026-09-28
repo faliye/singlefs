@@ -19,8 +19,8 @@
   ③ 新串比旧串多出来的位置指代、时间指代与自称（doc-lint 那三项词表的子集：如上所述、上述、下表、本轮、这一轮、本条、本决策……）；
      时间指代在同一行带 YYYY-MM-DD 日期时不算，自称只在行首或标点之后才算；
   ④ 改了决策正文里「**依据**」段、增删了引的实验号的，同一份规格里要有那个实验页（.claude/kb/experiments/<号>-*.md）的一条改动
-     （门禁 75 号那条双向检查的另一侧）；
-  ⑤ 写决策变更史（.claude/kb/decisions-history/<年-月>.md）的，新串里要有「### 」标题行与「快查·改前：」「快查·改后：」两行。
+     （门禁 doc-experiments 的 decision-links 格那条双向检查的另一侧）；
+  ⑤ 写决策变更史（.claude/kb/decisions-history.md）的，新串里要有「### 」或「#### 」标题行与「快查·改前：」「快查·改后：」两行。
 ②③ 只判新串比旧串多出来的：旧串里原有的不怪这份规格。认不出规格（两种写法都不是、一条都没有）退 2。
 """
 import glob
@@ -215,11 +215,11 @@ def check_entries(entries, root):
             changed = set(EXPERIMENT_NUMBER.findall(entry["new"])) ^ set(EXPERIMENT_NUMBER.findall(entry["old"]))
             for experiment in sorted(changed, key=int):
                 if not any(re.match(rf"\.claude/kb/experiments/0*{experiment}-", target) for target in targets):
-                    problems.append(f"{label}：依据段增删了 E{experiment}，规格里却没有它实验页「### 影响的决策」那一行的改动（门禁 75 号的另一侧）")
-        if entry["file"].startswith(".claude/kb/decisions-history/") and BROKEN != "no-history":
+                    problems.append(f"{label}：依据段增删了 E{experiment}，规格里却没有它实验页「### 影响的决策」那一行的改动（门禁 doc-experiments 的 decision-links 格的另一侧）")
+        if entry["file"] == ".claude/kb/decisions-history.md" and BROKEN != "no-history":
             new = entry["new"]
-            if not re.search(r"^### \S", new, re.M) or "快查·改前：" not in new or "快查·改后：" not in new:
-                problems.append(f"{label}：写变更史要有「### 」标题行与「快查·改前：」「快查·改后：」两行")
+            if not re.search(r"^#{3,4} \S", new, re.M) or "快查·改前：" not in new or "快查·改后：" not in new:
+                problems.append(f"{label}：写变更史要有「### 」或「#### 」标题行与「快查·改前：」「快查·改后：」两行")
     return problems
 
 
@@ -253,14 +253,13 @@ def selftest():
         kb = os.path.join(work, ".claude", "kb")
         os.makedirs(os.path.join(kb, "decisions"))
         os.makedirs(os.path.join(kb, "experiments"))
-        os.makedirs(os.path.join(kb, "decisions-history"))
         open(os.path.join(kb, "checks-owed.md"), "w", encoding="utf-8").write(
             "# 欠的检查\n\n<!-- doc-lint:registry name-col=2 -->\n| 编号 | 简称 | 内容 |\n|---|---|---|\n| C120 | 锚点腐化 | 旧行 |\n| C121 | 另一笔 | 行 |\n")
         open(os.path.join(kb, "decisions", "03-空间分配.md"), "w", encoding="utf-8").write(
             "## D3 空间分配 —— 已定\n\n**依据**：E10（样本实验） 证明了 x。\n")
         open(os.path.join(kb, "experiments", "10-样本实验.md"), "w", encoding="utf-8").write("## E10 样本实验 —— 已跑\n\n### 影响的决策\n| D3 | 支撑 | 不受影响 |\n")
         open(os.path.join(kb, "experiments", "11-另一实验.md"), "w", encoding="utf-8").write("## E11 另一实验 —— 已跑\n\n### 影响的决策\n")
-        open(os.path.join(kb, "decisions-history", "2026-09.md"), "w", encoding="utf-8").write("# 变更史\n\n锚点行\n")
+        open(os.path.join(kb, "decisions-history.md"), "w", encoding="utf-8").write("# 决策变更史\n\n## D3（空间分配）\n\n锚点行\n")
         def entry(file, old, new):
             return {"file": file, "old": old, "new": new, "basis": "样本"}
         owed = ".claude/kb/checks-owed.md"
@@ -278,9 +277,9 @@ def selftest():
             ("依据段加实验号带了配对", [entry(".claude/kb/decisions/03-空间分配.md", "**依据**：E10（样本实验） 证明了 x。",
                                                "**依据**：E10（样本实验） 证明了 x；E11（另一实验） 证明了 y。"),
                                          entry(".claude/kb/experiments/11-另一实验.md", "### 影响的决策\n", "### 影响的决策\n| D3（空间分配） 已定项 1 | 支撑 | 2026-09-26 改了 |\n")], 0),
-            ("变更史缺快查", [entry(".claude/kb/decisions-history/2026-09.md", "锚点行", "锚点行\n\n### 2026-09-26 样本\n")], 1),
-            ("变更史带快查", [entry(".claude/kb/decisions-history/2026-09.md", "锚点行",
-                                    "锚点行\n\n### 2026-09-26 样本\n\n> 快查·改前：甲。\n>\n> 快查·改后：乙。\n")], 0),
+            ("变更史缺快查", [entry(".claude/kb/decisions-history.md", "锚点行", "锚点行\n\n### 2026-09-26\n\n#### 已定项 1：样本\n")], 1),
+            ("变更史带快查", [entry(".claude/kb/decisions-history.md", "锚点行",
+                                    "锚点行\n\n### 2026-09-26\n\n#### 已定项 1：样本\n\n> 快查·改前：甲。\n>\n> 快查·改后：乙。\n")], 0),
         ]
         failures = []
         for label, entries, want in cases:

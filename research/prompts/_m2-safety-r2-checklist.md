@@ -1,4 +1,4 @@
-# 小节清单：`m2-safety-r2`（材料员拼装，2026-09-25 19:11 JST / 2026-09-25 10:11 UTC）
+# 小节清单：`m2-safety-r2`（材料员拼装，2026-09-25）
 
 清单由 `python3 research/scripts/kb-sections.py <文件…>` 一次性生成，未经任何过滤（`.claude/rules/three-way-inference.md`「机器生成的清单不许再过滤」）；命令与全部输出行数见交回。
 

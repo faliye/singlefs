@@ -1,0 +1,73 @@
+## 一、结论
+
+1. **第 15 条（C475）做完，一处来源**：`journal::slot_after_the_journal_ring(环长)` 是唯一的式子。
+   - mkfs：`check_geometry` 按环长现算 `UnitAreaStart::following_the_journal_ring` 并把它交回给写的那一步。实例表写在起点、树表写在起点加 2，`MakeFilesystemOutput` 多一个字段 `unit_area_start`，另有 `instance_table_placement()` / `tree_table_genesis_placement()` 两个方法。`allocator_after_make_filesystem` 按这个起点建空闲图。
+   - 起点不在 64 槽段边界上，在任何写之前拒成新成员 `MakeFilesystemError::UnitAreaStartOffTheClusterSegmentBoundaryUnsupported`。
+   - `JournalRingPastTheCompiledUnitAreaStartUnsupported` 删了：起点就是环末尾的下一个槽，环不会越过它。
+   - 系统配置：`to_slot` 写偏移 417 时写 `slot_after_the_journal_ring(环长)`，写之前断言位置。新增 `unit_area_start_slot_recorded_in_the_slot`，读那 8 字节。
+   - 读者（`recovery::system_configuration_values_this_reader_accepts`）：编译期上界（环末端 ≤ 784 MiB）改成三判，都报 `JournalRingBytesOutsideTheSupportedRange`，与 checker `journal_ring_bytes_lie_in_the_supported_range` 同一个判法：
+     - 环末端不越过同一槽记着的 417 起点；
+     - 在飞上限不为 0；
+     - 在飞上限装得进 4 字节。
+     另加两个新成员：
+     - 417 那 8 字节 ≠ 环长现算的起点 ⇒ `UnitAreaStartNotTheSlotAfterTheJournalRing`；
+     - 起点不在段边界上 ⇒ `UnitAreaStartOffTheClusterSegmentBoundaryUnsupported`。
+   - `scan_journal` 没有提示时，逐槽列偏移只列到那块盘的末尾（理由见第三节 Q3）。
+   - 恢复与挂载：
+     - `allocation_records_fit_the_pool_geometry`、`placement_lies_in_the_unit_area_of_its_device`、`every_device_reaches_the_unit_area_start` 都多一个 `unit_area_start` 参数。
+     - `rebuild_version`、`walk_to_file`、`allocation_records_under_root`、`allocation_records_of_version_without_file` 各多一份带起点的 `…_in_the_unit_area_starting_at`。原名保留，签名不变，改成先择一次系统配置现算起点（调用方是单外的用例与实验装置）。
+     - 挂载、管理员回退、`recover()` 走带起点的那一份，起点取 `unit_area_start_of_the_chosen_system_configuration`（择到的那份系统配置按环长算；择的时候判过它与 417 相等、在段边界上）。
+     - `mount.rs` 的 `rebuilt_allocator` 改成 `DeviceFreeMap::with_unit_area_start`。
+   - harness：
+     - `crash.rs` 的单元扫描候选下界、journal 扫描候选的环长，改成读这块盘系统配置槽 0 自述的 417 与 333。槽 0 自证不过时退到能罩住任何几何的那一档。
+     - `model.rs` 模型自己一份式子：新构造 `after_make_filesystem_on_a_journal_ring_of`；原 `after_make_filesystem` 取默认环，它在单外的三处构造点签名不变。
+     - `history.rs` 的三档小盘见第三节 Q1。
+   - checker 没改。`crates/singlefs-checker/src/image.rs:226` `let unit_area_start_slot = read_u64(slot, 417);`，1 GiB 与 128 MiB 两条用例在 mkfs 之后、可写挂载之后都跑池级 checker，0 违例（第四节）。
+   - 默认环 768 MiB 下起点仍是 50176。mkfs 到第一个文件两块盘整盘 CRC-32C 与改之前逐字节相同：基线副本现算 `name=a3b_default_ring_first_transaction_images_crc32 value=1783297687`，钉进用例。
+2. **第 3 条（C11b 第 5 条）**：mkfs 在任何写之前拒成 `JournalInFlightRecordLimitWiderThanItsFourByteField { ring_bytes, in_flight_record_limit }`（紧跟「F 条记录」那一判）；读者同一格报 `JournalRingBytesOutsideTheSupportedRange`。改之前的现象：48 TiB 环、200 TiB 稀疏盘上 mkfs 清完环、写完单元与根，在 `to_slot` 的 expect 上 panic（变异 007 复现，第五节）。
+3. **第 2 条（A3c Q-A 甲）**：`rebuild_version` 在 `tree_table_entries_each_kind_at_most_once` 之后判两道，都报 `InvariantViolated { invariant: "D8 已定项 8 排序契约", detail }`，常量 `TREE_TABLE_ENTRIES_ORDERING_CONTRACT`。
+   - ① 盘上次序树 ID 严格升序，detail「树表条目不按树 ID 严格升序」。
+   - ② 七棵树按发号次序树 ID 严格升序，detail 写明次序。
+   - 为什么要第 ② 道见第三节 Q2：探针一过得了 ①。
+   - 两个探针的用例都钉「可写挂载在任何写之前拒、两块盘逐字节不变」。`transaction.rs` 那条断言没动：它此后依赖的读者判定就是 `recovery::rebuild_version_in_the_unit_area_starting_at` 里这两道（①② 各管一种坏法）。**那条断言的消息要改成指到这两处，归改 `transaction.rs` 的人。**
+4. **第 4 条（C554 乙 Q6）**，照乙的形态收，被攻过零轮：
+   - 可写挂载：`rebuilt_allocator` 里算生效 F 不再自己读实例表，用影子账那一张表（`instance_table_of_the_newest_root_read_at_most_twice` 读的、读不出重读一次）。读不出照乙已有的 `NewerStateStillUnreadableAfterOneReread(InstanceTableOfTheNewestRootForTheShadowLedger)` 拒可写，取号之前。新函数 `effective_rollback_floor_under_the_newest_roots_table`。
+   - 挂着时抬 F（`raise_the_floor_through`），在动分配器与任何写之前拒这一次抬，两个新 `RecoveryFailure` 成员，经 `MountError::Recovery` 交出：
+     - 算生效 F：`effective_rollback_floor_rereading_the_newest_instance_table_once`，读根环、择最新根、读表；读不出立即重读一次；仍读不出报 `InstanceTableOfTheNewestRootStillUnreadableAfterOneReread`。
+     - 回收门槛与影子账：`readable_roots_rereading_unreadable_root_ring_slots_once`，读不出（`BadRootRingSlotReading::Unreadable`）的槽立即重读一次；仍读不出报 `RootRingSlotStillUnreadableAfterOneReread { ring_slot }`。读得出、自证不过的槽照旧当没有根。
+   - 为什么不加 `MountError` 成员、名字怎么起：见第三节 Q4。
+5. 交回前验证：
+   - 新测试二进制 14 条全绿。
+   - core `--lib` 132 条全绿，harness `--lib` 97 条全绿。
+   - fmt 过。
+   - clippy（带 `CODE_DISCIPLINE_LINTS`）与 `build --all-targets` 只红在单外的 `core_review_geometry_back_chain_and_empty_inode.rs` 两处，引了删掉的成员。
+   - 74 号改后红 3 条：基线就红 1 条，新增红 2 条，都是小盘上按步数钉的用例（第三节 Q1、第六节）。
+   - 33 号在改锚点之后绿。
+   - 证红：新测试 14 条、单元扫描候选 1 条都抓到。其余见第五节。
+
+**推翻条件**：
+- 在副本上把第五节任一行变异施加回去，它点名的测试不红。
+- 默认环下 mkfs 到第一个文件整盘 CRC 不是 1783297687。
+- `recover` 在 1 GiB 或 128 MiB 环的池上读不回第一个文件。
+- 读者在 417 与环长对不上时照常挂上。
+
+## 二、这一轮写过的文件
+
+副本 `/tmp/claude-1000/impl-rev-a3b/work/`，补丁 `/tmp/claude-1000/impl-rev-a3b/patch/crates.patch` 就按这些生成：
+
+- `crates/singlefs-core/src/system_configuration.rs`：写 417 按环长算；新增 `UNIT_AREA_START_SLOT_OFFSET`、`unit_area_start_slot_recorded_in_the_slot`、`journal_in_flight_record_limit_fits_its_four_byte_field`。
+- `crates/singlefs-core/src/make_filesystem.rs`：起点现算并交回给写的那一步；两个新成员，删一个成员；`MakeFilesystemOutput::unit_area_start` 与两个落点方法；`allocator_after_make_filesystem` 按起点建图。
+- `crates/singlefs-core/src/recovery.rs`：
+  - 读者三判加两个新成员；两个 `RecoveryFailure` 新成员；
+  - 几何判带起点；四个带起点的公开入口，原名做包装；`scan_journal` 列到盘尾为止；
+  - 树表排序两道；生效 F 三个入口（原函数、按给定表算、重读一次）；读根环重读一次。
+- `crates/singlefs-core/src/mount.rs`：建空闲图与判落点都带起点；生效 F 用影子账那张表；抬 F 两处改成重读一次的版本；回退与 inode 号水位走带起点的那一份。
+- `crates/singlefs-harness/src/crash.rs`：扫描候选按盘上系统配置槽 0 取环长与起点。
+- `crates/singlefs-harness/src/model.rs`：模型的单元区起点随环长。
+- `crates/singlefs-harness/src/history.rs`：两个新 `RecoveryFailure` 成员的分支；三档小盘环 6 MiB、盘宽 = 起点 + 单元区槽数；模型按环长建。
+- 新建 `crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs`（14 条用例）。
+- `crates/mutations.tsv` 的改动走补丁目录的三个文件，不进 `crates.patch`：
+  - 追加 16 行，名字以「实审 A3b」开头（`patch/mutations-append.tsv`）；
+  - 整行替换 11 行（`patch/mutations-replacements.tsv`，33 号锚点，第五节）；
+  - 删 2 行（`patch/mutations-delete.txt`）：「实审 A2a 第 15 条：journal 环末端越过编译期单元区起点也不拒」「实审 A2a 第 15 条：环末端正好是单元区起点也当越过（默认环被拒）」。它们守的那一判（mkfs 的编译期上界）已经不存在；点名的用例在单外的 `core_review_geometry_back_chain_and_empty_inode.rs`，要跟着改（第四节）。
+

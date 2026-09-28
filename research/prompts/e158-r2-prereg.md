@@ -1,6 +1,6 @@
 # E158 第 2 次跑的重跑登记：择根与修复四岔路
 
-写于 2026-09-26 19:24 JST，装置改写之前、任何第 2 次跑的产物之前。写的人没看第 2 次跑的任何读数（还没有）；第一次跑的读数读到了一部分，全部列在第四节。
+写于 2026-09-26，装置改写之前、任何第 2 次跑的产物之前。写的人没看第 2 次跑的任何读数（还没有）；第一次跑的读数读到了一部分，全部列在第四节。
 
 装置写在哪（写死）：**入库装置**——执行员改写 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`（`crates/singlefs-harness/src/bin/`）。理由：岔路单第 1、2 行问的都是「`crates/` 今天这份代码（与它的改法）在故障下选哪条根、拒不拒挂载」，另写独立模型答不了。各臂对 `crates/` 的改动写成 `research/mutations/e158_arms.tsv`（四列同 `crates/mutations.tsv`：说明、文件、旧串、新串；旧行的旧串今天多半不再命中，按第五节的臂定义重写，不改就用），在草稿目录里整树 `cp -a` 出来的副本上逐臂套用、各自编译；装置源码各臂同一份。要读 `crates/` 的常量见 5.7，一律改成本地常量加回比断言，不直接引。
 
@@ -34,7 +34,7 @@
 
 ### 问题单第一节的三个前提：答案（设计员读代码的答案，执行员在第一段开跑前按停机条款 S0 逐条重核）
 
-| # | 答 | 依据（`crates/` 文件:行号，2026-09-26 19:24 JST 现查） | 最小复现 |
+| # | 答 | 依据（`crates/` 文件:行号，2026-09-26 现查） | 最小复现 |
 |---|---|---|---|
 | 前提 1 | **成立**：今天造得出被抛弃的根，而且只有崩溃恢复这一路。能造出它的历史 = 一次 `mount_writable` 时，某实例最新的 k 条根的根槽暂时读不出、且紧接在所选根之后那一次发布的记录（或它点名的一个单元）两份都读不出，重放接不上它们；这次挂载写行 (i, 所选那一版的 txg, W)，中间实例写 (i, 0, 0)；故障撤掉之后那 k 条根读得出、按新实例表判被抛弃。**不经故障造不出**：根槽 FUA 落盘就读得出、记录先于根落盘，崩溃点本身不留下「比所选根新而重放接不上」的根（推的，第四节；H1c 的 Q1-0 在装置上量） | `mount.rs:2827`（`mount_writable_with_test_only_switches`：择根 → 扫记录 → 重放 → 写行）；`recovery.rs:776`（`choose_root` 取 (txg, 实例) 最大、不读实例表）；`mount.rs:2222`（`instance_rows_to_write`：上一个实例一行、中间实例 (i, 0, 0)）；`mount.rs:852`（重建分配器时按最新根的实例表判抛弃）→ `recovery.rs:897`（`root_is_abandoned_by_the_instance_table`）；`mount.rs:714`（账读不出只 `unreadable += 1`）；管理员回退不抛弃：`mount.rs:3381` `roll_back_by_a_forward_publish` 与 D23 已定项 14 那一句、D28 已定项 1 第九项「被抛弃的根今天只由崩溃恢复造出」（第二节整段抄） | `crates/singlefs-harness/tests/common/mod.rs:424` `abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before`（藏最新那条根的根槽与它的数据单元两份、重开可写挂载、写回）+ `crates/singlefs-harness/tests/second_transaction_step_four_rollback.rs:1041` `torn_tree_table_of_an_abandoned_root_is_counted_and_does_not_fail_the_mount`（再改坏它的树表：挂载照样成、计数 1）；C554 那一形：`crates/singlefs-harness/tests/second_transaction_supplement_two_unreadable_abandoned_root_slot.rs:224` |
 | 前提 2 | **成立**：C331 今天仍打得中，候选乙那一格**要重新定义**。新实例第一次发布的 txg 今天仍只取 max(可读根最大 txg, 环里自证记录最大 txg) + 1，**不读系统配置里的 F**；择根键不变。乙要重定两处：① 字段表今天 489（F 占 [481, 489)），乙加的「已发布 txg」接在 F 之后占 [489, 497)，字段表 489 → 497；② 系统配置里今天已经住着一个 txg（F），它每次系统配置写都带整池生效值（取号那一写也带，不写 0），正常卸载时抬到现行那一版的 txg——于是多一条零字节的乙：**乙F**（读系统配置里的 F，不加字段）。「照旧」的乙（加 8 字节字段）与乙F 两种都登记（5.3） | `mount.rs:599`–`617`（`first_txg_of_new_instance` 只读 `highest_root_txg` 与记录）；`grep -n 'first_txg_of_new_instance' crates/singlefs-core/src/mount.rs` 只命中定义（`:599`）与调用（`:2870`），函数体里没有 `rollback_floor`；`transaction.rs:341`–`405`（每次系统配置写带 `effective_rollback_floor`）；`transaction.rs:654`–`675`（取号：journal tail 写 0、F 写整池生效值）；`mount.rs:1349`–`1387`（`unmount`：F = 现行那一版的 txg）；`system_configuration.rs:48`、`:50`、`:53`（tail 偏移 469、F 宽 8、F 偏移 = 489 − 8） | 判决 K2 给甲的那条构造（实例 1 最新几条根的根槽读失败）在今天的代码上重跑即是（阳性对照 PC2，5.3）；零故障的读法没有 |
@@ -254,7 +254,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 - 用户定案 2026-09-24：这一版发布失败原样重发（实二十报告 `research/prompts/m2-lastflag-implementer-report.md` 第六节 1：同一实例失败后接着发，会留下两条同 (实例代号, checkpoint_txg) 都带末条标志的记录），原话在变更史；无实验：只定失败之后发什么，不改盘上格式。
 - `research/prompts/m2-final-code-r2-main-verification.md` 第三节 Z8（这一版发布失败原样重发，攻方没打中）；那一份的 Z9 与第四节改法 1–4 是回退见证的，随见证删掉不再承重。
 - 管理员回退改成挂着时的一次向前发布（候选集、释放、复活、水位、拒）、删前缀第五条与回退见证、影子账依据改指 H6：无实验，三方原型（`research/prompts/m2-rollback-forward-r1-opus-model/`、`m2-rollback-forward-r2-opus-model/`、`m2-rollback-forward-r3-opus-model/`）在冻结副本上量过，没立实验号，原型上的数不是入库装置上的数；三轮判决 `research/prompts/m2-rollback-forward-r1-main-verification.md`、`m2-rollback-forward-r2-main-verification.md`、`m2-rollback-forward-r3-main-verification.md`。水位取 max(内存, 环) 的收严（第三轮判决第二节 K1 的水位分句）被攻过零轮；用户定案 2026-09-25（向前发布、只在挂着的时候做）与 2026-09-26（第三轮交用户的四问），原话在变更史。
-- 主 agent 2026-09-26 定：回退那次发布之前逐盘验复活集里的每个单元（「在任何写之前拒」那一格最后一句），照用户 2026-09-25 JST 12:1x 原话「1 就是fsync失败后 两个盘掉一个盘。这个不能认，这个违背我们数据安全的承诺」（`records/2026-09-24-里程碑二收尾调度.md` 第三节那一时刻的一行），与 C519（丢一整块盘时恢复丢掉刚确认的那一版） 那一格「两份都验过才施加」同一方向；无实验，推的，被攻过零轮；多读的量随 R_old 之后释放的用户可见单元数涨，没量。
+- 主 agent 2026-09-26 定：回退那次发布之前逐盘验复活集里的每个单元（「在任何写之前拒」那一格最后一句），照用户 2026-09-25 原话「1 就是fsync失败后 两个盘掉一个盘。这个不能认，这个违背我们数据安全的承诺」（`records/2026-09-24-里程碑二收尾调度.md` 第三节那一时刻的一行），与 C519（丢一整块盘时恢复丢掉刚确认的那一版） 那一格「两份都验过才施加」同一方向；无实验，推的，被攻过零轮；多读的量随 R_old 之后释放的用户可见单元数涨，没量。
 - 用户定案 2026-09-25：点名单元两份都验过才施加、认下丢一整块盘时丢掉刚确认的那一版（C519（丢一整块盘时恢复丢掉刚确认的那一版） 实一复现：`crates/singlefs-harness/tests/second_transaction_supplement_two_c519_whole_device_loss_after_warm_up.rs`），原话在变更史；无实验：照今天的实现写成条款，另一读法「任一份验过」会不会放过 E77（发布的持久顺序） 那种嫁接没量。
 
 **欠**：C77（重放起点未定义）；C314（回退可以复用被抛弃的根引用的单元）；C554（崩溃恢复抛弃的根暂时读不出时影子账算不到）；C318（影子账隔离的单元没进准入不等式）；C331（择根倒挂压过已确认的写）；C334（切换的所选根没有会红的检查）；C365（恢复路径的链首不锚在所选根覆盖的最后一条）；C287（切换收养开放 checkpoint 的事务后再崩）；C126（切换预留的最坏量没有口径）；C493（回退候选集条文与实现说反话）；C500（所选根那条记录读不出时链首接法没有条款）；C381（根已落盘之后发布失败，分配器仍退回）——三方第二、三轮打中失败表那两支判别子（探针写在盘上没有落点、屏障类失败点连「失败的那个落点」都没有定义），用户已定「落点进地址空间表、射程逐个失败点列一张表」，第 2、4 题已定（`D16（发布语义）` 新立一条已定项、失败表改两步判别子），「实例切换取的是内存里的根」那一题定成切换重新读盘择根、带出的三件待定（`research/prompts/c381-r2-main-verification.md`、`c381-r3-main-verification.md`）；代码那一半（探针写、只读复核、实例切换、转只读）跟里程碑「第二个事务」收口表第 16 行一起挪到后面的里程碑；C458（实例切换取内存里的根，不重新读盘）：切换重新读盘择根那条会红的检查；C539（锚点读得出时下一次发布的首条序号不是 1）；C540（末条标志坏在一次发布中间，读者切出两次发布）；C541（原样重发把一次失败放大成整条发布流阻塞）；C558（回退目标是环里最旧的根时回退那次发布会写坏它）。
@@ -351,7 +351,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 ## 三、实现今天的样子
 
-2026-09-26 19:24 JST 现查，`git rev-parse HEAD` = `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`，`git status --porcelain crates/` 有未提交改动（实一至实五的工作区；另一条线可能还在改，执行员开跑前按 S1 逐行重核，行号漂了就按函数名重找、写进第十二节）。
+2026-09-26 现查，`git rev-parse HEAD` = `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`，`git status --porcelain crates/` 有未提交改动（实一至实五的工作区；另一条线可能还在改，执行员开跑前按 S1 逐行重核，行号漂了就按函数名重找、写进第十二节）。
 
 | 文件:行号 | 函数 / 类型 | 它做的那件事 |
 |---|---|---|
@@ -382,7 +382,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 | `crates/singlefs-harness/src/history.rs:338`–`346` | `HistoryOperationKind` | 七种操作；`CloseAndMountWritable` 是关闭 C（不调 `unmount`）；没有挂载内的实例切换 |
 | `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs` | 装置（第一次跑的） | shim `mount_rollback`（`:47`）与 7 处调用、`DEFAULT_WEIGHT_CEILING_WHEN_INFEASIBLE = 12`（`:105`）、`use singlefs_harness::segments::FixedGeometry`（`:89`，文件头 `:9`–`:12` 说只在故障注入 API 的参数类型里用）、单测 43 条（`grep -c '#\[test\]'`） |
 
-实现里没有的（命令原样，2026-09-26 JST 在仓根跑）：
+实现里没有的（命令原样，2026-09-26 在仓根跑）：
 
 ```
 $ grep -rn 'fn [a-z_]*instance_switch\|fn switch_instance\|fn [a-z_]*_switch_[a-z_]*' crates/singlefs-core/src/
@@ -506,9 +506,9 @@ op1 三种（受注入的就是这一次入口调用）：**O1** `mount_writable
 7. 搜法预算 2¹⁷ 个子集、只在权重档边界停；装置里照丙的读数定的「权重上限 12」删掉。
 8. 岔路单第 2 行够判条件 ③ 按「对象不存在」处理，只附算术。
 
-**主 agent 2026-09-26 JST 19:3x 认定**（装置改写之前）：第 1、2、4、6、7、8 条照认。第 3 条照认，另注：C565（挂载处推满仍不够怎么收尾没定） 用户同日已定「挂载照样做成」（D2（RAID 条带策略） 已定项 13 空间那一条的例外），K2 是挂载做成，不算被拒。**第 5 条改**：(b) 的走树范围是读了第一次跑的差集之后定的（第四节已记），照 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「跑产物之前修订臂或判据」那一段，原形照留、新形另起一条臂，两条各自判：「(b) 原形」取第一次跑登记里的走树范围（不含实例表链），「(b) 含链」取根记录能走到的全部结构、含实例表链；两条臂的判定各占一行报，不合成一个结论。
+**主 agent 2026-09-26 认定**（装置改写之前）：第 1、2、4、6、7、8 条照认。第 3 条照认，另注：C565（挂载处推满仍不够怎么收尾没定） 用户同日已定「挂载照样做成」（D2（RAID 条带策略） 已定项 13 空间那一条的例外），K2 是挂载做成，不算被拒。**第 5 条改**：(b) 的走树范围是读了第一次跑的差集之后定的（第四节已记），照 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「跑产物之前修订臂或判据」那一段，原形照留、新形另起一条臂，两条各自判：「(b) 原形」取第一次跑登记里的走树范围（不含实例表链），「(b) 含链」取根记录能走到的全部结构、含实例表链；两条臂的判定各占一行报，不合成一个结论。
 
-**主 agent 2026-09-26 JST 22:5x 跑前修订**（装置改写与任何产物之前；依据：实七在故障注入大档撞到的一形，与用户同日定案「崩溃恢复把一条暂时读不出的最新根当成被抛弃，这个不能接受，这个要改」，`records/2026-09-24-里程碑二收尾调度.md` 第三节「C554 用户定案」那一行）：历史族加 **H1d**——崩溃恢复把最新的根当成读不出（两种造法都做：注入根槽读错 `ReadFails`；根槽读回清零），抛弃它、取号，这一次可写挂载在复用那条根引用的单元槽之后、它自己的写行根落盘之前崩溃；之后故障撤掉、那条根读得出，再挂载。每条臂（岔路单第 1 行三个候选 × 两个指称，第 2 行甲-txg、乙族、乙F-留环、丁族、丙）各报三格，各占一行、不合成一个结论：①恢复落到的根引用的单元有没有被覆盖；②这次挂载是拒还是做成（按 K0–K4 分）；③读回的内容是不是最后一次确认的那一版。原有各节的判据与臂照留，H1d 是加的族，不替换任何一族。实七的最小复现（`research/prompts/m2-impl7-implementer-report.md`「交主 agent 的」第 1 条）：故障注入大档种子基 + 110（7463871032432355223），抛弃根那一步注入 `barrier_fails`，挂载报 `MountError::Publish(BlockDevice)`，重开走到 (1, 3)、报 `MappingStillUnreadable { slot: 50240 }`；崩溃注入快档种子基 + 16 是同一形。H1d 的取样要罩住这两段历史，另在「挂载在写行根落盘之前断」的每个写点上各取一格（注入写失败与崩溃两种）。
+**主 agent 2026-09-26 跑前修订**（装置改写与任何产物之前；依据：实七在故障注入大档撞到的一形，与用户同日定案「崩溃恢复把一条暂时读不出的最新根当成被抛弃，这个不能接受，这个要改」，`records/2026-09-24-里程碑二收尾调度.md` 第三节「C554 用户定案」那一行）：历史族加 **H1d**——崩溃恢复把最新的根当成读不出（两种造法都做：注入根槽读错 `ReadFails`；根槽读回清零），抛弃它、取号，这一次可写挂载在复用那条根引用的单元槽之后、它自己的写行根落盘之前崩溃；之后故障撤掉、那条根读得出，再挂载。每条臂（岔路单第 1 行三个候选 × 两个指称，第 2 行甲-txg、乙族、乙F-留环、丁族、丙）各报三格，各占一行、不合成一个结论：①恢复落到的根引用的单元有没有被覆盖；②这次挂载是拒还是做成（按 K0–K4 分）；③读回的内容是不是最后一次确认的那一版。原有各节的判据与臂照留，H1d 是加的族，不替换任何一族。实七的最小复现（`research/prompts/m2-impl7-implementer-report.md`「交主 agent 的」第 1 条）：故障注入大档种子基 + 110（7463871032432355223），抛弃根那一步注入 `barrier_fails`，挂载报 `MountError::Publish(BlockDevice)`，重开走到 (1, 3)、报 `MappingStillUnreadable { slot: 50240 }`；崩溃注入快档种子基 + 16 是同一形。H1d 的取样要罩住这两段历史，另在「挂载在写行根落盘之前断」的每个写点上各取一格（注入写失败与崩溃两种）。
 
 ### 5.6　装置要本地化的常量
 
@@ -705,7 +705,7 @@ Q2-2a 固定脚本：mkfs → 可写挂载 → 首个文件 → 3 次覆盖写 �
 - **S1**　开跑前重读第三节表里每个函数：`first_txg_of_new_instance` 的两项、`next_counter` 规则、`choose_root` 的比较键、`write_acquired_instance` 写的占位与 F、`persist_the_root_then_rotate_the_system_configuration` 的先后、`isolate_slots_referenced_only_by_abandoned_roots` 只计数不拒绝、`SystemRuntimeQuantities` 的四项、`unmount` 抬 F 到现行 txg。任一处与第三节写的不同 ⇒ 停。特别是：记录那一项没了，「今天 = 丙」不再成立；F 进了 `first_txg_of_new_instance`，「今天 ≠ 乙F」不再成立。
 - **S2**　`e158_arms.tsv` 某一行的旧串在副本里不是恰好命中一次（第七类）⇒ 那一臂停。
 - **S3**　某一臂的副本编不过（第八类）⇒ 那一臂停；今天的 `crates/` 与 D22 已定项 9 的 489 对不上 ⇒ 全停。
-- **S4**　`crates/` 可能正被另一条线改：全部副本从**同一次** `cp -a` 的快照派生，运行记录写下快照时刻（JST）、`git rev-parse HEAD`、`git status --porcelain crates/` 的原样输出与 `crates/` 下全部文件的 sha256 汇总；两份副本的 `crates/`（臂改动之外）对不上 ⇒ 停。
+- **S4**　`crates/` 可能正被另一条线改：全部副本从**同一次** `cp -a` 的快照派生，运行记录写下快照日期、`git rev-parse HEAD`、`git status --porcelain crates/` 的原样输出与 `crates/` 下全部文件的 sha256 汇总；两份副本的 `crates/`（臂改动之外）对不上 ⇒ 停。
 - **S5**　装置自己的根槽 / 指针 / 系统配置 / 实例表解码与 `crates/` 的解析在同一个镜像上对不上，或 7.3 的现算值与 `crates/` 的输出对不上 ⇒ 停。
 - **S6**　装置用 `FixedGeometry` 默认值或 harness 里写死的几何决定工作量（5.6 末）⇒ 停，改完再跑。
 
@@ -717,12 +717,12 @@ Q2-2a 固定脚本：mkfs → 可写挂载 → 首个文件 → 3 次覆盖写 �
 
 （留空；装置写之后、产物之前由执行员写，只许收严或补臂，写明改了什么、依据是哪个单测读数、时点在产物之前。第一节处理表要求写进这一节的删与改——变异行、`replay.sh` 行、shim 调用计数——也写在这里。）
 
-### 12.1　2026-09-26 第 2 次跑第一段（执行员；写于 2026-09-27 00:0x JST，装置第 2 次跑那一节写完、单测跑过之后，任何产物之前）
+### 12.1　2026-09-26 第 2 次跑第一段（执行员；写于 2026-09-27，装置第 2 次跑那一节写完、单测跑过之后，任何产物之前）
 
 依据的单测都在 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs` 的测试模块里（第 2 次跑那一节的单测），在草稿副本上跑过、全绿；原判据与原臂一条都不改。
 
 1. **H1c 与 H1d 的 b 补一支 `unit_first_copy`（只补不改）**：断链发布第一条记录点名的第一个单元，只让位置条目第一条那一份读不出。依据：单测 `replay_stops_at_the_first_copy_of_a_named_unit_so_the_second_copy_is_never_read`——b = unit（两份都坏）时第二份落点被拦下的读次数是 0（`recovery.rs` `replay_journal` 验点名单元是 `named.locations.iter().all(...)`，第一份读错就不再读第二份），照 V2 那些试次作废；只坏第一份就断得了链、最新那条根被抛弃。原 b = unit 那一支照跑、照 V2 记作废，不删。这一条也让 F6 的「最少故障数」量到 2（根槽 1 + 单元一份 1），比登记推的 3 少；F6 原文「只量得出 3 不够」那一句照留。
-2. **H1d 的操作化（主 agent 22:5x 跑前修订没给参数，这里写死）**：G0；历史 = mkfs → `mount_writable`（实例 1）→ 首个文件 → n1 次覆盖写 → 关闭 C，**n1 ∈ {0, 1, 2, 3}**；抛弃步 = 一次 `mount_writable`，瞬时藏最新那 1 条根的根槽加断链（b ∈ {records, unit, unit_first_copy}），两种造法（读错 `read_fails`、读回清零 `reads_zeros`）各对全部落点整套施加；这次挂载「在写行根落盘之前断」取四类：不断（`none`，挂载做完）、崩溃（`crash`：设备一层前 j 个写落盘、第 j 个起没落，j 取 0 到写行根那个写的下标 J，逐个取）、注入写失败（`write_fails`：整池第 j 个写报错，j 同样取 0 到 J）、注入屏障失败（`barrier_fails`：写行根之前的每一次屏障逐个报错）；之后撤故障、再做一次不注入的 `mount_writable`，再冷启动 `recover` 读回。三格：① 恢复落到的那条根（`crates` 的 `choose_root` 与装置自己的择根逐条比，不等走 S5）引用的单元——账里没释放的分配记录、树表、映射树根、分配记录树根、实例表链各片——在断之前与断之后两份镜像上的字节有没有不同；那条根是这次挂载自己写出的（`none` 那一格）时记 `written_in_this_mount`；被藏那条根的单元另报一栏；② 再挂载那一次 K0–K4；③ 读回的是不是最后一次确认的那一版（被藏那条根的内容）。依据 n1 从 0 起：单测 `the_row_publish_before_its_root_overwrites_the_hidden_newest_root_only_when_it_is_the_first_file`——n1 = 0 时写行那次发布在根落盘之前的写盖到被藏的首个文件那条根的单元，n1 = 1 时一处不盖（最新根与前一条根同在一个开放段，写行那次发布开的是更高的新段）；只取 n1 ≥ 1 就量不到实七那一形。崩溃只取前缀那一种状态（层 0 的段内子集没有逐个枚举），这一条写进「它答不了的」。岔路单第 1 行的 (b) 两条臂（原形、含链）与 (c) 在 `crates/` 里没有实现（第三节末句）：它们与今天的差别只在「取号之前或别处的计数 > 0」的那几格，装置在今天那一臂上数出这几格、列出来，其余格就是今天那一臂的三格；(a) 在 A1 副本上真跑；岔路单第 2 行六条臂在各自副本上真跑。
+2. **H1d 的操作化（主 agent 跑前修订没给参数，这里写死）**：G0；历史 = mkfs → `mount_writable`（实例 1）→ 首个文件 → n1 次覆盖写 → 关闭 C，**n1 ∈ {0, 1, 2, 3}**；抛弃步 = 一次 `mount_writable`，瞬时藏最新那 1 条根的根槽加断链（b ∈ {records, unit, unit_first_copy}），两种造法（读错 `read_fails`、读回清零 `reads_zeros`）各对全部落点整套施加；这次挂载「在写行根落盘之前断」取四类：不断（`none`，挂载做完）、崩溃（`crash`：设备一层前 j 个写落盘、第 j 个起没落，j 取 0 到写行根那个写的下标 J，逐个取）、注入写失败（`write_fails`：整池第 j 个写报错，j 同样取 0 到 J）、注入屏障失败（`barrier_fails`：写行根之前的每一次屏障逐个报错）；之后撤故障、再做一次不注入的 `mount_writable`，再冷启动 `recover` 读回。三格：① 恢复落到的那条根（`crates` 的 `choose_root` 与装置自己的择根逐条比，不等走 S5）引用的单元——账里没释放的分配记录、树表、映射树根、分配记录树根、实例表链各片——在断之前与断之后两份镜像上的字节有没有不同；那条根是这次挂载自己写出的（`none` 那一格）时记 `written_in_this_mount`；被藏那条根的单元另报一栏；② 再挂载那一次 K0–K4；③ 读回的是不是最后一次确认的那一版（被藏那条根的内容）。依据 n1 从 0 起：单测 `the_row_publish_before_its_root_overwrites_the_hidden_newest_root_only_when_it_is_the_first_file`——n1 = 0 时写行那次发布在根落盘之前的写盖到被藏的首个文件那条根的单元，n1 = 1 时一处不盖（最新根与前一条根同在一个开放段，写行那次发布开的是更高的新段）；只取 n1 ≥ 1 就量不到实七那一形。崩溃只取前缀那一种状态（层 0 的段内子集没有逐个枚举），这一条写进「它答不了的」。岔路单第 1 行的 (b) 两条臂（原形、含链）与 (c) 在 `crates/` 里没有实现（第三节末句）：它们与今天的差别只在「取号之前或别处的计数 > 0」的那几格，装置在今天那一臂上数出这几格、列出来，其余格就是今天那一臂的三格；(a) 在 A1 副本上真跑；岔路单第 2 行六条臂在各自副本上真跑。
 3. **读落点被这次调用自己写过之后不再拦**（补写读法写死表「故障」没写的一格）：同 `crates/singlefs-harness/src/history.rs` 的 `DeviceReadingZerosOverHiddenRanges`。依据：单测 `instrumented_device_fails_or_zeroes_only_reads_over_the_named_ranges_and_counts_them`。
 4. **PC1-c 的历史收严**：只取「读得出的被抛弃根只有一条」的节点（顺延规则照旧），「a 独占的槽在这次挂载交回的分配器里一个都没隔离」就读成「隔离总数 = 0」（`crates` 的分配器不交出逐槽的隔离位，只交 `isolated_slots_per_device`）；独占集合取「a 的单元减去全部别的可读根的单元」（比「减候选根与当前账」减得多，独占集合只会更小）；另跑一次不注入的孪生挂载报隔离数，证这一格分得出。依据：单测 `abandonment_step_produces_abandoned_roots_from_two_hidden_roots_and_none_from_one_with_its_records`（k = 2 那一格一次造出两条被抛弃根，多条时隔离总数混着别的根）。
 5. **实七两段复现历史的参数**：故障注入大档那一段 = 种子基 + 110、30 步、注入 6 次、每步跑池级 checker、两块 4 GiB 盘、按式子判准入（大档用例的缺省）；崩溃注入快档那一段 = 种子基 + 16、24 步、每段抽 4 个崩溃状态、不跑每步 checker（快档那一档）。直接调 `crates/singlefs-harness` 自己的 `inject_faults_into_history` / `inject_crashes_into_history`，报每个新发现的签名、重开或读回走到哪、有没有 `MappingStillUnreadable`；种子基本地写、开跑回比。

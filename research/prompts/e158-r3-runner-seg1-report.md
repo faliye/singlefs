@@ -1,6 +1,6 @@
-# E158 第 3 次跑第一段 执行员报告（交接版，2026-09-27 02:3x JST）
+# E158 第 3 次跑第一段 执行员报告（交接版，2026-09-27）
 
-主 agent 02:2x JST 来消息要求交接（上下文到线、跑满一小时），停在下面「做到一半」那一处。时刻都是 JST。
+主 agent 来消息要求交接（上下文到线、跑满一小时），停在下面「做到一半」那一处。
 
 ## 一、结论
 
@@ -16,11 +16,11 @@
 
 ## 二、快照、S0、S1–S3、S8
 
-- 快照：2026-09-27 01:20:12 JST 对 `crates/` 做了一次 `cp -a`（`/tmp/claude-1000/e158-r3-runner/snapshot-crates`）；`git rev-parse HEAD` = `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`；`crates/` 145 个文件的 sha256 清单 `snapshot-manifest.sha256`，清单本身 sha256 = `74912842b9a57eeb09336fbe3207866c9204fd565bbc1930c994b9bede44a41a`（写进每份产物第一行 `E7INPUT name=crates_snapshot …`）；`git status --porcelain crates/` 104 行原样在 `snapshot-git-status.txt`（01:21:58 再核一次清单仍相同时取的）。
+- 快照：2026-09-27 对 `crates/` 做了一次 `cp -a`（`/tmp/claude-1000/e158-r3-runner/snapshot-crates`）；`git rev-parse HEAD` = `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`；`crates/` 145 个文件的 sha256 清单 `snapshot-manifest.sha256`，清单本身 sha256 = `74912842b9a57eeb09336fbe3207866c9204fd565bbc1930c994b9bede44a41a`（写进每份产物第一行 `E7INPUT name=crates_snapshot …`）；`git status --porcelain crates/` 104 行原样在 `snapshot-git-status.txt`（再核一次清单仍相同时取的）。
 - S0（快照上逐条重核，行号现查）：`recovery.rs:716` 择根那一遍 `Unreadable => continue` 仍丢读错的槽；`mount.rs:2398` 只判「落后」；`transaction.rs:696` 取号写 tail 0；`transaction.rs:1025` 根槽之后轮换系统配置、`:1613`/`:1658` 写末条记录计数器；`mount.rs:888` `rebuilt_allocator` 仍再择根再读实例表；`recovery.rs:2035` 验点名单元 `.all` 第一份读不出就停；`mount.rs:750` 影子账只 `unreadable += 1`。快照里没有 A1 那种拒（`grep -rn AbandonedRootLedgerUnreadable` 零命中），S0 例外不适用。**S0 不停。**
 - S1：九份副本 `arms/<臂>/`（臂名 today jia-cfg jia-cfg-carry jia-slot yi-cfg yi-cfg-carry yi-slot bing-cfg bing-cfg-carry）都从 `snapshot-crates` 派生，按仓里 `research/mutations/e158_arms.tsv` 新加的 15 行 r3 行（第 36–51 行，含一行注释）套用（`apply_arm.py`，旧串恰好命中一次）：甲-配置、甲-槽、乙-配置、乙-槽、丙-配置 各 11 行，三条「续」各 12 行，今天 0 行。
 - S2：九份都编得过（0 warning）。S3：九份两两比，差别只落在臂表点名的五个文件里（`mount.rs`、`transaction.rs`、`history.rs`、`model_comparison.rs`、`singlefs-harness/Cargo.toml`），今天那一份与快照只差装置 bin 一个文件。
-- S8 / `r2-all`：01:21:15 与 01:21:25 两次核工作树 `crates/` 清单与快照逐字节相同，其间照 `driver_e158_r2_all` 同一条命令跑 `r2-all`，产物加 `E7INPUT` 头落成 `research/results/e158-root-choice-repair-2026-09-27-r2-all-today.out`（1055 行，末行 `E7RESULT name=done emitted=1054`）；这一次没有任何 `verdict=fail`，判定词那一处改动（两处 `H1c 里找不到` 改成 `not_constructible`）不改它的任何一行。与旧的 `…-2026-09-26-r2-all-today.out` 对不上：`r2_h1d_cell` 800 → 832 行、`r2_seventh_batch_crash_finding` 1 → 0 行（H1d 摘要 `cases=832 … last_confirmed 696`；实七-乙 那一段 `findings_reading_back_mapping_still_unreadable=0`，第二段的 S5 可能复现不出，先提醒）。`replay.sh` 那一行已改指新文件，旧文件留着。01:2x 之后工作树的 `crates/` 已被别人改过（`mutations.tsv`、`checker/src/image.rs`、`walk.rs` 等），这一行照旧会漂，不归这一次。
+- S8 / `r2-all`：前后两次核工作树 `crates/` 清单与快照逐字节相同，其间照 `driver_e158_r2_all` 同一条命令跑 `r2-all`，产物加 `E7INPUT` 头落成 `research/results/e158-root-choice-repair-2026-09-27-r2-all-today.out`（1055 行，末行 `E7RESULT name=done emitted=1054`）；这一次没有任何 `verdict=fail`，判定词那一处改动（两处 `H1c 里找不到` 改成 `not_constructible`）不改它的任何一行。与旧的 `…-2026-09-26-r2-all-today.out` 对不上：`r2_h1d_cell` 800 → 832 行、`r2_seventh_batch_crash_finding` 1 → 0 行（H1d 摘要 `cases=832 … last_confirmed 696`；实七-乙 那一段 `findings_reading_back_mapping_still_unreadable=0`，第二段的 S5 可能复现不出，先提醒）。`replay.sh` 那一行已改指新文件，旧文件留着。之后工作树的 `crates/` 已被别人改过（`mutations.tsv`、`checker/src/image.rs`、`walk.rs` 等），这一行照旧会漂，不归这一次。
 
 ## 三、做完的：装置、臂表、产物
 
@@ -162,11 +162,11 @@ E7RESULT name=r3_q5_extra_reads arm=bing-cfg family=h1e cells=16 positive_cells=
 
 ## 八、做到一半的（接手从这里起）
 
-1. **装置 v3 没重验**。产物之后为过门禁 33 号（我新加的代码与第 2 次跑 6 行变异原文撞锚：`crates/mutations.tsv` 第 837、838、839、844、846、851 行各在 bin 里命中 2 次）与 clippy（我自己新代码的 `geometry` 遮蔽两处、一个可折叠的 `if`）在仓里又改了 bin（只改写法：`fails = true` 改成块、`*written_over = … || …`、`this_write_is_the_injected_failure`、`copies` 改 match、`1 + highest_root.max(highest_record)`、`count` 改名 `intercepted`、两处 `base_pool_geometry`、F4 那个 if 折叠），并同步改了 `crates/mutations.tsv` 第 952 行（M13）的原文与替换文。现在仓里 bin sha256 = `4d515fdee15c76893446cae3509f1e56baab4c22c55d78fc625e5f080ddaaf07`，**与出产物的那一版不同**。要做：`cp` 仓里 bin 到 `arms/<九臂>/crates/singlefs-harness/src/bin/`、重编、`bash run_products.sh`（它会把现有 `products/` 覆盖——先 `mv products products-v2`）、逐份 `cmp` 与 `research/results/` 下九份 + compare（期望逐字节相同）；今天那一份副本上重跑单测（68 条）与 clippy（登记里 7 个编码纪律 lint，现存只该剩第 2 次跑那两处 `ranges`/`run` 遮蔽：`e158_root_choice_repair.rs:7244`、`:7245`）；`trial/today` 换成仓里 bin 后跑 `check_mutations.sh`（它读 `r3-mutation-rows.tsv`，先 `grep '第 3 次跑 M' crates/mutations.tsv | cut -f1-6 > r3-mutation-rows.tsv` 刷新）；重跑门禁 33 号（02:3x 修完 M13 那一行之后重跑：rc=1，E158 零命中；红的全是别人的行，`crates/mutations.tsv` 第 308、309、310、319、494、759、865、870、874、877、878 行，工作树别处正在被改，不归这一段）。
+1. **装置 v3 没重验**。产物之后为过门禁 33 号（我新加的代码与第 2 次跑 6 行变异原文撞锚：`crates/mutations.tsv` 第 837、838、839、844、846、851 行各在 bin 里命中 2 次）与 clippy（我自己新代码的 `geometry` 遮蔽两处、一个可折叠的 `if`）在仓里又改了 bin（只改写法：`fails = true` 改成块、`*written_over = … || …`、`this_write_is_the_injected_failure`、`copies` 改 match、`1 + highest_root.max(highest_record)`、`count` 改名 `intercepted`、两处 `base_pool_geometry`、F4 那个 if 折叠），并同步改了 `crates/mutations.tsv` 第 952 行（M13）的原文与替换文。现在仓里 bin sha256 = `4d515fdee15c76893446cae3509f1e56baab4c22c55d78fc625e5f080ddaaf07`，**与出产物的那一版不同**。要做：`cp` 仓里 bin 到 `arms/<九臂>/crates/singlefs-harness/src/bin/`、重编、`bash run_products.sh`（它会把现有 `products/` 覆盖——先 `mv products products-v2`）、逐份 `cmp` 与 `research/results/` 下九份 + compare（期望逐字节相同）；今天那一份副本上重跑单测（68 条）与 clippy（登记里 7 个编码纪律 lint，现存只该剩第 2 次跑那两处 `ranges`/`run` 遮蔽：`e158_root_choice_repair.rs:7244`、`:7245`）；`trial/today` 换成仓里 bin 后跑 `check_mutations.sh`（它读 `r3-mutation-rows.tsv`，先 `grep '第 3 次跑 M' crates/mutations.tsv | cut -f1-6 > r3-mutation-rows.tsv` 刷新）；重跑门禁 33 号（修完 M13 那一行之后重跑：rc=1，E158 零命中；红的全是别人的行，`crates/mutations.tsv` 第 308、309、310、319、494、759、865、870、874、877、878 行，工作树别处正在被改，不归这一段）。
 2. **`bash research/scripts/replay.sh E158` 没跑**（会把 E158 下 15+2 行全跑一遍；登记行已加：`E158|@driver_e158_r3_seg1_today||e158-root-choice-repair-2026-09-27-r3-seg1-today.out|exact`、`…r3_seg1_compare…`，驱动在 `driver_e158_r2_all` 之后）。预期：compare 那一行逐字节相同；r3-seg1 今天与 r2-all 两行读工作树的 `crates/`，工作树已经不是快照，可能对不上，照实报。
 3. **实验页、索引行、`experiments-history.md` 条目都没写**；doc-lint 没跑；门禁 27、34、40、69、75、84、85、86、88、99 号（读实验页的那几道）没跑。门禁 40 号会因为十份新产物没被实验页点名而红。已跑的：33 号 rc=1（见上，E158 已清零）、52 号 rc=1（E142 段序列表，与这一段无关）、80 号 rc=0 末行 `✓ 152 个实验二进制各自至少有一条绝对值断言…`、96 号 rc=0 末行 `✓ 实验源码纪律：扫了 152 个文件…`。
    实验页要写的（给接手的）：页首状态括注接「2026-09-27 第 3 次跑第一段（…）」；在「2026-09-26：第 2 次跑第一段」一节之前加「2026-09-27：第 3 次跑第一段（重跑登记 `research/prompts/e158-r3-prereg.md`）」一节，点名第三节表里十份新产物与 `…-2026-09-27-r2-all-today.out`、`research/mutations/e158_r3_arm_mutations.tsv`；新代号（Q0–Q8、H1e、L0–L6、PC-N、PC-O、PC-N0、N_真、V5、F13、F14、M1–M15 等）加进 `doc-lint:not-numbers`；「影响的决策」表五行都要写 2026-09-27 的回看（`grep -c 'E158（'` 在 D16、D23、D22、D8、D28 五个决策文件里都是 0，全是备料），另加这一段正文会提到的 D23 已定项 15、18，D16 已定项 1、7 四行（备料）；页末「历史版本」加 2026-09-27 条。
-4. 登记「十二、修订」：已写 14 条（01:52 JST 落盘，产物 01:56 起跑）；之后只把那一段的时刻标签从「02:0x」改成实际的「01:52」（产物之后，内容没动）。产物之后的装置改动（改名、防撞锚、clippy）都不改输出，还没写进修订——按定义「产物跑过之后不改登记」，交主 agent 决定记在哪。
+4. 登记「十二、修订」：已写 14 条（落盘，在产物起跑之前）；之后只把那一段的时刻标签改成实际的时刻（产物之后，内容没动）。产物之后的装置改动（改名、防撞锚、clippy）都不改输出，还没写进修订——按定义「产物跑过之后不改登记」，交主 agent 决定记在哪。
 
 ## 九、草稿目录里留着的副本（都没删，理由）
 

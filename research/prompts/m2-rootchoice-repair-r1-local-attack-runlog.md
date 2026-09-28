@@ -1,4 +1,4 @@
-# 运行记录：m2-rootchoice-repair-r1-local-attack（2026-09-22 UTC）
+# 运行记录：m2-rootchoice-repair-r1-local-attack（2026-09-22）
 
 提示文件：`research/prompts/m2-rootchoice-repair-r1-local-attack.md`（英文，K4：C335 链条怎么不再是
 吸收态，6 个 judgment 各 3 项子答复 = 18 格；K6：K2/K3/K4/K5 四格改法会不会互相打架，18 个 judgment

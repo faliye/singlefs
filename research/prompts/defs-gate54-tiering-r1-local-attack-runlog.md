@@ -1,4 +1,4 @@
-# 运行记录：defs-gate54-tiering-r1-local-attack（2026-09-23 UTC）
+# 运行记录：defs-gate54-tiering-r1-local-attack（2026-09-23）
 
 提示文件：`research/prompts/defs-gate54-tiering-r1-local-attack.md`（英文，覆盖 K1 五格、K2 四格，
 共 9 个标签，每格 WHATHAPPENS + GATE 两段 + 一句 "This would be refuted by:"）。转述核对表：

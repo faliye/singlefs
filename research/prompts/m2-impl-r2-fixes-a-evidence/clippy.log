@@ -1,0 +1,4 @@
+    Checking singlefs-checker v0.1.0 (/tmp/claude-1000/impl-r2-fixes-a/copy/crates/singlefs-checker)
+    Checking singlefs-core v0.1.0 (/tmp/claude-1000/impl-r2-fixes-a/copy/crates/singlefs-core)
+    Checking singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-a/copy/crates/singlefs-harness)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.22s

@@ -366,7 +366,7 @@ omitClaudeMd: true
 ```markdown
 # 门禁 54 号分档：交回报告
 
-改好的文件：`/home/fy5090/code/singlefs/.claude/gate.d/54-layer0-replay.sh`（338 行，sha256 `86ff561e868cab9ffb138a2e5fbcd668c467caea6939592c32485a162e017ec9`）。
+改好的文件：`.claude/gate.d/54-layer0-replay.sh`（338 行，sha256 `86ff561e868cab9ffb138a2e5fbcd668c467caea6939592c32485a162e017ec9`）。
 改前备份：`/tmp/claude-1000/gate54-tiering/54-layer0-replay.sh.orig`（sha256 `5bd04b7b…`，门禁修复会话那一处改动已在里面）；与它的 diff：`/tmp/claude-1000/gate54-tiering/54.diff`（+221 / −25 行）。
 没暂存、没提交。`stage-inputs.tsv` 没改（`git diff --quiet HEAD -- .claude/gate.d/stage-inputs.tsv` 退出码 0）。
 
@@ -388,7 +388,7 @@ omitClaudeMd: true
 
 原有几样的去向：线程数判定（`worker_threads_are_acceptable`）、`LAYER0` 下一行不是 `CHECKER` 判红（门禁修复会话那一块，一字未动）、`exhaustive=true` 判定、两条流的 release 全量跑法，都原样留在 --full 那条路上；改动范围没碰输入退 77、`stage-must-run.sh` 复用判定原样留在快档上。
 
-标记：`$(git -C <根> rev-parse --path-format=absolute --git-common-dir)/singlefs-layer0-full-green`，真仓里就是 `/home/fy5090/code/singlefs/.git/singlefs-layer0-full-green`。内容（自证临时仓里写出的一份原样见附录 A 开头）：`input_hash=`、`input_file_count=`、`input_paths=`、`started_utc=`、`finished_utc=`、`judged_root=`、`worker_threads=`、`LAYER0 …`、`CHECKER …`、`LAYER0B …` 三行原样，再逐文件一行 `input_file <sha256>  <路径>`。
+标记：`$(git -C <根> rev-parse --path-format=absolute --git-common-dir)/singlefs-layer0-full-green`，真仓里就是 `.git/singlefs-layer0-full-green`。内容（自证临时仓里写出的一份原样见附录 A 开头）：`input_hash=`、`input_file_count=`、`input_paths=`、`started_utc=`、`finished_utc=`、`judged_root=`、`worker_threads=`、`LAYER0 …`、`CHECKER …`、`LAYER0B …` 三行原样，再逐文件一行 `input_file <sha256>  <路径>`。
 
 输入哈希：路径取 `stage-inputs.tsv` 里 `54-layer0-replay.sh` 那一行（`crates/ Cargo.toml Cargo.lock .claude/kb/layout/ research/results/`）；文件集是 `git ls-files -z --cached --others --exclude-standard -- <这几条>` 里磁盘上真存在的文件，`LC_ALL=C sort -zu` 排序，逐个 `sha256sum`，整张清单再 `sha256sum` 一次。不按 git 对象算；附录 A「--staged 那条路」一段证明工作区跑的 --full 与临时 worktree 里的快档对同一份内容算出同一个哈希。
 
@@ -402,7 +402,7 @@ omitClaudeMd: true
 做法：`/tmp/claude-1000/gate54-tiering/selftest-repo`（`git init` 的临时仓，只放 54 号、`stage-inputs.tsv`、`stage-must-run.sh`、`change-touches-crates.sh` 与五个假输入文件），`/tmp/claude-1000/gate54-tiering/fake-bin/cargo` 按 `--include-ignored` 有没有打全量或快档的合成日志，环境变量控制缺 `CHECKER` 行、cargo 判红、第二条流跑时改一个输入。驱动脚本 `research/prompts/defs-gate54-tiering-implementer/selftest-driver.sh`，全部原样输出 `/tmp/claude-1000/gate54-tiering/selftest-output.txt`（194 行，全文在附录 A）。快档用 `SINGLEFS_GATE_FULL=1` 越过「没碰 crates/ 退 77」那一问（临时仓相对 HEAD 没改动）。
 不在真仓里做这几样，是因为合成日志跑出来的 --full 会在真仓 common-dir 里留一份假的全绿标记。
 
-1. **标记相等判绿**：附录 A「自证一」，退出码 0，成功句报「第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored」并原样带出标记里的 `LAYER0` / `CHECKER` / `LAYER0B` 三行与 `全量跑完于 2026-09-23T17:13:31Z`。
+1. **标记相等判绿**：附录 A「自证一」，退出码 0，成功句报「第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored」并原样带出标记里的 `LAYER0` / `CHECKER` / `LAYER0B` 三行与 `全量跑完于 2026-09-24`。
 2. **改一个输入文件一个字节判红**：`cmp` 报 `differ: byte 13, line 1`；附录 A「自证二」，退出码 1，列出「内容不同：crates/singlefs-harness/src/lib.rs」，出路句是「这批输入的层 0 全量没在收尾跑过：跑 `bash .claude/gate.d/54-layer0-replay.sh --full`」。改回那个字节再跑，退出码 0（证明红的就是那一个字节）。
 3. **删掉标记判红**：附录 A「自证三」，退出码 1，同一句出路。真仓里也现跑了一次（下一节），真仓本来就没有标记，同样判红。
 4. **--full 判红时不写标记**：附录 A「自证四」两支——合成日志里 `LAYER0` 下一行不是 `CHECKER`（门禁修复会话那一支判红，退出码 1）、假 cargo 退 101（「层 0 崩溃点重放的用例判红」，退出码 1）；两次跑完都是「[标记不在]」（开跑前标记在，开跑先删、判红不写）。紧接着跑快档，退出码 1、报没有标记。
@@ -416,17 +416,17 @@ omitClaudeMd: true
 ````markdown
 ## 真仓里快档真跑一次
 
-命令：`nice -n 19 bash .claude/gate.d/54-layer0-replay.sh`（不带 `--full`，工作区，没设 `SINGLEFS_STAGED_TREE`，所以复用那一问答「要跑」，改动范围那一问答「碰了」）。开跑 2026-09-23T17:12:35Z，结束 17:16:39Z（挂钟 4 分 4 秒，大半是 release 编译）。ps 看到的 cargo 命令行是 `cargo test --release -p singlefs-harness --test first_transaction_step_seven_layer0 -- --nocapture`（没有 `--include-ignored`）。
+命令：`nice -n 19 bash .claude/gate.d/54-layer0-replay.sh`（不带 `--full`，工作区，没设 `SINGLEFS_STAGED_TREE`，所以复用那一问答「要跑」，改动范围那一问答「碰了」）。开跑 2026-09-24（挂钟 4 分 4 秒，大半是 release 编译）。ps 看到的 cargo 命令行是 `cargo test --release -p singlefs-harness --test first_transaction_step_seven_layer0 -- --nocapture`（没有 `--include-ignored`）。
 全文 `/tmp/claude-1000/gate54-tiering/real-quick-run.log`，其中 `LAYER0_PROGRESS` 转发行 123 行（`grep -c`）；末尾原样：
 
 ```
-  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 8 条通过、1 条 ignored），但没有层 0 全量的全绿标记（/home/fy5090/code/singlefs/.git/singlefs-layer0-full-green）
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 8 条通过、1 条 ignored），但没有层 0 全量的全绿标记（.git/singlefs-layer0-full-green）
      → 怎么办：这批输入的层 0 全量没在收尾跑过：跑 `bash .claude/gate.d/54-layer0-replay.sh --full`
 exit=1
-finish=2026-09-23T17:16:39Z
+finish=2026-09-24
 ```
 
-跑完 `ls` 真仓 common-dir：`ls: cannot access '/home/fy5090/code/singlefs/.git/singlefs-layer0-full-green': No such file or directory`——真仓里没有留下标记。真仓的 --full 没有真跑（按派发，机器被编译占满；两条流合计约 4 小时）。
+跑完 `ls` 真仓 common-dir：`ls: cannot access '.git/singlefs-layer0-full-green': No such file or directory`——真仓里没有留下标记。真仓的 --full 没有真跑（按派发，机器被编译占满；两条流合计约 4 小时）。
 
 ````
 

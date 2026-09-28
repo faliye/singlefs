@@ -64,8 +64,8 @@ PROCESS_IDENTIFIER_REUSE_SLACK_SECONDS = 2.0
 # 有意跨轮复用的缓存：不判残留、clean 不碰。每条写明谁在用它。
 ALLOWLIST = (
     (re.compile(r'^singlefs-crates-mutation-target(-w[0-9]+)?$'),
-     '门禁 59 号的 cargo 编译产物目录，跨轮复用；带 -w<片号> 的是它分片并发跑时每片各自的那一个'
-     '（.claude/gate.d/59-crates-mutation-replay.sh 的 prepare_shard）'),
+     '门禁 checker-tier-crates-mutation-replay 的 cargo 编译产物目录，跨轮复用；带 -w<片号> 的是它分片并发跑时每片各自的那一个'
+     '（.claude/gate.d/checker-tier-crates-mutation-replay.sh 的 prepare_shard）'),
     (re.compile(r'^singlefs-mutate-target$'),
      'mutate.sh 的 cargo 编译产物目录，跨轮复用（research/scripts/mutate.sh 的 MUTATE_TARGET）'),
     (re.compile(r'^singlefs-e152-packages$'),
@@ -101,10 +101,11 @@ def format_bytes(byte_count):
 
 
 def format_time(epoch_seconds):
-    """本机时钟是 UTC，用户看的是东京时间：两个都写。"""
-    universal = datetime.datetime.fromtimestamp(epoch_seconds, datetime.timezone.utc)
-    tokyo = universal.astimezone(TOKYO_TIMEZONE)
-    return f'{universal:%Y-%m-%d %H:%M} UTC（东京 {tokyo:%m-%d %H:%M}）'
+    """东京的日期，外加离现在多久；不写钟点与时区词（时间只写到日期）。"""
+    tokyo = datetime.datetime.fromtimestamp(epoch_seconds, TOKYO_TIMEZONE)
+    age_minutes = int(max(time.time() - epoch_seconds, 0)) // 60
+    age = f'{age_minutes // 60} 小时 {age_minutes % 60} 分钟前' if age_minutes >= 60 else f'{age_minutes} 分钟前'
+    return f'{tokyo:%Y-%m-%d}（{age}）'
 
 
 def default_temporary_directories():
@@ -325,7 +326,7 @@ def classify_temporary_entry(path, open_path_scan, now_epoch, recent_seconds, pr
         if openers:
             return build('in_use', f'{owner_description}，但 {describe_openers(openers)}')
         if produced_after and latest_modification_epoch >= produced_after:
-            # 这一次跑自己产生的：门禁 59 号让每条变异点名的测试判红，那些测试红在断言上就 panic，
+            # 这一次跑自己产生的：门禁 checker-tier-crates-mutation-replay 让每条变异点名的测试判红，那些测试红在断言上就 panic，
             # 写在断言之后的清理走不到（C448）。它确实是垃圾，但不是「上一轮没清干净」，不该让整道红。
             return build('produced_by_this_run', f'{owner_description}，也没有进程开着它'
                          f'（名字形态出自 {source}）；这一次跑自己产生的，本次跑完再清')
@@ -806,7 +807,7 @@ def judge_devices(device_scan):
             f'{len(device_scan.residual_emulators)} 个命令行里带 singlefs 的 qemu-system* 进程',
             [f'pid {process_identifier}（父 pid {parent_identifier}）：{command_text[:160]}'
              for process_identifier, parent_identifier, command_text in device_scan.residual_emulators],
-            '确认它不是正在跑的门禁 55 号或 vm-bench.sh 之后，按列出的 pid 另起一条 kill <pid> 停掉'
+            '确认它不是正在跑的门禁 checker-tier-qemu-device-streams 或 vm-bench.sh 之后，按列出的 pid 另起一条 kill <pid> 停掉'
             '（clean 不自动杀进程）；父 pid 是 1 多半是跑它的脚本已经没了'))
     else:
         results.append(CategoryResult('残留测试设备·qemu 进程', 'green',
@@ -1190,7 +1191,7 @@ def run_clean(environment, confirmed):
         print(f'    · 没扫到：{directory_text}')
     # 不碰的那几项要在最后一行也报出来。逐条列在上面了，而读的人常常只看末尾那一行——
     # 「太新」这一档尤其要点名：它不是白名单，是这一次清不掉、下一次门禁开跑前又已经存在，
-    # 于是 77 号必然判它红（清完紧接着跑门禁时撞过一次，白跑一轮全量）。
+    # 于是 harness-test-environment 必然判它红（清完紧接着跑门禁时撞过一次，白跑一轮全量）。
     too_recent = [entry for entry in kept if '可能正在跑' in entry.reason]
     kept_summary = (f'；不碰 {len(kept)} 项'
                     + (f'，其中 {len(too_recent)} 项只是太新（不到 {environment.recent_seconds // 60} 分钟没改），'
@@ -1445,7 +1446,7 @@ def check_devices_and_clean(recorder, environment, holders, fake_temporary, outs
     recorder.expect(dry_run_exit == 0 and not recorded_commands and all_present,
                     f'不带 --yes 的 clean 不许动任何东西：退出码 {dry_run_exit}，命令 {recorded_commands}')
     # 汇总那一行自己要报出「不碰几项、其中几项只是太新」：读的人常常只看末尾一行，而「太新」这一档
-    # 这一次清不掉、下一次门禁开跑前又已经存在，77 号必然判它红（实测因此白跑一轮全量门禁）。
+    # 这一次清不掉、下一次门禁开跑前又已经存在，harness-test-environment 必然判它红（实测因此白跑一轮全量门禁）。
     dry_run_summary = next((line for line in dry_run_output.getvalue().split('\n') if '没动任何东西' in line), '')
     kept_count = sum(1 for verdict in expectations.values() if verdict != 'residual')
     recorder.expect(f'不碰 {kept_count} 项' in dry_run_summary,
@@ -1475,7 +1476,7 @@ def check_devices_and_clean(recorder, environment, holders, fake_temporary, outs
                     f'次序应是先卸载（深的先）、再拆 dm、最后摘 loop：{recorded_commands}')
 
 
-KERNEL_LOG_PREFIX = '2026-09-10T06:05:39+0000 selftest-host kernel: '
+KERNEL_LOG_PREFIX = '2026-09-10T06:05:39+0000 selftest-host kernel: '   # clock-times:allow 自检造的内核日志行，格式照 journalctl -o short-iso
 TEST_DEVICE_LOG_LINES = [
     KERNEL_LOG_PREFIX + 'Buffer I/O error on dev dm-0, logical block 1, async page read',
     KERNEL_LOG_PREFIX + 'device-mapper: table: 252:0: thin-pool: Invalid block size (-EINVAL)',
@@ -1612,12 +1613,12 @@ def build_argument_parser():
     parser.add_argument('--minimum-free-percent', type=float, default=10.0, help='剩余空间下限（百分比），默认 10')
     parser.add_argument('--produced-after', type=float, default=0.0,
                         help='这个时刻（epoch 秒）之后才出现的临时条目，单列成「这一次跑自己产生的」、不判红；'
-                             '门禁 77 号把本次门禁的开跑时刻传进来（C448）')
+                             '门禁 harness-test-environment 把本次门禁的开跑时刻传进来（C448）')
     parser.add_argument('--minimum-free-gibibytes', type=float, default=50.0, help='剩余空间下限（GiB），默认 50；两条取严')
     parser.add_argument('--recent-minutes', type=float, default=10.0,
                         help='名字里没有 pid 的条目这么多分钟内还在改就当可能正在跑，默认 10')
     parser.add_argument('--kernel-log-since', default='',
-                        help='只看这个时间之后的内核日志（传给 journalctl --since，按本机时钟 UTC）；默认本次开机以来')
+                        help='只看这个时间之后的内核日志（传给 journalctl --since，按本机时钟的时区读）；默认本次开机以来')
     parser.add_argument('--smart', action='store_true', help='再用 sudo 跑 smartctl -H 或 nvme smart-log')
     parser.add_argument('--yes', action='store_true', help='clean 真的动手')
     return parser

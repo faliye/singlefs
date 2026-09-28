@@ -10,7 +10,7 @@ C363（现算保留池时树高从哪读没有条款） 还开着两件：
 
 第三轮的混杂因素：当时走得到的固定点分配失败，全都发生在 C518（一次挂载之内环转过一圈之后不回收） 挡住回收的时候，腿造不出「活数据真把盘占满」的历史。**C518 与 C517 已由实三实现**（报告 `research/prompts/m2-mountfix-implementer-report.md` 第 39、40 行；分配器的 `RootRingOccupancy`），只剩「mkfs 同一个进程、没做过挂载的那次会话」一格（同一报告第 107 行）。所以这一轮先问：**今天的代码上，固定点分配失败还走不走得到。**
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-25 02:0x JST）
+## 二、实现今天的样子（主 agent 的观测，2026-09-25）
 
 - 腿读代码一律读冻结副本 `/tmp/claude-1000/c363b-r1/tree/crates/`（sha256 在 `research/prompts/c363b-r1-snapshot/crates-src-sha256.txt`）。它已含实二十、实十六接续、实十九：记账树与中央映射树已能长成多层（`crates/singlefs-core/src/code_two_tree.rs`），产品容量记账叶 477 / 内部 150、映射叶 294 / 内部 143（实十九报告 `research/prompts/m2-treesplit-implementer-report.md` 第一节第 7 条）。
 - 固定点分配失败在今天的代码上是 `PublishError::PlacementRefused { NoFreeSlotOnAnyDevice }`，在任何写之前拒绝（单次发布）。

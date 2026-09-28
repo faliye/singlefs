@@ -1,11 +1,11 @@
 # 工具实现员报告：54 号与双机驱动接发现日志（层 0 放量的发现日志，工具那一半）
 
-报告时刻：2026-09-27 JST 11:5x（本机 UTC 02:5x）。关的是 `records/2026-09-24-里程碑二收尾调度.md`「层 0 放量的发现日志」那一行；接口照 `/tmp/claude-1000/impl-layer0-findings/report.md` 第一节逐字读。
+报告时刻：2026-09-27。关的是 `records/2026-09-24-里程碑二收尾调度.md`「层 0 放量的发现日志」那一行；接口照 `/tmp/claude-1000/impl-layer0-findings/report.md` 第一节逐字读。
 
 ## 结论
 
 出口 1–5 都做到了：
-- 54 号 `--full`：每条用例的全量日志与发现日志放 `<common-dir>/singlefs-layer0-logs/<UTC 时刻>-<pid>/`，名字 `log.<用例名>` 与 `log.<用例名>.findings.tsv`，跑完不删。单机跑时在 crash-case-command 交的命令外面套 `env SINGLEFS_LAYER0_FINDINGS_FILE=<发现日志>`。跑完先打发现表，再判：没有 summary 的节报「这一趟没跑完」判红；`red_states` 不是 0 判红；定稿行数与 `signatures=` 对不上判红；超过 30 个签名只打前 30 行，再打一行「其余 N 个见 <路径>」。全量日志只给路径。快档不设、不读，还用 `env -u` 清掉调用方的这个变量。
+- 54 号 `--full`：每条用例的全量日志与发现日志放 `<common-dir>/singlefs-layer0-logs/<时刻>-<pid>/`，名字 `log.<用例名>` 与 `log.<用例名>.findings.tsv`，跑完不删。单机跑时在 crash-case-command 交的命令外面套 `env SINGLEFS_LAYER0_FINDINGS_FILE=<发现日志>`。跑完先打发现表，再判：没有 summary 的节报「这一趟没跑完」判红；`red_states` 不是 0 判红；定稿行数与 `signatures=` 对不上判红；超过 30 个签名只打前 30 行，再打一行「其余 N 个见 <路径>」。全量日志只给路径。快档不设、不读，还用 `env -u` 清掉调用方的这个变量。
 - 双机驱动：三趟各设一个发现日志，每份都是那一趟的日志名加 `.findings.tsv`。`--merged-log` 时 merge 那一份就是 `<54 给的日志>.findings.tsv`，正是 54 号读的那一份。第二台那一片先写在第二台上，跑完拷回本机、放在那一片的日志旁边，第二台上那一份随后删掉。三份路径都打进输出。
 - 判别力样本 `.claude/gate.d/fixtures/54-layer0-replay.sh/{red,green}`，`stage-selftest.sh` 两格都判对。
 - 全绿标记不带发现表（judged 行文件没动）。
@@ -140,7 +140,7 @@ red 样本里两签名那一条（原样，路径换成了 <临时目录>）：
      → 怎么办：「这一趟没跑完」看全量日志 <临时目录>/.git/singlefs-layer0-logs/20260927T023150Z-3641958/log.unfinished 的尾部是 panic 还是被杀；red_states 不是 0 是有状态判红而用例没红，
         其余 2 个见 <临时目录>/.git/singlefs-layer0-logs/20260927T023150Z-3641958/log.many-signatures.findings.tsv
      → 怎么办：「这一趟没跑完」看全量日志 <临时目录>/.git/singlefs-layer0-logs/20260927T023150Z-3641958/log.many-signatures 的尾部是 panic 还是被杀；red_states 不是 0 是有状态判红而用例没红，
-  ✗ --full 有 3 条崩溃枚举用例判红：crash-case:two-signatures crash-case:unfinished crash-case:many-signatures（这一趟判绿 0 条、复用 0 条；开跑 2026-09-27T02:31:50Z，跑完 2026-09-27T02:31:51Z）
+  ✗ --full 有 3 条崩溃枚举用例判红：crash-case:two-signatures crash-case:unfinished crash-case:many-signatures（这一趟判绿 0 条、复用 0 条；开跑 2026-09-27，跑完 2026-09-27）
 ```
 
 ### 驱动脚本（layer0-shard-run.sh --selftest，假 cargo；草稿在 rsync 出来的仓副本里跑，这份副本已删）
@@ -164,7 +164,7 @@ rc=0
 ```
 装进仓之后，47 号里的 `bash research/scripts/layer0-shard-run.sh --selftest` 与 `python3 research/scripts/admission.py --selftest` 两项都没列进红项（47 号只列出没过的那几项，见下）。
 
-## 第 7 步与出口 4 各项（仓里现跑，UTC 02:4x–02:5x）
+## 第 7 步与出口 4 各项（仓里现跑）
 
 | 命令 | 退出码 | 末行（原样） |
 |---|---|---|

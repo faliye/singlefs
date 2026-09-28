@@ -1,6 +1,6 @@
 # 实四甲交回：E156、E158 两个装置跟上实一到实三的形态
 
-实现员（implementation-writer），2026-09-26 JST 11:12 开工（UTC 02:12），在主工作区改，没有提交、没有任何 git 写操作。开工时把两个 bin 与 `crates/mutations.tsv` 拷成快照 `/tmp/claude-1000/impl-rbf-4a/start-snapshot/`，下文「开工时」都指它。
+实现员（implementation-writer），2026-09-26 开工，在主工作区改，没有提交、没有任何 git 写操作。开工时把两个 bin 与 `crates/mutations.tsv` 拷成快照 `/tmp/claude-1000/impl-rbf-4a/start-snapshot/`，下文「开工时」都指它。
 
 ## 一、结论
 
@@ -231,7 +231,7 @@ lint 是 `clippy::assertions_on_constants`，退出码 101。换回改后的 e15
 
 ## 八、第 4 步那几样的末尾原样输出与门禁判定行
 
-最后一遍在 UTC 02:35（JST 11:35）起跑，主工作区，自己的 `target-main`。测试经 `run-with-memory-cap.sh 8G` 与 `capped.sh 10`；fmt、clippy、build 不经内存包装。
+最后一遍在起跑，主工作区，自己的 `target-main`。测试经 `run-with-memory-cap.sh 8G` 与 `capped.sh 10`；fmt、clippy、build 不经内存包装。
 
 `cargo test --offline -p singlefs-harness --bin e158_root_choice_repair`（退出码 101）：
 ```
@@ -257,12 +257,12 @@ error: test failed, to rerun pass `-p singlefs-harness --bin e156_allocation_bas
 
 `cargo clippy --offline --workspace --all-targets --all-features -- -D warnings`（加 check.sh 那七条 `-D clippy::…`，退出码 0）：
 ```
-    Checking singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+    Checking singlefs-harness v0.1.0 (crates/singlefs-harness)
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s
 ```
 `cargo build --offline --all-targets`（退出码 0）：
 ```
-   Compiling singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+   Compiling singlefs-harness v0.1.0 (crates/singlefs-harness)
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.46s
 ```
 

@@ -1,0 +1,13 @@
+exit=0
+want=实验号引用全部有定义：2 个不同的实验号（扫 7 份 kb 文件、0 份规则）
+want=决策号引用全部有定义：2 个不同的决策号（扫 7 份 kb 文件、0 份规则）
+want=欠检查 1 条、已还清 1 条
+want=不变量条数一致：正文声称 1 条在用，表里在用 1 条
+want=治理文档与 kb 里的门禁号、门禁全名与格名、路径与「小节」都指得到，没有用旧编号称呼门禁
+want=扫 1 份治理文档：门禁号 5 处、路径 4 处、小节 1 处；没判 2 处；跳过 3 处（被 .gitignore 挡着 0、不像仓内路径 2、仓外或带占位 1）
+want=`.claude/kb/decisions/99-不存在的决策.md` 不全是路径字符
+want=nowhere.md「某一节」 的文件在四个解析基准下都找不到，小节没判
+want=不变量条数跨文件一致：实际在用 1 条，扫了 6 份 kb 文件、命中 1 处声明
+want=样本替身：3 条命中，0 条未命中
+want=这次改动新写或改写的 1 行不变量都点名了已定分项
+want=doc-registries.sh：7 格里 7 格绿（experiment-refs decision-refs declared-counts governance-refs invariant-count-elsewhere citations invariant-anchors），0 格本次未跑（无）

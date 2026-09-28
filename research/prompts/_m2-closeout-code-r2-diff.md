@@ -1,4 +1,4 @@
-# 附录二：`crates/` 从第一轮冻结快照到第二轮冻结快照的差，代码轮第二轮 diff（生成于 2026-09-27 18:49 JST / 2026-09-27 09:49 UTC）
+# 附录二：`crates/` 从第一轮冻结快照到第二轮冻结快照的差，代码轮第二轮 diff（生成于 2026-09-27）
 
 基准：`refs/sop/m2-closeout-code-r1-snapshot`（第一轮冻结快照）。这一轮冻结快照：`refs/sop/m2-closeout-code-r2-snapshot`（腿读代码一律读这份快照，不读主工作区；取法：`git archive refs/sop/m2-closeout-code-r2-snapshot crates | tar -x -C <目录>`）。
 
@@ -126,7 +126,7 @@ index aa6250fb..9bbc9460 100644
 +/// 29 字节预留位全 0（`walk` 的 `judge_unit_header`），在每条跟随的指针上判头部 MAC 16 + nonce 12 全 0
 +/// （[`judge_pointer_mac_and_nonce_are_zero`]，D19（块指针的结构与宽度预算） 已定项 3 射程）。
 +///
-+/// I-9.16（树表条目按树 ID 严格升序且合发号次序）：实审 A3b Q2 交上来，用户 2026-09-27 JST 17:4x 定「立不变量并同步」；
++/// I-9.16（树表条目按树 ID 严格升序且合发号次序）：实审 A3b Q2 交上来，用户 2026-09-27 定「立不变量并同步」；
 +/// `invariants.md` 那一行由 kb 第八批写。池级走读每读一版的树表判一次（`walk` 的 `judge_tree_table_entries_ordering`）。
 +pub const IMPLEMENTED_INVARIANTS: [&str; 48] = [
      "I-1.1",
@@ -2902,7 +2902,7 @@ index 71d83103..d9029ff6 100644
      /// 抬 F 那一串自己也取不到落点、被空间准入拒的不走这里（推满仍不够，挂载照样做成，`MountSpaceAdmission::StillShortAfterTheFloorRaises`）。
      /// 装箱：不装箱 `MountError` 就大过 clippy `result_large_err` 的 128 字节。
      FloorRaiseFailedAfterTheMountsPublishes(Box<FloorRaiseFailedAfterTheMountsPublishes>),
-+    /// C554 乙（用户 2026-09-27 JST 09:07 定：重读后再判，R = 1；岔路单 `research/prompts/c554-fix-forks.md` 第 1 行）：
++    /// C554 乙（用户 2026-09-27 定：重读后再判，R = 1；岔路单 `research/prompts/c554-fix-forks.md` 第 1 行）：
 +    /// 可写挂载读到的样子里有一样更新的东西读不出，重读一次（D16（发布语义） 已定项 1「根槽这一次读坏」那一行的「重读一次」）仍读不出——
 +    /// 不按读得出的那一版往下走，不把读不出的那一版当成被抛弃，拒可写挂载。是哪一样读不出见 [`StillUnreadableAfterOneReread`]。
 +    /// 在取号之前返回：一个写都没发，盘上逐字节不变。只读挂载不走这一判，照常（`mounted_read`、`recovery::recover`）。
@@ -5220,7 +5220,7 @@ index c59b287f..aff93d53 100644
  
 +/// 树表条目不按排序时报的不变量名：I-9.16（树表条目按树 ID 严格升序且合发号次序）。两道合成这一条，任一道不成立即判红：
 +/// ① 盘上次序树 ID 严格升序（D8（核心索引结构） 已定项 8 排序契约「条目按树 ID 升序排」）；② 按发号次序相邻两棵的树 ID 严格升序
-+/// （D8 已定项 8 ②「八棵树的号从水位起连号发，次序照格式常量 11..18 那一组」）。立号：实审 A3b Q2 交上来，用户 2026-09-27 JST 17:4x 定
++/// （D8 已定项 8 ②「八棵树的号从水位起连号发，次序照格式常量 11..18 那一组」）。立号：实审 A3b Q2 交上来，用户 2026-09-27 定
 +/// 「立不变量并同步」；`invariants.md` 那一行由 kb 第八批写。
 +pub const TREE_TABLE_ENTRIES_ORDERING_CONTRACT: &str = "I-9.16";
 +
@@ -6548,7 +6548,7 @@ index 977ca11a..143269e3 100644
  
      /// 取号全或无失败：已写出的那几份回卷成旧代号（D18（块里携带什么信息） 已定项 11），回卷写发生在任何单元之前。
 +    /// 回卷写带的 tail 是取号那一写带的同一个见证值（`witnessed_journal_tail`，取号那一刻读的那一次）：回卷是「像没取过号」，
-+    /// 取号之前盘上的见证值是它，不退回 0（C554 乙-配置续，用户 2026-09-27 JST 12:08 定）。
++    /// 取号之前盘上的见证值是它，不退回 0（C554 乙-配置续，用户 2026-09-27 定）。
      fn roll_back_acquisition(
          &mut self,
          written: &[usize],
@@ -6652,7 +6652,7 @@ index 977ca11a..143269e3 100644
 +        .collect()
 +}
 +
-+/// 取号那一刻的见证值 c_见证（C554 乙-配置续，用户 2026-09-27 JST 12:08 定；定义取自 `research/prompts/e158-r3-prereg.md`
++/// 取号那一刻的见证值 c_见证（C554 乙-配置续，用户 2026-09-27 定；定义取自 `research/prompts/e158-r3-prereg.md`
 +/// 第 348 行「N-配置续」与 `research/prompts/e158-r4-prereg.md` 第 413 行）：每块盘两槽里全部自证过的系统配置的 journal tail 的最大值，
 +/// 与可写挂载判 N-配置 同一取法（`mount.rs` 的 `newer_publish_witness`）。`slots_of_every_device` 是
 +/// [`self_verified_system_configurations_of_every_device`] 那一次读到的（每块盘至少一份）；盘表为空时
@@ -6785,7 +6785,7 @@ index 977ca11a..143269e3 100644
 +        }
 +        .into());
 +    }
-+    // 取号那一写带的 tail 是这一刻的见证值（C554 乙-配置续，用户 2026-09-27 JST 12:08 定），不是 0：连着几次取号之后崩溃、中间没有
++    // 取号那一写带的 tail 是这一刻的见证值（C554 乙-配置续，用户 2026-09-27 定），不是 0：连着几次取号之后崩溃、中间没有
 +    // 发布轮换，两槽都换成了取号写，写 0 就把上一次轮换见证的那次发布抹掉，下一次可写挂载的 N-配置 判不出、会抛弃暂时读不出的最新根。
 +    // 第一道屏障之后、第一个取号写之前另读每块盘两槽一次（E158 第 4 次跑登记第 413 行）；逐盘取号写与回卷写都用这一次读到的。
 +    // 屏障前那一核与这一次读之间又有一块盘读不出，就不写（判定与写读同一份输入：写之前重算、对不上不写）。
@@ -6908,7 +6908,7 @@ index 977ca11a..143269e3 100644
 +/// 三条发布路径（带单元的、零单元的、树表 0 条上只写实例表的）与重发冻结的那一次共用这一处，不各抄一份——
 +/// 抄出来的几份会分叉，而「根槽在系统配置槽之前」「轮换持久之后才返回」正是崩溃窗口那几格的前提。
 +///
-+/// 末尾那道屏障（C577（系统配置没见证到的最新根，乙罩不到），用户 2026-09-27 JST 15:1x 定「发布返回前加屏障」）：
++/// 末尾那道屏障（C577（系统配置没见证到的最新根，乙罩不到），用户 2026-09-27 定「发布返回前加屏障」）：
 +/// 没有它，发布返回时轮换还可能在写缓存里，崩溃之后系统配置只见证到上一次发布；这次的根槽一时读不出，可写挂载的见证判据
 +/// （D23（journal 的角色与格式） 已定项 14「可写挂载读到的更新状态读不出」）就看不出有更新的状态、把这次发布当被抛弃，
 +/// 它引用的单元再发出去。屏障报错与轮换报错同一格：这次发布失败，由调用方冻结或整个挂载返回错误
@@ -24270,7 +24270,7 @@ index ab14b1ba..711c1870 100644
      VersionWithoutFileNotWrittenByMakeFilesystem,
      /// 要抬的 F 超过上限（D16（发布语义） 已定项 1「抬 F 的上限」）。
      FloorAboveCeiling,
-+    /// 可写挂载读到的样子里有比所选那一版新的发布读不出、系统配置见证过它，重读一次仍读不出（C554 乙：用户 2026-09-27 JST 09:07 定
++    /// 可写挂载读到的样子里有比所选那一版新的发布读不出、系统配置见证过它，重读一次仍读不出（C554 乙：用户 2026-09-27 定
 +    /// 「乙 重读后再判」，`research/prompts/c554-fix-forks.md` 第 1 行；重读次数取自 D16（发布语义） 已定项 1「根槽这一次读坏」那一行的
 +    /// 「重读一次」，挂进 D23（journal 的角色与格式） 已定项 14）：取号之前拒，盘上逐字节不变。
 +    NewerPublishWitnessedBySystemConfigurationStillUnreadableAfterOneReread,
@@ -24423,7 +24423,7 @@ index ab14b1ba..711c1870 100644
 -    /// 新实例写的行把它判成被抛弃的（行 (i, 所选根的 txg) 或中间实例的 (i, 0, 0)）。F 生效值、抬 F 的上限在这次挂载里都按看不见它算。
 -    /// 调之前先 `close_session`。
 +    /// 点名的单元整次挂载读回全 0。那条根是这个进程发的，系统配置在它的根槽 FUA 之后轮换（D16（发布语义） 已定项 7），见证着它；
-+    /// 读阶段落到它前一条根、判出系统配置见证过比所选那一版新的发布，重读一次仍全 0，取号之前拒可写（C554 乙，用户 2026-09-27 JST 09:07 定，
++    /// 读阶段落到它前一条根、判出系统配置见证过比所选那一版新的发布，重读一次仍全 0，取号之前拒可写（C554 乙，用户 2026-09-27 定，
 +    /// `research/prompts/c554-fix-forks.md` 第 1 行；重读一次取自 D16（发布语义） 已定项 1「根槽这一次读坏」那一行）：一个字节都不写，
 +    /// 模型状态不变（会话照旧关着，根环、F、取过的号都不动）。系统配置没见证到最新那条根的那一形（它那次发布的轮换没落盘）乙罩不到、
 +    /// 照旧抛弃它，这一步造不出，模型不答。调之前先 `close_session`。
@@ -25413,7 +25413,7 @@ index 00000000..43a9290a
 --- /dev/null
 +++ b/crates/singlefs-harness/tests/a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable.rs
 @@ -0,0 +1,670 @@
-+//! C554 乙（用户 2026-09-27 JST 09:07 定：重读后再判，R = 1；岔路单 `research/prompts/c554-fix-forks.md` 第 1 行）：可写挂载读到的样子里
++//! C554 乙（用户 2026-09-27 定：重读后再判，R = 1；岔路单 `research/prompts/c554-fix-forks.md` 第 1 行）：可写挂载读到的样子里
 +//! 有一样更新的东西读不出，就重读一次（D16（发布语义） 已定项 1「根槽这一次读坏」那一行的「重读一次」）；重读读得出就照常挂载——
 +//! 用读出的那条根择根，不把它当成被抛弃；仍读不出就拒可写（`MountError::NewerStateStillUnreadableAfterOneReread`，取号之前、
 +//! 盘上逐字节不变），只读挂载照常。「更新的东西」两样：
@@ -26090,7 +26090,7 @@ index 00000000..c8cb8d08
 +++ b/crates/singlefs-harness/tests/a_publish_returns_only_after_the_system_configuration_rotation_is_durable.rs
 @@ -0,0 +1,523 @@
 +//! C577（系统配置没见证到的最新根，乙罩不到）：发布返回之前，系统配置轮换之后再一道屏障（D16（发布语义） 已定项 7「根槽（FUA）→
-+//! 系统配置槽 → 屏障；fsync 等系统配置轮换持久之后才返回」，用户 2026-09-27 JST 15:1x 定「发布返回前加屏障」）。
++//! 系统配置槽 → 屏障；fsync 等系统配置轮换持久之后才返回」，用户 2026-09-27 定「发布返回前加屏障」）。
 +//!
 +//! 改之前发布路径根槽 FUA 之后轮换系统配置就返回：返回的那一刻轮换还可能没持久，崩溃之后系统配置只见证到上一次发布；这次的根槽
 +//! 一时读不出时，可写挂载的见证判据（D23（journal 的角色与格式） 已定项 14「可写挂载读到的更新状态读不出」）看不出有更新的状态，
@@ -26707,7 +26707,7 @@ index 00000000..1767156c
 --- /dev/null
 +++ b/crates/singlefs-harness/tests/acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics.rs
 @@ -0,0 +1,677 @@
-+//! 实审 A3c（规格 `/tmp/claude-1000/impl-rev-a3c/spec.md`，写于 2026-09-27 JST）：
++//! 实审 A3c（规格 `/tmp/claude-1000/impl-rev-a3c/spec.md`，写于 2026-09-27）：
 +//!
 +//! 一、C554 乙-配置续 Q1（主 agent 定走「拒」）：取号那一刻读见证值时某块盘两槽里一份本池自证过的系统配置都读不出，
 +//! 在第一个取号写之前拒——可写挂载报 `MountError::WritableMountRefusedByDevicesWithoutTheSelectedVersion`
@@ -27390,7 +27390,7 @@ index 00000000..895b8801
 --- /dev/null
 +++ b/crates/singlefs-harness/tests/acquisition_writes_the_witnessed_journal_tail_so_two_crashed_acquisitions_still_witness_the_newest_publish.rs
 @@ -0,0 +1,517 @@
-+//! C554 乙-配置续（用户 2026-09-27 JST 12:08 定；岔路单 `research/prompts/c554-fix-forks.md` 第 2 行；定义取自 E158 第 3 次跑登记
++//! C554 乙-配置续（用户 2026-09-27 定；岔路单 `research/prompts/c554-fix-forks.md` 第 2 行；定义取自 E158 第 3 次跑登记
 +//! `research/prompts/e158-r3-prereg.md` 第 348 行与第 4 次跑登记 `research/prompts/e158-r4-prereg.md` 第 413 行）：取号那一写的 tail
 +//! 不写 0，写取号那一刻按判据 N-配置 同一取法读到的见证值 c_见证（每块盘两槽里全部自证过的系统配置槽的 `journal_tail` 取最大，
 +//! 一份都没有时 0）；取号失败的回卷写带同一个值。
@@ -34865,7 +34865,7 @@ index 00000000..6b6bcaf7
 +++ b/crates/singlefs-harness/tests/entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration.rs
 @@ -0,0 +1,620 @@
 +//! 代码三方 m2-closeout-code-r1 Z3-A（判决 `research/prompts/m2-closeout-code-r1-main-verification.md` 第一节 Z3-A、第二节「Z3-A 乙」；
-+//! 用户 2026-09-27 JST 11:1x 定「乙：每个入口都逐盘核，含会话发布」）：挂着之后收盘表的入口（正常卸载、管理员回退、抬 F、准入抬 F、
++//! 用户 2026-09-27 定「乙：每个入口都逐盘核，含会话发布」）：挂着之后收盘表的入口（正常卸载、管理员回退、抬 F、准入抬 F、
 +//! 一次准入里再推一串）与会话发布，交进来的每块盘要「可见」——两个系统配置槽里至少一份本池自证过的（整槽校验和过、fsid 与本池相同），
 +//! 与可写挂载取号之前的逐盘核第一支同一判（D18（块里携带什么信息） 已定项 11「取号之前逐盘核带不带所选那一版」）。
 +//!
@@ -38356,7 +38356,7 @@ index 00000000..d8655b97
 --- /dev/null
 +++ b/crates/singlefs-harness/tests/tree_table_ordering_is_judged_by_the_cold_walk_and_the_checker.rs
 @@ -0,0 +1,384 @@
-+//! I-9.16（树表条目按树 ID 严格升序且合发号次序）：实审 A3b Q2 交上来，用户 2026-09-27 JST 17:4x 定「立不变量并同步」。
++//! I-9.16（树表条目按树 ID 严格升序且合发号次序）：实审 A3b Q2 交上来，用户 2026-09-27 定「立不变量并同步」。
 +//! 两道合成这一条，任一道不成立即判红：① 盘上次序树 ID 严格升序（D8（核心索引结构） 已定项 8 排序契约）；
 +//! ② 按发号次序（extent、inode、分配记录、记账、livelist、稀疏旁表、deadlist）相邻两棵的树 ID 严格升序（D8 已定项 8 ②）。
 +//!
@@ -38746,7 +38746,7 @@ index 00000000..d3e19ec3
 --- /dev/null
 +++ b/crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs
 @@ -0,0 +1,1102 @@
-+//! 实审 A3b（规格 `/tmp/claude-1000/impl-rev-a3b/spec.md`，写于 2026-09-27 JST）：
++//! 实审 A3b（规格 `/tmp/claude-1000/impl-rev-a3b/spec.md`，写于 2026-09-27）：
 +//!
 +//! 一、代码审阅第 15 条（C475（非默认环长下单元区起点取编译期常量））：单元区起点按环长现算、全链路一处来源——mkfs 按环长算起点
 +//! （journal 环末尾的下一个槽，D3（空间分配） 已定项 10 ④）、写进系统配置偏移 417 的 8 字节、实例表与树表写在那里；读者择系统配置时

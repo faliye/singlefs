@@ -1,0 +1,33 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.05s
+     Running tests/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments.rs (target/debug/deps/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments-0c3313fbbd50c6b6)
+
+running 4 tests
+test a_write_whose_data_unit_lands_but_whose_commit_generated_units_find_no_unblocked_slot_is_refused_by_the_space_admission_before_any_write ... ok
+test a_write_on_the_narrower_pool_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_refused_for_its_data_units_before_any_write ... ok
+test with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write ... FAILED
+test a_write_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_refused_by_the_space_admission_before_any_write_while_the_byte_formula_admits ... FAILED
+
+failures:
+
+---- with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write stdout ----
+
+thread 'with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write' (1375035) panicked at crates/singlefs-harness/tests/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments.rs:424:5:
+推过一串抬 F，推它的是数据单元 0 的落点被拒：[]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_write_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_refused_by_the_space_admission_before_any_write_while_the_byte_formula_admits stdout ----
+
+thread 'a_write_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_refused_by_the_space_admission_before_any_write_while_the_byte_formula_admits' (1375033) panicked at crates/singlefs-harness/tests/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments.rs:180:5:
+assertion `left == right` failed: 每块盘成对的空槽：这次挂载开过的聚簇段外 0 对、段内 79 对
+  left: [(DeviceIdentity(0), 20, 54), (DeviceIdentity(1), 20, 54)]
+ right: [(DeviceIdentity(0), 0, 79), (DeviceIdentity(1), 0, 79)]
+
+
+failures:
+    a_write_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_refused_by_the_space_admission_before_any_write_while_the_byte_formula_admits
+    with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write
+
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.36s
+
+error: test failed, to rerun pass `-p singlefs-harness --test admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments`

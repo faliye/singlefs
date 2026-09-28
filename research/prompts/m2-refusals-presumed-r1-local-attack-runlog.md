@@ -1,4 +1,4 @@
-# 运行记录：m2-refusals-presumed-r1-local-attack（2026-09-22 UTC / 2026-09-23 JST）
+# 运行记录：m2-refusals-presumed-r1-local-attack（2026-09-23）
 
 提示文件：`research/prompts/m2-refusals-presumed-r1-local-attack.md`（英文；分工表 R5–R8 四格，
 20 条 Fact、4 道 Judgment，每道 Judgment 四个子部分对应四列①②③④）。不用任何 markdown 强调，

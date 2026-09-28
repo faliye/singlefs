@@ -1,0 +1,13 @@
+  ✗ 这些实验装置与变异表这一轮改了，research/results/ 里却没有一份不比它旧的产物——这一跑多半只留在 /tmp 的草稿里：
+     research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs（装置源码，改于 2026-09-27）：E142 的输入与产物头的指纹对不上，最新带指纹的产物 research/results/e142-first-txn-dry-run-2026-09-27-r19-arm-n18.out 记的是 0c63a9f36181，今天的输入是 1f50b94e7309
+     research/mutations/e142_first_transaction_dry_run.tsv（变异表，改于 2026-09-27）：E142 的输入与产物头的指纹对不上，最新带指纹的产物 research/results/e142-first-txn-dry-run-2026-09-27-r19-arm-n18.out 记的是 0c63a9f36181，今天的输入是 1f50b94e7309
+     → 怎么办：跑一次把产物存进 research/results/，并在 research/scripts/replay.sh 把这个实验的登记行指到它。
+               这一跑已经跑过、产物还在 /tmp 的草稿目录里，就现在拷进来（会话一重启那个目录就没了）；
+               只改了 // 注释的装置本阶段不判；改了字符串里的路径，照 .claude/rules/path-moves.md 第 4 条连同留存产物一起改，复跑仍逐字相同。
+               登记了准入的实验（.claude/gate.d/stage-inputs.tsv 有 E<号> 那一行）按产物头的输入指纹判：指纹对不上就是产物跟不上今天的输入，
+               重跑一次（装置入口放行并把新指纹打在产物头），修改时刻新旧不作数。
+  ✗ 这些地方把 /tmp 下的东西当依据引用了——那是会话自己的草稿目录，一重启就没了，三个月后没人核得动：
+     research/prompts/m2-impl-r2-fixes-a-evidence/spec.md:25：…- 报告 `/tmp/claude-1000/impl-r2-fixes-a/report.md
+     → 怎么办：把 /tmp 下那份东西拷进仓里该在的位置（报告、提示与判决进 research/prompts/，跑出来的数进 research/results/），
+               引用改成指那一份：在引用它的文件里把 /tmp 路径逐处换成仓内路径。
+               原件已经没了，就写明它没了、把还核得动的那部分落进仓里；只是在说做法（草稿放在哪），把句子里的依据词去掉。

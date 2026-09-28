@@ -1,0 +1,5 @@
+exit=1
+want=  tree-table-reserve：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（tree-table-reserve）
+want=认购合计 88 超过预留 76
+want=「丁」这一行只有 3 格，认购表每行要四格

@@ -1,13 +1,13 @@
 # 调查：合入后验证一剩下的三条红（fsync_drop 两条、warm_up_counter 的 c366）
 
-写于 2026-09-27，UTC 12:1x–12:4x（JST 21:1x–21:4x）。只查、不修；主工作区一个字没动，所有跑都在草稿目录的副本上。
+写于 2026-09-27。只查、不修；主工作区一个字没动，所有跑都在草稿目录的副本上。
 每条 cargo 都经 `run-with-memory-cap.sh 8G` 与 `capped.sh 4`，加 `nice -n 19`。原样日志在 `/tmp/claude-1000/investigate-three-reds/logs/`。
 
 ## 一、结论
 
 1. 三条红都出在 **C554 乙**（`m2-impl-c554-yi` 那一件，补丁 `/tmp/claude-1000/impl-c554-yi/patch/crates.patch`，sha256 `440fa87c…67c4`），
    不是 A3b、善后一、I-9.16、乙-配置续，也不是合入后验证一自己的三处 src。
-   - 定位是今天 `crates/singlefs-core/src/mount.rs` 的两行（行号取自 12:13:54Z 的主工作区副本）。两条 fsync_drop 红在第 376 行
+   - 定位是今天 `crates/singlefs-core/src/mount.rs` 的两行（行号取自 now 那份主工作区副本）。两条 fsync_drop 红在第 376 行
      `} => self.witness.witnessed_journal_counter > selected_version_last_record_counter,`，
      c366 红在第 384 行 `WitnessedCounterComparison::Undecidable => true,`。
      判真之后，拒绝在第 4088 行 `return Err(MountError::NewerStateStillUnreadableAfterOneReread(` 发出；
@@ -70,14 +70,14 @@
 ---
 > use singlefs_harness::memory_pool::SparseBlockDevice;
 ```
-所以红只能来自 src。各端的做法与结果（`logs/exit-codes.txt` 原样摘行，时刻 UTC）：
+所以红只能来自 src。各端的做法与结果（`logs/exit-codes.txt` 原样摘行）：
 
 | 端 | 怎么造 | 退出码 | fsync_drop | warm_up_counter |
 |---|---|---|---|---|
-| r1 | `git archive refs/sop/m2-closeout-code-r1-snapshot`（67f447de） | `r1 0 2026-09-27T12:15:21Z` | `ok. 17 passed; 0 failed` | `ok. 2 passed; 0 failed` |
-| r1yi | r1 + C554 乙补丁（`git apply --check` 退 0，apply 退 0，偏移 −1 到 −18 行） | `r1yi 101 2026-09-27T12:25:31Z` | `FAILED. 15 passed; 2 failed`，同两条、:1556:9 | `FAILED. 1 passed; 1 failed`，c366 :231:63 |
-| r2 | `git archive refs/sop/m2-closeout-code-r2-snapshot`（30c08413） | `r2 101 …12:18:14Z`；`r2-warmup 101 …12:21:59Z` | 同上 | 同上 |
-| now | 12:13:54Z 主工作区 `rsync -a --exclude target --exclude .git crates Cargo.toml Cargo.lock` | `now 101 …12:21:26Z`；`now-warmup 101 …12:22:08Z` | 同上 | 同上 |
+| r1 | `git archive refs/sop/m2-closeout-code-r1-snapshot`（67f447de） | `r1 0 2026-09-27` | `ok. 17 passed; 0 failed` | `ok. 2 passed; 0 failed` |
+| r1yi | r1 + C554 乙补丁（`git apply --check` 退 0，apply 退 0，偏移 −1 到 −18 行） | `r1yi 101 2026-09-27` | `FAILED. 15 passed; 2 failed`，同两条、:1556:9 | `FAILED. 1 passed; 1 failed`，c366 :231:63 |
+| r2 | `git archive refs/sop/m2-closeout-code-r2-snapshot`（30c08413） | `r2 101 …`；`r2-warmup 101 …` | 同上 | 同上 |
+| now | 当时的主工作区 `rsync -a --exclude target --exclude .git crates Cargo.toml Cargo.lock` | `now 101 …`；`now-warmup 101 …` | 同上 | 同上 |
 
 panic 消息逐字比过：r1yi 三条与 r2 三条 `diff` 为空；r2 的 fsync 两条与合入后验证一 run1 那两条 `diff` 为空；now 的 c366 与 run1 那条 `diff` 为空。
 （run-three 那一次 cargo 没带 `--no-fail-fast`，r2 与 now 在 fsync 那个二进制红了之后就停了，warm_up 另跑，所以多出 `-warmup` 两行。）
@@ -93,9 +93,9 @@ panic 消息逐字比过：r1yi 三条与 r2 三条 `diff` 为空；r2 的 fsync
 
 | 变体 | 改法（`logs/variant-*.diff`） | 退出码 | fsync_drop | warm_up_counter |
 |---|---|---|---|---|
-| A undecidable-false | 第 384 行 `Undecidable => true` 改成 `=> false` | `now-undecidable-false 101 …12:28:51Z` | `FAILED. 15 passed; 2 failed`，消息不变 | `ok. 2 passed; 0 failed` |
-| B last-record-false | 第 376 行 `witnessed_journal_counter > selected_version_last_record_counter` 改成恒 `false` | `now-last-record-false 101 …12:31:43Z` | `ok. 17 passed; 0 failed` | `FAILED. 1 passed; 1 failed`，c366 :231:63，消息不变 |
-| C both-false | 两处都改 | `now-both-false 0 …12:34:55Z` | `ok. 17 passed; 0 failed` | `ok. 2 passed; 0 failed` |
+| A undecidable-false | 第 384 行 `Undecidable => true` 改成 `=> false` | `now-undecidable-false 101 …` | `FAILED. 15 passed; 2 failed`，消息不变 | `ok. 2 passed; 0 failed` |
+| B last-record-false | 第 376 行 `witnessed_journal_counter > selected_version_last_record_counter` 改成恒 `false` | `now-last-record-false 101 …` | `ok. 17 passed; 0 failed` | `FAILED. 1 passed; 1 failed`，c366 :231:63，消息不变 |
+| C both-false | 两处都改 | `now-both-false 0 …` | `ok. 17 passed; 0 failed` | `ok. 2 passed; 0 failed` |
 
 四条预测全中：每一条红各自只跟一行走，另一行改了不影响它。
 变体 B 下 fsync 两条整条过，说明乙一旦不拒，逐盘核报的成员、所选那一版 (1, 4) / (1, 3)、jsn、点名的盘、盘上不变，在今天的代码上都照测试写的那样；
@@ -106,7 +106,7 @@ panic 消息逐字比过：r1yi 三条与 r2 三条 `diff` 为空；r2 的 fsync
 
 最小复现：在任意一份主工作区现状的副本里跑下面这条命令（原样输出是上表 now 那两行；`logs/now.log`、`logs/now-warmup.log`）：
 ```
-nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G bash /home/fy5090/code/singlefs/research/scripts/capped.sh 4 \
+nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 4 \
   cargo test --offline --no-fail-fast -p singlefs-harness \
   --test second_transaction_supplement_two_fsync_drop_and_devices_without_the_selected_version \
   --test second_transaction_supplement_two_warm_up_counter
@@ -152,7 +152,7 @@ nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.
   `/tmp/claude-1000/impl-r2-fixes-a` 上的 `checker_known_bad_images`、一个 `e161_crash_state_dedup_and_time_split` 测试二进制、
   变异跑道的 `e142_first_txn_dry_run`。没有 qemu、vm-bench、e152、fio。
   每个副本用各自的 target，没有等锁。
-- 主工作区现状的副本取于 2026-09-27T12:13:54Z；那一刻 `git status --short crates Cargo.toml Cargo.lock` 119 行（`now.git-status.txt`）。
+- 主工作区现状的副本取于 2026-09-27；那一刻 `git status --short crates Cargo.toml Cargo.lock` 119 行（`now.git-status.txt`）。
   取之后主工作区还在变：交回前复查时，fsync 那份测试的 `use` 行已经从原位替换改成挪了位置。所以第一节的行号只对那一刻的副本。
 
 ## 九、没做什么

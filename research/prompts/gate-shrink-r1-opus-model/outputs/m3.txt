@@ -1,0 +1,2 @@
+plain_exit=1 staged_exit=77 tmp_evidence_line_present_in_staged_tree=yes
+plain /tmp lines: 2  staged /tmp lines: 0

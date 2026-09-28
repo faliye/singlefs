@@ -1,0 +1,8 @@
+exit=1
+want=缺「改新池新建文件的字节」：1 条
+want=缺「动不动格式」：2 条
+want=D311 未定项 3
+want=D311 未定项 4
+want=多定位出：D311 未定项 5（生成器不认它是未定项）
+want=  blocking-verdict：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（blocking-verdict）

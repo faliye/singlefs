@@ -1,0 +1,17 @@
+最底一层扇出改用内部扇出（144→147）	const EXTENT_TREE_LOWER_LEAF_DATA_UNITS: u64 = 144;	const EXTENT_TREE_LOWER_LEAF_DATA_UNITS: u64 = 147;
+内部扇出改小一档（147→146）	const EXTENT_TREE_INTERNAL_FANOUT: u64 = 147;	const EXTENT_TREE_INTERNAL_FANOUT: u64 = 146;
+数据单元载荷不扣头偏移	const DATA_UNIT_PAYLOAD_BYTES: u64 = DATA_UNIT_BYTES - DATA_UNIT_PAYLOAD_OFFSET;	const DATA_UNIT_PAYLOAD_BYTES: u64 = DATA_UNIT_BYTES;
+一条记录装旧记录宽的项数（67→72）	const JOURNAL_NAMED_ENTRIES_PER_RECORD: u64 = 67;	const JOURNAL_NAMED_ENTRIES_PER_RECORD: u64 = 72;
+甲的游标记录不计块	const INTENT_RECORD_BLOCKS: u64 = 1;	const INTENT_RECORD_BLOCKS: u64 = 0;
+甲的根槽不计块	const INTENT_ROOT_SLOT_BLOCKS: u64 = 1;	const INTENT_ROOT_SLOT_BLOCKS: u64 = 0;
+祖先只走到根层级的下一层（漏根）	(0..=root_level).map(|level| (level, unit / span_in_units(self.leaf_units, self.fanout, level))).collect()	(0..root_level).map(|level| (level, unit / span_in_units(self.leaf_units, self.fanout, level))).collect()
+根层级取跨度大于等于N改成大于N（边界取错）	while span_in_units(leaf_units, fanout, level) < units {	while span_in_units(leaf_units, fanout, level) <= units {
+流的落点用地板除改成向上取整	geometry.units / stream_count	geometry.units.div_ceil(stream_count)
+预测式的树高少套一层	let predicted_intent = batch as f64 + (stream_count.min(batch) as f64) * node_levels as f64 + 2.0;	let predicted_intent = batch as f64 + (stream_count.min(batch) as f64) * (node_levels - 1) as f64 + 2.0;
+相对误差的分母恒用预测比值	(predicted_ratio - model_ratio) / denominator	(predicted_ratio - model_ratio) / predicted_ratio
+峰值集合容差从0.1%换成10%	const PEAK_SET_TOLERANCE: f64 = 0.001;	const PEAK_SET_TOLERANCE: f64 = 0.10;
+批≈流数带宽因子从2换成4	const NEAR_DIAGONAL_BAND_FACTOR: f64 = 2.0;	const NEAR_DIAGONAL_BAND_FACTOR: f64 = 4.0;
+单调容差从1%换成0	const MONOTONIC_TOLERANCE: f64 = 0.01;	const MONOTONIC_TOLERANCE: f64 = 0.0;
+乙每次fsync落全部脏单元不扣已落过的	let unpersisted_count = write_ahead_log_leaf_dirty.difference(&write_ahead_log_leaf_persisted).count() as u64;	let unpersisted_count = write_ahead_log_leaf_dirty.len() as u64;
+checkpoint间隔恒取2000不取批的整数倍	batch * CHECKPOINT_BASE_OPERATIONS.div_ceil(batch)	CHECKPOINT_BASE_OPERATIONS
+记录宽旋钮的EntriesPerRecord改成地板除	RecordFormat::EntriesPerRecord(entries_per_record) => entry_count.div_ceil(entries_per_record),	RecordFormat::EntriesPerRecord(entries_per_record) => entry_count / entries_per_record,

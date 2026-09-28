@@ -1,0 +1,18 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_r2_y6_journal_ring_turned_torn_records.rs (/tmp/claude-1000/three-way-attack-r2/target/release/deps/opus_r2_y6_journal_ring_turned_torn_records-7c34bcd738a51373)
+
+running 1 test
+Y6 window=unmount overwrites_to_turn=298 writes=65 segments=13 tearable_journal_writes=6 tearable_total=14 states_this_run=60 full_states=196665 estimate=true
+LAYER0_PARALLEL_START states=60 slices=4 states_per_slice=16 worker_threads=2 configured_worker_threads=2 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=4
+LAYER0_PROGRESS slice=2/4 states=[16,32) segments=3..=6 finished_slices=1/4 finished_states=16/60 resumed_slices=0 elapsed_seconds=0.3
+LAYER0_PROGRESS slice=1/4 states=[0,16) segments=0..=2 finished_slices=2/4 finished_states=32/60 resumed_slices=0 elapsed_seconds=0.5
+LAYER0_PROGRESS slice=3/4 states=[32,48) segments=6..=10 finished_slices=3/4 finished_states=48/60 resumed_slices=0 elapsed_seconds=0.6
+LAYER0_PROGRESS slice=4/4 states=[48,60) segments=10..=all_persisted finished_slices=4/4 finished_states=60/60 resumed_slices=0 elapsed_seconds=0.7
+LAYER0_FINDINGS signatures=0 red_states=0 states=60
+LAYER0_PARALLEL_FINISHED states=60 slices=4 worker_threads=2 configured_worker_threads=2 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=4 progress_file_after_completion=none elapsed_seconds=0.7
+Y6 window=unmount states=60 violations=0 first_violation=None checker_violated={} checker_first={} failed_states=0 torn_journal_states=15 seconds_enumerate=1.3
+Y6 window=unmount remount mounted=60 refused=0 checker_red_after_mount=0 examples=[] seconds_total=2.7
+test crash_states_of_an_entry_on_a_turned_journal_ring ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 2.67s
+

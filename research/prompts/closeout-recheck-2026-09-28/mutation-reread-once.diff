@@ -1,0 +1,7 @@
+--- mount.rs (工作区原样)
++++ mount.rs (推翻条件造法：影子账读不出时重读一次)
+@@ -1252 +1252,3 @@
+-        let Some(placements) = placements_referenced_by_root(devices, unit_area_start, root) else {
++        let Some(placements) = placements_referenced_by_root(devices, unit_area_start, root)
++            .or_else(|| placements_referenced_by_root(devices, unit_area_start, root))
++        else {

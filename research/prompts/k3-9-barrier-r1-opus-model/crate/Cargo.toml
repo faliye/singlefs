@@ -1,0 +1,13 @@
+[package]
+name = "k39-barrier-attack"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "K3-9 攻方腿原型（副本，不入 crates/）：删掉单元与记录之间那道屏障之后找会出错的崩溃状态"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-harness = { path = "../singlefs-harness" }

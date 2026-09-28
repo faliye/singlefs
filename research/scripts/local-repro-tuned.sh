@@ -19,7 +19,7 @@ REQ="$(PROMPT="$PROMPT" PP="$PP" RP="$RP" python3 -c '
 import json,os
 body={"model":"local","presence_penalty":float(os.environ["PP"]),
       "messages":[{"role":"user","content":os.environ["PROMPT"]}]}
-# repetition_penalty 是 vLLM 的扩展参数，惩罚的是**已出现过的 token 再次出现**，
+# repetition_penalty 是本地模型服务的扩展参数（OpenAI 标准里没有），惩罚的是**已出现过的 token 再次出现**，
 # 比 presence_penalty 更对症紧邻复读。留空表示不传。
 if os.environ.get("RP"): body["repetition_penalty"]=float(os.environ["RP"])
 print(json.dumps(body))')"

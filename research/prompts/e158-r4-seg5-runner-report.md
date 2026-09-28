@@ -1,6 +1,6 @@
 # E158 第 4 次跑 第五段（几何敏感性）执行员报告
 
-写于 2026-09-27 10:50 JST。登记 `research/prompts/e158-r4-prereg.md` 8.2（r3 登记第 525–540 行，r3 登记 sha256 核过 = `5520bf1e…fa37e`）、11.2；5.5 与第十二节两段「主 agent 认定」照办。装置与臂副本照 `research/prompts/e158-r4-device-runner-report.md` 第五节用，一个字节没改。
+写于 2026-09-27。登记 `research/prompts/e158-r4-prereg.md` 8.2（r3 登记第 525–540 行，r3 登记 sha256 核过 = `5520bf1e…fa37e`）、11.2；5.5 与第十二节两段「主 agent 认定」照办。装置与臂副本照 `research/prompts/e158-r4-device-runner-report.md` 第五节用，一个字节没改。
 
 ## 一、结论
 
@@ -16,12 +16,12 @@
 ```
 cd /tmp/claude-1000/e158-r4-device/arms/<臂>
 SINGLEFS_E158_ARM=<臂> SINGLEFS_E158_SNAPSHOT_SHA256=bb5ca9bef0b09eb957906317adf7d2b47567d901ef341e85c14b6fe23a37cf4b SINGLEFS_E158_TODAY_BASES=/tmp/claude-1000/e158-r4-device/today-bases \
-  nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/capped.sh 3 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 10G ./target/release/e158_root_choice_repair r4-seg5 > research/results/e158-root-choice-repair-2026-09-27-r4-seg5-<臂>.out
+  nice -n 19 bash research/scripts/capped.sh 3 bash research/scripts/run-with-memory-cap.sh 10G ./target/release/e158_root_choice_repair r4-seg5 > research/results/e158-root-choice-repair-2026-09-27-r4-seg5-<臂>.out
 ```
 
-跨臂（today 副本里）：同一串环境变量，`… e158_root_choice_repair r4-compare /home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5 > research/results/e158-root-choice-repair-2026-09-27-r4-seg5-compare.out`，rc=0。
+跨臂（today 副本里）：同一串环境变量，`… e158_root_choice_repair r4-compare research/results/e158-root-choice-repair-2026-09-27-r4-seg5 > research/results/e158-root-choice-repair-2026-09-27-r4-seg5-compare.out`，rc=0。
 
-开跑前 `ps` 看到第一段（`r4-seg1`，xargs -P 3）、第三段（`r4-seg3`）的装置与别人的 `cargo test`、一个 `gate.sh`（另一个仓）在跑；没有 qemu、vm-bench、e152、fio。没等锁。18 份臂二进制的 sha256 开跑前记下（`arm-binaries.sha256`），跑完 `sha256sum -c` 18 个 OK。耗时（`progress.md`，JST）：today 40 秒，甲 / 丙 各约 25–36 秒，乙 与 乙-窄读 主族各 276–417 秒，六条 R = 3 各 5–7 秒；10:24:02 起、10:43:26 止。
+开跑前 `ps` 看到第一段（`r4-seg1`，xargs -P 3）、第三段（`r4-seg3`）的装置与别人的 `cargo test`、一个 `gate.sh`（另一个仓）在跑；没有 qemu、vm-bench、e152、fio。没等锁。18 份臂二进制的 sha256 开跑前记下（`arm-binaries.sha256`），跑完 `sha256sum -c` 18 个 OK。耗时（`progress.md`）：today 40 秒，甲 / 丙 各约 25–36 秒，乙 与 乙-窄读 主族各 276–417 秒，六条 R = 3 各 5–7 秒。
 
 ## 三、产物（`research/results/`，sha256 前 16 位、行数、末行）
 
@@ -340,7 +340,7 @@ name=seg5_sensitivity quantity=q6_not_covered_cells arm=yi-slot family=l5 point=
   - `r4_q6 arm=today … not_covered_cells=3 verdict=not_covered` 两行（S4、S16）：登记预期内（PC-22 的 [今] 句钉住今天那一臂没罩住）。
   - 其余 `verdict=` 取值：covered 22、inference_holds 1、pass 45。
 
-## 七、门禁（登记给 experiment-runner 的阶段，主工作区，10:47–10:49 JST）
+## 七、门禁（登记给 experiment-runner 的阶段，主工作区）
 
 | 阶段 | 退出码 | 原样末行（截 230 字） | 与第五段 |
 |---|---|---|---|

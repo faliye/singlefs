@@ -1,6 +1,6 @@
 # m2-final-code-r2 云端攻方（Opus）：Z8、Z9、Z12
 
-2026-09-25 JST（2026-09-24 UTC 19:50–20:50）。立场：找反例。代码读冻结副本 `/tmp/claude-1000/m2-final-code-r2/tree/crates/`，kb 读快照 `/tmp/claude-1000/m2-final-code-r2/kb-snapshot/.claude/kb/`；用例全在副本的拷贝 `/tmp/claude-1000/m2-final-code-r2-opus/tree/` 上跑，**副本上的数不是入库装置上的数**。
+2026-09-25。立场：找反例。代码读冻结副本 `/tmp/claude-1000/m2-final-code-r2/tree/crates/`，kb 读快照 `/tmp/claude-1000/m2-final-code-r2/kb-snapshot/.claude/kb/`；用例全在副本的拷贝 `/tmp/claude-1000/m2-final-code-r2-opus/tree/` 上跑，**副本上的数不是入库装置上的数**。
 
 ## 各格判定一览
 

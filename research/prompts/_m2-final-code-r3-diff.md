@@ -1,4 +1,4 @@
-# 附录二：第二轮冻结树到第三轮冻结树的 crates 改动，加第二轮之后打进的定义改动 diff（生成于 2026-09-25 08:32 JST / 2026-09-24 23:32 UTC）
+# 附录二：第二轮冻结树到第三轮冻结树的 crates 改动，加第二轮之后打进的定义改动 diff（生成于 2026-09-25）
 
 基准：第二轮冻结副本 `/tmp/claude-1000/m2-final-code-r2/tree/crates/` 到本轮冻结副本 `/tmp/claude-1000/m2-final-code-r3/tree/crates/`（腿读代码一律读本轮冻结副本，不读主工作区——主工作区在腿跑着的时候还会被实二五继续改 `transaction.rs`、`mount.rs`、`allocator.rs`、`recovery.rs`、`rollback_witness.rs`、`walk.rs`）。
 
@@ -12,8 +12,8 @@ diff 原始文件（两份，均由主 agent 给出，材料员未重新生成�
 
 ```diff
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/mutations.tsv tree/crates/mutations.tsv
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/mutations.tsv	2026-09-24 18:48:58.254848952 +0000
-+++ tree/crates/mutations.tsv	2026-09-24 22:40:06.357335347 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/mutations.tsv	2026-09-25
++++ tree/crates/mutations.tsv	2026-09-25
 @@ -7,7 +7,7 @@
  同盘槽号不核唯一	crates/singlefs-core/src/recovery.rs	        if !slots_per_device	        if false && !slots_per_device	-p singlefs-core --lib -- allocation_records_per_device	two_records_for_the_same_slot_on_the_same_device_are_rejected
  空闲不随分配减（I-5.2 要红）	crates/singlefs-core/src/allocator.rs	        self.free_slots -= span;	        // 变异：空闲不减	-p singlefs-harness --test second_transaction_step_one_overwrite -- cold_start	cold_start_reads_the_second_content_and_the_pool_checker_stays_green
@@ -267,8 +267,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/mutations.tsv 
 +K1 单测：分配记录树根之下的节点的步号把盘与层级写反	crates/singlefs-core/src/transaction.rs	                "t5@{}.{}.{}",	                "t5@{1}.{0}.{2}",	-p singlefs-core --lib -- transaction::tests::every_transaction_unit_names	every_transaction_unit_names_its_class_tree_and_placement_rule
 +K2 × 格式常量：extent 上段一片叶罩的 inode 数写成 142（与 (16384 − 163) ÷ 113 对不上）	crates/singlefs-format/src/lib.rs	pub const EXTENT_TREE_UPPER_LEAF_INODES: u64 = 143;	pub const EXTENT_TREE_UPPER_LEAF_INODES: u64 = 142;	-p singlefs-format --lib -- widths_match_the_first_transaction_byte_table	widths_match_the_first_transaction_byte_table
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-checker/src/lib.rs tree/crates/singlefs-checker/src/lib.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-checker/src/lib.rs	2026-09-24 18:48:58.241397937 +0000
-+++ tree/crates/singlefs-checker/src/lib.rs	2026-09-24 19:50:56.219113424 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-checker/src/lib.rs	2026-09-25
++++ tree/crates/singlefs-checker/src/lib.rs	2026-09-25
 @@ -7,6 +7,7 @@
  #![forbid(unsafe_code)]
  
@@ -278,8 +278,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-check
  
  use singlefs_format::{
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-checker/src/position_addressed.rs tree/crates/singlefs-checker/src/position_addressed.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-checker/src/position_addressed.rs	1970-01-01 00:00:00.000000000 +0000
-+++ tree/crates/singlefs-checker/src/position_addressed.rs	2026-09-24 20:56:52.992717813 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-checker/src/position_addressed.rs	1970-01-01
++++ tree/crates/singlefs-checker/src/position_addressed.rs	2026-09-25
 @@ -0,0 +1,338 @@
 +//! 按 key 空间定形状的两棵派生树（分配记录树、extent 树，D8（核心索引结构） 已定项 14，用户 2026-09-24 定 K1 / K2）在 checker 这边的几何：
 +//! 只与实现共享格式常量模块（D13（验证路线） 已定项 5），几何、key 的字节、位置怎么算按条款另写一份，不用实现的解析。
@@ -620,8 +620,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-check
 +    }
 +}
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-checker/src/walk.rs tree/crates/singlefs-checker/src/walk.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-checker/src/walk.rs	2026-09-24 18:48:58.241408187 +0000
-+++ tree/crates/singlefs-checker/src/walk.rs	2026-09-24 22:03:26.635379293 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-checker/src/walk.rs	2026-09-25
++++ tree/crates/singlefs-checker/src/walk.rs	2026-09-25
 @@ -7,9 +7,19 @@
  use std::collections::{BTreeMap, BTreeSet};
  
@@ -1581,8 +1581,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-check
      Some(records)
  }
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/allocation_record_tree.rs tree/crates/singlefs-core/src/allocation_record_tree.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/allocation_record_tree.rs	1970-01-01 00:00:00.000000000 +0000
-+++ tree/crates/singlefs-core/src/allocation_record_tree.rs	2026-09-24 20:56:53.030717457 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/allocation_record_tree.rs	1970-01-01
++++ tree/crates/singlefs-core/src/allocation_record_tree.rs	2026-09-25
 @@ -0,0 +1,993 @@
 +//! 分配记录树按 key 空间定形状（D8（核心索引结构） 已定项 14「分配记录树」，用户 2026-09-24 定 K1）：不分裂，按绝对槽号按位置寻址。
 +//!
@@ -2578,8 +2578,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/
 +    }
 +}
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/allocator.rs tree/crates/singlefs-core/src/allocator.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/allocator.rs	2026-09-24 18:48:58.241408187 +0000
-+++ tree/crates/singlefs-core/src/allocator.rs	2026-09-24 19:23:04.554198476 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/allocator.rs	2026-09-25
++++ tree/crates/singlefs-core/src/allocator.rs	2026-09-25
 @@ -627,6 +627,14 @@
      record_at_the_placement_slot
  }
@@ -2658,8 +2658,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/
  
      #[must_use]
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/extent_tree.rs tree/crates/singlefs-core/src/extent_tree.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/extent_tree.rs	1970-01-01 00:00:00.000000000 +0000
-+++ tree/crates/singlefs-core/src/extent_tree.rs	2026-09-24 20:56:53.036717401 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/extent_tree.rs	1970-01-01
++++ tree/crates/singlefs-core/src/extent_tree.rs	2026-09-25
 @@ -0,0 +1,1203 @@
 +//! extent 树按 key 空间定形状（D8（核心索引结构） 已定项 14「extent 树」，用户 2026-09-24 定 K2）：两段，都按位置寻址，不分裂。
 +//!
@@ -3865,8 +3865,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/
 +    }
 +}
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/lib.rs tree/crates/singlefs-core/src/lib.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/lib.rs	2026-09-24 18:48:58.241504616 +0000
-+++ tree/crates/singlefs-core/src/lib.rs	2026-09-24 19:18:53.194747347 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/lib.rs	2026-09-25
++++ tree/crates/singlefs-core/src/lib.rs	2026-09-25
 @@ -8,11 +8,13 @@
  
  pub mod address;
@@ -3882,8 +3882,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/
  pub mod instance_table;
  pub mod journal;
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/mounted_read.rs tree/crates/singlefs-core/src/mounted_read.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/mounted_read.rs	2026-09-24 16:50:54.714217512 +0000
-+++ tree/crates/singlefs-core/src/mounted_read.rs	2026-09-24 22:03:32.608439714 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/mounted_read.rs	2026-09-25
++++ tree/crates/singlefs-core/src/mounted_read.rs	2026-09-25
 @@ -17,8 +17,9 @@
  //!   记录条数要等于文件大小按 D4（校验和位置） 已定项 5 的除法算出来的单元数；对不上就拒绝打开这个文件，不猜。
  //!   于是「第 i 条记录就是文件第 i 个数据单元」这件事由 key 本身担保，解引用时再核单元头的锚点偏移与 key 相等。
@@ -4201,8 +4201,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/
      #[must_use]
      pub fn data_unit_count(&self) -> u64 {
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/mount.rs tree/crates/singlefs-core/src/mount.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/mount.rs	2026-09-24 18:48:58.241518146 +0000
-+++ tree/crates/singlefs-core/src/mount.rs	2026-09-24 21:35:39.449983013 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/mount.rs	2026-09-25
++++ tree/crates/singlefs-core/src/mount.rs	2026-09-25
 @@ -4,6 +4,9 @@
  //! 第一版没有干净关闭标记，重开一律走恢复。
  
@@ -5166,8 +5166,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/
          .chain(&warm_up_publishes)
          .map(placements_taken_by)
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/recovery.rs tree/crates/singlefs-core/src/recovery.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/recovery.rs	2026-09-24 18:48:58.241538946 +0000
-+++ tree/crates/singlefs-core/src/recovery.rs	2026-09-24 20:56:53.071717073 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/recovery.rs	2026-09-25
++++ tree/crates/singlefs-core/src/recovery.rs	2026-09-25
 @@ -11,23 +11,32 @@
  use std::collections::{BTreeMap, BTreeSet};
  
@@ -5885,8 +5885,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/
              || header.identity.anchor_offset != first_file_byte.0
          {
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/transaction.rs tree/crates/singlefs-core/src/transaction.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/transaction.rs	2026-09-24 18:48:58.241580116 +0000
-+++ tree/crates/singlefs-core/src/transaction.rs	2026-09-24 22:04:35.929349323 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/transaction.rs	2026-09-25
++++ tree/crates/singlefs-core/src/transaction.rs	2026-09-25
 @@ -10,9 +10,8 @@
  use std::collections::{BTreeMap, BTreeSet};
  
@@ -9073,8 +9073,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/
                  .placement(),
              PlacementRule::CommitGenerated(UnitFootprint::TwoSlotsAligned),
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/write_accounting.rs tree/crates/singlefs-core/src/write_accounting.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/write_accounting.rs	2026-09-24 16:50:54.714292753 +0000
-+++ tree/crates/singlefs-core/src/write_accounting.rs	2026-09-24 20:56:53.114716670 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/write_accounting.rs	2026-09-25
++++ tree/crates/singlefs-core/src/write_accounting.rs	2026-09-25
 @@ -49,10 +49,14 @@
      pub const fn of_unit(identity: TransactionUnit) -> WrittenStructureKind {
          match identity {
@@ -9093,8 +9093,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/
              TransactionUnit::AccountingTreeNodeBelowTheRoot(_)
              | TransactionUnit::AccountingTree => WrittenStructureKind::AccountingTreeNode,
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-format/src/lib.rs tree/crates/singlefs-format/src/lib.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-format/src/lib.rs	2026-09-24 18:48:58.241580116 +0000
-+++ tree/crates/singlefs-format/src/lib.rs	2026-09-24 19:10:19.219676936 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-format/src/lib.rs	2026-09-25
++++ tree/crates/singlefs-format/src/lib.rs	2026-09-25
 @@ -133,6 +133,33 @@
  /// 中央映射树内部节点条目：分隔 key 27 + 子指针 86（D8（核心索引结构） 已定项 11）。format-const: CENTRAL_MAPPING_INTERNAL_ENTRY_BYTES
  pub const CENTRAL_MAPPING_INTERNAL_ENTRY_BYTES: u64 = 113;
@@ -9180,8 +9180,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-forma
              8 + 26 + NODE_POINTER_BYTES,
              "inode 内部条目 = 分隔 key 8 + 身份引用 26 + 子指针"
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harness/src/bad_disk_input.rs tree/crates/singlefs-harness/src/bad_disk_input.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harness/src/bad_disk_input.rs	2026-09-23 22:56:34.090557683 +0000
-+++ tree/crates/singlefs-harness/src/bad_disk_input.rs	2026-09-24 21:01:15.127131029 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harness/src/bad_disk_input.rs	2026-09-24
++++ tree/crates/singlefs-harness/src/bad_disk_input.rs	2026-09-25
 @@ -830,24 +830,25 @@
      let Some(reached) = reach_the_tree_table(image) else {
          return false;
@@ -9654,8 +9654,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harne
          return None;
      }
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs tree/crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs	2026-09-24 05:10:20.899145112 +0000
-+++ tree/crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs	2026-09-24 21:36:05.371480421 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs	2026-09-24
++++ tree/crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs	2026-09-25
 @@ -2698,7 +2698,7 @@
          "β0 上镜像读法与内存读法应当一致（都还没 corrupt）"
      );
@@ -9697,8 +9697,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harne
      for step in 1..=hr_prefix_length {
          let mut pool = PoolWriter::new(&parameters, hr_devices.as_mut_slice());
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harness/src/history.rs tree/crates/singlefs-harness/src/history.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harness/src/history.rs	2026-09-24 18:48:58.241580116 +0000
-+++ tree/crates/singlefs-harness/src/history.rs	2026-09-24 20:56:53.151716323 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harness/src/history.rs	2026-09-25
++++ tree/crates/singlefs-harness/src/history.rs	2026-09-25
 @@ -51,8 +51,8 @@
  use crate::fault_injection::{FaultInjectingBlockDevice, SharedFaultPlan};
  use crate::model::{
@@ -10008,8 +10008,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harne
              let raised_floor = if let StepOutcome::Applied(AppliedEffect::RaisedFloor {
                  new_floor,
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harness/src/model_comparison.rs tree/crates/singlefs-harness/src/model_comparison.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harness/src/model_comparison.rs	2026-09-24 18:48:58.241685305 +0000
-+++ tree/crates/singlefs-harness/src/model_comparison.rs	2026-09-24 20:07:28.373234637 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harness/src/model_comparison.rs	2026-09-25
++++ tree/crates/singlefs-harness/src/model_comparison.rs	2026-09-25
 @@ -42,9 +42,12 @@
      }
  }
@@ -10123,8 +10123,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harne
              let judged = model
                  .clone()
 diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harness/src/model.rs tree/crates/singlefs-harness/src/model.rs
---- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harness/src/model.rs	2026-09-24 16:50:54.714341234 +0000
-+++ tree/crates/singlefs-harness/src/model.rs	2026-09-24 20:56:53.162716220 +0000
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harness/src/model.rs	2026-09-25
++++ tree/crates/singlefs-harness/src/model.rs	2026-09-25
 @@ -13,16 +13,17 @@
  //!
  //! 模型不记落点：单元落在哪个槽、分配记录写得对不对（回收门槛、释放时改没改写记录、复用时罩住的槽删没删）归池级 checker 判，
@@ -10850,8 +10850,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harne
 ## 四、定义相对第二轮冻结的 diff（`defs-r2-to-r3.diff`，4 个文件，整段进）
 
 ```diff
---- /tmp/claude-1000/m2-final-code-r2/defs/.claude/agent-common.md	2026-09-24 19:28:06.096563176 +0000
-+++ defs/.claude/agent-common.md	2026-09-24 22:47:56.775221502 +0000
+--- /tmp/claude-1000/m2-final-code-r2/defs/.claude/agent-common.md	2026-09-25
++++ defs/.claude/agent-common.md	2026-09-25
 @@ -54,7 +54,7 @@
  - 本机常有别的会话在同一个仓里干活：只动这一轮自己的文件；看到别人没提交的改动不碰、不修。
  - 长活可以等，不给它设超时、不自己中途杀掉：编译、变异表、复跑这类长活用 Bash 的 `run_in_background` 起，起完结束本轮，完成时会通知你。交给它的命令要一直跑到真正的活结束才退出：不在里面再把活放到后台——不用 `disown`、`coproc`、`setsid -f`、`nohup … &`、`tmux`/`screen` 的分离模式、`systemd-run`，子 shell 或 `$( … )` 里也不写 `&`；`&` 只在同一条命令随后用不带参数的 `wait` 等齐时用。结束本轮就是这一条回复只写一句在等什么、不再调工具；前台命令的 `timeout` 不超过 240000 毫秒。
@@ -10861,8 +10861,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harne
  
  ## 门禁
  
---- /tmp/claude-1000/m2-final-code-r2/defs/.claude/main-agent.md	2026-09-24 19:28:06.103397261 +0000
-+++ defs/.claude/main-agent.md	2026-09-24 22:47:56.776427505 +0000
+--- /tmp/claude-1000/m2-final-code-r2/defs/.claude/main-agent.md	2026-09-25
++++ defs/.claude/main-agent.md	2026-09-25
 @@ -26,9 +26,9 @@
  
  ## 派出去之后
@@ -10875,8 +10875,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harne
  
  子 agent 等长活时不续提示缓存；主 agent 除了看门狗报「跑满 N 小时」时的那一条例行询问，不另外定时 ping 它。临时派不读共用约束的 agent（general-purpose 这类）干带长等待的活时，派发提示里写上共用约束「长活可以等」那一条里后台命令怎么写。
  
---- /tmp/claude-1000/m2-final-code-r2/defs/.claude/agents/crash-verifier.md	2026-09-24 19:28:06.097796672 +0000
-+++ defs/.claude/agents/crash-verifier.md	2026-09-24 22:47:56.777483201 +0000
+--- /tmp/claude-1000/m2-final-code-r2/defs/.claude/agents/crash-verifier.md	2026-09-25
++++ defs/.claude/agents/crash-verifier.md	2026-09-25
 @@ -10,7 +10,7 @@
  
  开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
@@ -10886,8 +10886,8 @@ diff -ruN -x target /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-harne
  开工先读：`.claude/singlefs-ai-sop/skills/crash-test/SKILL.md`「判读纪律」；`.claude/singlefs-ai-sop/rules/test-discipline.md`「崩溃一致性只能靠崩溃点重放验证」「阴性结果要能和「代码没跑到」分开」；`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「文件系统特有的反推缺口」。
  
  ## 输入（主 agent 必须给）
---- /tmp/claude-1000/m2-final-code-r2/defs/.claude/rules/implementation-workflow.md	2026-09-24 19:28:06.104441137 +0000
-+++ defs/.claude/rules/implementation-workflow.md	2026-09-24 22:47:56.778569067 +0000
+--- /tmp/claude-1000/m2-final-code-r2/defs/.claude/rules/implementation-workflow.md	2026-09-25
++++ defs/.claude/rules/implementation-workflow.md	2026-09-25
 @@ -1,4 +1,4 @@
 -# 实现改动的流程：写代码 → 三方对抗 → checker，提交前跑 herd7 与 QEMU
 +# 实现改动的流程：写代码 → 三方对抗 → checker，重型测试只在提交时跑

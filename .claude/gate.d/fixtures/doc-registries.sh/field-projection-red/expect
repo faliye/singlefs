@@ -1,0 +1,5 @@
+exit=1
+want=  field-projection：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（field-projection）
+want=的字段表有「树 ID 水位」
+want=D362 已定项 7 的字段表有「块头版本」（宽 2），而 .claude/kb/layout/01-first-txn.md 里引用了这条分项的那几节的表格行里找不到它

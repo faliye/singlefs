@@ -1,0 +1,4 @@
+exit=1
+want=这一段模型一步都没判：「随机历史：越过原分配记录墙的取样点」（用例 allocation_record_sampling_with_the_checker_goes_past_the_812_records_of_the_former_one_node_wall）
+want=样本只跑 .gate-cells 点名的格：model-allocation-record-wall
+want=model-allocation-record-wall：红（退出 1）

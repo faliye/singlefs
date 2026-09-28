@@ -2,7 +2,7 @@
 
 <!-- doc-lint:not-numbers J1 J2 J3 J4 J5 K1 K2 K3 K4 K5 Y1 Y2 Y3 Y4 Y5 Y6 Y7 Y8 P1 P2 P3 P4 P5 P6 P7 P8 P9 P10 D1 D2 D3 -->
 
-写于 2026-09-26 15:28 UTC（2026-09-27 00:28 JST）。被判的是开工快照 `research/prompts/defs-gatebatch-m2-r2-snapshot/sha256sums.txt` 那 11 个文件；开工时 `sha256sum -c` 11 个全 OK。派发没给禁读清单，按「无」办。
+写于 2026-09-27。被判的是开工快照 `research/prompts/defs-gatebatch-m2-r2-snapshot/sha256sums.txt` 那 11 个文件；开工时 `sha256sum -c` 11 个全 OK。派发没给禁读清单，按「无」办。
 
 ## 复跑
 

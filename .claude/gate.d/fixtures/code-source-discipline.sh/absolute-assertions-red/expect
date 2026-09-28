@@ -1,0 +1,11 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：absolute-assertions
+want=e1_relative.rs 一条绝对值断言都没有
+want=e2_multiline_relative.rs 一条绝对值断言都没有
+want=crates/demo/src/bin/e2_crates_relative.rs 一条绝对值断言都没有
+want=e6_commented_and_structural.rs 一条绝对值断言都没有
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=absolute-assertions：红（退出 1）
+want=code-source-discipline.sh：1 格里 1 格红（absolute-assertions）
+want=→ absolute-assertions：
+want=bash .claude/gate.d/code-source-discipline.sh --check absolute-assertions

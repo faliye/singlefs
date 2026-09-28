@@ -4,7 +4,7 @@
 # 放进 opus_r3_p3_attack.rs，逐段跑，输出写进 <输出目录>，再出各段汇总。
 #   bash rerun.sh [与快照相同的仓根（含 crates/、Cargo.toml、Cargo.lock）] [工作目录] [输出目录]
 # 默认：/tmp/claude-1000/safety-r3-frozen、/tmp/claude-1000/m2-safety-r3-opus-rerun、<工作目录>/out。
-# ⚠️ 冻结副本 /tmp/claude-1000/safety-r3-frozen 在 2026-09-26 04:31–04:33 UTC 被改过四个文件，下面的 sha256 核对会拒它；
+# ⚠️ 冻结副本 /tmp/claude-1000/safety-r3-frozen 在 2026-09-26 被改过四个文件，下面的 sha256 核对会拒它；
 #    给一份与快照相同的仓根（这条腿交回时留着的 /tmp/claude-1000/m2-safety-r3-opus/tree 倒回补丁之后就是，见报告「没做什么」）。
 # 编译与跑一律经 research/scripts/run-with-memory-cap.sh（10G）与 research/scripts/capped.sh（6 线程）。
 # 挂钟（6 线程，这条腿量的）：E1 2.6 分、E3 0.7 分、E4 0.8 分、E6 4.8 分、E7 13.1 分、E8 10.7 分、E10 7.3 分、E2 13.0 分、E5 43.9 分、E7/E1 的 P3r 3 分。

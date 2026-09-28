@@ -1,0 +1,3 @@
+4502d78f2b43ce57e7ae735dd30ea3889ac49bb2b3dd180cfe500e23ca409343  research/prompts/_m3-prune-gpu-r3-body.md
+9aa121aa357dc671145f18421f7c59d1176d2557230d2d0958e76720b81331b4  research/prompts/m3-prune-gpu-r3-forks.md
+48ab1acf1f801381cecfc619c18be5e235a3525419801bb9dbc5518912b9735c  research/prompts/_m3-prune-gpu-r3-background.md

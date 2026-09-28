@@ -1,8 +1,8 @@
-# E142 第十九次跑：重跑登记交回（experiment-designer，2026-09-27 JST）
+# E142 第十九次跑：重跑登记交回（experiment-designer，2026-09-27）
 
 ## 结论
 
-- 重跑登记：`/home/fy5090/code/singlefs/research/prompts/e142-r19-prereg.md`（669 行，sha256 `10aa89901ac68d42c8c75c7479f891ac62b2ea44f6f56d5108957896a272f9dc`），十三节齐，节名照固定节名。重跑，不占号。
+- 重跑登记：`research/prompts/e142-r19-prereg.md`（669 行，sha256 `10aa89901ac68d42c8c75c7479f891ac62b2ea44f6f56d5108957896a272f9dc`），十三节齐，节名照固定节名。重跑，不占号。
 - 准入今天放行（`admission.py experiment … E142` 退 0：输入自 `…-r18-main.out` 以来变了，f62e18e1695d → 6730b2f80c2a），不是「输入没变」的重跑。
 - 一次做完一段（第五节 5.4），三行共用一份主产物；中途要停就停在步 ② 冻结之后。
 

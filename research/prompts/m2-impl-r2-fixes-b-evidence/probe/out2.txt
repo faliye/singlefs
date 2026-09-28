@@ -1,0 +1,128 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 38.3 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排队（已等 60 秒，至多 3600 秒）：slice 已占 32.4 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排队（已等 120 秒，至多 3600 秒）：slice 已占 32.4 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排了 126 秒，起跑（singlefs-memory-cap-1861355-179702028）
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/zz_probe_two.rs (target/debug/deps/zz_probe_two-9a164d3cdea43570)
+
+running 4 tests
+PROBE7 UnitAreaOf240Slots overwrites=1 direct=1 ok
+PROBE7 UnitAreaOf240Slots overwrites=1 direct=2 ok
+PROBE7 UnitAreaOf240Slots overwrites=1 direct=3 ok
+PROBE7 UnitAreaOf240Slots overwrites=1 direct=4 ok
+PROBE7 UnitAreaOf240Slots overwrites=2 direct=1 ok
+PROBE7 UnitAreaOf240Slots overwrites=2 direct=2 ok
+PROBE7 UnitAreaOf240Slots overwrites=2 direct=3 ok
+PROBE7 UnitAreaOf240Slots overwrites=2 direct=4 ok
+PROBE7 UnitAreaOf240Slots overwrites=3 direct=1 ok
+PROBE7 UnitAreaOf240Slots overwrites=3 direct=2 ok
+PROBE7 UnitAreaOf240Slots overwrites=3 direct=3 ok
+PROBE7 UnitAreaOf240Slots overwrites=3 direct=4 ok
+PROBE9 16 other AdmittedAfterTheFloorRaises { refusal_before_acquisition: AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-1097728
+PROBE7 UnitAreaOf240Slots overwrites=4 direct=1 ok
+PROBE7 UnitAreaOf240Slots overwrites=4 direct=2 ok
+PROBE7 UnitAreaOf240Slots overwrites=4 direct=3 ok
+PROBE7 UnitAreaOf240Slots overwrites=4 direct=4 refused [(1, 12), (1, 12)]
+PROBE8 empties=140 refused_units=8 bound=35 available=[30, 30] error=SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(0), demand: BytesOnOneDevice(262144) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(0), demand: BytesOnOneDevice(262144) }] })
+PROBE9 17 instance=InstanceGeneration(2) still_short raises=0 stop=FloorRaiseRefusedForSpace { refusal: RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { refused_publish_in_the_sequence: 3, publishes_in_the_sequence: 3, cause: PlacementRefused { unit: AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 0, device: DeviceIdentity(0), index_in_device: 2 }), refusal: NoFreeSlotOnAnyDevice } } }
+PROBE7 UnitAreaOf240Slots overwrites=5 direct=1 ok
+PROBE7 UnitAreaOf240Slots overwrites=5 direct=2 refused [(7, 12), (7, 12)]
+PROBE9 18 instance=InstanceGeneration(2) still_short raises=0 stop=FloorRaiseRefusedForSpace { refusal: RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { refused_publish_in_the_sequence: 1, publishes_in_the_sequence: 2, cause: PlacementRefused { unit: AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 0, device: DeviceIdentity(1), index_in_device: 1 }), refusal: NoFreeSlotOnAnyDevice } } }
+test probe_nine_mount_stop ... ok
+PROBE7 UnitAreaOf240Slots overwrites=6 direct=1 ok
+PROBE7 UnitAreaOf240Slots overwrites=6 direct=2 refused [(1, 12), (1, 12)]
+PROBE7 UnitAreaOf240Slots overwrites=7 direct=1 refused [(1, 12), (1, 12)]
+PROBE7 UnitAreaOf256Slots overwrites=1 direct=1 ok
+PROBE7 UnitAreaOf256Slots overwrites=1 direct=2 ok
+PROBE7 UnitAreaOf256Slots overwrites=1 direct=3 ok
+PROBE7 UnitAreaOf256Slots overwrites=1 direct=4 ok
+PROBE7 UnitAreaOf256Slots overwrites=2 direct=1 ok
+PROBE7 UnitAreaOf256Slots overwrites=2 direct=2 ok
+PROBE7 UnitAreaOf256Slots overwrites=2 direct=3 ok
+PROBE7 UnitAreaOf256Slots overwrites=2 direct=4 ok
+PROBE8off empties=140 units=2 ok raises=0
+PROBE7 UnitAreaOf256Slots overwrites=3 direct=1 ok
+PROBE7 UnitAreaOf256Slots overwrites=3 direct=2 ok
+PROBE7 UnitAreaOf256Slots overwrites=3 direct=3 ok
+PROBE8off empties=140 units=3 ok raises=0
+PROBE7 UnitAreaOf256Slots overwrites=3 direct=4 ok
+PROBE8off empties=140 units=4 ok raises=0
+PROBE8off empties=140 units=5 ok raises=0
+PROBE8off empties=140 units=6 ok raises=0
+PROBE8off empties=140 units=7 ok raises=0
+PROBE7 UnitAreaOf256Slots overwrites=4 direct=1 ok
+PROBE7 UnitAreaOf256Slots overwrites=4 direct=2 ok
+PROBE7 UnitAreaOf256Slots overwrites=4 direct=3 ok
+PROBE7 UnitAreaOf256Slots overwrites=4 direct=4 refused [(11, 14), (11, 14)]
+PROBE7 UnitAreaOf256Slots overwrites=5 direct=1 ok
+PROBE7 UnitAreaOf256Slots overwrites=5 direct=2 ok
+PROBE7 UnitAreaOf256Slots overwrites=5 direct=3 refused [(11, 12), (11, 12)]
+PROBE7 UnitAreaOf256Slots overwrites=6 direct=1 ok
+PROBE7 UnitAreaOf256Slots overwrites=6 direct=2 ok
+PROBE7 UnitAreaOf256Slots overwrites=6 direct=3 refused [(5, 12), (5, 12)]
+PROBE7 UnitAreaOf256Slots overwrites=7 direct=1 ok
+PROBE7 UnitAreaOf256Slots overwrites=7 direct=2 refused [(5, 12), (5, 12)]
+PROBE8off empties=140 units=8 ok raises=1 pushed=[PlacementRefused { unit: Data(DataUnitIndexInFile(0)), refusal: NoFreeSlotOnAnyDevice }] floor CheckpointTxg(0)->CheckpointTxg(148) checker=[]
+PROBE7 UnitAreaOf256Slots overwrites=8 direct=1 refused [(-5, 14), (-5, 14)]
+PROBE7 UnitAreaOf384Slots overwrites=1 direct=1 ok
+PROBE7 UnitAreaOf384Slots overwrites=1 direct=2 ok
+PROBE7 UnitAreaOf384Slots overwrites=1 direct=3 ok
+PROBE7 UnitAreaOf384Slots overwrites=1 direct=4 ok
+PROBE7 UnitAreaOf384Slots overwrites=2 direct=1 ok
+PROBE7 UnitAreaOf384Slots overwrites=2 direct=2 ok
+PROBE7 UnitAreaOf384Slots overwrites=2 direct=3 ok
+PROBE7 UnitAreaOf384Slots overwrites=2 direct=4 ok
+PROBE7 UnitAreaOf384Slots overwrites=3 direct=1 ok
+PROBE7 UnitAreaOf384Slots overwrites=3 direct=2 ok
+PROBE7 UnitAreaOf384Slots overwrites=3 direct=3 ok
+PROBE7 UnitAreaOf384Slots overwrites=3 direct=4 ok
+PROBE7 UnitAreaOf384Slots overwrites=4 direct=1 ok
+PROBE7 UnitAreaOf384Slots overwrites=4 direct=2 ok
+PROBE7 UnitAreaOf384Slots overwrites=4 direct=3 ok
+PROBE7 UnitAreaOf384Slots overwrites=4 direct=4 ok
+PROBE7 UnitAreaOf384Slots overwrites=5 direct=1 ok
+PROBE7 UnitAreaOf384Slots overwrites=5 direct=2 ok
+PROBE7 UnitAreaOf384Slots overwrites=5 direct=3 ok
+PROBE7 UnitAreaOf384Slots overwrites=5 direct=4 ok
+PROBE8 empties=200 refused_units=6 bound=31 available=[60, 60] error=SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(0), demand: BytesOnOneDevice(196608) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(0), demand: BytesOnOneDevice(196608) }] })
+PROBE7 UnitAreaOf384Slots overwrites=6 direct=1 ok
+PROBE7 UnitAreaOf384Slots overwrites=6 direct=2 ok
+PROBE7 UnitAreaOf384Slots overwrites=6 direct=3 ok
+PROBE7 UnitAreaOf384Slots overwrites=6 direct=4 ok
+PROBE7 UnitAreaOf384Slots overwrites=7 direct=1 ok
+PROBE7 UnitAreaOf384Slots overwrites=7 direct=2 ok
+PROBE7 UnitAreaOf384Slots overwrites=7 direct=3 ok
+PROBE7 UnitAreaOf384Slots overwrites=7 direct=4 ok
+PROBE7 UnitAreaOf384Slots overwrites=8 direct=1 ok
+PROBE7 UnitAreaOf384Slots overwrites=8 direct=2 ok
+PROBE7 UnitAreaOf384Slots overwrites=8 direct=3 ok
+PROBE7 UnitAreaOf384Slots overwrites=8 direct=4 ok
+PROBE7 UnitAreaOf384Slots overwrites=9 direct=1 ok
+PROBE7 UnitAreaOf384Slots overwrites=9 direct=2 ok
+PROBE7 UnitAreaOf384Slots overwrites=9 direct=3 ok
+PROBE7 UnitAreaOf384Slots overwrites=9 direct=4 ok
+PROBE7 UnitAreaOf384Slots overwrites=10 direct=1 ok
+PROBE7 UnitAreaOf384Slots overwrites=10 direct=2 ok
+PROBE7 UnitAreaOf384Slots overwrites=10 direct=3 ok
+PROBE7 UnitAreaOf384Slots overwrites=10 direct=4 ok
+PROBE8off empties=200 units=2 ok raises=0
+PROBE8off empties=200 units=3 ok raises=0
+PROBE8off empties=200 units=4 ok raises=0
+PROBE8off empties=200 units=5 ok raises=0
+PROBE7 UnitAreaOf384Slots overwrites=11 direct=1 ok
+PROBE7 UnitAreaOf384Slots overwrites=11 direct=2 ok
+PROBE7 UnitAreaOf384Slots overwrites=11 direct=3 ok
+PROBE10 ending=Completed last=Some(Refused { member: "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)" })
+PROBE7 UnitAreaOf384Slots overwrites=11 direct=4 ok
+PROBE10 direct Some(PlacementRefusedBeforeAcquisitionMountAdmissionUndecided { instance_to_acquire: InstanceGeneration(2), publish_index: 0, warm_up_publishes_planned: 1, unit: AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 0, device: DeviceIdentity(1), index_in_device: 2 }), refusal: NoFreeSlotOnAnyDevice })
+test probe_ten_direct_mount_after_empty_overwrites ... ok
+PROBE8off empties=200 units=6 ok raises=1 pushed=[PlacementRefused { unit: Data(DataUnitIndexInFile(0)), refusal: NoFreeSlotOnAnyDevice }] floor CheckpointTxg(0)->CheckpointTxg(206) checker=[]
+test probe_eight_admission_384 ... ok
+PROBE7 UnitAreaOf384Slots overwrites=12 direct=1 ok
+PROBE7 UnitAreaOf384Slots overwrites=12 direct=2 ok
+PROBE7 UnitAreaOf384Slots overwrites=12 direct=3 ok
+PROBE7 UnitAreaOf384Slots overwrites=12 direct=4 ok
+test probe_seven_direct_overwrites ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.16s
+

@@ -1,6 +1,6 @@
-# 附录二：门禁批 G1 + G2 diff（defs-gatebatch-m2-r3，生成于 2026-09-27 12:33 JST / 2026-09-27 03:33 UTC）
+# 附录二：门禁批 G1 + G2 diff（defs-gatebatch-m2-r3，生成于 2026-09-27）
 
-基准：这一轮被判的是两份已归档的 diff，原样放进本附录——`research/prompts/defs-gatebatch-m2-r2-fixes.diff`（G1，1630 行）与 `research/prompts/defs-gatebatch-m2-g2-changes.diff`（G2，1498 行），两批 2026-09-27 00:32 UTC 一起进了提交 `ecdf8465`（门禁批 G1/G2：层 0 分片、崩溃枚举用例准入、重型测试闸与交回闸）。被判的就是这两批 diff 落在今天文件里的样子。
+基准：这一轮被判的是两份已归档的 diff，原样放进本附录——`research/prompts/defs-gatebatch-m2-r2-fixes.diff`（G1，1630 行）与 `research/prompts/defs-gatebatch-m2-g2-changes.diff`（G2，1498 行），两批 2026-09-27 一起进了提交 `ecdf8465`（门禁批 G1/G2：层 0 分片、崩溃枚举用例准入、重型测试闸与交回闸）。被判的就是这两批 diff 落在今天文件里的样子。
 
 sha256（材料员现算，与正文第一节给的一致）：
 ```
@@ -935,10 +935,10 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
                                  "LAYER0 states=5 closed_form=5 exhaustive=true\nparallel_finished=LAYER0_PARALLEL_FINISHED states=5 slices=1\n")
          fingerprint_now, _count = fingerprint()
 -        exit_code, marker_path, _messages = admission("crash-case-record", work, "crash-case:own", fingerprint_now, manifest_file, judged_file,
--                                                      "--files", "6", "--excluded", "1", "--started", "2026-09-26T00:00:00Z",
+-                                                      "--files", "6", "--excluded", "1", "--started", "2026-09-26",
 -                                                      "--judged-root", work, "--threads-text", "样本")
 +        record_arguments = ("crash-case-record", work, "crash-case:own", fingerprint_now, manifest_file, judged_file, "--files", "6", "--excluded", "1",
-+                            "--started", "2026-09-26T00:00:00Z", "--judged-root", work, "--machine-cores", "32", "--threads", "7",
++                            "--started", "2026-09-26", "--judged-root", work, "--machine-cores", "32", "--threads", "7",
 +                            "--threads-origin", "explicit")
 +        exit_code, marker_path, _messages = admission(*record_arguments, changes={BREAK_VARIABLE: "single-worker-threads-field"})
 +        with open(marker_path.strip(), encoding="utf-8") as handle:
@@ -2467,8 +2467,8 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
  #     断点续跑（crash-case-command 设）：跑用例时设 SINGLEFS_LAYER0_PROGRESS_DIRECTORY=<common-dir>/singlefs-layer0-progress/<这条用例的输入指纹>
  #     （不随 worktree 删掉）、SINGLEFS_LAYER0_INPUT_FINGERPRINT=<这条用例的输入指纹>；--start-over 设 SINGLEFS_LAYER0_START_OVER=1（丢掉进度文件、从头跑），
  #     不带它时从调用方的环境里清掉这个变量。续跑的判法（片方案、校验和、观察者计数、判红删进度文件）在 crates/singlefs-harness/src/layer0_progress.rs。
-+#     双机分片（里程碑三第六项，用户 2026-09-27 定默认不分片）：本地配置（${SINGLEFS_LAYER0_SHARD_CONFIG:-<主工作树的根>/layer0-shard.env}，
-+#     模板是仓根 layer0-shard.env.example）在、research/scripts/layer0-shard-configuration-check.sh 判得过（键齐、第二台 ssh 连得上、它上面有 cargo）
++#     双机分片（里程碑三第六项，用户 2026-09-27 定默认不分片）：本地配置（${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}，
++#     模板是仓根 multi-host.env.example）在、research/scripts/layer0-shard-configuration-check.sh 判得过（键齐、第二台 ssh 连得上、它上面有 cargo）
 +#     才开；开着时登记了 shard=across-machines 的用例（admission.py crash-case-shardable）交给 research/scripts/layer0-shard-run.sh --merged-log
 +#     （本机 0/2、第二台 1/2、本机 merge/2；驱动脚本与配置判法按内容进这几条用例的指纹），它交回的 merge 那一趟日志照单机的判法判、写同一格标记；
 +#     别的用例、配置不在或判不过时，照 crash-case-command 单机跑。开没开、为什么，开跑时打一行。
@@ -2543,7 +2543,7 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
      delete_crash_case_marker "$case_key" "$fingerprint_at_start"
 +    if [[ "$case_sharded" == 1 ]]; then
 +      echo "  ✗ $case_key 判红：双机分片那一趟退 $case_run_exit（上面是驱动脚本的输出与 merge 那一趟日志的尾部）"
-+      echo "     → 怎么办：驱动脚本输出里判红的那一句说清卡在哪一步（工具链、指纹、某一片、账本、merge）；要单机复核，挪开本地配置 layer0-shard.env 再跑 --full"
++      echo "     → 怎么办：驱动脚本输出里判红的那一句说清卡在哪一步（工具链、指纹、某一片、账本、merge）；要单机复核，挪开本地配置 multi-host.env 再跑 --full"
 +      red_cases+=("$case_key")
 +      continue
 +    fi
@@ -2577,7 +2577,7 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 +# 登记的崩溃枚举用例都标了 #[ignore]，三趟 cargo test 都带 --include-ignored --exact <用例函数>；只供测试的开关
 +# SINGLEFS_LAYER0_SHARD_INCLUDE_IGNORED=0 时不带 --include-ignored（--selftest 那条小流用例不标 ignore，不必把别的 ignore 用例放进过滤范围）。
 +#
-+# 配置（本地、git 忽略）：${SINGLEFS_LAYER0_SHARD_CONFIG:-<主工作树的根>/layer0-shard.env}，键与写法见仓根 layer0-shard.env.example；
++# 配置（本地、git 忽略）：${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}，键与写法见仓根 multi-host.env.example；
 +# 在不在、齐不齐、第二台连不连得上由 research/scripts/layer0-shard-configuration-check.sh 判（门禁 54 号拿同一份判走不走分片）。
 +# 这一份与配置判法按内容进登记了 shard=across-machines 的用例的输入指纹（research/scripts/admission.py 的 SHARD_DRIVER_FILES）：两片与 merge 的
 +# cargo 由这里起、不经 admission.py crash-case-command，改了这里那几条用例的旧全绿标记不再作数。
@@ -2848,7 +2848,7 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 +#   ② --merged-log（门禁 54 号调的那一条）：merge 那一趟的日志写进给的文件，带 LAYER0_SHARD mode=merge shards=2 与同一行计数
 +#   ③ 「第二台」的 rustc -Vv 第一行不同 ⇒ 拒（工具链不同），标记不动
 +#   ④ 「第二台」那一片没写账本 ⇒ 判红，删这批输入那一格标记
-+#   ⑤ 配置缺键、配置文件不在 ⇒ 开跑之后头一步的配置判法拒（退 1），出路指到 layer0-shard.env.example
++#   ⑤ 配置缺键、配置文件不在 ⇒ 开跑之后头一步的配置判法拒（退 1），出路指到 multi-host.env.example
 +#   ⑥ 没登记 shard=across-machines 的用例 ⇒ 拒
 +# 成功行报核了几格（现算）。
 +#
@@ -2880,7 +2880,7 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 +
 +selftest_case_key="crash-case:sharded-selftest"
 +copy="$work/repository"
-+rsync -a --exclude target --exclude .git --exclude layer0-shard.env "$repository_root/" "$copy/"
++rsync -a --exclude target --exclude .git --exclude multi-host.env "$repository_root/" "$copy/"
 +git -C "$copy" init -q
 +real_rustc="$(command -v rustc)"
 +if [[ -n "${SINGLEFS_HEAVY_TESTS:-}" ]]; then
@@ -2944,8 +2944,8 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 +QUIESCE_STARTED_CHECK_COMMAND=test ! -e $work/quiesced
 +CONFIGURATION
 +}
-+write_configuration "$work/layer0-shard.env" "$selftest_bin_directory"
-+export SINGLEFS_LAYER0_SHARD_CONFIG="$work/layer0-shard.env"
++write_configuration "$work/multi-host.env" "$selftest_bin_directory"
++export SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host.env"
 +export SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1
 +# 三趟 cargo test 都不带 --include-ignored：真 cargo 那条小流用例不标 ignore（同一个测试目标里标了 ignore 的 golden 子进程用例不进过滤范围）；
 +# 假 cargo 的替身用例标了 ignore，不带它就不算重型
@@ -2995,7 +2995,7 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 +printf '#!/usr/bin/env bash\nif [[ "${1:-}" == -Vv ]]; then %q -Vv | sed "1s/\$/ (another build)/"; else exec %q "$@"; fi\n' "$real_rustc" "$real_rustc" > "$work/other-toolchain/rustc"
 +chmod +x "$work/other-toolchain/cargo" "$work/other-toolchain/rustc"
 +write_configuration "$work/other-toolchain.env" "$work/other-toolchain"
-+SINGLEFS_LAYER0_SHARD_CONFIG="$work/other-toolchain.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/other-toolchain.log" 2>&1
++SINGLEFS_MULTI_HOST_CONFIG="$work/other-toolchain.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/other-toolchain.log" 2>&1
 +toolchain_exit=$?
 +python3 "$admission_module" crash-case-marker-check "$copy" "$selftest_case_key" "$fingerprint" "$work/manifest" > /dev/null
 +toolchain_marker_exit=$?
@@ -3011,7 +3011,7 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 +write_configuration "$work/no-ledger.env" "$work/no-ledger"
 +git_common_directory="$(git -C "$copy" rev-parse --path-format=absolute --git-common-dir)"
 +rm -f -- "${git_common_directory:?}/singlefs-layer0-progress/$fingerprint"/layer0-shard-*.tally "${work:?}/peer/progress/$fingerprint"/layer0-shard-*.tally
-+SINGLEFS_LAYER0_SHARD_CONFIG="$work/no-ledger.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/no-ledger.log" 2>&1
++SINGLEFS_MULTI_HOST_CONFIG="$work/no-ledger.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/no-ledger.log" 2>&1
 +no_ledger_exit=$?
 +python3 "$admission_module" crash-case-marker-check "$copy" "$selftest_case_key" "$fingerprint" "$work/manifest" > /dev/null
 +no_ledger_marker_exit=$?
@@ -3020,14 +3020,14 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 +  "退 $no_ledger_exit，标记核 $no_ledger_marker_exit；输出：$(tail -4 "$work/no-ledger.log" | tr '\n' '|')"
 +
 +# ⑤ 配置缺键、配置文件不在 ⇒ 开跑之后头一步的配置判法拒
-+grep -v '^PEER_CARGO_BIN_DIRECTORY=' "$work/layer0-shard.env" > "$work/missing-key.env"
-+SINGLEFS_LAYER0_SHARD_CONFIG="$work/missing-key.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/missing-key.log" 2>&1
++grep -v '^PEER_CARGO_BIN_DIRECTORY=' "$work/multi-host.env" > "$work/missing-key.env"
++SINGLEFS_MULTI_HOST_CONFIG="$work/missing-key.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/missing-key.log" 2>&1
 +missing_key_exit=$?
-+SINGLEFS_LAYER0_SHARD_CONFIG="$work/no-such-configuration.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/no-configuration.log" 2>&1
++SINGLEFS_MULTI_HOST_CONFIG="$work/no-such-configuration.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/no-configuration.log" 2>&1
 +no_configuration_exit=$?
-+expect "⑤ 配置缺键 PEER_CARGO_BIN_DIRECTORY、配置文件不在 ⇒ 配置判法各拒（退 1，说双机分片不能用），出路指到 layer0-shard.env.example" \
++expect "⑤ 配置缺键 PEER_CARGO_BIN_DIRECTORY、配置文件不在 ⇒ 配置判法各拒（退 1，说双机分片不能用），出路指到 multi-host.env.example" \
 +  "$([[ $missing_key_exit == 1 && $no_configuration_exit == 1 ]] && grep -q '双机分片不能用' "$work/missing-key.log" && grep -q '双机分片不能用' "$work/no-configuration.log" \
-+     && grep -q 'layer0-shard.env.example' "$work/missing-key.log" && grep -q 'layer0-shard.env.example' "$work/no-configuration.log"; echo $?)" \
++     && grep -q 'multi-host.env.example' "$work/missing-key.log" && grep -q 'multi-host.env.example' "$work/no-configuration.log"; echo $?)" \
 +  "缺键退 $missing_key_exit（$(tail -3 "$work/missing-key.log" | tr '\n' '|')），不在退 $no_configuration_exit（$(tail -3 "$work/no-configuration.log" | tr '\n' '|')）"
 +
 +# ⑥ 没登记 shard=across-machines 的用例
@@ -3055,10 +3055,10 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 +#   layer0-shard-configuration-check.sh --emit-assignments [<仓根>]
 +#       判法同上；能分片时 stdout 改打配置里每个键的 bash 赋值（printf %q，调用方 eval），不打那一句。
 +#
-+# 配置文件：${SINGLEFS_LAYER0_SHARD_CONFIG:-<主工作树的根>/layer0-shard.env}。主工作树的根按 git common-dir 取（在 HEAD + 暂存区的
-+# 临时 worktree 里跑也读主工作树那一份）；文件 git 忽略、不进仓，模板是仓根的 layer0-shard.env.example。
++# 配置文件：${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}。主工作树的根按 git common-dir 取（在 HEAD + 暂存区的
++# 临时 worktree 里跑也读主工作树那一份）；文件 git 忽略、不进仓，模板是仓根的 multi-host.env.example。
 +# 写法：一行一个 KEY=值（值不做 shell 展开；两头成对的单引号或双引号去掉一层），# 起头的行与空行不算；认不出的行、不认得的键、
-+# 缺键都判不能分片。键与各自的意思见 layer0-shard.env.example。
++# 缺键都判不能分片。键与各自的意思见 multi-host.env.example。
 +# 只供测试的开关：SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1 时不连第二台、不查它的 cargo（layer0-shard-run.sh --selftest 用，
 +# 那时「第二台」是本机上的另一个目录）。
 +#
@@ -3078,17 +3078,17 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 +
 +refuse() { # refuse <原因>：打原因与出路，退 1
 +  echo "  ✗ 双机分片不能用：$1"
-+  echo "     → 怎么办：照仓根 layer0-shard.env.example 建本地配置 layer0-shard.env（git 忽略），或设 SINGLEFS_LAYER0_SHARD_CONFIG 指到它；第二台连不上先修 ssh 免密登录"
++  echo "     → 怎么办：照仓根 multi-host.env.example 建本地配置 multi-host.env（git 忽略），或设 SINGLEFS_MULTI_HOST_CONFIG 指到它；第二台连不上先修 ssh 免密登录"
 +  exit 1
 +}
 +
-+if [[ -n "${SINGLEFS_LAYER0_SHARD_CONFIG:-}" ]]; then
-+  configuration_file="$SINGLEFS_LAYER0_SHARD_CONFIG"
++if [[ -n "${SINGLEFS_MULTI_HOST_CONFIG:-}" ]]; then
++  configuration_file="$SINGLEFS_MULTI_HOST_CONFIG"
 +else
 +  if ! common_directory="$(git -C "$repository_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || [[ -z "$common_directory" ]]; then
 +    refuse "$repository_root 不是 git 工作树，找不到主工作树的根（配置默认在那里）"
 +  fi
-+  configuration_file="$(dirname "$common_directory")/layer0-shard.env"
++  configuration_file="$(dirname "$common_directory")/multi-host.env"
 +fi
 +[[ -f "$configuration_file" ]] || refuse "没有配置文件 $configuration_file"
 +
@@ -3159,7 +3159,7 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
  5 files changed, 227 insertions(+), 23 deletions(-)
 ```
 
-正文第一节「不归这一轮的」点名：`.claude/gate.d/54-layer0-replay.sh`（这份统计里的 +150 行）与 `research/scripts/layer0-shard-run.sh`（+60 行）里读层 0 发现日志的那几段，以及 `research/scripts/layer0-shard-run-selftest.sh`（+34 行，自证第 ⑦ 格，随发现日志那件一起加），是 2026-09-27 JST 11:4x 工具员加的（报告 `research/prompts/defs-gate54-findings-report.md`；工作区里还没提交），与写发现日志的 `crates/singlefs-harness/src/crash.rs` 一起归代码第二轮三方，不归这一轮。这一趟统计里剩下的 `.claude/gate.d/stage-inputs.tsv`（+2 行）与 `.claude/rules/implementation-workflow.md`（+4 行）：`stage-inputs.tsv` 的改动是正文第二节写明的「第 34 行 E142 那一行加了一个输入 `research/prompts/e142-r19-prereg.md`，与崩溃枚举无关」；`implementation-workflow.md` 的改动是正文第二节写明的「已提交的 2 行（别的会话的措辞改动）」——现跑 `git diff ecdf8465 -- .claude/rules/implementation-workflow.md`，两行改动都是遣词，不涉判据字面（材料员现查，见下）。`research/scripts/admission.py`、`.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`、`research/scripts/layer0-shard-configuration-check.sh` 四份在这份统计里没有出现，即与 `ecdf8465` 逐字节相同，与正文第二节「逐字节相同」的声明一致。
+正文第一节「不归这一轮的」点名：`.claude/gate.d/54-layer0-replay.sh`（这份统计里的 +150 行）与 `research/scripts/layer0-shard-run.sh`（+60 行）里读层 0 发现日志的那几段，以及 `research/scripts/layer0-shard-run-selftest.sh`（+34 行，自证第 ⑦ 格，随发现日志那件一起加），是 2026-09-27 工具员加的（报告 `research/prompts/defs-gate54-findings-report.md`；工作区里还没提交），与写发现日志的 `crates/singlefs-harness/src/crash.rs` 一起归代码第二轮三方，不归这一轮。这一趟统计里剩下的 `.claude/gate.d/stage-inputs.tsv`（+2 行）与 `.claude/rules/implementation-workflow.md`（+4 行）：`stage-inputs.tsv` 的改动是正文第二节写明的「第 34 行 E142 那一行加了一个输入 `research/prompts/e142-r19-prereg.md`，与崩溃枚举无关」；`implementation-workflow.md` 的改动是正文第二节写明的「已提交的 2 行（别的会话的措辞改动）」——现跑 `git diff ecdf8465 -- .claude/rules/implementation-workflow.md`，两行改动都是遣词，不涉判据字面（材料员现查，见下）。`research/scripts/admission.py`、`.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`、`research/scripts/layer0-shard-configuration-check.sh` 四份在这份统计里没有出现，即与 `ecdf8465` 逐字节相同，与正文第二节「逐字节相同」的声明一致。
 
 `git diff ecdf8465 -- .claude/rules/implementation-workflow.md` 原样：
 
@@ -3212,7 +3212,7 @@ index f04de53d..b551f1dd 100644
 # 登记的崩溃枚举用例都标了 #[ignore]，三趟 cargo test 都带 --include-ignored --exact <用例函数>；只供测试的开关
 # SINGLEFS_LAYER0_SHARD_INCLUDE_IGNORED=0 时不带 --include-ignored（--selftest 那条小流用例不标 ignore，不必把别的 ignore 用例放进过滤范围）。
 #
-# 配置（本地、git 忽略）：${SINGLEFS_LAYER0_SHARD_CONFIG:-<主工作树的根>/layer0-shard.env}，键与写法见仓根 layer0-shard.env.example；
+# 配置（本地、git 忽略）：${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}，键与写法见仓根 multi-host.env.example；
 # 在不在、齐不齐、第二台连不连得上由 research/scripts/layer0-shard-configuration-check.sh 判（门禁 54 号拿同一份判走不走分片）。
 # 这一份与配置判法按内容进登记了 shard=across-machines 的用例的输入指纹（research/scripts/admission.py 的 SHARD_DRIVER_FILES）：两片与 merge 的
 # cargo 由这里起、不经 admission.py crash-case-command，改了这里那几条用例的旧全绿标记不再作数。
@@ -3485,7 +3485,7 @@ sed 's/^/      /' "$judged_lines_file"
 #   ② --merged-log（门禁 54 号调的那一条）：merge 那一趟的日志写进给的文件，带 LAYER0_SHARD mode=merge shards=2 与同一行计数
 #   ③ 「第二台」的 rustc -Vv 第一行不同 ⇒ 拒（工具链不同），标记不动
 #   ④ 「第二台」那一片没写账本 ⇒ 判红，删这批输入那一格标记
-#   ⑤ 配置缺键、配置文件不在 ⇒ 开跑之后头一步的配置判法拒（退 1），出路指到 layer0-shard.env.example
+#   ⑤ 配置缺键、配置文件不在 ⇒ 开跑之后头一步的配置判法拒（退 1），出路指到 multi-host.env.example
 #   ⑥ 没登记 shard=across-machines 的用例 ⇒ 拒
 # 成功行报核了几格（现算）。
 #
@@ -3517,7 +3517,7 @@ expect() { # expect <名> <判据的退出码：0 为过> <不过时的细节>
 
 selftest_case_key="crash-case:sharded-selftest"
 copy="$work/repository"
-rsync -a --exclude target --exclude .git --exclude layer0-shard.env "$repository_root/" "$copy/"
+rsync -a --exclude target --exclude .git --exclude multi-host.env "$repository_root/" "$copy/"
 git -C "$copy" init -q
 real_rustc="$(command -v rustc)"
 if [[ -n "${SINGLEFS_HEAVY_TESTS:-}" ]]; then
@@ -3581,8 +3581,8 @@ QUIESCE_START_COMMAND=rm -f $work/quiesced
 QUIESCE_STARTED_CHECK_COMMAND=test ! -e $work/quiesced
 CONFIGURATION
 }
-write_configuration "$work/layer0-shard.env" "$selftest_bin_directory"
-export SINGLEFS_LAYER0_SHARD_CONFIG="$work/layer0-shard.env"
+write_configuration "$work/multi-host.env" "$selftest_bin_directory"
+export SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host.env"
 export SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1
 # 三趟 cargo test 都不带 --include-ignored：真 cargo 那条小流用例不标 ignore（同一个测试目标里标了 ignore 的 golden 子进程用例不进过滤范围）；
 # 假 cargo 的替身用例标了 ignore，不带它就不算重型
@@ -3632,7 +3632,7 @@ printf '#!/usr/bin/env bash\nexec %q "$@"\n' "$selftest_cargo" > "$work/other-to
 printf '#!/usr/bin/env bash\nif [[ "${1:-}" == -Vv ]]; then %q -Vv | sed "1s/\$/ (another build)/"; else exec %q "$@"; fi\n' "$real_rustc" "$real_rustc" > "$work/other-toolchain/rustc"
 chmod +x "$work/other-toolchain/cargo" "$work/other-toolchain/rustc"
 write_configuration "$work/other-toolchain.env" "$work/other-toolchain"
-SINGLEFS_LAYER0_SHARD_CONFIG="$work/other-toolchain.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/other-toolchain.log" 2>&1
+SINGLEFS_MULTI_HOST_CONFIG="$work/other-toolchain.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/other-toolchain.log" 2>&1
 toolchain_exit=$?
 python3 "$admission_module" crash-case-marker-check "$copy" "$selftest_case_key" "$fingerprint" "$work/manifest" > /dev/null
 toolchain_marker_exit=$?
@@ -3648,7 +3648,7 @@ chmod +x "$work/no-ledger/cargo" "$work/no-ledger/rustc"
 write_configuration "$work/no-ledger.env" "$work/no-ledger"
 git_common_directory="$(git -C "$copy" rev-parse --path-format=absolute --git-common-dir)"
 rm -f -- "${git_common_directory:?}/singlefs-layer0-progress/$fingerprint"/layer0-shard-*.tally "${work:?}/peer/progress/$fingerprint"/layer0-shard-*.tally
-SINGLEFS_LAYER0_SHARD_CONFIG="$work/no-ledger.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/no-ledger.log" 2>&1
+SINGLEFS_MULTI_HOST_CONFIG="$work/no-ledger.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/no-ledger.log" 2>&1
 no_ledger_exit=$?
 python3 "$admission_module" crash-case-marker-check "$copy" "$selftest_case_key" "$fingerprint" "$work/manifest" > /dev/null
 no_ledger_marker_exit=$?
@@ -3657,14 +3657,14 @@ expect "④ 「第二台」那一片没写账本 ⇒ 判红（退 1，说两片�
   "退 $no_ledger_exit，标记核 $no_ledger_marker_exit；输出：$(tail -4 "$work/no-ledger.log" | tr '\n' '|')"
 
 # ⑤ 配置缺键、配置文件不在 ⇒ 开跑之后头一步的配置判法拒
-grep -v '^PEER_CARGO_BIN_DIRECTORY=' "$work/layer0-shard.env" > "$work/missing-key.env"
-SINGLEFS_LAYER0_SHARD_CONFIG="$work/missing-key.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/missing-key.log" 2>&1
+grep -v '^PEER_CARGO_BIN_DIRECTORY=' "$work/multi-host.env" > "$work/missing-key.env"
+SINGLEFS_MULTI_HOST_CONFIG="$work/missing-key.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/missing-key.log" 2>&1
 missing_key_exit=$?
-SINGLEFS_LAYER0_SHARD_CONFIG="$work/no-such-configuration.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/no-configuration.log" 2>&1
+SINGLEFS_MULTI_HOST_CONFIG="$work/no-such-configuration.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/no-configuration.log" 2>&1
 no_configuration_exit=$?
-expect "⑤ 配置缺键 PEER_CARGO_BIN_DIRECTORY、配置文件不在 ⇒ 配置判法各拒（退 1，说双机分片不能用），出路指到 layer0-shard.env.example" \
+expect "⑤ 配置缺键 PEER_CARGO_BIN_DIRECTORY、配置文件不在 ⇒ 配置判法各拒（退 1，说双机分片不能用），出路指到 multi-host.env.example" \
   "$([[ $missing_key_exit == 1 && $no_configuration_exit == 1 ]] && grep -q '双机分片不能用' "$work/missing-key.log" && grep -q '双机分片不能用' "$work/no-configuration.log" \
-     && grep -q 'layer0-shard.env.example' "$work/missing-key.log" && grep -q 'layer0-shard.env.example' "$work/no-configuration.log"; echo $?)" \
+     && grep -q 'multi-host.env.example' "$work/missing-key.log" && grep -q 'multi-host.env.example' "$work/no-configuration.log"; echo $?)" \
   "缺键退 $missing_key_exit（$(tail -3 "$work/missing-key.log" | tr '\n' '|')），不在退 $no_configuration_exit（$(tail -3 "$work/no-configuration.log" | tr '\n' '|')）"
 
 # ⑥ 没登记 shard=across-machines 的用例
@@ -3694,10 +3694,10 @@ echo "  ✓ layer0-shard-run.sh 自证通过：${checked} 格都对（${cargo_mo
 #   layer0-shard-configuration-check.sh --emit-assignments [<仓根>]
 #       判法同上；能分片时 stdout 改打配置里每个键的 bash 赋值（printf %q，调用方 eval），不打那一句。
 #
-# 配置文件：${SINGLEFS_LAYER0_SHARD_CONFIG:-<主工作树的根>/layer0-shard.env}。主工作树的根按 git common-dir 取（在 HEAD + 暂存区的
-# 临时 worktree 里跑也读主工作树那一份）；文件 git 忽略、不进仓，模板是仓根的 layer0-shard.env.example。
+# 配置文件：${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}。主工作树的根按 git common-dir 取（在 HEAD + 暂存区的
+# 临时 worktree 里跑也读主工作树那一份）；文件 git 忽略、不进仓，模板是仓根的 multi-host.env.example。
 # 写法：一行一个 KEY=值（值不做 shell 展开；两头成对的单引号或双引号去掉一层），# 起头的行与空行不算；认不出的行、不认得的键、
-# 缺键都判不能分片。键与各自的意思见 layer0-shard.env.example。
+# 缺键都判不能分片。键与各自的意思见 multi-host.env.example。
 # 只供测试的开关：SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1 时不连第二台、不查它的 cargo（layer0-shard-run.sh --selftest 用，
 # 那时「第二台」是本机上的另一个目录）。
 #
@@ -3717,17 +3717,17 @@ repository_root="${1:-$layer0_shard_check_script_directory/../..}"
 
 refuse() { # refuse <原因>：打原因与出路，退 1
   echo "  ✗ 双机分片不能用：$1"
-  echo "     → 怎么办：照仓根 layer0-shard.env.example 建本地配置 layer0-shard.env（git 忽略），或设 SINGLEFS_LAYER0_SHARD_CONFIG 指到它；第二台连不上先修 ssh 免密登录"
+  echo "     → 怎么办：照仓根 multi-host.env.example 建本地配置 multi-host.env（git 忽略），或设 SINGLEFS_MULTI_HOST_CONFIG 指到它；第二台连不上先修 ssh 免密登录"
   exit 1
 }
 
-if [[ -n "${SINGLEFS_LAYER0_SHARD_CONFIG:-}" ]]; then
-  configuration_file="$SINGLEFS_LAYER0_SHARD_CONFIG"
+if [[ -n "${SINGLEFS_MULTI_HOST_CONFIG:-}" ]]; then
+  configuration_file="$SINGLEFS_MULTI_HOST_CONFIG"
 else
   if ! common_directory="$(git -C "$repository_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || [[ -z "$common_directory" ]]; then
     refuse "$repository_root 不是 git 工作树，找不到主工作树的根（配置默认在那里）"
   fi
-  configuration_file="$(dirname "$common_directory")/layer0-shard.env"
+  configuration_file="$(dirname "$common_directory")/multi-host.env"
 fi
 [[ -f "$configuration_file" ]] || refuse "没有配置文件 $configuration_file"
 

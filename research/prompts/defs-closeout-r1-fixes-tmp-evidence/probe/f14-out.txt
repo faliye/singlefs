@@ -1,9 +1,9 @@
 K1	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K2	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：qemu-system-x86_64（QEMU）：主 agent 跑「QEMU」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K3	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：直接执行名字含 layer0 的测试二进制（second_transaction_step_zero_layer0）（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
-K4	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（/home/fy5090/code/singlefs）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-req
-K5	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（/home/fy5090/code/singlefs/research）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 
-K6	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test 不挑目标，而包的范围是整个工作区（/home/fy5090/code/singlefs/research 的全部 1 个成员），等于全量（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-r
+K4	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（<仓根>）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-req
+K5	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（research）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 
+K6	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test 不挑目标，而包的范围是整个工作区（research 的全部 1 个成员），等于全量（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-r
 K7	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K8	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：research/scripts/mutate.sh 跑 crates/mutations.tsv 整表（crates 变异整表）：主 agent 跑「crates 变异整表」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K9	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：.claude/scripts/lkmm.sh（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
@@ -14,7 +14,7 @@ K13	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo run --bin e152-file
 K14	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：e152-run.sh（E152 装置）：主 agent 跑「E152 装置」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K15	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test 不挑目标，会跑到名字含 layer0 的测试二进制（first_transaction_step_seven_layer0、second_transaction_parallel_line_one_layer0、second_transaction_paral
 K16	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test --test second_transaction_step_zero_* 命中名字含 layer0 的测试二进制（second_transaction_step_zero_layer0）（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAV
-K17	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：脚本 /home/fy5090/code/singlefs/.claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request
+K17	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：脚本 .claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request
 K18	heavy	主 agent	fg	exit=0	
 K19	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：check.sh（里面是全量 cargo test）（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K20	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：门禁 87 号（87-replay.sh）（全部实验复跑）：主 agent 跑「全部实验复跑」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带

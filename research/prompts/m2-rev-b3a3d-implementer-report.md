@@ -1,6 +1,6 @@
 # 实审 B3a-3d 报告（implementation-writer）：降高那条流真走降高；两份层 0 全量登记成崩溃枚举用例；并行线一的前提
 
-时刻是 UTC（本机时钟），JST = UTC + 9。开工 2026-09-27T00:00Z，规格 `/tmp/claude-1000/impl-rev-b3a3d/spec.md`。
+开工 2026-09-27，规格 `/tmp/claude-1000/impl-rev-b3a3d/spec.md`。
 
 ## 一、结论
 
@@ -28,7 +28,7 @@
 
 ## 二、写过的文件
 
-**主工作区**（都在 `crates/singlefs-harness/tests/`、用 Edit 写、在 00:06Z 收到通知之前写完；之后没写主工作区。开工快照在 `originals/`，行数用 `git diff --no-index --numstat` 对快照数）：
+**主工作区**（都在 `crates/singlefs-harness/tests/`、用 Edit 写、在收到通知之前写完；之后没写主工作区。开工快照在 `originals/`，行数用 `git diff --no-index --numstat` 对快照数）：
 
 | 文件 | +/− | 写了什么 |
 |---|---|---|
@@ -37,10 +37,10 @@
 
 全份 diff：`/tmp/claude-1000/impl-rev-b3a3d/logs/my-changes-vs-originals.diff`，318 行。
 
-- 核对：这两份此刻在主工作区里、在 HEAD（260fa60a，这两份提交于 45d49aaf）里、在我 00:06Z 拷出的 `main-at-notice/` 里、在副本的最终版里，四处逐字节相同（`cmp` 与 `git show HEAD:… | sha256sum` 核过）。
+- 核对：这两份此刻在主工作区里、在 HEAD（260fa60a，这两份提交于 45d49aaf）里、在我收到通知时拷出的 `main-at-notice/` 里、在副本的最终版里，四处逐字节相同（`cmp` 与 `git show HEAD:… | sha256sum` 核过）。
   - tree_split：`06b8d91faacc44132777d177ea45d8b2f05a356b36eb03904ac3f93ca2d8022a`；
   - parallel_line_one：`cbe656b1037bd5c10fb3284f250ee950ad71896852b6b95c0460184c24480c76`。
-  - 拉远端的时候（00:11:52Z），这两份一度变成当时的 HEAD 那一版（`7af05264…`、`f4eda3b3…`，都是 346f5e6 的）；拉完之后恢复成我这一版，随后提交。
+  - 拉远端的时候，这两份一度变成当时的 HEAD 那一版（`7af05264…`、`f4eda3b3…`，都是 346f5e6 的）；拉完之后恢复成我这一版，随后提交。
 - `crates/mutations.tsv` 主表没动。要追加的 1 行在 `patch/mutations-append.tsv`，变异名：`实审 B3a-3d：树分裂 层 0：根只剩一个孩子时不降高（根降高那条流录之后是 L10 I1，不是 L10）`。
   - 六段；名字在主表里 0 次；原文在主工作区的 `code_two_tree.rs` 里恰好 1 次（第 569 行）；点名的测试函数在测试文件里恰好 1 个。
 - **补丁目录** `/tmp/claude-1000/impl-rev-b3a3d/patch/`：只有 `mutations-append.tsv` 与 `report.md`。
@@ -64,7 +64,7 @@
   - 建 2 个 inode 结果相同；目标叶容量 10 相同；目标叶容量 9 会再切一次，得 `L5 L5 I2`。
   - 我取叶容量 9（与原来这条流相同）、建 1 个、按产品容量。
 
-**探针核的**（副本 `copy/` 00:01:16Z 从主工作区取；探针是两份文件整份拷成非 layer0 名字、摘掉 `#[test]` / `#[ignore]`，只 `prepare`、数状态数，不枚举；经 `run-with-memory-cap.sh 8G`、`capped.sh 5`）。降高那条流一行原样（`logs/baseline-probe_b3a3d_tree_split.log`，删了末尾 `rewritten=`）：
+**探针核的**（副本 `copy/` 从主工作区取；探针是两份文件整份拷成非 layer0 名字、摘掉 `#[test]` / `#[ignore]`，只 `prepare`、数状态数，不枚举；经 `run-with-memory-cap.sh 8G`、`capped.sh 5`）。降高那条流一行原样（`logs/baseline-probe_b3a3d_tree_split.log`，删了末尾 `rewritten=`）：
 ```text
 PROBE tree_split stream=CentralMappingRootLowered prefix=LAYER0_TREE_SPLIT_CENTRAL_MAPPING_ROOT_LOWERED shape_before=L5 L5 I2 shape_after=L10 units=10 sizes=[20, 2, 1, 2] quick=13 full=1048588 closed_form_two_state=1048583 keys_before=[c1t11g3,c2t11g3,c2t12g3,c2t13g3,c2t13g3] [c2t13g3,c2t13g3,c2t13g3,c2t14g3,c3t12g3] keys_after=[c1t11g3,c2t11g3,c2t12g4,c2t13g4,c2t13g4,c2t13g4,c2t13g4,c2t13g4,c2t14g4,c3t12g4]
 ```
@@ -175,8 +175,8 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 ## 八、交回前的验证（第 4 步那几样，末尾原样）
 
-- 开跑前 `ps`（00:00:36Z）：没有 `qemu-system`、`vm-bench.sh`、`e152-file-system-benchmark`、`fio`。有别的会话的两条 `cargo test`（`second_transaction_admission_raises_the_floor_before_refusing`、`second_transaction_supplement_three_crash_injection`）与一个上游 `gate.sh`。我的每条命令都加了 `nice -n 19`、经 `capped.sh 5`；跑测试二进制的都经 `run-with-memory-cap.sh 8G`（派发没给内存上限，取 `replay.sh` 的默认值），一次都没撞到 250–254。
-- 除 92 号外都在副本 `copy/` 上跑：它是 00:01:16Z 从主工作区取的，之后同步进了我这两份最终版。
+- 开跑前 `ps`：没有 `qemu-system`、`vm-bench.sh`、`e152-file-system-benchmark`、`fio`。有别的会话的两条 `cargo test`（`second_transaction_admission_raises_the_floor_before_refusing`、`second_transaction_supplement_three_crash_injection`）与一个上游 `gate.sh`。我的每条命令都加了 `nice -n 19`、经 `capped.sh 5`；跑测试二进制的都经 `run-with-memory-cap.sh 8G`（派发没给内存上限，取 `replay.sh` 的默认值），一次都没撞到 250–254。
+- 除 92 号外都在副本 `copy/` 上跑：它是从主工作区取的，之后同步进了我这两份最终版。
   - 那时主工作区里 crates 的其余文件，就是后来提交进 45d49aaf 的那一批。依据：开工时我记了 `code_two_tree.rs`、`crash.rs`、`common_tree_split/mod.rs`、`common/mod.rs`、`transaction.rs` 的 sha256，此刻主工作区里这五份逐份相同。
   - 92 号要 git 仓，在主工作区上跑。
 - **动到的测试二进制**：两个都是名字带 layer0 的，按定义不跑。它们的钉值与形状用探针核（第三、五节）。
@@ -229,7 +229,7 @@ checker 没动，按定义这一节可以不写。列出来给集成时排快档
 
 ## 十一、草稿目录删了什么、留了什么
 
-- **删了**：仓副本 `/tmp/claude-1000/impl-rev-b3a3d/copy`，15G，几乎全是它自己的 `target`（00:01:16Z 建）。删之前把副本里生成的三份探针源码挪进了 `draft/probe-generated/`。
+- **删了**：仓副本 `/tmp/claude-1000/impl-rev-b3a3d/copy`，15G，几乎全是它自己的 `target`（建）。删之前把副本里生成的三份探针源码挪进了 `draft/probe-generated/`。
 - **留着**，都在 `/tmp/claude-1000/impl-rev-b3a3d/` 下，共约 570K，没有仓副本与编译目录：
   - 报告 `report.md`，规格 `spec.md`，进度 `progress.md`；
   - 补丁目录 `patch/`（`mutations-append.tsv`、`report.md`）；
@@ -246,6 +246,6 @@ checker 没动，按定义这一节可以不写。列出来给集成时排快档
 - 没写 `stage-inputs.tsv`（写不了），也没写 kb：里程碑那条「≤ 10」没动。
 - 树分裂没加断点续跑，也没分片（Q2）。
 - `crash.rs` 与别的会话在改的文件一个字没碰。`code_two_tree.rs` 只在副本里临时改坏、改完还原，主工作区里的那份没碰。
-- 00:06Z 收到主 agent 通知之后没写主工作区。之后读过主工作区，还在上面跑了只读的 92 号与 `apply-writer-patch.py --dry-run`。
-- 00:13Z 前后有一阵，每条 Bash 都被拒：主工作区的 `.claude/hooks/heavy-test-guard.sh` 第 49 行是合并冲突标记。我没碰它，后来它自己恢复了（`progress.md` 记着）。
+- 收到主 agent 通知之后没写主工作区。之后读过主工作区，还在上面跑了只读的 92 号与 `apply-writer-patch.py --dry-run`。
+- 有一阵每条 Bash 都被拒：主工作区的 `.claude/hooks/heavy-test-guard.sh` 第 49 行是合并冲突标记。我没碰它，后来它自己恢复了（`progress.md` 记着）。
 - 没走三方对抗；层 0、QEMU、herd7 与 crates 变异表归 `crash-verifier`；没提交。

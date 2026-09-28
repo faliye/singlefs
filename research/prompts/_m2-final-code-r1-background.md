@@ -1,4 +1,4 @@
-# 三方论证背景材料：`m2-final-code-r1`（材料员拼装，2026-09-25 01:38 JST / 2026-09-24 16:38 UTC）
+# 三方论证背景材料：`m2-final-code-r1`（材料员拼装，2026-09-25）
 
 顺序固定：正文 → 小节清单 → 附录。附录二（diff）不并入本文件——按 `.claude/agents/three-way-materials.md`「拼背景材料」一节，它不并进背景材料，各腿按正文里写的路径去读；diff 单独落在 `research/prompts/_m2-final-code-r1-diff.md`，腿读代码一律读正文点名的冻结副本 `/tmp/claude-1000/m2-final-code-r1/tree/crates/`。
 
@@ -35,7 +35,7 @@ HEAD（`e980a219`）之后打进主工作区的四份补丁，一轮三方都没
 | **替没写的条款做了选择** | 不同实现会做出不同的、都说得通的选择 | 那个选择是什么、它影响哪些字节或哪条可达历史、今天有没有会红的东西钉着 |
 | **和条款说反话** | 代码做的与某条已定分项的字面相反 | 两边各自的原文，以及这次差异在哪个字节 / 哪条历史上看得出来 |
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-25 01:29 JST 现查）
+## 二、实现今天的样子（主 agent 的观测，2026-09-25 现查）
 
 - 腿读代码一律读冻结副本 `/tmp/claude-1000/m2-final-code-r1/tree/crates/`（主工作区在腿跑着的时候还会被实十九的补丁改）；它的 `src/*.rs` 共 48 份，sha256 在 `research/prompts/m2-final-code-r1-snapshot/crates-src-sha256.txt`。
 - HEAD 之后 `crates/*/src/*.rs` 里改过的 19 份（`git diff --stat HEAD`）：
@@ -94,7 +94,7 @@ HEAD（`e980a219`）之后打进主工作区的四份补丁，一轮三方都没
 
 ## 二、小节清单
 
-# 小节清单：`m2-final-code-r1`（材料员生成，2026-09-25 01:38 JST / 2026-09-24 16:38 UTC）
+# 小节清单：`m2-final-code-r1`（材料员生成，2026-09-25）
 
 `python3 research/scripts/kb-sections.py` 全量生成，未再过滤（8 份文件：正文里点名的 6 份决策文件 + `invariants.md` + `checks-owed.md`）。8 份全部由正文里字面出现的 `D<n>（`／`C<n>（`／`I-<n>.<m>（` 编号命中（`quote-kb.py` 的 `--cited` 正则），不需要材料员另外补文件；`D3（空间分配）` 解析到 `.claude/kb/decisions/03-空间分配.md`（`glob` 命中「03-」这一个前缀，唯一）。
 

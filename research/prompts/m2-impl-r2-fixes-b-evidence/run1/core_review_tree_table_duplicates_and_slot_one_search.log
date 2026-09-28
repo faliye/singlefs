@@ -1,0 +1,20 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.37s
+     Running tests/core_review_tree_table_duplicates_and_slot_one_search.rs (target/debug/deps/core_review_tree_table_duplicates_and_slot_one_search-63b28703fbf2485c)
+
+running 12 tests
+test a_device_whose_slot_zero_fails_borrows_the_spacing_another_slot_zero_records_instead_of_searching ... ok
+test a_journal_ring_holding_fewer_records_than_the_safety_factor_is_refused_before_any_write ... ok
+test a_self_verifying_slot_whose_recorded_spacing_is_not_its_own_offset_is_not_taken ... ok
+test a_slot_spacing_that_is_a_multiple_of_512_bytes_only_is_found_too ... ok
+test devices_whose_highest_found_slots_disagree_on_the_filesystem_identifier_refuse_the_pool ... ok
+test slot_one_is_found_by_trying_every_spacing_when_no_slot_zero_in_the_pool_verifies ... ok
+test slots_of_equal_generation_found_by_the_search_resolve_to_the_smaller_offset ... ok
+test the_search_keeps_the_incompat_and_slots_per_region_refusals_of_slot_one ... ok
+test the_search_takes_the_highest_generation_even_when_it_is_a_stale_slot_of_an_earlier_make_filesystem ... ok
+test the_search_tries_the_largest_spacing_whose_slot_one_ends_at_the_root_ring_base ... ok
+test a_chosen_root_whose_checkpoint_txg_is_the_largest_value_is_refused_as_damaged_instead_of_panicking ... ok
+test a_tree_table_carrying_one_kind_of_tree_twice_is_refused_as_damaged_by_every_reader ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+

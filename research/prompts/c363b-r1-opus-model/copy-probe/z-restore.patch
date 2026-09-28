@@ -1,5 +1,5 @@
---- a/crates/singlefs-core/src/mount.rs	2026-09-24 18:10:07.427489656 +0000
-+++ b/crates/singlefs-core/src/mount.rs	2026-09-24 18:10:07.427923274 +0000
+--- a/crates/singlefs-core/src/mount.rs	2026-09-25
++++ b/crates/singlefs-core/src/mount.rs	2026-09-25
 @@ -961,6 +961,8 @@
      } else {
          0

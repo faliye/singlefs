@@ -1,0 +1,1 @@
+name=r3_tree_compare files=60 raw_differs=['crates/singlefs-core/src/recovery.rs'] tokens_doc_as_comment_differs=['crates/singlefs-core/src/recovery.rs'] tokens_doc_as_attribute_differs=['crates/singlefs-core/src/recovery.rs'] fn_items_differs=['crates/singlefs-core/src/recovery.rs'] outside_fn_items_differs=[]

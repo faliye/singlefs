@@ -1,0 +1,4 @@
+C577 结清 ②：litmus「轮换之后屏障」的 P0 去掉轮换之后那道屏障，与录制流里发布最后三步对不上	抓到	the_rotation_barrier_litmus_writer_follows_the_last_three_steps_of_every_recorded_publish 红了（日志 /tmp/claude-1000/impl-r2-fixes-a/prove-red-logs-2/001.log）
+C577 结清 ③：零单元发布落盘失败时原样重发一次（冻结再重发的形态），轮换之后那道屏障报错一次时挂载照常做成	抓到	a_zero_unit_publish_whose_post_rotation_barrier_fails_is_not_frozen_and_the_whole_mount_returns_the_error 红了（日志 /tmp/claude-1000/impl-r2-fixes-a/prove-red-logs-2/002.log）
+✓ 点名 2 条：跑了 2 条，跳过 0 条，跑的都抓到了
+exit=0

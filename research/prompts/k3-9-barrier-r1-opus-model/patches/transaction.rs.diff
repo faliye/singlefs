@@ -1,0 +1,14 @@
+--- /tmp/claude-1000/k3-9-barrier-r1/tree/crates/singlefs-core/src/transaction.rs	2026-09-28 06:45:35.056501846 +0000
++++ repo/crates/singlefs-core/src/transaction.rs	2026-09-28 07:03:00.354765299 +0000
+@@ -1055,7 +1055,10 @@
+             identity: unit.identity,
+         })?;
+     }
+-    writer.perform_commit_step(CommitStep::Barrier)?;
++    // K3-9 攻方腿原型（副本）：设 K39_DROP_UNIT_RECORD_BARRIER 时跳过单元与记录之间那道屏障（等同删掉冻结副本第 1058 行）。
++    if std::env::var_os("K39_DROP_UNIT_RECORD_BARRIER").is_none() {
++        writer.perform_commit_step(CommitStep::Barrier)?;
++    }
+     for record in &writes.records {
+         writer.perform_commit_step(CommitStep::WriteJournalRecordToEveryDevice {
+             counter: record.counter,

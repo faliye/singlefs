@@ -1,10 +1,10 @@
 # m2-newq-r1 云端攻方（Opus）报告：N1、N2、N3
 
-本腿接续一条撞了会话限额的同立场腿（交接摘要 `/tmp/claude-1000/handover/a89a2bee5683faebd.md`）：那条腿做的副本改动、第一版驱动与扫描（`out/sweep-len4.tsv`、`out/n2-*`、`out/ring-*`、`out/long-F4-*`、`out/long-F6-*`）原样沿用，本腿核过现场后接着补了故障 F8–F11、N1 候选丁、N2 读法乙、N3 的跨重挂历史，以及被 /dev/shm 写满污染的几组重跑。时刻均为 UTC（东京 = UTC+9）。
+本腿接续一条撞了会话限额的同立场腿（交接摘要 `/tmp/claude-1000/handover/a89a2bee5683faebd.md`）：那条腿做的副本改动、第一版驱动与扫描（`out/sweep-len4.tsv`、`out/n2-*`、`out/ring-*`、`out/long-F4-*`、`out/long-F6-*`）原样沿用，本腿核过现场后接着补了故障 F8–F11、N1 候选丁、N2 读法乙、N3 的跨重挂历史，以及被 /dev/shm 写满污染的几组重跑。
 
 ## 一、复跑
 
-模型目录 `research/prompts/m2-newq-r1-opus-model/`（下称 `M`）。基线：主工作区 2026-09-24 01:22 UTC 的 `crates/`，打包在 `M/baseline-crates.tgz`（不含 `mutations.tsv`），逐文件 sha256 在 `M/baseline-crates.sha256`；工作区根的其余文件取同一时刻的主工作区（本腿草稿里的 `/tmp/claude-1000/m2-newq-opus/repo` 留着那一份）。
+模型目录 `research/prompts/m2-newq-r1-opus-model/`（下称 `M`）。基线：主工作区 2026-09-24 的 `crates/`，打包在 `M/baseline-crates.tgz`（不含 `mutations.tsv`），逐文件 sha256 在 `M/baseline-crates.sha256`；工作区根的其余文件取同一时刻的主工作区（本腿草稿里的 `/tmp/claude-1000/m2-newq-opus/repo` 留着那一份）。
 
 ```
 W=<草稿目录>; rsync -a --exclude target --exclude .git <那一刻的仓>/ $W/repo/
@@ -234,7 +234,7 @@ F3-latent-eio-dev0	N1A-every-isoBad-mem	O	O:ok	[2, 0]	2	12	262144	t1@50182:relea
 
 ## 四、N2：`rebuild_version` 与释放判定用不用同一条判据核位置项
 
-### 今天的两条判据（主工作区 2026-09-24 04:30 UTC 现查；副本基线早于这一刻，见第八节）
+### 今天的两条判据（主工作区 2026-09-24 现查；副本基线早于这一刻，见第八节）
 
 - 重建读数据单元走父指针里的位置项（提示），任一单元读不出整次挂载失败：`crates/singlefs-core/src/recovery.rs` 第 1038 行 `        data_unit_bytes_in_file_order.push(read_unit_via_locations(`（副本基线里是单个数据单元的同一种读法）
 - 重建读映射条目只取 key、位置项丢掉：同一文件第 1127 行 `        let (key, _locations) =`
@@ -420,7 +420,7 @@ F11 那一行五个臂一样：映射指到的槽没有分配记录，结构判�
 
 ## 八、这条腿自己的限度
 
-- 全部数都在副本上量：基线是主工作区 2026-09-24 01:22 UTC 的 `crates/`（未提交态，文件与 sha256 在模型目录 `baseline-crates.tgz`、`baseline-crates.sha256`）。之后主工作区又变了（新增 `admission.rs`，`recovery.rs`、`mount.rs` 等有改动），本腿没在新代码上重跑。副本上的数按规则不进 kb，要引须在入库装置上重做。
+- 全部数都在副本上量：基线是主工作区 2026-09-24 的 `crates/`（未提交态，文件与 sha256 在模型目录 `baseline-crates.tgz`、`baseline-crates.sha256`）。之后主工作区又变了（新增 `admission.rs`，`recovery.rs`、`mount.rs` 等有改动），本腿没在新代码上重跑。副本上的数按规则不进 kb，要引须在入库装置上重做。
 - 「核 + 隔离」是本腿（及上一条腿）自己加的最小实现（`patch/release_check_model.rs` + `patch/apply.py`），不是那个实现员的正式版；隔离走的是影子账同一张位图（`isolate_abandoned`）。正式版若另开位图，第五节「并进第九项」那一行的数就不适用。
 - 「落盘」臂只在驱动里模拟（挂载之后把记下的集合施回），没真写盘、没真改格式；它的格式代价是推的。丙的实例切换按「同一挂载里重做这次发布」模拟，第一版没有实现切换。
 - F6、F7 的写者错只改内存里上一版的映射节点字节（重挂即消失）；F8、F10、F11 是在发布装映射节点时注入、照常封好落盘。两种都是「写者自己算错映射条目」这一类，不是介质故障。
@@ -436,13 +436,13 @@ F11 那一行五个臂一样：映射指到的槽没有分配记录，结构判�
 - 落盘臂没真写盘；「并进第九项」「另开位图」两个口径只量了输入差。
 - 没跑多轮：这是第一轮，攻过零轮的丁、「记录留在已分配」两个改法都没被攻过。
 - 本腿没有登记给自己的门禁阶段要跑（没查 `stage-owners.tsv` 以外的阶段；写的只有报告、模型目录与草稿目录）。
-- 过程事故：03:27 UTC 前后 /dev/shm 被三路并发扫描写满（内存盘镜像没清掉），当时在跑的几组（F10 × 重挂现算两组、N1 丁与 F11 全部、F3/F5 every 三组）结果被 `No space left on device` 污染；已删掉死进程留下的镜像、单路重跑（`patch4/rerun-after-enospc.sh`），报告只用重跑的结果，污染的文件没拷进模型目录（草稿目录里还在：`/tmp/claude-1000/m2-newq-opus/out3/tail*-F10-N3-iso-recompute.tsv`、`out4/`、`out/long-F3-*`、`out/long-F5-N1A-every-isoBad-mem.tsv`）。
+- 过程事故： /dev/shm 被三路并发扫描写满（内存盘镜像没清掉），当时在跑的几组（F10 × 重挂现算两组、N1 丁与 F11 全部、F3/F5 every 三组）结果被 `No space left on device` 污染；已删掉死进程留下的镜像、单路重跑（`patch4/rerun-after-enospc.sh`），报告只用重跑的结果，污染的文件没拷进模型目录（草稿目录里还在：`/tmp/claude-1000/m2-newq-opus/out3/tail*-F10-N3-iso-recompute.tsv`、`out4/`、`out/long-F3-*`、`out/long-F5-N1A-every-isoBad-mem.tsv`）。
 - 跑时 `ps` 看到别的会话有 3–4 个 `cargo test`，没有性能测量进程；本腿全部加 `nice -n 19`、`CARGO_BUILD_JOBS=4`。
 - 原始产物（tsv）放在模型目录 `out/`、`out3/`、`out4/`，没进 `research/results/`（写范围只给了报告、模型目录与草稿目录），要不要挪由主 agent 定。
 
 ## 十、主工作区在本腿期间落了正式的「核 + 隔离」（只读对照，没在它上面跑）
 
-2026-09-24 04:30 UTC 现查，主工作区已有正式实现（本腿副本基线早于它）。按代码读，它落在本腿的哪几臂上：
+2026-09-24 现查，主工作区已有正式实现（本腿副本基线早于它）。按代码读，它落在本腿的哪几臂上：
 
 | 维度 | 正式实现（读出来的） | 对应本腿的臂 | 本腿在那一臂上量到的 |
 |---|---|---|---|

@@ -1,0 +1,5 @@
+E7RESULT name=r2_state_budget world=data_unit_at_60000_only closed_form_state_count=16777243 enumerated_with_torn=48 writes=43 segments=12
+E7RESULT name=r2_f1_shifted world=data_unit_at_60000_only states_from_the_new_segments=4 red_under_todays_overlay_candidates=0 red_names={} red_under_current_unit_start_candidates=0 must_be_nonzero=0
+E7RESULT name=r2_state_budget world=node_at_60001_then_data_unit_at_60000 closed_form_state_count=16777244 enumerated_with_torn=49 writes=44 segments=13
+E7RESULT name=r2_f1_shifted world=node_at_60001_then_data_unit_at_60000 states_from_the_new_segments=5 red_under_todays_overlay_candidates=0 red_names={} red_under_current_unit_start_candidates=0 must_be_nonzero=0
+E7RESULT name=done emitted=5

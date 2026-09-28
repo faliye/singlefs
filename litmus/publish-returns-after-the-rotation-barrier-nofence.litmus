@@ -1,0 +1,32 @@
+C publish-returns-after-the-rotation-barrier-nofence
+
+(*
+ * publish-returns-after-the-rotation-barrier 的对照组：去掉轮换之后那一道屏障，写的次序不变。
+ *
+ * 它存在的唯一目的是证明原测试有判别力：这一份若也判 Never，说明「返回之后读不到轮换」这个模式本来就撞不上，
+ * 原测试判 Never 就什么都没证明（rules/show-me-test.md：不能证明会红的检查等于没写）。
+ * 它也是 C577（系统配置没见证到的最新根，乙罩不到） 改之前的发布形态：轮换写完就返回。
+ *
+ * singlefs-expect: Sometimes
+ *)
+
+{}
+
+P0(int *root, int *configuration, int *returned)
+{
+	WRITE_ONCE(*root, 1);
+	WRITE_ONCE(*configuration, 1);
+	WRITE_ONCE(*returned, 1);
+}
+
+P1(int *root, int *configuration, int *returned)
+{
+	int r0;
+	int r1;
+
+	r0 = READ_ONCE(*returned);
+	smp_rmb();
+	r1 = READ_ONCE(*configuration);
+}
+
+exists (1:r0=1 /\ 1:r1=0)

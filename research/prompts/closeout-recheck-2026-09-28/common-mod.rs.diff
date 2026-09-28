@@ -1,0 +1,22 @@
+--- /home/fy5090/code/singlefs/crates/singlefs-harness/tests/common/mod.rs	2026-09-27 15:26:45.195793361 +0000
++++ mod.rs	2026-09-28 04:43:12.980891461 +0000
+@@ -572,6 +572,10 @@
+     OnlyTheFirst,
+     /// 第 n 次起每次都坏（之前那几次照读）。
+     FromTheNthOnward(u64),
++    /// 只有第 n 次坏（C331 复查用：只在某一次读上坏的瞬时读错）。
++    OnlyTheNth(u64),
++    /// 除第 n 次之外每次都坏（C331 复查用：重读那一次读得出、之后又坏）。
++    AllButTheNth(u64),
+ }
+ 
+ /// 读坏的那一次交回什么。
+@@ -664,6 +668,8 @@
+                 FailingReadsOfARange::FromTheNthOnward(first_failing) => {
+                     *reads_of_this_range >= first_failing
+                 }
++                FailingReadsOfARange::OnlyTheNth(n) => *reads_of_this_range == n,
++                FailingReadsOfARange::AllButTheNth(n) => *reads_of_this_range != n,
+             };
+             if *presence == UnreadableRangesPresence::InPlace && fails_this_time {
+                 failing.push(*range);

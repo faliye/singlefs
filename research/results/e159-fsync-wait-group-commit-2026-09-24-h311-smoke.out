@@ -4,7 +4,7 @@
 # 这份文件不是入库的判据产物（判据钉在源码里的单测与变异表，`anchors` 产物走
 # `research/results/e159-fsync-wait-group-commit-2026-09-24-anchors.out`，两次跑逐字节相同、未换新文件）。
 # 本机口径：AMD Ryzen 9 9950X，来宾 4 vCPU / 2048M 内存（vm-bench.sh 默认）、virtio-blk。
-# 跑于 2026-09-24 23:00–23:10 JST（RECORD_HEADER_BYTES: 307 → 311 之后）。
+# 跑于 2026-09-24（RECORD_HEADER_BYTES: 307 → 311 之后）。
 
 ## 一、cargo test（release，55/55，含新增 named_items_per_record_remainder_matches_head_311）
 
@@ -83,7 +83,7 @@ E7RESULT name=done emitted=3
 ## 五、小结（Q159.3 判据：无 panic、结果行齐、emitted= 对得上——三样都满足）
 
 三条臂与 S3 探针都跑通，退出码全部 0，`emitted=` 与实收行数逐次相符。`samples=0`（本次三条臂在测量窗口内都没有一次 fsync 落在
-warmup 之后的窗口里，与 2026-09-24 03:36 UTC 那次的 samples=5/50/37 不同）——**这一次不判这个数**：
+warmup 之后的窗口里，与 2026-09-24 那次的 samples=5/50/37 不同）——**这一次不判这个数**：
 `research/prompts/e159-r1-prereg.md`「冒烟里的延迟、吞吐、写量读数：只报数，不判」，Q159.3 只看跑没跑通、
 探针是不是 512、结果行齐不齐，这三样这一次都满足。yi-M-K10 那格 checkpoint_count=1，checkpoint 机制仍真跑通。
 S1（记录条数 / 容量随头宽变的那几格）与 Q159.4（与 E155 第四次装置的逐函数 diff）见报告，不在这份冒烟文件里。

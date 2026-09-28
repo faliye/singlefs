@@ -1,0 +1,136 @@
+--- tree/crates/singlefs-harness/tests/common/mod.rs	2026-09-28 08:21:58.386682326 +0000
++++ opus/base/crates/singlefs-harness/tests/common/mod.rs	2026-09-28 08:22:36.235102903 +0000
+@@ -6,7 +6,8 @@
+ 
+ use singlefs_core::address::{DeviceIdentity, InstanceGeneration};
+ use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
+-use singlefs_core::block_device::{FileBackedBlockDevice, PhysicalBlockSizeInBytes};
++use singlefs_core::block_device::PhysicalBlockSizeInBytes;
++use singlefs_harness::memory_pool::SparseBlockDevice;
+ use singlefs_core::make_filesystem::{
+     make_filesystem, MakeFilesystemOutput, MakeFilesystemParameters, INSTANCE_TABLE_SLOT,
+     TREE_TABLE_GENESIS_SLOT,
+@@ -33,7 +34,8 @@
+ /// E142 装置里的固定写入时间（`FIXED_WRITE_TIME_SECONDS`）。
+ pub const FIXED_WRITE_TIME_SECONDS: u64 = 1_788_000_000;
+ 
+-pub type Recorded = RecordingBlockDevice<FileBackedBlockDevice>;
++/// unreadable-at-mount-r2 攻方腿：镜像全在内存稀疏盘上（不在磁盘上建镜像文件）；「重开」从带内容的录制流重建同一份字节。
++pub type Recorded = RecordingBlockDevice<SparseBlockDevice>;
+ 
+ pub fn image_path(tag: &str, device: u32) -> PathBuf {
+     let sequence = IMAGE_COUNTER.fetch_add(1, Ordering::SeqCst);
+@@ -101,46 +103,31 @@
+     pool
+ }
+ 
+-/// 按路径重开镜像，写照旧录进同一条流。
++/// 「重开」镜像：从带内容的录制流重建两块内存盘，写照旧录进同一条流（unreadable-at-mount-r2 攻方腿：不建文件镜像）。
+ fn reopen_recorded_images(
+-    paths: &[PathBuf],
++    _paths: &[PathBuf],
+     stream: &SharedStream,
+ ) -> Vec<(DeviceIdentity, Recorded)> {
+-    paths
+-        .iter()
+-        .enumerate()
+-        .map(|(index, path)| {
+-            let file = FileBackedBlockDevice::open_existing_image_file(
+-                path,
+-                IMAGE_BYTES,
+-                PhysicalBlockSizeInBytes(512),
+-            )
+-            .expect("重开镜像");
+-            let identity = DeviceIdentity(u32::try_from(index).expect("设备号"));
++    reopen_cold_images(stream)
++        .into_iter()
++        .map(|(identity, device)| {
+             (
+                 identity,
+-                RecordingBlockDevice::with_shared_stream(identity, file, stream.clone()),
++                RecordingBlockDevice::with_shared_stream(identity, device, stream.clone()),
+             )
+         })
+         .collect()
+ }
+ 
+-/// 按路径重开镜像，不录。
+-fn reopen_cold_images(paths: &[PathBuf]) -> Vec<(DeviceIdentity, FileBackedBlockDevice)> {
+-    paths
+-        .iter()
+-        .enumerate()
+-        .map(|(index, path)| {
+-            let device = FileBackedBlockDevice::open_existing_image_file(
+-                path,
+-                IMAGE_BYTES,
+-                PhysicalBlockSizeInBytes(512),
+-            )
+-            .expect("重开镜像");
+-            (
+-                DeviceIdentity(u32::try_from(index).expect("设备号")),
+-                device,
+-            )
++/// 「重开」镜像，不录：从带内容的录制流重建两块内存盘。
++fn reopen_cold_images(stream: &SharedStream) -> Vec<(DeviceIdentity, SparseBlockDevice)> {
++    memory_pool_of(&stream.retained_operations())
++        .devices
++        .into_iter()
++        .map(|(identity, image)| {
++            let mut device = SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512));
++            device.image = image;
++            (identity, device)
+         })
+         .collect()
+ }
+@@ -156,16 +143,11 @@
+     usize,
+ ) {
+     let stream = SharedStream::retaining_contents();
+-    let mut paths = Vec::new();
++    let paths: Vec<PathBuf> = Vec::new();
+     let mut devices: Vec<(DeviceIdentity, Recorded)> = Vec::new();
+     for device_number in 0..2u32 {
+-        let path = image_path(tag, device_number);
+-        let file = FileBackedBlockDevice::create_image_file_exclusively(
+-            &path,
+-            IMAGE_BYTES,
+-            PhysicalBlockSizeInBytes(512),
+-        )
+-        .expect("建镜像");
++        let _ = tag;
++        let file = SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512));
+         devices.push((
+             DeviceIdentity(device_number),
+             RecordingBlockDevice::with_shared_stream(
+@@ -174,7 +156,6 @@
+                 stream.clone(),
+             ),
+         ));
+-        paths.push(path);
+     }
+     let genesis = make_filesystem(&parameters(), &mut devices).expect("mkfs");
+     let mkfs_operation_count = stream.operations().len();
+@@ -201,9 +182,9 @@
+     }
+ 
+     /// 冷启动：丢掉进程内的设备句柄，按路径重新打开镜像。
+-    pub fn reopen_cold(&mut self) -> Vec<(DeviceIdentity, FileBackedBlockDevice)> {
++    pub fn reopen_cold(&mut self) -> Vec<(DeviceIdentity, SparseBlockDevice)> {
+         drop(self.devices.take());
+-        reopen_cold_images(&self.paths)
++        reopen_cold_images(&self.stream)
+     }
+ }
+ 
+@@ -239,9 +220,9 @@
+         drop(self.devices.take());
+         reopen_recorded_images(&self.paths, &self.stream)
+     }
+-    pub fn reopen_cold(&mut self) -> Vec<(DeviceIdentity, FileBackedBlockDevice)> {
++    pub fn reopen_cold(&mut self) -> Vec<(DeviceIdentity, SparseBlockDevice)> {
+         drop(self.devices.take());
+-        reopen_cold_images(&self.paths)
++        reopen_cold_images(&self.stream)
+     }
+ }
+ 

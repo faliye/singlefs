@@ -7,3 +7,4 @@ want=crash-case:clean-stream 判绿
 want=crash-case:no-enumeration 判绿
 want=这一趟跑了判绿 2 条
 want=退 3 不退 0
+not-green-by-design=layer0-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的层 0，不许记成通过）

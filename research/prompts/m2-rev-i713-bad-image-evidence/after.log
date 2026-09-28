@@ -1,4 +1,4 @@
-run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 40.1 GiB，这一条要 7.9 GiB（按峰值表里上一次实测的峰值 7.9 GiB（2026-09-27T08:11:44Z 量的）算），总上限 40.1 GiB；账上在跑 4 条
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 40.1 GiB，这一条要 7.9 GiB（按峰值表里上一次实测的峰值 7.9 GiB（2026-09-27 量的）算），总上限 40.1 GiB；账上在跑 4 条
 run-with-memory-cap: 排了 13 秒，起跑（singlefs-memory-cap-927655-2238726229）
    Compiling singlefs-format v0.1.0 (/tmp/claude-1000/impl-i713-bad-image/work/crates/singlefs-format)
    Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/impl-i713-bad-image/work/crates/singlefs-checker)

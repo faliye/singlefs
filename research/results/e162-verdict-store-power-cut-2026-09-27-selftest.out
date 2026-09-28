@@ -1,0 +1,49 @@
+E7RESULT name=anchor id=A1 value=0xe220a8397b1dcdaf,0x6e789e6aa1b965f4,0x06c45d188009454f matches_registration=true
+E7RESULT name=anchor id=A2 value=0xe3069283 matches_registration=true
+E7RESULT name=anchor id=A3_j0 value=76020f1b59444d587a6607195c0f8fed/8351809/0x08eefd5c matches_registration=true
+E7RESULT name=anchor id=A3_j12345 value=b3c1f0df0c77c9e98c9df5b21d0395bf/8321879/0x565d4801 matches_registration=true
+E7RESULT name=anchor id=A3b value=76020f1b59444d587a6607195c0f8fed/131533 matches_registration=true
+E7RESULT name=anchor id=A4_j0 value=267/32629 matches_registration=true
+E7RESULT name=anchor id=A4_j12345 value=245/28761 matches_registration=true
+E7RESULT name=anchor id=A5 value=7299025377b7594e92ceeb8a1c3cbeac matches_registration=true
+E7RESULT name=anchor id=A6_j0 value=000000000000000000000000000000007299025377b7594e92ceeb8a1c3cbeac matches_registration=true
+E7RESULT name=anchor id=A6_j1 value=000000000000000100000000000000007299025377b7594e92ceeb8a1c3cbeac matches_registration=true
+E7RESULT name=anchor id=A6_j63 value=000000070000000700000000000000007299025377b7594e92ceeb8a1c3cbeac matches_registration=true
+E7RESULT name=anchor id=A6_j64 value=000000000000000000000000000100007299025377b7594e92ceeb8a1c3cbeac matches_registration=true
+E7RESULT name=anchor id=A6_j12345 value=00000007000000010000000000c000007299025377b7594e92ceeb8a1c3cbeac matches_registration=true
+E7RESULT name=anchor id=A6_j99999 value=000000030000000700000000061a00007299025377b7594e92ceeb8a1c3cbeac matches_registration=true
+E7RESULT name=anchor id=A6b value=000000070000000100000000000300007299025377b7594e92ceeb8a1c3cbeac matches_registration=true
+E7RESULT name=anchor id=B1 value=0=R1,1=R0,2=K,3=F,4=R1-None,5=R0-None,6=K-nosync,7=F-nofsync,8=F-nodirsync,9=PC4-C,10=R1-NB,11=R0-NB,12=K-NB,13=F-NB,14=R1-bs10,15=R0-bs10,16=K-bs10,17=F-bs10 matches_registration=true
+E7RESULT name=anchor id=B2 value=100/60/40;6895,5605,40371,9726,18098;50396,50274,50461,50044,50216;64169,60139,63547,63950,62245;7787893 matches_registration=true
+E7RESULT name=anchor id=B2b value=130/30/40;26612,4589,2232 matches_registration=true
+E7RESULT name=anchor id=B2c value=2232,2241,2612,4589,9184,14497,14598,15089,16593,18900,21649,26612,27155,28849,31573,32287,32340,34273,37366,38401 matches_registration=true
+E7RESULT name=anchor id=B3 value=1000000100/Some((7, 1)) matches_registration=true
+E7RESULT name=anchor id=B3b value=0110000011/Some((2, 5)) matches_registration=true
+E7RESULT name=anchor id=B4 value=53/47 matches_registration=true
+E7RESULT name=anchor id=B5_a0 value=1380,2481,2596,4737,5356,3368/86,69 matches_registration=true
+E7RESULT name=anchor id=B5_a1 value=4969,4100,4435,810,3663,762/7,31 matches_registration=true
+E7RESULT name=anchor id=B5_a2 value=5473,3722,537,2873,1713,5287/78,42 matches_registration=true
+E7RESULT name=anchor id=B5_a3 value=4929,1614,967,5654,1819,4038/57,29 matches_registration=true
+E7RESULT name=anchor id=B5b value=5280,2981,296,1337,4056,4668,2830,1561/ matches_registration=true
+E7RESULT name=anchor id=B7 value=53464d4b43000000050000000000000002000000000000000000000070e31542/845bcdb2f8e741bbb81e81f3f40032f0e4bd948f1032c56d171d388abea214ee matches_registration=true
+E7RESULT name=anchor id=B8_log value=8192/078793918714a9ff52eb78e50f4871973e9073eaba9c4fcaf61b53463c098897 matches_registration=true
+E7RESULT name=anchor id=B8_k6_U-drop value=35a90229de2b1bd3674ec949ccbfc9676cd6718869f40225cc3628b9670807a0 matches_registration=true
+E7RESULT name=anchor id=B8_k6_U-keep value=6e6d2a487aa2864b75b62637bd06aa2983e5fd5a5a8344debcdee784e774e510 matches_registration=true
+E7RESULT name=anchor id=B8_k6_U-rand value=df9020850109e36d3b6d34da043be5a0fb016ffd4004372c52dac115009c1d65 matches_registration=true
+E7RESULT name=anchor id=B8_k6_U-tear value=6467f85ca3d8eefcb7eac7ea3cd4978d4cbb92d6b66b842b68a19adb6d46a763 matches_registration=true
+E7RESULT name=anchor id=B8_k5_U-drop value=35a90229de2b1bd3674ec949ccbfc9676cd6718869f40225cc3628b9670807a0 matches_registration=true
+E7RESULT name=anchor id=B8_k5_U-keep value=4d2a669e7156f1c1ec6cc051809c0a67c191b9b5c65df784ad0c717eec5a4608 matches_registration=true
+E7RESULT name=anchor id=B8_k5_U-rand value=0783c6aa6d776285d9fd1100701a4d57a6256e54332bafea82a53af6b1bacb55 matches_registration=true
+E7RESULT name=anchor id=B8_k5_U-tear value=0783c6aa6d776285d9fd1100701a4d57a6256e54332bafea82a53af6b1bacb55 matches_registration=true
+E7RESULT name=anchor id=B8_k3_U-drop value=35a90229de2b1bd3674ec949ccbfc9676cd6718869f40225cc3628b9670807a0 matches_registration=true
+E7RESULT name=anchor id=B8_k3_U-keep value=35a90229de2b1bd3674ec949ccbfc9676cd6718869f40225cc3628b9670807a0 matches_registration=true
+E7RESULT name=anchor id=B8_k3_U-rand value=35a90229de2b1bd3674ec949ccbfc9676cd6718869f40225cc3628b9670807a0 matches_registration=true
+E7RESULT name=anchor id=B8_k3_U-tear value=35a90229de2b1bd3674ec949ccbfc9676cd6718869f40225cc3628b9670807a0 matches_registration=true
+E7RESULT name=anchor id=B8b value=9216/9956234bb62be39429e2086b19e37c511266fa9e56c16d3429579ba9a9803bd1/6/6e6d2a487aa2864b75b62637bd06aa2983e5fd5a5a8344debcdee784e774e510 matches_registration=true
+E7RESULT name=anchor id=PC4-C_synthetic value=201/1/1/U-drop:0,100;U-keep:0,0;U-rand:0,47;U-tear:0,47/true matches_registration=true
+E7RESULT name=anchor id=M26_control_forms value=exactly_registered matches_registration=true
+E7RESULT name=anchor id=B9b value=12002/131072 matches_registration=true
+E7RESULT name=anchor id=B9c value=2048/6291456/6293504/131072/3137 matches_registration=true
+E7RESULT name=anchor id=B9d value=true matches_registration=true
+E7RESULT name=verdict part=anchors anchor_mismatches=0
+E7RESULT name=done emitted=49

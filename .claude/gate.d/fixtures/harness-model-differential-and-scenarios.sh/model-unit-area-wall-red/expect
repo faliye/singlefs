@@ -1,0 +1,4 @@
+exit=1
+want=这一段却没有「模型对拍 N 步」那一行：「随机历史：小盘上逼近单元区墙的取样点」（用例 unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device）
+want=样本只跑 .gate-cells 点名的格：model-unit-area-wall
+want=model-unit-area-wall：红（退出 1）

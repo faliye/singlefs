@@ -1,6 +1,6 @@
 diff -ru a/crates/singlefs-core/src/admission.rs b/crates/singlefs-core/src/admission.rs
---- a/crates/singlefs-core/src/admission.rs	2026-09-26 06:46:30.578841537 +0000
-+++ b/crates/singlefs-core/src/admission.rs	2026-09-26 06:46:30.579426447 +0000
+--- a/crates/singlefs-core/src/admission.rs	2026-09-26
++++ b/crates/singlefs-core/src/admission.rs	2026-09-26
 @@ -584,7 +584,7 @@
  ) -> AdmissionReading {
      let checkpoint_cost =
@@ -141,8 +141,8 @@ diff -ru a/crates/singlefs-core/src/admission.rs b/crates/singlefs-core/src/admi
  mod tests {
      use super::*;
 diff -ru a/crates/singlefs-core/src/mount.rs b/crates/singlefs-core/src/mount.rs
---- a/crates/singlefs-core/src/mount.rs	2026-09-26 06:46:30.578878407 +0000
-+++ b/crates/singlefs-core/src/mount.rs	2026-09-26 06:46:30.579995127 +0000
+--- a/crates/singlefs-core/src/mount.rs	2026-09-26
++++ b/crates/singlefs-core/src/mount.rs	2026-09-26
 @@ -2198,10 +2198,16 @@
                      bytes: BytesOnOneDevice::ZERO,
                  })
@@ -165,8 +165,8 @@ diff -ru a/crates/singlefs-core/src/mount.rs b/crates/singlefs-core/src/mount.rs
                  |refusal| MountError::SpaceAdmissionRefusedBeforeAcquisition {
                      instance_to_acquire,
 diff -ru a/crates/singlefs-core/src/transaction.rs b/crates/singlefs-core/src/transaction.rs
---- a/crates/singlefs-core/src/transaction.rs	2026-09-26 06:46:30.578931647 +0000
-+++ b/crates/singlefs-core/src/transaction.rs	2026-09-26 06:46:30.580433036 +0000
+--- a/crates/singlefs-core/src/transaction.rs	2026-09-26
++++ b/crates/singlefs-core/src/transaction.rs	2026-09-26
 @@ -4721,12 +4721,41 @@
              .any(|demand_on_device| demand_on_device.bytes != BytesOnOneDevice::ZERO),
          SpaceAdmission::SkippedByTheTestOnlySwitch => false,

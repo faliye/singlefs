@@ -73,8 +73,8 @@
 
 - **判据一（E142/E158 产物跟不上装置）**：改前改后都红，不归本任务（派发提示已说明），原样未动。
 - **`research/prompts/e158-r4-prereg.md:472`**：改后第二次重跑 69 号时新出现的一处判据二红。
-  这份文件在我开工之后才由**另一个会话**写出（`git status` 是 `??`，mtime 2026-09-26 23:20:38 UTC，
-  比我重跑 69 号的时刻 23:24:34 UTC 早 4 分钟；本任务开工前它并不存在，不在 gate69-before.log 的
+  这份文件在我开工之后才由**另一个会话**写出（`git status` 是 `??`，mtime 2026-09-27，
+  比我重跑 69 号的时刻早 4 分钟；本任务开工前它并不存在，不在 gate69-before.log 的
   44 行里）。按「只动这一轮自己的文件；看到别人没提交的改动不碰、不修」，没有碰它，留给主 agent
   或那个会话自己处理。
 - **process-safety 目录里 before/、patches/、日志等其余材料**：仍在 `/tmp/claude-1000/process-safety/`
@@ -87,7 +87,7 @@
 
 ## 关键文件路径
 
-- 门禁脚本：`/home/fy5090/code/singlefs/.claude/gate.d/69-evidence-in-repo.sh`
+- 门禁脚本：`.claude/gate.d/69-evidence-in-repo.sh`
 - 改前/改后判定：`/tmp/claude-1000/gate69-tmp-evidence/g69-before.log`、
   `/tmp/claude-1000/gate69-tmp-evidence/g69-after2.log`
 - 源文件 sha256：`/tmp/claude-1000/gate69-tmp-evidence/source-sha256.txt`

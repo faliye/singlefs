@@ -1,0 +1,10 @@
+exit=1
+want=改过的定义与共用约束里 3 份没有三方判决点名
+want=      .claude/agent-common.md
+want=      .claude/agents/gone.md
+want=      .claude/main-agent.md
+want=样本只跑 .gate-cells 点名的格：agent-def-adversarial-review
+want=── 汇总：doc-process-records.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-process-records.sh：1 格里 1 格红（agent-def-adversarial-review）
+want=→ agent-def-adversarial-review：走一轮三方
+want=bash .claude/gate.d/doc-process-records.sh --check agent-def-adversarial-review

@@ -1,4 +1,4 @@
-# m2-safety-r1 云端攻方（Opus）：S1、S2、S3 的候选修法与量出来的数（2026-09-25，UTC 起笔 04:3x / JST 13:3x）
+# m2-safety-r1 云端攻方（Opus）：S1、S2、S3 的候选修法与量出来的数（2026-09-25）
 
 读的代码是冻结副本 `/tmp/claude-1000/m2-safety-r1/tree/crates/`（`sha256sum -c /tmp/claude-1000/m2-safety-r1/crates-sha256.txt` 全过）；kb 行号取快照 `/tmp/claude-1000/m2-safety-r1/kb-snapshot/.claude/kb/` 里那份文件自己的行号。
 量数的是冻结副本的拷贝 `/tmp/claude-1000/m2-safety-r1-opus/tree/`，副本专用补丁只加环境变量开关，不设变量时与冻结副本同行为。**副本上量出来的数一律是副本上的数，不是入库装置上的数；每个候选都只在我的模型上量过、被攻过零轮。**

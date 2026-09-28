@@ -1,0 +1,28 @@
+## 一、结论
+
+- `crates/singlefs-core/src/transaction.rs`：取号那一写（`write_acquired_instance`）不再写 tail 0，写取号那一刻按 N-配置 同一取法读到的见证值；取号失败的回卷写（`roll_back_acquisition`）带同一个值。新函数 `highest_system_configuration_journal_tail`（每块盘两槽里全部自证过、fsid 与本池相同的系统配置槽 `journal_tail` 取最大，一份都没有时 0，命名常量 `JOURNAL_TAIL_WITNESSED_BY_NO_SYSTEM_CONFIGURATION`），在第一道屏障之后、第一个取号写之前调一次，逐盘取号写与回卷写都用这一次读到的。`recovery.rs`、`mount.rs` 不改。
+- mkfs 写 tail 0，mkfs 之后第一次取号读到 0、写 0：第一个事务的字节不变（新测试钉住）。
+- 新测试文件 6 条，全绿；6 行变异逐条用 `prove-red.sh` 证红（在打 A3a 之前的副本上证过一遍，又在「主工作区现状（含 A3a）+ 本补丁」的副本上重证，结果见第四节）。
+- 盘点：我跑的 50 个非层 0 测试二进制里，改动之后没有一条测试因这一件变红；改动副本上红的 10 个二进制，在不带这一件的基线上红法逐条相同（第六节）。只换钉值的文件：没有，清单外一份都没改。
+- 停下交主 agent 的：取号那一刻某块盘两槽都读不出自证过的系统配置时要不要拒——走得到（瞬时读错），拒要改 `mount.rs` 与 `history.rs`，不在我能动的文件里（第三节 Q1）。
+
+什么现象会推翻「续的行为对」：H1g a = 2 那一形（连着两次取号之后崩、藏掉最新根）可写挂载做成而不是拒；或 mkfs 之后第一次取号写出的系统配置槽 tail 不是 0；或回卷写的 tail 是 0。这三样各有一条测试与变异盯着。
+
+## 二、写过的文件
+
+| 文件 | 改动 |
+|---|---|
+| `crates/singlefs-core/src/transaction.rs` | 改：`roll_back_acquisition` 加参数 `witnessed_journal_tail`、回卷写带它；新 `JOURNAL_TAIL_WITNESSED_BY_NO_SYSTEM_CONFIGURATION`、`highest_system_configuration_journal_tail`；`write_acquired_instance` 读一次见证值、取号写与两处回卷调用带它；`acquire_instance` 与 `write_acquired_instance` 的文档注释 |
+| `crates/singlefs-harness/tests/acquisition_writes_the_witnessed_journal_tail_so_two_crashed_acquisitions_still_witness_the_newest_publish.rs` | 新建，6 条测试 |
+| `crates/mutations.tsv`（补丁目录里按名字合并，不进 crates.patch） | 追加 6 行（名字见第四节表）；替换 1 行「步 3 验收：取号之后没有屏障（取号的系统配置槽写与写行那次发布的单元写并成一段）」——它的原文是 `write_acquired_instance` 末尾那段，`roll_back_acquisition` 多了一个参数、rustfmt 换成多行，锚点跟着改到今天的写法（替换文、参数、必须红的测试不变；它点名的是 layer0 二进制，没证红，留给提交时的 59 号） |
+
+`git apply --stat` 原样（副本不是 git 仓，`git diff --stat -- crates litmus` 在主工作区上会混进别的会话的改动，贴这份补丁自己的）：
+
+```
+ crates/singlefs-core/src/transaction.rs            |   63 ++
+ ...cquisitions_still_witness_the_newest_publish.rs |  512 ++++++++++++++++++++
+ 2 files changed, 568 insertions(+), 7 deletions(-)
+```
+
+`git apply --check` 对主工作区现状（含打上的 A3a）：过（第七节贴原样）。
+

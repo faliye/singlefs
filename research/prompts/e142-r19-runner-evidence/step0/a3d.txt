@@ -1,0 +1,45 @@
+## 一、结论
+
+- 规格表三行都做了。两个测试目标在副本里整二进制全绿：`second_transaction_supplement_three_bad_disk_input` 13 过 1 忽略（改前基线 8 过 1 红 1 忽略），`second_transaction_supplement_two_tree_split` 5 过（改前 4 过 1 红）。
+- `bad_disk_input` 那四种走乙。记账树根、中央映射树根缩条目宽改成「每条只留 key、条目数不变」，水位那一行改标签时「节点头的最大 key 跟着改」。三份坏镜像都过得了判全那一道，可写挂载仍报原来那几个更深的成员，`every_fixed_panic_site…` 里可写挂载那一列一个字没改。R10 从盘上走不到了，这一格改成在同一条用例里直接调发布路径的释放判定（`instance_table_chain_to_release`），报的成员逐字与原期望相同。另加四条用例，钉这四种原坏法被判全那一道拒成什么成员（两个读者都钉）。
+- **偏离 A3a 建议的一处**：A3a 乙写的是「条目宽那两种顺手把节点头的 key 区间改成剩下那一条的 key」。照那样做，记账、映射两棵树只剩 1 条，会先红在判全的条目数判定上（「记账条目数不是 3 + 6 × 盘数」「映射条目数不是 1 + …」，这两道在解条目之前，`recovery.rs` 的 `rebuild_version` 与 `walk_to_file` 都是这个次序），照样走不到 R4 / R2。所以改成保留全部条目、只把每条缩成它的 key：首末 key 不变，区间、条数、key 次序都对得上。
+- `tree_split` 那一条走甲。期望改成 `Recovery(InvariantViolated { invariant: "I-1.1", detail: "分隔 key 大于孩子头里的最小 key" })`，盘上逐字节不变那一判原样留着。用例改名为 `a_central_mapping_root_whose_separator_hides_a_key_is_refused_by_the_rebuild_before_the_instance_generation_is_acquired`。
+- `fault_injection.rs` 只改了模块头的文档注释：分两条写明 `HistoryDevice`（注入在录制器外）与 55 号 `CountedDevice`（录制器在外）各是什么次序、录制流各记什么。
+- 变异：追加 9 行，副本里逐条 `prove-red.sh` 证红，9/9 抓到。第 252、256 行照旧抓到；586 行（checker 走读映射条目宽）也抓到。
+- **报一处不是这一件带来的**：第 240 行「分配记录的读者不判条目宽…」（锚点 `allocator.rs` 的 `AllocationRecord::parse`）在副本里**没红**。这一件没碰能走到分配记录叶的那条坏法，理由在第六节。
+
+**什么现象会推翻**：打进主工作区之后，这 9 行里有一行在门禁 59 号没红；或者 `bad_disk_inputs_never_read_back…` 快档撞出 panic、读回了没提交过的内容（坏法改了三种，快档的坏镜像份数没变：「三棵树都在」12 段 203 份、「树表 0 条」8 段 40 份，与基线同）。
+
+## 二、这一轮写过的文件
+
+补丁 `patch/crates.patch` 里的（相对快照；`git -C 主工作区 apply --check` 退 0）：
+
+- `crates/singlefs-harness/src/bad_disk_input.rs`：
+  - `EntriesKeptWhenNarrowing`（第 2107 行）：`OnlyTheFirst` 就是原来的缩法，`EveryOneAsItsKey` 是新的「每条只留 key、条数不变」。
+  - `NarrowedEntryArea` 与 `narrow_the_entry_width_of_the_node(node, kept)`（第 2142 行），六处共用。extent、inode、分配记录树根、树表单元这四处仍走 `OnlyTheFirst`，行为不变。
+  - `LargestKeyOfTheNodeHeader` 与 `relabel_the_inode_watermark_row(image, largest_key)`（第 2496、2506 行）。
+  - `INDEX_NODE_SMALLEST_KEY_OFFSET`（第 88 行）；`NewestRootSlot` 多带一个 `checkpoint_txg`（第 1439 行）。
+  - 公开的 `DamageRefusedAtTheHeaderJudgement` 与 `damage_image_the_way_the_header_judgement_refuses`（第 1886、1916 行），是三种原坏法，不进 `EVERY_DAMAGE_KIND`。
+  - `release_check_of_the_instance_table_placement_released_on_the_second_device_only`（第 1955 行）。
+  - 三种 `DamageKind` 的文档与 `name()` 跟着改（名字里多了「每条只留 key」「节点头的最大 key 跟着改」）；新增 core 的几条 `use`。
+- `crates/singlefs-harness/src/fault_injection.rs`：只改模块头第 5–7 行的文档注释（改成 8 行两条）。
+- `crates/singlefs-harness/tests/second_transaction_supplement_three_bad_disk_input.rs`：
+  - `every_fixed_panic_site…`（第 330 行）：表由 13 格变成 12 格，R10 那一格挪到表后，直接调发布路径（第 487 行起）；记账、映射、水位三格的恢复那一列改了。
+  - 文档注释改写：原来那段说两个读者走的不是同一条路，A3a 之后不对了。
+  - 新 `observation_of`（第 506 行）与四条新用例（第 527、570、613、658 行）；导入加了四个名字。
+- `crates/singlefs-harness/tests/second_transaction_supplement_two_tree_split.rs`：那条用例改名（第 390 行）、改期望、改文档；删掉不再用的两个导入 `CodeTwoTreeRefusal`、`PublishError`。
+
+补丁之外：`patch/mutations-append.tsv` 追加 9 行，名字全以「实审 A3d：」起头，第四节逐行列。没有替换行、没有删行，第 252、256、592 行不动。
+
+`git apply --stat patch/crates.patch`（对主工作区，原样）：
+
+```
+ crates/singlefs-harness/src/bad_disk_input.rs      |  338 +++++++++++++++++---
+ crates/singlefs-harness/src/fault_injection.rs     |   10 -
+ ..._transaction_supplement_three_bad_disk_input.rs |  267 ++++++++++++++--
+ ...second_transaction_supplement_two_tree_split.rs |   34 +-
+ 4 files changed, 558 insertions(+), 91 deletions(-)
+```
+
+（补丁模式、主工作区没动，所以不附 `git diff --stat -- crates litmus`：那里显示的全是别的会话的改动。）
+

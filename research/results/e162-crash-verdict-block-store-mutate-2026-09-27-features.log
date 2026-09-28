@@ -17,4 +17,4 @@ mutate: e162-crash-verdict-block-store 在 e7-index-bench/src/bin/../../Cargo.to
 计数：内存撞顶 0 条（上限 16G）、超时 0 条
 已还原，基线仍全绿
 rc=0
-2026-09-27T07:11:48Z
+2026-09-27

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # G3 出口：仓里换进之后的自证与门禁（每件退出码进自己的文件）
 set -u
-D=/tmp/claude-1000/gate-batch-m2-g3; O=$D/final; R=/home/fy5090/code/singlefs
+D=/tmp/claude-1000/gate-batch-m2-g3; O=$D/final; R=<仓根>
 cd $R; rm -f $O/*.exit
 job() { local name=$1; shift; { nice -n 19 "$@" > $O/$name.log 2>&1; echo $? > $O/$name.exit; } & }
 job admission env SINGLEFS_GATE_FULL=1 python3 research/scripts/admission.py --selftest

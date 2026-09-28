@@ -1,0 +1,4 @@
+exit=1
+want=这一段却没有「模型对拍 N 步」那一行：「随机历史快档」（用例 random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation）
+want=样本只跑 .gate-cells 点名的格：model-fast-tier
+want=model-fast-tier：红（退出 1）

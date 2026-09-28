@@ -1,0 +1,6 @@
+E7RESULT name=r3_multi_record_shape units=6 sequential_step_segments=["36xU", "12xJ", "1xR", "2xS"]
+E7RESULT name=r2_state_budget world=multi_record_record_segment closed_form_state_count=68736258074 enumerated_with_torn=4096 writes=92 segments=15
+E7RESULT name=r3_a4_record_segment units=6 record_writes=12 states=4095 distinct_record_verdicts=1 distinct_status_vectors=2 symbolic_key_classes=4095 symbolic_key_inconsistent=0 tightened_key_classes=2 tightened_key_inconsistent=0 tightened_key_inconsistent_on_the_whole_status_vector=3366 seconds=33.5 must_be_nonzero=4094
+E7RESULT name=r2_state_budget world=multi_record_unit_segment_k12 closed_form_state_count=16781335 enumerated_with_torn=4096 writes=53 segments=12
+E7RESULT name=r3_a3_keys world=a3_multi_record_unit_segment_k12_units6 states=4095 red_states=0 distinct_full_verdicts=1 distinct_status_vectors=1 read_set_key_classes=4095 read_set_key_inconsistent_full=0 read_set_key_inconsistent_status=0 p7_key_classes=1 p7_key_inconsistent_full=0 p7_key_inconsistent_status=0 p7_classes_minus_distinct_status=0 must_be_nonzero=0 i78_red_under_the_f1_candidates=0 i78_red_under_the_in_place_candidates=0 seconds=133.8
+E7RESULT name=done emitted=6

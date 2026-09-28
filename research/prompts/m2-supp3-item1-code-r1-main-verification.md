@@ -2,7 +2,7 @@
 
 正文 `research/prompts/_m2-supp3-item1-code-r1-body.md`；三条腿：Opus 攻方 `m2-supp3-item1-code-r1-opus-output.md`（Z2、Z3、Z4），Sonnet 正推 `m2-supp3-item1-code-r1-sonnet-output.md`（Z1 条款那一半、Z6），本地攻方两份干净样本 `m2-supp3-item1-code-r1-local-attack-output-s1.md`、`-s2.md`（Z5、Z1 前提表）；核查员 `m2-supp3-item1-code-r1-verifier-output.md`（113 处，✓ 108、✗ 5、核不动 0）。
 
-开工快照 11 个文件里有两份 kb 在腿跑的过程中被改过：`.claude/kb/milestone/02-second-txn.md` 第 41 行是主 agent 约 15:50 UTC 改的（层 0 并行化那一句，违反「腿跑着的时候主 agent 不改快照里的文件」；这一轮没有腿引第 41 行），`.claude/kb/decisions/16-发布语义.md` 已定项 8 一行是另一个会话 15:44:50 UTC 改的（这一轮引的是已定项 1、9）。两份快照时的原样交给了核查员，sha256 与快照逐个相同。
+开工快照 11 个文件里有两份 kb 在腿跑的过程中被改过：`.claude/kb/milestone/02-second-txn.md` 第 41 行是主 agent 改的（层 0 并行化那一句，违反「腿跑着的时候主 agent 不改快照里的文件」；这一轮没有腿引第 41 行），`.claude/kb/decisions/16-发布语义.md` 已定项 8 一行是另一个会话改的（这一轮引的是已定项 1、9）。两份快照时的原样交给了核查员，sha256 与快照逐个相同。
 
 ## 一、逐格判定
 

@@ -8,7 +8,7 @@
 现查：开工时该文件为 797 行；本报告写作过程中再次 `sha256sum` 发现它已变成 845 行——
 `git status` 同时显示同一批 `.claude/gate.d/*.sh`、多份 kb 文件在工作区被改动，说明另一个会话正在这个仓里并行改动，
 派发提示那句「它这一轮没人改」在我写报告的这段时间内**不成立**（现查，非转述）。
-为了让本报告的引用可复核，我把 2026-09-27T11:33:00Z 那一刻的 `gate.sh` 拷成只读副本：
+为了让本报告的引用可复核，我把 2026-09-27 当时的 `gate.sh` 拷成只读副本：
 `/tmp/claude-1000/three-way-forward/verification-split-r1/gate.sh.pinned`（`sha256sum` `1a3140c0de61812336b103a1666ce93196f0f0742a7dd4e6fdde7517c2a42bde`），
 下面凡引 `gate.sh` 的行号，都是这份 pinned 副本里现 `grep -n` 出来的行号，不是快照、也不是此刻工作区的行号。
 `.claude/gate.d/54-layer0-replay.sh` 与其余 Q5 引用的 agent 定义、`.claude/rules/implementation-workflow.md`、

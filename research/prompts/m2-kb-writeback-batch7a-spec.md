@@ -8,7 +8,7 @@
 | I-7.12 | 系统配置 F 不低于同盘根上的 F | 每块盘分开判：这块盘两槽里自证过（校验和过且 fsid 与本池相同，与取号同一读法，D18（块里携带什么信息） 已定项 11）的系统配置槽中回退下界 F（D22（单元原子性怎么合成） 已定项 9 的字段）的最大值，不低于这块盘根槽里每一条自证过的根带的 F（D22（单元原子性怎么合成） 已定项 7 的字段）。抬 F 那一串先把新 F 写进每块盘的系统配置、过一道屏障，才发第一条带新 F 的根（D16（发布语义） 已定项 1「抬 F 那一串」），所以任何合法状态上一条根带的 F 都已经在它所在那块盘的系统配置里。某块盘两槽都自证不过时，那块盘不判；一块盘都判不了时整条报「不适用」。判别力：把「先写系统配置」挪到第一条根之后，崩在两者之间的状态必须红 | 已实现（2026-09-26，池级 checker `walk::check_pool_image` 的 `judge_system_configuration_floor_against_the_roots_on_each_device`：每块有自证过的系统配置槽的盘判一格，那块盘上一条根都没有时那一格成立；两槽都自证不过的盘不判，一块盘都判不了时整条报「不适用」。坏镜像 `crates/singlefs-harness/tests/checker_known_bad_images.rs` 的 `one_device_whose_system_configuration_floor_is_below_a_root_on_it_reddens_only_the_system_configuration_floor_invariant`：步 5 那段历史上抬到上限 11 的镜像一条都不红、I-7.12（系统配置 F 不低于同盘根上的 F） 真被评估过且成立，盘 1 两槽的 F 改回 0 只红它、红在盘 1 txg 16 那条带 11 的根上；变异「不比系统配置里的 F（每块盘恒成立）」「checker 不读系统配置里的 F（读成 0）」（实二）。条款仍是主 agent 2026-09-26 按 SysPre 的写序推的，没三方；层 0 每个崩溃状态都跑池级 checker，按判法每个状态都评估得到它（推的，层 0 没跑） |
 | I-7.13 | 系统配置池级字段在读者收的范围里 | 任一自证过（magic 与整槽校验和对，`check_system_configuration_slot`）、incompat 位认得的系统配置槽：格式版本 = 1（`SYSTEM_CONFIGURATION_FORMAT_VERSION_THIS_CHECKER_READS`）、加密类型 = 0（第一版恒关，`SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFF`）、固定结构槽距 ≥ 4096 字节（`FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES`）且槽 1 整槽落在根环基址之前、`physical_block_size` ∈ [457（`ROOT_RECORD_BYTES`）, 槽距]、journal 环长 ÷ 4096 ÷ F（`JOURNAL_SAFETY_FACTOR`）≥ 1 且环末端不越过单元区起始槽号（`geometry_of` 的 `fixed_structure_slot_spacing_lies_in_the_format_range` / `physical_block_size_fits_a_root_slot` / `journal_ring_bytes_lie_in_the_supported_range`）。任一盘任一槽不满足其中一项即判红：checker 报违例、不作保，且该池其余不变量一律报「不适用」，与实现整池拒绝挂载一致（用户 2026-09-27 定系统配置越界整池拒）。R（区域数）与 S（每区槽数）越界不在这一条里，仍归「这一槽不可择」 | 已实现（2026-09-27，池级 checker `crates/singlefs-checker/src/image.rs` 的常量 `SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS`（:46）登记这个编号，`IMPLEMENTED_INVARIANTS`（:54）由此变 47 条；判定 `judge_system_configuration_values_the_reader_accepts`（image.rs:454）在 `walk::check_pool_image`（walk.rs:5573 起）里调用，任一盘任一槽带越界值时该池其余不变量整批报「不适用」并提前返回（walk.rs:5578）；坏镜像 `crates/singlefs-harness/tests/checker_known_bad_images.rs` 里现在还没有改坏触发它的一份，`the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target` 因此判红，补不补交主 agent 定） |
 ````
-依据：records/2026-09-24-里程碑二收尾调度.md「实审 A3-checker-2 交回并打上；I-7.13 立号（2026-09-27 JST 17:0x）」那一行；research/prompts/m2-rev-a3-checker-2-implementer-report.md 第四节第 1 点；crates/singlefs-checker/src/image.rs、walk.rs 现查
+依据：records/2026-09-24-里程碑二收尾调度.md「实审 A3-checker-2 交回并打上；I-7.13 立号（2026-09-27）」那一行；research/prompts/m2-rev-a3-checker-2-implementer-report.md 第四节第 1 点；crates/singlefs-checker/src/image.rs、walk.rs 现查
 
 文件：.claude/kb/invariants.md
 旧串：
@@ -74,7 +74,7 @@
 ````
 - **读者择系统配置时判根槽宽与固定结构槽距**：固定结构槽距 ∈ [4096, 1 MiB − 4096]（上界是槽 1 整槽落在根环基址之前，`root_ring::region_start(0)` 减系统配置槽宽 4096）；根槽宽（`physical_block_size`）∈ [根记录宽 457 字节（已定项 7）, 槽距]；越界整池拒绝挂载，与每区槽数 S 越界同一个处置（实审 A3a 落地：`crates/singlefs-core/src/recovery.rs` 的 `system_configuration_values_this_reader_accepts`，`SystemConfigurationValueOutsideWhatThisReaderAccepts::FixedStructureSlotSpacingOutsideTheFormatRange` / `PhysicalBlockSizeOutsideTheRootSlotBounds`）；池级 checker 报 I-7.13（系统配置池级字段在读者收的范围里） 违例、该池其余不变量一律报不适用（实审 A3-checker-2 落地：`crates/singlefs-checker/src/image.rs` 的 `judge_system_configuration_values_the_reader_accepts`）。
 ````
-依据：crates/singlefs-checker/src/image.rs:454、walk.rs:5573-5585 现查；用户 2026-09-27 JST 14:0x 定「整池拒」，records/2026-09-24-里程碑二收尾调度.md
+依据：crates/singlefs-checker/src/image.rs:454、walk.rs:5573-5585 现查；用户 2026-09-27 定「整池拒」，records/2026-09-24-里程碑二收尾调度.md
 
 文件：.claude/kb/decisions-history/2026-09.md
 旧串：
@@ -95,11 +95,11 @@
 
 - 改前：D9（加密） 已定项 10 射程末句写「池级 checker 判单元头 29 字节全 0（`check_unit`）；池级码 1 / 码 3 与指针头部在 A3-checker-2 里做」；D22（单元原子性怎么合成） 已定项 9 那句写「……不按今天的字段表往下解（主 agent 2026-09-27 定，池级判定在 A3-checker-2 里做）」；已定项 2 那条只到「越界整池拒绝挂载，与每区槽数 S 越界同一个处置」，没提 checker 报哪条不变量；`invariants.md` 没有 I-7.13 这一行，第 12 行写「判 46 条」。
 - 改后：D9（加密） 已定项 10 射程改写：池级 checker 判三种码单元头 29 字节全 0与格式版本认得、及走读跟随的指针头部 MAC / nonce 全 0，均归 I-2.4（头校验和覆盖范围）；系统配置格式版本、加密类型、固定结构槽距、`physical_block_size`、journal 环长越出这一版读者收的范围，归 I-7.13（系统配置池级字段在读者收的范围里）。D22（单元原子性怎么合成） 已定项 9 那句改成「……不按今天的字段表往下解（主 agent 2026-09-27 定；池级 checker 判定已落地：单元头格式版本归 I-2.4（头校验和覆盖范围），系统配置格式版本归 I-7.13（系统配置池级字段在读者收的范围里），实审 A3-checker-2）」；已定项 2 那条追加「池级 checker 报 I-7.13（系统配置池级字段在读者收的范围里） 违例、该池其余不变量一律报不适用（实审 A3-checker-2 落地：`crates/singlefs-checker/src/image.rs` 的 `judge_system_configuration_values_the_reader_accepts`）」。`invariants.md` 新增一行 I-7.13（系统配置池级字段在读者收的范围里），判据是任一自证过的系统配置槽格式版本 = 1、加密类型 = 0、固定结构槽距 ≥ 4096 且槽 1 落在根环基址之前、`physical_block_size` ∈ [457, 槽距]、journal 环长 ÷ 4096 ÷ F ≥ 1 且环末端不越过单元区起点；任一盘任一槽不成立即判红、该池其余不变量报不适用（R、S 越界不在这一条里，仍归「这一槽不可择」）；池级 checker 判定条数 46 → 47（`crates/singlefs-checker/src/image.rs` 的 `IMPLEMENTED_INVARIANTS`：新增常量 `SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS`，:46/:54）。
-- 依据：实审 A3-checker-2 实现员报告 `research/prompts/m2-rev-a3-checker-2-implementer-report.md` 第四节第 1、2 点；用户 2026-09-27 JST 14:0x 定「系统配置字段越界整池拒（推荐）」，原话在 `records/2026-09-24-里程碑二收尾调度.md`「实审 A3-checker-2 交回并打上；I-7.13 立号（2026-09-27 JST 17:0x）」那一行。
+- 依据：实审 A3-checker-2 实现员报告 `research/prompts/m2-rev-a3-checker-2-implementer-report.md` 第四节第 1、2 点；用户 2026-09-27 定「系统配置字段越界整池拒（推荐）」，原话在 `records/2026-09-24-里程碑二收尾调度.md`「实审 A3-checker-2 交回并打上；I-7.13 立号（2026-09-27）」那一行。
 
 ### 2026-09-27（其十五）
 ````
-依据：research/prompts/m2-rev-a3-checker-2-implementer-report.md 第四节；records/2026-09-24-里程碑二收尾调度.md「实审 A3-checker-2 交回并打上；I-7.13 立号（2026-09-27 JST 17:0x）」那一行
+依据：research/prompts/m2-rev-a3-checker-2-implementer-report.md 第四节；records/2026-09-24-里程碑二收尾调度.md「实审 A3-checker-2 交回并打上；I-7.13 立号（2026-09-27）」那一行
 
 文件：.claude/kb/invariants.md
 旧串：
@@ -114,7 +114,7 @@
 
 ### 2026-09-27（立 I-7.13（系统配置池级字段在读者收的范围里）；I-2.4（头校验和覆盖范围） 与 I-1.10（码 2 条目宽等于字段表宽） 状态列改成现值；已实现 46 → 47）
 
-- 实审 A3-checker-2（`research/prompts/m2-rev-a3-checker-2-implementer-report.md`）交回并打上，用户 2026-09-27 JST 14:0x 定「系统配置字段越界整池拒」（`records/2026-09-24-里程碑二收尾调度.md`「实审 A3-checker-2 交回并打上；I-7.13 立号（2026-09-27 JST 17:0x）」那一行）。
+- 实审 A3-checker-2（`research/prompts/m2-rev-a3-checker-2-implementer-report.md`）交回并打上，用户 2026-09-27 定「系统配置字段越界整池拒」（`records/2026-09-24-里程碑二收尾调度.md`「实审 A3-checker-2 交回并打上；I-7.13 立号（2026-09-27）」那一行）。
 - I-7.13（系统配置池级字段在读者收的范围里） 立，状态已实现：判据是任一自证过的系统配置槽格式版本 = 1、加密类型 = 0、固定结构槽距 ≥ 4096 且槽 1 落在根环基址之前、`physical_block_size` ∈ [457, 槽距]、journal 环长 ÷ 4096 ÷ F ≥ 1 且环末端不越过单元区起点；任一盘任一槽不成立即判红、整池不作保（该池其余不变量报不适用），R、S 越界不在这一条里、仍归「这一槽不可择」。判定 `crates/singlefs-checker/src/image.rs` 的 `judge_system_configuration_values_the_reader_accepts`（:454），`walk::check_pool_image`（walk.rs:5573 起）调用；坏镜像还没补，`checker_known_bad_images.rs` 那条「清单里每条都要有坏镜像」的断言暂时判红，交主 agent 派实现员补。已实现条数 46 → 47，与 `IMPLEMENTED_INVARIANTS` 相等。
 - I-2.4（头校验和覆盖范围）：状态列改成现值——池级走读在 `walk::judge_unit_header`（walk.rs:649 起）判三种码单元头的格式版本 = 1、29 字节预留位全 0；走读跟随的每条指针在 `judge_pointer_mac_and_nonce_are_zero`（image.rs:619）判头部 MAC / nonce 全 0，四个入口（码 2 节点指针、inode 内部条目子指针、实例表链指针、extent 数据指针）都已接上；改前状态列写「指针头部那一半的池级判定在 A3-checker-2 里做，还没落地」。
 - I-1.10（码 2 条目宽等于字段表宽）：状态列改成现值——`index_node_view_judging_a_zero_entry_width`（walk.rs:747）在解码失败理由是「条目宽 0 而条目数非 0」、且这棵树登记了条目字段表时报违例；树表与中央映射树不在射程内，只记走读失败。改前状态列写「条目宽为 0 时条目数非 0 那一条池级判定在 A3-checker-2 里做，还没落地」。

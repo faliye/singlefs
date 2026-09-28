@@ -1,0 +1,6 @@
+8fc0dfbf5e48636fc9c0d729b69b8b41873dd43a54849079d5c92e8a42583f79  .claude/kb/decisions/13-验证路线.md
+5750f2c743cb7e6b1d00401d408af9deec1c558db6106d0114c67992a11e1ac7  .claude/kb/decisions/16-发布语义.md
+e71e6f87bbfb7784b9dec9a32dc84fd99038a639bd2faec7de152950124bbee7  .claude/kb/decisions/24-后台重活能不能卸给GPU.md
+8943430efb87383e89ad204f67e3cf78c547e28c8fe977d3b8cf0489eb1d58aa  .claude/kb/invariants.md
+4b06a10f96e3aa9e5c98a47af75d729ebf1a0dae8f66b8bad11b7a44b8e1c8ff  .claude/kb/milestone/03-third-txn.md
+9a737485ddbcc94507b20bcf21d9d2aefad8e0419f17b6744c4ef7d496235cf2  .claude/kb/checks-owed.md

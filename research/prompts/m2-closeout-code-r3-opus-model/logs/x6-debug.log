@@ -1,0 +1,15 @@
+   Compiling opus-r3-proto v0.1.0 (/tmp/claude-1000/m2-closeout-code-r3-opus/snapshot/crates/opus-r3-proto)
+    Finished `release` profile [optimized + debuginfo] target(s) in 9.05s
+     Running tests/opus_r3_x6_stale_snapshot_mid_publish_and_one_slot_fault.rs (target/release/deps/opus_r3_x6_stale_snapshot_mid_publish_and_one_slot_fault-62d226d3dc60b279)
+
+running 1 test
+DEBUG corrupt=false step=0 action=create_inode outcome=Ok read=FileRead root=Some((InstanceGeneration(1), CheckpointTxg(8))) len=Some(2999) equals_p=true equals_start=false equals_content_now=true
+DEBUG corrupt=false step=1 action=crash_remount outcome=Ok chose_1_8 read=FileRead root=Some((InstanceGeneration(2), CheckpointTxg(10))) len=Some(2999) equals_p=true equals_start=false equals_content_now=true
+DEBUG corrupt=false step=2 action=create_inode outcome=Ok read=FileRead root=Some((InstanceGeneration(2), CheckpointTxg(11))) len=Some(2999) equals_p=true equals_start=false equals_content_now=true
+DEBUG corrupt=true step=0 action=create_inode outcome=Ok read=FileRead root=Some((InstanceGeneration(1), CheckpointTxg(8))) len=Some(2999) equals_p=true equals_start=false equals_content_now=true
+DEBUG corrupt=true step=1 action=crash_remount outcome=Ok chose_1_8 read=FileRead root=Some((InstanceGeneration(2), CheckpointTxg(10))) len=Some(2999) equals_p=true equals_start=false equals_content_now=true
+DEBUG corrupt=true step=2 action=create_inode outcome=Ok read=FileRead root=Some((InstanceGeneration(2), CheckpointTxg(11))) len=Some(2999) equals_p=true equals_start=false equals_content_now=true
+test content_check_of_the_one_slot_sequences_with_a_crash_remount ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.04s
+

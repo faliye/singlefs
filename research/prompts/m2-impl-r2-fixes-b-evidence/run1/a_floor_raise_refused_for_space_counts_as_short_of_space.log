@@ -1,0 +1,29 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.90s
+     Running tests/a_floor_raise_refused_for_space_counts_as_short_of_space.rs (target/debug/deps/a_floor_raise_refused_for_space_counts_as_short_of_space-f317b5923c67e721)
+
+running 2 tests
+test a_floor_raise_pushed_by_the_session_whose_own_publishes_find_no_slot_reports_no_space ... FAILED
+test a_mount_whose_floor_raise_after_the_row_publish_finds_no_slot_is_still_made_and_still_short ... FAILED
+
+failures:
+
+---- a_floor_raise_pushed_by_the_session_whose_own_publishes_find_no_slot_reports_no_space stdout ----
+
+thread 'a_floor_raise_pushed_by_the_session_whose_own_publishes_find_no_slot_reports_no_space' (1380096) panicked at crates/singlefs-harness/tests/a_floor_raise_refused_for_space_counts_as_short_of_space.rs:53:10:
+第 19 次覆盖写：单元区满了，推抬 F 也推不出空间: UserChangePublished { floor_raises: [], refusals_that_pushed_the_floor_raises: [] }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_mount_whose_floor_raise_after_the_row_publish_finds_no_slot_is_still_made_and_still_short stdout ----
+
+thread 'a_mount_whose_floor_raise_after_the_row_publish_finds_no_slot_is_still_made_and_still_short' (1380097) panicked at crates/singlefs-harness/tests/a_floor_raise_refused_for_space_counts_as_short_of_space.rs:138:5:
+抬 F 那一串三次空发布在预演里第 1 次就取不到落点：RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { refused_publish_in_the_sequence: 3, publishes_in_the_sequence: 3, cause: PlacementRefused { unit: AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 0, device: DeviceIdentity(0), index_in_device: 2 }), refusal: NoFreeSlotOnAnyDevice } }
+
+
+failures:
+    a_floor_raise_pushed_by_the_session_whose_own_publishes_find_no_slot_reports_no_space
+    a_mount_whose_floor_raise_after_the_row_publish_finds_no_slot_is_still_made_and_still_short
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.62s
+
+error: test failed, to rerun pass `-p singlefs-harness --test a_floor_raise_refused_for_space_counts_as_short_of_space`

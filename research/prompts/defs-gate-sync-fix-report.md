@@ -1,11 +1,11 @@
-# gate-sync-fix 报告（tooling-writer，2026-09-27，时刻均 UTC）
+# gate-sync-fix 报告（tooling-writer，2026-09-27）
 
 ## 结论
 
 - 第 3 件（heavy-test-guard 自检一格）：现行定案是「层 0 归崩溃验证员」，按这个把自检改好了。`heavy-test-guard.sh --selftest` 从 exit=1 变成 exit=0。63 号、hooks-registered、`lib_heavy_tests.py --selftest` 全绿。
 - `lib_heavy_tests.py` 没改：远端根本没动过它，里面也没有「谁能跑什么」的判法（详见下文）。
 - 第 4 件（54 号第 270 行）：同一行里另外三处 `$layer0_full_base/tree` 补上 `${…:?}` 守卫。shell-lint 对 54 号转绿；54 号自己的自证（`admission.py --selftest`）绿。
-- 两处改动已经被另一个会话提交进 `ecdf8465`（00:32:09 UTC，提交说明里自己写着「heavy-test-guard 自检一格与 54 号 rm -rf 守卫还在改，这里提交的是提交时工作区的样子」）。所以这三份文件对 HEAD 的 `git diff --stat` 现在是空的。
+- 两处改动已经被另一个会话提交进 `ecdf8465`（提交说明里自己写着「heavy-test-guard 自检一格与 54 号 rm -rf 守卫还在改，这里提交的是提交时工作区的样子」）。所以这三份文件对 HEAD 的 `git diff --stat` 现在是空的。
 - 推翻条件：如果主 agent 或用户定「层 0 全量由主 agent 跑、不归崩溃验证员」（也就是远端那一侧），那么这一格的期望要改回 2，放行表里还要去掉 layer0-*。
 
 ## 第 3 件：判定依据
@@ -16,7 +16,7 @@
   - `.claude/gate.d/stage-owners.tsv` 第 37 行（`54-layer0-replay.sh	crash-verifier	…`）
   - `.claude/main-agent.md` 第 57、61 行
   - `.claude/rules/implementation-workflow.md` 第 64、67 行（第 67 行：「崩溃验证员在 HEAD + 暂存区的 worktree 里跑 54 号 `--full`（连同登记的崩溃枚举用例），另跑 55、57、59 号」）
-- 提醒：开工时（约 00:2x UTC）读到的这张表第 55 行还是远端那句「层 0 全量由主 agent 在 HEAD + 暂存区的 worktree 里跑；崩溃验证员跑 55、57、59 号」。之后另一个会话在 `faf255e2` 里改成了现在的样子。
+- 提醒：开工时读到的这张表第 55 行还是远端那句「层 0 全量由主 agent 在 HEAD + 暂存区的 worktree 里跑；崩溃验证员跑 55、57、59 号」。之后另一个会话在 `faf255e2` 里改成了现在的样子。
 - 自检那一格（第 863–864 行）是远端改的，自动合并进来时不在冲突块里，所以还留着「：层 0 不归它」和期望 2。放行表（第 147 行）用的是本地一侧，里面有 layer0-stage，于是实际判 0，这一格就红了。
 
 ## 第 3 件：改法
@@ -77,7 +77,7 @@
 
 没有新写 `# gate-similar:` / `# hook-events:` 行（没建新门禁或新钩子）。
 
-## 第 7 步收尾（00:3x UTC 串行跑的，日志在 `/tmp/claude-1000/gate-sync-fix/closing/`）
+## 第 7 步收尾（串行跑的，日志在 `/tmp/claude-1000/gate-sync-fix/closing/`）
 
 | 项 | 退出码 | 末行 |
 |---|---|---|

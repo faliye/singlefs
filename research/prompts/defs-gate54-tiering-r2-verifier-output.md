@@ -2,8 +2,6 @@
 
 你交的是观测，不是判决：核对表里的 ✗ 不免除主 agent 对推论的逐条现查。
 
-时区：本机 UTC；本报告中出现的时刻均为 UTC（人在 JST，UTC+9，换算时+9 小时）。
-
 ## 判别力自证
 
 取 opus 报告 `defs-gate54-tiering-r2-opus-output.md:249` 引用的
@@ -25,7 +23,7 @@ $ sed -n '250p' 54-layer0-replay.sh
   与派发提示给的两串逐字节相同（MATCH）。本地腿三份文件无对应 sha256 可核（未给）。
 - 开工快照 `defs-gate54-tiering-r2-snapshot/sha256sums.txt`（11 个文件的 hash 清单，不含实际内容副本）：
   `sha256sum -c` 结果 9 个 OK、2 个 FAILED——`.claude/main-agent.md`（派发提示已告知，见下）与
-  `.claude/kb/checks-owed.md`（派发提示未提及，本报告独立发现；`stat` 显示它于 01:06:11 UTC 被改，
+  `.claude/kb/checks-owed.md`（派发提示未提及，本报告独立发现；`stat` 显示它被改过，那一次改动
   早于三条腿的大部分工作时段）。全仓 grep 三条腿报告与本地腿三份材料，
   `checks-owed.md` 零次被引用到具体行号，这处漂移不影响任何一条待核引用，不单列。
 - `.claude/main-agent.md` 漂移的可核实性：该文件从未被 `git add`（`git cat-file -t 14a43f86…` 报
@@ -87,7 +85,7 @@ $ sed -n '250p' 54-layer0-replay.sh
 `  ✗ 快档绿了…没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/m`（2）——
 全部是产物文件里的原样整行，逐字节命中。
 
-**重点复跑详情**：草稿副本 `run-all.sh` 于 01:59:06–~02:07 UTC 跑完（受同机 `cargo test/clippy` 抢核，
+**重点复跑详情**：草稿副本 `run-all.sh` 跑完（受同机 `cargo test/clippy` 抢核，
 比 opus 自己那趟 8 分钟长，无异常）。9 个产物文件（`h-a-late-stage-54.out`、`h-b-revert-stale-cell.out`、
 `h-b2-forced-recheck.out`、`h-c-foreign-run-deletes.out`、`v1-outpath-scenes.out`、
 `fix-arms-g1/g2/g4/g124.out`）与入库版逐个 `diff -q` 未掩码时全部「differ」；用
@@ -143,7 +141,7 @@ sonnet 报告本身没有像 opus 那样加一句「文件在我跑的时候被�
 **Sonnet「没做什么」**：没有重跑任何命令之外的门禁或编译（sonnet 本身没有产出可执行装置）；
 没有对 K3 提到的 f5/f3 改法在 opus 模型上的读数做二次复跑（已含在「一、云端攻方」的重点复跑范围
 内，此处不重复）；没有排出 main-agent.md 的两次改动（sonnet 完成 vs. 别的会话编辑）先后的精确时刻，
-`stat` 只给出该文件最终的一次 mtime（01:09:04 UTC），不能反推是否在 sonnet 读取之前或之后发生
+`stat` 只给出该文件最终的一次 mtime，不能反推是否在 sonnet 读取之前或之后发生
 ——这一点留给主 agent，若要判定 sonnet 这处引用是否「应当自报而没自报」需要更细的时间线证据。
 
 ## 三、本地腿（转述核对表 + 运行记录）核对表

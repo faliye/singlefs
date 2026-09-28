@@ -1,4 +1,4 @@
-# E158 第 4 次跑 第四段 执行员报告（2026-09-27 JST 10:2x）
+# E158 第 4 次跑 第四段 执行员报告（2026-09-27）
 
 ## 一、结论
 
@@ -12,7 +12,7 @@
 
 ## 二、怎么跑的
 
-- 负载（01:22 UTC）：有别的会话在跑 `cargo build --offline --all-targets`、一条 `cargo test -p singlefs-harness --test a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable`、另一个仓的 `gate.sh`；没有 qemu、vm-bench、e152、fio。按规定加 `nice -n 19` 照跑，没有等锁。
+- 负载：有别的会话在跑 `cargo build --offline --all-targets`、一条 `cargo test -p singlefs-harness --test a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable`、另一个仓的 `gate.sh`；没有 qemu、vm-bench、e152、fio。按规定加 `nice -n 19` 照跑，没有等锁。
 - 脚本 `/tmp/claude-1000/e158-r4-seg4/run_seg4_v2.sh`：12 条臂逐个在 `arms/<臂>` 下跑，环境变量与命令都照派发提示（`capped.sh 3` 加 `run-with-memory-cap.sh 10G`）；compare 在仓根下跑，用 `arms/today` 那份 bin，参数是相对路径 `research/results/e158-root-choice-repair-2026-09-27-r4-seg4`（这样产物里的 `path=` 字段写的是仓内相对路径）。
 - 原样日志（`run_seg4.log`）：
 
@@ -242,7 +242,7 @@ E7RESULT name=r4_q6 arm=yi-slot geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=7
 3. **L5 分不出乙的重读**：乙 的重读在 L5 上没有一格是读出之后挂上的。要在第 22 条那一格上比出乙与甲的差别，得加一种「两份各读坏一次、重读读得出」的时长。这是新加的一格，要主 agent 定（按登记规矩只能在新一次跑或修订里加）。
 4. 本段的 compare 只读第四段的产物，V1 的跨段作废没算：第一段的 PC-N0（管 Q4）和 PC-多读（管 Q5）打不中的话，本段的 Q4 / Q5 在那几臂上也要作废。最后要拿全部段的前缀一起跑一次 `r4-compare`（装置报告第五节已写这一句）。
 
-## 十一、门禁（登记给 experiment-runner 的阶段，主工作区，JST 10:2x）
+## 十一、门禁（登记给 experiment-runner 的阶段，主工作区）
 
 各阶段的退出码取自这一次跑的原样输出，末行用 `tail -n 1` 从各自的日志抄（日志在草稿目录 `gate-<阶段>.log`）：
 

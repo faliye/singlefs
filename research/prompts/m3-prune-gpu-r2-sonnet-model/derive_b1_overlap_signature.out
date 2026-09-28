@@ -1,0 +1,5 @@
+kind_string='"SS|UUUUUUUUUUUUUUUUUUUUUUUUUUUU|JJ|R|SS'
+  签名='reuse=false,root_slot_rewrite=false,journal_slot_rewrite=false\\' -> root_slot_fua_overlap_bit=False
+  签名='reuse=false,root_slot_rewrite=true,journal_slot_rewrite=false\\' -> root_slot_fua_overlap_bit=True
+distinct_kind_strings_here=1 distinct_condition_signatures=2 distinct_node_identities_with_overlap_bit=2
+PASS: 加一位 RootRecordFua 重叠位之后，kinds 世界这一条种类串下的两个条件签名分成了两个不同的节点身份

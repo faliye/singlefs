@@ -1,0 +1,5 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：shape
+want=.claude/kb/invariants.md:5  ### 2026-09-28（其一）：新写的一条还是旧形态
+want=── 汇总：doc-decisions.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-decisions.sh：1 格里 1 格红（shape）

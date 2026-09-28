@@ -1,0 +1,6 @@
+exit=0
+want=门禁自检通过：4 个脚本
+want=进程安全：查了 5 个脚本（.sh 5 个、.py 0 个）
+want=own-scope 标注放行 1 处（research/scripts/stop-own.sh:9）
+want=研究脚本、hook 与 .claude/scripts 的门禁纪律：扫了 3 个目录
+want=执行位：本次未判（script-modes.sh 退 77

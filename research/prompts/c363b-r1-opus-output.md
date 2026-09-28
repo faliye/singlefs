@@ -2,7 +2,7 @@
 
 <!-- doc-lint:not-numbers V1 V2 T1 T2 T3 Z1 -->
 
-冻结副本 `/tmp/claude-1000/c363b-r1/tree/crates/` 拷进草稿目录后只加了一个测试文件 `v1_reach.rs`，产品代码与 harness 一个字节没改（拷贝按 `research/prompts/c363b-r1-snapshot/crates-src-sha256.txt` 核过，49 行全对）。**下面所有的数都是副本上的数，不是入库装置上的数。** 跑的时刻：2026-09-25 03:10–03:32 JST（`run.sh` 整轮，含第五节那份补丁副本）。开跑前 `ps` 看到别的会话在跑 `e158_root_choice_repair`（cargo），没有 qemu / fio / vm-bench，加 `nice -n 19` 照常跑、没等锁。
+冻结副本 `/tmp/claude-1000/c363b-r1/tree/crates/` 拷进草稿目录后只加了一个测试文件 `v1_reach.rs`，产品代码与 harness 一个字节没改（拷贝按 `research/prompts/c363b-r1-snapshot/crates-src-sha256.txt` 核过，49 行全对）。**下面所有的数都是副本上的数，不是入库装置上的数。** 跑的时刻：2026-09-25（`run.sh` 整轮，含第五节那份补丁副本）。开跑前 `ps` 看到别的会话在跑 `e158_root_choice_repair`（cargo），没有 qemu / fio / vm-bench，加 `nice -n 19` 照常跑、没等锁。
 
 ## 复跑
 
@@ -27,7 +27,7 @@ bash research/prompts/c363b-r1-opus-model/run.sh            # 默认：冻结副
 | `results/trace-C-120-n48.txt` | `a8e8d528bac6c3a8f0cbe0785a578076b502d787fc2b7a009ad11bcd41a6daec` |
 | `results/trace-D-raise-136-k20-s1000.txt` | `ccdc1c3dba8a3de016e05b3780ed43adadbca14643eee517cc2e16616dfb7fc8` |
 
-⚠️ 这是第二次整轮。第一次整轮（02:45–02:58 JST）之后改过四处再整轮重跑，`results/` 整个重生成，上表全是第二次的：① `summarize.sh` 里 I 类那两段 awk 把「做成的步号表」读成第 14 列（实为第 13 列）；② 一处 `| head -40` 在 `pipefail` 下吃 SIGPIPE 退出 141；③ `run.sh` 加了第四条追踪与第五节的补丁副本；④ **`v1_reach.rs` 的第 20 列换了内容**：原来列的是「分配记录里已释放记录的释放代范围」，而实现回收之后记录不删（`reclaim_released_records_up_to` 只记进 `reclaimed`、记录留着），那一列把已回收的也算进去、会误导，换成「漏收」（第三节）。命中数、分级、单元分布两次逐格相同。
+⚠️ 这是第二次整轮。第一次整轮之后改过四处再整轮重跑，`results/` 整个重生成，上表全是第二次的：① `summarize.sh` 里 I 类那两段 awk 把「做成的步号表」读成第 14 列（实为第 13 列）；② 一处 `| head -40` 在 `pipefail` 下吃 SIGPIPE 退出 141；③ `run.sh` 加了第四条追踪与第五节的补丁副本；④ **`v1_reach.rs` 的第 20 列换了内容**：原来列的是「分配记录里已释放记录的释放代范围」，而实现回收之后记录不删（`reclaim_released_records_up_to` 只记进 `reclaimed`、记录留着），那一列把已回收的也算进去、会误导，换成「漏收」（第三节）。命中数、分级、单元分布两次逐格相同。
 
 ## 各格判定一览
 
@@ -222,7 +222,7 @@ awk -F'\t' '$1=="R" && ($28=="T2"||$28=="T3"){t++; if($16>$17) h++} END{print t,
 awk -F'\t' '$1=="R" && $6 !~ /^(Raise|Mount|Rb)/ {n++; if($10!=$11) d++} END{print n, d+0}' v1_reach.out
 ```
 
-原样输出（2026-09-25 03:3x JST）：`nofree inproc stuck 3330`、`nofree mount stuck 4440`、`other inproc escaped 78`、`other inproc stuck 552`、`other mount escaped 30`、`other mount stuck 810`；`T1 251132`、`T2 1309`、`T3 1183`、`- 14024`；`2492 2492`；`313966 0`。
+原样输出（2026-09-25）：`nofree inproc stuck 3330`、`nofree mount stuck 4440`、`other inproc escaped 78`、`other inproc stuck 552`、`other mount escaped 30`、`other mount stuck 810`；`T1 251132`、`T2 1309`、`T3 1183`、`- 14024`；`2492 2492`；`313966 0`。
 
 ## 九、没做什么
 

@@ -27,7 +27,7 @@
       [格] 8cf4b9f80110 worker_threads=1 judged_root=…/tmp.DiOX5TocYW/tree
   ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：crates/singlefs-harness/src/crash.rs 
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（8cf4b9f801105dd4…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:42:40Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（8cf4b9f801105dd4…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 真值（X 门禁那一刻的 HEAD + 暂存区）
     [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
@@ -53,11 +53,11 @@
 ════ H-B [post] 漂移=54 用户动作=during
   ── 提交 A 之前的门禁（C0，旧 54 号）
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（a1188279c1664127…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:42:41Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（a1188279c1664127…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 提交 B 之前的门禁（C1，新 54 号）
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（c3d3d247979da778…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:42:42Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（c3d3d247979da778…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
       [格] a1188279c166 worker_threads=1 judged_root=…/tmp.eXKeQdGMeI/tree
@@ -76,11 +76,11 @@
 ════ H-B [post] 漂移=54 用户动作=kill9
   ── 提交 A 之前的门禁（C0，旧 54 号）
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（a1188279c1664127…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:42:43Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（a1188279c1664127…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 提交 B 之前的门禁（C1，新 54 号）
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（c3d3d247979da778…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:42:43Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（c3d3d247979da778…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
       [格] a1188279c166 worker_threads=1 judged_root=…/tmp.EkAcshSXdu/tree
@@ -99,11 +99,11 @@
 ════ H-B [post] 漂移=54 用户动作=finish
   ── 提交 A 之前的门禁（C0，旧 54 号）
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（a1188279c1664127…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:42:45Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（a1188279c1664127…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 提交 B 之前的门禁（C1，新 54 号）
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（c3d3d247979da778…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:42:45Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（c3d3d247979da778…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
       [格] a1188279c166 worker_threads=1 judged_root=…/tmp.BqkCeN6GwO/tree
@@ -122,11 +122,11 @@
 ════ H-B [post] 漂移=toolchain 用户动作=during
   ── 提交 A 之前的门禁（C0，工具链 1）
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（95bb434c6dd2062d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:42:50Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（95bb434c6dd2062d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 提交 B 之前的门禁（C1，工具链 2）
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（251fad687a9ed69d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:42:50Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（251fad687a9ed69d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
       [格] 251fad687a9e worker_threads=32 judged_root=…/tmp.oCS5IcM3gK/tree
@@ -145,11 +145,11 @@
 ════ H-B [post] 漂移=toolchain 用户动作=kill9
   ── 提交 A 之前的门禁（C0，工具链 1）
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（95bb434c6dd2062d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:43:02Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（95bb434c6dd2062d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 提交 B 之前的门禁（C1，工具链 2）
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（251fad687a9ed69d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:43:03Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（251fad687a9ed69d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
       [格] 251fad687a9e worker_threads=32 judged_root=…/tmp.SKQpesWWGu/tree
@@ -168,7 +168,7 @@
 ════ H-B2 [post] 工具链 1 下提交 A → 工具链升到 2 → SINGLEFS_GATE_FULL=1 重新验 HEAD
   ── 提交 A 之前的门禁（工具链 1）
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（95bb434c6dd2062d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:43:12Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（95bb434c6dd2062d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 工具链升到 2；工作树干净：0 行 status
       [格] 95bb434c6dd2 worker_threads=32 judged_root=…/tmp.USPYmAtj05/tree
@@ -191,7 +191,7 @@
       [格] 251fad687a9e worker_threads=32 judged_root=…/tmp.bu0QzkDl1J/tree
   ── X 起门禁
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（251fad687a9ed69d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:43:14Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（251fad687a9ed69d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 真值
     [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
@@ -205,7 +205,7 @@
       [格] 251fad687a9e worker_threads=32 judged_root=…/tmp.E5UZGMxoTz/tree
   ── X 起门禁
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（251fad687a9ed69d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:43:20Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（251fad687a9ed69d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 真值
     [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
@@ -219,7 +219,7 @@
       [格] 251fad687a9e worker_threads=32 judged_root=…/tmp.nORHA8xLGo/tree
   ── X 起门禁
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（251fad687a9ed69d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:43:26Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（251fad687a9ed69d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 真值
     [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
@@ -233,7 +233,7 @@
       [格] 251fad687a9e worker_threads=32 judged_root=…/tmp.PvUjgGTr9E/tree
   ── X 起门禁
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（251fad687a9ed69d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:43:29Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（251fad687a9ed69d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 真值
     [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]

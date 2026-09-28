@@ -1,0 +1,329 @@
+own_stage	sample	want	own_expected_exit	other_stages_exit_1	other_stages_printing_want
+10	green	实验号引用全部有定义：2 个不同的实验号（扫 7 份 kb 文件、0 份规则）	0	32,20,43,	none
+10	green	决策号引用全部有定义：2 个不同的决策号（扫 7 份 kb 文件、0 份规则）	0	32,20,43,	none
+10	green	欠检查 1 条、已还清 1 条	0	32,20,43,	none
+10	green	不变量条数一致：正文声称 1 条在用，表里在用 1 条	0	32,20,43,	none
+10	green	治理文档里的门禁号、路径与「小节」都指得到	0	32,20,43,	none
+10	green	扫 1 份治理文档：门禁号 5 处、路径 4 处、小节 1 处；没判 2 处；跳过 3 处（被 .gitignore 挡着 0、不像仓内路径 2、仓外或带占位 1）	0	32,20,43,	none
+10	green	`.claude/kb/decisions/99-不存在的决策.md` 不全是路径字符	0	32,20,43,	none
+10	green	nowhere.md「某一节」 的文件在四个解析基准下都找不到，小节没判	0	32,20,43,	none
+10	green	不变量条数跨文件一致：实际在用 1 条，扫了 6 份 kb 文件、命中 1 处声明	0	32,20,43,	none
+10	green	样本替身：3 条命中，0 条未命中	0	32,20,43,	none
+10	green	这次改动新写或改写的 1 行不变量都点名了已定分项	0	32,20,43,	none
+10	green	引用与不变量通过：判绿 7 格（experiment-refs decision-refs declared-counts governance-refs invariant-count-elsewhere citations invariant-anchors）；本次无对象可判 0 格：无	0	32,20,43,	none
+10	red	E999 被引用但 experiments/ 下没有它	1	32,20,43,	none
+10	red	invariants.md 里没有 <!-- invariant-count --> 标记	1	32,20,43,	none
+10	red	checks-owed.md 里一行 `| C<n> ` 都没数到（欠着 0、已还清 0）	1	32,20,43,	none
+10	red	D998 被引用但 decisions/ 下没有它	1	32,20,43,	none
+10	red	治理文档里有指不到的指向（上面逐条列出）	1	32,20,43,	none
+10	red	「09 号」在门禁目录里没有 09-*.sh	1	32,20,43,	none
+10	red	里的 notes/gone.md 在仓里不存在	1	32,20,43,	none
+10	red	里的 research/scripts/gone-script.py 在仓里不存在	1	32,20,43,	none
+10	red	.claude/kb/invariants.md「不存在的小节」在那份文件里一处都找不到	1	32,20,43,	none
+10	red	写「99 条在用」，而 invariants.md 实际在用 3 条	1	32,20,43,	none
+10	red	360-样例.md:5 写「26 条不变量在用」，而 invariants.md 实际在用 3 条	1	32,20,43,	none
+10	red	找不到 research/scripts/verify-citations.sh	1	32,20,43,	none
+10	red	这次改动新写或改写的 1 行不变量，没有点名它判的字段住在哪条已定分项	1	32,20,43,	none
+10	red	      I-99.2：| I-99.2 | 样本新条目 |	1	32,20,43,	none
+10	red	引用与不变量：7 格判红（experiment-refs decision-refs declared-counts governance-refs invariant-count-elsewhere citations invariant-anchors）	1	32,20,43,	none
+10	red-unreadable	抽 E 号引用时有文件读不了（grep 退 2）	1	32,20,43,30,	none
+10	red-unreadable	抽 D 号引用时有文件读不了（grep 退 2）	1	32,20,43,30,	none
+10	red-unreadable	.claude/kb/dangling-link.md	1	32,20,43,30,	32,20,30,
+20	green	决策标题与未定项列表相符，且两节没有互相串味（21 条决策、核 46 行分项索引）	0	32,10,43,30,	none
+20	green	没有文件内自指链接（扫 27 份 kb 文件，历史类文件除外）	0	32,10,43,30,	none
+20	green	决策索引表的状态列与正文相符（21 条决策，分项数是本段自己数的）	0	32,10,43,30,	none
+20	green	分项引用与正文状态一致（21 条决策、46 个分项；扫了 30 个文件、46 处分项引用）	0	32,10,43,30,	none
+20	green	.claude/kb/引用方甲.md：围栏里 1 行	0	32,10,43,30,	none
+20	green	状态只说一遍，且分项都在对的节里（扫 22 份、核 46 条分项索引行）	0	32,10,43,30,	none
+20	green	没有把已定的决策说成未定（扫 28 份 kb 文件，比对 21 条决策的状态行）	0	32,10,43,30,	none
+20	green	已定项的正文没有把已经定了的东西说成未定（扫 21 条决策，其中 15 条有已定项区段、共 153 行）	0	32,10,43,30,	none
+20	green	扫了 29 个文件、43 处已定项引用，没有一处紧跟着说它没定	0	32,10,43,30,	none
+20	green	没扫 1 个（两份变更史与 records/ 写的是当时的状态）：records/样本记录.md	0	32,10,43,30,	none
+20	green	没有未定项被别处的更新甩在后面（查了 13 条未定项，其中 1 条点名了定过东西的别的决策	0	32,10,43,30,	none
+20	green	同文件的未定项与索引页的待议节都被回头看过（新增已定小节的决策 1 份，查了 1 条未定项、0 节待议）	0	32,10,43,30,	none
+20	green	冻结层归属登记表判过了（33 行：D15 已定项 7 的 4 层与 3 个组件、lib.rs 的 8 棵树、D18 已定项 11 的 6 个单元类都有行；依据点名的 26 处分项都在且已定）	0	32,10,43,30,	none
+20	green	② 没判的 7 行（退不退出冻结写「判不动」）：livelist 共享树（树 ID 16）的 key 编码；	0	32,10,43,30,	none
+20	green	另有 2 行态别写「判不动」而退不退出冻结已定（括号里是退出列）：系统配置槽（不退出）；journal 记录格式（不退出）	0	32,10,43,30,	none
+20	green	决策索引表状态列与正文同步（21 条决策）	0	32,10,43,30,	none
+20	green	决策分项清单与正文同步（46 个分项）	0	32,10,43,30,	none
+20	green	13 条未定项两把尺都判过	0	32,10,43,30,	none
+20	green	改新池新建文件的字节、动不动格式	0	32,10,43,30,	none
+20	green	待用户复核的条款都有未还的账盯着	0	32,10,43,30,	none
+20	green	决策索引结论列都不超 200 字（共 21 行）	0	32,10,43,30,	none
+20	green	kb 形状与决策文档一致（13 格：判过 13 格、本次无对象 0 格）	0	32,10,43,30,	none
+20	green-some-grids-not-run	本次未跑（这不是通过）：格「分项引用状态」本次无对象可判（退出码 77，原因见那一格的输出）	0	32,10,43,	none
+20	green-some-grids-not-run	本次未跑（这不是通过）：格「引用写已定紧跟说没定」本次无对象可判（退出码 77，原因见那一格的输出）	0	32,10,43,	none
+20	green-some-grids-not-run	本次未跑（这不是通过）：格「未定项被别处定了」本次无对象可判（退出码 77，原因见那一格的输出）	0	32,10,43,	none
+20	green-some-grids-not-run	本次未跑（这不是通过）：格「定了新东西没回看同文件未定项」本次无对象可判（退出码 77，原因见那一格的输出）	0	32,10,43,	none
+20	green-some-grids-not-run	本次未跑（这不是通过）：格「冻结层归属登记表」本次无对象可判（退出码 77，原因见那一格的输出）	0	32,10,43,	none
+20	green-some-grids-not-run	本次未跑（这不是通过）：格「动了用户定案的条款记了未还的账」本次无对象可判（退出码 77，原因见那一格的输出）	0	32,10,43,	none
+20	green-some-grids-not-run	kb 形状与决策文档一致（13 格：判过 7 格、本次无对象 6 格）	0	32,10,43,	none
+20	red-blocking-verdict	缺「改新池新建文件的字节」：1 条	1	32,10,43,	none
+20	red-blocking-verdict	缺「动不动格式」：2 条	1	32,10,43,	none
+20	red-blocking-verdict	D311 未定项 3	1	32,10,43,	none
+20	red-blocking-verdict	D311 未定项 4	1	32,10,43,	none
+20	red-blocking-verdict	多定位出：D311 未定项 5（生成器不认它是未定项）	1	32,10,43,	none
+20	red-blocking-verdict	格「未定项判过改不改新池新建文件的字节」退出码 1	1	32,10,43,	none
+20	red-cross-decision-status	说 D180 未定	1	32,10,43,	none
+20	red-cross-decision-status	.claude/kb/decisions/181-状态样本引用方甲.md:7 说 D180 未定	1	32,10,43,	none
+20	red-cross-decision-status	格「说未定其实已定」退出码 1	1	32,10,43,	none
+20	red-decision-items-sync	D211 状态列写着「已定 2 项 / 未定 0 项」，正文投影是「已定 1 项 / 未定 1 项」	1	32,10,43,	none
+20	red-decision-items-sync	D216 有正文，而决策索引表里没有它的行	1	32,10,43,	none
+20	red-decision-items-sync	D212 在决策索引表里有行，而 decisions/ 下没有它的正文	1	32,10,43,	none
+20	red-decision-items-sync	决策分项清单与正文不同步	1	32,10,43,	none
+20	red-decision-items-sync	>   - 1. 校验和算法取 SHA256 —— 已定	1	32,10,43,	none
+20	red-decision-items-sync	>   - 2. 尾部留多少 —— **未定**	1	32,10,43,	none
+20	red-decision-items-sync	> - **D216（漏登索引样本）** —— 已定（分项 1，其中未定 0）	1	32,10,43,	none
+20	red-decision-items-sync	格「决策分项清单与正文同步」退出码 1	1	32,10,43,	none
+20	red-decision-summary-width	决策索引结论列有 2 行超出上限（限 200 字）	1	32,10,43,	none
+20	red-decision-summary-width	D53（宽度样本丙） 的结论列 245 字，超出上限 200 字：a \|	1	32,10,43,	none
+20	red-decision-summary-width	D52（宽度样本乙） 的结论列 253 字	1	32,10,43,	none
+20	red-decision-summary-width	格「决策索引结论列的宽度」退出码 1	1	32,10,43,	none
+20	red-freeze-layer-membership	① 有 3 个层或结构在登记表里没有行	1	32,10,43,	none
+20	red-freeze-layer-membership	TREE_IDENTIFIER_EXTENT（树 ID 11）在第 3 层（key 编码）没有一行	1	32,10,43,	none
+20	red-freeze-layer-membership	组件 ② 没有一行	1	32,10,43,	none
+20	red-freeze-layer-membership	码 16（根记录（根槽））没有一行	1	32,10,43,	none
+20	red-freeze-layer-membership	② 有 1 行写着退出冻结而态别不是派生态	1	32,10,43,	none
+20	red-freeze-layer-membership	「记账树（树 ID 14）的码 2 节点内部布局」写着退出冻结，态别却是「权威态」	1	32,10,43,	none
+20	red-freeze-layer-membership	③ 有 4 处依据指不到一条已定分项	1	32,10,43,	none
+20	red-freeze-layer-membership	D19 第 99 条分项，而那条决策的索引表里没有第 99 条	1	32,10,43,	none
+20	red-freeze-layer-membership	D19 第 98 条分项，而那条决策的索引表里没有第 98 条	1	32,10,43,	none
+20	red-freeze-layer-membership	点名 D14，而 .claude/kb/decisions/ 里没有这条决策	1	32,10,43,	none
+20	red-freeze-layer-membership	D2 第 21 条分项，而它在索引表里是未定项	1	32,10,43,	none
+20	red-freeze-layer-membership	格「冻结层归属登记表」退出码 1	1	32,10,43,	none
+20	red-item-ref-status	「已定项 2」写的是已定	1	32,10,43,	none
+20	red-item-ref-status	正文里第 2 条是未定	1	32,10,43,	none
+20	red-item-ref-status	指名 D92（样本乙），而它正文里没有第 7 条	1	32,10,43,	none
+20	red-item-ref-status	decisions/ 下有 2 份首行读不出	1	32,10,43,	none
+20	red-item-ref-status	213-漏破折号样本.md：首行是	1	32,10,43,	none
+20	red-item-ref-status	README.md：首行是	1	32,10,43,	none
+20	red-item-ref-status	.claude/kb/引用方丙.md:6 「已定项 2」写的是已定	1	32,10,43,	none
+20	red-item-ref-status	「已定项 1」指名 D214（双轨（大小文件）），而它正文里没有第 1 条	1	32,10,43,	none
+20	red-item-ref-status	格「分项引用状态」退出码 1	1	32,10,43,	none
+20	red-kb-shape	D1 已定项里有一条分项的状态标记写着「未定」：| 1 | **甲问题**	1	32,10,43,	none
+20	red-kb-shape	D1 状态列写「已定 1 项 / 未定 2 项」，而正文两节里数出「已定 1 项 / 未定 1 项」	1	32,10,43,	none
+20	red-kb-shape	kb 里出现「未答项 / 已答项」	1	32,10,43,	none
+20	red-kb-shape	.claude/kb/形状杂项.md:3:这一行写了未答项	1	32,10,43,	none
+20	red-kb-shape	小节标题写作「### 未定」/「### 已定」	1	32,10,43,	none
+20	red-kb-shape	.claude/kb/形状杂项.md:5:### 未定	1	32,10,43,	none
+20	red-kb-shape	kb 文件里有链接指回它自己：1 处	1	32,10,43,	none
+20	red-kb-shape	.claude/kb/形状杂项.md:9: [形状杂项.md](形状杂项.md)	1	32,10,43,	none
+20	red-kb-shape	上游规则写成了裸路径	1	32,10,43,	none
+20	red-kb-shape	.claude/kb/形状杂项.md:7:规则路径写成裸的：见 singlefs-ai-sop/rules/kb-discipline.md	1	32,10,43,	none
+20	red-kb-shape	标题缺状态（已定/半定/待定）：## D2 形状样本丙（两项未定）	1	32,10,43,	none
+20	red-kb-shape	D2 已定项里有一条分项写了两个互相冲突的状态标记：| 1 | **丁问题**	1	32,10,43,	none
+20	red-kb-shape	D2 已定项一侧的正文自陈还没定	1	32,10,43,	none
+20	red-kb-shape	D2 分项编号重号：[1]	1	32,10,43,	none
+20	red-kb-shape	D2 标题写「两项未定」，「### 未定项」小节里实际 1 项	1	32,10,43,	none
+20	red-kb-shape	.claude/kb/decisions/02-样本.md 首行读不出 `## D<n> 简称 —— 状态`	1	32,10,43,	none
+20	red-kb-shape	.claude/kb/空格 文件.md:3:这一行也写了未答项	1	32,10,43,	none
+20	red-kb-shape	「未答项 / 已答项」：有文件读不了（grep 退 2）	1	32,10,43,	none
+20	red-kb-shape	上游规则的裸路径：有文件读不了（grep 退 2）	1	32,10,43,	none
+20	red-kb-shape	.claude/kb/形状杂项.md:11:singlefs-ai-sop/rules/kb-discipline.md 这一行以裸路径起头	1	32,10,43,	none
+20	red-kb-shape	D3 标题写「十一项未定」，「### 未定项」小节里实际 1 项	1	32,10,43,	none
+20	red-kb-shape	D3 正文标题说「11 项未定」，而「### 未定项」一节里是 1 项	1	32,10,43,	none
+20	red-kb-shape	格「kb 形状」退出码 1	1	32,10,43,	none
+20	red-settled-item-self-open	自指	1	32,10,43,	none
+20	red-settled-item-self-open	186-兄弟样本丙.md:12 已定项正文里断言「校验算法选哪个」未定	1	32,10,43,	none
+20	red-settled-item-self-open	在同一条决策的另一条**已定**分项里已经定了	1	32,10,43,	none
+20	red-settled-item-self-open	182-自指样本甲.md:19 已定项正文里断言「取值」未定	1	32,10,43,	none
+20	red-settled-item-self-open	182-自指样本甲.md:21 已定项正文里断言「的取值」未定	1	32,10,43,	none
+20	red-settled-item-self-open	格「已定分项自称未定」退出码 1	1	32,10,43,	none
+20	red-settled-ref-says-open	「D450（引用样本甲） 已定项 1」后面紧跟着说它没定	1	32,10,43,	none
+20	red-settled-ref-says-open	引用写着已定项、紧跟着却说它没定 3 处	1	32,10,43,	none
+20	red-settled-ref-says-open	.claude/kb/引用方.md:2 「D450（引用样本甲） 已定项 1」后面紧跟着说它没定	1	32,10,43,	none
+20	red-settled-ref-says-open	crates/sample/src/lib.rs:1	1	32,10,43,	none
+20	red-settled-ref-says-open	README.md：首行是	1	32,10,43,	none
+20	red-settled-ref-says-open	格「引用写已定紧跟说没定」退出码 1	1	32,10,43,	none
+20	red-settled-same-file	本次新增了「已定」小节，而这条未定项一个字都没动	1	32,10,43,30,	none
+20	red-settled-same-file	980-样本.md:7 本次新增了「已定」小节，而这条未定项一个字都没动	1	32,10,43,30,	none
+20	red-settled-same-file	decisions.md:8 本次有决策定案，而这一节「待议」一个字都没动	1	32,10,43,30,	none
+20	red-settled-same-file	格「定了新东西没回看同文件未定项」退出码 1	1	32,10,43,30,	none
+20	red-stale-open-items	的未定项点名了 D96	1	32,10,43,	none
+20	red-stale-open-items	94-样本.md:8 的未定项点名了 D96	1	32,10,43,	none
+20	red-stale-open-items	复核这一项是不是已经被 D96 定掉了	1	32,10,43,	none
+20	red-stale-open-items	这些决策的「—— 已定」小节最近一次变动时间取不到（git log 失败），点名它们的未定项这一轮没法比：D93（93-样本.md）	1	32,10,43,	none
+20	red-stale-open-items	990-样本.md:7 的复核判据没跑成（复核判据 OPEN_ITEM_REVIEW_SOURCE 退出码 3）	1	32,10,43,	none
+20	red-stale-open-items	取不到条目块的历史，这一条没比：git log -L 7,	1	32,10,43,	none
+20	red-stale-open-items	88-样本.md:5 的未定项点名了 D96，而 D96 的状态行在它之后变过	1	32,10,43,	none
+20	red-stale-open-items	格「未定项被别处定了」退出码 1	1	32,10,43,	none
+20	red-status-redundancy	标题重复	1	32,10,43,	none
+20	red-status-redundancy	条目说两遍	1	32,10,43,	none
+20	red-status-redundancy	挂错节	1	32,10,43,	none
+20	red-status-redundancy	101-样本.md:7  条目说两遍 —— 3. **丁项 —— 未定（2026-09-02）	1	32,10,43,	none
+20	red-status-redundancy	标题重复 —— #### 已定项 3（2026-09-02）—— 已定	1	32,10,43,	none
+20	red-status-redundancy	格「状态别说两遍」退出码 1	1	32,10,43,	none
+20	red-user-verdict-owed	D316 的正文标着待用户复核	1	32,10,43,	none
+20	red-user-verdict-owed	没有未还的账	1	32,10,43,	none
+20	red-user-verdict-owed	D31 的正文标着待用户复核，checks-owed.md 里却没有一笔**未还**的账点名它	1	32,10,43,	none
+20	red-user-verdict-owed	格「动了用户定案的条款记了未还的账」退出码 1	1	32,10,43,	none
+30	green	决策正文改了 7 行，变更史新增 1 条条目	0	32,20,10,43,	none
+30	green	查了 3 份 kb 文件、1 个 `### 日期` 标题（两份变更史里 1 个），只判基准 HEAD 之后新增的行，新增的没有违例	0	32,20,10,43,	none
+30	green	现状行与索引表一致：查了决策 1 节	0	32,20,10,43,	none
+30	green	决策变更史 3 格里 3 格通过	0	32,20,10,43,	none
+30	red	决策正文改了 2 行（碰了 2 行状态行，不按小改动放行），却没往变更史新增任何条目	1	32,20,10,43,	none
+30	red	.claude/kb/invariants.md:5  ### 2026-09-28（其一）：新写的一条还是旧形态	1	32,20,10,43,	none
+30	red	.claude/kb/decisions-history.md:5  D1 的现状行与索引表对不上：这里写「已定 0 项 / 未定 1 项。块取 16 KiB」，索引表是「已定 1 项 / 未定 0 项。块取 16 KiB」	1	32,20,10,43,	none
+30	red	决策变更史 3 格里有 3 格判红	1	32,20,10,43,	none
+30	shape-green	变更史的形状对：查了 7 份 kb 文件、11 个 `### 日期` 标题（两份变更史里 7 个），只判基准 HEAD 之后新增的行，新增的没有违例	0	32,20,10,43,	none
+30	shape-green	存量（基准里就有，等搬迁，只计数不判红）：日期与序号粘在一起 1 处、条目住在节外 1 处、同节日期重复 1 组	0	32,20,10,43,	none
+30	shape-green	现状行与索引表一致：查了决策 2 节、实验 1 节	0	32,20,10,43,	none
+30	shape-green	决策变更史 3 格里 2 格通过（shape status-sync），1 格本次无对象可判（entry-added）	0	32,20,10,43,	none
+30	shape-red	2 处新写的标题把日期与「（其N）」粘在同一个 `### ` 里	1	32,20,10,43,	none
+30	shape-red	.claude/kb/invariants.md:7  ### 2026-09-28（其二）：新加的还是粘在一起	1	32,20,10,43,	none
+30	shape-red	.claude/kb/experiments/01-样本实验.md:5  ### 2026-09-27（其一）：新页也用了旧形态	1	32,20,10,43,	none
+30	shape-red	4 个新写的日期块没住进自己的节	1	32,20,10,43,	none
+30	shape-red	.claude/kb/decisions-history.md:3  ### 2026-09-20  不在任何 `## D<n>（` 节里，上一级标题是「# 决策变更史」	1	32,20,10,43,	none
+30	shape-red	.claude/kb/decisions-history.md:33  ### 2026-09-21  不在任何 `## D<n>（` 节里，上一级标题是「## 不挂在某一条决策上的」	1	32,20,10,43,	none
+30	shape-red	.claude/kb/decisions-history.md:39  ### 2026-09-22  在文件自己的「## 历史版本」里，标题点名了 D2，要写进那一节	1	32,20,10,43,	none
+30	shape-red	.claude/kb/experiments-history.md:17  ### 2026-09-23  在文件自己的「## 历史版本」里，标题点名了 E1，要写进那一节	1	32,20,10,43,	none
+30	shape-red	2 组同一节里同一个日期开了几个 `### ` 块	1	32,20,10,43,	none
+30	shape-red	.claude/kb/decisions-history.md:19 ## D2（样本二） 节里 ### 2026-09-25 出现 2 次（第 23、27 行）	1	32,20,10,43,	none
+30	shape-red	.claude/kb/experiments-history.md:3 ## E1（样本实验） 节里 ### 2026-09-15 出现 2 次（第 7、11 行）	1	32,20,10,43,	none
+30	shape-red	存量（基准里就有，等搬迁，只计数不判红）：日期与序号粘在一起 1 处、条目住在节外 1 处、同节日期重复 1 组	1	32,20,10,43,	none
+30	shape-red	决策变更史 3 格里有 1 格判红：shape（退出 1）	1	32,20,10,43,	none
+30	status-sync-green	现状行与索引表一致：查了决策 2 节、实验 1 节	0	32,20,10,43,	none
+30	status-sync-green	决策变更史 3 格里 2 格通过（shape status-sync），1 格本次无对象可判（entry-added）	0	32,20,10,43,	none
+30	status-sync-red	变更史各节顶上的现状与索引表有 5 处对不上	1	32,20,10,43,	none
+30	status-sync-red	.claude/kb/decisions-history.md:5  D1 的现状行与索引表对不上：这里写「已定 1 项 / 未定 0 项。块取 32 KiB」，索引表是「已定 1 项 / 未定 0 项。块取 16 KiB」	1	32,20,10,43,	none
+30	status-sync-red	.claude/kb/decisions-history.md:11 ## D2（样本二）  节顶上没有「**现状**：」一行；索引表那一行是「**现状**：已定 2 项 / 未定 1 项。条带可变」	1	32,20,10,43,	none
+30	status-sync-red	.claude/kb/decisions-history.md:17 ## D4（索引里没有的）  .claude/kb/decisions.md 的索引表里没有 D4 这一行	1	32,20,10,43,	none
+30	status-sync-red	.claude/kb/decisions.md 的索引表有 D3，.claude/kb/decisions-history.md 里没有 `## D3（简称）` 节	1	32,20,10,43,	none
+30	status-sync-red	.claude/kb/experiments-history.md:5  E1 的现状行与索引表对不上：这里写「未跑。一半已答」，索引表是「部分已跑。一半已答」	1	32,20,10,43,	none
+30	status-sync-red	决策变更史 3 格里有 1 格判红：status-sync（退出 1）	1	32,20,10,43,	none
+32	green	新池新建文件的字段表指向都成立（查了 7 处引用）	0	20,10,43,	none
+32	green	被投影的分项，字段表都投影全了（1 张字段表、2 行；投影表引用了 3 条分项）	0	20,10,43,	none
+32	green	扫了 10 份决策、4 份字节布局表；表后合计 3 张，表前说明句 2 张，format-const 标记 2 个；字节布局表里的结构总宽 5 处都有登记	0	20,10,43,	none
+32	green	! 跳过：365-样例.md 已定项 8 的 format-const 标记 SAMPLE_UNDECIDED_WIDTH 没核：这一节有宽度不是数的字段表，加不出确定的和	0	20,10,43,	none
+32	green	没验：365-样例.md:16 那张字段表，表前表后都没写认得出的总宽	0	20,10,43,	none
+32	green	互相挂钩（判「是」的未定项 1 条、字节表 4 节、里程碑 2 步）	0	20,10,43,	none
+32	green	准入不等式 3 项逐项有归属	0	20,10,43,	none
+32	green	比对了 2 处登记（表格 1 行 + 整条流提示 1 处	0	20,10,43,	none
+32	green	第二条流的登记 1 处与钉它的用例相符：第二条流 `2+1`（3 次写、5 个状态	0	20,10,43,	none
+32	green	2 个占位	0	20,10,43,	none
+32	green	登记表 1 行、行到步 1 处、「写出的字节」点名 3 处、用例 2 个、段序列登记表标到的步 1 个	0	20,10,43,	none
+32	green	3 条认购	0	20,10,43,	none
+32	green	余 44	0	20,10,43,	none
+32	green	判过 9 格	0	20,10,43,	none
+32	red-admission-terms	admission-terms（退 1）	1	20,10,43,	none
+32	red-admission-terms	式子里有「挂载期承诺量」，对照表	1	20,10,43,	none
+32	red-admission-terms	.claude/kb/decisions/28-样本准入.md:9 的式子副本与权威那一行（.claude/kb/decisions/28-样本准入.md）对不上	1	20,10,43,	none
+32	red-field-projection	field-projection（退 1）	1	20,10,43,	none
+32	red-field-projection	的字段表有「树 ID 水位」	1	20,10,43,	none
+32	red-field-projection	D362 已定项 7 的字段表有「块头版本」（宽 2），而 .claude/kb/layout/01-first-txn.md 里引用了这条分项的那几节的表格行里找不到它	1	20,10,43,	none
+32	red-field-refs	field-refs（退 1）	1	20,10,43,	none
+32	red-field-refs	已定项 7	1	20,10,43,	20,
+32	red-field-refs	指向了不存在的分项	1	20,10,43,	none
+32	red-field-refs	01-first-txn.md:6 指向 D323（323-样本嵌套简称.md）的「已定项 3」，而那张表里没有这一条	1	20,10,43,	none
+32	red-field-refs	01-first-txn.md:7 指向 D322（322-样本缺分项.md）的「已定项 5」，而那张表里没有这一条	1	20,10,43,	none
+32	red-field-table-sums	field-table-sums（退 1）	1	20,10,43,	none
+32	red-field-table-sums	写「合计 4 字节」，而它上面那张字段表 2 行加起来是 12	1	20,10,43,	none
+32	red-field-table-sums	已定项 7 登记 SAMPLE_HDR_RED = 99，而这一节的字段表加起来是 12	1	20,10,43,	none
+32	red-field-table-sums	.claude/kb/layout/01-样例.md:8  写「合计 9 字节」，而它上面那张字段表 2 行加起来是 8	1	20,10,43,	none
+32	red-field-table-sums	366-样例.md:4  标记按文法读不出来	1	20,10,43,	none
+32	red-field-table-sums	SAMPLE_EXTRA_KEY = 12 note=多写的键	1	20,10,43,	none
+32	red-field-table-sums	SAMPLE_TWICE 在这一份里登记了 2 次（第 12、13 行）	1	20,10,43,	none
+32	red-field-table-sums	已定项 4 登记 SAMPLE_RECORD_HEADER_RED = 78，而这一节的字段表加起来是 91	1	20,10,43,	none
+32	red-field-table-sums	369-样例.md:7  表前写「（5 字节，」，而这张字段表 2 行加起来是 6	1	20,10,43,	none
+32	red-field-table-sums	369-样例.md:14  表前写「+12 字节」，而这张字段表 2 行加起来是 16	1	20,10,43,	none
+32	red-field-table-sums	369-样例.md:14  表前写「共 20 字节」，而这一节到这张表为止的字段表加起来是 22	1	20,10,43,	none
+32	red-field-table-sums	02-样例.md:20  写「合计 27 字节」，而它上面那张字段表 2 行加起来是 28	1	20,10,43,	none
+32	red-field-table-sums	01-样例.md:8  合计写出宽度 9，这一行的登记：一个都没有	1	20,10,43,	none
+32	red-field-table-sums	02-样例.md:5  已定行的加粗宽度写出宽度 12，这一行的登记：一个都没有	1	20,10,43,	none
+32	red-field-table-sums	02-样例.md:7  ⇒ 等式写出宽度 30，这一行的登记：一个都没有	1	20,10,43,	none
+32	red-field-table-sums	02-样例.md:9  ⇒ 等式写出宽度 16，这一行的登记：SAMPLE_LAYOUT_WRONG = 15	1	20,10,43,	none
+32	red-field-table-sums	02-样例.md:11  ⇒ 等式写出宽度 24，这一行的登记：SAMPLE_UNREGISTERED = （kb 里没登记）	1	20,10,43,	none
+32	red-first-txn-hooks	first-txn-hooks（退 1）	1	20,10,43,	none
+32	red-first-txn-hooks	未定项 1	1	20,10,43,	20,
+32	red-first-txn-hooks	一处都没引它	1	20,10,43,	none
+32	red-first-txn-hooks	没标步号	1	20,10,43,	none
+32	red-first-txn-hooks	写「写出的字节：无」	1	20,10,43,	none
+32	red-first-txn-hooks	未定项 2	1	20,10,43,	20,
+32	red-first-txn-hooks	步 2 点名「样本」，而 .claude/kb/layout/01-first-txn.md 没有标题是它的节	1	20,10,43,	none
+32	red-format-const-placeholders	format-const-placeholders（退 1）	1	20,10,43,	none
+32	red-format-const-placeholders	找不到 已定项 99	1	20,10,43,	none
+32	red-format-const-placeholders	找不到 未定项 2	1	20,10,43,	none
+32	red-format-const-placeholders	占位没写成	1	20,10,43,	none
+32	red-format-const-placeholders	crates/singlefs-format/src/lib.rs:6  D99 没有决策文件	1	20,10,43,	none
+32	red-second-txn-hooks	second-txn-hooks（退 1）	1	20,10,43,	none
+32	red-second-txn-hooks	「样本形态乙」指里程碑步 1，而步 1 的「写出的字节」没点名这一行	1	20,10,43,	none
+32	red-second-txn-hooks	点名「九、没有这一节」	1	20,10,43,	none
+32	red-second-txn-hooks	用例文件 sample_step_missing.rs 在 crates/*/tests/ 下不存在	1	20,10,43,	none
+32	red-second-txn-hooks	点名的用例 sample_function_that_was_renamed 在同一格点名的文件里找不到 fn	1	20,10,43,	none
+32	red-second-txn-hooks	有一行标着里程碑「覆盖写、释放、回退与复用」步 2，而步 2 的「写出的字节」没点名「八、」那一节	1	20,10,43,	none
+32	red-second-txn-hooks	步 3 点名 .claude/kb/layout/02-second-txn.md「样本形态甲」，而那一行的「里程碑那一步」里没有步 3	1	20,10,43,	none
+32	red-second-txn-hooks	步 3 的「写出的字节」点名了「八、」那一节，而那张表里没有一行标「里程碑「覆盖写、释放、回退与复用」步 3」	1	20,10,43,	none
+32	red-second-txn-hooks	「丙号残行」这一行只有 4 格，登记表每行要 6 格	1	20,10,43,	none
+32	red-second-txn-hooks	点名「样本形态」，而它是 .claude/kb/layout/02-second-txn.md 里 2 行形态的共同前缀	1	20,10,43,	none
+32	red-segment-registry	segment-registry（退 1）	1	20,10,43,	none
+32	red-segment-registry	对不上，共 14 处	1	20,10,43,	none
+32	red-segment-registry	甲路径（path=a）：kb 写的段序列是 `3+1`，产物里是 `2+1`	1	20,10,43,	none
+32	red-segment-registry	乙路径（path=b）：kb 写的种类是 `[x]|[z]`，产物里 kinds 是 `[x]|[y]`	1	20,10,43,	none
+32	red-segment-registry	丙路径（path=c）：kb 写的操作次数是 3，产物里 operations 是 2	1	20,10,43,	none
+32	red-segment-registry	丁路径（path=d）：kb 写的崩溃状态数是 4，产物里 closed_form 是 3	1	20,10,43,	none
+32	red-segment-registry	戊路径：登记表引用 path=e，产物 syn.out 里没有这个 path 的 name=segments 行	1	20,10,43,	none
+32	red-segment-registry	己路径：这一行不是预想，却没有可比对的段序列数字串	1	20,10,43,	none
+32	red-segment-registry	庚路径（path=g）：kb 写了种类 `[x]|[y]`，产物这一行却没有 kinds= 字段——产物是第五次跑之前的，要重跑 E142	1	20,10,43,	none
+32	red-segment-registry	辛路径：出处指的用例文件 crates/demo/tests/gone.rs 不存在	1	20,10,43,	none
+32	red-segment-registry	壬路径：出处指的用例文件里找不到 `fn renamed_sequence`	1	20,10,43,	none
+32	red-segment-registry	癸路径：这一行不是预想，「出处」栏里既没有 `path=...` 引用、也没有指到一条钉住活代码的用例（`<文件>.rs` 加测试函数名），登记表这一行本身要修	1	20,10,43,	none
+32	red-segment-registry	⚠️ 整条流（发布与下一次发布之间没有屏障那句提示）（path=m）：kb 写的崩溃状态数是 4，产物里 closed_form 是 3	1	20,10,43,	none
+32	red-segment-registry	第二条流 `2+1`：数字串加起来是 3 次写，kb 写的是 4	1	20,10,43,	none
+32	red-segment-registry	第二条流 `2+1`：用例文件 crates/demo/tests/pin.rs 里没有钉这个数组 `[2, 1]`	1	20,10,43,	none
+32	red-segment-registry	第二条流 `2+1`：用例文件 crates/demo/tests/pin.rs 里没有钉状态数 5	1	20,10,43,	none
+32	red-tree-table-reserve	tree-table-reserve（退 1）	1	20,10,43,	none
+32	red-tree-table-reserve	认购合计 88 超过预留 76	1	20,10,43,	none
+32	red-tree-table-reserve	「丁」这一行只有 3 格，认购表每行要四格	1	20,10,43,	none
+43	green	检查了 16 行	0	32,20,10,	none
+43	green	没判 0 张带编号行的表	0	32,20,10,	none
+43	green	判了 2 份；02-sample.md：全文点名 3 个 C 编号，其中还开着 2 个：表里 1 个、豁免 1 个；收口表 3 行的行号都是顺序号或圆圈号	0	32,20,10,	none
+43	green	没判 1 份（没有收口表标记）：01-sample.md	0	32,20,10,	none
+43	green	查了 1 个标识符	0	32,20,10,	none
+43	green	C902 the_sample_test_that_really_exists	0	32,20,10,	none
+43	green	没查的 5 行	0	32,20,10,	none
+43	green	每一行都有去向	0	32,20,10,	none
+43	green	第五节 5 行，判了 5 行；写「已改」的 3 行引了 3 句原文，都在那一行点名的文件的今天正文里找得到；其中 1 行没点名 kb 文件，按 kb 全部正文找	0	32,20,10,	none
+43	green	欠账表按共用读法 lib-owed.py 切：开着 10 笔、已还清 6 笔	0	32,20,10,	none
+43	green	本次未跑	0	32,20,10,	20,
+43	green	5 条逐字探针、覆盖 4 笔	0	32,20,10,	none
+43	green	没做成探针的 2 笔	0	32,20,10,	none
+43	green	收口表第 27 行现算 4 笔；探针与没做成探针的清单两边都没有的 0 笔：（没有）	0	32,20,10,	none
+43	green	「alloc-basis 第三轮转来的」那一笔第 27 行写 3 条，这里探针与清单合计 3 条	0	32,20,10,	none
+43	green	判过 4 格：table-shape closeout-collects-open paid-cited-tests audit-contradictions；本次未跑 1 格：row27-preconditions	0	32,20,10,	none
+43	red	C4：6 格	1	32,20,10,	none
+43	red	表头在第 25 行	1	32,20,10,	none
+43	red	第 19 行 C9：前面没有表头	1	32,20,10,	none
+43	red	C10：第 3 列开头写着「2026-09-07 作废	1	32,20,10,	none
+43	red	C5：第 3 列开头写着「已还（2026-09-19）	1	32,20,10,	none
+43	red	C11：第 3 列开头写着「2026-09-19 销账	1	32,20,10,	none
+43	red	02-sample.md 点名了这些还开着的欠账号，收口表里没有、表后也没有豁免	1	32,20,10,	none
+43	red	C9711（红样漏收的账）：第 5 行起出现	1	32,20,10,	none
+43	red	这些编号豁免了，又写进了收口表	1	32,20,10,	none
+43	red	C9713（红样豁免又进表的账）：豁免在第 18 行	1	32,20,10,	none
+43	red	豁免行写坏了	1	32,20,10,	none
+43	red	第 19 行：- 不收口 C9715（红样豁免没写理由的账）：	1	32,20,10,	none
+43	red	03-sample.md 第 3 行的收口表标记后面第一处非空内容不是表格	1	32,20,10,	none
+43	red	02-sample.md 收口表的行号带了后缀	1	32,20,10,	none
+43	red	第 15 行：行号写成「1'」	1	32,20,10,	none
+43	red	第 16 行：行号写成「2a」	1	32,20,10,	none
+43	red	接着表里最大的那个往下取	1	32,20,10,	none
+43	red	C902 引的 `the_sample_test_that_was_renamed_away` 在仓里的 .rs / .py / .sh 里一处都找不到	1	32,20,10,	none
+43	red	已还清的行里有 3 个点名的标识符已经不在仓里了	1	32,20,10,	none
+43	red	C904 引的 `the_sample_test_left_only_in_a_comment` 在仓里的 .rs / .py / .sh 里一处都找不到	1	32,20,10,	none
+43	red	C905 引的 `the_sample_test_renamed_with_suffix` 在仓里的 .rs / .py / .sh 里一处都找不到	1	32,20,10,	none
+43	red	有行没有去向	1	32,20,10,	none
+43	red	第 3 行处置列写	1	32,20,10,	none
+43	red	既不是「已改」、也没点名一个还开着的欠账号	1	32,20,10,	none
+43	red	第 4 行处置列只点名了已还清的 C901	1	32,20,10,	none
+43	red	挂账表 2026-09-23 已清空并关闭，不许再加行	1	32,20,10,	none
+43	red	第 1 行处置列写「已改」，却没有用「」引一句今天正文里的原文	1	32,20,10,	none
+43	red	第 5 行处置列写「已改」，引的「只在另一份样本里写着」在 decisions/09-样本决策.md 的今天正文里找不到；只在 decisions/08-另一份样本.md 里有，那一行没点名它	1	32,20,10,	none
+43	red	第 6 行处置列写「已改」，引的「哪里都没有的一句」在 decisions/09-样本决策.md 的今天正文里找不到	1	32,20,10,	none
+43	red	第 7 行处置列写「已改」，引的「只在另一份样本里写着」在 样本说明.md 的今天正文里找不到；只在 decisions/08-另一份样本.md 里有，那一行没点名它	1	32,20,10,	none
+43	red	第五节标题：## 五 文档级矛盾	1	32,20,10,	none
+43	red	第 8 行处置列写「已改」，引的「D9」只是编号或文件名	1	32,20,10,	none
+43	red	收口表第 27 行那几笔欠账的前置动了	1	32,20,10,	none
+43	red	C333（删行那次发布被重放）：行回收	1	32,20,10,	none
+43	red	rows.retain(」命中 1 次，登记的今天的值是 0 次	1	32,20,10,	none
+43	red	当场做成一条会红的用例	1	32,20,10,	none
+43	red	欠账与收口跑了 5 格，5 格判红	1	32,20,10,	none

@@ -13,23 +13,35 @@
 #    目标路径规范化之后命中它的任一模式才放行。表在同目录的 agent-write-scope.tsv。拦不住 Bash 里的写，定义的「没做什么」照写。
 # 三、撇号类角标（Write、Edit、MultiEdit）：Write 的 content、Edit 的 new_string、MultiEdit 每一处的 new_string 里
 #    出现撇号类字符之一就拒绝；只在 old_string 里出现（删掉它的改动）放行，ASCII 单引号不判。主 agent 与所有子 agent 一样判，目标在不在仓里都判。
-#    为什么：门禁 12 号只在收尾跑整轮门禁时判，2026-09-24 实验设计员照样把这类名字写进三份重跑登记、执行员又抄进源码。
-#    字符集与 12 号同一份：../gate.d/lib-prime-marks.py，不在这里另抄；读不到就拒绝（不静默放行）。
+#    为什么：门禁 doc-text 只在收尾跑整轮门禁时判，2026-09-24 实验设计员照样把这类名字写进三份重跑登记、执行员又抄进源码。
+#    字符集与 doc-text 同一份：../gate.d/lib-forbidden-notations.py 的 PRIME_MARKS，不在这里另抄；读不到就拒绝（不静默放行）。
 # 四、先编后换（Write、Edit）：experiment-runner（名单是 COMPILE_FIRST_AGENTS）写主工作区 crates/ 下的 .rs（改已有的、新建的都算）一律拒绝，
 #    出路是在草稿目录的副本里改、经 research/scripts/compile-then-swap.py 编过再整份换进来。排在写范围那一道之前判，拒绝信息给的是这条出路。
 #    implementation-writer、主 agent、别的 agent 不判；草稿目录里的副本与 crates/ 下不是 .rs 的（crates/mutations.tsv）不判。
 #    为什么：执行员直接在主工作区改入库装置，改到一半编不过，别的会话带 --all-targets 的编译一起卡住
 #    （records/2026-09-16-subagent拆分提案.md 第四十节那张表第 51 行）。Bash 里的同一类写法归 bash-command-detector.sh 的 ⑨。
+# 五、描述里的钟点、时区词与时间戳（Write、Edit、MultiEdit）：目标在仓里、不在 lib-forbidden-notations.py 里钟点那一形态（clock-times）的排除前缀下，
+#    写进去的内容命中那一形态的判据行之一就拒绝；仓外（草稿目录、报告目录）不判。主 agent 与所有子 agent 一样判。
+#    判据与门禁 doc-text 同一份：../gate.d/lib-forbidden-notations.py，不在这里另抄；读不到就拒绝。Bash 里的写（cp、重定向）归 doc-text 在收尾时判。
+#    形态有几族：时:分（日期后、时区词旁、x 通配、Z 后缀、不挨日期时区的时:分与区间）、ISO 时间戳、光秃的时区词，
+#    与中文的「N 点 / N 时」和时段词（挨着日期或时区词的、时段词后面跟钟点的、不挨日期时区却带「前后 / 左右 / 许 / 半 / 钟」的）；
+#    长得像钟点的冒号对靠库里的上下文规则放过，.sh、.py、.rs 里带「clock-times:allow <理由>」的那一行放过（目标路径交给库判后缀）；
+#    逐个形态的判据与放行写在那份库的文档串里。
 #
 # 三道原本是两个 hook（refuse-overwrite-untracked.sh、agent-write-scope.sh），2026-09-17 用户定合并；第三道 2026-09-24 加进来。
 # 它们拒的是一次写，不停任务和脚本；拒绝时退出码 2、stderr 交给做这次写的模型，同时往检出记录
 # （默认 /tmp/claude-1000/agent-hook-detections.jsonl，环境变量 AGENT_HOOK_DETECTIONS 可改）追加一行，
 # 主 agent 的看门狗（research/scripts/agent-watch.py watch）读到就叫醒主 agent，由主 agent 判断怎么处理。
-# 这份源码与 lib-prime-marks.py 里撇号类字符一律写成转义（门禁 12 号也扫它们）；改带转义的那几行用 Bash 里的 python，反斜杠拿 chr(92) 拼：
+# 这份源码里撇号类字符一律写成转义、lib-forbidden-notations.py 里用码位拼（门禁 doc-text 也扫它们）；改带转义的那几行用 Bash 里的 python，反斜杠拿 chr(92) 拼：
 # 2026-09-24 写这一道时实测，Write 的 content 里写的反斜杠 u 转义落盘成了字符本身，这道闸也会拒这样的写。
 #
 #   write-guard.sh             # 从 stdin 读 hook 的 JSON
-#   write-guard.sh --selftest  # 走一遍四道判定的放行与拒绝；WRITE_GUARD_DISABLE_OVERWRITE=1、WRITE_GUARD_DISABLE_COMPILE_FIRST=1 或 WRITE_GUARD_DISABLE_SCOPE=1 时自检必须判红
+#   write-guard.sh --selftest  # 走一遍五道判定的放行与拒绝；WRITE_GUARD_DISABLE_OVERWRITE=1、WRITE_GUARD_DISABLE_COMPILE_FIRST=1、
+#                              # WRITE_GUARD_DISABLE_SCOPE=1 或 WRITE_GUARD_DISABLE_CLOCK_TIMES=1 时自检必须判红；
+#                              # LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键>（钟点的 date-zone-hour、date-zone-period、period-hour、hour-suffix、
+#                              # bare-clock、iso-timestamp、zone-word，键写在 ../gate.d/lib-forbidden-notations.py）关掉一条判据行时，点名那一行的用例必须判红；
+#                              # LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=clock-times 时靠上下文放行的用例、LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=clock-times 时
+#                              # 带放行标记的用例必须判红
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -134,12 +146,12 @@ def decide_compile_first(hook_input, project_root):
                f"{relative} --scratch <草稿目录>，它编过才整份换进来，编不过一个字节不写。\n"
                "→ 目标不是 crates/<crate>/src/bin/ 下的装置（crate 的库、测试）的，不归你改，写进报告交回主 agent。")
 
-def prime_marks_library_path(hook_dir):
-    return os.path.join(os.path.dirname(hook_dir), "gate.d", "lib-prime-marks.py")
+def notations_library_path(hook_dir):
+    return os.path.join(os.path.dirname(hook_dir), "gate.d", "lib-forbidden-notations.py")
 
 def load_prime_marks(library_path):
-    """撇号类字符集，与门禁 12 号同一份；读不到或读出来是空的就抛异常，由调用方按拒绝处理。"""
-    spec = importlib.util.spec_from_file_location("lib_prime_marks", library_path)
+    """撇号类字符集，与门禁 doc-text 同一份；读不到或读出来是空的就抛异常，由调用方按拒绝处理。"""
+    spec = importlib.util.spec_from_file_location("lib_forbidden_notations", library_path)
     library = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(library)
     prime_marks = library.PRIME_MARKS
@@ -168,7 +180,7 @@ def decide_prime_marks(hook_input, library_path):
         prime_marks = load_prime_marks(library_path)
     except Exception as error:
         return 2, (f"✗ 读不到撇号类字符集 {library_path}（{type(error).__name__}：{error}），这次写没法判，按拒绝处理。\n"
-                   "→ 怎么办：那一份是门禁 12 号与这道 hook 共用的唯一定义，先 git status 看它是被删了还是被改坏了，"
+                   "→ 怎么办：那一份是门禁 doc-text 与这道 hook 共用的唯一定义，先 git status 看它是被删了还是被改坏了，"
                    "用 Bash 恢复它（不在 hook 里另抄一份）；恢复之前 Write / Edit 都会被拒。")
     occurrences = sum(text.count(mark) for text in texts for mark in prime_marks)
     if not occurrences:
@@ -187,7 +199,38 @@ def decide_prime_marks(hook_input, library_path):
                "做法见 .claude/rules/path-moves.md「变体起新名字，不用角标」\n"
                "→ 引用户原话或原文时也不例外：把那个字符改写成文字（写成「B2（加撇号）」这类）")
 
-def decide(hook_input, project_root, table_path, prime_marks_library):
+def decide_clock_times(hook_input, project_root, library_path):
+    """五、写进仓里的内容带描述性的钟点。"""
+    if os.environ.get("WRITE_GUARD_DISABLE_CLOCK_TIMES") == "1":
+        return 0, None
+    texts = [text for text in written_texts(hook_input) if text]
+    absolute = absolute_target(hook_input, project_root)
+    root = os.path.normpath(project_root)
+    if not texts or not absolute or os.path.commonpath([absolute, root]) != root:
+        return 0, None
+    try:
+        spec = importlib.util.spec_from_file_location("lib_forbidden_notations", library_path)
+        library = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(library)
+        relative = os.path.relpath(absolute, root)
+        if library.is_excluded("clock-times", relative):
+            return 0, None
+        found = next((result for result in (library.first_hit("clock-times", text, relative) for text in texts) if result), None)
+    except Exception as error:
+        return 2, (f"✗ 读不到钟点判据 {library_path}（{type(error).__name__}：{error}），这次写没法判，按拒绝处理。\n"
+                   "→ 怎么办：那一份是门禁 doc-text 与这道 hook 共用的唯一定义，先 git status 看它是被删了还是被改坏了，"
+                   "用 Bash 恢复它（不在 hook 里另抄一份）；恢复之前往仓里的 Write / Edit 都会被拒。")
+    if not found:
+        return 0, None
+    position, shape, matched = found
+    return 2, (f"✗ 写进 {relative} 的内容在描述里写了钟点（{shape}：「{matched}」）\n"
+               "→ 怎么办：时间只写到日期，把钟点（时:分、「N 点 / N 时」、上午下午这类时段词）连同挨着它的时区词、「前后」一起删掉；"
+               "光秃的时区词、ISO 时间戳与 date 的原样输出也删，只写日期。\n"
+               "→ .sh、.py、.rs 里代码真要用这些字面（TZ 环境变量、解析外部文本的正则、造时间戳的自检输入），在那一行写「# clock-times:allow <理由>」（Rust 写「//」）；"
+               "命中的其实不是钟点（产物字段、切片、编号对），改 .claude/gate.d/lib-forbidden-notations.py 的上下文规则\n"
+               "→ 钟点确实是被测输入的整份文件（hook 自检、门禁样本），登记进 .claude/gate.d/lib-forbidden-notations.py 里钟点那一形态的 excluded_prefixes 并写明理由")
+
+def decide(hook_input, project_root, table_path, prime_marks_library, clock_times_library=None):
     """返回 (0, None, None) 放行；(2, 说明, 哪一道) 拒绝。"""
     code, message = decide_overwrite(hook_input, project_root)
     if code:
@@ -201,6 +244,11 @@ def decide(hook_input, project_root, table_path, prime_marks_library):
     code, message = decide_prime_marks(hook_input, prime_marks_library)
     if code:
         return code, message, "写进撇号类角标"
+    if clock_times_library is None:
+        clock_times_library = prime_marks_library
+    code, message = decide_clock_times(hook_input, project_root, clock_times_library)
+    if code:
+        return code, message, "描述里写了钟点"
     return 0, None, None
 
 def record_detection(hook_input, finding, detections_path):
@@ -244,7 +292,7 @@ def selftest(hook_dir):
         return 1
     work = tempfile.mkdtemp(dir=base)
     cases = []
-    library = prime_marks_library_path(hook_dir)
+    library = notations_library_path(hook_dir)
     try:
         subprocess.run(["git", "init", "-q", work], check=True)
         subprocess.run(["git", "-C", work, "config", "user.email", "t@t"], check=True)
@@ -332,8 +380,111 @@ def selftest(hook_dir):
             prime_case("角标:MultiEdit 只在 old_string 里有放行", "MultiEdit", None,
                        {"edits": [{"old_string": "B2\u2032", "new_string": "B3"}]}, 0),
             prime_case("角标:读不到共用字符集就拒绝", "Write", None, {"content": "普通内容\n"}, 2,
-                       library_path=os.path.join(work, "no-such-lib-prime-marks.py")),
+                       library_path=os.path.join(work, "no-such-lib-forbidden-notations.py")),
         ]
+        # 五、钟点：样本串用 colon 拼、时区词用 jst / utc 两个变量拼，这份源码里不出现字面钟点与时区词（门禁 doc-text 也扫它）
+        colon = ":"
+        jst, utc = "J" + "ST", "U" + "TC"
+        clock_library = notations_library_path(hook_dir)
+        def clock_case(label, target, tool_input, want, agent=None, library_path=clock_library):
+            hook_input = {"tool_name": "Edit" if "new_string" in tool_input else "Write",
+                          "tool_input": dict(tool_input, file_path=target if os.path.isabs(target) else f"{work}/{target}")}
+            if agent:
+                hook_input["agent_type"] = agent
+            return (label, want, decide(hook_input, work, table, library, library_path)[2])
+        cases += [
+            clock_case("钟点:日期 时区词 时分x", "records/x.md", {"content": f"用户 2026-09-26 {jst} 15{colon}3x 定\n"}, "描述里写了钟点"),
+            clock_case("钟点:日期 时分 时区词 前后", "records/x.md", {"content": f"实十九（2026-09-24 16{colon}50 {utc} 前后落地）\n"}, "描述里写了钟点"),
+            clock_case("钟点:时区词 时分，不带日期", ".claude/kb/x.md", {"old_string": "a", "new_string": f"同日 {utc} 14{colon}00 前后：\n"}, "描述里写了钟点"),
+            clock_case("钟点:时分 时区词，不带日期", "crates/a.rs", {"content": f"// 跑于 03{colon}44 {jst}\n"}, "描述里写了钟点"),
+            clock_case("钟点:带 x 通配的裸时分", "records/x.md", {"content": f"主 agent 22{colon}5x 跑前修订\n"}, "描述里写了钟点"),
+            clock_case("钟点:子 agent 也判", "research/prompts/e12-preregistration.md", {"content": f"交回 {jst} 22{colon}0x\n"}, "描述里写了钟点", agent="experiment-runner"),
+            clock_case("钟点:只写日期放行", "records/x.md", {"content": "用户 2026-09-26 定\n"}, None),
+            clock_case("钟点:仓外草稿目录放行", "/tmp/claude-1000/x/progress.md", {"content": f"2026-09-27 22{colon}41 {jst} 编过\n"}, None),
+            clock_case("钟点:排除的门禁样本放行", ".claude/gate.d/fixtures/x/red/expect", {"content": f"改于 2026-09-05 00{colon}00\n"}, None),
+            clock_case("钟点:排除的 hook 自检放行", ".claude/hooks/session-start.sh", {"content": f"2026-09-25 07{colon}58{colon}02 {utc}\n"}, None),
+            clock_case("钟点:排除的 c510 提示放行", "research/prompts/_c510-date-gate-r1-body.md", {"content": f"本机时钟是 {utc}\n"}, None),
+            clock_case("钟点:只在 old_string 里有放行", "records/x.md", {"old_string": f"{jst} 15{colon}3x", "new_string": ""}, None),
+            clock_case("钟点:读不到判据就拒绝", "records/x.md", {"content": "普通内容\n"}, "描述里写了钟点",
+                       library_path=os.path.join(work, "no-such-lib-forbidden-notations.py")),
+        ]
+        # 五、钟点里的各个判据行：样本串用 glued 把数字与「点」、日期与时段词拆开拼，这份源码里不出现字面写法；
+        # 判的是拒绝信息点名的判据行名字，LIB_FORBIDDEN_NOTATIONS_BREAK 关掉哪一条判据行，点名它的那几例就红；
+        # 放行的几组分别靠上下文规则、放行标记，LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT / _ALLOW 点名钟点那一形态时它们就红
+        def glued(*parts):
+            return "".join(parts)
+        def clock_shape_case(label, content, want_shape, target="records/x.md"):
+            code, message, finding = decide({"tool_name": "Write", "tool_input": {"file_path": f"{work}/{target}", "content": content + "\n"}},
+                                            work, table, library, clock_library)
+            shape = re.search(r"描述里写了钟点（(.+?)：「", message) if finding == "描述里写了钟点" else None
+            return (label, want_shape, shape.group(1) if shape else finding)
+        hour_shape, period_shape, period_hour_shape, suffix_shape = "日期或时区后面跟「N 点 / N 时」", "日期或时区后面跟时段词", "时段词后面跟钟点", "「N 点前后」这类钟点"
+        date_shape, bare_shape, iso_shape, zone_shape = "日期后面跟钟点", "不挨日期时区的钟点", "ISO 时间戳", "时区词"
+        cases += [
+            clock_shape_case("钟点:日期 时区词 N 点前后", glued(f"用户 2026-09-28 {jst} 08 ", "点前后要开"), hour_shape),
+            clock_shape_case("钟点:时区词 日期 N 点后（时区词那一处先中）", glued(f"本机 {utc} 2026-09-26 23 ", "点后"), zone_shape),
+            clock_shape_case("钟点:日期 时区词 N 时许", glued(f"2026-09-16 {utc} 17 ", "时许的快照"), hour_shape),
+            clock_shape_case("钟点:不带年份的日期 时区词 N 点前后", glued(f"09-24 {jst} 19 ", "点前后问了四件"), hour_shape),
+            clock_shape_case("钟点:日期 时区词 N 点后", glued(f"2026-09-25 {jst} 01 ", "点后弹窗"), hour_shape),
+            clock_shape_case("钟点:日期 时区词 时段词", glued(f"交回于 2026-09-27 {jst} ", "上午"), period_shape),
+            clock_shape_case("钟点:括号里日期后跟时段词", glued("降为待证（2026-09-13 ", "上午）"), period_shape),
+            clock_shape_case("钟点:日期时段词再括号时区词", glued("2026-09-12 ", f"凌晨（{jst}）"), period_shape),
+            clock_shape_case("钟点:括号里时区词日期时段词（时区词那一处先中）", glued(f"（{jst} 2026-09-27 ", "早上）"), zone_shape),
+            clock_shape_case("钟点:日期时段词前后", glued("满载到 2026-09-28 ", "中午前后"), period_shape),
+            clock_shape_case("钟点:标题里日期后括号时段词", glued("### 2026-09-27（", "下午）：E162"), period_shape),
+            clock_shape_case("钟点:日期时段词再时分（日期那一处先中）", glued("2026-09-27 ", f"上午 08{colon}32 现跑"), period_shape),
+            clock_shape_case("钟点:时段词后跟时分", f"上午 08{colon}32 现跑", period_hour_shape),
+            clock_shape_case("钟点:时段词后跟 N 点", glued("晚上 ", "8 点"), period_hour_shape),
+            clock_shape_case("钟点:光秃的 N 点前后", glued("19 ", "点前后问了"), suffix_shape),
+            clock_shape_case("钟点:裸时分", f"用户 23{colon}10 定", bare_shape),
+            clock_shape_case("钟点:裸时分秒", f"交回 14{colon}00{colon}10、续做", bare_shape),
+            clock_shape_case("钟点:裸时分秒带毫秒", f"07{colon}58{colon}02.123 起跑", bare_shape),
+            clock_shape_case("钟点:时分区间", f"14{colon}00–15{colon}30 之间跑完", bare_shape),
+            clock_shape_case("钟点:月-日 时分", f"核查员缺快照（09-24 23{colon}44 那一次）", bare_shape),
+            clock_shape_case("钟点:反引号里两位小时的时分", f"跑于 `09{colon}55` 的那一轮", bare_shape),
+            clock_shape_case("钟点:日期后面跟带秒带偏移的 diff 头", f"--- a/x.rs\t2026-09-24 16{colon}27{colon}05.398761624 +0000", date_shape),
+            clock_shape_case("钟点:stat 的修改时间", f"Modify: 2026-09-24 18{colon}48{colon}58.254848952 +0000", date_shape),
+            clock_shape_case("钟点:ISO 时间戳", f"派腿 2026-09-27T09{colon}55{colon}07+00{colon}00", iso_shape),
+            clock_shape_case("钟点:不带日期的 T 钟点", f"交回于 …T23{colon}15Z", iso_shape),
+            clock_shape_case("钟点:光秃的时区词", f"本机时钟是 {utc}、直接 date 会差一天", zone_shape),
+            clock_shape_case("钟点:日期后括号时区词", f"跑于 2026-09-27（{jst}），本机", zone_shape),
+            clock_shape_case("钟点:两个时区的名字", f"{jst} 与 {utc} 两个时区", zone_shape),
+            clock_shape_case("钟点:时区词 时间", f"{utc} 时间", zone_shape),
+            clock_shape_case("钟点:放行标记写在 md 里不认", f"用户 23{colon}10 定  # clock-times:allow 写在 md 里不认", bare_shape),
+            clock_shape_case("钟点:放行标记没写理由不认", f"// 跑于 23{colon}10  // clock-times:allow", bare_shape, target="crates/a.rs"),
+            clock_shape_case("钟点:第 N 点前后是序号放行", "第 3 点前后两句", None),
+            clock_shape_case("钟点:N 点意见放行", "3 点意见", None),
+            clock_shape_case("钟点:个数后的点放行", "1000 个崩溃点", None),
+            clock_shape_case("钟点:夜间放行", "全量由用户要求或夜间跑", None),
+            clock_shape_case("钟点:只写日期放行（Write 整份）", "用户 2026-09-28 定", None),
+            clock_shape_case("钟点:不挨日期时区的光秃时段词放行", "同一天下午续跑", None),
+            clock_shape_case("钟点:标识符里的时区词放行", f"`{jst}_OFFSET`、`started_{utc}`", None),
+        ]
+        context_cases = [
+            clock_shape_case("钟点上下文:产物行的名字=值放行", f"remount_chosen=2{colon}12 device_chosen=1{colon}16 values=1{colon}16.000,3{colon}12.000", None),
+            clock_shape_case("钟点上下文:差分与计数的冒号对放行", f"adjacent_differences=0->1{colon}10,1->2{colon}8 steps_by_changed_leaf_count=1{colon}108,2{colon}36", None),
+            clock_shape_case("钟点上下文:字典放行", f"分布 {{0{colon}14, 1{colon}14, 2{colon}16}}", None),
+            clock_shape_case("钟点上下文:Python 切片放行", f"r[8{colon}12]=i.to_bytes(4); fields[11{colon}15]; arguments[5{colon}13]", None),
+            clock_shape_case("钟点上下文:代码里的时区偏移放行", f'stamp.replace("Z", "+00{colon}00")', None),
+            clock_shape_case("钟点上下文:双引号里的代码字面放行", f'            Some("2{colon}11"),', None),
+            clock_shape_case("钟点上下文:单引号里的代码字面放行", f"                      printf '2{colon}11' ;;", None),
+            clock_shape_case("钟点上下文:百分比放行", f"B Lost Writes **13{colon}54%**", None),
+            clock_shape_case("钟点上下文:time -v 的格式说明放行", f"Elapsed (wall clock) time (h:mm:ss or m:ss): 0{colon}03.21", None),
+            clock_shape_case("钟点上下文:门禁号行号表格放行", f"| 共用脚本不在 | 21{colon}38 | 31{colon}68 |", None),
+            clock_shape_case("钟点上下文:门禁号行号列表放行", f"| kb 目录不在 | —— | 21{colon}39、24{colon}27、27{colon}39 |", None),
+            clock_shape_case("钟点上下文:门禁文件名放行", f"门禁 20{colon}54-layer0-replay.sh 那一行", None),
+            clock_shape_case("钟点上下文:同一行带文件行号的编号对放行", f"触发的那一处（decisions/06-快照实现模型.md{colon}42），06{colon}42 正是没抽到的那一行", None),
+            clock_shape_case("钟点上下文:反引号里一位小时的键放行", f"撞键 `3{colon}10`：冷重开是 `2{colon}11`", None),
+            clock_shape_case("钟点上下文:产物字段里的 ISO 时间戳放行", f"taken_jst=2026-09-27T01{colon}20{colon}12+09{colon}00", None),
+        ]
+        allow_cases = [
+            clock_shape_case("钟点放行标记:sh 里的 TZ 环境变量放行", f"TZ={utc}-14 date +%F  # clock-times:allow 环境变量写法，符号与东京时间相反", None, target=".claude/scripts/tz.sh"),
+            clock_shape_case("钟点放行标记:py 里解析外部通知的正则放行", f'RESETS = re.compile(r"resets (\\d+)(am|pm) \\({utc}\\)")  # clock-times:allow 解析外部通知文本', None,
+                             target=".claude/hooks/parse.py"),
+            clock_shape_case("钟点放行标记:rs 里造时间戳的自检输入放行", f'let stamp = "2026-09-27T09{colon}55{colon}07Z"; // clock-times:allow 造时间戳格式的自检输入', None,
+                             target="crates/a.rs"),
+        ]
+        cases += context_cases + allow_cases
         # 走真实入口：把脚本当子进程、从标准输入喂 JSON，防「判定函数对、入口读不到输入」；拒绝要落进检出记录
         script = os.path.join(hook_dir, "write-guard.sh")
         detections = os.path.join(work, "detections.jsonl")
@@ -367,13 +518,16 @@ def selftest(hook_dir):
     for label, want, got in failures:
         print(f"  ✗ 自检：{label} 应当是 {want}，实际 {got}")  # gate-lint:detail
     if failures:
-        print("    → 看 decide_overwrite() / decide_compile_first() / decide_scope() / decide_prime_marks() 与入口；"
-              "WRITE_GUARD_DISABLE_OVERWRITE / WRITE_GUARD_DISABLE_COMPILE_FIRST / WRITE_GUARD_DISABLE_SCOPE 设着的话这里本来就该红")
+        print("    → 看 decide_overwrite() / decide_compile_first() / decide_scope() / decide_prime_marks() / decide_clock_times() 与入口；"
+              "WRITE_GUARD_DISABLE_OVERWRITE / WRITE_GUARD_DISABLE_COMPILE_FIRST / WRITE_GUARD_DISABLE_SCOPE / WRITE_GUARD_DISABLE_CLOCK_TIMES 设着的话这里本来就该红")
         return 1
     print(f"  ✓ 自检通过（查了 {len(cases)} 种情形）：未跟踪的已有文件整份覆盖拒绝，已跟踪 / 不存在 / 仓外 / Edit 放行；主 agent 与内置 agent 放行、范围内放行、"
           "范围外与 .. 绕路与未登记的项目 agent 拒绝；experiment-runner 写主工作区 crates/ 下的 .rs（改、新建、.. 绕路）按先编后换拒绝并点名 compile-then-swap.py，"
           "implementation-writer 与主 agent 写同一处、执行员写草稿目录与 crates/mutations.tsv 放行；Write 内容、Edit 与 MultiEdit 的 new_string 里有撇号类角标（五个字符各一例，主 agent 与子 agent 一样）拒绝，"
-          "只在 old_string 里有、ASCII 单引号放行，共用字符集读不到拒绝；拒绝都记进检出记录")
+          "只在 old_string 里有、ASCII 单引号放行，共用字符集读不到拒绝；写进仓里的内容带钟点（日期后、时区词旁、x 通配、日期或时区词后的「N 点 / N 时」与时段词、时段词后的钟点、光秃的「N 点前后」、"
+          "不挨日期时区的时分与区间、ISO 与 diff 头 stat 的机器时间、光秃的时区词，md 里与没写理由的放行标记不认，主 agent 与子 agent 一样）拒绝并点名形态，"
+          f"只写日期、序号与个数后的「点」、不挨日期时区的时段词、标识符里的时区词、{len(context_cases)} 类长得像钟点的冒号对、"
+          f".sh / .py / .rs 里带理由的放行标记 {len(allow_cases)} 例、仓外、排除的样本、hook 自检与 c510 提示、只在 old_string 里有放行，判据读不到拒绝；拒绝都记进检出记录")
     return 0
 
 hook_dir = sys.argv[1]
@@ -385,7 +539,7 @@ try:
 except ValueError:
     sys.exit(0)
 project_root = os.environ.get("CLAUDE_PROJECT_DIR") or hook_input.get("cwd") or os.getcwd()
-code, message, finding = decide(hook_input, project_root, os.path.join(hook_dir, "agent-write-scope.tsv"), prime_marks_library_path(hook_dir))
+code, message, finding = decide(hook_input, project_root, os.path.join(hook_dir, "agent-write-scope.tsv"), notations_library_path(hook_dir))
 if code:
     print(message, file=sys.stderr)
     record_detection(hook_input, finding, os.environ.get("AGENT_HOOK_DETECTIONS") or DEFAULT_DETECTIONS)

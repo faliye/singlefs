@@ -2,7 +2,7 @@
 
 - 轮名 verification-split-r1；攻击面 Q1、Q2、Q4、Q6、Q9，另核正文第二节「54 号快档红 = C577 之后钉值没改」的归因。
 - 判的是开工快照 `refs/sop/verification-split-r1-snapshot`（fe0bbf13），用 `git archive` 解到草稿目录再读、再跑；工作区一律不读。
-- 报告写于 2026-09-27 12:0x–12:3x UTC（21:0x–21:3x JST）。
+- 报告写于 2026-09-27。
 - ⚠️ 报告写的时候，工作区有 8 份被引文件已经和快照不一样了（别的会话在改）：`.claude/gate.d/94-checker-implementation-disjoint.sh`（工作区里 `dev-` 已经加回去了），`crates/singlefs-checker/tests/first_transaction_step_seven_layer0.rs`、`record_checker_judges_absence_by_the_persisted_set.rs`、`crates/singlefs-checker/Cargo.toml`、harness 的 `e161_…rs`、`history.rs`、`crash_enumeration_resumes_from_its_progress_file.rs`、`crash_segments_per_device_and_torn_in_place_overwrites.rs`。
   这几份在下文只放在标着「快照」的代码块里整行抄，不写成「」引文；「」引文只给交回前现查过、还和快照逐字节相同的文件。
 

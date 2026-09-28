@@ -1,6 +1,6 @@
 # 实审 C11b 交回：format 里带算术的 8 个 `pub const` 改字面量；`journal_in_flight_record_limit` 搬出 format，core 与 E158 各算一份 + 交叉断言
 
-时刻：2026-09-26 23:20 UTC 前后开工（JST 2026-09-27 08:20；进度记录 `progress.md` 第一行 23:22Z）。交法：**交补丁**。改动都在仓副本 `/tmp/claude-1000/impl-rev-c11b/repo` 里，主工作区一个字没碰；补丁目录 `/tmp/claude-1000/impl-rev-c11b/patch/`。
+日期：2026-09-27 开工（进度记录 `progress.md` 第一行）。交法：**交补丁**。改动都在仓副本 `/tmp/claude-1000/impl-rev-c11b/repo` 里，主工作区一个字没碰；补丁目录 `/tmp/claude-1000/impl-rev-c11b/patch/`。
 第一次取副本之后收到主 agent 消息（A2c 已打进主工作区、`transaction.rs` 加进清单、底座换成新的主工作区）：删了第一份副本，按当时的主工作区重取（主表 1093 行），之后全部在新副本上做。
 
 ## 结论
@@ -130,7 +130,7 @@ prove-red 的原样判定行在 `/tmp/claude-1000/impl-rev-c11b/prove-red-run-1.
 
 ## 验证输出（第 4 步那几样；都在仓副本上跑，线程上限 5，内存上限没给、按 `replay.sh` 的默认 8G）
 
-开跑前 `ps` 看负载：23:21 UTC 看到别的会话的 `cargo test`（层 0 分片自检、`checker_known_bad_images`）、`cargo clippy` 在跑，没有 `qemu-system`、`vm-bench.sh`、`e152-file-system-benchmark`、`fio`；23:36 UTC 编译前再看，没有别的 cargo，也没有性能测量。收到主 agent 消息是在读完条款、正要动手改的时候（23:27Z），改了什么见文件头第二段。副本用它自己的 `target`，没有等锁。
+开跑前 `ps` 看负载：看到别的会话的 `cargo test`（层 0 分片自检、`checker_known_bad_images`）、`cargo clippy` 在跑，没有 `qemu-system`、`vm-bench.sh`、`e152-file-system-benchmark`、`fio` 编译前再看，没有别的 cargo，也没有性能测量。收到主 agent 消息是在读完条款、正要动手改的时候，改了什么见文件头第二段。副本用它自己的 `target`，没有等锁。
 
 **动到的测试二进制**（经 `run-with-memory-cap.sh 8G`，整个二进制、不按名字挑；末行原样）：
 ```

@@ -48,14 +48,14 @@ rc=0
 rc=0
 #### g3-git-blind.sh
 腿引的是第 10 行；现在第 10 行是什么、那两条现查各出什么（核查员第 2 步 / 输入一节第 21 行的判法：没改过记 ✗）
-.claude/singlefs-ai-sop/rules/evidence-discipline.md	T=2026-09-26T15:15:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「rule line 9」
-.claude/singlefs-ai-sop/rules/evidence-discipline.md	T=2026-09-26T15:30:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「rule line 9」
-research/scripts/memory-peaks.tsv	T=2026-09-26T15:15:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「peak 9」
-research/scripts/memory-peaks.tsv	T=2026-09-26T15:30:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「peak 9」
-.claude/hooks/tracked-changed-late.sh	T=2026-09-26T15:15:00Z	git log=[2b38302 ]	git status=[]	改过 ⇒ 分不清	真相：第 10 行已变成「tracked line 9」
-.claude/hooks/tracked-changed-late.sh	T=2026-09-26T15:30:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「tracked line 9」
-.claude/hooks/bash-command-detector.sh	T=2026-09-26T15:15:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行没动
-.claude/hooks/bash-command-detector.sh	T=2026-09-26T15:30:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行没动
+.claude/singlefs-ai-sop/rules/evidence-discipline.md	T=2026-09-27（腿甲开工）	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「rule line 9」
+.claude/singlefs-ai-sop/rules/evidence-discipline.md	T=2026-09-27（腿乙派发）	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「rule line 9」
+research/scripts/memory-peaks.tsv	T=2026-09-27（腿甲开工）	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「peak 9」
+research/scripts/memory-peaks.tsv	T=2026-09-27（腿乙派发）	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「peak 9」
+.claude/hooks/tracked-changed-late.sh	T=2026-09-27（腿甲开工）	git log=[2b38302 ]	git status=[]	改过 ⇒ 分不清	真相：第 10 行已变成「tracked line 9」
+.claude/hooks/tracked-changed-late.sh	T=2026-09-27（腿乙派发）	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「tracked line 9」
+.claude/hooks/bash-command-detector.sh	T=2026-09-27（腿甲开工）	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行没动
+.claude/hooks/bash-command-detector.sh	T=2026-09-27（腿乙派发）	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行没动
 看得见被忽略文件的两种现查（推的改法，不是定义里的）：
 .claude/singlefs-ai-sop/rules/evidence-discipline.md	git status --short --ignored=[!! .claude/singlefs-ai-sop/]	git check-ignore=[.claude/singlefs-ai-sop/rules/evidence-discipline.md]
 research/scripts/memory-peaks.tsv	git status --short --ignored=[!! research/scripts/memory-peaks.tsv]	git check-ignore=[research/scripts/memory-peaks.tsv]
@@ -71,9 +71,9 @@ rc=0
 这一轮（governance-defs-r3）的快照目录里有什么：
 sha256sums.txt
 上一轮核查员用的开工时刻、攻方腿自记的开工时刻、正推腿报告的提交时刻：
-腿开工时刻 2026-09-26T15:30:00Z 前后
-开工 2026-09-26 15:15 UTC
-107b79f 2026-09-26T15:30:07+00:00 三方 governance-defs-r2：云端正推腿报告
+腿开工于 2026-09-27
+开工 2026-09-27
+107b79f 2026-09-27 三方 governance-defs-r2：云端正推腿报告
 rc=0
 #### g4-driver-name.sh
 今天 replay.sh 里 @driver 登记行按实验号数：

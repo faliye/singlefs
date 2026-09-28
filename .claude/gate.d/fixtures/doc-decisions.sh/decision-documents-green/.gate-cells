@@ -1,0 +1,15 @@
+# 决策文档组十四格的绿样本并在一棵树里：十三格判绿，write-frequency 没有登记表退 77
+kb-shape
+item-ref-status
+status-redundancy
+cross-decision-status
+settled-item-self-open
+settled-ref-says-open
+stale-open-items
+settled-same-file
+freeze-layer-membership
+decision-items-sync
+blocking-verdict
+user-verdict-owed
+decision-summary-width
+write-frequency

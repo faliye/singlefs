@@ -1,9 +1,9 @@
-# E158 第 4 次跑：装置交回（执行员，2026-09-27 JST）
+# E158 第 4 次跑：装置交回（执行员，2026-09-27）
 
 ## 一、结论
 
 - 这一趟只写装置、不跑产物。第一、三、四、五段与跨臂的 `r4-compare` 已写完，另有模式 `r4-bases`（今天那一臂造的起始镜像）。臂表的 `r4` 行（18 条臂）已写，单测与变异表也写完并证红。**第二段没写**：实七-甲、实七-乙、实八、H-随 30 段、H-随全 68 段、PC-随、M22、S5a/S5b、S9。原因见第六节。
-- C0 快照：manifest-1 08:57:12 JST，manifest-2 08:58:15 JST，两份逐字节相同；`cp -a` 在 08:58:26 JST。**快照指纹** `bb5ca9bef0b09eb957906317adf7d2b47567d901ef341e85c14b6fe23a37cf4b`。四个 core 文件的 sha256 与底座认定逐个相同。S0 七件都没变（行号在登记修订第 3 条），不停。
+- C0 快照：先取 manifest-1、再取 manifest-2，两份逐字节相同；之后 `cp -a`。**快照指纹** `bb5ca9bef0b09eb957906317adf7d2b47567d901ef341e85c14b6fe23a37cf4b`。四个 core 文件的 sha256 与底座认定逐个相同。S0 七件都没变（行号在登记修订第 3 条），不停。
 - 主工作区里已写（cp 之后 cmp 相同）：
   - `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`：19513 行，sha256 `37a8a312cf9c2d3bf6bf1a835530e78fa6d9f3a4b36607d3ecb8fd5e5cf1445b`，已 fmt、clippy 清零
   - `research/prompts/e158-r4-prereg.md`：只在第十二节加「执行员修订」17 条，原判据没动

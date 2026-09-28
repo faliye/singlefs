@@ -1,0 +1,37 @@
+diff -ruN '--exclude=r1-opus-crash-proto' '--exclude=c331_candidates_grid.rs' '--exclude=c393_candidates_grid.rs' '--exclude=c331_newer_instance_roots_unreadable_then_readable_again.rs' '--exclude=c393_abandoned_root_account_unreadable_at_remount.rs' '--exclude=mod.rs' tree/crates/singlefs-core/src/mount.rs opus/bing/crates/singlefs-core/src/mount.rs
+--- tree/crates/singlefs-core/src/mount.rs
++++ opus/bing/crates/singlefs-core/src/mount.rs
+@@ -4157,6 +4157,15 @@
+         .map(|slot| slot.quantities.journal_tail)
+         .max()
+         .unwrap_or(0);
++    newer_publish_witness_of_the_counter(witnessed_journal_counter, selected_version, records)
++}
++
++/// 候选丙（unreadable-at-mount-r1）：给定 c_见证，按判据 N-配置 的次序比（与 `newer_publish_witness` 后半段同一段）。
++fn newer_publish_witness_of_the_counter(
++    witnessed_journal_counter: u64,
++    selected_version: &RootRecord,
++    records: &BTreeMap<(InstanceGeneration, u64), crate::journal::JournalRecord>,
++) -> NewerPublishWitness {
+     let comparison = if witnessed_journal_counter == 0 {
+         WitnessedCounterComparison::NothingWitnessed
+     } else if let Some(last_record_of_the_selected_version) = records
+@@ -4246,7 +4255,16 @@
+         return Ok((first, ReadStageSettled::OnTheFirstRead { first_read }));
+     }
+     before_the_one_reread.before_rereading();
+-    let reread = read_stage(&cache, devices, system_configuration)?;
++    let mut reread = read_stage(&cache, devices, system_configuration)?;
++    // 候选丙（unreadable-at-mount-r1）：重读那一遍的 c_见证 取两遍读到的最大，再按重读那一遍的所选那一版与记录比。
++    reread.against_the_witness.witness = newer_publish_witness_of_the_counter(
++        first_read
++            .witness
++            .witnessed_journal_counter
++            .max(reread.against_the_witness.witness.witnessed_journal_counter),
++        &reread.effective_root,
++        &reread.records,
++    );
+     let reread_against_the_witness = reread.against_the_witness;
+     if reread_against_the_witness.witnesses_a_publish_newer_than_the_selected_version() {
+         return Err(MountError::NewerStateStillUnreadableAfterOneReread(

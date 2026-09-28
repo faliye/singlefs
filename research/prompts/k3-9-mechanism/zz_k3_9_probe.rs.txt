@@ -1,0 +1,262 @@
+//! K3-⑨ 调查用探针（只在草稿副本里）：照 crash_injection.rs:796-966 第一截、第二截的做法，在写死的那段历史上
+//! 把「写数不超过 PROBE_SEGMENT_WRITES 的候选段」整段全枚举，逐个状态跑恢复、理想模型、池级 checker、记录核对器（crash.rs:104-333 原样拷贝）；
+//! 第二截（崩溃后镜像上可写挂载 + 发一次布，crash_injection.rs:1049-1331 原样拷贝）只在「同一次发布的单元写与记录写并在一段」的段上跑。
+#![allow(dead_code, unused_imports, clippy::all)]
+
+use std::collections::{BTreeMap, BTreeSet};
+use std::rc::Rc;
+
+use singlefs_checker::image::{ImageReader, InvariantVerdict};
+use singlefs_checker::walk::{check_pool_image, InstanceTableOfRootRecord};
+use singlefs_core::address::{CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration};
+use singlefs_core::admission::SpaceAdmission;
+use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+use singlefs_core::make_filesystem::MakeFilesystemParameters;
+use singlefs_core::mount::mount_writable_with_space_admission;
+use singlefs_core::recovery::{recover, JournalPolicy, PoolReader};
+use singlefs_core::system_configuration::SystemConfiguration;
+use singlefs_core::transaction::{publish_first_file, publish_overwrite, FirstFile, PoolVersion, PoolWriter};
+use singlefs_format::NODE_POINTER_BYTES;
+use singlefs_harness::history::{
+    execute_history_with, ContentChoice, ContentLength, GeneratedHistory, HistoryDeviceWidth,
+    HistoryExecution, HistoryOperation, HistorySeed, HistoryStartingPoint, PerStepChecker,
+};
+use singlefs_harness::memory_pool::{
+    newest_persisted_root, publishes_in, root_identity_of_write, root_identity_written_by,
+    writes_and_segments_with_stream_indexes, CrashImage, MemoryPool, PublishWrites, RecordCheck,
+    RecordStreamContinuity, RetainedWrite, SparseBlockDevice, SECTOR_BYTES,
+};
+use singlefs_harness::model::{crash_recovery_disagreement, ObservedReadBack, ObservedRefusalReason};
+use singlefs_harness::model_comparison::{
+    model_root_key, observed_read_back_after_a_crash, refusal_reason_of_mount_error,
+    refusal_reason_of_publish_error,
+};
+use singlefs_harness::scenario::FIXED_WRITE_TIME_SECONDS;
+use singlefs_harness::segments::StepKind;
+use singlefs_harness::{RecordingBlockDevice, RetainedOperation, SharedStream};
+
+include!("zz_k3_9/record_checker_copy.rs");
+
+/// 拷贝的第二截代码只读崩溃点的段号。
+pub struct CrashPoint {
+    pub segment_index: usize,
+}
+include!("zz_k3_9/writable_mount_copy.rs");
+
+fn written_out_history() -> GeneratedHistory {
+    // 与 crates/singlefs-checker-tier/tests/crash_injection_campaign.rs:379-393 逐项相同。
+    let content = |selector: u64| {
+        HistoryOperation::PublishOverwrite(ContentChoice {
+            length: ContentLength::InsideOneDataUnit { selector },
+            fill_seed: selector,
+        })
+    };
+    GeneratedHistory {
+        seed: HistorySeed(0),
+        starting_point: HistoryStartingPoint::AfterMakeFilesystem,
+        operations: vec![
+            HistoryOperation::CloseAndMountWritable,
+            HistoryOperation::PublishFirstFile(ContentChoice {
+                length: ContentLength::InsideOneDataUnit { selector: 3 },
+                fill_seed: 1,
+            }),
+            content(5),
+            HistoryOperation::PublishWithoutUnits,
+            HistoryOperation::CloseAndMountWritable,
+            content(7),
+        ],
+    }
+}
+
+#[derive(Default, Debug)]
+struct ClassTally {
+    states: u64,
+    effective_root_reaches_the_publish: u64,
+    verification_failed: u64,
+    prefix_applied: u64,
+    claimed_state_missing_unit: u64,
+    root_without_record: u64,
+    checker_red: u64,
+    model_red: u64,
+    stage2_runs: u64,
+    stage2_checker_red: u64,
+    stage2_record_red: u64,
+    stage2_refused: u64,
+}
+
+#[test]
+fn probe() {
+    let policy = match std::env::var("PROBE_POLICY").as_deref() {
+        Ok("without") => JournalPolicy::ConsultWithoutNamedVerification,
+        _ => JournalPolicy::Consult,
+    };
+    let limit: usize = std::env::var("PROBE_SEGMENT_WRITES").ok().and_then(|v| v.parse().ok()).unwrap_or(12);
+    let run_stage2 = std::env::var("PROBE_STAGE2").as_deref() != Ok("0");
+    println!("PROBE policy={policy:?} segment_writes<={limit} stage2={run_stage2}");
+    let execution = HistoryExecution {
+        per_step_checker: PerStepChecker::Skipped,
+        device_width: HistoryDeviceWidth::FourGibibytes,
+        space_admission: SpaceAdmission::JudgedByTheFormula,
+    };
+    let history = written_out_history();
+    let stream = SharedStream::retaining_contents();
+    let mut committed_versions = BTreeMap::new();
+    let mut after_the_last_finished_step = 0usize;
+    let run = execute_history_with(&history, execution, &stream, &mut |observation| {
+        for (key, file) in observation.model.committed_versions() {
+            committed_versions.insert(key, file);
+        }
+        after_the_last_finished_step = stream.operation_count();
+    });
+    println!("PROBE history ending={:?}", run.ending);
+    let after_make_filesystem = run.operations_written_by_make_filesystem;
+    let operations = stream.retained_operations();
+    let parameters = execution.device_width.parameters();
+    let (writes, segments, stream_indexes) =
+        writes_and_segments_with_stream_indexes(&operations, &execution.device_width.fixed_geometry());
+    let every = vec![true; writes.len()];
+    let publishes = publishes_in(&writes, &every, RecordStreamContinuity::OneRecording);
+    for publish in &publishes {
+        let offsets: BTreeSet<(u32, u64)> = publish.units.iter().map(|u| (writes[*u].device.0, writes[*u].offset.0)).collect();
+        let unit_segments: BTreeSet<usize> = publish.units.iter().map(|u| segments.iter().position(|s| s.contains(u)).unwrap()).collect();
+        let record_segments: BTreeSet<usize> = publish.records.iter().map(|u| segments.iter().position(|s| s.contains(u)).unwrap()).collect();
+        let root_segment = segments.iter().position(|s| s.contains(&publish.root)).unwrap();
+        println!(
+            "PROBE publish ({}, {}): unit writes {} (distinct device+offset {}), record writes {}, unit segments {:?}, record segments {:?}, root segment {}",
+            publish.instance, publish.checkpoint_txg, publish.units.len(), offsets.len(), publish.records.len(), unit_segments, record_segments, root_segment
+        );
+    }
+    let candidate: Vec<usize> = (0..segments.len())
+        .filter(|segment_index| {
+            segments[*segment_index].iter().all(|write| {
+                (after_make_filesystem..after_the_last_finished_step).contains(&stream_indexes[*write])
+            })
+        })
+        .collect();
+    for (segment_index, segment) in segments.iter().enumerate() {
+        let kinds: Vec<&str> = segment.iter().map(|w| writes[*w].kind.name()).collect();
+        println!("PROBE segment {segment_index}: {} writes, candidate {}, kinds {:?}", segment.len(), candidate.contains(&segment_index), kinds);
+    }
+    let last_committed_version = committed_versions.keys().next_back().copied();
+    let mut base = MemoryPool::with_devices(&[DeviceIdentity(0), DeviceIdentity(1)], execution.device_width.device_bytes());
+    let mut applied = 0usize;
+    let mut total = ClassTally::default();
+    let mut by_class: BTreeMap<String, ClassTally> = BTreeMap::new();
+    let mut first_class_a_example_printed = false;
+    for segment_index in candidate.iter().copied() {
+        let segment = &segments[segment_index];
+        let length = segment.len();
+        if length > limit {
+            println!("PROBE segment {segment_index} skipped: {length} writes > {limit}");
+            continue;
+        }
+        let first = segment[0];
+        base.apply_writes(&writes[applied..first]);
+        applied = first;
+        // 同一次发布的单元写与记录写都在这一段：变异 C 才造得出。
+        let merged: Vec<&PublishWrites> = publishes
+            .iter()
+            .filter(|p| p.units.iter().any(|u| segment.contains(u)) && p.records.iter().any(|r| segment.contains(r)))
+            .collect();
+        for mask in 0..(1u64 << length) - 1 {
+            let within: Vec<bool> = (0..length).map(|bit| mask & (1 << bit) != 0).collect();
+            let mut persisted = vec![false; writes.len()];
+            persisted[..first].fill(true);
+            for (k, p) in within.iter().enumerate() {
+                persisted[first + k] = *p;
+            }
+            let image = CrashImage { base: &base, writes: &writes[first..first + length], persisted: within.clone() };
+            let newest_persisted = newest_persisted_root(&writes, &persisted).map(|(txg, instance)| model_root_key(instance, txg));
+            let report = recover(&image, policy);
+            let read_back = observed_read_back_after_a_crash(&report);
+            let disagreement = crash_recovery_disagreement(&committed_versions, newest_persisted, &read_back);
+            let record_check = check_records_against(&image, &image, &writes, &persisted, RecordStreamContinuity::OneRecording, report.effective_root);
+            let checker_red: Vec<&str> = check_pool_image(&image)
+                .into_iter()
+                .filter_map(|(invariant, verdict)| match verdict {
+                    InvariantVerdict::Violated(_) => Some(invariant),
+                    _ => None,
+                })
+                .collect();
+            let mut classes: Vec<String> = Vec::new();
+            for p in &merged {
+                let records_all = p.records.iter().all(|r| persisted[*r]);
+                let mut copies_by_offset: BTreeMap<u64, Vec<usize>> = BTreeMap::new();
+                for u in &p.units {
+                    copies_by_offset.entry(writes[*u].offset.0).or_default().push(*u);
+                }
+                let some_offset_all_withheld = copies_by_offset.values().any(|c| c.iter().all(|u| !persisted[*u]));
+                let some_copy_withheld = p.units.iter().any(|u| !persisted[*u]);
+                let class = match (records_all, some_offset_all_withheld, some_copy_withheld) {
+                    (true, true, _) => "A_records_all_persisted_and_some_unit_every_copy_withheld",
+                    (true, false, true) => "B_records_all_persisted_and_some_copy_but_no_unit_every_copy_withheld",
+                    (true, false, false) => "C_records_all_persisted_and_every_unit_copy_persisted",
+                    (false, _, _) => "D_some_record_withheld",
+                };
+                classes.push(format!("({},{}) {class}", p.instance, p.checkpoint_txg));
+                let entry = by_class.entry(format!("segment {segment_index} publish ({},{}) {class}", p.instance, p.checkpoint_txg)).or_default();
+                entry.states += 1;
+                if report.effective_root.is_some_and(|(_, txg)| txg.0 >= p.checkpoint_txg) {
+                    entry.effective_root_reaches_the_publish += 1;
+                }
+                if report.journal.verification_failed > 0 { entry.verification_failed += 1; }
+                if report.journal.prefix_applied > 0 { entry.prefix_applied += 1; }
+                if record_check.claimed_state_missing_unit { entry.claimed_state_missing_unit += 1; }
+                if record_check.root_without_record { entry.root_without_record += 1; }
+                if !checker_red.is_empty() { entry.checker_red += 1; }
+                if disagreement.is_some() { entry.model_red += 1; }
+                if class.starts_with('A') && !first_class_a_example_printed {
+                    first_class_a_example_printed = true;
+                    println!(
+                        "PROBE class A example: segment {segment_index} mask {within:?} effective_root {:?} journal {:?} record_check {record_check:?} checker_red {checker_red:?} model {:?} newest_persisted {newest_persisted:?}",
+                        report.effective_root, report.journal, disagreement
+                    );
+                }
+                if run_stage2 {
+                    let materialized = materialized_crash_image(&image);
+                    let mount_run = mount_and_publish_once_on_the_crash_image(
+                        &materialized, &parameters, execution, history.seed, &CrashPoint { segment_index },
+                    );
+                    let geometry = execution.device_width.fixed_geometry();
+                    let (mount_writes, _, _) = writes_and_segments_with_stream_indexes(&mount_run.mount_operations, &geometry);
+                    let (publish_writes, _, _) = writes_and_segments_with_stream_indexes(&mount_run.publish_operations, &geometry);
+                    let records_across = HistoryThenWritableMountRecords::new(&writes, &persisted, report.effective_root, &mount_writes, &publish_writes);
+                    let check_after = records_across.record_check_after_the_writable_mount(&image, &mount_run.pool_after);
+                    let stage2_checker_red: Vec<&str> = check_pool_image(&mount_run.pool_after)
+                        .into_iter()
+                        .filter_map(|(invariant, verdict)| match verdict {
+                            InvariantVerdict::Violated(_) => Some(invariant),
+                            _ => None,
+                        })
+                        .collect();
+                    entry.stage2_runs += 1;
+                    if !stage2_checker_red.is_empty() { entry.stage2_checker_red += 1; }
+                    if check_after != RecordCheck::default() { entry.stage2_record_red += 1; }
+                    let refused = match &mount_run.outcome {
+                        WritableMountOutcome::Published => false,
+                        WritableMountOutcome::MountRefused { reason, .. } | WritableMountOutcome::PublishRefused { reason, .. } => {
+                            *reason != ObservedRefusalReason::Explained(singlefs_harness::model::ModelRefusalReason::UnitAreaWall)
+                        }
+                    };
+                    if refused { entry.stage2_refused += 1; }
+                }
+            }
+            total.states += 1;
+            if record_check.claimed_state_missing_unit { total.claimed_state_missing_unit += 1; }
+            if record_check.root_without_record { total.root_without_record += 1; }
+            if !checker_red.is_empty() { total.checker_red += 1; }
+            if disagreement.is_some() { total.model_red += 1; }
+            if report.journal.verification_failed > 0 { total.verification_failed += 1; }
+            if report.journal.prefix_applied > 0 { total.prefix_applied += 1; }
+            if !checker_red.is_empty() || disagreement.is_some() || record_check != RecordCheck::default() {
+                println!("PROBE RED segment {segment_index} mask {within:?} classes {classes:?} effective_root {:?} record_check {record_check:?} checker_red {checker_red:?} model {:?}", report.effective_root, disagreement);
+            }
+        }
+    }
+    println!("PROBE last_committed_version {last_committed_version:?}");
+    for (name, tally) in &by_class {
+        println!("PROBE class {name}: {tally:?}");
+    }
+    println!("PROBE TOTAL crash states {} ; root_without_record {} ; claimed_state_missing_unit {} ; checker red {} ; model red {} ; recoveries with verification_failed>0 {} ; with prefix_applied>0 {}",
+        total.states, total.root_without_record, total.claimed_state_missing_unit, total.checker_red, total.model_red, total.verification_failed, total.prefix_applied);
+}

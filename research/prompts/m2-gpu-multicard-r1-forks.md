@@ -2,7 +2,7 @@
 
 出处：用户 2026-09-27 定「你做小范围 多显卡的验证就好了」「单机 多卡 双机多卡的验证」；背景是 `.claude/kb/milestone/03-third-txn.md` 第四项（崩溃放量的 checker 挪到 GPU）。只问能不能跑、能不能用，不问快多少才值得。只写问题与候选的定义，不写倾向、不写已有的数。
 
-环境（2026-09-27 现查，不是答案）：两台机器都是 Ubuntu 24.04、glibc 2.39，驱动 595.84，都有 `libcuda.so` 与 NVIDIA 的 Vulkan ICD（`/usr/share/vulkan/icd.d/nvidia_icd.json`）；都没有 nvcc 与 nvrtc；另一台（ssh 别名 faliye-jplife）没有 Rust 工具链，二进制要在本机编好拷过去。卡：本机 RTX 5090、RTX 5060 Ti；另一台 RTX 5080、RTX 5060 Ti × 2。多数卡的显存被本地模型占着。
+环境（2026-09-27 现查，不是答案）：两台机器都是 Ubuntu 24.04、glibc 2.39，驱动 595.84，都有 `libcuda.so` 与 NVIDIA 的 Vulkan ICD（`/usr/share/vulkan/icd.d/nvidia_icd.json`）；都没有 nvcc 与 nvrtc；另一台（第二台）没有 Rust 工具链，二进制要在本机编好拷过去。卡：本机 RTX 5090、RTX 5060 Ti；另一台 RTX 5080、RTX 5060 Ti × 2。多数卡的显存被本地模型占着。
 
 | # | 问题 | 候选（各自的定义） | 翻面观测 | 够判条件 | 状态 |
 |---|---|---|---|---|---|

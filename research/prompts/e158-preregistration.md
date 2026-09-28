@@ -1,6 +1,6 @@
 # E158 跑前登记：择根与修复四岔路
 
-写于 2026-09-23 22:17 JST，装置写之前。
+写于 2026-09-23，装置写之前。
 
 装置写在哪（写死）：**入库装置**——执行员新写 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`（改写 `crates/singlefs-harness/src/bin/`）。理由：四条岔路问的都是「`crates/` 今天这份代码（与它的改法）在故障下选哪条根、拒不拒挂载」，另写独立模型答不了。各臂对 `crates/` 的改动写成 `research/mutations/e158_arms.tsv`（四列同 `crates/mutations.tsv`：说明、文件、旧串、新串），在草稿目录里整树 `cp -a` 出来的**副本**上逐臂套用、各自编译；装置源码各臂同一份。要读 `crates/` 的常量见第五节末「装置要本地化的常量」，一律改成本地常量加回比断言，不直接 `use`。
 
@@ -549,7 +549,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 ## 三、实现今天的样子
 
-2026-09-23 JST 现查（`crates/` 正被另一条线改，**只写函数名与它做的那件事，不写行号**；执行员开跑前按第十一节停机条款 S1 逐条重核）。
+2026-09-23 现查（`crates/` 正被另一条线改，**只写函数名与它做的那件事，不写行号**；执行员开跑前按第十一节停机条款 S1 逐条重核）。
 
 | 文件 | 函数 / 类型 | 它做的那件事 |
 |---|---|---|
@@ -575,7 +575,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 | `crates/singlefs-harness/src/history.rs` | `HistoryOperationKind` | 七种操作：首个文件、覆盖写、零单元发布、关闭并可写挂载、关闭并回退、抬 F、冷启动恢复；**没有挂载内的实例切换** |
 | `crates/singlefs-harness/tests/` | `second_transaction_step_four_rollback.rs`、`second_transaction_supplement_two_unreadable_abandoned_root_slot.rs`、`second_transaction_step_zero_test_only_switches.rs`、`second_transaction_step_five_reuse.rs` | 已有用例钉住的今天的行为，数列进第四节 |
 
-实现里没有的（命令原样，2026-09-23 JST 在仓根跑）：
+实现里没有的（命令原样，2026-09-23 在仓根跑）：
 
 ```
 $ grep -rn -i 'switch' crates/singlefs-core/src/ | wc -l
@@ -908,7 +908,7 @@ H3 的省法（只省挂载，不省对数）：P332 在 (b)、(c) 两处要做�
 - **S1**　开跑前重读第三节表里每个函数：`first_txg_of_new_instance` 的两项（可读根、记录）、两种挂载的 `next_counter` 规则、`choose_root` 的比较键、`write_acquired_instance` 写的占位、`persist_the_root_then_rotate_the_system_configuration` 的先后、`isolate_slots_referenced_only_by_abandoned_roots` 只计数不拒绝、`SystemRuntimeQuantities` 的三项。任一处与第三节写的不同 ⇒ 停。特别是：记录那一项没了，「今天 = 丙」不再成立；`next_counter` 改了，「今天 = 甲-jsn」不再成立。
 - **S2**　`e158_arms.tsv` 某一行的旧串在副本里不是恰好命中一次（第七类）⇒ 那一臂停。
 - **S3**　某一臂的副本编不过（第八类）⇒ 那一臂停；今天的 `crates/` 与 D22 已定项 9 的 481 对不上 ⇒ 全停。
-- **S4**　`crates/` 正被另一条线改：全部副本从**同一次** `cp -a` 的快照派生，运行记录写下快照时刻（JST）、`git rev-parse HEAD`、`git status --porcelain crates/` 的原样输出与 `crates/` 下全部文件的 sha256 汇总；两份副本的 `crates/`（臂改动之外）对不上 ⇒ 停。
+- **S4**　`crates/` 正被另一条线改：全部副本从**同一次** `cp -a` 的快照派生，运行记录写下快照时刻、`git rev-parse HEAD`、`git status --porcelain crates/` 的原样输出与 `crates/` 下全部文件的 sha256 汇总；两份副本的 `crates/`（臂改动之外）对不上 ⇒ 停。
 - **S5**　装置自己的根槽 / 指针 / 系统配置解码与 `crates/` 的解析（`readable_roots`、`choose_system_configuration`）在同一个镜像上对不上，或第七节 7.3 的现算值与 `crates/` 的输出对不上 ⇒ 停。
 
 ### 11.3　前置条款（岔路 4）
@@ -1318,7 +1318,7 @@ repair-2026-09-24-q1-g0-today.out` 83→85 行、`...-q1-s16.out`/`...-q1-s4.out
    `allocation_record_tree_reachable_placements_via_central_mapping_reflects_written_content_and_
    errors_on_an_empty_pointer` 红 → 还原 → 复绿；`bash .claude/gate.d/33-mutation-tables.sh` 复跑
    变绿（唯一剩下的红是 `research/mutations/e142_first_transaction_dry_run.tsv:23`，与本实验无关，
-   不归本段处理）。② 实十九合并（2026-09-24 16:50 UTC 前后）提醒：中央映射树条目数超过单节点叶容量
+   不归本段处理）。② 实十九合并（2026-09-25）提醒：中央映射树条目数超过单节点叶容量
    （`crates/singlefs-core/src/transaction.rs` 第 1334 行「中央映射树叶 294」）会长成多层，
    `allocation_record_tree_reachable_placements_via_central_mapping` 把根节点当叶解、没检查
    `level`——**手工验证发现这不是「会报错、不会算错」，是会静默算错**：内部条目宽约 114 字节
@@ -1556,7 +1556,7 @@ repair-2026-09-24-q1-g0-today.out` 83→85 行、`...-q1-s16.out`/`...-q1-s4.out
    三条新行的锚点各命中源码一次。
 6. **crates/ 快照（主 agent 知会「实二六」正在改 `mount.rs`/`allocator.rs`/`allocation_record_
    tree.rs`）**：重出产物之前取一次快照，`research/results/e158-root-choice-repair-2026-09-25-
-   s10-crates-sha256.out`（`snapshot_time_jst=2026-09-25 10:22:11`、`git_head=
+   s10-crates-sha256.out`（`snapshot_time_jst=2026-09-25`、`git_head=
    e980a219f1834c638cd2fae18b25a60525a6bd52`、`git_status_crates_lines=84`、
    `crates_sha256_of_sha256s=48dd4f273289ee6c47d84cae8704c52dd7eb1f0bebf80ca95b63b1e0bb3466ff`）。
    重出产物中途（`replay.sh` 还没跑完时）现查同一份 `find crates -type f | sort | xargs sha256sum`
@@ -1702,12 +1702,12 @@ repair-2026-09-24-q1-g0-today.out` 83→85 行、`...-q1-s16.out`/`...-q1-s4.out
 
 ### 13.2　跑过的命令（原样；输出原样）
 
-取号与占号（同一条命令，2026-09-23 22:17 JST）：
+取号与占号（同一条命令，2026-09-23）：
 
 ```
 $ n1=$(grep -oE '^\| E[0-9]+' .claude/kb/experiments.md | grep -oE '[0-9]+' | sort -n | tail -1); n2=$(bash research/scripts/claim-experiment.sh --next | tr -d 'E'); n=$(( n1 + 1 > n2 ? n1 + 1 : n2 )); echo "experiments.md 最大号=$n1 claim--next=E$n2 取=E$n"; bash research/scripts/claim-experiment.sh "E$n" 择根与修复四岔路; echo "rc=$?"
 experiments.md 最大号=157 claim--next=E158 取=E158
-  ✓ 占住 E158：/home/fy5090/code/singlefs/research/prompts/e158-preregistration.md
+  ✓ 占住 E158：research/prompts/e158-preregistration.md
 rc=0
 ```
 

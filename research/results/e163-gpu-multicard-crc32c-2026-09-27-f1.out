@@ -1,5 +1,5 @@
 E163（GPU多卡算单元校验和）F1：往两片各注入一个翻位（本机 R1 两片配置），验证比对本身会不会红（M3）。
-跑于 2026-09-27（JST），本机。注入：全局单元 100（字节 4099 位 1，片 0）与 1381（字节 8198 位 2，片 1）。
+跑于 2026-09-27，本机。注入：全局单元 100（字节 4099 位 1，片 0）与 1381（字节 8198 位 2，片 1）。
 
 ===== run-shard 片 0（--inject-flip 100:4099:1） =====
 $ bash research/scripts/run-with-memory-cap.sh 8G ./target/release/e163-gpu-multicard-crc32c run-shard --input <input> --start 0 --count 1280 --adapter-index 0 --output f1-shard0.out --inject-flip 100:4099:1

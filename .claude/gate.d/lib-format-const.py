@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""format-const 标记与 Rust const 声明的解析：门禁 27、39、92 号共用这一份，不各抄一份。
+"""format-const 标记与 Rust const 声明的解析：门禁 code-source-discipline、doc-registries、checker-independence-and-sync 共用这一份，不各抄一份。
 
-三道各写一份解析器时口径分叉过：27 号要求标记整条按文法收尾，标记里多写一个键它就当这条不存在、
-静默不登记，而 39、92 号只匹配前缀照认——同一行标记，一道看不见、两道照用；27 号同一份文件里
+三道各写一份解析器时口径分叉过：code-source-discipline 要求标记整条按文法收尾，标记里多写一个键它就当这条不存在、
+静默不登记，而 doc-registries、checker-independence-and-sync 只匹配前缀照认——同一行标记，一道看不见、两道照用；code-source-discipline 同一份文件里
 同名标记写两次不报，第二个值静默丢掉。所以这里只有一条文法，读不出来的与重复的都报给调用方判红，
 不许跳过。
 

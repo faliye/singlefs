@@ -1,4 +1,4 @@
-# 三方论证背景材料：`m2-final-code-r4`（材料员拼装，2026-09-25 10:35 JST / 2026-09-25 01:35 UTC）
+# 三方论证背景材料：`m2-final-code-r4`（材料员拼装，2026-09-25）
 
 kb 引文与行号以 `/tmp/claude-1000/m2-final-code-r4/kb-snapshot/` 为准。
 
@@ -25,7 +25,7 @@ kb 引文与行号以 `/tmp/claude-1000/m2-final-code-r4/kb-snapshot/` 为准。
 - **共用问句与三种结论**：照 `research/prompts/_m2-final-code-r1-body.md` 第一节。
 - **欢迎攻的**：实二五自己取的读法（报告第六节 Q1–Q5）已由主 agent 认下、写成条款，都被攻过零轮，这几格打中照常算。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-25 10:1x JST 现查）
+## 二、实现今天的样子（主 agent 的观测，2026-09-25 现查）
 
 - **冻结副本**：腿读代码一律读 `/tmp/claude-1000/m2-final-code-r4/tree/crates/`，那是实二五交回那一刻的整棵树。
   - 哈希在 `crates-src-sha256.txt`、`crates-tests-sha256.txt`。
@@ -108,7 +108,7 @@ kb 引文与行号以 `/tmp/claude-1000/m2-final-code-r4/kb-snapshot/` 为准。
 
 ## 二、小节清单
 
-# 小节清单：`m2-final-code-r4`（材料员生成，2026-09-25 10:35 JST / 2026-09-25 01:35 UTC）
+# 小节清单：`m2-final-code-r4`（材料员生成，2026-09-25）
 
 `python3 research/scripts/kb-sections.py` 全量生成，未再过滤（6 份文件：主 agent 给出的 4 份决策文件 `28-挂载期承诺量.md`、`03-空间分配.md`、`19-块指针的结构与宽度预算.md`、`23-journal的角色与格式.md` + `checks-owed.md` + `.claude/singlefs-ai-sop/rules/rules-discipline.md`）。
 

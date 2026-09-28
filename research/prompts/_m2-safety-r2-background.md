@@ -1,4 +1,4 @@
-# 三方论证背景材料：`m2-safety-r2`（材料员拼装，2026-09-25 19:13 JST / 2026-09-25 10:13 UTC）
+# 三方论证背景材料：`m2-safety-r2`（材料员拼装，2026-09-25）
 
 kb 引文与行号以 `/tmp/claude-1000/m2-safety-r2/kb-snapshot/` 为准（sha256 见 `research/prompts/m2-safety-r2-snapshot/kb-sha256.txt`，与主工作区逐字节相同）；`crates/` 引文以正文点名的冻结副本 `/tmp/claude-1000/m2-safety-r2/tree/crates/` 为准（sha256 见 `research/prompts/m2-safety-r2-snapshot/crates-sha256.txt`）。
 
@@ -16,7 +16,7 @@ kb 引文与行号以 `/tmp/claude-1000/m2-safety-r2/kb-snapshot/` 为准（sha2
 
 ## 一、这一轮要判什么
 
-安全设计轮第一轮（`research/prompts/m2-safety-r1-main-verification.md` 第二节）留下的 S4 这一轮判。同轮留下的 S6（实例号撞号，`research/prompts/seed540096-investigation/report.md`）用户 2026-09-25 JST 19:0x 定「先不要管，记成欠账」，不在这一轮。
+安全设计轮第一轮（`research/prompts/m2-safety-r1-main-verification.md` 第二节）留下的 S4 这一轮判。同轮留下的 S6（实例号撞号，`research/prompts/seed540096-investigation/report.md`）用户 2026-09-25 定「先不要管，记成欠账」，不在这一轮。
 
 | 格 | 问题 | 出处 |
 |---|---|---|
@@ -31,7 +31,7 @@ kb 引文与行号以 `/tmp/claude-1000/m2-safety-r2/kb-snapshot/` 为准（sha2
 - 不许用「拒绝」换「安全」而把池永远卡在只读，除非说得出用户手里还有哪一步能让它重新可写；
 - `.claude/rules/fs-design.md`「释放空间这个操作本身不需要申请空间」与 D3（空间分配） 已定项 9「`df` 报出 s 字节空闲，写 s 字节就必须成功；删掉 s 字节之后同样大小的写在有界步数内成功」逐句核。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-25 18:5x JST 现查；冻结副本由材料员取）
+## 二、实现今天的样子（主 agent 的观测，2026-09-25 现查；冻结副本由材料员取）
 
 - **准入**：`crates/singlefs-core/src/admission.rs`（`admission_reading_before_a_publish`；`available_on_each_device` 里 `own_terms` 那段是九项）；发布路径在 `crates/singlefs-core/src/transaction.rs` 的 `prepare_the_version_publish`，挂载路径在 `crates/singlefs-core/src/mount.rs` 的 `establish_instance`。第一轮正推腿指出两处结构上会分叉的口径：挂载期承诺量的 `rows0`、被抛弃根独占量只在挂载路径现算（`mount.rs` 的 `isolate_slots_referenced_only_by_abandoned_roots`），这段历史上没露头。
 - **行号**以冻结副本为准，材料员现查。
@@ -72,9 +72,9 @@ kb 引文与行号以 `/tmp/claude-1000/m2-safety-r2/kb-snapshot/` 为准（sha2
 
 ---
 
-### 材料员补充：正文第二节函数名的行号（冻结副本现查，2026-09-25 19:1x JST，正文本身不改）
+### 材料员补充：正文第二节函数名的行号（冻结副本现查，2026-09-25，正文本身不改）
 
-以下行号取自 `/tmp/claude-1000/m2-safety-r2/tree/crates/`（与主工作区逐字节相同，见清单前言的 sha256 核对），不是主工作区今天 18:5x JST 之后可能出现的任何改动的行号：
+以下行号取自 `/tmp/claude-1000/m2-safety-r2/tree/crates/`（与主工作区逐字节相同，见清单前言的 sha256 核对），不是主工作区此后可能出现的任何改动的行号：
 
 - `crates/singlefs-core/src/admission.rs`：
   - `admission_reading_before_a_publish`：第 581 行；

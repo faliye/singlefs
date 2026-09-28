@@ -37,8 +37,8 @@ crates/singlefs-core/src/allocator.rs: OK
 ```
 
 3 个 kb 文件今天（我核查时）与开工快照不同，**但 Opus 与 Sonnet 报告里各自贴的 `sha256sum -c` 原样输出都是全 OK**——
-两条腿各自完成时（Opus 报告文件 mtime 23:17、Sonnet 23:11）应确实是 OK；这 3 个文件的 mtime 是 23:09–23:10，
-早于两条报告完稿、晚于快照时刻 22:57，判定是**另一个并发会话在这一轮腿工作期间改了这 3 个 kb 文件**
+两条腿各自完成时（看两份报告文件的 mtime）应确实是 OK；这 3 个文件的 mtime
+早于两条报告完稿、晚于快照时刻，判定是**另一个并发会话在这一轮腿工作期间改了这 3 个 kb 文件**
 （`.claude/agents/agent-common.md`「本机常有别的会话在同一个仓里干活」），不是腿说谎。
 
 **这 3 个文件今天的主树内容不能拿来核这一轮的引用**（会核出与腿开工时不同的行号/文本）。
@@ -64,7 +64,7 @@ bcd38e66482e30222cbfd2cd992a8a241eed76752ec5f05c40cce3196676129a  ...checks-owed
 
 同理，`crates/singlefs-harness/{fault_injection.rs, segments.rs, scenario.rs}`、`crates/singlefs-format/src/lib.rs`
 四个文件也不在 manifest 里，且 `segments.rs`/`scenario.rs` 相对 HEAD 有未提交改动（`fault_injection.rs` 整个未跟踪）。
-四者的 mtime 分别是 13:25 / 12:13 / 12:02（均为 9-22 当天），早于快照时刻 22:57 十小时以上，此后无改动迹象 ⇒
+四者的 mtime 都在 9-22 当天、早于快照时刻十小时以上，此后无改动迹象 ⇒
 按同样理由对主树核，标注同上。
 
 ## 二、云端攻方（Opus）：K2、K5 引用逐条核
@@ -117,7 +117,7 @@ m = 1（写行）+1（暖机）+1（第一次用户发布）= 3，与 Opus 算�
 （mount.rs:155/641/642、recovery.rs:219、allocator.rs:513/524/636/660、fault_injection.rs:276/362/398/483）
 与 Opus 报告逐字相同（只是 glob 展开顺序不同，不影响集合）；`_m2-rootchoice-repair-r1-body.md:22` 确实写
 「只命中三处」，Opus「这中间有别的会话落地了新开关」的推断与 `fault_injection.rs` 是当天新建的未跟踪文件
-（mtime 12:02，早于快照 22:57）这一事实相容。
+（mtime 早于快照）这一事实相容。
 
 `fault_injection.rs:276`、`:286-292`、`:393-400`、`:486-494`、`:658`、`:666` 六处引用逐条核：✓ 全部逐字相同
 （主树，manifest 未覆盖，见第一节说明）。

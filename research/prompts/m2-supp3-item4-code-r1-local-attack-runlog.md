@@ -1,4 +1,4 @@
-# 运行记录：m2-supp3-item4-code-r1-local-attack（2026-09-21 UTC）
+# 运行记录：m2-supp3-item4-code-r1-local-attack（2026-09-21）
 
 提示文件：
 - `research/prompts/m2-supp3-item4-code-r1-local-attack-k3.md`（英文，K3：设备说谎那一类该不该进；3 道 judgment，各 3 项子答复，9 格）

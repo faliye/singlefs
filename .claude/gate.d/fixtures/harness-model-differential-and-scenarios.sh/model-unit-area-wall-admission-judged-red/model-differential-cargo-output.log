@@ -1,0 +1,13 @@
+    Finished `release` profile [optimized] target(s) in 0.21s
+     Running tests/random_histories.rs (target/release/deps/random_histories-0000000000000000)
+
+running 1 test
+── 随机历史：小盘上逼近单元区墙的取样点 ──
+种子 [0, 32)，每段 150 步，比重：往单元区墙走；每一步之后跑池级 checker；两块单元区 256 槽的小盘；空间准入关着（只供测试的开关）
+  checker 跑了 4749 次；一个写都没发、沿用上一次结论的 612 步；已知红第 0 条那一形只记不停 0 步（0 段历史）
+  模型对拍 4749 步：该拒而拒 649、区间里拒 325、该成而成 3775；比过根 4400 条、分配记录 78450 条、冷启动内容 52 次、抬 F 上限 165 次；回退到 txg = F_生效 > 0 的根做成 0 次；单元区墙按区间放行 312 次
+用时 18.1 秒
+test unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 25 filtered out; finished in 18.10s
+

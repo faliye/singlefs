@@ -3,7 +3,7 @@
 # 用法：bash rerun.sh [冻结副本根] [草稿目录]
 #   冻结副本根默认 /tmp/claude-1000/l0scale-r1-frozen；草稿目录默认 /tmp/claude-1000/m2-layer0-scale-r2-opus-rerun
 # 环境变量：THREADS（线程上限，默认 10）。只跑本目录的两个探针二进制（名字不带 layer0），不跑名字带 layer0 的目标、不跑 54 号。
-# 挂钟（2026-09-26 JST 本机、10 线程、nice 19）：q3 约 6 分钟，q1 随机 120 条约 16 分钟，q6 约 19 分钟，q9 约 4 分钟，其余每格不到 1 分钟。
+# 挂钟（2026-09-26 本机、10 线程、nice 19）：q3 约 6 分钟，q1 随机 120 条约 16 分钟，q6 约 19 分钟，q9 约 4 分钟，其余每格不到 1 分钟。
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$here/../../.." && pwd)"

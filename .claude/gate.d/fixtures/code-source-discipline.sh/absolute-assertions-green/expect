@@ -1,0 +1,8 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：absolute-assertions
+want=✓ 6 个实验二进制各自至少有一条绝对值断言（research/e7-index-bench/src/bin 下 4 份，别处 src/bin 下以 e<数字>_ 开头的 2 份）
+want=没判的 1 份（别处 src/bin 下不以 e<数字>_ 开头，按装置工具算）
+want=crates/demo/src/bin/probe.rs
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=absolute-assertions：绿
+want=code-source-discipline.sh：1 格里 1 格绿（absolute-assertions），0 格本次未跑（无）

@@ -1,7 +1,7 @@
 # 实现员报告：impl-m2-vm-raise-floor2（实二四续：抬 F 模式让 F 真的抬过 0；增补 2 收口表第 58 行）
 
-时刻一律 UTC（东京 = UTC+9）。仓副本 `repo/`（17:03:37 从主工作区 rsync，HEAD `e980a21`；那三个文件与 `crates/mutations.tsv` 的原件快照在 `base/`，不改动的对照副本 `pristine/`）。
-主工作区一个字没动：改动只在补丁里，变异表的改动只在两份 tsv 里。17:23:28 核过：主工作区那三个文件与 `crates/mutations.tsv` 仍与 `base/` 逐字节相同，补丁 `git apply --check` 退出 0。
+仓副本 `repo/`（开工时从主工作区 rsync，HEAD `e980a21`；那三个文件与 `crates/mutations.tsv` 的原件快照在 `base/`，不改动的对照副本 `pristine/`）。
+主工作区一个字没动：改动只在补丁里，变异表的改动只在两份 tsv 里。交回前核过：主工作区那三个文件与 `crates/mutations.tsv` 仍与 `base/` 逐字节相同，补丁 `git apply --check` 退出 0。
 
 ## 一、交付物
 
@@ -66,7 +66,7 @@ RaiseRollbackFloor name=device_log device=1 declared_entries=NA expected_writes=
 
 ## 三、门禁 55 号要改的新行（交主 agent 改；我没碰 `.claude/gate.d/`）
 
-主工作区的 55 号今天 `MODES` 仍是五档（17:24 现读 `.claude/gate.d/55-qemu-first-transaction.sh:31`），上一轮报告给的 `raise-rollback-floor` 那几行还没进去。下面是这一版（发布 D + 抬 F 到上限）该进去的，覆盖上一轮报告第六节给的那几条：
+主工作区的 55 号今天 `MODES` 仍是五档（交回前现读 `.claude/gate.d/55-qemu-first-transaction.sh:31`），上一轮报告给的 `raise-rollback-floor` 那几行还没进去。下面是这一版（发布 D + 抬 F 到上限）该进去的，覆盖上一轮报告第六节给的那几条：
 
 - `MODES` 加 `raise-rollback-floor`（六档）。
 - `cold_root_of`：`raise-rollback-floor) printf '2:11' ;;`
@@ -98,7 +98,7 @@ RaiseRollbackFloor name=device_log device=1 declared_entries=NA expected_writes=
 
 ## 五、每条新测试「改坏哪一行 → 哪条断言红」
 
-基线（`pristine/`，17:04 起跑，debug）：三个测试二进制全绿，**基线红集为空**——
+基线（`pristine/`，debug）：三个测试二进制全绿，**基线红集为空**——
 
 ```
 test result: ok. 68 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.90s
@@ -106,7 +106,7 @@ test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
 ```
 
-证红办法：`proof/prove.py` 每条变异一份新副本（从 `repo/` 连 target 一起 rsync，各用各的 target），改坏一处、对被改文件 touch、跑那条测试所在的**整个**测试二进制（`--lib` 或 `--bin <名>`，不按名字挑），记红了哪些，跑完删副本、不拷回。17:14 前后起跑、17:19:10 跑完，14 条全部在 debug 下红在点名那条测试的断言上（没有一条红在 `debug_assert` 或编译错上），没跑 release。证红跑在补丁的前一版上，与最终补丁只差 6 处文档注释（`on_device_modes.rs` 因此多 2 行）；下表行号已换算成「主工作区 + 最终补丁」的。明细 `proof/summary.txt`，日志 `proof/row-NN.log`。
+证红办法：`proof/prove.py` 每条变异一份新副本（从 `repo/` 连 target 一起 rsync，各用各的 target），改坏一处、对被改文件 touch、跑那条测试所在的**整个**测试二进制（`--lib` 或 `--bin <名>`，不按名字挑），记红了哪些，跑完删副本、不拷回。14 条全部在 debug 下红在点名那条测试的断言上（没有一条红在 `debug_assert` 或编译错上），没跑 release。证红跑在补丁的前一版上，与最终补丁只差 6 处文档注释（`on_device_modes.rs` 因此多 2 行）；下表行号已换算成「主工作区 + 最终补丁」的。明细 `proof/summary.txt`，日志 `proof/row-NN.log`。
 
 | # | 变异（改坏哪一行） | 红的测试 → 断言 | 同时红的 |
 |---|---|---|---|
@@ -125,7 +125,7 @@ test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 | ⑬ | 重证第 619 行：`first_transaction_on_device.rs:103` 分段表删掉 `"raise_rollback_floor",` | `every_mode_registers_its_own_segments_with_no_repeats` → `:1968`「…多发布 D 与抬 F 两段…」 | 无 |
 | ⑭ | 重证第 620 行：`first_transaction_device_log_check.rs:185` 抬 F 那一段的终点记成 `ThirdTransaction` | `raise_rollback_floor_mode_compares_…` → `:861` | `every_mode_reruns_…` |
 
-（`mount.rs` 的行号是主工作区 17:25 现取的，那份文件归实二二三，不在补丁里；⑩⑪ 证红用的是 17:03 的快照。）
+（`mount.rs` 的行号是主工作区交回前现取的，那份文件归实二二三，不在补丁里；⑩⑪ 证红用的是开工时的快照。）
 
 新测试与扩了的测试各由哪几行证过：`raise_rollback_floor_mode_publishes_the_fourth_version_…`（改名重写）由 ①②⑧；`fourth_version_publish_failing_midway_…`（新）由 ③；`the_four_versions_differ_…`（改名扩断言）由 ④⑦；宿主检查两条（扩断言）由 ⑤⑥⑭；`failed_raise_…`（前置多了发布 D）由 ⑩⑪⑫；`every_mode_registers_…`（扩断言）由 ⑬。**没有留给 59 号的行**：追加的 6 行、接替的 2 行都证过。
 
@@ -151,9 +151,9 @@ test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 ```
   ✓ 147 个实验二进制都有成形的变异表，1614 条变异的原文各命中源码一次；crates/mutations.tsv 621 条的原文各命中源码一次（本阶段不跑变异，只验装置在、锚点对得上、两段里没有 \n 以外的反斜杠转义、crates 那张表里没有两行重复——重复按「文件 + 原文 + 替换文 + 点名的测试」四项认，变异名另判）
 ```
-退出码 0。第 494、496 行的锚点在 `mount.rs`（实二二三在改），以上核的是 17:03 的快照。
+退出码 0。第 494、496 行的锚点在 `mount.rs`（实二二三在改），以上核的是开工时的快照。
 
-## 七、交回前的验证（都在 `repo/`，线程上限 5，`nice -n 19`，17:22–17:23 跑最终那一版）
+## 七、交回前的验证（都在 `repo/`，线程上限 5，`nice -n 19`，跑最终那一版）
 
 动到的三个测试二进制（整个二进制，debug），末尾原样：
 
@@ -167,7 +167,7 @@ test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 tests_exit=0
 ```
 
-`cargo clippy --offline --all-targets --all-features -- -D warnings` 加 `check.sh` 那七条 `-D clippy::…`，告警与错误 0 条，末尾原样（最终这一版只重查了 harness；17:13 那一次从零查了四个 crate，同样 0 条、退出 0）：
+`cargo clippy --offline --all-targets --all-features -- -D warnings` 加 `check.sh` 那七条 `-D clippy::…`，告警与错误 0 条，末尾原样（最终这一版只重查了 harness；更早那一次从零查了四个 crate，同样 0 条、退出 0）：
 
 ```
     Checking singlefs-harness v0.1.0 (/tmp/claude-1000/impl-m2-vm-raise-floor2/repo/crates/singlefs-harness)
@@ -184,7 +184,7 @@ build_exit=0
 
 `cargo fmt --all -- --check` 退出 1，`Diff in` 只落在 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`（第 1927、2370、3628、5988、6039 行，E158 执行员没提交的改动，不是我的）；我那三个文件 `rustfmt --edition 2021 --check` 退出 0。
 
-`git apply --check`（主工作区，17:23:28）退出 0，无输出。
+`git apply --check`（主工作区）退出 0，无输出。
 
 登记给实现员的门禁阶段（`stage-owners.tsv`），拿副本 `repo/` 当被判目录跑，末行与退出码原样：
 - 33 号：见第六节，退出 0（带参数跑时它按相对路径找 `research/e7-index-bench/src/bin`、退 77，从副本根重跑才判到）。
@@ -195,7 +195,7 @@ build_exit=0
 - 93 号：`  ✓ feature bit 位号在记账表、D15（格式冻结政策） 已定项 4 与代码三处一致…`，退出 0。
 - 89 号：`  ⊘ 本次未跑：收口表第 27 行那几笔的前置一个都没进来，今天无对象可判（5 条逐字探针、覆盖 4 笔，逐条对上今天的值）`，退出 77。
 
-## 八、主工作区 `git diff --stat -- crates litmus`（17:24 现跑，原样）
+## 八、主工作区 `git diff --stat -- crates litmus`（交回前现跑，原样）
 
 那是别的会话没提交的改动与上一轮已经打进来的补丁（我的改动只在补丁里，不在主工作区），照定义原样附上：
 
@@ -252,7 +252,7 @@ build_exit=0
 
 ## 九、负载
 
-开工（17:03）`ps` 看到别的会话的 `cargo test --release --bin e142-first-txn-dry-run`（pid 2653009）；17:10 再看：`cargo test --release -p singlefs-harness --test opus_r1_attack z6_a2`（pid 2656491）、三条 E158 的 `cargo run --release … e158_root_choice_repair`（在 `/tmp/claude-1000/e158-s9/arms/…` 各自的目录里）、`cargo test --release --bin e142-first-txn-dry-run`（pid 2944188）；17:22 前再看，没有 `qemu-system`、`vm-bench.sh`、E152、`fio`。各用各的 target，没等文件锁。我的每条编译、测试命令都是 `nice -n 19 bash research/scripts/capped.sh 5 …`，证红的 14 份副本一次只跑一份。
+开工时 `ps` 看到别的会话的 `cargo test --release --bin e142-first-txn-dry-run`（pid 2653009）；之后再看：`cargo test --release -p singlefs-harness --test opus_r1_attack z6_a2`（pid 2656491）、三条 E158 的 `cargo run --release … e158_root_choice_repair`（在 `/tmp/claude-1000/e158-s9/arms/…` 各自的目录里）、`cargo test --release --bin e142-first-txn-dry-run`（pid 2944188）；交回前再看，没有 `qemu-system`、`vm-bench.sh`、E152、`fio`。各用各的 target，没等文件锁。我的每条编译、测试命令都是 `nice -n 19 bash research/scripts/capped.sh 5 …`，证红的 14 份副本一次只跑一份。
 
 ## 十、没做什么
 

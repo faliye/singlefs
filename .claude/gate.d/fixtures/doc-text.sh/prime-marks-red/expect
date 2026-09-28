@@ -1,0 +1,10 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：prime-marks
+want=2 行用了角标写法
+want=.claude/kb/候选.md:3  …
+want=crates/demo/src/variant.rs:1  …
+want=── 汇总：doc-text.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=  prime-marks：红（退出 1）
+want=doc-text.sh：1 格里 1 格红（prime-marks）
+want=→ prime-marks：给变体起一个新名字
+want=bash .claude/gate.d/doc-text.sh --check prime-marks

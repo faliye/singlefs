@@ -122,7 +122,7 @@ E12（攒批的顺序追加 vs 不攒批的随机页读改写） 更是靠它做
 
 `VM_BLKLOGWRITES_DIR=<目录>` 时，`vm-bench.sh` 在每块盘前面套一层 QEMU 的 `blklogwrites` 过滤节点（本机 QEMU 8.2.2 带这个驱动，2026-09-14 现查）。
 来宾发到盘上的每个写（带数据）与每个 FLUSH 按 dm-log-writes 格式记进 `<目录>/log<d>.img`；数据盘也放在同一个目录（`disk<d>.img`），跑完不删。
-录制在来宾之外，与被测程序自己的录制器不共享代码。解析与比对在 `crates/singlefs-checker-tier/src/device_log.rs`，判据在门禁 55 号（`.claude/gate.d/55-qemu-device-streams.sh`）。
+录制在来宾之外，与被测程序自己的录制器不共享代码。解析与比对在 `crates/singlefs-checker-tier/src/device_log.rs`，判据在门禁 checker-tier-qemu-device-streams（`.claude/gate.d/checker-tier-qemu-device-streams.sh`）。
 
 | 现象（2026-09-14 实测，新池新建文件） | 口径 |
 |---|---|
@@ -130,7 +130,7 @@ E12（攒批的顺序追加 vs 不攒批的随机页读改写） 更是靠它做
 | 来宾 `/sys/block/<名>/stat` 的写请求数 = 程序的写数 + FLUSH 数（盘 0：23 + 12 = 35） | 比对用写扇区数（= 字节 ÷ 512）与 FLUSH 数；FLUSH 数是 stat 的下标 15，不是 14（14 是 discard 耗时，读它会得到 0） |
 | 走页缓存时设备侧的写被合并 | m1（32 KiB）与 m2（16 KiB）回写成一个 48 KiB 的写；这是阳性对照判红的地方 |
 
-⚠️ **日志盘要装得下全部写的数据**：`log<d>.img` 的大小取 `VM_LOG_MB`（MiB），`vm-bench.sh` 自己的默认是 256。mkfs 按 4 MiB 一块写零 768 MiB 之后，每块盘的日志实用约 770 MiB（2026-09-27 实测，VM_DISKS=2、每盘 4096 MiB，六档都在 769–771 MiB）；256 MiB 时 direct、file-overwrite、second-instance 三档在 mkfs 里报 `run_failed step=mkfs cause=BlockDevice(InputOutput(…I/O error))`；page-cache、skip-new-pool-file-creation-barrier、raise-rollback-floor 三档那一次没报，为什么没查。门禁 55 号因此默认传 `VM_LOG_MB=4096`（一块数据盘的大小，镜像是稀疏文件，只占真写进去的那些）；别处开 blklogwrites 模式的，照写的数据量设 `VM_LOG_MB`。
+⚠️ **日志盘要装得下全部写的数据**：`log<d>.img` 的大小取 `VM_LOG_MB`（MiB），`vm-bench.sh` 自己的默认是 256。mkfs 按 4 MiB 一块写零 768 MiB 之后，每块盘的日志实用约 770 MiB（2026-09-27 实测，VM_DISKS=2、每盘 4096 MiB，六档都在 769–771 MiB）；256 MiB 时 direct、file-overwrite、second-instance 三档在 mkfs 里报 `run_failed step=mkfs cause=BlockDevice(InputOutput(…I/O error))`；page-cache、skip-new-pool-file-creation-barrier、raise-rollback-floor 三档那一次没报，为什么没查。门禁 checker-tier-qemu-device-streams 因此默认传 `VM_LOG_MB=4096`（一块数据盘的大小，镜像是稀疏文件，只占真写进去的那些）；别处开 blklogwrites 模式的，照写的数据量设 `VM_LOG_MB`。
 
 ⚠️ 这一档验的是「程序发出的写与 FLUSH 在虚拟设备上原样到达、次序不变」，不是真盘的持久语义：`cache=none` 下设备侧 FLUSH 映射成宿主上的 `fdatasync`，宿主盘自己的缓存不在射程里。
 
@@ -160,7 +160,7 @@ E12（攒批的顺序追加 vs 不攒批的随机页读改写） 更是靠它做
 | 真要按到达时刻切，先把子进程输出整份读到 EOF、每行记下到达时刻，读完再转打 | E152（按里程碑对比六家文件系统的文件性能） 装置的 `read_lines_with_arrival_times`：签名里不给输出句柄，读的循环里写不出转打 |
 | 外层与里层两个数都有时，报一个包含自检，外层不包住里层的轮不进中位 | E152（按里程碑对比六家文件系统的文件性能） 的 `file_overwrite_outer_contains_inner`，汇总时 false、NA、缺字段的轮报 `summary_excluded` |
 
-谁在拦：门禁 65 号（`research/scripts/relay-timing-lint.py`）扫 `research/` 与 `crates/` 下的 Rust 与 Python 装置，读子进程输出的循环里同时取时间与输出就判红；它认得出读循环被挪进同一个文件里的另一个函数（跨一层）；输出藏进自己写的函数、子进程输出跨文件或隔两层以上传递、经通道或结构体字段传出去、shell 的 `while read` 配 `date` 这几种写法它够不着，逐条列在脚本头。不扫 `research/prompts/` 与 `research/results/`（冻结证据）。
+谁在拦：共享 `gate.sh` 内置的「转发计时」阶段（脚本已并入上游 `.claude/singlefs-ai-sop/scripts/relay-timing-lint.py`，不再是项目本地门禁、不在 `.claude/gate.d/` 下）扫 `research/` 与 `crates/` 下的 Rust 与 Python 装置，读子进程输出的循环里同时取时间与输出就判红；它认得出读循环被挪进同一个文件里的另一个函数（跨一层）；输出藏进自己写的函数、子进程输出跨文件或隔两层以上传递、经通道或结构体字段传出去、shell 的 `while read` 配 `date` 这几种写法它够不着，逐条列在脚本头。不扫 `research/prompts/` 与 `research/results/`（冻结证据）。
 ⚠️ 包含自检只查外层包不包住里层，两边一起偏查不出；子进程自己计的纳秒只有这一条路。
 
 ## 来宾块层计数与程序计数：写请求数的记法不同

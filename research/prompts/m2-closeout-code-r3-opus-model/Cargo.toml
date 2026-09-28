@@ -1,0 +1,13 @@
+[package]
+name = "opus-r3-proto"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "m2-closeout-code-r3 云端攻方腿的原型（只在草稿副本里）：调 singlefs-checker-tier 的枚举函数跑自己造的小流，不跑 checker 档包自己的测试"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-harness = { path = "../singlefs-harness" }

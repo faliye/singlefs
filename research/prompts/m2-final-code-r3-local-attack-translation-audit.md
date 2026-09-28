@@ -1,4 +1,4 @@
-# 转述核对表：m2-final-code-r3-local-attack（2026-09-25 UTC）
+# 转述核对表：m2-final-code-r3-local-attack（2026-09-25）
 
 逐句核对 `research/prompts/m2-final-code-r3-local-attack.md`（本地攻方：分配记录树 W 与内部扇出、
 根层公式在三种盘配置上各取几、extent 树三个宽度、145 单元文件下段几层，五道算术题）里每一条

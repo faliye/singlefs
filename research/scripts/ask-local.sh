@@ -6,7 +6,7 @@
 #   ask-local.sh <prompt 文件>        提示从文件读，答案打到 stdout
 #   cat p.md | ask-local.sh           也接 stdin
 #
-# 上游是 ~/code/ai-center 的 OpenAI 兼容网关（:8200，前置 vLLM）。
+# 上游是 ~/code/ai-center 的 OpenAI 兼容网关（:8200，前置本地模型服务）。
 # 不传 max_tokens / thinking_token_budget —— 网关按两本账补值并按形状学习，
 # 传一个偏小的值等于把自己按死在那个值上（ai-center kb/token-budget.md）。
 #

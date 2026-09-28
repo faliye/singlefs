@@ -1,0 +1,14 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.53s
+     Running tests/acquisition_writes_the_witnessed_journal_tail_so_two_crashed_acquisitions_still_witness_the_newest_publish.rs (target/debug/deps/acquisition_writes_the_witnessed_journal_tail_so_two_crashed_acquisitions_still_witness_the_newest_publish-40b7a09b951c2332)
+
+running 6 tests
+test the_first_acquisition_after_mkfs_still_writes_tail_zero_so_the_first_transaction_bytes_do_not_change ... ok
+test a_later_acquisition_writes_the_largest_tail_of_the_pool_into_every_device_when_the_first_device_lost_its_newest_slot ... ok
+test a_later_acquisition_writes_the_largest_tail_of_the_pool_into_every_device_when_the_second_device_lost_its_newest_slot ... ok
+test a_rolled_back_acquisition_writes_the_witnessed_tail_back_instead_of_zero ... ok
+test two_crashed_acquisitions_in_a_row_still_witness_the_newest_publish_so_the_writable_mount_refuses_instead_of_abandoning_its_unreadable_root ... ok
+test three_crashed_acquisitions_in_a_row_carry_the_witness_from_acquisition_write_to_acquisition_write ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.28s
+

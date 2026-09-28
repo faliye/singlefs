@@ -1,0 +1,6 @@
+E7RESULT name=attack_small_paths path_a_writes=41 path_a_segments=11 path_b_writes=70 path_b_segments=15 path_b_lengths=[2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2] shared_prefix_identical=true
+E7RESULT name=attack_state_budget world=small_domain_path_a closed_form_state_count=16777240 enumerated_with_torn=45 writes=41 segments=11
+E7RESULT name=attack_u4_shared_node states=44 judgment_digest_differs=0 red_list_differs=0 segments_whose_publish_label_differs=["10:after_the_last_root->instance1_txg4"] enumerated_states=45
+E7RESULT name=attack_g2 states=44 classes_by_representative_positions=38 states_whose_judgment_differs_from_their_class=6 gpu_cpu_partition_mismatch=0 must_be_nonzero=6
+E7RESULT name=attack_p4 pairs_differing_in_one_write=62 pairs_reading_positions_the_flipped_write_does_not_cover=10 example=Some("segment=0 flipped_write=1 kind=SystemConfigurationSlot NotPersisted->Torn positions_not_covered_by_the_flipped_write=4064") must_be_nonzero=10
+E7RESULT name=done emitted=6

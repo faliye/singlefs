@@ -1,0 +1,4 @@
+E7RESULT name=r2_state_budget world=b1_x closed_form_state_count=16777240 enumerated_with_torn=45 writes=41 segments=11
+E7RESULT name=r2_b1_merge world=x_versus_payload_mutant_z segments=11 segments_with_equal_b1_label=11 compared_states=44 states_equal_label_status_differs=8 in_segments={10} example_z=Some("segment=10 red=[\"oracle_consult:read_failed\", \"oracle_ignore:read_failed\", \"checker:I-2.1\", \"checker:I-4.8\", \"checker:I-7.2\", \"checker:I-7.4\"]") must_be_nonzero=8
+E7RESULT name=r2_b1_split world=x_versus_write_time_plus_one_y segments=11 segments_with_equal_b1_label=11 segments_with_equal_path_hash=7 compared_states=44 states_path_hash_differs_status_equal=12 in_segments={8, 9, 10} must_be_nonzero=12
+E7RESULT name=done emitted=4

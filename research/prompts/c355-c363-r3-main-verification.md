@@ -4,7 +4,7 @@
 
 材料：正文 `research/prompts/_c355-c363-r3-body.md`，清单 `_c355-c363-r3-checklist.md`、附录 `_c355-c363-r3-appendix.md`（23 段），拼成 `_c355-c363-r3-background.md`（956 行）。三条攻击面逐字取自第二轮判决第四节末尾。**这是第三轮，判完就停，不开第四轮。**
 
-**开工快照漂移**（`c355-c363-r3-snapshot/sha256sums.txt`，2026-09-23 20:35 JST 记）：13 份里 3 份变了。`checks-owed.md`（C37 行、C45 挪进已还清、C236 一处链接）与 `invariants.md`（插了 I-8.8、改了 I-8.3 / I-9.14 的措辞）——附录里抄的 C84 / C355 / C363 / C370 与 I-3.1 / I-5.4 六行主 agent 核过与今天逐字节相同，只是 I-3.1 / I-5.4 行号往后挪了 1。`crates/singlefs-core/src/mount.rs` 被 C512（根记录加分配记录树根指针）那条实现线改了，核查员量出漂移比主 agent 给它的描述大得多（`git diff` 新增 346 行、删除 187 行，含 `raise_rollback_floor` 的文档注释重写与新的错误成员）；它逐条核过三条腿引的 `raise_rollback_floor`、`release_reclaim_holds`、`sort_key`、`release()` 等都不落在漂移的那几处，结论不受影响。
+**开工快照漂移**（`c355-c363-r3-snapshot/sha256sums.txt`，2026-09-23 记）：13 份里 3 份变了。`checks-owed.md`（C37 行、C45 挪进已还清、C236 一处链接）与 `invariants.md`（插了 I-8.8、改了 I-8.3 / I-9.14 的措辞）——附录里抄的 C84 / C355 / C363 / C370 与 I-3.1 / I-5.4 六行主 agent 核过与今天逐字节相同，只是 I-3.1 / I-5.4 行号往后挪了 1。`crates/singlefs-core/src/mount.rs` 被 C512（根记录加分配记录树根指针）那条实现线改了，核查员量出漂移比主 agent 给它的描述大得多（`git diff` 新增 346 行、删除 187 行，含 `raise_rollback_floor` 的文档注释重写与新的错误成员）；它逐条核过三条腿引的 `raise_rollback_floor`、`release_reclaim_holds`、`sort_key`、`release()` 等都不落在漂移的那几处，结论不受影响。
 
 ## 一、三条腿与核查员
 

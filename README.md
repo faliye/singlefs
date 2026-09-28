@@ -40,11 +40,11 @@ waaagh！
 
 | 验证 | 现状 |
 |---|---|
-| 崩溃点重放（门禁 54 号） | 层 0 两条流：新池新建文件；覆盖写、释放、回退与复用的固定脚本（覆盖写、释放、重开写行、暖机、回退、抬 F、复用各一次）。另有 `.claude/gate.d/stage-inputs.tsv` 登记的崩溃枚举用例。固定脚本那条流的层 0 结果还没重核，暂不作数。**门禁全绿只构成新池新建文件在模型层的崩溃一致性证据** |
+| 崩溃点重放（门禁 54-layer0-replay） | 层 0 两条流：新池新建文件；覆盖写、释放、回退与复用的固定脚本（覆盖写、释放、重开写行、暖机、回退、抬 F、复用各一次）。另有 `.claude/gate.d/stage-inputs.tsv` 登记的崩溃枚举用例。固定脚本那条流的层 0 结果还没重核，暂不作数。**门禁全绿只构成新池新建文件在模型层的崩溃一致性证据** |
 | checker | 判 46 条不变量，数法见表后那条命令 |
-| 模型对拍（门禁 74 号） | 随机历史的快档加五个偏向某种历史的取样点，每一步拿实现的结局与只住内存的理想模型比 |
-| QEMU 真设备（门禁 55 号） | 两块 virtio 盘上跑新池新建文件、发布 B、第二个实例、发布 D 与抬 F，设备侧独立录下的写与 FLUSH 和程序自己录的流逐项比；只有真实负载，没有崩溃注入 |
-| 内存序（门禁 57 号） | herd7 判 `litmus/` 下每条 Never，每条都配一条去掉屏障的对照 |
+| 模型对拍（门禁 harness-model-differential-and-scenarios） | 随机历史的快档加五个偏向某种历史的取样点，每一步拿实现的结局与只住内存的理想模型比 |
+| QEMU 真设备（门禁 checker-tier-qemu-device-streams） | 两块 virtio 盘上跑新池新建文件、发布 B、第二个实例、发布 D 与抬 F，设备侧独立录下的写与 FLUSH 和程序自己录的流逐项比；只有真实负载，没有崩溃注入 |
+| 内存序（门禁 checker-tier-lkmm） | herd7 判 `litmus/` 下每条 Never，每条都配一条去掉屏障的对照 |
 
 数 checker 判了几条：`grep -c '^| I-.*已实现' .claude/kb/invariants.md`。
 
@@ -103,10 +103,10 @@ waaagh！
 
 | 工具 | 验什么 |
 |---|---|
-| **QEMU / KVM** | 真实负载 + 崩溃注入下的端到端行为，是准入的最终判据。今天门禁 55 号只接了真实负载与设备侧录制，崩溃注入还没接，所以「最终判据」仍列在门禁的未实现清单里 |
+| **QEMU / KVM** | 真实负载 + 崩溃注入下的端到端行为，是准入的最终判据。今天门禁 checker-tier-qemu-device-streams 只接了真实负载与设备侧录制，崩溃注入还没接，所以「最终判据」仍列在门禁的未实现清单里 |
 | **herd7 / LKMM** | 并发路径的内存序——无锁结构、屏障、跨 CPU 可见性 |
-| 崩溃点重放 | 写请求流按每块盘自己的屏障切段，段内任意一组整写持久（原地覆写多一种「新旧都读不出」的撕裂态），枚举出的每个崩溃状态都生成镜像、跑恢复 + checker。由门禁 54 号跑：两条层 0 流加登记的崩溃枚举用例，哪些结果作数见「当前状态」 |
-| 模型对拍 | 功能正确性：随机操作序列与内存里的理想模型比对。由门禁 74 号跑：随机历史的快档加五个偏向某种历史的取样点，一共六段（段名以 74 号的 `SECTIONS` 为准），每一步拿实现的结局与只住内存的理想模型比 |
+| 崩溃点重放 | 写请求流按每块盘自己的屏障切段，段内任意一组整写持久（原地覆写多一种「新旧都读不出」的撕裂态），枚举出的每个崩溃状态都生成镜像、跑恢复 + checker。由门禁 54-layer0-replay 跑：两条层 0 流加登记的崩溃枚举用例，哪些结果作数见「当前状态」 |
+| 模型对拍 | 功能正确性：随机操作序列与内存里的理想模型比对。由门禁 harness-model-differential-and-scenarios 跑：随机历史的快档加五个偏向某种历史的取样点，一共六段，每段一格（段名以它文件头的格名表为准），每一步拿实现的结局与只住内存的理想模型比 |
 
 三条硬要求：
 
@@ -122,42 +122,55 @@ waaagh！
 bash .claude/scripts/gate.sh              # 共享阶段 + .claude/gate.d/ 的项目阶段（含 checker 档快档与逐条全绿标记核对、QEMU 真设备、herd7、crates 变异表复跑；层 0 全量不在里面）
 
 cargo test -p singlefs-harness            # harness 档：单元与集成测试，改了代码随时跑（.claude/rules/verification.md）
-SINGLEFS_HEAVY_TESTS=user-request cargo test --release -p singlefs-checker-tier --lib --tests   # checker 档快档：崩溃枚举用例住这个包的 tests/，全量那几条标 ignored；默认只在提交时由门禁 54 号跑
-bash .claude/gate.d/54-layer0-replay.sh   # 单跑 54 号快档（checker 档包不标 ignored 的用例），再逐条核登记的崩溃枚举用例各自那一格全绿标记，不作数的报「本次未跑」
-bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full <worktree>  # 层 0 全量（release）：暂存之后在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑（建法见快档判红时的出路句），逐条崩溃枚举用例按它自己的输入指纹复用或重跑，判绿写那一条的全绿标记
-bash .claude/gate.d/55-qemu-device-streams.sh  # 单跑 QEMU 两块 virtio 盘上的新池新建文件、发布 B、第二个实例、发布 D 与抬 F
+SINGLEFS_HEAVY_TESTS=user-request cargo test --release -p singlefs-checker-tier --lib --tests   # checker 档快档：崩溃枚举用例住这个包的 tests/，全量那几条标 ignored；默认只在提交时由门禁 54-layer0-replay 跑
+bash .claude/gate.d/54-layer0-replay.sh   # 单跑 54-layer0-replay 的快档（checker 档包不标 ignored 的用例），再逐条核登记的崩溃枚举用例各自那一格全绿标记，不作数的报「本次未跑」
+bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full <worktree>  # 层 0 全量（release）：暂存之后在 HEAD + 暂存区的 worktree 里用那棵树里的 54-layer0-replay 跑（建法见快档判红时的出路句），逐条崩溃枚举用例按它自己的输入指纹复用或重跑，判绿写那一条的全绿标记
+bash .claude/gate.d/checker-tier-qemu-device-streams.sh  # 单跑 QEMU 两块 virtio 盘上的新池新建文件、发布 B、第二个实例、发布 D 与抬 F
 bash .claude/scripts/lkmm.sh              # 单跑 LKMM，需要 herd7 与一棵内核树
 bash research/scripts/vm-bench.sh --selftest  # 单跑虚机装置自检（装置归项目）
 ```
 
 `lkmm.sh` 要 `opam install herdtools7`，并用 `SINGLEFS_KERNEL_TREE=` 指一棵带
 `tools/memory-model` 的 Linux 源码树。虚机装置 `research/scripts/vm-bench.sh` 要可读的内核镜像，
-找不到会给出办法而**不会静默降级到软件模拟**。门禁 55 号要 `qemu-system-x86_64` 与 KVM，
+找不到会给出办法而**不会静默降级到软件模拟**。门禁 checker-tier-qemu-device-streams 要 `qemu-system-x86_64` 与 KVM，
 前置条件见 [`.claude/kb/vm-harness.md`](.claude/kb/vm-harness.md)「三个前置」。
 
 ### 层 0 全量分到两台机器上跑（可选）
 
-默认不分片：没有下面这份配置，或者配置判不过，门禁 54 号 `--full` 就在本机单机跑。
+默认不分片：没有下面这份配置、配置判不过，或者配置里的双机开关 `ENABLE_ACROSS_MACHINES` 不是 1，门禁 54-layer0-replay 的 `--full` 就在本机单机跑。这份配置是多机配置：层 0 分片、门禁 checker-tier-crates-mutation-replay 的双机分片与通用跨机脚本（「把一件活挪到第二台跑（可选）」那一节）共用一份。
 
-要分片，就在本机写一份配置。路径是 `${SINGLEFS_LAYER0_SHARD_CONFIG:-<主工作树的根>/layer0-shard.env}`，已被 git 忽略、不进仓；从仓根的模板 `layer0-shard.env.example` 拷一份改。一行一个 `KEY=值`，值不做 shell 展开，七个键都要写：
+要分片，就在本机写一份配置。路径是 `${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}`，已被 git 忽略、不进仓；从仓根的模板 `multi-host.env.example` 拷一份改。一行一个 `KEY=值`，值不做 shell 展开。前八个键都要写，最后两个开关没写算关：
 
 | 键 | 写什么 |
 |---|---|
 | `PEER_SSH_HOST` | 第二台的 ssh 别名，要能免密登录（`ssh -o BatchMode=yes <别名> true` 退 0） |
 | `PEER_REPOSITORY_DIRECTORY` | 第二台上的专用目录（绝对路径）：每一趟在 `runs/` 下放树与编译目录、跑完删；两片的进度文件与账本在 `progress/<输入指纹>/` |
 | `PEER_CARGO_BIN_DIRECTORY` | 第二台的 `~/.cargo/bin`（绝对路径；非登录 shell 的 PATH 里没有它） |
+| `PEER_MEMORY_CAP` | 第二台上那一份活的内存上限（写法照 `research/scripts/run-with-memory-cap.sh`：正整数加 K / M / G / T），不大于第二台的内存减去它上面别的服务的占用 |
 | `QUIESCE_STOP_COMMAND` | 开跑前在本机跑的清场命令，空串表示不清场 |
 | `QUIESCE_STOPPED_CHECK_COMMAND` | 清场之后回读，退 0 才算清完；写了 STOP 就要写它 |
 | `QUIESCE_START_COMMAND` | 跑完（跑红了也跑）在本机复原；写了 STOP 就要写它 |
 | `QUIESCE_STARTED_CHECK_COMMAND` | 复原之后回读，退 0 才算复原了；写了 START 就要写它 |
+| `ENABLE_ACROSS_MACHINES` | 双机开关：写 1 才开，没写或写 0 算关，写别的值判法报错；层 0 分片、checker-tier-crates-mutation-replay 的双机分片、跨机脚本的 `--peer` 都要它是 1 |
+| `ENABLE_GPU` | GPU 开关：写 1 才开，没写或写 0 算关，写别的值判法报错；用 GPU 的崩溃放量与核对要它是 1 |
 
-写完先判一次：`bash research/scripts/layer0-shard-configuration-check.sh [<仓根>]`，退 0 就能分片。环境变量 `SINGLEFS_LAYER0_SHARD`（`<i>/<n>` 或 `merge/<n>`）由驱动脚本 `research/scripts/layer0-shard-run.sh` 自己设，一般不用手设。第二台的构建环境（`~/.cargo/config*`、`RUSTFLAGS` 这类）进输入指纹，与本机对不上时驱动脚本拒跑。
+写完先判一次：`bash research/scripts/layer0-shard-configuration-check.sh [<仓根>]`：退 0 是双机开、能分片；退 3 是配置判得过但双机开关没开，照单机跑；退 1 是判不过。两个开关的定义只在这份判法里。环境变量 `SINGLEFS_LAYER0_SHARD`（`<i>/<n>` 或 `merge/<n>`）由驱动脚本 `research/scripts/layer0-shard-run.sh` 自己设，一般不用手设。第二台的构建环境（`~/.cargo/config*`、`RUSTFLAGS` 这类）进输入指纹，与本机对不上时驱动脚本拒跑。
 
 走分片的只有在 `.claude/gate.d/stage-inputs.tsv` 的崩溃枚举用例行里登记了 `shard=across-machines` 的用例，今天是两条层 0 流（`crash-case:layer0-first-stream`、`crash-case:layer0-second-stream`），别的用例照旧在本机单机跑。分片时本机跑第 0/2 片、第二台跑第 1/2 片，第二台的账本拷回本机后按 `merge/2` 并起来；merge 那一趟的输出照单机的判法判，判绿写同一格全绿标记。两片的进度文件各留在自己的进度目录里，被杀之后下一趟接着跑。
 
 两台要装同一个 rustup 工具链：`rustc -Vv` 的前三行与 host 行、`cargo -V` 逐字相同，否则驱动脚本拒跑。本机要有 `rsync`、`ssh`，第二台要有 `python3` 与 `git`（它在树副本里算输入指纹）。
 
-驱动脚本也能单独调：`bash research/scripts/layer0-shard-run.sh <crash-case:键> <树根>`，树根是 HEAD + 暂存区那棵树（建法同 54 号 `--full`）。它跑的是标了 ignore 的全量用例，和层 0 全量一样只在提交时或用户要求时跑。`bash research/scripts/layer0-shard-run.sh --selftest` 不碰第二台：本机起两个进程各跑一片，走同一条路（工具链与指纹比对、清场与复原、两片、merge、判、写标记）。
+驱动脚本也能单独调：`bash research/scripts/layer0-shard-run.sh <crash-case:键> <树根>`，树根是 HEAD + 暂存区那棵树（建法同 54-layer0-replay 的 `--full`）。它跑的是标了 ignore 的全量用例，和层 0 全量一样只在提交时或用户要求时跑。`bash research/scripts/layer0-shard-run.sh --selftest` 不碰第二台：本机起两个进程各跑一片，走同一条路（工具链与指纹比对、清场与复原、两片、merge、判、写标记）。
+
+### 把一件活挪到第二台跑（可选）
+
+本机的内存包装排队、或者 CPU 被别的长活占满时，结果是文件的确定性活（编译加单测、实验装置跑产物）可以挪到第二台跑：
+
+```bash
+bash research/scripts/multi-host-run.sh [--peer] [--memory-cap <上限>] [--label <标签>] [--fetch <树里的相对路径>]… -- <命令与参数…>
+```
+
+默认不跨机：不带 `--peer` 就在本机仓根经 `research/scripts/run-with-memory-cap.sh` 跑那条命令，不读多机配置。带 `--peer` 要多机配置判得过、而且 `ENABLE_ACROSS_MACHINES=1`，没开就拒、不偷偷退回本机。它比两台工具链（不同就拒），把 git 列得出的文件（不带 `.git`、编译目录与被 git 忽略的本地配置）拷到第二台 `runs/<标签>/`，在那边经那棵树里的内存包装跑（上限不大于 `PEER_MEMORY_CAP`），`--fetch` 点名的产物取回本机，跑完删掉第二台那一趟的目录；退出码就是那条命令的。输出里第二台的主机与目录一律换成「第二台」。重型测试的规矩照旧，不因为挪到第二台就能跑。`bash research/scripts/multi-host-run.sh --selftest` 不碰第二台（「第二台」是本机上的另一个目录）。
 
 **门禁脚本与规则由 [singlefs-ai-sop](https://github.com/faliye/singlefs-ai-sop) 统一分发**，
 所有参与者跑的是同一套——判据一致，你才知道自己该验到什么程度。
@@ -185,10 +198,10 @@ bash .claude/scripts/gate.sh
 | [`crates/singlefs-core`](crates/singlefs-core) | mkfs、分配器、事务层（封闭的提交步骤枚举）、可写挂载与挂着的会话（管理员回退、抬 F、准入）、恢复、挂载态的读、各棵索引树、O_DIRECT 块设备后端 |
 | [`crates/singlefs-harness`](crates/singlefs-harness) | 写请求录制器、层 0 崩溃状态枚举（含断点续跑与双机分片）、设备侧日志核对、随机历史、崩溃注入与故障注入、坏盘输入、只住内存的理想模型，以及里程碑各步的验收用例 |
 | [`crates/singlefs-checker`](crates/singlefs-checker) | checker：与实现只共享格式常量，解析、校验、遍历各写一份 |
-| [`crates/mutations.tsv`](crates/mutations.tsv) | crates 的变异表：每条改坏一处、点名一条必须变红的测试，门禁 59 号复跑 |
+| [`crates/mutations.tsv`](crates/mutations.tsv) | crates 的变异表：每条改坏一处、点名一条必须变红的测试，门禁 checker-tier-crates-mutation-replay 复跑 |
 | [`.claude/kb/`](.claude/kb/) | 设计决策与变更史、不变量清单、实验索引与正文、欠账表、每个里程碑写出的字节表（`layout/`）、里程碑规划（`milestone/`）、验证手段与虚机装置怎么落地、他家方案调研、避坑清单 |
 | [`.claude/rules/`](.claude/rules/) | 项目本地规则：文件系统的设计纪律、格式演进、三方论证、实现流程等；共享规则在 `.claude/singlefs-ai-sop/rules/` |
-| [`.claude/scripts/`](.claude/scripts/) | 门禁包装，多数只转发到 singlefs-ai-sop 的共享脚本；`lkmm.sh`（门禁 57 号的逻辑）、`fetch-deps.sh`（取测试依赖）、`gen-decision-items.py`（生成决策分项清单）是项目自己的 |
+| [`.claude/scripts/`](.claude/scripts/) | 门禁包装，多数只转发到 singlefs-ai-sop 的共享脚本；`lkmm.sh`（门禁 checker-tier-lkmm 的逻辑）、`fetch-deps.sh`（取测试依赖）、`gen-decision-items.py`（生成决策分项清单）是项目自己的 |
 | [`.claude/gate.d/`](.claude/gate.d/) | 项目本地的门禁阶段；`stage-inputs.tsv` 登记每道阶段读哪些输入，以及崩溃枚举用例 |
 | [`.claude/agents/`](.claude/agents/) | subagent 的定义；共用约束在 `.claude/agent-common.md`，主 agent 的职责与调度表在 `.claude/main-agent.md` |
 | [`.claude/hooks/`](.claude/hooks/) | Claude Code 钩子：执行前拒绝重型测试、越界写、没超时的等待循环这几类写法，以及派发、续做、交回的闸 |
@@ -197,7 +210,7 @@ bash .claude/scripts/gate.sh
 | `.claude/singlefs-ai-sop/` | 共享规范与门禁脚本的拷贝，git 忽略，「开工」那一步取来 |
 | [`research/`](research/) | 实验：装置（`e7-index-bench/`）、留存产物（`results/`）、实验的变异表（`mutations/`）、脚本（`scripts/`，含复跑、变异、虚机与层 0 双机分片的驱动）、三方论证的材料与各条腿的报告和判决（`prompts/`）、按里程碑的性能对比（`perf-by-milestone.md`） |
 | [`.cargo/mutants.toml`](.cargo/mutants.toml) | 广谱变异（cargo-mutants）的配置 |
-| [`layer0-shard.env.example`](layer0-shard.env.example) | 层 0 双机分片本地配置的模板，见「层 0 全量分到两台机器上跑（可选）」 |
+| [`multi-host.env.example`](multi-host.env.example) | 多机配置的模板（层 0 双机分片、门禁 checker-tier-crates-mutation-replay 的双机分片、跨机脚本 `research/scripts/multi-host-run.sh` 共用；双机与 GPU 两个开关默认关），见「层 0 全量分到两台机器上跑（可选）」与「把一件活挪到第二台跑（可选）」 |
 | [`litmus/`](litmus/) | herd7 的 litmus 测试，每条 Never 配一条去掉屏障的对照 |
 | [`records/`](records/) | 建设过程 |
 | [`briefs/`](briefs/) | 每次更新的简报，按日期一份：那一版能做什么、验到哪、还没罩到什么。`records/` 写过程，这里写现状 |

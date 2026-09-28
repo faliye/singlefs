@@ -1,6 +1,6 @@
 # m2-final-code-r1 云端攻方腿（Opus）报告：Z1、Z4、Z6
 
-2026-09-24 UTC（2026-09-25 JST）。背景材料 `research/prompts/_m2-final-code-r1-background.md`（sha256 5bbf908ff1e0675b86029c1187cecd53454943c663370b62f9a61f7d7c3cd089），代码一律读冻结副本 `/tmp/claude-1000/m2-final-code-r1/tree/crates/`（`mount.rs`、`transaction.rs`、`recovery.rs`、`journal.rs`、`allocator.rs` 五份的 sha256 与 `research/prompts/m2-final-code-r1-snapshot/crates-src-sha256.txt` 逐行相同，现查过）。下文代码行号都是冻结副本的行号，kb 行号是 kb 文件自己的。
+2026-09-25。背景材料 `research/prompts/_m2-final-code-r1-background.md`（sha256 5bbf908ff1e0675b86029c1187cecd53454943c663370b62f9a61f7d7c3cd089），代码一律读冻结副本 `/tmp/claude-1000/m2-final-code-r1/tree/crates/`（`mount.rs`、`transaction.rs`、`recovery.rs`、`journal.rs`、`allocator.rs` 五份的 sha256 与 `research/prompts/m2-final-code-r1-snapshot/crates-src-sha256.txt` 逐行相同，现查过）。下文代码行号都是冻结副本的行号，kb 行号是 kb 文件自己的。
 
 ## 各格判定一览
 
@@ -21,7 +21,7 @@
 
 ```bash
 cd /tmp/claude-1000/m2-final-code-r1-opus/tree
-R=/home/fy5090/code/singlefs/research/scripts/capped.sh
+R=research/scripts/capped.sh
 bash $R 5 nice -n 19 cargo test --release -p singlefs-harness --test opus_r1_attack z6_a1 -- --nocapture
 bash $R 5 nice -n 19 cargo test --release -p singlefs-harness --test opus_r1_attack z1_a1b -- --nocapture
 bash $R 5 nice -n 19 cargo test --release -p singlefs-harness --test opus_r1_attack z4_a3 -- --nocapture

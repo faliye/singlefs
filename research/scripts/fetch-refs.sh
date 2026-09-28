@@ -9,7 +9,7 @@
 # 今天已不在本机，引用它们的结论却仍标着「已核实」。文献没了，那些引用就只是线索。
 # --check 只查在不在、hash 对不对，不下载。
 set -uo pipefail
-DEST="${FS_REFS:-/home/fy5090/code/fs-refs}/docs"
+DEST="${FS_REFS:-$HOME/code/fs-refs}/docs"
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 mkdir -p "$DEST"

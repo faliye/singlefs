@@ -1,0 +1,5 @@
+exit=1
+want=no-table.sh：文件头没有格名表
+want=lenient-check.sh：--check 不存在的格退 0，该退 2
+want=list-mismatch.sh：--list 打出的格与格名表不一致
+want=门禁结构不对：gate-structure-check.py 退 1

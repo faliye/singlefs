@@ -1,6 +1,6 @@
 # 实审 B2 报告（checker 查窄的不变量与 B1 留下的几件；中途交接）
 
-写于 2026-09-26 UTC（JST 2026-09-27）。实现员，主工作区。主 agent 按上下文线（72 万）叫停，这是交接报告：做完的、做到一半的、没开的分开写。
+写于 2026-09-27。实现员，主工作区。主 agent 按上下文线（72 万）叫停，这是交接报告：做完的、做到一半的、没开的分开写。
 
 ## 一、结论
 
@@ -19,7 +19,7 @@
 - `crates/singlefs-harness/tests/checker_known_bad_images.rs`：I-1.2 那份坏镜像连映射里 extent 根那条 key 的出生序号一起 +1（新函数 `raise_the_mapping_key_tail_of_the_node_at`）；`known_bad_images()` 加一份 `I-MAPPING-KEY` 坏镜像（映射里数据单元那条 key 的出生 txg 3 → 4，用现成的 `rewrite_the_data_unit_mapping_key_birth_txg`）；新加 3 条用例与 `break_the_back_chain_of_journal_record`（第三节）。
 - `crates/singlefs-checker/src/lib.rs`、`position_addressed.rs`：没改（`cargo fmt -p singlefs-checker` 跑过，`cmp` 与改前重建的那份相同）。
 - `crates/mutations.tsv`：没改。
-- 草稿：`/tmp/claude-1000/impl-rev-b2/` 下 `orig/`（改之前的 checker 源码：`walk.rs` 取自调查员 16:30:40Z 的快照、`image.rs.rebuilt` = HEAD + 调查员当时存的 diff；`cmp` 核过 `walk.rs.orig` 与 HEAD + diff 逐字节相同）、`copy/`（改之前的副本，下一节）、各次运行日志、`progress.md`。
+- 草稿：`/tmp/claude-1000/impl-rev-b2/` 下 `orig/`（改之前的 checker 源码：`walk.rs` 取自调查员的快照、`image.rs.rebuilt` = HEAD + 调查员当时存的 diff；`cmp` 核过 `walk.rs.orig` 与 HEAD + diff 逐字节相同）、`copy/`（改之前的副本，下一节）、各次运行日志、`progress.md`。
 
 ### 各件改在哪（`crates/singlefs-checker/src/walk.rs`，函数名定位；行号会漂）
 

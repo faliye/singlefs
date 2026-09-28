@@ -1,0 +1,3 @@
+exit=1
+want=harness-test-environment.sh 排在第 2/4 道，这些跑测试的阶段排在它后面
+want=     harness-tests.sh（第 3 道，代码里有「cargo test」）

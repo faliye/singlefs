@@ -1,4 +1,0 @@
-# 样本耗时表
-# 测试目标	测试名	秒	结局
-a	fast_case	0.30	ok
-a	slow_case	75.00	ok

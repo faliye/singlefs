@@ -14,7 +14,7 @@
 
 **共用问句**：照改后的字面干活，哪一步会做错或做不了；举出具体的派发情形或命令。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-26 JST 12:xx）
+## 二、实现今天的样子（主 agent 的观测，2026-09-26）
 
 - 被判的改动：修定义的 agent 报告 `research/prompts/defs-closeout-r2-fixes-tmp-evidence/report.md` 与它的 `my-changes-final.diff`（258 行，比的是开工时 `cp -p` 的备份）；材料员把 diff 原样放进附录二，把报告的逐条表、探针与门禁两节抄进附录。开工快照 `research/prompts/defs-m2-closeout-r3-snapshot/sha256sums.txt`。
 - 这一轮被改的文件：`.claude/agents/three-way-attack.md`、`three-way-local-defense.md`、`experiment-runner.md`、`crash-verifier.md`、`gate-triage.md`、`implementation-writer.md`，`.claude/agent-common.md`，`.claude/main-agent.md`，`.claude/hooks/ask-user-claim-guard.sh`（自证 30 → 36 格），`.claude/gate.d/74-model-differential.sh`、`.claude/gate.d/15-research-build.sh`（阶段里的 cargo 经包装），另有主 agent 补的 `.claude/gate.d/stage-inputs.tsv` 74 号那一行（加 `research/scripts/run-with-memory-cap.sh` 与 `research/scripts/capped.sh`）。

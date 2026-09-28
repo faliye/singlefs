@@ -1,0 +1,5 @@
+exit=0
+want=这一批的 3 个触发文件都登记进了 .claude/batch-scope，登记的 3 个都在这一批里（相对 HEAD 共 7 个改动路径，另外 4 个不是触发文件、不用登记；触发文件的判据是 .claude/gate.d/knowledge-sync-triggers.tsv 的 3 条正则）
+want=样本只跑 .gate-cells 点名的格：batch-scope
+want=── 汇总：doc-process-records.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-process-records.sh：1 格里 1 格绿（batch-scope），0 格本次未跑（无）

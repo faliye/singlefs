@@ -1,5 +1,0 @@
-exit=1
-want=e1_relative.rs 一条绝对值断言都没有
-want=e2_multiline_relative.rs 一条绝对值断言都没有
-want=crates/demo/src/bin/e2_crates_relative.rs 一条绝对值断言都没有
-want=e6_commented_and_structural.rs 一条绝对值断言都没有

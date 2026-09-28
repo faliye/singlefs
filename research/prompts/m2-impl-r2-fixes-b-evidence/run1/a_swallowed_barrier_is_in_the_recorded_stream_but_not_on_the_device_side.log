@@ -1,0 +1,9 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.68s
+     Running tests/a_swallowed_barrier_is_in_the_recorded_stream_but_not_on_the_device_side.rs (target/debug/deps/a_swallowed_barrier_is_in_the_recorded_stream_but_not_on_the_device_side-cdfadae0c9e418db)
+
+running 1 test
+test a_swallowed_barrier_is_in_the_recorded_stream_but_not_on_the_device_side ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

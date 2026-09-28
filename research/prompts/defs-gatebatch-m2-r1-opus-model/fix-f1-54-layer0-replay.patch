@@ -1,5 +1,5 @@
---- .claude/gate.d/54-layer0-replay.sh	2026-09-26 12:08:55.510242626 +0000
-+++ /tmp/claude-1000/defs-gatebatch-r1-opus/fix/54-layer0-replay.sh	2026-09-26 13:16:48.386890804 +0000
+--- .claude/gate.d/54-layer0-replay.sh	2026-09-26
++++ /tmp/claude-1000/defs-gatebatch-r1-opus/fix/54-layer0-replay.sh	2026-09-26
 @@ -111,7 +111,9 @@
      echo "     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径见 .claude/gate.d/stage-inputs.tsv。"
      exit 77

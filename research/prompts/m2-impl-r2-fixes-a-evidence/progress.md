@@ -1,0 +1,7 @@
+- 2026-09-27 开工：读完定义、规则、规格
+- 2026-09-27 主工作区 crates 有别的会话在挪 crash 模块（编不过），副本改从 HEAD 的 git archive 起；我要改的四份与 HEAD 逐字节相同
+- 2026-09-27 HEAD 副本 build --all-targets 结果：exit=0
+- 2026-09-27 第 3 件 litmus 两份写进副本；在等基线测试（checker_known_bad_images 等三个二进制）
+- 2026-09-27 四件代码与测试写完；clippy（含纪律 lint）绿、fmt 绿；新测试 3 条跑绿；prove-red 9 行在跑
+- 2026-09-27 prove-red 11 条全抓到（9+2，另 1313 行换锚点证过）；fmt/clippy/build 绿；33（副本）只剩 6 行是别的会话挪文件；53/93/94 绿；92 副本非 git 77；89 77；74 在跑；补丁 git apply --check 过
+- 2026-09-27 报告写完、草稿副本与编译目录删完，交回

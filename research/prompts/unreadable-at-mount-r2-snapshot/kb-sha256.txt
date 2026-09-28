@@ -1,0 +1,12 @@
+5d81ea082dce1e5832d4dd4b1c2fa012abd4ccbfb87f8e523a3e04e15123df37  .claude/kb/decisions/23-journal的角色与格式.md
+5750f2c743cb7e6b1d00401d408af9deec1c558db6106d0114c67992a11e1ac7  .claude/kb/decisions/16-发布语义.md
+a9426ca7497a1e7c98f8388e3b01093af864f669de24f687d076b45868380ad2  .claude/kb/decisions/22-单元原子性怎么合成.md
+cd67a48bf2f5f5b6e885bafa181150c27a1b24f6134ac6397110ab474de9e63e  .claude/kb/decisions/21-权威态与派生态的分界.md
+c0902e6ebbca14123e1729fd50ed2f5f6b165b747a21d592afc3f8e04ed99740  .claude/kb/decisions/20-承重面单元的原子性与自包含.md
+dda80675e29bdfef6487175e47ba6e65f7f2f1aaf2bdb9af97ed4edcc84f7910  .claude/kb/decisions/18-块里携带什么信息.md
+27be035e1efdd81708cbc3486294087559dea3ee7cc35bb3e196249fa4d7eb4a  .claude/kb/decisions/28-挂载期承诺量.md
+a5b1b4a9f2d6fe995c4d4f018b37d4bb4c9d804d2fef026cfedebadf29788f5b  .claude/kb/experiments/158-择根与修复四岔路.md
+8943430efb87383e89ad204f67e3cf78c547e28c8fe977d3b8cf0489eb1d58aa  .claude/kb/invariants.md
+5e9428b08b262f9d0053e210289cf7ae59f5c04d104db91fbc672cf662af228a  .claude/kb/checks-owed.md
+a272ab429fda1628edb4b07cdb06416c837326ac27947d2a738c8405a1275a93  .claude/kb/milestone/02-second-txn.md
+91f7bf3b1120f580c64491118446047c4e051179507bb106716428845f766e89  research/prompts/unreadable-at-mount-r1-main-verification.md

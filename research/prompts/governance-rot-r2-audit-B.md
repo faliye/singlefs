@@ -1,6 +1,6 @@
 # B 组治理文档核对报告（agent-common + 五份定义）
 
-口径：按 2026-09-26 UTC 工作区现状（含未提交改动：`.claude/agent-common.md`、`.claude/main-agent.md`、`CLAUDE.md`、`.claude/hooks/bash-command-detector.sh`）。本机 `id -u` = 0，`date` = `Sat Sep 26 12:58:23 UTC 2026`。行号均为 `cat -n` / `grep -n` 现取。
+口径：按 2026-09-26 工作区现状（含未提交改动：`.claude/agent-common.md`、`.claude/main-agent.md`、`CLAUDE.md`、`.claude/hooks/bash-command-detector.sh`）。本机 `id -u` = 0，`date` = `Sat Sep 26 2026`。行号均为 `cat -n` / `grep -n` 现取。
 
 ## 逐条
 
@@ -41,7 +41,7 @@
 
 | 文档 | 核过的类别与条数 |
 |---|---|
-| agent-common.md | 「某文件「某小节」」指向 6 处（command-safety 两节、writing-discipline「说人话」、implementation-workflow「改 agent 定义…三步」、path-moves「变体起新名字，不用角标」、three-way-inference「云端腿的报告要分段落盘」）；门禁号及判什么 3 处（12 号撇号、69 号两条判据与头部一致、91 号归档）；stage-owners.tsv 的 awk 取法现跑 5 个 agent 都取得出、62 号现跑 `✓ 阶段归属表与门禁目录一致（75 个阶段，归 9 个 agent）` exit=0；bash-command-detector「拒绝七种」与头部 :31-131 七条逐条对上（本次未提交改动把「五种」改成「七种」，与头部一致）；16 份定义都带 `omitClaudeMd: true`（`grep -L` 零命中）；写范围闸只挂 Write\|Edit（settings.json 现读）；capped.sh 设的变量、proc.py stop「只停给定那一个」、看门狗 watch.sh→agent-watch.py；本机时钟 UTC —— 共 22 条 |
+| agent-common.md | 「某文件「某小节」」指向 6 处（command-safety 两节、writing-discipline「说人话」、implementation-workflow「改 agent 定义…三步」、path-moves「变体起新名字，不用角标」、three-way-inference「云端腿的报告要分段落盘」）；门禁号及判什么 3 处（12 号撇号、69 号两条判据与头部一致、91 号归档）；stage-owners.tsv 的 awk 取法现跑 5 个 agent 都取得出、62 号现跑 `✓ 阶段归属表与门禁目录一致（75 个阶段，归 9 个 agent）` exit=0；bash-command-detector「拒绝七种」与头部 :31-131 七条逐条对上（本次未提交改动把「五种」改成「七种」，与头部一致）；16 份定义都带 `omitClaudeMd: true`（`grep -L` 零命中）；写范围闸只挂 Write\|Edit（settings.json 现读）；capped.sh 设的变量、proc.py stop「只停给定那一个」、看门狗 watch.sh→agent-watch.py；本机时钟的时区 —— 共 22 条 |
 | crash-verifier.md | 开工先读 4 处小节全在（crash-test SKILL「判读纪律」:30、test-discipline 两节、evidence-discipline「文件系统特有的反推缺口」）；「三步」第 3 步；登记给它的阶段 7 道；54 快档 / --full / E142 比对与头部一致；59 号 `GATE_MUTATION_TARGET_DIR`（59:32、:90）；hook 放行 crash-verifier 那几类（heavy-test-guard :39；runner-dispatch-guard :139）—— 共 9 条 |
 | gate-triage.md | session-wrapup「4.」一节在；`gate.sh --staged` 参数与临时 worktree（共享 gate.sh :34、:58）；54 号两句红句与「三行命令」（54:285、:293、:229-233）；「工作区跑的过程中没变」（gate.sh :474-483）；gate.sh 不打印单阶段耗时（grep 零命中）；env.sh 在；hook 放行 gate-triage 那几类（heavy-test-guard :40）—— 共 8 条 |
 | implementation-writer.md | 开工先读 4 处在；写范围与 agent-write-scope.tsv:6-8 一致；main-agent「暂存之后、提交之前跑门禁」行在（main-agent.md:59）；`DiskSnapshot` 在 crates/singlefs-harness/tests/common/mod.rs 等；crates/mutations.tsv 六段（724 行全是 6 段）；登记给它的 7 道阶段存在 —— 共 6 条 |

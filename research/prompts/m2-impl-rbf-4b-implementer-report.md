@@ -1,6 +1,6 @@
 # 实四乙交回：收尾杂项（12 件）
 
-实现员（implementation-writer），2026-09-26 UTC 02:13（JST 11:13）开工；开工快照 `/tmp/claude-1000/impl-rbf-4b/pristine/`（crates、litmus、Cargo.*，含实一至实三与别的会话没提交的改动），下文「基线」都指它。改动都在主工作区，没有提交、没有 git 写操作。
+实现员（implementation-writer），2026-09-26 开工；开工快照 `/tmp/claude-1000/impl-rbf-4b/pristine/`（crates、litmus、Cargo.*，含实一至实三与别的会话没提交的改动），下文「基线」都指它。改动都在主工作区，没有提交、没有 git 写操作。
 实四甲同时在改 `e156_allocation_basis_counts.rs`、`e158_root_choice_repair.rs`，并往 `crates/mutations.tsv` 末尾追加了两行（第 747、748 行），这三处我没碰。
 
 ## 一、逐件结论

@@ -14,11 +14,11 @@
 
 判据（机械，不靠人记）：
   删 —— `research/results/` 与 `research/prompts/` 下，**在 HEAD 里有、且这一轮没碰过**的文件；
-        「这一轮」的起点与门禁 68 号同一个基准：`research/scripts/changed-paths.sh` 的 `gate_diff_base gate`
+        「这一轮」的起点与门禁 doc-process-records 的 knowledge-sync 格同一个基准：`research/scripts/changed-paths.sh` 的 `gate_diff_base gate`
         （`GATE_BASE`，否则 `@{upstream}` 的 merge-base，都没有就 HEAD），见 base_of 的说明。
         没改过 = 它是上一次提交固化下来的，属于上一轮及更早。
   留 —— 工作区里新加或改过的（本轮在产生的）、三方判决 `*-main-verification.md`（kb 的依据指着它）、
-        `abandoned-rounds.tsv`（登记表，门禁 66 号的输入）、还被代码当输入的产物（still_an_input）。
+        `abandoned-rounds.tsv`（登记表，门禁 doc-process-records 的 abandoned-rounds 格的输入）、还被代码当输入的产物（still_an_input）。
   ⚠️ 删文件会让别处指向它的链接指空，所以 --apply 同时把那些引用**只留文件名、去掉路径**，
      不留一个指空的路径——共享 `gate.sh` 的「链接指向」阶段（`.claude/singlefs-ai-sop/scripts/link-targets.py`）判的就是这个。「找不到就去 git 历史里看」写在 `.claude/agent-common.md`，不逐处重复。
 """
@@ -52,16 +52,16 @@ class BaseUnavailable(Exception):
 
 
 def base_of(root="."):
-    """「这一轮」的起点。与门禁 68 号（改了规则、agent、hook、门禁、脚本或实现之后有没有写阶段同步记录）
+    """「这一轮」的起点。与门禁 doc-process-records 的 knowledge-sync 格（改了规则、agent、hook、门禁、脚本或实现之后有没有写阶段同步记录）
     取同一个基准——两道对同一批文件判相反的事，基准必须是同一个。取法不在这里另写一份，
-    直接调 68 号用的那一份：`research/scripts/changed-paths.sh` 的 `gate_diff_base gate`
+    直接调那一格用的那一份：`research/scripts/changed-paths.sh` 的 `gate_diff_base gate`
     （GATE_BASE，否则 @{upstream} 的 merge-base，都没有就 HEAD）。只认「GATE_BASE，否则 HEAD」时，
     没设 GATE_BASE 又有没推的提交，两道的窗口就不一样（C450 那一形）。
 
     ⚠️ **基准不一致会让两道直接打架**（C450 实测 2026-09-21，同一天撞了两次）：
-    68 号的改动范围取 `GATE_BASE`（门禁跑时给的是 `diff_base`，`refs/sop/gate-ok` 不存在时退回 `HEAD~1`），
+    knowledge-sync 格（当时是单独的一道门禁）的改动范围取 `GATE_BASE`（门禁跑时给的是 `diff_base`，`refs/sop/gate-ok` 不存在时退回 `HEAD~1`），
     这一处原先写死 `HEAD`。差这一格的后果是**每次提交之后，上一轮的同步记录必然同时满足
-    「这一道说该删」（它已进仓、相对 HEAD 没再改）与「68 号说要留」（它点名的触发文件相对 `HEAD~1` 还在范围里）**，
+    「这一道说该删」（它已进仓、相对 HEAD 没再改）与「knowledge-sync 格说要留」（它点名的触发文件相对 `HEAD~1` 还在范围里）**，
     不是偶发。实测那天两份 sync 记录点名的触发文件相对 `HEAD~1` 分别还有 14 个和 7 个在范围里。
     取同一个基准之后，上一轮的记录能正常退场。
     """
@@ -84,7 +84,7 @@ def still_an_input(root, candidates):
     """候选里还被代码当输入的那些：门禁阶段按名字读它去比对、装置源码 include_str! 在编译期读它。
     返回 {相对路径: [点名它的源文件]}。这些**不删**——它们不是上一轮的记录，是这一轮还在跑的东西的输入。
 
-    2026-09-21 实测两次，都是删完才发现：① 门禁 52 号（段序列登记表与 E142 产物逐字比对）连同它的自证一起塌；
+    2026-09-21 实测两次，都是删完才发现：① 段序列登记表那一道门禁（段序列登记表与 E142 产物逐字比对，已搬进 doc-registries 的 segment-registry 那一格）连同它的自证一起塌；
     ② 归档删掉四份跨实验断言读的产物之后，research 整个编不过（e134 读 e133、e136 读 e134 与 e109、e137 读 e136），
     而 HEAD 上就是这个状态。第一次只把射程补到门禁脚本与 research/scripts，漏掉装置源码，于是第二次照样发生——
     所以这里按「哪些后缀是代码」扫，不按「我记得哪些目录会引」扫。"""
@@ -213,7 +213,7 @@ def stale_exclusions(root):
 def run(root, apply_changes):
     # `--apply` 不给基准就拒绝跑，不是提醒、是拒绝。
     # 为什么非拒绝不可：门禁跑的时候 GATE_BASE 是设好的，人照着出路抄到自己的 shell 里就没了，
-    # 于是它按 HEAD 算「这一轮」，把**这一次提交要带的**同步记录也当上一轮的删掉——删完门禁 68 号
+    # 于是它按 HEAD 算「这一轮」，把**这一次提交要带的**同步记录也当上一轮的删掉——删完门禁 doc-process-records 的 knowledge-sync 格
     # 当场红（触发文件没人点名），而删掉的文件没进过任何提交就找不回来。
     # 2026-09-22 实测：这么删掉两份，白跑一趟 20 分钟的全量门禁。
     # 文件头写着 base_of 取 GATE_BASE 拦不住这件事：写下来的提醒不会在动手那一刻拦人（sop-first.md）。
@@ -228,7 +228,7 @@ def run(root, apply_changes):
         doomed = past_round_files(root)
     except BaseUnavailable as error:
         print(f"  ✗ 取不到「这一轮」的起点（{error}），分不出哪些实验记录是上一轮的")
-        print("     → 怎么办：在仓根跑、确认 research/scripts/changed-paths.sh 在；基准取法与门禁 68 号是同一份，那一份坏了两道一起坏。")
+        print("     → 怎么办：在仓根跑、确认 research/scripts/changed-paths.sh 在；基准取法与门禁 doc-process-records 的 knowledge-sync 格是同一份，那一份坏了两边一起坏。")
         return 1
     inputs = still_an_input(root, doomed)
     doomed = [p for p in doomed if p not in inputs]
@@ -240,9 +240,9 @@ def run(root, apply_changes):
         # 数磁盘上真有的，不数 git 索引：删过还没提交时索引里仍跟踪着那些文件，
         # 拿索引数报「现有多少份」会报出一个磁盘上不成立的数。
         kept = sum(len(names) for base in DIRS for _, _, names in os.walk(os.path.join(root, base)))
-        print("  ✓ 没有上一轮留下的实验记录（%s 下磁盘上现有 %d 份，都是本轮的或按规则保留的；「这一轮」的起点 %s，取法同门禁 68 号：changed-paths.sh 的 gate_diff_base gate）"
+        print("  ✓ 没有上一轮留下的实验记录（%s 下磁盘上现有 %d 份，都是本轮的或按规则保留的；「这一轮」的起点 %s，取法同门禁 doc-process-records 的 knowledge-sync 格：changed-paths.sh 的 gate_diff_base gate）"
               % ("、".join(DIRS), kept, base_of(root)))
-        print("     保留的三类：三方判决 *-main-verification.md（kb 的依据指着它）、abandoned-rounds.tsv（门禁 66 号的输入）、"
+        print("     保留的三类：三方判决 *-main-verification.md（kb 的依据指着它）、abandoned-rounds.tsv（门禁 doc-process-records 的 abandoned-rounds 格的输入）、"
               "还被代码当输入的产物（这一次 %d 份，逐个列在上面）" % len(inputs))
         return 0
     if not apply_changes:
@@ -253,13 +253,13 @@ def run(root, apply_changes):
             print("      research/%s/  %d 份" % (name, count))       # gate-lint:detail
         print("  ✗ 还留着上一轮及更早的实验记录 %d 份（本轮的与判决不算）" % len(doomed))
         # 出路里把基准一起打出来：门禁跑的时候 GATE_BASE 是设好的，人照着抄到自己的 shell 里就没了，
-        # 于是它按 HEAD 算「这一轮」，把**这一次提交要带的**同步记录也当上一轮的删掉——删完门禁 68 号
+        # 于是它按 HEAD 算「这一轮」，把**这一次提交要带的**同步记录也当上一轮的删掉——删完门禁 doc-process-records 的 knowledge-sync 格
         # 当场红（触发文件没人点名），实测 2026-09-22 多删两份、白跑一轮全量门禁。
         given_base = os.environ.get("GATE_BASE", "")
         shown_base = given_base if given_base else "<门禁那一行「diff 基准 <sha>」报的那个提交>"
         print("     → 怎么办：跑 GATE_BASE=%s python3 research/scripts/archive-past-rounds.py --apply 删掉，" % shown_base)
         print("               这个基准要与门禁跑的时候一样（`gate.sh` 开头打的那一行「diff 基准 <sha>」就是它）；")
-        print("               不给基准它会按 HEAD 算，把这一次提交要带的同步记录也当上一轮的删掉，删完门禁 68 号当场红；")
+        print("               不给基准它会按 HEAD 算，把这一次提交要带的同步记录也当上一轮的删掉，删完门禁 doc-process-records 的 knowledge-sync 格当场红；")
         print("               它同时把别处指向这些文件的引用改成只留文件名、不留路径；")
         print("               要查删掉的内容去 git 历史里找，有疑问就重新验证、不翻旧证据。")
         return 1
@@ -288,7 +288,7 @@ def run(root, apply_changes):
 def selftest():
     import tempfile
     # 自检自己控制 GATE_BASE，先清掉外面传进来的那一个。
-    # 门禁跑这一条自证时 GATE_BASE 是 export 好的（门禁 47 号在 gate.sh 底下跑），
+    # 门禁跑这一条自证时 GATE_BASE 是 export 好的（门禁 code-tooling 在 gate.sh 底下跑），
     # 不清掉，「不给基准的 --apply 必须被拒绝」那一格在门禁里永远不触发、当场判红，
     # 而单独手敲它又是绿的——`command-safety.md`「握手用的环境变量漏给子进程」那一格。
     inherited_base = os.environ.pop("GATE_BASE", None)
@@ -393,7 +393,7 @@ def selftest_in_temporary_directory():
             return 1
         # ── 基准对齐：上一轮的记录已进仓，而它点名的触发文件相对 HEAD~1 还在改动范围里 ──
         # 这一格分的是「这一轮」取哪个起点。取 HEAD（旧行为）时那份记录被判成「上一轮的、该删」，
-        # 而门禁 68 号按 GATE_BASE（= HEAD~1）判它「还要着」，两道打架（C450 实测撞过两次）。
+        # 而门禁 doc-process-records 的 knowledge-sync 格按 GATE_BASE（= HEAD~1）判它「还要着」，两边打架（C450 实测撞过两次）。
         # 取同一个 GATE_BASE 之后它落进「这一轮碰过的」，不再被判该删。
         open(os.path.join(work, "research/prompts/r1-sync.md"), "w").write("<!-- knowledge-sync -->\n同步记录\n")
         git("add", "-A", root=work)
@@ -406,11 +406,11 @@ def selftest_in_temporary_directory():
             os.environ.pop("GATE_BASE", None)
         if any(name.endswith("r1-sync.md") for name in still_past):
             print("  ✗ 自检失败：给了 GATE_BASE 之后，这一轮碰过的记录仍被判成上一轮的")
-            print("     → 怎么办：看 base_of —— 它要取 GATE_BASE（与门禁 68 号同一个基准），")
+            print("     → 怎么办：看 base_of —— 它要取 GATE_BASE（与门禁 doc-process-records 的 knowledge-sync 格同一个基准），")
             print("               写死 HEAD 会让两道对同一份记录判相反的事。")
             return 1
-        # ── 没设 GATE_BASE、有没推的提交：基准取 @{upstream} 的 merge-base（changed-paths.sh 的 gate 取法，与 68 号同一份）──
-        # 只认「GATE_BASE，否则 HEAD」时，没推的那次提交里写的记录会被当成上一轮的删掉，而 68 号按 merge-base 判它还要着。
+        # ── 没设 GATE_BASE、有没推的提交：基准取 @{upstream} 的 merge-base（changed-paths.sh 的 gate 取法，与 knowledge-sync 格同一份）──
+        # 只认「GATE_BASE，否则 HEAD」时，没推的那次提交里写的记录会被当成上一轮的删掉，而 knowledge-sync 格按 merge-base 判它还要着。
         pushed_tip = git("rev-parse", "HEAD", root=work).strip()
         subprocess.run(["git", "branch", "upstream-sample", pushed_tip], cwd=work, check=True)
         subprocess.run(["git", "branch", "-q", "--set-upstream-to=upstream-sample"], cwd=work, check=True)
@@ -419,13 +419,13 @@ def selftest_in_temporary_directory():
         subprocess.run(["git", "commit", "-qm", "没推的一次提交"], cwd=work, check=True)
         if any(name.endswith("r2-sync.md") for name in past_round_files(work)):
             print("  ✗ 自检失败：没设 GATE_BASE、有没推的提交时，那次提交里写的记录被判成上一轮的")
-            print("     → 怎么办：看 base_of —— 它要调 research/scripts/changed-paths.sh 的 gate_diff_base gate（与门禁 68 号同一份），")
+            print("     → 怎么办：看 base_of —— 它要调 research/scripts/changed-paths.sh 的 gate_diff_base gate（与门禁 doc-process-records 的 knowledge-sync 格同一份），")
             print("               那一份没设 GATE_BASE 时取 @{upstream} 的 merge-base；只认「GATE_BASE，否则 HEAD」就会在这里判错。")
             return 1
 
     print("  ✓ 自检：不给 GATE_BASE 的 --apply 当场拒绝且一个文件没删、有旧记录判红、删完判绿、判决与本轮新产物不被删、装置 include_str! 读的产物不被删且链接不被改、"
           "指向被删文件的引用改成不带路径的说法、include 指空的产物报得出来、注释里的 include 与产物都在时不误报、"
-          "没设 GATE_BASE 时基准取上游的 merge-base（与门禁 68 号同一份取法）")
+          "没设 GATE_BASE 时基准取上游的 merge-base（与门禁 doc-process-records 的 knowledge-sync 格同一份取法）")
     return 0
 
 

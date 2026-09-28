@@ -1,6 +1,6 @@
 # 55 号装置步数：两处写死的 23 改成量出来的边界
 
-时刻 UTC（本机时钟）。里程碑 `.claude/kb/milestone/02-second-txn.md` 收尾批「55 号装置步数」；输入是 `/tmp/claude-1000/investigate-gate55-segments/report.md`（sha256 前 8 位 30b8ddef）。
+里程碑 `.claude/kb/milestone/02-second-txn.md` 收尾批「55 号装置步数」；输入是 `/tmp/claude-1000/investigate-gate55-segments/report.md`（sha256 前 8 位 30b8ddef）。
 
 ## 结论
 
@@ -18,12 +18,12 @@
 
 ## 中途插入：C554 乙补丁落主工作区，改了 `first_transaction_on_device.rs`
 
-主 agent 2026-09-27 JST 10:5x（UTC 约 01:52）通知：C554 乙给 `MountError` 加了新成员，同一份文件里两处穷举 `match` 补了新分支（`MountError::NewerStateStillUnreadableAfterOneReread(_)`，约在原文件的 `reopen_and_mount_writable` 与 `raise_the_rollback_floor_and_describe` 两处 match，行号约 837 / 1250）。同一批还改了 `crates/singlefs-harness/tests/common/mod.rs`（加 `UnreadableRange` 一整套读故障装置）与 `crates/mutations.tsv`（追加它自己的变异行）。核实：这几处改动与我这两处的文本锚点不重叠（C554 的两处 match 分支在我的 `first_transaction_paths` 与 `main()` 改动之前；`common/mod.rs` 的新增代码在 `build_pool()` 之后的下一个函数里）。
+主 agent 2026-09-27 通知：C554 乙给 `MountError` 加了新成员，同一份文件里两处穷举 `match` 补了新分支（`MountError::NewerStateStillUnreadableAfterOneReread(_)`，约在原文件的 `reopen_and_mount_writable` 与 `raise_the_rollback_floor_and_describe` 两处 match，行号约 837 / 1250）。同一批还改了 `crates/singlefs-harness/tests/common/mod.rs`（加 `UnreadableRange` 一整套读故障装置）与 `crates/mutations.tsv`（追加它自己的变异行）。核实：这几处改动与我这两处的文本锚点不重叠（C554 的两处 match 分支在我的 `first_transaction_paths` 与 `main()` 改动之前；`common/mod.rs` 的新增代码在 `build_pool()` 之后的下一个函数里）。
 
 处理：把草稿目录的仓副本全量重新 `rsync -a --delete --exclude target <主工作区>/crates/ /litmus/`（覆盖掉副本里旧的、C554 之前的版本），在这份新底座上把我这三份文件的改动逐条重放（Edit 的 old_string / new_string 与之前一致，因为文本锚点没被 C554 碰到），`crates/mutations.tsv` 重新追加同样两行。之后完整重跑：`cargo build --offline --all-targets`、两个测试二进制、`cargo fmt --all -- --check`、clippy、`prove-red.sh`（见下面各节），全部绿/抓到。
 
-**底座时刻与 sha256**（主工作区，UTC）：
-- 底座时刻：2026-09-27T01:55:43Z 起（那次整仓 rsync 的时刻），到本报告落盘前最后一次核对 2026-09-27T02:07:57Z，这三个文件与 `crates/mutations.tsv` 的 sha256 一直没变（每次核对都重跑了 `sha256sum`，见下）：
+**底座时刻与 sha256**（主工作区）：
+- 底座时刻：2026-09-27 起（那次整仓 rsync 的时刻），到本报告落盘前最后一次核对 2026-09-27，这三个文件与 `crates/mutations.tsv` 的 sha256 一直没变（每次核对都重跑了 `sha256sum`，见下）：
   - `crates/singlefs-harness/src/bin/first_transaction_on_device.rs`：`3f84693ff6cd9c2200e92e63f38f8733fe3e99c64a9f0f7afcfdc703974738bb`
   - `crates/singlefs-harness/tests/common/mod.rs`：`84ef4a64987b2d9a32838ced7671a9bb3cdaec0c2c465d66728fe48657843ff3`
   - `crates/singlefs-harness/tests/publish_order_matches_litmus.rs`（未被 C554 碰过，从会话开始就没变过）：`a861c32621f98d376dfcc83ca344e924e0bf188982866e5161e66af1af2d76c0`

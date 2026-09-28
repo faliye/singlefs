@@ -1,6 +1,6 @@
 # m2-refusals-presumed-r1 云端攻方腿（Opus）：R1、R2、R3、R4、Q1
 
-立场：找误拒。2026-09-22 21:56 UTC（2026-09-23 06:56 JST）跑完。
+立场：找误拒。2026-09-23 跑完。
 判据照正文第五节第 2 条：**一格算「误拒」，当且仅当给出了一条具体的历史（写序列 + 故障点），而且它在 `crates/` 今天的代码上真的会撞上那个拒绝**。
 
 ## 零、复跑
@@ -34,12 +34,12 @@ e3bfd53032602f82bbdee73441f9068256bd875973637d998ea80e7b24893235  opus_patched_r
 
 ⚠️ **这个目录里另有七个不是我写的文件**（`opus_m2_refusals_r1.rs`、`raise-reads-table-from-root.patch`、
 `two-refusals-off.patch`、`run7-final-unpatched.txt`、`run8-patchA-probe.txt`、`run9-patchB-probe.txt`、
-`run10-patchB-stepfive.txt`，时间戳都是 2026-09-22 13:59）。派发提示说上一条腿「产物没落盘」，而这七个在盘上。
+`run10-patchB-stepfive.txt`，时间戳都是 2026-09-22）。派发提示说上一条腿「产物没落盘」，而这七个在盘上。
 我按指示没读它们、也没动它们；主 agent 要注意这个目录今天混着两条腿的产物。
 
-## 一、行号现查（正文的行号是 2026-09-22 上午记的，这一轮全部重取）
+## 一、行号现查（正文的行号是 2026-09-22 记的，这一轮全部重取）
 
-| 正文写的 | 现查（2026-09-22 21:56 UTC 工作区） | 差 |
+| 正文写的 | 现查（2026-09-23 工作区） | 差 |
 |---|---|---|
 | `FileVersionWithoutAnyJournalRecord` 37 / 200 / 1270 | `mount.rs:38`（成员）/ `:226`（`map_rebuild_failure`）/ `:1310`（`mount_rollback`） | 挪了 |
 | `RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion` 43 / 622 | `mount.rs:44`（成员）/ `:660`（`raise_rollback_floor` 里那一句） | 挪了 |
@@ -432,8 +432,8 @@ txg 2 落盘 0，写行那次已经覆盖了一块盘），第二次（跳开两
    推翻它们的观测：**只要有人给出一条「根落了、它那次发布的记录两份都没落」的崩溃点，R3 立刻变成一次普通崩溃可达。**
 5. **判 Q1 的「今天不伤用户」只在 `crates/` 这一层成立**：产品路径零调用点是我 `grep` 出来的
    （`crates/*/src/` 里除定义外 0 个），FUSE / 命令行那一层今天不存在，将来有了要重查。
-6. **跑的时候仓在动**：`crates/singlefs-core/src/recovery.rs`（21:56 UTC）与 `transaction.rs`（21:57 UTC）在我这一轮中途被
-   别的会话改过（`mount.rs` 没动，13:21 UTC）⇒ 报告里 `transaction.rs` 的行号是 22:01 UTC 重取的，
+6. **跑的时候仓在动**：`crates/singlefs-core/src/recovery.rs`与 `transaction.rs`在我这一轮中途被
+   别的会话改过（`mount.rs` 没动）⇒ 报告里 `transaction.rs` 的行号是重取的，
    **`mount.rs` / `recovery.rs` 的行号取自同一时刻**；再过一会儿可能又不对了，判定请按**错误成员的名字**读。
 
 ## 十一、没做什么

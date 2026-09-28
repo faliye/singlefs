@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # admission: always 每个实现员补丁交回都要打一次，判的是这一刻的补丁目录与主工作区
 # run-condition: command git
-"""把实现员交回的补丁目录打进主工作区：补丁、变异表按名字合并、跑 33 号，记一笔「自上次崩溃验证全绿以来打了几个补丁」。
+"""把实现员交回的补丁目录打进主工作区：补丁、变异表按名字合并、跑 code-source-discipline，记一笔「自上次崩溃验证全绿以来打了几个补丁」。
 
 用法：
     apply-writer-patch.py <补丁目录> [--root 仓根] [--dry-run]
@@ -14,10 +14,10 @@
     mutations-delete.txt         要删的变异名，一行一个，表里要恰好一行
     report.md                    实现员的报告；补丁动了 crates/singlefs-checker/src/ 的，报告里要有「受影响的层 0 流与崩溃枚举用例」一节
 次序：先全部核一遍（补丁 git apply --check、名字在不在、行是不是六段、checker 那一节在不在），有一处不对就一个字不改、退 2；
-都对了才 git apply、改名换上新的变异表，跑 .claude/gate.d/33-mutation-tables.sh，把这一次记进 <git common-dir>/singlefs-applied-writer-patches.tsv。
+都对了才 git apply、改名换上新的变异表，跑 .claude/gate.d/code-source-discipline.sh 的 mutation-tables 那一格（--check mutation-tables），把这一次记进 <git common-dir>/singlefs-applied-writer-patches.tsv。
 自上次崩溃验证全绿（git common-dir 里最新的 singlefs-crash-case-green.* 标记）以来打过的补丁到 CRASH_VERIFY_HINT_PATCHES 个（5，推的）就打一行提示：
 只提示、不拦，跑不跑由用户定。
-退出码：0 打上了（33 号绿）；1 打上了但 33 号红；2 核的时候就不对，一个字没改。
+退出码：0 打上了（code-source-discipline 绿）；1 打上了但 code-source-discipline 红；2 核的时候就不对，一个字没改。
 """
 import glob
 import hashlib
@@ -125,7 +125,7 @@ def apply(patch_directory, root, dry_run, gate33):
     lines = [f"✓ 打上了：{os.path.basename(os.path.normpath(patch_directory))}（补丁 {'有' if patch else '没有'}）"]
     gate = subprocess.run(gate33, cwd=root, capture_output=True, text=True)
     gate_line = ([line for line in gate.stdout.splitlines() if line.strip()] or ["（没有输出）"])[-1]
-    lines.append(f"33 号：退出码 {gate.returncode}，{gate_line.strip()}")
+    lines.append(f"code-source-discipline：退出码 {gate.returncode}，{gate_line.strip()}")
     common = git(root, "rev-parse", "--git-common-dir").stdout.strip()
     log_path = os.path.join(common if os.path.isabs(common) else os.path.join(root, common), LOG_NAME)
     digest = hashlib.sha256(open(patch, "rb").read()).hexdigest() if patch else "-"
@@ -135,7 +135,7 @@ def apply(patch_directory, root, dry_run, gate33):
     if count >= CRASH_VERIFY_HINT_PATCHES and BROKEN != "no-hint":
         lines.append(f"! 自上次崩溃验证全绿以来已打 {count} 个实现员补丁（提示线 {CRASH_VERIFY_HINT_PATCHES}，推的）：弹窗问用户要不要用 "
                      "SINGLEFS_HEAVY_TESTS=user-request 派 crash-verifier 跑一次（54 号按用例复用，只跑输入变了的崩溃枚举用例）；只提示，不拦")
-    lines.append(f"调度表可贴的一行：| {os.path.basename(os.path.normpath(patch_directory))} | 已打（{time.strftime('%m-%d %H:%M', time.localtime())}） | 33 号 {gate.returncode} |")
+    lines.append(f"调度表可贴的一行：| {os.path.basename(os.path.normpath(patch_directory))} | 已打（{time.strftime('%m-%d %H:%M', time.localtime())}） | code-source-discipline {gate.returncode} |")
     return (0 if gate.returncode == 0 else 1), lines
 
 
@@ -220,6 +220,6 @@ if __name__ == "__main__":
     if len(arguments) != 1 or not os.path.isdir(arguments[0]):
         print("✗ 要给一个补丁目录\n→ 怎么办：apply-writer-patch.py <补丁目录> [--root 仓根] [--dry-run]")
         sys.exit(2)
-    code, lines = apply(arguments[0], root, dry_run, ["bash", os.path.join(root, ".claude", "gate.d", "33-mutation-tables.sh")])
+    code, lines = apply(arguments[0], root, dry_run, ["bash", os.path.join(root, ".claude", "gate.d", "code-source-discipline.sh"), "--check", "mutation-tables"])
     print("\n".join(lines))
     sys.exit(code)

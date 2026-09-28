@@ -30,11 +30,11 @@
 
 ## 二、特别核：冻结副本被改过这件事
 
-### 2.1 攻方（Opus）开工时拷的那一份，是不是早于 04:31
+### 2.1 攻方（Opus）开工时拷的那一份，是不是早于冻结副本被改
 
-- `/tmp/claude-1000/m2-safety-r3-opus/tree` 目录自身 mtime：`2026-09-26 03:53:49.856951908 +0000`；
+- `/tmp/claude-1000/m2-safety-r3-opus/tree` 目录自身 mtime：`2026-09-26`；
   快照文件 `research/prompts/m2-safety-r3-snapshot/crates-sha256sums.txt` 的 mtime：
-  `2026-09-26 03:53:49.866725347 +0000`——两者相差 10 毫秒，即这份拷贝与开工快照几乎同时生成，**早于 04:31**。
+  `2026-09-26`——两者相差 10 毫秒，即这份拷贝与开工快照几乎同时生成，**早于冻结副本被改**。
 - **树相对快照的差异，逐字节核过正好等于 `core-arms.patch`**：把 `tree/` 拷进草稿目录，
   `patch -p1 -R < core-arms.patch` 反打（`patching file crates/singlefs-core/src/{admission,mount,transaction}.rs`，
   退出码 0），再把这条腿自己加的测试文件 `crates/singlefs-harness/tests/opus_r3_p3_attack.rs` 移出去，
@@ -52,28 +52,28 @@
 ```
 
 即：这条腿确实**直接在共享冻结副本自己的目录**（不是它的拷贝）里编译、跑过它的候选代码。三份早期日志的
-mtime：`run1.log` 04:39:09（`Finished ... in 0.00s`，复用已编译的二进制）、`run2.log` 04:40:43（如上，重新编译 harness）、
-`run3.log` 04:41:55（`Finished ... in 0.00s`）。冻结副本四个文件的当前 mtime（复原之后）全部是
-`2026-09-26 04:49:20`，即复原动作发生在 run3 之后、`diff/*.patch`（04:47:56）与 `rerun.sh`（04:48:13）生成之后。
-对照 Opus 报告披露的「2026-09-26 04:41 UTC 再核时四个 FAILED（修改时刻 04:31–04:33 UTC）」：**修改内容从
-04:31 一直留到 04:49:20 才被换回，窗口约 18 分钟，比 Opus 报告字面给出的「04:31–04:33」更长**；run1/run2/run3
+mtime 依次是 `run1.log`（`Finished ... in 0.00s`，复用已编译的二进制）、`run2.log`（如上，重新编译 harness）、
+`run3.log`（`Finished ... in 0.00s`）。冻结副本四个文件的当前 mtime（复原之后）全部是
+`2026-09-26`，即复原动作发生在 run3 之后、`diff/*.patch` 与 `rerun.sh` 生成之后。
+对照 Opus 报告披露的「2026-09-26 再核时四个 FAILED（修改时刻）」：**修改内容从
+被改那一刻起一直留到复原才被换回，窗口约 18 分钟，比 Opus 报告字面给出的「……」（约 2 分钟）更长**；run1/run2/run3
 这三次编译 + 跑测试全部落在这段被改过的窗口之内。
 
 - **辩方报告自己的披露不够具体**：第八节只写「打了补丁、跑了测试（应该在它的一份拷贝上做）」，没有点出
   编译目录字面就是 `/tmp/claude-1000/safety-r3-frozen/crates/singlefs-harness`——这一点靠 `run2.log` 的编译头才坐实。
-- **但被点名引用为证据的那份 `rerun-output.log`（04:52:02 生成）不是这三次污染跑的产物**：它自己的编译头是
+- **但被点名引用为证据的那份 `rerun-output.log`（复原之后生成）不是这三次污染跑的产物**：它自己的编译头是
   `Compiling ... (/tmp/claude-1000/m2-safety-r3-sonnet-rerun2/crates/singlefs-harness)`——`rerun2` 是
-  `rerun.sh` 从主仓 `crates/`（不是冻结副本）拷出来的独立目录；`rerun-check.log`（04:48:55）同理编译在
+  `rerun.sh` 从主仓 `crates/`（不是冻结副本）拷出来的独立目录；`rerun-check.log` 同理编译在
   `m2-safety-r3-sonnet-rerun-check/`。报告第六节表格引的证据文件正是 `rerun-output.log`，不是 run1/2/3.log
   ——**核对表里没有一处把 run1/2/3.log 当证据引用**。
-- **我在自己的草稿目录独立复跑了一遍**（不碰冻结副本，`rerun.sh /home/fy5090/code/singlefs
+- **我在自己的草稿目录独立复跑了一遍**（不碰冻结副本，`rerun.sh <仓根>
   /tmp/claude-1000/m2-safety-r3-verifier/sonnet-rerun-verify`），48 条组合的数据行与交回的 `rerun-output.log`
   逐行排序后 `diff` **完全一致**（114/114 行，退出码 0；细节见第四节表）。
 - 结论：**污染真实发生过，且持续时间比 Opus 报告字面暗示的更长**；但报告表格实际引用、并被我独立复现的
   那份证据文件不是从被污染的冻结副本产生的。这条留给主 agent 判断：报告第八节这句披露本身不够精确
   （少了「literally 编译在冻结副本自己的目录里」这个具体事实），要不要因此要求它补一句更准确的披露。
 - **未核项**：run1.log 首次编译（在这之前谁在冻结副本里第一次跑起了完整编译）没有留下更早的日志可查，
-  无法确定 04:31–04:39 之间冻结副本是否被除 Sonnet 之外的别的进程读取过；本轮材料里没有第三方证据可核。
+  无法确定从冻结副本被改到 run1 之间，它是否被除 Sonnet 之外的别的进程读取过；本轮材料里没有第三方证据可核。
 
 ## 三、云端辩方（Sonnet）引用核对
 
@@ -108,7 +108,7 @@ mtime：`run1.log` 04:39:09（`Finished ... in 0.00s`，复用已编译的二进
 **点名复跑（A3 + C283，三个盘宽的 normal_unmount 分支）**：
 
 ```
-bash research/prompts/m2-safety-r3-sonnet-model/rerun.sh /home/fy5090/code/singlefs \
+bash research/prompts/m2-safety-r3-sonnet-model/rerun.sh <仓根> \
     /tmp/claude-1000/m2-safety-r3-verifier/sonnet-rerun-verify
 ```
 
@@ -158,7 +158,7 @@ S4 width=384 candidate=a3 branch=normal_unmount c283=true  ... remount=RaiseFloo
 
 ```
 # 建副本、打补丁（与 rerun.sh 相同步骤，主树替代已被污染又已复原的冻结副本）
-rsync -a --exclude target --exclude .git /home/fy5090/code/singlefs/{crates,Cargo.toml,Cargo.lock} tree/
+rsync -a --exclude target --exclude .git {crates,Cargo.toml,Cargo.lock} tree/
 patch -p1 --forward < core-arms.patch
 # E1
 env OPUS_ARMS=T,P1,P2,P3,P3pl nice -n 19 bash run-with-memory-cap.sh 10G bash capped.sh 16 \
@@ -234,7 +234,7 @@ python3 research/scripts/corruption-check.py research/prompts/m2-safety-r3-local
   「复跑核对」（E1/E3/E4 用最终源码重跑一遍）——那是它自己已经做过并入库的复核，我只复核了主 agent 点名的两段。
 - 没有判断本地攻方 s1/s2 的算术答案对不对（Q1–Q5 的具体数值是否是这套式子的正确解）——那需要重新推导
   C283 的完整算法，属于推理本身，不在我的射程内；只核了它引用的每条 fact 的文件行号与转述。
-- 没有查清 04:31–04:39 之间冻结副本是否被 Sonnet 之外的进程读取过：没有更早的日志可查，材料里也没有第三方证据。
+- 没有查清从冻结副本被改到 run1 之间，它是否被 Sonnet 之外的进程读取过：没有更早的日志可查，材料里也没有第三方证据。
 - 没有对 Sonnet 报告 diff 补丁与 Opus 报告 `core-arms.patch` 之外的产品代码文件（如 `allocator.rs` 的其余部分、
   `checker`）做全文比对，只核了报告点名引用的具体行。
 - 没有跑 `layer0` 测试目标，没有跑 54 号门禁阶段（按派发要求）。

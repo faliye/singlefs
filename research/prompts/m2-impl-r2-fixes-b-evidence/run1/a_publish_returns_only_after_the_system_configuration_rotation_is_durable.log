@@ -1,0 +1,11 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.51s
+     Running tests/a_publish_returns_only_after_the_system_configuration_rotation_is_durable.rs (target/debug/deps/a_publish_returns_only_after_the_system_configuration_rotation_is_durable-e23b3140293fe08c)
+
+running 3 tests
+test a_barrier_failing_after_the_rotation_freezes_the_publish_and_the_resend_returns_only_after_its_rotation_is_durable ... ok
+test every_crash_point_after_a_publish_returns_keeps_a_system_configuration_witness_of_its_last_record ... ok
+test every_crash_point_after_a_publish_on_a_version_without_file_returns_keeps_the_witness ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 28.78s
+

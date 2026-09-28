@@ -1,0 +1,3 @@
+E7RESULT name=r2_state_budget world=b4_two_nodes_with_a_high_instance closed_form_state_count=81 enumerated_with_torn=96 writes=18 segments=8
+E7RESULT name=r2_b4_keys world=two_nodes_with_a_high_instance_in_a_unit_segment states=63 red_states=47 distinct_full_verdicts=3 distinct_status_vectors=2 read_set_key_classes=63 read_set_key_inconsistent_full=0 read_set_key_inconsistent_status=0 p7_key_classes=6 p7_key_inconsistent_full=16 p7_key_inconsistent_status=0 p7_classes_minus_distinct_status=4 must_be_nonzero=16 example_red_with_only_the_first_node=Some("[\"checker:I-7.7\"]")
+E7RESULT name=done emitted=3

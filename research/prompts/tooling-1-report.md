@@ -1,6 +1,6 @@
-# 工具一交回：subagent 体系分析 22 条的第一段（2026-09-27 JST）
+# 工具一交回：subagent 体系分析 22 条的第一段（2026-09-27）
 
-规格 `/tmp/claude-1000/tooling-1/spec.md`；清单与每条的证据在 `research/prompts/agent-analysis-2026-09-27/report.md` 第五节。进度逐条记在同目录 `progress.md`（时刻 JST）。
+规格 `/tmp/claude-1000/tooling-1/spec.md`；清单与每条的证据在 `research/prompts/agent-analysis-2026-09-27/report.md` 第五节。进度逐条记在同目录 `progress.md`。
 
 ## 结论
 
@@ -27,7 +27,7 @@
 | 7 cite-check | 新 `research/scripts/cite-check.py`；forward / attack / defense 加交回前跑它，verifier 第 2 步先跑它；交回闸对这四类跑它 | 自证 11 种；`CITE_CHECK_BREAK=always-ok/no-heading-check/no-background-check/ignore-changed` 各 rc=1 |
 | 8 补丁集成 | 新 `research/scripts/apply-writer-patch.py`；`implementation-writer.md`「产出」规定补丁目录五个文件的格式 | 自证 5 种；`APPLY_WRITER_PATCH_BREAK=checker-section-ignored/apply-unchecked/append-duplicates/no-hint` 各 rc=1 |
 | 9 证红与崩溃用例 | 新 `research/scripts/prove-red.sh`、新 `research/scripts/crash-case-check.py`；`implementation-writer.md` 3a、7a；门禁阶段文件与 heavy-test-guard 那一半进第二段 | prove-red 自证 4 种、`PROVE_RED_BREAK=any-target/main-allowed/layer0-run/never-caught` 各 rc=1；crash-case-check 自证 4 种、5 个 BREAK 各 rc=1；heavy-test-guard 对实现员跑 prove-red.sh 放行（rc=0） |
-| 10 opus 并发与限额窗口 | 并进序 4；上限按用户 2026-09-27 定改成 8 | `opus-no-limit`、`window-ignored`、`window-never-lifted` 各 rc=1；真会话探针：09-22 那次周限额（resets Sep 27, 4pm UTC）之后同一族又派出去没再撞，算已解开，不拒 |
+| 10 opus 并发与限额窗口 | 并进序 4；上限按用户 2026-09-27 定改成 8 | `opus-no-limit`、`window-ignored`、`window-never-lifted` 各 rc=1；真会话探针：09-22 那次周限额（resets Sep 27, ……）之后同一族又派出去没再撞，算已解开，不拒 |
 | 11 investigator | 新 `.claude/agents/investigator.md` | 63 号 ⑧（omitClaudeMd、开工先读）现判绿；它只有 Read / Bash，不进写范围表 |
 | 12 后台轮询拒 | `.claude/hooks/bash-command-detector.sh`（run_in_background 里轮询 `tasks/*.output` 的循环拒，加 3 个样本）；`agent-common.md` 长活那一条与拒绝写法 ② | `BASH_COMMAND_DETECTOR_ALLOW_BACKGROUND_TASK_OUTPUT_WAIT=1` → `✗ 自检：等待循环:run_in_background 里轮询后台任务的输出文件 应当…`（rc=1，2 处） |
 | 13 执行员进度 | `experiment-runner.md` 第 8 步；看门狗「进度文件不涨」与整点询问附进度 | 见看门狗一节 `progressstale`、`progressnote` |
@@ -56,7 +56,7 @@
 共用约束：`.claude/agent-common.md`（10 处：tooling-writer 例外、600k 交接、后台轮询拒、进度文件、拒绝写法 ②⑧、派发闸与续做闸与交回正文闸三条、绿行报数、报告进文件与 2000 字、Bash 不就地写）。
 在跑的子 agent 手上要改的：派发闸新判法只影响主 agent 的派发；子 agent 这边新增的执行时拒绝是后台轮询 `tasks/*.output`（拒绝写法 ②）、有 Edit 的子 agent 在 Bash 里就地改仓内文件（⑧）、交回正文超 2000 字 / 三方腿引文对不上 / 书记员执行员绿行没数（交回正文闸）。在跑的执行员（E156、E158）、实现员（实分一、实审 A1、B1）交回时会撞交回正文闸，要提前告诉它们「全文进报告文件，交回只写结论、路径、sha256」。
 
-## 各 lint 与 47 / 62 / 63 的末行与退出码（改完之后那一批，`lints.sh after1`，2026-09-27 JST 00:5x 起跑；基线那一批 `lints.sh base` 在开工时跑，47 / 62 / 63 / 58 / 73 / doc-lint / 规则纪律 / gate-lint / shell-lint / gate-overlap 都绿，preflight-lint 基线就红 295 处）
+## 各 lint 与 47 / 62 / 63 的末行与退出码（改完之后那一批，`lints.sh after1`，2026-09-27 起跑；基线那一批 `lints.sh base` 在开工时跑，47 / 62 / 63 / 58 / 73 / doc-lint / 规则纪律 / gate-lint / shell-lint / gate-overlap 都绿，preflight-lint 基线就红 295 处）
 
 | 项 | 退出码 | 原样末行 |
 |---|---|---|
@@ -65,7 +65,7 @@
 | 63 号 | 0 | `✓ 写范围闸、Bash 检出 hook、重型测试闸、续派闸、续做闸、交回闸与弹窗断言闸注册着、自证通过，定义的 model 取值认得，…表与定义一致（4 个有 Write 或 Edit 的定义、28 条路径模式）…` |
 | 58 号 | 0 | `没查 0 份`（上一行 `标题日期 ≥ 2026-09-28、另核了本地腿一侧与开工快照的 0 份`） |
 | 73 号（研究脚本、hook、.claude/scripts 的 gate-lint 与 shell-lint） | 0 | `没扫的目录 0 个（不在）：（没有）` |
-| doc-lint | 1 | `✗ 文档铁律检查失败：1 个文件违规、0 处编号引用无定义、11 处编号定义/引用不合规、0 条排除项不合规、0 处规则清单/警告记录不合规（检查 516，跳过 0）`（红全在 `.claude/kb/experiments/158-*.md`、`156-*.md`、`experiments-history.md`，UTC 15:33–15:36 别的会话的执行员写的，不是这一轮的） |
+| doc-lint | 1 | `✗ 文档铁律检查失败：1 个文件违规、0 处编号引用无定义、11 处编号定义/引用不合规、0 条排除项不合规、0 处规则清单/警告记录不合规（检查 516，跳过 0）`（红全在 `.claude/kb/experiments/158-*.md`、`156-*.md`、`experiments-history.md` 别的会话的执行员写的，不是这一轮的） |
 | 规则纪律（项目本地） | 0 | `✓ 规则只写怎么做（扫了 32 份文件 1985 行；没扫 0 个；…）` |
 | gate-lint（`GATE_LINT_DIR=.claude/gate.d`） | 0 | `✓ 门禁自检通过：84 个脚本（.sh 与 .py）、302 条拒绝都带了出路` |
 | shell-lint（`SHELL_LINT_DIR=.claude/gate.d`） | 0 | `✓ shell 纪律检查通过（共 76 个脚本）` |
@@ -85,20 +85,20 @@
 | 实现员一件活 3 件 | `main-agent.md` 那一句（第二段规格第四节第 1 条） | 推的，没量过；派发闸只数文件，不数件 |
 | 实现员一件活 8 个 crates 文件 | `runner-dispatch-guard.sh` 的 `IMPLEMENTATION_WRITER_FILE_LIMIT = 8`；`implementation-writer.md` 输入 | 推的，没量过 |
 | 规格起草一次 8 条 | `kb-spec-drafter.md` 输入；第二段规格第四节第 4 条 | 推的，没量过 |
-| opus 并发上限 | `runner-dispatch-guard.sh` 的 `OPUS_CONCURRENCY_LIMIT = 8` | **用户定**（2026-09-27 JST 02:2x 弹窗原话「8」，主 agent 转来的消息；报告原文的 4 已不用） |
+| opus 并发上限 | `runner-dispatch-guard.sh` 的 `OPUS_CONCURRENCY_LIMIT = 8` | **用户定**（2026-09-27 弹窗原话「8」，主 agent 转来的消息；报告原文的 4 已不用） |
 | 上下文交接线 600k | `implementation-writer.md` 第 8 步、`tooling-writer.md` 第 8 步、`investigator.md` 第 6 步、`agent-common.md`「不做」读大文件那一条 | 推的，没量过 |
 | 看门狗「该交接」700k | `agent-watch.py` `--context-tokens` 默认 700000、`watch.conf` 注释 | 推的，没量过 |
 | 交回正文 2000 字 | `handback-guard.sh` 的 `HANDBACK_CHARACTER_LIMIT`、`agent-common.md`「报告」一节 | 推的，没量过（报告 p90 是 8002 字） |
 | 崩溃验证提示线 5 个补丁 | `apply-writer-patch.py` 的 `CRASH_VERIFY_HINT_PATCHES` | 推的，没量过 |
 | 宽检索词门槛 100 行 | `stale-candidates.py` 的 `WIDE_TERM_SPOT_CHECK_LINES` | 推的，没量过 |
-| 进度文件不涨 30 分钟 | `agent-watch.py` `--progress-stale-minutes` 默认 30、`experiment-runner.md` 第 8 步 | 30 分钟来自用户 09-26 08:29「超过30分钟的任务 断点」与报告 3.2；「不涨多久报」这一用法是推的 |
+| 进度文件不涨 30 分钟 | `agent-watch.py` `--progress-stale-minutes` 默认 30、`experiment-runner.md` 第 8 步 | 30 分钟来自用户 09-26「超过30分钟的任务 断点」与报告 3.2；「不涨多久报」这一用法是推的 |
 | 单字母替换至少 5 次 | `corruption-check.py` 的 `SUBSTITUTION_MINIMUM_COUNT` | 推的（`UNTESFED` 那次 27 处） |
 | 在跑判定的 3 小时窗口、没派出去的 10 分钟宽限、限额回看 8 天 | `runner-dispatch-guard.sh` 的 `RUNNING_RECENT_SECONDS`、`UNLAUNCHED_GRACE_SECONDS`、`LIMIT_WINDOW_LOOKBACK_SECONDS` | 推的，没量过（我起的，报告里没有） |
 | inherit / 没有定义的类型按 opus 算 | `runner-dispatch-guard.sh` 的 `INHERITED_MODEL_FAMILY` | 推的：这个会话的主 agent 跑 opus |
 
 ## 做的时候撞到、改了判法的几处（给三方当线索）
 
-- 派发闸在真会话上探了一次（主会话记录 226 MB，判一次 0.5 秒）：09-22 那次周限额写着「resets Sep 27, 4pm (UTC)」、之后 opus 照派没再撞，所以加了「失败之后同一族又派出去没再撞，算已解开」；不加的话现在派任何 opus 都会被拒到 09-28 01:00 JST。
+- 派发闸在真会话上探了一次（主会话记录 226 MB，判一次 0.5 秒）：09-22 那次周限额写着「resets Sep 27, ……」、之后 opus 照派没再撞，所以加了「失败之后同一族又派出去没再撞，算已解开」；不加的话现在派任何 opus 都会被拒到 09-28。
 - 书记员汇总「交回之后才报」：`agent-watch.py` 里早就是这样（`scribe_followup_report`，`AGENT_WATCH_BREAK=scribedefer` 那一格），报告写的「看门狗没改」与代码对不上，没重做。
 - 58 号的新两条只管标题日期 ≥ 2026-09-28 的正文：门禁批第二轮（09-27）的正文在冻结快照里，没有「本地腿：攻 / 辩」一行，按 09-27 起判会当场红、又不许改。
 - `checklist-specs.py` 的随行核对：`_m2-safety-r3-checklist.md` 用 `--extra` 取整份文件、随行没有父节，第一版把它判红了；改成「同一份文件有 --extra 取法的算带到」之后，三份真清单判绿。

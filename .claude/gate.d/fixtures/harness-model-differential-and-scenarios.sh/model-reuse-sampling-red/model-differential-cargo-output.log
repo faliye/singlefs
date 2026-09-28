@@ -1,0 +1,14 @@
+    Finished `release` profile [optimized] target(s) in 0.21s
+     Running tests/random_histories.rs (target/release/deps/random_histories-0000000000000000)
+
+running 1 test
+── 随机历史：偏向抬 F 之后复用的取样点 ──
+种子 [0, 48)，每段 30 步，比重：偏向抬 F 之后复用；每一步之后跑池级 checker；两块 4 GiB 的盘
+历史 48 段：跑完 40、以已知红收尾 {0: 8}、新发现 0；根环转过一圈的 20 段；最高 txg 31
+  checker 跑了 1183 次；一个写都没发、沿用上一次结论的 257 步；已知红第 0 条那一形只记不停 0 步（0 段历史）
+  模型对拍 0 步：该拒而拒 0、区间里拒 0、该成而成 0；比过根 0 条、分配记录 0 条、冷启动内容 0 次、抬 F 上限 0 次；回退到 txg = F_生效 > 0 的根做成 0 次；单元区墙按区间放行 0 次
+用时 6.4 秒
+test reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 25 filtered out; finished in 6.41s
+

@@ -2,7 +2,7 @@
 
 <!-- doc-lint:not-numbers G1 G2 G3 G4 G5 G6 G7 G8 G9 K1 K2 K3 R1 R2 R3 R4 R5 R6 R7 R8 F9 F13 D1 D2 D3 D4 D5 D6 A1 A2 A3 A4 A5 A6 A7 A8 -->
 
-时刻：开工 2026-09-26 03:52 UTC（12:52 JST）。开工快照 `research/prompts/defs-m2-closeout-r3-snapshot/sha256sums.txt` 27 个文件 `sha256sum -c` 全部 OK（03:52:03 UTC）。
+时刻：开工 2026-09-26。开工快照 `research/prompts/defs-m2-closeout-r3-snapshot/sha256sums.txt` 27 个文件 `sha256sum -c` 全部 OK。
 
 ## 复跑
 
@@ -119,7 +119,7 @@ exit=1
 **情形**：提交时分诊员照第 2 步跑 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/scripts/gate.sh --staged`（没设上限变量，15、74 号各取 8G）。两种可达的结局：
 
 - 250：15 号在 `--staged` 的新 worktree 里从零编整个 research 工作区（`release` 带 `debug = true`，148 个 bin 源文件，`gate.sh` 不经 `capped.sh`，cargo 取整机 32 核）；8G 够不够没量过（见本节末「没量」）。
-- 252：别的会话同时在 `singlefs-heavy.slice` 里占着量（峰值表里 `capped.sh 16 cargo test … --test checker_known_bad_images` 这一类一条就记到 24G 上限），总上限约 40.1 GiB（`bash research/scripts/run-with-memory-cap.sh --status` 04:06 UTC 那一行原样：`  … slice singlefs-heavy.slice 的总上限 40.1 GiB（整机内存 − 余量 20G；RUN_WITH_MEMORY_CAP_RESERVE 改余量）`），15 号按 8G 排队等满 3600 秒退 252。
+- 252：别的会话同时在 `singlefs-heavy.slice` 里占着量（峰值表里 `capped.sh 16 cargo test … --test checker_known_bad_images` 这一类一条就记到 24G 上限），总上限约 40.1 GiB（`bash research/scripts/run-with-memory-cap.sh --status` 那一行原样：`  … slice singlefs-heavy.slice 的总上限 40.1 GiB（整机内存 − 余量 20G；RUN_WITH_MEMORY_CAP_RESERVE 改余量）`），15 号按 8G 排队等满 3600 秒退 252。
 
 阶段给的 ✗ 行（`.claude/gate.d/15-research-build.sh:36`、`.claude/gate.d/74-model-differential.sh:58` 同形）点名的文件是 `research/scripts/run-with-memory-cap.sh`，不带行号。分诊员第 3 步（`.claude/agents/gate-triage.md:28`，整行）：
 
@@ -144,7 +144,7 @@ exit=1
 ### R6 G9 的「量过的」在今天的峰值表上做不成、下一次也对不上
 
 - `.claude/agents/crash-verifier.md:20`（整行）：`- 54、55、57 号各自的内存上限（第 1b 步用），每道一个数：54、57 号的写明是量过的（峰值表 \`research/scripts/memory-peaks.tsv\` 里那一道整条经包装跑出的峰值）还是推的；55 号的不小于同时起的虚机数乘每台的内存（\`.claude/gate.d/55-qemu-first-transaction.sh\` 的 \`MODES\` 档数 × \`research/scripts/vm-bench.sh\` 的 \`VM_MEM\`）。`
-- `research/scripts/memory-peaks.tsv:4`（整行）：`# 列（制表符分隔）：峰值字节、量的时刻（UTC）、那一次的上限、键（命令的各个词用空格接起来，测试二进制名里的 16 位哈希去掉；RUN_WITH_MEMORY_CAP_KEY 可以指定）。`
+- `research/scripts/memory-peaks.tsv:4`（整行）：`# 列（制表符分隔）：峰值字节、量的时刻……、那一次的上限、键（命令的各个词用空格接起来，测试二进制名里的 16 位哈希去掉；RUN_WITH_MEMORY_CAP_KEY 可以指定）。`
 
 现查：`awk -F'\t' '!/^#/ && $4 ~ /54-layer0|57-lkmm|55-qemu|lkmm\.sh|herd7/'` 在峰值表上 0 行——今天只能写「推的」。表没有线程数一列，而层 0 全量按线程切片跑；同一个键在不同线程数下量到的峰值不能互换（推的，没量过）。主 agent 定义的提交流程让 54 号在 HEAD + 暂存区的临时 worktree 里跑 `--full <它的根>`（`.claude/main-agent.md:61`），根是临时路径，键里带着它（键「命令的各个词用空格接起来」），下一次换一个临时路径，表里那一行就对不上：「量过的」要靠人按前缀去认。小：不让任何一道做错，只让「量过的」这个选项在今天与下一次都难成立。
 
@@ -188,10 +188,10 @@ K1-01..05 是分诊员把上限变量放在 `SINGLEFS_HEAVY_TESTS=commit` 前、
 74 号在阶段里经包装的那条 cargo，峰值表原样（`research/scripts/memory-peaks.tsv:910`）：
 
 ```
-2265972736	2026-09-25T14:09:40Z	12G	cargo test --release -p singlefs-harness --test second_transaction_step_zero_layer0 -- --exact every_crash_state_outside_the_two_unit_segments_recovers_to_the_version_its_root_claims --nocapture
+2265972736	2026-09-25	12G	cargo test --release -p singlefs-harness --test second_transaction_step_zero_layer0 -- --exact every_crash_state_outside_the_two_unit_segments_recovers_to_the_version_its_root_claims --nocapture
 ```
 
-5111808000 字节约 4.76 GiB，在 8G 以下（这一行不是我跑的，03:40:32 UTC 别的会话或主 agent 跑出来的）。
+5111808000 字节约 4.76 GiB，在 8G 以下（这一行不是我跑的，是别的会话或主 agent 跑出来的）。
 
 **15 号的 stage-inputs 缺口**：15 号整份不调 `research/scripts/stage-must-run.sh`（`grep -c stage-must-run .claude/gate.d/15-research-build.sh` 为 0），每次都跑，没有「输入没变就复用」这条路，也就没有「包装改了而复用旧绿」的缺口。旁支（不归 G1）：74 号那一行列了 `research/scripts/capped.sh`，74 号与包装都不读它（`grep -n capped .claude/gate.d/74-model-differential.sh` 0 行，包装里只有 `run_capped` 这个函数名）；74 号读的 `stage-must-run.sh`、`change-touches-crates.sh`、`admission.py` 没列（59 号那一行同样没列），是既有的。
 
@@ -415,7 +415,7 @@ G4 没有新添一句误拒。两版一起误拒的 21 条路径是既有的：4
 - 两道阶段只在镜像根上跑了「写法错」这一种结局（包装在起 cargo 之前就退），没在仓上真跑 15、74 号，也没跑 `gate.sh`；R3 是按两份原文逐分句推的。
 - 15 号 8G 够不够没量：重型闸拒了 `cargo test --no-run`，没换写法（K1 节末）。
 - 每格只抽了一次（这一条腿自己就是一次观测）；「没打中」的几格照 `.claude/rules/three-way-inference.md`「一条腿只抽一次样不算一次观测」只算一次。
-- 行号都是 2026-09-26 03:52–04:20 UTC 现取的；开工快照 27 个文件当时全 OK，之后没再核。
+- 行号都是 2026-09-26 现取的；开工快照 27 个文件当时全 OK，之后没再核。
 - 40 号副本基线就红 7 份（今天工作区里 e156、e158 的几份产物没被实验页点名），是别的会话留下的，我只看了新文件让条数加不加 1，没判那 7 份。
 
 ## 没做什么

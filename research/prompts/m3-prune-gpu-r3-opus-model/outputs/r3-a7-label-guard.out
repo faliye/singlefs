@@ -1,0 +1,9 @@
+E7RESULT name=r3_a7_label_guard guard=weak case=label_as_store_key refused:E0308
+E7RESULT name=r3_a7_label_guard guard=weak case=label_in_a_hash_map refused:E0277
+E7RESULT name=r3_a7_label_guard guard=weak case=forge_the_key_from_a_label refused:E0603
+E7RESULT name=r3_a7_label_guard guard=weak case=label_text_as_an_in_memory_key compiles
+E7RESULT name=r3_a7_label_guard guard=strong case=label_as_store_key refused:E0308
+E7RESULT name=r3_a7_label_guard guard=strong case=label_in_a_hash_map refused:E0277
+E7RESULT name=r3_a7_label_guard guard=strong case=forge_the_key_from_a_label refused:E0603
+E7RESULT name=r3_a7_label_guard guard=strong case=label_text_as_an_in_memory_key refused:E0599
+E7RESULT name=r3_a7_label_guard_summary label_as_key_compiling_under_the_weak_guard=1 must_be_nonzero=1

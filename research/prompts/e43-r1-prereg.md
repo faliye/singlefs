@@ -1,6 +1,6 @@
 # E43 重跑登记（记录头 307 → 311）：扩展点字节上限的自证单元档在头 311 下还判不判出原来的结论
 
-写于 2026-09-24 20:50 JST，装置改之前、这一次的任何产物之前。原判据在 `.claude/kb/experiments/43-扩展点字节上限.md`「### 要测什么、判据、失败条款」（E43 没有单独的跑前登记文件，`git log --all --name-only` 里没有 `e43-preregistration.md`，原判据就是实验页这一节与装置文件头那张三段表，第二节整段抄）。
+写于 2026-09-24，装置改之前、这一次的任何产物之前。原判据在 `.claude/kb/experiments/43-扩展点字节上限.md`「### 要测什么、判据、失败条款」（E43 没有单独的跑前登记文件，`git log --all --name-only` 里没有 `e43-preregistration.md`，原判据就是实验页这一节与装置文件头那张三段表，第二节整段抄）。
 
 判据、门槛、作废条款在这里写死；跑出数之后要改，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」三步走，不在这里回改。
 
@@ -392,7 +392,7 @@ Q43.2–Q43.5 都是「两次比」的判定；两次一起错（比如常量改
 
 ## 十三、读过的文件与跑过的命令
 
-五份头 311 重跑登记（E43、E116、E155、E157、E159）是同一次派发里一起写的，这一节五份相同：列的是这一次派发里读过的全部文件，不只这一份用到的。行号是读的那一刻（2026-09-24 20:37–21:50 JST）的行号。`research/results/` 下的产物一份都没读（只在 `git log --all --name-only` 的输出里看到过文件名）。
+五份头 311 重跑登记（E43、E116、E155、E157、E159）是同一次派发里一起写的，这一节五份相同：列的是这一次派发里读过的全部文件，不只这一份用到的。行号是读的那一刻（2026-09-24）的行号。`research/results/` 下的产物一份都没读（只在 `git log --all --name-only` 的输出里看到过文件名）。
 
 ### 13.1 规则、共用约束、门禁与脚本
 
@@ -476,7 +476,7 @@ $ nice -n 19 python3 research/scripts/quote-kb.py <草稿目录>/orig-e116.md 'r
 $ grep -rn 'extension_point\|扩展点\|ExtensionPoint' crates/ --include=*.rs          # 2 行：system_configuration.rs:348、model.rs:251
 $ grep -rn 'settle\|整理\|compaction\|搬迁\|repack' crates/ --include=*.rs           # 水位字段、恢复注释、测试注释，没有搬迁写路径
 $ ls research/scripts | grep e159                                                    # 零命中
-$ TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M JST'                                          # 2026-09-24 20:47 JST（开写前）
+$ TZ=Asia/Tokyo date +%F                                                              # 2026-09-24（开写前）
 ```
 
 `<草稿目录>` 是派发提示给的那个目录；命令二的两个脚本全文与原样输出在下面，执行员要复核时可以原样拷进 `research/` 下重跑。

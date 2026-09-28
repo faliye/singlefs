@@ -1,4 +1,4 @@
-# 定义改动第二批：交回报告（2026-09-26 JST 09:0x）
+# 定义改动第二批：交回报告（2026-09-26）
 
 ## 一、结论一览
 
@@ -10,7 +10,7 @@
 | 4 跑二进制经内存包装 | `agent-common.md` 原来没有这一句（改前 `grep -n 'run-with-memory-cap' .claude/agent-common.md` 零命中），加「跑编译出来的代码经内存包装」一条；执行员第 1b 步改成指过去，崩溃验证员、门禁分诊员、实现员各加第 1b 步指过去 | 四份定义「做什么」第 1b 步 |
 | 5 攻方「内存与进程」 | 收进 `three-way-attack.md` 第 3c 步，紧跟第 3b 步 | `three-way-attack.md` |
 | 6 84 号归属 | 84 号文件头判的是「`replay.sh` 登记的入库产物里判决行 `字段=false` 要在实验页里被点名」，与执行员第 4c 步同一件事，登记给 `experiment-runner` | `stage-owners.tsv` 第 48 行 |
-| 记录 | 第四十节第 30 行现状格「欠：崩溃验证员、门禁分诊员、实现员…」那一段改成「定义已改、待定义三方（2026-09-26 JST）」＋改了哪份文件哪一节，剩下的欠账照留 | `records/2026-09-16-subagent拆分提案.md` 第 941 行 |
+| 记录 | 第四十节第 30 行现状格「欠：崩溃验证员、门禁分诊员、实现员…」那一段改成「定义已改、待定义三方（2026-09-26）」＋改了哪份文件哪一节，剩下的欠账照留 | `records/2026-09-16-subagent拆分提案.md` 第 941 行 |
 | 门禁 | 47、62、63、doc-lint、规则纪律（项目本地）全绿；62 号由红转绿 | 第四节 |
 
 只改了派发点名的八份文件与记录那一格：`.claude/main-agent.md`、`.claude/agent-common.md`、`.claude/agents/{implementation-writer,crash-verifier,gate-triage,experiment-runner,three-way-attack}.md`、`.claude/gate.d/stage-owners.tsv`。hooks、SOP 副本、`crates/`、kb、`CLAUDE.md` 没碰。
@@ -65,10 +65,10 @@ bash-command-detector	旁：sed -i 改脚本	exit=0
 `write-guard.sh`（原样）：
 
 ```
-write-guard	一 Write 覆盖未跟踪已有文件	exit=2	✗ 拒绝用 Write 整份覆盖 /home/fy5090/code/singlefs/research/results/e142-first-txn-dry-run-2026-09-25-r17-main.out：它已存在而且没进 git
+write-guard	一 Write 覆盖未跟踪已有文件	exit=2	✗ 拒绝用 Write 整份覆盖 research/results/e142-first-txn-dry-run-2026-09-25-r17-main.out：它已存在而且没进 git
 write-guard	一 Write 新文件（对照放行）	exit=0	
-write-guard	二 子 agent 越出写范围	exit=2	✗ experiment-runner 的写范围不含 /home/fy5090/code/singlefs/.claude/main-agent.md
-write-guard	二 未登记的项目 agent	exit=2	✗ gate-triage 在写范围表里没有登记，按拒绝处理：/home/fy5090/code/singlefs/README.md
+write-guard	二 子 agent 越出写范围	exit=2	✗ experiment-runner 的写范围不含 .claude/main-agent.md
+write-guard	二 未登记的项目 agent	exit=2	✗ gate-triage 在写范围表里没有登记，按拒绝处理：README.md
 write-guard	三 Edit 写进撇号角标	exit=2	✗ 写进去的内容里有撇号类角标 （U+2032）在「…A…」（/tmp/claude-1000/x.md，这次写的内容里共 1 处）
 write-guard	三 Write 写进撇号角标	exit=2	✗ 写进去的内容里有撇号类角标 （U+02B9）在「…B…」（/tmp/claude-1000/probe-new-xyz.md，这次写的内容里共 1 处）
 ```
@@ -202,17 +202,17 @@ heavy-test-guard	implementation-writer	"bash research/scripts/run-with-memory-ca
 
 记录第四十节第 30 行现状格，`research/scripts/replace-once.py` 定点替换（「命中 1 次，已替换（改名换上新 inode）并回读确认」）。换掉的旧串：
 
-> 欠：崩溃验证员、门禁分诊员、实现员的定义里还没写经包装跑（改定义走 72 号那一轮三方）；执行员的定义已改、待定义三方（2026-09-26 JST：`experiment-runner.md`「做什么」加第 1b 步，单测、`cargo run` 与装置二进制一律经 `run-with-memory-cap.sh`，`mutate.sh`、`replay.sh` 自己在里面套了、外面不再包；`agent-common.md` 里没有同类的一句，没改）；`research/scripts/mutate.sh` 每条变异外面套
+> 欠：崩溃验证员、门禁分诊员、实现员的定义里还没写经包装跑（改定义走 72 号那一轮三方）；执行员的定义已改、待定义三方（2026-09-26：`experiment-runner.md`「做什么」加第 1b 步，单测、`cargo run` 与装置二进制一律经 `run-with-memory-cap.sh`，`mutate.sh`、`replay.sh` 自己在里面套了、外面不再包；`agent-common.md` 里没有同类的一句，没改）；`research/scripts/mutate.sh` 每条变异外面套
 
 换成：
 
-> 定义已改、待定义三方（2026-09-26 JST）：`agent-common.md`「不做」一节加「跑编译出来的代码经内存包装」一条（`cargo test` / `run` / `bench` 与 cargo 编出来的二进制一律经 `run-with-memory-cap.sh`，写进自己脚本的整条经它；上限取派发提示给的、没给取 `replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值；`mutate.sh`、`replay.sh`、59 号在里面套了、外面不再包；退出码 250–254 的那一次不算结果；`cargo build` / `clippy` / `fmt` 不要求），执行员、崩溃验证员、门禁分诊员、实现员四份定义「做什么」的第 1b 步都指过去：`experiment-runner.md` 第 1b 步改成指到这一条、上限先取跑前登记给的；`crash-verifier.md` 加第 1b 步，54、55、57 号整条经包装跑、59 号直接跑；`gate-triage.md` 加第 1b 步，自己单跑的 `cargo test`、测试二进制经包装，`gate.sh` 与单跑的门禁阶段直接跑；`implementation-writer.md` 加第 1b 步，第 3 步证红与第 4 步动到的测试二进制经包装，fmt、clippy、build 不经。欠：`research/scripts/mutate.sh` 每条变异外面套
+> 定义已改、待定义三方（2026-09-26）：`agent-common.md`「不做」一节加「跑编译出来的代码经内存包装」一条（`cargo test` / `run` / `bench` 与 cargo 编出来的二进制一律经 `run-with-memory-cap.sh`，写进自己脚本的整条经它；上限取派发提示给的、没给取 `replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值；`mutate.sh`、`replay.sh`、59 号在里面套了、外面不再包；退出码 250–254 的那一次不算结果；`cargo build` / `clippy` / `fmt` 不要求），执行员、崩溃验证员、门禁分诊员、实现员四份定义「做什么」的第 1b 步都指过去：`experiment-runner.md` 第 1b 步改成指到这一条、上限先取跑前登记给的；`crash-verifier.md` 加第 1b 步，54、55、57 号整条经包装跑、59 号直接跑；`gate-triage.md` 加第 1b 步，自己单跑的 `cargo test`、测试二进制经包装，`gate.sh` 与单跑的门禁阶段直接跑；`implementation-writer.md` 加第 1b 步，第 3 步证红与第 4 步动到的测试二进制经包装，fmt、clippy、build 不经。欠：`research/scripts/mutate.sh` 每条变异外面套
 
 格子后半（`mutate.sh` 的 timeout、按名字判的门禁阶段里的 cargo、slice 外面涨过余量、两条老包装）原样留着，仍是欠账。
 
 ## 四、门禁判定行（原样）
 
-跑的时刻 2026-09-25 UTC 23:58–2026-09-26 UTC 00:02（JST 08:58–09:02），开跑前 `ps -o pid,etime,args -u "$(id -u)"` 过滤 `qemu-system|vm-bench|e152|fio|cargo|gate\.sh` 零命中。八份文件的最后改动（`three-way-attack.md` 23:58:17 UTC）早于 62、63、doc-lint、规则纪律开跑（47 号 00:00:38 UTC 结束之后才起）；47 号不读这几份定义。日志在 `/tmp/claude-1000/defs-closeout-draft-2/gate-*.log`、`doc-lint.log`、`rules-lint.log`，汇总 `gates-summary.log`：
+跑于 2026-09-26，开跑前 `ps -o pid,etime,args -u "$(id -u)"` 过滤 `qemu-system|vm-bench|e152|fio|cargo|gate\.sh` 零命中。八份文件的最后改动（`three-way-attack.md`）早于 62、63、doc-lint、规则纪律开跑（47 号结束之后才起）；47 号不读这几份定义。日志在 `/tmp/claude-1000/defs-closeout-draft-2/gate-*.log`、`doc-lint.log`、`rules-lint.log`，汇总 `gates-summary.log`：
 
 ```
 47-research-script-selftests.sh exit=0

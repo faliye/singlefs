@@ -1,6 +1,6 @@
 # 实审 A3d 实现员报告：A3a 判全之后，两份测试的坏法与期望跟上
 
-写于 2026-09-27（时刻都是 UTC；东京 JST = UTC + 9）。规格 `/tmp/claude-1000/impl-rev-a3d/spec.md`。在副本 `/tmp/claude-1000/impl-rev-a3d/work` 里改、交补丁 `/tmp/claude-1000/impl-rev-a3d/patch/`（`crates.patch`、`mutations-append.tsv`）。快照 04:19 UTC 取自主工作区（四个文件与 `crates/mutations.tsv` 的 sha256 记在 `snapshot-sha256.txt`；交回前核过四个文件此刻与快照逐字节相同）。
+写于 2026-09-27。规格 `/tmp/claude-1000/impl-rev-a3d/spec.md`。在副本 `/tmp/claude-1000/impl-rev-a3d/work` 里改、交补丁 `/tmp/claude-1000/impl-rev-a3d/patch/`（`crates.patch`、`mutations-append.tsv`）。快照取自主工作区（四个文件与 `crates/mutations.tsv` 的 sha256 记在 `snapshot-sha256.txt`；交回前核过四个文件此刻与快照逐字节相同）。
 
 ## 一、结论
 
@@ -93,7 +93,7 @@ R10 那一格搭分配器的方式：拿基线镜像最新那条根里的实例�
 | 586「普查 R2：checker 走读中央映射条目之前不判条目宽…」 | 抓到（013）：池级 checker panic 在 `crates/singlefs-checker/src/walk.rs:862`「range end index 55 out of range for slice of length 27」 |
 | 240「分配记录的读者不判条目宽：可写挂载那一侧的落点…」 | **没红**（010），见第六节 |
 
-第 3 步：变异表里点名这两个目标（含 `_layer0`）的 37 行，逐行在副本里核过，锚点都恰好命中一次，点名的用例也都还在。核的办法：在工作副本的快照 `work-crates-snapshot/` 上跑一段内联 python，逐行数锚点命中次数，再从测试文件里抽 `#[test]` 的函数名比对。输出末行原样：`rows 37 bad 0`。其中 9 行是我追加的。主工作区的表 04:19 UTC 之后涨到 1250 行（别的会话追加的），我那 9 个名字都不在里面；5 行 `recovery.rs` 锚点在主工作区的 `recovery.rs` 上各命中 1 次（它与快照逐字节相同）。
+第 3 步：变异表里点名这两个目标（含 `_layer0`）的 37 行，逐行在副本里核过，锚点都恰好命中一次，点名的用例也都还在。核的办法：在工作副本的快照 `work-crates-snapshot/` 上跑一段内联 python，逐行数锚点命中次数，再从测试文件里抽 `#[test]` 的函数名比对。输出末行原样：`rows 37 bad 0`。其中 9 行是我追加的。主工作区的表之后涨到 1250 行（别的会话追加的），我那 9 个名字都不在里面；5 行 `recovery.rs` 锚点在主工作区的 `recovery.rs` 上各命中 1 次（它与快照逐字节相同）。
 
 ## 六、第 240 行没红：不是这一件带来的（照报，没修）
 
@@ -136,7 +136,7 @@ Diff in /tmp/claude-1000/impl-rev-a3d/work/crates/singlefs-harness/src/bin/first
 | 阶段 | 退出码 | 末行 / 判定（原样摘自 `gate-<阶段>.log`） |
 |---|---|---|
 | 33（副本） | 1 | `crates/mutations.tsv:659 E158 root_choice_repair session s10：…原文在 crates/singlefs-harness/src/bin/e158_root_choice_repair.rs 里命中 2 次`。这是快照里 E158 那一行，不是我的；我那 9 行不在红行里 |
-| 33（主工作区现状，14:1x 打上 E158 补丁之后） | 1 | 只剩 `research/mutations/e163_gpu_multicard_crc32c.tsv 不存在（被测的是 research/e7-index-bench/src/bin/e163_gpu_multicard_crc32c.rs）`，crates 表那一段没有红行。E163 不是我的 |
+| 33（主工作区现状打上 E158 补丁之后） | 1 | 只剩 `research/mutations/e163_gpu_multicard_crc32c.tsv 不存在（被测的是 research/e7-index-bench/src/bin/e163_gpu_multicard_crc32c.rs）`，crates 表那一段没有红行。E163 不是我的 |
 | 53 | 0 | `✓ 格式常量文件里的占位都指得到分项或欠账（4 个占位：…）` |
 | 92 | 77（本次未跑） | `! /tmp/claude-1000/impl-rev-a3d/work 不是 git 仓，本阶段跳过`，按没判写 |
 | 94 | 0 | `✓ checker 与实现只共享常量模块 singlefs-format（…checker 闭包 1 个、实现闭包 2 个，内部依赖图 4 个 crate）…` |
@@ -144,9 +144,9 @@ Diff in /tmp/claude-1000/impl-rev-a3d/work/crates/singlefs-harness/src/bin/first
 | 89 | 77（本次未跑） | `⊘ 本次未跑：收口表第 27 行那几笔的前置一个都没进来，今天无对象可判（5 条逐字探针、覆盖 4 笔…）`，按没判写 |
 | 74 | 1 | `test result: FAILED. 21 passed; 3 failed; 2 ignored`：`second_transaction_supplement_three_random_history` 那三条，判法见下 |
 
-`apply-writer-patch.py …/patch --dry-run`（对主工作区现状）原样：`✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 1264 行`，退 0。`git -C 主工作区 apply --check patch/crates.patch` 退 0（14:1x 主工作区又打上 E158 补丁之后重做过）。
+`apply-writer-patch.py …/patch --dry-run`（对主工作区现状）原样：`✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 1264 行`，退 0。`git -C 主工作区 apply --check patch/crates.patch` 退 0（主工作区又打上 E158 补丁之后重做过）。
 
-74 号红的判法：同一个二进制在改前的 `baseline/` 副本（同一快照、不带这一件的改动）复跑，命令 `cargo test --offline --release -p singlefs-harness --test second_transaction_supplement_three_random_history`（经 `run-with-memory-cap.sh 8G` 与 `capped.sh 4`，日志 `baseline-random-history.log`，05:29 UTC 跑完），红的是同样那三条，末尾原样：
+74 号红的判法：同一个二进制在改前的 `baseline/` 副本（同一快照、不带这一件的改动）复跑，命令 `cargo test --offline --release -p singlefs-harness --test second_transaction_supplement_three_random_history`（经 `run-with-memory-cap.sh 8G` 与 `capped.sh 4`，日志 `baseline-random-history.log` 跑完），红的是同样那三条，末尾原样：
 
 ```
 failures:
@@ -159,11 +159,11 @@ test result: FAILED. 21 passed; 3 failed; 2 ignored; 0 measured; 0 filtered out;
 
 `work/` 副本上 74 号那一次（`gate-74-model-differential.sh.log`）红的也是这三个名字，`21 passed; 3 failed; 2 ignored`。签名是 `ModelDisagreement { aspect: "模型说该成、实现拒了" }`：模型说 `MountWritable` 该成，实现报 `NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)`。这是 C554 乙之后本来就有的基线红，模型跟上乙那一件正在修，不是这一件带来的。照派发提示的要求没修。
 
-## 五之二、接手之后对主工作区现状重核（2026-09-27 约 05:3x UTC，JST 14:3x）
+## 五之二、接手之后对主工作区现状重核（2026-09-27）
 
-前一个实现员在 05:29 UTC 撞了会话限额，我从这里接手。已经做完、证过红的都没重做，只核了下面几样：
+前一个实现员中途撞了会话限额，我从这里接手。已经做完、证过红的都没重做，只核了下面几样：
 
-- 主工作区的 `crates/mutations.tsv` 现在 1255 行（打上 E158 bin 补丁之后）。`git -C /home/fy5090/code/singlefs apply --check /tmp/claude-1000/impl-rev-a3d/patch/crates.patch` 退 0。`python3 research/scripts/apply-writer-patch.py /tmp/claude-1000/impl-rev-a3d/patch --dry-run` 末行原样 `✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 1264 行`，退 0（1255 + 9）。
+- 主工作区的 `crates/mutations.tsv` 现在 1255 行（打上 E158 bin 补丁之后）。`git -C <仓根> apply --check /tmp/claude-1000/impl-rev-a3d/patch/crates.patch` 退 0。`python3 research/scripts/apply-writer-patch.py /tmp/claude-1000/impl-rev-a3d/patch --dry-run` 末行原样 `✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 1264 行`，退 0（1255 + 9）。
 - 主工作区里这四个文件的 sha256 与 `snapshot-sha256.txt` 逐个相同，所以副本上的测试与证红结果对今天的主工作区照样成立。
 - 追加的 9 行照 33 号的解法（只把 `\n` 还原成换行）数锚点。4 行 `bad_disk_input.rs` 在打过补丁的 `work/` 副本上各命中 1 次；5 行 `recovery.rs` 在主工作区现状上各命中 1 次（主工作区的 `recovery.rs` 与副本逐字节相同，`cmp` 退 0）。9 个名字都不在主工作区的表里。
 - 第 240、252、256、586、592 行的名字与目标仍在原来的行号上，没有挪。

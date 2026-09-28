@@ -1,4 +1,4 @@
-# 附录二：池级 checker 补三条、事务号按实例计数、checker 与恢复的挂载口径对齐（`git diff -- crates/singlefs-checker/src/ crates/singlefs-core/src/` 原样；生成时刻 2026-09-21 18:40 UTC / 2026-09-22 03:40 JST，基准 HEAD 11a551b，工作区未暂存改动）
+# 附录二：池级 checker 补三条、事务号按实例计数、checker 与恢复的挂载口径对齐（`git diff -- crates/singlefs-checker/src/ crates/singlefs-core/src/` 原样；生成于 2026-09-22，基准 HEAD 11a551b，工作区未暂存改动）
 
 ## 一、diff（`git status --porcelain -- crates/singlefs-checker/src/ crates/singlefs-core/src/` 五处全是 ` M`，无 `??`，diff 范围内没有新增文件，因此本附录没有「新文件全文」一节）
 

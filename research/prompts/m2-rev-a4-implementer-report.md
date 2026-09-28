@@ -1,6 +1,6 @@
 # 实审 A4 报告：准入 ckpt_cost 按盘分路计（代码审阅第 20 条）
 
-时刻：2026-09-26 UTC 17:0x–18:xx（JST 2026-09-27 02:0x–03:xx）。规格 `/tmp/claude-1000/impl-rev-a4/spec.md`。
+日期：2026-09-27。规格 `/tmp/claude-1000/impl-rev-a4/spec.md`。
 
 ## 结论
 
@@ -109,7 +109,7 @@ name=a4-checkpoint-cost cell=three-4GiB-allocation-record-tree-only height_alloc
 
 ## 改法波及的既有用例（文件不在我的清单里，没改；交主 agent 重钉或重造）
 
-做法：主工作区快照拷进副本 `copy-fix`（17:20 UTC），副本里施加改法跑下面这些测试二进制（`run-impact.sh`，汇总 `impact-summary.txt`）；再把副本里 `admission.rs` 换回改前、`touch` 之后对红了的那几个二进制跑基线（`run-baseline.sh`，汇总 `baseline-summary.txt`）。基线同样红的不算我的（别的会话在改 `mount.rs` / `transaction.rs` 等，见「没做什么」）。
+做法：主工作区快照拷进副本 `copy-fix`，副本里施加改法跑下面这些测试二进制（`run-impact.sh`，汇总 `impact-summary.txt`）；再把副本里 `admission.rs` 换回改前、`touch` 之后对红了的那几个二进制跑基线（`run-baseline.sh`，汇总 `baseline-summary.txt`）。基线同样红的不算我的（别的会话在改 `mount.rs` / `transaction.rs` 等，见「没做什么」）。
 
 改后红、基线绿（我的改法造成，7 条）：
 
@@ -199,7 +199,7 @@ D16（发布语义） 已定项 1「准入」那一行（`.claude/kb/decisions/1
 ## 证红（第 3 步）
 
 - **改前整条二进制**：主工作区在施加改法之前跑整个 `admission_checkpoint_cost_per_device_paths` 二进制，三条全红（`red-before-fix.log`，`test result: FAILED. 0 passed; 3 failed`）：第一条红在第 446 行（`under_reserved` 非空，首行 two-1GiB empty#0 difference=1），第三条红在第 563 行（「每块盘一片叶、中央映射树 1 层的空发布不少扣」；那一次之后 fmt 合了一行，今天是第 562 行），三块盘那条红在第 526 行（left `MetadataBlocks(4)` right `MetadataBlocks(8)`）。改前没有新单测（被测函数是这一轮新加的），它由第 2 行变异证。
-- **变异**：`bash research/scripts/prove-red.sh --copy /tmp/claude-1000/impl-rev-a4/copy-fix --memory 8G <crate> <变异名…>`（副本 17:20 UTC 快照，`crates/mutations.tsv` 末尾接上那 5 行；基线由脚本先跑、绿）。原样输出：
+- **变异**：`bash research/scripts/prove-red.sh --copy /tmp/claude-1000/impl-rev-a4/copy-fix --memory 8G <crate> <变异名…>`（副本快照，`crates/mutations.tsv` 末尾接上那 5 行；基线由脚本先跑、绿）。原样输出：
 
 ```text
 实审 A4（D28 已定项 4 按盘分路计，用户 2026-09-27 定）：分配记录树那一项退回树高（盘数不乘进去，两块盘少扣）	抓到	every_empty_publish_on_one_leaf_path_per_device_fits_in_the_checkpoint_cost_before_it_on_each_device_width 红了（日志 /tmp/claude-1000/impl-rev-a4/prove-red-logs/001.log）
@@ -225,7 +225,7 @@ D16（发布语义） 已定项 1「准入」那一行（`.claude/kb/decisions/1
 `cargo fmt --all -- --check`（退出 1；Diff 全在别的会话的 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`，我的两份文件按包 `cargo fmt -p … -- --check` 各 0 处）：
 
 ```text
-     67 Diff in /home/fy5090/code/singlefs/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs
+     67 Diff in crates/singlefs-harness/src/bin/e158_root_choice_repair.rs
 ```
 
 `cargo clippy`（check.sh 那一套 -D）：`-p singlefs-core --all-targets --all-features` 退出 0；带上 `-p singlefs-harness` 时退出 101，红在别的会话在改的 `crates/singlefs-checker/src/walk.rs`（第 231、1453、4633、4641、4668 行，4 个 error），harness 编不到。新测试目标改用同一套 lint 的 `-W` 跑（`cargo clippy -p singlefs-harness --test admission_checkpoint_cost_per_device_paths`），我的文件 0 处告警：
@@ -240,7 +240,7 @@ error: could not compile `singlefs-checker` (lib) due to 4 previous errors
 `cargo build --offline --all-targets`（退出 0）：
 
 ```text
-   Compiling singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+   Compiling singlefs-harness v0.1.0 (crates/singlefs-harness)
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.20s
 ```
 

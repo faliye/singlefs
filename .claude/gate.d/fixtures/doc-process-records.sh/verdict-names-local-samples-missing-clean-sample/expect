@@ -1,0 +1,7 @@
+exit=1
+want=新写的判决里 1 份没按路径点名那一轮本地腿的全部样本（共漏 1 份）
+want=research/prompts/three-r1-main-verification.md 漏 1 份：
+want=        three-r1-local-attack-output-s2.md
+want=样本只跑 .gate-cells 点名的格：verdict-names-local-samples
+want=── 汇总：doc-process-records.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-process-records.sh：1 格里 1 格红（verdict-names-local-samples）

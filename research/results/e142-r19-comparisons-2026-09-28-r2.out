@@ -1,0 +1,205 @@
+# step ③-8 比对甲（Q142.46 N19M / Q142.58 N18）、Q142.47 crates 一格、Q142.49（第十九次跑第四段，臂 N19M）
+name=extract triples=5 kinds=5 full_three_state=1 tearable=1
+name=pin path=mkfs operations=23 segments=12+1+1+1+4 closed_form=4114 kinds=[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]
+name=pin path=instance_acquisition operations=2 segments=2 closed_form=4 kinds=[system_configuration_slot×2]
+name=pin path=warm_up operations=20 segments=2+1+2+2+1+2 closed_form=15 kinds=[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]
+name=pin path=transaction operations=35 segments=24+2+1+2 closed_form=16777223 kinds=[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]
+name=pin path=post_mkfs_stream operations=57 segments=2+2+1+2+2+1+2+24+2+1+2 closed_form=16777240 kinds=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]
+name=pin path=post_mkfs_stream closed_form_three_state=16777260 in_place_kinds=[system_configuration_slot×8]
+name=q46 arm=N19M path=mkfs field=operations model=23 pinned=23 literal_equal=true
+name=q46 arm=N19M path=mkfs field=segments model=12+1+1+1+4 pinned=12+1+1+1+4 literal_equal=true
+name=q46 arm=N19M path=mkfs field=closed_form model=4114 pinned=4114 literal_equal=true
+name=q46 arm=N19M path=mkfs field=kinds model=[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2] pinned=[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2] literal_equal=true
+name=q46 arm=N19M path=instance_acquisition field=operations model=2 pinned=2 literal_equal=true
+name=q46 arm=N19M path=instance_acquisition field=segments model=2 pinned=2 literal_equal=true
+name=q46 arm=N19M path=instance_acquisition field=closed_form model=4 pinned=4 literal_equal=true
+name=q46 arm=N19M path=instance_acquisition field=kinds model=[system_configuration_slot×2] pinned=[system_configuration_slot×2] literal_equal=true
+name=q46 arm=N19M path=warm_up field=operations model=20 pinned=20 literal_equal=true
+name=q46 arm=N19M path=warm_up field=segments model=2+1+2+2+1+2 pinned=2+1+2+2+1+2 literal_equal=true
+name=q46 arm=N19M path=warm_up field=closed_form model=15 pinned=15 literal_equal=true
+name=q46 arm=N19M path=warm_up field=kinds model=[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2] pinned=[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2] literal_equal=true
+name=q46 arm=N19M path=transaction field=operations model=35 pinned=35 literal_equal=true
+name=q46 arm=N19M path=transaction field=segments model=24+2+1+2 pinned=24+2+1+2 literal_equal=true
+name=q46 arm=N19M path=transaction field=closed_form model=16777223 pinned=16777223 literal_equal=true
+name=q46 arm=N19M path=transaction field=kinds model=[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2] pinned=[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2] literal_equal=true
+name=q46 arm=N19M path=post_mkfs_stream field=operations model=57 pinned=57 literal_equal=true
+name=q46 arm=N19M path=post_mkfs_stream field=segments model=2+2+1+2+2+1+2+24+2+1+2 pinned=2+2+1+2+2+1+2+24+2+1+2 literal_equal=true
+name=q46 arm=N19M path=post_mkfs_stream field=closed_form model=16777240 pinned=16777240 literal_equal=true
+name=q46 arm=N19M path=post_mkfs_stream field=kinds model=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2] pinned=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2] literal_equal=true
+name=q47_crates arm=N19M path=post_mkfs_stream field=closed_form_three_state model=16777260 pinned=16777260 equal=true
+name=q47_crates arm=N19M path=post_mkfs_stream field=in_place_kinds model=[system_configuration_slot×8] pinned=[system_configuration_slot×8] equal=true
+name=q46 arm=N18 path=mkfs field=operations model=21 pinned=23 literal_equal=false
+name=q46 arm=N18 path=mkfs field=segments model=12+1+1+1+4 pinned=12+1+1+1+4 literal_equal=true
+name=q46 arm=N18 path=mkfs field=closed_form model=4114 pinned=4114 literal_equal=true
+name=q46 arm=N18 path=mkfs field=kinds model=[unit_write×4,zero_fill×8,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier] pinned=[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2] literal_equal=false multiset_equal=false
+name=q46 arm=N18 path=instance_acquisition field=operations model=2 pinned=2 literal_equal=true
+name=q46 arm=N18 path=instance_acquisition field=segments model=2 pinned=2 literal_equal=true
+name=q46 arm=N18 path=instance_acquisition field=closed_form model=4 pinned=4 literal_equal=true
+name=q46 arm=N18 path=instance_acquisition field=kinds model=[system_configuration_slot×2] pinned=[system_configuration_slot×2] literal_equal=true
+name=q46 arm=N18 path=warm_up field=operations model=14 pinned=20 literal_equal=false
+name=q46 arm=N18 path=warm_up field=segments model=2+1+2+2+1+2 pinned=2+1+2+2+1+2 literal_equal=true
+name=q46 arm=N18 path=warm_up field=closed_form model=15 pinned=15 literal_equal=true
+name=q46 arm=N18 path=warm_up field=kinds model=[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2] pinned=[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2] literal_equal=false multiset_equal=false
+name=q46 arm=N18 path=transaction field=operations model=31 pinned=35 literal_equal=false
+name=q46 arm=N18 path=transaction field=segments model=24+2+1+2 pinned=24+2+1+2 literal_equal=true
+name=q46 arm=N18 path=transaction field=closed_form model=16777223 pinned=16777223 literal_equal=true
+name=q46 arm=N18 path=transaction field=kinds model=[unit_write×24,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2] pinned=[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2] literal_equal=false multiset_equal=false
+name=q46 arm=N18 path=post_mkfs_stream field=operations model=47 pinned=57 literal_equal=false
+name=q46 arm=N18 path=post_mkfs_stream field=segments model=2+2+1+2+2+1+26+2+1+2 pinned=2+2+1+2+2+1+2+24+2+1+2 literal_equal=false
+name=q46 arm=N18 path=post_mkfs_stream field=closed_form model=67108885 pinned=16777240 literal_equal=false
+name=q46 arm=N18 path=post_mkfs_stream field=kinds model=[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2] pinned=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2] literal_equal=false multiset_equal=false
+name=q49 item=i_before_window_operations model=45 crates=45 equal=true
+name=q49 item=i_before_window_writes model=31 crates=31 equal=true
+name=q49 item=i_before_window_last_five model=device0@16781312+4096,device1@16781312+4096,device0@7340032+512,device0@0+4096,device1@0+4096 crates=device0@16781312+4096,device1@16781312+4096,device0@7340032+512,device0@0+4096,device1@0+4096 equal=true
+name=q49 item=ii_transaction_operations model=35 crates=35 equal=true
+name=q49 item=ii_transaction_writes model=29 crates=29 equal=true
+name=q49 item=ii_transaction_barrier_steps model=6 crates=6 equal=true
+name=q49 item=iii_window_segments model=24+2+1+2 crates=24+2+1+2 equal=true
+# 锚点逐格（Q142.47 Q142.48 Q142.57 Q142.60 Q142.61 R41 C10 C12；锚点按 R19E-4 第 4 条）
+name=row_counts segments=5 segments_three_state=5 segments_sensitivity=13 segments_paths_ok=true three_state_paths_ok=true
+name=q48 arm=N19M path=mkfs field=operations model=23 expected=23 equal=true source=D1 D2 D3 D4 C1
+name=q48 arm=N19M path=mkfs field=segments model=12+1+1+1+4 expected=12+1+1+1+4 equal=true source=D1 D2 D3 D4 C1
+name=q48 arm=N19M path=mkfs field=closed_form model=4114 expected=4114 equal=true source=D1 D2 D3 D4 C1
+name=q48 arm=N19M path=mkfs field=kinds model=[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2] expected=[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2] equal=true source=D1 D2 D3 D4 C1
+name=q48 arm=N19M path=mkfs field=in_place_per_segment model=0+0+0+0+0 expected=0+0+0+0+0 equal=true source=D1 D2 D3 D4 C1
+name=q48 arm=N19M path=mkfs field=in_place_kinds model=none expected=none equal=true source=D1 D2 D3 D4 C1
+name=q47 arm=N19M path=mkfs field=closed_form_three_state model=4114 expected=4114 equal=true source=D1 D2 D3 D4 C1
+name=q47 arm=N19M path=mkfs field=in_place_per_segment model=0+0+0+0+0 expected=0+0+0+0+0 equal=true source=D1 D2 D3 D4 C1
+name=q47 arm=N19M path=mkfs field=in_place_overwrites model=0 expected=0 equal=true source=D1 D2 D3 D4 C1
+name=q47 arm=N19M path=mkfs field=closed_form_two_state_vs_segments_row model=4114 expected=4114 equal=true source=same_product
+name=q48 arm=N19M path=instance_acquisition field=operations model=2 expected=2 equal=true source=D1 D2 D3 D4 C2
+name=q48 arm=N19M path=instance_acquisition field=segments model=2 expected=2 equal=true source=D1 D2 D3 D4 C2
+name=q48 arm=N19M path=instance_acquisition field=closed_form model=4 expected=4 equal=true source=D1 D2 D3 D4 C2
+name=q48 arm=N19M path=instance_acquisition field=kinds model=[system_configuration_slot×2] expected=[system_configuration_slot×2] equal=true source=D1 D2 D3 D4 C2
+name=q48 arm=N19M path=instance_acquisition field=in_place_per_segment model=2 expected=2 equal=true source=D1 D2 D3 D4 C2
+name=q48 arm=N19M path=instance_acquisition field=in_place_kinds model=[system_configuration_slot×2] expected=[system_configuration_slot×2] equal=true source=D1 D2 D3 D4 C2
+name=q47 arm=N19M path=instance_acquisition field=closed_form_three_state model=9 expected=9 equal=true source=D1 D2 D3 D4 C2
+name=q47 arm=N19M path=instance_acquisition field=in_place_per_segment model=2 expected=2 equal=true source=D1 D2 D3 D4 C2
+name=q47 arm=N19M path=instance_acquisition field=in_place_overwrites model=2 expected=2 equal=true source=D1 D2 D3 D4 C2
+name=q47 arm=N19M path=instance_acquisition field=closed_form_two_state_vs_segments_row model=4 expected=4 equal=true source=same_product
+name=q48 arm=N19M path=warm_up field=operations model=20 expected=20 equal=true source=D1 D2 D3 D4 C3
+name=q48 arm=N19M path=warm_up field=segments model=2+1+2+2+1+2 expected=2+1+2+2+1+2 equal=true source=D1 D2 D3 D4 C3
+name=q48 arm=N19M path=warm_up field=closed_form model=15 expected=15 equal=true source=D1 D2 D3 D4 C3
+name=q48 arm=N19M path=warm_up field=kinds model=[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2] expected=[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2] equal=true source=D1 D2 D3 D4 C3
+name=q48 arm=N19M path=warm_up field=in_place_per_segment model=0+0+2+0+0+2 expected=0+0+2+0+0+2 equal=true source=D1 D2 D3 D4 C3
+name=q48 arm=N19M path=warm_up field=in_place_kinds model=[system_configuration_slot×4] expected=[system_configuration_slot×4] equal=true source=D1 D2 D3 D4 C3
+name=q47 arm=N19M path=warm_up field=closed_form_three_state model=25 expected=25 equal=true source=D1 D2 D3 D4 C3
+name=q47 arm=N19M path=warm_up field=in_place_per_segment model=0+0+2+0+0+2 expected=0+0+2+0+0+2 equal=true source=D1 D2 D3 D4 C3
+name=q47 arm=N19M path=warm_up field=in_place_overwrites model=4 expected=4 equal=true source=D1 D2 D3 D4 C3
+name=q47 arm=N19M path=warm_up field=closed_form_two_state_vs_segments_row model=15 expected=15 equal=true source=same_product
+name=q48 arm=N19M path=transaction field=operations model=35 expected=35 equal=true source=D1 D2 D3 D4 C4
+name=q48 arm=N19M path=transaction field=segments model=24+2+1+2 expected=24+2+1+2 equal=true source=D1 D2 D3 D4 C4
+name=q48 arm=N19M path=transaction field=closed_form model=16777223 expected=16777223 equal=true source=D1 D2 D3 D4 C4
+name=q48 arm=N19M path=transaction field=kinds model=[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2] expected=[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2] equal=true source=D1 D2 D3 D4 C4
+name=q48 arm=N19M path=transaction field=in_place_per_segment model=0+0+0+2 expected=0+0+0+2 equal=true source=D1 D2 D3 D4 C4
+name=q48 arm=N19M path=transaction field=in_place_kinds model=[system_configuration_slot×2] expected=[system_configuration_slot×2] equal=true source=D1 D2 D3 D4 C4
+name=q47 arm=N19M path=transaction field=closed_form_three_state model=16777228 expected=16777228 equal=true source=D1 D2 D3 D4 C4
+name=q47 arm=N19M path=transaction field=in_place_per_segment model=0+0+0+2 expected=0+0+0+2 equal=true source=D1 D2 D3 D4 C4
+name=q47 arm=N19M path=transaction field=in_place_overwrites model=2 expected=2 equal=true source=D1 D2 D3 D4 C4
+name=q47 arm=N19M path=transaction field=closed_form_two_state_vs_segments_row model=16777223 expected=16777223 equal=true source=same_product
+name=q48 arm=N19M path=post_mkfs_stream field=operations model=57 expected=57 equal=true source=D1 D2 D3 D4 C5
+name=q48 arm=N19M path=post_mkfs_stream field=segments model=2+2+1+2+2+1+2+24+2+1+2 expected=2+2+1+2+2+1+2+24+2+1+2 equal=true source=D1 D2 D3 D4 C5
+name=q48 arm=N19M path=post_mkfs_stream field=closed_form model=16777240 expected=16777240 equal=true source=D1 D2 D3 D4 C5
+name=q48 arm=N19M path=post_mkfs_stream field=kinds model=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2] expected=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2] equal=true source=D1 D2 D3 D4 C5
+name=q48 arm=N19M path=post_mkfs_stream field=in_place_per_segment model=2+0+0+2+0+0+2+0+0+0+2 expected=2+0+0+2+0+0+2+0+0+0+2 equal=true source=D1 D2 D3 D4 C5
+name=q48 arm=N19M path=post_mkfs_stream field=in_place_kinds model=[system_configuration_slot×8] expected=[system_configuration_slot×8] equal=true source=D1 D2 D3 D4 C5
+name=q47 arm=N19M path=post_mkfs_stream field=closed_form_three_state model=16777260 expected=16777260 equal=true source=D1 D2 D3 D4 C5
+name=q47 arm=N19M path=post_mkfs_stream field=in_place_per_segment model=2+0+0+2+0+0+2+0+0+0+2 expected=2+0+0+2+0+0+2+0+0+0+2 equal=true source=D1 D2 D3 D4 C5
+name=q47 arm=N19M path=post_mkfs_stream field=in_place_overwrites model=8 expected=8 equal=true source=D1 D2 D3 D4 C5
+name=q47 arm=N19M path=post_mkfs_stream field=closed_form_two_state_vs_segments_row model=16777240 expected=16777240 equal=true source=same_product
+name=q48 arm=N19M row=write_list field=writes model=29 expected=29 equal=true source=D5
+name=q48 arm=N19M row=write_list field=barriers model=6 expected=6 equal=true source=D5
+name=q48 arm=N19M row=write_list field=fua model=1 expected=1 equal=true source=D5
+name=q48 arm=N19M row=verdict field=write_list_ok value=true
+name=c10 arm=N19M row=before_window_summary field=operations model=45 expected=45 equal=true source=C10 R19E-4
+name=c10 arm=N19M row=before_window_summary field=writes model=31 expected=31 equal=true source=C10 R19E-4
+name=c12 arm=N19M row=layer0 field=closed_form model=16777240 expected=16777240 equal=true source=C12
+name=c12 arm=N19M row=layer0 field=segments model=2+2+1+2+2+1+2+24+2+1+2 expected=2+2+1+2+2+1+2+24+2+1+2 equal=true source=C12=C5
+name=q57 point=G10a path=transaction field=operations model=34 expected=34 equal=true source=C6 D6
+name=q57 point=G10a path=transaction field=segments model=24+5 expected=24+5 equal=true source=C6 D6
+name=q57 point=G10a path=transaction field=closed_form model=16777247 expected=16777247 equal=true source=C6 D6
+name=q57 point=G10a path=transaction field=closed_form_three_state model=16777287 expected=16777287 equal=true source=C6 D6
+name=q57 point=G10a path=transaction field=in_place_per_segment model=0+2 expected=0+2 equal=true source=C6 D6
+name=q57 point=G10a path=transaction field=kinds_multiset model=[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,system_configuration_slot×2,barrier×3] multiset_equal=true source=C6 D6
+name=q57 point=G10a path=post_mkfs_stream field=operations model=56 expected=56 equal=true source=C7 D6
+name=q57 point=G10a path=post_mkfs_stream field=segments model=2+2+1+2+2+1+2+24+5 expected=2+2+1+2+2+1+2+24+5 equal=true source=C7 D6
+name=q57 point=G10a path=post_mkfs_stream field=closed_form model=16777264 expected=16777264 equal=true source=C7 D6
+name=q57 point=G10a path=post_mkfs_stream field=closed_form_three_state model=16777319 expected=16777319 equal=true source=C7 D6
+name=q57 point=G10a path=post_mkfs_stream field=in_place_per_segment model=2+0+0+2+0+0+2+0+2 expected=2+0+0+2+0+0+2+0+2 equal=true source=C7 D6
+name=q57 point=G10a path=post_mkfs_stream field=kinds_multiset model=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,system_configuration_slot×2,barrier×3] multiset_equal=true source=C7 D6
+name=q57 point=G10b path=transaction field=operations model=34 expected=34 equal=true source=C8 D6
+name=q57 point=G10b path=transaction field=segments model=24+3+2 expected=24+3+2 equal=true source=C8 D6
+name=q57 point=G10b path=transaction field=closed_form model=16777226 expected=16777226 equal=true source=C8 D6
+name=q57 point=G10b path=transaction field=closed_form_three_state model=16777231 expected=16777231 equal=true source=C8 D6
+name=q57 point=G10b path=transaction field=in_place_per_segment model=0+0+2 expected=0+0+2 equal=true source=C8 D6
+name=q57 point=G10b path=transaction field=kinds_multiset model=[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,barrier]|[system_configuration_slot×2,barrier×2] multiset_equal=true source=C8 D6
+name=q57 point=G10b path=post_mkfs_stream field=operations model=56 expected=56 equal=true source=C9 D6
+name=q57 point=G10b path=post_mkfs_stream field=segments model=2+2+1+2+2+1+2+24+3+2 expected=2+2+1+2+2+1+2+24+3+2 equal=true source=C9 D6
+name=q57 point=G10b path=post_mkfs_stream field=closed_form model=16777243 expected=16777243 equal=true source=C9 D6
+name=q57 point=G10b path=post_mkfs_stream field=closed_form_three_state model=16777263 expected=16777263 equal=true source=C9 D6
+name=q57 point=G10b path=post_mkfs_stream field=in_place_per_segment model=2+0+0+2+0+0+2+0+0+2 expected=2+0+0+2+0+0+2+0+0+2 equal=true source=C9 D6
+name=q57 point=G10b path=post_mkfs_stream field=kinds_multiset model=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,barrier]|[system_configuration_slot×2,barrier×2] multiset_equal=true source=C9 D6
+name=q60 point=G11 path=mkfs field=segments_vs_arm_n18 model=12+1+1+1+4 expected=12+1+1+1+4 equal=true source=arm_n18_product
+name=q60 point=G11 path=mkfs field=closed_form_vs_arm_n18 model=4114 expected=4114 equal=true source=arm_n18_product
+name=q60 point=G11 path=mkfs field=operations model=23 expected=23 equal=true source=A1 A2 A3 A4 B1
+name=q60 point=G11 path=mkfs field=segments model=12+1+1+1+4 expected=12+1+1+1+4 equal=true source=A1 A2 A3 A4 B1
+name=q60 point=G11 path=mkfs field=closed_form model=4114 expected=4114 equal=true source=A1 A2 A3 A4 B1
+name=q60 point=G11 path=mkfs field=closed_form_three_state model=4114 expected=4114 equal=true source=A1 A2 A3 A4 B1
+name=q60 point=G11 path=mkfs field=in_place_per_segment model=0+0+0+0+0 expected=0+0+0+0+0 equal=true source=A1 A2 A3 A4 B1
+name=q60 point=G11 path=mkfs field=kinds model=[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2] expected=[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2] equal=true source=A1 A2 A3 A4 B1
+name=q60 point=G11 path=instance_acquisition field=segments_vs_arm_n18 model=2 expected=2 equal=true source=arm_n18_product
+name=q60 point=G11 path=instance_acquisition field=closed_form_vs_arm_n18 model=4 expected=4 equal=true source=arm_n18_product
+name=q60 point=G11 path=instance_acquisition field=operations model=2 expected=2 equal=true source=A1 A2 A3 A4 B2
+name=q60 point=G11 path=instance_acquisition field=segments model=2 expected=2 equal=true source=A1 A2 A3 A4 B2
+name=q60 point=G11 path=instance_acquisition field=closed_form model=4 expected=4 equal=true source=A1 A2 A3 A4 B2
+name=q60 point=G11 path=instance_acquisition field=closed_form_three_state model=9 expected=9 equal=true source=A1 A2 A3 A4 B2
+name=q60 point=G11 path=instance_acquisition field=in_place_per_segment model=2 expected=2 equal=true source=A1 A2 A3 A4 B2
+name=q60 point=G11 path=instance_acquisition field=kinds model=[system_configuration_slot×2] expected=[system_configuration_slot×2] equal=true source=A1 A2 A3 A4 B2
+name=q60 point=G11 path=warm_up field=segments_vs_arm_n18 model=2+1+2+2+1+2 expected=2+1+2+2+1+2 equal=true source=arm_n18_product
+name=q60 point=G11 path=warm_up field=closed_form_vs_arm_n18 model=15 expected=15 equal=true source=arm_n18_product
+name=q60 point=G11 path=warm_up field=operations model=18 expected=18 equal=true source=A1 A2 A3 A4 B3
+name=q60 point=G11 path=warm_up field=segments model=2+1+2+2+1+2 expected=2+1+2+2+1+2 equal=true source=A1 A2 A3 A4 B3
+name=q60 point=G11 path=warm_up field=closed_form model=15 expected=15 equal=true source=A1 A2 A3 A4 B3
+name=q60 point=G11 path=warm_up field=closed_form_three_state model=25 expected=25 equal=true source=A1 A2 A3 A4 B3
+name=q60 point=G11 path=warm_up field=in_place_per_segment model=0+0+2+0+0+2 expected=0+0+2+0+0+2 equal=true source=A1 A2 A3 A4 B3
+name=q60 point=G11 path=warm_up field=kinds model=[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2] expected=[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2] equal=true source=A1 A2 A3 A4 B3
+name=q60 point=G11 path=transaction field=segments_vs_arm_n18 model=24+2+1+2 expected=24+2+1+2 equal=true source=arm_n18_product
+name=q60 point=G11 path=transaction field=closed_form_vs_arm_n18 model=16777223 expected=16777223 equal=true source=arm_n18_product
+name=q60 point=G11 path=transaction field=operations model=33 expected=33 equal=true source=A1 A2 A3 A4 B4
+name=q60 point=G11 path=transaction field=segments model=24+2+1+2 expected=24+2+1+2 equal=true source=A1 A2 A3 A4 B4
+name=q60 point=G11 path=transaction field=closed_form model=16777223 expected=16777223 equal=true source=A1 A2 A3 A4 B4
+name=q60 point=G11 path=transaction field=closed_form_three_state model=16777228 expected=16777228 equal=true source=A1 A2 A3 A4 B4
+name=q60 point=G11 path=transaction field=in_place_per_segment model=0+0+0+2 expected=0+0+0+2 equal=true source=A1 A2 A3 A4 B4
+name=q60 point=G11 path=transaction field=kinds model=[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2] expected=[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2] equal=true source=A1 A2 A3 A4 B4
+name=q60 point=G11 path=post_mkfs_stream field=segments_vs_arm_n18 model=2+2+1+2+2+1+26+2+1+2 expected=2+2+1+2+2+1+26+2+1+2 equal=true source=arm_n18_product
+name=q60 point=G11 path=post_mkfs_stream field=closed_form_vs_arm_n18 model=67108885 expected=67108885 equal=true source=arm_n18_product
+name=q60 point=G11 path=post_mkfs_stream field=operations model=53 expected=53 equal=true source=A1 A2 A3 A4 B5
+name=q60 point=G11 path=post_mkfs_stream field=segments model=2+2+1+2+2+1+26+2+1+2 expected=2+2+1+2+2+1+26+2+1+2 equal=true source=A1 A2 A3 A4 B5
+name=q60 point=G11 path=post_mkfs_stream field=closed_form model=67108885 expected=67108885 equal=true source=A1 A2 A3 A4 B5
+name=q60 point=G11 path=post_mkfs_stream field=closed_form_three_state model=150994980 expected=150994980 equal=true source=A1 A2 A3 A4 B5
+name=q60 point=G11 path=post_mkfs_stream field=in_place_per_segment model=2+0+0+2+0+0+2+0+0+2 expected=2+0+0+2+0+0+2+0+0+2 equal=true source=A1 A2 A3 A4 B5
+name=q60 point=G11 path=post_mkfs_stream field=kinds model=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2] expected=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2] equal=true source=A1 A2 A3 A4 B5
+name=q61 point=G12a path=transaction field=operations model=32 expected=32 equal=true source=B6 A6
+name=q61 point=G12a path=transaction field=segments model=24+5 expected=24+5 equal=true source=B6 A6
+name=q61 point=G12a path=transaction field=closed_form model=16777247 expected=16777247 equal=true source=B6 A6
+name=q61 point=G12a path=transaction field=closed_form_three_state model=16777287 expected=16777287 equal=true source=B6 A6
+name=q61 point=G12a path=transaction field=in_place_per_segment model=0+2 expected=0+2 equal=true source=B6 A6
+name=q61 point=G12a path=transaction field=kinds_multiset model=[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,system_configuration_slot×2,barrier] multiset_equal=true source=B6 A6
+name=q61 point=G12a path=post_mkfs_stream field=operations model=52 expected=52 equal=true source=B7 A6
+name=q61 point=G12a path=post_mkfs_stream field=segments model=2+2+1+2+2+1+26+5 expected=2+2+1+2+2+1+26+5 equal=true source=B7 A6
+name=q61 point=G12a path=post_mkfs_stream field=closed_form model=67108909 expected=67108909 equal=true source=B7 A6
+name=q61 point=G12a path=post_mkfs_stream field=closed_form_three_state model=150995039 expected=150995039 equal=true source=B7 A6
+name=q61 point=G12a path=post_mkfs_stream field=in_place_per_segment model=2+0+0+2+0+0+2+2 expected=2+0+0+2+0+0+2+2 equal=true source=B7 A6
+name=q61 point=G12a path=post_mkfs_stream field=kinds_multiset model=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier×2]|[journal_record×2,root_record_fua,system_configuration_slot×2,barrier] multiset_equal=true source=B7 A6
+name=q61 point=G12b path=transaction field=operations model=32 expected=32 equal=true source=B8 A6
+name=q61 point=G12b path=transaction field=segments model=24+3+2 expected=24+3+2 equal=true source=B8 A6
+name=q61 point=G12b path=transaction field=closed_form model=16777226 expected=16777226 equal=true source=B8 A6
+name=q61 point=G12b path=transaction field=closed_form_three_state model=16777231 expected=16777231 equal=true source=B8 A6
+name=q61 point=G12b path=transaction field=in_place_per_segment model=0+0+2 expected=0+0+2 equal=true source=B8 A6
+name=q61 point=G12b path=transaction field=kinds_multiset model=[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,barrier]|[system_configuration_slot×2] multiset_equal=true source=B8 A6
+name=q61 point=G12b path=post_mkfs_stream field=operations model=52 expected=52 equal=true source=B9 A6
+name=q61 point=G12b path=post_mkfs_stream field=segments model=2+2+1+2+2+1+26+3+2 expected=2+2+1+2+2+1+26+3+2 equal=true source=B9 A6
+name=q61 point=G12b path=post_mkfs_stream field=closed_form model=67108888 expected=67108888 equal=true source=B9 A6
+name=q61 point=G12b path=post_mkfs_stream field=closed_form_three_state model=150994983 expected=150994983 equal=true source=B9 A6
+name=q61 point=G12b path=post_mkfs_stream field=in_place_per_segment model=2+0+0+2+0+0+2+0+2 expected=2+0+0+2+0+0+2+0+2 equal=true source=B9 A6
+name=q61 point=G12b path=post_mkfs_stream field=kinds_multiset model=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier×2]|[journal_record×2,root_record_fua,barrier]|[system_configuration_slot×2] multiset_equal=true source=B9 A6

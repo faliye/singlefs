@@ -29,7 +29,7 @@ bash .claude/gate.d/95-fixture-claims.sh            # 现在是绿
 
 ```
 rsync -a --exclude target --exclude research/target \
-  /home/fy5090/code/singlefs/ /tmp/claude-1000/c510-attack/repo/
+  <仓根>/ /tmp/claude-1000/c510-attack/repo/
 cd /tmp/claude-1000/c510-attack/repo && bash .claude/gate.d/95-fixture-claims.sh
 ```
 
@@ -44,7 +44,7 @@ bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh "$(pwd)/.claude/gd95"
 ```
 
 副本上的数只用来演示机理，**不入库**；每一条打中都另给了真仓上的只读复核命令。
-本机时钟 UTC，跑这一轮时是 2026-09-23 08:52–09:10 UTC（东京 17:52–18:10 JST）。
+跑这一轮时是 2026-09-23。
 
 ## 一、A1（G3，主打）：一行里只有第一个日期被判，第二个直接丢掉
 
@@ -404,7 +404,7 @@ RC=1
 | 被 `.gitignore` 挡住的路径（A7） | **漏，但漏得有理** | `git ls-files -z --others --ignored --exclude-standard --directory` 现查得 14 项，唯一带日期的是 `/.claude/singlefs-ai-sop/`（3 个 `warnings/2026-09-06.md`，合法）；它是另一个包的东西，本仓也改不了它。其余是 `target/`、`__pycache__/`、`.env`、`settings.local.json` |
 | 索引里有、工作区没有的文件 | **没跑** | `:156` 的 `grep … 2>/dev/null` 会把「文件不存在」静默吞掉。要造这个现场得 `git rm --cached` 或手删已提交文件，**agent-common 不许我做 git 写操作**，所以这一格我只读到了代码、没有实测 |
 | `gate.sh --staged` 的临时 worktree（A8） | **推的，没跑** | 读 `.claude/singlefs-ai-sop/scripts/gate.sh:54–80`：它用 `git worktree add --detach` 建树，所以 `.git` 是文件、`git rev-parse --show-toplevel` 有值、`git ls-files` 正常，`project_start_date` 拿到的是同一段历史。**推断是这一维在 --staged 下照常跑**；要实测得 `git worktree add`，同样是 git 写操作，没做 |
-| 写明天的日期（A9） | **半天拦得住、半天拦不住，没实测到绿的那一半** | `latest_today()` 是 `TZ=UTC-14 date +%F`（UTC+14）。跑这一轮时是 UTC 08:52，UTC+14 还在同一天，`records/2026-09-24-总审核.md` 判红（实测）。**UTC 10:00 之后 UTC+14 就进了第二天**，那时写 UTC 的明天会判绿——每天有 14 小时是这样。本机没有 `faketime` / `datefudge`（`command -v` 都空），不许改上游 `lib.sh`，所以这一半我没有跑出来 |
+| 写明天的日期（A9） | **半天拦得住、半天拦不住，没实测到绿的那一半** | `latest_today()` 是 `TZ=UTC-14 date +%F`（UTC+14）。跑这一轮时，UTC+14 还在同一天，`records/2026-09-24-总审核.md` 判红（实测）。**约一小时后 UTC+14 就进了第二天**，那时写 UTC 的明天会判绿——每天有 14 小时是这样。本机没有 `faketime` / `datefudge`（`command -v` 都空），不许改上游 `lib.sh`，所以这一半我没有跑出来 |
 | 把 `date_report` 换成别的文件 / 竞争 `mktemp` | **没试** | 要往 `/tmp` 里抢一个随机名，不是「可达的历史或输入」，是攻击装置本身 |
 
 ## 八、我自己提的改法（**只在副本上量过、被攻过零轮**）

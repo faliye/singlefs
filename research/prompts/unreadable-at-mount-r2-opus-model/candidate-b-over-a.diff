@@ -1,0 +1,119 @@
+--- a/crates/singlefs-core/src/mount.rs	2026-09-28 08:22:42.466149486 +0000
++++ b/crates/singlefs-core/src/mount.rs	2026-09-28 08:24:39.925233603 +0000
+@@ -1252,13 +1252,41 @@
+     let mut unreadable = 0;
+     let mut placements_referenced_by_abandoned_root = BTreeMap::new();
+     for root in roots.iter().filter(|root| is_abandoned(root)) {
+-        // 候选 (a)（unreadable-at-mount-r1）：读不出就重读一次（重读之前调钩子），仍读不出就拒可写、只读照常。
++        // 候选 (b)-从树表现算（unreadable-at-mount-r2）：账读不出时先按树表与中央映射现算这条根引用的落点，只在内存里隔离、不写盘；
++        // 现算不成（树表读不出、解不开、0 条，中央映射树读不出、解不开）才照 (a)：重读一次（重读之前调钩子），仍读不出、仍现算不成就拒可写。
++        // 攻方腿自核（只在设了 SINGLEFS_R2_B_COMPARE 时打印）：账读得出时，把现算的落点集与账里的落点集比一次。
++        if std::env::var_os("SINGLEFS_R2_B_COMPARE").is_some() {
++            if let Some(from_the_account) = placements_referenced_by_root(devices, unit_area_start, root) {
++                let computed = placements_referenced_by_root_computed_from_the_tree_table(devices, unit_area_start, root);
++                let account_set: BTreeSet<(u32, u64, u64)> =
++                    from_the_account.iter().map(|(device, slot, span)| (device.0, slot.0, *span)).collect();
++                let computed_set: Option<BTreeSet<(u32, u64, u64)>> = computed
++                    .as_ref()
++                    .map(|placements| placements.iter().map(|(device, slot, span)| (device.0, slot.0, *span)).collect());
++                eprintln!(
++                    "name=r2-b-compare root=({},{}) account={} computed={} only_in_account={:?} only_in_computed={:?}",
++                    root.instance.0,
++                    root.checkpoint_txg.0,
++                    account_set.len(),
++                    computed_set.as_ref().map_or(0, BTreeSet::len),
++                    computed_set.as_ref().map(|set| account_set.difference(set).copied().collect::<Vec<_>>()),
++                    computed_set.as_ref().map(|set| set.difference(&account_set).copied().collect::<Vec<_>>()),
++                );
++            }
++        }
+         let placements = match placements_referenced_by_root(devices, unit_area_start, root) {
+             Some(placements) => placements,
+             None => {
+                 unreadable += 1;
++                if let Some(computed) =
++                    placements_referenced_by_root_computed_from_the_tree_table(devices, unit_area_start, root)
++                {
++                    computed
++                } else {
+                 before_the_one_reread.before_rereading();
+-                match placements_referenced_by_root(devices, unit_area_start, root) {
++                match placements_referenced_by_root(devices, unit_area_start, root).or_else(|| {
++                    placements_referenced_by_root_computed_from_the_tree_table(devices, unit_area_start, root)
++                }) {
+                     Some(placements) => placements,
+                     None => {
+                         return Err(MountError::NewerStateStillUnreadableAfterOneReread(
+@@ -1271,6 +1299,7 @@
+                         ))
+                     }
+                 }
++                }
+             }
+         };
+         for (device, slot, span_slots) in placements.iter().copied() {
+@@ -1294,6 +1323,64 @@
+     })
+ }
+ 
++/// 候选 (b)-从树表现算（unreadable-at-mount-r2 攻方腿的一种读法，被攻过零轮）：分配记录树读不出、同一条根的树表读得出
++/// （解得开、不是 0 条）时，不读分配记录，按这条根现算它引用的全部落点：根记录直接指着的豁免单元（实例表链上认得出的每一片、
++/// 树表、中央映射树的每个节点）加中央映射树里每一条映射条目的落点（数据单元、打包单元、四棵树的节点，含分配记录树自己的节点）。
++/// 只在内存里用，不写盘。树表读不出、解不开、0 条，中央映射树读不出、解不开，映射条目解不开、落点不同槽或不在单元区：交 `None`。
++#[allow(
++    clippy::ptr_arg,
++    reason = "read_unit_via_locations 走 &dyn PoolReader，要一个有大小的读者：Vec 实现了它、切片不能转成 dyn"
++)]
++fn placements_referenced_by_root_computed_from_the_tree_table<Device: BlockDevice>(
++    devices: &Vec<(DeviceIdentity, Device)>,
++    unit_area_start: UnitAreaStart,
++    root: &RootRecord,
++) -> Option<Vec<(DeviceIdentity, crate::address::SlotNumber, u64)>> {
++    if crate::recovery::tree_table_entry_count(devices, root).ok()? == 0 {
++        return None;
++    }
++    let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
++    let mapping_tree = crate::code_two_tree::read_code_two_tree(
++        &root.mapping_root,
++        &crate::transaction::MultiLevelCodeTwoTree::CentralMapping
++            .read_expectation(root.mapping_root.head.birth_tree),
++        crate::code_two_tree::CodeTwoTreeHeaderJudgement::OnlyWhatTheShapeNeeds,
++        root,
++        crate::unit::unit_filesystem_identifier(&root.filesystem_identifier),
++        &mut |pointer: &crate::pointer::NodePointer| {
++            read_unit_via_locations(devices, &pointer.locations, node_bytes)
++        },
++    )
++    .ok()?;
++    let mut located: Vec<([LocationEntry; 2], u64)> = Vec::new();
++    for page in instance_table_page_pointers_as_far_as_readable(devices, root) {
++        located.push((page.locations, TransactionUnit::InstanceTable.span_slots()));
++    }
++    located.push((root.tree_table.locations, TransactionUnit::TreeTable.span_slots()));
++    for pointer in &mapping_tree.version.pointers {
++        located.push((pointer.locations, TransactionUnit::MappingTree.span_slots()));
++    }
++    for entry in &mapping_tree.leaf_entries_in_key_order {
++        let (key, locations) = crate::records::parse_mapping_entry(entry)?;
++        let span = match key.first().copied()? {
++            crate::unit::UNIT_CLASS_DATA | crate::unit::UNIT_CLASS_PACKED => 2,
++            crate::unit::UNIT_CLASS_INDEX_NODE => 1,
++            _ => return None,
++        };
++        located.push((locations, span));
++    }
++    let mut placements = Vec::new();
++    for (locations, span) in located {
++        let slot = slot_shared_by_both_location_entries(&locations).ok()?;
++        for (identity, _) in devices {
++            placement_lies_in_the_unit_area_of_its_device(devices, unit_area_start, *identity, slot, span)
++                .ok()?;
++            placements.push((*identity, slot, span));
++        }
++    }
++    Some(placements)
++}
++
+ /// 一条根引用着的落点，逐盘：带文件的一版从它那一版的分配记录里取（账里已释放的是它换下的上一版的，不算它引用）；
+ /// **树表 0 条的一版**引用的就是根记录直接指着的那几个单元——实例表（连同链上后面各片）、树表，写过行的一版还有它自己那片
+ /// 分配记录树节点（根指针住根记录那一项，C512（树表 0 条的一版上被换下的单元记在哪））——两盘同槽，不读分配记录树：

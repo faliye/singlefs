@@ -1,6 +1,6 @@
 # 批 B harness 那一组（收口表第 21、45、47、57 行）实现员交回
 
-接手：前一个实现员（a6660031b4890a181）撞会话额度中断，本份由接手的实现员写。时刻都是 UTC。
+接手：前一个实现员（a6660031b4890a181）撞会话额度中断，本份由接手的实现员写。
 主工作区一字未动：改动全在副本 `/tmp/claude-1000/impl-harness-batch/repo/`，补丁 `/tmp/claude-1000/impl-harness-batch/harness.patch` 只含 `crates/singlefs-harness/` 下 9 个文件；新变异 7 行在 `/tmp/claude-1000/impl-harness-batch/mutations-append.tsv`，没写进 `crates/mutations.tsv`。
 
 ## 一、四件逐条
@@ -57,7 +57,7 @@
 
 ## 三、每条新测试怎么证明会红
 
-做法：`drafts/mutant/` 是 `repo/` 的一份副本（`rsync -a --exclude target --exclude .git`，之后 `touch` 全部 `.rs`），用它自己的 `target`。先跑基线，再逐条把 `mutations-append.tsv` 那一行改进去、跑那条测试所在的整个测试二进制、从 `repo/` 拷回原件并 `touch`。接手之后整批重跑一遍（22:15–22:36），日志在 `drafts/logs/`，汇总在 `drafts/rerun-batch.txt` 与 `drafts/rerun-barrier.txt`。
+做法：`drafts/mutant/` 是 `repo/` 的一份副本（`rsync -a --exclude target --exclude .git`，之后 `touch` 全部 `.rs`），用它自己的 `target`。先跑基线，再逐条把 `mutations-append.tsv` 那一行改进去、跑那条测试所在的整个测试二进制、从 `repo/` 拷回原件并 `touch`。接手之后整批重跑一遍，日志在 `drafts/logs/`，汇总在 `drafts/rerun-batch.txt` 与 `drafts/rerun-barrier.txt`。
 
 **基线红集：空。** 6 个测试二进制与 `--lib crash` 全绿：
 
@@ -84,7 +84,7 @@
 | 7 改成回卷 | `mount_writable` 在 `establish_instance` 报 `MountError::Publish(_)` 之后把系统配置的实例代号写回旧号 | `a_write_error_after_the_acquisition_leaves_the_new_instance_in_the_system_configuration_and_the_report_names_it`（`second_transaction_supplement_three_fault_injection.rs:719`「取号之后第 3 次写报错：重开的盘上系统配置还是新号 2、不回卷成 1」，left `[]`） | 无 |
 
 七条红的都是测试自己的断言，不是被测代码里的 `debug_assert`（日志里 panic 点全在 `tests/` 下）；没有另跑 `--release`。
-门禁 59 号只跑这 7 行（`drafts/gate-root` 里把 `crates/mutations.tsv` 换成表头 + 这 7 行，`SINGLEFS_GATE_FULL=1`，4 个工作进程），22:31:46 开跑、22:36:36 跑完，原样：
+门禁 59 号只跑这 7 行（`drafts/gate-root` 里把 `crates/mutations.tsv` 换成表头 + 这 7 行，`SINGLEFS_GATE_FULL=1`，4 个工作进程），跑完原样：
 
 ```
   ✓ 步 1 验收第 4 条：extent 叶记录的指针忘了换（覆盖写之后仍指上一版的数据单元，读回等于旧内容）：cold_start_reads_the_second_content_and_the_pool_checker_stays_green 红了
@@ -145,7 +145,7 @@ exit 0
 
 代码：`crates/singlefs-core/src/mount.rs:309` `first_txg_of_new_instance` = max(根环全部根的 txg, 环里全部自证过的记录的 txg) + 1；`mount.rs:1276` `next_counter` = 环里记录的最大计数器 + 1。两者只在两种情形下分开：某条根的 txg 高过每一条读得出的记录；或者盘上已有计数器 ≠ txg 的记录（只会是前一种留下来的）。
 
-草稿探针（都在 `drafts/mutant/` 里、不进补丁，22:15–22:53 在同步到主工作区现状之后跑）：
+草稿探针（都在 `drafts/mutant/` 里、不进补丁，在同步到主工作区现状之后跑）：
 
 | 盘面 | 结果 |
 |---|---|
@@ -224,7 +224,7 @@ exit 0
 
 ## 八、补丁对主工作区现状的 `git apply --check`
 
-22:55 UTC 在主工作区跑（主工作区 `crates/` 与副本相比只差我这 9 个文件，`diff -rq` 现查过，所以同步之后主工作区没再变过）：
+在主工作区跑（主工作区 `crates/` 与副本相比只差我这 9 个文件，`diff -rq` 现查过，所以同步之后主工作区没再变过）：
 
 ```
 Checking patch crates/singlefs-harness/src/bad_disk_input.rs...

@@ -5,7 +5,7 @@
 # 命令与时刻见 /tmp/claude-1000/e159-s1/report.md。本机口径：AMD Ryzen 9 9950X + NVMe KINGSTON SNV3S4000G，
 # 来宾 8 vCPU / 2048M 内存（vm-bench.sh 默认）、virtio-blk cache=none,aio=native。
 
-## 一、cargo test（release，54/54）——跑于 2026-09-24 03:45 UTC
+## 一、cargo test（release，54/54）——跑于 2026-09-24
    Compiling e7-index-bench v0.1.0 (/home/fy5090/code/singlefs/research/e7-index-bench)
 warning: unused variable: `inode_container_catch_up`
     --> e7-index-bench/src/bin/e159_fsync_wait_group_commit.rs:2013:27
@@ -78,7 +78,7 @@ test e159_anchor_and_rule_tests::closed_loop_queueing_delay_is_counted_when_grou
 test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s
 
 
-## 二、mutate.sh（14/14 全抓，第二次跑：加了 read_at 修复与 anchors 重构之后）——跑于 2026-09-24 03:44 UTC
+## 二、mutate.sh（14/14 全抓，第二次跑：加了 read_at 修复与 anchors 重构之后）——跑于 2026-09-24
 基线：全绿
 ✅ [M1_甲发布去掉第二道屏障] 红：e159_anchor_and_rule_tests::jia_single_fsync_batch_step_sequence_matches_crates_order
 ✅ [M2_第一道屏障之后就放行] 红：e159_anchor_and_rule_tests::jia_durable_instant_is_not_earlier_than_the_root_slot_fua
@@ -96,7 +96,7 @@ test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 ✅ [M14_放行到醒这一段漏掉唤醒] 红：e159_anchor_and_rule_tests::release_to_wake_is_positive_when_release_precedes_return
 已还原，基线仍全绿
 
-## 三、真机冒烟：S3 探针（logical_block_size）——跑于 2026-09-24 03:44 UTC（修复之后）
+## 三、真机冒烟：S3 探针（logical_block_size）——跑于 2026-09-24（修复之后）
 
 ══ 虚机 benchmark harness ══
   ✓ 内核 /boot/vmlinuz-6.17.0-lockdep
@@ -105,7 +105,7 @@ E7RESULT E159PROBE device=vda logical_block_size=512
 E7RESULT name=done emitted=2
   ✓ 退出码 0，抓到 2 条结果（与程序声称的 2 条相符）
 
-## 四、真机冒烟：第一次真跑撞见的真 bug（修复前，2026-09-24 01:31 UTC）
+## 四、真机冒烟：第一次真跑撞见的真 bug（修复前，2026-09-24）
 # `RealBlockDevice::read_at` 把数据读进一块普通 `vec![0u8; length]`（不对齐），O_DIRECT 下
 # EINVAL；这一条之前没有任何单测覆盖到 `RealBlockDevice`（全部 48 条旧单测只用
 # `RecordingBlockDevice` 或 `SleepingBlockDevice`）。命令：
@@ -131,7 +131,7 @@ E7RESULT name=done emitted=2
         note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
         qemu-system-x86_64: terminating on signal 15 from pid 4066353 (timeout)
 
-## 五、真机冒烟：修复之后，同一条命令换 k=4（无预分配，稀疏盘，2026-09-24 03:34 UTC）
+## 五、真机冒烟：修复之后，同一条命令换 k=4（无预分配，稀疏盘，2026-09-24）
 # 不再 panic；samples=0 是稀疏盘首次触碰扇区要改宿主 ext4 元数据（第五节 5.3「测量之前整盘写一遍」
 # 那一步这次没做），不是 bug——见下一节加了 VM_DISK_PREALLOCATE=1 之后 samples 变正。
 
@@ -143,7 +143,7 @@ E7RESULT E159BLOCKSTAT device=vda sectors_written_diff=3746 sectors_read_diff=32
 E7RESULT name=done emitted=3
   ✓ 退出码 0，抓到 3 条结果（与程序声称的 3 条相符）
 
-## 六、真机冒烟：三条臂各跑一格（fallocate 预分配，2026-09-24 03:36–03:37 UTC）
+## 六、真机冒烟：三条臂各跑一格（fallocate 预分配，2026-09-24）
 ### 甲，k=1，group-commit on，duration=3s
 
 ══ 虚机 benchmark harness ══
@@ -177,7 +177,7 @@ E7RESULT E159BLOCKSTAT device=vda sectors_written_diff=24905 sectors_read_diff=1
 E7RESULT name=done emitted=3
   ✓ 退出码 0，抓到 3 条结果（与程序声称的 3 条相符）
 
-## 七、真机冒烟：最终确认（read_at 修复 + anchors 重构之后再跑一遍，2026-09-24 03:44 UTC）
+## 七、真机冒烟：最终确认（read_at 修复 + anchors 重构之后再跑一遍，2026-09-24）
 ### 甲，k=4，group-commit on，duration=3s（fallocate 预分配）
 
 ══ 虚机 benchmark harness ══

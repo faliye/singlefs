@@ -1,0 +1,4 @@
+# 样本的 runner 表（换掉这一道的 SELFTEST_RUNNERS）：三条都退 0
+bash research/scripts/sample-pass-a.sh --selftest
+python3 research/scripts/sample-pass-c.py --selftest
+bash research/scripts/sample-pass-d.sh --selftest

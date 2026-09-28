@@ -1,0 +1,32 @@
+[
+ {
+  "file": ".claude/kb/invariants.md",
+  "old": "| I-7.14 | 系统配置本盘设备号等于盘在池里的身份 | 每块盘两个系统配置槽里，每个自证过（magic 与整槽校验和对）、fsid 与本池相同的槽，自举头里的本盘设备号等于这块盘在池里的身份。字段住 D22（单元原子性怎么合成） 已定项 9 的系统配置字段表（自举头「本盘设备号 4」）；实现一侧是 D18（块里携带什么信息） 已定项 11 里挂载核盘表那一句：可写挂载比盘表（`crates/singlefs-core/src/mount.rs` 的 `device_table_disagreeing_with`，`OwnDeviceNumberDiffersFromTheIdentityHandedIn`）。别的池的槽归 I-1.4（块头 fsid 一致） 判，不在这一条里 | 已实现（2026-09-28，池级 checker `crates/singlefs-checker/src/image.rs` 的常量 `SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY` 登记这个编号、列进 `IMPLEMENTED_INVARIANTS`；判定 `judge_own_device_number_is_the_device_identity` 在 `walk::check_pool_image` 里调用，每块盘每个自证过、fsid 属于本池的系统配置槽判一次，本盘设备号与 `ImageReader::devices` 给的这块盘的身份比。坏镜像 `crates/singlefs-harness/tests/checker_known_bad_images.rs`：两块盘四个系统配置槽的本盘设备号互换，`devices_whose_own_device_numbers_are_swapped_redden_only_the_own_device_number_invariant` 钉只红 I-7.14（系统配置本盘设备号等于盘在池里的身份），这份坏镜像也在 `the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target` 的清单里；变异表 `crates/mutations.tsv` 里对着这一判的三行（判定恒真、池级走读不调这一判、坏镜像写回原值）改法 A 的 `prove-red.sh` 各抓到（`research/prompts/m2-impl-r2-fixes-a-implementer-report.md` 第 77–78 行）。合法历史上不判违例：门禁 74 号随机历史那一趟 I-7.14（系统配置本盘设备号等于盘在池里的身份） 判绿 4155 次、不适用 0 次（同一报告第 189 行）；层 0 快档与全量没跑）|",
+  "new": "| I-7.14 | 系统配置本盘设备号等于盘在池里的身份 | 每块盘两个系统配置槽里，每个自证过（magic 与整槽校验和对）、fsid 与本池相同的槽，自举头里的本盘设备号等于这块盘在池里的身份。字段住 D22（单元原子性怎么合成） 已定项 9 的系统配置字段表（自举头「本盘设备号 4」）；实现一侧是 D18（块里携带什么信息） 已定项 11 里挂载核盘表那一句：可写挂载比盘表（`crates/singlefs-core/src/mount.rs` 的 `device_table_disagreeing_with`，`OwnDeviceNumberDiffersFromTheIdentityHandedIn`）。别的池的槽归 I-1.4（块头 fsid 一致） 判，不在这一条里 | 已实现（2026-09-28，池级 checker `crates/singlefs-checker/src/image.rs` 的常量 `SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY` 登记这个编号、列进 `IMPLEMENTED_INVARIANTS`；判定 `judge_own_device_number_is_the_device_identity` 在 `walk::check_pool_image` 里调用，每块盘每个自证过、fsid 属于本池的系统配置槽判一次，本盘设备号与 `ImageReader::devices` 给的这块盘的身份比。坏镜像 `crates/singlefs-harness/tests/checker_known_bad_images.rs`：两块盘四个系统配置槽的本盘设备号互换，`devices_whose_own_device_numbers_are_swapped_redden_only_the_own_device_number_invariant` 钉只红 I-7.14（系统配置本盘设备号等于盘在池里的身份），这份坏镜像也在 `the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target` 的清单里；变异表 `crates/mutations.tsv` 里对着这一判的三行（判定恒真、池级走读不调这一判、坏镜像写回原值）改法 A 的 `prove-red.sh` 各抓到（`research/prompts/m2-impl-r2-fixes-a-implementer-report.md` 第 77–78 行）。合法历史上不判违例：门禁 harness-model-differential-and-scenarios 随机历史那一趟 I-7.14（系统配置本盘设备号等于盘在池里的身份） 判绿 4155 次、不适用 0 次（同一报告第 189 行）；层 0 快档与全量没跑）|",
+  "basis": "records/2026-09-28-门禁59号提速与双机分片.md「旧编号与现在的门禁」一节"
+ },
+ {
+  "file": ".claude/kb/decisions/05-快照-空间记账机制.md",
+  "old": "**式子逐项对照**（式子的权威正文在 D28（挂载期承诺量） 已定项 1；这张表是式子与统计量清单之间唯一的对照位，门禁 51 号拿两边逐项比）：",
+  "new": "**式子逐项对照**（式子的权威正文在 D28（挂载期承诺量） 已定项 1；这张表是式子与统计量清单之间唯一的对照位，门禁 doc-registries 的 admission-terms 格拿两边逐项比）：",
+  "basis": "records/2026-09-28-门禁59号提速与双机分片.md「旧编号与现在的门禁」一节"
+ },
+ {
+  "file": ".claude/kb/decisions/21-权威态与派生态的分界.md",
+  "old": "**欠**：无。这一项依赖的「从权威态重算」有了独立路径——门禁 94 号判 checker 与实现不共享代码（C12（增量语义共用） 2026-09-21 还清）；重算出来的结果对不对是另一件事，归 C13（checker 判定失效）。",
+  "new": "**欠**：无。这一项依赖的「从权威态重算」有了独立路径——门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格判 checker 与实现不共享代码（C12（增量语义共用） 2026-09-21 还清）；重算出来的结果对不对是另一件事，归 C13（checker 判定失效）。",
+  "basis": "records/2026-09-28-门禁59号提速与双机分片.md「旧编号与现在的门禁」一节"
+ },
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "**射程**：⚠️ **那个原子宽度不由本工程定**：D20（承重面：单元的原子性与自包含）已定自证单元依赖**运行时探测**的 `physical_block_size`，不许把 512 焊进格式。⚠️ **这个值是格式常量，改它要三处一起动**：kb 标记与正文、实验源码的 `const` 与钉死它的单测、重跑实验并更新产物；由门禁阶段「格式常量在 kb 与实验源码之间同步」（`.claude/gate.d/27-format-constants.sh`）判红。记录尺寸取 4 KiB 定长之后对齐浪费恒为 0（已定项 12）；变长记录的对齐代价表只对变长记录成立。",
+  "new": "**射程**：⚠️ **那个原子宽度不由本工程定**：D20（承重面：单元的原子性与自包含）已定自证单元依赖**运行时探测**的 `physical_block_size`，不许把 512 焊进格式。⚠️ **这个值是格式常量，改它要三处一起动**：kb 标记与正文、实验源码的 `const` 与钉死它的单测、重跑实验并更新产物；由门禁阶段「格式常量在 kb 与实验源码之间同步」（`.claude/gate.d/code-source-discipline.sh` 的 format-constants 格）判红。记录尺寸取 4 KiB 定长之后对齐浪费恒为 0（已定项 12）；变长记录的对齐代价表只对变长记录成立。",
+  "basis": "records/2026-09-28-门禁59号提速与双机分片.md「旧编号与现在的门禁」一节"
+ },
+ {
+  "file": ".claude/kb/decisions/20-承重面单元的原子性与自包含.md",
+  "old": "**定案**：第 3 问的落点是**崩溃点重放 + checker**。两样都有了（门禁 54 号、`crates/singlefs-checker`），但层 0 只录本工程自己这一条管道、按整写枚举、撕裂并进「没持久」（D13（验证路线） 已定项 4）⇒「失败原子性宽度 / 撕裂 / 重排序」按管道声明的那一类仍**零覆盖**。",
+  "new": "**定案**：第 3 问的落点是**崩溃点重放 + checker**。两样都有了（门禁 54-layer0-replay、`crates/singlefs-checker`），但层 0 只录本工程自己这一条管道、按整写枚举、撕裂并进「没持久」（D13（验证路线） 已定项 4）⇒「失败原子性宽度 / 撕裂 / 重排序」按管道声明的那一类仍**零覆盖**。",
+  "basis": "records/2026-09-28-门禁59号提速与双机分片.md「旧编号与现在的门禁」一节"
+ }
+]

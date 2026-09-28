@@ -1,4 +1,4 @@
-# crates/ 冻结副本 sha256 清单，取自 /tmp/claude-1000/m2-rollback-forward-r2/tree/crates/，2026-09-25 21:57 JST 拷贝。
+# crates/ 冻结副本 sha256 清单，取自 /tmp/claude-1000/m2-rollback-forward-r2/tree/crates/，2026-09-25 拷贝。
 # 排除 crates/singlefs-harness/src/bin/e1*.rs（e142_first_transaction_write_dump.rs、e142_first_transaction_write_dump_one_device.rs、e156_allocation_basis_counts.rs、e158_root_choice_repair.rs），规则照上一轮（m2-rollback-forward-r1）：这几份实验二进制此刻可能被别的会话在改，不属于这一轮。
 # 核验：cd /tmp/claude-1000/m2-rollback-forward-r2/tree && sha256sum -c research/prompts/m2-rollback-forward-r2-snapshot/crates-sha256.txt（或把本文件拷到该目录下用相对路径核）。
 f330c8ee64fdb3e9b1c125440c9adf1f3e729d98537dcc65748f5670b9352374  crates/mutations.tsv

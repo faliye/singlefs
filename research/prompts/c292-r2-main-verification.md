@@ -1,6 +1,6 @@
 # C292（码 2 身份段零消费者的理由已不成立）·第二轮·主 agent 核实与判决
 
-**口径**：2026-09-12（JST）主 agent 写。材料 `_c292-r2-background.md`；第一轮核实与判决 `c292-r1-main-verification.md`。第二轮立场对调：Sonnet 正推、Opus 反推、本地反例。被判的是戊 与它的对手臂丁。
+**口径**：2026-09-12 主 agent 写。材料 `_c292-r2-background.md`；第一轮核实与判决 `c292-r1-main-verification.md`。第二轮立场对调：Sonnet 正推、Opus 反推、本地反例。被判的是戊 与它的对手臂丁。
 
 | 腿 | 文件 | 状况 |
 |---|---|---|

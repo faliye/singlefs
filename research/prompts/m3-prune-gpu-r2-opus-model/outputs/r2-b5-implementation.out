@@ -1,0 +1,3 @@
+E7RESULT name=r2_state_budget world=b5_recorded_implementation closed_form_state_count=16777240 enumerated_with_torn=45 writes=41 segments=11
+E7RESULT name=r2_b5_implementation segments=["2xS", "2xJ", "1xR", "2xS", "2xJ", "1xR", "2xS", "24xU", "2xJ", "1xR", "2xS"] ownership=["root4(1, 1):order=[2, 3]/own=[2, 3]", "root9(1, 2):order=[7, 8]/own=[7, 8]", "root38(1, 3):order=[36, 37]/own=[36, 37]"] states=45 true_holes_by_persisted_bits=0 of_those_red_by_any_todays_judgment=0 root_without_record_today=0 root_without_own_record=0 own_red_that_is_not_a_true_hole=0 must_be_nonzero=0
+E7RESULT name=done emitted=3

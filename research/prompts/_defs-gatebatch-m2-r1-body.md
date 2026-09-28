@@ -16,7 +16,7 @@
 
 **共用问句**：照改后的字面与代码，哪一步会做错、放过、或误拒；给具体的命令、改动或派发情形。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-26 JST 21:2x）
+## 二、实现今天的样子（主 agent 的观测，2026-09-26）
 
 - 登记的四条崩溃枚举用例（`python3 research/scripts/admission.py crash-cases .` 原样）：`layer0-first-stream`（`first_transaction_step_seven_layer0`）、`layer0-second-stream`（`second_transaction_step_zero_layer0`）、`floor-raise-pushed-by-the-session`、`c561-sigma-full`，都在 `singlefs-harness` 包里。
 - 门禁批自报：`admission.py --selftest` 140 格、54 号自证 13 格加 10 个变异全抓、`lib_heavy_tests.py --selftest` 55 种加 6 个变异、`heavy-test-guard.sh --selftest` 580 种；62、63、doc-lint、gate-lint、shell-lint 全绿；47 号在主 agent 修了 52 号脚本之后退 0。

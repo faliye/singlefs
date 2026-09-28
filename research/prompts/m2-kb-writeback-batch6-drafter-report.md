@@ -48,7 +48,7 @@ $ python3 research/scripts/kb-spec-check.py /tmp/claude-1000/kb-batch6-drafter/s
 
 1. `.claude/kb/decisions/22-单元原子性怎么合成.md` 已定项 9：补「读者遇格式版本不是 1 一律拒收」。
 2. 同文件已定项 16：补「读者判固定结构槽距 / physical_block_size 界，越界即拒（checker 报违例、实现整池拒挂载）」
-   ——处置按用户 2026-09-27 JST 14:0x 定的「整池拒」写，没写「这一槽不可择」。
+   ——处置按用户 2026-09-27 定的「整池拒」写，没写「这一槽不可择」。
 3. `.claude/kb/decisions/09-加密.md` 已定项 10 射程末句：从「checker 那一半实现在做」改成现状
    「池级 checker 判单元头 29 字节全 0；池级码 1 / 码 3 与指针头部在 A3-checker-2 里做」。
 4. `.claude/kb/decisions/15-格式冻结政策.md` 已定项 4 依据第 3 条：追加一句标注「今天的读者不核版本号」

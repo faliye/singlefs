@@ -1,6 +1,0 @@
-exit=1
-want=「D450（引用样本甲） 已定项 1」后面紧跟着说它没定
-want=引用写着已定项、紧跟着却说它没定 3 处
-want=.claude/kb/引用方.md:2 「D450（引用样本甲） 已定项 1」后面紧跟着说它没定
-want=crates/sample/src/lib.rs:1
-want=README.md：首行是

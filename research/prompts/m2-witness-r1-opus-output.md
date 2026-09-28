@@ -1,6 +1,6 @@
 # m2-witness-r1 云端攻方腿（Opus）：W2 放处、W3 写序
 
-时刻：2026-09-24（UTC，JST 同日晚）。格：W2、W3。开工快照 `research/prompts/m2-witness-r1-snapshot/sha256sums.txt` 13 行全部 `OK`（`sha256sum -c` 现核）。
+日期：2026-09-24。格：W2、W3。开工快照 `research/prompts/m2-witness-r1-snapshot/sha256sums.txt` 13 行全部 `OK`（`sha256sum -c` 现核）。
 派发没给禁读清单，按空处理；这一轮没读别的腿的 output、没读岔路单。
 **本报告里所有数都是副本上量的**（`/tmp/claude-1000/m2-witness-r1-opus/repo`，入库仓一个字节没动），只在我的模型上量过、被攻过零轮；引用前要在入库装置上重做。
 
@@ -8,9 +8,9 @@
 
 ```bash
 # 1. 仓拷一份（排除 target、.git），把原型补丁打上
-rsync -a --exclude target --exclude .git /home/fy5090/code/singlefs/ /tmp/x/repo/
-cd /tmp/x/repo && patch -p1 < /home/fy5090/code/singlefs/research/prompts/m2-witness-r1-opus-model/src/prototype.diff
-bash /home/fy5090/code/singlefs/research/scripts/capped.sh 4 cargo build --release -p singlefs-harness --bin e158_root_choice_repair
+rsync -a --exclude target --exclude .git <仓根>/ /tmp/x/repo/
+cd /tmp/x/repo && patch -p1 < research/prompts/m2-witness-r1-opus-model/src/prototype.diff
+bash research/scripts/capped.sh 4 cargo build --release -p singlefs-harness --bin e158_root_choice_repair
 # 2. 一臂一进程；放处 none|a|b|c，写序 pre|post|late，物理块 512|4096
 SINGLEFS_WITNESS_PLACEMENT=a SINGLEFS_WITNESS_ORDER=pre E158_PBS=512 target/release/e158_root_choice_repair w-family 2   # H3 G0 L=3，|F|≤2
 SINGLEFS_WITNESS_PLACEMENT=a E158_PBS=512 target/release/e158_root_choice_repair w-min                                # 构造 F* = Hi ∪ 见证副本

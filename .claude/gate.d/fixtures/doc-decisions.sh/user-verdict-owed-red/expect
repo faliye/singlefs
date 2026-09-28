@@ -1,0 +1,6 @@
+exit=1
+want=D316 的正文标着待用户复核
+want=没有未还的账
+want=D31 的正文标着待用户复核，checks-owed.md 里却没有一笔**未还**的账点名它
+want=  user-verdict-owed：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（user-verdict-owed）

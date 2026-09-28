@@ -1,4 +1,4 @@
-# 附录二：三处定义改动与门禁 54 号分档相关文件的工作区改动（`git diff HEAD -- <8 个路径>` 原样；基准 HEAD `3b60f098e97dc4c4f3ed9c6355422b607db1c34c`，生成于 2026-09-24T00:50:31Z）
+# 附录二：三处定义改动与门禁 54 号分档相关文件的工作区改动（`git diff HEAD -- <8 个路径>` 原样；基准 HEAD `3b60f098e97dc4c4f3ed9c6355422b607db1c34c`，生成于 2026-09-24）
 
 ## 一、diff（8 份文件相对 HEAD `3b60f098e97dc4c4f3ed9c6355422b607db1c34c` 的工作区改动，未裁剪）
 
@@ -61,7 +61,7 @@ index 0834ef1..539d945 100755
 +#     `$(git rev-parse --git-common-dir)/singlefs-layer0-full-green.<输入哈希>`，不进工作树；放 common-dir，各 worktree 读写的是同一组。
 +#     开跑一格都不删：同一批输入的结果是确定的，前一趟写下的那一格在这一趟跑的过程中照样算数。这一趟没写成标记就退出（判红、跑的过程中输入变了、
 +#     被 TERM / INT / HUP 打断）时，退出前删这批输入那一格；被 SIGKILL 杀掉来不及删，前一趟那一格留着。别的格不动；全绿才写这一格。
-+#     标记里有输入哈希、逐文件的「sha256  路径」、开跑与跑完的 UTC 时刻、工作线程数、两条流的计数行与 CHECKER 行原样。
++#     标记里有输入哈希、逐文件的「sha256  路径」、开跑与跑完的时刻、工作线程数、两条流的计数行与 CHECKER 行原样。
 +#   bash .claude/gate.d/54-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
 +#     快档：两条流的测试二进制在 release 下只跑不标 ignored 的用例，一条都没通过判红；再按这批输入的哈希找那一格：
 +#     有、里面记的哈希相同、计数行恰好三行、LAYER0 与 LAYER0B 两行都是 exhaustive=true，才判绿，成功句报快档计数、原样带出那一格的全量计数行与时刻。
@@ -534,7 +534,7 @@ index 008ef73..72390c4 100644
 | `.claude/hooks/agent-write-scope.tsv` | hunk 2（`@@ -7,6 +9,8 @@`）新增两行 | **一行属于这一轮、一行不属于——同一 hunk 内裁不开** | 与 `_defs-gate54-tiering-r1-diff.md:371-379` 逐字节相同。`experiment-runner\tcrates/singlefs-harness/src/bin/e*.rs\t…`（E156，2026-09-22）不属于这一轮；`experiment-runner\tcrates/mutations.tsv\t…`（K1，2026-09-23 E158 撞上）属于这一轮。两行相邻在同一个 `@@` 段落里，git 不会把它们拆成两个 hunk，故整段保留，不单独抽出这一行 |
 | `.claude/main-agent.md` | hunk 1（`@@ -16,11 +16,11 @@`，「派出去之后」看门狗） | **不属于这一轮** | 与 `_defs-gate54-tiering-r1-diff.md:384-393` 逐字节相同（`agent-watch.py` → `watch.sh` 那处改法），r1 开工前已存在，与 gate54 分档无关的看门狗脚本改名 |
 | `.claude/main-agent.md` | hunk 2（`@@ -41,7 +41,7 @` "暂存之后、提交之前跑门禁"） | 属于这一轮 | r1 的原始改法落在「一个阶段任务结束」那一行末尾（`_defs-gate54-tiering-r1-diff.md:398-406`，追加「这一批碰了 crates/ 就后台跑 …--full」一句）；K3 被 r1 判决「站不住，改」后，落地版把改动从那一行**撤回**、改到「暂存之后、提交之前跑门禁」那一行——今天这一 hunk 正是撤回加新写的结果，径直体现 K3 从判决到落地 |
-| `.claude/rules/implementation-workflow.md` | hunk 1（`@@ -15,10 +15,12 @@`，「改 agent 定义与共用约束」） | **不属于这一轮** | 门禁 71 号 → 「规则纪律（项目本地）」与新增「三步在定义上各取什么」一段，正文没有点名这一节（正文只点「复用上一次全量门禁的判定」与「测试与崩溃检测优先多线程」两节）；`research/prompts/gate-fix-forks-r3-snapshot/changed-during-legs.md` 记录这处改动是「主 agent 在 2026-09-24 02:20 JST 改了 1 处」，属于另一个并行会话（gate-fix-forks 轮），不是 gate54-tiering |
+| `.claude/rules/implementation-workflow.md` | hunk 1（`@@ -15,10 +15,12 @@`，「改 agent 定义与共用约束」） | **不属于这一轮** | 门禁 71 号 → 「规则纪律（项目本地）」与新增「三步在定义上各取什么」一段，正文没有点名这一节（正文只点「复用上一次全量门禁的判定」与「测试与崩溃检测优先多线程」两节）；`research/prompts/gate-fix-forks-r3-snapshot/changed-during-legs.md` 记录这处改动是「主 agent 在 2026-09-24 改了 1 处」，属于另一个并行会话（gate-fix-forks 轮），不是 gate54-tiering |
 | `.claude/rules/implementation-workflow.md` | hunk 2（`@@ -27,7 +29,7 @@`，「复用上一次全量门禁的判定」） | 属于这一轮 | 正文一节名点名「复用上一次全量门禁的判定」；改法把「层 0 崩溃点重放还读字节布局表…」换成「每一道读哪些路径，以 `.claude/gate.d/stage-inputs.tsv` 里它那一行为准」，正是 V4 的落地措辞，虽不见于三份实现员报告（均未提及自己改了这一处），但与正文点名的范围一致 |
 | `.claude/rules/implementation-workflow.md` | hunk 3（`@@ -60,4 +62,4 @@`，「门禁管哪一半」末段） | 属于这一轮（r3） | 与 `r3-report.md` 附录 `r3/implementation-workflow.diff`（第 705-717 行）逐字节相同 |
 

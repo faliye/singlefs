@@ -1,0 +1,2 @@
+E7RESULT name=r3_panic_location location=crates/singlefs-core/src/allocator.rs:371 message_head=建空闲图的盘末尾不在单元
+E7RESULT name=done emitted=2

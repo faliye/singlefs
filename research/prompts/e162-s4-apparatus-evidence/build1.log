@@ -1,0 +1,73 @@
+   Compiling e7-index-bench v0.1.0 (research/e7-index-bench)
+warning: unused import: `BufRead`
+  --> e7-index-bench/src/bin/e162_verdict_store_power_cut.rs:33:15
+   |
+33 | use std::io::{BufRead, BufReader, Read, Write};
+   |               ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+    --> e7-index-bench/src/bin/e162_verdict_store_power_cut.rs:2453:9
+     |
+2453 |     let mut push = |items: &mut Vec<VerifyItem>, group: PointGroup, point: usize, variant: ReplayVariant, subset_index: u64, damag...
+     |         ----^^^^
+     |         |
+     |         help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `label` is never used
+   --> e7-index-bench/src/bin/e162_verdict_store_power_cut.rs:427:8
+    |
+426 | impl Candidate {
+    | -------------- method in this implementation
+427 |     fn label(self) -> &'static str {
+    |        ^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `differing_setting_names` is never used
+   --> e7-index-bench/src/bin/e162_verdict_store_power_cut.rs:494:8
+    |
+480 | impl WriteSettings {
+    | ------------------ method in this implementation
+...
+494 |     fn differing_setting_names(self, other: WriteSettings) -> Vec<&'static str> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `registered_control_difference` is never used
+   --> e7-index-bench/src/bin/e162_verdict_store_power_cut.rs:690:8
+    |
+576 | impl PowerCutArm {
+    | ---------------- method in this implementation
+...
+690 |     fn registered_control_difference(self) -> Option<&'static str> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: variant `Recording` is never constructed
+    --> e7-index-bench/src/bin/e162_verdict_store_power_cut.rs:1576:5
+     |
+1574 | enum MarkerSink {
+     |      ---------- variant in this enum
+1575 |     MarkerPartition { device: File, aligned: AlignedSector, next_sequence: u64, arm_index: u32 },
+1576 |     Recording { events: Vec<WriteLoopEvent>, next_sequence: u64, arm_index: u32 },
+     |     ^^^^^^^^^
+
+warning: associated function `recording` is never used
+    --> e7-index-bench/src/bin/e162_verdict_store_power_cut.rs:1589:8
+     |
+1579 | impl MarkerSink {
+     | --------------- associated function in this implementation
+...
+1589 |     fn recording(arm_index: u32) -> MarkerSink {
+     |        ^^^^^^^^^
+
+warning: function `synthetic_write_cache_model_log` is never used
+    --> e7-index-bench/src/bin/e162_verdict_store_power_cut.rs:2105:4
+     |
+2105 | fn synthetic_write_cache_model_log() -> Vec<u8> {
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `e7-index-bench` (bin "e162-verdict-store-power-cut") generated 8 warnings (run `cargo fix --bin "e162-verdict-store-power-cut" -p e7-index-bench` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 5.39s

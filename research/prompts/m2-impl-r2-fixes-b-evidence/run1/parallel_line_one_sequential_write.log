@@ -1,0 +1,10 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.42s
+     Running tests/parallel_line_one_sequential_write.rs (target/debug/deps/parallel_line_one_sequential_write-d6cceddd34f0ceba)
+
+running 2 tests
+test sequential_write_of_one_data_unit_writes_the_same_bytes_as_an_overwrite_of_the_same_content ... ok
+test sequential_write_publishes_one_record_per_data_unit_across_the_sixty_seven_threshold_up_to_the_full_extent_leaf ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.39s
+

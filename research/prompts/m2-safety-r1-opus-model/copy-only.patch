@@ -1,6 +1,6 @@
 diff -ruN -x target -x 's_opus_*' pristine/crates/singlefs-core/src/mount.rs tree/crates/singlefs-core/src/mount.rs
---- pristine/crates/singlefs-core/src/mount.rs	2026-09-25 01:54:51.710902883 +0000
-+++ tree/crates/singlefs-core/src/mount.rs	2026-09-25 05:16:49.584999395 +0000
+--- pristine/crates/singlefs-core/src/mount.rs	2026-09-25
++++ tree/crates/singlefs-core/src/mount.rs	2026-09-25
 @@ -389,6 +389,11 @@
      space_admission: SpaceAdmission,
  }
@@ -256,8 +256,8 @@ diff -ruN -x target -x 's_opus_*' pristine/crates/singlefs-core/src/mount.rs tre
      // 那些根发过的号不许再发（D8（核心索引结构） 已定项 8 ②），回退行那次发布带的是环里的 max，
      // 之后再发第一个文件版本就从它往上发（C511（回退到无文件那一版之后诞生代怎么接） 第 3 步）。
 diff -ruN -x target -x 's_opus_*' pristine/crates/singlefs-core/src/transaction.rs tree/crates/singlefs-core/src/transaction.rs
---- pristine/crates/singlefs-core/src/transaction.rs	2026-09-24 23:55:14.709111916 +0000
-+++ tree/crates/singlefs-core/src/transaction.rs	2026-09-25 04:22:01.214445376 +0000
+--- pristine/crates/singlefs-core/src/transaction.rs	2026-09-25
++++ tree/crates/singlefs-core/src/transaction.rs	2026-09-25
 @@ -4591,7 +4591,23 @@
                  &settled.previous_roles_replaced,
                  &device_identities_of_the_accounting_rows,
@@ -284,8 +284,8 @@ diff -ruN -x target -x 's_opus_*' pristine/crates/singlefs-core/src/transaction.
          (None, _) => Vec::new(),
      };
 diff -ruN -x target -x 's_opus_*' pristine/crates/singlefs-harness/src/history.rs tree/crates/singlefs-harness/src/history.rs
---- pristine/crates/singlefs-harness/src/history.rs	2026-09-25 01:49:11.921508617 +0000
-+++ tree/crates/singlefs-harness/src/history.rs	2026-09-25 04:21:47.254416235 +0000
+--- pristine/crates/singlefs-harness/src/history.rs	2026-09-25
++++ tree/crates/singlefs-harness/src/history.rs	2026-09-25
 @@ -111,7 +111,12 @@
                  (UNIT_AREA_START_SLOT + SMALLER_DEVICE_UNIT_AREA_SLOTS) * SLOT_BYTES
              }

@@ -1,0 +1,4 @@
+exit=1
+want=从 research/scripts/replay.sh 里一行都没读到
+want=── 汇总：checker-tier-research-build-and-replay.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=checker-tier-research-build-and-replay.sh：1 格里 1 格红（experiment-replay）

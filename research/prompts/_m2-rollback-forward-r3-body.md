@@ -20,9 +20,9 @@
 
 **共用问句**：每一格都要回答「那一版引用的块有没有被复用、读不读得对」，答案要量，不许推。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-26 00:5x JST）
+## 二、实现今天的样子（主 agent 的观测，2026-09-26）
 
-- `crates/` 自第二轮开工快照（`research/prompts/m2-rollback-forward-r2-snapshot/crates-sha256.txt`，125 个文件）以来没改过：主 agent 2026-09-26 JST 00:3x 在主树上 `sha256sum -c` 全 OK。冻结副本由材料员重取，照第二轮的排除规则。
+- `crates/` 自第二轮开工快照（`research/prompts/m2-rollback-forward-r2-snapshot/crates-sha256.txt`，125 个文件）以来没改过：主 agent 2026-09-26 在主树上 `sha256sum -c` 全 OK。冻结副本由材料员重取，照第二轮的排除规则。
 - 挂着时回退、B1、C419 的三条臂、K3 的去重、K6、K7：`crates/` 里都没有。第二轮攻方原型 `research/prompts/m2-rollback-forward-r2-opus-model/prototype.patch` 有挂着时回退（`prototype_rollback_in_mount`）、B1（`prototype_unmount_b1`）、MAX 与 MAX+HOLD 的开关、删掉见证与截断的开关，可以借。
 - 今天的回退候选、见证、截断在冻结副本的这几处：`mount.rs` 的 `mount_rollback_with_space_admission`（`OnAbandonedTimeline` 唯一的产生处在它里面），`recovery.rs` 的 `choose_root`、`rollback_high_water_of_root`，`rollback_witness.rs`；行号由材料员照冻结副本现查。
 - I-7.9 的 checker 判定在 `crates/singlefs-checker/src/`，由材料员现查落点。

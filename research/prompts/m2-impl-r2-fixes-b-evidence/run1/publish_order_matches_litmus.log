@@ -1,0 +1,9 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-r2-fixes-b/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.41s
+     Running tests/publish_order_matches_litmus.rs (target/debug/deps/publish_order_matches_litmus-4288a30301ba0215)
+
+running 1 test
+test litmus_writer_threads_follow_the_recorded_publish_order ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+

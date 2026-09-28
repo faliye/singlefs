@@ -2,7 +2,7 @@
 
 我交的是观测，不是判决：核对表里的 ✗ 不免除主 agent 对推论的逐条现查。
 
-时区：本机时钟 UTC，人在东京 UTC+9。核验时间 2026-09-21 UTC 当天。
+核验时间 2026-09-21 当天。
 
 ## 0. 判别力自证
 
@@ -112,7 +112,7 @@ $ sed -n '692p' /tmp/claude-1000/m2-checker-supp-r1-verifier/selftest/mount.rs
 | walk.rs:1423-1431（`TotalOrderKey::UndecidedForDataUnit` 定义与引用位置说明） | 该段落落在已知编辑区间内/紧邻，当前主树该处已改写，不再具备逐字比对意义；不计 ✗（第 2 节口径） | — |
 | 第 4 节反例（改归并键字面纳入载荷校验和后 Holds/Violated 对照，含具体 hex 校验和值） | ✓ **主 agent 点名独立重做，完全重现，见第 6 节** | 见第 6 节 |
 | checker_known_bad_images.rs:706-713 / :684-701（坏镜像构造细节） | ✓ 一致 | `sed -n '684,701p'` |
-| L196-198：「清理」小节 `diff … \| wc -l` = 9 | **分不清（非 ✗）**：`/tmp/claude-1000/m2-checker-supp-r1-sonnet/` 副本其实还在（派发提示说「可能没了」，现查未删）。今天重跑同一条命令得到 18，不是 9；拆开看两处差异——① 归并键改动已按 Sonnet 所述清理干净，`grep -c "42\\.\\.105\\|42\\.\\.107" 该副本/crates/singlefs-checker/src/walk.rs` 为 0，与主树一致；② 差异全部落在两处：a) walk.rs:1430-1434 一处（正是本表上一行核到的、编辑前后的注释差异，与 Sonnet 无关）；b) walk.rs:1615-1622 一段 `SINGLEFS_DEBUG_I18` 调试 `eprintln!`（Sonnet 自己加的，与其判定一览最后一行「object_key_groups=2, candidates_with_2plus_versions=1」的量法吻合）。9 这个数是 Sonnet 收尾时（主 agent 编辑 walk.rs 之前）量的，那一刻主树与它的副本在编辑点上还相同，只差调试代码；今天多出的 9 行差额=主 agent 事后编辑贡献的净行数，与 Sonnet 报告无关，不计 ✗ | `diff /tmp/claude-1000/m2-checker-supp-r1-sonnet/repo/crates/singlefs-checker/src/walk.rs /home/fy5090/code/singlefs/crates/singlefs-checker/src/walk.rs \| wc -l` → 18 |
+| L196-198：「清理」小节 `diff … \| wc -l` = 9 | **分不清（非 ✗）**：`/tmp/claude-1000/m2-checker-supp-r1-sonnet/` 副本其实还在（派发提示说「可能没了」，现查未删）。今天重跑同一条命令得到 18，不是 9；拆开看两处差异——① 归并键改动已按 Sonnet 所述清理干净，`grep -c "42\\.\\.105\\|42\\.\\.107" 该副本/crates/singlefs-checker/src/walk.rs` 为 0，与主树一致；② 差异全部落在两处：a) walk.rs:1430-1434 一处（正是本表上一行核到的、编辑前后的注释差异，与 Sonnet 无关）；b) walk.rs:1615-1622 一段 `SINGLEFS_DEBUG_I18` 调试 `eprintln!`（Sonnet 自己加的，与其判定一览最后一行「object_key_groups=2, candidates_with_2plus_versions=1」的量法吻合）。9 这个数是 Sonnet 收尾时（主 agent 编辑 walk.rs 之前）量的，那一刻主树与它的副本在编辑点上还相同，只差调试代码；今天多出的 9 行差额=主 agent 事后编辑贡献的净行数，与 Sonnet 报告无关，不计 ✗ | `diff /tmp/claude-1000/m2-checker-supp-r1-sonnet/repo/crates/singlefs-checker/src/walk.rs crates/singlefs-checker/src/walk.rs \| wc -l` → 18 |
 
 **Sonnet 计数**：核 19 处，✓ 19，分不清 1（清理小节的 `diff \| wc -l` 数值随主 agent 事后编辑而变化，非 Sonnet 报告本身的错误，见上表说明）。
 

@@ -1,0 +1,7 @@
+ARM mutated(no-1058)
+SURVEY first width=384 target=(1, 3) floor=(1, 2) segments [22:journal_recordx2,unit_writex20] [1:root_record_fuax1] [2:system_configuration_slotx2] closed_form=4194308
+SURVEY over width=384 target=(1, 4) floor=(1, 3) segments [22:journal_recordx2,unit_writex20] [1:root_record_fuax1] [2:system_configuration_slotx2] closed_form=4194308
+SURVEY seq2 width=384 target=(1, 4) floor=(1, 3) segments [28:journal_recordx4,unit_writex24] [1:root_record_fuax1] [2:system_configuration_slotx2] closed_form=268435460
+SURVEY seq3 width=384 target=(1, 4) floor=(1, 3) segments [32:journal_recordx6,unit_writex26] [1:root_record_fuax1] [2:system_configuration_slotx2] closed_form=4294967300
+SURVEY over_i2 width=384 target=(2, 6) floor=(2, 5) segments [22:journal_recordx2,unit_writex20] [1:root_record_fuax1] [2:system_configuration_slotx2] closed_form=4194308
+SURVEY rollback width=384 target=(1, 5) floor=(1, 4) segments [14:journal_recordx2,unit_writex12] [1:root_record_fuax1] [2:system_configuration_slotx2] closed_form=16388

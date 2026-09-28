@@ -1,4 +1,0 @@
-exit=1
-want=格式常量在这次改动里变了
-want=改值 SAMPLE_UNIT_BYTES：16384 → 32768（format/src/lib.rs）
-want=新增 SAMPLE_UNIT_BYTES = 32768（format/布局.md）

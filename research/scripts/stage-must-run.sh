@@ -14,6 +14,9 @@
 # 以及**模块自己出错一律按要跑处理**——python 起不来、抛异常退 1，都不许被读成「可跳过」，那等于把这道门禁关掉。
 #
 # 判据只有一句：**这一道读的那几条路径，在 `refs/sop/staged-green` 那棵树与这一次的暂存树之间，git 说变没变。**
+# 在这之前先看一眼全绿标记：checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay 判绿时按登记输入在被判那棵树上的指纹写 git common-dir 里的
+# `singlefs-stage-green.<阶段文件名>.<指纹>`（admission.py stage-marker-write），在且没过 SINGLEFS_REUSE_HOURS 就可跳过——
+# 崩溃验证员在工作区跑过的那一趟，整轮门禁不用再跑第二遍（用户 2026-09-27 定：照 54 号写标记、只跑变了的）。
 # 路径清单在 `.claude/gate.d/stage-inputs.tsv`，那是唯一登记位；清单自己也进比对（清单变了必定重跑）。
 #
 # 为什么用树不用提交、为什么只一条 ref：

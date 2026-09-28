@@ -1,4 +1,4 @@
-# 种子 540096 的 I-8.6 红：查因报告（2026-09-25 UTC 08:10 前后）
+# 种子 540096 的 I-8.6 红：查因报告（2026-09-25）
 
 调查 agent 交回的正文，主 agent 原样落盘（它写报告文件被工具拦下，改成交回消息）。产物在同一目录：`seed540096_trace.rs`、`probe-journal-max.patch`、`main-crates-sha256.txt`、`logs/`。编译与运行都在 `/tmp/claude-1000/seed540096/` 的副本里，主工作区的 `crates/` 与 kb 没动，没跑重型测试。
 
@@ -13,7 +13,7 @@
 
 - 前任的 4 个后台任务（b1qjpee27 / b4wh3k0r0 / b32posxoa / b00b39pbb）都已退出，退出码 0，输出和 `logs/` 都在。
 - 冻结副本 `frozen/`：源树 `/tmp/claude-1000/m2-safety-r1/` 按 `crates-sha256.txt` 做 `sha256sum -c` 全过；副本只差 `copy-only.patch` 改的 3 个文件，加放进去的两个测试文件。
-- 主树副本 `main/`：主工作区 `crates/` 的拷贝（HEAD e980a21 加工作区未提交改动），08:08 UTC 按 129 个文件重核 sha256 全等（`main-crates-sha256.txt`）；副本里 `devices_without_the_selected_version`（实二七）有 3 处，冻结副本里 0 处。
+- 主树副本 `main/`：主工作区 `crates/` 的拷贝（HEAD e980a21 加工作区未提交改动）按 129 个文件重核 sha256 全等（`main-crates-sha256.txt`）；副本里 `devices_without_the_selected_version`（实二七）有 3 处，冻结副本里 0 处。
 - 两棵树逐字相同的函数：`instance_generation_to_acquire`、`highest_system_configuration_instance`、`write_acquired_instance`、`highest_root_instance`、`first_txg_of_new_instance`，以及 checker 的 `judge_journal_back_chain`。
 - 接着做的：`seed540096_trace.rs` 末尾加单点读数用例 `seed540096_minimal_one`（环境变量 MIN_K、MIN_MODE）；另拷一份 `probe/` 打只用来校验机理的补丁（第五节）；三棵树都重编，0 个 warning。
 

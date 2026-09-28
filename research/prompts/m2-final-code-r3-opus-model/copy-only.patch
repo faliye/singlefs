@@ -1,6 +1,6 @@
 diff -ru m2-final-code-r3/tree/crates/singlefs-core/src/mount.rs m2-final-code-r3-opus/tree/crates/singlefs-core/src/mount.rs
---- m2-final-code-r3/tree/crates/singlefs-core/src/mount.rs	2026-09-24 21:35:39.449983013 +0000
-+++ m2-final-code-r3-opus/tree/crates/singlefs-core/src/mount.rs	2026-09-25 00:05:50.863527626 +0000
+--- m2-final-code-r3/tree/crates/singlefs-core/src/mount.rs	2026-09-25
++++ m2-final-code-r3-opus/tree/crates/singlefs-core/src/mount.rs	2026-09-25
 @@ -1253,7 +1253,12 @@
                  &plan,
                  Some(output),
@@ -69,8 +69,8 @@ diff -ru m2-final-code-r3/tree/crates/singlefs-core/src/mount.rs m2-final-code-r
          assert_eq!(
              &placements_taken, planned,
 diff -ru m2-final-code-r3/tree/crates/singlefs-harness/src/history.rs m2-final-code-r3-opus/tree/crates/singlefs-harness/src/history.rs
---- m2-final-code-r3/tree/crates/singlefs-harness/src/history.rs	2026-09-24 20:56:53.151716323 +0000
-+++ m2-final-code-r3-opus/tree/crates/singlefs-harness/src/history.rs	2026-09-24 23:48:13.268743836 +0000
+--- m2-final-code-r3/tree/crates/singlefs-harness/src/history.rs	2026-09-25
++++ m2-final-code-r3-opus/tree/crates/singlefs-harness/src/history.rs	2026-09-25
 @@ -109,7 +109,12 @@
                  (UNIT_AREA_START_SLOT + SMALLER_DEVICE_UNIT_AREA_SLOTS) * SLOT_BYTES
              }

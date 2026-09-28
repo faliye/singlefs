@@ -8,7 +8,7 @@ export TMPDIR="$RUNS/tmp"
 export PATH="$MODEL/fake-bin:$PATH"
 export FAKE_TOOLCHAIN_FILE="$RUNS/toolchain-version"
 unset SINGLEFS_LAYER0_THREADS SINGLEFS_STAGED_TREE GATE_BASE SINGLEFS_GATE_FULL FAKE_CARGO_HOLD
-export GIT_AUTHOR_DATE="2026-09-24T00:00:00Z" GIT_COMMITTER_DATE="2026-09-24T00:00:00Z"
+export GIT_AUTHOR_DATE="2026-09-24T00:00:00Z" GIT_COMMITTER_DATE="2026-09-24T00:00:00Z"  # clock-times:allow 给临时仓的提交写死时间戳
 STAGE=".claude/gate.d/54-layer0-replay.sh"
 trim() { LC_ALL=C.UTF-8 awk -v n="$1" '{ print substr($0, 1, n) }'; }
 THREAD_CHECK_LINE='  if [[ "$2" == 1 && "$machine_cores" -gt 1 && ! ( "$threads_origin" == "显式设的" && "$SINGLEFS_LAYER0_THREADS" == 1 ) ]]; then'

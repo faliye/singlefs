@@ -1,6 +1,6 @@
 # impl-m2-checker3 报告（收口表第 26 行 I-7.9、第 46 行 C480 跟着要做的 I-9.15、实六报告第 ② 件映射回退、第 13 行 N2）
 
-时刻一律 UTC。副本与草稿目录 `/tmp/claude-1000/impl-m2-checker3/`；主工作区一个字节都没改（改在副本里、交补丁）。
+副本与草稿目录 `/tmp/claude-1000/impl-m2-checker3/`；主工作区一个字节都没改（改在副本里、交补丁）。
 
 ## 一、结论
 
@@ -15,11 +15,11 @@
 
 ## 二、交付物
 
-- 补丁：`/tmp/claude-1000/impl-m2-checker3/impl-m2-checker3.patch`，只含 `crates/`，打在主工作区 10:48 UTC 的现状上（HEAD `e980a21`，`crates/` 里只有 `e158_root_choice_repair.rs` 一处没提交、不是我的；快照 `main-crates-now/`）；`git apply --check /tmp/claude-1000/impl-m2-checker3/impl-m2-checker3.patch` 在主工作区里跑过、无输出（第三节）。
+- 补丁：`/tmp/claude-1000/impl-m2-checker3/impl-m2-checker3.patch`，只含 `crates/`，打在主工作区的现状上（HEAD `e980a21`，`crates/` 里只有 `e158_root_choice_repair.rs` 一处没提交、不是我的；快照 `main-crates-now/`）；`git apply --check /tmp/claude-1000/impl-m2-checker3/impl-m2-checker3.patch` 在主工作区里跑过、无输出（第三节）。
 - 变异行：`/tmp/claude-1000/impl-m2-checker3/mutations-append.tsv`，12 行，六段制表符分隔，追加到 `crates/mutations.tsv` 末尾即可（原文在补丁打上之后的文件里各恰好命中一次，第九节）。
 - 报告：本文件。
-- 旧底座上的同一份改动（05:26 快照）：`impl-m2-checker3-on-0526-base.patch`，只作记录；变异证明与第一轮全量测试是在它上面跑的（第十节）。
-- 续会话（主 agent 10:4x 的消息，说旧会话进程退出、`bqf4dan1a` 的通知没送到）：那一次 `cargo test --all` 的日志 `logs/check-steps-after-clippy.log` 停在「== cargo test --all」、之后没有输出也没有退出码——没跑完，没有结果可用；补丁对主工作区现状重新生成（`e980a21` 之后 `crates/` 与我 08:54 的底座只差 `mutations.tsv` 与 `e158_root_choice_repair.rs` 两个文件，都不在补丁里），`check.sh` 在新底座上重跑（第十一节）。
+- 旧底座上的同一份改动：`impl-m2-checker3-on-0526-base.patch`，只作记录；变异证明与第一轮全量测试是在它上面跑的（第十节）。
+- 续会话（主 agent 的消息，说旧会话进程退出、`bqf4dan1a` 的通知没送到）：那一次 `cargo test --all` 的日志 `logs/check-steps-after-clippy.log` 停在「== cargo test --all」、之后没有输出也没有退出码——没跑完，没有结果可用；补丁对主工作区现状重新生成（`e980a21` 之后 `crates/` 与我先前取的底座只差 `mutations.tsv` 与 `e158_root_choice_repair.rs` 两个文件，都不在补丁里），`check.sh` 在新底座上重跑（第十一节）。
 
 ## 三、这一轮写过的文件
 
@@ -37,9 +37,9 @@
 - `crates/singlefs-harness/tests/second_transaction_supplement_two_tree_nodes_and_the_central_mapping.rs`
 - 新建 `crates/singlefs-harness/tests/second_transaction_supplement_two_rebuild_with_an_unreadable_data_unit.rs`（测试目标自动发现，不用改 `Cargo.toml`）
 
-`crates/mutations.tsv` 没改，要追加的 12 行在 `mutations-append.tsv`（变异名见第九节）。草稿目录里另有 `repo/`（05:26 底座上的工作副本）、`mutant/`（变异证明用，自己的 target）、`baseline/`（没打补丁的 05:26 底座，拿来定基线红集与「今天红」）、`rebased/`、`tools/`、`logs/`。
+`crates/mutations.tsv` 没改，要追加的 12 行在 `mutations-append.tsv`（变异名见第九节）。草稿目录里另有 `repo/`（旧底座上的工作副本）、`mutant/`（变异证明用，自己的 target）、`baseline/`（没打补丁的旧底座，拿来定基线红集与「今天红」）、`rebased/`、`tools/`、`logs/`。
 
-主工作区里 `git diff --stat -- crates litmus` 原样（10:48 UTC；这一轮一个字节都没写进主工作区，这一行是别的会话的）：
+主工作区里 `git diff --stat -- crates litmus` 原样（这一轮一个字节都没写进主工作区，这一行是别的会话的）：
 
 ```
  crates/singlefs-harness/src/bin/e158_root_choice_repair.rs | 8 ++++++--
@@ -120,7 +120,7 @@
 
 ## 八、每条新测试「改坏哪一行 → 哪条断言红」
 
-证明分两路：①「今天」——把新测试文件拷进一份没打补丁的主工作区副本（05:26 快照 `baseline/`）直接跑（`logs/new-tests-on-today-code.log`，跑完已还原）；② 变异——在 `mutant/` 副本里按 `mutations-append.tsv` 逐行改坏一处，跑点名测试所在的**整个**测试二进制，拷回原件并 `touch`（`tools/prove_red.py`，日志 `logs/mutation-NN-whole.log`）。`mutant/` 用自己的 target。基线红集：`baseline/` 全量 `cargo test --workspace --no-fail-fast` 只红 `layer0_partial_enumeration_skipping_the_eighteen_write_segment_matches_the_full_tally_shape`（`first_transaction_step_seven_layer0.rs` 第 130 行，I-3.10 评估状态数 7 ≠ 4，不在这一轮的改动里）；`mutant/` 不改动时 `checker_known_bad_images` 29 条全过，其余点名二进制在 `repo/` 全量里全过。下表只列基线红集之外的。
+证明分两路：①「今天」——把新测试文件拷进一份没打补丁的主工作区副本（旧底座快照 `baseline/`）直接跑（`logs/new-tests-on-today-code.log`，跑完已还原）；② 变异——在 `mutant/` 副本里按 `mutations-append.tsv` 逐行改坏一处，跑点名测试所在的**整个**测试二进制，拷回原件并 `touch`（`tools/prove_red.py`，日志 `logs/mutation-NN-whole.log`）。`mutant/` 用自己的 target。基线红集：`baseline/` 全量 `cargo test --workspace --no-fail-fast` 只红 `layer0_partial_enumeration_skipping_the_eighteen_write_segment_matches_the_full_tally_shape`（`first_transaction_step_seven_layer0.rs` 第 130 行，I-3.10 评估状态数 7 ≠ 4，不在这一轮的改动里）；`mutant/` 不改动时 `checker_known_bad_images` 29 条全过，其余点名二进制在 `repo/` 全量里全过。下表只列基线红集之外的。
 
 | 新测试 | 改坏哪一处 | 哪条断言红 | 同时红的 |
 |---|---|---|---|
@@ -141,7 +141,7 @@
 | `data_unit_unreadable_on_both_devices_…_until_the_file_is_read` | 今天的代码 | 第 47 行「重建要照抄它的位置项、照常做成，实际 Walk(UnitUnreadable { slot: 50180 })」 | — |
 | 同上 | 变异 12：重建时读不出的数据单元照旧报错 | 同一行，`MappingStillUnreadable { slot: 50180 }` | 无 |
 
-「今天的代码」那几行：同一次运行里这个文件原有的 5 条用例全过（`logs/new-tests-on-today-code.log`）。变异的行号是 05:26 底座上的；补丁打到新底座上 `walk.rs` 行号不变，测试文件行号有偏移。N2 那条用例证明会红时名字还带前缀 `a_`，之后为过命名检查改了名，内容没动。
+「今天的代码」那几行：同一次运行里这个文件原有的 5 条用例全过（`logs/new-tests-on-today-code.log`）。变异的行号是旧底座上的；补丁打到新底座上 `walk.rs` 行号不变，测试文件行号有偏移。N2 那条用例证明会红时名字还带前缀 `a_`，之后为过命名检查改了名，内容没动。
 
 ## 九、`crates/mutations.tsv` 要追加的 12 行（`mutations-append.tsv`）
 
@@ -160,18 +160,18 @@
 11. 实六报告第 ② 件：allocation_records_under_root 的分配记录树根不经映射回退（查映射恒查不到） —— `crates/singlefs-core/src/recovery.rs` → `reading_the_allocation_records_of_a_root_goes_through_the_central_mapping_when_the_hint_is_stale`
 12. 收口表第 13 行 N2：重建时读不出的数据单元不容下（照今天整次挂载失败） —— `crates/singlefs-core/src/recovery.rs` → `data_unit_unreadable_on_both_devices_is_carried_by_its_locations_and_the_writable_mount_goes_on_until_the_file_is_read`
 
-锚点：每行原文在补丁打上之后的文件里恰好命中一次（`tools/mutation_rows_rebased.py` 逐行核过，输出「12 行，原文都恰好命中一次」）；`crates/mutations.tsv`（主工作区 13:09 UTC 那一版，520 行；第 520 行是别的会话新加的 E158 那一条，锚在没提交的 `e158_root_choice_repair.rs` 上）的锚点在补丁打上之后也都恰好一次（`anchor_check.py`：「不是恰好一次的：0」）。第 395–398 行（实六加的 C480 那几条，锚在 `records.rs`）不动；第 9 行是同一个写路径变异点名到 checker 这一条，实六报告第七节 Q1 说的「把它的点名测试改成 checker 那一条」按追加做、没改原行。第 5、6、9 行点名的测试不是这一轮新加的那条，它们钉的是「这一轮的改动会被悄悄撤回」那一格：第 5 行撤回「同一实例」，固定用例红。
+锚点：每行原文在补丁打上之后的文件里恰好命中一次（`tools/mutation_rows_rebased.py` 逐行核过，输出「12 行，原文都恰好命中一次」）；`crates/mutations.tsv`（主工作区那一版，520 行；第 520 行是别的会话新加的 E158 那一条，锚在没提交的 `e158_root_choice_repair.rs` 上）的锚点在补丁打上之后也都恰好一次（`anchor_check.py`：「不是恰好一次的：0」）。第 395–398 行（实六加的 C480 那几条，锚在 `records.rs`）不动；第 9 行是同一个写路径变异点名到 checker 这一条，实六报告第七节 Q1 说的「把它的点名测试改成 checker 那一条」按追加做、没改原行。第 5、6、9 行点名的测试不是这一轮新加的那条，它们钉的是「这一轮的改动会被悄悄撤回」那一格：第 5 行撤回「同一实例」，固定用例红。
 
 ## 十、受影响的测试在旧底座上的结果
 
-- `baseline/`（05:26 主工作区快照，没打补丁）全量 `cargo test --offline --workspace --no-fail-fast`（05:36–08:12，`baseline-test.log`，退出 101）：红的只有 `layer0_partial_enumeration_skipping_the_eighteen_write_segment_matches_the_full_tally_shape`（`first_transaction_step_seven_layer0.rs` 第 130 行「I-3.10 评估过的状态数」left 7 / right 4）。这就是基线红集。
-- `repo/`（同一底座 + 改动）全量（06:09–08:37，`logs/modified-test-1.log`，退出 101）：红的是基线那一条，加 4 条写死了「每条不变量都成立」的旧断言（`checker_known_bad_images.rs` 3 条、`second_transaction_step_four_rollback.rs` 1 条，I-7.9 在没抬过 F 的镜像上报不适用）。这 4 处断言随后按「没抬过 F ⇒ I-7.9 不适用」改了，两个二进制重跑全过（`logs/rerun-fixed-binaries.log`：29 过、12 过）。同一次全量里随机历史快档与四个取样点、崩溃注入各档、层 0 快档都过，I-7.9 与 I-9.15 的判绿次数见第四、五节。
+- `baseline/`（旧底座，主工作区快照，没打补丁）全量 `cargo test --offline --workspace --no-fail-fast`（`baseline-test.log`，退出 101）：红的只有 `layer0_partial_enumeration_skipping_the_eighteen_write_segment_matches_the_full_tally_shape`（`first_transaction_step_seven_layer0.rs` 第 130 行「I-3.10 评估过的状态数」left 7 / right 4）。这就是基线红集。
+- `repo/`（同一底座 + 改动）全量（`logs/modified-test-1.log`，退出 101）：红的是基线那一条，加 4 条写死了「每条不变量都成立」的旧断言（`checker_known_bad_images.rs` 3 条、`second_transaction_step_four_rollback.rs` 1 条，I-7.9 在没抬过 F 的镜像上报不适用）。这 4 处断言随后按「没抬过 F ⇒ I-7.9 不适用」改了，两个二进制重跑全过（`logs/rerun-fixed-binaries.log`：29 过、12 过）。同一次全量里随机历史快档与四个取样点、崩溃注入各档、层 0 快档都过，I-7.9 与 I-9.15 的判绿次数见第四、五节。
 
 ## 十一、`check.sh`
 
 在 `rebased/`（主工作区 `e980a21` 现状 + 补丁）上跑，`tools/check_rebased.sh`，日志 `logs/check-rebased-2.log`。
 
-`check.sh` 末尾原样（10:49 UTC）：
+`check.sh` 末尾原样：
 
 ```
   ✓ 格式通过
@@ -182,7 +182,7 @@
 - clippy（check.sh 那一组 `-D` 全带上），`singlefs-format`、`singlefs-core`、`singlefs-checker` 全部目标：0；
 - clippy，`singlefs-harness` 的 lib、108 个测试目标参数（54 个测试文件）、e158 之外四个 bin（构建与测试两种各一遍）：0、0；
 - `cargo build --all-targets`：0；
-- `cargo test --all --no-fail-fast`：**没跑完。全量测试留给最后统一跑**（主 agent 13:0x UTC 的指示：用户定全量验证在全部代码落定之后统一跑一次）；按主 agent 给的进程号用 `proc.py stop` 停掉了 `check_rebased.sh`（pid 2060768）、它底下的 `cargo test`（pid 2061409）与正在跑的 `second_transaction_step_five_reuse` 二进制（pid 3893799），13:08 UTC。
+- `cargo test --all --no-fail-fast`：**没跑完。全量测试留给最后统一跑**（主 agent 的指示：用户定全量验证在全部代码落定之后统一跑一次）；按主 agent 给的进程号用 `proc.py stop` 停掉了 `check_rebased.sh`（pid 2060768）、它底下的 `cargo test`（pid 2061409）与正在跑的 `second_transaction_step_five_reuse` 二进制（pid 3893799）。
 
 已跑完的 25 个二进制结果如下（全绿，0 条红）：
 
@@ -214,7 +214,7 @@
 | `second_transaction_parallel_line_three_many_inodes` | 4 | 0 | 0 |
 | `second_transaction_parallel_line_two_mounted_read` | 11 | 0 | 0 |
 
-我动到的 9 个测试二进制里，只有 `checker_known_bad_images` 与 `first_transaction_step_seven_layer0` 在新底座上跑过（上表；后者在旧底座上的基线红，在新底座上随主工作区的「I-3.10 计数」那份补丁绿了）。另外 7 个——`second_transaction_step_four_rollback`、`second_transaction_step_three_formatted_pool`、`second_transaction_step_three_formatted_pool_layer0`、`second_transaction_step_zero_layer0`、`second_transaction_supplement_three_random_history`（含随机历史快档）、`second_transaction_supplement_two_tree_nodes_and_the_central_mapping`、`second_transaction_supplement_two_rebuild_with_an_unreadable_data_unit`——只在 05:26 底座上绿过（第十节；最后两个在 `repo/` 单独跑过，`logs/new-tests-1.log` 全过；`second_transaction_step_four_rollback` 08:5x 在 `repo/` 重跑过、12 过），**没在 `e980a21` 上重跑**。两个底座的差别（`diff -rq base-crates main-crates-now`）：这 7 个测试文件里只有 `second_transaction_step_three_formatted_pool.rs`（78 行差）与 `second_transaction_supplement_three_random_history.rs`（318 行差）变了；它们调的代码里变了 `singlefs-core` 的 `allocator.rs`、`journal.rs`、`make_filesystem.rs`、`mount.rs`、`recovery.rs`、`transaction.rs`，`singlefs-format`，`singlefs-checker` 的 `lib.rs`、`walk.rs`，`singlefs-harness` 的 `history.rs`、`model_comparison.rs`、`scenario.rs`（其中能看到的一处是实十三把 journal 记录头从 307 改到 311、`recovery.rs` 链首判定多一条「本次发布内序号」）。补丁都打得上，行为上的交互没验。
+我动到的 9 个测试二进制里，只有 `checker_known_bad_images` 与 `first_transaction_step_seven_layer0` 在新底座上跑过（上表；后者在旧底座上的基线红，在新底座上随主工作区的「I-3.10 计数」那份补丁绿了）。另外 7 个——`second_transaction_step_four_rollback`、`second_transaction_step_three_formatted_pool`、`second_transaction_step_three_formatted_pool_layer0`、`second_transaction_step_zero_layer0`、`second_transaction_supplement_three_random_history`（含随机历史快档）、`second_transaction_supplement_two_tree_nodes_and_the_central_mapping`、`second_transaction_supplement_two_rebuild_with_an_unreadable_data_unit`——只在旧底座上绿过（第十节；最后两个在 `repo/` 单独跑过，`logs/new-tests-1.log` 全过；`second_transaction_step_four_rollback` 在 `repo/` 重跑过、12 过），**没在 `e980a21` 上重跑**。两个底座的差别（`diff -rq base-crates main-crates-now`）：这 7 个测试文件里只有 `second_transaction_step_three_formatted_pool.rs`（78 行差）与 `second_transaction_supplement_three_random_history.rs`（318 行差）变了；它们调的代码里变了 `singlefs-core` 的 `allocator.rs`、`journal.rs`、`make_filesystem.rs`、`mount.rs`、`recovery.rs`、`transaction.rs`，`singlefs-format`，`singlefs-checker` 的 `lib.rs`、`walk.rs`，`singlefs-harness` 的 `history.rs`、`model_comparison.rs`、`scenario.rs`（其中能看到的一处是实十三把 journal 记录头从 307 改到 311、`recovery.rs` 链首判定多一条「本次发布内序号」）。补丁都打得上，行为上的交互没验。
 
 ## 十二、停下交主 agent 的设计问题
 
@@ -253,15 +253,15 @@
 - 没走三方对抗；层 0 全量、QEMU、herd7、`crates/mutations.tsv` 整表复跑（门禁 59 号）都没跑，层 0 与 crates 变异表归 `crash-verifier`；没提交。
 - 登记给我的七个门禁阶段（`33-mutation-tables.sh`、`53-format-const-placeholders.sh`、`74-model-differential.sh`、`92-layout-checker-sync.sh`、`94-checker-implementation-disjoint.sh`、`93-feature-bits.sh`、`89-closeout-row27-preconditions.sh`）按派发没跑。
 - `invariants.md`、`checks-owed.md`、里程碑收口表都没改（不写 kb）；`crates/mutations.tsv` 没改，要追加的行在 `mutations-append.tsv`。
-- 12 行变异是在 05:26 底座上证明会红的；补丁挪到 `e980a21` 底座之后只核了锚点仍恰好命中一次，没在新底座上重跑变异。
+- 12 行变异是在旧底座上证明会红的；补丁挪到 `e980a21` 底座之后只核了锚点仍恰好命中一次，没在新底座上重跑变异。
 - 全量 `cargo test --all` 没跑完，按主 agent 指示留给最后统一跑；我动到的 9 个测试二进制里有 7 个没在新底座上重跑（第十一节末段）。
 - `allocation_records_of_version_without_file` 没做回退（第十二节第 2 条）；两处读者的多跳观测点没接（第 4 条）；读者侧的 blocks 判定没做（第 3 条）。
 - 没碰的别的会话的文件：`journal.rs`、`mount.rs`、`allocator.rs`、`transaction.rs` 一个字节都没改。
-- 负载：开工时（05:25）`ps` 看到别的会话在跑 `cargo test --offline --all --no-fail-fast` 与随机历史那个二进制，没有 `qemu-system`、`vm-bench.sh`、`e152-file-system-benchmark`、`fio`；机器负载一直在 50–70，每个测试二进制比平时慢几倍，没有等锁（副本各用自己的 target）。
+- 负载：开工时 `ps` 看到别的会话在跑 `cargo test --offline --all --no-fail-fast` 与随机历史那个二进制，没有 `qemu-system`、`vm-bench.sh`、`e152-file-system-benchmark`、`fio`；机器负载一直在 50–70，每个测试二进制比平时慢几倍，没有等锁（副本各用自己的 target）。
 
 ## 十六、中途收到的消息
 
-1. 10:4x UTC，主 agent：旧会话进程退出、续上；核现场、对主工作区现状 `git apply --check`、不加 `&` 等长活。照做：旧的 `cargo test --all` 没跑完（第二节），补丁对 `e980a21` 重新生成、`git apply --check` 过。
+1.，主 agent：旧会话进程退出、续上；核现场、对主工作区现状 `git apply --check`、不加 `&` 等长活。照做：旧的 `cargo test --all` 没跑完（第二节），补丁对 `e980a21` 重新生成、`git apply --check` 过。
 2. 之后，主 agent：线程上限 4，新起的编译 / 测试 / 变异命令用 `research/scripts/capped.sh 4`。收到时只有 `check_rebased.sh` 那一串在跑（照指示不停）；之后我没有再起编译、测试或变异命令。
-3. 13:0x UTC，主 agent 例行询问：回了在等 pid 2061409（`cargo test --offline --all --no-fail-fast`）、已跑完 25 个二进制、预计还要两三个小时。
-4. 13:0x UTC，主 agent：全量测试不用等，停掉 `check_rebased.sh` 那一串、照实列已跑完的、交回。照做（第十一节）。
+3.，主 agent 例行询问：回了在等 pid 2061409（`cargo test --offline --all --no-fail-fast`）、已跑完 25 个二进制、预计还要两三个小时。
+4.，主 agent：全量测试不用等，停掉 `check_rebased.sh` 那一串、照实列已跑完的、交回。照做（第十一节）。

@@ -1,0 +1,7 @@
+exit=77
+want=静态检查全过
+want=1 条绑到代码、0 条声明不对应代码
+want=共 2 条 Sometimes
+want=静态档（.lkmm-static-only）：herd7 那一层没判，这一格本次未跑
+want=litmus-verdicts：本次未跑
+not-green-by-design=litmus-verdicts 样本只放静态档（.lkmm-static-only），herd7 那一层在样本里不跑，绿的一侧只能记本次未跑

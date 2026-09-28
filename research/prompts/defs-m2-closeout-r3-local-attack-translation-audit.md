@@ -1,4 +1,4 @@
-# 转述核对表：defs-m2-closeout-r3-local-attack（2026-09-26 UTC）
+# 转述核对表：defs-m2-closeout-r3-local-attack（2026-09-26）
 
 逐句核对 `research/prompts/defs-m2-closeout-r3-local-attack.md`（本地攻方 K2 的 G7：
 按事实表逐格核十道阶段各自读不读实验页或实验索引、在 `.claude/gate.d/stage-owners.tsv`

@@ -7,17 +7,17 @@
   relabel-item.py D19 6 [--dry-run]
   relabel-item.py --selftest
 
-为什么要有它：分项从未定翻成已定（或反过来），22 号门禁要求全仓每一处「D<n>（简称） 未定项 k」都跟着改；
+为什么要有它：分项从未定翻成已定（或反过来），门禁 doc-decisions 的格「分项引用状态」要求全仓每一处「D<n>（简称） 未定项 k」都跟着改；
 2026-09-11 D19 已定项 6 定案时这样的引用有八十多处，其中四十五处是裸写的「未定项 6」，要靠「同一行更早的 D 记号 /
 文件自身的决策号 / 变更史条目标题」才归属得到——按字面替换改不全，逐处手改又会漏。
-归属规则 import 自 `.claude/gate.d/lib-item-ref-status.py`，与 22 号门禁是同一份，不另抄。
+归属规则 import 自 `.claude/gate.d/lib-item-ref-status.py`，与门禁 doc-decisions 的格「分项引用状态」是同一份，不另抄。
 
 改完标签，**句子本身**可能还在说它没定（「D19 已定项 6 未定」）：这类句子列成「要人看」，不替人改——
-它要重写成定下来之后的说法，44 号阶段会对它判红。两份变更史与 records/ 写的是当时的状态，不列。
+它要重写成定下来之后的说法，门禁 doc-decisions 的格「引用写已定紧跟说没定」会对它判红。两份变更史与 records/ 写的是当时的状态，不列。
 research/prompts/ 按证据链不改（门禁同样不扫它）。
 
 自证会红：--selftest 在临时仓里造一条已定分项、三处旧标签引用（其中一处裸写、靠同一行更早的 D 记号归属），
-改写之后拿 22 号门禁那一份库复判必须全绿、「要人看」里必须有那句「已定项 1 未定」；
+改写之后拿门禁 doc-decisions 格「分项引用状态」那一份库复判必须全绿、「要人看」里必须有那句「已定项 1 未定」；
 再用 RELABEL_ADJACENT_ONLY=1 只改紧挨着编号的引用，裸写那一处漏改、复判变红，selftest 判红。
 """
 import importlib.util
@@ -121,11 +121,11 @@ def selftest():
         if os.environ.get('RELABEL_ADJACENT_ONLY') == '1':
             if full_ok:
                 print('selftest: 只改紧挨着编号的引用之后复判仍然全绿 —— 检查坏了'); return 1
-            print('selftest: 只改紧挨着编号的引用确认判红（裸写的那一处漏改，22 号的库复判不过）'); return 0
+            print('selftest: 只改紧挨着编号的引用确认判红（裸写的那一处漏改，doc-decisions 格「分项引用状态」的库复判不过）'); return 0
         if not full_ok:
-            print('selftest: 改写之后 22 号的库复判不过、或该改的没改全、或「要人看」没列出那句 —— 正是本脚本要防的形态')
+            print('selftest: 改写之后 doc-decisions 格「分项引用状态」的库复判不过、或该改的没改全、或「要人看」没列出那句 —— 正是本脚本要防的形态')
             print(rejudged.stdout.strip()[:300]); return 1
-        print('selftest: 通过（三处旧标签全改、没归属到它的那一处没动、22 号的库复判全绿、「已定项 1 未定」列进要人看）')
+        print('selftest: 通过（三处旧标签全改、没归属到它的那一处没动、doc-decisions 格「分项引用状态」的库复判全绿、「已定项 1 未定」列进要人看）')
         return 0
 
 

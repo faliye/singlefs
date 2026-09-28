@@ -1,11 +1,11 @@
 # 门禁批第三轮（defs-gatebatch-m2-r3）云端攻方（Opus）：L1 改法与站住形态
 
-写于 2026-09-27 UTC 03:4x–04:1x（JST 12:4x–13:1x）。攻击面：正文第一节 L1。被判文件取开工快照（`research/prompts/defs-gatebatch-m2-r3-snapshot/sha256sums.txt` 14 个，交回前 `sha256sum -c` 现核 14 个 OK）；54 号与驱动里读发现日志的那几段不攻、不列。所有「打中」都在今天仓里被判的那一份上量（闸只喂 JSON、准入模块在草稿目录的小仓上跑），改法那一栏的「量过」是 hooks 副本上的数。重型测试一条没跑。
+写于 2026-09-27。攻击面：正文第一节 L1。被判文件取开工快照（`research/prompts/defs-gatebatch-m2-r3-snapshot/sha256sums.txt` 14 个，交回前 `sha256sum -c` 现核 14 个 OK）；54 号与驱动里读发现日志的那几段不攻、不列。所有「打中」都在今天仓里被判的那一份上量（闸只喂 JSON、准入模块在草稿目录的小仓上跑），改法那一栏的「量过」是 hooks 副本上的数。重型测试一条没跑。
 
 ## 复跑
 
 ```
-cd /home/fy5090/code/singlefs
+cd <仓根>
 bash research/prompts/defs-gatebatch-m2-r3-opus-model/rerun.sh [<输出目录>] [<草稿目录>]
 ```
 

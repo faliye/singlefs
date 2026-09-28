@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# /dev/shm 在 03:27 UTC 前后被三路并发扫描写满（镜像文件每个约 0.7 GB 实占），那之后起跑的几组要重跑：一次只跑一组。
+# /dev/shm 在被三路并发扫描写满（镜像文件每个约 0.7 GB 实占），那之后起跑的几组要重跑：一次只跑一组。
 set -u
 D=/tmp/claude-1000/m2-newq-opus
 B3=$D/target3/debug/deps/m2_newq_attack3-d70f2ca914405fb7

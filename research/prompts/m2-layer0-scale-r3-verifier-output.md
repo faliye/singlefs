@@ -2,7 +2,7 @@
 
 这是观测，不是判决：核对表里的 ✗ 不免除主 agent 对推论的逐条现查。
 
-写于 2026-09-26（JST）。核的对象：云端辩方 `m2-layer0-scale-r3-sonnet-output.md`（含模型目录）、
+写于 2026-09-26。核的对象：云端辩方 `m2-layer0-scale-r3-sonnet-output.md`（含模型目录）、
 云端攻方 `m2-layer0-scale-r3-opus-output.md`（含模型目录）、本地攻方 `-local-attack-output-s1.md`/`-s2.md`
 （提示 `-local-attack.md`、转述核对表 `-local-attack-translation-audit.md`、运行记录 `-local-attack-runlog.md`）。
 

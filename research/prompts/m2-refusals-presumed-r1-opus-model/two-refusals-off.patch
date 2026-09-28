@@ -1,5 +1,5 @@
---- /tmp/claude-1000/m2-refusals-opus/mount.rs.orig	2026-09-22 13:55:44.314265694 +0000
-+++ crates/singlefs-core/src/mount.rs	2026-09-22 13:55:44.324462500 +0000
+--- /tmp/claude-1000/m2-refusals-opus/mount.rs.orig	2026-09-22
++++ crates/singlefs-core/src/mount.rs	2026-09-22
 @@ -862,6 +862,10 @@
      start: &InstanceStart,
      instance_to_acquire: InstanceGeneration,

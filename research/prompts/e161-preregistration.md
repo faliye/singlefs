@@ -1,6 +1,6 @@
 # E161 跑前登记：崩溃放量的去重与分段耗时
 
-写于 2026-09-27 11:37 JST，装置写之前。
+写于 2026-09-27，装置写之前。
 
 ## 一、问题
 
@@ -169,7 +169,7 @@
 | 4.3 | 到 D 那条流：两态闭式 206 307 373、甲二 95、全量 463 863 878、甲二 180 | `second_transaction_step_zero_layer0.rs:605`（`grep -n '固定脚本'` 的命中行） | 不用 |
 | 4.4 | E142（第一个事务的干跑） G7：4097 个状态、2046 个违例；段尾 `26,2,1,2` → `26,5` | D13（验证路线） 已定项 4 依据（第二节整抄） | 不用 |
 | 4.5 | checker 注释「池级 checker 在层 0 的每个崩溃状态上要算几十个单元，按位算太慢」 | `crates/singlefs-checker/src/lib.rs:54-56` | 定性说每状态几十个单元、按位 CRC 慢；门槛没照它定 |
-| 4.6 | 本机两张卡：5090 total 32607 MiB、used 15880、free 16232；5060 Ti total 16311、used 15348、free 503（2026-09-27 02:28 UTC 现查）。另一台 5080 16303 MiB、5060 Ti 16311 MiB × 2 是主 agent 转述的读数，我没现查 | `nvidia-smi --query-gpu=index,name,memory.total,memory.used,memory.free --format=csv` | G5 的容量：单卡 32607 MiB，五卡合计 97843 MiB = 102 595 821 568 字节 |
+| 4.6 | 本机两张卡：5090 total 32607 MiB、used 15880、free 16232；5060 Ti total 16311、used 15348、free 503（2026-09-27 现查）。另一台 5080 16303 MiB、5060 Ti 16311 MiB × 2 是主 agent 转述的读数，我没现查 | `nvidia-smi --query-gpu=index,name,memory.total,memory.used,memory.free --format=csv` | G5 的容量：单卡 32607 MiB，五卡合计 97843 MiB = 102 595 821 568 字节 |
 | 4.7 | 段模型逐段数（我按 D13（验证路线） 已定项 4 的公式 3^m·2^(n−m) − 1 算，m 是取三态的写数）：第一条流逐段 `[8,3,1,8,3,1,150994943,3,1,8]`，加 1 得 150 994 980；第二条流段 9–22 逐段 `[150994943,3,1,8,8,262143,3,1,589823,3,1,589823,3,1]`，和 152 436 764；两域合计 303 431 744 | 第十三节 13.2 的 `anchors.py`（全文与原样输出都贴在那里） | 当第七节锚点 A1–A3；与 4.1、4.2 的用例断言逐格相同 |
 | 4.8 | 显存预算：10¹⁰ 个状态时单卡每状态 3.419 字节、五卡每状态 10.26 字节 | 同 4.7 | **G5 的判定在跑之前已被算术大半定了**：凡按状态存下来的部分（子集掩码、每状态的键），每状态超过 10.26 字节，一次装入在五卡上也装不下 |
 | 4.9 | 子集掩码按写表位图算（推的：W = 录制流写数 + 每次取三态的写一份撕裂镜像，同段没有与它重叠的更晚写、没有重放）：第一条流 W = 49、7 字节/状态，10¹⁰ 时 7×10¹⁰ 字节（66 757 MiB），单卡装不下、五卡装得下；第二条流整条 W = 523、66 字节/状态，10¹⁰ 时 6.6×10¹¹ 字节，五卡装不下；第二条流最大一段 2 415 919 103 个状态 × 66 字节 = 159.45 GB，按段分批也装不下 | 同 4.7 | 同 4.8：显式存每状态掩码的「一次装入」按第二条流的 W 已装不下；跑出来的数补的是 P1（去重后的内容）、P3（读集）的实际大小与每状态平均。问题单的两个候选都假定掩码要存；「掩码不存、由序号现算」不在候选里，交回时报给主 agent |
@@ -453,7 +453,7 @@ PC2c、PC4c 找不到判别位置、或命中数为 0 不作废：那条臂的�
 
 （留空：装置写之后、产物之前由执行员写，只许收严或补臂，写明改了什么、依据哪个单测读数、时点在产物之前。）
 
-### 12.1 执行员（experiment-runner 第二任）写于 2026-09-27 13:19 JST，装置单测跑完之后、两份产物一次都没跑之前
+### 12.1 执行员（experiment-runner 第二任）写于 2026-09-27，装置单测跑完之后、两份产物一次都没跑之前
 
 原判据一条不动，下面三条都是收严或把停机条款的跑法落实，第六、七、九节里任何一条的去留与报告方式都没动。
 
@@ -463,9 +463,9 @@ PC2c、PC4c 找不到判别位置、或命中数为 0 不作废：那条臂的�
 | R2 | 收严：S3、S4 另在 D1-quick（两条流的甲二域，54 + 84 个状态）上与 crates 对拍；S2 另核第一条流的根槽写是 3 条 | 装置单测 `device_tally_equals_the_crates_tally_on_the_first_stream_small_domain` 通过之后，开发用的 `probe-first-stream-stop-clauses` 读数：`stop_clause_crates cell=first_quick … persisted_mismatches=0`、`cell=second_quick … compared_states=84`（草稿，不入库） |
 | R3（沿用到 12.2） | 收严：A1 的「装置自己的计划逐段数出来的」在取样段里一律逐个数——每个序号的持久集合真生成、按这一段的写与撕裂镜像的位置编码进位图判不同；取样段之外（第二条流段 0–8、23–63）报组合数、行里标 `in_domain_counted_one_by_one=false` | 同一个开发用探针：第一条流段 6、第二条流段 9 各 150994943 个持久集合逐个数完，`three_agree=true`，单线程约半分钟 |
 
-### 12.2 执行员写于 2026-09-27 13:46 JST：按用户定只跑可行性档，时点在任何产物之前
+### 12.2 执行员写于 2026-09-27：按用户定只跑可行性档，时点在任何产物之前
 
-依据：主 agent 转来的用户定案（2026-09-27）「这一轮只验可行性（能跑、能用），不要量到够判」，派发续做消息第 1–4 条。12.1 的 R1（stop-clauses 与 segment-one 两份长跑）作废：stop-clauses 那一趟 13:42 JST 在跑到第二条流之前停掉，输出不入库；segment-one 从没起过。R2、R3 沿用。
+依据：主 agent 转来的用户定案（2026-09-27）「这一轮只验可行性（能跑、能用），不要量到够判」，派发续做消息第 1–4 条。12.1 的 R1（stop-clauses 与 segment-one 两份长跑）作废：stop-clauses 那一趟在跑到第二条流之前停掉，输出不入库；segment-one 从没起过。R2、R3 沿用。
 
 | # | 改了什么 |
 |---|---|
@@ -532,11 +532,11 @@ grep -rn '读集' crates/ --include=*.rs | wc -l            # 3（全是 allocat
 grep -rniw 'cuda\|gpu\|wgpu\|opencl' crates/ --include=*.rs --include=Cargo.toml | wc -l   # 0
 grep -n '^\[dependencies\]' -A8 crates/singlefs-harness/Cargo.toml
 which perf valgrind ; cat /proc/sys/kernel/perf_event_paranoid   # /usr/bin/perf；4（非 root 用不了 perf，所以 G3 只能在进程里计时）
-nproc ; free -g ; df -h /tmp /home/fy5090                        # 32；60 GiB；1.9T 可用
+nproc ; free -g ; df -h /tmp ~                        # 32；60 GiB；1.9T 可用
 nvidia-smi --query-gpu=index,name,memory.total,memory.used,memory.free --format=csv
 ```
 
-nvidia-smi 原样输出（2026-09-27T02:28:51Z，UTC）：
+nvidia-smi 原样输出（2026-09-27）：
 
 ```text
 index, name, memory.total [MiB], memory.used [MiB], memory.free [MiB]

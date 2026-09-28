@@ -1,4 +1,4 @@
-# 运行记录：defs-gate54-tiering-r2-local-attack（2026-09-24 UTC）
+# 运行记录：defs-gate54-tiering-r2-local-attack（2026-09-24）
 
 提示文件：`research/prompts/defs-gate54-tiering-r2-local-attack.md`（英文，覆盖 V3 九格、
 V4 四格，共 13 个标签，每格 TRACE/VERDICT 或 REPLAYRUN/REUSEDECISION/AGREE（V4NARROW、

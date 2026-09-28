@@ -1,0 +1,61 @@
+warning: field `seed` is never read
+   --> crates/opus-r3-proto/tests/opus_r3_x5_resample_single_fault_then_power_loss.rs:155:5
+    |
+154 | struct Base {
+    |        ---- field in this struct
+155 |     seed: u64,
+    |     ^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `opus-r3-proto` (test "opus_r3_x5_resample_single_fault_then_power_loss") generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running tests/opus_r3_x5_resample_single_fault_then_power_loss.rs (target/release/deps/opus_r3_x5_resample_single_fault_then_power_loss-dd99504318add1c6)
+
+running 1 test
+BASE seed=7 steps=["create_one_inode:Ok(())", "raise_floor:AtCeiling_0_0", "create_one_inode:Ok(())", "overwrite:Ok(())", "overwrite:Ok(())", "raise_floor:Raised_to_4", "create_one_inode:Ok(())"] current=(1,11) floor=4 rollback_target=Some((1, 5)) seconds=0.01
+SWEEP seed=7 entry=raise_floor_to_the_admission_ceiling clean outcome=Ok Raised_to_5 reads=402 writes=36 barriers=16
+SWEEP seed=7 entry=raise_floor_to_the_admission_ceiling fault=Some((Barrier, 1)) fired=Some((Barrier, 1, 0, 0)) outcome=Err RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot(RaisedFloorSystemConfigurationWriteFailed { devices_carrying_the_raised_floor: [], cause: InputOutput(Custom { kind: Other, error: "注入的屏障错" }) writes_before=0 writes_after=0 frozen=false resend=- checker=0 first=None read=FileRead root=Some((InstanceGeneration(1), CheckpointTxg(11))) content_ok=true remount=Ok checker_after_remount=0 first_after=None enum=no_writes
+SWEEP seed=7 entry=raise_floor_to_the_admission_ceiling fault=Some((Barrier, 2)) fired=Some((Barrier, 2, 1, 0)) outcome=Err RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot(RaisedFloorSystemConfigurationWriteFailed { devices_carrying_the_raised_floor: [], cause: InputOutput(Custom { kind: Other, error: "注入的屏障错" }) writes_before=0 writes_after=0 frozen=false resend=- checker=0 first=None read=FileRead root=Some((InstanceGeneration(1), CheckpointTxg(11))) content_ok=true remount=Ok checker_after_remount=0 first_after=None enum=no_writes
+LAYER0_PARALLEL_START states=9 slices=1 states_per_slice=9 worker_threads=1 configured_worker_threads=3 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=1
+LAYER0_PROGRESS slice=1/1 states=[0,9) segments=0..=all_persisted finished_slices=1/1 finished_states=9/9 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_FINDINGS signatures=0 red_states=0 states=9
+LAYER0_PARALLEL_FINISHED states=9 slices=1 worker_threads=1 configured_worker_threads=3 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=1 progress_file_after_completion=none elapsed_seconds=0.1
+SWEEP seed=7 entry=raise_floor_to_the_admission_ceiling fault=Some((Barrier, 3)) fired=Some((Barrier, 3, 0, 0)) outcome=Err RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot(RaisedFloorSystemConfigurationWriteFailed { devices_carrying_the_raised_floor: [DeviceIdentity(0), DeviceIdentity(1)], cause: InputOutput(Cust writes_before=2 writes_after=0 frozen=false resend=- checker=0 first=None read=FileRead root=Some((InstanceGeneration(1), CheckpointTxg(11))) content_ok=true remount=Ok checker_after_remount=0 first_after=None enum=states=9 seconds=0.1 closed=4 exact=9 oracle=0 ignored=0 root_without_record=0 missing_unit=0 checker_red_states=0 first=None first_checker=None
+LAYER0_PARALLEL_START states=9 slices=1 states_per_slice=9 worker_threads=1 configured_worker_threads=3 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=1
+LAYER0_PROGRESS slice=1/1 states=[0,9) segments=0..=all_persisted finished_slices=1/1 finished_states=9/9 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_FINDINGS signatures=0 red_states=0 states=9
+LAYER0_PARALLEL_FINISHED states=9 slices=1 worker_threads=1 configured_worker_threads=3 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=1 progress_file_after_completion=none elapsed_seconds=0.1
+SWEEP seed=7 entry=raise_floor_to_the_admission_ceiling fault=Some((Barrier, 4)) fired=Some((Barrier, 4, 1, 0)) outcome=Err RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot(RaisedFloorSystemConfigurationWriteFailed { devices_carrying_the_raised_floor: [DeviceIdentity(0), DeviceIdentity(1)], cause: InputOutput(Cust writes_before=2 writes_after=0 frozen=false resend=- checker=0 first=None read=FileRead root=Some((InstanceGeneration(1), CheckpointTxg(11))) content_ok=true remount=Ok checker_after_remount=0 first_after=None enum=states=9 seconds=0.1 closed=4 exact=9 oracle=0 ignored=0 root_without_record=0 missing_unit=0 checker_red_states=0 first=None first_checker=None
+LAYER0_PARALLEL_START states=4104 slices=64 states_per_slice=65 worker_threads=3 configured_worker_threads=3 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=64
+LAYER0_PROGRESS slice=2/64 states=[65,130) segments=1..=1 finished_slices=1/64 finished_states=65/4104 resumed_slices=0 elapsed_seconds=1.0
+LAYER0_PROGRESS slice=3/64 states=[130,195) segments=1..=1 finished_slices=2/64 finished_states=130/4104 resumed_slices=0 elapsed_seconds=1.0
+LAYER0_PROGRESS slice=1/64 states=[0,65) segments=0..=1 finished_slices=3/64 finished_states=195/4104 resumed_slices=0 elapsed_seconds=1.0
+LAYER0_PROGRESS slice=4/64 states=[195,260) segments=1..=1 finished_slices=4/64 finished_states=260/4104 resumed_slices=0 elapsed_seconds=2.0
+LAYER0_PROGRESS slice=5/64 states=[260,325) segments=1..=1 finished_slices=5/64 finished_states=325/4104 resumed_slices=0 elapsed_seconds=2.0
+LAYER0_PROGRESS slice=6/64 states=[325,390) segments=1..=1 finished_slices=6/64 finished_states=390/4104 resumed_slices=0 elapsed_seconds=2.0
+LAYER0_PROGRESS slice=7/64 states=[390,455) segments=1..=1 finished_slices=7/64 finished_states=455/4104 resumed_slices=0 elapsed_seconds=3.0
+LAYER0_PROGRESS slice=8/64 states=[455,520) segments=1..=1 finished_slices=8/64 finished_states=520/4104 resumed_slices=0 elapsed_seconds=3.0
+LAYER0_PROGRESS slice=9/64 states=[520,585) segments=1..=1 finished_slices=9/64 finished_states=585/4104 resumed_slices=0 elapsed_seconds=3.0
+LAYER0_PROGRESS slice=10/64 states=[585,650) segments=1..=1 finished_slices=10/64 finished_states=650/4104 resumed_slices=0 elapsed_seconds=4.0
+LAYER0_PROGRESS slice=11/64 states=[650,715) segments=1..=1 finished_slices=11/64 finished_states=715/4104 resumed_slices=0 elapsed_seconds=4.0
+LAYER0_PROGRESS slice=12/64 states=[715,780) segments=1..=1 finished_slices=12/64 finished_states=780/4104 resumed_slices=0 elapsed_seconds=4.0
+LAYER0_PROGRESS slice=13/64 states=[780,845) segments=1..=1 finished_slices=13/64 finished_states=845/4104 resumed_slices=0 elapsed_seconds=5.0
+LAYER0_PROGRESS slice=14/64 states=[845,910) segments=1..=1 finished_slices=14/64 finished_states=910/4104 resumed_slices=0 elapsed_seconds=5.0
+LAYER0_PROGRESS slice=15/64 states=[910,975) segments=1..=1 finished_slices=15/64 finished_states=975/4104 resumed_slices=0 elapsed_seconds=5.0
+LAYER0_PROGRESS slice=16/64 states=[975,1040) segments=1..=1 finished_slices=16/64 finished_states=1040/4104 resumed_slices=0 elapsed_seconds=6.0
+LAYER0_PROGRESS slice=17/64 states=[1040,1105) segments=1..=1 finished_slices=17/64 finished_states=1105/4104 resumed_slices=0 elapsed_seconds=6.0
+LAYER0_PROGRESS slice=18/64 states=[1105,1170) segments=1..=1 finished_slices=18/64 finished_states=1170/4104 resumed_slices=0 elapsed_seconds=6.0
+LAYER0_PROGRESS slice=19/64 states=[1170,1235) segments=1..=1 finished_slices=19/64 finished_states=1235/4104 resumed_slices=0 elapsed_seconds=7.0
+LAYER0_PROGRESS slice=20/64 states=[1235,1300) segments=1..=1 finished_slices=20/64 finished_states=1300/4104 resumed_slices=0 elapsed_seconds=7.0
+LAYER0_PROGRESS slice=21/64 states=[1300,1365) segments=1..=1 finished_slices=21/64 finished_states=1365/4104 resumed_slices=0 elapsed_seconds=7.0
+LAYER0_PROGRESS slice=22/64 states=[1365,1430) segments=1..=1 finished_slices=22/64 finished_states=1430/4104 resumed_slices=0 elapsed_seconds=8.0
+LAYER0_PROGRESS slice=23/64 states=[1430,1495) segments=1..=1 finished_slices=23/64 finished_states=1495/4104 resumed_slices=0 elapsed_seconds=8.0
+LAYER0_PROGRESS slice=24/64 states=[1495,1560) segments=1..=1 finished_slices=24/64 finished_states=1560/4104 resumed_slices=0 elapsed_seconds=8.0
+LAYER0_PROGRESS slice=25/64 states=[1560,1625) segments=1..=1 finished_slices=25/64 finished_states=1625/4104 resumed_slices=0 elapsed_seconds=9.0
+LAYER0_PROGRESS slice=26/64 states=[1625,1690) segments=1..=1 finished_slices=26/64 finished_states=1690/4104 resumed_slices=0 elapsed_seconds=9.0
+LAYER0_PROGRESS slice=27/64 states=[1690,1755) segments=1..=1 finished_slices=27/64 finished_states=1755/4104 resumed_slices=0 elapsed_seconds=9.0
+error: test failed, to rerun pass `-p opus-r3-proto --test opus_r3_x5_resample_single_fault_then_power_loss`
+
+Caused by:
+  process didn't exit successfully: `/tmp/claude-1000/m2-closeout-code-r3-opus/snapshot/target/release/deps/opus_r3_x5_resample_single_fault_then_power_loss-dd99504318add1c6 --nocapture` (signal: 15, SIGTERM: termination signal)

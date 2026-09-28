@@ -1,0 +1,15 @@
+batch=1 pieces=14 rc_files=14
+piece=1 item=jia:torn rc=0
+piece=2 item=jiaeio:torn rc=0
+piece=3 item=a:torn rc=0
+piece=4 item=b:torn rc=0
+piece=5 item=base:single_slot rc=0
+piece=6 item=jia:single_slot rc=0
+piece=7 item=jiaeio:single_slot rc=0
+piece=8 item=a:single_slot rc=0
+piece=9 item=b:single_slot rc=0
+piece=10 item=base:c393_single rc=0
+piece=11 item=a:c393_single rc=0
+piece=12 item=b:c393_single rc=0
+piece=13 item=jia:c393_single rc=101
+piece=14 item=jiaeio:c393_single rc=0

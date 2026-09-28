@@ -1,6 +1,6 @@
 # 实 Z3-A 乙：挂着之后的每个入口都逐盘核，含会话发布——实现员报告
 
-写于 2026-09-27 UTC 02:1x（JST 11:1x）。规格 `/tmp/claude-1000/impl-z3a-yi/spec.md`；交补丁（在副本里改，主工作区没碰）。
+写于 2026-09-27。规格 `/tmp/claude-1000/impl-z3a-yi/spec.md`；交补丁（在副本里改，主工作区没碰）。
 补丁目录 `/tmp/claude-1000/impl-z3a-yi/patch/`：`crates.patch`、`mutations-append.tsv`（8 行）、`report.md`（本报告的拷贝）。
 
 ## 一、结论
@@ -37,11 +37,11 @@
 `crates/singlefs-core/src/lib.rs` 不用动：新成员都在已导出的枚举里，新函数是 `pub(crate)`。
 补丁里没有、只在我的副本 `/tmp/claude-1000/impl-z3a-yi/work/` 里为了编译加的：`crates/singlefs-harness/src/history.rs` 两处、`crates/singlefs-harness/tests/common_admission/mod.rs` 一处（第七节）。
 
-`crates.patch` 对主工作区 `git apply --check` 退 0（2026-09-27 UTC 02:0x 与交回前各核一次，交回前那次的输出在第八节）。补丁的 diffstat（主工作区没打，`git diff --stat -- crates litmus` 看不到它，这里贴补丁自己的）在第八节。
+`crates.patch` 对主工作区 `git apply --check` 退 0（2026-09-27 与交回前各核一次，交回前那次的输出在第八节）。补丁的 diffstat（主工作区没打，`git diff --stat -- crates litmus` 看不到它，这里贴补丁自己的）在第八节。
 
 ## 三、条款与代码对照（规格表第 4 行）
 
-D18 已定项 11 第 314 行（`.claude/kb/decisions/18-块里携带什么信息.md`，UTC 02:1x 现取；开工时 01:5x 读的那一版第 314 行还没有这一句，是这一轮当中第三批书记员写进去的）末尾那一句，原文整句：
+D18 已定项 11 第 314 行（`.claude/kb/decisions/18-块里携带什么信息.md` 现取；开工时读的那一版第 314 行还没有这一句，是这一轮当中第三批书记员写进去的）末尾那一句，原文整句：
 
 > 挂着之后收盘表的每个入口（正常卸载、管理员回退、会话每次发布、抬 F）在任何写之前同样逐盘核，一块盘一份本池 fsid 的自证系统配置槽都没有就拒；实现随「Z3-A 乙」那一件（还没派，写「实现待派」）。
 

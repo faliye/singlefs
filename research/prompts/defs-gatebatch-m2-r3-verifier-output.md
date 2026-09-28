@@ -2,9 +2,9 @@
 
 核查员交的是观测，不是判决：核对表里的 ✗ 不免除主 agent 对推论的逐条现查。
 
-写于 2026-09-27 UTC 04:2x。快照 `research/prompts/defs-gatebatch-m2-r3-snapshot/sha256sums.txt`
+写于 2026-09-27。快照 `research/prompts/defs-gatebatch-m2-r3-snapshot/sha256sums.txt`
 14 个文件，交回前 `sha256sum -c` 现核全部 OK（无一处对不上，见下方判别力自证一节之后的第一条命令）；
-腿开工时刻 2026-09-27T03:38:29Z（epoch 1790480309），用于 `cite-check.py --unchanged-since`。
+腿开工时刻 2026-09-27（epoch 1790480309），用于 `cite-check.py --unchanged-since`。
 两条云端腿报告文件现测 sha256 与派发提示给的一致（opus `b3fb28ef44a7ba9…`、sonnet `41aaa1356bfc1215…`），
 不判「分不清：报告在腿交回之后被改过」。
 
@@ -141,7 +141,7 @@ sonnet K4 复跑（原样，nice -n 19，用真实 `research/prompts/defs-gateba
 跑完已清理该 mktemp 目录，不留在系统里）：
 
 ```
-$ bash research/prompts/defs-gatebatch-m2-r3-sonnet-model/rerun.sh /home/fy5090/code/singlefs
+$ bash research/prompts/defs-gatebatch-m2-r3-sonnet-model/rerun.sh <仓根>
 今天 admission.py 行数：3939
 重建出的 r2 基线行数：3202（r2 判决原句说 3194 行）
 

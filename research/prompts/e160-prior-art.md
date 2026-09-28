@@ -1,13 +1,13 @@
 # E160 prior-art：公开负载特征里，随机小读占多少
 
-写于 2026-09-24 09:47 JST（写作时 UTC 2026-09-24 00:47）。全部内容来自外部文献与外部工具，
+写于 2026-09-24。全部内容来自外部文献与外部工具，
 **未在本项目验证**，不许当结论用，只能当线索（`.claude/singlefs-ai-sop/rules/evidence-discipline.md`
 「别的项目怎么做，是线索不是证据」）。
 
 ## 查法
 
 本机没有 SNIA IOTTA / MSR Cambridge / FIU / Alibaba / Tencent 的 trace 文件或论文镜像
-（`find /home/fy5090/code/fs-refs -iname '*fio*'` 与目录列表只有 zfs 自带的 `.fio` 作业文件和
+（`find ~/code/fs-refs -iname '*fio*'` 与目录列表只有 zfs 自带的 `.fio` 作业文件和
 Linux 内核文档，没有存储负载特征论文）；这些引用一律走 WebFetch / WebSearch 现查，写 URL 与取得日期。
 
 fio 本身在本机已装（`fio --version` → `fio-3.36`，Ubuntu 包 `fio 3.36-1ubuntu0.1`），

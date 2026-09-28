@@ -14,20 +14,25 @@ use common::{
 };
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
-use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
+use singlefs_core::address::{
+    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
+};
 use singlefs_core::allocator::{Placement, ReclaimedReuse};
 use singlefs_core::block_device::{BlockDevice, WriteDurability};
 use singlefs_core::journal::record_offset;
 use singlefs_core::mount::{
     mount_writable, raise_rollback_floor, roll_back_by_a_forward_publish, MountError, RaisedFloor,
     RollbackCandidateExclusion, RollbackError, RollbackTarget, RolledBack, ShadowLedger,
+    StillUnreadableAfterOneReread,
 };
 use singlefs_core::recovery::{
-    choose_system_configuration, readable_roots, recover, scan_journal, JournalPolicy,
-    RecoveryOutcome,
+    choose_system_configuration, readable_roots, recover, scan_journal, BadRootRingSlotReading,
+    JournalPolicy, PoolReader, RecoveryOutcome,
 };
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
+use singlefs_core::system_configuration::SystemConfiguration;
 use singlefs_core::transaction::{publish_overwrite, FirstFile, PoolWriter, TransactionOutput};
+use singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES;
 
 fn content_of(length: usize, seed: usize) -> Vec<u8> {
     (0..length)
@@ -635,23 +640,28 @@ fn reclaiming_without_raising_the_floor_reuses_a_slot_a_candidate_root_still_ref
     );
 }
 
-/// 回退候选集的 F 用 F_生效（D16（发布语义） 已定项 1「生效」，SysPre：max(根上带的, 系统配置里读得出的)）：抬到 11 之后把盘 1 的载体
-/// （txg 16）改坏，F_生效 仍是 11（盘 0 的 txg 15 与两块盘系统配置里都带 11），txg 9 的根 D 在 F 之下、不是候选，挂着的时候回退在任何写之前
-/// 拒成 `BelowEffectiveFloor`、盘上逐字节不变、分配器与现行版本不动。改之前按「各盘所带 F 最大值的最小值」只读根，F_生效 回到 0、D 退得到。
+/// 抬到 11 之后把盘 1 的载体（txg 16 的根）改坏一个字节（自证不过），挂着的时候回退到 txg 9 的根 D：那条载体是这个进程写过、FUA 返回过的，
+/// 它住的槽在这个进程的根环表里——D16（发布语义） 已定项 1「根槽这一次读坏」那一行全句：读不出或自证不过就重读一次，仍坏就拒。
+/// 回退判候选读根环时拒成 `CandidateJudgementStillUnreadableAfterOneReread(RootRingSlotKnownToHoldARoot { 自证不过, 自证不过 })`，
+/// 在任何写之前：盘上逐字节不变、分配器与现行版本不动。
+/// 这一条原来钉的是「载体坏了当没有根，F_生效 照 SysPre（max(根上带的, 系统配置里读得出的)）仍是 11、D 拒成 `BelowEffectiveFloor`」；
+/// 照全句之后已知根被改坏那一形在判候选时就拒（代码三方第二轮之后的规格第 3 条：已知根被改坏之后回退，改钉拒）。
+/// 改坏挪到挂载之前（那时它不是已知根）保不住原来那一判：之后可写挂载的写行与暖机两块盘都写带 F 11 的根，「F 只在系统配置里」
+/// 那一形就没了（推的，没造）。
 #[test]
 #[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
-fn floor_carried_by_only_one_device_root_and_the_system_configuration_keeps_the_roots_below_it_out_of_the_rollback_candidates(
+fn rolling_back_after_the_floor_carrier_this_process_wrote_on_device_one_reads_not_self_verified_is_refused_before_any_write(
 ) {
     let mut pool = build_through_rollback("step-five-candidate-floor");
     five_overwrites_after_the_rollback(&mut pool);
     let raised = raise_floor(&mut pool, CheckpointTxg(11)).expect("抬 F");
     let second_carrier = raised.publishes[1].root.checkpoint_txg;
+    let target = target_for_publish(
+        second_carrier,
+        parameters().geometry.root_ring_slots_per_region,
+    );
     {
         let devices = pool.devices.as_mut().expect("镜像还开着");
-        let target = target_for_publish(
-            second_carrier,
-            parameters().geometry.root_ring_slots_per_region,
-        );
         let device = parameters().region_devices[usize::try_from(target.region).expect("区域号")];
         let offset = slot_offset(target, 4096);
         let (_, recorded) = devices
@@ -678,12 +688,98 @@ fn floor_carried_by_only_one_device_root_and_the_system_configuration_keeps_the_
     assert!(
         matches!(
             &refused,
-            Err(RollbackError::TargetNotACandidate {
-                exclusion: RollbackCandidateExclusion::BelowEffectiveFloor,
-                ..
-            })
+            Err(RollbackError::CandidateJudgementStillUnreadableAfterOneReread(still_bad))
+                if **still_bad
+                    == StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot {
+                        ring_slot: target,
+                        first_reading: BadRootRingSlotReading::NotSelfVerified,
+                        reread: BadRootRingSlotReading::NotSelfVerified,
+                    }
         ),
-        "F_生效 仍是 11，txg 9 的根不在候选集里：{:?}",
+        "载体是这个进程写过的，自证不过重读仍坏：{:?}",
+        refused.as_ref().err()
+    );
+    assert_eq!(
+        common::disk_snapshot(&pool.memory_pool(), &pool.stream),
+        before,
+        "拒在任何写之前"
+    );
+    assert_eq!(pool.output, current_before, "现行版本不动");
+    assert_eq!(
+        pool.allocator.records(),
+        records_before.as_slice(),
+        "分配器不动"
+    );
+}
+
+/// 挂着的回退判候选时 F_生效 取 max(根上带的, 系统配置里读得出的)（D16（发布语义） 已定项 1「生效」，SysPre）：系统配置里的 F
+/// 高于环里每条根带的 F、已知根全读得出时，回退用的是系统配置那一个。
+/// 造法：固定脚本到 D（A、B、重开取号 2、写行、暖机两次、C（txg 8）、挂着的时候回退到 A 那次向前发布 D（txg 9）），环里每条根带的 F 都是 0；
+/// 不经抬 F 的路径，把两块盘四个系统配置槽里的 F 改成 9、经读者解开再由写者重写（整槽校验和随之重封）——即 SysPre 先把新 F 写进每块盘的
+/// 系统配置、带新 F 的根还一条没落的那个盘面（抬 F 的第一次空发布失败时留下的样子）。挂着的时候回退到 C（txg 8 < 9）：
+/// 拒成 `TargetNotACandidate { BelowEffectiveFloor }`，在任何写之前：盘上逐字节不变、现行版本与分配器不动。
+/// 原来守这一判的是 `second_transaction_step_five_reuse.rs:641` 那一条（载体根被改坏、F 只剩系统配置里那一份），它改钉成「已知根读坏重读仍坏就拒」
+/// 之后这一判没有用例了；只取根上带的 F 时 F_生效 是 0、C 是候选、回退照做（`crates/mutations.tsv`）。
+#[test]
+fn rolling_back_while_mounted_takes_the_floor_from_the_system_configuration_when_it_is_above_every_root_carried_floor(
+) {
+    let mut pool = build_through_rollback("step-five-floor-only-in-the-system-configuration");
+    let planted_floor = CheckpointTxg(9);
+    {
+        let devices = pool.devices.as_mut().expect("镜像还开着");
+        let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
+        for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+            for offset in [DeviceOffsetInBytes(0), DeviceOffsetInBytes(spacing)] {
+                let bytes = PoolReader::read(
+                    &*devices,
+                    device,
+                    offset,
+                    usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096"),
+                )
+                .expect("系统配置槽读得到");
+                let mut system_configuration =
+                    SystemConfiguration::parse_slot(&bytes).expect("这一槽自证得过");
+                assert!(
+                    system_configuration.quantities.rollback_floor < planted_floor,
+                    "改之前系统配置里的 F 低于 9"
+                );
+                system_configuration.quantities.rollback_floor = planted_floor;
+                let (_, recorded) = devices
+                    .iter_mut()
+                    .find(|(identity, _)| *identity == device)
+                    .expect("那块盘");
+                recorded
+                    .write_at(
+                        offset,
+                        &system_configuration.to_slot(),
+                        WriteDurability::Plain,
+                    )
+                    .expect("写回系统配置槽");
+            }
+        }
+    }
+    assert_eq!(
+        newest_root_floor(&pool),
+        CheckpointTxg(0),
+        "环里最新那条根带的 F 是 0：F 只在系统配置里"
+    );
+    let before = common::disk_snapshot(&pool.memory_pool(), &pool.stream);
+    let current_before = pool.output.clone();
+    let records_before = pool.allocator.records().to_vec();
+    let target = RollbackTarget {
+        instance: InstanceGeneration(2),
+        checkpoint_txg: CheckpointTxg(8),
+    };
+    let refused = roll_back(&mut pool, target);
+    assert!(
+        matches!(
+            &refused,
+            Err(RollbackError::TargetNotACandidate {
+                target: refused_target,
+                exclusion: RollbackCandidateExclusion::BelowEffectiveFloor,
+            }) if *refused_target == target
+        ),
+        "F_生效 = max(根上带的 0, 系统配置里的 9) = 9，C（txg 8）在 F 之下：{:?}",
         refused.as_ref().err()
     );
     assert_eq!(
@@ -901,7 +997,6 @@ fn raising_the_floor_counts_abandoned_roots_whose_ledger_is_unreadable() {
 
 /// 建池（第一个文件 A，txg 3）→ 同一个进程里覆盖写 B（txg 4）、C（txg 5）→ 崩溃恢复抛弃 C（C 的根槽与数据单元暂时读不出，
 /// 择根落到 B、C 那条记录验不过；实例 2 写行 txg 6、暖机 txg 7；再写回，C 按实例 2 的表判被抛弃）→ 实例 2 覆盖写四次（txg 8–11）。
-/// 交回之前的镜像 checker 全绿；抬 F 的上限 = min(每块盘上最新的有效根, 第 4 新的不同状态非空有效根 8) = 8。
 fn pool_after_a_recovery_abandoned_the_third_version_and_four_overwrites(tag: &str) -> BuiltPool {
     let mut pool = build_pool(tag);
     overwrite_in_process(&mut pool, &content_of(4100, 3), InstanceGeneration(1));
@@ -933,45 +1028,25 @@ fn pool_after_a_recovery_abandoned_the_third_version_and_four_overwrites(tag: &s
         );
     }
     assert_eq!(pool.output.root.checkpoint_txg, CheckpointTxg(11));
-    let verdicts = check_pool_image(&pool.memory_pool());
-    assert!(
-        verdicts
-            .iter()
-            .all(|(_, verdict)| !matches!(verdict, InvariantVerdict::Violated(_))),
-        "抬 F 之前一条违例都没有：{verdicts:?}"
-    );
     pool
 }
 
-/// 增补 2 收口表第 43 行那一形（`history::KNOWN_RED_FORMS` 第 1 条）在管理员回退改成挂着时的向前发布之后还走不走得到
-/// （实三交回 Q4：随机历史与崩溃注入里都没再复现；「没复现」不等于「不可达」）：**走得到**，被抛弃的时间线由崩溃恢复造。
-/// F 抬到 5——C 那个 txg，环里 txg 5 上只有 C 一条根、它属于被抛弃的实例 1 那一段（抬之前的镜像上
-/// `raised_floor_lands_only_on_abandoned_roots` 为真）——之后 checker 只判 I-3.1 红、记账的已分配多于遍历：B（txg 4）在 F 之下、
-/// 出了候选集，它独占、被实例 2 写行那次换下的单元释放代 6，F = 5 回收不了，还算在已分配里。拿这一次的观察按「已知红」清单归类，
-/// 归到第 1 条（收口表第 43 行）。对照：同一段历史 F 抬到 6（写行那次的根）或 7（暖机），回收到释放代 6，checker 全绿。
-/// 修法没定（收口表第 43 行「要三方」），这里只钉今天的结局。
+/// 双故障形（C583（双故障形：每盘一槽系统配置坏加最新根一时读不出），已知，留里程碑三）：崩溃恢复抛弃 C（实例 1、txg 5）之后实例 2 覆盖写四次，
+/// 那次恢复看不见 C、把 C 引用的单元又发出去，抬 F 之前池级 checker 就恰好红一条 I-7.4（近 K 代块未被复用），说明文字点名实例 1、
+/// txg 5 那条被抛弃的根——C554 乙罩不到的那一格，不是乙的拒。
+/// 原来这一条接着把 F 抬到 5（C 那个 txg）、钉「只有 I-3.1 红、归到『已知红』清单第 0 条（收口表第 43 行）」，另有 F 抬到 6、7 两个对照全绿；
+/// 抬 F 之前已经 I-7.4 红，抬 F、归类与两个对照那一段都立不住，删掉（`random_histories.rs` 那一条同形、同样改钉）。
+/// 清单第 0 条的归类由 `crates/singlefs-harness/src/history.rs` 的库单测钉着。
 #[test]
 #[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
-fn raising_the_floor_into_the_txg_of_the_root_abandoned_by_crash_recovery_ends_in_the_known_red_form_of_closeout_row_43(
+fn four_overwrites_after_crash_recovery_abandoned_the_third_version_are_red_only_on_i_7_4_before_any_floor_raise_in_the_known_double_fault_form(
 ) {
-    let mut pool =
+    let pool =
         pool_after_a_recovery_abandoned_the_third_version_and_four_overwrites("step-five-gap-5");
-    let image_before_raising = pool.memory_pool();
-    assert_eq!(
-        singlefs_harness::history::raised_floor_lands_only_on_abandoned_roots(
-            &image_before_raising,
-            CheckpointTxg(5)
-        ),
-        Some(true),
-        "抬之前的镜像上 txg 5 那一条根（C）属于被抛弃的实例"
-    );
-    let raised = raise_floor(&mut pool, CheckpointTxg(5)).expect("F 抬到 5：不超过上限 8");
-    assert_eq!(raised.ceiling, CheckpointTxg(8));
-    let verdicts = check_pool_image(&pool.memory_pool());
-    let violations: Vec<(&'static str, String)> = verdicts
-        .iter()
+    let violations: Vec<(&'static str, String)> = check_pool_image(&pool.memory_pool())
+        .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
-            InvariantVerdict::Violated(detail) => Some((*invariant, detail.clone())),
+            InvariantVerdict::Violated(detail) => Some((invariant, detail)),
             InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
         })
         .collect();
@@ -980,50 +1055,15 @@ fn raising_the_floor_into_the_txg_of_the_root_abandoned_by_crash_recovery_ends_i
             .iter()
             .map(|(invariant, _)| *invariant)
             .collect::<Vec<_>>(),
-        vec!["I-3.1"],
-        "只有 I-3.1 红：{violations:?}"
+        vec!["I-7.4"],
+        "抬 F 之前恰好 I-7.4 红：{violations:?}"
     );
-    let (newest_ring_root_txg, root_ring_slot_count) =
-        singlefs_harness::history::newest_ring_root_and_slot_count(&pool.memory_pool());
-    let observation = singlefs_harness::history::FailureObservation {
-        position: singlefs_harness::history::StepPosition::Operation(0),
-        operation_kind: Some(singlefs_harness::history::HistoryOperationKind::RaiseRollbackFloor),
-        violations,
-        panic: None,
-        newest_ring_root_txg,
-        root_ring_slot_count,
-        harness_judgement: None,
-        model_disagreement: None,
-        raised_floor_lands_only_on_abandoned_roots:
-            singlefs_harness::history::raised_floor_lands_only_on_abandoned_roots(
-                &image_before_raising,
-                CheckpointTxg(5),
-            ),
-        record_check: singlefs_harness::memory_pool::RecordCheck::default(),
-    };
-    let ending = singlefs_harness::history::classify_failure(observation);
     assert!(
-        matches!(
-            ending,
-            singlefs_harness::history::HistoryEnding::KnownRed { form: 0, .. }
-        ),
-        "归到「已知红」清单第 1 条（{}）：{ending:?}",
-        singlefs_harness::history::KNOWN_RED_FORMS[0].closeout_table_row
+        violations[0]
+            .1
+            .starts_with("被抛弃的根（实例 1、txg 5）引用的单元已被重新分配或抹头"),
+        "I-7.4 的说明文字点名实例 1、txg 5 那条被抛弃的根：{violations:?}"
     );
-
-    for floor in [6u64, 7] {
-        let mut control = pool_after_a_recovery_abandoned_the_third_version_and_four_overwrites(
-            &format!("step-five-gap-control-{floor}"),
-        );
-        raise_floor(&mut control, CheckpointTxg(floor)).expect("对照：F 抬到写行或暖机那一条根");
-        let control_verdicts = check_pool_image(&control.memory_pool());
-        assert!(
-            control_verdicts
-                .iter()
-                .all(|(_, verdict)| !matches!(verdict, InvariantVerdict::Violated(_))),
-            "对照：F 抬到 {floor}（不在空档里）一条违例都没有：{control_verdicts:?}"
-        );
-    }
 }
 
 /// 事务号按实例计数、从 1 起（D23（journal 的角色与格式） 已定项 7），**不承载事务的空发布写 0 也不许把计数拉回去**。

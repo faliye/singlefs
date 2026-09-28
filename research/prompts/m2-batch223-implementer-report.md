@@ -1,6 +1,6 @@
 # 实二二三报告（实二二 + 实二三并做：a–h，加主 agent 追加的 i 与 h 的 Z4-1 历史）
 
-时刻一律 UTC。底：主工作区 17:02:26 的 `crates/`、`litmus/`、`Cargo.*`（rsync 进 `base/`，16:50 打进的实二十、实十六接续、实十九都在里面）。
+底：主工作区的 `crates/`、`litmus/`、`Cargo.*`（rsync 进 `base/`，先前打进的实二十、实十六接续、实十九都在里面）。
 改在副本 `repo/`，交付的是 `repo/` 对 `base/` 的补丁 `impl-m2-batch223.patch`（只含 `crates/` 下的源码与测试；`crates/mutations.tsv` 不在补丁里，按变异名另交三件）。
 
 ## 一、结论
@@ -11,7 +11,7 @@
 | b 读者规则两格 | 做完 | C539、C540 各一份坏镜像：恢复断在那里、那次发布不施加；checker 的 I-8.9 分别判「不从 1 起」「末条之后还有记录」 |
 | c 只一份坏两盘一起留 | 做完，`ReleaseChecksumFailedOnSomeCopiesOnlyAsymmetricRecordsUnsupported` 删了 | 一份坏：两盘记录都留、覆盖写照成、冷启动读回、下一次覆盖写不被拒 |
 | d 位置项池外 / 两条同盘 | 做完，成员改名去掉「未定」 | 两种各一条：在任何写之前拒、盘上逐字节不变（快照比两盘四个系统配置槽、根环、录制流步数）、分配器一条记录没改写 |
-| e checker 的 I-3.1 / I-3.11 豁免 | 做完，按主 agent 定的**按单元**读法（18:1x UTC 收到） | 两份都坏：豁免、不红；一份坏一份好：两条记录都豁免、不红；改回两份都好：照红 |
+| e checker 的 I-3.1 / I-3.11 豁免 | 做完，按主 agent 后来定的**按单元**读法 | 两份都坏：豁免、不红；一份坏一份好：两条记录都豁免、不红；改回两份都好：照红 |
 | f 树表 0 条写行跨记录 | 做完 | 只供测试的开关把一条记录压到一项：写行跨两条记录（事务号 0、序号 1、2、提交标记与末条标志只在末条）；恢复锚在末条、施加下一次发布；checker 一条不红；再挂载照常 |
 | g 回退见证 | 做完（格式、写序、择根、重放、候选集、删除规则、表满、checker 两条新判定）；层 0 三条流只 build 过 | C332 那一格：回退实例的根在两块盘上都读不出，恢复择 R_old、读回 A；改之前落到被抛弃的 C（第三节末 basecheck） |
 | h 写行释放核验挪到取号之前 | 做完，另加主 agent 追加的 Z4-1 历史 | 坏映射条目上写行的释放核验报错：取号之前拒、号不变、盘上逐字节不变；树表 0 条那一臂 66 片、分配记录装不下：取号之前拒、号不涨，再试一次同样 |
@@ -21,13 +21,13 @@
 
 推翻条件：主工作区打上补丁之后第五节那些二进制里有一条红（除上面两条）；第三节证过的变异在主表里有一条不红；层 0 三条新流全量跑出违例；统一跑的 `cargo test --all` 里有别的二进制因这份补丁红（第八节列了最可能受牵连的几个）。
 
-### 主 agent 18:5x 要写清的四件
+### 主 agent 要写清的四件
 
 1. **还红的测试**：`second_transaction_supplement_three_fault_injection` 二进制里两条——
    - `fault_injection_fast_tier_returns_errors_instead_of_panicking`：红在 `crates/singlefs-harness/tests/second_transaction_supplement_three_fault_injection.rs:112`「注入之后「已知红」清单外的失败」；
    - `one_fixed_history_injects_twelve_faults_and_none_of_them_panics`：红在同一文件第 319 行「「已知红」清单外的失败」。
    两条都是同一个新发现：种子 7463871032432355113、`read_returns_corrupted_bytes`、整池第 787018 次读、第 7 步 `PublishOverwrite`，`CheckerViolations { invariants: ["I-3.11"] }`，说明「盘 0：记账的已分配 Some(933888) 减 defer 待释放 Some(704512)，不等于从最新根（txg 10）走读到的 196608（其中隔离豁免 0）」（`logs-touched-fault-injection-2.log`）。
-   原因就是主 agent 18:5x 定的那一格：释放读盘核那一读报成功、读回的字节翻了一位，核出对不上就隔离（两盘一起留），盘上两份其实都完好，checker 读得出且对得上不豁免。修法（运行时核出对不上也先重读一次、两次都坏才隔离；每次读都给坏字节的那一格登记成已知红）交下一个实现员，这份补丁里没做。
+   原因就是主 agent 定的那一格：释放读盘核那一读报成功、读回的字节翻了一位，核出对不上就隔离（两盘一起留），盘上两份其实都完好，checker 读得出且对得上不豁免。修法（运行时核出对不上也先重读一次、两次都坏才隔离；每次读都给坏字节的那一格登记成已知红）交下一个实现员，这份补丁里没做。
 2. **c × e 按单元豁免已落**：checker `quarantined_slots_exempted_per_device` 按单元（起点槽、跨度）归组，一组里任一份 `check_unit` 不过整组豁免（第二节 e；用例 10、11；第三节 e 那三行变异）。它修掉了「一份真坏、一份好」那一格（探针 `probe-one-copy-checker.log`：按份豁免时好盘那条 I-3.11 红），修不掉上面那一格。
 3. **I-7.11 回退到 (0, 0) 那一格**：按单元豁免之后第一次重跑故障注入，快档里还有一条新发现——种子 7463871032432355114、`barrier_fails`、第 7 步 `CloseAndMountRollback`，I-7.11「所选根（实例 1、txg 2）的实例表罩不住见证条目 (新实例 1, 目标 (0, 0))」。回退到 mkfs 的第 0 代根时实例 0 不写行（D18 已定项 11），我写的 I-7.11 却要目标实例那一行。修法：目标实例是 0 时不要那一行（实例 0 只有 txg 0 那一条根，没有越过目标的根要抛弃）；配用例 `a_rollback_to_the_make_filesystem_root_holds_the_witness_table_invariant_without_a_row_for_instance_zero` 与一行变异（第二轮证红）。修完重跑，快档与 one_fixed_history 只剩第 1 条那一个新发现。
 4. **证红第二轮作废重来**：第一轮在新拷的副本上做，23 条都红在点名的那条（`mutation/proof-summary-round1.txt`）。第二轮（e 的新锚点、I-7.11 的新变异）之前我用 `rsync -a` 把 `repo/` 拷回已有构建的 `mutant/`：`rsync -a` 保留了 `repo/` 里较旧的 mtime，比第一轮还原时 `touch` 过的时间早，cargo 认为源码没变、用了第一轮最后一条变异（`to_slot` 不写见证表）编出来的旧产物，I-7.11 那条变异没红在点名的测试上、别的 8 条见证用例反而红了。正是定义第 3 步点名的那个坑。处置：那一轮作废（`mutation/proof-summary-round1-and-stale-round2.txt` 留着），删掉 `mutant/` 重拷、先跑两个二进制的基线（都绿）再证，4 条都红在点名的那条（第三节表里 e 三行与 I-7.11 那一行是这一遍的）。
@@ -102,7 +102,7 @@
 - `mutations-replacements.tsv`（sha256 db7c5ba162a594bc316a6f81c9c0aa7fc420b8d1969224ab4cfd545ca8e1a747）：18 行整行替代，第一段是主表里现在那一行的变异名、其后六段是替代它的整行（锚点随改动腐化的；其中 4 行连名字一起换了）。
 - `mutations-append.tsv`（sha256 99583fe6ac5677d243696e46969c2894dc9aa2e7cddc21cdf44ae5fa09bb6c96）：27 行追加到末尾。
 - `mutations-delete.txt`：空（没有要删的行）。
-- 核过：主工作区 18:49 的现状打上补丁、主表按这三件改完，total=648 bad=0（每一行的原文在目标文件里恰好命中一次；`tools/anchor_check.py`）。
+- 核过：主工作区现状打上补丁、主表按这三件改完，total=648 bad=0（每一行的原文在目标文件里恰好命中一次；`tools/anchor_check.py`）。
 - 证过的：第三节表里那 26 条（替代行里 4 条、追加行里 22 条；第一轮按旧锚点证的 e 那一条作废、第二轮按新锚点重证）；其余 14 条替代行只换锚点、点名的测试没变，其余 5 条追加行没单独证，整表复跑留给门禁 59 号。
 
 替代的（旧名 → 新名，同名的只写一次）：
@@ -162,7 +162,7 @@ C394：位置项指的盘不在池里时不在写之前交回点名条款没写�
 
 ## 五、验证（副本 `repo/` 上，线程上限 5；末尾原样）
 
-动到的测试二进制各跑整个（`touched-summary.txt`，18:3x 那一遍；之后改过的 walk.rs 与两份测试文件，quarantine、rollback_witness 两个二进制在第二轮证红的基线里重跑过、故障注入重跑过）：
+动到的测试二进制各跑整个（`touched-summary.txt` 那一遍；之后改过的 walk.rs 与两份测试文件，quarantine、rollback_witness 两个二进制在第二轮证红的基线里重跑过、故障注入重跑过）：
 
 ```
 --lib exit=0 | test result: ok. 110 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s | failed=[]
@@ -201,7 +201,7 @@ build exit=0
 
 fmt 唯一的 Diff 在 `e158_root_choice_repair.rs`：E158 执行员在改的文件，`base/` 与主工作区同样没排版，我没碰它（补丁里没有它）。
 
-对主工作区现状（18:48:44Z）：
+对主工作区现状：
 
 ```
 $ git apply --check impl-m2-batch223.patch
@@ -225,7 +225,7 @@ d4ca110a9e1d101739705c08dfb4b9a34ac5a92ced55ed8ab4633a38f21e95f3  impl-m2-batch2
 ## 六、停下交主 agent 的设计问题
 
 **Q1（c × e，还红着）瞬时读回坏字节落在释放读盘核上。** 种子 7463871032432355113、整池第 787018 次读、第 7 步覆盖写：读盘核那一读报成功、读回的字节翻了一位（`read_returns_corrupted_bytes`），CRC 对不上 ⇒ 按 D19 已定项 5「任一份核出对不上，两块盘一起留」两条记录留在已分配；而盘上那两份都完好，checker 读出来对得上 ⇒ 按 I-3.1 / I-3.11 末句（按单元读法也一样）不豁免 ⇒ I-3.11 红（`盘 0：记账的已分配 Some(933888) 减 defer 待释放 Some(704512)，不等于从最新根（txg 10）走读到的 196608（其中隔离豁免 0）`，`logs-touched-fault-injection-2.log`）。
-条款的缝：D19「读盘本身失败先重读一次」只管读失败，读成功而对不上不重读；I-3.1 / I-3.11 的豁免要 checker 自己也读出坏。主 agent 18:5x 定了：运行时核出对不上也先重读一次、两次都坏才隔离（与 N1 读盘失败那一次重读对称），故障注入若每次读都给坏字节、那一格登记成已知红的形态——交下一个实现员，这份补丁里没做，这两条用例照红交回。
+条款的缝：D19「读盘本身失败先重读一次」只管读失败，读成功而对不上不重读；I-3.1 / I-3.11 的豁免要 checker 自己也读出坏。主 agent 定了：运行时核出对不上也先重读一次、两次都坏才隔离（与 N1 读盘失败那一次重读对称），故障注入若每次读都给坏字节、那一格登记成已知红的形态——交下一个实现员，这份补丁里没做，这两条用例照红交回。
 **Q2（g）见证条目的删除规则（派发提示说由我定）**：条目 (N, r_old, T_old) 删掉 ⟺ 根环每一个槽都读得出、都自证过（是本池的根），且其中没有一条根的实例代号落在 [r_old, N) 里。理由：条目抛弃的是实例落在 (r_old, N) 的根与 r_old 里越过 T_old 的根，还护着「所选根是 r_old、不超过 T_old」时的重放；环里没有实例落在 [r_old, N) 的根，这几样都没有对象，之后新写的根实例都 > N，删了永远安全。读不出、自证不过的槽按「可能住着这样的根」算（与 D18 已定项 11 行回收的根环条件同一个读法），代价是一个槽持续读不出时条目永远删不掉。删只在挂载时算（`mount::rollback_witness_entries_still_needed`），同一次挂载的取号写就写删过的表。被攻过零轮，交代码三方。
 **Q3（g）表满**：条款说「表写不满」（上限只由根环几何定），那是按根环每个槽都读得出推的；按 Q2 的删除规则，有槽持续读不出时条目删不掉，回退够多次就满。那时怎么办条款没写 ⇒ 在取号之前返回 `RecoveryFailure::RollbackWitnessTableFullWhoseHandlingIsUndecided { entries, capacity }`（包在 `MountError::Recovery` 里；`MountError` 加不了成员，理由同 h），用例钉住「返回这个成员、盘上逐字节不变」，不钉之后。走得到：用例用塞满 23 条的表造。
 **Q4（g）前缀第五条怎么读见证**：我取「重放遇到被见证抛弃的记录即停」（与择根同一个判法，攻方原型也是这么补的）；C340 仍取 P2（新实例接在环里最大 jsn 之后），`rollback_high_water_of_root` 的回退行截断没动。D23 写的是「随实现交代码三方」。
@@ -259,7 +259,7 @@ I-3.1、I-3.11 两行末尾那句（「只在 checker 自己读它罩住的那�
 
 补丁里的 26 个（`crates/` 下；新建 6 个：`crates/singlefs-core/src/rollback_witness.rs` 与 5 份测试 `…_multi_record_transaction_zero_publishes.rs`、`…_publish_failure_resent_unchanged.rs`、`…_rollback_witness.rs`、`…_rollback_witness_layer0.rs`、`…_row_publish_checks_before_acquisition.rs`）。`crates/mutations.tsv` 没改（第四节三件）。别的会话在改的四份（`on_device_modes.rs`、`first_transaction_on_device.rs`、`first_transaction_device_log_check.rs`、`e158_root_choice_repair.rs`）一份都没碰：`e158` 被我一次 `cargo fmt --all` 改过，当场从 `base/` 拷回、不在补丁里。
 
-补丁对主工作区的 `git apply --stat`（18:48:44Z）：
+补丁对主工作区的 `git apply --stat`：
 
 ```
  crates/singlefs-checker/src/image.rs               |   77 +
@@ -291,7 +291,7 @@ I-3.1、I-3.11 两行末尾那句（「只在 checker 自己读它罩住的那�
  26 files changed, 4512 insertions(+), 455 deletions(-)
 ```
 
-主工作区 `git diff --stat -- crates litmus`（18:52，只看得到别的会话的改动：我的改动都在副本里）：
+主工作区 `git diff --stat -- crates litmus`（只看得到别的会话的改动：我的改动都在副本里）：
 
 ```
  crates/mutations.tsv                               |  189 +-

@@ -1,0 +1,6632 @@
+# 附录二：里程碑二收尾代码三方第三轮 —— 两块 diff（基准 `refs/sop/m2-closeout-code-r3-base` 9a9cfb6c，生成于 2026-09-28）
+
+## 一、合入后验证二第一段（改法 A + B）：`git diff refs/sop/m2-closeout-code-r3-base refs/sop/m2-closeout-code-r3-snapshot -- crates/ litmus/`（33 个文件，+2594 / −684；两个 ref 都在仓里，基准是同一刻不打第一段的样子；`git diff` 在两个提交之间跑，新文件的全文已经在这份 diff 里，不用另附）
+
+```diff
+diff --git a/crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs b/crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs
+index 779b1d9b..bbc0b42c 100644
+--- a/crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs
++++ b/crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs
+@@ -19081,7 +19081,9 @@ mod fourth_run_segment_two {
+                 Err(
+                     UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount { .. }
+                     | UserChangeRefused::NoFileVersionToChange
+-                    | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. },
++                    | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. }
++                    | UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable { .. }
++                    | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. },
+                 ) => &[],
+                 Err(UserChangeRefused::Publish { floor_raises, .. }) => floor_raises,
+                 Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(refused_change)) => {
+diff --git a/crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs b/crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs
+index 11448bd7..c3ab81a8 100644
+--- a/crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs
++++ b/crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs
+@@ -831,6 +831,8 @@ where
+                 | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration {
+                     ..
+                 }
++                // 有盘落后于现行那一版又缺它的单元：挂着之后的入口在任何写之前拒，这个二进制不换盘，走不到。
++                | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
+                 // 盘上的实例代号或 txg 到顶：取号之前拒，一个写都没发。
+                 | MountError::SequenceNumberPastTheTopOfItsRange(_)
+                 // 写行与暖机之后推的抬 F 报错（实审 A1b Q5，账在错里）：这个二进制每次都在新建的池上挂，取号之前的准入不会不够、走不到推抬 F；
+@@ -1246,6 +1248,8 @@ fn raise_the_rollback_floor_and_describe<Inner: BlockDevice>(
+                 | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration {
+                     ..
+                 }
++                // 有盘落后于现行那一版又缺它的单元：挂着之后的入口在任何写之前拒，这个二进制不换盘，走不到。
++                | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
+                 // 现行那一版 txg 到顶：算这一串的 txg 时拒，一个写都没发；可写挂载那一处的抬 F 报错成员抬 F 自己报不出来。
+                 | MountError::SequenceNumberPastTheTopOfItsRange(_)
+                 | MountError::FloorRaiseFailedAfterTheMountsPublishes(_)
+@@ -2772,6 +2776,11 @@ mod tests {
+         let operations = stream.retained_operations();
+         let new_operations = &operations[operations_before_the_fourth_version..];
+         let counts_after_the_raise = device_call_counts(&raised.devices, &raised.plan);
++        // C577 之后发布 D 以一道池屏障收尾，抬 F 那一串开的新写入口开头又一道，两道之间没有写：录制器
++        // （`SharedStream::push` 的末尾一串屏障去重）把后一道并掉，设备照收两次 FLUSH，所以每块盘设备一层比录制流投出的多 1。
++        // 录制器并掉相邻屏障、设备收两次，归第五步 55 号六档重录时定（合入后验证一报告第八节；主 agent 定不改装置、不改判据，照今天的数改钉）。
++        // 盘 0 的 12 / 13 是合入后验证一那一次跑出来的；盘 1 同一个机制推的，没跑（singlefs-checker-tier 是 checker 档，归提交时的 crash-verifier）。
++        let flushes_the_recorder_merged_into_the_barrier_that_closed_publish_d: u64 = 1;
+         for (index, identity) in [DeviceIdentity(0), DeviceIdentity(1)]
+             .into_iter()
+             .enumerate()
+@@ -2799,9 +2808,10 @@ mod tests {
+                 identity.0
+             );
+             assert_eq!(
+-                u64::try_from(projected_flushes).expect("件数"),
++                u64::try_from(projected_flushes).expect("件数")
++                    + flushes_the_recorder_merged_into_the_barrier_that_closed_publish_d,
+                 counted.barrier_calls + counted.force_unit_access_writes,
+-                "发布 D 与抬 F 两段盘 {}：录制流投出的 FLUSH 与设备一层转发的屏障 + FUA 写",
++                "发布 D 与抬 F 两段盘 {}：录制流投出的 FLUSH 加录制器并掉的那一道，与设备一层转发的屏障 + FUA 写",
+                 identity.0
+             );
+         }
+@@ -3017,7 +3027,8 @@ mod tests {
+     /// 宿主检查（`new_pool_file_creation_device_log_check`）拿录制流投到每块盘上的事件当「程序的信念」：每个写一件、FUA 写之后一个 FLUSH、
+     /// 每道池屏障在每块盘上各一个 FLUSH（录制器把连续几道并成一道）。这个投法在发布 B、可写挂载、发布 C 三段上是否就是设备收到的，
+     /// 拿录制器外面那一层（注入包装，与录制器不共享计数）数到的核：每块盘、每段，写的件数相等，FLUSH 件数 = 转发的屏障 + FUA 写。
+-    /// 录制器并掉的屏障若在设备上是两次，这里先红，虚机档的逐项比对不会冤判。
++    /// 录制器并掉的屏障若在设备上是两次，这里先红，虚机档的逐项比对不会冤判。C577 之后重开那一段开头就有这样一道（段里写明的
++    /// `flushes_the_recorder_merged`，照今天的数钉），怎么收归第五步 55 号六档重录时定。
+     #[test]
+     fn the_recorded_stream_projects_onto_each_device_the_writes_and_flushes_the_device_layer_counted(
+     ) {
+@@ -3055,15 +3066,22 @@ mod tests {
+             Err(failed) => panic!("第二个实例：{failed:?}"),
+         };
+         let operations = stream.retained_operations();
++        // 每一段里录制器并掉、设备照收的屏障数（每块盘）：C577 之后发布 B 以一道池屏障收尾，重开之后取号那个新写入口开头又一道，
++        // 两道之间没有写，录制器（`SharedStream::push` 的末尾一串屏障去重）把后一道并进上一段，设备在这一段照收一次 FLUSH。
++        // 录制器并掉相邻屏障、设备收两次，归第五步 55 号六档重录时定（合入后验证一报告第八节；主 agent 定不改装置、不改判据，照今天的数改钉）。
++        // 发布 B 那一段是 0（合入后验证一那一次两块盘都过了）；重开那一段盘 0 的 16 / 17 是那一次跑出来的，盘 1 同一个机制推的，没跑
++        // （singlefs-checker-tier 是 checker 档，归提交时的 crash-verifier）。
+         let windows = [
+             (
+                 "file_overwrite",
+                 &operations[operations_after_the_new_pool_file_creation
+                     ..operations_after_the_file_overwrite],
++                0_u64,
+             ),
+             (
+                 "reopen_and_writable_mount_and_third_transaction",
+                 &operations[operations_after_the_file_overwrite..],
++                1,
+             ),
+         ];
+         for (index, identity) in [DeviceIdentity(0), DeviceIdentity(1)]
+@@ -3079,7 +3097,7 @@ mod tests {
+                     .plan()
+                     .counts_of_device(identity),
+             );
+-            for ((window, slice), counted) in windows
++            for ((window, slice, flushes_the_recorder_merged), counted) in windows
+                 .iter()
+                 .zip([file_overwrite_counted, after_reopen_counted])
+             {
+@@ -3100,9 +3118,9 @@ mod tests {
+                     identity.0
+                 );
+                 assert_eq!(
+-                    u64::try_from(projected_flushes).expect("件数"),
++                    u64::try_from(projected_flushes).expect("件数") + flushes_the_recorder_merged,
+                     counted.barrier_calls + counted.force_unit_access_writes,
+-                    "{window} 盘 {}：录制流投出的 FLUSH 与设备一层转发的屏障 + FUA 写",
++                    "{window} 盘 {}：录制流投出的 FLUSH 加录制器并掉的那几道，与设备一层转发的屏障 + FUA 写",
+                     identity.0
+                 );
+             }
+diff --git a/crates/singlefs-checker-tier/tests/crash_enumeration_findings_log_dedupes_by_signature_and_survives_resume.rs b/crates/singlefs-checker-tier/tests/crash_enumeration_findings_log_dedupes_by_signature_and_survives_resume.rs
+index 8260d99b..24c93825 100644
+--- a/crates/singlefs-checker-tier/tests/crash_enumeration_findings_log_dedupes_by_signature_and_survives_resume.rs
++++ b/crates/singlefs-checker-tier/tests/crash_enumeration_findings_log_dedupes_by_signature_and_survives_resume.rs
+@@ -1,10 +1,10 @@
+ //! checker 档模块：crash、layer0_progress
+ //! 层 0 放量的发现日志（用户 2026-09-27「崩溃放量日志 只写出错日志或者需要全量和错误双份日志 不然你读不过来了」；里程碑「覆盖写、释放、回退与复用」
+-//! 收尾批「层 0 发现日志」）：在第一条流上（mkfs → 取号 → 暖机 → A，按甲二展开，原地覆写取三态，54 个状态）把版本表故意写错——
++//! 收尾批「层 0 发现日志」）：在第一条流上（mkfs → 取号 → 暖机 → A，按甲二展开，原地覆写取三态，46 个状态；C577 之前 54 个）把版本表故意写错——
+ //! 暖机第二次发布（实例 1、txg 2）下面说有文件、A（txg 3）的内容说成别的——落在 txg 2 的状态报「有文件却报没有」，读出 A 的状态报
+ //! 「读回的内容不对」，两遍恢复（看 journal、不看 journal）各红几段。今天的计数只留一条 `first_violation`；发现表按签名去重之后
+ //! 是几个签名、各几个状态、最先是哪几个状态，拿一个与枚举器分开写的观察者逐状态重判来核，再核发现日志的每一行。
+-//! 名字里不带 layer0：它只跑甲二那 54 个状态，平时跑得起。
++//! 名字里不带 layer0：它只跑甲二那 46 个状态，平时跑得起。
+ 
+ #[path = "../../singlefs-harness/tests/common/mod.rs"]
+ mod common;
+@@ -38,7 +38,7 @@ use singlefs_harness::memory_pool::{
+ use singlefs_harness::segments::StepKind;
+ 
+ /// 第一条流按甲二展开的状态数（`crash_enumeration_sharded_across_processes.rs` 的 `QUICK_TIER_STATES`，那里写了怎么数出来的）。
+-const QUICK_TIER_STATES: u64 = 54;
++const QUICK_TIER_STATES: u64 = 46;
+ /// 进度文件、账本与发现日志 begin 行里的流名。
+ const STREAM_NAME: &str = "findings_new_pool_file_creation_stream";
+ 
+diff --git a/crates/singlefs-checker-tier/tests/crash_enumeration_multi_record_publish_stream.rs b/crates/singlefs-checker-tier/tests/crash_enumeration_multi_record_publish_stream.rs
+index c4ca08d9..af25ba55 100644
+--- a/crates/singlefs-checker-tier/tests/crash_enumeration_multi_record_publish_stream.rs
++++ b/crates/singlefs-checker-tier/tests/crash_enumeration_multi_record_publish_stream.rs
+@@ -2,7 +2,7 @@
+ //! 里程碑「覆盖写、释放、回退与复用」并行线一的层 0 小负载（验收第 3 条）：多条记录的发布边界在小单元数上造出来——
+ //! 「取号 → 暖机 × 2 → A（第一个文件，一个数据单元：12 个单元）→ B（顺序写两个数据单元：14 个单元、两条记录）
+ //! → C（顺序写三个数据单元：15 个单元、三条记录）」整条录制流按 D13（验证路线） 已定项 4 枚举崩溃状态，
+-//! 与新池新建文件同一种切法（上一次发布的系统配置槽写与下一次发布的单元写落在同一段）。每个状态跑恢复 + 多版本 oracle、
++//! 与新池新建文件同一种切法（C577 之后上一次发布的系统配置槽轮换过了发布末尾那道屏障、自成一段；改之前与下一次发布的单元写落在同一段）。每个状态跑恢复 + 多版本 oracle、
+ //! 池级 checker、记录核对器；另逐状态核发布边界（D23（journal 的角色与格式） 已定项 14 第六条）：
+ //! 一次发布的第一条记录落了而末条一份都没落 ⇒ 那次发布整体不施加，读回上一版、文件是旧长度（I-4.3（提交原子））。
+ //!
+@@ -17,9 +17,9 @@
+ //! extent 下段一片根兼叶装两条、三条记录（上段那条条目换成下段根指针，D8（核心索引结构） 已定项 14），
+ //! 中央映射里两条、三条码 1 条目。多跑的一步只有恢复本身（这条流上没有重开、挂载）。
+ //!
+-//! 快的那条只展开写数小于 10 的段（A、B、C 三个单元段 26 写、30 写与 32 写不展开，只以整段持久进入后面的状态）；
+-//! 全量标 ignored（层 0 的枚举域 12230590578 个状态，B、C 两个单元段占 12079595518；每次写只取两态时的闭式 5435818083、
+-//! 两段占 5368709118），登记成崩溃枚举用例，门禁 54 号 --full 在 release 下跑，带断点续跑、可双机分片（与第一、第二条流同一个入口）。
++//! 快的那条只展开写数小于 10 的段（A、B、C 三个单元段 24 写、28 写与 30 写不展开，只以整段持久进入后面的状态）；
++//! 全量标 ignored（层 0 的枚举域 1358954634 个状态，B、C 两个单元段占 1342177278；每次写只取两态时的闭式 1358954604、
++//! 两段同样占 1342177278；C577 之前轮换并进单元段，12230590578 与 5435818083），登记成崩溃枚举用例，门禁 54 号 --full 在 release 下跑，带断点续跑、可双机分片（与第一、第二条流同一个入口）。
+ //! 系统配置槽写是原地覆写，取三态（`crash::TearableInPlaceOverwrites`），其余写取两态。
+ 
+ #[path = "../../singlefs-harness/tests/common/mod.rs"]
+@@ -182,9 +182,9 @@ fn prepare(tag: &str) -> Prepared {
+     let sizes: Vec<usize> = segments.iter().map(Vec::len).collect();
+     assert_eq!(
+         sizes,
+-        vec![2, 2, 1, 2, 2, 1, 26, 2, 1, 30, 4, 1, 32, 6, 1, 2],
+-        "取号 2、暖机两次、A 的 24 个单元写并上一次的系统配置槽写 26；B 的 28 个单元写并 A 的轮换 30、两条记录 4 写；\
+-         C 的 30 个单元写并 B 的轮换 32、三条记录 6 写"
++        vec![2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 28, 4, 1, 2, 30, 6, 1, 2],
++        "取号 2、暖机两次、上一次的系统配置槽轮换 2 与 A 的 24 个单元写各自成一段；A 的轮换 2、B 的 28 个单元写、两条记录 4 写；\
++         B 的轮换 2、C 的 30 个单元写、三条记录 6 写（C577 之后轮换之后有屏障，改之前轮换并进下一次的单元段：26、30、32）"
+     );
+     let root_indexes: Vec<usize> = writes
+         .iter()
+@@ -286,7 +286,7 @@ fn assert_clean(tally: &Layer0Tally) {
+     }
+ }
+ 
+-/// 平时跑的那一份：B、C 两个单元段（30 写、32 写）与 A 那一段（26 写）不展开，其余每段任意子集——B 的两条记录段（4 写）、
++/// 平时跑的那一份：A、B、C 三个单元段（24 写、28 写、30 写）不展开，其余每段任意子集——B 的两条记录段（4 写）、
+ /// C 的三条记录段（6 写）全展开，崩在一次发布的记录之间的每个状态都跑到。
+ #[test]
+ fn every_crash_state_between_the_records_of_a_multi_record_publish_keeps_the_version_before_it() {
+@@ -312,8 +312,9 @@ fn every_crash_state_between_the_records_of_a_multi_record_publish_keeps_the_ver
+         .collect();
+     assert_eq!(
+         closed_form_state_count(&expanded),
+-        102,
+-        "每次写只取两态时展开的段按闭式数（补第三态之前的口径）：1 + 六个 2 写段各 3 + 五个 1 写段各 1 + 4 写段 15 + 6 写段 63"
++        111,
++        "每次写只取两态时展开的段按闭式数（补第三态之前的口径）：1 + 九个 2 写段各 3 + 五个 1 写段各 1 + 4 写段 15 + 6 写段 63\
++         （C577 之前暖机第二次、A、B 的轮换并在单元段里不展开，六个 2 写段、102）"
+     );
+     assert_eq!(
+         tally.states,
+@@ -333,8 +334,9 @@ fn every_crash_state_between_the_records_of_a_multi_record_publish_keeps_the_ver
+     );
+     assert_eq!(
+         tally.states,
+-        1 + 3 * (3 * 3 - 1) + 3 * 3 + 5 + 15 + 63,
+-        "1 + 三个系统配置槽 2 写段各 3² − 1 + 三个记录 2 写段各 3 + 五个 1 写段各 1 + 4 写段 15 + 6 写段 63（每次写只取两态时 102）"
++        1 + 6 * (3 * 3 - 1) + 3 * 3 + 5 + 15 + 63,
++        "1 + 六个系统配置槽 2 写段各 3² − 1 + 三个记录 2 写段各 3 + 五个 1 写段各 1 + 4 写段 15 + 6 写段 63（每次写只取两态时 111；\
++         C577 之前三个系统配置槽段、117）"
+     );
+     // B：记录段 4 写里第一条落了（至少一份）、第二条一份没落 ⇒ 3 × 1 = 3 个状态。
+     // C：记录段 6 写里第一条落了、第三条一份没落 ⇒ 第一条 3 种 × 第二条 4 种 = 12 个状态。
+@@ -352,23 +354,24 @@ fn every_crash_state_between_the_records_of_a_multi_record_publish_keeps_the_ver
+     assert_clean(&tally);
+ }
+ 
+-/// 全量：16 段、闭式见下。B、C 两个单元段（各带上一次发布的两次系统配置槽轮换，取三态）各 3² · 2^28 − 1 与 3² · 2^30 − 1 个状态，
++/// 全量：19 段、闭式见下。A、B、C 三个单元段各 2^24 − 1、2^28 − 1 与 2^30 − 1 个状态（C577 之前各带上一次发布的两次系统配置槽轮换、
++/// 取三态，各 3² · 2^n − 1，共 16 段、12230590578），
+ /// 每个状态两遍恢复 + checker。登记成崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv`），54 号认下面打印的
+ /// `LAYER0_PARALLEL_LINE_ONE` 行里 `exhaustive=true`。带断点续跑：进度目录、输入指纹与强制从头跑的开关从环境变量取，
+ /// 没设进度目录就不留进度文件。双机分片（`SINGLEFS_LAYER0_SHARD`，`research/scripts/layer0-shard-run.sh`）：
+ /// 跑一片时只写账本、不打计数行、不判；merge 那一趟拿并齐的计数照下面逐项判、逐字打同样的行。
+ #[test]
+-#[ignore = "全量 12230590578 个状态（一百二十多亿）、每个两遍恢复 + checker；门禁 54 号 --full 在 release 下跑，带断点续跑、可双机分片"]
++#[ignore = "全量 1358954634 个状态（十三亿多）、每个两遍恢复 + checker；门禁 54 号 --full 在 release 下跑，带断点续跑、可双机分片"]
+ fn full_enumeration_of_the_multi_record_publish_stream_is_exhaustive_and_clean() {
+     let prepared = prepare("parallel-line-one-layer0-full");
+     let closed_form_with_two_states_per_write = closed_form_state_count(&prepared.segments);
+     assert_eq!(
+         closed_form_with_two_states_per_write,
+-        1 + 6 * 3 + 5 + ((1 << 26) - 1) + ((1 << 30) - 1) + 15 + ((1 << 32) - 1) + 63,
+-        "每次写只取两态时的闭式：1 + Σ(2^|段| − 1)，十六段"
++        1 + 9 * 3 + 5 + ((1 << 24) - 1) + ((1 << 28) - 1) + 15 + ((1 << 30) - 1) + 63,
++        "每次写只取两态时的闭式：1 + Σ(2^|段| − 1)，十九段"
+     );
+-    assert_eq!(closed_form_with_two_states_per_write, 5_435_818_083);
+-    // 计数行的 closed_form 报枚举域的闭式（原地覆写三态）：六段各带两次系统配置槽写，每段 3^m · 2^(n−m) − 1。
++    assert_eq!(closed_form_with_two_states_per_write, 1_358_954_604);
++    // 计数行的 closed_form 报枚举域的闭式（原地覆写三态）：六个系统配置槽 2 写段各 3² − 1，每段 3^m · 2^(n−m) − 1。
+     let closed_form = layer0_state_count_with_torn_in_place_overwrites(
+         &prepared.base,
+         &prepared.writes,
+@@ -377,17 +380,17 @@ fn full_enumeration_of_the_multi_record_publish_stream_is_exhaustive_and_clean()
+     );
+     assert_eq!(
+         closed_form,
+-        1 + 3 * (3 * 3 - 1)
++        1 + 6 * (3 * 3 - 1)
+             + 3 * 3
+             + 5
+-            + (9 * (1 << 24) - 1)
+-            + (9 * (1 << 28) - 1)
++            + ((1 << 24) - 1)
++            + ((1 << 28) - 1)
+             + 15
+-            + (9 * (1 << 30) - 1)
++            + ((1 << 30) - 1)
+             + 63,
+-        "枚举域的闭式：三个只有系统配置槽写的 2 写段各 3² − 1、三个记录 2 写段各 3、五个 1 写段、A / B / C 的单元段各 3² · 2^(n−2) − 1、4 写段 15、6 写段 63"
++        "枚举域的闭式：六个只有系统配置槽写的 2 写段各 3² − 1、三个记录 2 写段各 3、五个 1 写段、A / B / C 的单元段各 2^n − 1、4 写段 15、6 写段 63"
+     );
+-    assert_eq!(closed_form, 12_230_590_578);
++    assert_eq!(closed_form, 1_358_954_634);
+     let tally = match enumerate_layer0_in_state_slices_or_one_shard(
+         &prepared.base,
+         &prepared.writes,
+diff --git a/crates/singlefs-checker-tier/tests/crash_injection_campaign.rs b/crates/singlefs-checker-tier/tests/crash_injection_campaign.rs
+index bf5a4bbb..ce885d61 100644
+--- a/crates/singlefs-checker-tier/tests/crash_injection_campaign.rs
++++ b/crates/singlefs-checker-tier/tests/crash_injection_campaign.rs
+@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
+ use std::io::Write as _;
+ 
+ use singlefs_checker::walk::InstanceTableOfRootRecord;
+-use singlefs_checker_tier::crash::{check_records, check_records_against};
++use singlefs_checker_tier::crash::check_records;
+ use singlefs_checker_tier::crash_injection::{
+     inject_crashes_into_history, run_crash_injection_campaign, CrashInjectionCampaign,
+     CrashInjectionReport, CrashInjectionWorkerThreads, CrashPoint, CrashPointDraw,
+@@ -26,11 +26,11 @@ use singlefs_harness::history::{
+     execute_history_with, generate_history, generate_history_with_weights, ContentChoice,
+     ContentLength, FloorTargetChoice, GeneratedHistory, GenerationWeights, HistoryDeviceWidth,
+     HistoryEnding, HistoryExecution, HistoryOperation, HistoryOperationKind, HistorySeed,
+-    HistoryStartingPoint, PerStepChecker, RollbackTargetChoice,
++    HistoryStartingPoint, PerStepChecker, RollbackTargetChoice, StepOutcome,
+ };
+ use singlefs_harness::memory_pool::{
+     root_identity_written_by, writes_and_segments, CrashImage, MemoryPool, RecordCheck,
+-    RecordStreamContinuity, RetainedWrite,
++    RetainedWrite,
+ };
+ use singlefs_harness::segments::StepKind;
+ use singlefs_harness::SharedStream;
+@@ -553,6 +553,15 @@ fn unit_write_is_still_on_disk(image: &CrashImage<'_>, write: &RetainedWrite) ->
+ /// （行 (1, 3) 且 4 > 3，D23（journal 的角色与格式） 已定项 14），(1, 4) 写出的单元不算「该在」，记录核对器不判红。
+ /// 判别力的两半：同一条流上把没被抛弃的发布的一个单元的两份都扣下，照判红——一次是 (1, 3)（行 (1, 3) 的边上，T = Ti 不算被抛弃），
+ /// 一次是最后那次覆盖写。
++///
++/// **C554 乙之后「崩溃恢复抛弃根」这一步造不出被抛弃的根**（合入后验证一，主 agent 2026-09-27 定改钉「这一形不可达」）：(1, 4) 是这个会话发的，
++/// 系统配置见证过它；这一步让它的根槽与单元读回全 0 之后，可写挂载读阶段判据 N-配置 为真、重读一次仍为真，按 C554 乙拒
++/// （`MountError::NewerStateStillUnreadableAfterOneReread`，`history.rs` 的 `apply_crash_recovery_abandoning_the_newest_root` 文档写着），
++/// 不开新实例、不写抛弃行，后面三次覆盖写没有可写会话、都不适用。第一轮快照（`refs/sop/m2-closeout-code-r1-snapshot`，C554 乙合入之前）上这一条绿，
++/// 今天的底座上把 C577 那道屏障去掉它照样造不出（探针量过，合入后验证一报告）：不可达是 C554 乙定的，不是 C577。
++/// 这一条保留原来的构造（同一串步），改钉今天的样子：整条流都落了盘的那个状态上恢复落到 (1, 4)（实例 1），流里没有实例 2 的发布，
++/// 记录核对器不判红；判别力那两次扣单元照旧，扣的是 (1, 3) 与流里最后一次发布 (1, 4)。把 C554 乙那一判关掉，挂载照旧做成、落到实例 2，
++/// 红在「落到实例 1」那一条（`crates/mutations.tsv`）。
+ #[test]
+ fn units_of_a_publish_the_landed_version_abandons_are_not_required_while_a_kept_publish_missing_a_unit_is_still_red(
+ ) {
+@@ -599,27 +608,19 @@ fn units_of_a_publish_the_landed_version_abandons_are_not_required_while_a_kept_
+         persisted: vec![true; writes.len()],
+     };
+     let report = recover(&every_write_landed, JournalPolicy::Consult);
+-    let (landed_instance, landed_txg) = report.effective_root.expect("恢复落到了一版");
+     assert_eq!(
+-        landed_instance,
+-        InstanceGeneration(2),
+-        "落到实例 2 的最新那一版"
++        report.effective_root,
++        Some((InstanceGeneration(1), CheckpointTxg(4))),
++        "C554 乙之后崩溃恢复抛弃根那一步的可写挂载被拒：落到实例 1 的 (1, 4)，没有实例 2（C554 乙之前落到实例 2、比 (1, 4) 新的一版）"
+     );
+     assert!(
+-        landed_txg > CheckpointTxg(4),
+-        "落到的那一版比被抛弃的 (1, 4) 新"
+-    );
+-    let abandoned_units = units_of((1, 4));
+-    assert!(
+-        abandoned_units
+-            .iter()
+-            .any(|unit| !unit_write_is_still_on_disk(&every_write_landed, &writes[*unit])),
+-        "(1, 4) 写出的单元有被后来的发布复用盖掉的（这一条要罩的就是这一形）"
++        publishes.iter().all(|((instance, _), _)| *instance <= 1),
++        "流里只有 mkfs（实例 0）与实例 1 的发布、没有实例 2 的：{publishes:?}"
+     );
+     assert_eq!(
+         check_records(&every_write_landed, report.effective_root),
+         RecordCheck::default(),
+-        "被抛弃的 (1, 4) 的单元不算「该在」，记录核对器一条都不判红"
++        "整条流都落了盘：记录核对器一条都不判红"
+     );
+ 
+     let last_overwrite = publishes.last().expect("流里至少一次发布").0;
+@@ -686,82 +687,42 @@ fn history_with_a_crash_state_landing_on_a_version_rebuilt_from_records() -> Gen
+     )
+ }
+ 
+-/// 一个恢复落到由 journal 记录重建的一版上的崩溃状态（调查报告第 1 条那一形），按崩溃注入重建镜像的那种摆法拆开：
+-/// 整条历史录制流的写表、崩溃点所在的段与段内持久了哪几个写、落到的那一版与它在整条流里的根槽写（在这一段之后）、
+-/// 被那一版的实例表抛弃而单元已被后来的发布复用盖掉的那次发布。
+-struct CrashStateLandingOnAVersionRebuiltFromRecords {
+-    writes: Vec<RetainedWrite>,
+-    device_bytes: u64,
+-    first_write_of_the_segment: usize,
+-    persisted_within_the_segment: Vec<bool>,
+-    landed_version: (InstanceGeneration, CheckpointTxg),
+-    root_write_of_the_landed_version: usize,
+-    abandoned_publish_with_a_unit_overwritten: (u32, u64),
+-}
+-
+-impl CrashStateLandingOnAVersionRebuiltFromRecords {
+-    fn end_of_the_segment(&self) -> usize {
+-        self.first_write_of_the_segment + self.persisted_within_the_segment.len()
+-    }
+-
+-    /// 崩溃注入交给记录核对器的那一种持久集合，另扣下 `withheld_earlier_writes`（[`persisted_over_the_whole_stream`]）。
+-    fn persisted_over_the_whole_stream(&self, withheld_earlier_writes: &[usize]) -> Vec<bool> {
+-        persisted_over_the_whole_stream(
+-            self.writes.len(),
+-            self.first_write_of_the_segment,
+-            &self.persisted_within_the_segment,
+-            withheld_earlier_writes,
+-        )
+-    }
+-
+-    fn base_pool(&self, persisted: &[bool]) -> MemoryPool {
+-        pool_of_the_persisted_writes_before_the_segment(
+-            &self.writes[..self.first_write_of_the_segment],
+-            persisted,
+-            self.device_bytes,
+-        )
+-    }
+-
+-    /// 基线加上崩溃点所在段里持久了的写（崩溃注入重建镜像的同一种摆法）。
+-    fn crash_image<'base>(&'base self, base: &'base MemoryPool) -> CrashImage<'base> {
+-        CrashImage {
+-            base,
+-            writes: &self.writes[self.first_write_of_the_segment..self.end_of_the_segment()],
+-            persisted: self.persisted_within_the_segment.clone(),
+-        }
+-    }
++/// C554 乙之后崩溃恢复抛弃根那一步的结局：可写挂载读阶段判据 N-配置 为真、重读一次仍为真，拒可写（`history.rs` 的
++/// `apply_crash_recovery_abandoning_the_newest_root`）。
++const CRASH_RECOVERY_REFUSED_BY_THE_WITNESS: &str =
++    "MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)";
+ 
+-    /// 落到的那一版的实例表，从 `image` 上按它在整条流里那次根槽写带的指针读。
+-    fn instance_table_of_the_landed_version(
+-        &self,
+-        image: &CrashImage<'_>,
+-    ) -> Option<InstanceTableOfRootRecord> {
+-        InstanceTableOfRootRecord::read(
+-            image,
+-            self.writes[self.root_write_of_the_landed_version]
+-                .bytes()
+-                .expect("根槽写带着字节"),
+-        )
+-    }
++/// `history` 在崩溃注入那一种执行下，每一步「崩溃恢复抛弃根」的结局，按次序。
++fn outcomes_of_the_crash_recovery_steps(history: &GeneratedHistory) -> Vec<StepOutcome> {
++    let run = execute_history_with(
++        history,
++        UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
++        &SharedStream::new(),
++        &mut |_| {},
++    );
++    history
++        .operations
++        .iter()
++        .zip(run.outcomes)
++        .filter(|(operation, _)| {
++            matches!(
++                operation,
++                HistoryOperation::CrashRecoveryAbandoningTheNewestRoot
++            )
++        })
++        .map(|(_, outcome)| outcome)
++        .collect()
+ }
+ 
+-/// 与整条流（`write_count` 个写）逐条对应的持久集合：崩溃点所在段之前整段持久（`withheld_earlier_writes` 里的除外）、
++/// 与整条流（`write_count` 个写）逐条对应的持久集合：崩溃点所在段之前整段持久、
+ /// 这一段按崩溃点的子集、之后的一个都没持久——崩溃注入交给记录核对器的那一种。
+ fn persisted_over_the_whole_stream(
+     write_count: usize,
+     first_write_of_the_segment: usize,
+     persisted_within_the_segment: &[bool],
+-    withheld_earlier_writes: &[usize],
+ ) -> Vec<bool> {
+     let mut persisted = vec![false; write_count];
+     persisted[..first_write_of_the_segment].fill(true);
+-    for withheld in withheld_earlier_writes {
+-        assert!(
+-            *withheld < first_write_of_the_segment,
+-            "另扣下的只能是崩溃点所在段之前的写（写表下标 {withheld}）"
+-        );
+-        persisted[*withheld] = false;
+-    }
+     persisted[first_write_of_the_segment
+         ..first_write_of_the_segment + persisted_within_the_segment.len()]
+         .copy_from_slice(persisted_within_the_segment);
+@@ -786,13 +747,11 @@ fn pool_of_the_persisted_writes_before_the_segment(
+ /// 在 `history` 的整条录制流上，按 `crash_points`（这段历史上崩溃注入摆出来的那几个）逐个重建崩溃镜像、跑恢复，
+ /// 挑出第一个这样的崩溃状态：恢复施加过 journal 记录、落到的那一版的根槽写不在到这一段为止的前缀里（在更晚的段），
+ /// 那一版的实例表读得出、抛弃了更早的一次发布，而那次发布写在某个偏移上的单元每一份都已不在盘上（被后来的发布复用盖掉）。
+-///
+-/// # Panics
+-/// 一个这样的崩溃状态都没有：种子基、切段或这段历史怎么跑变了，这一形不在这几个崩溃状态里，靠它的用例要换一段摆得出它的历史。
++/// 交回落到的那一版与被它的实例表抛弃的那次发布；一个这样的崩溃状态都没有时 `None`（C554 乙之后这一形不可达，见用到它的两条用例）。
+ fn crash_state_landing_on_a_version_rebuilt_from_records(
+     history: &GeneratedHistory,
+     crash_points: &[CrashPoint],
+-) -> CrashStateLandingOnAVersionRebuiltFromRecords {
++) -> Option<((InstanceGeneration, CheckpointTxg), (u32, u64))> {
+     let execution = UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES;
+     let stream = SharedStream::retaining_contents();
+     execute_history_with(history, execution, &stream, &mut |_| {});
+@@ -802,7 +761,7 @@ fn crash_state_landing_on_a_version_rebuilt_from_records(
+     );
+     let publishes = unit_writes_of_each_publish(&writes);
+     let device_bytes = execution.device_width.device_bytes();
+-    let found = crash_points.iter().find_map(|crash_point| {
++    crash_points.iter().find_map(|crash_point| {
+         let segment = &segments[crash_point.segment_index];
+         assert_eq!(
+             segment.len(),
+@@ -816,7 +775,6 @@ fn crash_state_landing_on_a_version_rebuilt_from_records(
+             writes.len(),
+             first_write_of_the_segment,
+             &crash_point.persisted_within_the_segment,
+-            &[],
+         );
+         let base = pool_of_the_persisted_writes_before_the_segment(
+             &writes[..first_write_of_the_segment],
+@@ -866,43 +824,21 @@ fn crash_state_landing_on_a_version_rebuilt_from_records(
+                                 .all(|copy| !unit_write_is_still_on_disk(&image, &writes[*copy]))
+                         })
+                 })?;
+-        Some((
+-            first_write_of_the_segment,
+-            crash_point.persisted_within_the_segment.clone(),
+-            landed_version,
+-            root_write_of_the_landed_version,
+-            *abandoned_publish_with_a_unit_overwritten,
+-        ))
+-    });
+-    let (
+-        first_write_of_the_segment,
+-        persisted_within_the_segment,
+-        landed_version,
+-        root_write_of_the_landed_version,
+-        abandoned_publish_with_a_unit_overwritten,
+-    ) = found.unwrap_or_else(|| {
+-        panic!(
+-            "种子 {:?} 的崩溃状态 {crash_points:#?} 里没有「恢复落到由记录重建的一版、它的根槽写在更晚的段、它的实例表抛弃的发布有单元已被复用盖掉」那一形：\
+-             种子基、切段或这段历史怎么跑变了，要换一段摆得出这一形的历史",
+-            history.seed
+-        )
+-    });
+-    CrashStateLandingOnAVersionRebuiltFromRecords {
+-        writes,
+-        device_bytes,
+-        first_write_of_the_segment,
+-        persisted_within_the_segment,
+-        landed_version,
+-        root_write_of_the_landed_version,
+-        abandoned_publish_with_a_unit_overwritten,
+-    }
++        Some((landed_version, *abandoned_publish_with_a_unit_overwritten))
++    })
+ }
+ 
+-/// 调查报告 `research/prompts/m2-investigate-crash-injection-reds-report.md` 第 1 条（装置错）：种子基 + 2 那段历史上摆出来的一个崩溃状态，
++/// 调查报告 `research/prompts/m2-investigate-crash-injection-reds-report.md` 第 1 条（装置错）那一形：种子基 + 2 那段历史上摆出来的一个崩溃状态，
+ /// 扣下一份 journal 记录、留下另一份，恢复施加记录落到由记录重建的那一版，那一版的根槽写在更晚的段里（D23（journal 的角色与格式） 已定项 15）；
+-/// 那一版的实例表抛弃了更早的一次发布，那次发布的单元已被后来的发布复用盖掉。记录核对器按落到的那一版的实例表豁免它（实八），
+-/// 前提是交给它的写表里找得到那一版的根槽写：崩溃注入交整条流（与层 0 同一种交法），这段历史上的崩溃状态一条「恢复自称新态而单元缺席」都不判。
+-/// 只交到崩溃点所在段为止的前缀时，那一版的实例表读不出、豁免整条落空，这一条判红。
++/// 那一版的实例表抛弃了更早的一次发布，那次发布的单元已被后来的发布复用盖掉。那时记录核对器按落到的那一版的实例表豁免它（实八），
++/// 前提是交给它的写表里找得到那一版的根槽写（崩溃注入交整条流）。
++///
++/// **C554 乙之后这一形不可达**（合入后验证一，主 agent 2026-09-27 定改钉「这一形不可达」）：实例表抛弃一次发布要崩溃恢复抛弃根
++/// （`CrashRecoveryAbandoningTheNewestRoot`），而那条根是这个会话发的、系统配置见证过它，下一次可写挂载读不出它时按 C554 乙拒
++/// （`MountError::NewerStateStillUnreadableAfterOneReread`），没有新实例、没有抛弃行。第一轮快照（C554 乙合入之前）上这一条绿；
++/// 今天的底座上把 C577 那道屏障去掉照样摆不出来，不可达是 C554 乙定的。
++/// 这一条保留原来的构造（同一段历史、同一批崩溃状态），改钉：这批崩溃状态里一个这样的都没有，记录核对器一条都不判。
++/// 把 C554 乙那一判关掉，这一形回来，第一条断言红（`crates/mutations.tsv`）。
+ #[test]
+ fn crash_state_landing_on_a_version_rebuilt_from_records_exempts_the_publishes_its_instance_table_abandons(
+ ) {
+@@ -913,17 +849,24 @@ fn crash_state_landing_on_a_version_rebuilt_from_records_exempts_the_publishes_i
+         FAST_TIER_DRAW,
+         None,
+     );
+-    let state =
+-        crash_state_landing_on_a_version_rebuilt_from_records(&history, &injection.crash_points);
+     print_uncaptured(&format!(
+-        "── 崩溃注入：恢复落到由记录重建的 {:?}（根槽写在写表第 {} 项，崩溃点所在段 [{}, {})），它的实例表抛弃 {:?} ──\n{}",
+-        state.landed_version,
+-        state.root_write_of_the_landed_version,
+-        state.first_write_of_the_segment,
+-        state.end_of_the_segment(),
+-        state.abandoned_publish_with_a_unit_overwritten,
++        "── 崩溃注入：种子基 + 2 那段历史，C554 乙之后找「恢复落到由记录重建的一版、它的实例表抛弃了单元被复用的发布」那一形 ──\n{}",
+         injection.tally.render()
+     ));
++    let crash_recovery_outcomes = outcomes_of_the_crash_recovery_steps(&history);
++    assert!(
++        !crash_recovery_outcomes.is_empty()
++            && crash_recovery_outcomes.iter().all(|outcome| *outcome
++                == StepOutcome::Refused {
++                    member: CRASH_RECOVERY_REFUSED_BY_THE_WITNESS.to_string()
++                }),
++        "这段历史里的崩溃恢复抛弃根每一步都被 C554 乙拒、一个被抛弃的根都没造出来：{crash_recovery_outcomes:?}"
++    );
++    assert_eq!(
++        crash_state_landing_on_a_version_rebuilt_from_records(&history, &injection.crash_points),
++        None,
++        "C554 乙之后崩溃恢复抛弃根那一步被拒、造不出被抛弃的根：这批崩溃状态里不该有落到由记录重建、实例表抛弃了单元被复用的发布的那一版"
++    );
+     assert_eq!(
+         injection.tally.record_checks,
+         u64::try_from(injection.crash_points.len()).expect("崩溃状态数装得进 u64"),
+@@ -931,8 +874,7 @@ fn crash_state_landing_on_a_version_rebuilt_from_records_exempts_the_publishes_i
+     );
+     assert_eq!(
+         injection.tally.record_claimed_state_missing_unit, 0,
+-        "被落到的那一版的实例表抛弃的 {:?} 的单元不算「该在」：记录核对器要在交给它的写表里找得到那一版的根槽写（写表第 {} 项）",
+-        state.abandoned_publish_with_a_unit_overwritten, state.root_write_of_the_landed_version
++        "这段历史上的崩溃状态一条「恢复自称新态而单元缺席」都不判"
+     );
+     assert_eq!(
+         injection.tally.record_root_without_record, 0,
+@@ -940,10 +882,11 @@ fn crash_state_landing_on_a_version_rebuilt_from_records_exempts_the_publishes_i
+     );
+ }
+ 
+-/// 判别力（调查报告第 1 条「推翻条件与造它的那一次」第 2 次）：同一个崩溃状态、同样交整条流，先不另扣——一条不判（对照）；
+-/// 再把落到的那一版在它实例里的前一版（没被抛弃）写在某个偏移上的单元两份都扣下，照判红：整条流让那一版的实例表读得出、豁免生效之后，
+-/// 没被抛弃的发布缺单元照样判。只算干净的扣法——扣下之后恢复仍落到同一版、那一版的实例表仍读得出且仍抛弃单元被复用的那次发布
+-/// （扣下实例表那一片会把豁免又关掉，那样判红说明不了判别力）；干净的扣法至少一个，每个都判红。
++/// 判别力那一半（调查报告第 1 条「推翻条件与造它的那一次」第 2 次）原来在上一条那一形上做：落到的那一版在它实例里的前一版（没被抛弃）
++/// 写在某个偏移上的单元两份都扣下，照判红。**C554 乙之后那一形不可达**（见上一条），这一条改钉：用快档的崩溃状态与同一段历史，
++/// 一个那样的崩溃状态都摆不出来。「没被抛弃的发布缺单元照样判红」那一半由
++/// [`units_of_a_publish_the_landed_version_abandons_are_not_required_while_a_kept_publish_missing_a_unit_is_still_red`] 的扣单元那两次守着。
++/// 把 C554 乙那一判关掉，这一形回来，这一条红（`crates/mutations.tsv`）。
+ #[test]
+ fn on_the_whole_stream_a_kept_publish_missing_a_unit_under_a_version_rebuilt_from_records_is_still_red(
+ ) {
+@@ -954,91 +897,19 @@ fn on_the_whole_stream_a_kept_publish_missing_a_unit_under_a_version_rebuilt_fro
+         FAST_TIER_DRAW,
+         None,
+     );
+-    let state =
+-        crash_state_landing_on_a_version_rebuilt_from_records(&history, &injection.crash_points);
+-    let (landed_instance, landed_txg) = state.landed_version;
+-    let (abandoned_instance, abandoned_txg) = state.abandoned_publish_with_a_unit_overwritten;
+-
+-    let nothing_else_withheld = state.persisted_over_the_whole_stream(&[]);
+-    let base = state.base_pool(&nothing_else_withheld);
+-    let image = state.crash_image(&base);
+-    assert_eq!(
+-        check_records_against(
+-            &image,
+-            &image,
+-            &state.writes,
+-            &nothing_else_withheld,
+-            RecordStreamContinuity::OneRecording,
+-            Some(state.landed_version)
+-        ),
+-        RecordCheck::default(),
+-        "对照：整条流、不另扣，被抛弃的 {:?} 豁免，一条不判",
+-        state.abandoned_publish_with_a_unit_overwritten
+-    );
+-
+-    let publishes = unit_writes_of_each_publish(&state.writes);
+-    let (kept_publish, kept_units) = publishes
+-        .iter()
+-        .rev()
+-        .find(|((instance, checkpoint_txg), units)| {
+-            *instance == landed_instance.0
+-                && *checkpoint_txg < landed_txg.0
+-                && !units.is_empty()
+-                && units
+-                    .iter()
+-                    .all(|unit| *unit < state.first_write_of_the_segment)
+-        })
+-        .unwrap_or_else(|| {
+-            panic!(
+-                "落到的那一版 {:?} 在它实例里有前一版，写过单元",
+-                state.landed_version
+-            )
+-        });
+-    let mut copies_by_offset: BTreeMap<u64, Vec<usize>> = BTreeMap::new();
+-    for unit in kept_units {
+-        copies_by_offset
+-            .entry(state.writes[*unit].offset.0)
+-            .or_default()
+-            .push(*unit);
+-    }
+-    let mut clean_withholdings = 0usize;
+-    for (offset, copies) in &copies_by_offset {
+-        let persisted = state.persisted_over_the_whole_stream(copies);
+-        let base_with_the_unit_withheld = state.base_pool(&persisted);
+-        let image_with_the_unit_withheld = state.crash_image(&base_with_the_unit_withheld);
+-        let recovery = recover(&image_with_the_unit_withheld, JournalPolicy::Consult);
+-        let still_abandons_the_overwritten_publish = state
+-            .instance_table_of_the_landed_version(&image_with_the_unit_withheld)
+-            .is_some_and(|table| table.abandons(abandoned_instance, abandoned_txg));
+-        if recovery.effective_root != Some(state.landed_version)
+-            || !still_abandons_the_overwritten_publish
+-        {
+-            continue;
+-        }
+-        clean_withholdings += 1;
+-        assert!(
+-            check_records_against(
+-                &image_with_the_unit_withheld,
+-                &image_with_the_unit_withheld,
+-                &state.writes,
+-                &persisted,
+-                RecordStreamContinuity::OneRecording,
+-                recovery.effective_root
+-            )
+-            .claimed_state_missing_unit,
+-            "{kept_publish:?} 没被落到的那一版 {:?} 抛弃，它写在偏移 {offset} 上的单元两份（写表第 {copies:?} 项）都扣下，照判红",
+-            state.landed_version
+-        );
+-    }
+-    print_uncaptured(&format!(
+-        "── 崩溃注入：落到 {:?}，扣下 {kept_publish:?} 的单元：{} 个偏移里干净的扣法 {clean_withholdings} 个，都判红 ──\n",
+-        state.landed_version,
+-        copies_by_offset.len()
+-    ));
++    let crash_recovery_outcomes = outcomes_of_the_crash_recovery_steps(&history);
+     assert!(
+-        clean_withholdings >= 1,
+-        "{kept_publish:?} 写出的 {} 个偏移里一个干净的扣法都没有（扣哪一个恢复都换了一版，或那一版的实例表读不出）：判别力这一半没验到",
+-        copies_by_offset.len()
++        !crash_recovery_outcomes.is_empty()
++            && crash_recovery_outcomes.iter().all(|outcome| *outcome
++                == StepOutcome::Refused {
++                    member: CRASH_RECOVERY_REFUSED_BY_THE_WITNESS.to_string()
++                }),
++        "这段历史里的崩溃恢复抛弃根每一步都被 C554 乙拒、一个被抛弃的根都没造出来：{crash_recovery_outcomes:?}"
++    );
++    assert_eq!(
++        crash_state_landing_on_a_version_rebuilt_from_records(&history, &injection.crash_points),
++        None,
++        "C554 乙之后这一形不可达：判别力那一半没有可做的崩溃状态"
+     );
+ }
+ 
+diff --git a/crates/singlefs-checker-tier/tests/record_checker_judges_absence_by_the_persisted_set.rs b/crates/singlefs-checker-tier/tests/record_checker_judges_absence_by_the_persisted_set.rs
+index f268442d..83abbf21 100644
+--- a/crates/singlefs-checker-tier/tests/record_checker_judges_absence_by_the_persisted_set.rs
++++ b/crates/singlefs-checker-tier/tests/record_checker_judges_absence_by_the_persisted_set.rs
+@@ -5,8 +5,9 @@
+ //! C561 那一行要的四格各一条用例，前三格都在同一条可达历史 `UOOUOMSU` 上（A、B 之后：卸载重挂、覆盖写两次、卸载重挂、覆盖写、
+ //! 进程重开重挂、写一个十几字节的小文件、卸载重挂；层 0 规模第二、三轮攻方的历史，字母的意思照他们的探针）：
+ //! - B（txg 4）在相邻两槽写两个 16K 节点 u、u2；txg 17 的 32K 数据单元 l 复用这两槽；txg 25 在同样两槽写两个 16K 节点 y、x，
+-//!   y、x 与 σ 那一段的其余 14 个单元写、两个系统配置槽写同段（σ：2 个原地写 + 16 个单元写）；
+-//! - 假红状态 X：σ 之前整段持久、σ 的原地写全落、σ 的单元写只落 y（两盘）——u2 那一槽上是 l 的零尾，l 落了、合法复用，
++//!   y、x 与 σ 那一段的其余 14 个单元写同段（σ：16 个单元写；C577（发布返回之前、系统配置轮换之后一道屏障）之前上一次发布的
++//!   两个系统配置槽轮换也在这一段，2 个原地写 + 16 个单元写，C577 之后它们过了那道屏障、在 σ 前一段）；
++//! - 假红状态 X：σ 之前整段持久（上一次发布的轮换在内）、σ 的单元写只落 y（两盘）——u2 那一槽上是 l 的零尾，l 落了、合法复用，
+ //!   按整份判的那一版判 u2 缺席（假红），按扇区、拿持久集合判不缺席；
+ //! - 状态 Y（C507（记录核对器的复用豁免比登记的候选宽，把真洞变哑） 那一格的错位形）：X 再把 u2 与 l 摘成没落盘——u2 那一槽上是从没写过的零，
+ //!   与 X 崩溃镜像逐字节相同，只有持久集合分得开：u2 真的缺席；
+@@ -15,7 +16,7 @@
+ //! - C513（复用豁免不判那次复用合不合法） 那三个状态（复用窗口置 0、txg 5 的数据单元落回 txg 4 的那一对槽）：解释那一槽的后写落了、
+ //!   但过不了回收谓词，照判缺席。
+ //!
+-//! σ 那一段全部 2^18 个状态的记录核对器判定另有一条标了 ignore 的全量（崩溃枚举，提交时由崩溃验证员跑）。
++//! σ 那一段全部 2^16 个状态（C577 之前 2^18）的记录核对器判定另有一条标了 ignore 的全量（崩溃枚举，提交时由崩溃验证员跑）。
+ 
+ #[path = "../../singlefs-harness/tests/common/mod.rs"]
+ mod common;
+@@ -324,8 +325,8 @@ fn misaligned_reuse_chain(recorded: &RecordedHistory) -> MisalignedReuseChain {
+                 .filter(|write_index| writes[**write_index].kind == StepKind::UnitWrite)
+                 .count()
+         ),
+-        (18, 16),
+-        "σ：2 个原地写（上一次发布的系统配置槽轮换）+ 16 个单元写"
++        (16, 16),
++        "σ：16 个单元写（C577 之后上一次发布的系统配置槽轮换过了发布末尾那道屏障、在 σ 前一段；改之前 2 个原地写 + 16 个单元写）"
+     );
+     MisalignedReuseChain {
+         sigma,
+@@ -337,7 +338,7 @@ fn misaligned_reuse_chain(recorded: &RecordedHistory) -> MisalignedReuseChain {
+     }
+ }
+ 
+-/// σ 之前整段持久、σ 的原地写全落、σ 的单元写一个都不落。
++/// σ 之前整段持久、σ 的原地写全落（C577 之后 σ 里没有原地写）、σ 的单元写一个都不落。
+ fn persisted_before_the_units_of_sigma(recorded: &RecordedHistory, sigma: usize) -> Vec<bool> {
+     let mut persisted = vec![false; recorded.writes.len()];
+     for segment in &recorded.segments[..sigma] {
+@@ -498,7 +499,8 @@ fn a_node_whose_every_later_write_to_the_same_offset_never_landed_is_missing() {
+     assert!(check.claimed_state_missing_unit, "u 与 l 都缺席");
+ }
+ 
+-/// σ 的两个原地写取任意子集 × y、x 两盘四份写取任意子集，σ 其余 12 个单元写不落：64 个状态，记录核对器一个都不判缺席。
++/// σ 的原地写取任意子集 × y、x 两盘四份写取任意子集，σ 其余 12 个单元写不落：C577 之后 σ 里没有原地写（上一次发布的轮换在 σ 前一段、
++/// 整段持久），16 个状态（改之前两个原地写、2^2 × 2^4 = 64 个），记录核对器一个都不判缺席。
+ /// 按整份判的那一版在 y、x 只落一部分的状态上判 u 或 u2 缺席（C561 的假红那一类）。
+ #[test]
+ fn partial_landing_of_the_two_later_nodes_never_reports_a_unit_missing() {
+@@ -534,7 +536,11 @@ fn partial_landing_of_the_two_later_nodes_never_reports_a_unit_missing() {
+             }
+         }
+     }
+-    assert_eq!(states, 64, "2^2 × 2^4");
++    assert_eq!(
++        (in_place_writes_of_sigma.len(), states),
++        (0, 16),
++        "2^0 × 2^4：C577 之后 σ 只有单元写"
++    );
+     assert_eq!(
+         reported_missing,
+         Vec::<(u32, u32)>::new(),
+@@ -703,12 +709,13 @@ fn persisted_before_sigma(recorded: &RecordedHistory, sigma: usize) -> Vec<bool>
+     before_sigma
+ }
+ 
+-/// σ 那一段全部 2^18 个状态（σ 之前整段持久）：记录核对器一个都不判缺席。层 0 规模第二轮攻方在冻结副本上量过按整份判的那一版在这里红 32768 个
+-/// （`research/prompts/m2-layer0-scale-r2-opus-output.md` 第一节，核查员复跑逐字一致）。每个状态一遍看 journal 的恢复加记录核对器，
++/// σ 那一段全部 2^16 个状态（σ 之前整段持久；C577 之前 σ 带上一次的轮换、2^18 个）：记录核对器一个都不判缺席。层 0 规模第二轮攻方
++/// 在冻结副本上量过按整份判的那一版在这里红 32768 个（那时 σ 18 个写；`research/prompts/m2-layer0-scale-r2-opus-output.md` 第一节，
++/// 核查员复跑逐字一致）。每个状态一遍看 journal 的恢复加记录核对器，
+ /// 按掩码区间切片多线程跑（线程数与层 0 同一个来源）；打计数行 `C561_SIGMA_FULL`（状态数等于闭式时带 `exhaustive=true`）
+ /// 与一行 `LAYER0_PARALLEL_FINISHED` 同形的线程行，门禁 54 号按这两行判穷尽没有、线程用没用上。
+ #[test]
+-#[ignore = "崩溃枚举（262144 个状态、每个一遍恢复）：提交时由崩溃验证员按输入哈希跑（release），平时不跑"]
++#[ignore = "崩溃枚举（65536 个状态、每个一遍恢复）：提交时由崩溃验证员按输入哈希跑（release），平时不跑"]
+ fn every_crash_state_of_sigma_leaves_every_unit_of_the_claimed_publishes_present() {
+     let recorded = record_history("c561-sigma-full", &HISTORY_UOOUOMSU);
+     let chain = misaligned_reuse_chain(&recorded);
+@@ -721,7 +728,10 @@ fn every_crash_state_of_sigma_leaves_every_unit_of_the_claimed_publishes_present
+     );
+     println!("{}", parallel_finished_line(&enumerated));
+     println!("{}", count_line("C561_SIGMA_FULL", &enumerated));
+-    assert_eq!(enumerated.states, 262_144, "σ 有 18 个写");
++    assert_eq!(
++        enumerated.states, 65_536,
++        "σ 有 16 个写（C577 之前 18 个、262144）"
++    );
+     assert_eq!(
+         enumerated.states, enumerated.closed_form_states,
+         "σ 的每一个子集都评过"
+diff --git a/crates/singlefs-checker/src/image.rs b/crates/singlefs-checker/src/image.rs
+index 9bbc9460..d224ace3 100644
+--- a/crates/singlefs-checker/src/image.rs
++++ b/crates/singlefs-checker/src/image.rs
+@@ -4,9 +4,10 @@
+ use std::collections::BTreeMap;
+ 
+ use singlefs_format::{
+-    FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_SAFETY_FACTOR,
+-    ROOT_RECORD_BYTES, ROOT_RING_SLOTS_PER_REGION_MAXIMUM, ROOT_RING_SLOTS_PER_REGION_MINIMUM,
+-    SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
++    CLUSTER_SEGMENT_SLOTS, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES, JOURNAL_RECORD_BYTES,
++    JOURNAL_RING_START_SLOT, JOURNAL_SAFETY_FACTOR, ROOT_RECORD_BYTES, ROOT_RING_BASE_SLOT,
++    ROOT_RING_SLOTS_PER_REGION_MAXIMUM, ROOT_RING_SLOTS_PER_REGION_MINIMUM, SLOT_BYTES,
++    SYSTEM_CONFIGURATION_SLOT_BYTES,
+ };
+ 
+ use crate::{
+@@ -41,10 +42,20 @@ pub const MAPPING_KEY_MATCHES_THE_UNIT_HEADER: &str = "I-1.11";
+ /// 「自证过的系统配置槽里，池级字段都在这一版读者收的范围里」那一条（实审 A3-checker-2，用户 2026-09-27 定系统配置越界整池拒）：
+ /// 格式版本 = 1、加密类型 = 0（关）、固定结构槽距、`physical_block_size`、journal 环长在各自的上下界里（[`crate::Verdict`] 的
+ /// `FormatVersionNotRecognized` / `EncryptionTypeNotOff` / `FixedStructureSlotSpacingOutsideTheFormatRange` /
+-/// `PhysicalBlockSizeOutsideTheRootSlotBounds` / `JournalRingBytesOutsideTheSupportedRange`）。`invariants.md` 今天没有一条罩得住它，
+-/// **编号是暂立的，待 kb 第六批登记时定**；改号只改这一处。
++/// `PhysicalBlockSizeOutsideTheRootSlotBounds` / `JournalRingBytesOutsideTheSupportedRange`）；journal 环起点（偏移 325）与根环起点
++/// （偏移 371）是第一版的格式常量、单元区起始槽号（偏移 417）是环长现算的那个槽且落在聚簇段边界上
++/// （`JournalRingStartSlotNotTheFirstVersionConstant` / `RootRingBaseSlotNotTheFirstVersionConstant` /
++/// `UnitAreaStartNotTheSlotAfterTheJournalRing` / `UnitAreaStartOffTheClusterSegmentBoundary`；实审 Y4-a，用户 2026-09-27 定
++/// 「读字段，不等于常量就整池拒」，与实现收同一张表）。**编号是暂立的，待 kb 第六批登记时定**；改号只改这一处。
+ pub const SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS: &str = "I-7.13";
+ 
++/// 「每块盘每个自证过的系统配置槽里的本盘设备号，等于这块盘在池里的身份」那一条（实审 Y2-b 越格线索：盘体对调之后的池
++/// 可写挂载因本盘设备号拒，而 checker 读本盘设备号却没有一条不变量拿它比盘的身份，0 违例）。实现那一侧是
++/// `crates/singlefs-core/src/mount.rs` 的 `device_table_disagreeing_with`（`OwnDeviceNumberDiffersFromTheIdentityHandedIn`），
++/// checker 自己按字段表读一份（[`judge_own_device_number_is_the_device_identity`]）。`invariants.md` 今天没有这一行，
++/// **编号是暂立的，照 I-7.13、I-9.16 的先例待 kb 下一批登记时定**；改号只改这一处。
++pub const SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY: &str = "I-7.14";
++
+ /// 第一版 checker 判的不变量，按这个次序报；每次都全部报出来，没评估到的报「不适用」。
+ ///
+ /// I-2.4（头校验和覆盖范围） 的射程从「单元头 29 字节预留位」扩到「单元头与指针头部的加密预留位，加密关着时恒 0」
+@@ -54,7 +65,7 @@ pub const SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS: &str = "I
+ ///
+ /// I-9.16（树表条目按树 ID 严格升序且合发号次序）：实审 A3b Q2 交上来，用户 2026-09-27 定「立不变量并同步」；
+ /// `invariants.md` 那一行由 kb 第八批写。池级走读每读一版的树表判一次（`walk` 的 `judge_tree_table_entries_ordering`）。
+-pub const IMPLEMENTED_INVARIANTS: [&str; 48] = [
++pub const IMPLEMENTED_INVARIANTS: [&str; 49] = [
+     "I-1.1",
+     "I-1.2",
+     "I-1.3",
+@@ -88,6 +99,7 @@ pub const IMPLEMENTED_INVARIANTS: [&str; 48] = [
+     "I-7.9",
+     "I-7.12",
+     SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS,
++    SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
+     "I-8.6",
+     "I-8.7",
+     "I-8.8",
+@@ -222,6 +234,10 @@ pub const REGION_DEVICE_FIELDS_IN_THE_SYSTEM_CONFIGURATION: usize = 3;
+ /// `journal_ring_bytes_lie_in_the_supported_range`），越界各报一个成员。这三个成员与 R、S 那两个处置不同：池级读法把它们认成
+ /// 「带这一版读者不收的值」（[`value_refused_by_this_reader`]），报违例、整池不作保（用户 2026-09-27 定系统配置越界整池拒）；
+ /// R、S 越界照旧是这一槽不可择。槽距先判：它是根槽宽的上界。
++///
++/// journal 环起点（325）、根环起点（371）不等于第一版的格式常量，单元区起始槽号（417）不是环长现算的那个槽或不在聚簇段边界上，
++/// 同样各报一个成员、同样认成「带这一版读者不收的值」（实审 Y4-a，用户 2026-09-27 定「读字段，不等于常量就整池拒」）。
++/// 两个起点先于槽距判：槽距的上界按同一槽自述的根环起点算，起点不对时报起点、不报槽距。
+ pub fn geometry_of(
+     slot: &[u8],
+     view: &SystemConfigurationView,
+@@ -243,6 +259,12 @@ pub fn geometry_of(
+     let base_slot = read_u64(slot, 371);
+     let unit_area_start_slot = read_u64(slot, 417);
+     let slot_spacing = read_u32(slot, 429);
++    if journal_ring_start_slot != JOURNAL_RING_START_SLOT {
++        return Err(crate::Verdict::JournalRingStartSlotNotTheFirstVersionConstant);
++    }
++    if base_slot != ROOT_RING_BASE_SLOT {
++        return Err(crate::Verdict::RootRingBaseSlotNotTheFirstVersionConstant);
++    }
+     if !fixed_structure_slot_spacing_lies_in_the_format_range(slot_spacing, base_slot) {
+         return Err(crate::Verdict::FixedStructureSlotSpacingOutsideTheFormatRange);
+     }
+@@ -256,6 +278,16 @@ pub fn geometry_of(
+     ) {
+         return Err(crate::Verdict::JournalRingBytesOutsideTheSupportedRange);
+     }
++    if !unit_area_start_slot_is_the_slot_after_the_journal_ring(
++        journal_ring_start_slot,
++        journal_ring_bytes,
++        unit_area_start_slot,
++    ) {
++        return Err(crate::Verdict::UnitAreaStartNotTheSlotAfterTheJournalRing);
++    }
++    if !unit_area_start_slot.is_multiple_of(CLUSTER_SEGMENT_SLOTS) {
++        return Err(crate::Verdict::UnitAreaStartOffTheClusterSegmentBoundary);
++    }
+     Ok(PoolGeometry {
+         filesystem_identifier: view.filesystem_identifier,
+         physical_block_size: view.declared_physical_block_size,
+@@ -319,6 +351,22 @@ fn journal_ring_bytes_lie_in_the_supported_range(
+         })
+ }
+ 
++/// 单元区起始槽号是 journal 环末尾的下一个槽：同一槽自述的环起点 + 环长向上取整到 16 KiB 槽（D3（空间分配） 已定项 10 ④
++/// 「第一版 = journal 环末尾的下一个槽」；D23（journal 的角色与格式） 已定项 19 ③「单元区起始槽号随环长走」）。
++/// checker 自己按条款算一份，不引实现的 `journal::slot_after_the_journal_ring`（门禁 94 号）。环长是盘上读来的 8 字节：
++/// 槽数不超过 2⁶⁴ ÷ 16384，加环起点溢出时算不相等。
++fn unit_area_start_slot_is_the_slot_after_the_journal_ring(
++    journal_ring_start_slot: u64,
++    journal_ring_bytes: u64,
++    unit_area_start_slot: u64,
++) -> bool {
++    journal_ring_start_slot
++        .checked_add(journal_ring_bytes.div_ceil(SLOT_BYTES))
++        .is_some_and(|slot_after_the_journal_ring| {
++            unit_area_start_slot == slot_after_the_journal_ring
++        })
++}
++
+ /// 一个系统配置槽读下来是什么样。
+ #[derive(Clone, Debug, PartialEq, Eq)]
+ pub enum SystemConfigurationSlotReading {
+@@ -346,7 +394,11 @@ pub const fn value_refused_by_this_reader(verdict: &crate::Verdict) -> bool {
+         | crate::Verdict::EncryptionTypeNotOff
+         | crate::Verdict::FixedStructureSlotSpacingOutsideTheFormatRange
+         | crate::Verdict::PhysicalBlockSizeOutsideTheRootSlotBounds
+-        | crate::Verdict::JournalRingBytesOutsideTheSupportedRange => true,
++        | crate::Verdict::JournalRingBytesOutsideTheSupportedRange
++        | crate::Verdict::JournalRingStartSlotNotTheFirstVersionConstant
++        | crate::Verdict::RootRingBaseSlotNotTheFirstVersionConstant
++        | crate::Verdict::UnitAreaStartNotTheSlotAfterTheJournalRing
++        | crate::Verdict::UnitAreaStartOffTheClusterSegmentBoundary => true,
+         crate::Verdict::Valid
+         | crate::Verdict::BadMagic
+         | crate::Verdict::ChecksumMismatch
+@@ -490,6 +542,30 @@ pub fn judge_system_configuration_values_the_reader_accepts(
+     any_slot_carries_a_refused_value
+ }
+ 
++/// [`SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY`]：每块盘两槽里每个自证过、属于本池（fsid 相同）的系统配置槽，
++/// 自述的本盘设备号等于这块盘在池里的身份（`ImageReader::devices` 给的那个号），每槽判一次。读法与实现可写挂载比盘表时同一个：
++/// 自证过的槽、fsid 与择到的那份相同的槽（`crates/singlefs-core/src/mount.rs` 的 `device_table_disagreeing_with`）；
++/// 别的池的槽归 I-1.4 判，不在这里。盘体对调（身份 0 的位置上装着自述 1 的盘）时两块盘各红一处。
++pub fn judge_own_device_number_is_the_device_identity(
++    verified_system_configurations_of_this_pool: &[(u32, Vec<crate::SystemConfigurationView>)],
++    judgements: &mut Judgements,
++) {
++    for (device_identity, slots) in verified_system_configurations_of_this_pool {
++        for view in slots {
++            judgements.judge(
++                SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
++                view.this_device == *device_identity,
++                || {
++                    format!(
++                        "盘 {device_identity} 上世代 {} 的系统配置槽自述本盘设备号 {}：与这块盘在池里的身份不同",
++                        view.slot_generation, view.this_device
++                    )
++                },
++            );
++        }
++    }
++}
++
+ /// 每盘择一个系统配置：两槽里世代号大的那一份（相等取槽 0）。
+ #[must_use]
+ pub fn chosen_system_configurations(
+diff --git a/crates/singlefs-checker/src/lib.rs b/crates/singlefs-checker/src/lib.rs
+index 30d442c0..7b00fa9d 100644
+--- a/crates/singlefs-checker/src/lib.rs
++++ b/crates/singlefs-checker/src/lib.rs
+@@ -149,6 +149,19 @@ pub enum Verdict {
+     /// 系统配置自述的 journal 环长装不下 F 条记录（在飞记录数上限 = 环槽数 ÷ F 是 0，D23（journal 的角色与格式） 已定项 18），
+     /// 或环的末端越过同一槽自述的单元区起点（已定项 19 ③：单元区起始槽号随环长走）。
+     JournalRingBytesOutsideTheSupportedRange,
++    /// 系统配置偏移 325 自述的 journal 环起点不是第一版的格式常量 `JOURNAL_RING_START_SLOT`（D23（journal 的角色与格式） 已定项 2：
++    /// 环从槽 1024 起）。实现按这个常量写记录、扫环（实审 Y4，用户 2026-09-27 定「读字段，不等于常量就整池拒」）：
++    /// checker 若按字段扫一个错位的环，判的是另一个环。
++    JournalRingStartSlotNotTheFirstVersionConstant,
++    /// 系统配置偏移 371 自述的根环起点不是第一版的格式常量 `ROOT_RING_BASE_SLOT`（D22（单元原子性怎么合成） 已定项 16 第 1 句：
++    /// 基址 = 该字段 × 16384，第一版取 64）。同一条用户定案：实现按常量写根，checker 若按字段读就读另一个根环。
++    RootRingBaseSlotNotTheFirstVersionConstant,
++    /// 系统配置偏移 417 自述的单元区起始槽号不是 journal 环末尾的下一个槽（同一槽的环起点 + 环长向上取整到槽，
++    /// D3（空间分配） 已定项 10 ④、D23（journal 的角色与格式） 已定项 19 ③「单元区起始槽号随环长走」）。
++    UnitAreaStartNotTheSlotAfterTheJournalRing,
++    /// 系统配置偏移 417 自述的单元区起始槽号不落在聚簇段边界上（不是 `CLUSTER_SEGMENT_SLOTS` 的整数倍，D3（空间分配） 已定项 10 ①）：
++    /// 这样的单元区怎么分段条款没写，第一版不支持。
++    UnitAreaStartOffTheClusterSegmentBoundary,
+ }
+ 
+ /// 系统配置槽解出来的几个要紧字段。
+diff --git a/crates/singlefs-checker/src/walk.rs b/crates/singlefs-checker/src/walk.rs
+index c77b0e0a..10e6b836 100644
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ -25,11 +25,11 @@ use crate::position_addressed::{
+ 
+ use crate::image::{
+     chosen_system_configurations, judge_location_entries_order, judge_location_order,
+-    judge_pointer_mac_and_nonce_are_zero, judge_system_configuration_values_the_reader_accepts,
+-    parse_data_pointer, parse_node_pointer, read_referenced_unit, root_slot_positions,
+-    system_configuration_slot_readings, valid_roots, verified_system_configuration_slots,
+-    ImageReader, InvariantVerdict, Judgements, PointerLocation, PointerView, PoolGeometry,
+-    MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
++    judge_own_device_number_is_the_device_identity, judge_pointer_mac_and_nonce_are_zero,
++    judge_system_configuration_values_the_reader_accepts, parse_data_pointer, parse_node_pointer,
++    read_referenced_unit, root_slot_positions, system_configuration_slot_readings, valid_roots,
++    verified_system_configuration_slots, ImageReader, InvariantVerdict, Judgements,
++    PointerLocation, PointerView, PoolGeometry, MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+ };
+ use crate::{
+     back_chain_of_record_header, check_index_node_keys, check_internal_node_separators,
+@@ -5669,7 +5669,8 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
+     // 「系统配置每盘放一份」买的就是这份冗余）。早退会让这种镜像上每一条不变量都报「不适用」，
+     // 而它是一个挂得上的合法镜像——故障注入让一块盘的两个槽先后写失败就造得出它，判定会被静默放过
+     // （.claude/kb/checks-owed.md 的 C461）。⚠️ 「哪块盘的系统配置全废了」今天没有编号报得出来，仍欠在 C461。
+-    // 任一盘任一槽自证过而带这一版读者不收的池级值（格式版本、加密类型、槽距、physical_block_size、环长）：实现整池拒绝挂载
++    // 任一盘任一槽自证过而带这一版读者不收的池级值（格式版本、加密类型、槽距、physical_block_size、环长、journal 环起点、
++    // 根环起点、单元区起始槽号）：实现整池拒绝挂载
+     // （`RecoveryFailure::SystemConfigurationValueRefused`），checker 报违例、别的不变量同「挂不上的镜像」一样不作保
+     // （用户 2026-09-27 定系统配置越界整池拒，实审 A3-checker-2）。只有一部分槽带越界值时不拿别的槽照判下去。
+     let any_system_configuration_slot_carries_a_refused_value =
+@@ -5753,6 +5754,10 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
+             )
+         })
+         .collect();
++    judge_own_device_number_is_the_device_identity(
++        &verified_system_configurations_of_this_pool,
++        &mut root_ring_judgements,
++    );
+     judge_system_configuration_floor_against_the_roots_on_each_device(
+         &verified_system_configurations_of_this_pool,
+         &roots,
+diff --git a/crates/singlefs-core/src/make_filesystem.rs b/crates/singlefs-core/src/make_filesystem.rs
+index 8451f8f0..a22c7ef4 100644
+--- a/crates/singlefs-core/src/make_filesystem.rs
++++ b/crates/singlefs-core/src/make_filesystem.rs
+@@ -34,6 +34,7 @@ use crate::system_configuration::{
+     journal_in_flight_record_limit, journal_in_flight_record_limit_fits_its_four_byte_field,
+     SystemConfiguration, SystemImmutableConfiguration, SystemImmutableSizes,
+     SystemMutableConfiguration, SystemRuntimeConfiguration, SystemRuntimeQuantities,
++    JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION, ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+ };
+ use crate::unit::{
+     build_index_node, build_packed_unit, PackedIdentity, WriteOrder, PACKED_TYPE_INSTANCE_TABLE,
+@@ -572,6 +573,8 @@ pub fn make_filesystem<Device: BlockDevice>(
+                 device_count: u32::try_from(identities.len()).expect("设备数"),
+                 region_devices: parameters.region_devices,
+                 sizes: parameters.geometry,
++                journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
++                root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+             },
+             mutable: SystemMutableConfiguration,
+             runtime: SystemRuntimeConfiguration,
+diff --git a/crates/singlefs-core/src/mount.rs b/crates/singlefs-core/src/mount.rs
+index 0f751b3f..82673188 100644
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -52,7 +52,7 @@ use crate::recovery::{
+     EffectiveFloorReadingStillUnreadableAfterOneReread, InstanceTableChain,
+     InstanceTableOfTheNewestRootStillUnreadableAfterOneReread, JournalScanReport, PoolReader,
+     RebuildVersionFailure, RebuiltVersion, RecoveryFailure,
+-    RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread, UserVisibleTreeRootPointers,
++    RootRingSlotKnownToHoldARootStillBadAfterOneReread, UserVisibleTreeRootPointers,
+ };
+ use crate::recovery::{every_root_ring_slot, read_root_ring_slot, RootRingSlotReading};
+ use crate::root_record::{RootRecord, UnmountMarker};
+@@ -264,6 +264,15 @@ pub enum MountError {
+         disagreeing_fields: Vec<MakeFilesystemParameterField>,
+         disagreeing_device_table: Vec<DeviceTableDisagreement>,
+     },
++    /// 挂着之后收盘表的入口（抬 F、准入抬 F、一次准入里再推一串、正常卸载）在参数、盘表与「可见」都核过之后，交进来的这几块盘落后于
++    /// 现行那一版、又缺它的单元（[`DeviceBehindTheCurrentVersion`]，与可写挂载取号之前逐盘核的落后支同一判，「所选那一版」换成调用方持着的
++    /// 现行那一版；D18（块里携带什么信息） 已定项 11「挂着之后收盘表的每个入口……核三样」，用户 2026-09-27 定）。不核这一判时，
++    /// 同池一份旧快照的盘经这些入口照常收到本池的写、系统配置被轮换到「跟得上」，之后可写挂载的落后支就认不出它
++    /// （代码三方 m2-closeout-code-r2「同池旧快照的盘经入口洗白」）。只读过每块盘的两个系统配置槽与落后那几块盘上现行那一版单元的落点，
++    /// 在任何写之前返回（抬 F 与卸载在动分配器之前）：盘上逐字节不变。调用方要做的是换回这个池现行的盘，不是改参数或盘表的次序。
++    DevicesBehindTheCurrentVersionAndMissingItsUnits {
++        devices: Vec<DeviceBehindTheCurrentVersion>,
++    },
+     /// 盘上读来的一个编号已到它那一格的顶、下一次要用的号（它加一）装不下（代码审阅第 36 条）：可写挂载要的新实例代号
+     /// （盘上最大的实例代号 + 1）、新实例第一次发布的 txg（环里最大的 txg + 1）与暖机那几次、抬 F 与正常卸载那一串接在现行那一版后面的 txg。
+     /// 这些号是盘上读来的 4 / 8 字节，坏镜像、外来镜像才走得到。在任何写之前返回（抬 F 与卸载在动分配器之前），盘上逐字节不变。
+@@ -313,19 +322,23 @@ pub enum StillUnreadableAfterOneReread {
+         newest_root_on_the_reread: Option<RollbackTarget>,
+     },
+     /// 挂着时抬 F 重算影子账与回收门槛读根环（`recovery::readable_roots_rereading_ring_slots_known_to_hold_a_root_once`）或管理员回退
+-    /// 判候选、算 F_生效 读根环：`ring_slot` 是这个进程知道住着一条根的槽（挂载那一刻读得出、或这个进程写过且 FUA 返回过），这一次读不出，
+-    /// 重读一次仍读不出——那一槽里的根在不在判不了，不按有根或没根猜（D16（发布语义） 已定项 1「根槽这一次读坏」那一行的分法，
+-    /// 用户 2026-09-26 定）。挂载那一刻就读坏、之后没写过的槽不走这一条，当没有根。
++    /// 判候选、算 F_生效 读根环：`ring_slot` 是这个进程知道住着一条根的槽（挂载那一刻读得出、或这个进程写过且 FUA 返回过），这一次读坏
++    /// （`first_reading`：读不出或自证不过），重读一次仍坏（`reread`）——那一槽里的根在不在判不了，不按有根或没根猜（D16（发布语义） 已定项 1
++    /// 「根槽这一次读坏」那一行全句，用户 2026-09-26 定）。挂载那一刻就读坏、之后没写过的槽不走这一条，当没有根。
+     /// 实审 A3b 报告 Q4：与乙那一族同级，改之前是 `RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread`（那时不分槽知不知道住着根）。
+-    RootRingSlotKnownToHoldARoot { ring_slot: RootRingSlot },
++    RootRingSlotKnownToHoldARoot {
++        ring_slot: RootRingSlot,
++        first_reading: BadRootRingSlotReading,
++        reread: BadRootRingSlotReading,
++    },
+ }
+ 
+-impl From<RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread>
+-    for StillUnreadableAfterOneReread
+-{
+-    fn from(still_unreadable: RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread) -> Self {
++impl From<RootRingSlotKnownToHoldARootStillBadAfterOneReread> for StillUnreadableAfterOneReread {
++    fn from(still_bad: RootRingSlotKnownToHoldARootStillBadAfterOneReread) -> Self {
+         Self::RootRingSlotKnownToHoldARoot {
+-            ring_slot: still_unreadable.ring_slot,
++            ring_slot: still_bad.ring_slot,
++            first_reading: still_bad.first_reading,
++            reread: still_bad.reread,
+         }
+     }
+ }
+@@ -492,6 +505,10 @@ pub enum CallerInputsDisagreeingWithTheDisk {
+         disagreeing_fields: Vec<MakeFilesystemParameterField>,
+         disagreeing_device_table: Vec<DeviceTableDisagreement>,
+     },
++    /// 同 `MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits`：清单不空。
++    DevicesBehindTheCurrentVersionAndMissingItsUnits {
++        devices: Vec<DeviceBehindTheCurrentVersion>,
++    },
+ }
+ 
+ impl From<CallerInputsDisagreeingWithTheDisk> for MountError {
+@@ -507,6 +524,9 @@ impl From<CallerInputsDisagreeingWithTheDisk> for MountError {
+                 disagreeing_fields,
+                 disagreeing_device_table,
+             },
++            CallerInputsDisagreeingWithTheDisk::DevicesBehindTheCurrentVersionAndMissingItsUnits {
++                devices,
++            } => MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { devices },
+         }
+     }
+ }
+@@ -575,6 +595,29 @@ pub enum DeviceTableDisagreement {
+     NoSelfVerifiedSystemConfigurationOnTheDeviceHandedIn { identity_handed_in: DeviceIdentity },
+ }
+ 
++/// 盘表把一块盘标成 `identity_handed_in`，它一份自证过的系统配置槽（本池的 fsid、整槽校验和过）里记的本盘设备号是
++/// `own_device_number_on_disk`（[`own_device_numbers_on_disk_differing_from_the_identities_handed_in`]）。可写挂载与挂着之后收盘表的入口
++/// 报成 [`DeviceTableDisagreement::OwnDeviceNumberDiffersFromTheIdentityHandedIn`]，会话报成
++/// `mounted_session::UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable`（代码三方 m2-closeout-code-r2「盘体对调的盘表」）。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct OwnDeviceNumberOnDiskDifferingFromTheIdentityHandedIn {
++    pub identity_handed_in: DeviceIdentity,
++    pub own_device_number_on_disk: DeviceIdentity,
++}
++
++/// 挂着之后收盘表的入口在「可见」之后逐盘核出的一块落后于现行那一版、又缺它的单元的盘（[`devices_behind_the_current_version`]）：
++/// 它两槽里自证过的系统配置世代号最大那一份的 (实例代号, journal tail) 是 `newest_system_configuration_journal_tail`，小于调用方持着的
++/// 现行那一版那次发布末条记录的 jsn（`current_version_journal_position`），而现行那一版有单元在这块盘上它的落点读不出、或字节与这个进程
++/// 验得过的那一份不同（`units_missing`，按角色与落点列出，次序同现行那一版的单元清单）。与可写挂载取号之前逐盘核的
++/// [`SelectedVersionLackingOnDevice::BehindTheSelectedVersionAndMissingItsUnits`] 同一判（[`units_of_the_version_missing_on_a_device_behind_it`]）。
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct DeviceBehindTheCurrentVersion {
++    pub device: DeviceIdentity,
++    pub newest_system_configuration_journal_tail: JournalSequenceNumber,
++    pub current_version_journal_position: JournalSequenceNumber,
++    pub units_missing: Vec<(TransactionUnit, SlotNumber)>,
++}
++
+ /// 盘的块数：可写挂载准入拿交进来的不同设备身份数与 w 的下限比（`MountError::WritableDeviceCountBelowTheStripeWidthLowerBound`）。
+ #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+ pub struct DeviceCount(pub usize);
+@@ -1866,7 +1909,8 @@ struct FloorRaisedThroughTheSequence {
+ ///
+ /// # Errors
+ /// 盘表里有身份交了不止一次（`DeviceIdentitiesHandedInMoreThanOnce`）、调用方的参数或盘表（盘数与 `devs`、每块盘的本盘设备号）
+-/// 与盘上择到的系统配置不一致（`CallerParametersDisagreeWithTheSelectedSystemConfiguration`），都在回收、影子账与任何写之前；
++/// 与盘上择到的系统配置不一致、或有盘不「可见」（`CallerParametersDisagreeWithTheSelectedSystemConfiguration`）、有盘落后于现行那一版又缺它的单元
++/// （`DevicesBehindTheCurrentVersionAndMissingItsUnits`），都在回收、影子账与任何写之前；
+ /// 现行那一版的根指着的实例表读不出或解不开（`InstanceTableMalformed`）；`new_floor` 低于盘上现算的 F 生效值
+ /// （`RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided`）；`new_floor` 超过上限；算上限的错（[`rollback_floor_ceiling`]，
+ /// 含知道住着根的根环槽重读仍坏 `RollbackFloorCeilingRootRingSlotStillBadAfterOneReread`）；现行那一版的 txg 已到顶、这一串的 txg 装不下
+@@ -1997,7 +2041,7 @@ pub fn raise_rollback_floor_to_the_admission_ceiling<Device: BlockDevice>(
+     shadow_ledger: ShadowLedger,
+ ) -> Result<RaiseToTheAdmissionCeiling, MountError> {
+     let caller_inputs_agreeing_with_the_disk =
+-        caller_inputs_agreeing_with_the_disk(parameters, devices)?;
++        caller_inputs_agreeing_with_the_disk(parameters, devices, current)?;
+     raise_to_the_admission_ceiling_on_caller_inputs_agreeing_with_the_disk(
+         &caller_inputs_agreeing_with_the_disk,
+         devices,
+@@ -2099,6 +2143,7 @@ fn floor_raise_refused_for_space(refusal: &MountError) -> bool {
+         | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. }
+         | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
+         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
++        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
+         // txg 到顶不是空间不够；可写挂载那一处抬 F 的错装进的那个成员只由可写挂载交回、抬 F 自己报不出来。
+         | MountError::SequenceNumberPastTheTopOfItsRange(_)
+         | MountError::FloorRaiseFailedAfterTheMountsPublishes(_)
+@@ -2135,7 +2180,7 @@ pub fn push_one_floor_raise_within_the_admission_budget<Device: BlockDevice>(
+     publishes_pushed: usize,
+ ) -> Result<FloorRaisePushedWithinTheAdmissionBudget, MountError> {
+     let caller_inputs_agreeing_with_the_disk =
+-        caller_inputs_agreeing_with_the_disk(parameters, devices)?;
++        caller_inputs_agreeing_with_the_disk(parameters, devices, current)?;
+     let parameters_of_the_pool = &caller_inputs_agreeing_with_the_disk.parameters_of_the_pool;
+     let all_devices: Vec<DeviceIdentity> = devices.iter().map(|(identity, _)| *identity).collect();
+     let device_of_txg = |txg: CheckpointTxg| {
+@@ -2219,7 +2264,7 @@ fn raise_the_floor_through<Device: BlockDevice>(
+     let CallerInputsAgreeingWithTheDisk {
+         system_configuration,
+         parameters_of_the_pool,
+-    } = caller_inputs_agreeing_with_the_disk(parameters, devices)?;
++    } = caller_inputs_agreeing_with_the_disk(parameters, devices, current)?;
+     // 候选集按现行那一版的实例表判：从它的根指着的第 0 片沿链真读出来、解出来（C502（抬 F 时现行版本里没有实例表单元）；
+     // D18（块里携带什么信息） 已定项 11：一张表可以不止一片）。不看 `TransactionOutput::units`——那是这个进程内存里的角色列表，
+     // 第一个文件版本那一版起就不带实例表单元，mkfs 同一个进程里后面发多少次都一样，而表就在根指针后面、读得出也解得开。
+@@ -3035,24 +3080,15 @@ fn devices_without_the_selected_version<Reader: PoolReader + ?Sized>(
+             });
+             continue;
+         };
+-        let newest_system_configuration_journal_tail = JournalSequenceNumber {
+-            instance_generation: newest_self_verified.quantities.journal_instance,
+-            counter: newest_self_verified.quantities.journal_tail,
+-        };
+-        if newest_system_configuration_journal_tail >= selected_version_journal_position {
+-            continue;
+-        }
+-        let units_missing: Vec<(TransactionUnit, SlotNumber)> = units
+-            .iter()
+-            .filter(|unit| !unit.bytes.is_empty())
+-            .filter(|unit| {
+-                !reader
+-                    .read(device, unit.slot.to_device_offset(), unit.bytes.len())
+-                    .is_some_and(|bytes_on_this_device| bytes_on_this_device == unit.bytes)
+-            })
+-            .map(|unit| (unit.identity, unit.slot))
+-            .collect();
+-        if !units_missing.is_empty() {
++        if let Some((newest_system_configuration_journal_tail, units_missing)) =
++            units_of_the_version_missing_on_a_device_behind_it(
++                reader,
++                device,
++                &newest_self_verified,
++                selected_version_journal_position,
++                units,
++            )
++        {
+             devices_without.push(DeviceWithoutTheSelectedVersion {
+                 device,
+                 lacking:
+@@ -3066,6 +3102,132 @@ fn devices_without_the_selected_version<Reader: PoolReader + ?Sized>(
+     devices_without
+ }
+ 
++/// 落后支的那一判（可写挂载取号之前逐盘核 [`devices_without_the_selected_version`] 与挂着之后收盘表的入口 [`devices_behind_the_current_version`]
++/// 共用这一份）：`newest_self_verified` 是这块盘两槽里本池自证过、世代号最大的那一份系统配置；它的 (实例代号, journal tail) 不落后于
++/// `version_journal_position`（那一版那次发布末条记录的 jsn）就交回 `None`（跟上了这一版的系统配置轮换，不读它的单元）；落后的再逐个读
++/// `units` 在这块盘上的落点，读不出或字节与验得过的那一份不同就记下，一个都没记下也交回 `None`（只落后、单元都在：根落盘之后、轮换之前崩，
++/// 或只剩一槽自证、那一槽停在上一次轮换）；记下了至少一个才交回 (那份的 tail, 缺的单元)。字节是空的单元（提示与映射都读不出的数据单元，
++/// D19（块指针的结构与宽度预算） 已定项 5）没有验得过的一份可比，跳过。只读盘。
++///
++/// 循环：按 `units`（轮数 = 这一版的单元数），跨轮只往缺的清单里追加，没有提前出口。
++fn units_of_the_version_missing_on_a_device_behind_it<Reader: PoolReader + ?Sized>(
++    reader: &Reader,
++    device: DeviceIdentity,
++    newest_self_verified: &crate::system_configuration::SystemConfiguration,
++    version_journal_position: JournalSequenceNumber,
++    units: &[PublishedUnit],
++) -> Option<(JournalSequenceNumber, Vec<(TransactionUnit, SlotNumber)>)> {
++    let newest_system_configuration_journal_tail = JournalSequenceNumber {
++        instance_generation: newest_self_verified.quantities.journal_instance,
++        counter: newest_self_verified.quantities.journal_tail,
++    };
++    if newest_system_configuration_journal_tail >= version_journal_position {
++        return None;
++    }
++    let units_missing: Vec<(TransactionUnit, SlotNumber)> = units
++        .iter()
++        .filter(|unit| !unit.bytes.is_empty())
++        .filter(|unit| {
++            !reader
++                .read(device, unit.slot.to_device_offset(), unit.bytes.len())
++                .is_some_and(|bytes_on_this_device| bytes_on_this_device == unit.bytes)
++        })
++        .map(|unit| (unit.identity, unit.slot))
++        .collect();
++    (!units_missing.is_empty()).then_some((newest_system_configuration_journal_tail, units_missing))
++}
++
++/// 挂着之后收盘表的入口在「可见」之后逐盘核的落后支（D18（块里携带什么信息） 已定项 11「挂着之后收盘表的每个入口……核三样」的第三样，
++/// 用户 2026-09-27 定；代码三方 m2-closeout-code-r2「同池旧快照的盘经入口洗白」）：交进来的每块盘，两槽里本池自证过、世代号最大的那一份
++/// 系统配置落后于调用方持着的现行那一版（`current` 那次发布的末条记录），又缺它的单元，就记下（[`DeviceBehindTheCurrentVersion`]）；
++/// 判法与可写挂载取号之前逐盘核的落后支同一份（[`units_of_the_version_missing_on_a_device_behind_it`]），「所选那一版」换成现行那一版。
++/// 活的会话里每次发布在系统配置轮换落盘之后才返回（`transaction::CommitStep::RotateSystemConfigurationSlots`），现行那一版的盘都跟得上，
++/// 只有被换成旧快照的盘落后；只剩一槽自证、那一槽停在上一次轮换的盘落后而单元都在，不记（不误拒）。
++/// 一份自证过的都没有的盘不在这里判（「可见」那一判先拒了它，[`devices_without_a_self_verified_system_configuration`]）。
++/// 按交进来的次序交回。只读盘：每块盘读两个系统配置槽，落后的那几块再读现行那一版每个单元的落点。
++///
++/// 循环：按交进来的盘逐块（轮数 = 盘数），跨轮只往交回的清单里追加；外层的提前出口一个：一份自证过的都没有（「可见」那一判的事，看下一块）。
++pub(crate) fn devices_behind_the_current_version<Reader: PoolReader + ?Sized>(
++    reader: &Reader,
++    parameters_of_the_pool: &MakeFilesystemParameters,
++    current: &TransactionOutput,
++) -> Vec<DeviceBehindTheCurrentVersion> {
++    let current_version_journal_position = JournalSequenceNumber {
++        instance_generation: current.record.instance,
++        counter: current.record.counter,
++    };
++    let mut devices_behind = Vec::new();
++    for device in reader.device_identities() {
++        let Some(newest_self_verified) = self_verified_system_configuration_slots_of_the_pool(
++            reader,
++            device,
++            parameters_of_the_pool,
++        )
++        .into_iter()
++        .max_by_key(|slot| slot.quantities.slot_generation) else {
++            continue;
++        };
++        if let Some((newest_system_configuration_journal_tail, units_missing)) =
++            units_of_the_version_missing_on_a_device_behind_it(
++                reader,
++                device,
++                &newest_self_verified,
++                current_version_journal_position,
++                &current.units,
++            )
++        {
++            devices_behind.push(DeviceBehindTheCurrentVersion {
++                device,
++                newest_system_configuration_journal_tail,
++                current_version_journal_position,
++                units_missing,
++            });
++        }
++    }
++    devices_behind
++}
++
++/// 交进来的每块盘自证过的系统配置槽（本池的 fsid、整槽校验和过，`recovery::verified_system_configuration_slots`，槽距取本池的固定结构槽距）
++/// 里记的本盘设备号不是盘表给它的身份的各一项（一块盘上同一个号只报一次），按交进来的次序（D18（块里携带什么信息） 已定项 11
++/// 「挂着之后收盘表的每个入口……核三样」的第二样）。可写挂载与挂着之后收盘表的入口经 [`device_table_disagreeing_with`] 调它，
++/// 会话在每次用户改动之前调它（`mounted_session`；代码三方 m2-closeout-code-r2「盘体对调的盘表」：会话此前只比身份次序）。
++/// 一份自证过的都没有的盘不在这里报。调用方先判过盘表里没有重复身份（按身份读盘，重复了读的是哪一块说不清）。读每块盘的两个系统配置槽，不写盘。
++///
++/// 循环：按交进来的盘逐块（轮数 = 盘数），每块读两槽；跨轮只往交回的清单里追加，没有提前出口。
++pub(crate) fn own_device_numbers_on_disk_differing_from_the_identities_handed_in<
++    Reader: PoolReader + ?Sized,
++>(
++    reader: &Reader,
++    parameters_of_the_pool: &MakeFilesystemParameters,
++) -> Vec<OwnDeviceNumberOnDiskDifferingFromTheIdentityHandedIn> {
++    let mut differing = Vec::new();
++    for identity_handed_in in reader.device_identities() {
++        let own_device_numbers_on_disk: BTreeSet<DeviceIdentity> =
++            self_verified_system_configuration_slots_of_the_pool(
++                reader,
++                identity_handed_in,
++                parameters_of_the_pool,
++            )
++            .into_iter()
++            .map(|slot| slot.immutable.this_device)
++            .collect();
++        differing.extend(
++            own_device_numbers_on_disk
++                .into_iter()
++                .filter(|own_device_number_on_disk| {
++                    *own_device_number_on_disk != identity_handed_in
++                })
++                .map(|own_device_number_on_disk| {
++                    OwnDeviceNumberOnDiskDifferingFromTheIdentityHandedIn {
++                        identity_handed_in,
++                        own_device_number_on_disk,
++                    }
++                }),
++        );
++    }
++    differing
++}
++
+ /// 一块盘两个系统配置槽里本池自证过的那几份（整槽校验和过、fsid 与本池相同，`recovery::verified_system_configuration_slots`，
+ /// 槽距取本池的固定结构槽距）。一份都没有，这块盘就不「可见」（D18（块里携带什么信息） 已定项 11「可写挂载的顺序」：
+ /// 「可见」= 独占打开成功且系统配置读得通）：可写挂载取号之前的逐盘核（[`devices_without_the_selected_version`] 第一支）、
+@@ -3186,35 +3348,24 @@ fn device_table_disagreeing_with<Device: BlockDevice>(
+             },
+         );
+     }
+-    let slot_spacing_in_bytes = u64::from(
+-        system_configuration
+-            .immutable
+-            .sizes
+-            .fixed_structure_slot_spacing,
++    disagreements.extend(
++        own_device_numbers_on_disk_differing_from_the_identities_handed_in(
++            devices,
++            &parameters_of_the_system_configuration(system_configuration),
++        )
++        .into_iter()
++        .map(
++            |OwnDeviceNumberOnDiskDifferingFromTheIdentityHandedIn {
++                 identity_handed_in,
++                 own_device_number_on_disk,
++             }| {
++                DeviceTableDisagreement::OwnDeviceNumberDiffersFromTheIdentityHandedIn {
++                    identity_handed_in,
++                    own_device_number_on_disk,
++                }
++            },
++        ),
+     );
+-    for (identity_handed_in, _) in devices {
+-        let own_device_numbers_on_disk: BTreeSet<DeviceIdentity> =
+-            verified_system_configuration_slots(
+-                devices,
+-                *identity_handed_in,
+-                slot_spacing_in_bytes,
+-                &system_configuration.immutable.filesystem_identifier,
+-            )
+-            .into_iter()
+-            .map(|slot| slot.immutable.this_device)
+-            .collect();
+-        disagreements.extend(
+-            own_device_numbers_on_disk
+-                .into_iter()
+-                .filter(|own_device_number_on_disk| own_device_number_on_disk != identity_handed_in)
+-                .map(|own_device_number_on_disk| {
+-                    DeviceTableDisagreement::OwnDeviceNumberDiffersFromTheIdentityHandedIn {
+-                        identity_handed_in: *identity_handed_in,
+-                        own_device_number_on_disk,
+-                    }
+-                }),
+-        );
+-    }
+     disagreements
+ }
+ 
+@@ -3315,11 +3466,14 @@ struct CallerInputsAgreeingWithTheDisk {
+ /// （[`DeviceTableDisagreement::NoSelfVerifiedSystemConfigurationOnTheDeviceHandedIn`]，与可写挂载取号之前的逐盘核第一支同一判；
+ /// 代码三方 m2-closeout-code-r1 Z3-A 乙）。择系统配置那一步只要求读得出的那几份彼此对得上，空盘上一份都没有、择得出来，
+ /// 前三项也报不出它（本盘设备号是逐份自证槽比的，一份都没有就一条都不比），所以另判这一项。
++/// 「可见」之后再核落后支：每块盘最新那份自证系统配置不落后于调用方持着的现行那一版（`current`）、或落后而现行那一版的单元都在
++/// （[`devices_behind_the_current_version`]；D18（块里携带什么信息） 已定项 11「挂着之后收盘表的每个入口……核三样」，用户 2026-09-27 定，
++/// 代码三方 m2-closeout-code-r2「同池旧快照的盘经入口洗白」）。三样里的本盘设备号在前面盘表那一判里已比过（[`device_table_disagreeing_with`]）。
+ /// 只读盘，不写盘：每个入口在它的第一个写之前调它。
+ ///
+ /// # Errors
+-/// 交进来的不对（[`CallerInputsDisagreeingWithTheDisk`] 的两种；不「可见」的盘报在第二种的 `disagreeing_device_table` 里）；
+-/// 系统配置择不出来（别的池的盘换进来，两块盘上各有一份 fsid 不同的自证槽，报在这里）。
++/// 交进来的不对（[`CallerInputsDisagreeingWithTheDisk`] 的三种；不「可见」的盘报在第二种的 `disagreeing_device_table` 里，
++/// 落后又缺单元的盘报在第三种里）；系统配置择不出来（别的池的盘换进来，两块盘上各有一份 fsid 不同的自证槽，报在这里）。
+ #[allow(
+     clippy::ptr_arg,
+     reason = "choose_system_configuration 走 &dyn PoolReader，要一个有大小的读者：Vec 实现了它、切片不能转成 dyn"
+@@ -3327,6 +3481,7 @@ struct CallerInputsAgreeingWithTheDisk {
+ fn caller_inputs_agreeing_with_the_disk<Device: BlockDevice>(
+     caller_parameters: &MakeFilesystemParameters,
+     devices: &Vec<(DeviceIdentity, Device)>,
++    current: &TransactionOutput,
+ ) -> Result<CallerInputsAgreeingWithTheDisk, CallerInputsCheckRefused> {
+     refuse_device_identities_handed_in_more_than_once(devices)
+         .map_err(CallerInputsCheckRefused::Disagreeing)?;
+@@ -3356,6 +3511,15 @@ fn caller_inputs_agreeing_with_the_disk<Device: BlockDevice>(
+             },
+         ));
+     }
++    let devices_behind =
++        devices_behind_the_current_version(devices, &parameters_of_the_pool, current);
++    if !devices_behind.is_empty() {
++        return Err(CallerInputsCheckRefused::Disagreeing(
++            CallerInputsDisagreeingWithTheDisk::DevicesBehindTheCurrentVersionAndMissingItsUnits {
++                devices: devices_behind,
++            },
++        ));
++    }
+     Ok(CallerInputsAgreeingWithTheDisk {
+         system_configuration,
+         parameters_of_the_pool,
+@@ -4243,7 +4407,8 @@ pub enum RollbackError {
+     /// 调用方交进来的参数或盘表不对（盘表里有身份交了不止一次；参数、盘数或某块盘的本盘设备号与盘上择到的系统配置不一致），
+     /// 照可写挂载同一套核（[`caller_inputs_agreeing_with_the_disk`]，实审 A1b 留下的这一处）：回退那次发布的写入口按盘上那份参数建、
+     /// 系统配置轮换按盘表逐项写，拿错的参数或盘表回退会改写盘上不可变段、让多交的那块盘收到本池的写
+-    /// （D22（单元原子性怎么合成） 已定项 26 第一档）。在任何写之前（重复身份在任何读之前）拒，盘上逐字节不变。
++    /// （D22（单元原子性怎么合成） 已定项 26 第一档）。有盘不「可见」、或落后于现行那一版又缺它的单元（D18（块里携带什么信息） 已定项 11
++    /// 「挂着之后收盘表的每个入口……核三样」）也报在这里。在任何写之前（重复身份在任何读之前）拒，盘上逐字节不变。
+     CallerInputsDisagreeWithTheDisk(CallerInputsDisagreeingWithTheDisk),
+     /// 现行那一版的 checkpoint_txg 已是 `u64::MAX`，回退那次发布的 txg（它加一）装不下（代码审阅第 36 条）：那个 txg 是盘上读来的，
+     /// 坏镜像、外来镜像才走得到。在任何写之前、动分配器之前拒。
+@@ -4744,16 +4909,16 @@ pub fn roll_back_by_a_forward_publish<Device: BlockDevice>(
+     let CallerInputsAgreeingWithTheDisk {
+         system_configuration,
+         parameters_of_the_pool,
+-    } = caller_inputs_agreeing_with_the_disk(parameters, devices).map_err(
+-        |refused| match refused {
++    } = caller_inputs_agreeing_with_the_disk(parameters, devices, current).map_err(|refused| {
++        match refused {
+             CallerInputsCheckRefused::Disagreeing(disagreeing) => {
+                 RollbackError::CallerInputsDisagreeWithTheDisk(disagreeing)
+             }
+             CallerInputsCheckRefused::SystemConfigurationNotChosen(failure) => {
+                 RollbackError::Recovery(failure)
+             }
+-        },
+-    )?;
++        }
++    })?;
+     let rollback_txg = current
+         .root
+         .checkpoint_txg
+diff --git a/crates/singlefs-core/src/mounted_session.rs b/crates/singlefs-core/src/mounted_session.rs
+index b26f0517..5bc0e23e 100644
+--- a/crates/singlefs-core/src/mounted_session.rs
++++ b/crates/singlefs-core/src/mounted_session.rs
+@@ -11,7 +11,9 @@
+ //! （`mount::ParametersAndDeviceTableOfTheMount`：盘上择到的系统配置里的参数、挂载时核过的盘表），写入口只按那份参数建、不收调用方的参数；
+ //! 盘本身不持，每次调用由调用方把盘表交进来——用例在两次调用之间照样摸得到盘（拷镜像、注入故障）——交进来的盘表与挂载时的逐项比，
+ //! 对不上在任何读写之前拒（实审 A1b Q2、Q3）；身份对得上，还要每块盘「可见」（两个系统配置槽里至少一份本池自证过的），
+-//! 有一块不可见就在任何写之前拒（代码三方 m2-closeout-code-r1 Z3-A 乙：只比身份时，换上去的一块空盘照样收到本池的写）。
++//! 有一块不可见就在任何写之前拒（代码三方 m2-closeout-code-r1 Z3-A 乙：只比身份时，换上去的一块空盘照样收到本池的写）；
++//! 「可见」之后再核每块盘自证槽里的本盘设备号是盘表给它的身份、这块盘不落后于现行那一版又缺它的单元（D18（块里携带什么信息） 已定项 11
++//! 「挂着之后收盘表的每个入口……核三样」，用户 2026-09-27 定；代码三方 m2-closeout-code-r2「盘体对调的盘表」「同池旧快照的盘经入口洗白」）。
+ //! 发布路径与抬 F 各自开写入口的做法不变。
+ 
+ use crate::address::{DeviceIdentity, InstanceGeneration};
+@@ -19,9 +21,11 @@ use crate::allocator::PoolAllocator;
+ use crate::block_device::BlockDevice;
+ use crate::make_filesystem::MakeFilesystemParameters;
+ use crate::mount::{
+-    devices_without_a_self_verified_system_configuration,
+-    push_one_floor_raise_within_the_admission_budget, FloorRaisePushedWithinTheAdmissionBudget,
+-    FloorRaiseStop, MountError, MountOutput, Mounted, ParametersAndDeviceTableOfTheMount,
++    devices_behind_the_current_version, devices_without_a_self_verified_system_configuration,
++    own_device_numbers_on_disk_differing_from_the_identities_handed_in,
++    push_one_floor_raise_within_the_admission_budget, DeviceBehindTheCurrentVersion,
++    FloorRaisePushedWithinTheAdmissionBudget, FloorRaiseStop, MountError, MountOutput, Mounted,
++    OwnDeviceNumberOnDiskDifferingFromTheIdentityHandedIn, ParametersAndDeviceTableOfTheMount,
+     RaisedFloor, ShadowLedger,
+ };
+ use crate::transaction::{
+@@ -82,6 +86,23 @@ pub enum UserChangeRefused {
+     /// 读过每块盘的两个系统配置槽，一个写都没发：盘上逐字节不变、会话不动。调用方要做的是停下这块盘上的写（换回这个池的盘），
+     /// 不是换一份盘表的次序再发（那是 `DeviceTableOtherThanTheOneOfTheMount`）。
+     DevicesWithoutASelfVerifiedSystemConfiguration { devices: Vec<DeviceIdentity> },
++    /// 盘表的身份与这次挂载核过的那一份相同、每块盘都「可见」，这几块盘（按交进来的次序）自证过的系统配置槽里记的本盘设备号却不是
++    /// 盘表给它的身份——盘体对调了、或插错了位置（与可写挂载、挂着之后收盘表的入口同一判，
++    /// `mount::own_device_numbers_on_disk_differing_from_the_identities_handed_in`）。只比身份时，发布照样做成、系统配置轮换把错的本盘设备号
++    /// 写进两块盘、根写到不归它的那块盘上，之后这个池可写挂不上（代码三方 m2-closeout-code-r2「盘体对调的盘表」，用户 2026-09-27 定）。
++    /// 读过每块盘的两个系统配置槽，一个写都没发：盘上逐字节不变、会话不动。调用方要做的是把盘体放回各自的身份再发。
++    OwnDeviceNumbersDifferFromTheDeviceTable {
++        disagreements: Vec<OwnDeviceNumberOnDiskDifferingFromTheIdentityHandedIn>,
++    },
++    /// 盘表的身份对得上、每块盘都「可见」、本盘设备号也对得上，这几块盘（按交进来的次序）却落后于会话的现行那一版、又缺它的单元：
++    /// 同池一份旧快照被换了上去（与可写挂载取号之前逐盘核的落后支、挂着之后收盘表的入口同一判，`mount::devices_behind_the_current_version`）。
++    /// 不核这一判时发布照样做成、旧快照的系统配置被轮换到「跟得上」，之后可写挂载的落后支就认不出它、池级 checker 红 I-2.1
++    /// （代码三方 m2-closeout-code-r2「同池旧快照的盘经入口洗白」，用户 2026-09-27 定）。只剩一槽自证、那一槽停在上一次轮换的盘
++    /// 落后而单元都在，不在这里。读过每块盘的两个系统配置槽与落后那几块上现行那一版单元的落点，一个写都没发：盘上逐字节不变、会话不动。
++    /// 调用方要做的是换回这个池现行的盘。
++    DevicesBehindTheCurrentVersionAndMissingItsUnits {
++        devices: Vec<DeviceBehindTheCurrentVersion>,
++    },
+     /// 发布被拒、不是空间不够的那两种（内容装不下、释放判定对不上、块设备错、冻结着一次没重发……）：`cause` 原样，不因它推。
+     /// `floor_raises` 是这之前已经因为空间不够推过的那几串（它们已落盘，现行那一版在它们后面）。
+     Publish {
+@@ -203,8 +224,9 @@ impl MountedSession {
+     /// 发布一次用户改动：被拒是空间不够的那两种（[`refusal_is_short_of_space`]）就推一串抬 F 的空发布、再重判，
+     /// 直到发成或不再推（D16（发布语义） 已定项 1「准入」那一行）。发成时 `current` 换成新的一版；推了的那几串已落盘，
+     /// 没发成时 `current` 停在最后一次落盘的空发布上。写入口只按会话持着的那份参数建（`parameters_and_device_table`），
+-    /// 交进来的盘表先与它逐项比（实审 A1b Q2、Q3），再读每块盘的两个系统配置槽核它「可见」（Z3-A 乙）。
+-    /// 「可见」在进循环之前核一次：一次调用里盘表借着、换不了盘；循环里推的每一串抬 F 在它自己的第一个写之前再核一遍
++    /// 交进来的盘表先与它逐项比（实审 A1b Q2、Q3），再读每块盘的两个系统配置槽核它「可见」（Z3-A 乙），再核本盘设备号与落后支
++    /// （D18（块里携带什么信息） 已定项 11「挂着之后收盘表的每个入口……核三样」：「每次发布」按「每次用户改动」读）。
++    /// 三样在进循环之前核一次：一次调用里盘表借着、换不了盘；循环里推的每一串抬 F 在它自己的第一个写之前再核一遍三样
+     /// （`mount::push_one_floor_raise_within_the_admission_budget` 经 `caller_inputs_agreeing_with_the_disk`），
+     /// 所以这次调用发出的每一个写之前都核过。
+     ///
+@@ -212,7 +234,7 @@ impl MountedSession {
+     /// 预算把推的次数压在 B − 1 以内 ⇒ 至多 8 轮；跨轮携带的是现行那一版（抬 F 就地推进它）与已推的几串。
+     ///
+     /// # Errors
+-    /// [`UserChangeRefused`] 的六种。
++    /// [`UserChangeRefused`] 的八种。
+     pub fn publish_user_change<Device: BlockDevice>(
+         &mut self,
+         devices: &mut Vec<(DeviceIdentity, Device)>,
+@@ -247,6 +269,30 @@ impl MountedSession {
+                 },
+             );
+         }
++        let own_device_numbers_differing =
++            own_device_numbers_on_disk_differing_from_the_identities_handed_in(
++                devices.as_slice(),
++                parameters,
++            );
++        if !own_device_numbers_differing.is_empty() {
++            return Err(
++                UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable {
++                    disagreements: own_device_numbers_differing,
++                },
++            );
++        }
++        let devices_behind = devices_behind_the_current_version(
++            devices.as_slice(),
++            parameters,
++            current_file_version,
++        );
++        if !devices_behind.is_empty() {
++            return Err(
++                UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits {
++                    devices: devices_behind,
++                },
++            );
++        }
+         let mut floor_raises: Vec<RaisedFloor> = Vec::new();
+         let mut refusals_that_pushed_the_floor_raises: Vec<PublishError> = Vec::new();
+         let mut publishes_pushed = 0;
+diff --git a/crates/singlefs-core/src/recovery.rs b/crates/singlefs-core/src/recovery.rs
+index f7710db7..00460e69 100644
+--- a/crates/singlefs-core/src/recovery.rs
++++ b/crates/singlefs-core/src/recovery.rs
+@@ -61,6 +61,7 @@ use crate::system_configuration::{
+     journal_in_flight_record_limit, journal_in_flight_record_limit_fits_its_four_byte_field,
+     unit_area_start_slot_recorded_in_the_slot, IncompatBitmap, SystemConfiguration,
+     SystemConfigurationSlotRefusal, SystemImmutableSizes,
++    JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION, ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+ };
+ use crate::transaction::{
+     role_of_allocation_record_tree_node, role_of_extent_upper_node, FileVersionTreeIdentifiers,
+@@ -246,13 +247,15 @@ pub enum RecoveryFailure {
+ }
+ 
+ /// 读根环时，这个进程知道住着一条根的一个槽（挂载那一刻读得出、或这个进程写过且 FUA 返回过，
+-/// `allocator::RootRingOccupancy::ring_slots_known_to_hold_a_root`）这一次读不出（[`BadRootRingSlotReading::Unreadable`]），
+-/// 重读一次仍读不出（[`readable_roots_rereading_ring_slots_known_to_hold_a_root_once`]；D16（发布语义） 已定项 1「根槽这一次读坏」那一行的
+-/// 两类分法，用户 2026-09-26 定）：那一槽里的根在不在判不了，不按有根或没根猜。挂着时抬 F 与管理员回退拒这一次，经
++/// `allocator::RootRingOccupancy::ring_slots_known_to_hold_a_root`）这一次读坏（`first_reading`：读不出或自证不过），
++/// 重读一次仍坏（`reread`；[`readable_roots_rereading_ring_slots_known_to_hold_a_root_once`]；D16（发布语义） 已定项 1「根槽这一次读坏」那一行
++/// 全句，用户 2026-09-26 定）：那一槽里的根在不在判不了，不按有根或没根猜。挂着时抬 F 与管理员回退拒这一次，经
+ /// `mount::StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot` 交出。
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+-pub struct RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread {
++pub struct RootRingSlotKnownToHoldARootStillBadAfterOneReread {
+     pub ring_slot: RootRingSlot,
++    pub first_reading: BadRootRingSlotReading,
++    pub reread: BadRootRingSlotReading,
+ }
+ 
+ /// 算生效的回退下界 F 时（[`effective_rollback_floor_rereading_the_newest_instance_table_once`]），根环里最新那条根指着的实例表
+@@ -269,7 +272,7 @@ pub struct InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
+ /// 重读一次仍读坏的是哪一样。
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+ pub enum EffectiveFloorReadingStillUnreadableAfterOneReread {
+-    RootRingSlotKnownToHoldARoot(RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread),
++    RootRingSlotKnownToHoldARoot(RootRingSlotKnownToHoldARootStillBadAfterOneReread),
+     InstanceTableOfTheNewestRoot(InstanceTableOfTheNewestRootStillUnreadableAfterOneReread),
+ }
+ 
+@@ -626,12 +629,29 @@ pub enum SystemConfigurationValueOutsideWhatThisReaderAccepts {
+     FormatVersionNotRecognized { format_version: u16 },
+     /// 加密类型不是 0（关）：加密不进第一个可运行版本（D9（加密） 已定项 10），1、2 是登记过的算法、别的码不认识，都不收。
+     EncryptionTypeNotOff { encryption_type: u8 },
+-    /// 固定结构槽距落在格式允许的区间之外：不小于 4096、槽 1 整槽落在根环基址之前（与逐档找槽 1 同一个区间，
+-    /// [`largest_fixed_structure_slot_spacing_the_format_allows`]）。槽距是根槽宽的上界，这一条先于根槽宽判。
++    /// 固定结构槽距落在格式允许的区间之外：不小于 4096、槽 1 整槽落在同一槽自述的根环起点之前（D22（单元原子性怎么合成） 已定项 16
++    /// 第 5 句；根环起点字段 × 16384 − 4096 是上界，[`largest_fixed_structure_slot_spacing_under_the_root_ring_base`]；根环起点不到一个
++    /// 系统配置槽宽时一档槽距都不收）。槽距是根槽宽的上界，这一条先于根槽宽判；也先于根环起点等不等第一版常量那一判，
++    /// 根环起点落在槽 1 之前的槽报在这里（与 checker 的 I-7.13 报同一格）。
+     FixedStructureSlotSpacingOutsideTheFormatRange { fixed_structure_slot_spacing: u32 },
+     /// `physical_block_size`（根槽宽，D22（单元原子性怎么合成） 已定项 2）装不下根记录（457 字节，已定项 7），或大于固定结构槽距
+     /// （槽 j 在区域起点 + j × 槽距，已定项 16）。读根槽按它开缓冲，不设上界时一个盘上的 4 字节就定得了每一次读的内存。
+     PhysicalBlockSizeOutsideTheRootSlotBounds { physical_block_size: u32 },
++    /// 同一槽记着的根环起点（偏移 371 的 8 字节，16 KiB 槽号）不是第一版写的那个（64 = 1 MiB，
++    /// `system_configuration::ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION`）：core 读写根环按格式常量走（`root_ring::region_start`），
++    /// 字段与常量不等时两边读的不是同一个环；条款定的是按字段读、第一版只收常量，不等整池拒（D22（单元原子性怎么合成） 已定项 16 第 1 句，
++    /// 用户 2026-09-27 定「读字段，不等于常量就整池拒」；代码三方 m2-closeout-code-r2「core 与 checker 对系统配置几何字段的读法」）。
++    RootRingBaseNotTheFirstVersionSlot {
++        recorded_root_ring_base_slot: SlotNumber,
++        first_version_root_ring_base_slot: SlotNumber,
++    },
++    /// 同一槽记着的 journal 环起点（偏移 325 的 8 字节，16 KiB 槽号）不是第一版写的那个（1024，
++    /// `system_configuration::JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION`）：core 读写 journal 环按格式常量走，处置同
++    /// [`Self::RootRingBaseNotTheFirstVersionSlot`]（同一条款、同一次用户定案）。
++    JournalRingStartNotTheFirstVersionSlot {
++        recorded_journal_ring_start_slot: SlotNumber,
++        first_version_journal_ring_start_slot: SlotNumber,
++    },
+     /// journal 环长装不下 F 条记录（在飞上限 = 环槽数 ÷ F 是 0，D23（journal 的角色与格式） 已定项 18），在飞上限装不进系统配置里它那 4 字节
+     /// （mkfs 的 `JournalInFlightRecordLimitWiderThanItsFourByteField`；不拒的话挂载之后轮换系统配置槽时写这 4 字节那一句 panic），
+     /// 或环的末端越过同一槽记着的单元区起点（偏移 417 的 8 字节；与 checker 同一个判法，C475（非默认环长下单元区起点取编译期常量）之后
+@@ -659,14 +679,30 @@ const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET: usize =
+ /// 加密类型登记表里的「关」（未加密，D9（加密） 已定项 10；D22（单元原子性怎么合成） 已定项 17）。
+ const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFF: u8 = 0;
+ 
+-/// 格式允许的最大固定结构槽距：槽 1 整槽落在根环基址（区域 0 的起点）之前。逐档找槽 1 与读者判槽距共用这一个上界。
++/// 格式允许的最大固定结构槽距：槽 1 整槽落在第一版根环基址（区域 0 的起点）之前。逐档找槽 1 用它：那时一槽可择的都没有，
++/// 没有哪一槽自述的根环起点可读。读者判一槽的槽距用那一槽自述的根环起点（[`largest_fixed_structure_slot_spacing_under_the_root_ring_base`]）。
+ fn largest_fixed_structure_slot_spacing_the_format_allows() -> u64 {
+     region_start(0).0 - SYSTEM_CONFIGURATION_SLOT_BYTES
+ }
+ 
++/// 一槽自述的根环起点下格式允许的最大固定结构槽距：槽 1 整槽落在根环基址（该字段 × 16384）之前（D22（单元原子性怎么合成） 已定项 16
++/// 第 1、5 句）。根环起点是盘上读来的 8 字节：乘出来溢出时上界取 `u64::MAX`（基址在任何设备偏移之外，槽 1 落在它之前）；
++/// 基址不到一个系统配置槽宽时一档都不收（`None`）。
++fn largest_fixed_structure_slot_spacing_under_the_root_ring_base(
++    root_ring_base_slot: SlotNumber,
++) -> Option<u64> {
++    root_ring_base_slot.0.checked_mul(SLOT_BYTES).map_or(
++        Some(u64::MAX),
++        |root_ring_base_in_bytes| {
++            root_ring_base_in_bytes.checked_sub(SYSTEM_CONFIGURATION_SLOT_BYTES)
++        },
++    )
++}
++
+ /// 一槽自证得过的系统配置，逐个判这个读者收不收它的池级不可变字段（[`SystemConfigurationValueOutsideWhatThisReaderAccepts`] 各成员的出处）。
+-/// 次序：格式版本、加密类型、槽距、根槽宽、环长、单元区起点——根槽宽的上界是槽距，所以槽距先判；环末端对单元区起点那一判先于起点是不是
+-/// 环长现算的那个，与 checker 的环长判法（`journal_ring_bytes_lie_in_the_supported_range`）报同一格。
++/// 次序：格式版本、加密类型、槽距、根槽宽、根环起点、journal 环起点、环长、单元区起点——根槽宽的上界是槽距，所以槽距先判；
++/// 槽距的上界取同一槽自述的根环起点，所以根环起点落在槽 1 之前的那一格报成槽距越界、与 checker 的 I-7.13 同一格，之后才判它等不等
++/// 第一版常量；环末端对单元区起点那一判先于起点是不是环长现算的那个，与 checker 的环长判法（`journal_ring_bytes_lie_in_the_supported_range`）报同一格。
+ fn system_configuration_values_this_reader_accepts(
+     slot: &[u8],
+     system_configuration: &SystemConfiguration,
+@@ -693,7 +729,10 @@ fn system_configuration_values_this_reader_accepts(
+     let sizes = &system_configuration.immutable.sizes;
+     let fixed_structure_slot_spacing = u64::from(sizes.fixed_structure_slot_spacing);
+     if fixed_structure_slot_spacing < FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES
+-        || fixed_structure_slot_spacing > largest_fixed_structure_slot_spacing_the_format_allows()
++        || largest_fixed_structure_slot_spacing_under_the_root_ring_base(
++            system_configuration.immutable.root_ring_base_slot,
++        )
++        .is_none_or(|largest_spacing| fixed_structure_slot_spacing > largest_spacing)
+     {
+         return Err(
+             SystemConfigurationValueOutsideWhatThisReaderAccepts::FixedStructureSlotSpacingOutsideTheFormatRange {
+@@ -710,6 +749,24 @@ fn system_configuration_values_this_reader_accepts(
+             },
+         );
+     }
++    let recorded_root_ring_base_slot = system_configuration.immutable.root_ring_base_slot;
++    if recorded_root_ring_base_slot != ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION {
++        return Err(
++            SystemConfigurationValueOutsideWhatThisReaderAccepts::RootRingBaseNotTheFirstVersionSlot {
++                recorded_root_ring_base_slot,
++                first_version_root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
++            },
++        );
++    }
++    let recorded_journal_ring_start_slot = system_configuration.immutable.journal_ring_start_slot;
++    if recorded_journal_ring_start_slot != JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION {
++        return Err(
++            SystemConfigurationValueOutsideWhatThisReaderAccepts::JournalRingStartNotTheFirstVersionSlot {
++                recorded_journal_ring_start_slot,
++                first_version_journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
++            },
++        );
++    }
+     let recorded_unit_area_start_slot = unit_area_start_slot_recorded_in_the_slot(slot);
+     // 环末端 = 环起点 + 环长；单元区起点 × 16384。两个都是盘上读来的数：乘加溢出时环末端算越界，起点乘出来溢出时它在任何设备偏移之外。
+     let journal_ring_end_in_bytes =
+@@ -1187,19 +1244,17 @@ pub fn readable_roots<Reader: PoolReader + ?Sized>(
+     roots
+ }
+ 
+-/// 读根环，读不出的槽按这个进程知不知道那里住着一条根分两类（D16（发布语义） 已定项 1「根槽这一次读坏」那一行的分法，用户 2026-09-26 定；
+-/// 与 `mount::rollback_floor_ceiling` 读根环同一个分法）：每个槽读一次；读不出（[`BadRootRingSlotReading::Unreadable`]：设备报错、越界）的槽
+-/// 不在 `ring_slots_known_to_hold_a_root` 里（挂载那一刻就读不出或自证不过、这个进程之后也没写过）的当没有根、不重读；在里面的
+-/// （挂载那一刻读得出、或这个进程写过且 FUA 返回过，`allocator::RootRingOccupancy::ring_slots_known_to_hold_a_root`）立即重读一次
+-/// （C554 乙的形态，R = 1），重读读得出就照它算，仍读不出就报错，不按有根或没根猜。读得出、自证不过的槽（第一遍或重读那一遍）照旧当没有根，
+-/// 不分类、不重读：合入后验证一的规格只要「读不出」这一支（D16 那一行另写的「或自证不过」没接进这两处读，带 F 的根被改坏、F 由系统配置撑着的
+-/// 那一形——`reuse_after_raising_the_floor.rs` 的 `floor_carried_by_only_one_device_root_and_the_system_configuration_…`——
+-/// 管理员回退照旧判到「低于 F_生效」）。交回读得出的每一条根连同它的槽，按根环槽的次序。
++/// 读根环，读坏的槽按这个进程知不知道那里住着一条根分两类（D16（发布语义） 已定项 1「根槽这一次读坏」那一行全句，用户 2026-09-26 定；
++/// 与 `mount::rollback_floor_ceiling` 读根环同一个分法）：每个槽读一次；读坏（读不出 [`BadRootRingSlotReading::Unreadable`]：设备报错、越界；
++/// 或自证不过 [`BadRootRingSlotReading::NotSelfVerified`]）的槽不在 `ring_slots_known_to_hold_a_root` 里（挂载那一刻就读不出或自证不过、
++/// 这个进程之后也没写过）的当没有根、不重读；在里面的（挂载那一刻读得出、或这个进程写过且 FUA 返回过，
++/// `allocator::RootRingOccupancy::ring_slots_known_to_hold_a_root`）立即重读一次（C554 乙的形态，R = 1），重读自证得过就照它算，
++/// 仍坏（读不出或自证不过）就报错，不按有根或没根猜。交回读得出的每一条根连同它的槽，按根环槽的次序。
+ /// 挂着时抬 F 重算影子账与回收门槛、管理员回退判候选与算 F 生效值用它（C554 乙报告 Q6：`readable_roots` 把读不出的槽一律当没有根，
+ /// 那一槽里的被抛弃根引用的槽不隔离、也不计进读不出账的被抛弃根）。
+ ///
+ /// # Errors
+-/// 知道住着根的槽重读仍读不出 ⇒ [`RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread`]（按 [`every_root_ring_slot`] 的次序第一个）。
++/// 知道住着根的槽重读仍坏 ⇒ [`RootRingSlotKnownToHoldARootStillBadAfterOneReread`]（按 [`every_root_ring_slot`] 的次序第一个）。
+ /// 只读盘。
+ pub fn readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_once<
+     Reader: PoolReader + ?Sized,
+@@ -1209,10 +1264,7 @@ pub fn readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_
+     immutable_sizes: &SystemImmutableSizes,
+     filesystem_identifier: &[u8; 16],
+     ring_slots_known_to_hold_a_root: &BTreeSet<RootRingSlot>,
+-) -> Result<
+-    Vec<(RootRingSlot, RootRecord)>,
+-    RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread,
+-> {
++) -> Result<Vec<(RootRingSlot, RootRecord)>, RootRingSlotKnownToHoldARootStillBadAfterOneReread> {
+     let read_the_slot = |ring_slot| {
+         read_root_ring_slot(
+             reader,
+@@ -1223,25 +1275,25 @@ pub fn readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_
+         )
+     };
+     let mut roots = Vec::new();
+-    // 迭代次数的上界是根环槽数 R × S；跨轮只带已认出的根。提前出口只有「知道住着根的槽重读仍读不出」一个。
++    // 迭代次数的上界是根环槽数 R × S；跨轮只带已认出的根。提前出口只有「知道住着根的槽重读仍坏」一个。
+     for ring_slot in every_root_ring_slot(immutable_sizes) {
+-        match read_the_slot(ring_slot) {
++        let first_reading = match read_the_slot(ring_slot) {
+             RootRingSlotReading::SelfVerified(root) => {
+                 roots.push((ring_slot, root));
+                 continue;
+             }
+-            RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified) => continue,
+-            RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => {}
+-        }
++            RootRingSlotReading::Bad(first_reading) => first_reading,
++        };
+         if !ring_slots_known_to_hold_a_root.contains(&ring_slot) {
+             continue;
+         }
+         match read_the_slot(ring_slot) {
+             RootRingSlotReading::SelfVerified(root) => roots.push((ring_slot, root)),
+-            RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified) => {}
+-            RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => {
+-                return Err(RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread {
++            RootRingSlotReading::Bad(reread) => {
++                return Err(RootRingSlotKnownToHoldARootStillBadAfterOneReread {
+                     ring_slot,
++                    first_reading,
++                    reread,
+                 });
+             }
+         }
+@@ -1261,7 +1313,7 @@ pub fn readable_roots_rereading_ring_slots_known_to_hold_a_root_once<
+     immutable_sizes: &SystemImmutableSizes,
+     filesystem_identifier: &[u8; 16],
+     ring_slots_known_to_hold_a_root: &BTreeSet<RootRingSlot>,
+-) -> Result<Vec<RootRecord>, RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread> {
++) -> Result<Vec<RootRecord>, RootRingSlotKnownToHoldARootStillBadAfterOneReread> {
+     readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_once(
+         reader,
+         region_devices,
+@@ -1468,7 +1520,7 @@ pub fn effective_rollback_floor_rereading_the_newest_instance_table_once<
+ /// 那样 F 生效值可以算低，低于真 F 的目标被当成候选）。
+ ///
+ /// # Errors
+-/// 知道住着根的槽重读仍读不出 ⇒ [`EffectiveFloorReadingStillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot`]；
++/// 知道住着根的槽重读仍坏 ⇒ [`EffectiveFloorReadingStillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot`]；
+ /// 最新那条根的实例表重读仍读不出 ⇒ [`EffectiveFloorReadingStillUnreadableAfterOneReread::InstanceTableOfTheNewestRoot`]。只读盘、不写盘。
+ pub fn effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instance_table_once<
+     Reader: PoolReader + ?Sized,
+diff --git a/crates/singlefs-core/src/system_configuration.rs b/crates/singlefs-core/src/system_configuration.rs
+index fe2acdd7..cba2f345 100644
+--- a/crates/singlefs-core/src/system_configuration.rs
++++ b/crates/singlefs-core/src/system_configuration.rs
+@@ -44,6 +44,10 @@ const FSID_OFFSET: usize = 4 + 2 + 96;
+ /// 写侧 [`SystemConfiguration::to_slot`] 写它之前断言位置、读侧 [`SystemConfiguration::parse_slot`] 按它切，
+ /// 一个偏移只有这一处定义。
+ const ROOT_RING_SLOTS_PER_REGION_OFFSET: u64 = 362;
++/// 几何段里「journal 环起点」那 8 字节（16 KiB 槽号，字段表 `layout/01-first-txn.md` 一）。写侧写它之前断言位置、读侧按它切。
++const JOURNAL_RING_START_SLOT_OFFSET: u64 = 325;
++/// 几何段里「根环起点」那 8 字节（16 KiB 槽号，D22（单元原子性怎么合成） 已定项 16 第 1 句）。写侧写它之前断言位置、读侧按它切。
++const ROOT_RING_BASE_SLOT_OFFSET: u64 = 371;
+ const REGION_DEVICES_OFFSET: u64 = 379;
+ /// 几何段里「单元区起始槽号」那 8 字节（字段表 `layout/01-first-txn.md` 一；D3（空间分配） 已定项 10 ④）。
+ /// 写侧 [`SystemConfiguration::to_slot`] 写它之前断言位置、读侧 [`unit_area_start_slot_recorded_in_the_slot`] 按它切。
+@@ -54,6 +58,14 @@ const ROLLBACK_FLOOR_FIELD_BYTES: u64 = 8;
+ /// 回退下界 F 住字段表最后一行、journal 实例代号之后（D22（单元原子性怎么合成） 已定项 9）：偏移 = 字段表合计减它自己的宽，
+ /// 从格式常量 [`SYSTEM_CONFIGURATION_BYTES`] 推出来，不另写一个数。写侧写它之前断言位置、读侧按它切。
+ const ROLLBACK_FLOOR_OFFSET: u64 = SYSTEM_CONFIGURATION_BYTES - ROLLBACK_FLOOR_FIELD_BYTES;
++/// 第一版写进、也只收的 journal 环起点（16 KiB 槽号 1024，D22（单元原子性怎么合成） 已定项 16 第 1 句）：mkfs 与写入口照它写，
++/// 读者择系统配置时拿槽里读到的与它比，不等整池拒（`recovery` 的 `system_configuration_values_this_reader_accepts`）。
++/// core 读写 journal 环按格式常量走，这一判保证盘上那一份与它相同。
++pub const JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION: SlotNumber =
++    SlotNumber(JOURNAL_RING_START_SLOT);
++/// 第一版写进、也只收的根环起点（16 KiB 槽号 64 = 1 MiB，D22（单元原子性怎么合成） 已定项 16 第 1 句）：同上，core 读写根环按格式常量走
++/// （`root_ring::region_start`）。
++pub const ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION: SlotNumber = SlotNumber(ROOT_RING_BASE_SLOT);
+ /// D2（RAID 条带策略） 已定项 18：第一版 w_max 与 g 都写 4。
+ const MAXIMUM_STRIPE_WIDTH: u8 = 4;
+ const GROUP_SIZE: u8 = 4;
+@@ -156,8 +168,10 @@ impl SystemImmutableSizes {
+ /// 自举头 8 行 147（magic 4 + 格式版本 2 + feature bits 96 + fsid 16 + 写入者身份 20 +
+ /// 校验和算法标识 1 + 本盘设备号 4 + 设备数 devs 4）+ 加密预留 6 行 114（系统配置自身 MAC 16 +
+ /// nonce 水位 12 + KDF 标识 4 + 加密类型 1 + MAC 长度声明 1 + 主密钥槽 80）+ 几何段除节点大小之外的
+-/// 23 行 128。这 37 行里只有下面 5 个字段（`sizes` 里 4 个值，合起来 8 个值）在内存里存着，
+-/// 其余由 [`SystemConfiguration::to_slot`] 照格式常量写死。
++/// 23 行 128。这 37 行里只有下面 7 个字段（`sizes` 里 5 个值，合起来 11 个值）在内存里存着，
++/// 其余由 [`SystemConfiguration::to_slot`] 照格式常量写死。journal 环起点与根环起点两个字段读进来（代码三方 m2-closeout-code-r2
++/// 「core 与 checker 对系统配置几何字段的读法」：此前解槽跳过这两个字段、按编译期常量走，checker 按字段读，两边判不一致；
++/// 用户 2026-09-27 定「读字段，不等于常量就整池拒」）。
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+ pub struct SystemImmutableConfiguration {
+     pub filesystem_identifier: [u8; 16],
+@@ -166,6 +180,11 @@ pub struct SystemImmutableConfiguration {
+     pub device_count: u32,
+     pub region_devices: [DeviceIdentity; 3],
+     pub sizes: SystemImmutableSizes,
++    /// journal 环起点（偏移 325，16 KiB 槽号）。写者写 [`JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION`]；读者收的只有它。
++    pub journal_ring_start_slot: SlotNumber,
++    /// 根环起点（偏移 371，16 KiB 槽号；基址 = 该字段 × 16384，D22（单元原子性怎么合成） 已定项 16 第 1 句）。
++    /// 写者写 [`ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION`]；读者收的只有它，判固定结构槽距的上界用它（同一槽自述的根环起点）。
++    pub root_ring_base_slot: SlotNumber,
+ }
+ 
+ impl SystemImmutableConfiguration {
+@@ -402,7 +421,8 @@ impl SystemConfiguration {
+             writer.put_u32(u32::try_from(LOC_ENTRY).expect("位置条目宽度"));
+             writer.put_u32(self.immutable.sizes.physical_block_size);
+             writer.put_u32(0); // 扩展点声明值 N：第一版 0（D21（权威态与派生态的分界） 已定项 8）
+-            writer.put_u64(JOURNAL_RING_START_SLOT);
++            writer.assert_position(JOURNAL_RING_START_SLOT_OFFSET, "journal 环起点");
++            writer.put_u64(self.immutable.journal_ring_start_slot.0);
+             writer.put_u64(self.immutable.sizes.journal_ring_bytes);
+             writer.put_u32(u32::try_from(JOURNAL_RECORD_BYTES).expect("记录尺寸"));
+             let in_flight_limit =
+@@ -422,7 +442,8 @@ impl SystemConfiguration {
+             );
+             writer.put_u32(u32::try_from(ROOT_RING_PRIME_STEP).expect("P"));
+             writer.put_u32(u32::try_from(ROOT_RING_CHUNK_BYTES).expect("chunk"));
+-            writer.put_u64(ROOT_RING_BASE_SLOT);
++            writer.assert_position(ROOT_RING_BASE_SLOT_OFFSET, "根环起点");
++            writer.put_u64(self.immutable.root_ring_base_slot.0);
+             writer.assert_position(REGION_DEVICES_OFFSET, "根环逐区域设备身份");
+             for region_device in &self.immutable.region_devices {
+                 writer.put_u32(region_device.0);
+@@ -494,8 +515,22 @@ impl SystemConfiguration {
+         let slot_generation = reader.get_u64();
+         reader.skip(32 + 16 + 12 + 4 + 1 + 1 + 80 + 4 + 4 + 4 + 4);
+         let physical_block_size = reader.get_u32();
++        let journal_ring_start_slot = SlotNumber(
++            ByteReader::at(
++                bytes,
++                usize::try_from(JOURNAL_RING_START_SLOT_OFFSET).expect("325"),
++            )
++            .get_u64(),
++        );
+         reader.skip(4 + 8);
+         let journal_ring_bytes = reader.get_u64();
++        let root_ring_base_slot = SlotNumber(
++            ByteReader::at(
++                bytes,
++                usize::try_from(ROOT_RING_BASE_SLOT_OFFSET).expect("371"),
++            )
++            .get_u64(),
++        );
+         let mut region_reader =
+             ByteReader::at(bytes, usize::try_from(REGION_DEVICES_OFFSET).expect("379"));
+         let region_devices = [
+@@ -527,6 +562,8 @@ impl SystemConfiguration {
+                     journal_ring_bytes,
+                     root_ring_slots_per_region,
+                 },
++                journal_ring_start_slot,
++                root_ring_base_slot,
+             },
+             // 节点大小那 4 字节不读回来：它今天只可能是格式常量 `NODE_BYTES`，读回来会多出一个
+             // 「盘上的值与格式常量不符」的状态而没人判它。有了 mkfs 参数那天连着判定一起加。
+@@ -608,6 +645,8 @@ mod tests {
+                     journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
+                     root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
+                 },
++                journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
++                root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+             },
+             mutable: SystemMutableConfiguration,
+             runtime: SystemRuntimeConfiguration,
+diff --git a/crates/singlefs-core/src/transaction.rs b/crates/singlefs-core/src/transaction.rs
+index b13ce86b..405c25f1 100644
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -93,6 +93,7 @@ use crate::root_ring::{slot_offset, target_for_publish};
+ use crate::system_configuration::{
+     journal_in_flight_record_limit, SystemConfiguration, SystemImmutableConfiguration,
+     SystemMutableConfiguration, SystemRuntimeConfiguration, SystemRuntimeQuantities,
++    JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION, ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+ };
+ use crate::unit::{
+     build_data_unit, build_index_node, build_packed_unit, data_unit_payload_capacity,
+@@ -389,6 +390,8 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
+                 device_count: u32::try_from(self.devices.len()).expect("设备数"),
+                 region_devices: self.parameters.region_devices,
+                 sizes: self.parameters.geometry,
++                journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
++                root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+             },
+             mutable: SystemMutableConfiguration,
+             runtime: SystemRuntimeConfiguration,
+diff --git a/crates/singlefs-harness/src/history.rs b/crates/singlefs-harness/src/history.rs
+index 12108bfe..894b2981 100644
+--- a/crates/singlefs-harness/src/history.rs
++++ b/crates/singlefs-harness/src/history.rs
+@@ -2387,6 +2387,9 @@ fn mount_error_member(error: &MountError) -> String {
+         MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. } => {
+             "CallerParametersDisagreeWithTheSelectedSystemConfiguration"
+         }
++        MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. } => {
++            "DevicesBehindTheCurrentVersionAndMissingItsUnits"
++        }
+         MountError::SequenceNumberPastTheTopOfItsRange(_) => "SequenceNumberPastTheTopOfItsRange",
+         MountError::FloorRaiseFailedAfterTheMountsPublishes(failed) => {
+             return format!(
+@@ -2824,7 +2827,9 @@ fn settle_user_change(
+         Err(
+             UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount { .. }
+             | UserChangeRefused::NoFileVersionToChange
+-            | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. },
++            | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. }
++            | UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable { .. }
++            | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. },
+         ) => &[],
+         Err(UserChangeRefused::Publish { floor_raises, .. }) => floor_raises,
+         Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(refused)) => &refused.floor_raises,
+@@ -2907,6 +2912,15 @@ fn settle_user_change(
+             "UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration".to_string(),
+             ObservedRefusalReason::Unexplained,
+         ),
++        // 执行器交的盘体各在自己的身份上、没换过旧快照（代码三方 m2-closeout-code-r2 那两判）：走不到，走到了就按说不出理由的拒绝判。
++        UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable { .. } => (
++            "UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable".to_string(),
++            ObservedRefusalReason::Unexplained,
++        ),
++        UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. } => (
++            "UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits".to_string(),
++            ObservedRefusalReason::Unexplained,
++        ),
+         UserChangeRefused::Publish { cause, .. } => (
+             publish_error_member(cause),
+             refusal_reason_of_publish_error(cause),
+diff --git a/crates/singlefs-harness/src/model_comparison.rs b/crates/singlefs-harness/src/model_comparison.rs
+index 81e417cc..73141d47 100644
+--- a/crates/singlefs-harness/src/model_comparison.rs
++++ b/crates/singlefs-harness/src/model_comparison.rs
+@@ -775,9 +775,11 @@ pub fn refusal_reason_of_mount_error(error: &MountError) -> ObservedRefusalReaso
+         | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. }
+         | MountError::RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot(_)
+         | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided { .. }
+-        // 盘表里同一个身份交了几次、调用方参数与盘上系统配置不一致：随机历史每次都交整池两块盘、用建池的那一份参数，走不到。
++        // 盘表里同一个身份交了几次、调用方参数与盘上系统配置不一致、有盘落后于现行那一版又缺它的单元：随机历史每次都交整池两块盘
++        // （没换过盘）、用建池的那一份参数，走不到。
+         | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
+         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
++        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
+         // 盘上的实例代号或 txg 已到顶：坏镜像才有。
+         | MountError::SequenceNumberPastTheTopOfItsRange(_) => ObservedRefusalReason::Unexplained,
+     }
+@@ -828,6 +830,7 @@ pub fn root_ring_slot_still_bad_after_one_reread_of_mount_error(
+         | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided { .. }
+         | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
+         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
++        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
+         | MountError::SequenceNumberPastTheTopOfItsRange(_)
+         | MountError::NewerStateStillUnreadableAfterOneReread(_) => None,
+     }
+@@ -864,6 +867,7 @@ pub fn reported_ceiling_of_mount_error(error: &MountError) -> Option<ModelCheckp
+         | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided { .. }
+         | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
+         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
++        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
+         | MountError::SequenceNumberPastTheTopOfItsRange(_)
+         | MountError::NewerStateStillUnreadableAfterOneReread(_) => None,
+     }
+diff --git a/crates/singlefs-harness/tests/a_floor_raise_refused_for_space_counts_as_short_of_space.rs b/crates/singlefs-harness/tests/a_floor_raise_refused_for_space_counts_as_short_of_space.rs
+index fd5ed16a..c6ad0f8a 100644
+--- a/crates/singlefs-harness/tests/a_floor_raise_refused_for_space_counts_as_short_of_space.rs
++++ b/crates/singlefs-harness/tests/a_floor_raise_refused_for_space_counts_as_short_of_space.rs
+@@ -40,17 +40,19 @@ fn pool_after_overwrites_with_the_space_admission_switched_off(
+     pool
+ }
+ 
+-/// 覆盖写 18 次之后第 19 次：用户那次发布取不到落点，会话推抬 F，那一串两次空发布在预演里第 2 次也取不到落点。
++/// 覆盖写 19 次之后第 20 次：用户那次发布取不到落点，会话推抬 F，那一串三次空发布在预演里第 1 次就取不到落点
++/// （A3b 把小盘改成 6 MiB 环、单元区从 1408 起之前是「18 次之后第 19 次、两次空发布里第 2 次」：分配记录树按绝对槽号按位置寻址，
++/// 单元区挪了位置，每次发布重写的节点跟着变，撞墙的步数与那一串的次数都变；草稿探针在新几何上逐次覆盖写现跑的数）。
+ /// 会话报空间不够（`NoSpaceAfterRaisingTheFloor`），最后一次被拒是用户那次的落点拒绝、一串都没推成；
+ /// 这一次一个字节都没写（用户那次在落盘之前被拒，抬 F 那一串在预演里被拒），会话的现行版本不动。
+ #[test]
+ fn a_floor_raise_pushed_by_the_session_whose_own_publishes_find_no_slot_reports_no_space() {
+-    let mut pool = pool_after_overwrites_with_the_space_admission_switched_off(18);
++    let mut pool = pool_after_overwrites_with_the_space_admission_switched_off(19);
+     let image_before = pool.image();
+     let root_before = *pool.session().current.root();
+     let refusal = pool
+         .overwrite(OVERWRITE_BYTES)
+-        .expect_err("第 19 次覆盖写：单元区满了，推抬 F 也推不出空间");
++        .expect_err("第 20 次覆盖写：单元区满了，推抬 F 也推不出空间");
+     let UserChangeRefused::NoSpaceAfterRaisingTheFloor(no_space) = refusal else {
+         panic!("抬 F 自己也取不到落点，该报空间不够 NoSpaceAfterRaisingTheFloor，实际 {refusal:?}")
+     };
+@@ -84,15 +86,15 @@ fn a_floor_raise_pushed_by_the_session_whose_own_publishes_find_no_slot_reports_
+         matches!(
+             **raise_refusal,
+             MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite {
+-                refused_publish_in_the_sequence: 2,
+-                publishes_in_the_sequence: 2,
++                refused_publish_in_the_sequence: 1,
++                publishes_in_the_sequence: 3,
+                 cause: PublishError::PlacementRefused {
+                     refusal: PlacementRefusal::NoFreeSlotOnAnyDevice,
+                     ..
+                 },
+             }
+         ),
+-        "抬 F 那一串两次空发布在预演里第 2 次取不到落点：{raise_refusal:?}"
++        "抬 F 那一串三次空发布在预演里第 1 次就取不到落点：{raise_refusal:?}"
+     );
+     assert_eq!(
+         pool.image(),
+@@ -106,11 +108,13 @@ fn a_floor_raise_pushed_by_the_session_whose_own_publishes_find_no_slot_reports_
+     );
+ }
+ 
+-/// 覆盖写 17 次之后崩了再挂（空间准入判着）：取号之前不够，写行与暖机之后推抬 F，那一串三次空发布在预演里第 1 次就取不到落点。
++/// 覆盖写 18 次之后崩了再挂（空间准入判着）：取号之前不够，写行与暖机之后推抬 F，那一串两次空发布在预演里第 1 次就取不到落点。
++/// （A3b 把小盘改成 6 MiB 环、单元区从 1408 起之前是「17 次、三次空发布里第 1 次」；新几何下 17 次那一串是三次里第 3 次才取不到，
++/// 草稿探针在 16–18 次上现跑，取 18 次，留住「第 1 次就取不到」那一形。）
+ /// 挂载照样做成（C565 那一格：推满仍不够，`StillShortAfterTheFloorRaises`），实例已取、一串都没推成。
+ #[test]
+ fn a_mount_whose_floor_raise_after_the_row_publish_finds_no_slot_is_still_made_and_still_short() {
+-    let mut pool = pool_after_overwrites_with_the_space_admission_switched_off(17);
++    let mut pool = pool_after_overwrites_with_the_space_admission_switched_off(18);
+     let output = pool.crash_and_mount_writable().unwrap_or_else(|error| {
+         panic!("抬 F 自己也取不到落点是推满仍不够：挂载照样做成（C565 那一格），实际 {error:?}")
+     });
+@@ -140,13 +144,13 @@ fn a_mount_whose_floor_raise_after_the_row_publish_finds_no_slot_is_still_made_a
+             **raise_refusal,
+             MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite {
+                 refused_publish_in_the_sequence: 1,
+-                publishes_in_the_sequence: 3,
++                publishes_in_the_sequence: 2,
+                 cause: PublishError::PlacementRefused {
+                     refusal: PlacementRefusal::NoFreeSlotOnAnyDevice,
+                     ..
+                 },
+             }
+         ),
+-        "抬 F 那一串三次空发布在预演里第 1 次就取不到落点：{raise_refusal:?}"
++        "抬 F 那一串两次空发布在预演里第 1 次就取不到落点：{raise_refusal:?}"
+     );
+ }
+diff --git a/crates/singlefs-harness/tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs b/crates/singlefs-harness/tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs
+new file mode 100644
+index 00000000..d78c88e8
+--- /dev/null
++++ b/crates/singlefs-harness/tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs
+@@ -0,0 +1,319 @@
++//! C577（系统配置没见证到的最新根，乙罩不到） 结清 ③：零单元发布（`transaction::publish_without_units`）轮换之后那道屏障报错时，
++//! 这次发布不冻结——零单元发布不经分配器，没有「冻结着等原样重发」那一层——整个可写挂载返回错误
++//! （D23（journal 的角色与格式） 已定项 14「这一版的失败处置」：由调用方冻结或整个挂载返回错误，射程写成了选择）。
++//! 这条用例钉住这一支今天的结局，不改行为：挂载返回哪个错误成员、盘上哪几步已落、之后的可写挂载怎么判。
++//!
++//! 历史：只做过 mkfs 的池（树表 0 条、上一个实例是 0）第一次可写挂载：取号 1 → 写行那次发布是零单元发布（txg 1，根落盘 1）
++//! → 盘 1 上它轮换之后那道屏障报错一次。之后换回不报错的设备、重开再可写挂载一次。
++//!
++//! 同一份文件还把 C577 结清 ② 的 litmus 绑到代码：`litmus/publish-returns-after-the-rotation-barrier.litmus` 与它的
++//! `-nofence` 对照，P0 的写与屏障次序就是录制流里发布最后三步的次序（`.claude/scripts/lkmm.sh` 按文件名认这份测试）。
++
++mod common;
++
++use common::{disk_snapshot, format_pool, geometry, parameters};
++use singlefs_core::address::{
++    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
++};
++use singlefs_core::block_device::{
++    BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
++};
++use singlefs_core::mount::{mount_writable, MountError};
++use singlefs_core::transaction::PublishError;
++use singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE;
++use singlefs_harness::fault_injection::injected_block_device_error;
++use singlefs_harness::segments::StepKind;
++
++/// 一块盘从上一道屏障起写过什么：发布的最后三步是根槽 FUA → 系统配置槽轮换 → 屏障（`persist_the_root_then_rotate_the_system_configuration`）。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++enum SinceTheLastBarrier {
++    /// 还没有根槽 FUA 写（取号那两次系统配置槽写之后的那道屏障落在这里，不拦）。
++    NoRootSlotWritten,
++    /// 写过根槽（FUA），还没轮换系统配置。
++    RootSlotWrittenForceUnitAccess,
++    /// 根槽之后轮换了系统配置：下一道屏障就是轮换之后那一道。
++    SystemConfigurationRotatedAfterTheRootSlot,
++}
++
++/// 盘 1 上「根槽 FUA → 系统配置槽写」之后的第一道屏障报块设备错一次（不转给里面的设备、录制流里没有它），之后照转；写、读都照转。
++struct BarrierAfterTheRotationFailsOnce<Inner: BlockDevice> {
++    inner: Inner,
++    is_the_failing_device: bool,
++    since_the_last_barrier: SinceTheLastBarrier,
++    barriers_refused: u64,
++}
++
++impl<Inner: BlockDevice> BlockDevice for BarrierAfterTheRotationFailsOnce<Inner> {
++    fn read_at(
++        &self,
++        offset: DeviceOffsetInBytes,
++        buffer: &mut [u8],
++    ) -> Result<(), BlockDeviceError> {
++        self.inner.read_at(offset, buffer)
++    }
++    fn write_at(
++        &mut self,
++        offset: DeviceOffsetInBytes,
++        bytes: &[u8],
++        durability: WriteDurability,
++    ) -> Result<(), BlockDeviceError> {
++        let system_configuration_end_in_bytes = SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE
++            * u64::from(parameters().geometry.fixed_structure_slot_spacing);
++        let is_a_system_configuration_slot_write = offset.0 < system_configuration_end_in_bytes;
++        self.since_the_last_barrier = match (durability, self.since_the_last_barrier) {
++            (WriteDurability::ForceUnitAccess, _) => {
++                SinceTheLastBarrier::RootSlotWrittenForceUnitAccess
++            }
++            (WriteDurability::Plain, SinceTheLastBarrier::RootSlotWrittenForceUnitAccess)
++                if is_a_system_configuration_slot_write =>
++            {
++                SinceTheLastBarrier::SystemConfigurationRotatedAfterTheRootSlot
++            }
++            (
++                WriteDurability::Plain,
++                unchanged @ (SinceTheLastBarrier::NoRootSlotWritten
++                | SinceTheLastBarrier::RootSlotWrittenForceUnitAccess
++                | SinceTheLastBarrier::SystemConfigurationRotatedAfterTheRootSlot),
++            ) => unchanged,
++        };
++        self.inner.write_at(offset, bytes, durability)
++    }
++    fn write_zeroes_at(
++        &mut self,
++        offset: DeviceOffsetInBytes,
++        length: u64,
++    ) -> Result<(), BlockDeviceError> {
++        self.inner.write_zeroes_at(offset, length)
++    }
++    fn barrier(&mut self) -> Result<(), BlockDeviceError> {
++        if self.is_the_failing_device
++            && self.since_the_last_barrier
++                == SinceTheLastBarrier::SystemConfigurationRotatedAfterTheRootSlot
++            && self.barriers_refused == 0
++        {
++            self.barriers_refused += 1;
++            return Err(injected_block_device_error("刷盘"));
++        }
++        self.since_the_last_barrier = SinceTheLastBarrier::NoRootSlotWritten;
++        self.inner.barrier()
++    }
++    fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
++        self.inner.probe_physical_block_size()
++    }
++    fn size_in_bytes(&self) -> u64 {
++        self.inner.size_in_bytes()
++    }
++}
++
++/// 录制流里 mkfs 之后的每一步：(盘, 步骤种类)。
++fn steps_after_the_mkfs(
++    operations: &[singlefs_harness::RecordedOperation],
++    mkfs_operation_count: usize,
++) -> Vec<(DeviceIdentity, StepKind)> {
++    operations[mkfs_operation_count..]
++        .iter()
++        .map(|operation| (operation.device, geometry().classify(operation)))
++        .collect()
++}
++
++#[test]
++fn a_zero_unit_publish_whose_post_rotation_barrier_fails_is_not_frozen_and_the_whole_mount_returns_the_error(
++) {
++    let mut pool = format_pool("c577-zero-unit-publish-barrier-after-the-rotation-fails");
++    let mut wrapped: Vec<(
++        DeviceIdentity,
++        BarrierAfterTheRotationFailsOnce<common::Recorded>,
++    )> = pool
++        .devices
++        .take()
++        .expect("mkfs 之后盘还开着")
++        .into_iter()
++        .map(|(identity, device)| {
++            (
++                identity,
++                BarrierAfterTheRotationFailsOnce {
++                    inner: device,
++                    is_the_failing_device: identity == DeviceIdentity(1),
++                    since_the_last_barrier: SinceTheLastBarrier::NoRootSlotWritten,
++                    barriers_refused: 0,
++                },
++            )
++        })
++        .collect();
++
++    let failure = match mount_writable(&parameters(), &mut wrapped) {
++        Err(failure) => failure,
++        Ok(mounted) => panic!(
++            "盘 1 上零单元发布轮换之后那道屏障报错：挂载不许做成（今天不冻结、不重发），得到实例 {:?}",
++            mounted.output.instance
++        ),
++    };
++    let MountError::Publish(publish_sequence_failed) = &failure else {
++        panic!("整个挂载返回取号之后那一串发布的失败（MountError::Publish），得到 {failure:?}")
++    };
++    assert!(
++        matches!(publish_sequence_failed.cause, PublishError::BlockDevice(_)),
++        "失败的是块设备错：{:?}",
++        publish_sequence_failed.cause
++    );
++    assert!(
++        publish_sequence_failed
++            .writes_of_persisted_publishes
++            .is_empty(),
++        "报错的是取号之后第一次发布（写行那次零单元发布），之前没有落盘的发布：{:?}",
++        publish_sequence_failed.writes_of_persisted_publishes
++    );
++    assert_eq!(
++        publish_sequence_failed.writes_of_failed_publishes.len(),
++        1,
++        "落盘阶段失败的恰好一次"
++    );
++    let barriers_refused: Vec<u64> = wrapped
++        .iter()
++        .map(|(_, device)| device.barriers_refused)
++        .collect();
++    assert_eq!(barriers_refused, vec![0, 1], "盘 1 拒了恰好一道屏障");
++    pool.devices = Some(
++        wrapped
++            .into_iter()
++            .map(|(identity, device)| (identity, device.inner))
++            .collect(),
++    );
++
++    // 盘上已落的：取号（两盘各一次系统配置槽写 + 屏障），零单元发布的空记录（两盘镜像）+ 屏障、根槽 FUA（txg 1 → 区域 1 → 盘 1）、
++    // 两盘的轮换，再是盘 0 那一道屏障；盘 1 那一道报错、没进录制流。
++    let steps = steps_after_the_mkfs(&pool.stream.operations(), pool.mkfs_operation_count);
++    assert_eq!(
++        steps,
++        vec![
++            (DeviceIdentity(0), StepKind::SystemConfigurationSlot),
++            (DeviceIdentity(1), StepKind::SystemConfigurationSlot),
++            (DeviceIdentity(0), StepKind::Barrier),
++            (DeviceIdentity(1), StepKind::Barrier),
++            (DeviceIdentity(0), StepKind::JournalRecord),
++            (DeviceIdentity(1), StepKind::JournalRecord),
++            (DeviceIdentity(0), StepKind::Barrier),
++            (DeviceIdentity(1), StepKind::Barrier),
++            (DeviceIdentity(1), StepKind::RootRecordFua),
++            (DeviceIdentity(0), StepKind::SystemConfigurationSlot),
++            (DeviceIdentity(1), StepKind::SystemConfigurationSlot),
++            (DeviceIdentity(0), StepKind::Barrier),
++        ],
++        "取号与写行那次零单元发布发到盘上的每一步，止于盘 1 那道报错的屏障之前"
++    );
++    let snapshot_after_the_failure = disk_snapshot(&pool.memory_pool(), &pool.stream);
++    assert!(
++        snapshot_after_the_failure
++            .readable_roots
++            .iter()
++            .any(|root| root.instance == InstanceGeneration(1)
++                && root.checkpoint_txg == CheckpointTxg(1)),
++        "写行那次零单元发布的根（实例 1、txg 1）已落盘：{:?}",
++        snapshot_after_the_failure.readable_roots
++    );
++
++    // 之后的可写挂载：换回不报错的设备、重开。轮换已写进两块盘（盘 1 那一写没等到屏障，文件镜像上照样在），
++    // 系统配置见证到了实例 1 的那条记录，恢复择到实例 1 的根；取号 2。
++    let mut devices = pool.reopen_recorded();
++    let mounted =
++        mount_writable(&parameters(), &mut devices).expect("换回不报错的设备之后可写挂载做得成");
++    assert_eq!(
++        (
++            mounted.output.instance,
++            mounted.output.chosen_root.instance,
++            mounted.output.chosen_root.checkpoint_txg
++        ),
++        (
++            InstanceGeneration(2),
++            InstanceGeneration(1),
++            CheckpointTxg(1)
++        ),
++        "之后的可写挂载取号 2、择到失败那次挂载写行落下的根（实例 1、txg 1）"
++    );
++    pool.devices = Some(devices);
++}
++
++/// litmus 里发布一侧（P0）的写与屏障，按出现的次序认成步骤种类；`returned`（返回的那一刻）不是盘上的一步，不算。
++fn litmus_writer_steps_of(litmus_file_name: &str) -> Vec<StepKind> {
++    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
++        .join("../../litmus")
++        .join(litmus_file_name);
++    let text = std::fs::read_to_string(&path)
++        .unwrap_or_else(|error| panic!("读不了 {}：{error}", path.display()));
++    let writer = text
++        .split("P0(")
++        .nth(1)
++        .expect("litmus 里有 P0")
++        .split("\n}")
++        .next()
++        .expect("P0 有函数体");
++    writer
++        .lines()
++        .filter_map(|line| {
++            let line = line.trim();
++            if line.starts_with("smp_wmb()") {
++                Some(StepKind::Barrier)
++            } else if line.starts_with("WRITE_ONCE(*root") {
++                Some(StepKind::RootRecordFua)
++            } else if line.starts_with("WRITE_ONCE(*configuration") {
++                Some(StepKind::SystemConfigurationSlot)
++            } else {
++                None
++            }
++        })
++        .collect()
++}
++
++/// 录制流里一段步骤不分盘、相邻同类并成一步之后的次序（两块盘各一次轮换写、各一道屏障算一步）。
++fn collapsed_step_kinds(operations: &[singlefs_harness::RecordedOperation]) -> Vec<StepKind> {
++    let mut collapsed: Vec<StepKind> = Vec::new();
++    for operation in operations {
++        let kind = geometry().classify(operation);
++        if collapsed.last() != Some(&kind) {
++            collapsed.push(kind);
++        }
++    }
++    collapsed
++}
++
++/// 发布的最后三步与 litmus 的 P0 逐项相同：只做过 mkfs 的池第一次可写挂载，写行那次零单元发布与之后每次暖机空发布返回的那一刻，
++/// 录制流末尾是「根槽 FUA → 系统配置槽 → 屏障」；Never 那一条的 P0 就是这三步，`-nofence` 对照写的次序相同、少那一道屏障。
++#[test]
++fn the_rotation_barrier_litmus_writer_follows_the_last_three_steps_of_every_recorded_publish() {
++    let mut pool = format_pool("c577-rotation-barrier-litmus-binding");
++    let mounted = {
++        let devices = pool.devices.as_mut().expect("mkfs 之后盘还开着");
++        mount_writable(&parameters(), devices).expect("只做过 mkfs 的池可写挂载")
++    };
++    let publishes_in_the_mount = 1 + mounted.output.warm_up_publishes.len();
++    let operations = pool.stream.operations();
++    let collapsed = collapsed_step_kinds(&operations[pool.mkfs_operation_count..]);
++    let last_three_steps_of_a_publish = vec![
++        StepKind::RootRecordFua,
++        StepKind::SystemConfigurationSlot,
++        StepKind::Barrier,
++    ];
++    let publishes_ending_in_the_last_three_steps = collapsed
++        .windows(last_three_steps_of_a_publish.len())
++        .filter(|window| *window == last_three_steps_of_a_publish.as_slice())
++        .count();
++    assert_eq!(
++        publishes_ending_in_the_last_three_steps, publishes_in_the_mount,
++        "这次挂载的每次发布（写行一次、暖机 {} 次）都以根槽 FUA → 系统配置槽 → 屏障收尾：{collapsed:?}",
++        mounted.output.warm_up_publishes.len()
++    );
++    assert!(
++        collapsed.ends_with(&last_three_steps_of_a_publish),
++        "挂载返回的那一刻录制流以这三步收尾：{collapsed:?}"
++    );
++    assert_eq!(
++        litmus_writer_steps_of("publish-returns-after-the-rotation-barrier.litmus"),
++        last_three_steps_of_a_publish,
++        "publish-returns-after-the-rotation-barrier.litmus 的 P0 要与录制流里发布最后三步逐项相同"
++    );
++    assert_eq!(
++        litmus_writer_steps_of("publish-returns-after-the-rotation-barrier-nofence.litmus"),
++        vec![StepKind::RootRecordFua, StepKind::SystemConfigurationSlot],
++        "对照组写的次序相同、去掉轮换之后那一道屏障"
++    );
++}
+diff --git a/crates/singlefs-harness/tests/admission_formula_on_the_mounted_state.rs b/crates/singlefs-harness/tests/admission_formula_on_the_mounted_state.rs
+index f3d16e81..1fdc9857 100644
+--- a/crates/singlefs-harness/tests/admission_formula_on_the_mounted_state.rs
++++ b/crates/singlefs-harness/tests/admission_formula_on_the_mounted_state.rs
+@@ -466,7 +466,7 @@ fn image_of_the_devices(
+ /// 可写挂载那一处（C363 (b) 判决第四节第 2 条接进来；D16（发布语义） 已定项 1「准入」那一行定了不够时怎么办，用户 2026-09-26 定）：
+ /// 两块单元区 256 槽的小盘，第一个文件之后可写挂载、覆盖写 12 次的盘面上再可写挂载——取号之前按这次挂载的 rows0 算
+ /// （D28（挂载期承诺量） 已定项 3），扣掉实例切换预留、checkpoint 保留池（已定项 4，按最坏情况计，用户 2026-09-27 定）与已分配之后，
+-/// 两块盘的可用(d) 都是 −47 槽 < 0：
++/// 两块盘的可用(d) 都是 −39 槽 < 0（A3b 把小盘改成 6 MiB 环、单元区从 1408 起之前是 −47 槽）：
+ /// 实例切换的预留拿不到。写行那次发布照走切换预留、写完行与暖机之后推抬 F 的空发布、再判：这里推一串（F 抬到上限 14，3 次空发布），
+ /// 再判就够了，挂载做成（取号 3），交回 `MountSpaceAdmission::AdmittedAfterTheFloorRaises`，带着取号之前那一判的拒绝原样。
+ /// 推的那一串的根都带新 F = 14、接在暖机后面，现行那一版就是最后一次；挂载之后的镜像池级 checker 0 违例；按可写挂载的读数再判，每块盘可用 ≥ 0。
+@@ -503,12 +503,12 @@ fn writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_th
+                 .into_iter()
+                 .map(|device| DeviceShortOfDemand {
+                     device,
+-                    available: AvailableBytesOnOneDevice(-47 * i128::from(SLOT_BYTES)),
++                    available: AvailableBytesOnOneDevice(-39 * i128::from(SLOT_BYTES)),
+                     demand: BytesOnOneDevice::ZERO,
+                 })
+                 .collect(),
+         },
+-        "取号之前两块盘都短：可用 −47 槽，挂载这一刻不另要需求"
++        "取号之前两块盘都短：可用 −39 槽，挂载这一刻不另要需求"
+     );
+     assert_eq!(floor_raises.len(), 1, "推一串就够");
+     let raised = &floor_raises[0];
+@@ -577,22 +577,24 @@ fn writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_th
+     );
+ }
+ 
+-/// 发布路径那一处（C363 (b) 判决第四节第 2 条）：两块单元区 240 槽的小盘，第一个文件之后可写挂载、覆盖写 5 次的盘面上，进程重开、
+-/// 可写挂载（取号之前就够），在这次挂载里直接调发布路径再覆盖写一次：需求 = 这次发布新写的全部槽（D28（挂载期承诺量） 已定项 1 接线，
++/// 发布路径那一处（C363 (b) 判决第四节第 2 条）：两块单元区 256 槽的小盘，第一个文件之后可写挂载、覆盖写 4 次的盘面上，进程重开、
++/// 可写挂载（取号之前就够），在这次挂载里直接调发布路径接连覆盖写三次（都放行），第四次：需求 = 这次发布新写的全部槽（D28（挂载期承诺量） 已定项 1 接线，
+ /// 普通分配加固定点、不加换下的，用户 2026-09-25 定），每块盘 14 槽（普通分配 6、固定点 8），而两块盘的可用(d) 都只剩 11 槽
+ /// （实例切换的预留按下一次挂载的 rows0，已定项 3；checkpoint 保留池与 c_max 按最坏情况计，已定项 4，用户 2026-09-27 定）——
+ /// 在读盘核与动分配器之前返回 `PublishError::SpaceAdmissionRefused`：录制流一步没多、两块盘逐字节不变、`DiskSnapshot` 不变、
+ /// 分配器与发布之前逐项相同。这一格只有把固定点算进需求才拒：普通分配只有 6 槽 ≤ 11。需求那 14 槽从同一次覆盖写真发出去的角色现数
+ /// （关掉准入的那一次），不从读数反推。直接调发布路径不推抬 F（那是挂着的会话的事，`mounted_session`）。
+ /// 覆盖写 9 次那一份盘面（按树高、按每块盘一条叶路径计时这一格用它）在按最坏情况计之下挂载那一刻就要推抬 F、推完可用 44 槽，
+-/// 分不出「普通分配装得下、固定点装不下」，换成 5 次。
++/// 分不出「普通分配装得下、固定点装不下」，换成 5 次；A3b 把小盘改成 6 MiB 环、单元区从 1408 起之后（分配记录树按绝对槽号按位置寻址，
++/// 每次发布重写的节点跟着变），240 槽 5 次那一格第一次直接覆盖写就放行了。草稿探针在三档、覆盖写 1–12 次、挂载之后接连直接覆盖写
++/// 1–4 次上扫：可用落在 [普通分配 6, 需求) 之间的只有 256 槽、覆盖写 4 次、第 4 次直接覆盖写那一格，取它。
+ /// 判别力：同一次挂载里把只供测试的开关装成关掉准入，同一次覆盖写做成——拒的是式子，不是落点。
+ #[test]
+ fn an_overwrite_whose_new_slots_exceed_the_available_bytes_is_refused_by_the_space_admission_before_any_write(
+ ) {
+-    let device_width = HistoryDeviceWidth::UnitAreaOf240Slots;
+-    let image = small_pool_image_after_overwrites(device_width, 5);
+-    let content = content_of(DIRECT_OVERWRITE_CONTENT_BYTES, 1);
++    let device_width = HistoryDeviceWidth::UnitAreaOf256Slots;
++    let image = small_pool_image_after_overwrites(device_width, 4);
++    let content = content_of(DIRECT_OVERWRITE_CONTENT_BYTES, 4);
+     let publish_parameters = device_width.parameters();
+ 
+     let stream = SharedStream::new();
+@@ -615,9 +617,25 @@ fn an_overwrite_whose_new_slots_exceed_the_available_bytes_is_refused_by_the_spa
+         "取号之前就够，一次都没推：{:?}",
+         mount_output.space_admission
+     );
+-    let current = current
++    let mut current = current
+         .into_file_version()
+         .expect("可写挂载之后现行那一版带文件");
++    for seed in 1..=3 {
++        let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
++        current = publish_overwrite(
++            &mut writer,
++            &mut allocator,
++            &current,
++            FirstFile {
++                content: &content_of(DIRECT_OVERWRITE_CONTENT_BYTES, seed),
++                write_time_seconds: FIXED_WRITE_TIME_SECONDS
++                    + 600
++                    + u64::try_from(seed).expect("小"),
++            },
++            mount_output.instance,
++        )
++        .unwrap_or_else(|refusal| panic!("挂载之后第 {seed} 次直接覆盖写放行：{refusal:?}"));
++    }
+     let image_after_the_mount = image_of_the_devices(&devices, image.device_size_in_bytes);
+     let before = disk_snapshot(&image_after_the_mount, &stream);
+     let allocator_before_the_publish = format!("{allocator:?}");
+@@ -629,7 +647,7 @@ fn an_overwrite_whose_new_slots_exceed_the_available_bytes_is_refused_by_the_spa
+             &current,
+             FirstFile {
+                 content: &content,
+-                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 600,
++                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 604,
+             },
+             mount_output.instance,
+         )
+@@ -654,7 +672,7 @@ fn an_overwrite_whose_new_slots_exceed_the_available_bytes_is_refused_by_the_spa
+             &current,
+             FirstFile {
+                 content: &content,
+-                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 600,
++                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 604,
+             },
+             mount_output.instance,
+         )
+diff --git a/crates/singlefs-harness/tests/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments.rs b/crates/singlefs-harness/tests/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments.rs
+index ad40df91..d5f39733 100644
+--- a/crates/singlefs-harness/tests/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments.rs
++++ b/crates/singlefs-harness/tests/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments.rs
+@@ -149,17 +149,20 @@ fn slots_of_data_units(data_units: u64) -> u64 {
+ }
+ 
+ /// C545 那一格（实审 A4c 造出来的，报告第三节）：用户数据落得下的空槽对全在这次挂载开过的聚簇段里、段外一对都没有，而按字节算的式子放得下这次的需求。
+-/// 两块单元区 384 槽的小盘，第一个文件之后崩了再挂；这次挂载里直接推 80 次空发布（固定点在这次挂载开的聚簇段里 bump，根环转过之后回收，
+-/// 段里空出来的槽照旧只给提交内生块，D3（空间分配） 已定项 8 第 2 条），再直接把文件顺序写到 6 个数据单元，都做成。
+-/// 接着顺序写到 7 个单元：每块盘段外成对的空槽 0 对、段内 79 对；按字节算的式子（`admission_reading_before_a_publish`）每块盘可用 49 槽，
+-/// 放得下这次需求的上界（6 个单元那次新写的槽 + 多一个数据单元 2 槽 + 一次空发布的 ckpt_cost）。发布路径在走固定点之前判「这次的单元落得下」：
+-/// 7 个数据单元要 7 对、段外 0 对，交回 `SpaceAdmissionRefused`，每块盘报段外 0 槽 < 数据单元 14 槽；两块盘逐字节不变、分配器不动。
++/// 两块单元区 384 槽的小盘，第一个文件之后崩了再挂；这次挂载里直接推 200 次空发布（固定点在这次挂载开的聚簇段里 bump，根环转过之后回收，
++/// 段里空出来的槽照旧只给提交内生块，D3（空间分配） 已定项 8 第 2 条），再直接把文件顺序写到 5 个数据单元，都做成。
++/// 接着顺序写到 6 个单元：每块盘段外成对的空槽 0 对、段内 85 对；按字节算的式子（`admission_reading_before_a_publish`）每块盘可用 60 槽，
++/// 放得下这次需求的上界（5 个单元那次新写的槽 + 多一个数据单元 2 槽 + 一次空发布的 ckpt_cost，31 槽）。发布路径在走固定点之前判「这次的单元落得下」：
++/// 6 个数据单元要 6 对、段外 0 对，交回 `SpaceAdmissionRefused`，每块盘报段外 0 槽 < 数据单元 12 槽；两块盘逐字节不变、分配器不动。
++/// A3b 把小盘改成 6 MiB 环、单元区从 1408 起之前是「80 次空发布、写到 6 个、段外 0 对段内 79 对、可用 49 槽、7 个单元 14 槽」：分配记录树按
++/// 绝对槽号按位置寻址，单元区挪了位置，每次发布重写的节点跟着变。草稿探针在空发布 60–200 次上扫：段外恰好 0 对、式子又放得下上界的是 200 次这一格
++/// （140 次那一格段外也是 0 对，式子可用 30 槽 < 上界 35 槽）。
+ /// 判别力：「落得下」那一判不判数据单元（或整判拿掉）时，走固定点在分配器的拷贝上取不到数据单元 0 的落点，交回 `PlacementRefused`（实审 A4c 钉的那个）。
+ #[test]
+ fn a_write_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_refused_by_the_space_admission_before_any_write_while_the_byte_formula_admits(
+ ) {
+-    const EMPTY_PUBLISHES_IN_THIS_MOUNT: usize = 80;
+-    const DATA_UNITS_THAT_STILL_LAND: usize = 6;
++    const EMPTY_PUBLISHES_IN_THIS_MOUNT: usize = 200;
++    const DATA_UNITS_THAT_STILL_LAND: usize = 5;
+     let mut pool = start_plain(HistoryDeviceWidth::UnitAreaOf384Slots);
+     pool.crash_and_mount_writable()
+         .expect("第一个文件之后崩了再挂");
+@@ -179,8 +182,8 @@ fn a_write_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_
+     let allocator_before = pool.session().allocator.clone();
+     assert_eq!(
+         free_slot_pairs_outside_and_inside_the_cluster_segments_of_this_mount(&allocator_before),
+-        vec![(DeviceIdentity(0), 0, 79), (DeviceIdentity(1), 0, 79)],
+-        "每块盘成对的空槽：这次挂载开过的聚簇段外 0 对、段内 79 对"
++        vec![(DeviceIdentity(0), 0, 85), (DeviceIdentity(1), 0, 85)],
++        "每块盘成对的空槽：这次挂载开过的聚簇段外 0 对、段内 85 对"
+     );
+     let demand_upper_bound_in_slots = last_write_that_landed
+         .rewritten
+@@ -221,9 +224,9 @@ fn a_write_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_
+         refusal.short_devices,
+         the_same_shortage_on_both_devices(
+             AvailableBytesOnOneDevice(0),
+-            BytesOnOneDevice::of_slots(slots_of_data_units(7)),
++            BytesOnOneDevice::of_slots(slots_of_data_units(6)),
+         ),
+-        "每块盘段外 0 对（0 槽）< 7 个数据单元（14 槽）"
++        "每块盘段外 0 对（0 槽）< 6 个数据单元（12 槽）"
+     );
+     assert!(pool.image() == image_before, "两块盘逐字节不变");
+     assert!(
+@@ -385,11 +388,12 @@ fn a_write_whose_data_unit_lands_but_whose_commit_generated_units_find_no_unbloc
+ }
+ 
+ /// 第一格那一形，会话的准入用只供测试的开关关掉（`SpaceAdmission::SkippedByTheTestOnlySwitch`：式子与落得下两判都不判）：
+-/// 落点那一道照样兜着。两块单元区 384 槽的小盘，崩了再挂、直接推 80 次空发布之后，经会话把文件顺序写到 2、3……6 个数据单元，都一次做成；
+-/// 写到 7 个单元：走固定点时在分配器的拷贝上取不到数据单元 0 的落点，交回 `PlacementRefused { Data(0), NoFreeSlotOnAnyDevice }`，
++/// 落点那一道照样兜着。两块单元区 384 槽的小盘，崩了再挂、直接推 200 次空发布之后，经会话把文件顺序写到 2、3……5 个数据单元，都一次做成；
++/// 写到 6 个单元：走固定点时在分配器的拷贝上取不到数据单元 0 的落点，交回 `PlacementRefused { Data(0), NoFreeSlotOnAnyDevice }`，
+ /// 会话照 D16（发布语义） 已定项 1「准入」那一行（准入放行而落点取不到也推）推一串抬 F、回收之后再发，做成——推过的只这一串、
+ /// 推它的是那一次落点被拒；F 抬上去了，池级 checker 0 违例。
+-/// 判别力：会话只在准入拒时推（落点被拒原样交回）时，写到 7 个单元报 `UserChangeRefused::Publish { PlacementRefused }`。
++/// 判别力：会话只在准入拒时推（落点被拒原样交回）时，写到 6 个单元报 `UserChangeRefused::Publish { PlacementRefused }`。
++/// A3b 把小盘改成 6 MiB 环、单元区从 1408 起之前是「80 次空发布、写到 6 个、第 7 个推」，与第一格同一次改（草稿探针在新几何上现跑的数）。
+ #[test]
+ fn with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write(
+ ) {
+@@ -401,10 +405,10 @@ fn with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_pl
+         .expect("这次挂载的会话")
+         .allocator
+         .set_space_admission(SpaceAdmission::SkippedByTheTestOnlySwitch);
+-    for _ in 0..80 {
++    for _ in 0..200 {
+         publish_an_empty_version_directly_on_the_session(&mut pool);
+     }
+-    for data_units in 2..=6 {
++    for data_units in 2..=5 {
+         let published = pool
+             .sequential_write(data_units * data_unit_payload_capacity())
+             .unwrap_or_else(|refusal| {
+@@ -417,9 +421,9 @@ fn with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_pl
+     }
+     let floor_before = pool.rollback_floor();
+     let published = pool
+-        .sequential_write(7 * data_unit_payload_capacity())
++        .sequential_write(6 * data_unit_payload_capacity())
+         .unwrap_or_else(|refusal| {
+-            panic!("经会话顺序写到 7 个数据单元，推过抬 F 之后做成：{refusal:?}")
++            panic!("经会话顺序写到 6 个数据单元，推过抬 F 之后做成：{refusal:?}")
+         });
+     assert!(
+         matches!(
+diff --git a/crates/singlefs-harness/tests/checker_judges_reserved_bytes_and_widths_it_used_to_skip.rs b/crates/singlefs-harness/tests/checker_judges_reserved_bytes_and_widths_it_used_to_skip.rs
+index 5539c24e..0c87f89a 100644
+--- a/crates/singlefs-harness/tests/checker_judges_reserved_bytes_and_widths_it_used_to_skip.rs
++++ b/crates/singlefs-harness/tests/checker_judges_reserved_bytes_and_widths_it_used_to_skip.rs
+@@ -462,9 +462,11 @@ fn a_journal_ring_that_holds_fewer_than_the_safety_factor_records_or_ends_past_t
+     let image = first_file_version_pool().memory_pool();
+     for (journal_ring_bytes, expected) in [
+         (JOURNAL_RING_BYTES_OF_THE_POOL, Ok(())),
++        // 装得下 F 条记录的最短环过得了环长那一判；单元区起始槽号照旧 50176、不是这个环长现算的槽 1025，
++        // 报的是单元区起点那个成员（实审 Y4-a：checker 与实现收同一张表）。
+         (
+             SMALLEST_JOURNAL_RING_BYTES_HOLDING_THE_SAFETY_FACTOR_RECORDS,
+-            Ok(()),
++            Err(Verdict::UnitAreaStartNotTheSlotAfterTheJournalRing),
+         ),
+         (
+             SMALLEST_JOURNAL_RING_BYTES_HOLDING_THE_SAFETY_FACTOR_RECORDS - 1,
+diff --git a/crates/singlefs-harness/tests/checker_known_bad_images.rs b/crates/singlefs-harness/tests/checker_known_bad_images.rs
+index 61691500..88ec8843 100644
+--- a/crates/singlefs-harness/tests/checker_known_bad_images.rs
++++ b/crates/singlefs-harness/tests/checker_known_bad_images.rs
+@@ -11,6 +11,7 @@ use common::{
+ };
+ use singlefs_checker::image::{
+     InvariantVerdict, SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS,
++    SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
+ };
+ use singlefs_checker::walk::check_pool_image;
+ use singlefs_core::address::{
+@@ -416,6 +417,21 @@ const ENCRYPTION_TYPE_THE_FIRST_VERSION_DOES_NOT_READ: u8 = 1;
+ /// I-7.13（系统配置池级字段在读者收的范围里） 那份坏镜像改的那一槽：盘 1 的槽 0。
+ const DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT: u32 = 1;
+ const OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT: u64 = 0;
++/// 系统配置字段表（`.claude/kb/layout/01-first-txn.md` 一）几何段里几个 16 KiB 槽号与环长的偏移：journal 环起点 325、环长 333、
++/// 根环起点 371、单元区起始槽号 417。checker 与实现今天各自按这几个偏移读；这里照字段表各写一份。
++const SYSTEM_CONFIGURATION_JOURNAL_RING_START_SLOT_OFFSET: usize = 325;
++const SYSTEM_CONFIGURATION_JOURNAL_RING_BYTES_OFFSET: usize = 333;
++const SYSTEM_CONFIGURATION_ROOT_RING_BASE_SLOT_OFFSET: usize = 371;
++const SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET: usize = 417;
++/// 系统配置自举头里的本盘设备号（4 字节）：fsid（偏移 102，宽 16）之后 20 字节、再 1 字节之后，偏移 139。
++const SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_OFFSET: usize = 139;
++/// 第一版 mkfs 写进这几格的值（字段表那一列）：journal 环从槽 1024 起、默认环长 768 MiB、根环从槽 64 起、单元区从槽 50176 起。
++const JOURNAL_RING_START_SLOT_OF_THE_POOL: u64 = 1024;
++const JOURNAL_RING_BYTES_OF_THE_POOL: u64 = 805_306_368;
++const ROOT_RING_BASE_SLOT_OF_THE_POOL: u64 = 64;
++const UNIT_AREA_START_SLOT_OF_THE_POOL: u64 = 50176;
++/// 聚簇段 64 槽（D3（空间分配） 已定项 10 ①）：单元区起始槽号要落在它的整数倍上。
++const CLUSTER_SEGMENT_SLOTS_OF_THE_POOL: u64 = 64;
+ 
+ /// 系统配置槽重封：自证校验和在 155，罩整槽 4096。
+ fn mutate_system_configuration_slot(
+@@ -437,6 +453,99 @@ fn set_u64(bytes: &mut [u8], offset: usize, value: u64) {
+ fn set_u16(bytes: &mut [u8], offset: usize, value: u16) {
+     bytes[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
+ }
++fn set_u32(bytes: &mut [u8], offset: usize, value: u32) {
++    bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
++}
++
++/// 两块盘对调盘体：每块盘两个系统配置槽里的本盘设备号改成另一块盘的身份（盘 0 的两槽写 1、盘 1 的两槽写 0），整槽重封，
++/// 别的字节不动。与盘体真对调不同的只有这一格：根环区域、单元都还在原来的盘上，所以别的不变量照判成立。
++fn swap_the_own_device_numbers_of_the_two_devices(image: &mut MemoryPool) {
++    let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
++    for (device, own_device_number_written) in [(0u32, 1u32), (1, 0)] {
++        for slot_offset in [0, spacing] {
++            mutate_system_configuration_slot(image, device, slot_offset, |bytes| {
++                set_u32(
++                    bytes,
++                    SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_OFFSET,
++                    own_device_number_written,
++                );
++            });
++        }
++    }
++}
++
++/// I-7.13（系统配置池级字段在读者收的范围里） 的几何那五格（实审 Y4 的 A、B、C、D、E，用户 2026-09-27 定「读字段，不等于常量就整池拒」）：
++/// 盘 1 槽 0 的一个几何字段改掉、整槽重封，别的三槽照原样。每项带 checker 该报的那个 `Verdict` 成员名（违例说明里带着它）。
++fn known_bad_images_of_the_system_configuration_geometry() -> Vec<(&'static str, Mutation)> {
++    let on_the_refused_slot = |change: fn(&mut Vec<u8>)| -> Mutation {
++        Box::new(move |image: &mut MemoryPool| {
++            mutate_system_configuration_slot(
++                image,
++                DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT,
++                OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT,
++                change,
++            );
++        })
++    };
++    vec![
++        // A：单元区起始槽号往后挪一段（50176 → 50240），环长不动：不是环长现算的那个槽。
++        (
++            "UnitAreaStartNotTheSlotAfterTheJournalRing",
++            on_the_refused_slot(|bytes| {
++                set_u64(
++                    bytes,
++                    SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET,
++                    UNIT_AREA_START_SLOT_OF_THE_POOL + CLUSTER_SEGMENT_SLOTS_OF_THE_POOL,
++                );
++            }),
++        ),
++        // D：环长少一槽（768 MiB − 16 KiB），单元区起始槽号跟着改成它现算的 50175（两者自洽）：不在聚簇段边界上。
++        (
++            "UnitAreaStartOffTheClusterSegmentBoundary",
++            on_the_refused_slot(|bytes| {
++                set_u64(
++                    bytes,
++                    SYSTEM_CONFIGURATION_JOURNAL_RING_BYTES_OFFSET,
++                    JOURNAL_RING_BYTES_OF_THE_POOL - SLOT,
++                );
++                set_u64(
++                    bytes,
++                    SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET,
++                    UNIT_AREA_START_SLOT_OF_THE_POOL - 1,
++                );
++            }),
++        ),
++        // B：journal 环起点写 1023：实现按常量 1024 写记录、扫环，按字段扫的读者判的是错位 16 KiB 的另一个环。
++        (
++            "JournalRingStartSlotNotTheFirstVersionConstant",
++            on_the_refused_slot(|bytes| {
++                set_u64(
++                    bytes,
++                    SYSTEM_CONFIGURATION_JOURNAL_RING_START_SLOT_OFFSET,
++                    JOURNAL_RING_START_SLOT_OF_THE_POOL - 1,
++                );
++            }),
++        ),
++        // C：根环起点写 65：实现按常量 64 写根，按字段读的读者读的是另一个根环。
++        (
++            "RootRingBaseSlotNotTheFirstVersionConstant",
++            on_the_refused_slot(|bytes| {
++                set_u64(
++                    bytes,
++                    SYSTEM_CONFIGURATION_ROOT_RING_BASE_SLOT_OFFSET,
++                    ROOT_RING_BASE_SLOT_OF_THE_POOL + 1,
++                );
++            }),
++        ),
++        // E：根环起点写 0：先于槽距判，报起点、不报「槽 1 不在根环起点之前」。
++        (
++            "RootRingBaseSlotNotTheFirstVersionConstant",
++            on_the_refused_slot(|bytes| {
++                set_u64(bytes, SYSTEM_CONFIGURATION_ROOT_RING_BASE_SLOT_OFFSET, 0);
++            }),
++        ),
++    ]
++}
+ 
+ /// 树表单元里第 index 条条目（条目区从 115 + 2 × 8 = 131 起，每条 200）。
+ fn tree_table_entry_offset(index: usize) -> usize {
+@@ -825,6 +934,11 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
+                 )
+             }),
+         ),
++        // 两块盘四个系统配置槽里的本盘设备号互换、整槽重封（实审 Y2-b 越格线索：盘体对调之后的池可写挂载因本盘设备号拒）。
++        (
++            SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
++            Box::new(swap_the_own_device_numbers_of_the_two_devices),
++        ),
+         // C322（取号那一步的屏障怎么放没有条款） 的撞号镜像：没人引用的槽 50302 上放一份写序实例代号 2 的数据单元（头与载荷
+         // 校验和都过），两盘系统配置都还是实例 1 ⇒ ① 红（旧的「各盘相等且 ≥ 根环」在这里判成立）。
+         (
+@@ -2380,6 +2494,93 @@ fn a_system_configuration_slot_whose_encryption_type_is_on_reddens_only_its_own_
+     }
+ }
+ 
++/// I-7.13（系统配置池级字段在读者收的范围里） 的几何那五格（[`known_bad_images_of_the_system_configuration_geometry`]）各**只**红 I-7.13，
++/// 红在盘 1 偏移 0 那一槽、说明里带该报的那个 `Verdict` 成员；别的每一条都报不适用（实现整池拒绝挂载，checker 不替这个池作保）。
++/// 改之前 checker 不判 417 = 环长现算、不判段边界、按字段读 325 与 371：A、B、C、D 四格 I-7.13 不红（A、D 红的是 I-5.2，
++/// C 红的是 I-7.1），E 格红的是槽距那个成员。
++#[test]
++fn each_system_configuration_geometry_field_the_reader_refuses_reddens_only_its_own_invariant_naming_the_refused_field(
++) {
++    let clean = build_pool("known-bad-refused-system-configuration-geometry").memory_pool();
++    let cases = known_bad_images_of_the_system_configuration_geometry();
++    assert_eq!(cases.len(), 5, "实审 Y4 的 A、B、C、D、E 五格");
++    for (refused_member, mutation) in cases {
++        let mut image = clean.clone();
++        mutation(&mut image);
++        let verdicts = check_pool_image(&image);
++        assert!(
++            verdicts.iter().any(|(judged, _)| *judged
++                == SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS),
++            "I-7.13 在判定清单里：{verdicts:?}"
++        );
++        for (judged, found) in &verdicts {
++            if *judged == SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS {
++                match found {
++                    InvariantVerdict::Violated(detail) => {
++                        assert!(
++                            detail.contains(&format!(
++                                "盘 {DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT} 偏移 {OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT}"
++                            )),
++                            "{refused_member}：违例要点名被改的那一槽：{detail}"
++                        );
++                        assert!(
++                            detail.contains(refused_member),
++                            "{refused_member}：违例说明里要是这个成员：{detail}"
++                        );
++                    }
++                    other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
++                        panic!("{refused_member}：这一槽自证过而带这一版读者不收的值，I-7.13 要判违例，得到 {other:?}")
++                    }
++                }
++            } else {
++                assert!(
++                    matches!(found, InvariantVerdict::NotApplicable(_)),
++                    "{refused_member}：这个池挂不上，{judged} 要报不适用，得到 {found:?}"
++                );
++            }
++        }
++    }
++}
++
++/// I-7.14（本盘设备号等于盘在池里的身份，暂立） 那份坏镜像（两块盘四个系统配置槽的本盘设备号互换）**只**红 I-7.14，
++/// 说明里点名盘 0 上自述 1 的那一槽；别的每一条与干净镜像上的判定逐条相同。改之前 checker 读本盘设备号而不拿它比盘的身份，
++/// 这份镜像上 0 条违例（实审 Y2-b 越格线索）。
++#[test]
++fn devices_whose_own_device_numbers_are_swapped_redden_only_the_own_device_number_invariant() {
++    let clean = build_pool("known-bad-swapped-own-device-numbers").memory_pool();
++    let clean_verdicts = check_pool_image(&clean);
++    let mut image = clean.clone();
++    swap_the_own_device_numbers_of_the_two_devices(&mut image);
++    let verdicts = check_pool_image(&image);
++    assert_eq!(
++        violated_invariants(&verdicts),
++        vec![SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY],
++        "只红 I-7.14：{verdicts:?}"
++    );
++    let detail = match verdict(
++        &image,
++        SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
++    ) {
++        InvariantVerdict::Violated(detail) => detail,
++        other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
++            panic!("本盘设备号互换，I-7.14 要判违例，得到 {other:?}")
++        }
++    };
++    assert!(
++        detail.contains("盘 0 上") && detail.contains("本盘设备号 1"),
++        "第一处违例是盘 0 上自述 1 的那一槽：{detail}"
++    );
++    assert_eq!(
++        verdicts_that_differ_outside(
++            &verdicts,
++            &clean_verdicts,
++            &[SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY]
++        ),
++        Vec::new(),
++        "除 I-7.14 之外每一条与干净镜像上的判定逐条相同"
++    );
++}
++
+ #[test]
+ fn the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target() {
+     let clean = build_pool("known-bad").memory_pool();
+diff --git a/crates/singlefs-harness/tests/common_admission/mod.rs b/crates/singlefs-harness/tests/common_admission/mod.rs
+index 51bba077..9e0fbf27 100644
+--- a/crates/singlefs-harness/tests/common_admission/mod.rs
++++ b/crates/singlefs-harness/tests/common_admission/mod.rs
+@@ -256,7 +256,9 @@ impl<Device: DeviceOverASparseImage> PoolUnderTest<Device> {
+             Err(
+                 UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount { .. }
+                 | UserChangeRefused::NoFileVersionToChange
+-                | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. },
++                | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. }
++                | UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable { .. }
++                | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. },
+             ) => {}
+         }
+         outcome
+diff --git a/crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs b/crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs
+new file mode 100644
+index 00000000..6b9a173e
+--- /dev/null
++++ b/crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs
+@@ -0,0 +1,625 @@
++//! 代码三方 m2-closeout-code-r2（判决 `research/prompts/m2-closeout-code-r2-main-verification.md` 第一节 Y2-a、Y2-b，第二节「四个入口再核两样」；
++//! 用户 2026-09-27 定「采纳，四个入口都核」）：挂着之后收盘表的每个入口——会话发布、正常卸载、抬 F、管理员回退——在「可见」
++//! 那一判之后再核两样（D18（块里携带什么信息） 已定项 11「挂着之后收盘表的每个入口……核三样」）：
++//! - 每块盘自证过的系统配置槽里记的本盘设备号等于盘表给它的身份（盘体对调的盘表，Y2-b）；
++//! - 这块盘最新那份自证系统配置的 (实例代号, journal tail) 不落后于现行那一版末条记录的 jsn、落后就读现行那一版的单元，缺一份就拒
++//!   （同池旧快照的盘，Y2-a；与可写挂载取号之前逐盘核的落后支同一判）。
++//!
++//! 任一不过都在任何写之前拒，两块盘逐字节不变；之后拿同一组盘可写挂载，照不经这些入口的对照一样被落后支拒。
++//! 只剩一槽自证的盘（那一槽停在上一次轮换、单元都在）四个入口都不误拒（Y2-c）。
++//!
++//! 攻方用例（`research/prompts/m2-closeout-code-r2-opus-model/opus_r2_y2_session_and_entries_with_stale_or_swapped_devices.rs`）只打印、
++//! 钉改之前的样子：旧快照经会话发布或卸载照常做成、之后可写挂载做成（实例 2）、池级 checker 红 I-2.1；盘体对调经会话照常发布。
++//! 这里搬过来反过来钉，每形一条；攻方放开扫的 16 格（旧快照取自哪一刻 × 换哪块盘 × 之后会话发 1/2/3 次或卸载一次）单列一条。
++//!
++//! 起点同攻方：两块 4 GiB 内存稀疏盘上 mkfs、取号、暖机、第一个文件（txg 3），会话里覆盖写两次（txg 4、5）。
++
++mod common_admission;
++
++use common_admission::{content_of, start_plain, PoolUnderTest, OVERWRITE_BYTES};
++use singlefs_core::address::{
++    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
++};
++use singlefs_core::block_device::{BlockDevice, PhysicalBlockSizeInBytes, WriteDurability};
++use singlefs_core::mount::{
++    mount_writable, raise_rollback_floor_to_the_admission_ceiling, roll_back_by_a_forward_publish,
++    unmount, CallerInputsDisagreeingWithTheDisk, DeviceBehindTheCurrentVersion,
++    DeviceTableDisagreement, MountError, OwnDeviceNumberOnDiskDifferingFromTheIdentityHandedIn,
++    RollbackError, RollbackTarget, ShadowLedger, Unmounted,
++};
++use singlefs_core::mounted_session::{MountedSession, UserChange, UserChangeRefused};
++use singlefs_core::recovery::verified_system_configuration_slots;
++use singlefs_core::transaction::{FirstFile, PoolVersion, TransactionOutput};
++use singlefs_harness::history::HistoryDeviceWidth;
++use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice, SparseDevice};
++
++const DEVICE_WIDTH: HistoryDeviceWidth = HistoryDeviceWidth::FourGibibytes;
++
++type SparseDevices = Vec<(DeviceIdentity, SparseBlockDevice)>;
++
++/// 管理员回退那一格的目标：第一个文件那一版（实例 1、txg 3），F = 0 时是候选。
++const FIRST_FILE_VERSION: RollbackTarget = RollbackTarget {
++    instance: InstanceGeneration(1),
++    checkpoint_txg: CheckpointTxg(3),
++};
++
++/// 镜像里 `identity` 那块盘的一份拷贝（改它不动镜像）。
++fn copy_of_device(image: &MemoryPool, identity: DeviceIdentity) -> SparseBlockDevice {
++    let mut device =
++        SparseBlockDevice::new(image.device_size_in_bytes, PhysicalBlockSizeInBytes(512));
++    device.image = image
++        .devices
++        .get(&identity)
++        .cloned()
++        .expect("镜像里有这块盘");
++    device
++}
++
++/// 盘表每一项的身份与盘体从哪份镜像的哪块盘拷来：`(身份, 镜像, 那份镜像里的哪块盘)`。
++fn devices_from(bodies: [(DeviceIdentity, &MemoryPool, DeviceIdentity); 2]) -> SparseDevices {
++    bodies
++        .into_iter()
++        .map(|(identity, image, body)| (identity, copy_of_device(image, body)))
++        .collect()
++}
++
++/// 盘表里每块盘此刻的镜像，按盘表次序。
++fn images_of(devices: &[(DeviceIdentity, SparseBlockDevice)]) -> Vec<SparseDevice> {
++    devices
++        .iter()
++        .map(|(_, device)| device.image.clone())
++        .collect()
++}
++
++/// 一组盘的拷贝（拿去可写挂载，原来那组不动）。
++fn copies_of(devices: &[(DeviceIdentity, SparseBlockDevice)]) -> SparseDevices {
++    devices
++        .iter()
++        .map(|(identity, device)| {
++            let mut copy =
++                SparseBlockDevice::new(device.size_in_bytes(), PhysicalBlockSizeInBytes(512));
++            copy.image = device.image.clone();
++            (*identity, copy)
++        })
++        .collect()
++}
++
++/// 这组盘（拷贝）上可写挂载的结局，错误按 `Debug` 交回（对照与入口之后的那一次逐字比）。
++fn writable_mount_outcome_on_a_copy_of(
++    parameters: &singlefs_core::make_filesystem::MakeFilesystemParameters,
++    devices: &[(DeviceIdentity, SparseBlockDevice)],
++) -> Result<InstanceGeneration, String> {
++    let mut copies = copies_of(devices);
++    mount_writable(parameters, &mut copies)
++        .map(|mounted| mounted.output.instance)
++        .map_err(|error| format!("{error:?}"))
++}
++
++/// 第一个文件之后留一份镜像（旧快照），会话里再覆盖写两次（txg 4、5）：交回池、旧快照与此刻的镜像。
++fn pool_with_a_snapshot_after_the_first_file(
++) -> (PoolUnderTest<SparseBlockDevice>, MemoryPool, MemoryPool) {
++    let mut pool = start_plain(DEVICE_WIDTH);
++    let snapshot_after_the_first_file = pool.image();
++    pool.overwrite(OVERWRITE_BYTES)
++        .expect("会话里第一次覆盖写（txg 4）");
++    pool.overwrite(OVERWRITE_BYTES)
++        .expect("会话里第二次覆盖写（txg 5）");
++    let now = pool.image();
++    (pool, snapshot_after_the_first_file, now)
++}
++
++/// 会话此刻的现行那一版（第一个文件之后都带文件）：抬 F 与管理员回退要一份 `&mut TransactionOutput`。
++fn file_version_of(current: &mut PoolVersion) -> &mut TransactionOutput {
++    match current {
++        PoolVersion::WithFile(current) => current,
++        PoolVersion::WithoutFile(_) => panic!("第一个文件之后现行那一版带文件"),
++    }
++}
++
++/// 一次覆盖写的改动（写入时刻接着池里的往后数）。
++fn overwrite_after(pool: &PoolUnderTest<SparseBlockDevice>, steps_after: u64) -> (Vec<u8>, u64) {
++    let write_time_seconds = pool.write_time_seconds + 1 + steps_after;
++    (
++        content_of(OVERWRITE_BYTES, write_time_seconds),
++        write_time_seconds,
++    )
++}
++
++/// 挂着之后收盘表的四个入口（D18（块里携带什么信息） 已定项 11「挂着之后收盘表的每个入口」）。
++#[derive(Clone, Copy, Debug)]
++enum EntryAfterTheMount {
++    SessionPublish,
++    NormalUnmount,
++    FloorRaiseToTheAdmissionCeiling,
++    AdministratorRollback,
++}
++
++const EVERY_ENTRY: [EntryAfterTheMount; 4] = [
++    EntryAfterTheMount::SessionPublish,
++    EntryAfterTheMount::NormalUnmount,
++    EntryAfterTheMount::FloorRaiseToTheAdmissionCeiling,
++    EntryAfterTheMount::AdministratorRollback,
++];
++
++/// 四个入口各自被拒时的错误（[`go_through`] 做成交回 `None`）。
++enum EntryRefusal {
++    Session(UserChangeRefused),
++    Mount(MountError),
++    Rollback(RollbackError),
++}
++
++/// 拿池里那条会话，经 `entry` 把这组盘交进去一次。
++fn go_through(
++    entry: EntryAfterTheMount,
++    pool: &mut PoolUnderTest<SparseBlockDevice>,
++    devices: &mut SparseDevices,
++) -> Option<EntryRefusal> {
++    let parameters = pool.parameters.clone();
++    let (content, write_time_seconds) = overwrite_after(pool, 0);
++    let session = pool.session.as_mut().expect("这一刻有可写会话");
++    match entry {
++        EntryAfterTheMount::SessionPublish => session
++            .publish_user_change(
++                devices,
++                UserChange::Overwrite(FirstFile {
++                    content: &content,
++                    write_time_seconds,
++                }),
++            )
++            .err()
++            .map(EntryRefusal::Session),
++        EntryAfterTheMount::NormalUnmount => unmount(
++            &parameters,
++            devices,
++            &mut session.allocator,
++            &mut session.current,
++            ShadowLedger::On,
++        )
++        .map(|unmounted| match unmounted {
++            Unmounted::FloorRaisedToTheCurrentVersion(_) => (),
++            Unmounted::NothingWrittenOnAVersionWithoutFile { .. } => {
++                panic!("现行那一版带文件，卸载要推那一串")
++            }
++        })
++        .err()
++        .map(EntryRefusal::Mount),
++        EntryAfterTheMount::FloorRaiseToTheAdmissionCeiling => {
++            let MountedSession {
++                allocator,
++                current,
++                shadow_ledger,
++                ..
++            } = session;
++            raise_rollback_floor_to_the_admission_ceiling(
++                &parameters,
++                devices,
++                allocator,
++                file_version_of(current),
++                *shadow_ledger,
++            )
++            .err()
++            .map(EntryRefusal::Mount)
++        }
++        EntryAfterTheMount::AdministratorRollback => {
++            let MountedSession {
++                allocator, current, ..
++            } = session;
++            roll_back_by_a_forward_publish(
++                &parameters,
++                devices,
++                allocator,
++                file_version_of(current),
++                FIRST_FILE_VERSION,
++            )
++            .err()
++            .map(EntryRefusal::Rollback)
++        }
++    }
++}
++
++/// 落后支拒的那一块盘：盘 `device` 被换成旧快照，最新那份自证系统配置停在第一个文件（实例 1、计数器 3），现行那一版末条记录是 (1, 5)。
++fn assert_refused_as_behind(
++    refusal: Option<EntryRefusal>,
++    entry: EntryAfterTheMount,
++    device: DeviceIdentity,
++) {
++    let devices_behind: Vec<DeviceBehindTheCurrentVersion> = match refusal {
++        Some(EntryRefusal::Session(
++            UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { devices },
++        ))
++        | Some(EntryRefusal::Mount(
++            MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { devices },
++        ))
++        | Some(EntryRefusal::Rollback(RollbackError::CallerInputsDisagreeWithTheDisk(
++            CallerInputsDisagreeingWithTheDisk::DevicesBehindTheCurrentVersionAndMissingItsUnits {
++                devices,
++            },
++        ))) => devices,
++        other => panic!("{entry:?}：该被落后支拒，实际 {}", describe(&other)),
++    };
++    assert_eq!(
++        devices_behind
++            .iter()
++            .map(|behind| behind.device)
++            .collect::<Vec<_>>(),
++        vec![device],
++        "{entry:?}：点名换成旧快照的那一块"
++    );
++    let behind = &devices_behind[0];
++    assert_eq!(
++        (
++            behind
++                .newest_system_configuration_journal_tail
++                .instance_generation,
++            behind.newest_system_configuration_journal_tail.counter,
++        ),
++        (InstanceGeneration(1), 3),
++        "{entry:?}：旧快照最新那份系统配置停在第一个文件那一次发布"
++    );
++    assert_eq!(
++        (
++            behind.current_version_journal_position.instance_generation,
++            behind.current_version_journal_position.counter,
++        ),
++        (InstanceGeneration(1), 5),
++        "{entry:?}：现行那一版末条记录"
++    );
++    assert!(
++        !behind.units_missing.is_empty(),
++        "{entry:?}：现行那一版有单元在旧快照上不在"
++    );
++}
++
++fn describe(refusal: &Option<EntryRefusal>) -> String {
++    match refusal {
++        None => "做成了".to_string(),
++        Some(EntryRefusal::Session(refused)) => format!("{refused:?}"),
++        Some(EntryRefusal::Mount(refused)) => format!("{refused:?}"),
++        Some(EntryRefusal::Rollback(refused)) => format!("{refused:?}"),
++    }
++}
++
++/// Y2-a 的一格：盘 1 换成第一个文件之后的旧快照，经 `entry` 交进去。在任何写之前拒成落后支、点名盘 1，两块盘逐字节不变、会话的现行版本不动；
++/// 之后拿这组盘可写挂载，与不经入口的对照逐字相同（被落后支拒）。
++fn stale_snapshot_of_device_one_through(entry: EntryAfterTheMount) {
++    let (mut pool, snapshot, now) = pool_with_a_snapshot_after_the_first_file();
++    let mut devices = devices_from([
++        (DeviceIdentity(0), &now, DeviceIdentity(0)),
++        (DeviceIdentity(1), &snapshot, DeviceIdentity(1)),
++    ]);
++    let control = writable_mount_outcome_on_a_copy_of(&pool.parameters, &devices);
++    assert!(
++        control.as_ref().is_err_and(
++            |error| error.starts_with("WritableMountRefusedByDevicesWithoutTheSelectedVersion")
++        ),
++        "对照：不经入口直接可写挂载，被落后支拒：{control:?}"
++    );
++    let images_before = images_of(&devices);
++    let current_before = pool.current_file_version().root;
++    let refusal = go_through(entry, &mut pool, &mut devices);
++    assert_refused_as_behind(refusal, entry, DeviceIdentity(1));
++    assert_eq!(
++        images_of(&devices),
++        images_before,
++        "{entry:?}：两块盘逐字节不变"
++    );
++    assert_eq!(
++        pool.current_file_version().root,
++        current_before,
++        "{entry:?}：会话的现行版本不动"
++    );
++    assert_eq!(
++        writable_mount_outcome_on_a_copy_of(&pool.parameters, &devices),
++        control,
++        "{entry:?}：之后可写挂载照对照一样被拒"
++    );
++}
++
++#[test]
++fn a_session_publish_onto_a_stale_snapshot_of_device_one_is_refused_before_any_write() {
++    stale_snapshot_of_device_one_through(EntryAfterTheMount::SessionPublish);
++}
++
++#[test]
++fn a_normal_unmount_onto_a_stale_snapshot_of_device_one_is_refused_before_any_write() {
++    stale_snapshot_of_device_one_through(EntryAfterTheMount::NormalUnmount);
++}
++
++#[test]
++fn a_floor_raise_onto_a_stale_snapshot_of_device_one_is_refused_before_any_write() {
++    stale_snapshot_of_device_one_through(EntryAfterTheMount::FloorRaiseToTheAdmissionCeiling);
++}
++
++#[test]
++fn an_administrator_rollback_onto_a_stale_snapshot_of_device_one_is_refused_before_any_write() {
++    stale_snapshot_of_device_one_through(EntryAfterTheMount::AdministratorRollback);
++}
++
++/// 本盘设备号那一判拒的：盘表 [0, 1] 交进来的是对调的盘体，每块盘两槽里记的都是另一个身份。
++fn assert_refused_as_swapped(refusal: Option<EntryRefusal>, entry: EntryAfterTheMount) {
++    let expected_pairs = vec![
++        (DeviceIdentity(0), DeviceIdentity(1)),
++        (DeviceIdentity(1), DeviceIdentity(0)),
++    ];
++    let pairs: Vec<(DeviceIdentity, DeviceIdentity)> = match refusal {
++        Some(EntryRefusal::Session(UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable {
++            disagreements,
++        })) => disagreements
++            .into_iter()
++            .map(
++                |OwnDeviceNumberOnDiskDifferingFromTheIdentityHandedIn {
++                     identity_handed_in,
++                     own_device_number_on_disk,
++                 }| (identity_handed_in, own_device_number_on_disk),
++            )
++            .collect(),
++        Some(EntryRefusal::Mount(MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration {
++            disagreeing_fields,
++            disagreeing_device_table,
++        }))
++        | Some(EntryRefusal::Rollback(RollbackError::CallerInputsDisagreeWithTheDisk(
++            CallerInputsDisagreeingWithTheDisk::ParametersOrDeviceTableDisagreeWithTheSelectedSystemConfiguration {
++                disagreeing_fields,
++                disagreeing_device_table,
++            },
++        ))) => {
++            assert!(disagreeing_fields.is_empty(), "{entry:?}：参数都对得上");
++            disagreeing_device_table
++                .into_iter()
++                .map(|disagreement| match disagreement {
++                    DeviceTableDisagreement::OwnDeviceNumberDiffersFromTheIdentityHandedIn {
++                        identity_handed_in,
++                        own_device_number_on_disk,
++                    } => (identity_handed_in, own_device_number_on_disk),
++                    DeviceTableDisagreement::DeviceCountDiffersFromTheSystemConfiguration { .. }
++                    | DeviceTableDisagreement::NoSelfVerifiedSystemConfigurationOnTheDeviceHandedIn {
++                        ..
++                    } => panic!("{entry:?}：只该是本盘设备号不符，实际 {disagreement:?}"),
++                })
++                .collect()
++        }
++        other => panic!("{entry:?}：该被本盘设备号那一判拒，实际 {}", describe(&other)),
++    };
++    assert_eq!(
++        pairs, expected_pairs,
++        "{entry:?}：(盘表给的身份, 盘上记的本盘设备号)"
++    );
++}
++
++/// Y2-b 的一格：盘表身份照旧是 [0, 1]，盘 0 的位置交盘 1 的盘体、盘 1 的位置交盘 0 的盘体。经 `entry` 交进去，在任何写之前拒成
++/// 本盘设备号不符、两块都点名，两块盘逐字节不变、会话的现行版本不动；盘体放回各自的身份之后照常可写挂载。
++/// 会话那一格改之前只比盘表的身份次序：照常发布、把错的本盘设备号写进两块盘，之后这个池可写挂不上。
++fn swapped_device_bodies_through(entry: EntryAfterTheMount) {
++    let (mut pool, _, now) = pool_with_a_snapshot_after_the_first_file();
++    let mut devices = devices_from([
++        (DeviceIdentity(0), &now, DeviceIdentity(1)),
++        (DeviceIdentity(1), &now, DeviceIdentity(0)),
++    ]);
++    let images_before = images_of(&devices);
++    let current_before = pool.current_file_version().root;
++    let refusal = go_through(entry, &mut pool, &mut devices);
++    assert_refused_as_swapped(refusal, entry);
++    assert_eq!(
++        images_of(&devices),
++        images_before,
++        "{entry:?}：两块盘逐字节不变"
++    );
++    assert_eq!(
++        pool.current_file_version().root,
++        current_before,
++        "{entry:?}：会话的现行版本不动"
++    );
++    let bodies_put_back: SparseDevices = vec![
++        (DeviceIdentity(0), devices.remove(1).1),
++        (DeviceIdentity(1), devices.remove(0).1),
++    ];
++    assert!(
++        writable_mount_outcome_on_a_copy_of(&pool.parameters, &bodies_put_back).is_ok(),
++        "{entry:?}：盘体放回各自的身份之后照常可写挂载"
++    );
++}
++
++#[test]
++fn a_session_publish_with_the_two_device_bodies_swapped_is_refused_before_any_write() {
++    swapped_device_bodies_through(EntryAfterTheMount::SessionPublish);
++}
++
++#[test]
++fn a_normal_unmount_with_the_two_device_bodies_swapped_is_refused_before_any_write() {
++    swapped_device_bodies_through(EntryAfterTheMount::NormalUnmount);
++}
++
++#[test]
++fn a_floor_raise_with_the_two_device_bodies_swapped_is_refused_before_any_write() {
++    swapped_device_bodies_through(EntryAfterTheMount::FloorRaiseToTheAdmissionCeiling);
++}
++
++#[test]
++fn an_administrator_rollback_with_the_two_device_bodies_swapped_is_refused_before_any_write() {
++    swapped_device_bodies_through(EntryAfterTheMount::AdministratorRollback);
++}
++
++/// Y2-c：盘 1 两个系统配置槽里较新（世代号大）那一槽写坏一个字节，只剩上一次轮换那一槽自证得过——它落后于现行那一版，而现行那一版的单元
++/// 都在盘 1 上。四个入口都照常做成（不误拒），做完之后池级 checker 不红、照常可写挂载。
++#[test]
++fn a_device_left_with_one_self_verified_system_configuration_slot_is_not_refused_by_any_entry() {
++    for entry in EVERY_ENTRY {
++        let (mut pool, _, now) = pool_with_a_snapshot_after_the_first_file();
++        let mut devices = devices_from([
++            (DeviceIdentity(0), &now, DeviceIdentity(0)),
++            (DeviceIdentity(1), &now, DeviceIdentity(1)),
++        ]);
++        let spacing = u64::from(pool.parameters.geometry.fixed_structure_slot_spacing);
++        let newer_generation = verified_system_configuration_slots(
++            &devices,
++            DeviceIdentity(1),
++            spacing,
++            &pool.parameters.filesystem_identifier,
++        )
++        .into_iter()
++        .map(|slot| slot.quantities.slot_generation)
++        .max()
++        .expect("盘 1 两槽自证得过");
++        // 下一次写的槽 = 世代号 mod 2（D22（单元原子性怎么合成） 已定项 16）：世代号 g 那一份住槽 g mod 2。
++        let newer_slot_offset = DeviceOffsetInBytes((newer_generation % 2) * spacing);
++        let device_one = &mut devices[1].1;
++        let mut newer_slot = vec![0u8; 512];
++        device_one
++            .read_at(newer_slot_offset, &mut newer_slot)
++            .expect("读较新那一槽");
++        newer_slot[100] ^= 0xff;
++        device_one
++            .write_at(newer_slot_offset, &newer_slot, WriteDurability::Plain)
++            .expect("写坏较新那一槽");
++        assert_eq!(
++            verified_system_configuration_slots(
++                &devices,
++                DeviceIdentity(1),
++                spacing,
++                &pool.parameters.filesystem_identifier,
++            )
++            .len(),
++            1,
++            "{entry:?}：盘 1 只剩一槽自证"
++        );
++        let refusal = go_through(entry, &mut pool, &mut devices);
++        assert!(
++            refusal.is_none(),
++            "{entry:?}：只剩一槽自证的盘不误拒：{}",
++            describe(&refusal)
++        );
++        let after = MemoryPool {
++            devices: devices
++                .iter()
++                .map(|(identity, device)| (*identity, device.image.clone()))
++                .collect(),
++            device_size_in_bytes: now.device_size_in_bytes,
++        };
++        assert_eq!(
++            common_admission::checker_violations_on(&after),
++            Vec::<String>::new(),
++            "{entry:?}：做完之后池级 checker 不红"
++        );
++        assert!(
++            writable_mount_outcome_on_a_copy_of(&pool.parameters, &devices).is_ok(),
++            "{entry:?}：之后照常可写挂载"
++        );
++    }
++}
++
++/// 攻方放开扫的 16 格（`stale_snapshot_substitution_swept_over_the_user_steps`）：旧快照取自第一个文件之后或覆盖写 1 之后 × 换盘 0 或盘 1 ×
++/// 之后经会话发 1 / 2 / 3 次或正常卸载一次。每一格：对照（不经入口直接可写挂载）被拒；入口的每一次都拒成落后支、点名换掉的那一块；
++/// 两块盘逐字节不变；之后可写挂载与对照逐字相同。改之前 16 格入口都做成、之后可写挂载做成（实例 2）、池级 checker 红 1–6 条 I-2.1。
++#[test]
++fn stale_snapshot_substitution_is_refused_by_every_entry_over_the_swept_user_steps() {
++    let mut cells = Vec::new();
++    for snapshot_after_overwrites in [0_usize, 1] {
++        for stale_device in [DeviceIdentity(0), DeviceIdentity(1)] {
++            for session_publishes in [Some(1_u64), Some(2), Some(3), None] {
++                cells.push((snapshot_after_overwrites, stale_device, session_publishes));
++            }
++        }
++    }
++    // 16 格彼此独立（各自建池）：按线程数切片并行（`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」），
++    // 线程数取 SINGLEFS_THREAD_CAP，没设取 available_parallelism；每格自己断言，一格红就在 join 时带着它的名字红。
++    let thread_count = std::env::var("SINGLEFS_THREAD_CAP")
++        .ok()
++        .and_then(|value| value.parse::<usize>().ok())
++        .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, usize::from))
++        .clamp(1, cells.len());
++    let cells_per_thread = cells.len().div_ceil(thread_count);
++    std::thread::scope(|scope| {
++        for slice in cells.chunks(cells_per_thread) {
++            scope.spawn(move || {
++                for (snapshot_after_overwrites, stale_device, session_publishes) in slice {
++                    eprintln!(
++                        "扫到：旧快照在第 {snapshot_after_overwrites} 次覆盖写之后、换盘 {}、{session_publishes:?}",
++                        stale_device.0
++                    );
++                    stale_snapshot_sweep_cell(*snapshot_after_overwrites, *stale_device, *session_publishes);
++                }
++            });
++        }
++    });
++}
++
++/// 放开扫的一格：旧快照取自第 `snapshot_after_overwrites` 次覆盖写之后、换的是 `stale_device`、之后经会话发 `session_publishes` 次
++/// （`None` 是正常卸载一次）。
++fn stale_snapshot_sweep_cell(
++    snapshot_after_overwrites: usize,
++    stale_device: DeviceIdentity,
++    session_publishes: Option<u64>,
++) {
++    let cell = format!(
++        "旧快照在第 {snapshot_after_overwrites} 次覆盖写之后、换盘 {}、{}",
++        stale_device.0,
++        session_publishes.map_or("正常卸载一次".to_string(), |count| format!(
++            "会话发 {count} 次"
++        ))
++    );
++    let mut pool = start_plain(DEVICE_WIDTH);
++    let mut snapshot = pool.image();
++    for overwrite in 0..2 {
++        if overwrite == snapshot_after_overwrites {
++            snapshot = pool.image();
++        }
++        pool.overwrite(OVERWRITE_BYTES).expect("会话里覆盖写");
++    }
++    let now = pool.image();
++    let mut devices: SparseDevices = [DeviceIdentity(0), DeviceIdentity(1)]
++        .into_iter()
++        .map(|identity| {
++            let image = if identity == stale_device {
++                &snapshot
++            } else {
++                &now
++            };
++            (identity, copy_of_device(image, identity))
++        })
++        .collect();
++    let control = writable_mount_outcome_on_a_copy_of(&pool.parameters, &devices);
++    // 换盘 1 时对照拒在落后支；换盘 0 时最新那条根（txg 5）只在盘 0 上、所选那一版退到 txg 4，盘 1 的系统配置见证过 txg 5，
++    // 先被 C554 乙拒（`NewerStateStillUnreadableAfterOneReread`）。两种都是可写挂载在取号之前拒，这里只钉「拒」与之后逐字相同。
++    assert!(control.is_err(), "{cell}：对照可写挂载被拒：{control:?}");
++    let images_before = images_of(&devices);
++    let refusals: Vec<Option<EntryRefusal>> = match session_publishes {
++        Some(count) => (0..count)
++            .map(|_| go_through(EntryAfterTheMount::SessionPublish, &mut pool, &mut devices))
++            .collect(),
++        None => vec![go_through(
++            EntryAfterTheMount::NormalUnmount,
++            &mut pool,
++            &mut devices,
++        )],
++    };
++    for refusal in refusals {
++        let devices_behind: Vec<DeviceIdentity> = match refusal {
++            Some(EntryRefusal::Session(
++                UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits {
++                    devices: behind_devices,
++                },
++            ))
++            | Some(EntryRefusal::Mount(
++                MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits {
++                    devices: behind_devices,
++                },
++            )) => behind_devices.iter().map(|behind| behind.device).collect(),
++            other => panic!("{cell}：该被落后支拒，实际 {}", describe(&other)),
++        };
++        assert_eq!(
++            devices_behind,
++            vec![stale_device],
++            "{cell}：点名换掉的那一块"
++        );
++    }
++    assert_eq!(
++        images_of(&devices),
++        images_before,
++        "{cell}：两块盘逐字节不变"
++    );
++    assert_eq!(
++        writable_mount_outcome_on_a_copy_of(&pool.parameters, &devices),
++        control,
++        "{cell}：之后可写挂载与对照逐字相同"
++    );
++}
+diff --git a/crates/singlefs-harness/tests/fsync_drop_and_devices_without_the_selected_version.rs b/crates/singlefs-harness/tests/fsync_drop_and_devices_without_the_selected_version.rs
+index 3dbb1db9..2015d876 100644
+--- a/crates/singlefs-harness/tests/fsync_drop_and_devices_without_the_selected_version.rs
++++ b/crates/singlefs-harness/tests/fsync_drop_and_devices_without_the_selected_version.rs
+@@ -42,8 +42,9 @@ use singlefs_core::make_filesystem::{
+     make_filesystem, MakeFilesystemParameters, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
+ };
+ use singlefs_core::mount::{
+-    mount_writable, DeviceCount, DeviceWithoutTheSelectedVersion, MountError, RollbackTarget,
+-    SelectedVersionLackingOnDevice, STRIPE_WIDTH_LOWER_BOUND,
++    mount_writable, DeviceCount, DeviceWithoutTheSelectedVersion, MountError, NewerPublishWitness,
++    RollbackTarget, SelectedVersionAgainstTheWitness, SelectedVersionLackingOnDevice,
++    StillUnreadableAfterOneReread, WitnessedCounterComparison, STRIPE_WIDTH_LOWER_BOUND,
+ };
+ use singlefs_core::mounted_read::mount_read_only;
+ use singlefs_core::records::STATISTIC_ALLOCATED_BYTES;
+@@ -1565,6 +1566,40 @@ fn refusal_by_devices_without_the_selected_version(
+     }
+ }
+ 
++/// C554 乙先拒的那一格（`MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)`）：
++/// 读阶段交出的所选那一版是 `selected_version`、它那次发布末条记录读得出、计数器 `selected_version_last_record_counter`，另一块盘的系统配置
++/// 见证过计数器 `witnessed_journal_counter`（更大）；重读一遍读数相同。乙在读阶段之后、取号之前逐盘核之前判，所以这几格走不到逐盘核
++/// （调查 `research/prompts/m2-investigate-three-reds-report.md` 第二节）。
++fn assert_refused_by_the_witness_of_a_newer_publish(
++    error: &MountError,
++    what: &str,
++    selected_version: RollbackTarget,
++    witnessed_journal_counter: u64,
++    selected_version_last_record_counter: u64,
++) {
++    let reading = SelectedVersionAgainstTheWitness {
++        selected_version,
++        witness: NewerPublishWitness {
++            witnessed_journal_counter,
++            comparison: WitnessedCounterComparison::AgainstTheSelectedVersionsLastRecord {
++                selected_version_last_record_counter,
++            },
++        },
++    };
++    assert!(
++        matches!(
++            error,
++            MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable)
++                if **still_unreadable
++                    == StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion {
++                        first_read: reading,
++                        reread: reading,
++                    }
++        ),
++        "{what}：该被 C554 乙拒（见证 {witnessed_journal_counter} > 所选那一版末条 {selected_version_last_record_counter}），实际 {error:?}"
++    );
++}
++
+ fn version_key(instance: u32, txg: u64) -> RollbackTarget {
+     RollbackTarget {
+         instance: InstanceGeneration(instance),
+@@ -1629,9 +1664,12 @@ fn newest_system_configuration_journal_tail_on(
+     })
+ }
+ 
+-/// 空盘在盘 1（盘 0 带着 txg 5 那一版）或在盘 0（盘 1 带着的最新一版是 txg 4：txg 5 的根在盘 0 上，它那条记录的点名单元
+-/// 盘 0 那一份验不过、施加不了）：可写挂载在取号之前拒掉，报新成员、点名那块空盘「没有自证过的系统配置」，
++/// 空盘在盘 1（盘 0 带着 txg 5 那一版）：可写挂载在取号之前拒掉，报新成员、点名那块空盘「没有自证过的系统配置」，
+ /// 带出所选那一版与它那次发布末条记录的 jsn；两块盘逐字节不变。
++/// 空盘在盘 0（盘 1 带着的最新一版是 txg 4：txg 5 的根在盘 0 上，它那条记录的点名单元盘 0 那一份验不过、施加不了）：
++/// 盘 1 的系统配置见证过 txg 5 那次发布（jsn 5 > 所选那一版末条 4），C554 乙在逐盘核之前拒，逐盘核这一格不可达（C554 乙之后）；
++/// 同样拒在取号之前、两块盘逐字节不变。逐盘核点名空盘那一判由「盘 1 是空盘」那一格与
++/// `stale_device_one_refuses_the_writable_mount_naming_every_unit_it_misses_before_any_write` 钉着。
+ #[test]
+ fn blank_device_refuses_the_writable_mount_by_name_before_any_write() {
+     let pool = pool_at_txg_five_with_device_one_stale_at_txg_three();
+@@ -1641,28 +1679,37 @@ fn blank_device_refuses_the_writable_mount_by_name_before_any_write() {
+         (4, 5),
+         "txg 4、txg 5 各一条记录"
+     );
+-    let cases = [
+-        (
+-            "盘 1 是空盘",
+-            DEVICE_ONE,
+-            vec![
+-                (DEVICE_ZERO, sparse_from(&pool.full, DEVICE_ZERO)),
+-                (DEVICE_ONE, blank_device()),
+-            ],
+-            version_key(1, 5),
+-            journal_position(1, 5),
+-        ),
+-        (
+-            "盘 0 是空盘",
+-            DEVICE_ZERO,
+-            vec![
+-                (DEVICE_ZERO, blank_device()),
+-                (DEVICE_ONE, sparse_from(&pool.full, DEVICE_ONE)),
+-            ],
+-            version_key(1, 4),
+-            journal_position(1, 4),
+-        ),
++    let cases = [(
++        "盘 1 是空盘",
++        DEVICE_ONE,
++        vec![
++            (DEVICE_ZERO, sparse_from(&pool.full, DEVICE_ZERO)),
++            (DEVICE_ONE, blank_device()),
++        ],
++        version_key(1, 5),
++        journal_position(1, 5),
++    )];
++    let mut devices_with_device_zero_blank = vec![
++        (DEVICE_ZERO, blank_device()),
++        (DEVICE_ONE, sparse_from(&pool.full, DEVICE_ONE)),
+     ];
++    let image_before_the_mount_with_device_zero_blank =
++        memory_pool_of(&devices_with_device_zero_blank);
++    let refusal_with_device_zero_blank =
++        mount_writable(&pool.parameters, &mut devices_with_device_zero_blank)
++            .expect_err("盘 0 是空盘，可写挂载要拒");
++    assert_refused_by_the_witness_of_a_newer_publish(
++        &refusal_with_device_zero_blank,
++        "盘 0 是空盘",
++        version_key(1, 4),
++        5,
++        4,
++    );
++    assert_eq!(
++        memory_pool_of(&devices_with_device_zero_blank),
++        image_before_the_mount_with_device_zero_blank,
++        "盘 0 是空盘：拒在取号之前，两块盘逐字节不变"
++    );
+     for (what, blank, mut devices, expected_version, expected_position) in cases {
+         let before = memory_pool_of(&devices);
+         let error =
+@@ -2077,12 +2124,13 @@ fn device_one_stale_on_the_version_without_file_refuses_the_writable_mount_namin
+ 
+ /// 读路径那一格（不是 fsync 失败；调查文件那条 `mount_writable_while_every_read_of_device_one_fails_is_recorded` 只记不判）：
+ /// 第一个文件（txg 3）→ 覆盖写 txg 4 之后，盘 1 的每一次读都报错、写照常。交进来的是两块盘，w 的下限那一判不拦；
+-/// 可写挂载在取号之前拒掉，报 `WritableMountRefusedByDevicesWithoutTheSelectedVersion`，点名盘 1「没有自证过的系统配置」——
+-/// 两个系统配置槽都读不出，这块盘不「可见」（D18（块里携带什么信息） 已定项 11「可写挂载的顺序」）。一个写、一道屏障都没落下。
+ /// 所选那一版是 (1, 3)、不是 (1, 4)：txg 4 的根只落在区域 1（盘 1，读不出），txg 4 那条记录点名的单元在盘 1 上那一份验不了、
+-/// 那次发布不施加（同「盘 0 是空盘」那一格所选的是 (1, 4) 而不是 (1, 5) 的道理）。
++/// 那次发布不施加（同「盘 0 是空盘」那一格所选的是 (1, 4) 而不是 (1, 5) 的道理）。盘 0 的系统配置见证过 txg 4 那次发布
++/// （jsn 4 > 所选那一版末条 3），可写挂载在取号之前被 C554 乙拒——逐盘核（点名盘 1「没有自证过的系统配置」）在乙之后不可达，
++/// 那一判由 `blank_device_refuses_the_writable_mount_by_name_before_any_write` 的「盘 1 是空盘」那一格钉着。一个写、一道屏障都没落下。
+ #[test]
+-fn mount_writable_while_every_read_of_device_one_fails_is_refused_naming_device_one() {
++fn mount_writable_while_every_read_of_device_one_fails_is_refused_by_the_witness_before_any_write()
++{
+     let (mut rig, mut allocator, first, instance) = build_rig();
+     let second =
+         overwrite(&mut rig, &mut allocator, &first, &content_of(2), instance).expect("txg 4");
+@@ -2103,24 +2151,12 @@ fn mount_writable_while_every_read_of_device_one_fails_is_refused_naming_device_
+     let error = mount_writable(&rig.parameters, &mut rig.devices)
+         .expect_err("盘 1 每次读都报错，可写挂载要拒");
+     rig.plan.disarm();
+-    let refusal = refusal_by_devices_without_the_selected_version(&error, "盘 1 每次读都报错");
+-    assert_eq!(
+-        refusal.selected_version,
++    assert_refused_by_the_witness_of_a_newer_publish(
++        &error,
++        "盘 1 每次读都报错",
+         version_key(1, 3),
+-        "所选那一版是 txg 3 那一版：txg 4 的根只在盘 1 上，它那条记录施加不了"
+-    );
+-    assert_eq!(
+-        refusal.selected_version_journal_position,
+-        journal_position(1, 3),
+-        "所选那一版那次发布的末条记录"
+-    );
+-    assert_eq!(
+-        refusal.devices,
+-        vec![DeviceWithoutTheSelectedVersion {
+-            device: DEVICE_ONE,
+-            lacking: SelectedVersionLackingOnDevice::NoSelfVerifiedSystemConfiguration,
+-        }],
+-        "点名盘 1：两个系统配置槽都读不出，没有自证过的一份"
++        4,
++        3,
+     );
+     assert_eq!(
+         rig.stream.operation_count(),
+diff --git a/crates/singlefs-harness/tests/reuse_after_raising_the_floor.rs b/crates/singlefs-harness/tests/reuse_after_raising_the_floor.rs
+index 415f536e..5ca77a37 100644
+--- a/crates/singlefs-harness/tests/reuse_after_raising_the_floor.rs
++++ b/crates/singlefs-harness/tests/reuse_after_raising_the_floor.rs
+@@ -20,11 +20,11 @@ use singlefs_core::block_device::{BlockDevice, WriteDurability};
+ use singlefs_core::journal::record_offset;
+ use singlefs_core::mount::{
+     mount_writable, raise_rollback_floor, roll_back_by_a_forward_publish, MountError, RaisedFloor,
+-    RollbackCandidateExclusion, RollbackError, RollbackTarget, RolledBack, ShadowLedger,
++    RollbackError, RollbackTarget, RolledBack, ShadowLedger, StillUnreadableAfterOneReread,
+ };
+ use singlefs_core::recovery::{
+-    choose_system_configuration, readable_roots, recover, scan_journal, JournalPolicy,
+-    RecoveryOutcome,
++    choose_system_configuration, readable_roots, recover, scan_journal, BadRootRingSlotReading,
++    JournalPolicy, RecoveryOutcome,
+ };
+ use singlefs_core::root_ring::{slot_offset, target_for_publish};
+ use singlefs_core::transaction::{publish_overwrite, FirstFile, PoolWriter, TransactionOutput};
+@@ -635,23 +635,28 @@ fn reclaiming_without_raising_the_floor_reuses_a_slot_a_candidate_root_still_ref
+     );
+ }
+ 
+-/// 回退候选集的 F 用 F_生效（D16（发布语义） 已定项 1「生效」，SysPre：max(根上带的, 系统配置里读得出的)）：抬到 11 之后把盘 1 的载体
+-/// （txg 16）改坏，F_生效 仍是 11（盘 0 的 txg 15 与两块盘系统配置里都带 11），txg 9 的根 D 在 F 之下、不是候选，挂着的时候回退在任何写之前
+-/// 拒成 `BelowEffectiveFloor`、盘上逐字节不变、分配器与现行版本不动。改之前按「各盘所带 F 最大值的最小值」只读根，F_生效 回到 0、D 退得到。
++/// 抬到 11 之后把盘 1 的载体（txg 16 的根）改坏一个字节（自证不过），挂着的时候回退到 txg 9 的根 D：那条载体是这个进程写过、FUA 返回过的，
++/// 它住的槽在这个进程的根环表里——D16（发布语义） 已定项 1「根槽这一次读坏」那一行全句：读不出或自证不过就重读一次，仍坏就拒。
++/// 回退判候选读根环时拒成 `CandidateJudgementStillUnreadableAfterOneReread(RootRingSlotKnownToHoldARoot { 自证不过, 自证不过 })`，
++/// 在任何写之前：盘上逐字节不变、分配器与现行版本不动。
++/// 这一条原来钉的是「载体坏了当没有根，F_生效 照 SysPre（max(根上带的, 系统配置里读得出的)）仍是 11、D 拒成 `BelowEffectiveFloor`」；
++/// 照全句之后已知根被改坏那一形在判候选时就拒（代码三方第二轮之后的规格第 3 条：已知根被改坏之后回退，改钉拒）。
++/// 改坏挪到挂载之前（那时它不是已知根）保不住原来那一判：之后可写挂载的写行与暖机两块盘都写带 F 11 的根，「F 只在系统配置里」
++/// 那一形就没了（推的，没造）。
+ #[test]
+ #[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+-fn floor_carried_by_only_one_device_root_and_the_system_configuration_keeps_the_roots_below_it_out_of_the_rollback_candidates(
++fn rolling_back_after_the_floor_carrier_this_process_wrote_on_device_one_reads_not_self_verified_is_refused_before_any_write(
+ ) {
+     let mut pool = build_through_rollback("step-five-candidate-floor");
+     five_overwrites_after_the_rollback(&mut pool);
+     let raised = raise_floor(&mut pool, CheckpointTxg(11)).expect("抬 F");
+     let second_carrier = raised.publishes[1].root.checkpoint_txg;
++    let target = target_for_publish(
++        second_carrier,
++        parameters().geometry.root_ring_slots_per_region,
++    );
+     {
+         let devices = pool.devices.as_mut().expect("镜像还开着");
+-        let target = target_for_publish(
+-            second_carrier,
+-            parameters().geometry.root_ring_slots_per_region,
+-        );
+         let device = parameters().region_devices[usize::try_from(target.region).expect("区域号")];
+         let offset = slot_offset(target, 4096);
+         let (_, recorded) = devices
+@@ -678,12 +683,15 @@ fn floor_carried_by_only_one_device_root_and_the_system_configuration_keeps_the_
+     assert!(
+         matches!(
+             &refused,
+-            Err(RollbackError::TargetNotACandidate {
+-                exclusion: RollbackCandidateExclusion::BelowEffectiveFloor,
+-                ..
+-            })
++            Err(RollbackError::CandidateJudgementStillUnreadableAfterOneReread(still_bad))
++                if **still_bad
++                    == StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot {
++                        ring_slot: target,
++                        first_reading: BadRootRingSlotReading::NotSelfVerified,
++                        reread: BadRootRingSlotReading::NotSelfVerified,
++                    }
+         ),
+-        "F_生效 仍是 11，txg 9 的根不在候选集里：{:?}",
++        "载体是这个进程写过的，自证不过重读仍坏：{:?}",
+         refused.as_ref().err()
+     );
+     assert_eq!(
+diff --git a/crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs b/crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs
+index fbd95f5b..9258f61f 100644
+--- a/crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs
++++ b/crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs
+@@ -34,14 +34,15 @@ use singlefs_core::block_device::{
+ use singlefs_core::mount::{
+     is_a_user_visible_unit, mount_writable, mount_writable_with_test_only_switches,
+     roll_back_by_a_forward_publish, Mounted, RollbackCandidateExclusion, RollbackError,
+-    RollbackTarget, RolledBack, ShadowLedger,
++    RollbackTarget, RolledBack, ShadowLedger, StillUnreadableAfterOneReread,
+ };
+ use singlefs_core::pointer::LocationEntry;
+ use singlefs_core::records::TREE_KIND_ALLOCATION;
+ use singlefs_core::recovery::{
+     allocation_records_under_root, choose_system_configuration,
+     highest_tree_identifier_watermark_in_the_ring, readable_roots, recover, scan_journal,
+-    user_visible_tree_root_pointers, walk_to_file, JournalPolicy, RecoveryFailure, RecoveryOutcome,
++    user_visible_tree_root_pointers, walk_to_file, BadRootRingSlotReading, JournalPolicy,
++    RecoveryFailure, RecoveryOutcome,
+ };
+ use singlefs_core::root_ring::{slot_offset, target_for_publish};
+ use singlefs_core::transaction::{
+@@ -816,12 +817,19 @@ fn refusal_before_any_write_leaves_the_disk_the_allocator_and_the_current_versio
+     );
+ }
+ 
+-/// 验收「水位」：C 那一版新建了三个 inode（号 2、3、4，水位 5），回退那一刻 C 的根槽读不出——环里读得出的根带的 inode 号水位都是 2；
+-/// D 的 inode 号水位取 max(C 内存里的 5, 环里的 2) = 5，D 之后再新建的 inode 从 5 起、不重发 2–4。树 ID 水位同一个取法。
+-/// 只取环里读得出的根时 D 的水位是 2——`crates/mutations.tsv` 里那一行证这条断言红。
++/// C 那一版新建了三个 inode（号 2、3、4，水位 5），回退那一刻 C 的根槽被改成全 0（自证不过）。C 的根是这个进程写过、FUA 返回过的，
++/// 它住的槽在这个进程的根环表里：D16（发布语义） 已定项 1「根槽这一次读坏」那一行全句——读不出或自证不过就重读一次，仍坏就拒——
++/// 管理员回退判候选读根环时拒成 `CandidateJudgementStillUnreadableAfterOneReread(RootRingSlotKnownToHoldARoot { 自证不过, 自证不过 })`，
++/// 在任何写之前：盘上逐字节不变、现行版本与分配器不动。根槽改回原样之后回退照做：D 的 inode 号水位 5，D 之后再新建的 inode 从 5 起、
++/// 不重发 2–4；树 ID 水位同一个取法。
++/// 这一条原来钉的是「C 的根槽读不出、回退照做、水位取内存里的」（合入后验证一只管「读不出」时自证不过当没有根）；照全句之后那一形在
++/// 判候选时就拒（代码三方第二轮之后的规格第 3 条：已知根被改坏之后回退，改钉拒）。「水位取 max(内存里的, 环里读得出的)」那一判挪到
++/// `unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs` 的
++/// `the_rollback_takes_the_inode_number_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_its_root`
++/// （判候选两遍读得出、算水位那一遍瞬时读不出），`crates/mutations.tsv` 里实三「水位」那一行跟着换靶。
+ #[test]
+ #[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+-fn the_rollback_takes_the_watermarks_from_the_current_version_in_memory_when_its_root_is_unreadable(
++fn rolling_back_while_a_root_slot_this_process_wrote_reads_not_self_verified_is_refused_before_any_write(
+ ) {
+     let mut pool = build_pool("step-four-forward-watermark");
+     let _second = overwrite_in_process(&mut pool, &second_content(), InstanceGeneration(1));
+@@ -858,11 +866,47 @@ fn the_rollback_takes_the_watermarks_from_the_current_version_in_memory_when_its
+         write_root_slot(open_devices, third_root_slot, &vec![0u8; root_slot_bytes()]);
+         saved
+     };
+-    roll_back(&mut pool, first_root()).expect("回退到 A：C 的根读不出不碍事，候选与账都读得出");
++    let before = disk_snapshot(&pool.memory_pool(), &pool.stream);
++    let current_before = pool.output.clone();
++    let records_before = pool.allocator.records().to_vec();
++    let refused = roll_back(&mut pool, first_root());
++    assert!(
++        matches!(
++            &refused,
++            Err(RollbackError::CandidateJudgementStillUnreadableAfterOneReread(still_bad))
++                if **still_bad
++                    == StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot {
++                        ring_slot: target_for_publish(
++                            CheckpointTxg(8),
++                            parameters().geometry.root_ring_slots_per_region,
++                        ),
++                        first_reading: BadRootRingSlotReading::NotSelfVerified,
++                        reread: BadRootRingSlotReading::NotSelfVerified,
++                    }
++        ),
++        "C 的根槽是这个进程写过的，自证不过重读仍坏：{:?}",
++        refused.as_ref().err()
++    );
++    assert_eq!(
++        disk_snapshot(&pool.memory_pool(), &pool.stream),
++        before,
++        "拒在任何写之前"
++    );
++    assert_eq!(pool.output, current_before, "现行版本不动");
++    assert_eq!(
++        pool.allocator.records(),
++        records_before.as_slice(),
++        "分配器不动"
++    );
++    {
++        let open_devices = pool.devices.as_mut().expect("镜像还开着");
++        write_root_slot(open_devices, third_root_slot, &saved_third_root_slot);
++    }
++    roll_back(&mut pool, first_root()).expect("C 的根槽改回原样之后回退到 A");
+     assert_eq!(
+         pool.output.inode_number_watermark(),
+         5,
+-        "D 的 inode 号水位 = max(C 内存里的 5, 环里读得出的根的 2)"
++        "D 的 inode 号水位 = max(C 内存里的 5, 环里读得出的根的)"
+     );
+     assert_eq!(
+         pool.output.root.tree_identifier_watermark, third.root.tree_identifier_watermark,
+@@ -893,10 +937,6 @@ fn the_rollback_takes_the_watermarks_from_the_current_version_in_memory_when_its
+         BTreeSet::from([1, 5, 6]),
+         "D 之后新建的号从 5 起：C 发过的 2–4 不重发"
+     );
+-    {
+-        let open_devices = pool.devices.as_mut().expect("镜像还开着");
+-        write_root_slot(open_devices, third_root_slot, &saved_third_root_slot);
+-    }
+     let verdicts = verdicts_without_any_violation(&pool.memory_pool(), "D、新建两个 inode 之后");
+     assert_judged_and_holding(&verdicts, &["I-9.6"], "D、新建两个 inode 之后");
+ }
+diff --git a/crates/singlefs-harness/tests/system_configuration_mutability_classes.rs b/crates/singlefs-harness/tests/system_configuration_mutability_classes.rs
+index 9f443d31..f60a4e68 100644
+--- a/crates/singlefs-harness/tests/system_configuration_mutability_classes.rs
++++ b/crates/singlefs-harness/tests/system_configuration_mutability_classes.rs
+@@ -15,6 +15,7 @@ use singlefs_core::root_ring::RootRingSlotsPerRegion;
+ use singlefs_core::system_configuration::{
+     SlotBytesByMutability, SystemConfiguration, SystemImmutableConfiguration, SystemImmutableSizes,
+     SystemMutableConfiguration, SystemRuntimeConfiguration, SystemRuntimeQuantities,
++    JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION, ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+ };
+ use singlefs_format::{JOURNAL_RING_DEFAULT_BYTES, SYSTEM_CONFIGURATION_BYTES};
+ use singlefs_harness::sha256::sha256_hexadecimal;
+@@ -34,6 +35,8 @@ fn system_configuration_at_mkfs() -> SystemConfiguration {
+                 journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
+                 root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
+             },
++            journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
++            root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+         },
+         mutable: SystemMutableConfiguration,
+         runtime: SystemRuntimeConfiguration,
+@@ -65,6 +68,8 @@ fn system_configuration_after_the_new_pool_file_creation() -> SystemConfiguratio
+                 journal_ring_bytes: 805_306_368,
+                 root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
+             },
++            journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
++            root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+         },
+         mutable: SystemMutableConfiguration,
+         runtime: SystemRuntimeConfiguration,
+diff --git a/crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs b/crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs
+index 4c89dd37..3f989408 100644
+--- a/crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs
++++ b/crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs
+@@ -20,6 +20,12 @@
+ //! - 另两处读不出就无声放过（A3b 报告 Q7）：管理员回退判候选照同一读法拒成 `RollbackError` 的新成员；写系统配置槽之前算 F 生效值
+ //!   读不出的重读一次，仍读不出照原来的退路（写入口手里没有根环表，不拒）。
+ //!
++//! 代码三方第二轮（`research/prompts/m2-closeout-code-r2-main-verification.md`，规格 `/tmp/claude-1000/impl-r2-fixes-b/spec.md`）改了两样：
++//! - 读根环照 D16（发布语义） 已定项 1「根槽这一次读坏」那一行全句（用户 2026-09-26 定）：知道住着根的槽「读不出**或自证不过**」都重读一次、
++//!   仍坏就拒（第四节末尾两条；包装盘另加「读得出、字节被改」那一种坏法）。管理员回退算水位读根环那一遍仍是 `readable_roots`
++//!   （不重读），判候选那两遍读得出、这一遍瞬时读坏时水位取内存里的现行那一版（`the_rollback_takes_the_inode_number_watermark_…`）。
++//! - 五、core 读系统配置的 journal 环起点（偏移 325）与根环起点（偏移 371），与第一版常量不等整池拒（Y4-a，用户 2026-09-27 定）。
++//!
+ //! 盘：两块内存稀疏盘（`SparseBlockDevice`），改盘上字节之后重封每一道校验和；读故障用这个文件自己的包装盘按「这一段第几次读」坏。
+ use std::cell::RefCell;
+ use std::collections::BTreeSet;
+@@ -46,16 +52,17 @@ use singlefs_core::mount::{
+     roll_back_by_a_forward_publish, MountError, RollbackError, RollbackTarget, ShadowLedger,
+     StillUnreadableAfterOneReread,
+ };
++use singlefs_core::mounted_read::{mount_read_only, MountReadOnlyFailure};
+ use singlefs_core::records::{TREE_KIND_LIVELIST, TREE_KIND_SPARSE_SIDE_TABLE};
+ use singlefs_core::recovery::{
+     choose_system_configuration, effective_rollback_floor_rereading_the_newest_instance_table_once,
+     effective_rollback_floor_rereading_unreadable_reads_once, every_root_ring_slot,
+     read_root_ring_slot, readable_roots,
+     readable_roots_rereading_ring_slots_known_to_hold_a_root_once, readable_roots_with_ring_slots,
+-    recover, verified_system_configuration_slots,
++    recover, verified_system_configuration_slots, BadRootRingSlotReading,
+     InstanceTableOfTheNewestRootStillUnreadableAfterOneReread, JournalPolicy, RecoveryFailure,
+-    RecoveryOutcome, RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread,
+-    RootRingSlotReading, SystemConfigurationValueOutsideWhatThisReaderAccepts,
++    RecoveryOutcome, RootRingSlotKnownToHoldARootStillBadAfterOneReread, RootRingSlotReading,
++    SystemConfigurationValueOutsideWhatThisReaderAccepts,
+ };
+ use singlefs_core::root_record::RootRecord;
+ use singlefs_core::root_ring::{slot_offset, RootRingSlot, RootRingSlotsPerRegion};
+@@ -64,13 +71,14 @@ use singlefs_core::system_configuration::{
+     SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
+ };
+ use singlefs_core::transaction::{
+-    acquire_instance, publish_first_file, publish_overwrite, warm_up, FirstFile, PoolWriter,
+-    TransactionOutput,
++    acquire_instance, publish_first_file, publish_new_inodes, publish_overwrite, warm_up,
++    FirstFile, PoolWriter, TransactionOutput,
+ };
+ use singlefs_core::unit::seal_header_checksum;
+ use singlefs_format::{
+     JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT,
+-    JOURNAL_SAFETY_FACTOR, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
++    JOURNAL_SAFETY_FACTOR, ROOT_RING_BASE_SLOT, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
++    UNIT_AREA_START_SLOT,
+ };
+ use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice, SparseDevice, SECTOR_BYTES};
+ 
+@@ -713,29 +721,45 @@ fn a_tree_table_whose_two_entries_carry_the_same_tree_identifier_is_refused_by_t
+ 
+ // ─── 四、读不出就不无声放过（C554 乙报告 Q6） ───
+ 
+-/// 这个文件自己的读故障：几段落点，每一段按它自己被读的次数（从 1 数，一次读碰到这一段就算一次）点名哪几次读坏
+-/// （块设备报 `InputOutput`）。两块盘共用一份。
++/// 这个文件自己的读故障：几段落点，每一段按它自己被读的次数（从 1 数，一次读碰到这一段就算一次）点名哪几次读坏。
++/// 两块盘共用一份。
+ struct ChosenReadFaults {
+     ranges: Vec<ChosenReadFaultsOfARange>,
+ }
+ 
++/// 点名的那几次读怎么坏。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++enum ChosenReadFault {
++    /// 块设备报 `InputOutput`（读不出）。
++    Fails,
++    /// 读得出，这一段落在这次读里的第一个字节取反（根槽里是 magic 那一字节：自证不过）。
++    ReturnsTheFirstByteOfTheRangeFlipped,
++}
++
+ struct ChosenReadFaultsOfARange {
+     device: DeviceIdentity,
+     offset_in_bytes: u64,
+     length_in_bytes: u64,
+     failing_read_numbers: BTreeSet<u64>,
++    fault: ChosenReadFault,
+     reads_so_far: u64,
+ }
+ 
++/// 这一次读里点名要坏的那一段：它怎么坏，和它在这次读里从第几个字节起。
++struct ChosenReadGoingBad {
++    fault: ChosenReadFault,
++    first_byte_of_the_range_in_the_read: usize,
++}
++
+ impl ChosenReadFaults {
+-    /// 记下这一次读碰到的每一段被读了一次；这一次读里有一段点名这一次坏就交回 true。
+-    fn note_a_read_and_tell_whether_it_fails(
++    /// 记下这一次读碰到的每一段被读了一次；这一次读里有一段点名这一次坏，就交回第一段点名的那一个。
++    fn note_a_read_and_tell_how_it_goes_bad(
+         &mut self,
+         device: DeviceIdentity,
+         offset_in_bytes: u64,
+         length_in_bytes: u64,
+-    ) -> bool {
+-        let mut fails = false;
++    ) -> Option<ChosenReadGoingBad> {
++        let mut going_bad = None;
+         for range in &mut self.ranges {
+             let overlaps = range.device == device
+                 && offset_in_bytes < range.offset_in_bytes + range.length_in_bytes
+@@ -744,9 +768,17 @@ impl ChosenReadFaults {
+                 continue;
+             }
+             range.reads_so_far += 1;
+-            fails |= range.failing_read_numbers.contains(&range.reads_so_far);
++            if going_bad.is_none() && range.failing_read_numbers.contains(&range.reads_so_far) {
++                going_bad = Some(ChosenReadGoingBad {
++                    fault: range.fault,
++                    first_byte_of_the_range_in_the_read: usize::try_from(
++                        range.offset_in_bytes.saturating_sub(offset_in_bytes),
++                    )
++                    .expect("一次读里的偏移装得进 usize"),
++                });
++            }
+         }
+-        fails
++        going_bad
+     }
+ }
+ 
+@@ -764,16 +796,27 @@ impl BlockDevice for DeviceFailingChosenReads {
+         buffer: &mut [u8],
+     ) -> Result<(), BlockDeviceError> {
+         let length_in_bytes = u64::try_from(buffer.len()).expect("一次读的长度装得进 u64");
+-        if self
++        let going_bad = self
+             .faults
+             .borrow_mut()
+-            .note_a_read_and_tell_whether_it_fails(self.identity, offset.0, length_in_bytes)
+-        {
+-            return Err(BlockDeviceError::InputOutput(std::io::Error::other(
++            .note_a_read_and_tell_how_it_goes_bad(self.identity, offset.0, length_in_bytes);
++        match going_bad {
++            None => self.inner.read_at(offset, buffer),
++            Some(ChosenReadGoingBad {
++                fault: ChosenReadFault::Fails,
++                ..
++            }) => Err(BlockDeviceError::InputOutput(std::io::Error::other(
+                 "用例点名的这一次读坏",
+-            )));
++            ))),
++            Some(ChosenReadGoingBad {
++                fault: ChosenReadFault::ReturnsTheFirstByteOfTheRangeFlipped,
++                first_byte_of_the_range_in_the_read,
++            }) => {
++                self.inner.read_at(offset, buffer)?;
++                buffer[first_byte_of_the_range_in_the_read] ^= 0xff;
++                Ok(())
++            }
+         }
+-        self.inner.read_at(offset, buffer)
+     }
+ 
+     fn write_at(
+@@ -806,7 +849,7 @@ impl BlockDevice for DeviceFailingChosenReads {
+     }
+ }
+ 
+-/// 一段读故障：哪块盘、从哪个字节起、多长，这一段第几次读坏。
++/// 一段读故障：哪块盘、从哪个字节起、多长，这一段第几次读坏（读不出）。
+ fn chosen_read_faults_of(
+     device: DeviceIdentity,
+     offset_in_bytes: u64,
+@@ -818,6 +861,24 @@ fn chosen_read_faults_of(
+         offset_in_bytes,
+         length_in_bytes,
+         failing_read_numbers: failing_read_numbers.iter().copied().collect(),
++        fault: ChosenReadFault::Fails,
++        reads_so_far: 0,
++    }
++}
++
++/// 同 [`chosen_read_faults_of`]，点名的那几次读得出、这一段第一个字节取反（自证不过）。
++fn chosen_corrupted_reads_of(
++    device: DeviceIdentity,
++    offset_in_bytes: u64,
++    length_in_bytes: u64,
++    corrupted_read_numbers: &[u64],
++) -> ChosenReadFaultsOfARange {
++    ChosenReadFaultsOfARange {
++        device,
++        offset_in_bytes,
++        length_in_bytes,
++        failing_read_numbers: corrupted_read_numbers.iter().copied().collect(),
++        fault: ChosenReadFault::ReturnsTheFirstByteOfTheRangeFlipped,
+         reads_so_far: 0,
+     }
+ }
+@@ -1002,6 +1063,8 @@ fn raising_the_floor_while_a_root_ring_slot_known_to_hold_a_root_stays_unreadabl
+                 if **still_unreadable
+                     == StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot {
+                         ring_slot: newest_slot,
++                        first_reading: BadRootRingSlotReading::Unreadable,
++                        reread: BadRootRingSlotReading::Unreadable,
+                     }
+         ),
+         "{:?}",
+@@ -1115,8 +1178,10 @@ fn a_root_ring_slot_unreadable_once_is_read_on_the_reread_and_one_unreadable_twi
+             &pool.parameters.filesystem_identifier,
+             &known,
+         ),
+-        Err(RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread {
++        Err(RootRingSlotKnownToHoldARootStillBadAfterOneReread {
+             ring_slot: newest_slot,
++            first_reading: BadRootRingSlotReading::Unreadable,
++            reread: BadRootRingSlotReading::Unreadable,
+         })
+     );
+     let last_slot = *every_root_ring_slot(&sizes).last().expect("根环至少一槽");
+@@ -1372,6 +1437,280 @@ fn a_system_configuration_write_rereads_an_unreadable_root_ring_slot_once_before
+     }
+ }
+ 
++/// 抬 F 到 3 那一串里最新那条根住的槽（这个进程知道住着根）：第 3 次读（重算影子账那一遍）读得出而自证不过、重读（第 4 次）仍自证不过 ⇒
++/// 拒成 `StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot { first_reading: NotSelfVerified, reread: NotSelfVerified }`，
++/// 在动分配器与任何写之前（D16（发布语义） 已定项 1「根槽这一次读坏」那一行全句：「读不出或自证不过就重读一次，仍坏就拒」）。
++/// 合入后验证一那一版只管「读不出」，自证不过当没有根、这一次抬照做。
++#[test]
++fn raising_the_floor_while_a_root_ring_slot_known_to_hold_a_root_stays_not_self_verified_is_refused_before_any_write(
++) {
++    let mut pool = pool_after_three_overwrites();
++    let sizes = pool.parameters.geometry;
++    let (newest_slot, _) = newest_root_in_the_ring(&pool.devices);
++    assert!(
++        ring_slots_known_to_hold_a_root_by(&pool.allocator).contains(&newest_slot),
++        "最新那条根住的槽在这个进程的根环表里"
++    );
++    let slot_device =
++        pool.parameters.region_devices[usize::try_from(newest_slot.region).expect("区域号")];
++    let slot_start = slot_offset(newest_slot, sizes.fixed_structure_slot_spacing).0;
++    let images_before = images_of(&pool.devices);
++    let allocator_before = format!("{:?}", pool.allocator);
++    let refused = raise_the_floor_to_three_through(
++        &mut pool,
++        vec![chosen_corrupted_reads_of(
++            slot_device,
++            slot_start,
++            u64::from(sizes.physical_block_size),
++            &[3, 4],
++        )],
++    );
++    assert!(
++        matches!(
++            &refused,
++            Err(MountError::NewerStateStillUnreadableAfterOneReread(still_bad))
++                if **still_bad
++                    == StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot {
++                        ring_slot: newest_slot,
++                        first_reading: BadRootRingSlotReading::NotSelfVerified,
++                        reread: BadRootRingSlotReading::NotSelfVerified,
++                    }
++        ),
++        "{:?}",
++        refused.as_ref().err()
++    );
++    assert_eq!(images_of(&pool.devices), images_before, "两块盘逐字节不变");
++    assert_eq!(
++        format!("{:?}", pool.allocator),
++        allocator_before,
++        "分配器与抬 F 之前逐项相同"
++    );
++}
++
++/// 同一槽只在重算影子账那一遍的第一次读（第 3 次）自证不过，重读（第 4 次）自证得过：照读出来的根算，这一次抬照做。
++#[test]
++fn a_root_ring_slot_known_to_hold_a_root_not_self_verified_once_is_read_on_the_reread_and_the_floor_is_raised(
++) {
++    let mut pool = pool_after_three_overwrites();
++    let sizes = pool.parameters.geometry;
++    let (newest_slot, _) = newest_root_in_the_ring(&pool.devices);
++    let slot_device =
++        pool.parameters.region_devices[usize::try_from(newest_slot.region).expect("区域号")];
++    let slot_start = slot_offset(newest_slot, sizes.fixed_structure_slot_spacing).0;
++    let raised = raise_the_floor_to_three_through(
++        &mut pool,
++        vec![chosen_corrupted_reads_of(
++            slot_device,
++            slot_start,
++            u64::from(sizes.physical_block_size),
++            &[3],
++        )],
++    );
++    assert!(
++        raised.is_ok(),
++        "重读自证得过，抬 F 做成：{:?}",
++        raised.err()
++    );
++}
++
++/// 管理员回退算水位（D23（journal 的角色与格式） 已定项 14「水位」：inode 号水位 = max(现行那一版内存里的, 环里读得出的根的)）：
++/// txg 7 那一版新建三个 inode（号 2、3、4，水位 5），环里别的根的 inode 号水位都是 2。回退到 txg 5 时 txg 7 的根槽判候选那两遍
++/// （第 1、2 次读）读得出，算水位那一遍（第 3 次，`readable_roots`，不重读）瞬时读不出：回退那次发布的 inode 号水位仍是 5，
++/// 之后新建的 inode 不重发 2–4。只取环里读得出的根时是 2——`crates/mutations.tsv` 里那一行（实三「水位」）证这条断言红。
++/// 这一格原来钉在 `rollback_by_a_forward_publish.rs` 那一条（C 的根槽在回退之前改坏），D16（发布语义） 已定项 1「根槽这一次读坏」
++/// 全句接进判候选之后那一形在判候选时就被拒（那一条改钉拒），水位这一判挪到这里：判候选读得出、算水位那一遍读不出。
++#[test]
++fn the_rollback_takes_the_inode_number_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_its_root(
++) {
++    let mut pool = pool_after_three_overwrites();
++    let sizes = pool.parameters.geometry;
++    let with_new_inodes = {
++        let mut writer = PoolWriter::new(&pool.parameters, pool.devices.as_mut_slice());
++        publish_new_inodes(
++            &mut writer,
++            &mut pool.allocator,
++            &pool.first,
++            3,
++            WRITE_TIME_SECONDS + 120,
++            pool.instance,
++        )
++        .expect("新建三个 inode")
++    };
++    assert_eq!(with_new_inodes.root.checkpoint_txg, CheckpointTxg(7));
++    assert_eq!(with_new_inodes.inode_number_watermark(), 5);
++    let (newest_slot, newest) = newest_root_in_the_ring(&pool.devices);
++    assert_eq!(
++        newest.checkpoint_txg,
++        CheckpointTxg(7),
++        "最新那条根是新建 inode 那一版的"
++    );
++    let slot_device =
++        pool.parameters.region_devices[usize::try_from(newest_slot.region).expect("区域号")];
++    let slot_start = slot_offset(newest_slot, sizes.fixed_structure_slot_spacing).0;
++    let parameters = pool.parameters.clone();
++    let mut faulty = with_chosen_read_faults(
++        std::mem::take(&mut pool.devices),
++        vec![chosen_read_faults_of(
++            slot_device,
++            slot_start,
++            u64::from(sizes.physical_block_size),
++            &[3],
++        )],
++    );
++    let mut current = with_new_inodes;
++    roll_back_by_a_forward_publish(
++        &parameters,
++        &mut faulty,
++        &mut pool.allocator,
++        &mut current,
++        RollbackTarget {
++            instance: InstanceGeneration(1),
++            checkpoint_txg: CheckpointTxg(5),
++        },
++    )
++    .expect("判候选两遍读得出，回退做成");
++    pool.devices = without_chosen_read_faults(faulty);
++    assert_eq!(
++        current.root.checkpoint_txg,
++        CheckpointTxg(8),
++        "回退那次发布"
++    );
++    assert_eq!(
++        current.inode_number_watermark(),
++        5,
++        "回退那次发布的 inode 号水位 = max(现行那一版内存里的 5, 环里读得出的根的 2)"
++    );
++}
++
++// ─── 五、core 读系统配置的 journal 环起点与根环起点（代码三方 m2-closeout-code-r2 Y4-a） ───
++
++/// 系统配置槽里 journal 环起点那 8 字节（16 KiB 槽号，字段表 `layout/01-first-txn.md` 一）。
++const JOURNAL_RING_START_SLOT_OFFSET: usize = 325;
++/// 系统配置槽里根环起点那 8 字节（16 KiB 槽号，D22（单元原子性怎么合成） 已定项 16 第 1 句）。
++const ROOT_RING_BASE_SLOT_OFFSET: usize = 371;
++
++/// 攻方 Y4 那五格（`research/prompts/m2-closeout-code-r2-opus-model/opus_r2_y4_system_configuration_fields_core_and_checker_read_differently.rs`）：
++/// 第一个文件之后那份合法镜像，四个系统配置槽里改一个字段、整槽校验和重封。每一格改哪几个字段、core 该拒成哪一个值。
++struct SystemConfigurationFieldCell {
++    name: &'static str,
++    fields_written: Vec<(usize, u64)>,
++    refused_as: SystemConfigurationValueOutsideWhatThisReaderAccepts,
++}
++
++fn system_configuration_field_cells() -> Vec<SystemConfigurationFieldCell> {
++    let ring_off_the_segment_boundary = JOURNAL_RING_DEFAULT_BYTES - SLOT_BYTES;
++    let start_after_the_ring_off_the_boundary =
++        JOURNAL_RING_START_SLOT + ring_off_the_segment_boundary / SLOT_BYTES;
++    vec![
++        SystemConfigurationFieldCell {
++            name: "A：单元区起点改成现算起点 + 64",
++            fields_written: vec![(UNIT_AREA_START_SLOT_OFFSET, 50_240)],
++            refused_as: SystemConfigurationValueOutsideWhatThisReaderAccepts::UnitAreaStartNotTheSlotAfterTheJournalRing {
++                recorded_unit_area_start_slot: SlotNumber(50_240),
++                slot_after_the_journal_ring: SlotNumber(50_176),
++            },
++        },
++        SystemConfigurationFieldCell {
++            name: "B：journal 环起点 1024 改成 1023",
++            fields_written: vec![(JOURNAL_RING_START_SLOT_OFFSET, 1023)],
++            refused_as: SystemConfigurationValueOutsideWhatThisReaderAccepts::JournalRingStartNotTheFirstVersionSlot {
++                recorded_journal_ring_start_slot: SlotNumber(1023),
++                first_version_journal_ring_start_slot: SlotNumber(JOURNAL_RING_START_SLOT),
++            },
++        },
++        SystemConfigurationFieldCell {
++            name: "C：根环起点 64 改成 65",
++            fields_written: vec![(ROOT_RING_BASE_SLOT_OFFSET, 65)],
++            refused_as: SystemConfigurationValueOutsideWhatThisReaderAccepts::RootRingBaseNotTheFirstVersionSlot {
++                recorded_root_ring_base_slot: SlotNumber(65),
++                first_version_root_ring_base_slot: SlotNumber(ROOT_RING_BASE_SLOT),
++            },
++        },
++        SystemConfigurationFieldCell {
++            name: "D：环长改成 768 MiB − 16 KiB、单元区起点跟着改成它现算的 50175（不在段边界上）",
++            fields_written: vec![
++                (JOURNAL_RING_BYTES_OFFSET, ring_off_the_segment_boundary),
++                (UNIT_AREA_START_SLOT_OFFSET, start_after_the_ring_off_the_boundary),
++            ],
++            refused_as: SystemConfigurationValueOutsideWhatThisReaderAccepts::UnitAreaStartOffTheClusterSegmentBoundaryUnsupported {
++                unit_area_start_slot: SlotNumber(start_after_the_ring_off_the_boundary),
++            },
++        },
++        SystemConfigurationFieldCell {
++            name: "E：根环起点 64 改成 0（槽 1 不再整槽落在同一槽自述的根环起点之前）",
++            fields_written: vec![(ROOT_RING_BASE_SLOT_OFFSET, 0)],
++            refused_as: SystemConfigurationValueOutsideWhatThisReaderAccepts::FixedStructureSlotSpacingOutsideTheFormatRange {
++                fixed_structure_slot_spacing: 4096,
++            },
++        },
++    ]
++}
++
++/// 五格 core 都整池拒，只读挂载与可写挂载拒成同一个值（`RecoveryFailure::SystemConfigurationValueRefused`），两块盘逐字节不变。
++/// 改之前 core 解槽跳过 325 与 371、取编译期常量：B、C、E 三格只读与可写都做成（E 格 checker 报 I-7.13「实现整池拒绝挂载」而实现照挂）。
++#[test]
++fn a_system_configuration_field_the_reader_does_not_accept_is_refused_by_both_mounts_before_any_write(
++) {
++    for cell in system_configuration_field_cells() {
++        let mut pool = pool_after_the_first_file(JOURNAL_RING_DEFAULT_BYTES, FOUR_GIBIBYTES);
++        let parameters = pool.parameters.clone();
++        rewrite_every_system_configuration_slot(&mut pool.devices, &parameters, |slot| {
++            for (offset, value) in &cell.fields_written {
++                slot[*offset..*offset + 8].copy_from_slice(&value.to_le_bytes());
++            }
++        });
++        let images_before = images_of(&pool.devices);
++        let read_only = mount_read_only(&pool.devices);
++        assert!(
++            matches!(
++                &read_only,
++                Err(MountReadOnlyFailure::Recovery(RecoveryFailure::SystemConfigurationValueRefused {
++                    value,
++                    ..
++                })) if *value == cell.refused_as
++            ),
++            "{}：只读挂载 {:?}",
++            cell.name,
++            read_only.as_ref().err()
++        );
++        let writable = mount_writable(&parameters, &mut pool.devices);
++        assert!(
++            matches!(
++                &writable,
++                Err(MountError::Recovery(RecoveryFailure::SystemConfigurationValueRefused {
++                    value,
++                    ..
++                })) if *value == cell.refused_as
++            ),
++            "{}：可写挂载 {:?}",
++            cell.name,
++            writable.as_ref().err()
++        );
++        assert_eq!(
++            images_of(&pool.devices),
++            images_before,
++            "{}：两块盘逐字节不变",
++            cell.name
++        );
++    }
++}
++
++/// 解槽读回 325 与 371 两个字段：mkfs 写的是第一版常量，择到的系统配置里两个字段就是它们（没改过的镜像照挂）。
++#[test]
++fn the_chosen_system_configuration_carries_the_first_version_journal_ring_start_and_root_ring_base()
++{
++    let pool = pool_after_the_first_file(JOURNAL_RING_DEFAULT_BYTES, FOUR_GIBIBYTES);
++    let chosen = choose_system_configuration(&pool.devices).expect("没改过的镜像择得到");
++    assert_eq!(
++        chosen.immutable.journal_ring_start_slot,
++        SlotNumber(JOURNAL_RING_START_SLOT)
++    );
++    assert_eq!(
++        chosen.immutable.root_ring_base_slot,
++        SlotNumber(ROOT_RING_BASE_SLOT)
++    );
++}
++
+ /// 一池内存盘的一份拷贝（盘宽与镜像都照抄）：读故障包在拷贝外面，原池不动。
+ fn copy_of_the_devices(devices: &[(DeviceIdentity, SparseBlockDevice)]) -> SparseDevices {
+     devices
+diff --git a/crates/singlefs-harness/tests/warm_up_journal_counter.rs b/crates/singlefs-harness/tests/warm_up_journal_counter.rs
+index aa9e90f4..a1a9ad81 100644
+--- a/crates/singlefs-harness/tests/warm_up_journal_counter.rs
++++ b/crates/singlefs-harness/tests/warm_up_journal_counter.rs
+@@ -3,31 +3,30 @@
+ //!
+ //! 两条用例：
+ //! - 函数这一层给不相等的起点：环里最后一条记录的 jsn 是 40 时，mkfs 之后那一档的暖机写 jsn 41、42，txg 仍是 1、2。
+-//! - 可写挂载这一层唯一分得开两个量的可达盘面：所选根自己那条记录两份都读不出（2026-09-23 harness 那一组查出，
+-//!   随机历史 3600 步里重挂时两个量处处相等，只有这一格分得开）。D23（journal 的角色与格式） 已定项 14 注 3 定前缀末的计数器
+-//!   取环里读得出的最大那一个（用户 2026-09-23 定），于是写行那次发布 txg 5、jsn 4，之后每次发布的 jsn 与 tail 都比 txg 小 1。
++//! - 可写挂载这一层没有可达盘面：C554 乙判不出按真（用户 2026-09-27 定，C579）。原来那一格（所选根自己那条记录两份都读不出，
++//!   2026-09-23 harness 那一组查出，随机历史 3600 步里重挂时两个量处处相等，只有这一格分得开）在可写挂载的读阶段被乙拒，
++//!   这里改钉「可写挂载拒、只读挂载照常择 (1, 4)」。
+ 
+ mod common;
+ 
+ use common::{
+-    build_pool, geometry, parameters, publish_overwrite_in_process, FIXED_WRITE_TIME_SECONDS,
++    build_pool, disk_snapshot, parameters, publish_overwrite_in_process, FIXED_WRITE_TIME_SECONDS,
+     IMAGE_BYTES,
+ };
+-use singlefs_core::address::{
+-    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
+-};
++use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
+ use singlefs_core::block_device::{BlockDevice, PhysicalBlockSizeInBytes, WriteDurability};
+ use singlefs_core::journal::{record_offset, JournalRecord};
+ use singlefs_core::make_filesystem::make_filesystem;
+-use singlefs_core::mount::{mount_writable, Mounted};
++use singlefs_core::mount::{
++    mount_writable, MountError, NewerPublishWitness, RollbackTarget,
++    SelectedVersionAgainstTheWitness, StillUnreadableAfterOneReread, WitnessedCounterComparison,
++};
++use singlefs_core::mounted_read::mount_read_only;
+ use singlefs_core::recovery::{choose_system_configuration, PoolReader};
+-use singlefs_core::system_configuration::SystemConfiguration;
+ use singlefs_core::transaction::{acquire_instance, warm_up_after_journal_counter, PoolWriter};
+ use singlefs_core::unit::unit_filesystem_identifier;
+ use singlefs_format::{JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES};
+ use singlefs_harness::memory_pool::SparseBlockDevice;
+-use singlefs_harness::segments::StepKind;
+-use singlefs_harness::RetainedOperation;
+ 
+ /// 环里最后一条记录的 jsn：与暖机的 txg 1、2 都不相等，计数器写成 txg 就分得出来。
+ const LAST_JOURNAL_COUNTER_BEFORE_WARM_UP: u64 = 40;
+@@ -126,70 +125,18 @@ fn second_version_content() -> Vec<u8> {
+         .collect()
+ }
+ 
+-/// 一次可写挂载写出的发布（写行那次在前、暖机在后），各自的 (txg, jsn)。
+-fn txg_and_counter_of_each_publish(mounted: &Mounted) -> Vec<(CheckpointTxg, u64)> {
+-    std::iter::once(&mounted.output.row_publish)
+-        .chain(mounted.output.warm_up_publishes.iter())
+-        .map(|publish| (publish.root().checkpoint_txg, publish.record().counter))
+-        .collect()
+-}
+-
+-/// 一段录制流里写出去的系统配置槽（盘、实例代号、tail）与 journal 记录（盘、落点、txg、jsn），按写出的次序。
+-struct WrittenJournalPositions {
+-    system_configuration_tails: Vec<(DeviceIdentity, InstanceGeneration, u64)>,
+-    journal_records: Vec<(DeviceIdentity, DeviceOffsetInBytes, CheckpointTxg, u64)>,
+-}
+-
+-fn written_journal_positions(operations: &[RetainedOperation]) -> WrittenJournalPositions {
+-    let filesystem_identifier = unit_filesystem_identifier(&parameters().filesystem_identifier);
+-    let mut positions = WrittenJournalPositions {
+-        system_configuration_tails: Vec::new(),
+-        journal_records: Vec::new(),
+-    };
+-    for retained in operations {
+-        match geometry().classify(&retained.operation) {
+-            StepKind::SystemConfigurationSlot => {
+-                let slot = SystemConfiguration::parse_slot(
+-                    retained.contents.as_deref().expect("录制流开了内容保留"),
+-                )
+-                .expect("写出去的系统配置槽自证得过");
+-                positions.system_configuration_tails.push((
+-                    retained.operation.device,
+-                    slot.quantities.journal_instance,
+-                    slot.quantities.journal_tail,
+-                ));
+-            }
+-            StepKind::JournalRecord => {
+-                let record = JournalRecord::parse(
+-                    retained.contents.as_deref().expect("录制流开了内容保留"),
+-                    filesystem_identifier,
+-                )
+-                .expect("写出去的记录自证得过");
+-                positions.journal_records.push((
+-                    retained.operation.device,
+-                    retained.operation.offset,
+-                    record.checkpoint_txg,
+-                    record.counter,
+-                ));
+-            }
+-            StepKind::ZeroFill
+-            | StepKind::UnitWrite
+-            | StepKind::RootRecordFua
+-            | StepKind::Barrier => {}
+-        }
+-    }
+-    positions
+-}
+-
+-/// 所选根 (1, 4) 自己那条记录 jsn 4 两份都读不出时，可写挂载写的 jsn 与 tail 跟着记录号走（D23（journal 的角色与格式） 已定项 14 注 3：
+-/// 前缀末的计数器取环里读得出的最大那一个，新实例的第一条编在它 + 1、落回那条读不出的记录原来的槽；已定项 18：tail 存 jsn 计数器）。
+-/// 历史：A（txg 3、jsn 3）→ B（txg 4、jsn 4）→ 进程退出 → 两块盘上 jsn 4 那一格各坏一个字节 → 可写挂载。
+-/// 读得出的最大号是 jsn 3 ⇒ 写行那次发布 jsn 4、写进 jsn 4 那一格；txg = max(根环 4, 记录 3) + 1 = 5；暖机 txg 6、7 的 jsn 5、6；
+-/// 三次发布各自轮换的系统配置 tail 是那次的 jsn（4、5、6），不是 txg。
+-/// 再干净重开一次，落后 1 的差照样留着：前缀末 jsn 6 ⇒ 写行 txg 8、jsn 7，暖机 txg 9、10 的 jsn 8、9，tail 9。
+-/// 判别力自证：写行那次的 jsn 取 txg、暖机的 jsn 取上一版的 txg + 1、tail 取 txg，三处各改一处都红（`crates/mutations.tsv`）。
++/// 所选根 (1, 4) 自己那条记录 jsn 4 两份都读不出时（C366（暖机路径把 txg 写进计数器与 tail） 在可写挂载这一层分得开 txg 与 jsn 的那一格）：
++/// 历史：A（txg 3、jsn 3）→ B（txg 4、jsn 4）→ 进程退出 → 两块盘上 jsn 4 那一格各坏一个字节。
++/// 系统配置见证过 jsn 4（B 那次发布轮换写的 tail），所选那一版 (1, 4) 自己的末条记录读不出、计数器等于见证值的记录也是这一条——
++/// C554 乙判不出，按真处置，重读一次仍判不出：可写挂载拒成 `NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion
++/// { 见证 4、判不出 })`，拒在取号之前、任何写之前：录制流一步都没多、两块盘逐字节不变。只读挂载照常，择的根是 (1, 4)、环里读得出的
++/// 只有 jsn 1–3，一条都不施加（C579（C554 乙「两条都读不出按真」与 C366 定案在这一盘面上冲突）用户 2026-09-27 定：维持乙字面，判不出按真、
++/// 拒可写、只读挂载照常）。
++/// 原来钉的是可写挂载做成之后写行 txg 5 / jsn 4、暖机 txg 6、7 / jsn 5、6、tail 跟着 jsn 走，再干净重开一次落后 1 的差照样留着——
++/// 可写挂载被拒之后那一段不可达，删掉；函数这一层 jsn 与 txg 各走各的由这个文件第一条用例钉着。
++/// 判别力自证：乙把「判不出」按假处置时这一条红（`crates/mutations.tsv`）。
+ #[test]
+-fn c366_when_the_chosen_root_own_record_is_unreadable_the_new_instance_numbers_records_and_tail_from_the_highest_readable_record(
++fn c366_when_the_chosen_root_own_record_is_unreadable_the_writable_mount_is_refused_by_the_undecidable_witness_and_the_read_only_mount_opens_the_chosen_root(
+ ) {
+     let mut pool = build_pool("c366-chosen-root-record-unreadable");
+     let first_version = pool.output.clone();
+@@ -228,99 +175,62 @@ fn c366_when_the_chosen_root_own_record_is_unreadable_the_new_instance_numbers_r
+             .expect("改坏 jsn 4 那一格");
+     }
+     let operations_before_the_mount = pool.stream.operation_count();
+-    let mounted = mount_writable(&parameters(), &mut devices).expect("可写挂载");
++    pool.devices = Some(devices);
++    let before = disk_snapshot(&pool.memory_pool(), &pool.stream);
++    let reopened_devices = pool.devices.as_mut().expect("镜像还开着");
++    let refused = mount_writable(&parameters(), reopened_devices)
++        .expect_err("所选根自己那条记录读不出、见证判不出：可写挂载拒");
++    let reading = SelectedVersionAgainstTheWitness {
++        selected_version: RollbackTarget {
++            instance: InstanceGeneration(1),
++            checkpoint_txg: CheckpointTxg(4),
++        },
++        witness: NewerPublishWitness {
++            witnessed_journal_counter: 4,
++            comparison: WitnessedCounterComparison::Undecidable,
++        },
++    };
++    assert!(
++        matches!(
++            &refused,
++            MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable)
++                if **still_unreadable
++                    == StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion {
++                        first_read: reading,
++                        reread: reading,
++                    }
++        ),
++        "C554 乙判不出按真、重读仍判不出：{refused:?}"
++    );
++    assert_eq!(
++        pool.stream.operation_count(),
++        operations_before_the_mount,
++        "拒在取号之前：录制流一个写、一道屏障都没多"
++    );
++    let read_only = mount_read_only(&*reopened_devices).expect("只读挂载照常");
+     assert_eq!(
+         (
+-            mounted.output.chosen_root.instance,
+-            mounted.output.chosen_root.checkpoint_txg
++            read_only.chosen_root.instance,
++            read_only.chosen_root.checkpoint_txg
+         ),
+         (InstanceGeneration(1), CheckpointTxg(4)),
+-        "B 的根持久了：所选根是 (1, 4)"
++        "B 的根持久了：只读挂载择的根是 (1, 4)"
+     );
+     assert_eq!(
+         (
+-            mounted.output.journal.valid_records,
+-            mounted.output.journal.prefix_applied
++            read_only.journal.valid_records,
++            read_only.journal.prefix_applied
+         ),
+         (3, 0),
+         "环里读得出的只有 jsn 1–3（jsn 4 两份都坏了），一条都不施加"
+     );
+     assert_eq!(
+-        mounted.output.effective_root, mounted.output.chosen_root,
++        read_only.effective_root, read_only.chosen_root,
+         "没有记录要施加"
+     );
+     assert_eq!(
+-        txg_and_counter_of_each_publish(&mounted),
+-        vec![
+-            (CheckpointTxg(5), 4),
+-            (CheckpointTxg(6), 5),
+-            (CheckpointTxg(7), 6)
+-        ],
+-        "jsn 从读得出的最大号 3 接着数（4、5、6），txg 从 max(根环 4, 记录 3) + 1 = 5 起：两个量各走各的"
+-    );
+-    let written = written_journal_positions(
+-        &pool.stream.retained_operations()[operations_before_the_mount..],
+-    );
+-    let record_written_to = |counter: u64, txg: u64| {
+-        [DeviceIdentity(0), DeviceIdentity(1)].map(|device| {
+-            (
+-                device,
+-                record_offset(counter, JOURNAL_RING_DEFAULT_BYTES),
+-                CheckpointTxg(txg),
+-                counter,
+-            )
+-        })
+-    };
+-    assert_eq!(
+-        written.journal_records,
+-        [
+-            record_written_to(4, 5),
+-            record_written_to(5, 6),
+-            record_written_to(6, 7)
+-        ]
+-        .concat(),
+-        "三条记录按 jsn 落格：写行那条落回那条读不出的 jsn 4 原来的槽"
+-    );
+-    let tail_written = |tail: u64| {
+-        [DeviceIdentity(0), DeviceIdentity(1)].map(|device| (device, InstanceGeneration(2), tail))
+-    };
+-    assert_eq!(
+-        written.system_configuration_tails.len(),
+-        8,
+-        "取号两份 + 三次发布各两份"
+-    );
+-    assert_eq!(
+-        written.system_configuration_tails[2..],
+-        [tail_written(4), tail_written(5), tail_written(6)].concat(),
+-        "每次发布轮换的系统配置 tail 是那次的 jsn（4、5、6），不是 txg（5、6、7）"
+-    );
+-
+-    pool.devices = Some(devices);
+-    let mut reopened = pool.reopen_recorded();
+-    let remounted = mount_writable(&parameters(), &mut reopened).expect("干净重开再可写挂载");
+-    assert_eq!(
+-        (
+-            remounted.output.chosen_root.instance,
+-            remounted.output.chosen_root.checkpoint_txg
+-        ),
+-        (InstanceGeneration(2), CheckpointTxg(7))
+-    );
+-    assert_eq!(
+-        txg_and_counter_of_each_publish(&remounted),
+-        vec![
+-            (CheckpointTxg(8), 7),
+-            (CheckpointTxg(9), 8),
+-            (CheckpointTxg(10), 9)
+-        ],
+-        "落后 1 的差一直留着：前缀末 jsn 6 ⇒ jsn 7、8、9；txg 8 ≡ 2 (mod 3) 落盘 0，暖机推两次"
+-    );
+-    assert_eq!(
+-        choose_system_configuration(&reopened)
+-            .expect("挂载之后系统配置自证得过")
+-            .quantities
+-            .journal_tail,
+-        9,
+-        "盘上的 tail 是最后一条记录的 jsn 9，不是 txg 10"
++        disk_snapshot(&pool.memory_pool(), &pool.stream),
++        before,
++        "两块盘逐字节不变"
+     );
+-    pool.devices = Some(reopened);
+ }
+diff --git a/litmus/publish-returns-after-the-rotation-barrier-nofence.litmus b/litmus/publish-returns-after-the-rotation-barrier-nofence.litmus
+new file mode 100644
+index 00000000..78ecd6b0
+--- /dev/null
++++ b/litmus/publish-returns-after-the-rotation-barrier-nofence.litmus
+@@ -0,0 +1,32 @@
++C publish-returns-after-the-rotation-barrier-nofence
++
++(*
++ * publish-returns-after-the-rotation-barrier 的对照组：去掉轮换之后那一道屏障，写的次序不变。
++ *
++ * 它存在的唯一目的是证明原测试有判别力：这一份若也判 Never，说明「返回之后读不到轮换」这个模式本来就撞不上，
++ * 原测试判 Never 就什么都没证明（rules/show-me-test.md：不能证明会红的检查等于没写）。
++ * 它也是 C577（系统配置没见证到的最新根，乙罩不到） 改之前的发布形态：轮换写完就返回。
++ *
++ * singlefs-expect: Sometimes
++ *)
++
++{}
++
++P0(int *root, int *configuration, int *returned)
++{
++	WRITE_ONCE(*root, 1);
++	WRITE_ONCE(*configuration, 1);
++	WRITE_ONCE(*returned, 1);
++}
++
++P1(int *root, int *configuration, int *returned)
++{
++	int r0;
++	int r1;
++
++	r0 = READ_ONCE(*returned);
++	smp_rmb();
++	r1 = READ_ONCE(*configuration);
++}
++
++exists (1:r0=1 /\ 1:r1=0)
+diff --git a/litmus/publish-returns-after-the-rotation-barrier.litmus b/litmus/publish-returns-after-the-rotation-barrier.litmus
+new file mode 100644
+index 00000000..40f96ebb
+--- /dev/null
++++ b/litmus/publish-returns-after-the-rotation-barrier.litmus
+@@ -0,0 +1,41 @@
++C publish-returns-after-the-rotation-barrier
++
++(*
++ * 发布的最后三步（D16（发布语义） 已定项 7：根槽（FUA）→ 系统配置槽 → 屏障，屏障完成才返回；
++ * 实现在 crates/singlefs-core 的 transaction::persist_the_root_then_rotate_the_system_configuration，三条发布路径与重发共用）。
++ * 坏结果 = 发布已经返回，之后读系统配置槽却看不到这次轮换写的值
++ * （C577（系统配置没见证到的最新根，乙罩不到）：返回那一刻轮换还在写缓存里，崩溃之后系统配置只见证到上一次发布）。
++ *
++ * P0 = 发布：根槽 FUA → 轮换 → 屏障 → 返回（写 returned）。P0 里的写与屏障逐项就是录制流里发布最后三步的次序
++ * （crates/singlefs-harness/tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs 比对）。
++ * 根槽与轮换之间不写屏障：FUA 返回才发轮换，那一段的序不是这条判的（根的序归 new-pool-file-creation-* 两条）；这条只判轮换之后那道屏障。
++ * P1 = 返回之后的读者（崩溃之后的可写挂载读两槽取见证值）：先看到已经返回，再读系统配置槽。
++ * 屏障写成 smp_wmb，读者一侧的先后写成 smp_rmb：herd7 判的是这条屏障形态在 LKMM 下的序，不是块层的 FLUSH；
++ * 块层那一半在录制流上判（crates/singlefs-harness/tests/a_publish_returns_only_after_the_system_configuration_rotation_is_durable.rs）。
++ *
++ * singlefs-expect: Never
++ * singlefs-models: crates/singlefs-core/src/transaction.rs::persist_the_root_then_rotate_the_system_configuration 写者（P0）
++ * singlefs-models: crates/singlefs-core/src/recovery.rs::verified_system_configuration_slots 读者（P1：返回之后读两槽的见证值）
++ *)
++
++{}
++
++P0(int *root, int *configuration, int *returned)
++{
++	WRITE_ONCE(*root, 1);
++	WRITE_ONCE(*configuration, 1);
++	smp_wmb();
++	WRITE_ONCE(*returned, 1);
++}
++
++P1(int *root, int *configuration, int *returned)
++{
++	int r0;
++	int r1;
++
++	r0 = READ_ONCE(*returned);
++	smp_rmb();
++	r1 = READ_ONCE(*configuration);
++}
++
++exists (1:r0=1 /\ 1:r1=0)
+```
+
+## 二、合入后验证一（P1、Q7、Q4 与钉值）：补丁副本 `research/prompts/m2-closeout-code-r3-snapshot/merge-verify-1-crates.patch`（sha256 24ce451b2fd85173488ca345674fd9e37dbcbb1a435fa91bb5d1cd68a3c3d24b）
+
+**路径是改名之前的**：它随别的会话的提交 `bc57af7a` 进了 HEAD，同一笔里混着改名，没有干净的提交点可 `git diff`；改名前后的路径对照见 `/tmp/claude-1000/impl-merge-verify-2/spec.md` 那张表（主 agent 派发提示指定的位置，不在这份材料的写范围内，各腿按需去读）。以下原样整份放入这份补丁文件的内容：
+
+```diff
+diff --git a/crates/singlefs-core/src/mount.rs b/crates/singlefs-core/src/mount.rs
+index d9029ff..d41cbbb 100644
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -39,17 +39,20 @@ use crate::recovery::{
+ use crate::recovery::{
+     allocation_records_of_version_without_file_in_the_unit_area_starting_at,
+     allocation_records_under_root_in_the_unit_area_starting_at, choose_root,
+-    choose_system_configuration, effective_rollback_floor,
++    choose_system_configuration,
++    effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instance_table_once,
+     effective_rollback_floor_rereading_the_newest_instance_table_once,
+     effective_rollback_floor_under_the_newest_roots_table, highest_root_txg,
+     highest_tree_identifier_watermark_in_the_ring, instance_table_chain_of_root,
+     instance_table_of_root, instance_table_page_pointers_as_far_as_readable, readable_roots,
+-    readable_roots_rereading_unreadable_root_ring_slots_once, readable_roots_with_ring_slots,
++    readable_roots_rereading_ring_slots_known_to_hold_a_root_once, readable_roots_with_ring_slots,
+     rebuild_version_in_the_unit_area_starting_at, replay_journal,
+     root_is_abandoned_by_the_instance_table, scan_journal, tree_table_has_no_entries,
+     user_visible_tree_root_pointers, verified_system_configuration_slots, BadRootRingSlotReading,
+-    InstanceTableChain, JournalScanReport, PoolReader, RebuildVersionFailure, RebuiltVersion,
+-    RecoveryFailure, UserVisibleTreeRootPointers,
++    EffectiveFloorReadingStillUnreadableAfterOneReread, InstanceTableChain,
++    InstanceTableOfTheNewestRootStillUnreadableAfterOneReread, JournalScanReport, PoolReader,
++    RebuildVersionFailure, RebuiltVersion, RecoveryFailure,
++    RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread, UserVisibleTreeRootPointers,
+ };
+ use crate::recovery::{every_root_ring_slot, read_root_ring_slot, RootRingSlotReading};
+ use crate::root_record::{RootRecord, UnmountMarker};
+@@ -276,6 +279,10 @@ pub enum MountError {
+     /// 可写挂载读到的样子里有一样更新的东西读不出，重读一次（D16（发布语义） 已定项 1「根槽这一次读坏」那一行的「重读一次」）仍读不出——
+     /// 不按读得出的那一版往下走，不把读不出的那一版当成被抛弃，拒可写挂载。是哪一样读不出见 [`StillUnreadableAfterOneReread`]。
+     /// 在取号之前返回：一个写都没发，盘上逐字节不变。只读挂载不走这一判，照常（`mounted_read`、`recovery::recover`）。
++    /// 挂着时抬 F 那一串（准入与卸载共用）算 F 生效值、重算影子账读根环重读一次仍读坏，同样报这一条
++    /// （[`StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor`]、
++    /// [`StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot`]，实审 A3b 报告 Q4）：在动分配器与任何写之前拒这一次抬，
++    /// 盘上逐字节不变、分配器与调用方的现行版本不动。
+     /// 装箱：不装箱 `MountError` 就大过 clippy `result_large_err` 的 128 字节。
+     NewerStateStillUnreadableAfterOneReread(Box<StillUnreadableAfterOneReread>),
+ }
+@@ -296,6 +303,59 @@ pub enum StillUnreadableAfterOneReread {
+         /// 重读那一遍择到的最新那条根；根环那一遍一条自证过的根都没读到时 `None`。
+         newest_root_on_the_reread: Option<RollbackTarget>,
+     },
++    /// 挂着时抬 F 算 F 生效值（`recovery::effective_rollback_floor_rereading_the_newest_instance_table_once`）或管理员回退判候选算
++    /// F_生效（`recovery::effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instance_table_once`）：根环里最新那条根
++    /// 指着的实例表（按它判哪几条根被抛弃）读不出、解不开，或一条自证过的根都择不到，连根环一起重读一次仍是这样（C554 乙报告 Q6）。
++    /// 不按「不按表滤」往下走（那样被抛弃时间线上的根带的 F 也算进生效值）。实审 A3b 报告 Q4：与乙那一族同级，改之前是
++    /// `RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread`。
++    InstanceTableOfTheNewestRootForTheEffectiveFloor {
++        /// 重读那一遍择到的最新那条根；一条自证过的根都没读到时 `None`。
++        newest_root_on_the_reread: Option<RollbackTarget>,
++    },
++    /// 挂着时抬 F 重算影子账与回收门槛读根环（`recovery::readable_roots_rereading_ring_slots_known_to_hold_a_root_once`）或管理员回退
++    /// 判候选、算 F_生效 读根环：`ring_slot` 是这个进程知道住着一条根的槽（挂载那一刻读得出、或这个进程写过且 FUA 返回过），这一次读不出，
++    /// 重读一次仍读不出——那一槽里的根在不在判不了，不按有根或没根猜（D16（发布语义） 已定项 1「根槽这一次读坏」那一行的分法，
++    /// 用户 2026-09-26 定）。挂载那一刻就读坏、之后没写过的槽不走这一条，当没有根。
++    /// 实审 A3b 报告 Q4：与乙那一族同级，改之前是 `RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread`（那时不分槽知不知道住着根）。
++    RootRingSlotKnownToHoldARoot { ring_slot: RootRingSlot },
++}
++
++impl From<RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread>
++    for StillUnreadableAfterOneReread
++{
++    fn from(still_unreadable: RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread) -> Self {
++        Self::RootRingSlotKnownToHoldARoot {
++            ring_slot: still_unreadable.ring_slot,
++        }
++    }
++}
++
++impl From<InstanceTableOfTheNewestRootStillUnreadableAfterOneReread>
++    for StillUnreadableAfterOneReread
++{
++    fn from(still_unreadable: InstanceTableOfTheNewestRootStillUnreadableAfterOneReread) -> Self {
++        Self::InstanceTableOfTheNewestRootForTheEffectiveFloor {
++            newest_root_on_the_reread: still_unreadable.newest_root_on_the_reread.map(
++                |(instance, checkpoint_txg)| RollbackTarget {
++                    instance,
++                    checkpoint_txg,
++                },
++            ),
++        }
++    }
++}
++
++impl From<EffectiveFloorReadingStillUnreadableAfterOneReread> for StillUnreadableAfterOneReread {
++    fn from(still_unreadable: EffectiveFloorReadingStillUnreadableAfterOneReread) -> Self {
++        match still_unreadable {
++            EffectiveFloorReadingStillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot(
++                slot,
++            ) => slot.into(),
++            EffectiveFloorReadingStillUnreadableAfterOneReread::InstanceTableOfTheNewestRoot(
++                table,
++            ) => table.into(),
++        }
++    }
+ }
+ 
+ /// 读阶段交出的所选那一版（`effective_root`）与判据 N-配置 的读数：「系统配置见证过比它新的发布」判不判得真。
+@@ -2176,7 +2236,9 @@ fn raise_the_floor_through<Device: BlockDevice>(
+         &system_configuration.immutable.sizes,
+         &system_configuration.immutable.filesystem_identifier,
+     )
+-    .map_err(MountError::Recovery)?;
++    .map_err(|still_unreadable| {
++        MountError::NewerStateStillUnreadableAfterOneReread(Box::new(still_unreadable.into()))
++    })?;
+     if new_floor < effective_floor {
+         return Err(
+             MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided {
+@@ -2223,15 +2285,19 @@ fn raise_the_floor_through<Device: BlockDevice>(
+     // 取候选集的并集，释放代 ≤ F 的落点不在并集里，记账的「已分配」也不能再算它们。但回收的槽在生效（每块盘都有带新 F 的根）之前
+     // 不许发出去：带新 F 的空发布自己就在分配固定点，开放段满了会开到刚回收空的那一段（alloc-basis 第二轮云端攻方腿打中），所以先扣住、
+     // 落满每块盘之后再放开。记账按写那条根的那一刻的 F 算还是按它持久之后的 F_生效 算，口径交 alloc-basis 那一轮（预想）。
+-    // 回收门槛与影子账读的这一遍根环：一个根槽读不出就重读那一槽一次，仍读不出就拒这一次抬（C554 乙报告 Q6：按「没有根」往下走，
+-    // 那一槽里的被抛弃根引用的槽不隔离、也不计数）。在动分配器（影子账重算、回收）之前返回，分配器与盘都不动。
+-    let roots = readable_roots_rereading_unreadable_root_ring_slots_once(
++    // 回收门槛与影子账读的这一遍根环，照 D16（发布语义） 已定项 1「根槽这一次读坏」那一行分两类（与算上限那一遍同一个分法）：
++    // 这个进程知道住着根的槽读坏就重读那一槽一次，仍坏就拒这一次抬（C554 乙报告 Q6：按「没有根」往下走，那一槽里的被抛弃根引用的槽
++    // 不隔离、也不计数）；挂载那一刻就读坏、之后没写过的槽当没有根。在动分配器（影子账重算、回收）之前返回，分配器与盘都不动。
++    let roots = readable_roots_rereading_ring_slots_known_to_hold_a_root_once(
+         &**devices,
+         &system_configuration.immutable.region_devices,
+         &system_configuration.immutable.sizes,
+         &system_configuration.immutable.filesystem_identifier,
++        &ring_slots_known_to_hold_a_root_by(allocator),
+     )
+-    .map_err(MountError::Recovery)?;
++    .map_err(|still_unreadable| {
++        MountError::NewerStateStillUnreadableAfterOneReread(Box::new(still_unreadable.into()))
++    })?;
+     let oldest_valid_root = roots
+         .iter()
+         .filter(|root| !abandoned_by_table(root, &table))
+@@ -4227,6 +4293,11 @@ pub enum RollbackError {
+     /// 释放现行那一版不再被引用的用户可见单元时，释放判定路径报错（映射里查不到、条目切不动、两条位置条目不同槽、这块盘的记录
+     /// 不在册 / 已释放 / 跨度不对、位置项指池外的盘或两条指同一块盘）：`cause` 原样是发布路径的那一种。
+     CurrentVersionUnitNotReleasable { cause: PublishError },
++    /// 判候选集时读根环或算 F_生效 重读一次仍读坏（[`rollback_candidate`]；D16（发布语义） 已定项 1「根槽这一次读坏」那一行的读法，
++    /// 实审 A3b 报告 Q7）：只有 [`StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot`] 与
++    /// [`StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor`] 两个成员走得到。目标在不在候选集里判不了，
++    /// 不按有根或没根猜。在任何写之前、动分配器之前拒，盘上逐字节不变。
++    CandidateJudgementStillUnreadableAfterOneReread(Box<StillUnreadableAfterOneReread>),
+     /// 回退那次发布没发成，连同这次回退开的写入口交得出的写账（[`PublishSequenceFailed`]：之前没有别的写、已落盘的发布一次都没有）。
+     /// 落盘之前被拒（`cause` 是落点、释放判定这一类）：分配器换回回退之前那一份，盘上逐字节不变。落盘途中失败（`cause` 是块设备错）：
+     /// 这次发布冻结在分配器上等原样重发（`transaction::resend_the_frozen_publish`），重发成功就是回退做成。
+@@ -4311,31 +4382,45 @@ fn user_visible_units_through_the_mapping(
+ 
+ /// 回退候选集那一判（D23（journal 的角色与格式） 已定项 14「候选集」）：根环里有它 ∧ txg ≥ F_生效 ∧ 按现行那一版的实例表判仍然有效
+ /// ∧ 带文件。按 [`RollbackCandidateExclusion`] 成员的次序判。交回根环里读出来的那条根。
++/// 「根环里有它」与 F_生效 两处读根环都照抬 F 同一个读法（D16（发布语义） 已定项 1「根槽这一次读坏」那一行，实审 A3b 报告 Q7）：
++/// `ring_slots_known_to_hold_a_root`（这个进程分配器上那张根环表，[`ring_slots_known_to_hold_a_root_by`]）里没有的槽读坏当没有根；
++/// 有的重读一次，仍坏就拒——不按没有根往下走（那样目标可以被判成不在环里，F_生效 可以算低、低于真 F 的目标被当成候选）。
++/// F_生效 那一半最新那条根的实例表读不出同样重读一次，仍读不出就拒。
+ ///
+ /// # Errors
+-/// `TargetNotACandidate`；目标那一版的树表读不出 ⇒ `TargetVersionUnreadable`。
++/// `TargetNotACandidate`；目标那一版的树表读不出 ⇒ `TargetVersionUnreadable`；知道住着根的槽或最新那条根的实例表重读仍读坏 ⇒
++/// `CandidateJudgementStillUnreadableAfterOneReread`（在任何写之前、动分配器之前）。
+ fn rollback_candidate<Reader: PoolReader>(
+     reader: &Reader,
+     system_configuration: &crate::system_configuration::SystemConfiguration,
+     current_table: &InstanceTableRecords,
++    ring_slots_known_to_hold_a_root: &BTreeSet<RootRingSlot>,
+     target: RollbackTarget,
+ ) -> Result<RootRecord, RollbackError> {
+     let not_a_candidate = |exclusion| RollbackError::TargetNotACandidate { target, exclusion };
+-    let target_root = readable_roots(
++    let still_unreadable = |still_unreadable: StillUnreadableAfterOneReread| {
++        RollbackError::CandidateJudgementStillUnreadableAfterOneReread(Box::new(still_unreadable))
++    };
++    let target_root = readable_roots_rereading_ring_slots_known_to_hold_a_root_once(
+         reader,
+         &system_configuration.immutable.region_devices,
+         &system_configuration.immutable.sizes,
+         &system_configuration.immutable.filesystem_identifier,
++        ring_slots_known_to_hold_a_root,
+     )
++    .map_err(|reading| still_unreadable(reading.into()))?
+     .into_iter()
+     .find(|root| root.instance == target.instance && root.checkpoint_txg == target.checkpoint_txg)
+     .ok_or_else(|| not_a_candidate(RollbackCandidateExclusion::NotInRing))?;
+-    let effective_floor = effective_rollback_floor(
+-        reader,
+-        &system_configuration.immutable.region_devices,
+-        &system_configuration.immutable.sizes,
+-        &system_configuration.immutable.filesystem_identifier,
+-    );
++    let effective_floor =
++        effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instance_table_once(
++            reader,
++            &system_configuration.immutable.region_devices,
++            &system_configuration.immutable.sizes,
++            &system_configuration.immutable.filesystem_identifier,
++            ring_slots_known_to_hold_a_root,
++        )
++        .map_err(|reading| still_unreadable(reading.into()))?;
+     if target.checkpoint_txg < effective_floor {
+         return Err(not_a_candidate(
+             RollbackCandidateExclusion::BelowEffectiveFloor,
+@@ -4681,7 +4766,13 @@ pub fn roll_back_by_a_forward_publish<Device: BlockDevice>(
+     let current_table = instance_table_chain_of_root(&*devices, &current.root)
+         .map_err(|_unreadable_or_malformed| RollbackError::CurrentInstanceTableMalformed)?
+         .records;
+-    let target_root = rollback_candidate(&*devices, &system_configuration, &current_table, target)?;
++    let target_root = rollback_candidate(
++        &*devices,
++        &system_configuration,
++        &current_table,
++        &ring_slots_known_to_hold_a_root_by(allocator),
++        target,
++    )?;
+     let unit_area_start = unit_area_start_of_the_chosen_system_configuration(&system_configuration);
+     // R_old 那一版整个从盘上重建（它的账、它的三棵用户可见树、记账树、中央映射树都读回来）：有一个节点读不出就拒。
+     // 顶着的记录只给重建填字段，这里只用那一版的用户可见一半与它的账。
+diff --git a/crates/singlefs-core/src/recovery.rs b/crates/singlefs-core/src/recovery.rs
+index aff93d5..cd5f6a9 100644
+--- a/crates/singlefs-core/src/recovery.rs
++++ b/crates/singlefs-core/src/recovery.rs
+@@ -243,18 +243,34 @@ pub enum RecoveryFailure {
+         checkpoint_txg: CheckpointTxg,
+         counters: Vec<u64>,
+     },
+-    /// 算生效的回退下界 F 时（[`effective_rollback_floor_rereading_the_newest_instance_table_once`]），根环里最新那条根指着的实例表
+-    /// （按它判哪几条根被抛弃）读不出、解不开，或一条自证过的根都择不到；重读一次（C554 乙的形态，R = 1：立即重读根环与那张表）仍是这样。
+-    /// 不按「不按表滤」往下走（那样被抛弃时间线上的根带的 F 也算进生效值，C554 乙报告 Q6）。挂着时抬 F 在动分配器与任何写之前拒这一次抬，
+-    /// 盘上逐字节不变。`newest_root_on_the_reread` 是重读那一遍择到的最新那条根（实例代号, checkpoint_txg），一条都没择到时 `None`。
+-    InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
+-        newest_root_on_the_reread: Option<(InstanceGeneration, CheckpointTxg)>,
+-    },
+-    /// 读根环时一个根槽读不出（`PoolReader::read` 交回空：设备报错、越界），立即重读一次仍读不出
+-    /// （[`readable_roots_rereading_unreadable_root_ring_slots_once`]，C554 乙的形态，R = 1）：那一槽里有没有一条被抛弃的根判不了，
+-    /// 不按「没有根」往下走（那样它引用的槽不隔离、也不计进读不出账的被抛弃根，C554 乙报告 Q6）。挂着时抬 F 重算影子账在动分配器与
+-    /// 任何写之前拒这一次抬，盘上逐字节不变。读得出、自证不过的槽（从没写过的全 0 槽、校验和不过）不走这一条，照旧当没有根。
+-    RootRingSlotStillUnreadableAfterOneReread { ring_slot: RootRingSlot },
++}
++
++/// 读根环时，这个进程知道住着一条根的一个槽（挂载那一刻读得出、或这个进程写过且 FUA 返回过，
++/// `allocator::RootRingOccupancy::ring_slots_known_to_hold_a_root`）这一次读不出（[`BadRootRingSlotReading::Unreadable`]），
++/// 重读一次仍读不出（[`readable_roots_rereading_ring_slots_known_to_hold_a_root_once`]；D16（发布语义） 已定项 1「根槽这一次读坏」那一行的
++/// 两类分法，用户 2026-09-26 定）：那一槽里的根在不在判不了，不按有根或没根猜。挂着时抬 F 与管理员回退拒这一次，经
++/// `mount::StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot` 交出。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread {
++    pub ring_slot: RootRingSlot,
++}
++
++/// 算生效的回退下界 F 时（[`effective_rollback_floor_rereading_the_newest_instance_table_once`]），根环里最新那条根指着的实例表
++/// （按它判哪几条根被抛弃）读不出、解不开，或一条自证过的根都择不到；重读一次（C554 乙的形态，R = 1：立即重读根环与那张表）仍是这样。
++/// 不按「不按表滤」往下走（那样被抛弃时间线上的根带的 F 也算进生效值，C554 乙报告 Q6）。挂着时抬 F 与管理员回退拒这一次，经
++/// `mount::StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor` 交出。
++/// `newest_root_on_the_reread` 是重读那一遍择到的最新那条根（实例代号, checkpoint_txg），一条都没择到时 `None`。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
++    pub newest_root_on_the_reread: Option<(InstanceGeneration, CheckpointTxg)>,
++}
++
++/// 管理员回退算 F 生效值（[`effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instance_table_once`]）时
++/// 重读一次仍读坏的是哪一样。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum EffectiveFloorReadingStillUnreadableAfterOneReread {
++    RootRingSlotKnownToHoldARoot(RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread),
++    InstanceTableOfTheNewestRoot(InstanceTableOfTheNewestRootStillUnreadableAfterOneReread),
+ }
+ 
+ /// 恢复的结果：择到的根下面没有文件（第 0 代）、读回文件、或走不下去。`root` 恒是**所选**的那条根。
+@@ -1171,19 +1187,32 @@ pub fn readable_roots<Reader: PoolReader + ?Sized>(
+     roots
+ }
+ 
+-/// 同 [`readable_roots`]，而一个根槽读不出（[`BadRootRingSlotReading::Unreadable`]：设备报错、越界）时立即重读那一槽一次
+-/// （C554 乙的形态，R = 1；D16（发布语义） 已定项 1「根槽这一次读坏」那一行的「重读一次」），重读读得出就照它算；读得出、自证不过的槽
+-/// 照旧当没有根。挂着时抬 F 重算影子账与回收门槛用它（C554 乙报告 Q6：`readable_roots` 把读不出的槽当没有根，那一槽里的被抛弃根
+-/// 引用的槽不隔离、也不计进读不出账的被抛弃根）。
++/// 读根环，读不出的槽按这个进程知不知道那里住着一条根分两类（D16（发布语义） 已定项 1「根槽这一次读坏」那一行的分法，用户 2026-09-26 定；
++/// 与 `mount::rollback_floor_ceiling` 读根环同一个分法）：每个槽读一次；读不出（[`BadRootRingSlotReading::Unreadable`]：设备报错、越界）的槽
++/// 不在 `ring_slots_known_to_hold_a_root` 里（挂载那一刻就读不出或自证不过、这个进程之后也没写过）的当没有根、不重读；在里面的
++/// （挂载那一刻读得出、或这个进程写过且 FUA 返回过，`allocator::RootRingOccupancy::ring_slots_known_to_hold_a_root`）立即重读一次
++/// （C554 乙的形态，R = 1），重读读得出就照它算，仍读不出就报错，不按有根或没根猜。读得出、自证不过的槽（第一遍或重读那一遍）照旧当没有根，
++/// 不分类、不重读：合入后验证一的规格只要「读不出」这一支（D16 那一行另写的「或自证不过」没接进这两处读，带 F 的根被改坏、F 由系统配置撑着的
++/// 那一形——`second_transaction_step_five_reuse.rs` 的 `floor_carried_by_only_one_device_root_and_the_system_configuration_…`——
++/// 管理员回退照旧判到「低于 F_生效」）。交回读得出的每一条根连同它的槽，按根环槽的次序。
++/// 挂着时抬 F 重算影子账与回收门槛、管理员回退判候选与算 F 生效值用它（C554 乙报告 Q6：`readable_roots` 把读不出的槽一律当没有根，
++/// 那一槽里的被抛弃根引用的槽不隔离、也不计进读不出账的被抛弃根）。
+ ///
+ /// # Errors
+-/// 某一槽重读仍读不出 ⇒ [`RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread`]（按 [`every_root_ring_slot`] 的次序第一个）。只读盘。
+-pub fn readable_roots_rereading_unreadable_root_ring_slots_once<Reader: PoolReader + ?Sized>(
++/// 知道住着根的槽重读仍读不出 ⇒ [`RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread`]（按 [`every_root_ring_slot`] 的次序第一个）。
++/// 只读盘。
++pub fn readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_once<
++    Reader: PoolReader + ?Sized,
++>(
+     reader: &Reader,
+     region_devices: &[DeviceIdentity; 3],
+     immutable_sizes: &SystemImmutableSizes,
+     filesystem_identifier: &[u8; 16],
+-) -> Result<Vec<RootRecord>, RecoveryFailure> {
++    ring_slots_known_to_hold_a_root: &BTreeSet<RootRingSlot>,
++) -> Result<
++    Vec<(RootRingSlot, RootRecord)>,
++    RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread,
++> {
+     let read_the_slot = |ring_slot| {
+         read_root_ring_slot(
+             reader,
+@@ -1194,7 +1223,83 @@ pub fn readable_roots_rereading_unreadable_root_ring_slots_once<Reader: PoolRead
+         )
+     };
+     let mut roots = Vec::new();
+-    // 迭代次数的上界是根环槽数 R × S；跨轮只带已认出的根。提前出口只有「重读仍读不出」一个。
++    // 迭代次数的上界是根环槽数 R × S；跨轮只带已认出的根。提前出口只有「知道住着根的槽重读仍读不出」一个。
++    for ring_slot in every_root_ring_slot(immutable_sizes) {
++        match read_the_slot(ring_slot) {
++            RootRingSlotReading::SelfVerified(root) => {
++                roots.push((ring_slot, root));
++                continue;
++            }
++            RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified) => continue,
++            RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => {}
++        }
++        if !ring_slots_known_to_hold_a_root.contains(&ring_slot) {
++            continue;
++        }
++        match read_the_slot(ring_slot) {
++            RootRingSlotReading::SelfVerified(root) => roots.push((ring_slot, root)),
++            RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified) => {}
++            RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => {
++                return Err(RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread {
++                    ring_slot,
++                });
++            }
++        }
++    }
++    Ok(roots)
++}
++
++/// 同 [`readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_once`]，只交回根（不带槽）。
++///
++/// # Errors
++/// 同那一份。
++pub fn readable_roots_rereading_ring_slots_known_to_hold_a_root_once<
++    Reader: PoolReader + ?Sized,
++>(
++    reader: &Reader,
++    region_devices: &[DeviceIdentity; 3],
++    immutable_sizes: &SystemImmutableSizes,
++    filesystem_identifier: &[u8; 16],
++    ring_slots_known_to_hold_a_root: &BTreeSet<RootRingSlot>,
++) -> Result<Vec<RootRecord>, RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread> {
++    readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_once(
++        reader,
++        region_devices,
++        immutable_sizes,
++        filesystem_identifier,
++        ring_slots_known_to_hold_a_root,
++    )
++    .map(|roots_with_ring_slots| {
++        roots_with_ring_slots
++            .into_iter()
++            .map(|(_, root)| root)
++            .collect()
++    })
++}
++
++/// 同 [`readable_roots_with_ring_slots`]，而一个根槽读不出（[`BadRootRingSlotReading::Unreadable`]：设备报错、越界）时立即重读那一槽一次，
++/// 重读读得出就照它算，仍读不出当没有根；读得出、自证不过的槽不重读（从没写过的全 0 槽都是这一类）。给手里没有这个进程根环表、
++/// 分不出哪几个槽住着根的读者用（`transaction::PoolWriter` 写系统配置之前算 F 生效值，[`effective_rollback_floor_rereading_unreadable_reads_once`]）。
++#[must_use]
++pub fn readable_roots_with_ring_slots_rereading_unreadable_slots_once<
++    Reader: PoolReader + ?Sized,
++>(
++    reader: &Reader,
++    region_devices: &[DeviceIdentity; 3],
++    immutable_sizes: &SystemImmutableSizes,
++    filesystem_identifier: &[u8; 16],
++) -> Vec<(RootRingSlot, RootRecord)> {
++    let read_the_slot = |ring_slot| {
++        read_root_ring_slot(
++            reader,
++            region_devices,
++            immutable_sizes,
++            filesystem_identifier,
++            ring_slot,
++        )
++    };
++    let mut roots = Vec::new();
++    // 迭代次数的上界是根环槽数 R × S；跨轮只带已认出的根；没有提前出口。
+     for ring_slot in every_root_ring_slot(immutable_sizes) {
+         let reading = match read_the_slot(ring_slot) {
+             RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => {
+@@ -1204,16 +1309,13 @@ pub fn readable_roots_rereading_unreadable_root_ring_slots_once<Reader: PoolRead
+             | RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified)) => first_reading,
+         };
+         match reading {
+-            RootRingSlotReading::SelfVerified(root) => roots.push(root),
+-            RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified) => {}
+-            RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => {
+-                return Err(RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread {
+-                    ring_slot,
+-                });
+-            }
++            RootRingSlotReading::SelfVerified(root) => roots.push((ring_slot, root)),
++            RootRingSlotReading::Bad(
++                BadRootRingSlotReading::NotSelfVerified | BadRootRingSlotReading::Unreadable,
++            ) => {}
+         }
+     }
+-    Ok(roots)
++    roots
+ }
+ 
+ /// 同 `readable_roots`，每条根带着它读出来的那个根环槽（挂载与抬 F 给分配器建根环那张表用，`allocator::RootRingOccupancy`）。
+@@ -1261,8 +1363,11 @@ pub fn root_is_abandoned_by_the_instance_table(
+ ///
+ /// 两处一条都读不出时 0（mkfs 写的就是 0）。
+ ///
+-/// ⚠️ 那张表读不出时「不按表滤」是无声放过（C554 乙报告 Q6）：可写挂载与挂着时抬 F 不走这一份——可写挂载按重读过的那张表算
+-/// （[`effective_rollback_floor_under_the_newest_roots_table`]），抬 F 走 [`effective_rollback_floor_rereading_the_newest_instance_table_once`]。
++/// ⚠️ 读不出的根槽当没有根、那张表读不出时「不按表滤」是无声放过（C554 乙报告 Q6，实审 A3b 报告 Q7）：产品路径都不走这一份——
++/// 可写挂载按重读过的那张表算（[`effective_rollback_floor_under_the_newest_roots_table`]），抬 F 走
++/// [`effective_rollback_floor_rereading_the_newest_instance_table_once`]，管理员回退走
++/// [`effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instance_table_once`]，写系统配置槽走
++/// [`effective_rollback_floor_rereading_unreadable_reads_once`]。留给单外的实验装置与用例。
+ #[must_use]
+ pub fn effective_rollback_floor<Reader: PoolReader + ?Sized>(
+     reader: &Reader,
+@@ -1320,7 +1425,7 @@ pub fn effective_rollback_floor_under_the_newest_roots_table<Reader: PoolReader
+ /// 立即重读一次根环与那张表（C554 乙的形态，R = 1；D16（发布语义） 已定项 1「重读一次」），仍是这样就报错，不按「不按表滤」往下走。
+ ///
+ /// # Errors
+-/// 重读仍读不出 ⇒ [`RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread`]。只读盘、不写盘。
++/// 重读仍读不出 ⇒ [`InstanceTableOfTheNewestRootStillUnreadableAfterOneReread`]。只读盘、不写盘。
+ pub fn effective_rollback_floor_rereading_the_newest_instance_table_once<
+     Reader: PoolReader + ?Sized,
+ >(
+@@ -1328,44 +1433,193 @@ pub fn effective_rollback_floor_rereading_the_newest_instance_table_once<
+     region_devices: &[DeviceIdentity; 3],
+     immutable_sizes: &SystemImmutableSizes,
+     filesystem_identifier: &[u8; 16],
+-) -> Result<CheckpointTxg, RecoveryFailure> {
+-    // 读一遍根环、择最新那条根、沿链读它的实例表：第一次读与重读一次走同一段。
+-    let read_the_ring_and_the_newest_roots_table = || {
+-        let roots_with_ring_slots = readable_roots_with_ring_slots(
++) -> Result<CheckpointTxg, InstanceTableOfTheNewestRootStillUnreadableAfterOneReread> {
++    let read_the_ring = || {
++        Ok::<_, std::convert::Infallible>(readable_roots_with_ring_slots(
+             reader,
+             region_devices,
+             immutable_sizes,
+             filesystem_identifier,
+-        );
++        ))
++    };
++    let Ok(floor) = effective_rollback_floor_rereading_the_newest_instance_table_once_over(
++        reader,
++        region_devices,
++        immutable_sizes,
++        filesystem_identifier,
++        read_the_ring,
++    );
++    match floor {
++        EffectiveFloorAfterAtMostOneReread::UnderTheNewestRootsTable(floor) => Ok(floor),
++        EffectiveFloorAfterAtMostOneReread::NewestRootsTableStillUnreadable {
++            newest_root_on_the_reread,
++            ..
++        } => Err(InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
++            newest_root_on_the_reread,
++        }),
++    }
++}
++
++/// 生效的回退下界 F（[`effective_rollback_floor`] 同一个算法），管理员回退判候选用：读根环照
++/// [`readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_once`]（这个进程知道住着根的槽读不出就重读一次，
++/// 别的读不出的槽当没有根，D16（发布语义） 已定项 1「根槽这一次读坏」那一行的分法），根环里最新那条根的实例表照
++/// [`effective_rollback_floor_rereading_the_newest_instance_table_once`] 读不出就连根环一起重读一次。
++/// 不按原 [`effective_rollback_floor`] 那样把读不出的槽当没有根、把读不出的表当不按表滤（实审 A3b 报告 Q7：
++/// 那样 F 生效值可以算低，低于真 F 的目标被当成候选）。
++///
++/// # Errors
++/// 知道住着根的槽重读仍读不出 ⇒ [`EffectiveFloorReadingStillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot`]；
++/// 最新那条根的实例表重读仍读不出 ⇒ [`EffectiveFloorReadingStillUnreadableAfterOneReread::InstanceTableOfTheNewestRoot`]。只读盘、不写盘。
++pub fn effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instance_table_once<
++    Reader: PoolReader + ?Sized,
++>(
++    reader: &Reader,
++    region_devices: &[DeviceIdentity; 3],
++    immutable_sizes: &SystemImmutableSizes,
++    filesystem_identifier: &[u8; 16],
++    ring_slots_known_to_hold_a_root: &BTreeSet<RootRingSlot>,
++) -> Result<CheckpointTxg, EffectiveFloorReadingStillUnreadableAfterOneReread> {
++    let read_the_ring = || {
++        readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_once(
++            reader,
++            region_devices,
++            immutable_sizes,
++            filesystem_identifier,
++            ring_slots_known_to_hold_a_root,
++        )
++    };
++    match effective_rollback_floor_rereading_the_newest_instance_table_once_over(
++        reader,
++        region_devices,
++        immutable_sizes,
++        filesystem_identifier,
++        read_the_ring,
++    )
++    .map_err(EffectiveFloorReadingStillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot)?
++    {
++        EffectiveFloorAfterAtMostOneReread::UnderTheNewestRootsTable(floor) => Ok(floor),
++        EffectiveFloorAfterAtMostOneReread::NewestRootsTableStillUnreadable {
++            newest_root_on_the_reread,
++            ..
++        } => Err(
++            EffectiveFloorReadingStillUnreadableAfterOneReread::InstanceTableOfTheNewestRoot(
++                InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
++                    newest_root_on_the_reread,
++                },
++            ),
++        ),
++    }
++}
++
++/// 生效的回退下界 F（[`effective_rollback_floor`] 同一个算法），给手里没有这个进程根环表、也没有错误可报的写者用
++/// （`transaction::PoolWriter` 每次写系统配置槽之前算要写的 F，实审 A3b 报告 Q7）：读根环照
++/// [`readable_roots_with_ring_slots_rereading_unreadable_slots_once`]（读不出的槽重读一次，仍读不出当没有根），根环里最新那条根的实例表
++/// 读不出就连根环一起重读一次，仍读不出不按表滤（与原 [`effective_rollback_floor`] 同一个退路）。
++/// 为什么这一处不拒：见 `transaction::PoolWriter::write_system_configuration_slot` 里那一段注释。只读盘、不写盘。
++#[must_use]
++pub fn effective_rollback_floor_rereading_unreadable_reads_once<Reader: PoolReader + ?Sized>(
++    reader: &Reader,
++    region_devices: &[DeviceIdentity; 3],
++    immutable_sizes: &SystemImmutableSizes,
++    filesystem_identifier: &[u8; 16],
++) -> CheckpointTxg {
++    let read_the_ring = || {
++        Ok::<_, std::convert::Infallible>(
++            readable_roots_with_ring_slots_rereading_unreadable_slots_once(
++                reader,
++                region_devices,
++                immutable_sizes,
++                filesystem_identifier,
++            ),
++        )
++    };
++    let Ok(floor) = effective_rollback_floor_rereading_the_newest_instance_table_once_over(
++        reader,
++        region_devices,
++        immutable_sizes,
++        filesystem_identifier,
++        read_the_ring,
++    );
++    match floor {
++        EffectiveFloorAfterAtMostOneReread::UnderTheNewestRootsTable(floor) => floor,
++        EffectiveFloorAfterAtMostOneReread::NewestRootsTableStillUnreadable {
++            roots_with_ring_slots_on_the_reread,
++            ..
++        } => effective_rollback_floor_of_the_roots_read(
++            reader,
++            region_devices,
++            immutable_sizes,
++            filesystem_identifier,
++            &roots_with_ring_slots_on_the_reread,
++            None,
++        ),
++    }
++}
++
++/// 算 F 生效值时读根环、择最新那条根、读它的实例表，至多重读一次之后的结局
++/// （[`effective_rollback_floor_rereading_the_newest_instance_table_once_over`]）。
++enum EffectiveFloorAfterAtMostOneReread {
++    /// 第一遍或重读那一遍读出了最新那条根的实例表，按它算出的 F 生效值。
++    UnderTheNewestRootsTable(CheckpointTxg),
++    /// 重读那一遍仍没有表（表读不出、解不开，或一条自证过的根都择不到）：交回重读那一遍读到的根环与择到的最新那条根，
++    /// 调用方定拒还是不按表滤。
++    NewestRootsTableStillUnreadable {
++        roots_with_ring_slots_on_the_reread: Vec<(RootRingSlot, RootRecord)>,
++        /// 重读那一遍择到的最新那条根（实例代号, checkpoint_txg）；一条都没择到时 `None`。
++        newest_root_on_the_reread: Option<(InstanceGeneration, CheckpointTxg)>,
++    },
++}
++
++/// 读一遍根环（`read_the_ring`：怎么读、读坏的槽怎么办由调用方定）、择最新那条根、沿链读它的实例表；表读不出、解不开或一条根都择不到时
++/// 立即把根环与表一起重读一次（C554 乙的形态，R = 1；D16（发布语义） 已定项 1「重读一次」），读出表就按它算 F 生效值。
++/// 第一次读与重读一次走同一段。
++///
++/// # Errors
++/// `read_the_ring` 的错原样交回（那一遍之后不再读）。
++fn effective_rollback_floor_rereading_the_newest_instance_table_once_over<
++    Reader: PoolReader + ?Sized,
++    RingReadingFailure,
++>(
++    reader: &Reader,
++    region_devices: &[DeviceIdentity; 3],
++    immutable_sizes: &SystemImmutableSizes,
++    filesystem_identifier: &[u8; 16],
++    read_the_ring: impl Fn() -> Result<Vec<(RootRingSlot, RootRecord)>, RingReadingFailure>,
++) -> Result<EffectiveFloorAfterAtMostOneReread, RingReadingFailure> {
++    let read_the_ring_and_the_newest_roots_table = || {
++        let roots_with_ring_slots = read_the_ring()?;
+         let newest = newest_root_among(&roots_with_ring_slots);
+         let newest_roots_table = newest
+             .and_then(|newest| instance_table_chain_of_root(reader, &newest).ok())
+             .map(|chain| chain.records);
+-        (roots_with_ring_slots, newest, newest_roots_table)
++        Ok((roots_with_ring_slots, newest, newest_roots_table))
+     };
+     let floor_under = |roots_with_ring_slots: &[(RootRingSlot, RootRecord)],
+                        table: &InstanceTableRecords| {
+-        effective_rollback_floor_of_the_roots_read(
+-            reader,
+-            region_devices,
+-            immutable_sizes,
+-            filesystem_identifier,
+-            roots_with_ring_slots,
+-            Some(table),
++        EffectiveFloorAfterAtMostOneReread::UnderTheNewestRootsTable(
++            effective_rollback_floor_of_the_roots_read(
++                reader,
++                region_devices,
++                immutable_sizes,
++                filesystem_identifier,
++                roots_with_ring_slots,
++                Some(table),
++            ),
+         )
+     };
+-    if let (roots_with_ring_slots, _, Some(table)) = read_the_ring_and_the_newest_roots_table() {
++    if let (roots_with_ring_slots, _, Some(table)) = read_the_ring_and_the_newest_roots_table()? {
+         return Ok(floor_under(&roots_with_ring_slots, &table));
+     }
+-    match read_the_ring_and_the_newest_roots_table() {
+-        (roots_with_ring_slots, _, Some(table)) => Ok(floor_under(&roots_with_ring_slots, &table)),
+-        (_, newest_on_the_reread, None) => Err(
+-            RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
++    Ok(match read_the_ring_and_the_newest_roots_table()? {
++        (roots_with_ring_slots, _, Some(table)) => floor_under(&roots_with_ring_slots, &table),
++        (roots_with_ring_slots_on_the_reread, newest_on_the_reread, None) => {
++            EffectiveFloorAfterAtMostOneReread::NewestRootsTableStillUnreadable {
++                roots_with_ring_slots_on_the_reread,
+                 newest_root_on_the_reread: newest_on_the_reread
+                     .map(|root| (root.instance, root.checkpoint_txg)),
+-            },
+-        ),
+-    }
++            }
++        }
++    })
+ }
+ 
+ /// 读出来的根里 (checkpoint_txg, 实例代号) 最大的那一条（与 [`choose_root`] 同一个择法）；一条都没有时 `None`。
+diff --git a/crates/singlefs-core/src/transaction.rs b/crates/singlefs-core/src/transaction.rs
+index 143269e..482c938 100644
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -85,8 +85,8 @@ use crate::records::{
+     TREE_KIND_EXTENT, TREE_KIND_INODE, TREE_KIND_LIVELIST, TREE_KIND_SPARSE_SIDE_TABLE,
+ };
+ use crate::recovery::{
+-    effective_rollback_floor, highest_root_instance, tree_table_entry_count,
+-    verified_system_configuration_slots, PoolReader, RecoveryFailure,
++    effective_rollback_floor_rereading_unreadable_reads_once, highest_root_instance,
++    tree_table_entry_count, verified_system_configuration_slots, PoolReader, RecoveryFailure,
+ };
+ use crate::root_record::{RootRecord, UnmountMarker};
+ use crate::root_ring::{slot_offset, target_for_publish};
+@@ -365,7 +365,12 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
+             + 1;
+         // 这一写带的 F 在写之前按盘上现状现算整池的生效值（D16（发布语义） 已定项 1「生效」）：非抬 F 的写就带它，
+         // 抬 F 先写系统配置那一步带新 F 与它的大者——F 的生效值只增不减（「抬 F 那一串」那一行）。
+-        let pool_effective_floor = effective_rollback_floor(
++        // 读不出的根槽与最新那条根读不出的实例表各重读一次（实审 A3b 报告 Q7），仍读不出照原来的退路（当没有根、不按表滤），不拒：
++        // 这个写入口手里没有分配器上那张根环表，分不出哪个槽是这个进程知道住着根的（D16（发布语义） 已定项 1「根槽这一次读坏」那一行
++        // 要按它分两类），而这一写是发布末尾的轮换、取号或先写 F，报错的去处只有块设备错。退路不让 F 回落：生效值取系统配置里读得出的
++        // F 与根上带的 F 的大者，要被覆写的那一槽在这里先读进来，根上的 F 不高于它那块盘系统配置里的（I-7.12（系统配置 F 不低于同盘根上的 F）），
++        // 只剩「那块盘两槽系统配置与带最高 F 的根同时读不出」这一种叠加故障算得低（推的，没造过）。
++        let pool_effective_floor = effective_rollback_floor_rereading_unreadable_reads_once(
+             &*self.devices,
+             &self.parameters.region_devices,
+             &self.parameters.geometry,
+@@ -510,7 +515,7 @@ pub struct AcquisitionFailed {
+ }
+ 
+ /// 一次系统配置写带哪一个回退下界 F（D16（发布语义） 已定项 1「生效」与「抬 F 那一串」）。
+-/// 两个成员都在写之前按盘上现状现算整池的生效值（`recovery::effective_rollback_floor`）：一块盘两槽都读不出之后的那一次写，
++/// 两个成员都在写之前按盘上现状现算整池的生效值（`recovery::effective_rollback_floor_rereading_unreadable_reads_once`）：一块盘两槽都读不出之后的那一次写，
+ /// 带的仍是整池的，不是这块盘自己读得出的（那样会把它写回 0，让它两槽里的最大值低于它上面的根，I-7.12（系统配置 F 不低于同盘根上的 F） 红）。
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+ enum RollbackFloorOfASystemConfigurationWrite {
+diff --git a/crates/singlefs-harness/src/history.rs b/crates/singlefs-harness/src/history.rs
+index 9a07252..83c4fcf 100644
+--- a/crates/singlefs-harness/src/history.rs
++++ b/crates/singlefs-harness/src/history.rs
+@@ -2257,12 +2257,6 @@ fn recovery_failure_member(failure: &RecoveryFailure) -> String {
+             ..
+         } => "RecoveryFailure::RootPublishCarriesMoreThanOneLastRecordFlagWhoseAnchorIsUndecided"
+             .to_string(),
+-        RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread { .. } => {
+-            "RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread".to_string()
+-        }
+-        RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread { .. } => {
+-            "RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread".to_string()
+-        }
+     }
+ }
+ 
+@@ -2383,20 +2377,32 @@ fn mount_error_member(error: &MountError) -> String {
+         MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable) => {
+             return format!(
+                 "MountError::NewerStateStillUnreadableAfterOneReread({})",
+-                match **still_unreadable {
+-                    StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { .. } => {
+-                        "PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion"
+-                    }
+-                    StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger { .. } => {
+-                        "InstanceTableOfTheNewestRootForTheShadowLedger"
+-                    }
+-                }
++                still_unreadable_after_one_reread_member(still_unreadable)
+             )
+         }
+     };
+     format!("MountError::{member}")
+ }
+ 
++fn still_unreadable_after_one_reread_member(
++    still_unreadable: &StillUnreadableAfterOneReread,
++) -> &'static str {
++    match still_unreadable {
++        StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { .. } => {
++            "PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion"
++        }
++        StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger { .. } => {
++            "InstanceTableOfTheNewestRootForTheShadowLedger"
++        }
++        StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor { .. } => {
++            "InstanceTableOfTheNewestRootForTheEffectiveFloor"
++        }
++        StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot { .. } => {
++            "RootRingSlotKnownToHoldARoot"
++        }
++    }
++}
++
+ fn rollback_error_member(error: &RollbackError) -> String {
+     let member = match error {
+         RollbackError::PublishFrozenAfterAWriteFailureIsNotResentYet { .. } => {
+@@ -2437,6 +2443,12 @@ fn rollback_error_member(error: &RollbackError) -> String {
+         RollbackError::NextCheckpointTxgPastTheTopOfItsRange { .. } => {
+             "NextCheckpointTxgPastTheTopOfItsRange".to_string()
+         }
++        RollbackError::CandidateJudgementStillUnreadableAfterOneReread(still_unreadable) => {
++            format!(
++                "CandidateJudgementStillUnreadableAfterOneReread({})",
++                still_unreadable_after_one_reread_member(still_unreadable)
++            )
++        }
+     };
+     format!("RollbackError::{member}")
+ }
+diff --git a/crates/singlefs-harness/src/model_comparison.rs b/crates/singlefs-harness/src/model_comparison.rs
+index 2b820da..9efb38c 100644
+--- a/crates/singlefs-harness/src/model_comparison.rs
++++ b/crates/singlefs-harness/src/model_comparison.rs
+@@ -694,7 +694,9 @@ pub fn refusal_reason_of_rollback_error(error: &RollbackError) -> ObservedRefusa
+         }
+         | RollbackError::UserVisibleUnitWithoutItsRecordInTheCurrentAccount { .. }
+         | RollbackError::UserVisibleUnitStillAllocatedUnderAnotherGeneration { .. }
+-        | RollbackError::ResurrectedUnitCopyUnreadableOrMismatched { .. } => {
++        | RollbackError::ResurrectedUnitCopyUnreadableOrMismatched { .. }
++        // 判候选集读根环或算 F_生效 重读一次仍读坏（实审 A3b Q7）：只在读路径上注入故障才有，与 `MountError::Recovery(_)` 同一处置。
++        | RollbackError::CandidateJudgementStillUnreadableAfterOneReread(_) => {
+             ObservedRefusalReason::Unexplained
+         }
+     }
+@@ -748,7 +750,11 @@ pub fn refusal_reason_of_mount_error(error: &MountError) -> ObservedRefusalReaso
+                 }
+                 // 重建分配器时最新那条根的实例表重读仍读不出（代码审阅第 22 条）：读阶段判完、判据为假之后才读它，崩溃恢复抛弃根
+                 // 那一步在读阶段就拒了走不到；只在读路径上注入故障、正好落在那一片上才有，模型没有这一条。
+-                StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger { .. } => {
++                StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger { .. }
++                // 挂着时抬 F 算 F 生效值读最新那条根的实例表、重算影子账读根环里这个进程知道住着根的槽，重读一次仍读坏（实审 A3b Q4，
++                // 改之前经 `MountError::Recovery` 交出、同样记成没理由）：只在读路径上注入故障才有，模型没有这一条。
++                | StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor { .. }
++                | StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot { .. } => {
+                     ObservedRefusalReason::Unexplained
+                 }
+             }
+diff --git a/crates/singlefs-harness/tests/acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics.rs b/crates/singlefs-harness/tests/acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics.rs
+index 1767156..32df58a 100644
+--- a/crates/singlefs-harness/tests/acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics.rs
++++ b/crates/singlefs-harness/tests/acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics.rs
+@@ -59,6 +59,87 @@ use singlefs_harness::RecordedOperationKind;
+ 
+ // ─── 一、取号那一刻读见证值时读不出的那块盘拒 ───
+ 
++/// 数屏障调用的包装盘（套在读故障那一层外面）：两块盘共用一个计数。C577（发布返回之前、系统配置轮换之后一道池屏障）之后，
++/// 第一个事务末尾那道屏障与重开之后取号写之前那一道之间没有写，录制器把后一道并进前一道（录制流里看不出取号那道屏障发没发），
++/// 盘上照收两次 FLUSH；取号写之前那道屏障发没发就在这一层数。
++struct DeviceCountingBarriers<Inner> {
++    inner: Inner,
++    barrier_calls: Rc<RefCell<u64>>,
++}
++
++impl<Inner: BlockDevice> BlockDevice for DeviceCountingBarriers<Inner> {
++    fn read_at(
++        &self,
++        offset: DeviceOffsetInBytes,
++        buffer: &mut [u8],
++    ) -> Result<(), BlockDeviceError> {
++        self.inner.read_at(offset, buffer)
++    }
++
++    fn write_at(
++        &mut self,
++        offset: DeviceOffsetInBytes,
++        bytes: &[u8],
++        durability: WriteDurability,
++    ) -> Result<(), BlockDeviceError> {
++        self.inner.write_at(offset, bytes, durability)
++    }
++
++    fn write_zeroes_at(
++        &mut self,
++        offset: DeviceOffsetInBytes,
++        length: u64,
++    ) -> Result<(), BlockDeviceError> {
++        self.inner.write_zeroes_at(offset, length)
++    }
++
++    fn barrier(&mut self) -> Result<(), BlockDeviceError> {
++        *self.barrier_calls.borrow_mut() += 1;
++        self.inner.barrier()
++    }
++
++    fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
++        self.inner.probe_physical_block_size()
++    }
++
++    fn size_in_bytes(&self) -> u64 {
++        self.inner.size_in_bytes()
++    }
++}
++
++/// 套上数屏障那一层的一池盘。
++type DevicesCountingBarriers<Inner> = Vec<(DeviceIdentity, DeviceCountingBarriers<Inner>)>;
++
++/// 给每块盘套上数屏障的那一层，交回套好的盘与两块盘共用的计数。
++fn counting_barriers<Inner: BlockDevice>(
++    devices: Vec<(DeviceIdentity, Inner)>,
++) -> (DevicesCountingBarriers<Inner>, Rc<RefCell<u64>>) {
++    let barrier_calls = Rc::new(RefCell::new(0));
++    let counted = devices
++        .into_iter()
++        .map(|(identity, inner)| {
++            (
++                identity,
++                DeviceCountingBarriers {
++                    inner,
++                    barrier_calls: barrier_calls.clone(),
++                },
++            )
++        })
++        .collect();
++    (counted, barrier_calls)
++}
++
++/// 拆掉数屏障的那一层。
++fn without_barrier_counting<Inner: BlockDevice>(
++    devices: DevicesCountingBarriers<Inner>,
++) -> Vec<(DeviceIdentity, Inner)> {
++    devices
++        .into_iter()
++        .map(|(identity, device)| (identity, device.inner))
++        .collect()
++}
++
+ const DEVICE_WHOSE_SLOTS_TURN_UNREADABLE: DeviceIdentity = DeviceIdentity(1);
+ 
+ /// 盘 1 两个系统配置槽各一段读故障，两段都按 `failing_reads` 坏（每段各自从 1 数它被读了几次）。
+@@ -208,7 +289,8 @@ fn describe(refusal: &Result<singlefs_core::mount::Mounted, MountError>) -> Stri
+ /// 场景：第一个事务之后重开、可写挂载。盘 1 两个系统配置槽从「取号写之前最后一次读」起每次都读坏
+ /// （次数取另一份相同的池上照常挂载时数到的：择系统配置、取号之前的逐盘核、算号那几遍都读得出）。
+ /// 预期：取号拒在第一道屏障之前，报 `WritableMountRefusedByDevicesWithoutTheSelectedVersion`（盘 1、`NoSelfVerifiedSystemConfiguration`），
+-/// `DiskSnapshot` 不变（系统配置槽、根环、录制流步数：一个写、一道屏障都没发）。
++/// `DiskSnapshot` 不变（系统配置槽、根环、录制流步数：一个写都没发），盘上一次屏障调用都没收到（录制流看不出取号那道屏障，
++/// 见 [`DeviceCountingBarriers`]）。
+ /// 改之前：见证值只取盘 0 的、取号写照做，挂载做成。
+ #[test]
+ fn a_device_whose_slots_turn_unreadable_before_the_acquisition_barrier_refuses_the_writable_mount_without_a_step(
+@@ -225,23 +307,30 @@ fn a_device_whose_slots_turn_unreadable_before_the_acquisition_barrier_refuses_t
+         ]),
+         UnreadableRangeReadBack::DeviceError,
+     );
+-    let mut devices = with_unreadable_ranges(pool.reopen_recorded(), &ranges);
++    let (mut devices, barrier_calls) =
++        counting_barriers(with_unreadable_ranges(pool.reopen_recorded(), &ranges));
+     let refusal = mount_writable(&common::parameters(), &mut devices);
+     assert!(
+         refused_for_device_one_without_a_self_verified_system_configuration(&refusal, &first),
+         "取号那一刻盘 1 两槽都读不出：拒可写，报盘 1 不带所选那一版；得到 {}",
+         describe(&refusal)
+     );
+-    pool.devices = Some(without_unreadable_ranges(devices));
++    pool.devices = Some(without_unreadable_ranges(without_barrier_counting(devices)));
+     assert_eq!(
+         disk_snapshot(&pool.memory_pool(), &pool.stream),
+         before,
+-        "拒在第一道屏障之前：一个写、一道屏障都没发"
++        "拒在第一道屏障之前：一个写都没发"
++    );
++    assert_eq!(
++        *barrier_calls.borrow(),
++        0,
++        "拒在第一道屏障之前：盘上一次屏障调用都没收到"
+     );
+ }
+ 
+ /// 场景：同上，盘 1 两槽从「取号写之前那道屏障之后的第一次读」起读坏：屏障之前那一核读得出，屏障之后取见证值那一遍读不出。
+-/// 预期：不写、报同一个成员；系统配置槽与根环不变，录制流只多那一道屏障。改之前：见证值只取盘 0 的、取号写照做，挂载做成。
++/// 预期：不写、报同一个成员；系统配置槽与根环不变，录制流一个写都不多；那一道屏障两块盘各收到一次（盘上数，录制流里它并进了
++/// 第一个事务末尾那一道，见 [`DeviceCountingBarriers`]）。改之前：见证值只取盘 0 的、取号写照做，挂载做成。
+ #[test]
+ fn a_device_whose_slots_turn_unreadable_after_the_acquisition_barrier_refuses_before_any_write() {
+     let [slot_zero_reads, slot_one_reads] =
+@@ -256,14 +345,15 @@ fn a_device_whose_slots_turn_unreadable_after_the_acquisition_barrier_refuses_be
+         ]),
+         UnreadableRangeReadBack::DeviceError,
+     );
+-    let mut devices = with_unreadable_ranges(pool.reopen_recorded(), &ranges);
++    let (mut devices, barrier_calls) =
++        counting_barriers(with_unreadable_ranges(pool.reopen_recorded(), &ranges));
+     let refusal = mount_writable(&common::parameters(), &mut devices);
+     assert!(
+         refused_for_device_one_without_a_self_verified_system_configuration(&refusal, &first),
+         "屏障之后取见证值时盘 1 两槽都读不出：不写、拒可写；得到 {}",
+         describe(&refusal)
+     );
+-    pool.devices = Some(without_unreadable_ranges(devices));
++    pool.devices = Some(without_unreadable_ranges(without_barrier_counting(devices)));
+     let after = disk_snapshot(&pool.memory_pool(), &pool.stream);
+     assert_eq!(
+         (&after.system_configuration_slots, &after.readable_roots),
+@@ -272,11 +362,15 @@ fn a_device_whose_slots_turn_unreadable_after_the_acquisition_barrier_refuses_be
+     );
+     let operations_since = &pool.stream.operations()[before.recorded_operations..];
+     assert!(
+-        !operations_since.is_empty()
+-            && operations_since
+-                .iter()
+-                .all(|operation| operation.kind == RecordedOperationKind::Barrier),
+-        "录制流只多取号写之前那一道屏障（每块盘一条屏障记录），没有写：{operations_since:?}"
++        operations_since
++            .iter()
++            .all(|operation| operation.kind == RecordedOperationKind::Barrier),
++        "录制流没有多出写：{operations_since:?}"
++    );
++    assert_eq!(
++        *barrier_calls.borrow(),
++        2,
++        "取号写之前那一道池屏障发了、只发了这一道：两块盘各一次"
+     );
+ }
+ 
+diff --git a/crates/singlefs-harness/tests/corrupt_on_disk_content_is_refused_instead_of_panicking.rs b/crates/singlefs-harness/tests/corrupt_on_disk_content_is_refused_instead_of_panicking.rs
+index aabab98..ae57bbe 100644
+--- a/crates/singlefs-harness/tests/corrupt_on_disk_content_is_refused_instead_of_panicking.rs
++++ b/crates/singlefs-harness/tests/corrupt_on_disk_content_is_refused_instead_of_panicking.rs
+@@ -31,7 +31,7 @@ use singlefs_core::pointer::{
+ };
+ use singlefs_core::records::{
+     mapping_key_for_node, parse_mapping_entry, TreeTableEntry, TREE_KIND_ACCOUNTING,
+-    TREE_KIND_INODE, TREE_KIND_LIVELIST,
++    TREE_KIND_DEADLIST, TREE_KIND_INODE,
+ };
+ use singlefs_core::recovery::{
+     choose_system_configuration, every_root_ring_slot, read_root_ring_slot, recover, JournalPolicy,
+@@ -427,14 +427,16 @@ fn an_accounting_leaf_with_a_repeated_key_is_refused_by_the_writable_mount_befor
+     );
+ }
+ 
+-/// 场景：最新那条根的树表里 livelist 那条条目的树 ID 改成根记录的树 ID 水位（第一个文件那一版是 19），树表与根记录重封。
+-/// 预期：可写挂载在任何写之前报 I-7.8（根记录树 ID 水位不低于全池最大树 ID）「树 ID 不低于水位」。改之前重建不判它，
+-/// 写行那次发布照抄这张树表，在 `transaction` 的「树表条目按树 ID 升序」断言上 panic（livelist 的号 19 排到了 deadlist 18 前面）。
++/// 场景：最新那条根的树表里 deadlist 那条条目的树 ID 改成根记录的树 ID 水位（第一个文件那一版是 19），树表与根记录重封。
++/// deadlist 在发号次序里排最后、号最大（18），改成 19 之后树表条目仍按树 ID 严格升序、合发号次序，只违反水位那一条。
++/// 预期：可写挂载在任何写之前报 I-7.8（根记录树 ID 水位不低于全池最大树 ID）「树 ID 不低于水位」。改之前重建不判它，写行那次发布照抄这张树表。
++/// 合入后验证一（2026-09-27）把被改的条目从 livelist 换成 deadlist：livelist 改成 19 同时违反 I-9.16（树表条目按树 ID 严格升序且合发号次序），
++/// 而 I-9.16 那一判排在水位之前（树表排序报告第八节第 3 条），报的是 I-9.16，这条用例就判不到 I-7.8 了。
+ #[test]
+ fn a_tree_table_entry_at_or_above_the_tree_identifier_watermark_is_refused_by_the_writable_mount() {
+     let (mut devices, first) = pool_after_the_first_file();
+     let watermark = first.root.tree_identifier_watermark;
+-    rewrite_a_tree_table_entry_of_the_newest_root(&mut devices, TREE_KIND_LIVELIST, |entry| {
++    rewrite_a_tree_table_entry_of_the_newest_root(&mut devices, TREE_KIND_DEADLIST, |entry| {
+         entry[..8].copy_from_slice(&watermark.to_le_bytes());
+     });
+     let refusal = writable_mount_refused_before_any_write(&mut devices);
+diff --git a/crates/singlefs-harness/tests/crash_image_journal_hint_matches_the_full_ring_scan.rs b/crates/singlefs-harness/tests/crash_image_journal_hint_matches_the_full_ring_scan.rs
+index 6ea3753..e33e912 100644
+--- a/crates/singlefs-harness/tests/crash_image_journal_hint_matches_the_full_ring_scan.rs
++++ b/crates/singlefs-harness/tests/crash_image_journal_hint_matches_the_full_ring_scan.rs
+@@ -81,7 +81,8 @@ fn persisted_through_segments(
+     persisted
+ }
+ 
+-/// 第一个事务那条流（取号、两次暖机、第一个事务）的崩溃状态上逐个比：11 个段边界（前 k 段全持久），
++/// 第一个事务那条流（取号、两次暖机、第一个事务）的崩溃状态上逐个比：12 个段边界（前 k 段全持久；C577 之后暖机第二次的轮换自成一段，
++/// 改之前 11 个），
+ /// 再加每段 journal 记录写里只落一份的那几个状态（两块盘各一份，只落一块盘上那份时提示只该给那块盘）。
+ #[test]
+ fn on_the_first_transaction_stream_the_hint_finds_what_the_full_ring_scan_finds_in_every_compared_state(
+@@ -92,7 +93,11 @@ fn on_the_first_transaction_stream_the_hint_finds_what_the_full_ring_scan_finds_
+         &pool.retained_operations()[pool.mkfs_operation_count..],
+         &common::geometry(),
+     );
+-    assert_eq!(segments.len(), 10, "第一个事务那条流 2+2+1+2+2+1+26+2+1+2");
++    assert_eq!(
++        segments.len(),
++        11,
++        "第一个事务那条流 2+2+1+2+2+1+2+24+2+1+2（C577 之前轮换与单元写同段，2+2+1+2+2+1+26+2+1+2）"
++    );
+ 
+     let mut records_found_on_each_boundary = Vec::new();
+     for persisted_segment_count in 0..=segments.len() {
+@@ -110,7 +115,7 @@ fn on_the_first_transaction_stream_the_hint_finds_what_the_full_ring_scan_finds_
+     }
+     assert_eq!(
+         records_found_on_each_boundary,
+-        vec![0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3],
++        vec![0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3],
+         "三次发布（两次暖机、第一个事务）的记录各在它的记录段落盘之后读得出：两种扫法都读到了记录，比对不是两边都空"
+     );
+ 
+diff --git a/crates/singlefs-harness/tests/first_transaction_step_five_publish.rs b/crates/singlefs-harness/tests/first_transaction_step_five_publish.rs
+index f198ade..3c0ce5c 100644
+--- a/crates/singlefs-harness/tests/first_transaction_step_five_publish.rs
++++ b/crates/singlefs-harness/tests/first_transaction_step_five_publish.rs
+@@ -320,6 +320,10 @@ fn recorded_paths_match_the_registered_segment_sequences() {
+     // 与产物**不同**：清 journal 环与清根环都是这之后加的，E142 干跑的产物还没重跑（重跑之前门禁 55 号红着）。
+     // 录制器按设备记屏障（代码审阅第 1 条，用户 2026-09-27 定）之后，每道池屏障两块盘各记一步：操作数与种类串里的屏障数
+     // 与产物不同（mkfs 21 → 23、暖机 14 → 18、第一个事务 31 → 33、mkfs 之后整条 47 → 53），段序列与闭式不变；产物要重出。
++    // C577（发布返回之前、系统配置轮换之后一道池屏障）之后每次发布末尾多两步屏障：暖机 18 → 20（第一次末尾那一道顶替了第二次开头
++    // 那道没有写在前、写入口不发的屏障，只多第二次末尾 2 步），第一个事务 33 → 35，mkfs 之后整条 2 + 20 + 35 = 57；
++    // 暖机第二次的系统配置槽轮换不再与第一个事务的 24 个单元写同段：整条流 26 写一段拆成 2 与 24，
++    // 闭式 1 + (3 + 3 + 1 + 3 + 3 + 1 + 3 + 3 + 1 + 3) + (2^24 − 1) = 16777240（改之前 67108885）。
+     assert_eq!(
+         (
+             mkfs_operations.len(),
+@@ -350,11 +354,11 @@ fn recorded_paths_match_the_registered_segment_sequences() {
+             sizes(warm_up_operations),
+             closed_form(warm_up_operations)
+         ),
+-        (18, "2+1+2+2+1+2".to_string(), 15)
++        (20, "2+1+2+2+1+2".to_string(), 15)
+     );
+     assert_eq!(
+         kinds(warm_up_operations),
+-        "[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]"
++        "[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]"
+     );
+     assert_eq!(
+         (
+@@ -362,11 +366,11 @@ fn recorded_paths_match_the_registered_segment_sequences() {
+             sizes(transaction_operations),
+             closed_form(transaction_operations)
+         ),
+-        (33, "24+2+1+2".to_string(), 16_777_223)
++        (35, "24+2+1+2".to_string(), 16_777_223)
+     );
+     assert_eq!(
+         kinds(transaction_operations),
+-        "[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]"
++        "[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]"
+     );
+     assert_eq!(
+         (
+@@ -374,11 +378,11 @@ fn recorded_paths_match_the_registered_segment_sequences() {
+             sizes(post_mkfs_operations),
+             closed_form(post_mkfs_operations)
+         ),
+-        (53, "2+2+1+2+2+1+26+2+1+2".to_string(), 67_108_885)
++        (57, "2+2+1+2+2+1+2+24+2+1+2".to_string(), 16_777_240)
+     );
+     assert_eq!(
+         kinds(post_mkfs_operations),
+-        "[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]"
++        "[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]"
+     );
+     // 每一步恰好落在一个段里。
+     for slice in [
+diff --git a/crates/singlefs-harness/tests/in_place_overwrite_torn_state_count.rs b/crates/singlefs-harness/tests/in_place_overwrite_torn_state_count.rs
+index 91f7f39..66ff7f9 100644
+--- a/crates/singlefs-harness/tests/in_place_overwrite_torn_state_count.rs
++++ b/crates/singlefs-harness/tests/in_place_overwrite_torn_state_count.rs
+@@ -258,7 +258,8 @@ fn a_tearable_in_place_overwrite_takes_a_third_state_and_every_other_write_two()
+     );
+ }
+ 
+-/// 量：第一个事务那条流（层 0 从 mkfs 之后枚举的整条流，段序列 `2+2+1+2+2+1+26+2+1+2`）补第三态之后的状态数。
++/// 量：第一个事务那条流（层 0 从 mkfs 之后枚举的整条流，段序列 `2+2+1+2+2+1+2+24+2+1+2`；C577 之前暖机第二次的轮换与第一个事务的
++/// 单元写同段，`2+2+1+2+2+1+26+2+1+2`）补第三态之后的状态数。
+ /// 这条流上取 3 态的只有系统配置槽写（8 次，每次都罩住 mkfs 写下的旧槽）；journal 记录都写在 mkfs 清过的环里、没有覆写，
+ /// 根槽写一个扇区、单元写 COW，都照旧 2 态。
+ #[test]
+@@ -315,12 +316,14 @@ fn the_first_transaction_stream_counts_with_the_torn_third_state_as_measured() {
+         ]
+     );
+     assert_eq!(
+-        today_full, 67_108_885,
+-        "今天的全量闭式（layout/01-first-txn.md 八那一行）"
++        today_full, 16_777_240,
++        "今天的全量闭式：1 + (3 + 3 + 1 + 3 + 3 + 1 + 3 + 3 + 1 + 3) + (2^24 − 1)（C577 之前 26 写段 2^26 − 1，67108885，\
++         layout/01-first-txn.md 八那一行要跟着改）"
+     );
+     assert_eq!(
+         (torn_full, today_quick_tier, torn_quick_tier),
+-        (150_994_980, 29, 54),
+-        "补第三态：全量第 7 段 3² · 2²⁴ − 1、其余三段系统配置槽段各 3² − 1；甲二那一段 3² · 2 − 1"
++        (16_777_260, 26, 46),
++        "补第三态：全量四个系统配置槽段各 3² − 1、24 写的单元段 2²⁴ − 1；甲二单元段全不落 1、系统配置槽段各 3² − 1 \
++         （C577 之前轮换与单元同段：全量那一段 3² · 2²⁴ − 1、甲二 3² · 2 − 1，共 150994980、29、54）"
+     );
+ }
+diff --git a/crates/singlefs-harness/tests/publish_order_matches_litmus.rs b/crates/singlefs-harness/tests/publish_order_matches_litmus.rs
+index 164285b..db03676 100644
+--- a/crates/singlefs-harness/tests/publish_order_matches_litmus.rs
++++ b/crates/singlefs-harness/tests/publish_order_matches_litmus.rs
+@@ -50,13 +50,31 @@ fn litmus_writer_threads_follow_the_recorded_publish_order() {
+     let transaction = &operations[pool.warm_up_operation_count..];
+     assert_eq!(
+         transaction.len(),
+-        33,
++        35,
+         "第一个事务的步数写死错了就在这里先红：24 次单元写 + 2 道屏障 + 2 条 journal 记录 + 2 道屏障 \
+-         + 1 次根槽 FUA + 2 次系统配置槽写，与 first_transaction_step_five_publish.rs 的断言\
+-         （第 365 行 `(33, \"24+2+1+2\", 16_777_223)`）同一个数"
++         + 1 次根槽 FUA + 2 次系统配置槽写 + 2 道屏障（C577：轮换之后、发布返回之前），与 first_transaction_step_five_publish.rs 的断言\
++         `(35, \"24+2+1+2\", 16_777_223)` 同一个数"
++    );
++    // litmus 的写者线程只写到根槽；根槽之后的系统配置槽轮换与它之后那道池屏障（C577）另钉。
++    let root_position = transaction
++        .iter()
++        .rposition(|operation| geometry().classify(operation) == StepKind::RootRecordFua)
++        .expect("第一个事务写了根槽");
++    assert_eq!(
++        transaction[root_position + 1..]
++            .iter()
++            .map(|operation| geometry().classify(operation))
++            .collect::<Vec<StepKind>>(),
++        vec![
++            StepKind::SystemConfigurationSlot,
++            StepKind::SystemConfigurationSlot,
++            StepKind::Barrier,
++            StepKind::Barrier
++        ],
++        "根槽之后：两块盘各一次系统配置槽轮换，再一道池屏障（两块盘各一步）才返回"
+     );
+     let mut collapsed: Vec<StepKind> = Vec::new();
+-    for operation in transaction {
++    for operation in &transaction[..=root_position] {
+         let kind = geometry().classify(operation);
+         if kind == StepKind::SystemConfigurationSlot || collapsed.last() == Some(&kind) {
+             continue;
+diff --git a/crates/singlefs-harness/tests/rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs b/crates/singlefs-harness/tests/rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs
+index b6917f3..a7f25a8 100644
+--- a/crates/singlefs-harness/tests/rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs
++++ b/crates/singlefs-harness/tests/rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs
+@@ -225,8 +225,10 @@ fn verdict_of(verdicts: &[(&'static str, InvariantVerdict)], invariant: &str) ->
+ }
+ 
+ /// SysPre（D16（发布语义） 已定项 1「抬 F 那一串」、已定项 7）：第一个事务之后覆盖写三次（txg 4–6），抬 F 到上限 3——
+-/// 这一串先一道池屏障（txg 6 末尾轮换写的那一槽先持久，代码审阅第 19 条），接着两块盘各一次系统配置槽写、带新 F 3（tail 与实例代号照现行那一版末次轮换写的），
+-/// 再一道池屏障，第一次根槽 FUA 写在它之后；录制流按设备记屏障（实审 B3a-2 第 1 条），每道池屏障是两块盘各一步；
++/// txg 6 末尾轮换写的那一槽先持久（代码审阅第 19 条）：C577 之后由 txg 6 那次发布返回之前那道池屏障兑现，它是抬 F 之前录制流的最后两步；
++/// 这一串自己开头那道屏障前面没有写，录制器把它与前一道并成一道（设备上照收 FLUSH），录制流里这一串从系统配置写起。
++/// 接着两块盘各一次系统配置槽写、带新 F 3（tail 与实例代号照现行那一版末次轮换写的），再一道池屏障，第一次根槽 FUA 写在它之后；
++/// 录制流按设备记屏障（实审 B3a-2 第 1 条），每道池屏障是两块盘各一步；
+ /// 那两次写的账（两次、8192 字节）单列在 `system_configuration_writes_before_the_first_publish`，不在任何一次发布里。
+ /// 做完之后每块盘两槽里读得出的最大 F 是 3，F 生效值是 3。
+ #[test]
+@@ -238,30 +240,36 @@ fn raising_the_floor_writes_the_new_floor_into_every_system_configuration_behind
+     let tail_before_the_raise = pool.output.record.counter;
+     let operations_before_the_raise = pool.stream.operation_count();
+     let raised = raise_floor(&mut pool, CheckpointTxg(3)).expect("抬到上限 3");
+-    let steps = step_kinds_since(&pool.stream, operations_before_the_raise);
+     assert_eq!(
+-        steps[..6],
++        step_kinds_since(&pool.stream, operations_before_the_raise - 2)[..2],
+         [
+             (StepKind::Barrier, DeviceIdentity(0)),
+             (StepKind::Barrier, DeviceIdentity(1)),
++        ],
++        "抬 F 之前录制流的最后两步是 txg 6 那次发布返回之前那道池屏障（C577）：txg 6 末尾轮换的那一槽先持久（代码审阅第 19 条）"
++    );
++    let steps = step_kinds_since(&pool.stream, operations_before_the_raise);
++    assert_eq!(
++        steps[..4],
++        [
+             (StepKind::SystemConfigurationSlot, DeviceIdentity(0)),
+             (StepKind::SystemConfigurationSlot, DeviceIdentity(1)),
+             (StepKind::Barrier, DeviceIdentity(0)),
+             (StepKind::Barrier, DeviceIdentity(1)),
+         ],
+-        "抬 F 那一串的头六步：一道池屏障（两块盘各一步；txg 6 末尾轮换的那一槽先持久，代码审阅第 19 条）、两块盘各写一次系统配置槽、再一道池屏障（两块盘各一步）"
++        "抬 F 那一串的头四步：两块盘各写一次系统配置槽、再一道池屏障（两块盘各一步）；开头那道屏障与 txg 6 返回之前那道之间没有写，录制流里并成一道"
+     );
+     let first_root_step = steps
+         .iter()
+         .position(|(kind, _)| *kind == StepKind::RootRecordFua)
+         .expect("这一串写了根");
+     assert!(
+-        first_root_step > 5,
++        first_root_step > 3,
+         "第一条带新 F 的根在写完系统配置之后那道池屏障之后：{first_root_step}"
+     );
+     let retained = pool.stream.retained_operations();
+-    // 头六步里第 2、3 步是两块盘的系统配置槽写（第 0、1 步与第 4、5 步是两道池屏障）。
+-    for step in 2..4 {
++    // 头四步里第 0、1 步是两块盘的系统配置槽写（第 2、3 步是那道池屏障）。
++    for step in 0..2 {
+         let written = SystemConfiguration::parse_slot(
+             retained[operations_before_the_raise + step]
+                 .contents
+@@ -493,7 +501,7 @@ fn normal_unmount_raises_the_floor_to_the_current_txg_with_marked_empty_publishe
+             );
+         }
+         assert_eq!(
+-            step_kinds_since(&pool.stream, operations_before_the_unmount)[..6],
++            step_kinds_since(&pool.stream, operations_before_the_unmount - 2)[..6],
+             [
+                 (StepKind::Barrier, DeviceIdentity(0)),
+                 (StepKind::Barrier, DeviceIdentity(1)),
+@@ -502,7 +510,8 @@ fn normal_unmount_raises_the_floor_to_the_current_txg_with_marked_empty_publishe
+                 (StepKind::Barrier, DeviceIdentity(0)),
+                 (StepKind::Barrier, DeviceIdentity(1)),
+             ],
+-            "卸载那一串照抬 F 那一串：一道池屏障、先写系统配置、过池屏障（录制流按设备记屏障，每道两块盘各一步）"
++            "卸载那一串照抬 F 那一串：上一次发布返回之前那道池屏障（C577；卸载开头那道与它之间没有写，录制流里并成一道）、\
++             先写系统配置、过池屏障（录制流按设备记屏障，每道两块盘各一步）"
+         );
+         let image = pool.memory_pool();
+         let roots_on_disk = readable_roots_of(&image);
+@@ -711,7 +720,8 @@ fn three_overwrites_on_fault_injected_devices() -> PoolOnFaultInjectedDevices {
+ 
+ /// 先写系统配置那一步失败（「抬 F 那一串」那一行，主 agent 2026-09-26 定）：抬 F 到 3，第二次写（盘 1 的系统配置槽）报块设备错——
+ /// 报 `RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot`、点名只有盘 0 已带新 F、这一步记下的写是盘 0 那一次；
+-/// 这一串的根一条都没发（根环逐条不变、录制流只多写之前那道池屏障（两块盘各一步）与盘 0 那一次写、报错之后没有屏障），调用方的现行版本没动，分配器与抬 F 之前逐项相同；
++/// 这一串的根一条都没发（根环逐条不变、录制流只多盘 0 那一次写——写之前那道池屏障与 txg 6 返回之前那道（C577）之间没有写、录制流里并成一道——、
++/// 报错之后没有屏障），调用方的现行版本没动，分配器与抬 F 之前逐项相同；
+ /// 盘 0 系统配置里的新 F 留着、不回卷，F 生效值已经是 3（「只增不减」）。之后同一个进程里要抬到 2（低于生效值）在任何写之前拒；
+ /// 再抬到 3 做成，两块盘都带上新 F。
+ #[test]
+@@ -763,12 +773,20 @@ fn failing_to_write_the_new_floor_into_the_second_system_configuration_publishes
+         .collect();
+     assert_eq!(
+         recorded,
++        vec![(RecordedOperationKind::Write, DeviceIdentity(0))],
++        "录制流只多盘 0 那一次写：写之前那道池屏障（代码审阅第 19 条）与 txg 6 返回之前那道（C577）之间没有写、录制流里并成一道；\
++         报错之后一个写、一道屏障都没发"
++    );
++    assert_eq!(
++        pool.stream.operations()[operations_before - 2..operations_before]
++            .iter()
++            .map(|operation| (operation.kind, operation.device))
++            .collect::<Vec<_>>(),
+         vec![
+             (RecordedOperationKind::Barrier, DeviceIdentity(0)),
+             (RecordedOperationKind::Barrier, DeviceIdentity(1)),
+-            (RecordedOperationKind::Write, DeviceIdentity(0))
+         ],
+-        "录制流只多写之前那道池屏障（代码审阅第 19 条；按设备记屏障，两块盘各一步）与盘 0 那一次写：报错之后一个写、一道屏障都没发"
++        "盘 0 那一次写之前录制流的最后两步是 txg 6 返回之前那道池屏障：覆写旧槽时新槽已持久"
+     );
+     assert_eq!(
+         readable_roots_of(pool.devices.as_slice()),
+diff --git a/crates/singlefs-harness/tests/second_transaction_step_one_overwrite.rs b/crates/singlefs-harness/tests/second_transaction_step_one_overwrite.rs
+index 8077b14..06aa1f4 100644
+--- a/crates/singlefs-harness/tests/second_transaction_step_one_overwrite.rs
++++ b/crates/singlefs-harness/tests/second_transaction_step_one_overwrite.rs
+@@ -97,8 +97,9 @@ fn overwrite_publishes_the_second_version_through_the_same_commit_shape() {
+     );
+     assert_eq!(
+         segment_kinds_text(&segments),
+-        "[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]",
+-        "种类串里屏障按设备数：每道池屏障两块盘各记一步（实审 B3a-2 第 1 条，录制器按设备记屏障）"
++        "[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]",
++        "种类串里屏障按设备数：每道池屏障两块盘各记一步（实审 B3a-2 第 1 条，录制器按设备记屏障）；C577 之后系统配置轮换之后、\
++         发布返回之前多一道池屏障，末段多 barrier×2"
+     );
+ 
+     assert_eq!(second.root.checkpoint_txg, CheckpointTxg(4));
+diff --git a/crates/singlefs-harness/tests/second_transaction_supplement_three_fault_injection.rs b/crates/singlefs-harness/tests/second_transaction_supplement_three_fault_injection.rs
+index 34da610..c3446f6 100644
+--- a/crates/singlefs-harness/tests/second_transaction_supplement_three_fault_injection.rs
++++ b/crates/singlefs-harness/tests/second_transaction_supplement_three_fault_injection.rs
+@@ -11,11 +11,8 @@ use singlefs_checker::image::InvariantVerdict;
+ use singlefs_checker::walk::check_pool_image;
+ use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
+ use singlefs_core::admission::SpaceAdmission;
+-use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
+ use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+-use singlefs_core::make_filesystem::{
+-    make_filesystem, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
+-};
++use singlefs_core::make_filesystem::{allocator_after_make_filesystem, make_filesystem};
+ use singlefs_core::recovery::{
+     choose_system_configuration, readable_roots, recover, JournalPolicy, RecoveryOutcome,
+ };
+@@ -586,20 +583,9 @@ fn publish_that_fails_on_the_system_configuration_slot_is_frozen_so_the_next_pub
+         })
+         .collect();
+     let genesis = make_filesystem(&parameters, &mut devices).expect("mkfs");
+-    let mut allocator = PoolAllocator::new(vec![
+-        DeviceFreeMap::new(DeviceIdentity(0), IMAGE_BYTES),
+-        DeviceFreeMap::new(DeviceIdentity(1), IMAGE_BYTES),
+-    ]);
+-    allocator.mark_format_time_units(
+-        Placement {
+-            slot: INSTANCE_TABLE_SLOT,
+-            span: 2,
+-        },
+-        Placement {
+-            slot: TREE_TABLE_GENESIS_SLOT,
+-            span: 1,
+-        },
+-    );
++    // mkfs 同一个进程里接着写的分配器照 mkfs 按环长现算的单元区起点建（实审 A3b 报告 Q8：环境变量选小盘那一档时环不是默认的 768 MiB，
++    // 起点不是编译期常量 50176），并装上 mkfs 刚写下的根环。
++    let mut allocator = allocator_after_make_filesystem(&parameters, &devices, &genesis);
+     let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
+     let instance = acquire_instance(&mut writer).expect("取号");
+     let warmed = warm_up(&mut writer, &genesis.root, instance).expect("暖机");
+diff --git a/crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs b/crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs
+index d3e19ec..875521b 100644
+--- a/crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs
++++ b/crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs
+@@ -13,6 +13,12 @@
+ //!
+ //! 四、C554 乙报告 Q6（用户 2026-09-26「不能接受 要改」）：两处「读不出就无声放过」照乙的形态收——先重读一次，仍读不出就在任何写之前拒：
+ //! 算生效 F 时最新那条根的实例表读不出（改之前「不按表滤」）；挂着时抬 F 重算影子账时根槽读不出（改之前当那一槽没有根）。
++//! 合入后验证一（规格 `/tmp/claude-1000/impl-merge-verify-1/spec.md`，2026-09-27）改了三样：
++//! - 读根环照 D16（发布语义） 已定项 1「根槽这一次读坏」那一行分两类（善后一报告 P1）：挂载那一刻就读坏、这个进程之后没写过的槽当没有根，
++//!   不重读、不拒；这个进程知道住着根的槽读坏重读一次，仍坏才拒；
++//! - 两个拒的成员从 `RecoveryFailure` 挪进乙那一族 `StillUnreadableAfterOneReread`（A3b 报告 Q4）；
++//! - 另两处读不出就无声放过（A3b 报告 Q7）：管理员回退判候选照同一读法拒成 `RollbackError` 的新成员；写系统配置槽之前算 F 生效值
++//!   读不出的重读一次，仍读不出照原来的退路（写入口手里没有根环表，不拒）。
+ //!
+ //! 盘：两块内存稀疏盘（`SparseBlockDevice`），改盘上字节之后重封每一道校验和；读故障用这个文件自己的包装盘按「这一段第几次读」坏。
+ use std::cell::RefCell;
+@@ -35,14 +41,21 @@ use singlefs_core::make_filesystem::{
+     allocator_after_make_filesystem, make_filesystem, MakeFilesystemError,
+     MakeFilesystemParameters, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
+ };
+-use singlefs_core::mount::{mount_writable, raise_rollback_floor, MountError, ShadowLedger};
++use singlefs_core::mount::{
++    mount_writable, raise_rollback_floor, ring_slots_known_to_hold_a_root_by,
++    roll_back_by_a_forward_publish, MountError, RollbackError, RollbackTarget, ShadowLedger,
++    StillUnreadableAfterOneReread,
++};
+ use singlefs_core::records::{TREE_KIND_LIVELIST, TREE_KIND_SPARSE_SIDE_TABLE};
+ use singlefs_core::recovery::{
+     choose_system_configuration, effective_rollback_floor_rereading_the_newest_instance_table_once,
+-    every_root_ring_slot, read_root_ring_slot, readable_roots,
+-    readable_roots_rereading_unreadable_root_ring_slots_once, recover, JournalPolicy,
+-    RecoveryFailure, RecoveryOutcome, RootRingSlotReading,
+-    SystemConfigurationValueOutsideWhatThisReaderAccepts,
++    effective_rollback_floor_rereading_unreadable_reads_once, every_root_ring_slot,
++    read_root_ring_slot, readable_roots,
++    readable_roots_rereading_ring_slots_known_to_hold_a_root_once, readable_roots_with_ring_slots,
++    recover, verified_system_configuration_slots,
++    InstanceTableOfTheNewestRootStillUnreadableAfterOneReread, JournalPolicy, RecoveryFailure,
++    RecoveryOutcome, RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread,
++    RootRingSlotReading, SystemConfigurationValueOutsideWhatThisReaderAccepts,
+ };
+ use singlefs_core::root_record::RootRecord;
+ use singlefs_core::root_ring::{slot_offset, RootRingSlot, RootRingSlotsPerRegion};
+@@ -895,7 +908,8 @@ const INSTANCE_TABLE_BYTES: u64 = 2 * SLOT_BYTES;
+ 
+ /// 抬 F 那一串先读现行那一版的实例表（这一段每块盘的第 1 次读，读盘 0 那一份就够），再算生效 F 时读根环里最新那条根的实例表
+ /// （同一片：盘 0 第 2 次、盘 1 第 1 次），重读一次（盘 0 第 3 次、盘 1 第 2 次）。点名这两遍两份都坏：拒成
+-/// `InstanceTableOfTheNewestRootStillUnreadableAfterOneReread`，在动分配器与任何写之前——两块盘逐字节不变、分配器与抬 F 之前逐项相同。
++/// `StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor`（经 `MountError::NewerStateStillUnreadableAfterOneReread`，
++/// 与乙那一族同级），在动分配器与任何写之前——两块盘逐字节不变、分配器与抬 F 之前逐项相同。
+ /// 改之前「不按表滤」往下走，这一次抬照做。
+ #[test]
+ fn raising_the_floor_while_the_newest_roots_instance_table_stays_unreadable_is_refused_before_any_write(
+@@ -914,12 +928,15 @@ fn raising_the_floor_while_the_newest_roots_instance_table_stays_unreadable_is_r
+     );
+     assert!(
+         matches!(
+-            refused,
+-            Err(MountError::Recovery(
+-                RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
+-                    newest_root_on_the_reread: Some((InstanceGeneration(1), CheckpointTxg(6))),
+-                }
+-            ))
++            &refused,
++            Err(MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable))
++                if **still_unreadable
++                    == StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor {
++                        newest_root_on_the_reread: Some(RollbackTarget {
++                            instance: InstanceGeneration(1),
++                            checkpoint_txg: CheckpointTxg(6),
++                        }),
++                    }
+         ),
+         "{:?}",
+         refused.as_ref().err()
+@@ -948,44 +965,44 @@ fn the_newest_roots_instance_table_read_on_the_one_reread_lets_the_floor_be_rais
+     assert!(raised.is_ok(), "重读读得出，抬 F 做成：{:?}", raised.err());
+ }
+ 
+-/// 根环里一个从没写过的槽（最后一个区域的最后一槽）：抬 F 到 3 的那一串里它的每一次读都坏。重算影子账读根环时这一槽读不出、
+-/// 重读一次仍读不出 ⇒ 拒成 `RootRingSlotStillUnreadableAfterOneReread`，在动分配器与任何写之前。改之前当那一槽没有根、这一次抬照做。
++/// 根环里最新那条根住的槽：挂载（这里是 mkfs 同一个进程）之后这个进程写过、FUA 返回过，在这个进程的根环表里。抬 F 到 3 那一串读它：
++/// 第 1 次是算 F 生效值读根环，第 2 次是算上限读根环，都读得出；第 3 次是重算影子账与回收门槛读根环，读坏，重读（第 4 次）仍坏 ⇒
++/// 拒成 `StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot`（经 `MountError::NewerStateStillUnreadableAfterOneReread`），
++/// 在动分配器与任何写之前。改之前（A3b 之前）当那一槽没有根、这一次抬照做。
++/// 合入后验证一改了造法：原来坏的是从没写过的最后一槽，D16（发布语义） 已定项 1「根槽这一次读坏」那一行要它当没有根、不拒
++/// （[`raising_the_floor_while_a_root_ring_slot_never_written_stays_unreadable_counts_it_as_no_root`]）。
+ #[test]
+-fn raising_the_floor_while_a_root_ring_slot_stays_unreadable_is_refused_before_any_write() {
++fn raising_the_floor_while_a_root_ring_slot_known_to_hold_a_root_stays_unreadable_is_refused_before_any_write(
++) {
+     let mut pool = pool_after_three_overwrites();
+     let sizes = pool.parameters.geometry;
+-    let last_slot = *every_root_ring_slot(&sizes).last().expect("根环至少一槽");
+-    let slot_device =
+-        pool.parameters.region_devices[usize::try_from(last_slot.region).expect("区域号")];
+-    let slot_start = slot_offset(last_slot, sizes.fixed_structure_slot_spacing).0;
+-    let readable_before = readable_roots(
+-        &pool.devices,
+-        &pool.parameters.region_devices,
+-        &sizes,
+-        &pool.parameters.filesystem_identifier,
+-    );
++    let (newest_slot, _) = newest_root_in_the_ring(&pool.devices);
+     assert!(
+-        readable_before.len() < every_root_ring_slot(&sizes).len(),
+-        "根环还没转满一圈，最后一槽没写过"
++        ring_slots_known_to_hold_a_root_by(&pool.allocator).contains(&newest_slot),
++        "最新那条根住的槽在这个进程的根环表里"
+     );
++    let slot_device =
++        pool.parameters.region_devices[usize::try_from(newest_slot.region).expect("区域号")];
++    let slot_start = slot_offset(newest_slot, sizes.fixed_structure_slot_spacing).0;
+     let images_before = images_of(&pool.devices);
+     let allocator_before = format!("{:?}", pool.allocator);
+-    let every_read_number: Vec<u64> = (1..=64).collect();
+     let refused = raise_the_floor_to_three_through(
+         &mut pool,
+         vec![chosen_read_faults_of(
+             slot_device,
+             slot_start,
+             u64::from(sizes.physical_block_size),
+-            &every_read_number,
++            &[3, 4],
+         )],
+     );
+     assert!(
+         matches!(
+-            refused,
+-            Err(MountError::Recovery(
+-                RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread { ring_slot }
+-            )) if ring_slot == last_slot
++            &refused,
++            Err(MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable))
++                if **still_unreadable
++                    == StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot {
++                        ring_slot: newest_slot,
++                    }
+         ),
+         "{:?}",
+         refused.as_ref().err()
+@@ -998,11 +1015,66 @@ fn raising_the_floor_while_a_root_ring_slot_stays_unreadable_is_refused_before_a
+     );
+ }
+ 
+-/// 读根环逐槽重读那一段本身：一条根住的槽第一次读坏、重读读得出，交回的根里有它；每一次都坏，报那一槽。
++/// 同一槽只在重算影子账那一遍的第一次读坏（第 3 次），重读（第 4 次）读得出：照读出来的根算，这一次抬照做。
++#[test]
++fn a_root_ring_slot_known_to_hold_a_root_read_on_the_one_reread_lets_the_floor_be_raised() {
++    let mut pool = pool_after_three_overwrites();
++    let sizes = pool.parameters.geometry;
++    let (newest_slot, _) = newest_root_in_the_ring(&pool.devices);
++    let slot_device =
++        pool.parameters.region_devices[usize::try_from(newest_slot.region).expect("区域号")];
++    let slot_start = slot_offset(newest_slot, sizes.fixed_structure_slot_spacing).0;
++    let raised = raise_the_floor_to_three_through(
++        &mut pool,
++        vec![chosen_read_faults_of(
++            slot_device,
++            slot_start,
++            u64::from(sizes.physical_block_size),
++            &[3],
++        )],
++    );
++    assert!(raised.is_ok(), "重读读得出，抬 F 做成：{:?}", raised.err());
++}
++
++/// 根环里一个从没写过的槽（最后一个区域的最后一槽）：挂载那一刻就自证不过、这个进程之后也没写过，不在这个进程的根环表里。
++/// 抬 F 到 3 那一串里它的每一次读都坏：D16（发布语义） 已定项 1「根槽这一次读坏」那一行要它当没有根——不重读、不拒，这一次抬照做
++/// （善后一报告 P1；A3b 那一版对每个读不出的槽都重读、仍读不出就拒）。
++#[test]
++fn raising_the_floor_while_a_root_ring_slot_never_written_stays_unreadable_counts_it_as_no_root() {
++    let mut pool = pool_after_three_overwrites();
++    let sizes = pool.parameters.geometry;
++    let last_slot = *every_root_ring_slot(&sizes).last().expect("根环至少一槽");
++    assert!(
++        !ring_slots_known_to_hold_a_root_by(&pool.allocator).contains(&last_slot),
++        "最后一槽没写过，不在这个进程的根环表里"
++    );
++    let slot_device =
++        pool.parameters.region_devices[usize::try_from(last_slot.region).expect("区域号")];
++    let slot_start = slot_offset(last_slot, sizes.fixed_structure_slot_spacing).0;
++    let every_read_number: Vec<u64> = (1..=64).collect();
++    let raised = raise_the_floor_to_three_through(
++        &mut pool,
++        vec![chosen_read_faults_of(
++            slot_device,
++            slot_start,
++            u64::from(sizes.physical_block_size),
++            &every_read_number,
++        )],
++    );
++    assert!(
++        raised.is_ok(),
++        "从没写过的槽读不出当没有根，抬 F 做成：{:?}",
++        raised.err()
++    );
++}
++
++/// 读根环逐槽重读那一段本身：这个进程知道住着根的槽（最新那条根住的）第一次读坏、重读读得出，交回的根里有它；两次都坏，报那一槽；
++/// 不在这个进程根环表里的槽（从没写过的最后一槽）每一次都坏，当没有根、不报错，交回的根与没有读故障时相同。
+ #[test]
+ fn a_root_ring_slot_unreadable_once_is_read_on_the_reread_and_one_unreadable_twice_is_named() {
+     let pool = pool_after_three_overwrites();
+     let sizes = pool.parameters.geometry;
++    let known = ring_slots_known_to_hold_a_root_by(&pool.allocator);
+     let (newest_slot, newest) = newest_root_in_the_ring(&pool.devices);
+     let slot_device =
+         pool.parameters.region_devices[usize::try_from(newest_slot.region).expect("区域号")];
+@@ -1017,11 +1089,12 @@ fn a_root_ring_slot_unreadable_once_is_read_on_the_reread_and_one_unreadable_twi
+             &[1],
+         )],
+     );
+-    let roots = readable_roots_rereading_unreadable_root_ring_slots_once(
++    let roots = readable_roots_rereading_ring_slots_known_to_hold_a_root_once(
+         &read_once_badly,
+         &pool.parameters.region_devices,
+         &sizes,
+         &pool.parameters.filesystem_identifier,
++        &known,
+     )
+     .expect("重读读得出");
+     assert!(roots.contains(&newest), "重读那一遍认出了最新那条根");
+@@ -1035,16 +1108,46 @@ fn a_root_ring_slot_unreadable_once_is_read_on_the_reread_and_one_unreadable_twi
+         )],
+     );
+     assert_eq!(
+-        readable_roots_rereading_unreadable_root_ring_slots_once(
++        readable_roots_rereading_ring_slots_known_to_hold_a_root_once(
+             &read_twice_badly,
+             &pool.parameters.region_devices,
+             &sizes,
+             &pool.parameters.filesystem_identifier,
++            &known,
+         ),
+-        Err(RecoveryFailure::RootRingSlotStillUnreadableAfterOneReread {
+-            ring_slot: newest_slot
++        Err(RootRingSlotKnownToHoldARootStillUnreadableAfterOneReread {
++            ring_slot: newest_slot,
+         })
+     );
++    let last_slot = *every_root_ring_slot(&sizes).last().expect("根环至少一槽");
++    assert!(!known.contains(&last_slot), "最后一槽没写过");
++    let last_slot_device =
++        pool.parameters.region_devices[usize::try_from(last_slot.region).expect("区域号")];
++    let never_written_slot_always_bad = with_chosen_read_faults(
++        copy_of_the_devices(&pool.devices),
++        vec![chosen_read_faults_of(
++            last_slot_device,
++            slot_offset(last_slot, sizes.fixed_structure_slot_spacing).0,
++            slot_length,
++            &[1, 2, 3],
++        )],
++    );
++    assert_eq!(
++        readable_roots_rereading_ring_slots_known_to_hold_a_root_once(
++            &never_written_slot_always_bad,
++            &pool.parameters.region_devices,
++            &sizes,
++            &pool.parameters.filesystem_identifier,
++            &known,
++        ),
++        Ok(readable_roots(
++            &pool.devices,
++            &pool.parameters.region_devices,
++            &sizes,
++            &pool.parameters.filesystem_identifier,
++        )),
++        "不在根环表里的槽读不出当没有根"
++    );
+ }
+ 
+ /// 算生效 F 那一段本身：最新那条根的实例表第一遍两份都读坏、重读读得出，按表算出来的 F 与没有读故障时相同；两遍都坏报错。
+@@ -1080,14 +1183,195 @@ fn the_effective_floor_rereads_the_newest_roots_instance_table_once() {
+     );
+     assert_eq!(
+         floor_of(&both_reads_bad),
+-        Err(
+-            RecoveryFailure::InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
+-                newest_root_on_the_reread: Some((InstanceGeneration(1), CheckpointTxg(6))),
+-            }
+-        )
++        Err(InstanceTableOfTheNewestRootStillUnreadableAfterOneReread {
++            newest_root_on_the_reread: Some((InstanceGeneration(1), CheckpointTxg(6))),
++        })
++    );
++}
++
++/// 管理员回退 txg 5 那一版（实例 1）的结局，盘换回里面那几块。目标那条根住的槽在这个进程的根环表里。
++fn roll_back_to_txg_five_through(
++    pool: &mut PoolAfterTheFirstFile,
++    ranges_of_the_target_slot: impl Fn(DeviceIdentity, u64, u64) -> Vec<ChosenReadFaultsOfARange>,
++) -> Result<singlefs_core::mount::RolledBack, RollbackError> {
++    let sizes = pool.parameters.geometry;
++    let target = RollbackTarget {
++        instance: InstanceGeneration(1),
++        checkpoint_txg: CheckpointTxg(5),
++    };
++    let (target_slot, _) = readable_roots_with_ring_slots(
++        &pool.devices,
++        &pool.parameters.region_devices,
++        &sizes,
++        &pool.parameters.filesystem_identifier,
++    )
++    .into_iter()
++    .find(|(_, root)| {
++        root.instance == target.instance && root.checkpoint_txg == target.checkpoint_txg
++    })
++    .expect("txg 5 那条根在环里");
++    assert!(
++        ring_slots_known_to_hold_a_root_by(&pool.allocator).contains(&target_slot),
++        "目标住的槽在这个进程的根环表里"
++    );
++    let slot_device =
++        pool.parameters.region_devices[usize::try_from(target_slot.region).expect("区域号")];
++    let slot_start = slot_offset(target_slot, sizes.fixed_structure_slot_spacing).0;
++    let parameters = pool.parameters.clone();
++    let mut faulty = with_chosen_read_faults(
++        std::mem::take(&mut pool.devices),
++        ranges_of_the_target_slot(
++            slot_device,
++            slot_start,
++            u64::from(sizes.physical_block_size),
++        ),
++    );
++    let mut current = pool.first.clone();
++    let rolled_back = roll_back_by_a_forward_publish(
++        &parameters,
++        &mut faulty,
++        &mut pool.allocator,
++        &mut current,
++        target,
++    );
++    pool.devices = without_chosen_read_faults(faulty);
++    rolled_back
++}
++
++/// 管理员回退判候选（实审 A3b 报告 Q7，合入后验证一）：两处读根环都照 D16（发布语义） 已定项 1「根槽这一次读坏」那一行的读法。
++/// 目标那条根住的槽：判「根环里有它」那一遍读坏（第 1 次）、重读（第 2 次）仍坏；或那一遍读得出、算 F_生效 那一遍读坏（第 2 次）、
++/// 重读（第 3 次）仍坏 ⇒ 都拒成 `RollbackError::CandidateJudgementStillUnreadableAfterOneReread(RootRingSlotKnownToHoldARoot)`，
++/// 在任何写之前：两块盘逐字节不变、分配器不动。改之前第一格当那一槽没有根、报目标不在环里；第二格 F_生效 少算一条根、回退照做。
++/// 只在第一遍读坏（第 1 次）、重读读得出：回退照做。
++#[test]
++fn rolling_back_while_the_targets_root_ring_slot_stays_unreadable_is_refused_before_any_write() {
++    for (failing_read_numbers, what) in [
++        (&[1_u64, 2][..], "判根环里有它那一遍"),
++        (&[2, 3][..], "算 F_生效 那一遍"),
++    ] {
++        let mut pool = pool_after_three_overwrites();
++        let images_before = images_of(&pool.devices);
++        let allocator_before = format!("{:?}", pool.allocator);
++        let refused = roll_back_to_txg_five_through(&mut pool, |device, offset, length| {
++            vec![chosen_read_faults_of(
++                device,
++                offset,
++                length,
++                failing_read_numbers,
++            )]
++        });
++        assert!(
++            matches!(
++                &refused,
++                Err(RollbackError::CandidateJudgementStillUnreadableAfterOneReread(still_unreadable))
++                    if matches!(
++                        **still_unreadable,
++                        StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot { .. }
++                    )
++            ),
++            "{what}：{:?}",
++            refused.as_ref().err()
++        );
++        assert_eq!(
++            images_of(&pool.devices),
++            images_before,
++            "{what}：两块盘逐字节不变"
++        );
++        assert_eq!(
++            format!("{:?}", pool.allocator),
++            allocator_before,
++            "{what}：分配器不动"
++        );
++    }
++    let mut pool = pool_after_three_overwrites();
++    let rolled_back = roll_back_to_txg_five_through(&mut pool, |device, offset, length| {
++        vec![chosen_read_faults_of(device, offset, length, &[1])]
++    });
++    assert!(
++        rolled_back.is_ok(),
++        "重读读得出，回退做成：{:?}",
++        rolled_back.err()
+     );
+ }
+ 
++/// 系统配置槽里回退下界 F 那 8 字节的偏移（`SystemConfiguration::to_slot` 的写法，小端）。
++const ROLLBACK_FLOOR_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT: usize = 481;
++
++/// 写系统配置槽之前算 F 生效值（`transaction::PoolWriter`，实审 A3b 报告 Q7，合入后验证一）：读不出的根槽重读一次。
++/// 造法：抬 F 到 3（那一串的根带 F 3、落满两块盘），再把两块盘四槽系统配置里的 F 改回 0、重封——一份违反 I-7.12（系统配置 F 不低于
++/// 同盘根上的 F） 的改出来的镜像，只为让根上的 F 成为生效值里唯一带 3 的来源。之后取号：先读一遍根环算要取的号（带 F 3 的每条根住的槽
++/// 第 1 次读），再逐盘写一次系统配置槽、每一写之前算一遍生效值读一遍根环。点名那几个槽第 2、4 次读坏：两次都重读（第 3、5 次）读得出，
++/// 两块盘新写的那一槽都带 F 3。改之前（不重读）第一块盘那一写读不到带 F 3 的根，写成 0。
++#[test]
++fn a_system_configuration_write_rereads_an_unreadable_root_ring_slot_once_before_taking_the_effective_floor(
++) {
++    let mut pool = pool_after_three_overwrites();
++    raise_the_floor_to_three_through(&mut pool, Vec::new()).expect("抬 F 到 3");
++    let parameters = pool.parameters.clone();
++    rewrite_every_system_configuration_slot(&mut pool.devices, &parameters, |slot| {
++        slot[ROLLBACK_FLOOR_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT
++            ..ROLLBACK_FLOOR_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT + 8]
++            .copy_from_slice(&0_u64.to_le_bytes());
++    });
++    let sizes = parameters.geometry;
++    let slots_of_the_roots_carrying_three: Vec<RootRingSlot> = readable_roots_with_ring_slots(
++        &pool.devices,
++        &parameters.region_devices,
++        &sizes,
++        &parameters.filesystem_identifier,
++    )
++    .into_iter()
++    .filter(|(_, root)| root.rollback_floor == CheckpointTxg(3))
++    .map(|(ring_slot, _)| ring_slot)
++    .collect();
++    assert!(
++        slots_of_the_roots_carrying_three.len() >= 2,
++        "抬 F 那一串落满两块盘"
++    );
++    assert_eq!(
++        effective_rollback_floor_rereading_unreadable_reads_once(
++            &pool.devices,
++            &parameters.region_devices,
++            &sizes,
++            &parameters.filesystem_identifier,
++        ),
++        CheckpointTxg(3),
++        "没有读故障时生效值只从根上来"
++    );
++    let ranges = slots_of_the_roots_carrying_three
++        .iter()
++        .map(|ring_slot| {
++            chosen_read_faults_of(
++                parameters.region_devices[usize::try_from(ring_slot.region).expect("区域号")],
++                slot_offset(*ring_slot, sizes.fixed_structure_slot_spacing).0,
++                u64::from(sizes.physical_block_size),
++                &[2, 4],
++            )
++        })
++        .collect();
++    let mut faulty = with_chosen_read_faults(std::mem::take(&mut pool.devices), ranges);
++    let mut writer = PoolWriter::new(&parameters, faulty.as_mut_slice());
++    acquire_instance(&mut writer).expect("取号");
++    pool.devices = without_chosen_read_faults(faulty);
++    for device in [DeviceIdentity(0), DeviceIdentity(1)] {
++        let newest_written = verified_system_configuration_slots(
++            &pool.devices,
++            device,
++            u64::from(sizes.fixed_structure_slot_spacing),
++            &parameters.filesystem_identifier,
++        )
++        .into_iter()
++        .max_by_key(|system_configuration| system_configuration.quantities.slot_generation)
++        .expect("这块盘刚写过一槽");
++        assert_eq!(
++            newest_written.quantities.rollback_floor,
++            CheckpointTxg(3),
++            "盘 {} 取号写的那一槽带的 F",
++            device.0
++        );
++    }
++}
++
+ /// 一池内存盘的一份拷贝（盘宽与镜像都照抄）：读故障包在拷贝外面，原池不动。
+ fn copy_of_the_devices(devices: &[(DeviceIdentity, SparseBlockDevice)]) -> SparseDevices {
+     devices
+```

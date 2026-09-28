@@ -1,0 +1,13 @@
+[package]
+name = "r1-opus-crash-proto"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "unreadable-at-mount-r1 云端攻方腿的原型：几条自己造的小流按层 0 的枚举域展开，每个崩溃状态在候选副本上可写挂载。只在仓副本里，不入库"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-harness = { path = "../singlefs-harness" }

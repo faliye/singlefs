@@ -1,7 +1,7 @@
 # 实二六 交回：抬 F 那一串整串预演、Z15 两个测试缺口、分配记录树根层的绝对槽数收成一个函数
 
-实现员（implementation-writer），2026-09-25（时刻均为 UTC；JST = UTC + 9）。规格 `/tmp/claude-1000/impl-m2-e26/spec.md`（sha256 82f45c3c…0ae0c3，开工时核过）。
-改动直接写在主工作区 `crates/` 里（开工快照 `/tmp/claude-1000/impl-m2-e26/pristine/`，01:23Z 拷）。没有另开补丁，`git apply --check` 那一步没有对象：主工作区现状就是结果。
+实现员（implementation-writer），2026-09-25。规格 `/tmp/claude-1000/impl-m2-e26/spec.md`（sha256 82f45c3c…0ae0c3，开工时核过）。
+改动直接写在主工作区 `crates/` 里（开工快照 `/tmp/claude-1000/impl-m2-e26/pristine/`，开工时拷）。没有另开补丁，`git apply --check` 那一步没有对象：主工作区现状就是结果。
 开工到收工，`crates/` 里别的会话动过的只有 `e156_allocation_basis_counts.rs` 与 `crates/mutations.tsv` 末尾两行（E156 M33 / M34），我没碰。
 
 ## 一、三件各到哪
@@ -99,7 +99,7 @@ H 组第一版替换文编不过（未使用的闭包推不出错误类型，`lo
 
 **Q6 模型那一改。** `model.rs` 里抬 F 的答案改成「容量墙在第一次写之前整串判」（同可写挂载、回退）：实现今天就是这样，不改的话模型会接受「半路落了盘再拒」。随机历史二进制与门禁 74 号在改后都绿；A 组变异下 `unit_area_wall_sampling…` 那条因此多红一条（第四节）。故障注入、崩溃注入两个二进制也用这个模型与执行器，我没跑（第八节）。
 
-## 五、交回前的验证（末尾原样输出；脚本 `scripts/run-touched-final.sh`，日志 `logs/touched-final/`，线程上限 8，02:5x UTC 起跑）
+## 五、交回前的验证（末尾原样输出；脚本 `scripts/run-touched-final.sh`，日志 `logs/touched-final/`，线程上限 8 起跑）
 
 动到的测试二进制各整跑一次（名字含 layer0 的没有动到）：
 
@@ -125,8 +125,8 @@ error: test failed, to rerun pass `-p singlefs-harness --bin first_transaction_o
 
 `cargo fmt --check`（退出 1，差异只在别的会话的两个文件）：
 ```
-     10 Diff in /home/fy5090/code/singlefs/crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs
-      8 Diff in /home/fy5090/code/singlefs/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs
+     10 Diff in crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs
+      8 Diff in crates/singlefs-harness/src/bin/e158_root_choice_repair.rs
 ```
 check.sh 那一套 lint 下的 `cargo clippy --all-targets --all-features`（再用 `--keep-going` 跑一遍，确认只有这一处）：
 ```

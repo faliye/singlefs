@@ -831,6 +831,8 @@ where
                 | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration {
                     ..
                 }
+                // 有盘落后于现行那一版又缺它的单元：挂着之后的入口在任何写之前拒，这个二进制不换盘，走不到。
+                | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
                 // 盘上的实例代号或 txg 到顶：取号之前拒，一个写都没发。
                 | MountError::SequenceNumberPastTheTopOfItsRange(_)
                 // 写行与暖机之后推的抬 F 报错（实审 A1b Q5，账在错里）：这个二进制每次都在新建的池上挂，取号之前的准入不会不够、走不到推抬 F；
@@ -1246,6 +1248,8 @@ fn raise_the_rollback_floor_and_describe<Inner: BlockDevice>(
                 | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration {
                     ..
                 }
+                // 有盘落后于现行那一版又缺它的单元：挂着之后的入口在任何写之前拒，这个二进制不换盘，走不到。
+                | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
                 // 现行那一版 txg 到顶：算这一串的 txg 时拒，一个写都没发；可写挂载那一处的抬 F 报错成员抬 F 自己报不出来。
                 | MountError::SequenceNumberPastTheTopOfItsRange(_)
                 | MountError::FloorRaiseFailedAfterTheMountsPublishes(_)
@@ -2772,6 +2776,11 @@ mod tests {
         let operations = stream.retained_operations();
         let new_operations = &operations[operations_before_the_fourth_version..];
         let counts_after_the_raise = device_call_counts(&raised.devices, &raised.plan);
+        // C577 之后发布 D 以一道池屏障收尾，抬 F 那一串开的新写入口开头又一道，两道之间没有写：录制器
+        // （`SharedStream::push` 的末尾一串屏障去重）把后一道并掉，设备照收两次 FLUSH，所以每块盘设备一层比录制流投出的多 1。
+        // 录制器并掉相邻屏障、设备收两次，归第五步 55 号六档重录时定（合入后验证一报告第八节；主 agent 定不改装置、不改判据，照今天的数改钉）。
+        // 盘 0 的 12 / 13 是合入后验证一那一次跑出来的；盘 1 同一个机制推的，没跑（singlefs-checker-tier 是 checker 档，归提交时的 crash-verifier）。
+        let flushes_the_recorder_merged_into_the_barrier_that_closed_publish_d: u64 = 1;
         for (index, identity) in [DeviceIdentity(0), DeviceIdentity(1)]
             .into_iter()
             .enumerate()
@@ -2799,9 +2808,10 @@ mod tests {
                 identity.0
             );
             assert_eq!(
-                u64::try_from(projected_flushes).expect("件数"),
+                u64::try_from(projected_flushes).expect("件数")
+                    + flushes_the_recorder_merged_into_the_barrier_that_closed_publish_d,
                 counted.barrier_calls + counted.force_unit_access_writes,
-                "发布 D 与抬 F 两段盘 {}：录制流投出的 FLUSH 与设备一层转发的屏障 + FUA 写",
+                "发布 D 与抬 F 两段盘 {}：录制流投出的 FLUSH 加录制器并掉的那一道，与设备一层转发的屏障 + FUA 写",
                 identity.0
             );
         }
@@ -3017,7 +3027,8 @@ mod tests {
     /// 宿主检查（`new_pool_file_creation_device_log_check`）拿录制流投到每块盘上的事件当「程序的信念」：每个写一件、FUA 写之后一个 FLUSH、
     /// 每道池屏障在每块盘上各一个 FLUSH（录制器把连续几道并成一道）。这个投法在发布 B、可写挂载、发布 C 三段上是否就是设备收到的，
     /// 拿录制器外面那一层（注入包装，与录制器不共享计数）数到的核：每块盘、每段，写的件数相等，FLUSH 件数 = 转发的屏障 + FUA 写。
-    /// 录制器并掉的屏障若在设备上是两次，这里先红，虚机档的逐项比对不会冤判。
+    /// 录制器并掉的屏障若在设备上是两次，这里先红，虚机档的逐项比对不会冤判。C577 之后重开那一段开头就有这样一道（段里写明的
+    /// `flushes_the_recorder_merged`，照今天的数钉），怎么收归第五步 55 号六档重录时定。
     #[test]
     fn the_recorded_stream_projects_onto_each_device_the_writes_and_flushes_the_device_layer_counted(
     ) {
@@ -3055,15 +3066,22 @@ mod tests {
             Err(failed) => panic!("第二个实例：{failed:?}"),
         };
         let operations = stream.retained_operations();
+        // 每一段里录制器并掉、设备照收的屏障数（每块盘）：C577 之后发布 B 以一道池屏障收尾，重开之后取号那个新写入口开头又一道，
+        // 两道之间没有写，录制器（`SharedStream::push` 的末尾一串屏障去重）把后一道并进上一段，设备在这一段照收一次 FLUSH。
+        // 录制器并掉相邻屏障、设备收两次，归第五步 55 号六档重录时定（合入后验证一报告第八节；主 agent 定不改装置、不改判据，照今天的数改钉）。
+        // 发布 B 那一段是 0（合入后验证一那一次两块盘都过了）；重开那一段盘 0 的 16 / 17 是那一次跑出来的，盘 1 同一个机制推的，没跑
+        // （singlefs-checker-tier 是 checker 档，归提交时的 crash-verifier）。
         let windows = [
             (
                 "file_overwrite",
                 &operations[operations_after_the_new_pool_file_creation
                     ..operations_after_the_file_overwrite],
+                0_u64,
             ),
             (
                 "reopen_and_writable_mount_and_third_transaction",
                 &operations[operations_after_the_file_overwrite..],
+                1,
             ),
         ];
         for (index, identity) in [DeviceIdentity(0), DeviceIdentity(1)]
@@ -3079,7 +3097,7 @@ mod tests {
                     .plan()
                     .counts_of_device(identity),
             );
-            for ((window, slice), counted) in windows
+            for ((window, slice, flushes_the_recorder_merged), counted) in windows
                 .iter()
                 .zip([file_overwrite_counted, after_reopen_counted])
             {
@@ -3100,9 +3118,9 @@ mod tests {
                     identity.0
                 );
                 assert_eq!(
-                    u64::try_from(projected_flushes).expect("件数"),
+                    u64::try_from(projected_flushes).expect("件数") + flushes_the_recorder_merged,
                     counted.barrier_calls + counted.force_unit_access_writes,
-                    "{window} 盘 {}：录制流投出的 FLUSH 与设备一层转发的屏障 + FUA 写",
+                    "{window} 盘 {}：录制流投出的 FLUSH 加录制器并掉的那几道，与设备一层转发的屏障 + FUA 写",
                     identity.0
                 );
             }

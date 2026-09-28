@@ -1,6 +1,6 @@
 # 实审 A3c 实现员报告：取号时读不出见证槽就拒；`transaction.rs` 与 `inode_tree.rs` 剩下的 panic 面
 
-写于 2026-09-27（JST）。规格 `/tmp/claude-1000/impl-rev-a3c/spec.md`。底座：主工作区现状（开工时 rsync 成 `orig/`，改在 `work/`）。补丁目录 `/tmp/claude-1000/impl-rev-a3c/patch/`。
+写于 2026-09-27。规格 `/tmp/claude-1000/impl-rev-a3c/spec.md`。底座：主工作区现状（开工时 rsync 成 `orig/`，改在 `work/`）。补丁目录 `/tmp/claude-1000/impl-rev-a3c/patch/`。
 
 ## 一、结论
 
@@ -62,7 +62,7 @@
 
 ### Q-B `history.rs` 要跟着改（在别的会话单里，没进补丁）
 
-`publish_without_units` 改交 `PublishError` 之后，`crates/singlefs-harness/src/history.rs` 的 `apply_publish_without_units`（开工副本第 2941–2951 行附近；主工作区 15:0x 之后已被别的会话改过，今天在第 2970、2977 行）编不过。改法原文（副本里就是这样改的，编得过、clippy 过）：
+`publish_without_units` 改交 `PublishError` 之后，`crates/singlefs-harness/src/history.rs` 的 `apply_publish_without_units`（开工副本第 2941–2951 行附近；主工作区之后已被别的会话改过，今天在第 2970、2977 行）编不过。改法原文（副本里就是这样改的，编得过、clippy 过）：
 
 ```rust
             let member = format!("publish_without_units({})", publish_error_member(&error));
@@ -199,7 +199,7 @@ exit 101
 
 ## 七、补丁与打法
 
-`patch/` 里：`crates.patch`（清单内 4 份）、`outside-the-list.patch`（清单外 3 份测试，`apply-writer-patch.py` 不认这个文件名，要主 agent 另外 `git apply`）、`mutations-append.tsv`（7 行）、`mutations-replacements.tsv`（2 行）、`report.md`（这份的拷贝）。对主工作区现状（15:0x 之后打上了 checker 那一半，`crates/mutations.tsv` 1300 行）核过：
+`patch/` 里：`crates.patch`（清单内 4 份）、`outside-the-list.patch`（清单外 3 份测试，`apply-writer-patch.py` 不认这个文件名，要主 agent 另外 `git apply`）、`mutations-append.tsv`（7 行）、`mutations-replacements.tsv`（2 行）、`report.md`（这份的拷贝）。对主工作区现状（之后打上了 checker 那一半，`crates/mutations.tsv` 1300 行）核过：
 ```
 git apply --check crates.patch：过
 git apply --check outside-the-list.patch：过

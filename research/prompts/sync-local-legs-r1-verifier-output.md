@@ -30,11 +30,11 @@ bca324040083bb273423cb266ce9eafd816111a1e69f188067b07ce5dcf01f79  research/promp
 `research/prompts/sync-local-legs-r1-snapshot/defs-sha256.txt` 列 10 个文件，主 agent 已现查 `sha256sum -c` 全 OK；
 本报告对这 10 个文件的引用按快照核，其余被引文件（`research/scripts/agent-watch.py`、`.claude/settings.json`、
 `.claude/hooks/agent-write-scope.tsv`、`.claude/hooks/runner-dispatch-guard.sh`、`.claude/hooks/handback-guard.sh`）
-不在快照清单里；核过这 5 个文件在腿开工时刻（2026-09-27T01:17:07Z）之后没有改动：
+不在快照清单里；核过这 5 个文件在腿开工时刻（2026-09-27）之后没有改动：
 
 ```
 $ git log -1 --format="%cI" -- research/scripts/agent-watch.py .claude/settings.json .claude/hooks/agent-write-scope.tsv .claude/hooks/runner-dispatch-guard.sh .claude/hooks/handback-guard.sh
-（逐个查，最晚一次提交 2026-09-27T00:32:09+00:00，早于腿开工 01:17:07Z）
+（逐个查，最晚一次提交 2026-09-27，早于腿开工）
 $ git status --porcelain -- 同 5 个文件
 （空，无未提交改动）
 ```

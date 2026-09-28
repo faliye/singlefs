@@ -787,7 +787,37 @@ fn command_merge(arguments: &[String]) {
     }
 }
 
+/// 开跑前判准入与运行条件（`.claude/singlefs-ai-sop/rules/preflight-discipline.md`「开头先判」Rust 那一行）。
+/// `run-shard` 要在另一台上跑（那边只有这个二进制，没有源文件与规范副本），不判；别的子命令都在本机、先判。
+fn preflight() {
+    let arguments: Vec<String> = env::args().skip(1).collect();
+    if arguments.first().is_some_and(|subcommand| subcommand == "run-shard") {
+        return;
+    }
+    let manifest_directory = env!("CARGO_MANIFEST_DIR");
+    let source = format!("{manifest_directory}/src/bin/e163_gpu_multicard_crc32c.rs");
+    let script = format!("{manifest_directory}/../../.claude/singlefs-ai-sop/scripts/preflight.py");
+    let mut command = std::process::Command::new("python3");
+    command.arg(&script).arg("check").arg(&source);
+    if arguments.iter().any(|argument| argument == "--force") {
+        command.arg("--force");
+    }
+    command.arg("--");
+    command.args(arguments.iter().filter(|argument| *argument != "--force"));
+    let output = command.output().unwrap_or_else(|error| {
+        eprintln!("  ✗ 起不了 python3 判准入：{error}");
+        eprintln!("  → 怎么办：装上 python3，或在有 python3 的机器上跑");
+        std::process::exit(78)
+    });
+    if !output.status.success() {
+        eprint!("{}", String::from_utf8_lossy(&output.stderr));
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+        std::process::exit(output.status.code().unwrap_or(1));
+    }
+}
+
 fn main() {
+    preflight();
     let arguments: Vec<String> = env::args().collect();
     let subcommand = arguments.get(1).map(String::as_str).unwrap_or("");
     let rest = &arguments[1.min(arguments.len())..];

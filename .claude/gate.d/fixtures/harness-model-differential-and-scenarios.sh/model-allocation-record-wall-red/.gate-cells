@@ -1,0 +1,2 @@
+# 录好的输出是 RUST_TEST_THREADS=1 时的排法：段标题跟在「test <名字> ... 」后面
+model-allocation-record-wall

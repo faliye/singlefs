@@ -1,6 +1,6 @@
 # E159 跑前登记：fsync等待时间随并发数：组提交与WAL臂
 
-写于 2026-09-24 09:34 JST，装置写之前。
+写于 2026-09-24，装置写之前。
 
 两条都留、各判各的（主 agent 2026-09-24 定）
 
@@ -705,7 +705,7 @@ J1、J2a、J4 在下面每个反向取样点上重判。每次只翻一个旋钮
 $ bash research/scripts/claim-experiment.sh --next
 E159
 $ bash research/scripts/claim-experiment.sh E159 'fsync等待时间随并发数：组提交与WAL臂'
-  ✓ 占住 E159：/home/fy5090/code/singlefs/research/prompts/e159-preregistration.md
+  ✓ 占住 E159：research/prompts/e159-preregistration.md
 ```
 
 本机口径（第一节）：

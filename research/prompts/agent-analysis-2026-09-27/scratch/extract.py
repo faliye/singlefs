@@ -1,5 +1,5 @@
 import json,collections,re,datetime,os
-p='/home/fy5090/.claude/projects/-home-fy5090-code-singlefs/d16a74c5-453c-44d5-8a19-7e71d116de72.jsonl'
+p='~/.claude/projects/-home-fy5090-code-singlefs/d16a74c5-453c-44d5-8a19-7e71d116de72.jsonl'
 out='/tmp/claude-1000/agent-analysis/scratch/'
 os.makedirs(out+'prompts',exist_ok=True)
 seen=set()

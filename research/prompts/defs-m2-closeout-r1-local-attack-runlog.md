@@ -1,4 +1,4 @@
-# 运行记录：defs-m2-closeout-r1-local-attack（2026-09-26 UTC）
+# 运行记录：defs-m2-closeout-r1-local-attack（2026-09-26）
 
 提示文件：`research/prompts/defs-m2-closeout-r1-local-attack.md`（英文，D2 攻击面：
 按事实表把 `agent-common.md`「执行前拒绝的写法」列的每一种写法与探针日志逐格核对，

@@ -1,4 +1,4 @@
-# 附录二：HEAD 之后打进主工作区的四份补丁，代码轮第一轮 diff（`git diff HEAD -- crates/` 到冻结副本；生成于 2026-09-25 01:38 JST / 2026-09-24 16:38 UTC）
+# 附录二：HEAD 之后打进主工作区的四份补丁，代码轮第一轮 diff（`git diff HEAD -- crates/` 到冻结副本；生成于 2026-09-25）
 
 基准：HEAD `e980a219f1834c638cd2fae18b25a60525a6bd52`。冻结副本：`/tmp/claude-1000/m2-final-code-r1/tree/crates/`（腿读代码一律读这份副本，不读主工作区——主工作区在腿跑着的时候还会被别的实现员改）。
 

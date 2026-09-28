@@ -41,7 +41,7 @@ THREADS = ["--machine-cores", "32", "--threads", "32", "--threads-origin", "defa
 judge_code, judge_out, _ = pc.run([sys.executable, pc.ADMISSION, "crash-case-judge", work, "crash-case:own", os.path.join(work, "log"),
                                    os.path.join(work, "judged"), *THREADS])
 record_code, marker_path, _ = pc.run([sys.executable, pc.ADMISSION, "crash-case-record", work, "crash-case:own", fingerprint, manifest,
-                                      os.path.join(work, "judged"), "--files", "4", "--excluded", "0", "--started", "2026-09-27T00:00:00Z",
+                                      os.path.join(work, "judged"), "--files", "4", "--excluded", "0", "--started", "2026-09-27T00:00:00Z",  # clock-times:allow 传给被测脚本的开跑时间戳参数
                                       "--judged-root", work, *THREADS])
 marker_lines = open(marker_path.strip(), encoding="utf-8").read().split("\n") if record_code == 0 else []
 thread_lines = [line for line in marker_lines if line.startswith(("configured_worker_threads=", "started_worker_threads=", "CRASH_INJECTION_FINISHED"))]

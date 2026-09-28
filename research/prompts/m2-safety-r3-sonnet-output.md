@@ -69,7 +69,7 @@ B = 4 + 2 k_tol，k_tol = 2）；写行那次发布之前不推（同一行的�
 带不带 C283，共 3 × 2 × 4 × 2 = 48 条组合，跑一次 13–22 秒（三次独立跑逐字节相同，见第八节）。
 
 **产物**：`research/prompts/m2-safety-r3-sonnet-model/rerun-output.log`（48 条组合全量原始输出）；
-`rerun.sh` 拿本仓 `crates/` 打补丁、编译、跑，我在 `/home/fy5090/code/singlefs` 上原样跑过一次
+`rerun.sh` 拿本仓 `crates/` 打补丁、编译、跑，我在 `<仓根>` 上原样跑过一次
 （不碰工作区、只拷到 `/tmp` 打补丁），产物与我自己在冻结副本拷贝上跑的逐字节相同（`diff -q` 确认过）。
 
 **结果表**（`admitted` = 会话里放行了几次覆盖写；`remount` 空白 = 不适用，因为 remount 本身没做成；

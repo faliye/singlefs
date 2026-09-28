@@ -1,0 +1,14 @@
+    Finished `release` profile [optimized] target(s) in 0.21s
+     Running tests/random_histories.rs (target/release/deps/random_histories-0000000000000000)
+
+running 1 test
+test allocation_record_sampling_with_the_checker_goes_past_the_812_records_of_the_former_one_node_wall ... ── 随机历史：越过原分配记录墙的取样点 ──
+种子 [0, 32)，每段 150 步，比重：往原分配记录墙走；每一步之后跑池级 checker；两块 4 GiB 的盘
+历史 32 段：跑完 32、以已知红收尾 {}、新发现 0；根环转过一圈的 30 段；最高 txg 140
+  checker 跑了 4001 次；一个写都没发、沿用上一次结论的 799 步；已知红第 0 条那一形只记不停 0 步（0 段历史）
+  模型对拍 0 步：该拒而拒 0、区间里拒 0、该成而成 0；比过根 0 条、分配记录 0 条、冷启动内容 0 次、抬 F 上限 0 次；回退到 txg = F_生效 > 0 的根做成 0 次；单元区墙按区间放行 0 次
+用时 21.7 秒
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 25 filtered out; finished in 21.70s
+

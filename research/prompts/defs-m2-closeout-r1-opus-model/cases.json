@@ -131,7 +131,7 @@
  {
   "id": "H9",
   "hook": "heavy",
-  "command": "bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh /home/fy5090/code/singlefs/.claude/gate.d",
+  "command": "bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh .claude/gate.d",
   "agent": "implementation-writer"
  },
  {

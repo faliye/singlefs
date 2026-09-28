@@ -466,7 +466,7 @@ fn image_of_the_devices(
 /// 可写挂载那一处（C363 (b) 判决第四节第 2 条接进来；D16（发布语义） 已定项 1「准入」那一行定了不够时怎么办，用户 2026-09-26 定）：
 /// 两块单元区 256 槽的小盘，第一个文件之后可写挂载、覆盖写 12 次的盘面上再可写挂载——取号之前按这次挂载的 rows0 算
 /// （D28（挂载期承诺量） 已定项 3），扣掉实例切换预留、checkpoint 保留池（已定项 4，按最坏情况计，用户 2026-09-27 定）与已分配之后，
-/// 两块盘的可用(d) 都是 −47 槽 < 0：
+/// 两块盘的可用(d) 都是 −39 槽 < 0（A3b 把小盘改成 6 MiB 环、单元区从 1408 起之前是 −47 槽）：
 /// 实例切换的预留拿不到。写行那次发布照走切换预留、写完行与暖机之后推抬 F 的空发布、再判：这里推一串（F 抬到上限 14，3 次空发布），
 /// 再判就够了，挂载做成（取号 3），交回 `MountSpaceAdmission::AdmittedAfterTheFloorRaises`，带着取号之前那一判的拒绝原样。
 /// 推的那一串的根都带新 F = 14、接在暖机后面，现行那一版就是最后一次；挂载之后的镜像池级 checker 0 违例；按可写挂载的读数再判，每块盘可用 ≥ 0。
@@ -503,12 +503,12 @@ fn writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_th
                 .into_iter()
                 .map(|device| DeviceShortOfDemand {
                     device,
-                    available: AvailableBytesOnOneDevice(-47 * i128::from(SLOT_BYTES)),
+                    available: AvailableBytesOnOneDevice(-39 * i128::from(SLOT_BYTES)),
                     demand: BytesOnOneDevice::ZERO,
                 })
                 .collect(),
         },
-        "取号之前两块盘都短：可用 −47 槽，挂载这一刻不另要需求"
+        "取号之前两块盘都短：可用 −39 槽，挂载这一刻不另要需求"
     );
     assert_eq!(floor_raises.len(), 1, "推一串就够");
     let raised = &floor_raises[0];
@@ -577,22 +577,24 @@ fn writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_th
     );
 }
 
-/// 发布路径那一处（C363 (b) 判决第四节第 2 条）：两块单元区 240 槽的小盘，第一个文件之后可写挂载、覆盖写 5 次的盘面上，进程重开、
-/// 可写挂载（取号之前就够），在这次挂载里直接调发布路径再覆盖写一次：需求 = 这次发布新写的全部槽（D28（挂载期承诺量） 已定项 1 接线，
+/// 发布路径那一处（C363 (b) 判决第四节第 2 条）：两块单元区 256 槽的小盘，第一个文件之后可写挂载、覆盖写 4 次的盘面上，进程重开、
+/// 可写挂载（取号之前就够），在这次挂载里直接调发布路径接连覆盖写三次（都放行），第四次：需求 = 这次发布新写的全部槽（D28（挂载期承诺量） 已定项 1 接线，
 /// 普通分配加固定点、不加换下的，用户 2026-09-25 定），每块盘 14 槽（普通分配 6、固定点 8），而两块盘的可用(d) 都只剩 11 槽
 /// （实例切换的预留按下一次挂载的 rows0，已定项 3；checkpoint 保留池与 c_max 按最坏情况计，已定项 4，用户 2026-09-27 定）——
 /// 在读盘核与动分配器之前返回 `PublishError::SpaceAdmissionRefused`：录制流一步没多、两块盘逐字节不变、`DiskSnapshot` 不变、
 /// 分配器与发布之前逐项相同。这一格只有把固定点算进需求才拒：普通分配只有 6 槽 ≤ 11。需求那 14 槽从同一次覆盖写真发出去的角色现数
 /// （关掉准入的那一次），不从读数反推。直接调发布路径不推抬 F（那是挂着的会话的事，`mounted_session`）。
 /// 覆盖写 9 次那一份盘面（按树高、按每块盘一条叶路径计时这一格用它）在按最坏情况计之下挂载那一刻就要推抬 F、推完可用 44 槽，
-/// 分不出「普通分配装得下、固定点装不下」，换成 5 次。
+/// 分不出「普通分配装得下、固定点装不下」，换成 5 次；A3b 把小盘改成 6 MiB 环、单元区从 1408 起之后（分配记录树按绝对槽号按位置寻址，
+/// 每次发布重写的节点跟着变），240 槽 5 次那一格第一次直接覆盖写就放行了。草稿探针在三档、覆盖写 1–12 次、挂载之后接连直接覆盖写
+/// 1–4 次上扫：可用落在 [普通分配 6, 需求) 之间的只有 256 槽、覆盖写 4 次、第 4 次直接覆盖写那一格，取它。
 /// 判别力：同一次挂载里把只供测试的开关装成关掉准入，同一次覆盖写做成——拒的是式子，不是落点。
 #[test]
 fn an_overwrite_whose_new_slots_exceed_the_available_bytes_is_refused_by_the_space_admission_before_any_write(
 ) {
-    let device_width = HistoryDeviceWidth::UnitAreaOf240Slots;
-    let image = small_pool_image_after_overwrites(device_width, 5);
-    let content = content_of(DIRECT_OVERWRITE_CONTENT_BYTES, 1);
+    let device_width = HistoryDeviceWidth::UnitAreaOf256Slots;
+    let image = small_pool_image_after_overwrites(device_width, 4);
+    let content = content_of(DIRECT_OVERWRITE_CONTENT_BYTES, 4);
     let publish_parameters = device_width.parameters();
 
     let stream = SharedStream::new();
@@ -615,9 +617,25 @@ fn an_overwrite_whose_new_slots_exceed_the_available_bytes_is_refused_by_the_spa
         "取号之前就够，一次都没推：{:?}",
         mount_output.space_admission
     );
-    let current = current
+    let mut current = current
         .into_file_version()
         .expect("可写挂载之后现行那一版带文件");
+    for seed in 1..=3 {
+        let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
+        current = publish_overwrite(
+            &mut writer,
+            &mut allocator,
+            &current,
+            FirstFile {
+                content: &content_of(DIRECT_OVERWRITE_CONTENT_BYTES, seed),
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS
+                    + 600
+                    + u64::try_from(seed).expect("小"),
+            },
+            mount_output.instance,
+        )
+        .unwrap_or_else(|refusal| panic!("挂载之后第 {seed} 次直接覆盖写放行：{refusal:?}"));
+    }
     let image_after_the_mount = image_of_the_devices(&devices, image.device_size_in_bytes);
     let before = disk_snapshot(&image_after_the_mount, &stream);
     let allocator_before_the_publish = format!("{allocator:?}");
@@ -629,7 +647,7 @@ fn an_overwrite_whose_new_slots_exceed_the_available_bytes_is_refused_by_the_spa
             &current,
             FirstFile {
                 content: &content,
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 600,
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 604,
             },
             mount_output.instance,
         )
@@ -654,7 +672,7 @@ fn an_overwrite_whose_new_slots_exceed_the_available_bytes_is_refused_by_the_spa
             &current,
             FirstFile {
                 content: &content,
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 600,
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 604,
             },
             mount_output.instance,
         )

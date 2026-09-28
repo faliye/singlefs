@@ -256,7 +256,9 @@ impl<Device: DeviceOverASparseImage> PoolUnderTest<Device> {
             Err(
                 UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount { .. }
                 | UserChangeRefused::NoFileVersionToChange
-                | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. },
+                | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. }
+                | UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable { .. }
+                | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. },
             ) => {}
         }
         outcome

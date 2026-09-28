@@ -1,4 +1,4 @@
-# 背景材料：`m2-wave3-code-r1`（材料员拼装，2026-09-24 00:45 UTC / 09:45 JST）
+# 背景材料：`m2-wave3-code-r1`（材料员拼装，2026-09-24 /）
 
 顺序固定：正文 → 小节清单 → 附录。三份原文分别是 `_m2-wave3-code-r1-body.md`、`_m2-wave3-code-r1-checklist.md`、`_m2-wave3-code-r1-appendix.md`，这里原样拼接、排他新建，不改一个字。代码轮的附录二（四份补丁与 C511/C512 那一组的现状代码）另在 `_m2-wave3-code-r1-diff.md`，不并进这一份——各条腿按正文里给的路径自己去读。
 
@@ -36,7 +36,7 @@
 ## 二、实现今天的样子（主 agent 的观测，2026-09-24 现查）
 
 - 四份补丁碰到的 `crates/` 文件（按 `+++ b/` 行并起来）：`crates/singlefs-core/src/` 的 `transaction.rs`、`mount.rs`、`recovery.rs`、`mounted_read.rs`，C512 那一份另有 `root_record.rs`、`make_filesystem.rs`；`crates/singlefs-checker/src/` 的 `walk.rs`、`image.rs`；`crates/singlefs-harness/src/` 的 `crash.rs`、`bad_disk_input.rs`、`fault_injection.rs`、`history.rs`、`model.rs`、`model_comparison.rs`；以及十几份 `tests/`。全集以四份报告「写过的文件」一节为准，材料员照那四节列全。
-- 门禁 56 号 2026-09-24 00:20 UTC 现跑：只报 `crates/singlefs-core/src/root_record.rs` 与 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs` 两个文件没被任何新判决点名；别的文件被 09-22、09-23 的判决按路径点名过，**但那些判决判的不是这四份补丁**。`e158_root_choice_repair.rs` 是实验装置、实验执行员正在改，不进这一轮。
+- 门禁 56 号 2026-09-24 现跑：只报 `crates/singlefs-core/src/root_record.rs` 与 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs` 两个文件没被任何新判决点名；别的文件被 09-22、09-23 的判决按路径点名过，**但那些判决判的不是这四份补丁**。`e158_root_choice_repair.rs` 是实验装置、实验执行员正在改，不进这一轮。
 - 树 ID 水位：`recovery.rs` 的 `highest_tree_identifier_watermark_in_the_ring`、`mount.rs` 的 `tree_identifier_watermark_of_the_ring` 取根环里全部自证过的根（被抛弃时间线上的也算）∪ 环里全部自证通过的记录新根段 ∪ 要接在后面的那一版的 max；`publish_first_file` 看树表条数，不再看「水位 = 11」；八棵树从水位起按格式常量 11..18 的次序连号发（`transaction.rs` 的 `FileVersionTreeIdentifiers`）。
 - checker：`walk.rs` 的 `versions_applied_only_by_records` 四条同时成立才并进一版（checker 报告第五节那张表）；`judge_allocation_generations_against_unit_births`（I-3.10）只读回退候选集里的分配记录树；中央映射树根按根指针的出生树判 I-1.3（`walk_tree_table_and_central_mapping_root`）。
 - ⚠️ 行号一律现查：同一时刻有八个实现员在各自副本里改 `crates/`，主工作区在腿跑着的时候不动（开工快照 `research/prompts/m2-wave3-code-r1-snapshot/`）。判用的是**函数名与它做的那件事**。
@@ -98,7 +98,7 @@ C481 基线按档抽、加「树表 0 条」一档；C378 认了（取号之后�
 
 ---
 
-# 小节清单：`m2-wave3-code-r1`（材料员生成，2026-09-24 00:40 UTC / 09:40 JST）
+# 小节清单：`m2-wave3-code-r1`（材料员生成，2026-09-24 /）
 
 `python3 research/scripts/kb-sections.py` 全量生成，未再过滤（10 份文件：正文里提到的 8 份 kb / 决策 / 里程碑文件 + 正文点名的判决文件 + 材料员现查加的 `.claude/rules/fs-design.md`，理由见下）。
 

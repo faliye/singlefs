@@ -1,6 +1,6 @@
 # m2-safety-r2 云端攻方腿（Opus）输出：S4 的 A1–A4
 
-2026-09-25 19:50 JST（10:50 UTC）。攻击面：正文第五节分工表「云端攻方」那一行。前几轮判决：`research/prompts/m2-safety-r1-main-verification.md` S4 那一节。
+2026-09-25。攻击面：正文第五节分工表「云端攻方」那一行。前几轮判决：`research/prompts/m2-safety-r1-main-verification.md` S4 那一节。
 
 ## 复跑
 

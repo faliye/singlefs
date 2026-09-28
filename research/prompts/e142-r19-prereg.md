@@ -1,6 +1,6 @@
 # E142 重跑登记（第 19 次）：录制器按设备记屏障、原地覆写补第三态之后，第一个事务录制流的段序列与两态 / 三态闭式；第十八次那几个判决字段还成不成立；与第十八次逐行比各因哪一批改动
 
-写于 2026-09-27 11:00 JST 起（本机 UTC 2026-09-27 02:00 起），装置改之前、这一次的任何产物之前。判据、门槛、作废与停机条款在这里写死；跑出数之后要改，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」三步走，不在这里回改。
+写于 2026-09-27 起，装置改之前、这一次的任何产物之前。判据、门槛、作废与停机条款在这里写死；跑出数之后要改，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」三步走，不在这里回改。
 
 **文件名取 `r19`**：`research/prompts/e142-r18-prereg.md` 是第 18 次跑的登记，这一次是第 19 次。不占号。
 
@@ -34,7 +34,7 @@
 2. 执行员逐件核（命令与原样输出进报告）：`test -f <报告>`；`grep -n '^#' <报告>` 找它的「结论」节与「写过的文件」节（节名不同的取同义的那一节），**只读这两节**；那一节点名的每个 `crates/` 文件，从报告里挑一个它说加了或改了的标识符（函数、常量、类型或测试名），`grep -n` 在今天主工作区的那个文件里，至少命中 1 行。报告一个 `crates/` 文件都没点名，或有一个标识符零命中 ⇒ S19-open。
 3. A3 那一件另核一处：它的「结论」节里「挂载侧单元区起点随环长现算」落在哪个函数，那个函数名在 `crates/singlefs-core/src/` 下 `grep -rn` 命中至少 1 行。
 4. 准入一节第二条：`.claude/gate.d/stage-inputs.tsv` 的 E142 行含这份登记。
-5. `git status --short crates/` 与 `git diff --stat -- crates/` 原样存进 `research/results/e142-r19-crates-status-<日期>.txt`（文件名日期取跑的那一天，JST）。
+5. `git status --short crates/` 与 `git diff --stat -- crates/` 原样存进 `research/results/e142-r19-crates-status-<日期>.txt`（文件名日期取跑的那一天）。
 6. `ps -o pid,args -u "$(id -u)"` 看负载，照共用约束「不做」一节办；记下看到的 `cargo` 进程（别的会话在编 `crates/` 时，步 ① ③ 的快照比对会判 V19c）。
 
 **执行员读什么、按什么次序做（写死）**：
@@ -47,7 +47,7 @@
 | ③ | (1) 按 S19-clause 再重抄条款核一次。(2) 取快照 B，与 A `cmp`（V19c）。(3) 照 `driver_e142` 跑，模型是冻结的 N19，整份存 `research/results/e142-first-txn-dry-run-<日期>-r19-main.out`（准入必须放行）。(4) 取快照 C，与 B `cmp`（V19c）；A、B、C 三份都进 `research/results/`。(5) 主产物落盘之后立即跑 `python3 research/scripts/admission.py experiment <仓根> E142`（Q142.50）。(6) 独立 bin `old-new (主产物, 臂 N18 产物)`，输出存 `research/results/e142-region-old-new-independent-<日期>-r19.out`（Q142.55）。(7) 归一化 diff D_model、D_total（Q142.53、Q142.54），同样只落文件、只打行数。(8) **从这一格起才读** `crates/singlefs-harness/tests/first_transaction_step_five_publish.rs` 的 `recorded_paths_match_the_registered_segment_sequences` 与 `crates/singlefs-harness/tests/crash_segments_per_device_and_torn_in_place_overwrites.rs` 里钉第一条流三态数与取三态写种类的那一条用例（只读钉值那几行），做 Q142.46–Q142.49、Q142.57，比对输出存 `research/results/e142-r19-comparisons-<日期>.out`。(9) Q142.51。(10) 第五节 PC-a、PC-b、PC-c 与第八节判别力自证，合成文件放草稿目录，输出存 `research/results/e142-r19-controls-<日期>.out` | 同上；(8) 起解禁那两份用例文件与 `crates/` 的读 |
 | ④ | 归因（Q142.52–Q142.54）：这一步起读实现员报告整份、读 `research/results/e142-r18-crates-sha256-after-2026-09-26.txt`；`research/scripts/replay.sh` 第 171 行改指主产物；写实验页；交回照第十一节「交回之前」 | 实验页「判决」「影响的决策」两节在这一步才读 |
 
-文件名里的日期取跑的那一天（JST）；已存在的同名文件不覆盖，按日期另存。步 ② 冻结之后到主产物落盘之前，模型源码的改动一律进第十二节修订，写明时点、依据的条款原文（整行抄）。**看过步 ① 的臂 N18 产物、`crates/` 的字节或用例钉值之后，不许为了与 `crates/` 相等、或为了让第 3 行「每处都归得了因」去改模型的写法与第七节锚点**；条款定了的地方发现模型写错，照改，修订里写明「依据是条款原文第几行，不是 `crates/`」，两边都查（停机 S19-crates）。主产物落盘之后这份登记不再改（准入一节）。
+文件名里的日期取跑的那一天；已存在的同名文件不覆盖，按日期另存。步 ② 冻结之后到主产物落盘之前，模型源码的改动一律进第十二节修订，写明时点、依据的条款原文（整行抄）。**看过步 ① 的臂 N18 产物、`crates/` 的字节或用例钉值之后，不许为了与 `crates/` 相等、或为了让第 3 行「每处都归得了因」去改模型的写法与第七节锚点**；条款定了的地方发现模型写错，照改，修订里写明「依据是条款原文第几行，不是 `crates/`」，两边都查（停机 S19-crates）。主产物落盘之后这份登记不再改（准入一节）。
 
 ## 一、问题
 
@@ -262,7 +262,7 @@
 
 ## 三、实现今天的样子
 
-### 3.1 `crates/`（2026-09-27 11:00–11:05 JST 现查，HEAD `faf255e2`；`git status --short crates/ | wc -l` 为 20，其中有 `crates/singlefs-core/src/mount.rs` 等别的会话的未提交改动；行号只是那一刻的。三件开跑条件的改动交回之后行号会挪，执行员步 ③-8 起按名字现查）
+### 3.1 `crates/`（2026-09-27 现查，HEAD `faf255e2`；`git status --short crates/ | wc -l` 为 20，其中有 `crates/singlefs-core/src/mount.rs` 等别的会话的未提交改动；行号只是那一刻的。三件开跑条件的改动交回之后行号会挪，执行员步 ③-8 起按名字现查）
 
 - **录制器按设备记屏障**：`crates/singlefs-harness/src/lib.rs` 第 144 行 `SharedStream`，第 183 行起 `fn push`：一串连着的屏障（中间没有写）里，同一块盘已经记过的那一道不再记；不同盘各记一步。
 - **切段**：`crates/singlefs-harness/src/segments.rs` 第 21 行 `StepKind`（声明序 `ZeroFill, UnitWrite, JournalRecord, RootRecordFua, SystemConfigurationSlot, Barrier`，就是种类串的规范序）；第 107 行 `SegmentClosingRule`、第 117 行 `after`：写把它那块盘记成「没放行」，屏障移出它那块盘，FUA 写算一个写并移出它那块盘，段里有写且「没放行」的盘为空才关段；段里没写时的屏障并进即将开始的一段；第 159 行 `split_into_segments`，流尾只有屏障的一串并进上一段；第 203 行 `closed_form_state_count`（两态，1 + Σ(2^写数 − 1)）；第 219 行 `segment_kinds_text`。
@@ -503,14 +503,14 @@ step_five 钉的五组文本、`crash_segments…` 钉的三态数与种类、�
 
 （装置写之后、主产物之前由执行员写，只许收严或补臂；每条写明时点与依据。主产物落盘之后这一节也不再写——见第一节准入一节。）
 
-**主 agent 认定（2026-09-27 JST 12:0x，装置改写与任何产物之前；读的是设计员报告 `research/prompts/e142-r19-designer-report.md`）**：
+**主 agent 认定（2026-09-27，装置改写与任何产物之前；读的是设计员报告 `research/prompts/e142-r19-designer-report.md`）**：
 1. 臂 N19 七处改动里的 ④（种类串里 `zero_fill` 排最前，依据 `.claude/kb/layout/01-first-txn.md` 第八节 mkfs 行原文）与 ⑤（`write_list_ok` 的屏障门槛 2 → 2 × 盘数）：认。
 2. 四条读法 R35（第 2 行「今天的代码」取 N19 的判决行）、R36（「第十八次产物」取 `replay.sh` 登记的 `-r18-main-2`）、R38（一组差异两份报告都说得通时两份都列）、R39（「原来有东西」按那一版镜像上至少一个非零字节判）：认。
 3. 这份登记已加进 `.claude/gate.d/stage-inputs.tsv` 的 E142 行（主 agent 现改）。
 4. kb 是 E142 的准入输入、主产物落盘之后再改 kb 会让 69 号再红：定「接受事后补跑一次 `driver_e142`（内容不变、只换指纹）」——layout/01 第八节的句子要照产物写，先写 kb 就成了先有答案。
 5. 派执行员的时机：C554 乙已合入（`research/prompts/m2-impl-c554-yi-implementer-report.md`）；Z3-A 乙与 A3 还没交回，等这两件合入主工作区、`crates/` 定下来再派，派发提示写明三份报告路径与「这一版就是要比的那一版」。
 
-### 设计员跑前修订，2026-09-27，产物之前（experiment-designer；写于 2026-09-27 JST 17:45–18:40，即 UTC 08:45–09:40）
+### 设计员跑前修订，2026-09-27，产物之前（experiment-designer；写于 2026-09-27）
 
 写这一段时：模型还没照 N19 改过一行（工作区模型 sha256 `0676ed9b…`，见 R19C-3）；第十九次的任何产物都还没有；`research/results/` 下没读任何产物。上面各节原文一字不删不改；与下面冲突的格以下面为准，逐条写明是哪一格、为什么、按 `evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」三步走在哪。编号 R19C-1 起（「C」取 C577）。这一段由主 agent 派发（修三件：开跑条件第 1 条的理由、C577 进前提、因屏障要重判的格）；设计时另查出两处开跑即停的格（R19C-3），一并写在这里，交主 agent 认。
 
@@ -525,7 +525,7 @@ step_five 钉的五组文本、`crash_segments…` 钉的三态数与种类、�
 
 **更正后的理由**：E142 的准入输入罩着整个 `crates/`（`.claude/gate.d/stage-inputs.tsv` 第 34 行路径列有 `crates/`）。主产物落盘之后 `crates/` 任何一个文件再变，产物头的指纹就旧了（Q142.50、门禁 69 号第一类、S19-fingerprint），所以要等已知要进 `crates/` 的改动都合入再跑。C577 另外改了录制流：每次发布多一道屏障（R19C-2），改的是段序列、操作数与种类串，不是写出的字节。
 
-**新开跑条件第 1 条（替换原第 1 条）**：C577（发布返回前加屏障）与 A3b 已合入主工作区。派发提示里要有下表八份报告的路径，与一句「这几件已合入主工作区，`crates/` 这一版就是要比的那一版」。缺一样 ⇒ S19-open。设计员现查（`ls` 于 UTC 08:48，`grep` 于 08:58）：
+**新开跑条件第 1 条（替换原第 1 条）**：C577（发布返回前加屏障）与 A3b 已合入主工作区。派发提示里要有下表八份报告的路径，与一句「这几件已合入主工作区，`crates/` 这一版就是要比的那一版」。缺一样 ⇒ S19-open。设计员现查（先 `ls`，后 `grep`）：
 
 | 件 | 报告 | 此刻 | 步 ⓪ 核法 |
 |---|---|---|---|
@@ -535,28 +535,28 @@ step_five 钉的五组文本、`crash_segments…` 钉的三态数与种类、�
 | A3a | `research/prompts/m2-rev-a3a-implementer-report.md` | 在 | 原第 2 条 |
 | A3c | `research/prompts/m2-rev-a3c-implementer-report.md` | 在 | 原第 2 条。文件里有非 UTF-8 字节（`file` 报 Non-ISO extended-ASCII），`grep` 不加 `-a` 当它是二进制、`grep -n '^#'` 零输出——对它一律 `grep -a -n` |
 | A3d | `research/prompts/m2-rev-a3d-implementer-report.md` | 在 | 原第 2 条 |
-| A3b | `research/prompts/m2-rev-a3b-implementer-report.md` | 在；代码 UTC 08:56 合入（主 agent 转告，设计员 08:58 grep 核过） | 原第 2 条，加新第 3 条第 1 项 |
-| C577 | `research/prompts/m2-impl-c577-barrier-implementer-report.md` | 在（UTC 08:57 起）；代码 08:56 合入（同上） | 新第 3 条第 2、3 项，不走原第 2 条 |
+| A3b | `research/prompts/m2-rev-a3b-implementer-report.md` | 在；代码已合入（主 agent 转告，设计员 grep 核过） | 原第 2 条，加新第 3 条第 1 项 |
+| C577 | `research/prompts/m2-impl-c577-barrier-implementer-report.md` | 在；代码已合入（同上） | 新第 3 条第 2、3 项，不走原第 2 条 |
 
 `ls research/prompts/ | grep 'm2-rev-a3'` 另有两份不在派发提示给的清单里：`m2-rev-a3-checker-implementer-report.md`、`m2-rev-a3-checker-2-implementer-report.md`（正文没读）。列不列进派发提示由主 agent 定；不列时，步 ④ D_crates 里若有组只能归到这两份，照 R38 记「未归因」（F19e）。
 
 **新开跑条件第 3 条（替换原第 3 条）**，执行员逐条跑、原样贴输出：
 
-1. A3b：`grep -rn 'fn unit_area_start_of_the_chosen_system_configuration' crates/singlefs-core/src/` 至少 1 行；`grep -c 'with_unit_area_start' crates/singlefs-core/src/mount.rs` 至少 1。设计员 UTC 08:58：`crates/singlefs-core/src/recovery.rs:741` 一行；计数 2。合入之前 08:48：两条都是 0。这两个名字取自 A3b 报告「## 一、结论」第 23、24 行，就是原第 3 条要核的「挂载侧单元区起点随环长现算」落在的函数。
-2. C577：`test -f research/prompts/m2-impl-c577-barrier-implementer-report.md`；`grep -rn 'fn persist_the_root_then_rotate_the_system_configuration' crates/singlefs-core/src/` 至少 1 行；`awk '/^fn persist_the_root_then_rotate_the_system_configuration/,/^}/' crates/singlefs-core/src/transaction.rs | grep -c 'CommitStep::Barrier'` 至少 1（只打计数，不读函数体）。设计员 UTC 08:58：`transaction.rs:1193` 一行，计数 1；合入之前 08:48 计数 0。
+1. A3b：`grep -rn 'fn unit_area_start_of_the_chosen_system_configuration' crates/singlefs-core/src/` 至少 1 行；`grep -c 'with_unit_area_start' crates/singlefs-core/src/mount.rs` 至少 1。设计员：`crates/singlefs-core/src/recovery.rs:741` 一行；计数 2。合入之前：两条都是 0。这两个名字取自 A3b 报告「## 一、结论」第 23、24 行，就是原第 3 条要核的「挂载侧单元区起点随环长现算」落在的函数。
+2. C577：`test -f research/prompts/m2-impl-c577-barrier-implementer-report.md`；`grep -rn 'fn persist_the_root_then_rotate_the_system_configuration' crates/singlefs-core/src/` 至少 1 行；`awk '/^fn persist_the_root_then_rotate_the_system_configuration/,/^}/' crates/singlefs-core/src/transaction.rs | grep -c 'CommitStep::Barrier'` 至少 1（只打计数，不读函数体）。设计员：`transaction.rs:1193` 一行，计数 1；合入之前计数 0。
 3. C577 报告在步 ⓪ 只读 `grep -a -n '^#'` 的节标题与「这一轮写过的文件」那一节；「结论」一节正文到步 ④ 才读（主 agent 转告：那份报告里有实现员自报的数，是已有答案）。设计员只看过节标题：第 5 行「## 结论」、第 12 行「## 这一轮写过的文件（都在副本里，主工作区一个字没动）」、第 89 行「## 我不改、交主 agent 另派的（从盘点和代码现查列出，按文件）」。对这一份比原第 2 条读得少，是收严。
 
 **新开跑条件第 7 条（加）**：派发提示写一句：C577 报告「我不改、交主 agent 另派的」一节点名的改动里，有没有落在 E142 会读或会跑的 `crates/` 文件上（`first_transaction_step_five_publish.rs`、`crash_segments_per_device_and_torn_in_place_overwrites.rs`、导出 bin、`crates/singlefs-harness/src/lib.rs` 的录制器、`crates/singlefs-harness/src/segments.rs`），合没合入；没合入就写「不等，接受合入之后补跑一次 `driver_e142`」。缺这一句 ⇒ S19-open。
 
 **新开跑条件第 8 条（加）**：步 ⓪ 先照 R19C-3(b) 的七个取法重抄一次条款，sha256 不是那里写的值 ⇒ S19-open（C577 的 kb 写回还在动，等它定下来再开）。
 
-**编译（加）**：主工作区此刻 `crates/singlefs-harness/tests/core_review_geometry_back_chain_and_empty_inode.rs` 编不过（别的会话在改；主 agent UTC 08:5x 转告）。执行员编 E142 的装置只编点名的 bin：模型在 `research/` 下 `cargo build --release -p e7-index-bench --bin e142-first-txn-dry-run`（单测 `cargo test --release -p e7-index-bench --bin e142-first-txn-dry-run`，经内存包装），导出 bin 照 `research/scripts/replay.sh` 第 453 行 `cargo run -q -p singlefs-harness --bin e142_first_transaction_write_dump` 原样；一律**不带 `--all-targets`**、不带 `--workspace`、不带 `--tests`。点名的 bin 编不过 ⇒ 导出 bin 记 S19-dump；模型停在步 ② 交回。
+**编译（加）**：主工作区此刻 `crates/singlefs-harness/tests/core_review_geometry_back_chain_and_empty_inode.rs` 编不过（别的会话在改；主 agent 转告）。执行员编 E142 的装置只编点名的 bin：模型在 `research/` 下 `cargo build --release -p e7-index-bench --bin e142-first-txn-dry-run`（单测 `cargo test --release -p e7-index-bench --bin e142-first-txn-dry-run`，经内存包装），导出 bin 照 `research/scripts/replay.sh` 第 453 行 `cargo run -q -p singlefs-harness --bin e142_first_transaction_write_dump` 原样；一律**不带 `--all-targets`**、不带 `--workspace`、不带 `--tests`。点名的 bin 编不过 ⇒ 导出 bin 记 S19-dump；模型停在步 ② 交回。
 
 #### R19C-2 C577 进前提
 
-**前提（写死）**：用户 2026-09-27（JST 15:1x）定 C577 走「发布返回前加屏障」：`crates/singlefs-core/src/transaction.rs` 的 `persist_the_root_then_rotate_the_system_configuration` 在系统配置轮换之后、向调用方返回之前加一道池屏障；D16（发布语义） 已定项 7 一次发布的序点从三个变四个（两道 FLUSH + 根槽 FUA + 系统配置轮换之后一道屏障；末三步「根槽 FUA → 系统配置槽 → 屏障」）。实现员报告 `research/prompts/m2-impl-c577-barrier-implementer-report.md`（合入时才有，UTC 08:57 起在），步 ⓪ 照 R19C-1 新第 3 条核。被测条款加上 D16 已定项 7（派发提示点名）；D13 已定项 4 与第二节原列的条款照旧。
+**前提（写死）**：用户 2026-09-27 定 C577 走「发布返回前加屏障」：`crates/singlefs-core/src/transaction.rs` 的 `persist_the_root_then_rotate_the_system_configuration` 在系统配置轮换之后、向调用方返回之前加一道池屏障；D16（发布语义） 已定项 7 一次发布的序点从三个变四个（两道 FLUSH + 根槽 FUA + 系统配置轮换之后一道屏障；末三步「根槽 FUA → 系统配置槽 → 屏障」）。实现员报告 `research/prompts/m2-impl-c577-barrier-implementer-report.md`（合入时才有 起在），步 ⓪ 照 R19C-1 新第 3 条核。被测条款加上 D16 已定项 7（派发提示点名）；D13 已定项 4 与第二节原列的条款照旧。
 
-**条款今天的原文**（`quote-kb.py` 机械抄，UTC 08:58；命令在 R19C-9）。D16 已定项 7 的定案句与射程已写回（有末尾那道屏障）。同一文件第 15 行索引表那一格与 `checks-owed.md` 的 C577 行还是**写回前的原文**：索引表那一格没有末尾那道屏障，C577 行写「加屏障待主 agent 派实现员」。这两处照实抄在下面，只作前提记录、不进 S19-clause 的基线，以用户定案与已定项 7 定案句为准。
+**条款今天的原文**（`quote-kb.py` 机械抄；命令在 R19C-9）。D16 已定项 7 的定案句与射程已写回（有末尾那道屏障）。同一文件第 15 行索引表那一格与 `checks-owed.md` 的 C577 行还是**写回前的原文**：索引表那一格没有末尾那道屏障，C577 行写「加屏障待主 agent 派实现员」。这两处照实抄在下面，只作前提记录、不进 S19-clause 的基线，以用户定案与已定项 7 定案句为准。
 
 
 **出处 `.claude/kb/decisions/16-发布语义.md:177-193`（整段抄，未转述）**
@@ -569,7 +569,7 @@ step_five 钉的五组文本、`crash_segments…` 钉的三态数与种类、�
 **射程**：定的是一次发布内部这几步的先后与 fsync 什么时候返回，不定屏障的真机代价、也不定根槽本身的冗余形态（D22（单元原子性怎么合成） 已定项 2）。三样已知边角：
 
 - **「fsync 等系统配置轮换持久之后才返回」的射程**：返回之后这一代的根只由那一个根槽罩着（根槽不镜像），见证它的系统配置已落盘。同一实例里退一代，靠 journal 重放追得上；**每个新实例（每次可写挂载、恢复、切换）的第一个根在下一次发布之前是单点**——那个槽读不出或它所在的盘掉了，恢复退到上一个实例的根，重放按严格前缀停在实例边界（D23（journal 的角色与格式） 已定项 14 的注 1），这次挂载里 fsync 已返回的事务丢，一个故障就够。要不要让新实例先把根写到两块盘上再确认，是已定项 8。
-- **屏障口径**：两道 FLUSH + 根槽 FUA + 系统配置轮换之后一道屏障 = 每次发布四个序点，比 D25（目标负载优先级） 推导的两个多两个——多的两个是第二道屏障与「发布返回前加屏障」的价钱，知情接受（后者用户 2026-09-27 JST 15:1x 定，起因是 C577（系统配置没见证到的最新根，乙罩不到） 那条用例在抬 F 之前更早红：发布路径根槽 FUA 之后轮换系统配置就返回，没有屏障）。
+- **屏障口径**：两道 FLUSH + 根槽 FUA + 系统配置轮换之后一道屏障 = 每次发布四个序点，比 D25（目标负载优先级） 推导的两个多两个——多的两个是第二道屏障与「发布返回前加屏障」的价钱，知情接受（后者用户 2026-09-27 定，起因是 C577（系统配置没见证到的最新根，乙罩不到） 那条用例在抬 F 之前更早红：发布路径根槽 FUA 之后轮换系统配置就返回，没有屏障）。
 - **第二道屏障买的是记录流完整性**，不是数据完整性：数据完整性的必要屏障恰一道（根槽之前）；不上第二道有 7 类「根在案而记录缺席」的状态，记录核对器与反向链的输入有洞。用户定案「需要」，两道都上。
 
 **依据**：
@@ -590,10 +590,10 @@ step_five 钉的五组文本、`crash_segments…` 钉的三态数与种类、�
 **出处 `.claude/kb/checks-owed.md:490-490`（整段抄，未转述）**
 
 ```markdown
-| C577 | 系统配置没见证到的最新根，乙罩不到 | 判据只认系统配置槽里的 tail；发布的系统配置轮换是普通写，返回之前没有尾随屏障（代码审阅第 19 条），「根已 FUA、调用方拿到了返回、轮换还在缓存里」崩掉之后见证就没了，重开时那条根暂时读不出，乙照旧把它当成被抛弃、把它的单元再发出去（池级 checker 的 I-7.4（近 K 代块未被复用） 照实红）；钉这一格的用例：`a_newest_root_the_system_configuration_never_witnessed_is_abandoned_without_a_reread`、formatted_pool 的 `crash_recovery_abandoning_the_unwitnessed_row_publish_…`、`raising_the_floor_into_the_txg_of_the_root_abandoned_by_crash_recovery_ends_in_the_known_red_form_of_closeout_row_43` | 已定续，实现已落地（`transaction.rs` 的 `write_acquired_instance` 改写取号那一刻按乙-配置同一取法读到的见证值，实现员 2026-09-27 JST 12:4x 交回并打上，`m2-impl-c554-yi-carry-implementer-report.md`）；按「要拦什么」一栏点名的三条用例，`raising_the_floor_into_the_txg_of_the_root_abandoned_by_crash_recovery_ends_in_the_known_red_form_of_closeout_row_43` 仍红得更早：抬 F 之前 checker 已报 I-7.4（近 K 代块未被复用），因为发布路径根槽 FUA 之后轮换系统配置就返回、没有屏障（`transaction.rs:1109`）；用户已定「发布返回前加屏障」（2026-09-27 JST 15:1x，D16（发布语义） 已定项 7），加屏障落地后这条用例断言不再判 I-7.4（近 K 代块未被复用） 红；判别力自证：把「续」这一步去掉（回到写 0）或把新屏障去掉，检查都必须变红 | 乙-配置续已派出并交回（实现员 2026-09-27 JST 12:1x 派出，12:4x 交回并打上，只动 `transaction.rs` 的 `write_acquired_instance`）；加屏障待主 agent 派实现员，排在实审 A3c 之后（`records/2026-09-24-里程碑二收尾调度.md`「三份定义的来历……」那一行）；依据先指 E158（择根与修复四岔路） 第 4 次跑第二段与第三段 H1g 两份报告，E158（择根与修复四岔路） 实验页还没写这一段，门禁 75 号那一对等实验页补上再登记，这一格记欠 | 2026-09-27 实 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙报告（`research/prompts/m2-impl-c554-yi-implementer-report.md`「六、停下交主 agent 的设计问题」Q1）；用户定续见 `records/2026-09-24-里程碑二收尾调度.md`「用户定乙-配置续」那一行 |
+| C577 | 系统配置没见证到的最新根，乙罩不到 | 判据只认系统配置槽里的 tail；发布的系统配置轮换是普通写，返回之前没有尾随屏障（代码审阅第 19 条），「根已 FUA、调用方拿到了返回、轮换还在缓存里」崩掉之后见证就没了，重开时那条根暂时读不出，乙照旧把它当成被抛弃、把它的单元再发出去（池级 checker 的 I-7.4（近 K 代块未被复用） 照实红）；钉这一格的用例：`a_newest_root_the_system_configuration_never_witnessed_is_abandoned_without_a_reread`、formatted_pool 的 `crash_recovery_abandoning_the_unwitnessed_row_publish_…`、`raising_the_floor_into_the_txg_of_the_root_abandoned_by_crash_recovery_ends_in_the_known_red_form_of_closeout_row_43` | 已定续，实现已落地（`transaction.rs` 的 `write_acquired_instance` 改写取号那一刻按乙-配置同一取法读到的见证值，实现员 2026-09-27 交回并打上，`m2-impl-c554-yi-carry-implementer-report.md`）；按「要拦什么」一栏点名的三条用例，`raising_the_floor_into_the_txg_of_the_root_abandoned_by_crash_recovery_ends_in_the_known_red_form_of_closeout_row_43` 仍红得更早：抬 F 之前 checker 已报 I-7.4（近 K 代块未被复用），因为发布路径根槽 FUA 之后轮换系统配置就返回、没有屏障（`transaction.rs:1109`）；用户已定「发布返回前加屏障」（2026-09-27，D16（发布语义） 已定项 7），加屏障落地后这条用例断言不再判 I-7.4（近 K 代块未被复用） 红；判别力自证：把「续」这一步去掉（回到写 0）或把新屏障去掉，检查都必须变红 | 乙-配置续已派出并交回（实现员 2026-09-27 派出 交回并打上，只动 `transaction.rs` 的 `write_acquired_instance`）；加屏障待主 agent 派实现员，排在实审 A3c 之后（`records/2026-09-24-里程碑二收尾调度.md`「三份定义的来历……」那一行）；依据先指 E158（择根与修复四岔路） 第 4 次跑第二段与第三段 H1g 两份报告，E158（择根与修复四岔路） 实验页还没写这一段，门禁 75 号那一对等实验页补上再登记，这一格记欠 | 2026-09-27 实 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙报告（`research/prompts/m2-impl-c554-yi-implementer-report.md`「六、停下交主 agent 的设计问题」Q1）；用户定续见 `records/2026-09-24-里程碑二收尾调度.md`「用户定乙-配置续」那一行 |
 ```
 
-**实现今天的样子（补第三节 3.1、3.2；设计员 UTC 08:58 现查，行号只是那一刻的）**：
+**实现今天的样子（补第三节 3.1、3.2；设计员 现查，行号只是那一刻的）**：
 
 - `crates/singlefs-core/src/transaction.rs` 第 1193–1209 行 `persist_the_root_then_rotate_the_system_configuration`：第 1200 行根槽 FUA 写、第 1204 行系统配置槽轮换、第 1208 行 `writer.perform(CommitStep::Barrier)`；第 1184–1192 行注释：三条发布路径与重发冻结的那一次共用这一处。
 - 它唯一的调用在第 1058 行、`persist_publish_writes`（第 1039 行起）的末尾；`persist_publish_writes` 在第 1134、1165、1235 行被调（带单元的发布、重发冻结的那一次、零单元发布）。第一个事务那条流里走它的是暖机两次空发布与第一个事务；mkfs 与取号不走它（`grep -rn 'persist_publish_writes(\|persist_the_root_then_rotate' crates/singlefs-core/src/` 只命中 `transaction.rs` 那几行）。
@@ -604,7 +604,7 @@ step_five 钉的五组文本、`crash_segments…` 钉的三态数与种类、�
 
 #### R19C-3 开跑即停的两格：S19-sha 与 S19-clause
 
-**(a) 模型的 sha256 已不是冻结值**（照原文，步 ①(1) 必触发 S19-sha）。UTC 09:03 现核：模型 `0676ed9bc6f21fd9a6627eb55543021c63e02d0c5c74d9452c0305d0cd3f7ba2`、8834 行；`git show HEAD:research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs | sha256sum` 是冻结值 `8765c1fe…`；另三个照旧（独立 bin `f4f26386…`、模型变异表 `dfc51c20…`、独立 bin 变异表 `8978e80a…`）。差别是别的会话改的一处（UTC 08:4x 在暂存区，09:03 在工作区未暂存；`git diff -- <模型>` 原样摘改动行）：
+**(a) 模型的 sha256 已不是冻结值**（照原文，步 ①(1) 必触发 S19-sha）。 现核：模型 `0676ed9bc6f21fd9a6627eb55543021c63e02d0c5c74d9452c0305d0cd3f7ba2`、8834 行；`git show HEAD:research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs | sha256sum` 是冻结值 `8765c1fe…`；另三个照旧（独立 bin `f4f26386…`、模型变异表 `dfc51c20…`、独立 bin 变异表 `8978e80a…`）。差别是别的会话改的一处（在暂存区；另一次查时在工作区未暂存；`git diff -- <模型>` 原样摘改动行）：
 
 ```
 @@ -103,7 +103,8 @@ const JOURNAL_HEADER_BYTES: u64 = 311;
@@ -615,7 +615,7 @@ step_five 钉的五组文本、`crash_segments…` 钉的三态数与种类、�
 
 主 agent 说值不变、不动它。改法：步 ①(1) 里模型那一个的期望值换成 `0676ed9b…`，其余三个照旧；臂 N18 = 这一份。它跑出来与第十八次模型那一侧是否逐行相同，仍由 Q142.56 判、不同 ⇒ V19a——换的只是「哪份源码算 N18」，判据不放宽。模型在步 ① 之前又被别人改了（sha 不是 `0676ed9b…`）⇒ S19-sha 照旧。
 
-**(b) 条款已在登记之后变了**（照原文，步 ② 开工时必触发 S19-clause）。用第十三节命令二同样六个取法重抄，与第二节比，四行不同（`diff` 原样，`<` 是 UTC 08:58 的今天，`>` 是第二节）：
+**(b) 条款已在登记之后变了**（照原文，步 ② 开工时必触发 S19-clause）。用第十三节命令二同样六个取法重抄，与第二节比，四行不同（`diff` 原样，`<` 是 的今天，`>` 是第二节）：
 
 ```diff
 59c59
@@ -636,9 +636,9 @@ step_five 钉的五组文本、`crash_segments…` 钉的三态数与种类、�
 > - 用户定案 2026-09-26：位 0 退役、布局身份换成位 1，旧镜像（带回退见证、系统配置不带 F）挂不上（三方判决 `research/prompts/m2-rollback-forward-r3-main-verification.md` 第二节 K7：「见证表非空就拒可写挂载」出局，只读恢复 13 个改坏深度里 4 个落到被回退掉的那一版；改系统配置格式版本号挡不住，今天的读者不核版本号），原话在变更史；无实验：旧读者对新位挂不上在原型上量过，新读者对旧位拒是推的。
 ```
 
-逐行判：两处是同文件上方插了一行、出处行号挪一（D22 已定项 9 187–218 → 188–219，已定项 7 128–168 → 129–169）；两处是 A3-checker-2 一批的写回：D22 已定项 9 第四条末尾加「读者遇到系统配置或单元头的格式版本不是 1，一律拒收…」，D15 已定项 4 依据末尾加「…这一句已过时…」。UTC 08:47 第一次重抄时 D22 那一句是另一种说法，08:50 又改过一次（文件 mtime），08:58 是上面这一版——kb 此刻还在动。写者一侧（字段表、偏移、位分配、字节）一个字没动；臂 N18、N19、N19C 的「怎么做」没有一处引这两句（模型读者第 1137 行本来就判 `FORMAT_VERSION`、第 292 行它是 1）；第十八次四个判决字段的门槛不引读者拒收那一句 ⇒ **臂的定义不改**。三步：记一次输——第二节那一版已不是今天的条款，照原文走会停在步 ②；只许收严——比对仍逐字节，基线换成今天的全文；收严在哪——基线多了 D16 已定项 7 一段。
+逐行判：两处是同文件上方插了一行、出处行号挪一（D22 已定项 9 187–218 → 188–219，已定项 7 128–168 → 129–169）；两处是 A3-checker-2 一批的写回：D22 已定项 9 第四条末尾加「读者遇到系统配置或单元头的格式版本不是 1，一律拒收…」，D15 已定项 4 依据末尾加「…这一句已过时…」。 第一次重抄时 D22 那一句是另一种说法，之后又改过一次（文件 mtime），再后是上面这一版——kb 此刻还在动。写者一侧（字段表、偏移、位分配、字节）一个字没动；臂 N18、N19、N19C 的「怎么做」没有一处引这两句（模型读者第 1137 行本来就判 `FORMAT_VERSION`、第 292 行它是 1）；第十八次四个判决字段的门槛不引读者拒收那一句 ⇒ **臂的定义不改**。三步：记一次输——第二节那一版已不是今天的条款，照原文走会停在步 ②；只许收严——比对仍逐字节，基线换成今天的全文；收严在哪——基线多了 D16 已定项 7 一段。
 
-**新基线（S19-clause 与新开跑条件第 8 条都比它）**：七个取法 = 第十三节命令二的六个，加第七个 `'.claude/kb/decisions/16-发布语义.md@#### 已定项 7：发布的持久顺序'`，按这个次序、出口放执行员草稿目录；UTC 08:58 抄出 189 行，sha256 `0bfc8e84e754078a94eac0639684a03beea024fd54bd9fa2083b9c7a80a79526`。前 167 行 = 第二节原文换上上面四行，后 22 行 = 本条上面抄的 D16 那一段（出口里 D16 那一段单独取出的 sha256 `6d4ca1a37217e1aada269a3c2556e85db77a540b42fb17790724852f72cb29af`）。执行员在步 ⓪、步 ② 开工前、步 ③(1) 各重抄一次：sha256 不等 ⇒ 步 ⓪ 记 S19-open，步 ②③ 记 S19-clause；交回时附重抄件对第二节与对上面那一段的 `diff`。注意：比对连 `**出处 …:A-B**` 那一行一起比，同一文件别处加删一行也会触发（上面两处就是这样来的）；要不要只比条款正文，是放宽，由主 agent 定（R19C-10）。
+**新基线（S19-clause 与新开跑条件第 8 条都比它）**：七个取法 = 第十三节命令二的六个，加第七个 `'.claude/kb/decisions/16-发布语义.md@#### 已定项 7：发布的持久顺序'`，按这个次序、出口放执行员草稿目录 抄出 189 行，sha256 `0bfc8e84e754078a94eac0639684a03beea024fd54bd9fa2083b9c7a80a79526`。前 167 行 = 第二节原文换上上面四行，后 22 行 = 本条上面抄的 D16 那一段（出口里 D16 那一段单独取出的 sha256 `6d4ca1a37217e1aada269a3c2556e85db77a540b42fb17790724852f72cb29af`）。执行员在步 ⓪、步 ② 开工前、步 ③(1) 各重抄一次：sha256 不等 ⇒ 步 ⓪ 记 S19-open，步 ②③ 记 S19-clause；交回时附重抄件对第二节与对上面那一段的 `diff`。注意：比对连 `**出处 …:A-B**` 那一行一起比，同一文件别处加删一行也会触发（上面两处就是这样来的）；要不要只比条款正文，是放宽，由主 agent 定（R19C-10）。
 
 #### R19C-4 臂：N19 记一次输；补臂 N19C（N19 加发布尾屏障）；N19 的原判据搬到取样点 G11、G12 上原样判
 
@@ -788,7 +788,7 @@ step_five 钉的五组文本、`crash_segments…` 钉的三态数与种类、�
 3. `research/prompts/m2-keyspace-rerun-questions.md` 第 18 行（准入键 `E142/layer0` 的问题行，第 6 行）里引的第十六次产物行：`writes=13 states=8192 closed_form=8192 violations=4092 expected_violations=4080 root_persisted_states=4096 failed=4092`、`control_violations_ok=false`。**影响**：一盘阳性对照的数；⑧ 不碰它（R19C-4），这一段没有一格用它。
 4. D16 已定项 7 原文里的 E77 数（1024 个状态、504 个违例、63 处嫁接）与「四个序点」。**影响**：⑧ 的依据只取序点那一句。
 5. 模型源码：第 4556 行 `67_108_885`，第 4558–4563 行 4 / 7 / 3 / 9，第 292 行 `FORMAT_VERSION = 1`、第 1137 行读者判它，单测 67_108_885、134_217_754（第 7375–7397、8748–8793 行附近）。**影响**：⑪ 与 R19C-8。
-6. `crates/` 的行（R19C-1、R19C-2 列的）与 `git status --short crates/ | wc -l`：约 UTC 08:50 为 58，08:58 为 62。
+6. `crates/` 的行（R19C-1、R19C-2 列的）与 `git status --short crates/ | wc -l`：先为 58，后为 62。
 7. 自己算的：R19C-5 C 表与附表 M，全部出自下面脚本的原样输出。
 8. C577 报告只读了节标题（`grep -a -n '^#'`），正文一行没读。
 
@@ -798,14 +798,14 @@ step_five 钉的五组文本、`crash_segments…` 钉的三态数与种类、�
 
 ```
 nice -n 19 python3 research/scripts/quote-kb.py /tmp/claude-1000/e142-r19-revision/requote-section2.md <第十三节命令二的六个取法>
-  ✓ 6 段整抄进 …/requote-section2.md，回读逐字节一致            # UTC 08:47，与第二节比四行不同
+  ✓ 6 段整抄进 …/requote-section2.md，回读逐字节一致            #，与第二节比四行不同
 nice -n 19 python3 research/scripts/quote-kb.py /tmp/claude-1000/e142-r19-revision/baseline-clauses.md <同六个取法> '.claude/kb/decisions/16-发布语义.md@#### 已定项 7：发布的持久顺序'
-  ✓ 7 段整抄进 …/baseline-clauses.md，回读逐字节一致            # UTC 08:58，189 行，sha256 0bfc8e84e754078a94eac0639684a03beea024fd54bd9fa2083b9c7a80a79526
+  ✓ 7 段整抄进 …/baseline-clauses.md，回读逐字节一致            #，189 行，sha256 0bfc8e84e754078a94eac0639684a03beea024fd54bd9fa2083b9c7a80a79526
 nice -n 19 python3 research/scripts/quote-kb.py /tmp/claude-1000/e142-r19-revision/premise-quotes.md '.claude/kb/decisions/16-发布语义.md:15-15' '.claude/kb/checks-owed.md:490-490'
   ✓ 2 段整抄进 …/premise-quotes.md，回读逐字节一致
-sha256sum <模型> <独立 bin> <两张变异表>                          # UTC 09:03：0676ed9b… f4f26386… dfc51c20… 8978e80a…
+sha256sum <模型> <独立 bin> <两张变异表>                          #：0676ed9b… f4f26386… dfc51c20… 8978e80a…
 git show HEAD:research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs | sha256sum     # 8765c1fe…
-git diff --cached -- <模型>（UTC 08:4x）/ git diff -- <模型>（UTC 09:03）                         # 同一处，R19C-3(a)
+git diff --cached -- <模型>/ git diff -- <模型>                         # 同一处，R19C-3(a)
 nice -n 19 python3 anchors_e142_r19_c577.py > anchors-final-output.txt; cmp 与初稿脚本的输出   # SAME
 nice -n 19 python3 research/scripts/replace-batch.py [--dry-run] <规格>                           # 这一段分八次插在第十三节之前，每次先 --dry-run
 ```
@@ -993,33 +993,157 @@ ANCHOR point=G11_merge_reading path=before_window operations=43 writes=31 barrie
 #### R19C-10 交主 agent 认的项（派执行员之前）
 
 1. R19C-1 的新开跑条件第 1、3、7、8 条与「编译」一段；`m2-rev-a3-checker-*`、`m2-rev-a3-checker-2-*` 两份列不列进派发提示。
-2. R19C-3(a)：臂 N18 取工作区 `0676ed9b…` 那一份（别的会话的一处改动，值不变）。R19C-3(b)：S19-clause 的基线换成 UTC 08:58 的七段全文（第二节之后 D22、D15 被写回改了四行，逐行判过不改臂）；另问一句要不要只比条款正文、不比 `**出处 …:A-B**` 行号——那是放宽，这一段没做。
+2. R19C-3(a)：臂 N18 取工作区 `0676ed9b…` 那一份（别的会话的一处改动，值不变）。R19C-3(b)：S19-clause 的基线换成 的七段全文（第二节之后 D22、D15 被写回改了四行，逐行判过不改臂）；另问一句要不要只比条款正文、不比 `**出处 …:A-B**` 行号——那是放宽，这一段没做。
 3. 补臂 N19C（⑧–⑪）、R43–R45、G11 / G12 两组取样点；N19 在今天 `crates/` 上的一次输（R19C-4 开头）照这里记。
 4. **R40 这条岔在 C577 之后显出来了**：模型照 R40 不合并连着的屏障，`crates/` 的录制器合并（`crates/singlefs-harness/src/lib.rs` 第 183–195 行）；暖机第一次的 ⑧ 与第二次开头那道背靠背，推的预期是 Q142.46 暖机、整条两行的 `operations=`、`kinds=` 与 Q142.49 (i) 共五格「不同」、恰如附表 M（没量过）。这一段不改 R40：照原登记走 S19-crates、第 1 行答「不同」、另标「R40 分叉」。要在派执行员之前换读法（改成合并），是新读法、起新名字，由主 agent 定并另走修订。
-5. kb 写回还在动：D16 第 15 行索引表那一格、`checks-owed.md` C577 行都是写回前的原文；写回若在 UTC 08:58 之后又动了 D16 已定项 7 那一节（或 D13 已定项 4、`layout/01` 第八节、D22 已定项 7 / 9、D15 已定项 4），新开跑条件第 8 条会停。等写回定下来再派，或再派设计员重抄基线。
+5. kb 写回还在动：D16 第 15 行索引表那一格、`checks-owed.md` C577 行都是写回前的原文；写回若在 之后又动了 D16 已定项 7 那一节（或 D13 已定项 4、`layout/01` 第八节、D22 已定项 7 / 9、D15 已定项 4），新开跑条件第 8 条会停。等写回定下来再派，或再派设计员重抄基线。
 6. 第二段（R19C-8）是重型，要跑时由主 agent 问用户；第一段不等它。
 7. 这一段改了登记本身（准入输入之一），在任何产物之前；`stage-inputs.tsv` 第 34 行已含这份登记，不用再改。
 
-### 执行员补登（experiment-runner，2026-09-27 JST 20:4x，即 UTC 11:4x；步 ⓪，这一次任何产物之前、模型改一行之前）
+### 执行员补登（experiment-runner，2026-09-27；步 ⓪，这一次任何产物之前、模型改一行之前）
 
 #### R19E-1 执行员补登：kb 第八批之后的现值（S19-clause 与新开跑条件第 8 条的基线）
 
-依据是派发提示原句：「第 8 条：主 agent 的 kb 第八批（2026-09-27 10:2x UTC）改了 D16 已定项 7 的依据行与索引行（加「→ 屏障」、「实现已合入」），R19C-3(b) 记的 sha256 会对不上——这不是 S19-open：C577 的 kb 写回已经定下来了；你在任何产物之前照 R19C-3(b) 的七个取法重抄一遍、把新 sha256 追加进第十二节（写明「执行员补登：kb 第八批之后的现值」与时点），再开跑。」
+依据是派发提示原句：「第 8 条：主 agent 的 kb 第八批（2026-09-27）改了 D16 已定项 7 的依据行与索引行（加「→ 屏障」、「实现已合入」），R19C-3(b) 记的 sha256 会对不上——这不是 S19-open：C577 的 kb 写回已经定下来了；你在任何产物之前照 R19C-3(b) 的七个取法重抄一遍、把新 sha256 追加进第十二节（写明「执行员补登：kb 第八批之后的现值」与时点），再开跑。」
 
-- 重抄（UTC 11:41）：`nice -n 19 python3 research/scripts/quote-kb.py <草稿目录>/step0/baseline-clauses-step0.md <第十三节命令二的六个取法> '.claude/kb/decisions/16-发布语义.md@#### 已定项 7：发布的持久顺序'`，「✓ 7 段整抄进 …，回读逐字节一致」，189 行，**sha256 `e1bda65b8b3c333efc4cba03cf88dfbce7ca43d7a22ae837e7a49d5ba8cf49ce`**（其中 D16 那一段第 168–189 行 sha256 `1702a15a3dbfa61a498283b2825d50dd65284a73d38dd514a736835119ed411f`）。步 ② 开工前与步 ③(1) 的重抄都比这一个值。
-- 与 UTC 08:58 那一版（第二节原文按 R19C-3(b) 的 diff 还原、接上 R19C-2 抄的 D16 那一段）逐行比，不同的有三类，逐条判：
+- 重抄：`nice -n 19 python3 research/scripts/quote-kb.py <草稿目录>/step0/baseline-clauses-step0.md <第十三节命令二的六个取法> '.claude/kb/decisions/16-发布语义.md@#### 已定项 7：发布的持久顺序'`，「✓ 7 段整抄进 …，回读逐字节一致」，189 行，**sha256 `e1bda65b8b3c333efc4cba03cf88dfbce7ca43d7a22ae837e7a49d5ba8cf49ce`**（其中 D16 那一段第 168–189 行 sha256 `1702a15a3dbfa61a498283b2825d50dd65284a73d38dd514a736835119ed411f`）。步 ② 开工前与步 ③(1) 的重抄都比这一个值。
+- 与 那一版（第二节原文按 R19C-3(b) 的 diff 还原、接上 R19C-2 抄的 D16 那一段）逐行比，不同的有三类，逐条判：
   1. D13 已定项 4 的出处行 `:69-83` → `:70-84`：同文件上方多了一行，条款正文一字没变。
   2. `layout/01` 第八节表格第 6–9 行（写行、后续暖机、抬 F、只做过 mkfs 的池）与表后「第二条流」一段里的用例路径 `crates/singlefs-harness/tests/second_transaction_…` → `crates/singlefs-checker/tests/second_transaction_…`（派发提示说的「被 singlefs-8b 挪进 `crates/singlefs-checker/tests/` 的 11 份测试」），段序列、写数、种类串、闭式一个字没变。**这一类派发提示那句没点名**，照实记在这里、报告里交主 agent。
   3. D16 已定项 7 依据第二条「实现待派（排在实审 A3c 之后），代价另登记小实验量」→「实现已合入（`crates/singlefs-core/src/transaction.rs` 的 `persist_the_root_then_rotate_the_system_configuration`，实 C577（系统配置没见证到的最新根，乙罩不到） 报告 `research/prompts/m2-impl-c577-barrier-implementer-report.md`），代价仍另登记小实验量」：派发提示点名的那一处。D16 第 15 行索引表那一格不在七个取法里，今天是「…→ 根槽（FUA）→ 系统配置槽 → 屏障；…」。
 - 臂 N18、N19、N19C 的「怎么做」与第六、七节的门槛没有一处引这三类改动的字句 ⇒ 臂与判据不改；比对仍逐字节，基线换成上面这个值（与 R19C-3(b) 同一种收严）。
 
-#### R19E-2 步 ② 冻结（experiment-runner，2026-09-27 JST 21:58–22:00，即 UTC 12:58–13:00；主产物之前，臂与判据不改）
+#### R19E-2 步 ② 冻结（experiment-runner，2026-09-27；主产物之前，臂与判据不改）
 
-- 步 ② 开工前按 S19-clause 重抄（UTC 11:47）：sha256 `e1bda65b8b3c333efc4cba03cf88dfbce7ca43d7a22ae837e7a49d5ba8cf49ce`，= R19E-1 的基线。
+- 步 ② 开工前按 S19-clause 重抄：sha256 `e1bda65b8b3c333efc4cba03cf88dfbce7ca43d7a22ae837e7a49d5ba8cf49ce`，= R19E-1 的基线。
 - 模型照 N19C 的 ①–⑪ 改完；单测 `cargo test --release -p e7-index-bench --bin e142-first-txn-dry-run` 原样末行「test result: ok. 94 passed; 0 failed; 1 ignored」。7.1、7.2（在 G11、G12 上）与 7.4 C1–C13、D1–D6 的锚点各由单测钉住（`registered_segment_sequences_match_every_recorded_path`、`three_state_rows_match_the_registered_anchors`、`g11_rows_match_the_anchors_of_the_stream_without_the_trailing_barrier`、`swallowed_barrier_points_match_the_registered_anchors`、`before_window_and_window_counts_match_the_registered_anchors`、`layer0_segment_sizes_and_closed_form_match_the_new_layout`、`fua_not_a_boundary_gives_16777249_states_and_134217754_without_the_trailing_barrier`、`layer0_main_arm_verdict_flags_every_threshold_independently`），绝对值一律取自第七节与 7.4，不取任何产物。
-- 变异表重锚三条（第九节「已有 158 条对改后的源码整张重跑」那一段，第七类）：`M2_drop_second_barrier` 的替换 `pool.operations.pop()` 改成删掉第二道池屏障的全部步（按盘数截断），仍在 `before_window_and_window_counts_match_the_registered_anchors` 等处红；`M13_fua_never_a_boundary` 的原文改到 `SegmentClosingRule::closes_after` 里的 `if self.fua_is_boundary && write.is_fua() {`；`M154_fua_write_isolates_its_own_segment` 的原文改到 `split_into_segments` 里推写下标那一段（FUA 写之前先关段、之后再关段），替换文的意思不变。加 M180–M201 共 22 条（第九节 M180–M193，R19C-7 M194–M201）；M186、M187、M188 落在合成取样点上，由 `in_place_overwrite_needs_all_three_conditions_on_synthetic_writes` 钉住；M200 由直接调 `layer0_main_arm_verdict` 的单测钉住。整张 180 条第二次跑（`MUTATE_JOBS=2`，经 `capped.sh 2`）：抓到 180、无效 0、没红 0，「计数：内存撞顶 0 条（上限 16G）、超时 0 条」「已还原，基线仍全绿」，退出码 0。第一次跑（同样 180/180 抓到）退 5：UTC 12:22:25 别的会话把模型两行注释里的 `singlefs-harness` 改成 `singlefs-checker-tier`（crate 拆分），不算数，已重跑。
+- 变异表重锚三条（第九节「已有 158 条对改后的源码整张重跑」那一段，第七类）：`M2_drop_second_barrier` 的替换 `pool.operations.pop()` 改成删掉第二道池屏障的全部步（按盘数截断），仍在 `before_window_and_window_counts_match_the_registered_anchors` 等处红；`M13_fua_never_a_boundary` 的原文改到 `SegmentClosingRule::closes_after` 里的 `if self.fua_is_boundary && write.is_fua() {`；`M154_fua_write_isolates_its_own_segment` 的原文改到 `split_into_segments` 里推写下标那一段（FUA 写之前先关段、之后再关段），替换文的意思不变。加 M180–M201 共 22 条（第九节 M180–M193，R19C-7 M194–M201）；M186、M187、M188 落在合成取样点上，由 `in_place_overwrite_needs_all_three_conditions_on_synthetic_writes` 钉住；M200 由直接调 `layer0_main_arm_verdict` 的单测钉住。整张 180 条第二次跑（`MUTATE_JOBS=2`，经 `capped.sh 2`）：抓到 180、无效 0、没红 0，「计数：内存撞顶 0 条（上限 16G）、超时 0 条」「已还原，基线仍全绿」，退出码 0。第一次跑（同样 180/180 抓到）退 5： 别的会话把模型两行注释里的 `singlefs-harness` 改成 `singlefs-checker-tier`（crate 拆分），不算数，已重跑。
 - **冻结**：模型 `research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs` 9319 行，sha256 `41ef20b50ffc32adece04054d6ffdffce1d0f6ca8d127ad8680953b37e4b9dd1`（含上面那两行别人改的注释）；变异表 `research/mutations/e142_first_transaction_dry_run.tsv` 180 行，sha256 `15a4fe6da352e15236f267b38e6735295d7d0c7659900de6dedd80867d2e9c77`。
-- ⚠️ 这一段停在冻结之后，步 ③ 没开：快照 A（UTC 11:44）之后 `crates/` 被拆出新 crate `crates/singlefs-checker-tier`（导出 bin 也挪进去），`crates/singlefs-core/src/` 的 `mount.rs`、`recovery.rs`、`system_configuration.rs`、`transaction.rs` 与 `crates/singlefs-format/src/lib.rs` 的 sha256 都变了，`research/scripts/replay.sh` 的 `driver_e142` 也被别的会话改成 `-p singlefs-checker-tier`；照原文跑步 ③ 会触发 V19c。续不续、怎么续由主 agent 定。
+- ⚠️ 这一段停在冻结之后，步 ③ 没开：快照 A之后 `crates/` 被拆出新 crate `crates/singlefs-checker-tier`（导出 bin 也挪进去），`crates/singlefs-core/src/` 的 `mount.rs`、`recovery.rs`、`system_configuration.rs`、`transaction.rs` 与 `crates/singlefs-format/src/lib.rs` 的 sha256 都变了，`research/scripts/replay.sh` 的 `driver_e142` 也被别的会话改成 `-p singlefs-checker-tier`；照原文跑步 ③ 会触发 V19c。续不续、怎么续由主 agent 定。
+
+#### R19E-3 执行员补登（experiment-runner，2026-09-28；续做，这一次任何产物之前；臂与判据不改）
+
+时点：写于步 ① 重做与步 ③ 主产物之前，第十九次在今天 `crates/` 上的产物一份都还没有。依据是派发提示「主 agent 对上一段停下那四件的判定」四条（每条开头整句抄）与第 5 条写的 V19c。臂 N18、N19C 的「怎么做」与第六、七节门槛一格不改；下面只换冻结值、N18 源码、S19-clause 基线的写法与路径，并把步 ① 挪到今天的 `crates/` 上重做，都是收严或路径改名。
+
+1. **冻结值**。原句：「冻结值：今天的模型 `research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs`（`5f882741…`）与冻结版（blob `47002dc0`，`41ef20b5…`）只差全仓术语改名。主 agent 复核：`reverse_rename.py` 作用在今天的模型上 sha256 = `41ef20b5…`、逐行 diff 0 行；作用在变异表上 = `15a4fe6d…`；8 对替换都登记在 `.claude/kb/term-renames.md` 第 43–47、53 行。认这一份为冻结模型，冻结值记成「`41ef20b5…` 经登记改名后的 `5f882741…`」；产物里那三个字段名（`new_pool_file_creation_txg`、`new_pool_file_creation_allocation_nodes`、`mapping_entries_new_pool_file_creation`）用新名。依据：`.claude/rules/path-moves.md`「改一个全仓术语：正文之外还有五处会红」那一节「留存产物分两类」。」
+   执行员复核（草稿 `/tmp/claude-1000/e142-r19-runner3/freeze/`；`reverse_rename.py` 是 8 对新 → 旧，`forward_rename.py` 是同 8 对旧 → 新）：`git cat-file -p 47002dc0 | sha256sum` = `41ef20b50ffc32adece04054d6ffdffce1d0f6ca8d127ad8680953b37e4b9dd1`；`forward_rename.py <冻结版>` = `5f882741ae96687b9abce9f30830ec32da1c9f411091d4fe3cac4248a5fb5a43`（= 今天的模型）；`reverse_rename.py <今天的模型>` = `41ef20b5…`；`reverse_rename.py <今天的变异表>` = `15a4fe6da352e15236f267b38e6735295d7d0c7659900de6dedd80867d2e9c77`（今天的表 `0d91aafd4460de8efcc38c7a6a976c97732244e0a9d867927eab18fe33422f14`，180 行）。
+   冻结值：模型「`41ef20b5…` 经登记改名后的 `5f882741…`」（9319 行）；变异表「`15a4fe6d…` 经登记改名后的 `0d91aafd…`」。8 对里 7 对由 `term-renames.md` 第 43–47、53 行登记；测试名那一对（`probes_behave_as_milestone_step_six_expects` → `eight_byte_flip_probes_recover_as_the_e142_product_records`）在那张表里 `grep` 零命中，是 `bc57af7a` 同一批按内容改的测试名，不进产物。
+
+2. **臂 N18 的源码**。原句：「臂 N18 的源码：冻结的 `0676ed9b…` 加同一批登记改名（换回脚本作用在它上面必须逐字节回到 `0676ed9b…`，贴 sha256）；这样两边字段名一致，R37 的归一化比法不动。D_model 里不会因改名多出行组；要是多出，停下交回。」
+   取法：`git show 7a3c8e1e:research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs`（`0676ed9bc6f21fd9a6627eb55543021c63e02d0c5c74d9452c0305d0cd3f7ba2`，8834 行）经 `forward_rename.py` 得 `f326f72a8366810cb329a3f117112d927ce9ee09b4cc260b381e86c12e4d8fe9`（8834 行）；`reverse_rename.py` 作用在它上面得 `0676ed9bc6f21fd9a6627eb55543021c63e02d0c5c74d9452c0305d0cd3f7ba2`，逐字节回到原件。
+   **编在哪（执行员补，派发提示没写）**：主工作区那份模型是冻结的 N19C，不为 N18 改它。N18 在草稿目录的一份仓副本里编：`cp -a` 主工作区（不带任何 `target/`），只把模型那一个文件换成 `f326f72a…`，在副本里 `cargo build --release`。装置的准入按编译时的 `CARGO_MANIFEST_DIR/../..` 取仓根，所以 N18 的准入判的是副本（副本里模型与主工作区不同 ⇒ 输入变了、放行）；产物头 `E7INPUT` 那一行是副本的指纹，R37 的归一化本来就删它。导出照 `driver_e142` 第一条命令在主工作区跑（今天的 `crates/`），装置在主工作区 `research/` 下起（读同一份臂 N15 参照产物），拼法同 `driver_e142`（装置 stdout 在前、导出在后）。
+
+3. **S19-clause 基线**。原句：「S19-clause 基线：认 `4d98ee79…`，替换 R19E-1 的 `e1bda65b…`。依据：两者换回旧名后逐字符比只差用例路径、产物文件名、D16 那一段删掉的钟点三类（上一段报告与 `freeze/requote-reversed-vs-baseline.diff`）；路径与术语改名不在冻结范围内（同上一条依据），钟点是用户 2026-09-28 定不写的；段序列、写数、种类串、闭式一个字没变。修订里把这三类差异逐类列出。」
+   基线换成 `4d98ee794050933c8686abd47131212790878d7f35add64bbef400aae3590ddb`（七个取法同 R19C-3(b)，189 行）。执行员把今天的重抄件换回旧名后与 R19E-1 原件（`e1bda65b…`）逐行比，20 行 `diff` 行、10 个抄件行不同，逐类（抄件行号）：
+   - 用例路径（`layout/01` 第八节）：第 34、40 行 `crates/singlefs-harness/tests/first_transaction_step_one_mkfs.rs` → `crates/singlefs-harness/tests/mkfs_bytes_judged_by_the_checker.rs`；第 44 行 `crates/singlefs-harness/tests/second_transaction_step_four_rollback.rs` → `crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs`；第 45、46、47、52 行 `crates/singlefs-checker/tests/second_transaction_step_zero_layer0.rs` → `crates/singlefs-checker-tier/tests/crash_enumeration_fixed_script_stream.rs`；第 48 行 `crates/singlefs-checker/tests/second_transaction_step_three_formatted_pool_layer0.rs` → `crates/singlefs-checker-tier/tests/crash_enumeration_writable_mount_of_a_formatted_pool.rs`。
+   - 产物文件名（第 36 行）：`e142-first-txn-dry-run-2026-09-25-r16-combined.out` → `e142-new-pool-file-creation-dry-run-2026-09-25-r16-combined.out`。
+   - 钟点（第 179 行，D16 已定项 7 射程「屏障口径」一条）：「用户 2026-09-27」与「定，起因是」之间原有的一个钟点删掉了；这里不重抄那个钟点。
+   这三类之外一个字符都不差。步 ③(1) 的重抄（七个取法，出口 `/tmp/claude-1000/e142-r19-runner3/step3/requote-step3-1.md`）：「✓ 7 段整抄进 …，回读逐字节一致」，189 行，sha256 `4d98ee79…` ⇒ 与新基线相同，S19-clause 不触发。
+
+4. **臂 N18 旧产物被改名就地改写**。原句：「上一段臂 N18 的产物被改名就地改写（`2bbacde1…` → `f5eaeedd…`）：认，理由同第 1 条。」`research/results/e142-new-pool-file-creation-dry-run-2026-09-27-r19-arm-n18.out` 照留；它与 2026-09-27 的快照 A、D_crates、`crates/` 状态文件都是在快照 A 那一版 `crates/` 上量的，这一次不参与任何一格的判定（第 5 条）。
+
+5. **步 ① 在今天的 `crates/` 上重做（执行员补；依据 V19c 与第 2 条）**：2026-09-27 的快照 A 之后 `crates/` 变了（R19E-2 末条），拿它当 V19c 的起点必触发 V19c。这一次重做开跑条件第 5 条与步 ①(2)–(4)：`crates/` 状态存 `research/results/e142-r19-crates-status-2026-09-28.txt`；快照叫 **A28**（2026-09-28 重取的快照 A），存 `research/results/e142-r19-crates-sha256-a-2026-09-28.txt`，V19c 比 A28 与 B、B 与 C；臂 N18 照第 2 条跑，存 `research/results/e142-new-pool-file-creation-dry-run-2026-09-28-r19-arm-n18.out`；Q142.56 与 D_crates（`research/results/e142-r19-diff-r18-to-arm-n18-2026-09-28.txt`）照 R37 在它上面重做。主产物存 `research/results/e142-new-pool-file-creation-dry-run-2026-09-28-r19-main.out`。步 ①(1) 的四个 sha256 按第 1、7 条的改名后值核。
+
+6. **登记里点名的路径今天的位置**（路径不在冻结范围内）：模型、变异表见第 1 条，bin 名 `e142-new-pool-file-creation-dry-run`；导出 bin `crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs`，`driver_e142` 今天跑 `cargo run -q -p singlefs-checker-tier --bin e142_new_pool_file_creation_write_dump`；R33 与步 ③-8 的 step_five 用例今天是 `crates/singlefs-harness/tests/new_pool_file_creation_publish.rs`（按函数名 `recorded_paths_match_the_registered_segment_sequences` 用 `grep -rl` 找到）；`crash_segments_per_device_and_torn_in_place_overwrites.rs` 今天在 `crates/singlefs-checker-tier/tests/`；实验页 `.claude/kb/experiments/142-新池新建文件的干跑.md`；产物文件名前缀按 `term-renames.md` 第 54 行是 `e142-new-pool-file-creation-dry-run`。
+
+7. **独立比对 bin**：今天 `311ce77c9c73148059f4d8a3425ab8902413c34e7ca45ddc04cc582de92fae51`，与 `git show 1ca9b2f9:` 那一版 `f4f26386…` 只差第 3 行文档注释里的模型文件名（`diff` 2 行）；变异表 `8978e80a…` 没变。照用，不改。
+
+8. R19C-10 第 4 条（R40 分叉）照原，不改读法。
+
+9. **这一段在第二台跑（执行员补；依据是主 agent 追加输入原句「把这一段的编译、单测与跑产物挪到第二台」「登记修订里写一条：这一段在第二台跑，附两台工具链逐字相同的原样输出」）**。本机那条单测包装在内存队里排了约 15 分钟没起来，按主 agent 的话停掉（包装退 143，命令一行都没跑，不算结果）；第 2 条写的本机仓副本没用上、已删。改成：主工作区的树（不带 `target/`、`.git`）拷两份到第二台，一份原样（主臂 N19C），一份只把模型换成 `f326f72a…`（臂 N18），各 `git init` 并提交一次（准入模块要 git 列文件），规范副本另拷；两份里各自编、各自跑。两份的 `crates/` 逐文件 sha256 与本机快照 A28 逐字节相同（`cmp` 退 0），模型、独立 bin、变异表的 sha256 在第二台现核：主臂 `5f882741…`、臂 N18 `f326f72a…`、独立 bin `311ce77c…`、变异表 `0d91aafd…`。导出（`driver_e142` 第一条命令）也在第二台那两棵树里跑，它们的 `crates/` 就是 A28。V19c 的快照 B、C 仍在本机主工作区取（那才是准入与门禁看的 `crates/`），另把第二台两棵树的 `crates/` 清单与 A28 比。准入：装置在第二台那棵树里判（`CARGO_MANIFEST_DIR/../..` 是那棵树），产物头 `E7INPUT` 那一行是那棵树的指纹；主产物落回本机之后 Q142.50 照原文在本机跑准入，退 77 才算指纹对上。两台工具链逐字相同的原样输出（`rustc -Vv` 前三行与 host 行、`cargo -V`）：
+   ```
+   == 本机
+   rustc 1.98.0 (88d9e12ae 2026-08-18)
+   binary: rustc
+   commit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea
+   host: x86_64-unknown-linux-gnu
+   cargo 1.98.0 (797e8a9bc 2026-08-05)
+   == 第二台
+   rustc 1.98.0 (88d9e12ae 2026-08-18)
+   binary: rustc
+   commit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea
+   host: x86_64-unknown-linux-gnu
+   cargo 1.98.0 (797e8a9bc 2026-08-05)
+   ```
+
+#### R19E-4 执行员补登（experiment-runner，2026-09-28；续做第四段，这一段任何产物之前、模型改一行之前）：R40 换成「同一块盘上连着的屏障并成一道」
+
+时点：写于模型改动、单测、变异与这一段任何产物之前。上一段的主产物 `research/results/e142-new-pool-file-creation-dry-run-2026-09-28-r19-main.out`（臂 N19C）照留，这一段不改它。依据是派发提示「主 agent 对 S19-crates 的处置」一段，原句：
+
+> 用户 2026-09-28 定「并，跟今天的录制器」，主 agent 已写进 D13（验证路线） 已定项 4 定案末句（你只读，不改决策与变更史），原句：「**同一块盘上连着的屏障并成一道**：录制流里一道屏障与这块盘上一道屏障之间没有任何一次写（别的盘的屏障不算写）时，这一道不记（`crates/singlefs-harness/src/lib.rs` 的 `push`），独立模型照同一条规矩记；中间没有写，这一段不产生崩溃状态，合并与否不改变崩溃状态集合，只改变操作数与种类串。」变更史里是 2026-09-28（其八）那一条。
+> 1. 登记 R40 那一条（第 85 行）「不合并连着的屏障」按这一句改：模型照上面那句自己实现合并（独立手写，不引 `crates/`），改完重新冻结模型与变异表的 sha256；补一条变异「不合并同一块盘连着的屏障」，它必须被单测抓到。
+> 2. 重跑步 ③④ 需要的产物（主产物另起新文件名，旧产物一个不删不改）；Q142.46 那 4 格照新规矩应当与 `crates/` 钉的相同，不同就停下交回。
+
+1. **记一次输（臂 N19C）**：N19C 照 R40 两道都记，在今天的 `crates/` 上 Q142.46 有 4 格不同（暖机、整条流的 `operations=`、`kinds=`），撞停机 S19-crates（上一段报告 `research/prompts/e142-r19-runner3-report.md`「结论」第 2 条）。这一次输照原样留在上一段的产物与报告里，不改写。
+2. **新读法 R46（替换 R40；R40 原文照留）**：模型每发一道池屏障，按设备号升序每块盘记一步；**某块盘上这一步与这块盘上一次记下的屏障之间，录制流里没有任何一次写时，这一步不记**。「任何一次写」读作任何一块盘上的写（原句括注「别的盘的屏障不算写」只把别的盘的屏障排除在「写」之外）；这块盘上还没记过屏障时照记。对面读法「只看这块盘上的写」：主几何与一盘几何的流上，相邻两道池屏障之间要么两块盘都有写、要么一次写都没有（暖机第一次发布尾那道与第二次开头那道），两读法认出的合并集合相同（推的，没量过）；这一次不建它的臂，由第 5 条的合成单测把 R46 这一读法钉住、变异 M203 打它。
+3. **新臂 N19M（真实基线；5.3 与 R19C-4 的「臂 N19C」在这一段一律读作 N19M）** = N19C 的 ①–⑪ 加 ⑫：`RecordingPool::barrier` 照 R46 记步。⑫ 只删步、不加写、不动切段规则 ⇒ 待证命题：段序列、两态、三态、m、写出的字节与 N19C 相同，只有暖机与整条（及窗口之前）的操作数少 2、暖机第二次开头那一段 `barrier×4` 变 `barrier×2`；一盘几何（阳性对照、G6、G7）一行不变（那几条流里没有背靠背的屏障：阳性对照与 G7 不放屏障，G6 是 mkfs 之后直接一次发布）；⑧ 关时（G11、G12）一行不变。由 Q142.46–Q142.49、Q142.53、Q142.55、Q142.57、Q142.60、Q142.61 核；不成立照 F19c / F19d 三步记。
+4. **锚点**（7.1、7.2、7.4 原文照留；下表只列 N19M 上换值的格，其余格照 7.4 原值判）。新值出自登记 R19C-9 那份脚本（`anchors_e142_r19_c577.py`，137 行，sha256 `e25e6d0b77ad098362275964c08ff2973163d1abbb50a11e20170c7c6736d5f6`，这一段从本登记第 816–952 行原样抽出，sha256 与原样输出 `f624b80d…` 都现核相同）只把末尾那段循环换成「全部取样点都 `merge=True`」的一份（`anchors_e142_r19_merge.py`，136 行，sha256 `f2f445940c532e19f400fa6b8ace0f5312f2730f83cf7bd7fb6bdbc9ef424c76`；`merge=True` 就是脚本原注释里「R40 的对面读法」，它的 `self.run` 在任何一块盘的写之后清空，= R46）。
+
+   | 格 | 7.4 原值（N19C） | N19M |
+   |---|---|---|
+   | D2 / C3 暖机操作数 | 22 | 20 |
+   | D2 / C5 整条操作数 | 59 | 57 |
+   | D2 / C10 窗口之前操作数 | 47（写 31） | 45（写 31） |
+   | D3 暖机种类串 | `…\|[journal_record×2,barrier×4]\|…`（第 4 段） | 第 4 段 `[journal_record×2,barrier×2]`，其余同 |
+   | D3 整条种类串 | 第 5 段 `[journal_record×2,barrier×4]` | 第 5 段 `[journal_record×2,barrier×2]`，其余同 |
+   | D6 / C7 / C9 G10a、G10b 整条操作数 | 58 | 56；整条第 5 段同上改 |
+   | 暖机 `barrier_steps`（单测 C3） | 12 | 10 |
+
+   不变的（脚本现核）：D1、D4、D5、C1、C2、C4、C6、C8、C11、C12、C13；G10 两点的 `path=transaction` 两行；G11 五行与 G12 四行（`point=G11_merge`、`G12a_merge`、`G12b_merge` 与 `point=G11`、`G12a`、`G12b` 逐行 `diff` 为空），7.1 A1–A6 与 7.2 B1–B9 在 G11、G12 上照原判。`point=N19M` 的六行与 R19C-9 原样输出里 `point=N19C_merge_reading` 的六行逐行相同（`diff` 为空）。
+   脚本末段（替换原循环）与原样输出（22 行，sha256 `42ca21e135c92ee74caf4a7926cf882f28a99d86ba773232dcae0361483db3ec`）：
+
+```python
+# R19E-4 加：同一套函数，只把 merge=True 用到全部取样点（D13 已定项 4 2026-09-28 定案末句「同一块盘上连着的屏障并成一道」）。
+for name, kwargs in [('N19M', dict(trailing_barrier=True, merge=True)), ('G10a_merge', dict(trailing_barrier=True, swallow=1, merge=True)),
+                     ('G10b_merge', dict(trailing_barrier=True, swallow=0, merge=True)), ('G11_merge', dict(trailing_barrier=False, merge=True)),
+                     ('G12a_merge', dict(trailing_barrier=False, swallow=1, merge=True)), ('G12b_merge', dict(trailing_barrier=False, swallow=0, merge=True))]:
+    paths = build(**kwargs)
+    wanted = ['transaction', 'post_mkfs_stream'] if name[:3] in ('G10', 'G12') else \
+        ['mkfs', 'instance_acquisition', 'warm_up', 'transaction', 'post_mkfs_stream', 'before_window']
+    for path in wanted:
+        report(f'point={name} path={path}', paths[path])
+    if name in ('N19M', 'G11_merge'):
+        report(f'point={name} path=post_mkfs_stream fua_is_boundary=false', paths['post_mkfs_stream'], fua_is_boundary=False)
+```
+
+```
+ANCHOR point=N19M path=mkfs operations=23 writes=19 barrier_steps=4 fua=3 segments=12+1+1+1+4 in_place_per_segment=0+0+0+0+0 in_place_overwrites=0 in_place_kinds=none closed_form_two_state=4114 closed_form_three_state=4114 kinds=[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]
+ANCHOR point=N19M path=instance_acquisition operations=2 writes=2 barrier_steps=0 fua=0 segments=2 in_place_per_segment=2 in_place_overwrites=2 in_place_kinds=[system_configuration_slot×2] closed_form_two_state=4 closed_form_three_state=9 kinds=[system_configuration_slot×2]
+ANCHOR point=N19M path=warm_up operations=20 writes=10 barrier_steps=10 fua=2 segments=2+1+2+2+1+2 in_place_per_segment=0+0+2+0+0+2 in_place_overwrites=4 in_place_kinds=[system_configuration_slot×4] closed_form_two_state=15 closed_form_three_state=25 kinds=[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]
+ANCHOR point=N19M path=transaction operations=35 writes=29 barrier_steps=6 fua=1 segments=24+2+1+2 in_place_per_segment=0+0+0+2 in_place_overwrites=2 in_place_kinds=[system_configuration_slot×2] closed_form_two_state=16777223 closed_form_three_state=16777228 kinds=[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]
+ANCHOR point=N19M path=post_mkfs_stream operations=57 writes=41 barrier_steps=16 fua=3 segments=2+2+1+2+2+1+2+24+2+1+2 in_place_per_segment=2+0+0+2+0+0+2+0+0+0+2 in_place_overwrites=8 in_place_kinds=[system_configuration_slot×8] closed_form_two_state=16777240 closed_form_three_state=16777260 kinds=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]
+ANCHOR point=N19M path=before_window operations=45 writes=31 barrier_steps=14 fua=5 segments=12+1+1+1+4+2+2+1+2+2+1+2 in_place_per_segment=0+0+0+0+0+2+0+0+2+0+0+2 in_place_overwrites=6 in_place_kinds=[system_configuration_slot×6] closed_form_two_state=4131 closed_form_three_state=4146 kinds=[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]
+ANCHOR point=N19M path=post_mkfs_stream fua_is_boundary=false operations=57 writes=41 barrier_steps=16 fua=3 segments=2+2+3+2+3+24+2+3 in_place_per_segment=2+0+2+0+2+0+0+2 in_place_overwrites=8 in_place_kinds=[system_configuration_slot×8] closed_form_two_state=16777249 closed_form_three_state=16777284 kinds=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua,system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua,system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua,system_configuration_slot×2,barrier×2]
+ANCHOR point=G10a_merge path=transaction operations=34 writes=29 barrier_steps=5 fua=1 segments=24+5 in_place_per_segment=0+2 in_place_overwrites=2 in_place_kinds=[system_configuration_slot×2] closed_form_two_state=16777247 closed_form_three_state=16777287 kinds=[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,system_configuration_slot×2,barrier×3]
+ANCHOR point=G10a_merge path=post_mkfs_stream operations=56 writes=41 barrier_steps=15 fua=3 segments=2+2+1+2+2+1+2+24+5 in_place_per_segment=2+0+0+2+0+0+2+0+2 in_place_overwrites=8 in_place_kinds=[system_configuration_slot×8] closed_form_two_state=16777264 closed_form_three_state=16777319 kinds=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,system_configuration_slot×2,barrier×3]
+ANCHOR point=G10b_merge path=transaction operations=34 writes=29 barrier_steps=5 fua=1 segments=24+3+2 in_place_per_segment=0+0+2 in_place_overwrites=2 in_place_kinds=[system_configuration_slot×2] closed_form_two_state=16777226 closed_form_three_state=16777231 kinds=[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,barrier]|[system_configuration_slot×2,barrier×2]
+ANCHOR point=G10b_merge path=post_mkfs_stream operations=56 writes=41 barrier_steps=15 fua=3 segments=2+2+1+2+2+1+2+24+3+2 in_place_per_segment=2+0+0+2+0+0+2+0+0+2 in_place_overwrites=8 in_place_kinds=[system_configuration_slot×8] closed_form_two_state=16777243 closed_form_three_state=16777263 kinds=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,barrier]|[system_configuration_slot×2,barrier×2]
+ANCHOR point=G11_merge path=mkfs operations=23 writes=19 barrier_steps=4 fua=3 segments=12+1+1+1+4 in_place_per_segment=0+0+0+0+0 in_place_overwrites=0 in_place_kinds=none closed_form_two_state=4114 closed_form_three_state=4114 kinds=[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]
+ANCHOR point=G11_merge path=instance_acquisition operations=2 writes=2 barrier_steps=0 fua=0 segments=2 in_place_per_segment=2 in_place_overwrites=2 in_place_kinds=[system_configuration_slot×2] closed_form_two_state=4 closed_form_three_state=9 kinds=[system_configuration_slot×2]
+ANCHOR point=G11_merge path=warm_up operations=18 writes=10 barrier_steps=8 fua=2 segments=2+1+2+2+1+2 in_place_per_segment=0+0+2+0+0+2 in_place_overwrites=4 in_place_kinds=[system_configuration_slot×4] closed_form_two_state=15 closed_form_three_state=25 kinds=[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]
+ANCHOR point=G11_merge path=transaction operations=33 writes=29 barrier_steps=4 fua=1 segments=24+2+1+2 in_place_per_segment=0+0+0+2 in_place_overwrites=2 in_place_kinds=[system_configuration_slot×2] closed_form_two_state=16777223 closed_form_three_state=16777228 kinds=[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]
+ANCHOR point=G11_merge path=post_mkfs_stream operations=53 writes=41 barrier_steps=12 fua=3 segments=2+2+1+2+2+1+26+2+1+2 in_place_per_segment=2+0+0+2+0+0+2+0+0+2 in_place_overwrites=8 in_place_kinds=[system_configuration_slot×8] closed_form_two_state=67108885 closed_form_three_state=150994980 kinds=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]
+ANCHOR point=G11_merge path=before_window operations=43 writes=31 barrier_steps=12 fua=5 segments=12+1+1+1+4+2+2+1+2+2+1+2 in_place_per_segment=0+0+0+0+0+2+0+0+2+0+0+2 in_place_overwrites=6 in_place_kinds=[system_configuration_slot×6] closed_form_two_state=4131 closed_form_three_state=4146 kinds=[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]
+ANCHOR point=G11_merge path=post_mkfs_stream fua_is_boundary=false operations=53 writes=41 barrier_steps=12 fua=3 segments=2+2+3+2+27+2+3 in_place_per_segment=2+0+2+0+2+0+2 in_place_overwrites=8 in_place_kinds=[system_configuration_slot×8] closed_form_two_state=134217754 closed_form_three_state=301989939 kinds=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua,system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[unit_write×24,root_record_fua,system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua,system_configuration_slot×2]
+ANCHOR point=G12a_merge path=transaction operations=32 writes=29 barrier_steps=3 fua=1 segments=24+5 in_place_per_segment=0+2 in_place_overwrites=2 in_place_kinds=[system_configuration_slot×2] closed_form_two_state=16777247 closed_form_three_state=16777287 kinds=[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,system_configuration_slot×2,barrier]
+ANCHOR point=G12a_merge path=post_mkfs_stream operations=52 writes=41 barrier_steps=11 fua=3 segments=2+2+1+2+2+1+26+5 in_place_per_segment=2+0+0+2+0+0+2+2 in_place_overwrites=8 in_place_kinds=[system_configuration_slot×8] closed_form_two_state=67108909 closed_form_three_state=150995039 kinds=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier×2]|[journal_record×2,root_record_fua,system_configuration_slot×2,barrier]
+ANCHOR point=G12b_merge path=transaction operations=32 writes=29 barrier_steps=3 fua=1 segments=24+3+2 in_place_per_segment=0+0+2 in_place_overwrites=2 in_place_kinds=[system_configuration_slot×2] closed_form_two_state=16777226 closed_form_three_state=16777231 kinds=[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,barrier]|[system_configuration_slot×2]
+ANCHOR point=G12b_merge path=post_mkfs_stream operations=52 writes=41 barrier_steps=11 fua=3 segments=2+2+1+2+2+1+26+3+2 in_place_per_segment=2+0+0+2+0+0+2+0+2 in_place_overwrites=8 in_place_kinds=[system_configuration_slot×8] closed_form_two_state=67108888 closed_form_three_state=150994983 kinds=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier×2]|[journal_record×2,root_record_fua,barrier]|[system_configuration_slot×2]
+```
+
+5. **单测与变异（加，收严）**：单测按第 4 条换值（不取任何产物）；另加一条合成单测钉 R46：两块盘的空池上 `barrier(); barrier()` 只记两步；`barrier(); 盘 1 写一次; barrier()` 记四步（盘 0 那一步因为中间有盘 1 的写照记）；一块盘时 `barrier(); barrier()` 只记一步。第九节加两条（编号接 M201）：**M202「不合并同一块盘连着的屏障」**（`barrier()` 退回每块盘都记，即 N19C）——主几何：暖机 20 → 22、整条 57 → 59、窗口之前 45 → 47，暖机与整条第 5 段 `barrier×2` → `barrier×4`，单测 `registered_segment_sequences_match_every_recorded_path` 与合成单测必须红；**M203「只看这块盘上的写」**（盘 1 的写不打断盘 0 的合并）——主几何不变（第 2 条，推的），只在合成单测那一格变（四步 → 三步），不许记成等价变异。已有 180 条照原文整张重跑（锚点不再恰好命中一次的逐条重锚，写进 R19E-5）。
+6. **Q142.46 与停机（加，收严）**：派发提示第 2 条的「那 4 格」= 暖机、整条的 `operations=` 与 `kinds=`。Q142.46 的 20 格仍逐格判；任一格 `literal_equal=false` ⇒ 停机 S19-crates，停在比对之后交回（不写 `replay.sh`、不写实验页）。Q142.49 (i) 的 `i_before_window_operations` 照同一停机。R19C-6 第 1、9 格「差得恰如附表 M ⇒ 另标 R40 分叉」对 N19M 不再适用（附表 M 就是 N19M 的锚点）。
+7. **S19-clause 基线换成 `80e98fbd9039f7808dc9d85209ce48dbbe6f6d86c969b0c12a9d787fa852e8e2`**（七个取法同 R19C-3(b)，190 行；出口 `/tmp/claude-1000/e142-r19-runner4/step0/requote-step0.md`）。与 `4d98ee79…` 逐字符比只差三处，都在 D13 已定项 4 那一段、都是派发提示点名的那一次改动：出处行 `:70-84` → `:70-85`；定案末尾加「**同一块盘上连着的屏障并成一道**：……只改变操作数与种类串。」一句（即上面引的原句）；依据加一行「- 同一块盘上连着的屏障并成一道：用户 2026-09-28 定「并，跟今天的录制器」（……），原话在变更史。」。`layout/01` 第八节、D22、D15、D16 那几段一个字符没变。步 ③(1) 的重抄比这个值。
+8. **沿用的产物**：`crates/` 今天与快照 A28 逐文件相同（`find crates -type f -not -path '*/target/*' -print0 | sort -z | xargs -0 sha256sum` 与 `research/results/e142-r19-crates-sha256-a-2026-09-28.txt` `cmp` 退 0），臂 N18 产物 `…-2026-09-28-r19-arm-n18.out`、D_crates（`e142-r19-diff-r18-to-arm-n18-2026-09-28.txt`）与 Q142.56 照用，不重跑。V19c 比 A28 与这一段新取的快照 B、C。
+9. **这一段的新文件名**（旧文件一个不删不改；同一天再跑加 `-r2`）：主产物 `research/results/e142-new-pool-file-creation-dry-run-2026-09-28-r19-main-2026-09-28.out`（旧名去掉 `.out` 末尾不是日期，照执行员定义接今天的日期）；快照 `e142-r19-crates-sha256-{b,c}-2026-09-28-r2.txt`；D_model、D_total `e142-r19-diff-{arm-n18-to-main,r18-to-main}-2026-09-28-r2.txt`；比对 `e142-r19-comparisons-2026-09-28-r2.out`；控制 `e142-r19-controls-2026-09-28-r2.out`；独立 bin `e142-region-old-new-independent-2026-09-28.out`（旧名 `…-2026-09-28-r19` 末尾是「日期-rN」形，照定义去掉再接日期）。
+10. **在哪台跑**：开工时本机内存包装不排队（`run-with-memory-cap.sh --status`：slice 总上限 40.1 GiB、已占 346 MiB），编译、单测、变异与产物在本机跑；排上队再照 R19E-3 第 9 条挪第二台，并在 R19E-5 里写明。
+
+#### R19E-5 冻结（experiment-runner，2026-09-28；单测与变异整张跑完之后、这一段主产物之前；臂与判据不改）
+
+- 模型只改了 R19E-4 第 3、5 条那几处：`RecordingPool::barrier` 照 R46 记步（加一个从流尾往回找「这块盘上一次屏障之后有没有写」的函数）；单测按 R19E-4 第 4 条换值（暖机 20、整条 57、窗口之前 45、暖机屏障步 10、G10 两点整条 56 与第 5 段种类），加合成单测 `consecutive_barriers_on_one_device_merge_and_any_write_in_between_keeps_them_apart`。没有一处取产物的数。
+- 单测（本机，`research/` 下 `nice -n 19 bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 32 cargo test --release -p e7-index-bench --bin e142-new-pool-file-creation-dry-run`）末行原样：`test result: ok. 95 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.73s`；`grep -c '^test .* ok$'` = 95。
+- 变异整张（本机，`MUTATE_JOBS=2 nice -n 19 bash scripts/capped.sh 16 bash scripts/mutate.sh e142-new-pool-file-creation-dry-run e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs mutations/e142_new_pool_file_creation_dry_run.tsv`，182 条），按行首符号数：✅ 182、⏭ 0、❌ 0、💥 0、⚠️ 0、⏱ 0、🧱 0；收尾原样「计数：内存撞顶 0 条（上限 16G）、超时 0 条」「已还原，基线仍全绿」，退出码 0。已有 180 条不用重锚。M202 被 `consecutive_barriers_on_one_device_merge_and_any_write_in_between_keeps_them_apart`、`before_window_and_window_counts_match_the_registered_anchors`、`registered_segment_sequences_match_every_recorded_path`、`swallowed_barrier_points_match_the_registered_anchors`、`warm_up_writes_two_empty_publishes_covering_both_devices` 抓到；M203 只被合成单测抓到（R19E-4 第 5 条预言的那一格）。日志 `research/results/e142_new_pool_file_creation_dry_run-mutate-2026-09-28.log`（sha256 `0e9f82837459c26fc69457a60c23c8acadbbb0d91c3c869b8a5fe42bc20d8ee7`）。
+- **冻结**：模型 `research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs` 9371 行，sha256 `ebefbe936d5f173420b0d568ca47ddc64069afc724764a676fb03fd561f2a4dd`；变异表 `research/mutations/e142_new_pool_file_creation_dry_run.tsv` 182 行，sha256 `ec2af965de10fb42fb4d79e141dda75c355273ef822e998ca2ef0274512aa107`。这一段主产物由这一份模型编出；主产物落盘之后这份登记不再改。
 
 ## 十三、读过的文件与跑过的命令
 
@@ -1053,7 +1177,7 @@ ANCHOR point=G11_merge_reading path=before_window operations=43 writes=31 barrie
 - `crates/singlefs-harness/tests/crash_segments_per_device_and_torn_in_place_overwrites.rs` 第 1–30、600–665 行与 grep 命中。
 - `crates/singlefs-harness/tests/*.rs` 里 grep `150_994_980\|150994980\|67_108_885\|with_torn_in_place` 的命中行。
 - `crates/singlefs-harness/src/bin/e142_first_transaction_write_dump.rs` grep `name=` 命中行与第 165–225 行；`crates/singlefs-harness/src/bin/first_transaction_on_device.rs` 第 1485–1495 行。
-- `git status --short crates/`（2026-09-27 11:02 JST，20 行）。
+- `git status --short crates/`（2026-09-27，20 行）。
 
 ### 13.5 模型装置、独立 bin 与变异表
 
@@ -1171,10 +1295,10 @@ grep -n '三态\|three_state\|原地覆写' research/e7-index-bench/src/bin/e142
 （零命中，退出码 1）
 ```
 
-#### 命令六：准入今天放不放行（2026-09-27 约 10:55 JST）
+#### 命令六：准入今天放不放行（2026-09-27 约）
 
 ```
-nice -n 19 python3 research/scripts/admission.py experiment /home/fy5090/code/singlefs E142
+nice -n 19 python3 research/scripts/admission.py experiment <仓根> E142
 exit=0
 stderr:   ✓ 放行 E142：输入自 research/results/e142-first-txn-dry-run-2026-09-26-r18-main.out 以来变了（那一份 f62e18e1695d，今天 6730b2f80c2a）
 stdout: E7INPUT name=input_fingerprint key=E142 sha256=6730b2f80c2ac2faa5e1ff1a1f93806a68afa78e764aced5b7c7ef31f81e218f files=178

@@ -1,0 +1,23 @@
+ARM mutated(no-1058)
+CLASS 0A candidates=10
+CLASS 0B candidates=20
+CLASS 0O candidates=19
+CLASS 0R candidates=100
+CLASS 0S candidates=1
+CLASS 1 candidates=6
+CLASS 2 candidates=51
+PICK 0A #0
+PICK 0B #0
+PICK 0O #0
+PICK 0R #0
+SKIP crash1-rank0 state_count=1146929 budget_left=1000000
+SKIP crash1-rank0 state_count=1146929 budget_left=1000000
+SKIP crash1-rank0 state_count=1146929 budget_left=1000000
+SKIP crash1-rank0 state_count=1146929 budget_left=1000000
+MOUNT 4 rank0 landed=Some((2, 5)) vfail=1 mounted eff=(2, 5) instance=3
+MOUNT 4 rank0 second-mount mounted instance=4
+SIG 4 after-mount-rank0 eff=Some((4, 10)) FileRead(1,3)|(2,5)|(3,7)|(3,8)|(4,9)|(4,10) vfail=0 applied=0 below_floor=false oracle=ok checker=[] record=(false,false)
+TALLY over_i2-third-cut states=0 violations=0 ignored_violations=0 checker_violated={} record_root_without_record=0 record_claimed_state_missing_unit=0 verification_failed_states=0 root_persisted_states=0 failed_states=0 first_violation=None
+TALLY over_i2-suffix-publish states=0 violations=0 ignored_violations=0 checker_violated={} record_root_without_record=0 record_claimed_state_missing_unit=0 verification_failed_states=0 root_persisted_states=0 failed_states=0 first_violation=None
+CRASH1_STATES 4 per_rank={0: 4} budget_left=1000000 ELAPSED 0.1s
+WALL 0s rc=0

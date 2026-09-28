@@ -1,0 +1,15 @@
+exit=0
+want=新池新建文件的字段表指向都成立（查了 7 处引用）
+want=被投影的分项，字段表都投影全了（1 张字段表、2 行；投影表引用了 3 条分项）
+want=扫了 10 份决策、4 份字节布局表；表后合计 3 张，表前说明句 2 张，format-const 标记 2 个；字节布局表里的结构总宽 5 处都有登记
+want=! 跳过：365-样例.md 已定项 8 的 format-const 标记 SAMPLE_UNDECIDED_WIDTH 没核：这一节有宽度不是数的字段表，加不出确定的和
+want=没验：365-样例.md:16 那张字段表，表前表后都没写认得出的总宽
+want=互相挂钩（判「是」的未定项 1 条、字节表 4 节、里程碑 2 步）
+want=准入不等式 3 项逐项有归属
+want=比对了 2 处登记（表格 1 行 + 整条流提示 1 处
+want=第二条流的登记 1 处与钉它的用例相符：第二条流 `2+1`（3 次写、5 个状态
+want=2 个占位
+want=登记表 1 行、行到步 1 处、「写出的字节」点名 3 处、用例 2 个、段序列登记表标到的步 1 个
+want=3 条认购
+want=余 44
+want=doc-registries.sh：9 格里 9 格绿（field-refs field-projection field-table-sums first-txn-hooks admission-terms segment-registry format-const-placeholders second-txn-hooks tree-table-reserve），0 格本次未跑（无）

@@ -1,6 +1,6 @@
 # m2-closeout-code-r1 云端攻方腿（Opus）报告
 
-轮名 `m2-closeout-code-r1`，攻击面 Z1、Z3、Z5、Z8（正文第四节分工表）。代码一律读快照 `refs/sop/m2-closeout-code-r1-snapshot`（提交 `67f447de`），用例写在快照副本上跑，没有碰主工作区。下文「快照 `文件:行号`」都是快照里的行号；主工作区的 `mount.rs`、`transaction.rs`、`crash.rs` 此刻已经和快照不同（`cmp` 现查），所以代码位置不用「」引号写，照 `git show refs/sop/m2-closeout-code-r1-snapshot:<路径>` 取。时刻都是 UTC，2026-09-27 00:1x–01:1x（JST 09:1x–10:1x）。
+轮名 `m2-closeout-code-r1`，攻击面 Z1、Z3、Z5、Z8（正文第四节分工表）。代码一律读快照 `refs/sop/m2-closeout-code-r1-snapshot`（提交 `67f447de`），用例写在快照副本上跑，没有碰主工作区。下文「快照 `文件:行号`」都是快照里的行号；主工作区的 `mount.rs`、`transaction.rs`、`crash.rs` 此刻已经和快照不同（`cmp` 现查），所以代码位置不用「」引号写，照 `git show refs/sop/m2-closeout-code-r1-snapshot:<路径>` 取。日期 2026-09-27。
 
 ## 复跑命令与文件哈希
 

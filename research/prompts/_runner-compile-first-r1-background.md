@@ -31,7 +31,7 @@
 
 **不归这一轮的**：`experiment-runner.md` 里别的会话同一天没提交的改动（第 2 步前半段的英文名与 bin 名规矩、第 5 步复跑驱动那一句）；`mutate.sh` 不带 `--features` 的缺口（已交里程碑二收尾会话）。
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-27 JST 16:4x）
+## 二、实现今天的样子（主 agent 的观测，2026-09-27）
 
 - 入库装置今天在 `crates/singlefs-harness/src/bin/` 下（`e158_root_choice_repair.rs`、`e161_crash_state_dedup_and_time_split.rs` 等），harness 带 `--all-targets` 连带编它们（singlefs-99 两次报的原样错误：`error[E0425]: cannot find value unit_check_fields`，`e161_crash_state_dedup_and_time_split.rs:5062` 等 5 处）。
 - 自证现跑（原样末行）：
@@ -119,7 +119,7 @@
 | ## 九、用户定案 | 不抄 | 同上 |
 | ## 十、这份提案没做的 | 不抄 | 同上 |
 | ## 十一、第一轮查出、还没做的欠账 | 不抄 | 同上 |
-| ## 十二、第 0 步实测（2026-09-16 UTC 22:31 与 23:05–23:30，东京 09-17 07:31 与 08:05–08:30） | 不抄 | 同上 |
+| ## 十二、第 0 步实测（2026-09-17） | 不抄 | 同上 |
 | ## 十三、定义的静态核实（2026-09-17） | 不抄 | 同上 |
 | ## 十四、CLAUDE.md 与规则做减法的次序 | 不抄 | 同上 |
 | ## 十五、门禁阶段归属与 `crash-verifier`（2026-09-17） | 不抄 | 同上 |
@@ -249,7 +249,7 @@ required-inputs: 草稿目录, 报告
 7. 主 agent 要写实验页时：`.claude/kb/experiments/<号>-<简称>.md`，结果整行抄自产物并带文件名，写复跑命令、口径、它答不了的；索引行进 `.claude/kb/experiments.md`。写完（连同第 7b 步）跑第 6 步留下的那几道，各贴原样末行与退出码。
    7b. 实验页的 `### 影响的决策` 一节照第 7 步写实验页的规则写，形态与判据不在这份定义里复述。这一步你要做的三件：① 要写支撑或推翻时，先 `grep -n 'E<号>（' .claude/kb/decisions/<那条决策的文件>` 看那条分项的「**依据**」段引没引这个实验——引了才写支撑或推翻，没引就写备料，并把「这一格该不该升成支撑」列进报告交主 agent，**不自己去改决策文件**（写范围闸也不放行）。② 那条决策还在 `.claude/decision-links-pending` 里时（那份清单只减不增；清单里一条都没有时 ② 不适用，① ③ 照做）不查依据段（门禁 75 号对清单里的决策整段跳过双向检查，那些决策还没有依据段），写决策级一行，并把它列进报告。③ 重跑已有实验、换了产物、加了历史条目之后，表里每一行都重新回看一遍。
    7c. 写完实验页与 `experiments-history.md` 的条目，对这两份跑一次 `bash .claude/singlefs-ai-sop/scripts/doc-lint.sh .`，贴末行；红在这一次写的句子上的改到绿，红在别处的照写不修。
-8. 跑超过 30 分钟的量：每完成一格往草稿目录的 `progress.md` 追加一行（格名、这一格耗时、下一格预计多久，时刻写 JST），主 agent 读文件不必发消息；看门狗在它超过 30 分钟没改、而你在等后台任务时提前报。
+8. 跑超过 30 分钟的量：每完成一格往草稿目录的 `progress.md` 追加一行（格名、这一格耗时、下一格预计多久），主 agent 读文件不必发消息；看门狗在它超过 30 分钟没改、而你在等后台任务时提前报。
 
 ```
 
@@ -314,7 +314,7 @@ required-inputs: 草稿目录, 报告
   不整份读。
 - 每个定义都照守、不再写进各自「开工先读：」一行的三处：跑命令照 `.claude/singlefs-ai-sop/rules/command-safety.md`「退不回去的操作，动手前先想一遍」「`pkill -f` / `killall` 一律禁用」两节；
   给人看的文字照 `.claude/singlefs-ai-sop/rules/writing-discipline.md`「说人话」一节；说外部状态之前现查（`.claude/singlefs-ai-sop/rules/verify-before-claiming.md` 开头一节）。
-- 本机时钟是 UTC，人在东京（JST，UTC+9）；报告里的时刻写清是哪个时区。
+- 本机时钟与人所在的东京不在一个时区；报告里的时刻写清是哪个时区。
 - 候选、臂、方案、判据、提问编号有了变体，起一个新名字（那一族里下一个没用过的号，或一个短的描述性名字），不在原名后面加撇号类角标（U+2032、U+2033、U+2034、U+02B9、U+02BA）；全仓由门禁 12 号判，写法见 `.claude/rules/path-moves.md`「变体起新名字，不用角标」。
 - 派发提示里没给、定义里也没写的项目事实（某份 kb 在哪、某条决策的原文），去仓里现查，不凭印象补。
 - **找不到历史实验的数据、提示或产物，去 `git log` 里看。** 上一轮及更早的实验记录不留在工作区：
@@ -458,5 +458,5 @@ required-inputs: 草稿目录, 报告
 **出处 `records/2026-09-16-subagent拆分提案.md:962-962`（整段抄，未转述）**
 
 ```markdown
-| 51 | `.claude/agents/experiment-runner.md` 与一个新的写入前钩子 | 实验执行员直接在主工作区里改入库装置（`crates/` 下的 bin），改到一半编不过；harness 带 `--all-targets` 会连带编所有 bin，别的会话与实现员的编译一起卡住。同一天两次：2026-09-27 JST 11:1x E158 第二段执行员、13:1x E161 执行员（singlefs-99 报的原样错误 `error[E0425]: cannot find value unit_check_fields`，`crates/singlefs-harness/src/bin/e161_crash_state_dedup_and_time_split.rs:5062` 等 5 处） | 用户 2026-09-27 JST 16:1x 弹窗选「改定义并加钩子」：定义加一条「入库装置先在草稿目录的副本里改，编过再整份换进主工作区；主工作区里任何时候都只放编得过的版本」，另做写入前钩子让执行员对主工作区 `crates/` 下 `.rs` 的写入只经一条先编后换的路径。派 tooling-writer；定义改动进一轮定义三方（门禁 72 号按路径点名）。2026-09-27 JST 16:3x 做了、待定义三方：定义第 2 步入库装置那几条加 ④（先在草稿副本里改，经脚本编过再整份换进来）；写入前钩子没另起，并进已有两份、都只拦 experiment-runner：`.claude/hooks/write-guard.sh` 加「四、先编后换」（Write / Edit），`.claude/hooks/bash-command-detector.sh` 加 ⑨（Bash 里的 cp、重定向、sed -i、rm、python 写这类）；先编后换的脚本 `research/scripts/compile-then-swap.py`（仓副本里 `cargo build` 与 `cargo test --no-run` 那一个 bin，编过才改名换上，自证挂进门禁 47 号） |
+| 51 | `.claude/agents/experiment-runner.md` 与一个新的写入前钩子 | 实验执行员直接在主工作区里改入库装置（`crates/` 下的 bin），改到一半编不过；harness 带 `--all-targets` 会连带编所有 bin，别的会话与实现员的编译一起卡住。同一天两次：2026-09-27 E158 第二段执行员 E161 执行员（singlefs-99 报的原样错误 `error[E0425]: cannot find value unit_check_fields`，`crates/singlefs-harness/src/bin/e161_crash_state_dedup_and_time_split.rs:5062` 等 5 处） | 用户 2026-09-27 弹窗选「改定义并加钩子」：定义加一条「入库装置先在草稿目录的副本里改，编过再整份换进主工作区；主工作区里任何时候都只放编得过的版本」，另做写入前钩子让执行员对主工作区 `crates/` 下 `.rs` 的写入只经一条先编后换的路径。派 tooling-writer；定义改动进一轮定义三方（门禁 72 号按路径点名）。2026-09-27 做了、待定义三方：定义第 2 步入库装置那几条加 ④（先在草稿副本里改，经脚本编过再整份换进来）；写入前钩子没另起，并进已有两份、都只拦 experiment-runner：`.claude/hooks/write-guard.sh` 加「四、先编后换」（Write / Edit），`.claude/hooks/bash-command-detector.sh` 加 ⑨（Bash 里的 cp、重定向、sed -i、rm、python 写这类）；先编后换的脚本 `research/scripts/compile-then-swap.py`（仓副本里 `cargo build` 与 `cargo test --no-run` 那一个 bin，编过才改名换上，自证挂进门禁 47 号） |
 ```

@@ -4,7 +4,7 @@
 set -uo pipefail
 out=$1; shift
 here=/tmp/claude-1000/impl-r2-fixes-b
-main=/home/fy5090/code/singlefs
+main=<仓根>
 mkdir -p "$out"
 cd "$here/work"
 run() {

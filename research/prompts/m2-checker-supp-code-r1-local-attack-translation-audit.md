@@ -1,4 +1,4 @@
-# 转述核对表：m2-checker-supp-code-r1-local-attack（2026-09-21 UTC / 2026-09-22 JST）
+# 转述核对表：m2-checker-supp-code-r1-local-attack（2026-09-22）
 
 逐条核对 `research/prompts/m2-checker-supp-code-r1-local-attack.md`（K4 全面 + K3 里
 「实现与判据原文逐字对不对得上」那几格）里每一条 Fact 与中文/源码原文。行号现查工作区版本

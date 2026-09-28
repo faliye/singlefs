@@ -1,0 +1,2177 @@
+    Checking libc v0.2.189
+    Checking libz-sys v1.1.29
+    Checking bzip2-sys v0.1.13+1.0.8
+    Checking zstd-sys v2.1.0+zstd.1.5.7
+    Checking getrandom v0.4.3
+    Checking lz4-sys v1.11.1+lz4-1.10.0
+    Checking redb v4.3.0
+    Checking librocksdb-sys v0.19.0+11.8.1
+    Checking crypto-common v0.2.2
+    Checking rocksdb v0.25.0
+    Checking universal-hash v0.6.1
+    Checking cipher v0.5.2
+    Checking aead v0.6.1
+    Checking polyval v0.7.3
+    Checking poly1305 v0.9.1
+    Checking aes v0.9.3
+    Checking chacha20 v0.10.2
+    Checking ctr v0.10.1
+    Checking ghash v0.6.0
+    Checking chacha20poly1305 v0.11.0
+    Checking aes-gcm v0.11.1
+    Checking e7-index-bench v0.1.0 (research/e7-index-bench)
+warning: use of deprecated trait `aes_gcm::aead::AeadInPlace`: use `AeadInOut` instead
+  --> e7-index-bench/src/bin/e58_csum_grain.rs:71:12
+   |
+71 |     aead::{AeadInPlace, KeyInit},
+   |            ^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated method `aes_gcm::aead::AeadInPlace::encrypt_in_place_detached`: use `AeadInOut::encrypt_inout_detached` instead
+   --> e7-index-bench/src/bin/e58_csum_grain.rs:189:15
+    |
+189 |     let t = c.encrypt_in_place_detached(nonce, b"", buf).expect("MAC 失败");
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated associated function `aes_gcm::aead::hybrid_array::Array::<T, U>::from_slice`: use `TryFrom` instead
+   --> e7-index-bench/src/bin/e58_csum_grain.rs:206:24
+    |
+206 |     let nonce = Nonce::from_slice(&[0u8; 12]);
+    |                        ^^^^^^^^^^
+
+warning: use of deprecated associated function `aes_gcm::aead::hybrid_array::Array::<T, U>::from_slice`: use `TryFrom` instead
+   --> e7-index-bench/src/bin/e58_csum_grain.rs:259:24
+    |
+259 |     let nonce = Nonce::from_slice(&[0u8; 12]);
+    |                        ^^^^^^^^^^
+
+warning: manual `RangeInclusive::contains` implementation
+  --> e7-index-bench/src/bin/e88_impostor_orphan.rs:79:12
+   |
+79 |         if live_index >= 1 && live_index <= NESTED_FOREIGN_IMAGE_COUNT {
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `(1..=NESTED_FOREIGN_IMAGE_COUNT).contains(&live_index)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_range_contains
+   = note: `#[warn(clippy::manual_range_contains)]` on by default
+
+warning: manual checked division
+   --> e7-index-bench/src/bin/e63_width_rule.rs:136:8
+    |
+136 |     if denominator == 0 { 0 } else { numerator * 1_000_000 / denominator }
+    |        ^^^^^^^^^^^^^^^^              ----------------------------------- division performed here
+    |        |
+    |        check performed here
+    |
+    = help: consider using `checked_div`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_checked_ops
+    = note: `#[warn(clippy::manual_checked_ops)]` on by default
+
+warning: manual checked division
+   --> e7-index-bench/src/bin/e63_width_rule.rs:177:28
+    |
+177 |                         if totals.stripes == 0 { 0 } else { totals.hit_ppm_weighted / totals.stripes },
+    |                            ^^^^^^^^^^^^^^^^^^^              ---------------------------------------- division performed here
+    |                            |
+    |                            check performed here
+    |
+    = help: consider using `checked_div`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_checked_ops
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> e7-index-bench/src/bin/e63_width_rule.rs:191:13
+    |
+191 |             totals.data = width - 1;
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `RunTotals { data: width - 1, physical_cells: width, ..Default::default() }` and removing relevant reassignments
+   --> e7-index-bench/src/bin/e63_width_rule.rs:190:13
+    |
+190 |             let mut totals = RunTotals::default();
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#field_reassign_with_default
+    = note: `#[warn(clippy::field_reassign_with_default)]` on by default
+
+warning: using `contains()` instead of `iter().any()` is more efficient
+   --> e7-index-bench/src/bin/e42_transaction_records.rs:124:13
+    |
+124 |         if !truth.iter().any(|truth_state| *truth_state == replayed_state) { illegal += 1; }
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `truth.contains(&replayed_state)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_contains
+    = note: `#[warn(clippy::manual_contains)]` on by default
+
+warning: this operation has no effect
+   --> e7-index-bench/src/bin/e42_transaction_records.rs:184:112
+    |
+184 |         assert_eq!(measure(&two_hundred_transactions_of_eight_writes(), Arm::SplitNoBoundary, 4).cut_prefixes, 200 * (2 - 1));
+    |                                                                                                                ^^^^^^^^^^^^^ help: consider reducing it to: `200`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#identity_op
+    = note: `#[warn(clippy::identity_op)]` on by default
+
+warning: `e7-index-bench` (bin "e63-width-rule" test) generated 3 warnings
+warning: `e7-index-bench` (bin "e88-impostor-orphan" test) generated 1 warning (run `cargo clippy --fix --bin "e88-impostor-orphan" -p e7-index-bench --tests -- ` to apply 1 suggestion)
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> e7-index-bench/src/bin/e130_livelist_bounded_destroy.rs:167:13
+    |
+167 | const ARMS: [(&str, fn(&Load) -> Reading); 3] =
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: `e7-index-bench` (bin "e42_transaction_records" test) generated 2 warnings (run `cargo clippy --fix --bin "e42_transaction_records" -p e7-index-bench --tests -- ` to apply 2 suggestions)
+warning: `e7-index-bench` (bin "e130_livelist_bounded_destroy" test) generated 1 warning
+warning: constant `CHAINS` is never used
+   --> e7-index-bench/src/bin/e49_chain_width.rs:109:7
+    |
+109 | const CHAINS: [u64; 3] = [2, 4, 8];
+    |       ^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `e7-index-bench` (bin "e58-csum-grain" test) generated 4 warnings
+warning: manually reimplementing `div_ceil`
+   --> e7-index-bench/src/bin/e106_stripe_member_table.rs:337:28
+    |
+337 |             let midpoint = (lower_bound + upper_bound + 1) / 2;
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `(lower_bound + upper_bound).div_ceil(2)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_div_ceil
+    = note: `#[warn(clippy::manual_div_ceil)]` on by default
+
+warning: `e7-index-bench` (bin "e49_chain_width" test) generated 1 warning
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> e7-index-bench/src/bin/e134_map_key_slot_baselines.rs:404:23
+    |
+404 |         let expected: [(&str, u64, u64, u64, u64, u64, u64, u64); 14] = [
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: `e7-index-bench` (bin "e106-stripe-member-table" test) generated 1 warning (run `cargo clippy --fix --bin "e106-stripe-member-table" -p e7-index-bench --tests -- ` to apply 1 suggestion)
+warning: `e7-index-bench` (bin "e134_map_key_slot_baselines" test) generated 1 warning
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> e7-index-bench/src/bin/e133_map_key_format_cost.rs:402:23
+    |
+402 |         let expected: [(&str, u64, u64, u64, u64, u64, u64, u64); 12] = [
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: the loop variable `nonce_byte_index` is used to index `header_bytes`
+   --> e7-index-bench/src/bin/e61_chain_hash.rs:135:29
+    |
+135 |     for nonce_byte_index in 42..54 {
+    |                             ^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_range_loop
+    = note: `#[warn(clippy::needless_range_loop)]` on by default
+help: consider using an iterator and enumerate()
+    |
+135 -     for nonce_byte_index in 42..54 {
+135 +     for (nonce_byte_index, <item>) in header_bytes.iter_mut().enumerate().take(54).skip(42) {
+    |
+
+warning: the loop variable `row_index` is used to index `image_vectors`
+   --> e7-index-bench/src/bin/e61_chain_hash.rs:155:30
+    |
+155 |             for row_index in 0..image_vectors.len() {
+    |                              ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+    |
+155 -             for row_index in 0..image_vectors.len() {
+155 +             for (row_index, <item>) in image_vectors.iter_mut().enumerate() {
+    |
+
+warning: `e7-index-bench` (bin "e133_map_key_format_cost" test) generated 1 warning
+warning: manual implementation of `.is_multiple_of()`
+  --> e7-index-bench/src/bin/e45_span_ring_cost.rs:36:12
+   |
+36 |         if self.cursor % self.atomic_unit_bytes != 0 {
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `!self.cursor.is_multiple_of(self.atomic_unit_bytes)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+   = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: manual implementation of `.is_multiple_of()`
+  --> e7-index-bench/src/bin/e45_span_ring_cost.rs:43:12
+   |
+43 |         if self.cursor % self.atomic_unit_bytes != 0 {
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `!self.cursor.is_multiple_of(self.atomic_unit_bytes)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+
+warning: `e7-index-bench` (bin "e61-chain-hash" test) generated 2 warnings
+warning: `e7-index-bench` (bin "e45_span_ring_cost" test) generated 2 warnings (run `cargo clippy --fix --bin "e45_span_ring_cost" -p e7-index-bench --tests -- ` to apply 2 suggestions)
+warning: manual `Range::contains` implementation
+   --> e7-index-bench/src/bin/e142_region_diff_independent.rs:165:51
+    |
+165 | ...TES && offset >= RING_START_OFFSET && offset < RING_START_OFFSET + RING_REGIONS * RING_PRIME_STEP * RING_CHUNK_BYTES {
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `(RING_START_OFFSET..RING_START_OFFSET + RING_REGIONS * RING_PRIME_STEP * RING_CHUNK_BYTES).contains(&offset)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_range_contains
+    = note: `#[warn(clippy::manual_range_contains)]` on by default
+
+warning: `e7-index-bench` (bin "e142-region-diff-independent" test) generated 1 warning (run `cargo clippy --fix --bin "e142-region-diff-independent" -p e7-index-bench --tests -- ` to apply 1 suggestion)
+warning: non-canonical implementation of `partial_cmp` on an `Ord` type
+   --> e7-index-bench/src/bin/e160_random_small_read_share.rs:118:1
+    |
+118 | / impl PartialOrd for RationalNumber {
+119 | |     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+120 | |         Some((self.numerator * other.denominator).cmp(&(other.numerator * self.denominator)))
+121 | |     }
+122 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#non_canonical_partial_ord_impl
+    = note: `#[warn(clippy::non_canonical_partial_ord_impl)]` on by default
+help: change this to
+    |
+119 -     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+120 -         Some((self.numerator * other.denominator).cmp(&(other.numerator * self.denominator)))
+121 -     }
+119 +     fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
+    |
+
+warning: this operation has no effect
+   --> e7-index-bench/src/bin/e46_region_spacing.rs:256:60
+    |
+256 |         assert_eq!(regions_hit_by_one_read_modify_write(0, REGION_BYTES + 0, REGION_BYTES, 4096), 2);
+    |                                                            ^^^^^^^^^^^^^^^^ help: consider reducing it to: `REGION_BYTES`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#identity_op
+    = note: `#[warn(clippy::identity_op)]` on by default
+
+warning: `e7-index-bench` (bin "e46_region_spacing" test) generated 1 warning (run `cargo clippy --fix --bin "e46_region_spacing" -p e7-index-bench --tests -- ` to apply 1 suggestion)
+warning: call to `std::mem::drop` with a value that does not implement `Drop`. Dropping such a type only extends its contained lifetimes
+   --> e7-index-bench/src/bin/e117_reserved_header.rs:177:5
+    |
+177 |     drop(line);
+    |     ^^^^^^^^^^
+    |
+note: argument has type `{closure@e7-index-bench/src/bin/e117_reserved_header.rs:115:20: 115:41}`
+   --> e7-index-bench/src/bin/e117_reserved_header.rs:177:10
+    |
+177 |     drop(line);
+    |          ^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#drop_non_drop
+    = note: `#[warn(clippy::drop_non_drop)]` on by default
+
+warning: clamp-like pattern without using clamp function
+   --> e7-index-bench/src/bin/e56_epsilon.rs:590:34
+    |
+590 |     let internal_node_capacity = buffer_capacity.max(1).min(LEAF_ENTRY_CAPACITY);
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with clamp: `buffer_capacity.clamp(1, LEAF_ENTRY_CAPACITY)`
+    |
+    = note: clamp will panic if max < min
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_clamp
+    = note: `#[warn(clippy::manual_clamp)]` on by default
+
+warning: `e7-index-bench` (bin "e117-reserved-header" test) generated 1 warning
+warning: `e7-index-bench` (bin "e160-random-small-read-share" test) generated 1 warning
+warning: this assertion is always `true`
+   --> e7-index-bench/src/bin/e79_root_record.rs:187:9
+    |
+187 |         assert!(67 * 243 <= 16284);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: remove the assertion
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+    = note: `#[warn(clippy::assertions_on_constants)]` on by default
+
+warning: this assertion is always `true`
+   --> e7-index-bench/src/bin/e79_root_record.rs:188:9
+    |
+188 |         assert!(67 * 244 > 16284);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: remove the assertion
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+
+warning: this assertion has a constant value
+   --> e7-index-bench/src/bin/e79_root_record.rs:218:9
+    |
+218 |         assert!(HEAD_BASE + WATERMARK < 512);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider moving this into a const block: `const { assert!(..) }`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+
+warning: `e7-index-bench` (bin "e79-root-record" test) generated 3 warnings
+warning: `e7-index-bench` (bin "e56_epsilon" test) generated 1 warning
+warning: field `slot_count` is never read
+  --> e7-index-bench/src/bin/e93_aging_placement.rs:91:5
+   |
+89 | struct AgingSimulation {
+   |        --------------- field in this struct
+90 |     object_count: usize,
+91 |     slot_count: usize,
+   |     ^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: manual implementation of `.is_multiple_of()`
+   --> e7-index-bench/src/bin/e93_aging_placement.rs:111:46
+    |
+111 |         assert!(object_count < slot_count && slot_count % segment_slots == 0);
+    |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `slot_count.is_multiple_of(segment_slots)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+    = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: the loop variable `key` is used to index `key_at`
+   --> e7-index-bench/src/bin/e93_aging_placement.rs:114:20
+    |
+114 |         for key in 0..object_count {
+    |                    ^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_range_loop
+    = note: `#[warn(clippy::needless_range_loop)]` on by default
+help: consider using an iterator and enumerate()
+    |
+114 -         for key in 0..object_count {
+114 +         for (key, <item>) in key_at.iter_mut().enumerate().take(object_count) {
+    |
+
+warning: this function has too many arguments (10/7)
+   --> e7-index-bench/src/bin/e155_third_run_release_cascade.rs:938:1
+    |
+938 | / fn convergence_and_saturation_status(
+939 | |     iterations: u64,
+940 | |     maximum_iterations: u64,
+941 | |     extent_layers: &[u64],
+...   |
+948 | |     mapping_dirty: &[f64],
+949 | | ) -> (bool, Vec<&'static str>) {
+    | |______________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+    = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: `e7-index-bench` (bin "e93-aging-placement" test) generated 3 warnings (run `cargo clippy --fix --bin "e93-aging-placement" -p e7-index-bench --tests -- ` to apply 1 suggestion)
+warning: this function has too many arguments (8/7)
+    --> e7-index-bench/src/bin/e155_third_run_release_cascade.rs:1123:1
+     |
+1123 | fn intermediate_version_counts(shape: PoolShape, arm: WriteAheadLogArm, interval_fsyncs: u64, extent_layers: &[u64], dedup_extent_dirty: &[f64], inode_layers: &[u64], dedup_inode_dirty: &[f64], dedup_data_units_touched: f64) -> (f64, f64, f64) {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: unnecessary `>= y + 1` or `x - 1 >=`
+   --> e7-index-bench/src/bin/e47_ring_loss.rs:211:85
+    |
+211 | ...enerations| rollback_generations <= root_ring_depth - 1).unwrap_or(false);
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change it to: `rollback_generations < root_ring_depth`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#int_plus_one
+    = note: `#[warn(clippy::int_plus_one)]` on by default
+
+warning: unnecessary `>= y + 1` or `x - 1 >=`
+   --> e7-index-bench/src/bin/e47_ring_loss.rs:423:17
+    |
+423 |         assert!(rollback.unwrap() <= 8 - 1 || rollback.unwrap() == 8); // K=8 时恰好卡在边界外
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change it to: `rollback.unwrap() < 8`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#int_plus_one
+
+warning: `e7-index-bench` (bin "e155-third-run-release-cascade" test) generated 2 warnings
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> e7-index-bench/src/bin/e90_tree_aad.rs:159:17
+    |
+159 |     let sealed: Vec<(&(Birth, u64, u64, Vec<u8>), BlockPointer)> = [&shared_pre_clone_extent, &shared_mid_chain_extent, &head_2_pri...
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: `e7-index-bench` (bin "e90-tree-aad" test) generated 1 warning
+warning: `e7-index-bench` (bin "e47_ring_loss" test) generated 2 warnings (run `cargo clippy --fix --bin "e47_ring_loss" -p e7-index-bench --tests -- ` to apply 2 suggestions)
+warning: doc list item without indentation
+  --> e7-index-bench/src/bin/e97_entry_encoding.rs:76:5
+   |
+76 | //!    ⇒ 一条几十字节的插入要脏一个完整的 16 KiB 节点。判据 4 第一、二版按条目字节量，
+   |     ^^^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+   = note: `#[warn(clippy::doc_lazy_continuation)]` on by default
+help: indent this line
+   |
+76 | //!     ⇒ 一条几十字节的插入要脏一个完整的 16 KiB 节点。判据 4 第一、二版按条目字节量，
+   |        +
+
+warning: doc list item without indentation
+  --> e7-index-bench/src/bin/e97_entry_encoding.rs:77:5
+   |
+77 | //!    **系统性低估**；第三轮改成数脏叶。
+   |     ^^^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+help: indent this line
+   |
+77 | //!     **系统性低估**；第三轮改成数脏叶。
+   |        +
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> e7-index-bench/src/bin/e97_entry_encoding.rs:505:26
+    |
+505 |     let allocation_arms: [(&str, u64, u64, bool, u64, u64, u64, bool); 7] = [
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: this assertion has a constant value
+   --> e7-index-bench/src/bin/e97_entry_encoding.rs:926:9
+    |
+926 |         assert!(4 < ACCOUNTING_VALUE_BYTES, "条目连 value 都装不下 ⇒ 无可行 key 宽度");
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider moving this into a const block: `const { assert!(..) }`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+    = note: `#[warn(clippy::assertions_on_constants)]` on by default
+
+warning: `e7-index-bench` (bin "e97-entry-encoding" test) generated 4 warnings
+warning: this assertion is always `true`
+   --> e7-index-bench/src/bin/e54_accounting_generations.rs:255:9
+    |
+255 |         assert!(576 < 64_000_000, "两个下界都远小于甲");
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: remove the assertion
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+    = note: `#[warn(clippy::assertions_on_constants)]` on by default
+
+warning: manual `Range::contains` implementation
+   --> e7-index-bench/src/bin/e103_inode_update_cost.rs:496:25
+    |
+496 |                 assert!(single_update_ratio >= 1.25 - 1e-9 && single_update_ratio < 2.0, "头 {node_header} N={inode_count} 比值 {si...
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `(1.25 - 1e-9..2.0).contains(&single_update_ratio)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_range_contains
+    = note: `#[warn(clippy::manual_range_contains)]` on by default
+
+warning: `e7-index-bench` (bin "e54_accounting_generations" test) generated 1 warning
+warning: `e7-index-bench` (bin "e103-inode-update-cost" test) generated 1 warning (run `cargo clippy --fix --bin "e103-inode-update-cost" -p e7-index-bench --tests -- ` to apply 1 suggestion)
+warning: use of deprecated trait `aes_gcm::aead::AeadInPlace`: use `AeadInOut` instead
+  --> e7-index-bench/src/bin/e65_write_grain.rs:39:12
+   |
+39 |     aead::{AeadInPlace, KeyInit},
+   |            ^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: this assertion has a constant value
+   --> e7-index-bench/src/bin/e157_parallel_line_one_clauses.rs:507:9
+    |
+507 |         assert!(67 * JOURNAL_NAMED_ENTRY_BYTES + JOURNAL_HEADER_BYTES <= JOURNAL_RECORD_BYTES);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider moving this into a const block: `const { assert!(..) }`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+    = note: `#[warn(clippy::assertions_on_constants)]` on by default
+
+warning: this assertion has a constant value
+   --> e7-index-bench/src/bin/e157_parallel_line_one_clauses.rs:508:9
+    |
+508 |         assert!(JOURNAL_RECORD_BYTES < 68 * JOURNAL_NAMED_ENTRY_BYTES + JOURNAL_HEADER_BYTES);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider moving this into a const block: `const { assert!(..) }`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+
+warning: this assertion has a constant value
+   --> e7-index-bench/src/bin/e157_parallel_line_one_clauses.rs:555:9
+    |
+555 |         assert!(144 * EXTENT_LEAF_RECORD_BYTES + EXTENT_NODE_HEADER_BYTES <= 16384);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider moving this into a const block: `const { assert!(..) }`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+
+warning: this assertion has a constant value
+   --> e7-index-bench/src/bin/e157_parallel_line_one_clauses.rs:556:9
+    |
+556 |         assert!(16384 < 145 * EXTENT_LEAF_RECORD_BYTES + EXTENT_NODE_HEADER_BYTES);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider moving this into a const block: `const { assert!(..) }`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+
+warning: you seem to want to iterate on a map's values
+   --> e7-index-bench/src/bin/e99_writebuffer_sequence.rs:507:36
+    |
+507 |                 for (_, truths) in truths_by_key.iter() {
+    |                                    ^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#for_kv_map
+    = note: `#[warn(clippy::for_kv_map)]` on by default
+help: use the corresponding method
+    |
+507 -                 for (_, truths) in truths_by_key.iter() {
+507 +                 for truths in truths_by_key.values() {
+    |
+
+warning: called `Iterator::last` on a `DoubleEndedIterator`; this will needlessly iterate the entire iterator
+   --> e7-index-bench/src/bin/e99_writebuffer_sequence.rs:522:28
+    |
+522 |         let last_of_key0 = updates.iter().filter(|update| update.key == 0).last().unwrap().truth;
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#double_ended_iterator_last
+    = note: `#[warn(clippy::double_ended_iterator_last)]` on by default
+help: try
+    |
+522 -         let last_of_key0 = updates.iter().filter(|update| update.key == 0).last().unwrap().truth;
+522 +         let last_of_key0 = updates.iter().filter(|update| update.key == 0).next_back().unwrap().truth;
+    |
+
+warning: called `Iterator::last` on a `DoubleEndedIterator`; this will needlessly iterate the entire iterator
+   --> e7-index-bench/src/bin/e99_writebuffer_sequence.rs:528:28
+    |
+528 |         let last_of_key1 = updates.iter().filter(|update| update.key == 1).last().unwrap().truth;
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#double_ended_iterator_last
+help: try
+    |
+528 -         let last_of_key1 = updates.iter().filter(|update| update.key == 1).last().unwrap().truth;
+528 +         let last_of_key1 = updates.iter().filter(|update| update.key == 1).next_back().unwrap().truth;
+    |
+
+warning: use of deprecated associated function `aes_gcm::aead::hybrid_array::Array::<T, U>::from_slice`: use `TryFrom` instead
+   --> e7-index-bench/src/bin/e65_write_grain.rs:111:24
+    |
+111 |     let nonce = Nonce::from_slice(&[0u8; 12]);
+    |                        ^^^^^^^^^^
+
+warning: use of deprecated method `aes_gcm::aead::AeadInPlace::encrypt_in_place_detached`: use `AeadInOut::encrypt_inout_detached` instead
+   --> e7-index-bench/src/bin/e65_write_grain.rs:125:24
+    |
+125 |                 cipher.encrypt_in_place_detached(nonce, b"", &mut unit_buffer.as_mut_slice()[..grain_bytes])
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `aes_gcm::aead::AeadInPlace::encrypt_in_place_detached`: use `AeadInOut::encrypt_inout_detached` instead
+   --> e7-index-bench/src/bin/e65_write_grain.rs:136:20
+    |
+136 |             cipher.encrypt_in_place_detached(nonce, b"", &mut unit_buffer.as_mut_slice()[..grain_bytes])
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `e7-index-bench` (bin "e99-writebuffer-sequence" test) generated 3 warnings (run `cargo clippy --fix --bin "e99-writebuffer-sequence" -p e7-index-bench --tests -- ` to apply 3 suggestions)
+warning: `e7-index-bench` (bin "e157-parallel-line-one-clauses" test) generated 4 warnings
+warning: redundant field names in struct initialization
+  --> e7-index-bench/src/bin/e105_extent_leaf_packed.rs:86:40
+   |
+86 |     Geometry { index_leaf_tree_levels, container_count: container_count, packed_internal_levels, index_leaf_fanout: index_leaf_fanou...
+   |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace it with: `container_count`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_field_names
+   = note: `#[warn(clippy::redundant_field_names)]` on by default
+
+warning: redundant field names in struct initialization
+  --> e7-index-bench/src/bin/e105_extent_leaf_packed.rs:86:98
+   |
+86 | ... packed_internal_levels, index_leaf_fanout: index_leaf_fanout, records_per_container: records_per_container }
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace it with: `index_leaf_fanout`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_field_names
+
+warning: redundant field names in struct initialization
+  --> e7-index-bench/src/bin/e105_extent_leaf_packed.rs:86:136
+   |
+86 | ...index_leaf_fanout, records_per_container: records_per_container }
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace it with: `records_per_container`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_field_names
+
+warning: unnecessary `>= y + 1` or `x - 1 >=`
+   --> e7-index-bench/src/bin/e105_extent_leaf_packed.rs:273:25
+    |
+273 | ...       assert!(tree_geometry.packed_internal_levels.len() + 1 <= tree_geometry.index_leaf_tree_levels.len(), "码 3 叶的树高不许...
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change it to: `tree_geometry.packed_internal_levels.len() < tree_geometry.index_leaf_tree_levels.len()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#int_plus_one
+    = note: `#[warn(clippy::int_plus_one)]` on by default
+
+warning: `e7-index-bench` (bin "e65-write-grain" test) generated 4 warnings
+warning: unused variable: `inode_container_catch_up`
+    --> e7-index-bench/src/bin/e159_fsync_wait_group_commit.rs:2021:27
+     |
+2021 |     let (extent_catch_up, inode_container_catch_up, inode_root_catch_up, extra_named_items) = match arm {
+     |                           ^^^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_inode_container_catch_up`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: redundant field names in struct initialization
+   --> e7-index-bench/src/bin/e94_move_touchset.rs:423:65
+    |
+423 | ...nodes, root_references, deadlist_rewrites: deadlist_rewrites, moved: plan.len() as u64, skipped_shared: 0 }
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace it with: `deadlist_rewrites`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_field_names
+    = note: `#[warn(clippy::redundant_field_names)]` on by default
+
+warning: `e7-index-bench` (bin "e105-extent-leaf-packed" test) generated 4 warnings (run `cargo clippy --fix --bin "e105-extent-leaf-packed" -p e7-index-bench --tests -- ` to apply 4 suggestions)
+warning: unused variable: `inode_container_catch_up`
+    --> e7-index-bench/src/bin/e155_fsync_write_volume.rs:1217:27
+     |
+1217 |     let (extent_catch_up, inode_container_catch_up, inode_root_catch_up, extra_named_items) = match arm {
+     |                           ^^^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_inode_container_catch_up`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: this function has too many arguments (9/7)
+    --> e7-index-bench/src/bin/e159_fsync_wait_group_commit.rs:1768:1
+     |
+1768 | fn convergence_and_saturation_status(iterati..._dirty: &[f64]) -> (bool, Vec<&'static str>) {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^...^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+     = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: this function has too many arguments (8/7)
+    --> e7-index-bench/src/bin/e159_fsync_wait_group_commit.rs:1855:1
+     |
+1855 | / fn intermediate_version_counts(
+1856 | |     shape: PoolShape,
+1857 | |     arm: WriteAheadLogArm,
+1858 | |     interval_fsyncs: u64,
+...    |
+1863 | |     dedup_data_units_touched: f64,
+1864 | | ) -> (f64, f64, f64, f64) {
+     | |_________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: manual implementation of `.is_multiple_of()`
+    --> e7-index-bench/src/bin/e159_fsync_wait_group_commit.rs:2728:16
+     |
+2728 |             if batch_index % 2 == 0 {
+     |                ^^^^^^^^^^^^^^^^^^^^ help: replace with: `batch_index.is_multiple_of(2)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+     = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: unnecessary use of `to_vec`
+    --> e7-index-bench/src/bin/e159_fsync_wait_group_commit.rs:3245:37
+     |
+3245 |     let arguments = parse_arguments(&raw_arguments[1..].to_vec());
+     |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `&raw_arguments[1..]`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_to_owned
+     = note: `#[warn(clippy::unnecessary_to_owned)]` on by default
+
+warning: this function has too many arguments (8/7)
+  --> e7-index-bench/src/bin/e25_journal_reserve.rs:56:1
+   |
+56 | / fn simulate_reserve_run(shape: Shape, reserve: u64, capacity: u64, fill_percent: u64,
+57 | |        operation_count: u64, checkpoint_every: u64, ckpt_cost: u64, blocks_per_operation: u64) -> RunOutcome {
+   | |____________________________________________________________________________________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+   = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: constant `RING_SAFETY_FACTOR_REVERSE` is never used
+  --> e7-index-bench/src/bin/e155_fsync_write_volume.rs:34:7
+   |
+34 | const RING_SAFETY_FACTOR_REVERSE: u64 = 2;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `unaccounted_switchback` is never read
+   --> e7-index-bench/src/bin/e155_fsync_write_volume.rs:486:5
+    |
+481 | struct Geometry {
+    |        -------- field in this struct
+...
+486 |     unaccounted_switchback: bool, // K10（true）：WAL 两臂 checkpoint 多写已释放记录，甲不受影响
+    |     ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `Geometry` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: field `named_items` is never read
+    --> e7-index-bench/src/bin/e155_fsync_write_volume.rs:1086:5
+     |
+1078 | struct WriteAheadLogFsyncOutcome {
+     |        ------------------------- field in this struct
+...
+1086 |     named_items: u64,
+     |     ^^^^^^^^^^^
+     |
+     = note: `WriteAheadLogFsyncOutcome` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: fields `barriers` and `named_items` are never read
+    --> e7-index-bench/src/bin/e155_fsync_write_volume.rs:1159:5
+     |
+1148 | struct WriteAheadLogCheckpointOutcome {
+     |        ------------------------------ fields in this struct
+...
+1159 |     barriers: u64,
+     |     ^^^^^^^^
+1160 |     fua_count: u64,
+1161 |     named_items: u64,
+     |     ^^^^^^^^^^^
+     |
+     = note: `WriteAheadLogCheckpointOutcome` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: this function has too many arguments (10/7)
+   --> e7-index-bench/src/bin/e155_fsync_write_volume.rs:664:1
+    |
+664 | / fn solve_fixed_point_core(
+665 | |     data_unit_count: u64,
+666 | |     file_count: u64,
+667 | |     extent_touch: TouchSpecification,
+...   |
+680 | |     tree_table_entry_count: u64,
+681 | | ) -> FixedPointCoreResult {
+    | |_________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+    = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: `e7-index-bench` (bin "e25_journal_reserve" test) generated 1 warning
+warning: `e7-index-bench` (bin "e159-fsync-wait-group-commit" test) generated 5 warnings (run `cargo clippy --fix --bin "e159-fsync-wait-group-commit" -p e7-index-bench --tests -- ` to apply 3 suggestions)
+warning: unnecessary use of `to_vec`
+   --> e7-index-bench/src/bin/e94_move_touchset.rs:726:35
+    |
+726 |     let plan = plan_moves(&world, &batch.to_vec());
+    |                                   ^^^^^^^^^^^^^^^ help: use: `batch`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_to_owned
+    = note: `#[warn(clippy::unnecessary_to_owned)]` on by default
+
+warning: this loop could be written as a `while let` loop
+    --> e7-index-bench/src/bin/e155_fsync_write_volume.rs:1729:5
+     |
+1729 | /     loop {
+1730 | |         match bisect_first_threshold(floor, search_upper_bound, base_height, &height_at) {
+1731 | |             Some(threshold) => {
+1732 | |                 thresholds.push(threshold);
+...    |
+1741 | |     }
+     | |_____^ help: try: `while let Some(threshold) = bisect_first_threshold(floor, search_upper_bound, base_height, &height_at) { .. }`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#while_let_loop
+     = note: `#[warn(clippy::while_let_loop)]` on by default
+
+warning: this operation has no effect
+    --> e7-index-bench/src/bin/e155_fsync_write_volume.rs:1854:25
+     |
+1854 |         let expected = (1 * 2 * 28_160) as f64 / baseline as f64;
+     |                         ^^^^^ help: consider reducing it to: `2`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#identity_op
+     = note: `#[warn(clippy::identity_op)]` on by default
+
+warning: redundant field names in struct initialization
+   --> e7-index-bench/src/bin/e104_current_version.rs:360:13
+    |
+360 |             tree: tree,
+    |             ^^^^^^^^^^ help: replace it with: `tree`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_field_names
+    = note: `#[warn(clippy::redundant_field_names)]` on by default
+
+warning: `e7-index-bench` (bin "e94-move-touchset" test) generated 2 warnings (run `cargo clippy --fix --bin "e94-move-touchset" -p e7-index-bench --tests -- ` to apply 2 suggestions)
+warning: `e7-index-bench` (bin "e155-fsync-write-volume" test) generated 8 warnings (run `cargo clippy --fix --bin "e155-fsync-write-volume" -p e7-index-bench --tests -- ` to apply 2 suggestions)
+warning: manual checked division
+   --> e7-index-bench/src/bin/e6_units.rs:117:21
+    |
+117 |     let spread = if best == 0 {
+    |                     ^^^^^^^^^ check performed here
+...
+120 |         (worst - best) * 10_000 / best
+    |         ------------------------------ division performed here
+    |
+    = help: consider using `checked_div`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_checked_ops
+    = note: `#[warn(clippy::manual_checked_ops)]` on by default
+
+warning: `e7-index-bench` (bin "e6-units" test) generated 1 warning
+warning: this operation has no effect
+   --> e7-index-bench/src/bin/e116_pack_settle.rs:330:20
+    |
+330 |         assert_eq!((UNIT - 0) / (16286 + SLOT_EXTRA), 2);
+    |                    ^^^^^^^^^^ help: consider reducing it to: `UNIT`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#identity_op
+    = note: `#[warn(clippy::identity_op)]` on by default
+
+warning: this assertion has a constant value
+   --> e7-index-bench/src/bin/e112_old_writer_unknown_tree.rs:259:9
+    |
+259 |         assert!(KNOWN_WRITABLE_HEAD_COUNT <= KNOWN_TREE_COUNT);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider moving this into a const block: `const { assert!(..) }`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+    = note: `#[warn(clippy::assertions_on_constants)]` on by default
+
+warning: this assertion has a constant value
+   --> e7-index-bench/src/bin/e112_old_writer_unknown_tree.rs:260:9
+    |
+260 |         assert!(UNKNOWN_WRITABLE_HEAD_COUNT <= UNKNOWN_TREE_COUNT);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider moving this into a const block: `const { assert!(..) }`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+
+warning: this assertion has a constant value
+   --> e7-index-bench/src/bin/e112_old_writer_unknown_tree.rs:261:9
+    |
+261 |         assert!(PUBLISHED_GENERATIONS > KEPT_GENERATIONS, "代数要大过保留代数，否则丢弃看不见");
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider moving this into a const block: `const { assert!(..) }`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+
+warning: `e7-index-bench` (bin "e116-pack-settle" test) generated 1 warning (run `cargo clippy --fix --bin "e116-pack-settle" -p e7-index-bench --tests -- ` to apply 1 suggestion)
+warning: `e7-index-bench` (bin "e112-old-writer-unknown-tree" test) generated 3 warnings
+warning: use of deprecated trait `aes_gcm::aead::AeadInPlace`: use `AeadInOut` instead
+  --> e7-index-bench/src/bin/e140_header_alignment.rs:28:12
+   |
+28 |     aead::{AeadInPlace, KeyInit},
+   |            ^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: consider using `sort_by_key`
+   --> e7-index-bench/src/bin/e150_rollback_reuse_of_abandoned_roots.rs:187:5
+    |
+187 |     candidates.sort_by(|left, right| (right.txg, right.instance).cmp(&(left.txg, left.instance)));
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_sort_by
+    = note: `#[warn(clippy::unnecessary_sort_by)]` on by default
+help: try
+    |
+187 -     candidates.sort_by(|left, right| (right.txg, right.instance).cmp(&(left.txg, left.instance)));
+187 +     candidates.sort_by_key(|left| std::cmp::Reverse((left.txg, left.instance)));
+    |
+
+warning: use of deprecated method `aes_gcm::aead::AeadInPlace::encrypt_in_place_detached`: use `AeadInOut::encrypt_inout_detached` instead
+   --> e7-index-bench/src/bin/e140_header_alignment.rs:224:22
+    |
+224 |     let tag = cipher.encrypt_in_place_detached(nonce, b"", unit).expect("MAC 失败");
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated associated function `aes_gcm::aead::hybrid_array::Array::<T, U>::from_slice`: use `TryFrom` instead
+   --> e7-index-bench/src/bin/e140_header_alignment.rs:250:22
+    |
+250 |     (cipher, *Nonce::from_slice(&[0u8; 12]))
+    |                      ^^^^^^^^^^
+
+warning: `e7-index-bench` (bin "e150-rollback-reuse-of-abandoned-roots" test) generated 1 warning
+warning: unused variable: `inode_container_catch_up`
+    --> e7-index-bench/src/bin/e155_fourth_run_group_commit_concurrency.rs:2017:27
+     |
+2017 |     let (extent_catch_up, inode_container_catch_up, inode_root_catch_up, extra_named_items) = match arm {
+     |                           ^^^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_inode_container_catch_up`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `inode_container_catch_up`
+    --> e7-index-bench/src/bin/e155_fourth_run_group_commit_concurrency.rs:2133:27
+     |
+2133 |     let (extent_catch_up, inode_container_catch_up, inode_root_catch_up, extra_named_items) = match arm {
+     |                           ^^^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_inode_container_catch_up`
+
+warning: manually reimplementing `div_ceil`
+   --> e7-index-bench/src/bin/e140_header_alignment.rs:185:5
+    |
+185 |     (user_bytes + payload as u64 - 1) / payload as u64
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `user_bytes.div_ceil(payload as u64)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_div_ceil
+    = note: `#[warn(clippy::manual_div_ceil)]` on by default
+
+warning: manual implementation of `Iterator::find`
+   --> e7-index-bench/src/bin/e43_extension_point_budget.rs:113:5
+    |
+113 | /     for extension_point_bytes in 0..=node_bytes {
+114 | |         if height(node_bytes, extension_point_bytes, carrier, leaves) > base_height {
+115 | |             return Some(extension_point_bytes);
+...   |
+118 | |     None
+    | |________^ help: replace with an iterator: `(0..=node_bytes).find(|&extension_point_bytes| height(node_bytes, extension_point_bytes, carrier, leaves) > base_height)`
+    |
+    = note: you may need to dereference some variables
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_find
+    = note: `#[warn(clippy::manual_find)]` on by default
+
+warning: manually reimplementing `div_ceil`
+   --> e7-index-bench/src/bin/e140_header_alignment.rs:409:25
+    |
+409 |     let request_count = (units + units_per_request as u64 - 1) / units_per_request as u64;
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `units.div_ceil(units_per_request as u64)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_div_ceil
+
+warning: field `container_key_by_birth` is never read
+   --> e7-index-bench/src/bin/e104_current_version.rs:158:5
+    |
+125 | struct WorldConfiguration {
+    |        ------------------ field in this struct
+...
+158 |     container_key_by_birth: bool,
+    |     ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `WorldConfiguration` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: this assertion has a constant value
+   --> e7-index-bench/src/bin/e43_extension_point_budget.rs:566:9
+    |
+566 |         assert!(BASE_METADATA_RAID_TENTHS > ZFS_TENTHS);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider moving this into a const block: `const { assert!(..) }`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+    = note: `#[warn(clippy::assertions_on_constants)]` on by default
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> e7-index-bench/src/bin/e104_current_version.rs:246:14
+    |
+246 |     history: Vec<(Txg, u32, BTreeMap<Tree, View>, Vec<View>, BTreeMap<Tree, (Tree, Txg)>)>,
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: usage of `contains_key` followed by `insert` on a `BTreeMap`
+   --> e7-index-bench/src/bin/e104_current_version.rs:464:21
+    |
+464 | /                     if !head.data.contains_key(&key) {
+465 | |                         let location = self.write_unit(key, tree, Payload::Data);
+466 | |                         written_this_transaction.push(location);
+467 | |                         head.data.insert(key, location);
+468 | |                     }
+    | |_____________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_entry
+    = note: `#[warn(clippy::map_entry)]` on by default
+help: try
+    |
+464 ~                     head.data.entry(key).or_insert_with(|| {
+465 +                         let location = self.write_unit(key, tree, Payload::Data);
+466 +                         written_this_transaction.push(location);
+467 +                         location
+468 +                     });
+    |
+
+warning: you seem to want to iterate on a map's values
+   --> e7-index-bench/src/bin/e104_current_version.rs:714:60
+    |
+714 |         for (_, (container_key, container_location, _)) in &snapshot_view.inodes {
+    |                                                            ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#for_kv_map
+    = note: `#[warn(clippy::for_kv_map)]` on by default
+help: use the corresponding method
+    |
+714 -         for (_, (container_key, container_location, _)) in &snapshot_view.inodes {
+714 +         for (container_key, container_location, _) in snapshot_view.inodes.values() {
+    |
+
+warning: this `map_or` can be simplified
+   --> e7-index-bench/src/bin/e104_current_version.rs:781:86
+    |
+781 | ...!= 0 && disk.get(&location).map_or(false, |unit| unit.birth == txg && unit.write_sequence.instance == previous_instance);
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+    = note: `#[warn(clippy::unnecessary_map_or)]` on by default
+help: use `is_some_and` instead
+    |
+781 -             let stale = |disk: &BTreeMap<u64, Unit>, location: u64| location != 0 && disk.get(&location).map_or(false, |unit| unit.birth == txg && unit.write_sequence.instance == previous_instance);
+781 +             let stale = |disk: &BTreeMap<u64, Unit>, location: u64| location != 0 && disk.get(&location).is_some_and(|unit| unit.birth == txg && unit.write_sequence.instance == previous_instance);
+    |
+
+warning: `e7-index-bench` (bin "e43_extension_point_budget" test) generated 2 warnings
+warning: this `if` statement can be collapsed
+   --> e7-index-bench/src/bin/e104_current_version.rs:981:21
+    |
+981 | /                     if unit.write_sequence.instance < self.instance {
+982 | |                         if !row_published(&self.watermarks, unit) { candidates.push(*location); }
+983 | |                     }
+    | |_____________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#collapsible_if
+    = note: `#[warn(clippy::collapsible_if)]` on by default
+help: collapse nested if block
+    |
+981 ~                     if unit.write_sequence.instance < self.instance
+982 ~                         && !row_published(&self.watermarks, unit) { candidates.push(*location); }
+    |
+
+warning: `e7-index-bench` (bin "e140-header-alignment" test) generated 5 warnings (run `cargo clippy --fix --bin "e140-header-alignment" -p e7-index-bench --tests -- ` to apply 2 suggestions)
+warning: this `map_or` can be simplified
+    --> e7-index-bench/src/bin/e104_current_version.rs:1176:28
+     |
+1176 |   ...   let dead = kills.get(current_key).map_or(false, |kill_entries| kill_entries.iter().any(|(kill_death_write_sequence, kill_d...
+     |  __________________^
+1177 | | ...       if arm.use_death_write_sequence && !arm.write_sequence_metadata_only { if arm.tie_unit_wins { kill_death_write_sequenc...
+1178 | | ...           if kill_death_txg == birth { ambiguous_count += 1; false } else { kill_death_txg > birth }
+1179 | | ...       }
+1180 | | ...   }));
+     | |_________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+     |
+1176 -                 let dead = kills.get(current_key).map_or(false, |kill_entries| kill_entries.iter().any(|(kill_death_write_sequence, kill_death_txg)| {
+1176 +                 let dead = kills.get(current_key).is_some_and(|kill_entries| kill_entries.iter().any(|(kill_death_write_sequence, kill_death_txg)| {
+     |
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+  --> e7-index-bench/src/bin/e28_map_rebuild.rs:52:102
+   |
+52 | ...carry_self_description: bool) -> (Vec<Unit>, PlaintextMap, BTreeMap<(u64, u64, u64), UnitClass>) {
+   |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+   = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: this `map_or` can be simplified
+    --> e7-index-bench/src/bin/e104_current_version.rs:1612:27
+     |
+1612 |             let abandon = crash_at.map_or(false, |crash_index| transaction_index >= crash_index);
+     |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+     |
+1612 -             let abandon = crash_at.map_or(false, |crash_index| transaction_index >= crash_index);
+1612 +             let abandon = crash_at.is_some_and(|crash_index| transaction_index >= crash_index);
+     |
+
+warning: this `impl` can be derived
+    --> e7-index-bench/src/bin/e104_current_version.rs:1639:1
+     |
+1639 | / impl Default for ClosedFormCounts {
+1640 | |     fn default() -> Self {
+1641 | |         ClosedFormCounts { abandoned_unrewritten: 0, reclaimed_readable: 0, cross_head_keys: 0, same_txg_pairs: 0, same_txg_over...
+1642 | |     }
+1643 | | }
+     | |_^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#derivable_impls
+     = note: `#[warn(clippy::derivable_impls)]` on by default
+help: replace the manual implementation with a derive attribute
+     |
+1227 + #[derive(Default)]
+1228 | struct ClosedFormCounts {
+     |
+
+warning: variant `Scattered` is never constructed
+   --> e7-index-bench/src/bin/e155_fourth_run_group_commit_concurrency.rs:724:5
+    |
+722 | enum TouchSpecification {
+    |      ------------------ variant in this enum
+723 |     Continuous(f64),
+724 |     Scattered(f64),
+    |     ^^^^^^^^^
+    |
+    = note: `TouchSpecification` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: fields `named_items`, `intermediate_version_data`, `intermediate_version_extent_total`, and `intermediate_version_inode_total` are never read
+    --> e7-index-bench/src/bin/e155_fourth_run_group_commit_concurrency.rs:1735:5
+     |
+1722 | struct WriteAheadLogCheckpointOutcome {
+     |        ------------------------------ fields in this struct
+...
+1735 |     named_items: u64,
+     |     ^^^^^^^^^^^
+...
+1738 |     intermediate_version_data: f64,
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+1739 |     intermediate_version_extent_total: f64,
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1740 |     intermediate_version_inode_total: f64,
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `WriteAheadLogCheckpointOutcome` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: `e7-index-bench` (bin "e28_map_rebuild" test) generated 1 warning
+warning: doc list item without indentation
+ --> e7-index-bench/src/bin/e17_merge.rs:6:5
+  |
+6 | //! 若合并这一段也卡在单线程，那并行化加密买到的东西会被它吃掉。
+  |     ^
+  |
+  = help: if this is supposed to be its own paragraph, add a blank line
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+  = note: `#[warn(clippy::doc_lazy_continuation)]` on by default
+help: indent this line
+  |
+6 | //!     若合并这一段也卡在单线程，那并行化加密买到的东西会被它吃掉。
+  |     ++++
+
+warning: this function has too many arguments (9/7)
+    --> e7-index-bench/src/bin/e155_fourth_run_group_commit_concurrency.rs:1764:1
+     |
+1764 | fn convergence_and_saturation_status(iterati..._dirty: &[f64]) -> (bool, Vec<&'static str>) {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^...^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+     = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: this function has too many arguments (8/7)
+    --> e7-index-bench/src/bin/e155_fourth_run_group_commit_concurrency.rs:1851:1
+     |
+1851 | / fn intermediate_version_counts(
+1852 | |     shape: PoolShape,
+1853 | |     arm: WriteAheadLogArm,
+1854 | |     interval_fsyncs: u64,
+...    |
+1859 | |     dedup_data_units_touched: f64,
+1860 | | ) -> (f64, f64, f64, f64) {
+     | |_________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: `e7-index-bench` (bin "e17-merge" test) generated 1 warning
+warning: `e7-index-bench` (bin "e104-current-version" test) generated 10 warnings (run `cargo clippy --fix --bin "e104-current-version" -p e7-index-bench --tests -- ` to apply 8 suggestions)
+warning: this loop could be written as a `while let` loop
+    --> e7-index-bench/src/bin/e155_fourth_run_group_commit_concurrency.rs:3054:5
+     |
+3054 | /     loop {
+3055 | |         match bisect_first_threshold(floor, search_upper_bound, base_height, &height_at) {
+3056 | |             Some(threshold) => {
+3057 | |                 thresholds.push(threshold);
+...    |
+3066 | |     }
+     | |_____^ help: try: `while let Some(threshold) = bisect_first_threshold(floor, search_upper_bound, base_height, &height_at) { .. }`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#while_let_loop
+     = note: `#[warn(clippy::while_let_loop)]` on by default
+
+warning: this operation has no effect
+    --> e7-index-bench/src/bin/e155_fourth_run_group_commit_concurrency.rs:3153:25
+     |
+3153 |         let expected = (1 * 2 * 28_160) as f64 / baseline as f64;
+     |                         ^^^^^ help: consider reducing it to: `2`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#identity_op
+     = note: `#[warn(clippy::identity_op)]` on by default
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> e7-index-bench/src/bin/e131_livelist_carrier.rs:129:13
+    |
+129 | const ARMS: [(&str, fn(u64, u64) -> Reading); 2] = [("per_head", per_head), ("shared", shared)];
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: `e7-index-bench` (bin "e131_livelist_carrier" test) generated 1 warning
+warning: `e7-index-bench` (bin "e155-fourth-run-group-commit-concurrency" test) generated 8 warnings (run `cargo clippy --fix --bin "e155-fourth-run-group-commit-concurrency" -p e7-index-bench --tests -- ` to apply 3 suggestions)
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> e7-index-bench/src/bin/e110_stripe_table_steady.rs:146:24
+    |
+146 |         let workloads: [(&str, fn(u64) -> u64); 2] = [("main", main_leaves), ("mixed", mixed_leaves)];
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: `e7-index-bench` (bin "e110-stripe-table-steady" test) generated 1 warning
+warning: doc list item without indentation
+   --> e7-index-bench/src/bin/e32_journal_timeline.rs:219:5
+    |
+219 | /// 建出崩溃前那一刻的环。返回 `(环, tail, 空洞的 jsn, 链锚)`。
+    |     ^
+    |
+    = help: if this is supposed to be its own paragraph, add a blank line
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+    = note: `#[warn(clippy::doc_lazy_continuation)]` on by default
+help: indent this line
+    |
+219 | ///   建出崩溃前那一刻的环。返回 `(环, tail, 空洞的 jsn, 链锚)`。
+    |     ++
+
+warning: redundant closure
+   --> e7-index-bench/src/bin/e32_journal_timeline.rs:292:60
+    |
+292 |     let mut chain_hash = first_recovery_records.last().map(|record| record_hash(record)).unwrap_or(anchor);
+    |                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the function itself: `record_hash`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_closure
+    = note: `#[warn(clippy::redundant_closure)]` on by default
+
+warning: `e7-index-bench` (bin "e32-journal-timeline" test) generated 2 warnings (run `cargo clippy --fix --bin "e32-journal-timeline" -p e7-index-bench --tests -- ` to apply 1 suggestion)
+warning: casting to the same type is unnecessary (`u64` -> `u64`)
+  --> e7-index-bench/src/bin/e38_accounting_copy_on_write.rs:32:31
+   |
+32 |     fn leaves(&self) -> u64 { (self.fanout as u64).pow(self.height) }
+   |                               ^^^^^^^^^^^^^^^^^^^^ help: try: `self.fanout`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_cast
+   = note: `#[warn(clippy::unnecessary_cast)]` on by default
+
+warning: `e7-index-bench` (bin "e38_accounting_copy_on_write" test) generated 1 warning (run `cargo clippy --fix --bin "e38_accounting_copy_on_write" -p e7-index-bench --tests -- ` to apply 1 suggestion)
+warning: this assertion is always `true`
+   --> e7-index-bench/src/bin/e44_jsn_width.rs:325:9
+    |
+325 |         assert!(!(100u64 > 100 * 2), "同速不算通过");
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: remove the assertion
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+    = note: `#[warn(clippy::assertions_on_constants)]` on by default
+
+warning: this assertion is always `true`
+   --> e7-index-bench/src/bin/e44_jsn_width.rs:326:9
+    |
+326 |         assert!(300u64 > 100 * 2, "快三倍算通过");
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: remove the assertion
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+
+warning: `e7-index-bench` (bin "e44_jsn_width" test) generated 2 warnings
+warning: manual implementation of `.is_multiple_of()`
+   --> e7-index-bench/src/bin/e137_map_key_performance.rs:503:8
+    |
+503 |     if total_units % shape.checkpoint_every_writes != 0 {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `!total_units.is_multiple_of(shape.checkpoint_every_writes)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+    = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: manual implementation of `.is_multiple_of()`
+   --> e7-index-bench/src/bin/e137_map_key_performance.rs:690:16
+    |
+690 |             if unit_count % BACKGROUND_CHECKPOINT_EVERY_UNITS != 0 {
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `!unit_count.is_multiple_of(BACKGROUND_CHECKPOINT_EVERY_UNITS)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+
+warning: manual implementation of `.is_multiple_of()`
+   --> e7-index-bench/src/bin/e137_map_key_performance.rs:709:16
+    |
+709 |             if unit_count % BACKGROUND_CHECKPOINT_EVERY_UNITS != 0 {
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `!unit_count.is_multiple_of(BACKGROUND_CHECKPOINT_EVERY_UNITS)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+
+warning: using `chunks_exact` with a constant chunk size
+   --> e7-index-bench/src/bin/e162_verdict_store_power_cut.rs:300:25
+    |
+300 |     for chunk in padded.chunks_exact(64) {
+    |                         ^^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<64>().0`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+    = note: `#[warn(clippy::chunks_exact_to_as_chunks)]` on by default
+
+warning: using `chunks_exact` with a constant chunk size
+   --> e7-index-bench/src/bin/e162_verdict_store_power_cut.rs:302:41
+    |
+302 |         for (word_index, word) in chunk.chunks_exact(4).enumerate() {
+    |                                         ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<4>().0.iter()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+
+warning: manual implementation of `.is_multiple_of()`
+    --> e7-index-bench/src/bin/e162_verdict_store_power_cut.rs:1053:8
+     |
+1053 |     if text.len() % 2 != 0 {
+     |        ^^^^^^^^^^^^^^^^^^^ help: replace with: `!text.len().is_multiple_of(2)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+     = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: this operation has no effect
+   --> e7-index-bench/src/bin/e107_stripe_table_wa.rs:632:51
+    |
+632 |         assert_eq!(stripe_table_arm.parity_bytes, 1 * 32768 + 2 * 16384);
+    |                                                   ^^^^^^^^^ help: consider reducing it to: `32768`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#identity_op
+    = note: `#[warn(clippy::identity_op)]` on by default
+
+warning: `e7-index-bench` (bin "e137_map_key_performance" test) generated 3 warnings (run `cargo clippy --fix --bin "e137_map_key_performance" -p e7-index-bench --tests -- ` to apply 3 suggestions)
+warning: `e7-index-bench` (bin "e107-stripe-table-wa" test) generated 1 warning (run `cargo clippy --fix --bin "e107-stripe-table-wa" -p e7-index-bench --tests -- ` to apply 1 suggestion)
+warning: manual implementation of `.is_multiple_of()`
+   --> e7-index-bench/src/bin/e135_rollback_floor.rs:741:75
+    |
+741 |         World::TornNewest | World::Disk0Loss | World::SlotWriteFail => if seed % 2 == 0 { 0 } else { MINIMUM_PROTECTED_GENERATIONS },
+    |                                                                           ^^^^^^^^^^^^^ help: replace with: `seed.is_multiple_of(2)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+    = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: manual checked division
+   --> e7-index-bench/src/bin/e135_rollback_floor.rs:919:63
+    |
+919 | ...hundredths = if total.checks == 0 { 0 } else { total.candidate_sum * 100 / total.checks };
+    |                    ^^^^^^^^^^^^^^^^^              ---------------------------------------- division performed here
+    |                    |
+    |                    check performed here
+    |
+    = help: consider using `checked_div`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_checked_ops
+    = note: `#[warn(clippy::manual_checked_ops)]` on by default
+
+warning: manual implementation of `isolate_lowest_one`
+   --> e7-index-bench/src/bin/e127_group_identity_under_split_merge.rs:184:22
+    |
+184 |             index += index & index.wrapping_neg();
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.isolate_lowest_one()`: `index.isolate_lowest_one()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_isolate_lowest_one
+    = note: `#[warn(clippy::manual_isolate_lowest_one)]` on by default
+
+warning: `e7-index-bench` (bin "e135_rollback_floor" test) generated 2 warnings (run `cargo clippy --fix --bin "e135_rollback_floor" -p e7-index-bench --tests -- ` to apply 1 suggestion)
+warning: manual implementation of `.is_multiple_of()`
+   --> e7-index-bench/src/bin/e127_group_identity_under_split_merge.rs:248:44
+    |
+248 |         assert!(node_count < slot_count && slot_count % slots_per_segment == 0);
+    |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `slot_count.is_multiple_of(slots_per_segment)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+    = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: the loop variable `position` is used to index `slot_holder`
+   --> e7-index-bench/src/bin/e127_group_identity_under_split_merge.rs:263:25
+    |
+263 |         for position in 0..node_count {
+    |                         ^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_range_loop
+    = note: `#[warn(clippy::needless_range_loop)]` on by default
+help: consider using an iterator and enumerate()
+    |
+263 -         for position in 0..node_count {
+263 +         for (position, <item>) in slot_holder.iter_mut().enumerate().take(node_count) {
+    |
+
+warning: `e7-index-bench` (bin "e127-group-identity-under-split-merge" test) generated 3 warnings (run `cargo clippy --fix --bin "e127-group-identity-under-split-merge" -p e7-index-bench --tests -- ` to apply 2 suggestions)
+warning: manual implementation of `.is_multiple_of()`
+   --> e7-index-bench/src/bin/e118_single_disk_recovery.rs:125:75
+    |
+125 |             Fault::Scatter { period_in_slots } => period_in_slots != 0 && slot % period_in_slots == 0,
+    |                                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `slot.is_multiple_of(period_in_slots)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+    = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: `e7-index-bench` (bin "e162-verdict-store-power-cut" test) generated 3 warnings (run `cargo clippy --fix --bin "e162-verdict-store-power-cut" -p e7-index-bench --tests -- ` to apply 3 suggestions)
+warning: `e7-index-bench` (bin "e118-single-disk-recovery" test) generated 1 warning (run `cargo clippy --fix --bin "e118-single-disk-recovery" -p e7-index-bench --tests -- ` to apply 1 suggestion)
+warning: field `txg` is never read
+   --> e7-index-bench/src/bin/e96_hybrid_consistency.rs:120:5
+    |
+119 | struct Snapshot {
+    |        -------- field in this struct
+120 |     txg: u64,
+    |     ^^^
+    |
+    = note: `Snapshot` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: doc list item without indentation
+ --> e7-index-bench/src/bin/e16_journal.rs:6:5
+  |
+6 | //! D16 原文两处指向意图日志，而「所有结构、所有操作先进同一个 journal」读起来像 WAL。
+  |     ^
+  |
+  = help: if this is supposed to be its own paragraph, add a blank line
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+  = note: `#[warn(clippy::doc_lazy_continuation)]` on by default
+help: indent this line
+  |
+6 | //!     D16 原文两处指向意图日志，而「所有结构、所有操作先进同一个 journal」读起来像 WAL。
+  |     ++++
+
+warning: doc list item without indentation
+  --> e7-index-bench/src/bin/e16_journal.rs:14:5
+   |
+14 | //! **拿本实验的数去谈延迟是误用。**
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+help: indent this line
+   |
+14 | //!     **拿本实验的数去谈延迟是误用。**
+   |     ++++
+
+warning: this assertion has a constant value
+   --> e7-index-bench/src/bin/e16_journal.rs:194:5
+    |
+194 |     debug_assert!(HEIGHT >= 2, "树高不足 2 时「根的子节点」这一层不存在");
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider moving this into a const block: `const { assert!(..) }`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+    = note: `#[warn(clippy::assertions_on_constants)]` on by default
+
+warning: writing `&mut Vec` instead of `&mut [_]` involves a new object where a slice will do
+   --> e7-index-bench/src/bin/e16_journal.rs:305:24
+    |
+305 | fn percentile(samples: &mut Vec<u64>, quantile: f64) -> u64 {
+    |                        ^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#ptr_arg
+    = note: `#[warn(clippy::ptr_arg)]` on by default
+help: change this to
+    |
+305 - fn percentile(samples: &mut Vec<u64>, quantile: f64) -> u64 {
+305 + fn percentile(samples: &mut [u64], quantile: f64) -> u64 {
+    |
+
+warning: `e7-index-bench` (bin "e96-hybrid-consistency" test) generated 1 warning
+warning: manual checked division
+   --> e7-index-bench/src/bin/e16_journal.rs:406:30
+    |
+406 |     let expected_fsyncs = if fsync_every == 0 { 0 } else { operation_count / fsync_every };
+    |                              ^^^^^^^^^^^^^^^^              ----------------------------- division performed here
+    |                              |
+    |                              check performed here
+    |
+    = help: consider using `checked_div`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_checked_ops
+    = note: `#[warn(clippy::manual_checked_ops)]` on by default
+
+warning: `e7-index-bench` (bin "e16-journal" test) generated 5 warnings
+warning: redundant field names in struct initialization
+  --> e7-index-bench/src/bin/e9_keylayout.rs:63:163
+   |
+63 | ...ectories[directory_index]), directory_index: directory_index });
+   |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace it with: `directory_index`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_field_names
+   = note: `#[warn(clippy::redundant_field_names)]` on by default
+
+warning: `e7-index-bench` (bin "e162-verdict-store-power-cut") generated 3 warnings (3 duplicates)
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> e7-index-bench/src/bin/e59_message_recompute.rs:140:13
+    |
+140 | const ARMS: [(&str, fn() -> Arm); 7] = [
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: the variable `physical_address` is used as a loop counter
+   --> e7-index-bench/src/bin/e59_message_recompute.rs:195:5
+    |
+195 |     for object_index in 0..load.object_count {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `for (physical_address, object_index) in (1_000_000u64..).zip((0..load.object_count))`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#explicit_counter_loop
+    = note: `#[warn(clippy::explicit_counter_loop)]` on by default
+
+warning: `e7-index-bench` (bin "e59_message_recompute" test) generated 2 warnings
+warning: this operation has no effect
+   --> e7-index-bench/src/bin/e50_ring_slots.rs:197:36
+    |
+197 |             let total_slot_count = region_count * 1;
+    |                                    ^^^^^^^^^^^^^^^^ help: consider reducing it to: `region_count`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#identity_op
+    = note: `#[warn(clippy::identity_op)]` on by default
+
+warning: `e7-index-bench` (bin "e50_ring_slots" test) generated 1 warning (run `cargo clippy --fix --bin "e50_ring_slots" -p e7-index-bench --tests -- ` to apply 1 suggestion)
+warning: manually reimplementing `div_ceil`
+   --> e7-index-bench/src/bin/e9_keylayout.rs:167:22
+    |
+167 |     (leaf_of_object, (keys_with_object_index.len() + SLOTS - 1) / SLOTS)
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `keys_with_object_index.len().div_ceil(SLOTS)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_div_ceil
+    = note: `#[warn(clippy::manual_div_ceil)]` on by default
+
+warning: the loop variable `directory` is only used to index `objects_by_directory`
+   --> e7-index-bench/src/bin/e9_keylayout.rs:189:22
+    |
+189 |     for directory in 0..directory_count {
+    |                      ^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_range_loop
+    = note: `#[warn(clippy::needless_range_loop)]` on by default
+help: consider using an iterator
+    |
+189 -     for directory in 0..directory_count {
+189 +     for <item> in objects_by_directory.iter().take(directory_count) {
+    |
+
+warning: the loop variable `directory` is only used to index `objects_by_directory`
+   --> e7-index-bench/src/bin/e9_keylayout.rs:306:30
+    |
+306 | ...   for directory in 0..directory_count { for &object_index in &objects_by_directory[directory] { union.insert(leaf_of_object[obj...
+    |                        ^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_range_loop
+help: consider using an iterator
+    |
+306 -             for directory in 0..directory_count { for &object_index in &objects_by_directory[directory] { union.insert(leaf_of_object[object_index]); } }
+306 +             for <item> in objects_by_directory.iter().take(directory_count) { for &object_index in &objects_by_directory[directory] { union.insert(leaf_of_object[object_index]); } }
+    |
+
+warning: `e7-index-bench` (bin "e9-keylayout" test) generated 4 warnings (run `cargo clippy --fix --bin "e9-keylayout" -p e7-index-bench --tests -- ` to apply 2 suggestions)
+warning: this assertion has a constant value
+   --> e7-index-bench/src/bin/e76_payload_checksum.rs:540:9
+    |
+540 |         assert!(OFF_PAYLOAD_CHECKSUM < OFF_HEADER_CHECKSUM, "载荷校验和必须落在头校验和覆盖范围内");
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider moving this into a const block: `const { assert!(..) }`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+    = note: `#[warn(clippy::assertions_on_constants)]` on by default
+
+warning: `e7-index-bench` (bin "e76-payload-checksum" test) generated 1 warning
+error: this operation will always return zero. This is likely not the intended outcome
+   --> e7-index-bench/src/bin/e108_plaintext_layer_cost.rs:191:20
+    |
+191 |         assert_eq!(0 / bytes_per_publish, 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#erasing_op
+    = note: `#[deny(clippy::erasing_op)]` on by default
+
+error: could not compile `e7-index-bench` (bin "e108-plaintext-layer-cost" test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+warning: unused variable: `inode_container_catch_up`
+    --> e7-index-bench/src/bin/e155_second_run_fsync_write_volume.rs:1982:27
+     |
+1982 |     let (extent_catch_up, inode_container_catch_up, inode_root_catch_up, extra_named_items) = match arm {
+     |                           ^^^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_inode_container_catch_up`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `inode_container_catch_up`
+    --> e7-index-bench/src/bin/e155_second_run_fsync_write_volume.rs:2098:27
+     |
+2098 |     let (extent_catch_up, inode_container_catch_up, inode_root_catch_up, extra_named_items) = match arm {
+     |                           ^^^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_inode_container_catch_up`
+
+warning: this assertion is always `true`
+   --> e7-index-bench/src/bin/e91_ring_admission.rs:243:9
+    |
+243 |         assert!(71 * 1846 < 131_072 && 131_072 <= 71 * 1847, "记录数该恰为 1847");
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: remove the assertion
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+    = note: `#[warn(clippy::assertions_on_constants)]` on by default
+
+warning: `e7-index-bench` (bin "e91-ring-admission" test) generated 1 warning
+warning: manual checked division
+   --> e7-index-bench/src/bin/e139_tightened_floor.rs:364:12
+    |
+364 |         if self.checks == 0 { 0 } else { self.candidate_sum * 100 / self.checks }
+    |            ^^^^^^^^^^^^^^^^              -------------------------------------- division performed here
+    |            |
+    |            check performed here
+    |
+    = help: consider using `checked_div`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_checked_ops
+    = note: `#[warn(clippy::manual_checked_ops)]` on by default
+
+warning: manual checked division
+   --> e7-index-bench/src/bin/e139_tightened_floor.rs:367:12
+    |
+367 |         if self.checks == 0 { 0 } else { self.nonempty_candidate_sum * 100 / self.checks }
+    |            ^^^^^^^^^^^^^^^^              ----------------------------------------------- division performed here
+    |            |
+    |            check performed here
+    |
+    = help: consider using `checked_div`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_checked_ops
+
+warning: manual checked division
+   --> e7-index-bench/src/bin/e139_tightened_floor.rs:370:12
+    |
+370 |         if self.checks == 0 { 0 } else { self.distinct_state_sum * 100 / self.checks }
+    |            ^^^^^^^^^^^^^^^^              ------------------------------------------- division performed here
+    |            |
+    |            check performed here
+    |
+    = help: consider using `checked_div`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_checked_ops
+
+warning: manual checked division
+   --> e7-index-bench/src/bin/e139_tightened_floor.rs:373:12
+    |
+373 |         if self.user_windows == 0 { 0 } else { self.forced_publications * 100 / self.user_windows }
+    |            ^^^^^^^^^^^^^^^^^^^^^^              -------------------------------------------------- division performed here
+    |            |
+    |            check performed here
+    |
+    = help: consider using `checked_div`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_checked_ops
+
+warning: manual checked division
+   --> e7-index-bench/src/bin/e139_tightened_floor.rs:376:12
+    |
+376 |         if self.lag_samples == 0 { 0 } else { self.lag_sum * 100 / self.lag_samples }
+    |            ^^^^^^^^^^^^^^^^^^^^^              ------------------------------------- division performed here
+    |            |
+    |            check performed here
+    |
+    = help: consider using `checked_div`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_checked_ops
+
+warning: manual implementation of `.is_multiple_of()`
+    --> e7-index-bench/src/bin/e139_tightened_floor.rs:1234:74
+     |
+1234 |         World::TornNewest | World::DiskLoss | World::SlotWriteFail => if seed % 2 == 0 { 0 } else { TXG_ARITHMETIC_GENERATIONS },
+     |                                                                          ^^^^^^^^^^^^^ help: replace with: `seed.is_multiple_of(2)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+     = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: the loop variable `lost_disk` is used to index `by_class`
+    --> e7-index-bench/src/bin/e139_tightened_floor.rs:1708:46
+     |
+1708 | ...                   for lost_disk in 0..DISK_COUNT {
+     |                                        ^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_range_loop
+     = note: `#[warn(clippy::needless_range_loop)]` on by default
+help: consider using an iterator and enumerate()
+     |
+1708 -                             for lost_disk in 0..DISK_COUNT {
+1708 +                             for (lost_disk, <item>) in by_class.iter_mut().enumerate().take(DISK_COUNT) {
+     |
+
+warning: variant `Scattered` is never constructed
+   --> e7-index-bench/src/bin/e155_second_run_fsync_write_volume.rs:723:5
+    |
+721 | enum TouchSpecification {
+    |      ------------------ variant in this enum
+722 |     Continuous(f64),
+723 |     Scattered(f64),
+    |     ^^^^^^^^^
+    |
+    = note: `TouchSpecification` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `named_items` is never read
+    --> e7-index-bench/src/bin/e155_second_run_fsync_write_volume.rs:1569:5
+     |
+1561 | struct WriteAheadLogFsyncOutcome {
+     |        ------------------------- field in this struct
+...
+1569 |     named_items: u64,
+     |     ^^^^^^^^^^^
+     |
+     = note: `WriteAheadLogFsyncOutcome` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: fields `named_items`, `intermediate_version_data`, `intermediate_version_extent_total`, and `intermediate_version_inode_total` are never read
+    --> e7-index-bench/src/bin/e155_second_run_fsync_write_volume.rs:1700:5
+     |
+1687 | struct WriteAheadLogCheckpointOutcome {
+     |        ------------------------------ fields in this struct
+...
+1700 |     named_items: u64,
+     |     ^^^^^^^^^^^
+...
+1703 |     intermediate_version_data: f64,
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+1704 |     intermediate_version_extent_total: f64,
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1705 |     intermediate_version_inode_total: f64,
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `WriteAheadLogCheckpointOutcome` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: unused variable: `outcome`
+    --> e7-index-bench/src/bin/e153_ledger_shape_and_ring_holes.rs:3079:21
+     |
+3079 |                 for outcome in &outcomes {
+     |                     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_outcome`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: this function has too many arguments (9/7)
+    --> e7-index-bench/src/bin/e155_second_run_fsync_write_volume.rs:1729:1
+     |
+1729 | fn convergence_and_saturation_status(iterati..._dirty: &[f64]) -> (bool, Vec<&'static str>) {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^...^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+     = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: this function has too many arguments (8/7)
+    --> e7-index-bench/src/bin/e155_second_run_fsync_write_volume.rs:1816:1
+     |
+1816 | / fn intermediate_version_counts(
+1817 | |     shape: PoolShape,
+1818 | |     arm: WriteAheadLogArm,
+1819 | |     interval_fsyncs: u64,
+...    |
+1824 | |     dedup_data_units_touched: f64,
+1825 | | ) -> (f64, f64, f64, f64) {
+     | |_________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: `e7-index-bench` (bin "e139_tightened_floor" test) generated 7 warnings (run `cargo clippy --fix --bin "e139_tightened_floor" -p e7-index-bench --tests -- ` to apply 1 suggestion)
+warning: constant `MINIMUM_RETAINED_STATES` is never used
+  --> e7-index-bench/src/bin/e153_ledger_shape_and_ring_holes.rs:45:7
+   |
+45 | const MINIMUM_RETAINED_STATES: u64 = 4;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: type alias `Reference` is never used
+   --> e7-index-bench/src/bin/e153_ledger_shape_and_ring_holes.rs:290:6
+    |
+290 | type Reference = (u64, u64);
+    |      ^^^^^^^^^
+
+warning: function `sum_spans` is never used
+   --> e7-index-bench/src/bin/e153_ledger_shape_and_ring_holes.rs:292:4
+    |
+292 | fn sum_spans(references: &BTreeSet<Reference>) -> u64 {
+    |    ^^^^^^^^^
+
+warning: method `tag` is never used
+   --> e7-index-bench/src/bin/e153_ledger_shape_and_ring_holes.rs:392:8
+    |
+388 | impl GeometryCell {
+    | ----------------- method in this implementation
+...
+392 |     fn tag(self) -> String {
+    |        ^^^
+
+warning: fields `violations_candidate` and `violations_abandoned` are never read
+    --> e7-index-bench/src/bin/e153_ledger_shape_and_ring_holes.rs:1274:5
+     |
+1267 | struct PublishOutcome {
+     |        -------------- fields in this struct
+...
+1274 |     violations_candidate: [u64; 5],
+     |     ^^^^^^^^^^^^^^^^^^^^
+1275 |     violations_abandoned: [u64; 5],
+     |     ^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `PublishOutcome` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: this loop could be written as a `while let` loop
+    --> e7-index-bench/src/bin/e155_second_run_fsync_write_volume.rs:2656:5
+     |
+2656 | /     loop {
+2657 | |         match bisect_first_threshold(floor, search_upper_bound, base_height, &height_at) {
+2658 | |             Some(threshold) => {
+2659 | |                 thresholds.push(threshold);
+...    |
+2668 | |     }
+     | |_____^ help: try: `while let Some(threshold) = bisect_first_threshold(floor, search_upper_bound, base_height, &height_at) { .. }`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#while_let_loop
+     = note: `#[warn(clippy::while_let_loop)]` on by default
+
+warning: manual implementation of `.is_multiple_of()`
+   --> e7-index-bench/src/bin/e153_ledger_shape_and_ring_holes.rs:887:38
+    |
+887 |             if start_must_be_even && candidate % 2 != 0 {
+    |                                      ^^^^^^^^^^^^^^^^^^ help: replace with: `!candidate.is_multiple_of(2)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+    = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: manual implementation of `.is_multiple_of()`
+   --> e7-index-bench/src/bin/e153_ledger_shape_and_ring_holes.rs:923:42
+    |
+923 |                 if start_must_be_even && cursor % 2 != 0 {
+    |                                          ^^^^^^^^^^^^^^^ help: replace with: `!cursor.is_multiple_of(2)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+
+warning: this operation has no effect
+    --> e7-index-bench/src/bin/e155_second_run_fsync_write_volume.rs:2755:25
+     |
+2755 |         let expected = (1 * 2 * 28_160) as f64 / baseline as f64;
+     |                         ^^^^^ help: consider reducing it to: `2`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#identity_op
+     = note: `#[warn(clippy::identity_op)]` on by default
+
+warning: you seem to use `.enumerate()` and immediately discard the index
+    --> e7-index-bench/src/bin/e153_ledger_shape_and_ring_holes.rs:1713:54
+     |
+1713 |             for (_index, arm) in self.arms.iter_mut().enumerate() {
+     |                                                      ^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unused_enumerate_index
+     = note: `#[warn(clippy::unused_enumerate_index)]` on by default
+help: remove the `.enumerate()` call
+     |
+1713 -             for (_index, arm) in self.arms.iter_mut().enumerate() {
+1713 +             for arm in self.arms.iter_mut() {
+     |
+
+warning: unnecessary use of `to_vec`
+    --> e7-index-bench/src/bin/e153_ledger_shape_and_ring_holes.rs:1717:45
+     |
+1717 |                 for &role in &ordered_roles(&EMPTY_PUBLISH_ROLES.to_vec()) {
+     |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `EMPTY_PUBLISH_ROLES.as_ref()`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_to_owned
+     = note: `#[warn(clippy::unnecessary_to_owned)]` on by default
+
+warning: manual implementation of `.is_multiple_of()`
+    --> e7-index-bench/src/bin/e153_ledger_shape_and_ring_holes.rs:1992:23
+     |
+1992 |         let kind = if next_step_index % period == 0 { PublishKind::Overwrite } else { PublishKind::Empty };
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `next_step_index.is_multiple_of(period)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+    --> e7-index-bench/src/bin/e153_ledger_shape_and_ring_holes.rs:2256:19
+     |
+2256 |     let families: [(&str, fn(&mut World) -> Option<Vec<PublishOutcome>>); 9] = [
+     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+     = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+    --> e7-index-bench/src/bin/e153_ledger_shape_and_ring_holes.rs:2267:49
+     |
+2267 |     let families_needing_first_rollback_target: [(&str, fn(&mut World) -> Option<Vec<PublishOutcome>>); 3] = [
+     |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+    --> e7-index-bench/src/bin/e153_ledger_shape_and_ring_holes.rs:2461:26
+     |
+2461 |     let bad_image_kinds: [(&str, fn(BaseImageState) -> BaseImageState); 5] =
+     |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+
+warning: `e7-index-bench` (bin "e155-second-run-fsync-write-volume" test) generated 9 warnings (run `cargo clippy --fix --bin "e155-second-run-fsync-write-volume" -p e7-index-bench --tests -- ` to apply 3 suggestions)
+warning: `e7-index-bench` (bin "e153-ledger-shape-and-ring-holes" test) generated 14 warnings (run `cargo clippy --fix --bin "e153-ledger-shape-and-ring-holes" -p e7-index-bench --tests -- ` to apply 6 suggestions)
+warning: doc list item without indentation
+  --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:40:5
+   |
+40 | /// 压缩那两段 2026-09-14 用户定案加，头部从 47 变 50。
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+   = note: `#[warn(clippy::doc_lazy_continuation)]` on by default
+help: indent this line
+   |
+40 | ///   压缩那两段 2026-09-14 用户定案加，头部从 47 变 50。
+   |     ++
+
+warning: doc list item without indentation
+   --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:101:5
+    |
+101 | /// 4096 的记录装 (4096 − 311) / 56 = 67 个点名项。
+    |     ^
+    |
+    = help: if this is supposed to be its own paragraph, add a blank line
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+help: indent this line
+    |
+101 | ///   4096 的记录装 (4096 − 311) / 56 = 67 个点名项。
+    |     ++
+
+warning: doc list item without indentation
+   --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:122:5
+    |
+122 | /// key 宽 2026-09-14 用户定案从 81 + 2k 挪到**偏移 51**——定位它不再需要先知道 k。
+    |     ^
+    |
+    = help: if this is supposed to be its own paragraph, add a blank line
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+help: indent this line
+    |
+122 | ///   key 宽 2026-09-14 用户定案从 81 + 2k 挪到**偏移 51**——定位它不再需要先知道 k。
+    |     ++
+
+warning: using `chunks_exact` with a constant chunk size
+   --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:455:28
+    |
+455 |     let mut chunks = bytes.chunks_exact(8);
+    |                            ^^^^^^^^^^^^^^^
+    |
+help: consider using `as_chunks::<8>()` instead
+   --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:455:28
+    |
+455 |     let mut chunks = bytes.chunks_exact(8);
+    |                            ^^^^^^^^^^^^^^^
+    = note: you can access the chunks using `chunks.0.iter()`, and the remainder using `chunks.1`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+    = note: `#[warn(clippy::chunks_exact_to_as_chunks)]` on by default
+
+warning: using `chunks_exact` with a constant chunk size
+   --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:505:26
+    |
+505 |     for chunk in message.chunks_exact(64) {
+    |                          ^^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<64>().0`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+
+warning: using `chunks_exact` with a constant chunk size
+   --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:603:44
+    |
+603 |         for (sector_index, chunk) in bytes.chunks_exact(PHYSICAL_BLOCK_BYTES as usize).enumerate() {
+    |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<PHYSICAL_BLOCK_BYTES as usize>().0.iter()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+
+warning: methods with the following characteristics: (`to_*` and `self` type is `Copy`) usually take `self` by value
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:1329:16
+     |
+1329 |     fn to_slot(&self) -> Vec<u8> {
+     |                ^^^^^
+     |
+     = help: consider choosing a less ambiguous name
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#wrong_self_convention
+     = note: `#[warn(clippy::wrong_self_convention)]` on by default
+
+warning: methods with the following characteristics: (`to_*` and `self` type is `Copy`) usually take `self` by value
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:1747:17
+     |
+1747 |     fn to_bytes(&self) -> Vec<u8> {
+     |                 ^^^^^
+     |
+     = help: consider choosing a less ambiguous name
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#wrong_self_convention
+
+warning: methods with the following characteristics: (`to_*` and `self` type is `Copy`) usually take `self` by value
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:1832:17
+     |
+1832 |     fn to_bytes(&self) -> Vec<u8> {
+     |                 ^^^^^
+     |
+     = help: consider choosing a less ambiguous name
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#wrong_self_convention
+
+warning: methods with the following characteristics: (`to_*` and `self` type is `Copy`) usually take `self` by value
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:1911:17
+     |
+1911 |     fn to_bytes(&self) -> Vec<u8> {
+     |                 ^^^^^
+     |
+     = help: consider choosing a less ambiguous name
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#wrong_self_convention
+
+warning: methods with the following characteristics: (`to_*` and `self` type is `Copy`) usually take `self` by value
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:1949:17
+     |
+1949 |     fn to_bytes(&self) -> Vec<u8> {
+     |                 ^^^^^
+     |
+     = help: consider choosing a less ambiguous name
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#wrong_self_convention
+
+warning: manual implementation of `.is_multiple_of()`
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:3318:16
+     |
+3318 |             if (offset - ring_start) % JOURNAL_RECORD_BYTES != 0 {
+     |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `!(offset - ring_start).is_multiple_of(JOURNAL_RECORD_BYTES)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+     = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: manual implementation of `.is_multiple_of()`
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:3607:93
+     |
+3607 | ...>= span_start + span_length || (child_span_start - span_start) % child_span != 0 {
+     |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `!(child_span_start - span_start).is_multiple_of(child_span)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+
+warning: this function has too many arguments (8/7)
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:4476:1
+     |
+4476 | / fn compare_layer0_predictions(
+4477 | |     base: &Pool,
+4478 | |     writes: &[WriteRequest],
+4479 | |     segments: &[Vec<usize>],
+...    |
+4484 | |     role_names: &[String],
+4485 | | ) -> (Layer0Tally, PredictionComparison) {
+     | |________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+     = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: manually reimplementing `div_ceil`
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:4770:17
+     |
+4770 |     let chunk = (closed_form + threads as u64 - 1) / threads as u64;
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `closed_form.div_ceil(threads as u64)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_div_ceil
+     = note: `#[warn(clippy::manual_div_ceil)]` on by default
+
+warning: unneeded cloning of iterator items
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:4777:31
+     |
+4777 |         let handles: Vec<_> = ranges.iter().cloned().map(|range| scope.spawn(|| run_range(range))).collect();
+     |                               ^^^^^^^^^^^^^-------------------------------------------------------
+     |                                            |
+     |                                            help: try: `.map(|range| scope.spawn(|| run_range(range)))`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_iter_cloned
+     = note: `#[warn(clippy::redundant_iter_cloned)]` on by default
+
+warning: casting to the same type is unnecessary (`u64` -> `u64`)
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:5078:22
+     |
+5078 |     [pointer_start + POINTER_HEAD_BYTES as u64 + 10, pointer_start + POINTER_HEAD_BYTES as u64 + LOC_ENTRY + 10]
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `POINTER_HEAD_BYTES`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_cast
+     = note: `#[warn(clippy::unnecessary_cast)]` on by default
+
+warning: casting to the same type is unnecessary (`u64` -> `u64`)
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:5078:70
+     |
+5078 |     [pointer_start + POINTER_HEAD_BYTES as u64 + 10, pointer_start + POINTER_HEAD_BYTES as u64 + LOC_ENTRY + 10]
+     |                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `POINTER_HEAD_BYTES`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_cast
+
+warning: casting to the same type is unnecessary (`u64` -> `u64`)
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:5115:32
+     |
+5115 |             let record_start = (PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES) as u64;
+     |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `(PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_cast
+
+warning: this `if` can be collapsed into the outer `match`
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:5339:17
+     |
+5339 | /                 if overlaps(offset_in_structure, length, 138, 32) {
+5340 | |                     self.root_record_checksum_covered = true;
+5341 | |                 }
+     | |_________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#collapsible_match
+     = note: `#[warn(clippy::collapsible_match)]` on by default
+help: collapse nested if block
+     |
+5338 ~             "root_record"
+5339 ~                 if overlaps(offset_in_structure, length, 138, 32) => {
+5340 |                     self.root_record_checksum_covered = true;
+5341 ~                 }
+     |
+
+warning: casting to the same type is unnecessary (`u64` -> `u64`)
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:5320:36
+     |
+5320 |                 let record_start = (PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES) as u64;
+     |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `(PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_cast
+
+warning: this `if` has identical blocks
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:5991:90
+     |
+5991 |   ...   let asserted_kind: Option<&str> = if *key == "record" && *value == token {
+     |  ________________________________________________________________________________^
+5992 | | ...       Some("journal_record")
+5993 | | ...   } else if *key == "field" && value.len() > token.len() && value.starts_with(token) && value.as_bytes()[token.len()] == b'_' {
+     | |_______^
+     |
+note: same as this
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:5993:141
+     |
+5993 |                   } else if *key == "field" && value.len() > token.len() && value.starts_with(token) && value.as_bytes()[token.len()] == b'_' {
+     |  _____________________________________________________________________________________________________________________________________________^
+5994 | |                     Some("journal_record")
+5995 | |                 } else {
+     | |_________________^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#if_same_then_else
+     = note: `#[warn(clippy::if_same_then_else)]` on by default
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:6465:18
+     |
+6465 |     let p6_rows: [(&str, Option<fn(&mut JournalRecord)>, bool); 8] = [
+     |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+     = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: manual implementation of `.is_multiple_of()`
+    --> e7-index-bench/src/bin/e162_crash_verdict_block_store.rs:1113:16
+     |
+1113 |             if self.confirmations_in_this_run % LAZY_RENAME_EVERY_CONFIRMATIONS == 0 {
+     |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `self.confirmations_in_this_run.is_multiple_of(LAZY_RENAME_EVERY_CONFIRMATIONS)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+     = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: manual implementation of `.is_multiple_of()`
+    --> e7-index-bench/src/bin/e162_crash_verdict_block_store.rs:1195:8
+     |
+1195 |     if text.len() % 2 != 0 {
+     |        ^^^^^^^^^^^^^^^^^^^ help: replace with: `!text.len().is_multiple_of(2)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+
+warning: manual implementation of `.is_multiple_of()`
+    --> e7-index-bench/src/bin/e162_crash_verdict_block_store.rs:1698:24
+     |
+1698 |                     if written_blocks % WINDOW_BLOCKS == 0 {
+     |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `written_blocks.is_multiple_of(WINDOW_BLOCKS)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+
+warning: this assertion has a constant value
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:7371:9
+     |
+7371 |         assert!(JOURNAL_RING_BYTES * 4 <= DEVICE_BYTES, "环 ≤ 设备容量 ÷ 4");
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: consider moving this into a const block: `const { assert!(..) }`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+     = note: `#[warn(clippy::assertions_on_constants)]` on by default
+
+warning: this assertion has a constant value
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:7445:9
+     |
+7445 |         assert!(SLOT_DATA_UNIT < OPEN_CLUSTER_SEGMENT_START_SLOT, "用户数据不进开放聚簇段");
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: consider moving this into a const block: `const { assert!(..) }`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#assertions_on_constants
+
+warning: casting to the same type is unnecessary (`u64` -> `u64`)
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:8949:28
+     |
+8949 |         let record_start = (PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES) as u64;
+     |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `(PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_cast
+
+warning: `e7-index-bench` (bin "e162-crash-verdict-block-store" test) generated 3 warnings (run `cargo clippy --fix --bin "e162-crash-verdict-block-store" -p e7-index-bench --tests -- ` to apply 3 suggestions)
+warning: field assignment outside of initializer for an instance created with Default::default()
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:9296:9
+     |
+9296 |         dirty_comparison.off_diagonal = 1;
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: consider initializing the variable with `PredictionComparison { off_diagonal: 1, ..Default::default() }` and removing relevant reassignments
+    --> e7-index-bench/src/bin/e142_first_transaction_dry_run.rs:9295:9
+     |
+9295 |         let mut dirty_comparison = PredictionComparison::default();
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#field_reassign_with_default
+     = note: `#[warn(clippy::field_reassign_with_default)]` on by default
+
+warning: `e7-index-bench` (bin "e142-first-txn-dry-run" test) generated 27 warnings (run `cargo clippy --fix --bin "e142-first-txn-dry-run" -p e7-index-bench --tests -- ` to apply 11 suggestions)

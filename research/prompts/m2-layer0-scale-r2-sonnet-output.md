@@ -1,4 +1,4 @@
-# 层 0 规模第二轮 M4：辩方复核第一轮判决（m2-layer0-scale-r2-sonnet，2026-09-26 JST）
+# 层 0 规模第二轮 M4：辩方复核第一轮判决（m2-layer0-scale-r2-sonnet，2026-09-26）
 
 立场：替第一轮被判出局或被打中的一方辩，回答四问：甲出局判得对不对（第 304 行那一类在新形状上存不存在）、H1 归到 S6/C555 归得对不对、甲二的 210 能不能当代价数、第一轮判决里哪一句够不着它引的证据。
 被复核判决：`research/prompts/m2-layer0-scale-r1-main-verification.md`；依据的腿报告：`m2-layer0-scale-r1-opus-output.md`（云端攻方）、`m2-layer0-scale-r1-sonnet-output.md`（正推）、`m2-layer0-scale-r1-verifier-output.md`（核查员）。全部引文行号现查于对应文件，命中 0 次的一律未写成引文。

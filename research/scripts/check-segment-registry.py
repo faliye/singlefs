@@ -485,7 +485,7 @@ def perform_check(repository_root):
             # 出处指到一条钉住活代码的用例（`<文件>.rs` 加一个测试函数名）时，按那条用例里写死的串比，
             # 不按 E142 产物比：mkfs 那一行 2026-09-22 起就是这一种——E142 的装置是 research/ 下一份
             # 独立手写模型、不读 crates/ 的 mkfs 实现，清零那八步它没有，拿它当基准两边会一起过时
-            # （C485（门禁 52 号不读活代码，段序列变了它照样绿））。
+            # （C485（segment-registry 格不读活代码，段序列变了照样绿））。
             pinned = compare_against_pinning_test(entry, repository_root)
             if pinned is None:
                 mismatches.append(f'{entry.row_label}：这一行不是预想，「出处」栏里既没有 `path=...` 引用、也没有指到一条钉住活代码的用例（`<文件>.rs` 加测试函数名），登记表这一行本身要修')

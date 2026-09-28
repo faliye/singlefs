@@ -1,0 +1,10 @@
+exit=1
+want=一份都找不到
+want=99-样本.md:6
+want=99-样本.md:7  E7RESULT name=verdict arm=b count=7
+want=只在没在 replay.sh 登记的产物里有（e99-sample-2026-09-15-old.out）
+want=样本只跑 .gate-cells 点名的格：quoted-result-lines
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（quoted-result-lines）
+want=→ quoted-result-lines：打开这个实验复跑命令登记的那份产物
+want=bash .claude/gate.d/doc-experiments.sh --check quoted-result-lines

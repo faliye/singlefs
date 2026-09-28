@@ -1,6 +1,6 @@
 # 实审 B2b 报告（B2 收尾：变异行与证红、11 行腐化锚点、被带红的测试、fmt / clippy / build）
 
-写于 2026-09-26 UTC（JST 2026-09-27 早上）。实现员，主工作区改测试与 checker 的 clippy 四处；`crates/mutations.tsv` 一个字没动，行放在草稿目录。
+写于 2026-09-27。实现员，主工作区改测试与 checker 的 clippy 四处；`crates/mutations.tsv` 一个字没动，行放在草稿目录。
 
 ## 一、结论
 
@@ -8,7 +8,7 @@
 - **证红**：37 行全部在副本上用 `prove-red.sh` 跑过，37 条全抓到（`✓ 点名 37 条：跑了 37 条，跳过 0 条，跑的都抓到了`）。副本的变异表换上这 37 行之后，门禁 33 号在副本上判绿（`crates/mutations.tsv 997 条的原文各命中源码一次`）。
 - **测试期望**：B1 那份 4 条照第六节改完（3 条映射 key 的期望换成 `MAPPING_KEY_MATCHES_THE_UNIT_HEADER`、函数名跟着改；计数器 0 改判违例）；formatted_pool 三张不适用名单照第六节改完。**另有第六节没列的 1 条**：formatted_pool 里 C554 那一形的历史，B2 补上被抛弃根那一半之后照实红 I-7.4，我把它的期望从「一条违例都没有」改成「只红 I-7.4、红在被抛弃根 (2, 3) 上」（第五节；这一处请主 agent 过目）。
 - **checker 源码**：只为 clippy 改了 `walk.rs` 四处（type_complexity、needless_borrow、shadow_unrelated 两个绑定），不动判定。
-- **主工作区编不过**：`singlefs-core` 别的会话在改（先是 `admission.rs`，后来是 `allocator.rs`），harness 在主工作区编不出来。测试二进制、harness 那两个目标的 clippy 与 `cargo build --all-targets` 都在副本上跑（副本 = 22:15Z 的主工作区 + 我的改动，walk.rs 与主工作区逐字节相同），全绿；checker 的 clippy 与 fmt 在主工作区上跑，绿。
+- **主工作区编不过**：`singlefs-core` 别的会话在改（先是 `admission.rs`，后来是 `allocator.rs`），harness 在主工作区编不出来。测试二进制、harness 那两个目标的 clippy 与 `cargo build --all-targets` 都在副本上跑（副本 = 取副本那一刻的主工作区 + 我的改动，walk.rs 与主工作区逐字节相同），全绿；checker 的 clippy 与 fmt 在主工作区上跑，绿。
 
 推翻条件：主 agent 把两份 tsv 写回主表之后，门禁 33 号在这 37 行上报「不是恰好命中一次」；或者 `core` 编好之后，在主工作区跑我动的两个测试二进制，有一条不过。
 
@@ -27,9 +27,9 @@
 - 874 / 877 / 878：判定点从 `"I-1.6"` / `"I-1.2"` 搬到 `MAPPING_KEY_MATCHES_THE_UNIT_HEADER`，877 的比较挪到单独一行（只盯 `header_class_tag == key_class_tag,`）；点名测试换成改名后的三条。
 - 875 / 879：锚点没腐化，只因点名测试改名换了第 5 / 6 段。
 
-## 三、证红（`research/scripts/prove-red.sh --copy /tmp/claude-1000/impl-rev-b2b/copy --memory 8G singlefs-harness <37 个名字>`，经 `capped.sh 4`，2026-09-26 22:22–22:25Z）
+## 三、证红（`research/scripts/prove-red.sh --copy /tmp/claude-1000/impl-rev-b2b/copy --memory 8G singlefs-harness <37 个名字>`，经 `capped.sh 4`，2026-09-27）
 
-副本 = 22:15Z 主工作区 rsync（去 target、.git）+ 我改的两份测试；副本的 `crates/mutations.tsv` 换上 13 行、追加 24 行之后跑。prove-red 每组参数先跑一次不改源码的基线（都绿），再逐条改坏、跑、还原。行的参数照表里惯例带 `-- <测试名>` 过滤，所以每条只看到点名那一条红，「同时红了哪些」看不到；整个二进制的基线红集另跑，在第四节。行号是主工作区今天的（clippy 那四处改完之后，原文在 walk.rs 里仍各命中一次，`count_anchors.py` 数过 37 行都是 1）。第 1–13 行是替换，第 14–37 行是追加（与 `mutations-append.tsv` 同序）。
+副本 = 取副本那一刻的主工作区 rsync（去 target、.git）+ 我改的两份测试；副本的 `crates/mutations.tsv` 换上 13 行、追加 24 行之后跑。prove-red 每组参数先跑一次不改源码的基线（都绿），再逐条改坏、跑、还原。行的参数照表里惯例带 `-- <测试名>` 过滤，所以每条只看到点名那一条红，「同时红了哪些」看不到；整个二进制的基线红集另跑，在第四节。行号是主工作区今天的（clippy 那四处改完之后，原文在 walk.rs 里仍各命中一次，`count_anchors.py` 数过 37 行都是 1）。第 1–13 行是替换，第 14–37 行是追加（与 `mutations-append.tsv` 同序）。
 
 原样末行：
 
@@ -112,7 +112,7 @@ test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 
 clippy 的 lint 集照 `check.sh`：`-D warnings` 加 `wildcard_enum_match_arm`、`allow_attributes_without_reason`、`cast_possible_truncation`、`cast_sign_loss`、`cast_possible_wrap`、`undocumented_unsafe_blocks`、`shadow_unrelated`；目标是 `-p singlefs-checker --all-targets` 与 `-p singlefs-harness --test checker_cross_links_malformed_nodes_and_mapping_entries --test second_transaction_step_three_formatted_pool`。
 
-**主工作区**（22:33–22:35Z，core 一度编得过的那一刻；门禁 33 等六道在 22:26Z 跑）：
+**主工作区**（core 一度编得过的那一刻；门禁 33 等六道在那时跑）：
 
 ```
 build main exit 0 18s                        （cargo build --offline --all-targets，warning 0 行）
@@ -158,7 +158,7 @@ error: could not compile `singlefs-core` (lib) due to 3 previous errors
 2. `random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation`（`…random_history.rs:256`）：`历史 96 段：跑完 67、以已知红收尾 {0: 1}、新发现 28`，新发现只有一种签名 `CheckerViolations { invariants: ["I-7.4"] }`（第一个种子 7463871032432355115，说明「被抛弃的根（实例 1、txg 4）引用的单元已被重新分配或抹头…盘 0 槽 50182…」）；统计行 `I-7.4：判绿 1682 次、不适用 0 次`（checker 跑了 1710 次）。
 3. `unit_area_wall_sampling_on_small_devices_with_the_space_admission_judged_is_refused_by_the_formula_inside_the_model_interval`（`…random_history.rs:496`）：`准入判着时式子先拒，落点那一道走不到`，`left: 2` `right: 0`。
 
-前两条都是 B2 新加的 I-7.4 被抛弃根那一半在随机历史上的新红（B2 报告第六节第 3、4 条推过「会新红」），说明都点名「被抛弃的根」，改之前 checker 根本不走被抛弃的根，这一格不可能红——是 checker 判严之后照出来的，还是写者在抛弃之后抬 F / 回收时放掉了被抛弃根的影子账、是真违例，我没查（要读 `mount.rs` 的影子账与随机历史那几段的操作序列，不在这件活里）。第 3 条数的是落点那一道的拒绝次数，与 checker 无关（推的），副本里的 `singlefs-core` 是 22:15Z 的快照，A4 一族正在改准入。三条都交主 agent 分派。
+前两条都是 B2 新加的 I-7.4 被抛弃根那一半在随机历史上的新红（B2 报告第六节第 3、4 条推过「会新红」），说明都点名「被抛弃的根」，改之前 checker 根本不走被抛弃的根，这一格不可能红——是 checker 判严之后照出来的，还是写者在抛弃之后抬 F / 回收时放掉了被抛弃根的影子账、是真违例，我没查（要读 `mount.rs` 的影子账与随机历史那几段的操作序列，不在这件活里）。第 3 条数的是落点那一道的拒绝次数，与 checker 无关（推的），副本里的 `singlefs-core` 是取副本那一刻的快照，A4 一族正在改准入。三条都交主 agent 分派。
 
 ## 七、受影响的层 0 流与崩溃枚举用例
 

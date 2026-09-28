@@ -1,6 +1,6 @@
 # 实现员报告：C554 乙-配置续（取号那一写的 tail 写见证值）
 
-写于 2026-09-27（JST）。规格 `/tmp/claude-1000/impl-c554-yi-carry/spec.md`。补丁目录 `/tmp/claude-1000/impl-c554-yi-carry/patch/`（`crates.patch`、`mutations-append.tsv`、`mutations-replacements.tsv`、`report.md` = 这份的拷贝）。
+写于 2026-09-27。规格 `/tmp/claude-1000/impl-c554-yi-carry/spec.md`。补丁目录 `/tmp/claude-1000/impl-c554-yi-carry/patch/`（`crates.patch`、`mutations-append.tsv`、`mutations-replacements.tsv`、`report.md` = 这份的拷贝）。
 
 ## 一、结论
 
@@ -28,7 +28,7 @@
  2 files changed, 568 insertions(+), 7 deletions(-)
 ```
 
-`git apply --check` 对主工作区现状（含 04:1x UTC 打上的 A3a）：过（第七节贴原样）。
+`git apply --check` 对主工作区现状（含打上的 A3a）：过（第七节贴原样）。
 
 ## 三、停下交主 agent 的设计问题
 
@@ -102,11 +102,11 @@ E158 第 3 次跑登记 `research/prompts/e158-r3-prereg.md` 第 348 行 N-配�
 
 **D23（journal 的角色与格式） 已定项 14**（`.claude/kb/decisions/23-journal的角色与格式.md`，已定项 14 从第 351 行起），第 387 行里写取号那一写 tail 的句子，原样：
 
-> **「续」**：取号那一写（`crates/singlefs-core/src/transaction.rs` 的 `write_acquired_instance`）不再把 tail 写成 0，改写取号那一刻按同一取法读到的见证值 c_见证（用户 2026-09-27 JST 12:08 定「乙-配置续（推荐）」；实现在做，实现员 2026-09-27 JST 12:1x 派出）。系统配置没见证到的最新根，「续」落地之后由下一次挂载在自己的 c_见证 里看到；这一形记欠见 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 的 Q1。
+> **「续」**：取号那一写（`crates/singlefs-core/src/transaction.rs` 的 `write_acquired_instance`）不再把 tail 写成 0，改写取号那一刻按同一取法读到的见证值 c_见证（用户 2026-09-27 定「乙-配置续（推荐）」；实现在做，实现员 2026-09-27 派出）。系统配置没见证到的最新根，「续」落地之后由下一次挂载在自己的 c_见证 里看到；这一形记欠见 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 的 Q1。
 
 要改成什么：
 
-1. 「实现在做，实现员 2026-09-27 JST 12:1x 派出」→ 写实现的落点：`transaction.rs` 的 `highest_system_configuration_journal_tail`（取法：每块盘两槽里全部自证过、fsid 与本池相同的系统配置槽 `journal_tail` 取最大，一份都没有时 0），在 `write_acquired_instance` 第一道屏障之后、第一个取号写之前读一次；逐盘取号写与回卷写都带这一次读到的值。补丁打上之后再改。
+1. 「实现在做，实现员 2026-09-27 派出」→ 写实现的落点：`transaction.rs` 的 `highest_system_configuration_journal_tail`（取法：每块盘两槽里全部自证过、fsid 与本池相同的系统配置槽 `journal_tail` 取最大，一份都没有时 0），在 `write_acquired_instance` 第一道屏障之后、第一个取号写之前读一次；逐盘取号写与回卷写都带这一次读到的值。补丁打上之后再改。
 2. 加一句回卷写：「取号失败的回卷写（D18（块里携带什么信息） 已定项 11）带同一个见证值，不退回 0」。这一半是规格定的、登记里 N-配置续 的定义（第 348 行「其余写一个字节都不改」）没有（第三节 Q2）。
 3. 加一句「mkfs 写 tail 0，mkfs 之后第一次取号读到 0、写 0：第一个事务的字节不变」。
 4. 取号那一刻某块盘两槽都读不出时怎么办：条款没写，等主 agent 定了第三节 Q1 再写。
@@ -160,7 +160,7 @@ E158 第 3 次跑登记 `research/prompts/e158-r3-prereg.md` 第 348 行 N-配�
 
 ## 七、交回前的验证（末尾原样）
 
-最后一遍在 work2 上跑（主工作区 13:2x JST 的样子，含 A3a，打上本补丁；按协调者的话不用 `--all-targets`）：
+最后一遍在 work2 上跑（主工作区的样子，含 A3a，打上本补丁；按协调者的话不用 `--all-targets`）：
 
 ```
 rustfmt --edition 2021 --check crates/singlefs-core/src/transaction.rs crates/singlefs-harness/tests/<T>.rs
@@ -178,7 +178,7 @@ run-with-memory-cap.sh 8G capped.sh 4 cargo test --offline -p singlefs-harness -
 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.04s
 ```
 
-更早在副本 work 上（A3a 之前）跑过全仓的三样：`cargo clippy --all-targets --all-features -- -D warnings <七条>` 退 0，`cargo build --offline --all-targets` 退 0，`cargo fmt --all -- --check` 退 1。fmt 那一次唯一的 diff 在 `crates/singlefs-harness/src/bin/first_transaction_on_device.rs:3059`，不是我的文件；主工作区 14:3x 已经给它跑过 rustfmt。
+更早在副本 work 上（A3a 之前）跑过全仓的三样：`cargo clippy --all-targets --all-features -- -D warnings <七条>` 退 0，`cargo build --offline --all-targets` 退 0，`cargo fmt --all -- --check` 退 1。fmt 那一次唯一的 diff 在 `crates/singlefs-harness/src/bin/first_transaction_on_device.rs:3059`，不是我的文件；主工作区已经给它跑过 rustfmt。
 
 登记给实现员的门禁阶段（`stage-owners.tsv`），在副本上跑：
 - 33 号：退 1，只点第 659 行（E158 bin 那一行，不是这一件的）；work2 与主工作区此刻红法相同。我追加的 6 行与替换的 1 行都没被点名。末行：`    → crates 这张表：把原文改到今天源码里逐字存在、只出现一次的那一段（原文里的换行写成 \n），改完单跑那几行证明点名的测试红。`
@@ -189,7 +189,7 @@ test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 - 89 号：退 77（本次未跑；末行是它对收口表第 27 行的提示，与这一件无关）
 - 74 号（release，在 work 上）：退 1，`✗ 随机历史的测试二进制判红`。红的 3 条就是第六节表里 random_history 那 3 条，debug 基线同红。
 
-补丁对主工作区现状（14:3x 打上 A3d 与 rustfmt 之后，`crates/mutations.tsv` 1264 行，`transaction.rs` 与我开副本时逐字节相同）：
+补丁对主工作区现状（打上 A3d 与 rustfmt 之后，`crates/mutations.tsv` 1264 行，`transaction.rs` 与我开副本时逐字节相同）：
 
 ```
 git apply --check /tmp/claude-1000/impl-c554-yi-carry/patch/crates.patch

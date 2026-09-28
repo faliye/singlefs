@@ -1,0 +1,6 @@
+ARM mutated(no-1058)
+
+thread 'main' (2946697) panicked at crates/k39-barrier-attack/src/scenario.rs:157:182:
+覆盖写: SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(81920), demand: BytesOnOneDevice(229376) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(81920), demand: BytesOnOneDevice(229376) }] })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+WALL 0s rc=101

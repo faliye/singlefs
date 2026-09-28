@@ -1,4 +1,4 @@
-# 运行记录：m2-treesplit-r1-local-attack（2026-09-24 UTC）
+# 运行记录：m2-treesplit-r1-local-attack（2026-09-24）
 
 提示文件：
 - `research/prompts/m2-treesplit-r1-local-attack.md`（52 格，四棵树合在一份提示里；第 1 次调用撞输出

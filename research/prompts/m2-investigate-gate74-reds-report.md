@@ -1,6 +1,6 @@
 # 调查：门禁 74 号在 B2b 副本上的三条红（随机历史二进制）
 
-调查员，2026-09-26 22:39–23:05 UTC（JST 09-27 07:39–08:05）。只读主工作区；复现、加打印、换文件都在副本 `/tmp/claude-1000/investigate-gate74-reds/repo/` 里做。
+调查员，2026-09-27。只读主工作区；复现、加打印、换文件都在副本 `/tmp/claude-1000/investigate-gate74-reds/repo/` 里做。
 
 ## 一、结论
 
@@ -11,14 +11,14 @@
    - 判红那一刻，被抛弃的根 28/28 都在根环里，txg 都严格高于 F_生效；它不在回退候选集里，只因为实例表判它被抛弃。
    - I-7.4 条款原文要求这种根引用的块「在离开根环之前」不许重新分配，没有 F 这一道界；checker 被抛弃根那一半（`walk.rs:5388`）也不看 F，与条款一致。
 2. **第 3 条来自实审 A4 改的 `admission.rs`（ckpt_cost 按盘分路计）。**
-   - 副本里其余文件都不动、只换 `admission.rs`：换成 A4 那一版（sha256 `08c40771…`），红，`left: 2 right: 0`；用 22:39:54Z 主工作区那一版（A4b 改到一半，`2eca8b86…`），绿。
+   - 副本里其余文件都不动、只换 `admission.rs`：换成 A4 那一版（sha256 `08c40771…`），红，`left: 2 right: 0`；用稍后的主工作区那一版（A4b 改到一半，`2eca8b86…`），绿。
    - 那两次落点拒绝发生时，每块盘空闲 100 槽，隔离 0、扣住（抬 F 回收、F 还没生效）0。落点取不到，是因为对齐的空闲槽对全在这次挂载开的两个聚簇段 [50304, 50368] 里：段外 0 对，段内 49 / 48 对。用户数据落点不许落进开放聚簇段（`allocator.rs:587`，D3 已定项 10 ②），准入式子只按字节数算、不管这一条。
    - A4 报告推测的「抬 F 回收的槽扣住」在这两次里不成立（扣住 = 0）。
 3. B2b 副本上的三条红，在我的副本上复现了第 1、2 条，数一模一样；第 3 条没复现，原因就是上一条说的 `admission.rs` 版本不同。
 
 ## 二、取副本时的快照
 
-主工作区 HEAD `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`。副本取于 2026-09-26 22:39:54 UTC，用的是 `rsync -a --exclude target --exclude .git`。取之前和取之后各算一次 7 份文件的 sha256，两次相同：
+主工作区 HEAD `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`。副本取于 2026-09-27，用的是 `rsync -a --exclude target --exclude .git`。取之前和取之后各算一次 7 份文件的 sha256，两次相同：
 
 ```
 2eca8b864f3f6695763ec3cc553c0d5429c91355ee3b3292c4022f38e29334c6  admission.rs
@@ -30,17 +30,17 @@
 842f766a907e5e414fa73900fdc026809dc32068af4476bba69527ad6a3fe0f7  make_filesystem.rs
 ```
 
-- 副本能编过：`cargo test --release --offline -p singlefs-harness --test second_transaction_supplement_three_random_history --no-run`，22:40:56Z `Finished`。
+- 副本能编过：`cargo test --release --offline -p singlefs-harness --test second_transaction_supplement_three_random_history --no-run`， `Finished`。
 - 副本与 HEAD 的差别：
   - `crates/` 下有 88 份跟踪文件的内容不同，逐份列在 `copy-vs-head-modified.txt`；另有 28 份未跟踪文件，列在 `copy-untracked.txt`。
   - 其中 `singlefs-core/src` 与 `singlefs-checker/src` 里不同的是：checker 的 image.rs、lib.rs、position_addressed.rs、walk.rs；core 的 admission.rs、allocation_record_tree.rs、allocator.rs、code_two_tree.rs、extent_tree.rs、instance_table.rs、journal.rs、lib.rs、make_filesystem.rs、mount.rs、mounted_read.rs、recovery.rs、rollback_witness.rs、root_record.rs、system_configuration.rs、transaction.rs、write_request_split.rs。
   - core 另有一份未跟踪文件 `mounted_session.rs`。
-- 23:01:48Z 再看主工作区：`admission.rs` 已变成 `aa0201f8…`（A4b 还在改）；mount、allocator、transaction、recovery 四份的 sha 与快照相同。
-- 下文引的 mount.rs、allocator.rs、transaction.rs、recovery.rs、walk.rs、history.rs 行号，都是 23:01Z 在主工作区现取的。其中 walk.rs、history.rs、allocator.rs、mounted_session.rs 与副本逐行比过：副本比主工作区只多出我加的诊断行（`diff` 的 `<` 行 0 条）。
+- 之后再看主工作区：`admission.rs` 已变成 `aa0201f8…`（A4b 还在改）；mount、allocator、transaction、recovery 四份的 sha 与快照相同。
+- 下文引的 mount.rs、allocator.rs、transaction.rs、recovery.rs、walk.rs、history.rs 行号，都是那一次在主工作区现取的。其中 walk.rs、history.rs、allocator.rs、mounted_session.rs 与副本逐行比过：副本比主工作区只多出我加的诊断行（`diff` 的 `<` 行 0 条）。
 - 负载：开跑前 `ps` 看到别的会话在跑一条 `cargo test --offline -p singlefs-harness --test second_transaction_supplement_three_bad_disk_input`，没有性能测量进程。我用的是自己的 target 目录，没等锁。
-- 线程上限：开头按 6；22:5xZ 收到主 agent 的消息改成 5，之后起的 cargo 都经 `capped.sh 5`。内存一律经 `run-with-memory-cap.sh 12G`。
+- 线程上限：开头按 6；Z 收到主 agent 的消息改成 5，之后起的 cargo 都经 `capped.sh 5`。内存一律经 `run-with-memory-cap.sh 12G`。
 
-## 三、原样复现（第 1 次跑，22:41–22:42Z，副本未加任何打印）
+## 三、原样复现（第 1 次跑，副本未加任何打印）
 
 命令（在副本根目录，`CARGO_TARGET_DIR=/tmp/claude-1000/investigate-gate74-reds/target`）：
 
@@ -63,7 +63,7 @@ thread 'crash_recovery_abandoning_the_newest_root_then_raising_the_floor_into_it
 ```
 
 - 第 1、2 条复现了，种子、txg、槽号、「跑完 67、已知红 {0: 1}、新发现 28」都与 B2b 报告第六节一样。
-- 第 3 条在这一版上是 `ok`，没复现。与 B2b 现场的差别见第六节：`admission.rs` 从 A4 那一版（`08c40771…`）变成了 A4b 改到一半的那一版（`2eca8b86…`）。B2b 副本（22:15Z）核心文件的 sha 没有留档，只能拿 A4 报告与 B2b 日志里的数来对。
+- 第 3 条在这一版上是 `ok`，没复现。与 B2b 现场的差别见第六节：`admission.rs` 从 A4 那一版（`08c40771…`）变成了 A4b 改到一半的那一版（`2eca8b86…`）。B2b 副本核心文件的 sha 没有留档，只能拿 A4 报告与 B2b 日志里的数来对。
 
 注：上面 `要以「已知红」…` 那一行在报告里截到 700 字符，全文见 `run1.log` 第 536 行。
 
@@ -199,7 +199,7 @@ DIAG-I74 RED abandoned root inst 1 txg 5 F 0
 
 | I-7.3 | 环健康性 | **环健康性**：S 中除代号最大者外，至少还存在一条更早代号的记录。不存在即判红——它意味着某次提交把上一代直接覆盖了，轮换逻辑已失效，**下一次撕裂将无路可退**。**例外只有一个**：S 全部是第 0 代（mkfs 把第 0 代种进全部区域，D22（单元原子性怎么合成）已定项 8）时判绿，崩溃后回退到这个态的镜像同样判绿。⚠️ 射程：种子没被覆盖完之前，它们自己就充当「更早代号的记录」，连续两代落进同一槽的轮换 bug 要等 R × S 次发布把种子全部覆盖之后才会被这一条抓到 | 已实现（2026-09-21，池级 checker `walk::check_pool_image`，例外（自证过的根全部是第 0 代）照判据原样实现；坏镜像建在 mkfs 刚写完那份上（三条第 0 代根的 checkpoint_txg 一起改成 1），例外那一支另有一份阳性对照；坏镜像在 `crates/singlefs-harness/tests/checker_known_bad_images.rs`；层 0 每个崩溃状态都判） |
 
-`crates/singlefs-checker/src/walk.rs` 第 5388–5391 行（主工作区 23:01Z）：
+`crates/singlefs-checker/src/walk.rs` 第 5388–5391 行（主工作区）：
 
 ```
         let abandoned = instance_table_rows.iter().any(|row| {
@@ -215,7 +215,7 @@ DIAG-I74 RED abandoned root inst 1 txg 5 F 0
 
 ### 4.4 写者哪一段放掉了被抛弃根的单元
 
-以下行号都在主工作区 23:01Z，sha 与快照相同：
+以下行号都在主工作区，sha 与快照相同：
 
 - `crates/singlefs-core/src/mount.rs:958` `rebuilt_allocator`：
   - 第 985 行取根环用的是 `readable_roots_with_ring_slots`（`crates/singlefs-core/src/recovery.rs:976`），只收读得出、自证过的根；
@@ -320,7 +320,7 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 25 filtered out; fin
 
 | `admission.rs` | 来源 | 结局 | 日志 |
 |---|---|---|---|
-| `2eca8b86…` | 22:39:54Z 主工作区（A4b 改到一半） | ok；落点拒绝 0；`SpaceAdmissionRefused` 1095；最高 txg 559 | `run1.log` |
+| `2eca8b86…` | 稍后的主工作区（A4b 改到一半） | ok；落点拒绝 0；`SpaceAdmissionRefused` 1095；最高 txg 559 | `run1.log` |
 | `08c40771…` | `/tmp/claude-1000/impl-rev-a4b/admission-a4-baseline.rs`，A4b 当作 A4 基线存的那份 | 红 | `red3-a4-admission.log` |
 | `529da256…` | HEAD | 编不过（core 别处引用 `admission_reading_of_a_writable_mount`、`publish_has_an_ordinary_allocation`，HEAD 这份没有），没跑成 | `red3-head-admission.log` |
 
@@ -337,7 +337,7 @@ test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 25 filtered out;
 ```
 
 - 与 A4 报告第 12 行「改后出现 2 次…原先 0 次」合起来看：这一条随 A4 的改动出现，随 A4b 的改动消失，与 B2b、B2 的 checker 改动无关（这个取样点的 checker 判红为 0，「新发现 0」）。
-- 「`08c40771…` 就是 B2b 22:15Z 副本里那一份」没有直接证据：B2b 的 `md5-at-start.txt` 只记了 checker 文件。只有数与 A4 报告、B2b 日志逐项相同这一条。
+- 「`08c40771…` 就是 B2b 取的副本里那一份」没有直接证据：B2b 的 `md5-at-start.txt` 只记了 checker 文件。只有数与 A4 报告、B2b 日志逐项相同这一条。
 
 ### 5.2 那两次落点拒绝时盘上是什么样（`red3-probe2.log`，`admission.rs` = `08c40771…`）
 
@@ -377,7 +377,7 @@ cargo test --release -p singlefs-harness --test second_transaction_supplement_th
 - 没修、没判该怎么改，也没判第 1 条用例、formatted_pool 用例的期望该怎么钉。
 - 没跑重型测试：名字带 layer0 的、54 / 55 / 57 / 59 / 87 号、全量 cargo test、`gate.sh` 都没跑。门禁 74 号整段没跑，只跑了它里面这一个测试二进制，外加 formatted_pool 一条用例、收缩那一条 `#[ignore]` 用例和我自己的诊断测试。
 - 「被抛弃根已在 F_生效 之下时这一半该不该看 F」没有观测：28 个种子里一次都没出现。
-- 第 3 条：没收缩到单个种子；没核 A4b 那一版是否在别的种子上仍有同一个缺口；B2b 22:15Z 副本里 core 七份文件的确切版本无从核对，副本已删。
+- 第 3 条：没收缩到单个种子；没核 A4b 那一版是否在别的种子上仍有同一个缺口；B2b 取的副本里 core 七份文件的确切版本无从核对，副本已删。
 - 第 2 条 28 个种子里，逐槽盯过分配栈的只有第 1 条固定历史、…129、…119；其余 25 个靠「槽在藏起来的范围里、中间没有挂载、复用那一步判红」推出同一机理，再用 5 个种子的反事实验证。
 - 副本里的改动（诊断打印、诊断测试 `tests/diag_gate74.rs`、换过的 `admission.rs`）都没回主工作区；改动全文在 `diag-instrumentation.patch`。第 3 条那两个探针（`mounted_session.rs`、`allocator.rs` 的 `diag_counts` / `diag_pairs`）也在里面，打印不受环境变量控制，只在「推满之后落点被拒」时出声。
 - 没有产物进 `research/results/`：这是调查，不是登记过的实验；日志都在草稿目录里，要不要留由主 agent 定。

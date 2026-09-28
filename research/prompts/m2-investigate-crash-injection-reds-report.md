@@ -1,10 +1,8 @@
 # 调查报告：崩溃注入快档三条红（investigator）
 
-时刻都是 UTC（本机时钟），JST = UTC + 9。
-
 ## 〇、现场
 
-- 副本取于 2026-09-26T16:30:40Z–16:30:57Z（`rsync -a --exclude /target --exclude .git` 主工作区，另删了副本里带过来的 `research/target`），HEAD `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`。
+- 副本取于 2026-09-27（`rsync -a --exclude /target --exclude .git` 主工作区，另删了副本里带过来的 `research/target`），HEAD `73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321`。
 - 那一刻 `git diff --stat -- crates` 的输出存为 `diffstat-at-copy.txt`，sha256 `7fc06c0df0c5edac2bfae89aab981f7075aaafcaca88b4e3b616f6ebd1011609`（末行 `85 files changed, 22097 insertions(+), 10583 deletions(-)`）；整份 `git diff -- crates` 存为 `diff-crates-at-copy.patch`，sha256 `ea8a6d7a9ddfbcab652c3afa96c00e513f7d9c5fe21eb5221346c973199aa32d`。都在草稿目录根。
 - 下文引的行号都是**这份快照**的行号（`crash.rs`、`walk.rs` 的原件留在草稿目录 `crash.rs.orig`、`walk.rs.orig`）；主工作区此后有 A1b、B3a-2 等在改，行号可能已漂。
 - 全部跑在副本上：release，`bash research/scripts/run-with-memory-cap.sh 16G bash research/scripts/capped.sh 4 cargo test --release --offline -p singlefs-harness --test …`，`TMPDIR` 指到草稿目录。开跑前 `ps` 没有 qemu / vm-bench / e152 / fio / cargo。

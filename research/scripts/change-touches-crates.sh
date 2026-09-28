@@ -29,7 +29,7 @@
 # `SINGLEFS_GATE_FULL=1` 强制当成碰了，用来在干净工作树上重新验一遍 HEAD。
 set -uo pipefail
 
-# 基取哪一个：显式的 GATE_BASE > 与上游的 merge-base > HEAD。与 .claude/gate.d/75-decision-experiment-links.sh 同一套取法。
+# 基取哪一个：显式的 GATE_BASE > 与上游的 merge-base > HEAD。与 .claude/gate.d/doc-experiments.sh（decision-links 那一格）同一套取法。
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 base_of() {
@@ -75,7 +75,7 @@ judge() {
     echo "碰了（保守）：仓里还没有 HEAD，算不出改动范围"
     return 0
   fi
-  # 判别力样本目录住在仓里面（`.claude/gate.d/fixtures/<阶段>/{green,red}/`），门禁 89 号拿它当项目根来跑。
+  # 判别力样本目录住在仓里面（`.claude/gate.d/fixtures/<阶段>/{green,red}/`），上游的 stage-selftest.sh 拿它当项目根来跑。
   # 那时候算「这次改动碰了什么」没有意义，而跳过等于把样本判错——样本必须永远判。
   # 判据：给的根不是这个仓的顶层，就当成样本或子目录，照常跑。
   local top_level; top_level="$(git -C "$root" rev-parse --show-toplevel 2>/dev/null)"

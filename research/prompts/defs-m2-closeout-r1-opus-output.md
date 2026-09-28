@@ -1,6 +1,6 @@
 # defs-m2-closeout-r1 云端攻方腿（Opus）报告
 
-写于 2026-09-26 00:4x UTC（JST 09:4x）。攻击面 D1、D2、D3、D4（背景材料第四节分工表）。前几轮判决：无。被判文件开工时逐个核过快照（`sha256sum -c research/prompts/defs-m2-closeout-r1-snapshot/sha256sums.txt` 全 OK），没改。
+写于 2026-09-26。攻击面 D1、D2、D3、D4（背景材料第四节分工表）。前几轮判决：无。被判文件开工时逐个核过快照（`sha256sum -c research/prompts/defs-m2-closeout-r1-snapshot/sha256sums.txt` 全 OK），没改。
 
 ## 复跑
 
@@ -151,7 +151,7 @@ H37	heavy	three-way-attack	fg	exit=0
 E7RESULT name=verdict trees_with_height_difference=0 today_resolves_registered=1000 today_resolves_unregistered=0 today_ambiguous=0 self_describing_resolves_all=true
 ```
 
-情形：E142 某次重跑里层 0 枚举出违例，判决行写 `layer0_violations=7`，其余布尔字段恰好都是 `true`（这一行里没有与它配对的 `layer0_violations_zero` 布尔）。执行员照 4c 的字面 `grep -n 'name=verdict'`，逐字段找 `false` / `not_run`，一个没有，报告写「判决行 N 条，没有 false / not_run 字段」——正是记录第四十节第 33 行要防的「判决行里有东西、交回没报」，换了一种值的写法。门禁 84 号同样只认 `false`（它的末行原样：`  ✓ 登记产物里判决字段是 false 的都在对应实验页里点了名（点名 3 个）`，2026-09-26 00:4x UTC 我跑的一次，退 0），两道一起看不见。
+情形：E142 某次重跑里层 0 枚举出违例，判决行写 `layer0_violations=7`，其余布尔字段恰好都是 `true`（这一行里没有与它配对的 `layer0_violations_zero` 布尔）。执行员照 4c 的字面 `grep -n 'name=verdict'`，逐字段找 `false` / `not_run`，一个没有，报告写「判决行 N 条，没有 false / not_run 字段」——正是记录第四十节第 33 行要防的「判决行里有东西、交回没报」，换了一种值的写法。门禁 84 号同样只认 `false`（它的末行原样：`  ✓ 登记产物里判决字段是 false 的都在对应实验页里点了名（点名 3 个）`，2026-09-26 我跑的一次，退 0），两道一起看不见。
 
 值的分布（`grep -rhoE 'name=verdict.*' research/results/ | tr ' ' '\n' | grep '=' | sed 's/^[^=]*=//' | sort | uniq -c | sort -rn`，前几行原样）：
 
@@ -206,7 +206,7 @@ H22	heavy	implementation-writer	fg	exit=0
 H23	heavy	implementation-writer	fg	exit=2	✗ 不经内存包装跑编译出来的代码被拒：cargo test（implementation-writer 不经 run-with-memory-cap.sh）
 H26	heavy	gate-triage	fg	exit=0	
 H30	heavy	gate-triage	fg	exit=0	
-H31	heavy	gate-triage	fg	exit=2	✗ 重型测试被拒：在工作区根（/home/fy5090/code/singlefs/research）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：gate-triage 不跑「全量测试」
+H31	heavy	gate-triage	fg	exit=2	✗ 重型测试被拒：在工作区根（research）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：gate-triage 不跑「全量测试」
 H35	heavy	gate-triage	fg	exit=0	
 H36	heavy	implementation-writer	fg	exit=0	
 H38	heavy	crash-verifier	fg	exit=0	
@@ -309,8 +309,8 @@ PreToolUse SubagentHandback handback-scratch-check.sh
 B10	detector	three-way-attack	fg	exit=0	
 H1	heavy	crash-verifier	fg	exit=0	
 H2	heavy	crash-verifier	fg	exit=2	✗ 重型测试被拒：herd7（herd7）：crash-verifier 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
-H3c	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：脚本 /home/fy5090/code/singlefs/.claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request
-H24	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（/home/fy5090/code/singlefs）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-req
+H3c	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：脚本 .claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request
+H24	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：在工作区根（<仓根>）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-req
 H24b	heavy	主 agent	fg	exit=0	
 A1	ask	主 agent	fg	exit=2	✗ 弹窗里有 1 句带断言词，同一句里却没有出处，也没写明是推的——这样送到用户面前，推断就被当成了事实：
 A2	ask	主 agent	fg	exit=0	
@@ -372,9 +372,9 @@ A4	ask	主 agent	fg	exit=0
 ```
 H2	heavy	crash-verifier	fg	exit=2	✗ 重型测试被拒：herd7（herd7）：crash-verifier 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 H2b	heavy	implementation-writer	fg	exit=2	✗ 重型测试被拒：herd7（herd7）：implementation-writer 不跑「herd7」
-H3	heavy	gate-triage	fg	exit=2	✗ 重型测试被拒：脚本 /home/fy5090/code/singlefs/.claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：gate-triage 不跑「herd7」
-H3b	heavy	crash-verifier	fg	exit=2	✗ 重型测试被拒：脚本 /home/fy5090/code/singlefs/.claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：crash-verifier 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-
-H3c	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：脚本 /home/fy5090/code/singlefs/.claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request
+H3	heavy	gate-triage	fg	exit=2	✗ 重型测试被拒：脚本 .claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：gate-triage 不跑「herd7」
+H3b	heavy	crash-verifier	fg	exit=2	✗ 重型测试被拒：脚本 .claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：crash-verifier 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-
+H3c	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：脚本 .claude/scripts/fetch-deps.sh:81 里的 herd7（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request
 H5	heavy	implementation-writer	fg	exit=2	✗ 重型测试被拒：.claude/scripts/lkmm.sh（herd7）：implementation-writer 不跑「herd7」
 H6	heavy	implementation-writer	fg	exit=2	✗ 重型测试被拒：.claude/scripts/lkmm.sh（herd7）：implementation-writer 不跑「herd7」
 H6b	heavy	crash-verifier	fg	exit=2	✗ 重型测试被拒：.claude/scripts/lkmm.sh（herd7）：crash-verifier 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带

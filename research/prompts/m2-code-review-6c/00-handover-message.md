@@ -1,4 +1,4 @@
-# singlefs-6c 移交的代码审阅（原样，2026-09-27 JST 01:0x 收到）
+# singlefs-6c 移交的代码审阅（原样，2026-09-27 收到）
 
 <!-- doc-lint:not-numbers C475 C512 C314 -->
 
@@ -13,7 +13,7 @@
 ## 口径
 - 范围：singlefs-format、singlefs-core 全部、singlefs-checker 全部；singlefs-harness 只审了 lib.rs / segments.rs / crash.rs / model.rs / model_comparison.rs，其余 harness 源文件与 tests/ 没审。
 - 做法：7 个只读审阅员分组逐行读（没跑 cargo），交回后我对着现行代码逐条核重点项。每条标「主核」= 我现读代码核过；「审」= 只有审阅员报告、我没现核。
-- 时点：2026-09-26 14:15–14:55 UTC 的工作区，含你那边未提交的改动。审阅期间 walk.rs、crash.rs、model.rs、model_comparison.rs、fault_injection.rs、layer0_progress.rs 被改过，行号可能已漂，请按引的代码串定位。
+- 时点：2026-09-26 的工作区，含你那边未提交的改动。审阅期间 walk.rs、crash.rs、model.rs、model_comparison.rs、fault_injection.rs、layer0_progress.rs 被改过，行号可能已漂，请按引的代码串定位。
 - HEAD 对照：除标「仅工作区」的两条（18、23）外，主核条目的代码串在 HEAD（73ba4a4）里同样存在，是一直就有的，不是这轮带进来的。
 - 欠账表：按关键词 grep 过 .claude/kb/checks-owed.md，只有第 15 条对上 C475（非默认环长下单元区起点取编译期常量）；其余没搜到对应条目。搜法是关键词，不保证穷尽。
 - 分组详细报告（每条带原行引用、失败场景、注释与代码不一致表）：/tmp/claude-1000/-home-fy5090-code-singlefs/e0d0c045-b2b9-463b-958e-930037b4bce3/scratchpad/review/ 下 A-report.md 到 G-report.md。A format 与编解码；B 分配器、准入、块设备；C 事务层；D 挂载与读路径；E 恢复与树；F checker（含 45 条不变量的落点表）；G 验证装置（含崩溃点枚举的「枚举了什么 / 省略了什么」两张表）。读不到那个目录也不要紧，下面是全部结论。

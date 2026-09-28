@@ -1,0 +1,8 @@
+exit=1
+want=标题重复
+want=条目说两遍
+want=挂错节
+want=101-样本.md:7  条目说两遍 —— 3. **丁项 —— 未定（2026-09-02）
+want=标题重复 —— #### 已定项 3（2026-09-02）—— 已定
+want=  status-redundancy：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（status-redundancy）

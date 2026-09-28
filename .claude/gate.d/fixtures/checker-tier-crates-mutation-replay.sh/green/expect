@@ -1,0 +1,16 @@
+exit=0
+want=各自红在点名的测试上
+want=每条在内存上限 512M 里跑、内存撞顶 0 条
+want=这一轮开 5 个工作进程
+want=卡在「这一趟要现跑的条数」这一项；内存不按进程数收：每条经 run-with-memory-cap.sh 排队
+want=每条经 run-with-memory-cap.sh 排队、被总上限挤掉与排不上 0 条，每条限时 1800 秒、超时 0 条
+want=计数：抓到 5 条、没红 0 条、无效 0 条、内存撞顶 0 条、超时 0 条、被总上限挤掉 0 条、排不上没跑 0 条、scope 起不来没跑 0 条（共 5 条）
+want=临时目录：5 条变异各一个自己的 TMPDIR，每条结束时不论退出码都整个删掉了
+want=✓ divide-no-longer-panics：dividing_by_zero_panics 红了
+want=✓ litmus-write-changed：litmus_sample_writes_one 红了
+want=✓ second-addition-deleted：adding_three_twice_gives_six 红了
+want=基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 5 行，基线不绿 0 行（按 cargo 参数分 1 批；共 5 行）
+want=按条记录：复用抓到 0 条、复用基线 ok 0 行
+want=双机分片：没分（本地配置判不过；单跑 bash research/scripts/layer0-shard-configuration-check.sh 看原因），整张表在本机判
+want=── 汇总：checker-tier-crates-mutation-replay.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=crates-mutation-rows：绿

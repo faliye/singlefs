@@ -1,0 +1,5 @@
+exit=0
+want=实验索引行与正文标题一致
+want=样本只跑 .gate-cells 点名的格：index-sync
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格绿（index-sync），0 格本次未跑（无）

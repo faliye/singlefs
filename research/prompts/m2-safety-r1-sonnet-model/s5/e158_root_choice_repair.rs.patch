@@ -1,5 +1,5 @@
---- /tmp/claude-1000/m2-safety-r1/tree/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs	2026-09-25 03:02:56.989581724 +0000
-+++ /tmp/claude-1000/m2-safety-r1-sonnet/tree-s5/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs	2026-09-25 04:32:24.101379818 +0000
+--- /tmp/claude-1000/m2-safety-r1/tree/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs	2026-09-25
++++ /tmp/claude-1000/m2-safety-r1-sonnet/tree-s5/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs	2026-09-25
 @@ -1267,7 +1267,12 @@
                  false,
              )

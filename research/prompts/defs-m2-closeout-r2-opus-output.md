@@ -2,14 +2,14 @@
 
 <!-- doc-lint:not-numbers D1 D2 D3 D4 O1 O2 O3 O4 O5 O6 O7 O8 O9 O10 O11 O12 O13 O14 O15 O16 O17 O18 F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 F14 F15 F16 E1 E2 E3 H1 H2 H3 H4 H5 H6 H7 H8 H9 G1 -->
 
-写于 2026-09-26 02:36 UTC（JST 11:36）。攻击面：E1（F1–F16 改后字面）、E2（修定义的 agent 自己报的线索）。E3 与 F14 逐格对表不归这条腿。
-被判的文件一个没改；开工时与收尾时（02:5x UTC）`sha256sum -c research/prompts/defs-m2-closeout-r2-snapshot/sha256sums.txt` 都是 24 个全 OK。
+写于 2026-09-26。攻击面：E1（F1–F16 改后字面）、E2（修定义的 agent 自己报的线索）。E3 与 F14 逐格对表不归这条腿。
+被判的文件一个没改；开工时与收尾时`sha256sum -c research/prompts/defs-m2-closeout-r2-snapshot/sha256sums.txt` 都是 24 个全 OK。
 喂 hook 的探针只喂 JSON、只看退出码，被判的命令一条都没执行；检出记录写进草稿目录下自己的临时文件。
 
 ## 复跑
 
 ```
-cd /home/fy5090/code/singlefs && bash research/prompts/defs-m2-closeout-r2-opus-model/rerun.sh /tmp/claude-1000/defs-m2-closeout-r2-opus
+cd <仓根> && bash research/prompts/defs-m2-closeout-r2-opus-model/rerun.sh /tmp/claude-1000/defs-m2-closeout-r2-opus
 ```
 
 它依次跑：三份探针用例（`probe.py`，F4 那几格在一份只含 Cargo 清单与 `crates/` 源码的临时副本里判）、F13 改法 G1 的副本自证、两个包装演示（各在自己开的临时 slice、总上限 600M 里跑 `true` 与一次 400 MiB 分配，跑完 `systemctl --user stop` + `revert` 自己的 slice）、40 / 86 号的仓副本演示、`.rc` 读旧值演示、F5 判决行扫描。第一次整份复跑的原样输出在 `rerun-output.txt`（114 行，退出码 0）。
@@ -48,7 +48,7 @@ d2703c2bfa0fcd8109a79b2652677c5d56d125439824563d81cf763548373699  rerun-output.t
 | H8 | E1 | F10（实现员跑登记给它的 74 号） | 打中（小） | 74 号经 hook 直接放行、不经包装，里面的 `cargo test --release` 不在任何上限里；F9 修的正是这一类成本（O9），F10 把它变成实现员的必做步；74 号还登记给崩溃验证员，它的第 1b 步只包 54、55、57 | hook 量过；峰值 4.41–4.70 GiB 来自峰值表 |
 | H9 | E2 | F6（本地辩方读攻方「输入」） | 小，推的 | 攻方「输入」要主 agent 给「样本文件名前缀」，辩方的文件名形态把样本名写死；F6 的换名只管带 `-local-attack` 的名字，前缀那一项两边各说各的；作废副本的名字跟提示文件名走（`ask-local.sh:67`） | 推的；门禁与脚本里除 66 号认提示文件名之外没有读样本名的（grep） |
 | — | E2 | F8（55 号下限只算客机内存） | 没打中，推的 | 客机内存不预占（`vm-bench.sh:133` 没有 `-mem-prealloc`），6×2048 MiB 多半是松的上界而不是紧的下界；qemu 自己的开销没量过、峰值表里没有 55 号的行 | 推的 |
-| — | E2 | F10 的 8G | 没打中 | 峰值表里整道 74 号经包装跑过：4.41 / 4.59 GiB（`capped.sh` 12 / 16、上限 16G / 24G），02:32 UTC 另一个会话在 8G 上限下（`capped.sh` 10）跑完、峰值 4.70 GiB（这一行顶掉了同一个键 02:1x UTC 我读到的 4.22 GiB，峰值表一个键只留最近一次） | 峰值表实测（别的会话量的，只在本机成立） |
+| — | E2 | F10 的 8G | 没打中 | 峰值表里整道 74 号经包装跑过：4.41 / 4.59 GiB（`capped.sh` 12 / 16、上限 16G / 24G）另一个会话在 8G 上限下（`capped.sh` 10）跑完、峰值 4.70 GiB（这一行顶掉了同一个键我读到的 4.22 GiB，峰值表一个键只留最近一次） | 峰值表实测（别的会话量的，只在本机成立） |
 | — | E1 | F3、F11、F12、F15 | 没打中 | 见「没打中的形状」 | — |
 | — | E1 | F14 | 不归这条腿 | 本地攻方逐格对；这条腿只从命令侧加了 P1–P3 三格（F4 用） | — |
 
@@ -95,18 +95,18 @@ outer_cap=300M outer_key=nest-outer-c outer_exit=0
 
 ```
 $ grep -v '^#' research/scripts/memory-peaks.tsv | awk -F'\t' '$4 ~ /checker_known_bad_images|74-model-differential/ {printf "%s\t%.2fGiB\t%s\t%s\n", $2, $1/1073741824, $3, $4}' | sort
-（整份 46 行，02:4x UTC 现跑；与这一格有关的原样摘出下面 8 行。其余 38 行：36 行在 `--` 后面点名一两个用例，峰值 1.28–3.60 GiB；1 行只编不跑 0.33 GiB；1 行是 2026-09-25T15:18:10Z 不带 `capped.sh`、4G 上限下整个二进制撞顶 4.00 GiB）
-2026-09-25T21:56:40Z	16.00GiB	16G	bash research/scripts/capped.sh 12 cargo test --offline -p singlefs-harness --test checker_known_bad_images
-2026-09-25T22:18:59Z	16.00GiB	16G	bash /home/fy5090/code/singlefs/research/scripts/capped.sh 12 cargo test --offline -p singlefs-harness --test checker_known_bad_images
-2026-09-26T01:11:17Z	23.66GiB	24G	bash research/scripts/capped.sh 16 cargo test --offline -p singlefs-harness --test checker_known_bad_images
-2026-09-26T01:25:03Z	3.33GiB	24G	bash /home/fy5090/code/singlefs/research/scripts/capped.sh 16 cargo test --offline --no-run -p singlefs-core -p singlefs-harness --lib --test second_transaction_step_four_rollback --test second_transaction_step_five_reuse --test checker_known_bad_images --test rollback_floor_written_into_the_system_
-2026-09-26T01:26:35Z	24.00GiB	24G	bash /home/fy5090/code/singlefs/research/scripts/capped.sh 16 cargo test --offline -p singlefs-harness --test checker_known_bad_images
-2026-09-25T22:32:37Z	4.41GiB	16G	bash research/scripts/capped.sh 12 bash .claude/gate.d/74-model-differential.sh
-2026-09-26T02:03:05Z	4.59GiB	24G	bash research/scripts/capped.sh 16 bash .claude/gate.d/74-model-differential.sh
-2026-09-26T02:32:19Z	4.70GiB	8G	bash research/scripts/capped.sh 10 bash .claude/gate.d/74-model-differential.sh
+（整份 46 行，现跑；与这一格有关的原样摘出下面 8 行。其余 38 行：36 行在 `--` 后面点名一两个用例，峰值 1.28–3.60 GiB；1 行只编不跑 0.33 GiB；1 行是 2026-09-26 不带 `capped.sh`、4G 上限下整个二进制撞顶 4.00 GiB）
+2026-09-26	16.00GiB	16G	bash research/scripts/capped.sh 12 cargo test --offline -p singlefs-harness --test checker_known_bad_images
+2026-09-26	16.00GiB	16G	bash research/scripts/capped.sh 12 cargo test --offline -p singlefs-harness --test checker_known_bad_images
+2026-09-26	23.66GiB	24G	bash research/scripts/capped.sh 16 cargo test --offline -p singlefs-harness --test checker_known_bad_images
+2026-09-26	3.33GiB	24G	bash research/scripts/capped.sh 16 cargo test --offline --no-run -p singlefs-core -p singlefs-harness --lib --test second_transaction_step_four_rollback --test second_transaction_step_five_reuse --test checker_known_bad_images --test rollback_floor_written_into_the_system_
+2026-09-26	24.00GiB	24G	bash research/scripts/capped.sh 16 cargo test --offline -p singlefs-harness --test checker_known_bad_images
+2026-09-26	4.41GiB	16G	bash research/scripts/capped.sh 12 bash .claude/gate.d/74-model-differential.sh
+2026-09-26	4.59GiB	24G	bash research/scripts/capped.sh 16 bash .claude/gate.d/74-model-differential.sh
+2026-09-26	4.70GiB	8G	bash research/scripts/capped.sh 10 bash .claude/gate.d/74-model-differential.sh
 ```
 
-（「峰值 = 上限」的行是撞了自己的上限，包装按上限记，`run-with-memory-cap.sh:56`。）线程 12 撞 16G 两次、线程 16 一次 23.66 GiB 一次撞 24G；只编不跑（`--no-run`）3.33 GiB，所以大头在跑、不在编。本机 `nproc` = 32，`check.sh` 不设线程上限时按 32 跑：按每线程约 1.4–1.5 GiB 线性外推约 45–48 GiB（推的，没量过），比 slice 总上限 40.1 GiB 还大——那时外层上限取多少都撞，①就必然发生；就算不外推，下界也已在 24 GiB 以上（量过的撞顶），而②给的上界约 31–32 GiB，窗口至多几 GiB，还没算 55 号的 12 GiB 客机内存与别的会话同时占的（02:1x UTC 我看 `--status` 时账上就有别的会话一条 8.0 GiB）。
+（「峰值 = 上限」的行是撞了自己的上限，包装按上限记，`run-with-memory-cap.sh:56`。）线程 12 撞 16G 两次、线程 16 一次 23.66 GiB 一次撞 24G；只编不跑（`--no-run`）3.33 GiB，所以大头在跑、不在编。本机 `nproc` = 32，`check.sh` 不设线程上限时按 32 跑：按每线程约 1.4–1.5 GiB 线性外推约 45–48 GiB（推的，没量过），比 slice 总上限 40.1 GiB 还大——那时外层上限取多少都撞，①就必然发生；就算不外推，下界也已在 24 GiB 以上（量过的撞顶），而②给的上界约 31–32 GiB，窗口至多几 GiB，还没算 55 号的 12 GiB 客机内存与别的会话同时占的（我看 `--status` 时账上就有别的会话一条 8.0 GiB）。
 
 **四句**：
 1. 分不分辨臂：分辨。①②只在「整条经包装」这条臂上发生；F9 之前（`gate.sh` 不经包装）没有外层 scope、没有外层占账。③是两条臂共用的前提（`check.sh` 不限线程），但只有 F9 这条臂把它变成整轮作废。
@@ -326,7 +326,7 @@ F6 让辩方读攻方的「输入」一节，那一节要主 agent 给「样本�
 
 ### F10 的 8G（没打中）
 
-`74-model-differential.sh:47` 建议的 8G 与 `replay.sh:24` 的默认值一致。整道 74 号（比建议命令多一段编译）经包装跑过三次：4.41 GiB（`capped.sh 12`、16G 上限）、4.59 GiB（`capped.sh 16`、24G 上限）、4.70 GiB（`capped.sh 10`、**8G 上限**，02:32 UTC 另一个会话跑的），原样见 H1 节峰值表最后三行。不设线程上限时（按 32）没量过：从 10 → 12 → 16 线程的 4.70 → 4.41 → 4.59 看不出随线程涨，推 8G 够用。
+`74-model-differential.sh:47` 建议的 8G 与 `replay.sh:24` 的默认值一致。整道 74 号（比建议命令多一段编译）经包装跑过三次：4.41 GiB（`capped.sh 12`、16G 上限）、4.59 GiB（`capped.sh 16`、24G 上限）、4.70 GiB（`capped.sh 10`、**8G 上限** 另一个会话跑的），原样见 H1 节峰值表最后三行。不设线程上限时（按 32）没量过：从 10 → 12 → 16 线程的 4.70 → 4.41 → 4.59 看不出随线程涨，推 8G 够用。
 
 ## 改法表（每一格：量过 = 副本或模型上贴了原样输出；推的 = 没实现没跑）
 
@@ -360,7 +360,7 @@ F6 让辩方读攻方的「输入」一节，那一节要主 agent 给「样本�
 ## 这条腿自己的限度
 
 - H1 的机制（撞顶停整个 scope、外层占账挡里层）只在私有 slice 的缩小版上量过；真门禁里 `check.sh` 在 32 线程下要多少没量（按峰值表线性外推，推的），55 号六台虚机真碰多少页没量（QEMU 是重型，不跑）。「窗口可能是空的」是推的；「窗口在 24 GiB 以上、约 31–32 GiB 以下，且没有任何一处写它怎么取」是量过的下界加算出来的上界。
-- 峰值表 `research/scripts/memory-peaks.tsv` 不进 git、别的会话随时在写，一个键只留最近一次（我读到的 74 号 4.22 GiB 那一行在读完之后被 02:32 UTC 的 4.70 GiB 顶掉了）；H1 节贴的那几行是 02:4x UTC 现跑的原样，复跑时数可能变。
+- 峰值表 `research/scripts/memory-peaks.tsv` 不进 git、别的会话随时在写，一个键只留最近一次（我读到的 74 号 4.22 GiB 那一行在读完之后被之后一次的 4.70 GiB 顶掉了）；H1 节贴的那几行是写报告时现跑的原样，复跑时数可能变。
 - H2 没在副本上跑 69 号（它要 git，非 git 目录退 77；我不做 git 写操作，不在副本里 `git init`）。
 - H5 里哪个计数「算坏」要看各实验的跑前登记，我没逐个去读，`journal_differing_states` 是不是坏计数是推的。
 - H6「前台超时会不会连子进程一起停」没量。
@@ -371,7 +371,7 @@ F6 让辩方读攻方的「输入」一节，那一节要主 agent 给「样本�
 ## 没做什么
 
 - 没改任何被判的文件；没有 git 写操作；没编译 Rust、没跑任何 `cargo test` 或重型测试、没跑 QEMU、herd7、门禁 54 / 55 / 57 / 59 / 87。
-- 门禁阶段在仓副本里跑了 40、86 号（轻阶段）；主仓里跑过 69 号一次（02:5x UTC，核这份报告与模型目录没有把 `/tmp` 路径当依据：它点名的 25 处里没有这一条腿的文件；它红在 E142 的装置指纹与别的轮的背景材料上，不是这一条腿的），40 号一次看基线（红，点名的是 `e156-alloc-basis-counts-2026-09-22-stage1.out` 等，不是这一轮的）。
+- 门禁阶段在仓副本里跑了 40、86 号（轻阶段）；主仓里跑过 69 号一次（核这份报告与模型目录没有把 `/tmp` 路径当依据：它点名的 25 处里没有这一条腿的文件；它红在 E142 的装置指纹与别的轮的背景材料上，不是这一条腿的），40 号一次看基线（红，点名的是 `e156-alloc-basis-counts-2026-09-22-stage1.out` 等，不是这一轮的）。
 - 包装演示在自己开的 `singlefs_r2opus_nest_<pid>.slice`、`singlefs_r2opus_oom_<pid>.slice` 里跑，跑完 `stop` + `revert`；收尾 `systemctl --user list-units --all 'singlefs_r2opus*'` 数出 0 个。
 - 草稿目录 `/tmp/claude-1000/defs-m2-closeout-r2-opus/` 里的仓副本（`copy/`、`repo/`）与 hook 副本（`f13fix/`、`probe-ask-head-*`）都已删掉；留着的是探针的检出记录、`quotes.list` / `quotes*.out`（`quotes.list` 已拷进模型目录）、`40-main.log`、`69.log`、`verdict-fields.txt`、`peaks-now.txt` 这类文本草稿，不进仓，主 agent 用不上可以删。
 - E3（第一轮判决复核）不归这条腿；F14 逐格对表不归这条腿。
@@ -379,7 +379,7 @@ F6 让辩方读攻方的「输入」一节，那一节要主 agent 给「样本�
 
 ## 附录 A：引文原行（行号取自被引文件本身）
 
-命令（在仓根）：`while read -r f n; do printf '%s:%s\t' "$f" "$n"; awk -v n="$n" 'NR==n' "$f"; done < research/prompts/defs-m2-closeout-r2-opus-model/quotes.list`，62 行，原样（02:5x UTC 现跑；`quotes.list` 不进 `rerun.sh`，被引文件改了行号会移）：
+命令（在仓根）：`while read -r f n; do printf '%s:%s\t' "$f" "$n"; awk -v n="$n" 'NR==n' "$f"; done < research/prompts/defs-m2-closeout-r2-opus-model/quotes.list`，62 行，原样（现跑；`quotes.list` 不进 `rerun.sh`，被引文件改了行号会移）：
 
 ```
 .claude/agents/three-way-attack.md:31	   - 正式跑之前先跑一小段，按它估全量的挂钟；估出来超过 40 分钟，先缩历史、候选与几何的取样，报告里写明缩了什么、缩前缩后各多少、估时怎么算的。

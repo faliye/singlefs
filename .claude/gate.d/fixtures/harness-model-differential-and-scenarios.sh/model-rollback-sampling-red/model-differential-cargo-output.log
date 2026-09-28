@@ -1,0 +1,18 @@
+    Finished `release` profile [optimized] target(s) in 0.21s
+     Running tests/random_histories.rs (target/release/deps/random_histories-0000000000000000)
+
+running 2 tests
+── 随机历史：偏向抬 F 之后回退的取样点 ──
+种子 [0, 48)，每段 30 步，比重：偏向抬 F 之后回退；每一步之后跑池级 checker；两块 4 GiB 的盘
+历史 48 段：跑完 41、以已知红收尾 {0: 7}、新发现 0；根环转过一圈的 18 段；最高 txg 29
+  checker 跑了 913 次；一个写都没发、沿用上一次结论的 301 步；已知红第 0 条那一形只记不停 0 步（0 段历史）
+用时 5.1 秒
+test rollback_heavy_random_histories_reach_the_floor_root_and_end_only_in_known_red_forms ... ok
+── 随机历史快档 ──
+种子 [0, 96)，每段 30 步，比重：各类操作都抽（快档、大档）；每一步之后跑池级 checker；两块 4 GiB 的盘
+  模型对拍 1912 步：该拒而拒 572、区间里拒 34、该成而成 1306；比过根 1862 条、分配记录 31250 条、冷启动内容 78 次、抬 F 上限 164 次；回退到 txg = F_生效 > 0 的根做成 0 次；单元区墙按区间放行 0 次
+用时 6.4 秒
+test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 24 filtered out; finished in 11.52s
+

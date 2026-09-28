@@ -1,0 +1,3 @@
+exit=77
+want=  beta：本次未跑
+not-green-by-design=beta 样本里摆不出这一格要的工具，绿的一侧只能记本次未跑

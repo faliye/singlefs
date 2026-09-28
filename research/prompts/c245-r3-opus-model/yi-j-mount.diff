@@ -1,0 +1,30 @@
+--- a/crates/singlefs-core/src/mount.rs	2026-09-27 18:03:17.342235235 +0000
++++ b/crates/singlefs-core/src/mount.rs	2026-09-28 07:02:45.424018388 +0000
+@@ -3121,7 +3121,26 @@
+         instance_generation: newest_self_verified.quantities.journal_instance,
+         counter: newest_self_verified.quantities.journal_tail,
+     };
+-    if newest_system_configuration_journal_tail >= version_journal_position {
++    // c245-r3 攻方腿原型「乙-J」：落后不看系统配置 tail，看这块盘上那一版末条记录所在的环槽里是不是那条记录。
++    if version_journal_position.counter == 0 {
++        return None;
++    }
++    let record_bytes = usize::try_from(crate::journal::JOURNAL_RECORD_BYTES_FOR_PROBE).expect("4096");
++    let record_offset = crate::journal::record_offset(
++        version_journal_position.counter,
++        newest_self_verified.immutable.sizes.journal_ring_bytes,
++    );
++    let expected_filesystem_identifier = crate::unit::unit_filesystem_identifier(
++        &newest_self_verified.immutable.filesystem_identifier,
++    );
++    let holds_the_versions_last_record = reader
++        .read(device, record_offset, record_bytes)
++        .and_then(|bytes| crate::journal::JournalRecord::parse(&bytes, expected_filesystem_identifier))
++        .is_some_and(|record| {
++            record.instance == version_journal_position.instance_generation
++                && record.counter == version_journal_position.counter
++        });
++    if holds_the_versions_last_record {
+         return None;
+     }
+     let units_missing: Vec<(TransactionUnit, SlotNumber)> = units

@@ -2,7 +2,7 @@
 
 <!-- doc-lint:not-numbers L1 L2 L6 L7 H1 H2 R1 R2 R3 R4 R5 M1 M2 M3 M4 -->
 
-写于 2026-09-26（JST）。攻击面 M1、M2、M3（背景材料第四节）。前几轮判决：`research/prompts/m2-layer0-scale-r1-main-verification.md`。全部量出来的数出自冻结副本 `/tmp/claude-1000/l0scale-r1-frozen/` 的拷贝（草稿目录里的 `repo`、`repo-l7` 两份，交回前删），不是入库装置；要引须在入库装置上重做。
+写于 2026-09-26。攻击面 M1、M2、M3（背景材料第四节）。前几轮判决：`research/prompts/m2-layer0-scale-r1-main-verification.md`。全部量出来的数出自冻结副本 `/tmp/claude-1000/l0scale-r1-frozen/` 的拷贝（草稿目录里的 `repo`、`repo-l7` 两份，交回前删），不是入库装置；要引须在入库装置上重做。
 
 复跑（在仓根下）：
 

@@ -1,6 +1,6 @@
-# 附录二：`crates/*/src` 从上次提交到冻结快照的差，代码轮第一轮 diff（生成于 2026-09-27 09:13 JST / 2026-09-27 00:13 UTC）
+# 附录二：`crates/*/src` 从上次提交到冻结快照的差，代码轮第一轮 diff（生成于 2026-09-27）
 
-基准：`346f5e6`（`crates/` 上次提交，2026-09-25 22:29 JST）。冻结快照：提交 `67f447de9761f826711565032d8ce16fbf44b902`，ref `refs/sop/m2-closeout-code-r1-snapshot`（腿读代码一律读这份快照，不读主工作区）。
+基准：`346f5e6`（`crates/` 上次提交，2026-09-25）。冻结快照：提交 `67f447de9761f826711565032d8ce16fbf44b902`，ref `refs/sop/m2-closeout-code-r1-snapshot`（腿读代码一律读这份快照，不读主工作区）。
 
 **取法与主 agent 给的原样命令不同，原因如下**：主 agent 给的范围是 `git diff 346f5e6 refs/sop/m2-closeout-code-r1-snapshot -- 'crates/*/src' ':!crates/singlefs-harness/src/bin/e1*'`，材料员按这条原样跑出 **0 行**（`git diff ... -- 'crates/*/src' ... | wc -l` = 0）。原因是 git 的 pathspec 一旦出现通配符就整段按字面 glob 匹配整条路径，不再对末段 `src` 做「目录前缀」展开；`crates/*/src` 只匹配路径整串恰好等于 `crates/<任意>/src` 的对象，仓里没有这样的对象（文件都在 `src/` 之下更深的位置）。材料员改用等价、且能匹配到同一批对象的 `'crates/*/src/*'`（同样排除 `crates/singlefs-harness/src/bin/e1*`），产出 **39 个文件、+14780/−3047 行**。这一步不是材料员对正文判断的介入，是执行给定命令时发现它字面对不上仓里的路径，照 `.claude/singlefs-ai-sop/rules/command-safety.md`「脚本改文件之后要回读确认」的同一道理换成能跑通的等价取法；有没有用错取法、要不要改判主 agent 定。
 

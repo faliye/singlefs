@@ -1,6 +1,6 @@
 # E156（alloc-basis 四条岔路的代价数） 第 4 次重跑执行报告（第二次派发，r4b）
 
-写于 2026-09-26 15:4x UTC（2026-09-27 00:4x JST）。重跑登记 `research/prompts/e156-r4-prereg.md`。主 agent 在上下文 78 万时叫停交接，停在这里；做完的、做到一半的、没开的都在下面。
+写于 2026-09-27。重跑登记 `research/prompts/e156-r4-prereg.md`。主 agent 在上下文 78 万时叫停交接，停在这里；做完的、做到一半的、没开的都在下面。
 
 ## 结论
 
@@ -49,7 +49,7 @@
 
 ## 交主 agent 的
 
-1. **S3 在 r2 那一次触发**：r2 产物前后两次 `crates/` 快照不同（diff `7ec976b9…` → `2ed8d525…`，status `c49e35a0…` → `1a54ee32…`，UTC 15:35:37 → 15:39:18）；逐文件比：跑的那 3 分多钟里 `crates/singlefs-checker/src/walk.rs`、`crates/singlefs-harness/src/fault_injection.rs`、`crates/singlefs-harness/tests/instance_acquisition.rs` 被别的会话改了（不是这个装置、不是 `crates/mutations.tsv`）。r2 与第一份产物逐字节相同，第一份的 S3 两次相同。按 S3 不自己判「不构成停机」，交你定。
+1. **S3 在 r2 那一次触发**：r2 产物前后两次 `crates/` 快照不同（diff `7ec976b9…` → `2ed8d525…`，status `c49e35a0…` → `1a54ee32…`）；逐文件比：跑的那 3 分多钟里 `crates/singlefs-checker/src/walk.rs`、`crates/singlefs-harness/src/fault_injection.rs`、`crates/singlefs-harness/tests/instance_acquisition.rs` 被别的会话改了（不是这个装置、不是 `crates/mutations.tsv`）。r2 与第一份产物逐字节相同，第一份的 S3 两次相同。按 S3 不自己判「不构成停机」，交你定。
 2. S1(i) 对照造法的改动要不要认（登记修订 2 第 1 条）。
 3. I-3.11（已分配减 defer 等于最新根走读） 的条款正文还把失效的基底 `beta_hr_rollback_row` 与 `e156-alloc-basis-counts-2026-09-25-fork7-selfproof.out` 当「可达状态第 5 项可以为 0」的依据；今天挂着回退那一版第 5 项是 356 槽（`u13a_rollback_to_oldest_candidate … item5_slots=356`）。`invariants.md` 不在我的写范围，没改。
 4. 抬 F 那一串扣住位比 F_生效 晚放（登记第三节 J7、J8），不是岔路单第 3 行的两个候选之一。

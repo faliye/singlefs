@@ -1,0 +1,7 @@
+b292379e90cd3931567090b8f5611e2943c89a6a6d9c65df984ffbb3e40cd2d7  .claude/kb/decisions/13-验证路线.md
+acc22aa3ddaece3c6c84132dfec273f4e2479b7676d780a93b9a157318e4191e  .claude/kb/decisions/16-发布语义.md
+a68553ace2cf9bd6b0b1e9b5970fbd0cdb521e1d036452d022e8b62d4b32a9e8  .claude/kb/decisions/18-块里携带什么信息.md
+d4800d41e8a69ae3db56977dc3644deb46c623ce1bf2bfba26fde3169b1b55a0  .claude/kb/decisions/22-单元原子性怎么合成.md
+ee2091e2f2f3401934f31fb628caf08eddb7811a4e7d871efcb042053aed544b  .claude/kb/decisions/23-journal的角色与格式.md
+52fbf54d9b866929342a9fc8a47921ece886fc839b25c42b2088f6532d677fd1  .claude/kb/invariants.md
+3a3473f0fd2727dd2d5cf897d3045e5461d3a7d95dd183b804f9a7dadc6bfe19  .claude/kb/checks-owed.md

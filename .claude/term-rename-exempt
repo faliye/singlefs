@@ -9,15 +9,13 @@ research/scripts/sweep-term.py  # 清扫工具自己：替换表与检测正则�
 .claude/term-rename-exempt  # 这张表自己：豁免理由里要写得出旧名才说得清豁免的是什么
 .claude/kb/term-renames.md  # 新旧对照的唯一权威记录：写「X 改名成 Y」必须写得出 X，旧名要有一处查得到，历史产物与旧提交的字段才对得上
 research/prompts/  # 冻结证据：发给模型的提示、腿的产出、拼好的背景材料与 diff 附录。evidence-discipline「原样保存的证据不许事后改」——改一个字，产物就不再对应它的输入；而这一轮的材料正文讨论的就是这次改名，词换掉整份材料失去意义
-.claude/kb/decisions-history/2026-09.md  # 两处 F2FS 的原题引文（「F2FS 用 superblock 里的后缀表」，D14 已定项 2 的来历）：别家术语，与 prior-art.md 同一条理由。这份变更史别处的旧名已随本次改名一起换掉，所以只豁免这一份、不豁免整个目录
+.claude/kb/decisions-history.md  # F2FS 的原题引文（「F2FS 用 superblock 里的后缀表」，D14 已定项 2 的来历）：别家术语，与 prior-art.md 同一条理由。2026-09-28 按决策分节搬迁之后，这条改动点名了 D3（空间分配）、D14（双轨（大小文件 / 持久临时）） 与 D28（挂载期承诺量） 三条决策，同一句引文各在那三节里抄了一份；这份变更史别处的旧名已随本次改名一起换掉，所以只豁免这一份、不豁免整个目录
 records/2026-09-07-D14项2第一轮.md  # 同一句 F2FS 原题的引文（「原题逐字」那一行）：别家术语。records/ 别处的旧名已随本次改名一起换掉，不豁免整个目录
 .claude/kb/experiments/23-journal几何.md  # jbd2 自己的 journal superblock：别家术语，与 prior-art.md 同一条理由
 .claude/kb/checks-owed.md  # C65 那一行引的是 D14 已定项 2 的原题「F2FS 用 superblock 里的后缀表」：别家术语的引文
-.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md  # 整行抄自留存产物的引文块：产物已归档进版本库，字节改不了，正文换名那句「整行抄自」就成假的（门禁 88 号会红）
-.claude/gate.d/fixtures/90-term-renames.sh/  # 这道门禁自己的判别力样本：red 那一份必须留着旧名才红得出来，green 的登记表旧名列也要写得出旧名。扫了它，红绿两份会被改成一模一样，判别力当场归零（2026-09-21 实测过一次）
+.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md  # 整行抄自留存产物的引文块：产物已归档进版本库，字节改不了，正文换名那句「整行抄自」就成假的（门禁 doc-experiments 的 quoted-result-lines 格会红）
 research/results/e160-e152-input-single-2026-09-15.out  # E160 的输入：E152 在 2026-09-15 真设备上跑出的产物原样拷来（改名在 2026-09-20/21 之后），E152 要虚机与真盘才跑得出来、不能随源码重生成；改字节等于改证据，引它的 E160 页那句「整行抄自」也会成假
 research/results/e160-e152-input-mirror-2026-09-15.out  # 同上一行，镜像那一份
-.claude/gate.d/fixtures/14-test-granularity.sh/red/  # 14 号的红样本故意按里程碑起名（second_transaction_step_one_sample.rs），这道检查判的就是它；换成新名样本就不红了
 research/scripts/crash-case-check.py  # 自检里造的按里程碑起名的样本文件名与判它的正则都要写得出旧名，换掉自检就测不到这一条
-.claude/kb/experiments/148-提交固定点按两棵记录树重算.md  # 第 38–56 行整行抄自 E148 的留存产物（已归档进版本库，工作区里没有）：产物里写的是 scale=first_transaction，改了那几行「整行抄自」就成假的（门禁 88 号会红）；这份正文别处照新名写
+.claude/kb/experiments/148-提交固定点按两棵记录树重算.md  # 第 38–56 行整行抄自 E148 的留存产物（已归档进版本库，工作区里没有）：产物里写的是 scale=first_transaction，改了那几行「整行抄自」就成假的（门禁 doc-experiments 的 quoted-result-lines 格会红）；这份正文别处照新名写
 records/2026-09-27-验证两档拆分.md  # 「第二批」一节的旧→新对照表记的就是按里程碑起名改成按内容起名这件事本身，旧名那一列换掉就成了新→新；这份记录别处已照新名写

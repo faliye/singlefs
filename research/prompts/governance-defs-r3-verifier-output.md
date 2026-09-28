@@ -109,7 +109,7 @@ Sonnet 报告没有出现产物引用（没有交模型或复跑命令），本�
 - 不判 G1–G5 各条推论打中成不成立、该不该采纳，也不判两条腿之间谁的判定更对；这些交主 agent 逐条现查裁定。
 - 未复核 cargo/libtest 在真实编译下对信号杀死测试进程时是否确实打印 `error: test failed`（Opus D1、D2 与 Sonnet 判定都依赖这一条，两条腿都自称是「推的，没真跑」；仓里唯一现存的真实证据是 `governance-defs-r2-opus-model/g3-outputs/crash-before-named-test.txt` 与 `research/scripts/mutate.sh:496` 的旧注释，Sonnet 已引用，Opus 未重新核实——本报告同样未再跑 59 号或造一次真实的 abort 变异，因为那是重型测试，子 agent/核查员不跑）。
 - 未核 `.claude/hooks/kb-scribe-followups.tsv` 里 21/30/49 号触发条件的精确行号（Sonnet 只给了 grep 命中方式，未点名行号，本报告因此记「核不动」，不是 ✗）。
-- 未反推 Opus 报告开头「开工核过快照…`git diff --stat bfc447e HEAD -- .claude research/scripts crates` 无输出」这一句在腿实际开工那一刻（2026-09-26 约 22:20 UTC）是否为真：这是一次性状态断言，现在（核查时刻，晚于开工）重跑同一命令依然无输出，但不能据此倒推开工那一刻的仓库状态，记「核不动」。
+- 未反推 Opus 报告开头「开工核过快照…`git diff --stat bfc447e HEAD -- .claude research/scripts crates` 无输出」这一句在腿实际开工那一刻（2026-09-27）是否为真：这是一次性状态断言，现在（核查时刻，晚于开工）重跑同一命令依然无输出，但不能据此倒推开工那一刻的仓库状态，记「核不动」。
 - 未对 Sonnet、Opus 两份报告之间的判定分歧（例如 D1/D2 与 Sonnet G1 判定对同一处「无效」判档问题的描述角度不同）做仲裁，两条腿的角度本身就不完全重叠（Sonnet 判「后半句留白」，Opus 判「次序相反」/「第三类来源」），这些差异是否互斥、是否都成立，留给主 agent。
 - 未跑任何重型测试（54、55、57、59、87、整轮门禁、`gate-staged.sh`），未编译，未执行 cargo。
 - 只写了本报告文件与草稿目录 `/tmp/claude-0/-home-user-singlefs/77b4b1be-00af-5f85-8659-f6e6d51fb840/scratchpad/defs-r3-verifier/`（含一次模型复跑的输出 `rerun.out`），未改仓里任何文件；`git status --short` 复跑前后均为空，已现查确认。

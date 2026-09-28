@@ -1,6 +1,6 @@
 # 实审 B3c-2 报告（implementation-writer）：崩溃注入第二、三截交记录核对器的写表补全（代码审阅第 2 条收尾）
 
-时刻都是 UTC（本机时钟），JST = UTC + 9。开工 2026-09-26T22:5xZ。按规格在草稿目录的仓副本里做、交补丁，主工作区一个字没动。
+开工 2026-09-27。按规格在草稿目录的仓副本里做、交补丁，主工作区一个字没动。
 
 ## 一、结论
 
@@ -34,7 +34,7 @@
   这里的「截断处」由持久集合与恢复落到的那一版来认，接缝只记一个下标（`first_write_after_the_crash` = 历史录制流的写数）。第 2 条是我自己定的，理由是真实状态上量出来的：整条历史接一条来分，截断处之后历史自己重开的实例与挂载取到同一个号、txg 接在同一处，身份撞上，而挂载那一版的实例表不带本实例的行，豁免不到，结果判红（用例 B2 的阳性对照：同一批 832 次里判红 92 次）；只接到截断处为止，截在中间那次发布没落的写归进挂载写行那次发布，判红 4 次（这就是 B3b 报告第二节第 4 条那一形）。
 - 回收谓词（`reuse_is_not_proven_illegal_by_the_reclaim_predicate`）没改。接缝之后的写在取「这次写之前」时，照样把截断处之后那一截没发生过的历史写算进去。那一截的根 txg 都比截断处之前的大、带的 F 不比之前小，算进去只会让界更宽，不会把合法复用判成不合法。这是推的，没造状态量过松了多少，已写进 `crash.rs:1060`。
 - 第二截恢复自称的那一版：取挂载与那次发布写出的最新那条根，挂载一条根都没写出时退回第一次崩溃落到的那一版。第二截的恢复后镜像是整次挂载加一次发布之后的池，池上现行的是那一版（用例 B3 挂载发布那一半与变异 11 证了这一点）。
-- 今天的交法与改后的交法各在哪：今天第三截取 `mount_writes[..first_write_of_the_segment + writes_in_the_segment]`，只交挂载前缀（取副本时 `crash_injection.rs` 第 1422–1461 行，副本取于 22:53Z）；今天第二截只跑 `checker_violations_of`，观察里的记录核对器结论写死成 `RecordCheck::default()`（取副本时第 1231 行）。
+- 今天的交法与改后的交法各在哪：今天第三截取 `mount_writes[..first_write_of_the_segment + writes_in_the_segment]`，只交挂载前缀（取副本时 `crash_injection.rs` 第 1422–1461 行）；今天第二截只跑 `checker_violations_of`，观察里的记录核对器结论写死成 `RecordCheck::default()`（取副本时第 1231 行）。
 - 没停在「条款没写」的分支上：这次只改装置怎么交入参、判定用哪份镜像，没有新加错误成员、`todo!` 或 `assert!`。新加的 `assert_eq!` 都是入参长度的不变量：持久集合与写表逐条对应。
 
 ## 四、先红：今天的代码上两个状态都不报
@@ -63,7 +63,7 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 ## 七、不做、只列：树表 0 条的那一版，实例表与分配代比不了（B3b 报告第二节第 2 条第 1 小条）
 
-今天的样子：`crates/singlefs-harness/src/model_comparison.rs:280` `observed_root_of_version_without_file` 交回 `ObservedInstanceTable::NotInTheOutput`（`:288`）与 `ObservedUnitAllocationRecords::RewrittenRolesOnly`（`:291`）。模型那一侧，这两种各走一臂只计数、只比重写集合（`crates/singlefs-harness/src/model.rs:2014`、`:2041`）。行号是取副本时（22:53Z）的，主工作区后来打进了 A2c、C11、C11b 的补丁，行号要现查。
+今天的样子：`crates/singlefs-harness/src/model_comparison.rs:280` `observed_root_of_version_without_file` 交回 `ObservedInstanceTable::NotInTheOutput`（`:288`）与 `ObservedUnitAllocationRecords::RewrittenRolesOnly`（`:291`）。模型那一侧，这两种各走一臂只计数、只比重写集合（`crates/singlefs-harness/src/model.rs:2014`、`:2041`）。行号是取副本时的，主工作区后来打进了 A2c、C11、C11b 的补丁，行号要现查。
 
 - **路一：让 `transaction.rs` 的输出带上这两样**（A2c 在改）。
   - `crates/singlefs-core/src/transaction.rs:821` 的 `VersionWithoutFilePublishOutput` 加两个字段：这一版整条实例表链各片的 `TransactionUnit`（字节 + 位置），与这一版每个角色的分配记录。
@@ -109,7 +109,7 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 | B4 | `the_pool_after_the_mount_exempts_what_the_newest_mount_version_abandons_by_its_instance_table_on_the_recovered_image`（`:892`） | 对照：历史「覆盖写 → 崩溃恢复抛弃最新根 → 覆盖写三次」，第二截恢复自称 (3,14)，那一版的表只在恢复后的池上，照它豁免被抛弃的 (1,4)，一条不判；同一状态从崩溃态读表时判红（阳性对照） |
 | B5 | `every_crash_state_runs_the_record_checker_after_the_writable_mount_and_on_every_second_crash_without_new_findings`（`:960`） | 崩溃注入整段（种子 3、11，各 8 步，每段 2 个崩溃状态）：第二截记录核对器的次数等于崩溃状态数，第三截的次数等于二次崩溃数，没有新发现 |
 
-证红：在最终副本 `/tmp/claude-1000/impl-rev-b3c2/final/`（取于 2026-09-26T23:57:35Z，已打上补丁与变异行）上跑，命令是 `bash research/scripts/capped.sh 5 bash research/scripts/prove-red.sh --copy <副本> singlefs-harness <16 个名字>`，日志在 `prove-red-logs-final/`。末行原样：`✓ 点名 16 条：跑了 16 条，跳过 0 条，跑的都抓到了`。基线：新二进制整个跑 8 条全绿，所以基线红集为空；prove-red 各组参数的基线也都绿，留下的最后一份是 `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 9.29s`。每行按测试全名过滤，只跑点名那一条，同时红了谁没看。16 次红的都是测试自己的断言，不是被测代码里的 `debug_assert`，所以没有在 release 下再跑。
+证红：在最终副本 `/tmp/claude-1000/impl-rev-b3c2/final/`（取于 2026-09-27，已打上补丁与变异行）上跑，命令是 `bash research/scripts/capped.sh 5 bash research/scripts/prove-red.sh --copy <副本> singlefs-harness <16 个名字>`，日志在 `prove-red-logs-final/`。末行原样：`✓ 点名 16 条：跑了 16 条，跳过 0 条，跑的都抓到了`。基线：新二进制整个跑 8 条全绿，所以基线红集为空；prove-red 各组参数的基线也都绿，留下的最后一份是 `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 9.29s`。每行按测试全名过滤，只跑点名那一条，同时红了谁没看。16 次红的都是测试自己的断言，不是被测代码里的 `debug_assert`，所以没有在 release 下再跑。
 
 | # | 变异名（追加行） | 改坏哪一处 | 红在（最终副本行号，消息原样取头一截） |
 |---|---|---|---|
@@ -133,7 +133,7 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 ## 九、验证（第 4 步那几样，末尾原样）
 
-都在最终副本 `final/` 上跑：主工作区 2026-09-26T23:57:35Z 的样子，打上本补丁与变异行（取副本时在改文件的 sha256 在 `final-copy-sha256.txt`；我这三份文件那一刻与开工时相同）。build、fmt、clippy、四个测试二进制写在同一个脚本里，整条经 `run-with-memory-cap.sh 8G`、`capped.sh 5` 跑。
+都在最终副本 `final/` 上跑：主工作区取副本那一刻的样子，打上本补丁与变异行（取副本时在改文件的 sha256 在 `final-copy-sha256.txt`；我这三份文件那一刻与开工时相同）。build、fmt、clippy、四个测试二进制写在同一个脚本里，整条经 `run-with-memory-cap.sh 8G`、`capped.sh 5` 跑。
 
 `cargo build --offline --all-targets`（整个工作区）：
 ```
@@ -169,7 +169,7 @@ B3b 那份    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filt
 - 92 号，退 77：`  ! /tmp/claude-1000/impl-rev-b3c2/work 不是 git 仓，本阶段跳过`。这一次是在旧副本 `work/` 上跑的，副本不带 `.git`，没判；最终副本上没再跑，理由相同。
 - 74 号，退 1：随机历史二进制 `test result: FAILED. 22 passed; 2 failed; 2 ignored; 0 measured; 0 filtered out; finished in 40.49s`，红的是 `crash_recovery_abandoning_the_newest_root_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43` 与 `random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation`，签名是 ModelDisagreement。**这不是我的改动带进来的**：同一时刻主工作区的副本（`pristine/`，不带我的补丁）上跑同一道，也红这两条（`test result: FAILED. 22 passed; 2 failed; 2 ignored; 0 measured; 0 filtered out; finished in 49.65s`，`logs/pristine-gate-74.log`）；随机历史这一路也不调我改过的函数，只用了没改的 `MemoryPool`、`RecordCheck`、`SparseBlockDevice`。
 
-补丁对主工作区的 `git apply --check`（2026-09-27T00:10:57Z，那一刻我这三份文件的 sha256 仍是 `baa9fe35…`、`6d37a516…`、`2526b80c…`）：`git apply --check (主工作区) exit=0`；`apply-writer-patch.py <补丁目录> --dry-run`：`✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 1124 行`。
+补丁对主工作区的 `git apply --check`（2026-09-27，那一刻我这三份文件的 sha256 仍是 `baa9fe35…`、`6d37a516…`、`2526b80c…`）：`git apply --check (主工作区) exit=0`；`apply-writer-patch.py <补丁目录> --dry-run`：`✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 1124 行`。
 
 补丁的 stat（临时仓里 `git diff --stat -- crates` 原样）：
 ```
@@ -200,4 +200,4 @@ B3b 那份    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filt
 - 没写 kb（第八节第 1 条交 kb-scribe），没改 B3b 那份用例文件（不在文件单里）。
 - 回收谓词在接缝处偏松了多少，没造状态量（第三节末两条）。写表克隆的内存代价没量（第八节第 7 条）。
 - 92 号在副本上跑不了（不是 git 仓），89 号退 77，这两道都按没判记。
-- 最终副本取于 23:57:35Z。之后主工作区要是又改了 harness 的公开接口（`history.rs` 的 `execute_history_with`、`HistoryExecution` 这类），新用例可能编不过。补丁 00:10:57Z 在主工作区上 `git apply --check` 过了，但那一刻的主工作区我没重编。
+- 最终副本取得之后，主工作区要是又改了 harness 的公开接口（`history.rs` 的 `execute_history_with`、`HistoryExecution` 这类），新用例可能编不过。补丁交回前在主工作区上 `git apply --check` 过了，但那一刻的主工作区我没重编。

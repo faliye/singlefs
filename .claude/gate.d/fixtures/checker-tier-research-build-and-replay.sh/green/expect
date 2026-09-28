@@ -1,0 +1,5 @@
+exit=0
+want=样本 replay.sh 收到：E1（
+want=没派 2 个：E9（慢） E17（计时）
+want=── 汇总：checker-tier-research-build-and-replay.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=experiment-replay：绿

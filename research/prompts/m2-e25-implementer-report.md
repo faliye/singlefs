@@ -1,8 +1,8 @@
 # 实二五 交回：空间准入接线、抬 F 退回、核出对不上先重读、回退见证删与补、真设备读回 F、三处红、空节点坏镜像
 
-实现员（implementation-writer），2026-09-25（时刻均为 UTC；JST = UTC + 9）。规格 `/tmp/claude-1000/impl-m2-e25/spec.md`（sha256 c35bde98…7a26，开工时核过）。
+实现员（implementation-writer），2026-09-25。规格 `/tmp/claude-1000/impl-m2-e25/spec.md`（sha256 c35bde98…7a26，开工时核过）。
 改动直接写在主工作区 `crates/` 里，没有另开补丁，所以没有 `git apply --check` 那一步可做：主工作区现状就是结果。
-开工时 `crates/` 没有别人在改；收工时 `diff -rq` 对开工那一刻的副本差出 23 个文件：22 个是这一轮自己改的（清单见第二节），另一个 `e156_allocation_basis_counts.rs` 是别的会话在 00:32Z 之后改的，我没碰。
+开工时 `crates/` 没有别人在改；收工时 `diff -rq` 对开工那一刻的副本差出 23 个文件：22 个是这一轮自己改的（清单见第二节），另一个 `e156_allocation_basis_counts.rs` 是别的会话后来改的，我没碰。
 
 ## 一、八件各到哪
 
@@ -191,7 +191,7 @@ D16 已定项 1「准入不够时先推空发布抬 F 再判」（C283）没实�
    - random_history `test result: ok. 20 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 376.14s`
    - checker_known_bad_images（run4 之后加了空叶那条，单独再跑一遍）`test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 57.49s`
 2. `cargo fmt --all -- --check`：exit 1，`Diff in` 只落在两个不归我的文件——`e158_root_choice_repair.rs`（5 处，E158 执行员的）与 `e156_allocation_basis_counts.rs`
-   （9 处；这个文件开工时与我无关，00:32Z / 00:42Z 被别的会话改过，我没碰）。我改过的文件全部干净。
+   （9 处；这个文件开工时与我无关，之后被别的会话改过两次，我没碰）。我改过的文件全部干净。
 3. clippy（check.sh 那一套 `-D warnings` 加七条编码纪律 lint）：`--all-targets` 整跑 exit 101，唯一的错在 `e156_allocation_basis_counts.rs:4037`（`assertions_on_constants`，别的会话刚改的）；
    绕开那一个 bin 分开跑：`clippy core/checker/format exit=0`、`clippy harness lib + every integration test + four bins exit=0`、`clippy harness bins in test profile exit=0`。
    （e156 被改之前，我这一轮的 `--all-targets` 整跑一次是干净的。）
@@ -216,8 +216,8 @@ D16 已定项 1「准入不够时先推空发布抬 F 再判」（C283）没实�
 
 ## 九、干到一半收到的主 agent 消息
 
-1. 2026-09-24T23:47Z 左右（写进度文件之前，那时八件都已写完第一遍、正在加测试开关）：整点询问 + 「门禁 33 号在主工作区红，点名 transaction.rs、mount.rs 的锚点」。进度写进 `progress.md`；33 号按第三节修绿。
-2. 2026-09-25T00:38Z 左右（第一批证红刚跑完）：共用约束第 57 行加了第五种拒绝写法（整份覆盖 `research/results/` 下已存在且未跟踪的文件）。这一轮不写 `research/results/`，手上步骤不用改。
+1. 2026-09-25（写进度文件之前，那时八件都已写完第一遍、正在加测试开关）：整点询问 + 「门禁 33 号在主工作区红，点名 transaction.rs、mount.rs 的锚点」。进度写进 `progress.md`；33 号按第三节修绿。
+2. 2026-09-25（第一批证红刚跑完）：共用约束第 57 行加了第五种拒绝写法（整份覆盖 `research/results/` 下已存在且未跟踪的文件）。这一轮不写 `research/results/`，手上步骤不用改。
 
 ## 十、没做什么
 

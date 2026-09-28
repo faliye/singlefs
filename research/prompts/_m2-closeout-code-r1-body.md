@@ -4,7 +4,7 @@
 
 ## 一、这一轮要判什么
 
-`crates/` 上一次提交是 `346f5e6`（2026-09-25 22:29 JST）。之后打进主工作区的改动，一轮代码三方都没走过（`.claude/rules/implementation-workflow.md` 三步里的第 2 步）。这一轮攻的是**写好的代码与它的测试**：代码做的是不是条款说的。设计不重判；设计轮的判决当已定的前提用。
+`crates/` 上一次提交是 `346f5e6`（2026-09-25）。之后打进主工作区的改动，一轮代码三方都没走过（`.claude/rules/implementation-workflow.md` 三步里的第 2 步）。这一轮攻的是**写好的代码与它的测试**：代码做的是不是条款说的。设计不重判；设计轮的判决当已定的前提用。
 
 被判的改动出自这些批次，报告都在 `research/prompts/` 下：
 
@@ -34,9 +34,9 @@
 | **替没写的条款做了选择** | 不同实现会做出不同的、都说得通的选择 | 那个选择是什么、它影响哪些字节或哪条可达历史、今天有没有会红的东西钉着 |
 | **和条款说反话** | 代码做的与某条已定分项的字面相反 | 两边各自的原文，以及这次差异在哪个字节 / 哪条历史上看得出来 |
 
-## 二、实现今天的样子（主 agent 的观测，2026-09-27 08:4x JST 现查）
+## 二、实现今天的样子（主 agent 的观测，2026-09-27 现查）
 
-- **腿读代码一律读快照**：提交 `67f447de9761f826711565032d8ce16fbf44b902`（ref `refs/sop/m2-closeout-code-r1-snapshot`，树 `ae2a472004d614fbe7e9b261cb236d0ce750520c`）。它是 08:4x 主工作区 `crates/` 的原样，含未跟踪的新测试，不在任何分支上。取法：`git archive refs/sop/m2-closeout-code-r1-snapshot crates | tar -x -C <草稿目录>`。主工作区在腿跑着的时候还会被在飞的补丁改，别读主工作区。
+- **腿读代码一律读快照**：提交 `67f447de9761f826711565032d8ce16fbf44b902`（ref `refs/sop/m2-closeout-code-r1-snapshot`，树 `ae2a472004d614fbe7e9b261cb236d0ce750520c`）。它是主工作区 `crates/` 的原样，含未跟踪的新测试，不在任何分支上。取法：`git archive refs/sop/m2-closeout-code-r1-snapshot crates | tar -x -C <草稿目录>`。主工作区在腿跑着的时候还会被在飞的补丁改，别读主工作区。
 - 快照里 `crates/*/src/*.rs` 56 份的 sha256 在 `research/prompts/m2-closeout-code-r1-snapshot/crates-src-sha256.txt`。
 - 被判的范围：`git diff 346f5e6 refs/sop/m2-closeout-code-r1-snapshot -- crates/`，123 个文件，+47000 / −11385 行。其中 src 41 份（`git diff --stat 346f5e6 -- crates/*/src` 在快照上同数）：
   - checker：`image.rs`、`lib.rs`、`position_addressed.rs`、`walk.rs`；

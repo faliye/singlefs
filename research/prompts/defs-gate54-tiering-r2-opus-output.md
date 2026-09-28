@@ -2,9 +2,9 @@
 
 <!-- doc-lint:not-numbers V1 V2 V3 V4 V5 K1 K2 K3 S1 S2 S3 S4 S5 T0 T1 T2 T3 H-A H-B H-B2 H-C g1 g2 g4 g6 g124 f2 f3 f4a f4b f5 -->
 
-2026-09-24，01:05–01:45 UTC（10:05–10:45 JST）。攻击面：正文第三节 V1、V2。禁读清单照派发提示，没读。
+2026-09-24。攻击面：正文第三节 V1、V2。禁读清单照派发提示，没读。
 被判的 54 号：工作区那一份，sha256 `232c8c0de11bf6561f9ca1736652745f387d05832ad0a5c99a08bc80c0386bf7`，与 `defs-gate54-tiering-r2-snapshot/sha256sums.txt` 同（`sha256sum -c` OK）。
-`.claude/main-agent.md` 在我干活的途中被别的会话改过（01:16 UTC 现查 sha256 `66e18e65…`，快照记的是 `14a43f86…`，`-c` FAILED），我引的那一行字面与背景材料里的逐字相同（`grep -c` 两边各 1 次），行号从我开工时的第 44 行挪到了第 49 行；下文写第 49 行。
+`.claude/main-agent.md` 在我干活的途中被别的会话改过（现查 sha256 `66e18e65…`，快照记的是 `14a43f86…`，`-c` FAILED），我引的那一行字面与背景材料里的逐字相同（`grep -c` 两边各 1 次），行号从我开工时的第 44 行挪到了第 49 行；下文写第 49 行。
 
 ## 复跑
 
@@ -12,7 +12,7 @@
 bash research/prompts/defs-gate54-tiering-r2-opus-model/run-all.sh /tmp/claude-1000/defs54-r2-attack/runs
 ```
 
-只在给的草稿根下建合成仓（`git init` 的临时仓，每格一个）、跑假 cargo（`fake-bin/cargo`，打合成日志，行为由调用那一刻 `crash.rs` 里的记号与仓外的假工具链版本决定）；真仓一处 git 写都没做，真仓 common-dir 里 `singlefs-layer0*` 现查 0 个。整趟 01:35:24–01:43:30 UTC，8 分钟。入库的 `outputs/` 就是这一趟的原样。
+只在给的草稿根下建合成仓（`git init` 的临时仓，每格一个）、跑假 cargo（`fake-bin/cargo`，打合成日志，行为由调用那一刻 `crash.rs` 里的记号与仓外的假工具链版本决定）；真仓一处 git 写都没做，真仓 common-dir 里 `singlefs-layer0*` 现查 0 个。整趟，8 分钟。入库的 `outputs/` 就是这一趟的原样。
 
 模型文件（`sha256sums.txt` 原样，`run-all.sh` 开跑先 `-c`）：
 
@@ -110,7 +110,7 @@ post 臂 T1 原样（`outputs/h-a-late-stage-54.out`）：
       [格] b42259802cca worker_threads=1 judged_root=…/tmp.poU65Fs6mr/tree
   ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（b42259802ccae17c…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:35:33Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（b42259802ccae17c…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 真值（X 门禁那一刻的 HEAD + 暂存区）
   ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
@@ -169,7 +169,7 @@ post 臂 T1 原样（`outputs/h-a-late-stage-54.out`）：
   ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 74f88a29d4fc1e39…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/m
   ── 红句里打出的三行与 54 号出路函数的三行逐字相同（cmp 0）
   ── 照红句三行原样跑完
-  · --full 开跑（2026-09-24T01:38:32Z）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 ccec9defeddec16d…（4 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
+  · --full 开跑（2026-09-24）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 ccec9defeddec16d…（4 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
   ── 崩溃验证员再跑快档，退出码 1
   ── gate --staged（暂存区为空）
   ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间一个改动都没有（干净工作树；要重新验 HEAD 用 SINGLEFS_GATE_FULL=1）
@@ -241,7 +241,7 @@ post 臂、漂移=54、`during` 原样：
       [格] f56ecab4287c worker_threads=1 judged_root=…/tmp.mW0CMJ6bPb/tree
   ── --full 还在跑（54 号 pid 2198424），起门禁
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（f56ecab4287c8f55…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:35:56Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（f56ecab4287c8f55…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 这一趟 --full 的判定行：
   ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
@@ -252,7 +252,7 @@ post 臂、漂移=54、`during` 原样：
 
 ```
   ── 54 号 pid 2204210 被 SIGKILL 之后起门禁
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（63342786f92e3d2d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:44Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（63342786f92e3d2d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── 这一趟 --full 的判定行：
       （没打出判定行）
@@ -301,7 +301,7 @@ post 臂原样（挑的整行）：
   ── 工具链升到 2；工作树干净：0 行 status
       [格] 63342786f92e worker_threads=32 judged_root=…/tmp.48W3DX9UXb/tree
   ── SINGLEFS_GATE_FULL=1，带 --staged 的建法
-  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（63342786f92e3d2d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:37:45Z，标记里的计数行原样
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（63342786f92e3d2d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
   ── SINGLEFS_GATE_FULL=1，主工作区直接跑 54 号
     [退出码 0]
@@ -422,7 +422,7 @@ edit、overlapZlast 里 Z 的红句原样：`  ✗ 全量跑的过程中这一�
 | 标记里的线程数不核 | 推的 | 没有按定义可达的触发 |
 | 掉电 | 推的 | 最坏零长格 → 快档红（原因说错），不误绿 |
 
-扫过的用户动作：H-A 扫 Y 暂存的 4 个时刻 × Y 放什么 2 种 × X 的内容 2 种（跑了 12 格，含 pre 臂）；H-B 扫全量起来之后 5 种动作 × 2 种漂移（加 pre 共 12 格）；H-B2 扫带不带 `--staged`；H-C 扫两趟先后 4 种 × Z 的 2 种（加 pre 共 10 格）。每格只跑一次：脚本是确定性的（开发时的一趟与入库这一趟，H-A、H-B、H-C、V1 的每格门禁与真值退出码相同；H-B2 是后加的，它的 pre 臂真值在第一次整趟 `run-all.sh`（01:25–01:34 UTC）里退 77，是我的真值函数没越过「没碰输入」那一问，改了 `lib.sh` 之后整趟重跑，入库的是重跑的）。
+扫过的用户动作：H-A 扫 Y 暂存的 4 个时刻 × Y 放什么 2 种 × X 的内容 2 种（跑了 12 格，含 pre 臂）；H-B 扫全量起来之后 5 种动作 × 2 种漂移（加 pre 共 12 格）；H-B2 扫带不带 `--staged`；H-C 扫两趟先后 4 种 × Z 的 2 种（加 pre 共 10 格）。每格只跑一次：脚本是确定性的（开发时的一趟与入库这一趟，H-A、H-B、H-C、V1 的每格门禁与真值退出码相同；H-B2 是后加的，它的 pre 臂真值在第一次整趟 `run-all.sh`里退 77，是我的真值函数没越过「没碰输入」那一问，改了 `lib.sh` 之后整趟重跑，入库的是重跑的）。
 
 ## 这条腿自己的限度
 
@@ -431,7 +431,7 @@ edit、overlapZlast 里 Z 的红句原样：`  ✗ 全量跑的过程中这一�
 - H-A、H-B 的「更严的 54 号」是照 `fc7942f` 的形状倒推的（把线程那一判拿掉当旧版），不是一次真的未来改动；H-B、H-B2 的工具链漂移是一个开关，真实的 rustc 升级让结论翻面很少见。
 - H-C 的 wip 半成品是我造的一判（`journal_differing=0`）。
 - 合成仓的 `crates/` 只有两个文件；「真值」用的是同一套假 cargo，真值本身不是层 0 真跑。
-- 开发时有一趟改法对比，我在它跑的途中改了它的驱动脚本，那一趟的尾巴报了语法错；那一趟整个作废，入库的 `outputs/` 全部来自 01:35–01:43 UTC 那一趟干净的 `run-all.sh`。
+- 开发时有一趟改法对比，我在它跑的途中改了它的驱动脚本，那一趟的尾巴报了语法错；那一趟整个作废，入库的 `outputs/` 全部来自那一趟干净的 `run-all.sh`。
 - 报告里贴的块是产物里挑出来的整行（`grep -cxF` 核过几条在产物里整行命中），不是整段；整段在 `outputs/` 里。
 
 ## 没做什么

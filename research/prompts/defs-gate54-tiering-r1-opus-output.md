@@ -3,7 +3,7 @@
 <!-- doc-lint:not-numbers K1 K2 K3 S1 S2 S3 S4 S5 S6 -->
 
 - 攻击面：K3（收尾跑 54 号 `--full`、整轮门禁只核全绿标记），以及 K2 与 K3 撞在一起那一格。K1、K2 的定义句交叉归本地攻方，这里不判。
-- 跑于 2026-09-23T23:26Z 前后（UTC；东京时间 2026-09-24 08:26 前后）。主仓 HEAD `3b60f098e97dc4c4f3ed9c6355422b607db1c34c`。
+- 跑于 2026-09-24。主仓 HEAD `3b60f098e97dc4c4f3ed9c6355422b607db1c34c`。
 - 装置：合成仓 + 打合成日志的假 cargo，不编译 Rust、不跑真全量。合成仓都建在 `/tmp/claude-1000/defs54-attack/` 下，各自 `git init`，只读主仓（`cp` 与 `git show HEAD:…`），没写主仓的 git common-dir。
 - 这里所有数都是**副本上的数**，不算入库装置上的数。
 
@@ -132,7 +132,7 @@ post 臂里「只改测试」「只追加变异表」两格的 1 是因为模型
 
 `main-agent.md` 第 43 行把 `--full` 放在「这一批交回到齐、暂存之前」那一步，命令不带根（默认主工作区）。
 
-**可达性（真仓现查，只读）**：`git status --porcelain -- crates/ Cargo.toml Cargo.lock` 按状态计数，2026-09-23T23:30:44Z：
+**可达性（真仓现查，只读）**：`git status --porcelain -- crates/ Cargo.toml Cargo.lock` 按状态计数，2026-09-24：
 
 ```
      21 ??
@@ -213,7 +213,7 @@ post 臂原样（`outputs/s4-marker-provenance.out`）：
   ── 收尾：主工作区 bash .claude/gate.d/54-layer0-replay.sh --full
     [标记：input_hash=ad967f0e6db52cb2… judged_root=/tmp/claude-1000/defs54-attack/s4/repo-post；exhaustive=false]
   ── gate.sh --staged
-      ✓ 全绿标记与这批输入的内容哈希相同（ad967f0e6db52cb2…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:09Z，标记里的计数行原样：
+      ✓ 全绿标记与这批输入的内容哈希相同（ad967f0e6db52cb2…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
           LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=false
     [gate --staged 里 54 号的退出码 0]
 ```
@@ -245,9 +245,9 @@ pre 臂（分档前，门禁在临时 worktree 里用暂存区那份脚本自己
 S5a post 原样（`outputs/s5-transient-edit.out`）：
 
 ```
-      ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s5/repo-a-post/.git/singlefs-layer0-full-green（输入哈希 e54134bdac4527be…，8 个文件；开跑 2026-09-23T23:28:09Z，跑完 2026-09-23T23:28:09Z）
+      ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s5/repo-a-post/.git/singlefs-layer0-full-green（输入哈希 e54134bdac4527be…，8 个文件；开跑 2026-09-24，跑完 2026-09-24）
     [标记：input_hash=e54134bdac4527be… judged_root=/tmp/claude-1000/defs54-attack/s5/repo-a-post；exhaustive=true]
-      ✓ 全绿标记与这批输入的内容哈希相同（e54134bdac4527be…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:09Z，标记里的计数行原样：
+      ✓ 全绿标记与这批输入的内容哈希相同（e54134bdac4527be…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
     compiled test=first_transaction_step_seven_layer0 include_ignored=1 root=/tmp/claude-1000/defs54-attack/s5/repo-a-post crates_content=0380147310f385b4
     compiled test=second_transaction_step_zero_layer0 include_ignored=1 root=/tmp/claude-1000/defs54-attack/s5/repo-a-post crates_content=93f8d9b332633f60

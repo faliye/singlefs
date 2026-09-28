@@ -1,0 +1,10 @@
+--- /home/fy5090/code/singlefs/Cargo.toml	2026-09-27 15:26:39.413137613 +0000
++++ repo/Cargo.toml	2026-09-28 07:04:09.899924363 +0000
+@@ -8,6 +8,7 @@
+     "crates/singlefs-harness",
+     "crates/singlefs-checker",
+     "crates/singlefs-checker-tier",
++    "crates/k39-barrier-attack",
+ ]
+ exclude = ["research"]
+ 
