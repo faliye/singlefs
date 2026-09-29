@@ -33,6 +33,9 @@ KILLS_LISTED_ONE_BY_ONE = 12  # 杀得多时逐条列 anon-rss 最大的这么�
 KILLED_PROCESS_LINE = re.compile(
     r"^(?P<timestamp>\S+) \S+ kernel: (?P<kind>Memory cgroup out of memory|Out of memory)(?: \([^)]*\))?: "
     r"Killed process (?P<pid>\d+) \((?P<name>.*)\) total-vm:\d+kB, anon-rss:(?P<anon_rss_kibibytes>\d+)kB")
+# oom-kill 明细行：带被杀进程所在的 cgroup（task_memcg）与进程号，跟在 Killed process 行的前后
+OOM_KILL_DETAIL_LINE = re.compile(r"kernel: oom-kill:constraint=\S*?task_memcg=(?P<memcg>[^,]+),task=[^,]+,pid=(?P<pid>\d+)")
+SELFTEST_CGROUP_MARK = "singlefs_memory_selftest_"   # run-with-memory-cap.sh --selftest 给自己开的 slice 名（它文件头「slice 名」那一段）；那里的 OOM 是自检故意造的
 # journalctl 看不到别人的日志时退 0、只在 stderr 给这句提示：不认它，读不到就会被当成「没有 OOM」
 JOURNAL_PERMISSION_HINT = "not seeing messages from other users and the system"
 TOKYO = ZoneInfo("Asia/Tokyo")
@@ -94,6 +97,11 @@ def read_kernel_journal(hours):
 
 
 def killed_processes(journal_text):
+    memcg_by_pid = {}
+    for line in journal_text.splitlines():
+        detail = OOM_KILL_DETAIL_LINE.search(line)
+        if detail:
+            memcg_by_pid[detail.group("pid")] = detail.group("memcg")
     kills = []
     for line in journal_text.splitlines():
         matched = KILLED_PROCESS_LINE.match(line)
@@ -103,9 +111,11 @@ def killed_processes(journal_text):
             moment = datetime.fromisoformat(matched.group("timestamp")).astimezone(timezone.utc)
         except ValueError:
             continue
+        memcg = memcg_by_pid.get(matched.group("pid"), "")
         kills.append({"moment": moment, "pid": matched.group("pid"), "name": matched.group("name"),
                       "anon_rss_kibibytes": int(matched.group("anon_rss_kibibytes")),
-                      "whole_machine": matched.group("kind") == "Out of memory"})
+                      "whole_machine": matched.group("kind") == "Out of memory",
+                      "selftest": SELFTEST_CGROUP_MARK in memcg and BROKEN_JUDGEMENT != "count-selftest-kills"})
     return kills
 
 
@@ -142,7 +152,12 @@ def oom_report(hours):
             f"- 怎么办：手动跑 `journalctl -k --since '-{hours:g}h' | grep 'Killed process'` 看一眼；查不了就当不知道，不当成没有 OOM——"
             "会话要是突然断掉才重开的，先别照原样重派断掉之前在跑的那件活。"])
     kills = killed_processes(journal_text)
+    selftest_kills = [kill for kill in kills if kill["selftest"]]
+    kills = [kill for kill in kills if not kill["selftest"]]
     if not kills:
+        if selftest_kills:
+            return (f"近 {hours:g} 小时内核杀过的 {len(selftest_kills)} 个进程全是 run-with-memory-cap.sh --selftest 故意造的"
+                    f"（cgroup 名带 {SELFTEST_CGROUP_MARK}），不算事故；别的没有（journalctl -k 查过，看得到内核日志）。")
         return f"近 {hours:g} 小时内核没有因为内存不够杀过进程（journalctl -k 查过，看得到内核日志）。"
     whole_machine = [kill for kill in kills if kill["whole_machine"]]
     capped = [kill for kill in kills if not kill["whole_machine"]]
@@ -153,6 +168,8 @@ def oom_report(hours):
     if capped:
         lines.append(f"- 内存上限（cgroup）里杀的 {len(capped)} 个：撞的是那一个 cgroup 的上限（例 run-with-memory-cap.sh 给变异定的），整机没耗尽")
         lines += kill_lines(capped)
+    if selftest_kills:
+        lines.append(f"- 另有 {len(selftest_kills)} 次是 run-with-memory-cap.sh --selftest 故意造的（cgroup 名带 {SELFTEST_CGROUP_MARK}），不算事故、不列")
     lines.append("- 怎么办：先查这几个进程是谁起的、为什么涨（进程名对上是哪个实验二进制或测试，去派它的子 agent 的会话记录与变异表里找那一步），"
                  "查清之前别照原样重派同一件活；重派时让那一步经 research/scripts/run-with-memory-cap.sh 带上限跑。")
     return "\n".join(lines)
@@ -172,6 +189,13 @@ FAKE_KILL_LINES = (
     "2026-09-25T07:58:02.681372+00:00 host kernel: Out of memory: Killed process 1691212 (e142_region_dif) total-vm:67315408kB, anon-rss:56156416kB, file-rss:1460kB, shmem-rss:0kB, UID:1000 pgtables:120792kB oom_score_adj:0\n"
     "2026-09-25T08:20:52.953154+00:00 host kernel: Memory cgroup out of memory: Killed process 2295476 (python3) total-vm:222788kB, anon-rss:65280kB, file-rss:6820kB, shmem-rss:0kB, UID:1000 pgtables:196kB oom_score_adj:0\n"
     "2026-09-25T08:20:52.953000+00:00 host kernel: oom-kill:constraint=CONSTRAINT_MEMCG,task=python3,pid=2295476,uid=1000\n")
+# run-with-memory-cap.sh --selftest 故意造的一次 OOM：明细行的 task_memcg 带 singlefs_memory_selftest_
+SELFTEST_ONLY_KILL_LINES = (
+    "2026-09-25T08:21:10.100000+00:00 host kernel: oom-kill:constraint=CONSTRAINT_MEMCG,nodemask=(null),cpuset=/,mems_allowed=0,"
+    "oom_memcg=/user.slice/user-1000.slice/user@1000.service/singlefs_memory_selftest_777_1.slice,"
+    "task_memcg=/user.slice/user-1000.slice/user@1000.service/singlefs_memory_selftest_777_1.slice/singlefs-memory-cap-777-1.scope,task=python3,pid=2400001,uid=1000\n"
+    "2026-09-25T08:21:10.100500+00:00 host kernel: Memory cgroup out of memory: Killed process 2400001 (python3) total-vm:100000kB, anon-rss:65536kB, file-rss:100kB, shmem-rss:0kB, UID:1000 pgtables:100kB oom_score_adj:0\n")
+FAKE_KILL_LINES = FAKE_KILL_LINES + SELFTEST_ONLY_KILL_LINES
 
 
 def write_fake_journalctl(directory, recent_output, probe_output, stderr_text="", exit_code=0):
@@ -246,6 +270,7 @@ def selftest_in(hook_dir, work):
                ["内存不够杀过 3 个进程", "整机 OOM（Out of memory）杀的 2 个",
                 "2026-09-25 07:58:02 UTC / 09-25 16:58:02 JST  进程 1691212（e142_region_dif）anon-rss 53.6 GiB",
                 "进程 2405（ray::IDLE）anon-rss 33 MiB", "内存上限（cgroup）里杀的 1 个", "进程 2295476（python3）anon-rss 64 MiB",
+                "另有 1 次是 run-with-memory-cap.sh --selftest 故意造的（cgroup 名带 singlefs_memory_selftest_），不算事故、不列",
                 "- 怎么办：先查这几个进程是谁起的、为什么涨", "查清之前别照原样重派同一件活"],
                ["上下文刚压缩过"])
     many = os.path.join(work, "many-kills")
@@ -255,6 +280,11 @@ def selftest_in(hook_dir, work):
     write_fake_journalctl(many, many_lines + FAKE_KILL_LINES, "x\n")
     expect("杀得多时逐条列最大的、其余合计", run_hook("startup", many),
            ["进程 1691212（e142_region_dif）anon-rss 53.6 GiB", f"另有 {20 + 2 - KILLS_LISTED_ONE_BY_ONE} 次没逐条列", "ray::IDLE ×"])
+    selftest_only = os.path.join(work, "selftest-only")
+    os.makedirs(selftest_only)
+    write_fake_journalctl(selftest_only, SELFTEST_ONLY_KILL_LINES, "x\n")
+    expect("只有自检故意造的 OOM 不算事故", run_hook("startup", selftest_only),
+           ["杀过的 1 个进程全是 run-with-memory-cap.sh --selftest 故意造的", "不算事故"], ["内存不够杀过", "怎么办：先查这几个进程是谁起的"])
     clean = os.path.join(work, "clean")
     os.makedirs(clean)
     write_fake_journalctl(clean, "2026-09-25T08:30:00+00:00 host kernel: usb 1-1: new device\n", "2026-09-25T08:30:00+00:00 host kernel: usb 1-1: new device\n")
@@ -277,7 +307,7 @@ def selftest_in(hook_dir, work):
         print(f"  ✗ 自检：{failure}")  # gate-lint:detail
     if failures:
         print("    → 看 reminder() / oom_report() / read_kernel_journal() / killed_processes() 与入口；"
-              "AFTER_COMPACT_DISABLE=1 或 SESSION_START_BREAK（skip-oom、unreadable-as-clean）设着的话这里本来就该红")
+              "AFTER_COMPACT_DISABLE=1 或 SESSION_START_BREAK（skip-oom、unreadable-as-clean、count-selftest-kills）设着的话这里本来就该红")
         return 1
     print(f"  ✓ 自检通过（查了 {checked} 种）：压缩之后补分支、未提交数、最近的记录与看门狗命令；startup 与 resume 列近几小时内核杀的进程"
           f"（时间写 UTC 与 JST、进程号、进程名、anon-rss，整机 OOM 与 cgroup 上限分开，杀得多时逐条列最大的 {KILLS_LISTED_ONE_BY_ONE} 个、其余按进程名合计，"

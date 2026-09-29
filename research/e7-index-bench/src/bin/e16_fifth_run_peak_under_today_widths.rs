@@ -30,6 +30,8 @@
 //! 跑前登记要求 `B_lo` 或 `B_hi` 换成它在批轴上的相邻取值会改变归类时，在两个相邻取值之间
 //! 逐个整数加密重判、报「加密过」。这一版没有实现这一步：报告与实验页里写明未做，
 //! 由主 agent 判要不要第二段补。
+// admission: always 独立手写的计数模型，每次现算今天几何下甲 / 乙的比值与预测式，判的是此刻装置的样子
+// run-condition: command python3
 use e7_index_bench::Emitter;
 use std::collections::HashSet;
 
@@ -897,7 +899,39 @@ fn assert_registered_constants_are_internally_consistent() {
     assert_eq!(RECORD_WIDTH_KNOB_MAXIMUM_GEOMETRY.fanout, ONE_TEBIBYTE_FILE_GEOMETRY.fanout);
 }
 
+fn repository_root() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .expect("仓根在 research/e7-index-bench 往上两层")
+}
+
+fn preflight() {
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    let root = repository_root();
+    let source = root.join("research/e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs");
+    let script = root.join(".claude/singlefs-ai-sop/scripts/preflight.py");
+    let mut command = std::process::Command::new("python3");
+    command.arg(&script).arg("check").arg(&source);
+    if arguments.iter().any(|argument| argument == "--force") {
+        command.arg("--force");
+    }
+    command.arg("--");
+    command.args(arguments.iter().filter(|argument| *argument != "--force"));
+    let output = command.output().unwrap_or_else(|error| {
+        eprintln!("  ✗ 起不了 python3 判准入：{error}");
+        eprintln!("  → 怎么办：装上 python3，或在有 python3 的机器上跑");
+        std::process::exit(78)
+    });
+    if !output.status.success() {
+        eprint!("{}", String::from_utf8_lossy(&output.stderr));
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+        std::process::exit(output.status.code().unwrap_or(1));
+    }
+}
+
 fn main() {
+    preflight();
     assert_registered_constants_are_internally_consistent();
     match std::env::args().nth(1).as_deref() {
         Some("pc3") => run_pc3_mode(),

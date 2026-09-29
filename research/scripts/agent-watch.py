@@ -188,6 +188,10 @@ SCRATCH_PATH_MENTION = re.compile(r"/tmp/claude-\d+/[^\s`'\"，。；：、（�
 # 一个会话一个看门狗（--discover）：锁、确认过的告警与见过没结束的子 agent 都放在这个会话的状态目录里
 STATE_ROOT = os.environ.get("AGENT_WATCH_STATE_ROOT") or f"/tmp/claude-{os.getuid()}/watch-state"
 SINGLE_INSTANCE_EXIT = 5
+# 钩子已经拒掉的写与判不了的脚本：只记进报告，不叫醒主 agent（2026-09-28 量到 8 天里看门狗转报的检出大半是这两类，主 agent 醒了也没事可做）
+INFO_DETECTION_PREFIXES = ("写被拒", "重型测试闸没判全")
+# 只记进报告、不叫醒主 agent 的三类条件告警（2026-09-28 量到 8 天里看门狗按告警退出 533 次，这三类醒来多半只是重起一只）：
+INFO_ALERT_NAMES = {"等待循环", "同一命令反复且输出不变", PROGRESS_STALE_ALERT}
 EVENT_ALERT_NAMES = {"hook 检出"}   # 事件类告警：确认之后到那个子 agent 结束都不再叫醒；别的是条件类，条件消失就作废
 
 
@@ -1693,6 +1697,10 @@ def read_detections(detections_path, start_offset, session_ids, watched_agent_id
                 # 按模式找进程由上游钩子在执行前拒绝，不写检出记录，这里读不到它。
                 notes.append(f"主 agent 自己的命令被 hook 拒了（不叫醒，拒绝信息在它的工具结果里）：{(entry.get('command') or '')[:120]}")
                 continue
+            if findings and all(finding.startswith(INFO_DETECTION_PREFIXES) for finding in findings) and BROKEN_DETECTION != "infowakes":
+                notes.append(f"hook 检出（只记不叫醒）：{entry.get('agent_type') or '?'} {entry.get('agent_id') or ''}：{'、'.join(findings)}："
+                             f"{(entry.get('command') or '')[:120]}")
+                continue
             # 主体写 agent 号（有的话）：--ack <agent 号>:hook 检出 只压这一个子 agent 的检出；类型写进说明
             subject = (entry.get("agent_id") if BROKEN_DETECTION != "detectiontype" else None) or entry.get("agent_type") or "?"
             alerts.append((subject, "hook 检出",
@@ -1728,6 +1736,16 @@ def own_process_chain(table, start_pid):
         chain.add(pid)
         pid = table[pid]["parent"]
     return chain
+
+
+def split_informational(alerts):
+    """三类只记不叫醒的条件告警：从告警里摘出来，写成报告行；AGENT_WATCH_BREAK=infoalertwakes 时照旧叫醒（自检用）。"""
+    if BROKEN_DETECTION == "infoalertwakes":
+        return alerts, []
+    remaining, informational = [], []
+    for alert in alerts:
+        (informational if alert[1] in INFO_ALERT_NAMES else remaining).append(alert)
+    return remaining, [f"只记不叫醒：{name}（{subject}）：{explanation}" for subject, name, explanation, _ in informational]
 
 
 def split_acknowledged(alerts, acknowledgements):
@@ -1915,6 +1933,8 @@ def run(arguments):
         alerts += detection_alerts
         if discover:
             write_acks(state_dir, pruned_acks(acknowledgements(), alerts, set(agent_ids)))
+        alerts, informational_lines = split_informational(alerts)
+        lines += informational_lines
         alerts, acknowledged = split_acknowledged(alerts, acknowledgements())
         for subject, name, explanation, _ in acknowledged:
             lines.append(f"已确认接着盯（--ack {subject}:{name}）：{explanation}")
@@ -1948,6 +1968,8 @@ def run(arguments):
             # 常驻内存过线等不到下一次整查：单查到了就同检出一样马上整查一次（整查的报告里带着内存一节），有没确认的告警就退 3
             if detection_alerts or memory_alarm_between_checks(process_root_pid, excluded_pids, arguments):
                 lines, alerts, _, active_lists, _ = build_report(agent_ids, arguments.session_dir, arguments, watch_started, excluded_pids, process_root_pid)
+                alerts, informational_lines = split_informational(alerts)
+                lines += informational_lines
                 alerts, acknowledged = split_acknowledged(alerts + detection_alerts, acknowledgements())
                 if alerts:
                     lines = lines + detection_notes + [f"已确认接着盯（--ack {subject}:{name}）：{explanation}"
@@ -2482,12 +2504,16 @@ def selftest_session_watch_in(work, session, scratch, thresholds, failures, watc
     if inquiry is None or "第三格在跑，预计 40 分钟" not in inquiry[1]:
         failures.append(f"整点询问应当附上 progress.md 的末几行，实际 {inquiry}")
     detections = os.path.join(work, "detections-subject.jsonl")
-    open(detections, "w", encoding="utf-8").write(json.dumps({"session_id": "s1", "agent_type": "implementation-writer", "agent_id": "a1",
-                                                              "command": "until x; do sleep 1; done", "findings": ["写被拒"]}, ensure_ascii=False) + "\n")
-    _, detection_alerts, _ = read_detections(detections, 0, {"s1"}, set())
+    with open(detections, "w", encoding="utf-8") as detections_file:
+        detections_file.write(json.dumps({"session_id": "s1", "agent_type": "implementation-writer", "agent_id": "a1",
+                                          "command": "Write /x/.claude/kb/a.md", "findings": ["写被拒：越出写范围"]}, ensure_ascii=False) + "\n")
+        detections_file.write(json.dumps({"session_id": "s1", "agent_type": "implementation-writer", "agent_id": "a1",
+                                          "command": "pgrep -f cargo", "findings": ["命令里有 pgrep -f / pkill -f / killall"]}, ensure_ascii=False) + "\n")
+    _, detection_alerts, detection_notes = read_detections(detections, 0, {"s1"}, set())
     checks += 1
-    if [alert[0] for alert in detection_alerts] != ["a1"]:
-        failures.append(f"hook 检出的主体应当是 agent 号 a1（--ack a1:hook 检出 只压它），实际 {[alert[0] for alert in detection_alerts]}")
+    if [alert[0] for alert in detection_alerts] != ["a1"] or not any("只记不叫醒" in note and "写被拒" in note for note in detection_notes):
+        failures.append("hook 检出：写被拒的应当只记进报告不叫醒，按模式找进程的应当告警且主体是 agent 号 a1（--ack a1:hook 检出 只压它），"
+                        f"实际告警主体 {[alert[0] for alert in detection_alerts]}，记录 {detection_notes}")
     # --discover：状态目录放自检自己的；一个会话一个看门狗，--ack 落文件下一次读回，条件消失的确认作废
     state_root = os.path.join(work, "watch-state")
     environment = dict(os.environ, AGENT_WATCH_STATE_ROOT=state_root)
@@ -2845,9 +2871,13 @@ def selftest_in(work):
     watch_exit = run_watch(["--agents", "finished,interrupted,stoppedidle", "--interval-seconds", "1", "--max-minutes", "1"]).returncode
     if watch_exit != 0:
         failures.append(f"被看的子 agent 都交回或被停时看门狗应当退出码 0，实际 {watch_exit}")
-    watch_exit = run_watch(["--agents", "waitloop", "--interval-seconds", "1", "--max-minutes", "1"]).returncode
+    watch_exit = run_watch(["--agents", "longtool", "--interval-seconds", "1", "--max-minutes", "1"]).returncode
     if watch_exit != 3:
-        failures.append(f"有告警时看门狗应当退出码 3，实际 {watch_exit}")
+        failures.append(f"有告警（工具调用过长）时看门狗应当退出码 3，实际 {watch_exit}")
+    waitloop_run = run_watch(["--agents", "waitloop", "--interval-seconds", "1", "--max-minutes", "0.03"])
+    if waitloop_run.returncode != 4 or "只记不叫醒：等待循环" not in waitloop_run.stdout:
+        failures.append(f"只有「等待循环」这类只记不叫醒的告警时，看门狗应当到点退 4 并在报告里写「只记不叫醒：等待循环」，"
+                        f"实际退出码 {waitloop_run.returncode}：{waitloop_run.stdout[-300:]}")
     watch_exit = run_watch(["--agents", "healthy", "--interval-seconds", "1", "--max-minutes", "0.03"]).returncode
     if watch_exit != 4:
         failures.append(f"到定时回报的时刻看门狗应当退出码 4，实际 {watch_exit}")
@@ -2881,7 +2911,7 @@ def selftest_in(work):
     self_background = "run_in_background 里又自己放后台"
     for session_label, finding_text, agent_type, agent_id, wanted_exit, wanted_note in (
             ("session", self_background, "experiment-runner", "healthy", 3, None),
-            ("session", "写被拒", "experiment-runner", "healthy", 3, None),
+            ("session", "写被拒", "experiment-runner", "healthy", 4, "只记不叫醒"),
             ("另一个会话", self_background, "experiment-runner", "healthy", 4, None),
             ("session", "没有 timeout 的等待循环", "experiment-runner", "healthy", 4, None),
             ("session", self_background, "experiment-runner", "别的子agent", 4, None),

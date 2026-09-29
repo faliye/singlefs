@@ -1,0 +1,62 @@
+subagents 982
+
+type                         n wall_med(min) wall_p90 waiting_med(min) wait_share waits>3min med no_handback
+general-purpose            154            22       43                0        18%              0          19
+implementation-writer      145            54      141               10        43%              2          29
+experiment-runner           83            56      142                9        35%              2          15
+three-way-materials         78            19       29                0         5%              0           4
+three-way-attack            78            33       86                4        40%              1           8
+three-way-local-attack      78            23       35                0        14%              0           9
+kb-scribe                   66            18       35                0         7%              0           1
+three-way-verifier          57            22       34                0        28%              0           5
+tooling-writer              56            25       42                2        22%              0           9
+three-way-forward           56            14       28                0         3%              0           4
+sweep                       35            18       33                0         3%              0           1
+experiment-designer         28            30       38                0         8%              0           3
+three-way-defense           19            14       42                0        22%              0           3
+kb-spec-drafter             18            22       31                0         3%              0           0
+investigator                14            18       27                0        25%              0           2
+Explore                      8             9       20                0         0%              0           0
+mutation-triage              4            15       62                2        47%              0           0
+gate-triage                  3            38       99                0        50%              0           0
+prior-art                    1            18       18                0         0%              0           0
+three-way-local-defense      1            24       24                0         0%              0           0
+TOTAL subagent wall 600 h, of which gaps>3min (waiting) 174 h (29%)
+agents without handback: 112, their wall 68 h, calls 10118
+
+injection: agents measured 406, ctx jump at injection median 76172 p25 67051 p75 81103; calls after injection median 85 sum 42927; est. injected read tokens 3.3B
+
+MAIN: dispatches with agent launched 1582; batch sizes (<=90s apart): median 2, share of size-1 batches 47%, max 24
+dispatches made within 10 min after some handback notification: 352 (22%)
+handback -> notification delivered to main: median 0.1 min, p90 0.2 min (n=180)
+notification -> next main assistant message: median 3 s, p90 4 s
+per-session max concurrency: [2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 6, 6, 7, 8, 44]; share of time with zero subagents running (median over sessions): 28%
+
+three-way rounds (materials -> legs -> verdict), minutes:
+round                              mats mat_min legs leg_max leg_med legs_end->verdict  total
+m2-refusals-presumed-r1               1      26    5      28      21                 2    931
+m2-keyspace-r1                        1      19    4     330      30                 1    362
+gate-fix-forks-r3                     1      17    5      35      22                -7    334
+m2-safety-r1                          1      19   15     210      18                 1    288
+m2-newq-r1                            2      20    8     121      47               -29    282
+elastic-ring-r1                       2      18    8      23      18                 1    237
+m2-safety-r3                          1      21    4     152      36                 1    200
+m3-prune-gpu-r3                       1      14    6      84       9                19    198
+m2-safety-r2                          4      20   20      43      37                 6    190
+m2-rollback-forward-r2                4      20   10     119      26                 2    189
+m2-rollback-forward-r1                4      28   20      73      23                 2    188
+c355-c363-r3                          8      12   16      49      29                 2    186
+m2-layer0-scale-r3                    1      30    4     106      30                 2    168
+m2-lines234-code-r1                   0       0    3      34      15               131    165
+c245-r3                               3      14    3      29      16                15    158
+m2-final-code-r4                      1      17    4     110      25                 1    149
+m2-treesplit-r1                       1      36    4      69      41                 1    145
+c363b-r1                              1      31    4      72      29                 1    139
+m2-wave3-code-r1                      2      29    8      54      40                -3    129
+m2-final-code-r3                      1      25    4      72      25                -4    124
+m2-layer0-scale-r2                    1      22    4      72      27                 1    121
+m2-rootchoice-repair-r1               1      21    4      36      19                 1    120
+m2-layer0-scale-r1                    2      19    7      65      49                 9    119
+k3-9-barrier-r1                       2      18    3      92      25                 3    114
+m2-presumed-clauses-r1                4      21   27      46      15                 7    109
+rounds with verdict located: 70 of 72; total median 88 min p90 200; legs_end->verdict median 1 min; materials median 20 min; leg max median 37 min

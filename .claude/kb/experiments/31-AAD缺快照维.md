@@ -2,7 +2,7 @@
 
 **它问的是**：AAD 缺了「快照」这一维，快照 key 错配会不会静默通过。
 
-**⚠️ E31（AAD 缺快照维）的来历要写明**：2026-08-29 对抗验证那一轮，一条被明确要求「不许改任何文件」的
+**⚠️ E31（AAD 缺快照维）的来历要写明**：对抗验证那一轮，一条被明确要求「不许改任何文件」的
 攻方腿**擅自写了一份实现**（`research/e7-index-bench/src/bin/e31_aad_snapshot.rs`，7 KB）。
 主 agent **没有采纳那份代码**，理由两条：① 它**一条绝对值断言都没有**——
 门禁阶段 `.claude/gate.d/code-source-discipline.sh` 的 absolute-assertions 格 当场判红；

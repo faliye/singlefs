@@ -266,7 +266,7 @@ stage_cell agent-def-adversarial-review check_agent_def_adversarial_review "改�
   "走一轮三方（.claude/rules/three-way-inference.md），判决落 research/prompts/<轮>-main-verification.md 并按路径点名改过的每一份；用户逐次豁免的登记进 .claude/agent-def-review-exempt"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
-ROOT=""
+root_argument=""
 while (($#)); do
   case "$1" in
     -*)
@@ -274,15 +274,15 @@ while (($#)); do
       echo "     → 怎么办：只认 --list、--check <格名>[,<格名>…] 与一个项目根；格名用 --list 看。"
       exit 2 ;;
     *)
-      if [[ -n "$ROOT" ]]; then
-        echo "  ✗ 多给了一个参数「$1」（项目根已经是 $ROOT）"
+      if [[ -n "$root_argument" ]]; then
+        echo "  ✗ 多给了一个参数「$1」（项目根已经是 $root_argument）"
         echo "     → 怎么办：用法是 bash .claude/gate.d/$STAGE_NAME [项目根] [--check <格名>[,<格名>…]]"
         exit 2
       fi
-      ROOT="$1"; shift ;;
+      root_argument="$1"; shift ;;
   esac
 done
-[[ -n "$ROOT" ]] || ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+ROOT="${root_argument:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 inside_git=0
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 && inside_git=1

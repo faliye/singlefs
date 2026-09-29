@@ -14,13 +14,14 @@ use singlefs_checker_tier::crash::{
     LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE,
 };
 use singlefs_checker_tier::crash_amplification::{
-    check_recorded_blocks, compare_judge_and_verifier, plan_crash_points, read_violations,
-    record_crash_points, unjudged_blocks, verify_blocks_from_facts, CrashFlow, CrashPlan,
-    CrashPointSpan, FactsVerifierOn, JudgingCodes, UnitChecksumsOn, WeightedShares,
+    check_blocks_where_until, check_recorded_blocks, compare_judge_and_verifier, plan_crash_points,
+    read_violations, record_crash_points, unjudged_blocks, unjudged_blocks_of_the_flow,
+    verify_blocks_from_facts, CrashFlow, CrashPlan, CrashPointSpan, FactsVerifierOn,
+    PipelineJudgingCode, UnitChecksumsOn, WeightedShares,
 };
 use singlefs_checker_tier::crash_identity::CoverageReport;
 use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
-use singlefs_checker_tier::verdict_store::VerdictStore;
+use singlefs_checker_tier::verdict_store::{JudgeVersion, VerdictStore};
 use singlefs_harness::memory_pool::{
     writes_and_segments_with_stream_indexes, MemoryPool, PublishedVersion, RetainedWrite,
 };
@@ -120,13 +121,17 @@ fn record_new_pool_file_creation(
     }
 }
 
-fn judging_code() -> JudgingCodes {
-    JudgingCodes::of_files(
+fn judging_code() -> PipelineJudgingCode {
+    PipelineJudgingCode::of_the_judges(
         &repository_root(),
-        &[THIS_FILE],
         &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),
     )
     .expect("判法代码摘要算得出")
+}
+
+/// 判定行上的判法版本：两个判器的闭包摘要。
+fn judge_version() -> JudgeVersion {
+    judging_code().version()
 }
 
 /// 库放在临时目录，用例结束（成功、失败、panic）都删掉。
@@ -165,7 +170,7 @@ fn records_checks_and_then_reuses_every_block_of_the_new_pool_file_creation_flow
     let recorded =
         record_new_pool_file_creation("crash-amplification-pipeline", false, file_content());
     let flow = recorded.flow();
-    let plan = plan_crash_points(&flow, &judging_code());
+    let plan = plan_crash_points(&flow);
     assert_eq!(plan.points.len(), 2);
     assert_eq!(
         plan.points[0].ordinals.end, plan.points[1].ordinals.start,
@@ -198,12 +203,15 @@ fn records_checks_and_then_reuses_every_block_of_the_new_pool_file_creation_flow
     let temporary = TemporaryStore::new("reuse");
     let mut store = temporary.create();
     let mut report = CoverageReport::default();
-    let recording = record_crash_points(&mut store, &plan, &mut report).expect("录得进");
+    let recording =
+        record_crash_points(&mut store, &plan, &judge_version(), &mut report).expect("录得进");
     assert_eq!(recording.blocks_recorded, total_blocks(&plan));
     assert_eq!(recording.states_recorded, state_count);
     assert_eq!(recording.blocks_already_judged, 0);
     assert_eq!(
-        unjudged_blocks(&store).expect("对得了账").len(),
+        unjudged_blocks(&store, &judge_version())
+            .expect("对得了账")
+            .len(),
         usize::try_from(total_blocks(&plan)).expect("装得进")
     );
     assert!(
@@ -227,6 +235,7 @@ fn records_checks_and_then_reuses_every_block_of_the_new_pool_file_creation_flow
         &WeightedShares::new(vec![1]),
         0,
         &UnitChecksumsOn::CpuOnly,
+        &judge_version(),
     )
     .expect("核得完");
     assert_eq!(checking.blocks_checked, total_blocks(&plan));
@@ -238,14 +247,17 @@ fn records_checks_and_then_reuses_every_block_of_the_new_pool_file_creation_flow
     );
     assert_eq!(checking.gpu_cpu_disagreements, 0);
     assert!(
-        unjudged_blocks(&store).expect("对得了账").is_empty(),
+        unjudged_blocks(&store, &judge_version())
+            .expect("对得了账")
+            .is_empty(),
         "核完对账为空"
     );
-    assert!(read_violations(&store, &plan)
+    assert!(read_violations(&store, &plan, &judge_version())
         .expect("读得了违例")
         .is_empty());
     let mut second_report = CoverageReport::default();
-    let second = record_crash_points(&mut store, &plan, &mut second_report).expect("录得进");
+    let second = record_crash_points(&mut store, &plan, &judge_version(), &mut second_report)
+        .expect("录得进");
     assert_eq!(
         second.blocks_already_judged,
         total_blocks(&plan),
@@ -267,9 +279,126 @@ fn records_checks_and_then_reuses_every_block_of_the_new_pool_file_creation_flow
         &WeightedShares::new(vec![1]),
         0,
         &UnitChecksumsOn::CpuOnly,
+        &judge_version(),
     )
     .expect("核得完");
     assert_eq!(nothing_left.blocks_checked, 0, "复用的块不再核");
+}
+
+/// 一份库装几条流：这条流的块都判完了，它自己的账就是空的，哪怕库里还有别的流录了没判的块；整份库的账照旧报出那一块。
+#[test]
+fn a_flow_reconciles_its_own_blocks_and_not_the_blocks_another_flow_recorded() {
+    let recorded =
+        record_new_pool_file_creation("crash-amplification-own-blocks", false, file_content());
+    let flow = recorded.flow();
+    let plan = plan_crash_points(&flow);
+    let temporary = TemporaryStore::new("own-blocks");
+    let mut store = temporary.create();
+    record_crash_points(
+        &mut store,
+        &plan,
+        &judge_version(),
+        &mut CoverageReport::default(),
+    )
+    .expect("录得进");
+    assert_eq!(
+        unjudged_blocks_of_the_flow(&store, &plan, &judge_version())
+            .expect("对得了账")
+            .len(),
+        2,
+        "录了还没判：两块都在这条流自己的账上"
+    );
+    // 别的流录进同一份库的一块（拿这条流第一块的键换一个起点序号造出来），一直没判
+    let mut block_of_another_flow = unjudged_blocks(&store, &judge_version())
+        .expect("对得了账")
+        .first()
+        .expect("录了两块")
+        .0
+        .clone();
+    block_of_another_flow.block_start.0 += 1 << 40;
+    store
+        .record_block(&block_of_another_flow, 7)
+        .expect("录得进");
+    check_recorded_blocks(
+        &mut store,
+        &flow,
+        &plan,
+        &WeightedShares::new(vec![1]),
+        0,
+        &UnitChecksumsOn::CpuOnly,
+        &judge_version(),
+    )
+    .expect("核得完");
+    assert!(
+        unjudged_blocks_of_the_flow(&store, &plan, &judge_version())
+            .expect("对得了账")
+            .is_empty(),
+        "这条流的块都判完了，它自己的账是空的"
+    );
+    assert_eq!(
+        unjudged_blocks(&store, &judge_version()).expect("对得了账"),
+        vec![(block_of_another_flow, 7)],
+        "整份库的账照旧报出别的流那一块"
+    );
+}
+
+/// 核到一半被叫停：不再领新的块，已经判完的那一块在库里；下一趟只判剩下的那一块，对账为空。
+#[test]
+fn a_run_asked_to_stop_keeps_the_block_it_judged_and_the_next_run_judges_only_the_rest() {
+    let recorded = record_new_pool_file_creation("crash-amplification-stop", false, file_content());
+    let flow = recorded.flow();
+    let plan = plan_crash_points(&flow);
+    assert_eq!(total_blocks(&plan), 2, "两个点各一块");
+    let temporary = TemporaryStore::new("stop");
+    let mut store = temporary.create();
+    record_crash_points(
+        &mut store,
+        &plan,
+        &judge_version(),
+        &mut CoverageReport::default(),
+    )
+    .expect("录得进");
+    // 领第一块之前问一次（不停），领第二块之前再问一次（停）
+    let asked = std::sync::atomic::AtomicUsize::new(0);
+    let stop_before_the_second_block =
+        || asked.fetch_add(1, std::sync::atomic::Ordering::SeqCst) >= 1;
+    let stopped = check_blocks_where_until(
+        &mut store,
+        &flow,
+        &plan,
+        &|_block| true,
+        &UnitChecksumsOn::CpuOnly,
+        &judge_version(),
+        &stop_before_the_second_block,
+    )
+    .expect("核得完");
+    assert_eq!(stopped.blocks_checked, 1, "被叫停之前只判了第一块");
+    assert_eq!(
+        unjudged_blocks(&store, &judge_version())
+            .expect("对得了账")
+            .len(),
+        1,
+        "第二块还没判"
+    );
+    let resumed = check_blocks_where_until(
+        &mut store,
+        &flow,
+        &plan,
+        &|_block| true,
+        &UnitChecksumsOn::CpuOnly,
+        &judge_version(),
+        &|| false,
+    )
+    .expect("核得完");
+    assert_eq!(resumed.blocks_checked, 1, "接着判的那一趟只判剩下的那一块");
+    assert_eq!(
+        stopped.states_checked + resumed.states_checked,
+        plan.points.last().expect("有点").ordinals.end,
+        "两趟合起来每个状态恰好判一次"
+    );
+    assert!(unjudged_blocks(&store, &judge_version())
+        .expect("对得了账")
+        .is_empty());
 }
 
 #[test]
@@ -278,7 +407,7 @@ fn two_shares_leave_the_other_side_unjudged_until_that_side_checks_and_two_libra
     let recorded =
         record_new_pool_file_creation("crash-amplification-shares", false, file_content());
     let flow = recorded.flow();
-    let plan = plan_crash_points(&flow, &judging_code());
+    let plan = plan_crash_points(&flow);
     assert_eq!(total_blocks(&plan), 2, "两个点各一块");
     let shares = WeightedShares::new(vec![1, 1]);
     let first_temporary = TemporaryStore::new("share-a");
@@ -286,7 +415,13 @@ fn two_shares_leave_the_other_side_unjudged_until_that_side_checks_and_two_libra
     let mut first = first_temporary.create();
     let mut second = second_temporary.create();
     for store in [&mut first, &mut second] {
-        record_crash_points(store, &plan, &mut CoverageReport::default()).expect("录得进");
+        record_crash_points(
+            store,
+            &plan,
+            &judge_version(),
+            &mut CoverageReport::default(),
+        )
+        .expect("录得进");
     }
     let first_tally = check_recorded_blocks(
         &mut first,
@@ -295,11 +430,14 @@ fn two_shares_leave_the_other_side_unjudged_until_that_side_checks_and_two_libra
         &shares,
         0,
         &UnitChecksumsOn::CpuOnly,
+        &judge_version(),
     )
     .expect("核得完");
     assert_eq!(first_tally.blocks_checked, 1, "第一方只核分到它的那一块");
     assert_eq!(
-        unjudged_blocks(&first).expect("对得了账").len(),
+        unjudged_blocks(&first, &judge_version())
+            .expect("对得了账")
+            .len(),
         1,
         "另一方那一块在第一方的库里对账为没核完"
     );
@@ -310,16 +448,19 @@ fn two_shares_leave_the_other_side_unjudged_until_that_side_checks_and_two_libra
         &shares,
         1,
         &UnitChecksumsOn::CpuOnly,
+        &judge_version(),
     )
     .expect("核得完");
     assert_eq!(second_tally.blocks_checked, 1);
     let imported = first.import_from(&second).expect("导得进");
     assert_eq!(imported, 1, "第二方那一块导进第一方的库");
     assert!(
-        unjudged_blocks(&first).expect("对得了账").is_empty(),
+        unjudged_blocks(&first, &judge_version())
+            .expect("对得了账")
+            .is_empty(),
         "并成一个库之后对账为空"
     );
-    assert!(read_violations(&first, &plan)
+    assert!(read_violations(&first, &plan, &judge_version())
         .expect("读得了违例")
         .is_empty());
 }
@@ -331,8 +472,8 @@ fn an_ignored_crash_point_keeps_its_place_in_the_tree_but_contributes_only_the_f
     let full =
         record_new_pool_file_creation("crash-amplification-not-ignored", false, file_content());
     let judging = judging_code();
-    let plan = plan_crash_points(&recorded.flow(), &judging);
-    let full_plan = plan_crash_points(&full.flow(), &judging);
+    let plan = plan_crash_points(&recorded.flow());
+    let full_plan = plan_crash_points(&full.flow());
     assert!(plan.points[1].ignored);
     assert_eq!(
         plan.points[1].ordinals.end - plan.points[1].ordinals.start,
@@ -351,29 +492,79 @@ fn an_ignored_crash_point_keeps_its_place_in_the_tree_but_contributes_only_the_f
         plan.points[1].reuse_key, full_plan.points[1].reuse_key,
         "ignore 不动复用键：以后开 ignore 只补它自己的块"
     );
+    // 判法版本改了：计划不看判法，树与复用键都不动；库里旧版本的判定不复用、旧行留着
     let mut other_judging = judging.clone();
-    let mut flipped = *judging.digest_of(THIS_FILE);
+    let mut flipped = *judging.digest();
     flipped[0] ^= 0x01;
-    other_judging.replace_digest(THIS_FILE, flipped);
-    let other_plan = plan_crash_points(&full.flow(), &other_judging);
+    other_judging.replace_digest(flipped);
+    assert_ne!(other_judging.version(), judging.version());
+    let other_plan = plan_crash_points(&full.flow());
     assert_eq!(
         other_plan.points[1].path_number, full_plan.points[1].path_number,
-        "判法代码改了树不动"
+        "判法改了树不动"
     );
-    assert_ne!(
+    assert_eq!(
         other_plan.points[1].reuse_key, full_plan.points[1].reuse_key,
-        "判法代码改了复用键变，判定失效"
+        "判法改了复用键也不动：块键只由流程定"
     );
     let temporary = TemporaryStore::new("ignored");
     let mut store = temporary.create();
     let mut report = CoverageReport::default();
-    record_crash_points(&mut store, &plan, &mut report).expect("录得进");
+    record_crash_points(&mut store, &plan, &judging.version(), &mut report).expect("录得进");
     assert!(
         report.lines()[1].ends_with(" ignored"),
         "{:?}",
         report.lines()
     );
     assert!(report.lines()[0].ends_with(" checked"));
+    let checking = check_recorded_blocks(
+        &mut store,
+        &recorded.flow(),
+        &plan,
+        &WeightedShares::new(vec![1]),
+        0,
+        &UnitChecksumsOn::CpuOnly,
+        &judging.version(),
+    )
+    .expect("核得完");
+    assert!(checking.blocks_checked > 0);
+    assert!(unjudged_blocks(&store, &judging.version())
+        .expect("对得了账")
+        .is_empty());
+    let mut other_report = CoverageReport::default();
+    let other_recording = record_crash_points(
+        &mut store,
+        &plan,
+        &other_judging.version(),
+        &mut other_report,
+    )
+    .expect("录得进");
+    assert_eq!(
+        other_recording.blocks_already_judged, 0,
+        "判法版本换了，旧版本的判定一块都不复用"
+    );
+    assert_eq!(
+        other_recording.blocks_recorded, checking.blocks_checked,
+        "同样的块在新版本下全部待判"
+    );
+    assert_eq!(
+        unjudged_blocks(&store, &other_judging.version())
+            .expect("对得了账")
+            .len(),
+        usize::try_from(checking.blocks_checked).expect("块数"),
+        "新版本下对账列出全部块"
+    );
+    assert!(
+        unjudged_blocks(&store, &judging.version())
+            .expect("对得了账")
+            .is_empty(),
+        "旧版本的行还在"
+    );
+    assert_eq!(
+        store.judge_versions().expect("列版本").len(),
+        0,
+        "直接调录入不登版本描述；描述由 run_from_environment 登"
+    );
 }
 
 #[test]
@@ -382,10 +573,16 @@ fn a_wrong_version_table_makes_the_pipeline_store_red_states_the_gate_can_read()
     wrong_content[0] ^= 0x01;
     let recorded = record_new_pool_file_creation("crash-amplification-red", false, wrong_content);
     let flow = recorded.flow();
-    let plan = plan_crash_points(&flow, &judging_code());
+    let plan = plan_crash_points(&flow);
     let temporary = TemporaryStore::new("red");
     let mut store = temporary.create();
-    record_crash_points(&mut store, &plan, &mut CoverageReport::default()).expect("录得进");
+    record_crash_points(
+        &mut store,
+        &plan,
+        &judge_version(),
+        &mut CoverageReport::default(),
+    )
+    .expect("录得进");
     let checking = check_recorded_blocks(
         &mut store,
         &flow,
@@ -393,6 +590,7 @@ fn a_wrong_version_table_makes_the_pipeline_store_red_states_the_gate_can_read()
         &WeightedShares::new(vec![1]),
         0,
         &UnitChecksumsOn::CpuOnly,
+        &judge_version(),
     )
     .expect("核得完");
     assert!(
@@ -407,7 +605,7 @@ fn a_wrong_version_table_makes_the_pipeline_store_red_states_the_gate_can_read()
                 .all(|(_, _, text)| !text.is_empty()),
         "每个红状态有自己现算的正文"
     );
-    let violations = read_violations(&store, &plan).expect("读得了违例");
+    let violations = read_violations(&store, &plan, &judge_version()).expect("读得了违例");
     assert_eq!(
         u64::try_from(violations.len()).expect("装得进"),
         checking.red_states,
@@ -436,10 +634,16 @@ fn the_cpu_facts_verifier_agrees_with_the_judge_on_every_state_and_reuses_its_bl
     let recorded =
         record_new_pool_file_creation("crash-amplification-verifier", false, file_content());
     let flow = recorded.flow();
-    let plan = plan_crash_points(&flow, &judging_code());
+    let plan = plan_crash_points(&flow);
     let temporary = TemporaryStore::new("verifier");
     let mut store = temporary.create();
-    record_crash_points(&mut store, &plan, &mut CoverageReport::default()).expect("录得进");
+    record_crash_points(
+        &mut store,
+        &plan,
+        &judge_version(),
+        &mut CoverageReport::default(),
+    )
+    .expect("录得进");
     let checking = check_recorded_blocks(
         &mut store,
         &flow,
@@ -447,6 +651,7 @@ fn the_cpu_facts_verifier_agrees_with_the_judge_on_every_state_and_reuses_its_bl
         &WeightedShares::new(vec![1]),
         0,
         &UnitChecksumsOn::CpuOnly,
+        &judge_version(),
     )
     .expect("核得完");
     assert_eq!(checking.red_states, 0);
@@ -459,7 +664,8 @@ fn the_cpu_facts_verifier_agrees_with_the_judge_on_every_state_and_reuses_its_bl
     assert_eq!(tally.verifier_red_states, 0, "健康流第 ② 段也全绿");
     assert_eq!(tally.blocks_already_verified, 0);
     let comparison =
-        compare_judge_and_verifier(&store, &plan, &on.verifier_digest()).expect("比得完");
+        compare_judge_and_verifier(&store, &plan, &on.verifier_digest(), &judge_version())
+            .expect("比得完");
     assert_eq!(comparison.states_compared, checking.states_checked);
     assert_eq!(comparison.both_green, checking.states_checked);
     assert_eq!(comparison.disagreements, 0);
@@ -471,7 +677,8 @@ fn the_cpu_facts_verifier_agrees_with_the_judge_on_every_state_and_reuses_its_bl
     // 换一版「核对代码」（摘要不同）：旧行留着，新版从头核
     let mut other_digest = on.verifier_digest();
     other_digest[0] ^= 0x01;
-    let elsewhere = compare_judge_and_verifier(&store, &plan, &other_digest).expect("比得完");
+    let elsewhere =
+        compare_judge_and_verifier(&store, &plan, &other_digest, &judge_version()).expect("比得完");
     assert_eq!(elsewhere.states_compared, 0, "别的摘要下一块都没核过");
     assert_eq!(elsewhere.blocks_without_verifier, tally.blocks_verified);
 }
@@ -483,10 +690,16 @@ fn a_wrong_version_table_is_judge_red_only_for_the_facts_verifier() {
     let recorded =
         record_new_pool_file_creation("crash-amplification-verifier-red", false, wrong_content);
     let flow = recorded.flow();
-    let plan = plan_crash_points(&flow, &judging_code());
+    let plan = plan_crash_points(&flow);
     let temporary = TemporaryStore::new("verifier-red");
     let mut store = temporary.create();
-    record_crash_points(&mut store, &plan, &mut CoverageReport::default()).expect("录得进");
+    record_crash_points(
+        &mut store,
+        &plan,
+        &judge_version(),
+        &mut CoverageReport::default(),
+    )
+    .expect("录得进");
     let checking = check_recorded_blocks(
         &mut store,
         &flow,
@@ -494,6 +707,7 @@ fn a_wrong_version_table_is_judge_red_only_for_the_facts_verifier() {
         &WeightedShares::new(vec![1]),
         0,
         &UnitChecksumsOn::CpuOnly,
+        &judge_version(),
     )
     .expect("核得完");
     assert!(checking.red_states > 0, "版本表写错，判器红");
@@ -504,7 +718,8 @@ fn a_wrong_version_table_is_judge_red_only_for_the_facts_verifier() {
         "版本表是判器的输入，不是盘上的事实：第 ② 段看不见它"
     );
     let comparison =
-        compare_judge_and_verifier(&store, &plan, &on.verifier_digest()).expect("比得完");
+        compare_judge_and_verifier(&store, &plan, &on.verifier_digest(), &judge_version())
+            .expect("比得完");
     assert_eq!(
         comparison.judge_red_only, checking.red_states,
         "判器红而核对绿的正是那些状态"

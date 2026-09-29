@@ -44,7 +44,7 @@
 ## 没做什么
 
 - 没跑任何重型测试（54、55、57、59、87、整轮门禁、check.sh、全量 cargo test）；没编译小 crate（defs-r3 已在草稿里实测过信号杀的判档，A1 不依赖新的量）。
-- 门禁 12 号现跑退 1，红在 `research/prompts/governance-review-r1-report-B.md:61`（本分支 4717077 新加）与 `research/prompts/m2-lastflag-implementer-report.md:130` 的角标 `′`：不在甲组射程里，没判该怎么处置，只报出来。
+- 门禁 12 号现跑退 1，红在 `research/prompts/governance-review-r1-report-B.md:61`（本分支 4717077 新加）与 `research/prompts/m2-lastflag-implementer-report.md:130` 的角标（U+2032）：不在甲组射程里，没判该怎么处置，只报出来。
 - 门禁 47 号现跑退 1：`check-segment-registry.py`、`replace-once.py`、`replace-batch.py`（「以 root 跑」那一格）、`sweep-term.py` 自证没过，多半是这个容器以 root 跑与别的会话的产物，不在甲组射程里，没判。
 - `number-name-sync.sh .` 退 1，红在 `crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs:2783、:2850` 与 `records/2026-09-24-里程碑二收尾调度.md:62、:140`，与 r2 甲组报告所记相同，不在射程里。
 - 没核 `.claude/agents/`、`.claude/hooks/`、`.claude/gate.d/` 自己的改动（乙组、丙组），只在甲组文件指到它们时读了对应几行；A1 里 59 号 :348、:413 两处打印要丙组同步。

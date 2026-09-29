@@ -18,7 +18,7 @@ code-source-discipline.sh	feature-bits	kb-scribe,implementation-writer	feature b
 code-source-discipline.sh	mutation-tables	experiment-runner,kb-scribe,implementation-writer	实验二进制有同名变异表；relabel-item.py 改写实验源码之后锚点会腐化，书记员也要修；crates/mutations.tsv 的锚点也归它数，改 crates/ 的实现员修
 code-source-discipline.sh	absolute-assertions	experiment-runner	实验钉绝对值的断言，实验源码由执行员写
 code-source-discipline.sh	reading-discipline	experiment-runner,mutation-triage	实验源码的种子折叠（C59）与恒为字面量 0 的读数（C60）：research/e7-index-bench/src/bin/ 下的源码由实验执行员写；变异分诊读同一批源码
-code-tooling.sh	research-script-selftests	three-way-materials	材料员用的抽取脚本与本地腿脚本的自证
+code-tooling.sh	research-script-selftests	three-way-materials	材料员用的抽取脚本的自证
 code-tooling.sh	research-script-selftest-coverage	three-way-materials	研究脚本实现了 --selftest 就要有门禁在跑它，材料员的抽取脚本与本地腿脚本最常新加
 code-tooling.sh	rules-manifest	gate-triage	看 CLAUDE.md 的规则引用，收尾跑整轮门禁时一并判
 code-tooling.sh	stage-owners	gate-triage	本表与门禁目录、格名表、agent 定义，收尾跑整轮门禁时一并判
@@ -45,7 +45,7 @@ doc-decisions.sh	decision-summary-width	kb-scribe	决策索引结论列宽度，
 doc-decisions.sh	write-frequency	kb-scribe	决策正文里的频率断言与写频率登记表不说反话，两边都是 kb
 doc-decisions.sh	entry-added	kb-scribe	决策正文改了要在变更史留条目，归写 kb 的书记员
 doc-decisions.sh	shape	kb-scribe	变更史的形状，归写 kb 的书记员
-doc-decisions.sh	status-sync	kb-scribe	变更史各节现状与索引表同步，归写 kb 的书记员
+doc-decisions.sh	history-loss	kb-scribe	变更史整理不许丢数与编号，归整理变更史的书记员
 doc-experiments.sh	index-sync	experiment-runner	实验索引行与正文标题，实验页由执行员写
 doc-experiments.sh	results-cited	experiment-runner	实验产物写回，归跑实验的执行员
 doc-experiments.sh	evidence-in-repo	experiment-runner,kb-scribe,gate-triage	两半各归一个：装置与变异表改了要有产物，归执行员；kb 里把依据写成 /tmp 路径，归书记员；这一轮新写的提示由主 agent 写，分诊员先替它看
@@ -86,6 +86,7 @@ doc-registries.sh	citations	kb-scribe,prior-art	外部引用还核得动；写�
 doc-registries.sh	invariant-anchors	kb-scribe	新写的不变量要点名字段落点：不变量清单归书记员写
 doc-text.sh	prime-marks	gate-triage	全仓不许用撇号类角标给变体起名：谁写文件都可能写进一撇，收尾跑整轮门禁时一并判
 doc-text.sh	clock-times	gate-triage	全仓描述里不许写钟点：谁写文件都可能写进时分，收尾跑整轮门禁时一并判
+doc-text.sh	date-once	kb-scribe	记录与 kb 页里日期只在标题上，归写 kb 与记录的书记员
 doc-text.sh	term-renames	sweep	全仓术语改名的残余归回扫员：它本来就是「撤回一个数、改一个格式常量、新立一条判据之后全仓找还在引旧值的地方」那类活
 harness-model-differential-and-scenarios.sh	one-scenario	gate-triage	用例一条一个场景：谁改 crates/ 下测试都可能写成一条多场景，收尾跑整轮门禁时一并判
 harness-model-differential-and-scenarios.sh	model-fast-tier	implementation-writer,crash-verifier	模型对拍快档：改 crates/ 的实现员修；崩溃一致性验证员跑重门禁时一起看

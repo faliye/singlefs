@@ -89,7 +89,7 @@ stage_cell multipath-registry cell_multipath_registry "多条路径互证的实�
   "在实验页写「### 路径与结论登记」一节（形态见 .claude/rules/format-evolution.md），源码落点写现存路径、共用项写实；multipath-registry-lag.tsv 只缩不涨，补齐的删行"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
-ROOT=""
+root_argument=""
 while (($#)); do
   case "$1" in
     -*)
@@ -98,17 +98,17 @@ while (($#)); do
       exit 2
       ;;
     *)
-      if [[ -n "$ROOT" ]]; then
-        echo "  ✗ 给了两个项目根：$ROOT 与 $1"
+      if [[ -n "$root_argument" ]]; then
+        echo "  ✗ 给了两个项目根：$root_argument 与 $1"
         echo "     → 怎么办：参数只认一个项目根与 --check <格名>[,<格名>…]；不给项目根就取这个脚本往上两级。"
         exit 2
       fi
-      ROOT="$1"
+      root_argument="$1"
       shift
       ;;
   esac
 done
-ROOT="${ROOT:-$SCRIPT_REPOSITORY_ROOT}"
+ROOT="${root_argument:-$SCRIPT_REPOSITORY_ROOT}"
 cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 ROOT="$(pwd)"
 
@@ -843,6 +843,8 @@ PY
 # 管不到的：回看写的理由对不对、关系判得对不对（支撑写成不影响也过得了③以外的判据），靠人与抽查；
 # 实验正文只用编号不用「D<号>（」形态提到的决策，①看不见。
 #
+# 只删与所属标题相同的行内日期、只把同一天的第二个小节并进第一个的改动，不算「正文改了」（判法借 research/scripts/doc-consolidate.py，
+# 两版整理后的正文按行排序逐字相同就是），样本 decision-links-formatting-green 判绿、成功行报「不算正文改了 1 份」。
 # 样本：decision-links-red 在一个临时仓里把上面每一条各犯一次（want 逐条点名）；decision-links-green 放瘦身的与没瘦身的决策、
 # 待回填清单、结论作废的实验、这次改动改了正文与产物又回看了表、新判决带「## 回看决策」、搬了家的实验页，必须判绿并报对数。
 cell_decision_links() {
@@ -870,8 +872,11 @@ cell_decision_links() {
     fi
     changed_list="$SHARED_CHANGED_PATHS"
   fi
+  # 只删同日日期、只并同日小节的改动不算「正文改了」：判法借 research/scripts/doc-consolidate.py（门禁 doc-text 的 date-once 格用同一份）
+  DOC_CONSOLIDATE="$(dirname "$LIB_CHANGED_PATHS")/doc-consolidate.py"
+  export DOC_CONSOLIDATE
   python3 - "$ROOT" "$base" "$in_git" "$changed_list" <<'PY'
-import glob, os, re, subprocess, sys
+import glob, importlib.util, os, re, subprocess, sys
 
 root, base, in_git = sys.argv[1], sys.argv[2], sys.argv[3] == '1'
 changed = {line for line in open(sys.argv[4], encoding='utf-8').read().split('\n') if line}
@@ -1190,6 +1195,7 @@ for kind, number in sorted(pending):
 
 # ── 按这次改动 ──
 triggered = 0
+formatting_only = 0
 became_ran_checked = 0
 
 
@@ -1239,6 +1245,45 @@ def base_title(rel, number=None):
     return next((line for line in shown.stdout.split('\n') if re.match(r'^## E\d+ ', line)), None)
 
 
+_consolidate = None
+
+
+def consolidate_module():
+    """research/scripts/doc-consolidate.py：读不到就当没有这一层判法（改动照样算正文改了）。"""
+    global _consolidate
+    if _consolidate is None:
+        path = os.environ.get('DOC_CONSOLIDATE', '')
+        if not os.path.isfile(path):
+            _consolidate = False
+        else:
+            spec = importlib.util.spec_from_file_location('doc_consolidate', path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            _consolidate = module
+    return _consolidate
+
+
+def normalized_body_lines(text):
+    """整理之后的正文行（去空白与列表、标题、表格的符号）按行排序：两版一样就是只删了同日日期、只并了同日小节。"""
+    module = consolidate_module()
+    body, _hist = module.split_history(text.split('\n'))
+    migrated, _report = module.migrate_document('\n'.join(body), '', drop_history=False)
+    return sorted(stripped for stripped in (re.sub(r'[\s#*|>\-]', '', line) for line in migrated.split('\n')) if stripped)
+
+
+def formatting_only_change(rel):
+    """这次对实验页的改动是不是只删了与所属标题相同的日期、只把同一天的第二个小节并进第一个。"""
+    if not consolidate_module():
+        return False
+    shown = git('show', f'{base}:{rel}')
+    if shown.returncode != 0:
+        return False
+    try:
+        return normalized_body_lines(shown.stdout) == normalized_body_lines(read(os.path.join(root, rel)))
+    except Exception:  # noqa: BLE001 —— 判法自己出错时按「正文改了」判，不放过
+        return False
+
+
 def check_changed_rows(rel, row_lines):
     for text in row_lines:
         cells = split_cells(text)
@@ -1266,6 +1311,9 @@ if in_git:
             inside_table = section and section[0] <= line_number < section[1]
             if line_number < page['hist'] and not inside_table:
                 body_changed = True
+        if body_changed and formatting_only_change(rel):
+            body_changed = False
+            formatting_only += 1
         table_touched = [text for line_number, text in added
                          if text is not None and section and section[0] <= line_number < section[1]
                          and text.strip().startswith('|') and not TABLE_HEAD.match(text.strip())
@@ -1321,7 +1369,8 @@ pending_experiments = sum(1 for kind, _ in pending if kind == 'E')
 pending_decisions = sum(1 for kind, _ in pending if kind == 'D')
 summary = (f'实验页 {len(experiments)} 个（待回填 {pending_experiments}）、决策 {len(decisions)} 条（待回填 {pending_decisions}）、'
            f'已瘦身决策的已定项 {slim_items} 个（其中写「无实验」的 {no_experiment_items} 个）、'
-           f'表行 {rows_total} 行、这次改动触发回看 {triggered} 处、改成已跑而引了它的决策 {became_ran_checked} 条')
+           f'表行 {rows_total} 行、这次改动触发回看 {triggered} 处、改成已跑而引了它的决策 {became_ran_checked} 条；'
+           f'只删同日日期、只并同日小节的改动 {formatting_only} 份不算正文改了')
 if problems:
     kinds = {}
     for kind, _ in problems:

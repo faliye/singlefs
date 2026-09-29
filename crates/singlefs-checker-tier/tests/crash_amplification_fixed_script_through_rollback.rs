@@ -18,7 +18,7 @@ use common_crash_points::{mount_writable_step, overwrite_step, record_pool_build
 use singlefs_checker_tier::crash::{layer0_plan_state_count, Layer0SegmentExpansion};
 use singlefs_checker_tier::crash_amplification::{
     checking_threads, plan_crash_points, run_from_environment, CrashFlow, CrashPointRecorder,
-    JudgingCodes,
+    PipelineJudgingCode,
 };
 use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
@@ -241,13 +241,12 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
         .join("../..")
         .canonicalize()
         .expect("仓根");
-    let judging = JudgingCodes::of_the_flow(
+    let judging = PipelineJudgingCode::of_the_judges(
         &root,
-        &flow,
         &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),
     )
     .expect("判法摘要");
-    let plan = plan_crash_points(&flow, &judging);
+    let plan = plan_crash_points(&flow);
     let state_count = layer0_plan_state_count(&base, &writes, &segments, &expansion);
     assert_eq!(plan.points.last().expect("有点").ordinals.end, state_count);
     let overwrite_points: Vec<usize> = plan
@@ -281,12 +280,38 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
                 std::process::id()
             ));
             std::env::set_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY", &directory);
+            std::env::set_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY", "1");
             Some(TemporaryStore { directory })
         }
     };
     let checking_started = Instant::now();
     let run = run_from_environment(&flow, &judging, &root).expect("按环境跑得完");
     let checking_seconds = checking_started.elapsed().as_secs_f64();
+    if run.placement_only {
+        // 只排派活计划的那一趟一块都没判：不断言、不打汇总行
+        drop(library_guard);
+        return;
+    }
+    if run.stopped_early {
+        // 被叫停的那一趟：判过的块在库里、第 ②③ 段没做；只报判了多少，不断言对账
+        println!(
+            "CRASH_AMPLIFICATION mode={} share={}/{} states={state_count} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} stopped_early=true",
+            run.mode.name(),
+            run.share.index,
+            run.share.count,
+            run.checking.states_checked,
+            run.checking.blocks_checked,
+            run.unjudged_blocks,
+            run.checking.red_states
+        );
+        assert_eq!(
+            run.checking.red_states, 0,
+            "健康的固定脚本一个红状态都不该有：{:?}",
+            run.checking.red_texts
+        );
+        drop(library_guard);
+        return;
+    }
     assert_eq!(
         run.recording.states_recorded + run.recording.states_already_judged,
         state_count,
@@ -307,10 +332,15 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
         assert!(run.violations.is_empty());
     }
     if run.share.count == 1 {
-        assert_eq!(run.checking.states_checked, state_count, "每个状态都核了");
+        // 库里这一判法版本已经判过的块复用、不重核（续跑）：这一趟核的是它录下来还没判的那些
+        assert_eq!(
+            run.checking.states_checked, run.recording.states_recorded,
+            "这一趟录下来要判的状态都核了"
+        );
         let second = run_from_environment(&flow, &judging, &root).expect("第二趟跑得完");
         assert_eq!(
-            second.recording.blocks_already_judged, run.recording.blocks_recorded,
+            second.recording.blocks_already_judged,
+            run.recording.blocks_recorded + run.recording.blocks_already_judged,
             "第二趟全部复用"
         );
         assert_eq!(second.checking.blocks_checked, 0, "复用的块不再核");
@@ -322,10 +352,13 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
             "核对红而判器绿：{:?}",
             comparison.disagreement_samples
         );
-        assert_eq!(
-            comparison.blocks_without_verifier, 0,
-            "这台领的块第 ② 段都核过"
-        );
+        // 两台各跑一份、还没导入对方的库时，本机库里有对方那份的块（本机先判着的那一段判的），它们归对方核，这时不判
+        if run.share.count == 1 || imported {
+            assert_eq!(
+                comparison.blocks_without_verifier, 0,
+                "判过的块第 ② 段都核过"
+            );
+        }
     }
     let verifier_line = match (&run.verification, &run.comparison) {
         (Some(outcome), Some(comparison)) => format!(
@@ -340,12 +373,13 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
         ),
         _ => " verifier=none".to_string(),
     };
+    let gpu_judge_line = common_crash_points::judge_fields_of_the_summary_line(&run);
     drop(library_guard);
     for line in &run.coverage_lines {
         println!("CRASH_AMPLIFICATION_POINT {line}");
     }
     println!(
-        "CRASH_AMPLIFICATION mode={} share={}/{} cards={} states={state_count} states_checked_here={} blocks_checked_here={} imported_blocks={} unjudged_blocks={} red={} threads={} expand_up_to={limit} checking_seconds={checking_seconds:.1} states_per_second={:.0} total_seconds={:.1} exhaustive={exhaustive}{verifier_line}",
+        "CRASH_AMPLIFICATION mode={} share={}/{} cards={} states={state_count} states_checked_here={} blocks_checked_here={} imported_blocks={} unjudged_blocks={} red={} threads={} judge_version={} expand_up_to={limit} checking_seconds={checking_seconds:.1} states_per_second={:.0} total_seconds={:.1} exhaustive={exhaustive}{verifier_line}{gpu_judge_line}",
         run.mode.name(),
         run.share.index,
         run.share.count,
@@ -356,6 +390,12 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
         run.unjudged_blocks,
         run.checking.red_states,
         checking_threads(),
+        run.judge_version
+            .0
+            .iter()
+            .take(8)
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>(),
         f64::from(u32::try_from(run.checking.states_checked).expect("装得进 u32")) / checking_seconds.max(0.001),
         started.elapsed().as_secs_f64()
     );

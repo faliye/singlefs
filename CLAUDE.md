@@ -5,7 +5,7 @@
 **并行agent治理与上游sop治理**
 agent治理与上游sop治理，是另外一个重要的任务。因此遇到问题优先从流程、规范和门禁等方面着手解决问题，目的不是改一行代码，而是避免再发。
 
-当前里程碑：**「覆盖写、释放、回退与复用」**（`.claude/kb/milestone/02-second-txn.md`，做到哪一步看那份文件）。收尾九步（`records/2026-09-24-里程碑二收尾调度.md`）做到第 9 步；崩溃放量（增补 4：身份、KV、双机、GPU 核对、前缀共享、三段流）已接进 `crates/singlefs-checker-tier`，固定脚本到 D 全域 51 773 558 态零违例，到 E 全域在跑。上一个里程碑「新池新建文件」（`.claude/kb/milestone/01-first-txn.md`）的出口已经满足，代码在 `crates/` 下五个 crate（格式常量、核心、池级 checker、harness 档、checker 档；两档怎么分见 `.claude/rules/verification.md`）。
+当前里程碑：**「覆盖写、释放、回退与复用」**（`.claude/kb/milestone/02-second-txn.md`，做到哪一步看那份文件）收尾中，与它并行开的是**「删除与多次 COW」**（`.claude/kb/milestone/03-third-txn.md`，作业点、验收与次序在那份文件；用户 2026-09-28 定并行开工，同日定今天只写文档不开工）。收尾九步（`records/2026-09-24-里程碑二收尾调度.md`）做到第 9 步；崩溃放量（增补 4：身份、KV、双机、GPU 核对、前缀共享、三段流）已接进 `crates/singlefs-checker-tier`，判器整套上了 GPU，展开 28 全枚举六个分项 26.15 亿态零违例（到 E 全域 1 662 648 564 态），σ 那一项 GPU 判器一个落点 32 次写的容量不够、没判。上一个里程碑「新池新建文件」（`.claude/kb/milestone/01-first-txn.md`）的出口已经满足，代码在 `crates/` 下五个 crate（格式常量、核心、池级 checker、harness 档、checker 档；两档怎么分见 `.claude/rules/verification.md`）。
 
 ## 任务从哪进
 
@@ -23,29 +23,28 @@ subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案
 
 ## 规则（始终生效）
 
-@.claude/singlefs-ai-sop/rules/engineering-philosophy.md
 @.claude/singlefs-ai-sop/rules/sop-first.md
 @.claude/singlefs-ai-sop/rules/show-me-test.md
-@.claude/singlefs-ai-sop/rules/machine-first.md
 @.claude/singlefs-ai-sop/rules/code-discipline.md
 @.claude/singlefs-ai-sop/rules/writing-discipline.md
 @.claude/singlefs-ai-sop/rules/rules-discipline.md
-@.claude/singlefs-ai-sop/rules/design-doc-discipline.md
 @.claude/singlefs-ai-sop/rules/kb-discipline.md
 @.claude/singlefs-ai-sop/rules/test-discipline.md
 @.claude/singlefs-ai-sop/rules/evidence-discipline.md
 @.claude/singlefs-ai-sop/rules/verify-before-claiming.md
-@.claude/singlefs-ai-sop/rules/pushback-discipline.md
 @.claude/singlefs-ai-sop/rules/command-safety.md
 @.claude/singlefs-ai-sop/rules/session-wrapup.md
 @.claude/singlefs-ai-sop/rules/preflight-discipline.md
+
+四篇理念类规则不 `@` 常驻，开会话先整份读一次、之后按名字回查：`.claude/singlefs-ai-sop/rules/engineering-philosophy.md`、`.claude/singlefs-ai-sop/rules/machine-first.md`、`.claude/singlefs-ai-sop/rules/design-doc-discipline.md`、`.claude/singlefs-ai-sop/rules/pushback-discipline.md`。
+<!-- doc-lint:read-once engineering-philosophy.md machine-first.md design-doc-discipline.md pushback-discipline.md -->
 
 ## 规范从哪来
 
 | 项 | 值 |
 |---|---|
 | 上游仓 | `singlefs-ai-sop`，在本机兄弟目录 `../singlefs-ai-sop-zh`。同一份规范有多语言版本，**对外以 `-en` 为准**；本项目只接其中一份，不需要知道别的 |
-| 项目里的副本 | `.claude/singlefs-ai-sop/`（[README](.claude/singlefs-ai-sop/README.md)），是**拷贝，不是符号链接**；与上游同步靠重新拷贝一份：`rsync -a --exclude '.git' ../singlefs-ai-sop-zh/ .claude/singlefs-ai-sop/`，拷完 `diff -rq --exclude=.git ../singlefs-ai-sop-zh .claude/singlefs-ai-sop` 确认一致再刷版本戳（`cp -r` 会把上游的 `.git` 一起拷进副本，第二次同步时那些只读 object 报一屏 Permission denied） |
+| 项目里的副本 | `.claude/singlefs-ai-sop/`（[README](.claude/singlefs-ai-sop/README.md)），是**拷贝，不是符号链接**；与上游同步靠重新拷贝一份：`rsync -a --exclude '.git' --exclude CLAUDE.md ../singlefs-ai-sop-zh/ .claude/singlefs-ai-sop/`，拷完 `diff -rq --exclude=.git --exclude=CLAUDE.md ../singlefs-ai-sop-zh .claude/singlefs-ai-sop` 确认一致再刷版本戳；副本不带上游的 `CLAUDE.md`：它是给在上游仓里干活的人读的，留在副本里会被当成目录级 CLAUDE.md，子 agent 一读副本里的规则就被整份注入（`cp -r` 会把上游的 `.git` 一起拷进副本，第二次同步时那些只读 object 报一屏 Permission denied） |
 | 版本戳 | `.singlefs-ai-sop-version`。门禁第一阶段拿它跟副本的 `VERSION` 比，对不上就红——那是在提醒「规矩变过了，先读再跑」 |
 | 怎么改 | 共享规则只能在**上游**改。从本仓的会话改上游**只往文件里填内容**（规则正文、脚本逻辑、三语译文那几行）：不跑 `bump.sh`、不动 `VERSION`、不改 MANIFEST / SOURCE-MANIFEST 与译文首行的溯源哈希、不写带版本号的 CHANGELOG 条目、不提交，这些归做发版的会话；填之前先看上游三语仓 `git status`，有人在发版就等它提交完，填完告诉发版会话填了哪些文件哪几段。发版之后同步副本、跑 `bash .claude/singlefs-ai-sop/install.sh` 刷版本戳。**不许在 `.claude/singlefs-ai-sop/` 里就地改**——下次同步就没了，而且改它们等于改所有项目。上游的改动应当罕见：经常变说明规范本身没设计好；**作业在本仓，不在上游仓** |
 
@@ -79,7 +78,7 @@ subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案
 | `.claude/kb/feature-bits.md` | feature bit 的记账表（位号 / 类别 / 名称 / 引入版本 / 引入 commit / 状态 / 语义一句话），形态由 D15（格式冻结政策） 已定项 10 定。**位号的唯一登记位不在这里**，在 D15（格式冻结政策） 已定项 4 那张表；门禁 code-source-discipline 的 feature-bits 格判两处逐位一致 |
 | `.claude/kb/term-renames.md` | 全仓术语改名的登记表，一行一条（旧名 / 新名 / 匹配），门禁 doc-text 的 term-renames 格按它查全仓不再出现旧名；怎么改名见 `.claude/rules/path-moves.md`「改一个全仓术语」 |
 | `.claude/kb/freeze-layer-membership.md` | 冻结层归属登记表：一行一个结构，写它落 D15（格式冻结政策） 已定项 7 的哪一层或哪个独立冻结组件、态别、退不退出冻结、依据哪条分项；门禁 doc-decisions 的 freeze-layer-membership 格按它判三条（每层、每棵树、每个单元类都有行；写「退出」的必须是派生态；依据点名的分项存在且已定）。态别判得对不对门禁管不了 |
-| `.claude/kb/tooling.md` | 本机工具与模型的事实（本地腿用哪个模型、网关怎么调、量化到几位、中文为什么会退化性复读） |
+| `.claude/kb/tooling.md` | 本机工具与模型的事实（本地模型是哪个、网关怎么调、量化到几位、中文为什么会退化性复读；三方论证不再派它当腿） |
 | `.claude/kb/INDEX.md` | kb 的导航表，本身不放事实；它是唯一不留「## 历史版本」节的 kb 文件（`kb-discipline.md` 第 8 条显式豁免） |
 | `.claude/kb/prior-art.md` | 他家方案调研，含来源与口径 |
 | `.claude/kb/pitfalls.md` | 避坑清单，每做设计决定回来对一遍 |

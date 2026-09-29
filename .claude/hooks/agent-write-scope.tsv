@@ -31,3 +31,10 @@ tooling-writer	.claude/agent-common.md	tooling-writer.md「写范围」第二种
 tooling-writer	.claude/main-agent.md	tooling-writer.md「写范围」第二种活
 tooling-writer	.claude/rules/*.md	tooling-writer.md「写范围」第二种活
 tooling-writer	/tmp/claude-1000/**	报告文件与草稿目录
+investigator	crates/**	investigator.md「写范围」：派发提示写「查到就修」时在主工作区改
+investigator	crates/mutations.tsv	investigator.md「写范围」：查到就修时追加变异行
+investigator	/tmp/claude-1000/**	报告文件与草稿目录
+clerk	records/**	clerk.md「写范围」：一次性的活常写的地方
+clerk	research/prompts/**	clerk.md「写范围」：事实表、拷进仓的证据
+clerk	research/results/**	clerk.md「写范围」：拷进仓的产物
+clerk	/tmp/claude-1000/**	报告文件与草稿目录

@@ -23,10 +23,9 @@ use singlefs_core::recovery::PoolReader;
 use singlefs_format::{DATA_UNIT_BYTES, NODE_BYTES, ROOT_RECORD_BYTES, SLOT_BYTES};
 use singlefs_harness::memory_pool::{MemoryPool, RetainedWrite};
 use singlefs_harness::segments::StepKind;
-use singlefs_harness::sha256::sha256_digest;
+use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 
 use crate::crash::{layer0_enumeration_tables, Layer0EnumerationTables, Layer0SegmentExpansion};
-use crate::crash_identity::SHA256_BYTES;
 
 /// 事实抽取器的版本：解析规则变了就抬它，事实表的键跟着变。
 pub const FACTS_EXTRACTOR_VERSION: u32 = 1;
@@ -311,7 +310,7 @@ fn base_roots(base: &MemoryPool) -> Vec<RootFact> {
 impl FlowFacts {
     /// 事实表的摘要（连同抽取器版本）：进 KV 键。
     #[must_use]
-    pub fn digest(&self) -> [u8; SHA256_BYTES] {
+    pub fn digest(&self) -> [u8; DIGEST_BYTES] {
         let mut message = FACTS_EXTRACTOR_VERSION.to_le_bytes().to_vec();
         message.extend_from_slice(&self.to_bytes());
         sha256_digest(&message)
@@ -332,50 +331,15 @@ impl FlowFacts {
     /// 序号越过状态总数。
     #[must_use]
     pub fn persisted_writes_of_state(&self, ordinal: u64) -> Vec<bool> {
-        assert!(
-            ordinal < self.state_count,
-            "序号 {ordinal} 越过状态总数 {}",
-            self.state_count
-        );
-        let recorded = usize::try_from(self.recorded_write_count).expect("装得进 usize");
-        let enumerated = usize::try_from(self.enumerated_write_count).expect("装得进 usize");
-        // 0 没持久、1 撕裂、2 持久
-        let mut landings = vec![0u8; recorded];
-        let segment_of_state = self.segment_of_state(ordinal);
-        for segment in &self.segments[..segment_of_state] {
-            for write in &segment.writes {
-                landings[*write as usize] = 2;
-            }
-        }
-        if let Some(segment) = self.segments.get(segment_of_state) {
-            let mut remaining = ordinal - segment.states.start;
-            for write in &segment.writes {
-                let index = *write as usize;
-                let choices = if self.is_tearable[index] { 3 } else { 2 };
-                let digit = remaining % choices;
-                remaining /= choices;
-                landings[index] = match (choices, digit) {
-                    (2, 0) | (3, 0) => 0,
-                    (2, 1) | (3, 2) => 2,
-                    (3, 1) => 1,
-                    _ => unreachable!("数字不超过态数"),
-                };
-            }
-            assert_eq!(remaining, 0, "段内序号超出这几次写的组合数");
-        }
-        let mut persisted = vec![false; enumerated];
-        for (index, landing) in landings.iter().enumerate() {
-            persisted[index] = *landing == 2;
-        }
-        for torn in &self.torn_images {
-            if landings[torn.write_index as usize] == 1 {
-                persisted[torn.torn_image_index as usize] = true;
-                for (replay_index, replayed) in &torn.replays {
-                    persisted[*replay_index as usize] = landings[*replayed as usize] == 2;
-                }
-            }
-        }
-        persisted
+        persisted_writes_of_state(
+            usize::try_from(self.recorded_write_count).expect("装得进 usize"),
+            usize::try_from(self.enumerated_write_count).expect("装得进 usize"),
+            &self.is_tearable,
+            &self.torn_images,
+            &self.segments,
+            self.state_count,
+            ordinal,
+        )
     }
 
     /// 序列化：全部小端定宽，字段次序就是 [`Self::from_bytes`] 读的次序。
@@ -554,6 +518,65 @@ impl FlowFacts {
             newest_base_root,
         })
     }
+}
+
+/// 序号 → 持久掩码，按枚举写表给（事实表与 GPU 判器的输入表共用这一份；层 0 的 `Layer0StatePlan::persisted_writes_of_state`
+/// 是同一套数字次序：两态的写数字 0 / 1 = 没持久 / 持久，三态的写 0 / 1 / 2 = 没持久 / 撕裂 / 持久；撕裂那一态记成原写没持久、
+/// 撕裂镜像持久，撕裂镜像之后的重放跟着被重放的那次写落不落）。
+///
+/// # Panics
+/// 序号越过状态总数。
+#[must_use]
+pub fn persisted_writes_of_state(
+    recorded_write_count: usize,
+    enumerated_write_count: usize,
+    is_tearable: &[bool],
+    torn_images: &[TornImageFact],
+    segments: &[SegmentFact],
+    state_count: u64,
+    ordinal: u64,
+) -> Vec<bool> {
+    assert!(
+        ordinal < state_count,
+        "序号 {ordinal} 越过状态总数 {state_count}"
+    );
+    // 0 没持久、1 撕裂、2 持久
+    let mut landings = vec![0u8; recorded_write_count];
+    let segment_of_state = segments.partition_point(|segment| segment.states.end <= ordinal);
+    for segment in &segments[..segment_of_state] {
+        for write in &segment.writes {
+            landings[*write as usize] = 2;
+        }
+    }
+    if let Some(segment) = segments.get(segment_of_state) {
+        let mut remaining = ordinal - segment.states.start;
+        for write in &segment.writes {
+            let index = *write as usize;
+            let choices = if is_tearable[index] { 3 } else { 2 };
+            let digit = remaining % choices;
+            remaining /= choices;
+            landings[index] = match (choices, digit) {
+                (2, 0) | (3, 0) => 0,
+                (2, 1) | (3, 2) => 2,
+                (3, 1) => 1,
+                _ => unreachable!("数字不超过态数"),
+            };
+        }
+        assert_eq!(remaining, 0, "段内序号超出这几次写的组合数");
+    }
+    let mut persisted = vec![false; enumerated_write_count];
+    for (index, landing) in landings.iter().enumerate() {
+        persisted[index] = *landing == 2;
+    }
+    for torn in torn_images {
+        if landings[torn.write_index as usize] == 1 {
+            persisted[torn.torn_image_index as usize] = true;
+            for (replay_index, replayed) in &torn.replays {
+                persisted[*replay_index as usize] = landings[*replayed as usize] == 2;
+            }
+        }
+    }
+    persisted
 }
 
 struct Cursor<'bytes> {
@@ -752,7 +775,7 @@ mod tests {
             None,
             "少一个字节认不回"
         );
-        assert_ne!(facts.digest(), [0u8; SHA256_BYTES]);
+        assert_ne!(facts.digest(), [0u8; DIGEST_BYTES]);
     }
 
     #[test]

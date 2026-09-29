@@ -1,3 +1,0 @@
-exit=0
-want=现状行与索引表一致：查了决策 2 节、实验 1 节
-want=doc-decisions.sh：3 格里 2 格绿（shape status-sync），1 格本次未跑（entry-added）

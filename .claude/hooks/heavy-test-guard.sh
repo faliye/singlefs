@@ -1022,7 +1022,7 @@ def selftest(hook_dir):
             ("实现员 ./ 直接执行没扩展名、#! 指到 bash 的脚本：读进去照拒", writer, "./runner", 2, 0, 1),
             ("实现员 ./ 直接执行 .py 名字、#! 指到 sh 的脚本：读进去照拒", writer, "./mislabeled.py", 2, 0, 1),
             ("实现员 bash 起 .rs 文件：显式交给 shell 的照读，里面反引号括着的 .rs 不再读", writer, "bash crates/singlefs-checker/src/walk.rs", 2, 0, 1),
-            ("实现员复现输入那一条（反引号里的 walk.rs）：末尾的 doc-lint.sh 是提交时才跑的检查、拒，不记检出，只读 doc-lint.sh", writer, SLOW_REPRODUCTION_COMMAND, 2, 0, 1),
+            ("实现员复现输入那一条（反引号里的 walk.rs）：末尾的 doc-lint.sh 是提交时才跑的检查、读它之前就拒，不记检出，一份脚本都不读", writer, SLOW_REPRODUCTION_COMMAND, 2, 0, 0),
             # 同一份脚本一次判定里只读一遍、只判一遍；换了当前目录、前缀的值、写出的内容，或那一遍撞上嵌套上限的，重判
             ("实现员同一条命令里起含 --all 的 s.sh 两遍：只判一遍", writer, "bash s.sh; ./s.sh", 2, 0, 1),
             ("实现员起的脚本里三种起法各起一遍 s.sh：s.sh 只判一遍", writer, "bash twice.sh", 2, 0, 2),

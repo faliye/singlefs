@@ -1,6 +1,7 @@
 //! 崩溃放量共用的流程步骤。几个测试文件调这里的同一个函数，就得到同一个身份、同一串路径段：前缀节点在库里只核一次，
 //! 别的流直接复用（用户 2026-09-28 定：前缀共享是剪枝的基础，没有它每次放量都从头核）。
-//! 崩溃点的文件是这一份（`file!()`），不是调它的测试文件；判法代码也按这一份的闭包取，改调用方的测试文件不动这里的节点。
+//! 崩溃点的文件是这一份（`file!()`），不是调它的测试文件：改调用方的测试文件不动这里的节点。判法摘要与设点的文件无关，
+//! 只随两个判器的闭包变（`crash_identity::JUDGE_ENTRY_FILES`）。
 #![allow(
     dead_code,
     reason = "共用的步骤模块：每个测试文件只调其中几步，没调的在那个测试二进制里就是没用到"
@@ -148,4 +149,172 @@ pub fn unmount_step(
             }
         }
     })
+}
+
+/// 一条已经录好的流（起点镜像、写表、段、被判的根槽写、版本表、崩溃点）按环境跑一趟崩溃放量：展开上限从
+/// `SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO` 取（没设用 `default_expand_up_to`），库目录从 `SINGLEFS_CRASH_AMPLIFICATION_LIBRARY` 取
+/// （没设建在临时目录、跑完删），判法摘要取两个判器的闭包；健康的流一个红状态都不该有。只排派活计划的那一趟（`placement_only`）不判，原样交回。
+/// 打一行 `CRASH_AMPLIFICATION flow=<名> …`，交回这一趟的结果。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "一条流的七样各自独立，收成一个结构体只是把七个字段挪个地方"
+)]
+pub fn amplify_prepared_flow(
+    flow_name: &str,
+    base: &singlefs_harness::memory_pool::MemoryPool,
+    writes: &[singlefs_harness::memory_pool::RetainedWrite],
+    segments: &[Vec<usize>],
+    judged_root_index: usize,
+    versions: &[singlefs_harness::memory_pool::PublishedVersion],
+    crash_points: Vec<singlefs_checker_tier::crash_amplification::CrashPointSpan>,
+    default_expand_up_to: usize,
+) -> singlefs_checker_tier::crash_amplification::EnvironmentRun {
+    use singlefs_checker_tier::crash::Layer0SegmentExpansion;
+    use singlefs_checker_tier::crash_amplification::{
+        run_from_environment, CrashFlow, PipelineJudgingCode,
+    };
+    use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
+    let limit: usize = std::env::var("SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO")
+        .ok()
+        .and_then(|text| text.parse().ok())
+        .unwrap_or(default_expand_up_to);
+    let exhaustive = segments.iter().all(|segment| segment.len() <= limit);
+    let expansion = move |_segment_index: usize, segment: &[usize]| {
+        if segment.len() <= limit {
+            Layer0SegmentExpansion::EveryProperSubset
+        } else {
+            Layer0SegmentExpansion::NotExpanded
+        }
+    };
+    let flow = CrashFlow {
+        base,
+        writes,
+        segments,
+        judged_root_index,
+        versions,
+        expansion: &expansion,
+        crash_points,
+    };
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .expect("仓根");
+    let judging = PipelineJudgingCode::of_the_judges(
+        &root,
+        &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),
+    )
+    .expect("判法摘要");
+    let temporary_library = match std::env::var_os("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY") {
+        Some(_) => None,
+        None => {
+            let directory = std::env::temp_dir().join(format!(
+                "singlefs-crash-amplification-{flow_name}-{}",
+                std::process::id()
+            ));
+            std::env::set_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY", &directory);
+            std::env::set_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY", "1");
+            Some(directory)
+        }
+    };
+    let started = std::time::Instant::now();
+    let run = run_from_environment(&flow, &judging, &root).expect("按环境跑得完");
+    let seconds = started.elapsed().as_secs_f64();
+    if let Some(directory) = &temporary_library {
+        std::env::remove_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY");
+        std::env::remove_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY");
+        let _ = std::fs::remove_dir_all(directory);
+    }
+    if run.placement_only {
+        return run;
+    }
+    if run.stopped_early {
+        // 被叫停的那一趟：判过的块在库里、第 ②③ 段没做；只报判了多少，不断言对账
+        println!(
+            "CRASH_AMPLIFICATION flow={flow_name} mode={} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} stopped_early=true",
+            run.mode.name(),
+            run.checking.states_checked,
+            run.checking.blocks_checked,
+            run.unjudged_blocks,
+            run.checking.red_states
+        );
+        assert_eq!(
+            run.checking.red_states, 0,
+            "健康的流 {flow_name} 一个红状态都不该有：{:?}",
+            run.checking.red_texts
+        );
+        return run;
+    }
+    let judge_line = judge_fields_of_the_summary_line(&run);
+    let judge_version: String = run
+        .judge_version
+        .0
+        .iter()
+        .take(8)
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    println!(
+        "CRASH_AMPLIFICATION flow={flow_name} mode={} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} violations_in_the_library={} judge_version={judge_version} expand_up_to={limit} exhaustive={exhaustive} seconds={seconds:.1}{judge_line}",
+        run.mode.name(),
+        run.checking.states_checked,
+        run.checking.blocks_checked,
+        run.unjudged_blocks,
+        run.checking.red_states,
+        run.violations.len()
+    );
+    assert_eq!(
+        run.checking.red_states, 0,
+        "健康的流 {flow_name} 一个红状态都不该有：{:?}",
+        run.checking.red_texts
+    );
+    // 这一趟复用的块（库里这一判法版本早先判过的）判红过也要红：只看这一趟判出的红数，红过一次的流再跑一遍就成了绿
+    if run.unjudged_blocks == 0 {
+        assert!(
+            run.violations.is_empty(),
+            "健康的流 {flow_name}：库里这条流的块有 {} 个红状态（含早先判过、这一趟复用的），前几个：{:?}",
+            run.violations.len(),
+            run.violations.iter().take(3).collect::<Vec<_>>()
+        );
+    }
+    if let Some(comparison) = &run.comparison {
+        assert_eq!(
+            comparison.disagreements, 0,
+            "流 {flow_name}：核对红而判器绿：{:?}",
+            comparison.disagreement_samples
+        );
+    }
+    run
+}
+
+/// 汇总行里说第 ① 段在哪判的那几个字段：GPU 判的带用了几张卡、判了多少、多快、写库花了多久；CPU 判的只有 `judge=cpu`。
+#[must_use]
+pub fn judge_fields_of_the_summary_line(
+    run: &singlefs_checker_tier::crash_amplification::EnvironmentRun,
+) -> String {
+    match &run.gpu_judge {
+        Some(gpu) => format!(
+            " judge=gpu gpu_cards={} gpu_states={} gpu_compile_seconds={:.1} gpu_judge_seconds={:.1} gpu_states_per_second={:.0} gpu_seconds_storing={:.1}",
+            gpu.cards_used,
+            gpu.states_judged,
+            gpu.compile_seconds,
+            gpu.judge_seconds,
+            gpu.states_per_second(),
+            gpu.seconds_storing
+        ),
+        None => " judge=cpu".to_string(),
+    }
+}
+
+/// 一次录下的整条写表当一个崩溃点（起点镜像不枚举、只录一次发布那几条流）：名字是这条流的名字，设点的文件给 `file!()`。
+pub fn one_crash_point_over_every_write(
+    code_file: &str,
+    name: &str,
+    write_count: usize,
+) -> Vec<singlefs_checker_tier::crash_amplification::CrashPointSpan> {
+    vec![singlefs_checker_tier::crash_amplification::CrashPointSpan {
+        name: name.to_string(),
+        code_file_in_repository:
+            singlefs_checker_tier::crash_amplification::repository_relative_file(code_file),
+        writes: 0..write_count,
+        ignored: false,
+    }]
 }

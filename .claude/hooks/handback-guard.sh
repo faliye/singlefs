@@ -15,7 +15,7 @@
 #      （background_start_in_result、own_background_tasks_still_running），不另抄一份。命令里自己用 `&`、`nohup` 放出去又改了输出去向的进程认不出（与看门狗同一处射程）。
 #      找不到它的会话记录、导入不了 agent-watch.py 就不判这一条，stderr 写一句。
 # 下面三条只判项目子 agent（`.claude/agents/<agent_type>.md` 在的）；主 agent、general-purpose 这类不判：
-#   ① 交回正文超过 HANDBACK_CHARACTER_LIMIT 个字符（按 python 的 len 数，默认 2000）：全文写进报告文件，交回只写结论、报告路径与 sha256；
+#   ① 交回正文超过 HANDBACK_CHARACTER_LIMIT 个字符（按 python 的 len 数，默认 4000；原 2000 时 8 天里拒了 67 次，每次都在最大的上下文上重写整份交回）：全文写进报告文件，交回只写结论、报告路径与 sha256；
 #   ② three-way-forward / three-way-attack / three-way-defense / three-way-verifier：交回里点名的 research/prompts/…-output.md 逐份交给
 #      research/scripts/cite-check.py（--root 项目根，--unchanged-since 取这个子 agent 会话记录第一条的时刻），有对不上的拒；交回里一份报告都没点名也拒；
 #      找不到它的会话记录（认不出开工时刻）就不判这一条，stderr 写一句；
@@ -35,7 +35,7 @@ python3 /dev/fd/3 "$HOOK_DIR" "$@" 3<<'PY'
 import json, os, re, shutil, subprocess, sys, tempfile
 from datetime import datetime, timezone
 
-HANDBACK_CHARACTER_LIMIT = int(os.environ.get("HANDBACK_CHARACTER_LIMIT", "2000"))
+HANDBACK_CHARACTER_LIMIT = int(os.environ.get("HANDBACK_CHARACTER_LIMIT", "4000"))
 CITATION_CHECKED_AGENTS = {"three-way-forward", "three-way-attack", "three-way-defense", "three-way-verifier"}
 GREEN_COUNT_CHECKED_AGENTS = {"kb-scribe", "experiment-runner"}
 LEG_REPORT_MENTION = re.compile(r"research/prompts/[^\s`'\"，。；：、（）()「」]+-output\.md")

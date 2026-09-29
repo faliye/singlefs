@@ -8,10 +8,9 @@
 //! 核对代码的摘要 [`gpu_verifier_digest`] 进核对表的键：着色器改一个字，旧行留着当历史，新行另起。
 use std::ops::Range;
 
-use singlefs_harness::sha256::sha256_digest;
+use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 
 use crate::crash_facts::{FlowFacts, BASE_IMAGE_SOURCE, MAXIMUM_ENUMERATED_WRITES};
-use crate::crash_identity::SHA256_BYTES;
 use crate::gpu_unit_checks::GpuCard;
 
 /// 每个工作组 64 个状态。
@@ -236,7 +235,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
 /// GPU 核对代码的摘要：进核对表的键。
 #[must_use]
-pub fn gpu_verifier_digest() -> [u8; SHA256_BYTES] {
+pub fn gpu_verifier_digest() -> [u8; DIGEST_BYTES] {
     let mut message = b"gpu-facts-verifier-v2\n".to_vec();
     message.extend_from_slice(GPU_VERIFIER_SHADER_SOURCE.as_bytes());
     sha256_digest(&message)

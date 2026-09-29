@@ -23,14 +23,3 @@
 ## E152（按里程碑对比六家文件系统的文件性能） 第三次跑量到的（2026-09-17）
 
 发布 B 在真设备（两块 16 GiB virtio 盘）上 5 轮逐字相同：两盘合计 21 次写调用（来宾块层记 26 次写请求：每道屏障与每次 FUA 各多记一次）、344 576 字节（2 × 172 032 + 根槽 512）、4 次屏障、1 次 FUA，段序列 16+2+1+2，与新池新建文件的 `path=transaction` 同型——产物 `e152-file-system-benchmark-second-transaction-2026-09-17.out` 的 `name=summary` 行，表在 `research/perf-by-milestone.md` 第三·二节。回退、抬 F、复用那几次发布的字节只有层 0 与用例钉着，真设备上没量。
-
-## 历史版本
-
-### 2026-09-26
-- 管理员回退改成挂着时的一次向前发布之后按实现改（D23（journal 的角色与格式） 已定项 14；实三交回，`records/2026-09-24-里程碑二收尾调度.md` 第三节「实三交回」那一行）：「实例表 `kind` 0 行」改前写回退的发布 D（txg 9）写回退行 (1, 3, 0) flags bit0 = 1 与中间实例行 (2, 0, 0)、回退行的 W 恒 0，改后写 D 不写行、实例表照 C 的，flags 第一版恒 0；「复用后改写的分配记录；回退之后新实例的第一条记录接在环里最大 jsn 之后」改名「复用后改写的分配记录；回退那次复活的分配记录」，改前写 E 拿到 50178、回退之后新实例的第一条记录 jsn = 环里最大 + 1（C340（回退之后记录链从哪条之后接没有定义） 取 P2），改后写 E 拿到 50176、D 把 A 的单元的记录改回已分配（分配代写回 3）、D 的记录 jsn 接 C、事务号 0；「系统配置槽的回退见证表第一次有条目」那一行删掉：见证表删了，系统配置字段表之后是补齐 0（D22（单元原子性怎么合成） 已定项 9），它点名的 `file_overwrite_supplement_two_rollback_witness.rs` 随实三删掉。
-- 「根记录的回退下界 F 第一次不为 0」点名的用例改前是 `one_device_carrying_the_floor_alone_does_not_take_effect_on_remount`（实二改名改写、断言翻面），改后点 `raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it` 与 `floor_carried_by_the_system_configuration_takes_effect_on_remount_even_when_one_device_lost_its_root_carrying_it`。
-
-### 2026-09-17
-- 发布 B 真设备那段：改前写「两盘合计 21 次写请求」；改后写 21 次写调用、来宾块层记 26 次写请求。依据：E152（按里程碑对比六家文件系统的文件性能） 实验页「这几个数说明什么（覆盖写、释放、回退与复用，与两盘镜像的六家比）」一节第 5 条的块层差分。
-- 立表：五种形态各指到决策分项、里程碑那一步与钉住它的用例。登记位放哪（另开一份还是并进新池新建文件那份）标预想、等用户定。
-- 用户定案：按里程碑放进 `.claude/kb/layout/` 目录，一个里程碑一份、与 `milestone/` 同号；这份从 `.claude/kb/second-txn-layout.md` 搬到 `.claude/kb/layout/02-second-txn.md`，全仓现行文件里的引用一并改写（`research/prompts/` 下冻结的论证材料不改，里面的旧路径照旧）。

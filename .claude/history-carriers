@@ -1,0 +1,6 @@
+# 哪些 kb 文件带「## 历史版本」节。一行一条 <相对项目根的目录或文件>  # 为什么
+# 只有决策与实验有历史（.claude/rules/changelog-format.md）；没登记的 kb 文件不留历史节，改动直接改正文，经过靠 git。
+# 上游 doc-lint 规则 C 读这张表：登记的必须以「## 历史版本」收尾，没登记的不许有这一节。
+.claude/kb/decisions/  # 决策页：每条决策的历史另有 decisions-history.md 一节，页内留文末一行指过去
+.claude/kb/experiments/  # 实验页：每个实验的历史另有 experiments-history.md 一节，页内留历史节
+.claude/gate.d/fixtures/  # 门禁样本里造的 kb 文件照旧带历史节（样本判的是别的格，不改样本）

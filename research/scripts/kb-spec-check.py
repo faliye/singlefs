@@ -218,8 +218,9 @@ def check_entries(entries, root):
                     problems.append(f"{label}：依据段增删了 E{experiment}，规格里却没有它实验页「### 影响的决策」那一行的改动（门禁 doc-experiments 的 decision-links 格的另一侧）")
         if entry["file"] == ".claude/kb/decisions-history.md" and BROKEN != "no-history":
             new = entry["new"]
-            if not re.search(r"^#{3,4} \S", new, re.M) or "快查·改前：" not in new or "快查·改后：" not in new:
-                problems.append(f"{label}：写变更史要有「### 」或「#### 」标题行与「快查·改前：」「快查·改后：」两行")
+            if (not re.search(r"^(?:### 20\d\d-\d\d-\d\d|- )", new, re.M) or "快查·" in new
+                    or re.search(r"^#### ", new, re.M) or re.search(r"^\*\*现状\*\*：", new, re.M)):
+                problems.append(f"{label}：写变更史要有「### 日期」行或顶格「- 」变更项，不写「#### 」子条目、快查两行与现状行（.claude/rules/changelog-format.md）")
     return problems
 
 
@@ -277,9 +278,10 @@ def selftest():
             ("依据段加实验号带了配对", [entry(".claude/kb/decisions/03-空间分配.md", "**依据**：E10（样本实验） 证明了 x。",
                                                "**依据**：E10（样本实验） 证明了 x；E11（另一实验） 证明了 y。"),
                                          entry(".claude/kb/experiments/11-另一实验.md", "### 影响的决策\n", "### 影响的决策\n| D3（空间分配） 已定项 1 | 支撑 | 2026-09-26 改了 |\n")], 0),
-            ("变更史缺快查", [entry(".claude/kb/decisions-history.md", "锚点行", "锚点行\n\n### 2026-09-26\n\n#### 已定项 1：样本\n")], 1),
-            ("变更史带快查", [entry(".claude/kb/decisions-history.md", "锚点行",
-                                    "锚点行\n\n### 2026-09-26\n\n#### 已定项 1：样本\n\n> 快查·改前：甲。\n>\n> 快查·改后：乙。\n")], 0),
+            ("变更史用旧形态", [entry(".claude/kb/decisions-history.md", "锚点行",
+                                      "锚点行\n\n### 2026-09-26\n\n#### 已定项 1：样本\n\n> 快查·改前：甲。\n>\n> 快查·改后：乙。\n")], 1),
+            ("变更史新形态", [entry(".claude/kb/decisions-history.md", "锚点行",
+                                    "锚点行\n\n### 2026-09-26\n\n- 已定项 1：样本\n  - **结论**：乙。\n")], 0),
         ]
         failures = []
         for label, entries, want in cases:
@@ -296,7 +298,7 @@ def selftest():
         if failures:
             print("  → 看 check_entries() / reference_problems() / pointer_problems() / parse_markdown_spec() 的判法；KB_SPEC_CHECK_BREAK 设着的话这里本来就该红")
             return 1
-        print(f"  ✓ kb-spec-check 自检通过：旧串次数、编号简称、段名撞登记、位置与时间指代、依据配对、变更史快查各有红绿样本，markdown 规格认得出（{len(cases) + 1} 种）")
+        print(f"  ✓ kb-spec-check 自检通过：旧串次数、编号简称、段名撞登记、位置与时间指代、依据配对、变更史形态各有红绿样本，markdown 规格认得出（{len(cases) + 1} 种）")
         return 0
     finally:
         import shutil

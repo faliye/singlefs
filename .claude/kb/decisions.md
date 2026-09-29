@@ -465,7 +465,3 @@ bash .claude/gate.d/doc-decisions.sh --check decision-items-sync           # 只
   - 3. 实例切换的预留 —— 已定
   - 4. checkpoint 保留池进准入 —— 已定
 <!-- gen:decision-items:end -->
-
-## 历史版本
-
-decisions.md 与全部决策的变更史，原文按决策分节住在 [decisions-history.md](decisions-history.md)，组织形态见 `.claude/rules/changelog-format.md`；各决策正文文末只放指路。

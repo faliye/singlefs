@@ -182,6 +182,9 @@ FRESH_POOL_CALL = re.compile(r"\b(?:build_pool\w*|build_through_\w+|format_pool)
 TIER_MODULES = ["crash", "layer0_progress", "crash_injection", "bad_disk_input", "device_log", "on_device_modes", "crash_identity", "crash_amplification", "verdict_store", "gpu_unit_checks",
     "crash_facts",
     "crash_verify_gpu",
+    "crash_judge_tables",
+    "crash_judge_gpu",
+    "crash_judge_dispatch",
 ]
 MODULE_DECLARATION = re.compile(r"^//! checker 档模块：(.+)$")
 # 按里程碑、步号、增补号、并行线号、欠账号起的测试文件名：名字说的是它在哪一步写出来的，不是它测什么

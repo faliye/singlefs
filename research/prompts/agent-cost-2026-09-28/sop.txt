@@ -1,0 +1,54 @@
+# sop.py 口径：2026-09-20 起的会话记录；副本 .claude/singlefs-ai-sop，VERSION 0.0.61
+
+## 体量
+上游规则 16 篇 119461 字节；项目本地规则 9 篇 104830 字节
+上游脚本 34 份；门禁格 98 个在 15 道里；样本文件 1184 份
+带准入声明的脚本 83 ；preflight-exclude 登记 189
+上游仓 2026-09-20 起提交 8 次；CHANGELOG 里提误报 / 误判 / 漏判的条目 17
+
+## 规则被谁读（U 上游、L 本地）
+rule                          bytes sub reads sub agents main reads in prompts
+U code-discipline             26382       413        195          8         24
+U command-safety              10538       158         95         28         46
+U design-doc-discipline        1966         2          1         10          1
+U engineering-philosophy       3022         0          0          2          0
+U evidence-discipline         12466       751        409         86         43
+U kb-discipline                7335       247        162         15         19
+U machine-first                4704         1          1          0          0
+U preflight-discipline         7276        70         51         21          7
+U pushback-discipline          3450         7          3          2          1
+U rules-discipline             5128        89         35         34         11
+U session-wrapup               6175        48         17          9         16
+U show-me-test                 8896       489        231         68         58
+U sop-first                    5073       120         63         18         84
+U test-discipline              7472       267        126         45         40
+U verify-before-claiming       3174       106         69          3          1
+U writing-discipline           6404       131         93         13         12
+L changelog-format             4689        56         20         23         13
+L format-evolution            10801       463        221        102         64
+L fs-design                   15397       477        216         86         30
+L implementation-first         2276       476        238         23          7
+L implementation-workflow     13705       584        165        215         93
+L mutation-sampling            9368       327        123         73         44
+L path-moves                   9090       186         64        113         48
+L three-way-inference         24026       801        404        191         52
+L verification                15478       177         46        103        445
+
+## lint 与门禁脚本的真正调用与判红（不算读源码）
+tool                   main runs  main ✗  sub runs  sub ✗
+doc-lint.sh                  791     295       507    201
+gate.sh                      108      20       397     12
+gate-staged.sh                10       2        12      4
+check.sh                      16       0       140     33
+gate-lint.sh                 101      35       132     44
+shell-lint.sh                 70      44        29      5
+rules-lint.sh                102      37        36      4
+stage-selftest.sh            144      44       149     49
+naming-lint.sh                51      19       248     65
+preflight-lint.py             32      15        18     12
+gate-overlap.py                8       1       108     24
+hooks-registered.sh            4       0        16      3
+show-me-test.sh                3       0         1      0
+version-discipline.sh          5       0         4      2
+doc-lint 的 ✗ 行按种类: [('编号或简称', 1086), ('其他', 270), ('指代或自称', 138), ('文风', 21), ('历史节', 7)]
+准入不满足（退出码 78）出现 74 次；带 --force 的调用 161 次

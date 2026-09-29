@@ -27,6 +27,7 @@
 #      取回目录：${MULTI_HOST_RUN_FETCH_DIRECTORY:-${TMPDIR:-/tmp}/singlefs-multi-host-run/<标签>}，路径在里面照原样；已有东西就拒（退 2）。
 #   ⑦ 删第二台这一趟的树与 .pid / .exit / .log；④ 之后在哪一步失败退出，这一步都挂在 EXIT 上照做。
 # 收到 TERM / INT / HUP（退 143 / 130 / 129）：先停那条命令——本机的从它的进程号起、第二台的从它在第二台上记下的进程号起（peer_host_stop_detached），
+#   第二台的停下之后先取回 --fetch 点名的路径（写到一半的产物不随树一起丢），
 #   连同全部后代冻住、从最底层起 TERM、放开，至多等 30 秒，还在的 KILL——再删第二台这一趟的树，做完才退。
 # 退出码：那条命令的退出码（250–254 是内存包装自己的结局，含义见 run-with-memory-cap.sh 文件头「退出码」，那一次的输出不算结果）；
 #   2 用法错（命令一行都没跑）；255 这个脚本自己没跑成（配置、工具链、拷树、起不来、等不到结局，或命令退 0 而点名取回的路径不在）。
@@ -130,6 +131,8 @@ multi_host_stop_and_exit() { # <信号名> <退出码>：先停那条命令，�
       echo "  ✗ 第二台那条命令没停下：$stop_output" >&2
       echo "     → 怎么办：到第二台 runs/$run_label.pid 里的进程号，连同后代逐个 python3 .claude/singlefs-ai-sop/scripts/proc.py stop <进程号>" >&2
     fi
+    # 停下之后先把 --fetch 点名的路径取回来再删树：那条命令写到一半的产物（崩溃放量判到一半的库）不随树一起丢
+    if (( peer_run_pending )) && (( ${#fetch_paths[@]} > 0 )); then multi_host_fetch; fi
   fi
   exit "$2"
 }

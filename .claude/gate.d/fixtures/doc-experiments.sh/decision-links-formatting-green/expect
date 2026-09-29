@@ -1,0 +1,4 @@
+exit=0
+want=这次改动触发回看 0 处
+want=只删同日日期、只并同日小节的改动 1 份不算正文改了
+want=doc-experiments.sh：1 格里 1 格绿（decision-links），0 格本次未跑（无）

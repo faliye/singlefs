@@ -10,7 +10,7 @@
 | 名字 | 包 | 装什么 | 什么时候跑 |
 |---|---|---|---|
 | **harness 档** | `crates/singlefs-harness` | 单元测试与集成测试，加上它们用的脚手架库：录制器、内存池（`memory_pool`）、理想模型、随机历史、故障注入设备、场景 | 改了代码随时跑 |
-| **checker 档** | `crates/singlefs-checker-tier` | 崩溃态枚举引擎与记录核对器（`crash`）、断点续跑与双机分片（`layer0_progress`）、崩溃注入与坏盘输入两场战役、真设备一侧的设备日志比对与运行模式、崩溃放量（崩溃点身份与复用键 `crash_identity`、先录后核的流水线 `crash_amplification`、判定存储 `verdict_store`、单元校验和上 GPU `gpu_unit_checks`、三段流第 ① 段的事实表与 CPU 参照核对 `crash_facts`、第 ② 段的 GPU 核对内核 `crash_verify_gpu`；`verdict_store` 挂特性 `verdict-store`，`gpu_unit_checks` 与 `crash_verify_gpu` 挂特性 `gpu`）、实验与真设备装置二进制（`src/bin/`），以及它们的全部用例；连同 QEMU（门禁 checker-tier-qemu-device-streams）、herd7（checker-tier-lkmm）、crates 变异整表（checker-tier-crates-mutation-replay）、全部实验复跑（checker-tier-research-build-and-replay 的 experiment-replay 格） | 默认只在提交时跑；想单独跑带 `SINGLEFS_HEAVY_TESTS=user-request` |
+| **checker 档** | `crates/singlefs-checker-tier` | 崩溃态枚举引擎与记录核对器（`crash`）、断点续跑与双机分片（`layer0_progress`）、崩溃注入与坏盘输入两场战役、真设备一侧的设备日志比对与运行模式、崩溃放量（崩溃点身份与复用键 `crash_identity`、先录后核的流水线 `crash_amplification`、判定存储 `verdict_store`、单元校验和上 GPU `gpu_unit_checks`、三段流第 ① 段的事实表与 CPU 参照核对 `crash_facts`、第 ② 段的 GPU 核对内核 `crash_verify_gpu`、GPU 判器的输入表 `crash_judge_tables`、GPU 判器的判法 `crash_judge_gpu` 与它的派活 `crash_judge_dispatch`；`verdict_store` 挂特性 `verdict-store`，`gpu_unit_checks`、`crash_verify_gpu`、`crash_judge_gpu` 与 `crash_judge_dispatch` 挂特性 `gpu`）、实验与真设备装置二进制（`src/bin/`），以及它们的全部用例；连同 QEMU（门禁 checker-tier-qemu-device-streams）、herd7（checker-tier-lkmm）、crates 变异整表（checker-tier-crates-mutation-replay）、全部实验复跑（checker-tier-research-build-and-replay 的 experiment-replay 格） | 默认只在提交时跑；想单独跑带 `SINGLEFS_HEAVY_TESTS=user-request` |
 | **池级 checker** | `crates/singlefs-checker` | 判一个镜像的判决器库（O2，`check_pool_image`，D13（验证路线） 已定项 7）；只依赖 `singlefs-format` | 它是库，被两档调用；它自己的库单测归 harness 档，随时跑 |
 
 归类判据：一条测试或一段代码要枚举崩溃状态、要真设备或外部工具、或跑一次以十分钟计，归 checker 档；否则归 harness 档。拿不准的放 checker 档，再由代码三方判要不要挪回。
@@ -32,12 +32,13 @@
 |---|---|---|
 | 快档 | `cargo test --release -p singlefs-checker-tier --lib --tests` 不带 `--ignored`（库与集成测试；装置二进制 `src/bin/` 的内联单测不在快档里，归它们的变异表与实验复跑）；门禁 `54-layer0-replay` 跑它，再逐条核 `.claude/gate.d/stage-inputs.tsv` 里键是 `crash-case:` 的用例各自那一格全绿标记，标记不作数的报「本次未跑」、不判红 | 整轮门禁与每次提交 |
 | 全量 | `54-layer0-replay` `--full`：在 HEAD + 暂存区的 worktree 里逐条跑登记的崩溃枚举用例（`--include-ignored --exact`），那一格全绿标记在就复用；分层照 D13（验证路线） 已定项 9；GPU 只接校验和那一截，要不要接归 D24（后台重活能不能卸给 GPU） | 用户要求或夜间 |
+| 崩溃放量全量 | `bash research/scripts/crash-amplification.sh`：不带参数跑登记表里全部分项（`--list-items` 列、`--item <分项>` 点名），开跑先照多机配置清场、退出时复原；每项交 `crash-amplification-item.sh`：配置开了双机就两台跑、没开就一台跑，配置 `ENABLE_GPU=1` 时由 GPU 判，显卡照私有显卡配置（模板 `gpu-cards.env.example`）的先后与额度用，做不到（第二台跑不成、点名的卡用不了、建不出表、有状态 GPU 判不了、内核展开超预算）报错退出，不退回少一台或 CPU；一份库装全部分项，落在 `${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/library`，落在开机会清空的目录里被拒；重跑同一条命令就是续跑（同一判法版本下判过的块复用，判法版本变了旧行留着、这一版从头判） | 用户要求或夜间 |
 
 checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay 与 checker-tier-research-build-and-replay 的 experiment-replay 格照各自的复用判定跑（`research/scripts/stage-must-run.sh` 文件头）。
 
 ## 崩溃枚举用例住哪、怎么登记
 
-- checker 档每个测试文件第一行写它测哪几个模块：`//! checker 档模块：<模块，按 crash、layer0_progress、crash_injection、bad_disk_input、device_log、on_device_modes、crash_identity、crash_amplification、verdict_store、gpu_unit_checks、crash_facts、crash_verify_gpu 的次序用、隔开>`，与它从 `singlefs_checker_tier::` 导入的模块逐个相同；一个都不导入的写 `无（为什么）`。按模块找用例：`grep -l '^//! checker 档模块：.*crash_injection' crates/singlefs-checker-tier/tests/*.rs`。`research/scripts/crash-case-check.py` 的 modules 那一样判，门禁 `54-layer0-replay` 开跑前在真仓上跑它。
+- checker 档每个测试文件第一行写它测哪几个模块：`//! checker 档模块：<模块，按 crash、layer0_progress、crash_injection、bad_disk_input、device_log、on_device_modes、crash_identity、crash_amplification、verdict_store、gpu_unit_checks、crash_facts、crash_verify_gpu、crash_judge_tables、crash_judge_gpu、crash_judge_dispatch 的次序用、隔开>`，与它从 `singlefs_checker_tier::` 导入的模块逐个相同；一个都不导入的写 `无（为什么）`。按模块找用例：`grep -l '^//! checker 档模块：.*crash_injection' crates/singlefs-checker-tier/tests/*.rs`。`research/scripts/crash-case-check.py` 的 modules 那一样判，门禁 `54-layer0-replay` 开跑前在真仓上跑它。
 
 - 写在 `crates/singlefs-checker-tier/tests/<流的名字>.rs`，全量那条标 `#[ignore]`，同文件的快档用例不标。
 - 共用的搭建模块经 `#[path = "../../singlefs-harness/tests/common/mod.rs"] mod common;` 这类声明指回 harness 档的 `tests/common*/mod.rs`，不抄第二份。

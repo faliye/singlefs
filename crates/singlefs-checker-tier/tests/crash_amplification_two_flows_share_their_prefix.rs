@@ -1,7 +1,7 @@
 //! checker 档模块：crash、layer0_progress、crash_identity、crash_amplification、verdict_store
 //! 前缀共享（用户 2026-09-28 定：剪枝的基础）：两条流都从 mkfs → 取号加暖机 → 新池新建文件起，之后各自覆盖写不同的内容。
 //! 前缀那些点由公共模块 `common_crash_points` 设，所以两条流里它们的身份、路径、块键逐个相同：流 A 核完之后，流 B 录入时前缀全部复用、
-//! 只核自己的尾巴；尾巴同名不同数据，路径这一级并成一段、身份不同；改流 B 自己那份测试文件的判法代码，前缀节点的复用键不动。
+//! 只核自己的尾巴；尾巴同名不同数据，路径这一级并成一段、身份不同；判法摘要一份、对全部点相同，改了它树不动、每个点的复用键都变。
 //! 路径在库的路径索引表里（路径 → 身份），块键里只有身份。要 `verdict-store` 特性。
 #![cfg(feature = "verdict-store")]
 
@@ -16,7 +16,7 @@ use common_crash_points::{overwrite_step, record_pool_build};
 use singlefs_checker_tier::crash::Layer0SegmentExpansion;
 use singlefs_checker_tier::crash_amplification::{
     check_recorded_blocks, plan_crash_points, record_crash_points, repository_relative_file,
-    unjudged_blocks, CrashFlow, CrashPlan, CrashPointRecorder, CrashPointSpan, JudgingCodes,
+    unjudged_blocks, CrashFlow, CrashPlan, CrashPointRecorder, CrashPointSpan, PipelineJudgingCode,
     UnitChecksumsOn, WeightedShares,
 };
 use singlefs_checker_tier::crash_identity::CoverageReport;
@@ -172,10 +172,10 @@ fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail()
     let root = repository_root();
     let flow_a = record_flow("prefix-share-a", &content_of(3, 4100), true);
     let flow_b = record_flow("prefix-share-b", &content_of(11, 4100), false);
-    let judging_a = JudgingCodes::of_the_flow(&root, &flow_a.flow(), &toolchain).expect("判法");
-    let judging_b = JudgingCodes::of_the_flow(&root, &flow_b.flow(), &toolchain).expect("判法");
-    let plan_a = plan_crash_points(&flow_a.flow(), &judging_a);
-    let plan_b = plan_crash_points(&flow_b.flow(), &judging_b);
+    let judging = PipelineJudgingCode::of_the_judges(&root, &toolchain).expect("判法");
+    let version = judging.version();
+    let plan_a = plan_crash_points(&flow_a.flow());
+    let plan_b = plan_crash_points(&flow_b.flow());
 
     // 一、前缀逐点相同：身份、路径、块键
     let prefix = prefix_length(&plan_a);
@@ -236,19 +236,27 @@ fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail()
     );
     assert_eq!(repository_relative_file(file!()), THIS_FILE);
 
-    // 三、改流 B 自己这份文件的判法代码：前缀不动，尾巴变
-    let mut judging_b_changed = judging_b.clone();
-    let mut flipped = *judging_b.digest_of(THIS_FILE);
+    // 三、判法改了：计划不看判法，树与每个点的复用键都不动；判法版本只在判定行上分（第四段末尾核）
+    let mut judging_changed = judging.clone();
+    let mut flipped = *judging.digest();
     flipped[0] ^= 0x01;
-    judging_b_changed.replace_digest(THIS_FILE, flipped);
-    let plan_b_changed = plan_crash_points(&flow_b.flow(), &judging_b_changed);
-    for index in 0..prefix {
+    judging_changed.replace_digest(flipped);
+    let changed_version = judging_changed.version();
+    assert_ne!(changed_version, version);
+    let plan_b_changed = plan_crash_points(&flow_b.flow());
+    assert_eq!(plan_b_changed.points.len(), plan_b.points.len());
+    for (changed, unchanged) in plan_b_changed.points.iter().zip(&plan_b.points) {
         assert_eq!(
-            plan_b_changed.points[index].identity, plan_b.points[index].identity,
-            "改测试文件不动公共模块设的前缀节点"
+            changed.path_number, unchanged.path_number,
+            "判法改了树不动：{}",
+            unchanged.name
+        );
+        assert_eq!(
+            changed.reuse_key, unchanged.reuse_key,
+            "判法改了复用键也不动：{}",
+            unchanged.name
         );
     }
-    assert_ne!(plan_b_changed.points[prefix].identity, tail_b.identity);
 
     // 四、库：A 录、核；B 录入时前缀全部复用、只核尾巴；路径索引表里前缀一条一份、尾巴一条（最后写的身份）
     let temporary = TemporaryStore {
@@ -260,7 +268,8 @@ fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail()
     let _ = std::fs::remove_dir_all(&temporary.directory);
     let mut store = VerdictStore::create_empty(&temporary.directory).expect("建得了库");
     let mut report_a = CoverageReport::default();
-    let recording_a = record_crash_points(&mut store, &plan_a, &mut report_a).expect("录得进");
+    let recording_a =
+        record_crash_points(&mut store, &plan_a, &version, &mut report_a).expect("录得进");
     assert_eq!(recording_a.blocks_already_judged, 0);
     let checking_a = check_recorded_blocks(
         &mut store,
@@ -269,13 +278,38 @@ fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail()
         &WeightedShares::new(vec![1]),
         0,
         &UnitChecksumsOn::CpuOnly,
+        &version,
     )
     .expect("核得完");
     assert_eq!(checking_a.red_states, 0, "{:?}", checking_a.red_texts);
-    assert!(unjudged_blocks(&store).expect("对得了账").is_empty());
+    assert!(unjudged_blocks(&store, &version)
+        .expect("对得了账")
+        .is_empty());
+    // 判法版本换了：A 的每一块在新版本下都算没判，旧版本的行留着
+    let mut report_changed = CoverageReport::default();
+    let recording_changed =
+        record_crash_points(&mut store, &plan_a, &changed_version, &mut report_changed)
+            .expect("录得进");
+    assert_eq!(
+        recording_changed.blocks_already_judged, 0,
+        "换了判法版本一块都不复用"
+    );
+    assert_eq!(
+        unjudged_blocks(&store, &changed_version)
+            .expect("对得了账")
+            .len(),
+        usize::try_from(recording_changed.blocks_recorded).expect("块数")
+    );
+    assert!(
+        unjudged_blocks(&store, &version)
+            .expect("对得了账")
+            .is_empty(),
+        "旧版本的判定还在"
+    );
 
     let mut report_b = CoverageReport::default();
-    let recording_b = record_crash_points(&mut store, &plan_b, &mut report_b).expect("录得进");
+    let recording_b =
+        record_crash_points(&mut store, &plan_b, &version, &mut report_b).expect("录得进");
     let prefix_blocks: u64 = plan_a.points[..prefix]
         .iter()
         .map(|point| u64::try_from(point.blocks().len()).expect("块数"))
@@ -324,11 +358,14 @@ fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail()
         &WeightedShares::new(vec![1]),
         0,
         &UnitChecksumsOn::CpuOnly,
+        &version,
     )
     .expect("核得完");
     assert_eq!(checking_b.blocks_checked, tail_blocks);
     assert_eq!(checking_b.red_states, 0, "{:?}", checking_b.red_texts);
-    assert!(unjudged_blocks(&store).expect("对得了账").is_empty());
+    assert!(unjudged_blocks(&store, &version)
+        .expect("对得了账")
+        .is_empty());
 
     let paths = store.paths_with_prefix("").expect("读得了路径索引");
     assert_eq!(
@@ -356,7 +393,7 @@ fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail()
     // 五、改名只动路径索引：把流 B 的第一个点改名（祖先改名），它自己的身份变（名字在身份里），后代的身份不变、路径变、块照样复用
     let mut renamed_flow = flow_b.flow();
     renamed_flow.crash_points[0].name = format!("renamed_{}", renamed_flow.crash_points[0].name);
-    let plan_renamed = plan_crash_points(&renamed_flow, &judging_b);
+    let plan_renamed = plan_crash_points(&renamed_flow);
     assert_ne!(plan_renamed.points[0].identity, plan_b.points[0].identity);
     for index in 1..plan_b.points.len() {
         assert_eq!(
@@ -370,7 +407,8 @@ fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail()
     }
     let mut report_renamed = CoverageReport::default();
     let recording_renamed =
-        record_crash_points(&mut store, &plan_renamed, &mut report_renamed).expect("录得进");
+        record_crash_points(&mut store, &plan_renamed, &version, &mut report_renamed)
+            .expect("录得进");
     let first_blocks = u64::try_from(plan_renamed.points[0].blocks().len()).expect("块数");
     let all_blocks: u64 = plan_renamed
         .points

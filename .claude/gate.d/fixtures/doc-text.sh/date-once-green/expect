@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：date-once
+want=日期只在标题上：这次改动碰到的 2 份记录与 kb 页干跑一份都没改
+want=doc-text.sh：1 格里 1 格绿（date-once），0 格本次未跑（无）

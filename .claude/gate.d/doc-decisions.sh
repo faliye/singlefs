@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: 决策文档与变更史（十七格：kb 形状；分项引用状态；状态别说两遍；说未定其实已定；已定分项自称未定；引用写已定紧跟说没定；未定项被别处定了；定了新东西没回看同文件未定项；冻结层归属登记表；决策分项清单与正文同步；未定项判过改不改新池新建文件的字节；动了用户定案的条款记了未还的账；决策索引结论列的宽度；同一结构的写频率只有一个量级；决策正文改了要留变更史条目；变更史的形状；变更史各节现状与索引表同步）
+# gate-stage: 决策文档与变更史（十六格：kb 形状；分项引用状态；状态别说两遍；说未定其实已定；已定分项自称未定；引用写已定紧跟说没定；未定项被别处定了；定了新东西没回看同文件未定项；冻结层归属登记表；决策分项清单与正文同步；未定项判过改不改新池新建文件的字节；动了用户定案的条款记了未还的账；决策索引结论列的宽度；同一结构的写频率只有一个量级；决策正文改了要留变更史条目；变更史的形状）
 # gate-category: 文档类
 # gate-similar: history-ordinal.sh 它也读变更史的条目标题、也只判这一轮新增的，但判的是「（其 N）」撞号，住在上游副本里由上游门禁管，项目本地改不了它
 # gate-similar: doc-registries.sh 它从欠账表、收口表与总审核出发判表本身的形状与账的去向，判字段与布局登记表（字节表「指向」列点名的分项存不存在、字段投影与加和、认购表求和不超预留），它的 decision-refs 那一格判 kb 全文引用的 D 号有定义、不看分项号与状态；这里的 user-verdict-owed 那一格方向相反，从决策正文里的「待用户复核」出发去欠账表找一笔未还的账，item-ref-status 那一格判引用写的已定 / 未定与正文分项表相符，判的对象都是决策正文、索引页、冻结层归属登记表与变更史
 # gate-similar: code-source-discipline.sh 它的 clause-enums 格也读 .claude/gate.d/ 下一张登记表、去决策分项里找逐字的串，但比对的另一边是代码里的枚举；这里格「同一结构的写频率只有一个量级」两边都在决策正文里（句子写的频率与登记的量级），不碰代码
 #
 # 决策文档与变更史：kb 里同一件事不许有两种写法，决策与分项的状态在哪一处说都要说得一样，
-# 决策索引页与它的投影、决策相关的登记表都要与决策正文对得上；决策正文改了要在变更史里留条目，变更史自己的形状与各节现状也要对。
-# 原是两道阶段（「kb 形状与决策文档」十四格、「变更史的条目与形状」三格，下面分别叫决策文档组、变更史组），2026-09-28 按门禁收缩判决
+# 决策索引页与它的投影、决策相关的登记表都要与决策正文对得上；决策正文改了要在变更史里留条目，变更史自己的形状也要对。
+# 原是两道阶段（「kb 形状与决策文档」十四格、「变更史的条目与形状」两格，下面分别叫决策文档组、变更史组），2026-09-28 按门禁收缩判决
 # research/prompts/gate-shrink-r1-main-verification.md「采纳的改法」第 2 条合成这一道；每一格的判据、出路、成功行报的数与射程照原样留在那一格的函数上方与函数里。
-# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就十七格按下面的次序全跑，格名写错退 2）：
+# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就十六格按下面的次序全跑，格名写错退 2）：
 # gate-cell: kb-shape kb 形状：分项只许一种叫法、kb 文件不链回自己、规则路径带 .claude/、决策标题与分项两节、索引页分项计数与正文相符
 # gate-cell: item-ref-status 每一处「D<n>（简称） 已定项 k / 未定项 k」写的状态与正文分项表相符
 # gate-cell: status-redundancy 状态别说两遍：小节标题不带「—— 已定」、条目不同时写破折号与「状态：」、分项索引行挂在对的节
@@ -27,8 +27,8 @@
 # gate-cell: decision-summary-width 决策索引表每一行的「结论」列不超过 decisions.md 写的字数上限
 # gate-cell: write-frequency 决策正文里落在登记结构上的频率断言，不与 write-frequency.tsv 登记的量级说反话
 # gate-cell: entry-added 决策正文改了，变更史里要有新增条目
-# gate-cell: shape 变更史的形状：日期与序号分属两层、条目住在自己的节、同节日期不重复
-# gate-cell: status-sync 变更史各节顶上的现状与索引表同步
+# gate-cell: shape 变更史的形状：日期块住在自己的节、同节同一天只一块、块下是 - 变更项而不是 #### 子条目、不留快查与现状行
+# gate-cell: history-loss 两份变更史与基准相比，基准里每个日期块的数、编号、产物名、引名在改后都找得到（提交前整理不许丢）
 #
 #   格名（--check 用）         格（原中文名）                   判什么
 #   kb-shape                   kb 形状                          1 未定项 / 已定项只许一种叫法；3 kb 文件不许链回自己；4 上游规则路径带 .claude/；
@@ -48,18 +48,16 @@
 #   write-frequency            同一结构的写频率只有一个量级     决策正文里一处频率断言落在登记的结构上（叫法在句内、同一表格行或所属标题），与 .claude/gate.d/write-frequency.tsv 登记的说反话
 #                                                               （不同级、否定了登记罩住的时机、「只在 / 仅」限定到别的量）
 #   entry-added                决策正文改了要留条目             决策正文改了，decisions-history.md 里要有新增条目
-#   shape                      变更史的形状                     日期与序号分属 `### ` / `#### ` 两层；两份变更史里的日期块住在自己的 `## D<n>（` / `## E<n>（` 节；同一节里日期不重复
-#   status-sync                变更史现状与索引表同步           两份变更史每节顶上的「**现状**：」一行与索引表那一行一致（--write 只重写这一行）
+#   shape                      变更史的形状                     两份变更史里的日期块住在自己的 `## D<n>（` / `## E<n>（` 节；同一节里同一天只一块；块下是顶格 `- ` 变更项，不许 `#### ` 子条目、「> 快查·」行与「**现状**：」行；新开的块不许空
+#   history-loss               变更史整理不许丢                 两份变更史各拿基准里的那一版与现在的比（research/scripts/history-consolidate.py loss-check）：基准里每个日期块的数、编号、产物名、别的日期、引名，在改后同一块、它指到的家节同日块或引的 git 版本里都找得到
 #
 # 参数解析、样本根的 .gate-cells、每格一个子 shell、逐格汇总与退出码都经共用库 lib/stage-cells.sh（写法与判据在它的文件头），
 # 这里只登记格、解析自己的 --write 与项目根。格按上表的次序一格跑完再跑下一格（决策文档组十四格原是并行跑的，并进来之后照共用库逐格跑）。
 #   有一格红（退出码既不是 0 也不是 77）⇒ 整道退 1，红格逐格接它登记的出路；跑到的格全退 77 ⇒ 整道退 77，不记通过；
 #   退 77 的格逐格往 $GATE_NOT_RUN_FILE 报一行「本次未跑」。
 #
-# --write 重写两块投影，按格表次序：先 decision-items-sync（重新生成 decisions.md 的分项清单、改写索引表「状态」列），
-# 再 status-sync（按索引表重写两份变更史每节顶上的现状行）——后一块抄的是前一块写好的索引表，次序反了会抄进旧状态。
-# 给了项目根写那个仓，不给写本脚本所在的仓。--write 可以与 --check decision-items-sync / --check status-sync 一起用，只写点名的那一块；
-# 与别的格一起用退 2。两块写完各自回读判一遍，汇总照同一套退出码。
+# --write 重写一块投影：decision-items-sync（重新生成 decisions.md 的分项清单、改写索引表「状态」列）。给了项目根写那个仓，不给写本脚本所在的仓。
+# --write 可以与 --check decision-items-sync 一起用；与别的格一起用退 2。写完回读判一遍，汇总照同一套退出码。
 #
 # 判别力：fixtures/doc-decisions.sh/ 下每份样本根放 .gate-cells，只跑它点名的格：
 #   <格名>-red                    决策文档组的十四份红样本，各对一格（kb-shape-red、item-ref-status-red……write-frequency-red），必须判红，
@@ -70,16 +68,14 @@
 #   decision-documents-some-cells-not-run  不是 git 仓、没有分项引用、没有 D15、没有一处「待用户复核」、没有写频率登记表：
 #                                 决策文档组十四格里七格退 77，整道退 0 而那七格逐格报「本次未跑」
 #   decision-history-red          决策首行状态翻了、已提交没推出去、变更史没新增条目；新建的一份 kb 页里有日期与序号粘在一起的标题；
-#                                 D1 的现状行与索引表对不上（entry-added、shape、status-sync 三格都红）
-#   shape-cells-marker-red        现场与 decision-history-red 同样三格都红，.gate-cells 只点名 shape：只跑 shape 那一格，汇总只列一格
-#   decision-history-green        决策正文改了 7 行，D1 节里新增一个日期块带一条 `#### `，现状行与索引表一致（三格都绿）
+#                                 （entry-added、shape 两格都红）
+#   shape-cells-marker-red        现场与 decision-history-red 同样两格都红，.gate-cells 只点名 shape：只跑 shape 那一格，汇总只列一格
+#   decision-history-green        决策正文改了 7 行，D1 节里新增一个日期块带一条顶格 `- ` 变更项（两格都绿）
 #   shape-red                     这一轮新增的 a 两处、b 四处、c 两组；基准里另有 a、b、c 各一处存量，只计数
-#   shape-green                   新增的日期块都住对了节、同节日期不重复、序号写在 `#### ` 里、围栏里的旧形态不算；基准里 a、b、c 各一处存量，只计数不判红
-#   status-sync-red               一节现状文字对不上、一节缺现状行、一节在索引表里没有、索引表一行没有节、实验那一份的现状对不上；另有一节对得上
-#   status-sync-green             决策两节、实验一节的现状行都与索引表一致
-#   shape-red、status-sync-red 只点名自己那一格；shape-green、status-sync-green 照原样三格（entry-added、shape、status-sync）一起跑。
+#   shape-green                   新增的日期块都住对了节、同节日期不重复、块下是顶格 `- ` 变更项、围栏里的旧形态不算；基准里 a、b、c 各一处存量，只计数不判红
+#   shape-red 只点名自己那一格；shape-green 照原样两格（entry-added、shape）一起跑。
 # 汇总与 --check 的弄坏开关归共用库（STAGE_CELLS_BREAK=red-swallowed 让各份 *-red 整道退 0；=marker-ignored 让 shape-cells-marker-red
-# 十七格都跑、「跑了 1 格」那条 want 找不到；=check-ignored 让 --check 不起作用）。
+# 十六格都跑、「跑了 1 格」那条 want 找不到；=check-ignored 让 --check 不起作用）。
 # 格的弄坏开关 DOC_DECISIONS_BREAK=<项>（样本自检时设进环境），每一项都让某几份样本判错：
 #   <格名>                                   那一格不跑、按判过了记：那一格的红样本出不来它的红行，绿样本出不来它的成功行
 #   write-frequency-levels-merged            格「同一结构的写频率只有一个量级」把不同级一律判成同级，write-frequency-red 出不来「每次挂载」那一行
@@ -92,7 +88,8 @@
 #   fused-ignored                            shape 不判 a：shape-red、decision-history-red 里 a 那几条 want 找不到
 #   no-home-ignored                          shape 不判 b：shape-red 里 b 那几条 want 找不到
 #   duplicate-date-ignored                   shape 不判 c：shape-red 里 c 那几条 want 找不到
-#   status-text-ignored                      status-sync 只看现状行在不在、不比文字：status-sync-red、decision-history-red 里对不上的那几条 want 找不到
+#   wrapper-ignored                          shape 不判 d：shape-red 里 `#### `、快查行、现状行那几条 want 找不到
+#   empty-ignored                            shape 不判 e：shape-red 里空日期块那一条 want 找不到
 #
 # ── entry-added：决策正文改了，变更史里要有新增条目 ──
 # 改了决策正文却没在 `.claude/kb/decisions-history.md` 留条目 ⇒ 判红。
@@ -102,7 +99,7 @@
 # 不留条目就等于它从未存在过，三个月后没人知道它为什么不算数了。
 #
 # ⚠️ 判据是「有没有新增条目」，不判「条目写得对不对」——后者只有人能判。
-# 条目数按新增的 `#### ` 子标题数（一条改动一个）；一个 `#### ` 都没加的，按新增的 `### 日期` 标题数。
+# 条目数按新增的顶格 `- ` 变更项数（一条改动一个）；一个都没加的，按新增的 `### 日期` 标题数。
 #
 # 改动范围：基准取共用库 research/scripts/changed-paths.sh 的 gate 取法（与 doc-process-records.sh、这一道 settled-same-file 格「定了新东西没回看同文件未定项」同一份）：
 # 这一轮已经提交、还没推出去的决策改动也算，不只看 HEAD 之后的——先提交决策改动再跑门禁，基准是 HEAD 就什么都看不见。
@@ -115,36 +112,28 @@
 # ⇒ 路径改成数组，历史条目改到正确的文件里数。
 #
 # ── shape：变更史的形状 ──
-# 判三样：
+# 变更史的形态是「条目 → 日期 → 变更清单」：每条决策 / 实验一个 `## D<n>（` / `## E<n>（` 节，节里按 `### YYYY-MM-DD` 分块，
+# 块下每条改动一个顶格的 `- ` 变更项（正文缩进在项下）；没有 `#### ` 子条目、「（其N）」、「> 快查·」两行与节顶「**现状**：」行。
+# 判五样：
 #   a) `.claude/kb/` 下任何一份 .md 里，`### 20YY-MM-DD` 后面直接跟「（其…）」：日期与序号粘在同一个标题里的旧形态。
-#      同一天的改动收进一个 `### 日期`，每条各占一个 `#### ` 子标题，「（其N）」只写在 `#### ` 里。
 #   b) decisions-history.md 里每个 `### 日期` 的上一级标题是 `## D<n>（`，experiments-history.md 里是 `## E<n>（`：
 #      落在节外（文件头下面、`## 不挂在某一条决策上的` 这类别的节里）是条目忘了放进决策 / 实验自己的节。
-#      文件自己文末的「## 历史版本」留着写这一份文件自己的改动（kb-discipline 要求每份 kb 以它收尾），那里的日期块不算节外；
-#      但块里 `### ` / `#### ` 标题点名了 `D<n>（` / `E<n>（` 的，是那条决策 / 实验的条目写错了地方，照样判红。
+#      文件自己文末的「## 历史版本」里的日期块不算节外；但块里标题或 `- ` 项点名了 `D<n>（` / `E<n>（` 的，是那条决策 / 实验的条目写错了地方，照样判红。
 #   c) 同一个 `## D<n>（` / `## E<n>（` 节里，同一个日期的 `### ` 标题出现两次以上（按标题开头的日期比）。
-# 只判这一轮新增的：基准与 entry-added 同一个（gate_diff_base gate）。a) 看那一行是不是新增的；
-#   b) 看日期块的 `### ` 行或块里某个 `#### ` 行是不是新增的；c) 看重复的几行里有没有一行是新增的。
+#   d) 两份变更史里出现 `#### ` 子条目、「> 快查·」行或「**现状**：」行：旧形态的包装。变更写成 `- ` 项，结论写进项里，现状只在索引表里。
+#   e) 两份变更史里某个 `## D<n>（` / `## E<n>（` 节下的 `### 日期` 块一条 `- ` 变更项都没有：空块。
+# 只判这一轮新增的：基准与 entry-added 同一个（gate_diff_base gate）。a、d 看那一行是不是新增的；
+#   b 看日期块的 `### ` 行或块里某一行是不是新增的；c 看重复的几行里有没有一行是新增的；e 看那个 `### ` 行是不是新增的。
 #   基准里就有的（规则改形态之前写下、等搬迁的存量）只计数写进输出，不判红——与上游 history-ordinal.sh 对存量撞号同一个口径。
-#   新增行按行号取（`git diff -U0` 的 hunk 头，未跟踪的文件整份算新增）：b、c 要知道是哪一行，
+#   新增行按行号取（`git diff -U0` 的 hunk 头，未跟踪的文件整份算新增）：
 #   共用库 changed-paths.sh 的 gate_added_lines 只给行文、不给行号，所以这里另解析一次。
 #   不在 git 仓里没有基准：整棵树都按新增判，输出里写明。围栏代码块里的行不算。
-# ⚠️ 判不了：摘要写得对不对、一条改动该点名的决策或实验点没点全、日期块排没排成倒序、
-#   同一天只有一条改动时 `#### ` 那一层省没省——这几样靠人。
+# ⚠️ 判不了：变更项写得对不对、一条改动该点名的决策或实验点没点全、日期块排没排成倒序——这几样靠人。
 #
-# ── status-sync：各节顶上的现状与索引表同步 ──
-# decisions-history.md 每个 `## D<n>（简称）` 节顶上（标题下第一行非空行）写一行
-#   **现状**：<decisions.md 索引表那一行的「状态」格>。<「结论（简报）」格>
-# experiments.md 的索引表同样有「状态」「结论（简报）」两格，experiments-history.md 的 `## E<n>（简称）` 节照同一个写法。
-# 判四样：节顶上没有这一行；这一行与索引表对不上；节在索引表里没有那一行；索引表里的一行在变更史里没有节。
-# --write 只重写这一行（缺了就在标题下补上），不碰历史条目；节或索引行缺了，--write 补不了，照样判红。
-# 两份变更史都不在、或一节都没有且索引表一行都没有，这一格退 77（本次无对象可判）。
-# ⚠️ 判不了：索引表那一行本身写得对不对。
-#
-#   bash .claude/gate.d/doc-decisions.sh [项目根]                                     十七格都跑
+#   bash .claude/gate.d/doc-decisions.sh [项目根]                                     十六格都跑
 #   bash .claude/gate.d/doc-decisions.sh --list                                       逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/doc-decisions.sh --check <格名>[,<格名>…] [项目根]            只跑点名的格
-#   bash .claude/gate.d/doc-decisions.sh --write [--check <格名>[,<格名>…]] [项目根]   按格表次序重写两块投影（分项清单与索引表状态列、变更史现状行），再回读判一遍
+#   bash .claude/gate.d/doc-decisions.sh --write [--check <格名>[,<格名>…]] [项目根]   重写一块投影（分项清单与索引表状态列），再回读判一遍
 set -uo pipefail
 # 路径要在 cd 之前算：$0 是相对路径时，cd 进项目根之后就指不到了
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
@@ -197,10 +186,10 @@ stage_cell write-frequency judge_write_frequency "决策正文里落在登记结
   "按登记行点名的权威分项改这句的频率；权威分项自己改了先改 .claude/gate.d/write-frequency.tsv 的登记；这句不是在说这个结构多久写一次，加进 .claude/gate.d/write-frequency-exclude.tsv 并写理由"
 stage_cell entry-added judge_entry_added "决策正文改了，变更史里要有新增条目" \
   "在 .claude/kb/decisions-history.md 那条决策的 \`## D<n>（简称）\` 节里加条目（.claude/rules/changelog-format.md）；纯排版改动拆成单独一个提交"
-stage_cell shape judge_shape "变更史的形状：日期与序号分属两层、条目住在自己的节、同节日期不重复" \
-  "日期写在 \`### \`、序号写在 \`#### \`，条目搬进自己的 \`## D<n>（\` / \`## E<n>（\` 节，同节同一天并成一个日期块（.claude/rules/changelog-format.md）"
-stage_cell status-sync judge_status_sync "变更史各节顶上的现状与索引表同步" \
-  "先改索引表，再跑 bash .claude/gate.d/doc-decisions.sh --write 重写各节顶上的现状行；节或索引行缺了先核编号"
+stage_cell shape judge_shape "变更史的形状：日期块住在自己的节、同节同一天只一块、块下是 - 变更项而不是 #### 子条目、不留快查与现状行" \
+  "日期写在 \`### \`，块下每条改动一个顶格 \`- \` 项，条目搬进自己的 \`## D<n>（\` / \`## E<n>（\` 节，同节同一天并成一个日期块；\`#### \`、「（其N）」、快查两行与现状行删掉（.claude/rules/changelog-format.md）"
+stage_cell history-loss judge_history_loss "两份变更史与基准相比，基准里每个日期块的数、编号、产物名、引名在改后都找得到（提交前整理不许丢）" \
+  "红行列出的数或编号逐个补回那一块、改成指针或 git 引用；确认是有意删的过程数才可以不补，那就在同一块里写一行「去向」说明"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 write_mode=0; root_argument=""
@@ -1867,7 +1856,7 @@ PY
 # （本文件的 INDEX_VS_BODY_SOURCE）直接去数正文两节里的分项，不调生成器——两格同住一个文件，判法仍是两段各自的代码。
 # 只有这一格的话，生成器自己数错时索引页会跟着一起错，而两边仍然逐字相同。
 #
-# 带 --write 时先写这一块（格表次序在 status-sync 前面，status-sync 抄的是这里写好的索引表）：重新生成分项清单、改写索引表的「状态」列，写回 `decisions.md`（给了项目根写那个仓，不给写本脚本所在的仓）：
+# 带 --write 时写这一块：重新生成分项清单、改写索引表的「状态」列，写回 `decisions.md`（给了项目根写那个仓，不给写本脚本所在的仓）：
 #   bash .claude/gate.d/doc-decisions.sh --write [项目根]
 # 判别力：fixtures/doc-decisions.sh/decision-items-sync-red 状态列写错、索引漏登、索引多一行、生成块漂了各一处，必须判红。
 grid_decision_items_sync() (
@@ -2596,7 +2585,7 @@ if missed:
 PY
 )
 
-# ════════════════ 变更史组的三格（变更史的条目与形状） ════════════════
+# ════════════════ 变更史组的两格（变更史的条目与形状） ════════════════
 
 # 在仓里时取 gate 基准写进 diff_base；不在仓里 diff_base 留空。source 失败、取不到基准就判红退出。
 load_diff_base() {
@@ -2643,9 +2632,9 @@ cell_entry_added() {
   # 改动碰没碰状态行：碰了就不算小改动（把「—— 半定」改成「—— 已定」只有两行，而它正是最该留痕的那种）
   decision_diff="$(git diff "$diff_base" -U0 -- "${KB[@]}")" || git_failed "diff -U0" "$?"
   status_lines_touched=$(grep -cE '^[+-](## D[0-9]+ .*——|#{3,4} *(已定项|未定项)|.*状态：)' <<<"$decision_diff" || true)
-  # 本次 diff 往变更史里加了几条：一条改动一个 `#### `；一个都没加的按 `### 日期` 数
+  # 本次 diff 往变更史里加了几条：一条改动一个顶格的 `- ` 变更项；一个都没加的按 `### 日期` 数
   hist_diff="$(git diff "$diff_base" -- "$HIST")" || git_failed "diff（变更史）" "$?"
-  added=$(grep -c '^+#### ' <<<"$hist_diff" || true)
+  added=$(grep -c '^+- ' <<<"$hist_diff" || true)
   if ((added == 0)); then added=$(grep -c '^+### 20[0-9][0-9]-' <<<"$hist_diff" || true); fi
 
   if [[ "$added" -gt 0 ]]; then
@@ -2662,151 +2651,54 @@ cell_entry_added() {
   else
     bad "决策正文改了 $changed 行，却没往变更史新增任何条目"
   fi
-  howto "若这次改动推翻或定下了任何结论，在 $HIST 里那条决策的 \`## D<n>（简称）\` 节里加一条（.claude/rules/changelog-format.md）："
-  howto "  这一天的 \`### $(TZ=Asia/Tokyo date +%F)\` 块已经有就在块里最下面加，没有就在现状行下面新开一块（新的日期在上），"
-  howto "  每条改动一个 \`#### 摘要\`，正文写改前 / 改后 / 依据；一条改动点名了几条决策，就在几节里各写一份。"
-  howto "已定 / 未定项数或一句话现状变了，改完 decisions.md 的索引表再跑 bash .claude/gate.d/doc-decisions.sh --write 同步节顶的现状行。"
+  howto "若这次改动推翻或定下了任何结论，在 $HIST 里那条决策的 \`## D<n>（简称）\` 节里加一条变更（.claude/rules/changelog-format.md）："
+  howto "  这一天的 \`### $(TZ=Asia/Tokyo date +%F)\` 块已经有就在块里最下面加一个顶格 \`- \` 项，没有就在节标题下面新开一块（新的日期在上）；"
+  howto "  项里写结论、依据与改前（改前写一行 git show <提交>:<路径>，不抄原文）；一条改动点名了几条决策，只在标题里点名的第一条决策的节里写全文，别的节写一行「- 见 D<n>（简称） 节同日条目「摘要」」。"
+  howto "已定 / 未定项数或一句话现状变了，改 decisions.md 的索引表再跑 bash .claude/gate.d/doc-decisions.sh --write 同步索引表的状态列。"
   howto "纯排版改动可以拆成单独一个提交，那时这一格就无对象可判了。"
   exit 1
 }
 
-# ── status-sync ──
-#   cell_status_sync check   比对
-#   cell_status_sync write   按索引表重写（缺了补上）每节顶上的现状行，再回读判一遍
-cell_status_sync() {
-  python3 - "$1" <<'PY'
-import os, re, sys
-
-PAIRS = (('D', '决策', '.claude/kb/decisions.md', '.claude/kb/decisions-history.md'),
-         ('E', '实验', '.claude/kb/experiments.md', '.claude/kb/experiments-history.md'))
-PREFIX = '**现状**：'
-FENCE = re.compile(r'^[ \t]*```')
-BREAK = os.environ.get('DOC_DECISIONS_BREAK', '')
-WRITE_COMMAND = 'bash .claude/gate.d/doc-decisions.sh --write'
-
-
-def split_cells(line):
-    return [cell.strip().replace('\\|', '|') for cell in re.split(r'(?<!\\)\|', line.strip())[1:-1]]
-
-
-def index_rows(kind, path):
-    """{编号: 该有的现状行}：索引表第一格 `D<n>（…）`，现状行取第二格（状态）与第三格（结论（简报））。"""
-    rows = {}
-    with open(path, encoding='utf-8') as handle:
-        for line in handle:
-            match = re.match(rf'^\| {kind}(\d+)（', line)
-            if not match:
-                continue
-            cells = split_cells(line)
-            if len(cells) >= 3:
-                rows.setdefault(int(match.group(1)), f'{PREFIX}{cells[1]}。{cells[2]}')
-    return rows
-
-
-def sections(kind, lines):
-    """[(编号, 标题行下标, 现状行下标或 None)]。现状行是标题下第一行非空行、以「**现状**：」开头。"""
-    heading = re.compile(rf'^## {kind}(\d+)（')
-    found, fenced = [], False
-    for index, line in enumerate(lines):
-        if FENCE.match(line):
-            fenced = not fenced
-            continue
-        match = None if fenced else heading.match(line)
-        if not match:
-            continue
-        status_index = None
-        for later in range(index + 1, len(lines)):
-            if lines[later].strip():
-                status_index = later if lines[later].startswith(PREFIX) else None
-                break
-        found.append((int(match.group(1)), index, status_index))
-    return found
-
-
-def judge(kind, index_path, history_path, write):
-    """返回（问题清单, 查了几节, 改写了几行）。write 时只改现状行，别的问题照报。"""
-    if not os.path.isfile(index_path):
-        return [f'{history_path} 在，索引表 {index_path} 却不在：现状行没处对'], 0, 0
-    rows = index_rows(kind, index_path)
-    with open(history_path, encoding='utf-8') as handle:
-        lines = handle.read().split('\n')
-    found = sections(kind, lines)
-    problems, rewritten = [], 0
-    # 从后往前改：补一行会挪动后面各节的下标
-    for number, heading_index, status_index in reversed(found):
-        expected = rows.get(number)
-        if expected is None:
-            problems.append(f'{history_path}:{heading_index + 1} {lines[heading_index]}  {index_path} 的索引表里没有 {kind}{number} 这一行')
-            continue
-        if status_index is None:
-            if write:
-                blank_follows = heading_index + 1 < len(lines) and not lines[heading_index + 1].strip()
-                lines[heading_index + 1:heading_index + 1] = ['', expected] + ([] if blank_follows else [''])
-                rewritten += 1
-            else:
-                problems.append(f'{history_path}:{heading_index + 1} {lines[heading_index]}  节顶上没有「{PREFIX}」一行；索引表那一行是「{expected}」')
-            continue
-        if BREAK == 'status-text-ignored' or lines[status_index] == expected:
-            continue
-        if write:
-            lines[status_index] = expected
-            rewritten += 1
-        else:
-            problems.append(f'{history_path}:{status_index + 1}  {kind}{number} 的现状行与索引表对不上：'
-                            f'这里写「{lines[status_index][len(PREFIX):]}」，索引表是「{expected[len(PREFIX):]}」')
-    problems.reverse()
-    for number in sorted(set(rows) - {number for number, _, _ in found}):
-        problems.append(f'{index_path} 的索引表有 {kind}{number}，{history_path} 里没有 `## {kind}{number}（简称）` 节')
-    if write and rewritten:
-        with open(history_path, 'w', encoding='utf-8') as handle:
-            handle.write('\n'.join(lines))
-    return problems, len(found), rewritten
-
-
-def run(write):
-    """返回（问题清单, {类: 查了几节}, 改写了几行, 不在的变更史）。"""
-    problems, checked, rewritten, absent = [], {}, 0, []
-    for kind, name, index_path, history_path in PAIRS:
-        if not os.path.isfile(history_path):
-            absent.append(history_path)
-            continue
-        pair_problems, pair_checked, pair_rewritten = judge(kind, index_path, history_path, write)
-        problems += pair_problems
-        checked[name] = pair_checked
-        rewritten += pair_rewritten
-    return problems, checked, rewritten, absent
-
-
-write = sys.argv[1] == 'write'
-if write:
-    _, _, rewritten, _ = run(True)
-    print(f'  · 按索引表重写了 {rewritten} 行现状（缺的补在标题下面），下面回读再判一遍')
-problems, checked, _, absent = run(False)
-if len(absent) == len(PAIRS):
-    # 退 77：门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
-    print(f'  ! 找不到 {"、".join(absent)}，这一格无对象可判')
-    sys.exit(77)
-if problems:
-    print(f'  ✗ 变更史各节顶上的现状与索引表有 {len(problems)} 处对不上')  # gate-lint:summary
-    for problem in problems[:40]:
-        print(f'     {problem}')  # gate-lint:detail
-    if len(problems) > 40:
-        print(f'     ……另有 {len(problems) - 40} 处')  # gate-lint:detail
-    print(f'     → 现状行照索引表那一行写：「{PREFIX}<状态格>。<结论（简报）格>」，放在 `## D<n>（简称）` / `## E<n>（简称）` 标题下第一行；')
-    print(f'       先改索引表，再跑 {WRITE_COMMAND} 按索引表重写（缺了补上），它不碰历史条目。')
-    print('     → 节在索引表里没有行、索引表的行在变更史里没有节，--write 补不了：先核编号——新立的决策 / 实验在变更史里加一节')
-    print('       （标题照索引表第一格写），编号写错或并走了就改对，再跑 --write。规则：.claude/rules/changelog-format.md。')
-    sys.exit(1)
-total = sum(checked.values())
-if total == 0:
-    print(f'  ! 两份变更史里一节 `## D<n>（` / `## E<n>（` 都没有、索引表也一行都没有，这一格无对象可判')
-    sys.exit(77)
-skipped = f'；{"、".join(absent)} 不在，那一半没判' if absent else ''
-print(f'  ✓ 现状行与索引表一致：查了{"、".join(f"{name} {count} 节" for name, count in checked.items())}{skipped}')
-PY
+# ── history-loss：变更史整理不许丢 ──
+# 提交前主 agent 把当天的变更项整理成结论（.claude/rules/changelog-format.md）；整理只许删同日日期、包装、原文围栏与批量复制，
+# 数、编号、产物名、别的日期、引名一个都不许丢。这一格拿基准里的那一版与现在的比：两份变更史各跑一次
+# research/scripts/history-consolidate.py loss-check（判法在那份脚本文件头），任一份退 3 判红；两份都与基准无差异退 77。
+# 弄坏开关 DOC_DECISIONS_BREAK=history-loss：这一格不跑、按判过了记，history-loss-red 出不来它的红行。
+# 判别力：fixtures/doc-decisions.sh/history-loss-red 基准里一块带一个数，工作区整理时把那个数弄丢了，必须判红；
+#         history-loss-green 同一块整理成一条结论、数都在，判绿。
+cell_history_loss() {
+  local diff_base checked=0 failed=0 hist base_copy rc
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "  ! 不在 git 仓库里，这一格无对象可判"
+    exit 77
+  fi
+  load_diff_base
+  for hist in .claude/kb/decisions-history.md .claude/kb/experiments-history.md; do
+    [[ -f "$hist" ]] || continue
+    if git diff --quiet "$diff_base" -- "$hist" 2>/dev/null; then continue; fi
+    if ! git cat-file -e "$diff_base:$hist" 2>/dev/null; then continue; fi
+    base_copy="$(mktemp "${TMPDIR:-/tmp}/history-loss-base.XXXXXX")"
+    git show "$diff_base:$hist" > "$base_copy"
+    rc=0
+    python3 "$REPO_ROOT/research/scripts/history-consolidate.py" loss-check "$base_copy" "$hist" --repo "$PWD" --force > "$base_copy.out" 2>&1 || rc=$?
+    checked=$((checked + 1))
+    if ((rc != 0)); then
+      failed=$((failed + 1))
+      echo "  ✗ $hist：整理之后基准里的这几块有数或编号找不到了"   # gate-lint:summary
+      grep -E '^  ' "$base_copy.out" | sed 's/^/     /'   # gate-lint:detail
+    fi
+    rm -f "$base_copy" "$base_copy.out"
+  done
+  if ((failed)); then
+    howto "红行列出的数或编号逐个补回那一块、改成指针或 git 引用；判法与出路在 research/scripts/history-consolidate.py 文件头。"
+    exit 1
+  fi
+  if ((checked == 0)); then
+    echo "  ! 两份变更史与基准 $diff_base 无差异，这一格无对象可判"
+    exit 77
+  fi
+  ok "变更史整理没丢：查了 $checked 份，基准里每个日期块的数、编号、产物名、引名在改后都找得到"
 }
-
-cell_status_sync_check() { cell_status_sync check; }
 
 # ── shape ──
 cell_shape() {
@@ -2907,8 +2799,10 @@ except DiffUnreadable as error:
     print('     → 按上面 git 的报错修好仓库状态再跑；取不到新增行时这一格什么都没比，不是通过。')
     sys.exit(1)
 
-fused_new, no_home_new, duplicate_new = [], [], []
-fused_stock = no_home_stock = duplicate_stock = 0
+fused_new, no_home_new, duplicate_new, wrapper_new, empty_new = [], [], [], [], []
+fused_stock = no_home_stock = duplicate_stock = wrapper_stock = empty_stock = 0
+WRAPPER = re.compile(r'^(?:####[ \t]|>[ \t]*快查·|\*\*现状\*\*：)')
+ITEM = re.compile(r'^- ')
 files = kb_files()
 date_headings = history_date_headings = 0
 for path in files:
@@ -2932,24 +2826,38 @@ for path in files:
         if UPPER_HEADING.match(line):
             parent = (number, line)
             continue
+        if WRAPPER.match(line) and BREAK != 'wrapper-ignored':
+            if is_new(changes, path, [number]):
+                wrapper_new.append(f'{path}:{number}  {line[:70]}')
+            else:
+                wrapper_stock += 1
+            continue
         match = DATE_HEADING.match(line)
         if not match:
             continue
         history_date_headings += 1
         block = [(number, line)]
+        items = 0
         for later_number, later_line in lines[index + 1:]:
             if BLOCK_END.match(later_line):
                 break
-            if SUB_HEADING.match(later_line):
-                block.append((later_number, later_line))
-        if parent and section_heading.match(parent[1]):
+            block.append((later_number, later_line))
+            if ITEM.match(later_line):
+                items += 1
+        in_section = bool(parent and section_heading.match(parent[1]))
+        if in_section and items == 0 and BREAK != 'empty-ignored':
+            if is_new(changes, path, [number]):
+                empty_new.append(f'{path}:{number}  {line}')
+            else:
+                empty_stock += 1
+        if in_section:
             by_section.setdefault(parent, {}).setdefault(match.group(1), []).append(number)
             continue
         if parent and OWN_HISTORY.match(parent[1]):
-            named = sorted({found.rstrip('（') for _, text in block for found in mention.findall(text)})
+            named = sorted({found.rstrip('（') for _, text in block if text.startswith('#') or ITEM.match(text) for found in mention.findall(text)})
             if not named:
                 continue
-            reason = f'在文件自己的「## 历史版本」里，标题点名了 {"、".join(named)}，要写进那一节'
+            reason = f'在文件自己的「## 历史版本」里，标题或变更项点名了 {"、".join(named)}，要写进那一节'
         else:
             upper = parent[1] if parent else '（没有，在文件开头）'
             reason = f'不在任何 `## {kind}<n>（` 节里，上一级标题是「{upper}」'
@@ -2972,28 +2880,40 @@ for path in files:
 scope = '不在 git 仓里、没有基准：整棵树都按新增判' if changes is None else f'只判基准 {base[:12]} 之后新增的行'
 stock = ('没有存量一说' if changes is None else
          f'存量（基准里就有，等搬迁，只计数不判红）：日期与序号粘在一起 {fused_stock} 处、'
-         f'条目住在节外 {no_home_stock} 处、同节日期重复 {duplicate_stock} 组')
+         f'条目住在节外 {no_home_stock} 处、同节日期重复 {duplicate_stock} 组、旧形态包装 {wrapper_stock} 行、空日期块 {empty_stock} 个')
 failed = False
 if fused_new:
     failed = True
     print(f'  ✗ {len(fused_new)} 处新写的标题把日期与「（其N）」粘在同一个 `### ` 里')  # gate-lint:summary
     for item in fused_new:
         print(f'     {item}')  # gate-lint:detail
-    print('     → 同一天的改动收进一个 `### YYYY-MM-DD`（这一组里这一天已经有就并进去），每条改动各占一个 `#### 摘要`；')
-    print('       「（其N）」只在摘要撞了或没有摘要时写进 `#### `。规则：.claude/rules/changelog-format.md「一份 kb 文件自己的「历史版本」节」。')
+    print('     → 同一天的改动收进一个 `### YYYY-MM-DD`（这一组里这一天已经有就并进去），块下每条改动一个顶格 `- ` 项，「（其N）」不再写。')
+    print('       规则：.claude/rules/changelog-format.md。')
 if no_home_new:
     failed = True
     print(f'  ✗ {len(no_home_new)} 个新写的日期块没住进自己的节')  # gate-lint:summary
     for item in no_home_new:
         print(f'     {item}')  # gate-lint:detail
-    print('     → decisions-history.md 的条目写进它点名的那条决策的 `## D<n>（简称）` 节，experiments-history.md 的写进 `## E<n>（简称）` 节；')
-    print('       点名了几条就在几节里各写一份。文件自己的「## 历史版本」只写这一份文件自己的改动。规则：.claude/rules/changelog-format.md。')
+    print('     → decisions-history.md 的变更写进它点名的那条决策的 `## D<n>（简称）` 节，experiments-history.md 的写进 `## E<n>（简称）` 节；')
+    print('       点名了几条只在标题里点名的第一条的节里写全文，别的节写一行「- 见 … 节同日条目」。文件自己的「## 历史版本」只写这一份文件自己的改动。规则：.claude/rules/changelog-format.md。')
 if duplicate_new:
     failed = True
     print(f'  ✗ {len(duplicate_new)} 组同一节里同一个日期开了几个 `### ` 块')  # gate-lint:summary
     for item in duplicate_new:
         print(f'     {item}')  # gate-lint:detail
-    print('     → 同一天的改动并进一个 `### 日期` 块，块下每条改动各一个 `#### `（先写的在上面）；多出来的 `### 日期` 行删掉。')
+    print('     → 同一天的改动并进一个 `### 日期` 块，块下每条改动一个顶格 `- ` 项（先写的在上面）；多出来的 `### 日期` 行删掉。')
+if wrapper_new:
+    failed = True
+    print(f'  ✗ {len(wrapper_new)} 行新写进变更史的旧形态包装（`#### ` 子条目、「> 快查·」行或「**现状**：」行）')  # gate-lint:summary
+    for item in wrapper_new:
+        print(f'     {item}')  # gate-lint:detail
+    print('     → 变更写成顶格 `- ` 项、结论写在项里；快查两行删掉；现状只在 decisions.md / experiments.md 的索引表里写。规则：.claude/rules/changelog-format.md。')
+if empty_new:
+    failed = True
+    print(f'  ✗ {len(empty_new)} 个新开的 `### 日期` 块下一条 `- ` 变更项都没有')  # gate-lint:summary
+    for item in empty_new:
+        print(f'     {item}')  # gate-lint:detail
+    print('     → 在块下写至少一条顶格 `- ` 项说明改了什么，或者删掉这个空块。')
 if failed:
     print(f'     {scope}；{stock}')
     print(f'     → 改完只重跑这一格：{CHECK_COMMAND}')
@@ -3004,6 +2924,7 @@ if date_headings == 0:
     sys.exit(77)
 print(f'  ✓ 变更史的形状对：查了 {len(files)} 份 kb 文件、{date_headings} 个 `### 日期` 标题'
       f'（两份变更史里 {history_date_headings} 个），{scope}，新增的没有违例；{stock}')
+
 PY
 }
 
@@ -3031,50 +2952,34 @@ judge_decision_summary_width()  { break_skips decision-summary-width;  grid_deci
 judge_write_frequency()         { break_skips write-frequency;         grid_write_frequency </dev/null; }
 judge_entry_added()             { break_skips entry-added;             cell_entry_added; }
 judge_shape()                   { break_skips shape;                   cell_shape; }
-judge_status_sync()             { break_skips status-sync;             cell_status_sync_check; }
+judge_history_loss()            { break_skips history-loss;            cell_history_loss; }
 
 # ════ --write：按格表次序重写两块投影，每块在自己的子 shell 里写完回读判一遍 ════
 if ((write_mode)); then
-  write_cells=()
+  write_cells=(decision-items-sync)
   if ((STAGE_CELLS_CHECK_GIVEN)); then
     for write_cell in "${STAGE_CELLS_SELECTED[@]}"; do
-      case "$write_cell" in
-        decision-items-sync|status-sync) write_cells+=("$write_cell") ;;
-        *)
-          bad "--write 只重写 decision-items-sync（decisions.md 的分项清单与索引表状态列）与 status-sync（两份变更史各节顶上的现状行）两格管的投影，不能与 --check $write_cell 一起用"
-          howto "去掉 --check 两块一起写，或写成 --check decision-items-sync / --check status-sync：bash .claude/gate.d/doc-decisions.sh --write"
-          exit 2 ;;
-      esac
+      if [[ "$write_cell" != decision-items-sync ]]; then
+        bad "--write 只重写 decision-items-sync（decisions.md 的分项清单与索引表状态列）管的投影，不能与 --check $write_cell 一起用"
+        howto "去掉 --check，或写成 --check decision-items-sync：bash .claude/gate.d/doc-decisions.sh --write"
+        exit 2
+      fi
     done
-  else
-    write_cells=(decision-items-sync status-sync)
   fi
-  write_green=(); write_red=(); write_not_run=()
-  for write_cell in "${write_cells[@]}"; do
-    echo "── ${write_cell}（--write）"
-    case "$write_cell" in
-      decision-items-sync)
-        if ( DECISION_ITEMS_WRITE=1; grid_decision_items_sync ); then write_exit=0; else write_exit=$?; fi ;;
-      status-sync)
-        if ( cell_status_sync write ); then write_exit=0; else write_exit=$?; fi ;;
-    esac
-    case "$write_exit" in
-      0) write_green+=("$write_cell") ;;
-      77) write_not_run+=("$write_cell") ;;
-      *) write_red+=("${write_cell}（退出 ${write_exit}）") ;;
-    esac
-  done
-  if ((${#write_red[@]})); then
-    bad "--write 写了 ${#write_cells[@]} 块，${#write_red[@]} 块写完回读仍红：${write_red[*]}"
+  echo "── decision-items-sync（--write）"
+  if ( DECISION_ITEMS_WRITE=1; grid_decision_items_sync ); then write_exit=0; else write_exit=$?; fi
+  if ((write_exit == 77)); then
+    echo "  ! --write 写的 ${#write_cells[@]} 块都本次无对象可判（${write_cells[*]}），不记通过"
+    exit 77
+  fi
+  if ((write_exit != 0)); then
+    bad "--write 写了 ${#write_cells[@]} 块，写完回读仍红：${write_cells[*]}（退出 ${write_exit}）"
     howto "照上面那一块自己的红行改（节或索引行缺了 --write 补不了，先核编号），再跑 bash .claude/gate.d/doc-decisions.sh --write"
     exit 1
   fi
-  if ((${#write_green[@]} == 0)); then
-    echo "  ! --write 写的 ${#write_cells[@]} 块都本次无对象可判（${write_not_run[*]}），不记通过"
-    exit 77
-  fi
-  ok "--write 按格表次序写完 ${#write_cells[@]} 块、回读都对：${write_green[*]}；本次无对象 ${#write_not_run[@]} 块"
+  ok "--write 写完 ${#write_cells[@]} 块、回读都对：${write_cells[*]}"
   exit 0
 fi
+
 
 stage_cells_run "$ROOT"

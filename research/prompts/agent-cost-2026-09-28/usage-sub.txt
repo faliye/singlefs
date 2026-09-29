@@ -1,0 +1,43 @@
+agentType                    n  calls firstctx_avg cache_read(M)   w5m(M)   w1h(M)  input(M)  out(K)  folded(M) wall_avg_min claudemd_attach
+implementation-writer      145  28345         9602        9780.7   198.95     0.00      0.06   26172    1357.68           73            1260
+experiment-runner           83  15872        13937        6007.8    80.27     0.00      0.03   13192     767.11           73             939
+general-purpose            154  13557       131297        4329.3    69.36     0.00      0.03   12503     582.17           26             805
+three-way-attack            78   8530         7512        2109.5    54.32     0.00      0.02    7812     317.92           48             557
+three-way-materials         78   6349        10630        1305.3    23.15     0.00      0.01    4511     182.04           19            1378
+three-way-verifier          57   5941        10705        1215.7    17.90     0.00      0.01    4399     165.95           28             842
+kb-scribe                   66   4661        12343         968.3    18.61     0.00      0.01    3986     140.03           21            1083
+tooling-writer              56   5421        10197        1085.7    20.54     0.00      0.01    1029     139.40           27             220
+three-way-forward           56   3925         9747         862.1    15.91     0.00      0.01    2672     119.46           16             974
+three-way-local-attack      78   4802        10058         693.9    16.30     0.00      0.01    5032     114.93           23             296
+experiment-designer         28   2449         9705         542.9     9.20     0.00      0.00    3310      82.34           28             171
+sweep                       35   2561        12832         516.1    10.22     0.00      0.01    2751      78.14           20             567
+kb-spec-drafter             18   1557        10093         303.8     5.01     0.00      0.00     724      40.26           22             236
+three-way-defense           19   1025         9815         167.0     3.79     0.00      0.00     976      26.31           19              75
+investigator                14   1001         7350         137.8     3.23     0.00      0.00     306      19.35           21              96
+gate-triage                  3    373        10508          74.0     1.03     0.00      0.00     290      10.13           53              40
+Explore                      8    426        13238          70.9     1.83     0.00      0.00      29       9.52           10              49
+mutation-triage              4    191        10690          20.2     1.22     0.00      0.00     171       4.40           25              58
+prior-art                    1     73        10807          12.1     0.25     0.00      0.00      54       1.79           18              16
+three-way-local-defense      1     65         9720           8.3     0.18     0.00      0.00      60       1.36           24               4
+TOTAL                      982 107124        29433       30211.4   551.25     0.00      0.22   89977    4160.30           37            9666
+
+Top 15 single subagents by folded:
+  implementation-writer   agent-a8e0abaed98417b75.jsonl    calls=1047 cache_read= 472.0M w5m= 3.67M out= 1072K folded= 57.15M wall=  229min ['claude-opus-5-5']
+  experiment-runner       agent-a0197eed96128d40f.jsonl    calls= 739 cache_read= 408.6M w5m= 7.73M out=  463K folded= 52.84M wall=  492min ['claude-sonnet-5']
+  implementation-writer   agent-aa4e717ba6d338a9e.jsonl    calls= 528 cache_read= 259.2M w5m= 8.45M out=  612K folded= 39.54M wall=  310min ['claude-opus-5-5']
+  implementation-writer   agent-af0bde0d96d46ccea.jsonl    calls= 592 cache_read= 301.0M w5m= 2.06M out=  699K folded= 36.18M wall=  168min ['claude-opus-5-5']
+  implementation-writer   agent-aad0c6faacbcc0308.jsonl    calls= 395 cache_read= 242.8M w5m= 4.46M out=  467K folded= 32.18M wall=  122min ['claude-opus-5-5']
+  implementation-writer   agent-aa5f8a536cc664e40.jsonl    calls= 359 cache_read= 218.0M w5m= 6.80M out=  366K folded= 32.13M wall=  285min ['claude-opus-5-5']
+  implementation-writer   agent-a210cbecf8992a4a4.jsonl    calls= 399 cache_read= 237.7M w5m= 4.44M out=  380K folded= 31.23M wall=  129min ['claude-opus-5-5']
+  implementation-writer   agent-af96ae5683902ec27.jsonl    calls= 382 cache_read= 226.1M w5m= 5.12M out=  406K folded= 31.04M wall=  110min ['claude-opus-5-5']
+  experiment-runner       agent-abb91233a39bfb538.jsonl    calls= 456 cache_read= 243.3M w5m= 3.56M out=  355K folded= 30.55M wall=  213min ['claude-sonnet-5', '<synthetic>']
+  experiment-runner       agent-ac075a6843314ec2d.jsonl    calls= 459 cache_read= 212.6M w5m= 2.84M out=  350K folded= 26.56M wall=  119min ['claude-sonnet-5']
+  implementation-writer   agent-abcf1812681e62e9f.jsonl    calls= 408 cache_read= 208.0M w5m= 2.49M out=  402K folded= 25.92M wall=  100min ['claude-opus-5-5']
+  implementation-writer   agent-a7e9452a02b490de4.jsonl    calls= 329 cache_read= 167.5M w5m= 4.31M out=  290K folded= 23.60M wall=  240min ['claude-opus-5-5']
+  implementation-writer   agent-adc20bcca8074e007.jsonl    calls= 303 cache_read= 158.0M w5m= 4.46M out=  295K folded= 22.86M wall=  153min ['claude-opus-5-5', '<synthetic>']
+  experiment-runner       agent-acafe21a11c13f37b.jsonl    calls= 413 cache_read= 174.4M w5m= 2.03M out=  321K folded= 21.58M wall=  167min ['claude-sonnet-5']
+  experiment-runner       agent-a5581b714555508b4.jsonl    calls= 363 cache_read= 171.4M w5m= 1.99M out=  285K folded= 21.05M wall=  103min ['claude-sonnet-5']
+
+calls per subagent: n=982 median=87 p90=204 max=1047
+first-call context: median=10692 p90=130993 max=142812
+avg cache_read per call: median=204822 p90=368154

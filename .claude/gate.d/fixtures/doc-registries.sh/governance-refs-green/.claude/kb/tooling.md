@@ -4,6 +4,12 @@
 门禁 harness-test-environment 排在跑测试的门禁之后。
 对照表在 `records/2026-09-28-门禁59号提速与双机分片.md`「旧编号与现在的门禁」一节（记录文件名里带的号不是在称呼门禁）。
 
+产物整行抄在围栏里，旧路径照抄不算称呼门禁：
+
+```
+E7RESULT name=w3_duplicate_identity_by_path identity=.claude/gate.d/fixtures/59-crates-mutation-replay.sh/red/crates/tiny/src/lib.rs::doubles_three_to_six
+```
+
 ## 历史版本
 
 - 那时叫门禁 77 号，判的是跑完测试之后机器干不干净（`.claude/gate.d/77-test-environment.sh`）。

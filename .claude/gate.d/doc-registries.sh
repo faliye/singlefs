@@ -78,7 +78,7 @@
 #                               记录文件名里带的号不判，仓根 README.md 里按全名指的门禁与格（含门禁 54-layer0-replay 与它的脚本路径）都在，
 #                               判绿并报扫了几份、全名与格名几处
 # 每一格的样本放了什么，写在那一格的注释里。
-# governance-refs 另有 lib-governance-refs.py 的弄坏开关 GOVERNANCE_REFS_BREAK=old-numbers-ignored / names-ignored（governance-refs-red 里对应的 want 找不到）、
+# governance-refs 另有 lib-governance-refs.py 的弄坏开关 GOVERNANCE_REFS_BREAK=old-numbers-ignored / names-ignored / fences-scanned（governance-refs-red 里对应的 want 找不到）、
 # =history-scanned（governance-refs-green 判红）、=readme-skipped（仓根 README.md 不进射程：governance-refs-red 里 README.md 那两行 want 找不到，
 # governance-refs-green 的份数与处数对不上）。
 # 汇总与 --check 的弄坏开关归共用库（STAGE_CELLS_BREAK=red-swallowed 让各份 *-red 整道退 0；=check-ignored 让 --check 不起作用）。

@@ -7,11 +7,12 @@
 # gate-similar: code-tooling.sh 它的 fixture-claims 格也扫全仓文件，但判的是文件名与样本目录里编出来的日期、阶段头部声称的样本在不在，不是文本里的写法
 # gate-similar: code-source-discipline.sh 它的 vague-names 与 test-file-names 两格也判写法，但对象是 .rs 里声明的函数名、类型名与测试文件名，读的是空泛词表与按里程碑起名的正则，不扫全部文本
 #
-# 三格，都扫全仓文本（原是禁用写法、术语改名两道，合成这一道）。
-# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就三格都跑，格名写错退 2）：
+# 四格：前三格扫全仓文本（原是禁用写法、术语改名两道，合成这一道），第四格只判这次改动碰到的记录与 kb 页。
+# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就四格都跑，格名写错退 2）：
 # gate-cell: prime-marks 撇号类角标
 # gate-cell: clock-times 描述里的钟点、时区词与时间戳
 # gate-cell: term-renames 登记过改名的术语不再出现旧名
+# gate-cell: date-once 这次改动碰到的记录与 kb 页里，日期只在标题上：正文行不重复所属标题或文件名里的日期，同一天不开第二个同级小节
 # 参数解析、样本根的 .gate-cells、每格一个子 shell、逐格汇总与退出码都经共用库 lib/stage-cells.sh（写法与判据在它的文件头），
 # 这里只登记格、解析项目根。
 #
@@ -35,7 +36,20 @@
 # .claude/rules/path-moves.md「改一个全仓术语：正文之外还有五处会红」。没有登记表时这一格本次无对象可判。
 # 管不到的：登记表里没登记的改名；一个概念换了名字却没往登记表加一行，这一格照旧绿，靠改名的人登记。
 #
-# 样本：fixtures/doc-text.sh/ 下六份，每份样本根放 .gate-cells 只点名它判的那一格：
+# ── date-once ──
+# 判据：research/scripts/changed-paths.sh 的 gate 取法取基准，这次改动碰到的（含未跟踪的）records/*.md 与 .claude/kb/ 下的 .md
+# （两份变更史归 doc-decisions 的 shape 格，INDEX.md 不判）逐份交 research/scripts/doc-consolidate.py migrate 干跑：
+# 它会删掉与所属日期（文件名里的日期、最近一个带日期的标题）相同的行内日期、并掉同一天的第二个同级小节；
+# 干跑改了什么就是违例，报那一份删了几个日期、并了几个小节。路径、产物名、「」里的引名、紧跟「：」的小节名、
+# 实验页回看列与未定项两句字节判决里的日期不算（判法逐条在那份脚本文件头）。规则：.claude/rules/changelog-format.md、kb-discipline 第 1 条。
+# 不在 git 仓里没有基准：整棵树都判。一份都没碰到：这一格本次无对象可判。
+# 管不到的：别的日期该不该写（事件的锚照写）、日期挪进标题之后小节切得对不对——这两样靠人。
+# 弄坏开关 GATE_TEXT_NOTATIONS_BREAK=date-once-unjudged：这一格不干跑、记无对象可判，date-once-red 退 77、样本判错。
+#
+# 样本：fixtures/doc-text.sh/ 下八份，每份样本根放 .gate-cells 只点名它判的那一格：
+#   date-once-red       setup.sh 建 git 仓，基准里一份记录与一份实验页干净；这一轮往记录正文加一行带文件名日期的话、
+#                       往实验页加第二个同日 `### ` 小节，逐份点名判红
+#   date-once-green     同一基准；这一轮加的行只带别的日期、加的小节是另一天，判绿
 #   prime-marks-red     setup.sh 现写一份带「K9」加一撇的 md、一份带「G5」加两撇的 rs，逐处点名「文件:行」判红（现场与 clock-times-red 是同一份 setup.sh）
 #   prime-marks-green   只有正常写法（变体起了新名字、ASCII 单引号），外加上游副本里带角标的 md（排除前缀下），判绿
 #   clock-times-red     setup.sh 现写一份带「日期 时区词 时:分x」的 md、一份带「时:分 时区词」的 rs，
@@ -53,7 +67,7 @@
 # LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=<形态键> 让那一形态的排除前缀失效，那一格的绿样本判红，样本判错；
 # GATE_TEXT_NOTATIONS_BREAK=term-renames-unjudged 让 term-renames 那一格不调 sweep-term、记无对象可判，term-renames-red 退 77、样本判错。
 #
-#   bash .claude/gate.d/doc-text.sh [项目根]                                     三格都跑
+#   bash .claude/gate.d/doc-text.sh [项目根]                                     四格都跑
 #   bash .claude/gate.d/doc-text.sh --list                                       逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/doc-text.sh --check <格名>[,<格名>…] [项目根]            只跑点名的格
 set -uo pipefail
@@ -64,6 +78,8 @@ REPO_ROOT="$(cd "$STAGE_DIR/../.." && pwd)"
 source "$STAGE_DIR/lib/stage-cells.sh"
 LIBRARY="$STAGE_DIR/lib-forbidden-notations.py"
 SWEEP_TERM="$REPO_ROOT/research/scripts/sweep-term.py"
+DOC_CONSOLIDATE="$REPO_ROOT/research/scripts/doc-consolidate.py"
+source "$REPO_ROOT/research/scripts/changed-paths.sh"
 text_notations_break="${GATE_TEXT_NOTATIONS_BREAK:-}"
 
 stage_cell prime-marks cell_prime_marks "撇号类角标" \
@@ -72,6 +88,8 @@ stage_cell clock-times cell_clock_times "描述里的钟点、时区词与时间
   "时间只写到日期，钟点、时区词、时间戳连同「前后」一起删；代码真要用这些字面的那一行写「# clock-times:allow <理由>」，整份是被测输入的登记进 lib-forbidden-notations.py 的 excluded_prefixes"
 stage_cell term-renames cell_term_renames "登记过改名的术语不再出现旧名" \
   "python3 research/scripts/sweep-term.py --apply 一次换完（跑不出来的产物一个字节都不许动，连同引它的正文留旧名）；确实该留旧名的登记进 .claude/term-rename-exempt 并写明为什么"
+stage_cell date-once cell_date_once "这次改动碰到的记录与 kb 页里，日期只在标题上：正文行不重复所属标题或文件名里的日期，同一天不开第二个同级小节" \
+  "python3 research/scripts/doc-consolidate.py migrate <那一份> --out <临时文件> 看它删了哪些、并了哪些，照着改；红行列的是每份删了几个日期、并了几个小节"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 root_argument=""
@@ -201,6 +219,55 @@ cell_term_renames() {
   echo "               确实该留旧名的（别家术语、冻结证据目录、历史类文件里换了就成假话的那一句、引文块、对照表自己），"
   echo "               登记进 .claude/term-rename-exempt 并写明为什么；历史类文件逐文件登记，不整个目录豁免；指向不存在路径的那一行删掉。"
   exit 1
+}
+
+# ── date-once ──
+cell_date_once() {
+  local base changed path count=0 red=0 scratch summary dates merges
+  if [[ "$text_notations_break" == date-once-unjudged ]]; then
+    echo "  ! 弄坏开关 date-once-unjudged：这一格不干跑，记本次无对象可判"
+    exit 77
+  fi
+  cd "$ROOT" || exit 1
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    base="$(gate_diff_base gate)"
+    changed="$(gate_changed_paths "$base" untracked)"
+  else
+    changed="$(find records .claude/kb -name '*.md' 2>/dev/null)"
+  fi
+  scratch="$(mktemp "${TMPDIR:-/tmp}/date-once.XXXXXX")"
+  while IFS= read -r path; do
+    [[ -n "$path" ]] || continue
+    case "$path" in
+      records/*.md) ;;
+      .claude/kb/*.md) ;;
+      *) continue ;;
+    esac
+    case "$path" in
+      .claude/kb/decisions-history.md|.claude/kb/experiments-history.md|.claude/kb/INDEX.md) continue ;;
+    esac
+    [[ -f "$path" ]] || continue
+    count=$((count + 1))
+    summary="$(python3 "$DOC_CONSOLIDATE" migrate "$path" --out "$scratch" --force 2>&1 | head -1)"
+    dates="$(sed -n 's/.*同日日期删 \([0-9]*\).*/\1/p' <<<"$summary")"
+    merges="$(sed -n 's/.*同日小节合并 \([0-9]*\).*/\1/p' <<<"$summary")"
+    if [[ "${dates:-0}" != 0 || "${merges:-0}" != 0 ]]; then
+      red=$((red + 1))
+      echo "  ✗ $path：正文里重复所属日期 ${dates:-0} 处、同一天的第二个小节 ${merges:-0} 个"   # gate-lint:detail
+    fi
+  done <<<"$changed"
+  rm -f "$scratch"
+  if ((red)); then
+    echo "  ✗ 这次改动碰到的 $count 份记录与 kb 页里 $red 份日期没有只写在标题上"   # gate-lint:summary
+    echo "     → 怎么办：python3 research/scripts/doc-consolidate.py migrate <那一份> --out <临时文件>，看它删了哪些日期、并了哪些小节，照着改回仓里；"
+    echo "               规则：.claude/rules/changelog-format.md「只有决策与实验有历史」与 kb-discipline 第 1 条。"
+    exit 1
+  fi
+  if ((count == 0)); then
+    echo "  ! 这次改动没碰到 records/ 与 .claude/kb/ 下的 .md，这一格无对象可判"
+    exit 77
+  fi
+  echo "  ✓ 日期只在标题上：这次改动碰到的 $count 份记录与 kb 页干跑一份都没改"
 }
 
 stage_cells_run "$ROOT"

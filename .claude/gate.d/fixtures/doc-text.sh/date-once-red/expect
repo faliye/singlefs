@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：date-once
+want=records/2026-09-24-样本调度.md：正文里重复所属日期 1 处、同一天的第二个小节 0 个
+want=.claude/kb/experiments/01-样本实验.md：正文里重复所属日期 0 处、同一天的第二个小节 1 个
+want=这次改动碰到的 2 份记录与 kb 页里 2 份日期没有只写在标题上
+want=doc-text.sh：1 格里 1 格红（date-once）

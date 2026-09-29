@@ -14,11 +14,10 @@ use std::path::{Path, PathBuf};
 
 use singlefs_harness::hexadecimal::hexadecimal_text;
 use singlefs_harness::memory_pool::{MemoryPool, RetainedWrite, WrittenContents};
-use singlefs_harness::sha256::sha256_digest;
+use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 
 use crate::layer0_progress::Layer0ToolchainIdentity;
 
-pub const SHA256_BYTES: usize = 32;
 const SECTOR_BYTES: u64 = 512;
 
 // ============================== 标签与复用键 ==============================
@@ -76,34 +75,33 @@ impl NodeLabel {
     }
 }
 
-/// 复用键：只能从属性算出（[`StepAttributes::reuse_key`]）。输入与判法都没变就是同一个键，沿用库里的判定。
+/// 复用键：只能从属性算出（[`StepAttributes::reuse_key`]）。这一步的输入没变就是同一个键；判法变不变另按判法版本在判定行上分。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ReuseKey([u8; SHA256_BYTES]);
+pub struct ReuseKey([u8; DIGEST_BYTES]);
 
 impl ReuseKey {
     #[must_use]
-    pub fn as_bytes(&self) -> &[u8; SHA256_BYTES] {
+    pub fn as_bytes(&self) -> &[u8; DIGEST_BYTES] {
         &self.0
     }
 }
 
-/// 一步的三样属性（各是 SHA-256）。
+/// 一步的两样属性（各是 SHA-256）：这一步写下的字节（带屏障的写表）与它起步的镜像。只有流程进复用键：
+/// 判法是判定行的属性（`verdict_store::JudgeVersion`），不在这里。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StepAttributes {
-    pub write_table_with_barriers: [u8; SHA256_BYTES],
-    pub parent_output: [u8; SHA256_BYTES],
-    pub judging_code: [u8; SHA256_BYTES],
+    pub write_table_with_barriers: [u8; DIGEST_BYTES],
+    pub parent_output: [u8; DIGEST_BYTES],
 }
 
 impl StepAttributes {
-    /// 三样按固定次序、各带名字拼起来取 SHA-256。
+    /// 两样按固定次序、各带名字拼起来取 SHA-256。
     #[must_use]
     pub fn reuse_key(&self) -> ReuseKey {
         let mut message = Vec::new();
         for (name, digest) in [
             ("write_table_with_barriers", &self.write_table_with_barriers),
             ("parent_output", &self.parent_output),
-            ("judging_code", &self.judging_code),
         ] {
             message.extend_from_slice(name.as_bytes());
             message.push(b'=');
@@ -183,7 +181,7 @@ pub fn step_write_table_with_barriers(
     writes: &[RetainedWrite],
     segments: &[Vec<usize>],
     step_writes: std::ops::Range<usize>,
-) -> [u8; SHA256_BYTES] {
+) -> [u8; DIGEST_BYTES] {
     let mut segment_of_write: BTreeMap<usize, usize> = BTreeMap::new();
     for (segment_index, segment) in segments.iter().enumerate() {
         for write_index in segment {
@@ -218,7 +216,7 @@ pub fn step_write_table_with_barriers(
 /// 扇区终值表：（盘，扇区号）→ 那个扇区最后留下的内容摘要。父输出 = 基镜像上叠这一步之前全部写之后的这张表。
 #[derive(Clone, Default)]
 pub struct SectorImage {
-    sectors: BTreeMap<(u32, u64), [u8; SHA256_BYTES]>,
+    sectors: BTreeMap<(u32, u64), [u8; DIGEST_BYTES]>,
 }
 
 impl SectorImage {
@@ -261,7 +259,7 @@ impl SectorImage {
 
     /// 按（盘，扇区）升序每行 `<盘> <扇区> <摘要>` 拼起来取 SHA-256。
     #[must_use]
-    pub fn digest(&self) -> [u8; SHA256_BYTES] {
+    pub fn digest(&self) -> [u8; DIGEST_BYTES] {
         let mut text = String::new();
         for ((device, sector), digest) in &self.sectors {
             text.push_str(&format!("{device} {sector} {}\n", hexadecimal_text(digest)));
@@ -407,14 +405,16 @@ pub struct JudgingCodeError {
     pub reason: String,
 }
 
-/// 按模块引用取出的判法代码：收了哪些文件（仓内路径）、其中按原文取的是哪几份、整份摘要。
+/// 按模块引用取出的判法代码：收了哪些文件（仓内路径）、其中按原文取的是哪几份、在哪几份门外停下、整份摘要。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct JudgingCode {
     pub files: Vec<String>,
     pub raw_files: BTreeSet<String>,
     /// 每份被收的文件是被谁、因为什么收进来的（入口文件记「entry」）：给人查「为什么这份也算进来」。
     pub reason_of_each_file: BTreeMap<String, String>,
-    pub digest: [u8; SHA256_BYTES],
+    /// 被引到、按停止表停在门外的文件（不收、不往下收）：给人查停止表里哪几条真的拦到了。
+    pub stopped_at: BTreeSet<String>,
+    pub digest: [u8; DIGEST_BYTES],
 }
 
 /// 工作区里每个 crate 的名字（下划线形）→ 目录（仓内路径）。
@@ -793,18 +793,91 @@ fn read_repository_file(repository_root: &Path, file: &str) -> Result<String, Ju
     })
 }
 
-/// 判法代码：从 `entry_files`（节点的测试文件，仓内路径）出发，顺着路径与 `use` 引用收文件；再收同 crate 里 `impl` 头点名了
-/// 已收文件里所声明类型或 trait 的文件，反复到收不到新文件为止。自己原文被 `include_str!` / `include_bytes!` 读的文件取原文摘要，
-/// 其余取词法单元串。摘要另拼 `Cargo.lock`、收到的各 crate 的 `Cargo.toml`（原文）与工具链。
+/// 判法闭包的入口：判一个崩溃状态对不对的两份代码——CPU 判器 `crash`（把状态序号解成持久集合的枚举表、择根与两遍恢复、七类 oracle、
+/// 记录核对器、调池级 checker）与 GPU 判器 `crash_judge_gpu`（三个内核与它们的输入表）。从这两份出发按模块引用收：恢复、池级 checker、
+/// 格式常量、内存池里的状态拼装都在闭包里，恢复顺着模块引用够到的实现文件（`transaction`、`allocator` 这几份）也在；设崩溃点的测试文件、
+/// 流水线（录入、领块、存储、对账、身份）都不在——它们变了，判定不变。
+pub const JUDGE_ENTRY_FILES: &[&str] = &[
+    "crates/singlefs-checker-tier/src/crash.rs",
+    "crates/singlefs-checker-tier/src/crash_judge_gpu.rs",
+];
+
+/// 判器引到、而不参与判对错的文件：闭包到这里就停，不收它、也不顺着它往下收。每条写明判器为什么引它、它为什么不判对错。
+pub const JUDGE_CLOSURE_STOP_FILES: &[(&str, &str)] = &[
+    (
+        "crates/singlefs-checker-tier/src/layer0_progress.rs",
+        "`crash` 的枚举驱动经它写进度文件、分片账本与发现日志、取工具链身份；判一个状态的路径一行都不读它，工具链身份另拼进摘要",
+    ),
+    (
+        "crates/singlefs-checker-tier/src/lib.rs",
+        "只有模块声明与 crate 级属性；判器文件测试模块里的 `use super::…` 落不到模块文件时兜底落到它，加一个模块不改任何判定",
+    ),
+    (
+        "crates/singlefs-core/src/lib.rs",
+        "只有模块声明与 crate 级属性；`recovery` 测试模块里的 `use super::…` 兜底落到它，加一个模块不改任何判定",
+    ),
+];
+
+/// 判器不许引、也不在闭包里的文件：判法那一份引了它就等于把它拉回闭包。每条写明它为什么不判对错。
+pub const FILES_THE_JUDGES_MUST_NOT_REACH: &[(&str, &str)] = &[
+    (
+        "crates/singlefs-checker-tier/src/crash_judge_dispatch.rs",
+        "GPU 判器的派活：表与草稿区怎么上卡、一次派活带几个状态、几条缓冲；判一个状态的逻辑全在内核与 `crash_judge_gpu.rs` 里。改结论的毛病修在这里时抬 `GPU_JUDGE_REVISION`",
+    ),
+    (
+        "crates/singlefs-checker-tier/src/gpu_unit_checks.rs",
+        "起显卡上下文、读显存、按配置挑卡；只有派活那一份引它",
+    ),
+];
+
+/// 判器的判法代码：从 [`JUDGE_ENTRY_FILES`] 出发、到 [`JUDGE_CLOSURE_STOP_FILES`] 停的模块引用闭包。
 ///
 /// # Errors
-/// 读不了某份文件、工作区的 crate 清单读不出来。
+/// 同 [`judging_code_by_module_references_stopping_at`]。
+pub fn judging_code_of_the_judges(
+    repository_root: &Path,
+    toolchain: &Layer0ToolchainIdentity,
+) -> Result<JudgingCode, JudgingCodeError> {
+    let stop_files: Vec<&str> = JUDGE_CLOSURE_STOP_FILES
+        .iter()
+        .map(|(file, _reason)| *file)
+        .collect();
+    judging_code_by_module_references_stopping_at(
+        repository_root,
+        JUDGE_ENTRY_FILES,
+        &stop_files,
+        toolchain,
+    )
+}
+
+/// 同 [`judging_code_by_module_references_stopping_at`]，不设停止文件。
+///
+/// # Errors
+/// 同 [`judging_code_by_module_references_stopping_at`]。
 pub fn judging_code_by_module_references(
     repository_root: &Path,
     entry_files: &[&str],
     toolchain: &Layer0ToolchainIdentity,
 ) -> Result<JudgingCode, JudgingCodeError> {
+    judging_code_by_module_references_stopping_at(repository_root, entry_files, &[], toolchain)
+}
+
+/// 判法代码：从 `entry_files`（仓内路径）出发，顺着路径与 `use` 引用收文件；再收同 crate 里 `impl` 头点名了
+/// 已收文件里所声明类型或 trait 的文件，反复到收不到新文件为止；`stop_files` 里的文件被引到就停在门外，不收、不往下收，记进 `stopped_at`。
+/// 自己原文被 `include_str!` / `include_bytes!` 读的文件取原文摘要，其余取词法单元串。摘要另拼 `Cargo.lock`、收到的各 crate 的
+/// `Cargo.toml`（原文）与工具链。
+///
+/// # Errors
+/// 读不了某份文件、工作区的 crate 清单读不出来。
+pub fn judging_code_by_module_references_stopping_at(
+    repository_root: &Path,
+    entry_files: &[&str],
+    stop_files: &[&str],
+    toolchain: &Layer0ToolchainIdentity,
+) -> Result<JudgingCode, JudgingCodeError> {
     let crates = workspace_crates(repository_root)?;
+    let stopped = |file: &str| stop_files.contains(&file);
+    let mut stopped_at: BTreeSet<String> = BTreeSet::new();
     let mut included: BTreeSet<String> = BTreeSet::new();
     let mut raw_files: BTreeSet<String> = BTreeSet::new();
     let mut tokens_of: BTreeMap<String, Vec<String>> = BTreeMap::new();
@@ -830,6 +903,10 @@ pub fn judging_code_by_module_references(
                 }
             }
             for referenced_file in referenced {
+                if stopped(&referenced_file) {
+                    stopped_at.insert(referenced_file);
+                    continue;
+                }
                 if !included.contains(&referenced_file) {
                     reason_of_each_file
                         .entry(referenced_file.clone())
@@ -861,6 +938,10 @@ pub fn judging_code_by_module_references(
                 let header_names = names_in_impl_headers(&tokens);
                 let shared: Vec<&String> = header_names.intersection(&declared).collect();
                 if let Some(name) = shared.first() {
+                    if stopped(&file) {
+                        stopped_at.insert(file);
+                        continue;
+                    }
                     reason_of_each_file
                         .entry(file.clone())
                         .or_insert_with(|| format!("impl names {name}"));
@@ -914,6 +995,7 @@ pub fn judging_code_by_module_references(
         files: included.into_iter().collect(),
         raw_files,
         reason_of_each_file,
+        stopped_at,
         digest: sha256_digest(text.as_bytes()),
     })
 }
@@ -993,7 +1075,6 @@ mod tests {
         let key = StepAttributes {
             write_table_with_barriers: [1; 32],
             parent_output: [2; 32],
-            judging_code: [3; 32],
         }
         .reuse_key();
         let text = label.identity_text(&key);
@@ -1012,7 +1093,6 @@ mod tests {
         let base = StepAttributes {
             write_table_with_barriers: [1; 32],
             parent_output: [2; 32],
-            judging_code: [3; 32],
         };
         let key = base.reuse_key();
         assert_ne!(
@@ -1026,14 +1106,6 @@ mod tests {
         assert_ne!(
             StepAttributes {
                 parent_output: [9; 32],
-                ..base
-            }
-            .reuse_key(),
-            key
-        );
-        assert_ne!(
-            StepAttributes {
-                judging_code: [9; 32],
                 ..base
             }
             .reuse_key(),
@@ -1054,6 +1126,168 @@ mod tests {
                 std::fs::copy(entry.path(), &target).expect("拷得了文件");
             }
         }
+    }
+
+    /// 判器的判法闭包：两个判器、它们调的恢复与池级 checker、格式常量、内存池里的状态拼装、五份内核原文都在；流水线（录入、存储、
+    /// 身份、对账）、进度模块、设点的测试文件、实现的写路径、装置二进制都不在。停止表里每一条都指到现存文件、都真的拦到了（没拦到的是死条目）。
+    #[test]
+    fn the_judging_closure_of_the_judges_holds_recovery_the_checker_and_the_kernels_and_stops_before_the_pipeline(
+    ) {
+        let root = repository_root();
+        let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
+        let code = judging_code_of_the_judges(&root, &toolchain).expect("算得出");
+        println!(
+            "JUDGING_CODE entry=judges files={} raw={} stopped={} digest={}",
+            code.files.len(),
+            code.raw_files.len(),
+            code.stopped_at.len(),
+            hexadecimal_text(&code.digest)
+        );
+        for file in &code.files {
+            println!(
+                "JUDGING_CODE_FILE entry=judges file={file} reason={}",
+                code.reason_of_each_file[file]
+            );
+        }
+        for file in &code.stopped_at {
+            println!("JUDGING_CODE_STOPPED entry=judges file={file}");
+        }
+        let has = |path: &str| code.files.iter().any(|file| file == path);
+        for required in [
+            "crates/singlefs-checker-tier/src/crash.rs",
+            "crates/singlefs-checker-tier/src/crash_judge_gpu.rs",
+            "crates/singlefs-checker-tier/src/crash_judge_tables.rs",
+            "crates/singlefs-checker-tier/src/crash_facts.rs",
+            "crates/singlefs-checker/src/walk.rs",
+            "crates/singlefs-checker/src/image.rs",
+            "crates/singlefs-core/src/recovery.rs",
+            "crates/singlefs-format/src/lib.rs",
+            "crates/singlefs-harness/src/memory_pool.rs",
+        ] {
+            assert!(has(required), "判器的闭包要含 {required}");
+        }
+        for kernel in [
+            "crash_judge_common.wgsl",
+            "crash_judge_recovery.wgsl",
+            "crash_judge_checker_common.wgsl",
+            "crash_judge_checker.wgsl",
+            "crash_judge_checker_scan.wgsl",
+        ] {
+            let path = format!("crates/singlefs-checker-tier/src/{kernel}");
+            assert!(has(&path), "内核 {path} 要在判器的闭包里");
+            assert!(code.raw_files.contains(&path), "内核 {path} 要按原文进摘要");
+        }
+        for excluded in [
+            "crates/singlefs-checker-tier/src/crash_amplification.rs",
+            "crates/singlefs-checker-tier/src/verdict_store.rs",
+            "crates/singlefs-checker-tier/src/crash_identity.rs",
+            "crates/singlefs-checker-tier/src/layer0_progress.rs",
+            "crates/singlefs-checker-tier/src/crash_verify_gpu.rs",
+            "crates/singlefs-checker-tier/src/lib.rs",
+            "crates/singlefs-core/src/lib.rs",
+        ] {
+            assert!(!has(excluded), "{excluded} 不判对错，不该在判器的闭包里");
+        }
+        let outside: Vec<&String> = code
+            .files
+            .iter()
+            .filter(|file| file.contains("/tests/") || file.contains("/src/bin/"))
+            .collect();
+        assert!(
+            outside.is_empty(),
+            "测试文件与装置二进制不判对错，不该在判器的闭包里：{outside:?}"
+        );
+        for (file, reason) in FILES_THE_JUDGES_MUST_NOT_REACH {
+            assert!(
+                root.join(file).is_file(),
+                "不许引的表指到不存在的文件 {file}（{reason}）"
+            );
+            assert!(
+                !has(file) && !code.stopped_at.contains(*file),
+                "判器引到了 {file}：它不该在判法闭包里（{reason}）"
+            );
+        }
+        for (stop_file, reason) in JUDGE_CLOSURE_STOP_FILES {
+            assert!(
+                root.join(stop_file).is_file(),
+                "停止表指到不存在的文件 {stop_file}（{reason}）"
+            );
+            assert!(
+                code.stopped_at.contains(*stop_file),
+                "停止表里的 {stop_file} 没被判器引到：死条目，删掉它"
+            );
+        }
+    }
+
+    /// 判定只随判器变：在仓副本里给流水线、存储、身份、进度模块、设点的测试文件、实现的写路径各加一条真语句，判法摘要不动；
+    /// 给 CPU 判器、GPU 判器、它的输入表、恢复、池级 checker 走树各加一条，摘要变；一份内核原文改一个字节，摘要变。
+    #[test]
+    fn the_judging_digest_ignores_the_pipeline_and_the_progress_module_but_follows_every_judge() {
+        let root = repository_root();
+        let copy = std::env::temp_dir().join(format!(
+            "singlefs-judging-closure-copy-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&copy);
+        copy_tree(&root.join("crates"), &copy.join("crates"));
+        std::fs::copy(root.join("Cargo.lock"), copy.join("Cargo.lock")).expect("拷得了 Cargo.lock");
+        let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
+        let baseline = judging_code_of_the_judges(&copy, &toolchain)
+            .expect("副本算得出")
+            .digest;
+        let digest_after_appending = |file: &str, appended: &str| {
+            let path = copy.join(file);
+            let original = std::fs::read(&path).expect("读得了副本里的文件");
+            let mut edited = original.clone();
+            edited.extend_from_slice(appended.as_bytes());
+            std::fs::write(&path, &edited).expect("写得了副本");
+            let digest = judging_code_of_the_judges(&copy, &toolchain)
+                .expect("改过的副本算得出")
+                .digest;
+            std::fs::write(&path, &original).expect("还原得了副本");
+            digest
+        };
+        const RUST_PROBE: &str = "\npub const JUDGING_CLOSURE_PROBE: u8 = 1;\n";
+        for unchanged in [
+            "crates/singlefs-checker-tier/src/crash_amplification.rs",
+            "crates/singlefs-checker-tier/src/verdict_store.rs",
+            "crates/singlefs-checker-tier/src/crash_identity.rs",
+            "crates/singlefs-checker-tier/src/layer0_progress.rs",
+            "crates/singlefs-checker-tier/src/crash_verify_gpu.rs",
+            "crates/singlefs-checker-tier/src/crash_judge_dispatch.rs",
+            "crates/singlefs-checker-tier/src/gpu_unit_checks.rs",
+            "crates/singlefs-checker-tier/src/lib.rs",
+            "crates/singlefs-core/src/lib.rs",
+            "crates/singlefs-checker-tier/tests/common_crash_points/mod.rs",
+        ] {
+            assert_eq!(
+                digest_after_appending(unchanged, RUST_PROBE),
+                baseline,
+                "改 {unchanged} 不该动判法摘要"
+            );
+        }
+        for changed in [
+            "crates/singlefs-checker-tier/src/crash.rs",
+            "crates/singlefs-checker-tier/src/crash_judge_gpu.rs",
+            "crates/singlefs-checker-tier/src/crash_judge_tables.rs",
+            "crates/singlefs-core/src/recovery.rs",
+            "crates/singlefs-checker/src/walk.rs",
+        ] {
+            assert_ne!(
+                digest_after_appending(changed, RUST_PROBE),
+                baseline,
+                "改 {changed} 要动判法摘要"
+            );
+        }
+        assert_ne!(
+            digest_after_appending(
+                "crates/singlefs-checker-tier/src/crash_judge_checker.wgsl",
+                "\n// probe\n"
+            ),
+            baseline,
+            "内核原文改一个字节要动判法摘要"
+        );
+        std::fs::remove_dir_all(&copy).expect("删得掉副本");
     }
 
     /// 身份要能跨机器、跨目录：同一份代码拷到别的路径，判法代码收的文件与摘要逐字相同。

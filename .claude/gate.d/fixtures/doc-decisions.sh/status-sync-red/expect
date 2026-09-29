@@ -1,9 +1,0 @@
-exit=1
-want=变更史各节顶上的现状与索引表有 5 处对不上
-want=.claude/kb/decisions-history.md:5  D1 的现状行与索引表对不上：这里写「已定 1 项 / 未定 0 项。块取 32 KiB」，索引表是「已定 1 项 / 未定 0 项。块取 16 KiB」
-want=.claude/kb/decisions-history.md:11 ## D2（样本二）  节顶上没有「**现状**：」一行；索引表那一行是「**现状**：已定 2 项 / 未定 1 项。条带可变」
-want=.claude/kb/decisions-history.md:17 ## D4（索引里没有的）  .claude/kb/decisions.md 的索引表里没有 D4 这一行
-want=.claude/kb/decisions.md 的索引表有 D3，.claude/kb/decisions-history.md 里没有 `## D3（简称）` 节
-want=.claude/kb/experiments-history.md:5  E1 的现状行与索引表对不上：这里写「未跑。一半已答」，索引表是「部分已跑。一半已答」
-want=  status-sync：红（退出 1）
-want=doc-decisions.sh：1 格里 1 格红（status-sync）

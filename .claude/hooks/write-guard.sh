@@ -37,7 +37,9 @@
 #
 #   write-guard.sh             # 从 stdin 读 hook 的 JSON
 #   write-guard.sh --selftest  # 走一遍五道判定的放行与拒绝；WRITE_GUARD_DISABLE_OVERWRITE=1、WRITE_GUARD_DISABLE_COMPILE_FIRST=1、
-#                              # WRITE_GUARD_DISABLE_SCOPE=1 或 WRITE_GUARD_DISABLE_CLOCK_TIMES=1 时自检必须判红；
+#                              # WRITE_GUARD_DISABLE_SCOPE=1、WRITE_GUARD_DISABLE_CLOCK_TIMES=1 或 WRITE_GUARD_DISABLE_SYNTAX=1 时自检必须判红；
+#                              # 第六道：写进 .claude/hooks/、.claude/gate.d/、.claude/scripts/、research/scripts/ 下的 .sh 先过 bash -n、.py 先过 ast 解析，
+#                              # 语法错的拒（带语法错误的钩子一上线，每一次 Bash 调用都收到它的报错）；
 #                              # LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键>（钟点的 date-zone-hour、date-zone-period、period-hour、hour-suffix、
 #                              # bare-clock、iso-timestamp、zone-word，键写在 ../gate.d/lib-forbidden-notations.py）关掉一条判据行时，点名那一行的用例必须判红；
 #                              # LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=clock-times 时靠上下文放行的用例、LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=clock-times 时
@@ -230,6 +232,64 @@ def decide_clock_times(hook_input, project_root, library_path):
                "命中的其实不是钟点（产物字段、切片、编号对），改 .claude/gate.d/lib-forbidden-notations.py 的上下文规则\n"
                "→ 钟点确实是被测输入的整份文件（hook 自检、门禁样本），登记进 .claude/gate.d/lib-forbidden-notations.py 里钟点那一形态的 excluded_prefixes 并写明理由")
 
+SYNTAX_CHECKED_DIRECTORIES = (".claude/hooks", ".claude/gate.d", ".claude/scripts", "research/scripts")
+PYTHON_SYNTAX_CHECK = "import ast, sys; ast.parse(open(sys.argv[1], encoding='utf-8').read(), sys.argv[1])"
+
+def edited_content(hook_input, target):
+    """Write 给的整份内容，或 Edit / MultiEdit 施加到现文件之后的内容；施加不了（文件不在、旧串找不到）返回 None，那一步 Edit 自己会拒。"""
+    tool_name = hook_input.get("tool_name")
+    tool_input = hook_input.get("tool_input") or {}
+    if tool_name == "Write":
+        return tool_input.get("content")
+    if not os.path.isfile(target):
+        return None
+    try:
+        text = open(target, encoding="utf-8", errors="replace").read()
+    except OSError:
+        return None
+    edits = tool_input.get("edits") if tool_name == "MultiEdit" else [tool_input]
+    for edit in edits or []:
+        old_string = edit.get("old_string") or ""
+        if not old_string or old_string not in text:
+            return None
+        new_string = edit.get("new_string") or ""
+        text = text.replace(old_string, new_string) if edit.get("replace_all") else text.replace(old_string, new_string, 1)
+    return text
+
+def decide_shell_syntax(hook_input, project_root):
+    """六、钩子、门禁、项目脚本与研究脚本目录下的 .sh 与 .py：写进去的内容先过语法，过不了就拒。"""
+    if os.environ.get("WRITE_GUARD_DISABLE_SYNTAX") == "1" or hook_input.get("tool_name") not in ("Write", "Edit", "MultiEdit"):
+        return 0, None
+    target = absolute_target(hook_input, project_root)
+    if not target:
+        return 0, None
+    relative = os.path.relpath(target, project_root)
+    if relative.startswith("..") or not any(relative.startswith(directory + "/") for directory in SYNTAX_CHECKED_DIRECTORIES):
+        return 0, None
+    if target.endswith(".sh"):
+        checker, checker_name = ["bash", "-n"], "bash -n"
+    elif target.endswith(".py"):
+        checker, checker_name = [sys.executable, "-c", PYTHON_SYNTAX_CHECK], "python3 的 ast 解析"
+    else:
+        return 0, None
+    content = edited_content(hook_input, target)
+    if content is None:
+        return 0, None
+    handle = tempfile.NamedTemporaryFile("w", suffix=os.path.splitext(target)[1], delete=False, encoding="utf-8")
+    handle.write(content)
+    handle.close()
+    try:
+        result = subprocess.run(checker + [handle.name], capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return 0, None
+    finally:
+        os.unlink(handle.name)
+    if result.returncode == 0:
+        return 0, None
+    detail = (result.stderr or result.stdout).strip().replace(handle.name, relative)[-600:]
+    return 2, (f"✗ 写进 {relative} 的内容过不了 {checker_name}：\n  {detail}\n"
+               f"→ 怎么办：先在草稿目录里改到 `{checker_name}` 过，再写进来；钩子、门禁与脚本带着语法错误上线，之后每一次调用都会收到它的报错。")
+
 def decide(hook_input, project_root, table_path, prime_marks_library, clock_times_library=None):
     """返回 (0, None, None) 放行；(2, 说明, 哪一道) 拒绝。"""
     code, message = decide_overwrite(hook_input, project_root)
@@ -238,6 +298,9 @@ def decide(hook_input, project_root, table_path, prime_marks_library, clock_time
     code, message = decide_compile_first(hook_input, project_root)
     if code:
         return code, message, "绕过先编后换"
+    code, message = decide_shell_syntax(hook_input, project_root)
+    if code:
+        return code, message, "写进语法错误"
     code, message = decide_scope(hook_input, project_root, table_path)
     if code:
         return code, message, "越出写范围"
@@ -320,12 +383,25 @@ def selftest(hook_dir):
             if agent:
                 hook_input["agent_type"] = agent
             return (label, want, decide(hook_input, work, table, library)[2])
+        os.makedirs(os.path.join(work, "research", "scripts"))
+        open(os.path.join(work, "research", "scripts", "y.sh"), "w").write("#!/usr/bin/env bash\necho ok\n")
+        def content_case(label, tool_name, path, tool_input, want):
+            hook_input = {"tool_name": tool_name, "tool_input": dict(tool_input, file_path=path)}
+            return (label, want, decide(hook_input, work, table, library)[0])
         def prime_case(label, tool_name, agent, tool_input, want, library_path=library):
             hook_input = {"tool_name": tool_name, "tool_input": dict(tool_input, file_path=f"{work}/crates/a.rs")}
             if agent:
                 hook_input["agent_type"] = agent
             return (label, want, decide(hook_input, work, table, library_path)[0])
         cases += [
+            # 六、语法：钩子、门禁、项目脚本、研究脚本目录下的 .sh / .py
+            content_case("语法:hooks 下写进语法错误的 .sh", "Write", f"{work}/.claude/hooks/x.sh", {"content": "if [ ; then\n  echo\n"}, 2),
+            content_case("语法:hooks 下语法对的 .sh", "Write", f"{work}/.claude/hooks/x.sh", {"content": "#!/usr/bin/env bash\necho ok\n"}, 0),
+            content_case("语法:Edit 把研究脚本改出语法错误", "Edit", f"{work}/research/scripts/y.sh", {"old_string": "echo ok", "new_string": "if [ ; then"}, 2),
+            content_case("语法:Edit 研究脚本合法改动", "Edit", f"{work}/research/scripts/y.sh", {"old_string": "echo ok", "new_string": "echo fine"}, 0),
+            content_case("语法:门禁目录下语法错误的 .py", "Write", f"{work}/.claude/gate.d/z.py", {"content": "def (:\n"}, 2),
+            content_case("语法:门禁目录下语法对的 .py", "Write", f"{work}/.claude/gate.d/z.py", {"content": "print(1)\n"}, 0),
+            content_case("语法:别处的 .sh 不判", "Write", f"{work}/crates/run.sh", {"content": "if [ ; then\n"}, 0),
             # 一、整份覆盖未跟踪文件
             case("覆盖:未跟踪的已有文件用 Write", "Write", None, f"{work}/untracked.md", 2),
             case("覆盖:未跟踪的已有文件用 Edit", "Edit", None, f"{work}/untracked.md", 0),
@@ -518,10 +594,11 @@ def selftest(hook_dir):
     for label, want, got in failures:
         print(f"  ✗ 自检：{label} 应当是 {want}，实际 {got}")  # gate-lint:detail
     if failures:
-        print("    → 看 decide_overwrite() / decide_compile_first() / decide_scope() / decide_prime_marks() / decide_clock_times() 与入口；"
-              "WRITE_GUARD_DISABLE_OVERWRITE / WRITE_GUARD_DISABLE_COMPILE_FIRST / WRITE_GUARD_DISABLE_SCOPE / WRITE_GUARD_DISABLE_CLOCK_TIMES 设着的话这里本来就该红")
+        print("    → 看 decide_overwrite() / decide_compile_first() / decide_shell_syntax() / decide_scope() / decide_prime_marks() / decide_clock_times() 与入口；"
+              "WRITE_GUARD_DISABLE_OVERWRITE / WRITE_GUARD_DISABLE_COMPILE_FIRST / WRITE_GUARD_DISABLE_SYNTAX / WRITE_GUARD_DISABLE_SCOPE / WRITE_GUARD_DISABLE_CLOCK_TIMES 设着的话这里本来就该红")
         return 1
-    print(f"  ✓ 自检通过（查了 {len(cases)} 种情形）：未跟踪的已有文件整份覆盖拒绝，已跟踪 / 不存在 / 仓外 / Edit 放行；主 agent 与内置 agent 放行、范围内放行、"
+    print(f"  ✓ 自检通过（查了 {len(cases)} 种情形）：钩子、门禁、项目脚本、研究脚本目录下写进语法错误的 .sh（Write 与 Edit）与 .py 拒绝、语法对的与别处的放行；"
+          "未跟踪的已有文件整份覆盖拒绝，已跟踪 / 不存在 / 仓外 / Edit 放行；主 agent 与内置 agent 放行、范围内放行、"
           "范围外与 .. 绕路与未登记的项目 agent 拒绝；experiment-runner 写主工作区 crates/ 下的 .rs（改、新建、.. 绕路）按先编后换拒绝并点名 compile-then-swap.py，"
           "implementation-writer 与主 agent 写同一处、执行员写草稿目录与 crates/mutations.tsv 放行；Write 内容、Edit 与 MultiEdit 的 new_string 里有撇号类角标（五个字符各一例，主 agent 与子 agent 一样）拒绝，"
           "只在 old_string 里有、ASCII 单引号放行，共用字符集读不到拒绝；写进仓里的内容带钟点（日期后、时区词旁、x 通配、日期或时区词后的「N 点 / N 时」与时段词、时段词后的钟点、光秃的「N 点前后」、"

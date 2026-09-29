@@ -1,4 +1,4 @@
-//! checker 档模块：crash、layer0_progress
+//! checker 档模块：crash、layer0_progress、crash_amplification
 //! 里程碑「覆盖写、释放、回退与复用」并行线一的层 0 小负载（验收第 3 条）：多条记录的发布边界在小单元数上造出来——
 //! 「取号 → 暖机 × 2 → A（第一个文件，一个数据单元：12 个单元）→ B（顺序写两个数据单元：14 个单元、两条记录）
 //! → C（顺序写三个数据单元：15 个单元、三条记录）」整条录制流按 D13（验证路线） 已定项 4 枚举崩溃状态，
@@ -24,6 +24,8 @@
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
+#[cfg(feature = "verdict-store")]
+mod common_crash_points;
 
 use common::{build_pool, file_content, geometry, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS};
 use singlefs_checker_tier::crash::{
@@ -416,4 +418,63 @@ fn full_enumeration_of_the_multi_record_publish_stream_is_exhaustive_and_clean()
     );
     assert_eq!(tally.states, closed_form);
     assert_clean(&tally);
+}
+
+/// 崩溃放量的形态（前缀节点与别的流共享：取号加暖机、新池新建文件两个点由公共模块设，B、C 两次顺序写各一个点）：按环境跑一趟，
+/// 健康的流零红；配置开了 GPU 就是 GPU 判器判。展开上限默认 6（每段真子集全枚举时状态数 2^n − 1）。
+#[cfg(feature = "verdict-store")]
+#[test]
+fn crash_amplification_of_the_multi_record_publish_stream_is_clean() {
+    use singlefs_checker_tier::crash_amplification::CrashPointRecorder;
+    let mut pool = build_pool("crash-amplification-multi-record");
+    let mut recorder = CrashPointRecorder::new(pool.stream.clone(), pool.mkfs_operation_count);
+    common_crash_points::record_pool_build(&mut recorder, &pool);
+    let first = pool.output.clone();
+    let second_content = content_needing(2, 1);
+    let second = recorder.step(file!(), "sequential_write", || {
+        sequential_write(&mut pool, &second_content)
+    });
+    let third_content = content_needing(3, 2);
+    let third = recorder.step(file!(), "sequential_write", || {
+        sequential_write(&mut pool, &third_content)
+    });
+    let base = pool.memory_pool_after_mkfs();
+    let operations = pool.retained_operations();
+    let (writes, segments, stream_indexes) =
+        singlefs_harness::memory_pool::writes_and_segments_with_stream_indexes(
+            &operations[pool.mkfs_operation_count..],
+            &geometry(),
+        );
+    let crash_points = recorder.into_crash_points(&writes, &segments, &stream_indexes);
+    let judged_root_index = writes
+        .iter()
+        .rposition(|write| write.kind == StepKind::RootRecordFua)
+        .expect("根槽写");
+    let versions = vec![
+        PublishedVersion {
+            instance: first.root.instance,
+            checkpoint_txg: first.root.checkpoint_txg,
+            content: file_content(),
+        },
+        PublishedVersion {
+            instance: second.root.instance,
+            checkpoint_txg: second.root.checkpoint_txg,
+            content: second_content,
+        },
+        PublishedVersion {
+            instance: third.root.instance,
+            checkpoint_txg: third.root.checkpoint_txg,
+            content: third_content,
+        },
+    ];
+    common_crash_points::amplify_prepared_flow(
+        "multi-record-publish",
+        &base,
+        &writes,
+        &segments,
+        judged_root_index,
+        &versions,
+        crash_points,
+        6,
+    );
 }

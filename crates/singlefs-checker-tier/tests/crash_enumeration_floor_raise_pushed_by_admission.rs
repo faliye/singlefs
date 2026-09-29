@@ -5,8 +5,12 @@
 //! 恢复之后与挂载之后两份镜像的池级 checker 都判；挂载那一遍照枚举用的写表叠，撕裂那一态的镜像也交给挂载。
 //! 名字里不带 layer0：它不是层 0 的全量流，是一条历史上的一小段，平时跑得起。
 
+#[path = "../../singlefs-harness/tests/common/mod.rs"]
+mod common;
 #[path = "../../singlefs-harness/tests/common_admission/mod.rs"]
 mod common_admission;
+#[cfg(feature = "verdict-store")]
+mod common_crash_points;
 
 use common_admission::{
     checker_violations_on, content_of, plain_devices_on, PoolUnderTest, OVERWRITE_BYTES,
@@ -23,24 +27,25 @@ use singlefs_core::mount::{
 };
 use singlefs_core::transaction::{FirstFile, PoolVersion, PoolWriter, PublishError};
 use singlefs_harness::history::HistoryDeviceWidth;
-use singlefs_harness::memory_pool::{writes_and_segments, MemoryPool, RetainedWrite};
+use singlefs_harness::memory_pool::{
+    writes_and_segments, MemoryPool, PublishedVersion, RetainedWrite, SparseBlockDevice,
+};
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
-/// 崩在准入推的那一串空发布中间（攻方「崩在准入推空发布的那一串中间」那一形）：会话里数据单元在段外落不下的那一刻（单元区 384 槽的小盘，
-/// 崩了再挂之后第 62 次覆盖写，见 `admission_raises_the_floor_before_refusing.rs` 的
-/// `an_overwrite_whose_data_unit_has_no_slot_pair_outside_the_cluster_segments_is_refused_by_the_admission_and_published_after_raising_the_floor_in_the_session`；
-/// ckpt_cost 按最坏情况计之后第 18、32、47 次是式子先拒、会话推过再发成，第 62 次是「这次的单元落得下」那一判先拒——C545 用户 2026-09-27 定准入先拒，
-/// 此前那一次是走固定点时落点被拒），
-/// 只录会话推的那一串抬 F（先把新 F 写进每块盘的系统配置、那几次带新 F 的空发布），按层 0 的枚举域（每一段都展开）枚举这条流的每个崩溃状态：
-/// 恢复之后 oracle 与池级 checker 0 违例（枚举器自己判）；再可写挂载（空间准入判着），挂载之后的镜像池级 checker 0 违例；
-/// 挂载全做成。状态数照层 0 的口径另算（系统配置槽写是原地覆写、取三态，[`layer0_state_count_with_torn_in_place_overwrites`]），
-/// 落在 10⁶ 以内才枚举；挂载那一遍的镜像照观察者交来的枚举用写表叠（录制流里的写在前，撕裂镜像与重放接在后面），不只叠录制流那几次写。
-#[test]
-#[ignore = "崩溃枚举：提交时由崩溃验证员按输入哈希跑（release），平时不跑"]
-fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount_with_the_checker_green(
-) {
-    const STATES_AT_MOST: u64 = 1_000_000;
+/// 录好的那一串抬 F：推之前的镜像、那一串的写表与段、最后一次根槽写、每一版（含推过之后重发的那一次覆盖写），与仍挂着的池。
+struct RecordedFloorRaise {
+    pool: PoolUnderTest<RecordingBlockDevice<SparseBlockDevice>>,
+    base: MemoryPool,
+    writes: Vec<RetainedWrite>,
+    segments: Vec<Vec<usize>>,
+    last_root_write: usize,
+    versions: Vec<PublishedVersion>,
+}
+
+/// 会话覆盖写 61 次之后直接发布到准入先拒（写这条用例时拒在第 62 次，准入的式子改过之后往后挪，按实际拒的那一次取）、推一串抬 F、
+/// 再把那一次覆盖写重发做成；只录推的那一串。层 0 用例与流水线用例共用这一段。
+fn record_the_floor_raise_pushed_by_the_session() -> RecordedFloorRaise {
     let stream = SharedStream::retaining_contents();
     let stream_for_the_devices = stream.clone();
     let mut pool = PoolUnderTest::start_after_the_first_file(
@@ -59,32 +64,49 @@ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount
         pool.overwrite(OVERWRITE_BYTES)
             .unwrap_or_else(|refusal| panic!("第 {overwrite_index} 次覆盖写：{refusal:?}"));
     }
-    // 第 62 次：直接调发布路径，准入先拒（每块盘段外成对的空槽 0 对，走固定点之前「这次的单元落得下」那一判拒，在任何写之前返回）；再照会话被拒之后那一步推一串抬 F
-    // （`push_one_floor_raise_within_the_admission_budget`，会话调的就是它），只录这一串。
+    // 之后直接调发布路径，一次一次发，直到准入先拒（每块盘段外成对的空槽 0 对，走固定点之前「这次的单元落得下」那一判拒，在任何写之前返回）；
+    // 拒之前做成的每一次都当现行那一版记下（版本表要它）。写这条用例时拒在第 62 次；准入的式子改过之后拒的那一次会往后挪，按实际拒的那一次取，
+    // 200 次之内拒不了就是场景没了、用例红。拒了再照会话那样推一串抬 F（`push_one_floor_raise_within_the_admission_budget`，会话调的就是它），只录这一串。
     let mut session = pool.session.take().expect("这次挂载的会话");
-    pool.write_time_seconds += 1;
-    let content = content_of(OVERWRITE_BYTES, pool.write_time_seconds);
+    let mut refused_at: Option<usize> = None;
+    for attempt in 62..=262 {
+        pool.write_time_seconds += 1;
+        let content = content_of(OVERWRITE_BYTES, pool.write_time_seconds);
+        let PoolVersion::WithFile(current) = &mut session.current else {
+            panic!("挂载之后现行那一版带文件");
+        };
+        let outcome = {
+            let mut writer = PoolWriter::new(&pool.parameters, pool.devices.as_mut_slice());
+            singlefs_core::transaction::publish_overwrite(
+                &mut writer,
+                &mut session.allocator,
+                current,
+                FirstFile {
+                    content: &content,
+                    write_time_seconds: pool.write_time_seconds,
+                },
+                session.instance,
+            )
+        };
+        match outcome {
+            Err(PublishError::SpaceAdmissionRefused(_)) => {
+                refused_at = Some(attempt);
+                break;
+            }
+            Ok(published) => {
+                pool.content_of_the_current_version = content.clone();
+                pool.note_root_of_the_current_content(&published.root);
+                *current = published;
+            }
+            Err(other) => panic!("第 {attempt} 次覆盖写不该这样失败：{other:?}"),
+        }
+    }
+    let refused_at =
+        refused_at.expect("200 次直接发布之内准入总要先拒一次（数据单元在段外落不下）");
+    println!("FLOOR_RAISE_PUSHED_BY_THE_SESSION admission_refused_at_overwrite={refused_at}");
     let PoolVersion::WithFile(current) = &mut session.current else {
         panic!("挂载之后现行那一版带文件");
     };
-    let refused = {
-        let mut writer = PoolWriter::new(&pool.parameters, pool.devices.as_mut_slice());
-        singlefs_core::transaction::publish_overwrite(
-            &mut writer,
-            &mut session.allocator,
-            current,
-            FirstFile {
-                content: &content,
-                write_time_seconds: pool.write_time_seconds,
-            },
-            session.instance,
-        )
-    };
-    assert!(
-        matches!(refused, Err(PublishError::SpaceAdmissionRefused(_))),
-        "第 62 次：准入先拒（数据单元在段外落不下）：{:?}",
-        refused.as_ref().map(|version| version.root.checkpoint_txg)
-    );
     let base = pool.image();
     let operations_before_the_raise = stream.operation_count();
     let FloorRaisePushedWithinTheAdmissionBudget::Raised(raised) =
@@ -104,8 +126,8 @@ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount
     pool.note_floor_raises(std::slice::from_ref(&raised));
     let recorded = stream.retained_operations()[operations_before_the_raise..].to_vec();
     let geometry = HistoryDeviceWidth::UnitAreaOf384Slots.fixed_geometry();
-    let (writes_of_the_raise, segments_of_the_raise) = writes_and_segments(&recorded, &geometry);
-    let root_writes: Vec<usize> = writes_of_the_raise
+    let (writes, segments) = writes_and_segments(&recorded, &geometry);
+    let root_writes: Vec<usize> = writes
         .iter()
         .enumerate()
         .filter(|(_, write)| write.kind == StepKind::RootRecordFua)
@@ -116,7 +138,44 @@ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount
         raised.publishes.len(),
         "那一串里每次空发布一次根槽写"
     );
-    let last_root_write_of_the_raise = *root_writes.last().expect("那一串至少一次空发布");
+    let last_root_write = *root_writes.last().expect("那一串至少一次空发布");
+    // 推过之后同一次覆盖写照会话那样重发，做成（这一格的结局与会话里那一次相同）。
+    pool.overwrite(OVERWRITE_BYTES)
+        .expect("推过抬 F 之后覆盖写做成");
+    let versions = pool.published_versions();
+    RecordedFloorRaise {
+        pool,
+        base,
+        writes,
+        segments,
+        last_root_write,
+        versions,
+    }
+}
+
+/// 崩在准入推的那一串空发布中间（攻方「崩在准入推空发布的那一串中间」那一形）：会话里数据单元在段外落不下的那一刻（单元区 384 槽的小盘，
+/// 崩了再挂之后会话覆盖写 61 次、再直接发布到准入拒（写这条用例时是第 62 次，准入的式子改过之后往后挪，用例按实际拒的那一次取、打一行
+/// `FLOOR_RAISE_PUSHED_BY_THE_SESSION admission_refused_at_overwrite=`），见 `admission_raises_the_floor_before_refusing.rs` 的
+/// `an_overwrite_whose_data_unit_has_no_slot_pair_outside_the_cluster_segments_is_refused_by_the_admission_and_published_after_raising_the_floor_in_the_session`；
+/// ckpt_cost 按最坏情况计之后第 18、32、47 次是式子先拒、会话推过再发成，第 62 次是「这次的单元落得下」那一判先拒——C545 用户 2026-09-27 定准入先拒，
+/// 此前那一次是走固定点时落点被拒），
+/// 只录会话推的那一串抬 F（先把新 F 写进每块盘的系统配置、那几次带新 F 的空发布），按层 0 的枚举域（每一段都展开）枚举这条流的每个崩溃状态：
+/// 恢复之后 oracle 与池级 checker 0 违例（枚举器自己判）；再可写挂载（空间准入判着），挂载之后的镜像池级 checker 0 违例；
+/// 挂载全做成。状态数照层 0 的口径另算（系统配置槽写是原地覆写、取三态，[`layer0_state_count_with_torn_in_place_overwrites`]），
+/// 落在 10⁶ 以内才枚举；挂载那一遍的镜像照观察者交来的枚举用写表叠（录制流里的写在前，撕裂镜像与重放接在后面），不只叠录制流那几次写。
+#[test]
+#[ignore = "崩溃枚举：提交时由崩溃验证员按输入哈希跑（release），平时不跑"]
+fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount_with_the_checker_green(
+) {
+    const STATES_AT_MOST: u64 = 1_000_000;
+    let RecordedFloorRaise {
+        pool,
+        base,
+        writes: writes_of_the_raise,
+        segments: segments_of_the_raise,
+        last_root_write: last_root_write_of_the_raise,
+        versions,
+    } = record_the_floor_raise_pushed_by_the_session();
     let states = layer0_state_count_with_torn_in_place_overwrites(
         &base,
         &writes_of_the_raise,
@@ -127,10 +186,6 @@ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount
         states > 0 && states <= STATES_AT_MOST,
         "推的那一串的崩溃状态数 {states} 在 10⁶ 以内"
     );
-    // 推过之后同一次覆盖写照会话那样重发，做成（这一格的结局与会话里那一次相同）。
-    pool.overwrite(OVERWRITE_BYTES)
-        .expect("推过抬 F 之后覆盖写做成");
-    let versions = pool.published_versions();
     // 线程数与层 0 同一个来源（环境变量 `SINGLEFS_LAYER0_THREADS`，`research/scripts/capped.sh` 设它），挂载那一遍也按它分片。
     let parallelism = Layer0Parallelism::from_environment();
     // 观察者交来的 `image.writes` 是枚举用的写表（`CrashImage` 的文档：录制流里的写在前，原地覆写的撕裂镜像与重放接在后面），
@@ -247,4 +302,29 @@ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount
         states,
         failures.len()
     );
+}
+
+/// 抬 F 那一串接进崩溃放量流水线（用户 2026-09-29 定：崩溃注入之外的崩溃枚举用例都进流水线、由 GPU 判）：推之前的镜像是起点，
+/// 只录推的那一串，一个点全部展开；判器是流水线的（两遍恢复、oracle、池级 checker、记录核对器）。挂载那一遍不在流水线里，
+/// 归上面的层 0 用例。展开上限从环境取（`SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO`，没设 6）。
+#[cfg(feature = "verdict-store")]
+#[test]
+fn crash_amplification_of_the_floor_raise_pushed_by_the_session_is_clean() {
+    let recorded = record_the_floor_raise_pushed_by_the_session();
+    let crash_points = common_crash_points::one_crash_point_over_every_write(
+        file!(),
+        "raise_rollback_floor_pushed_by_the_session",
+        recorded.writes.len(),
+    );
+    common_crash_points::amplify_prepared_flow(
+        "floor-raise-pushed-by-the-session",
+        &recorded.base,
+        &recorded.writes,
+        &recorded.segments,
+        recorded.last_root_write,
+        &recorded.versions,
+        crash_points,
+        6,
+    );
+    drop(recorded.pool);
 }

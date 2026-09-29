@@ -1,0 +1,284 @@
+# dispatch.py 口径：/home/fy5090/.claude/projects/-home-fy5090-code-singlefs 下 2026-09-20 起改动过的会话记录
+
+## 派发：按类型（Agent 工具调用次数，含被闸拒的）
+合计 1772 ；真正起来的 1582 ；平均提示长度（字符） 1491
+  general-purpose             296
+  implementation-writer       286
+  experiment-runner           163
+  three-way-local-attack      132
+  three-way-attack            131
+  three-way-materials         127
+  kb-scribe                   118
+  three-way-verifier          105
+  three-way-forward           98
+  tooling-writer              81
+  experiment-designer         63
+  sweep                       61
+  three-way-defense           31
+  kb-spec-drafter             24
+  investigator                19
+  Explore                     16
+  gate-triage                 12
+  mutation-triage             4
+  three-way-local-defense     2
+  prior-art                   2
+  crash-verifier              1
+
+## 主 agent 侧的钩子拒绝（按钩子、按原因）
+  runner-dispatch-guard.sh: 187
+        16 派 experiment-runner 的提示里没写「这一段回答的岔路：…」。
+         9 派 tooling-writer 的提示缺它定义要的输入：要改的文件（.claude/a
+         9 EN 已经有实验页，这是续做，派发提示里却没写「上一段岔路表里还差：…」。
+         9 这一件要动的文件与还在跑的实现员撞了：crates/mutations.tsv、crat
+         6 派 tooling-writer 的提示缺它定义要的输入：出口（.claude/agen
+         6 本会话已有 N 个 opus 子 agent 在跑（<id>、ab
+  bash-command-detector.sh: 61
+        16 命令里有 pgrep -f / pkill -f / killall：模式串会命中这条命
+        12 看门狗起法不对（run_in_background 不是 true；命令里有单独的 &；
+         7 要在同一个 inode 上改一个已经存在的脚本（认出的写法与目标：python Path
+         5 终止进程的写法打得到不是自己点名的那一个进程（proc.py stop 在 for / 
+         4 要在同一个 inode 上改一个已经存在的脚本（认出的写法与目标：python open
+         3 终止进程的写法打得到不是自己点名的那一个进程（proc.py stop：进程 N
+  heavy-test-guard.sh: 20
+         4 提交时才跑的检查被拒：.claude/singlefs-ai-sop/scripts/d
+         2 重型测试被拒：cargo test 跑到 singlefs-checker-tier 包
+         2 提交时才跑的检查被拒：门禁阶段 N-review-and-sync-records.sh
+         2 重型测试被拒：research/scripts/layerN-shard-run.sh（
+         1 重型测试被拒：cargo test 跑到 singlefs-checker 包的测试（c
+         1 重型测试被拒：门禁 N 号（N-qemu-first-transaction.sh）（Q
+  pattern-process-guard.sh: 5
+         5 这条命令里有按模式找进程的写法（pgrep 或 pkill 带 -f / --full，
+  write-guard.sh: 4
+         2 拒绝用 Write 整份覆盖 /home/fyN/code/singlefs/.cla
+         1 写进去的内容里有撇号类角标 [角标]（U+N）在「…），它们的去向是「ignore，等 
+         1 写进去的内容里有撇号类角标 [角标]（U+N）在「…# ④[角标] --send 点…」
+  ask-user-claim-guard.sh: 3
+         3 弹窗里有 N 句带断言词，同一句里却没有出处，也没写明是推的——这样送到用户面前，推断就
+  continuation-guard.sh: 1
+         1 子 agent <id> 已经交回过（它的会话记录里有一次送达的 
+  ?: 1
+         1 ): [('?', N), ('heavy-test-guard.sh', N)]
+
+## 同一描述在同一会话里派第三次以上
+描述数 184 ；覆盖派发 726 ；占派发 41%
+   12 ('d16a74c5', '实审 B3b 崩溃注入补可写挂载等')
+    9 ('d16a74c5', '实审 B3a 验证装置切段与稀疏盘')
+    9 ('d16a74c5', '实审 A2a 核心静默出错五条')
+    9 ('d16a74c5', '实审 B2 checker 查窄的不变量等')
+    9 ('d16a74c5', '实审 B3a-2 按设备切段与第三态')
+    8 ('71b89f6d', 'E155 第二段收尾（新执行员）')
+    8 ('d16a74c5', 'Build the round-3 three-way materials')
+    8 ('d16a74c5', 'Write E156 rerun registration for three ')
+
+## 派发批与串行
+批（相邻派发间隔 90 秒内）中位 2 ；只派 1 个的批占 47% ；最大一批 24
+交回通知之后 10 分钟内的派发 352 （22%）
+
+## 主 agent 发的消息与 TaskStop
+{'给别的会话': 465, '纠正/追加': 573, '例行询问': 136}
+TaskStop {'bash/other': 380, 'agent': 46}
+
+## 后台任务通知（类别、状态、看门狗退出码）
+    912 ('agent', 'completed', '')
+    534 ('watchdog', 'failed', '3')
+    152 ('bash-other', 'completed', '')
+    144 ('watchdog', 'completed', '0')
+    116 ('heavy/cargo', 'completed', '')
+     79 ('agent', 'failed', '')
+     38 ('bash-other', '?', '')
+     33 ('watchdog', 'failed', '4')
+     23 ('agent', 'stopped', '')
+     20 ('watchdog', 'stopped', '-')
+      9 ('bash-other', 'stopped', '')
+      9 ('bash-other', 'failed', '')
+      7 ('agent', '?', '')
+      1 ('heavy/cargo', 'failed', '')
+      1 ('agent', 'killed', '')
+
+## 看门狗告警之后主 agent 的第一批工具调用
+508 {'read-output': 444, 'watch': 35, 'bash-other': 26, 'Read': 3}
+
+## 主 agent 读到的看门狗告警名（含重复读）
+    224 hook 检出
+     51 结束本轮却不会醒
+     39 跑满 N 小时要主 agent 问一次
+     34 上下文过大
+     31 工具调用过长
+     20 同一命令反复且输出不变
+     13 无动静
+     12 进程无输出
+     10 按内容哈希认，不按文件名认
+      5 重型测试没带前缀
+      5 等待循环
+      5 行号按 N
+      4 禁用命令
+      4 进程过长
+
+## 看门狗转报的 hook 检出，按内容
+     51 整份覆盖未跟踪文件：Write /home/fy5090/c
+     41 75-decision-experiment-links.s
+     35 越出写范围：Edit /home/fy5090/code/s
+     27 bash / sh 起的脚本 /tmp/claude-100
+     13 重型测试闸没判全：bash / sh 起的脚本 /tmp/c
+     13 越出写范围：Write /home/fy5090/code/
+      9 重型测试被拒：cargo test 不挑目标，会跑到名字含 
+      7 重型测试被拒：在工作区根（/home/fy5090/code
+      7 写被拒：整份覆盖未跟踪文件：Write /home/fy50
+      7 直接执行的脚本 /tmp/claude-1000/impl-
+
+## 主 agent 的工具调用按名字
+  Bash                26401
+  Agent               1772
+  SendMessage         1174
+  Edit                492
+  TaskStop            426
+  Write               383
+  AskUserQuestion     333
+  Read                266
+  ToolSearch          130
+  ListAgents          63
+  Monitor             19
+  CronCreate          15
+
+## 主 agent 的 Bash 命令开头
+    3197 grep
+    2390 sed
+    2382 watch.sh/agent-watch.py
+    1859 cd singlefs
+    1634 cd singlefs;
+    1487 python3 -
+    1361 echo
+     999 python3 replace-once.py
+     918 S=/tmp/claude-1000/-home-fy5090-co
+     728 cat
+     713 for
+     677 ls
+     665 git
+     518 tail
+     368 awk
+     234 set
+     194 cd singlefs-ai-sop-zh
+     162 python3 insert-row.py
+     153 mkdir
+     153 R=research/scripts/replace-once.py
+     148 ps
+     147 sha256sum
+     134 sleep
+     127 head
+
+## 子 agent 的工具调用（按类型，前六种工具）
+  implementation-writer    合计  31327  Bash=24202, Edit=5443, Read=1377, Write=167, SubagentHandback=138
+  experiment-runner        合计  16881  Bash=11291, Edit=2997, Read=2386, Write=119, SubagentHandback=88
+  general-purpose          合计  14349  Bash=12751, Edit=785, Read=504, SubagentHandback=148, Write=129, ToolSearch=20
+  three-way-attack         合计   8701  Bash=8083, Read=543, SubagentHandback=75
+  three-way-materials      合计   7207  Bash=6277, Read=834, SubagentHandback=93, Write=3
+  tooling-writer           合计   6704  Bash=4706, Edit=1212, Write=445, Read=273, SubagentHandback=68
+  three-way-verifier       合计   6392  Bash=5654, Read=679, SubagentHandback=59
+  kb-scribe                合计   5199  Bash=4349, Read=755, SubagentHandback=76, Edit=19
+  three-way-local-attack   合计   5194  Bash=4197, Read=921, SubagentHandback=74, Write=2
+  three-way-forward        合计   4206  Bash=3354, Read=796, SubagentHandback=56
+
+## 子 agent 每个的中位数：Bash、编译测试、切片读、Read、Edit
+  general-purpose          n= 154 bash=71 cargo=0 slice=30 read=1 edit=0
+  implementation-writer    n= 145 bash=156 cargo=25 slice=71 read=6 edit=23
+  experiment-runner        n=  83 bash=121 cargo=17 slice=54 read=19 edit=25
+  three-way-local-attack   n=  78 bash=54 cargo=0 slice=22 read=11 edit=0
+  three-way-materials      n=  78 bash=83 cargo=0 slice=33 read=10 edit=0
+  three-way-attack         n=  78 bash=103 cargo=12 slice=41 read=6 edit=0
+  kb-scribe                n=  66 bash=63 cargo=0 slice=22 read=10 edit=0
+  three-way-verifier       n=  57 bash=100 cargo=3 slice=39 read=11 edit=0
+  tooling-writer           n=  56 bash=75 cargo=2 slice=30 read=2 edit=15
+  three-way-forward        n=  56 bash=52 cargo=1 slice=28 read=12 edit=0
+  sweep                    n=  35 bash=67 cargo=0 slice=21 read=8 edit=0
+  experiment-designer      n=  28 bash=86 cargo=1 slice=45 read=7 edit=0
+  three-way-defense        n=  19 bash=44 cargo=0 slice=26 read=8 edit=0
+  kb-spec-drafter          n=  18 bash=79 cargo=0 slice=41 read=8 edit=0
+  investigator             n=  14 bash=59 cargo=13 slice=28 read=5 edit=0
+  Explore                  n=   8 bash=55 cargo=0 slice=29 read=0 edit=0
+  mutation-triage          n=   4 bash=58 cargo=9 slice=22 read=6 edit=0
+  gate-triage              n=   3 bash=93 cargo=4 slice=32 read=6 edit=0
+  prior-art                n=   1 bash=65 cargo=0 slice=6 read=8 edit=0
+  three-way-local-defense  n=   1 bash=74 cargo=0 slice=34 read=12 edit=0
+
+## 工具结果字符数（按类型，百万字符）
+  implementation-writer    合计    66.8M  Bash=51.9M, Read=14.0M, Edit=0.8M, Write=0.0M
+  general-purpose          合计    33.6M  Bash=28.0M, Read=5.5M, Edit=0.1M, Write=0.0M
+  experiment-runner        合计    31.1M  Bash=15.5M, Read=15.1M, Edit=0.5M, Write=0.0M
+  three-way-attack         合计    22.5M  Bash=15.7M, Read=6.8M, SubagentHandback=0.0M
+  three-way-materials      合计    14.0M  Bash=7.2M, Read=6.8M, SubagentHandback=0.0M, Write=0.0M
+  three-way-local-attack   合计    12.6M  Read=7.8M, Bash=4.8M, SubagentHandback=0.0M, Write=0.0M
+  tooling-writer           合计    12.4M  Bash=10.3M, Read=1.9M, Edit=0.2M, Write=0.1M
+  three-way-verifier       合计    11.9M  Read=6.2M, Bash=5.7M, SubagentHandback=0.0M
+
+## 5 分钟缓存过期后的整份重写（第二次调用起，缓存写超过 5 万且超过上下文一半）
+  implementation-writer      327 次    132.7M token
+  experiment-runner          126 次     44.0M token
+  three-way-attack           102 次     29.8M token
+  three-way-materials         78 次      7.2M token
+  kb-scribe                   69 次      7.0M token
+  three-way-forward           54 次      4.9M token
+  three-way-verifier          51 次      5.4M token
+  tooling-writer              35 次      6.2M token
+  sweep                       30 次      2.2M token
+  general-purpose             30 次     11.2M token
+  kb-spec-drafter             11 次      0.8M token
+  three-way-local-attack       8 次      1.6M token
+  investigator                 7 次      0.6M token
+  mutation-triage              7 次      0.8M token
+  experiment-designer          6 次      0.5M token
+  gate-triage                  4 次      0.4M token
+  prior-art                    1 次      0.1M token
+  three-way-defense            1 次      0.2M token
+  Explore                      1 次      0.1M token
+  合计 948 次 255.9M token
+
+## 子 agent 侧的钩子错误（按钩子、拒绝或其他）
+    157 ('bash-command-detector.sh', 'reject')
+     89 ('handback-guard.sh', 'reject')
+     40 ('heavy-test-guard.sh', 'reject')
+     28 ('write-guard.sh', 'reject')
+     23 ('pattern-process-guard.sh', 'reject')
+     14 ('handback-scratch-check.sh', 'reject')
+     11 ('?', 'other')
+      8 ('?', 'reject')
+      6 ('heavy-test-guard.sh', 'other')
+      3 ('runner-dispatch-guard.sh', 'reject')
+  == handback-guard.sh
+        20 tooling-writer 的交回正文 N 字，超过 N 字。
+        20 implementation-writer 的交回正文 N 字，超过 N 字。
+        12 experiment-runner 的交回正文 N 字，超过 N 字。
+        10 three-way-materials 的交回正文 N 字，超过 N 字。
+         6 报告里的引文对不上（research/scripts/cite-check.py）：
+  == bash-command-detector.sh
+        41 要在同一个 inode 上改一个已经存在的脚本（认出的写法与目标：python open
+        27 implementation-writer 有 Edit 工具，却在 Bash 里就地改
+        16 要在同一个 inode 上改一个已经存在的脚本（认出的写法与目标：cp /tmp/cla
+        16 tooling-writer 有 Edit 工具，却在 Bash 里就地改仓内文件（认出
+        13 要在同一个 inode 上改一个已经存在的脚本（认出的写法与目标：> /tmp/clau
+  == heavy-test-guard.sh
+         7 重型测试被拒：cargo test 不挑目标，会跑到名字含 layerN 的测试二进制（
+         3 不经内存包装跑编译出来的代码被拒：直接执行 cargo 编出来的二进制 ./target
+         3 重型测试被拒：在工作区根（/home/fyN/code/singlefs）上不带 -p
+         2 不经内存包装跑编译出来的代码被拒：脚本 /home/fyN/code/singlefs
+         2 重型测试被拒：脚本 /tmp/claude-N/impl-rbf-N/run-test
+  == write-guard.sh
+         6 拒绝用 Write 整份覆盖 /home/fyN/code/singlefs/.cla
+         6 拒绝用 Write 整份覆盖 /home/fyN/code/singlefs/crat
+         5 experiment-runner 的写范围不含 /home/fyN/code/sin
+         4 tooling-writer 的写范围不含 /home/fyN/code/single
+         2 写进去的内容里有撇号类角标 [角标]（U+N）在「…变体 BN[角标] 的读法…」（/t
+
+## 实现员按活的种类，与写回两跳
+  writer:其他              n= 124 calls= 24507 folded= 1177.2M avg=  9.5M
+  kb-scribe              n=  66 calls=  4661 folded=  140.0M avg=  2.1M
+  writer:交补丁             n=  16 calls=  2886 folded=  137.9M avg=  8.6M
+  kb-spec-drafter        n=  18 calls=  1557 folded=   40.3M avg=  2.2M
+  writer:合入后验证           n=   2 calls=   523 folded=   25.3M avg= 12.6M
+  investigator           n=  14 calls=  1001 folded=   19.3M avg=  1.4M
+  writer:接调查/分诊          n=   3 calls=   429 folded=   17.4M avg=  5.8M
+  mutation-triage        n=   4 calls=   191 folded=    4.4M avg=  1.1M
+
+## 治理类与文件系统类（按派发提示关键词粗判）
+  filesystem   agents= 645 calls= 79833 folded= 3281.4M (79%)
+  governance   agents= 274 calls= 22225 folded=  708.7M (17%)
+  unclear      agents=  63 calls=  5066 folded=  170.2M (4%)

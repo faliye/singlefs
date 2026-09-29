@@ -24,7 +24,7 @@
 | .claude/hooks/runner-dispatch-guard.sh:569 | 层 0 归 crash-verifier | 改了：丙 6 |
 | research/scripts/ask-local-selftest.sh:12 | 缺了哪样红的就是「检测器找不到」 | 改了：丙 7 |
 | .claude/main-agent.md:59 | 要跑时 54 号跑快档并核全绿标记 | 不改：丙 5，派发闸文件头已登记的误拒形态，照抄进提示时按闸给的出路改写 |
-| research/prompts/governance-review-r1-report-B.md:61 | （角标 P′） | 改了：甲附带发现、门禁 12 号：本分支带进来的证据副本，只改这一个记号 |
+| research/prompts/governance-review-r1-report-B.md:61 | （角标写法：P 加 U+2032） | 改了：甲附带发现、门禁 12 号：本分支带进来的证据副本，只改这一个记号 |
 | .claude/rules/mutation-sampling.md:75 | 无效要改的是那一行替换文 | 改了：甲 A1 |
 | .claude/gate.d/59-crates-mutation-replay.sh:348 | 替换文写进源码之后编不过 | 改了：甲 A1 |
 | .claude/gate.d/59-crates-mutation-replay.sh:413 | 改这一行替换文，不是去补用例 | 改了：甲 A1 |

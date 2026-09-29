@@ -15,7 +15,7 @@ use singlefs_checker::crc32_castagnoli_table;
 use singlefs_checker_tier::crash::Layer0SegmentExpansion;
 use singlefs_checker_tier::crash_amplification::{
     check_recorded_blocks, plan_crash_points, record_crash_points, CrashFlow, CrashPointSpan,
-    JudgingCodes, UnitChecksumsOn, WeightedShares,
+    PipelineJudgingCode, UnitChecksumsOn, WeightedShares,
 };
 use singlefs_checker_tier::crash_identity::CoverageReport;
 use singlefs_checker_tier::gpu_unit_checks::{
@@ -194,18 +194,23 @@ fn the_pipeline_with_gpu_unit_checks_reports_no_red_and_no_disagreement_on_the_h
         .join("../..")
         .canonicalize()
         .expect("仓根");
-    let judging = JudgingCodes::of_files(
+    let judging = PipelineJudgingCode::of_the_judges(
         &root,
-        &[THIS_FILE],
         &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),
     )
     .expect("判法摘要");
-    let plan = plan_crash_points(&flow, &judging);
+    let plan = plan_crash_points(&flow);
     let directory =
         std::env::temp_dir().join(format!("singlefs-gpu-pipeline-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&directory);
     let mut store = VerdictStore::create_empty(&directory).expect("建得了库");
-    record_crash_points(&mut store, &plan, &mut CoverageReport::default()).expect("录得进");
+    record_crash_points(
+        &mut store,
+        &plan,
+        &judging.version(),
+        &mut CoverageReport::default(),
+    )
+    .expect("录得进");
     let tally = check_recorded_blocks(
         &mut store,
         &flow,
@@ -213,6 +218,7 @@ fn the_pipeline_with_gpu_unit_checks_reports_no_red_and_no_disagreement_on_the_h
         &WeightedShares::new(vec![1]),
         0,
         &UnitChecksumsOn::Gpu(card),
+        &judging.version(),
     )
     .expect("核得完");
     drop(store);

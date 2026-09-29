@@ -25,6 +25,8 @@
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
+#[cfg(feature = "verdict-store")]
+mod common_crash_points;
 #[path = "../../singlefs-harness/tests/common_tree_split/mod.rs"]
 mod common_tree_split;
 
@@ -481,5 +483,36 @@ fn full_enumeration_of_every_enumerable_position_addressed_tree_stream_is_exhaus
     for stream in PositionAddressedStream::ENUMERABLE_IN_FULL {
         let tally = enumerate(stream, &|_segment_index, _segment| true);
         assert!(tally.states > 1, "{stream:?}");
+    }
+}
+
+/// 崩溃放量的形态：五条流各自一个崩溃点（起点镜像不枚举、只录被判的那一次），按环境跑一趟，健康的流零红；
+/// 配置开了 GPU 就是 GPU 判器判。
+#[cfg(feature = "verdict-store")]
+fn amplify_position_addressed_stream(stream: PositionAddressedStream) {
+    let prepared = prepare(stream);
+    let name = format!("position_addressed_{stream:?}");
+    let crash_points = common_crash_points::one_crash_point_over_every_write(
+        file!(),
+        &name,
+        prepared.writes.len(),
+    );
+    common_crash_points::amplify_prepared_flow(
+        &name,
+        &prepared.base,
+        &prepared.writes,
+        &prepared.segments,
+        prepared.judged_root_index,
+        &prepared.versions,
+        crash_points,
+        6,
+    );
+}
+
+#[cfg(feature = "verdict-store")]
+#[test]
+fn crash_amplification_of_every_position_addressed_tree_stream_is_clean() {
+    for stream in PositionAddressedStream::ALL {
+        amplify_position_addressed_stream(stream);
     }
 }

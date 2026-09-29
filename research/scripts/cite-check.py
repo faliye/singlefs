@@ -10,7 +10,8 @@
 认的两种写法（同一行里）：
     「原文」（`路径:行号`）  或  「原文」(`路径:行号`)        引号紧挨着括号里的位置
     `路径:行号`：「原文」    或  `路径:行号` 「原文」          位置之后紧跟引号
-行号可以是区间（`路径:12-15`）。路径带目录的按 --root（默认仓根）逐个找；只写文件名的在仓里 `git ls-files` 按文件名找，恰好一个才判。
+行号可以是区间（`路径:12-15`）；位置也可以写成小节：`路径@标题`（标题不带井号、逐字，原文要在那一节里，到同级或更高一级的下一个标题为止；
+标题命中不是恰好一次判红）——引规则与 kb 的条款优先这样写，不用为一个行号再读一遍文件。路径带目录的按 --root（默认仓根）逐个找；只写文件名的在仓里 `git ls-files` 按文件名找，恰好一个才判。
 原文里的「…」与「……」是省略：切开的每一段要按次序出现在那一行（或区间）里。比对前两边都去掉 ** 与反引号、把连续空白并成一个空格。
 判不了的不判、单列：路径认不出（不在、文件名不唯一）、行号超出文件、给了 --unchanged-since 而被引文件在那之后改过。
 退出码：0 全部对上（或没有可判的）；1 有对不上的；2 用法错。
@@ -28,7 +29,7 @@ sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "
 from preflight import preflight  # noqa: E402
 BROKEN = os.environ.get("CITE_CHECK_BREAK", "")
 
-LOCATION = r"`?(?P<path>[A-Za-z0-9_./\-一-鿿]+\.[A-Za-z0-9]+):(?P<first>\d+)(?:[-–](?P<last>\d+))?`?"
+LOCATION = r"`?(?P<path>[A-Za-z0-9_./\-一-鿿]+\.[A-Za-z0-9]+)(?::(?P<first>\d+)(?:[-–](?P<last>\d+))?|@(?P<title>[^`」（）()\n]{2,80}?))`?"
 QUOTE = r"「(?P<quote>[^「」]{2,400})」"
 QUOTE_THEN_LOCATION = re.compile(QUOTE + r"\s*[（(]\s*(?:[^（）()`]{0,12}?)" + LOCATION)
 LOCATION_THEN_QUOTE = re.compile(LOCATION + r"\s*[：:]?\s*" + QUOTE)
@@ -46,8 +47,11 @@ def citations_in(report_text):
         seen = set()
         for pattern in (QUOTE_THEN_LOCATION, LOCATION_THEN_QUOTE):
             for match in pattern.finditer(line):
-                first = int(match.group("first"))
-                last = int(match.group("last") or first)
+                if match.group("title") is not None:
+                    first, last = match.group("title").strip(), None   # 小节写法：first 放标题、last 空
+                else:
+                    first = int(match.group("first"))
+                    last = int(match.group("last") or first)
                 key = (match.group("path"), first, last, match.group("quote"))
                 if key not in seen:
                     seen.add(key)
@@ -104,6 +108,8 @@ def judge(citation, roots, by_basename, background_lines, unchanged_since):
     if unchanged_since is not None and os.path.getmtime(absolute) > unchanged_since and BROKEN != "ignore-changed":
         return "skip", "被引文件在开工之后改过，行号可能是开工那一刻的"
     lines = open(absolute, encoding="utf-8", errors="replace").read().splitlines()
+    if last is None:   # `路径@标题`：原文要在那一节里
+        return judge_section(lines, first, quote)
     if first < 1 or last > len(lines) or first > last:
         return "bad", f"行号超出文件（文件共 {len(lines)} 行）"
     cited = "\n".join(lines[first - 1:last])
@@ -122,6 +128,25 @@ def judge(citation, roots, by_basename, background_lines, unchanged_since):
     return "bad", f"那一行不含这句{where}{background_hint}"
 
 
+def judge_section(lines, title, quote):
+    """标题逐字命中恰好一行；那一节从标题行起、到同级或更高一级的下一个标题之前；原文要在节里。"""
+    heads = [(index, len(line) - len(line.lstrip("#"))) for index, line in enumerate(lines)
+             if line.startswith("#") and line.lstrip("#").strip() == title]
+    if len(heads) != 1 and BROKEN != "title-any-section":
+        return "bad", (f"标题「{title}」在这份文件里命中 {len(heads)} 次（要恰好 1 次）" + ("" if heads else "；标题逐字抄，不带井号"))
+    start, level = heads[0] if heads else (0, 0)
+    end = len(lines)
+    for index in range(start + 1, len(lines)):
+        if lines[index].startswith("#") and (len(lines[index]) - len(lines[index].lstrip("#"))) <= level:
+            end = index
+            break
+    section = "\n".join(lines[start:end]) if BROKEN != "title-any-section" else "\n".join(lines)
+    if BROKEN == "always-ok" or quote_is_in(quote, section):
+        return "ok", ""
+    hints = [str(index) for index, line in enumerate(lines, 1) if quote_is_in(quote, line)][:3]
+    return "bad", f"「{title}」那一节（第 {start + 1}-{end} 行）里不含这句" + (f"；原文在这份文件第 {', '.join(hints)} 行" if hints else "；这份文件里找不到这句")
+
+
 def check_reports(report_paths, roots, background_paths, unchanged_since):
     by_basename = tracked_files_by_basename(roots[0])
     background_lines = [(path, open(path, encoding="utf-8", errors="replace").read().splitlines()) for path in background_paths] or None
@@ -131,11 +156,12 @@ def check_reports(report_paths, roots, background_paths, unchanged_since):
             total += 1
             verdict, explanation = judge(citation, roots, by_basename, background_lines, unchanged_since)
             report_line, path, first, last, quote = citation
-            span = f"{first}" if first == last else f"{first}-{last}"
+            span = f"@{first}" if last is None else (f"{first}" if first == last else f"{first}-{last}")
+            joiner = "" if span.startswith("@") else ":"
             if verdict == "bad":
-                bad.append(f"{os.path.basename(report_path)}:{report_line} 引 {path}:{span}「{quote[:60]}」：{explanation}")
+                bad.append(f"{os.path.basename(report_path)}:{report_line} 引 {path}{joiner}{span}「{quote[:60]}」：{explanation}")
             elif verdict == "skip":
-                skipped.append(f"{os.path.basename(report_path)}:{report_line} 引 {path}:{span}：{explanation}")
+                skipped.append(f"{os.path.basename(report_path)}:{report_line} 引 {path}{joiner}{span}：{explanation}")
     return total, bad, skipped
 
 
@@ -198,6 +224,10 @@ def selftest():
             ("行号是背景材料的", "「第二条：引文整行抄」（`kb/rule.md:2`）", 1),
             ("行号超出文件", "「先查」（`kb/rule.md:99`）", 1),
             ("认不出的路径不判", "「随便」（`nothere/x.md:3`）", 0),
+            ("小节写法：原文在那一节里", "「引文整行抄，不许摘句」（`kb/rule.md@一节`）", 0),
+            ("小节写法：位置在前", "`kb/rule.md@一节`：「第一条：先查 再写」", 0),
+            ("小节写法：标题不在", "「先查」（`kb/rule.md@没有的节`）", 1),
+            ("小节写法：原文不在那一节", "「let answer = 42」（`kb/rule.md@一节`）", 1),
         ]
         failures = []
         for label, text, want in cases:
@@ -221,7 +251,7 @@ def selftest():
         for failure in failures:
             print(f"  ✗ 自检：{failure}")  # gate-lint:detail
         if failures:
-            print("  → 看 citations_in() / judge() 的判法；CITE_CHECK_BREAK 设着的话这里本来就该红")
+            print("  → 看 citations_in() / judge() / judge_section() 的判法；CITE_CHECK_BREAK（always-ok、no-heading-check、no-background-check、ignore-changed、title-any-section）设着的话这里本来就该红")
             return 1
         print(f"  ✓ cite-check 自检通过：对上的、位置在前、省略号、只写文件名、区间放行，错行、标题行、背景材料行号、超出文件判红，认不出的与开工后改过的只列不判（{len(cases) + 1} 种）")
         return 0

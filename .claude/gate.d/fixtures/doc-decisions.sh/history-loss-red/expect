@@ -1,0 +1,5 @@
+exit=1
+want=.claude/kb/decisions-history.md：整理之后基准里的这几块有数或编号找不到了
+want=D1（样本决策） 2026-09-10：1.7
+want=  history-loss：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（history-loss）

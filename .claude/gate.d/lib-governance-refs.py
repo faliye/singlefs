@@ -50,6 +50,7 @@ python 起不来时退 2（打不开脚本）。调用方把 0、1、3 之外的
   old-numbers-ignored   ⑤ 整条不判：governance-refs-red 里「用旧编号称呼门禁」那几行 want 找不到
   names-ignored         ④ 整条不判：governance-refs-red 里「不是门禁目录里的门禁」「格名表里没有」那几行 want 找不到
   history-scanned       「## 历史版本」一节与变更史也扫：governance-refs-green 判红
+  fences-scanned        代码围栏里的行也当现状文字扫：governance-refs-green 里围栏内那行旧路径判红
   readme-skipped        仓根 README.md 不进现状文字：governance-refs-red 里「README.md:」那两行 want 找不到，
                         governance-refs-green 的现状文字份数与全名、格名处数对不上
 """
@@ -75,6 +76,7 @@ README_PATTERNS = ["README.md"]
 HISTORY_FILES = ("decisions-history.md", "experiments-history.md", "CHANGELOG.md")
 HISTORY_HEADING = re.compile(r"^##\s*历史版本")
 LEVEL_TWO_HEADING = re.compile(r"^##\s")
+FENCE_LINE = re.compile(r"^[ \t]*```")
 GATE_NUMBER = re.compile(r"(?<![0-9A-Za-z.\-–])((?:[0-9]{2}\s*[、/]\s*)*[0-9]{2})\s*号")
 NOT_A_GATE_BEFORE = re.compile(r"(第|月|日)\s*$")
 GATE_WORD_NUMBER = re.compile(r"门禁\s*`?([0-9]{2})(?![0-9])")
@@ -105,7 +107,7 @@ OLD_GATES = {
     27: ("code-source-discipline", ("format-constants",)),
     28: ("doc-decisions", ("cross-decision-status",)),
     29: ("doc-decisions", ("settled-item-self-open",)),
-    30: ("doc-decisions", ("entry-added", "shape", "status-sync")),
+    30: ("doc-decisions", ("entry-added", "shape")),
     31: ("doc-decisions", ("blocking-verdict",)),
     32: ("doc-registries", ("field-refs",)),
     33: ("code-source-discipline", ("mutation-tables",)),
@@ -308,13 +310,18 @@ def gate_numbers_in(line):
 
 
 def current_text_lines(carrier):
-    """现状文字：跳过「## 历史版本」一节；变更史整份跳过。返回 [(行号, 行)]。"""
+    """现状文字：跳过「## 历史版本」一节、代码围栏里的行；变更史整份跳过。返回 [(行号, 行)]。"""
     if os.path.basename(carrier) in HISTORY_FILES and BROKEN != "history-scanned":
         return []
     with open(carrier, encoding="utf-8", errors="replace") as handle:
         lines = handle.read().split("\n")
-    kept, in_history = [], False
+    kept, in_history, in_fence = [], False, False
     for number, line in enumerate(lines, 1):
+        if FENCE_LINE.match(line):
+            in_fence = not in_fence and BROKEN != "fences-scanned"
+            continue
+        if in_fence:
+            continue   # 围栏里是整行抄的产物与命令，不是现状文字：旧路径照抄进去不算称呼门禁
         if LEVEL_TWO_HEADING.match(line):
             in_history = bool(HISTORY_HEADING.match(line)) and BROKEN != "history-scanned"
         if not in_history:

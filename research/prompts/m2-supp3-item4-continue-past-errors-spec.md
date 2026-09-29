@@ -1,4 +1,4 @@
-<!-- 2026-09-28 从会话 d16a74c5 的记录（2026-09-21T17:27:09Z 那次 Bash heredoc）逐字抽回；原件 /tmp/claude-1000/continue-past-errors/spec.md 已不存在 -->
+<!-- 2026-09-28 从会话 d16a74c5 的记录（2026-09-21 那次 Bash heredoc）逐字抽回；原件 /tmp/claude-1000/continue-past-errors/spec.md 已不存在 -->
 
 # 改法：注入的块设备错之后，让历史继续往下跑
 

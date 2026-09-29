@@ -4,33 +4,6 @@
 .claude/gate.d/lib-item-ref-status.py  # 被门禁阶段 import 的函数库，没有自己的入口，不单独调
 .claude/gate.d/lib-owed.py  # 被门禁阶段 import 的函数库，没有自己的入口，不单独调
 .claude/gate.d/lib-forbidden-notations.py  # 被门禁阶段 import 的函数库，没有自己的入口，不单独调
-research/scripts/peer-host-lib.sh  # 被 research/scripts/mutation-shard-run.sh source 的函数库（在第二台上跑命令、拷文件、脱离会话起进程与轮询、按进程号停、清场复原），不单独调
-.claude/hooks/lib_heavy_tests.py  # 被钩子 import 的函数库（--selftest 由提交时共享门禁 hooks-registered 经钩子跑），不单独调
-.claude/hooks/lib_selftest_scratch.py  # 被钩子 import 的函数库（--selftest 由提交时共享门禁 hooks-registered 经钩子跑），不单独调
-.claude/hooks/lib_shell_words.py  # 被钩子 import 的函数库（--selftest 由提交时共享门禁 hooks-registered 经钩子跑），不单独调
-research/scripts/changed-paths.sh  # 被门禁阶段 source 的函数库（gate_diff_base、gate_changed_paths），不单独调
-research/scripts/stage-run-or-skip.sh  # 被门禁阶段 source 的函数库（stage_run_or_skip）；它的 --selftest 由门禁 code-tooling 的 research-script-selftests 格跑
-research/scripts/lib_atomic_replace.py  # 被 replace-once.py、insert-row.py import 的函数库，不单独调
-research/scripts/e125-zoned-wp-probe.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/e129-tear-injector.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/e129-thin-neighbour.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/e129-thin-rmw.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/e152-run.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/e152-stage-root.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/e152-tables.py  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/e21-compute.py  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/e21-prove-gpu.py  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/e21-transfer.py  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/e34-iomin-probe.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/e56-report.py  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/e56-sweep.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/e6-units.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/e72-devtable-probe.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/local-repro-tuned.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/local-repro.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/stripe-map-probe.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/vm-bench.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-research/scripts/vm-geom.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 research/e7-index-bench/src/bin/e100_system_configuration_slot.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 research/e7-index-bench/src/bin/e101_node_tag_reserve.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 research/e7-index-bench/src/bin/e102_unit_class_registry.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
@@ -186,6 +159,4 @@ crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs  # 还没改完�
 crates/singlefs-checker-tier/src/bin/new_pool_file_creation_device_log_check.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试并走代码三方（门禁 doc-process-records 的 crates-adversarial-review 格）
 crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs  # 在虚机的 busybox initramfs 里跑的静态二进制，那里没有 python3，preflight 判不了条件
 crates/singlefs-checker-tier/src/bin/new_pool_file_creation_region_bytes.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试并走代码三方（门禁 doc-process-records 的 crates-adversarial-review 格）
-.claude/scripts/preflight.sh  # 被项目脚本 source 的函数库：找到规范副本里的 preflight.sh（本树或主仓）就 source 它，找不到就定义一个当场判红的 preflight；不单独调
-.claude/scripts/project_preflight.py  # 被项目的 python 脚本 import 的函数库：找到规范副本里的 preflight.py（本树或主仓）再转调，找不到判红；不单独调
 .claude/gate.d/lib-governance-refs.py  # 被门禁 doc-registries 调的函数库（治理文档里的门禁号、路径与「小节」指不指得到），不单独调

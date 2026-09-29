@@ -1,4 +1,4 @@
-//! checker 档模块：crash
+//! checker 档模块：crash、crash_amplification
 //! C561（记录核对器的复用豁免在复用只落一半时假红）：记录核对器第二条判据按扇区、拿枚举器给的持久集合判一份单元副本缺不缺席
 //! （D13（验证路线） 已定项 7：记录核对器的入参含持久集合；判据原文在 `crash::check_records_against` 的文档注释上）。
 //!
@@ -20,8 +20,12 @@
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
+#[cfg(feature = "verdict-store")]
+mod common_crash_points;
 
-use common::{build_pool, geometry, parameters, publish_overwrite_in_process, BuiltPool};
+use common::{
+    build_pool, file_content, geometry, parameters, publish_overwrite_in_process, BuiltPool,
+};
 use singlefs_checker_tier::crash::{
     check_records, Layer0Parallelism, Layer0SliceLength, Layer0WorkerThreadsSource,
 };
@@ -32,8 +36,8 @@ use singlefs_core::recovery::{recover, JournalPolicy, PoolReader};
 use singlefs_core::transaction::PoolVersion;
 use singlefs_harness::memory_pool::{
     closed_form_state_count, root_identity_written_by, writes_and_segments,
-    writes_and_segments_with_stream_indexes_and_entries, CrashImage, MemoryPool, RecordCheck,
-    RetainedWrite,
+    writes_and_segments_with_stream_indexes_and_entries, CrashImage, MemoryPool, PublishedVersion,
+    RecordCheck, RetainedWrite,
 };
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::{RecordedEntrySpan, RecordedPublishEntry};
@@ -88,6 +92,10 @@ const HISTORY_UOOUOMSU: [UserAction; 8] = [
 struct PoolUnderHistory {
     pool: BuiltPool,
     instance: InstanceGeneration,
+    /// 现行那一版的文件内容：挂载与卸载推出的空发布沿用它。
+    current_content: Vec<u8>,
+    /// 每一版（实例、txg、内容），崩溃放量的 oracle 按它认恢复落到的是哪一版；从第一个文件那一版起记。
+    versions: Vec<PublishedVersion>,
 }
 
 impl PoolUnderHistory {
@@ -101,18 +109,34 @@ impl PoolUnderHistory {
             self.instance,
         )
         .expect("覆盖写");
+        self.current_content = content.to_vec();
+        self.versions.push(PublishedVersion {
+            instance: self.instance,
+            checkpoint_txg: self.pool.output.root.checkpoint_txg,
+            content: content.to_vec(),
+        });
     }
 
     fn reopen_and_mount(&mut self) {
+        let previous_txg = self.pool.output.root.checkpoint_txg;
         let mut devices = self.pool.reopen_recorded();
         let mounted = mount_writable(&parameters(), &mut devices).expect("可写挂载");
         self.pool.devices = Some(devices);
         self.pool.allocator = mounted.allocator;
         self.instance = mounted.current.root().instance;
+        let mounted_txg = mounted.current.root().checkpoint_txg;
         self.pool.output = mounted
             .current
             .into_file_version()
             .expect("这段历史上每一版都带文件");
+        // 取号、写行、暖机各推一版，内容不变
+        for txg in previous_txg.0 + 1..=mounted_txg.0 {
+            self.versions.push(PublishedVersion {
+                instance: self.instance,
+                checkpoint_txg: CheckpointTxg(txg),
+                content: self.current_content.clone(),
+            });
+        }
     }
 
     fn unmount(&mut self) {
@@ -131,27 +155,50 @@ impl PoolUnderHistory {
                 )
             })
             .expect("正常卸载");
-        assert!(
-            matches!(unmounted, Unmounted::FloorRaisedToTheCurrentVersion(_)),
-            "带文件的一版上卸载推一串抬 F"
-        );
+        let Unmounted::FloorRaisedToTheCurrentVersion(raised) = unmounted else {
+            panic!("带文件的一版上卸载要推一串抬 F，这次却一个字节都没写")
+        };
+        // 卸载推的每一次空发布一版，内容不变
+        for publish in &raised.publishes {
+            self.versions.push(PublishedVersion {
+                instance: self.instance,
+                checkpoint_txg: publish.root.checkpoint_txg,
+                content: self.current_content.clone(),
+            });
+        }
         self.pool.output = current
             .into_file_version()
             .expect("带文件的一版卸载之后仍带文件");
     }
 }
 
-/// 一条历史的录制流：mkfs 之后的基线、写表、段。
+/// 一条历史的录制流：mkfs 之后的基线、写表、段，与每一版（崩溃放量的 oracle 用）。
 struct RecordedHistory {
     base: MemoryPool,
     writes: Vec<RetainedWrite>,
     segments: Vec<Vec<usize>>,
+    #[cfg_attr(
+        not(feature = "verdict-store"),
+        allow(
+            dead_code,
+            reason = "只有崩溃放量那条用例读它，那条挂 verdict-store 特性"
+        )
+    )]
+    versions: Vec<PublishedVersion>,
 }
 
 fn record_history(tag: &str, actions: &[UserAction]) -> RecordedHistory {
-    let mut history = PoolUnderHistory {
-        pool: build_pool(tag),
+    let pool = build_pool(tag);
+    let first_file_version = PublishedVersion {
         instance: InstanceGeneration(1),
+        checkpoint_txg: pool.output.root.checkpoint_txg,
+        content: file_content(),
+    };
+    let mut history = PoolUnderHistory {
+        pool,
+        instance: InstanceGeneration(1),
+        current_content: file_content(),
+        versions: vec![first_file_version],
     };
     history.overwrite(&second_content());
     for (letter_position, action) in actions.iter().enumerate() {
@@ -186,6 +233,7 @@ fn record_history(tag: &str, actions: &[UserAction]) -> RecordedHistory {
         base: pool.memory_pool_after_mkfs(),
         writes,
         segments,
+        versions: history.versions.clone(),
     }
 }
 
@@ -866,6 +914,7 @@ fn an_illegal_reuse_does_not_explain_the_overwritten_unit_in_any_of_the_three_st
         base: pool.memory_pool_after_mkfs(),
         writes,
         segments,
+        versions: Vec::new(),
     };
     let root_indexes: Vec<usize> = recorded
         .writes
@@ -926,4 +975,85 @@ fn an_illegal_reuse_does_not_explain_the_overwritten_unit_in_any_of_the_three_st
             "{state_name}：解释 50178 的那次后写落了、但过不了回收谓词，txg 4 的数据单元缺席（C513）"
         );
     }
+}
+
+/// σ 接进崩溃放量流水线（用户 2026-09-29 定：崩溃注入之外的崩溃枚举用例都进流水线、由 GPU 判）：整条 `UOOUOMSU` 历史一张写表；
+/// σ 之前的段与 σ 那次发布之后的段各包成一个 ignore 的点（只留全持久那一个状态：是剪枝，也是别的流可复用的前缀），
+/// σ 那次发布（单元写段起、到它的根槽写与系统配置轮换为止）一个点全部展开。判器是流水线的：两遍恢复、oracle、池级 checker、
+/// 记录核对器，比 `every_crash_state_of_sigma_leaves_every_unit_of_the_claimed_publishes_present` 多判 oracle 与 checker。
+/// 展开上限从环境取（`SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO`，没设 6：σ 16 个写平时不展开，全量脚本给 28 才展开）。
+#[cfg(feature = "verdict-store")]
+#[test]
+fn crash_amplification_of_sigma_on_the_misaligned_reuse_history_is_clean() {
+    use singlefs_checker_tier::crash_amplification::{repository_relative_file, CrashPointSpan};
+    let recorded = record_history("crash-amplification-sigma", &HISTORY_UOOUOMSU);
+    let chain = misaligned_reuse_chain(&recorded);
+    let sigma_first_write = *recorded.segments[chain.sigma]
+        .first()
+        .expect("σ 至少一个写");
+    let sigma_root_write = (sigma_first_write..recorded.writes.len())
+        .find(|index| recorded.writes[*index].kind == StepKind::RootRecordFua)
+        .expect("σ 之后有根槽写");
+    // σ 那次发布到它根槽写所在的段末为止；紧跟的一段若只有系统配置槽轮换（没有单元写、没有根槽写），也归它
+    let segment_of = |write_index: usize| {
+        recorded
+            .segments
+            .iter()
+            .position(|segment| segment.contains(&write_index))
+            .expect("每个写都在某一段里")
+    };
+    let mut last_segment_of_the_publish = segment_of(sigma_root_write);
+    if let Some(next) = recorded.segments.get(last_segment_of_the_publish + 1) {
+        if next.iter().all(|write_index| {
+            recorded.writes[*write_index].kind == StepKind::SystemConfigurationSlot
+        }) {
+            last_segment_of_the_publish += 1;
+        }
+    }
+    let end_of_the_publish = *recorded.segments[last_segment_of_the_publish]
+        .last()
+        .expect("段非空")
+        + 1;
+    let code_file = repository_relative_file(file!());
+    let mut crash_points = vec![
+        CrashPointSpan {
+            name: "history_before_sigma".to_string(),
+            code_file_in_repository: code_file.clone(),
+            writes: 0..sigma_first_write,
+            ignored: true,
+        },
+        CrashPointSpan {
+            name: "sigma_publish".to_string(),
+            code_file_in_repository: code_file.clone(),
+            writes: sigma_first_write..end_of_the_publish,
+            ignored: false,
+        },
+    ];
+    if end_of_the_publish < recorded.writes.len() {
+        crash_points.push(CrashPointSpan {
+            name: "history_after_sigma".to_string(),
+            code_file_in_repository: code_file,
+            writes: end_of_the_publish..recorded.writes.len(),
+            ignored: true,
+        });
+    }
+    let judged_root_index = recorded
+        .writes
+        .iter()
+        .rposition(|write| write.kind == StepKind::RootRecordFua)
+        .expect("历史末尾有根槽写");
+    let run = common_crash_points::amplify_prepared_flow(
+        "sigma-of-the-misaligned-reuse",
+        &recorded.base,
+        &recorded.writes,
+        &recorded.segments,
+        judged_root_index,
+        &recorded.versions,
+        crash_points,
+        6,
+    );
+    assert!(
+        run.recording.states_recorded + run.recording.states_already_judged >= 3,
+        "三个点至少各一个状态"
+    );
 }

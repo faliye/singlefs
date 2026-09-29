@@ -7,7 +7,7 @@
 ## 调用记录
 
 第 1 次调用：`bash research/scripts/ask-local.sh research/prompts/k3-9-barrier-r1-local-attack.md > research/prompts/k3-9-barrier-r1-local-attack-output-s1.md`，退出码 5（字词损坏闸判红）。
-- `research/prompts/k3-9-barrier-r1-local-attack-output-s1.md`：判红那次重定向建出的空文件，已确认 0 字节（`ls -la` 原样：`-rw-rw-r-- 1 fy5090 fy5090 0 Sep 28 07:08`）。
+- `research/prompts/k3-9-barrier-r1-local-attack-output-s1.md`：判红那次重定向建出的空文件，已确认 0 字节（`ls -la` 原样：`-rw-rw-r-- 1 fy5090 fy5090 0 Sep 28 <时刻>`）。
 - `research/prompts/k3-9-barrier-r1-local-attack-output-void1.md`：脚本留的作废副本，9104 字节，词数 1498（`corruption-check.py` 报的 `words=1498`），参考样本。
   - `corruption-check.py` 原样：`红 research/prompts/k3-9-barrier-r1-local-attack-output-void1.md  cjk=0 words=1498 fffd=0 汉字复读=0(0.00/千) 英文复读=0(0.00/千) 反引号落单=0 星号落单=0 粘连=0 实词自复读=0 缩写自粘=0 单字母替换=1` 接一行 `     单字母替换: affect×10（提示里是 effect）`。
   - `oov-check.py` 原样：`绿 research/prompts/k3-9-barrier-r1-local-attack-output-void1.md  生词=0 拼接=0`。

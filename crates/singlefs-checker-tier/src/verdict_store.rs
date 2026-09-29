@@ -13,12 +13,15 @@
 //!
 //! | 表 | 键 | 值 |
 //! |---|---|---|
-//! | 判定块 | `01` ‖ 块键 | 块里每个状态一个字节：判定向量编号 |
+//! | 判定块 | `01` ‖ 块键 ‖ 判法版本（32 字节） | 块里每个状态一个字节：判定向量编号 |
 //! | 判定向量按内容 | `02` ‖ 判定向量的字节 | 编号，一个字节 |
 //! | 判定向量按编号 | `03` ‖ 编号，一个字节 | 判定向量的字节 |
-//! | 违例 | `04` ‖ 块键 ‖ 块内序号（8 字节） | 那个状态的判定向量编号，一个字节 |
+//! | 违例 | `04` ‖ 块键 ‖ 判法版本（32 字节） ‖ 块内序号（8 字节） | 那个状态的判定向量编号，一个字节 |
+//! | 判法版本 | `09` ‖ 判法版本（32 字节） | 这一版判器闭包收的文件清单（UTF-8 文本） |
 //!
 //! 块键 = 输入指纹（32 字节）‖ 流名或节点名的字节数（2 字节）‖ 流名或节点名 ‖ 枚举计划哈希（32 字节）‖ 块起点（8 字节）。
+//! 块键只由流程定（点的位置、它写下的字节、它起步的镜像）；判器改了不动块键，判定块与违例另按判法版本分行，旧版本的行留作历史，
+//! 复用只认同一判法版本（用户 2026-09-29 定：结果只绑流程，判法版本是行的属性）。
 //! 名字前面带字节数，一个块键不会是另一个块键的前缀，按块键前缀扫违例表只扫到这一块的。
 
 use std::collections::{BTreeSet, HashMap};
@@ -37,6 +40,14 @@ pub struct InputFingerprint(pub [u8; SHA256_DIGEST_BYTES]);
 /// 枚举计划哈希（`crash` 模块现算的计划哈希，SHA-256）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct EnumerationPlanHash(pub [u8; SHA256_DIGEST_BYTES]);
+
+/// 按块键排的表（录入表、判定块表）里的一行：块键、块键之后的键后缀（判定块表是 32 字节判法版本，录入表为空）、值。
+type BlockTableRow = (VerdictBlockKey, Vec<u8>, Vec<u8>);
+
+/// 判法版本：判这一块的判器闭包摘要（`crash_identity::judging_code_of_the_judges`）。判定块与违例按（块键，判法版本）存：
+/// 同一块在几个版本下的判定并存、旧版本的行留作历史，复用只认同一版本；录入表只按块键。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct JudgeVersion(pub [u8; SHA256_DIGEST_BYTES]);
 
 /// 块起点：这一块第一个状态在它那份枚举计划里的序号。块长由调用方定，不进键。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -107,8 +118,16 @@ impl VerdictBlockKey {
         key_bytes
     }
 
-    /// [`Self::to_block_key_bytes`] 的逆：列表、导入时从键字节认回块键；长度或名字对不上交回 None。
-    fn from_block_key_bytes(bytes: &[u8]) -> Option<Self> {
+    /// 块键字节接上判法版本（判定块表与违例表的键）。
+    fn to_block_key_bytes_with_version(&self, version: &JudgeVersion) -> Vec<u8> {
+        let mut key_bytes = self.to_block_key_bytes();
+        key_bytes.extend_from_slice(&version.0);
+        key_bytes
+    }
+
+    /// [`Self::to_block_key_bytes`] 的逆：列表、导入时从键字节认回块键，交回块键与它后面剩下的字节（判法版本、块内序号这类后缀）；
+    /// 长度或名字对不上交回 None。
+    fn from_block_key_bytes_with_suffix(bytes: &[u8]) -> Option<(Self, &[u8])> {
         let fingerprint =
             <[u8; SHA256_DIGEST_BYTES]>::try_from(bytes.get(..SHA256_DIGEST_BYTES)?).ok()?;
         let name_length_bytes =
@@ -120,13 +139,17 @@ impl VerdictBlockKey {
             bytes.get(name_end..name_end + SHA256_DIGEST_BYTES)?,
         )
         .ok()?;
-        let start_bytes = <[u8; 8]>::try_from(bytes.get(name_end + SHA256_DIGEST_BYTES..)?).ok()?;
-        Some(Self {
-            input_fingerprint: InputFingerprint(fingerprint),
-            stream_or_node_name: StreamOrNodeName::new(name).ok()?,
-            enumeration_plan_hash: EnumerationPlanHash(plan_hash),
-            block_start: BlockStartStateIndex(u64::from_be_bytes(start_bytes)),
-        })
+        let start_at = name_end + SHA256_DIGEST_BYTES;
+        let start_bytes = <[u8; 8]>::try_from(bytes.get(start_at..start_at + 8)?).ok()?;
+        Some((
+            Self {
+                input_fingerprint: InputFingerprint(fingerprint),
+                stream_or_node_name: StreamOrNodeName::new(name).ok()?,
+                enumeration_plan_hash: EnumerationPlanHash(plan_hash),
+                block_start: BlockStartStateIndex(u64::from_be_bytes(start_bytes)),
+            },
+            &bytes[start_at + 8..],
+        ))
     }
 }
 
@@ -212,6 +235,8 @@ pub enum VerdictStoreTable {
     /// 三段流第 ② 段的核对表：键是块键字节 + 核对代码摘要，值是事实表摘要 32 字节 + 每个状态一个 u32 结论位（小端）。
     /// 与判定块表分开：判定块是 CPU 判器写的，这张是 CPU 参照 / GPU 核对写的，第 ③ 段逐状态比。
     VerifierVerdicts,
+    /// 判法版本表：键是判法版本（判器闭包摘要），值是这一版收的文件清单（UTF-8 文本），给人查「这一版判器是哪几份代码」。
+    JudgeVersions,
 }
 
 impl VerdictStoreTable {
@@ -225,18 +250,24 @@ impl VerdictStoreTable {
             Self::PathIndex => 0x06,
             Self::FlowFacts => 0x07,
             Self::VerifierVerdicts => 0x08,
+            Self::JudgeVersions => 0x09,
         }
     }
 }
 
 /// 库里的一个键，或按前缀扫一段键时的前缀。键的字节只在 [`VerdictStoreKey::to_key_bytes`] 一处拼。
 enum VerdictStoreKey<'key> {
-    VerdictBlock(&'key VerdictBlockKey),
+    /// 判定块表里一块的键：块键 + 判法版本。
+    VerdictBlock(&'key VerdictBlockKey, &'key JudgeVersion),
     VerdictVectorNumberByContent(&'key EncodedVerdictVector),
     VerdictVectorContentByNumber(VerdictVectorNumber),
-    Violation(&'key VerdictBlockKey, StateOffsetInBlock),
-    /// 违例表里这一块的全部键共有的前缀。
-    ViolationsOfBlockPrefix(&'key VerdictBlockKey),
+    Violation(
+        &'key VerdictBlockKey,
+        &'key JudgeVersion,
+        StateOffsetInBlock,
+    ),
+    /// 违例表里这一块在这一判法版本下的全部键共有的前缀。
+    ViolationsOfBlockPrefix(&'key VerdictBlockKey, &'key JudgeVersion),
     /// 一张表全部键共有的前缀（只有表标签）。
     WholeTablePrefix(VerdictStoreTable),
     RecordedBlock(&'key VerdictBlockKey),
@@ -246,6 +277,8 @@ enum VerdictStoreKey<'key> {
     FlowFacts(&'key [u8; 32]),
     /// 核对表里一块的键：块键 + 核对代码摘要。
     VerifierBlock(&'key VerdictBlockKey, &'key [u8; 32]),
+    /// 判法版本表里一版的键。
+    JudgeVersionDescription(&'key JudgeVersion),
 }
 
 /// 按 [`VerdictStoreKey`] 拼出来的键字节。
@@ -255,13 +288,13 @@ struct VerdictStoreKeyBytes(Vec<u8>);
 impl VerdictStoreKey<'_> {
     fn to_key_bytes(&self) -> VerdictStoreKeyBytes {
         let (table, key_bytes_after_tag) = match self {
-            Self::VerdictBlock(block_key) => (
+            Self::VerdictBlock(block_key, version) => (
                 VerdictStoreTable::VerdictBlocks,
-                block_key.to_block_key_bytes(),
+                block_key.to_block_key_bytes_with_version(version),
             ),
-            Self::ViolationsOfBlockPrefix(block_key) => (
+            Self::ViolationsOfBlockPrefix(block_key, version) => (
                 VerdictStoreTable::Violations,
-                block_key.to_block_key_bytes(),
+                block_key.to_block_key_bytes_with_version(version),
             ),
             Self::VerdictVectorNumberByContent(verdict_vector) => (
                 VerdictStoreTable::VerdictVectorNumberByContent,
@@ -271,8 +304,8 @@ impl VerdictStoreKey<'_> {
                 VerdictStoreTable::VerdictVectorContentByNumber,
                 vec![number.0],
             ),
-            Self::Violation(block_key, offset) => {
-                let mut key_bytes_after_tag = block_key.to_block_key_bytes();
+            Self::Violation(block_key, version, offset) => {
+                let mut key_bytes_after_tag = block_key.to_block_key_bytes_with_version(version);
                 key_bytes_after_tag.extend_from_slice(&offset.0.to_be_bytes());
                 (VerdictStoreTable::Violations, key_bytes_after_tag)
             }
@@ -287,6 +320,9 @@ impl VerdictStoreKey<'_> {
                 let mut key_bytes_after_tag = block_key.to_block_key_bytes();
                 key_bytes_after_tag.extend_from_slice(&verifier_digest[..]);
                 (VerdictStoreTable::VerifierVerdicts, key_bytes_after_tag)
+            }
+            Self::JudgeVersionDescription(version) => {
+                (VerdictStoreTable::JudgeVersions, version.0.to_vec())
             }
         };
         let mut key_bytes = Vec::with_capacity(1 + key_bytes_after_tag.len());
@@ -603,10 +639,11 @@ impl VerdictStore {
         self.verdict_vector_by_number.get(usize::from(number.0))
     }
 
-    /// 存一块与它的违例：块与每个违例状态同一批同步写下去之后才返回；违例状态的判定向量编号取块里那个状态的。
+    /// 存一块在这一判法版本下的判定与它的违例：块与每个违例状态同一批同步写下去之后才返回；违例状态的判定向量编号取块里那个状态的。
+    /// 同一块键在别的判法版本下的行不受影响。
     ///
     /// # Errors
-    /// 这个块键下已经存着不同的块或不同的违例（`DifferentVerdictsUnderAStoredBlockKeyNotDecidedInTheFirstVersion`，
+    /// 这个块键在这一版本下已经存着不同的块或不同的违例（`DifferentVerdictsUnderAStoredBlockKeyNotDecidedInTheFirstVersion`，
     /// 什么都没写）；已存的违例读回来不合布局；RocksDB 读写失败。
     ///
     /// # Panics
@@ -614,6 +651,7 @@ impl VerdictStore {
     pub fn store_verdict_block(
         &mut self,
         block_key: &VerdictBlockKey,
+        version: &JudgeVersion,
         block: &VerdictBlock,
         violating_states: &[StateOffsetInBlock],
     ) -> Result<VerdictBlockStoring, VerdictStoreError> {
@@ -637,14 +675,14 @@ impl VerdictStore {
                     .expect("违例状态的块内序号必须在块里（调用方给的序号超出了块长）"),
             })
             .collect();
-        let block_key_bytes = VerdictStoreKey::VerdictBlock(block_key).to_key_bytes();
+        let block_key_bytes = VerdictStoreKey::VerdictBlock(block_key, version).to_key_bytes();
         let block_value_bytes = block.to_block_value_bytes();
         let stored_block_value = self
             .database
             .get(&block_key_bytes.0)
             .map_err(VerdictStoreError::RocksDatabase)?;
         if let Some(stored_block_value_bytes) = stored_block_value {
-            let stored_violations = self.violations_in_block(block_key)?;
+            let stored_violations = self.violations_in_block(block_key, version)?;
             let is_identical = stored_block_value_bytes == block_value_bytes
                 && stored_violations == requested_violations;
             if is_identical {
@@ -660,7 +698,7 @@ impl VerdictStore {
         batch.put(&block_key_bytes.0, &block_value_bytes);
         for violation in &requested_violations {
             batch.put(
-                VerdictStoreKey::Violation(block_key, violation.offset_in_block)
+                VerdictStoreKey::Violation(block_key, version, violation.offset_in_block)
                     .to_key_bytes()
                     .0,
                 [violation.verdict_vector_number.0],
@@ -688,15 +726,16 @@ impl VerdictStore {
         ))
     }
 
-    /// 读回一块；这个块键下没存过时是 `None`。
+    /// 读回一块在这一判法版本下的判定；这个块键在这一版本下没存过时是 `None`（别的版本存过也是 `None`：复用只认同一版本）。
     ///
     /// # Errors
     /// 存着的块值是空的或点名了没登记的编号；RocksDB 读失败。
     pub fn read_verdict_block(
         &self,
         block_key: &VerdictBlockKey,
+        version: &JudgeVersion,
     ) -> Result<Option<VerdictBlock>, VerdictStoreError> {
-        let block_key_bytes = VerdictStoreKey::VerdictBlock(block_key).to_key_bytes();
+        let block_key_bytes = VerdictStoreKey::VerdictBlock(block_key, version).to_key_bytes();
         let Some(block_value_bytes) = self
             .database
             .get(&block_key_bytes.0)
@@ -725,15 +764,16 @@ impl VerdictStore {
             })
     }
 
-    /// 这一块的违例，按块内序号排；没有违例或没存过这一块时是空的。
+    /// 这一块在这一判法版本下的违例，按块内序号排；没有违例或没存过这一块时是空的。
     ///
     /// # Errors
     /// 违例表里的键或值长度不对、点名了没登记的编号；RocksDB 读失败。
     pub fn violations_in_block(
         &self,
         block_key: &VerdictBlockKey,
+        version: &JudgeVersion,
     ) -> Result<Vec<StoredViolation>, VerdictStoreError> {
-        let prefix = VerdictStoreKey::ViolationsOfBlockPrefix(block_key).to_key_bytes();
+        let prefix = VerdictStoreKey::ViolationsOfBlockPrefix(block_key, version).to_key_bytes();
         let prefix_length = prefix.0.len();
         let mut violations = Vec::new();
         for entry in entries_with_key_prefix(&self.database, prefix) {
@@ -952,17 +992,19 @@ impl VerdictStore {
         Ok(rows)
     }
 
+    /// 一张按块键排的表里的全部行：块键、块键之后的键后缀、值。
     fn block_keys_of_table(
         &self,
         table: VerdictStoreTable,
-    ) -> Result<Vec<(VerdictBlockKey, Vec<u8>)>, VerdictStoreError> {
+    ) -> Result<Vec<BlockTableRow>, VerdictStoreError> {
         let prefix = VerdictStoreKey::WholeTablePrefix(table).to_key_bytes();
         let mut found = Vec::new();
         for entry in entries_with_key_prefix(&self.database, prefix) {
             let (key_bytes, value_bytes) = entry.map_err(VerdictStoreError::RocksDatabase)?;
-            let block_key = VerdictBlockKey::from_block_key_bytes(&key_bytes[1..])
-                .ok_or_else(|| stored_bytes_mismatch(table, &key_bytes, "键字节认不回块键"))?;
-            found.push((block_key, value_bytes.to_vec()));
+            let (block_key, suffix) =
+                VerdictBlockKey::from_block_key_bytes_with_suffix(&key_bytes[1..])
+                    .ok_or_else(|| stored_bytes_mismatch(table, &key_bytes, "键字节认不回块键"))?;
+            found.push((block_key, suffix.to_vec(), value_bytes.to_vec()));
         }
         Ok(found)
     }
@@ -974,7 +1016,14 @@ impl VerdictStore {
     pub fn recorded_blocks(&self) -> Result<Vec<(VerdictBlockKey, u64)>, VerdictStoreError> {
         self.block_keys_of_table(VerdictStoreTable::RecordedBlocks)?
             .into_iter()
-            .map(|(block_key, value)| {
+            .map(|(block_key, suffix, value)| {
+                if !suffix.is_empty() {
+                    return Err(stored_bytes_mismatch(
+                        VerdictStoreTable::RecordedBlocks,
+                        &suffix,
+                        "录入表的键在块键之后不该有别的字节",
+                    ));
+                }
                 let count = <[u8; 8]>::try_from(value.as_slice())
                     .map(u64::from_be_bytes)
                     .map_err(|_| {
@@ -989,20 +1038,85 @@ impl VerdictStore {
             .collect()
     }
 
-    /// 判定块表里的全部块键，按键序。
+    /// 判定块表里的全部（块键，判法版本），按键序：同一块在几个版本下判过就有几行。
     ///
     /// # Errors
     /// RocksDB 读失败；键字节认不回来。
-    pub fn stored_verdict_block_keys(&self) -> Result<Vec<VerdictBlockKey>, VerdictStoreError> {
-        Ok(self
-            .block_keys_of_table(VerdictStoreTable::VerdictBlocks)?
+    pub fn stored_verdict_block_keys(
+        &self,
+    ) -> Result<Vec<(VerdictBlockKey, JudgeVersion)>, VerdictStoreError> {
+        self.block_keys_of_table(VerdictStoreTable::VerdictBlocks)?
             .into_iter()
-            .map(|(block_key, _)| block_key)
-            .collect())
+            .map(|(block_key, suffix, _value)| {
+                let version = <[u8; SHA256_DIGEST_BYTES]>::try_from(suffix.as_slice())
+                    .map(JudgeVersion)
+                    .map_err(|_| {
+                        stored_bytes_mismatch(
+                            VerdictStoreTable::VerdictBlocks,
+                            &suffix,
+                            "判定块的键在块键之后要正好是 32 字节的判法版本",
+                        )
+                    })?;
+                Ok((block_key, version))
+            })
+            .collect()
     }
 
-    /// 把另一台的库导进来（两台各写各的库、最后并成一个）：录入表、路径索引、事实表与核对表逐行照抄；判定块按判定向量的内容在这个库里重新登记编号，
-    /// 连同违例一起写；这个库里已有同一块键、判定相同的算已导入，不同就报错。交回导入的判定块数。
+    /// 判法版本表登一版：这一版判器闭包收了哪些文件（给人查）。同一版再登照写。
+    ///
+    /// # Errors
+    /// RocksDB 写失败。
+    pub fn store_judge_version_description(
+        &mut self,
+        version: &JudgeVersion,
+        description: &str,
+    ) -> Result<(), VerdictStoreError> {
+        let key_bytes = VerdictStoreKey::JudgeVersionDescription(version).to_key_bytes();
+        let mut batch = rocksdb::WriteBatch::default();
+        batch.put(&key_bytes.0, description.as_bytes());
+        self.database
+            .write_opt(batch, &synced_write_options())
+            .map_err(VerdictStoreError::RocksDatabase)
+    }
+
+    /// 判法版本表里登过的每一版与它的描述，按版本字节排。
+    ///
+    /// # Errors
+    /// RocksDB 读失败；键不是 32 字节。
+    pub fn judge_versions(&self) -> Result<Vec<(JudgeVersion, String)>, VerdictStoreError> {
+        let prefix =
+            VerdictStoreKey::WholeTablePrefix(VerdictStoreTable::JudgeVersions).to_key_bytes();
+        let mut found = Vec::new();
+        for entry in entries_with_key_prefix(&self.database, prefix) {
+            let (key_bytes, value_bytes) = entry.map_err(VerdictStoreError::RocksDatabase)?;
+            let version = <[u8; SHA256_DIGEST_BYTES]>::try_from(&key_bytes[1..])
+                .map(JudgeVersion)
+                .map_err(|_| {
+                    stored_bytes_mismatch(
+                        VerdictStoreTable::JudgeVersions,
+                        &key_bytes,
+                        "判法版本表的键要是 32 字节",
+                    )
+                })?;
+            found.push((version, String::from_utf8_lossy(&value_bytes).into_owned()));
+        }
+        Ok(found)
+    }
+
+    /// 判法版本表里全部行的原始键值（导入用）。
+    fn judge_version_rows(&self) -> Result<RawRows, VerdictStoreError> {
+        let prefix =
+            VerdictStoreKey::WholeTablePrefix(VerdictStoreTable::JudgeVersions).to_key_bytes();
+        let mut rows = Vec::new();
+        for entry in entries_with_key_prefix(&self.database, prefix) {
+            let (key_bytes, value_bytes) = entry.map_err(VerdictStoreError::RocksDatabase)?;
+            rows.push((key_bytes.to_vec(), value_bytes.to_vec()));
+        }
+        Ok(rows)
+    }
+
+    /// 把另一台的库导进来（两台各写各的库、最后并成一个）：录入表、路径索引、事实表、核对表与判法版本表逐行照抄；判定块按判定向量的内容在这个库里
+    /// 重新登记编号，连同违例一起写、判法版本照抄；这个库里已有同一块键同一版本、判定相同的算已导入，不同就报错。交回导入的判定块数。
     ///
     /// # Errors
     /// RocksDB 读写失败；同一块键两边判定不同；判定向量超过 256 种。
@@ -1018,6 +1132,7 @@ impl VerdictStore {
             .facts_rows()?
             .into_iter()
             .chain(other.verifier_rows()?)
+            .chain(other.judge_version_rows()?)
         {
             let mut batch = rocksdb::WriteBatch::default();
             batch.put(&key_bytes, &value_bytes);
@@ -1026,9 +1141,9 @@ impl VerdictStore {
                 .map_err(VerdictStoreError::RocksDatabase)?;
         }
         let mut imported = 0u64;
-        for block_key in other.stored_verdict_block_keys()? {
+        for (block_key, version) in other.stored_verdict_block_keys()? {
             let block = other
-                .read_verdict_block(&block_key)?
+                .read_verdict_block(&block_key, &version)?
                 .expect("刚列出来的块键读得到");
             let mut renumbered =
                 Vec::with_capacity(block.verdict_vector_number_of_each_state().len());
@@ -1040,12 +1155,12 @@ impl VerdictStore {
                 renumbered.push(self.register_verdict_vector(&vector)?);
             }
             let violating: Vec<StateOffsetInBlock> = other
-                .violations_in_block(&block_key)?
+                .violations_in_block(&block_key, &version)?
                 .into_iter()
                 .map(|violation| violation.offset_in_block)
                 .collect();
             let renumbered_block = VerdictBlock::new(renumbered).expect("读回的块至少一个状态");
-            self.store_verdict_block(&block_key, &renumbered_block, &violating)?;
+            self.store_verdict_block(&block_key, &version, &renumbered_block, &violating)?;
             imported += 1;
         }
         Ok(imported)
@@ -1099,6 +1214,8 @@ mod tests {
     }
 
     const FINGERPRINT_BYTE: u8 = 0x11;
+    const TEST_JUDGE_VERSION: JudgeVersion = JudgeVersion([0x33; SHA256_DIGEST_BYTES]);
+    const OTHER_JUDGE_VERSION: JudgeVersion = JudgeVersion([0x44; SHA256_DIGEST_BYTES]);
     const PLAN_HASH_BYTE: u8 = 0x22;
 
     fn block_key_of(
@@ -1144,18 +1261,24 @@ mod tests {
         let block = block_of(&[clean, torn, clean, lost, lost]);
         assert_eq!(
             store
-                .store_verdict_block(&block_key, &block, &[])
+                .store_verdict_block(&block_key, &TEST_JUDGE_VERSION, &block, &[])
                 .expect("存块"),
             VerdictBlockStoring::WrittenAndSynced
         );
         assert_eq!(
-            store.read_verdict_block(&block_key).expect("读块"),
+            store
+                .read_verdict_block(&block_key, &TEST_JUDGE_VERSION)
+                .expect("读块"),
             Some(block),
             "读回来的块要与存进去的逐个编号相同"
         );
         let stored_value_bytes = store
             .database
-            .get(VerdictStoreKey::VerdictBlock(&block_key).to_key_bytes().0)
+            .get(
+                VerdictStoreKey::VerdictBlock(&block_key, &TEST_JUDGE_VERSION)
+                    .to_key_bytes()
+                    .0,
+            )
             .expect("读原始值")
             .expect("块在库里");
         assert_eq!(
@@ -1179,18 +1302,27 @@ mod tests {
                 .expect("登记");
             let block = block_of(&[torn, clean, torn]);
             store
-                .store_verdict_block(&block_key, &block, &[StateOffsetInBlock(2)])
+                .store_verdict_block(
+                    &block_key,
+                    &TEST_JUDGE_VERSION,
+                    &block,
+                    &[StateOffsetInBlock(2)],
+                )
                 .expect("存块");
             (clean, torn, block)
         };
         let (mut store, opening) = VerdictStore::open_existing(&directory.path).expect("重开");
         assert_eq!(opening, VerdictStoreOpening::OpenedAtTheFirstAttempt);
         assert_eq!(
-            store.read_verdict_block(&block_key).expect("读块"),
+            store
+                .read_verdict_block(&block_key, &TEST_JUDGE_VERSION)
+                .expect("读块"),
             Some(block)
         );
         assert_eq!(
-            store.violations_in_block(&block_key).expect("读违例"),
+            store
+                .violations_in_block(&block_key, &TEST_JUDGE_VERSION)
+                .expect("读违例"),
             vec![StoredViolation {
                 offset_in_block: StateOffsetInBlock(2),
                 verdict_vector_number: torn,
@@ -1272,7 +1404,7 @@ mod tests {
         for (block_key, block) in &keys_and_blocks {
             assert_eq!(
                 store
-                    .store_verdict_block(block_key, block, &[])
+                    .store_verdict_block(block_key, &TEST_JUDGE_VERSION, block, &[])
                     .expect("存块"),
                 VerdictBlockStoring::WrittenAndSynced,
                 "块键 {block_key:?} 之前没存过"
@@ -1280,7 +1412,10 @@ mod tests {
         }
         for (block_key, block) in &keys_and_blocks {
             assert_eq!(
-                store.read_verdict_block(block_key).expect("读块").as_ref(),
+                store
+                    .read_verdict_block(block_key, &TEST_JUDGE_VERSION)
+                    .expect("读块")
+                    .as_ref(),
                 Some(block),
                 "块键 {block_key:?} 下读回的要是它自己的块"
             );
@@ -1306,6 +1441,7 @@ mod tests {
         store
             .store_verdict_block(
                 &first_key,
+                &TEST_JUDGE_VERSION,
                 &block_of(&[clean, lost, torn, clean]),
                 &[StateOffsetInBlock(2), StateOffsetInBlock(1)],
             )
@@ -1313,15 +1449,23 @@ mod tests {
         store
             .store_verdict_block(
                 &key_with_a_longer_name,
+                &TEST_JUDGE_VERSION,
                 &block_of(&[torn, clean]),
                 &[StateOffsetInBlock(0)],
             )
             .expect("存块");
         store
-            .store_verdict_block(&next_block_key, &block_of(&[clean, clean]), &[])
+            .store_verdict_block(
+                &next_block_key,
+                &TEST_JUDGE_VERSION,
+                &block_of(&[clean, clean]),
+                &[],
+            )
             .expect("存块");
         assert_eq!(
-            store.violations_in_block(&first_key).expect("读违例"),
+            store
+                .violations_in_block(&first_key, &TEST_JUDGE_VERSION)
+                .expect("读违例"),
             vec![
                 StoredViolation {
                     offset_in_block: StateOffsetInBlock(1),
@@ -1336,7 +1480,7 @@ mod tests {
         );
         assert_eq!(
             store
-                .violations_in_block(&key_with_a_longer_name)
+                .violations_in_block(&key_with_a_longer_name, &TEST_JUDGE_VERSION)
                 .expect("读违例"),
             vec![StoredViolation {
                 offset_in_block: StateOffsetInBlock(0),
@@ -1344,7 +1488,9 @@ mod tests {
             }]
         );
         assert_eq!(
-            store.violations_in_block(&next_block_key).expect("读违例"),
+            store
+                .violations_in_block(&next_block_key, &TEST_JUDGE_VERSION)
+                .expect("读违例"),
             Vec::new(),
             "没有违例的块查回空的"
         );
@@ -1363,11 +1509,17 @@ mod tests {
         let block_key = block_key_named("stream", 0);
         let block = block_of(&[clean, torn]);
         store
-            .store_verdict_block(&block_key, &block, &[StateOffsetInBlock(1)])
+            .store_verdict_block(
+                &block_key,
+                &TEST_JUDGE_VERSION,
+                &block,
+                &[StateOffsetInBlock(1)],
+            )
             .expect("存块");
         let entries_before = store.every_stored_entry();
         let different_block = store.store_verdict_block(
             &block_key,
+            &TEST_JUDGE_VERSION,
             &block_of(&[torn, torn]),
             &[StateOffsetInBlock(1)],
         );
@@ -1378,7 +1530,8 @@ mod tests {
             ),
             "同一个块键下换一个块要拒：{different_block:?}"
         );
-        let different_violations = store.store_verdict_block(&block_key, &block, &[]);
+        let different_violations =
+            store.store_verdict_block(&block_key, &TEST_JUDGE_VERSION, &block, &[]);
         assert!(
             matches!(
                 different_violations,
@@ -1406,12 +1559,22 @@ mod tests {
         let block_key = block_key_named("stream", 0);
         let block = block_of(&[torn, clean]);
         store
-            .store_verdict_block(&block_key, &block, &[StateOffsetInBlock(0)])
+            .store_verdict_block(
+                &block_key,
+                &TEST_JUDGE_VERSION,
+                &block,
+                &[StateOffsetInBlock(0)],
+            )
             .expect("存块");
         let entries_before = store.every_stored_entry();
         assert_eq!(
             store
-                .store_verdict_block(&block_key, &block, &[StateOffsetInBlock(0)])
+                .store_verdict_block(
+                    &block_key,
+                    &TEST_JUDGE_VERSION,
+                    &block,
+                    &[StateOffsetInBlock(0)]
+                )
                 .expect("再存同一块"),
             VerdictBlockStoring::AlreadyStoredIdentically,
             "续跑时重写逐字节相同的块要放行"
@@ -1463,7 +1626,12 @@ mod tests {
                 .expect("登记");
             let block = block_of(&[clean, torn]);
             store
-                .store_verdict_block(&block_key, &block, &[StateOffsetInBlock(1)])
+                .store_verdict_block(
+                    &block_key,
+                    &TEST_JUDGE_VERSION,
+                    &block,
+                    &[StateOffsetInBlock(1)],
+                )
                 .expect("存块");
             (torn, block)
         };
@@ -1476,11 +1644,15 @@ mod tests {
             "第一次打不开、修过才开得了：{opening:?}"
         );
         assert_eq!(
-            store.read_verdict_block(&block_key).expect("读块"),
+            store
+                .read_verdict_block(&block_key, &TEST_JUDGE_VERSION)
+                .expect("读块"),
             Some(block)
         );
         assert_eq!(
-            store.violations_in_block(&block_key).expect("读违例"),
+            store
+                .violations_in_block(&block_key, &TEST_JUDGE_VERSION)
+                .expect("读违例"),
             vec![StoredViolation {
                 offset_in_block: StateOffsetInBlock(1),
                 verdict_vector_number: torn,
@@ -1538,11 +1710,13 @@ mod tests {
         store
             .database
             .put(
-                VerdictStoreKey::VerdictBlock(&block_key).to_key_bytes().0,
+                VerdictStoreKey::VerdictBlock(&block_key, &TEST_JUDGE_VERSION)
+                    .to_key_bytes()
+                    .0,
                 [0, 1],
             )
             .expect("绕过 store_verdict_block 直接写一个点名编号 1 的块值");
-        let read = store.read_verdict_block(&block_key);
+        let read = store.read_verdict_block(&block_key, &TEST_JUDGE_VERSION);
         assert!(
             matches!(
                 read,
@@ -1566,6 +1740,7 @@ mod tests {
         let block_key = block_key_named("stream", 0);
         let _outcome = store.store_verdict_block(
             &block_key,
+            &TEST_JUDGE_VERSION,
             &block_of(&[clean, clean]),
             &[StateOffsetInBlock(2)],
         );
@@ -1580,8 +1755,12 @@ mod tests {
             .register_verdict_vector(&verdict_vector(b"clean"))
             .expect("登记");
         let block_key = block_key_named("stream", 0);
-        let _outcome =
-            store.store_verdict_block(&block_key, &block_of(&[VerdictVectorNumber(1)]), &[]);
+        let _outcome = store.store_verdict_block(
+            &block_key,
+            &TEST_JUDGE_VERSION,
+            &block_of(&[VerdictVectorNumber(1)]),
+            &[],
+        );
     }
 
     #[test]
@@ -1648,6 +1827,105 @@ mod tests {
             merged.paths_with_prefix("").expect("读得了"),
             source.paths_with_prefix("").expect("读得了"),
             "路径索引随导入合并"
+        );
+    }
+
+    /// 同一块在两个判法版本下各存一份判定：各自读得回、互不相扰（复用只认同一版本），判定块表列出两行，判法版本表记得两版的描述，
+    /// 导入把两版连同描述一起带过去。
+    #[test]
+    fn the_same_block_judged_under_two_judge_versions_keeps_both_rows_and_reads_only_its_own_version(
+    ) {
+        let directory = TemporaryLibraryDirectory::new("two-judge-versions");
+        let mut store = VerdictStore::create_empty(&directory.path).expect("建库");
+        let clean = store
+            .register_verdict_vector(&verdict_vector(b""))
+            .expect("登记");
+        let red = store
+            .register_verdict_vector(&verdict_vector(b"red"))
+            .expect("登记");
+        let block_key = block_key_named("stream", 0);
+        store
+            .store_verdict_block(
+                &block_key,
+                &TEST_JUDGE_VERSION,
+                &block_of(&[clean, clean]),
+                &[],
+            )
+            .expect("存旧版本的块");
+        assert_eq!(
+            store
+                .read_verdict_block(&block_key, &OTHER_JUDGE_VERSION)
+                .expect("读块"),
+            None,
+            "另一个判法版本下这一块还没判：旧版本的判定不复用"
+        );
+        store
+            .store_verdict_block(
+                &block_key,
+                &OTHER_JUDGE_VERSION,
+                &block_of(&[clean, red]),
+                &[StateOffsetInBlock(1)],
+            )
+            .expect("存新版本的块：与旧版本判得不同也不算冲突");
+        assert_eq!(
+            store
+                .read_verdict_block(&block_key, &TEST_JUDGE_VERSION)
+                .expect("读块"),
+            Some(block_of(&[clean, clean])),
+            "旧版本的行留着"
+        );
+        assert_eq!(
+            store
+                .violations_in_block(&block_key, &TEST_JUDGE_VERSION)
+                .expect("读违例"),
+            Vec::new(),
+            "旧版本没有违例"
+        );
+        assert_eq!(
+            store
+                .violations_in_block(&block_key, &OTHER_JUDGE_VERSION)
+                .expect("读违例")
+                .len(),
+            1,
+            "新版本一处违例"
+        );
+        assert_eq!(
+            store.stored_verdict_block_keys().expect("列块"),
+            vec![
+                (block_key.clone(), TEST_JUDGE_VERSION),
+                (block_key.clone(), OTHER_JUDGE_VERSION),
+            ],
+            "同一块两版两行，按版本字节排"
+        );
+        store
+            .store_judge_version_description(&TEST_JUDGE_VERSION, "old judge\n")
+            .expect("登版本");
+        store
+            .store_judge_version_description(&OTHER_JUDGE_VERSION, "new judge\n")
+            .expect("登版本");
+        assert_eq!(
+            store.judge_versions().expect("列版本"),
+            vec![
+                (TEST_JUDGE_VERSION, "old judge\n".to_string()),
+                (OTHER_JUDGE_VERSION, "new judge\n".to_string()),
+            ]
+        );
+        let merged_directory = TemporaryLibraryDirectory::new("two-judge-versions-merged");
+        let mut merged = VerdictStore::create_empty(&merged_directory.path).expect("建库");
+        assert_eq!(
+            merged.import_from(&store).expect("导入"),
+            2,
+            "两版各一块都导过去"
+        );
+        assert_eq!(
+            merged.stored_verdict_block_keys().expect("列块").len(),
+            2,
+            "导入之后两版两行"
+        );
+        assert_eq!(
+            merged.judge_versions().expect("列版本").len(),
+            2,
+            "判法版本表随导入合并"
         );
     }
 }

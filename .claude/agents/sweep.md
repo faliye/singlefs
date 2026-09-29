@@ -13,7 +13,7 @@ required-inputs: 草稿目录, 报告
 开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 只找、只分类，不改。清单交主 agent，要改的由主 agent 交 `kb-scribe` 或自己改。
-开工先读：`.claude/rules/format-evolution.md`「改一个格式常量：旧值的派生形态要逐类搜，改完登记进 `stale=`」；`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「新立一条判据，当场拿它回扫已有的条目」及其两个子小节；`.claude/singlefs-ai-sop/rules/verify-before-claiming.md`「核了窄的那一句，说出口的却是宽的那一句」。
+开工先读：`.claude/rules/format-evolution.md`「改一个格式常量：旧值的派生形态要逐类搜，改完登记进 `stale=`」；`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「新立一条判据，记下要回扫的条目，随下一次阶段同步一批扫」及其两个子小节；`.claude/singlefs-ai-sop/rules/verify-before-claiming.md`「核了窄的那一句，说出口的却是宽的那一句」。
 
 ## 输入（主 agent 必须给）
 

@@ -7,7 +7,10 @@
 # 判法，按次序，第一条不成立就拒：
 #   ① 重型测试一行：派 crash-verifier、gate-triage 之外的任何类型，提示里要有一行「重型测试：不跑」（行首可带 - * > 与粗体）。
 #      提示正文里提到重型阶段的句子不再逐句判；执行时 heavy-test-guard.sh 与看门狗的进程一层照旧兜底。
-#   ② 不读共用约束的类型（general-purpose，或不给 subagent_type）：提示里要有「开工先读」与 `.claude/agent-common.md`。
+#   ⑫ 内置通用类型（general-purpose、claude，或不给 subagent_type）一律拒：一次性的活派项目定义 clerk（起步不带 CLAUDE.md 与规则），只读搜索派 Explore；
+#      确要派内置类型，提示里写一行「通用已判：<为什么 clerk 做不了>」放行。
+#   ⑬ 骨架的占位没填完：提示里还有 `<填 …>`（research/scripts/dispatch-prompt.py 打出来的占位）就拒，逐个列出那几行。
+#   ② 不读共用约束的类型（Explore、写了放行行的通用类型，或没有定义文件的类型）：提示里要有「开工先读」与 `.claude/agent-common.md`。
 #   ③ 输入齐不齐：`.claude/agents/<类型>.md` 的 frontmatter 有 `required-inputs:` 的，逐组查——组之间逗号分隔，组内 `|` 分隔的同义词在提示里出现一个就算；
 #      定义不在、没写这一行的不查。
 #   ④ 写范围：类型在 `.claude/hooks/agent-write-scope.tsv` 里的，提示里「报告路径 / 报告写进 / 写进 / 写到 / 更新」后面紧跟的路径
@@ -40,7 +43,7 @@
 #                                        # snapshot-closed-round-open / snapshot-body-optional / snapshot-valve-ignored / snapshot-valve-loose /
 #                                        # snapshot-any-agent / snapshot-loose-lines / snapshot-no-edges / snapshot-unreadable-denies /
 #                                        # snapshot-unreadable-aborts / snapshot-missing-spec-denies / json-error-silent / json-error-denies /
-#                                        # inputs-ignored / general-purpose-free / scope-ignored / scope-negation-ignored /
+#                                        # inputs-ignored / general-purpose-free / general-purpose-allowed / verdict-not-spec / placeholders-ignored / scope-ignored / scope-negation-ignored /
 #                                        # registry-ignored / registry-no-prune / opus-no-limit / window-ignored / spec-check-skipped /
 #                                        # admission-ignored / mutation-table-free / runner-backfill-refused / valve-loose-all / window-never-lifted 各自也必须让它红
 # gate-similar: heavy-test-guard.sh 管同一条「子 agent 不跑重型测试」，但挂 Bash、在执行那一刻判真要跑的命令与它执行的脚本；这里只在派发那一刻查一行结构化声明，判法没有能共用的
@@ -64,6 +67,10 @@ def labelled_value(prompt, label):
 
 
 HEAVY_TEST_OWNERS = {"crash-verifier", "gate-triage"}
+GENERAL_PURPOSE_TYPES = {"general-purpose", "claude"}
+SKELETON_PLACEHOLDER = re.compile(r"<填[^>\n]*>")   # research/scripts/dispatch-prompt.py 骨架里没填的格   # 内置通用类型：继承项目 CLAUDE.md 与全部规则，起步约 13 万 token
+# 写回员（kb-scribe）给判决自己起草规格时，提示里点名的判决文件
+VERDICT_MENTION = re.compile(r"research/prompts/[A-Za-z0-9][A-Za-z0-9_.\-]*-main-verification\.md")
 LINE_START = r"^[ \t>*_\-]*"
 HEAVY_TEST_LINE = re.compile(LINE_START + r"重型测试[* \t]*[：:][* \t]*不跑", re.M)
 COMMON_CONSTRAINTS_READ = re.compile(r"开工先读[^\n]*\.claude/agent-common\.md")
@@ -332,6 +339,8 @@ def kb_scribe_spec_verdict(prompt, project_root, hook_dir):
         if os.path.isfile(path) and path.endswith((".json", ".md", ".txt")):
             candidates.append(path)
     inline = None
+    if not candidates and VERDICT_MENTION.search(prompt) and not break_switch_is("verdict-not-spec"):
+        return None   # 写回员自己起草：给的是判决，规格由它写、它跑 kb-spec-check.py
     if not candidates:
         inline = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8")
         inline.write(prompt)
@@ -354,10 +363,10 @@ def kb_scribe_spec_verdict(prompt, project_root, hook_dir):
                 return None
         if problems:
             return ("✗ 给书记员的规格会让门禁红（research/scripts/kb-spec-check.py）：\n" + "\n".join(f"  {line}" for line in problems[:20]) +
-                    "\n→ 怎么办：改规格原文再派；判断不了的交用户；要 kb-spec-drafter 起草就先派它。确要照这份派，提示里写一行「规格检查已判：<理由>」。")
+                    "\n→ 怎么办：改规格原文再派；判断不了的交用户；要写回员自己起草就给它判决与条目、不给规格。确要照这份派，提示里写一行「规格检查已判：<理由>」。")
         if recognized == 0:
             return ("✗ 派 kb-scribe 的提示里认不出一份规格（提示正文与点名的 /tmp/claude-<uid>/ 下文件都不是 kb-spec-check.py 认的写法）。\n"
-                    "→ 怎么办：照 research/scripts/kb-spec-check.py 文件头「规格的两种写法」写，或派 kb-spec-drafter 起草；确要照原样派，提示里写一行「规格检查已判：<理由>」。")
+                    "→ 怎么办：照 research/scripts/kb-spec-check.py 文件头「规格的两种写法」写，或给判决让写回员自己起草；确要照原样派，提示里写一行「规格检查已判：<理由>」。")
         return None
     finally:
         if inline is not None:
@@ -570,6 +579,16 @@ def decide(hook_input, project_root, hook_dir=None):
                    "只由 crash-verifier（54-layer0-replay、checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay）与 gate-triage（gate.sh 整轮与 checker-tier-research-build-and-replay）跑；执行时 .claude/hooks/heavy-test-guard.sh 也拒。\n"
                    "→ 怎么办：提示里单独写一行「重型测试：不跑」；提交时的重阶段派 crash-verifier、整轮门禁派 gate-triage；提交之外确实要跑，先弹窗问用户，"
                    "用户同意了由主 agent 带 SINGLEFS_HEAVY_TESTS=user-request 跑。")
+    if (subagent_type in GENERAL_PURPOSE_TYPES and valve_reason(prompt, "通用已判") is None
+            and not break_switch_is("general-purpose-allowed")):
+        return 2, (f"✗ 派 {subagent_type}：内置通用类型起步就带项目 CLAUDE.md 与全部规则（约 13 万 token），一次性的活不派它。\n"
+                   "→ 怎么办：subagent_type 写 clerk（.claude/agents/clerk.md，输入只要草稿目录与报告；难的活派发参数 model 写 opus）；"
+                   "只读的搜索派 Explore；确要派内置类型，提示里单起一行「通用已判：<为什么 clerk 做不了>」。")
+    unfilled = [line.strip() for line in prompt.split("\n") if SKELETON_PLACEHOLDER.search(line)]
+    if unfilled and not break_switch_is("placeholders-ignored"):
+        shown = "\n".join(f"  {line[:100]}" for line in unfilled[:8])
+        return 2, (f"✗ 派 {subagent_type} 的提示骨架还有 {len(unfilled)} 处占位没填：\n{shown}\n"
+                   "→ 怎么办：把每处 <填 …> 换成实际内容，不适用的整行删掉；python3 research/scripts/dispatch-prompt.py --check <提示文件> 核到没有占位再派。")
     fields = agent_definition_fields(project_root, subagent_type)
     if fields is None and not COMMON_CONSTRAINTS_READ.search(prompt) and not break_switch_is("general-purpose-free"):
         return 2, (f"✗ {subagent_type} 不是项目定义的 agent，不读共用约束，提示里却没写「开工先读 `.claude/agent-common.md`」。\n"
@@ -732,13 +751,14 @@ def selftest(hook_dir):
         write_sample(defs_work, ".claude/agents/experiment-runner.md", "---\nname: experiment-runner\nmodel: opus\nrequired-inputs: 草稿目录\n---\n")
         write_sample(defs_work, ".claude/agents/implementation-writer.md", "---\nname: implementation-writer\nmodel: opus\n---\n")
         write_sample(defs_work, ".claude/agents/mutation-triage.md", "---\nname: mutation-triage\nmodel: sonnet\n---\n")
+        write_sample(defs_work, ".claude/agents/clerk.md", "---\nname: clerk\nmodel: sonnet\nrequired-inputs: 草稿目录, 报告\n---\n")
         write_sample(defs_work, ".claude/hooks/agent-write-scope.tsv",
                      "# 样本\nexperiment-runner\tresearch/results/**\t样本\nexperiment-runner\tresearch/prompts/e*-r*-prereg.md\t样本\nexperiment-runner\t/tmp/claude-1000/**\t样本\n"
                      "implementation-writer\tcrates/**\t样本\nimplementation-writer\t/tmp/claude-1000/**\t样本\n")
         heavy_line = "重型测试：不跑\n"
         defs_case = lambda label, subagent_type, prompt, want: case_in(defs_work, label, subagent_type, heavy_line + prompt, want, footer=False)
         for index, sentence in enumerate(OLD_HEAVY_TEST_REFUSALS, 1):
-            cases.append(case(f"重型:旧判法误拦的原句 {index} 带上那一行就放行", "general-purpose", sentence, 0))
+            cases.append(case(f"重型:旧判法误拦的原句 {index} 带上那一行就放行", "experiment-designer", sentence, 0))
         cases += [
             case("重型:没写那一行（实现员）", "implementation-writer", "改完交回。", 2, footer=FOOTER_WITHOUT_HEAVY_LINE),
             case("重型:没写那一行（通用 agent）", "general-purpose", "查一个文件。", 2, footer=FOOTER_WITHOUT_HEAVY_LINE),
@@ -746,8 +766,16 @@ def selftest(hook_dir):
             case("重型:门禁分诊员不要那一行", "gate-triage", "带 SINGLEFS_HEAVY_TESTS=commit 跑 gate.sh --staged。", 0, footer=FOOTER_WITHOUT_HEAVY_LINE),
             case("重型:那一行带粗体与列表记号也认", "implementation-writer", "改完交回。\n- **重型测试**：不跑\n", 0, footer=FOOTER_WITHOUT_HEAVY_LINE),
             case("重型:写在句子中间不算那一行", "implementation-writer", "这一件的重型测试：不跑也行吧", 2, footer=FOOTER_WITHOUT_HEAVY_LINE),
-            case_in(defs_work, "共用约束:通用 agent 没写开工先读", "general-purpose", heavy_line + "查一个文件。", 2, footer=False),
-            case_in(defs_work, "共用约束:通用 agent 写了开工先读", "general-purpose", heavy_line + "开工先读 `.claude/agent-common.md`。查一个文件。", 0, footer=False),
+            case_in(defs_work, "共用约束:通用 agent 没写开工先读", "general-purpose", heavy_line + "通用已判：要 WebSearch 查外部文档\n查一个文件。", 2, footer=False),
+            case_in(defs_work, "共用约束:通用 agent 写了开工先读", "general-purpose", heavy_line + "通用已判：要 WebSearch 查外部文档\n开工先读 `.claude/agent-common.md`。查一个文件。", 0, footer=False),
+            case_in(defs_work, "通用:general-purpose 没写放行行的拒", "general-purpose", heavy_line + "开工先读 `.claude/agent-common.md`。查一个文件。", 2, footer=False),
+            case_in(defs_work, "通用:claude 类型同样拒", "claude", heavy_line + "开工先读 `.claude/agent-common.md`。查一个文件。", 2, footer=False),
+            case_in(defs_work, "通用:Explore 放行", "Explore", heavy_line + "开工先读 `.claude/agent-common.md`。找文件。", 0, footer=False),
+            case_in(defs_work, "骨架:占位没填的拒", "Explore", heavy_line + "开工先读 `.claude/agent-common.md`。\n草稿目录：<填 草稿目录>\n找文件。", 2, footer=False),
+            case_in(defs_work, "骨架:占位填完放行", "Explore", heavy_line + "开工先读 `.claude/agent-common.md`。\n草稿目录：/tmp/claude-1000/x/\n找文件。", 0, footer=False),
+            defs_case("通用:clerk 有定义放行", "clerk", "草稿目录 /tmp/claude-1000/c/，报告 /tmp/claude-1000/c/report.md", 0),
+            case("书记员:给判决不给规格放行（写回员自己起草）", "kb-scribe", "判决 research/prompts/r-closed-main-verification.md，条目 C120。", 0,
+                 footer="重型测试：不跑\n开工先读 `.claude/agent-common.md`\n"),
             defs_case("输入:本地攻方缺禁读清单（09-23 那一次）", "three-way-local-attack", "提示文件 research/prompts/r-local-attack.md，草稿目录 /tmp/claude-1000/r/", 2),
             defs_case("输入:本地攻方齐了", "three-way-local-attack", "提示文件 research/prompts/r-local-attack.md，草稿目录 /tmp/claude-1000/r/，禁读清单：别的腿的产出", 0),
             defs_case("输入:核查员缺草稿目录（09-24 那一次）", "three-way-verifier", "快照 research/prompts/r-snapshot/，报告路径 research/prompts/r-verifier-output.md", 2),
@@ -823,7 +851,7 @@ def selftest(hook_dir):
             session_case("opus:用户定了超上限", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物\nopus 并发已判：用户当面定这一件照派", 0, "busy"),
             session_case("opus:派 sonnet 不算", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 0, "busy", model="sonnet"),
             session_case(f"opus:{OPUS_CONCURRENCY_LIMIT - 1} 个在跑放行", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 0, "light"),
-            session_case("opus:没有定义的类型按 opus 算", "general-purpose", "开工先读 `.claude/agent-common.md`。", 2, "busy"),
+            session_case("opus:没有定义的类型按 opus 算", "undefined-adhoc-type", "开工先读 `.claude/agent-common.md`。", 2, "busy"),
             session_case("窗口:还没到 resets 时刻不派同一族", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 2, "window"),
             session_case("窗口:换一族放行", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 0, "window", model="sonnet"),
             session_case("窗口:用户定了照派", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物\n限额窗口已判：用户说换号了", 0, "window"),
@@ -870,7 +898,7 @@ def selftest(hook_dir):
             case("快照:放行行没写理由、下一行不算它的理由，照拒", "kb-scribe", collided + "快照冲突已判：r-open\n报告写到草稿目录。\n", 2),
             case("快照:放行行理由是占位，照拒", "kb-scribe", collided + "- 快照冲突已判：r-open <理由>\n", 2),
             case("快照:拒绝信息原样转贴，句中的放行模板不算", "kb-scribe", forwarded_refusal, 2),
-            case("快照:派别的 agent 放行（通用）", "general-purpose", collided, 0),
+            case("快照:派别的 agent 放行（设计员）", "experiment-designer", collided, 0),
             case("快照:派别的 agent 放行（实验设计员）", "experiment-designer", collided, 0),
             case("快照:清单里认不出的行不拒", "kb-scribe", "规格：改 README.md、research/prompts/r-odd-model.md 与 `.claude/kb/pitfalls.md`。", 0),
             case("快照:规格文件不存在不拒", "kb-scribe", f"逐条规格在 {missing_specification_path}，草稿目录 {specification_directory}/，报告写 {specification_directory}/report.md。", 0),
@@ -915,7 +943,8 @@ def selftest(hook_dir):
               "_DISABLE_SNAPSHOT 或 _BREAK 设着的话这里本来就该红")
         return 1
     print(f"  ✓ 自检通过（查了 {len(cases)} 种）：没写「重型测试：不跑」一行的拒（崩溃验证员、门禁分诊员不要，旧判法误拦的 {len(OLD_HEAVY_TEST_REFUSALS)} 句原句带上那一行放行）；"
-          "通用 agent 没写开工先读共用约束的拒；定义 required-inputs 缺一组的拒、同义词认得；提示点名写范围外的路径拒、否定句里的不判；"
+          "内置通用类型不带「通用已判」放行行的拒，Explore 与 clerk 放行；骨架占位没填完的拒；不读共用约束的类型没写开工先读的拒；定义 required-inputs 缺一组的拒、同义词认得；提示点名写范围外的路径拒、否定句里的不判；"
+          "写回员给判决不给规格的放行；"
           "实现员没写要动的 crates 文件、超上限、与在跑的实现员撞文件的拒，交回之后不再撞；opus 在跑满上限的拒、sonnet 与用户放行行放行，"
           "限额窗口没到的同一族拒、换一族或时刻已过放行；书记员规格检查红或一份规格都认不出的拒；设计员重跑登记准入判输入没变的拒；"
           "变异分诊员没给表的拒；执行员没点名岔路、续做没写还差或还差写无的拒，只修锚点与只补落产物放行；"

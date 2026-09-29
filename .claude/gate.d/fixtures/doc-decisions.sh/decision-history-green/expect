@@ -1,5 +1,4 @@
 exit=0
 want=决策正文改了 7 行，变更史新增 1 条条目
 want=查了 3 份 kb 文件、1 个 `### 日期` 标题（两份变更史里 1 个），只判基准 HEAD 之后新增的行，新增的没有违例
-want=现状行与索引表一致：查了决策 1 节
-want=doc-decisions.sh：3 格里 3 格绿（entry-added shape status-sync），0 格本次未跑（无）
+want=doc-decisions.sh：2 格里 2 格绿（entry-added shape），0 格本次未跑（无）

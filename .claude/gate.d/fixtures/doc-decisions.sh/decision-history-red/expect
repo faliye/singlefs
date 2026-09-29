@@ -1,8 +1,6 @@
 exit=1
 want=决策正文改了 2 行（碰了 2 行状态行，不按小改动放行），却没往变更史新增任何条目
 want=.claude/kb/invariants.md:5  ### 2026-09-28（其一）：新写的一条还是旧形态
-want=.claude/kb/decisions-history.md:5  D1 的现状行与索引表对不上：这里写「已定 0 项 / 未定 1 项。块取 16 KiB」，索引表是「已定 1 项 / 未定 0 项。块取 16 KiB」
 want=  entry-added：红（退出 1）
 want=  shape：红（退出 1）
-want=  status-sync：红（退出 1）
-want=doc-decisions.sh：3 格里 3 格红（entry-added shape status-sync）
+want=doc-decisions.sh：2 格里 2 格红（entry-added shape）

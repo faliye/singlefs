@@ -614,7 +614,7 @@ write buffer 对 accounting 与普通 key 在入 buffer、flush 去重、落 btr
 
 来源：Linux mainline v6.17 `fs/bcachefs/`（`disk_accounting.{c,h}`、`disk_accounting_format.h`、
 `btree_write_buffer.{c,h}`、`btree_trans_commit.c`、`btree_gc.c`、`buckets.c`、`bcachefs_format.h`），
-2026-08-26 现拉并逐字比对。
+现拉并逐字比对。
 
 ## 八、根环槽宽与「长时间消费者怎么跟发布赛跑」这两件事，现役实现怎么做
 
@@ -700,7 +700,7 @@ I-7.4（近 K 代块未被复用） 扣住的块数挂载时算**」）。⇒ �
 
 D21（权威态与派生态的分界） 已定项 3 ③ 逐字「用户要求的外部调研（别家怎么做每对象扩展槽）还没做」。五家全部现查原文（URL 在表里），**未在本项目验证**；按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`，它们只能提假设、指该测的路径，不进正推 / 反推 / 校验。每家都写一处与本工程的已知差异。
 
-| 实现 | 扩展槽住哪 | 形态与宽度 | 装不下时 | 来源（2026-09-13 现查） | 与本工程的一处差异 |
+| 实现 | 扩展槽住哪 | 形态与宽度 | 装不下时 | 来源（现查） | 与本工程的一处差异 |
 |---|---|---|---|---|---|
 | ext4 | inode 记录里固定字段之后的空间（`i_extra_isize` 记「Size of this inode - 128」，默认 256 字节 inode 里固定部分 160 字节，余下装 xattr） | 头 `ext4_xattr_ibody_header` 4 字节（magic 0xEA020000）+ 条目 `ext4_xattr_entry`（`e_name_len`、`e_name_index`、`e_value_offs`、`e_value_inum`、`e_value_size`、`e_hash`），值 4 字节对齐；内联数据是一条名为 `system.data` 的 xattr（`EXT4_INLINE_DATA_FL`） | 溢出到 `i_file_acl` 指向的一个独立块（「it is not possible for this block to contain a pointer to a second extended attribute block」）；值再大用 EA inode（`e_value_inum`，`EXT4_EA_INODE_FL`） | https://www.kernel.org/doc/html/latest/filesystems/ext4/inodes.html 、 https://www.kernel.org/doc/html/latest/filesystems/ext4/attributes.html | 槽在 inode 记录内、可按名字装任意键值；本工程的扩展点按 D1（数据可移动性 / 反向索引） 已定项 3「要么为空，要么是一个指向」，不内联数据 |
 | XFS | inode 字面区（`XFS_LITINO` = inode 大小 − 核心）由数据叉与属性叉共用，`di_forkoff`（「attr fork offs, <<3 for 64b align」，单位 8 字节）定属性叉起点；`di_aformat` 取 `XFS_DINODE_FMT_LOCAL / EXTENTS / BTREE` | 短形式：`xfs_attr_sf_hdr { totsize u16, count u8, padding u8 }` + `xfs_attr_sf_entry { namelen u8, valuelen u8, flags u8, nameval[] }`，「packed as tightly as possible so as to fit into the literal area of the inode」 | 属性叉换成 extents / btree 格式指向叶块、节点块、远程值块 | https://raw.githubusercontent.com/torvalds/linux/master/fs/xfs/libxfs/xfs_format.h 、 https://raw.githubusercontent.com/torvalds/linux/master/fs/xfs/libxfs/xfs_da_format.h | 叉起点是每 inode 一个可变偏移（`di_forkoff`）；本工程的扩展点起点由系统配置声明的 N 与单元结构隐含，每单元不另存偏移 |
@@ -733,72 +733,3 @@ D21（权威态与派生态的分界） 已定项 3 ③ 逐字「用户要求的
 - [Bcachefs removed from the mainline kernel (LWN)](https://lwn.net/Articles/1040120/)
 
 ---
-
-## 历史版本
-
-### 2026-09-13
-- 补第九节：D21（权威态与派生态的分界） 已定项 3 ③ 要的每对象扩展槽调研，ext4 / XFS / btrfs / ZFS / APFS 五家现查原文，各记一处与本工程的差异；五家「为空」都靠计数为 0，没有一家只装一个指向。
-
-### 2026-08-30
-- 抬头新增「来源固定点与复核机制」：那一节从 [decisions.md](decisions.md) 顶部那块
-  「证据可靠性标注」搬来——那块写的是引用出处与复核机制，不是决策，
-  留在决策索引页既重复又检索不到。**曾经**：抬头写「全部为文档阅读所得……未 clone」；
-  **现在**：源码已固定在本机 `fs-refs/` 并逐行核对过，措辞随之改正。
-  变更依据见 [decisions-history.md](decisions-history.md) 2026-08-30（其十一）。
-
-### 2026-08-29
-- 新增 6.5 / 6.6 / 6.7（卷身份的分层、明文水位字段的回滚先例、AEAD tag 可截断），
-  三节均为本机内核树逐行现查，用于 D9（加密） 已定项 8 定案。
-- **更正一处转述**：本仓草稿曾把 fscrypt 说成「每次挂载换新盐」。
-  **曾经**：per-mount fresh salt；**现在**：每文件 nonce 在建 inode 时取一次并持久化；
-  **依据**：`fs/crypto/keysetup.c:762` 与 `fs/crypto/fscrypt_private.h:78` 逐行现查。
-  该错误只在工作笔记里，未进过任何决策，喂给三方论证的背景材料也把它写成「待攻击的提案」
-  而非 fscrypt 的做法——**三条腿没有继承这个错误**。
-
-### 2026-08-26
-
-#### （其一）
-- 补第五节：D8（核心索引结构） 索引结构专项调查。读了 bcachefs Principles of Operation
-  Rev 1.39.2（2026-08-25）原文，含 28 棵树的清单、write buffer 的代价、
-  日志结构节点的三条性质、bucket 分配器的演进；另加 XFS rmapbt 成本量级
-  与 BetrFS 的改名教训。
-
-#### （其二）
-- 补第六节：D9（加密） 加密专项调查。读了 bcachefs Encryption 设计文档与 OpenZFS
-  `zio_crypt.c` 设计注释原文，记下三种加密边界的取舍、ZFS 与 bcachefs 在
-  「无 key 能否维护」上的分岔、nonce 被迫进格式的那个字段，以及四条公开的坑。
-
-#### （其三）
-- 补第七节：2012–2026 学术成果扫描，只收「可能推翻既有决策前提」的条目，共 8 小节。
-- 5.6 改写：曾经写作「BetrFS 用全路径索引，改名代价高到不可接受……按路径编 key 就会继承这个坑」，
-  现在写作「BetrFS 0.4（FAST 2018）用 lifted Bε-tree 把改名代价从子树大小降到子树深度」。
-  改动依据：读了 FAST 2018 论文原文，复杂度一节明写被切分或合并的节点数
-  「at most proportional to the height of the tree」。旧写法把 BetrFS 0.3 的状态当成了现状。
-
-#### （其四）
-- 7.1 补核实结果：BetrFS 的持久化是 redo log + 每 5 秒 checkpoint、节点 copy-on-write、
-  全文无 checksum。核实经过：本地提取 FAST 2018 论文 PDF 文本后逐词检索。
-  据此给那组随机写数字加了「能证明什么 / 不能证明什么」的分界。
-  起因是一次三方论证里有一条腿断言「那个数字来自没有 COW 的系统」，核实后该断言不成立。
-
-#### （其五）
-- 7.1 与 7.5 删掉「每事务发布新根」这个说法。它曾经被当成本工程的既有承诺写进正文，
-  实际上项目里从来没有这条：litmus 只钉一次发布事件内部的顺序，
-  decisions.md / CLAUDE.md / rules/fs-design.md 全文无此表述（逐文件 grep 核实）。
-  改动依据：它是一个未经审查的默认假设，而基于它做出的「Bε 收益在本工程会缩水」的推理
-  因此站不住——发布频率是自由变量，checkpoint 语义下批量是免费的。
-
-#### （其六）
-- 补 7.10：bcachefs 官方文档现查补录六条，含 bucket gen 限定为缓存数据、
-  gen 绕回机制已被反向索引取代（`need_gc_gens` 标为 legacy）、copygc 预留 8%、
-  以及 `nocow` 数据在加密文件系统上明文存储这条硬不兼容。
-  同时明说一条**未找到**：没有一手材料用散文说「无密钥时后台任务不能跑」，那是推论。
-
-#### （其七）
-- 补 7.11：bcachefs 的记账验证有一处自我作废——checker 与运行时共用同一行加减代码
-  （`disk_accounting.h:208`，只差 gc 下标），因此抓不到「加减语义本身写错」。
-  这是 evidence-discipline 那条规则在真实系统里已经被违反并产生盲区的实例，不是推测。
-  同批核实了 accounting 的 delta 形态与它派生出的成本清单。
-
-### 2026-08-25
-- 建档。记账四模型、bcachefs 六点、Rust 轮子六个、内核 Rust fs 现状。

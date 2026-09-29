@@ -234,6 +234,9 @@ SELFTEST_RUNNERS=(
   "bash research/scripts/change-touches-crates.sh --selftest" "bash research/scripts/verify-citations.sh --selftest"
   "python3 research/scripts/agent-handover.py --selftest" "python3 research/scripts/decision-slim-check.py --selftest"
   "python3 research/scripts/pdf-text.py --selftest" "python3 research/scripts/rules-sweep-audit.py --selftest"
+  "python3 research/scripts/dispatch-prompt.py --selftest" "python3 research/scripts/three-way-materials.py --selftest"
+  "bash research/scripts/merge-and-verify.sh --selftest"
+  "python3 research/scripts/agent-cost.py --selftest" "bash research/scripts/snapshot-check.sh --selftest"
   "bash research/scripts/stage-must-run.sh --selftest" "bash research/scripts/changed-paths.sh --selftest"
   "bash research/scripts/gate-staged.sh --selftest" "python3 research/scripts/admission.py --selftest"
   "bash research/scripts/capped.sh --selftest" "bash research/scripts/stage-run-or-skip.sh --selftest"
@@ -246,6 +249,8 @@ SELFTEST_RUNNERS=(
   "python3 research/scripts/corruption-check.py --selftest" "python3 research/scripts/crates-mutation-rows.py --selftest"
   "bash .claude/gate.d/lib/stage-cells.sh --selftest" "python3 research/scripts/gate-structure-check.py --selftest"
   "python3 research/scripts/migrate-changelog-format.py --selftest"
+  "bash research/scripts/crash-amplification.sh --selftest"
+  "bash research/scripts/crash-amplification-item.sh --selftest"
 )
 SELFTEST_RUNNERS_STARTED_ALONE=("bash research/scripts/layer0-shard-run.sh --selftest" "python3 research/scripts/agent-watch.py --selftest")
 
@@ -367,6 +372,7 @@ echo "  ✓ research 脚本的自证都通过（这一格跑了 ${#runners[@]} �
 # coverage-claims-red 放一份用 match 语句实现 --selftest、没人跑的 .py，必须报它没人跑。
 NOT_RUN_HERE=(
   "research/scripts/vm-bench.sh	自证要连起三次虚机，挂钟太重，不进每轮门禁"
+  "research/scripts/crash-amplification-two-hosts.sh	自证要编 checker 档、两个进程各领一份真跑一条流水线用例再导入，挂钟以分计，归用户要求时跑"
 )
 cell_research_script_selftest_coverage() {
 # 被扫集合现算，不手抄份数（show-me-test.md「跳过清单要与被扫集合出自同一份数据、现算」）。

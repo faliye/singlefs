@@ -23,6 +23,8 @@
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
+#[cfg(feature = "verdict-store")]
+mod common_crash_points;
 #[path = "../../singlefs-harness/tests/common_tree_split/mod.rs"]
 mod common_tree_split;
 
@@ -461,5 +463,36 @@ fn the_accounting_streams_read_the_tree_height_from_the_root_node_header() {
                 .matches('L')
                 .count()
         );
+    }
+}
+
+/// 崩溃放量的形态：七条流各自一个崩溃点（起点镜像不枚举、只录分裂那一次发布），按环境跑一趟，健康的流零红；
+/// 配置开了 GPU 就是 GPU 判器判。
+#[cfg(feature = "verdict-store")]
+fn amplify_tree_split_stream(stream: TreeSplitStream) {
+    let prepared = prepare(stream);
+    let name = format!("tree_split_{stream:?}");
+    let crash_points = common_crash_points::one_crash_point_over_every_write(
+        file!(),
+        &name,
+        prepared.writes.len(),
+    );
+    common_crash_points::amplify_prepared_flow(
+        &name,
+        &prepared.base,
+        &prepared.writes,
+        &prepared.segments,
+        prepared.judged_root_index,
+        &prepared.versions,
+        crash_points,
+        6,
+    );
+}
+
+#[cfg(feature = "verdict-store")]
+#[test]
+fn crash_amplification_of_every_tree_split_stream_is_clean() {
+    for stream in TreeSplitStream::ALL {
+        amplify_tree_split_stream(stream);
     }
 }

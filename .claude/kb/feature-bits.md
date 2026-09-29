@@ -19,13 +19,3 @@
 **代码侧引用了哪几位**：`crates/singlefs-core/src/system_configuration.rs` 的 `INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT = 0x02`，位 1；同一份文件的 `INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT = 0x01` 是退役的位 0，只在测试与注释里用，留着让「用过的位不回收」写进代码；`SUPPORTED_INCOMPAT_BITS` 由位 1 合成，不是位掩码字面量，门禁 code-source-discipline 的 feature-bits 格解不出位号，把它列进成功那句的「没判位号的」名单。`crates/singlefs-checker/src/lib.rs` 判 incompat 用它自己的具名常量 `INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT = 0x02`（第 219 行）。
 
 **位图的字节序**：位图小端，位 n 住第 n div 8 个字节的第 n mod 8 低位（D22（单元原子性怎么合成） 已定项 13）。
-
-## 历史版本
-
-### 2026-09-26（实一）
-
-- 位 1 的名称列填上代码里的常量名；位 0 的名称列改成退役常量名（改前 `INCOMPAT_FIRST_SSD_LINE_BIT`，实一已从代码删掉）；「代码侧引用了哪几位」改成现状：checker 不再写裸字面量 `0x01`，改用具名常量。
-
-### 2026-09-21
-
-- 立 `.claude/kb/feature-bits.md`，还 C11（feature bit 跳号）。D15（格式冻结政策） 已定项 10 逐字写着记账落在这个文件名上，而文件一直不存在，C11（feature bit 跳号） 那条门禁也就无从挂起。

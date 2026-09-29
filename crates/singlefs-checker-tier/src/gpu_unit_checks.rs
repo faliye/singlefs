@@ -56,22 +56,36 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 }
 "#;
 
+/// 没给额度的卡，崩溃放量最多用它空闲显存的几分之几（分子、分母）：剩下的留给卡上别的进程。
+const SHARE_OF_FREE_MEMORY_WITHOUT_A_QUOTA: (u64, u64) = (3, 4);
+
 /// 一张起好上下文的卡。
 pub struct GpuCard {
     pub name: String,
     pub pci_bus_identifier: String,
-    /// 起上下文那一刻 `nvidia-smi` 报的空闲显存（MiB）；按它分工。
+    /// `nvidia-smi` 给这张卡的序号（配置按它点名）。
+    pub index: u32,
+    /// 起上下文那一刻 `nvidia-smi` 报的空闲显存（MiB）。
     pub free_memory_mebibytes: u64,
+    /// 配置给这张卡的显存额度（MiB）：崩溃放量在这张卡上占的显存不超过它；没给额度的是 `None`。
+    pub memory_quota_mebibytes: Option<u64>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     pipeline: wgpu::ComputePipeline,
 }
 
-/// `nvidia-smi` 报的每张卡：PCI 总线号（小写、去掉前导的 0 域）→ 空闲显存 MiB。起不来 `nvidia-smi` 就是空表。
-fn free_memory_by_pci_bus() -> std::collections::BTreeMap<String, u64> {
+/// `nvidia-smi` 报的一张卡：序号与空闲显存 MiB。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ReportedCard {
+    index: u32,
+    free_memory_mebibytes: u64,
+}
+
+/// `nvidia-smi` 报的每张卡：PCI 总线号（小写、去掉前导的 0 域）→ 序号与空闲显存。起不来 `nvidia-smi` 就是空表。
+fn reported_cards_by_pci_bus() -> std::collections::BTreeMap<String, ReportedCard> {
     let Ok(output) = std::process::Command::new("nvidia-smi")
         .args([
-            "--query-gpu=pci.bus_id,memory.free",
+            "--query-gpu=pci.bus_id,index,memory.free",
             "--format=csv,noheader,nounits",
         ])
         .output()
@@ -81,8 +95,17 @@ fn free_memory_by_pci_bus() -> std::collections::BTreeMap<String, u64> {
     String::from_utf8_lossy(&output.stdout)
         .lines()
         .filter_map(|line| {
-            let (bus, free) = line.split_once(',')?;
-            Some((normalized_bus(bus), free.trim().parse().ok()?))
+            let mut fields = line.split(',');
+            let bus = fields.next()?;
+            let index = fields.next()?.trim().parse().ok()?;
+            let free_memory_mebibytes = fields.next()?.trim().parse().ok()?;
+            Some((
+                normalized_bus(bus),
+                ReportedCard {
+                    index,
+                    free_memory_mebibytes,
+                },
+            ))
         })
         .collect()
 }
@@ -94,14 +117,36 @@ fn normalized_bus(text: &str) -> String {
     parts[parts.len().saturating_sub(2)..].join(":")
 }
 
+/// 配置点名的卡，按配置的次序（优先级）：`(nvidia-smi 序号, 显存额度 MiB)`。点名而用不了的卡（本机没有这个序号、
+/// 空闲显存低于 [`MINIMUM_FREE_MEMORY_MEBIBYTES`]、上下文起不来）打一行说明，不悄悄换成别的卡；没点名的卡一张不用。
+#[must_use]
+pub fn gpu_cards_by_priority(configured: &[(u32, u64)]) -> Vec<GpuCard> {
+    let mut usable = usable_gpu_cards();
+    let mut cards = Vec::with_capacity(configured.len());
+    for (index, quota) in configured {
+        match usable.iter().position(|card| card.index == *index) {
+            Some(position) => {
+                let mut card = usable.remove(position);
+                card.memory_quota_mebibytes = Some(*quota);
+                cards.push(card);
+            }
+            None => eprintln!(
+                "GPU_CARD_NOT_USABLE index={index}：配置点名了这张卡，本机却用不了它（没有这个序号、空闲显存低于 {MINIMUM_FREE_MEMORY_MEBIBYTES} MiB、或上下文起不来）"
+            ),
+        }
+    }
+    cards
+}
+
 /// 本机能用的卡：Vulkan 下的 NVIDIA 独显，空闲显存不低于 [`MINIMUM_FREE_MEMORY_MEBIBYTES`]，上下文起得来；按空闲显存从大到小排。
 #[must_use]
 pub fn usable_gpu_cards() -> Vec<GpuCard> {
+    enable_the_driver_shader_disk_cache();
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: wgpu::Backends::VULKAN,
         ..wgpu::InstanceDescriptor::new_without_display_handle()
     });
-    let free_by_bus = free_memory_by_pci_bus();
+    let reported_by_bus = reported_cards_by_pci_bus();
     let mut cards: Vec<GpuCard> =
         pollster::block_on(instance.enumerate_adapters(wgpu::Backends::VULKAN))
             .into_iter()
@@ -112,7 +157,9 @@ pub fn usable_gpu_cards() -> Vec<GpuCard> {
                 {
                     return None;
                 }
-                let free = *free_by_bus.get(&normalized_bus(&information.device_pci_bus_id))?;
+                let reported =
+                    *reported_by_bus.get(&normalized_bus(&information.device_pci_bus_id))?;
+                let free = reported.free_memory_mebibytes;
                 if free < MINIMUM_FREE_MEMORY_MEBIBYTES {
                     return None;
                 }
@@ -120,7 +167,9 @@ pub fn usable_gpu_cards() -> Vec<GpuCard> {
                     pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
                         label: Some("singlefs-gpu-unit-checks"),
                         required_features: wgpu::Features::empty(),
-                        required_limits: wgpu::Limits::default(),
+                        // 崩溃放量的判器把整条流的版本字节与每个状态的草稿区各绑成一张存储缓冲，默认的 128 MiB 绑定上限装不下大流：
+                        // 按这张卡实际支持的上限要（NVIDIA Vulkan 上是 2 GiB − 1）。
+                        required_limits: adapter.limits(),
                         experimental_features: wgpu::ExperimentalFeatures::disabled(),
                         memory_hints: wgpu::MemoryHints::Performance,
                         trace: wgpu::Trace::Off,
@@ -141,7 +190,9 @@ pub fn usable_gpu_cards() -> Vec<GpuCard> {
                 Some(GpuCard {
                     name: information.name,
                     pci_bus_identifier: normalized_bus(&information.device_pci_bus_id),
+                    index: reported.index,
                     free_memory_mebibytes: free,
+                    memory_quota_mebibytes: None,
                     device,
                     queue,
                     pipeline,
@@ -152,7 +203,58 @@ pub fn usable_gpu_cards() -> Vec<GpuCard> {
     cards
 }
 
+/// 驱动把编好的 Vulkan 管线存到盘上的目录：跨轮复用的缓存放 `GATE_CROSS_RUN_TMPDIR` 下；没设就放家目录 `~/.cache/singlefs`
+/// （`/tmp` 开机会清空，冷编要十几分钟的内核每次重启都得重编）；连 `HOME` 都没有才退到 `TMPDIR`、`/tmp`
+/// （`command-safety.md`「测试镜像一律放临时目录」：有意跨轮复用的缓存不算镜像）。
+#[must_use]
+pub fn driver_shader_disk_cache_directory() -> std::path::PathBuf {
+    let base = std::env::var_os("GATE_CROSS_RUN_TMPDIR")
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .map(|home| std::path::PathBuf::from(home).join(".cache/singlefs"))
+        })
+        .or_else(|| std::env::var_os("TMPDIR").map(std::path::PathBuf::from))
+        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+    base.join("singlefs-gpu-shader-cache")
+}
+
+/// NVIDIA 驱动的盘上着色器缓存默认不罩 Vulkan 管线（崩溃放量的判器内核冷编要几分钟，每个进程都重编）；
+/// 起 Vulkan 实例之前把它开起来、指到 [`driver_shader_disk_cache_directory`]，同一版内核第二个进程起就直接装（实测 57 秒变 0.5 秒）。
+/// 用户已经设了这几个变量的照用户的；`SKIP_CLEANUP` 让驱动不按默认的容量上限清掉大内核的那一份。
+fn enable_the_driver_shader_disk_cache() {
+    if std::env::var_os("__GL_SHADER_DISK_CACHE").is_none() {
+        std::env::set_var("__GL_SHADER_DISK_CACHE", "1");
+    }
+    if std::env::var_os("__GL_SHADER_DISK_CACHE_PATH").is_none() {
+        let directory = driver_shader_disk_cache_directory();
+        let _ = std::fs::create_dir_all(&directory);
+        std::env::set_var("__GL_SHADER_DISK_CACHE_PATH", &directory);
+    }
+    if std::env::var_os("__GL_SHADER_DISK_CACHE_SKIP_CLEANUP").is_none() {
+        std::env::set_var("__GL_SHADER_DISK_CACHE_SKIP_CLEANUP", "1");
+    }
+    // 驱动按可执行文件分缓存目录；崩溃放量七个分项各是一个测试二进制，同一版内核每个都要冷编一遍（release 十几分钟）。
+    // 给一个共用的应用名，认得这个变量的驱动把它们放进同一份缓存，只编一次；不认得的照旧按可执行文件分。
+    if std::env::var_os("__GL_SHADER_DISK_CACHE_APP_NAME").is_none() {
+        std::env::set_var("__GL_SHADER_DISK_CACHE_APP_NAME", "singlefs-crash-judge");
+    }
+}
+
 impl GpuCard {
+    /// 崩溃放量在这张卡上最多占多少显存（MiB）：给了额度的取额度与空闲显存里小的那个，
+    /// 没给额度的取空闲显存的 [`SHARE_OF_FREE_MEMORY_WITHOUT_A_QUOTA`]。
+    #[must_use]
+    pub fn memory_budget_mebibytes(&self) -> u64 {
+        match self.memory_quota_mebibytes {
+            Some(quota) => quota.min(self.free_memory_mebibytes),
+            None => {
+                let (numerator, denominator) = SHARE_OF_FREE_MEMORY_WITHOUT_A_QUOTA;
+                self.free_memory_mebibytes / denominator * numerator
+            }
+        }
+    }
+
     /// 这张卡的设备（崩溃放量第 ② 段的核对内核在同一张卡上另起自己的管线）。
     #[must_use]
     pub fn device(&self) -> &wgpu::Device {
