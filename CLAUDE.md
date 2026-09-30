@@ -5,7 +5,7 @@
 **并行agent治理与上游sop治理**
 agent治理与上游sop治理，是另外一个重要的任务。因此遇到问题优先从流程、规范和门禁等方面着手解决问题，目的不是改一行代码，而是避免再发。
 
-当前里程碑：**「覆盖写、释放、回退与复用」**（`.claude/kb/milestone/02-second-txn.md`，做到哪一步看那份文件）收尾中，与它并行开的是**「删除与多次 COW」**（`.claude/kb/milestone/03-third-txn.md`，作业点、验收与次序在那份文件；用户 2026-09-28 定并行开工，同日定今天只写文档不开工）。收尾九步（`records/2026-09-24-里程碑二收尾调度.md`）做到第 9 步；崩溃放量（增补 4：身份、KV、双机、GPU 核对、前缀共享、三段流）已接进 `crates/singlefs-checker-tier`，判器整套上了 GPU，展开 28 全枚举六个分项 26.15 亿态零违例（到 E 全域 1 662 648 564 态），σ 那一项 GPU 判器一个落点 32 次写的容量不够、没判。上一个里程碑「新池新建文件」（`.claude/kb/milestone/01-first-txn.md`）的出口已经满足，代码在 `crates/` 下五个 crate（格式常量、核心、池级 checker、harness 档、checker 档；两档怎么分见 `.claude/rules/verification.md`）。
+当前里程碑：**「覆盖写、释放、回退与复用」**（`.claude/kb/milestone/02-second-txn.md`，做到哪一步看那份文件）收尾中，与它并行开的是**「删除与多次 COW」**（`.claude/kb/milestone/03-third-txn.md`，作业点、验收与次序在那份文件；用户 2026-09-28 定并行开工，同日定今天只写文档不开工）。收尾九步（`records/2026-09-24-里程碑二收尾调度.md`）做到第 9 步；崩溃放量（增补 4：身份、KV、双机、GPU 核对、前缀共享、三段流）已接进 `crates/singlefs-checker-tier`，判器整套上了 GPU，一个落点的组合掩码放到 64 位之后按新判法版本重判，展开 28 全枚举七个分项（含 σ）26.16 亿态零违例（到 E 全域 1 662 648 564 态），一趟 7 小时 37 分。上一个里程碑「新池新建文件」（`.claude/kb/milestone/01-first-txn.md`）的出口已经满足，代码在 `crates/` 下五个 crate（格式常量、核心、池级 checker、harness 档、checker 档；两档怎么分见 `.claude/rules/verification.md`）。
 
 ## 任务从哪进
 

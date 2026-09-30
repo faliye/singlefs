@@ -381,16 +381,22 @@ fn find_location(device: u32, offset: vec2<u32>) -> u32 {
 fn version_of_location(location: u32) -> u32 {
     let writes_first = location_word(location, 5u);
     let writes_count = location_word(location, 6u);
-    var combination = 0u;
+    // 组合掩码 64 位：第 i 次写在低字的第 i 位（i < 32）或高字的第 i − 32 位；版本表里第 0 字是低字、第 7 字是高字
+    var combination = vec2<u32>(0u, 0u);
     for (var i = 0u; i < writes_count; i = i + 1u) {
         if (is_persisted(tab(T_LOCATION_WRITES, writes_first + i))) {
-            combination = combination | (1u << i);
+            if (i < 32u) {
+                combination.x = combination.x | (1u << i);
+            } else {
+                combination.y = combination.y | (1u << (i - 32u));
+            }
         }
     }
     let versions_first = location_word(location, 7u);
     let versions_count = location_word(location, 8u);
     for (var i = 0u; i < versions_count; i = i + 1u) {
-        if (tab(T_VERSIONS, (versions_first + i) * VERSION_WORDS) == combination) {
+        let version_words = (versions_first + i) * VERSION_WORDS;
+        if (tab(T_VERSIONS, version_words) == combination.x && tab(T_VERSIONS, version_words + 7u) == combination.y) {
             return versions_first + i;
         }
     }

@@ -1,4 +1,4 @@
-//! checker 档模块：crash、crash_amplification
+//! checker 档模块：crash、crash_amplification、gpu_unit_checks、crash_judge_tables、crash_judge_dispatch
 //! C561（记录核对器的复用豁免在复用只落一半时假红）：记录核对器第二条判据按扇区、拿枚举器给的持久集合判一份单元副本缺不缺席
 //! （D13（验证路线） 已定项 7：记录核对器的入参含持久集合；判据原文在 `crash::check_records_against` 的文档注释上）。
 //!
@@ -212,25 +212,25 @@ fn record_history(tag: &str, actions: &[UserAction]) -> RecordedHistory {
             }
         }
     }
-    let pool = &history.pool;
-    let operations = pool.retained_operations();
-    let entry_spans: Vec<RecordedEntrySpan> = pool
+    let recorded_pool = &history.pool;
+    let operations = recorded_pool.retained_operations();
+    let entry_spans: Vec<RecordedEntrySpan> = recorded_pool
         .stream
         .entry_spans()
         .into_iter()
         .map(|span| RecordedEntrySpan {
             entry: span.entry,
-            operations: span.operations.start - pool.mkfs_operation_count
-                ..span.operations.end - pool.mkfs_operation_count,
+            operations: span.operations.start - recorded_pool.mkfs_operation_count
+                ..span.operations.end - recorded_pool.mkfs_operation_count,
         })
         .collect();
     let (writes, segments, _stream_indexes) = writes_and_segments_with_stream_indexes_and_entries(
-        &operations[pool.mkfs_operation_count..],
+        &operations[recorded_pool.mkfs_operation_count..],
         &entry_spans,
         &geometry(),
     );
     RecordedHistory {
-        base: pool.memory_pool_after_mkfs(),
+        base: recorded_pool.memory_pool_after_mkfs(),
         writes,
         segments,
         versions: history.versions.clone(),
@@ -977,24 +977,16 @@ fn an_illegal_reuse_does_not_explain_the_overwritten_unit_in_any_of_the_three_st
     }
 }
 
-/// σ 接进崩溃放量流水线（用户 2026-09-29 定：崩溃注入之外的崩溃枚举用例都进流水线、由 GPU 判）：整条 `UOOUOMSU` 历史一张写表；
-/// σ 之前的段与 σ 那次发布之后的段各包成一个 ignore 的点（只留全持久那一个状态：是剪枝，也是别的流可复用的前缀），
-/// σ 那次发布（单元写段起、到它的根槽写与系统配置轮换为止）一个点全部展开。判器是流水线的：两遍恢复、oracle、池级 checker、
-/// 记录核对器，比 `every_crash_state_of_sigma_leaves_every_unit_of_the_claimed_publishes_present` 多判 oracle 与 checker。
-/// 展开上限从环境取（`SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO`，没设 6：σ 16 个写平时不展开，全量脚本给 28 才展开）。
-#[cfg(feature = "verdict-store")]
-#[test]
-fn crash_amplification_of_sigma_on_the_misaligned_reuse_history_is_clean() {
-    use singlefs_checker_tier::crash_amplification::{repository_relative_file, CrashPointSpan};
-    let recorded = record_history("crash-amplification-sigma", &HISTORY_UOOUOMSU);
-    let chain = misaligned_reuse_chain(&recorded);
+/// σ 那次发布的写区间：单元写段起、到它根槽写所在的段末为止；紧跟的一段若只有系统配置槽轮换（没有单元写、没有根槽写），也归它。
+#[cfg(any(feature = "verdict-store", feature = "gpu"))]
+fn sigma_publish_writes(recorded: &RecordedHistory) -> std::ops::Range<usize> {
+    let chain = misaligned_reuse_chain(recorded);
     let sigma_first_write = *recorded.segments[chain.sigma]
         .first()
         .expect("σ 至少一个写");
     let sigma_root_write = (sigma_first_write..recorded.writes.len())
         .find(|index| recorded.writes[*index].kind == StepKind::RootRecordFua)
         .expect("σ 之后有根槽写");
-    // σ 那次发布到它根槽写所在的段末为止；紧跟的一段若只有系统配置槽轮换（没有单元写、没有根槽写），也归它
     let segment_of = |write_index: usize| {
         recorded
             .segments
@@ -1014,6 +1006,192 @@ fn crash_amplification_of_sigma_on_the_misaligned_reuse_history_is_clean() {
         .last()
         .expect("段非空")
         + 1;
+    sigma_first_write..end_of_the_publish
+}
+
+/// GPU 判器在 σ 那次发布上与 CPU 判器逐状态相同：这条历史把系统配置 0 号槽写了 34 次，判器表里一个落点的组合掩码要用到高 32 位
+/// （它是今天唯一一条一个落点超过 32 次写的流）。只展开 σ 那次发布的段，其余段不展开；每个状态 GPU 的红项与 CPU 判器的
+/// `red_items` 逐项同名、同序，GPU 一个状态都不许判不了。要一张空闲显存够的 NVIDIA 独显。
+#[cfg(feature = "gpu")]
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_written_more_than_thirty_two_times(
+) {
+    use singlefs_checker_tier::crash::{judge_layer0_state_range, Layer0SegmentExpansion};
+    use singlefs_checker_tier::crash_amplification::{
+        gpu_recovery_words, gpu_verdict_items, recovery_words_of,
+    };
+    use singlefs_checker_tier::crash_judge_dispatch::GpuCrashJudge;
+    use singlefs_checker_tier::crash_judge_tables::{build_judge_tables, JudgeFlow};
+    use singlefs_checker_tier::gpu_unit_checks::usable_gpu_cards;
+    let recorded = record_history("gpu-judge-sigma", &HISTORY_UOOUOMSU);
+    let sigma_publish = sigma_publish_writes(&recorded);
+    let expansion = |_segment_index: usize, segment: &[usize]| {
+        if segment
+            .iter()
+            .all(|write_index| sigma_publish.contains(write_index))
+        {
+            Layer0SegmentExpansion::EveryProperSubset
+        } else {
+            Layer0SegmentExpansion::NotExpanded
+        }
+    };
+    let judged_root_index = recorded
+        .writes
+        .iter()
+        .rposition(|write| write.kind == StepKind::RootRecordFua)
+        .expect("历史末尾有根槽写");
+    let tables = build_judge_tables(&JudgeFlow {
+        base: &recorded.base,
+        writes: &recorded.writes,
+        segments: &recorded.segments,
+        judged_root_index,
+        versions: &recorded.versions,
+        expansion: &expansion,
+    })
+    .expect("一个落点 64 次写以内，建得出表");
+    let most_writes_on_one_location = tables
+        .locations
+        .iter()
+        .map(|location| location.writes.len())
+        .max()
+        .expect("至少一个落点");
+    assert!(
+        most_writes_on_one_location > 32,
+        "这条对拍要的是一个落点超过 32 次写的流，今天最多 {most_writes_on_one_location} 次"
+    );
+    // 高 32 位真起作用：有两个版本低 32 位相同、只差高位（只比低 32 位的内核会把它们认成同一个）
+    let versions_told_apart_only_by_the_high_bits: usize = tables
+        .locations
+        .iter()
+        .map(|location| {
+            let mut by_low: std::collections::BTreeMap<u32, usize> =
+                std::collections::BTreeMap::new();
+            for version in &location.versions {
+                *by_low
+                    .entry(u32::try_from(version.combination & 0xFFFF_FFFF).expect("低 32 位"))
+                    .or_insert(0) += 1;
+            }
+            by_low.values().filter(|count| **count > 1).count()
+        })
+        .sum();
+    assert!(
+        versions_told_apart_only_by_the_high_bits > 0,
+        "这条对拍要有两个版本低 32 位相同、只差高位，不然只比低 32 位的内核也判得对"
+    );
+    let card = usable_gpu_cards()
+        .into_iter()
+        .next()
+        .expect("本机要有一张空闲显存够的 NVIDIA 独显；没有就是这条测试的环境没搭好，不悄悄跳过");
+    let judge = GpuCrashJudge::new(&card, &tables);
+    let gpu = judge.judge_states(0..tables.state_count);
+    // CPU 判器按区间切片并行判（每个状态十几到几十毫秒，单线程判 6.5 万态要一个多小时）：线程数从
+    // SINGLEFS_CRASH_JUDGE_CPU_THREADS 取，没设取本机可用并行度；每线程 8 片，按片序拼回，与单线程逐状态相同
+    let threads = std::env::var("SINGLEFS_CRASH_JUDGE_CPU_THREADS")
+        .ok()
+        .and_then(|text| text.parse::<usize>().ok())
+        .filter(|count| *count >= 1)
+        .unwrap_or_else(|| {
+            std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)
+        });
+    let slice_count = u64::try_from(threads * 8).expect("装得进 u64");
+    let slice_length = tables.state_count.div_ceil(slice_count).max(1);
+    let slices: Vec<std::ops::Range<u64>> = (0..slice_count)
+        .map(|index| {
+            (index * slice_length).min(tables.state_count)
+                ..((index + 1) * slice_length).min(tables.state_count)
+        })
+        .filter(|range| !range.is_empty())
+        .collect();
+    let next_slice = std::sync::atomic::AtomicUsize::new(0);
+    /// 一个状态的 CPU 判定：红项与落到的根、两遍的结局（[`recovery_words_of`] 的四个数）。
+    type CpuVerdict = (Vec<String>, [u32; 4]);
+    let mut judged_slices: Vec<(usize, Vec<CpuVerdict>)> = std::thread::scope(|scope| {
+        let workers: Vec<_> = (0..threads)
+            .map(|_| {
+                scope.spawn(|| {
+                    let mut mine = Vec::new();
+                    loop {
+                        let index = next_slice.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        let Some(range) = slices.get(index) else {
+                            break;
+                        };
+                        let mut items = Vec::new();
+                        let state_count = judge_layer0_state_range(
+                            &recorded.base,
+                            &recorded.writes,
+                            &recorded.segments,
+                            judged_root_index,
+                            &recorded.versions,
+                            &expansion,
+                            range.clone(),
+                            &mut |_ordinal, _image, judgement| {
+                                items.push((judgement.red_items(), recovery_words_of(judgement)));
+                            },
+                        );
+                        assert_eq!(
+                            state_count, tables.state_count,
+                            "CPU 判器与判器的表数的状态总数相同"
+                        );
+                        assert_eq!(
+                            u64::try_from(items.len()).expect("装得进 u64"),
+                            range.end - range.start,
+                            "这一片的状态都判了"
+                        );
+                        mine.push((index, items));
+                    }
+                    mine
+                })
+            })
+            .collect();
+        workers
+            .into_iter()
+            .flat_map(|worker| worker.join().expect("判器线程不 panic"))
+            .collect()
+    });
+    judged_slices.sort_by_key(|(index, _)| *index);
+    let cpu: Vec<CpuVerdict> = judged_slices
+        .into_iter()
+        .flat_map(|(_, items)| items)
+        .collect();
+    let states = u64::try_from(cpu.len()).expect("装得进 u64");
+    assert_eq!(states, tables.state_count, "CPU 判器判了全部状态");
+    // 红项与落到的根、两遍的结局都要相同：这条流全绿，判器读错一个落点的版本时红项照样为空，只露在落到的根上
+    let mut mismatches = Vec::new();
+    for (ordinal, (gpu_words, (cpu_items, cpu_recovery))) in gpu.iter().zip(&cpu).enumerate() {
+        let gpu_items = gpu_verdict_items(gpu_words);
+        let gpu_recovery = gpu_recovery_words(gpu_words);
+        if (gpu_items.as_ref() != Some(cpu_items) || gpu_recovery != *cpu_recovery)
+            && mismatches.len() < 5
+        {
+            mismatches.push(format!(
+                "状态 {ordinal}：GPU {gpu_items:?} {gpu_recovery:?}，CPU {cpu_items:?} {cpu_recovery:?}"
+            ));
+        }
+    }
+    println!(
+        "GPU_JUDGE_SIGMA states={} most_writes_on_one_location={most_writes_on_one_location} red_states={} mismatches={}",
+        tables.state_count,
+        cpu.iter().filter(|(items, _)| !items.is_empty()).count(),
+        mismatches.len()
+    );
+    assert!(
+        mismatches.is_empty(),
+        "GPU 与 CPU 判器在 σ 上有不同：{mismatches:?}"
+    );
+}
+
+/// σ 接进崩溃放量流水线（用户 2026-09-29 定：崩溃注入之外的崩溃枚举用例都进流水线、由 GPU 判）：整条 `UOOUOMSU` 历史一张写表；
+/// σ 之前的段与 σ 那次发布之后的段各包成一个 ignore 的点（只留全持久那一个状态：是剪枝，也是别的流可复用的前缀），
+/// σ 那次发布（单元写段起、到它的根槽写与系统配置轮换为止）一个点全部展开。判器是流水线的：两遍恢复、oracle、池级 checker、
+/// 记录核对器，比 `every_crash_state_of_sigma_leaves_every_unit_of_the_claimed_publishes_present` 多判 oracle 与 checker。
+/// 展开上限从环境取（`SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO`，没设 6：σ 16 个写平时不展开，全量脚本给 28 才展开）。
+#[cfg(feature = "verdict-store")]
+#[test]
+fn crash_amplification_of_sigma_on_the_misaligned_reuse_history_is_clean() {
+    use singlefs_checker_tier::crash_amplification::{repository_relative_file, CrashPointSpan};
+    let recorded = record_history("crash-amplification-sigma", &HISTORY_UOOUOMSU);
+    let sigma_publish = sigma_publish_writes(&recorded);
+    let (sigma_first_write, end_of_the_publish) = (sigma_publish.start, sigma_publish.end);
     let code_file = repository_relative_file(file!());
     let mut crash_points = vec![
         CrashPointSpan {

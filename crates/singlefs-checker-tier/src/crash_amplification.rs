@@ -978,6 +978,42 @@ fn gpu_unit_checksum_items(
 
 // ============================== 第 ① 段的 GPU 形态：GPU 判器判块，卡按优先级领活 ==============================
 
+/// CPU 两遍恢复换成与 GPU 结论第 2、3、4、6 字同口径的四个数：看 journal 那一遍落到的实例代号与 txg 低 32 位
+/// （没落到根时 GPU 写 `u32::MAX`、`u32::MAX`），两遍的结局类别（0 没有文件、1 读到文件、2 失败）。
+/// 红项相同而落到的根不同也是判错（判器读错了一个落点的版本、两个版本都判绿时就只露在这里），对拍要连它一起比。
+#[must_use]
+pub fn recovery_words_of(judgement: &crate::crash::Layer0StateJudgement) -> [u32; 4] {
+    use singlefs_core::recovery::RecoveryOutcome;
+    let (instance, txg) =
+        judgement
+            .consulted
+            .effective_root
+            .map_or((u32::MAX, u32::MAX), |(instance, txg)| {
+                (
+                    instance.0,
+                    u32::try_from(txg.0 & 0xFFFF_FFFF).expect("低 32 位"),
+                )
+            });
+    let class = |outcome: &RecoveryOutcome| match outcome {
+        RecoveryOutcome::NoFile { .. } => 0,
+        RecoveryOutcome::FileRead { .. } => 1,
+        RecoveryOutcome::Failed { .. } => 2,
+    };
+    [
+        instance,
+        txg,
+        class(&judgement.consulted.outcome),
+        class(&judgement.ignored.outcome),
+    ]
+}
+
+/// GPU 一个状态的结论字里与 [`recovery_words_of`] 同口径的四个字（第 2、3、4、6 字）。
+#[cfg(feature = "gpu")]
+#[must_use]
+pub fn gpu_recovery_words(words: &[u32; crate::crash_judge_gpu::VERDICT_WORDS]) -> [u32; 4] {
+    [words[2], words[3], words[4], words[6]]
+}
+
 /// 一块的结论字里第一个 GPU 判不了的状态（块内序号）：恢复内核带「判不了」位、或 checker 内核的「判不了」字不为 0。没有就是 `None`。
 #[cfg(feature = "gpu")]
 #[must_use]
@@ -1481,8 +1517,8 @@ pub fn judge_my_blocks_on_gpu_cards(
                 CardMessage::Refused(reason) => {
                     refusal.get_or_insert(reason);
                 }
-                CardMessage::Block(block) => {
-                    waiting.insert(block.pending_index, block);
+                CardMessage::Block(arrived_block) => {
+                    waiting.insert(arrived_block.pending_index, arrived_block);
                     while let Some(block) = waiting.remove(&next_to_store) {
                         if storing_error.is_some() {
                             continue;

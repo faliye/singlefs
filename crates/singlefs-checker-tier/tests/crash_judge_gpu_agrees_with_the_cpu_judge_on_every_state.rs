@@ -22,8 +22,8 @@ use singlefs_checker_tier::crash::{
     Layer0SegmentExpansion, Layer0StateJudgement,
 };
 use singlefs_checker_tier::crash_amplification::{
-    judge_my_blocks_on_gpu_cards, plan_crash_points, record_crash_points, unjudged_blocks,
-    CrashFlow, CrashPointRecorder, CrashPointSpan,
+    gpu_recovery_words, judge_my_blocks_on_gpu_cards, plan_crash_points, record_crash_points,
+    recovery_words_of, unjudged_blocks, CrashFlow, CrashPointRecorder, CrashPointSpan,
 };
 use singlefs_checker_tier::crash_identity::CoverageReport;
 use singlefs_checker_tier::crash_judge_dispatch::{
@@ -406,16 +406,17 @@ fn corrupt_units_and_reseal_up_to_the_root(
                     let referrer_old_crc = {
                         // 位置条目已换、校验和还没重封：整单元 CRC 要按重封之前的原样算，用写进去之前的字节复原
                         let mut before = bytes.clone();
-                        let mut position = 0;
-                        while position + 14 <= before.len() {
-                            if before[position..position + 10] == pattern[..10]
-                                && before[position + 10..position + 14] == new_crc.to_le_bytes()
+                        let mut restore_position = 0;
+                        while restore_position + 14 <= before.len() {
+                            if before[restore_position..restore_position + 10] == pattern[..10]
+                                && before[restore_position + 10..restore_position + 14]
+                                    == new_crc.to_le_bytes()
                             {
-                                before[position + 10..position + 14]
+                                before[restore_position + 10..restore_position + 14]
                                     .copy_from_slice(&old_crc.to_le_bytes());
-                                position += 14;
+                                restore_position += 14;
                             } else {
-                                position += 1;
+                                restore_position += 1;
                             }
                         }
                         crc32c(&before)
@@ -435,7 +436,7 @@ fn corrupt_units_and_reseal_up_to_the_root(
         }
         // 反向链一路传下去：同盘、同实例、计数器大 1 的那一条带的是这一条头的链值
         while let Some(record_index) = journal_records_resealed.pop() {
-            let (device, instance, counter, chain) = {
+            let (record_device, instance, counter, chain) = {
                 let write = &flow.writes[record_index];
                 let bytes = write.bytes().expect("记录写带字节");
                 let mut counter = [0u8; 8];
@@ -449,7 +450,7 @@ fn corrupt_units_and_reseal_up_to_the_root(
             };
             for next in 0..flow.writes.len() {
                 if flow.writes[next].kind != StepKind::JournalRecord
-                    || flow.writes[next].device != device
+                    || flow.writes[next].device != record_device
                 {
                     continue;
                 }
@@ -794,33 +795,6 @@ fn expected_bits(judgement: &Layer0StateJudgement) -> u32 {
     bits
 }
 
-/// CPU 两遍恢复换成与 GPU 结论第 2、3、4、6 字同口径的四个数：看 journal 那一遍落到的实例代号与 txg 低 32 位
-/// （没落到根时 GPU 写 `u32::MAX`、`u32::MAX`），两遍的结局类别（0 没有文件、1 读到文件、2 失败）。
-fn recovery_words(judgement: &Layer0StateJudgement) -> [u32; 4] {
-    use singlefs_core::recovery::RecoveryOutcome;
-    let (instance, txg) =
-        judgement
-            .consulted
-            .effective_root
-            .map_or((u32::MAX, u32::MAX), |(instance, txg)| {
-                (
-                    instance.0,
-                    u32::try_from(txg.0 & 0xFFFF_FFFF).expect("低 32 位"),
-                )
-            });
-    let class = |outcome: &RecoveryOutcome| match outcome {
-        RecoveryOutcome::NoFile { .. } => 0,
-        RecoveryOutcome::FileRead { .. } => 1,
-        RecoveryOutcome::Failed { .. } => 2,
-    };
-    [
-        instance,
-        txg,
-        class(&judgement.consulted.outcome),
-        class(&judgement.ignored.outcome),
-    ]
-}
-
 /// CPU 池级 checker 的违例位：位 i ↔ `IMPLEMENTED_INVARIANTS[i]`。
 fn expected_pool_checker_bits(judgement: &Layer0StateJudgement) -> u64 {
     let mut bits = 0u64;
@@ -880,7 +854,7 @@ fn compare_on_every_state(card: &GpuCard, flow: &RecordedFlow, limit: usize) -> 
         versions: &flow.versions,
         expansion: &expansion,
     };
-    let started = Instant::now();
+    let tables_started = Instant::now();
     let tables = build_judge_tables(&judge_flow).expect("建得出表");
     let state_count = layer0_plan_state_count(&flow.base, &flow.writes, &flow.segments, &expansion);
     assert_eq!(tables.state_count, state_count);
@@ -890,16 +864,16 @@ fn compare_on_every_state(card: &GpuCard, flow: &RecordedFlow, limit: usize) -> 
         flow.name,
         tables.locations.len(),
         words.version_bytes.len(),
-        started.elapsed()
+        tables_started.elapsed()
     );
-    let started = Instant::now();
+    let gpu_started = Instant::now();
     let judge = GpuCrashJudge::new(card, &tables);
     let gpu = judge.judge_states(0..state_count);
-    let gpu_elapsed = started.elapsed();
+    let gpu_elapsed = gpu_started.elapsed();
     assert_eq!(gpu.len(), usize::try_from(state_count).expect("装得进"));
     // CPU 那一侧按线程分段判（`SINGLEFS_CRASH_JUDGE_CPU_THREADS`，没设取本机可用并行度），合并按序号排。
     // 段切得比线程数细（每个线程八段、轮着领）：靠后的状态历史长、判得慢，按线程数等分时最后一段拖住整趟
-    let started = Instant::now();
+    let cpu_started = Instant::now();
     let threads: u64 = std::env::var("SINGLEFS_CRASH_JUDGE_CPU_THREADS")
         .ok()
         .and_then(|text| text.parse().ok())
@@ -953,7 +927,7 @@ fn compare_on_every_state(card: &GpuCard, flow: &RecordedFlow, limit: usize) -> 
                                         judgement.consulted.effective_root,
                                         judgement.ignored.outcome
                                     ),
-                                    recovery_words(judgement),
+                                    recovery_words_of(judgement),
                                 ));
                             },
                         );
@@ -971,7 +945,7 @@ fn compare_on_every_state(card: &GpuCard, flow: &RecordedFlow, limit: usize) -> 
     slices.sort_by_key(|(index, _)| *index);
     let mut cpu: Vec<JudgedOnCpu> = slices.into_iter().flat_map(|(_, judged)| judged).collect();
     assert_eq!(cpu.len(), gpu.len());
-    let cpu_elapsed = started.elapsed();
+    let cpu_elapsed = cpu_started.elapsed();
     cpu.truncate(gpu.len());
     let mut comparison = Comparison {
         states: state_count,
@@ -1010,7 +984,7 @@ fn compare_on_every_state(card: &GpuCard, flow: &RecordedFlow, limit: usize) -> 
             comparison.gpu_checker_red += 1;
         }
         // 落到的根与两遍的结局也要相同：只比红位看不出「两遍恢复落到同一条根」这类漏洞（重放没扫环那一次就是这样漏的）
-        let gpu_recovery = [gpu_words[2], gpu_words[3], gpu_words[4], gpu_words[6]];
+        let gpu_recovery = gpu_recovery_words(&gpu_words);
         if gpu_recovery != *cpu_recovery {
             comparison.recovery_mismatches += 1;
         }

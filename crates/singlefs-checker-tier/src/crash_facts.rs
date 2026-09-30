@@ -346,8 +346,12 @@ impl FlowFacts {
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
-        let put32 = |out: &mut Vec<u8>, value: u32| out.extend_from_slice(&value.to_le_bytes());
-        let put64 = |out: &mut Vec<u8>, value: u64| out.extend_from_slice(&value.to_le_bytes());
+        let put32 = |serialized: &mut Vec<u8>, value: u32| {
+            serialized.extend_from_slice(&value.to_le_bytes())
+        };
+        let put64 = |serialized: &mut Vec<u8>, value: u64| {
+            serialized.extend_from_slice(&value.to_le_bytes())
+        };
         put32(&mut out, self.recorded_write_count);
         put32(&mut out, self.enumerated_write_count);
         put32(

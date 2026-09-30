@@ -336,7 +336,9 @@ pub fn kernel_inlined_size(source: &str) -> KernelInlinedSize {
             )
         })
         .collect();
-    largest_contributors.sort_by_key(|(_, copies, own)| std::cmp::Reverse(copies * own));
+    largest_contributors.sort_by_key(|(_, copies_of_function, own_expressions)| {
+        std::cmp::Reverse(copies_of_function * own_expressions)
+    });
     largest_contributors.truncate(5);
     KernelInlinedSize {
         expressions,

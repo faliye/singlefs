@@ -37,10 +37,11 @@ use crate::crash::{
 use crate::crash_facts::{persisted_writes_of_state, SegmentFact, TornImageFact};
 
 /// 表的形态版本：落点、版本、检查字或发布表的布局变了就抬它。
-pub const JUDGE_TABLES_VERSION: u32 = 2;
+pub const JUDGE_TABLES_VERSION: u32 = 3;
 
-/// 一个落点最多被几次写盖住：GPU 内核里组合掩码是一个 u32。
-pub const MAXIMUM_WRITES_PER_LOCATION: usize = 32;
+/// 一个落点最多被几次写盖住：GPU 内核里组合掩码是两个 u32（版本表里一个版本的第 0 字是低 32 位、第 7 字是高 32 位）。
+/// 错位复用那条历史把系统配置 0 号槽写了 34 次，32 位装不下。
+pub const MAXIMUM_WRITES_PER_LOCATION: usize = 64;
 /// 一个落点最多枚举几种版本：越过就是这条流的落点太复杂，GPU 判不了（先报错，不悄悄漏版本）。
 pub const MAXIMUM_VERSIONS_PER_LOCATION: usize = 4096;
 /// 一个落点最长 32 KiB：64 个扇区，逐扇区等不等的掩码是一个 u64。
@@ -88,7 +89,7 @@ pub fn step_kind_code(kind: StepKind) -> u32 {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct JudgeVersion {
     /// 第 i 位 = 这个落点的 `writes[i]` 在这个组合里持久。
-    pub combination: u32,
+    pub combination: u64,
     /// 这个落点整段的字节（长度 = 落点长度）。
     pub bytes: Vec<u8>,
     /// 按落点种类各有含义的四个检查字（[`version_checks`]）。
@@ -552,7 +553,7 @@ fn enumerate_versions(
         usize::try_from(location.length).expect("落点长度装得进 usize"),
     )
     .expect("落点在盘内、按扇区对齐");
-    let mut combinations: BTreeSet<u32> = BTreeSet::new();
+    let mut combinations: BTreeSet<u64> = BTreeSet::new();
     // 一次写的落地按它在哪一段与这个组合里给它的落地算
     let landing_of = |write_index: usize, cut: usize, free: &BTreeMap<usize, Landing>| -> Landing {
         if let Some(landing) = free.get(&write_index) {
@@ -577,11 +578,11 @@ fn enumerate_versions(
             Some(replayed) => landing_of(replayed, cut, free) == Landing::Persisted,
         }
     };
-    let combination_of = |cut: usize, free: &BTreeMap<usize, Landing>| -> u32 {
-        let mut combination = 0u32;
+    let combination_of = |cut: usize, free: &BTreeMap<usize, Landing>| -> u64 {
+        let mut combination = 0u64;
         for (position, entry) in location.writes.iter().enumerate() {
             if persisted_in(usize::try_from(*entry).expect("下标"), cut, free) {
-                combination |= 1u32 << position;
+                combination |= 1u64 << position;
             }
         }
         combination
@@ -654,7 +655,7 @@ fn enumerate_versions(
     for combination in combinations {
         let mut bytes = base_bytes.clone();
         for (position, entry) in location.writes.iter().enumerate() {
-            if combination & (1u32 << position) == 0 {
+            if combination & (1u64 << position) == 0 {
                 continue;
             }
             let write = &enumerated[usize::try_from(*entry).expect("下标")];
@@ -1093,10 +1094,10 @@ impl JudgeTables {
         location: &'location JudgeLocation,
         persisted: &[bool],
     ) -> Option<&'location JudgeVersion> {
-        let mut combination = 0u32;
+        let mut combination = 0u64;
         for (position, entry) in location.writes.iter().enumerate() {
             if persisted[usize::try_from(*entry).expect("下标")] {
-                combination |= 1u32 << position;
+                combination |= 1u64 << position;
             }
         }
         location
@@ -1234,15 +1235,16 @@ impl JudgeTables {
             ]);
             location_writes.extend(location.writes.iter().copied());
             for version in &location.versions {
+                let (combination_lo, combination_hi) = split(version.combination);
                 versions.extend([
-                    version.combination,
+                    combination_lo,
                     index(version_bytes.len()),
                     version.checks[0],
                     version.checks[1],
                     version.checks[2],
                     version.checks[3],
                     index(equal_masks.len() / 2),
-                    0,
+                    combination_hi,
                 ]);
                 version_bytes.extend(bytes_to_words(&version.bytes));
                 for mask in &version.sector_equals {

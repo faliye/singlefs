@@ -426,13 +426,13 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
             run.checking.states_checked, run.recording.states_recorded,
             "这一趟录下来要判的状态都核了"
         );
-        let second = run_from_environment(&flow, &judging, &root).expect("第二趟跑得完");
+        let second_run = run_from_environment(&flow, &judging, &root).expect("第二趟跑得完");
         assert_eq!(
-            second.recording.blocks_already_judged,
+            second_run.recording.blocks_already_judged,
             run.recording.blocks_recorded + run.recording.blocks_already_judged,
             "第二趟全部复用"
         );
-        assert_eq!(second.checking.blocks_checked, 0, "复用的块不再核");
+        assert_eq!(second_run.checking.blocks_checked, 0, "复用的块不再核");
     }
     // 第 ②③ 段跑了就要：核对红 ⇒ 判器红，一条不一致都不许
     if let Some(comparison) = &run.comparison {
