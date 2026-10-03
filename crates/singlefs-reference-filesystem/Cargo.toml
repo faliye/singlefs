@@ -1,0 +1,10 @@
+[package]
+name = "singlefs-reference-filesystem"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "RefFS：语义级的参照文件系统，只在内存里按 POSIX 操作走，判一次崩溃之后恢复读出的内容落不落在允许集合里；依赖只有 std"
+
+# 依赖闭包只许 {自己, singlefs-format}，能只用 std 就只用 std（research/prompts/m3-formal-r5-main-verification.md 第二节 U4）；
+# 不许有指向实现、池级 checker、harness 档、checker 档的 dev-dependencies。
+[dependencies]
