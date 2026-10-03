@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # admission: always Claude Code 每一次触发都要现判这一次调用，上一次的结论不替这一次作保
 # run-condition: command python3
-# PreToolUse hook（Write、Edit）：写文件之前的四道判定，合在一个 hook 里；拒绝的同时把它记进检出记录，交主 agent 看。
+# PreToolUse hook（Write、Edit、MultiEdit：.claude/settings.json 里注册在 matcher "Write|Edit|MultiEdit" 上）：写文件之前的八道判定（一至五、七、八写在下面，六是语法检查、写在 --selftest 那一段），合在一个 hook 里；拒绝的同时把它记进检出记录，交主 agent 看。
 #
 # 一、整份覆盖未跟踪文件（只管 Write）：仓里已存在、又没进 git 的文件，拒绝用 Write 整份覆盖。
 #    为什么：几个会话同时在一个仓里干活。2026-09-11 一个会话用 Write 新建 `research/prompts/e137-preregistration.md`，
 #    另一个会话几分钟前刚写了同名的未提交文件，Write 回报「updated」就把它盖了——没进过 git，事后只能从对话记录里重放复原。
 #    放行：目标不存在；目标已被 git 跟踪（盖了还能从 git 找回）；目标在仓外（scratchpad 之类）。
-# 二、项目 subagent 的写范围（Write、Edit）：项目定义的 subagent 写文件时，目标必须落在它登记的写范围里。
+# 二、项目 subagent 的写范围（Write、Edit、MultiEdit）：项目定义的 subagent 写文件时，目标必须落在它登记的写范围里。
 #    为什么：执行类 agent 越界写，不该等人翻 diff 才发现（records/2026-09-16-subagent拆分提案.md 第五节，用户 2026-09-17 定走项目 settings hook）。
 #    输入里没有 agent_type（主 agent）放行；agent_type 没有项目定义（内置 agent）放行；有项目定义而表里没有它的写范围，拒绝；
 #    目标路径规范化之后命中它的任一模式才放行。表在同目录的 agent-write-scope.tsv。拦不住 Bash 里的写，定义的「没做什么」照写。
@@ -15,7 +15,7 @@
 #    出现撇号类字符之一就拒绝；只在 old_string 里出现（删掉它的改动）放行，ASCII 单引号不判。主 agent 与所有子 agent 一样判，目标在不在仓里都判。
 #    为什么：门禁 doc-text 只在收尾跑整轮门禁时判，2026-09-24 实验设计员照样把这类名字写进三份重跑登记、执行员又抄进源码。
 #    字符集与 doc-text 同一份：../gate.d/lib-forbidden-notations.py 的 PRIME_MARKS，不在这里另抄；读不到就拒绝（不静默放行）。
-# 四、先编后换（Write、Edit）：experiment-runner（名单是 COMPILE_FIRST_AGENTS）写主工作区 crates/ 下的 .rs（改已有的、新建的都算）一律拒绝，
+# 四、先编后换（Write、Edit、MultiEdit）：experiment-runner（名单是 COMPILE_FIRST_AGENTS）写主工作区 crates/ 下的 .rs（改已有的、新建的都算）一律拒绝，
 #    出路是在草稿目录的副本里改、经 research/scripts/compile-then-swap.py 编过再整份换进来。排在写范围那一道之前判，拒绝信息给的是这条出路。
 #    implementation-writer、主 agent、别的 agent 不判；草稿目录里的副本与 crates/ 下不是 .rs 的（crates/mutations.tsv）不判。
 #    为什么：执行员直接在主工作区改入库装置，改到一半编不过，别的会话带 --all-targets 的编译一起卡住
@@ -27,8 +27,23 @@
 #    与中文的「N 点 / N 时」和时段词（挨着日期或时区词的、时段词后面跟钟点的、不挨日期时区却带「前后 / 左右 / 许 / 半 / 钟」的）；
 #    长得像钟点的冒号对靠库里的上下文规则放过，.sh、.py、.rs 里带「clock-times:allow <理由>」的那一行放过（目标路径交给库判后缀）；
 #    逐个形态的判据与放行写在那份库的文档串里。
+# 七、会话号（Write、Edit、MultiEdit）：ListAgents 列的会话名（目录名后面跟「-」与十六进制）写进仓里就拒绝，排除前缀、放行标记与仓外不判同五；
+#    判据是同一份库里的 session-names 那一形态，与门禁 doc-text 的 session-names 格同一份。改过标题的会话认不出。
+# 八、old_string 以空白收尾（Edit、MultiEdit）：目标不是 .md / .mdx（后缀不分大小写）时，Edit 的 old_string、MultiEdit 每一处的 old_string
+#    以空格或制表符收尾就拒绝；主 agent 与所有子 agent 一样判，目标在不在仓里都判。.md / .mdx 目标与 Write 不判。
+#    为什么：Edit 在 .md / .mdx 以外的目标上先去掉 new_string 每一行行尾的空格与制表符，钩子拿到的已是去过的 new_string，old_string 原样。
+#    old_string 收尾的空白在文件里照样命中、被换掉，new_string 里对应的那一个却没了，紧跟着的字就粘上来。
+#    2026-10-01 把钩子收到的输入落盘核过：.txt 目标 old_string、new_string 都以「declared = 」收尾，
+#    钩子收到的 old_string 带着那个空格、new_string 没有，落盘成「declared =foo」；门禁注释精简那一批因此把
+#    doc-decisions.sh 的 `python3 - "$DEC"` 改成 `python3 -"$DEC"`（records/2026-10-01-门禁注释精简.md「第 3 批」件一）。
+#    看 old_string 而不看 new_string：new_string 收尾的空白到不了钩子，判它一次都拦不到；old_string 收尾的空白钩子看得到，粘连只在它那里发生。
+#    .md / .mdx 不判：同一次核查里 .md、.mdx、.MD 目标的 new_string 行尾空白原样到了钩子、原样落盘，在那里以空白收尾的框选写得对。
+#    后缀只认这两个：2026-10-03 拿 Edit 在草稿目录里各改一份 .md、.MD、.markdown、.mdown、.mkd、.txt（new_string 头一行以两个空格收尾），
+#    落盘只有 .md、.MD 留着那两个空格，.markdown、.mdown、.mkd 与 .txt 一样去掉了，所以它们照判、不并进 TRAILING_BLANK_EXEMPT_SUFFIXES。
+#    不判 old_string 中间行的行尾空白：new_string 那一行去掉的空白后面是换行，不会把两个词粘起来。
+#    出路：把框选范围收到不以空白结尾（多框到下一个非空白字符，或止于行尾）；确实要删行尾空白的，用 Bash 跑 research/scripts/replace-once.py。
 #
-# 三道原本是两个 hook（refuse-overwrite-untracked.sh、agent-write-scope.sh），2026-09-17 用户定合并；第三道 2026-09-24 加进来。
+# 八道判定合在这一个 hook 里：一至五、七、八各占文件头一段，六写在 --selftest 那一行的说明里。
 # 它们拒的是一次写，不停任务和脚本；拒绝时退出码 2、stderr 交给做这次写的模型，同时往检出记录
 # （默认 /tmp/claude-1000/agent-hook-detections.jsonl，环境变量 AGENT_HOOK_DETECTIONS 可改）追加一行，
 # 主 agent 的看门狗（research/scripts/agent-watch.py watch）读到就叫醒主 agent，由主 agent 判断怎么处理。
@@ -36,11 +51,12 @@
 # 2026-09-24 写这一道时实测，Write 的 content 里写的反斜杠 u 转义落盘成了字符本身，这道闸也会拒这样的写。
 #
 #   write-guard.sh             # 从 stdin 读 hook 的 JSON
-#   write-guard.sh --selftest  # 走一遍五道判定的放行与拒绝；WRITE_GUARD_DISABLE_OVERWRITE=1、WRITE_GUARD_DISABLE_COMPILE_FIRST=1、
-#                              # WRITE_GUARD_DISABLE_SCOPE=1、WRITE_GUARD_DISABLE_CLOCK_TIMES=1 或 WRITE_GUARD_DISABLE_SYNTAX=1 时自检必须判红；
+#   write-guard.sh --selftest  # 走一遍各道判定的放行与拒绝；WRITE_GUARD_DISABLE_OVERWRITE=1、WRITE_GUARD_DISABLE_COMPILE_FIRST=1、
+#                              # WRITE_GUARD_DISABLE_SCOPE=1、WRITE_GUARD_DISABLE_CLOCK_TIMES=1、WRITE_GUARD_DISABLE_SESSION_NAMES=1、WRITE_GUARD_DISABLE_SYNTAX=1 或
+#                              # WRITE_GUARD_BREAK=trailing-blank-ignored（第八道放行以空白收尾的 old_string）时自检必须判红；
 #                              # 第六道：写进 .claude/hooks/、.claude/gate.d/、.claude/scripts/、research/scripts/ 下的 .sh 先过 bash -n、.py 先过 ast 解析，
 #                              # 语法错的拒（带语法错误的钩子一上线，每一次 Bash 调用都收到它的报错）；
-#                              # LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键>（钟点的 date-zone-hour、date-zone-period、period-hour、hour-suffix、
+#                              # LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键>（钟点的 date-zone-hour、date-zone-period、period-hour、hour-suffix、twelve-hour、
 #                              # bare-clock、iso-timestamp、zone-word，键写在 ../gate.d/lib-forbidden-notations.py）关掉一条判据行时，点名那一行的用例必须判红；
 #                              # LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=clock-times 时靠上下文放行的用例、LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=clock-times 时
 #                              # 带放行标记的用例必须判红
@@ -201,27 +217,65 @@ def decide_prime_marks(hook_input, library_path):
                "做法见 .claude/rules/path-moves.md「变体起新名字，不用角标」\n"
                "→ 引用户原话或原文时也不例外：把那个字符改写成文字（写成「B2（加撇号）」这类）")
 
-def decide_clock_times(hook_input, project_root, library_path):
-    """五、写进仓里的内容带描述性的钟点。"""
-    if os.environ.get("WRITE_GUARD_DISABLE_CLOCK_TIMES") == "1":
+TRAILING_BLANKS = (" ", "\t")
+TRAILING_BLANK_EXEMPT_SUFFIXES = (".md", ".mdx")
+
+def decide_trailing_blank(hook_input):
+    """八、目标不是 .md / .mdx 时，Edit 的 old_string、MultiEdit 每一处的 old_string 以空格或制表符收尾。"""
+    if os.environ.get("WRITE_GUARD_BREAK") == "trailing-blank-ignored":
         return 0, None
+    tool_name = hook_input.get("tool_name")
+    if tool_name not in ("Edit", "MultiEdit"):
+        return 0, None
+    tool_input = hook_input.get("tool_input") or {}
+    if str(tool_input.get("file_path") or "").lower().endswith(TRAILING_BLANK_EXEMPT_SUFFIXES):
+        return 0, None
+    edits = (tool_input.get("edits") or []) if tool_name == "MultiEdit" else [tool_input]
+    texts = [str((edit or {}).get("old_string") or "") for edit in edits]
+    offending = [index for index, text in enumerate(texts) if text.endswith(TRAILING_BLANKS)]
+    if not offending:
+        return 0, None
+    text = texts[offending[0]]
+    last_line = text[text.rfind("\n") + 1:]
+    blank = last_line[len(last_line.rstrip(" \t")):]
+    shown = last_line.rstrip(" \t")[-30:] + blank.replace(" ", "␠").replace("\t", "⇥")
+    where = f"第 {offending[0] + 1} 处（共 {len(offending)} 处以空白收尾）的 " if tool_name == "MultiEdit" else ""
+    file_path = tool_input.get("file_path") or ""
+    return 2, (f"✗ {tool_name} {where}old_string 以空白收尾：「…{shown}」（{file_path}；␠ 是空格，⇥ 是制表符）\n"
+               "  .md / .mdx 以外的目标，Edit 先去掉 new_string 每一行行尾的空格与制表符再施加：old_string 收尾的空白照样被换掉，"
+               "new_string 里对应的那一个却没了，文件里紧跟着的字就粘上来（`python3 - \"$DEC\"` 落成 `python3 -\"$DEC\"`）。\n"
+               "→ 怎么办：把 old_string 与 new_string 的框选范围收到不以空白结尾：两边一起往后多框到下一个非空白字符，或止于行尾（框到换行之前）。\n"
+               "→ 确实要删行尾空白的：用 Bash 跑 python3 research/scripts/replace-once.py <文件> <旧串> <新串>（旧串恰好命中一次才写）。")
+
+def first_library_hit_in_written_texts(hook_input, project_root, library_path, form_key, form_name):
+    """写进仓里的内容在共用库那一形态下最靠前的一处：(拒绝信息, None, None) 读不到库；(None, None, None) 没命中或不判；
+    (None, 相对路径, (位置, 判据行名字, 命中的串)) 命中。"""
     texts = [text for text in written_texts(hook_input) if text]
     absolute = absolute_target(hook_input, project_root)
     root = os.path.normpath(project_root)
     if not texts or not absolute or os.path.commonpath([absolute, root]) != root:
-        return 0, None
+        return None, None, None
     try:
         spec = importlib.util.spec_from_file_location("lib_forbidden_notations", library_path)
         library = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(library)
         relative = os.path.relpath(absolute, root)
-        if library.is_excluded("clock-times", relative):
-            return 0, None
-        found = next((result for result in (library.first_hit("clock-times", text, relative) for text in texts) if result), None)
+        if library.is_excluded(form_key, relative):
+            return None, None, None
+        found = next((result for result in (library.first_hit(form_key, text, relative) for text in texts) if result), None)
     except Exception as error:
-        return 2, (f"✗ 读不到钟点判据 {library_path}（{type(error).__name__}：{error}），这次写没法判，按拒绝处理。\n"
-                   "→ 怎么办：那一份是门禁 doc-text 与这道 hook 共用的唯一定义，先 git status 看它是被删了还是被改坏了，"
-                   "用 Bash 恢复它（不在 hook 里另抄一份）；恢复之前往仓里的 Write / Edit 都会被拒。")
+        return (f"✗ 读不到{form_name}判据 {library_path}（{type(error).__name__}：{error}），这次写没法判，按拒绝处理。\n"
+                "→ 怎么办：那一份是门禁 doc-text 与这道 hook 共用的唯一定义，先 git status 看它是被删了还是被改坏了，"
+                "用 Bash 恢复它（不在 hook 里另抄一份）；恢复之前往仓里的 Write / Edit 都会被拒。"), None, None
+    return None, relative, found
+
+def decide_clock_times(hook_input, project_root, library_path):
+    """五、写进仓里的内容带描述性的钟点。"""
+    if os.environ.get("WRITE_GUARD_DISABLE_CLOCK_TIMES") == "1":
+        return 0, None
+    unreadable, relative, found = first_library_hit_in_written_texts(hook_input, project_root, library_path, "clock-times", "钟点")
+    if unreadable:
+        return 2, unreadable
     if not found:
         return 0, None
     position, shape, matched = found
@@ -231,6 +285,21 @@ def decide_clock_times(hook_input, project_root, library_path):
                "→ .sh、.py、.rs 里代码真要用这些字面（TZ 环境变量、解析外部文本的正则、造时间戳的自检输入），在那一行写「# clock-times:allow <理由>」（Rust 写「//」）；"
                "命中的其实不是钟点（产物字段、切片、编号对），改 .claude/gate.d/lib-forbidden-notations.py 的上下文规则\n"
                "→ 钟点确实是被测输入的整份文件（hook 自检、门禁样本），登记进 .claude/gate.d/lib-forbidden-notations.py 里钟点那一形态的 excluded_prefixes 并写明理由")
+
+def decide_session_names(hook_input, project_root, library_path):
+    """七、写进仓里的内容带会话号（ListAgents 列的会话名）。"""
+    if os.environ.get("WRITE_GUARD_DISABLE_SESSION_NAMES") == "1":
+        return 0, None
+    unreadable, relative, found = first_library_hit_in_written_texts(hook_input, project_root, library_path, "session-names", "会话号")
+    if unreadable:
+        return 2, unreadable
+    if not found:
+        return 0, None
+    position, shape, matched = found
+    return 2, (f"✗ 写进 {relative} 的内容写了会话号（「{matched}」）\n"
+               "→ 怎么办：会话号不写进仓：标签式的「（会话 <号>，<日期>）」只留日期，当主语用的写成「别的会话」「SOP 会话」这类不带号的说法，事情与日期照留；"
+               "改过标题的会话（「会话「<标题>」」）同样不写标题。\n"
+               "→ .sh、.py、.rs 里代码真要用这些字面（解析 ListAgents 输出的正则、造会话号的自检输入），在那一行写「# session-names:allow <理由>」（Rust 写「//」）")
 
 SYNTAX_CHECKED_DIRECTORIES = (".claude/hooks", ".claude/gate.d", ".claude/scripts", "research/scripts")
 PYTHON_SYNTAX_CHECK = "import ast, sys; ast.parse(open(sys.argv[1], encoding='utf-8').read(), sys.argv[1])"
@@ -298,6 +367,9 @@ def decide(hook_input, project_root, table_path, prime_marks_library, clock_time
     code, message = decide_compile_first(hook_input, project_root)
     if code:
         return code, message, "绕过先编后换"
+    code, message = decide_trailing_blank(hook_input)
+    if code:
+        return code, message, "old_string 以空白收尾"
     code, message = decide_shell_syntax(hook_input, project_root)
     if code:
         return code, message, "写进语法错误"
@@ -312,6 +384,9 @@ def decide(hook_input, project_root, table_path, prime_marks_library, clock_time
     code, message = decide_clock_times(hook_input, project_root, clock_times_library)
     if code:
         return code, message, "描述里写了钟点"
+    code, message = decide_session_names(hook_input, project_root, clock_times_library)
+    if code:
+        return code, message, "写了会话号"
     return 0, None, None
 
 def record_detection(hook_input, finding, detections_path):
@@ -458,6 +533,34 @@ def selftest(hook_dir):
             prime_case("角标:读不到共用字符集就拒绝", "Write", None, {"content": "普通内容\n"}, 2,
                        library_path=os.path.join(work, "no-such-lib-forbidden-notations.py")),
         ]
+        # 八、old_string 以空白收尾：判的是拒绝那一道的名字；WRITE_GUARD_BREAK=trailing-blank-ignored 时拒绝的几例就红。
+        # 不是 .md / .mdx 的目标，钩子收到的 new_string 已去过行尾空白，例子里照那样写
+        trailing_finding = "old_string 以空白收尾"
+        def trailing_case(label, tool_name, tool_input, want, agent=None, target=None):
+            hook_input = {"tool_name": tool_name, "tool_input": dict(tool_input, file_path=target or f"{work}/records/x.sh")}
+            if agent:
+                hook_input["agent_type"] = agent
+            return (label, want, decide(hook_input, work, table, library)[2])
+        cases += [
+            trailing_case("行尾空白:.sh 目标 old_string 以空格收尾", "Edit", {"old_string": "x = 1\ndeclared = ", "new_string": "x = 2\ndeclared ="}, trailing_finding),
+            trailing_case("行尾空白:.sh 目标 old_string 以制表符收尾", "Edit", {"old_string": "key\t", "new_string": "key"}, trailing_finding),
+            trailing_case("行尾空白:MultiEdit 第二处 old_string 以空格收尾", "MultiEdit",
+                          {"edits": [{"old_string": "a", "new_string": "b"}, {"old_string": "python3 - ", "new_string": "python3 -"}]}, trailing_finding),
+            trailing_case("行尾空白:.txt 目标也判", "Edit", {"old_string": "declared = ", "new_string": "declared ="}, trailing_finding, target=f"{work}/records/x.txt"),
+            trailing_case("行尾空白:.markdown 目标也判（Edit 只在 .md / .mdx 上留行尾空白）", "Edit", {"old_string": "declared = ", "new_string": "declared ="},
+                          trailing_finding, target=f"{work}/records/x.markdown"),
+            trailing_case("行尾空白:子 agent 写仓外文件也判", "Edit", {"old_string": "a ", "new_string": "b"}, trailing_finding,
+                          agent="implementation-writer", target="/tmp/claude-1000/agents/implementation-writer/notes.txt"),
+            trailing_case("行尾空白:.md 目标 old_string 以空格收尾放行", "Edit", {"old_string": "x = 1\ndeclared = ", "new_string": "x = 2\ndeclared = "}, None,
+                          target=f"{work}/records/x.md"),
+            trailing_case("行尾空白:.mdx 目标放行", "Edit", {"old_string": "a ", "new_string": "b "}, None, target=f"{work}/records/x.mdx"),
+            trailing_case("行尾空白:大写 .MD 目标放行", "Edit", {"old_string": "a\t", "new_string": "b\t"}, None, target=f"{work}/records/X.MD"),
+            trailing_case("行尾空白:.sh 目标 old_string 不以空白收尾放行", "Edit", {"old_string": "x = 1\ndeclared = foo", "new_string": "x = 2\ndeclared = foo"}, None),
+            trailing_case("行尾空白:.sh 目标只在中间行有行尾空白放行", "Edit", {"old_string": "x = 1  \ny", "new_string": "x = 3\ny"}, None),
+            trailing_case("行尾空白:old_string 以换行收尾、换行前有空白放行", "Edit", {"old_string": "a \n", "new_string": "b\n"}, None),
+            trailing_case("行尾空白:只有 new_string 以空白收尾放行（旧判据已撤）", "Edit", {"old_string": "a", "new_string": "b "}, None),
+            trailing_case("行尾空白:Write 不判", "Write", {"content": "x = 1 "}, None, target=f"{work}/records/new.sh"),
+        ]
         # 五、钟点：样本串用 colon 拼、时区词用 jst / utc 两个变量拼，这份源码里不出现字面钟点与时区词（门禁 doc-text 也扫它）
         colon = ":"
         jst, utc = "J" + "ST", "U" + "TC"
@@ -496,7 +599,26 @@ def selftest(hook_dir):
             return (label, want_shape, shape.group(1) if shape else finding)
         hour_shape, period_shape, period_hour_shape, suffix_shape = "日期或时区后面跟「N 点 / N 时」", "日期或时区后面跟时段词", "时段词后面跟钟点", "「N 点前后」这类钟点"
         date_shape, bare_shape, iso_shape, zone_shape = "日期后面跟钟点", "不挨日期时区的钟点", "ISO 时间戳", "时区词"
+        twelve_hour_shape = "十二小时制钟点"
         cases += [
+            clock_shape_case("钟点:限额通知原样的英文月日十二小时制", glued("通知写 resets Oct 4 4", f"pm {utc}"), twelve_hour_shape),
+            clock_shape_case("钟点:十二小时制隔空格大写", glued("11 ", "AM 截止"), twelve_hour_shape),
+            clock_shape_case("钟点:十二小时制带点", glued("交回于 3", "p.m."), twelve_hour_shape),
+            clock_shape_case("钟点:以 am / pm 起头的英文词放行", glued("2 AMD 显卡、3 ", "amps、5 ppm、pm2 进程、v1.2", "am"), None),
+        ]
+        # 七、会话号：样本串用 glued 把目录名与十六进制拆开拼，这份源码里不出现会话号；
+        # WRITE_GUARD_DISABLE_SESSION_NAMES=1 或 LIB_FORBIDDEN_NOTATIONS_BREAK=session-names 时拒绝的几例就红，
+        # LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=session-names 时带放行标记的那一例就红
+        session_shape = "写了会话号"
+        cases += [
+            clock_shape_case("会话号:标签式（会话 号，日期）", glued("### 第 4 批开工（会话 singlefs-", "21，2026-10-01）"), session_shape),
+            clock_shape_case("会话号:当主语用的", glued("已发消息，singlefs-", "e1 回话"), session_shape),
+            clock_shape_case("会话号:上游三语仓的", glued("SOP 会话 singlefs-ai-sop-zh-", "86 同步来"), session_shape),
+            clock_shape_case("会话号:四位十六进制", glued("会话 singlefs-", "e152 在跑"), session_shape),
+            clock_shape_case("会话号:crate 名、上游仓目录名、临时目录名放行",
+                             glued("改 singlefs-core 与 singlefs-ai-sop-zh；mktemp -d /tmp/singlefs-", "e152.XXXXXX；/tmp/singlefs-", "e152-packages"), None),
+            clock_shape_case("会话号放行标记:sh 里的自检输入放行",
+                             glued("echo singlefs-", "6a  # session-names:allow 解析 ListAgents 输出的自检输入"), None, target=".claude/scripts/parse.sh"),
             clock_shape_case("钟点:日期 时区词 N 点前后", glued(f"用户 2026-09-28 {jst} 08 ", "点前后要开"), hour_shape),
             clock_shape_case("钟点:时区词 日期 N 点后（时区词那一处先中）", glued(f"本机 {utc} 2026-09-26 23 ", "点后"), zone_shape),
             clock_shape_case("钟点:日期 时区词 N 时许", glued(f"2026-09-16 {utc} 17 ", "时许的快照"), hour_shape),
@@ -548,7 +670,7 @@ def selftest(hook_dir):
             clock_shape_case("钟点上下文:time -v 的格式说明放行", f"Elapsed (wall clock) time (h:mm:ss or m:ss): 0{colon}03.21", None),
             clock_shape_case("钟点上下文:门禁号行号表格放行", f"| 共用脚本不在 | 21{colon}38 | 31{colon}68 |", None),
             clock_shape_case("钟点上下文:门禁号行号列表放行", f"| kb 目录不在 | —— | 21{colon}39、24{colon}27、27{colon}39 |", None),
-            clock_shape_case("钟点上下文:门禁文件名放行", f"门禁 20{colon}54-layer0-replay.sh 那一行", None),
+            clock_shape_case("钟点上下文:门禁文件名放行", f"门禁 20{colon}09-sample-stage.sh 那一行", None),
             clock_shape_case("钟点上下文:同一行带文件行号的编号对放行", f"触发的那一处（decisions/06-快照实现模型.md{colon}42），06{colon}42 正是没抽到的那一行", None),
             clock_shape_case("钟点上下文:反引号里一位小时的键放行", f"撞键 `3{colon}10`：冷重开是 `2{colon}11`", None),
             clock_shape_case("钟点上下文:产物字段里的 ISO 时间戳放行", f"taken_jst=2026-09-27T01{colon}20{colon}12+09{colon}00", None),
@@ -574,6 +696,10 @@ def selftest(hook_dir):
             stdin_case("stdin:覆盖未跟踪文件", {"tool_name": "Write", "tool_input": {"file_path": f"{work}/untracked.md", "content": "x"}}, 2),
             stdin_case("stdin:kb-scribe 越界", {"tool_name": "Edit", "agent_type": "kb-scribe", "tool_input": {"file_path": f"{work}/crates/a.rs"}}, 2),
             stdin_case("stdin:kb-scribe 范围内", {"tool_name": "Edit", "agent_type": "kb-scribe", "tool_input": {"file_path": f"{work}/.claude/kb/x.md"}}, 0),
+            stdin_case("stdin:kb-scribe 用 MultiEdit 越界", {"tool_name": "MultiEdit", "agent_type": "kb-scribe",
+                                                            "tool_input": {"file_path": f"{work}/crates/a.rs", "edits": [{"old_string": "a", "new_string": "b"}]}}, 2),
+            stdin_case("stdin:kb-scribe 用 MultiEdit 范围内", {"tool_name": "MultiEdit", "agent_type": "kb-scribe",
+                                                              "tool_input": {"file_path": f"{work}/.claude/kb/x.md", "edits": [{"old_string": "a", "new_string": "b"}]}}, 0),
             stdin_case("stdin:大内容越界", {"tool_name": "Write", "agent_type": "implementation-writer", "tool_input": {"file_path": f"{work}/research/big.md", "content": "y" * 300000}}, 2),
         ]
         runner_entry = run_entry({"tool_name": "Edit", "agent_type": "experiment-runner",
@@ -585,8 +711,14 @@ def selftest(hook_dir):
         cases.append(("stdin:Edit 写进角标", 2, prime_entry.returncode))
         cases.append(("stdin:角标的拒绝带字符、前后几个字与出路", True,
                       all(fragment in prime_entry.stderr for fragment in ("撇号类角标 \u2032", "取 B2\u2032 的读法", "→ 怎么办", "path-moves.md"))))
+        trailing_entry = run_entry({"tool_name": "Edit", "tool_input": {"file_path": f"{work}/records/x.sh", "old_string": "python3 - ", "new_string": "python3 -"}})
+        cases.append(("stdin:.sh 目标 Edit old_string 以空白收尾", 2, trailing_entry.returncode))
+        cases.append(("stdin:行尾空白的拒绝带收尾那几个字、两条出路", True,
+                      all(fragment in trailing_entry.stderr for fragment in ("「…python3 -␠」", "→ 怎么办", "多框到下一个非空白字符", "replace-once.py"))))
+        cases.append(("stdin:.md 目标 Edit old_string 以空白收尾放行", 0,
+                      run_entry({"tool_name": "Edit", "tool_input": {"file_path": f"{work}/records/x.md", "old_string": "python3 - ", "new_string": "python3 - "}}).returncode))
         recorded = sum(1 for _ in open(detections, encoding="utf-8")) if os.path.exists(detections) else 0
-        cases.append(("stdin:五次拒绝都落进检出记录", 5, recorded))
+        cases.append(("stdin:七次拒绝都落进检出记录", 7, recorded))
         os.unlink(outside.name)
     finally:
         shutil.rmtree(work)
@@ -594,17 +726,19 @@ def selftest(hook_dir):
     for label, want, got in failures:
         print(f"  ✗ 自检：{label} 应当是 {want}，实际 {got}")  # gate-lint:detail
     if failures:
-        print("    → 看 decide_overwrite() / decide_compile_first() / decide_shell_syntax() / decide_scope() / decide_prime_marks() / decide_clock_times() 与入口；"
-              "WRITE_GUARD_DISABLE_OVERWRITE / WRITE_GUARD_DISABLE_COMPILE_FIRST / WRITE_GUARD_DISABLE_SYNTAX / WRITE_GUARD_DISABLE_SCOPE / WRITE_GUARD_DISABLE_CLOCK_TIMES 设着的话这里本来就该红")
+        print("    → 看 decide_overwrite() / decide_compile_first() / decide_trailing_blank() / decide_shell_syntax() / decide_scope() / decide_prime_marks() / decide_clock_times() / decide_session_names() 与入口；"
+              "WRITE_GUARD_DISABLE_OVERWRITE / WRITE_GUARD_DISABLE_COMPILE_FIRST / WRITE_GUARD_DISABLE_SYNTAX / WRITE_GUARD_DISABLE_SCOPE / WRITE_GUARD_DISABLE_CLOCK_TIMES / WRITE_GUARD_DISABLE_SESSION_NAMES 或 WRITE_GUARD_BREAK=trailing-blank-ignored 设着的话这里本来就该红")
         return 1
     print(f"  ✓ 自检通过（查了 {len(cases)} 种情形）：钩子、门禁、项目脚本、研究脚本目录下写进语法错误的 .sh（Write 与 Edit）与 .py 拒绝、语法对的与别处的放行；"
           "未跟踪的已有文件整份覆盖拒绝，已跟踪 / 不存在 / 仓外 / Edit 放行；主 agent 与内置 agent 放行、范围内放行、"
-          "范围外与 .. 绕路与未登记的项目 agent 拒绝；experiment-runner 写主工作区 crates/ 下的 .rs（改、新建、.. 绕路）按先编后换拒绝并点名 compile-then-swap.py，"
+          "范围外（Edit、Write、MultiEdit）与 .. 绕路与未登记的项目 agent 拒绝；experiment-runner 写主工作区 crates/ 下的 .rs（改、新建、.. 绕路）按先编后换拒绝并点名 compile-then-swap.py，"
           "implementation-writer 与主 agent 写同一处、执行员写草稿目录与 crates/mutations.tsv 放行；Write 内容、Edit 与 MultiEdit 的 new_string 里有撇号类角标（五个字符各一例，主 agent 与子 agent 一样）拒绝，"
           "只在 old_string 里有、ASCII 单引号放行，共用字符集读不到拒绝；写进仓里的内容带钟点（日期后、时区词旁、x 通配、日期或时区词后的「N 点 / N 时」与时段词、时段词后的钟点、光秃的「N 点前后」、"
-          "不挨日期时区的时分与区间、ISO 与 diff 头 stat 的机器时间、光秃的时区词，md 里与没写理由的放行标记不认，主 agent 与子 agent 一样）拒绝并点名形态，"
-          f"只写日期、序号与个数后的「点」、不挨日期时区的时段词、标识符里的时区词、{len(context_cases)} 类长得像钟点的冒号对、"
-          f".sh / .py / .rs 里带理由的放行标记 {len(allow_cases)} 例、仓外、排除的样本、hook 自检与 c510 提示、只在 old_string 里有放行，判据读不到拒绝；拒绝都记进检出记录")
+          "不挨日期时区的时分与区间、ISO 与 diff 头 stat 的机器时间、光秃的时区词、英文十二小时制，md 里与没写理由的放行标记不认，主 agent 与子 agent 一样）拒绝并点名形态，"
+          f"只写日期、序号与个数后的「点」、不挨日期时区的时段词、标识符里的时区词、以 am / pm 起头的英文词、{len(context_cases)} 类长得像钟点的冒号对、"
+          f".sh / .py / .rs 里带理由的放行标记 {len(allow_cases)} 例、仓外、排除的样本、hook 自检与 c510 提示、只在 old_string 里有放行，判据读不到拒绝；写进仓里的会话号（标签式、当主语、上游三语仓、长十六进制）拒绝，crate 名、上游仓目录名、临时目录名与 .sh 里带理由的放行标记放行；"
+          "目标不是 .md / .mdx 时 Edit 与 MultiEdit 的 old_string 以空格或制表符收尾（.sh、.txt、.markdown，仓里仓外、主 agent 与子 agent 一样）拒绝并给出收窄框选与 replace-once.py 两条出路，"
+          ".md / .mdx / .MD 目标、不以空白收尾、只在中间行或换行前有行尾空白、只有 new_string 以空白收尾与 Write 放行；拒绝都记进检出记录")
     return 0
 
 hook_dir = sys.argv[1]

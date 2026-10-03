@@ -5,40 +5,41 @@
 
 ## 定义与名字
 
-三个包，三个名字，全仓只用这三个名字称呼它们：
+四个包，四个名字，全仓只用这四个名字称呼它们：
 
 | 名字 | 包 | 装什么 | 什么时候跑 |
 |---|---|---|---|
 | **harness 档** | `crates/singlefs-harness` | 单元测试与集成测试，加上它们用的脚手架库：录制器、内存池（`memory_pool`）、理想模型、随机历史、故障注入设备、场景 | 改了代码随时跑 |
-| **checker 档** | `crates/singlefs-checker-tier` | 崩溃态枚举引擎与记录核对器（`crash`）、断点续跑与双机分片（`layer0_progress`）、崩溃注入与坏盘输入两场战役、真设备一侧的设备日志比对与运行模式、崩溃放量（崩溃点身份与复用键 `crash_identity`、先录后核的流水线 `crash_amplification`、判定存储 `verdict_store`、单元校验和上 GPU `gpu_unit_checks`、三段流第 ① 段的事实表与 CPU 参照核对 `crash_facts`、第 ② 段的 GPU 核对内核 `crash_verify_gpu`、GPU 判器的输入表 `crash_judge_tables`、GPU 判器的判法 `crash_judge_gpu` 与它的派活 `crash_judge_dispatch`；`verdict_store` 挂特性 `verdict-store`，`gpu_unit_checks`、`crash_verify_gpu`、`crash_judge_gpu` 与 `crash_judge_dispatch` 挂特性 `gpu`）、实验与真设备装置二进制（`src/bin/`），以及它们的全部用例；连同 QEMU（门禁 checker-tier-qemu-device-streams）、herd7（checker-tier-lkmm）、crates 变异整表（checker-tier-crates-mutation-replay）、全部实验复跑（checker-tier-research-build-and-replay 的 experiment-replay 格） | 默认只在提交时跑；想单独跑带 `SINGLEFS_HEAVY_TESTS=user-request` |
+| **checker 档** | `crates/singlefs-checker-tier` | 崩溃态枚举引擎与记录核对器（`crash`）、断点续跑与双机分片（`layer0_progress`）、崩溃注入与坏盘输入两场战役、真设备一侧的设备日志比对与运行模式、崩溃放量（崩溃点身份与复用键 `crash_identity`、先录后核的流水线 `crash_amplification`、判定存储 `verdict_store`、单元校验和上 GPU `gpu_unit_checks`、三段流第 ① 段的事实表与 CPU 参照核对 `crash_facts`、第 ② 段的 GPU 核对内核 `crash_verify_gpu`、GPU 判器的输入表 `crash_judge_tables`、GPU 判器的判法 `crash_judge_gpu` 与它的派活 `crash_judge_dispatch`；`verdict_store` 挂特性 `verdict-store`，`gpu_unit_checks`、`crash_verify_gpu`、`crash_judge_gpu` 与 `crash_judge_dispatch` 挂特性 `gpu`）、实验与真设备装置二进制（`src/bin/`），以及它们的全部用例；连同 QEMU（门禁 checker-tier-qemu-device-streams）、herd7（checker-tier-lkmm）、crates 变异整表（checker-tier-crates-mutation-replay）、全部实验复跑（checker-tier-research-build-and-replay 的 experiment-replay 格）、形式化验证（checker-tier-formal-verification：Verus 验 `crates/singlefs-replay-prefix`，E165 红例钉表两格）、广谱变异（驱动 `research/scripts/broad-mutation.py`；提交门禁 checker-tier-broad-mutation 判这一次暂存树那一版每一条变异都有结论、没有没红） | 默认只在提交时跑；想单独跑带 `SINGLEFS_HEAVY_TESTS=user-request` |
 | **池级 checker** | `crates/singlefs-checker` | 判一个镜像的判决器库（O2，`check_pool_image`，D13（验证路线） 已定项 7）；只依赖 `singlefs-format` | 它是库，被两档调用；它自己的库单测归 harness 档，随时跑 |
+| **RefFS** | `crates/singlefs-reference-filesystem` | 语义级的参照文件系统：只在内存里按 POSIX 操作走，判一次崩溃之后恢复读出的内容落不落在允许集合里；依赖只有 `std`，不引实现、池级 checker、harness 档、checker 档，实现与池级 checker 也不依赖它（门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格 ⑤⑥⑦ 判） | 它是库，被 harness 档与 checker 档调用；它自己的单测归 harness 档，随时跑 |
 
 归类判据：一条测试或一段代码要枚举崩溃状态、要真设备或外部工具、或跑一次以十分钟计，归 checker 档；否则归 harness 档。拿不准的放 checker 档，再由代码三方判要不要挪回。
 依赖只许一个方向：checker 档依赖 harness 档与池级 checker，harness 档不依赖 checker 档（它的依赖闭包里没有 `singlefs-checker-tier`，dev-dependencies 也算；源码里零处引它；门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格判）。两档都要用的一小段代码，宁可各留一份（例：`crates/singlefs-harness/tests/common_corrupted_allocation_record/mod.rs` 抄自 checker 档的坏盘输入），也不让 harness 依赖 checker 档。
-测试文件按它测什么起名：领域在前、场景在后（`rollback_by_a_forward_publish`、`crash_enumeration_fixed_script_stream`），checker 档的以模块起头（`crash_enumeration_`、`crash_points_`、`crash_injection_`、`bad_disk_input_`、`record_checker_`）；不带里程碑、步号、增补号、并行线号、欠账号（以里程碑序数起头的、`*_step_four_*`、`*_supplement_two_*`、`*_c519_*`），来历写进文件头的文档注释。`research/scripts/crash-case-check.py` 的 file-names 那一样判，门禁 code-source-discipline 的 test-file-names 格在真仓上跑它。
+测试文件按它测什么起名：领域在前、场景在后（`rollback_by_a_forward_publish`、`crash_enumeration_fixed_script_stream`），checker 档的以模块起头（`crash_enumeration_`、`crash_points_`、`crash_injection_`、`bad_disk_input_`、`record_checker_`）；名字不带来历照 `.claude/singlefs-ai-sop/rules/test-script-discipline.md`「用例原子化：每一条都能单独跑」，本仓判的形态是以里程碑序数起头的、`*_step_four_*`、`*_supplement_two_*`、`*_parallel_line_one_*`、`*_c519_*`。`research/scripts/crash-case-check.py` 的 file-names 那一样判，门禁 code-source-discipline 的 test-file-names 格在真仓上跑它。
 不许用的叫法：「checker 包」（分不清是池级 checker 还是 checker 档）、「放量用例」「验证档」（说 checker 档）。
 
-## harness 档里再分轻用例与耗时用例
+## harness 档里再分快档用例与慢档用例
 
 - 轻：每次改完跑，`cargo test -p singlefs-harness` 不带 `--ignored` 跑到的全部。
-- 红了只重跑红的那几条，不整份重跑，轻用例与耗时用例一样：`python3 research/scripts/rerun-failed-tests.py <上一趟的日志> -p <包>` 按测试目标打印只跑那几条的命令（一律带 `--include-ignored`，红的是耗时用例也跑得到），经 Bash 起、加内存包装；修完代码也只重跑红的那几条；整份重跑只在上一趟的日志不全时（脚本判红、一条命令都不打），完整的一遍归提交时的整轮门禁。
-- 耗时用例：debug 下单条跑到 60 秒及以上的用例，标 `#[ignore = "harness 耗时用例：…"]`；要跑随时跑，一律经 `research/scripts/run-with-memory-cap.sh`，线程数按派发提示的上限。单条用时看平常跑的时候量到的，不另外单独量。
-- 调全量崩溃枚举函数（`enumerate_layer0` 一族，快档 `quick_tier` 那几个除外）或自己逐个造崩溃状态（名字带 `every_crash`；循环里对录制操作取到循环变量为止的前缀去 `apply`、或造 `CrashImage`），直接这样做或经同一文件里的函数这样做的测试不是 harness 档的重，它是 checker 档，写进 `crates/singlefs-checker-tier/tests/`；`research/scripts/crash-case-check.py` 的 placement 那一样判这一条，写在别的包里判红，门禁 `54-layer0-replay` 开跑前在真仓上跑它。
-- 一条用例一个场景：按参数循环、每一轮新建一个池（`build_pool`、`build_through_*`、`format_pool`、`MemoryPool::with_devices`）的，拆成一个带参数的函数加每个取值一条 `#[test]`，红了只重跑那一条；确是一个场景的（同一个池上按次序做几轮）在用例上面写一行 `// harness-test-granularity:one-scenario <理由>`。`research/scripts/crash-case-check.py` 的 one-scenario 那一样判，门禁 harness-model-differential-and-scenarios 的 one-scenario 格在真仓上跑它。
+- 红了只重跑红的那几条（`.claude/singlefs-ai-sop/rules/test-script-discipline.md`「用例原子化：每一条都能单独跑」），快档用例与慢档用例一样：`python3 research/scripts/rerun-failed-tests.py <上一趟的日志> -p <包>` 按测试目标打印只跑那几条的命令（一律带 `--include-ignored`），经 Bash 起、加内存包装；它判红、一条命令都不打时才整份重跑，完整的一遍归提交时的整轮门禁。
+- 慢档用例：debug 下单条跑到 60 秒及以上的用例，标 `#[ignore = "harness 慢档用例：…"]`；要跑随时跑，一律经 `research/scripts/run-with-memory-cap.sh`，线程数按派发提示的上限。单条用时看平常跑的时候量到的，不另外单独量。
+- 调全量崩溃枚举函数（`enumerate_layer0` 一族，快档 `quick_tier` 那几个除外）或自己逐个造崩溃状态（名字带 `every_crash`；循环里对录制操作取到循环变量为止的前缀去 `apply`、或造 `CrashImage`），直接这样做或经同一文件里的函数这样做的测试不是 harness 档的重，它是 checker 档，写进 `crates/singlefs-checker-tier/tests/`；`research/scripts/crash-case-check.py` 的 placement 那一样判这一条，写在别的包里判红，门禁 `checker-tier-layer0-replay` 开跑前在真仓上跑它。
+- 一条用例一个场景照 `.claude/singlefs-ai-sop/rules/test-script-discipline.md`「用例原子化：每一条都能单独跑」：本仓按「每一轮新建一个池」认参数循环（`build_pool`、`build_through_*`、`format_pool`、`MemoryPool::with_devices`），确是一个场景的在用例上面写一行 `// harness-test-granularity:one-scenario <理由>`。`research/scripts/crash-case-check.py` 的 one-scenario 那一样判，门禁 harness-model-differential-and-scenarios 的 one-scenario 格在真仓上跑它。
 
 ## checker 档自己分快档与全量
 
 | 档 | 命令 | 什么时候 |
 |---|---|---|
-| 快档 | `cargo test --release -p singlefs-checker-tier --lib --tests` 不带 `--ignored`（库与集成测试；装置二进制 `src/bin/` 的内联单测不在快档里，归它们的变异表与实验复跑）；门禁 `54-layer0-replay` 跑它，再逐条核 `.claude/gate.d/stage-inputs.tsv` 里键是 `crash-case:` 的用例各自那一格全绿标记，标记不作数的报「本次未跑」、不判红 | 整轮门禁与每次提交 |
-| 全量 | `54-layer0-replay` `--full`：在 HEAD + 暂存区的 worktree 里逐条跑登记的崩溃枚举用例（`--include-ignored --exact`），那一格全绿标记在就复用；分层照 D13（验证路线） 已定项 9；GPU 只接校验和那一截，要不要接归 D24（后台重活能不能卸给 GPU） | 用户要求或夜间 |
-| 崩溃放量全量 | `bash research/scripts/crash-amplification.sh`：不带参数跑登记表里全部分项（`--list-items` 列、`--item <分项>` 点名），开跑先照多机配置清场、退出时复原；每项交 `crash-amplification-item.sh`：配置开了双机就两台跑、没开就一台跑，配置 `ENABLE_GPU=1` 时由 GPU 判，显卡照私有显卡配置（模板 `gpu-cards.env.example`）的先后与额度用，做不到（第二台跑不成、点名的卡用不了、建不出表、有状态 GPU 判不了、内核展开超预算）报错退出，不退回少一台或 CPU；一份库装全部分项，落在 `${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/library`，落在开机会清空的目录里被拒；重跑同一条命令就是续跑（同一判法版本下判过的块复用，判法版本变了旧行留着、这一版从头判） | 用户要求或夜间 |
+| 快档 | `cargo test --release -p singlefs-checker-tier --lib --tests` 不带 `--ignored`（库与集成测试；装置二进制 `src/bin/` 的内联单测不在快档里，归它们的变异表与实验复跑），再一趟 `cargo test --release -p singlefs-checker-tier --features <tests/ 里 cfg 点到的特性> --lib --test <挂特性的测试文件>…`（`BINDGEN_EXTRA_CLANG_ARGS` 取 `research/scripts/crash-amplification-lib.sh` 的 `CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS`）；门禁 `checker-tier-layer0-replay` 跑这两趟（feature-gated-tests 格：挂特性的测试文件跑到 0 条的、没卡时 GPU 对拍打的 `NOT_RUN_NO_GPU_ADAPTER` 逐条报「本次未跑」），再逐条核 `.claude/gate.d/stage-inputs.tsv` 里键是 `crash-case:` 的用例各自那一格全绿标记，标记不作数的报「本次未跑」、不判红 | 整轮门禁与每次提交 |
+| 全量 | `checker-tier-layer0-replay` `--full`：在 HEAD + 暂存区的 worktree 里逐条跑登记的崩溃枚举用例（`--include-ignored --exact`），那一格全绿标记在就复用；分层照 D13（验证路线） 已定项 9；GPU 只接校验和那一截，要不要接归 D24（后台重活能不能卸给 GPU） | 用户要求 |
+| 崩溃放量全量 | `bash research/scripts/crash-amplification.sh`：不带参数跑登记表里全部分项（`--list-items` 列、`--item <分项>` 点名），开跑先照多机配置清场、退出时复原；每项交 `crash-amplification-item.sh`：配置开了双机就两台跑、没开就一台跑，配置 `ENABLE_GPU=1` 时由 GPU 判，显卡照私有显卡配置（模板 `gpu-cards.env.example`）的先后与额度用，用不上时照 `.claude/singlefs-ai-sop/rules/test-script-discipline.md`「用上现有的硬件加速」退 78（配置对不上、点名的卡用不了、第二台连不上、清场没过），算法上判不了的（有状态 GPU 判不了、内核展开超预算、建不出表）退 248，退出码表在入口与分项驱动的文件头；不带参数按入口登记的全量展开深度跑（`FULL_EXPAND_UP_TO`），给了 `--expand-up-to` 的是缩过规模的一趟；一份库装全部分项，落在 `${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/library`，落在开机会清空的目录里被拒；复用与续跑照同一篇「判定可复用：按输入存，按前缀剪」，键与判法版本在 `crates/singlefs-checker-tier/src/crash_identity.rs`，存放布局在 `crates/singlefs-checker-tier/src/verdict_store.rs` | 用户要求 |
 
-checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay 与 checker-tier-research-build-and-replay 的 experiment-replay 格照各自的复用判定跑（`research/scripts/stage-must-run.sh` 文件头）。
+checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification、checker-tier-broad-mutation 与 checker-tier-research-build-and-replay 的 experiment-replay 格照各自的复用判定跑（`research/scripts/stage-must-run.sh` 文件头）。
 
 ## 崩溃枚举用例住哪、怎么登记
 
-- checker 档每个测试文件第一行写它测哪几个模块：`//! checker 档模块：<模块，按 crash、layer0_progress、crash_injection、bad_disk_input、device_log、on_device_modes、crash_identity、crash_amplification、verdict_store、gpu_unit_checks、crash_facts、crash_verify_gpu、crash_judge_tables、crash_judge_gpu、crash_judge_dispatch 的次序用、隔开>`，与它从 `singlefs_checker_tier::` 导入的模块逐个相同；一个都不导入的写 `无（为什么）`。按模块找用例：`grep -l '^//! checker 档模块：.*crash_injection' crates/singlefs-checker-tier/tests/*.rs`。`research/scripts/crash-case-check.py` 的 modules 那一样判，门禁 `54-layer0-replay` 开跑前在真仓上跑它。
+- checker 档每个测试文件第一行写它测哪几个模块：`//! checker 档模块：<模块，按 crash、layer0_progress、crash_injection、bad_disk_input、device_log、on_device_modes、crash_identity、crash_amplification、verdict_store、gpu_unit_checks、crash_facts、crash_verify_gpu、crash_judge_tables、crash_judge_gpu、crash_judge_dispatch 的次序用、隔开>`，与它从 `singlefs_checker_tier::` 导入的模块逐个相同；一个都不导入的写 `无（为什么）`。按模块找用例：`grep -l '^//! checker 档模块：.*crash_injection' crates/singlefs-checker-tier/tests/*.rs`。`research/scripts/crash-case-check.py` 的 modules 那一样判，门禁 `checker-tier-layer0-replay` 开跑前在真仓上跑它。
 
 - 写在 `crates/singlefs-checker-tier/tests/<流的名字>.rs`，全量那条标 `#[ignore]`，同文件的快档用例不标。
 - 共用的搭建模块经 `#[path = "../../singlefs-harness/tests/common/mod.rs"] mod common;` 这类声明指回 harness 档的 `tests/common*/mod.rs`，不抄第二份。
@@ -72,7 +73,7 @@ checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutat
 
 每道门禁都能全跑，也能逐格点名跑。
 
-- 每格一个函数，判一件事。门禁 source 共用库 `.claude/gate.d/lib/stage-cells.sh`（住在 `lib/` 下，`gate.sh` 不把它当阶段跑），用 `stage_cell <格名> <函数> <判什么的一句> <判红时的出路>` 逐格登记；参数解析、样本标记、逐格汇总都经它，不各写一份。写法在它的文件头，样板是 `.claude/gate.d/doc-decisions.sh`。`54-layer0-replay` 不 source 它，参数照同一张表自己解析。
+- 每格一个函数，判一件事。门禁 source 共用库 `.claude/gate.d/lib/stage-cells.sh`（住在 `lib/` 下，`gate.sh` 不把它当阶段跑），用 `stage_cell <格名> <函数> <判什么的一句> <判红时的出路>` 逐格登记；参数解析、样本标记、逐格汇总都经它，不各写一份。写法在它的文件头，样板是 `.claude/gate.d/doc-decisions.sh`。`checker-tier-layer0-replay` 不 source 它，参数照同一张表自己解析。
 - 文件头写格名表：每格一行 `# gate-cell: <格名> <判什么的一句>`，与登记的逐格相同、次序相同。
 
 | 参数 | 做什么 |
@@ -86,7 +87,7 @@ checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutat
 
 - 汇总：每格在自己的子 shell 里跑，汇总逐格列「格名：绿 / 红 / 本次未跑」。有一格红整道退 1，红格后面接它自己登记的出路与只重跑红格的 `--check` 命令；跑到的格全退 77 整道退 77；否则退 0。退 77 的格逐格报进 `$GATE_NOT_RUN_FILE`。
 - 样本要证某一格时，在样本根放 `.gate-cells`（一行一个格名），门禁只跑点名的格；被判的根是门禁所在的仓、或是 `gate.sh --staged` 的临时树时，这个文件不认。
-- `--list` / `--check` 只管格，与文件头 `# gate-cell:` 表逐格相同。重型门禁的逐项点名另用两个参数：`--list-items` 逐行打可点名的项，不编、不跑；`--item <项>` 只跑点名的项，给几次取并集，项写错退 2 并列出可点的项。可点的项：`54-layer0-replay` 按崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv` 的 `crash-case:` 行）、checker-tier-qemu-device-streams 按模式、checker-tier-research-build-and-replay 的 experiment-replay 格按实验、checker-tier-crates-mutation-replay 按变异行。
+- `--list` / `--check` 只管格，与文件头 `# gate-cell:` 表逐格相同。重型门禁的逐项点名另用两个参数：`--list-items` 逐行打可点名的项，不编、不跑；`--item <项>` 只跑点名的项，给几次取并集，项写错退 2 并列出可点的项。可点的项：`checker-tier-layer0-replay` 按崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv` 的 `crash-case:` 行）、checker-tier-qemu-device-streams 按模式、checker-tier-research-build-and-replay 的 experiment-replay 格按实验、checker-tier-crates-mutation-replay 按变异行。
 - `research/scripts/gate-structure-check.py` 判 `.claude/gate.d/` 顶层每道门禁（共用库在 `lib/` 下，不判）：文件头有格名表；`--list` 退 0、输出与格名表逐格相同、跑的时候没起 cargo、QEMU、herd7 这类重活；`--check` 不存在的格退 2。
 - 阶段归属表 `.claude/gate.d/stage-owners.tsv` 一行一个门禁与格名：门禁、格名、判红时派给谁修、为什么。
 
@@ -94,14 +95,16 @@ checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutat
 
 | 判什么 | 谁判 |
 |---|---|
-| 崩溃点重放跑了、快档绿、每条登记用例的全绿标记作不作数 | 门禁 `54-layer0-replay`；覆盖声明 `# gate-covers: 崩溃点重放`，键登记在项目根 `.claude/gate-not-implemented.tsv` |
+| 崩溃点重放跑了、快档绿、每条登记用例的全绿标记作不作数；挂特性的 checker 档测试文件快档至少一趟编进来、跑到的用例不为 0 | 门禁 `checker-tier-layer0-replay`（后一半是 feature-gated-tests 格）；覆盖声明 `# gate-covers: 崩溃点重放`，键登记在项目根 `.claude/gate-not-implemented.tsv` |
+| 形式化验证：恢复重放取前缀的核经 Verus 验过，E165 全量的红例都钉进快速档、在被判那棵树的实现上逐行重放与原实现相同 | 门禁 checker-tier-formal-verification：verus-toolchain-pinned、verus-proof、verus-vacuity、verus-must-red-worlds 四格用 Verus 验 `crates/singlefs-replay-prefix`（登记表 `.claude/gate.d/verus-pins.tsv`），pinned-red-examples-complete、pinned-red-examples-replay 两格判红例钉表 `.claude/gate.d/e165-pinned-red-examples.tsv` |
+| 广谱变异：这一次暂存树那一版里改到的变异每一条都有这一版的结论、沿用的结论都在、没有一条没红 | 门禁 checker-tier-broad-mutation：library-version-is-staged-tree 格判驱动库目录此刻那一版与暂存树在导出范围上逐文件相同、工具链与全局键相同，gate-verdict 格判驱动 `--summary` 的 `BROAD_MUTATION_GATE` 行与汇总行，超时、内存撞顶经驱动升档判成的抓到逐行核库目录登记表 `escalated-verdicts.tsv` 的证据（`research/scripts/broad-mutation.py` 文件头「升档」；基线按登记行记的行号找那一版 `baseline.tsv` 的那一行复核），证据不齐的超时、撞顶照旧算没结论、加大限时或上限再点名重跑；结果表每一行带用库目录与仓之外的密钥算的校验列，这一格另用同一把密钥逐行核（驱动文件头「结果行的校验列」）；驱动由主 agent 提交时先起（`.claude/skills/crash-test/commit-stages.md` 第 2b 步） |
 | 模型对拍跑了、每段都判过 | 门禁 harness-model-differential-and-scenarios 以 `model-` 起头的那几格；覆盖声明 `# gate-covers: 模型对拍`，键登记在项目根 `.claude/gate-not-implemented.tsv` |
-| 崩溃枚举用例住在 checker 档、标了 `#[ignore]` 的登记了 `crash-case:`；checker 档测试文件声明模块 | 门禁 `54-layer0-replay` 开跑前跑 `research/scripts/crash-case-check.py --only placement,modules`，红了不起 cargo；门禁 code-tooling 的 research-script-selftests 格跑那份脚本的自证 |
+| 崩溃枚举用例住在 checker 档、标了 `#[ignore]` 的登记了 `crash-case:`；checker 档测试文件声明模块 | 门禁 `checker-tier-layer0-replay` 开跑前跑 `research/scripts/crash-case-check.py --only placement,modules`，红了不起 cargo；门禁 code-tooling 的 research-script-selftests 格跑那份脚本的自证 |
 | 函数名与类型名不只由空泛词拼成；测试文件不按里程碑起名 | 门禁 code-source-discipline：vague-names 格读词表 `.claude/naming-vague-words`、还没改完的文件 `.claude/naming-vague-exclude`；test-file-names 格跑 `research/scripts/crash-case-check.py --only file-names` |
-| 池级 checker 库不依赖实现；harness 档不依赖 checker 档 | 门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格 |
+| 池级 checker 库不依赖实现；harness 档不依赖 checker 档；RefFS 的依赖闭包只有自己与 `singlefs-format`、源码零处引实现与池级 checker 与两档（真名与改名别名都算）、实现与池级 checker 的依赖闭包里没有它 | 门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格（⑤⑥⑦ 判 RefFS 那三样；RefFS 包不在时 ⑤⑥ 报本次未跑） |
 | harness 档一条用例一个场景 | 门禁 harness-model-differential-and-scenarios 的 one-scenario 格（跑 `research/scripts/crash-case-check.py --only one-scenario`） |
 | 变异行点名的测试跑得到：标了 `#[ignore]` 的带 `--include-ignored`、`--` 之后的筛选词筛得到点名的测试 | 门禁 code-source-discipline 的 mutation-tables 格 |
 | 每道阶段认第一个参数当项目根 | 门禁 code-tooling 的 stage-owners 格 |
-| 谁在什么时候跑得了 checker 档 | `.claude/hooks/heavy-test-guard.sh`，判定在 `lib_heavy_tests.py`：跑到 checker 档包 `singlefs-checker-tier` 的测试（库单测、集成测试、装置二进制的内联测试）、门禁 checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay 与 checker-tier-research-build-and-replay 的 experiment-replay 格、QEMU、herd7、`crates/mutations.tsv` 整表、全量 `cargo test`、整轮门禁、E152 装置算重型 |
+| 谁在什么时候跑得了 checker 档 | `.claude/hooks/heavy-test-guard.sh`，判定在 `lib_heavy_tests.py`：跑到 checker 档包 `singlefs-checker-tier` 的测试（库单测、集成测试、装置二进制的内联测试）、门禁 checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification（连同直接起它的判法脚本 `research/scripts/verus-proof-check.py` 证明、空真、必红三种用法与 `research/scripts/e165-pin-red-examples.py --replay`）与 checker-tier-research-build-and-replay 的 experiment-replay 格、QEMU、herd7、`crates/mutations.tsv` 整表、全量 `cargo test`、整轮门禁、E152 装置、广谱变异（`research/scripts/broad-mutation.py` 起 cargo 或改库目录的每一种用法；`--list-items`、`--summary`、`--check-ignored`、`--help`（`-h`）与登记为 light 的单独 `--selftest` 不算）与门禁 checker-tier-broad-mutation（只点名 gate-verdict 一格的 `--check gate-verdict` 不算）、真编 QEMU（`research/scripts/build-patched-qemu.sh` 除 `--selftest` 之外的用法）算重型 |
 
-**它们管不到的**：harness 耗时用例标得对不对、快档抽的取样点够不够、全量该多久跑一次——这几样靠人与代码三方。
+**它们管不到的**：harness 慢档用例标得对不对、快档抽的取样点够不够、全量该多久跑一次——这几样靠人与代码三方。

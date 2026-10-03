@@ -27,12 +27,12 @@ required-inputs: 草稿目录, 报告, 出口, 要改的文件
 
 1. 开跑前照共用约束「不做」一节看负载；动手前跑 `python3 .claude/singlefs-ai-sop/scripts/gate-overlap.py --list`，看要改的判据有没有已有的门禁或钩子在管。
 2. 每条改法先造一个该红的输入：给被改的脚本加弄坏开关或样本目录。说不出该红的输入，这一条停下交主 agent。
-3. 改已存在的脚本写同目录临时文件再 `mv`，或用 `research/scripts/replace-once.py` 定点改；不在同一个 inode 上就地改。新建文件排他（Write 前先 `ls` 确认不存在）。
+3. 改已存在的脚本写同目录临时文件再 `mv`，或用 `research/scripts/replace-once.py` 定点改；不在同一个 inode 上就地改。改 `.claude/hooks/` 下的钩子只经 `research/scripts/hook-swap.py` 换上（草稿里先验、换上后再验、不对按反向定点替换回滚），不直接定点改。新建文件排他（Write 前先 `ls` 确认不存在）。
 4. 新门禁阶段与新钩子写 `# gate-similar:` 与 `# hook-events:`；新钩子在 `.claude/settings.json` 的 `hooks` 一节注册、带 `--selftest`（自证由上游 `hooks-registered.sh` 跑），注册在哪个 matcher 上的判据挂进 `.claude/gate.d/code-tooling.sh` 的 agent-write-scope 格；新研究脚本写 `admission:` / `run-condition:` 文件头、开头调 `preflight`，自证挂进 `.claude/gate.d/code-tooling.sh` 的 research-script-selftests 格的 runner 表（`SELFTEST_RUNNERS`）。
 5. 自证里只对自己起的进程号发信号（`kill "$!"`、`proc.py stop <pid>`），不按名字、cgroup 或进程组发。
 6. 第二种活：只写判决或规格给的改法，不另加条款；改完在报告里逐份列出改过的定义、共用约束与规则，交主 agent 开定义三方（门禁 doc-process-records 的 agent-def-adversarial-review 格）。
-7. 交回前不跑任何验证，语法检查（`bash -n`、`python3 -m py_compile`）除外（共用约束「门禁」一节）；证据写全：样本红绿各至少一份、自证格与弄坏开关写全。
-8. 上下文过 400k：停在最近一条改法写完的点，报告写做完的条、做到一半的（文件与差哪一步）、没开的，交回。
+7. 交回前不跑门禁阶段与各类 lint；改了的脚本与门禁，`.claude/hooks/selftest-registry.tsv` 登记为 light 的 `--selftest` 与样本档照钩子拒绝说明里写的起法自己跑到绿、新开关逐个打开核红在点名那一格；登记为 heavy 的、登记为 heavy-if-set 而命令里设了那个变量的、没登记的，以及照拒绝说明也起不了的，写明命令交主 agent；语法检查（`bash -n`、`python3 -m py_compile`）照做（共用约束「门禁」一节）；证据写全：样本红绿各至少一份、自证格与弄坏开关写全。
+8. 上下文多大都不交回，活没做完就接着做。
 
 ## 写范围
 
@@ -46,4 +46,4 @@ required-inputs: 草稿目录, 报告, 出口, 要改的文件
 
 ## 没做什么（固定会有的）
 
-- 没跑重型测试（`54-layer0-replay`、checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-research-build-and-replay 本身、`gate.sh`、全量 `cargo test`、`check.sh`）；没走定义三方；没提交。
+- 没跑重型测试（`checker-tier-layer0-replay`、checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification、checker-tier-research-build-and-replay 本身、`gate.sh`、全量 `cargo test`、`check.sh`）；没走定义三方；没提交。

@@ -33,7 +33,7 @@ required-inputs: 判决|规格, 草稿目录, 报告
 3. 分项翻状态：`python3 research/scripts/relabel-item.py D<n> <k> --dry-run` 先看，给它列出的文件各记一次 `sha256sum`，再实跑；把它列出的「要人看」原样交主 agent，不自己改那些句子。它改写了 `research/**/*.rs` 的，把改到的实验源码逐个列给主 agent；`--dry-run` 列出要改写 `crates/**/*.rs` 的（实现的地盘，要走代码轮），停在实跑之前，把那些文件与引用逐个列给主 agent（并进实现批），不实跑；预演列出的文件里带别的会话没提交改动的（`git status --porcelain` 里有它），也逐个列给主 agent。然后 `bash .claude/gate.d/doc-decisions.sh --write`。
    3b. 规格里决策那几处与实验页那几行是一批，一起写、一起回读，不分两次。**判一个实验撑不撑一条分项不在你的活里**，规格没写的关系一个字不加。
    新立分项、改索引行这类不翻状态的规格不走第 3 步，写完正文自己跑一次 `bash .claude/gate.d/doc-decisions.sh --write` 再往下。
-4. 门禁阶段交回前不跑，由提交前 `gate-triage` 跑的 `research/scripts/gate-staged.sh`（它起的整轮 `gate.sh`）判（共用约束 `.claude/agent-common.md`「门禁」一节）；第 2、3 步里的 `--write` 是写回流程的生成一步，照跑。
+4. 门禁阶段交回前不跑，由提交前主 agent 照 `.claude/skills/gate/staged-gate.md` 跑的 `research/scripts/gate-staged.sh`（它起的整轮 `gate.sh`）判（共用约束 `.claude/agent-common.md`「门禁」一节）；第 2、3 步里的 `--write` 是写回流程的生成一步，照跑。
 5. 收尾再记一次每个被改文件的 `sha256sum`，报告里列全部改过的文件与开工时、收尾时两次哈希。
 
 ## 写范围

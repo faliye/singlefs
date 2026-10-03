@@ -10,7 +10,11 @@
 命令前的关键字与赋值、nohup / setsid / nice / ionice / timeout / env / stdbuf / sudo / taskset / command / exec 这类前缀、
 `bash [选项] 脚本` 与 `bash -c '…'`（递归进去）、`python3 [选项] 脚本`、`source` / `.`（后面跟的像一个路径才算）、`capped.sh N …` 与 `run-with-memory-cap.sh <上限> …`，
 （被执行的只是脚本位上那一个词：`bash -n 脚本` 只查语法、`python3 - 词…` 的程序从标准输入读，后面的词都是参数，都不当被执行的脚本交出；
-弄坏开关 LIB_SHELL_WORDS_BREAK=arguments-as-executed 把这两种里的参数照旧当被执行的脚本，只给 lib_heavy_tests.py 与 heavy-test-guard.sh 的自检证明它会红），
+弄坏开关 LIB_SHELL_WORDS_BREAK=arguments-as-executed 把这两种里的参数照旧当被执行的脚本，哪几份自证的哪几项红见「弄坏开关」一段），
+python 的选项照解释器的语义切（python_invocation）：短选项可以合写（`-Bu`），`-W`、`-X` 与 `--check-hash-based-pycs` 带一个值（贴着写或另起一个词），
+值不当脚本名；`-c <代码>` 的程序是那段代码、没有被执行的脚本，交出的是 python 这一条本身（代码由调用方从参数里取）；`-m <模块>` 交出
+`<模块里的点换成斜杠>.py` 当被执行的脚本（launcher 是 "python"），`-m runpy <模块>` 取后面那个模块，调用方拿它与仓内脚本的位置比
+（弄坏开关 LIB_SHELL_WORDS_BREAK=python-options-by-dash 退回「以 - 开头的词都当选项跳过、第一个不以 - 开头的词当脚本」，哪几份自证的哪几项红见「弄坏开关」一段），
 数组赋值 `名字=(…)`（元素是值，不当命令）、`command -v` / `-V`（查名字，后面那个词不当命令），
 以及 cd / pushd 换目录、export / unset 改变量对后面命令的影响。喂给非 shell 命令的 heredoc 正文每一层都先剥掉。
 剥掉的 heredoc 正文与输出重定向挂回它所在的那条命令（CommandAtPosition 的 standard_input_heredocs、output_redirections）：
@@ -18,9 +22,70 @@
 剥掉包装之后命令词是一个脚本时，记下它是怎么起的（launcher：bash / sh 这类后面跟的、source / . 读进来的、python3 后面跟的）；
 经 `run-with-memory-cap.sh <上限>` 剥出来的命令记 memory_capped，连同它 `bash -c` 里的命令；调用方往里读它起的脚本时，把这个标记当 memory_capped 参数传回来。
 脚本文件本身不在这里读，要读的 hook 自己读，再把正文交回 commands_at_command_position。
+只有一处例外：detached_run_script 认 research/scripts/detached-run.sh（名字、符号链接、文件开头的签名行），读命令词那份文件的开头 4 KiB，两个 hook 共用这一份认法。
+detached-run.sh 的参数先照它的 preflight 摘掉每一个 `--force`（连 `--` 之后的、连写在选项值位置上的），再切 start（detached_run_arguments_after_preflight）：
+闸看的那条命令与单元里真跑的逐字相同（弄坏开关 LIB_SHELL_WORDS_BREAK=detached-run-force-kept 退回只跳过子命令前与选项之间的 --force，
+哪几份自证的哪几项红见「弄坏开关」一段）。
 判不到的：变量里拼出来的命令、eval、`<<<` 喂给 shell 的字符串、进程替换的输出再交给 shell 执行（`bash <(…)`、`source <(…)`，括号里的命令照判，它打印出来的不判）、Makefile 与 xargs 起的命令；
 喂给 shell 的 heredoc 正文里引号没配对时，其后的切词会错；heredoc 挂的命令从上一行续行过来时认不出它喂给谁（当数据剥掉）；heredoc 挂在命令替换或进程替换里面的命令上（`$(bash <<EOF`、`<(bash <<EOF`）认不出它喂给 shell（当数据剥掉）；圆括号子 shell 里的 cd 与 export 当成对后面的命令也生效；
 命令替换与进程替换里的命令按替换所在那条命令开始时的目录与 export 判（替换里的 cd 不影响外面）。
+弄坏开关（LIB_SHELL_WORDS_BREAK，几个用逗号连；只给自证判红用）。这一份没有自己的 --selftest，由导入它的几份的自证判红：
+lib_heavy_tests.py、heavy-test-guard.sh、bash-command-detector.sh、research/scripts/detached-run.sh 各自的 --selftest。
+逐项写开关名、弄坏哪一处、打开后哪几份自证的哪几项红（项名是那份自证的用例标签，括号里是失败行在标签之后的开头；
+失败行 lib_heavy_tests.py 以「✗ lib_heavy_tests 自检：」起头，heavy-test-guard.sh、bash-command-detector.sh 以「✗ 自检：」起头，
+detached-run.sh 以「✗ 自证格不对：」起头、标签之后不另写期望值；heavy-test-guard.sh 的自证还原样转出 lib_heavy_tests.py 自证的失败行）：
+  LIB_SHELL_WORDS_BREAK=arguments-as-executed  `bash -n 脚本` 的目标与 `python3 - 词…` 后面的词照旧当被执行的脚本交出
+      lib_heavy_tests.py --selftest：
+        python3 - 后面的门禁文件名是参数（门禁目录里跑）（「应当是 None，实际 commit-check-stage」）
+        bash -n 只查门禁的语法（「应当是 None，实际 commit-check-stage」）
+      heavy-test-guard.sh --selftest（另转出 lib_heavy_tests.py 那两项）：
+        工具实现员 bash -n 查门禁的语法（「应当是 0，实际 2」）
+        工具实现员在门禁目录里 python3 - 读几份门禁（2026-09-28 误拦的那一条原样，目录换成自检的临时工作区）（「应当是 0，实际 2」）
+        实现员 bash -n 只查语法（「应当是 0，实际 2」）
+        lib_heavy_tests.py 的自检（「应当是 0，实际 1」）
+      bash-command-detector.sh --selftest：
+        看门狗:前台 bash -n 只查语法（「应当是 0，实际 1」）
+      detached-run.sh --selftest 不红
+  LIB_SHELL_WORDS_BREAK=python-options-by-dash  python_invocation() 退回「以 - 开头的词都当选项跳过、第一个不以 - 开头的词当脚本」：带值选项的值当成脚本名，-m、-c 不认
+      lib_heavy_tests.py --selftest：
+        python3 -W ignore 起广谱变异（「应当是 broad-mutation，实际 None」）
+        python3 -X dev 起广谱变异（「应当是 broad-mutation，实际 None」）
+        python3 -BW default（合写、值另起一个词）起广谱变异（「应当是 broad-mutation，实际 None」）
+        python3 --check-hash-based-pycs never 起广谱变异（「应当是 broad-mutation，实际 None」）
+        cd 进 research/scripts 再 python3 -m broad-mutation（「应当是 broad-mutation，实际 None」）
+        python3 -m research.scripts.broad-mutation（命名空间包）（「应当是 broad-mutation，实际 None」）
+        python3 -m runpy broad-mutation（「应当是 broad-mutation，实际 None」）
+        PYTHONPATH 指到 research/scripts 再 python3 -m broad-mutation（「应当是 broad-mutation，实际 None」）
+        python3 -c runpy.run_path 起广谱变异（「应当是 broad-mutation，实际 None」）
+        python3 -c exec(open(驱动).read())（「应当是 broad-mutation，实际 None」）
+        python3 -c runpy.run_module 按模块名起（「应当是 broad-mutation，实际 None」）
+        PYTHONPATH 指到 research/scripts 再 python3 -m 起判法脚本跑必红世界（「应当是 verus-stage，实际 None」）
+        export PYTHONPATH 再 python3 -m 起红例重放（「应当是 verus-stage，实际 None」）
+        python3 -c runpy.run_path 起判法脚本跑必红世界（「应当是 verus-stage，实际 None」）
+        经 PYTHONPATH 起判法脚本的 --selftest：不在登记表的位置上，照旧算提交时才跑的检查（「应当是 commit-check-selftest，实际 None」）
+        python3 -c 里改 sys.argv 成 proof、代码之后写 tool-versions（「应当是 verus-stage，实际 None」）
+        python3 -c 里改 sys.argv 成 --replay、代码之后不写词（「应当是 verus-stage，实际 None」）
+        python3 -c 里 __import__ 按模块名起判法脚本验证明（「应当是 verus-stage，实际 None」）
+        python3 -c 里 importlib.import_module 起红例重放（「应当是 verus-stage，实际 None」）
+        python3 -c 里 spec_from_file_location 载入判法脚本再调 run_check、代码之后写 toolchain（「应当是 verus-stage，实际 None」）
+        python3 -c 的 print 包着 __import__ 起判法脚本（「应当是 verus-stage，实际 None」）
+        python3 -c 的 print 包着 __import__、代码只有这一句（「应当是 verus-stage，实际 None」）
+        python3 -c runpy.run_path 起红例钉表、代码之后写 --check（「应当是 verus-stage，实际 None」）
+      heavy-test-guard.sh --selftest（另转出 lib_heavy_tests.py 那 23 项）：
+        lib_heavy_tests.py 的自检（「应当是 0，实际 1」）
+      bash-command-detector.sh、detached-run.sh 的 --selftest 不红
+  LIB_SHELL_WORDS_BREAK=detached-run-force-kept  detached_run_arguments_after_preflight() 原样交回参数：-- 之后、选项值位置上的 --force 不摘
+      lib_heavy_tests.py --selftest：
+        detached-run.sh start 的 -- 之后先写 --force 照摘（「应当是 full-cargo，实际 None」）
+      heavy-test-guard.sh --selftest（另转出 lib_heavy_tests.py 那一项）：
+        主 agent 不带前缀经 detached-run.sh start、-- 之后先写 --force 再起全量照拒（「应当是 2，实际 0」）
+        主 agent 不带前缀经 detached-run.sh start、--label 后面先写 --force 再起全量照拒（「应当是 2，实际 0」）
+        主 agent 不带前缀经 detached-run.sh start、--label 后面先写 --force 再起全量照拒：读进去几份脚本（「应当是 0，实际 1」）
+        lib_heavy_tests.py 的自检（「应当是 0，实际 1」）
+      bash-command-detector.sh --selftest：
+        放出追踪:detached-run.sh start 的 -- 之后先写 --force、里面 setsid -f 照拒（「应当是 1，实际 0」）
+      detached-run.sh --selftest：
+        Ⓟ -- 之后的 --force 照 preflight 摘：命令收到 a b，闸切出的词与登记里的命令逐字相同
 """
 import os
 import re
@@ -45,6 +110,9 @@ PREFIX_POSITIONAL_COUNT = {"timeout": 1, "taskset": 1}
 ASSIGNMENT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", re.S)
 ARRAY_ASSIGNMENT_START = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\+?=$")  # `名字=(` 与 `名字+=(` 的前半，后面紧跟左括号
 PYTHON_NAME = re.compile(r"^python(?:\d+(?:\.\d+)?)?$")
+# python 解释器带一个值的选项：-c <代码>、-m <模块> 定执行什么；-W <警告设置>、-X <实现选项> 与 --check-hash-based-pycs <模式> 的值只是解释器的设置
+PYTHON_SHORT_OPTIONS_WITH_VALUE = "cmWX"
+PYTHON_LONG_OPTIONS_WITH_VALUE = {"--check-hash-based-pycs"}
 # source / . 后面跟的得像一个路径才算读脚本（`source = open(…)` 这类 python 源码里的写法不算）
 SOURCE_TARGET = re.compile(r"^[^\s=,-][^\s=,]*$")
 HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1([^\n]*)\n(.*?)\n\s*\2[ \t]*(?=\n|$)", re.S)
@@ -53,6 +121,14 @@ MAXIMUM_NESTING = 8
 WRAPPERS_TAKING_ONE_ARGUMENT = {"capped.sh", "run-with-memory-cap.sh"}
 # 其中给命令定内存上限的那一个：剥掉它的命令记 memory_capped（heavy-test-guard.sh 判子 agent 跑编译出来的代码经没经它）
 MEMORY_CAP_WRAPPER = "run-with-memory-cap.sh"
+# research/scripts/detached-run.sh（脱离会话长跑的入口）：两个 hook 都要认它，按名字（路径不论）、解到的真实路径（符号链接）与文件开头的签名行
+# （行首 `# detached-run-script-signature:`，改名或拷走的一份）认；读文件开头这么多字节找签名行。这份文件自己的开头里没有以它起头的行
+DETACHED_RUN_SCRIPT_NAME = "detached-run.sh"
+DETACHED_RUN_SCRIPT_LOCATION = "research/scripts/detached-run.sh"
+DETACHED_RUN_SIGNATURE_LINE = re.compile(rb"^# detached-run-script-signature:", re.MULTILINE)
+DETACHED_RUN_HEAD_BYTES = 4096
+# 它的 start 带值的选项（`--label <名>`、`--log <文件>`、`--stop-timeout <秒>`，也可以写成 `--选项=值`）
+DETACHED_RUN_OPTIONS_WITH_VALUE = frozenset({"--label", "--log", "--stop-timeout"})
 # 剥掉的 heredoc 在剥完的文字里换成这个记号（NUL 开头，不是 \w，不会被 HEREDOC 再认一次），切词之后它是 `<<` 的目标词，按编号找回正文
 HEREDOC_BODY_MARKER = re.compile(r"^\x00heredoc-body-(\d+)\x00$")
 
@@ -72,6 +148,13 @@ class PrefixSkip(NamedTuple):
 class ShellInvocation(NamedTuple):
     code_string: str | None   # `bash -c '…'` 的那段代码
     script_index: int | None  # 起的是脚本时，脚本名在参数里的下标；只查语法（-n）或没给脚本时是 None
+
+
+class PythonInvocation(NamedTuple):
+    code_string: str | None   # `python3 -c '…'` 的那段代码
+    module: str | None        # `python3 -m <模块>` 的模块名（`-m runpy <模块>` 取后面那个）
+    script_index: int | None  # 起的是脚本文件时，脚本名在参数里的下标；-c / -m 时是程序自己的第一个参数的下标（可以等于参数个数）；
+                              # 程序从标准输入读（`-`）或只有选项时是 None
 
 
 class CommandAtPosition(NamedTuple):
@@ -401,6 +484,54 @@ def shell_invocation(arguments):
     return ShellInvocation(None, option_count)
 
 
+def python_options_by_dash():
+    """弄坏开关 LIB_SHELL_WORDS_BREAK=python-options-by-dash：python 的选项只按「以 - 开头」认，带值选项的值被当成脚本名（只给自检证红用）。"""
+    return "python-options-by-dash" in os.environ.get("LIB_SHELL_WORDS_BREAK", "").split(",")
+
+
+def python_invocation(arguments):
+    """python 解释器后面的参数：是 -c 的一段代码、是 -m 的一个模块、是起一个脚本文件，还是都不是（从标准输入读、只有选项）。
+    短选项逐个字母看（可以合写）：头一个要值的字母（PYTHON_SHORT_OPTIONS_WITH_VALUE）之后剩下的是它的值，没剩下就取下一个词；
+    `--` 之后的第一个词是脚本。"""
+    position = 0
+    if python_options_by_dash():
+        while position < len(arguments) and arguments[position].startswith("-"):
+            if arguments[position] == "-" and not arguments_as_executed():
+                return PythonInvocation(None, None, None)
+            position += 1
+        return PythonInvocation(None, None, position if position < len(arguments) else None)
+    while position < len(arguments):
+        argument = arguments[position]
+        if argument == "-":
+            if arguments_as_executed():
+                position += 1
+                continue
+            return PythonInvocation(None, None, None)   # `python3 -`：程序从标准输入读，后面的词都是它的参数，没有被执行的脚本
+        if argument == "--":
+            position += 1
+            break
+        if not argument.startswith("-"):
+            break
+        if argument.startswith("--"):
+            position += 2 if argument in PYTHON_LONG_OPTIONS_WITH_VALUE else 1
+            continue
+        letters = argument[1:]
+        value_letter = next((index for index, letter in enumerate(letters) if letter in PYTHON_SHORT_OPTIONS_WITH_VALUE), None)
+        if value_letter is None:
+            position += 1
+            continue
+        attached = letters[value_letter + 1:]
+        value = attached if attached else (arguments[position + 1] if position + 1 < len(arguments) else "")
+        position += 1 if attached else 2
+        if letters[value_letter] == "c":
+            return PythonInvocation(value, None, min(position, len(arguments)))
+        if letters[value_letter] == "m":
+            if value == "runpy" and position < len(arguments) and not arguments[position].startswith("-"):
+                value, position = arguments[position], position + 1   # `python3 -m runpy <模块>`：runpy 再按名字起后面那个模块
+            return PythonInvocation(None, value, min(position, len(arguments)))
+    return PythonInvocation(None, None, position if position < len(arguments) else None)
+
+
 def resolve_path(directory, path):
     """相对路径按 directory 解成绝对路径；directory 认不出（None）时交 None。"""
     if os.path.isabs(path):
@@ -408,6 +539,69 @@ def resolve_path(directory, path):
     if directory is None:
         return None
     return os.path.normpath(os.path.join(directory, path))
+
+
+def carries_detached_run_signature(head):
+    """一份文件开头的字节（只看前 DETACHED_RUN_HEAD_BYTES 个）里有没有 detached-run.sh 的签名行（行首）。"""
+    return bool(DETACHED_RUN_SIGNATURE_LINE.search(head[:DETACHED_RUN_HEAD_BYTES]))
+
+
+def detached_run_script(word, directory, by_name_only=False):
+    """命令词是不是 research/scripts/detached-run.sh：是就交一句凭什么认出来的，不是交 None。三种办法：名字叫 detached-run.sh（路径不论）；
+    解到的文件的真实路径落在 research/scripts/detached-run.sh（符号链接）；文件开头有签名行（改名或拷走的一份）。
+    后两种读盘：相对路径按 directory 解（directory 是 None 时只认绝对路径），带没展开的变量、命令替换、通配的词不解；文件不在就认不出。
+    by_name_only 为真时只按名字认（两个 hook 的弄坏开关用）。"""
+    expanded = os.path.expanduser(word)
+    if os.path.basename(expanded) == DETACHED_RUN_SCRIPT_NAME:
+        return word
+    if by_name_only or not expanded or set("$`*?[") & set(expanded):
+        return None
+    resolved = resolve_path(directory, expanded)
+    if resolved is None or not os.path.isfile(resolved):
+        return None
+    real = os.path.realpath(resolved)
+    if real.endswith("/" + DETACHED_RUN_SCRIPT_LOCATION):
+        return f"{word}（符号链接，指到 {DETACHED_RUN_SCRIPT_LOCATION}）"
+    try:
+        with open(real, "rb") as handle:
+            head = handle.read(DETACHED_RUN_HEAD_BYTES)
+    except OSError:
+        return None
+    if carries_detached_run_signature(head):
+        return f"{word}（开头带 {DETACHED_RUN_SCRIPT_LOCATION} 的签名行：改名或拷走的一份）"
+    return None
+
+
+def detached_run_arguments_after_preflight(arguments):
+    """detached-run.sh 脚本名之后的参数经它开头的 preflight 之后是什么：每一个整词 `--force` 都摘掉（.claude/singlefs-ai-sop/scripts/preflight.sh
+    逐词比，连 `--` 之后的、连写在 `--label` 这类选项值位置上的）。弄坏开关 LIB_SHELL_WORDS_BREAK=detached-run-force-kept 下原样交回。"""
+    if "detached-run-force-kept" in os.environ.get("LIB_SHELL_WORDS_BREAK", "").split(","):
+        return list(arguments)
+    return [argument for argument in arguments if argument != "--force"]
+
+
+def detached_run_start_command(arguments):
+    """detached-run.sh 脚本名之后的参数是 `[--force] start <选项> -- <命令…>` 时交回 <命令…> 的词（它把这条命令挂到用户级 systemd 下跑）；
+    先照 preflight 摘掉每一个 --force（detached_run_arguments_after_preflight），交回的就是单元里真跑的那几个词。
+    别的子命令（list、watch、stop、--selftest）、没有 `--`、`--` 之后是空的、带认不出的选项（它按用法错拒、什么都不跑）交 None。"""
+    arguments = detached_run_arguments_after_preflight(arguments)
+    position = 0
+    while position < len(arguments) and arguments[position] == "--force":
+        position += 1
+    if arguments[position:position + 1] != ["start"]:
+        return None
+    position += 1
+    while position < len(arguments):
+        word = arguments[position]
+        if word == "--":
+            return arguments[position + 1:] or None
+        if word in DETACHED_RUN_OPTIONS_WITH_VALUE:
+            position += 2
+        elif word == "--force" or word.partition("=")[0] in DETACHED_RUN_OPTIONS_WITH_VALUE:
+            position += 1
+        else:
+            return None
+    return None
 
 
 def changed_directory(directory, arguments):
@@ -493,16 +687,17 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
                 launcher = "shell"
                 continue
             if PYTHON_NAME.match(name):
-                option_count = 0
-                while option_count < len(arguments) and arguments[option_count].startswith("-"):
-                    if arguments[option_count] == "-" and not arguments_as_executed():
-                        option_count = len(arguments)   # `python3 -`：程序从标准输入读，后面的词都是它的参数，没有被执行的脚本
-                        break
-                    option_count += 1
-                if option_count >= len(arguments):
+                invocation = python_invocation(arguments)
+                if invocation.module:
+                    # `python3 -m <模块>`：被执行的是 sys.path 上的 <模块>.py（当前目录排第一），交出这个名字，调用方按位置认
+                    remaining = [invocation.module.replace(".", "/") + ".py"] + arguments[invocation.script_index:]
+                    launcher = "python"
+                    continue
+                if invocation.code_string is not None or invocation.script_index is None:
+                    # `python3 -c '…'`、`python3 -`、只有选项：没有被执行的脚本文件，交出 python 这一条本身
                     commands.append(CommandAtPosition(remaining, directory, command_environment, **attached, memory_capped=command_memory_capped))
                     break
-                remaining = arguments[option_count:]
+                remaining = arguments[invocation.script_index:]
                 launcher = "python"
                 continue
             if name in ("source", "."):

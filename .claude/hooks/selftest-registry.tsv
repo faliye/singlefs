@@ -1,0 +1,121 @@
+# 研究脚本（research/scripts/）、钩子（.claude/hooks/）与门禁共用库（.claude/gate.d/lib/）的自证起不起重活：一行一份。
+# 写法：<相对仓根的路径><制表符><判定><制表符># <理由>（理由至少 4 个字，写那份自证起的是什么、怎么换成假的）。
+#   light                 自证用假的驱动，不起 cargo、编译、虚机、herd7、Verus：任何 agent 单独跑 `<脚本> --selftest`
+#                         （门禁共用库是单独执行，或单独带 --selftest）都放行
+#   heavy                 自证本身起这类重活：照旧按「提交时才跑的检查」拦（带前缀的主 agent 才放行）
+#   heavy-if-set:<变量>   命令里把这个变量设成非空时，自证换成真家伙、算 heavy；没设算 light
+# 登记为 heavy 或 heavy-if-set 的行，理由一律以「偏离上游：」起头（上游要自证用假的驱动、不起重活），写明起的是什么重活、为什么换不成假的。
+# 判法在 .claude/hooks/lib_heavy_tests.py 的 classify_selftest；表外的、或带了 --selftest 之外参数的，照旧按提交时才跑的检查拒，拒绝说明写怎么登记。
+# 键认的是本仓里那一份文件：命令词解析后的真实路径要正是 <仓根>/<键>，仓副本、worktree 里路径尾部相同的拷贝与路径写在变量里的照旧按提交时才跑的检查拒。
+# 登记之前读那份脚本 --selftest 走的代码：它起的每个子进程里 cargo / rustc / qemu / herd7 / verus 都换成了假的、或根本不起，才写 light；
+#   只问版本的（参数只有 `-V` 或 `--version`，例如 admission.py --selftest 调真 cargo 的 `-V`）不算起重活，不碍写 light。
+# 门禁阶段的样本档（表尾一节）：键写 .claude/gate.d/<阶段>.sh，判定写下面三种之一（判法在 lib_heavy_tests.py 文件头「门禁样本」）：
+#   samples-light                         样本档只读样本里的文本与录好的输出，不起 cargo、编译、虚机、herd7、Verus：经 stage-selftest.sh 喂、阶段目录里有样本的每一道都是轻的才放行，
+#                                         喂的样本还要与仓 HEAD 加暂存区逐字节相同（多出的 setup.sh、没暂存的新样本照拒）；
+#                                         带 --item <阶段文件名> 时只判点名的几道（点名的每一道都要是轻的），阶段目录里另有起重活的那几道不碍事
+#   samples-light-marker:<相对样本根的路径> 样本根放了这个假工具标记时，阶段自己走假工具那一支：另放行 cd 进样本根、根参数写同一个目录直接起它；
+#                                         标记是目录的，里面的假 cargo 要可执行、与仓里那一道某份样本的逐字节相同，标记是文件的与仓里某份样本的标记逐字节相同
+#   samples-heavy                         样本档本身起真 cargo、Verus 这类重活：照旧拦
+#   登记之前逐道读阶段文件头的样本说明与 fixtures/<阶段>/ 下每一份样本；有一份起真家伙就写 samples-heavy。
+# 研究脚本
+research/scripts/admission.py	light	# 临时仓里跑，PATH 前面放假 cargo、假 rustc、假 herd7（FAKE_CARGO_FOR_STAGE、FAKE_HERD7_SCRIPT），checker-tier-layer0-replay 那一份也拿打合成日志的假 cargo
+research/scripts/agent-cost.py	light	# 造几条会话记录在内存里算账，不起子进程
+research/scripts/agent-handover.py	light	# 只起它自己（--selftest 的子角色）读造出来的会话记录
+research/scripts/agent-watch.py	light	# 起的「重型进程」是名字像 checker 档测试二进制、里面只睡的 python 替身，占内存那一格至多 256M，不起 cargo
+research/scripts/apply-writer-patch.py	light	# 临时仓里 git apply，门禁那一步换成 true
+research/scripts/archive-past-rounds.py	light	# 临时目录里 git 仓上判归档，不起编译
+research/scripts/broad-mutation.py	light	# 一步驱动换成假的（SELFTEST_STEP_DRIVER），有一格经真的内存包装起假一步、上限写死 64M，不起 cargo
+research/scripts/mutation-prune.py	light	# 只在临时目录写样本源码现切现判；runner 那两格起的测试二进制是自己写的 python 假程序，不起 cargo
+research/scripts/build-patched-qemu.sh	light	# 手造 .dsc、tarball、私有目录与假源码树，判法函数只起 sha256sum、stat、grep、find；不联网、不起 dpkg-source、configure、make，不编不装
+research/scripts/cache-keepalive.sh	light	# 跑它自己 1 秒的一轮，只读会话记录与 /proc
+research/scripts/capped.sh	light	# 起 true、printenv、bash -c 'exit 7' 核线程变量与退出码
+research/scripts/changed-paths.sh	light	# 临时 git 仓里取改动路径
+research/scripts/change-touches-crates.sh	light	# 临时 git 仓里判改动碰没碰 crates/
+research/scripts/check-segment-registry.py	light	# 读真仓的布局与产物文本，在内存里改坏一处看它判红，不起子进程
+research/scripts/checklist-specs.py	light	# 造带空格标题的清单，只起它自己
+research/scripts/cite-check.py	light	# 临时 git 仓里核引文
+research/scripts/claim-experiment.sh	light	# 临时目录里摆几处已用的号
+research/scripts/closeout-status.py	light	# 造样本文本判收尾状态
+research/scripts/compile-then-swap.py	light	# 自证每一项一份临时仓、PATH 最前面放假 cargo（FAKE_CARGO_SCRIPT），编过与编不过都由假 cargo 造，不起真 cargo、rustc
+research/scripts/corruption-check.py	light	# 喂造出来的输出与本地词表
+research/scripts/crash-amplification.sh	light	# 分项驱动换成假的（CRASH_AMPLIFICATION_ITEM_DRIVER），清场与复原也是假的，不编不跑
+research/scripts/crash-amplification-item.sh	light	# 拿造出来的派活计划行走判法，本机那一趟与双机驱动都是假的，不编、不跑、不上卡、不连第二台
+research/scripts/crash-amplification-two-hosts.sh	light	# 自证里本机那一趟、第二台（换掉 multi-host-run.sh）、清场（换掉 peer-host-lib.sh）与用例全是假的：不起 cargo、不连第二台、不上卡
+research/scripts/crash-case-check.py	light	# 在内存里判造出来的用例正文
+research/scripts/crates-mutation-rows.py	light	# 临时仓里拿假 cargo（FAKE_CARGO）与假内存包装跑那一道的派活
+research/scripts/decision-slim-check.py	light	# 读造出来的决策文本，只起 git
+research/scripts/detached-run.sh	light	# 用户级 systemd 单元里起 sleep 与替身命令，不起 cargo
+research/scripts/dispatch-prompt.py	light	# 只读定义与造出来的提示文本
+research/scripts/doc-consolidate.py	light	# 造样本文本判合并
+research/scripts/e152-tables.py	light	# 造样本产物行出表
+research/scripts/e165-compare-kill-bounds.py	light	# 只读内嵌的合成产物（或点名的一份产物文本）在临时目录里改几处再比，弄坏开关那一轮只起它自己，不起 cargo
+research/scripts/e165-pin-red-examples.py	light	# 桩装置、假内存包装；临时根里装置源码不认 --pinned-cases 那一格退 77，不起 cargo build
+research/scripts/e165-replay-mutation-kill-bounds.sh	light	# 临时仓里拿假 cargo（FAKE_CARGO）跑整轮
+research/scripts/gate-staged.sh	light	# 转给 gate-staged-selftest.sh：临时小仓里用假 gate.sh 造三种局面
+research/scripts/gate-structure-check.py	light	# 喂样本阶段，PATH 最前面放 cargo、rustc、qemu、herd7、fio 的替身，被调就判红
+research/scripts/history-consolidate.py	light	# 临时 git 仓里判合并
+research/scripts/hook-swap.py	light	# 临时目录里造假钩子与假共用模块，喂 JSON 只起 bash 与 python
+research/scripts/insert-row.py	light	# 临时文件上插行
+research/scripts/kb-sections.py	light	# 造样本文本取小节
+research/scripts/kb-spec-check.py	light	# 造样本规格核
+research/scripts/layer0-shard-run.sh	heavy-if-set:SINGLEFS_HEAVY_TESTS	# 偏离上游：转给 layer0-shard-run-selftest.sh，默认假 cargo、不编不跑；设了 SINGLEFS_HEAVY_TESTS 是显式选的真跑模式，换真 cargo、release 下真编真跑 checker 档包的小流用例，核的正是不分片与双机分片 merge 之后的计数行逐字相同，换成假 cargo 就没有真计数可比
+research/scripts/merge-and-verify.sh	light	# PATH 前面放假 cargo，合并与核对都走它
+research/scripts/migrate-changelog-format.py	light	# 临时 git 仓里迁移样本
+research/scripts/multi-host-run.sh	light	# 本机当第二台，经真的内存包装起 bash -c 小命令（上限 256M），不起 cargo
+research/scripts/mutate.sh	light	# PATH 前面放假 cargo，照被测源码里的 BEHAVIOR 演结局
+research/scripts/mutation-shard-run.sh	light	# 两台都用 PATH 上的假 cargo，本机当第二台
+research/scripts/oov-check.py	light	# 喂红绿样本与本地词表
+research/scripts/pdf-text.py	light	# 从本机文献目录抽三份 PDF 的锚点句，纯 python
+research/scripts/prove-red.sh	light	# 假 cargo 与假包装，照源码里的数打 libtest 的原样形态
+research/scripts/qemu-blklogwrites-check.sh	light	# 手造日志盘与数据盘核判法，整条路走 python 写的假 qemu-io（原版与补好两种形状），不起真 qemu-io、qemu-system
+research/scripts/quote-kb.py	light	# 造样本 kb 取引文，只起它自己
+research/scripts/quote-rust-items.py	light	# 造样本源码取项
+research/scripts/relabel-item.py	light	# 临时仓里改标签，复判只起 python
+research/scripts/replace-batch.py	light	# 临时文件上做替换
+research/scripts/replace-once.py	light	# 临时文件上做替换
+research/scripts/rerun-failed-tests.py	light	# 只核从样本输出取出的命令行，不起 cargo
+research/scripts/rules-sweep-audit.py	light	# 读样本规则文本，只起 git show
+research/scripts/run-with-memory-cap.sh	light	# 用户级 systemd scope 里起 python 占内存（撞 64M 上限被杀）、sleep、bash -c，不起 cargo
+research/scripts/snapshot-check.sh	light	# 临时目录里造快照核
+research/scripts/stage-mine.py	light	# 临时 git 仓里造两份文件判
+research/scripts/stage-must-run.sh	light	# 转给 stage-must-run-selftest.sh：临时小仓里判要不要跑
+research/scripts/stage-run-or-skip.sh	light	# 临时目录里放退 0 / 1 的判定脚本
+research/scripts/stale-candidates.py	light	# 临时 git 仓里判候选
+research/scripts/sweep-term.py	light	# 临时 git 仓里扫词
+research/scripts/test-environment-check.py	light	# 命令执行器换成假的（make_fake_command_runner），临时目录与块设备表都是造的
+research/scripts/three-way-materials.py	light	# 临时 git 仓里备材料，只起 kb-sections.py
+research/scripts/verify-citations.sh	light	# 合成两棵假树，不碰本机的真树
+research/scripts/verus-proof-check.py	light	# 假 Verus 安装、假 z3、假内存包装，不起真的 Verus
+research/scripts/vm-bench.sh	heavy	# 偏离上游：自证起 QEMU/KVM 虚机跑三个桩程序（成功、失败、查 /dev/vda），测的就是虚机这一层抓退出码与挂盘，换不成假的；按名字另算 QEMU 那一类，这一行只是登记
+research/scripts/watch.sh	light	# 只走 --dry-run，起它自己与 agent-watch.py 的判定
+# 钩子
+.claude/hooks/ask-user-claim-guard.sh	light	# 喂造出来的问句，只起它自己的入口
+.claude/hooks/bash-command-detector.sh	light	# 在临时目录里判造出来的命令文本，只起它自己的入口
+.claude/hooks/continuation-guard.sh	light	# 喂造出来的会话记录，只起它自己的入口
+.claude/hooks/handback-guard.sh	light	# 喂造出来的交回正文，起一条 sleep 当在跑的任务
+.claude/hooks/heavy-test-guard.sh	light	# 在临时工作区里判造出来的命令文本与脚本，只起它自己的入口
+.claude/hooks/lib_heavy_tests.py	light	# 在临时工作区里判造出来的命令行，不起子进程
+.claude/hooks/runner-dispatch-guard.sh	light	# 喂造出来的派发提示，只起它自己的入口
+.claude/hooks/session-start.sh	light	# 假 journalctl，喂造出来的仓与日志
+.claude/hooks/write-guard.sh	light	# 临时 git 仓里判写入，语法检查只起 bash -n 与 python 的 ast
+# 门禁共用库（直接执行就是跑它的自证）
+.claude/gate.d/lib/stage-cells.sh	light	# 在临时目录里造一道合成阶段来跑，只要 bash 与 coreutils
+.claude/gate.d/lib/rejection-blocks.py	light	# 没有自证入口，直接执行只读进定义、什么都不跑
+# 门禁阶段的样本档（理由写样本里起的是什么、靠什么避开真家伙）
+.claude/gate.d/checker-tier-layer0-replay.sh	samples-light-marker:.layer0-sample-tools	# 样本根放了 .layer0-sample-tools（假 cargo、假 rustc，照 cases/ 打日志），阶段走样本档、判绿退 3；static-check-red 没放标记，开跑前的静态判据先判红、不起 cargo
+.claude/gate.d/checker-independence-and-sync.sh	samples-light	# 只读样本里的 crates 源码与布局登记，不起 cargo
+.claude/gate.d/checker-tier-broad-mutation.sh	samples-light-marker:.broad-mutation-sample	# 样本根放了 .broad-mutation-sample，阶段读 .broad-sample/ 里造的库目录、录好的 --summary 输出、rustc -Vv 与工具版本，setup.sh 只起 git 与 python3；阶段在样本模式下起的 .broad-sample/prepare.py 只载入驱动、调算指纹的纯函数，带 write-marker 的两份经 admission.py 写标记时只问 cargo -V、rustc -V；不起驱动、不编不跑
+.claude/gate.d/checker-tier-crates-mutation-replay.sh	samples-heavy	# 样本用真 cargo：每个工作进程冷编一份样本 crate、经真的内存包装起 systemd scope 跑点名的测试，red 里一条把缓冲撑到 1536 MiB 撞 512M 上限、一条跑满 20 秒限时
+.claude/gate.d/checker-tier-formal-verification.sh	samples-heavy	# verus-proof、verus-vacuity、verus-must-red-worlds 那几份样本起真的 Verus（阶段文件头：Verus 那几份样本起的是真的 Verus）
+.claude/gate.d/checker-tier-lkmm.sh	samples-light-marker:.lkmm-static-only	# 样本根放了 .lkmm-static-only，阶段只跑不需要 herd7 的那几层
+.claude/gate.d/checker-tier-qemu-device-streams.sh	samples-light-marker:.qemu-prerecorded	# 样本根放了 .qemu-prerecorded，阶段拿预录的输出判、不起虚机
+.claude/gate.d/checker-tier-research-build-and-replay.sh	samples-heavy	# research-unit-tests 那两份样本在样本里的 research 小工作区上真跑 cargo build --release 与 cargo test --release
+.claude/gate.d/code-source-discipline.sh	samples-light	# 只读样本里的源码与变异表（变异表那一格经 crates-mutation-rows.py static-check 静态判），不起 cargo
+.claude/gate.d/code-tooling.sh	samples-light	# 研究脚本自证那一格的样本换成样本根 .selftest-runners 里的替身（只打一行、退 0 或 1），别的格只读文本
+.claude/gate.d/doc-decisions.sh	samples-light	# 只读样本里的 kb 与决策文本
+.claude/gate.d/doc-experiments.sh	samples-light	# 只读样本里的实验页与产物文本，evidence-in-repo 那一格另起 git 与 cargo -V、rustc -V
+.claude/gate.d/doc-process-records.sh	samples-light	# 只读样本里的过程记录与样本仓的 git 历史
+.claude/gate.d/doc-registries.sh	samples-light	# 只读样本里的登记表与 kb 文本
+.claude/gate.d/doc-text.sh	samples-light	# 只读样本里的文本
+.claude/gate.d/harness-model-differential-and-scenarios.sh	samples-light	# 样本根没有 Cargo.toml 而有 model-differential-cargo-output.log，只判录好的输出；one-scenario 两份只读用例源码
+.claude/gate.d/harness-test-environment.sh	samples-light	# 样本根有 test-environment-check-output.log，只判录好的输出、不跑检查脚本

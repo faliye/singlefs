@@ -25,8 +25,31 @@
 # 没有就接着跑、接着续。这里原先还按上下文 40 万拒绝续做，那天主 agent 据此停掉了一个 28 万、任务并无异常的 agent。
 #
 #   continuation-guard.sh             # 从 stdin 读 hook 的 JSON
-#   continuation-guard.sh --selftest  # 在临时目录里走一遍放行与拒绝；CONTINUATION_GUARD_DISABLE_CHECK=1 时自检必须判红，
-#                                     # CONTINUATION_GUARD_BREAK=anyrecord / handback-grep / handback-anyresult / ignore-main-handback 各自也必须让它红
+#   continuation-guard.sh --selftest  # 在临时目录里走一遍放行与拒绝
+# 弄坏开关（只给自证判红用；自证里经 stdin 起的那几次入口照样带着调用方设的值）。
+# 逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里 case 的标签，括号里是那条「✗ 自检：<标签>」失败行在标签之后的开头）：
+#   CONTINUATION_GUARD_BREAK=disable-check  decide() 一进来就放行，交回过的、中断过的都不判
+#       主会话已有交回消息、子 agent 记录里还没有：拒（「应当返回 2，实际 0」）
+#       撞过限额（failed）的上下文小也不续（「应当返回 2，实际 0」）
+#       被停（killed）的不续（「应当返回 2，实际 0」）
+#       已交回（SubagentHandback 送达）的不续（「应当返回 2，实际 0」）
+#       stdin:被停过的续做（「应当返回 2，实际 0」）
+#       stdin:已交回的续做（「应当返回 2，实际 0」）
+#   CONTINUATION_GUARD_BREAK=anyrecord  latest_task_status() 不只认任务通知：主 agent 自己命令里写着的「<task-id>…<status>completed</status>」也算，盖掉真通知的 killed
+#       被停（killed）的不续（「应当返回 2，实际 0」）
+#       stdin:被停过的续做（「应当返回 2，实际 0」）
+#   CONTINUATION_GUARD_BREAK=handback-grep  handback_delivered() 按字符串搜 SubagentHandback：工具清单、派发提示、没送出的调用里带着这个名字的都判成交回过
+#       调过 SubagentHandback 但 tool_result 是错误的放行（「应当返回 0，实际 2」）
+#       调过 SubagentHandback 但 tool_result 是 success:false（没送出）的放行（「应当返回 0，实际 2」）
+#       只有工具清单与正文里带着 SubagentHandback 这个名字的放行（「应当返回 0，实际 2」）
+#       结束本轮在等后台任务、还没交回的放行（「应当返回 0，实际 2」）
+#       调了 SubagentHandback、还没有 tool_result 的放行（「应当返回 0，实际 2」）
+#       stdin:在等后台任务的询问（「应当返回 0，实际 2」）
+#   CONTINUATION_GUARD_BREAK=handback-anyresult  handback_result_is_error() 一律当送达：is_error 为真、内容是 {"success": false, …} 的 tool_result 也算交回过
+#       调过 SubagentHandback 但 tool_result 是错误的放行（「应当返回 0，实际 2」）
+#       调过 SubagentHandback 但 tool_result 是 success:false（没送出）的放行（「应当返回 0，实际 2」）
+#   CONTINUATION_GUARD_BREAK=ignore-main-handback  handback_in_session_transcript() 不看主会话记录里的交回消息，只看子 agent 自己的会话记录
+#       主会话已有交回消息、子 agent 记录里还没有：拒（「应当返回 2，实际 0」）
 # hook-events: PreToolUse:SendMessage
 # gate-similar: runner-dispatch-guard.sh 同样读主会话记录里的交回消息（<agent-message from=…> [Subagent hand-back]），但它挂 Agent|Task、判在跑的实现员与 opus 数；这里挂 SendMessage、判收件人交回过没有，只按一个 agent 号找一种记号，两行正则，不值得抽共用
 # gate-similar: handback-guard.sh 挂 SubagentHandback、在交回那一刻判交回正文；这里在交回之后判能不能再给它发消息
@@ -146,7 +169,7 @@ def handback_in_session_transcript(session_transcript, recipient):
 
 def decide(hook_input):
     """返回 (0, None) 放行；(2, 说明) 拒绝。"""
-    if os.environ.get("CONTINUATION_GUARD_DISABLE_CHECK") == "1":
+    if os.environ.get("CONTINUATION_GUARD_BREAK") == "disable-check":
         return 0, None
     tool_input = hook_input.get("tool_input") or {}
     recipient = tool_input.get("to") or ""
@@ -267,7 +290,7 @@ def selftest(hook_dir):
     for label, want, got in failures:
         print(f"  ✗ 自检：{label} 应当返回 {want}，实际 {got}")  # gate-lint:detail
     if failures:
-        print("    → 看 decide() / handback_delivered() 的判法；CONTINUATION_GUARD_DISABLE_CHECK 或 CONTINUATION_GUARD_BREAK 设着的话这里本来就该红")
+        print("    → 看 decide() / handback_delivered() 的判法；CONTINUATION_GUARD_BREAK 设着的话这里本来就该红")
         return 1
     print(f"  ✓ 自检通过（查了 {len(cases)} 种）：上下文大小不论、收件人没有会话记录、中断之后又完成过、还没交回（在等后台任务、交回报错或没送出、只在工具清单里带着名字）的放行；"
           "交回送达过的、最近一次通知是 failed 或 killed 的一律拒绝")

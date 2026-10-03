@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always Claude Code 每一次触发都要现判这一次调用，上一次的结论不替这一次作保
 # run-condition: command python3
-# PreToolUse hook（Bash）：检出可能出问题的命令，记下来交给主 agent 判断；起看门狗的错误写法、前台没超时的等待循环、把活放出追踪的写法、run_in_background 里后面没有 wait 的单独 `&`、整份覆盖 `research/results/` 下未跟踪产物的写法、打得到别人进程的终止写法与在同一个 inode 上改已有脚本的写法在执行前拒绝，其余只记不拦，不停任何在跑的命令与脚本。
+# PreToolUse hook（Bash）：检出可能出问题的命令，记下来交给主 agent 判断；起看门狗的错误写法、前台没超时的等待循环、把活放出追踪的写法（主 agent 经 research/scripts/detached-run.sh start 起的放行，子 agent 用它照拒）、run_in_background 里后面没有 wait 的单独 `&`、整份覆盖 `research/results/` 下未跟踪产物的写法、打得到别人进程的终止写法与在同一个 inode 上改已有脚本的写法在执行前拒绝，其余只记不拦，不停任何在跑的命令与脚本。
 # hook-events: PreToolUse:Bash
 # gate-similar: heavy-test-guard.sh 同挂 PreToolUse[Bash]、按同一个切词模块认命令位置，但它只判重型测试与内存包装；这里判等待循环、放出追踪、单独的 &、覆盖产物、终止进程、同 inode 改脚本、就地改仓内文件，判据没有一条相同
 # gate-similar: write-guard.sh 管 Write / Edit 的写范围与先编后换；这里 ⑧ 管有 Edit 的子 agent 绕到 Bash 里写仓内文件、⑨ 管执行员在 Bash 里写主工作区 crates/ 下的 .rs，两边判的工具不同
@@ -33,6 +33,9 @@
 # 两种检出都先剥掉喂给非 shell 命令的 heredoc 正文（往笔记里写一段等待循环不是在跑它；2026-09-18 撞过，
 # `records/2026-09-16-subagent拆分提案.md` 第二十五节）；喂给 bash / sh 的 heredoc 正文照查。其余只看顶层命令文本，
 # 引号里当数据写的等待循环也会被记一条，主 agent 看了判断即可。
+#
+# ⑩ 子 agent（输入里有 agent_type）用 run_in_background 起命令：要放后台等的活一律交回主 agent 跑（用户 2026-10-02 定），前台跑得完的照常前台跑；
+#   排在最前面判，主 agent 不判（subagent_background_refusal）。
 #
 # 拒绝七种（退出 2，stderr 写原因与出路；拒了不记检出）。它们拒的是一种危险写法、在执行之前，不停在跑的任务，
 # 是 .claude/singlefs-ai-sop/rules/command-safety.md「检出和处置分开」那一条写明的例外（「拒绝某一种危险写法的钩子不在此列」）。
@@ -75,11 +78,22 @@
 # ③ 命令位置上把活放出追踪的写法：`disown`、`coproc`、`setsid -f` / `--fork`、`nohup` 而同一层有单独的 `&`、`tmux new(-session) … -d`、
 #   `screen -dm…` / `-d -m`、不带 --wait / --pipe / --pty / --scope 的 `systemd-run`——前台、run_in_background 一样拒，主 agent 与子 agent 都拒。
 #   进程移出 shell 的作业表或另起会话之后，随后的 `wait` 立刻返回、harness 的完成通知当场发出，进程成了没人追踪的孤儿接着跑
-#   （2026-09-25 一个核查员写 `… & disown 2>/dev/null || true & wait`）；`.claude/agent-common.md`「长活可以等」那一条明令不用这几种，靠自觉守不住。
+#   （2026-09-25 一个核查员写 `… & disown 2>/dev/null || true & wait`）；`.claude/agent-common.md`「长活交回主 agent」那一条明令不用这几种，靠自觉守不住。
 #   每一层（`bash -c '…'`、喂给 shell 的 heredoc 正文、命令替换）都判，nice / timeout / env 这类前缀、`capped.sh N`、`bash 包装脚本` 剥开往里找；
 #   引号里当数据写的、写进文件的 heredoc 正文、注释里的不拒；`nohup` 不带 `&`、裸 `setsid`（不 fork）、`systemd-run --wait` 这类会等到结束的不拒；
 #   单独的 `&` 不在这一条：run_in_background 里之后没有 `wait` 的归 ④，其余照检出 ② 只记。
 #   判不到的：变量里拼出来的命令、eval、`bash x.sh` 起的脚本文件里的写法、`start-stop-daemon -b`（只在 ② 里记）。
+#   放行口：research/scripts/detached-run.sh 的 `start --label <名> -- <命令>`（用户 2026-10-01 定「后台不能中断我们运行中的脚本」「后台只能上报」，
+#   records/2026-09-16-subagent拆分提案.md 第四十二节）：它把命令挂到用户级 systemd 的服务单元下，名字、退出码与日志登记在册，会话里由 `watch` 上报。
+#   这一条不读脚本正文，它本来就放；`--` 之后那条命令当一层接着判（wrapped_commands 剥开），里面的放出追踪、终止进程、覆盖产物照拒。
+#   它的参数先照它开头的 preflight 摘掉每一个 `--force`（连 `--` 之后的），判的就是单元里真跑的那条（共用模块的 detached_run_arguments_after_preflight）。
+#   start 与 stop 只给主 agent：子 agent（输入里有 agent_type）用就拒（detached_run_refusal，前台、run_in_background 一样；前缀、包装、bash -c 里的照认），
+#   经它起的活不在子 agent 的进程树里，交回之后没人认领；list、watch 只读，谁都放。
+#   认它按内容（共用模块 lib_shell_words 的 detached_run_script，
+#   与重型闸同一份）：命令词名叫 detached-run.sh（路径不论）、指到 research/scripts/detached-run.sh 的符号链接、开头带签名行（行首
+#   `# detached-run-script-signature:`）的改名拷贝，bash / sh 起的、source / . 读进来的、直接执行的都认；同一条命令里前面 cp / install / ln / mv
+#   拷出来的按目标认（detached_run_copy_destinations）。相对路径从 hook 输入的 cwd 起算（没有就从仓库根），cd 跟着算。
+#   罩不住的写法在 research/scripts/detached-run.sh 文件头「谁能用」那一段；`--` 之后那条命令的剥开（③ 的放行口）仍只认名字。
 # ④ run_in_background 为 true 的命令里，有一个作业以单独的 `&` 收尾（不是 `&&`、`>&`、`&>`、`|&`），之后同一层、同一对圆括号里再没有 `wait`
 #   （不带参数的 `wait`，或带进程号的 `wait "$pid"`；只带选项的 `wait -n` 不算）：外层 shell 起完它就退出，完成通知当场发出，
 #   真跑完的那个进程叫不醒任何人。2026-09-25 一天里子 agent 至少三次在 run_in_background 里写 `… > 日志 2>&1 &`
@@ -163,22 +177,144 @@
 #
 #   bash-command-detector.sh             # 从 stdin 读 hook 的 JSON；拒绝七种之一退出 2（拒绝），其余退出 0
 #   bash-command-detector.sh --scan-scripts <仓根> <目录>…  # ⑥ 的判定扫目录里的 .sh 与 .py（门禁 code-tooling 的 research-gate-lint 格调）；有红退出 1
-#   bash-command-detector.sh --selftest  # 走一遍检出、不检出、拒绝与放行；BASH_COMMAND_DETECTOR_DISABLE_CHECK=1（两种检出、后六种拒绝与 ⑤ 的检出都关）、
-#                                        # BASH_COMMAND_DETECTOR_DISABLE_SELF_BACKGROUND=1（只关第三种）或
-#                                        # BASH_COMMAND_DETECTOR_KEEP_HEREDOC_BODIES=1（前两种不剥 heredoc 正文）或
-#                                        # BASH_COMMAND_DETECTOR_ALLOW_WATCHDOG_MISUSE=1（起看门狗的错误写法也放行）或
-#                                        # BASH_COMMAND_DETECTOR_ALLOW_FOREGROUND_WAIT_LOOP=1（前台没超时的等待循环也放行）或
-#                                        # BASH_COMMAND_DETECTOR_ALLOW_DETACHING=1（把活放出追踪的写法也放行）或
-#                                        # BASH_COMMAND_DETECTOR_ALLOW_UNWAITED_AMPERSAND=1（run_in_background 里后面没有 wait 的单独 & 也放行）或
-#                                        # BASH_COMMAND_DETECTOR_ALLOW_BACKGROUND_TASK_OUTPUT_WAIT=1（run_in_background 里轮询 tasks/*.output 也放行）或
-#                                        # BASH_COMMAND_DETECTOR_ALLOW_REPOSITORY_IN_PLACE_EDIT=1（有 Edit 的子 agent 在 Bash 里就地改仓内文件也放行）或
-#                                        # BASH_COMMAND_DETECTOR_ALLOW_COMPILE_FIRST_BYPASS=1（⑨ experiment-runner 在 Bash 里写主工作区 crates/ 下的 .rs 也放行）或
-#                                        # BASH_COMMAND_DETECTOR_ALLOW_RESULTS_OVERWRITE=1（整份覆盖 research/results/ 下未跟踪产物也放行、也不记检出）或
-#                                        # BASH_COMMAND_DETECTOR_ALLOW_PROCESS_SIGNALS=1（⑥ 终止进程的写法也放行）或
-#                                        # BASH_COMMAND_DETECTOR_IGNORE_PRIVATE_CONFIG=1（⑥ 不读私有配置，本地模型服务的单元与进程也放行）或
-#                                        # BASH_COMMAND_DETECTOR_ALLOW_SCRIPT_IN_PLACE_WRITE=1（⑦ 在同一个 inode 上改已有脚本也放行）或
-#                                        # BASH_COMMAND_DETECTOR_KEEP_SELFTEST_SCRATCH=1（自证的临时目录走回 mkdtemp 不删；通过、判红、抛异常三格由 lib_selftest_scratch.py 判）或
-#                                        # BASH_COMMAND_DETECTOR_REFUSE_EVERY_WAIT_LOOP=1（外层 timeout 与 run_in_background 都不算，等待循环一律拒）时自检必须判红
+#   bash-command-detector.sh --selftest  # 走一遍检出、不检出、拒绝与放行；
+#                                        # 弄坏开关 BASH_COMMAND_DETECTOR_BREAK=<项>（几个用逗号连；项名写错的，自检「BASH_COMMAND_DETECTOR_BREAK 里的项都认得」一格红），设了哪一项自检都必须判红。
+#                                        # 逐项写开关名、弄坏哪一处、打开后自检哪几格红。格名照自检失败行「✗ 自检：」之后、「应当是」之前那一段原样写；
+#                                        # keep-selftest-scratch 那三格由 lib_selftest_scratch.py 报，失败行在格名后面接「：」与留下的名字；
+#                                        # 共用模块的 LIB_SHELL_WORDS_BREAK=detached-run-force-kept 同样照自检输出逐字写格名（stdin: 前缀与「（退出码 N）」后缀都在格名里）：
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=disable-check  findings_for() 不检出；③ 放出追踪与子 agent 用 detached-run.sh、② 前台等待循环、④ 单独的 &、⑤ 覆盖产物（连同它的检出）、⑥ 终止进程、⑦ 同 inode 改脚本、⑧ 就地改仓内文件、⑨ 先编后换都放行（① 起看门狗的错误写法照拒）
+#                                        #       「没有 timeout 的 until 等待」「喂给 bash 的 heredoc 里真是一段没超时的等待循环」「heredoc 之后的命令里是没超时的等待循环」「后台起的 nohup … & 加 disown」「后台起的命令末尾单独一个 &」「后台起的 & 在 wait 之后」「bg-notify-r1 X01」「bg-notify-r1 X02」「bg-notify-r1 X03」
+#                                        #       「bg-notify-r1 X04」「bg-notify-r1 X05」「bg-notify-r1 X06」「bg-notify-r1 X07」「bg-notify-r1 X08」「bg-notify-r1 X09」「bg-notify-r1 X10」「bg-notify-r1 X11」「bg-notify-r1 X12」
+#                                        #       「bg-notify-r1 F02（第三种不记；它的轮询循环没有 timeout，记的是第二种）」「bg-notify-r1 F06」「setsid -f 放后台」「等待循环:前台 until … sleep 没超时」「等待循环:run_in_background 里轮询后台任务的输出文件」「等待循环:run_in_background 里轮询后台任务输出、外面套了 timeout 也拒」
+#                                        #       「等待循环:前台按 pid 轮询的 while kill -0」「等待循环:前台 timeout 只在循环条件里」「等待循环:前台多行写的 while true」「等待循环:前台 sleep 在循环条件里」「等待循环:前台喂给 bash 的 heredoc 里的循环」「等待循环:前台 bash -c 里没有 timeout」
+#                                        #       「等待循环:前台 capped.sh 包着的 bash -c 里没有 timeout」「等待循环:前台 run-with-memory-cap.sh 包着的 bash -c 里没有 timeout」「等待循环:前台命令替换里的循环」「等待循环:前台 if 里的循环」「等待循环:前台循环体里套 for、sleep 在 for 之后」「就地改仓内文件:执行员 sed -i 改仓内源文件」
+#                                        #       「就地改仓内文件:执行员 python open(仓内路径, 'w')」「就地改仓内文件:执行员 python Path(仓内绝对路径).write_text」「先编后换:执行员 cp 草稿副本盖主工作区的入库装置」「先编后换:执行员 cat > 新建入库装置」「先编后换:执行员 >> 追加」「先编后换:执行员 tee -a」「先编后换:执行员 mv 草稿副本进 bin 目录」
+#                                        #       「先编后换:执行员 cd 进 bin 目录之后 cp 到 .」「先编后换:执行员 sed -i」「先编后换:执行员 perl -pi -e」「先编后换:执行员 rsync」「先编后换:执行员 rm 入库装置」「先编后换:执行员 mv 把入库装置挪走」「先编后换:执行员 bash -c 里 cp」「先编后换:执行员变量里的目录」「先编后换:执行员目标算不出、对得上已有的入库装置」
+#                                        #       「先编后换:执行员 python shutil.copy」「先编后换:执行员 python open(…, 'a')」「先编后换:执行员 python os.replace」「放出追踪:现场：& disown 之后又 & wait」「放出追踪:nohup … &」「放出追踪:nice 包着的 nohup … &」「放出追踪:coproc」「放出追踪:setsid -f」
+#                                        #       「放出追踪:setsid --fork」「放出追踪:tmux new-session -d」「放出追踪:screen -dmS」「放出追踪:systemd-run 不等结束」「放出追踪:bash -c 里的 & disown」「放出追踪:命令替换里的 nohup … &」「放出追踪:capped.sh 包着的 setsid -f」「放出追踪:喂给 bash 的 heredoc 里的 disown」
+#                                        #       「放出追踪:detached-run.sh start 里面那条 bash -c 里的 & disown 照拒」「放出追踪:detached-run.sh --force start --label= --log 里面不等结束的 systemd-run 照拒」「放出追踪:detached-run.sh start 的 -- 之后先写 --force、里面 setsid -f 照拒」
+#                                        #       「单独的 &:结尾单独一个 &」「单独的 &:& 之后接 echo $!」「单独的 &:& 在 capped.sh 前缀的那条命令上」「单独的 &:& 在 capped.sh 包着的 bash -c 里」「单独的 &:& 在 wait 之后」「单独的 &:圆括号子 shell 里的 &、wait 在外面」「单独的 &:& 之后的 wait 在另一对圆括号里」
+#                                        #       「单独的 &:命令替换里的 &、wait 在外面」「单独的 &:bash -c 里的 &、wait 在外面」「单独的 &:喂给 bash 的 heredoc 正文里的 &」「单独的 &:喂给 python 的 heredoc 挂在 & 前面」「单独的 &:& 之后只 wait -n」「单独的 &:& 之后按 pid 轮询不算 wait」「单独的 &:整个循环放后台」
+#                                        #       「单独的 &:一对圆括号整组放后台」「终止进程:kill -- 负进程号（进程组）」「终止进程:kill -TERM 负进程号」「终止进程:kill -s TERM 负进程号」「终止进程:自己的任务的进程组 -"$job"」「终止进程:kill 0」「终止进程:kill -TERM 0」「终止进程:kill -9 -1（全部）」「终止进程:kill $PPID（Claude 会话本身）」
+#                                        #       「终止进程:kill $(pgrep …)」「终止进程:kill $(jobs -p)」「终止进程:kill `pidof sshd`」「终止进程:kill 数组整批展开」「终止进程:kill "$@"」「终止进程:kill 一次两个」「终止进程:kill %1 %2」「终止进程:kill 带通配」「终止进程:for 循环里 kill」
+#                                        #       「终止进程:while read cgroup.procs 里 kill（现场那一段）」「终止进程:多行循环里 kill」「终止进程:cgroup.procs 交给 xargs kill」「终止进程:xargs -n1 kill」「终止进程:pgrep 交给 xargs -r kill -9」「终止进程:find -exec kill」「终止进程:pkill 按名字」
+#                                        #       「终止进程:pkill -x claude」「终止进程:killall」「终止进程:fuser -k」「终止进程:先从 cgroup.procs 挑一个再 kill」「终止进程:先 pgrep 挑一个再 kill」「终止进程:python -c 推导式里读 cgroup.procs 再 os.kill」「终止进程:喂给 python 的 heredoc 里 os.killpg」
+#                                        #       「终止进程:python -c os.kill(0, …)」「终止进程:systemctl stop ssh」「终止进程:sudo systemctl restart sshd」「终止进程:systemctl kill session-1.scope」「终止进程:systemctl stop user@1000.service」
+#                                        #       「终止进程:systemctl set-property user.slice」「终止进程:systemctl stop 私有配置登记的本地模型服务（不写后缀）」「终止进程:systemctl restart 私有配置登记的第二个单元」「终止进程:systemctl disable --now ssh」「终止进程:systemctl --user stop 带通配 singlefs-*」
+#                                        #       「终止进程:systemctl --user kill 带通配 *.scope」「终止进程:systemctl --user stop 命令替换列出来的一批」「终止进程:systemctl isolate」「终止进程:systemctl --user exit」「终止进程:systemctl reboot」「终止进程:loginctl terminate-session」
+#                                        #       「终止进程:loginctl kill-user」「终止进程:往 cgroup.kill 写」「终止进程:tee 进 cgroup.freeze」「终止进程:sudo reboot」「终止进程:shutdown -h now」「终止进程:写死的进程号是 sshd」「终止进程:写死的进程号是 VSCode 服务端」「终止进程:写死的进程号是这个会话自己的 Claude」
+#                                        #       「终止进程:写死的进程号是另一个 Claude 会话」「终止进程:写死的进程号是另一个 Claude 会话起的 cargo」「终止进程:写死的进程号是私有配置登记的本地模型服务」「终止进程:kill -HUP 1」「终止进程:proc.py stop 写死的 sshd」「终止进程:proc.py stop 一次两个」「终止进程:循环里 proc.py stop」
+#                                        #       「终止进程:bash -c 里 kill 进程组」「终止进程:nice 包着 kill -9 -1」「终止进程:喂给 bash 的 heredoc 里 kill 0」「终止进程:timeout 包着 kill 负进程号」「终止进程:run-with-memory-cap.sh 包着 pkill」「终止进程:shell 函数与变量里的脚本包着的 bash -c 里 kill 0」
+#                                        #       「终止进程:shell 函数包着的 python -c 里 os.killpg」「终止进程:私有配置文件不在:systemctl stop ssh 照拒」「终止进程:私有配置里没有那两个键:systemctl stop ssh 照拒」「覆盖产物:> 覆盖未跟踪的产物」「覆盖产物:tee 不带 -a」「覆盖产物:cp 的目标（现场原句的形态）」「覆盖产物:bash -c 里的 >」「覆盖产物:>|」
+#                                        #       「覆盖产物:&>」「覆盖产物:2> 同样截断」「覆盖产物:>& 后面跟文件名」「覆盖产物:tee -i 不是追加」「覆盖产物:tee 写两份、其中一份是未跟踪的」「覆盖产物:mv 的目标」「覆盖产物:install 的目标」「覆盖产物:cp 进已有目录、源的文件名撞上」「覆盖产物:cp -t 目录」「覆盖产物:cp 源里的通配按这一刻展开」「覆盖产物:cd 进去之后写相对路径」
+#                                        #       「覆盖产物:cd 进子目录之后写」「覆盖产物:绝对路径」「覆盖产物:喂给 bash 的 heredoc 正文里的 >」「覆盖产物:命令替换里的 >」「覆盖产物:cat 把 heredoc 写进未跟踪的产物」「覆盖产物:花括号整组重定向」「覆盖产物:圆括号整组重定向」「覆盖产物:timeout、capped.sh 包着的 bash -c 整条重定向」「覆盖产物:前面赋过值的变量代入」
+#                                        #       「覆盖产物:export 过的变量代入」「覆盖产物:cd 到变量路径算不出来、按仓库根解析」「覆盖产物:进程替换里的 tee」「覆盖产物:整个循环重定向」「覆盖产物:sudo 包着的 tee」「覆盖产物:git add 的是另一份，这一份照拒」「覆盖产物:dd of= 覆盖未跟踪的产物」「覆盖产物:dd conv=notrunc 覆盖未跟踪的产物」
+#                                        #       「覆盖产物:truncate -s 0 覆盖未跟踪的产物」「覆盖产物:truncate 选项连写覆盖未跟踪产物」「覆盖产物检出:算不出的变量对得上一份未跟踪的产物」「覆盖产物检出:变量在前、research/results/ 在后」「覆盖产物检出:git 判不了（不是 git 仓）只记不拦」「就地改脚本:> 覆盖已有的 .sh」「就地改脚本:>|」「就地改脚本:&>」「就地改脚本:2> 同样截断」
+#                                        #       「就地改脚本:>& 后面跟文件名」「就地改脚本:cat > 旧 <<EOF」「就地改脚本:tee 不带 -a」「就地改脚本:tee -i 不是追加」「就地改脚本:cp 新 旧」「就地改脚本:cp -f」「就地改脚本:cp -a」「就地改脚本:cp 进已有目录、文件名撞上」「就地改脚本:cp -t 目录」「就地改脚本:dd of=」「就地改脚本:dd conv=notrunc」
+#                                        #       「就地改脚本:truncate -s 0」「就地改脚本:truncate -cs 0（选项连写）」「就地改脚本:写已有的 .py」「就地改脚本:带执行位、没有后缀的」「就地改脚本:经符号链接写它指向的脚本」「就地改脚本:scratch 根下的脚本」「就地改脚本:cd 进去之后写相对路径」「就地改脚本:bash -c 里的 >」「就地改脚本:喂给 bash 的 heredoc 正文里的 cp」
+#                                        #       「就地改脚本:命令替换里的 >」「就地改脚本:前面赋过值的变量代入」「就地改脚本:nice、timeout 包着的 cp」「就地改脚本:python3 -c 的 open(…, 'w')」「就地改脚本:python3 -c 的 open(…, 'r+')」「就地改脚本:python3 -c 的 open(…, mode='wb')」
+#                                        #       「就地改脚本:喂给 python 的 heredoc：只赋过一次的名字」「就地改脚本:喂给 python 的 heredoc：Path(…) / '…' 的 write_text」「就地改脚本:喂给 python 的 heredoc：pathlib.Path(…).write_bytes」「就地改脚本:喂给 python 的 heredoc：Path(…).open('w')」
+#                                        #       「就地改脚本:喂给 python 的 heredoc：os.path.join 与 io.open」「就地改脚本:喂给 python 的 heredoc：shutil.copyfile」「就地改脚本:喂给 python 的 heredoc：shutil.copy 进已有目录」「就地改脚本:cd 之后喂给 python 的相对路径」「就地改脚本:bash -c 里的 python3 -c」
+#                                        #       「就地改脚本:拒绝时报出写法与相对仓库根的路径」「就地改脚本:⑤ 现在认 dd、truncate 覆盖未跟踪产物（与 ⑦ 共用同一段 overwrite_steps，不抄第二份）」「就地改脚本:rm 掉再写未跟踪产物，⑤ 照拒（rm 没留住旧字节）」「stdin:cp 覆盖未跟踪的产物拒绝（退出码 2）」
+#                                        #       「stdin:拒绝时 stderr 写了出路（按日期另存、先 git add 或挪到带日期的旧名）」「stdin:run_in_background 里的 > 覆盖同样拒绝（退出码 2）」「stdin:目标算不出、对得上未跟踪产物的放行（退出码 0）并记一条检出」「stdin:cp 覆盖已有脚本拒绝（退出码 2）」
+#                                        #       「stdin:拒绝时 stderr 写了出路（临时文件再 mv 换上、replace-once.py / insert-row.py 定点改）」「stdin:run_in_background 里喂给 python 的 open(…, 'w') 同样拒绝（退出码 2）」「stdin:experiment-runner cp 进主工作区的入库装置拒绝（退出码 2）」
+#                                        #       「stdin:先编后换的拒绝点名那条脚本与出路」「stdin:子 agent 经 detached-run.sh start 起长跑拒绝（退出码 2）」「stdin:拒绝时 stderr 点名 detached-run.sh、写了交回主 agent 的写法」
+#                                        #       「stdin:子 agent 带前缀、nice、绝对路径、--force 的 detached-run.sh start 同样拒绝（退出码 2）」「stdin:子 agent 在 bash -c 里经 detached-run.sh start 同样拒绝（退出码 2）」「stdin:子 agent 的 detached-run.sh stop 拒绝（退出码 2）」
+#                                        #       「stdin:子 agent 经source 读进来的 detached-run.sh 起或停拒绝（退出码 2）」「stdin:子 agent 经. 读进来的 detached-run.sh 起或停拒绝（退出码 2）」「stdin:子 agent 经开头带签名行的改名拷贝的 detached-run.sh 起或停拒绝（退出码 2）」
+#                                        #       「stdin:子 agent 经指到它的符号链接 stop的 detached-run.sh 起或停拒绝（退出码 2）」「stdin:子 agent 经同一条命令里先 cp 改名再起的 detached-run.sh 起或停拒绝（退出码 2）」「stdin:子 agent 经同一条命令里先 ln -s 再起的 detached-run.sh 起或停拒绝（退出码 2）」
+#                                        #       「stdin:子 agent 经同一条命令里先 install 改名再起的 detached-run.sh 拒绝（退出码 2）」「stdin:子 agent 经同一条命令里先 mv 改名再起的 detached-run.sh 拒绝（退出码 2）」「stdin:子 agent 经cd 之后按相对路径起的改名拷贝的 detached-run.sh 拒绝（退出码 2）」
+#                                        #       「等待循环:同一条走 run_in_background 记一条检出」「stdin:检出落进检出记录」「stdin:前台没超时的等待循环拒绝（退出码 2）」
+#                                        #       「stdin:拒绝时 stderr 写了两种写法（run_in_background 与 proc.py wait --timeout）」「stdin:run_in_background 里 & disown 拒绝（退出码 2）」「stdin:放出追踪的拒绝 stderr 写了 run_in_background 的起法」「stdin:进程替换里前台没超时的等待循环拒绝（退出码 2）」
+#                                        #       「stdin:run_in_background 里后面没有 wait 的单独 & 拒绝（退出码 2）」「stdin:拒绝时 stderr 写了两条出路（run_in_background 里不加 & 与 proc.py wait <pid> --timeout <秒>）」「stdin:kill 负进程号拒绝（退出码 2）」「stdin:拒绝时 stderr 写了按 pid 停一个的出路」
+#                                        #       「stdin:kill 写死的 1 拒绝（退出码 2，读真的进程表）」「stdin:kill 写死的自检进程号（hook 的祖先）拒绝（退出码 2）」「stdin:run_in_background 里循环 kill 拒绝（退出码 2）」
+#                                        #       「stdin:子 agent 用 run_in_background 起命令拒绝（退出码 2）」「stdin:子 agent 的 run_in_background 拒绝时 stderr 写了交回主 agent」（共 276 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=disable-self-background  findings_for() 不检出 run_in_background 里又自己放后台的那一种
+#                                        #       「后台起的 nohup … & 加 disown」「后台起的命令末尾单独一个 &」「后台起的 & 在 wait 之后」「bg-notify-r1 X01」「bg-notify-r1 X02」「bg-notify-r1 X03」「bg-notify-r1 X04」「bg-notify-r1 X05」「bg-notify-r1 X06」「bg-notify-r1 X07」
+#                                        #       「bg-notify-r1 X08」「bg-notify-r1 X09」「bg-notify-r1 X10」「bg-notify-r1 X11」「bg-notify-r1 X12」「bg-notify-r1 F06」「setsid -f 放后台」（共 17 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=keep-heredoc-bodies  findings_for() 不剥 heredoc 正文，写进文件的正文里的等待循环也检出
+#                                        #       「写进笔记的 heredoc 正文里是一段没超时的等待循环」（共 1 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=allow-watchdog-misuse  ① 起看门狗的错误写法也放行
+#                                        #       「看门狗:前台起、输出丢进 /dev/null 还带 &」「看门狗:run_in_background 起却又带 &」「看门狗:前台起、什么都没加」「看门狗:前台起 agent-watch.py watch」「看门狗:run_in_background 起却挂 nohup」「看门狗:run_in_background 起却挂 setsid」
+#                                        #       「看门狗:run_in_background 起却跟 disown」「看门狗:run_in_background 起却把输出丢进 /dev/null」「看门狗:前台起、写在 bash -c 里」「看门狗:前台起、包在 capped.sh 里」「stdin:前台起看门狗拒绝（退出码 2）」「stdin:拒绝时 stderr 写了出路（run_in_background: true 的起法）」
+#                                        #       （共 12 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=allow-subagent-background  ⑩ 子 agent 的 run_in_background 也放行
+#                                        #       「stdin:子 agent 用 run_in_background 起命令拒绝（退出码 2）」「stdin:子 agent 的 run_in_background 拒绝时 stderr 写了交回主 agent」（共 2 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=allow-foreground-wait-loop  ② 等待循环一律放行（前台没超时的、run_in_background 里轮询 tasks/*.output 的都放）
+#                                        #       「等待循环:前台 until … sleep 没超时」「等待循环:run_in_background 里轮询后台任务的输出文件」「等待循环:run_in_background 里轮询后台任务输出、外面套了 timeout 也拒」「等待循环:前台按 pid 轮询的 while kill -0」「等待循环:前台 timeout 只在循环条件里」「等待循环:前台多行写的 while true」
+#                                        #       「等待循环:前台 sleep 在循环条件里」「等待循环:前台喂给 bash 的 heredoc 里的循环」「等待循环:前台 bash -c 里没有 timeout」「等待循环:前台 capped.sh 包着的 bash -c 里没有 timeout」「等待循环:前台 run-with-memory-cap.sh 包着的 bash -c 里没有 timeout」「等待循环:前台命令替换里的循环」
+#                                        #       「等待循环:前台 if 里的循环」「等待循环:前台循环体里套 for、sleep 在 for 之后」「stdin:前台没超时的等待循环拒绝（退出码 2）」「stdin:拒绝时 stderr 写了两种写法（run_in_background 与 proc.py wait --timeout）」「stdin:前台拒了的与套上 timeout 的都不记检出」
+#                                        #       「stdin:进程替换里前台没超时的等待循环拒绝（退出码 2）」（共 18 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=allow-detaching  ③ 把活放出追踪的写法也放行
+#                                        #       「放出追踪:现场：& disown 之后又 & wait」「放出追踪:nohup … &」「放出追踪:nice 包着的 nohup … &」「放出追踪:coproc」「放出追踪:setsid -f」「放出追踪:setsid --fork」「放出追踪:tmux new-session -d」「放出追踪:screen -dmS」「放出追踪:systemd-run 不等结束」
+#                                        #       「放出追踪:bash -c 里的 & disown」「放出追踪:命令替换里的 nohup … &」「放出追踪:capped.sh 包着的 setsid -f」「放出追踪:喂给 bash 的 heredoc 里的 disown」「放出追踪:detached-run.sh start 里面那条 bash -c 里的 & disown 照拒」
+#                                        #       「放出追踪:detached-run.sh --force start --label= --log 里面不等结束的 systemd-run 照拒」「放出追踪:detached-run.sh start 的 -- 之后先写 --force、里面 setsid -f 照拒」「stdin:run_in_background 里 & disown 拒绝（退出码 2）」
+#                                        #       「stdin:放出追踪的拒绝 stderr 写了 run_in_background 的起法」（共 18 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=allow-subagent-detached-run  子 agent 的 detached-run.sh start / stop 也放行
+#                                        #       「stdin:子 agent 经 detached-run.sh start 起长跑拒绝（退出码 2）」「stdin:拒绝时 stderr 点名 detached-run.sh、写了交回主 agent 的写法」「stdin:子 agent 带前缀、nice、绝对路径、--force 的 detached-run.sh start 同样拒绝（退出码 2）」
+#                                        #       「stdin:子 agent 在 bash -c 里经 detached-run.sh start 同样拒绝（退出码 2）」「stdin:子 agent 的 detached-run.sh stop 拒绝（退出码 2）」「stdin:子 agent 经source 读进来的 detached-run.sh 起或停拒绝（退出码 2）」
+#                                        #       「stdin:子 agent 经. 读进来的 detached-run.sh 起或停拒绝（退出码 2）」「stdin:子 agent 经开头带签名行的改名拷贝的 detached-run.sh 起或停拒绝（退出码 2）」「stdin:子 agent 经指到它的符号链接 stop的 detached-run.sh 起或停拒绝（退出码 2）」
+#                                        #       「stdin:子 agent 经同一条命令里先 cp 改名再起的 detached-run.sh 起或停拒绝（退出码 2）」「stdin:子 agent 经同一条命令里先 ln -s 再起的 detached-run.sh 起或停拒绝（退出码 2）」「stdin:子 agent 经同一条命令里先 install 改名再起的 detached-run.sh 拒绝（退出码 2）」
+#                                        #       「stdin:子 agent 经同一条命令里先 mv 改名再起的 detached-run.sh 拒绝（退出码 2）」「stdin:子 agent 经cd 之后按相对路径起的改名拷贝的 detached-run.sh 拒绝（退出码 2）」
+#                                        #       （共 14 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=opaque-detached-run  detached-run.sh start -- 之后那条命令不剥开，里面的放出追踪放过去
+#                                        #       「放出追踪:detached-run.sh start 里面那条 bash -c 里的 & disown 照拒」「放出追踪:detached-run.sh --force start --label= --log 里面不等结束的 systemd-run 照拒」「放出追踪:detached-run.sh start 的 -- 之后先写 --force、里面 setsid -f 照拒」（共 3 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=detached-run-by-name  子 agent 闸只认命令词名叫 detached-run.sh 的：source / . 读进来的、改名拷贝、符号链接、同一条命令里先拷再起的都放过去
+#                                        #       「stdin:子 agent 经source 读进来的 detached-run.sh 起或停拒绝（退出码 2）」「stdin:子 agent 经. 读进来的 detached-run.sh 起或停拒绝（退出码 2）」「stdin:子 agent 经开头带签名行的改名拷贝的 detached-run.sh 起或停拒绝（退出码 2）」
+#                                        #       「stdin:子 agent 经指到它的符号链接 stop的 detached-run.sh 起或停拒绝（退出码 2）」「stdin:子 agent 经同一条命令里先 cp 改名再起的 detached-run.sh 起或停拒绝（退出码 2）」「stdin:子 agent 经同一条命令里先 ln -s 再起的 detached-run.sh 起或停拒绝（退出码 2）」
+#                                        #       「stdin:子 agent 经同一条命令里先 install 改名再起的 detached-run.sh 拒绝（退出码 2）」「stdin:子 agent 经同一条命令里先 mv 改名再起的 detached-run.sh 拒绝（退出码 2）」「stdin:子 agent 经cd 之后按相对路径起的改名拷贝的 detached-run.sh 拒绝（退出码 2）」（共 9 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=detached-run-copy-by-cp-ln  同一条命令里只认 cp / ln 拷出来的，install / mv 的目标放过去
+#                                        #       「stdin:子 agent 经同一条命令里先 install 改名再起的 detached-run.sh 拒绝（退出码 2）」「stdin:子 agent 经同一条命令里先 mv 改名再起的 detached-run.sh 拒绝（退出码 2）」（共 2 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=detached-run-start-directory  认改名拷贝时相对路径不跟 cd，从开头的当前目录解
+#                                        #       「stdin:子 agent 经cd 之后按相对路径起的改名拷贝的 detached-run.sh 拒绝（退出码 2）」（共 1 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=allow-unwaited-ampersand  ④ run_in_background 里后面没有 wait 的单独 & 也放行
+#                                        #       「单独的 &:结尾单独一个 &」「单独的 &:& 之后接 echo $!」「单独的 &:& 在 capped.sh 前缀的那条命令上」「单独的 &:& 在 capped.sh 包着的 bash -c 里」「单独的 &:& 在 wait 之后」「单独的 &:圆括号子 shell 里的 &、wait 在外面」「单独的 &:& 之后的 wait 在另一对圆括号里」
+#                                        #       「单独的 &:命令替换里的 &、wait 在外面」「单独的 &:bash -c 里的 &、wait 在外面」「单独的 &:喂给 bash 的 heredoc 正文里的 &」「单独的 &:喂给 python 的 heredoc 挂在 & 前面」「单独的 &:& 之后只 wait -n」「单独的 &:& 之后按 pid 轮询不算 wait」「单独的 &:整个循环放后台」
+#                                        #       「单独的 &:一对圆括号整组放后台」「stdin:run_in_background 里后面没有 wait 的单独 & 拒绝（退出码 2）」「stdin:拒绝时 stderr 写了两条出路（run_in_background 里不加 & 与 proc.py wait <pid> --timeout <秒>）」「stdin:拒了的与前台的单独 & 都不记检出」（共 18 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=allow-background-task-output-wait  ② run_in_background 里轮询 tasks/*.output 的等待循环也放行
+#                                        #       「等待循环:run_in_background 里轮询后台任务的输出文件」「等待循环:run_in_background 里轮询后台任务输出、外面套了 timeout 也拒」（共 2 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=allow-repository-in-place-edit  ⑧ 有 Edit 的子 agent 在 Bash 里就地改仓内文件也放行
+#                                        #       「就地改仓内文件:执行员 sed -i 改仓内源文件」「就地改仓内文件:执行员 python open(仓内路径, 'w')」「就地改仓内文件:执行员 python Path(仓内绝对路径).write_text」（共 3 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=allow-compile-first-bypass  ⑨ experiment-runner 在 Bash 里写主工作区 crates/ 下的 .rs 也放行
+#                                        #       「先编后换:执行员 cp 草稿副本盖主工作区的入库装置」「先编后换:执行员 cat > 新建入库装置」「先编后换:执行员 >> 追加」「先编后换:执行员 tee -a」「先编后换:执行员 mv 草稿副本进 bin 目录」「先编后换:执行员 cd 进 bin 目录之后 cp 到 .」「先编后换:执行员 sed -i」「先编后换:执行员 perl -pi -e」「先编后换:执行员 rsync」
+#                                        #       「先编后换:执行员 rm 入库装置」「先编后换:执行员 mv 把入库装置挪走」「先编后换:执行员 bash -c 里 cp」「先编后换:执行员变量里的目录」「先编后换:执行员目标算不出、对得上已有的入库装置」「先编后换:执行员 python shutil.copy」「先编后换:执行员 python open(…, 'a')」「先编后换:执行员 python os.replace」
+#                                        #       「stdin:experiment-runner cp 进主工作区的入库装置拒绝（退出码 2）」「stdin:先编后换的拒绝点名那条脚本与出路」（共 19 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=allow-results-overwrite  ⑤ 整份覆盖 research/results/ 下未跟踪产物也放行、也不记检出
+#                                        #       「覆盖产物:> 覆盖未跟踪的产物」「覆盖产物:tee 不带 -a」「覆盖产物:cp 的目标（现场原句的形态）」「覆盖产物:bash -c 里的 >」「覆盖产物:>|」「覆盖产物:&>」「覆盖产物:2> 同样截断」「覆盖产物:>& 后面跟文件名」「覆盖产物:tee -i 不是追加」「覆盖产物:tee 写两份、其中一份是未跟踪的」「覆盖产物:mv 的目标」「覆盖产物:install 的目标」
+#                                        #       「覆盖产物:cp 进已有目录、源的文件名撞上」「覆盖产物:cp -t 目录」「覆盖产物:cp 源里的通配按这一刻展开」「覆盖产物:cd 进去之后写相对路径」「覆盖产物:cd 进子目录之后写」「覆盖产物:绝对路径」「覆盖产物:喂给 bash 的 heredoc 正文里的 >」「覆盖产物:命令替换里的 >」「覆盖产物:cat 把 heredoc 写进未跟踪的产物」「覆盖产物:花括号整组重定向」
+#                                        #       「覆盖产物:圆括号整组重定向」「覆盖产物:timeout、capped.sh 包着的 bash -c 整条重定向」「覆盖产物:前面赋过值的变量代入」「覆盖产物:export 过的变量代入」「覆盖产物:cd 到变量路径算不出来、按仓库根解析」「覆盖产物:进程替换里的 tee」「覆盖产物:整个循环重定向」「覆盖产物:sudo 包着的 tee」「覆盖产物:git add 的是另一份，这一份照拒」
+#                                        #       「覆盖产物:dd of= 覆盖未跟踪的产物」「覆盖产物:dd conv=notrunc 覆盖未跟踪的产物」「覆盖产物:truncate -s 0 覆盖未跟踪的产物」「覆盖产物:truncate 选项连写覆盖未跟踪产物」「覆盖产物检出:算不出的变量对得上一份未跟踪的产物」「覆盖产物检出:变量在前、research/results/ 在后」「覆盖产物检出:git 判不了（不是 git 仓）只记不拦」
+#                                        #       「就地改脚本:⑤ 现在认 dd、truncate 覆盖未跟踪产物（与 ⑦ 共用同一段 overwrite_steps，不抄第二份）」「就地改脚本:rm 掉再写未跟踪产物，⑤ 照拒（rm 没留住旧字节）」「stdin:cp 覆盖未跟踪的产物拒绝（退出码 2）」「stdin:拒绝时 stderr 写了出路（按日期另存、先 git add 或挪到带日期的旧名）」
+#                                        #       「stdin:run_in_background 里的 > 覆盖同样拒绝（退出码 2）」「stdin:目标算不出、对得上未跟踪产物的放行（退出码 0）并记一条检出」（共 44 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=allow-process-signals  ⑥ 终止进程的写法也放行
+#                                        #       「终止进程:kill -- 负进程号（进程组）」「终止进程:kill -TERM 负进程号」「终止进程:kill -s TERM 负进程号」「终止进程:自己的任务的进程组 -"$job"」「终止进程:kill 0」「终止进程:kill -TERM 0」「终止进程:kill -9 -1（全部）」「终止进程:kill $PPID（Claude 会话本身）」「终止进程:kill $(pgrep …)」
+#                                        #       「终止进程:kill $(jobs -p)」「终止进程:kill `pidof sshd`」「终止进程:kill 数组整批展开」「终止进程:kill "$@"」「终止进程:kill 一次两个」「终止进程:kill %1 %2」「终止进程:kill 带通配」「终止进程:for 循环里 kill」「终止进程:while read cgroup.procs 里 kill（现场那一段）」
+#                                        #       「终止进程:多行循环里 kill」「终止进程:cgroup.procs 交给 xargs kill」「终止进程:xargs -n1 kill」「终止进程:pgrep 交给 xargs -r kill -9」「终止进程:find -exec kill」「终止进程:pkill 按名字」「终止进程:pkill -x claude」「终止进程:killall」「终止进程:fuser -k」
+#                                        #       「终止进程:先从 cgroup.procs 挑一个再 kill」「终止进程:先 pgrep 挑一个再 kill」「终止进程:python -c 推导式里读 cgroup.procs 再 os.kill」「终止进程:喂给 python 的 heredoc 里 os.killpg」「终止进程:python -c os.kill(0, …)」「终止进程:systemctl stop ssh」
+#                                        #       「终止进程:sudo systemctl restart sshd」「终止进程:systemctl kill session-1.scope」「终止进程:systemctl stop user@1000.service」「终止进程:systemctl set-property user.slice」「终止进程:systemctl stop 私有配置登记的本地模型服务（不写后缀）」
+#                                        #       「终止进程:systemctl restart 私有配置登记的第二个单元」「终止进程:systemctl disable --now ssh」「终止进程:systemctl --user stop 带通配 singlefs-*」「终止进程:systemctl --user kill 带通配 *.scope」「终止进程:systemctl --user stop 命令替换列出来的一批」
+#                                        #       「终止进程:systemctl isolate」「终止进程:systemctl --user exit」「终止进程:systemctl reboot」「终止进程:loginctl terminate-session」「终止进程:loginctl kill-user」「终止进程:往 cgroup.kill 写」「终止进程:tee 进 cgroup.freeze」「终止进程:sudo reboot」
+#                                        #       「终止进程:shutdown -h now」「终止进程:写死的进程号是 sshd」「终止进程:写死的进程号是 VSCode 服务端」「终止进程:写死的进程号是这个会话自己的 Claude」「终止进程:写死的进程号是另一个 Claude 会话」「终止进程:写死的进程号是另一个 Claude 会话起的 cargo」「终止进程:写死的进程号是私有配置登记的本地模型服务」
+#                                        #       「终止进程:kill -HUP 1」「终止进程:proc.py stop 写死的 sshd」「终止进程:proc.py stop 一次两个」「终止进程:循环里 proc.py stop」「终止进程:bash -c 里 kill 进程组」「终止进程:nice 包着 kill -9 -1」「终止进程:喂给 bash 的 heredoc 里 kill 0」
+#                                        #       「终止进程:timeout 包着 kill 负进程号」「终止进程:run-with-memory-cap.sh 包着 pkill」「终止进程:shell 函数与变量里的脚本包着的 bash -c 里 kill 0」「终止进程:shell 函数包着的 python -c 里 os.killpg」「终止进程:私有配置文件不在:systemctl stop ssh 照拒」
+#                                        #       「终止进程:私有配置里没有那两个键:systemctl stop ssh 照拒」「stdin:kill 负进程号拒绝（退出码 2）」「stdin:拒绝时 stderr 写了按 pid 停一个的出路」「stdin:kill 写死的 1 拒绝（退出码 2，读真的进程表）」「stdin:kill 写死的自检进程号（hook 的祖先）拒绝（退出码 2）」
+#                                        #       「stdin:run_in_background 里循环 kill 拒绝（退出码 2）」（共 76 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=ignore-private-config  ⑥ 不读私有配置，本地模型服务的单元与进程也放行
+#                                        #       「终止进程:systemctl stop 私有配置登记的本地模型服务（不写后缀）」「终止进程:systemctl restart 私有配置登记的第二个单元」「终止进程:写死的进程号是私有配置登记的本地模型服务」（共 3 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=allow-script-in-place-write  ⑦ 在同一个 inode 上改已有脚本也放行
+#                                        #       「就地改脚本:> 覆盖已有的 .sh」「就地改脚本:>|」「就地改脚本:&>」「就地改脚本:2> 同样截断」「就地改脚本:>& 后面跟文件名」「就地改脚本:cat > 旧 <<EOF」「就地改脚本:tee 不带 -a」「就地改脚本:tee -i 不是追加」「就地改脚本:cp 新 旧」「就地改脚本:cp -f」「就地改脚本:cp -a」「就地改脚本:cp 进已有目录、文件名撞上」
+#                                        #       「就地改脚本:cp -t 目录」「就地改脚本:dd of=」「就地改脚本:dd conv=notrunc」「就地改脚本:truncate -s 0」「就地改脚本:truncate -cs 0（选项连写）」「就地改脚本:写已有的 .py」「就地改脚本:带执行位、没有后缀的」「就地改脚本:经符号链接写它指向的脚本」「就地改脚本:scratch 根下的脚本」「就地改脚本:cd 进去之后写相对路径」
+#                                        #       「就地改脚本:bash -c 里的 >」「就地改脚本:喂给 bash 的 heredoc 正文里的 cp」「就地改脚本:命令替换里的 >」「就地改脚本:前面赋过值的变量代入」「就地改脚本:nice、timeout 包着的 cp」「就地改脚本:python3 -c 的 open(…, 'w')」「就地改脚本:python3 -c 的 open(…, 'r+')」
+#                                        #       「就地改脚本:python3 -c 的 open(…, mode='wb')」「就地改脚本:喂给 python 的 heredoc：只赋过一次的名字」「就地改脚本:喂给 python 的 heredoc：Path(…) / '…' 的 write_text」「就地改脚本:喂给 python 的 heredoc：pathlib.Path(…).write_bytes」
+#                                        #       「就地改脚本:喂给 python 的 heredoc：Path(…).open('w')」「就地改脚本:喂给 python 的 heredoc：os.path.join 与 io.open」「就地改脚本:喂给 python 的 heredoc：shutil.copyfile」「就地改脚本:喂给 python 的 heredoc：shutil.copy 进已有目录」
+#                                        #       「就地改脚本:cd 之后喂给 python 的相对路径」「就地改脚本:bash -c 里的 python3 -c」「就地改脚本:拒绝时报出写法与相对仓库根的路径」「stdin:cp 覆盖已有脚本拒绝（退出码 2）」「stdin:拒绝时 stderr 写了出路（临时文件再 mv 换上、replace-once.py / insert-row.py 定点改）」
+#                                        #       「stdin:run_in_background 里喂给 python 的 open(…, 'w') 同样拒绝（退出码 2）」（共 43 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=keep-selftest-scratch  自证的临时目录走回 mkdtemp 不删（lib_selftest_scratch.py 的 keep）
+#                                        #       「通过那条路上临时目录没删」「red 那条路上临时目录没删」「crash 那条路上临时目录没删」（共 3 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=refuse-every-wait-loop  ② 外层 timeout 与 run_in_background 都不算，等待循环一律拒
+#                                        #       「等待循环:同一条套上 timeout 60」「等待循环:同一条走 run_in_background」「等待循环:timeout 60 bash 的 heredoc 里的循环」「等待循环:capped.sh 与 nice 包着的 timeout」「stdin:run_in_background 里没超时的等待循环只记不拦（退出码 0）」「stdin:检出落进检出记录」
+#                                        #       「stdin:套上 timeout 的前台等待循环放行（退出码 0）」（共 7 格）
+#                                        #   LIB_SHELL_WORDS_BREAK=detached-run-force-kept  共用模块 lib_shell_words.py 的 detached_run_arguments_after_preflight() 原样交回参数：-- 之后、选项值位置上的 --force 不摘，`-- --force <放出追踪的命令>` 放过去
+#                                        #       「放出追踪:detached-run.sh start 的 -- 之后先写 --force、里面 setsid -f 照拒」（共 1 格）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -237,13 +373,13 @@ def puts_itself_in_background(command):
 DEFAULT_DETECTIONS = "/tmp/claude-1000/agent-hook-detections.jsonl"
 
 def findings_for(command, run_in_background=False):
-    if os.environ.get("BASH_COMMAND_DETECTOR_DISABLE_CHECK") == "1":
+    if detector_break_is_set("disable-check"):
         return []
     findings = []
-    executed = command if os.environ.get("BASH_COMMAND_DETECTOR_KEEP_HEREDOC_BODIES") == "1" else shell_words.strip_data_heredocs(command)
+    executed = command if detector_break_is_set("keep-heredoc-bodies") else shell_words.strip_data_heredocs(command)
     if WAIT_LOOP.search(executed) and not re.search(r"\btimeout\b", executed):
         findings.append("没有 timeout 的等待循环")
-    if run_in_background and puts_itself_in_background(command) and os.environ.get("BASH_COMMAND_DETECTOR_DISABLE_SELF_BACKGROUND") != "1":
+    if run_in_background and puts_itself_in_background(command) and not detector_break_is_set("disable-self-background"):
         findings.append("run_in_background 里又自己放后台（nohup / setsid / disown / 后面没有 wait 的 &）：完成通知当场发出，跑完的那个不会叫醒你")
     return findings
 
@@ -296,7 +432,7 @@ def watchdog_calls_and_detaching(text):
 
 def watchdog_rejection(command, run_in_background):
     """起看门狗的写法不对就返回 (原因, 认出的调用)；写法对、或根本没起看门狗，原因为空。"""
-    if os.environ.get("BASH_COMMAND_DETECTOR_ALLOW_WATCHDOG_MISUSE") == "1":
+    if detector_break_is_set("allow-watchdog-misuse"):
         return [], []
     calls, detaching = watchdog_calls_and_detaching(command)
     if not calls:
@@ -327,8 +463,40 @@ def is_sleep_command(words):
     skipped = shell_words.skip_prefixes(words)
     return skipped.command_position is not None and os.path.basename(words[skipped.command_position]) == "sleep"
 
+# research/scripts/detached-run.sh：start 把 `--` 之后那条命令挂到用户级 systemd 的服务单元下跑（主 agent 跑过后台时限的长活走它，③ 的放行口），
+#   stop 只按登记的单元名停一个；这两样只给主 agent（detached_run_refusal）。list、watch 只读，谁都放。参数里的 --force 照 preflight 每一个都摘。
+#   认脚本（名字、符号链接、签名行）与切 start 的参数在共用模块（lib_shell_words 的 detached_run_script、detached_run_start_command），与重型闸同一份
+DETACHED_RUN_SCRIPT_NAME = "detached-run.sh"
+DETACHED_RUN_MAIN_AGENT_ONLY = {"start", "stop"}
+# 弄坏开关 BASH_COMMAND_DETECTOR_BREAK=<项>（几个用逗号连；只给自检证明点名的几格会红，项名与红的格写在文件头）
+DETECTOR_BREAK_VARIABLE = "BASH_COMMAND_DETECTOR_BREAK"
+KNOWN_DETECTOR_BREAK_ITEMS = ("disable-check", "disable-self-background", "keep-heredoc-bodies", "allow-watchdog-misuse",
+                              "allow-foreground-wait-loop", "allow-subagent-background", "allow-detaching", "allow-subagent-detached-run", "opaque-detached-run",
+                              "detached-run-by-name", "detached-run-copy-by-cp-ln", "detached-run-start-directory", "allow-unwaited-ampersand",
+                              "allow-background-task-output-wait", "allow-repository-in-place-edit", "allow-compile-first-bypass", "allow-results-overwrite",
+                              "allow-process-signals", "ignore-private-config", "allow-script-in-place-write", "keep-selftest-scratch",
+                              "refuse-every-wait-loop")
+
+def detector_break_is_set(item):
+    return item in os.environ.get(DETECTOR_BREAK_VARIABLE, "").split(",")
+# 同一条命令里把它拷走、链走再起的：这几个命令的目标算它的拷贝（cp、install 的目标与 -t 目录，ln 的链接名，mv 的目标）
+DETACHED_RUN_COPYING_COMMANDS = {"cp", "install", "ln", "mv"}
+DETACHED_RUN_COPY_OPTIONS_WITH_VALUE = {"-t", "--target-directory", "-S", "--suffix", "-m", "--mode", "-o", "--owner", "-g", "--group"}
+
+def detached_run_subcommand(arguments):
+    """detached-run.sh 的参数：交回 (子命令, 子命令之后的参数)；先照它的 preflight 摘掉每一个 --force（共用模块的 detached_run_arguments_after_preflight）。"""
+    arguments = shell_words.detached_run_arguments_after_preflight(arguments)
+    position = 0
+    while position < len(arguments) and arguments[position] == "--force":
+        position += 1
+    return (arguments[position], arguments[position + 1:]) if position < len(arguments) else (None, [])
+
+def detached_run_inner_words(arguments):
+    """detached-run.sh start 的参数里 `--` 之后那条命令的词；不是 start、没有 `--`、带认不出的选项（它按用法错拒、什么都不跑）交 None。"""
+    return shell_words.detached_run_start_command(arguments)
+
 def wrapped_commands(words):
-    """一条简单命令一层层剥开前缀、capped.sh N 与 `bash 包装脚本`（bash 起的是脚本时接着往里剥）：
+    """一条简单命令一层层剥开前缀、capped.sh N、`bash 包装脚本`（bash 起的是脚本时接着往里剥）与 `detached-run.sh start … --`：
     依次交回 (这一层命令词前面的前缀词, 路过的前缀名, 命令词的名字, 参数)；最后只剩关键字、赋值与前缀的，名字是 None。"""
     remaining = words
     for _ in range(shell_words.MAXIMUM_NESTING):
@@ -342,6 +510,11 @@ def wrapped_commands(words):
         if name in shell_words.WRAPPERS_TAKING_ONE_ARGUMENT and len(arguments) >= 2 and not arguments[0].startswith("-"):
             remaining = arguments[1:]
             continue
+        if name == DETACHED_RUN_SCRIPT_NAME and not detector_break_is_set("opaque-detached-run"):
+            inner = detached_run_inner_words(arguments)
+            if inner:
+                remaining = inner
+                continue
         if name in shell_words.SHELL_NAMES:
             invocation = shell_words.shell_invocation(arguments)
             if invocation.code_string is None and invocation.script_index is not None:
@@ -410,7 +583,7 @@ def unbounded_wait_loops(text, honor_timeout=True):
     """命令位置上的 until / while 循环里（条件或循环体）有 sleep、外面又没有 timeout 的，交回每个循环开头那条简单命令。"""
     return [loop for layer in shell_layers(text, honor_timeout=honor_timeout) if not layer.under_timeout for loop in wait_loops_in(layer.commands)]
 
-# 把活放出追踪的写法（agent-common.md「长活可以等」那一条列的）：命令词是这几个的
+# 把活放出追踪的写法（agent-common.md「长活交回主 agent」那一条列的）：命令词是这几个的
 DETACHING_COMMANDS = {"disown", "coproc"}
 
 def detaching_command(name, arguments):
@@ -459,10 +632,89 @@ def detaching_forms(text):
 
 def detaching_refusal(command):
     """命令位置上有把活放出追踪的写法就交回认出的写法；否则交 []。前台、run_in_background 一样拒。"""
-    if (os.environ.get("BASH_COMMAND_DETECTOR_DISABLE_CHECK") == "1"
-            or os.environ.get("BASH_COMMAND_DETECTOR_ALLOW_DETACHING") == "1"):
+    if (detector_break_is_set("disable-check")
+            or detector_break_is_set("allow-detaching")):
         return []
     return detaching_forms(command)
+
+def detached_run_calls_by_name(text, directory=None):
+    """弄坏开关 BASH_COMMAND_DETECTOR_BREAK=detached-run-by-name 用的旧认法：只认命令词名叫 detached-run.sh 的（不认 source / .、改名拷贝、符号链接）。"""
+    found = []
+    for layer in shell_layers(text):
+        for words in layer.commands:
+            for _, _, name, arguments in wrapped_commands(words):
+                subcommand, rest = detached_run_subcommand(arguments) if name == DETACHED_RUN_SCRIPT_NAME else (None, [])
+                if subcommand in DETACHED_RUN_MAIN_AGENT_ONLY:
+                    found.append(" ".join([name, subcommand, *rest[:2]]))
+    return list(dict.fromkeys(found))
+
+def detached_run_copy_destinations(command, copied):
+    """这一条是 cp / install / ln / mv、源里有 detached-run.sh（按名字、符号链接、签名行认，或这条命令里前面拷出来的）时，交回它写出的目标（绝对路径）。"""
+    name = os.path.basename(command.words[0])
+    copying_commands = ({"cp", "ln"} if detector_break_is_set("detached-run-copy-by-cp-ln")
+                        else DETACHED_RUN_COPYING_COMMANDS)
+    if name not in copying_commands or command.directory is None:
+        return set()
+    operands, target_directory, position, arguments = [], None, 0, command.words[1:]
+    while position < len(arguments):
+        argument = arguments[position]
+        if argument in DETACHED_RUN_COPY_OPTIONS_WITH_VALUE:
+            if argument in ("-t", "--target-directory") and position + 1 < len(arguments):
+                target_directory = arguments[position + 1]
+            position += 2
+            continue
+        if argument.startswith("--target-directory="):
+            target_directory = argument.split("=", 1)[1]
+        elif not argument.startswith("-") or argument == "-":
+            operands.append(argument)
+        position += 1
+    if target_directory is None and len(operands) < 2:
+        return set()
+    sources, destination = (operands, target_directory) if target_directory is not None else (operands[:-1], operands[-1])
+    destination_path = shell_words.resolve_path(command.directory, os.path.expanduser(destination))
+    if destination_path is None:
+        return set()
+    into_directory = target_directory is not None or len(sources) > 1 or destination.endswith("/") or os.path.isdir(destination_path)
+    written = set()
+    for source in sources:
+        source_path = shell_words.resolve_path(command.directory, os.path.expanduser(source))
+        if source_path is None or not (source_path in copied or shell_words.detached_run_script(source, command.directory)):
+            continue
+        written.add(os.path.join(destination_path, os.path.basename(source)) if into_directory else destination_path)
+    return written
+
+def detached_run_calls(text, directory):
+    """命令位置上 detached-run.sh 的 start 与 stop：交回认出的调用。按共用模块切出的每一条命令（前缀、capped.sh N、bash 起的、source / . 读进来的、
+    bash -c、喂给 shell 的 heredoc、命令替换都剥开，cd 跟着算；directory 是开头的当前目录）认命令词：名字、指到它的符号链接、开头带签名行的改名拷贝
+    （共用模块的 detached_run_script），以及同一条命令里前面 cp / install / ln / mv 拷出来的（detached_run_copy_destinations）。"""
+    if detector_break_is_set("detached-run-by-name"):
+        return detached_run_calls_by_name(text, directory)
+    found, copied = [], set()
+    for command in shell_words.commands_at_command_position(text, directory).commands:
+        word = command.words[0]
+        resolved = shell_words.resolve_path(command.directory, os.path.expanduser(word)) if command.directory else None
+        recognized = shell_words.detached_run_script(word, command.directory)
+        if detector_break_is_set("detached-run-start-directory"):   # 弄坏开关：相对路径不跟 cd，从开头的当前目录解
+            resolved = shell_words.resolve_path(directory, os.path.expanduser(word)) if directory else None
+            recognized = shell_words.detached_run_script(word, directory)
+        if not recognized and resolved in copied:
+            recognized = f"{word}（这条命令里前面拷出来的 {shell_words.DETACHED_RUN_SCRIPT_LOCATION}）"
+        if recognized:
+            subcommand, rest = detached_run_subcommand(command.words[1:])
+            if subcommand in DETACHED_RUN_MAIN_AGENT_ONLY:
+                how = "source 读进来的 " if command.launcher == "source" else ""
+                found.append(" ".join([f"{how}{recognized}", subcommand, *rest[:2]]))
+            continue
+        copied |= detached_run_copy_destinations(command, copied)
+    return list(dict.fromkeys(found))
+
+def detached_run_refusal(command, agent_type, directory, repository_root):
+    """③ 的放行口只给主 agent：子 agent（输入里有 agent_type）用 detached-run.sh 的 start 或 stop 就交回认出的调用；主 agent 与别的写法交 []。
+    directory 是命令开头的当前目录（hook 输入里的 cwd，没有就是仓库根），认改名拷贝与符号链接时解相对路径用；repository_root 是这个 hook 所在的仓。"""
+    if (not agent_type or detector_break_is_set("disable-check")
+            or detector_break_is_set("allow-subagent-detached-run")):
+        return []
+    return detached_run_calls(command, directory)
 
 # ⑧ 有 Edit 工具的项目子 agent 在 Bash 里就地改仓内文件：命令位置上的 `sed -i`（目标不在 /tmp/ 下），或 python 代码里 open(<仓内路径字面量>, 'w' / 'a' / 'x')、
 #   Path(<仓内路径字面量>).write_text( / .write_bytes(。仓内路径字面量：crates/、.claude/、research/、records/、litmus/、briefs/ 起头的，或仓根起的绝对路径。
@@ -489,8 +741,8 @@ def sed_in_place_targets(arguments):
     return [path for path in files if not path.startswith("/tmp/")]
 
 def repository_in_place_edit_refusal(command, agent_type, repository_root):
-    if (not agent_type or os.environ.get("BASH_COMMAND_DETECTOR_DISABLE_CHECK") == "1"
-            or os.environ.get("BASH_COMMAND_DETECTOR_ALLOW_REPOSITORY_IN_PLACE_EDIT") == "1"
+    if (not agent_type or detector_break_is_set("disable-check")
+            or detector_break_is_set("allow-repository-in-place-edit")
             or not agent_has_edit_tool(repository_root, agent_type)):
         return []
     found = []
@@ -550,8 +802,8 @@ def compile_first_verdict(command, repository_root):
 
 def compile_first_refusal(command, agent_type, repository_root):
     """交回要拒的写法与目标；只判 COMPILE_FIRST_AGENTS 里的 agent，前台、run_in_background 一样判。"""
-    if (agent_type not in COMPILE_FIRST_AGENTS or os.environ.get("BASH_COMMAND_DETECTOR_DISABLE_CHECK") == "1"
-            or os.environ.get("BASH_COMMAND_DETECTOR_ALLOW_COMPILE_FIRST_BYPASS") == "1"):
+    if (agent_type not in COMPILE_FIRST_AGENTS or detector_break_is_set("disable-check")
+            or detector_break_is_set("allow-compile-first-bypass")):
         return []
     return compile_first_verdict(command, repository_root)
 
@@ -565,14 +817,20 @@ def background_task_output_wait_loops(text):
     """命令位置上的等待循环、条件或循环体里点名了 tasks/<id>.output 的，外面有没有 timeout 都算。"""
     return [loop for layer in shell_layers(text, honor_timeout=False) for loop in wait_loops_in(layer.commands, waits_on_task_output)]
 
+def subagent_background_refusal(agent_type, run_in_background):
+    """⑩ 子 agent（输入里有 agent_type）用 run_in_background 起命令就交 True；主 agent 与前台命令交 False。"""
+    if detector_break_is_set("disable-check") or detector_break_is_set("allow-subagent-background"):
+        return False
+    return bool(agent_type) and run_in_background is True
+
 def wait_loop_refusal(command, run_in_background):
     """前台（run_in_background 不是 true）的命令里有没超时的等待循环，就交回认出的循环（每个循环开头那条简单命令）；否则交 []。"""
-    if (os.environ.get("BASH_COMMAND_DETECTOR_DISABLE_CHECK") == "1"
-            or os.environ.get("BASH_COMMAND_DETECTOR_ALLOW_FOREGROUND_WAIT_LOOP") == "1"):
+    if (detector_break_is_set("disable-check")
+            or detector_break_is_set("allow-foreground-wait-loop")):
         return []
-    refuse_every = os.environ.get("BASH_COMMAND_DETECTOR_REFUSE_EVERY_WAIT_LOOP") == "1"
+    refuse_every = detector_break_is_set("refuse-every-wait-loop")
     if run_in_background is True and not refuse_every:
-        if os.environ.get("BASH_COMMAND_DETECTOR_ALLOW_BACKGROUND_TASK_OUTPUT_WAIT") == "1":
+        if detector_break_is_set("allow-background-task-output-wait"):
             return []
         return background_task_output_wait_loops(command)
     return unbounded_wait_loops(command, honor_timeout=not refuse_every)
@@ -634,8 +892,8 @@ def unwaited_background_jobs(text):
 
 def unwaited_ampersand_refusal(command, run_in_background):
     """run_in_background 为 true 的命令里有以单独的 & 收尾、之后同一层没有 wait 的作业，就交回认出的作业；否则交 []。前台不拒。"""
-    if (os.environ.get("BASH_COMMAND_DETECTOR_DISABLE_CHECK") == "1"
-            or os.environ.get("BASH_COMMAND_DETECTOR_ALLOW_UNWAITED_AMPERSAND") == "1"):
+    if (detector_break_is_set("disable-check")
+            or detector_break_is_set("allow-unwaited-ampersand")):
         return []
     if run_in_background is not True:
         return []
@@ -1098,8 +1356,8 @@ def results_overwrite_verdict(command, repository_root):
 
 def results_overwrite_refusal(command, repository_root):
     """交回 (要拒的写法与目标, 要记的检出)；前台、run_in_background 一样判，主 agent 与子 agent 都判。"""
-    if (os.environ.get("BASH_COMMAND_DETECTOR_DISABLE_CHECK") == "1"
-            or os.environ.get("BASH_COMMAND_DETECTOR_ALLOW_RESULTS_OVERWRITE") == "1"):
+    if (detector_break_is_set("disable-check")
+            or detector_break_is_set("allow-results-overwrite")):
         return [], []
     return results_overwrite_verdict(command, repository_root)
 
@@ -1266,8 +1524,8 @@ def script_in_place_verdict(command, repository_root, scratch_root=SCRIPT_SCRATC
 
 def script_in_place_refusal(command, repository_root, scratch_root=SCRIPT_SCRATCH_ROOT):
     """交回要拒的写法与目标；前台、run_in_background 一样判，主 agent 与子 agent 都判。"""
-    if (os.environ.get("BASH_COMMAND_DETECTOR_DISABLE_CHECK") == "1"
-            or os.environ.get("BASH_COMMAND_DETECTOR_ALLOW_SCRIPT_IN_PLACE_WRITE") == "1"):
+    if (detector_break_is_set("disable-check")
+            or detector_break_is_set("allow-script-in-place-write")):
         return []
     return script_in_place_verdict(command, repository_root, scratch_root)
 
@@ -1296,7 +1554,7 @@ def private_config_path():
 
 def private_words(key):
     """私有配置里 key 的值按空白与逗号切开的词；文件不在、读不了、没有这个键、弄坏开关设着，都交回空表（那一项不判、不报错）。"""
-    if os.environ.get("BASH_COMMAND_DETECTOR_IGNORE_PRIVATE_CONFIG") == "1":
+    if detector_break_is_set("ignore-private-config"):
         return []
     try:
         with open(private_config_path(), encoding="utf-8") as handle:
@@ -1630,8 +1888,8 @@ def termination_findings(text, process_table=None, own_ancestors=(), whole_comma
 
 def process_signal_refusal(command, process_table_reader=read_process_table, own_process_id=None):
     """命令里有打得到别人的终止写法就交回每一处的原因；否则交 []。写死的进程号才读进程表。前台、run_in_background 一样拒。"""
-    if (os.environ.get("BASH_COMMAND_DETECTOR_DISABLE_CHECK") == "1"
-            or os.environ.get("BASH_COMMAND_DETECTOR_ALLOW_PROCESS_SIGNALS") == "1"):
+    if (detector_break_is_set("disable-check")
+            or detector_break_is_set("allow-process-signals")):
         return []
     table = process_table_reader() if re.search(r"(?<![\w$-])\d+\b", command) else None
     own_ancestors = ancestors_in(table, own_process_id or os.getpid()) if table is not None else []
@@ -1803,10 +2061,10 @@ def selftest(hook_dir):
         return 1
     exit_code, problems = scratch.run_with_scratch(
         lambda work: selftest_in(hook_dir, work), "bash-command-detector-",
-        os.environ.get("BASH_COMMAND_DETECTOR_KEEP_SELFTEST_SCRATCH") == "1", "BASH_COMMAND_DETECTOR_SELFTEST_ROLE",
+        detector_break_is_set("keep-selftest-scratch"), "BASH_COMMAND_DETECTOR_SELFTEST_ROLE",
         ["bash", os.path.join(hook_dir, "bash-command-detector.sh"), "--selftest"])
     return scratch.merged_exit_code(exit_code, problems, ".claude/hooks/bash-command-detector.sh 的 selftest()",
-                                    "BASH_COMMAND_DETECTOR_KEEP_SELFTEST_SCRATCH=1")
+                                    "BASH_COMMAND_DETECTOR_BREAK=keep-selftest-scratch")
 
 def selftest_in(hook_dir, work):
     detections = os.path.join(work, "detections.jsonl")
@@ -2000,6 +2258,15 @@ def selftest_in(hook_dir, work):
         ("并行加 wait", "bash a.sh > a.log 2>&1 & bash b.sh > b.log 2>&1 & wait", 0),
         ("echo 引号里当数据写", 'echo "nohup bash x.sh & disown"', 0),
         ("grep 的参数里写着 disown", "grep -n 'disown\\|coproc' notes.md", 0),
+        # research/scripts/detached-run.sh start 是 ③ 的放行口（谁能用归 detached_run_refusal）；它 -- 之后那条命令照判（BASH_COMMAND_DETECTOR_BREAK=opaque-detached-run 下第二、三、四格红）
+        ("detached-run.sh start 本身不算放出追踪", "bash research/scripts/detached-run.sh start --label m -- sleep 1", 0),
+        ("detached-run.sh start 里面那条 bash -c 里的 & disown 照拒", "bash research/scripts/detached-run.sh start --label m -- bash -c 'bash long.sh & disown'", 1),
+        ("detached-run.sh --force start --label= --log 里面不等结束的 systemd-run 照拒",
+         "nice -n 19 bash /abs/research/scripts/detached-run.sh --force start --label=m --log /tmp/m.log -- systemd-run --user bash gate.sh", 1),
+        # -- 之后先写 --force：它的 preflight 摘掉它，单元里跑的是后面那条（共用模块的 LIB_SHELL_WORDS_BREAK=detached-run-force-kept 下这一格红）
+        ("detached-run.sh start 的 -- 之后先写 --force、里面 setsid -f 照拒",
+         "bash research/scripts/detached-run.sh start --label m -- --force setsid -f bash long.sh", 1),
+        ("detached-run.sh list 不算", "bash research/scripts/detached-run.sh list", 0),
         ("写进笔记的 heredoc 正文", "cat > note.md <<'EOF'\nnohup bash long.sh &\ndisown\nEOF", 0),
         ("注释里写的", "ls  # nohup bash long.sh & disown", 0),
     ]
@@ -2484,12 +2751,72 @@ def selftest_in(hook_dir, work):
                               env=dict(os.environ, AGENT_HOOK_DETECTIONS=detections),
                               input=json.dumps({"tool_name": "Bash", "session_id": "s", "agent_type": agent_type,
                                                 "tool_input": {"command": command, "run_in_background": False}}))
+    def entry_in_background_as(agent_type, command):
+        hook_payload = {"tool_name": "Bash", "session_id": "s", "tool_input": {"command": command, "run_in_background": True}}
+        if agent_type:
+            hook_payload["agent_type"] = agent_type
+        return subprocess.run(["bash", os.path.join(repository_hooks, "bash-command-detector.sh")], capture_output=True, text=True,
+                              env=dict(os.environ, AGENT_HOOK_DETECTIONS=detections), input=json.dumps(hook_payload))
+    subagent_background = entry_in_background_as("implementation-writer", "cargo build -p singlefs-core")
+    results.append(("stdin:子 agent 用 run_in_background 起命令拒绝（退出码 2）", 2, subagent_background.returncode))
+    results.append(("stdin:子 agent 的 run_in_background 拒绝时 stderr 写了交回主 agent", 1,
+                    int("✗" in subagent_background.stderr and "→" in subagent_background.stderr and "交回主 agent" in subagent_background.stderr)))
+    results.append(("stdin:主 agent 用 run_in_background 起同一条命令放行（退出码 0）", 0, entry_in_background_as(None, "cargo build -p singlefs-core").returncode))
+    results.append(("stdin:子 agent 前台起同一条命令放行（退出码 0）", 0, entry_as("implementation-writer", "cargo build -p singlefs-core").returncode))
     runner_copy = entry_as("experiment-runner", "cp /tmp/claude-1000/runner-x/e161_x.rs crates/singlefs-checker-tier/src/bin/e161_x.rs")
     results.append(("stdin:experiment-runner cp 进主工作区的入库装置拒绝（退出码 2）", 2, runner_copy.returncode))
     results.append(("stdin:先编后换的拒绝点名那条脚本与出路", 1,
                     int("✗" in runner_copy.stderr and "→" in runner_copy.stderr and COMPILE_THEN_SWAP_SCRIPT in runner_copy.stderr)))
     writer_copy = entry_as("implementation-writer", "cp /tmp/claude-1000/runner-x/e161_x.rs crates/singlefs-checker-tier/src/bin/e161_x.rs")
     results.append(("stdin:implementation-writer 同样的 cp 放行（退出码 0）", 0, writer_copy.returncode))
+    # 走真实入口：detached-run.sh 的 start、stop 只给主 agent，子 agent 的拒绝（退出码 2）、stderr 给出路；list、watch 谁都放；主 agent 放行
+    #   （BASH_COMMAND_DETECTOR_BREAK=allow-subagent-detached-run 下子 agent 拒绝的那五格红）
+    subagent_start = entry_as("implementation-writer", "bash research/scripts/detached-run.sh start --label m -- sleep 1")
+    results.append(("stdin:子 agent 经 detached-run.sh start 起长跑拒绝（退出码 2）", 2, subagent_start.returncode))
+    results.append(("stdin:拒绝时 stderr 点名 detached-run.sh、写了交回主 agent 的写法", 1,
+                    int("✗" in subagent_start.stderr and "→" in subagent_start.stderr and "detached-run.sh" in subagent_start.stderr
+                        and "要主 agent 跑的命令" in subagent_start.stderr and "交回" in subagent_start.stderr)))
+    results.append(("stdin:子 agent 带前缀、nice、绝对路径、--force 的 detached-run.sh start 同样拒绝（退出码 2）", 2,
+                    entry_as("clerk", "SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash /abs/research/scripts/detached-run.sh --force start --label m -- sleep 1").returncode))
+    results.append(("stdin:子 agent 在 bash -c 里经 detached-run.sh start 同样拒绝（退出码 2）", 2,
+                    entry_as("clerk", "bash -c 'bash research/scripts/detached-run.sh start --label m -- sleep 1'").returncode))
+    results.append(("stdin:子 agent 的 detached-run.sh stop 拒绝（退出码 2）", 2, entry_as("clerk", "bash research/scripts/detached-run.sh stop m").returncode))
+    results.append(("stdin:子 agent 的 detached-run.sh list 放行（退出码 0）", 0, entry_as("clerk", "bash research/scripts/detached-run.sh list").returncode))
+    results.append(("stdin:子 agent 的 detached-run.sh watch 放行（退出码 0）", 0,
+                    entry_as("clerk", "bash research/scripts/detached-run.sh watch --every 600").returncode))
+    results.append(("stdin:主 agent 经 detached-run.sh start 起长跑放行（退出码 0）", 0,
+                    entry_as(None, "cd /tmp/wt && SINGLEFS_HEAVY_TESTS=user-request bash /abs/research/scripts/detached-run.sh start --label m -- sleep 1").returncode))
+    results.append(("stdin:主 agent 的 detached-run.sh stop 放行（退出码 0）", 0, entry_as(None, "bash research/scripts/detached-run.sh stop m").returncode))
+    # 走真实入口：按内容认 detached-run.sh——source / . 读进来的、开头带签名行的改名拷贝、指到它的符号链接、同一条命令里先 cp / ln -s 再起的，
+    #   子 agent 的 start / stop 照拒（BASH_COMMAND_DETECTOR_BREAK=detached-run-by-name 下这六格红）；删掉签名行的拷贝认不出、list 放行
+    detached_sample = "#!/usr/bin/env bash\n# detached-run-script-signature: 样本（bash-command-detector 自检造的）\necho sample\n"
+    os.makedirs(os.path.join(work, "research", "scripts"), exist_ok=True)
+    os.makedirs(os.path.join(work, "elsewhere"), exist_ok=True)
+    for relative, text in (("dr-renamed.sh", detached_sample), ("research/scripts/detached-run.sh", "#!/usr/bin/env bash\necho 没有签名行的样本\n"),
+                           ("dr-without-signature.sh", detached_sample.replace("# detached-run-script-signature:", "# 签名行删掉了："))):
+        with open(os.path.join(work, relative), "w", encoding="utf-8") as handle:
+            handle.write(text)
+    os.symlink(os.path.join(work, "research", "scripts", "detached-run.sh"), os.path.join(work, "elsewhere", "dr-link.sh"))
+    for label, command in (("source 读进来", "source research/scripts/detached-run.sh start --label m -- sleep 1"),
+                           (". 读进来", ". research/scripts/detached-run.sh start --label m -- sleep 1"),
+                           ("开头带签名行的改名拷贝", f"bash {work}/dr-renamed.sh start --label m -- sleep 1"),
+                           ("指到它的符号链接 stop", f"bash {work}/elsewhere/dr-link.sh stop m"),
+                           ("同一条命令里先 cp 改名再起", f"cp research/scripts/detached-run.sh {work}/dr2.sh && bash {work}/dr2.sh start --label m -- sleep 1"),
+                           ("同一条命令里先 ln -s 再起", "ln -s detached-run.sh research/scripts/drl.sh; bash research/scripts/drl.sh start --label m -- sleep 1")):
+        results.append((f"stdin:子 agent 经{label}的 detached-run.sh 起或停拒绝（退出码 2）", 2, entry_as("clerk", command).returncode))
+    # 同一条命令里 install / mv 拷出来再起的（BASH_COMMAND_DETECTOR_BREAK=detached-run-copy-by-cp-ln 下这两格红）；
+    #   cd 之后按相对路径起改名拷贝（开头的当前目录里没有这个文件；BASH_COMMAND_DETECTOR_BREAK=detached-run-start-directory 下这一格红）
+    for label, command in (("同一条命令里先 install 改名再起", f"install -m 755 research/scripts/detached-run.sh {work}/dr4.sh && bash {work}/dr4.sh start --label m -- sleep 1"),
+                           ("同一条命令里先 mv 改名再起", f"mv research/scripts/detached-run.sh {work}/dr5.sh && bash {work}/dr5.sh start --label m -- sleep 1"),
+                           ("cd 之后按相对路径起的改名拷贝", f"cd {work} && bash ./dr-renamed.sh start --label m -- sleep 1")):
+        results.append((f"stdin:子 agent 经{label}的 detached-run.sh 拒绝（退出码 2）", 2, entry_as("clerk", command).returncode))
+    for label, agent_type, command in (("子 agent 起删掉签名行的拷贝认不出（罩不住的那一种，钉住现状）", "clerk", f"bash {work}/dr-without-signature.sh start --label m -- sleep 1"),
+                                       ("子 agent 先 cp 改名再 list", "clerk", f"cp research/scripts/detached-run.sh {work}/dr3.sh && bash {work}/dr3.sh list"),
+                                       ("子 agent source 读进来 watch", "clerk", "source research/scripts/detached-run.sh watch --every 600"),
+                                       ("主 agent source 读进来 start", None, "source research/scripts/detached-run.sh start --label m -- sleep 1")):
+        results.append((f"stdin:{label}放行（退出码 0）", 0, entry_as(agent_type, command).returncode))
+    unknown_break_items = [item for item in os.environ.get(DETECTOR_BREAK_VARIABLE, "").split(",") if item and item not in KNOWN_DETECTOR_BREAK_ITEMS]
+    results.append((f"{DETECTOR_BREAK_VARIABLE} 里的项都认得（认得的：{'、'.join(KNOWN_DETECTOR_BREAK_ITEMS)}）", [], unknown_break_items))
     renamed, renamed_recorded = through_entry(f"cp /tmp/new.sh research/scripts/.running.sh.installing && mv research/scripts/.running.sh.installing {running}")
     results.append(("stdin:写到临时文件再 mv 换上放行（退出码 0）、不记检出", (0, 0), (renamed.returncode, renamed_recorded)))
     # 同走 run_in_background 的那一条：只记检出
@@ -2597,18 +2924,22 @@ def selftest_in(hook_dir, work):
               "unwaited_ampersand_refusal() / unwaited_background_jobs() / jobs_with_endings()、"
               "results_overwrite_refusal() / results_overwrite_verdict() / overwrite_steps() / follow_simple_command() / destination_words() 与共用的 lib_shell_words.py；"
               "「覆盖产物:临时 git 仓建得起来」红的是本机的 git 起不来，先看 git init 能不能跑；"
-              "BASH_COMMAND_DETECTOR_DISABLE_CHECK、_DISABLE_SELF_BACKGROUND、_KEEP_HEREDOC_BODIES、_KEEP_SELFTEST_SCRATCH、_ALLOW_WATCHDOG_MISUSE、"
-              "_ALLOW_FOREGROUND_WAIT_LOOP、_REFUSE_EVERY_WAIT_LOOP、_ALLOW_DETACHING、_ALLOW_UNWAITED_AMPERSAND、_ALLOW_RESULTS_OVERWRITE、_ALLOW_PROCESS_SIGNALS "
-              "或 _ALLOW_SCRIPT_IN_PLACE_WRITE 设着的话这里本来就该红；"
+              "BASH_COMMAND_DETECTOR_BREAK 设着的话（项与红的格见文件头）这里本来就该红；"
               "「终止进程:」「扫脚本:」红的看 process_signal_refusal() / termination_findings() / call_findings() / scan_scripts()；"
               "「就地改脚本:」红的看 script_in_place_refusal() / script_in_place_verdict() / python_in_place_writes() / is_existing_script()；"
-              "「先编后换:」红的看 compile_first_refusal() / compile_first_verdict() / overwrite_steps(every_write=True)，_ALLOW_COMPILE_FIRST_BYPASS 设着的话本来就该红")
+              "「先编后换:」红的看 compile_first_refusal() / compile_first_verdict() / overwrite_steps(every_write=True)，BASH_COMMAND_DETECTOR_BREAK=allow-compile-first-bypass 设着的话本来就该红；"
+              "detached-run.sh 那几格红的看 detached_run_refusal() / detached_run_calls() / detached_run_copy_destinations() / detached_run_inner_words() "
+              "与 wrapped_commands()、共用模块的 detached_run_script() / detached_run_start_command()，"
+              "BASH_COMMAND_DETECTOR_BREAK 的 allow-subagent-detached-run、opaque-detached-run、detached-run-by-name、detached-run-copy-by-cp-ln、detached-run-start-directory "
+              "或共用模块的 LIB_SHELL_WORDS_BREAK=detached-run-force-kept 设着的话本来就该红")
         return 1
     summary = ("没超时的等待循环、run_in_background 里又自己放后台记进检出记录，普通命令、重定向里的 & 、前台的 & 、写进文件的 heredoc 正文与按模式找进程（归上游钩子）不记；"
                "起看门狗不用 run_in_background、或带 &、nohup、setsid、disown、丢进 /dev/null 的拒绝（退出码 2），run_in_background 只写 watch.sh 的、把名字当参数的、"
                "不盯的模式与 agent-watch.py report 放行；前台没超时的等待循环拒绝（退出码 2、不记检出），外层套了 timeout 的、run_in_background 里的（只记检出）、"
                "引号与注释里当数据写的、不带 sleep 的与 for 循环放行；命令位置上的 disown、coproc、setsid -f、nohup … &、tmux / screen 分离、"
                "不等结束的 systemd-run 前台后台都拒，不带 & 的 nohup、裸 setsid、systemd-run --wait、并行加 wait 与当数据写的放行；"
+               "detached-run.sh start 本身放行、它 -- 之后那条照判（--force 照 preflight 摘），start 与 stop 只给主 agent（子 agent 带前缀、bash -c 里的、source / . 读进来的、"
+               "带签名行的改名拷贝、符号链接、同一条命令里先 cp / install / mv / ln -s 再起的、cd 之后按相对路径起的照拒，删掉签名行的拷贝认不出），list、watch 谁都放；"
                "run_in_background 里以单独的 & 收尾、之后同一层同一对圆括号里没有 wait 的拒绝（结尾 &、& 后接 echo $!、capped.sh 包着的、"
                "子 shell、命令替换、bash -c 与喂给 shell 的 heredoc 里的，wait -n 与按 pid 轮询不算 wait），之后用 wait / wait \"$pid\" 等的、"
                "&&、2>&1、|&、&>、当数据写的与前台的放行；在临时 git 仓里，整份覆盖 research/results/ 下已存在又没进 git 的文件拒绝（>、>|、&>、2>、>& 文件、"
@@ -2663,6 +2994,12 @@ def main():
             pass
         return 0
     tool_input = hook_input.get("tool_input") if isinstance(hook_input.get("tool_input"), dict) else {}
+    if subagent_background_refusal(hook_input.get("agent_type"), tool_input.get("run_in_background")):
+        print(f"  ✗ {hook_input.get('agent_type')} 用 run_in_background 起命令：子 agent 不跑要放后台等的活，一律交回主 agent 跑", file=sys.stderr)
+        print("     → 怎么办：不起这条命令；把它原样（工作目录、环境变量前缀、要的内存上限与线程数）写进交回报告「要主 agent 跑的命令」一节，"
+              "连同做完的、没做的一起交回；主 agent 跑完把输出路径交给新派的 agent 接着做。前台跑得完的短命令照常前台跑"
+              "（共用约束 .claude/agent-common.md「长活交回主 agent」）", file=sys.stderr)
+        return 2
     noted_overwrites = []
     try:
         reasons, calls = watchdog_rejection(tool_input.get("command") or "", tool_input.get("run_in_background"))
@@ -2694,7 +3031,24 @@ def main():
                   "`nohup … &`、`tmux` / `screen` 的分离模式、`systemd-run`），然后结束本轮，等它的完成通知再接着做；"
                   "几条活要并行就在同一条命令里每件把退出码写进自己的文件（`{ <命令>; echo \"$?\" > <草稿目录>/b<批号>-<件号>.rc; } &`，"
                   "每批开跑前先删掉这一批的 .rc），最后单独一个不带参数的 `wait` 等齐，数一遍 .rc 与派出去的件数对不上整批作废，"
-                  "对得上再按派活的次序逐个读（共用约束 .claude/agent-common.md「执行前拒绝的写法」那一条的 ④）", file=sys.stderr)
+                  "对得上再按派活的次序逐个读（共用约束 .claude/agent-common.md「执行前拒绝的写法」那一条的 ④）；"
+                  "主 agent 要跑过后台时限的长活，经 `bash research/scripts/detached-run.sh start --label <名> -- <命令>` 起（挂到用户级 systemd 下，"
+                  "会话被停也不停），会话里只用 run_in_background 起 `bash research/scripts/detached-run.sh watch` 上报", file=sys.stderr)
+            return 2
+        try:
+            given_directory = hook_input.get("cwd")
+            detached_calls = detached_run_refusal(tool_input.get("command") or "", hook_input.get("agent_type"),
+                                                  given_directory if isinstance(given_directory, str) and os.path.isdir(given_directory)
+                                                  else repository_root_of(hook_dir), repository_root_of(hook_dir))
+        except Exception as error:
+            print(f"  ! bash-command-detector.sh 没判成 detached-run.sh 的起法（{error!r}），这条命令照常执行", file=sys.stderr)
+            detached_calls = []
+        if detached_calls:
+            print(f"  ✗ {hook_input.get('agent_type')} 用 research/scripts/detached-run.sh 起或停脱离会话的长跑（认出的调用：{'；'.join(detached_calls)}）："
+                  "这个入口只给主 agent，经它起的活不在你的进程树里，你交回之后没人认领", file=sys.stderr)
+            print("     → 怎么办：要放后台等的活不起，把命令原样与预计多久写进交回报告「要主 agent 跑的命令」一节交回，主 agent 跑完再新派"
+                  "（共用约束 .claude/agent-common.md「长活交回主 agent」）。"
+                  "只读的 `detached-run.sh list`、`watch` 不拦。这一道只拒这种写法，不停你在跑的任何东西", file=sys.stderr)
             return 2
         try:
             jobs = unwaited_ampersand_refusal(tool_input.get("command") or "", tool_input.get("run_in_background"))
@@ -2719,7 +3073,7 @@ def main():
             loops = []
         if loops and tool_input.get("run_in_background") is True:
             print(f"  ✗ run_in_background 里轮询后台任务的输出文件（认出的循环：{'；'.join(loops)}）：等自己起的后台任务不写轮询", file=sys.stderr)
-            print("     → 怎么办：结束本轮，等那个后台任务的完成通知再接着做（共用约束 .claude/agent-common.md「长活可以等」）；"
+            print("     → 怎么办：结束本轮，等那个后台任务的完成通知再接着做（共用约束 .claude/agent-common.md「长活交回主 agent」）；"
                   "等的是别人起的进程，按进程号等：`python3 .claude/singlefs-ai-sop/scripts/proc.py wait <pid> --timeout <秒>`。"
                   "这一道只拒这种写法，不停你在跑的任何东西", file=sys.stderr)
             return 2

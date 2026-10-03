@@ -24,8 +24,33 @@
 # 这一道自己出错（读不了报告、cite-check 跑不起来、JSON 解析不了）不拒：放行，错误写进 stderr。
 #
 #   handback-guard.sh             # 从 stdin 读 hook 的 JSON
-#   handback-guard.sh --selftest  # 在临时目录里走一遍放行与拒绝；HANDBACK_GUARD_BREAK=no-limit / no-cite / cite-any-agent / no-green-count /
-#                                 # zero-count-ok / judge-general-purpose / no-background 各自必须让它红
+#   handback-guard.sh --selftest  # 在临时目录里走一遍放行与拒绝
+# 弄坏开关（只给自证判红用；自证里经 stdin 起的那一次入口照样带着调用方设的值）。
+# 逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里 cases 的标签，括号里是那条「✗ 自检：<标签>」失败行在标签之后的开头）：
+#   HANDBACK_GUARD_BREAK=no-limit  decide() 不判 ① 交回正文的长度
+#       超过上限的项目子 agent（「应当返回 2，实际 0」）
+#       走真实 stdin 入口：超长交回（「应当返回 2，实际 0」）
+#   HANDBACK_GUARD_BREAK=no-cite  decide() 不判 ② 三方腿与核查员的引文
+#       攻方腿引文行号错（「应当返回 2，实际 0」）
+#       核查员没点名报告（「应当返回 2，实际 0」）
+#   HANDBACK_GUARD_BREAK=cite-any-agent  ② 引文这一条对每个项目子 agent 都判，不只三方腿与核查员：交回里没点名 -output.md 的一律拒
+#       正好在上限的项目子 agent（「应当返回 0，实际 2」）
+#       回扫员不核引文（「应当返回 0，实际 2」）
+#       书记员绿行带数（「应当返回 0，实际 2」）
+#       回扫员的绿行不判（「应当返回 0，实际 2」）
+#       起过的后台任务都跑完了（「应当返回 0，实际 2」）
+#       那个后台任务结束之后再交回放行（「应当返回 0，实际 2」）
+#   HANDBACK_GUARD_BREAK=no-green-count  green_count_problems() 不判 ③ 绿行没有数
+#       书记员绿行没数（「应当返回 2，实际 0」）
+#       执行员报告文件里的绿行没数（「应当返回 2，实际 0」）
+#   HANDBACK_GUARD_BREAK=zero-count-ok  green_count_problems() 不判 ③ 绿行报 0 项
+#       书记员绿行 0 项（「应当返回 2，实际 0」）
+#   HANDBACK_GUARD_BREAK=judge-general-purpose  is_project_agent() 把带 agent_type 的一律当项目子 agent（general-purpose 也判 ①②③）
+#       不是项目定义的 agent 不判（「应当返回 0，实际 2」）
+#   HANDBACK_GUARD_BREAK=no-background  background_problems() 一律交空表，不判 ④ 自己起的后台任务还在跑
+#       交回时自己起的后台任务还在跑（项目子 agent）（「应当返回 2，实际 0」）
+#       交回时自己起的后台任务还在跑（通用 agent 也判）（「应当返回 2，实际 0」）
+#       后台还在跑的拒绝说明列出进程号、命令与两条出路（等完成通知、按进程号停）（「应当返回 True，实际 False」）
 set -uo pipefail
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$HOOK_DIR/../singlefs-ai-sop/scripts/preflight.sh"

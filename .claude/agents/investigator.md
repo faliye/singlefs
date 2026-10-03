@@ -29,8 +29,8 @@ required-inputs: 现象, 草稿目录, 报告
 2. 先原样复现：用输入给的命令在仓副本里（`rsync -a --exclude target --exclude .git`）跑一次，贴命令与原样输出。复现不出就写复现不出，列出与原现场差在哪（提交、环境变量、种子、线程数），不往下猜。
 3. 二分到文件:行：缩小输入、改坏或加打印都只在副本里做；每一步贴命令与输出，记下排除了哪几种解释、各凭哪条观测。
 4. 给最小复现：一条命令加它的原样输出；再给「什么现象会推翻这个定位」，并在副本里造一次那个现象看它确实会出现。
-5. 要跑的东西是重型测试（名字带 layer0 的测试二进制、门禁 `54-layer0-replay`、checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-research-build-and-replay 的 experiment-replay 格、全量 cargo test）的，不跑，写进报告交主 agent 去问用户。
-6. 上下文过 400k：停在最近一个能交接的点，报告写查到哪一步、排除了什么、还差什么，交回。
+5. 要跑的东西是重型测试（名字带 layer0 的测试二进制、门禁 `checker-tier-layer0-replay`、checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification、checker-tier-research-build-and-replay 的 experiment-replay 格、全量 cargo test）的，不跑，写进报告交主 agent 去问用户。
+6. 上下文多大都不交回，活没做完就接着做。
 7. 派发提示写了「查到就修」的：定位到的改法在条款里写明了的，在主工作区只改「要动的 crates 文件」那一行列的文件，照 `.claude/agents/implementation-writer.md` 第 2、3、3a、4 步写实现、补测试、证红（`prove-red.sh`）、变异行追加进 `crates/mutations.tsv`、末尾一条命令跑 fmt、clippy、build 与动到的测试二进制；条款没写、要做设计判断的，停在那一处写进报告，不自己定。报告附 `git diff --stat -- crates`。
 
 ## 写范围

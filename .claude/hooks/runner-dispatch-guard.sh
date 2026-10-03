@@ -5,7 +5,7 @@
 # run-condition: command python3
 #
 # 判法，按次序，第一条不成立就拒：
-#   ① 重型测试一行：派 crash-verifier、gate-triage 之外的任何类型，提示里要有一行「重型测试：不跑」（行首可带 - * > 与粗体）。
+#   ① 重型测试一行：派任何类型，提示里要有一行「重型测试：不跑」（重型测试只由主 agent 跑）（行首可带 - * > 与粗体）。
 #      提示正文里提到重型阶段的句子不再逐句判；执行时 heavy-test-guard.sh 与看门狗的进程一层照旧兜底。
 #   ⑫ 内置通用类型（general-purpose、claude，或不给 subagent_type）一律拒：一次性的活派项目定义 clerk（起步不带 CLAUDE.md 与规则），只读搜索派 Explore；
 #      确要派内置类型，提示里写一行「通用已判：<为什么 clerk 做不了>」放行。
@@ -21,9 +21,8 @@
 #      交回了（`<agent-message from="<id>">` 后跟 `[Subagent hand-back]`）、任务通知是 failed / killed / stopped、或被 TaskStop 停了；
 #      派发之后 10 分钟主会话记录里还没有它的，按没派出去删。
 #   ⑥ 快照冲突：派 kb-scribe、implementation-writer 时要改的文件在还没判完的三方轮开工快照里，拒（判法见 snapshot_conflict_verdict 上面那段）。
-#   ⑦ 模型：新派的是 opus（tool_input.model，没给取定义的 model；inherit、没有定义的按 opus 算，推的）时，本会话还在跑的 opus 子 agent
-#      （主会话记录里 resolvedModel 含 opus、没结束、会话记录 3 小时内动过或 3 小时内派的）已有 OPUS_CONCURRENCY_LIMIT 个（16，用户 2026-09-28 定）就拒；
-#      放行行「opus 并发已判：<理由>」。另外，主会话记录里 8 天内有 failed 任务通知写着「resets <时刻> (<时区缩写>)」、它的
+#   ⑦ 并发与模型：本会话还在跑的子 agent（不分模型；主会话记录里派出去、没结束、会话记录 3 小时内动过或 3 小时内派的）
+#      已有 SUBAGENT_CONCURRENCY_LIMIT 个（5，用户 2026-10-02 定）就拒，没有放行行。同一条消息里并行派的几个，后几个判的时候前几个可能还没写进主会话记录，数不到。另外，主会话记录里 8 天内有 failed 任务通知写着「resets <时刻> (<时区缩写>)」、它的
 #      「model sent to the API」与新派的同一族（opus / sonnet / haiku），而现在还没到那个时刻，拒；那次失败之后同一族又派出去、没再撞限额的
 #      算窗口已解开（换了账号或提前恢复），不拒；放行行「限额窗口已判：<理由>」。
 #   ⑧ 书记员：提示里点名的 /tmp/claude-<uid>/ 下规格文件逐份交给 research/scripts/kb-spec-check.py，红了拒；一份认得出的规格都没有也拒
@@ -37,15 +36,113 @@
 # 这一道自己出错（读不了表、主会话记录、规格，JSON 解析不了、脚本跑不起来）不拒：放行，错误写进 stderr。
 #
 #   runner-dispatch-guard.sh             # 从 stdin 读 hook 的 JSON
-#   runner-dispatch-guard.sh --selftest  # 在临时目录里走一遍放行与拒绝；RUNNER_DISPATCH_GUARD_DISABLE_CHECK=1（全关）、
-#                                        # RUNNER_DISPATCH_GUARD_DISABLE_HEAVY_TEST=1（只关重型测试一行）或 RUNNER_DISPATCH_GUARD_DISABLE_SNAPSHOT=1（只关快照）时
-#                                        # 自检必须判红；RUNNER_DISPATCH_GUARD_BREAK=snapshot-no-normalize / snapshot-spec-unread /
-#                                        # snapshot-closed-round-open / snapshot-body-optional / snapshot-valve-ignored / snapshot-valve-loose /
-#                                        # snapshot-any-agent / snapshot-loose-lines / snapshot-no-edges / snapshot-unreadable-denies /
-#                                        # snapshot-unreadable-aborts / snapshot-missing-spec-denies / json-error-silent / json-error-denies /
-#                                        # inputs-ignored / general-purpose-free / general-purpose-allowed / verdict-not-spec / placeholders-ignored / scope-ignored / scope-negation-ignored /
-#                                        # registry-ignored / registry-no-prune / opus-no-limit / window-ignored / spec-check-skipped /
-#                                        # admission-ignored / mutation-table-free / runner-backfill-refused / valve-loose-all / window-never-lifted 各自也必须让它红
+#   runner-dispatch-guard.sh --selftest  # 在临时目录里走一遍放行与拒绝；下面每个弄坏开关单独打开时自检必须判红
+# 弄坏开关（一次设一个；自检里经 bash 起钩子的 stdin 那几项也带着同一个值）。逐个写开关名、弄坏哪一处、打开后自检哪几项红：
+# 项名是 selftest() 里 cases 的标签，失败行是「✗ 自检：<项名> 应当返回 <应得>，实际 <实得>」，项名就是它的句首；
+# 项后面括号里写那一项的应得与实得，项之间用「；」隔开；开关说明末尾括号里的圈号是上面判法的条号：
+#   RUNNER_DISPATCH_GUARD_BREAK=disable-check  decide() 一进来就放行，后面哪一条都不判
+#       第一段没点名岔路（应当返回 2，实际 0）；第一段岔路写无（应当返回 2，实际 0）；续做没写还差（应当返回 2，实际 0）；续做还差写无（应当返回 2，实际 0）；重跑登记也算续做（应当返回 2，实际 0）；
+#       重型:没写那一行（实现员）（应当返回 2，实际 0）；重型:没写那一行（通用 agent）（应当返回 2，实际 0）；重型:写在句子中间不算那一行（应当返回 2，实际 0）；
+#       共用约束:通用 agent 没写开工先读（应当返回 2，实际 0）；通用:general-purpose 没写放行行的拒（应当返回 2，实际 0）；通用:claude 类型同样拒（应当返回 2，实际 0）；
+#       骨架:占位没填的拒（应当返回 2，实际 0）；输入:本地攻方缺禁读清单（09-23 那一次）（应当返回 2，实际 0）；输入:核查员缺草稿目录（09-24 那一次）（应当返回 2，实际 0）；
+#       输入:核查员缺快照（09-25 那一次）（应当返回 2，实际 0）；写范围:执行员报告写进 research/prompts（09-26 那一次）（应当返回 2，实际 0）；
+#       写范围:执行员去更新问题单（应当返回 2，实际 0）；写范围:实现员写进 invariants.md（应当返回 2，实际 0）；变异分诊:没给表（应当返回 2，实际 0）；
+#       实现员:第二件撞了在跑的那件（应当返回 2，实际 0）；实现员:没写要动的文件（应当返回 2，实际 0）；并发:已有 5 个在跑再派（应当返回 2，实际 0）；
+#       并发:派 sonnet 一样算（应当返回 2，实际 0）；并发:没有定义的类型一样算（应当返回 2，实际 0）；窗口:还没到 resets 时刻不派同一族（应当返回 2，实际 0）；规格:点名的规格旧串不在（应当返回 2，实际 0）；
+#       规格:一份认得出的规格都没有（应当返回 2，实际 0）；准入:输入没变不写重跑登记（应当返回 2，实际 0）；快照:书记员撞开着的轮（清单写 ./.claude/）（应当返回 2，实际 0）；
+#       快照:实现员撞开着的轮（清单写 tree/crates/）（应当返回 2，实际 0）；快照:提示写项目根起的绝对路径、中文文件名（应当返回 2，实际 0）；
+#       快照:清单写 defs/.claude/ 也归一（应当返回 2，实际 0）；快照:规格文件里点名的照拒（路径后面紧跟中文）（应当返回 2，实际 0）；快照:放行行写的是别的轮，照拒（应当返回 2，实际 0）；
+#       快照:放行行没写理由，照拒（应当返回 2，实际 0）；快照:放行行没写理由、下一行不算它的理由，照拒（应当返回 2，实际 0）；快照:放行行理由是占位，照拒（应当返回 2，实际 0）；
+#       快照:拒绝信息原样转贴，句中的放行模板不算（应当返回 2，实际 0）；快照:一份清单读不了，读得了的那份撞了照拒（应当返回 2，实际 0）；stdin:快照撞了拒绝（退出码 2）（应当返回 2，实际 0）；
+#       stdin:快照拒绝的 stderr 写了轮名、文件与出路（应当返回 1，实际 0）；stdin:快照清单读不了时 stderr 写了是哪一份（应当返回 1，实际 0）；stdin:续做没写还差（应当返回 2，实际 0）；
+#       stdin:派实现员没写重型测试一行拒绝（退出码 2）（应当返回 2，实际 0）；stdin:拒绝时 stderr 写了出路（应当返回 1，实际 0）；
+#       stdin:拒绝时 stderr 的「→ 规矩」那一串列出真编 QEMU（应当返回 1，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=disable-heavy-test  不查「重型测试：不跑」一行（①）
+#       重型:没写那一行（实现员）（应当返回 2，实际 0）；重型:写在句子中间不算那一行（应当返回 2，实际 0）；stdin:拒绝时 stderr 写了出路（应当返回 1，实际 0）；
+#       stdin:拒绝时 stderr 的「→ 规矩」那一串列出真编 QEMU（应当返回 1，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=disable-snapshot  snapshot_conflict_verdict 一进来就放行，快照那一条不判（⑥）
+#       快照:书记员撞开着的轮（清单写 ./.claude/）（应当返回 2，实际 0）；快照:实现员撞开着的轮（清单写 tree/crates/）（应当返回 2，实际 0）；
+#       快照:提示写项目根起的绝对路径、中文文件名（应当返回 2，实际 0）；快照:清单写 defs/.claude/ 也归一（应当返回 2，实际 0）；快照:规格文件里点名的照拒（路径后面紧跟中文）（应当返回 2，实际 0）；
+#       快照:放行行写的是别的轮，照拒（应当返回 2，实际 0）；快照:放行行没写理由，照拒（应当返回 2，实际 0）；快照:放行行没写理由、下一行不算它的理由，照拒（应当返回 2，实际 0）；
+#       快照:放行行理由是占位，照拒（应当返回 2，实际 0）；快照:拒绝信息原样转贴，句中的放行模板不算（应当返回 2，实际 0）；快照:一份清单读不了，读得了的那份撞了照拒（应当返回 2，实际 0）；
+#       stdin:快照撞了拒绝（退出码 2）（应当返回 2，实际 0）；stdin:快照拒绝的 stderr 写了轮名、文件与出路（应当返回 1，实际 0）；
+#       stdin:快照清单读不了时 stderr 写了是哪一份（应当返回 1，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=admission-ignored  designer_admission_verdict 不判重跑登记的准入：admission.py 退 77 也放行（⑨）
+#       准入:输入没变不写重跑登记（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=general-purpose-allowed  内置通用类型没写「通用已判」放行行也放行（⑫）
+#       通用:general-purpose 没写放行行的拒（应当返回 2，实际 0）；通用:claude 类型同样拒（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=general-purpose-free  没有定义文件的类型没写「开工先读 `.claude/agent-common.md`」也放行（②）
+#       共用约束:通用 agent 没写开工先读（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=inputs-ignored  missing_required_inputs 不查定义的 required-inputs（③）
+#       输入:本地攻方缺禁读清单（09-23 那一次）（应当返回 2，实际 0）；输入:核查员缺草稿目录（09-24 那一次）（应当返回 2，实际 0）；输入:核查员缺快照（09-25 那一次）（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=json-error-denies  hook 的 JSON 解析不了时拒（退 2），不放行
+#       stdin:JSON 解析不了放行（应当返回 0，实际 2）
+#   RUNNER_DISPATCH_GUARD_BREAK=json-error-silent  hook 的 JSON 解析不了时 stderr 不写错误
+#       stdin:JSON 解析不了时 stderr 写了错误（应当返回 1，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=mutation-table-free  派 mutation-triage 没给变异表也放行（⑩）
+#       变异分诊:没给表（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=concurrency-no-limit  model_verdict 不数在跑的子 agent，满上限也放行（⑦）
+#       并发:已有 5 个在跑再派（应当返回 2，实际 0）；并发:派 sonnet 一样算（应当返回 2，实际 0）；并发:没有定义的类型一样算（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=placeholders-ignored  骨架占位 `<填 …>` 没填完也放行（⑬）
+#       骨架:占位没填的拒（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=registry-ignored  implementation_writer_verdict 不比在跑的实现员登记的文件，撞了也放行（⑤）
+#       实现员:第二件撞了在跑的那件（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=registry-no-prune  live_registry_rows 不删已结束的、派发之后没出现的登记行（⑤）
+#       实现员:第一件交回之后不再撞（应当返回 0，实际 2）
+#   RUNNER_DISPATCH_GUARD_BREAK=runner-backfill-refused  执行员提示写「只补落产物」不放行，照查岔路一行（⑪）
+#       执行员:只补落产物放行（应当返回 0，实际 2）；并发:4 个在跑放行（应当返回 0，实际 2）；
+#       窗口:换一族放行（应当返回 0，实际 2）；窗口:用户定了照派（应当返回 0，实际 2）；窗口:resets 时刻已过（应当返回 0，实际 2）；窗口:撞限额之后同一族又派出去没再撞，已解开（应当返回 0，实际 2）
+#   RUNNER_DISPATCH_GUARD_BREAK=scope-ignored  out_of_scope_mentions 不判写范围（④）
+#       写范围:执行员报告写进 research/prompts（09-26 那一次）（应当返回 2，实际 0）；写范围:执行员去更新问题单（应当返回 2，实际 0）；
+#       写范围:实现员写进 invariants.md（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=scope-negation-ignored  路径前面六个字以内的否定词不看，否定句里的路径也判（④）
+#       写范围:否定句里的路径不判（应当返回 0，实际 2）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-any-agent  快照那一条对每种类型都判，不只 kb-scribe 与 implementation-writer（⑥）
+#       快照:派别的 agent 放行（设计员）（应当返回 0，实际 2）；快照:派别的 agent 放行（实验设计员）（应当返回 0，实际 2）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-body-optional  open_three_way_rounds 把没有 _<轮>-body.md 正文的快照也算开着的三方轮（⑥）
+#       快照:有快照没正文的不是三方轮，放行（应当返回 0，实际 2）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-closed-round-open  open_three_way_rounds 把已有 <轮>-main-verification.md 判决的轮也算开着（⑥）
+#       快照:撞的是已判完的轮，放行（应当返回 0，实际 2）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-loose-lines  快照清单每行取最后一个词当路径，不认「<哈希>  <路径>」的形状、不归一（⑥）
+#       快照:书记员撞开着的轮（清单写 ./.claude/）（应当返回 2，实际 0）；快照:实现员撞开着的轮（清单写 tree/crates/）（应当返回 2，实际 0）；
+#       快照:提示写项目根起的绝对路径、中文文件名（应当返回 2，实际 0）；快照:清单写 defs/.claude/ 也归一（应当返回 2，实际 0）；快照:规格文件里点名的照拒（路径后面紧跟中文）（应当返回 2，实际 0）；
+#       快照:放行行写的是别的轮，照拒（应当返回 2，实际 0）；快照:放行行没写理由，照拒（应当返回 2，实际 0）；快照:放行行没写理由、下一行不算它的理由，照拒（应当返回 2，实际 0）；
+#       快照:放行行理由是占位，照拒（应当返回 2，实际 0）；快照:拒绝信息原样转贴，句中的放行模板不算（应当返回 2，实际 0）；快照:清单里认不出的行不拒（应当返回 0，实际 2）；
+#       stdin:快照撞了拒绝（退出码 2）（应当返回 2，实际 0）；stdin:快照拒绝的 stderr 写了轮名、文件与出路（应当返回 1，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-missing-spec-denies  提示点名而不在的规格文件当成撞了快照（⑥）
+#       快照:规格文件不存在不拒（应当返回 0，实际 2）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-no-edges  mentioned_repository_paths 按子串判路径出现，不看前后连着的路径字符（⑥）
+#       快照:路径后面连着别的路径字符不算（应当返回 0，实际 2）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-no-normalize  快照清单里的路径不从 .claude/ 或 crates/ 那一段起归一，./、tree/、defs/ 前缀留着（⑥）
+#       快照:书记员撞开着的轮（清单写 ./.claude/）（应当返回 2，实际 0）；快照:实现员撞开着的轮（清单写 tree/crates/）（应当返回 2，实际 0）；
+#       快照:提示写项目根起的绝对路径、中文文件名（应当返回 2，实际 0）；快照:清单写 defs/.claude/ 也归一（应当返回 2，实际 0）；快照:规格文件里点名的照拒（路径后面紧跟中文）（应当返回 2，实际 0）；
+#       快照:放行行写的是别的轮，照拒（应当返回 2，实际 0）；快照:放行行没写理由，照拒（应当返回 2，实际 0）；快照:放行行没写理由、下一行不算它的理由，照拒（应当返回 2，实际 0）；
+#       快照:放行行理由是占位，照拒（应当返回 2，实际 0）；快照:拒绝信息原样转贴，句中的放行模板不算（应当返回 2，实际 0）；快照:清单里认不出的行不拒（应当返回 0，实际 2）；
+#       stdin:快照撞了拒绝（退出码 2）（应当返回 2，实际 0）；stdin:快照拒绝的 stderr 写了轮名、文件与出路（应当返回 1，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-spec-unread  不读提示点名的 /tmp/claude-<uid>/ 下规格文件，只判提示正文（⑥）
+#       快照:规格文件里点名的照拒（路径后面紧跟中文）（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-unreadable-aborts  读不了的快照清单直接抛异常，整条快照判法走「自己出错放行」（⑥）
+#       快照:一份清单读不了，读得了的那份撞了照拒（应当返回 2，实际 0）；stdin:快照清单读不了时 stderr 写了是哪一份（应当返回 1，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-unreadable-denies  读不了的快照清单当成撞了快照（⑥）
+#       快照:一份清单读不了，不拒（应当返回 0，实际 2）；stdin:快照清单读不了放行（应当返回 0，实际 2）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-valve-ignored  ruled_snapshot_conflicts 不认「快照冲突已判」放行行（⑥）
+#       快照:有放行行，放行（应当返回 0，实际 2）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-valve-loose  「快照冲突已判：」出现在任何地方就放行全部轮，不看行首、轮名与理由（⑥）
+#       快照:放行行写的是别的轮，照拒（应当返回 2，实际 0）；快照:放行行没写理由，照拒（应当返回 2，实际 0）；快照:放行行没写理由、下一行不算它的理由，照拒（应当返回 2，实际 0）；
+#       快照:放行行理由是占位，照拒（应当返回 2，实际 0）；快照:拒绝信息原样转贴，句中的放行模板不算（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=spec-check-skipped  kb_scribe_spec_verdict 不把规格交给 kb-spec-check.py（⑧）
+#       规格:点名的规格旧串不在（应当返回 2，实际 0）；规格:一份认得出的规格都没有（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=valve-reason-ignored  valve_reason 一律当没写放行行：「通用已判」「限额窗口已判」「规格检查已判」「准入已判」都不认
+#       共用约束:通用 agent 写了开工先读（应当返回 0，实际 2）；窗口:用户定了照派（应当返回 0，实际 2）；规格:写了放行行（应当返回 0，实际 2）；
+#       准入:写了放行行（应当返回 0，实际 2）；快照:撞的是已判完的轮，放行（应当返回 0，实际 2）；快照:有放行行，放行（应当返回 0，实际 2）；快照:清单里认不出的行不拒（应当返回 0，实际 2）；
+#       快照:规格文件不存在不拒（应当返回 0，实际 2）；快照:一份清单读不了，不拒（应当返回 0，实际 2）；stdin:快照清单读不了放行（应当返回 0，实际 2）；
+#       stdin:快照清单读不了时 stderr 写了是哪一份（应当返回 1，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=verdict-not-spec  提示给判决不给规格时照样当规格判，不让写回员自己起草（⑧）
+#       书记员:给判决不给规格放行（写回员自己起草）（应当返回 0，实际 2）
+#   RUNNER_DISPATCH_GUARD_BREAK=window-ignored  model_verdict 不判限额窗口（⑦）
+#       窗口:还没到 resets 时刻不派同一族（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=window-never-lifted  撞限额之后同一族又派出去、没再撞的，也不算窗口解开（⑦）
+#       窗口:撞限额之后同一族又派出去没再撞，已解开（应当返回 0，实际 2）
 # gate-similar: heavy-test-guard.sh 管同一条「子 agent 不跑重型测试」，但挂 Bash、在执行那一刻判真要跑的命令与它执行的脚本；这里只在派发那一刻查一行结构化声明，判法没有能共用的
 # gate-similar: continuation-guard.sh 同样读会话记录认子 agent 交回没有，但它挂 SendMessage、按子 agent 自己的会话记录判收件人；这里挂 Agent|Task、按主会话记录里的派发回执、交回消息、任务通知与 TaskStop 判在跑的实现员与 opus 数，读的记录种类不同
 # gate-similar: ask-user-claim-guard.sh 也判一段给人看的中文，但挂 AskUserQuestion、判断言词加出处；这里判的是固定标签行与路径，不逐句理解
@@ -66,7 +163,7 @@ def labelled_value(prompt, label):
     return None if match is None else match.group(1).strip()
 
 
-HEAVY_TEST_OWNERS = {"crash-verifier", "gate-triage"}
+HEAVY_TEST_OWNERS = set()   # 子 agent 一个都不跑重型测试：提交时的重阶段与整轮门禁由主 agent 跑
 GENERAL_PURPOSE_TYPES = {"general-purpose", "claude"}
 SKELETON_PLACEHOLDER = re.compile(r"<填[^>\n]*>")   # research/scripts/dispatch-prompt.py 骨架里没填的格   # 内置通用类型：继承项目 CLAUDE.md 与全部规则，起步约 13 万 token
 # 写回员（kb-scribe）给判决自己起草规格时，提示里点名的判决文件
@@ -74,7 +171,7 @@ VERDICT_MENTION = re.compile(r"research/prompts/[A-Za-z0-9][A-Za-z0-9_.\-]*-main
 LINE_START = r"^[ \t>*_\-]*"
 HEAVY_TEST_LINE = re.compile(LINE_START + r"重型测试[* \t]*[：:][* \t]*不跑", re.M)
 COMMON_CONSTRAINTS_READ = re.compile(r"开工先读[^\n]*\.claude/agent-common\.md")
-OPUS_CONCURRENCY_LIMIT = 16                 # 用户 2026-09-28 定（原话「子agent的数量限制在哪里 ？ 改为16」）
+SUBAGENT_CONCURRENCY_LIMIT = 5              # 用户 2026-10-02 定（原话「一个主agent 最多同时开5个subagent」）
 INHERITED_MODEL_FAMILY = "opus"             # inherit 与没有定义的类型按主 agent 的模型算；这个项目的主 agent 跑 opus（推的）
 RUNNING_RECENT_SECONDS = 3 * 3600
 UNLAUNCHED_GRACE_SECONDS = 600
@@ -95,7 +192,7 @@ MONTHS = {name: index for index, name in enumerate(["Jan", "Feb", "Mar", "Apr", 
 def valve_reason(prompt, label):
     """行首「<label>：<理由>」的理由；没有、空、占位都返回 None。"""
     match = re.search(LINE_START + re.escape(label) + r"[* \t]*[：:][* \t]*(.*?)[ \t]*$", prompt, re.M)
-    if match is None or break_switch_is("valve-loose-all"):
+    if match is None or break_switch_is("valve-reason-ignored"):
         return None
     reason = match.group(1).strip()
     return None if not reason or reason.startswith("<") or reason in NONE_WORDS else reason
@@ -214,7 +311,7 @@ def session_dispatch_events(transcript_path):
 
 
 def reset_moment(match, notified_at):
-    """「resets 3am (<时区缩写>)」→ 通知之后第一次到那个时刻；写了日期的取那一天（早于通知就算明年）。"""
+    """「resets <时>am (<时区缩写>)」→ 通知之后第一次到那个时刻；写了日期的取那一天（早于通知就算明年）。"""
     hour = int(match.group("hour")) % 12 + (12 if match.group("half") == "pm" else 0)
     minute = int(match.group("minute") or 0)
     base = datetime.fromtimestamp(notified_at, timezone.utc)
@@ -320,12 +417,12 @@ def model_verdict(hook_input, prompt, subagent_type, fields, launches, ended, wi
             wait_text = f"{wait_minutes // 60} 小时 {wait_minutes % 60} 分钟" if wait_minutes >= 60 else f"{wait_minutes} 分钟"
             return (f"✗ {family} 这一族撞过限额（「{original}」），限额窗口还要约 {wait_text} 才过去，这之前不派同一族的 agent。\n"
                     f"→ 怎么办：等约 {wait_text} 窗口过去，或换模型（派发参数 model 写别的一族）——换不换交用户定；用户定了照派，提示里写一行「限额窗口已判：<用户怎么定的>」。")
-    if family != "opus" or break_switch_is("opus-no-limit") or valve_reason(prompt, "opus 并发已判") is not None:
+    if break_switch_is("concurrency-no-limit"):
         return None
-    running = [agent_id for agent_id in launches if model_family(launches[agent_id][1]) == "opus" and is_running(agent_id, launches, ended, transcript_path)]
-    if len(running) >= OPUS_CONCURRENCY_LIMIT:
-        return (f"✗ 本会话已有 {len(running)} 个 opus 子 agent 在跑（{'、'.join(running[:10])}），上限 {OPUS_CONCURRENCY_LIMIT}（用户 2026-09-28 定）。\n"
-                "→ 怎么办：等其中一个交回再派，或这一件换 sonnet（派发参数 model）；确要超过就交用户定，定了在提示里写一行「opus 并发已判：<用户怎么定的>」。")
+    running = [agent_id for agent_id in launches if is_running(agent_id, launches, ended, transcript_path)]
+    if len(running) >= SUBAGENT_CONCURRENCY_LIMIT:
+        return (f"✗ 本会话已有 {len(running)} 个子 agent 在跑（{'、'.join(running[:10])}），一个主 agent 同时最多 {SUBAGENT_CONCURRENCY_LIMIT} 个（用户 2026-10-02 定）。\n"
+                "→ 怎么办：等其中一个交回再派；派不下的排进下一波（.claude/main-agent.md「一轮怎么开、怎么收」第 1 条）。")
     return None
 
 
@@ -517,7 +614,7 @@ def ruled_snapshot_conflicts(prompt):
 
 def snapshot_conflict_verdict(subagent_type, prompt, project_root):
     """第三条。返回 (0, 给 stderr 的提醒或 None) 放行；(2, 说明) 拒绝。这一条自己出错一律放行，错误写进说明。"""
-    if os.environ.get("RUNNER_DISPATCH_GUARD_DISABLE_SNAPSHOT") == "1":
+    if break_switch_is("disable-snapshot"):
         return 0, None
     if subagent_type not in SNAPSHOT_GUARDED_AGENTS and not break_switch_is("snapshot-any-agent"):
         return 0, None
@@ -566,18 +663,18 @@ def snapshot_conflict_verdict(subagent_type, prompt, project_root):
 
 def decide(hook_input, project_root, hook_dir=None):
     """返回 (0, None 或给 stderr 的提醒) 放行；(2, 说明) 拒绝。"""
-    if os.environ.get("RUNNER_DISPATCH_GUARD_DISABLE_CHECK") == "1":
+    if break_switch_is("disable-check"):
         return 0, None
     hook_dir = hook_dir or os.path.join(project_root, ".claude", "hooks")
     tool_input = hook_input.get("tool_input") or {}
     subagent_type = tool_input.get("subagent_type") or "general-purpose"
     prompt = tool_input.get("prompt") or ""
-    if (subagent_type not in HEAVY_TEST_OWNERS and os.environ.get("RUNNER_DISPATCH_GUARD_DISABLE_HEAVY_TEST") != "1"
+    if (subagent_type not in HEAVY_TEST_OWNERS and not break_switch_is("disable-heavy-test")
             and not HEAVY_TEST_LINE.search(prompt)):
         return 2, (f"✗ 派 {subagent_type} 的提示里没有「重型测试：不跑」一行。\n"
-                   "→ 规矩：重型测试（层 0、QEMU、herd7、crates 变异整表、全量测试、整轮门禁、全部实验复跑、E152 装置）只在提交代码时、或用户要求时跑，"
-                   "只由 crash-verifier（54-layer0-replay、checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay）与 gate-triage（gate.sh 整轮与 checker-tier-research-build-and-replay）跑；执行时 .claude/hooks/heavy-test-guard.sh 也拒。\n"
-                   "→ 怎么办：提示里单独写一行「重型测试：不跑」；提交时的重阶段派 crash-verifier、整轮门禁派 gate-triage；提交之外确实要跑，先弹窗问用户，"
+                   "→ 规矩：重型测试（层 0、QEMU、herd7、crates 变异整表、形式化验证（Verus）、全量测试、整轮门禁、全部实验复跑、E152 装置、真编 QEMU）只在提交代码时、或用户要求时跑，"
+                   "只由主 agent 跑（.claude/skills/crash-test/commit-stages.md 与 .claude/skills/gate/staged-gate.md）；执行时 .claude/hooks/heavy-test-guard.sh 也拒。\n"
+                   "→ 怎么办：提示里单独写一行「重型测试：不跑」；提交时的重阶段与整轮门禁由主 agent 自己跑；提交之外确实要跑，先弹窗问用户，"
                    "用户同意了由主 agent 带 SINGLEFS_HEAVY_TESTS=user-request 跑。")
     if (subagent_type in GENERAL_PURPOSE_TYPES and valve_reason(prompt, "通用已判") is None
             and not break_switch_is("general-purpose-allowed")):
@@ -593,7 +690,7 @@ def decide(hook_input, project_root, hook_dir=None):
     if fields is None and not COMMON_CONSTRAINTS_READ.search(prompt) and not break_switch_is("general-purpose-free"):
         return 2, (f"✗ {subagent_type} 不是项目定义的 agent，不读共用约束，提示里却没写「开工先读 `.claude/agent-common.md`」。\n"
                    "→ 怎么办：先看 .claude/main-agent.md「什么时候派哪个 agent」那张表有没有对应的定义（改门禁、钩子、脚本、定义派 tooling-writer，"
-                   "查真假与机理派 investigator）；确要派它，提示里写一行「开工先读 `.claude/agent-common.md`」，长活照那份的「长活可以等」写。")
+                   "查真假与机理派 investigator）；确要派它，提示里写一行「开工先读 `.claude/agent-common.md`」，长活照那份的「长活交回主 agent」写。")
     missing = missing_required_inputs(fields or {}, prompt)
     if missing:
         return 2, (f"✗ 派 {subagent_type} 的提示缺它定义要的输入：{'、'.join(missing)}（.claude/agents/{subagent_type}.md 的 required-inputs）。\n"
@@ -664,10 +761,10 @@ OLD_HEAVY_TEST_REFUSALS = [
     "前任有一次想在副本上跑全量测试被重型测试闸拒了——你只跑自己写的那几个测试二进制",
     "- **不许跑重型测试**：54 的 `--full`、55（QEMU）、57（herd7 真跑）、59（crates 变异表）、`gate.sh`、`cargo test --workspace` 都不许跑，钩子会拒",
     "- 59 号的红绿样本：重型测试闸按文件名拒绝子 agent 跑 59 号",
-    "- **禁跑**：名字带 `layer0` 的测试目标、54 号",
+    "- **禁跑**：名字带 `layer0` 的测试目标、checker-tier-layer0-replay",
     "- 撤回 F9：门禁分诊员定义里□那几处删掉，恢复直接起 `gate.sh`",
     "第二轮你这一侧的探针与复跑在 `research/prompts/m2-layer0-scale-r2-opus-model/`，可以接着用",
-    "只在临时拷贝上跑 `admission.py`、54 号与 hook 的自证",
+    "只在临时拷贝上跑 `admission.py`、checker-tier-layer0-replay 与 hook 的自证",
 ]
 
 FOOTER_WITHOUT_HEAVY_LINE = "开工先读 `.claude/agent-common.md`\n规格检查已判：自检样本不带规格\n"
@@ -762,8 +859,7 @@ def selftest(hook_dir):
         cases += [
             case("重型:没写那一行（实现员）", "implementation-writer", "改完交回。", 2, footer=FOOTER_WITHOUT_HEAVY_LINE),
             case("重型:没写那一行（通用 agent）", "general-purpose", "查一个文件。", 2, footer=FOOTER_WITHOUT_HEAVY_LINE),
-            case("重型:崩溃验证员不要那一行", "crash-verifier", "提交流程里跑 54 号 --full。", 0, footer=FOOTER_WITHOUT_HEAVY_LINE),
-            case("重型:门禁分诊员不要那一行", "gate-triage", "带 SINGLEFS_HEAVY_TESTS=commit 跑 gate.sh --staged。", 0, footer=FOOTER_WITHOUT_HEAVY_LINE),
+            case("重型:派原来跑重型测试的类型名也要那一行", "crash-verifier", "提交流程里跑 checker-tier-layer0-replay --full。", 2, footer=FOOTER_WITHOUT_HEAVY_LINE),
             case("重型:那一行带粗体与列表记号也认", "implementation-writer", "改完交回。\n- **重型测试**：不跑\n", 0, footer=FOOTER_WITHOUT_HEAVY_LINE),
             case("重型:写在句子中间不算那一行", "implementation-writer", "这一件的重型测试：不跑也行吧", 2, footer=FOOTER_WITHOUT_HEAVY_LINE),
             case_in(defs_work, "共用约束:通用 agent 没写开工先读", "general-purpose", heavy_line + "通用已判：要 WebSearch 查外部文档\n查一个文件。", 2, footer=False),
@@ -831,10 +927,10 @@ def selftest(hook_dir):
         cases.append(session_case("实现员:文件多也不拒（份数不设上限）", "implementation-writer", "要动的 crates 文件：" + " ".join(f"crates/b/src/f{n}.rs" for n in range(12)) + "\n", 0, "registry"))
         cases.append(session_case("实现员:带 mutations.tsv 的一件登记下来", "implementation-writer", "要动的 crates 文件：crates/mutations.tsv crates/a/src/five.rs\n", 0, "registry"))
         cases.append(session_case("实现员:mutations.tsv 与在跑的重叠不算撞", "implementation-writer", "要动的 crates 文件：crates/mutations.tsv crates/a/src/six.rs\n", 0, "registry"))
-        # opus 并发：4 个在跑（1 个交回、1 个失败的不算）；限额窗口：失败通知写着还没到的 resets 时刻
-        write_session("busy", [launch(f"a000000000000b{n:02d}", "claude-opus-5-5[1m]", f"活 {n}") for n in range(OPUS_CONCURRENCY_LIMIT + 2)]
+        # 并发：上限加 2 个派出去、1 个交回、1 个失败，在跑的正好是上限（不分模型）；限额窗口：失败通知写着还没到的 resets 时刻
+        write_session("busy", [launch(f"a000000000000b{n:02d}", "claude-opus-5-5[1m]" if n % 2 else "claude-sonnet-5", f"活 {n}") for n in range(SUBAGENT_CONCURRENCY_LIMIT + 2)]
                       + [handed_back("a000000000000b00"), notification("a000000000000b01", "failed")])
-        write_session("light", [launch(f"a000000000000c{n:02d}", "claude-opus-5", f"活 {n}") for n in range(OPUS_CONCURRENCY_LIMIT - 1)]
+        write_session("light", [launch(f"a000000000000c{n:02d}", "claude-opus-5", f"活 {n}") for n in range(SUBAGENT_CONCURRENCY_LIMIT - 2)]
                       + [launch("a000000000000c99", "claude-sonnet-5", "别的")])
         future = datetime.fromtimestamp(time.time() + 7200, timezone.utc)
         future_text = f"{future.hour % 12 or 12}{'pm' if future.hour >= 12 else 'am'}"
@@ -847,11 +943,10 @@ def selftest(hook_dir):
         past_reset = datetime.fromtimestamp(time.time() - 29 * 3600, timezone.utc)
         write_session("windowpast", [notification("a0000000000000e1", "failed", f"resets {past_reset.hour % 12 or 12}{'pm' if past_reset.hour >= 12 else 'am'} (UTC) (model sent to the API: claude-opus-5)", 30 * 3600)])  # clock-times:allow 自检造的外部限额通知原文
         cases += [
-            session_case(f"opus:已有 {OPUS_CONCURRENCY_LIMIT} 个在跑再派 opus", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 2, "busy"),
-            session_case("opus:用户定了超上限", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物\nopus 并发已判：用户当面定这一件照派", 0, "busy"),
-            session_case("opus:派 sonnet 不算", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 0, "busy", model="sonnet"),
-            session_case(f"opus:{OPUS_CONCURRENCY_LIMIT - 1} 个在跑放行", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 0, "light"),
-            session_case("opus:没有定义的类型按 opus 算", "undefined-adhoc-type", "开工先读 `.claude/agent-common.md`。", 2, "busy"),
+            session_case(f"并发:已有 {SUBAGENT_CONCURRENCY_LIMIT} 个在跑再派", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 2, "busy"),
+            session_case("并发:派 sonnet 一样算", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 2, "busy", model="sonnet"),
+            session_case(f"并发:{SUBAGENT_CONCURRENCY_LIMIT - 1} 个在跑放行", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 0, "light"),
+            session_case("并发:没有定义的类型一样算", "undefined-adhoc-type", "开工先读 `.claude/agent-common.md`。", 2, "busy"),
             session_case("窗口:还没到 resets 时刻不派同一族", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 2, "window"),
             session_case("窗口:换一族放行", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物", 0, "window", model="sonnet"),
             session_case("窗口:用户定了照派", "experiment-runner", "草稿目录 /tmp/claude-1000/e/\n只补落产物\n限额窗口已判：用户说换号了", 0, "window"),
@@ -928,6 +1023,9 @@ def selftest(hook_dir):
                                                                             "prompt": "改完交回。\n" + FOOTER_WITHOUT_HEAVY_LINE}}))
         cases.append(("stdin:派实现员没写重型测试一行拒绝（退出码 2）", 2, heavy.returncode))
         cases.append(("stdin:拒绝时 stderr 写了出路", 1, int("→ 怎么办" in heavy.stderr and "弹窗" in heavy.stderr)))
+        # 「→ 规矩」那一串列的重型测试带真编 QEMU（拒绝说明里删掉这一项，这一格红）
+        cases.append(("stdin:拒绝时 stderr 的「→ 规矩」那一串列出真编 QEMU", 1,
+                      int(any(line.startswith("→ 规矩：重型测试") and "真编 QEMU" in line for line in heavy.stderr.splitlines()))))
     finally:
         os.environ.pop("DISPATCH_GUARD_STATE_ROOT", None)
         os.environ.pop("RUNNER_DISPATCH_GUARD_ADMISSION_SCRIPT", None)
@@ -939,10 +1037,9 @@ def selftest(hook_dir):
         print(f"  ✗ 自检：{label} 应当返回 {want}，实际 {got}")  # gate-lint:detail
     if failures:
         print("    → 看 decide() 与它调的各条判法（重型测试一行、agent_definition_fields、out_of_scope_mentions、implementation_writer_verdict、model_verdict、"
-              "kb_scribe_spec_verdict、designer_admission_verdict、snapshot_conflict_verdict）；RUNNER_DISPATCH_GUARD_DISABLE_CHECK、_DISABLE_HEAVY_TEST、"
-              "_DISABLE_SNAPSHOT 或 _BREAK 设着的话这里本来就该红")
+              "kb_scribe_spec_verdict、designer_admission_verdict、snapshot_conflict_verdict）；RUNNER_DISPATCH_GUARD_BREAK 设着的话这里本来就该红")
         return 1
-    print(f"  ✓ 自检通过（查了 {len(cases)} 种）：没写「重型测试：不跑」一行的拒（崩溃验证员、门禁分诊员不要，旧判法误拦的 {len(OLD_HEAVY_TEST_REFUSALS)} 句原句带上那一行放行）；"
+    print(f"  ✓ 自检通过（查了 {len(cases)} 种）：没写「重型测试：不跑」一行的拒（哪种类型都要，旧判法误拦的 {len(OLD_HEAVY_TEST_REFUSALS)} 句原句带上那一行放行）；"
           "内置通用类型不带「通用已判」放行行的拒，Explore 与 clerk 放行；骨架占位没填完的拒；不读共用约束的类型没写开工先读的拒；定义 required-inputs 缺一组的拒、同义词认得；提示点名写范围外的路径拒、否定句里的不判；"
           "写回员给判决不给规格的放行；"
           "实现员没写要动的 crates 文件、超上限、与在跑的实现员撞文件的拒，交回之后不再撞；opus 在跑满上限的拒、sonnet 与用户放行行放行，"
