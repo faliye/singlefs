@@ -1,0 +1,36 @@
+out/q10.out seeds=25 cand_seeds=1 aband_seeds=1 checker_red_seeds=4 by_invariant={'I-7.4': 2, 'I-7.9': 2} aborted=0
+out/q11.out seeds=25 cand_seeds=0 aband_seeds=0 checker_red_seeds=3 by_invariant={'I-7.9': 3} aborted=0
+out/q12.out seeds=25 cand_seeds=0 aband_seeds=0 checker_red_seeds=3 by_invariant={'I-7.9': 3} aborted=0
+out/q1.out seeds=25 cand_seeds=0 aband_seeds=1 checker_red_seeds=2 by_invariant={'I-3.11': 1, 'I-7.9': 1} aborted=1
+out/q2.out seeds=25 cand_seeds=0 aband_seeds=0 checker_red_seeds=1 by_invariant={'I-7.9': 1} aborted=0
+out/q3.out seeds=25 cand_seeds=1 aband_seeds=0 checker_red_seeds=2 by_invariant={'I-7.4': 1, 'I-7.9': 1} aborted=1
+out/q4.out seeds=25 cand_seeds=0 aband_seeds=0 checker_red_seeds=0 by_invariant={} aborted=2
+out/q5.out seeds=25 cand_seeds=1 aband_seeds=0 checker_red_seeds=3 by_invariant={'I-7.4': 1, 'I-7.9': 2} aborted=4
+out/q6.out seeds=25 cand_seeds=1 aband_seeds=0 checker_red_seeds=6 by_invariant={'I-3.11': 1, 'I-7.4': 1, 'I-7.9': 5} aborted=0
+out/q7.out seeds=25 cand_seeds=1 aband_seeds=0 checker_red_seeds=6 by_invariant={'I-7.4': 1, 'I-7.9': 5} aborted=1
+out/q8.out seeds=25 cand_seeds=0 aband_seeds=0 checker_red_seeds=2 by_invariant={'I-7.9': 2} aborted=0
+out/q9.out seeds=25 cand_seeds=0 aband_seeds=1 checker_red_seeds=4 by_invariant={'I-7.9': 4} aborted=0
+out/r10.out seeds=60 cand_seeds=0 aband_seeds=0 checker_red_seeds=5 by_invariant={'I-7.9': 5} aborted=0
+out/r11.out seeds=60 cand_seeds=0 aband_seeds=0 checker_red_seeds=10 by_invariant={'I-7.9': 10} aborted=0
+out/r12.out seeds=60 cand_seeds=0 aband_seeds=0 checker_red_seeds=3 by_invariant={'I-7.9': 3} aborted=0
+out/r1.out seeds=60 cand_seeds=1 aband_seeds=1 checker_red_seeds=6 by_invariant={'I-3.11': 1, 'I-7.4': 2, 'I-7.9': 4} aborted=1
+out/r2.out seeds=60 cand_seeds=0 aband_seeds=1 checker_red_seeds=10 by_invariant={'I-3.1': 1, 'I-3.11': 1, 'I-7.9': 8} aborted=1
+out/r3.out seeds=60 cand_seeds=1 aband_seeds=0 checker_red_seeds=4 by_invariant={'I-3.1': 2, 'I-7.4': 1, 'I-7.9': 3} aborted=0
+out/r4.out seeds=60 cand_seeds=4 aband_seeds=1 checker_red_seeds=7 by_invariant={'I-2.1': 1, 'I-3.10': 1, 'I-3.11': 1, 'I-4.8': 1, 'I-7.2': 1, 'I-7.4': 4, 'I-7.9': 3} aborted=4
+out/r5.out seeds=60 cand_seeds=0 aband_seeds=1 checker_red_seeds=6 by_invariant={'I-3.1': 1, 'I-3.11': 1, 'I-7.4': 1, 'I-7.9': 5} aborted=0
+out/r6.out seeds=60 cand_seeds=1 aband_seeds=1 checker_red_seeds=9 by_invariant={'I-3.1': 1, 'I-3.11': 2, 'I-7.4': 1, 'I-7.9': 8} aborted=0
+out/r7.out seeds=60 cand_seeds=1 aband_seeds=3 checker_red_seeds=5 by_invariant={'I-3.11': 1, 'I-7.4': 2, 'I-7.9': 3} aborted=2
+out/r8.out seeds=60 cand_seeds=0 aband_seeds=0 checker_red_seeds=2 by_invariant={'I-7.9': 2} aborted=1
+out/r9.out seeds=60 cand_seeds=0 aband_seeds=4 checker_red_seeds=14 by_invariant={'I-7.4': 2, 'I-7.9': 12} aborted=1
+out/s10.out seeds=60 cand_seeds=0 aband_seeds=0 checker_red_seeds=5 by_invariant={'I-7.9': 5} aborted=0
+out/s11.out seeds=60 cand_seeds=0 aband_seeds=0 checker_red_seeds=10 by_invariant={'I-7.9': 10} aborted=0
+out/s12.out seeds=60 cand_seeds=0 aband_seeds=0 checker_red_seeds=3 by_invariant={'I-7.9': 3} aborted=0
+out/s1.out seeds=60 cand_seeds=1 aband_seeds=1 checker_red_seeds=6 by_invariant={'I-3.11': 1, 'I-7.4': 2, 'I-7.9': 4} aborted=1
+out/s2.out seeds=60 cand_seeds=0 aband_seeds=1 checker_red_seeds=10 by_invariant={'I-3.1': 1, 'I-3.11': 1, 'I-7.9': 8} aborted=1
+out/s3.out seeds=60 cand_seeds=1 aband_seeds=0 checker_red_seeds=4 by_invariant={'I-3.1': 2, 'I-7.4': 1, 'I-7.9': 3} aborted=0
+out/s4.out seeds=60 cand_seeds=4 aband_seeds=1 checker_red_seeds=7 by_invariant={'I-2.1': 1, 'I-3.10': 1, 'I-3.11': 1, 'I-4.8': 1, 'I-7.2': 1, 'I-7.4': 4, 'I-7.9': 3} aborted=4
+out/s5.out seeds=60 cand_seeds=0 aband_seeds=1 checker_red_seeds=6 by_invariant={'I-3.1': 1, 'I-3.11': 1, 'I-7.4': 1, 'I-7.9': 5} aborted=0
+out/s6.out seeds=60 cand_seeds=1 aband_seeds=1 checker_red_seeds=9 by_invariant={'I-3.1': 1, 'I-3.11': 2, 'I-7.4': 1, 'I-7.9': 8} aborted=0
+out/s7.out seeds=60 cand_seeds=1 aband_seeds=3 checker_red_seeds=5 by_invariant={'I-3.11': 1, 'I-7.4': 2, 'I-7.9': 3} aborted=2
+out/s8.out seeds=60 cand_seeds=0 aband_seeds=0 checker_red_seeds=2 by_invariant={'I-7.9': 2} aborted=1
+out/s9.out seeds=60 cand_seeds=0 aband_seeds=4 checker_red_seeds=14 by_invariant={'I-7.4': 2, 'I-7.9': 12} aborted=1

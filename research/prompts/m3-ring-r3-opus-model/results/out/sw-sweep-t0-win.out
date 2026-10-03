@@ -1,0 +1,4 @@
+SWEEP s=4 arm=sweep k=2 instance=3 txg=22 rows_before=[(1, 15), (2, 0)] rows_written=[(1, 15)] writes=27 segments=4 closed_form_states=4194311 layer0_states=4194316
+CRASH_STATE red=[]
+NEXT_MOUNT err=RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(4), cause: ReleaseTargetAlreadyReleased { unit: InstanceTable, device: DeviceIdentity(0), slot: SlotNumber(50432) 
+rc=0

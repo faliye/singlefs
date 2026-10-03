@@ -1,0 +1,4 @@
+SETUP s=4 n=3 R=4 A=(3,22) a_unit_writes=28 a_slots=36 shared_slots_written_by_A_and_referenced_by_R=[] anchor=Ring shadow_no_window=
+MOUNT_K1 chosen=(3,21) effective=(3,21) row_txg=23 a_units_intact=14/28 red=["I-3.11", "I-7.4"]
+MOUNT_K2 err=NewerStateStillUnreadableAfterOneReread(AccountOfAnAbandonedRoot { abandoned_root: RollbackTarget { instance: InstanceGeneration(3), checkpoint_txg: CheckpointT
+rc=0

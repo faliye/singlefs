@@ -1,0 +1,2 @@
+STATIC s=4 history=k1 hole=16 suffix=16 rollback=none anchor=Ring first_txg=17 writes=575 segments=77 unit_writes=478 valid_roots_outside_window_seen={} hit_writes=32 hits={"candidate_txg=4 newest=20": 4, "candidate_txg=4 newest=22": 16, "candidate_txg=4 newest=23": 8, "candidate_txg=4 newest=27": 4} first_hit=Some("segment17/write104/candidate_txg=4 newest=20") checker_on_hit_state=["I-2.1", "I-3.1", "I-3.10", "I-4.8", "I-7.4"] next_mount=ok chosen=20 effective=20 first_txg=21 checker_after_next_mount=["I-2.1", "I-3.1", "I-4.8", "I-5.1", "I-7.4"]
+rc=0

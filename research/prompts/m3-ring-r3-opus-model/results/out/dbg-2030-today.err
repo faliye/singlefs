@@ -1,0 +1,5 @@
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：m3-ring-r3 攻方腿原型，与别的会话各跑各的
+WINDOW_TRACE mount anchor=Off first_txg=1 window_lower=None oldest_valid_in_window=Some(CheckpointTxg(0)) effective_floor=0
+WINDOW_TRACE mount anchor=Off first_txg=8 window_lower=None oldest_valid_in_window=Some(CheckpointTxg(0)) effective_floor=0
+WINDOW_TRACE mount anchor=Off first_txg=13 window_lower=None oldest_valid_in_window=Some(CheckpointTxg(0)) effective_floor=0
+WINDOW_TRACE mount anchor=Off first_txg=33 window_lower=None oldest_valid_in_window=Some(CheckpointTxg(20)) effective_floor=13

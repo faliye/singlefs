@@ -1,0 +1,11 @@
+HOLES [16, 17]
+LIFE3 instance=4 x_txg=18 newest=21
+X txg=18 slot=(0,2) device=0 referenced_slots=28
+LIFE4 instance=5 row=23 red=[]
+ANCHOR 27 red=[]
+RAISE_ERR RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { root: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }, failure: UnitUnreadable { slot: SlotNumber(1172) } }
+AFTER_RAISE newest=27 (was 27) x_still_on_disk=Some(18) red=[]
+STEP 0 txg=28 unit_writes_over_x_refs=[] x_on_disk=Some(18) crash_before_root_red=[] after_red=[]
+STEP 1 txg=29 unit_writes_over_x_refs=[] x_on_disk=Some(18) crash_before_root_red=[] after_red=[]
+STEP 2 txg=30 unit_writes_over_x_refs=[] x_on_disk=Some(18) crash_before_root_red=[] after_red=[]
+rc=0

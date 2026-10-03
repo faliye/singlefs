@@ -1,0 +1,5 @@
+SETUP s=4 n=2 R=4 A=(3,21) a_unit_writes=28 a_slots=36 shared_slots_written_by_A_and_referenced_by_R=[(0, 50182), (0, 50183), (1, 50182), (1, 50183)] anchor=Ring shadow_no_window=1
+MOUNT_K1 chosen=(3,20) effective=(3,20) row_txg=22 a_units_intact=28/28 red=[]
+MOUNT_K2 row_txg=24 abandoned_roots_unreadable=0 R_still_in_ring=true A_in_ring=true a_units_intact=28/28 red=[]
+MOUNT_K2_SHARED_SLOTS dev0 ["50182:free=false", "50183:free=false"] F_eff=0 R_dev0_placements=Some([])
+rc=0

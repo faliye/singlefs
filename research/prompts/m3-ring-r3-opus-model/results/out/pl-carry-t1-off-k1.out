@@ -1,0 +1,6 @@
+SWEEP s=4 arm=carry k=1 instance=2 txg=21 rows_before=[(1, 16)] rows_written=[(1, 16)] writes=21 segments=4 closed_form_states=65543 layer0_states=65548
+CRASH_STATE red=["I-3.1"]
+NEXT_MOUNT ok chosen=(2,20) effective=(2,21) effective_instance_table_eq_written=true effective_instance_table_eq_chosen=true red_crash_state=["I-3.1"] red_after_mount=[]
+AFTER_MOUNT newest=(3,23) rows=Ok([(1, 16), (2, 21)])
+REMOUNT ok effective=(3,23) red=[]
+rc=0

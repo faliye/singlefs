@@ -1,0 +1,2 @@
+FUZZ seed=2030 s=4 arm=window faults=true journal=805306368 lives=3 unit_writes=994 candidate_hits=4 abandoned_hits=0 first_candidate_hit=Some("seg17/w112/dev0/slot50176/cand_txg25/newest36") first_abandoned_hit=None outside_seen=2 checker_reds=[] refusals={"R:TargetNotACandidate { target: RollbackTa": 1} aborted="" log=start7 |m2@8Or2R8CbeforeLastRoot19/21 |m3@13EFR16OR14OFFOEOOOOOCbeforeLastRoot82/84 |hideSlot1:0=txgSome(25)/newestSome(31) |m4@33OOOOOOFER43R44OR40OFOOCanywhere65/91
+rc=0

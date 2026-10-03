@@ -1,0 +1,2 @@
+FUZZ seed=1144 s=4 arm=window faults=false journal=805306368 lives=2 unit_writes=236 candidate_hits=0 abandoned_hits=0 first_candidate_hit=None first_abandoned_hit=None outside_seen=1 checker_reds=["life1:[\"I-7.9\"]"] refusals={} aborted="" log=start16 |m2@17CbeforeLastRoot11/13 |m3@20R20OFOO
+rc=0

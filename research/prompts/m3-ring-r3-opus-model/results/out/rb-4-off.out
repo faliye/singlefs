@@ -1,0 +1,18 @@
+ROLLBACK s=4 anchor=Off rollback_window_off= stale_txg=4 overwrites_before=0 current_txg=20 outcome=ok checker=[]
+ROLLBACK s=4 anchor=Off rollback_window_off= stale_txg=4 overwrites_before=1 current_txg=21 outcome=ok checker=[]
+ROLLBACK s=4 anchor=Off rollback_window_off= stale_txg=4 overwrites_before=2 current_txg=22 outcome=ok checker=[]
+ROLLBACK s=4 anchor=Off rollback_window_off= stale_txg=4 overwrites_before=3 current_txg=23 outcome=ok checker=[]
+ROLLBACK s=4 anchor=Off rollback_window_off= stale_txg=4 overwrites_before=4 current_txg=24 outcome=ok checker=[]
+ROLLBACK s=4 anchor=Off rollback_window_off= stale_txg=4 overwrites_before=5 current_txg=25 outcome=ok checker=[]
+ROLLBACK s=4 anchor=Off rollback_window_off= stale_txg=4 overwrites_before=6 current_txg=26 outcome=ok checker=[]
+ROLLBACK s=4 anchor=Off rollback_window_off= stale_txg=4 overwrites_before=7 current_txg=27 outcome=ok checker=[]
+ROLLBACK s=4 anchor=Off rollback_window_off= stale_txg=4 overwrites_before=8 current_txg=28 outcome=ok checker=[]
+ROLLBACK s=4 anchor=Off rollback_window_off= stale_txg=4 overwrites_before=9 current_txg=28 outcome=refused TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint
+ROLLBACK s=4 anchor=Off rollback_window_off= stale_txg=4 overwrites_before=10 current_txg=29 outcome=refused TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint
+ROLLBACK s=4 anchor=Off rollback_window_off= stale_txg=4 overwrites_before=11 current_txg=30 outcome=refused TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint
+ROLLBACK s=4 anchor=Off rollback_window_off= stale_txg=4 overwrites_before=12 current_txg=31 outcome=refused TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint
+ROLLBACK s=4 anchor=Off rollback_window_off= stale_txg=4 overwrites_before=13 current_txg=32 outcome=refused TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint
+ROLLBACK s=4 anchor=Off rollback_window_off= stale_txg=4 overwrites_before=14 current_txg=33 outcome=refused TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint
+ROLLBACK s=4 anchor=Off rollback_window_off= stale_txg=4 overwrites_before=15 current_txg=34 outcome=refused TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint
+ROLLBACK s=4 anchor=Off rollback_window_off= stale_txg=4 overwrites_before=16 current_txg=35 outcome=refused TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint
+rc=0

@@ -1,0 +1,11 @@
+HOLES [5, 6]
+LIFE3 instance=4 x_txg=7 newest=10
+X txg=7 slot=(1,2) device=1 referenced_slots=28
+LIFE4 instance=5 row=13 red=[]
+ANCHOR 16 red=[]
+RAISED Raised(RaisedFloor { ceiling: CheckpointTxg(7), system_configuration_writes_before_the_first_publish: WritesByStructureKind { counted: {SystemConfigurationSlot: WriteCallsAndBytes { write_calls: 2, written_bytes: 8192 }} }, publishes: [TransactionOutput { root: RootRecord { filesystem_identifier: [7
+AFTER_RAISE newest=19 (was 16) x_still_on_disk=None red=[]
+STEP 0 txg=20 unit_writes_over_x_refs=[] x_on_disk=None crash_before_root_red=[] after_red=[]
+STEP 1 txg=21 unit_writes_over_x_refs=[] x_on_disk=None crash_before_root_red=[] after_red=[]
+STEP 2 txg=22 unit_writes_over_x_refs=[] x_on_disk=None crash_before_root_red=[] after_red=[]
+rc=0

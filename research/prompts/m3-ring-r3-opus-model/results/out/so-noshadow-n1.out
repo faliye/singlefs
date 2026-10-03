@@ -1,0 +1,10 @@
+SETUP s=4 n=1 R=4 A=(3,20) a_unit_writes=28 a_slots=36 shared_slots_written_by_A_and_referenced_by_R=[] anchor=Ring shadow_no_window=1
+MOUNT_K1 chosen=(3,19) effective=(3,19) row_txg=21 a_units_intact=28/28 red=[]
+MOUNT_K2 row_txg=23 abandoned_roots_unreadable=0 R_still_in_ring=true A_in_ring=true a_units_intact=28/28 red=[]
+STEP 0 txg=26 A_in_ring=true a_units_intact=28/28 red=[]
+STEP 1 txg=27 A_in_ring=true a_units_intact=28/28 red=[]
+STEP 2 txg=28 A_in_ring=true a_units_intact=28/28 red=[]
+STEP 3 txg=29 A_in_ring=true a_units_intact=28/28 red=[]
+STEP 4 txg=30 A_in_ring=true a_units_intact=28/28 red=[]
+STEP 5 txg=31 A_in_ring=true a_units_intact=28/28 red=[]
+rc=0

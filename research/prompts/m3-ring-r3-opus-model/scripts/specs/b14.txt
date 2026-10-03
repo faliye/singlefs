@@ -1,0 +1,6 @@
+s8-today-a - 3000 8 20 today
+s8-window-a SINGLEFS_CHECKER_DEFER_WINDOW=1 3000 8 20 window
+s8-today-b - 3020 8 20 today
+s8-window-b SINGLEFS_CHECKER_DEFER_WINDOW=1 3020 8 20 window
+s8f-today-a FUZZ_FAULTS=1 3100 8 20 today
+s8f-window-a FUZZ_FAULTS=1,SINGLEFS_CHECKER_DEFER_WINDOW=1 3100 8 20 window

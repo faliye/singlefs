@@ -1,0 +1,11 @@
+HOLES [7, 8]
+LIFE3 instance=4 x_txg=9 newest=12
+X txg=9 slot=(0,3) device=0 referenced_slots=28
+LIFE4 instance=5 row=14 red=[]
+ANCHOR 18 red=[]
+RAISED Raised(RaisedFloor { ceiling: CheckpointTxg(10), system_configuration_writes_before_the_first_publish: WritesByStructureKind { counted: {SystemConfigurationSlot: WriteCallsAndBytes { write_calls: 2, written_bytes: 8192 }} }, publishes: [TransactionOutput { root: RootRecord { filesystem_identifier: [
+AFTER_RAISE newest=20 (was 18) x_still_on_disk=Some(9) red=["I-7.9：实例 5 txg 19 那条根把回退下界 F 从 0 抬到 10，高于它之前的根算出的抬 F 上限 9：每块盘上最新的有效根 {0: 18, 1: 16}，非空有效根 [9]，空不空判不了的有效根 []，最旧有效根 txg 9"]
+STEP 0 txg=21 unit_writes_over_x_refs=[] x_on_disk=Some(9) crash_before_root_red=["I-7.9：实例 5 txg 19 那条根把回退下界 F 从 0 抬到 10，高于它之前的根算出的抬 F 上限 9：每块盘上最新的有效根 {0: 18, 1: 16}，非空有效根 [9]，空不空判不了的有效根 []，最旧有效根 txg 9"] after_red=[]
+STEP 1 txg=22 unit_writes_over_x_refs=[] x_on_disk=None crash_before_root_red=[] after_red=[]
+STEP 2 txg=23 unit_writes_over_x_refs=[] x_on_disk=None crash_before_root_red=[] after_red=[]
+rc=0
