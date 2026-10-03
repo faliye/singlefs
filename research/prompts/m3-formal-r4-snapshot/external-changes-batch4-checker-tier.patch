@@ -1,0 +1,1325 @@
+diff --git a/crates/singlefs-checker-tier/src/crash_amplification.rs b/crates/singlefs-checker-tier/src/crash_amplification.rs
+index b99b274..1cb8061 100644
+--- a/crates/singlefs-checker-tier/src/crash_amplification.rs
++++ b/crates/singlefs-checker-tier/src/crash_amplification.rs
+@@ -1165,7 +1165,7 @@ pub fn gpu_verdict_items(
+         .iter()
+         .enumerate()
+     {
+-        if violated & (1u64 << index) != 0 {
++        if violated & (1u128 << index) != 0 {
+             items.push(format!("{LAYER0_RED_PASS_POOL_CHECKER}:{invariant}"));
+         }
+     }
+diff --git a/crates/singlefs-checker-tier/src/crash_identity.rs b/crates/singlefs-checker-tier/src/crash_identity.rs
+index 8551014..61d516a 100644
+--- a/crates/singlefs-checker-tier/src/crash_identity.rs
++++ b/crates/singlefs-checker-tier/src/crash_identity.rs
+@@ -1313,25 +1313,96 @@ mod tests {
+         assert_eq!(original.digest, copied.digest, "摘要相同：身份不含绝对路径");
+     }
+ 
++    /// 崩溃枚举用例登记表在仓里的位置（相对仓根）。
++    const CRASH_CASE_REGISTRY: &str = ".claude/gate.d/stage-inputs.tsv";
++
++    /// 从仓根取崩溃枚举用例登记了哪些测试目标：登记表在就逐行取 `crash-case:` 行 `test=` 列的测试目标；
++    /// 不在（只导出 `crates/` 的树，广谱变异的导出树就是这样）交回 [`CrashCaseRegistration::RegistryAbsent`]，不猜。
++    #[derive(Debug, PartialEq, Eq)]
++    enum CrashCaseRegistration {
++        Registered { targets: Vec<String> },
++        RegistryAbsent { looked_at: PathBuf },
++    }
++
++    /// # Panics
++    /// 登记表在却读不出、或某一行 `crash-case:` 没有 `test=` 列或 `test=` 列里没有测试目标。
++    fn crash_case_registration_under(root: &Path) -> CrashCaseRegistration {
++        let registry = root.join(CRASH_CASE_REGISTRY);
++        if !registry.is_file() {
++            return CrashCaseRegistration::RegistryAbsent {
++                looked_at: registry,
++            };
++        }
++        let registrations = std::fs::read_to_string(&registry).expect("登记表在就读得出");
++        let targets = registrations
++            .lines()
++            .filter(|line| line.starts_with("crash-case:"))
++            .map(|line| {
++                let test_column = line
++                    .split('\t')
++                    .find_map(|column| column.strip_prefix("test="))
++                    .expect("test= 列");
++                test_column.split(':').nth(1).expect("测试目标").to_string()
++            })
++            .collect();
++        CrashCaseRegistration::Registered { targets }
++    }
++
++    /// 仓里登记表在，取到的是登记的那几条。
++    #[test]
++    fn crash_case_registration_reads_the_crash_cases_registered_in_the_repository() {
++        match crash_case_registration_under(&repository_root()) {
++            CrashCaseRegistration::Registered { targets } => assert!(
++                targets
++                    .iter()
++                    .any(|target| target == "crash_enumeration_fixed_script_stream"),
++                "仓里的登记表登记了固定脚本那条流（取到的：{targets:?}）"
++            ),
++            CrashCaseRegistration::RegistryAbsent { looked_at } => {
++                panic!("仓里登记表 {} 在，却认成不在", looked_at.display())
++            }
++        }
++    }
++
++    /// 只有 `crates/` 的树（广谱变异的导出树）里登记表不在，认成「不在」，不认成「登记了 0 条」。
++    #[test]
++    fn crash_case_registration_reports_the_registry_absent_in_a_tree_of_only_crates() {
++        let exported =
++            std::env::temp_dir().join(format!("singlefs-exported-crates-{}", std::process::id()));
++        let _ = std::fs::remove_dir_all(&exported);
++        std::fs::create_dir_all(exported.join("crates")).expect("建得出导出树");
++        let registration = crash_case_registration_under(&exported);
++        std::fs::remove_dir_all(&exported).expect("删得掉导出树");
++        assert_eq!(
++            registration,
++            CrashCaseRegistration::RegistryAbsent {
++                looked_at: exported.join(CRASH_CASE_REGISTRY)
++            },
++            "只有 crates/ 的树里登记表不在"
++        );
++    }
++
+     /// 每条登记的崩溃枚举用例的判法代码：含恢复与 checker 走树（判它们的正是这两样），不含装置二进制、不含随机历史脚手架
+     /// （按 crate 闭包取会把整个 harness 收进来，E164 W5 量到崩溃枚举节点 20 个提交全部重跑；按模块引用取就不会）。
++    /// 登记表不在（只导出 `crates/` 的树）时这一核没有对象：打一行 `CRASH_CASE_REGISTRY_ABSENT` 写明跳过、不判；
++    /// 按 `tests/` 下的文件名认不出登记的那几条（登记的有不以 `crash_enumeration_` 起头的，以它起头的也有没登记的）。
+     #[test]
+     fn every_registered_crash_case_depends_on_recovery_and_the_checker_walk_but_not_on_apparatus_binaries(
+     ) {
+         let root = repository_root();
+         let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
+-        let registrations =
+-            std::fs::read_to_string(root.join(".claude/gate.d/stage-inputs.tsv")).expect("登记表");
++        let targets = match crash_case_registration_under(&root) {
++            CrashCaseRegistration::Registered { targets } => targets,
++            CrashCaseRegistration::RegistryAbsent { looked_at } => {
++                println!(
++                    "CRASH_CASE_REGISTRY_ABSENT registry={} 登记表不在（只导出 crates/ 的树），跳过「登记的崩溃枚举用例的判法代码」这一核",
++                    looked_at.display()
++                );
++                return;
++            }
++        };
+         let mut cases = 0usize;
+-        for line in registrations
+-            .lines()
+-            .filter(|line| line.starts_with("crash-case:"))
+-        {
+-            let test_column = line
+-                .split('\t')
+-                .find_map(|column| column.strip_prefix("test="))
+-                .expect("test= 列");
+-            let target = test_column.split(':').nth(1).expect("测试目标");
++        for target in &targets {
+             let entry = format!("crates/singlefs-checker-tier/tests/{target}.rs");
+             let code = judging_code_by_module_references(&root, &[entry.as_str()], &toolchain)
+                 .expect("算得出");
+diff --git a/crates/singlefs-checker-tier/src/crash_injection.rs b/crates/singlefs-checker-tier/src/crash_injection.rs
+index 63790ed..38e2226 100644
+--- a/crates/singlefs-checker-tier/src/crash_injection.rs
++++ b/crates/singlefs-checker-tier/src/crash_injection.rs
+@@ -17,6 +17,8 @@
+ //! （checker 与记录核对器，挂载或那次发布被拒也判）；挂载途中再崩一次的镜像（二次崩溃，取号、写行、暖机三段各摆一个；只读恢复、模型、
+ //! checker、记录核对器）。层 0 不跑可写挂载，这两截只在这里有。后两截交给记录核对器的是整条历史录制流接上挂载那一段
+ //! （与之后那次发布）的录制流（[`HistoryThenWritableMountRecords`]），历史那几次发布在挂载之后的池与二次崩溃镜像上还在不在也核得到。
++//! 每个二次崩溃镜像上再起一次可写挂载，判 I-8.4（重放幂等）的 R-换：「恢复加写行那一整段」做两次（第一次崩在半途）与做一次，
++//! 读出的内容相同（[`compare_content_read_once_and_twice`]；不比扇区、实例代号、实例表行）。
+ 
+ use std::collections::{BTreeMap, BTreeSet};
+ use std::fmt::Write as _;
+@@ -31,6 +33,7 @@ use singlefs_checker::walk::check_pool_image;
+ use singlefs_core::address::{
+     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
+ };
++use singlefs_core::admission::SpaceAdmission;
+ use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+ use singlefs_core::make_filesystem::MakeFilesystemParameters;
+ use singlefs_core::mount::mount_writable_with_space_admission;
+@@ -286,6 +289,8 @@ pub enum CrashStateStage {
+     AfterTheWritableMountAndOnePublish,
+     /// 可写挂载途中再崩一次（二次崩溃），崩在挂载的这一段里：只读恢复、问模型、池级 checker、记录核对器（历史与挂载写出的发布都核）。
+     SecondCrashInsideTheWritableMount(WritableMountPhase),
++    /// 二次崩溃镜像上再起一次可写挂载之后的池：读出的内容要与没崩过的那一次挂载之后读出的相同（I-8.4 的 R-换）。
++    RemountAfterASecondCrashInsideTheWritableMount(WritableMountPhase),
+ }
+ 
+ impl CrashStateStage {
+@@ -300,6 +305,9 @@ impl CrashStateStage {
+             CrashStateStage::SecondCrashInsideTheWritableMount(phase) => {
+                 format!("second_crash_inside_{}", phase.name())
+             }
++            CrashStateStage::RemountAfterASecondCrashInsideTheWritableMount(phase) => {
++                format!("remount_after_a_second_crash_inside_{}", phase.name())
++            }
+         }
+     }
+ }
+@@ -433,6 +441,13 @@ pub struct CrashInjectionTally {
+     pub second_crash_model_judgements: u64,
+     pub second_crash_checker_runs: u64,
+     pub second_crash_record_checks: u64,
++    /// 二次崩溃状态上判 I-8.4 的次数（每个二次崩溃状态一次，在它上面再起一次可写挂载）：判了的按崩在挂载的哪一段分、
++    /// 读出的内容与没崩过的那一次相同的、不同的（判红），没判的按为什么没判分。
++    pub remounts_after_a_second_crash: u64,
++    pub remount_idempotence_judged_by_phase: BTreeMap<WritableMountPhase, u64>,
++    pub remounts_after_a_second_crash_reading_the_same_content: u64,
++    pub remounts_after_a_second_crash_reading_different_content: u64,
++    pub remount_idempotence_not_judged: BTreeMap<RemountIdempotenceNotJudged, u64>,
+     /// 每一截（崩溃镜像本身、挂载与一次发布之后、二次崩溃）判到已知红与新发现的状态数之和。
+     pub crash_states_ending_known_red: BTreeMap<usize, u64>,
+     pub crash_states_ending_new_finding: u64,
+@@ -485,6 +500,11 @@ impl CrashInjectionTally {
+             second_crash_model_judgements,
+             second_crash_checker_runs,
+             second_crash_record_checks,
++            remounts_after_a_second_crash,
++            remount_idempotence_judged_by_phase,
++            remounts_after_a_second_crash_reading_the_same_content,
++            remounts_after_a_second_crash_reading_different_content,
++            remount_idempotence_not_judged,
+             crash_states_ending_known_red,
+             crash_states_ending_new_finding,
+         } = following;
+@@ -556,6 +576,23 @@ impl CrashInjectionTally {
+         self.second_crash_model_judgements += second_crash_model_judgements;
+         self.second_crash_checker_runs += second_crash_checker_runs;
+         self.second_crash_record_checks += second_crash_record_checks;
++        self.remounts_after_a_second_crash += remounts_after_a_second_crash;
++        for (phase, count) in remount_idempotence_judged_by_phase {
++            *self
++                .remount_idempotence_judged_by_phase
++                .entry(*phase)
++                .or_insert(0) += count;
++        }
++        self.remounts_after_a_second_crash_reading_the_same_content +=
++            remounts_after_a_second_crash_reading_the_same_content;
++        self.remounts_after_a_second_crash_reading_different_content +=
++            remounts_after_a_second_crash_reading_different_content;
++        for (reason, count) in remount_idempotence_not_judged {
++            *self
++                .remount_idempotence_not_judged
++                .entry(*reason)
++                .or_insert(0) += count;
++        }
+         for (form, count) in crash_states_ending_known_red {
+             *self.crash_states_ending_known_red.entry(*form).or_insert(0) += count;
+         }
+@@ -656,6 +693,18 @@ impl CrashInjectionTally {
+                     .unwrap_or(0)
+             );
+         }
++        let _ = writeln!(
++            text,
++            "二次崩溃之后再挂 {} 次（I-8.4 的 R-换）：读出的内容与没崩过的那一次相同 {}、不同 {}；判了的按段 {:?}；没判的 {:?}",
++            self.remounts_after_a_second_crash,
++            self.remounts_after_a_second_crash_reading_the_same_content,
++            self.remounts_after_a_second_crash_reading_different_content,
++            self.remount_idempotence_judged_by_phase
++                .iter()
++                .map(|(phase, count)| (phase.name(), *count))
++                .collect::<Vec<_>>(),
++            self.remount_idempotence_not_judged
++        );
+         let _ = writeln!(
+             text,
+             "崩溃状态：以已知红收尾 {:?}、新发现 {}",
+@@ -945,6 +994,11 @@ pub fn inject_crashes_into_history(
+             crash_point,
+             image_directory,
+         );
++        let content_after_the_uninterrupted_mount = content_read_after_the_uninterrupted_mount(
++            &crash_image_materialized,
++            &mount_run,
++            records_across_the_crash.mount_writes(),
++        );
+         judge_second_crashes_inside_the_writable_mount(
+             &mut tally,
+             &mut findings,
+@@ -955,6 +1009,9 @@ pub fn inject_crashes_into_history(
+                 committed_versions: &committed_versions,
+                 content_read_back_after_the_crash,
+                 newest_persisted_before_the_mount: newest_persisted,
++                content_after_the_uninterrupted_mount,
++                parameters: &parameters,
++                space_admission: execution.space_admission,
+             },
+             history.seed,
+             crash_point,
+@@ -1053,6 +1110,158 @@ pub fn materialized_crash_image(image: &CrashImage<'_>) -> MemoryPool {
+     pool
+ }
+ 
++/// I-8.4（重放幂等）在这里判的那一条的编号：R-换（用户 2026-10-01 定，`research/prompts/m3-inv-a-r1-main-verification.md` 第四节）——
++/// 在二次崩溃上判「恢复加写行那一整段」幂等，等价关系是读出的内容相同。池级 checker 不判它（单份镜像上恒真），判红时记在这一截的违例里。
++pub const REPLAY_IDEMPOTENCE_INVARIANT: &str = "I-8.4";
++
++/// 只读恢复（看 journal）读出的内容：I-8.4 的等价关系只比这个，不比扇区、实例代号、实例表行、恢复落到的那条根
++/// （攻方 `research/prompts/m3-inv-a-r1-opus-output.md` 一·2：挂一次与崩在取号之后再挂一次，这几样都不同，读出的内容相同）。
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub enum ContentReadByRecovery {
++    File(Vec<u8>),
++    NoFile,
++    /// 恢复失败，什么都没读出来。
++    NothingRead,
++}
++
++impl ContentReadByRecovery {
++    /// 给人看：几个字节、没有文件、没读出来（不把整份内容打出来）。
++    #[must_use]
++    pub fn render(&self) -> String {
++        match self {
++            ContentReadByRecovery::File(content) => format!("文件 {} 字节", content.len()),
++            ContentReadByRecovery::NoFile => "没有文件".to_string(),
++            ContentReadByRecovery::NothingRead => "恢复失败、没读出内容".to_string(),
++        }
++    }
++}
++
++/// 对 `reader` 跑一次只读恢复（看 journal），交回读出的内容。
++#[must_use]
++pub fn content_read_by_recovery(reader: &dyn PoolReader) -> ContentReadByRecovery {
++    match recover(reader, JournalPolicy::Consult).outcome {
++        RecoveryOutcome::FileRead { content, .. } => ContentReadByRecovery::File(content),
++        RecoveryOutcome::NoFile { .. } => ContentReadByRecovery::NoFile,
++        RecoveryOutcome::Failed { .. } => ContentReadByRecovery::NothingRead,
++    }
++}
++
++/// 二次崩溃之后再挂这一截为什么没判：这几种情形条款没写「做一次」或「做两次」的结果是什么，不替它定红绿，只计数（交主 agent）。
++#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
++pub enum RemountIdempotenceNotJudged {
++    /// 没崩过的那一次可写挂载被拒：没有「做一次」的结果。
++    TheUninterruptedMountWasRefused,
++    /// 没崩过的那一次挂载之后只读恢复失败：「做一次」没读出内容，没有可比的。
++    NothingWasReadAfterTheUninterruptedMount,
++    /// 二次崩溃镜像上再挂被拒：「做两次」那一趟没做完。
++    TheRemountWasRefused,
++}
++
++/// 「恢复加写行那一整段」做一次与做两次读出的内容比下来。
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub enum RemountIdempotence {
++    SameContent,
++    /// 读出的内容不同：判红。
++    DifferentContent {
++        once: ContentReadByRecovery,
++        twice: ContentReadByRecovery,
++    },
++    NotJudged(RemountIdempotenceNotJudged),
++}
++
++/// I-8.4 的等价关系：两边读出的内容逐字节相同（都没有文件也算相同）。做一次那一边恢复失败时没有可比的，不判；
++/// 做一次读出了东西、做两次恢复失败，算内容不同。
++#[must_use]
++pub fn compare_content_read_once_and_twice(
++    once: &ContentReadByRecovery,
++    twice: &ContentReadByRecovery,
++) -> RemountIdempotence {
++    match once {
++        ContentReadByRecovery::NothingRead => RemountIdempotence::NotJudged(
++            RemountIdempotenceNotJudged::NothingWasReadAfterTheUninterruptedMount,
++        ),
++        ContentReadByRecovery::File(_) | ContentReadByRecovery::NoFile => {
++            if once == twice {
++                RemountIdempotence::SameContent
++            } else {
++                RemountIdempotence::DifferentContent {
++                    once: once.clone(),
++                    twice: twice.clone(),
++                }
++            }
++        }
++    }
++}
++
++/// 只起一次可写挂载（取号、写行、暖机，不接发布）的结局。
++#[derive(Debug)]
++pub enum WritableMountAlone {
++    Mounted {
++        instance: InstanceGeneration,
++        pool_after: MemoryPool,
++    },
++    Refused {
++        member: String,
++        reason: ObservedRefusalReason,
++    },
++}
++
++/// 在 `pool` 的副本上只起一次可写挂载（建池那一份参数、给定的空间准入开关），不接发布；交回挂载之后的池或拒的理由。
++#[must_use]
++pub fn writable_mount_alone_on(
++    pool: &MemoryPool,
++    parameters: &MakeFilesystemParameters,
++    space_admission: SpaceAdmission,
++) -> WritableMountAlone {
++    let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = pool
++        .devices
++        .iter()
++        .map(|(identity, sectors)| {
++            let mut device = SparseBlockDevice::new(
++                pool.device_size_in_bytes,
++                PhysicalBlockSizeInBytes(parameters.geometry.physical_block_size),
++            );
++            device.image = sectors.clone();
++            (*identity, device)
++        })
++        .collect();
++    match mount_writable_with_space_admission(parameters, &mut devices, space_admission) {
++        Err(error) => WritableMountAlone::Refused {
++            member: format!("{error:?}"),
++            reason: refusal_reason_of_mount_error(&error),
++        },
++        Ok(mounted) => WritableMountAlone::Mounted {
++            instance: mounted.output.instance,
++            pool_after: MemoryPool {
++                devices: devices
++                    .into_iter()
++                    .map(|(identity, device)| (identity, device.image))
++                    .collect(),
++                device_size_in_bytes: pool.device_size_in_bytes,
++            },
++        },
++    }
++}
++
++/// 没崩过的那一次可写挂载之后读出的内容：挂载那一段的写全落在第一次崩溃之后的镜像上（不接之后那一次发布），再跑只读恢复。
++/// 挂载被拒时没有「做一次」的结果。
++fn content_read_after_the_uninterrupted_mount(
++    crash_image_materialized: &MemoryPool,
++    mount_run: &WritableMountOnTheCrashImage,
++    mount_writes: &[RetainedWrite],
++) -> Result<ContentReadByRecovery, RemountIdempotenceNotJudged> {
++    match mount_run.outcome {
++        WritableMountOutcome::MountRefused { .. } => {
++            Err(RemountIdempotenceNotJudged::TheUninterruptedMountWasRefused)
++        }
++        WritableMountOutcome::PublishRefused { .. } | WritableMountOutcome::Published => {
++            let mut pool_after_the_mount = crash_image_materialized.clone();
++            pool_after_the_mount.apply_writes(mount_writes);
++            Ok(content_read_by_recovery(&pool_after_the_mount))
++        }
++    }
++}
++
+ /// 崩溃后镜像上那次可写挂载与之后那一次发布的结局。
+ #[derive(Debug)]
+ pub enum WritableMountOutcome {
+@@ -1530,6 +1739,12 @@ struct SecondCrashInputs<'history> {
+     committed_versions: &'history BTreeMap<ModelRootKey, Option<Rc<[u8]>>>,
+     content_read_back_after_the_crash: Option<Option<Rc<[u8]>>>,
+     newest_persisted_before_the_mount: Option<ModelRootKey>,
++    /// 没崩过的那一次可写挂载之后读出的内容（I-8.4 的「做一次」）；挂载被拒时是没判的理由。
++    content_after_the_uninterrupted_mount:
++        Result<ContentReadByRecovery, RemountIdempotenceNotJudged>,
++    /// 二次崩溃之后再挂用的建池参数与空间准入开关（与没崩过的那一次挂载同一份）。
++    parameters: &'history MakeFilesystemParameters,
++    space_admission: SpaceAdmission,
+ }
+ 
+ /// 第三截：挂载途中的二次崩溃。每个二次崩溃状态上：只读恢复（看 journal）、问模型——允许的版本是模型提交过的每一版，加上这次挂载写出的根
+@@ -1552,6 +1767,9 @@ fn judge_second_crashes_inside_the_writable_mount(
+         committed_versions,
+         content_read_back_after_the_crash,
+         newest_persisted_before_the_mount,
++        content_after_the_uninterrupted_mount,
++        parameters,
++        space_admission,
+     } = inputs;
+     let mount_writes = records_across_the_crash.mount_writes();
+     let phase_of_each_write = writable_mount_phase_of_each_write(mount_writes);
+@@ -1620,6 +1838,18 @@ fn judge_second_crashes_inside_the_writable_mount(
+             &image,
+             report.effective_root,
+         );
++        judge_the_remount_after_a_second_crash(
++            tally,
++            findings,
++            &content_after_the_uninterrupted_mount,
++            &materialized_crash_image(&image),
++            parameters,
++            space_admission,
++            second.phase,
++            seed,
++            crash_point,
++            image_directory,
++        );
+         tally.second_crash_checker_runs += 1;
+         let violations = checker_violations_of(&image);
+         if violations.is_empty() && disagreement.is_none() && record_check == RecordCheck::default()
+@@ -1643,6 +1873,110 @@ fn judge_second_crashes_inside_the_writable_mount(
+     }
+ }
+ 
++/// I-8.4 的 R-换：二次崩溃镜像（`second_crash_image_materialized`）上再起一次可写挂载，「恢复加写行那一整段」于是做了两次；
++/// 再挂之后只读恢复读出的内容要与没崩过的那一次挂载之后读出的（`once`）相同。不同判红（违例记在 [`REPLAY_IDEMPOTENCE_INVARIANT`] 名下）；
++/// 条款没写的情形（[`RemountIdempotenceNotJudged`]）只计数。
++#[allow(
++    clippy::too_many_arguments,
++    reason = "每个参数各是一样东西：两次挂载的输入、计数与发现、这一个二次崩溃落在哪"
++)]
++fn judge_the_remount_after_a_second_crash(
++    tally: &mut CrashInjectionTally,
++    findings: &mut FindingsOfOneHistory,
++    once: &Result<ContentReadByRecovery, RemountIdempotenceNotJudged>,
++    second_crash_image_materialized: &MemoryPool,
++    parameters: &MakeFilesystemParameters,
++    space_admission: SpaceAdmission,
++    phase: WritableMountPhase,
++    seed: HistorySeed,
++    crash_point: &CrashPoint,
++    image_directory: Option<&Path>,
++) {
++    tally.remounts_after_a_second_crash += 1;
++    let once_content = match once {
++        Err(reason) => {
++            *tally
++                .remount_idempotence_not_judged
++                .entry(*reason)
++                .or_insert(0) += 1;
++            return;
++        }
++        Ok(content) => content,
++    };
++    let remount =
++        writable_mount_alone_on(second_crash_image_materialized, parameters, space_admission);
++    let pool_after_the_remount = match &remount {
++        WritableMountAlone::Refused { .. } => {
++            *tally
++                .remount_idempotence_not_judged
++                .entry(RemountIdempotenceNotJudged::TheRemountWasRefused)
++                .or_insert(0) += 1;
++            return;
++        }
++        WritableMountAlone::Mounted { pool_after, .. } => pool_after,
++    };
++    let (differing_content_read_once, differing_content_read_twice) =
++        match compare_content_read_once_and_twice(
++            once_content,
++            &content_read_by_recovery(pool_after_the_remount),
++        ) {
++            RemountIdempotence::SameContent => {
++                *tally
++                    .remount_idempotence_judged_by_phase
++                    .entry(phase)
++                    .or_insert(0) += 1;
++                tally.remounts_after_a_second_crash_reading_the_same_content += 1;
++                return;
++            }
++            RemountIdempotence::NotJudged(reason) => {
++                *tally
++                    .remount_idempotence_not_judged
++                    .entry(reason)
++                    .or_insert(0) += 1;
++                return;
++            }
++            RemountIdempotence::DifferentContent {
++                once: read_once,
++                twice: read_twice,
++            } => (read_once, read_twice),
++        };
++    *tally
++        .remount_idempotence_judged_by_phase
++        .entry(phase)
++        .or_insert(0) += 1;
++    tally.remounts_after_a_second_crash_reading_different_content += 1;
++    let image = CrashImage {
++        base: pool_after_the_remount,
++        writes: &[],
++        persisted: Vec::new(),
++    };
++    let detail = format!(
++        "恢复加写行那一整段做一次读出 {}，崩在挂载的 {} 里再做一次读出 {}",
++        differing_content_read_once.render(),
++        phase.name(),
++        differing_content_read_twice.render()
++    );
++    let observation = crash_state_observation(
++        &image,
++        crash_point,
++        vec![(REPLAY_IDEMPOTENCE_INVARIANT, detail.clone())],
++        None,
++        RecordCheck::default(),
++    );
++    findings.settle(
++        tally,
++        FailureAtAStage {
++            seed,
++            crash_point,
++            stage: CrashStateStage::RemountAfterASecondCrashInsideTheWritableMount(phase),
++            observation,
++            read_back: detail,
++            image: &image,
++        },
++        image_directory,
++    );
++}
++
+ /// 这个崩溃状态在段内扣下的写各是什么种类（同一种只记一次）。
+ fn withheld_write_kinds(
+     writes: &[RetainedWrite],
+@@ -2336,6 +2670,123 @@ mod tests {
+         crash_points_per_history: 4,
+     };
+ 
++    /// I-8.4 的等价关系：读出的内容逐字节相同才算相同；一边读出 3000 字节、另一边差一个字节、少一截、没有文件或恢复失败，都判内容不同；
++    /// 做一次那一边恢复失败时没有可比的，不判。
++    #[test]
++    fn content_read_twice_that_differs_from_content_read_once_is_red_and_the_same_content_is_not() {
++        let once = ContentReadByRecovery::File(vec![7u8; 3000]);
++        let mut one_byte_changed = vec![7u8; 3000];
++        one_byte_changed[1234] = 8;
++        assert_eq!(
++            compare_content_read_once_and_twice(&once, &once.clone()),
++            RemountIdempotence::SameContent,
++            "逐字节相同的内容判相同"
++        );
++        assert_eq!(
++            compare_content_read_once_and_twice(
++                &ContentReadByRecovery::NoFile,
++                &ContentReadByRecovery::NoFile
++            ),
++            RemountIdempotence::SameContent,
++            "两边都没有文件判相同"
++        );
++        for twice in [
++            ContentReadByRecovery::File(one_byte_changed),
++            ContentReadByRecovery::File(vec![7u8; 2999]),
++            ContentReadByRecovery::NoFile,
++            ContentReadByRecovery::NothingRead,
++        ] {
++            assert_eq!(
++                compare_content_read_once_and_twice(&once, &twice),
++                RemountIdempotence::DifferentContent {
++                    once: once.clone(),
++                    twice: twice.clone()
++                },
++                "做两次读出 {} 与做一次读出的 3000 字节不同，要判红",
++                twice.render()
++            );
++        }
++        assert_eq!(
++            compare_content_read_once_and_twice(
++                &ContentReadByRecovery::NothingRead,
++                &ContentReadByRecovery::NothingRead
++            ),
++            RemountIdempotence::NotJudged(
++                RemountIdempotenceNotJudged::NothingWasReadAfterTheUninterruptedMount
++            ),
++            "做一次那一边没读出内容，没有可比的，不判"
++        );
++    }
++
++    /// I-8.4 的 R-换 在真的二次崩溃上不误红：从第一个文件起的历史（起点就是攻方 `research/prompts/m3-inv-a-r1-opus-output.md`
++    /// 一·2 的「新池新建文件做完的镜像」），起点那一段也摆崩溃状态；每个二次崩溃镜像上都再挂了一次，取号、写行、暖机三段
++    /// 各有判过的，读出的内容都与没崩过的那一次挂载之后读出的相同（攻方量到实例代号、实例表行、扇区都不同的那种也算相同）。
++    #[test]
++    fn the_remount_after_each_second_crash_reads_the_same_content_as_the_uninterrupted_mount_in_every_mount_phase(
++    ) {
++        let history = GeneratedHistory {
++            seed: HistorySeed(3),
++            starting_point: HistoryStartingPoint::AfterFirstFile,
++            operations: generate_history(HistorySeed(3), 10).operations,
++        };
++        let injection = inject_crashes_into_history(
++            &history,
++            HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
++            CrashPointDraw::EveryProperSubsetOfShortSegments {
++                segment_writes: 2,
++                sampled_in_longer_segments: 2,
++            },
++            None,
++        );
++        let tally = &injection.tally;
++        assert!(
++            injection
++                .crash_points
++                .iter()
++                .any(|crash_point| crash_point.step == StepPosition::StartingPoint),
++            "起点那一段（新池新建文件做完）里要有崩溃状态"
++        );
++        assert_eq!(
++            tally.remounts_after_a_second_crash, tally.second_crash_points,
++            "每个二次崩溃镜像上都再挂过一次：{tally:?}"
++        );
++        for phase in WritableMountPhase::ALL {
++            assert!(
++                tally
++                    .remount_idempotence_judged_by_phase
++                    .get(&phase)
++                    .copied()
++                    .unwrap_or(0)
++                    >= 1,
++                "崩在挂载的 {} 里再挂，一次都没判过 I-8.4：判了的 {:?}，没判的 {:?}",
++                phase.name(),
++                tally.remount_idempotence_judged_by_phase,
++                tally.remount_idempotence_not_judged
++            );
++        }
++        assert_eq!(
++            tally.remounts_after_a_second_crash_reading_different_content,
++            0,
++            "二次崩溃之后再挂读出的内容与没崩过的那一次不同（I-8.4 的 R-换 判红）：{:?}",
++            injection
++                .new_findings
++                .iter()
++                .filter(|finding| matches!(
++                    finding.stage,
++                    CrashStateStage::RemountAfterASecondCrashInsideTheWritableMount(_)
++                ))
++                .collect::<Vec<_>>()
++        );
++        assert_eq!(
++            tally.remounts_after_a_second_crash_reading_the_same_content,
++            tally
++                .remount_idempotence_judged_by_phase
++                .values()
++                .sum::<u64>(),
++            "判过的都读出相同的内容"
++        );
++    }
++
+     /// 重放行写出的两种摆法（只抽样、短段整段枚举）都经重放入口的解析原样读回，连同种子区间与取样参数；
+     /// 默认值取的是另一组，读回的不是写出的那一组就红。
+     #[test]
+diff --git a/crates/singlefs-checker-tier/src/crash_judge_checker.wgsl b/crates/singlefs-checker-tier/src/crash_judge_checker.wgsl
+index a2dcb10..c832678 100644
+--- a/crates/singlefs-checker-tier/src/crash_judge_checker.wgsl
++++ b/crates/singlefs-checker-tier/src/crash_judge_checker.wgsl
+@@ -2844,9 +2844,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+         return;
+     }
+     begin_state(local);
+-    violated_lo = 0u;
+-    violated_hi = 0u;
+-    let out = local * 12u;
++    clear_violated();
++    let out = local * VERDICT_WORDS;
+     sws(H_BASE + H_VALID, 0u);
+     let device_count = hdr(3u);
+     var reached = 0u;
+@@ -3033,8 +3032,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+             }
+         }
+     }
+-    verdicts[out + 8u] = violated_lo;
+-    verdicts[out + 9u] = violated_hi;
+-    verdicts[out + 10u] = reached;
+-    verdicts[out + 11u] = undecidable;
++    store_violated(out);
++    verdicts[out + POOL_CHECKER_REACHED_WORD] = reached;
++    verdicts[out + POOL_CHECKER_UNDECIDABLE_WORD] = undecidable;
+ }
+diff --git a/crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl b/crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl
+index c1fdbb1..b93089c 100644
+--- a/crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl
++++ b/crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl
+@@ -104,15 +104,29 @@ const INVARIANT_I_9_15: u32 = 47u;
+ 
+ const INVARIANT_I_9_16: u32 = 48u;
+ 
+-var<private> violated_lo: u32;
+-
+-var<private> violated_hi: u32;
++// 违例位：位 i 在第 i / 32 字的第 i % 32 位（位 i ↔ IMPLEMENTED_INVARIANTS[i]），存进结论的第 POOL_CHECKER_VIOLATED_FIRST_WORD 字起。
++var<private> violated: array<u32, POOL_CHECKER_VIOLATED_WORDS>;
+ 
+ fn violate(invariant: u32) {
+-    if (invariant < 32u) {
+-        violated_lo = violated_lo | (1u << invariant);
+-    } else {
+-        violated_hi = violated_hi | (1u << (invariant - 32u));
++    let word_index = invariant / 32u;
++    violated[word_index] = violated[word_index] | (1u << (invariant % 32u));
++}
++
++fn clear_violated() {
++    for (var word_index = 0u; word_index < POOL_CHECKER_VIOLATED_WORDS; word_index = word_index + 1u) {
++        violated[word_index] = 0u;
++    }
++}
++
++fn load_violated(out: u32) {
++    for (var word_index = 0u; word_index < POOL_CHECKER_VIOLATED_WORDS; word_index = word_index + 1u) {
++        violated[word_index] = verdicts[out + POOL_CHECKER_VIOLATED_FIRST_WORD + word_index];
++    }
++}
++
++fn store_violated(out: u32) {
++    for (var word_index = 0u; word_index < POOL_CHECKER_VIOLATED_WORDS; word_index = word_index + 1u) {
++        verdicts[out + POOL_CHECKER_VIOLATED_FIRST_WORD + word_index] = violated[word_index];
+     }
+ }
+ 
+diff --git a/crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl b/crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl
+index a2bbf9d..395e5ac 100644
+--- a/crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl
++++ b/crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl
+@@ -1741,22 +1741,20 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+         return;
+     }
+     begin_state(local);
+-    let out = local * 12u;
++    let out = local * VERDICT_WORDS;
+     if (sw(H_BASE + H_VALID) == 0u) {
+         return;
+     }
+-    violated_lo = verdicts[out + 8u];
+-    violated_hi = verdicts[out + 9u];
++    load_violated(out);
+     handoff_load();
+     let fsid_low = vec2<u32>(sw(H_BASE + H_FSID0), sw(H_BASE + H_FSID1));
+     scan_stage(fsid_low);
+-    verdicts[out + 8u] = violated_lo;
+-    verdicts[out + 9u] = violated_hi;
++    store_violated(out);
+     if (undecidable != 0u) {
+-        if (verdicts[out + 11u] == 0u) {
+-            verdicts[out + 11u] = undecidable;
++        if (verdicts[out + POOL_CHECKER_UNDECIDABLE_WORD] == 0u) {
++            verdicts[out + POOL_CHECKER_UNDECIDABLE_WORD] = undecidable;
+         }
+     } else {
+-        verdicts[out + 10u] = 5u;
++        verdicts[out + POOL_CHECKER_REACHED_WORD] = 5u;
+     }
+ }
+diff --git a/crates/singlefs-checker-tier/src/crash_judge_common.wgsl b/crates/singlefs-checker-tier/src/crash_judge_common.wgsl
+index 309d6bf..7dca397 100644
+--- a/crates/singlefs-checker-tier/src/crash_judge_common.wgsl
++++ b/crates/singlefs-checker-tier/src/crash_judge_common.wgsl
+@@ -1,7 +1,7 @@
+ // GPU 判器：每个调用判一个崩溃状态，读 crash_judge_tables 摊出来的表（一张打包的 u32 表 + 目录），
+ // 按持久掩码给每个落点查版本，在版本字节上按 singlefs-core 的恢复路径解结构、择系统配置、择根、扫 journal 并重放、
+ // 走到第一个文件，两种 journal 政策各走一遍；再按 oracle 判七类违例、按记录核对器判两条判据。
+-// 结论：每个状态 8 个 u32（布局见 crash_judge_gpu.rs 的 VERDICT_WORDS 那一段）。判不了的状态置最高位并写原因码，交 CPU 判。
++// 结论：每个状态 VERDICT_WORDS 个 u32（布局见 crash_judge_gpu.rs 文件头；字号常量由 verdict_layout_wgsl_constants 生成、接在源码最前面）。判不了的状态置最高位并写原因码，交 CPU 判。
+ 
+ struct Dispatch {
+     block_start_lo: u32,
+diff --git a/crates/singlefs-checker-tier/src/crash_judge_dispatch.rs b/crates/singlefs-checker-tier/src/crash_judge_dispatch.rs
+index 698b446..c58b836 100644
+--- a/crates/singlefs-checker-tier/src/crash_judge_dispatch.rs
++++ b/crates/singlefs-checker-tier/src/crash_judge_dispatch.rs
+@@ -11,10 +11,9 @@
+ use std::ops::Range;
+ 
+ use crate::crash_judge_gpu::{
+-    checker_scan_kernel_source, checker_walk_kernel_source, dispatch_words, pack_tables,
+-    recovery_kernel_source, verdict_was_written_by_both_kernels, DISPATCH_BINDING, SCRATCH_BINDING,
+-    SCRATCH_WORDS, TABLES_BINDING, VERDICTS_BINDING, VERDICT_WORDS, VERDICT_WORD_NOT_WRITTEN,
+-    WORKGROUP_SIZE,
++    dispatch_words, pack_tables, verdict_was_written_by_both_kernels, JudgeKernelSources,
++    DISPATCH_BINDING, SCRATCH_BINDING, SCRATCH_WORDS, TABLES_BINDING, VERDICTS_BINDING,
++    VERDICT_WORDS, VERDICT_WORD_NOT_WRITTEN, WORKGROUP_SIZE,
+ };
+ use crate::crash_judge_tables::JudgeTables;
+ use crate::gpu_unit_checks::GpuCard;
+@@ -420,6 +419,27 @@ impl<'card> GpuCrashJudge<'card> {
+         card: &'card GpuCard,
+         tables: &PackedJudgeTables,
+         requested_states_per_dispatch: usize,
++    ) -> Self {
++        Self::on_card_compiling_these_kernel_sources(
++            card,
++            tables,
++            requested_states_per_dispatch,
++            &JudgeKernelSources::of_the_judge(),
++        )
++    }
++
++    /// 同 [`Self::on_card_with_packed_tables`]，编的是调用方给的三份内核源码。判器的结论按判法摘要
++    /// （`crate::crash_judge_gpu::gpu_judge_digest`，罩 [`JudgeKernelSources::of_the_judge`] 那三份）入库，
++    /// 编别的源码判出的结论与那个摘要对不上：只给对拍用例在内核里种假违例位用，判定入库的路径不调它。
++    ///
++    /// # Panics
++    /// 同 [`Self::new`]。
++    #[must_use]
++    pub fn on_card_compiling_these_kernel_sources(
++        card: &'card GpuCard,
++        tables: &PackedJudgeTables,
++        requested_states_per_dispatch: usize,
++        kernel_sources: &JudgeKernelSources,
+     ) -> Self {
+         let packed = &tables.words;
+         let device = card.device();
+@@ -461,34 +481,34 @@ impl<'card> GpuCrashJudge<'card> {
+             std::env::var("SINGLEFS_GPU_KERNELS_ONE_AT_A_TIME").is_ok_and(|value| value == "1");
+         let (recovery_pipeline, checker_walk_pipeline, checker_scan_pipeline) = if one_at_a_time {
+             (
+-                compute_pipeline(card, "crash-judge-recovery", &recovery_kernel_source()),
++                compute_pipeline(card, "crash-judge-recovery", &kernel_sources.recovery),
+                 compute_pipeline(
+                     card,
+                     "crash-judge-checker-walk",
+-                    &checker_walk_kernel_source(),
++                    &kernel_sources.checker_walk,
+                 ),
+                 compute_pipeline(
+                     card,
+                     "crash-judge-checker-scan",
+-                    &checker_scan_kernel_source(),
++                    &kernel_sources.checker_scan,
+                 ),
+             )
+         } else {
+             std::thread::scope(|scope| {
+                 let recovery = scope.spawn(|| {
+-                    compute_pipeline(card, "crash-judge-recovery", &recovery_kernel_source())
++                    compute_pipeline(card, "crash-judge-recovery", &kernel_sources.recovery)
+                 });
+                 let scan = scope.spawn(|| {
+                     compute_pipeline(
+                         card,
+                         "crash-judge-checker-scan",
+-                        &checker_scan_kernel_source(),
++                        &kernel_sources.checker_scan,
+                     )
+                 });
+                 let walk = compute_pipeline(
+                     card,
+                     "crash-judge-checker-walk",
+-                    &checker_walk_kernel_source(),
++                    &kernel_sources.checker_walk,
+                 );
+                 (
+                     recovery.join().expect("恢复内核的编译线程不 panic"),
+diff --git a/crates/singlefs-checker-tier/src/crash_judge_gpu.rs b/crates/singlefs-checker-tier/src/crash_judge_gpu.rs
+index 456e10e..cef99e1 100644
+--- a/crates/singlefs-checker-tier/src/crash_judge_gpu.rs
++++ b/crates/singlefs-checker-tier/src/crash_judge_gpu.rs
+@@ -8,7 +8,9 @@
+ //! 一个状态的结论 [`VERDICT_WORDS`] 个 u32：第 0 字是红位（位 0..6 看 journal 那一遍 oracle 的七类、位 8..14 不看那一遍、
+ //! 位 16 根在而记录都不在、位 17 恢复自称的状态少单元、位 31 判不了）；第 1 字判不了的原因（判得了时低 16 位是看 journal 那一遍
+ //! 重放停在哪一道、高 16 位是记录数，诊断用）；第 2 / 3 字看 journal 那一遍落到的
+-//! 实例代号与 checkpoint_txg 低 32 位；第 4 / 5 字它的走读结局与失败点；第 6 / 7 字不看那一遍的。
++//! 实例代号与 checkpoint_txg 低 32 位；第 4 / 5 字它的走读结局与失败点；第 6 / 7 字不看那一遍的；
++//! 第 8..12 字池级 checker 的违例位（[`POOL_CHECKER_VIOLATED_WORDS`] 个字，128 位）；第 12 字池级 checker 走到第几步；第 13 字它判不了的原因。
++//! 这几个字号在内核里的常量由 [`verdict_layout_wgsl_constants`] 从这里生成、接在每个内核源码前面，不在 WGSL 里另写一份。
+ //! 判法代码的摘要 [`gpu_judge_digest`] 进判定表的键：内核改一个字，旧行留着当历史，新行另起。
+ //!
+ //! 这一份只放判法：内核原文、表怎么打包、派活参数与结论各是哪几个字、草稿区每个状态多大。怎么上卡、一次派活带几个状态、
+@@ -24,19 +26,36 @@ pub const GPU_JUDGE_COMMON_SOURCE: &str = include_str!("crash_judge_common.wgsl"
+ pub const GPU_JUDGE_RECOVERY_SOURCE: &str = include_str!("crash_judge_recovery.wgsl");
+ /// 池级 checker 两个内核共用的那一半：不变量下标、根与记录的读法、草稿区各集合的位置、交接段。
+ pub const GPU_JUDGE_CHECKER_COMMON_SOURCE: &str = include_str!("crash_judge_checker_common.wgsl");
+-/// 池级 checker 走读内核：第一、二批不变量的违例位（写第 8..12 字），走完把计数与几何交进草稿区的交接段。
++/// 池级 checker 走读内核：第一、二批不变量的违例位（写违例位那几个字、走到第几步与判不了的原因），走完把计数与几何交进草稿区的交接段。
+ pub const GPU_JUDGE_CHECKER_SOURCE: &str = include_str!("crash_judge_checker.wgsl");
+-/// 池级 checker 扫描内核：第三批（扫描方向与记账那九条），违例位并进第 8、9 字。
++/// 池级 checker 扫描内核：第三批（扫描方向与记账那九条），违例位并进违例位那几个字。
+ pub const GPU_JUDGE_CHECKER_SCAN_SOURCE: &str = include_str!("crash_judge_checker_scan.wgsl");
+ 
+-/// 每个状态的结论几个 u32：恢复内核 8 个，池级 checker 内核 4 个。
+-pub const VERDICT_WORDS: usize = 12;
+-/// 池级 checker 违例位的低 32 位住第几字（位 i ↔ `singlefs_checker::image::IMPLEMENTED_INVARIANTS[i]`），高位在下一字。
+-pub const POOL_CHECKER_VIOLATED_LOW_WORD: usize = 8;
++/// 池级 checker 违例位的第一个字（位 i 在第 `POOL_CHECKER_VIOLATED_FIRST_WORD + i / 32` 字的第 `i % 32` 位，
++/// 位 i ↔ `singlefs_checker::image::IMPLEMENTED_INVARIANTS[i]`）。
++pub const POOL_CHECKER_VIOLATED_FIRST_WORD: usize = 8;
++/// 池级 checker 违例位占几个字：4 个字 128 位。m3-inv-a-r1 与 m3-inv-b-r1 两轮新立之后是 65 条，64 位的字装不下
++/// （判决 `research/prompts/m3-inv-b-r1-main-verification.md` 第二节第 11 行）。
++pub const POOL_CHECKER_VIOLATED_WORDS: usize = 4;
++/// 违例位最多能装几条不变量。
++pub const POOL_CHECKER_VIOLATED_BIT_CAPACITY: usize = POOL_CHECKER_VIOLATED_WORDS * 32;
+ /// 池级 checker 内核在这个状态上走到了第几步（0 盘数超上限、1 有槽带拒收的值、2 择到了系统配置、3 根环非空并判完第一批、4 走读那一批判完、5 扫描那一批判完）。
+-pub const POOL_CHECKER_REACHED_WORD: usize = 10;
++pub const POOL_CHECKER_REACHED_WORD: usize =
++    POOL_CHECKER_VIOLATED_FIRST_WORD + POOL_CHECKER_VIOLATED_WORDS;
+ /// 池级 checker 内核判不了的原因。
+-pub const POOL_CHECKER_UNDECIDABLE_WORD: usize = 11;
++pub const POOL_CHECKER_UNDECIDABLE_WORD: usize = POOL_CHECKER_REACHED_WORD + 1;
++/// 每个状态的结论几个 u32：恢复内核 8 个，池级 checker 内核违例位、走到第几步、判不了的原因。
++pub const VERDICT_WORDS: usize = POOL_CHECKER_UNDECIDABLE_WORD + 1;
++
++// 违例位装得下池级 checker 的每一条不变量；读出来的是一个 u128，字数再多就装不进。
++const _: () = assert!(
++    singlefs_checker::image::IMPLEMENTED_INVARIANTS.len() <= POOL_CHECKER_VIOLATED_BIT_CAPACITY,
++    "池级 checker 的不变量多于违例位的容量：先加宽 POOL_CHECKER_VIOLATED_WORDS"
++);
++const _: () = assert!(
++    POOL_CHECKER_VIOLATED_BIT_CAPACITY <= 128,
++    "违例位读成一个 u128"
++);
+ 
+ /// 池级 checker 内核覆盖到的不变量（`IMPLEMENTED_INVARIANTS` 的下标）：三批接完之后是全部 49 条，对拍逐位比。
+ pub const POOL_CHECKER_COVERED_INVARIANT_INDEXES: &[usize] = &[
+@@ -44,11 +63,28 @@ pub const POOL_CHECKER_COVERED_INVARIANT_INDEXES: &[usize] = &[
+     26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
+ ];
+ 
+-/// 一个状态结论里池级 checker 的违例位（64 位，位 i ↔ `IMPLEMENTED_INVARIANTS[i]`）。
++/// 一个状态结论里池级 checker 的违例位（[`POOL_CHECKER_VIOLATED_BIT_CAPACITY`] 位，位 i ↔ `IMPLEMENTED_INVARIANTS[i]`）。
++#[must_use]
++pub fn pool_checker_violated_bits(words: &[u32; VERDICT_WORDS]) -> u128 {
++    words[POOL_CHECKER_VIOLATED_FIRST_WORD
++        ..POOL_CHECKER_VIOLATED_FIRST_WORD + POOL_CHECKER_VIOLATED_WORDS]
++        .iter()
++        .enumerate()
++        .fold(0u128, |bits, (word_index, word)| {
++            bits | (u128::from(*word) << (32 * word_index))
++        })
++}
++
++/// 结论的字号在内核里的常量（WGSL 源码）：接在每个内核源码最前面，判法摘要也收它。
+ #[must_use]
+-pub fn pool_checker_violated_bits(words: &[u32; VERDICT_WORDS]) -> u64 {
+-    u64::from(words[POOL_CHECKER_VIOLATED_LOW_WORD])
+-        | (u64::from(words[POOL_CHECKER_VIOLATED_LOW_WORD + 1]) << 32)
++pub fn verdict_layout_wgsl_constants() -> String {
++    format!(
++        "const VERDICT_WORDS: u32 = {VERDICT_WORDS}u;\n\
++         const POOL_CHECKER_VIOLATED_FIRST_WORD: u32 = {POOL_CHECKER_VIOLATED_FIRST_WORD}u;\n\
++         const POOL_CHECKER_VIOLATED_WORDS: u32 = {POOL_CHECKER_VIOLATED_WORDS}u;\n\
++         const POOL_CHECKER_REACHED_WORD: u32 = {POOL_CHECKER_REACHED_WORD}u;\n\
++         const POOL_CHECKER_UNDECIDABLE_WORD: u32 = {POOL_CHECKER_UNDECIDABLE_WORD}u;\n"
++    )
+ }
+ /// 每个状态的草稿区几个 u32（checker 共用那一半里 `H_END`：共用的 `SCRATCH_WORDS_REQUIRED`、走读与扫描的集合、两个内核的交接段）。
+ pub const SCRATCH_WORDS: usize = 247_312;
+@@ -99,10 +135,11 @@ pub mod verdict_bits {
+     pub const UNDECIDABLE: u32 = 31;
+ }
+ 
+-/// 判法代码的摘要：五份内核源码连同一个版本前缀。
++/// 判法代码的摘要：结论字号的常量与五份内核源码，连同一个版本前缀。
+ #[must_use]
+ pub fn gpu_judge_digest() -> [u8; DIGEST_BYTES] {
+-    let mut message = b"gpu-crash-judge-v3\n".to_vec();
++    let mut message = b"gpu-crash-judge-v4\n".to_vec();
++    message.extend_from_slice(verdict_layout_wgsl_constants().as_bytes());
+     message.extend_from_slice(GPU_JUDGE_COMMON_SOURCE.as_bytes());
+     message.extend_from_slice(GPU_JUDGE_RECOVERY_SOURCE.as_bytes());
+     message.extend_from_slice(GPU_JUDGE_CHECKER_COMMON_SOURCE.as_bytes());
+@@ -111,24 +148,52 @@ pub fn gpu_judge_digest() -> [u8; DIGEST_BYTES] {
+     sha256_digest(&message)
+ }
+ 
+-/// 恢复内核的整份源码（共用那一半接上它自己那一半）。
++/// 恢复内核的整份源码（结论字号的常量、共用那一半接上它自己那一半）。
+ #[must_use]
+ pub fn recovery_kernel_source() -> String {
+-    format!("{GPU_JUDGE_COMMON_SOURCE}\n{GPU_JUDGE_RECOVERY_SOURCE}")
++    format!(
++        "{}\n{GPU_JUDGE_COMMON_SOURCE}\n{GPU_JUDGE_RECOVERY_SOURCE}",
++        verdict_layout_wgsl_constants()
++    )
+ }
+ 
+ /// 池级 checker 内核的整份源码。
+ #[must_use]
+ pub fn checker_walk_kernel_source() -> String {
+     format!(
+-        "{GPU_JUDGE_COMMON_SOURCE}\n{GPU_JUDGE_CHECKER_COMMON_SOURCE}\n{GPU_JUDGE_CHECKER_SOURCE}"
++        "{}\n{GPU_JUDGE_COMMON_SOURCE}\n{GPU_JUDGE_CHECKER_COMMON_SOURCE}\n{GPU_JUDGE_CHECKER_SOURCE}",
++        verdict_layout_wgsl_constants()
+     )
+ }
+ 
+ /// 池级 checker 扫描内核的整份源码。
+ #[must_use]
+ pub fn checker_scan_kernel_source() -> String {
+-    format!("{GPU_JUDGE_COMMON_SOURCE}\n{GPU_JUDGE_CHECKER_COMMON_SOURCE}\n{GPU_JUDGE_CHECKER_SCAN_SOURCE}")
++    format!(
++        "{}\n{GPU_JUDGE_COMMON_SOURCE}\n{GPU_JUDGE_CHECKER_COMMON_SOURCE}\n{GPU_JUDGE_CHECKER_SCAN_SOURCE}",
++        verdict_layout_wgsl_constants()
++    )
++}
++
++/// 判器编的三个内核的整份源码。派活那一侧照 [`JudgeKernelSources::of_the_judge`] 编；
++/// 对拍用例要在内核里种一个假违例位（证违例位的高位端到端走得通）时，拿它改一处再交给派活那一侧。
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct JudgeKernelSources {
++    pub recovery: String,
++    pub checker_walk: String,
++    pub checker_scan: String,
++}
++
++impl JudgeKernelSources {
++    /// 判法摘要 [`gpu_judge_digest`] 罩住的那三份。
++    #[must_use]
++    pub fn of_the_judge() -> Self {
++        Self {
++            recovery: recovery_kernel_source(),
++            checker_walk: checker_walk_kernel_source(),
++            checker_scan: checker_scan_kernel_source(),
++        }
++    }
+ }
+ 
+ /// 全部表按目录打包成一张 u32 表：前 38 个字是目录（每张表的起点、条数），之后依次是各表。
+@@ -151,7 +216,9 @@ pub fn pack_tables(words: &JudgeTablesWords) -> Vec<u32> {
+ mod tests {
+     use super::{
+         checker_scan_kernel_source, checker_walk_kernel_source, dispatch_words,
+-        recovery_kernel_source, verdict_was_written_by_both_kernels, SCRATCH_WORDS, VERDICT_WORDS,
++        pool_checker_violated_bits, recovery_kernel_source, verdict_was_written_by_both_kernels,
++        POOL_CHECKER_VIOLATED_FIRST_WORD, POOL_CHECKER_VIOLATED_WORDS, SCRATCH_WORDS,
++        VERDICT_WORDS,
+     };
+ 
+     /// 两个内核的源码先经 naga 解析与校验（毫秒级），不等 GPU 编译：内核改坏一个字这里当场红，错误带行号。
+@@ -198,6 +265,27 @@ mod tests {
+         );
+     }
+ 
++    /// 违例位的每个字都读进来：第 64 位（第三个字的最低位）与第 127 位（第四个字的最高位）读得出，不被截成 64 位。
++    #[test]
++    fn violated_bits_past_the_sixty_fourth_are_read_from_the_third_and_fourth_words() {
++        let mut words = [0u32; VERDICT_WORDS];
++        words[POOL_CHECKER_VIOLATED_FIRST_WORD] = 1;
++        words[POOL_CHECKER_VIOLATED_FIRST_WORD + 2] = 1;
++        words[POOL_CHECKER_VIOLATED_FIRST_WORD + POOL_CHECKER_VIOLATED_WORDS - 1] = 1 << 31;
++        assert_eq!(
++            pool_checker_violated_bits(&words),
++            1u128 | (1u128 << 64) | (1u128 << 127),
++            "位 0、64、127 各在第一、三、四个违例字里"
++        );
++        words[super::POOL_CHECKER_REACHED_WORD] = u32::MAX;
++        words[super::POOL_CHECKER_UNDECIDABLE_WORD] = u32::MAX;
++        assert_eq!(
++            pool_checker_violated_bits(&words),
++            1u128 | (1u128 << 64) | (1u128 << 127),
++            "走到第几步与判不了的原因那两个字不算进违例位"
++        );
++    }
++
+     /// 结论还是初值（全 1）的状态认得出；两个内核各写过自己那几个字的才算写过。
+     #[test]
+     fn a_verdict_still_at_its_initial_value_is_not_taken_as_written() {
+diff --git a/crates/singlefs-checker-tier/src/crash_judge_recovery.wgsl b/crates/singlefs-checker-tier/src/crash_judge_recovery.wgsl
+index d110fbe..5231e17 100644
+--- a/crates/singlefs-checker-tier/src/crash_judge_recovery.wgsl
++++ b/crates/singlefs-checker-tier/src/crash_judge_recovery.wgsl
+@@ -387,7 +387,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+     if (undecidable != 0u) {
+         bits = bits | (1u << BIT_UNDECIDABLE);
+     }
+-    let out = local * 12u;
++    let out = local * VERDICT_WORDS;
+     verdicts[out] = bits;
+     // 判得了时第 1 字本来恒 0：借它带出看 journal 那一遍重放停在哪一道（诊断，`replay_stop_reason`；高 16 位给 record_count）
+     if (undecidable != 0u) {
+diff --git a/crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs b/crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs
+index db2053d..f72daf1 100644
+--- a/crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs
++++ b/crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs
+@@ -32,8 +32,10 @@ use singlefs_checker_tier::crash_judge_dispatch::{
+     states_per_scratch_lane, GpuCrashJudge, PackedJudgeTables,
+ };
+ use singlefs_checker_tier::crash_judge_gpu::{
+-    gpu_judge_digest, pool_checker_violated_bits, verdict_bits,
+-    POOL_CHECKER_COVERED_INVARIANT_INDEXES, VERDICT_WORDS,
++    gpu_judge_digest, pool_checker_violated_bits, verdict_bits, JudgeKernelSources,
++    POOL_CHECKER_COVERED_INVARIANT_INDEXES, POOL_CHECKER_REACHED_WORD,
++    POOL_CHECKER_UNDECIDABLE_WORD, POOL_CHECKER_VIOLATED_BIT_CAPACITY,
++    POOL_CHECKER_VIOLATED_FIRST_WORD, POOL_CHECKER_VIOLATED_WORDS, VERDICT_WORDS,
+ };
+ use singlefs_checker_tier::crash_judge_tables::{build_judge_tables, JudgeFlow};
+ use singlefs_checker_tier::gpu_unit_checks::{usable_gpu_cards, GpuCard};
+@@ -864,31 +866,31 @@ fn expected_bits(judgement: &Layer0StateJudgement) -> u32 {
+ }
+ 
+ /// CPU 池级 checker 的违例位：位 i ↔ `IMPLEMENTED_INVARIANTS[i]`。
+-fn expected_pool_checker_bits(judgement: &Layer0StateJudgement) -> u64 {
+-    let mut bits = 0u64;
++fn expected_pool_checker_bits(judgement: &Layer0StateJudgement) -> u128 {
++    let mut bits = 0u128;
+     for (invariant, verdict) in &judgement.pool_checker {
+         if let InvariantVerdict::Violated(_) = verdict {
+             let index = IMPLEMENTED_INVARIANTS
+                 .iter()
+                 .position(|candidate| candidate == invariant)
+                 .expect("池级 checker 报的不变量在清单里");
+-            bits |= 1u64 << index;
++            bits |= 1u128 << index;
+         }
+     }
+     bits
+ }
+ 
+-fn covered_mask() -> u64 {
++fn covered_mask() -> u128 {
+     POOL_CHECKER_COVERED_INVARIANT_INDEXES
+         .iter()
+-        .fold(0u64, |mask, index| mask | (1u64 << index))
++        .fold(0u128, |mask, index| mask | (1u128 << index))
+ }
+ 
+-fn invariant_names(bits: u64) -> Vec<&'static str> {
++fn invariant_names(bits: u128) -> Vec<&'static str> {
+     IMPLEMENTED_INVARIANTS
+         .iter()
+         .enumerate()
+-        .filter(|(index, _)| bits & (1u64 << index) != 0)
++        .filter(|(index, _)| bits & (1u128 << index) != 0)
+         .map(|(_, name)| *name)
+         .collect()
+ }
+@@ -954,7 +956,7 @@ fn compare_on_every_state(card: &GpuCard, flow: &RecordedFlow, limit: usize) ->
+     let slice = state_count.div_ceil(threads * 8).max(1);
+     let next_slice = std::sync::atomic::AtomicU64::new(0);
+     let slice_count = state_count.div_ceil(slice);
+-    type JudgedOnCpu = (u32, u64, String, String, [u32; 4]);
++    type JudgedOnCpu = (u32, u128, String, String, [u32; 4]);
+     let mut slices: Vec<(u64, Vec<JudgedOnCpu>)> = std::thread::scope(|scope| {
+         let handles: Vec<_> = (0..threads.min(slice_count))
+             .map(|_| {
+@@ -1032,8 +1034,7 @@ fn compare_on_every_state(card: &GpuCard, flow: &RecordedFlow, limit: usize) ->
+         let gpu_words: [u32; VERDICT_WORDS] = gpu[ordinal];
+         let gpu_bits = gpu_words[0] & !(1 << verdict_bits::UNDECIDABLE);
+         let undecidable = gpu_words[0] & (1 << verdict_bits::UNDECIDABLE) != 0
+-            || gpu_words[singlefs_checker_tier::crash_judge_gpu::POOL_CHECKER_UNDECIDABLE_WORD]
+-                != 0;
++            || gpu_words[POOL_CHECKER_UNDECIDABLE_WORD] != 0;
+         let gpu_checker_bits = pool_checker_violated_bits(&gpu_words) & covered;
+         let cpu_checker_covered = *cpu_checker_bits & covered;
+         if *cpu_bits != 0 {
+@@ -1384,6 +1385,139 @@ fn verdicts_are_the_same_whether_one_dispatch_spans_one_scratch_lane_or_several(
+     assert_eq!(narrow.len(), wide.len());
+ }
+ 
++/// 在走读内核清零违例位之后种一个假的违例位（下标取 64 与池级 checker 条数里大的那个，落在高 64 位、不撞真的不变量）、
++/// 在扫描内核读回违例位之后种第 128 位（下标 127）：
++/// 两份种过的内核判出的每个状态，违例位等于没种的那一份判出的再并上种的位（第 65 位每个状态都有，第 128 位只在扫描内核判完的状态上有），
++/// 其余的字逐字相同。违例位的高 64 位在走读内核写出、扫描内核读回又写出、Rust 读出这三处任一处被截掉，这条红。
++/// 今天池级 checker 49 条，种的是第 65 位（下标 64）；m3-inv-a-r1、m3-inv-b-r1 两轮新立之后是 65 条，种的位跟着挪到下标 65。
++#[test]
++fn a_planted_violated_bit_past_the_sixty_fourth_reaches_the_verdict_through_both_checker_kernels() {
++    const FIRST_BIT_OF_THE_HIGH_HALF: usize = 64;
++    const PLANTED_BY_THE_SCAN: usize = 127;
++    const SCAN_KERNEL_JUDGED_THE_STATE: u32 = 5;
++    let planted_by_the_walk = IMPLEMENTED_INVARIANTS.len().max(FIRST_BIT_OF_THE_HIGH_HALF);
++    assert!(
++        planted_by_the_walk < PLANTED_BY_THE_SCAN
++            && PLANTED_BY_THE_SCAN < POOL_CHECKER_VIOLATED_BIT_CAPACITY,
++        "种的两位都在违例位容量之内、不撞真的不变量（池级 checker {} 条）",
++        IMPLEMENTED_INVARIANTS.len()
++    );
++    let judge_sources = JudgeKernelSources::of_the_judge();
++    let walk_anchor = "\n    clear_violated();\n";
++    let scan_anchor = "\n    load_violated(out);\n";
++    assert_eq!(
++        judge_sources.checker_walk.matches(walk_anchor).count(),
++        1,
++        "走读内核里清零违例位的调用恰好一处"
++    );
++    assert_eq!(
++        judge_sources.checker_scan.matches(scan_anchor).count(),
++        1,
++        "扫描内核里读回违例位的调用恰好一处"
++    );
++    let planted_sources = JudgeKernelSources {
++        recovery: judge_sources.recovery.clone(),
++        checker_walk: judge_sources.checker_walk.replacen(
++            walk_anchor,
++            &format!("{walk_anchor}    violate({planted_by_the_walk}u);\n"),
++            1,
++        ),
++        checker_scan: judge_sources.checker_scan.replacen(
++            scan_anchor,
++            &format!("{scan_anchor}    violate({PLANTED_BY_THE_SCAN}u);\n"),
++            1,
++        ),
++    };
++    let Some(card) = one_usable_card_or_report_not_run(
++        "a_planted_violated_bit_past_the_sixty_fourth_reaches_the_verdict_through_both_checker_kernels",
++    ) else {
++        return;
++    };
++    let limit = expand_up_to();
++    let flow = record_new_pool_file_creation("crash-judge-gpu-planted-bit", "new-pool");
++    let expansion = move |_segment_index: usize, segment: &[usize]| {
++        if segment.len() <= limit {
++            Layer0SegmentExpansion::EveryProperSubset
++        } else {
++            Layer0SegmentExpansion::NotExpanded
++        }
++    };
++    let judge_flow = JudgeFlow {
++        base: &flow.base,
++        writes: &flow.writes,
++        segments: &flow.segments,
++        judged_root_index: flow.judged_root_index,
++        versions: &flow.versions,
++        expansion: &expansion,
++    };
++    let tables = build_judge_tables(&judge_flow).expect("建得出表");
++    let state_count = tables.state_count;
++    let packed = PackedJudgeTables::of(&tables);
++    let unplanted = GpuCrashJudge::on_card_with_packed_tables(&card, &packed, usize::MAX)
++        .judge_states(0..state_count);
++    let planted = GpuCrashJudge::on_card_compiling_these_kernel_sources(
++        &card,
++        &packed,
++        usize::MAX,
++        &planted_sources,
++    )
++    .judge_states(0..state_count);
++    assert_eq!(unplanted.len(), planted.len());
++    let mut states_the_scan_judged = 0u64;
++    let mut mismatches = Vec::new();
++    for (ordinal, (unplanted_words, planted_words)) in unplanted.iter().zip(&planted).enumerate() {
++        assert_eq!(
++            unplanted_words[POOL_CHECKER_UNDECIDABLE_WORD], 0,
++            "状态 {ordinal}：没种的那一份池级 checker 判得了"
++        );
++        let scan_judged =
++            unplanted_words[POOL_CHECKER_REACHED_WORD] == SCAN_KERNEL_JUDGED_THE_STATE;
++        if scan_judged {
++            states_the_scan_judged += 1;
++        }
++        let planted_bits = (1u128 << planted_by_the_walk)
++            | if scan_judged {
++                1u128 << PLANTED_BY_THE_SCAN
++            } else {
++                0
++            };
++        let expected_bits = pool_checker_violated_bits(unplanted_words) | planted_bits;
++        let violated_words = POOL_CHECKER_VIOLATED_FIRST_WORD
++            ..POOL_CHECKER_VIOLATED_FIRST_WORD + POOL_CHECKER_VIOLATED_WORDS;
++        let other_words_agree = unplanted_words
++            .iter()
++            .zip(planted_words)
++            .enumerate()
++            .filter(|(word_index, _)| !violated_words.contains(word_index))
++            .all(|(_, (unplanted_word, planted_word))| unplanted_word == planted_word);
++        if pool_checker_violated_bits(planted_words) != expected_bits || !other_words_agree {
++            mismatches.push(format!(
++                "状态 {ordinal}：没种 {unplanted_words:?}；种过 {planted_words:?}；违例位要 {expected_bits:#x}，读出 {:#x}",
++                pool_checker_violated_bits(planted_words)
++            ));
++        }
++    }
++    println!(
++        "CRASH_JUDGE_PLANTED_BIT states={state_count} scan_judged={states_the_scan_judged} mismatches={}",
++        mismatches.len()
++    );
++    assert!(
++        states_the_scan_judged > 0,
++        "这条流上要有扫描内核判完的状态，第 128 位那一路才走得到"
++    );
++    assert!(
++        mismatches.is_empty(),
++        "{} 个状态上种的位没走到结论（前几个）：\n{}",
++        mismatches.len(),
++        mismatches
++            .iter()
++            .take(3)
++            .cloned()
++            .collect::<Vec<_>>()
++            .join("\n")
++    );
++}
++
+ /// 卡领块的时候被叫停：不再领新的块，已经领的判完写进库（块序连着）；下一趟只判剩下的，对账为空。
+ /// 配置开了 GPU、判器却建不出这条流的表（这里把一次写换成同样长的清零，判器的表不接清零写）：报错，
+ /// 不退回 CPU 判器，库里一块判定都不写（用户 2026-09-29 定：配了 GPU 就一定要 GPU 判，做不到就明确报错）。建表在上卡之前，不用卡。

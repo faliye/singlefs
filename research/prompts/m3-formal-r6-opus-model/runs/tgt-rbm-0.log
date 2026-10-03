@@ -1,0 +1,22 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：m3-formal-r6 攻方腿原型 r6probe 跑（副本）
+run-with-memory-cap: 排队（已等 0 秒，至多 150 秒）：slice 已占 39.5 GiB，这一条要 2.0 GiB（峰值表里没有这条，按它的上限 2G 算），总上限 40.1 GiB；账上在跑 6 条
+run-with-memory-cap: 排了 40 秒，起跑（singlefs-memory-cap-1199977-1322513479）
+history rbm: ending Completed positions ["StartingPoint", "Operation(0)", "Operation(1)", "Operation(2)"] marks [76, 107, 130, 182] mkfs_ops 23
+  step 0: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 1: Applied(RolledBack { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, released_user_visible_units: 4, resurrected_user_visible_copies: 8 })
+  step 2: Applied(Mounted { instance: InstanceGeneration(2), publishes: 2, allocation_records_compared: Compared { publishes: 2 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquisi
+  segment_terminator_position [2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3]
+  kinds [Publish, Publish, Rollback, Other] contents [Some(3000), Some(201), Some(3000), Some(3000)] window_writes 55 write_position [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
+history=rbm mode=tgt mutation=None writes=55 segments=13 closed_form_two_state=24598 with_torn=24618 prepare_secs=0.05
+states_judged=8000 of 24618 range=0..8000 elapsed_secs=147.7
+rec=v@0 mount_refused:NewerStateStillUnreadableAfterOneReread count=10
+rec=v@0 target_origin=c3_confirmed -> ok:c3:by_root count=3894
+rec=v@0 target_origin=continuation_mount -> ok:v@0:by_content_only count=7788
+rec=v@0 target_origin=original_run -> err:TargetNotACandidate:VersionWithoutFile count=11682
+rec=v@0 target_origin=original_run -> ok:v@0:by_content_only count=7785
+rec=v@0 target_origin=original_run -> ok:v@1:by_content_only count=3894
+rec=v@1 target_origin=c3_confirmed -> ok:c3:by_root count=4096
+rec=v@1 target_origin=continuation_mount -> ok:v@1:by_content_only count=12288
+rec=v@1 target_origin=original_run -> err:TargetNotACandidate:VersionWithoutFile count=12288
+rec=v@1 target_origin=original_run -> ok:v@0:by_content_only count=4096
+rec=v@1 target_origin=original_run -> ok:v@1:by_content_only count=4096

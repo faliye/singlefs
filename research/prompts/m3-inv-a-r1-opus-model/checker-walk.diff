@@ -1,0 +1,152 @@
+--- a/crates/singlefs-checker/src/walk.rs	2026-09-30 13:29:29.729889915 +0000
++++ b/crates/singlefs-checker/src/walk.rs	2026-09-30 14:13:30.935502852 +0000
+@@ -6360,8 +6360,148 @@
+     );
+     seen.extend(walk.tree_identifiers_in_tables.iter().copied());
+     let highest_seen = seen.iter().max().copied().unwrap_or(0);
++    // m3-inv-a-r1 攻方副本的观测：记录新根段里的水位（偏移 172）、「并进记录」那一读法的水位、候选 I-7.8b 的判定。
++    let mut inv_a_scan_line = String::new();
++    {
++        let record_watermarks: Vec<(u32, u64, u64)> = journal_records_by_device
++            .iter()
++            .flat_map(|(_, records)| records.values())
++            .map(|record| {
++                (
++                    record.instance,
++                    record.checkpoint_txg,
++                    read_u64(&record.new_root_segment, 172),
++                )
++            })
++            .collect();
++        let records_max = record_watermarks.iter().map(|(_, _, w)| *w).max();
++        let mut b78_first_violation: Option<String> = None;
++        let mut b78_pairs = 0u64;
++        for (_, _, root) in &roots {
++            for (instance, txg, record_watermark) in &record_watermarks {
++                let earlier = *instance < root.instance
++                    || (*instance == root.instance && *txg < root.checkpoint_txg);
++                if earlier {
++                    b78_pairs += 1;
++                    if root.tree_identifier_watermark < *record_watermark && b78_first_violation.is_none() {
++                        b78_first_violation = Some(format!(
++                            "根 ({}, {}) 水位 {} < 更早的记录 ({instance}, {txg}) 新根段水位 {record_watermark}",
++                            root.instance, root.checkpoint_txg, root.tree_identifier_watermark
++                        ));
++                    }
++                }
++            }
++        }
++        let diagnostics = InvAWatermarkDiagnostics {
++            roots_max: watermark,
++            records_max,
++            highest_seen,
++            b78_pairs,
++            b78_first_violation,
++        };
++        INV_A_LAST_DIAGNOSTICS.with(|cell| *cell.borrow_mut() = Some(diagnostics.clone()));
++        if !INV_A_SKIP_GLOBAL_COUNTS.with(std::cell::Cell::get) {
++            use std::sync::atomic::Ordering::Relaxed;
++            INV_A_GLOBAL_COUNTS[0].fetch_add(1, Relaxed);
++            if diagnostics.roots_max <= highest_seen {
++                INV_A_GLOBAL_COUNTS[1].fetch_add(1, Relaxed);
++            }
++            if diagnostics.roots_max.max(diagnostics.records_max.unwrap_or(0)) <= highest_seen {
++                INV_A_GLOBAL_COUNTS[2].fetch_add(1, Relaxed);
++            }
++            if diagnostics.b78_first_violation.is_some() {
++                INV_A_GLOBAL_COUNTS[3].fetch_add(1, Relaxed);
++            }
++            if diagnostics.records_max.is_some_and(|records| records > diagnostics.roots_max) {
++                INV_A_GLOBAL_COUNTS[4].fetch_add(1, Relaxed);
++            }
++        }
++        if std::env::var_os("INV_A_SCAN").is_some() {
++            inv_a_scan_line = format!(
++                "INV-A-SCAN roots_max={} records_max={:?} highest_seen={} stock78={} with_records78={} b78_pairs={} b78={}",
++                diagnostics.roots_max,
++                diagnostics.records_max,
++                diagnostics.highest_seen,
++                if diagnostics.roots_max > highest_seen { "H" } else { "V" },
++                if diagnostics.roots_max.max(diagnostics.records_max.unwrap_or(0)) > highest_seen { "H" } else { "V" },
++                diagnostics.b78_pairs,
++                diagnostics.b78_first_violation.as_deref().unwrap_or("H"),
++            );
++        }
++    }
++    let watermark = if std::env::var_os("INV_A_CHECKER_WATERMARK_WITH_RECORDS").is_some() {
++        journal_records_by_device
++            .iter()
++            .flat_map(|(_, records)| records.values())
++            .map(|record| read_u64(&record.new_root_segment, 172))
++            .fold(watermark, u64::max)
++    } else {
++        watermark
++    };
+     judgements.judge("I-7.8", watermark > highest_seen, || {
+         format!("根环水位最大 {watermark}，盘上出现过的最大树 ID {highest_seen}")
+     });
+-    judgements.into_report()
++    let report = judgements.into_report();
++    if std::env::var_os("INV_A_SCAN").is_some() {
++        let violated: Vec<&str> = report
++            .iter()
++            .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
++            .map(|(name, _)| *name)
++            .collect();
++        eprintln!("{inv_a_scan_line} violated={violated:?}");
++    }
++    report
++}
++
++/// m3-inv-a-r1 攻方副本：最近一次 `check_pool_image` 在 I-7.8 那一处看到的数（每个线程一份）。
++#[derive(Clone, Debug)]
++pub struct InvAWatermarkDiagnostics {
++    pub roots_max: u64,
++    pub records_max: Option<u64>,
++    pub highest_seen: u64,
++    pub b78_pairs: u64,
++    pub b78_first_violation: Option<String>,
++}
++
++thread_local! {
++    static INV_A_LAST_DIAGNOSTICS: std::cell::RefCell<Option<InvAWatermarkDiagnostics>> =
++        const { std::cell::RefCell::new(None) };
++}
++
++/// m3-inv-a-r1 攻方副本：全进程累计（工作线程上的判定也算）——[走到 I-7.8 的次数, 只取根判违例, 并进记录判违例, 候选 I-7.8b 判违例,
++/// 记录里的水位高于根环里的]。线程自己把 `INV_A_SKIP_GLOBAL_COUNTS` 立起来时那个线程上的判定不计。
++static INV_A_GLOBAL_COUNTS: [std::sync::atomic::AtomicU64; 5] = [
++    std::sync::atomic::AtomicU64::new(0),
++    std::sync::atomic::AtomicU64::new(0),
++    std::sync::atomic::AtomicU64::new(0),
++    std::sync::atomic::AtomicU64::new(0),
++    std::sync::atomic::AtomicU64::new(0),
++];
++
++thread_local! {
++    static INV_A_SKIP_GLOBAL_COUNTS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
++}
++
++/// 这个线程上的判定计不计进全进程累计。
++pub fn inv_a_skip_global_counts_on_this_thread(skip: bool) {
++    INV_A_SKIP_GLOBAL_COUNTS.with(|cell| cell.set(skip));
++}
++
++/// 读全进程累计。
++#[must_use]
++pub fn inv_a_global_counts() -> [u64; 5] {
++    use std::sync::atomic::Ordering::Relaxed;
++    [
++        INV_A_GLOBAL_COUNTS[0].load(Relaxed),
++        INV_A_GLOBAL_COUNTS[1].load(Relaxed),
++        INV_A_GLOBAL_COUNTS[2].load(Relaxed),
++        INV_A_GLOBAL_COUNTS[3].load(Relaxed),
++        INV_A_GLOBAL_COUNTS[4].load(Relaxed),
++    ]
++}
++
++/// 取走最近一次的观测。
++#[must_use]
++pub fn inv_a_take_last_watermark_diagnostics() -> Option<InvAWatermarkDiagnostics> {
++    INV_A_LAST_DIAGNOSTICS.with(|cell| cell.borrow_mut().take())
+ }

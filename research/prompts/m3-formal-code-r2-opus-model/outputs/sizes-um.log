@@ -1,0 +1,6 @@
+history um: ending Completed
+  unmount: F=CheckpointTxg(5) publishes=2
+history=um writes=55 segments=13 closed_form=24598 with_torn=24618 committed=11
+history umow: ending Completed
+  unmount: F=CheckpointTxg(7) publishes=3
+history=umow writes=55 segments=13 closed_form=24598 with_torn=24618 committed=14

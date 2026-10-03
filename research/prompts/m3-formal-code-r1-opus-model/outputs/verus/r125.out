@@ -1,0 +1,57 @@
+run-with-memory-cap: 上限 1500M 超过实测峰值 541M 的 2 倍，照理由放行：攻方腿改坏核或加探针，峰值随改动变
+error: postcondition not satisfied
+    --> src/lib.rs:2707:9
+     |
+2707 | /         replay_lands_no_earlier_than_the_chosen_root(
+2708 | |             root_instance,
+2709 | |             root_checkpoint_txg,
+2710 | |             chosen_root_source,
+...    |
+2716 | |             replayed,
+2717 | |         ),
+     | |_________^ failed this postcondition
+2718 |   {
+2719 | /     match replayed {
+2720 | |         Ok(outcome) => {
+2721 | |             let applied = outcome.applied@;
+2722 | |             if applied.len() > 0 {
+...    |
+2735 | |         ) => {},
+2736 | |     }
+     | |_____- at the end of the function body
+
+error: postcondition not satisfied
+    --> src/lib.rs:3600:9
+     |
+3600 | /         replay_lands_no_earlier_than_the_chosen_root(
+3601 | |             root_instance,
+3602 | |             root_checkpoint_txg,
+3603 | |             chosen_root_source,
+...    |
+3609 | |             replayed,
+3610 | |         ),
+     | |_________^ failed this postcondition
+...
+3623 | / {
+3624 | |     broadcast use {
+3625 | |         lemma_replay_core_result_replays_an_applied_record_twice_as_once,
+3626 | |         lemma_replay_core_result_is_a_fixed_point,
+...    |
+3972 | | }
+     | |_- at the end of the function body
+
+error: invariant not satisfied at end of loop body
+    --> src/lib.rs:3986:13
+     |
+3986 | /             root_chosen_among_the_first_slots(
+3987 | |                 root_slots@,
+3988 | |                 slot_index as int,
+3989 | |                 match chosen {
+...    |
+3992 | |                 },
+3993 | |             ),
+     | |_____________^
+
+verification results:: 53 verified, 3 errors
+error: aborting due to 3 previous errors
+

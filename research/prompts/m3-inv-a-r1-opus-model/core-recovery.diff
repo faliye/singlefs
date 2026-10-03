@@ -1,0 +1,22 @@
+--- a/crates/singlefs-core/src/recovery.rs	2026-09-30 13:29:29.731871165 +0000
++++ b/crates/singlefs-core/src/recovery.rs	2026-09-30 13:29:29.732283815 +0000
+@@ -1207,10 +1207,15 @@
+     filesystem_identifier: &[u8; 16],
+     records: &BTreeMap<(InstanceGeneration, u64), JournalRecord>,
+ ) -> Option<u64> {
+-    let mut highest: Option<u64> = records
+-        .values()
+-        .map(|record| record.new_tree_identifier_watermark)
+-        .max();
++    // m3-inv-a-r1 攻方副本的变异开关：只取根环、不并记录（C342 退回去的样子）。
++    let mut highest: Option<u64> = if std::env::var_os("INV_A_CORE_WATERMARK_ROOTS_ONLY").is_some() {
++        None
++    } else {
++        records
++            .values()
++            .map(|record| record.new_tree_identifier_watermark)
++            .max()
++    };
+     visit_valid_roots(
+         reader,
+         region_devices,

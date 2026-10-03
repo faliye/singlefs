@@ -1,0 +1,15 @@
+history rfx3-1: ending Completed
+  step 0: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 1: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 2: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 3: Applied(RaisedFloor { new_floor: CheckpointTxg(1), publishes: 2, reclaimed_placements: 0, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 } })
+history=rfx3-1 mode=k2 second=false writes=36 segments=9 closed_form=8208 with_torn=8223 range=0..8223
+states_judged=8223 second_states=0 elapsed_secs=50.7
+ALONE judged count=8208
+MOUNT floor=NotRaised count=8208
+MOUNT refused verdict=Legal(NewerPublishWitnessedBySystemConfiguration) member=NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheS count=15
+    e.g. ordinal=1 R1: eff=Some((1, 6)) cmp(inst,txg,W,F)=Some((1, 6, 65548, 0)) applied=0 above=0 sc_inst=Some(1) ring_inst=Some(1) ring_txg=Some(6) rec_txg=Some(6) F=Some(0)
+    e.g. ordinal=3 R1: eff=Some((1, 6)) cmp(inst,txg,W,F)=Some((1, 6, 65548, 0)) applied=0 above=0 sc_inst=Some(1) ring_inst=Some(1) ring_txg=Some(6) rec_txg=Some(6) F=Some(0)
+PUBLISH judged count=8208
+R1 outcome=file rebuilt=false o1=green count=8217
+R1 outcome=file rebuilt=true o1=green count=6

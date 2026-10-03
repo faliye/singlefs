@@ -1,0 +1,13 @@
+--- a/crates/singlefs-core/src/recovery.rs
++++ b/crates/singlefs-core/src/recovery.rs
+@@ -1275,8 +1275,8 @@
+         .iter()
+         .map(|self_verified_root| {
+             self_verified_root.map(|root| RootChoiceKey {
+-                checkpoint_txg: PrefixKernelCheckpointTxg(root.checkpoint_txg.0),
+-                instance: PrefixKernelInstanceGeneration(root.instance.0),
++                checkpoint_txg: PrefixKernelCheckpointTxg(u64::from(root.instance.0)),
++                instance: PrefixKernelInstanceGeneration(u32::try_from(root.checkpoint_txg.0).unwrap_or(u32::MAX)),
+             })
+         })
+         .collect();

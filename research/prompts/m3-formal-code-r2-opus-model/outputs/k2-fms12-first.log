@@ -1,0 +1,11 @@
+history fms12: ending Completed
+  window mount: instance=InstanceGeneration(2) floor_raises=1
+history=fms12 mode=k2 second=false writes=74 segments=18 closed_form=28703 with_torn=28733 range=0..14000
+states_judged=14000 second_states=0 elapsed_secs=210.7
+ALONE judged count=13995
+MOUNT floor=RaisedTo(CheckpointTxg(12)) count=13995
+MOUNT refused verdict=Legal(NewerPublishWitnessedBySystemConfiguration) member=NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheS count=5
+    e.g. ordinal=1 R1: eff=Some((1, 15)) cmp(inst,txg,W,F)=Some((1, 15, 65548, 0)) applied=0 above=0 sc_inst=Some(1) ring_inst=Some(1) ring_txg=Some(15) rec_txg=Some(15) F=Some(0)
+    e.g. ordinal=3 R1: eff=Some((1, 15)) cmp(inst,txg,W,F)=Some((1, 15, 65548, 0)) applied=0 above=0 sc_inst=Some(1) ring_inst=Some(1) ring_txg=Some(15) rec_txg=Some(15) F=Some(0)
+PUBLISH judged count=13995
+R1 outcome=file rebuilt=false o1=green count=14000

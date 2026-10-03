@@ -1,0 +1,90 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：m3-inv-a-r1 攻方腿在自己的副本上跑原型，与并行的其他腿各跑各的
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.04s
+     Running tests/inv_a_crash_states.rs (/tmp/claude-1000/m3-inv-a-r1-opus/target/release/deps/inv_a_crash_states-b466c569c6bd7ea4)
+
+running 1 test
+test e3_mount_stream_over_units_without_their_record ... INV-A-E E3 只有单元落了 挂载流 38 步、写 24 次、段 [2, 12, 2, 1, 2, 2, 1, 2]；closed_form_state_count=4113，带第三态的全量 4128；这次挂载施加 0 条、实例 InstanceGeneration(2)、行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(2), applied_transaction_high_water: 0 }]
+LAYER0_PARALLEL_START states=4128 slices=64 states_per_slice=65 worker_threads=2 configured_worker_threads=2 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=64
+LAYER0_PROGRESS slice=1/64 states=[0,65) segments=0..=1 finished_slices=1/64 finished_states=65/4128 resumed_slices=0 elapsed_seconds=0.1
+LAYER0_PROGRESS slice=2/64 states=[65,130) segments=1..=1 finished_slices=2/64 finished_states=130/4128 resumed_slices=0 elapsed_seconds=30.2
+LAYER0_PROGRESS slice=3/64 states=[130,195) segments=1..=1 finished_slices=3/64 finished_states=195/4128 resumed_slices=0 elapsed_seconds=57.0
+LAYER0_PROGRESS slice=4/64 states=[195,260) segments=1..=1 finished_slices=4/64 finished_states=260/4128 resumed_slices=0 elapsed_seconds=85.7
+LAYER0_PROGRESS slice=5/64 states=[260,325) segments=1..=1 finished_slices=5/64 finished_states=325/4128 resumed_slices=0 elapsed_seconds=113.8
+LAYER0_PROGRESS slice=6/64 states=[325,390) segments=1..=1 finished_slices=6/64 finished_states=390/4128 resumed_slices=0 elapsed_seconds=141.5
+LAYER0_PROGRESS slice=8/64 states=[455,520) segments=1..=1 finished_slices=7/64 finished_states=455/4128 resumed_slices=0 elapsed_seconds=168.4
+LAYER0_PROGRESS slice=7/64 states=[390,455) segments=1..=1 finished_slices=8/64 finished_states=520/4128 resumed_slices=0 elapsed_seconds=168.4
+LAYER0_PROGRESS slice=9/64 states=[520,585) segments=1..=1 finished_slices=9/64 finished_states=585/4128 resumed_slices=0 elapsed_seconds=224.0
+LAYER0_PROGRESS slice=10/64 states=[585,650) segments=1..=1 finished_slices=10/64 finished_states=650/4128 resumed_slices=0 elapsed_seconds=250.2
+LAYER0_PROGRESS slice=11/64 states=[650,715) segments=1..=1 finished_slices=11/64 finished_states=715/4128 resumed_slices=0 elapsed_seconds=279.7
+LAYER0_PROGRESS slice=12/64 states=[715,780) segments=1..=1 finished_slices=12/64 finished_states=780/4128 resumed_slices=0 elapsed_seconds=309.1
+LAYER0_PROGRESS slice=13/64 states=[780,845) segments=1..=1 finished_slices=13/64 finished_states=845/4128 resumed_slices=0 elapsed_seconds=336.0
+LAYER0_PROGRESS slice=14/64 states=[845,910) segments=1..=1 finished_slices=14/64 finished_states=910/4128 resumed_slices=0 elapsed_seconds=365.4
+LAYER0_PROGRESS slice=15/64 states=[910,975) segments=1..=1 finished_slices=15/64 finished_states=975/4128 resumed_slices=0 elapsed_seconds=393.6
+LAYER0_PROGRESS slice=16/64 states=[975,1040) segments=1..=1 finished_slices=16/64 finished_states=1040/4128 resumed_slices=0 elapsed_seconds=421.9
+LAYER0_PROGRESS slice=17/64 states=[1040,1105) segments=1..=1 finished_slices=17/64 finished_states=1105/4128 resumed_slices=0 elapsed_seconds=450.2
+LAYER0_PROGRESS slice=18/64 states=[1105,1170) segments=1..=1 finished_slices=18/64 finished_states=1170/4128 resumed_slices=0 elapsed_seconds=476.4
+LAYER0_PROGRESS slice=19/64 states=[1170,1235) segments=1..=1 finished_slices=19/64 finished_states=1235/4128 resumed_slices=0 elapsed_seconds=508.7
+LAYER0_PROGRESS slice=20/64 states=[1235,1300) segments=1..=1 finished_slices=20/64 finished_states=1300/4128 resumed_slices=0 elapsed_seconds=538.4
+LAYER0_PROGRESS slice=21/64 states=[1300,1365) segments=1..=1 finished_slices=21/64 finished_states=1365/4128 resumed_slices=0 elapsed_seconds=564.4
+LAYER0_PROGRESS slice=22/64 states=[1365,1430) segments=1..=1 finished_slices=22/64 finished_states=1430/4128 resumed_slices=0 elapsed_seconds=594.6
+LAYER0_PROGRESS slice=23/64 states=[1430,1495) segments=1..=1 finished_slices=23/64 finished_states=1495/4128 resumed_slices=0 elapsed_seconds=623.5
+LAYER0_PROGRESS slice=24/64 states=[1495,1560) segments=1..=1 finished_slices=24/64 finished_states=1560/4128 resumed_slices=0 elapsed_seconds=651.8
+LAYER0_PROGRESS slice=25/64 states=[1560,1625) segments=1..=1 finished_slices=25/64 finished_states=1625/4128 resumed_slices=0 elapsed_seconds=679.1
+LAYER0_PROGRESS slice=26/64 states=[1625,1690) segments=1..=1 finished_slices=26/64 finished_states=1690/4128 resumed_slices=0 elapsed_seconds=707.5
+LAYER0_PROGRESS slice=27/64 states=[1690,1755) segments=1..=1 finished_slices=27/64 finished_states=1755/4128 resumed_slices=0 elapsed_seconds=736.3
+LAYER0_PROGRESS slice=28/64 states=[1755,1820) segments=1..=1 finished_slices=28/64 finished_states=1820/4128 resumed_slices=0 elapsed_seconds=766.6
+LAYER0_PROGRESS slice=29/64 states=[1820,1885) segments=1..=1 finished_slices=29/64 finished_states=1885/4128 resumed_slices=0 elapsed_seconds=795.3
+LAYER0_PROGRESS slice=30/64 states=[1885,1950) segments=1..=1 finished_slices=30/64 finished_states=1950/4128 resumed_slices=0 elapsed_seconds=826.5
+LAYER0_PROGRESS slice=31/64 states=[1950,2015) segments=1..=1 finished_slices=31/64 finished_states=2015/4128 resumed_slices=0 elapsed_seconds=854.4
+LAYER0_PROGRESS slice=32/64 states=[2015,2080) segments=1..=1 finished_slices=32/64 finished_states=2080/4128 resumed_slices=0 elapsed_seconds=881.9
+LAYER0_PROGRESS slice=33/64 states=[2080,2145) segments=1..=1 finished_slices=33/64 finished_states=2145/4128 resumed_slices=0 elapsed_seconds=910.3
+LAYER0_PROGRESS slice=34/64 states=[2145,2210) segments=1..=1 finished_slices=34/64 finished_states=2210/4128 resumed_slices=0 elapsed_seconds=939.0
+LAYER0_PROGRESS slice=35/64 states=[2210,2275) segments=1..=1 finished_slices=35/64 finished_states=2275/4128 resumed_slices=0 elapsed_seconds=967.0
+LAYER0_PROGRESS slice=36/64 states=[2275,2340) segments=1..=1 finished_slices=36/64 finished_states=2340/4128 resumed_slices=0 elapsed_seconds=993.9
+LAYER0_PROGRESS slice=37/64 states=[2340,2405) segments=1..=1 finished_slices=37/64 finished_states=2405/4128 resumed_slices=0 elapsed_seconds=1019.1
+LAYER0_PROGRESS slice=38/64 states=[2405,2470) segments=1..=1 finished_slices=38/64 finished_states=2470/4128 resumed_slices=0 elapsed_seconds=1047.9
+LAYER0_PROGRESS slice=39/64 states=[2470,2535) segments=1..=1 finished_slices=39/64 finished_states=2535/4128 resumed_slices=0 elapsed_seconds=1077.6
+LAYER0_PROGRESS slice=40/64 states=[2535,2600) segments=1..=1 finished_slices=40/64 finished_states=2600/4128 resumed_slices=0 elapsed_seconds=1106.6
+LAYER0_PROGRESS slice=41/64 states=[2600,2665) segments=1..=1 finished_slices=41/64 finished_states=2665/4128 resumed_slices=0 elapsed_seconds=1134.4
+LAYER0_PROGRESS slice=42/64 states=[2665,2730) segments=1..=1 finished_slices=42/64 finished_states=2730/4128 resumed_slices=0 elapsed_seconds=1160.4
+LAYER0_PROGRESS slice=43/64 states=[2730,2795) segments=1..=1 finished_slices=43/64 finished_states=2795/4128 resumed_slices=0 elapsed_seconds=1184.3
+LAYER0_PROGRESS slice=44/64 states=[2795,2860) segments=1..=1 finished_slices=44/64 finished_states=2860/4128 resumed_slices=0 elapsed_seconds=1212.4
+LAYER0_PROGRESS slice=45/64 states=[2860,2925) segments=1..=1 finished_slices=45/64 finished_states=2925/4128 resumed_slices=0 elapsed_seconds=1238.6
+LAYER0_PROGRESS slice=46/64 states=[2925,2990) segments=1..=1 finished_slices=46/64 finished_states=2990/4128 resumed_slices=0 elapsed_seconds=1263.2
+LAYER0_PROGRESS slice=47/64 states=[2990,3055) segments=1..=1 finished_slices=47/64 finished_states=3055/4128 resumed_slices=0 elapsed_seconds=1288.5
+LAYER0_PROGRESS slice=48/64 states=[3055,3120) segments=1..=1 finished_slices=48/64 finished_states=3120/4128 resumed_slices=0 elapsed_seconds=1313.7
+LAYER0_PROGRESS slice=49/64 states=[3120,3185) segments=1..=1 finished_slices=49/64 finished_states=3185/4128 resumed_slices=0 elapsed_seconds=1339.3
+LAYER0_PROGRESS slice=50/64 states=[3185,3250) segments=1..=1 finished_slices=50/64 finished_states=3250/4128 resumed_slices=0 elapsed_seconds=1363.3
+LAYER0_PROGRESS slice=51/64 states=[3250,3315) segments=1..=1 finished_slices=51/64 finished_states=3315/4128 resumed_slices=0 elapsed_seconds=1388.3
+LAYER0_PROGRESS slice=52/64 states=[3315,3380) segments=1..=1 finished_slices=52/64 finished_states=3380/4128 resumed_slices=0 elapsed_seconds=1415.9
+LAYER0_PROGRESS slice=53/64 states=[3380,3445) segments=1..=1 finished_slices=53/64 finished_states=3445/4128 resumed_slices=0 elapsed_seconds=1443.7
+LAYER0_PROGRESS slice=54/64 states=[3445,3510) segments=1..=1 finished_slices=54/64 finished_states=3510/4128 resumed_slices=0 elapsed_seconds=1469.9
+LAYER0_PROGRESS slice=55/64 states=[3510,3575) segments=1..=1 finished_slices=55/64 finished_states=3575/4128 resumed_slices=0 elapsed_seconds=1497.3
+LAYER0_PROGRESS slice=56/64 states=[3575,3640) segments=1..=1 finished_slices=56/64 finished_states=3640/4128 resumed_slices=0 elapsed_seconds=1525.3
+LAYER0_PROGRESS slice=57/64 states=[3640,3705) segments=1..=1 finished_slices=57/64 finished_states=3705/4128 resumed_slices=0 elapsed_seconds=1552.8
+LAYER0_PROGRESS slice=58/64 states=[3705,3770) segments=1..=1 finished_slices=58/64 finished_states=3770/4128 resumed_slices=0 elapsed_seconds=1578.8
+LAYER0_PROGRESS slice=59/64 states=[3770,3835) segments=1..=1 finished_slices=59/64 finished_states=3835/4128 resumed_slices=0 elapsed_seconds=1606.8
+LAYER0_PROGRESS slice=60/64 states=[3835,3900) segments=1..=1 finished_slices=60/64 finished_states=3900/4128 resumed_slices=0 elapsed_seconds=1637.8
+LAYER0_PROGRESS slice=61/64 states=[3900,3965) segments=1..=1 finished_slices=61/64 finished_states=3965/4128 resumed_slices=0 elapsed_seconds=1665.6
+LAYER0_PROGRESS slice=62/64 states=[3965,4030) segments=1..=1 finished_slices=62/64 finished_states=4030/4128 resumed_slices=0 elapsed_seconds=1694.6
+LAYER0_PROGRESS slice=63/64 states=[4030,4095) segments=1..=1 finished_slices=63/64 finished_states=4095/4128 resumed_slices=0 elapsed_seconds=1724.1
+LAYER0_PROGRESS slice=64/64 states=[4095,4128) segments=1..=all_persisted finished_slices=64/64 finished_states=4128/4128 resumed_slices=0 elapsed_seconds=1754.6
+LAYER0_FINDINGS signatures=0 red_states=0 states=4128
+LAYER0_PARALLEL_FINISHED states=4128 slices=64 worker_threads=2 configured_worker_threads=2 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=64 progress_file_after_completion=none elapsed_seconds=1770.4
+INV-A-E E3 只有单元落了 枚举完：states=4128（观察者 4128），耗时 1770.4 秒；枚举器自己的判定：oracle 违例 0、不看 journal 那一遍违例 0、checker 判违例的 {}、恢复失败的状态 0、点名验证跑过 3 / 不过 0
+INV-A-E E3 只有单元落了 观察者看过 4128 个状态，粗键 5 种：
+INV-A-E E3 只有单元落了       3 × 崩溃态[自证槽 1+1] 只取根=H 并进记录=H I-7.8b=H 违例=[] → 可写挂载 Err NewerStateStillUnreadableAfterOneReread/SomeSystemConfigurationSlotUnreadOrUnverified
+INV-A-E E3 只有单元落了       6 × 崩溃态[自证槽 1+2] 只取根=H 并进记录=H I-7.8b=H 违例=[] → 可写挂载 Err NewerStateStillUnreadableAfterOneReread/SomeSystemConfigurationSlotUnreadOrUnverified
+INV-A-E E3 只有单元落了       6 × 崩溃态[自证槽 2+1] 只取根=H 并进记录=H I-7.8b=H 违例=[] → 可写挂载 Err NewerStateStillUnreadableAfterOneReread/SomeSystemConfigurationSlotUnreadOrUnverified
+INV-A-E E3 只有单元落了    4110 × 崩溃态[自证槽 2+2] 只取根=H 并进记录=H I-7.8b=H 违例=[] → 可写挂载 Ok（施加 0 条，树表 0 条，写行水位 11）只取根=H 并进记录=H I-7.8b=H 违例=[] → 新建文件 Ok（extent 树 11）只取根=H 并进记录=H I-7.8b=H 违例=[]
+INV-A-E E3 只有单元落了       3 × 崩溃态[自证槽 2+2] 只取根=H 并进记录=H I-7.8b=H 违例=[] → 可写挂载 Ok（施加 1 条，树表 0 条，写行水位 11）只取根=H 并进记录=H I-7.8b=H 违例=[] → 新建文件 Ok（extent 树 11）只取根=H 并进记录=H I-7.8b=H 违例=[]
+INV-A-E E3 只有单元落了 I-7.8b 第一处：None
+INV-A-E E3 只有单元落了 可写挂载被拒 NewerStateStillUnreadableAfterOneReread/SomeSystemConfigurationSlotUnreadOrUnverified 的第一处：NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }, witness: NewerPublishWitness { witnessed_journal_counter: 2, comparison: SomeSystemConfigurationSlotUnreadOrUnverified } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpo
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 1771.18s
+

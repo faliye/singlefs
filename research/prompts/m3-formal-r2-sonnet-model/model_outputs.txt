@@ -1,0 +1,31 @@
+# 2026-10-01 重跑，nice -n 19，python3.12.3；每条命令前一行是命令
+$ python3 reader_rule_model.py 1
+n=1 monotone_only=False states=146 failed=8 applied_ge1=6 as_whole=0 as_cont=0 as_stops=0 d_wc=0 d_ws=0 d_cs=0 j6=0 a_struct=0 rejected=48 base_not_q=0 base=0 mono_states=146
+$ python3 reader_rule_model.py 2
+n=2 monotone_only=False states=10658 failed=1168 applied_ge1=410 as_whole=0 as_cont=0 as_stops=0 d_wc=0 d_ws=0 d_cs=0 j6=0 a_struct=0 rejected=5856 base_not_q=0 base=0 mono_states=9122
+$ python3 reader_rule_model.py 3
+n=3 monotone_only=False states=778034 failed=127384 applied_ge1=24642 as_whole=2048 as_cont=1024 as_stops=3424 d_wc=1024 d_ws=3424 d_cs=2400 j6=464 a_struct=0 rejected=542736 base_not_q=0 base=1024 mono_states=523570
+$ python3 run_parallel.py 3
+n=3 monotone_only=False states=778034 failed=127384 applied_ge1=24642 as_whole=2048 as_cont=1024 as_stops=3424 d_wc=1024 d_ws=3424 d_cs=2400 j6=464 a_struct=0 rejected=542736 base=1024 mono_states=523570 base_in_q=1024
+$ python3 run_parallel.py 3 monotone
+n=3 monotone_only=True states=523570 failed=73368 applied_ge1=15906 as_whole=0 as_cont=0 as_stops=2400 d_wc=0 d_ws=2400 d_cs=2400 j6=0 a_struct=0 rejected=432144 base=0 mono_states=523570 base_in_q=0
+$ python3 agreement_where_readings_differ.py 3
+n=3 readings=whole_vs_cont differ=1024 impl_equals_whole=0 impl_equals_cont=1024 impl_equals_neither=0
+n=3 readings=whole_vs_stops differ=3424 impl_equals_whole=2400 impl_equals_stops=1024 impl_equals_neither=0
+n=3 readings=cont_vs_stops differ=2400 impl_equals_cont=2400 impl_equals_stops=0 impl_equals_neither=0
+$ python3 mutant448_equivalence.py 1
+n=1 states=146 differing_outcomes=0
+$ python3 mutant448_equivalence.py 2
+n=2 states=10658 differing_outcomes=0
+$ python3 mutant448_equivalence.py 3
+n=3 states=778034 differing_outcomes=0
+$ python3 run_parallel.py 4
+n=4 monotone_only=False states=56796482 failed=12307232 applied_ge1=1448298 as_whole=328192 as_cont=153600 as_stops=484800 d_wc=174592 d_ws=505792 d_cs=331200 j6=84936 a_struct=0 rejected=45266880 base=153600 mono_states=28459330 base_in_q=153600
+$ python3 run_parallel.py 4 monotone
+n=4 monotone_only=True states=28459330 failed=5031200 applied_ge1=730554 as_whole=0 as_cont=0 as_stops=233600 d_wc=0 d_ws=233600 d_cs=233600 j6=0 a_struct=0 rejected=26146752 base=0 mono_states=28459330 base_in_q=0
+$ python3 agreement_where_readings_differ.py 4
+n=4 readings=whole_vs_cont differ=174592 impl_equals_whole=0 impl_equals_cont=174592 impl_equals_neither=0
+n=4 readings=whole_vs_stops differ=505792 impl_equals_whole=331200 impl_equals_stops=174592 impl_equals_neither=0
+n=4 readings=cont_vs_stops differ=331200 impl_equals_cont=331200 impl_equals_stops=0 impl_equals_neither=0
+$ python3 mutant448_equivalence.py 4
+n=4 states=56796482 differing_outcomes=0

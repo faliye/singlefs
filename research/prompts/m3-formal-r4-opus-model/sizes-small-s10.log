@@ -1,0 +1,40 @@
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：m3-formal-r4 攻方腿跑自己的原型量状态数
+history s10: ending Completed
+  step 0: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 1: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 2: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 3: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 4: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 5: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 6: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 7: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 8: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 9: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 10: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 11: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 12: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 13: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 14: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 15: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 16: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 17: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 18: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 19: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 20: Applied(Published { reuse: RecordReuse { rewritten_from_released: 2, rewritten_with_changed_span: 2, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 1 })
+  step 21: Applied(Published { reuse: RecordReuse { rewritten_from_released: 6, rewritten_with_changed_span: 2, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 22: Applied(Published { reuse: RecordReuse { rewritten_from_released: 20, rewritten_with_changed_span: 4, released_records_removed: 2, released_records_covered: 2 }, floor_raises_pushed_by_the_session: 0 })
+  step 23: Applied(Published { reuse: RecordReuse { rewritten_from_released: 18, rewritten_with_changed_span: 4, released_records_removed: 2, released_records_covered: 2 }, floor_raises_pushed_by_the_session: 0 })
+  step 24: Applied(Mounted { instance: InstanceGeneration(2), publishes: 2, allocation_records_compared: Compared { publishes: 2 }, reuse: RecordReuse { rewritten_from_released: 24, rewritten_with_changed_span: 4, released_records_removed: 2, released_records_covered: 2 }, space_admission: AdmittedBeforeAcquisition })
+  marks [76, 107, 138, 169, 200, 231, 262, 293, 324, 355, 386, 417, 448, 479, 510, 545, 580, 615, 650, 685, 720, 805, 840, 875, 906, 958] mkfs_ops=23 base_ops=906
+  before: outcome=file len=Some(201) chosen=Some((29, 1)) eff=Some((29, 1)) marker=Some(NotWrittenByTheUnmountSequence) F_root=Some(20) prefix=0 W=0 rows=Some([]) floor=Some(20) ring=[(6, 1), (7, 1), (8, 1), (9, 1), (10, 1), (11, 1), (12, 1), (13, 1), (14, 1), (15, 1), (16, 1), (17, 1), (18, 1), (19, 1), (20, 1), (21, 1), (22, 1), (23, 1), (24, 1), (25, 1), (26, 1), (27, 1), (28, 1), (29, 1)] cand=[(20, 1), (21, 1), (22, 1), (23, 1), (24, 1), (25, 1), (26, 1), (27, 1), (28, 1), (29, 1)] q=Some("SystemRuntimeQuantities { slot_generation: 32, journal_tail: 29, journal_instance: InstanceGeneration(1), rollback_floor: CheckpointTxg(20) }")
+  after: outcome=file len=Some(201) chosen=Some((31, 2)) eff=Some((31, 2)) marker=Some(NotWrittenByTheUnmountSequence) F_root=Some(20) prefix=0 W=0 rows=Some([(1, 29, 0)]) floor=Some(20) ring=[(8, 1), (9, 1), (10, 1), (11, 1), (12, 1), (13, 1), (14, 1), (15, 1), (16, 1), (17, 1), (18, 1), (19, 1), (20, 1), (21, 1), (22, 1), (23, 1), (24, 1), (25, 1), (26, 1), (27, 1), (28, 1), (29, 1), (30, 2), (31, 2)] cand=[(20, 1), (21, 1), (22, 1), (23, 1), (24, 1), (25, 1), (26, 1), (27, 1), (28, 1), (29, 1), (30, 2), (31, 2)] q=Some("SystemRuntimeQuantities { slot_generation: 35, journal_tail: 31, journal_instance: InstanceGeneration(2), rollback_floor: CheckpointTxg(20) }")
+history=s10 writes=38 segments=9 closed_form_two_state=20496 with_torn=20511 prepare_secs=0.12
+  segment 0: 2 writes ["system_configuration_slot", "system_configuration_slot"]
+  segment 1: 14 writes ["unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write"]
+  segment 2: 2 writes ["journal_record", "journal_record"]
+  segment 3: 1 writes ["root_record_fua"]
+  segment 4: 2 writes ["system_configuration_slot", "system_configuration_slot"]
+  segment 5: 12 writes ["unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write"]
+  segment 6: 2 writes ["journal_record", "journal_record"]
+  segment 7: 1 writes ["root_record_fua"]
+  segment 8: 2 writes ["system_configuration_slot", "system_configuration_slot"]

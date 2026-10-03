@@ -1,0 +1,11 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 11M 的 2 倍，照理由放行：原型改过盘宽，峰值表里是旧盘宽的
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：m3-formal-r4 攻方腿跑自己的原型量状态数
+history s3: ending Completed
+  step 0: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 1: Applied(RolledBack { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, released_user_visible_units: 4, resurrected_user_visible_copies: 8 })
+  marks [76, 107, 130] mkfs_ops=23 base_ops=107
+history=s3 writes=17 segments=4 closed_form_two_state=4103 with_torn=4108 prepare_secs=0.01
+  segment 0: 12 writes ["unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write"]
+  segment 1: 2 writes ["journal_record", "journal_record"]
+  segment 2: 1 writes ["root_record_fua"]
+  segment 3: 2 writes ["system_configuration_slot", "system_configuration_slot"]

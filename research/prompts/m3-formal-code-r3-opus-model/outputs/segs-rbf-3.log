@@ -1,0 +1,83 @@
+HIST seed=3 start=AfterFirstFile ops=[RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 11307387092600937729 }), RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 3992596847233833366 }), PublishOverwrite(ContentChoice { length: OneByteBelowDataUnitPayloadCapacity, fill_seed: 9058503432725982842 }), PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 12883872826046839500 }, fill_seed: 8857471719570398452 }), PublishOverwrite(ContentChoice { length: ExactlyDataUnitPayloadCapacity, fill_seed: 5645703015062601190 }), RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 3191750077648340648 }), RollBackWhileMounted(RingRootAtTheNewestFloor), PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 12352764646684172691 }, fill_seed: 11481903486168252308 }), RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 3980598000218139604 }), RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 11828389778830673623 }), PublishOverwrite(ContentChoice { length: Empty, fill_seed: 3486659484579019557 }), RollBackWhileMounted(RingRoot { index_from_newest: 3 }), PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 6979605095718379556 }, fill_seed: 2900178596686685667 }), PublishOverwrite(ContentChoice { length: ExactlyDataUnitBytes, fill_seed: 5854146879569989648 }), PublishWithoutUnits, PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 319879161357156337 }, fill_seed: 2861568371682892958 }), PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 12854473568736176943 }, fill_seed: 9970217880615195871 }), PublishOverwrite(ContentChoice { length: Empty, fill_seed: 12332183036560393347 }), RollBackWhileMounted(RingRootAtTheNewestFloor), PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 3610107977866649864 }, fill_seed: 7660992861447426701 })] completed=true
+SEG 5 closing=start(AfterFirstFile) writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 6 closing=start(AfterFirstFile) writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 7 closing=start(AfterFirstFile) writes=1 kinds={"RootRecordFua:d1": 1}
+SEG 8 closing=start(AfterFirstFile) writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 9 closing=start(AfterFirstFile) writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 10 closing=start(AfterFirstFile) writes=1 kinds={"RootRecordFua:d0": 1}
+SEG 11 closing=start(AfterFirstFile) writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 12 closing=start(AfterFirstFile) writes=24 kinds={"UnitWrite:d0": 12, "UnitWrite:d1": 12}
+SEG 13 closing=start(AfterFirstFile) writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 14 closing=start(AfterFirstFile) writes=1 kinds={"RootRecordFua:d0": 1}
+SEG 15 closing=start(AfterFirstFile) writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 16 closing=op1:RaiseRollbackFloor writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 17 closing=op1:RaiseRollbackFloor writes=16 kinds={"UnitWrite:d0": 8, "UnitWrite:d1": 8}
+SEG 18 closing=op1:RaiseRollbackFloor writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 19 closing=op1:RaiseRollbackFloor writes=1 kinds={"RootRecordFua:d1": 1}
+SEG 20 closing=op1:RaiseRollbackFloor writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 21 closing=op1:RaiseRollbackFloor writes=16 kinds={"UnitWrite:d0": 8, "UnitWrite:d1": 8}
+SEG 22 closing=op1:RaiseRollbackFloor writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 23 closing=op1:RaiseRollbackFloor writes=1 kinds={"RootRecordFua:d0": 1}
+SEG 24 closing=op1:RaiseRollbackFloor writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 25 closing=op2:PublishOverwrite writes=24 kinds={"UnitWrite:d0": 12, "UnitWrite:d1": 12}
+SEG 26 closing=op2:PublishOverwrite writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 27 closing=op2:PublishOverwrite writes=1 kinds={"RootRecordFua:d0": 1}
+SEG 28 closing=op2:PublishOverwrite writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 29 closing=op3:PublishOverwrite writes=24 kinds={"UnitWrite:d0": 12, "UnitWrite:d1": 12}
+SEG 30 closing=op3:PublishOverwrite writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 31 closing=op3:PublishOverwrite writes=1 kinds={"RootRecordFua:d1": 1}
+SEG 32 closing=op3:PublishOverwrite writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 33 closing=op4:PublishOverwrite writes=24 kinds={"UnitWrite:d0": 12, "UnitWrite:d1": 12}
+SEG 34 closing=op4:PublishOverwrite writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 35 closing=op4:PublishOverwrite writes=1 kinds={"RootRecordFua:d0": 1}
+SEG 36 closing=op4:PublishOverwrite writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 37 closing=op5:RaiseRollbackFloor writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 38 closing=op5:RaiseRollbackFloor writes=16 kinds={"UnitWrite:d0": 8, "UnitWrite:d1": 8}
+SEG 39 closing=op5:RaiseRollbackFloor writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 40 closing=op5:RaiseRollbackFloor writes=1 kinds={"RootRecordFua:d0": 1}
+SEG 41 closing=op5:RaiseRollbackFloor writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 42 closing=op5:RaiseRollbackFloor writes=16 kinds={"UnitWrite:d0": 8, "UnitWrite:d1": 8}
+SEG 43 closing=op5:RaiseRollbackFloor writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 44 closing=op5:RaiseRollbackFloor writes=1 kinds={"RootRecordFua:d1": 1}
+SEG 45 closing=op5:RaiseRollbackFloor writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 46 closing=op7:PublishOverwrite writes=24 kinds={"UnitWrite:d0": 12, "UnitWrite:d1": 12}
+SEG 47 closing=op7:PublishOverwrite writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 48 closing=op7:PublishOverwrite writes=1 kinds={"RootRecordFua:d0": 1}
+SEG 49 closing=op7:PublishOverwrite writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 50 closing=op9:RaiseRollbackFloor writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 51 closing=op9:RaiseRollbackFloor writes=16 kinds={"UnitWrite:d0": 8, "UnitWrite:d1": 8}
+SEG 52 closing=op9:RaiseRollbackFloor writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 53 closing=op9:RaiseRollbackFloor writes=1 kinds={"RootRecordFua:d0": 1}
+SEG 54 closing=op9:RaiseRollbackFloor writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 55 closing=op9:RaiseRollbackFloor writes=20 kinds={"UnitWrite:d0": 10, "UnitWrite:d1": 10}
+SEG 56 closing=op9:RaiseRollbackFloor writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 57 closing=op9:RaiseRollbackFloor writes=1 kinds={"RootRecordFua:d1": 1}
+SEG 58 closing=op9:RaiseRollbackFloor writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 59 closing=op10:PublishOverwrite writes=28 kinds={"UnitWrite:d0": 14, "UnitWrite:d1": 14}
+SEG 60 closing=op10:PublishOverwrite writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 61 closing=op10:PublishOverwrite writes=1 kinds={"RootRecordFua:d0": 1}
+SEG 62 closing=op10:PublishOverwrite writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 63 closing=op11:RollBackWhileMounted writes=20 kinds={"UnitWrite:d0": 10, "UnitWrite:d1": 10}
+SEG 64 closing=op11:RollBackWhileMounted writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 65 closing=op11:RollBackWhileMounted writes=1 kinds={"RootRecordFua:d0": 1}
+SEG 66 closing=op11:RollBackWhileMounted writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 67 closing=op12:PublishOverwrite writes=28 kinds={"UnitWrite:d0": 14, "UnitWrite:d1": 14}
+SEG 68 closing=op12:PublishOverwrite writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 69 closing=op12:PublishOverwrite writes=1 kinds={"RootRecordFua:d1": 1}
+SEG 70 closing=op12:PublishOverwrite writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 71 closing=op15:PublishOverwrite writes=28 kinds={"UnitWrite:d0": 14, "UnitWrite:d1": 14}
+SEG 72 closing=op15:PublishOverwrite writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 73 closing=op15:PublishOverwrite writes=1 kinds={"RootRecordFua:d0": 1}
+SEG 74 closing=op15:PublishOverwrite writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 75 closing=op16:PublishOverwrite writes=28 kinds={"UnitWrite:d0": 14, "UnitWrite:d1": 14}
+SEG 76 closing=op16:PublishOverwrite writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 77 closing=op16:PublishOverwrite writes=1 kinds={"RootRecordFua:d0": 1}
+SEG 78 closing=op16:PublishOverwrite writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 79 closing=op17:PublishOverwrite writes=28 kinds={"UnitWrite:d0": 14, "UnitWrite:d1": 14}
+SEG 80 closing=op17:PublishOverwrite writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 81 closing=op17:PublishOverwrite writes=1 kinds={"RootRecordFua:d1": 1}
+SEG 82 closing=op17:PublishOverwrite writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}
+SEG 83 closing=op19:PublishOverwrite writes=28 kinds={"UnitWrite:d0": 14, "UnitWrite:d1": 14}
+SEG 84 closing=op19:PublishOverwrite writes=2 kinds={"JournalRecord:d0": 1, "JournalRecord:d1": 1}
+SEG 85 closing=op19:PublishOverwrite writes=1 kinds={"RootRecordFua:d0": 1}
+SEG 86 closing=op19:PublishOverwrite writes=2 kinds={"SystemConfigurationSlot:d0": 1, "SystemConfigurationSlot:d1": 1}

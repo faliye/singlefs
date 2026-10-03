@@ -1,0 +1,53 @@
+S6SPLIT name=precontrol premise_holds=true first_landed_at_u64_max=false second=equal states=50186
+S6SPLIT name=precontrol premise_holds=true first_landed_at_u64_max=true second=failed_no_successor states=2
+S1SPLIT name=precontrol applied_ge1=61
+S1SPLIT name=precontrol segment_or_ids_equal_chosen=61
+E7RESULT name=verdict domain=L ring_slots=64 smallest_n=1 largest_n=9 states=4031078 j0_violations=0 failed_states=1509478 j1_violations=0 j2_violations=101942 j3_violations=0 j4_violations=807790 j6_premise_holds_violations=0 j6_premise_fails_violations=0 j6_premise_fails_judged=0 ia1_violations=0 ia2_violations=0 specification_self_check_mismatches=0 applied_ge1=420864 applied_ge2=70400 domain_is_nonempty=true
+S6SPLIT name=verdict domain=L premise_holds=true first_landed_at_u64_max=false second=equal states=2521600
+S1SPLIT name=verdict domain=L applied_ge1=420864
+S1SPLIT name=verdict domain=L segment_or_ids_equal_chosen=420864
+E7RESULT name=verdict domain=L6 ring_slots=6 smallest_n=1 largest_n=6 states=3654 j0_violations=0 failed_states=462 j1_violations=0 j2_violations=212 j3_violations=42 j4_violations=892 j6_premise_holds_violations=0 j6_premise_fails_violations=52 j6_premise_fails_judged=1152 ia1_violations=0 ia2_violations=0 specification_self_check_mismatches=0 applied_ge1=852 applied_ge2=212 domain_is_nonempty=true
+S6SPLIT name=verdict domain=L6 premise_holds=false first_landed_at_u64_max=false second=equal states=1100
+S6SPLIT name=verdict domain=L6 premise_holds=false first_landed_at_u64_max=false second=returned_different states=52
+S6SPLIT name=verdict domain=L6 premise_holds=true first_landed_at_u64_max=false second=equal states=2040
+S1SPLIT name=verdict domain=L6 applied_ge1=852
+S1SPLIT name=verdict domain=L6 segment_or_ids_equal_chosen=852
+E7RESULT name=verdict domain=L9 ring_slots=9 smallest_n=1 largest_n=9 states=1171430 j0_violations=0 failed_states=252990 j1_violations=0 j2_violations=53426 j3_violations=4266 j4_violations=287134 j6_premise_holds_violations=0 j6_premise_fails_violations=1608 j6_premise_fails_judged=465434 ia1_violations=0 ia2_violations=0 specification_self_check_mismatches=0 applied_ge1=193672 applied_ge2=39304 domain_is_nonempty=true
+S6SPLIT name=verdict domain=L9 premise_holds=false first_landed_at_u64_max=false second=equal states=463826
+S6SPLIT name=verdict domain=L9 premise_holds=false first_landed_at_u64_max=false second=returned_different states=1608
+S6SPLIT name=verdict domain=L9 premise_holds=true first_landed_at_u64_max=false second=equal states=453006
+S1SPLIT name=verdict domain=L9 applied_ge1=193672
+S1SPLIT name=verdict domain=L9 segment_or_ids_equal_chosen=193672
+E7RESULT name=verdict domain=U_verify_on ring_slots=64 smallest_n=1 largest_n=5 states=666906 j0_violations=0 failed_states=390350 j1_violations=0 j2_violations=1002 j3_violations=0 j4_violations=28866 j6_premise_holds_violations=0 j6_premise_fails_violations=0 j6_premise_fails_judged=0 ia1_violations=0 ia2_violations=0 specification_self_check_mismatches=0 applied_ge1=14880 applied_ge2=864 domain_is_nonempty=true
+S6SPLIT name=verdict domain=U_verify_on premise_holds=true first_landed_at_u64_max=false second=equal states=276556
+S1SPLIT name=verdict domain=U_verify_on applied_ge1=14880
+S1SPLIT name=verdict domain=U_verify_on segment_or_ids_equal_chosen=14880
+E7RESULT name=verdict domain=U_verify_off ring_slots=64 smallest_n=1 largest_n=5 states=666906 j0_violations=0 failed_states=390350 j1_violations=0 j2_violations=64242 j3_violations=0 j4_violations=92106 j6_premise_holds_violations=0 j6_premise_fails_violations=0 j6_premise_fails_judged=0 ia1_violations=0 ia2_violations=0 specification_self_check_mismatches=0 applied_ge1=74400 applied_ge2=21600 domain_is_nonempty=true
+S6SPLIT name=verdict domain=U_verify_off premise_holds=true first_landed_at_u64_max=false second=equal states=276556
+S1SPLIT name=verdict domain=U_verify_off applied_ge1=74400
+S1SPLIT name=verdict domain=U_verify_off segment_or_ids_equal_chosen=74400
+E7RESULT name=verdict domain=C ring_slots=64 smallest_n=1 largest_n=6 states=149796 j0_violations=0 failed_states=26238 j1_violations=0 j2_violations=2885 j3_violations=0 j4_violations=14603 j6_premise_holds_violations=0 j6_premise_fails_violations=0 j6_premise_fails_judged=0 ia1_violations=0 ia2_violations=0 specification_self_check_mismatches=0 applied_ge1=16544 applied_ge2=2160 domain_is_nonempty=true
+S6SPLIT name=verdict domain=C premise_holds=true first_landed_at_u64_max=false second=equal states=123558
+S1SPLIT name=verdict domain=C applied_ge1=16544
+S1SPLIT name=verdict domain=C segment_or_ids_equal_chosen=16544
+E7RESULT name=verdict domain=C6 ring_slots=6 smallest_n=1 largest_n=5 states=9700 j0_violations=0 failed_states=806 j1_violations=0 j2_violations=234 j3_violations=33 j4_violations=928 j6_premise_holds_violations=0 j6_premise_fails_violations=38 j6_premise_fails_judged=586 ia1_violations=0 ia2_violations=0 specification_self_check_mismatches=0 applied_ge1=1474 applied_ge2=234 domain_is_nonempty=true
+S6SPLIT name=verdict domain=C6 premise_holds=false first_landed_at_u64_max=false second=equal states=548
+S6SPLIT name=verdict domain=C6 premise_holds=false first_landed_at_u64_max=false second=returned_different states=38
+S6SPLIT name=verdict domain=C6 premise_holds=true first_landed_at_u64_max=false second=equal states=8308
+S1SPLIT name=verdict domain=C6 applied_ge1=1474
+S1SPLIT name=verdict domain=C6 segment_or_ids_equal_chosen=1474
+E7RESULT name=verdict domain=X ring_slots=64 smallest_n=2 largest_n=7 states=216484 j0_violations=0 failed_states=53412 j1_violations=0 j2_violations=4192 j3_violations=0 j4_violations=25832 j6_premise_holds_violations=0 j6_premise_fails_violations=0 j6_premise_fails_judged=0 ia1_violations=0 ia2_violations=0 specification_self_check_mismatches=0 applied_ge1=23232 applied_ge2=3200 domain_is_nonempty=true
+S6SPLIT name=verdict domain=X premise_holds=true first_landed_at_u64_max=false second=equal states=163072
+S1SPLIT name=verdict domain=X applied_ge1=23232
+S1SPLIT name=verdict domain=X segment_or_ids_equal_chosen=23232
+E7RESULT name=verdict domain=E1 ring_slots=64 smallest_n=1 largest_n=4 states=398 j0_violations=0 failed_states=158 j1_violations=0 j2_violations=10 j3_violations=0 j4_violations=66 j6_premise_holds_violations=24 j6_premise_fails_violations=0 j6_premise_fails_judged=0 ia1_violations=0 ia2_violations=0 specification_self_check_mismatches=0 applied_ge1=24 applied_ge2=0 domain_is_nonempty=true
+S6SPLIT name=verdict domain=E1 premise_holds=true first_landed_at_u64_max=false second=equal states=216
+S6SPLIT name=verdict domain=E1 premise_holds=true first_landed_at_u64_max=true second=failed_no_successor states=24
+S1SPLIT name=verdict domain=E1 applied_ge1=24
+S1SPLIT name=verdict domain=E1 segment_or_ids_equal_chosen=24
+E7RESULT name=verdict domain=E2 ring_slots=64 smallest_n=1 largest_n=3 states=42 j0_violations=0 failed_states=42 j1_violations=0 j2_violations=0 j3_violations=0 j4_violations=0 j6_premise_holds_violations=0 j6_premise_fails_violations=0 j6_premise_fails_judged=0 ia1_violations=18 ia2_violations=0 specification_self_check_mismatches=0 applied_ge1=0 applied_ge2=0 domain_is_nonempty=true
+E7RESULT name=verdict domain=R ring_slots=64 smallest_n=2 largest_n=5 states=6964 j0_violations=0 failed_states=1076 j1_violations=430 j2_violations=614 j3_violations=430 j4_violations=1854 j6_premise_holds_violations=0 j6_premise_fails_violations=0 j6_premise_fails_judged=0 ia1_violations=0 ia2_violations=0 specification_self_check_mismatches=0 applied_ge1=946 applied_ge2=178 domain_is_nonempty=true
+S6SPLIT name=verdict domain=R premise_holds=true first_landed_at_u64_max=false second=equal states=5888
+S1SPLIT name=verdict domain=R applied_ge1=1376
+S1SPLIT name=verdict domain=R segment_or_ids_equal_chosen=1376
+E7RESULT name=verdict scope=run bounds=light family=legal states=6923358 self_checks_passed=13 control_readings=35 controls_not_red=0 void_conditions=0 halt_conditions=6

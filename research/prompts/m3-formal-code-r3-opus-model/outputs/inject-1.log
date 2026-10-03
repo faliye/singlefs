@@ -1,0 +1,3 @@
+CRASH_IMAGE 两者都绿 count=118
+SECOND_CRASH 两者都绿 count=354
+name=inject histories=20 crash_points=118 second_crash_points=354 new_findings=0

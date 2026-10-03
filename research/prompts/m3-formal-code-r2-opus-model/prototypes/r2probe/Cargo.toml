@@ -1,0 +1,13 @@
+[package]
+name = "r2probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "m3-formal-code-r2 攻方原型：挂载透明在合法历史上逐态判（K2）、checker 与实现逐档找槽 1 的结局（K3）、mkfs 写零之后的步数（K3）。只在冻结副本的拷贝上编、跑"
+
+[dependencies]
+singlefs-core = { path = "../singlefs-core" }
+singlefs-harness = { path = "../singlefs-harness" }
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-format = { path = "../singlefs-format" }

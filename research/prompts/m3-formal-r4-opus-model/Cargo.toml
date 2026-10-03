@@ -1,0 +1,11 @@
+[package]
+name = "r4probe"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "m3-formal-r4 攻方腿原型：崩溃状态上只读恢复与「可写挂载 + 用户动作」之后再恢复逐字段比"
+
+[dependencies]
+singlefs-core = { path = "../singlefs-core" }
+singlefs-harness = { path = "../singlefs-harness" }
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }

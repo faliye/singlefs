@@ -1,0 +1,17 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 5M 的 2 倍，照理由放行：原型改过盘宽，峰值表里是旧盘宽的
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：m3-formal-r4 攻方腿跑自己的原型量状态数
+history s5: ending Completed
+  step 0: Applied(Mounted { instance: InstanceGeneration(1), publishes: 2, allocation_records_compared: NoPublishWithFile, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquisition })
+  step 1: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  marks [23, 45, 54] mkfs_ops=23 base_ops=23
+history=s5 writes=17 segments=10 closed_form_two_state=25 with_torn=45 prepare_secs=0.00
+  segment 0: 2 writes ["system_configuration_slot", "system_configuration_slot"]
+  segment 1: 2 writes ["journal_record", "journal_record"]
+  segment 2: 1 writes ["root_record_fua"]
+  segment 3: 2 writes ["system_configuration_slot", "system_configuration_slot"]
+  segment 4: 2 writes ["journal_record", "journal_record"]
+  segment 5: 1 writes ["root_record_fua"]
+  segment 6: 2 writes ["system_configuration_slot", "system_configuration_slot"]
+  segment 7: 2 writes ["journal_record", "journal_record"]
+  segment 8: 1 writes ["root_record_fua"]
+  segment 9: 2 writes ["system_configuration_slot", "system_configuration_slot"]

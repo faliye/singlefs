@@ -1,0 +1,20 @@
+base-legal exit=0
+base-adversarial exit=0
+base-legal-marker exit=0
+v406-legal exit=0
+v406-adversarial exit=0
+v513-legal exit=0
+v513-adversarial exit=0
+v518-legal exit=1
+v518-adversarial exit=0
+v1003-legal exit=0
+v1003-adversarial exit=0
+v1004-legal exit=1
+v1004-adversarial exit=0
+v24-legal exit=0
+v24-adversarial exit=0
+v512-legal exit=0
+v512-adversarial exit=0
+v36-legal exit=0
+v36-adversarial exit=0
+batch-done

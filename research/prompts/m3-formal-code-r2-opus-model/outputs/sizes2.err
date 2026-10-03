@@ -1,0 +1,122 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 200 秒）：slice 已占 39.1 GiB，这一条要 1.0 GiB（峰值表里没有这条，按它的上限 1G 算），总上限 40.1 GiB；账上在跑 4 条
+run-with-memory-cap: 排了 47 秒，起跑（singlefs-memory-cap-1904188-107265887）
+
+thread 'main' (1910950) panicked at crates/r2probe/src/main.rs:100:18:
+未知历史 rfx2-1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' (1911037) panicked at crates/r2probe/src/main.rs:100:18:
+未知历史 rfx2-2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' (1911118) panicked at crates/r2probe/src/main.rs:100:18:
+未知历史 rfx3-1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' (1911216) panicked at crates/r2probe/src/main.rs:100:18:
+未知历史 rfx4-2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' (1911335) panicked at crates/r2probe/src/main.rs:100:18:
+未知历史 rfx4-3
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' (1911460) panicked at crates/r2probe/src/main.rs:100:18:
+未知历史 rfm4-2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+history rbm: ending Completed
+  step 0: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 1: Applied(Mounted { instance: InstanceGeneration(2), publishes: 3, allocation_records_compared: Compared { publishes: 3 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquisi
+  step 2: Applied(RolledBack { target: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(5) }, released_user_visible_units: 0, resurrected_user_visible_copies: 0 })
+history ab: ending Completed
+  step 0: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 1: Refused { member: "MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)" }
+
+thread 'main' (1911793) panicked at crates/r2probe/src/main.rs:161:92:
+窗口里至少一次根槽写
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+history ab2: ending Completed
+  step 0: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 1: Refused { member: "MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)" }
+  step 2: NotApplicable(NoWritableSession)
+
+thread 'main' (1911893) panicked at crates/r2probe/src/main.rs:161:92:
+窗口里至少一次根槽写
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+history abf: ending Completed
+  step 0: Applied(Mounted { instance: InstanceGeneration(1), publishes: 2, allocation_records_compared: NoPublishWithFile, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquisition })
+  step 1: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 2: Refused { member: "MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)" }
+
+thread 'main' (1911993) panicked at crates/r2probe/src/main.rs:161:92:
+窗口里至少一次根槽写
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+history abf2: ending Completed
+  step 0: Applied(Mounted { instance: InstanceGeneration(1), publishes: 2, allocation_records_compared: NoPublishWithFile, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquisition })
+  step 1: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 2: Refused { member: "MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)" }
+  step 3: NotApplicable(NoWritableSession)
+
+thread 'main' (1912124) panicked at crates/r2probe/src/main.rs:161:92:
+窗口里至少一次根槽写
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+history cold: ending Completed
+  step 0: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 1: Applied(Recovered { outcome: "FileRead", read_back: FileRead })
+  step 2: Applied(Mounted { instance: InstanceGeneration(2), publishes: 3, allocation_records_compared: Compared { publishes: 3 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquisi
+history puw: ending Completed
+  step 0: Applied(Mounted { instance: InstanceGeneration(1), publishes: 2, allocation_records_compared: NoPublishWithFile, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquisition })
+  step 1: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+run-with-memory-cap: 排队（已等 0 秒，至多 200 秒）：slice 已占 39.2 GiB，这一条要 1.0 GiB（峰值表里没有这条，按它的上限 1G 算），总上限 40.1 GiB；账上在跑 4 条
+run-with-memory-cap: 排了 24 秒，起跑（singlefs-memory-cap-1912406-74711038）
+history wrap30: ending Completed
+  step 0: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 1: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 2: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 3: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 4: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 5: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 6: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 7: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 8: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 9: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 10: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 11: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 12: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 13: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 14: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 15: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 16: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 17: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 18: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 19: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 20: Applied(Published { reuse: RecordReuse { rewritten_from_released: 2, rewritten_with_changed_span: 2, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 1 })
+  step 21: Applied(Published { reuse: RecordReuse { rewritten_from_released: 6, rewritten_with_changed_span: 2, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 22: Applied(Published { reuse: RecordReuse { rewritten_from_released: 20, rewritten_with_changed_span: 4, released_records_removed: 2, released_records_covered: 2 }, floor_raises_pushed_by_the_session: 0 })
+  step 23: Applied(Published { reuse: RecordReuse { rewritten_from_released: 18, rewritten_with_changed_span: 4, released_records_removed: 2, released_records_covered: 2 }, floor_raises_pushed_by_the_session: 0 })
+  step 24: Applied(Published { reuse: RecordReuse { rewritten_from_released: 18, rewritten_with_changed_span: 4, released_records_removed: 2, released_records_covered: 2 }, floor_raises_pushed_by_the_session: 0 })
+  step 25: Applied(Published { reuse: RecordReuse { rewritten_from_released: 18, rewritten_with_changed_span: 4, released_records_removed: 2, released_records_covered: 2 }, floor_raises_pushed_by_the_session: 0 })
+  step 26: Applied(Published { reuse: RecordReuse { rewritten_from_released: 18, rewritten_with_changed_span: 4, released_records_removed: 2, released_records_covered: 2 }, floor_raises_pushed_by_the_session: 0 })
+  step 27: Applied(Published { reuse: RecordReuse { rewritten_from_released: 18, rewritten_with_changed_span: 4, released_records_removed: 2, released_records_covered: 2 }, floor_raises_pushed_by_the_session: 0 })
+  step 28: Applied(Published { reuse: RecordReuse { rewritten_from_released: 18, rewritten_with_changed_span: 4, released_records_removed: 2, released_records_covered: 2 }, floor_raises_pushed_by_the_session: 0 })
+  step 29: Applied(Published { reuse: RecordReuse { rewritten_from_released: 18, rewritten_with_changed_span: 4, released_records_removed: 2, released_records_covered: 2 }, floor_raises_pushed_by_the_session: 0 })
+  step 30: Applied(Published { reuse: RecordReuse { rewritten_from_released: 18, rewritten_with_changed_span: 4, released_records_removed: 2, released_records_covered: 2 }, floor_raises_pushed_by_the_session: 0 })
+history fm256m12: ending Completed
+  step 0: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 1: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 2: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 3: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 4: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 5: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 6: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 7: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 8: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 9: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 10: Applied(Published { reuse: RecordReuse { rewritten_from_released: 2, rewritten_with_changed_span: 2, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 1 })
+  step 11: Applied(Published { reuse: RecordReuse { rewritten_from_released: 2, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 12: Applied(Mounted { instance: InstanceGeneration(2), publishes: 2, allocation_records_compared: Compared { publishes: 2 }, reuse: RecordReuse { rewritten_from_released: 22, rewritten_with_changed_span: 6, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquis
+history rfmnt: ending Completed
+  step 0: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 1: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 2: Refused { member: "MountError::RollbackFloorAboveCeiling" }
+  step 3: Applied(Mounted { instance: InstanceGeneration(2), publishes: 2, allocation_records_compared: Compared { publishes: 2 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquisi

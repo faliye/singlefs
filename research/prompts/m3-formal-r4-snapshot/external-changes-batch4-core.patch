@@ -1,0 +1,1513 @@
+diff --git a/crates/singlefs-core/src/make_filesystem.rs b/crates/singlefs-core/src/make_filesystem.rs
+index a22c7ef..6e4b15a 100644
+--- a/crates/singlefs-core/src/make_filesystem.rs
++++ b/crates/singlefs-core/src/make_filesystem.rs
+@@ -105,6 +105,15 @@ impl FixedStructureExtent {
+     }
+ }
+ 
++/// mkfs 按判定宽度判对齐的那一槽（[`MakeFilesystemError::FixedStructureSlotNotAlignedToTheDecisionWidth`]）。封闭集合，`match` 不写通配臂。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum SlotJudgedForAlignment {
++    /// 系统配置槽 `slot_index`（在 `slot_index` × 固定结构槽距处）。
++    SystemConfigurationSlot { slot_index: u64 },
++    /// 根环区域 `region` 的槽 `slot`（在区域起点 + 槽 × 固定结构槽距处）。
++    RootRingSlot(RootRingSlot),
++}
++
+ /// mkfs 能出的错：几何放不下，或底层块设备错。几何那几样都在任何写之前判（[`make_filesystem`] 的第一步）。
+ #[derive(Debug)]
+ pub enum MakeFilesystemError {
+@@ -170,6 +179,16 @@ pub enum MakeFilesystemError {
+     UnitAreaStartOffTheClusterSegmentBoundaryUnsupported(
+         UnitAreaStartOffTheClusterSegmentBoundaryUnsupported,
+     ),
++    /// 一个系统配置槽或根槽的起始偏移不是声明的判定宽度（[`SystemImmutableSizes::declared_alignment_decision_width_in_bytes`]，
++    /// max(physical_block_size, io_min)）的整数倍：一次槽写会跨两个原子单元，撕裂会连带打掉相邻的那一个（C47（根槽没按判定宽度对齐））。
++    /// 用户 2026-10-01 定「非常规几何由 mkfs 拒」（`research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 5 行、第四节）：
++    /// 改之前 pbs 4096 + io_min 3072（槽距 6144）在 4096 宽的盘上清完环、写完单元与根，写到系统配置槽 1 才被块设备拒；
++    /// pbs 512 + io_min 3072 整个收下。逐槽判（两个系统配置槽、R × S 个根槽），报的是按排布次序第一个不对齐的那一槽。
++    FixedStructureSlotNotAlignedToTheDecisionWidth {
++        slot: SlotJudgedForAlignment,
++        offset: DeviceOffsetInBytes,
++        decision_width_in_bytes: u64,
++    },
+     /// 参数说三个区域住哪块盘，而池里没有那块盘。
+     RegionDeviceMissing {
+         region: u64,
+@@ -297,9 +316,36 @@ fn fixed_structure_extents(geometry: &SystemImmutableSizes) -> Vec<FixedStructur
+         .collect()
+ }
+ 
++/// 两个系统配置槽与 R × S 个根槽，按排布次序（系统配置槽 0、1，区域 0 的槽 0..S，区域 1，区域 2）逐个判起始偏移是不是
++/// 声明的判定宽度的整数倍，交回第一个不是的。槽的偏移与 [`make_filesystem`] 写它们、[`fixed_structure_extents`] 判重叠用的是同一组式子
++/// （槽 i 在 i × 槽距、[`slot_offset`]）。迭代次数的上界是 2 + 3 × 16，唯一的提前出口是第一个不对齐的槽。
++fn first_slot_not_aligned_to_the_decision_width(
++    geometry: &SystemImmutableSizes,
++) -> Option<(SlotJudgedForAlignment, DeviceOffsetInBytes)> {
++    let decision_width_in_bytes = geometry.declared_alignment_decision_width_in_bytes();
++    let system_configuration_slots = (0..SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE).map(|slot_index| {
++        (
++            SlotJudgedForAlignment::SystemConfigurationSlot { slot_index },
++            DeviceOffsetInBytes(slot_index * u64::from(geometry.fixed_structure_slot_spacing)),
++        )
++    });
++    let root_ring_slots = (0..ROOT_RING_REGIONS).flat_map(|region| {
++        (0..geometry.root_ring_slots_per_region.count()).map(move |slot| {
++            let ring_slot = RootRingSlot { region, slot };
++            (
++                SlotJudgedForAlignment::RootRingSlot(ring_slot),
++                slot_offset(ring_slot, geometry.fixed_structure_slot_spacing),
++            )
++        })
++    });
++    system_configuration_slots
++        .chain(root_ring_slots)
++        .find(|(_, offset)| !offset.0.is_multiple_of(decision_width_in_bytes))
++}
++
+ /// 几何判定，全在任何写之前（[`make_filesystem`] 的第一步）。次序：根槽宽、环长下界（一条记录、F 条记录）、在飞上限装不装得进 4 字节、
+ /// 环长上界、根环末端在不在盘内、按环长现算的单元区起点在不在聚簇段边界上、单元区在不在盘内、根槽宽不超过槽距、
+-/// 固定结构两两不重叠、区域归属。
++/// 固定结构两两不重叠、系统配置槽与根槽按判定宽度对齐、区域归属。
+ ///
+ /// 交回按环长现算的单元区起点：mkfs 写实例表与树表、写系统配置偏移 417 那 8 字节、建 mkfs 同一个进程里的分配器，都用这一个数，
+ /// 判定与写读的是同一份输入。journal 环末端不会越过它：起点就是环末尾的下一个槽（向上取整到槽边界）。
+@@ -395,6 +441,15 @@ fn check_geometry(
+             }
+         }
+     }
++    if let Some((slot, offset)) = first_slot_not_aligned_to_the_decision_width(geometry) {
++        return Err(
++            MakeFilesystemError::FixedStructureSlotNotAlignedToTheDecisionWidth {
++                slot,
++                offset,
++                decision_width_in_bytes: geometry.declared_alignment_decision_width_in_bytes(),
++            },
++        );
++    }
+     for (region, device) in parameters.region_devices.iter().enumerate() {
+         if !devices.iter().any(|(identity, _)| identity == device) {
+             return Err(MakeFilesystemError::RegionDeviceMissing {
+diff --git a/crates/singlefs-core/src/mounted_read.rs b/crates/singlefs-core/src/mounted_read.rs
+index 69bdeaa..eda1dac 100644
+--- a/crates/singlefs-core/src/mounted_read.rs
++++ b/crates/singlefs-core/src/mounted_read.rs
+@@ -26,7 +26,7 @@ use std::cell::Cell;
+ use singlefs_format::{DATA_UNIT_BYTES, INODE_RECORD_BYTES, NODE_BYTES};
+ 
+ use crate::address::{
+-    DataUnitIndexInFile, FileOffsetInBytes, InodeNumber, SlotNumber, TreeIdentifier,
++    DataUnitIndexInFile, DeviceIdentity, FileOffsetInBytes, InodeNumber, SlotNumber, TreeIdentifier,
+ };
+ use crate::checksum::crc32_castagnoli;
+ use crate::code_two_tree::{read_code_two_tree, CodeTwoTreeHeaderJudgement};
+@@ -40,8 +40,9 @@ use crate::records::{
+     TREE_KIND_EXTENT, TREE_KIND_INODE,
+ };
+ use crate::recovery::{
+-    choose_root, choose_system_configuration, read_mapped_tree_node_via_hint_then_central_mapping,
+-    read_mapped_tree_root, read_unit_via_locations, replay_journal, scan_journal,
++    choose_root, choose_system_configuration_naming_devices_without_a_mountable_slot,
++    read_mapped_tree_node_via_hint_then_central_mapping, read_mapped_tree_root,
++    read_unit_via_locations, replay_journal, scan_journal,
+     tree_table_entries_each_kind_at_most_once, JournalScanReport, MappedTreeNodeClass, PoolReader,
+     RecoveryFailure, TreeTableEntriesRefusal,
+ };
+@@ -539,6 +540,9 @@ pub struct MountedReadOnly {
+     /// 施加前缀之后的根：挂载态是沿它打开的。
+     pub effective_root: RootRecord,
+     pub journal: JournalScanReport,
++    /// 两个系统配置槽都不可择、择系统配置时被跳过的盘（[`crate::recovery::SystemConfigurationChoice`]）：挂得上，但这几块盘上的
++    /// 系统配置冗余已经没了，再坏一块就整池挂不上（C463（一块盘的系统配置两份全废之后静默成功））。冗余完好时为空。只读挂载不重写它们。
++    pub devices_without_a_mountable_system_configuration_slot: Vec<DeviceIdentity>,
+ }
+ 
+ /// 只读挂载：择系统配置 → 择根 → 全环扫描 journal → 按前缀口径施加 → 沿施加之后的根打开挂载态。
+@@ -551,8 +555,10 @@ pub struct MountedReadOnly {
+ /// # Errors
+ /// 见 [`MountReadOnlyFailure`]。
+ pub fn mount_read_only(reader: &dyn PoolReader) -> Result<MountedReadOnly, MountReadOnlyFailure> {
+-    let system_configuration =
+-        choose_system_configuration(reader).map_err(MountReadOnlyFailure::Recovery)?;
++    let system_configuration_choice =
++        choose_system_configuration_naming_devices_without_a_mountable_slot(reader)
++            .map_err(MountReadOnlyFailure::Recovery)?;
++    let system_configuration = system_configuration_choice.system_configuration;
+     let chosen_root = choose_root(reader, &system_configuration)
+         .ok_or(MountReadOnlyFailure::Recovery(RecoveryFailure::NoValidRoot))?;
+     let records = scan_journal(reader, &system_configuration);
+@@ -571,6 +577,8 @@ pub fn mount_read_only(reader: &dyn PoolReader) -> Result<MountedReadOnly, Mount
+         chosen_root,
+         effective_root,
+         journal,
++        devices_without_a_mountable_system_configuration_slot: system_configuration_choice
++            .devices_without_a_mountable_system_configuration_slot,
+     })
+ }
+ 
+diff --git a/crates/singlefs-core/src/pointer.rs b/crates/singlefs-core/src/pointer.rs
+index f584e39..22940b3 100644
+--- a/crates/singlefs-core/src/pointer.rs
++++ b/crates/singlefs-core/src/pointer.rs
+@@ -105,8 +105,9 @@ pub struct PointerHead {
+ /// 指针头部里为加密与压缩留的那几段（D19（块指针的结构与宽度预算） 已定项 3 / 已定项 7）读到的不是第一版写的取值。
+ /// 这几段是**盘上读来的字节**、不是我们的不变量：读者判到就交回它，由调用方把那条指针所在的结构当损坏处置，不拿这条指针去解引用。
+ /// 第一版的取值：加密不进第一个可运行版本（D9（加密） 已定项 10），写者把 MAC 16、nonce 12、算法类型 1 写 0；
+-/// 压缩算法码登记表第一版只有码 0「不压缩」，码 0 时压后长度恒 0（D9（加密） 已定项 14）。extent 偏移那 2 字节不在这里判：
+-/// 读到非 0 怎么处置没有条款（第一版写 0）。
++/// 压缩算法码登记表第一版只有码 0「不压缩」，码 0 时压后长度恒 0（D9（加密） 已定项 14）；extent 偏移那 2 字节第一版写 0
++/// （第一版指针指整个单元），读到非 0 同 MAC / nonce 判该指针所在的结构损坏（C581（extent 偏移非 0 没有判据），
++/// `research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 11 行：I-2.4 扩到指针头部的 extent 偏移）。
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+ pub enum PointerHeadFieldOutsideTheFirstVersion {
+     /// MAC 16 或 nonce 12 里有非 0 字节。D19（块指针的结构与宽度预算） 已定项 3 只写了「不加密的卷把它们留成空位」，
+@@ -119,15 +120,27 @@ pub enum PointerHeadFieldOutsideTheFirstVersion {
+     CompressionAlgorithmCodeNotRecognized { compression_algorithm_code: u8 },
+     /// 压缩算法码是 0 而压后长度非 0：判这条指针损坏（D9（加密） 已定项 14「码 0 时它恒 0，非 0 判该指针损坏」）。
+     CompressedLengthNotZeroWithoutCompression { compressed_length: u16 },
++    /// extent 偏移不是 0（[`PointerHeadExtentOffsetNotZero`]）：不判的话读者从单元头读起，而写者要说的是从偏移处读——静默读错内容。
++    ExtentOffsetNotZero(PointerHeadExtentOffsetNotZero),
+ }
+ 
+-/// 指针头部按字段表读出来的样子，加密与压缩那几段还没判：[`PointerHead::read_from`] 与
+-/// [`PointerHead::read_judging_the_encryption_and_compression_fields_from`] 共用这一份读法，字段表的偏移只写一处。
++/// 指针头部 extent 偏移那 2 字节（头部偏移 32）读到非 0。第一版写者恒写 0（[`PointerHead::write_to`]），读者遇到非 0
++/// 判该指针所在的结构损坏，同 MAC / nonce（C581（extent 偏移非 0 没有判据））。**这是盘上读来的字节、不是我们的不变量**。
++/// 带着读到的值。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct PointerHeadExtentOffsetNotZero {
++    pub extent_offset: u16,
++}
++
++/// 指针头部按字段表读出来的样子，加密与压缩那几段与 extent 偏移还没判：[`PointerHead::read_from`]、
++/// [`PointerHead::read_judging_the_encryption_and_compression_fields_from`] 与 [`PointerHead::read_judging_the_extent_offset_from`]
++/// 共用这一份读法，字段表的偏移只写一处。
+ struct PointerHeadAsRead {
+     is_every_mac_and_nonce_byte_zero: bool,
+     algorithm_type: u8,
+     compression_algorithm_code: u8,
+     compressed_length: u16,
++    extent_offset: u16,
+     head: PointerHead,
+ }
+ 
+@@ -137,12 +150,13 @@ impl PointerHeadAsRead {
+         let algorithm_type = reader.get_u8();
+         let compression_algorithm_code = reader.get_u8();
+         let compressed_length = reader.get_u16();
+-        reader.skip(2); // extent 偏移：第一版写 0，读到非 0 怎么处置没有条款，不判
++        let extent_offset = reader.get_u16();
+         Self {
+             is_every_mac_and_nonce_byte_zero,
+             algorithm_type,
+             compression_algorithm_code,
+             compressed_length,
++            extent_offset,
+             head: PointerHead {
+                 birth_tree: TreeIdentifier(reader.get_u64()),
+                 birth_txg: CheckpointTxg(reader.get_u64()),
+@@ -150,7 +164,7 @@ impl PointerHeadAsRead {
+         }
+     }
+ 
+-    /// 加密与压缩那几段按第一版的取值判（[`PointerHeadFieldOutsideTheFirstVersion`] 各成员的出处）。
++    /// 加密与压缩那几段按第一版的取值判，再判 extent 偏移（[`PointerHeadFieldOutsideTheFirstVersion`] 各成员的出处）。
+     fn judged(self) -> Result<PointerHead, PointerHeadFieldOutsideTheFirstVersion> {
+         if !self.is_every_mac_and_nonce_byte_zero {
+             return Err(PointerHeadFieldOutsideTheFirstVersion::MacOrNonceNotZero);
+@@ -176,6 +190,18 @@ impl PointerHeadAsRead {
+                 },
+             );
+         }
++        self.judged_extent_offset()
++            .map_err(PointerHeadFieldOutsideTheFirstVersion::ExtentOffsetNotZero)
++    }
++
++    /// 只判 extent 偏移（C581）：根记录里那四条指针走这一判（[`NodePointer::read_judging_the_extent_offset_from`]），
++    /// 加密与压缩那几段在它们上面还没换成判（实审 A3a 的报告列着）。
++    fn judged_extent_offset(self) -> Result<PointerHead, PointerHeadExtentOffsetNotZero> {
++        if self.extent_offset != 0 {
++            return Err(PointerHeadExtentOffsetNotZero {
++                extent_offset: self.extent_offset,
++            });
++        }
+         Ok(self.head)
+     }
+ }
+@@ -196,13 +222,13 @@ impl PointerHead {
+             usize::try_from(POINTER_HEAD_BYTES).expect("50")
+         );
+     }
+-    /// 读头部，加密与压缩那几段不判（还没换成判的那几个读者用：`root_record`、`records`、`instance_table`、`extent_tree`、
+-    /// `allocation_record_tree` 里的指针，实审 A3a 的报告列了它们）。
++    /// 读头部，加密与压缩那几段与 extent 偏移都不判（还没换成判的那几个读者用：`records`、`instance_table`、`extent_tree`、
++    /// `allocation_record_tree` 里的指针，实审 A3a 的报告列了它们；`root_record` 走 [`Self::read_judging_the_extent_offset_from`]）。
+     pub fn read_from(reader: &mut ByteReader<'_>) -> Self {
+         PointerHeadAsRead::read_from(reader).head
+     }
+ 
+-    /// 读头部，加密与压缩那几段按第一版的取值判。
++    /// 读头部，加密与压缩那几段与 extent 偏移按第一版的取值判。
+     ///
+     /// # Errors
+     /// 那几段有一段不是第一版的取值 ⇒ [`PointerHeadFieldOutsideTheFirstVersion`]。
+@@ -211,6 +237,16 @@ impl PointerHead {
+     ) -> Result<Self, PointerHeadFieldOutsideTheFirstVersion> {
+         PointerHeadAsRead::read_from(reader).judged()
+     }
++
++    /// 读头部，只判 extent 偏移（加密与压缩那几段不判）。
++    ///
++    /// # Errors
++    /// extent 偏移非 0 ⇒ [`PointerHeadExtentOffsetNotZero`]。
++    pub fn read_judging_the_extent_offset_from(
++        reader: &mut ByteReader<'_>,
++    ) -> Result<Self, PointerHeadExtentOffsetNotZero> {
++        PointerHeadAsRead::read_from(reader).judged_extent_offset()
++    }
+ }
+ 
+ /// 指向码 2 / 码 3 的指针 86。
+@@ -287,6 +323,17 @@ impl NodePointer {
+         Ok(Self::read_after_the_head(head, reader))
+     }
+ 
++    /// 同 [`Self::read_from`]，头部里只判 extent 偏移（[`PointerHead::read_judging_the_extent_offset_from`]）。
++    ///
++    /// # Errors
++    /// extent 偏移非 0 ⇒ [`PointerHeadExtentOffsetNotZero`]。
++    pub fn read_judging_the_extent_offset_from(
++        reader: &mut ByteReader<'_>,
++    ) -> Result<Self, PointerHeadExtentOffsetNotZero> {
++        let head = PointerHead::read_judging_the_extent_offset_from(reader)?;
++        Ok(Self::read_after_the_head(head, reader))
++    }
++
+     fn read_after_the_head(head: PointerHead, reader: &mut ByteReader<'_>) -> Self {
+         let locations = [
+             LocationEntry::read_from(reader),
+diff --git a/crates/singlefs-core/src/recovery.rs b/crates/singlefs-core/src/recovery.rs
+index 7f92f65..791107d 100644
+--- a/crates/singlefs-core/src/recovery.rs
++++ b/crates/singlefs-core/src/recovery.rs
+@@ -14,8 +14,8 @@ use std::collections::{BTreeMap, BTreeSet};
+ use singlefs_format::{
+     ACCOUNTING_ENTRY_BYTES, DATA_UNIT_BYTES, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
+     INODE_INTERNAL_ENTRY, INODE_RECORD_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT,
+-    MAPPING_ENTRY_BYTES, NODE_BYTES, ROOT_RECORD_BYTES, ROOT_RING_REGIONS, SLOT_BYTES,
+-    SYSTEM_CONFIGURATION_SLOT_BYTES,
++    JOURNAL_SAFETY_FACTOR, MAPPING_ENTRY_BYTES, NODE_BYTES, ROOT_RECORD_BYTES, ROOT_RING_REGIONS,
++    SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
+ };
+ use singlefs_replay_prefix::{
+     replay_core, CoreFailure, CoreRecord, JournalCounter, NamedUnitVerification,
+@@ -66,8 +66,8 @@ use crate::root_record::{RootRecord, UnmountMarker};
+ use crate::root_ring::{region_start, slot_offset, RootRingSlot, RootRingSlotsPerRegionOutOfRange};
+ use crate::system_configuration::{
+     journal_in_flight_record_limit, journal_in_flight_record_limit_fits_its_four_byte_field,
+-    unit_area_start_slot_recorded_in_the_slot, IncompatBitmap, SystemConfiguration,
+-    SystemConfigurationSlotRefusal, SystemImmutableSizes,
++    journal_ring_geometry_fields_recorded_in_the_slot, unit_area_start_slot_recorded_in_the_slot,
++    IncompatBitmap, SystemConfiguration, SystemConfigurationSlotRefusal, SystemImmutableSizes,
+     JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION, ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+ };
+ use crate::transaction::{
+@@ -185,6 +185,10 @@ pub enum RecoveryFailure {
+     },
+     /// 各盘的系统配置 fsid 或设备数对不上。
+     SystemConfigurationsDisagree,
++    /// 交进来的池里一块盘都没有（[`PoolReader::device_identities`] 为空）：调用方要查的是自己交进来的盘表，
++    /// 不是哪块盘是外来的，所以不报 [`Self::SystemConfigurationsDisagree`]（C462（空池恢复报的错名不副实），
++    /// `research/prompts/m3-ring-r1-main-verification.md` 第二节第 11 行「恢复这一层单列错误成员」）。一个槽都没读，盘上不变。
++    NoDeviceInThePool,
+     /// 系统配置自述的每区槽数 S 落在格式承诺的区间之外（D22（单元原子性怎么合成） 已定项 1 的字段表：
+     /// 下界 k_tol + 2 = 4；上界字段表写的是「由 I-7.4（近 K 代块未被复用） 扣住的块数挂载时算」，
+     /// 那个数今天算不出来、按 16 收着，见 `singlefs_format::ROOT_RING_SLOTS_PER_REGION_MAXIMUM` 的占位）。
+@@ -675,6 +679,25 @@ pub enum SystemConfigurationValueOutsideWhatThisReaderAccepts {
+     /// 单元区起点（环长现算、与偏移 417 那 8 字节相等）不落在 64 槽聚簇段边界上：这样的单元区怎么分段条款没写，第一版不支持
+     /// （`allocator::UnitAreaStart` 的不变量；mkfs 同一格拒成 `UnitAreaStartOffTheClusterSegmentBoundaryUnsupported`）。
+     UnitAreaStartOffTheClusterSegmentBoundaryUnsupported { unit_area_start_slot: SlotNumber },
++    /// 同一槽记着的安全系数 F（偏移 357 的 4 字节）不是这个读者写的那个（`singlefs_format::JOURNAL_SAFETY_FACTOR`，第一版 3）。
++    /// I-8.1（环几何够大） 的三条等式之一，core 与 checker 同判（`research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 4 行）：
++    /// 恢复取前缀、发布切记录都按格式常量算在飞上限，盘上的 F 与它不等时两边说的不是同一个环几何。F ≥ 2 那一半落在格式常量上
++    /// （`system_configuration` 里的编译期断言）。
++    JournalSafetyFactorNotTheFirstVersionValue {
++        recorded_safety_factor: u32,
++        first_version_safety_factor: u64,
++    },
++    /// 同一槽记着的在飞记录数上限（偏移 345 的 4 字节）不等于按同一槽的环长现算的 ⌊环长 ÷ 4096 ÷ F⌋
++    /// （`system_configuration::journal_in_flight_record_limit`；I-8.1（环几何够大））。
++    JournalInFlightRecordLimitNotRecomputedFromTheRingLength {
++        recorded_in_flight_record_limit: u32,
++        recomputed_in_flight_record_limit: u64,
++    },
++    /// 同一槽记着的最坏占用（偏移 349 的 8 字节）不等于现算的在飞记录数上限 × 4096（I-8.1（环几何够大））。
++    JournalWorstCaseOccupancyNotTheInFlightLimitTimesTheRecordBytes {
++        recorded_worst_case_occupancy_bytes: u64,
++        recomputed_worst_case_occupancy_bytes: u64,
++    },
+ }
+ 
+ /// 系统配置槽里格式版本那 2 字节的偏移：紧跟 magic（`system_configuration::SystemConfiguration::to_slot` 的写法）。
+@@ -809,6 +832,45 @@ fn system_configuration_values_this_reader_accepts(
+             unit_area_start_slot: off_the_boundary.slot_after_the_journal_ring,
+         }
+     })?;
++    journal_ring_geometry_fields_recompute_from_the_ring_length(slot, sizes.journal_ring_bytes)
++}
++
++/// I-8.1（环几何够大） 的三条等式，挂载读系统配置时复算（core 同判，`research/prompts/m3-inv-a-r1-main-verification.md`
++/// 第二节第 4 行、第三节）：F = 格式常量、在飞上限 = ⌊环长 ÷ 4096 ÷ F⌋、最坏占用 = 在飞上限 × 4096，按这个次序判，第一个不等的报出来。
++/// 放在 [`system_configuration_values_this_reader_accepts`] 的最后：环长与单元区起点不收的槽先按那几格报，这三个字段是环长的函数，
++/// 环长本身不收时比它们没有意义。
++fn journal_ring_geometry_fields_recompute_from_the_ring_length(
++    slot: &[u8],
++    journal_ring_bytes: u64,
++) -> Result<(), SystemConfigurationValueOutsideWhatThisReaderAccepts> {
++    let recorded = journal_ring_geometry_fields_recorded_in_the_slot(slot);
++    if u64::from(recorded.safety_factor) != JOURNAL_SAFETY_FACTOR {
++        return Err(
++            SystemConfigurationValueOutsideWhatThisReaderAccepts::JournalSafetyFactorNotTheFirstVersionValue {
++                recorded_safety_factor: recorded.safety_factor,
++                first_version_safety_factor: JOURNAL_SAFETY_FACTOR,
++            },
++        );
++    }
++    let recomputed_in_flight_record_limit = journal_in_flight_record_limit(journal_ring_bytes);
++    if u64::from(recorded.in_flight_record_limit) != recomputed_in_flight_record_limit {
++        return Err(
++            SystemConfigurationValueOutsideWhatThisReaderAccepts::JournalInFlightRecordLimitNotRecomputedFromTheRingLength {
++                recorded_in_flight_record_limit: recorded.in_flight_record_limit,
++                recomputed_in_flight_record_limit,
++            },
++        );
++    }
++    let recomputed_worst_case_occupancy_bytes =
++        recomputed_in_flight_record_limit * JOURNAL_RECORD_BYTES;
++    if recorded.worst_case_occupancy_bytes != recomputed_worst_case_occupancy_bytes {
++        return Err(
++            SystemConfigurationValueOutsideWhatThisReaderAccepts::JournalWorstCaseOccupancyNotTheInFlightLimitTimesTheRecordBytes {
++                recorded_worst_case_occupancy_bytes: recorded.worst_case_occupancy_bytes,
++                recomputed_worst_case_occupancy_bytes,
++            },
++        );
++    }
+     Ok(())
+ }
+ 
+@@ -965,15 +1027,41 @@ fn slot_one_found_by_trying_every_slot_spacing_the_format_allows(
+ /// 池里每块盘的两个槽都无效（[`RecoveryFailure::NoValidSystemConfiguration`]）；
+ /// 池里一槽可择的都没有、而至少一槽自证得过只是 incompat 位图不认识（[`RecoveryFailure::SystemConfigurationIncompatBitsNotRecognized`]，
+ /// 先于上一条判）；
+-/// 交得出系统配置的几块盘之间 fsid 或设备数对不上、或者池里一块盘都没有（[`RecoveryFailure::SystemConfigurationsDisagree`]）；
++/// 交得出系统配置的几块盘之间 fsid 或设备数对不上（[`RecoveryFailure::SystemConfigurationsDisagree`]）；
++/// 池里一块盘都没有（[`RecoveryFailure::NoDeviceInThePool`]）；
+ /// 某一槽自证得过、而自述的每区槽数 S 越界（[`RecoveryFailure::RootRingSlotsPerRegionOutOfRange`]）——
+ /// **这一条是挂载时的区间判**：S 越界的池在这里就拒，后面一步不走、盘上一个字节不动。
+ pub fn choose_system_configuration(
+     reader: &dyn PoolReader,
+ ) -> Result<SystemConfiguration, RecoveryFailure> {
++    choose_system_configuration_naming_devices_without_a_mountable_slot(reader)
++        .map(|choice| choice.system_configuration)
++}
++
++/// 择到的系统配置，连带池里两个槽都不可择（读不出、自证不过、或 incompat 位图不认识）而被跳过的那几块盘
++/// （[`choose_system_configuration_naming_devices_without_a_mountable_slot`]）。
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct SystemConfigurationChoice {
++    pub system_configuration: SystemConfiguration,
++    /// 两个系统配置槽都不可择的盘，按 [`PoolReader::device_identities`] 的次序；冗余完好时为空。择系统配置时跳过它们、照常择别的盘那一份
++    /// （D22（单元原子性怎么合成） 已定项 8 第 1 条），这张表把「冗余被吃掉一份」报给只读与恢复路径的调用方（C463（一块盘的系统配置两份全废之后静默成功），
++    /// `research/prompts/m3-ring-r1-main-verification.md` 第二节第 11 行「只读与恢复路径报出来」）。只报、不重写：自愈随那一轮第四节第 3 条定。
++    pub devices_without_a_mountable_system_configuration_slot: Vec<DeviceIdentity>,
++}
++
++/// 与 [`choose_system_configuration`] 同一个择法、同一组错误（它就是调这一个），另交回两个槽都不可择而被跳过的盘
++/// （[`SystemConfigurationChoice::devices_without_a_mountable_system_configuration_slot`]）。
++/// 单开一个函数、不改 [`choose_system_configuration`] 的返回类型：后者的调用点遍布 core、harness 与 checker 档，
++/// 要这张表的只有只读挂载（`mounted_read::MountedReadOnly`）与想看冗余的恢复调用方。
++///
++/// # Errors
++/// 同 [`choose_system_configuration`]。
++pub fn choose_system_configuration_naming_devices_without_a_mountable_slot(
++    reader: &dyn PoolReader,
++) -> Result<SystemConfigurationChoice, RecoveryFailure> {
+     let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+     let mut chosen: Option<SystemConfiguration> = None;
+-    let mut first_device_with_no_valid_system_configuration_slot: Option<DeviceIdentity> = None;
++    let mut devices_without_a_mountable_system_configuration_slot: Vec<DeviceIdentity> = Vec::new();
+     let mut first_slot_with_incompat_bits_not_recognized: Option<(DeviceIdentity, IncompatBitmap)> =
+         None;
+     let mut slot_zero_of_each_device: Vec<(DeviceIdentity, SystemConfigurationSlotReading)> =
+@@ -1009,10 +1097,8 @@ pub fn choose_system_configuration(
+         }
+         let best_on_device = match (slot_zero.into_mountable(), slot_one.into_mountable()) {
+             (None, None) => {
+-                // 这块盘上的两份都废了，但别的盘各自还带着一份完整的系统配置：跳过它，别让整池挂不上。
+-                if first_device_with_no_valid_system_configuration_slot.is_none() {
+-                    first_device_with_no_valid_system_configuration_slot = Some(device);
+-                }
++                // 这块盘上的两份都废了，但别的盘各自还带着一份完整的系统配置：跳过它，别让整池挂不上；记下来交给调用方。
++                devices_without_a_mountable_system_configuration_slot.push(device);
+                 continue;
+             }
+             (Some(only), None) | (None, Some(only)) => only,
+@@ -1037,12 +1123,17 @@ pub fn choose_system_configuration(
+         }
+     }
+     if let Some(system_configuration) = chosen {
+-        return Ok(system_configuration);
++        return Ok(SystemConfigurationChoice {
++            system_configuration,
++            devices_without_a_mountable_system_configuration_slot,
++        });
+     }
+     // 一份可择的都没有：有一槽自证得过、只是布局不认识，就报布局不认识（不是数据坏了）；否则才是每块盘两槽都坏。
+     match (
+         first_slot_with_incompat_bits_not_recognized,
+-        first_device_with_no_valid_system_configuration_slot,
++        devices_without_a_mountable_system_configuration_slot
++            .first()
++            .copied(),
+     ) {
+         (Some((device, incompat_bitmap)), _) => Err(
+             RecoveryFailure::SystemConfigurationIncompatBitsNotRecognized {
+@@ -1053,8 +1144,8 @@ pub fn choose_system_configuration(
+         (None, Some(device)) => Err(RecoveryFailure::NoValidSystemConfiguration {
+             first_device_with_no_valid_system_configuration_slot: device,
+         }),
+-        // 池里一块盘都没有：没有哪一块盘点得出名，保持这个函数原先对空池的判定不变（见报告里的设计问题）。
+-        (None, None) => Err(RecoveryFailure::SystemConfigurationsDisagree),
++        // 一块盘交得出系统配置就落在上面的 `chosen`，一块交不出就记进那张表：两样都空只在池里一块盘都没有时。
++        (None, None) => Err(RecoveryFailure::NoDeviceInThePool),
+     }
+ }
+ 
+diff --git a/crates/singlefs-core/src/root_record.rs b/crates/singlefs-core/src/root_record.rs
+index 7d9bbfe..8a93a59 100644
+--- a/crates/singlefs-core/src/root_record.rs
++++ b/crates/singlefs-core/src/root_record.rs
+@@ -104,8 +104,10 @@ impl RootRecord {
+         bytes
+     }
+ 
+-    /// 读者：magic、整槽校验和、fsid、flags 四关。flags 只收卸载记号那一位（[`ROOT_RECORD_FLAG_UNMOUNT_MARKER`]），
++    /// 读者：magic、整槽校验和、fsid、flags、四条指针的 extent 偏移五关。flags 只收卸载记号那一位（[`ROOT_RECORD_FLAG_UNMOUNT_MARKER`]），
+     /// 别的位非 0 拒收；记号照实读进 [`RootRecord::unmount_marker`]（挂载与恢复不按它分支，按它分支的是池级 checker 的 I-7.9）。
++    /// 树表、实例表、中央映射树、分配记录树四条指针头部的 extent 偏移第一版恒 0，任一非 0 判这条根记录损坏、拒收
++    /// （C581（extent 偏移非 0 没有判据），`pointer::PointerHeadExtentOffsetNotZero`）：拒收的根与自证不过的根同一个处置，择根时不可择。
+     #[must_use]
+     pub fn parse_slot(bytes: &[u8], expected_filesystem_identifier: &[u8; 16]) -> Option<Self> {
+         if bytes.len() < usize::try_from(ROOT_RECORD_BYTES).expect("457")
+@@ -128,13 +130,14 @@ impl RootRecord {
+         let unmount_marker = UnmountMarker::of_flags_bits_carrying_only_the_marker(flags);
+         let instance = InstanceGeneration(reader.get_u32());
+         let checkpoint_txg = CheckpointTxg(reader.get_u64());
+-        let tree_table = NodePointer::read_from(&mut reader);
++        let tree_table = NodePointer::read_judging_the_extent_offset_from(&mut reader).ok()?;
+         let tree_identifier_watermark = reader.get_u64();
+         let rollback_floor = CheckpointTxg(reader.get_u64());
+         reader.skip(usize::try_from(WIDE_CHECKSUM_BYTES).expect("32"));
+-        let instance_table = NodePointer::read_from(&mut reader);
+-        let mapping_root = NodePointer::read_from(&mut reader);
+-        let allocation_record_tree_root = NodePointer::read_from(&mut reader);
++        let instance_table = NodePointer::read_judging_the_extent_offset_from(&mut reader).ok()?;
++        let mapping_root = NodePointer::read_judging_the_extent_offset_from(&mut reader).ok()?;
++        let allocation_record_tree_root =
++            NodePointer::read_judging_the_extent_offset_from(&mut reader).ok()?;
+         assert_eq!(
+             reader.position(),
+             ROOT_CHECKSUM_OFFSET + 32 + 3 * usize::try_from(NODE_POINTER_BYTES).expect("86")
+diff --git a/crates/singlefs-core/src/system_configuration.rs b/crates/singlefs-core/src/system_configuration.rs
+index cba2f34..08c2ea8 100644
+--- a/crates/singlefs-core/src/system_configuration.rs
++++ b/crates/singlefs-core/src/system_configuration.rs
+@@ -46,6 +46,18 @@ const FSID_OFFSET: usize = 4 + 2 + 96;
+ const ROOT_RING_SLOTS_PER_REGION_OFFSET: u64 = 362;
+ /// 几何段里「journal 环起点」那 8 字节（16 KiB 槽号，字段表 `layout/01-first-txn.md` 一）。写侧写它之前断言位置、读侧按它切。
+ const JOURNAL_RING_START_SLOT_OFFSET: u64 = 325;
++/// 几何段里「journal 在飞记录数上限」那 4 字节、「journal 最坏占用」那 8 字节、「安全系数 F」那 4 字节
++/// （字段表 `layout/01-first-txn.md` 一：环长 333 之后是记录尺寸 4，再是这三样，F 之后是 R 361）。
++/// 写侧 [`SystemConfiguration::to_slot`] 写它们之前断言位置、读侧 [`journal_ring_geometry_fields_recorded_in_the_slot`] 按它们切。
++const JOURNAL_IN_FLIGHT_RECORD_LIMIT_OFFSET: u64 = 345;
++const JOURNAL_WORST_CASE_OCCUPANCY_OFFSET: u64 = 349;
++const JOURNAL_SAFETY_FACTOR_OFFSET: u64 = 357;
++/// I-8.1（环几何够大）要 F ≥ 2；读者只收等于 [`JOURNAL_SAFETY_FACTOR`] 的 F（`recovery` 的
++/// `system_configuration_values_this_reader_accepts`），所以「F ≥ 2」那一半落在这个格式常量上，编译期判。
++const _: () = assert!(
++    JOURNAL_SAFETY_FACTOR >= 2,
++    "I-8.1（环几何够大）：安全系数 F ≥ 2"
++);
+ /// 几何段里「根环起点」那 8 字节（16 KiB 槽号，D22（单元原子性怎么合成） 已定项 16 第 1 句）。写侧写它之前断言位置、读侧按它切。
+ const ROOT_RING_BASE_SLOT_OFFSET: u64 = 371;
+ const REGION_DEVICES_OFFSET: u64 = 379;
+@@ -115,6 +127,40 @@ pub fn unit_area_start_slot_recorded_in_the_slot(slot: &[u8]) -> SlotNumber {
+     )
+ }
+ 
++/// 一槽系统配置里记着的 journal 环几何三个字段（I-8.1（环几何够大）：在飞记录数上限、最坏占用、安全系数 F）。
++/// 写者按环长现算写（[`SystemConfiguration::to_slot`]），[`SystemConfiguration::parse_slot`] 不读它们；
++/// 读者择系统配置时拿它们与环长现算的比（`recovery` 的 `system_configuration_values_this_reader_accepts`）。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct JournalRingGeometryFieldsRecordedInTheSlot {
++    pub in_flight_record_limit: u32,
++    pub worst_case_occupancy_bytes: u64,
++    pub safety_factor: u32,
++}
++
++/// 一槽系统配置里记着的 journal 环几何三个字段（偏移 345、349、357，小端）。只切字节、不判值。
++///
++/// # Panics
++/// 槽短于 4096 字节：调用方先过了 [`SystemConfiguration::parse_slot`]（它判过槽宽）才调这里。
++#[must_use]
++pub fn journal_ring_geometry_fields_recorded_in_the_slot(
++    slot: &[u8],
++) -> JournalRingGeometryFieldsRecordedInTheSlot {
++    let field_offset = |offset: u64| usize::try_from(offset).expect("字段表里的偏移装得进 usize");
++    JournalRingGeometryFieldsRecordedInTheSlot {
++        in_flight_record_limit: ByteReader::at(
++            slot,
++            field_offset(JOURNAL_IN_FLIGHT_RECORD_LIMIT_OFFSET),
++        )
++        .get_u32(),
++        worst_case_occupancy_bytes: ByteReader::at(
++            slot,
++            field_offset(JOURNAL_WORST_CASE_OCCUPANCY_OFFSET),
++        )
++        .get_u64(),
++        safety_factor: ByteReader::at(slot, field_offset(JOURNAL_SAFETY_FACTOR_OFFSET)).get_u32(),
++    }
++}
++
+ /// 系统配置槽里一个字段属于哪一档可改性（D22（单元原子性怎么合成） 已定项 26）。
+ /// 封闭集合：四类之外没有第五类，`match` 不写通配臂。
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+@@ -160,6 +206,17 @@ impl SystemImmutableSizes {
+         }
+         floor.div_ceil(minimum_input_output_bytes) * minimum_input_output_bytes
+     }
++
++    /// 根槽与系统配置槽的起始偏移要按的判定宽度：声明的 max(physical_block_size, io_min)（I-7.5（根槽按判定宽度对齐）
++    /// 的射程注：io_min 大于 physical_block_size 时按 io_min 判；io_min 写 0 是没声明，取 physical_block_size）。
++    /// 用户 2026-10-01 定「非常规几何由 mkfs 拒，I-7.5 按 max(pbs, io_min) 判」（`research/prompts/m3-inv-a-r1-main-verification.md` 第四节）。
++    #[must_use]
++    pub fn declared_alignment_decision_width_in_bytes(&self) -> u64 {
++        u64::from(
++            self.physical_block_size
++                .max(self.minimum_input_output_bytes),
++        )
++    }
+ }
+ 
+ /// 系统不可变配置：389 字节，改它 = 重建文件系统（D22（单元原子性怎么合成） 已定项 26 第一档）。
+@@ -427,10 +484,13 @@ impl SystemConfiguration {
+             writer.put_u32(u32::try_from(JOURNAL_RECORD_BYTES).expect("记录尺寸"));
+             let in_flight_limit =
+                 journal_in_flight_record_limit(self.immutable.sizes.journal_ring_bytes);
++            writer.assert_position(JOURNAL_IN_FLIGHT_RECORD_LIMIT_OFFSET, "journal 在飞记录数上限");
+             writer.put_u32(u32::try_from(in_flight_limit).expect(
+                 "在飞上限装得进 4 字节：mkfs 与读者择系统配置都按 journal_in_flight_record_limit_fits_its_four_byte_field 拒过装不下的环长",
+             ));
++            writer.assert_position(JOURNAL_WORST_CASE_OCCUPANCY_OFFSET, "journal 最坏占用");
+             writer.put_u64(in_flight_limit * JOURNAL_RECORD_BYTES);
++            writer.assert_position(JOURNAL_SAFETY_FACTOR_OFFSET, "安全系数 F");
+             writer.put_u32(u32::try_from(JOURNAL_SAFETY_FACTOR).expect("安全系数"));
+             writer.put_u8(u8::try_from(ROOT_RING_REGIONS).expect("R"));
+             writer.assert_position(ROOT_RING_SLOTS_PER_REGION_OFFSET, "每区槽数 S");
+diff --git a/crates/singlefs-harness/src/history.rs b/crates/singlefs-harness/src/history.rs
+index ea3eca0..2c70507 100644
+--- a/crates/singlefs-harness/src/history.rs
++++ b/crates/singlefs-harness/src/history.rs
+@@ -2277,6 +2277,7 @@ fn recovery_failure_member(failure: &RecoveryFailure) -> String {
+         RecoveryFailure::SystemConfigurationsDisagree => {
+             "RecoveryFailure::SystemConfigurationsDisagree".to_string()
+         }
++        RecoveryFailure::NoDeviceInThePool => "RecoveryFailure::NoDeviceInThePool".to_string(),
+         RecoveryFailure::RootRingSlotsPerRegionOutOfRange { out_of_range, .. } => {
+             format!(
+                 "RecoveryFailure::RootRingSlotsPerRegionOutOfRange（S = {}）",
+diff --git a/crates/singlefs-harness/tests/core_review_geometry_back_chain_and_empty_inode.rs b/crates/singlefs-harness/tests/core_review_geometry_back_chain_and_empty_inode.rs
+index 989be7f..d137cc4 100644
+--- a/crates/singlefs-harness/tests/core_review_geometry_back_chain_and_empty_inode.rs
++++ b/crates/singlefs-harness/tests/core_review_geometry_back_chain_and_empty_inode.rs
+@@ -432,10 +432,15 @@ fn system_configuration_slots_closer_than_a_slot_width_are_refused_before_any_wr
+ }
+ 
+ /// 槽距的上界：区域之间隔 P × chunk = 3 MiB，S = 8 时槽距到 384 KiB 三个区域首尾相接、放行；再多 512 字节，区域 0 伸进区域 1。
++/// 首尾相接那一格 io_min 取 512：io_min 也取 384 KiB 时判定宽度是 384 KiB，区域起点 1 MiB 不是它的整数倍，mkfs 按判定宽度拒
++/// （C47（根槽没按判定宽度对齐）），那一判不是这条用例要钉的。
+ #[test]
+ fn root_ring_regions_longer_than_the_region_step_are_refused_and_regions_that_just_touch_are_not() {
+     let regions_that_just_touch = make_filesystem_on_patterned_devices(
+-        &parameters_with(geometry_with_slot_spacing(384 * 1024)),
++        &parameters_with(SystemImmutableSizes {
++            minimum_input_output_bytes: 512,
++            ..geometry_with_slot_spacing(384 * 1024)
++        }),
+         DEVICE_BYTES,
+     );
+     assert!(
+diff --git a/crates/singlefs-harness/tests/core_review_tree_table_duplicates_and_slot_one_search.rs b/crates/singlefs-harness/tests/core_review_tree_table_duplicates_and_slot_one_search.rs
+index 41dc0cd..cd1182e 100644
+--- a/crates/singlefs-harness/tests/core_review_tree_table_duplicates_and_slot_one_search.rs
++++ b/crates/singlefs-harness/tests/core_review_tree_table_duplicates_and_slot_one_search.rs
+@@ -517,12 +517,19 @@ fn slot_one_is_found_by_trying_every_spacing_when_no_slot_zero_in_the_pool_verif
+     );
+ }
+ 
+-/// 槽距只是 512 的整数倍、不是 1024 的（io_min 1536 ⇒ 槽距 4608，D2（RAID 条带策略） 已定项 19 的式子）：逐档按 512 试才试得到。
++/// 槽距只是 512 的整数倍、不是 1024 的（4608）：逐档按 512 试才试得到。
++/// io_min 1536（D2（RAID 条带策略） 已定项 19 的式子算出槽距 4608）的池 mkfs 现在按判定宽度拒（区域起点 1 MiB 不是 1536 的整数倍，
++/// C47（根槽没按判定宽度对齐）），这里取 io_min 512、槽距写 4608：判定宽度 512，mkfs 收。
+ #[test]
+ fn a_slot_spacing_that_is_a_multiple_of_512_bytes_only_is_found_too() {
+-    let mut image = formatted_image_with_minimum_input_output_bytes(1536);
+-    let spacing = SystemImmutableSizes::slot_spacing_for(1536);
+-    assert_eq!(spacing, 4608, "io_min 1536 时槽距 4608");
++    let spacing = 4608;
++    let parameters = parameters_with(SystemImmutableSizes {
++        fixed_structure_slot_spacing: spacing,
++        ..geometry_with_minimum_input_output_bytes(512)
++    });
++    let mut devices = two_sparse_devices();
++    make_filesystem(&parameters, &mut devices).expect("io_min 512、槽距 4608 的池");
++    let mut image = image_of(&devices);
+     flip_slot_zero_on_every_device(&mut image);
+     let chosen = choose_system_configuration(&image).expect("两块盘的槽 1 都在 4608 处");
+     assert_eq!(
+diff --git a/crates/singlefs-harness/tests/journal_ring_geometry_fields_are_recomputed_when_choosing_the_system_configuration.rs b/crates/singlefs-harness/tests/journal_ring_geometry_fields_are_recomputed_when_choosing_the_system_configuration.rs
+new file mode 100644
+index 0000000..32bec4e
+--- /dev/null
++++ b/crates/singlefs-harness/tests/journal_ring_geometry_fields_are_recomputed_when_choosing_the_system_configuration.rs
+@@ -0,0 +1,208 @@
++//! I-8.1（环几何够大） 的三条等式由 core 在择系统配置时复算（判决 `research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 4 行
++//! 「core 同判并进实现簇」）：安全系数 F 等于格式常量（第一版 3；F ≥ 2 那一半落在格式常量的编译期断言上）、
++//! 在飞记录数上限 = ⌊环长 ÷ 4096 ÷ F⌋、最坏占用 = 在飞上限 × 4096。三个字段各改一个、整槽校验和重封，
++//! 只读恢复与可写挂载都在读系统配置那一步整池拒、报同一个成员，盘上逐字节不变。改之前读者不读这三个字段，两个入口照常挂。
++//!
++//! 盘：两块 4 GiB 内存稀疏盘上只做过 mkfs 的池（默认环 768 MiB：在飞上限 65536、最坏占用 256 MiB）。
++
++use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
++use singlefs_core::block_device::PhysicalBlockSizeInBytes;
++use singlefs_core::checksum::wide_checksum_with_field_zeroed;
++use singlefs_core::make_filesystem::{make_filesystem, MakeFilesystemParameters};
++use singlefs_core::mount::{mount_writable, MountError};
++use singlefs_core::recovery::{
++    recover, JournalPolicy, RecoveryFailure, RecoveryOutcome,
++    SystemConfigurationValueOutsideWhatThisReaderAccepts,
++};
++use singlefs_core::root_ring::RootRingSlotsPerRegion;
++use singlefs_core::system_configuration::{
++    SystemImmutableSizes, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
++};
++use singlefs_format::{
++    JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_SAFETY_FACTOR,
++    SYSTEM_CONFIGURATION_SLOT_BYTES,
++};
++use singlefs_harness::memory_pool::{SparseBlockDevice, SparseDevice};
++
++const DEVICE_BYTES: u64 = 4 << 30;
++const FILESYSTEM_IDENTIFIER: [u8; 16] = *b"singlefs-m3-i8-1";
++/// 系统配置槽里 journal 在飞记录数上限（4 字节）、最坏占用（8 字节）、安全系数 F（4 字节）的偏移（字段表 `layout/01-first-txn.md` 一）。
++/// 每条用例改之前先按 mkfs 写下的值核一遍偏移。
++const IN_FLIGHT_RECORD_LIMIT_OFFSET: usize = 345;
++const WORST_CASE_OCCUPANCY_OFFSET: usize = 349;
++const SAFETY_FACTOR_OFFSET: usize = 357;
++/// 默认环 768 MiB：⌊768 MiB ÷ 4096 ÷ 3⌋ = 65536。
++const DEFAULT_RING_IN_FLIGHT_RECORD_LIMIT: u64 =
++    JOURNAL_RING_DEFAULT_BYTES / JOURNAL_RECORD_BYTES / JOURNAL_SAFETY_FACTOR;
++
++type Devices = Vec<(DeviceIdentity, SparseBlockDevice)>;
++
++fn parameters() -> MakeFilesystemParameters {
++    MakeFilesystemParameters {
++        filesystem_identifier: FILESYSTEM_IDENTIFIER,
++        region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
++        geometry: SystemImmutableSizes {
++            physical_block_size: 512,
++            minimum_input_output_bytes: 512,
++            fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(512),
++            journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
++            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
++        },
++    }
++}
++
++fn formatted_pool() -> Devices {
++    let mut devices: Devices = [DeviceIdentity(0), DeviceIdentity(1)]
++        .into_iter()
++        .map(|identity| {
++            (
++                identity,
++                SparseBlockDevice::new(DEVICE_BYTES, PhysicalBlockSizeInBytes(512)),
++            )
++        })
++        .collect();
++    make_filesystem(&parameters(), &mut devices).expect("默认几何上 mkfs");
++    devices
++}
++
++fn images_of(devices: &Devices) -> Vec<(DeviceIdentity, SparseDevice)> {
++    devices
++        .iter()
++        .map(|(identity, device)| (*identity, device.image.clone()))
++        .collect()
++}
++
++/// 两块盘各两个系统配置槽（偏移 0 与槽距）：先核 mkfs 写下的三个字段就是环长现算的值，再改一下、整槽校验和重封。
++fn rewrite_every_system_configuration_slot(devices: &mut Devices, change: impl Fn(&mut [u8])) {
++    let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
++    let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
++    for (identity, device) in devices.iter_mut() {
++        for offset in [0, spacing] {
++            let mut slot = device.image.read(DeviceOffsetInBytes(offset), slot_bytes);
++            assert_eq!(
++                (
++                    u32::from_le_bytes(
++                        slot[IN_FLIGHT_RECORD_LIMIT_OFFSET..IN_FLIGHT_RECORD_LIMIT_OFFSET + 4]
++                            .try_into()
++                            .expect("4 字节")
++                    ),
++                    u64::from_le_bytes(
++                        slot[WORST_CASE_OCCUPANCY_OFFSET..WORST_CASE_OCCUPANCY_OFFSET + 8]
++                            .try_into()
++                            .expect("8 字节")
++                    ),
++                    u32::from_le_bytes(
++                        slot[SAFETY_FACTOR_OFFSET..SAFETY_FACTOR_OFFSET + 4]
++                            .try_into()
++                            .expect("4 字节")
++                    ),
++                ),
++                (
++                    u32::try_from(DEFAULT_RING_IN_FLIGHT_RECORD_LIMIT).expect("65536"),
++                    DEFAULT_RING_IN_FLIGHT_RECORD_LIMIT * JOURNAL_RECORD_BYTES,
++                    u32::try_from(JOURNAL_SAFETY_FACTOR).expect("3"),
++                ),
++                "盘 {identity:?} 偏移 {offset} 的槽：345、349、357 就是在飞上限、最坏占用、F"
++            );
++            change(&mut slot);
++            let digest = wide_checksum_with_field_zeroed(
++                &slot,
++                slot_bytes,
++                SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
++            );
++            slot[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32]
++                .copy_from_slice(&digest);
++            device.image.write(DeviceOffsetInBytes(offset), &slot);
++        }
++    }
++}
++
++/// 只读恢复与可写挂载都在读系统配置那一步拒、报同一个成员（盘 0 先读到的那一槽），可写挂载在任何写之前拒。交回被拒的那个值。
++fn refused_by_both_mounts_before_any_write(
++    devices: &mut Devices,
++) -> SystemConfigurationValueOutsideWhatThisReaderAccepts {
++    let images_before = images_of(devices);
++    let RecoveryOutcome::Failed {
++        failure:
++            RecoveryFailure::SystemConfigurationValueRefused {
++                device: DeviceIdentity(0),
++                value,
++            },
++        ..
++    } = recover(&*devices, JournalPolicy::Consult).outcome
++    else {
++        panic!("只读恢复要在读系统配置那一步拒（盘 0 先读到的那一槽）");
++    };
++    let writable = mount_writable(&parameters(), devices);
++    assert!(
++        matches!(
++            &writable,
++            Err(MountError::Recovery(RecoveryFailure::SystemConfigurationValueRefused {
++                device: DeviceIdentity(0),
++                value: refused_by_the_mount,
++            })) if *refused_by_the_mount == value
++        ),
++        "可写挂载与只读恢复报同一个成员：{:?}",
++        writable.as_ref().err()
++    );
++    assert_eq!(images_of(devices), images_before, "两块盘逐字节不变");
++    value
++}
++
++/// 场景：四个系统配置槽的安全系数 F 从 3 改成 2、整槽重封（在飞上限与最坏占用不动）。
++/// 预期：两个入口都整池拒，报 F 不是这个读者写的那个（记着 2、第一版 3）。改之前读者不读 F，两个入口照常挂。
++#[test]
++fn a_safety_factor_other_than_the_first_version_value_is_refused_by_both_mounts() {
++    let mut devices = formatted_pool();
++    rewrite_every_system_configuration_slot(&mut devices, |slot| {
++        slot[SAFETY_FACTOR_OFFSET..SAFETY_FACTOR_OFFSET + 4].copy_from_slice(&2u32.to_le_bytes());
++    });
++    assert_eq!(
++        refused_by_both_mounts_before_any_write(&mut devices),
++        SystemConfigurationValueOutsideWhatThisReaderAccepts::JournalSafetyFactorNotTheFirstVersionValue {
++            recorded_safety_factor: 2,
++            first_version_safety_factor: JOURNAL_SAFETY_FACTOR,
++        }
++    );
++}
++
++/// 场景：四个系统配置槽的在飞记录数上限从 65536 改成 65537、整槽重封（F 与最坏占用不动）。
++/// 预期：两个入口都整池拒，报在飞上限不等于按环长现算的 65536。改之前读者不读这 4 字节，两个入口照常挂。
++#[test]
++fn an_in_flight_record_limit_other_than_the_one_recomputed_from_the_ring_length_is_refused_by_both_mounts(
++) {
++    let mut devices = formatted_pool();
++    let recorded = u32::try_from(DEFAULT_RING_IN_FLIGHT_RECORD_LIMIT + 1).expect("65537");
++    rewrite_every_system_configuration_slot(&mut devices, |slot| {
++        slot[IN_FLIGHT_RECORD_LIMIT_OFFSET..IN_FLIGHT_RECORD_LIMIT_OFFSET + 4]
++            .copy_from_slice(&recorded.to_le_bytes());
++    });
++    assert_eq!(
++        refused_by_both_mounts_before_any_write(&mut devices),
++        SystemConfigurationValueOutsideWhatThisReaderAccepts::JournalInFlightRecordLimitNotRecomputedFromTheRingLength {
++            recorded_in_flight_record_limit: recorded,
++            recomputed_in_flight_record_limit: DEFAULT_RING_IN_FLIGHT_RECORD_LIMIT,
++        }
++    );
++}
++
++/// 场景：四个系统配置槽的最坏占用从 65536 × 4096 改成多一条记录（+ 4096）、整槽重封（F 与在飞上限不动）。
++/// 预期：两个入口都整池拒，报最坏占用不等于现算的在飞上限 × 4096。改之前读者不读这 8 字节，两个入口照常挂。
++#[test]
++fn a_worst_case_occupancy_other_than_the_in_flight_limit_times_the_record_bytes_is_refused_by_both_mounts(
++) {
++    let mut devices = formatted_pool();
++    let recomputed = DEFAULT_RING_IN_FLIGHT_RECORD_LIMIT * JOURNAL_RECORD_BYTES;
++    let recorded = recomputed + JOURNAL_RECORD_BYTES;
++    rewrite_every_system_configuration_slot(&mut devices, |slot| {
++        slot[WORST_CASE_OCCUPANCY_OFFSET..WORST_CASE_OCCUPANCY_OFFSET + 8]
++            .copy_from_slice(&recorded.to_le_bytes());
++    });
++    assert_eq!(
++        refused_by_both_mounts_before_any_write(&mut devices),
++        SystemConfigurationValueOutsideWhatThisReaderAccepts::JournalWorstCaseOccupancyNotTheInFlightLimitTimesTheRecordBytes {
++            recorded_worst_case_occupancy_bytes: recorded,
++            recomputed_worst_case_occupancy_bytes: recomputed,
++        }
++    );
++}
+diff --git a/crates/singlefs-harness/tests/mkfs_refuses_geometries_whose_root_slots_do_not_align.rs b/crates/singlefs-harness/tests/mkfs_refuses_geometries_whose_root_slots_do_not_align.rs
+new file mode 100644
+index 0000000..cbb8483
+--- /dev/null
++++ b/crates/singlefs-harness/tests/mkfs_refuses_geometries_whose_root_slots_do_not_align.rs
+@@ -0,0 +1,153 @@
++//! mkfs 拒根槽、系统配置槽不按声明的判定宽度 max(physical_block_size, io_min) 对齐的几何，在任何写之前
++//! （用户 2026-10-01 定「非常规几何由 mkfs 拒」，`research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 5 行、第四节；
++//! C47（根槽没按判定宽度对齐））。两组几何取自正推腿 A3 一节与攻方腿第四节量过的那两组：
++//! pbs 4096 + io_min 3072 改之前在 4096 宽的盘上清完环、写完单元与根，写到系统配置槽 1 才被块设备拒；
++//! pbs 512 + io_min 3072 改之前整个收下，24 个根槽没有一个是 io_min 的整数倍。
++
++use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
++use singlefs_core::block_device::PhysicalBlockSizeInBytes;
++use singlefs_core::make_filesystem::{
++    make_filesystem, MakeFilesystemError, MakeFilesystemParameters, SlotJudgedForAlignment,
++};
++use singlefs_core::root_ring::{RootRingSlot, RootRingSlotsPerRegion};
++use singlefs_core::system_configuration::SystemImmutableSizes;
++use singlefs_format::JOURNAL_RING_DEFAULT_BYTES;
++use singlefs_harness::memory_pool::{SparseBlockDevice, SparseDevice};
++use singlefs_harness::{RecordingBlockDevice, SharedStream};
++
++const DEVICE_BYTES: u64 = 4 << 30;
++const FILESYSTEM_IDENTIFIER: [u8; 16] = *b"singlefs-m3-algn";
++/// io_min 3072：不是 2 的幂，D2（RAID 条带策略） 已定项 19 的式子算出槽距 6144。
++const MINIMUM_INPUT_OUTPUT_BYTES_THAT_IS_NOT_A_POWER_OF_TWO: u32 = 3072;
++
++/// 一组 mkfs 参数：声明的 pbs 与 io_min 由调用方给，槽距照 D2（RAID 条带策略） 已定项 19 由 io_min 算。
++fn parameters_declaring(
++    physical_block_size: u32,
++    minimum_input_output_bytes: u32,
++) -> MakeFilesystemParameters {
++    MakeFilesystemParameters {
++        filesystem_identifier: FILESYSTEM_IDENTIFIER,
++        region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
++        geometry: SystemImmutableSizes {
++            physical_block_size,
++            minimum_input_output_bytes,
++            fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(
++                minimum_input_output_bytes,
++            ),
++            journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
++            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
++        },
++    }
++}
++
++/// 两块内存盘，块宽 `device_block_bytes`，外面包录制器、录进同一条流：mkfs 发出的每一个写、写零、屏障都在流里。
++fn recorded_devices(
++    device_block_bytes: u32,
++    stream: &SharedStream,
++) -> Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> {
++    [DeviceIdentity(0), DeviceIdentity(1)]
++        .into_iter()
++        .map(|identity| {
++            (
++                identity,
++                RecordingBlockDevice::with_shared_stream(
++                    identity,
++                    SparseBlockDevice::new(
++                        DEVICE_BYTES,
++                        PhysicalBlockSizeInBytes(device_block_bytes),
++                    ),
++                    stream.clone(),
++                ),
++            )
++        })
++        .collect()
++}
++
++/// 在任何写之前拒：录制流一步都没有（一个写、一次写零、一道屏障都没发），两块盘的镜像还是空的。
++fn assert_nothing_was_written(
++    stream: &SharedStream,
++    devices: &[(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)],
++    geometry_named: &str,
++) {
++    assert_eq!(
++        stream.operations().len(),
++        0,
++        "{geometry_named}：录制流里一步都没有"
++    );
++    for (identity, device) in devices {
++        assert_eq!(
++            device.wrapped_device().image,
++            SparseDevice::default(),
++            "{geometry_named}：盘 {identity:?} 一个扇区都没写"
++        );
++    }
++}
++
++/// pbs 4096 + io_min 3072（槽距 6144），4096 宽的盘：判定宽度 4096，按排布次序第一个不对齐的是系统配置槽 1（偏移 6144）。
++/// 改之前清完根环与 journal 环、写完两个单元与三条第 0 代根，写到系统配置槽 1 才被块设备报 `Unaligned`，盘上留下半份格式。
++#[test]
++fn physical_block_size_4096_with_io_min_3072_is_refused_at_system_configuration_slot_one_before_any_write(
++) {
++    let stream = SharedStream::retaining_contents();
++    let mut devices = recorded_devices(4096, &stream);
++    let result = make_filesystem(
++        &parameters_declaring(4096, MINIMUM_INPUT_OUTPUT_BYTES_THAT_IS_NOT_A_POWER_OF_TWO),
++        &mut devices,
++    );
++    assert!(
++        matches!(
++            &result,
++            Err(
++                MakeFilesystemError::FixedStructureSlotNotAlignedToTheDecisionWidth {
++                    slot: SlotJudgedForAlignment::SystemConfigurationSlot { slot_index: 1 },
++                    offset: DeviceOffsetInBytes(6144),
++                    decision_width_in_bytes: 4096,
++                }
++            )
++        ),
++        "pbs 4096 + io_min 3072：该报系统配置槽 1 在 6144 处不是 4096 的整数倍，实际 {:?}",
++        result.as_ref().err()
++    );
++    assert_nothing_was_written(&stream, &devices, "pbs 4096 + io_min 3072");
++}
++
++/// pbs 512 + io_min 3072（槽距 6144），512 宽的盘：判定宽度 3072；系统配置两槽（0、6144）都对齐，
++/// 按排布次序第一个不对齐的是根环区域 0 的槽 0（区域起点 1 MiB，1048576 ÷ 3072 不整除）。改之前 mkfs 整个收下。
++#[test]
++fn physical_block_size_512_with_io_min_3072_is_refused_at_the_first_root_slot_before_any_write() {
++    let stream = SharedStream::retaining_contents();
++    let mut devices = recorded_devices(512, &stream);
++    let result = make_filesystem(
++        &parameters_declaring(512, MINIMUM_INPUT_OUTPUT_BYTES_THAT_IS_NOT_A_POWER_OF_TWO),
++        &mut devices,
++    );
++    assert!(
++        matches!(
++            &result,
++            Err(
++                MakeFilesystemError::FixedStructureSlotNotAlignedToTheDecisionWidth {
++                    slot: SlotJudgedForAlignment::RootRingSlot(RootRingSlot { region: 0, slot: 0 }),
++                    offset: DeviceOffsetInBytes(1_048_576),
++                    decision_width_in_bytes: 3072,
++                }
++            )
++        ),
++        "pbs 512 + io_min 3072：该报区域 0 槽 0 在 1 MiB 处不是 3072 的整数倍，实际 {:?}",
++        result.as_ref().err()
++    );
++    assert_nothing_was_written(&stream, &devices, "pbs 512 + io_min 3072");
++}
++
++/// 对照：pbs 512 + io_min 4096（槽距 4096）判定宽度 4096，两个系统配置槽与 24 个根槽都对齐，mkfs 照收。
++/// 钉住「拒」只落在不对齐的几何上，不是新判定把常规几何也挡了。
++#[test]
++fn physical_block_size_512_with_io_min_4096_still_makes_a_filesystem() {
++    let stream = SharedStream::retaining_contents();
++    let mut devices = recorded_devices(512, &stream);
++    let result = make_filesystem(&parameters_declaring(512, 4096), &mut devices);
++    assert!(
++        result.is_ok(),
++        "pbs 512 + io_min 4096 是常规几何：{:?}",
++        result.as_ref().err()
++    );
++}
+diff --git a/crates/singlefs-harness/tests/pointer_extent_offset_that_is_not_zero_is_refused_by_both_mounts.rs b/crates/singlefs-harness/tests/pointer_extent_offset_that_is_not_zero_is_refused_by_both_mounts.rs
+new file mode 100644
+index 0000000..71b8065
+--- /dev/null
++++ b/crates/singlefs-harness/tests/pointer_extent_offset_that_is_not_zero_is_refused_by_both_mounts.rs
+@@ -0,0 +1,268 @@
++//! 指针头部 extent 偏移那 2 字节（指针头部偏移 32）第一版恒 0，读者遇到非 0 判该指针所在的结构损坏，同 MAC / nonce
++//! （D19（块指针的结构与宽度预算） 已定项 3；判决 `research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 11 行，C581（extent 偏移非 0 没有判据））。
++//!
++//! 坏镜像照攻方那一份造（`research/prompts/m3-inv-a-r1-opus-output.md` 五、A6）：两块内存盘上 mkfs、取号、暖机、第一个文件（txg 3），
++//! 把根环里每一条自证过的根的实例表指针 extent 偏移改成 1、整槽自证校验和重封。改之前 `recover` 读出文件、`mount_writable` 挂上
++//! （读者 `reader.skip(2)`）；改之后两个入口都择不到根、拒，盘上逐字节不变。
++//! 另一条在指针一级钉住判的那两个读法（多层码 2 树内部条目、journal 新根段指针用的、根记录用的）报的是 extent 偏移。
++
++use singlefs_core::address::{
++    CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber, TreeIdentifier,
++};
++use singlefs_core::allocator::PoolAllocator;
++use singlefs_core::block_device::PhysicalBlockSizeInBytes;
++use singlefs_core::bytes::{ByteReader, ByteWriter};
++use singlefs_core::checksum::wide_checksum_with_field_zeroed;
++use singlefs_core::make_filesystem::{
++    allocator_after_make_filesystem, make_filesystem, MakeFilesystemParameters,
++};
++use singlefs_core::mount::{mount_writable, MountError};
++use singlefs_core::pointer::{
++    BirthSequence, LocationEntry, NodePointer, PointerHead, PointerHeadExtentOffsetNotZero,
++    PointerHeadFieldOutsideTheFirstVersion,
++};
++use singlefs_core::recovery::{
++    choose_system_configuration, every_root_ring_slot, read_root_ring_slot, recover, JournalPolicy,
++    RecoveryFailure, RecoveryOutcome, RootRingSlotReading,
++};
++use singlefs_core::root_record::{RootRecord, ROOT_CHECKSUM_OFFSET};
++use singlefs_core::root_ring::{slot_offset, RootRingSlot, RootRingSlotsPerRegion};
++use singlefs_core::system_configuration::SystemImmutableSizes;
++use singlefs_core::transaction::{
++    acquire_instance, publish_first_file, warm_up, FirstFile, PoolWriter,
++};
++use singlefs_format::{JOURNAL_RING_DEFAULT_BYTES, NODE_POINTER_BYTES, UNIT_AREA_START_SLOT};
++use singlefs_harness::memory_pool::{SparseBlockDevice, SparseDevice};
++
++const DEVICE_BYTES: u64 = 4 << 30;
++const FILESYSTEM_IDENTIFIER: [u8; 16] = *b"singlefs-m3-extn";
++const WRITE_TIME_SECONDS: u64 = 1_788_300_000;
++/// 内存稀疏盘按 512 字节扇区存：物理块宽 512，根槽宽也是 512。
++const SECTOR_PHYSICAL_BLOCK_SIZE: PhysicalBlockSizeInBytes = PhysicalBlockSizeInBytes(512);
++/// 指针头部里 extent 偏移那 2 字节的偏移：MAC 16、nonce 12、算法类型 1、压缩算法码 1、压后长度 2 之后（D19（块指针的结构与宽度预算） 已定项 7 的字段表）。
++const EXTENT_OFFSET_IN_THE_POINTER_HEAD: usize = 32;
++/// 根槽里实例表指针的偏移：自证校验和 32 字节紧后面（`RootRecord::parse_slot` 的读法；用例里拿解出来的根核一遍）。
++const INSTANCE_TABLE_POINTER_IN_THE_ROOT_SLOT: usize = ROOT_CHECKSUM_OFFSET + 32;
++
++type Devices = Vec<(DeviceIdentity, SparseBlockDevice)>;
++
++fn parameters() -> MakeFilesystemParameters {
++    MakeFilesystemParameters {
++        filesystem_identifier: FILESYSTEM_IDENTIFIER,
++        region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
++        geometry: SystemImmutableSizes {
++            physical_block_size: 512,
++            minimum_input_output_bytes: 512,
++            fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(512),
++            journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
++            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
++        },
++    }
++}
++
++/// 两块内存盘上 mkfs → 取号 1 → 暖机 → 第一个文件（txg 3）。
++fn pool_after_the_first_file() -> Devices {
++    let parameters = parameters();
++    let mut devices: Devices = [DeviceIdentity(0), DeviceIdentity(1)]
++        .into_iter()
++        .map(|identity| {
++            (
++                identity,
++                SparseBlockDevice::new(DEVICE_BYTES, SECTOR_PHYSICAL_BLOCK_SIZE),
++            )
++        })
++        .collect();
++    let genesis = make_filesystem(&parameters, &mut devices).expect("默认几何上 mkfs");
++    let mut allocator: PoolAllocator =
++        allocator_after_make_filesystem(&parameters, &devices, &genesis);
++    let content: Vec<u8> = (0..3000u32)
++        .map(|index| u8::try_from(index % 251).expect("小于 256"))
++        .collect();
++    let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
++    let instance = acquire_instance(&mut writer).expect("取号 1");
++    let warmed = warm_up(&mut writer, &genesis.root, instance).expect("暖机");
++    publish_first_file(
++        &mut writer,
++        &mut allocator,
++        warmed.roots.last().expect("暖机写了两条根"),
++        FirstFile {
++            content: &content,
++            write_time_seconds: WRITE_TIME_SECONDS,
++        },
++        instance,
++        &warmed.last_record_bytes,
++    )
++    .expect("第一个文件");
++    devices
++}
++
++fn images_of(devices: &Devices) -> Vec<(DeviceIdentity, SparseDevice)> {
++    devices
++        .iter()
++        .map(|(identity, device)| (*identity, device.image.clone()))
++        .collect()
++}
++
++/// 根环里自证过的每一条根，连同它住的槽（改之前读）。
++fn self_verified_roots_in_the_ring(devices: &Devices) -> Vec<(RootRingSlot, RootRecord)> {
++    let system_configuration = choose_system_configuration(devices).expect("系统配置择得到");
++    every_root_ring_slot(&system_configuration.immutable.sizes)
++        .into_iter()
++        .filter_map(|ring_slot| {
++            match read_root_ring_slot(
++                devices,
++                &system_configuration.immutable.region_devices,
++                &system_configuration.immutable.sizes,
++                &system_configuration.immutable.filesystem_identifier,
++                ring_slot,
++            ) {
++                RootRingSlotReading::SelfVerified(root) => Some((ring_slot, root)),
++                RootRingSlotReading::Bad(_) => None,
++            }
++        })
++        .collect()
++}
++
++/// 根环里每一条自证过的根：实例表指针的 extent 偏移写成 1、整槽自证校验和重封（攻方 A6 的改法）。交回改了几条。
++fn set_the_instance_table_pointer_extent_offset_to_one_in_every_root(
++    devices: &mut Devices,
++) -> usize {
++    let parameters = parameters();
++    let root_slot_bytes =
++        usize::try_from(parameters.geometry.physical_block_size).expect("根槽宽装得进 usize");
++    let roots = self_verified_roots_in_the_ring(devices);
++    for (ring_slot, root) in &roots {
++        let device = parameters.region_devices[usize::try_from(ring_slot.region).expect("区域号")];
++        let offset = slot_offset(*ring_slot, parameters.geometry.fixed_structure_slot_spacing);
++        let device_under_change = &mut devices
++            .iter_mut()
++            .find(|(identity, _)| *identity == device)
++            .expect("池里有这块盘")
++            .1;
++        let mut slot = device_under_change.image.read(offset, root_slot_bytes);
++        assert_eq!(
++            NodePointer::read_from(&mut ByteReader::at(
++                &slot,
++                INSTANCE_TABLE_POINTER_IN_THE_ROOT_SLOT
++            )),
++            root.instance_table,
++            "根槽偏移 {INSTANCE_TABLE_POINTER_IN_THE_ROOT_SLOT} 起的 {NODE_POINTER_BYTES} 字节就是实例表指针"
++        );
++        let extent_offset_at =
++            INSTANCE_TABLE_POINTER_IN_THE_ROOT_SLOT + EXTENT_OFFSET_IN_THE_POINTER_HEAD;
++        assert_eq!(
++            &slot[extent_offset_at..extent_offset_at + 2],
++            &[0u8, 0][..],
++            "第一版写者写的 extent 偏移是 0"
++        );
++        slot[extent_offset_at..extent_offset_at + 2].copy_from_slice(&1u16.to_le_bytes());
++        let digest = wide_checksum_with_field_zeroed(&slot, root_slot_bytes, ROOT_CHECKSUM_OFFSET);
++        slot[ROOT_CHECKSUM_OFFSET..ROOT_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);
++        device_under_change.image.write(offset, &slot);
++    }
++    roots.len()
++}
++
++/// 场景：攻方 A6 那份镜像——第一个文件之后，根环里每条自证过的根的实例表指针 extent 偏移改成 1、整槽重封。
++/// 预期：只读恢复与可写挂载两个入口都择不到根（这样的根记录判损坏、不可择），报 `NoValidRoot`；可写挂载在任何写之前拒，两块盘逐字节不变。
++/// 改之前读者跳过这 2 字节：`recover` 读出文件、`mount_writable` 挂上。
++#[test]
++fn every_root_carrying_a_non_zero_instance_table_extent_offset_is_refused_by_recovery_and_the_writable_mount(
++) {
++    let mut devices = pool_after_the_first_file();
++    let roots_changed =
++        set_the_instance_table_pointer_extent_offset_to_one_in_every_root(&mut devices);
++    assert!(
++        roots_changed >= 4,
++        "第 0 代根三条、暖机两条、第一个文件一条，根环里自证过的根至少 4 条，实际改了 {roots_changed} 条"
++    );
++    let images_before = images_of(&devices);
++    let recovered = recover(&devices, JournalPolicy::Consult).outcome;
++    assert_eq!(
++        recovered,
++        RecoveryOutcome::Failed {
++            root: None,
++            failure: RecoveryFailure::NoValidRoot,
++        },
++        "只读恢复：每条根的实例表指针 extent 偏移都非 0，一条可择的根都没有"
++    );
++    let writable = mount_writable(&parameters(), &mut devices);
++    assert!(
++        matches!(
++            &writable,
++            Err(MountError::Recovery(RecoveryFailure::NoValidRoot))
++        ),
++        "可写挂载：同样择不到根，实际 {:?}",
++        writable.as_ref().err()
++    );
++    assert_eq!(
++        images_of(&devices),
++        images_before,
++        "可写挂载在任何写之前拒：两块盘逐字节不变"
++    );
++}
++
++/// 一条节点指针（86 字节），头部 extent 偏移那 2 字节写成 `extent_offset`。
++fn node_pointer_bytes_with_extent_offset(extent_offset: u16) -> (NodePointer, Vec<u8>) {
++    let pointer = NodePointer {
++        head: PointerHead {
++            birth_tree: TreeIdentifier(singlefs_format::TREE_IDENTIFIER_ACCOUNTING),
++            birth_txg: CheckpointTxg(3),
++        },
++        locations: [
++            LocationEntry {
++                device: DeviceIdentity(0),
++                slot: SlotNumber(UNIT_AREA_START_SLOT + 8),
++                unit_checksum: 0x1234,
++            },
++            LocationEntry {
++                device: DeviceIdentity(1),
++                slot: SlotNumber(UNIT_AREA_START_SLOT + 8),
++                unit_checksum: 0x1234,
++            },
++        ],
++        instance: InstanceGeneration(1),
++        birth_sequence: BirthSequence(2),
++    };
++    let mut writer = ByteWriter::new(usize::try_from(NODE_POINTER_BYTES).expect("86"));
++    pointer.write_to(&mut writer);
++    let mut bytes = writer.into_bytes();
++    bytes[EXTENT_OFFSET_IN_THE_POINTER_HEAD..EXTENT_OFFSET_IN_THE_POINTER_HEAD + 2]
++        .copy_from_slice(&extent_offset.to_le_bytes());
++    (pointer, bytes)
++}
++
++/// 场景：一条节点指针头部 extent 偏移写成 7，MAC、nonce、算法类型、压缩那几段都是第一版的取值。
++/// 预期：判头部的两个读法都报 extent 偏移非 0、带着读到的 7——多层码 2 树内部条目与 journal 新根段指针用的
++/// `read_judging_the_encryption_and_compression_fields_from`，根记录用的 `read_judging_the_extent_offset_from`；
++/// extent 偏移是 0 的同一条指针两个读法都照常读出。改之前两个读法都跳过这 2 字节、照常读出。
++#[test]
++fn a_node_pointer_head_with_a_non_zero_extent_offset_is_refused_by_both_judging_readers() {
++    let (pointer, clean) = node_pointer_bytes_with_extent_offset(0);
++    assert_eq!(
++        (
++            NodePointer::read_judging_the_encryption_and_compression_fields_from(
++                &mut ByteReader::at(&clean, 0)
++            ),
++            NodePointer::read_judging_the_extent_offset_from(&mut ByteReader::at(&clean, 0)),
++        ),
++        (Ok(pointer), Ok(pointer)),
++        "extent 偏移 0：两个读法都照常读出"
++    );
++    let (_, damaged) = node_pointer_bytes_with_extent_offset(7);
++    let not_zero = PointerHeadExtentOffsetNotZero { extent_offset: 7 };
++    assert_eq!(
++        NodePointer::read_judging_the_encryption_and_compression_fields_from(&mut ByteReader::at(
++            &damaged, 0
++        )),
++        Err(PointerHeadFieldOutsideTheFirstVersion::ExtentOffsetNotZero(
++            not_zero
++        )),
++        "判加密与压缩那几段的读法也判 extent 偏移"
++    );
++    assert_eq!(
++        NodePointer::read_judging_the_extent_offset_from(&mut ByteReader::at(&damaged, 0)),
++        Err(not_zero),
++        "根记录用的读法报 extent 偏移"
++    );
++}
+diff --git a/crates/singlefs-harness/tests/system_configuration_choice_names_an_empty_pool_and_devices_that_lost_both_slots.rs b/crates/singlefs-harness/tests/system_configuration_choice_names_an_empty_pool_and_devices_that_lost_both_slots.rs
+new file mode 100644
+index 0000000..07c7f3b
+--- /dev/null
++++ b/crates/singlefs-harness/tests/system_configuration_choice_names_an_empty_pool_and_devices_that_lost_both_slots.rs
+@@ -0,0 +1,182 @@
++//! 择系统配置报得清两件事（判决 `research/prompts/m3-ring-r1-main-verification.md` 第二节第 11 行）：
++//! - C462（空池恢复报的错名不副实）：交进来的池里一块盘都没有，恢复这一层报 `RecoveryFailure::NoDeviceInThePool`，
++//!   不再报「各盘系统配置对不上」（`SystemConfigurationsDisagree`）；
++//! - C463（一块盘的系统配置两份全废之后静默成功）：一块盘两个系统配置槽都废了、别的盘那一份照常择到时，只读挂载
++//!   （`MountedReadOnly::devices_without_a_mountable_system_configuration_slot`）与恢复这一层
++//!   （`choose_system_configuration_naming_devices_without_a_mountable_slot`）点名那块盘；冗余完好时两处都是空表。
++//!   在用的 `choose_system_configuration` 返回类型不变、择到的还是同一份。
++//!
++//! 盘：两块 4 GiB 内存稀疏盘上 mkfs、取号、暖机、第一个文件（txg 3）之后的池（只读挂载要沿根打开文件版本）。
++
++use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
++use singlefs_core::allocator::PoolAllocator;
++use singlefs_core::block_device::PhysicalBlockSizeInBytes;
++use singlefs_core::make_filesystem::{
++    allocator_after_make_filesystem, make_filesystem, MakeFilesystemParameters,
++};
++use singlefs_core::mounted_read::mount_read_only;
++use singlefs_core::recovery::{
++    choose_system_configuration,
++    choose_system_configuration_naming_devices_without_a_mountable_slot, recover, JournalPolicy,
++    RecoveryFailure, RecoveryOutcome,
++};
++use singlefs_core::root_ring::RootRingSlotsPerRegion;
++use singlefs_core::system_configuration::SystemImmutableSizes;
++use singlefs_core::transaction::{
++    acquire_instance, publish_first_file, warm_up, FirstFile, PoolWriter,
++};
++use singlefs_format::JOURNAL_RING_DEFAULT_BYTES;
++use singlefs_harness::memory_pool::{SparseBlockDevice, SECTOR_BYTES};
++
++const DEVICE_BYTES: u64 = 4 << 30;
++const WRITE_TIME_SECONDS: u64 = 1_788_400_000;
++const FILESYSTEM_IDENTIFIER: [u8; 16] = *b"singlefs-m3-c463";
++/// 系统配置槽里整槽校验和罩着的一个字节（magic 之后、fsid 里那一段，在槽的第一个扇区里）：翻转它，那一槽自证不过。
++const BYTE_INSIDE_THE_SYSTEM_CONFIGURATION_SLOT: u64 = 10;
++
++type Devices = Vec<(DeviceIdentity, SparseBlockDevice)>;
++
++fn parameters() -> MakeFilesystemParameters {
++    MakeFilesystemParameters {
++        filesystem_identifier: FILESYSTEM_IDENTIFIER,
++        region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
++        geometry: SystemImmutableSizes {
++            physical_block_size: 512,
++            minimum_input_output_bytes: 512,
++            fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(512),
++            journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
++            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
++        },
++    }
++}
++
++/// 两块内存盘上 mkfs → 取号 1 → 暖机 → 第一个文件（txg 3）。
++fn pool_after_the_first_file() -> Devices {
++    let parameters = parameters();
++    let mut devices: Devices = [DeviceIdentity(0), DeviceIdentity(1)]
++        .into_iter()
++        .map(|identity| {
++            (
++                identity,
++                SparseBlockDevice::new(DEVICE_BYTES, PhysicalBlockSizeInBytes(512)),
++            )
++        })
++        .collect();
++    let genesis = make_filesystem(&parameters, &mut devices).expect("默认几何上 mkfs");
++    let mut allocator: PoolAllocator =
++        allocator_after_make_filesystem(&parameters, &devices, &genesis);
++    let content: Vec<u8> = (0..3000u32)
++        .map(|index| u8::try_from(index % 251).expect("小于 256"))
++        .collect();
++    let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
++    let instance = acquire_instance(&mut writer).expect("取号 1");
++    let warmed = warm_up(&mut writer, &genesis.root, instance).expect("暖机");
++    publish_first_file(
++        &mut writer,
++        &mut allocator,
++        warmed.roots.last().expect("暖机写了两条根"),
++        FirstFile {
++            content: &content,
++            write_time_seconds: WRITE_TIME_SECONDS,
++        },
++        instance,
++        &warmed.last_record_bytes,
++    )
++    .expect("第一个文件");
++    devices
++}
++
++/// `identity` 那块盘的两个系统配置槽（偏移 0 与槽距）各翻一个校验和罩着的字节：两槽都自证不过。
++fn corrupt_both_system_configuration_slots_of(devices: &mut Devices, identity: DeviceIdentity) {
++    let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
++    let device = &mut devices
++        .iter_mut()
++        .find(|(candidate, _)| *candidate == identity)
++        .expect("池里有这块盘")
++        .1;
++    for slot_offset in [0, spacing] {
++        let sector = DeviceOffsetInBytes(slot_offset);
++        let mut bytes = device
++            .image
++            .read(sector, usize::try_from(SECTOR_BYTES).expect("512"));
++        bytes[usize::try_from(BYTE_INSIDE_THE_SYSTEM_CONFIGURATION_SLOT).expect("10")] ^= 0xff;
++        device.image.write(sector, &bytes);
++    }
++}
++
++/// 场景：交进来的池一块盘都没有。预期：择系统配置与整条恢复都报 `NoDeviceInThePool`。
++/// 改之前报 `SystemConfigurationsDisagree`，调用方会去找哪块盘是外来的。
++#[test]
++fn a_pool_without_any_device_is_refused_as_having_no_device() {
++    let empty_pool: Devices = Vec::new();
++    assert_eq!(
++        choose_system_configuration(&empty_pool).err(),
++        Some(RecoveryFailure::NoDeviceInThePool),
++        "择系统配置：池里一块盘都没有"
++    );
++    assert_eq!(
++        recover(&empty_pool, JournalPolicy::Consult).outcome,
++        RecoveryOutcome::Failed {
++            root: None,
++            failure: RecoveryFailure::NoDeviceInThePool,
++        },
++        "整条恢复：同一个成员"
++    );
++}
++
++/// 场景：第一个文件之后的池，两块盘四个系统配置槽都完好。预期：只读挂载与恢复这一层都报空表（冗余完好），择到的与在用的入口同一份。
++#[test]
++fn a_pool_whose_every_device_keeps_a_mountable_system_configuration_names_no_device() {
++    let devices = pool_after_the_first_file();
++    let choice = choose_system_configuration_naming_devices_without_a_mountable_slot(&devices)
++        .expect("系统配置择得到");
++    assert_eq!(
++        choice.devices_without_a_mountable_system_configuration_slot,
++        Vec::<DeviceIdentity>::new(),
++        "恢复这一层：冗余完好，一块盘都不点名"
++    );
++    assert_eq!(
++        Ok(choice.system_configuration),
++        choose_system_configuration(&devices),
++        "择到的与 choose_system_configuration 同一份"
++    );
++    let mounted = mount_read_only(&devices).expect("只读挂载");
++    assert_eq!(
++        mounted.devices_without_a_mountable_system_configuration_slot,
++        Vec::<DeviceIdentity>::new(),
++        "只读挂载：冗余完好，一块盘都不点名"
++    );
++}
++
++/// 场景：第一个文件之后的池，盘 1 两个系统配置槽都自证不过，盘 0 两槽完好。
++/// 预期：只读挂载照常挂上（择盘 0 那一份），并点名盘 1；恢复这一层同样点名盘 1，择到的与 `choose_system_configuration` 同一份。
++/// 改之前两处都只报成功，盘 1 的系统配置冗余已经没了却没人知道（C463）。
++#[test]
++fn a_device_whose_two_system_configuration_slots_are_both_lost_is_named_by_the_read_only_mount_and_recovery(
++) {
++    let mut devices = pool_after_the_first_file();
++    corrupt_both_system_configuration_slots_of(&mut devices, DeviceIdentity(1));
++    let choice = choose_system_configuration_naming_devices_without_a_mountable_slot(&devices)
++        .expect("盘 0 那一份照常择到");
++    assert_eq!(
++        choice.devices_without_a_mountable_system_configuration_slot,
++        vec![DeviceIdentity(1)],
++        "恢复这一层点名盘 1"
++    );
++    assert_eq!(
++        Ok(choice.system_configuration),
++        choose_system_configuration(&devices),
++        "在用的入口择到同一份"
++    );
++    assert_eq!(
++        choice.system_configuration.immutable.this_device,
++        DeviceIdentity(0),
++        "择到的是盘 0 那一份"
++    );
++    let mounted = mount_read_only(&devices).expect("一块盘两槽全废，只读挂载照常挂上");
++    assert_eq!(
++        mounted.devices_without_a_mountable_system_configuration_slot,
++        vec![DeviceIdentity(1)],
++        "只读挂载点名盘 1"
++    );
++}

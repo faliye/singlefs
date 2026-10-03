@@ -1,0 +1,157 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：m3-formal-code-r2 攻方腿自己的原型，与同会话别的 agent 各跑各的
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-code-r2-attack/tree-mut/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.39s
+     Running tests/mount_transparency_judged_field_by_field_after_a_writable_mount.rs (/tmp/claude-1000/m3-formal-code-r2-attack/target-mut/debug/deps/mount_transparency_judged_field_by_field_after_a_writable_mount-7895efab83a67d36)
+
+running 24 tests
+test a_mount_that_raises_no_floor_keeps_the_effective_floor_and_writes_it_into_its_root ... ok
+test a_recovery_after_the_mount_that_applies_a_record_is_red ... ok
+test a_second_crash_right_after_the_acquisition_recovers_the_first_version_field_by_field ... ok
+test a_second_crash_recovering_content_other_than_the_first_version_is_red ... ok
+test a_tree_identifier_watermark_that_moved_with_the_mount_is_red ... ok
+test a_checkpoint_txg_that_does_not_clear_the_newest_record_of_the_crash_image_is_red ... ok
+test an_effective_floor_that_moved_although_the_mount_raised_none_is_red ... ok
+test an_instance_generation_one_too_high_after_the_mount_is_red ... ok
+test an_immutable_configuration_with_another_device_count_after_the_mount_is_red ... ok
+test after_a_mount_on_a_pool_left_by_an_unmount_the_unmount_marker_is_not_written_by_the_unmount_sequence ... ok
+test an_inode_tree_root_pointer_that_moved_with_the_mount_is_red ... ok
+test posix_content_of_the_version_before_the_publish_after_the_mount_is_the_content_recovered_from_the_crash_image ... ok
+test an_instance_table_row_whose_applied_transaction_is_dropped_is_red ... ok
+test instance_table_rows_follow_the_recovery_rule_when_the_crash_image_is_rebuilt_from_a_record ... ok
+test an_unmount_marker_after_the_mount_is_red ... ok
+test a_mount_that_raises_the_floor_leaves_the_effective_floor_at_the_last_one_it_raised_to ... ok
+test posix_content_that_differs_from_the_crash_image_is_red ... ok
+test the_first_mount_of_a_new_pool_takes_one_above_every_instance_on_the_crash_image ... ok
+test the_immutable_configuration_except_this_device_is_the_same_after_a_mount_alone ... ok
+test an_effective_floor_other_than_the_last_one_the_mount_raised_to_is_red ... ok
+test the_tree_identifier_watermark_is_unchanged_by_a_mount_alone ... ok
+test the_checkpoint_txg_lies_above_every_root_and_record_of_a_crash_image_rebuilt_from_a_record ... ok
+test the_two_user_visible_tree_root_pointers_before_the_publish_after_the_mount_are_those_of_the_crash_image ... ok
+test the_recovery_after_the_mount_applies_no_record_even_when_the_crash_image_was_rebuilt_from_one ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.05s
+
+     Running tests/multi_record_publishes_of_transaction_zero.rs (/tmp/claude-1000/m3-formal-code-r2-attack/target-mut/debug/deps/multi_record_publishes_of_transaction_zero-db267464092c751c)
+
+running 2 tests
+test commit_marker_other_than_zero_or_one_counts_as_torn_and_breaks_the_chain_and_the_checker_reddens ... ok
+test row_publish_whose_named_units_do_not_fit_one_record_spills_over_and_recovery_and_the_checker_accept_it ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.29s
+
+     Running tests/presumed_clause_checks.rs (/tmp/claude-1000/m3-formal-code-r2-attack/target-mut/debug/deps/presumed_clause_checks-b5dd68efd55d7801)
+
+running 3 tests
+test c499_remount_after_a_clean_close_and_after_a_crash_both_scan_the_whole_ring_and_recover_by_the_same_rules ... ok
+test c497_every_publish_that_rewrites_the_instance_table_bumps_it_before_every_other_commit_generated_block ... ok
+test c498_warm_up_publishes_after_remounts_rollback_and_a_crash_in_the_middle_of_a_mount_are_counted_by_the_clause ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.59s
+
+     Running tests/publish_failure_resent_unchanged.rs (/tmp/claude-1000/m3-formal-code-r2-attack/target-mut/debug/deps/publish_failure_resent_unchanged-9803c1a2e3589042)
+
+running 1 test
+test publish_that_fails_midway_is_frozen_and_resent_byte_for_byte_before_the_next_publish ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+     Running tests/publish_order_matches_litmus.rs (/tmp/claude-1000/m3-formal-code-r2-attack/target-mut/debug/deps/publish_order_matches_litmus-f2eeb92a70a1fc3f)
+
+running 1 test
+test litmus_writer_threads_follow_the_recorded_publish_order ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic.rs (/tmp/claude-1000/m3-formal-code-r2-attack/target-mut/debug/deps/raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic-393443f58ac7c49f)
+
+running 2 tests
+test raising_the_floor_past_the_gap_keeps_every_invariant_green ... ok
+test raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_every_invariant_green ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.62s
+
+     Running tests/rebuild_with_an_unreadable_data_unit.rs (/tmp/claude-1000/m3-formal-code-r2-attack/target-mut/debug/deps/rebuild_with_an_unreadable_data_unit-ded0a5140e988db8)
+
+running 1 test
+test data_unit_unreadable_on_both_devices_is_carried_by_its_locations_and_the_writable_mount_goes_on_until_the_file_is_read ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.38s
+
+     Running tests/rebuilt_root_keeps_the_chosen_roots_fields_except_the_unmount_marker.rs (/tmp/claude-1000/m3-formal-code-r2-attack/target-mut/debug/deps/rebuilt_root_keeps_the_chosen_roots_fields_except_the_unmount_marker-3760e31e800d3d18)
+
+running 1 test
+test a_root_rebuilt_from_the_second_unmount_publish_record_keeps_the_chosen_roots_other_fields_and_is_not_marked_by_the_unmount_sequence ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+     Running tests/recovery_anchor_failure_carries_the_counters_the_prefix_kernel_saw.rs (/tmp/claude-1000/m3-formal-code-r2-attack/target-mut/debug/deps/recovery_anchor_failure_carries_the_counters_the_prefix_kernel_saw-3e68224bf6cae317)
+
+running 4 tests
+test last_record_flags_of_other_publishes_of_the_same_instance_leave_the_anchor_alone_and_the_next_publish_applies ... ok
+test two_last_record_flags_in_the_chosen_roots_publish_return_the_error_with_only_that_publishs_counters ... ok
+test a_record_whose_counter_is_the_largest_value_trips_the_glue_assertion_before_the_kernel_runs - should panic ... ok
+test a_table_whose_keys_disagree_with_its_records_trips_the_glue_assertion_before_the_kernel_runs - should panic ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/reused_allocation_record_overlap.rs (/tmp/claude-1000/m3-formal-code-r2-attack/target-mut/debug/deps/reused_allocation_record_overlap-507f093fe8ef1e9d)
+
+running 1 test
+test reusing_two_reclaimed_one_slot_records_for_a_two_slot_unit_leaves_no_overlap_and_the_ninth_mount_succeeds ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 50.14s
+
+     Running tests/root_ring_turn_in_one_mount.rs (/tmp/claude-1000/m3-formal-code-r2-attack/target-mut/debug/deps/root_ring_turn_in_one_mount-735f9149f5fd0669)
+
+running 3 tests
+test an_overwrite_that_goes_out_after_a_remount_goes_out_in_the_same_mount_as_well ... ok
+test zero_unit_publish_the_caller_issued_before_the_first_file_version_is_recorded_into_the_root_ring ... ok
+test turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.92s
+
+     Running tests/row_publish_admission.rs (/tmp/claude-1000/m3-formal-code-r2-attack/target-mut/debug/deps/row_publish_admission-eaca0ae34ca3b8d2)
+
+running 2 tests
+test writable_mount_on_the_pool_whose_second_warm_up_used_to_be_refused_before_acquisition_succeeds ... ok
+test writable_mount_on_the_pool_whose_row_publish_used_to_be_refused_before_acquisition_succeeds ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.34s
+
+     Running tests/row_publish_checks_before_acquisition.rs (/tmp/claude-1000/m3-formal-code-r2-attack/target-mut/debug/deps/row_publish_checks_before_acquisition-7ab0e2bf2e984493)
+
+running 2 tests
+test row_publishes_on_a_version_without_file_with_a_sixty_six_page_instance_table_keep_mounting_writable_past_812_allocation_records ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test row_publish_release_check_that_fails_on_the_damaged_mapping_entry_refuses_the_mount_before_acquisition ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.24s
+
+     Running tests/sequential_write_one_record_per_data_unit.rs (/tmp/claude-1000/m3-formal-code-r2-attack/target-mut/debug/deps/sequential_write_one_record_per_data_unit-49a2533b1303db4a)
+
+running 6 tests
+test sequential_write_of_2_data_units_publishes_2_records ... ok
+test sequential_write_of_one_data_unit_writes_the_same_bytes_as_an_overwrite_of_the_same_content ... ok
+test sequential_write_of_68_data_units_past_the_named_item_limit_publishes_68_records ... ok
+test sequential_write_of_67_data_units_at_the_named_item_limit_publishes_67_records ... ok
+test sequential_write_of_145_data_units_growing_the_extent_tree_publishes_145_records ... ok
+test sequential_write_of_144_data_units_filling_one_extent_leaf_publishes_144_records ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests/sequential_write_split_into_one_unit_transactions.rs (/tmp/claude-1000/m3-formal-code-r2-attack/target-mut/debug/deps/sequential_write_split_into_one_unit_transactions-2fce9f43b8b3e1f6)
+
+running 3 tests
+test sequential_write_that_fits_one_data_unit_publishes_through_the_single_transaction_path ... ok
+test the_second_extent_leaf_record_key_is_the_file_byte_offset_of_the_second_data_unit ... ok
+test publish_of_two_data_units_names_the_shared_commit_generated_units_only_in_its_last_record ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/sparse_devices_refuse_requests_outside_the_device_like_the_file_backend.rs (/tmp/claude-1000/m3-formal-code-r2-attack/target-mut/debug/deps/sparse_devices_refuse_requests_outside_the_device_like_the_file_backend-0f43027e3690fa3a)
+
+running 2 tests
+test a_sparse_block_device_accepts_and_refuses_every_request_exactly_like_the_file_backend ... ok
+test memory_pool_and_crash_image_readers_answer_none_outside_a_device_like_a_pool_of_real_devices ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

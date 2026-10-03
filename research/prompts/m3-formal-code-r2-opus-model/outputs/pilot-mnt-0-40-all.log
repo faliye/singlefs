@@ -1,0 +1,3 @@
+history mnt: ending Completed
+  step 0: Applied(Mounted { instance: InstanceGeneration(2), publishes: 2, allocation_records_compared: Compared { publishes: 2 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquisi
+history=mnt mode=k2 second=true writes=38 segments=9 closed_form=20496 with_torn=20511 range=0..40

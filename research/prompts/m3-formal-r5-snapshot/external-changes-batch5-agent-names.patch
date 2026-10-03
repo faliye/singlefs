@@ -1,0 +1,122 @@
+--- a/crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs
++++ b/crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs
+@@ -2781,7 +2781,7 @@
+         // C577 之后发布 D 以一道池屏障收尾，抬 F 那一串开的新写入口开头又一道，两道之间没有写：录制器
+         // （`SharedStream::push` 的末尾一串屏障去重）把后一道并掉，设备照收两次 FLUSH，所以每块盘设备一层比录制流投出的多 1。
+         // 录制器并掉相邻屏障、设备收两次，归第五步 55 号六档重录时定（合入后验证一报告第八节；主 agent 定不改装置、不改判据，照今天的数改钉）。
+-        // 盘 0 的 12 / 13 是合入后验证一那一次跑出来的；盘 1 同一个机制推的，没跑（singlefs-checker-tier 是 checker 档，归提交时的 crash-verifier）。
++        // 盘 0 的 12 / 13 是合入后验证一那一次跑出来的；盘 1 同一个机制推的，没跑（singlefs-checker-tier 是 checker 档，提交时由主 agent 经门禁 checker-tier-layer0-replay 快档跑）。
+         let flushes_the_recorder_merged_into_the_barrier_that_closed_publish_d: u64 = 1;
+         for (index, identity) in [DeviceIdentity(0), DeviceIdentity(1)]
+             .into_iter()
+@@ -3072,7 +3072,7 @@
+         // 两道之间没有写，录制器（`SharedStream::push` 的末尾一串屏障去重）把后一道并进上一段，设备在这一段照收一次 FLUSH。
+         // 录制器并掉相邻屏障、设备收两次，归第五步 55 号六档重录时定（合入后验证一报告第八节；主 agent 定不改装置、不改判据，照今天的数改钉）。
+         // 发布 B 那一段是 0（合入后验证一那一次两块盘都过了）；重开那一段盘 0 的 16 / 17 是那一次跑出来的，盘 1 同一个机制推的，没跑
+-        // （singlefs-checker-tier 是 checker 档，归提交时的 crash-verifier）。
++        // （singlefs-checker-tier 是 checker 档，提交时由主 agent 经门禁 checker-tier-layer0-replay 快档跑）。
+         let windows = [
+             (
+                 "file_overwrite",
+--- a/crates/singlefs-checker-tier/tests/crash_enumeration_floor_raise_pushed_by_admission.rs
++++ b/crates/singlefs-checker-tier/tests/crash_enumeration_floor_raise_pushed_by_admission.rs
+@@ -167,7 +167,7 @@
+ /// 挂载全做成。状态数照层 0 的口径另算（系统配置槽写是原地覆写、取三态，[`layer0_state_count_with_torn_in_place_overwrites`]），
+ /// 落在 10⁶ 以内才枚举；挂载那一遍的镜像照观察者交来的枚举用写表叠（录制流里的写在前，撕裂镜像与重放接在后面），不只叠录制流那几次写。
+ #[test]
+-#[ignore = "崩溃枚举：提交时由崩溃验证员按输入哈希跑（release），平时不跑"]
++#[ignore = "崩溃枚举：用户要求时由主 agent 经门禁 checker-tier-layer0-replay --full 按输入哈希跑（release），提交时的快档只核它的全绿标记，平时不跑"]
+ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount_with_the_checker_green(
+ ) {
+     const STATES_AT_MOST: u64 = 1_000_000;
+--- a/crates/singlefs-checker-tier/tests/crash_enumeration_position_addressed_trees.rs
++++ b/crates/singlefs-checker-tier/tests/crash_enumeration_position_addressed_trees.rs
+@@ -21,7 +21,7 @@
+ //! 缩回。多跑的一步：前四条只有恢复本身；第五条多一次取号与写行、暖机（可写挂载），恢复落在树表 0 条那几代上（只许报没有文件）。
+ //! 与已有流的基线镜像、写表、段序列都不相同，各自全量枚举（第三条的单元写段与记录段太大、全量枚举不出来，见那条用例的注）。
+ //!
+-//! 按派活的约束这一份只要求编译通过，一条都没跑；快档与全量交 crash-verifier 跑。
++//! 按派活的约束这一份只要求编译通过，一条都没跑；快档提交时由主 agent 经门禁 checker-tier-layer0-replay 跑，全量由主 agent 在用户要求时经它的 `--full` 跑。
+ 
+ #[path = "../../singlefs-harness/tests/common/mod.rs"]
+ mod common;
+@@ -478,7 +478,7 @@
+ /// 全量：单元写段的全部子集也展开（分配记录树那一条单元写段约 2 × 14 写，状态数上亿级；两条 extent 流约 2 × 10 写）。
+ /// 第三条（145 个数据单元）不在里面：单元写段约 300 写、记录段 290 写，全量枚举不出来——那一格要按段内取样，条款与装置都没有，交回里写明。
+ #[test]
+-#[ignore = "单元写段全展开，状态数上亿、每个两遍恢复 + checker；交 crash-verifier 在 release 下跑"]
++#[ignore = "单元写段全展开，状态数上亿、每个两遍恢复 + checker；用户要求时由主 agent 经门禁 checker-tier-layer0-replay --full 在 release 下跑，提交时的快档只核它的全绿标记"]
+ fn full_enumeration_of_every_enumerable_position_addressed_tree_stream_is_exhaustive_and_clean() {
+     for stream in PositionAddressedStream::ENUMERABLE_IN_FULL {
+         let tally = enumerate(stream, &|_segment_index, _segment| true);
+--- a/crates/singlefs-checker-tier/tests/crash_injection_campaign.rs
++++ b/crates/singlefs-checker-tier/tests/crash_injection_campaign.rs
+@@ -40,7 +40,7 @@
+ 
+ /// 快档的规模：段数、每段步数与每段摆几个崩溃状态。规模与种子基都写死（种子基是这个测试周期的常量）。
+ /// 每个崩溃状态上起可写挂载、发一次布、摆三个二次崩溃之后（代码审阅第 2 条），这一档 debug 下单跑一百来秒，标了 ignore，
+-/// 由提交时的崩溃验证员经门禁 54 号（`crash-case:crash-injection-fast-tier`）在 release 下跑；普通 `cargo test` 由小快档守。
++/// 用户要求时由主 agent 经门禁 54 号 `--full`（`crash-case:crash-injection-fast-tier`）在 release 下跑，提交时的快档只核它的全绿标记；普通 `cargo test` 由小快档守。
+ const FAST_TIER_SEEDS: u64 = 24;
+ const FAST_TIER_OPERATIONS_PER_HISTORY: usize = 24;
+ const FAST_TIER_DRAW: CrashPointDraw = CrashPointDraw::Sampled {
+@@ -127,7 +127,7 @@
+ /// 计数照打，并核各条路径真的跑到了：四种落点都扣下过、段内摆出过洞、起点那一段摆到过、截在发布中间过、
+ /// 截回到最后一版之前过、恢复三种结局见过两种（失败一次都不许有）、journal 记录真的施加过、模型真的比过内容。
+ #[test]
+-#[ignore = "快档：每个崩溃状态上起可写挂载、发一次布、摆三个二次崩溃之后 debug 下单跑一百来秒；交提交时的崩溃验证员经门禁 54 号按 crash-case:crash-injection-fast-tier 在 release 下跑，普通 cargo test 由 crash_injection_small_fast_tier_recovers_only_into_versions_the_model_committed 守"]
++#[ignore = "快档：每个崩溃状态上起可写挂载、发一次布、摆三个二次崩溃之后 debug 下单跑一百来秒；用户要求时由主 agent 经门禁 54 号 --full 按 crash-case:crash-injection-fast-tier 在 release 下跑、提交时的快档只核它的全绿标记，普通 cargo test 由 crash_injection_small_fast_tier_recovers_only_into_versions_the_model_committed 守"]
+ fn crash_injection_fast_tier_recovers_only_into_versions_the_model_committed() {
+     let started = std::time::Instant::now();
+     let report = run_crash_injection_campaign(&fast_tier_campaign(
+--- a/crates/singlefs-checker-tier/tests/record_checker_judges_absence_by_the_persisted_set.rs
++++ b/crates/singlefs-checker-tier/tests/record_checker_judges_absence_by_the_persisted_set.rs
+@@ -16,7 +16,7 @@
+ //! - C513（复用豁免不判那次复用合不合法） 那三个状态（复用窗口置 0、txg 5 的数据单元落回 txg 4 的那一对槽）：解释那一槽的后写落了、
+ //!   但过不了回收谓词，照判缺席。
+ //!
+-//! σ 那一段全部 2^16 个状态（C577 之前 2^18）的记录核对器判定另有一条标了 ignore 的全量（崩溃枚举，提交时由崩溃验证员跑）。
++//! σ 那一段全部 2^16 个状态（C577 之前 2^18）的记录核对器判定另有一条标了 ignore 的全量（崩溃枚举，用户要求时由主 agent 经门禁 checker-tier-layer0-replay --full 跑，提交时的快档只核它的全绿标记）。
+ 
+ #[path = "../../singlefs-harness/tests/common/mod.rs"]
+ mod common;
+@@ -807,7 +807,7 @@
+ /// 按掩码区间切片多线程跑（线程数与层 0 同一个来源）；打计数行 `C561_SIGMA_FULL`（状态数等于闭式时带 `exhaustive=true`）
+ /// 与一行 `LAYER0_PARALLEL_FINISHED` 同形的线程行，门禁 54 号按这两行判穷尽没有、线程用没用上。
+ #[test]
+-#[ignore = "崩溃枚举（65536 个状态、每个一遍恢复）：提交时由崩溃验证员按输入哈希跑（release），平时不跑"]
++#[ignore = "崩溃枚举（65536 个状态、每个一遍恢复）：用户要求时由主 agent 经门禁 checker-tier-layer0-replay --full 按输入哈希跑（release），提交时的快档只核它的全绿标记，平时不跑"]
+ fn every_crash_state_of_sigma_leaves_every_unit_of_the_claimed_publishes_present() {
+     let recorded = record_history("c561-sigma-full", &HISTORY_UOOUOMSU);
+     let chain = misaligned_reuse_chain(&recorded);
+--- a/crates/singlefs-core/src/mounted_read.rs
++++ b/crates/singlefs-core/src/mounted_read.rs
+@@ -550,7 +550,7 @@
+ ///
+ /// **扫环只在这一步发生一次**：之后每一次 [`OpenFileForRead::read_at`] 都不碰 journal 环。
+ /// 层 0 的每个恢复结果上也能跑这一条——`reader` 换成那个崩溃镜像即可（并行线二验收第 3 条；
+-/// 枚举那一半归 crash-verifier）。
++/// 枚举那一半归 checker 档，由主 agent 经门禁 checker-tier-layer0-replay 跑）。
+ ///
+ /// # Errors
+ /// 见 [`MountReadOnlyFailure`]。
+--- a/crates/singlefs-harness/tests/mounted_read_by_offset.rs
++++ b/crates/singlefs-harness/tests/mounted_read_by_offset.rs
+@@ -5,7 +5,7 @@
+ //!    （块层读计数由 `singlefs_harness::read_tally` 数，整扫一遍环是 196 608 次 / 盘，读期间要恒 0）；
+ //! 2. 改坏一个数据单元的一个字节 ⇒ 落在它上面的读报校验和错，**别的读不受影响**；
+ //! 3. 同一个镜像冷走读（`recovery::recover`）与挂载态读逐字节相同——层 0 的每个恢复结果上再跑一遍那一半归
+-//!    crash-verifier，这里只把接口（`mounted_read::mount_read_only`）做出来并钉住「同一个镜像两条路同字节」；
++//!    checker 档（主 agent 经门禁 checker-tier-layer0-replay 跑），这里只把接口（`mounted_read::mount_read_only`）做出来并钉住「同一个镜像两条路同字节」；
+ //! 4. 读路径报得出「这次读了几个单元」与「位置提示过期的多跳次数」（D19（块指针的结构与宽度预算） 已定项 5 硬规则 3）。
+ //!
+ //! **跨单元的页**：净荷 32634 不是 4096 的整数倍 ⇒ 约 12.5% 的 4 KiB 页跨两个单元（D4（校验和位置） 已定项 5）。
+@@ -656,7 +656,7 @@
+ ///
+ /// 顺带把验收第 1 条那个对照摆出来：**挂载那一步**要全环扫一遍（两块盘各 196 608 次记录读，
+ /// 因为文件后端交不出 journal 记录落点的提示），**打开之后的读**一次都不碰环。
+-/// 层 0 的每个恢复结果上再跑一遍这一条归 crash-verifier：接口是 `mount_read_only`，`reader` 换成崩溃镜像即可。
++/// 层 0 的每个恢复结果上再跑一遍这一条归 checker 档（主 agent 经门禁 checker-tier-layer0-replay 跑）：接口是 `mount_read_only`，`reader` 换成崩溃镜像即可。
+ #[test]
+ fn the_same_image_read_cold_and_read_through_the_mount_state_gives_the_same_bytes() {
+     let mut pool = build_pool("parallel-line-two-cold-versus-mounted");

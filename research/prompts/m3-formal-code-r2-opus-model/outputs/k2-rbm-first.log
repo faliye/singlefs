@@ -1,0 +1,14 @@
+history rbm: ending Completed
+  step 0: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  step 1: Applied(Mounted { instance: InstanceGeneration(2), publishes: 3, allocation_records_compared: Compared { publishes: 3 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquisi
+  step 2: Applied(RolledBack { target: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(5) }, released_user_visible_units: 0, resurrected_user_visible_copies: 0 })
+history=rbm mode=k2 second=false writes=17 segments=4 closed_form=4103 with_torn=4108 range=0..4108
+states_judged=4108 second_states=0 elapsed_secs=24.8
+ALONE judged count=4103
+MOUNT floor=NotRaised count=4103
+MOUNT refused verdict=Legal(NewerPublishWitnessedBySystemConfiguration) member=NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheS count=5
+    e.g. ordinal=4100 R1: eff=Some((2, 8)) cmp(inst,txg,W,F)=Some((2, 8, 65548, 0)) applied=0 above=0 sc_inst=Some(2) ring_inst=Some(2) ring_txg=Some(8) rec_txg=Some(8) F=Some(0)
+    e.g. ordinal=4102 R1: eff=Some((2, 8)) cmp(inst,txg,W,F)=Some((2, 8, 65548, 0)) applied=0 above=0 sc_inst=Some(2) ring_inst=Some(2) ring_txg=Some(8) rec_txg=Some(8) F=Some(0)
+PUBLISH judged count=4103
+R1 outcome=file rebuilt=false o1=green count=4105
+R1 outcome=file rebuilt=true o1=green count=3

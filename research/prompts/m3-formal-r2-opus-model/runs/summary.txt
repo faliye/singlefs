@@ -1,0 +1,285 @@
+## 表一：每个变体、每个域的合计（light 档合法历史一族）
+variant	domain	states	J1	J2	J3	J4	vm2_unsatisfiable	vm2_satisfied_but_j2	full_root_mismatch	legal_states	legal_j1	legal_j2	legal_j3	legal_j4	legal_vm2_satisfied_but_j2	legal_j6_premise_fails_judged	legal_j6_premise_fails	legal_j6_premise_holds
+m0	L	4031078	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m0	L6	3654	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m0	L9	1171430	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m0	U_verify_on	666906	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m0	U_verify_off	666906	0	352608	0	352608	0	352608	0	0	0	0	0	0	0	0	0	0
+m0	C	149796	0	0	0	0	0	0	0	14737	0	0	0	0	0	0	0	0
+m0	C6	9700	0	0	0	0	0	0	0	606	0	0	0	0	0	0	0	0
+m0	X	216484	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m0	E1	398	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m0	E2	42	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m0	R	6964	956	956	956	956	0	0	0	0	0	0	0	0	0	0	0	0
+m0row	L	4031078	0	0	0	0	0	0	1007514	0	0	0	0	0	0	0	0	0
+m0row	L6	3654	0	0	0	0	0	0	1362	0	0	0	0	0	0	0	0	0
+m0row	L9	1171430	0	0	0	0	0	0	372042	0	0	0	0	0	0	0	0	0
+m0row	U_verify_on	666906	0	0	0	0	0	0	41670	0	0	0	0	0	0	0	0	0
+m0row	U_verify_off	666906	0	352608	0	352608	0	352608	375150	0	0	0	0	0	0	0	0	0
+m0row	C	149796	0	0	0	0	0	0	4697	14737	0	0	0	0	0	0	0	0
+m0row	C6	9700	0	0	0	0	0	0	341	606	0	0	0	0	0	0	0	0
+m0row	X	216484	0	0	0	0	0	0	40156	0	0	0	0	0	0	0	0	0
+m0row	E1	398	0	0	0	0	0	0	70	0	0	0	0	0	0	0	0	0
+m0row	E2	42	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m0row	R	6964	956	956	956	956	0	0	1808	0	0	0	0	0	0	0	0	0
+m1	L	4031078	0	264499	0	264499	0	264499	0	0	0	0	0	0	0	0	0	0
+m1	L6	3654	0	454	376	454	0	454	0	0	0	0	0	0	0	0	0	0
+m1	L9	1171430	0	127871	87134	127871	0	127871	0	0	0	0	0	0	0	0	0	0
+m1	U_verify_on	666906	0	2447	0	2447	0	2447	0	0	0	0	0	0	0	0	0	0
+m1	U_verify_off	666906	0	371883	0	371883	0	371883	0	0	0	0	0	0	0	0	0	0
+m1	C	149796	0	4343	0	4343	0	4343	0	14737	0	0	0	0	0	0	0	0
+m1	C6	9700	0	394	285	394	0	394	0	606	0	0	0	0	0	0	0	0
+m1	X	216484	0	4876	0	4876	0	4876	0	0	0	0	0	0	0	0	0	0
+m1	E1	398	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m1	E2	42	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m1	R	6964	1070	1326	1070	1326	0	0	0	0	0	0	0	0	0	0	0	0
+m2	L	4031078	0	164809	0	164809	0	164809	0	0	0	0	0	0	0	0	0	0
+m2	L6	3654	0	348	260	348	0	348	0	0	0	0	0	0	0	0	0	0
+m2	L9	1171430	0	84761	45265	84761	0	84761	0	0	0	0	0	0	0	0	0	0
+m2	U_verify_on	666906	0	457	0	457	0	457	0	0	0	0	0	0	0	0	0	0
+m2	U_verify_off	666906	0	356253	0	356253	0	356253	0	0	0	0	0	0	0	0	0	0
+m2	C	149796	0	1700	0	1700	0	1700	0	14737	0	0	0	0	0	0	0	0
+m2	C6	9700	0	153	77	153	0	153	0	606	0	0	0	0	0	0	0	0
+m2	X	216484	0	3804	0	3804	0	3804	0	0	0	0	0	0	0	0	0	0
+m2	E1	398	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m2	E2	42	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m2	R	6964	1068	1222	1068	1222	0	0	0	0	0	0	0	0	0	0	0	0
+m3	L	4031078	0	1093324	0	1192684	1448536	0	0	0	0	0	0	0	0	0	0	0
+m3	L6	3654	0	568	216	676	1028	0	0	0	0	0	0	0	0	0	0	0
+m3	L9	1171430	0	265404	45400	298372	408248	0	0	0	0	0	0	0	0	0	0	0
+m3	U_verify_on	666906	0	48900	0	49188	52584	960	0	0	0	0	0	0	0	0	0	0
+m3	U_verify_off	666906	0	420948	0	421236	286200	139392	0	0	0	0	0	0	0	0	0	0
+m3	C	149796	0	14226	0	15450	20700	0	0	14737	0	2910	0	2910	0	0	0	0
+m3	C6	9700	0	532	148	606	990	0	0	606	0	52	0	52	0	0	0	0
+m3	X	216484	0	19536	0	21160	30072	0	0	0	0	0	0	0	0	0	0	0
+m3	E1	398	0	44	0	44	72	0	0	0	0	0	0	0	0	0	0	0
+m3	E2	42	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m3	R	6964	1412	3096	1412	3268	0	0	0	0	0	0	0	0	0	0	0	0
+m4	L	4031078	0	0	0	1007514	0	0	0	0	0	0	0	0	0	0	0	0
+m4	L6	3654	0	0	0	1362	0	0	0	0	0	0	0	0	0	0	0	0
+m4	L9	1171430	0	0	0	372042	0	0	0	0	0	0	0	0	0	0	0	0
+m4	U_verify_on	666906	0	0	0	41670	0	0	0	0	0	0	0	0	0	0	0	0
+m4	U_verify_off	666906	0	0	0	41670	0	0	0	0	0	0	0	0	0	0	0	0
+m4	C	149796	0	0	0	24987	0	0	0	14737	0	0	0	911	0	0	0	0
+m4	C6	9700	0	0	0	1967	0	0	0	606	0	0	0	119	0	0	0	0
+m4	X	216484	0	0	0	40156	0	0	0	0	0	0	0	0	0	0	0	0
+m4	E1	398	0	0	0	70	0	0	0	0	0	0	0	0	0	0	0	0
+m4	E2	42	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m4	R	6964	0	0	0	2002	0	0	0	0	0	0	0	0	0	0	0	0
+m5	L	4031078	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m5	L6	3654	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m5	L9	1171430	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m5	U_verify_on	666906	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m5	U_verify_off	666906	0	352608	0	352608	0	352608	0	0	0	0	0	0	0	0	0	0
+m5	C	149796	0	0	0	0	0	0	0	14737	0	0	0	0	0	0	0	0
+m5	C6	9700	0	0	0	0	0	0	0	606	0	0	0	0	0	0	0	0
+m5	X	216484	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m5	E1	398	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m5	E2	42	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m5	R	6964	956	956	956	956	0	0	0	0	0	0	0	0	0	0	0	0
+m6	L	4031078	0	0	0	0	0	0	1007514	0	0	0	0	0	0	0	0	0
+m6	L6	3654	0	0	0	0	0	0	1362	0	0	0	0	0	0	0	0	0
+m6	L9	1171430	0	0	0	0	0	0	372042	0	0	0	0	0	0	0	0	0
+m6	U_verify_on	666906	0	0	0	0	0	0	41670	0	0	0	0	0	0	0	0	0
+m6	U_verify_off	666906	0	352608	0	352608	0	352608	375150	0	0	0	0	0	0	0	0	0
+m6	C	149796	0	0	0	0	0	0	24987	14737	0	0	0	0	0	0	0	0
+m6	C6	9700	0	0	0	0	0	0	1967	606	0	0	0	0	0	0	0	0
+m6	X	216484	0	0	0	0	0	0	40156	0	0	0	0	0	0	0	0	0
+m6	E1	398	0	0	0	0	0	0	70	0	0	0	0	0	0	0	0	0
+m6	E2	42	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m6	R	6964	956	956	956	956	0	0	1808	0	0	0	0	0	0	0	0	0
+m9	L	4031078	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m9	L6	3654	0	0	354	354	0	0	0	0	0	0	0	0	0	0	0	0
+m9	L9	1171430	0	0	51998	51998	0	0	0	0	0	0	0	0	0	0	0	0
+m9	U_verify_on	666906	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m9	U_verify_off	666906	0	352608	0	352608	0	352608	0	0	0	0	0	0	0	0	0	0
+m9	C	149796	0	0	0	0	0	0	0	14737	0	0	0	0	0	0	0	0
+m9	C6	9700	0	0	215	215	0	0	0	606	0	0	0	0	0	0	0	0
+m9	X	216484	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m9	E1	398	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m9	E2	42	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m9	R	6964	956	956	956	956	0	0	0	0	0	0	0	0	0	0	0	0
+m10	L	4031078	0	0	0	926694	0	0	0	0	0	0	0	0	0	0	0	0
+m10	L6	3654	0	0	0	1240	0	0	0	0	0	0	0	0	0	0	0	0
+m10	L9	1171430	0	0	0	366774	0	0	0	0	0	0	0	0	0	0	0	0
+m10	U_verify_on	666906	0	0	0	29130	0	0	0	0	0	0	0	0	0	0	0	0
+m10	U_verify_off	666906	0	50160	0	79290	0	50160	0	0	0	0	0	0	0	0	0	0
+m10	C	149796	0	0	0	13679	0	0	0	14737	0	0	0	526	0	0	0	0
+m10	C6	9700	0	0	0	1014	0	0	0	606	0	0	0	52	0	0	0	0
+m10	X	216484	0	0	0	20248	0	0	0	0	0	0	0	0	0	0	0	0
+m10	E1	398	0	0	0	28	0	0	0	0	0	0	0	0	0	0	0	0
+m10	E2	42	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m10	R	6964	260	260	260	2002	0	0	0	0	0	0	0	0	0	0	0	0
+m5row	L	4031078	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m5row	L6	3654	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m5row	L9	1171430	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m5row	U_verify_on	666906	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m5row	U_verify_off	666906	0	352608	0	352608	0	352608	0	0	0	0	0	0	0	0	0	0
+m5row	C	149796	0	0	0	0	0	0	0	14737	0	0	0	0	0	0	0	0
+m5row	C6	9700	0	0	0	0	0	0	0	606	0	0	0	0	0	0	0	0
+m5row	X	216484	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m5row	E1	398	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m5row	E2	42	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m5row	R	6964	956	956	956	956	0	0	0	0	0	0	0	0	0	0	0	0
+m6row	L	4031078	0	0	0	0	0	0	1007514	0	0	0	0	0	0	0	0	0
+m6row	L6	3654	0	0	0	0	0	0	1362	0	0	0	0	0	0	0	0	0
+m6row	L9	1171430	0	0	0	0	0	0	372042	0	0	0	0	0	0	0	0	0
+m6row	U_verify_on	666906	0	0	0	0	0	0	41670	0	0	0	0	0	0	0	0	0
+m6row	U_verify_off	666906	0	352608	0	352608	0	352608	375150	0	0	0	0	0	0	0	0	0
+m6row	C	149796	0	0	0	0	0	0	24987	14737	0	0	0	0	0	0	0	0
+m6row	C6	9700	0	0	0	0	0	0	1967	606	0	0	0	0	0	0	0	0
+m6row	X	216484	0	0	0	0	0	0	40156	0	0	0	0	0	0	0	0	0
+m6row	E1	398	0	0	0	0	0	0	70	0	0	0	0	0	0	0	0	0
+m6row	E2	42	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m6row	R	6964	956	956	956	956	0	0	1808	0	0	0	0	0	0	0	0	0
+m0-adv	A	788838	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m0-adv	A6	788838	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+m0-adv	AC	6139590	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+
+## 表二：C、C6 状态对（today_j5a / today_j5b，各 N 合计）
+variant	domain	set	pairs	today_j5a	today_j5b	ideal_j5b
+m0	C	wide	7322544	830685	0	0
+m0	C	cut_own_legal	71579	4969	0	0
+m0	C	cut_own_same_segment	49644	911	0	0
+m0	C	cut_with_legal	190025	8146	0	0
+m0	C	cut_with_same_segment	144560	911	0	0
+m0	C6	wide	319689	41511	0	0
+m0	C6	cut_own_legal	2020	475	0	0
+m0	C6	cut_own_same_segment	829	119	0	0
+m0	C6	cut_with_legal	4507	701	0	0
+m0	C6	cut_with_same_segment	1929	119	0	0
+m0row	C	wide	7322544	830685	0	0
+m0row	C	cut_own_legal	71579	4969	0	0
+m0row	C	cut_own_same_segment	49644	911	0	0
+m0row	C	cut_with_legal	190025	8146	0	0
+m0row	C	cut_with_same_segment	144560	911	0	0
+m0row	C6	wide	319689	41511	0	0
+m0row	C6	cut_own_legal	2020	475	0	0
+m0row	C6	cut_own_same_segment	829	119	0	0
+m0row	C6	cut_with_legal	4507	701	0	0
+m0row	C6	cut_with_same_segment	1929	119	0	0
+m1	C	wide	7322544	1215527	21710	0
+m1	C	cut_own_legal	71579	4969	0	0
+m1	C	cut_own_same_segment	49644	911	0	0
+m1	C	cut_with_legal	190025	8146	0	0
+m1	C	cut_with_same_segment	144560	911	0	0
+m1	C6	wide	319689	64742	2009	0
+m1	C6	cut_own_legal	2020	475	0	0
+m1	C6	cut_own_same_segment	829	119	0	0
+m1	C6	cut_with_legal	4507	701	0	0
+m1	C6	cut_with_same_segment	1929	119	0	0
+m2	C	wide	7322544	1028250	16043	0
+m2	C	cut_own_legal	71579	4969	0	0
+m2	C	cut_own_same_segment	49644	911	0	0
+m2	C	cut_with_legal	190025	8146	0	0
+m2	C	cut_with_same_segment	144560	911	0	0
+m2	C6	wide	319689	51094	1037	0
+m2	C6	cut_own_legal	2020	475	0	0
+m2	C6	cut_own_same_segment	829	119	0	0
+m2	C6	cut_with_legal	4507	701	0	0
+m2	C6	cut_with_same_segment	1929	119	0	0
+m3	C	wide	7322544	1187209	0	0
+m3	C	cut_own_legal	71579	11423	0	0
+m3	C	cut_own_same_segment	49644	911	0	0
+m3	C	cut_with_legal	190025	29298	0	0
+m3	C	cut_with_same_segment	144560	16123	0	0
+m3	C6	wide	319689	52255	0	0
+m3	C6	cut_own_legal	2020	655	0	0
+m3	C6	cut_own_same_segment	829	119	0	0
+m3	C6	cut_with_legal	4507	1013	0	0
+m3	C6	cut_with_same_segment	1929	223	0	0
+m4	C	wide	7322544	0	0	0
+m4	C	cut_own_legal	71579	0	0	0
+m4	C	cut_own_same_segment	49644	0	0	0
+m4	C	cut_with_legal	190025	0	0	0
+m4	C	cut_with_same_segment	144560	0	0	0
+m4	C6	wide	319689	0	0	0
+m4	C6	cut_own_legal	2020	0	0	0
+m4	C6	cut_own_same_segment	829	0	0	0
+m4	C6	cut_with_legal	4507	0	0	0
+m4	C6	cut_with_same_segment	1929	0	0	0
+m5	C	wide	7322544	830685	0	0
+m5	C	cut_own_legal	71579	4969	0	0
+m5	C	cut_own_same_segment	49644	911	0	0
+m5	C	cut_with_legal	190025	8146	0	0
+m5	C	cut_with_same_segment	144560	911	0	0
+m5	C6	wide	319689	41511	0	0
+m5	C6	cut_own_legal	2020	475	0	0
+m5	C6	cut_own_same_segment	829	119	0	0
+m5	C6	cut_with_legal	4507	701	0	0
+m5	C6	cut_with_same_segment	1929	119	0	0
+m6	C	wide	7322544	830685	0	0
+m6	C	cut_own_legal	71579	4969	0	0
+m6	C	cut_own_same_segment	49644	911	0	0
+m6	C	cut_with_legal	190025	8146	0	0
+m6	C	cut_with_same_segment	144560	911	0	0
+m6	C6	wide	319689	41511	0	0
+m6	C6	cut_own_legal	2020	475	0	0
+m6	C6	cut_own_same_segment	829	119	0	0
+m6	C6	cut_with_legal	4507	701	0	0
+m6	C6	cut_with_same_segment	1929	119	0	0
+m9	C	wide	7322544	830685	0	0
+m9	C	cut_own_legal	71579	4969	0	0
+m9	C	cut_own_same_segment	49644	911	0	0
+m9	C	cut_with_legal	190025	8146	0	0
+m9	C	cut_with_same_segment	144560	911	0	0
+m9	C6	wide	319689	41511	0	0
+m9	C6	cut_own_legal	2020	475	0	0
+m9	C6	cut_own_same_segment	829	119	0	0
+m9	C6	cut_with_legal	4507	701	0	0
+m9	C6	cut_with_same_segment	1929	119	0	0
+m10	C	wide	7322544	356441	24583	0
+m10	C	cut_own_legal	71579	2883	0	0
+m10	C	cut_own_same_segment	49644	385	0	0
+m10	C	cut_with_legal	190025	4912	0	0
+m10	C	cut_with_same_segment	144560	385	0	0
+m10	C6	wide	319689	19515	1362	0
+m10	C6	cut_own_legal	2020	295	0	0
+m10	C6	cut_own_same_segment	829	67	0	0
+m10	C6	cut_with_legal	4507	441	0	0
+m10	C6	cut_with_same_segment	1929	67	0	0
+m5row	C	wide	7322544	830685	0	0
+m5row	C	cut_own_legal	71579	4969	0	0
+m5row	C	cut_own_same_segment	49644	911	0	0
+m5row	C	cut_with_legal	190025	8146	0	0
+m5row	C	cut_with_same_segment	144560	911	0	0
+m5row	C6	wide	319689	41511	0	0
+m5row	C6	cut_own_legal	2020	475	0	0
+m5row	C6	cut_own_same_segment	829	119	0	0
+m5row	C6	cut_with_legal	4507	701	0	0
+m5row	C6	cut_with_same_segment	1929	119	0	0
+m6row	C	wide	7322544	830685	0	0
+m6row	C	cut_own_legal	71579	4969	0	0
+m6row	C	cut_own_same_segment	49644	911	0	0
+m6row	C	cut_with_legal	190025	8146	0	0
+m6row	C	cut_with_same_segment	144560	911	0	0
+m6row	C6	wide	319689	41511	0	0
+m6row	C6	cut_own_legal	2020	475	0	0
+m6row	C6	cut_own_same_segment	829	119	0	0
+m6row	C6	cut_with_legal	4507	701	0	0
+m6row	C6	cut_with_same_segment	1929	119	0	0
+
+## 表三：每个变体的 run 判决行与作废行
+m0	E7RESULT name=verdict scope=run bounds=light family=legal states=6923358 self_checks_passed=13 control_readings=35 controls_not_red=0 void_conditions=0 halt_conditions=0
+m0row	E7RESULT name=verdict scope=run bounds=light family=legal states=6923358 self_checks_passed=13 control_readings=35 controls_not_red=0 void_conditions=0 halt_conditions=0
+m1	E7RESULT name=verdict scope=run bounds=light family=legal states=6923358 self_checks_passed=13 control_readings=35 controls_not_red=0 void_conditions=0 halt_conditions=0
+m2	E7RESULT name=verdict scope=run bounds=light family=legal states=6923358 self_checks_passed=13 control_readings=35 controls_not_red=0 void_conditions=0 halt_conditions=0
+m3	E7RESULT name=verdict scope=run bounds=light family=legal states=6923358 self_checks_passed=13 control_readings=35 controls_not_red=0 void_conditions=0 halt_conditions=0
+m4	E7RESULT name=void condition=V4_L_域没有一个态施加过发布，这个域的_0_违例不算数
+m4	E7RESULT name=void condition=V4_L6_域没有一个态施加过发布，这个域的_0_违例不算数
+m4	E7RESULT name=void condition=V4_L9_域没有一个态施加过发布，这个域的_0_违例不算数
+m4	E7RESULT name=void condition=V4_U_verify_on_域没有一个态施加过发布，这个域的_0_违例不算数
+m4	E7RESULT name=void condition=V4_U_verify_off_域没有一个态施加过发布，这个域的_0_违例不算数
+m4	E7RESULT name=void condition=V4_C_域没有一个态施加过发布，这个域的_0_违例不算数
+m4	E7RESULT name=void condition=V4_C6_域没有一个态施加过发布，这个域的_0_违例不算数
+m4	E7RESULT name=void condition=V4_X_域没有一个态施加过发布，这个域的_0_违例不算数
+m4	E7RESULT name=void condition=V4_E1_域没有一个态施加过发布，这个域的_0_违例不算数
+m4	E7RESULT name=void condition=V4_R_域没有一个态施加过发布，这个域的_0_违例不算数
+m4	E7RESULT name=verdict scope=run bounds=light family=legal states=6923358 self_checks_passed=13 control_readings=35 controls_not_red=0 void_conditions=10 halt_conditions=0
+m5	E7RESULT name=verdict scope=run bounds=light family=legal states=6923358 self_checks_passed=13 control_readings=35 controls_not_red=0 void_conditions=0 halt_conditions=0
+m6	E7RESULT name=verdict scope=run bounds=light family=legal states=6923358 self_checks_passed=13 control_readings=35 controls_not_red=0 void_conditions=0 halt_conditions=0
+m9	E7RESULT name=verdict scope=run bounds=light family=legal states=6923358 self_checks_passed=13 control_readings=35 controls_not_red=0 void_conditions=0 halt_conditions=0
+m10	E7RESULT name=verdict scope=run bounds=light family=legal states=6923358 self_checks_passed=13 control_readings=35 controls_not_red=0 void_conditions=0 halt_conditions=0
+m5row	E7RESULT name=verdict scope=run bounds=light family=legal states=6923358 self_checks_passed=13 control_readings=35 controls_not_red=0 void_conditions=0 halt_conditions=0
+m6row	E7RESULT name=verdict scope=run bounds=light family=legal states=6923358 self_checks_passed=13 control_readings=35 controls_not_red=0 void_conditions=0 halt_conditions=0
+m0-adv	E7RESULT name=verdict scope=run bounds=light family=adversarial states=7717266 self_checks_passed=13 control_readings=10 controls_not_red=0 void_conditions=0 halt_conditions=0

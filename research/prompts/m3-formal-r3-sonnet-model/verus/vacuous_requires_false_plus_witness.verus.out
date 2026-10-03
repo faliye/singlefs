@@ -1,0 +1,20 @@
+error: precondition not satisfied
+   --> src/lib.rs:574:20
+    |
+286 |           false,
+    |           ----- failed precondition
+...
+574 |       let _outcome = replay_core(
+    |  ____________________^
+575 | |         1u32,
+576 | |         1u64,
+577 | |         0u64,
+...   |
+582 | |         |_index: usize| true,
+583 | |     );
+    | |_____^
+
+verification results:: 14 verified, 1 errors
+error: aborting due to 1 previous error
+
+exit=1

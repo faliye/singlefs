@@ -1,0 +1,317 @@
+E name=nogc nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=45607 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=0 gc_completes=0 gc_paused=0 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=0 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+E name=AB-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=281485 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=1089 gc_completes=129905 gc_paused=59784 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=118 ev_delete_stuck=282 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=9701 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.W3.U1.G2
+W name=AB-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=AB-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=AB-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.W3.G0.B
+E name=AB-old-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=281485 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=1089 gc_completes=129905 gc_paused=59784 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=118 ev_delete_stuck=282 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=9701 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-old-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.W3.U1.G2
+W name=AB-old-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=AB-old-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=AB-old-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.W3.G0.B
+E name=AB-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=259237 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=1343 gc_completes=141607 gc_paused=58947 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=188 ev_delete_stuck=354 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=9903 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.W3.U1.G2
+W name=AB-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=AB-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=AB-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.W3.G0.B
+E name=AB-cur-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=259564 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=1342 gc_completes=140558 gc_paused=58574 gc_livelock=0 ev_gc_del=1145 ev_false_enospc=0 ev_unlink_stuck=188 ev_delete_stuck=354 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=9894 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-cur-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.W3.U1.G2
+W name=AB-cur-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_del path=W1.W2.G1.B.R0.B
+W name=AB-cur-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=AB-cur-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=AB-cur-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.W3.G0.B
+E name=C-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=281485 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=1089 gc_completes=129905 gc_paused=59784 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=118 ev_delete_stuck=282 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=9701 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=C-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.W3.U1.G2
+W name=C-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=C-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=C-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.W3.G0.B
+E name=C-old-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=281485 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=1089 gc_completes=129905 gc_paused=59784 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=118 ev_delete_stuck=282 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=9701 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=C-old-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.W3.U1.G2
+W name=C-old-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=C-old-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=C-old-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.W3.G0.B
+E name=C-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=318344 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=63943 queue_has_gone=9653 zero_not_queued=7652 cont_blocked=1651 gc_completes=167846 gc_paused=75887 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=223 ev_delete_stuck=378 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=11145 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=C-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=queue_has_live path=W1.U1.R1
+W name=C-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=queue_has_gone path=W1.W1.U2.R0
+W name=C-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=zero_not_queued path=W1.U1.D1.D1.R0
+W name=C-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.W3.U1.G2
+W name=C-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=C-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=C-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.W3.G0.B
+E name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=342648 live_lost=0 live_truncated=34938 del_lost=0 double_ref=0 leak=0 queue_has_live=102966 queue_has_gone=9746 zero_not_queued=5083 cont_blocked=1846 gc_completes=180130 gc_paused=77615 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=246 ev_delete_stuck=479 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=11760 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=live_truncated path=W1.U1.R1.D1
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=queue_has_live path=W1.U1.R1
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=queue_has_gone path=W1.W1.U2.R0
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=zero_not_queued path=W1.U1.D1.D1.R0
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.W3.U1.G2
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.W3.G0.B
+E name=adm-plain nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=281485 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=1089 gc_completes=129905 gc_paused=59784 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=118 ev_delete_stuck=282 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=9701 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=adm-plain nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.W3.U1.G2
+W name=adm-plain nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=adm-plain nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=adm-plain nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.W3.G0.B
+E name=adm-rterm nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=226540 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=440 gc_completes=50345 gc_paused=89760 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=57 ev_delete_stuck=160 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=16360 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=adm-rterm nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.W3.U1.G2
+W name=adm-rterm nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=adm-rterm nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=adm-rterm nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W1.W2.G1.B
+E name=adm-rterm_issue nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=205378 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=24 gc_completes=48632 gc_paused=76008 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=13772 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=adm-rterm_issue nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W1.G0.W3.U1.U2.D1.R0.U2
+W name=adm-rterm_issue nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W1.W2.G1.B
+E name=mut-gc_forget_release nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=275836 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=37752 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=1069 gc_completes=19956 gc_paused=168818 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=111 ev_delete_stuck=291 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=10640 ev_gc_paused_placement=0 ev_gc_unreferenced=456
+W name=mut-gc_forget_release nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=leak path=W1.G0.B
+W name=mut-gc_forget_release nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.W3.U1.G2
+W name=mut-gc_forget_release nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=mut-gc_forget_release nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=mut-gc_forget_release nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.W3.G0.B
+W name=mut-gc_forget_release nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_unreferenced path=W1.W2.G1.B.B.B
+E name=mut-rb_no_resurrect nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=320268 live_lost=135976 live_truncated=0 del_lost=151570 double_ref=29356 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=684 gc_completes=185239 gc_paused=30193 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=96 ev_delete_stuck=242 ev_rb_refused_no_record=0 ev_rb_refused_gen=12429 ev_gc_paused_admission=5300 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=mut-rb_no_resurrect nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=live_lost path=W1.U1.R1
+W name=mut-rb_no_resurrect nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=del_lost path=W1.U1.D1.R1
+W name=mut-rb_no_resurrect nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=double_ref path=W1.U1.W1.R0.W1
+W name=mut-rb_no_resurrect nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.W3.U1.G2
+W name=mut-rb_no_resurrect nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=mut-rb_no_resurrect nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=mut-rb_no_resurrect nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_rb_refused_gen path=W1.U1.W1.R0.W1.R1
+W name=mut-rb_no_resurrect nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.W3.G0.B
+E name=nogc nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 window=5 depth=8 states=61045 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=0 gc_completes=0 gc_paused=0 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=0 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+E name=AB-old-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 window=5 depth=8 states=382995 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=1269 gc_completes=87492 gc_paused=141899 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=79 ev_delete_stuck=239 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=22984 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-old-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W2.W3.U1.U2.G2
+W name=AB-old-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W2.W3.U1.D1.G2.U2
+W name=AB-old-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W2.W3.U1.U2.G2.D1
+W name=AB-old-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W2.W3.G0.B
+E name=AB-old-skip nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 window=5 depth=8 states=382995 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=1269 gc_completes=87492 gc_paused=141899 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=79 ev_delete_stuck=239 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=22984 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-old-skip nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W2.W3.U1.U2.G2
+W name=AB-old-skip nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W2.W3.U1.D1.G2.U2
+W name=AB-old-skip nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W2.W3.U1.U2.G2.D1
+W name=AB-old-skip nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W2.W3.G0.B
+E name=AB-cur-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 window=5 depth=8 states=282103 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=1298 gc_completes=87221 gc_paused=121148 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=99 ev_delete_stuck=256 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=21425 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-cur-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W2.W3.U1.U2.G2
+W name=AB-cur-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W2.W3.U1.D1.G2.U2
+W name=AB-cur-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W2.W3.U1.U2.G2.D1
+W name=AB-cur-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W2.W3.G0.B
+E name=AB-cur-skip nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 window=5 depth=8 states=282337 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=1298 gc_completes=88523 gc_paused=118160 gc_livelock=0 ev_gc_del=1130 ev_false_enospc=0 ev_unlink_stuck=99 ev_delete_stuck=256 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=21383 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-cur-skip nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W2.W3.U1.U2.G2
+W name=AB-cur-skip nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_gc_del path=W1.W2.G1.B.R1.B
+W name=AB-cur-skip nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W2.W3.U1.D1.G2.U2
+W name=AB-cur-skip nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W2.W3.U1.U2.G2.D1
+W name=AB-cur-skip nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W2.W3.G0.B
+E name=C-old-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 window=5 depth=8 states=382995 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=1269 gc_completes=87492 gc_paused=141899 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=79 ev_delete_stuck=239 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=22984 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=C-old-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W2.W3.U1.U2.G2
+W name=C-old-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W2.W3.U1.D1.G2.U2
+W name=C-old-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W2.W3.U1.U2.G2.D1
+W name=C-old-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W2.W3.G0.B
+E name=C-old-recheck-naive nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 window=5 depth=8 states=382995 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=1269 gc_completes=87492 gc_paused=141899 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=79 ev_delete_stuck=239 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=22984 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=C-old-recheck-naive nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W2.W3.U1.U2.G2
+W name=C-old-recheck-naive nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W2.W3.U1.D1.G2.U2
+W name=C-old-recheck-naive nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W2.W3.U1.U2.G2.D1
+W name=C-old-recheck-naive nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W2.W3.G0.B
+E name=C-cur-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 window=5 depth=8 states=360180 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=94864 queue_has_gone=15797 zero_not_queued=15774 cont_blocked=1584 gc_completes=106277 gc_paused=154250 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=115 ev_delete_stuck=256 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=24176 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=C-cur-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=queue_has_live path=W1.U1.R1
+W name=C-cur-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=queue_has_gone path=W1.W1.U2.R1
+W name=C-cur-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=zero_not_queued path=W1.U1.D1.D1.R1
+W name=C-cur-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W2.W3.U1.U2.G2
+W name=C-cur-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W2.W3.U1.D1.G2.U2
+W name=C-cur-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W2.W3.U1.U2.G2.D1
+W name=C-cur-recheck nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W2.W3.G0.B
+E name=C-cur-recheck-naive nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 window=5 depth=8 states=380876 live_lost=0 live_truncated=40187 del_lost=0 double_ref=0 leak=0 queue_has_live=141341 queue_has_gone=16366 zero_not_queued=8338 cont_blocked=2222 gc_completes=113431 gc_paused=157372 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=169 ev_delete_stuck=373 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=24976 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=live_truncated path=W1.U1.R1.D1
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=queue_has_live path=W1.U1.R1
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=queue_has_gone path=W1.W1.U2.R1
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=zero_not_queued path=W1.U1.D1.D1.R1
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W2.W3.U1.U2.G2
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W2.W3.U1.D1.G2.U2
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W2.W3.U1.U2.G2.D1
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W2.W3.G0.B
+E name=adm-plain nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 window=5 depth=8 states=382995 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=1269 gc_completes=87492 gc_paused=141899 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=79 ev_delete_stuck=239 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=22984 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=adm-plain nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W2.W3.U1.U2.G2
+W name=adm-plain nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W2.W3.U1.D1.G2.U2
+W name=adm-plain nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W2.W3.U1.U2.G2.D1
+W name=adm-plain nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W2.W3.G0.B
+E name=adm-rterm nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 window=5 depth=8 states=323505 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=823 gc_completes=29094 gc_paused=148874 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=70 ev_delete_stuck=139 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=26284 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=adm-rterm nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W2.W3.U1.U2.G2
+W name=adm-rterm nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W2.W3.U1.D1.G2.U2
+W name=adm-rterm nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W2.W3.U1.U2.G2.D1
+W name=adm-rterm nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W1.W2.G1.B
+E name=adm-rterm_issue nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 window=5 depth=8 states=208061 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=14 gc_completes=22730 gc_paused=79216 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=13242 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=adm-rterm_issue nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W2.W3.G0.U1.U2.D1.D1.D2
+W name=adm-rterm_issue nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W1.G0.W2.B
+E name=mut-gc_forget_release nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 window=5 depth=8 states=379936 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=24184 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=1285 gc_completes=20111 gc_paused=209163 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=79 ev_delete_stuck=239 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=23535 ev_gc_paused_placement=0 ev_gc_unreferenced=216
+W name=mut-gc_forget_release nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=leak path=W1.G0.B
+W name=mut-gc_forget_release nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W2.W3.U1.U2.G2
+W name=mut-gc_forget_release nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W2.W3.U1.D1.G2.U2
+W name=mut-gc_forget_release nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W2.W3.U1.U2.G2.D1
+W name=mut-gc_forget_release nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W2.W3.G0.B
+W name=mut-gc_forget_release nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_gc_unreferenced path=W1.W2.G1.B.B.B
+E name=mut-rb_no_resurrect nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 window=5 depth=8 states=416671 live_lost=265437 live_truncated=0 del_lost=256941 double_ref=26863 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=572 gc_completes=166370 gc_paused=77076 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=33 ev_delete_stuck=165 ev_rb_refused_no_record=0 ev_rb_refused_gen=12021 ev_gc_paused_admission=15031 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=mut-rb_no_resurrect nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=live_lost path=W1.U1.R1
+W name=mut-rb_no_resurrect nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=del_lost path=W1.U1.D1.R2
+W name=mut-rb_no_resurrect nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=double_ref path=W1.U1.W1.U2.R0.W1
+W name=mut-rb_no_resurrect nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W2.W3.U1.U2.G2
+W name=mut-rb_no_resurrect nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W2.W3.U1.D1.G2.U2
+W name=mut-rb_no_resurrect nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W2.W3.U1.U2.G2.D1
+W name=mut-rb_no_resurrect nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_rb_refused_gen path=W1.U1.W1.U2.R0.W1.R2
+W name=mut-rb_no_resurrect nseg=3 segsz=4 ring=4 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W2.W3.G0.B
+E name=nogc nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=75949 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=0 gc_completes=0 gc_paused=0 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=0 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+E name=AB-old-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=436697 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=11 gc_completes=293694 gc_paused=1167 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=1 ev_delete_stuck=1 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=187 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-old-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.U1.G1.B.W3.R1.W3
+W name=AB-old-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.U1.G1.B.W3.R1.W3.U3
+W name=AB-old-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.U1.G1.B.W3.R1.W3.D1
+W name=AB-old-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.G0.W3.R1.W3.B
+E name=AB-old-skip nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=436697 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=11 gc_completes=293694 gc_paused=1167 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=1 ev_delete_stuck=1 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=187 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-old-skip nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.U1.G1.B.W3.R1.W3
+W name=AB-old-skip nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.U1.G1.B.W3.R1.W3.U3
+W name=AB-old-skip nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.U1.G1.B.W3.R1.W3.D1
+W name=AB-old-skip nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.G0.W3.R1.W3.B
+E name=AB-cur-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=415354 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=17 gc_completes=320356 gc_paused=1281 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=9 ev_delete_stuck=1 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=172 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-cur-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.U1.G1.B.W3.R1.W3
+W name=AB-cur-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W1.G1.R0.W3.R1.W3.U1
+W name=AB-cur-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.U1.G1.B.W3.R1.W3.D1
+W name=AB-cur-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.W3.G0.R0.W3.B
+E name=AB-cur-skip nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=415692 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=17 gc_completes=318641 gc_paused=1281 gc_livelock=0 ev_gc_del=1430 ev_false_enospc=0 ev_unlink_stuck=9 ev_delete_stuck=1 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=172 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-cur-skip nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.U1.G1.B.W3.R1.W3
+W name=AB-cur-skip nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_del path=W1.W2.G1.B.R0.B
+W name=AB-cur-skip nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W1.G1.R0.W3.R1.W3.U1
+W name=AB-cur-skip nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.U1.G1.B.W3.R1.W3.D1
+W name=AB-cur-skip nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.W3.G0.R0.W3.B
+E name=C-old-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=436697 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=11 gc_completes=293694 gc_paused=1167 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=1 ev_delete_stuck=1 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=187 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=C-old-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.U1.G1.B.W3.R1.W3
+W name=C-old-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.U1.G1.B.W3.R1.W3.U3
+W name=C-old-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.U1.G1.B.W3.R1.W3.D1
+W name=C-old-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.G0.W3.R1.W3.B
+E name=C-old-recheck-naive nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=436697 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=11 gc_completes=293694 gc_paused=1167 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=1 ev_delete_stuck=1 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=187 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=C-old-recheck-naive nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.U1.G1.B.W3.R1.W3
+W name=C-old-recheck-naive nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.U1.G1.B.W3.R1.W3.U3
+W name=C-old-recheck-naive nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.U1.G1.B.W3.R1.W3.D1
+W name=C-old-recheck-naive nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.G0.W3.R1.W3.B
+E name=C-cur-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=499619 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=96423 queue_has_gone=24532 zero_not_queued=8419 cont_blocked=40 gc_completes=380638 gc_paused=1295 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=9 ev_delete_stuck=1 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=172 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=C-cur-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=queue_has_live path=W1.U1.R1
+W name=C-cur-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=queue_has_gone path=W1.W1.U2.R0
+W name=C-cur-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=zero_not_queued path=W1.U1.D1.D1.R0
+W name=C-cur-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.U1.G1.B.W3.R1.W3
+W name=C-cur-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W1.G1.R0.W3.R1.W3.U1
+W name=C-cur-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.U1.G1.B.W3.R1.W3.D1
+W name=C-cur-recheck nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.W3.G0.R0.W3.B
+E name=C-cur-recheck-naive nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=532383 live_lost=0 live_truncated=47159 del_lost=0 double_ref=0 leak=0 queue_has_live=149155 queue_has_gone=24698 zero_not_queued=5504 cont_blocked=44 gc_completes=399829 gc_paused=1305 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=9 ev_delete_stuck=2 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=172 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=C-cur-recheck-naive nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=live_truncated path=W1.U1.R1.D1
+W name=C-cur-recheck-naive nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=queue_has_live path=W1.U1.R1
+W name=C-cur-recheck-naive nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=queue_has_gone path=W1.W1.U2.R0
+W name=C-cur-recheck-naive nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=zero_not_queued path=W1.U1.D1.D1.R0
+W name=C-cur-recheck-naive nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.U1.G1.B.W3.R1.W3
+W name=C-cur-recheck-naive nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W1.G1.R0.W3.R1.W3.U1
+W name=C-cur-recheck-naive nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.U1.G1.B.W3.R1.W3.D1
+W name=C-cur-recheck-naive nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.W3.G0.R0.W3.B
+E name=adm-plain nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=436697 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=11 gc_completes=293694 gc_paused=1167 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=1 ev_delete_stuck=1 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=187 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=adm-plain nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.U1.G1.B.W3.R1.W3
+W name=adm-plain nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.U1.G1.B.W3.R1.W3.U3
+W name=adm-plain nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.U1.G1.B.W3.R1.W3.D1
+W name=adm-plain nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.G0.W3.R1.W3.B
+E name=adm-rterm nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=431300 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=0 gc_completes=281751 gc_paused=7972 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=876 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=adm-rterm nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.W3.U1.G2.B
+E name=adm-rterm_issue nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=431170 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=0 gc_completes=281685 gc_paused=7932 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=868 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=adm-rterm_issue nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.W3.U1.G2.B
+E name=mut-gc_forget_release nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=433853 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=73099 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=4 gc_completes=25532 gc_paused=272805 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=253 ev_gc_paused_placement=0 ev_gc_unreferenced=738
+W name=mut-gc_forget_release nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=leak path=W1.G0.B
+W name=mut-gc_forget_release nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.U1.G1.W3.R1.W3.R0.U2
+W name=mut-gc_forget_release nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.G0.W3.R1.W3.B
+W name=mut-gc_forget_release nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_unreferenced path=W1.W2.G1.B.B.B
+E name=mut-rb_no_resurrect nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=466742 live_lost=205564 live_truncated=0 del_lost=196091 double_ref=38937 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=3 gc_completes=315005 gc_paused=91 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=2 ev_delete_stuck=2 ev_rb_refused_no_record=0 ev_rb_refused_gen=15083 ev_gc_paused_admission=24 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=mut-rb_no_resurrect nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=live_lost path=W1.U1.R1
+W name=mut-rb_no_resurrect nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=del_lost path=W1.U1.D1.R1
+W name=mut-rb_no_resurrect nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=double_ref path=W1.U1.W1.R0.W1
+W name=mut-rb_no_resurrect nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.U1.G1.B.W3.R0.W3
+W name=mut-rb_no_resurrect nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.U1.G1.B.W3.R0.W3.U3
+W name=mut-rb_no_resurrect nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_delete_stuck path=W3.U1.G1.B.W3.R0.W3.D1
+W name=mut-rb_no_resurrect nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_rb_refused_gen path=W1.U1.W1.R0.W1.R1
+W name=mut-rb_no_resurrect nseg=4 segsz=4 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.G0.W3.R1.W3.B
+E name=nogc nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=77045 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=0 gc_completes=0 gc_paused=0 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=0 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+E name=AB-old-recheck nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=382035 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=0 gc_completes=249019 gc_paused=40 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=0 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+E name=AB-old-skip nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=382035 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=0 gc_completes=249019 gc_paused=40 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=0 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+E name=AB-cur-recheck nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=363781 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=5 gc_completes=274720 gc_paused=47 gc_livelock=0 ev_gc_del=0 ev_false_enospc=12 ev_unlink_stuck=4 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=0 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-cur-recheck nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.W2.G1.R0.U1.W3.R1.W3
+W name=AB-cur-recheck nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_false_enospc path=W2.W3.G1.R0.W2.R0.R0.W3
+W name=AB-cur-recheck nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W2.G1.R0.W3.R1.W3.U1
+E name=AB-cur-skip nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=364026 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=5 gc_completes=273285 gc_paused=47 gc_livelock=0 ev_gc_del=1165 ev_false_enospc=12 ev_unlink_stuck=4 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=0 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-cur-skip nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W3.W2.G1.R0.U1.W3.R1.W3
+W name=AB-cur-skip nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_del path=W1.G0.U1.B.R0.B
+W name=AB-cur-skip nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_false_enospc path=W2.W3.G1.R0.W2.R0.R0.W3
+W name=AB-cur-skip nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W2.G1.R0.W3.R1.W3.U1
+E name=C-old-recheck nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=382035 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=0 gc_completes=249019 gc_paused=40 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=0 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+E name=C-old-recheck-naive nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=382035 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=0 gc_completes=249019 gc_paused=40 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=0 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+E name=C-cur-recheck nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=438778 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=86180 queue_has_gone=23152 zero_not_queued=7505 cont_blocked=17 gc_completes=325705 gc_paused=47 gc_livelock=0 ev_gc_del=0 ev_false_enospc=12 ev_unlink_stuck=4 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=0 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=C-cur-recheck nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=queue_has_live path=W1.U1.R1
+W name=C-cur-recheck nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=queue_has_gone path=W1.W1.U2.R0
+W name=C-cur-recheck nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=zero_not_queued path=W1.U1.D1.D1.R0
+W name=C-cur-recheck nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W2.W3.G1.R0.W3.U1.R0.W3
+W name=C-cur-recheck nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_false_enospc path=W2.W3.G1.R0.W2.R0.R0.W3
+W name=C-cur-recheck nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W2.G1.R0.W3.R1.W3.U1
+E name=C-cur-recheck-naive nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=467943 live_lost=0 live_truncated=42157 del_lost=0 double_ref=0 leak=0 queue_has_live=133589 queue_has_gone=23298 zero_not_queued=4949 cont_blocked=17 gc_completes=341432 gc_paused=47 gc_livelock=0 ev_gc_del=0 ev_false_enospc=12 ev_unlink_stuck=4 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=0 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=C-cur-recheck-naive nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=live_truncated path=W1.U1.R1.D1
+W name=C-cur-recheck-naive nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=queue_has_live path=W1.U1.R1
+W name=C-cur-recheck-naive nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=queue_has_gone path=W1.W1.U2.R0
+W name=C-cur-recheck-naive nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=zero_not_queued path=W1.U1.D1.D1.R0
+W name=C-cur-recheck-naive nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=cont_blocked path=W2.W3.G1.R0.W3.U1.R0.W3
+W name=C-cur-recheck-naive nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_false_enospc path=W2.W3.G1.R0.W2.R0.R0.W3
+W name=C-cur-recheck-naive nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_unlink_stuck path=W3.W2.G1.R0.W3.R1.W3.U1
+E name=adm-plain nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=382035 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=0 gc_completes=249019 gc_paused=40 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=0 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+E name=adm-rterm nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=377518 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=0 gc_completes=238707 gc_paused=5970 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=767 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=adm-rterm nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W1.G0.W3.R1.W3.B
+E name=adm-rterm_issue nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=377354 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=0 gc_completes=238641 gc_paused=5914 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=759 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=adm-rterm_issue nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W1.G0.W3.R1.W3.B
+E name=mut-gc_forget_release nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=380399 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=63629 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=0 gc_completes=18509 gc_paused=233465 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=5 ev_gc_paused_placement=0 ev_gc_unreferenced=575
+W name=mut-gc_forget_release nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=leak path=W1.G0.B
+W name=mut-gc_forget_release nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_paused_admission path=W3.G0.B.W3.U1.R0.W3.B
+W name=mut-gc_forget_release nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_gc_unreferenced path=W1.G0.U1.B.B.B
+E name=mut-rb_no_resurrect nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 window=4 depth=8 states=410587 live_lost=191820 live_truncated=0 del_lost=174516 double_ref=31765 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=0 gc_completes=268915 gc_paused=0 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=12380 ev_gc_paused_admission=0 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=mut-rb_no_resurrect nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=live_lost path=W1.U1.R1
+W name=mut-rb_no_resurrect nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=del_lost path=W1.U1.D1.R1
+W name=mut-rb_no_resurrect nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=double_ref path=W1.U1.W1.R0.W1
+W name=mut-rb_no_resurrect nseg=3 segsz=6 ring=3 maxobj=2 maxdata=3 depth=8 flag=ev_rb_refused_gen path=W1.U1.W1.R0.W1.R1
+E name=nogc nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=9 states=154039 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=0 gc_completes=0 gc_paused=0 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=0 ev_delete_stuck=0 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=0 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+E name=AB-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=9 states=1174506 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=6047 gc_completes=599300 gc_paused=222833 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=747 ev_delete_stuck=1549 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=39924 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=cont_blocked path=W3.W3.U1.G2
+W name=AB-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=AB-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=AB-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_gc_paused_admission path=W3.W3.G0.B
+E name=AB-old-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=9 states=1174506 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=6047 gc_completes=599300 gc_paused=222833 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=747 ev_delete_stuck=1549 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=39924 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-old-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=cont_blocked path=W3.W3.U1.G2
+W name=AB-old-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=AB-old-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=AB-old-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_gc_paused_admission path=W3.W3.G0.B
+E name=AB-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=9 states=1116987 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=7031 gc_completes=661000 gc_paused=219229 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=1038 ev_delete_stuck=1901 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=40316 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=cont_blocked path=W3.W3.U1.G2
+W name=AB-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=AB-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=AB-cur-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_gc_paused_admission path=W3.W3.G0.B
+E name=AB-cur-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=9 states=1120169 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=7016 gc_completes=653109 gc_paused=217050 gc_livelock=0 ev_gc_del=8101 ev_false_enospc=0 ev_unlink_stuck=1037 ev_delete_stuck=1900 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=40264 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=AB-cur-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=cont_blocked path=W3.W3.U1.G2
+W name=AB-cur-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_gc_del path=W1.W2.G1.B.R0.B
+W name=AB-cur-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=AB-cur-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=AB-cur-skip nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_gc_paused_admission path=W3.W3.G0.B
+E name=C-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=9 states=1174506 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=6047 gc_completes=599300 gc_paused=222833 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=747 ev_delete_stuck=1549 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=39924 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=C-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=cont_blocked path=W3.W3.U1.G2
+W name=C-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=C-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=C-old-recheck nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_gc_paused_admission path=W3.W3.G0.B
+E name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=9 states=1611175 live_lost=0 live_truncated=201626 del_lost=0 double_ref=0 leak=0 queue_has_live=501496 queue_has_gone=54599 zero_not_queued=36060 cont_blocked=9944 gc_completes=923338 gc_paused=317557 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=1576 ev_delete_stuck=2940 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=54098 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=live_truncated path=W1.U1.R1.D1
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=queue_has_live path=W1.U1.R1
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=queue_has_gone path=W1.W1.U2.R0
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=zero_not_queued path=W1.U1.D1.D1.R0
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=cont_blocked path=W3.W3.U1.G2
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=C-cur-recheck-naive nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_gc_paused_admission path=W3.W3.G0.B
+E name=adm-plain nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=9 states=1174506 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=6047 gc_completes=599300 gc_paused=222833 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=747 ev_delete_stuck=1549 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=39924 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=adm-plain nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=cont_blocked path=W3.W3.U1.G2
+W name=adm-plain nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_unlink_stuck path=W3.W3.U1.G2.U2
+W name=adm-plain nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_delete_stuck path=W3.W3.U1.G2.D1
+W name=adm-plain nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_gc_paused_admission path=W3.W3.G0.B
+E name=adm-rterm_issue nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 window=4 depth=9 states=779765 live_lost=0 live_truncated=0 del_lost=0 double_ref=0 leak=0 queue_has_live=0 queue_has_gone=0 zero_not_queued=0 cont_blocked=226 gc_completes=207167 gc_paused=280375 gc_livelock=0 ev_gc_del=0 ev_false_enospc=0 ev_unlink_stuck=14 ev_delete_stuck=38 ev_rb_refused_no_record=0 ev_rb_refused_gen=0 ev_gc_paused_admission=55461 ev_gc_paused_placement=0 ev_gc_unreferenced=0
+W name=adm-rterm_issue nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=cont_blocked path=W1.G0.W3.U1.U2.D1.R0.U2
+W name=adm-rterm_issue nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_unlink_stuck path=W1.G0.W3.U1.U2.D1.R0.D1.U2
+W name=adm-rterm_issue nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_delete_stuck path=W1.G0.W3.U1.U2.D1.R0.U2.D1
+W name=adm-rterm_issue nseg=3 segsz=4 ring=3 maxobj=2 maxdata=3 depth=9 flag=ev_gc_paused_admission path=W1.W2.G1.B

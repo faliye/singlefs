@@ -1,0 +1,16 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：m3-formal-r6 攻方腿原型 r6probe 跑（副本）
+history fft: ending Completed positions ["StartingPoint", "Operation(0)", "Operation(1)"] marks [23, 45, 76] mkfs_ops 23
+  step 0: Applied(Mounted { instance: InstanceGeneration(1), publishes: 2, allocation_records_compared: NoPublishWithFile, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquisition })
+  step 1: Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+  segment_terminator_position [2, 2, 2]
+  kinds [Mkfs, Other, Publish] contents [None, None, Some(201)] window_writes 5 write_position [2, 2, 2, 2, 2]
+history=fft mode=tgt mutation=None writes=5 segments=3 closed_form_two_state=8 with_torn=13 prepare_secs=0.02
+states_judged=13 of 13 range=0..13 elapsed_secs=0.7
+rec=nofile target_origin=c3_confirmed -> ok:c3:by_root count=1
+rec=nofile target_origin=continuation_mount -> err:TargetNotACandidate:VersionWithoutFile count=2
+rec=nofile target_origin=original_run -> err:TargetNotACandidate:VersionWithoutFile count=3
+rec=v@2 mount_refused:NewerStateStillUnreadableAfterOneReread count=5
+rec=v@2 target_origin=c3_confirmed -> ok:c3:by_root count=7
+rec=v@2 target_origin=continuation_mount -> ok:v@2:unnameable count=14
+rec=v@2 target_origin=original_run -> err:TargetNotACandidate:VersionWithoutFile count=21
+rec=v@2 target_origin=original_run -> ok:v@2:unnameable count=4

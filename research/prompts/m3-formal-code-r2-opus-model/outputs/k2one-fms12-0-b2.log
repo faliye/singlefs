@@ -1,0 +1,71 @@
+run-with-memory-cap: 上限 3G 超过实测峰值 86M 的 2 倍，照理由放行：攻方原型逐段历史的峰值不同，表里那条是别的历史
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：m3-formal-code-r2 攻方腿自己的原型，与同会话别的 agent 各跑各的
+history fms12: ending Completed
+  window mount: instance=InstanceGeneration(2) floor_raises=1
+history=fms12 ordinal=0 floor=RaisedTo(CheckpointTxg(12)) R1: eff=Some((1, 15)) cmp(inst,txg,W,F)=Some((1, 15, 65548, 0)) applied=0 above=0 sc_inst=Some(1) ring_inst=Some(1) ring_txg=Some(15) rec_txg=Some(15) F=Some(0) mount_segments=[2, 14, 2, 1, 2, 12, 2, 1, 2, 2, 12, 2, 1, 2, 12, 2, 1, 2] second_total=28733 range=14000..28733
+  mount_segment 0: states=0..8 phase_of_first=acquisition kinds=["system_configuration_slot", "system_configuration_slot"]
+  mount_segment 1: states=8..16391 phase_of_first=row_publish kinds=["unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write"]
+  mount_segment 2: states=16391..16394 phase_of_first=row_publish kinds=["journal_record", "journal_record"]
+  mount_segment 3: states=16394..16395 phase_of_first=row_publish kinds=["root_record_fua"]
+  mount_segment 4: states=16395..16403 phase_of_first=row_publish kinds=["system_configuration_slot", "system_configuration_slot"]
+  mount_segment 5: states=16403..20498 phase_of_first=warm_up kinds=["unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write"]
+  mount_segment 6: states=20498..20501 phase_of_first=warm_up kinds=["journal_record", "journal_record"]
+  mount_segment 7: states=20501..20502 phase_of_first=warm_up kinds=["root_record_fua"]
+  mount_segment 8: states=20502..20510 phase_of_first=warm_up kinds=["system_configuration_slot", "system_configuration_slot"]
+  mount_segment 9: states=20510..20518 phase_of_first=warm_up kinds=["system_configuration_slot", "system_configuration_slot"]
+  mount_segment 10: states=20518..24613 phase_of_first=warm_up kinds=["unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write"]
+  mount_segment 11: states=24613..24616 phase_of_first=warm_up kinds=["journal_record", "journal_record"]
+  mount_segment 12: states=24616..24617 phase_of_first=warm_up kinds=["root_record_fua"]
+  mount_segment 13: states=24617..24625 phase_of_first=warm_up kinds=["system_configuration_slot", "system_configuration_slot"]
+  mount_segment 14: states=24625..28720 phase_of_first=warm_up kinds=["unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write", "unit_write"]
+  mount_segment 15: states=28720..28723 phase_of_first=warm_up kinds=["journal_record", "journal_record"]
+  mount_segment 16: states=28723..28724 phase_of_first=warm_up kinds=["root_record_fua"]
+  mount_segment 17: states=28724..28732 phase_of_first=warm_up kinds=["system_configuration_slot", "system_configuration_slot"]
+second_states=14733 elapsed_secs=136.7
+SECOND[row_publish] seg=1 field_not_judged=二次崩溃镜像上的扫描报告 count=2391
+SECOND[row_publish] seg=1 judged count=2391
+SECOND[row_publish] seg=2 field_not_judged=二次崩溃镜像上的扫描报告 count=3
+SECOND[row_publish] seg=2 judged count=3
+SECOND[row_publish] seg=3 field_not_judged=二次崩溃镜像上的扫描报告 count=1
+SECOND[row_publish] seg=3 judged count=1
+SECOND[row_publish] seg=4 field_not_judged=二次崩溃镜像上的扫描报告 count=8
+SECOND[row_publish] seg=4 judged count=8
+SECOND[warm_up] seg=10 field_not_judged=二次崩溃崩在抬 F 开始之后的 F count=4095
+SECOND[warm_up] seg=10 field_not_judged=二次崩溃镜像上的扫描报告 count=4095
+SECOND[warm_up] seg=10 judged count=4095
+SECOND[warm_up] seg=11 field_not_judged=二次崩溃崩在抬 F 开始之后的 F count=3
+SECOND[warm_up] seg=11 field_not_judged=二次崩溃镜像上的扫描报告 count=3
+SECOND[warm_up] seg=11 judged count=3
+SECOND[warm_up] seg=12 field_not_judged=二次崩溃崩在抬 F 开始之后的 F count=1
+SECOND[warm_up] seg=12 field_not_judged=二次崩溃镜像上的扫描报告 count=1
+SECOND[warm_up] seg=12 judged count=1
+SECOND[warm_up] seg=13 field_not_judged=二次崩溃崩在抬 F 开始之后的 F count=8
+SECOND[warm_up] seg=13 field_not_judged=二次崩溃镜像上的扫描报告 count=8
+SECOND[warm_up] seg=13 judged count=8
+SECOND[warm_up] seg=14 field_not_judged=二次崩溃崩在抬 F 开始之后的 F count=4095
+SECOND[warm_up] seg=14 field_not_judged=二次崩溃镜像上的扫描报告 count=4095
+SECOND[warm_up] seg=14 judged count=4095
+SECOND[warm_up] seg=15 field_not_judged=二次崩溃崩在抬 F 开始之后的 F count=3
+SECOND[warm_up] seg=15 field_not_judged=二次崩溃镜像上的扫描报告 count=3
+SECOND[warm_up] seg=15 judged count=3
+SECOND[warm_up] seg=16 field_not_judged=二次崩溃崩在抬 F 开始之后的 F count=1
+SECOND[warm_up] seg=16 field_not_judged=二次崩溃镜像上的扫描报告 count=1
+SECOND[warm_up] seg=16 judged count=1
+SECOND[warm_up] seg=17 field_not_judged=二次崩溃崩在抬 F 开始之后的 F count=8
+SECOND[warm_up] seg=17 field_not_judged=二次崩溃镜像上的扫描报告 count=8
+SECOND[warm_up] seg=17 judged count=8
+SECOND[warm_up] seg=5 field_not_judged=二次崩溃崩在抬 F 开始之后的 F count=4095
+SECOND[warm_up] seg=5 field_not_judged=二次崩溃镜像上的扫描报告 count=4095
+SECOND[warm_up] seg=5 judged count=4095
+SECOND[warm_up] seg=6 field_not_judged=二次崩溃崩在抬 F 开始之后的 F count=3
+SECOND[warm_up] seg=6 field_not_judged=二次崩溃镜像上的扫描报告 count=3
+SECOND[warm_up] seg=6 judged count=3
+SECOND[warm_up] seg=7 field_not_judged=二次崩溃崩在抬 F 开始之后的 F count=1
+SECOND[warm_up] seg=7 field_not_judged=二次崩溃镜像上的扫描报告 count=1
+SECOND[warm_up] seg=7 judged count=1
+SECOND[warm_up] seg=8 field_not_judged=二次崩溃崩在抬 F 开始之后的 F count=8
+SECOND[warm_up] seg=8 field_not_judged=二次崩溃镜像上的扫描报告 count=8
+SECOND[warm_up] seg=8 judged count=8
+SECOND[warm_up] seg=9 field_not_judged=二次崩溃崩在抬 F 开始之后的 F count=8
+SECOND[warm_up] seg=9 field_not_judged=二次崩溃镜像上的扫描报告 count=8
+SECOND[warm_up] seg=9 judged count=8

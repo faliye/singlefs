@@ -1,0 +1,6 @@
+rfx2-1 rc=101
+rfx2-2 rc=101
+history=rfx3-1 writes=36 segments=9 closed_form=8208 with_torn=8223 committed=9
+history=rfx4-2 writes=53 segments=13 closed_form=12310 with_torn=12330 committed=11
+history=rfx4-3 writes=53 segments=13 closed_form=12310 with_torn=12330 committed=11
+history=rfm4-2 writes=55 segments=13 closed_form=24598 with_torn=24618 committed=14

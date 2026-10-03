@@ -1,0 +1,11 @@
+20 rec=v@0 mount_refused:NewerStateStillUnreadableAfterOneReread
+20502 rec=v@0 target_origin=c3_confirmed -> ok:c3:by_root
+41011 rec=v@0 target_origin=continuation_mount -> ok:v@0:by_content_only
+61506 rec=v@0 target_origin=original_run -> err:TargetNotACandidate:VersionWithoutFile
+45111 rec=v@0 target_origin=original_run -> ok:v@0:by_content_only
+20502 rec=v@0 target_origin=original_run -> ok:v@1:by_content_only
+4096 rec=v@1 target_origin=c3_confirmed -> ok:c3:by_root
+12288 rec=v@1 target_origin=continuation_mount -> ok:v@1:by_content_only
+12288 rec=v@1 target_origin=original_run -> err:TargetNotACandidate:VersionWithoutFile
+4096 rec=v@1 target_origin=original_run -> ok:v@0:by_content_only
+4096 rec=v@1 target_origin=original_run -> ok:v@1:by_content_only

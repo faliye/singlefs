@@ -1,0 +1,115 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：m3-inv-a-r1 攻方腿在自己的副本上跑原型，与并行的其他腿各跑各的
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running tests/inv_a_crash_states.rs (/tmp/claude-1000/m3-inv-a-r1-opus/target/release/deps/inv_a_crash_states-b466c569c6bd7ea4)
+
+running 1 test
+test e2_mount_stream_over_a_record_without_its_root ... INV-A-E E2 记录在、根没落 挂载流 62 步、写 46 次、段 [2, 18, 2, 1, 2, 16, 2, 1, 2]；closed_form_state_count=327696，带第三态的全量 327711；这次挂载施加 1 条、实例 InstanceGeneration(2)、行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(3), applied_transaction_high_water: 1 }]
+LAYER0_PARALLEL_START states=327711 slices=96 states_per_slice=3414 worker_threads=6 configured_worker_threads=6 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=96
+LAYER0_PROGRESS slice=6/96 states=[17070,20484) segments=1..=1 finished_slices=1/96 finished_states=3414/327711 resumed_slices=0 elapsed_seconds=5.9
+LAYER0_PROGRESS slice=2/96 states=[3414,6828) segments=1..=1 finished_slices=2/96 finished_states=6828/327711 resumed_slices=0 elapsed_seconds=5.9
+LAYER0_PROGRESS slice=3/96 states=[6828,10242) segments=1..=1 finished_slices=3/96 finished_states=10242/327711 resumed_slices=0 elapsed_seconds=6.0
+LAYER0_PROGRESS slice=1/96 states=[0,3414) segments=0..=1 finished_slices=4/96 finished_states=13656/327711 resumed_slices=0 elapsed_seconds=6.0
+LAYER0_PROGRESS slice=4/96 states=[10242,13656) segments=1..=1 finished_slices=5/96 finished_states=17070/327711 resumed_slices=0 elapsed_seconds=27.9
+LAYER0_PROGRESS slice=5/96 states=[13656,17070) segments=1..=1 finished_slices=6/96 finished_states=20484/327711 resumed_slices=0 elapsed_seconds=33.8
+LAYER0_PROGRESS slice=7/96 states=[20484,23898) segments=1..=1 finished_slices=7/96 finished_states=23898/327711 resumed_slices=0 elapsed_seconds=52.0
+LAYER0_PROGRESS slice=9/96 states=[27312,30726) segments=1..=1 finished_slices=8/96 finished_states=27312/327711 resumed_slices=0 elapsed_seconds=60.0
+LAYER0_PROGRESS slice=8/96 states=[23898,27312) segments=1..=1 finished_slices=9/96 finished_states=30726/327711 resumed_slices=0 elapsed_seconds=60.0
+LAYER0_PROGRESS slice=10/96 states=[30726,34140) segments=1..=1 finished_slices=10/96 finished_states=34140/327711 resumed_slices=0 elapsed_seconds=75.9
+LAYER0_PROGRESS slice=11/96 states=[34140,37554) segments=1..=1 finished_slices=11/96 finished_states=37554/327711 resumed_slices=0 elapsed_seconds=82.8
+LAYER0_PROGRESS slice=12/96 states=[37554,40968) segments=1..=1 finished_slices=12/96 finished_states=40968/327711 resumed_slices=0 elapsed_seconds=94.3
+LAYER0_PROGRESS slice=14/96 states=[44382,47796) segments=1..=1 finished_slices=13/96 finished_states=44382/327711 resumed_slices=0 elapsed_seconds=104.2
+LAYER0_PROGRESS slice=16/96 states=[51210,54624) segments=1..=1 finished_slices=14/96 finished_states=47796/327711 resumed_slices=0 elapsed_seconds=104.2
+LAYER0_PROGRESS slice=13/96 states=[40968,44382) segments=1..=1 finished_slices=15/96 finished_states=51210/327711 resumed_slices=0 elapsed_seconds=104.2
+LAYER0_PROGRESS slice=15/96 states=[47796,51210) segments=1..=1 finished_slices=16/96 finished_states=54624/327711 resumed_slices=0 elapsed_seconds=122.4
+LAYER0_PROGRESS slice=17/96 states=[54624,58038) segments=1..=1 finished_slices=17/96 finished_states=58038/327711 resumed_slices=0 elapsed_seconds=137.7
+LAYER0_PROGRESS slice=18/96 states=[58038,61452) segments=1..=1 finished_slices=18/96 finished_states=61452/327711 resumed_slices=0 elapsed_seconds=148.0
+LAYER0_PROGRESS slice=19/96 states=[61452,64866) segments=1..=1 finished_slices=19/96 finished_states=64866/327711 resumed_slices=0 elapsed_seconds=156.0
+LAYER0_PROGRESS slice=20/96 states=[64866,68280) segments=1..=1 finished_slices=20/96 finished_states=68280/327711 resumed_slices=0 elapsed_seconds=162.5
+LAYER0_PROGRESS slice=21/96 states=[68280,71694) segments=1..=1 finished_slices=21/96 finished_states=71694/327711 resumed_slices=0 elapsed_seconds=170.9
+LAYER0_PROGRESS slice=22/96 states=[71694,75108) segments=1..=1 finished_slices=22/96 finished_states=75108/327711 resumed_slices=0 elapsed_seconds=178.2
+LAYER0_PROGRESS slice=23/96 states=[75108,78522) segments=1..=1 finished_slices=23/96 finished_states=78522/327711 resumed_slices=0 elapsed_seconds=186.6
+LAYER0_PROGRESS slice=24/96 states=[78522,81936) segments=1..=1 finished_slices=24/96 finished_states=81936/327711 resumed_slices=0 elapsed_seconds=194.9
+LAYER0_PROGRESS slice=25/96 states=[81936,85350) segments=1..=1 finished_slices=25/96 finished_states=85350/327711 resumed_slices=0 elapsed_seconds=202.1
+LAYER0_PROGRESS slice=26/96 states=[85350,88764) segments=1..=1 finished_slices=26/96 finished_states=88764/327711 resumed_slices=0 elapsed_seconds=209.4
+LAYER0_PROGRESS slice=28/96 states=[92178,95592) segments=1..=1 finished_slices=27/96 finished_states=92178/327711 resumed_slices=0 elapsed_seconds=217.1
+LAYER0_PROGRESS slice=27/96 states=[88764,92178) segments=1..=1 finished_slices=28/96 finished_states=95592/327711 resumed_slices=0 elapsed_seconds=217.1
+LAYER0_PROGRESS slice=29/96 states=[95592,99006) segments=1..=1 finished_slices=29/96 finished_states=99006/327711 resumed_slices=0 elapsed_seconds=233.2
+LAYER0_PROGRESS slice=30/96 states=[99006,102420) segments=1..=1 finished_slices=30/96 finished_states=102420/327711 resumed_slices=0 elapsed_seconds=241.9
+LAYER0_PROGRESS slice=31/96 states=[102420,105834) segments=1..=1 finished_slices=31/96 finished_states=105834/327711 resumed_slices=0 elapsed_seconds=247.6
+LAYER0_PROGRESS slice=32/96 states=[105834,109248) segments=1..=1 finished_slices=32/96 finished_states=109248/327711 resumed_slices=0 elapsed_seconds=255.2
+LAYER0_PROGRESS slice=33/96 states=[109248,112662) segments=1..=1 finished_slices=33/96 finished_states=112662/327711 resumed_slices=0 elapsed_seconds=262.6
+LAYER0_PROGRESS slice=34/96 states=[112662,116076) segments=1..=1 finished_slices=34/96 finished_states=116076/327711 resumed_slices=0 elapsed_seconds=271.6
+LAYER0_PROGRESS slice=35/96 states=[116076,119490) segments=1..=1 finished_slices=35/96 finished_states=119490/327711 resumed_slices=0 elapsed_seconds=277.5
+LAYER0_PROGRESS slice=36/96 states=[119490,122904) segments=1..=1 finished_slices=36/96 finished_states=122904/327711 resumed_slices=0 elapsed_seconds=283.1
+LAYER0_PROGRESS slice=37/96 states=[122904,126318) segments=1..=1 finished_slices=37/96 finished_states=126318/327711 resumed_slices=0 elapsed_seconds=291.9
+LAYER0_PROGRESS slice=38/96 states=[126318,129732) segments=1..=1 finished_slices=38/96 finished_states=129732/327711 resumed_slices=0 elapsed_seconds=298.5
+LAYER0_PROGRESS slice=39/96 states=[129732,133146) segments=1..=1 finished_slices=39/96 finished_states=133146/327711 resumed_slices=0 elapsed_seconds=305.5
+LAYER0_PROGRESS slice=40/96 states=[133146,136560) segments=1..=1 finished_slices=40/96 finished_states=136560/327711 resumed_slices=0 elapsed_seconds=315.6
+LAYER0_PROGRESS slice=41/96 states=[136560,139974) segments=1..=1 finished_slices=41/96 finished_states=139974/327711 resumed_slices=0 elapsed_seconds=327.1
+LAYER0_PROGRESS slice=42/96 states=[139974,143388) segments=1..=1 finished_slices=42/96 finished_states=143388/327711 resumed_slices=0 elapsed_seconds=334.7
+LAYER0_PROGRESS slice=44/96 states=[146802,150216) segments=1..=1 finished_slices=43/96 finished_states=146802/327711 resumed_slices=0 elapsed_seconds=344.5
+LAYER0_PROGRESS slice=43/96 states=[143388,146802) segments=1..=1 finished_slices=44/96 finished_states=150216/327711 resumed_slices=0 elapsed_seconds=344.5
+LAYER0_PROGRESS slice=45/96 states=[150216,153630) segments=1..=1 finished_slices=45/96 finished_states=153630/327711 resumed_slices=0 elapsed_seconds=357.7
+LAYER0_PROGRESS slice=46/96 states=[153630,157044) segments=1..=1 finished_slices=46/96 finished_states=157044/327711 resumed_slices=0 elapsed_seconds=366.8
+LAYER0_PROGRESS slice=47/96 states=[157044,160458) segments=1..=1 finished_slices=47/96 finished_states=160458/327711 resumed_slices=0 elapsed_seconds=374.8
+LAYER0_PROGRESS slice=48/96 states=[160458,163872) segments=1..=1 finished_slices=48/96 finished_states=163872/327711 resumed_slices=0 elapsed_seconds=382.8
+LAYER0_PROGRESS slice=49/96 states=[163872,167286) segments=1..=1 finished_slices=49/96 finished_states=167286/327711 resumed_slices=0 elapsed_seconds=390.8
+LAYER0_PROGRESS slice=50/96 states=[167286,170700) segments=1..=1 finished_slices=50/96 finished_states=170700/327711 resumed_slices=0 elapsed_seconds=398.1
+LAYER0_PROGRESS slice=51/96 states=[170700,174114) segments=1..=1 finished_slices=51/96 finished_states=174114/327711 resumed_slices=0 elapsed_seconds=405.1
+LAYER0_PROGRESS slice=52/96 states=[174114,177528) segments=1..=1 finished_slices=52/96 finished_states=177528/327711 resumed_slices=0 elapsed_seconds=413.4
+LAYER0_PROGRESS slice=53/96 states=[177528,180942) segments=1..=1 finished_slices=53/96 finished_states=180942/327711 resumed_slices=0 elapsed_seconds=421.8
+LAYER0_PROGRESS slice=54/96 states=[180942,184356) segments=1..=1 finished_slices=54/96 finished_states=184356/327711 resumed_slices=0 elapsed_seconds=428.1
+LAYER0_PROGRESS slice=55/96 states=[184356,187770) segments=1..=1 finished_slices=55/96 finished_states=187770/327711 resumed_slices=0 elapsed_seconds=437.2
+LAYER0_PROGRESS slice=56/96 states=[187770,191184) segments=1..=1 finished_slices=56/96 finished_states=191184/327711 resumed_slices=0 elapsed_seconds=441.7
+LAYER0_PROGRESS slice=57/96 states=[191184,194598) segments=1..=1 finished_slices=57/96 finished_states=194598/327711 resumed_slices=0 elapsed_seconds=451.1
+LAYER0_PROGRESS slice=58/96 states=[194598,198012) segments=1..=1 finished_slices=58/96 finished_states=198012/327711 resumed_slices=0 elapsed_seconds=457.7
+LAYER0_PROGRESS slice=59/96 states=[198012,201426) segments=1..=1 finished_slices=59/96 finished_states=201426/327711 resumed_slices=0 elapsed_seconds=464.0
+LAYER0_PROGRESS slice=60/96 states=[201426,204840) segments=1..=1 finished_slices=60/96 finished_states=204840/327711 resumed_slices=0 elapsed_seconds=470.0
+LAYER0_PROGRESS slice=61/96 states=[204840,208254) segments=1..=1 finished_slices=61/96 finished_states=208254/327711 resumed_slices=0 elapsed_seconds=478.3
+LAYER0_PROGRESS slice=62/96 states=[208254,211668) segments=1..=1 finished_slices=62/96 finished_states=211668/327711 resumed_slices=0 elapsed_seconds=489.1
+LAYER0_PROGRESS slice=63/96 states=[211668,215082) segments=1..=1 finished_slices=63/96 finished_states=215082/327711 resumed_slices=0 elapsed_seconds=497.1
+LAYER0_PROGRESS slice=64/96 states=[215082,218496) segments=1..=1 finished_slices=64/96 finished_states=218496/327711 resumed_slices=0 elapsed_seconds=504.4
+LAYER0_PROGRESS slice=65/96 states=[218496,221910) segments=1..=1 finished_slices=65/96 finished_states=221910/327711 resumed_slices=0 elapsed_seconds=512.1
+LAYER0_PROGRESS slice=66/96 states=[221910,225324) segments=1..=1 finished_slices=66/96 finished_states=225324/327711 resumed_slices=0 elapsed_seconds=517.3
+LAYER0_PROGRESS slice=67/96 states=[225324,228738) segments=1..=1 finished_slices=67/96 finished_states=228738/327711 resumed_slices=0 elapsed_seconds=523.9
+LAYER0_PROGRESS slice=68/96 states=[228738,232152) segments=1..=1 finished_slices=68/96 finished_states=232152/327711 resumed_slices=0 elapsed_seconds=530.1
+LAYER0_PROGRESS slice=69/96 states=[232152,235566) segments=1..=1 finished_slices=69/96 finished_states=235566/327711 resumed_slices=0 elapsed_seconds=538.5
+LAYER0_PROGRESS slice=70/96 states=[235566,238980) segments=1..=1 finished_slices=70/96 finished_states=238980/327711 resumed_slices=0 elapsed_seconds=547.2
+LAYER0_PROGRESS slice=71/96 states=[238980,242394) segments=1..=1 finished_slices=71/96 finished_states=242394/327711 resumed_slices=0 elapsed_seconds=553.9
+LAYER0_PROGRESS slice=72/96 states=[242394,245808) segments=1..=1 finished_slices=72/96 finished_states=245808/327711 resumed_slices=0 elapsed_seconds=561.3
+LAYER0_PROGRESS slice=73/96 states=[245808,249222) segments=1..=1 finished_slices=73/96 finished_states=249222/327711 resumed_slices=0 elapsed_seconds=566.6
+LAYER0_PROGRESS slice=74/96 states=[249222,252636) segments=1..=1 finished_slices=74/96 finished_states=252636/327711 resumed_slices=0 elapsed_seconds=572.2
+LAYER0_PROGRESS slice=75/96 states=[252636,256050) segments=1..=1 finished_slices=75/96 finished_states=256050/327711 resumed_slices=0 elapsed_seconds=578.9
+LAYER0_PROGRESS slice=76/96 states=[256050,259464) segments=1..=1 finished_slices=76/96 finished_states=259464/327711 resumed_slices=0 elapsed_seconds=585.2
+LAYER0_PROGRESS slice=77/96 states=[259464,262878) segments=1..=5 finished_slices=77/96 finished_states=262878/327711 resumed_slices=0 elapsed_seconds=592.2
+LAYER0_PROGRESS slice=78/96 states=[262878,266292) segments=5..=5 finished_slices=78/96 finished_states=266292/327711 resumed_slices=0 elapsed_seconds=599.2
+LAYER0_PROGRESS slice=80/96 states=[269706,273120) segments=5..=5 finished_slices=79/96 finished_states=269706/327711 resumed_slices=0 elapsed_seconds=607.1
+LAYER0_PROGRESS slice=81/96 states=[273120,276534) segments=5..=5 finished_slices=80/96 finished_states=273120/327711 resumed_slices=0 elapsed_seconds=607.1
+LAYER0_PROGRESS slice=79/96 states=[266292,269706) segments=5..=5 finished_slices=81/96 finished_states=276534/327711 resumed_slices=0 elapsed_seconds=607.1
+LAYER0_PROGRESS slice=82/96 states=[276534,279948) segments=5..=5 finished_slices=82/96 finished_states=279948/327711 resumed_slices=0 elapsed_seconds=630.9
+LAYER0_PROGRESS slice=83/96 states=[279948,283362) segments=5..=5 finished_slices=83/96 finished_states=283362/327711 resumed_slices=0 elapsed_seconds=640.3
+LAYER0_PROGRESS slice=84/96 states=[283362,286776) segments=5..=5 finished_slices=84/96 finished_states=286776/327711 resumed_slices=0 elapsed_seconds=646.4
+LAYER0_PROGRESS slice=85/96 states=[286776,290190) segments=5..=5 finished_slices=85/96 finished_states=290190/327711 resumed_slices=0 elapsed_seconds=651.4
+LAYER0_PROGRESS slice=86/96 states=[290190,293604) segments=5..=5 finished_slices=86/96 finished_states=293604/327711 resumed_slices=0 elapsed_seconds=660.0
+LAYER0_PROGRESS slice=88/96 states=[297018,300432) segments=5..=5 finished_slices=87/96 finished_states=297018/327711 resumed_slices=0 elapsed_seconds=669.0
+LAYER0_PROGRESS slice=87/96 states=[293604,297018) segments=5..=5 finished_slices=88/96 finished_states=300432/327711 resumed_slices=0 elapsed_seconds=669.0
+LAYER0_PROGRESS slice=89/96 states=[300432,303846) segments=5..=5 finished_slices=89/96 finished_states=303846/327711 resumed_slices=0 elapsed_seconds=683.8
+LAYER0_PROGRESS slice=90/96 states=[303846,307260) segments=5..=5 finished_slices=90/96 finished_states=307260/327711 resumed_slices=0 elapsed_seconds=693.1
+LAYER0_PROGRESS slice=91/96 states=[307260,310674) segments=5..=5 finished_slices=91/96 finished_states=310674/327711 resumed_slices=0 elapsed_seconds=700.2
+LAYER0_PROGRESS slice=92/96 states=[310674,314088) segments=5..=5 finished_slices=92/96 finished_states=314088/327711 resumed_slices=0 elapsed_seconds=707.5
+LAYER0_PROGRESS slice=94/96 states=[317502,320916) segments=5..=5 finished_slices=93/96 finished_states=317502/327711 resumed_slices=0 elapsed_seconds=717.4
+LAYER0_PROGRESS slice=93/96 states=[314088,317502) segments=5..=5 finished_slices=94/96 finished_states=320916/327711 resumed_slices=0 elapsed_seconds=717.4
+LAYER0_PROGRESS slice=95/96 states=[320916,324330) segments=5..=5 finished_slices=95/96 finished_states=324330/327711 resumed_slices=0 elapsed_seconds=734.6
+LAYER0_PROGRESS slice=96/96 states=[324330,327711) segments=5..=all_persisted finished_slices=96/96 finished_states=327711/327711 resumed_slices=0 elapsed_seconds=741.4
+LAYER0_FINDINGS signatures=0 red_states=0 states=327711
+LAYER0_PARALLEL_FINISHED states=327711 slices=96 worker_threads=6 configured_worker_threads=6 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=96 progress_file_after_completion=none elapsed_seconds=749.7
+INV-A-E E2 记录在、根没落 工作线程上每个状态的池级 checker：走到 I-7.8 的 327711 次，只取根判违例 0，并进记录判违例 0，候选 I-7.8b 判违例 0，记录里的水位高于根环里的 262155；观察者取样 1/160
+INV-A-E E2 记录在、根没落 枚举完：states=327711（观察者 327711），耗时 749.7 秒；枚举器自己的判定：oracle 违例 0、不看 journal 那一遍违例 0、checker 判违例的 {}、恢复失败的状态 0、点名验证跑过 262158 / 不过 0
+INV-A-E E2 记录在、根没落 观察者看过 2089 个状态，粗键 2 种：
+INV-A-E E2 记录在、根没落     423 × 崩溃态[自证槽 2+2] 只取根=H 并进记录=H I-7.8b=H 违例=[] → 可写挂载 Ok（施加 0 条，带文件）只取根=H 并进记录=H I-7.8b=H 违例=[]
+INV-A-E E2 记录在、根没落    1666 × 崩溃态[自证槽 2+2] 只取根=H 并进记录=H I-7.8b=H 违例=[] → 可写挂载 Ok（施加 1 条，带文件）只取根=H 并进记录=H I-7.8b=H 违例=[]
+INV-A-E E2 记录在、根没落 I-7.8b 第一处：None
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 750.39s
+

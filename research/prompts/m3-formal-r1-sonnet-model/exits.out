@@ -1,0 +1,11 @@
+replay() 里 break 出口共 10 个
+model行45 Rust行注 [] 最小N=2 条件=if (r.instance, r.counter) != expected:
+model行47 Rust行注 [] 最小N=1 条件=elif r.txg != chain_start_txg or r.ordinal != 1:
+model行50 Rust行注 [] 最小N=2 条件=if prev is not None and r.chain == 'B':                     
+model行52 Rust行注 [] 最小N=2 条件=if not open_publish and r.ordinal != 1:                     
+model行56 Rust行注 ['3138'] 最小N=2 条件=if r.txg != p.txg:
+model行58 Rust行注 ['3143'] 最小N=2 条件=if r.ordinal != p.ordinal + 1:
+model行60 Rust行注 ['3152'] 最小N=2 条件=if not p.commit and r.txn != p.txn:
+model行63 Rust行注 ['3161'] 最小N=1 条件=if not r.commit and r.last:
+model行65 Rust行注 [] 最小N=2 条件=if r.last and readable_same_publish_follows(r, records):    
+model行67 Rust行注 [] 最小N=1 条件=if verify_named_units and not r.verify:                     

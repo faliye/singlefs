@@ -1,0 +1,19 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：m3-formal-code-r2 攻方腿自己的原型，与同会话别的 agent 各跑各的
+history mnt: ending Completed
+  step 0: Applied(Mounted { instance: InstanceGeneration(2), publishes: 2, allocation_records_compared: Compared { publishes: 2 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquisi
+first_states_picked=9 per_segment=1
+history=mnt mode=k2 second=true writes=38 segments=9 closed_form=20496 with_torn=20511 range=0..20511
+states_judged=9 second_states=201027 elapsed_secs=497.0
+ALONE judged count=9
+MOUNT floor=NotRaised count=9
+PUBLISH judged count=9
+R1 outcome=file rebuilt=false o1=green count=8
+R1 outcome=file rebuilt=true o1=green count=1
+SECOND enumerated segments=[2, 14, 2, 1, 2, 12, 2, 1, 2, 12, 2, 1, 2] states=24618 count=4
+SECOND enumerated segments=[2, 14, 2, 1, 2, 12, 2, 1, 2] states=20511 count=5
+SECOND[acquisition] field_not_judged=二次崩溃镜像上的扫描报告 count=72
+SECOND[acquisition] judged count=72
+SECOND[row_publish] field_not_judged=二次崩溃镜像上的扫描报告 count=147555
+SECOND[row_publish] judged count=147555
+SECOND[warm_up] field_not_judged=二次崩溃镜像上的扫描报告 count=53391
+SECOND[warm_up] judged count=53391

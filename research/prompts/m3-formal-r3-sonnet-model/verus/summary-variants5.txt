@@ -1,0 +1,2 @@
+base_plus_witness	verification results:: 15 verified, 0 errors	exit=0
+vacuous_requires_false_plus_witness	verification results:: 14 verified, 1 errors	exit=1

@@ -1,0 +1,14 @@
+base	verification results:: 14 verified, 0 errors	exit=0
+d01_continuity_I83	verification results:: 13 verified, 1 errors	exit=1
+d02_chain_head_without_anchor	verification results:: 13 verified, 1 errors	exit=1
+d03_back_chain	verification results:: 14 verified, 0 errors	exit=0
+d04_first_ordinal_is_1	verification results:: 13 verified, 1 errors	exit=1
+d05_txg_change_in_open_publish	verification results:: 13 verified, 1 errors	exit=1
+d06_ordinal_skip	verification results:: 13 verified, 1 errors	exit=1
+d07_transaction_boundary	verification results:: 14 verified, 0 errors	exit=0
+d08_commit_mark_of_last_record	verification results:: 14 verified, 0 errors	exit=0
+d09_reader_rule_follows	verification results:: 14 verified, 0 errors	exit=0
+d10_named_units_not_verified	verification results:: 14 verified, 0 errors	exit=0
+d11_in_flight_limit	verification results:: 14 verified, 0 errors	exit=0
+d12_top_txg_check	verification results:: 13 verified, 1 errors	exit=1
+d13_above_the_root_filter	verification results:: 13 verified, 1 errors	exit=1

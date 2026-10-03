@@ -1,0 +1,7 @@
+054b9ebee80f05837a000ed704eb552dd4d2527281f03ee52b77bb1576523097  .claude/kb/milestone/03-third-txn.md
+203f86d71dfc2d4cdfb534ed30517f8549ed865c9ddc01aa87fc298245479b0b  .claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md
+576c061884220aa76560cd5cf4b409576fe074fab11d7bf49204897e27bff491  .claude/kb/decisions/13-验证路线.md
+042e559ad774fbc6b11e184846b090171f13ce690e8074742f7a2c9d9a2be6e4  .claude/kb/decisions/23-journal的角色与格式.md
+ce97e481e3d044017acacf5ce12ed20dc99b0e2f56911630fa7d8ecd5636b945  .claude/kb/decisions/16-发布语义.md
+1a47bdc3c83956395b45841bee1a585829b448458bb9f51fd8d266d1d95e58a0  .claude/kb/experiments/01-节点大小vs可恢复性.md
+9c516a472cca21797fc4313718807bf225a7834f4e3228415a6f2650cae888b7  .claude/kb/invariants.md

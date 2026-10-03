@@ -1,0 +1,48 @@
+world	selector	order	pairs	violations
+note3	real(txg,inst)	txg_only	211	0
+note3	real(txg,inst)	(inst,txg)	211	0
+note3	real(txg,inst)	(txg,inst)	211	0
+note3	mutA_tie_low	txg_only	211	0
+note3	mutA_tie_low	(inst,txg)	211	0
+note3	mutA_tie_low	(txg,inst)	211	0
+note3	mutB_instance_major	txg_only	211	0
+note3	mutB_instance_major	(inst,txg)	211	0
+note3	mutB_instance_major	(txg,inst)	211	0
+tie_only	real(txg,inst)	txg_only	65	0
+tie_only	real(txg,inst)	(inst,txg)	65	0
+tie_only	real(txg,inst)	(txg,inst)	65	0
+tie_only	mutA_tie_low	txg_only	65	0
+tie_only	mutA_tie_low	(inst,txg)	65	3
+tie_only	mutA_tie_low	(txg,inst)	65	3
+tie_only	mutB_instance_major	txg_only	65	0
+tie_only	mutB_instance_major	(inst,txg)	65	0
+tie_only	mutB_instance_major	(txg,inst)	65	0
+inversion	real(txg,inst)	txg_only	211	0
+inversion	real(txg,inst)	(inst,txg)	211	9
+inversion	real(txg,inst)	(txg,inst)	211	0
+inversion	mutA_tie_low	txg_only	211	0
+inversion	mutA_tie_low	(inst,txg)	211	42
+inversion	mutA_tie_low	(txg,inst)	211	30
+inversion	mutB_instance_major	txg_only	211	9
+inversion	mutB_instance_major	(inst,txg)	211	0
+inversion	mutB_instance_major	(txg,inst)	211	9
+
+见证（每格第一个；s、u 是读得出的根集合，land 是选根器的结果）：
+tie_only	mutA_tie_low	(inst,txg)	s=[(2, 101)]	u=[(1, 101), (2, 101)]	land(s)=(2, 101)	land(u)=(1, 101)
+tie_only	mutA_tie_low	(txg,inst)	s=[(2, 101)]	u=[(1, 101), (2, 101)]	land(s)=(2, 101)	land(u)=(1, 101)
+inversion	real(txg,inst)	(inst,txg)	s=[(2, 101)]	u=[(1, 102), (2, 101)]	land(s)=(2, 101)	land(u)=(1, 102)
+inversion	mutA_tie_low	(inst,txg)	s=[(2, 101)]	u=[(1, 101), (2, 101)]	land(s)=(2, 101)	land(u)=(1, 101)
+inversion	mutA_tie_low	(txg,inst)	s=[(2, 101)]	u=[(1, 101), (2, 101)]	land(s)=(2, 101)	land(u)=(1, 101)
+inversion	mutB_instance_major	txg_only	s=[(1, 102)]	u=[(1, 102), (2, 101)]	land(s)=(1, 102)	land(u)=(2, 101)
+inversion	mutB_instance_major	(txg,inst)	s=[(1, 102)]	u=[(1, 102), (2, 101)]	land(s)=(1, 102)	land(u)=(2, 101)
+
+真选根器上两种写法判定不同的对数：
+note3	txg_only vs (inst,txg)	differ_pairs=0
+note3	txg_only vs (txg,inst)	differ_pairs=0
+note3	(inst,txg) vs (txg,inst)	differ_pairs=0
+tie_only	txg_only vs (inst,txg)	differ_pairs=0
+tie_only	txg_only vs (txg,inst)	differ_pairs=0
+tie_only	(inst,txg) vs (txg,inst)	differ_pairs=0
+inversion	txg_only vs (inst,txg)	differ_pairs=9
+inversion	txg_only vs (txg,inst)	differ_pairs=0
+inversion	(inst,txg) vs (txg,inst)	differ_pairs=9

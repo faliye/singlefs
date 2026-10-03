@@ -1,0 +1,16 @@
+history=mkmnt mode=k2 second=true writes=12 segments=7 closed_form=18 with_torn=33 range=0..33
+states_judged=33 second_states=5013 elapsed_secs=4.2
+ALONE judged count=18
+MOUNT floor=NotRaised count=18
+MOUNT refused verdict=Legal(NewerPublishWitnessedBySystemConfiguration) member=NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheS count=15
+    e.g. ordinal=31 R1: eff=Some((1, 2)) cmp(inst,txg,W,F)=Some((1, 2, 65536, 0)) applied=0 above=0 sc_inst=Some(1) ring_inst=Some(1) ring_txg=Some(2) rec_txg=Some(2) F=Some(0)
+    e.g. ordinal=1 R1: eff=Some((0, 0)) cmp(inst,txg,W,F)=Some((0, 0, 65536, 0)) applied=0 above=0 sc_inst=Some(0) ring_inst=Some(0) ring_txg=Some(0) rec_txg=None F=Some(0)
+PUBLISH judged count=18
+R1 outcome=no_file rebuilt=false o1=green count=30
+R1 outcome=no_file rebuilt=true o1=green count=3
+SECOND[acquisition] field_not_judged=二次崩溃镜像上的扫描报告 count=144
+SECOND[acquisition] judged count=144
+SECOND[row_publish] field_not_judged=二次崩溃镜像上的扫描报告 count=4551
+SECOND[row_publish] judged count=4551
+SECOND[warm_up] field_not_judged=二次崩溃镜像上的扫描报告 count=300
+SECOND[warm_up] judged count=300

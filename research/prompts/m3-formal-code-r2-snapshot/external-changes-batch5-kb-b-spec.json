@@ -1,0 +1,206 @@
+[
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "头 311 字节 = 十个字段 78 + 四笔增量 21（事务边界 9、本次发布内序号 4、反向链 4、载荷校验和 4）+ 新根段 188 + fsid 8 + MAC 16",
+  "new": "头 487 字节 = 十个字段 78 + 四笔增量 21（事务边界 9、本次发布内序号 4、反向链 4、载荷校验和 4）+ 新根段 364 + fsid 8 + MAC 16",
+  "basis": "research/prompts/m3-ring-r3-main-verification.md 第二节第 1、2 行（回到甲：新根段带三个字段）；research/prompts/m3-ring-r2-main-verification.md 第二节第 2 行（首个文件、卸载补）；research/prompts/m3-ring-r1-main-verification.md 第四节第 1 条；字段与宽度取 research/prompts/m3-ring-r1-sonnet-output.md H1-b 的 γ 路（86 + 86 + 4，头 311 → 487、点名项 67 → 64）"
+ },
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "。头 **311 字节**：",
+  "new": "。头 **487 字节**：",
+  "basis": "research/prompts/m3-ring-r3-main-verification.md 第二节第 1、2 行（回到甲：新根段带三个字段）；research/prompts/m3-ring-r2-main-verification.md 第二节第 2 行（首个文件、卸载补）；research/prompts/m3-ring-r1-main-verification.md 第四节第 1 条；字段与宽度取 research/prompts/m3-ring-r1-sonnet-output.md H1-b 的 γ 路（86 + 86 + 4，头 311 → 487、点名项 67 → 64）"
+ },
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "新根段 99、fsid 287、MAC 295、头末 311",
+  "new": "新根段 99、fsid 463、MAC 471、头末 487",
+  "basis": "research/prompts/m3-ring-r3-main-verification.md 第二节第 1、2 行（回到甲：新根段带三个字段）；research/prompts/m3-ring-r2-main-verification.md 第二节第 2 行（首个文件、卸载补）；research/prompts/m3-ring-r1-main-verification.md 第四节第 1 条；字段与宽度取 research/prompts/m3-ring-r1-sonnet-output.md H1-b 的 γ 路（86 + 86 + 4，头 311 → 487、点名项 67 → 64）；偏移 = 99 + 364 = 463，463 + 8 = 471，471 + 16 = 487"
+ },
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "- **已定项 15 的新根段 188 字节**（树表指针 86 + 映射根指针 86 + 树 ID 水位 8 + F 8）。",
+  "new": "- **已定项 15 的新根段 364 字节**（树表指针 86 + 映射根指针 86 + 树 ID 水位 8 + F 8 + 实例表指针 86 + 分配记录树根指针 86 + 卸载记号 4）。",
+  "basis": "research/prompts/m3-ring-r3-main-verification.md 第二节第 1、2 行（回到甲：新根段带三个字段）；research/prompts/m3-ring-r2-main-verification.md 第二节第 2 行（首个文件、卸载补）；research/prompts/m3-ring-r1-main-verification.md 第四节第 1 条；字段与宽度取 research/prompts/m3-ring-r1-sonnet-output.md H1-b 的 γ 路（86 + 86 + 4，头 311 → 487、点名项 67 → 64）"
+ },
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "- 登记值就是 311（`JOURNAL_HEADER_BYTES`）；十个字段的 78 另登记为 `JOURNAL_HEADER_TEN_FIELD_BYTES`。**说 78 时要写明指的是十个字段，连同这一句一起引。** 311 占 512 扇区的 61%，其后还余 **201 字节**（装得下 3 个点名项，每项 56 字节）；4096 上余 **3785**（67 个点名项，⌊(4096 − 311) ÷ 56⌋ = ⌊3785 / 56⌋）。",
+  "new": "- 登记值就是 487（`JOURNAL_HEADER_BYTES`）；十个字段的 78 另登记为 `JOURNAL_HEADER_TEN_FIELD_BYTES`。**说 78 时要写明指的是十个字段，连同这一句一起引。** 487 占 512 扇区的 95%，其后还余 **25 字节**（装不下一个点名项，每项 56 字节）；4096 上余 **3609**（64 个点名项，⌊(4096 − 487) ÷ 56⌋ = ⌊3609 / 56⌋）。",
+  "basis": "research/prompts/m3-ring-r3-main-verification.md 第二节第 1、2 行（回到甲：新根段带三个字段）；research/prompts/m3-ring-r2-main-verification.md 第二节第 2 行（首个文件、卸载补）；research/prompts/m3-ring-r1-main-verification.md 第四节第 1 条；字段与宽度取 research/prompts/m3-ring-r1-sonnet-output.md H1-b 的 γ 路（86 + 86 + 4，头 311 → 487、点名项 67 → 64）；算术：487 / 512 = 95.1%，512 − 487 = 25，4096 − 487 = 3609，3609 ÷ 56 = 64.4"
+ },
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "<!-- format-const: JOURNAL_HEADER_BYTES = 311 stale=",
+  "new": "<!-- format-const: JOURNAL_HEADER_BYTES = 487 stale=",
+  "basis": "research/prompts/m3-ring-r3-main-verification.md 第二节第 1、2 行（回到甲：新根段带三个字段）；research/prompts/m3-ring-r2-main-verification.md 第二节第 2 行（首个文件、卸载补）；research/prompts/m3-ring-r1-main-verification.md 第四节第 1 条；字段与宽度取 research/prompts/m3-ring-r1-sonnet-output.md H1-b 的 γ 路（86 + 86 + 4，头 311 → 487、点名项 67 → 64）；format-const 标记是格式常量的权威，值跟着正文改，源码 const 随实现簇追平"
+ },
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "无实验：补的是读者规则的射程，没有新的实验读数。\n",
+  "new": "无实验：补的是读者规则的射程，没有新的实验读数。\n- 新根段加实例表指针、分配记录树根指针与卸载记号三项（头 311 → 487、点名项 67 → 64）：三方判决 `research/prompts/m3-ring-r1-main-verification.md` 第二节第 2 行（今天的施加法在写行、首个文件、卸载三种发布上补出错根，推的）与第四节第 1 条，`research/prompts/m3-ring-r2-main-verification.md` 第二节第 2 行（首个文件、卸载两种发布补进去之后与当初会写的根逐字节相同、checker 绿，攻方在副本上量的），`research/prompts/m3-ring-r3-main-verification.md` 第二节第 1、2 行（两位放进记录标志字节的形态被专用清扫发布打穿；施加处不从新根段来的只有卸载记号、实例表指针、分配记录树根三项）。用户定案「回到甲」（原话在变更史）。卸载记号占 4 字节是第一轮正推腿 H1-b 的算法（86 + 86 + 4），判决没有单独定宽。无实验：补的是施加处的字节，数都在三方副本上量过，没立实验号。\n",
+  "basis": "research/prompts/m3-ring-r3-main-verification.md 第二节第 1、2 行（回到甲：新根段带三个字段）；research/prompts/m3-ring-r2-main-verification.md 第二节第 2 行（首个文件、卸载补）；research/prompts/m3-ring-r1-main-verification.md 第四节第 1 条；字段与宽度取 research/prompts/m3-ring-r1-sonnet-output.md H1-b 的 γ 路（86 + 86 + 4，头 311 → 487、点名项 67 → 64）"
+ },
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "- 与已定项 4 相容：记录头 311 字节要完整落在",
+  "new": "- 与已定项 4 相容：记录头 487 字节要完整落在",
+  "basis": "research/prompts/m3-ring-r3-main-verification.md 第二节第 1、2 行（回到甲：新根段带三个字段）；research/prompts/m3-ring-r2-main-verification.md 第二节第 2 行（首个文件、卸载补）；research/prompts/m3-ring-r1-main-verification.md 第四节第 1 条；字段与宽度取 research/prompts/m3-ring-r1-sonnet-output.md H1-b 的 γ 路（86 + 86 + 4，头 311 → 487、点名项 67 → 64）"
+ },
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "- 4 KiB 记录装 67 个点名项 <!-- format-const: JOURNAL_NAMED_ENTRIES_PER_RECORD = 67 -->",
+  "new": "- 4 KiB 记录装 64 个点名项 <!-- format-const: JOURNAL_NAMED_ENTRIES_PER_RECORD = 64 -->",
+  "basis": "research/prompts/m3-ring-r3-main-verification.md 第二节第 1、2 行（回到甲：新根段带三个字段）；research/prompts/m3-ring-r2-main-verification.md 第二节第 2 行（首个文件、卸载补）；research/prompts/m3-ring-r1-main-verification.md 第四节第 1 条；字段与宽度取 research/prompts/m3-ring-r1-sonnet-output.md H1-b 的 γ 路（86 + 86 + 4，头 311 → 487、点名项 67 → 64）"
+ },
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "（4096 记录 67 项）",
+  "new": "（4096 记录 64 项）",
+  "basis": "research/prompts/m3-ring-r3-main-verification.md 第二节第 1、2 行（回到甲：新根段带三个字段）；research/prompts/m3-ring-r2-main-verification.md 第二节第 2 行（首个文件、卸载补）；research/prompts/m3-ring-r1-main-verification.md 第四节第 1 条；字段与宽度取 research/prompts/m3-ring-r1-sonnet-output.md H1-b 的 γ 路（86 + 86 + 4，头 311 → 487、点名项 67 → 64）"
+ },
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "由记录重建那次发布的根：记录头带 188 字节新根段，施加一条记录 = 换掉所选根的四个字段；一次发布的每条记录带同一份",
+  "new": "由记录重建那次发布的根：记录头带 364 字节新根段，施加一条记录 = 换掉所选根的七个字段；一次发布的每条记录带同一份",
+  "basis": "research/prompts/m3-ring-r3-main-verification.md 第二节第 2 行（施加处实例表指针、卸载记号、分配记录树根三项从新根段来）；research/prompts/m3-ring-r3-main-verification.md 第四节末用户 2026-10-02「回到甲」"
+ },
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "回退下界 F 8 = 188 字节 <!-- format-const: JOURNAL_NEW_ROOT_SEGMENT_BYTES = 188 -->（实例表单元指针照所选根），4096 记录装 67 个点名项。施加一条记录 = 把所选根的这四个字段换成记录里的，不需要树语义。",
+  "new": "回退下界 F 8 + 实例表单元指针 86 + 分配记录树根指针 86 + 卸载记号 4 = 364 字节 <!-- format-const: JOURNAL_NEW_ROOT_SEGMENT_BYTES = 364 -->，4096 记录装 64 个点名项。施加一条记录 = 把所选根的这七个字段换成记录里的（实例表指针、卸载记号、分配记录树根从新根段来，不再照抄所选根），不需要树语义。",
+  "basis": "research/prompts/m3-ring-r3-main-verification.md 第二节第 2 行（施加处实例表指针、卸载记号、分配记录树根三项从新根段来）；research/prompts/m3-ring-r3-main-verification.md 第四节末用户 2026-10-02「回到甲」；86 + 86 + 8 + 8 + 86 + 86 + 4 = 364"
+ },
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "两条指针的宽度随 D19（块指针的结构与宽度预算） 已定项 7 / 11 走",
+  "new": "指针的宽度随 D19（块指针的结构与宽度预算） 已定项 7 / 11 走",
+  "basis": "research/prompts/m3-ring-r3-main-verification.md 第二节第 2 行（施加处实例表指针、卸载记号、分配记录树根三项从新根段来）；research/prompts/m3-ring-r3-main-verification.md 第四节末用户 2026-10-02「回到甲」"
+ },
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "- 用户定案 2026-10-01：「多条记录的发布每条都带同一份新根段」补进已定项 15（`research/prompts/m3-inv-b-r1-main-verification.md` 第四节第 3 条），原话在变更史。\n",
+  "new": "- 用户定案 2026-10-01：「多条记录的发布每条都带同一份新根段」补进已定项 15（`research/prompts/m3-inv-b-r1-main-verification.md` 第四节第 3 条），原话在变更史。\n- 三方判决 `research/prompts/m3-ring-r3-main-verification.md` 第二节第 1、2 行：施加处的实例表指针、卸载记号、分配记录树根三项改从新根段来（首个文件、卸载两种发布补进去之后施加出来的根与当初会写的逐字节相同，攻方量的；专用清扫发布崩在记录已持久、根槽没持久时，实例表指针照抄所选根会让下一次可写挂载在取号之前被拒，攻方在副本上量的）；用户定案 2026-10-02「回到甲」，原话在变更史。无实验：数都在三方副本上，没立实验号。\n",
+  "basis": "research/prompts/m3-ring-r3-main-verification.md 第二节第 2 行（施加处实例表指针、卸载记号、分配记录树根三项从新根段来）；research/prompts/m3-ring-r3-main-verification.md 第四节末用户 2026-10-02「回到甲」"
+ },
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "- 回退时标签 6 的 n_live 现算读法：`research/prompts/m3-blanks-r1-main-verification.md` 第四节「回退那一刻 n_live 怎么现算」那一行（零轮；主 agent 采纳正推腿的读法）。\n",
+  "new": "- 回退时标签 6 的 n_live 现算读法：`research/prompts/m3-blanks-r1-main-verification.md` 第四节「回退那一刻 n_live 怎么现算」那一行（零轮；主 agent 采纳正推腿的读法）。\n- 三方判决 `research/prompts/m3-ring-r3-main-verification.md` 第二节第 9 行：清扫把读成功的全零根槽当没有根，会抹掉仍在环里的被抛弃根引用的单元，违反这一项正文明文的保护；全零根槽不当「没有根」、每槽自证过或全零否则重读一次仍不过就不删，两处收严采纳（零轮，推的，没造盘面）。无实验：保护的对象是被抛弃时间线的残余，不是活数据。\n",
+  "basis": "research/prompts/m3-ring-r3-main-verification.md 第二节第 9 行（清扫把读成功的全零根槽当没有根，违反已定项 14 的明文保护；两处收严零轮）；回退候选集随 research/prompts/m3-ring-r2-main-verification.md 第二节第 6 行与 research/prompts/m3-ring-r3-main-verification.md 第二节第 5 行的五处同改"
+ },
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "第三节 5c 行）。\n\n**依据**：",
+  "new": "第三节 5c 行）。\n- 实例表删行的清扫（D18（块里携带什么信息） 已定项 11 的「回收」一条）保护被抛弃根引用的单元：读成功的全零根槽不当「没有根」，每个槽须自证过或全零，否则重读一次、仍不过就这次不删（零轮，推的，没造盘面）。\n\n**依据**：",
+  "basis": "research/prompts/m3-ring-r3-main-verification.md 第二节第 9 行（清扫把读成功的全零根槽当没有根，违反已定项 14 的明文保护；两处收严零轮）；回退候选集随 research/prompts/m3-ring-r2-main-verification.md 第二节第 6 行与 research/prompts/m3-ring-r3-main-verification.md 第二节第 5 行的五处同改"
+ },
+ {
+  "file": ".claude/kb/decisions/23-journal的角色与格式.md",
+  "old": "txg ≥ F_生效（D16（发布语义） 已定项 1）∧ 带文件（那一版写过文件",
+  "new": "txg ≥ F_生效（D16（发布语义） 已定项 1）∧ txg 落在一圈窗口里（D16（发布语义） 已定项 1）∧ 带文件（那一版写过文件",
+  "basis": "回退候选集是一圈窗口同改的五处之一：research/prompts/m3-ring-r2-main-verification.md 第二节第 6 行、research/prompts/m3-ring-r3-main-verification.md 第二节第 5 行；用户 2026-10-02 定窗口五处同改"
+ },
+ {
+  "file": ".claude/kb/decisions/16-发布语义.md",
+  "old": "可再分配 ⟺ 已释放 ∧ 释放代 ≤ max(F_生效, 环里最旧有效根)；F 另记进系统配置",
+  "new": "可再分配 ⟺ 已释放 ∧ 释放代 ≤ max(F_生效, 窗口里最旧有效根)；F 另记进系统配置",
+  "basis": "research/prompts/m3-ring-r2-main-verification.md 第二节第 4、5、6 行（一圈窗口站住、锚在环里读得出的最新有效根、四处同改）；research/prompts/m3-ring-r3-main-verification.md 第二节第 3、4、5 行（第二次抽样没打中、读坏中间根门槛收严零轮、同改清单改成五处、「与装置里跑的一字不差」那一句与 E139 重跑记进实现清单）；用户定案取一圈窗口（research/prompts/m3-ring-r2-main-verification.md 第四节末第 2 条、research/prompts/m3-ring-r3-main-verification.md 第四节末第 2 条）"
+ },
+ {
+  "file": ".claude/kb/decisions/16-发布语义.md",
+  "old": "形态取 E139（按盘回退下界的收严形态） 的臂 G2S，与装置里跑的一字不差：",
+  "new": "形态取 E139（按盘回退下界的收严形态） 的臂 G2S；回收门槛取一圈窗口之后，装置里没有窗口这一项，这一句不再与装置里跑的一字不差，欠里记着 E139（按盘回退下界的收严形态） 要重跑：",
+  "basis": "research/prompts/m3-ring-r2-main-verification.md 第二节第 4、5、6 行（一圈窗口站住、锚在环里读得出的最新有效根、四处同改）；research/prompts/m3-ring-r3-main-verification.md 第二节第 3、4、5 行（第二次抽样没打中、读坏中间根门槛收严零轮、同改清单改成五处、「与装置里跑的一字不差」那一句与 E139 重跑记进实现清单）；用户定案取一圈窗口（research/prompts/m3-ring-r2-main-verification.md 第四节末第 2 条、research/prompts/m3-ring-r3-main-verification.md 第四节末第 2 条）"
+ },
+ {
+  "file": ".claude/kb/decisions/16-发布语义.md",
+  "old": "| 可再分配 | 已释放 ∧ 释放代 ≤ max(F_生效, 环里最旧有效根) |",
+  "new": "| 可再分配 | 已释放 ∧ 释放代 ≤ max(F_生效, 一圈窗口里最旧有效根) |",
+  "basis": "research/prompts/m3-ring-r2-main-verification.md 第二节第 4、5、6 行（一圈窗口站住、锚在环里读得出的最新有效根、四处同改）；research/prompts/m3-ring-r3-main-verification.md 第二节第 3、4、5 行（第二次抽样没打中、读坏中间根门槛收严零轮、同改清单改成五处、「与装置里跑的一字不差」那一句与 E139 重跑记进实现清单）；用户定案取一圈窗口（research/prompts/m3-ring-r2-main-verification.md 第四节末第 2 条、research/prompts/m3-ring-r3-main-verification.md 第四节末第 2 条）"
+ },
+ {
+  "file": ".claude/kb/decisions/16-发布语义.md",
+  "old": "| 环里最旧有效根 | 盘上全部根槽里自证合法、按实例表判仍然有效的根的最小 checkpoint_txg；写失败的槽按旧内容算，在飞、没持久的发布不算 |\n",
+  "new": "| 环里最旧有效根 | 盘上全部根槽里自证合法、按实例表判仍然有效的根的最小 checkpoint_txg；写失败的槽按旧内容算，在飞、没持久的发布不算 |\n| 一圈窗口里最旧有效根 | N = 环里读得出的最新有效根的 txg（挂载重建分配器时取它、不取 first_txg − 1；进程内每记一条根时取这条根）；窗口 = txg > N − 3S（一圈，3S 是环长）；窗口里自证合法、按实例表判仍然有效的根的最小 checkpoint_txg。挂载时读不出的槽在窗口里只对应一两个 txg：门槛按最小的算，根环表记最大的（零轮，只在攻方模型上量过）。同取这个窗口的五处：分配器的回收门槛、checker 的候选过滤、checker 的 I-3.1（已分配统计对得上） 丁-defer 门槛（max(F_生效, 窗口里最旧有效根)）、影子账的候选过滤、回退候选集 |\n",
+  "basis": "research/prompts/m3-ring-r2-main-verification.md 第二节第 4、5、6 行（一圈窗口站住、锚在环里读得出的最新有效根、四处同改）；research/prompts/m3-ring-r3-main-verification.md 第二节第 3、4、5 行（第二次抽样没打中、读坏中间根门槛收严零轮、同改清单改成五处、「与装置里跑的一字不差」那一句与 E139 重跑记进实现清单）；用户定案取一圈窗口（research/prompts/m3-ring-r2-main-verification.md 第四节末第 2 条、research/prompts/m3-ring-r3-main-verification.md 第四节末第 2 条）"
+ },
+ {
+  "file": ".claude/kb/decisions/16-发布语义.md",
+  "old": "| 回退候选集 | 按现行那一版的实例表判仍然有效 ∧ txg ≥ F_生效（D23（journal 的角色与格式） 已定项 14 的挂着时回退取同一个集合） |",
+  "new": "| 回退候选集 | 按现行那一版的实例表判仍然有效 ∧ txg ≥ F_生效 ∧ txg 落在一圈窗口里（D23（journal 的角色与格式） 已定项 14 的挂着时回退取同一个集合） |",
+  "basis": "research/prompts/m3-ring-r2-main-verification.md 第二节第 4、5、6 行（一圈窗口站住、锚在环里读得出的最新有效根、四处同改）；research/prompts/m3-ring-r3-main-verification.md 第二节第 3、4、5 行（第二次抽样没打中、读坏中间根门槛收严零轮、同改清单改成五处、「与装置里跑的一字不差」那一句与 E139 重跑记进实现清单）；用户定案取一圈窗口（research/prompts/m3-ring-r2-main-verification.md 第四节末第 2 条、research/prompts/m3-ring-r3-main-verification.md 第四节末第 2 条）"
+ },
+ {
+  "file": ".claude/kb/decisions/16-发布语义.md",
+  "old": "（会话里落点取不到 C283（准入失败时不先推发布就报 ENOSPC） 不管、只崩了再挂就把小盘挂死）。\n",
+  "new": "（会话里落点取不到 C283（准入失败时不先推发布就报 ENOSPC） 不管、只崩了再挂就把小盘挂死）。\n- 回收门槛取一圈窗口：三方判决 `research/prompts/m3-ring-r2-main-verification.md` 第二节第 4、5、6 行（窗口字面第一次抽样没打中；锚写死成环里读得出的最新有效根；分配器、checker、影子账候选过滤、回退候选集同改）与 `research/prompts/m3-ring-r3-main-verification.md` 第二节第 3、4、5 行（第二次抽样没打中；读坏的中间根那一格门槛按最小 txg 算、根环表记最大，零轮；同改清单加 checker 的 I-3.1（已分配统计对得上） 丁-defer 门槛，合计五处；定案里「与装置里跑的一字不差」那一句改写）。用户定案：取一圈窗口、「抹」不做（原话在变更史）。无实验：窗口形态在三方副本上量过，没立实验号，副本上的数不是入库装置上的数，E139（按盘回退下界的收严形态） 重跑欠着（欠里记着）。\n",
+  "basis": "research/prompts/m3-ring-r2-main-verification.md 第二节第 4、5、6 行（一圈窗口站住、锚在环里读得出的最新有效根、四处同改）；research/prompts/m3-ring-r3-main-verification.md 第二节第 3、4、5 行（第二次抽样没打中、读坏中间根门槛收严零轮、同改清单改成五处、「与装置里跑的一字不差」那一句与 E139 重跑记进实现清单）；用户定案取一圈窗口（research/prompts/m3-ring-r2-main-verification.md 第四节末第 2 条、research/prompts/m3-ring-r3-main-verification.md 第四节末第 2 条）"
+ },
+ {
+  "file": ".claude/kb/decisions/16-发布语义.md",
+  "old": "C563（读根环一槽读坏就当没有根，别的调用方没判）。\n",
+  "new": "C563（读根环一槽读坏就当没有根，别的调用方没判）；E139（按盘回退下界的收严形态） 重跑：回收门槛改成一圈窗口（锚在环里读得出的最新有效根，读不出的槽按最小 txg 算门槛、根环表记最大）、五处同改之后，装置要照新条款重跑（`research/prompts/m3-ring-r3-main-verification.md` 第二节第 5 行与第三节）。\n",
+  "basis": "research/prompts/m3-ring-r2-main-verification.md 第二节第 4、5、6 行（一圈窗口站住、锚在环里读得出的最新有效根、四处同改）；research/prompts/m3-ring-r3-main-verification.md 第二节第 3、4、5 行（第二次抽样没打中、读坏中间根门槛收严零轮、同改清单改成五处、「与装置里跑的一字不差」那一句与 E139 重跑记进实现清单）；用户定案取一圈窗口（research/prompts/m3-ring-r2-main-verification.md 第四节末第 2 条、research/prompts/m3-ring-r3-main-verification.md 第四节末第 2 条）"
+ },
+ {
+  "file": ".claude/kb/decisions/22-单元原子性怎么合成.md",
+  "old": "那一行。mkfs 中途崩溃（第一道屏障之前）该挂上旧池",
+  "new": "那一行。可写挂载读系统配置的见证按盘读（S-辨：一槽撕裂、另一槽自证过，与设备读不出分开），判不出 ⟺ 有槽设备报读错，且没有一块盘两槽都自证过（R2，用户定，被攻过零轮，原话在变更史）。丢写的界按类写：全池读回一个值的纯形丢写 120 格，一盘报读错、另一盘读回全 0 的混合形丢写 0 格（C331（择根倒挂压过已确认的写） 网格上的格数，副本上量的），丢写格都落在每盘各坏一槽系统配置、同时最新根一时读不出的双故障形里。mkfs 中途崩溃（第一道屏障之前）该挂上旧池",
+  "basis": "research/prompts/m3-ring-r2-main-verification.md 第二节第 9 行（S-辨 按盘读站得住）；research/prompts/m3-ring-r3-main-verification.md 第二节第 7、8 行（混合形丢写 240、界按类写、R2 零轮）与第四节末「R2 验证」段、用户定改取 R2"
+ },
+ {
+  "file": ".claude/kb/decisions/22-单元原子性怎么合成.md",
+  "old": "- 用户定案，原话在变更史。\n\n**欠**：C79（系统配置与 journal 环的放置没人定）",
+  "new": "- 用户定案，原话在变更史。\n- 系统配置见证读按盘读、判不出取 R2：三方判决 `research/prompts/m3-ring-r2-main-verification.md` 第二节第 9 行（按盘读站得住）与 `research/prompts/m3-ring-r3-main-verification.md` 第二节第 7、8 行（按盘读加每盘合起来混合形丢写 240，界按类写；R2 零轮）、第四节末「R2 验证」段（R2 在 C331（择根倒挂压过已确认的写） 网格上量过：纯形 120、混合形 0，混合形多拒 116 格；八趟网格由事务员在新副本上复核，与辩方日志逐键逐行字节相同，网格不在仓里）。用户定案：改取 R2（原话在变更史）。无实验：数都在三方副本与事务员的副本上，没立实验号。\n\n**欠**：C79（系统配置与 journal 环的放置没人定）",
+  "basis": "research/prompts/m3-ring-r2-main-verification.md 第二节第 9 行（S-辨 按盘读站得住）；research/prompts/m3-ring-r3-main-verification.md 第二节第 7、8 行（混合形丢写 240、界按类写、R2 零轮）与第四节末「R2 验证」段、用户定改取 R2"
+ },
+ {
+  "file": ".claude/kb/decisions/18-块里携带什么信息.md",
+  "old": "C335（根槽持续读不出时实例表只增不减））。量词取「池中每一个」",
+  "new": "C335（根槽持续读不出时实例表只增不减））。读成功的全零根槽不当「没有根」；每个槽须自证过或全零，否则重读一次，仍不过就这次不删。**删行落在一次专用的清扫发布上**：抹头全部 FUA 返回、过一道屏障之后才发这次清扫发布；读失败、设备不全不删。量词取「池中每一个」",
+  "basis": "research/prompts/m3-ring-r2-main-verification.md 第二节第 10 行（删行落在专用清扫发布、抹头先于它、读失败不删；(j, 0, 0) 行删不掉的一半成立）；research/prompts/m3-ring-r3-main-verification.md 第二节第 9 行（读成功的全零根槽不当没有根，两处收严）；落点现查：回收条件在本文件已定项 11「回收」一条，I-3.8 草案在 .claude/kb/invariants.md，C597 在 .claude/kb/checks-owed.md，欠里已有 C597"
+ },
+ {
+  "file": ".claude/kb/decisions/18-块里携带什么信息.md",
+  "old": "区域 2 落在第三块盘上的那一格等三块盘开线时补（`research/prompts/m3-code-r3-main-verification.md` 第四节）。",
+  "new": "区域 2 落在第三块盘上的那一格等三块盘开线时补（`research/prompts/m3-code-r3-main-verification.md` 第四节）。实例表删行的清扫：连崩挂载留下的 (j, 0, 0) 行（恢复给严格介于所选根的实例与新实例之间的实例写的行），下一次挂载取号之前删不掉，j 的单元还在；那次挂载的写行把 j 的单元全盖掉，再下一次挂载才删得掉（攻方在副本上量的，S = 4、两段历史；`research/prompts/m3-ring-r2-main-verification.md` 第二节第 10 行）。",
+  "basis": "research/prompts/m3-ring-r2-main-verification.md 第二节第 10 行（删行落在专用清扫发布、抹头先于它、读失败不删；(j, 0, 0) 行删不掉的一半成立）；research/prompts/m3-ring-r3-main-verification.md 第二节第 9 行（读成功的全零根槽不当没有根，两处收严）；落点现查：回收条件在本文件已定项 11「回收」一条，I-3.8 草案在 .claude/kb/invariants.md，C597 在 .claude/kb/checks-owed.md，欠里已有 C597"
+ },
+ {
+  "file": ".claude/kb/decisions/18-块里携带什么信息.md",
+  "old": "已定项 4 的 311 字节头（含已定项 15 的新根段 188、",
+  "new": "已定项 4 的 487 字节头（含已定项 15 的新根段 364、",
+  "basis": "research/prompts/m3-ring-r3-main-verification.md 第二节第 1、2 行（回到甲：新根段带三个字段）；research/prompts/m3-ring-r2-main-verification.md 第二节第 2 行（首个文件、卸载补）；research/prompts/m3-ring-r1-main-verification.md 第四节第 1 条；字段与宽度取 research/prompts/m3-ring-r1-sonnet-output.md H1-b 的 γ 路（86 + 86 + 4，头 311 → 487、点名项 67 → 64）"
+ },
+ {
+  "file": ".claude/kb/decisions/18-块里携带什么信息.md",
+  "old": "`research/prompts/m3-code-r2-main-verification.md`、`research/prompts/m3-code-r3-main-verification.md`）。\n\n**欠**",
+  "new": "`research/prompts/m3-code-r2-main-verification.md`、`research/prompts/m3-code-r3-main-verification.md`）。\n- 实例表删行与整轮清扫器：三方判决 `research/prompts/m3-ring-r1-main-verification.md` 第二节第 10 行与第四节第 4 条（I-3.8（实例表行唯一且低于挂载根） 草案的条件要整轮清扫，仓里没有清扫器；用户 2026-10-01 定现在做），`research/prompts/m3-ring-r2-main-verification.md` 第二节第 10 行（删行落在专用的清扫发布上、抹头先于它、读失败不删；(j, 0, 0) 行删不掉的一半成立），`research/prompts/m3-ring-r3-main-verification.md` 第二节第 9 行（读成功的全零根槽不当没有根、每槽自证过或全零否则重读一次仍不过就不删，两处收严零轮）。无实验：清扫器是条款，仓里零代码，数都在三方副本上。\n\n**欠**",
+  "basis": "research/prompts/m3-ring-r2-main-verification.md 第二节第 10 行（删行落在专用清扫发布、抹头先于它、读失败不删；(j, 0, 0) 行删不掉的一半成立）；research/prompts/m3-ring-r3-main-verification.md 第二节第 9 行（读成功的全零根槽不当没有根，两处收严）；落点现查：回收条件在本文件已定项 11「回收」一条，I-3.8 草案在 .claude/kb/invariants.md，C597 在 .claude/kb/checks-owed.md，欠里已有 C597"
+ },
+ {
+  "file": ".claude/kb/decisions-history.md",
+  "old": "## D23（journal 的角色与格式）\n\n### 2026-10-02\n\n",
+  "new": "## D23（journal 的角色与格式）\n\n### 2026-10-03\n\n- D23（journal 的角色与格式） 已定项 4、14、15：记录头新根段加三个字段（头 311 → 487、点名项 67 → 64），施加时三项从新根段来，清扫保护被抛弃根引用的单元\n  - **结论**：记录头新根段改成带实例表指针、卸载记号与分配记录树根三项（头 311 → 487、点名项 67 → 64），首个文件、卸载、清扫三种发布由记录施加时补出与当初会写的相同的根；两位放进标志字节（乙）被专用清扫发布打穿，回到三字段（用户 2026-10-02 定）。\n  - 落到正文：已定项 4 索引行与定案（新根段 188 → 364，字段偏移 fsid 287 → 463、MAC 295 → 471、头末 311 → 487，占 512 扇区 61% → 95%、其后余 201 → 25 字节，4096 上余 3785 → 3609）与 `JOURNAL_HEADER_BYTES` 标记 311 → 487；已定项 12 的头宽、「装 67 个点名项」与 `JOURNAL_NAMED_ENTRIES_PER_RECORD` 标记 67 → 64；已定项 17 末条跨记录段的「67 项」→「64 项」；已定项 15 索引行与定案（新根段 188 → 364，施加一条记录换掉所选根的字段四个 → 七个，实例表指针、卸载记号、分配记录树根从新根段来、不再照抄所选根）与 `JOURNAL_NEW_ROOT_SEGMENT_BYTES` 标记 188 → 364、射程「两条指针」→「指针」；已定项 14 候选集一行加「txg 落在一圈窗口里」（D16（发布语义） 已定项 1 一圈窗口五处同改里的回退候选集），射程加一句清扫保护被抛弃根引用的单元（读成功的全零根槽不当「没有根」、每个槽须自证过或全零否则重读一次、仍不过就这次不删，零轮）；三项依据各加一条。\n  - **依据**：三方判决 `research/prompts/m3-ring-r1-main-verification.md` 第二节第 2 行与第四节第 1 条、`research/prompts/m3-ring-r2-main-verification.md` 第二节第 2、3 行与第四节、`research/prompts/m3-ring-r3-main-verification.md` 第二节第 1、2、9 行与第四节。卸载记号占 4 字节是第一轮正推腿 H1-b 的算法（86 + 86 + 4），判决没有单独定宽。\n  - **用户原话**：\n    - `research/prompts/m3-ring-r1-main-verification.md` 第四节末「用户 2026-10-01 弹窗定」第 1 条：「三种发布留下的洞：**补**，journal 记录的新根段加三个字段（点名项 67 → 64）。这是格式改动，要同步字节表、不变量、checker 与产物；被攻过零轮。」\n    - `research/prompts/m3-ring-r2-main-verification.md` 第四节末「用户 2026-10-02 弹窗定」第 1 条（被下一条取代）：「新根段取乙：两位放进记录标志字节（位 1 卸载记号、位 2 分配记录树根全零），头仍 311、点名项仍 67；」\n    - `research/prompts/m3-ring-r3-main-verification.md` 第四节末「用户 2026-10-02 弹窗定」第 1 条：「回到甲：新根段带三个字段（含实例表指针，头 487、点名项 64）；」\n  - **改前**：`git show fcc4d340:.claude/kb/decisions/23-journal的角色与格式.md` 里已定项 4、12、17 的对应句，已定项 14 的候选集一行、射程末条与依据末条，已定项 15 的索引行、定案、射程与依据；已定项 4、14、15 在 fcc4d340 之上还叠着同节 2026-10-01、2026-10-02 条目记的改动，这一次只动文中点名的句子。\n\n### 2026-10-02\n\n",
+  "basis": "变更史：research/prompts/m3-ring-r3-main-verification.md 第四节（用户定案）与两份前序判决；每条决策一项"
+ },
+ {
+  "file": ".claude/kb/decisions-history.md",
+  "old": "## D16（发布语义）\n\n### 2026-10-01\n\n",
+  "new": "## D16（发布语义）\n\n### 2026-10-03\n\n- D16（发布语义） 已定项 1：回收门槛取一圈窗口，锚在环里读得出的最新有效根，五处同改\n  - **结论**：回收门槛取一圈窗口，锚在环里读得出的最新有效根，五处同改；读坏中间根那一格的门槛收严被攻过零轮；装置一字不差那一句改写，E139（按盘回退下界的收严形态） 待重跑。\n  - 落到正文：「可再分配」一行的门槛改成「一圈窗口里最旧有效根」，索引行同改（写成「窗口里最旧有效根」，索引行不超过 100 字）；新增一行写窗口（N 取环里读得出的最新有效根的 txg，窗口 = txg > N − 3S，挂载时读不出的槽门槛按最小 txg 算、根环表记最大，同取窗口的五处：分配器、checker 候选过滤、checker 的 I-3.1（已分配统计对得上） 丁-defer 门槛、影子账候选过滤、回退候选集）；回退候选集一行加「txg 落在一圈窗口里」；定案里「与装置里跑的一字不差」改写；依据加一条，欠加「E139（按盘回退下界的收严形态） 重跑」一句。原来的「环里最旧有效根」一行留着，准入的滞后量与抬 F 上限还在用它。\n  - **依据**：三方判决 `research/prompts/m3-ring-r2-main-verification.md` 第二节第 4、5、6 行、`research/prompts/m3-ring-r3-main-verification.md` 第二节第 3、4、5 行；窗口的数都在三方副本上量过，没在入库装置上重做。\n  - **用户原话**：\n    - `research/prompts/m3-ring-r2-main-verification.md` 第四节末「用户 2026-10-02 弹窗定」第 2 条：「K1 那一类后洞取一圈窗口，「抹」不做；」\n    - `research/prompts/m3-ring-r3-main-verification.md` 第四节末「用户 2026-10-02 弹窗定」第 2 条（编号补了简称）：「K1 后洞取一圈窗口，五处同改，加第 4 行读坏槽门槛的收严；D16（发布语义） 已定项 1 那一句与 E139（按盘回退下界的收严形态） 重跑进实现清单。」\n  - **改前**：`git show fcc4d340:.claude/kb/decisions/16-发布语义.md` 里已定项 1 的索引行、定案的「形态取」那一句、「可再分配」「回退候选集」两行、依据末条与欠。\n\n### 2026-10-01\n\n",
+  "basis": "变更史：research/prompts/m3-ring-r2-main-verification.md、research/prompts/m3-ring-r3-main-verification.md 第四节用户定案"
+ },
+ {
+  "file": ".claude/kb/decisions-history.md",
+  "old": "里已定项 24 一节与索引表第 24 行。\n\n### 2026-10-01",
+  "new": "里已定项 24 一节与索引表第 24 行。\n- D22（单元原子性怎么合成） 已定项 8：系统配置见证读取按盘读，判不出取 R2；丢写界按类写\n  - **结论**：系统配置见证读取按盘 S-辨，判不出取 R2（有槽设备报读错且没有一块盘两槽都自证过），混合形丢写 0、多拒 116 格（副本上的数）；R2 零轮，用户定。\n  - 落到正文：射程加两句，一句写见证读按盘读与 R2 的判不出，一句写丢写的界按类（纯形 120、混合形 0，都落在这一项写明不罩的双故障形里）；依据加一条。对 2026-09-28 定的甲（C331（择根倒挂压过已确认的写））按第二轮判决的口径记：收回甲买得比射程更多的那一部分，不是推翻。\n  - **依据**：三方判决 `research/prompts/m3-ring-r2-main-verification.md` 第二节第 9 行（按盘读站得住）、`research/prompts/m3-ring-r3-main-verification.md` 第二节第 7、8 行与第四节末「R2 验证」段；R2 在 C331（择根倒挂压过已确认的写） 网格上量过（纯形 120、混合形 0），八趟网格由事务员在新副本上复核，与辩方日志逐键逐行字节相同，网格不在仓里，是副本上的数。\n  - **用户原话**：\n    - `research/prompts/m3-ring-r1-main-verification.md` 第四节末「用户 2026-10-01 弹窗定」第 3 条：（编号补了简称）「C596（撕裂的系统配置轮换之后只剩只读挂载）：**S-辨**。见证读把「一槽撕裂、另一槽自证过」与读不出分开；C331（择根倒挂压过已确认的写） 甲改成甲-读错（判决表丢写 0 → 120），推翻用户 2026-09-28 的定案，要记进变更史。」（第二轮判决第二节第 9 行把「推翻」改写成「收回甲买得比射程更多的那一部分」）\n    - `research/prompts/m3-ring-r2-main-verification.md` 第四节末「用户 2026-10-02 弹窗定」第 3 条：「一槽持续设备读错取甲-读错-每盘；」（被下一条取代）\n    - `research/prompts/m3-ring-r3-main-verification.md` 第四节末「R2 验证」段末句：「……改取 R2（零轮）。」（句首的日期与所在日期块同日，略去）\n  - **改前**：`git show fcc4d340:.claude/kb/decisions/22-单元原子性怎么合成.md` 里已定项 8 的射程与依据。\n\n### 2026-10-01",
+  "basis": "变更史：research/prompts/m3-ring-r3-main-verification.md 第四节末「R2 验证」段与用户 2026-10-03 定改取 R2"
+ },
+ {
+  "file": ".claude/kb/decisions-history.md",
+  "old": "## D18（块里携带什么信息）\n\n### 2026-10-01\n\n",
+  "new": "## D18（块里携带什么信息）\n\n### 2026-10-03\n\n- D18（块里携带什么信息） 已定项 11：实例表删行落在专用清扫发布，抹头先于它，读失败或设备不全不删；全零根槽不当没有根，读不过重读一次仍不过就不删\n  - **结论**：实例表删行落在专用清扫发布，抹头先于它，读失败或设备不全不删；全零根槽不当没有根、读不过重读一次仍不过就不删（零轮）。\n  - 落到正文：「回收」一条加两句（全零根槽与自证过或全零的两处收严；删行落在一次专用的清扫发布上、抹头全部 FUA 返回、过一道屏障之后才发清扫发布、读失败与设备不全不删）；射程加连崩挂载留下的 (j, 0, 0) 行那一半；依据加一条；索引表第 17 行的头宽数随 D23（journal 的角色与格式） 已定项 4 改成 487、新根段 364。落点现查：I-3.8（实例表行唯一且低于挂载根） 草案的回收条件与 C597（实例表行只增不删，删行的条件没有条款） 都落在这一项（欠里已有 C597（实例表行只增不删，删行的条件没有条款）），第三轮判决回看决策表写的就是这一项，对得上。\n  - **依据**：三方判决 `research/prompts/m3-ring-r1-main-verification.md` 第二节第 10 行与第四节第 4 条、`research/prompts/m3-ring-r2-main-verification.md` 第二节第 10 行、`research/prompts/m3-ring-r3-main-verification.md` 第二节第 9 行；清扫器、删行落点与两处收严都没有入库装置上的数，仓里清扫器零代码。\n  - **用户原话**：\n    - `research/prompts/m3-ring-r1-main-verification.md` 第四节末「用户 2026-10-01 弹窗定」第 4 条（编号补了简称）：「C597（实例表行只增不删，删行的条件没有条款）：**现在做**。先造整轮清扫器，再落删行；要另起设计轮。」\n  - **改前**：`git show fcc4d340:.claude/kb/decisions/18-块里携带什么信息.md` 里已定项 11 的「回收」一条、射程末尾与依据末条，登记表第 17 行。\n\n### 2026-10-01\n\n",
+  "basis": "变更史：research/prompts/m3-ring-r1-main-verification.md 第四节第 4 条、research/prompts/m3-ring-r2-main-verification.md 第二节第 10 行"
+ }
+]

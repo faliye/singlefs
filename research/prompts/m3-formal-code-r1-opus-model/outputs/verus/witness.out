@@ -1,0 +1,23 @@
+run-with-memory-cap: 上限 1500M 超过实测峰值 328M 的 2 倍，照理由放行：攻方腿改坏核或加探针，峰值随改动变
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：攻方腿 m3-formal-code-r1 在自己的拷贝上单文件验核
+note: function body check: not all errors may have been reported; rerun with a higher value for --multiple-errors to find other potential errors in this function
+    --> src/lib.rs:4087:1
+     |
+4087 | fn attack_corollary_witness() {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: assertion failed
+    --> src/lib.rs:4106:20
+     |
+4106 |             assert(c == 2);
+     |                    ^^^^^^ assertion failed
+
+error: assertion failed
+    --> src/lib.rs:4108:26
+     |
+4108 |         None => { assert(false); },
+     |                          ^^^^^ assertion failed
+
+verification results:: 56 verified, 1 errors
+error: aborting due to 2 previous errors
+

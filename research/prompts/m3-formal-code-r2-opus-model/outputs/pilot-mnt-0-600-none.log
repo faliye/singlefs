@@ -1,0 +1,11 @@
+history mnt: ending Completed
+  step 0: Applied(Mounted { instance: InstanceGeneration(2), publishes: 2, allocation_records_compared: Compared { publishes: 2 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquisi
+history=mnt mode=k2 second=false writes=38 segments=9 closed_form=20496 with_torn=20511 range=0..600
+states_judged=600 second_states=0 elapsed_secs=2.3
+ALONE judged count=595
+MOUNT floor=NotRaised count=595
+MOUNT refused verdict=Legal(NewerPublishWitnessedBySystemConfiguration) member=NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheS count=5
+    e.g. ordinal=1 R1: eff=Some((1, 3)) cmp(inst,txg,W,F)=Some((1, 3, 65548, 0)) applied=0 above=0 sc_inst=Some(1) ring_inst=Some(1) ring_txg=Some(3) rec_txg=Some(3) F=Some(0)
+    e.g. ordinal=3 R1: eff=Some((1, 3)) cmp(inst,txg,W,F)=Some((1, 3, 65548, 0)) applied=0 above=0 sc_inst=Some(1) ring_inst=Some(1) ring_txg=Some(3) rec_txg=Some(3) F=Some(0)
+PUBLISH judged count=595
+R1 outcome=file rebuilt=false o1=green count=600
