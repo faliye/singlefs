@@ -1,0 +1,108 @@
+blklogwrites: linearize the data when a write would exceed IOV_MAX
+
+Applies with `patch -p1` on top of the Ubuntu source package qemu
+1:8.2.2+ds-0ubuntu1.18 (after its own debian/patches);
+research/scripts/build-patched-qemu.sh does that and installs the result
+into a private prefix.
+
+What it fixes: blk_log_writes_co_log() writes each log entry as one request
+made of the entry header (2 iovecs) followed by every iovec of the data
+(`qemu_iovec_init(&log_qiov, niov + 2)`). A data request with 1023 or more
+iovecs therefore turns into a log write with 1025 or more iovecs, the host
+pwritev() on the log file rejects it with EINVAL (IOV_MAX is 1024), and the
+guest gets an I/O error although the data disk was already written. A guest
+that writes 4 MiB per O_DIRECT request with 4 KiB pages, merged by
+virtio-blk into one 1024-segment request, hits this every time.
+
+How: when niov + 2 > IOV_MAX, copy the data into one buffer aligned for both
+the data node and the log node, log header + that buffer (3 iovecs), and
+free it after the log write. When niov itself is above IOV_MAX (only a
+front end that submits such a request directly, e.g. qemu-io writev with
+2048 buffers; virtio-blk merging stops at IOV_MAX), the data write would
+fail with EINVAL as well, so it is issued from the same buffer. Requests
+with niov + 2 <= IOV_MAX keep the original zero-copy path.
+
+Why not lower bl.max_iov in refresh_limits: that only stops virtio-blk from
+merging requests above the limit. A single request that already has 1023+
+iovecs (qemu-io `writev` with 1023 buffers, or any other front end) still
+reaches blk_log_writes_co_log() and still fails.
+
+Check: research/scripts/qemu-blklogwrites-check.sh <qemu-io> writes 1022,
+1023, 1024 and 2048 iovecs of 4 KiB through blklogwrites and compares the
+logged data and the data disk with what was written.
+
+--- a/block/blklogwrites.c
++++ b/block/blklogwrites.c
+@@ -17,6 +17,7 @@
+ #include "qapi/qmp/qdict.h"
+ #include "qapi/qmp/qstring.h"
+ #include "qemu/cutils.h"
++#include "qemu/memalign.h"
+ #include "qemu/module.h"
+ #include "qemu/option.h"
+ 
+@@ -404,6 +405,7 @@
+                       uint64_t entry_flags, bool is_zero_write)
+ {
+     QEMUIOVector log_qiov;
++    QEMUIOVector linear_qiov;
+     size_t niov = qiov ? qiov->niov : 0;
+     BDRVBlkLogWritesState *s = bs->opaque;
+     BlkLogWritesFileReq fr = {
+@@ -426,16 +428,46 @@
+         .zero_size = is_zero_write ? bytes : 0,
+     };
+     void *zeroes = g_malloc0(s->sectorsize - sizeof(lr.entry));
++    void *linear_data = NULL;
+ 
+     assert((1 << s->sectorbits) == s->sectorsize);
+     assert(bs->bl.request_alignment == s->sectorsize);
+     assert(QEMU_IS_ALIGNED(offset, bs->bl.request_alignment));
+     assert(QEMU_IS_ALIGNED(bytes, bs->bl.request_alignment));
+ 
+-    qemu_iovec_init(&log_qiov, niov + 2);
++    /*
++     * The log entry is the entry header (2 iovecs) followed by the data.
++     * When the data has more than IOV_MAX - 2 iovecs, the log write would
++     * exceed IOV_MAX and the host pwritev() fails with EINVAL.  Copy the
++     * data into one aligned linear buffer in that case and log from it.
++     * When the data alone has more than IOV_MAX iovecs, the data write
++     * would fail the same way, so it is issued from that buffer too.
++     * Requests that fit keep referencing the original buffers.
++     */
++    if (qiov && niov + 2 > IOV_MAX) {
++        size_t alignment = MAX(bdrv_opt_mem_align(bs->file->bs),
++                               bdrv_opt_mem_align(s->log_file->bs));
++
++        linear_data = qemu_try_memalign(alignment, qiov->size);
++        if (linear_data == NULL) {
++            g_free(zeroes);
++            return -ENOMEM;
++        }
++        qemu_iovec_to_buf(qiov, 0, linear_data, qiov->size);
++        if (niov > IOV_MAX) {
++            qemu_iovec_init_buf(&linear_qiov, linear_data, qiov->size);
++            fr.qiov = &linear_qiov;
++            fr.file_flags &= ~BDRV_REQ_REGISTERED_BUF;
++        }
++        qemu_iovec_init(&log_qiov, 3);
++    } else {
++        qemu_iovec_init(&log_qiov, niov + 2);
++    }
+     qemu_iovec_add(&log_qiov, &lr.entry, sizeof(lr.entry));
+     qemu_iovec_add(&log_qiov, zeroes, s->sectorsize - sizeof(lr.entry));
+-    if (qiov) {
++    if (linear_data) {
++        qemu_iovec_add(&log_qiov, linear_data, qiov->size);
++    } else if (qiov) {
+         qemu_iovec_concat(&log_qiov, qiov, 0, qiov->size);
+     }
+ 
+@@ -443,6 +475,7 @@
+     blk_log_writes_co_do_log(&lr);
+ 
+     qemu_iovec_destroy(&log_qiov);
++    qemu_vfree(linear_data);
+     g_free(zeroes);
+ 
+     if (lr.log_ret < 0) {
