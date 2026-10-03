@@ -133,11 +133,11 @@ pub fn build_internal_entry(separator_key: &[u8], child: NodePointer) -> Vec<u8>
 pub enum InternalEntryRefusal {
     /// 条目宽（节点头里的盘上字段）窄于 key 宽 + 86：调用方报「条目窄于字段表」。
     NarrowerThanTheKeyAndTheChildPointer,
-    /// 子指针头部里加密与压缩那几段不是第一版的取值（代码审阅第 29 条）。
+    /// 子指针头部里加密、压缩与 extent 偏移那几段不是第一版的取值（代码审阅第 29 条；extent 偏移是 C581）。
     ChildPointerHeadOutsideTheFirstVersion(PointerHeadFieldOutsideTheFirstVersion),
 }
 
-/// 解一条内部节点条目：条目宽是节点头里的**盘上字段**，子指针头部里加密与压缩那几段也是盘上的字节，
+/// 解一条内部节点条目：条目宽是节点头里的**盘上字段**，子指针头部里加密、压缩与 extent 偏移那几段也是盘上的字节，
 /// 这里是盘上字节进字段表的边界。
 ///
 /// # Errors
@@ -151,8 +151,10 @@ pub fn parse_internal_entry(
         return Err(InternalEntryRefusal::NarrowerThanTheKeyAndTheChildPointer);
     }
     let mut reader = ByteReader::at(entry, key_width_in_bytes);
-    let child = NodePointer::read_judging_the_encryption_and_compression_fields_from(&mut reader)
-        .map_err(InternalEntryRefusal::ChildPointerHeadOutsideTheFirstVersion)?;
+    let child = NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+        &mut reader,
+    )
+    .map_err(InternalEntryRefusal::ChildPointerHeadOutsideTheFirstVersion)?;
     Ok((entry[..key_width_in_bytes].to_vec(), child))
 }
 
@@ -789,10 +791,10 @@ fn violated(detail: &'static str) -> RecoveryFailure {
     }
 }
 
-/// 多层码 2 树（记账树、中央映射树）内部条目里的子指针头部，加密与压缩那几段不是第一版的取值时报
+/// 多层码 2 树（记账树、中央映射树）内部条目里的子指针头部，加密、压缩与 extent 偏移那几段不是第一版的取值时报
 /// [`RecoveryFailure::UnitMalformed`]，`what` 取这一句（`pointer::PointerHeadFieldOutsideTheFirstVersion`，代码审阅第 29 条）。
 pub const MULTI_LEVEL_CODE_TWO_TREE_CHILD_POINTER_HEAD_OUTSIDE_THE_FIRST_VERSION: &str =
-    "多层码 2 树内部条目的子指针头部里加密或压缩那几段不是第一版的取值";
+    "多层码 2 树内部条目的子指针头部里加密、压缩或 extent 偏移那几段不是第一版的取值";
 
 /// 核一个节点的头：只有 `EveryHeaderAgainstItsReference` 才走到这里。根（`is_root`）的报错逐字沿用 `recovery` 核树根的那几句，
 /// 读路径上几种坏法报的成员因此不随树长没长多层而变。

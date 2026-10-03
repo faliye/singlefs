@@ -1,6 +1,6 @@
 //! journal 记录 4096（D23（journal 的角色与格式） 已定项 4 / 已定项 7 / 已定项 8 / 已定项 13 / 已定项 15 / 已定项 17 / 已定项 18 / 已定项 19）：
-//! 头 311 + 点名项 56 × N；`header_csum` 罩整条 [0, 4096) 含补齐、自身按 0 参与；`payload_csum` 罩点名项数组；
-//! 反向链 = CRC-32C(本实例内逻辑前一条记录的 311 字节头，`header_csum` 按 0 参与)，本实例第一条恒 0。
+//! 头 487 + 点名项 56 × N；`header_csum` 罩整条 [0, 4096) 含补齐、自身按 0 参与；`payload_csum` 罩点名项数组；
+//! 反向链 = CRC-32C(本实例内逻辑前一条记录的 487 字节头，`header_csum` 按 0 参与)，本实例第一条恒 0。
 
 use singlefs_format::{
     JOURNAL_HEADER_BYTES, JOURNAL_NAMED_ENTRY_BYTES, JOURNAL_NEW_ROOT_SEGMENT_BYTES,
@@ -16,6 +16,7 @@ use crate::checksum::{
     crc32_castagnoli, wide_checksum_field_holds, wide_checksum_with_field_zeroed,
 };
 use crate::pointer::{LocationEntry, NodePointer};
+use crate::root_record::UnmountMarker;
 
 pub const JOURNAL_MAGIC: [u8; 4] = *b"SFSJ";
 /// 记录类型登记表（D23（journal 的角色与格式） 已定项 1）：0 无效、1 普通记录。
@@ -160,14 +161,19 @@ pub struct JournalRecord {
     pub new_mapping_root: NodePointer,
     pub new_tree_identifier_watermark: u64,
     pub new_rollback_floor: CheckpointTxg,
+    /// 新根段后三项（D23（journal 的角色与格式） 已定项 15，用户 2026-10-02「回到甲」）：这次发布写的根上的实例表指针、
+    /// 分配记录树根指针与卸载记号。施加一条记录时这三项与前四项一样换掉所选根的（`recovery::replay_journal` 拼新根那一截），不再照抄所选根。
+    pub new_instance_table: NodePointer,
+    pub new_allocation_record_tree_root: NodePointer,
+    pub new_unmount_marker: UnmountMarker,
     pub named: Vec<NamedUnit>,
 }
 
-/// 反向链：前一条记录的整个记录头（[`JOURNAL_HEADER_BYTES`] = 311 字节），`header_csum` 那 32 字节按 0 参与。
+/// 反向链：前一条记录的整个记录头（[`JOURNAL_HEADER_BYTES`] = 487 字节），`header_csum` 那 32 字节按 0 参与。
 #[must_use]
 pub fn back_chain_of(previous_record_bytes: &[u8]) -> u32 {
     let mut header =
-        previous_record_bytes[..usize::try_from(JOURNAL_HEADER_BYTES).expect("311")].to_vec();
+        previous_record_bytes[..usize::try_from(JOURNAL_HEADER_BYTES).expect("487")].to_vec();
     header[JOURNAL_HEADER_CHECKSUM_OFFSET
         ..JOURNAL_HEADER_CHECKSUM_OFFSET + usize::try_from(WIDE_CHECKSUM_BYTES).expect("32")]
         .fill(0);
@@ -240,9 +246,13 @@ impl JournalRecord {
         self.new_mapping_root.write_to(&mut writer);
         writer.put_u64(self.new_tree_identifier_watermark);
         writer.put_u64(self.new_rollback_floor.0);
+        self.new_instance_table.write_to(&mut writer);
+        self.new_allocation_record_tree_root.write_to(&mut writer);
+        // 卸载记号 4 字节与根记录 flags 同一个编码（位 0 = 卸载那一串写的，其余位恒 0；D22（单元原子性怎么合成） 已定项 7 / 已定项 13）。
+        writer.put_u32(self.new_unmount_marker.flags_bits());
         assert_eq!(
             writer.position() - new_root_segment_start,
-            usize::try_from(JOURNAL_NEW_ROOT_SEGMENT_BYTES).expect("188")
+            usize::try_from(JOURNAL_NEW_ROOT_SEGMENT_BYTES).expect("364")
         );
         writer.put_u64(self.filesystem_identifier);
         writer.skip(16); // MAC：第一版留位全 0
@@ -253,7 +263,7 @@ impl JournalRecord {
         let payload_end = writer.position();
         let mut bytes = writer.into_bytes();
         let payload_checksum = crc32_castagnoli(
-            &bytes[usize::try_from(JOURNAL_HEADER_BYTES).expect("311")..payload_end],
+            &bytes[usize::try_from(JOURNAL_HEADER_BYTES).expect("487")..payload_end],
         );
         bytes[payload_checksum_offset..payload_checksum_offset + 4]
             .copy_from_slice(&payload_checksum.to_le_bytes());
@@ -265,8 +275,9 @@ impl JournalRecord {
     }
 
     /// 读者：magic、类型、整条校验和、fsid、载荷校验和四关，外加四条当损坏的（D23（journal 的角色与格式） 已定项 4 / 已定项 7；最后一条是代码审阅第 29 条）：
-    /// 记录标志位 0 之外有位为 1、本次发布内序号为 0、提交标记不是 0 也不是 1，另有新根段两条指针头部里加密与压缩那几段不是第一版的取值
-    /// （代码审阅第 29 条）。当损坏就是与校验和不过同一个结局——这条记录不算在，前缀在它之前断
+    /// 记录标志位 0 之外有位为 1、本次发布内序号为 0、提交标记不是 0 也不是 1，另有新根段四条指针头部里加密、压缩与 extent 偏移那几段不是第一版的取值
+    /// （代码审阅第 29 条），以及新根段的卸载记号那 4 字节位 0 之外有位为 1（与根记录 flags 同判，`root_record::parse_slot`；条款没写这一格，
+    /// 照根记录与记录标志「其余位读到非 0 当损坏」的同一个处置取）。当损坏就是与校验和不过同一个结局——这条记录不算在，前缀在它之前断
     /// （已定项 22 断号即止）。不查反向链，也不查一次发布之内跳不跳号：那两样要看别的记录，是前缀取法的事。
     #[must_use]
     pub fn parse(bytes: &[u8], expected_filesystem_identifier: u64) -> Option<Self> {
@@ -307,16 +318,32 @@ impl JournalRecord {
         }
         let back_chain = reader.get_u32();
         let payload_checksum = reader.get_u32();
-        // 新根段那两条指针头部里加密与压缩那几段不是第一版的取值（代码审阅第 29 条，`pointer::PointerHeadFieldOutsideTheFirstVersion`）：
+        // 新根段那两条指针头部里加密、压缩与 extent 偏移那几段不是第一版的取值（代码审阅第 29 条，`pointer::PointerHeadFieldOutsideTheFirstVersion`）：
         // 与上面几格同一个结局，这条记录不算在、前缀在它之前断。
         let new_tree_table =
-            NodePointer::read_judging_the_encryption_and_compression_fields_from(&mut reader)
-                .ok()?;
+            NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+                &mut reader,
+            )
+            .ok()?;
         let new_mapping_root =
-            NodePointer::read_judging_the_encryption_and_compression_fields_from(&mut reader)
-                .ok()?;
+            NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+                &mut reader,
+            )
+            .ok()?;
         let new_tree_identifier_watermark = reader.get_u64();
         let new_rollback_floor = CheckpointTxg(reader.get_u64());
+        let new_instance_table =
+            NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+                &mut reader,
+            )
+            .ok()?;
+        let new_allocation_record_tree_root =
+            NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+                &mut reader,
+            )
+            .ok()?;
+        let new_unmount_marker =
+            UnmountMarker::of_unmount_marker_field_of_a_new_root_segment(reader.get_u32())?;
         let filesystem_identifier = reader.get_u64();
         if filesystem_identifier != expected_filesystem_identifier {
             return None;
@@ -324,7 +351,7 @@ impl JournalRecord {
         reader.skip(16);
         assert_eq!(
             reader.position(),
-            usize::try_from(JOURNAL_HEADER_BYTES).expect("311")
+            usize::try_from(JOURNAL_HEADER_BYTES).expect("487")
         );
         let payload_end = reader.position()
             + named_count * usize::try_from(JOURNAL_NAMED_ENTRY_BYTES).expect("56");
@@ -350,6 +377,9 @@ impl JournalRecord {
             new_mapping_root,
             new_tree_identifier_watermark,
             new_rollback_floor,
+            new_instance_table,
+            new_allocation_record_tree_root,
+            new_unmount_marker,
             named,
         })
     }
@@ -373,14 +403,17 @@ mod tests {
             filesystem_identifier: 7,
             new_tree_table: NodePointer::empty_root(),
             new_mapping_root: NodePointer::empty_root(),
-            new_tree_identifier_watermark: 11,
+            new_tree_identifier_watermark: singlefs_format::TREE_IDENTIFIER_WATERMARK_AT_MKFS,
             new_rollback_floor: CheckpointTxg(0),
+            new_instance_table: NodePointer::empty_root(),
+            new_allocation_record_tree_root: NodePointer::empty_root(),
+            new_unmount_marker: UnmountMarker::NotWrittenByTheUnmountSequence,
             named: Vec::new(),
         }
     }
 
     /// 本次发布内序号 4 字节紧跟事务号 8 与提交标记 1（D23（journal 的角色与格式） 已定项 4）：落在 [87, 91)、小端、读得回；
-    /// 它之后的反向链、载荷校验和、新根段、fsid 依次后挪 4 字节，MAC 16 占记录头最后的 [295, 311)。偏移按字段表手算、写成字面量，
+    /// 它之后的反向链、载荷校验和、新根段依次后挪 4 字节；新根段 364 字节之后是 fsid [463, 471)，MAC 16 占记录头最后的 [471, 487)。偏移按字段表手算、写成字面量，
     /// 不从写者用的常量推（已定项 26 第 1 条：覆盖范围是显式的盘上常量）。
     #[test]
     fn the_ordinal_within_publish_sits_right_after_the_commit_marker_and_round_trips() {
@@ -410,19 +443,103 @@ mod tests {
         );
         assert_eq!(
             &bytes[99 + 172..99 + 180],
-            &11u64.to_le_bytes(),
+            &singlefs_format::TREE_IDENTIFIER_WATERMARK_AT_MKFS.to_le_bytes(),
             "新根段从 99 起：两条指针 86 × 2 之后是树 ID 水位"
         );
         assert_eq!(
-            &bytes[287..295],
+            &bytes[463..471],
             &7u64.to_le_bytes(),
-            "fsid 后挪到 [287, 295)"
+            "fsid 在新根段之后，[463, 471)"
         );
         assert!(
-            bytes[295..311].iter().all(|byte| *byte == 0),
-            "MAC 16 占 [295, 311)，第一版全 0"
+            bytes[471..487].iter().all(|byte| *byte == 0),
+            "MAC 16 占 [471, 487)，第一版全 0"
         );
         assert_eq!(JournalRecord::parse(&bytes, 7), Some(record));
+    }
+
+    /// 新根段后三项（D23（journal 的角色与格式） 已定项 4 / 已定项 15）：F 之后依次是实例表指针 [287, 373)、分配记录树根指针 [373, 459)、
+    /// 卸载记号 [459, 463)（与根记录 flags 同一个编码，位 0）；三项各取一个与别的字段都不同的值，写得出、读得回。
+    /// 偏移按字段表手算、写成字面量，不从写者用的常量推（已定项 26 第 1 条）。
+    #[test]
+    fn the_instance_table_allocation_record_tree_root_and_unmount_marker_follow_the_floor_in_the_new_root_segment_and_round_trip(
+    ) {
+        let instance_table_location = |device: u32| LocationEntry {
+            device: crate::address::DeviceIdentity(device),
+            slot: crate::address::SlotNumber(60_001),
+            unit_checksum: 0x0a0b_0c0d,
+        };
+        let allocation_record_tree_location = |device: u32| LocationEntry {
+            device: crate::address::DeviceIdentity(device),
+            slot: crate::address::SlotNumber(60_002),
+            unit_checksum: 0x1a1b_1c1d,
+        };
+        let pointer_with = |locations: [LocationEntry; 2], birth_txg: u64| NodePointer {
+            head: crate::pointer::PointerHead {
+                birth_tree: TreeIdentifier(0),
+                birth_txg: CheckpointTxg(birth_txg),
+            },
+            locations,
+            instance: InstanceGeneration(1),
+            birth_sequence: crate::pointer::BirthSequence(3),
+        };
+        let record = JournalRecord {
+            new_instance_table: pointer_with(
+                [instance_table_location(0), instance_table_location(1)],
+                5,
+            ),
+            new_allocation_record_tree_root: pointer_with(
+                [
+                    allocation_record_tree_location(0),
+                    allocation_record_tree_location(1),
+                ],
+                6,
+            ),
+            new_unmount_marker: UnmountMarker::WrittenByTheUnmountSequence,
+            ..empty_record(9)
+        };
+        let bytes = record.to_bytes();
+        let mut instance_table_bytes = ByteWriter::new(86);
+        record
+            .new_instance_table
+            .write_to(&mut instance_table_bytes);
+        assert_eq!(
+            &bytes[287..373],
+            instance_table_bytes.into_bytes().as_slice(),
+            "实例表指针紧跟 F（99 + 188），在 [287, 373)"
+        );
+        let mut allocation_record_tree_bytes = ByteWriter::new(86);
+        record
+            .new_allocation_record_tree_root
+            .write_to(&mut allocation_record_tree_bytes);
+        assert_eq!(
+            &bytes[373..459],
+            allocation_record_tree_bytes.into_bytes().as_slice(),
+            "分配记录树根指针在 [373, 459)"
+        );
+        assert_eq!(
+            &bytes[459..463],
+            &[0x01, 0x00, 0x00, 0x00],
+            "卸载记号在 [459, 463)：卸载那一串写的，位 0 = 1"
+        );
+        assert_eq!(JournalRecord::parse(&bytes, 7), Some(record));
+    }
+
+    /// 新根段的卸载记号那 4 字节位 0 之外有位为 1 的记录，读者当损坏（与根记录 flags、记录标志「其余位读到非 0」同一个处置）。
+    /// 头部校验和按改过的字节重封过，拦住它的只有卸载记号那一判。
+    #[test]
+    fn record_whose_new_root_segment_unmount_marker_sets_any_bit_other_than_bit_zero_is_refused_by_the_parser(
+    ) {
+        for unmount_marker_field in [0x0000_0002u32, 0x0000_0003, 0x8000_0000] {
+            let mut bytes = empty_record(4).to_bytes();
+            bytes[459..463].copy_from_slice(&unmount_marker_field.to_le_bytes());
+            reseal_header_checksum(&mut bytes);
+            assert_eq!(
+                JournalRecord::parse(&bytes, 7),
+                None,
+                "卸载记号 {unmount_marker_field:#010x}：位 0 之外有位为 1，当损坏"
+            );
+        }
     }
 
     /// 改过记录头某几个字节之后重封头部校验和（罩整条 4096、自身按 0 参与，D23（journal 的角色与格式） 已定项 13）：
@@ -506,9 +623,9 @@ mod tests {
         );
     }
 
-    /// 一条 4096 字节记录装 67 个点名项（(4096 − 311) ÷ 56 = 3785 ÷ 56 取整）：67 项的记录写得出、读得回；头里自述 68 项的记录
+    /// 一条 4096 字节记录装 64 个点名项（(4096 − 487) ÷ 56 = 3609 ÷ 56 取整）：64 项的记录写得出、读得回；头里自述 65 项的记录
     /// （点名项区越过记录末尾）读者拒收，不按自述的项数切到 4096 之外（里程碑「覆盖写、释放、回退与复用」并行线一验收第 4 条第三个变异：
-    /// 点名项超过 67 仍塞进一条记录 ⇒ 记录解析拒收）。头校验和按改过的字节重算过，拦住它的只有项数那一判。
+    /// 点名项超过一条记录装得下的仍塞进一条记录 ⇒ 记录解析拒收）。头校验和按改过的字节重算过，拦住它的只有项数那一判。
     #[test]
     fn record_whose_header_claims_more_named_units_than_one_record_holds_is_refused_by_the_parser()
     {
@@ -527,11 +644,11 @@ mod tests {
                 },
             ],
             unit_class: 1,
-            birth_tree: TreeIdentifier(11),
+            birth_tree: TreeIdentifier(singlefs_format::TREE_IDENTIFIER_EXTENT),
             birth_txg: CheckpointTxg(3),
             key_tail: [0; 10],
         };
-        let capacity = usize::try_from(JOURNAL_NAMED_ENTRIES_PER_RECORD).expect("67");
+        let capacity = usize::try_from(JOURNAL_NAMED_ENTRIES_PER_RECORD).expect("64");
         let full = JournalRecord {
             named: vec![named_unit; capacity],
             ..empty_record(1)
@@ -540,12 +657,12 @@ mod tests {
         assert_eq!(
             JournalRecord::parse(&full_bytes, 7),
             Some(full),
-            "67 项正好装满一条记录"
+            "64 项正好装满一条记录"
         );
         let mut claims_one_more = full_bytes;
         let named_count_offset = 4 + 2 + 1 + 1 + 4;
         claims_one_more[named_count_offset..named_count_offset + 4]
-            .copy_from_slice(&u32::try_from(capacity + 1).expect("68").to_le_bytes());
+            .copy_from_slice(&u32::try_from(capacity + 1).expect("65").to_le_bytes());
         let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
         let digest = wide_checksum_with_field_zeroed(
             &claims_one_more,
@@ -557,18 +674,18 @@ mod tests {
         assert_eq!(
             JournalRecord::parse(&claims_one_more, 7),
             None,
-            "自述 68 个点名项的记录：点名项区越过 4096，读者拒收"
+            "自述 65 个点名项的记录：点名项区越过 4096，读者拒收"
         );
     }
 
     #[test]
-    fn record_is_4096_with_a_311_byte_header_and_round_trips() {
+    fn record_is_4096_with_a_487_byte_header_and_round_trips() {
         let record = empty_record(1);
         let bytes = record.to_bytes();
         assert_eq!(bytes.len(), 4096);
         assert!(
-            bytes[311..].iter().all(|byte| *byte == 0),
-            "空记录 311 之后全 0"
+            bytes[487..].iter().all(|byte| *byte == 0),
+            "空记录 487 之后全 0"
         );
         assert_eq!(JournalRecord::parse(&bytes, 7), Some(record.clone()));
         assert_eq!(

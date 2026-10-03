@@ -37,6 +37,16 @@ impl UnmountMarker {
         }
     }
 
+    /// journal 记录新根段里的卸载记号那 4 字节（D23（journal 的角色与格式） 已定项 15）：与根记录 flags 同一个编码，位 0 之外有位为 1 ⇒ `None`
+    /// （读者把那条记录当损坏，与根记录 flags、记录标志「其余位读到非 0」同一个处置）。
+    #[must_use]
+    pub const fn of_unmount_marker_field_of_a_new_root_segment(field: u32) -> Option<Self> {
+        if field & !ROOT_RECORD_FLAG_UNMOUNT_MARKER != 0 {
+            return None;
+        }
+        Some(Self::of_flags_bits_carrying_only_the_marker(field))
+    }
+
     /// 从已经判过「记号之外的位全是 0」的 flags 读回记号。
     #[must_use]
     const fn of_flags_bits_carrying_only_the_marker(flags: u32) -> Self {
@@ -104,8 +114,10 @@ impl RootRecord {
         bytes
     }
 
-    /// 读者：magic、整槽校验和、fsid、flags 四关。flags 只收卸载记号那一位（[`ROOT_RECORD_FLAG_UNMOUNT_MARKER`]），
+    /// 读者：magic、整槽校验和、fsid、flags、四条指针的 extent 偏移五关。flags 只收卸载记号那一位（[`ROOT_RECORD_FLAG_UNMOUNT_MARKER`]），
     /// 别的位非 0 拒收；记号照实读进 [`RootRecord::unmount_marker`]（挂载与恢复不按它分支，按它分支的是池级 checker 的 I-7.9）。
+    /// 树表、实例表、中央映射树、分配记录树四条指针头部的 extent 偏移第一版恒 0，任一非 0 判这条根记录损坏、拒收
+    /// （C581（extent 偏移非 0 没有判据），`pointer::PointerHeadExtentOffsetNotZero`）：拒收的根与自证不过的根同一个处置，择根时不可择。
     #[must_use]
     pub fn parse_slot(bytes: &[u8], expected_filesystem_identifier: &[u8; 16]) -> Option<Self> {
         if bytes.len() < usize::try_from(ROOT_RECORD_BYTES).expect("457")
@@ -128,13 +140,14 @@ impl RootRecord {
         let unmount_marker = UnmountMarker::of_flags_bits_carrying_only_the_marker(flags);
         let instance = InstanceGeneration(reader.get_u32());
         let checkpoint_txg = CheckpointTxg(reader.get_u64());
-        let tree_table = NodePointer::read_from(&mut reader);
+        let tree_table = NodePointer::read_judging_the_extent_offset_from(&mut reader).ok()?;
         let tree_identifier_watermark = reader.get_u64();
         let rollback_floor = CheckpointTxg(reader.get_u64());
         reader.skip(usize::try_from(WIDE_CHECKSUM_BYTES).expect("32"));
-        let instance_table = NodePointer::read_from(&mut reader);
-        let mapping_root = NodePointer::read_from(&mut reader);
-        let allocation_record_tree_root = NodePointer::read_from(&mut reader);
+        let instance_table = NodePointer::read_judging_the_extent_offset_from(&mut reader).ok()?;
+        let mapping_root = NodePointer::read_judging_the_extent_offset_from(&mut reader).ok()?;
+        let allocation_record_tree_root =
+            NodePointer::read_judging_the_extent_offset_from(&mut reader).ok()?;
         assert_eq!(
             reader.position(),
             ROOT_CHECKSUM_OFFSET + 32 + 3 * usize::try_from(NODE_POINTER_BYTES).expect("86")
@@ -165,7 +178,7 @@ mod tests {
             instance: InstanceGeneration(0),
             checkpoint_txg: CheckpointTxg(0),
             tree_table: NodePointer::empty_root(),
-            tree_identifier_watermark: 11,
+            tree_identifier_watermark: singlefs_format::TREE_IDENTIFIER_WATERMARK_AT_MKFS,
             rollback_floor: CheckpointTxg(0),
             instance_table: NodePointer::empty_root(),
             mapping_root: NodePointer::empty_root(),

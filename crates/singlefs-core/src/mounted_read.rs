@@ -26,7 +26,7 @@ use std::cell::Cell;
 use singlefs_format::{DATA_UNIT_BYTES, INODE_RECORD_BYTES, NODE_BYTES};
 
 use crate::address::{
-    DataUnitIndexInFile, FileOffsetInBytes, InodeNumber, SlotNumber, TreeIdentifier,
+    DataUnitIndexInFile, DeviceIdentity, FileOffsetInBytes, InodeNumber, SlotNumber, TreeIdentifier,
 };
 use crate::checksum::crc32_castagnoli;
 use crate::code_two_tree::{read_code_two_tree, CodeTwoTreeHeaderJudgement};
@@ -34,14 +34,18 @@ use crate::extent_tree::{
     extent_key_bytes, find_upper_leaf_entry, read_lower_segment, ExtentTreeHeaderJudgement,
     ExtentTreeReading, ExtentUpperLeafTarget,
 };
-use crate::pointer::{DataPointer, LocationEntry, NodePointer};
+use crate::pointer::{
+    DataPointer, LocationEntry, NodePointer, PointerHeadFieldOutsideTheFirstVersion,
+};
 use crate::records::{
-    mapping_key_for_data, parse_inode_internal_entry, parse_mapping_entry, InodeRecord,
-    TREE_KIND_EXTENT, TREE_KIND_INODE,
+    mapping_key_for_data, parse_inode_internal_entry_or_refusal, parse_mapping_entry, InodeRecord,
+    PointerCarryingEntryRefusal, NLINK_OF_AN_INODE_BEING_DELETED, TREE_KIND_EXTENT,
+    TREE_KIND_INODE,
 };
 use crate::recovery::{
-    choose_root, choose_system_configuration, read_mapped_tree_node_via_hint_then_central_mapping,
-    read_mapped_tree_root, read_unit_via_locations, replay_journal, scan_journal,
+    choose_root, choose_system_configuration_naming_devices_without_a_mountable_slot,
+    read_mapped_tree_node_via_hint_then_central_mapping, read_mapped_tree_root,
+    read_unit_via_locations, replay_journal, scan_journal,
     tree_table_entries_each_kind_at_most_once, JournalScanReport, MappedTreeNodeClass, PoolReader,
     RecoveryFailure, TreeTableEntriesRefusal,
 };
@@ -209,8 +213,16 @@ pub enum OpenPoolForReadFailure {
     InodeLeafContainerDisagreesWithTheInternalEntry { detail: &'static str },
     /// inode 记录解不开（填充 / flags / 预留非零，I-9.7）。
     InodeRecordMalformed,
-    /// 节点里的一条记录 / 条目解不开：盘上自述的条目宽窄于字段表。
+    /// 节点里的一条记录 / 条目解不开：盘上自述的条目宽窄于字段表（这一版的读者不认这一版写的条目布局）。
     RecordMalformed { what: &'static str },
+    /// 节点里的一条条目按字段表解得开，而它带的那条指针头部有一段不是第一版的取值（MAC / nonce 非 0、算法类型不是未加密、
+    /// 压缩算法码不认识、码 0 而压后长度非 0、extent 偏移非 0）：这条指针不能解引用，判该指针所在的结构损坏
+    /// （D19（块指针的结构与宽度预算） 已定项 3、D9（加密） 已定项 14、C581（extent 偏移非 0 没有判据））。与 `RecordMalformed` 分开报：
+    /// 那一种是条目布局不认，这一种是条目布局认得、指针指不过去（`records/2026-09-30-里程碑三开工第一轮.md` 第 8 批 core 簇第 8 条）。
+    PointerInTheRecordCannotBeDereferenced {
+        what: &'static str,
+        field: PointerHeadFieldOutsideTheFirstVersion,
+    },
 }
 
 impl From<RecoveryFailure> for OpenPoolForReadFailure {
@@ -222,7 +234,7 @@ impl From<RecoveryFailure> for OpenPoolForReadFailure {
 /// 打开一个文件没做成。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OpenFileFailure {
-    /// inode 树里没有这个号。
+    /// inode 树里没有这个号，或它的记录 nlink = 0（删除中，D8（核心索引结构） 已定项 16 第 4 条：读者答「没有文件」）。
     NoSuchInode { inode: InodeNumber },
     /// 按位置走 extent 树（上段到这个 inode 的叶条目、再到它的下段）时读不到、解不开或位置核不过
     /// （`extent_tree::find_upper_leaf_entry` / `read_lower_segment` 的判定，与冷启动走读同一套口径）。
@@ -448,11 +460,21 @@ pub fn open_pool_for_read(
     }
     let mut inode_records: Vec<InodeRecord> = Vec::new();
     for entry_bytes in &inode_root.entries {
-        let (_separator_key, identity_in_the_entry, child) = parse_inode_internal_entry(
+        let (_separator_key, identity_in_the_entry, child) = parse_inode_internal_entry_or_refusal(
             entry_bytes,
         )
-        .ok_or(OpenPoolForReadFailure::RecordMalformed {
-            what: "inode 树内部条目",
+        .map_err(|refusal| match refusal {
+            PointerCarryingEntryRefusal::NarrowerThanItsFieldTable => {
+                OpenPoolForReadFailure::RecordMalformed {
+                    what: "inode 树内部条目",
+                }
+            }
+            PointerCarryingEntryRefusal::PointerHeadFieldOutsideTheFirstVersion(field) => {
+                OpenPoolForReadFailure::PointerInTheRecordCannotBeDereferenced {
+                    what: "inode 树内部条目的子指针",
+                    field,
+                }
+            }
         })?;
         let container_bytes = read_mapped_tree_node_via_hint_then_central_mapping(
             reader,
@@ -539,6 +561,9 @@ pub struct MountedReadOnly {
     /// 施加前缀之后的根：挂载态是沿它打开的。
     pub effective_root: RootRecord,
     pub journal: JournalScanReport,
+    /// 两个系统配置槽都不可择、择系统配置时被跳过的盘（[`crate::recovery::SystemConfigurationChoice`]）：挂得上，但这几块盘上的
+    /// 系统配置冗余已经没了，再坏一块就整池挂不上（C463（一块盘的系统配置两份全废之后静默成功））。冗余完好时为空。只读挂载不重写它们。
+    pub devices_without_a_mountable_system_configuration_slot: Vec<DeviceIdentity>,
 }
 
 /// 只读挂载：择系统配置 → 择根 → 全环扫描 journal → 按前缀口径施加 → 沿施加之后的根打开挂载态。
@@ -546,13 +571,15 @@ pub struct MountedReadOnly {
 ///
 /// **扫环只在这一步发生一次**：之后每一次 [`OpenFileForRead::read_at`] 都不碰 journal 环。
 /// 层 0 的每个恢复结果上也能跑这一条——`reader` 换成那个崩溃镜像即可（并行线二验收第 3 条；
-/// 枚举那一半归 crash-verifier）。
+/// 枚举那一半归 checker 档，由主 agent 经门禁 checker-tier-layer0-replay 跑）。
 ///
 /// # Errors
 /// 见 [`MountReadOnlyFailure`]。
 pub fn mount_read_only(reader: &dyn PoolReader) -> Result<MountedReadOnly, MountReadOnlyFailure> {
-    let system_configuration =
-        choose_system_configuration(reader).map_err(MountReadOnlyFailure::Recovery)?;
+    let system_configuration_choice =
+        choose_system_configuration_naming_devices_without_a_mountable_slot(reader)
+            .map_err(MountReadOnlyFailure::Recovery)?;
+    let system_configuration = system_configuration_choice.system_configuration;
     let chosen_root = choose_root(reader, &system_configuration)
         .ok_or(MountReadOnlyFailure::Recovery(RecoveryFailure::NoValidRoot))?;
     let records = scan_journal(reader, &system_configuration);
@@ -571,6 +598,8 @@ pub fn mount_read_only(reader: &dyn PoolReader) -> Result<MountedReadOnly, Mount
         chosen_root,
         effective_root,
         journal,
+        devices_without_a_mountable_system_configuration_slot: system_configuration_choice
+            .devices_without_a_mountable_system_configuration_slot,
     })
 }
 
@@ -619,10 +648,13 @@ impl MountedPoolForRead {
         reader: &dyn PoolReader,
         inode: InodeNumber,
     ) -> Result<OpenFileForRead<'_>, OpenFileFailure> {
+        // nlink = 0 的记录是删除中的 inode：从意图那次发布起读者答「没有文件」（D8（核心索引结构） 已定项 16 第 4 条）。
         let inode_record = self
             .inode_records
             .iter()
-            .find(|record| record.inode == inode.0)
+            .find(|record| {
+                record.inode == inode.0 && record.nlink != NLINK_OF_AN_INODE_BEING_DELETED
+            })
             .copied()
             .ok_or(OpenFileFailure::NoSuchInode { inode })?;
         let reading = ExtentTreeReading {

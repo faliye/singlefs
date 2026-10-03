@@ -6,9 +6,18 @@
 //! 「写零」是第六个动作（用户 2026-09-19 定案，`records/2026-09-19-里程碑二遗留收拢.md` 第五之二节第 4 行：
 //! 问「块设备抽象加不加写零」答「加」）：一次调用覆盖 `[offset, offset + length)` 一整段，真设备上对应 WRITE ZEROES。
 //! **一次调用就是一个动作**——底下拆成几次 I/O 由后端自己定（[`ZERO_FILL_CHUNK_BYTES`]），上层（录制流、段序列）看到的是一步。
+//!
+//! 文件后端的写零落成打洞（`fallocate(2)` 的 `FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE`），文件系统报不支持打洞
+//! （`EOPNOTSUPP`、`ENOSYS`）才退回逐块写 0，别的错照常报成 [`BlockDeviceError::InputOutput`]（[`ZeroFillLanding`]，
+//! 用户 2026-09-30 定「只在不支持时退」）：mkfs 每块盘清 768 MiB 的 journal 环，真写 0 时每池 1.5 GiB 进页缓存又写回盘，
+//! 而镜像里非零的只有几 KiB（C603（测试与验证的资源浪费没有自检），用户 2026-09-30 定「稀疏打洞」）。
+//! 读回全 0、文件长度不变与真写 0 相同；持久同样由后面那次屏障给：打洞是元数据改动，ext4 的 `ext4_punch_hole`
+//! 把它记进 `fdatasync` 要等的那个日志事务（本机 6.17 内核源码 `fs/ext4/inode.c` 里调 `ext4_update_inode_fsync_trans(handle, inode, 1)`）。
+//! `O_DIRECT` 后端照旧真写 0：真设备上的块层计数与设备日志比对（checker 档 `device_log.rs` 的折叠）靠的是那些写。
 
 use std::fs::{File, OpenOptions};
 use std::io::{self, Seek, SeekFrom};
+use std::os::fd::AsRawFd;
 use std::os::unix::fs::{FileExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 
@@ -135,14 +144,96 @@ pub trait BlockDevice {
     fn size_in_bytes(&self) -> u64;
 }
 
+/// 文件后端的写零怎么落到镜像文件上。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ZeroFillLanding {
+    /// 先打洞；`fallocate` 报不支持打洞（`HolePunchFailure::PunchingUnsupported`）就退回逐块写 0，
+    /// 被信号打断（`HolePunchFailure::InterruptedBySignal`）原样重打，
+    /// 报别的错（`HolePunchFailure::OtherFailure`）照常交回 [`BlockDeviceError::InputOutput`]，不退、不写 0。
+    PunchHoleOrWriteZeroBytesIfUnsupported,
+    /// 只供测试的开关（`.claude/rules/fs-design.md`「五条硬要求」第 2 条）：不调 `fallocate`，当作它报了 `EOPNOTSUPP`。
+    /// 这个 errno 与真失败走同一段按 errno 分路的判定（`classify_hole_punch_failure`），落进退回逐块写 0 那条路。
+    ActAsIfPunchingWereUnsupported,
+    /// 只供测试的开关：不调 `fallocate`，当作它报了 `EIO`；与真失败走同一段判定，落进照常报错那条路。
+    ActAsIfPunchingFailedWithAnInputOutputError,
+    /// 只供测试的开关：这一次写零的前 `punches_interrupted_before_the_real_one` 次打洞不调 `fallocate`，每次都当作它报了 `EINTR`；
+    /// 与真失败走同一段判定，落进原样重打那条路，之后那一次照 [`ZeroFillLanding::PunchHoleOrWriteZeroBytesIfUnsupported`] 真调 `fallocate`。
+    /// 连着被打断几次都照样重打（代码三方 m3-code-r2 J5：只能打断第一次的开关测不出「被打断第二次就报错」）。
+    ActAsIfTheFirstPunchesWereInterruptedBySignal {
+        punches_interrupted_before_the_real_one: u64,
+    },
+}
+
+/// 打洞失败之后走哪条路，按 `fallocate` 交回的 errno 分（用户 2026-09-30 定「只在不支持时退」）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum HolePunchFailure {
+    /// 文件系统不支持打洞（`EOPNOTSUPP`，Linux 上与 `ENOTSUP` 同值）或内核没有 `fallocate`（`ENOSYS`）：
+    /// 退回逐块写 0，整段照样变成全 0。
+    PunchingUnsupported,
+    /// 打洞被信号打断（`EINTR`）：`fallocate(2)` 在动文件之前就返回了，原样再打一次洞；不算不支持、不退回逐块写 0，也不报错
+    /// （代码三方 m3-code-r1 Z3-b 采）。
+    InterruptedBySignal,
+    /// 别的错（读写错、`EBADF`、`EINVAL`、`ENOSPC`，以及没有 errno 的）：照常报成块设备 I/O 错，不被退路吞掉。
+    OtherFailure,
+}
+
+/// 按 errno 判一次打洞失败该退回逐块写 0，还是照常报错。
+fn classify_hole_punch_failure(error: &io::Error) -> HolePunchFailure {
+    match error.raw_os_error() {
+        Some(libc::EOPNOTSUPP | libc::ENOSYS) => HolePunchFailure::PunchingUnsupported,
+        Some(libc::EINTR) => HolePunchFailure::InterruptedBySignal,
+        Some(_) | None => HolePunchFailure::OtherFailure,
+    }
+}
+
+/// 文件后端这个句柄上的写零各落成了哪一种（`.claude/rules/fs-design.md`「五条硬要求」第 4 条：分支可观测）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ZeroFillLandingCounts {
+    /// 打洞成功、没经 write 系统调用的写零次数。
+    pub punched_calls: u64,
+    /// 退回逐块写 0 的写零次数。
+    pub written_as_zero_bytes_calls: u64,
+    /// 打洞被信号打断（`EINTR`）、原样重打的次数（按打洞的次数数，不按写零的次数数）。
+    pub punch_attempts_interrupted_by_signal: u64,
+}
+
 /// 文件后端：一个镜像文件当一块盘。物理块大小按参数给（本机 NVMe 是 512，D22（单元原子性怎么合成） 已定项 9 那一节现查）。
 pub struct FileBackedBlockDevice {
     file: File,
     size_in_bytes: u64,
     physical_block_size: PhysicalBlockSizeInBytes,
+    zero_fill_landing: ZeroFillLanding,
+    zero_fill_landing_counts: ZeroFillLandingCounts,
 }
 
+/// 两个构造入口起步时一样：先打洞，计数从 0 起。
+const INITIAL_ZERO_FILL_LANDING: ZeroFillLanding =
+    ZeroFillLanding::PunchHoleOrWriteZeroBytesIfUnsupported;
+const NO_ZERO_FILL_LANDED_YET: ZeroFillLandingCounts = ZeroFillLandingCounts {
+    punched_calls: 0,
+    written_as_zero_bytes_calls: 0,
+    punch_attempts_interrupted_by_signal: 0,
+};
+
 impl FileBackedBlockDevice {
+    /// 只供测试：换掉写零的落地方式（[`ZeroFillLanding::ActAsIfPunchingWereUnsupported`] 强制走退路，
+    /// [`ZeroFillLanding::ActAsIfPunchingFailedWithAnInputOutputError`] 强制走照常报错）。
+    #[must_use]
+    pub fn with_test_only_zero_fill_landing(self, landing: ZeroFillLanding) -> Self {
+        Self {
+            file: self.file,
+            size_in_bytes: self.size_in_bytes,
+            physical_block_size: self.physical_block_size,
+            zero_fill_landing: landing,
+            zero_fill_landing_counts: self.zero_fill_landing_counts,
+        }
+    }
+
+    #[must_use]
+    pub fn zero_fill_landing_counts(&self) -> ZeroFillLandingCounts {
+        self.zero_fill_landing_counts
+    }
+
     /// 排他地建出一个镜像文件并把它撑到 `size_in_bytes`；稀疏文件，不真占盘。
     /// 同名文件已经在那儿了就报 [`BlockDeviceError::ImageFileAlreadyExists`]，不接着用旧镜像：
     /// 测试的镜像名带进程号，而进程号会被系统复用、上一轮被杀留下的文件不会被清——接着用就是拿上一轮的盘面当这一轮的起点，
@@ -172,6 +263,8 @@ impl FileBackedBlockDevice {
             file,
             size_in_bytes,
             physical_block_size,
+            zero_fill_landing: INITIAL_ZERO_FILL_LANDING,
+            zero_fill_landing_counts: NO_ZERO_FILL_LANDED_YET,
         })
     }
 
@@ -203,6 +296,8 @@ impl FileBackedBlockDevice {
             file,
             size_in_bytes,
             physical_block_size,
+            zero_fill_landing: INITIAL_ZERO_FILL_LANDING,
+            zero_fill_landing_counts: NO_ZERO_FILL_LANDED_YET,
         })
     }
 
@@ -274,6 +369,42 @@ where
     Ok(())
 }
 
+/// 在 `file` 的 `[offset, offset + length)` 上打洞、不改文件长度：之后读这一段是全 0，
+/// 整块的文件系统块被释放，头尾不满一块的部分由内核就地写 0（`fallocate(2)`「Deallocating file space」）。
+/// 返回非 0 时交回 `errno`，由调用方按 `classify_hole_punch_failure` 决定退回逐块写 0、原样重打还是照常报错。
+#[allow(
+    unsafe_code,
+    reason = "std 没有 fallocate 的安全封装；全 crate 只在这一处放开 unsafe（C603（测试与验证的资源浪费没有自检））"
+)]
+fn punch_hole_keeping_the_file_length(
+    file: &File,
+    offset: DeviceOffsetInBytes,
+    length: u64,
+) -> io::Result<()> {
+    let offset_for_the_system_call = libc::off_t::try_from(offset.0)
+        .map_err(|_| io::Error::from(io::ErrorKind::InvalidInput))?;
+    let length_for_the_system_call =
+        libc::off_t::try_from(length).map_err(|_| io::Error::from(io::ErrorKind::InvalidInput))?;
+    // SAFETY: `fallocate` 只读它的四个整数参数，不碰进程内存；描述符取自 `file`，
+    // 而 `file` 借用到这次调用返回，调用期间不会被关掉或换成别的文件。偏移与长度由上面的 `try_from`
+    // 转成非负的 `off_t`，放不下就在转换处拒；越界的请求到不了这里：唯一的调用方 `write_zeroes_at` 先过 `check_request`
+    // （对齐、落在设备范围内），长度 0 也在 `write_zeroes_at` 里先交回、不到这里。
+    // 跨过文件末尾的打洞，文件内那一半照常打成 0，文件外的部分内核不做，都不碰内存。返回值在下面查了。
+    let return_code = unsafe {
+        libc::fallocate(
+            file.as_raw_fd(),
+            libc::FALLOC_FL_PUNCH_HOLE | libc::FALLOC_FL_KEEP_SIZE,
+            offset_for_the_system_call,
+            length_for_the_system_call,
+        )
+    };
+    if return_code == 0 {
+        Ok(())
+    } else {
+        Err(io::Error::last_os_error())
+    }
+}
+
 impl BlockDevice for FileBackedBlockDevice {
     fn read_at(
         &self,
@@ -310,12 +441,65 @@ impl BlockDevice for FileBackedBlockDevice {
         length: u64,
     ) -> Result<(), BlockDeviceError> {
         self.check_request(offset, length)?;
-        let zeros = vec![0u8; zero_fill_chunk_length(length)];
-        write_zeroes_in_chunks(offset, length, &zeros, |chunk_offset, chunk| {
-            self.file
-                .write_all_at(chunk, chunk_offset.0)
-                .map_err(BlockDeviceError::InputOutput)
-        })
+        // 长度 0 不调系统调用：`fallocate(2)` 对长度 0 报 `EINVAL`，而另两个后端（`O_DIRECT` 后端、内存稀疏盘）对它交回 `Ok`、
+        // 一个字节不动（代码三方 m3-code-r1 Z3-a）。同一个请求三个后端结局相同，这里照它们交回 `Ok`，不记进落地计数。
+        if length == 0 {
+            return Ok(());
+        }
+        // 循环：每一轮打一次洞。跨轮的状态只有这一次写零里被信号打断的次数（`punch_attempts_interrupted`，只增）；
+        // 出口三个：打成洞、报不支持（退回逐块写 0）、报别的错。被打断就原样再打，轮数的上界是这期间送到的信号数
+        // （与 std 的 `write_all_at` 对 `ErrorKind::Interrupted` 的处理同一个口径）。
+        let mut punch_attempts_interrupted: u64 = 0;
+        loop {
+            let punched = match self.zero_fill_landing {
+                ZeroFillLanding::ActAsIfTheFirstPunchesWereInterruptedBySignal {
+                    punches_interrupted_before_the_real_one,
+                } if punch_attempts_interrupted < punches_interrupted_before_the_real_one => {
+                    Err(io::Error::from_raw_os_error(libc::EINTR))
+                }
+                ZeroFillLanding::PunchHoleOrWriteZeroBytesIfUnsupported
+                | ZeroFillLanding::ActAsIfTheFirstPunchesWereInterruptedBySignal { .. } => {
+                    punch_hole_keeping_the_file_length(&self.file, offset, length)
+                }
+                ZeroFillLanding::ActAsIfPunchingWereUnsupported => {
+                    Err(io::Error::from_raw_os_error(libc::EOPNOTSUPP))
+                }
+                ZeroFillLanding::ActAsIfPunchingFailedWithAnInputOutputError => {
+                    Err(io::Error::from_raw_os_error(libc::EIO))
+                }
+            };
+            let punch_error = match punched {
+                Ok(()) => {
+                    self.zero_fill_landing_counts.punched_calls += 1;
+                    return Ok(());
+                }
+                Err(punch_error) => punch_error,
+            };
+            match classify_hole_punch_failure(&punch_error) {
+                HolePunchFailure::PunchingUnsupported => {
+                    self.zero_fill_landing_counts.written_as_zero_bytes_calls += 1;
+                    let zeros = vec![0u8; zero_fill_chunk_length(length)];
+                    return write_zeroes_in_chunks(
+                        offset,
+                        length,
+                        &zeros,
+                        |chunk_offset, chunk| {
+                            self.file
+                                .write_all_at(chunk, chunk_offset.0)
+                                .map_err(BlockDeviceError::InputOutput)
+                        },
+                    );
+                }
+                HolePunchFailure::InterruptedBySignal => {
+                    punch_attempts_interrupted += 1;
+                    self.zero_fill_landing_counts
+                        .punch_attempts_interrupted_by_signal += 1;
+                }
+                HolePunchFailure::OtherFailure => {
+                    return Err(BlockDeviceError::InputOutput(punch_error));
+                }
+            }
+        }
     }
 
     fn barrier(&mut self) -> Result<(), BlockDeviceError> {
@@ -567,6 +751,20 @@ mod tests {
         ))
     }
 
+    /// 镜像的删除守卫：用例做完、断言失败、panic 都在离开作用域时删掉镜像（`command-safety.md`「测试镜像一律放临时目录」）。
+    /// 删不掉只打一行，不在 Drop 里 panic（panic 途中再 panic 会直接中止进程）。
+    struct ImageRemovedOnDrop(std::path::PathBuf);
+
+    impl Drop for ImageRemovedOnDrop {
+        fn drop(&mut self) {
+            if let Err(error) = std::fs::remove_file(&self.0) {
+                if error.kind() != io::ErrorKind::NotFound {
+                    eprintln!("删不掉测试镜像 {}：{error}", self.0.display());
+                }
+            }
+        }
+    }
+
     #[test]
     fn write_then_read_returns_the_same_bytes_and_zero_fill_elsewhere() {
         let path = temporary_image_path("roundtrip");
@@ -661,6 +859,479 @@ mod tests {
             );
         }
         std::fs::remove_file(&path).expect("清理镜像");
+    }
+
+    /// 本线程经 write 一族系统调用交出去的字节数（`/proc/thread-self/io` 的 `wchar`）。
+    /// 取线程这一份、不取进程那一份：同一个测试二进制里别的用例在别的线程上并行写各自的镜像。
+    fn bytes_handed_to_write_calls_by_this_thread() -> u64 {
+        let accounting = std::fs::read_to_string("/proc/thread-self/io")
+            .expect("读 /proc/thread-self/io（Linux 3.17 起就有）");
+        accounting
+            .lines()
+            .find_map(|line| line.strip_prefix("wchar: "))
+            .expect("io 统计里有 wchar 一行")
+            .trim()
+            .parse()
+            .expect("wchar 是十进制数")
+    }
+
+    /// 打洞那条路：物理块 512、文件系统块 4096，段的头尾都不落在文件系统块边界上，读回整段全 0、
+    /// 同一个文件系统块里段外的扇区原样不动；第二段清到文件末尾，文件长度不变；两次写零一个字节都没经 write 系统调用。
+    #[test]
+    fn punching_ranges_off_the_filesystem_block_boundaries_reads_back_zero_keeps_the_neighbours_and_the_file_length(
+    ) {
+        const IMAGE_BYTES: u64 = 65536;
+        const DIRT: u8 = 0xC3;
+        let path = temporary_image_path("punch");
+        let mut device = FileBackedBlockDevice::create_image_file_exclusively(
+            &path,
+            IMAGE_BYTES,
+            PhysicalBlockSizeInBytes(512),
+        )
+        .expect("建镜像");
+        let image_length = usize::try_from(IMAGE_BYTES).expect("镜像长装得进 usize");
+        // 先弄脏整个镜像：稀疏镜像本来就读回全 0，不弄脏分不出「清过」与「从来没写过」。
+        device
+            .write_at(
+                DeviceOffsetInBytes(0),
+                &vec![DIRT; image_length],
+                WriteDurability::Plain,
+            )
+            .expect("填脏");
+        // 段一 [4608, 16896)：头落在第 2 个文件系统块中间、尾落在第 5 个中间；段二是最后 1536 字节，清到文件末尾。
+        let ranges: [(u64, u64); 2] = [(4608, 12288), (IMAGE_BYTES - 1536, 1536)];
+        let handed_before = bytes_handed_to_write_calls_by_this_thread();
+        for (range_start, range_length) in ranges {
+            device
+                .write_zeroes_at(DeviceOffsetInBytes(range_start), range_length)
+                .expect("写零");
+        }
+        let handed_during_zero_fills = bytes_handed_to_write_calls_by_this_thread() - handed_before;
+        assert_eq!(
+            handed_during_zero_fills, 0,
+            "打洞不经 write 系统调用；交出去 {handed_during_zero_fills} 字节说明退回了逐块写 0"
+        );
+        assert_eq!(
+            device.zero_fill_landing_counts(),
+            ZeroFillLandingCounts {
+                punched_calls: 2,
+                written_as_zero_bytes_calls: 0,
+                punch_attempts_interrupted_by_signal: 0,
+            },
+            "两次写零都该落成打洞"
+        );
+        let mut whole_image = vec![0xFFu8; image_length];
+        device
+            .read_at(DeviceOffsetInBytes(0), &mut whole_image)
+            .expect("读回整个镜像");
+        for (index, byte) in whole_image.iter().enumerate() {
+            let position = u64::try_from(index).expect("下标装得进 u64");
+            let is_inside_a_range = ranges.iter().any(|(range_start, range_length)| {
+                position >= *range_start && position < range_start + range_length
+            });
+            if is_inside_a_range {
+                assert_eq!(*byte, 0, "偏移 {position} 在清零段内，没被清干净");
+            } else {
+                assert_eq!(*byte, DIRT, "偏移 {position} 在清零段外，不该被动");
+            }
+        }
+        assert_eq!(
+            std::fs::metadata(&path).expect("读镜像元数据").len(),
+            IMAGE_BYTES,
+            "打洞带 KEEP_SIZE，文件长度不变"
+        );
+        std::fs::remove_file(&path).expect("清理镜像");
+    }
+
+    /// 打洞报不支持的退路（测试开关当作 `fallocate` 报了 `EOPNOTSUPP`，与真失败走同一段按 errno 分路的判定）：
+    /// 逐块写 0 铺满整段。段长取 `ZERO_FILL_CHUNK_BYTES` 的 2.5 倍，
+    /// 拆块的边界上不留没清的洞、段外一个字节不动、文件长度不变，经 write 系统调用交出去的恰好是段长那么多字节。
+    #[test]
+    fn an_unsupported_hole_punch_falls_back_to_writing_zero_bytes_across_chunk_boundaries() {
+        let path = temporary_image_path("unsupported-punch");
+        let chunk = ZERO_FILL_CHUNK_BYTES;
+        let zero_start = chunk;
+        let zero_length = chunk * 2 + chunk / 2;
+        let image_bytes = zero_start + zero_length + chunk;
+        let mut device = FileBackedBlockDevice::create_image_file_exclusively(
+            &path,
+            image_bytes,
+            PhysicalBlockSizeInBytes(512),
+        )
+        .expect("建镜像")
+        .with_test_only_zero_fill_landing(ZeroFillLanding::ActAsIfPunchingWereUnsupported);
+        let dirt = vec![0xC3u8; usize::try_from(chunk).expect("块长")];
+        let mut filled: u64 = 0;
+        while filled < image_bytes {
+            let this_piece = usize::try_from((image_bytes - filled).min(chunk)).expect("片长");
+            device
+                .write_at(
+                    DeviceOffsetInBytes(filled),
+                    &dirt[..this_piece],
+                    WriteDurability::Plain,
+                )
+                .expect("填脏");
+            filled += u64::try_from(this_piece).expect("片长装得进 u64");
+        }
+        let handed_before = bytes_handed_to_write_calls_by_this_thread();
+        device
+            .write_zeroes_at(DeviceOffsetInBytes(zero_start), zero_length)
+            .expect("写零");
+        let handed_during_zero_fill = bytes_handed_to_write_calls_by_this_thread() - handed_before;
+        assert_eq!(
+            handed_during_zero_fill, zero_length,
+            "退路逐块写 0：经 write 交出去的该恰好是段长"
+        );
+        assert_eq!(
+            device.zero_fill_landing_counts(),
+            ZeroFillLandingCounts {
+                punched_calls: 0,
+                written_as_zero_bytes_calls: 1,
+                punch_attempts_interrupted_by_signal: 0,
+            },
+            "这一次写零该落进退路"
+        );
+        let mut sample = vec![0xFFu8; 512];
+        for offset in [
+            zero_start,
+            zero_start + chunk - 512,
+            zero_start + chunk,
+            zero_start + 2 * chunk - 512,
+            zero_start + 2 * chunk,
+            zero_start + zero_length - 512,
+        ] {
+            device
+                .read_at(DeviceOffsetInBytes(offset), &mut sample)
+                .expect("读段内");
+            assert!(
+                sample.iter().all(|byte| *byte == 0),
+                "偏移 {offset} 那一扇区没被清干净"
+            );
+        }
+        for offset in [zero_start - 512, zero_start + zero_length] {
+            device
+                .read_at(DeviceOffsetInBytes(offset), &mut sample)
+                .expect("读段外");
+            assert!(
+                sample.iter().all(|byte| *byte == 0xC3),
+                "偏移 {offset} 在清零段外，不该被动"
+            );
+        }
+        assert_eq!(
+            std::fs::metadata(&path).expect("读镜像元数据").len(),
+            image_bytes,
+            "退路写的全在文件里面，文件长度不变"
+        );
+        std::fs::remove_file(&path).expect("清理镜像");
+    }
+
+    /// 打洞报别的错（测试开关当作 `fallocate` 报了 `EIO`）：照常交回 `InputOutput`、原 errno 带着，
+    /// 一个 0 都不写——段里还是旧字节，经 write 系统调用一个字节都没交出去，两个落地计数都不动。
+    #[test]
+    fn a_hole_punch_failing_with_an_input_output_error_is_reported_and_writes_no_zero_bytes() {
+        const IMAGE_BYTES: u64 = 65536;
+        const DIRT: u8 = 0xC3;
+        let path = temporary_image_path("failing-punch");
+        let mut device = FileBackedBlockDevice::create_image_file_exclusively(
+            &path,
+            IMAGE_BYTES,
+            PhysicalBlockSizeInBytes(512),
+        )
+        .expect("建镜像")
+        .with_test_only_zero_fill_landing(
+            ZeroFillLanding::ActAsIfPunchingFailedWithAnInputOutputError,
+        );
+        let image_length = usize::try_from(IMAGE_BYTES).expect("镜像长装得进 usize");
+        device
+            .write_at(
+                DeviceOffsetInBytes(0),
+                &vec![DIRT; image_length],
+                WriteDurability::Plain,
+            )
+            .expect("填脏");
+        let handed_before = bytes_handed_to_write_calls_by_this_thread();
+        let zero_fill_outcome = device.write_zeroes_at(DeviceOffsetInBytes(4096), 16384);
+        let handed_during_zero_fill = bytes_handed_to_write_calls_by_this_thread() - handed_before;
+        assert!(
+            matches!(
+                &zero_fill_outcome,
+                Err(BlockDeviceError::InputOutput(error)) if error.raw_os_error() == Some(libc::EIO)
+            ),
+            "打洞报 EIO 该照常交回带着这个 errno 的 InputOutput，实际是 {zero_fill_outcome:?}"
+        );
+        assert_eq!(
+            handed_during_zero_fill, 0,
+            "打洞报别的错不退回逐块写 0；交出去 {handed_during_zero_fill} 字节说明退路吞掉了这个错"
+        );
+        assert_eq!(
+            device.zero_fill_landing_counts(),
+            ZeroFillLandingCounts {
+                punched_calls: 0,
+                written_as_zero_bytes_calls: 0,
+                punch_attempts_interrupted_by_signal: 0,
+            },
+            "这一次写零既没打成洞，也没落进退路"
+        );
+        let mut whole_image = vec![0u8; image_length];
+        device
+            .read_at(DeviceOffsetInBytes(0), &mut whole_image)
+            .expect("读回整个镜像");
+        assert!(
+            whole_image.iter().all(|byte| *byte == DIRT),
+            "打洞报错之后镜像该原样不动，第一个被改的偏移是 {:?}",
+            whole_image.iter().position(|byte| *byte != DIRT)
+        );
+        std::fs::remove_file(&path).expect("清理镜像");
+    }
+
+    /// 按 errno 分路：只有 `EOPNOTSUPP`（与 `ENOTSUP` 同值）与 `ENOSYS` 退回逐块写 0，`EINTR` 原样重打，
+    /// 读写错、`EBADF`、`EINVAL`、`ENOSPC`、`EPERM` 与没有 errno 的错都照常报。
+    #[test]
+    fn only_unsupported_errnos_send_a_failed_hole_punch_to_the_zero_byte_fallback() {
+        for errno in [libc::EOPNOTSUPP, libc::ENOTSUP, libc::ENOSYS] {
+            assert_eq!(
+                classify_hole_punch_failure(&io::Error::from_raw_os_error(errno)),
+                HolePunchFailure::PunchingUnsupported,
+                "errno {errno} 是不支持打洞，该退回逐块写 0"
+            );
+        }
+        for errno in [
+            libc::EIO,
+            libc::EBADF,
+            libc::EINVAL,
+            libc::ENOSPC,
+            libc::EPERM,
+        ] {
+            assert_eq!(
+                classify_hole_punch_failure(&io::Error::from_raw_os_error(errno)),
+                HolePunchFailure::OtherFailure,
+                "errno {errno} 不是不支持打洞，该照常报错"
+            );
+        }
+        assert_eq!(
+            classify_hole_punch_failure(&io::Error::from_raw_os_error(libc::EINTR)),
+            HolePunchFailure::InterruptedBySignal,
+            "EINTR 是被信号打断、什么都没做，该原样重打，不退回逐块写 0、不报错"
+        );
+        assert_eq!(
+            classify_hole_punch_failure(&io::Error::from(io::ErrorKind::InvalidInput)),
+            HolePunchFailure::OtherFailure,
+            "没有 errno 的错（偏移装不进 off_t 那一类）该照常报错"
+        );
+    }
+
+    /// 打洞被信号打断（测试开关当作前 `punches_interrupted` 次 `fallocate` 都报了 `EINTR`，与真失败走同一段按 errno 分路的判定）：
+    /// 每次都原样重打，最后真打成洞，交回 `Ok`——不退回逐块写 0（经 write 系统调用一个字节都没交出去）、不报错；整段读回 0、
+    /// 段外原样不动；落地计数记一次打洞、`punches_interrupted` 次被打断。
+    fn assert_punched_again_after_interruptions_without_falling_back_or_reporting_an_error(
+        punches_interrupted: u64,
+    ) {
+        const IMAGE_BYTES: u64 = 65536;
+        const DIRT: u8 = 0xC3;
+        const ZERO_START: u64 = 4096;
+        const ZERO_LENGTH: u64 = 16384;
+        let path = temporary_image_path("interrupted-punch");
+        let _image_removed_on_drop = ImageRemovedOnDrop(path.clone());
+        let mut device = FileBackedBlockDevice::create_image_file_exclusively(
+            &path,
+            IMAGE_BYTES,
+            PhysicalBlockSizeInBytes(512),
+        )
+        .expect("建镜像")
+        .with_test_only_zero_fill_landing(
+            ZeroFillLanding::ActAsIfTheFirstPunchesWereInterruptedBySignal {
+                punches_interrupted_before_the_real_one: punches_interrupted,
+            },
+        );
+        let image_length = usize::try_from(IMAGE_BYTES).expect("镜像长装得进 usize");
+        device
+            .write_at(
+                DeviceOffsetInBytes(0),
+                &vec![DIRT; image_length],
+                WriteDurability::Plain,
+            )
+            .expect("填脏");
+        let handed_before = bytes_handed_to_write_calls_by_this_thread();
+        let zero_fill_outcome =
+            device.write_zeroes_at(DeviceOffsetInBytes(ZERO_START), ZERO_LENGTH);
+        let handed_during_zero_fill = bytes_handed_to_write_calls_by_this_thread() - handed_before;
+        assert!(
+            zero_fill_outcome.is_ok(),
+            "被信号打断 {punches_interrupted} 次的打洞该每次原样重打、交回 Ok，实际是 {zero_fill_outcome:?}"
+        );
+        assert_eq!(
+            device.zero_fill_landing_counts(),
+            ZeroFillLandingCounts {
+                punched_calls: 1,
+                written_as_zero_bytes_calls: 0,
+                punch_attempts_interrupted_by_signal: punches_interrupted,
+            },
+            "这一次写零被打断 {punches_interrupted} 次、重打成洞，没落进退路"
+        );
+        assert_eq!(
+            handed_during_zero_fill, 0,
+            "重打的是洞、不是逐块写 0；交出去 {handed_during_zero_fill} 字节说明 EINTR 落进了退路"
+        );
+        let mut whole_image = vec![0xFFu8; image_length];
+        device
+            .read_at(DeviceOffsetInBytes(0), &mut whole_image)
+            .expect("读回整个镜像");
+        for (index, byte) in whole_image.iter().enumerate() {
+            let position = u64::try_from(index).expect("下标装得进 u64");
+            if (ZERO_START..ZERO_START + ZERO_LENGTH).contains(&position) {
+                assert_eq!(*byte, 0, "偏移 {position} 在清零段内，没被清干净");
+            } else {
+                assert_eq!(*byte, DIRT, "偏移 {position} 在清零段外，不该被动");
+            }
+        }
+    }
+
+    /// 打洞被信号打断一次：原样重打一次、真打成洞（[`assert_punched_again_after_interruptions_without_falling_back_or_reporting_an_error`]）。
+    #[test]
+    fn a_hole_punch_interrupted_by_a_signal_is_punched_again_without_falling_back_or_reporting_an_error(
+    ) {
+        assert_punched_again_after_interruptions_without_falling_back_or_reporting_an_error(1);
+    }
+
+    /// 打洞连着被信号打断两次（代码三方 m3-code-r2 J5）：第二次被打断也照样原样重打、第三次真打成洞，不报错、不退回逐块写 0。
+    /// 「被打断第二次就报错」（重打只给一次）时这里交回 `InputOutput`。
+    #[test]
+    fn a_hole_punch_interrupted_by_a_signal_twice_in_a_row_is_punched_a_third_time_without_falling_back_or_reporting_an_error(
+    ) {
+        assert_punched_again_after_interruptions_without_falling_back_or_reporting_an_error(2);
+    }
+
+    /// 一次长度 0 的写零在一个后端上的结局：交回什么、本线程经 write 系统调用交出去几个字节、镜像变没变。
+    #[derive(Debug, PartialEq, Eq)]
+    struct ZeroLengthZeroFillOutcome {
+        returned: String,
+        bytes_handed_to_write_calls: u64,
+        is_the_image_unchanged: bool,
+    }
+
+    /// 在 `device` 上于偏移 0、中间、设备末尾、越过末尾一个物理块、没按物理块（512 字节）对齐的半块处各写零一次、长度都是 0，
+    /// 按这个次序交回每一次的结局。`device` 的镜像事先填满 `dirt`。
+    fn zero_length_zero_fills_on(
+        device: &mut dyn BlockDevice,
+        image_bytes: u64,
+        dirt: u8,
+    ) -> Vec<ZeroLengthZeroFillOutcome> {
+        let image_length = usize::try_from(image_bytes).expect("镜像长装得进 usize");
+        let offset_one_block_past_the_end = image_bytes + 512;
+        let offset_half_a_block_in = 256;
+        [
+            0,
+            image_bytes / 2,
+            image_bytes,
+            offset_one_block_past_the_end,
+            offset_half_a_block_in,
+        ]
+        .into_iter()
+        .map(|offset| {
+            let handed_before = bytes_handed_to_write_calls_by_this_thread();
+            let returned = format!(
+                "{:?}",
+                device.write_zeroes_at(DeviceOffsetInBytes(offset), 0)
+            );
+            let bytes_handed_to_write_calls =
+                bytes_handed_to_write_calls_by_this_thread() - handed_before;
+            let mut whole_image = vec![0u8; image_length];
+            device
+                .read_at(DeviceOffsetInBytes(0), &mut whole_image)
+                .expect("读回整个镜像");
+            ZeroLengthZeroFillOutcome {
+                returned,
+                bytes_handed_to_write_calls,
+                is_the_image_unchanged: whole_image.iter().all(|byte| *byte == dirt),
+            }
+        })
+        .collect()
+    }
+
+    /// 长度 0 的写零（代码三方 m3-code-r1 Z3-a）：文件后端与 `O_DIRECT` 后端（绕开页缓存、走页缓存两臂）在偏移 0、中间、
+    /// 设备末尾三处结局逐项相同——交回 `Ok`、经 write 系统调用一个字节都没交出去、镜像一个字节不动。文件后端另核落地计数一样都不记
+    /// （长度 0 不调 `fallocate`；调了内核报 `EINVAL`，交回的就是 `InputOutput`）。`O_DIRECT` 后端没有落地计数，比到「交回什么、
+    /// 交出去几个字节、镜像变没变」这三步为止。越过末尾一个物理块、没按物理块对齐的两处长度 0（代码三方 m3-code-r2 J4），
+    /// 三个后端照样先过请求判据、都拒成 `OutOfRange`、`Unaligned`，一个字节不动（长度 0 的早退挪到请求判据之前时文件后端交 `Ok`）。
+    /// 内存稀疏盘（`singlefs_harness::memory_pool::SparseBlockDevice`）在 harness 档，核心层的单测拿不到它，不在这里比
+    /// （它与文件后端对这两处长度 0 的请求逐个对拍在 `sparse_devices_refuse_requests_outside_the_device_like_the_file_backend`）。
+    #[test]
+    fn a_zero_length_zero_fill_ends_the_same_on_the_file_backend_and_both_arms_of_the_direct_backend(
+    ) {
+        const IMAGE_BYTES: u64 = 65536;
+        const DIRT: u8 = 0x5A;
+        let image_length = usize::try_from(IMAGE_BYTES).expect("镜像长装得进 usize");
+        let accepted = || ZeroLengthZeroFillOutcome {
+            returned: "Ok(())".to_string(),
+            bytes_handed_to_write_calls: 0,
+            is_the_image_unchanged: true,
+        };
+        let refused = |refusal: BlockDeviceError| ZeroLengthZeroFillOutcome {
+            returned: format!("{:?}", Err::<(), BlockDeviceError>(refusal)),
+            bytes_handed_to_write_calls: 0,
+            is_the_image_unchanged: true,
+        };
+        let expected: Vec<ZeroLengthZeroFillOutcome> = vec![
+            accepted(),
+            accepted(),
+            accepted(),
+            refused(BlockDeviceError::OutOfRange {
+                offset: DeviceOffsetInBytes(IMAGE_BYTES + 512),
+                length: 0,
+                device_size: IMAGE_BYTES,
+            }),
+            refused(BlockDeviceError::Unaligned {
+                offset: DeviceOffsetInBytes(256),
+                length: 0,
+                physical_block_size: 512,
+            }),
+        ];
+
+        let file_path = temporary_image_path("zero-length-file");
+        let _file_image_removed_on_drop = ImageRemovedOnDrop(file_path.clone());
+        let mut file_device = FileBackedBlockDevice::create_image_file_exclusively(
+            &file_path,
+            IMAGE_BYTES,
+            PhysicalBlockSizeInBytes(512),
+        )
+        .expect("建镜像");
+        file_device
+            .write_at(
+                DeviceOffsetInBytes(0),
+                &vec![DIRT; image_length],
+                WriteDurability::Plain,
+            )
+            .expect("填脏");
+        let file_outcomes = zero_length_zero_fills_on(&mut file_device, IMAGE_BYTES, DIRT);
+        assert_eq!(
+            file_device.zero_fill_landing_counts(),
+            NO_ZERO_FILL_LANDED_YET,
+            "长度 0 的写零既不打洞也不退回逐块写 0"
+        );
+        assert_eq!(
+            file_outcomes, expected,
+            "文件后端：设备里的长度 0 写零交回 Ok、什么都不做；越过末尾、没对齐的照样拒"
+        );
+
+        for policy in [
+            PageCachePolicy::BypassWithDirectInputOutput,
+            PageCachePolicy::GoThroughPageCache,
+        ] {
+            let direct_path = temporary_image_path("zero-length-direct");
+            let _direct_image_removed_on_drop = ImageRemovedOnDrop(direct_path.clone());
+            std::fs::write(&direct_path, vec![DIRT; image_length]).expect("建填脏的镜像");
+            let mut direct_device = DirectInputOutputBlockDevice::open_existing(
+                &direct_path,
+                policy,
+                PhysicalBlockSizeSource::Declared(PhysicalBlockSizeInBytes(512)),
+            )
+            .expect("打开（临时目录在 ext4 上，O_DIRECT 打得开）");
+            let direct_outcomes = zero_length_zero_fills_on(&mut direct_device, IMAGE_BYTES, DIRT);
+            assert_eq!(
+                direct_outcomes, file_outcomes,
+                "{policy:?}：长度 0 的写零与文件后端结局逐项相同"
+            );
+        }
     }
 
     /// 写零与写走同一条前置判定：偏移或长度不按物理块对齐、或者越过设备末尾，都在动盘之前拒绝。

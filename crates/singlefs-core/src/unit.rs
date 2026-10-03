@@ -17,9 +17,12 @@ pub const FORMAT_VERSION: u16 = 1;
 pub const UNIT_CLASS_DATA: u8 = 1;
 pub const UNIT_CLASS_INDEX_NODE: u8 = 2;
 pub const UNIT_CLASS_PACKED: u8 = 3;
-/// 打包记录类型（第二级登记表）：2 = inode 记录，4 = 实例表。
+/// 打包记录类型（第二级登记表）：1 = 墓碑（D18（块里携带什么信息） 已定项 24），2 = inode 记录，4 = 实例表。
+pub const PACKED_TYPE_TOMBSTONE: u16 = 1;
 pub const PACKED_TYPE_INODE: u16 = 2;
 pub const PACKED_TYPE_INSTANCE_TABLE: u16 = 4;
+/// 谱系记录（D18（块里携带什么信息） 已定项 24 第 5 条：不复用登记过的类型 3）。
+pub const PACKED_TYPE_LINEAGE: u16 = 5;
 /// 头校验和住共同前缀偏移 10。
 pub const HEADER_CHECKSUM_OFFSET: usize = 10;
 
@@ -656,7 +659,7 @@ mod tests {
     fn the_three_parsers_round_trip_their_builders_and_refuse_a_damaged_header() {
         let filesystem_identifier = [9u8; 16];
         let node = build_index_node(
-            TreeIdentifier(11),
+            TreeIdentifier(singlefs_format::TREE_IDENTIFIER_EXTENT),
             0,
             24,
             &[1u8; 24],
@@ -671,7 +674,11 @@ mod tests {
         let header = parse_index_node(&node).expect("码 2");
         assert_eq!(
             (header.tree, header.key_width, header.entry_width),
-            (TreeIdentifier(11), 24, 112)
+            (
+                TreeIdentifier(singlefs_format::TREE_IDENTIFIER_EXTENT),
+                24,
+                112
+            )
         );
         assert_eq!(header.entries.len(), 2);
         assert_eq!(header.smallest_key, vec![1u8; 24]);
@@ -692,7 +699,7 @@ mod tests {
         );
 
         let identity = PackedIdentity {
-            birth_tree: TreeIdentifier(12),
+            birth_tree: TreeIdentifier(singlefs_format::TREE_IDENTIFIER_INODE),
             record_type: PACKED_TYPE_INODE,
             container: 1,
             container_birth: CheckpointTxg(3),
@@ -723,7 +730,7 @@ mod tests {
 
         let data = build_data_unit(
             DataUnitIdentity {
-                tree: TreeIdentifier(11),
+                tree: TreeIdentifier(singlefs_format::TREE_IDENTIFIER_EXTENT),
                 object: 1,
                 object_birth: CheckpointTxg(3),
                 anchor_offset: 0,

@@ -105,6 +105,15 @@ impl FixedStructureExtent {
     }
 }
 
+/// mkfs 按判定宽度判对齐的那一槽（[`MakeFilesystemError::FixedStructureSlotNotAlignedToTheDecisionWidth`]）。封闭集合，`match` 不写通配臂。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SlotJudgedForAlignment {
+    /// 系统配置槽 `slot_index`（在 `slot_index` × 固定结构槽距处）。
+    SystemConfigurationSlot { slot_index: u64 },
+    /// 根环区域 `region` 的槽 `slot`（在区域起点 + 槽 × 固定结构槽距处）。
+    RootRingSlot(RootRingSlot),
+}
+
 /// mkfs 能出的错：几何放不下，或底层块设备错。几何那几样都在任何写之前判（[`make_filesystem`] 的第一步）。
 #[derive(Debug)]
 pub enum MakeFilesystemError {
@@ -170,6 +179,16 @@ pub enum MakeFilesystemError {
     UnitAreaStartOffTheClusterSegmentBoundaryUnsupported(
         UnitAreaStartOffTheClusterSegmentBoundaryUnsupported,
     ),
+    /// 一个系统配置槽或根槽的起始偏移不是声明的判定宽度（[`SystemImmutableSizes::declared_alignment_decision_width_in_bytes`]，
+    /// max(physical_block_size, io_min)）的整数倍：一次槽写会跨两个原子单元，撕裂会连带打掉相邻的那一个（C47（根槽没按判定宽度对齐））。
+    /// 用户 2026-10-01 定「非常规几何由 mkfs 拒」（`research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 5 行、第四节）：
+    /// 改之前 pbs 4096 + io_min 3072（槽距 6144）在 4096 宽的盘上清完环、写完单元与根，写到系统配置槽 1 才被块设备拒；
+    /// pbs 512 + io_min 3072 整个收下。逐槽判（两个系统配置槽、R × S 个根槽），报的是按排布次序第一个不对齐的那一槽。
+    FixedStructureSlotNotAlignedToTheDecisionWidth {
+        slot: SlotJudgedForAlignment,
+        offset: DeviceOffsetInBytes,
+        decision_width_in_bytes: u64,
+    },
     /// 参数说三个区域住哪块盘，而池里没有那块盘。
     RegionDeviceMissing {
         region: u64,
@@ -297,9 +316,36 @@ fn fixed_structure_extents(geometry: &SystemImmutableSizes) -> Vec<FixedStructur
         .collect()
 }
 
+/// 两个系统配置槽与 R × S 个根槽，按排布次序（系统配置槽 0、1，区域 0 的槽 0..S，区域 1，区域 2）逐个判起始偏移是不是
+/// 声明的判定宽度的整数倍，交回第一个不是的。槽的偏移与 [`make_filesystem`] 写它们、[`fixed_structure_extents`] 判重叠用的是同一组式子
+/// （槽 i 在 i × 槽距、[`slot_offset`]）。迭代次数的上界是 2 + 3 × 16，唯一的提前出口是第一个不对齐的槽。
+fn first_slot_not_aligned_to_the_decision_width(
+    geometry: &SystemImmutableSizes,
+) -> Option<(SlotJudgedForAlignment, DeviceOffsetInBytes)> {
+    let decision_width_in_bytes = geometry.declared_alignment_decision_width_in_bytes();
+    let system_configuration_slots = (0..SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE).map(|slot_index| {
+        (
+            SlotJudgedForAlignment::SystemConfigurationSlot { slot_index },
+            DeviceOffsetInBytes(slot_index * u64::from(geometry.fixed_structure_slot_spacing)),
+        )
+    });
+    let root_ring_slots = (0..ROOT_RING_REGIONS).flat_map(|region| {
+        (0..geometry.root_ring_slots_per_region.count()).map(move |slot| {
+            let ring_slot = RootRingSlot { region, slot };
+            (
+                SlotJudgedForAlignment::RootRingSlot(ring_slot),
+                slot_offset(ring_slot, geometry.fixed_structure_slot_spacing),
+            )
+        })
+    });
+    system_configuration_slots
+        .chain(root_ring_slots)
+        .find(|(_, offset)| !offset.0.is_multiple_of(decision_width_in_bytes))
+}
+
 /// 几何判定，全在任何写之前（[`make_filesystem`] 的第一步）。次序：根槽宽、环长下界（一条记录、F 条记录）、在飞上限装不装得进 4 字节、
 /// 环长上界、根环末端在不在盘内、按环长现算的单元区起点在不在聚簇段边界上、单元区在不在盘内、根槽宽不超过槽距、
-/// 固定结构两两不重叠、区域归属。
+/// 固定结构两两不重叠、系统配置槽与根槽按判定宽度对齐、区域归属。
 ///
 /// 交回按环长现算的单元区起点：mkfs 写实例表与树表、写系统配置偏移 417 那 8 字节、建 mkfs 同一个进程里的分配器，都用这一个数，
 /// 判定与写读的是同一份输入。journal 环末端不会越过它：起点就是环末尾的下一个槽（向上取整到槽边界）。
@@ -395,6 +441,15 @@ fn check_geometry(
             }
         }
     }
+    if let Some((slot, offset)) = first_slot_not_aligned_to_the_decision_width(geometry) {
+        return Err(
+            MakeFilesystemError::FixedStructureSlotNotAlignedToTheDecisionWidth {
+                slot,
+                offset,
+                decision_width_in_bytes: geometry.declared_alignment_decision_width_in_bytes(),
+            },
+        );
+    }
     for (region, device) in parameters.region_devices.iter().enumerate() {
         if !devices.iter().any(|(identity, _)| identity == device) {
             return Err(MakeFilesystemError::RegionDeviceMissing {
@@ -467,7 +522,7 @@ pub fn make_filesystem<Device: BlockDevice>(
         u16::try_from(TREE_TABLE_ENTRY_BYTES).expect("200"),
         &[],
     );
-    // 先把根环三个区域与 journal 环整段清零（每块盘每段一次调用、录制流各一步），再写元数据。
+    // 先把根环基址之前那一段、根环三个区域与 journal 环整段清零（每块盘每段一次调用、录制流各一步），再写元数据。
     // 为什么 mkfs 自己做：一条 journal 记录、一条根记录合不合法只看它自己的魔数与校验和，盘上的旧字节里
     // 凑出一条合法记录的概率不是 0（上一次 mkfs 留下的就是真合法的记录），而「这块盘是新建的全零镜像」
     // 是装置的假设、真设备上不成立。
@@ -480,9 +535,9 @@ pub fn make_filesystem<Device: BlockDevice>(
     // 它今天读不到全靠择根与 checker 两处各自按归属读（`recovery::visit_valid_roots`、
     // `singlefs-checker` 的 `image.rs`），任一处以后改成扫全部盘，漏就回来了。
     // 按几何清之后 mkfs 的后置条件只有一句：根环三段在每块盘上只剩这次写下的三条第 0 代根，别处全 0。
-    // 次序与屏障：清零按设备内偏移升序发（根环 1 / 4 / 7 MiB，journal 环 16 MiB），几段之间不另加屏障——
+    // 次序与屏障：清零按设备内偏移升序发（[0, 1 MiB)，根环 1 / 4 / 7 MiB，journal 环 16 MiB），几段之间不另加屏障——
     // 它们互不重叠，也不与同一段里的单元写重叠（`check_geometry` 判过固定结构两两不重叠；单元区起点是环末尾的下一个槽）；真正重叠的是清根环与根槽 FUA 写
-    //（区域 r 的槽 0），那一对由原有的那道屏障（单元写之后、根 FUA 之前）隔开，不靠发出次序。
+    //（区域 r 的槽 0）、清 [0, 1 MiB) 与系统配置两槽的写，这两对都由原有的那道屏障（单元写之后、根 FUA 之前）隔开，不靠发出次序。
     // mkfs 中途崩溃第一版没有条款（层 0 从 mkfs 之后的池起枚举，`.claude/kb/layout/01-first-txn.md` 八
     // mkfs 那一行的「层 0 枚举」格写「不在」），不为一个没有条款的语义加屏障。
     // 清的是 S 个槽那么长的一段，S 取 mkfs 参数里的那个——这一次写进系统配置的也是它，
@@ -492,7 +547,14 @@ pub fn make_filesystem<Device: BlockDevice>(
         parameters.geometry.root_ring_slots_per_region,
     );
     let journal_ring_start = DeviceOffsetInBytes(JOURNAL_RING_START_SLOT * SLOT_BYTES);
+    // 根环基址之前那一段 [0, 根环基址) 也整段清零，每块盘一次调用、发在最前（按偏移升序）：系统配置两槽住在这一段里，
+    // 槽 1 的偏移随槽距走。在用过的盘上换一个 io_min 重做 mkfs，旧池写在别的槽距上的槽 1 自证得过、记的槽距也等于它所在的偏移，
+    // 全池没有可用的槽 0 时逐档读槽 1 的读者（恢复与池级 checker）分不出它与本池的槽 1、按世代号会择中它
+    // （C651（全池没有可用的系统配置槽 0 时 checker 与实现找槽 1 的读法不同） 第一轮判决岔路 W，用户 2026-10-02 定 W1 mkfs 清零，
+    // `research/prompts/m3-c651-r1-main-verification.md`「用户定案」）。与根环、journal 环的清零同一种动作。
+    let root_ring_base = region_start(0);
     for (_, device) in devices.iter_mut() {
+        device.write_zeroes_at(DeviceOffsetInBytes(0), root_ring_base.0)?;
         for region_to_clear in 0..ROOT_RING_REGIONS {
             device.write_zeroes_at(region_start(region_to_clear), root_ring_region_bytes)?;
         }

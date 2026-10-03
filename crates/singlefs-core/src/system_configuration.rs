@@ -46,6 +46,18 @@ const FSID_OFFSET: usize = 4 + 2 + 96;
 const ROOT_RING_SLOTS_PER_REGION_OFFSET: u64 = 362;
 /// 几何段里「journal 环起点」那 8 字节（16 KiB 槽号，字段表 `layout/01-first-txn.md` 一）。写侧写它之前断言位置、读侧按它切。
 const JOURNAL_RING_START_SLOT_OFFSET: u64 = 325;
+/// 几何段里「journal 在飞记录数上限」那 4 字节、「journal 最坏占用」那 8 字节、「安全系数 F」那 4 字节
+/// （字段表 `layout/01-first-txn.md` 一：环长 333 之后是记录尺寸 4，再是这三样，F 之后是 R 361）。
+/// 写侧 [`SystemConfiguration::to_slot`] 写它们之前断言位置、读侧 [`journal_ring_geometry_fields_recorded_in_the_slot`] 按它们切。
+const JOURNAL_IN_FLIGHT_RECORD_LIMIT_OFFSET: u64 = 345;
+const JOURNAL_WORST_CASE_OCCUPANCY_OFFSET: u64 = 349;
+const JOURNAL_SAFETY_FACTOR_OFFSET: u64 = 357;
+/// I-8.1（环几何够大）要 F ≥ 2；读者只收等于 [`JOURNAL_SAFETY_FACTOR`] 的 F（`recovery` 的
+/// `system_configuration_values_this_reader_accepts`），所以「F ≥ 2」那一半落在这个格式常量上，编译期判。
+const _: () = assert!(
+    JOURNAL_SAFETY_FACTOR >= 2,
+    "I-8.1（环几何够大）：安全系数 F ≥ 2"
+);
 /// 几何段里「根环起点」那 8 字节（16 KiB 槽号，D22（单元原子性怎么合成） 已定项 16 第 1 句）。写侧写它之前断言位置、读侧按它切。
 const ROOT_RING_BASE_SLOT_OFFSET: u64 = 371;
 const REGION_DEVICES_OFFSET: u64 = 379;
@@ -115,6 +127,40 @@ pub fn unit_area_start_slot_recorded_in_the_slot(slot: &[u8]) -> SlotNumber {
     )
 }
 
+/// 一槽系统配置里记着的 journal 环几何三个字段（I-8.1（环几何够大）：在飞记录数上限、最坏占用、安全系数 F）。
+/// 写者按环长现算写（[`SystemConfiguration::to_slot`]），[`SystemConfiguration::parse_slot`] 不读它们；
+/// 读者择系统配置时拿它们与环长现算的比（`recovery` 的 `system_configuration_values_this_reader_accepts`）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct JournalRingGeometryFieldsRecordedInTheSlot {
+    pub in_flight_record_limit: u32,
+    pub worst_case_occupancy_bytes: u64,
+    pub safety_factor: u32,
+}
+
+/// 一槽系统配置里记着的 journal 环几何三个字段（偏移 345、349、357，小端）。只切字节、不判值。
+///
+/// # Panics
+/// 槽短于 4096 字节：调用方先过了 [`SystemConfiguration::parse_slot`]（它判过槽宽）才调这里。
+#[must_use]
+pub fn journal_ring_geometry_fields_recorded_in_the_slot(
+    slot: &[u8],
+) -> JournalRingGeometryFieldsRecordedInTheSlot {
+    let field_offset = |offset: u64| usize::try_from(offset).expect("字段表里的偏移装得进 usize");
+    JournalRingGeometryFieldsRecordedInTheSlot {
+        in_flight_record_limit: ByteReader::at(
+            slot,
+            field_offset(JOURNAL_IN_FLIGHT_RECORD_LIMIT_OFFSET),
+        )
+        .get_u32(),
+        worst_case_occupancy_bytes: ByteReader::at(
+            slot,
+            field_offset(JOURNAL_WORST_CASE_OCCUPANCY_OFFSET),
+        )
+        .get_u64(),
+        safety_factor: ByteReader::at(slot, field_offset(JOURNAL_SAFETY_FACTOR_OFFSET)).get_u32(),
+    }
+}
+
 /// 系统配置槽里一个字段属于哪一档可改性（D22（单元原子性怎么合成） 已定项 26）。
 /// 封闭集合：四类之外没有第五类，`match` 不写通配臂。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -159,6 +205,17 @@ impl SystemImmutableSizes {
             return floor;
         }
         floor.div_ceil(minimum_input_output_bytes) * minimum_input_output_bytes
+    }
+
+    /// 根槽与系统配置槽的起始偏移要按的判定宽度：声明的 max(physical_block_size, io_min)（I-7.5（根槽按判定宽度对齐）
+    /// 的射程注：io_min 大于 physical_block_size 时按 io_min 判；io_min 写 0 是没声明，取 physical_block_size）。
+    /// 用户 2026-10-01 定「非常规几何由 mkfs 拒，I-7.5 按 max(pbs, io_min) 判」（`research/prompts/m3-inv-a-r1-main-verification.md` 第四节）。
+    #[must_use]
+    pub fn declared_alignment_decision_width_in_bytes(&self) -> u64 {
+        u64::from(
+            self.physical_block_size
+                .max(self.minimum_input_output_bytes),
+        )
     }
 }
 
@@ -427,10 +484,13 @@ impl SystemConfiguration {
             writer.put_u32(u32::try_from(JOURNAL_RECORD_BYTES).expect("记录尺寸"));
             let in_flight_limit =
                 journal_in_flight_record_limit(self.immutable.sizes.journal_ring_bytes);
+            writer.assert_position(JOURNAL_IN_FLIGHT_RECORD_LIMIT_OFFSET, "journal 在飞记录数上限");
             writer.put_u32(u32::try_from(in_flight_limit).expect(
                 "在飞上限装得进 4 字节：mkfs 与读者择系统配置都按 journal_in_flight_record_limit_fits_its_four_byte_field 拒过装不下的环长",
             ));
+            writer.assert_position(JOURNAL_WORST_CASE_OCCUPANCY_OFFSET, "journal 最坏占用");
             writer.put_u64(in_flight_limit * JOURNAL_RECORD_BYTES);
+            writer.assert_position(JOURNAL_SAFETY_FACTOR_OFFSET, "安全系数 F");
             writer.put_u32(u32::try_from(JOURNAL_SAFETY_FACTOR).expect("安全系数"));
             writer.put_u8(u8::try_from(ROOT_RING_REGIONS).expect("R"));
             writer.assert_position(ROOT_RING_SLOTS_PER_REGION_OFFSET, "每区槽数 S");

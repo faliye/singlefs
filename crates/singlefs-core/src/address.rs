@@ -36,7 +36,7 @@ pub struct JournalSequenceNumber {
     pub counter: u64,
 }
 
-/// 树 ID，从 11 起编号、与树的种类码错开（D8（核心索引结构） 已定项 11）。
+/// 树 ID，从 65536 起编号、与树的种类码值域不相交（D8（核心索引结构） 已定项 11）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct TreeIdentifier(pub u64);
 

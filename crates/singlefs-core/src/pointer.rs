@@ -105,8 +105,9 @@ pub struct PointerHead {
 /// 指针头部里为加密与压缩留的那几段（D19（块指针的结构与宽度预算） 已定项 3 / 已定项 7）读到的不是第一版写的取值。
 /// 这几段是**盘上读来的字节**、不是我们的不变量：读者判到就交回它，由调用方把那条指针所在的结构当损坏处置，不拿这条指针去解引用。
 /// 第一版的取值：加密不进第一个可运行版本（D9（加密） 已定项 10），写者把 MAC 16、nonce 12、算法类型 1 写 0；
-/// 压缩算法码登记表第一版只有码 0「不压缩」，码 0 时压后长度恒 0（D9（加密） 已定项 14）。extent 偏移那 2 字节不在这里判：
-/// 读到非 0 怎么处置没有条款（第一版写 0）。
+/// 压缩算法码登记表第一版只有码 0「不压缩」，码 0 时压后长度恒 0（D9（加密） 已定项 14）；extent 偏移那 2 字节第一版写 0
+/// （第一版指针指整个单元），读到非 0 同 MAC / nonce 判该指针所在的结构损坏（C581（extent 偏移非 0 没有判据），
+/// `research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 11 行：I-2.4 扩到指针头部的 extent 偏移）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PointerHeadFieldOutsideTheFirstVersion {
     /// MAC 16 或 nonce 12 里有非 0 字节。D19（块指针的结构与宽度预算） 已定项 3 只写了「不加密的卷把它们留成空位」，
@@ -119,15 +120,69 @@ pub enum PointerHeadFieldOutsideTheFirstVersion {
     CompressionAlgorithmCodeNotRecognized { compression_algorithm_code: u8 },
     /// 压缩算法码是 0 而压后长度非 0：判这条指针损坏（D9（加密） 已定项 14「码 0 时它恒 0，非 0 判该指针损坏」）。
     CompressedLengthNotZeroWithoutCompression { compressed_length: u16 },
+    /// extent 偏移不是 0（[`PointerHeadExtentOffsetNotZero`]）：不判的话读者从单元头读起，而写者要说的是从偏移处读——静默读错内容。
+    ExtentOffsetNotZero(PointerHeadExtentOffsetNotZero),
 }
 
-/// 指针头部按字段表读出来的样子，加密与压缩那几段还没判：[`PointerHead::read_from`] 与
-/// [`PointerHead::read_judging_the_encryption_and_compression_fields_from`] 共用这一份读法，字段表的偏移只写一处。
+/// 指针头部第一版之外的取值落在哪一组字段上：读者按它挑报给调用方的那一句（`what`），两组各一句，诊断时分得开。
+/// 两组的处置相同（判该指针所在的结构损坏，不拿这条指针去解引用）。封闭集合，`match` 不写通配臂。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PointerHeadFieldGroup {
+    /// MAC / nonce、算法类型、压缩算法码与压后长度（D19（块指针的结构与宽度预算） 已定项 3、D9（加密） 已定项 14）。
+    EncryptionOrCompression,
+    /// extent 偏移（C581（extent 偏移非 0 没有判据））。
+    ExtentOffset,
+}
+
+impl PointerHeadFieldOutsideTheFirstVersion {
+    /// 这一处落在哪一组字段上。
+    #[must_use]
+    pub fn field_group(self) -> PointerHeadFieldGroup {
+        match self {
+            PointerHeadFieldOutsideTheFirstVersion::MacOrNonceNotZero
+            | PointerHeadFieldOutsideTheFirstVersion::AlgorithmTypeNotUnencrypted { .. }
+            | PointerHeadFieldOutsideTheFirstVersion::CompressionAlgorithmCodeNotRecognized {
+                ..
+            }
+            | PointerHeadFieldOutsideTheFirstVersion::CompressedLengthNotZeroWithoutCompression {
+                ..
+            } => PointerHeadFieldGroup::EncryptionOrCompression,
+            PointerHeadFieldOutsideTheFirstVersion::ExtentOffsetNotZero(_) => {
+                PointerHeadFieldGroup::ExtentOffset
+            }
+        }
+    }
+}
+
+/// 读盘上指针的读者判不判头部里第一版之外的取值（加密、压缩那几段与 extent 偏移）。封闭集合，`match` 不写通配臂。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PointerHeadFieldsJudgement {
+    /// 走读与挂载的读者：判，有一段不是第一版的取值就交回 [`PointerHeadFieldOutsideTheFirstVersion`]，调用方判该指针所在的结构损坏
+    /// （D19（块指针的结构与宽度预算） 已定项 3、D9（加密） 已定项 14、C581（extent 偏移非 0 没有判据））。
+    JudgedAsTheStructureIsCorruptOutsideTheFirstVersion,
+    /// 影子账认一条被抛弃根引用着哪些单元的读者：不判，指针里的位置条目照样认。影子账要的是多隔离、不漏隔离
+    /// （主 agent 2026-10-03 判，`records/2026-09-30-里程碑三开工第一轮.md` 第 8 批 core 簇第 7 条）：
+    /// 判了就少认一个单元，被抛弃根的那一个不隔离、回退之后可能被发出去。
+    NotJudgedByTheShadowLedger,
+}
+
+/// 指针头部 extent 偏移那 2 字节（头部偏移 32）读到非 0。第一版写者恒写 0（[`PointerHead::write_to`]），读者遇到非 0
+/// 判该指针所在的结构损坏，同 MAC / nonce（C581（extent 偏移非 0 没有判据））。**这是盘上读来的字节、不是我们的不变量**。
+/// 带着读到的值。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PointerHeadExtentOffsetNotZero {
+    pub extent_offset: u16,
+}
+
+/// 指针头部按字段表读出来的样子，加密与压缩那几段与 extent 偏移还没判：[`PointerHead::read_from`]、
+/// [`PointerHead::read_judging_the_encryption_compression_and_extent_offset_fields_from`] 与 [`PointerHead::read_judging_the_extent_offset_from`]
+/// 共用这一份读法，字段表的偏移只写一处。
 struct PointerHeadAsRead {
     is_every_mac_and_nonce_byte_zero: bool,
     algorithm_type: u8,
     compression_algorithm_code: u8,
     compressed_length: u16,
+    extent_offset: u16,
     head: PointerHead,
 }
 
@@ -137,12 +192,13 @@ impl PointerHeadAsRead {
         let algorithm_type = reader.get_u8();
         let compression_algorithm_code = reader.get_u8();
         let compressed_length = reader.get_u16();
-        reader.skip(2); // extent 偏移：第一版写 0，读到非 0 怎么处置没有条款，不判
+        let extent_offset = reader.get_u16();
         Self {
             is_every_mac_and_nonce_byte_zero,
             algorithm_type,
             compression_algorithm_code,
             compressed_length,
+            extent_offset,
             head: PointerHead {
                 birth_tree: TreeIdentifier(reader.get_u64()),
                 birth_txg: CheckpointTxg(reader.get_u64()),
@@ -150,7 +206,7 @@ impl PointerHeadAsRead {
         }
     }
 
-    /// 加密与压缩那几段按第一版的取值判（[`PointerHeadFieldOutsideTheFirstVersion`] 各成员的出处）。
+    /// 加密与压缩那几段按第一版的取值判，再判 extent 偏移（[`PointerHeadFieldOutsideTheFirstVersion`] 各成员的出处）。
     fn judged(self) -> Result<PointerHead, PointerHeadFieldOutsideTheFirstVersion> {
         if !self.is_every_mac_and_nonce_byte_zero {
             return Err(PointerHeadFieldOutsideTheFirstVersion::MacOrNonceNotZero);
@@ -176,6 +232,19 @@ impl PointerHeadAsRead {
                 },
             );
         }
+        self.judged_extent_offset()
+            .map_err(PointerHeadFieldOutsideTheFirstVersion::ExtentOffsetNotZero)
+    }
+
+    /// 只判 extent 偏移（C581）：今天只剩根记录（`root_record.rs`）走这一判，加密与压缩那几段在它上面还没换成判；树表条目、inode 内部条目、
+    /// extent 树的上段叶条目、内部条目与叶记录、分配记录树内部条目、实例表链指针已换成 [`Self::judged`]（判决
+    /// `research/prompts/m3-batch4-code-r1-main-verification.md` 第二节第 5 行、`records/2026-09-30-里程碑三开工第一轮.md` 第 8 批 core 簇第 9 条）。
+    fn judged_extent_offset(self) -> Result<PointerHead, PointerHeadExtentOffsetNotZero> {
+        if self.extent_offset != 0 {
+            return Err(PointerHeadExtentOffsetNotZero {
+                extent_offset: self.extent_offset,
+            });
+        }
         Ok(self.head)
     }
 }
@@ -196,20 +265,31 @@ impl PointerHead {
             usize::try_from(POINTER_HEAD_BYTES).expect("50")
         );
     }
-    /// 读头部，加密与压缩那几段不判（还没换成判的那几个读者用：`root_record`、`records`、`instance_table`、`extent_tree`、
-    /// `allocation_record_tree` 里的指针，实审 A3a 的报告列了它们）。
+    /// 读头部，加密与压缩那几段与 extent 偏移都不判。core 读盘上指针的读者一律不用它（走
+    /// [`Self::read_judging_the_extent_offset_from`] 或 [`Self::read_judging_the_encryption_compression_and_extent_offset_fields_from`]）；
+    /// 留给测试与造坏盘的装置读自己刚写出、要改的那几个字节。
     pub fn read_from(reader: &mut ByteReader<'_>) -> Self {
         PointerHeadAsRead::read_from(reader).head
     }
 
-    /// 读头部，加密与压缩那几段按第一版的取值判。
+    /// 读头部，加密与压缩那几段与 extent 偏移按第一版的取值判。
     ///
     /// # Errors
     /// 那几段有一段不是第一版的取值 ⇒ [`PointerHeadFieldOutsideTheFirstVersion`]。
-    pub fn read_judging_the_encryption_and_compression_fields_from(
+    pub fn read_judging_the_encryption_compression_and_extent_offset_fields_from(
         reader: &mut ByteReader<'_>,
     ) -> Result<Self, PointerHeadFieldOutsideTheFirstVersion> {
         PointerHeadAsRead::read_from(reader).judged()
+    }
+
+    /// 读头部，只判 extent 偏移（加密与压缩那几段不判）。
+    ///
+    /// # Errors
+    /// extent 偏移非 0 ⇒ [`PointerHeadExtentOffsetNotZero`]。
+    pub fn read_judging_the_extent_offset_from(
+        reader: &mut ByteReader<'_>,
+    ) -> Result<Self, PointerHeadExtentOffsetNotZero> {
+        PointerHeadAsRead::read_from(reader).judged_extent_offset()
     }
 }
 
@@ -276,15 +356,45 @@ impl NodePointer {
         Self::read_after_the_head(head, reader)
     }
 
-    /// 同 [`Self::read_from`]，头部里加密与压缩那几段按第一版的取值判（[`PointerHead::read_judging_the_encryption_and_compression_fields_from`]）。
+    /// 同 [`Self::read_from`]，头部里加密、压缩与 extent 偏移那几段按第一版的取值判（[`PointerHead::read_judging_the_encryption_compression_and_extent_offset_fields_from`]）。
     ///
     /// # Errors
     /// 那几段有一段不是第一版的取值 ⇒ [`PointerHeadFieldOutsideTheFirstVersion`]。
-    pub fn read_judging_the_encryption_and_compression_fields_from(
+    pub fn read_judging_the_encryption_compression_and_extent_offset_fields_from(
         reader: &mut ByteReader<'_>,
     ) -> Result<Self, PointerHeadFieldOutsideTheFirstVersion> {
-        let head = PointerHead::read_judging_the_encryption_and_compression_fields_from(reader)?;
+        let head =
+            PointerHead::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+                reader,
+            )?;
         Ok(Self::read_after_the_head(head, reader))
+    }
+
+    /// 同 [`Self::read_from`]，头部里只判 extent 偏移（[`PointerHead::read_judging_the_extent_offset_from`]）。
+    ///
+    /// # Errors
+    /// extent 偏移非 0 ⇒ [`PointerHeadExtentOffsetNotZero`]。
+    pub fn read_judging_the_extent_offset_from(
+        reader: &mut ByteReader<'_>,
+    ) -> Result<Self, PointerHeadExtentOffsetNotZero> {
+        let head = PointerHead::read_judging_the_extent_offset_from(reader)?;
+        Ok(Self::read_after_the_head(head, reader))
+    }
+
+    /// 读一条子指针，判不判头部第一版之外的取值由读者定（[`PointerHeadFieldsJudgement`]）：走读的读者判，影子账的读者不判。
+    ///
+    /// # Errors
+    /// `judgement` 是判的那一种、而头部有一段不是第一版的取值 ⇒ [`PointerHeadFieldOutsideTheFirstVersion`]；不判的那一种恒 `Ok`。
+    pub fn read_with_head_fields_judgement_from(
+        reader: &mut ByteReader<'_>,
+        judgement: PointerHeadFieldsJudgement,
+    ) -> Result<Self, PointerHeadFieldOutsideTheFirstVersion> {
+        match judgement {
+            PointerHeadFieldsJudgement::JudgedAsTheStructureIsCorruptOutsideTheFirstVersion => {
+                Self::read_judging_the_encryption_compression_and_extent_offset_fields_from(reader)
+            }
+            PointerHeadFieldsJudgement::NotJudgedByTheShadowLedger => Ok(Self::read_from(reader)),
+        }
     }
 
     fn read_after_the_head(head: PointerHead, reader: &mut ByteReader<'_>) -> Self {
@@ -332,14 +442,28 @@ impl DataPointer {
         Self::read_after_the_head(head, reader)
     }
 
-    /// 同 [`Self::read_from`]，头部里加密与压缩那几段按第一版的取值判（[`PointerHead::read_judging_the_encryption_and_compression_fields_from`]）。
+    /// 同 [`Self::read_from`]，头部里加密、压缩与 extent 偏移那几段按第一版的取值判（[`PointerHead::read_judging_the_encryption_compression_and_extent_offset_fields_from`]）。
     ///
     /// # Errors
     /// 那几段有一段不是第一版的取值 ⇒ [`PointerHeadFieldOutsideTheFirstVersion`]。
-    pub fn read_judging_the_encryption_and_compression_fields_from(
+    pub fn read_judging_the_encryption_compression_and_extent_offset_fields_from(
         reader: &mut ByteReader<'_>,
     ) -> Result<Self, PointerHeadFieldOutsideTheFirstVersion> {
-        let head = PointerHead::read_judging_the_encryption_and_compression_fields_from(reader)?;
+        let head =
+            PointerHead::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+                reader,
+            )?;
+        Ok(Self::read_after_the_head(head, reader))
+    }
+
+    /// 同 [`Self::read_from`]，头部里只判 extent 偏移（[`PointerHead::read_judging_the_extent_offset_from`]）。
+    ///
+    /// # Errors
+    /// extent 偏移非 0 ⇒ [`PointerHeadExtentOffsetNotZero`]。
+    pub fn read_judging_the_extent_offset_from(
+        reader: &mut ByteReader<'_>,
+    ) -> Result<Self, PointerHeadExtentOffsetNotZero> {
+        let head = PointerHead::read_judging_the_extent_offset_from(reader)?;
         Ok(Self::read_after_the_head(head, reader))
     }
 

@@ -3,12 +3,18 @@
 
 use singlefs_format::{
     ACCOUNTING_ENTRY_BYTES, EXTENT_LEAF_RECORD_BYTES, INODE_INTERNAL_ENTRY, INODE_RECORD_BYTES,
-    MAPPING_ENTRY_BYTES, MAPPING_KEY_BYTES, NODE_POINTER_BYTES, TREE_TABLE_ENTRY_BYTES,
+    LINEAGE_RECORD_BYTES, MAPPING_ENTRY_BYTES, MAPPING_KEY_BYTES, NODE_POINTER_BYTES,
+    TOMBSTONE_RECORD_BYTES, TREE_TABLE_ENTRY_BYTES,
 };
 
-use crate::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, TreeIdentifier};
+use crate::address::{
+    CheckpointTxg, DeviceIdentity, InodeNumber, InstanceGeneration, TreeIdentifier,
+};
 use crate::bytes::{ByteReader, ByteWriter};
-use crate::pointer::{BirthSequence, DataPointer, LocationEntry, NodePointer, PointerHead};
+use crate::pointer::{
+    BirthSequence, DataPointer, LocationEntry, NodePointer, PointerHead,
+    PointerHeadFieldOutsideTheFirstVersion,
+};
 use crate::unit::{PackedIdentity, WriteOrder, UNIT_CLASS_DATA};
 
 /// 统计量标签 = D5（快照 / 空间记账机制） 已定项 4 的行号（已定项 10 的登记表）。
@@ -29,6 +35,12 @@ pub const ACCOUNTING_SEQUENCE_DIRECT_TO_LEAF: u32 = 1;
 /// inode 记录偏移 48 那个 `blocks` 字段的计量单位：512 字节一块（D8（核心索引结构） 已定项 6）。
 pub const INODE_RECORD_BLOCKS_FIELD_UNIT_BYTES: u64 = 512;
 
+/// 第一版没有目录，活着的文件 nlink 恒 1（D8（核心索引结构） 已定项 6「第一版的唯一文件取 inode 1，nlink = 1」）。
+pub const NLINK_OF_A_LIVE_INODE_WITHOUT_DIRECTORIES: u32 = 1;
+
+/// unlink 的意图那次发布把记录写成 nlink = 0、size 不变（D8（核心索引结构） 已定项 16 第 1 条）：从那一版起读者答「没有文件」、写入口拒它。
+pub const NLINK_OF_AN_INODE_BEING_DELETED: u32 = 0;
+
 /// inode 记录 140（D8（核心索引结构） 已定项 6 的偏移表）；时间是发布参数，不取系统时钟（可复现）。
 ///
 /// 偏移 48 的 `blocks` **不是字段**：条款定它 = ⌈`size` ÷ 512⌉（逻辑长度的块数，不表示分到的空间），
@@ -38,6 +50,9 @@ pub const INODE_RECORD_BLOCKS_FIELD_UNIT_BYTES: u64 = 512;
 pub struct InodeRecord {
     pub inode: u64,
     pub object_birth: CheckpointTxg,
+    /// 偏移 36 那 4 字节（D8（核心索引结构） 已定项 16 第 4 条：`parse` 读它、`to_bytes` 写结构里的值）：
+    /// 活着的是 [`NLINK_OF_A_LIVE_INODE_WITHOUT_DIRECTORIES`]，删除中的是 [`NLINK_OF_AN_INODE_BEING_DELETED`]。
+    pub nlink: u32,
     pub size: u64,
     pub change_count: u64,
     pub write_time_seconds: u64,
@@ -53,7 +68,7 @@ impl InodeRecord {
         writer.put_u32(0o100_644); // mode
         writer.put_u32(0); // uid
         writer.put_u32(0); // gid
-        writer.put_u32(1); // nlink
+        writer.put_u32(self.nlink);
         writer.assert_position(40, "size");
         writer.put_u64(self.size);
         writer.put_u64(self.size.div_ceil(INODE_RECORD_BLOCKS_FIELD_UNIT_BYTES)); // blocks = ⌈size ÷ 512⌉
@@ -82,7 +97,8 @@ impl InodeRecord {
         let mut reader = ByteReader::at(bytes, 0);
         let inode = reader.get_u64();
         let object_birth = CheckpointTxg(reader.get_u64());
-        reader.skip(8 + 16);
+        reader.skip(8 + 4 + 4 + 4); // locality_id、mode、uid、gid
+        let nlink = reader.get_u32();
         let size = reader.get_u64();
         reader.skip(8 + 8); // blocks（由 size 定，不交出）、rdev
         let write_time_seconds = reader.get_u64();
@@ -91,9 +107,105 @@ impl InodeRecord {
         Some(Self {
             inode,
             object_birth,
+            nlink,
             size,
             change_count,
             write_time_seconds,
+        })
+    }
+}
+
+/// 墓碑记录 40（D18（块里携带什么信息） 已定项 24 第 2 条；字段表在 `.claude/kb/layout/03-third-txn.md`「二、墓碑记录」）：
+/// 对象 ID 8 + 对象出生代 8 + 区间起 8 + 区间止 8 + 死亡 txg 8，小端。第一版只写整对象，区间恒是 [0, 2⁶⁴ − 1]
+/// （[`TombstoneRecord::of_the_whole_object`]）；死亡 txg = 意图那次发布的 checkpoint_txg。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TombstoneRecord {
+    pub object: InodeNumber,
+    pub object_birth: CheckpointTxg,
+    pub range_start_in_bytes: u64,
+    pub range_end_in_bytes: u64,
+    pub death_txg: CheckpointTxg,
+}
+
+impl TombstoneRecord {
+    /// 整对象墓碑的区间：起 0、止 2⁶⁴ − 1（D18（块里携带什么信息） 已定项 24 第 2 条「整对象写 [0, 2⁶⁴ − 1]」）。
+    pub const WHOLE_OBJECT_RANGE_START_IN_BYTES: u64 = 0;
+    pub const WHOLE_OBJECT_RANGE_END_IN_BYTES: u64 = u64::MAX;
+
+    /// 意图那次发布给 `object` 写的整对象墓碑。
+    #[must_use]
+    pub const fn of_the_whole_object(
+        object: InodeNumber,
+        object_birth: CheckpointTxg,
+        death_txg: CheckpointTxg,
+    ) -> Self {
+        Self {
+            object,
+            object_birth,
+            range_start_in_bytes: Self::WHOLE_OBJECT_RANGE_START_IN_BYTES,
+            range_end_in_bytes: Self::WHOLE_OBJECT_RANGE_END_IN_BYTES,
+            death_txg,
+        }
+    }
+
+    #[must_use]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut writer = ByteWriter::new(usize::try_from(TOMBSTONE_RECORD_BYTES).expect("40"));
+        writer.put_u64(self.object.0);
+        writer.put_u64(self.object_birth.0);
+        writer.put_u64(self.range_start_in_bytes);
+        writer.put_u64(self.range_end_in_bytes);
+        writer.put_u64(self.death_txg.0);
+        writer.assert_position(TOMBSTONE_RECORD_BYTES, "墓碑记录");
+        writer.into_bytes()
+    }
+
+    /// 墓碑记录的读者：长度不是 40 交回 `None`（记录宽是容器头里的盘上字段，读者先核它等于 40 再切）。
+    #[must_use]
+    pub fn parse(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() != usize::try_from(TOMBSTONE_RECORD_BYTES).expect("40") {
+            return None;
+        }
+        let mut reader = ByteReader::at(bytes, 0);
+        Some(Self {
+            object: InodeNumber(reader.get_u64()),
+            object_birth: CheckpointTxg(reader.get_u64()),
+            range_start_in_bytes: reader.get_u64(),
+            range_end_in_bytes: reader.get_u64(),
+            death_txg: CheckpointTxg(reader.get_u64()),
+        })
+    }
+}
+
+/// 谱系记录 16（D18（块里携带什么信息） 已定项 24 第 5 条；字段表在 `.claude/kb/layout/03-third-txn.md`「三、谱系记录」）：
+/// T_rb 8 + T_old 8，小端，读作「T_rb 的父是 T_old」。管理员回退那次发布追加一条：T_rb 是回退那次发布的 checkpoint_txg，
+/// T_old 是回退目标 R_old 的 txg。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LineageRecord {
+    pub rollback_txg: CheckpointTxg,
+    pub rollback_target_txg: CheckpointTxg,
+}
+
+impl LineageRecord {
+    #[must_use]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut writer = ByteWriter::new(usize::try_from(LINEAGE_RECORD_BYTES).expect("16"));
+        writer.put_u64(self.rollback_txg.0);
+        writer.put_u64(self.rollback_target_txg.0);
+        writer.assert_position(LINEAGE_RECORD_BYTES, "谱系记录");
+        writer.into_bytes()
+    }
+
+    /// 谱系记录的读者：长度不是 16 交回 `None`（记录宽是容器头里的盘上字段，读者先核它等于 16 再切）。
+    #[must_use]
+    pub fn parse(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() != usize::try_from(LINEAGE_RECORD_BYTES).expect("16") {
+            return None;
+        }
+        let mut reader = ByteReader::at(bytes, 0);
+        Some(Self {
+            rollback_txg: CheckpointTxg(reader.get_u64()),
+            rollback_target_txg: CheckpointTxg(reader.get_u64()),
         })
     }
 }
@@ -265,6 +377,12 @@ pub const TREE_KIND_ACCOUNTING: u16 = 4;
 pub const TREE_KIND_LIVELIST: u16 = 6;
 pub const TREE_KIND_SPARSE_SIDE_TABLE: u16 = 7;
 pub const TREE_KIND_DEADLIST: u16 = 8;
+/// 第一个文件版本那次零根注册的四棵树的种类码：D8（核心索引结构） 已定项 9 登记表的码 9..12（只追加不重用码，接在 8 之后，
+/// 次序照 D18（块里携带什么信息） 已定项 24 第 6 条列的）。
+pub const TREE_KIND_DELETED_INODES: u16 = 9;
+pub const TREE_KIND_TOMBSTONE: u16 = 10;
+pub const TREE_KIND_LINEAGE: u16 = 11;
+pub const TREE_KIND_LOGGED_OPERATIONS: u16 = 12;
 
 /// 树表条目里根指针的起点：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2（`singlefs_format::TREE_TABLE_ENTRY_BYTES` 的字段表）。
 const TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES: usize = 8 + 2 + 2 + 2;
@@ -308,7 +426,9 @@ impl TreeTableEntry {
             ..TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES
                 + usize::try_from(NODE_POINTER_BYTES).expect("86")]
     }
-    /// 读者：条目长度、flags 未知位（D8（核心索引结构） 已定项 8 ㊁：一律拒收）、预留 76 非零都判不可用。
+    /// 读者：条目长度、flags 未知位（D8（核心索引结构） 已定项 8 ㊁：一律拒收）、预留 76 非零、根指针头部有一段不是第一版的取值
+    /// （MAC / nonce 非 0、算法类型不是未加密、压缩算法码不认识、码 0 而压后长度非 0、extent 偏移非 0：D19（块指针的结构与宽度预算） 已定项 3、
+    /// D9（加密） 已定项 14、C581（extent 偏移非 0 没有判据），判该指针所在的结构——这条条目——损坏）都判不可用。
     #[must_use]
     pub fn parse(bytes: &[u8]) -> Option<Self> {
         if bytes.len() != usize::try_from(TREE_TABLE_ENTRY_BYTES).expect("200")
@@ -325,7 +445,11 @@ impl TreeTableEntry {
         if reader.get_u16() != 0 {
             return None;
         }
-        let root = NodePointer::read_from(&mut reader);
+        let root =
+            NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+                &mut reader,
+            )
+            .ok()?;
         let _previous_snapshot_txg = reader.get_u64();
         let birth_txg = CheckpointTxg(reader.get_u64());
         let head_identifier = reader.get_u64();
@@ -339,12 +463,34 @@ impl TreeTableEntry {
     }
 }
 
+/// 一条带指针的条目（inode 内部条目 120、extent 叶记录 112）解不开是哪一种。封闭集合，`match` 不写通配臂。
+/// 两种都是盘上读来的字节、不是我们的不变量：调用方把这条条目当损坏处置，不拿里面的指针去解引用。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PointerCarryingEntryRefusal {
+    /// 条目宽（索引节点头里的盘上字段）窄于字段表：调用方报「条目窄于字段表」。
+    NarrowerThanItsFieldTable,
+    /// 条目里那条指针的头部有一段不是第一版的取值（MAC / nonce、算法类型、压缩算法码与压后长度、extent 偏移）：判该指针所在的结构
+    /// （这条条目）损坏（D19（块指针的结构与宽度预算） 已定项 3、D9（加密） 已定项 14、C581（extent 偏移非 0 没有判据））。
+    PointerHeadFieldOutsideTheFirstVersion(PointerHeadFieldOutsideTheFirstVersion),
+}
+
 /// inode 内部条目 120 的读者。条目宽是索引节点头里的一个盘上字段（`parse_index_node` 只判了它 ≥ key 宽 8），
-/// 窄于字段表时返回 `None`：这里是盘上字节进字段表的边界，往里就按 120 信它。
+/// 窄于字段表、或子指针头部有一段不是第一版的取值时返回 `None`：这里是盘上字节进字段表的边界，往里就按 120 信它。
+/// 要分清是哪一种的调用方（冷启动走读、只读挂载打开池）用 [`parse_inode_internal_entry_or_refusal`]；只要知道解不解得开的（用例）用这一个。
 #[must_use]
 pub fn parse_inode_internal_entry(bytes: &[u8]) -> Option<(u64, PackedIdentity, NodePointer)> {
+    parse_inode_internal_entry_or_refusal(bytes).ok()
+}
+
+/// 同 [`parse_inode_internal_entry`]，解不开时交回是哪一种。
+///
+/// # Errors
+/// 窄于 120 ⇒ `NarrowerThanItsFieldTable`；子指针头部有一段不是第一版的取值 ⇒ `PointerHeadFieldOutsideTheFirstVersion`。
+pub fn parse_inode_internal_entry_or_refusal(
+    bytes: &[u8],
+) -> Result<(u64, PackedIdentity, NodePointer), PointerCarryingEntryRefusal> {
     if bytes.len() < usize::try_from(INODE_INTERNAL_ENTRY).expect("120") {
-        return None;
+        return Err(PointerCarryingEntryRefusal::NarrowerThanItsFieldTable);
     }
     let mut reader = ByteReader::at(bytes, 0);
     let separator_key = reader.get_u64();
@@ -354,29 +500,40 @@ pub fn parse_inode_internal_entry(bytes: &[u8]) -> Option<(u64, PackedIdentity, 
         container: reader.get_u64(),
         container_birth: CheckpointTxg(reader.get_u64()),
     };
-    let child = NodePointer::read_from(&mut reader);
-    Some((separator_key, child_identity, child))
+    let child = NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+        &mut reader,
+    )
+    .map_err(PointerCarryingEntryRefusal::PointerHeadFieldOutsideTheFirstVersion)?;
+    Ok((separator_key, child_identity, child))
 }
 
-/// extent 叶记录 112 的读者：key 24 + 指针 88。条目宽窄于 112 时返回 `None`（同 [`parse_inode_internal_entry`]：
-/// `parse_index_node` 只判了条目宽 ≥ key 宽 24，切到偏移 112 之前要在这里判一次）。
-#[must_use]
-pub fn parse_extent_record(bytes: &[u8]) -> Option<([u8; 24], DataPointer)> {
+/// extent 叶记录 112 的读者：key 24 + 指针 88（同 [`parse_inode_internal_entry_or_refusal`]：`parse_index_node` 只判了条目宽 ≥ key 宽 24，
+/// 切到偏移 112 之前要在这里判一次；数据指针头部第一版之外的取值也在这里判）。
+///
+/// # Errors
+/// 窄于 112 ⇒ `NarrowerThanItsFieldTable`；数据指针头部有一段不是第一版的取值 ⇒ `PointerHeadFieldOutsideTheFirstVersion`。
+pub fn parse_extent_record(
+    bytes: &[u8],
+) -> Result<([u8; 24], DataPointer), PointerCarryingEntryRefusal> {
     if bytes.len() < usize::try_from(EXTENT_LEAF_RECORD_BYTES).expect("112") {
-        return None;
+        return Err(PointerCarryingEntryRefusal::NarrowerThanItsFieldTable);
     }
     let key: [u8; 24] = bytes[..24].try_into().expect("24");
-    let pointer = DataPointer::read_from(&mut ByteReader::at(bytes, 24));
-    Some((key, pointer))
+    let pointer =
+        DataPointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+            &mut ByteReader::at(bytes, 24),
+        )
+        .map_err(PointerCarryingEntryRefusal::PointerHeadFieldOutsideTheFirstVersion)?;
+    Ok((key, pointer))
 }
 
 /// 映射条目 55 的读者：key 27 + 位置条目 14 × 2。条目宽窄于 55 时返回 `None`
 /// （同 [`parse_inode_internal_entry`] 与 [`parse_extent_record`]：`parse_index_node` 只判了条目宽 ≥ key 宽，
 /// 切到偏移 27 与 55 之前要在这里判一次；panic 面普查 R2）。
 ///
-/// **判的是「今天这个解析器要几个字节」，不是「映射条目该有多宽」**：后者归 C307（映射树两种 key 宽怎么装进一棵定宽 key 的树），
-/// 那一条还开着（码 1 给 27、码 2 / 码 3 给 25，补不补零没定）。C307 定案改的是 [`MAPPING_KEY_BYTES`] 与
-/// [`MAPPING_ENTRY_BYTES`]，这一判跟着那两个常量走，不自己写死一个宽度。
+/// **判的是「今天这个解析器要几个字节」，不判条目宽是不是正好 55**：key 一律 27（码 2 / 码 3 的 25 字节末尾补零）、
+/// 条目一律 55 已由 D19（块指针的结构与宽度预算） 已定项 10 定，落在 [`MAPPING_KEY_BYTES`] 与 [`MAPPING_ENTRY_BYTES`] 上，
+/// 这一判跟着那两个常量走，不自己写死一个宽度。宽于 55 的条目这里不拒，拒它欠在 C307（映射树两种 key 宽怎么装进一棵定宽 key 的树）。
 #[must_use]
 pub fn parse_mapping_entry(bytes: &[u8]) -> Option<(Vec<u8>, [LocationEntry; 2])> {
     if bytes.len() < usize::try_from(MAPPING_ENTRY_BYTES).expect("55") {
@@ -397,12 +554,67 @@ pub fn parse_mapping_entry(bytes: &[u8]) -> Option<(Vec<u8>, [LocationEntry; 2])
 mod tests {
     use super::*;
     use crate::address::SlotNumber;
+    use singlefs_format::{
+        TREE_IDENTIFIER_ACCOUNTING, TREE_IDENTIFIER_ALLOCATION_RECORDS,
+        TREE_IDENTIFIER_CENTRAL_MAPPING, TREE_IDENTIFIER_DEADLIST, TREE_IDENTIFIER_DELETED_INODES,
+        TREE_IDENTIFIER_EXTENT, TREE_IDENTIFIER_INODE, TREE_IDENTIFIER_LINEAGE,
+        TREE_IDENTIFIER_LIVELIST, TREE_IDENTIFIER_LOGGED_OPERATIONS,
+        TREE_IDENTIFIER_SPARSE_SIDE_TABLE, TREE_IDENTIFIER_TOMBSTONE,
+        TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH, TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+    };
+
+    /// 树的种类码与树 ID 的值域不相交（D8（核心索引结构） 已定项 9 射程、已定项 11，用户 2026-10-01 定案「树 ID 整体挪开」）：
+    /// 核心层的每个种类码都小于 65536（树的种类那 2 字节取不到的最小值），每个树 ID 与两个水位都不小于它。
+    #[test]
+    fn every_tree_kind_code_is_below_every_tree_identifier() {
+        let first_value_the_kind_field_cannot_hold = u64::from(u16::MAX) + 1;
+        for kind in [
+            TREE_KIND_EXTENT,
+            TREE_KIND_INODE,
+            TREE_KIND_ALLOCATION,
+            TREE_KIND_ACCOUNTING,
+            TREE_KIND_LIVELIST,
+            TREE_KIND_SPARSE_SIDE_TABLE,
+            TREE_KIND_DEADLIST,
+            TREE_KIND_DELETED_INODES,
+            TREE_KIND_TOMBSTONE,
+            TREE_KIND_LINEAGE,
+            TREE_KIND_LOGGED_OPERATIONS,
+        ] {
+            assert!(
+                u64::from(kind) < first_value_the_kind_field_cannot_hold,
+                "种类码 {kind} 小于 65536"
+            );
+        }
+        for identifier in [
+            TREE_IDENTIFIER_EXTENT,
+            TREE_IDENTIFIER_INODE,
+            TREE_IDENTIFIER_ALLOCATION_RECORDS,
+            TREE_IDENTIFIER_ACCOUNTING,
+            TREE_IDENTIFIER_CENTRAL_MAPPING,
+            TREE_IDENTIFIER_LIVELIST,
+            TREE_IDENTIFIER_SPARSE_SIDE_TABLE,
+            TREE_IDENTIFIER_DEADLIST,
+            TREE_IDENTIFIER_DELETED_INODES,
+            TREE_IDENTIFIER_TOMBSTONE,
+            TREE_IDENTIFIER_LINEAGE,
+            TREE_IDENTIFIER_LOGGED_OPERATIONS,
+            TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+            TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH,
+        ] {
+            assert!(
+                identifier >= first_value_the_kind_field_cannot_hold,
+                "树 ID（或水位）{identifier} 不小于 65536：与种类码的值域不相交"
+            );
+        }
+    }
 
     #[test]
     fn widths_of_every_record_match_the_byte_table() {
         let record = InodeRecord {
             inode: 1,
             object_birth: CheckpointTxg(3),
+            nlink: NLINK_OF_A_LIVE_INODE_WITHOUT_DIRECTORIES,
             size: 3000,
             // 新池新建文件那条记录的取值：改动计数 = 这次发布的 checkpoint_txg 3（增补 2 第 11 行）。
             change_count: 3,
@@ -431,7 +643,7 @@ mod tests {
         assert_eq!(InodeRecord::parse(&tampered), None, "预留段非零拒收");
         let pointer = NodePointer::empty_root();
         let identity = PackedIdentity {
-            birth_tree: TreeIdentifier(12),
+            birth_tree: TreeIdentifier(TREE_IDENTIFIER_INODE),
             record_type: 2,
             container: 1,
             container_birth: CheckpointTxg(3),
@@ -439,7 +651,7 @@ mod tests {
         assert_eq!(build_inode_internal_entry(1, identity, pointer).len(), 120);
         let data_pointer = DataPointer {
             head: PointerHead {
-                birth_tree: TreeIdentifier(11),
+                birth_tree: TreeIdentifier(TREE_IDENTIFIER_EXTENT),
                 birth_txg: CheckpointTxg(3),
             },
             locations: [
@@ -496,16 +708,81 @@ mod tests {
         assert_eq!(&node_key[25..], &[0, 0], "码 2 的 key 末尾补零到 27");
         let table_entry = TreeTableEntry {
             kind: TREE_KIND_EXTENT,
-            tree: TreeIdentifier(11),
+            tree: TreeIdentifier(TREE_IDENTIFIER_EXTENT),
             root: pointer,
             birth_txg: CheckpointTxg(3),
-            head_identifier: 12,
+            head_identifier: TREE_IDENTIFIER_INODE,
         };
         assert_eq!(table_entry.to_bytes().len(), 200);
         assert_eq!(
             TreeTableEntry::parse(&table_entry.to_bytes()),
             Some(table_entry)
         );
+    }
+
+    /// 墓碑记录五个字段落在 `.claude/kb/layout/03-third-txn.md`「二、墓碑记录」那张表的偏移上，读回来逐字段相等。
+    #[test]
+    fn tombstone_record_fields_sit_at_the_offsets_of_the_layout_table_and_read_back() {
+        let record = TombstoneRecord::of_the_whole_object(
+            InodeNumber(7),
+            CheckpointTxg(5),
+            CheckpointTxg(9),
+        );
+        let bytes = record.to_bytes();
+        assert_eq!(bytes.len(), 40, "墓碑记录 40 字节（D18 已定项 24 第 2 条）");
+        let field_at = |offset: usize| {
+            u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
+        };
+        assert_eq!(field_at(0), 7, "偏移 0：对象 ID = 被删的 inode 号");
+        assert_eq!(field_at(8), 5, "偏移 8：对象出生代");
+        assert_eq!(field_at(16), 0, "偏移 16：区间起 0（整对象）");
+        assert_eq!(field_at(24), u64::MAX, "偏移 24：区间止 2⁶⁴ − 1（整对象）");
+        assert_eq!(field_at(32), 9, "偏移 32：死亡 txg = 意图那次发布的 txg");
+        assert_eq!(
+            TombstoneRecord::parse(&bytes),
+            Some(record),
+            "读回来逐字段相等"
+        );
+        assert_eq!(
+            TombstoneRecord::parse(&bytes[..39]),
+            None,
+            "窄于 40 字节不解"
+        );
+    }
+
+    /// D8（核心索引结构） 已定项 16 第 4 条：nlink 由 `to_bytes` 照结构里的值写进偏移 36、由 `parse` 读回来——
+    /// 删除中的记录（nlink = 0，size 不变）写出去读回来还是 0，读者与写入口才认得出它；活着的写 1。
+    #[test]
+    fn nlink_is_written_from_the_record_and_read_back_at_offset_thirty_six() {
+        let record_of_nlink = |nlink: u32| InodeRecord {
+            inode: 7,
+            object_birth: CheckpointTxg(5),
+            nlink,
+            size: 40_000,
+            change_count: 6,
+            write_time_seconds: 1_788_000_000,
+        };
+        for nlink in [
+            NLINK_OF_AN_INODE_BEING_DELETED,
+            NLINK_OF_A_LIVE_INODE_WITHOUT_DIRECTORIES,
+        ] {
+            let bytes = record_of_nlink(nlink).to_bytes();
+            assert_eq!(
+                u32::from_le_bytes(bytes[36..40].try_into().expect("偏移 36 起 4 字节")),
+                nlink,
+                "nlink 写在偏移 36，写的是结构里的值 {nlink}"
+            );
+            assert_eq!(
+                InodeRecord::parse(&bytes).map(|parsed| parsed.nlink),
+                Some(nlink),
+                "nlink {nlink} 读回来不变"
+            );
+            assert_eq!(
+                InodeRecord::parse(&bytes).map(|parsed| parsed.size),
+                Some(40_000),
+                "size 不随 nlink 变（意图那次 size 不变）"
+            );
+        }
     }
 
     /// C480（inode 记录的 blocks 怎么算全仓没有条款） 定案（D8（核心索引结构） 已定项 6）：`blocks` = ⌈size ÷ 512⌉，
@@ -518,6 +795,7 @@ mod tests {
             let bytes = InodeRecord {
                 inode: 1,
                 object_birth: CheckpointTxg(3),
+                nlink: NLINK_OF_A_LIVE_INODE_WITHOUT_DIRECTORIES,
                 size,
                 change_count: 3,
                 write_time_seconds: 1_788_000_000,
@@ -552,12 +830,16 @@ mod tests {
         let entry_narrowed_to_the_key_width = |key_width: usize| vec![0u8; key_width];
         assert_eq!(
             parse_extent_record(&entry_narrowed_to_the_key_width(24)),
-            None,
+            Err(PointerCarryingEntryRefusal::NarrowerThanItsFieldTable),
             "extent 叶记录该有 112 字节，条目宽缩到 key 宽 24 时不解"
         );
-        assert_eq!(parse_extent_record(&[0u8; 111]), None, "差一个字节也不解");
+        assert_eq!(
+            parse_extent_record(&[0u8; 111]),
+            Err(PointerCarryingEntryRefusal::NarrowerThanItsFieldTable),
+            "差一个字节也不解"
+        );
         assert!(
-            parse_extent_record(&[0u8; 112]).is_some(),
+            parse_extent_record(&[0u8; 112]).is_ok(),
             "刚好 112 要解得开"
         );
         assert_eq!(
@@ -594,7 +876,7 @@ mod tests {
     fn mapping_keys_order_by_field_not_by_bytes() {
         let pointer_with_sequence = |sequence: u32| NodePointer {
             head: PointerHead {
-                birth_tree: TreeIdentifier(15),
+                birth_tree: TreeIdentifier(TREE_IDENTIFIER_CENTRAL_MAPPING),
                 birth_txg: CheckpointTxg(3),
             },
             locations: NodePointer::empty_root().locations,

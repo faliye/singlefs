@@ -6,4 +6,8 @@ publish = false
 description = "核心层：地址 newtype 与块设备抽象（步 0），事务层与写路径随后各步接上"
 
 [dependencies]
+# 文件后端写零打洞要调 fallocate(2)（`src/block_device.rs`）；与 Cargo.lock 里已有的 libc 同一份，不新增包。
+libc = "0.2"
 singlefs-format = { path = "../singlefs-format" }
+# 取 journal 前缀的纯函数核（Verus 验的那一份），recovery::replay_journal 调它。
+singlefs-replay-prefix = { path = "../singlefs-replay-prefix" }

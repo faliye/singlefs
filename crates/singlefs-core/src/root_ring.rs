@@ -116,6 +116,21 @@ pub fn target_for_publish(
     }
 }
 
+/// 一圈窗口（D16（发布语义） 已定项 1「一圈窗口里最旧有效根」，用户 2026-10-02 定）：锚 N 之下的 txg 是不是落在窗口 txg > N − 3S 里
+/// （3S 是环长：R 个区域 × S 个槽）。写成 txg + 3S > N，N < 3S 时整个环都在窗口里、不减出负数。核心层判窗口的每一处
+/// （分配器的回收门槛、影子账的候选过滤、挂载时读不出的槽）都走它；锚取什么由调用方定（挂载时环里读得出的最新有效根，进程内这个进程记到的最新根）。
+#[must_use]
+pub fn txg_is_inside_the_one_revolution_window(
+    checkpoint_txg: CheckpointTxg,
+    window_anchor: CheckpointTxg,
+    slots_per_region: RootRingSlotsPerRegion,
+) -> bool {
+    checkpoint_txg
+        .0
+        .saturating_add(ROOT_RING_REGIONS * slots_per_region.count())
+        > window_anchor.0
+}
+
 /// 一个区域占多少字节：S 个槽 × 槽距。区域之间隔着 P × chunk，这一段之外的字节不归根环。
 /// mkfs 按它清根环、`ring_end` 按它算末端，两处同一个定义。
 #[must_use]

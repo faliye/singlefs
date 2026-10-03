@@ -28,8 +28,11 @@ use singlefs_format::{
 
 use crate::address::{CheckpointTxg, InstanceGeneration, SlotNumber, TreeIdentifier};
 use crate::bytes::{ByteReader, ByteWriter};
-use crate::pointer::{BirthSequence, DataPointer, NodePointer};
-use crate::records::{build_extent_record, parse_extent_record};
+use crate::pointer::{
+    BirthSequence, DataPointer, NodePointer, PointerHeadFieldGroup,
+    PointerHeadFieldOutsideTheFirstVersion,
+};
+use crate::records::{build_extent_record, parse_extent_record, PointerCarryingEntryRefusal};
 use crate::recovery::RecoveryFailure;
 use crate::root_record::RootRecord;
 use crate::unit::{
@@ -261,6 +264,43 @@ pub enum ExtentUpperLeafEntryMalformed {
     UnrecognizedTag(u8),
     /// key 的 locality 段或 offset 段不是 0，或载荷里该是零的字节不是零。
     NonZeroBytesWhereTheFieldTableSaysZero,
+    /// 标签 1 / 2 的载荷里那条指针（下段根指针、内联的数据指针）头部有一段不是第一版的取值（MAC / nonce、算法类型、压缩算法码与
+    /// 压后长度、extent 偏移）：判这条条目损坏（D19（块指针的结构与宽度预算） 已定项 3、D9（加密） 已定项 14、C581（extent 偏移非 0 没有判据））。
+    PointerHeadFieldOutsideTheFirstVersion(PointerHeadFieldOutsideTheFirstVersion),
+}
+
+/// extent 上段叶条目里那条指针（下段根指针或内联的数据指针）头部 extent 偏移非 0 时报 [`RecoveryFailure::UnitMalformed`]，`what` 取这一句。
+pub const EXTENT_UPPER_LEAF_ENTRY_POINTER_EXTENT_OFFSET_NOT_ZERO: &str =
+    "extent 上段叶条目里那条指针的头部 extent 偏移不是 0";
+/// extent 树内部条目里的子指针头部 extent 偏移非 0 时报 [`RecoveryFailure::UnitMalformed`]，`what` 取这一句。
+pub const EXTENT_TREE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO: &str =
+    "extent 树内部条目的子指针头部 extent 偏移不是 0";
+/// extent 叶记录里的数据指针头部 extent 偏移非 0 时报 [`RecoveryFailure::UnitMalformed`]，`what` 取这一句。
+pub const EXTENT_LEAF_RECORD_DATA_POINTER_EXTENT_OFFSET_NOT_ZERO: &str =
+    "extent 叶记录里数据指针的头部 extent 偏移不是 0";
+/// extent 上段叶条目里那条指针头部的加密、压缩那几段（MAC / nonce、算法类型、压缩算法码与压后长度）不是第一版的取值时报
+/// [`RecoveryFailure::UnitMalformed`]，`what` 取这一句（D19（块指针的结构与宽度预算） 已定项 3、D9（加密） 已定项 14）。
+pub const EXTENT_UPPER_LEAF_ENTRY_POINTER_ENCRYPTION_OR_COMPRESSION_FIELD_OUTSIDE_THE_FIRST_VERSION:
+    &str = "extent 上段叶条目里那条指针头部的加密、压缩那几段不是第一版的取值";
+/// extent 树内部条目里的子指针头部加密、压缩那几段不是第一版的取值时报 [`RecoveryFailure::UnitMalformed`]，`what` 取这一句。
+pub const EXTENT_TREE_INTERNAL_ENTRY_CHILD_POINTER_ENCRYPTION_OR_COMPRESSION_FIELD_OUTSIDE_THE_FIRST_VERSION:
+    &str = "extent 树内部条目的子指针头部的加密、压缩那几段不是第一版的取值";
+/// extent 叶记录里的数据指针头部加密、压缩那几段不是第一版的取值时报 [`RecoveryFailure::UnitMalformed`]，`what` 取这一句。
+pub const EXTENT_LEAF_RECORD_DATA_POINTER_ENCRYPTION_OR_COMPRESSION_FIELD_OUTSIDE_THE_FIRST_VERSION:
+    &str = "extent 叶记录里数据指针头部的加密、压缩那几段不是第一版的取值";
+
+/// 一条指针头部第一版之外的取值报哪一句：按落在哪一组字段上，在读者给的两句里挑（三类 extent 树读者共用）。
+fn what_of_a_pointer_head_field_outside_the_first_version(
+    field: PointerHeadFieldOutsideTheFirstVersion,
+    what_of_the_encryption_or_compression_fields: &'static str,
+    what_of_the_extent_offset: &'static str,
+) -> &'static str {
+    match field.field_group() {
+        PointerHeadFieldGroup::EncryptionOrCompression => {
+            what_of_the_encryption_or_compression_fields
+        }
+        PointerHeadFieldGroup::ExtentOffset => what_of_the_extent_offset,
+    }
 }
 
 impl ExtentUpperLeafEntry {
@@ -291,7 +331,7 @@ impl ExtentUpperLeafEntry {
     /// 上段叶条目的读者：这里是盘上字节进字段表的边界。
     ///
     /// # Errors
-    /// 窄于 113、标签不认识、该是零的字节不是零。
+    /// 窄于 113、标签不认识、该是零的字节不是零、载荷里那条指针头部有一段不是第一版的取值。
     pub fn parse(bytes: &[u8]) -> Result<Self, ExtentUpperLeafEntryMalformed> {
         if bytes.len() < usize::try_from(EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES).expect("113") {
             return Err(ExtentUpperLeafEntryMalformed::NarrowerThanItsFieldTable);
@@ -319,12 +359,18 @@ impl ExtentUpperLeafEntry {
                         ExtentUpperLeafEntryMalformed::NonZeroBytesWhereTheFieldTableSaysZero,
                     );
                 }
-                ExtentUpperLeafTarget::LowerSegmentRoot(NodePointer::read_from(
-                    &mut ByteReader::at(payload, 0),
-                ))
+                ExtentUpperLeafTarget::LowerSegmentRoot(
+                    NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+                        &mut ByteReader::at(payload, 0),
+                    )
+                    .map_err(ExtentUpperLeafEntryMalformed::PointerHeadFieldOutsideTheFirstVersion)?,
+                )
             }
             EXTENT_UPPER_LEAF_ENTRY_TAG_INLINE_DATA_UNIT => ExtentUpperLeafTarget::InlineDataUnit(
-                DataPointer::read_from(&mut ByteReader::at(payload, 0)),
+                DataPointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+                    &mut ByteReader::at(payload, 0),
+                )
+                .map_err(ExtentUpperLeafEntryMalformed::PointerHeadFieldOutsideTheFirstVersion)?,
             ),
             unrecognized => {
                 return Err(ExtentUpperLeafEntryMalformed::UnrecognizedTag(unrecognized))
@@ -424,10 +470,12 @@ pub fn build_lower_internal_node(
     )
 }
 
-/// 装上段一片叶：条目按 inode 号升序。
+/// 装上段一片叶：条目按 inode 号升序。一条条目都没有的只有上段的根兼叶（第一个文件删完、unlink 最后一批之后的零条目根，
+/// D8（核心索引结构） 已定项 16 第 5 条）：key 区间照旧是它的位置规定罩的那一段。
 ///
 /// # Panics
-/// 一条条目都没有，或有条目的 inode 号不在这片叶罩的那一段里：规划只把条目放进罩着它的那片叶。
+/// 有条目的 inode 号不在这片叶罩的那一段里，或一条条目都没有而它不是根兼叶（层级 0 的第 0 个）：规划只把条目放进罩着它的那片叶，
+/// 缺席的一段不写节点。
 #[must_use]
 pub fn build_upper_leaf(
     identity: &ExtentTreeNodeIdentity<'_>,
@@ -437,11 +485,11 @@ pub fn build_upper_leaf(
 ) -> Vec<u8> {
     let (first_inode, last_inode) = position.inode_range();
     assert!(
-        !entries.is_empty()
+        (!entries.is_empty() || position.index == 0)
             && entries
                 .iter()
                 .all(|entry| (first_inode..=last_inode).contains(&entry.inode)),
-        "上段叶里的条目都落在它罩的那一段 inode 号里"
+        "上段叶里的条目都落在它罩的那一段 inode 号里；零条目的只有根兼叶"
     );
     let (smallest_key, largest_key) = position.key_range();
     build_index_node(
@@ -659,7 +707,8 @@ impl ExtentTreeReading<'_> {
                 "extent 树节点头里的 key 区间不是它的位置规定罩的那一段",
             ));
         }
-        if header.entries.is_empty() {
+        // 零条目只许上段的根兼叶（第一个文件删完之后的零条目根，D8（核心索引结构） 已定项 16 第 5 条）。
+        if header.entries.is_empty() && !(is_the_root_of_the_tree && expected_level == 0) {
             return Err(violated(
                 "extent 树节点一条条目都没有（缺席的一段不写节点）",
             ));
@@ -679,16 +728,23 @@ impl ExtentTreeReading<'_> {
                 field_table_bytes: internal_width,
             });
         }
-        Ok(header
+        header
             .entries
             .iter()
             .map(|entry| {
-                (
-                    entry[..key_width()].to_vec(),
-                    NodePointer::read_from(&mut ByteReader::at(entry, key_width())),
+                NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+                    &mut ByteReader::at(entry, key_width()),
                 )
+                .map(|child| (entry[..key_width()].to_vec(), child))
+                .map_err(|field| RecoveryFailure::UnitMalformed {
+                    what: what_of_a_pointer_head_field_outside_the_first_version(
+                        field,
+                        EXTENT_TREE_INTERNAL_ENTRY_CHILD_POINTER_ENCRYPTION_OR_COMPRESSION_FIELD_OUTSIDE_THE_FIRST_VERSION,
+                        EXTENT_TREE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO,
+                    ),
+                })
             })
-            .collect())
+            .collect()
     }
 }
 
@@ -768,13 +824,26 @@ fn read_lower_node_and_its_subtree(
         let payload = payload_capacity_in_bytes();
         let mut previous_unit: Option<u64> = None;
         for entry in &header.entries {
-            let (key, data_pointer) = parse_extent_record(entry).ok_or(
-                RecoveryFailure::EntryNarrowerThanItsFieldTable {
-                    what: "extent 叶记录",
-                    entry_bytes: entry.len(),
-                    field_table_bytes: usize::try_from(EXTENT_LEAF_RECORD_BYTES).expect("112"),
-                },
-            )?;
+            let (key, data_pointer) =
+                parse_extent_record(entry).map_err(|refusal| match refusal {
+                    PointerCarryingEntryRefusal::NarrowerThanItsFieldTable => {
+                        RecoveryFailure::EntryNarrowerThanItsFieldTable {
+                            what: "extent 叶记录",
+                            entry_bytes: entry.len(),
+                            field_table_bytes: usize::try_from(EXTENT_LEAF_RECORD_BYTES)
+                                .expect("112"),
+                        }
+                    }
+                    PointerCarryingEntryRefusal::PointerHeadFieldOutsideTheFirstVersion(field) => {
+                        RecoveryFailure::UnitMalformed {
+                            what: what_of_a_pointer_head_field_outside_the_first_version(
+                                field,
+                                EXTENT_LEAF_RECORD_DATA_POINTER_ENCRYPTION_OR_COMPRESSION_FIELD_OUTSIDE_THE_FIRST_VERSION,
+                                EXTENT_LEAF_RECORD_DATA_POINTER_EXTENT_OFFSET_NOT_ZERO,
+                            ),
+                        }
+                    }
+                })?;
             let (locality, record_inode, offset) = extent_key_fields(&key);
             if locality != 0 || record_inode != inode || !offset.is_multiple_of(payload) {
                 return Err(violated(
@@ -880,6 +949,15 @@ fn upper_leaf_entries(
                     RecoveryFailure::InvariantViolated {
                         invariant: "E142 走读同款",
                         detail: "extent 上段叶条目里字段表写零的字节不是零",
+                    }
+                }
+                ExtentUpperLeafEntryMalformed::PointerHeadFieldOutsideTheFirstVersion(field) => {
+                    RecoveryFailure::UnitMalformed {
+                        what: what_of_a_pointer_head_field_outside_the_first_version(
+                            field,
+                            EXTENT_UPPER_LEAF_ENTRY_POINTER_ENCRYPTION_OR_COMPRESSION_FIELD_OUTSIDE_THE_FIRST_VERSION,
+                            EXTENT_UPPER_LEAF_ENTRY_POINTER_EXTENT_OFFSET_NOT_ZERO,
+                        ),
                     }
                 }
             })?;

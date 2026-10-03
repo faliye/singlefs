@@ -13,8 +13,9 @@
 //! 这个模块就是那个能判的地方：它只算「这次发布之后树里是哪几片容器、各装哪些记录、哪几片要重写」，
 //! 不发一个写、不动分配器、不碰落点，所以三条纪律在这里是纯函数的后置条件，单测判得了。
 //!
-//! **合并不在这个模块里**：这一版没有删除（`deleted_inodes` 的形态无落点，C118（`deleted_inodes` 树的形态无落点）），
-//! 记录只增不减，合并（只许左吸收右 / 左从右借）没有对象。
+//! **删除只有一种落法**（[`remove_record_from_leaf_containers`]，unlink 最后一批那次发布）：删掉那一条；那一片删空了就整片不落盘
+//! （「记录数为 0 的类型 2 容器不落盘」），它右边的每一片位置左移一格、这次全部重写。别的合并（左从右借、两片都不空的左吸收右）
+//! 没写——合并时机是写路径策略（D8（核心索引结构） 已定项 6），这一版只做「删空就不落盘」这一种。
 
 use singlefs_format::{INODE_INTERNAL_ENTRY, INODE_LEAF_RECORDS};
 
@@ -25,8 +26,8 @@ use crate::unit::{index_node_entry_capacity, PackedIdentity, PACKED_TYPE_INODE};
 /// inode 树里第几片叶容器，按叶序（= key 升序）从 0 数。
 ///
 /// 它是**树里的位置**，不是容器号：容器号是首次插入它的那条记录的 inode 号（D8（核心索引结构） 已定项 6），
-/// 位置随左边有没有别的容器而变，两者不是一个量。这一版没有删除与合并 ⇒ 位置一旦定下就不再挪
-/// （新容器只在最右端出现），所以它可以当发布路径里的角色序号用。
+/// 位置随左边有没有别的容器而变，两者不是一个量。新容器只在最右端出现；一片删空了不落盘时它右边的每一片左移一格，
+/// 那一次发布把挪了位置的几片全部重写（[`remove_record_from_leaf_containers`]），所以位置照样可以当发布路径里的角色序号用。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InodeLeafContainerIndexInTree(pub u32);
 
@@ -119,6 +120,17 @@ pub struct InodeLeafContainersAfterThisPublish {
     pub containers: Vec<InodeLeafContainer>,
     /// 这次要重写的那几片，按叶序升序。
     pub rewritten: Vec<InodeLeafContainerIndexInTree>,
+    /// 这次删空、不再落盘的片数（只有 [`remove_record_from_leaf_containers`] 删空一片时是 1，别的落法都是 0）：
+    /// 删空的是最右那一片时重写清单是空的，根照样要重写（少了一条条目）。
+    pub containers_dropped: usize,
+}
+
+impl InodeLeafContainersAfterThisPublish {
+    /// 这次要不要重写 inode 树根：有叶容器重写（COW 叶 + 全部祖先，D23（journal 的角色与格式） 已定项 1 甲），或有一片删空不再落盘。
+    #[must_use]
+    pub fn is_the_root_rewritten(&self) -> bool {
+        !self.rewritten.is_empty() || self.containers_dropped > 0
+    }
 }
 
 /// 往 inode 树里写记录时走得到、而条款没写的那几格。三样都在**任何落盘动作之前**交回，盘上逐字节不变。
@@ -140,6 +152,9 @@ pub enum InodeTreeWriteRefusal {
     /// （类型段 0 那一支今天盘上一条都没有）。里程碑「覆盖写、释放、回退与复用」并行线三把
     /// 「内部节点条目 120、扇出 135 ⇒ 十万个文件约 430 片叶、树高 2」整句标成**预想**。
     MoreLeafContainersThanOneRootNodeHolds { containers: usize, capacity: usize },
+    /// unlink 最后一批要删的那条记录不在树里（[`remove_record_from_leaf_containers`]）：调用方按现行那一版的队列取号，
+    /// 号在队列里而记录不在树里说明那一版的 `deleted_inodes` 与 inode 树对不上。
+    RecordToRemoveIsNotInTheTree { inode: InodeNumber },
     /// 同一次写里的记录没有按 inode 号严格升序排。
     ///
     /// 升序是调用方的义务，不是这里替它排：一次请求内按 key 升序取号是 D16（发布语义） 已定项 5 末段的纪律
@@ -252,6 +267,52 @@ pub fn write_records_into_leaf_containers(
     Ok(InodeLeafContainersAfterThisPublish {
         containers,
         rewritten,
+        containers_dropped: 0,
+    })
+}
+
+/// 从 inode 树的叶容器里删掉 `inode` 那一条记录（unlink 最后一批那次发布：D8（核心索引结构） 已定项 16 第 2 条「删 inode 记录」）。
+///
+/// - 那一片删完还有记录 ⇒ 只有它进重写清单，身份不变（COW 重写身份不变，D8 已定项 6）；
+/// - 那一片删空了 ⇒ 整片不落盘（「记录数为 0 的类型 2 容器不落盘」，D8 已定项 6：左吸收右的退化形——右边那片是空的），
+///   它右边的每一片在树里的位置左移一格。位置是发布路径里的角色序号，挪了位置的那几片这次全部重写：内容与身份都不变，
+///   只是换一份落点（合法的 COW）；它们上一版的落点与删空那一片的一起换下。删空的是最右那一片时重写清单是空的、根照样重写。
+///
+/// 删的是树里最后一条时交回零片容器：inode 树写零条目根（key 区间 `[0, 0]`，D8 已定项 6），那一版是「有树、文件集合为空」
+/// （D8 已定项 16 第 5 条），怎么装它归发布路径。
+///
+/// # Errors
+/// 树里没有这条记录 ⇒ [`InodeTreeWriteRefusal::RecordToRemoveIsNotInTheTree`]（在任何落盘动作之前）。
+pub fn remove_record_from_leaf_containers(
+    containers_before_this_publish: &[InodeLeafContainer],
+    inode: InodeNumber,
+) -> Result<InodeLeafContainersAfterThisPublish, InodeTreeWriteRefusal> {
+    let Some(index) = position_of_the_container_holding(containers_before_this_publish, inode)
+    else {
+        return Err(InodeTreeWriteRefusal::RecordToRemoveIsNotInTheTree { inode });
+    };
+    let mut containers = containers_before_this_publish.to_vec();
+    let container = &mut containers[index.position()];
+    let position_in_container = container
+        .records
+        .binary_search_by_key(&inode.0, |existing_record| existing_record.inode)
+        .expect("position_of_the_container_holding 找到的就是这条记录所在的容器");
+    container.records.remove(position_in_container);
+    if !container.records.is_empty() {
+        return Ok(InodeLeafContainersAfterThisPublish {
+            containers,
+            rewritten: vec![index],
+            containers_dropped: 0,
+        });
+    }
+    containers.remove(index.position());
+    let rewritten = (index.position()..containers.len())
+        .map(InodeLeafContainerIndexInTree::of_position)
+        .collect();
+    Ok(InodeLeafContainersAfterThisPublish {
+        containers,
+        rewritten,
+        containers_dropped: 1,
     })
 }
 
@@ -304,6 +365,7 @@ mod tests {
         InodeRecord {
             inode,
             object_birth: TREE_BIRTH_TXG,
+            nlink: crate::records::NLINK_OF_A_LIVE_INODE_WITHOUT_DIRECTORIES,
             size,
             change_count,
             write_time_seconds: 1_788_000_000,
@@ -646,5 +708,111 @@ mod tests {
             "容器号是触发分裂那条（234），不是这次写的最后一条（235）"
         );
         assert_eq!(after.containers[0].records[0], record(1, 4096, 9));
+    }
+
+    /// 三片叶容器：第一片 1..=233、第二片 234..=466、第三片只有 467（分裂纪律写出来的形状）。
+    fn three_containers() -> Vec<InodeLeafContainer> {
+        let after = write_records_into_leaf_containers(
+            &[],
+            &(1..=467u64)
+                .map(|inode| record(inode, 0, 3))
+                .collect::<Vec<_>>(),
+            TREE_BIRTH_TXG,
+            INODE_TREE,
+        )
+        .expect("467 条");
+        assert_eq!(after.containers.len(), 3, "233 + 233 + 1");
+        after.containers
+    }
+
+    /// 删一条、那一片还有记录：只重写那一片，身份不变，别的片不动，没有删空的片。
+    #[test]
+    fn removing_a_record_from_a_container_that_keeps_others_rewrites_only_that_container() {
+        let before = three_containers();
+        let after = remove_record_from_leaf_containers(&before, InodeNumber(300)).expect("删 300");
+        assert_eq!(after.containers.len(), 3);
+        assert_eq!(
+            after.containers[1].identity, before[1].identity,
+            "COW 重写身份不变"
+        );
+        assert_eq!(after.containers[1].records.len(), 232);
+        assert!(
+            after.containers[1]
+                .records
+                .iter()
+                .all(|kept| kept.inode != 300),
+            "那一条不在了"
+        );
+        assert_eq!(after.containers[0], before[0]);
+        assert_eq!(after.containers[2], before[2]);
+        assert_eq!(
+            after.rewritten,
+            vec![InodeLeafContainerIndexInTree::of_position(1)]
+        );
+        assert_eq!(after.containers_dropped, 0);
+        assert!(after.is_the_root_rewritten());
+    }
+
+    /// 删空最右那一片：整片不落盘，重写清单是空的，根照样重写（少了一条条目）。
+    #[test]
+    fn removing_the_only_record_of_the_rightmost_container_drops_it_and_still_rewrites_the_root() {
+        let before = three_containers();
+        let after = remove_record_from_leaf_containers(&before, InodeNumber(467)).expect("删 467");
+        assert_eq!(after.containers, before[..2].to_vec(), "前两片原样");
+        assert!(after.rewritten.is_empty(), "没有一片要重写");
+        assert_eq!(after.containers_dropped, 1);
+        assert!(after.is_the_root_rewritten(), "根少一条条目，要重写");
+    }
+
+    /// 删空中间一片：它右边的每一片左移一格、全部重写（身份与记录不变），左边的不动。
+    #[test]
+    fn removing_the_only_record_of_a_middle_container_shifts_and_rewrites_every_container_to_its_right(
+    ) {
+        let mut before = three_containers();
+        // 把第二片删到只剩 234 一条（直接在内容上改：这里判的是删空之后的落法，不是怎么删到只剩一条）。
+        before[1].records.truncate(1);
+        let after = remove_record_from_leaf_containers(&before, InodeNumber(234)).expect("删 234");
+        assert_eq!(after.containers.len(), 2);
+        assert_eq!(after.containers[0], before[0], "左边那片不动");
+        assert_eq!(
+            after.containers[1], before[2],
+            "第三片挪到第二个位置，身份与记录原样"
+        );
+        assert_eq!(
+            after.rewritten,
+            vec![InodeLeafContainerIndexInTree::of_position(1)],
+            "挪了位置的那一片重写"
+        );
+        assert_eq!(after.containers_dropped, 1);
+    }
+
+    /// 删的是树里唯一一条（unlink 唯一的文件）：一片都不剩、没有要重写的片，根照样重写成零条目根。
+    #[test]
+    fn removing_the_last_record_of_the_tree_leaves_no_container_and_rewrites_the_root() {
+        let before = write_records_into_leaf_containers(
+            &[],
+            &[record(1, 4096, 3)],
+            TREE_BIRTH_TXG,
+            INODE_TREE,
+        )
+        .expect("一条")
+        .containers;
+        let after = remove_record_from_leaf_containers(&before, InodeNumber(1)).expect("删 1");
+        assert!(after.containers.is_empty(), "一片都不剩");
+        assert!(after.rewritten.is_empty());
+        assert_eq!(after.containers_dropped, 1);
+        assert!(after.is_the_root_rewritten(), "根重写成零条目根");
+    }
+
+    /// 要删的号不在树里：在任何落盘动作之前拒。
+    #[test]
+    fn removing_a_number_that_is_not_in_the_tree_is_refused() {
+        let before = three_containers();
+        assert_eq!(
+            remove_record_from_leaf_containers(&before, InodeNumber(468)),
+            Err(InodeTreeWriteRefusal::RecordToRemoveIsNotInTheTree {
+                inode: InodeNumber(468)
+            })
+        );
     }
 }

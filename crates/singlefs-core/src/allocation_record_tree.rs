@@ -27,7 +27,9 @@ use crate::address::{
 };
 use crate::allocator::{absolute_slot_count_of_device, AllocationRecord, PoolAllocator};
 use crate::bytes::{ByteReader, ByteWriter};
-use crate::pointer::{BirthSequence, NodePointer};
+use crate::pointer::{
+    BirthSequence, NodePointer, PointerHeadFieldGroup, PointerHeadFieldsJudgement,
+};
 use crate::recovery::{PoolReader, RecoveryFailure};
 use crate::root_record::RootRecord;
 use crate::unit::{build_index_node, parse_index_node, IndexNodeHeader};
@@ -771,7 +773,20 @@ impl AllocationRecordTreeReading<'_> {
             }
             previous_child = Some(child);
             let mut reader = ByteReader::at(entry, key_bytes_width());
-            let child_pointer = NodePointer::read_from(&mut reader);
+            let child_pointer =
+                NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+                    &mut reader,
+                )
+                .map_err(|field| RecoveryFailure::UnitMalformed {
+                    what: match field.field_group() {
+                        PointerHeadFieldGroup::EncryptionOrCompression => {
+                            ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_CHILD_POINTER_ENCRYPTION_OR_COMPRESSION_FIELD_OUTSIDE_THE_FIRST_VERSION
+                        }
+                        PointerHeadFieldGroup::ExtentOffset => {
+                            ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO
+                        }
+                    },
+                })?;
             self.read_node_and_its_subtree(
                 child,
                 &child_pointer,
@@ -830,9 +845,20 @@ pub fn read_allocation_record_tree(
     Ok(AllocationRecordTreeReadFromDisk { nodes, records })
 }
 
+/// 分配记录树内部条目里的子指针头部 extent 偏移非 0 时报 [`RecoveryFailure::UnitMalformed`]，`what` 取这一句
+/// （C581（extent 偏移非 0 没有判据）：判该指针所在的结构损坏）。
+pub const ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO: &str =
+    "分配记录树内部条目的子指针头部 extent 偏移不是 0";
+/// 分配记录树内部条目里的子指针头部加密、压缩那几段（MAC / nonce、算法类型、压缩算法码与压后长度）不是第一版的取值时报
+/// [`RecoveryFailure::UnitMalformed`]，`what` 取这一句（D19（块指针的结构与宽度预算） 已定项 3、D9（加密） 已定项 14：判该指针所在的结构损坏）。
+pub const ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_CHILD_POINTER_ENCRYPTION_OR_COMPRESSION_FIELD_OUTSIDE_THE_FIRST_VERSION:
+    &str = "分配记录树内部条目的子指针头部的加密、压缩那几段不是第一版的取值";
+
 /// 从根指针往下，读得出多少就认多少：交回走得到的每个节点的指针（根在内；读不出、解不开、位置对不上的节点它自己的指针照样交回，
 /// 只是不再往它下面走）。影子账认一条被抛弃根引用着哪些单元时用它（`mount`）：这棵树的节点都是这条根引用的单元，
-/// 少认一个，被抛弃根的那一个就不隔离、回退之后可能被发出去——同实例表那条链「认得出的都算上」。
+/// 少认一个，被抛弃根的那一个就不隔离、回退之后可能被发出去——同实例表那条链「认得出的都算上」。所以子指针头部第一版之外的取值
+/// （加密、压缩那几段与 extent 偏移）这里不判，指针里的位置条目照样认它指的孩子（[`PointerHeadFieldsJudgement::NotJudgedByTheShadowLedger`]；
+/// 走读那一路 `read_allocation_record_tree` 照判）。
 #[must_use]
 pub fn node_pointers_as_far_as_readable(
     root_pointer: &NodePointer,
@@ -865,9 +891,12 @@ pub fn node_pointers_as_far_as_readable(
             if let Some(child) =
                 geometry.child_named_by_entry_key(node, &entry[..key_bytes_width()])
             {
-                let child_pointer =
-                    NodePointer::read_from(&mut ByteReader::at(entry, key_bytes_width()));
-                pending.push((child, child_pointer));
+                if let Ok(child_pointer) = NodePointer::read_with_head_fields_judgement_from(
+                    &mut ByteReader::at(entry, key_bytes_width()),
+                    PointerHeadFieldsJudgement::NotJudgedByTheShadowLedger,
+                ) {
+                    pending.push((child, child_pointer));
+                }
             }
         }
     }

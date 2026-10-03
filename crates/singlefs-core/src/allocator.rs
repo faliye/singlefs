@@ -19,9 +19,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::address::{CheckpointTxg, DeviceIdentity, SlotNumber};
 use crate::admission::SpaceAdmission;
 use crate::bytes::ByteWriter;
+use crate::instance_table::InstanceTableRecords;
 use crate::journal::slot_after_the_journal_ring;
-use crate::root_ring::{target_for_publish, RootRingSlot, RootRingSlotsPerRegion};
+use crate::root_ring::{
+    target_for_publish, txg_is_inside_the_one_revolution_window, RootRingSlot,
+    RootRingSlotsPerRegion,
+};
 use crate::transaction::FrozenPublish;
+use crate::unlink::DeletionSwitches;
 
 /// 跨度段的最高位借作已释放标志（D3（空间分配） 已定项 7 / 已定项 11）：0 = 仍分配、1 = 已释放，不占表达跨度值的位。
 pub const ALLOCATION_RECORD_RELEASED_FLAG: u16 = 0x8000;
@@ -938,10 +943,23 @@ impl PlacementOnDevice {
     }
 }
 
-/// 根环一个槽上这会儿住着哪条根。读不出、自证不过的槽不在 `RootRingOccupancy` 里：D16（发布语义） 已定项 1 的
-/// 「环里最旧有效根」只看自证合法的根，读不出的被抛弃根影子账本来就罩不到（`mount::isolate_slots_referenced_only_by_abandoned_roots`）。
+/// 根环一个槽上这会儿住着哪条根。自证不过的槽、读不出而落在一圈窗口之外的槽不在 `RootRingOccupancy` 里：D16（发布语义） 已定项 1 的
+/// 「一圈窗口里最旧有效根」只看自证合法的根与窗口里读不出的槽，读不出的被抛弃根影子账本来就罩不到（`mount::isolate_slots_referenced_only_by_abandoned_roots`）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RootRingOccupant {
+    /// 挂载那一刻设备报读错的槽，落在挂载时的一圈窗口里（D16（发布语义） 已定项 1「挂载时读不出的槽在窗口里只对应一两个 txg：
+    /// 门槛按最小的算，根环表记最大的」，`research/prompts/m3-ring-r3-main-verification.md` 第二节第 4 行，零轮）：按「那里住着一条 txg 为
+    /// `highest_txg_it_can_hold` 的有效根」进这个进程的回收门槛，直到这个进程把那个槽写掉。它不算「这个进程知道住着根的槽」
+    /// （[`RootRingOccupancy::ring_slots_known_to_hold_a_root`]）：D16 已定项 1「根槽这一次读坏」那一行，挂载那一刻就读不出、之后没写过的槽
+    /// 算上限、判回退候选时当没有根，不因为这里记了它就改成「读坏就拒」。
+    UnreadableAtMountInsideTheWindow {
+        highest_txg_it_can_hold: CheckpointTxg,
+    },
+    /// 挂载那一刻读不出的槽，这个进程在它成了窗口里最小的那个时重读、读出了一条自证过而按实例表仍然有效的根
+    /// （D16（发布语义） 已定项 1 的 E2，用户 2026-10-03 定，`research/prompts/m3-root-ring-code-r1-main-verification.md` 第三节表二之后那一段）：
+    /// 照读出来的 txg 进窗口。与 [`RootRingOccupant::UnreadableAtMountInsideTheWindow`] 一样不算「这个进程知道住着根的槽」：D16 已定项 1
+    /// 「根槽这一次读坏」那一行列的是挂载那一刻读得出的与这个进程写过的两种，进程内重读读出来的不在其内。
+    ValidRootReadWhenTheSlotUnreadableAtMountWasReread { checkpoint_txg: CheckpointTxg },
     /// 按实例表判仍然有效的根，txg 在不在 F 之下都算（可再分配谓词取 max(F_生效, 环里最旧有效根)，F 那一半另记）。
     ValidRoot { checkpoint_txg: CheckpointTxg },
     /// 按实例表判被抛弃的根（D23（journal 的角色与格式） 已定项 14），带着它引用的每个落点——挂载那一刻仍被候选根或现行账引用、
@@ -965,6 +983,8 @@ pub struct RootRingOccupancy {
     /// 谓词里 F 那一半再抬也多收不回一个槽。
     effective_floor: CheckpointTxg,
     latest_recorded_txg: CheckpointTxg,
+    /// 见 [`RootRingOccupancy::instance_table_judging_the_rereads`]。
+    instance_table_judging_the_rereads: InstanceTableRecords,
 }
 
 impl RootRingOccupancy {
@@ -983,24 +1003,57 @@ impl RootRingOccupancy {
             occupants: occupants.into_iter().collect(),
             effective_floor,
             latest_recorded_txg: latest_txg_before_the_next_publish,
+            instance_table_judging_the_rereads: InstanceTableRecords { rows: Vec::new() },
         }
+    }
+
+    /// 根环每区槽数 S（系统配置偏移 362）：准入式子里环窗口按它算（`admission::ring_window_on_one_device`）。
+    #[must_use]
+    pub fn slots_per_region(&self) -> RootRingSlotsPerRegion {
+        self.slots_per_region
     }
 
     /// 这个进程知道住着一条根的根环槽（D16（发布语义） 已定项 1「根槽这一次读坏」那一行）：挂载那一刻读得出、自证过的槽
     /// （有效的与被抛弃的都算），与这个进程之后写过、FUA 返回过的槽——发布在落盘之前或落盘途中失败时分配器整个换回发布之前那一份，
-    /// 这张表随之退回，记着的只剩根落盘做成的那几次。挂载那一刻读不出或自证不过、之后又没写过的槽不在其内。
+    /// 这张表随之退回，记着的只剩根落盘做成的那几次。挂载那一刻读不出或自证不过、之后又没写过的槽不在其内
+    /// （[`RootRingOccupant::UnreadableAtMountInsideTheWindow`] 记着的槽也不在）。
     #[must_use]
     pub fn ring_slots_known_to_hold_a_root(&self) -> BTreeSet<RootRingSlot> {
-        self.occupants.keys().copied().collect()
+        self.occupants
+            .iter()
+            .filter(|(_, occupant)| match occupant {
+                RootRingOccupant::ValidRoot { .. } | RootRingOccupant::AbandonedRoot { .. } => true,
+                RootRingOccupant::UnreadableAtMountInsideTheWindow { .. }
+                | RootRingOccupant::ValidRootReadWhenTheSlotUnreadableAtMountWasReread { .. } => {
+                    false
+                }
+            })
+            .map(|(ring_slot, _)| *ring_slot)
+            .collect()
     }
 
-    /// 环里最旧有效根的 txg；一条有效根都没有时 `None`。
-    fn oldest_valid_root(&self) -> Option<CheckpointTxg> {
+    /// 一圈窗口里最旧有效根的 txg（D16（发布语义） 已定项 1）：N = 这个进程记到的最新根的 txg（`latest_recorded_txg`：进程内每记一条根
+    /// 就是这条根），窗口 = txg > N − 3S（3S 是环长）；窗口里的有效根与挂载时窗口里读不出的槽（按它能住的最大 txg）取最小。一条都没有时 `None`。
+    /// 挂载那一刻的门槛不走这里（`mount::rebuilt_allocator` 锚在环里读得出的最新有效根、读不出的槽按最小 txg 算）。
+    fn oldest_valid_root_in_the_window(&self) -> Option<CheckpointTxg> {
         self.occupants
             .values()
             .filter_map(|occupant| match occupant {
-                RootRingOccupant::ValidRoot { checkpoint_txg, .. } => Some(*checkpoint_txg),
+                RootRingOccupant::ValidRoot { checkpoint_txg, .. }
+                | RootRingOccupant::ValidRootReadWhenTheSlotUnreadableAtMountWasReread {
+                    checkpoint_txg,
+                } => Some(*checkpoint_txg),
+                RootRingOccupant::UnreadableAtMountInsideTheWindow {
+                    highest_txg_it_can_hold,
+                } => Some(*highest_txg_it_can_hold),
                 RootRingOccupant::AbandonedRoot { .. } => None,
+            })
+            .filter(|checkpoint_txg| {
+                txg_is_inside_the_one_revolution_window(
+                    *checkpoint_txg,
+                    self.latest_recorded_txg,
+                    self.slots_per_region,
+                )
             })
             .min()
     }
@@ -1013,10 +1066,105 @@ impl RootRingOccupancy {
                 RootRingOccupant::AbandonedRoot {
                     referenced_placements,
                 } => referenced_placements.as_slice(),
-                RootRingOccupant::ValidRoot { .. } => &[],
+                RootRingOccupant::ValidRoot { .. }
+                | RootRingOccupant::UnreadableAtMountInsideTheWindow { .. }
+                | RootRingOccupant::ValidRootReadWhenTheSlotUnreadableAtMountWasReread { .. } => {
+                    &[]
+                }
             })
             .copied()
             .collect()
+    }
+
+    /// 挂载那一刻读不出、还记在表里的槽，各按它能住的最大 txg（[`RootRingOccupant::UnreadableAtMountInsideTheWindow`]），按槽的次序。
+    #[must_use]
+    pub fn ring_slots_unreadable_at_mount(&self) -> BTreeMap<RootRingSlot, CheckpointTxg> {
+        self.occupants
+            .iter()
+            .filter_map(|(ring_slot, occupant)| match occupant {
+                RootRingOccupant::UnreadableAtMountInsideTheWindow {
+                    highest_txg_it_can_hold,
+                } => Some((*ring_slot, *highest_txg_it_can_hold)),
+                RootRingOccupant::ValidRoot { .. }
+                | RootRingOccupant::ValidRootReadWhenTheSlotUnreadableAtMountWasReread { .. }
+                | RootRingOccupant::AbandonedRoot { .. } => None,
+            })
+            .collect()
+    }
+
+    /// 进程内重读那几个槽时判「按实例表仍然有效」用的那张表（D16（发布语义） 已定项 1「一圈窗口里最旧有效根」：按实例表判仍然有效）。
+    /// 挂载时装的是最新那条根的那一张（`mount::rebuilt_allocator`），写行那次发布的表一定下来就换成它（`mount::establish_instance`）——
+    /// 池级 checker 按镜像里最新那条根的实例表判，写行之后最新那条根带的就是写行那一张。mkfs 同一个进程里装的是空表（表里没有挂载时读不出的槽，用不到它）。
+    #[must_use]
+    pub fn instance_table_judging_the_rereads(&self) -> &InstanceTableRecords {
+        &self.instance_table_judging_the_rereads
+    }
+}
+
+/// 进程内重读一个挂载那一刻读不出的根环槽读到了什么（D16（发布语义） 已定项 1 的 E2，用户 2026-10-03 定）。封闭集合，`match` 不写通配臂。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RereadOfARootRingSlotUnreadableAtMount {
+    /// 读得出、自证过，按实例表仍然有效：照读出来的 txg 算（窗口里的进窗口，窗口外的不算）。
+    ValidRoot { checkpoint_txg: CheckpointTxg },
+    /// 读得出而自证不过，或读出来的根按实例表被抛弃：当没有根（与挂载那一刻读得出而自证不过的槽同一个处置）。
+    NoValidRoot,
+    /// 仍读不出：照旧按它能住的最大 txg 算。
+    StillUnreadable,
+}
+
+/// 一圈窗口里最旧有效根，挂载那一刻读不出的槽按 E2 并进来（D16（发布语义） 已定项 1，用户 2026-10-03 定）：`valid_root_txgs` 是已知
+/// 住着有效根的 txg，`unreadable_at_mount` 是挂载那一刻读不出、各按能住的最大 txg 记的槽；两者里窗口（锚 `window_anchor`）里最小的那个
+/// 若是一个读不出的槽，先重读那一槽（`reread`）：读出有效根就照它的 txg 换进去、当没有根就拿掉，再取最小；仍读不出才按最大 txg 算。
+/// 交回最小的 txg（一条都没有时 `None`）与每个重读过的槽读到了什么（按重读的次序）。
+///
+/// 循环：每轮要么换掉或拿掉一个读不出的槽（`unreadable_at_mount` 少一个），要么在最小的是一个仍读不出的槽、或最小的不是读不出的槽时返回；
+/// 轮数至多 `unreadable_at_mount` 的条数加一。跨轮携带两张表与重读结局。
+pub fn oldest_txg_in_the_window_rereading_slots_unreadable_at_mount(
+    valid_root_txgs: &[CheckpointTxg],
+    mut unreadable_at_mount: BTreeMap<RootRingSlot, CheckpointTxg>,
+    window_anchor: CheckpointTxg,
+    slots_per_region: RootRingSlotsPerRegion,
+    reread: &mut dyn FnMut(RootRingSlot) -> RereadOfARootRingSlotUnreadableAtMount,
+) -> (
+    Option<CheckpointTxg>,
+    Vec<(RootRingSlot, RereadOfARootRingSlotUnreadableAtMount)>,
+) {
+    let is_inside_the_window = |checkpoint_txg: CheckpointTxg| {
+        txg_is_inside_the_one_revolution_window(checkpoint_txg, window_anchor, slots_per_region)
+    };
+    let mut valid_root_txgs: Vec<CheckpointTxg> = valid_root_txgs.to_vec();
+    let mut rereads = Vec::new();
+    loop {
+        let oldest_valid_root = valid_root_txgs
+            .iter()
+            .copied()
+            .filter(|checkpoint_txg| is_inside_the_window(*checkpoint_txg))
+            .min();
+        let oldest_unreadable_slot = unreadable_at_mount
+            .iter()
+            .filter(|(_, highest_txg_it_can_hold)| is_inside_the_window(**highest_txg_it_can_hold))
+            .min_by_key(|(_, highest_txg_it_can_hold)| **highest_txg_it_can_hold)
+            .map(|(ring_slot, highest_txg_it_can_hold)| (*ring_slot, *highest_txg_it_can_hold));
+        let Some((ring_slot, highest_txg_it_can_hold)) = oldest_unreadable_slot else {
+            return (oldest_valid_root, rereads);
+        };
+        if oldest_valid_root.is_some_and(|oldest| oldest < highest_txg_it_can_hold) {
+            return (oldest_valid_root, rereads);
+        }
+        let reread_of_the_slot = reread(ring_slot);
+        rereads.push((ring_slot, reread_of_the_slot));
+        match reread_of_the_slot {
+            RereadOfARootRingSlotUnreadableAtMount::ValidRoot { checkpoint_txg } => {
+                unreadable_at_mount.remove(&ring_slot);
+                valid_root_txgs.push(checkpoint_txg);
+            }
+            RereadOfARootRingSlotUnreadableAtMount::NoValidRoot => {
+                unreadable_at_mount.remove(&ring_slot);
+            }
+            RereadOfARootRingSlotUnreadableAtMount::StillUnreadable => {
+                return (Some(highest_txg_it_can_hold), rereads);
+            }
+        }
     }
 }
 
@@ -1065,6 +1213,9 @@ pub struct PoolAllocator {
     /// 判不判空间准入，只供测试的开关（`admission::SpaceAdmission`）。只住内存：`new` 与 `rebuild_from_records` 起步是判；
     /// 可写挂载按调用方给的装（`mount::mount_writable_with_space_admission`）。
     space_admission: SpaceAdmission,
+    /// 删除那几次发布的两个只供测试的开关（`unlink::DeletionSwitches`）。只住内存：`new` 与 `rebuild_from_records` 起步是产品值；
+    /// 可写挂载按调用方给的装（`mount::mount_writable_with_test_only_switches_and_deletion_switches`），挂载续做与会话照它。
+    deletion_switches: DeletionSwitches,
 }
 
 impl PoolAllocator {
@@ -1085,7 +1236,19 @@ impl PoolAllocator {
             frozen_publish: None,
             instance_rows_after_this_mounts_row_publish: 0,
             space_admission: SpaceAdmission::JudgedByTheFormula,
+            deletion_switches: DeletionSwitches::PRODUCT,
         }
+    }
+
+    /// 装上删除那几次发布的只供测试的开关（`unlink::DeletionSwitches`）。产品路径一处都不调它。
+    pub fn set_deletion_switches(&mut self, deletion_switches: DeletionSwitches) {
+        self.deletion_switches = deletion_switches;
+    }
+
+    /// 这会儿装着的删除开关：运行时看得出走的是哪一条分支（`UnlinkBatchSize::name`、`TombstoneContainerCapacity::name`）。
+    #[must_use]
+    pub fn deletion_switches(&self) -> DeletionSwitches {
+        self.deletion_switches
     }
 
     /// 装上判不判空间准入这个只供测试的开关（`admission::SpaceAdmission`）。产品路径一处都不调它。
@@ -1190,7 +1353,7 @@ impl PoolAllocator {
         allocator
     }
 
-    /// mkfs 写在单元区里的两个单元：每盘一条分配代 0 的分配记录（字节表五：20 条里 m1 / m2 各两条，分配代 0）。
+    /// mkfs 写在单元区里的两个单元：每盘一条分配代 0 的分配记录（字节表五：28 条里 m1 / m2 各两条，分配代 0）。
     /// 单元区之外的固定结构（系统配置、根环、journal 环）不写分配记录、分配器不下探（D3（空间分配） 已定项 10 ④）。
     pub fn mark_format_time_units(&mut self, instance_table: Placement, tree_table: Placement) {
         self.record(instance_table, CheckpointTxg(0));
@@ -1612,6 +1775,17 @@ impl PoolAllocator {
         self.root_ring = Some(occupancy);
     }
 
+    /// 换上进程内重读挂载时读不出的槽时判「按实例表仍然有效」的那张表（[`RootRingOccupancy::instance_table_judging_the_rereads`]）。
+    /// 没装根环时什么都不做。
+    pub fn note_the_instance_table_judging_the_rereads_of_root_ring_slots(
+        &mut self,
+        table: InstanceTableRecords,
+    ) {
+        if let Some(occupancy) = self.root_ring.as_mut() {
+            occupancy.instance_table_judging_the_rereads = table;
+        }
+    }
+
     /// 这会儿装着的根环；`None` 见 `root_ring` 字段的注释。
     #[must_use]
     pub fn root_ring_occupancy(&self) -> Option<&RootRingOccupancy> {
@@ -1650,9 +1824,11 @@ impl PoolAllocator {
         let displaced = occupancy
             .occupants
             .insert(ring_slot, RootRingOccupant::ValidRoot { checkpoint_txg });
-        // 与挂载时同一个谓词（一处定义）：max(F_生效, 环里最旧有效根)。
-        let reclaim_floor =
-            crate::mount::reclaim_floor(occupancy.effective_floor, occupancy.oldest_valid_root());
+        // 与挂载时同一个谓词（一处定义）：max(F_生效, 一圈窗口里最旧有效根)。
+        let reclaim_floor = crate::mount::reclaim_floor(
+            occupancy.effective_floor,
+            occupancy.oldest_valid_root_in_the_window(),
+        );
         let still_referenced_by_abandoned_roots =
             occupancy.placements_referenced_by_abandoned_roots();
         match displaced {
@@ -1662,7 +1838,12 @@ impl PoolAllocator {
                 &referenced_placements,
                 &still_referenced_by_abandoned_roots,
             ),
-            Some(RootRingOccupant::ValidRoot { .. }) | None => {}
+            Some(
+                RootRingOccupant::ValidRoot { .. }
+                | RootRingOccupant::UnreadableAtMountInsideTheWindow { .. }
+                | RootRingOccupant::ValidRootReadWhenTheSlotUnreadableAtMountWasReread { .. },
+            )
+            | None => {}
         }
         let reclaimed =
             self.reclaim_released_records_up_to(reclaim_floor, ReclaimedReuse::Immediately);
@@ -1670,6 +1851,66 @@ impl PoolAllocator {
             &reclaimed,
             &still_referenced_by_abandoned_roots,
         );
+    }
+
+    /// 同 [`Self::record_root_written_by_this_process`]，记之前先照 E2 重读挂载那一刻读不出、记了这条根之后会是窗口里最小的那个槽
+    /// （D16（发布语义） 已定项 1，用户 2026-10-03 定：读得出且自证过就照读出来的根算——窗口里、按实例表有效的照它的 txg，别的当没有；
+    /// 仍读不出才按它能住的最大 txg 算）。`reread` 读盘、判自证与实例表（`mount::reread_of_a_root_ring_slot_unreadable_at_mount`）；
+    /// 这里只定重读哪一槽、按读到的改表。读不出的槽一个都不在窗口里最小的位置上时一个都不读。没装根环时只记根（什么都不做）。
+    pub fn record_root_written_by_this_process_rereading_slots_unreadable_at_mount(
+        &mut self,
+        checkpoint_txg: CheckpointTxg,
+        reread: &mut dyn FnMut(RootRingSlot) -> RereadOfARootRingSlotUnreadableAtMount,
+    ) {
+        if let Some(occupancy) = self.root_ring.as_mut() {
+            let ring_slot_of_this_root =
+                target_for_publish(checkpoint_txg, occupancy.slots_per_region);
+            // 这条根要盖掉的那一槽不算：记了之后那里住的是这条根。
+            let valid_root_txgs: Vec<CheckpointTxg> = occupancy
+                .occupants
+                .iter()
+                .filter(|(ring_slot, _)| **ring_slot != ring_slot_of_this_root)
+                .filter_map(|(_, occupant)| match occupant {
+                    RootRingOccupant::ValidRoot {
+                        checkpoint_txg: txg_of_the_occupant,
+                    }
+                    | RootRingOccupant::ValidRootReadWhenTheSlotUnreadableAtMountWasReread {
+                        checkpoint_txg: txg_of_the_occupant,
+                    } => Some(*txg_of_the_occupant),
+                    RootRingOccupant::UnreadableAtMountInsideTheWindow { .. }
+                    | RootRingOccupant::AbandonedRoot { .. } => None,
+                })
+                .chain(std::iter::once(checkpoint_txg))
+                .collect();
+            let mut unreadable_at_mount = occupancy.ring_slots_unreadable_at_mount();
+            unreadable_at_mount.remove(&ring_slot_of_this_root);
+            let (_oldest, rereads) = oldest_txg_in_the_window_rereading_slots_unreadable_at_mount(
+                &valid_root_txgs,
+                unreadable_at_mount,
+                checkpoint_txg,
+                occupancy.slots_per_region,
+                reread,
+            );
+            for (ring_slot, reread_of_the_slot) in rereads {
+                match reread_of_the_slot {
+                    RereadOfARootRingSlotUnreadableAtMount::ValidRoot {
+                        checkpoint_txg: txg_read_on_the_reread,
+                    } => {
+                        occupancy.occupants.insert(
+                            ring_slot,
+                            RootRingOccupant::ValidRootReadWhenTheSlotUnreadableAtMountWasReread {
+                                checkpoint_txg: txg_read_on_the_reread,
+                            },
+                        );
+                    }
+                    RereadOfARootRingSlotUnreadableAtMount::NoValidRoot => {
+                        occupancy.occupants.remove(&ring_slot);
+                    }
+                    RereadOfARootRingSlotUnreadableAtMount::StillUnreadable => {}
+                }
+            }
+        }
+        self.record_root_written_by_this_process(checkpoint_txg);
     }
 
     /// 第一个文件版本要建在上面的那一版（txg `version_to_build_on`，树表 0 条）之前，这个实例接连发过的零单元发布把根写到了
@@ -2348,7 +2589,7 @@ mod tests {
 
     /// 增补 2 第 20c 行（代码三方第一轮打中）：回落把开放段置空之后，那一段仍是聚簇段、仍不给用户数据
     /// （D3（空间分配） 已定项 8 第 2 条「聚簇段只给提交内生块」；已定项 10 ② 的量词是「任何开放的聚簇段」）。
-    /// 形态：开段 [50240, 50304) 发新池新建文件那七个提交内生块 ⇒ 游标停在 50249；段里游标前方的槽占满、单元区里一个全空段都不剩
+    /// 形态：开段 [50240, 50304) 发七个提交内生块（新池新建文件的前七个，字节表零 t2..t8）⇒ 游标停在 50249；段里游标前方的槽占满、单元区里一个全空段都不剩
     /// ⇒ 下一个提交内生块回落、`open_segment` 置空；再把段里那个两槽容器释放、回收（游标不回头，bump 够不着它）——
     /// 段里于是有一对空的偶数槽 50242–50243，而且它是全池最低的一对，段里 50244–50248 还躺着活着的内生块。
     /// 这时要一个用户数据落点：它必须落在段外面。
@@ -2472,6 +2713,94 @@ mod tests {
             );
             assert_eq!(device_map.deferred_slots(), 0);
         }
+    }
+
+    /// E2 那一判的取法（D16（发布语义） 已定项 1，用户 2026-10-03 定）：12 槽的环（S = 4），锚 txg 23，窗口 txg > 11；txg 13–23 住着有效根，
+    /// 区域 0 槽 0 挂载那一刻读不出、按它能住的最大 txg 12 记着，是窗口里最小的那个 ⇒ 重读那一槽一次。
+    fn oldest_in_the_window_when_the_slot_unreadable_at_mount_rereads_as(
+        reread_of_the_slot: RereadOfARootRingSlotUnreadableAtMount,
+    ) -> (
+        Option<CheckpointTxg>,
+        Vec<(RootRingSlot, RereadOfARootRingSlotUnreadableAtMount)>,
+    ) {
+        let slots_per_region =
+            RootRingSlotsPerRegion::from_system_configuration_field(4).expect("4 在区间里");
+        let hidden_slot = RootRingSlot { region: 0, slot: 0 };
+        assert_eq!(
+            target_for_publish(CheckpointTxg(12), slots_per_region),
+            hidden_slot
+        );
+        let valid_root_txgs: Vec<CheckpointTxg> = (13..=23).map(CheckpointTxg).collect();
+        oldest_txg_in_the_window_rereading_slots_unreadable_at_mount(
+            &valid_root_txgs,
+            BTreeMap::from([(hidden_slot, CheckpointTxg(12))]),
+            CheckpointTxg(23),
+            slots_per_region,
+            &mut |ring_slot| {
+                assert_eq!(ring_slot, hidden_slot, "只重读窗口里最小的那一槽");
+                reread_of_the_slot
+            },
+        )
+    }
+
+    /// 重读读出的是上一圈的 txg 0（窗口外）：照读出来的根算、那一槽不在窗口里，最旧有效根是 13。
+    #[test]
+    fn the_slot_unreadable_at_mount_rereading_as_a_root_outside_the_window_leaves_the_window() {
+        assert_eq!(
+            oldest_in_the_window_when_the_slot_unreadable_at_mount_rereads_as(
+                RereadOfARootRingSlotUnreadableAtMount::ValidRoot {
+                    checkpoint_txg: CheckpointTxg(0),
+                }
+            ),
+            (
+                Some(CheckpointTxg(13)),
+                vec![(
+                    RootRingSlot { region: 0, slot: 0 },
+                    RereadOfARootRingSlotUnreadableAtMount::ValidRoot {
+                        checkpoint_txg: CheckpointTxg(0),
+                    }
+                )]
+            )
+        );
+    }
+
+    /// 重读仍读不出：照旧按它能住的最大 txg 12 算。
+    #[test]
+    fn the_slot_unreadable_at_mount_still_unreadable_on_the_reread_counts_by_its_highest_txg() {
+        assert_eq!(
+            oldest_in_the_window_when_the_slot_unreadable_at_mount_rereads_as(
+                RereadOfARootRingSlotUnreadableAtMount::StillUnreadable
+            ),
+            (
+                Some(CheckpointTxg(12)),
+                vec![(
+                    RootRingSlot { region: 0, slot: 0 },
+                    RereadOfARootRingSlotUnreadableAtMount::StillUnreadable
+                )]
+            )
+        );
+    }
+
+    /// 窗口里还有比那一槽能住的最大 txg 更旧的有效根：不重读（重读的口子被调到就断言失败）。
+    #[test]
+    fn the_slot_unreadable_at_mount_is_not_reread_while_an_older_valid_root_is_in_the_window() {
+        let slots_per_region =
+            RootRingSlotsPerRegion::from_system_configuration_field(4).expect("4 在区间里");
+        // txg 12 与那一槽同槽，不在有效根里。
+        let valid_root_txgs: Vec<CheckpointTxg> = std::iter::once(11)
+            .chain(13..=22)
+            .map(CheckpointTxg)
+            .collect();
+        assert_eq!(
+            oldest_txg_in_the_window_rereading_slots_unreadable_at_mount(
+                &valid_root_txgs,
+                BTreeMap::from([(RootRingSlot { region: 0, slot: 0 }, CheckpointTxg(12))]),
+                CheckpointTxg(22),
+                slots_per_region,
+                &mut |ring_slot| panic!("窗口里 txg 11 比那一槽的 12 旧，不该重读 {ring_slot:?}"),
+            ),
+            (Some(CheckpointTxg(11)), Vec::new())
+        );
     }
 
     /// 记到的根 txg 跳了一格（txg 24 那条根没经分配器写出去）：这张表说的环已经不是盘上的环，断言失败，不按猜的环接着回收。

@@ -18,6 +18,12 @@ pub enum WrittenStructureKind {
     InodeTreeRoot,
     AllocationRecordTreeNode,
     AccountingTreeNode,
+    /// `deleted_inodes` 树的根（D8（核心索引结构） 已定项 16）。
+    DeletedInodesTreeNode,
+    /// 墓碑树的容器与根（D18（块里携带什么信息） 已定项 24）：按树数，不按容器与根分。
+    TombstoneTreeNode,
+    /// 谱系树的容器与根（D18（块里携带什么信息） 已定项 24 第 5 条）：另立一种、不并进墓碑树那一种（用户 2026-10-02 定「另立一种」），按树数。
+    LineageTreeNode,
     CentralMappingTreeNode,
     TreeTableUnit,
     InstanceTableUnit,
@@ -29,13 +35,16 @@ pub enum WrittenStructureKind {
 impl WrittenStructureKind {
     /// 报数的次序：单元按 bump 次序（实例表单元在末尾，同 `TransactionOutput::units`），固定结构按持久顺序（D16（发布语义） 已定项 7）。
     /// 合计不经过这张清单（`WritesByStructureKind::total` 只从记过的账里加）：清单漏一种，报出的各种之和就对不上合计。
-    pub const IN_REPORT_ORDER: [WrittenStructureKind; 12] = [
+    pub const IN_REPORT_ORDER: [WrittenStructureKind; 15] = [
         WrittenStructureKind::DataUnit,
         WrittenStructureKind::ExtentTreeNode,
         WrittenStructureKind::InodeTreeLeafContainer,
         WrittenStructureKind::InodeTreeRoot,
         WrittenStructureKind::AllocationRecordTreeNode,
         WrittenStructureKind::AccountingTreeNode,
+        WrittenStructureKind::DeletedInodesTreeNode,
+        WrittenStructureKind::TombstoneTreeNode,
+        WrittenStructureKind::LineageTreeNode,
         WrittenStructureKind::CentralMappingTreeNode,
         WrittenStructureKind::TreeTableUnit,
         WrittenStructureKind::InstanceTableUnit,
@@ -60,6 +69,18 @@ impl WrittenStructureKind {
             // 多层之后根之下的节点与根同一种：按树数，不按层数（增补 1 的账按结构种类记）。
             TransactionUnit::AccountingTreeNodeBelowTheRoot(_)
             | TransactionUnit::AccountingTree => WrittenStructureKind::AccountingTreeNode,
+            TransactionUnit::DeletedInodesRoot => WrittenStructureKind::DeletedInodesTreeNode,
+            TransactionUnit::TombstoneLeafContainer(_) | TransactionUnit::TombstoneRoot => {
+                WrittenStructureKind::TombstoneTreeNode
+            }
+            TransactionUnit::LineageLeafContainer(_) | TransactionUnit::LineageRoot => {
+                WrittenStructureKind::LineageTreeNode
+            }
+            // 根满长高之后根之下的码 2 节点与根同一种：按树数，不按层数。
+            TransactionUnit::TombstoneNodeBelowTheRoot(_) => {
+                WrittenStructureKind::TombstoneTreeNode
+            }
+            TransactionUnit::LineageNodeBelowTheRoot(_) => WrittenStructureKind::LineageTreeNode,
             TransactionUnit::MappingTreeNodeBelowTheRoot(_) | TransactionUnit::MappingTree => {
                 WrittenStructureKind::CentralMappingTreeNode
             }
@@ -80,6 +101,9 @@ impl WrittenStructureKind {
             WrittenStructureKind::InodeTreeRoot => "inode_tree_root",
             WrittenStructureKind::AllocationRecordTreeNode => "allocation_record_tree_node",
             WrittenStructureKind::AccountingTreeNode => "accounting_tree_node",
+            WrittenStructureKind::DeletedInodesTreeNode => "deleted_inodes_tree_node",
+            WrittenStructureKind::TombstoneTreeNode => "tombstone_tree_node",
+            WrittenStructureKind::LineageTreeNode => "lineage_tree_node",
             WrittenStructureKind::CentralMappingTreeNode => "central_mapping_tree_node",
             WrittenStructureKind::TreeTableUnit => "tree_table_unit",
             WrittenStructureKind::InstanceTableUnit => "instance_table_unit",
@@ -253,6 +277,9 @@ mod tests {
             TransactionUnit::InodeRoot,
             TransactionUnit::AllocationTree,
             TransactionUnit::AccountingTree,
+            TransactionUnit::DeletedInodesRoot,
+            TransactionUnit::TombstoneRoot,
+            TransactionUnit::LineageRoot,
             TransactionUnit::MappingTree,
             TransactionUnit::TreeTable,
             TransactionUnit::InstanceTable,
@@ -275,7 +302,7 @@ mod tests {
             assert_eq!(
                 every_kind_once.of(kind).write_calls,
                 1,
-                "{kind:?}：九个单元角色各归一种、三种固定结构各一种，每种恰好一笔"
+                "{kind:?}：十二个单元角色各归一种、三种固定结构各一种，每种恰好一笔"
             );
         }
         let reported = WrittenStructureKind::IN_REPORT_ORDER
@@ -291,10 +318,10 @@ mod tests {
         assert_eq!(
             every_kind_once.total(),
             WriteCallsAndBytes {
-                write_calls: 12,
-                written_bytes: 4095
+                write_calls: 15,
+                written_bytes: 32767
             },
-            "十二笔，长度 1 到 2048 各一次"
+            "十五笔，长度 1 到 16384 各一次"
         );
         let mut names: Vec<&str> = WrittenStructureKind::IN_REPORT_ORDER
             .iter()
@@ -302,6 +329,6 @@ mod tests {
             .collect();
         names.sort_unstable();
         names.dedup();
-        assert_eq!(names.len(), 12, "结果行的字段名前缀互不相同");
+        assert_eq!(names.len(), 15, "结果行的字段名前缀互不相同");
     }
 }

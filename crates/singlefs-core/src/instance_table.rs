@@ -9,7 +9,7 @@
 use crate::address::{CheckpointTxg, InstanceGeneration, TreeIdentifier};
 use crate::bytes::{ByteReader, ByteWriter};
 use crate::make_filesystem::instance_table_chain_record;
-use crate::pointer::NodePointer;
+use crate::pointer::{NodePointer, PointerHeadFieldsJudgement};
 use crate::transaction::TREE_IDENTIFIER_NONE;
 use crate::unit::{parse_packed_unit, PackedIdentity, PACKED_TYPE_INSTANCE_TABLE};
 use singlefs_format::{INSTANCE_ROW_BYTES, INSTANCE_TABLE_PAGE_RECORDS, NODE_POINTER_BYTES};
@@ -189,9 +189,24 @@ impl InstanceTableChainRecord {
     }
 
     /// 解一条链指针记录。宽不是 88、`kind` 不是 1、「有无下一片」不是 0 或 1、无下一片而位置指针不全零（条款：清零占位）、
-    /// 有下一片而位置指针全零（指不到任何地方），都是 `None`。
+    /// 有下一片而位置指针全零（指不到任何地方）、有下一片而位置指针头部有一段不是第一版的取值（MAC / nonce、算法类型、压缩算法码与
+    /// 压后长度、extent 偏移：D19（块指针的结构与宽度预算） 已定项 3、D9（加密） 已定项 14、C581（extent 偏移非 0 没有判据），
+    /// 判该指针所在的结构——这一片——损坏），都是 `None`。
     #[must_use]
     pub fn parse(bytes: &[u8]) -> Option<Self> {
+        Self::parse_with_pointer_head_fields_judgement(
+            bytes,
+            PointerHeadFieldsJudgement::JudgedAsTheStructureIsCorruptOutsideTheFirstVersion,
+        )
+    }
+
+    /// 同 [`Self::parse`]，链指针头部第一版之外的取值判不判由读者定：沿链读整张表的判，影子账认链上各片的不判
+    /// （[`PointerHeadFieldsJudgement::NotJudgedByTheShadowLedger`]：多隔离、不漏隔离）。
+    #[must_use]
+    pub fn parse_with_pointer_head_fields_judgement(
+        bytes: &[u8],
+        pointer_head_fields: PointerHeadFieldsJudgement,
+    ) -> Option<Self> {
         if bytes.len() != usize::try_from(INSTANCE_ROW_BYTES).expect("88")
             || bytes[0] != INSTANCE_ROW_KIND_CHAIN
         {
@@ -202,12 +217,17 @@ impl InstanceTableChainRecord {
             .all(|byte| *byte == 0);
         match bytes[1] {
             CHAIN_RECORD_NO_NEXT_PAGE => pointer_is_zero.then_some(Self::LastPage),
-            CHAIN_RECORD_HAS_NEXT_PAGE => (!pointer_is_zero).then(|| {
-                Self::NextPage(NodePointer::read_from(&mut ByteReader::at(
-                    bytes,
-                    CHAIN_RECORD_POINTER_OFFSET,
-                )))
-            }),
+            CHAIN_RECORD_HAS_NEXT_PAGE => {
+                if pointer_is_zero {
+                    return None;
+                }
+                NodePointer::read_with_head_fields_judgement_from(
+                    &mut ByteReader::at(bytes, CHAIN_RECORD_POINTER_OFFSET),
+                    pointer_head_fields,
+                )
+                .ok()
+                .map(Self::NextPage)
+            }
             _value_the_field_table_does_not_register => None,
         }
     }
@@ -223,14 +243,32 @@ pub struct InstanceTablePage {
 impl InstanceTablePage {
     /// 把一个单元当链上第 `page_index` 片解出来。单元解不开、身份四元组不是 (0, 4, 片序号, 0)（指针指到了别的单元，
     /// 或链的次序乱了、成了环）、最后一条不是合法的链指针记录、它前面有行之外的记录，都是 `None`。
+    /// 链指针头部第一版之外的取值按走读那一种判（[`InstanceTableChainRecord::parse`]）。
     #[must_use]
     pub fn parse(unit_bytes: &[u8], page_index: InstanceTablePageIndex) -> Option<Self> {
+        Self::parse_with_chain_pointer_head_fields_judgement(
+            unit_bytes,
+            page_index,
+            PointerHeadFieldsJudgement::JudgedAsTheStructureIsCorruptOutsideTheFirstVersion,
+        )
+    }
+
+    /// 同 [`Self::parse`]，链指针头部第一版之外的取值判不判由读者定（[`InstanceTableChainRecord::parse_with_pointer_head_fields_judgement`]）。
+    #[must_use]
+    pub fn parse_with_chain_pointer_head_fields_judgement(
+        unit_bytes: &[u8],
+        page_index: InstanceTablePageIndex,
+        chain_pointer_head_fields: PointerHeadFieldsJudgement,
+    ) -> Option<Self> {
         let unit = parse_packed_unit(unit_bytes).ok()?;
         if unit.identity != page_index.packed_identity() {
             return None;
         }
         let (last, rows_bytes) = unit.records.split_last()?;
-        let chain = InstanceTableChainRecord::parse(last)?;
+        let chain = InstanceTableChainRecord::parse_with_pointer_head_fields_judgement(
+            last,
+            chain_pointer_head_fields,
+        )?;
         let mut rows = Vec::with_capacity(rows_bytes.len());
         for bytes in rows_bytes {
             rows.push(InstanceRow::parse(bytes)?);
