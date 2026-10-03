@@ -1,0 +1,36 @@
+## 主 无前缀 改名拷贝 start cargo test --all
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash /tmp/claude-1000/tooling-detached-run-r2-sonnet/probe/renamed-copy.sh start --label p -- cargo test --all
+   bash: rc=0  
+   heavy: rc=0  
+## 主 无前缀 真名 start cargo test --all
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash research/scripts/detached-run.sh start --label p -- cargo test --all
+   bash: rc=0  
+   heavy: rc=2  ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+## 主 无前缀 直接 cargo test --all
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: cargo test --all
+   bash: rc=0  
+   heavy: rc=2  ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+## 主 无前缀 multi-host-run --peer -- cargo test --all
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash research/scripts/multi-host-run.sh --peer -- cargo test --all
+   bash: rc=0  
+   heavy: rc=0  
+## 主 无前缀 bash -c 里 cargo test --all
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash -c 'cargo test --all'
+   bash: rc=0  
+   heavy: rc=2  ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+## 主 无前缀 自己写个 wrapper.sh 里 cargo test --all 再 bash 它
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: printf 'cargo test --all
+' > /tmp/claude-1000/tooling-detached-run-r2-sonnet/probe/w.sh && bash /tmp/claude-1000/tooling-detached-run-r2-sonnet/probe/w.sh
+   bash: rc=0  
+   heavy: rc=0  ! heavy-test-guard.sh：bash / sh 起的脚本 /tmp/claude-1000/tooling-detached-run-r2-sonnet/probe/w.sh 不存在，里面的命令没判；这条命令照常执行，记了一条检出
+## 主 无前缀 xargs cargo test --all
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: echo | xargs cargo test --all
+   bash: rc=0  
+   heavy: rc=0  

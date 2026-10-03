@@ -1,0 +1,27 @@
+watch 退 124
+  == 第 1 次
+  == 第 2 次
+  == 第 3 次
+  · 还在跑  u1  单元 singlefs-detached-r3u1-am.service（active）  主进程 4242  命令进程 1  起�
+  == 第 4 次
+  == 第 5 次
+  == 第 6 次
+  · 还在跑  u1  单元 singlefs-detached-r3u1-am.service（active）  主进程 4242  命令进程 1  起�
+  == 第 7 次
+  == 第 8 次
+  == 第 9 次
+  ! 报警  u1  单元 singlefs-detached-r3u1-am.service：连续 3 次查不到单元状态（用户级 syste
+  == 第 10 次
+  ! 报警  u1  单元 singlefs-detached-r3u1-am.service：连续 4 次查不到单元状态（用户级 syste
+  == 第 11 次
+  · 还在跑  u1  单元 singlefs-detached-r3u1-am.service（active）  主进程 4242  命令进程 1  起�
+  == 第 12 次
+  · 还在跑  u1  单元 singlefs-detached-r3u1-am.service（active）  主进程 4242  命令进程 1  起�
+  == 第 13 次
+  · 还在跑  u1  单元 singlefs-detached-r3u1-am.service（active）  主进程 4242  命令进程 1  起�
+  == 第 14 次
+  · 还在跑  u1  单元 singlefs-detached-r3u1-am.service（active）  主进程 4242  命令进程 1  起�
+  == 第 15 次
+  · 还在跑  u1  单元 singlefs-detached-r3u1-am.service（active）  主进程 4242  命令进程 1  起�
+  · 还在跑  u1  单元 singlefs-detached-r3u1-am.service（active）  主进程 4242  命令进程 1  起�
+--- 查询次数与计划：16 次

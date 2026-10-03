@@ -11,7 +11,7 @@
 为了让本报告的引用可复核，我把 2026-09-27 当时的 `gate.sh` 拷成只读副本：
 `/tmp/claude-1000/three-way-forward/verification-split-r1/gate.sh.pinned`（`sha256sum` `1a3140c0de61812336b103a1666ce93196f0f0742a7dd4e6fdde7517c2a42bde`），
 下面凡引 `gate.sh` 的行号，都是这份 pinned 副本里现 `grep -n` 出来的行号，不是快照、也不是此刻工作区的行号。
-`.claude/gate.d/54-layer0-replay.sh` 与其余 Q5 引用的 agent 定义、`.claude/rules/implementation-workflow.md`、
+`.claude/gate.d/checker-tier-layer0-replay.sh` 与其余 Q5 引用的 agent 定义、`.claude/rules/implementation-workflow.md`、
 `.claude/kb/decisions/13-验证路线.md` 在写作这段时间内 `sha256sum` 与快照一致（逐个现查过，见下），行号按现在的工作区文件给。
 
 **推翻条件**：若有人在这份 pinned 副本之后又改了 `gate.sh` 里 `drain_not_run_side_channel`、
@@ -37,20 +37,20 @@
 
 ### 3.2 单跑（`GATE_NOT_RUN_FILE` 不在）时，有没有别的东西告诉人全量没跑
 
-**判绿的观测**（都在 `.claude/gate.d/54-layer0-replay.sh`，现查 `sha256sum` 与快照一致：`dc52e32e4ceae64a7514655b18be054617e5878dcaa22008eae6d7c5928f7433`）：
+**判绿的观测**（都在 `.claude/gate.d/checker-tier-layer0-replay.sh`，现查 `sha256sum` 与快照一致：`dc52e32e4ceae64a7514655b18be054617e5878dcaa22008eae6d7c5928f7433`）：
 
-- `echo "  ! ${#missing_cases[@]} 条崩溃枚举用例没有作数的全绿标记，全量这一轮没跑，记「本次未跑」、不判红（全量默认不在提交时跑，D13 已定项 15）：${missing_cases[*]}"`（`.claude/gate.d/54-layer0-replay.sh:447`）
-- `echo "     → 要跑全量（用户要求或夜间）：暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>"`（`.claude/gate.d/54-layer0-replay.sh:453`）
-- `if [[ -n "${GATE_NOT_RUN_FILE:-}" ]]; then`（`.claude/gate.d/54-layer0-replay.sh:456`）：这一段守卫只包住往 `GATE_NOT_RUN_FILE` 里写那几行（458 行 `echo "崩溃枚举用例 ${missing_case} 这批输入没有作数的全绿标记，全量没跑（要跑：54 号 --full）" >> "$GATE_NOT_RUN_FILE"`），**不包住** 447、453 两行——447、453 两行在 `if (( ${#missing_cases[@]} > 0 ))` 这个更外层的判断里（440 行左右开始），跟 `GATE_NOT_RUN_FILE` 变量在不在无关，单跑（`bash .claude/gate.d/54-layer0-replay.sh`，不经 `gate.sh`）时这个变量确实不会被设置，但只要有登记的用例缺当次有效标记，447 行的 `!` 与 453 行的 `→` 照样会打到标准输出。
+- `echo "  ! ${#missing_cases[@]} 条崩溃枚举用例没有作数的全绿标记，全量这一轮没跑，记「本次未跑」、不判红（全量默认不在提交时跑，D13 已定项 15）：${missing_cases[*]}"`（`.claude/gate.d/checker-tier-layer0-replay.sh:447`）
+- `echo "     → 要跑全量（用户要求或夜间）：暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>"`（`.claude/gate.d/checker-tier-layer0-replay.sh:453`）
+- `if [[ -n "${GATE_NOT_RUN_FILE:-}" ]]; then`（`.claude/gate.d/checker-tier-layer0-replay.sh:456`）：这一段守卫只包住往 `GATE_NOT_RUN_FILE` 里写那几行（458 行 `echo "崩溃枚举用例 ${missing_case} 这批输入没有作数的全绿标记，全量没跑（要跑：54 号 --full）" >> "$GATE_NOT_RUN_FILE"`），**不包住** 447、453 两行——447、453 两行在 `if (( ${#missing_cases[@]} > 0 ))` 这个更外层的判断里（440 行左右开始），跟 `GATE_NOT_RUN_FILE` 变量在不在无关，单跑（`bash .claude/gate.d/checker-tier-layer0-replay.sh`，不经 `gate.sh`）时这个变量确实不会被设置，但只要有登记的用例缺当次有效标记，447 行的 `!` 与 453 行的 `→` 照样会打到标准输出。
 
 **结论**：单跑时确实有 `!` 与 `→` 两行告诉人「全量这一轮没跑」，与判据表「判绿的观测」逐句对得上。**分类：兑现了条款**。
 **什么现象会推翻它**：把 447、453 两行也挪进 456 行那个 `if [[ -n "${GATE_NOT_RUN_FILE:-}" ]]` 块里，单跑时这两行就不会再打印，届时判定要改判红。
 
 ### 3.3 有没有一条路让 54 号退 0 而汇总里既没有「本次未跑」也没有「未实现」
 
-**判红的观测**（同一份 `54-layer0-replay.sh`，逻辑复核，未实际起跑 `cargo test`——起跑属于重型测试，子 agent 不跑，正推腿按代码推理即可，属于「正推：从代码推到结论」）：
+**判红的观测**（同一份 `checker-tier-layer0-replay.sh`，逻辑复核，未实际起跑 `cargo test`——起跑属于重型测试，子 agent 不跑，正推腿按代码推理即可，属于「正推：从代码推到结论」）：
 
-`missing_cases` 数组只在循环体里两处 `continue` 之前被追加（426、438 行附近，对应「算不出指纹」与「没有作数的全绿标记」两种情形）。如果 `.claude/gate.d/stage-inputs.tsv` 里登记的每一条 `crash-case:` 行，这一批输入的指纹都能在 `git common-dir` 里找到一份**此前某次 `--full` 跑**留下的、当次仍然作数的全绿标记（`crash-case-marker-check` 判绿），`missing_cases` 就会是空数组：`(( ${#missing_cases[@]} > 0 ))`（`.claude/gate.d/54-layer0-replay.sh:446`）为假，447–460 行那一整段（`!` 行、`GATE_NOT_RUN_FILE` 写入、`→` 出路）**一行都不会执行**；脚本继续跑到 462–464 行打印 `✓` 并 `exit 0`。回到 `gate.sh.pinned`：`STAGE_REPORTED_NOT_RUN` 全程是 0，`stage_rc` 是 0，`stage_counts_as_coverage` 保持 1，`COVERED_BY[崩溃点重放]` 被写入（`gate.sh.pinned:674-675`）——汇总里「未实现」清单不会列出「崩溃点重放」，`NOT_RUN` 数组里也不会出现它。**这条路确实存在**，与判据表「判红的观测」字面成立。
+`missing_cases` 数组只在循环体里两处 `continue` 之前被追加（426、438 行附近，对应「算不出指纹」与「没有作数的全绿标记」两种情形）。如果 `.claude/gate.d/stage-inputs.tsv` 里登记的每一条 `crash-case:` 行，这一批输入的指纹都能在 `git common-dir` 里找到一份**此前某次 `--full` 跑**留下的、当次仍然作数的全绿标记（`crash-case-marker-check` 判绿），`missing_cases` 就会是空数组：`(( ${#missing_cases[@]} > 0 ))`（`.claude/gate.d/checker-tier-layer0-replay.sh:446`）为假，447–460 行那一整段（`!` 行、`GATE_NOT_RUN_FILE` 写入、`→` 出路）**一行都不会执行**；脚本继续跑到 462–464 行打印 `✓` 并 `exit 0`。回到 `gate.sh.pinned`：`STAGE_REPORTED_NOT_RUN` 全程是 0，`stage_rc` 是 0，`stage_counts_as_coverage` 保持 1，`COVERED_BY[崩溃点重放]` 被写入（`gate.sh.pinned:674-675`）——汇总里「未实现」清单不会列出「崩溃点重放」，`NOT_RUN` 数组里也不会出现它。**这条路确实存在**，与判据表「判红的观测」字面成立。
 
 **但这条路不是漏洞，是设计内的复用**：它触发的前提是「全部登记用例已经有一份对得上当前输入指纹的全量绿标记」——即某一次 `--full` 真的跑过、而且从那之后代码与输入都没变。这正是 `.claude/rules/verification.md`「全量 | 54 号 `--full`：在 HEAD + 暂存区的 worktree 里逐条跑登记的崩溃枚举用例（`--include-ignored --exact`），那一格全绿标记在就复用」（`.claude/rules/verification.md:33`，行号取自快照副本 `/tmp/claude-1000/three-way-forward/verification-split-r1/verification.md`，因工作区这份已被另一会话改动，`sha256sum` 与快照不一致，见附录清单说明）与 D13（验证路线） 已定项 15「checker 档自己分两档：**快档**是 `cargo test --release -p singlefs-checker` 不带 `--ignored`……**全量**是登记在 `.claude/gate.d/stage-inputs.tsv` 键为 `crash-case:` 的用例逐条 `--include-ignored --exact`……提交时不默认跑，由用户要求或夜间跑」（`.claude/kb/decisions/13-验证路线.md:318`）明写的复用机制——「未实现清单里不出现」对应的是「这批输入真的已经被验过」，不是「什么都没做就声称覆盖」。
 
@@ -146,7 +146,7 @@
 | 格 | 判定 | 一句话 |
 |---|---|---|
 | Q3.1 覆盖算不算 | 兑现了条款 | `gate.sh.pinned:214/219/668/674-675` 逐句证实：报过「本次未跑」的 54 号不算覆盖 `# gate-covers: 崩溃点重放` |
-| Q3.2 单跑有没有告知 | 兑现了条款 | `54-layer0-replay.sh:447/453` 的 `!`/`→` 不受 `GATE_NOT_RUN_FILE` 守卫限制，单跑照样打印 |
+| Q3.2 单跑有没有告知 | 兑现了条款 | `checker-tier-layer0-replay.sh:447/453` 的 `!`/`→` 不受 `GATE_NOT_RUN_FILE` 守卫限制，单跑照样打印 |
 | Q3.3 有没有退 0 且两样都不报的路 | 有这条路，但是设计内的复用 | 全部登记用例已有当次有效全绿标记时，54 号退 0 且计入覆盖；这是 D13 已定项 15／verification.md 明写的「逐条按输入复用」，不是漏洞；`crash_case_rows` 为空这一支路径「没量到」 |
 | Q5 六份定义有没有自相矛盾 | 兑现了条款 | 逐句核对 main-agent.md/crash-verifier.md/gate-triage.md/implementation-writer.md/agent-common.md/implementation-workflow.md，没有一句要求每次提交跑层 0 全量，也没有一句按名字含 `layer0` 判 |
 | Q7.1 已定项 4/5/7 与 15 | 兑现了条款 | 三项正交或互相点名印证，没有互相否定的句子 |

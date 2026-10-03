@@ -1,0 +1,50 @@
+## 主 start 内层 & wait 合法
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m1 -- bash -c 'a & b & wait'
+   bash: rc=0  
+   heavy: rc=0  
+## 主 start 内层 & disown 应拒
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m1 -- bash -c 'a & disown'
+   bash: rc=2  ✗ 把活放出了追踪（认出的写法：disown）：进程移出 shell 的作业表或另起会话，随后的 wait 立刻返回、完成通知当场发出，它跑完不会叫醒任何人，成了没人追踪的孤儿
+   heavy: rc=0  
+## 主 start --stop-timeout 600 内层 disown 应拒
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m1 --stop-timeout 600 -- bash -c 'a & disown'
+   bash: rc=2  ✗ 把活放出了追踪（认出的写法：disown）：进程移出 shell 的作业表或另起会话，随后的 wait 立刻返回、完成通知当场发出，它跑完不会叫醒任何人，成了没人追踪的孤儿
+   heavy: rc=0  
+## 主 start --log 先于 --label
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --log /tmp/x.log --label m1 -- bash -c 'a & disown'
+   bash: rc=2  ✗ 把活放出了追踪（认出的写法：disown）：进程移出 shell 的作业表或另起会话，随后的 wait 立刻返回、完成通知当场发出，它跑完不会叫醒任何人，成了没人追踪的孤儿
+   heavy: rc=0  
+## 主 start --label= 形式 内层 setsid -f 应拒
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label=m1 -- setsid -f sleep 100
+   bash: rc=2  ✗ 把活放出了追踪（认出的写法：setsid -f）：进程移出 shell 的作业表或另起会话，随后的 wait 立刻返回、完成通知当场发出，它跑完不会叫醒任何人，成了没人追踪的孤儿
+   heavy: rc=0  
+## 主 start 内层 pkill -f 应拒
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m1 -- pkill -f cargo
+   bash: rc=2  ✗ 终止进程的写法打得到不是自己点名的那一个进程（pkill 按名字挑进程发信号：一次命中一批，别的会话起的同名进程也算（bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m1 -- pkil
+   heavy: rc=0  
+## 主 前缀 nice cd 内层 systemd-run 应拒
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: cd /tmp && nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m1 -- systemd-run --user bash x.sh
+   bash: rc=2  ✗ 把活放出了追踪（认出的写法：systemd-run（不带 --wait / --pipe / --pty / --scope））：进程移出 shell 的作业表或另起会话，随后的 wait 立刻返回、完成通知当场发出，它跑完不会叫醒任何人，成了没人追踪的孤儿
+   heavy: rc=0  ! heavy-test-guard.sh：bash / sh 起的脚本 /tmp/x.sh 不存在，里面的命令没判；这条命令照常执行，记了一条检出
+## 主 start 内层带 research/results 覆盖(仓外副本不判)
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m1 -- bash -c 'echo a > research/results/x.out'
+   bash: rc=0  
+   heavy: rc=0  
+## 主 start 内层 python 里 nohup
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m1 -- nohup python3 x.py
+   bash: rc=0  
+   heavy: rc=0  
+## 主 start 内层 timeout 套 python
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m1 -- timeout 3600 python3 x.py
+   bash: rc=0  
+   heavy: rc=0  

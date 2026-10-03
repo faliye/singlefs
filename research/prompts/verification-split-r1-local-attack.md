@@ -94,7 +94,7 @@ TASK for Part Two (item 15 of your answer): using only Rule Block One and Rule B
 16. cargo test --release -p singlefs-checker -- --include-ignored --exact full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean
 17. ./target/release/deps/first_transaction_step_seven_layer0-0123456789abcdef
 18. ./target/debug/deps/second_transaction_step_one_overwrite-0123456789abcdef
-19. bash .claude/gate.d/54-layer0-replay.sh
+19. bash .claude/gate.d/checker-tier-layer0-replay.sh
 20. bash .claude/gate.d/74-model-differential.sh
 21. cargo test -p singlefs-checker -- --list
 22. cargo test -p singlefs-format

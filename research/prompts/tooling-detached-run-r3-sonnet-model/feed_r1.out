@@ -1,0 +1,6 @@
+clerk 真名 start	detector=2	heavy=0
+clerk source	detector=0	heavy=0
+clerk .	detector=0	heavy=0
+clerk cp 改名再起	detector=0	heavy=0
+主agent 无前缀 改名拷贝 全量	detector=0	heavy=0
+clerk 改名拷贝 全量	detector=0	heavy=0

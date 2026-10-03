@@ -1,0 +1,62 @@
+== feed.py tree cases-g3.json（U2③ G3 摘 --force 的变体；原样）
+C0 对照：-- 之后先写 --force（G3 修的那一格）	agent=main	bash=0	heavy=2
+    heavy rc=2: ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+C1 对照：-- 之后写合法变量名的 名=值	agent=main	bash=0	heavy=2
+    heavy rc=2: ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+E1 -- 之后先写 --force=1（env 把它当 名=值，照跑后面那条）	agent=main	bash=0	heavy=0
+E2 -- 之后先写 1=1	agent=main	bash=0	heavy=0
+E3 -- 之后先写 a-b=1	agent=main	bash=0	heavy=0
+E4 -- 之后先写 --force=1，里面 setsid -f	agent=main	bash=0	heavy=0
+E5 -- 之后先写 a.b=1，里面 bash -c 后台 disown	agent=main	bash=0	heavy=0
+E6 子 agent 版：-- 之后 --force=1 跑 checker 档（start 本身子 agent 就拒，对照）	agent=clerk	bash=2	heavy=0
+    bash rc=2: ✗ clerk 用 research/scripts/detached-run.sh 起或停脱离会话的长跑（认出的调用：research/scripts/detached-run.sh start --label p）：这个入口只给主 agent，经它起的活不在你的进程树里，你交回之后没人认领
+Q1 $'--force'	agent=main	bash=0	heavy=0
+Q2 {--force,} 花括号	agent=main	bash=0	heavy=0
+Q3 --for''ce	agent=main	bash=0	heavy=2
+    heavy rc=2: ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+Q4 \--force	agent=main	bash=0	heavy=2
+    heavy rc=2: ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+Q5 "--force"	agent=main	bash=0	heavy=2
+    heavy rc=2: ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+Q6 变量 F=--force; $F	agent=main	bash=0	heavy=0
+Q7 --log --force -- -- （第二轮那一格）	agent=main	bash=0	heavy=2
+    heavy rc=2: ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+Q8 --label=p 后 -- --force	agent=main	bash=0	heavy=2
+    heavy rc=2: ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+Q9 --force 在子命令前与 -- 之后各一个	agent=main	bash=0	heavy=2
+    heavy rc=2: ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+S1 命令文本里写 LIB_SHELL_WORDS_BREAK 前缀（开关只读钩子自己的环境）	agent=main	bash=0	heavy=2
+    heavy rc=2: ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+S2 命令文本里写 export 再起	agent=main	bash=0	heavy=2
+    heavy rc=2: ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+S3 子 agent 命令文本里写 COPY_BY_CP_LN 前缀再 install 拷贝起	agent=clerk	bash=2	heavy=0
+    bash rc=2: ✗ clerk 用 research/scripts/detached-run.sh 起或停脱离会话的长跑（认出的调用：/tmp/opusr3-dr.sh（这条命令里前面拷出来的 research/scripts/detached-run.sh） start --label m）：这个入口只给主 agent，经它起的活
+    heavy rc=0: ! heavy-test-guard.sh：bash / sh 起的脚本 /tmp/opusr3-dr.sh 不存在，里面的命令没判；这条命令照常执行，记了一条检出
+S4 子 agent export START_DIRECTORY 后 cd 起相对路径拷贝	agent=clerk	bash=2	heavy=0
+    bash rc=2: ✗ clerk 用 research/scripts/detached-run.sh 起或停脱离会话的长跑（认出的调用：./opusr3-dr2.sh（这条命令里前面拷出来的 research/scripts/detached-run.sh） start --label m）：这个入口只给主 agent，经它起的活不在
+S5 主 agent 命令文本里写 HEREDOC 开关前缀，heredoc 写出带签名行的拷贝再起全量	agent=main	bash=0	heavy=2
+    heavy rc=2: ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+
+== feed.py tree cases-g3-generic.json（直接命令，不经 detached-run；证明是共用切词的盲区）
+G1 直接 env -- a-b=1 cargo test --all	agent=main	bash=0	heavy=0
+G2 直接 env a-b=1 cargo test --all	agent=main	bash=0	heavy=0
+G3 直接 env -- --force=1 cargo test --all	agent=main	bash=0	heavy=2
+    heavy rc=2: ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+G4 直接 $'cargo' test --all	agent=main	bash=0	heavy=0
+G5 直接 {cargo,} test --all	agent=main	bash=0	heavy=0
+G6 直接 cargo test $'--all'	agent=main	bash=0	heavy=0
+G7 直接 env -- FOO=1 cargo test --all（对照）	agent=main	bash=0	heavy=2
+    heavy rc=2: ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+
+== model-g3-env-assignment.sh（单元里 exec env -- "$@" 把带 = 的词当赋值、照跑后面那条）
+命令开头 --force=1：单元那个 bash 退 0；登记 exit=0；后面那条（touch marker）跑没跑：跑了；日志：
+命令开头 1=1：单元那个 bash 退 0；登记 exit=0；后面那条（touch marker）跑没跑：跑了；日志：
+命令开头 a-b=1：单元那个 bash 退 0；登记 exit=0；后面那条（touch marker）跑没跑：跑了；日志：
+命令开头 a.b=1：单元那个 bash 退 0；登记 exit=0；后面那条（touch marker）跑没跑：跑了；日志：
+命令开头 FOO=1：单元那个 bash 退 0；登记 exit=0；后面那条（touch marker）跑没跑：跑了；日志：
+
+== model-u3-list-scale-and-noise.sh 10 100 1000（U3 list 规模与自证噪声）
+甲 登记 10 条：list 退 0（最后一条命令），用时 .115370548 秒，输出 31 行 2855 字节
+甲 登记 100 条：list 退 0（最后一条命令），用时 .764608260 秒，输出 301 行 26732 字节
+甲 登记 1000 条：list 退 0（最后一条命令），用时 8.669359530 秒，输出 3001 行 270839 字节
+乙 登记 0 条、别的会话自证 25 个单元：「登记里没有」25 行；末行：  ✓ detached-run.sh list：还在跑、没结束的 0 条，已结束 0 条，没留退出码 0 条，登记写不进 

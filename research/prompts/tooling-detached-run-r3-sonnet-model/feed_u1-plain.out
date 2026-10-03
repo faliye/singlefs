@@ -1,0 +1,9 @@
+G3 判决点名样本 -- 之后 --force 全量	detector=0	heavy=2
+G3 带前缀 user-request 放行对照	detector=0	heavy=0
+G3 --label 值位置 --force	detector=0	heavy=2
+G3 --force 在最前	detector=0	heavy=2
+G3 --force=1 不是整词	detector=0	heavy=0
+G3 -- -- --force	detector=0	heavy=0
+G3 引号里的 --force	detector=0	heavy=2
+对照 无前缀 全量 cargo（无 detached）	detector=0	heavy=2
+对照 主 agent 真名 start sleep	detector=0	heavy=0

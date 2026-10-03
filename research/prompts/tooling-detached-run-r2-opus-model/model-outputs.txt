@@ -1,0 +1,65 @@
+# 模型原样输出（不起单元的那几份，本腿跑的；脚本参数都是 /tmp/claude-1000/tooling-detached-run-r2-opus/new/research/scripts/detached-run.sh，即冻结副本那一份）
+
+## w1.out
+watch 退出码 0；替身单元仍 active：active
+  ✓ detached-run.sh list：还在跑、没结束的 1 条，已结束 0 条，没留退出码 0 条，查不到 0 条，没起成 0 条；登记里没有的单元 0 个（登记 1 条，登记目录 /tmp/opusr2-w1.sREpOf/state）
+  · 登记里没有  单元 singlefs-detached-opusr2w1.service（loaded / active / running）：它的登记被删了、或在别的登记目录里；detached-run.sh 停不到它，看它用 systemctl --user status singlefs-detached-opusr2w1.service，怎么停交主 agent 判断
+  ✓ detached-run.sh list：还在跑、没结束的 0 条，已结束 0 条，没留退出码 0 条，查不到 0 条，没起成 0 条；登记里没有的单元 1 个（登记 0 条，登记目录 /tmp/opusr2-w1.sREpOf/state）
+  · opusr2w1 没留退出码（单元已不在：主进程被 KILL、用户级 systemd 退出或机器重启）（之后同名又起过一次，这一次的登记挪到了 /tmp/opusr2-w1.sREpOf/state/opusr2w1@1790821017）
+  ✓ detached-run.sh watch：观察到的 1 条都结束了，各自的退出码在上面
+
+## w2.out
+watch 退 0；替身单元：active
+  · 没起成  opusr2w2  单元 singlefs-detached-opusr2w2.service：2026-10-01 systemd-run 退 1，命令一行都没跑  起跑 2026-10-0
+  ✓ detached-run.sh watch：开跑时就没有还在跑的，观察到 0 条
+
+## f4.out
+== 1 不设开关（对照）
+  · 查不到  opusr2f4  单元 singlefs-detached-opusr2f4.service：systemctl --user show 失败（用户级
+      日志最后一行：/tmp/claude-1000/tooling-detached-run-r2-opus/opusr2-f4.O2ep60/state/opusr2f4/log
+  ✓ detached-run.sh list：还在跑、没结束的 0 条，已结束 0 条，没留退出码 0 条，查不
+   退 0
+== 2 设开关、不带令牌（F4 的拒）
+  ✗ DETACHED_RUN_BREAK=query-failure-as-gone 设在 --selftest 之外：弄坏开关只在自证起的进程
+   退 4
+== 3 设开关、自己造令牌
+  · 没留退出码  opusr2f4  单元 singlefs-detached-opusr2f4.service 已不在：主进程被 KILL、用�
+      日志最后一行：/tmp/claude-1000/tooling-detached-run-r2-opus/opusr2-f4.O2ep60/state/opusr2f4/log
+  ✓ detached-run.sh list：还在跑、没结束的 0 条，已结束 0 条，没留退出码 1 条，查不
+   退 0
+
+## v3w.out
+== 甲
+单元那个 bash 退 3；登记里：command log log.txt pid runner-pid started started-date unit ；它的报错：detached-run-runner: line 6: /tmp/claude-1000/tooling-detached-run-r2-opus/opusr2-v3w.LjA61O/state/opusr2v3a/.ended.tmp: Permission denied detached-run-runner: 
+  · 没留退出码  opusr2v3a  单元 singlefs-detached-opusr2v3a.service 已不在（ActiveState=inactive）：主进程被 KILL、用户级 system
+  ✓ detached-run.sh list：还在跑、没结束的 0 条，已结束 0 条，没留退出码 1 条，查不到 0 条，没起成 0 条；登记里�
+== 乙
+单元那个 bash 退 1；登记里 pid：没有  exit：1；命令跑没跑（marker）：没跑；它的报错：detached-run-runner: line 4: /tmp/claude-1000/tooling-detached-run-r2-opus/opusr2-v3w.LjA61O/ro/run.log: Permission denied 
+start 回读（照第 414–419 行）：✓ 起了…命令进程 （已经跑完），退 0
+
+## v3-scale-10.out
+N=10 类=ended list 退 0 耗时 121 ms 输出 33 行 4093 字节；末行：  ✓ detached-run.sh list：还在跑、没结束的 0 条，已结束 10 条，没留退出码 0 条，查不到 0 条
+N=10 类=vanished list 退 0 耗时 340 ms 输出 33 行 5293 字节；末行：  ✓ detached-run.sh list：还在跑、没结束的 0 条，已结束 0 条，没留退出码 10 条，查不到 0 条
+
+## v3-scale.out
+N=50 类=ended list 退 0 耗时 583 ms 输出 153 行 17093 字节；末行：  ✓ detached-run.sh list：还在跑、没结束的 0 条，已结束 50 条，没留退出码 0 条，查不到 0 条
+N=50 类=vanished list 退 0 耗时 457 ms 输出 153 行 23093 字节；末行：  ✓ detached-run.sh list：还在跑、没结束的 0 条，已结束 0 条，没留退出码 50 条，查不到 0 条
+N=200 类=ended list 退 0 耗时 1620 ms 输出 603 行 66249 字节；末行：  ✓ detached-run.sh list：还在跑、没结束的 0 条，已结束 200 条，没留退出码 0 条，查不到 0 �
+N=200 类=vanished list 退 0 耗时 2283 ms 输出 603 行 90249 字节；末行：  ✓ detached-run.sh list：还在跑、没结束的 0 条，已结束 0 条，没留退出码 200 条，查不到 0 �
+N=1000 类=ended list 退 0 耗时 11415 ms 输出 3003 行 329455 字节；末行：  ✓ detached-run.sh list：还在跑、没结束的 0 条，已结束 1000 条，没留退出码 0 条，查不到 0 �
+N=1000 类=vanished list 退 0 耗时 10264 ms 输出 3003 行 449455 字节；末行：  ✓ detached-run.sh list：还在跑、没结束的 0 条，已结束 0 条，没留退出码 1000 条，查不到 0 �
+
+## v4g.out
+== control
+watch 退 0
+  · 观察到的各条：
+  · opusr2g 退出码 0
+  ✓ detached-run.sh watch：观察到的 1 条都结束了，各自的退出码在上面
+== g-watch-skips-unknown
+watch 退 0
+  ✓ detached-run.sh watch：开跑时就没有还在跑的，观察到 0 条
+
+## watch 被 SIGKILL 之后它起的 sleep（--every 40）
+    PID    PPID COMMAND
+2481274 2481221 sleep 40
+kill -KILL 之后：PPID 变成 1，照活到 40 秒（本腿随后用 proc.py stop 停了它）

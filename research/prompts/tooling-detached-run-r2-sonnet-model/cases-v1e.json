@@ -1,0 +1,12 @@
+[
+ ["主 start 内层 & wait 合法", null, "bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m1 -- bash -c 'a & b & wait'"],
+ ["主 start 内层 & disown 应拒", null, "bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m1 -- bash -c 'a & disown'"],
+ ["主 start --stop-timeout 600 内层 disown 应拒", null, "bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m1 --stop-timeout 600 -- bash -c 'a & disown'"],
+ ["主 start --log 先于 --label", null, "bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --log /tmp/x.log --label m1 -- bash -c 'a & disown'"],
+ ["主 start --label= 形式 内层 setsid -f 应拒", null, "bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label=m1 -- setsid -f sleep 100"],
+ ["主 start 内层 pkill -f 应拒", null, "bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m1 -- pkill -f cargo"],
+ ["主 前缀 nice cd 内层 systemd-run 应拒", null, "cd /tmp && nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m1 -- systemd-run --user bash x.sh"],
+ ["主 start 内层带 research/results 覆盖(仓外副本不判)", null, "bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m1 -- bash -c 'echo a > research/results/x.out'"],
+ ["主 start 内层 python 里 nohup", null, "bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m1 -- nohup python3 x.py"],
+ ["主 start 内层 timeout 套 python", null, "bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m1 -- timeout 3600 python3 x.py"]
+]

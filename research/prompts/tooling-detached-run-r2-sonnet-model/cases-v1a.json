@@ -1,0 +1,17 @@
+[
+ ["基线 主agent 起 start", null, "bash research/scripts/detached-run.sh start --label m -- sleep 1"],
+ ["基线 子agent 起 start", "clerk", "bash research/scripts/detached-run.sh start --label m -- sleep 1"],
+ ["主agent worktree+主仓绝对路径+前缀", null, "cd /tmp/claude-1000/tooling-detached-run-r2-sonnet/wt && SINGLEFS_HEAVY_TESTS=user-request nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label bm-local-2026-10-01 --log /tmp/bm.log -- python3 research/scripts/broad-mutation.py --home /tmp/h"],
+ ["主agent 带日期label 无前缀 起 cargo test --all", null, "bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label bm-2026-10-01 -- cargo test --all"],
+ ["主agent 带日期label =commit 起 cargo test --all", null, "SINGLEFS_HEAVY_TESTS=commit bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label bm-2026-10-01 -- cargo test --all"],
+ ["主agent 无前缀 起 broad-mutation.py", null, "bash research/scripts/detached-run.sh start --label bm-x -- python3 research/scripts/broad-mutation.py --home /tmp/h"],
+ ["主agent 无前缀 起 multi-host-run --peer broad-mutation", null, "bash research/scripts/detached-run.sh start --label bm-peer -- bash research/scripts/multi-host-run.sh --peer -- python3 research/scripts/broad-mutation.py --home /tmp/h"],
+ ["主agent 无前缀 起 sleep", null, "bash research/scripts/detached-run.sh start --label s -- sleep 5"],
+ ["主agent list", null, "bash research/scripts/detached-run.sh list"],
+ ["主agent watch bg-style", null, "bash research/scripts/detached-run.sh watch --every 600"],
+ ["主agent stop", null, "bash research/scripts/detached-run.sh stop bm-x"],
+ ["主agent --stop-timeout 600", null, "SINGLEFS_HEAVY_TESTS=commit bash research/scripts/detached-run.sh start --label z --stop-timeout 600 -- cargo test --all"],
+ ["主agent 经 capped.sh 前缀", null, "bash research/scripts/capped.sh 8 bash research/scripts/detached-run.sh start --label z -- sleep 1"],
+ ["主agent cd && start", null, "cd /tmp && bash /tmp/claude-1000/tooling-detached-run-r2-sonnet/repo/research/scripts/detached-run.sh start --label z -- sleep 1"],
+ ["主agent 在 /tmp/wt 里相对路径 start (wt 里没有该脚本)", null, "bash research/scripts/detached-run.sh start --label z -- sleep 1", "/tmp/claude-1000/tooling-detached-run-r2-sonnet/wt"]
+]

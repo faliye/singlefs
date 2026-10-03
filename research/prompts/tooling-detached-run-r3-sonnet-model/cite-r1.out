@@ -1,0 +1,4 @@
+  - 没判：tooling-detached-run-r1-sonnet-output.md:159 引 .claude/singlefs-ai-sop/rules/rules-discipline.md:13：路径认不出（在给的根下都找不到）
+  - 没判：tooling-detached-run-r1-sonnet-output.md:182 引 research/scripts/watch.sh:11：路径认不出（在给的根下都找不到）
+  ✓ 核了 23 处引文，对上 21 处，没判 2 处（逐处列在上面）
+rc=0

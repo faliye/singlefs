@@ -1,0 +1,9 @@
+[
+ ["主 无前缀 改名拷贝 start cargo test --all", null, "bash /tmp/claude-1000/tooling-detached-run-r2-sonnet/probe/renamed-copy.sh start --label p -- cargo test --all"],
+ ["主 无前缀 真名 start cargo test --all", null, "bash research/scripts/detached-run.sh start --label p -- cargo test --all"],
+ ["主 无前缀 直接 cargo test --all", null, "cargo test --all"],
+ ["主 无前缀 multi-host-run --peer -- cargo test --all", null, "bash research/scripts/multi-host-run.sh --peer -- cargo test --all"],
+ ["主 无前缀 bash -c 里 cargo test --all", null, "bash -c 'cargo test --all'"],
+ ["主 无前缀 自己写个 wrapper.sh 里 cargo test --all 再 bash 它", null, "printf 'cargo test --all\n' > /tmp/claude-1000/tooling-detached-run-r2-sonnet/probe/w.sh && bash /tmp/claude-1000/tooling-detached-run-r2-sonnet/probe/w.sh"],
+ ["主 无前缀 xargs cargo test --all", null, "echo | xargs cargo test --all"]
+]

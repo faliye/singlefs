@@ -1,0 +1,10 @@
+U3 真起单元的复现（主 agent 带前缀跑；单元名前缀 singlefs-detached-opusr3-，登记目录临时，收尾核零残留）。
+本腿没跑过这一份（钩子拒子 agent 的 start / stop）；期望按代码推 + 本腿在 /tmp 副本上直接 kill 内存包装量到的机制。
+
+repro-u3-scope-survives-unit-kill.sh <仓根>
+  start 退 0、「✓ 起了「opusr3-scope-<pid>」」；
+  sleep 进程的 cgroup 落在 singlefs-heavy.slice 下的 singlefs-memory-cap-*.scope（不是 singlefs-detached-opusr3-scope-<pid>.service）；
+  stop 退 0；停完 service ActiveState=inactive（或 failed）；
+  而 sleep 还在、它的 scope ActiveState=active ⇒ 内存包装的 scope 在 service 被停之后活下来（U3 造出，记欠账、这一轮不修）。
+  残留 singlefs-detached-opusr3-* 单元 0 个（收尾停了 service 与 scope）。
+  推翻：停完 sleep 不在、scope inactive ⇒ scope 跟着 service 一起停了，这一条不成立。

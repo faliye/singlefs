@@ -20,7 +20,7 @@
 | 16 | `cargo test --release -p singlefs-checker -- --include-ignored --exact full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean` | checker-tier-cargo | checker 档 |
 | 17 | `./target/release/deps/first_transaction_step_seven_layer0-0123456789abcdef` | checker-tier-binary | checker 档 |
 | 18 | `./target/debug/deps/second_transaction_step_one_overwrite-0123456789abcdef` | None | 不重型 |
-| 19 | `bash .claude/gate.d/54-layer0-replay.sh` | layer0-stage | 层 0 |
+| 19 | `bash .claude/gate.d/checker-tier-layer0-replay.sh` | layer0-stage | 层 0 |
 | 20 | `bash .claude/gate.d/74-model-differential.sh` | None | 不重型 |
 | 21 | `cargo test -p singlefs-checker -- --list` | None | 不重型 |
 | 22 | `cargo test -p singlefs-format` | None | 不重型 |

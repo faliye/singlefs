@@ -1,0 +1,117 @@
+## 主 export 前缀;再 start cargo test --all
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: export SINGLEFS_HEAVY_TESTS=commit; bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label d -- cargo test --all
+   bash: rc=0  
+   heavy: rc=0  
+## 主 env 前缀 start
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: env SINGLEFS_HEAVY_TESTS=commit bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label d-2026-10-01 -- cargo test --workspace
+   bash: rc=0  
+   heavy: rc=0  
+## 主 subshell cd start
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: (cd /tmp/claude-1000/tooling-detached-run-r2-sonnet/wt && SINGLEFS_HEAVY_TESTS=commit bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label d -- bash -c 'cargo test --all')
+   bash: rc=0  
+   heavy: rc=0  
+## 主 start 非重型 cargo test -p lib
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label d -- cargo test -p singlefs-harness --lib
+   bash: rc=0  
+   heavy: rc=0  
+## 主 start 无前缀 checker-tier 测试
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label d -- cargo test -p singlefs-checker-tier
+   bash: rc=0  
+   heavy: rc=0  
+## 主 start 前缀 =commit checker-tier
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: SINGLEFS_HEAVY_TESTS=commit bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label d -- cargo test -p singlefs-checker-tier
+   bash: rc=0  
+   heavy: rc=0  
+## 主 start 起 multi-host-run --peer cargo test --all 无前缀 (非 detached 对照)
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash research/scripts/multi-host-run.sh --peer -- cargo test --all
+   bash: rc=0  
+   heavy: rc=0  
+## 主 直接 multi-host-run --peer broad-mutation 无前缀
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash research/scripts/multi-host-run.sh --peer -- python3 research/scripts/broad-mutation.py --home /tmp/h
+   bash: rc=0  
+   heavy: rc=0  
+## 主 start 起 run-with-memory-cap cargo test --all 无前缀
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label d -- bash research/scripts/run-with-memory-cap.sh 20G cargo test --all
+   bash: rc=0  
+   heavy: rc=2  ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+## 主 start 起 capped.sh 8 cargo test --all 无前缀
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label d -- bash research/scripts/capped.sh 8 cargo test --all
+   bash: rc=0  
+   heavy: rc=2  ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+## 子 cp 备份 detached-run.sh
+   agent=tooling-writer cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: cp research/scripts/detached-run.sh /tmp/claude-1000/x/backup.sh
+   bash: rc=0  
+   heavy: rc=0  
+## 子 cp 备份再 bash -n
+   agent=tooling-writer cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: cp research/scripts/detached-run.sh /tmp/claude-1000/x/backup.sh && bash -n /tmp/claude-1000/x/backup.sh
+   bash: rc=0  
+   heavy: rc=0  
+## 子 cp 备份再 list
+   agent=tooling-writer cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: cp research/scripts/detached-run.sh /tmp/claude-1000/x/b.sh && DETACHED_RUN_STATE_DIRECTORY=/tmp/x bash /tmp/claude-1000/x/b.sh list
+   bash: rc=0  
+   heavy: rc=0  
+## 子 cp 备份再 --selftest
+   agent=tooling-writer cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: cp research/scripts/detached-run.sh /tmp/claude-1000/x/b.sh && bash /tmp/claude-1000/x/b.sh --selftest
+   bash: rc=0  
+   heavy: rc=0  
+## 子 grep/cat/diff detached-run.sh
+   agent=tooling-writer cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: grep -n start research/scripts/detached-run.sh; diff research/scripts/detached-run.sh /tmp/x.sh; bash -n research/scripts/detached-run.sh
+   bash: rc=0  
+   heavy: rc=0  
+## 子 cp 覆盖拷贝后换成别的脚本再 start
+   agent=clerk cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: cp research/scripts/detached-run.sh /tmp/t.sh && cp research/scripts/capped.sh /tmp/t.sh && bash /tmp/t.sh start --label a -- true
+   bash: rc=2  ✗ clerk 用 research/scripts/detached-run.sh 起或停脱离会话的长跑（认出的调用：/tmp/t.sh（这条命令里前面拷出来的 research/scripts/detached-run.sh） start --label a）：这个入口只给主 agent，经它起
+   heavy: rc=0  
+## 子 别的脚本 start 子命令(无关)
+   agent=clerk cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash research/scripts/other-tool.sh start --label a -- true
+   bash: rc=0  
+   heavy: rc=0  ! heavy-test-guard.sh：bash / sh 起的脚本 /tmp/claude-1000/tooling-detached-run-r2-sonnet/repo/research/scripts/other-tool.sh 不存在，里面的命令没判；这条命令照常执行，记了一条检出
+## 子 调用 systemctl --user start 无关
+   agent=clerk cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: systemctl --user start foo.service
+   bash: rc=0  
+   heavy: rc=0  
+## 子 mv 走 detached-run.sh 再 bash 它 stop
+   agent=clerk cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: mv research/scripts/detached-run.sh /tmp/dr.sh && bash /tmp/dr.sh stop m
+   bash: rc=2  ✗ clerk 用 research/scripts/detached-run.sh 起或停脱离会话的长跑（认出的调用：/tmp/dr.sh（这条命令里前面拷出来的 research/scripts/detached-run.sh） stop m）：这个入口只给主 agent，经它起的活不在你的进程
+   heavy: rc=0  ! heavy-test-guard.sh：bash / sh 起的脚本 /tmp/dr.sh 不存在，里面的命令没判；这条命令照常执行，记了一条检出
+## 子 heredoc 里写 start 文本
+   agent=clerk cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: cat > /tmp/note.md <<'X'
+bash research/scripts/detached-run.sh start --label a -- true
+X
+   bash: rc=0  
+   heavy: rc=0  
+## 子 echo 引号里的 start
+   agent=clerk cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: echo 'bash research/scripts/detached-run.sh start --label a -- true' > /tmp/note.md
+   bash: rc=0  
+   heavy: rc=0  
+## 子 git commit -m 里的 start
+   agent=clerk cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: git commit -m 'doc: bash research/scripts/detached-run.sh start --label a -- true'
+   bash: rc=0  
+   heavy: rc=0  
+## 子 python -c 含 start 文本
+   agent=clerk cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: python3 -c "print('detached-run.sh start --label a -- true')"
+   bash: rc=0  
+   heavy: rc=0  

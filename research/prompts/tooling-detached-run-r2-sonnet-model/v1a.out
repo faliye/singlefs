@@ -1,0 +1,75 @@
+## 基线 主agent 起 start
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash research/scripts/detached-run.sh start --label m -- sleep 1
+   bash: rc=0  
+   heavy: rc=0  
+## 基线 子agent 起 start
+   agent=clerk cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash research/scripts/detached-run.sh start --label m -- sleep 1
+   bash: rc=2  ✗ clerk 用 research/scripts/detached-run.sh 起或停脱离会话的长跑（认出的调用：research/scripts/detached-run.sh start --label m）：这个入口只给主 agent，经它起的活不在你的进程树里，你交回之后没人认领
+   heavy: rc=0  
+## 主agent worktree+主仓绝对路径+前缀
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: cd /tmp/claude-1000/tooling-detached-run-r2-sonnet/wt && SINGLEFS_HEAVY_TESTS=user-request nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label bm-local-2026-10-01 --log /tmp/bm.log -- python3 research/scripts/broad-mutation.py --home /tmp/h
+   bash: rc=0  
+   heavy: rc=0  
+## 主agent 带日期label 无前缀 起 cargo test --all
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label bm-2026-10-01 -- cargo test --all
+   bash: rc=0  
+   heavy: rc=2  ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+## 主agent 带日期label =commit 起 cargo test --all
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: SINGLEFS_HEAVY_TESTS=commit bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label bm-2026-10-01 -- cargo test --all
+   bash: rc=0  
+   heavy: rc=0  
+## 主agent 无前缀 起 broad-mutation.py
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash research/scripts/detached-run.sh start --label bm-x -- python3 research/scripts/broad-mutation.py --home /tmp/h
+   bash: rc=0  
+   heavy: rc=2  ✗ 重型测试被拒：research/scripts/broad-mutation.py（逐条改坏 core / checker 的源码、每条起 cargo；--sync-tree 与 --import-results 改库目录里全局的版本指针与结果表；只有 --list-items、--summar
+## 主agent 无前缀 起 multi-host-run --peer broad-mutation
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash research/scripts/detached-run.sh start --label bm-peer -- bash research/scripts/multi-host-run.sh --peer -- python3 research/scripts/broad-mutation.py --home /tmp/h
+   bash: rc=0  
+   heavy: rc=0  
+## 主agent 无前缀 起 sleep
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash research/scripts/detached-run.sh start --label s -- sleep 5
+   bash: rc=0  
+   heavy: rc=0  
+## 主agent list
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash research/scripts/detached-run.sh list
+   bash: rc=0  
+   heavy: rc=0  
+## 主agent watch bg-style
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash research/scripts/detached-run.sh watch --every 600
+   bash: rc=0  
+   heavy: rc=0  
+## 主agent stop
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash research/scripts/detached-run.sh stop bm-x
+   bash: rc=0  
+   heavy: rc=0  
+## 主agent --stop-timeout 600
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: SINGLEFS_HEAVY_TESTS=commit bash research/scripts/detached-run.sh start --label z --stop-timeout 600 -- cargo test --all
+   bash: rc=0  
+   heavy: rc=0  
+## 主agent 经 capped.sh 前缀
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: bash research/scripts/capped.sh 8 bash research/scripts/detached-run.sh start --label z -- sleep 1
+   bash: rc=0  
+   heavy: rc=0  
+## 主agent cd && start
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: cd /tmp && bash /tmp/claude-1000/tooling-detached-run-r2-sonnet/repo/research/scripts/detached-run.sh start --label z -- sleep 1
+   bash: rc=0  
+   heavy: rc=0  
+## 主agent 在 /tmp/wt 里相对路径 start (wt 里没有该脚本)
+   agent=主agent cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/wt
+   cmd: bash research/scripts/detached-run.sh start --label z -- sleep 1
+   bash: rc=0  
+   heavy: rc=0  

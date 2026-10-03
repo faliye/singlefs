@@ -22,7 +22,7 @@
 | Q7.3 已定项 15 的「两档」覆盖面 | 正推：兑现了条款，附一处措辞覆盖面歧义 | 采纳歧义那一半 | 改了：已定项 15 那句改成「checker 档里的崩溃点重放（门禁 54 号）分两档，55、57、59、87 号不分」 |
 | Q8 命令分类表 | 本地攻方：两份样本各有 10、11 行与闸的真值对不上 | 逐行判：多数是标签用词不同（写 harness、layer 0，真值写不重型、checker 档），不是分类分歧；实质分歧只在第 5、6 行（`-p singlefs-checker --lib`、`--doc`），出自两包那一版规则文字说「singlefs-checker 包的测试」是重型而闸判不重型 | 三个包之后不再分歧：池级 checker 是 `singlefs-checker`，它自己的库单测归 harness 档（`.claude/rules/verification.md`「定义与名字」表），现查闸对这两条交 None |
 | Q9 旧路径与行号 | 攻方：红（小），两处相对 harness 的注释路径，e161 的 5 处行号错开 | 采纳 | 改了：搬进 checker 档包的 35 个文件逐个按旧路径全仓搜，变更史、实验变更史与 records 里 19 处改成新路径（`path-moves.md` 第 3 步）；指向搬走文件的行号引用 15 处里按 HEAD 到现在逐行对应重算了 7 处（e161 装置 6 处、e162 装置 1 处），另 6 处指的是别的包的 `lib.rs`，与搬家无关；`history.rs` 那处相对路径改成全路径 |
-| 归因 | 攻方：部分成立，射程比正文说的宽（C577 那道屏障解释第一条流的钉值，解释不了 `removing_the_barrier…` 的钉值） | 采纳，不在这一轮修 | 钉值不是这一轮改的，交 singlefs-99 那一轮「合入后验证」；拆包之后 harness 档 `cargo test -p singlefs-harness --no-fail-fast` 的红见第四节，同样归在飞的改动（推的，没量过） |
+| 归因 | 攻方：部分成立，射程比正文说的宽（C577 那道屏障解释第一条流的钉值，解释不了 `removing_the_barrier…` 的钉值） | 采纳，不在这一轮修 | 钉值不是这一轮改的，交别的会话那一轮「合入后验证」；拆包之后 harness 档 `cargo test -p singlefs-harness --no-fail-fast` 的红见第四节，同样归在飞的改动（推的，没量过） |
 
 ## 二、这一轮之后的改法（被攻过零轮）
 
@@ -40,7 +40,7 @@
 
 ## 四、拆包之后的测试（只核测试逻辑，不核被测内容）
 
-- `#[test]` 计数：HEAD 1089、工作区 1093；`#[ignore]` 都是 25。差的 4 条新增与 1 条改名都在 singlefs-99 在飞的测试文件里。
+- `#[test]` 计数：HEAD 1089、工作区 1093；`#[ignore]` 都是 25。差的 4 条新增与 1 条改名都在别的会话在飞的测试文件里。
 - harness 档 `cargo test -p singlefs-harness --no-fail-fast`（日志 `research/prompts/verification-split-tmp-evidence/harness-daily-after-split.log`）：47 个测试目标都编过、跑完，通过 622、失败 14、忽略 3，红在 8 个目标里。红的是抬 F、空间准入与见证那几条行为断言，这 14 条只重跑、不整份重跑（`research/scripts/rerun-failed-tests.py` 从日志取命令）：在只含这一轮改动的暂存树上同样 14 条红（`research/prompts/verification-split-tmp-evidence/rerun-failed-on-staged-tree.log`），在纯 HEAD 上也是这 14 条红（`research/prompts/verification-split-tmp-evidence/rerun-failed-on-head.log`）：拆包之前就红，不是拆包带进来的（量过）。
 
 ## 五、按路径点名被判的文件（门禁 56、72 号）
@@ -51,7 +51,7 @@ checker 档包（新建，多数从 harness 搬来）：`crates/singlefs-checker
 
 harness 档：`crates/singlefs-harness/src/lib.rs`、`crates/singlefs-harness/src/memory_pool.rs`、`crates/singlefs-harness/src/first_transaction_regions.rs`、`crates/singlefs-harness/src/fault_injection.rs`、`crates/singlefs-harness/src/history.rs`。
 
-改名与注释路径：`crates/singlefs-core/src/admission.rs`、`crates/singlefs-core/src/transaction.rs`、`crates/singlefs-core/src/system_configuration.rs`、`crates/singlefs-format/src/lib.rs`、`crates/singlefs-checker/src/walk.rs`。`crates/singlefs-core/src/transaction.rs` 里另有 singlefs-99 的改动（重读一次的生效 F），不归这一轮判。
+改名与注释路径：`crates/singlefs-core/src/admission.rs`、`crates/singlefs-core/src/transaction.rs`、`crates/singlefs-core/src/system_configuration.rs`、`crates/singlefs-format/src/lib.rs`、`crates/singlefs-checker/src/walk.rs`。`crates/singlefs-core/src/transaction.rs` 里另有别的会话的改动（重读一次的生效 F），不归这一轮判。
 
 定义与共用约束：`.claude/agent-common.md`、`.claude/main-agent.md`、`.claude/agents/crash-verifier.md`、`.claude/agents/gate-triage.md`、`.claude/agents/implementation-writer.md`、`.claude/agents/mutation-triage.md`、`.claude/agents/experiment-designer.md`、`.claude/agents/experiment-runner.md`、`.claude/agents/three-way-attack.md`。前五份 Q5 逐句核过；后四份只改了装置路径与指向的规则小节名，没攻。
 

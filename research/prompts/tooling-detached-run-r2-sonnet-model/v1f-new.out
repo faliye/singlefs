@@ -1,0 +1,20 @@
+## 子 source 真名
+   agent=clerk cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: source research/scripts/detached-run.sh start --label a -- true
+   bash: rc=2  ✗ clerk 用 research/scripts/detached-run.sh 起或停脱离会话的长跑（认出的调用：source 读进来的 research/scripts/detached-run.sh start --label a）：这个入口只给主 agent，经它起的活不在你的进程树里，
+   heavy: rc=0  
+## 子 . 真名
+   agent=clerk cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: . research/scripts/detached-run.sh start --label a -- true
+   bash: rc=2  ✗ clerk 用 research/scripts/detached-run.sh 起或停脱离会话的长跑（认出的调用：source 读进来的 research/scripts/detached-run.sh start --label a）：这个入口只给主 agent，经它起的活不在你的进程树里，
+   heavy: rc=0  
+## 子 source 改名拷贝(签名在)
+   agent=clerk cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: source /tmp/claude-1000/tooling-detached-run-r2-sonnet/probe/renamed-copy.sh start --label a -- true
+   bash: rc=2  ✗ clerk 用 research/scripts/detached-run.sh 起或停脱离会话的长跑（认出的调用：source 读进来的 /tmp/claude-1000/tooling-detached-run-r2-sonnet/probe/renamed-copy.sh（开头带 rese
+   heavy: rc=0  
+## 子 cp 再 bash 起 start (同一条命令)
+   agent=clerk cwd=/tmp/claude-1000/tooling-detached-run-r2-sonnet/repo
+   cmd: cp research/scripts/detached-run.sh /tmp/claude-1000/tooling-detached-run-r2-sonnet/probe/n2.sh && bash /tmp/claude-1000/tooling-detached-run-r2-sonnet/probe/n2.sh start --label a -- true
+   bash: rc=2  ✗ clerk 用 research/scripts/detached-run.sh 起或停脱离会话的长跑（认出的调用：/tmp/claude-1000/tooling-detached-run-r2-sonnet/probe/n2.sh（这条命令里前面拷出来的 research/scripts/d
+   heavy: rc=0  
