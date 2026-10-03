@@ -1,0 +1,20 @@
+[
+ ["baseline: subagent plain start", "clerk", "bash research/scripts/detached-run.sh start --label m -- sleep 1"],
+ ["baseline: main plain start", null, "bash research/scripts/detached-run.sh start --label m -- sleep 1"],
+ ["T3a eval wrapping", "clerk", "eval 'bash research/scripts/detached-run.sh start --label m -- sleep 1'"],
+ ["T3a variable holds script path", "clerk", "S=research/scripts/detached-run.sh; bash \"$S\" start --label m -- sleep 1"],
+ ["T3a renamed copy", "clerk", "cp research/scripts/detached-run.sh /tmp/dr.sh && bash /tmp/dr.sh start --label m -- sleep 1"],
+ ["T3a symlink", "clerk", "ln -s research/scripts/detached-run.sh /tmp/dr-link.sh; bash /tmp/dr-link.sh start --label m -- sleep 1"],
+ ["T3a python subprocess", "clerk", "python3 -c \"import subprocess; subprocess.run(['bash','research/scripts/detached-run.sh','start','--label','m','--','sleep','1'])\""],
+ ["T3a direct systemd-run", "clerk", "systemd-run --user --unit=x.service -- sleep 100"],
+ ["T3a nested detached under detached", "clerk", "bash research/scripts/detached-run.sh start --label m -- bash research/scripts/detached-run.sh start --label n -- sleep 1"],
+ ["T3a sh instead of bash", "clerk", "sh research/scripts/detached-run.sh start --label m -- sleep 1"],
+ ["T3a source instead", "clerk", "source research/scripts/detached-run.sh start --label m -- sleep 1"],
+ ["T3a exec", "clerk", "exec bash research/scripts/detached-run.sh start --label m -- sleep 1"],
+ ["T3c main start hides disown inside", null, "bash research/scripts/detached-run.sh start --label m -- bash -c 'long & disown'"],
+ ["T3c main start hides systemd-run inside", null, "bash research/scripts/detached-run.sh start --label m -- systemd-run --user bash gate.sh"],
+ ["T3c main start hides kill group inside", null, "bash research/scripts/detached-run.sh start --label m -- bash -c 'kill -- -1'"],
+ ["T3c main start inner results overwrite", null, "bash research/scripts/detached-run.sh start --label m -- bash -c 'echo x > research/results/existing.out'"],
+ ["T3c double --", null, "bash research/scripts/detached-run.sh start --label m -- bash -c 'x' -- disown"],
+ ["T3b inner cargo --all no prefix (detector not heavy)", null, "bash research/scripts/detached-run.sh start --label m -- cargo test --all"]
+]

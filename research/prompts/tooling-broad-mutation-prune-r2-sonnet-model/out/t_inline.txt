@@ -1,0 +1,2 @@
+caught 241 | core-lib T in the same file as the mutated function 163 | core-lib T in another file 22 | harness T 55 | other 1
+share of caught whose T file == mutated file: 67.6%

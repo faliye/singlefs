@@ -1,0 +1,11 @@
+a64c24450976e51f2ba2a1f12b7e156d8902e20d117866db8a503e8b95b1d152  .claude/hooks/lib_heavy_tests.py
+9e8dbd92db77f50b415873e7e0e4409633497b99cc66e6c25421a6eae0069aee  .claude/hooks/heavy-test-guard.sh
+d3c6a660d6ce809814d4021c3857e26494b0614572e030f840dbb1ffb51bd42f  .claude/hooks/selftest-registry.tsv
+b55c23439f72894b4d4ed622613a489fb80a7cef0ed2aa0f8fa0815c92de7440  research/scripts/hook-swap.py
+9dd80e969e68f366ad104558b041f939cae6200e017fe94f803893c5f77c3fea  .claude/gate.d/code-tooling.sh
+8bdd0e61dd37b72c71f07f589b670e6e335d842381620ec3649873df9708c7c5  .claude/main-agent.md
+37a2ac1146f8697e08575535541730d1c33289c8ef19e9c4c5220be9692ab914  .claude/agents/tooling-writer.md
+8e12808fd8a2e2e7b0f0c2568527b3a889e1d7558d8c4b34e79318136b504a3f  .claude/kb/checks-owed.md
+fabe412c9e1abacb7f2d24c382cdff642cc23cd9ede1f0f5260568b30e4b52af  .claude/kb/decisions/13-验证路线.md
+f59f21003cf48a234c98e00a4d5447f2ea9e7851e9d50edd5c222beb649969b7  .claude/kb/decisions-history.md
+4f1ebfe4f1a8369b663c7edf313774a9cc925120cb5e53598671888e9c52c099  research/prompts/test-script-align-r2-main-verification.md

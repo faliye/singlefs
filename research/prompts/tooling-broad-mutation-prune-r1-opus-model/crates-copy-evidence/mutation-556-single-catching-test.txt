@@ -1,0 +1,7 @@
+# 第 556 条施加后单跑抓它的那一条（cargo nextest run -p singlefs-harness --test test_only_switches_force_every_branch -E 'test(...)'，-j 未设，capped.sh 12，退出码 100，挂钟 148 秒）
+7:        FAIL [ 147.570s] (1/1) singlefs-harness::test_only_switches_force_every_branch the_forced_zero_reuse_window_switch_makes_the_second_overwrite_land_on_a_slot_that_the_gated_window_leaves_alone
+12:    test the_forced_zero_reuse_window_switch_makes_the_second_overwrite_land_on_a_slot_that_the_gated_window_leaves_alone ... FAILED
+19:    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 147.57s
+25:      left: ""
+26:     right: "reuse_window_gated_by_the_rollback_floor"
+31:     Summary [ 147.572s] 1 test run: 0 passed, 1 failed, 5 skipped

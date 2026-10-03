@@ -1,0 +1,3 @@
+wrapper still alive 3s after TERM (trap deferred)
+total wait 5.0s rc=143
+trap-ran

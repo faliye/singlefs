@@ -1,0 +1,18 @@
+8186d5b5 eff 2 L1 2.0 L2 2.0 hours full L1/L2 0.0/0.0  T-first 0.0/0.0
+0a47816d eff 717 L1 717.0 L2 717.0 hours full L1/L2 12.4/12.4  T-first 3.9/3.9
+5f9e449d eff 1308 L1 1308.0 L2 1308.0 hours full L1/L2 22.7/22.7  T-first 7.2/7.2
+cae5092f eff 3166 L1 3166 L2 3166 hours full L1/L2 54.9/54.9  T-first 17.4/17.4
+c3540c02 eff 3920 L1 3920.0 L2 3920.0 hours full L1/L2 68.0/68.0  T-first 21.5/21.5
+45d49aaf eff 3997 L1 4940 L2 3997 hours full L1/L2 85.7/69.3  T-first 27.1/21.9
+346f5e6c eff 4401 L1 4940 L2 4401.0 hours full L1/L2 85.7/76.3  T-first 27.1/24.1
+3cff909b eff 3073 L1 4940 L2 3073 hours full L1/L2 85.7/53.3  T-first 27.1/16.9
+d2aeb7de eff 24 L1 4940 L2 1764 hours full L1/L2 85.7/30.6  T-first 27.1/9.7
+dbcc0d2f eff 3006 L1 5091 L2 5091 hours full L1/L2 88.3/88.3  T-first 27.9/27.9
+bc57af7a eff 1155 L1 5091 L2 5091 hours full L1/L2 88.3/88.3  T-first 27.9/27.9
+973e1f58 eff 34 L1 5091 L2 5091 hours full L1/L2 88.3/88.3  T-first 27.9/27.9
+a1f4691b eff 4181 L1 5091 L2 5091 hours full L1/L2 88.3/88.3  T-first 27.9/27.9
+495bede6 eff 198 L1 5091 L2 198.0 hours full L1/L2 88.3/3.4  T-first 27.9/1.1
+eff median 2157 (42.4%) -> 37.4 h full / 11.8 h T-first
+L1 median 4940 (97.0%) -> 85.7 h full / 27.1 h T-first
+L2 median 3543 (69.6%) -> 61.5 h full / 19.4 h T-first
+commits at 100% of the list: L1 5 of 14, L2 4 of 14

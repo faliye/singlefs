@@ -1,0 +1,81 @@
+L2 site=common::<usize> value="8" outcome=accepted:Some(8)
+L2 site=common::<NonZeroUsize> value="8" outcome=accepted:Some(8)
+L2 site=crash_amplification::checking_threads value="8" outcome=accepted:8
+L2 site=crash_amplification::expand_up_to value="8" outcome=accepted:8
+L2 site=common::<usize> value=" 8" outcome=accepted:Some(8)
+L2 site=common::<NonZeroUsize> value=" 8" outcome=accepted:Some(8)
+L2 site=crash_amplification::checking_threads value=" 8" outcome=accepted:8
+L2 site=crash_amplification::expand_up_to value=" 8" outcome=accepted:8
+L2 site=common::<usize> value="8\n" outcome=accepted:Some(8)
+L2 site=common::<NonZeroUsize> value="8\n" outcome=accepted:Some(8)
+L2 site=crash_amplification::checking_threads value="8\n" outcome=accepted:8
+L2 site=crash_amplification::expand_up_to value="8\n" outcome=accepted:8
+L2 site=common::<usize> value="+8" outcome=accepted:Some(8)
+L2 site=common::<NonZeroUsize> value="+8" outcome=accepted:Some(8)
+L2 site=crash_amplification::checking_threads value="+8" outcome=accepted:8
+L2 site=crash_amplification::expand_up_to value="+8" outcome=accepted:8
+L2 site=common::<usize> value="08" outcome=accepted:Some(8)
+L2 site=common::<NonZeroUsize> value="08" outcome=accepted:Some(8)
+L2 site=crash_amplification::checking_threads value="08" outcome=accepted:8
+L2 site=crash_amplification::expand_up_to value="08" outcome=accepted:8
+L2 site=common::<usize> value="" outcome=panic:V="" 认不出（cannot parse integer from empty string）：要写一个 usize 的取值，不当成没设、不退回没设时的那一档
+L2 site=common::<NonZeroUsize> value="" outcome=panic:V="" 认不出（cannot parse integer from empty string）：要写一个 core::num::nonzero::NonZero<usize> 的
+L2 site=crash_amplification::checking_threads value="" outcome=panic:SINGLEFS_CRASH_AMPLIFICATION_THREADS="" 认不出（cannot parse integer from empty string）：要写一个 c
+L2 site=crash_amplification::expand_up_to value="" outcome=panic:SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO="" 认不出（cannot parse integer from empty string）：要
+L2 site=common::<usize> value=" " outcome=panic:V=" " 认不出（cannot parse integer from empty string）：要写一个 usize 的取值，不当成没设、不退回没设时的那一档
+L2 site=common::<NonZeroUsize> value=" " outcome=panic:V=" " 认不出（cannot parse integer from empty string）：要写一个 core::num::nonzero::NonZero<usize> 
+L2 site=crash_amplification::checking_threads value=" " outcome=panic:SINGLEFS_CRASH_AMPLIFICATION_THREADS=" " 认不出（cannot parse integer from empty string）：要写一个 
+L2 site=crash_amplification::expand_up_to value=" " outcome=panic:SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=" " 认不出（cannot parse integer from empty string）：
+L2 site=common::<usize> value="0" outcome=accepted:Some(0)
+L2 site=common::<NonZeroUsize> value="0" outcome=panic:V="0" 认不出（number would be zero for non-zero type）：要写一个 core::num::nonzero::NonZero<usize> 
+L2 site=crash_amplification::checking_threads value="0" outcome=panic:SINGLEFS_CRASH_AMPLIFICATION_THREADS="0" 认不出（number would be zero for non-zero type）：要写一个 
+L2 site=crash_amplification::expand_up_to value="0" outcome=accepted:0
+L2 site=common::<usize> value="eight" outcome=panic:V="eight" 认不出（invalid digit found in string）：要写一个 usize 的取值，不当成没设、不退回没设时的那一档
+L2 site=common::<NonZeroUsize> value="eight" outcome=panic:V="eight" 认不出（invalid digit found in string）：要写一个 core::num::nonzero::NonZero<usize> 的取值，不
+L2 site=crash_amplification::checking_threads value="eight" outcome=panic:SINGLEFS_CRASH_AMPLIFICATION_THREADS="eight" 认不出（invalid digit found in string）：要写一个 core:
+L2 site=crash_amplification::expand_up_to value="eight" outcome=panic:SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO="eight" 认不出（invalid digit found in string）：要写一个 
+L2 site=common::<usize> value="8\u{3000}" outcome=accepted:Some(8)
+L2 site=common::<NonZeroUsize> value="8\u{3000}" outcome=accepted:Some(8)
+L2 site=crash_amplification::checking_threads value="8\u{3000}" outcome=accepted:8
+L2 site=crash_amplification::expand_up_to value="8\u{3000}" outcome=accepted:8
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_FIRST_SEED value="7" outcome=accepted:"first_seed=7 seeds=2 operations=3 draw=Sampled { crash_points_per_history: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_FIRST_SEED value=" 7" outcome=accepted:"first_seed=7 seeds=2 operations=3 draw=Sampled { crash_points_per_history: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_FIRST_SEED value="7\n" outcome=accepted:"first_seed=7 seeds=2 operations=3 draw=Sampled { crash_points_per_history: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_FIRST_SEED value="0" outcome=accepted:"first_seed=0 seeds=2 operations=3 draw=Sampled { crash_points_per_history: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_FIRST_SEED value="" outcome=panic:SINGLEFS_CRASH_INJECTION_FIRST_SEED="" 认不出（cannot parse integer from empty string）：要写一个 u6
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_SEEDS value="5" outcome=accepted:"first_seed=1 seeds=5 operations=3 draw=Sampled { crash_points_per_history: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_SEEDS value=" 5" outcome=accepted:"first_seed=1 seeds=5 operations=3 draw=Sampled { crash_points_per_history: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_SEEDS value="0" outcome=accepted:"first_seed=1 seeds=0 operations=3 draw=Sampled { crash_points_per_history: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_SEEDS value="" outcome=panic:SINGLEFS_CRASH_INJECTION_SEEDS="" 认不出（cannot parse integer from empty string）：要写一个 u64 的取值
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_POINTS value="4" outcome=accepted:"first_seed=1 seeds=2 operations=3 draw=Sampled { crash_points_per_history: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_POINTS value=" 4" outcome=accepted:"first_seed=1 seeds=2 operations=3 draw=Sampled { crash_points_per_history: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_POINTS value="0" outcome=accepted:"first_seed=1 seeds=2 operations=3 draw=Sampled { crash_points_per_history: 0 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_POINTS value="" outcome=panic:SINGLEFS_CRASH_INJECTION_POINTS="" 认不出（cannot parse integer from empty string）：要写一个 usize 
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES value="3" outcome=accepted:"first_seed=1 seeds=2 operations=3 draw=EveryProperSubsetOfShortSegments { segment_writes: 3, sampled_in_longer_segments: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES value=" 3" outcome=accepted:"first_seed=1 seeds=2 operations=3 draw=EveryProperSubsetOfShortSegments { segment_writes: 3, sampled_in_longer_segments: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES value="none" outcome=accepted:"first_seed=1 seeds=2 operations=3 draw=Sampled { crash_points_per_history: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES value=" none" outcome=panic:SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES=" none" 认不出（invalid digit found in string）：要
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES value="none\n" outcome=panic:SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES="none\n" 认不出（invalid digit found in string）：
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES value="0" outcome=accepted:"first_seed=1 seeds=2 operations=3 draw=EveryProperSubsetOfShortSegments { segment_writes: 0, sampled_in_longer_segments: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES value="" outcome=panic:SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES="" 认不出（cannot parse integer from empty strin
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_OPERATIONS value="40" outcome=accepted:"first_seed=1 seeds=2 operations=40 draw=Sampled { crash_points_per_history: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_OPERATIONS value=" 40" outcome=panic:SINGLEFS_CRASH_INJECTION_OPERATIONS= 40：只认 非负整数
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_OPERATIONS value="40\n" outcome=panic:SINGLEFS_CRASH_INJECTION_OPERATIONS=40\n：只认 非负整数
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_OPERATIONS value="0" outcome=accepted:"first_seed=1 seeds=2 operations=0 draw=Sampled { crash_points_per_history: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_OPERATIONS value="" outcome=panic:SINGLEFS_CRASH_INJECTION_OPERATIONS=：只认 非负整数
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_ASSERTIONS value="fast-tier" outcome=accepted:"first_seed=1 seeds=2 operations=3 draw=Sampled { crash_points_per_history: 4 } assertions=FastTier"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_ASSERTIONS value=" fast-tier" outcome=panic:SINGLEFS_CRASH_INJECTION_ASSERTIONS= fast-tier：只认 new-findings、small-fast-tier、fast-tier、r
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_ASSERTIONS value="fast-tier\n" outcome=panic:SINGLEFS_CRASH_INJECTION_ASSERTIONS=fast-tier\n：只认 new-findings、small-fast-tier、fast-tier、r
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_ASSERTIONS value="" outcome=panic:SINGLEFS_CRASH_INJECTION_ASSERTIONS=：只认 new-findings、small-fast-tier、fast-tier、rollback-sa
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_DEVICES value="4gib" outcome=accepted:"first_seed=1 seeds=2 operations=3 draw=Sampled { crash_points_per_history: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_DEVICES value=" 4gib" outcome=panic:SINGLEFS_CRASH_INJECTION_DEVICES= 4gib：只认 4gib、unit-area-384、unit-area-256、unit-area-240
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_DEVICES value="" outcome=panic:SINGLEFS_CRASH_INJECTION_DEVICES=：只认 4gib、unit-area-384、unit-area-256、unit-area-240
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_WEIGHTS value="broad" outcome=accepted:"first_seed=1 seeds=2 operations=3 draw=Sampled { crash_points_per_history: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_WEIGHTS value="broad\n" outcome=panic:SINGLEFS_CRASH_INJECTION_WEIGHTS=broad\n：只认 broad、reuse、rollback、wall、unit-area-wall
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_CHECKER value="run" outcome=accepted:"first_seed=1 seeds=2 operations=3 draw=Sampled { crash_points_per_history: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_CHECKER value=" run" outcome=panic:SINGLEFS_CRASH_INJECTION_CHECKER= run：只认 run、skip
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_SPACE_ADMISSION value="judged" outcome=accepted:"first_seed=1 seeds=2 operations=3 draw=Sampled { crash_points_per_history: 4 } assertions=NewFindingsOnly"
+L2 site=crash_injection_campaign_from_environment variable=SINGLEFS_CRASH_INJECTION_SPACE_ADMISSION value="judged " outcome=panic:SINGLEFS_CRASH_INJECTION_SPACE_ADMISSION=judged ：只认 judged、skipped
+CRASH_INJECTION_START seeds=[1,1) slices=0 worker_threads=1 configured_worker_threads=1 worker_threads_source=given_by_caller images=/tmp/singlefs-crash-injection-3376432-seedbase-1
+CRASH_INJECTION_FINISHED seeds=[1,1) slices=0 worker_threads=1 elapsed_seconds=0.0
+L2ZERO seeds=0 histories_run_crash_points=0 new_findings=0 assertions=NewFindingsOnly judged_by_new_findings_only_would_be_green=true

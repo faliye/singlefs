@@ -1,0 +1,18 @@
+agent=- exit=0 cmd=python3 research/scripts/broad-mutation.py --list-items
+agent=- exit=0 cmd=python3 research/scripts/broad-mutation.py --summary
+agent=- exit=2 cmd=python3 research/scripts/broad-mutation.py
+agent=- exit=0 cmd=SINGLEFS_HEAVY_TESTS=user-request python3 research/scripts/broad-mutation.py
+agent=- exit=0 cmd=SINGLEFS_HEAVY_TESTS=user-request nice -n 19 python3 research/scripts/broad-mutation.py --item 12 --skip-stage-two
+agent=- exit=2 cmd=python3 research/scripts/broad-mutation.py --selftest
+agent=implementation-writer exit=0 cmd=SINGLEFS_HEAVY_TESTS=user-request python3 research/scripts/broad-mutation.py --item 1 --skip-stage-two
+agent=implementation-writer exit=0 cmd=python3 research/scripts/broad-mutation.py --item 1 --skip-stage-two
+agent=implementation-writer exit=0 cmd=SINGLEFS_HEAVY_TESTS=user-request python3 research/scripts/broad-mutation.py --item 1 --item 2 --item 3 --item 4 --skip-stage-two
+agent=implementation-writer exit=2 cmd=SINGLEFS_HEAVY_TESTS=user-request python3 research/scripts/broad-mutation.py --item 1
+agent=implementation-writer exit=2 cmd=SINGLEFS_HEAVY_TESTS=user-request python3 research/scripts/broad-mutation.py
+agent=implementation-writer exit=0 cmd=SINGLEFS_HEAVY_TESTS=user-request python3 -W ignore research/scripts/broad-mutation.py
+agent=implementation-writer exit=0 cmd=cd research/scripts && SINGLEFS_HEAVY_TESTS=user-request python3 -m broad-mutation
+agent=implementation-writer exit=0 cmd=python3 research/scripts/broad-mutation.py --sync-tree --commit HEAD
+agent=implementation-writer exit=0 cmd=bash research/scripts/multi-host-run.sh -- env SINGLEFS_HEAVY_TESTS=user-request python3 research/scripts/broad-mutation.py
+agent=implementation-writer exit=0 cmd=bash research/scripts/multi-host-run.sh -- bash .claude/gate.d/checker-tier-layer0-replay.sh --full .
+agent=three-way-forward exit=2 cmd=SINGLEFS_HEAVY_TESTS=user-request python3 research/scripts/broad-mutation.py --selftest
+agent=crash-verifier exit=2 cmd=SINGLEFS_HEAVY_TESTS=commit python3 research/scripts/broad-mutation.py

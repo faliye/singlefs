@@ -1,0 +1,7 @@
+数值环境变量 故障注入线程数写错悄悄退回本机并行度（不经共用解析）	抓到	an_unreadable_fault_injection_worker_thread_count_panics_naming_the_variable_and_the_value 红了（日志 /tmp/claude-1000/test-script-align-code-r3-opus/runs/prove-red-logs/001.log）
+数值环境变量 共用判法：设了而认不出悄悄当成没设（C606 同族：写错的规模、额度、线程数退回没设时的那一档）	抓到	a_number_variable_set_to_text_that_is_not_a_number_panics_naming_the_variable_and_the_value 红了（日志 /tmp/claude-1000/test-script-align-code-r3-opus/runs/prove-red-logs/002.log）
+数值环境变量 共用判法：线程数设成 0 也悄悄当成没设（不许为 0 的数认不出时退回本机并行度）	抓到	a_nonzero_number_variable_set_to_zero_panics_naming_the_variable_and_the_value 红了（日志 /tmp/claude-1000/test-script-align-code-r3-opus/runs/prove-red-logs/003.log）
+数值环境变量 共用判法：没设也当成设了 0（调用方没设时的那一档被吞）	抓到	an_unset_number_variable_is_none 红了（日志 /tmp/claude-1000/test-script-align-code-r3-opus/runs/prove-red-logs/004.log）
+数值环境变量 共用判法：不去前后空白（复现行抄出来带换行的值认不出）	抓到	a_set_number_variable_reads_back_without_surrounding_blanks 红了（日志 /tmp/claude-1000/test-script-align-code-r3-opus/runs/prove-red-logs/005.log）
+✓ 点名 5 条：跑了 5 条，跳过 0 条，跑的都抓到了
+exit=0

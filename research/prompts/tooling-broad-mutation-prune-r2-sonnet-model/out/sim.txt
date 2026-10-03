@@ -1,0 +1,29 @@
+functions with mutants 1031 files 30
+steady-state mean s/mutant: full-run 62.4  T-first 19.7
+k=1 own-functions-only A: mean 5 median 2 p10 1 p90 11
+     whole touched files B:  mean 368 median 314 p10 62 p90 1157
+       A mean: 0.08 h full-run / 0.03 h T-first;  median 0.03 h / 0.01 h
+       B mean: 6.37 h full-run / 2.02 h T-first;  median 5.45 h / 1.72 h
+k=5 own-functions-only A: mean 24 median 20 p10 10 p90 42
+     whole touched files B:  mean 1516 median 1490 p10 818 p90 2225
+       A mean: 0.41 h full-run / 0.13 h T-first;  median 0.35 h / 0.11 h
+       B mean: 26.30 h full-run / 8.32 h T-first;  median 25.84 h / 8.17 h
+k=20 own-functions-only A: mean 96 median 91 p10 63 p90 134
+     whole touched files B:  mean 3364 median 3420 p10 2855 p90 3815
+       A mean: 1.66 h full-run / 0.53 h T-first;  median 1.58 h / 0.50 h
+       B mean: 58.35 h full-run / 18.46 h T-first;  median 59.32 h / 18.76 h
+spill estimate if every harness-T mutant outside the touched files must be rejudged: 0.228*(5091-B)
+8186d5b5 changed fns 1 own-fn 2 eff(F2) 2 file-level 17 -> hours full/T-first (eff): 0.0 / 0.0 ; file-level 0.3 / 0.1
+d2aeb7de changed fns 6 own-fn 24 eff(F2) 24 file-level 734 -> hours full/T-first (eff): 0.4 / 0.1 ; file-level 12.7 / 4.0
+973e1f58 changed fns 13 own-fn 34 eff(F2) 34 file-level 1793 -> hours full/T-first (eff): 0.6 / 0.2 ; file-level 31.1 / 9.8
+495bede6 changed fns 5 own-fn 198 eff(F2) 198 file-level 3452 -> hours full/T-first (eff): 3.4 / 1.1 ; file-level 59.9 / 18.9
+0a47816d changed fns 3 own-fn 40 eff(F2) 717 file-level 2310 -> hours full/T-first (eff): 12.4 / 3.9 ; file-level 40.1 / 12.7
+bc57af7a changed fns 35 own-fn 141 eff(F2) 1155 file-level 3396 -> hours full/T-first (eff): 20.0 / 6.3 ; file-level 58.9 / 18.6
+5f9e449d changed fns 33 own-fn 118 eff(F2) 1308 file-level 1411 -> hours full/T-first (eff): 22.7 / 7.2 ; file-level 24.5 / 7.7
+dbcc0d2f changed fns 41 own-fn 384 eff(F2) 3006 file-level 3006 -> hours full/T-first (eff): 52.1 / 16.5 ; file-level 52.1 / 16.5
+3cff909b changed fns 42 own-fn 414 eff(F2) 3073 file-level 3073 -> hours full/T-first (eff): 53.3 / 16.9 ; file-level 53.3 / 16.9
+cae5092f changed fns 120 own-fn 974 eff(F2) 3166 file-level 3166 -> hours full/T-first (eff): 54.9 / 17.4 ; file-level 54.9 / 17.4
+c3540c02 changed fns 192 own-fn 1255 eff(F2) 3920 file-level 4001 -> hours full/T-first (eff): 68.0 / 21.5 ; file-level 69.4 / 21.9
+45d49aaf changed fns 291 own-fn 1589 eff(F2) 3997 file-level 4668 -> hours full/T-first (eff): 69.3 / 21.9 ; file-level 81.0 / 25.6
+a1f4691b changed fns 280 own-fn 1569 eff(F2) 4181 file-level 4181 -> hours full/T-first (eff): 72.5 / 22.9 ; file-level 72.5 / 22.9
+346f5e6c changed fns 246 own-fn 1812 eff(F2) 4401 file-level 4487 -> hours full/T-first (eff): 76.3 / 24.1 ; file-level 77.8 / 24.6

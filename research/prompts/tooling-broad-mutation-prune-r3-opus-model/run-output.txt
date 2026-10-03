@@ -1,0 +1,138 @@
+run-with-memory-cap: 上限 8G 超过实测峰值 395M 的 2 倍，照理由放行：攻方模型的编译加测试，场景一多峰值会变，派发给的上限是 8G
+C2 instrumented test-targets=['dispatch:test', 'golden:test', 'mcore:lib', 'mharness:lib', 'mixed:test', 'model-tool:bin', 'tool_bin:test', 'ys:test'] bins=['model-tool']
+C2 coverage-run test=dispatch:test::area_through_dyn_dispatch pid-profraw-files=1
+C2 coverage-run test=dispatch:test::mix_inlined_across_crates pid-profraw-files=1
+C2 coverage-run test=dispatch:test::triple_through_a_function_pointer_table pid-profraw-files=1
+C2 coverage-run test=golden:test::child_prints_scores pid-profraw-files=1
+C2 coverage-run test=golden:test::child_prints_scores_c pid-profraw-files=1
+C2 coverage-run test=golden:test::child_prints_scores_then_crashes pid-profraw-files=1
+C2 coverage-run test=golden:test::child_says_hello pid-profraw-files=1
+C2 coverage-run test=golden:test::golden_parent_compares_child_output pid-profraw-files=2
+C2 coverage-run test=golden:test::golden_parent_reads_the_crashed_child pid-profraw-files=1
+C2 coverage-run test=golden:test::golden_parent_runs_two_children_in_turn pid-profraw-files=3
+C2 coverage-run test=mixed:test::square_of_one_is_positive pid-profraw-files=1
+C2 coverage-run test=mixed:test::square_of_three_is_nine_at_compile_time pid-profraw-files=1
+C2 coverage-run test=tool_bin:test::checksum_stays_below_the_modulus pid-profraw-files=1
+C2 coverage-run test=tool_bin:test::the_tool_binary_prints_the_checksum pid-profraw-files=2
+C2 coverage-run test=tool_bin:test::the_tool_binary_prints_the_digest pid-profraw-files=2
+C2 coverage-run test=ys:test::y1_tag_of_zero_has_two_bytes pid-profraw-files=1
+C2 coverage-run test=ys:test::y2_wrap_is_even pid-profraw-files=1
+C2 coverage-run test=ys:test::y3_join_is_even pid-profraw-files=1
+C2 coverage-run test=ys:test::y4_bump_stays_small pid-profraw-files=1
+C2 coverage-run test=ys:test::y5_pick_is_even pid-profraw-files=1
+C2 coverage-run test=ys:test::y6_size_is_even pid-profraw-files=1
+C2 coverage-run test=ys:test::y7_next_of_zero_is_positive pid-profraw-files=1
+C2 coverage-run test=ys:test::y8_scaled_is_even pid-profraw-files=1
+C2 coverage-run test=ys:test::y9_make_of_zero_holds_zero pid-profraw-files=1
+C2 X1 shape=子进程（current_exe 跑子测试，正常退出） policy=naive+test-binary mutated=mcore/src/sub.rs:3 selected=['golden:test::child_prints_scores', 'golden:test::golden_parent_compares_child_output'] selected-verdict=caught first-failing=golden:test::golden_parent_compares_child_output all-tests-verdict=caught => same
+C2 X1 shape=子进程（current_exe 跑子测试，正常退出） policy=pid+test-binary mutated=mcore/src/sub.rs:3 selected=['golden:test::child_prints_scores', 'golden:test::golden_parent_compares_child_output'] selected-verdict=caught first-failing=golden:test::golden_parent_compares_child_output all-tests-verdict=caught => same
+C2 X1 shape=子进程（current_exe 跑子测试，正常退出） policy=pid+all-binaries mutated=mcore/src/sub.rs:3 selected=['golden:test::child_prints_scores', 'golden:test::golden_parent_compares_child_output'] selected-verdict=caught first-failing=golden:test::golden_parent_compares_child_output all-tests-verdict=caught => same
+C2 X1 all-tests-failing=['golden_parent_compares_child_output']
+C2 X1b shape=子进程（current_exe 跑子测试，打印完 abort） policy=naive+test-binary mutated=mcore/src/sub.rs:8 selected=['golden:test::child_prints_scores_then_crashes'] selected-verdict=missed first-failing=None all-tests-verdict=caught => HOLE
+C2 X1b shape=子进程（current_exe 跑子测试，打印完 abort） policy=pid+test-binary mutated=mcore/src/sub.rs:8 selected=['golden:test::child_prints_scores_then_crashes'] selected-verdict=missed first-failing=None all-tests-verdict=caught => HOLE
+C2 X1b shape=子进程（current_exe 跑子测试，打印完 abort） policy=pid+all-binaries mutated=mcore/src/sub.rs:8 selected=['golden:test::child_prints_scores_then_crashes'] selected-verdict=missed first-failing=None all-tests-verdict=caught => HOLE
+C2 X1b all-tests-failing=['golden_parent_reads_the_crashed_child']
+C2 X1c shape=子进程（先后两个子进程，只在第一个里执行） policy=naive+test-binary mutated=mcore/src/sub.rs:13 selected=['golden:test::child_prints_scores_c', 'golden:test::golden_parent_runs_two_children_in_turn'] selected-verdict=caught first-failing=golden:test::golden_parent_runs_two_children_in_turn all-tests-verdict=caught => same
+C2 X1c shape=子进程（先后两个子进程，只在第一个里执行） policy=pid+test-binary mutated=mcore/src/sub.rs:13 selected=['golden:test::child_prints_scores_c', 'golden:test::golden_parent_runs_two_children_in_turn'] selected-verdict=caught first-failing=golden:test::golden_parent_runs_two_children_in_turn all-tests-verdict=caught => same
+C2 X1c shape=子进程（先后两个子进程，只在第一个里执行） policy=pid+all-binaries mutated=mcore/src/sub.rs:13 selected=['golden:test::child_prints_scores_c', 'golden:test::golden_parent_runs_two_children_in_turn'] selected-verdict=caught first-failing=golden:test::golden_parent_runs_two_children_in_turn all-tests-verdict=caught => same
+C2 X1c all-tests-failing=['golden_parent_runs_two_children_in_turn']
+C2 X2 shape=子进程（CARGO_BIN_EXE 另一个二进制） policy=naive+test-binary mutated=mcore/src/tool.rs:5 selected=['tool_bin:test::checksum_stays_below_the_modulus', 'tool_bin:test::the_tool_binary_prints_the_checksum', 'tool_bin:test::the_tool_binary_prints_the_digest'] selected-verdict=caught first-failing=tool_bin:test::the_tool_binary_prints_the_checksum all-tests-verdict=caught => same
+C2 X2 shape=子进程（CARGO_BIN_EXE 另一个二进制） policy=pid+test-binary mutated=mcore/src/tool.rs:5 selected=['tool_bin:test::checksum_stays_below_the_modulus', 'tool_bin:test::the_tool_binary_prints_the_checksum', 'tool_bin:test::the_tool_binary_prints_the_digest'] selected-verdict=caught first-failing=tool_bin:test::the_tool_binary_prints_the_checksum all-tests-verdict=caught => same
+C2 X2 shape=子进程（CARGO_BIN_EXE 另一个二进制） policy=pid+all-binaries mutated=mcore/src/tool.rs:5 selected=['tool_bin:test::checksum_stays_below_the_modulus', 'tool_bin:test::the_tool_binary_prints_the_checksum', 'tool_bin:test::the_tool_binary_prints_the_digest'] selected-verdict=caught first-failing=tool_bin:test::the_tool_binary_prints_the_checksum all-tests-verdict=caught => same
+C2 X2 all-tests-failing=['the_tool_binary_prints_the_checksum']
+C2 X2b shape=子进程（CARGO_BIN_EXE，函数只在那个二进制里） policy=naive+test-binary mutated=mcore/src/tool.rs:12 selected=['tool_bin:test::the_tool_binary_prints_the_checksum', 'tool_bin:test::the_tool_binary_prints_the_digest'] selected-verdict=caught first-failing=tool_bin:test::the_tool_binary_prints_the_digest all-tests-verdict=caught => same
+C2 X2b shape=子进程（CARGO_BIN_EXE，函数只在那个二进制里） policy=pid+test-binary mutated=mcore/src/tool.rs:12 selected=['tool_bin:test::the_tool_binary_prints_the_checksum', 'tool_bin:test::the_tool_binary_prints_the_digest'] selected-verdict=caught first-failing=tool_bin:test::the_tool_binary_prints_the_digest all-tests-verdict=caught => same
+C2 X2b shape=子进程（CARGO_BIN_EXE，函数只在那个二进制里） policy=pid+all-binaries mutated=mcore/src/tool.rs:12 selected=['tool_bin:test::the_tool_binary_prints_the_checksum', 'tool_bin:test::the_tool_binary_prints_the_digest'] selected-verdict=caught first-failing=tool_bin:test::the_tool_binary_prints_the_digest all-tests-verdict=caught => same
+C2 X2b all-tests-failing=['the_tool_binary_prints_the_digest']
+C2 X3 shape=const fn 运行时与常量上下文都被叫 policy=naive+test-binary mutated=mcore/src/mixed.rs:3 selected=['mixed:test::square_of_one_is_positive'] selected-verdict=missed first-failing=None all-tests-verdict=caught => HOLE
+C2 X3 shape=const fn 运行时与常量上下文都被叫 policy=pid+test-binary mutated=mcore/src/mixed.rs:3 selected=['mixed:test::square_of_one_is_positive'] selected-verdict=missed first-failing=None all-tests-verdict=caught => HOLE
+C2 X3 shape=const fn 运行时与常量上下文都被叫 policy=pid+all-binaries mutated=mcore/src/mixed.rs:3 selected=['mixed:test::square_of_one_is_positive'] selected-verdict=missed first-failing=None all-tests-verdict=caught => HOLE
+C2 X3 all-tests-failing=['square_of_three_is_nine_at_compile_time']
+C2 X4 shape=跨 crate #[inline(always)] policy=naive+test-binary mutated=mcore/src/inl.rs:4 selected=['dispatch:test::mix_inlined_across_crates'] selected-verdict=caught first-failing=dispatch:test::mix_inlined_across_crates all-tests-verdict=caught => same
+C2 X4 shape=跨 crate #[inline(always)] policy=pid+test-binary mutated=mcore/src/inl.rs:4 selected=['dispatch:test::mix_inlined_across_crates'] selected-verdict=caught first-failing=dispatch:test::mix_inlined_across_crates all-tests-verdict=caught => same
+C2 X4 shape=跨 crate #[inline(always)] policy=pid+all-binaries mutated=mcore/src/inl.rs:4 selected=['dispatch:test::mix_inlined_across_crates'] selected-verdict=caught first-failing=dispatch:test::mix_inlined_across_crates all-tests-verdict=caught => same
+C2 X4 all-tests-failing=['mix_inlined_across_crates']
+C2 X5 shape=static 函数指针表 policy=naive+test-binary mutated=mcore/src/fptr.rs:7 selected=['dispatch:test::triple_through_a_function_pointer_table'] selected-verdict=caught first-failing=dispatch:test::triple_through_a_function_pointer_table all-tests-verdict=caught => same
+C2 X5 shape=static 函数指针表 policy=pid+test-binary mutated=mcore/src/fptr.rs:7 selected=['dispatch:test::triple_through_a_function_pointer_table'] selected-verdict=caught first-failing=dispatch:test::triple_through_a_function_pointer_table all-tests-verdict=caught => same
+C2 X5 shape=static 函数指针表 policy=pid+all-binaries mutated=mcore/src/fptr.rs:7 selected=['dispatch:test::triple_through_a_function_pointer_table'] selected-verdict=caught first-failing=dispatch:test::triple_through_a_function_pointer_table all-tests-verdict=caught => same
+C2 X5 all-tests-failing=['triple_through_a_function_pointer_table']
+C2 X6 shape=dyn 分派 policy=naive+test-binary mutated=mcore/src/dynd.rs:10 selected=['dispatch:test::area_through_dyn_dispatch'] selected-verdict=caught first-failing=dispatch:test::area_through_dyn_dispatch all-tests-verdict=caught => same
+C2 X6 shape=dyn 分派 policy=pid+test-binary mutated=mcore/src/dynd.rs:10 selected=['dispatch:test::area_through_dyn_dispatch'] selected-verdict=caught first-failing=dispatch:test::area_through_dyn_dispatch all-tests-verdict=caught => same
+C2 X6 shape=dyn 分派 policy=pid+all-binaries mutated=mcore/src/dynd.rs:10 selected=['dispatch:test::area_through_dyn_dispatch'] selected-verdict=caught first-failing=dispatch:test::area_through_dyn_dispatch all-tests-verdict=caught => same
+C2 X6 all-tests-failing=['area_through_dyn_dispatch']
+C2 X7 shape=只有文档测试抓得到 policy=naive+test-binary mutated=mcore/src/doc.rs:7 selected=[] selected-verdict=zero-coverage=>missed first-failing=None all-tests-verdict=caught => HOLE
+C2 X7 shape=只有文档测试抓得到 policy=pid+test-binary mutated=mcore/src/doc.rs:7 selected=[] selected-verdict=zero-coverage=>missed first-failing=None all-tests-verdict=caught => HOLE
+C2 X7 shape=只有文档测试抓得到 policy=pid+all-binaries mutated=mcore/src/doc.rs:7 selected=[] selected-verdict=zero-coverage=>missed first-failing=None all-tests-verdict=caught => HOLE
+C2 X7 all-tests-failing=['mcore/src/doc.rs - doc::halve (line 3)']
+C1 Y1 shape=串字面量里的空白 mutated-function=mcore/src/y1.rs::<file>::tag#1 other-changed-files=[]
+C1 Y1 reading=R1-regex-whole-item => reuse
+C1 Y1 reading=R2-lexer-whole-item => rerun:function-text-changed
+C1 Y1 reading=R3-lexer-body-only => rerun:function-text-changed
+C1 Y1 v2-baseline-failing=[] v1+M=caught ['y1_tag_of_zero_has_two_bytes'] v2+M=missed []
+C1 Y1 reading=R1-regex-whole-item c1=reuse v1+M=caught v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y1 reading=R2-lexer-whole-item c1=rerun:function-text-changed v1+M=caught v2+M=missed => ok
+C1 Y1 reading=R3-lexer-body-only c1=rerun:function-text-changed v1+M=caught v2+M=missed => ok
+C1 Y2 shape=串里的 /* */ 夹住代码 mutated-function=mcore/src/y2.rs::<file>::wrap#1 other-changed-files=[]
+C1 Y2 reading=R1-regex-whole-item => reuse
+C1 Y2 reading=R2-lexer-whole-item => rerun:function-text-changed
+C1 Y2 reading=R3-lexer-body-only => rerun:function-text-changed
+C1 Y2 v2-baseline-failing=[] v1+M=caught ['y2_wrap_is_even'] v2+M=missed []
+C1 Y2 reading=R1-regex-whole-item c1=reuse v1+M=caught v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y2 reading=R2-lexer-whole-item c1=rerun:function-text-changed v1+M=caught v2+M=missed => ok
+C1 Y2 reading=R3-lexer-body-only c1=rerun:function-text-changed v1+M=caught v2+M=missed => ok
+C1 Y3 shape=串里的 // 吃掉同行代码 mutated-function=mcore/src/y3.rs::<file>::join#1 other-changed-files=[]
+C1 Y3 reading=R1-regex-whole-item => reuse
+C1 Y3 reading=R2-lexer-whole-item => rerun:function-text-changed
+C1 Y3 reading=R3-lexer-body-only => rerun:function-text-changed
+C1 Y3 v2-baseline-failing=[] v1+M=caught ['y3_join_is_even'] v2+M=missed []
+C1 Y3 reading=R1-regex-whole-item c1=reuse v1+M=caught v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y3 reading=R2-lexer-whole-item c1=rerun:function-text-changed v1+M=caught v2+M=missed => ok
+C1 Y3 reading=R3-lexer-body-only c1=rerun:function-text-changed v1+M=caught v2+M=missed => ok
+C1 Y4 shape=别的文件里的 macro_rules! 展开进被改函数 mutated-function=mcore/src/y4.rs::<file>::bump#1 other-changed-files=['mcore/src/y4_macros.rs:added=[] removed=[]']
+C1 Y4 reading=R1-regex-whole-item => reuse
+C1 Y4 reading=R2-lexer-whole-item => reuse
+C1 Y4 reading=R3-lexer-body-only => reuse
+C1 Y4 v2-baseline-failing=[] v1+M=caught ['y4_bump_stays_small'] v2+M=missed []
+C1 Y4 reading=R1-regex-whole-item c1=reuse v1+M=caught v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y4 reading=R2-lexer-whole-item c1=reuse v1+M=caught v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y4 reading=R3-lexer-body-only c1=reuse v1+M=caught v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y5 shape=约束挪进 where 并换 trait，函数体不变 mutated-function=mcore/src/y5.rs::<file>::pick#1 other-changed-files=[]
+C1 Y5 reading=R1-regex-whole-item => rerun:function-text-changed
+C1 Y5 reading=R2-lexer-whole-item => rerun:function-text-changed
+C1 Y5 reading=R3-lexer-body-only => reuse
+C1 Y5 v2-baseline-failing=[] v1+M=caught ['y5_pick_is_even'] v2+M=missed []
+C1 Y5 reading=R1-regex-whole-item c1=rerun:function-text-changed v1+M=caught v2+M=missed => ok
+C1 Y5 reading=R2-lexer-whole-item c1=rerun:function-text-changed v1+M=caught v2+M=missed => ok
+C1 Y5 reading=R3-lexer-body-only c1=reuse v1+M=caught v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y6 shape=另一个文件的 impl 覆盖 trait 默认方法 mutated-function=mcore/src/y6_trait.rs::pub trait Sz::size#1 other-changed-files=["mcore/src/y6_impl.rs:added=['impl crate : : y6_trait : : Sz for P::size#1'] removed=[]"]
+C1 Y6 reading=R1-regex-whole-item => reuse
+C1 Y6 reading=R2-lexer-whole-item => reuse
+C1 Y6 reading=R3-lexer-body-only => reuse
+C1 Y6 v2-baseline-failing=[] v1+M=caught ['y6_size_is_even'] v2+M=missed []
+C1 Y6 reading=R1-regex-whole-item c1=reuse v1+M=caught v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y6 reading=R2-lexer-whole-item c1=reuse v1+M=caught v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y6 reading=R3-lexer-body-only c1=reuse v1+M=caught v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y7 shape=Cargo.toml 的 overflow-checks mutated-function=mcore/src/y7.rs::<file>::next#1 other-changed-files=['Cargo.toml:not-rust(C1-silent)']
+C1 Y7 reading=R1-regex-whole-item => reuse
+C1 Y7 reading=R2-lexer-whole-item => reuse
+C1 Y7 reading=R3-lexer-body-only => reuse
+C1 Y7 v2-baseline-failing=[] v1+M=caught ['y7_next_of_zero_is_positive'] v2+M=missed []
+C1 Y7 reading=R1-regex-whole-item c1=reuse v1+M=caught v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y7 reading=R2-lexer-whole-item c1=reuse v1+M=caught v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y7 reading=R3-lexer-body-only c1=reuse v1+M=caught v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y8 shape=include_str! 读的数据文件 mutated-function=mcore/src/y8.rs::<file>::scaled#1 other-changed-files=['mcore/src/y8_k.txt:not-rust(C1-silent)']
+C1 Y8 reading=R1-regex-whole-item => reuse
+C1 Y8 reading=R2-lexer-whole-item => reuse
+C1 Y8 reading=R3-lexer-body-only => reuse
+C1 Y8 v2-baseline-failing=[] v1+M=caught ['y8_scaled_is_even'] v2+M=missed []
+C1 Y8 reading=R1-regex-whole-item c1=reuse v1+M=caught v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y8 reading=R2-lexer-whole-item c1=reuse v1+M=caught v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y8 reading=R3-lexer-body-only c1=reuse v1+M=caught v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y9 shape=别的文件给返回类型加 derive(Default)，无效的变异变得编得过 mutated-function=mcore/src/y9.rs::<file>::make#1 other-changed-files=['mcore/src/y9_type.rs:added=[] removed=[]']
+C1 Y9 reading=R1-regex-whole-item => reuse
+C1 Y9 reading=R2-lexer-whole-item => reuse
+C1 Y9 reading=R3-lexer-body-only => reuse
+C1 Y9 v2-baseline-failing=[] v1+M=unviable [] v2+M=missed []
+C1 Y9 reading=R1-regex-whole-item c1=reuse v1+M=unviable v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y9 reading=R2-lexer-whole-item c1=reuse v1+M=unviable v2+M=missed => HOLE(reused-verdict-flips)
+C1 Y9 reading=R3-lexer-body-only c1=reuse v1+M=unviable v2+M=missed => HOLE(reused-verdict-flips)

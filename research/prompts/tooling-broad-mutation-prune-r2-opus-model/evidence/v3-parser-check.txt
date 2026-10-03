@@ -1,0 +1,12 @@
+mutations 5091 {'innermost-name-matches': 4918, 'no-enclosing-fn': 170, 'innermost-name-differs': 3}
+  innermost-name-matches | crates/singlefs-core/src/address.rs:72:9: replace DataUnitIndexInFile::first_file_byte -> FileOffsetInBytes with Default::default()
+  innermost-name-matches | crates/singlefs-core/src/address.rs:84:9: replace SlotNumber::to_device_offset -> DeviceOffsetInBytes with Default::default()
+  innermost-name-matches | crates/singlefs-core/src/address.rs:84:36: replace * with + in SlotNumber::to_device_offset
+  innermost-name-matches | crates/singlefs-core/src/address.rs:84:36: replace * with / in SlotNumber::to_device_offset
+  no-enclosing-fn | crates/singlefs-core/src/address.rs:90:38: replace << with >>
+  no-enclosing-fn | crates/singlefs-core/src/admission.rs:167:84: replace - with +
+  no-enclosing-fn | crates/singlefs-core/src/admission.rs:167:84: replace - with /
+  no-enclosing-fn | crates/singlefs-core/src/allocation_record_tree.rs:36:44: replace - with +
+  innermost-name-differs | crates/singlefs-core/src/transaction.rs:224:9: replace PoolWriter<'_, Device>::set_code_two_tree_node_capacities with ()
+  innermost-name-differs | crates/singlefs-core/src/transaction.rs:255:9: replace PoolWriter<'_, Device>::set_journal_record_named_entry_capacity with ()
+  innermost-name-differs | crates/singlefs-core/src/transaction.rs:424:9: replace PoolWriter<'_, Device>::count_failed_publish with ()

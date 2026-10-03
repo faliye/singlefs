@@ -1,0 +1,4 @@
+ac09739407883530a1d72045b6bf88156733000ab85db75a897259d4f1e9b8f8  .claude/kb/checks-owed.md
+9ead76b1848dcff49f8ad8165272bc9ec035bb2fad01c2267685d9b52daec168  .claude/kb/decisions/13-验证路线.md
+6da581c429139dc2cebe20b1fc0b3754f8f89eb1df62eb1ded502fa777f800a9  .claude/kb/decisions-history.md
+203f86d71dfc2d4cdfb534ed30517f8549ed865c9ddc01aa87fc298245479b0b  .claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md

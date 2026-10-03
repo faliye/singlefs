@@ -1,0 +1,2 @@
+fabe412c9e1abacb7f2d24c382cdff642cc23cd9ede1f0f5260568b30e4b52af  .claude/kb/decisions/13-验证路线.md
+8e12808fd8a2e2e7b0f0c2568527b3a889e1d7558d8c4b34e79318136b504a3f  .claude/kb/checks-owed.md

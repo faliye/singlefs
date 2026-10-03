@@ -1,0 +1,7 @@
+[package]
+name = "model-tier"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+model-core = { path = "../core" }

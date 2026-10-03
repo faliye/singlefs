@@ -1,0 +1,30 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：三方攻方腿与同轮别的腿并行各跑各的副本
+BASELINE v1 green 8 tests
+COVERAGE v1 harness/tests/const_values.rs::compile_time_values_are_pinned files=harness/tests/const_values.rs llvm-cov-names=/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/harness/tests/const_values.rs
+COVERAGE v1 harness/tests/generic_inline_closure.rs::generic_inline_and_closure_code_runs files=core/src/generic.rs,harness/tests/generic_inline_closure.rs llvm-cov-names=/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/core/src/generic.rs,/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/harness/tests/generic_inline_closure.rs
+COVERAGE v1 harness/tests/macro_wrap.rs::the_macro_wraps_once files=core/src/macro_user.rs,harness/tests/macro_wrap.rs llvm-cov-names=/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/core/src/macro_user.rs,/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/harness/tests/macro_wrap.rs
+COVERAGE v1 harness/tests/ring_slots.rs::forty_publishes_land_inside_the_ring files=core/src/ring.rs,harness/tests/ring_slots.rs llvm-cov-names=/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/core/src/ring.rs,/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/harness/tests/ring_slots.rs
+COVERAGE v1 harness/tests/split_units.rs::units_match_the_ceiling_division_over_the_sample files=core/src/split.rs,harness/tests/common/mod.rs,harness/tests/split_units.rs llvm-cov-names=/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/core/src/split.rs,/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/harness/tests/common/mod.rs,/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/harness/tests/split_units.rs
+COVERAGE v1 harness/tests/thing_describe.rs::a_gadget_describes_itself_with_the_next_number files=core/src/extra.rs,core/src/render.rs,harness/tests/thing_describe.rs llvm-cov-names=/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/core/src/extra.rs,/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/core/src/render.rs,/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/harness/tests/thing_describe.rs
+COVERAGE v1 harness/tests/thing_describe.rs::a_thing_describes_itself_with_the_next_number files=core/src/thing.rs,harness/tests/thing_describe.rs llvm-cov-names=/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/core/src/thing.rs,/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/harness/tests/thing_describe.rs
+COVERAGE v1 tier/tests/uses_harness_common.rs::the_shared_module_is_reached_through_a_path_with_dot_dot files=core/src/split.rs,harness/tests/common/mod.rs,tier/tests/uses_harness_common.rs llvm-cov-names=/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/core/src/split.rs,/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/tier/tests/../../harness/tests/common/mod.rs,/tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/model-work/v1/tier/tests/uses_harness_common.rs
+SCENARIO S1 v1+M failing=['harness/tests/split_units.rs::units_match_the_ceiling_division_over_the_sample'] => caught
+SCENARIO S1 reading=A-first-version-coverage T=harness/tests/split_units.rs::units_match_the_ceiling_division_over_the_sample associated=core/src/split.rs,harness/tests/common/mod.rs,harness/tests/split_units.rs changed=fmtc/src/lib.rs P1-P3=reuse caught
+SCENARIO S1 reading=B-second-version-coverage T=harness/tests/split_units.rs::units_match_the_ceiling_division_over_the_sample associated=core/src/split.rs,harness/tests/common/mod.rs,harness/tests/split_units.rs changed=fmtc/src/lib.rs P1-P3=reuse caught
+SCENARIO S1 v2-baseline=green v2+M failing=none => rerun-verdict=missed
+SCENARIO S2 v1+M failing=['harness/tests/ring_slots.rs::forty_publishes_land_inside_the_ring'] => caught
+SCENARIO S2 reading=A-first-version-coverage T=harness/tests/ring_slots.rs::forty_publishes_land_inside_the_ring associated=core/src/layout.rs,core/src/ring.rs,harness/tests/ring_slots.rs changed=fmtc/src/lib.rs P1-P3=reuse caught
+SCENARIO S2 reading=B-second-version-coverage T=harness/tests/ring_slots.rs::forty_publishes_land_inside_the_ring associated=core/src/layout.rs,core/src/ring.rs,harness/tests/ring_slots.rs changed=fmtc/src/lib.rs P1-P3=reuse caught
+SCENARIO S2 v2-baseline=green v2+M failing=none => rerun-verdict=missed
+SCENARIO S4a v1+M failing=['harness/tests/thing_describe.rs::a_thing_describes_itself_with_the_next_number'] => caught
+SCENARIO S4a reading=A-first-version-coverage T=harness/tests/thing_describe.rs::a_thing_describes_itself_with_the_next_number associated=core/src/thing.rs,harness/tests/thing_describe.rs changed=core/src/extra.rs P1-P3=reuse caught
+SCENARIO S4a reading=B-second-version-coverage T=harness/tests/thing_describe.rs::a_thing_describes_itself_with_the_next_number associated=core/src/extra.rs,core/src/thing.rs,harness/tests/thing_describe.rs changed=core/src/extra.rs P1-P3=rerun
+SCENARIO S4a v2-baseline=green v2+M failing=none => rerun-verdict=missed
+SCENARIO S4b v1+M failing=['harness/tests/thing_describe.rs::a_gadget_describes_itself_with_the_next_number'] => caught
+SCENARIO S4b reading=A-first-version-coverage T=harness/tests/thing_describe.rs::a_gadget_describes_itself_with_the_next_number associated=core/src/extra.rs,core/src/render.rs,harness/tests/thing_describe.rs changed=core/src/extra.rs P1-P3=rerun
+SCENARIO S4b reading=B-second-version-coverage T=harness/tests/thing_describe.rs::a_gadget_describes_itself_with_the_next_number associated=core/src/render.rs,core/src/thing.rs,harness/tests/thing_describe.rs changed=core/src/extra.rs P1-P3=reuse caught
+SCENARIO S4b v2-baseline=green v2+M failing=none => rerun-verdict=missed
+SCENARIO S7 v1+M failing=['harness/tests/const_values.rs::compile_time_values_are_pinned'] => caught
+SCENARIO S7 tests-whose-coverage-includes-the-mutated-file=none
+SCENARIO S7b v1+M failing=['harness/tests/const_values.rs::compile_time_values_are_pinned'] => caught
+SCENARIO S7b tests-whose-coverage-includes-the-mutated-file=none

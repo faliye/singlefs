@@ -1,0 +1,16 @@
+commits: 14
+dbcc0d2f: Cargo.lock .cargo litmus .claude/gate.d/stage-inputs.tsv
+bc57af7a: Cargo.toml .cargo litmus .claude/gate.d/stage-inputs.tsv crates/singlefs-format/Cargo.toml format/lib.rs
+973e1f58: Cargo.lock Cargo.toml .claude/gate.d/stage-inputs.tsv crates/singlefs-checker/Cargo.toml crates/singlefs-harness/Cargo.toml format/lib.rs
+c3540c02:
+45d49aaf: format/lib.rs
+346f5e6c: format/lib.rs
+a1f4691b: .cargo format/lib.rs
+8186d5b5:
+3cff909b: format/lib.rs
+495bede6: litmus format/lib.rs
+0a47816d:
+cae5092f:
+5f9e449d:
+d2aeb7de: format/lib.rs
+format lib.rs changed in 8 of 14; stage-inputs.tsv in 3; litmus in 3; any global/data file changed in 9

@@ -1,0 +1,99 @@
+SCENARIO C1 v1-baseline=green(7) v1+M failing=['harness/tests/route_small.rs::small_values_take_the_small_path'] => caught
+SCENARIO C1 T=harness/tests/route_small.rs::small_values_take_the_small_path T-on-v1+M-executed=core/src/big.rs,core/src/route.rs,harness/tests/route_small.rs not-in-v1-or-v2-baseline-coverage-of-T=core/src/big.rs
+SCENARIO C1 caught-tests=['harness/tests/route_small.rs::small_values_take_the_small_path'] union-coverage=core/src/route.rs,core/src/small.rs,harness/tests/route_small.rs P3-B8-closure-adds=none changed=core/src/small.rs
+SCENARIO C1 reading-丁-closure-adds=none
+SCENARIO C1 reading=甲 mutated-function-and-outside-unchanged=True changed-associated=core/src/small.rs => rerun
+SCENARIO C1 reading=乙内 mutated-function-and-outside-unchanged=True changed-associated=core/src/small.rs => rerun
+SCENARIO C1 reading=乙外 mutated-function-and-outside-unchanged=True changed-associated=core/src/small.rs => rerun
+SCENARIO C1 reading=丙 mutated-function-and-outside-unchanged=True changed-associated=core/src/small.rs => rerun
+SCENARIO C1 reading=丁 mutated-function-and-outside-unchanged=True changed-associated=core/src/small.rs => rerun
+SCENARIO C1 v2-baseline=green(7) v2+M failing=['harness/tests/route_small.rs::small_values_take_the_small_path'] => rerun-verdict=caught
+SCENARIO C2 v1-baseline=green(7) v1+M failing=['harness/tests/describe_slot.rs::describe_names_the_slot'] => caught
+SCENARIO C2 T=harness/tests/describe_slot.rs::describe_names_the_slot T-on-v1+M-executed=core/src/slots.rs,harness/tests/describe_slot.rs not-in-v1-or-v2-baseline-coverage-of-T=none
+SCENARIO C2 caught-tests=['harness/tests/describe_slot.rs::describe_names_the_slot'] union-coverage=core/src/slots.rs,harness/tests/describe_slot.rs P3-B8-closure-adds=none changed=core/src/slots.rs
+SCENARIO C2 reading-丁-closure-adds=none
+SCENARIO C2 reading=甲 mutated-function-and-outside-unchanged=True changed-associated=core/src/slots.rs => rerun
+SCENARIO C2 reading=乙内 mutated-function-and-outside-unchanged=False changed-associated=none => rerun
+SCENARIO C2 reading=乙外 mutated-function-and-outside-unchanged=False changed-associated=none => rerun
+SCENARIO C2 reading=丙 mutated-function-and-outside-unchanged=True changed-associated=core/src/slots.rs => rerun
+SCENARIO C2 reading=丁 mutated-function-and-outside-unchanged=True changed-associated=core/src/slots.rs => rerun
+SCENARIO C2 v2-baseline=green(7) v2+M failing=['harness/tests/describe_slot.rs::describe_names_the_slot'] => rerun-verdict=caught
+SCENARIO FA v1-baseline=green(7) v1+M failing=['harness/tests/describe_slot.rs::describe_names_the_slot'] => caught
+SCENARIO FA T=harness/tests/describe_slot.rs::describe_names_the_slot T-on-v1+M-executed=core/src/slots.rs,harness/tests/describe_slot.rs not-in-v1-or-v2-baseline-coverage-of-T=none
+SCENARIO FA caught-tests=['harness/tests/describe_slot.rs::describe_names_the_slot'] union-coverage=core/src/slots.rs,harness/tests/describe_slot.rs P3-B8-closure-adds=none changed=core/src/slots.rs
+SCENARIO FA reading-丁-closure-adds=none
+SCENARIO FA reading=甲 mutated-function-and-outside-unchanged=True changed-associated=core/src/slots.rs => rerun
+SCENARIO FA reading=乙内 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FA reading=乙外 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FA reading=丙 mutated-function-and-outside-unchanged=True changed-associated=core/src/slots.rs => rerun
+SCENARIO FA reading=丁 mutated-function-and-outside-unchanged=True changed-associated=core/src/slots.rs => rerun
+SCENARIO FA v2-baseline=green(7) v2+M failing=none => rerun-verdict=missed
+SCENARIO FA2 v1-baseline=green(7) v1+M failing=['harness/tests/thing_describe.rs::thing_describes_itself'] => caught
+SCENARIO FA2 T=harness/tests/thing_describe.rs::thing_describes_itself T-on-v1+M-executed=core/src/thing.rs,harness/tests/thing_describe.rs not-in-v1-or-v2-baseline-coverage-of-T=none
+SCENARIO FA2 caught-tests=['harness/tests/thing_describe.rs::thing_describes_itself'] union-coverage=core/src/thing.rs,harness/tests/thing_describe.rs P3-B8-closure-adds=none changed=core/src/thing.rs
+SCENARIO FA2 reading-丁-closure-adds=none
+SCENARIO FA2 reading=甲 mutated-function-and-outside-unchanged=True changed-associated=core/src/thing.rs => rerun
+SCENARIO FA2 reading=乙内 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FA2 reading=乙外 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FA2 reading=丙 mutated-function-and-outside-unchanged=True changed-associated=core/src/thing.rs => rerun
+SCENARIO FA2 reading=丁 mutated-function-and-outside-unchanged=True changed-associated=core/src/thing.rs => rerun
+SCENARIO FA2 v2-baseline=green(7) v2+M failing=none => rerun-verdict=missed
+SCENARIO FB v1-baseline=green(7) v1+M failing=['harness/tests/frame_roundtrip.rs::frame_of_five_checks'] => caught
+SCENARIO FB T=harness/tests/frame_roundtrip.rs::frame_of_five_checks T-on-v1+M-executed=core/src/codec_strict.rs,core/src/frame.rs,harness/tests/frame_roundtrip.rs not-in-v1-or-v2-baseline-coverage-of-T=none
+SCENARIO FB caught-tests=['harness/tests/frame_roundtrip.rs::frame_of_five_checks'] union-coverage=core/src/codec_lenient.rs,core/src/codec_strict.rs,core/src/frame.rs,harness/tests/frame_roundtrip.rs P3-B8-closure-adds=none changed=core/src/codec.rs
+SCENARIO FB reading-丁-closure-adds=core/src/codec.rs
+SCENARIO FB reading=甲 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FB reading=乙内 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FB reading=乙外 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FB reading=丙 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FB reading=丁 mutated-function-and-outside-unchanged=True changed-associated=core/src/codec.rs => rerun
+SCENARIO FB v2-baseline=green(7) v2+M failing=none => rerun-verdict=missed
+SCENARIO FC v1-baseline=green(7) v1+M failing=['harness/tests/pack_word.rs::pack_puts_high_above_low'] => caught
+SCENARIO FC T=harness/tests/pack_word.rs::pack_puts_high_above_low T-on-v1+M-executed=core/src/pack.rs,harness/tests/pack_word.rs not-in-v1-or-v2-baseline-coverage-of-T=none
+SCENARIO FC caught-tests=['harness/tests/pack_word.rs::pack_puts_high_above_low'] union-coverage=core/src/pack.rs,harness/tests/pack_word.rs P3-B8-closure-adds=none changed=core/src/word.rs
+SCENARIO FC reading-丁-closure-adds=core/src/word.rs
+SCENARIO FC reading=甲 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FC reading=乙内 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FC reading=乙外 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FC reading=丙 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FC reading=丁 mutated-function-and-outside-unchanged=True changed-associated=core/src/word.rs => rerun
+SCENARIO FC v2-baseline=green(7) v2+M failing=none => rerun-verdict=missed
+SCENARIO FD v1-baseline=green(7) v1+M failing=['harness/tests/tag_kind.rs::tag_scales_by_the_kind_code'] => caught
+SCENARIO FD T=harness/tests/tag_kind.rs::tag_scales_by_the_kind_code T-on-v1+M-executed=core/src/tag.rs,harness/tests/tag_kind.rs not-in-v1-or-v2-baseline-coverage-of-T=none
+SCENARIO FD caught-tests=['harness/tests/tag_kind.rs::tag_scales_by_the_kind_code'] union-coverage=core/src/tag.rs,harness/tests/tag_kind.rs P3-B8-closure-adds=none changed=core/src/kind.rs
+SCENARIO FD reading-丁-closure-adds=core/src/kind.rs
+SCENARIO FD reading=甲 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FD reading=乙内 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FD reading=乙外 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FD reading=丙 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FD reading=丁 mutated-function-and-outside-unchanged=True changed-associated=core/src/kind.rs => rerun
+SCENARIO FD v2-baseline=green(7) v2+M failing=none => rerun-verdict=missed
+SCENARIO FF v1-baseline=green(7) v1+M failing=['harness/tests/nested_outer.rs::outer_of_three_is_eight'] => caught
+SCENARIO FF T=harness/tests/nested_outer.rs::outer_of_three_is_eight T-on-v1+M-executed=core/src/nested.rs,harness/tests/nested_outer.rs not-in-v1-or-v2-baseline-coverage-of-T=none
+SCENARIO FF caught-tests=['harness/tests/nested_outer.rs::outer_of_three_is_eight'] union-coverage=core/src/nested.rs,harness/tests/nested_outer.rs P3-B8-closure-adds=none changed=core/src/nested.rs
+SCENARIO FF reading-丁-closure-adds=none
+SCENARIO FF reading=甲 mutated-function-and-outside-unchanged=True changed-associated=core/src/nested.rs => rerun
+SCENARIO FF reading=乙内 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FF reading=乙外 mutated-function-and-outside-unchanged=False changed-associated=none => rerun
+SCENARIO FF reading=丙 mutated-function-and-outside-unchanged=True changed-associated=core/src/nested.rs => rerun
+SCENARIO FF reading=丁 mutated-function-and-outside-unchanged=True changed-associated=core/src/nested.rs => rerun
+SCENARIO FF v2-baseline=green(7) v2+M failing=none => rerun-verdict=missed
+SCENARIO FH v1-baseline=green(7) v1+M failing=['harness/tests/route_small.rs::small_values_take_the_small_path'] => caught
+SCENARIO FH T=harness/tests/route_small.rs::small_values_take_the_small_path T-on-v1+M-executed=core/src/big.rs,core/src/route.rs,harness/tests/route_small.rs not-in-v1-or-v2-baseline-coverage-of-T=core/src/big.rs
+SCENARIO FH caught-tests=['harness/tests/route_small.rs::small_values_take_the_small_path'] union-coverage=core/src/route.rs,core/src/small.rs,harness/tests/route_small.rs P3-B8-closure-adds=none changed=core/src/big.rs
+SCENARIO FH reading-丁-closure-adds=none
+SCENARIO FH reading=甲 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FH reading=乙内 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FH reading=乙外 mutated-function-and-outside-unchanged=True changed-associated=none => reuse caught
+SCENARIO FH reading=丙 mutated-function-and-outside-unchanged=True changed-associated=core/src/big.rs => rerun
+SCENARIO FH reading=丁 mutated-function-and-outside-unchanged=True changed-associated=core/src/big.rs => rerun
+SCENARIO FH v2-baseline=green(7) v2+M failing=none => rerun-verdict=missed
+SCENARIO FH2 v1-baseline=green(7) v1+M failing=none => missed
+SCENARIO FH2 missed-tests=['harness/tests/route_small.rs::small_values_take_the_small_path'] union-coverage=core/src/route.rs,core/src/small.rs,harness/tests/route_small.rs P3-B8-closure-adds=none changed=core/src/big.rs
+SCENARIO FH2 reading-丁-closure-adds=none
+SCENARIO FH2 reading=甲 mutated-function-and-outside-unchanged=True changed-associated=none => reuse missed
+SCENARIO FH2 reading=乙内 mutated-function-and-outside-unchanged=True changed-associated=none => reuse missed
+SCENARIO FH2 reading=乙外 mutated-function-and-outside-unchanged=True changed-associated=none => reuse missed
+SCENARIO FH2 reading=丙 mutated-function-and-outside-unchanged=True changed-associated=core/src/big.rs => rerun
+SCENARIO FH2 reading=丁 mutated-function-and-outside-unchanged=True changed-associated=core/src/big.rs => rerun
+SCENARIO FH2 v2-baseline=green(7) v2+M failing=['harness/tests/route_small.rs::small_values_take_the_small_path'] => rerun-verdict=caught

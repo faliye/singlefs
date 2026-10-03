@@ -1,0 +1,11 @@
+scenario	v1_file	v1_source	v2_file	v2_source	mutated_file	mutated_fn	old	new
+C1	-	-	core/src/small.rs	v2/C1-small.rs	core/src/route.rs	route	value > 100	value < /* ~ changed by cargo-mutants ~ */ 100
+C2	-	-	core/src/slots.rs	v2/C2-slots.rs	core/src/slots.rs	slot_of	offset / 4096	offset % /* ~ changed by cargo-mutants ~ */ 4096
+FA	-	-	core/src/slots.rs	v2/FA-slots.rs	core/src/slots.rs	slot_of	offset / 4096	offset % /* ~ changed by cargo-mutants ~ */ 4096
+FA2	-	-	core/src/thing.rs	v2/FA2-thing.rs	core/src/thing.rs	impl Describe for Thing::describe	self.0 + 1	self.0 - /* ~ changed by cargo-mutants ~ */ 1
+FB	-	-	core/src/codec.rs	v2/FB-codec.rs	core/src/frame.rs	encode_len	length + 1	length - /* ~ changed by cargo-mutants ~ */ 1
+FC	-	-	core/src/word.rs	v2/FC-word.rs	core/src/pack.rs	pack	high << 8	high >> /* ~ changed by cargo-mutants ~ */ 8
+FD	-	-	core/src/kind.rs	v2/FD-kind.rs	core/src/tag.rs	tag	(kind as u64) * count	(kind as u64) + /* ~ changed by cargo-mutants ~ */ count
+FF	-	-	core/src/nested.rs	v2/FF-nested.rs	core/src/nested.rs	inner	input + 1	input - /* ~ changed by cargo-mutants ~ */ 1
+FH	-	-	core/src/big.rs	v2/FH-big.rs	core/src/route.rs	route	value > 100	value < /* ~ changed by cargo-mutants ~ */ 100
+FH2	core/src/big.rs	v2/FH-big.rs	core/src/big.rs	ws	core/src/route.rs	route	value > 100	value < /* ~ changed by cargo-mutants ~ */ 100

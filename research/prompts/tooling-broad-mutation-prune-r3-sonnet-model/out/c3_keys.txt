@@ -1,0 +1,4 @@
+qualified name not parsed: 0
+(file, qualified) keys 1031 with >1 function start: 0 mutants in them: 0
+(file, bare fn name) keys 974 with >1 function start: 38 mutants in them: 217
+mutants in functions 4921 distinct (fn, rel start, rel end, replacement) keys 4921 dup keys 0

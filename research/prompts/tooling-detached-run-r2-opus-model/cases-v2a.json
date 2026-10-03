@@ -1,0 +1,147 @@
+[
+[
+"A0 基线 子 agent 真名 start",
+"clerk",
+"bash research/scripts/detached-run.sh start --label m -- sleep 1"
+],
+[
+"A1 time -p",
+"clerk",
+"time -p bash research/scripts/detached-run.sh start --label m -- sleep 1"
+],
+[
+"A2 env -S",
+"clerk",
+"env -S 'bash research/scripts/detached-run.sh start --label m -- sleep 1'"
+],
+[
+"A3 builtin source",
+"clerk",
+"builtin source research/scripts/detached-run.sh start --label m -- sleep 1"
+],
+[
+"A4 bash --rcfile",
+"clerk",
+"bash --rcfile /dev/null research/scripts/detached-run.sh start --label m -- sleep 1"
+],
+[
+"A5 function 关键字",
+"clerk",
+"function f { bash research/scripts/detached-run.sh start --label m -- sleep 1; }; f"
+],
+[
+"A7 第二行深嵌套",
+"clerk",
+"bash research/scripts/detached-run.sh start --label m -- sleep 1\necho \"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\"$(\""
+],
+[
+"A8 exec -a",
+"clerk",
+"exec -a x bash research/scripts/detached-run.sh start --label m -- sleep 1"
+],
+[
+"A9 bash --",
+"clerk",
+"bash -- research/scripts/detached-run.sh start --label m -- sleep 1"
+],
+[
+"A18 cp 花括号改名",
+"clerk",
+"cp research/scripts/detached-run.sh{,.bak} && bash research/scripts/detached-run.sh.bak start --label m -- sleep 1"
+],
+[
+"A20 cp 后 //tmp",
+"clerk",
+"cp research/scripts/detached-run.sh /tmp/opusr2-x.sh && bash //tmp/opusr2-x.sh start --label m -- sleep 1"
+],
+[
+"A27 stop 走 --force 前置",
+"clerk",
+"bash research/scripts/detached-run.sh --force stop m"
+],
+[
+"B5 基线 主 agent 全量",
+null,
+"bash research/scripts/detached-run.sh start --label p -- cargo test --all"
+],
+[
+"B1 -- 之后 --force",
+null,
+"bash research/scripts/detached-run.sh start --label p -- --force cargo test --all"
+],
+[
+"B2 --label --force",
+null,
+"bash research/scripts/detached-run.sh start --label --force p -- cargo test --all"
+],
+[
+"B3 --log --force -- --",
+null,
+"bash research/scripts/detached-run.sh start --label p --log --force -- -- cargo test --all"
+],
+[
+"B4 cargo --force test",
+null,
+"bash research/scripts/detached-run.sh start --label p -- cargo --force test --all"
+],
+[
+"B6 time -p cargo 全量",
+null,
+"time -p cargo test --all"
+],
+[
+"B7 bash -- 全量",
+null,
+"bash -- research/scripts/detached-run.sh start --label p -- cargo test --all"
+],
+[
+"B8 子 agent time -p checker 档",
+"clerk",
+"time -p cargo test -p singlefs-checker-tier"
+],
+[
+"B9 子 agent -- --force checker 档(拒在 bash 闸)",
+"clerk",
+"bash research/scripts/detached-run.sh start --label p -- --force cargo test -p singlefs-checker-tier"
+],
+[
+"C3 基线 主 agent 内层 disown",
+null,
+"bash research/scripts/detached-run.sh start --label p -- bash -c 'sleep 100 & disown'"
+],
+[
+"C1 -- --force 内层 disown",
+null,
+"bash research/scripts/detached-run.sh start --label p -- --force bash -c 'sleep 100 & disown'"
+],
+[
+"C2 --label --force 内层 disown",
+null,
+"bash research/scripts/detached-run.sh start --label --force p -- bash -c 'sleep 100 & disown'"
+],
+[
+"C4 -- --force 内层 kill -- -1",
+null,
+"bash research/scripts/detached-run.sh start --label p -- --force bash -c 'kill -- -1'"
+],
+[
+"D1 子 agent bash -n",
+"clerk",
+"bash -n research/scripts/detached-run.sh"
+],
+[
+"D6 子 agent list",
+"clerk",
+"bash research/scripts/detached-run.sh list"
+],
+[
+"D7 子 agent 拷贝后 bash -n",
+"clerk",
+"cp research/scripts/detached-run.sh /tmp/opusr2-y.sh && bash -n /tmp/opusr2-y.sh"
+],
+[
+"E1 主 agent 主仓绝对路径带 nice",
+null,
+"cd /tmp && nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label m-2026-10-01 -- sleep 1"
+]
+]

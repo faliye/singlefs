@@ -1,0 +1,187 @@
+branchy 59 other 127
+B 34 crates/singlefs-core/src/admission.rs:447:26: replace < with > in admit_on_every_device
+B 42 crates/singlefs-core/src/admission.rs:565:61: replace < with > in admit_the_units_landing_on_every_device
+B 44 crates/singlefs-core/src/admission.rs:580:46: replace < with == in admit_the_units_landing_on_every_device
+B 46 crates/singlefs-core/src/admission.rs:580:46: replace < with <= in admit_the_units_landing_on_every_device
+B 84 crates/singlefs-core/src/admission.rs:851:13: delete match arm 0 in central_mapping_tree_nodes_an_empty_publish_rewrites_at_most
+B 90 crates/singlefs-core/src/admission.rs:868:40: replace <= with > in central_mapping_tree_nodes_an_empty_publish_rewrites_at_most
+B 94 crates/singlefs-core/src/admission.rs:885:37: replace > with < in central_mapping_tree_nodes_an_empty_publish_rewrites_at_most
+B 98 crates/singlefs-core/src/admission.rs:887:67: replace <= with > in central_mapping_tree_nodes_an_empty_publish_rewrites_at_most
+B 106 crates/singlefs-core/src/admission.rs:944:5: replace publish_has_an_ordinary_allocation -> bool with true
+B 108 crates/singlefs-core/src/admission.rs:946:49: replace == with != in publish_has_an_ordinary_allocation
+B 140 crates/singlefs-core/src/allocation_record_tree.rs:174:9: replace AllocationRecordTreeGeometry::has_device -> bool with false
+B 166 crates/singlefs-core/src/allocation_record_tree.rs:257:12: delete ! in AllocationRecordTreeGeometry::child_named_by_entry_key
+B 170 crates/singlefs-core/src/allocation_record_tree.rs:266:37: replace == with != in AllocationRecordTreeGeometry::child_named_by_entry_key
+B 172 crates/singlefs-core/src/allocation_record_tree.rs:272:9: replace AllocationRecordTreeGeometry::record_fits_in_its_leaf -> bool with false
+B 174 crates/singlefs-core/src/allocation_record_tree.rs:278:27: replace > with == in AllocationRecordTreeGeometry::record_fits_in_its_leaf
+B 198 crates/singlefs-core/src/allocation_record_tree.rs:374:30: replace != with == in nodes_whose_contents_changed
+B 280 crates/singlefs-core/src/allocator.rs:79:24: replace < with == in AllocationRecord::parse
+B 282 crates/singlefs-core/src/allocator.rs:79:24: replace < with <= in AllocationRecord::parse
+B 286 crates/singlefs-core/src/allocator.rs:92:71: replace != with == in AllocationRecord::parse
+B 298 crates/singlefs-core/src/allocator.rs:170:8: delete ! in agreement_across_devices
+B 320 crates/singlefs-core/src/allocator.rs:387:50: replace > with < in DeviceFreeMap::with_unit_area_start
+B 328 crates/singlefs-core/src/allocator.rs:429:9: replace DeviceFreeMap::is_unblocked_at_index -> bool with true
+B 330 crates/singlefs-core/src/allocator.rs:431:13: replace && with || in DeviceFreeMap::is_unblocked_at_index
+B 332 crates/singlefs-core/src/allocator.rs:429:9: delete ! in DeviceFreeMap::is_unblocked_at_index
+B 334 crates/singlefs-core/src/allocator.rs:431:16: delete ! in DeviceFreeMap::is_unblocked_at_index
+B 336 crates/singlefs-core/src/allocator.rs:437:9: replace DeviceFreeMap::is_unblocked_pair_at_index -> bool with false
+B 342 crates/singlefs-core/src/allocator.rs:439:13: replace && with || in DeviceFreeMap::is_unblocked_pair_at_index
+B 344 crates/singlefs-core/src/allocator.rs:438:37: replace < with > in DeviceFreeMap::is_unblocked_pair_at_index
+B 374 crates/singlefs-core/src/allocator.rs:515:9: replace DeviceFreeMap::is_free -> bool with false
+B 376 crates/singlefs-core/src/allocator.rs:518:13: replace && with || in DeviceFreeMap::is_free
+B 378 crates/singlefs-core/src/allocator.rs:516:13: replace && with || in DeviceFreeMap::is_free
+B 380 crates/singlefs-core/src/allocator.rs:516:23: replace < with == in DeviceFreeMap::is_free
+B 384 crates/singlefs-core/src/allocator.rs:518:16: delete ! in DeviceFreeMap::is_free
+B 408 crates/singlefs-core/src/allocator.rs:584:16: delete ! in DeviceFreeMap::isolate
+B 432 crates/singlefs-core/src/allocator.rs:631:9: replace DeviceFreeMap::is_blocked_for_commit_generated -> bool with true
+B 434 crates/singlefs-core/src/allocator.rs:632:55: replace || with && in DeviceFreeMap::is_blocked_for_commit_generated
+B 446 crates/singlefs-core/src/allocator.rs:664:31: replace > with == in DeviceFreeMap::mark_reclaimed
+B 448 crates/singlefs-core/src/allocator.rs:664:31: replace > with >= in DeviceFreeMap::mark_reclaimed
+B 452 crates/singlefs-core/src/allocator.rs:665:53: replace && with || in DeviceFreeMap::mark_reclaimed
+B 478 crates/singlefs-core/src/allocator.rs:696:9: replace DeviceFreeMap::segment_is_empty -> bool with true
+B 480 crates/singlefs-core/src/allocator.rs:696:46: replace == with != in DeviceFreeMap::segment_is_empty
+B 484 crates/singlefs-core/src/allocator.rs:716:35: replace && with || in DeviceFreeMap::mark_allocated
+B 486 crates/singlefs-core/src/allocator.rs:716:31: replace > with < in DeviceFreeMap::mark_allocated
+B 488 crates/singlefs-core/src/allocator.rs:716:38: delete ! in DeviceFreeMap::mark_allocated
+B 492 crates/singlefs-core/src/allocator.rs:717:30: replace < with == in DeviceFreeMap::mark_allocated
+B 512 crates/singlefs-core/src/allocator.rs:739:29: replace < with == in DeviceFreeMap::lowest_user_data_slot
+B 518 crates/singlefs-core/src/allocator.rs:741:27: replace >= with < in DeviceFreeMap::lowest_user_data_slot
+B 520 crates/singlefs-core/src/allocator.rs:741:53: replace < with > in DeviceFreeMap::lowest_user_data_slot
+B 524 crates/singlefs-core/src/allocator.rs:745:17: replace && with || in DeviceFreeMap::lowest_user_data_slot
+B 526 crates/singlefs-core/src/allocator.rs:743:16: delete ! in DeviceFreeMap::lowest_user_data_slot
+B 536 crates/singlefs-core/src/allocator.rs:762:21: replace && with || in DeviceFreeMap::lowest_empty_segment
+B 538 crates/singlefs-core/src/allocator.rs:762:60: replace == with != in DeviceFreeMap::lowest_empty_segment
+B 546 crates/singlefs-core/src/allocator.rs:783:45: replace <= with > in DeviceFreeMap::lowest_commit_generated_fallback_slot
+B 562 crates/singlefs-core/src/allocator.rs:882:17: replace && with || in make_room_for_record_on_device
+B 564 crates/singlefs-core/src/allocator.rs:882:34: replace < with == in make_room_for_record_on_device
+B 568 crates/singlefs-core/src/allocator.rs:883:37: replace < with > in make_room_for_record_on_device
+B 572 crates/singlefs-core/src/allocator.rs:897:24: replace == with != in make_room_for_record_on_device
+B 576 crates/singlefs-core/src/allocator.rs:908:37: delete ! in make_room_for_record_on_device
+B 578 crates/singlefs-core/src/allocator.rs:908:53: replace == with != in make_room_for_record_on_device
+O 3 crates/singlefs-core/src/address.rs:84:36: replace * with + in SlotNumber::to_device_offset
+O 3 crates/singlefs-core/src/address.rs:84:36: replace * with + in SlotNumber::to_device_offset
+O 4 crates/singlefs-core/src/address.rs:84:36: replace * with / in SlotNumber::to_device_offset
+O 5 crates/singlefs-core/src/address.rs:90:38: replace << with >>
+O 10 crates/singlefs-core/src/admission.rs:129:9: replace ReplicaCount::replicas -> u64 with 0
+O 11 crates/singlefs-core/src/admission.rs:129:9: replace ReplicaCount::replicas -> u64 with 1
+O 13 crates/singlefs-core/src/admission.rs:167:84: replace - with +
+O 14 crates/singlefs-core/src/admission.rs:167:84: replace - with /
+O 18 crates/singlefs-core/src/admission.rs:219:62: replace + with * in instance_switch_reserve_on_one_device
+O 28 crates/singlefs-core/src/admission.rs:379:21: replace + with * in AdmissionReading::available_on_each_device
+O 30 crates/singlefs-core/src/admission.rs:382:76: replace - with / in AdmissionReading::available_on_each_device
+O 40 crates/singlefs-core/src/admission.rs:553:5: replace admit_the_units_landing_on_every_device -> Result<(), AdmissionRefusedOnSomeDevices> with Ok(())
+O 54 crates/singlefs-core/src/admission.rs:736:5: replace allocation_record_tree_positions_over_the_unit_areas -> u64 with 1
+O 56 crates/singlefs-core/src/admission.rs:746:13: replace + with * in allocation_record_tree_positions_over_the_unit_areas
+O 58 crates/singlefs-core/src/admission.rs:754:17: replace + with * in allocation_record_tree_positions_over_the_unit_areas
+O 60 crates/singlefs-core/src/admission.rs:753:17: replace - with / in allocation_record_tree_positions_over_the_unit_areas
+O 62 crates/singlefs-core/src/admission.rs:752:70: replace / with * in allocation_record_tree_positions_over_the_unit_areas
+O 64 crates/singlefs-core/src/admission.rs:753:47: replace / with * in allocation_record_tree_positions_over_the_unit_areas
+O 74 crates/singlefs-core/src/admission.rs:808:5: replace splits_at_one_level_at_most -> u64 with 0
+O 76 crates/singlefs-core/src/admission.rs:810:9: replace + with - in splits_at_one_level_at_most
+O 78 crates/singlefs-core/src/admission.rs:810:60: replace / with % in splits_at_one_level_at_most
+O 80 crates/singlefs-core/src/admission.rs:810:22: replace - with + in splits_at_one_level_at_most
+O 82 crates/singlefs-core/src/admission.rs:828:5: replace central_mapping_tree_nodes_an_empty_publish_rewrites_at_most -> u64 with 0
+O 86 crates/singlefs-core/src/admission.rs:867:52: replace + with - in central_mapping_tree_nodes_an_empty_publish_rewrites_at_most
+O 88 crates/singlefs-core/src/admission.rs:867:47: replace - with + in central_mapping_tree_nodes_an_empty_publish_rewrites_at_most
+O 92 crates/singlefs-core/src/admission.rs:880:65: replace + with * in central_mapping_tree_nodes_an_empty_publish_rewrites_at_most
+O 96 crates/singlefs-core/src/admission.rs:886:66: replace + with - in central_mapping_tree_nodes_an_empty_publish_rewrites_at_most
+O 104 crates/singlefs-core/src/admission.rs:893:28: replace + with * in central_mapping_tree_nodes_an_empty_publish_rewrites_at_most
+O 112 crates/singlefs-core/src/admission.rs:989:9: replace InstanceRowsOfTheSwitchReserve::instance_rows -> u64 with 1
+O 120 crates/singlefs-core/src/allocation_record_tree.rs:58:5: replace allocation_record_key_bytes -> Vec<u8> with vec![]
+O 122 crates/singlefs-core/src/allocation_record_tree.rs:58:5: replace allocation_record_key_bytes -> Vec<u8> with vec![1]
+O 128 crates/singlefs-core/src/allocation_record_tree.rs:102:78: replace - with / in AllocationRecordTreeGeometry::of_devices
+O 134 crates/singlefs-core/src/allocation_record_tree.rs:162:9: replace AllocationRecordTreeGeometry::root_level -> u8 with 1
+O 136 crates/singlefs-core/src/allocation_record_tree.rs:168:9: replace AllocationRecordTreeGeometry::height -> u64 with 1
+O 138 crates/singlefs-core/src/allocation_record_tree.rs:168:36: replace + with * in AllocationRecordTreeGeometry::height
+O 144 crates/singlefs-core/src/allocation_record_tree.rs:189:37: replace / with * in AllocationRecordTreeGeometry::leaf_of_slot
+O 148 crates/singlefs-core/src/allocation_record_tree.rs:199:51: replace + with * in AllocationRecordTreeGeometry::parent_of
+O 152 crates/singlefs-core/src/allocation_record_tree.rs:219:9: replace AllocationRecordTreeGeometry::level_of -> u8 with 0
+O 154 crates/singlefs-core/src/allocation_record_tree.rs:230:9: replace AllocationRecordTreeGeometry::key_range_of -> (Vec<u8>, Vec<u8>) with (vec![], vec![])
+O 156 crates/singlefs-core/src/allocation_record_tree.rs:230:9: replace AllocationRecordTreeGeometry::key_range_of -> (Vec<u8>, Vec<u8>) with (vec![], vec![1])
+O 158 crates/singlefs-core/src/allocation_record_tree.rs:230:9: replace AllocationRecordTreeGeometry::key_range_of -> (Vec<u8>, Vec<u8>) with (vec![0], vec![0])
+O 160 crates/singlefs-core/src/allocation_record_tree.rs:230:9: replace AllocationRecordTreeGeometry::key_range_of -> (Vec<u8>, Vec<u8>) with (vec![1], vec![])
+O 162 crates/singlefs-core/src/allocation_record_tree.rs:230:9: replace AllocationRecordTreeGeometry::key_range_of -> (Vec<u8>, Vec<u8>) with (vec![1], vec![1])
+O 182 crates/singlefs-core/src/allocation_record_tree.rs:285:5: replace span_in_slots_at_level -> u64 with 0
+O 186 crates/singlefs-core/src/allocation_record_tree.rs:294:52: replace - with / in slot_range_of
+O 192 crates/singlefs-core/src/allocation_record_tree.rs:350:5: replace insert_the_node_and_its_ancestors with ()
+O 196 crates/singlefs-core/src/allocation_record_tree.rs:368:5: replace nodes_whose_contents_changed -> BTreeSet<AllocationRecordTreeNode> with BTreeSet::new()
+O 266 crates/singlefs-core/src/allocator.rs:47:9: replace AllocationRecord::to_bytes -> Vec<u8> with vec![]
+O 268 crates/singlefs-core/src/allocator.rs:47:9: replace AllocationRecord::to_bytes -> Vec<u8> with vec![1]
+O 278 crates/singlefs-core/src/allocator.rs:79:9: replace AllocationRecord::parse -> Option<Self> with None
+O 284 crates/singlefs-core/src/allocator.rs:90:36: replace & with ^ in AllocationRecord::parse
+O 290 crates/singlefs-core/src/allocator.rs:106:9: replace UnitFootprint::slots -> u64 with 1
+O 304 crates/singlefs-core/src/allocator.rs:301:5: replace absolute_slot_count_of_device -> u64 with 0
+O 306 crates/singlefs-core/src/allocator.rs:301:18: replace / with % in absolute_slot_count_of_device
+O 308 crates/singlefs-core/src/allocator.rs:322:5: replace unit_area_slots_of_device_starting_at -> Result<u64, DeviceEndsBeforeTheUnitAreaStart> with Ok(0)
+O 314 crates/singlefs-core/src/allocator.rs:376:63: replace * with / in DeviceFreeMap::with_unit_area_start
+O 316 crates/singlefs-core/src/allocator.rs:377:90: replace / with * in DeviceFreeMap::with_unit_area_start
+O 318 crates/singlefs-core/src/allocator.rs:377:34: replace - with / in DeviceFreeMap::with_unit_area_start
+O 322 crates/singlefs-core/src/allocator.rs:416:9: replace DeviceFreeMap::index -> usize with 0
+O 324 crates/singlefs-core/src/allocator.rs:424:9: replace DeviceFreeMap::unit_area_end_slot -> u64 with 0
+O 326 crates/singlefs-core/src/allocator.rs:424:39: replace + with - in DeviceFreeMap::unit_area_end_slot
+O 338 crates/singlefs-core/src/allocator.rs:437:45: replace - with / in DeviceFreeMap::is_unblocked_pair_at_index
+O 340 crates/singlefs-core/src/allocator.rs:437:53: replace % with + in DeviceFreeMap::is_unblocked_pair_at_index
+O 346 crates/singlefs-core/src/allocator.rs:438:33: replace + with - in DeviceFreeMap::is_unblocked_pair_at_index
+O 348 crates/singlefs-core/src/allocator.rs:440:67: replace + with - in DeviceFreeMap::is_unblocked_pair_at_index
+O 350 crates/singlefs-core/src/allocator.rs:445:9: replace DeviceFreeMap::set_blocking_bit with ()
+O 352 crates/singlefs-core/src/allocator.rs:455:51: replace -= with /= in DeviceFreeMap::set_blocking_bit
+O 354 crates/singlefs-core/src/allocator.rs:456:51: replace += with *= in DeviceFreeMap::set_blocking_bit
+O 356 crates/singlefs-core/src/allocator.rs:459:29: replace / with * in DeviceFreeMap::set_blocking_bit
+O 358 crates/singlefs-core/src/allocator.rs:462:64: replace -= with /= in DeviceFreeMap::set_blocking_bit
+O 360 crates/singlefs-core/src/allocator.rs:463:43: replace -= with /= in DeviceFreeMap::set_blocking_bit
+O 362 crates/singlefs-core/src/allocator.rs:466:64: replace += with *= in DeviceFreeMap::set_blocking_bit
+O 364 crates/singlefs-core/src/allocator.rs:467:43: replace += with *= in DeviceFreeMap::set_blocking_bit
+O 366 crates/singlefs-core/src/allocator.rs:476:9: replace DeviceFreeMap::unblocked_slots -> u64 with 1
+O 368 crates/singlefs-core/src/allocator.rs:491:9: replace DeviceFreeMap::unblocked_slot_pairs_outside_the_cluster_segments -> u64 with 1
+O 370 crates/singlefs-core/src/allocator.rs:502:63: replace / with * in DeviceFreeMap::unblocked_slot_pairs_outside_the_cluster_segments
+O 372 crates/singlefs-core/src/allocator.rs:510:35: replace - with / in DeviceFreeMap::unblocked_slot_pairs_outside_the_cluster_segments
+O 388 crates/singlefs-core/src/allocator.rs:528:9: replace DeviceFreeMap::unit_area_slots -> u64 with 1
+O 390 crates/singlefs-core/src/allocator.rs:532:9: replace DeviceFreeMap::device_size_in_bytes -> u64 with 1
+O 392 crates/singlefs-core/src/allocator.rs:536:9: replace DeviceFreeMap::allocated_slots -> u64 with 1
+O 394 crates/singlefs-core/src/allocator.rs:541:9: replace DeviceFreeMap::free_slots -> u64 with 1
+O 396 crates/singlefs-core/src/allocator.rs:545:9: replace DeviceFreeMap::deferred_slots -> u64 with 1
+O 398 crates/singlefs-core/src/allocator.rs:551:25: replace + with - in DeviceFreeMap::mark_released
+O 400 crates/singlefs-core/src/allocator.rs:556:29: replace += with -= in DeviceFreeMap::mark_released
+O 402 crates/singlefs-core/src/allocator.rs:561:9: replace DeviceFreeMap::mark_resurrected_out_of_the_defer_queue with ()
+O 406 crates/singlefs-core/src/allocator.rs:578:25: replace + with - in DeviceFreeMap::isolate
+O 410 crates/singlefs-core/src/allocator.rs:586:37: replace / with * in DeviceFreeMap::isolate
+O 412 crates/singlefs-core/src/allocator.rs:587:52: replace += with *= in DeviceFreeMap::isolate
+O 414 crates/singlefs-core/src/allocator.rs:588:37: replace += with *= in DeviceFreeMap::isolate
+O 416 crates/singlefs-core/src/allocator.rs:596:9: replace DeviceFreeMap::isolated_slots -> u64 with 1
+O 418 crates/singlefs-core/src/allocator.rs:605:33: replace / with % in DeviceFreeMap::clear_isolation_of_slot
+O 424 crates/singlefs-core/src/allocator.rs:613:9: replace DeviceFreeMap::hold_until_floor_takes_effect with ()
+O 426 crates/singlefs-core/src/allocator.rs:614:25: replace + with * in DeviceFreeMap::hold_until_floor_takes_effect
+O 430 crates/singlefs-core/src/allocator.rs:620:48: replace += with -= in DeviceFreeMap::hold_until_floor_takes_effect
+O 436 crates/singlefs-core/src/allocator.rs:638:9: replace DeviceFreeMap::release_holds with ()
+O 438 crates/singlefs-core/src/allocator.rs:644:39: replace * with + in DeviceFreeMap::release_holds
+O 440 crates/singlefs-core/src/allocator.rs:645:52: replace + with - in DeviceFreeMap::release_holds
+O 442 crates/singlefs-core/src/allocator.rs:658:9: replace DeviceFreeMap::mark_reclaimed with ()
+O 444 crates/singlefs-core/src/allocator.rs:659:25: replace + with * in DeviceFreeMap::mark_reclaimed
+O 458 crates/singlefs-core/src/allocator.rs:667:68: replace - with / in DeviceFreeMap::mark_reclaimed
+O 460 crates/singlefs-core/src/allocator.rs:667:45: replace - with / in DeviceFreeMap::mark_reclaimed
+O 462 crates/singlefs-core/src/allocator.rs:667:41: replace + with * in DeviceFreeMap::mark_reclaimed
+O 464 crates/singlefs-core/src/allocator.rs:670:33: replace / with * in DeviceFreeMap::mark_reclaimed
+O 470 crates/singlefs-core/src/allocator.rs:674:29: replace -= with /= in DeviceFreeMap::mark_reclaimed
+O 474 crates/singlefs-core/src/allocator.rs:680:9: replace DeviceFreeMap::free_runs -> u64 with 1
+O 476 crates/singlefs-core/src/allocator.rs:684:9: replace DeviceFreeMap::empty_segments -> u64 with 1
+O 482 crates/singlefs-core/src/allocator.rs:706:25: replace + with - in DeviceFreeMap::mark_allocated
+O 490 crates/singlefs-core/src/allocator.rs:716:60: replace - with / in DeviceFreeMap::mark_allocated
+O 496 crates/singlefs-core/src/allocator.rs:718:48: replace + with - in DeviceFreeMap::mark_allocated
+O 498 crates/singlefs-core/src/allocator.rs:719:55: replace - with + in DeviceFreeMap::mark_allocated
+O 500 crates/singlefs-core/src/allocator.rs:719:41: replace + with - in DeviceFreeMap::mark_allocated
+O 502 crates/singlefs-core/src/allocator.rs:722:33: replace / with % in DeviceFreeMap::mark_allocated
+O 504 crates/singlefs-core/src/allocator.rs:723:44: replace += with -= in DeviceFreeMap::mark_allocated
+O 506 crates/singlefs-core/src/allocator.rs:725:30: replace += with -= in DeviceFreeMap::mark_allocated
+O 508 crates/singlefs-core/src/allocator.rs:726:25: replace -= with += in DeviceFreeMap::mark_allocated
+O 510 crates/singlefs-core/src/allocator.rs:737:9: replace DeviceFreeMap::lowest_user_data_slot -> Option<SlotNumber> with None
+O 522 crates/singlefs-core/src/allocator.rs:741:65: replace + with - in DeviceFreeMap::lowest_user_data_slot
+O 530 crates/singlefs-core/src/allocator.rs:749:23: replace += with *= in DeviceFreeMap::lowest_user_data_slot
+O 534 crates/singlefs-core/src/allocator.rs:758:50: replace / with * in DeviceFreeMap::lowest_empty_segment
+O 540 crates/singlefs-core/src/allocator.rs:768:25: replace + with - in DeviceFreeMap::lowest_empty_segment
+O 542 crates/singlefs-core/src/allocator.rs:768:63: replace * with + in DeviceFreeMap::lowest_empty_segment
+O 544 crates/singlefs-core/src/allocator.rs:781:9: replace DeviceFreeMap::lowest_commit_generated_fallback_slot -> Option<SlotNumber> with None
+O 550 crates/singlefs-core/src/allocator.rs:784:65: replace + with * in DeviceFreeMap::lowest_commit_generated_fallback_slot
+O 552 crates/singlefs-core/src/allocator.rs:789:23: replace += with -= in DeviceFreeMap::lowest_commit_generated_fallback_slot
+O 554 crates/singlefs-core/src/allocator.rs:800:9: replace DeviceFreeMap::commit_generated_answer_without_open_segment -> Option<CommitGeneratedDeviceAnswer> with None
+O 560 crates/singlefs-core/src/allocator.rs:877:42: replace + with * in make_room_for_record_on_device
+O 570 crates/singlefs-core/src/allocator.rs:883:53: replace + with - in make_room_for_record_on_device

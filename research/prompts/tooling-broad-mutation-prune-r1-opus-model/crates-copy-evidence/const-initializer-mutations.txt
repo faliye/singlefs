@@ -1,0 +1,174 @@
+total 5091 operator-mutations-outside-any-fn 170
+outcomes {'caught': 3, 'none': 166, 'stage-one-only': 1}
+by-package {'singlefs-core': 108, 'singlefs-checker': 62}
+lines-not-looking-like-initializer 0
+5 caught singlefs-core address::tests::journal_sequence_numbers_order_by_instance_then_counter | crates/singlefs-core/src/address.rs:90:38: replace << with >> | pub const COUNTER_LIMIT: u64 = 1 << 48;
+13 caught singlefs-core admission::tests::publish_reading_reserves_the_switch_share_of_the_next_writable_mounts_rows_and_the_mount_reading_its_own | crates/singlefs-core/src/admission.rs:167:84: replace - with + | pub const INSTANCE_ROWS_PER_INSTANCE_TABLE_PAGE: u64 = INSTANCE_TABLE_PAGE_RECORDS - 1;
+14 caught singlefs-core admission::tests::publish_reading_reserves_the_switch_share_of_the_next_writable_mounts_rows_and_the_mount_reading_its_own | crates/singlefs-core/src/admission.rs:167:84: replace - with / | pub const INSTANCE_ROWS_PER_INSTANCE_TABLE_PAGE: u64 = INSTANCE_TABLE_PAGE_RECORDS - 1;
+117 none  | crates/singlefs-core/src/allocation_record_tree.rs:36:44: replace - with + | const LARGEST_SLOT_NUMBER: u64 = (1 << 48) - 1;
+118 stage-one-only  | crates/singlefs-core/src/allocation_record_tree.rs:36:44: replace - with / | const LARGEST_SLOT_NUMBER: u64 = (1 << 48) - 1;
+119 none  | crates/singlefs-core/src/allocation_record_tree.rs:36:37: replace << with >> | const LARGEST_SLOT_NUMBER: u64 = (1 << 48) - 1;
+712 none  | crates/singlefs-core/src/block_device.rs:103:49: replace * with + | pub const ZERO_FILL_CHUNK_BYTES: u64 = 4 * 1024 * 1024;
+713 none  | crates/singlefs-core/src/block_device.rs:103:49: replace * with / | pub const ZERO_FILL_CHUNK_BYTES: u64 = 4 * 1024 * 1024;
+714 none  | crates/singlefs-core/src/block_device.rs:103:42: replace * with + | pub const ZERO_FILL_CHUNK_BYTES: u64 = 4 * 1024 * 1024;
+715 none  | crates/singlefs-core/src/block_device.rs:103:42: replace * with / | pub const ZERO_FILL_CHUNK_BYTES: u64 = 4 * 1024 * 1024;
+1336 none  | crates/singlefs-core/src/journal.rs:24:82: replace + with - | pub const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 12;
+1337 none  | crates/singlefs-core/src/journal.rs:24:82: replace + with * | pub const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 12;
+1338 none  | crates/singlefs-core/src/journal.rs:24:78: replace + with - | pub const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 12;
+1339 none  | crates/singlefs-core/src/journal.rs:24:78: replace + with * | pub const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 12;
+1340 none  | crates/singlefs-core/src/journal.rs:24:73: replace + with - | pub const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 12;
+1341 none  | crates/singlefs-core/src/journal.rs:24:73: replace + with * | pub const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 12;
+1342 none  | crates/singlefs-core/src/journal.rs:24:69: replace + with - | pub const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 12;
+1343 none  | crates/singlefs-core/src/journal.rs:24:69: replace + with * | pub const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 12;
+1344 none  | crates/singlefs-core/src/journal.rs:24:65: replace + with - | pub const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 12;
+1345 none  | crates/singlefs-core/src/journal.rs:24:65: replace + with * | pub const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 12;
+1346 none  | crates/singlefs-core/src/journal.rs:24:61: replace + with - | pub const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 12;
+1347 none  | crates/singlefs-core/src/journal.rs:24:61: replace + with * | pub const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 12;
+1348 none  | crates/singlefs-core/src/journal.rs:24:57: replace + with - | pub const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 12;
+1349 none  | crates/singlefs-core/src/journal.rs:24:57: replace + with * | pub const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 12;
+1350 none  | crates/singlefs-core/src/journal.rs:24:53: replace + with - | pub const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 12;
+1351 none  | crates/singlefs-core/src/journal.rs:24:53: replace + with * | pub const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 12;
+1352 none  | crates/singlefs-core/src/journal.rs:26:54: replace + with - | pub const JOURNAL_RECORD_FLAGS_OFFSET: usize = 4 + 2 + 1;
+1353 none  | crates/singlefs-core/src/journal.rs:26:54: replace + with * | pub const JOURNAL_RECORD_FLAGS_OFFSET: usize = 4 + 2 + 1;
+1354 none  | crates/singlefs-core/src/journal.rs:26:50: replace + with - | pub const JOURNAL_RECORD_FLAGS_OFFSET: usize = 4 + 2 + 1;
+1355 none  | crates/singlefs-core/src/journal.rs:26:50: replace + with * | pub const JOURNAL_RECORD_FLAGS_OFFSET: usize = 4 + 2 + 1;
+1360 none  | crates/singlefs-core/src/journal.rs:67:45: replace + with - | JOURNAL_HEADER_CHECKSUM_OFFSET + 32 + 8 + 1;
+1361 none  | crates/singlefs-core/src/journal.rs:67:45: replace + with * | JOURNAL_HEADER_CHECKSUM_OFFSET + 32 + 8 + 1;
+1362 none  | crates/singlefs-core/src/journal.rs:67:41: replace + with - | JOURNAL_HEADER_CHECKSUM_OFFSET + 32 + 8 + 1;
+1363 none  | crates/singlefs-core/src/journal.rs:67:41: replace + with * | JOURNAL_HEADER_CHECKSUM_OFFSET + 32 + 8 + 1;
+1364 none  | crates/singlefs-core/src/journal.rs:67:36: replace + with - | JOURNAL_HEADER_CHECKSUM_OFFSET + 32 + 8 + 1;
+1365 none  | crates/singlefs-core/src/journal.rs:67:36: replace + with * | JOURNAL_HEADER_CHECKSUM_OFFSET + 32 + 8 + 1;
+1422 none  | crates/singlefs-core/src/make_filesystem.rs:55:81: replace + with - | pub const TREE_TABLE_GENESIS_SLOT: SlotNumber = SlotNumber(UNIT_AREA_START_SLOT + 2);
+1423 none  | crates/singlefs-core/src/make_filesystem.rs:55:81: replace + with * | pub const TREE_TABLE_GENESIS_SLOT: SlotNumber = SlotNumber(UNIT_AREA_START_SLOT + 2);
+2074 none  | crates/singlefs-core/src/records.rs:270:72: replace + with - | const TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES: usize = 8 + 2 + 2 + 2;
+2075 none  | crates/singlefs-core/src/records.rs:270:72: replace + with * | const TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES: usize = 8 + 2 + 2 + 2;
+2076 none  | crates/singlefs-core/src/records.rs:270:68: replace + with - | const TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES: usize = 8 + 2 + 2 + 2;
+2077 none  | crates/singlefs-core/src/records.rs:270:68: replace + with * | const TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES: usize = 8 + 2 + 2 + 2;
+2078 none  | crates/singlefs-core/src/records.rs:270:64: replace + with - | const TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES: usize = 8 + 2 + 2 + 2;
+2079 none  | crates/singlefs-core/src/records.rs:270:64: replace + with * | const TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES: usize = 8 + 2 + 2 + 2;
+2179 none  | crates/singlefs-core/src/recovery.rs:678:86: replace + with - | crate::system_configuration::SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32 + 16 + 12 + 4;
+2180 none  | crates/singlefs-core/src/recovery.rs:678:86: replace + with * | crate::system_configuration::SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32 + 16 + 12 + 4;
+2181 none  | crates/singlefs-core/src/recovery.rs:678:81: replace + with - | crate::system_configuration::SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32 + 16 + 12 + 4;
+2182 none  | crates/singlefs-core/src/recovery.rs:678:81: replace + with * | crate::system_configuration::SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32 + 16 + 12 + 4;
+2183 none  | crates/singlefs-core/src/recovery.rs:678:76: replace + with - | crate::system_configuration::SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32 + 16 + 12 + 4;
+2184 none  | crates/singlefs-core/src/recovery.rs:678:76: replace + with * | crate::system_configuration::SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32 + 16 + 12 + 4;
+2185 none  | crates/singlefs-core/src/recovery.rs:678:71: replace + with - | crate::system_configuration::SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32 + 16 + 12 + 4;
+2186 none  | crates/singlefs-core/src/recovery.rs:678:71: replace + with * | crate::system_configuration::SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32 + 16 + 12 + 4;
+2561 none  | crates/singlefs-core/src/root_record.rs:13:69: replace + with - | pub const ROOT_CHECKSUM_OFFSET: usize = 4 + 16 + 4 + 4 + 8 + 86 + 8 + 8;
+2562 none  | crates/singlefs-core/src/root_record.rs:13:69: replace + with * | pub const ROOT_CHECKSUM_OFFSET: usize = 4 + 16 + 4 + 4 + 8 + 86 + 8 + 8;
+2563 none  | crates/singlefs-core/src/root_record.rs:13:65: replace + with - | pub const ROOT_CHECKSUM_OFFSET: usize = 4 + 16 + 4 + 4 + 8 + 86 + 8 + 8;
+2564 none  | crates/singlefs-core/src/root_record.rs:13:65: replace + with * | pub const ROOT_CHECKSUM_OFFSET: usize = 4 + 16 + 4 + 4 + 8 + 86 + 8 + 8;
+2565 none  | crates/singlefs-core/src/root_record.rs:13:60: replace + with - | pub const ROOT_CHECKSUM_OFFSET: usize = 4 + 16 + 4 + 4 + 8 + 86 + 8 + 8;
+2566 none  | crates/singlefs-core/src/root_record.rs:13:60: replace + with * | pub const ROOT_CHECKSUM_OFFSET: usize = 4 + 16 + 4 + 4 + 8 + 86 + 8 + 8;
+2567 none  | crates/singlefs-core/src/root_record.rs:13:56: replace + with - | pub const ROOT_CHECKSUM_OFFSET: usize = 4 + 16 + 4 + 4 + 8 + 86 + 8 + 8;
+2568 none  | crates/singlefs-core/src/root_record.rs:13:56: replace + with * | pub const ROOT_CHECKSUM_OFFSET: usize = 4 + 16 + 4 + 4 + 8 + 86 + 8 + 8;
+2569 none  | crates/singlefs-core/src/root_record.rs:13:52: replace + with - | pub const ROOT_CHECKSUM_OFFSET: usize = 4 + 16 + 4 + 4 + 8 + 86 + 8 + 8;
+2570 none  | crates/singlefs-core/src/root_record.rs:13:52: replace + with * | pub const ROOT_CHECKSUM_OFFSET: usize = 4 + 16 + 4 + 4 + 8 + 86 + 8 + 8;
+2571 none  | crates/singlefs-core/src/root_record.rs:13:48: replace + with - | pub const ROOT_CHECKSUM_OFFSET: usize = 4 + 16 + 4 + 4 + 8 + 86 + 8 + 8;
+2572 none  | crates/singlefs-core/src/root_record.rs:13:48: replace + with * | pub const ROOT_CHECKSUM_OFFSET: usize = 4 + 16 + 4 + 4 + 8 + 86 + 8 + 8;
+2573 none  | crates/singlefs-core/src/root_record.rs:13:43: replace + with - | pub const ROOT_CHECKSUM_OFFSET: usize = 4 + 16 + 4 + 4 + 8 + 86 + 8 + 8;
+2574 none  | crates/singlefs-core/src/root_record.rs:13:43: replace + with * | pub const ROOT_CHECKSUM_OFFSET: usize = 4 + 16 + 4 + 4 + 8 + 86 + 8 + 8;
+2575 none  | crates/singlefs-core/src/root_record.rs:17:52: replace << with >> | pub const ROOT_RECORD_FLAG_UNMOUNT_MARKER: u32 = 1 << 0;
+2640 none  | crates/singlefs-core/src/system_configuration.rs:33:38: replace + with - | const FEATURE_BITS_OFFSET: usize = 4 + 2;
+2641 none  | crates/singlefs-core/src/system_configuration.rs:33:38: replace + with * | const FEATURE_BITS_OFFSET: usize = 4 + 2;
+2642 none  | crates/singlefs-core/src/system_configuration.rs:41:90: replace + with - | pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
+2643 none  | crates/singlefs-core/src/system_configuration.rs:41:90: replace + with * | pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
+2644 none  | crates/singlefs-core/src/system_configuration.rs:41:86: replace + with - | pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
+2645 none  | crates/singlefs-core/src/system_configuration.rs:41:86: replace + with * | pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
+2646 none  | crates/singlefs-core/src/system_configuration.rs:41:82: replace + with - | pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
+2647 none  | crates/singlefs-core/src/system_configuration.rs:41:82: replace + with * | pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
+2648 none  | crates/singlefs-core/src/system_configuration.rs:41:78: replace + with - | pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
+2649 none  | crates/singlefs-core/src/system_configuration.rs:41:78: replace + with * | pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
+2650 none  | crates/singlefs-core/src/system_configuration.rs:41:73: replace + with - | pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
+2651 none  | crates/singlefs-core/src/system_configuration.rs:41:73: replace + with * | pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
+2652 none  | crates/singlefs-core/src/system_configuration.rs:41:68: replace + with - | pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
+2653 none  | crates/singlefs-core/src/system_configuration.rs:41:68: replace + with * | pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
+2654 none  | crates/singlefs-core/src/system_configuration.rs:41:63: replace + with - | pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
+2655 none  | crates/singlefs-core/src/system_configuration.rs:41:63: replace + with * | pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
+2656 none  | crates/singlefs-core/src/system_configuration.rs:41:59: replace + with - | pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
+2657 none  | crates/singlefs-core/src/system_configuration.rs:41:59: replace + with * | pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
+2658 none  | crates/singlefs-core/src/system_configuration.rs:42:34: replace + with - | const FSID_OFFSET: usize = 4 + 2 + 96;
+2659 none  | crates/singlefs-core/src/system_configuration.rs:42:34: replace + with * | const FSID_OFFSET: usize = 4 + 2 + 96;
+2660 none  | crates/singlefs-core/src/system_configuration.rs:42:30: replace + with - | const FSID_OFFSET: usize = 4 + 2 + 96;
+2661 none  | crates/singlefs-core/src/system_configuration.rs:42:30: replace + with * | const FSID_OFFSET: usize = 4 + 2 + 96;
+2662 none  | crates/singlefs-core/src/system_configuration.rs:60:63: replace - with + | const ROLLBACK_FLOOR_OFFSET: u64 = SYSTEM_CONFIGURATION_BYTES - ROLLBACK_FLOOR_FIELD_BYTES;
+2663 none  | crates/singlefs-core/src/system_configuration.rs:60:63: replace - with / | const ROLLBACK_FLOOR_OFFSET: u64 = SYSTEM_CONFIGURATION_BYTES - ROLLBACK_FLOOR_FIELD_BYTES;
+2664 none  | crates/singlefs-core/src/system_configuration.rs:74:38: replace << with >> | const DIRTY_THRESHOLD_BYTES: u64 = 2 << 30;
+2885 none  | crates/singlefs-core/src/transaction.rs:2375:32: replace - with + | TREE_IDENTIFIER_EXTENT - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+2886 none  | crates/singlefs-core/src/transaction.rs:2375:32: replace - with / | TREE_IDENTIFIER_EXTENT - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+2887 none  | crates/singlefs-core/src/transaction.rs:2376:31: replace - with + | TREE_IDENTIFIER_INODE - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+2888 none  | crates/singlefs-core/src/transaction.rs:2376:31: replace - with / | TREE_IDENTIFIER_INODE - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+2889 none  | crates/singlefs-core/src/transaction.rs:2377:44: replace - with + | TREE_IDENTIFIER_ALLOCATION_RECORDS - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+2890 none  | crates/singlefs-core/src/transaction.rs:2377:44: replace - with / | TREE_IDENTIFIER_ALLOCATION_RECORDS - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+2891 none  | crates/singlefs-core/src/transaction.rs:2378:36: replace - with + | TREE_IDENTIFIER_ACCOUNTING - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+2892 none  | crates/singlefs-core/src/transaction.rs:2378:36: replace - with / | TREE_IDENTIFIER_ACCOUNTING - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+2893 none  | crates/singlefs-core/src/transaction.rs:2379:41: replace - with + | TREE_IDENTIFIER_CENTRAL_MAPPING - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+2894 none  | crates/singlefs-core/src/transaction.rs:2379:41: replace - with / | TREE_IDENTIFIER_CENTRAL_MAPPING - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+2895 none  | crates/singlefs-core/src/transaction.rs:2380:34: replace - with + | TREE_IDENTIFIER_LIVELIST - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+2896 none  | crates/singlefs-core/src/transaction.rs:2380:34: replace - with / | TREE_IDENTIFIER_LIVELIST - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+2897 none  | crates/singlefs-core/src/transaction.rs:2381:43: replace - with + | TREE_IDENTIFIER_SPARSE_SIDE_TABLE - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+2898 none  | crates/singlefs-core/src/transaction.rs:2381:43: replace - with / | TREE_IDENTIFIER_SPARSE_SIDE_TABLE - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+2899 none  | crates/singlefs-core/src/transaction.rs:2382:34: replace - with + | TREE_IDENTIFIER_DEADLIST - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+2900 none  | crates/singlefs-core/src/transaction.rs:2382:34: replace - with / | TREE_IDENTIFIER_DEADLIST - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+3378 none  | crates/singlefs-checker/src/lib.rs:199:41: replace + with - | 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+3379 none  | crates/singlefs-checker/src/lib.rs:199:41: replace + with * | 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+3380 none  | crates/singlefs-checker/src/lib.rs:199:36: replace + with - | 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+3381 none  | crates/singlefs-checker/src/lib.rs:199:36: replace + with * | 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+3382 none  | crates/singlefs-checker/src/lib.rs:199:32: replace + with - | 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+3383 none  | crates/singlefs-checker/src/lib.rs:199:32: replace + with * | 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+3384 none  | crates/singlefs-checker/src/lib.rs:199:28: replace + with - | 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+3385 none  | crates/singlefs-checker/src/lib.rs:199:28: replace + with * | 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+3386 none  | crates/singlefs-checker/src/lib.rs:199:24: replace + with - | 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+3387 none  | crates/singlefs-checker/src/lib.rs:199:24: replace + with * | 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+3388 none  | crates/singlefs-checker/src/lib.rs:199:19: replace + with - | 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+3389 none  | crates/singlefs-checker/src/lib.rs:199:19: replace + with * | 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+3390 none  | crates/singlefs-checker/src/lib.rs:199:14: replace + with - | 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+3391 none  | crates/singlefs-checker/src/lib.rs:199:14: replace + with * | 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+3392 none  | crates/singlefs-checker/src/lib.rs:199:9: replace + with - | 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+3393 none  | crates/singlefs-checker/src/lib.rs:199:9: replace + with * | 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+3394 none  | crates/singlefs-checker/src/lib.rs:203:96: replace + with - | const SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET: usize = SYSTEM_CONFIGURATION_TAIL_OFFSET + 8 + 4;
+3395 none  | crates/singlefs-checker/src/lib.rs:203:96: replace + with * | const SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET: usize = SYSTEM_CONFIGURATION_TAIL_OFFSET + 8 + 4;
+3396 none  | crates/singlefs-checker/src/lib.rs:203:92: replace + with - | const SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET: usize = SYSTEM_CONFIGURATION_TAIL_OFFSET + 8 + 4;
+3397 none  | crates/singlefs-checker/src/lib.rs:203:92: replace + with * | const SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET: usize = SYSTEM_CONFIGURATION_TAIL_OFFSET + 8 + 4;
+3398 none  | crates/singlefs-checker/src/lib.rs:212:41: replace << with >> | const ROOT_FLAG_UNMOUNT_MARKER: u32 = 1 << 0;
+3399 none  | crates/singlefs-checker/src/lib.rs:224:79: replace + with - | const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET: usize = 155 + 32 + 16 + 12 + 4;
+3400 none  | crates/singlefs-checker/src/lib.rs:224:79: replace + with * | const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET: usize = 155 + 32 + 16 + 12 + 4;
+3401 none  | crates/singlefs-checker/src/lib.rs:224:74: replace + with - | const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET: usize = 155 + 32 + 16 + 12 + 4;
+3402 none  | crates/singlefs-checker/src/lib.rs:224:74: replace + with * | const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET: usize = 155 + 32 + 16 + 12 + 4;
+3403 none  | crates/singlefs-checker/src/lib.rs:224:69: replace + with - | const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET: usize = 155 + 32 + 16 + 12 + 4;
+3404 none  | crates/singlefs-checker/src/lib.rs:224:69: replace + with * | const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET: usize = 155 + 32 + 16 + 12 + 4;
+3405 none  | crates/singlefs-checker/src/lib.rs:224:64: replace + with - | const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET: usize = 155 + 32 + 16 + 12 + 4;
+3406 none  | crates/singlefs-checker/src/lib.rs:224:64: replace + with * | const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET: usize = 155 + 32 + 16 + 12 + 4;
+3781 none  | crates/singlefs-checker/src/image.rs:659:47: replace + with - | const POINTER_MAC_AND_NONCE_BYTES: usize = 16 + 12;
+3782 none  | crates/singlefs-checker/src/image.rs:659:47: replace + with * | const POINTER_MAC_AND_NONCE_BYTES: usize = 16 + 12;
+3804 none  | crates/singlefs-checker/src/position_addressed.rs:20:44: replace - with + | const LARGEST_SLOT_NUMBER: u64 = (1 << 48) - 1;
+3805 none  | crates/singlefs-checker/src/position_addressed.rs:20:44: replace - with / | const LARGEST_SLOT_NUMBER: u64 = (1 << 48) - 1;
+3806 none  | crates/singlefs-checker/src/position_addressed.rs:20:37: replace << with >> | const LARGEST_SLOT_NUMBER: u64 = (1 << 48) - 1;
+3984 none  | crates/singlefs-checker/src/walk.rs:373:47: replace + with - | const MAPPING_KEY_BIRTH_TXG_OFFSET: usize = 1 + 8;
+3985 none  | crates/singlefs-checker/src/walk.rs:373:47: replace + with * | const MAPPING_KEY_BIRTH_TXG_OFFSET: usize = 1 + 8;
+3986 none  | crates/singlefs-checker/src/walk.rs:374:50: replace + with - | const MAPPING_KEY_INSTANCE_OFFSET: usize = 1 + 8 + 8;
+3987 none  | crates/singlefs-checker/src/walk.rs:374:50: replace + with * | const MAPPING_KEY_INSTANCE_OFFSET: usize = 1 + 8 + 8;
+3988 none  | crates/singlefs-checker/src/walk.rs:374:46: replace + with - | const MAPPING_KEY_INSTANCE_OFFSET: usize = 1 + 8 + 8;
+3989 none  | crates/singlefs-checker/src/walk.rs:374:46: replace + with * | const MAPPING_KEY_INSTANCE_OFFSET: usize = 1 + 8 + 8;
+3990 none  | crates/singlefs-checker/src/walk.rs:375:50: replace + with - | const MAPPING_KEY_TAIL_OFFSET: usize = 1 + 8 + 8 + 4;
+3991 none  | crates/singlefs-checker/src/walk.rs:375:50: replace + with * | const MAPPING_KEY_TAIL_OFFSET: usize = 1 + 8 + 8 + 4;
+3992 none  | crates/singlefs-checker/src/walk.rs:375:46: replace + with - | const MAPPING_KEY_TAIL_OFFSET: usize = 1 + 8 + 8 + 4;
+3993 none  | crates/singlefs-checker/src/walk.rs:375:46: replace + with * | const MAPPING_KEY_TAIL_OFFSET: usize = 1 + 8 + 8 + 4;
+3994 none  | crates/singlefs-checker/src/walk.rs:375:42: replace + with - | const MAPPING_KEY_TAIL_OFFSET: usize = 1 + 8 + 8 + 4;
+3995 none  | crates/singlefs-checker/src/walk.rs:375:42: replace + with * | const MAPPING_KEY_TAIL_OFFSET: usize = 1 + 8 + 8 + 4;
+3996 none  | crates/singlefs-checker/src/walk.rs:378:29: replace + with - | MAPPING_KEY_TAIL_OFFSET + 4..MAPPING_KEY_TAIL_OFFSET + 6;
+3997 none  | crates/singlefs-checker/src/walk.rs:378:29: replace + with * | MAPPING_KEY_TAIL_OFFSET + 4..MAPPING_KEY_TAIL_OFFSET + 6;
+3998 none  | crates/singlefs-checker/src/walk.rs:378:58: replace + with - | MAPPING_KEY_TAIL_OFFSET + 4..MAPPING_KEY_TAIL_OFFSET + 6;
+3999 none  | crates/singlefs-checker/src/walk.rs:378:58: replace + with * | MAPPING_KEY_TAIL_OFFSET + 4..MAPPING_KEY_TAIL_OFFSET + 6;
+4400 none  | crates/singlefs-checker/src/walk.rs:2601:69: replace + with - | const TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86 + 8;
+4401 none  | crates/singlefs-checker/src/walk.rs:2601:69: replace + with * | const TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86 + 8;
+4402 none  | crates/singlefs-checker/src/walk.rs:2601:64: replace + with - | const TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86 + 8;
+4403 none  | crates/singlefs-checker/src/walk.rs:2601:64: replace + with * | const TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86 + 8;
+4404 none  | crates/singlefs-checker/src/walk.rs:2601:60: replace + with - | const TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86 + 8;
+4405 none  | crates/singlefs-checker/src/walk.rs:2601:60: replace + with * | const TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86 + 8;
+4406 none  | crates/singlefs-checker/src/walk.rs:2601:56: replace + with - | const TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86 + 8;
+4407 none  | crates/singlefs-checker/src/walk.rs:2601:56: replace + with * | const TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86 + 8;
+4408 none  | crates/singlefs-checker/src/walk.rs:2601:52: replace + with - | const TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86 + 8;
+4409 none  | crates/singlefs-checker/src/walk.rs:2601:52: replace + with * | const TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86 + 8;
+4410 none  | crates/singlefs-checker/src/walk.rs:2603:47: replace + with - | const TREE_TABLE_ENTRY_KIND_OFFSET: usize = 8 + 2;
+4411 none  | crates/singlefs-checker/src/walk.rs:2603:47: replace + with * | const TREE_TABLE_ENTRY_KIND_OFFSET: usize = 8 + 2;

@@ -1,0 +1,12 @@
+# 变异 102 施加后单跑 admission::tests::central_mapping_term_keeps_growing_new_roots_while_they_overflow_under_capped_capacities（RUN_WITH_MEMORY_CAP_TIME_LIMIT=300）；同一条在没改过的副本上单跑 0.00s（jobB 那一行）
+rc=253 secs=300
+running 1 test
+test admission::tests::central_mapping_term_keeps_growing_new_roots_while_they_overflow_under_capped_capacities has been running for over 60 seconds
+run-with-memory-cap: 超过限时 300 秒（scope singlefs-memory-cap-1772068-1198428408 的 Result=timeout，systemd 停掉了 scope 里的进程；命令退出码 143）
+restored /tmp/claude-1000/tooling-broad-mutation-prune-r1-opus/repo/crates/singlefs-core/src/admission.rs
+
+[exited with code 0]
+--- 没改过的副本上同一条（jobB）
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 131 filtered out; finished in 0.00s
+

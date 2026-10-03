@@ -19,7 +19,7 @@
 ## 二、新门禁阶段 `.claude/gate.d/41-crash-case-registered.sh`（序 9 的门禁那一半）
 
 - 判据全在 `research/scripts/crash-case-check.py`（第一段已立，自证挂 47 号）：阶段只调 `python3 "$ROOT/research/scripts/crash-case-check.py" "$ROOT"`，原样转它的输出与退出码（2 → 1）。
-- 文件头：`# gate-stage: 直接调全量崩溃枚举的测试函数标了 #[ignore] 并登记成 crash-case`；`# gate-similar: 54-layer0-replay.sh 跑登记了的 crash-case 用例、核全绿标记；这里只判源码里的用例有没有标 ignore、有没有登记，不跑任何测试`；`# gate-similar: 80-absolute-assertions.sh 也扫 crates/*/tests/ 的源码，但判的是断言形态`（先跑 `python3 .claude/singlefs-ai-sop/scripts/gate-overlap.py --list` 复核还有没有更像的）。
+- 文件头：`# gate-stage: 直接调全量崩溃枚举的测试函数标了 #[ignore] 并登记成 crash-case`；`# gate-similar: checker-tier-layer0-replay.sh 跑登记了的 crash-case 用例、核全绿标记；这里只判源码里的用例有没有标 ignore、有没有登记，不跑任何测试`；`# gate-similar: 80-absolute-assertions.sh 也扫 crates/*/tests/ 的源码，但判的是断言形态`（先跑 `python3 .claude/singlefs-ai-sop/scripts/gate-overlap.py --list` 复核还有没有更像的）。
 - 样本 `.claude/gate.d/fixtures/41-crash-case-registered.sh/{red,green}/`：green 放一个标了 `#[ignore]`、登记了的用例与一个 `quick_tier` 快档；red 放一个没标没登记的，`expect` 要 `没标 #[ignore]` 与 `没有登记成 crash-case` 两句。
 - ⚠️ 仓里现查红一处（2026-09-27 跑 `python3 research/scripts/crash-case-check.py` 的原样行）：
   `✗ crates/singlefs-harness/tests/crash_enumeration_resumes_from_its_progress_file.rs:383 a_run_that_goes_red_leaves_no_progress_file_behind：直接调全量崩溃枚举，却没标 #[ignore]` 与同一处「没有登记成 crash-case」。
@@ -72,7 +72,7 @@
 - 旧：`派发提示要子 agent 跑重型测试的，由 `.claude/hooks/runner-dispatch-guard.sh` 拒绝。`
   新：`派 crash-verifier、gate-triage 之外的类型，派发提示里没有一行「重型测试：不跑」的，由 `.claude/hooks/runner-dispatch-guard.sh` 拒绝（提示正文里提到重型阶段的句子不再逐句判，执行时由上面这道闸与看门狗的进程一层兜底）。`
 
-## 八、`.claude/gate.d/stage-inputs.tsv`、`research/scripts/admission.py`、`.claude/gate.d/54-layer0-replay.sh`、`research/scripts/check-segment-registry.py`
+## 八、`.claude/gate.d/stage-inputs.tsv`、`research/scripts/admission.py`、`.claude/gate.d/checker-tier-layer0-replay.sh`、`research/scripts/check-segment-registry.py`
 
 - 第一段的 22 条里没有要改这四份的；只有第二节那条红（`crash_enumeration_resumes_from_its_progress_file.rs:383`）若判成真的全量用例，要在 `stage-inputs.tsv` 加它的 `crash-case:` 行（与实现员给 `#[ignore]` 同一次落）。
 

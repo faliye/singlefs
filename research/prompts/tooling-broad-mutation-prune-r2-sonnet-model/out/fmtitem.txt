@@ -1,0 +1,9 @@
+avg format consts in item-closure per mutated file: 6.9 of 89
+bc57af7a format consts changed 6 (+dependents 6) files whose item-closure hits: 1 of 30 mutants 394 (7.7%)
+973e1f58 format consts changed 0 (+dependents 0) files whose item-closure hits: 0 of 30 mutants 0 (0.0%)
+45d49aaf format consts changed 15 (+dependents 15) files whose item-closure hits: 8 of 30 mutants 1689 (33.2%)
+346f5e6c format consts changed 15 (+dependents 15) files whose item-closure hits: 5 of 30 mutants 1828 (35.9%)
+a1f4691b format consts changed 18 (+dependents 18) files whose item-closure hits: 18 of 30 mutants 4355 (85.5%)
+3cff909b format consts changed 6 (+dependents 6) files whose item-closure hits: 7 of 30 mutants 1837 (36.1%)
+495bede6 format consts changed 0 (+dependents 0) files whose item-closure hits: 0 of 30 mutants 0 (0.0%)
+d2aeb7de format consts changed 1 (+dependents 1) files whose item-closure hits: 4 of 30 mutants 1764 (34.6%)

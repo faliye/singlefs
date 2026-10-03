@@ -1,0 +1,9 @@
+ZERO-COVERAGE package=singlefs-checker inside-fn=24
+ZERO-COVERAGE package=singlefs-checker outside-fn=62
+ZERO-COVERAGE package=singlefs-core inside-fn=62
+ZERO-COVERAGE package=singlefs-core outside-fn=108
+ZERO-COVERAGE inside-fn library-outcome=none count=83
+ZERO-COVERAGE inside-fn library-outcome=stage-one-only count=3
+ZERO-COVERAGE outside-fn library-outcome=caught count=3
+ZERO-COVERAGE outside-fn library-outcome=none count=166
+ZERO-COVERAGE outside-fn library-outcome=stage-one-only count=1

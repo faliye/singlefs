@@ -1,0 +1,73 @@
+registered targets: 8
+T crash_enumeration_new_pool_file_creation_stream: files=43 numeric_in=true numeric_reason=Some("referenced by crates/singlefs-checker-tier/src/crash.rs") history_reason=None guard_ok=true
+T crash_enumeration_fixed_script_stream: files=43 numeric_in=true numeric_reason=Some("referenced by crates/singlefs-checker-tier/src/crash.rs") history_reason=None guard_ok=true
+T crash_enumeration_floor_raise_pushed_by_admission: files=64 numeric_in=true numeric_reason=Some("referenced by crates/singlefs-checker-tier/src/crash_amplification.rs") history_reason=Some("referenced by crates/singlefs-checker-tier/tests/crash_enumeration_floor_raise_pushed_by_admission.rs") guard_ok=true
+F crates/singlefs-checker-tier/src/crash.rs
+F crates/singlefs-checker-tier/src/crash_amplification.rs
+F crates/singlefs-checker-tier/src/crash_facts.rs
+F crates/singlefs-checker-tier/src/crash_identity.rs
+F crates/singlefs-checker-tier/src/crash_judge_checker.wgsl
+F crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl
+F crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl
+F crates/singlefs-checker-tier/src/crash_judge_common.wgsl
+F crates/singlefs-checker-tier/src/crash_judge_dispatch.rs
+F crates/singlefs-checker-tier/src/crash_judge_gpu.rs
+F crates/singlefs-checker-tier/src/crash_judge_recovery.wgsl
+F crates/singlefs-checker-tier/src/crash_judge_tables.rs
+F crates/singlefs-checker-tier/src/crash_verify_gpu.rs
+F crates/singlefs-checker-tier/src/gpu_unit_checks.rs
+F crates/singlefs-checker-tier/src/layer0_progress.rs
+F crates/singlefs-checker-tier/src/lib.rs
+F crates/singlefs-checker-tier/src/verdict_store.rs
+F crates/singlefs-checker-tier/tests/common_crash_points/mod.rs
+F crates/singlefs-checker-tier/tests/record_checker_judges_absence_by_the_persisted_set.rs
+F crates/singlefs-checker/src/image.rs
+F crates/singlefs-checker/src/lib.rs
+F crates/singlefs-checker/src/position_addressed.rs
+F crates/singlefs-checker/src/walk.rs
+F crates/singlefs-core/src/address.rs
+F crates/singlefs-core/src/admission.rs
+F crates/singlefs-core/src/allocation_record_tree.rs
+F crates/singlefs-core/src/allocator.rs
+F crates/singlefs-core/src/block_device.rs
+F crates/singlefs-core/src/bytes.rs
+F crates/singlefs-core/src/checksum.rs
+F crates/singlefs-core/src/code_two_tree.rs
+F crates/singlefs-core/src/extent_tree.rs
+F crates/singlefs-core/src/inode_tree.rs
+F crates/singlefs-core/src/instance_table.rs
+F crates/singlefs-core/src/journal.rs
+F crates/singlefs-core/src/lib.rs
+F crates/singlefs-core/src/make_filesystem.rs
+F crates/singlefs-core/src/mount.rs
+F crates/singlefs-core/src/mounted_session.rs
+F crates/singlefs-core/src/pointer.rs
+F crates/singlefs-core/src/records.rs
+F crates/singlefs-core/src/recovery.rs
+F crates/singlefs-core/src/root_record.rs
+F crates/singlefs-core/src/root_ring.rs
+F crates/singlefs-core/src/system_configuration.rs
+F crates/singlefs-core/src/transaction.rs
+F crates/singlefs-core/src/unit.rs
+F crates/singlefs-core/src/write_accounting.rs
+F crates/singlefs-core/src/write_request_split.rs
+F crates/singlefs-format/src/lib.rs
+F crates/singlefs-harness/src/fault_injection.rs
+F crates/singlefs-harness/src/hexadecimal.rs
+F crates/singlefs-harness/src/history.rs
+F crates/singlefs-harness/src/lib.rs
+F crates/singlefs-harness/src/memory_pool.rs
+F crates/singlefs-harness/src/model.rs
+F crates/singlefs-harness/src/model_comparison.rs
+F crates/singlefs-harness/src/numeric_environment_variable.rs
+F crates/singlefs-harness/src/scenario.rs
+F crates/singlefs-harness/src/segments.rs
+F crates/singlefs-harness/src/sha256.rs
+F crates/singlefs-harness/tests/common/mod.rs
+F crates/singlefs-replay-prefix/src/lib.rs
+T record_checker_judges_absence_by_the_persisted_set: files=63 numeric_in=true numeric_reason=Some("referenced by crates/singlefs-checker-tier/tests/record_checker_judges_absence_by_the_persisted_set.rs") history_reason=Some("referenced by crates/singlefs-checker-tier/tests/record_checker_judges_absence_by_the_persisted_set.rs") guard_ok=true
+T crash_enumeration_multi_record_publish_stream: files=58 numeric_in=true numeric_reason=Some("referenced by crates/singlefs-checker-tier/src/crash_amplification.rs") history_reason=None guard_ok=true
+T crash_enumeration_tree_split_streams: files=59 numeric_in=true numeric_reason=Some("referenced by crates/singlefs-checker-tier/src/crash_amplification.rs") history_reason=None guard_ok=true
+T crash_enumeration_position_addressed_trees: files=59 numeric_in=true numeric_reason=Some("referenced by crates/singlefs-checker-tier/src/crash_amplification.rs") history_reason=None guard_ok=true
+T crash_injection_campaign: files=48 numeric_in=true numeric_reason=Some("referenced by crates/singlefs-checker-tier/tests/crash_injection_campaign.rs") history_reason=Some("referenced by crates/singlefs-checker-tier/tests/crash_injection_campaign.rs") guard_ok=true
+guard-violations: 0

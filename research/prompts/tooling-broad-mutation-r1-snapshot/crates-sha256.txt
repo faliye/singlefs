@@ -1,0 +1,4 @@
+acd86ff58a756c8a9391fc2f1b04408bdd0fc414f85330c6dfc36f40cedd92fe  .claude/hooks/lib_heavy_tests.py
+b482a26878ba8be4885613c4c4ec860255a58471990cc228ab54d2660b24e321  .claude/hooks/heavy-test-guard.sh
+9027789786f63c467f1638d1ffe60ff3f3d47e4dfd2747e15933d6cc92a43f72  .claude/gate.d/code-tooling.sh
+a10d1ea35d9789c7eafbb5238a7c5e835e9ba34ccb3594128e2c0503fb40871e  research/scripts/broad-mutation.py

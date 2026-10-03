@@ -1,0 +1,6 @@
+[workspace]
+members = ["mcore", "mharness"]
+resolver = "2"
+
+[profile.dev]
+overflow-checks = true

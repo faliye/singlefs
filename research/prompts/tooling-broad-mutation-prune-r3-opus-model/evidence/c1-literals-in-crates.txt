@@ -1,0 +1,9 @@
+C1-LITERALS files=31 functions=1237 string-tokens-in-functions=1920 comment-markers-in-string=0 whitespace-run-or-newline-in-string=8
+C1-LITERALS example crates/singlefs-core/src/allocator.rs:1644 '"装了根环表的进程写的根 txg 逐个加一、每一条都经分配器记：带单元的发布在取完落点之后记，mou'
+C1-LITERALS example crates/singlefs-core/src/inode_tree.rs:100 '"一容器最多 233 条记录（D8 已定项 6）：写者只经 write_records_into_l'
+C1-LITERALS example crates/singlefs-core/src/mount.rs:2644 '"抬 F 之前在分配器的拷贝上预演取的落点与真发起来取的逐次相同：同一个分配器、同一串分配动作，这一'
+C1-LITERALS example crates/singlefs-core/src/mount.rs:4165 '"取号之前在分配器的拷贝上取的落点与真发起来取的逐次相同：同一个分配器、同一串分配动作，这一串里没有'
+C1-LITERALS example crates/singlefs-core/src/mount.rs:4183 '"取号之前不够、要写行之后推的只有上一版带文件的那一格（树表 0 条的在取号之前拒了）：\\\n    '
+C1-LITERALS example crates/singlefs-core/src/recovery.rs:3039 '"记录表的键要等于记录自己的 (实例代号, 计数器)：scan_journal 与各调用方都按它建键'
+C1-LITERALS example crates/singlefs-core/src/transaction.rs:2588 '"inode 号水位那一行在：发布路径每次都写它（D5 已定项 8 的池级三行之一），\\\n     '
+C1-LITERALS example crates/singlefs-core/src/transaction.rs:6917 '"{tree:?}：计划里叶的 key 与这次装出来的条目的 key 不是同一个集合（上一版叶里有重'

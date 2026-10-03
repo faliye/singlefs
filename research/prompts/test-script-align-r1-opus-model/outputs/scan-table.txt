@@ -1,0 +1,73 @@
+件数 72，并行 6
+0	research/scripts/admission.py	rc=1	sec=53	heavy_execve=160	execve("/home/fy5090/.local/bin/cargo" execve("/home/fy5090/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo" execve("/home/fy5090/.local/bin/rustc" 
+1	research/scripts/agent-cost.py	rc=0	sec=0	heavy_execve=0	 
+2	research/scripts/agent-handover.py	rc=0	sec=0	heavy_execve=0	 
+3	research/scripts/apply-writer-patch.py	rc=0	sec=0	heavy_execve=0	 
+4	research/scripts/archive-past-rounds.py	rc=0	sec=0	heavy_execve=0	 
+5	research/scripts/broad-mutation.py	rc=0	sec=22	heavy_execve=0	 
+6	research/scripts/cache-keepalive.sh	rc=0	sec=1	heavy_execve=0	 
+7	research/scripts/capped.sh	rc=0	sec=1	heavy_execve=0	 
+8	research/scripts/changed-paths.sh	rc=0	sec=0	heavy_execve=0	 
+9	research/scripts/change-touches-crates.sh	rc=0	sec=0	heavy_execve=0	 
+10	research/scripts/check-segment-registry.py	rc=0	sec=0	heavy_execve=0	 
+11	research/scripts/checklist-specs.py	rc=0	sec=0	heavy_execve=0	 
+12	research/scripts/cite-check.py	rc=0	sec=0	heavy_execve=0	 
+13	research/scripts/claim-experiment.sh	rc=0	sec=0	heavy_execve=0	 
+14	research/scripts/closeout-status.py	rc=0	sec=0	heavy_execve=0	 
+15	research/scripts/corruption-check.py	rc=0	sec=0	heavy_execve=0	 
+16	research/scripts/crash-amplification.sh	rc=0	sec=14	heavy_execve=0	 
+17	research/scripts/crash-amplification-item.sh	rc=0	sec=1	heavy_execve=0	 
+18	research/scripts/crash-case-check.py	rc=0	sec=0	heavy_execve=0	 
+19	research/scripts/crates-mutation-rows.py	rc=0	sec=2	heavy_execve=44	execve("/home/fy5090/.local/bin/rustc" execve("/home/fy5090/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc" execve("/home/fy5090/.local/bin/rustc" 
+20	research/scripts/decision-slim-check.py	rc=0	sec=0	heavy_execve=0	 
+21	research/scripts/detached-run.sh	rc=1	sec=49	heavy_execve=0	 
+22	research/scripts/dispatch-prompt.py	rc=0	sec=0	heavy_execve=0	 
+23	research/scripts/doc-consolidate.py	rc=0	sec=0	heavy_execve=0	 
+24	research/scripts/e152-tables.py	rc=0	sec=0	heavy_execve=0	 
+25	research/scripts/e165-pin-red-examples.py	rc=0	sec=2	heavy_execve=0	 
+26	research/scripts/e165-replay-mutation-kill-bounds.sh	rc=0	sec=6	heavy_execve=0	 
+27	research/scripts/gate-staged.sh	rc=0	sec=3	heavy_execve=0	 
+28	research/scripts/gate-structure-check.py	rc=0	sec=0	heavy_execve=0	 
+29	research/scripts/history-consolidate.py	rc=0	sec=0	heavy_execve=0	 
+30	research/scripts/insert-row.py	rc=0	sec=0	heavy_execve=0	 
+31	research/scripts/kb-sections.py	rc=0	sec=0	heavy_execve=0	 
+32	research/scripts/kb-spec-check.py	rc=0	sec=0	heavy_execve=0	 
+33	research/scripts/merge-and-verify.sh	rc=0	sec=0	heavy_execve=0	 
+34	research/scripts/migrate-changelog-format.py	rc=0	sec=0	heavy_execve=0	 
+35	research/scripts/multi-host-run.sh	rc=0	sec=9	heavy_execve=52	execve("/home/fy5090/.local/bin/rustc" execve("/home/fy5090/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc" execve("/home/fy5090/.local/bin/rustc" 
+36	research/scripts/mutate.sh	rc=0	sec=36	heavy_execve=0	 
+37	research/scripts/mutation-shard-run.sh	rc=1	sec=17	heavy_execve=96	execve("/home/fy5090/.local/bin/rustc" execve("/home/fy5090/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc" execve("/home/fy5090/.local/bin/rustc" 
+38	research/scripts/oov-check.py	rc=0	sec=0	heavy_execve=0	 
+39	research/scripts/pdf-text.py	rc=0	sec=0	heavy_execve=0	 
+40	research/scripts/prove-red.sh	rc=1	sec=0	heavy_execve=0	 
+41	research/scripts/quote-kb.py	rc=0	sec=0	heavy_execve=0	 
+42	research/scripts/quote-rust-items.py	rc=0	sec=0	heavy_execve=0	 
+43	research/scripts/relabel-item.py	rc=0	sec=0	heavy_execve=0	 
+44	research/scripts/replace-batch.py	rc=0	sec=0	heavy_execve=0	 
+45	research/scripts/replace-once.py	rc=0	sec=0	heavy_execve=0	 
+46	research/scripts/rerun-failed-tests.py	rc=0	sec=0	heavy_execve=0	 
+47	research/scripts/rules-sweep-audit.py	rc=0	sec=0	heavy_execve=0	 
+48	research/scripts/run-with-memory-cap.sh	rc=0	sec=42	heavy_execve=0	 
+49	research/scripts/snapshot-check.sh	rc=0	sec=0	heavy_execve=0	 
+50	research/scripts/stage-mine.py	rc=0	sec=0	heavy_execve=0	 
+51	research/scripts/stage-must-run.sh	rc=0	sec=2	heavy_execve=44	execve("/home/fy5090/.local/bin/cargo" execve("/home/fy5090/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo" execve("/home/fy5090/.local/bin/rustc" 
+52	research/scripts/stage-run-or-skip.sh	rc=0	sec=0	heavy_execve=0	 
+53	research/scripts/stale-candidates.py	rc=0	sec=1	heavy_execve=0	 
+54	research/scripts/sweep-term.py	rc=0	sec=0	heavy_execve=0	 
+55	research/scripts/test-environment-check.py	rc=0	sec=1	heavy_execve=0	 
+56	research/scripts/three-way-materials.py	rc=0	sec=0	heavy_execve=0	 
+57	research/scripts/verify-citations.sh	rc=0	sec=1	heavy_execve=0	 
+58	research/scripts/verus-proof-check.py	rc=0	sec=163	heavy_execve=0	 
+59	research/scripts/watch.sh	rc=0	sec=1	heavy_execve=0	 
+60	.claude/hooks/ask-user-claim-guard.sh	rc=0	sec=0	heavy_execve=0	 
+61	.claude/hooks/bash-command-detector.sh	rc=0	sec=5	heavy_execve=0	 
+62	.claude/hooks/continuation-guard.sh	rc=0	sec=0	heavy_execve=0	 
+63	.claude/hooks/handback-guard.sh	rc=0	sec=0	heavy_execve=0	 
+64	.claude/hooks/heavy-test-guard.sh	rc=0	sec=1	heavy_execve=0	 
+65	.claude/hooks/lib_heavy_tests.py	rc=0	sec=0	heavy_execve=0	 
+66	.claude/hooks/runner-dispatch-guard.sh	rc=0	sec=1	heavy_execve=0	 
+67	.claude/hooks/session-start.sh	rc=0	sec=1	heavy_execve=0	 
+68	.claude/hooks/write-guard.sh	rc=0	sec=1	heavy_execve=0	 
+69	.claude/gate.d/lib/stage-cells.sh	rc=0	sec=2	heavy_execve=0	 
+70	.claude/gate.d/lib/rejection-blocks.py	rc=0	sec=0	heavy_execve=0	 
+71	stage-samples	rc=1	sec=32	heavy_execve=12	execve("/home/fy5090/.local/bin/cargo" execve("/home/fy5090/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo" execve("/home/fy5090/.local/bin/rustc" 

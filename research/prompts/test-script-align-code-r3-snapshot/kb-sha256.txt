@@ -1,0 +1,5 @@
+7153d8a5cbc164be44e1b587ddea916fe6af025f757f5c2830322b3166d15ced  .claude/kb/checks-owed.md
+96e60a72b83c8053f1641cbf418d2f9a353457545d7c38702780cd64f7c40197  .claude/kb/experiments/158-择根与修复四岔路.md
+eb0eb2d0ac378f531d7d5ab95ab7ff2884ed8d75c506425d033f9f509e027dc5  .claude/kb/experiments/161-崩溃放量的去重与分段耗时.md
+d20da4d32318cbf421bc06d39f0199d506db67ae1447703ecf8d205932a2eb18  .claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md
+f1c72da1397091afdb5abe82c34db774fb6a4a102026f5f79733c6b2f71cb6e2  .claude/kb/experiments/168-删除借保留量的环窗口.md

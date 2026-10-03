@@ -1,0 +1,21 @@
+commits touching list files 15 of 23
+dbcc0d2f files 9 fns_changed(all,incl tests/nonlisted names) 41 file-own 3006 (59.0%) fn-own 384 (7.5%) outside-fn-changed files 9 effective(F2) 3006 (59.0%)
+bc57af7a files 15 fns_changed(all,incl tests/nonlisted names) 35 file-own 3396 (66.7%) fn-own 141 (2.8%) outside-fn-changed files 3 effective(F2) 1155 (22.7%)
+973e1f58 files 4 fns_changed(all,incl tests/nonlisted names) 13 file-own 1793 (35.2%) fn-own 34 (0.7%) outside-fn-changed files 0 effective(F2) 34 (0.7%)
+c3540c02 files 16 fns_changed(all,incl tests/nonlisted names) 192 file-own 4001 (78.6%) fn-own 1255 (24.7%) outside-fn-changed files 14 effective(F2) 3920 (77.0%)
+45d49aaf files 21 fns_changed(all,incl tests/nonlisted names) 291 file-own 4668 (91.7%) fn-own 1589 (31.2%) outside-fn-changed files 16 effective(F2) 3997 (78.5%)
+346f5e6c files 18 fns_changed(all,incl tests/nonlisted names) 246 file-own 4487 (88.1%) fn-own 1812 (35.6%) outside-fn-changed files 12 effective(F2) 4401 (86.4%)
+a1f4691b files 22 fns_changed(all,incl tests/nonlisted names) 280 file-own 4181 (82.1%) fn-own 1569 (30.8%) outside-fn-changed files 18 effective(F2) 4181 (82.1%)
+8186d5b5 files 1 fns_changed(all,incl tests/nonlisted names) 1 file-own 17 (0.3%) fn-own 2 (0.0%) outside-fn-changed files 0 effective(F2) 2 (0.0%)
+3cff909b files 10 fns_changed(all,incl tests/nonlisted names) 42 file-own 3073 (60.4%) fn-own 414 (8.1%) outside-fn-changed files 9 effective(F2) 3073 (60.4%)
+495bede6 files 10 fns_changed(all,incl tests/nonlisted names) 5 file-own 3452 (67.8%) fn-own 198 (3.9%) outside-fn-changed files 0 effective(F2) 198 (3.9%)
+0a47816d files 4 fns_changed(all,incl tests/nonlisted names) 3 file-own 2310 (45.4%) fn-own 40 (0.8%) outside-fn-changed files 2 effective(F2) 717 (14.1%)
+cae5092f files 10 fns_changed(all,incl tests/nonlisted names) 120 file-own 3166 (62.2%) fn-own 974 (19.1%) outside-fn-changed files 7 effective(F2) 3166 (62.2%)
+5f9e449d files 4 fns_changed(all,incl tests/nonlisted names) 33 file-own 1411 (27.7%) fn-own 118 (2.3%) outside-fn-changed files 3 effective(F2) 1308 (25.7%)
+d2aeb7de files 4 fns_changed(all,incl tests/nonlisted names) 6 file-own 734 (14.4%) fn-own 24 (0.5%) outside-fn-changed files 0 effective(F2) 24 (0.5%)
+53c9f384 files 17 fns_changed(all,incl tests/nonlisted names) 0 file-own 3623 (71.2%) fn-own 3623 (71.2%) outside-fn-changed files 0 effective(F2) 3623 (71.2%)
+EXCL-53c9f384 (first import) n=14 fl_own median 3119 (61.3%) p25 1793 p75 4001 min 17 max 4668
+EXCL-53c9f384 (first import) n=14 fn_own median 291 (5.7%) p25 40 p75 1255 min 2 max 1812
+EXCL-53c9f384 (first import) n=14 eff median 2157 (42.4%) p25 198 p75 3920 min 2 max 4401
+median effective 59.0%
+median file-own 62.2%  median fn-own 7.5%

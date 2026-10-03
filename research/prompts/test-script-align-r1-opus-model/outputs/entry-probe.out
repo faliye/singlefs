@@ -1,0 +1,50 @@
+### E0-header-control：退 1
+    CRASH_AMPLIFICATION_ITEM item=fixed-script-through-rollback exit=0 states=7 reused=3 red=2 lines=1 expand_up_to=28 exhaustive=true verdict=red seconds=0
+    CRASH_AMPLIFICATION_TOTAL dispatched=1 items=1 failed=1 not_run=0 reuse_unknown=0 states=7 reused_known=3 red=2 expand_up_to=28 scope=items seconds=0
+      ✗ 分项 fixed-script-through-rollback：CRASH_AMPLIFICATION 行报了 2 处红
+      ✗ 1 个分项判红
+### E1-red-then-78：退 78
+    CRASH_AMPLIFICATION_ITEM item=fixed-script-through-rollback exit=0 states=7 reused=3 red=2 lines=1 expand_up_to=28 exhaustive=true verdict=red seconds=0
+    CRASH_AMPLIFICATION_ITEM item=fixed-script-through-unmount exit=78 states=0 reused=unknown red=0 lines=0 expand_up_to=unknown exhaustive=false verdict=not-run seconds=0
+    CRASH_AMPLIFICATION_TOTAL dispatched=2 items=2 failed=1 not_run=1 reuse_unknown=1 states=7 reused_known=3 red=2 expand_up_to=28 scope=items seconds=0
+      ✗ 分项 fixed-script-through-rollback：CRASH_AMPLIFICATION 行报了 2 处红
+      ✗ 1 个分项判红
+      ✗ 分项 fixed-script-through-unmount 的驱动退 78（显卡或第二台用不上，或清场、多机配置不满足）：这一趟停在这一项，后面 0 项没派
+### E2-red-line-and-78：退 78
+    CRASH_AMPLIFICATION_ITEM item=fixed-script-through-rollback exit=78 states=7 reused=3 red=2 lines=1 expand_up_to=28 exhaustive=true verdict=not-run seconds=0
+    CRASH_AMPLIFICATION_TOTAL dispatched=1 items=1 failed=0 not_run=1 reuse_unknown=0 states=7 reused_known=3 red=2 expand_up_to=28 scope=items seconds=0
+      ✗ 分项 fixed-script-through-rollback 的驱动退 78（显卡或第二台用不上，或清场、多机配置不满足）：这一趟停在这一项，后面 0 项没派
+### E3-zero-states：退 0
+    CRASH_AMPLIFICATION_ITEM item=fixed-script-through-rollback exit=0 states=0 reused=0 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=fixed-script-through-unmount exit=0 states=0 reused=0 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=multi-record-publish exit=0 states=0 reused=0 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=tree-split-streams exit=0 states=0 reused=0 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=position-addressed-trees exit=0 states=0 reused=0 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=floor-raise-pushed-by-the-session exit=0 states=0 reused=0 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=sigma-of-the-misaligned-reuse exit=0 states=0 reused=0 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_TOTAL dispatched=7 items=7 failed=0 not_run=0 reuse_unknown=0 states=0 reused_known=0 red=0 expand_up_to=28 scope=full seconds=0
+      ✓ 崩溃放量全量（展开 28）：7 项都退 0、0 红；现判 0 态、复用 0 态；派出 7 项、收回 7 项
+### E4-no-red-field：退 0
+    CRASH_AMPLIFICATION_ITEM item=fixed-script-through-rollback exit=0 states=7 reused=3 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=fixed-script-through-unmount exit=0 states=7 reused=3 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=multi-record-publish exit=0 states=7 reused=3 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=tree-split-streams exit=0 states=7 reused=3 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=position-addressed-trees exit=0 states=7 reused=3 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=floor-raise-pushed-by-the-session exit=0 states=7 reused=3 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=sigma-of-the-misaligned-reuse exit=0 states=7 reused=3 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_TOTAL dispatched=7 items=7 failed=0 not_run=0 reuse_unknown=0 states=49 reused_known=21 red=0 expand_up_to=28 scope=full seconds=0
+      ✓ 崩溃放量全量（展开 28）：7 项都退 0、0 红；现判 49 态、复用 21 态；派出 7 项、收回 7 项
+### E5-red-not-a-number：退 0
+    CRASH_AMPLIFICATION_ITEM item=tree-split-streams exit=0 states=7 reused=3 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_TOTAL dispatched=1 items=1 failed=0 not_run=0 reuse_unknown=0 states=7 reused_known=3 red=0 expand_up_to=28 scope=items seconds=0
+      ✓ 崩溃放量点名的 1 项（展开 28）：1 项都退 0、0 红；现判 7 态、复用 3 态；派出 1 项、收回 1 项
+### E6-ignored-not-reported：退 0
+    CRASH_AMPLIFICATION_ITEM item=fixed-script-through-rollback exit=0 states=7 reused=3 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=fixed-script-through-unmount exit=0 states=7 reused=3 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=multi-record-publish exit=0 states=7 reused=3 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=tree-split-streams exit=0 states=7 reused=3 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=position-addressed-trees exit=0 states=7 reused=3 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=floor-raise-pushed-by-the-session exit=0 states=7 reused=3 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_ITEM item=sigma-of-the-misaligned-reuse exit=0 states=7 reused=3 red=0 lines=1 expand_up_to=28 exhaustive=true verdict=green seconds=0
+    CRASH_AMPLIFICATION_TOTAL dispatched=7 items=7 failed=0 not_run=0 reuse_unknown=0 states=49 reused_known=21 red=0 expand_up_to=28 scope=full seconds=0
+      ✓ 崩溃放量全量（展开 28）：7 项都退 0、0 红；现判 49 态、复用 21 态；派出 7 项、收回 7 项

@@ -1,0 +1,13 @@
+[
+ ["T3a copy inside research/scripts (basename differs)", "clerk", "cp research/scripts/detached-run.sh research/scripts/dr2.sh && bash research/scripts/dr2.sh start --label m -- sleep 1"],
+ ["T3a symlink inside research/scripts", "clerk", "ln -s detached-run.sh research/scripts/drl.sh; bash research/scripts/drl.sh start --label m -- sleep 1"],
+ ["T3a source", "clerk", "source research/scripts/detached-run.sh start --label m -- sleep 1"],
+ ["T3a dot", "clerk", ". research/scripts/detached-run.sh start --label m -- sleep 1"],
+ ["T3a bash -c nested (selftest claims caught)", "clerk", "bash -c 'bash research/scripts/detached-run.sh start --label m -- sleep 1'"],
+ ["T3a capped wrapper", "clerk", "bash research/scripts/capped.sh 4 bash research/scripts/detached-run.sh start --label m -- sleep 1"],
+ ["T3a nice prefix", "clerk", "nice -n 19 bash research/scripts/detached-run.sh start --label m -- sleep 1"],
+ ["T3a env prefix", "clerk", "env FOO=1 bash research/scripts/detached-run.sh start --label m -- sleep 1"],
+ ["T3a stop via source", "clerk", "source research/scripts/detached-run.sh stop m"],
+ ["T3a command builtin", "clerk", "command bash research/scripts/detached-run.sh start --label m -- sleep 1"],
+ ["T3b subagent heavy inside detached (should heavy-refuse regardless)", "clerk", "bash research/scripts/detached-run.sh start --label m -- cargo test --all"]
+]

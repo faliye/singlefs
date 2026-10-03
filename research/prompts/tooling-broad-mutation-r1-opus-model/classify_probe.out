@@ -1,0 +1,166 @@
+A1 点名一条只跑第一段（对照）
+    命令: python3 research/scripts/broad-mutation.py --item 12 --skip-stage-two
+    分类: None
+    驱动: 真跑 run_items：item=1 条 from=None package=None shard=None skip_two=True two_only=False threads=31 memory_cap=24G
+A2 点名 5091 条只跑第一段
+    命令: python3 research/scripts/broad-mutation.py --item 1 --item 2 --item 3 --item 4 --item 5 -- …（共 60044 字）… --item 5090 --item 5091 --skip-stage-two
+    分类: None
+    驱动: 真跑 run_items：item=5091 条 from=None package=None shard=None skip_two=True two_only=False threads=31 memory_cap=24G
+A3 A2 带前缀（驱动要它）
+    命令: SINGLEFS_HEAVY_TESTS=user-request nice -n 19 python3 research/scripts/broad-mutation.py -- …（共 60089 字）… --item 5090 --item 5091 --skip-stage-two
+    分类: None
+A4 点名 + 只跑第一段 + 放大线程与内存
+    命令: python3 research/scripts/broad-mutation.py --item 1 --skip-stage-two --threads 64 --memory-cap 200G
+    分类: None
+    驱动: 真跑 run_items：item=1 条 from=None package=None shard=None skip_two=True two_only=False threads=64 memory_cap=200G
+A5 假步驱动写真库
+    命令: BROAD_MUTATION_STEP_DRIVER=/bin/true python3 research/scripts/broad-mutation.py --item 7 --skip-stage-two
+    分类: None
+A6 弄坏开关进真跑
+    命令: BROAD_MUTATION_BREAK=interrupted-as-done python3 research/scripts/broad-mutation.py --item 7 --skip-stage-two
+    分类: None
+B1 --summary 加 --shard
+    命令: python3 research/scripts/broad-mutation.py --summary --shard 0/2
+    分类: None
+    驱动: 只列项/汇总后返回
+B2 --sync-tree 加 --shard
+    命令: python3 research/scripts/broad-mutation.py --sync-tree --shard 0/2
+    分类: None
+    驱动: 只 sync_tree(commit=HEAD) 后返回
+B3 --sync-tree 换提交
+    命令: python3 research/scripts/broad-mutation.py --sync-tree --commit HEAD~1
+    分类: None
+    驱动: 只 sync_tree(commit=HEAD~1) 后返回
+B4 --list-items 加 --from
+    命令: python3 research/scripts/broad-mutation.py --list-items --from 1
+    分类: None
+    驱动: 只列项/汇总后返回
+B5 -h 在后面
+    命令: python3 research/scripts/broad-mutation.py --shard 0/2 -h
+    分类: None
+B6 --summary 当 --home 的值
+    命令: python3 research/scripts/broad-mutation.py --home --summary
+    分类: None
+    驱动: argparse 退 2
+B7 -- 之后的 --summary
+    命令: python3 research/scripts/broad-mutation.py --shard 0/2 -- --summary
+    分类: None
+    驱动: argparse 退 2
+B8 两段开关并用
+    命令: python3 research/scripts/broad-mutation.py --item 1 --skip-stage-two --stage-two-only
+    分类: None
+    驱动: argparse 退 2
+B9 --item 加 --stage-two-only
+    命令: python3 research/scripts/broad-mutation.py --item 1 --stage-two-only
+    分类: broad-mutation
+    驱动: 真跑 run_items：item=1 条 from=None package=None shard=None skip_two=False two_only=True threads=31 memory_cap=24G
+B10 缩写 --skip（argparse 认前缀）
+    命令: python3 research/scripts/broad-mutation.py --item 1 --skip
+    分类: broad-mutation
+    驱动: 真跑 run_items：item=1 条 from=None package=None shard=None skip_two=True two_only=False threads=31 memory_cap=24G
+B11 缩写 --list
+    命令: python3 research/scripts/broad-mutation.py --list
+    分类: broad-mutation
+    驱动: 只列项/汇总后返回
+B12 缩写 --sum
+    命令: python3 research/scripts/broad-mutation.py --sum
+    分类: broad-mutation
+    驱动: 只列项/汇总后返回
+B13 --item=1 贴着写
+    命令: python3 research/scripts/broad-mutation.py --item=1 --skip-stage-two
+    分类: broad-mutation
+    驱动: 真跑 run_items：item=1 条 from=None package=None shard=None skip_two=True two_only=False threads=31 memory_cap=24G
+C1 bash -c
+    命令: bash -c 'python3 research/scripts/broad-mutation.py --shard 0/2'
+    分类: broad-mutation
+C2 env
+    命令: env X=1 python3 research/scripts/broad-mutation.py
+    分类: broad-mutation
+C3 nice + 绝对路径
+    命令: nice -n 19 python3 /home/fy5090/code/singlefs/research/scripts/broad-mutation.py
+    分类: broad-mutation
+C4 cd 进去相对路径
+    命令: cd research/scripts && python3 ./broad-mutation.py
+    分类: broad-mutation
+C5 直接执行（有执行位）
+    命令: ./research/scripts/broad-mutation.py --shard 1/2
+    分类: broad-mutation
+C6 python3 -u
+    命令: python3 -u research/scripts/broad-mutation.py
+    分类: broad-mutation
+C7 python3 -W ignore（带值的解释器选项）
+    命令: python3 -W ignore research/scripts/broad-mutation.py --shard 0/2
+    分类: None
+C8 python3 -X dev
+    命令: python3 -X dev research/scripts/broad-mutation.py
+    分类: None
+C9 python3 -c runpy
+    命令: python3 -c "import runpy; runpy.run_path('research/scripts/broad-mutation.py', run_name='__main__')" --shard 0/2
+    分类: None
+C10 python3 -c exec
+    命令: python3 -c "__file__='research/scripts/broad-mutation.py'; exec(open(__file__).read())"
+    分类: None
+C11 python3 - < 脚本
+    命令: python3 - --shard 0/2 < research/scripts/broad-mutation.py
+    分类: None
+C12 符号链接
+    命令: ln -s broad-mutation.py research/scripts/bm.py && python3 research/scripts/bm.py
+    分类: None
+C13 仓内改名拷贝
+    命令: cp research/scripts/broad-mutation.py research/scripts/bm2.py && python3 research/scripts/bm2.py
+    分类: None
+C14 变量间接
+    命令: S=research/scripts/broad-mutation.py; python3 $S
+    分类: None
+C15 python3.12 全路径
+    命令: /usr/bin/python3.12 research/scripts/broad-mutation.py
+    分类: broad-mutation
+C16 多余斜杠与 ..
+    命令: python3 research//scripts/../scripts/broad-mutation.py
+    分类: broad-mutation
+C17 capped.sh 包一层
+    命令: bash research/scripts/capped.sh 31 python3 research/scripts/broad-mutation.py
+    分类: broad-mutation
+C18 run-with-memory-cap 包一层
+    命令: bash research/scripts/run-with-memory-cap.sh 24G python3 research/scripts/broad-mutation.py
+    分类: broad-mutation
+C19 xargs
+    命令: echo --shard 0/2 | xargs python3 research/scripts/broad-mutation.py
+    分类: None
+C20 setsid / stdbuf
+    命令: stdbuf -oL python3 research/scripts/broad-mutation.py
+    分类: broad-mutation
+C21 command / exec
+    命令: exec python3 research/scripts/broad-mutation.py
+    分类: broad-mutation
+C22 前一条放过、后一条整趟
+    命令: python3 research/scripts/broad-mutation.py --summary; python3 research/scripts/broad-mutation.py
+    分类: broad-mutation
+C23 pypy3 / uv run
+    命令: uv run research/scripts/broad-mutation.py
+    分类: None
+D1 T2 py_compile 语法检查
+    命令: python3 -m py_compile research/scripts/broad-mutation.py
+    分类: None
+D2 T2 grep 读它
+    命令: grep -n main research/scripts/broad-mutation.py
+    分类: None
+D3 T2 sha256sum
+    命令: sha256sum research/scripts/broad-mutation.py
+    分类: None
+D4 T2 草稿目录的仓副本里起（路径尾是 research/scripts）
+    命令: python3 /tmp/claude-1000/some-leg/copy/research/scripts/broad-mutation.py --home /tmp/claude-1000/some-leg/home
+    分类: broad-mutation
+D5 T2 主 agent 全量
+    命令: SINGLEFS_HEAVY_TESTS=user-request nice -n 19 python3 research/scripts/broad-mutation.py --threads 31
+    分类: broad-mutation
+D6 T2 --selftest
+    命令: python3 research/scripts/broad-mutation.py --selftest
+    分类: commit-check-selftest
+D7 T2 --selftest 混运行参数
+    命令: python3 research/scripts/broad-mutation.py --selftest --shard 0/2
+    分类: commit-check-selftest
+    驱动: 走 --selftest
+D8 T2 --stage-two-only 全量
+    命令: python3 research/scripts/broad-mutation.py --stage-two-only
+    分类: broad-mutation

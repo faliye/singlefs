@@ -1,0 +1,125 @@
+    1|       |//! 地址与代号的 newtype。每一种都是它自己的类型：逻辑上不同的量传错了要编译不过。
+    2|       |//!
+    3|       |//! ```compile_fail
+    4|       |//! use singlefs_core::address::{DeviceOffsetInBytes, SlotNumber};
+    5|       |//! fn wants_an_offset(_offset: DeviceOffsetInBytes) {}
+    6|       |//! // 16 KiB 槽号不是设备内字节偏移：直接传过去编译不过。
+    7|       |//! wants_an_offset(SlotNumber(3));
+    8|       |//! ```
+    9|       |
+   10|       |use singlefs_format::SLOT_BYTES;
+   11|       |
+   12|       |/// 池内一块设备的身份，与位置条目里那 4 字节同宽（D19（块指针的结构与宽度预算） 已定项 4）。
+   13|       |#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+   14|       |pub struct DeviceIdentity(pub u32);
+   15|       |
+   16|       |/// 设备内的 16 KiB 槽号（D3（空间分配） 已定项 7）。
+   17|       |#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+   18|       |pub struct SlotNumber(pub u64);
+   19|       |
+   20|       |/// 设备内字节偏移。只由 [`SlotNumber::to_device_offset`] 或固定结构的落点表产生。
+   21|       |#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+   22|       |pub struct DeviceOffsetInBytes(pub u64);
+   23|       |
+   24|       |/// checkpoint 号：发布计数、轮转键、记账代、重放水位是同一个数（D16（发布语义） 已定项 6）。
+   25|       |#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+   26|       |pub struct CheckpointTxg(pub u64);
+   27|       |
+   28|       |/// journal 实例代号：mkfs 写 0，第一次可写挂载取 1（D23（journal 的角色与格式） 已定项 16）。
+   29|       |#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+   30|       |pub struct InstanceGeneration(pub u32);
+   31|       |
+   32|       |/// journal 记录序号 jsn：实例代号 4 字节 + 计数器 6 字节（D23（journal 的角色与格式） 已定项 9）。
+   33|       |#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+   34|       |pub struct JournalSequenceNumber {
+   35|       |    pub instance_generation: InstanceGeneration,
+   36|       |    pub counter: u64,
+   37|       |}
+   38|       |
+   39|       |/// 树 ID，从 11 起编号、与树的种类码错开（D8（核心索引结构） 已定项 11）。
+   40|       |#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+   41|       |pub struct TreeIdentifier(pub u64);
+   42|       |
+   43|       |/// inode 号。
+   44|       |#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+   45|       |pub struct InodeNumber(pub u64);
+   46|       |
+   47|       |/// 文件内的字节偏移，从文件第 0 个字节起算。与设备内字节偏移、16 KiB 槽号是三个地址空间
+   48|       |/// （`.claude/rules/fs-design.md`「不同地址空间必须是不同的 Rust 类型」）。
+   49|       |#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+   50|       |pub struct FileOffsetInBytes(pub u64);
+   51|       |
+   52|       |/// 一个文件里第几个数据单元，从 0 起：文件字节偏移除以数据单元的净荷容量取商
+   53|       |/// （D4（校验和位置） 已定项 5：净荷不是 2 的幂，文件偏移到单元做除法而不是移位）。
+   54|       |///
+   55|       |/// ⚠️ 它**不是** extent 叶记录 key 里那个 offset 段：那一段是文件字节偏移（D8（核心索引结构） 已定项 3，
+   56|       |/// 2026-09-23 定），第 n 个单元是 n × 净荷容量，由 [`DataUnitIndexInFile::first_file_byte`] 换算。
+   57|       |#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+   58|       |pub struct DataUnitIndexInFile(pub u64);
+   59|       |
+   60|       |impl DataUnitIndexInFile {
+   61|       |    /// 文件的第一个数据单元。只有一个单元的文件（新池新建文件那一档）就是它。
+   62|       |    pub const FIRST: Self = Self(0);
+   63|       |
+   64|       |    /// 这个单元载荷的第一个字节在文件里的偏移：单元序号乘净荷容量（D4（校验和位置） 已定项 5 的除法倒过来）。
+   65|       |    /// extent 叶记录 key 的 offset 段与数据单元头的锚点偏移写的都是它（D8（核心索引结构） 已定项 3；
+   66|       |    /// D9（加密） 已定项 6「锚点偏移 = `key.offset − ptr.extent_off`」，第一版 extent 距起点偏移恒 0）。
+   67|       |    ///
+   68|       |    /// # Panics
+   69|       |    /// 乘出来越过 `u64`：单元序号由一段内存里的内容长度除净荷容量得出，乘回去不超过内容长度加一个净荷。
+   70|       |    #[must_use]
+   71|      0|    pub fn first_file_byte(self, payload_capacity_in_bytes: u64) -> FileOffsetInBytes {
+   72|      0|        FileOffsetInBytes(
+   73|      0|            self.0
+   74|      0|                .checked_mul(payload_capacity_in_bytes)
+   75|      0|                .expect("单元序号由内容长度除净荷容量得出，乘回去不越过 u64"),
+   76|      0|        )
+   77|      0|    }
+   78|       |}
+   79|       |
+   80|       |impl SlotNumber {
+   81|       |    /// 槽号乘落点粒度就是设备内字节偏移；这是两个地址空间之间唯一的换算。
+   82|       |    #[must_use]
+   83|      0|    pub const fn to_device_offset(self) -> DeviceOffsetInBytes {
+   84|      0|        DeviceOffsetInBytes(self.0 * SLOT_BYTES)
+   85|      0|    }
+   86|       |}
+   87|       |
+   88|       |impl JournalSequenceNumber {
+   89|       |    /// 计数器只有 6 字节宽；超过它的值在盘上写不下。
+   90|       |    pub const COUNTER_LIMIT: u64 = 1 << 48;
+   91|       |}
+   92|       |
+   93|       |#[cfg(test)]
+   94|       |mod tests {
+   95|       |    use super::*;
+   96|       |
+   97|       |    #[test]
+   98|      0|    fn slot_number_converts_to_offset_by_the_placement_granularity() {
+   99|      0|        assert_eq!(SlotNumber(0).to_device_offset(), DeviceOffsetInBytes(0));
+  100|      0|        assert_eq!(
+  101|      0|            SlotNumber(50176).to_device_offset(),
+  102|      0|            DeviceOffsetInBytes(50176 * 16384)
+  103|       |        );
+  104|      0|        assert_eq!(
+  105|      0|            SlotNumber(64).to_device_offset(),
+  106|      0|            DeviceOffsetInBytes(1024 * 1024),
+  107|       |            "根环起点槽 64 = 1 MiB"
+  108|       |        );
+  109|      0|    }
+  110|       |
+  111|       |    #[test]
+  112|      1|    fn journal_sequence_numbers_order_by_instance_then_counter() {
+  113|      1|        let earlier_instance = JournalSequenceNumber {
+  114|      1|            instance_generation: InstanceGeneration(1),
+  115|      1|            counter: 9,
+  116|      1|        };
+  117|      1|        let later_instance = JournalSequenceNumber {
+  118|      1|            instance_generation: InstanceGeneration(2),
+  119|      1|            counter: 1,
+  120|      1|        };
+  121|      1|        assert!(earlier_instance < later_instance);
+  122|      1|        assert_eq!(JournalSequenceNumber::COUNTER_LIMIT, 281_474_976_710_656);
+  123|      1|    }
+  124|       |}
+

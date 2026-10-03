@@ -1,0 +1,9 @@
+## lib_heavy_tests.py --selftest（平目录）
+退出码 1
+  ✗ lib_heavy_tests 自检：这份文件所在仓（<草稿>）里找得到 checker 档包的测试目标 应当是 True，实际 False
+  ✗ lib_heavy_tests 自检：门禁样本：herd7 指到放了原样标记的样本根：样本档放行 应当是 None，实际 herd7-stage
+  ✗ lib_heavy_tests 自检：门禁样本：54 号指到放了 .layer0-sample-tools 的样本根（cd 进去、根参数写同一个目录）：样本档放行 应当是 None，实际 layer0-stage
+## heavy-test-guard.sh --selftest（平目录）
+退出码 1
+  ✗ <草稿>/flat/hooks/heavy-test-guard.sh：找不到规范副本里的 preflight.sh（这棵树与主仓里都没有：<草稿>/.clau
+     → 怎么办：规范副本 .claude/singlefs-ai-sop/ 不随 git 走；在主仓里装好它（bash .claude/singlefs-ai-sop/install.sh），临时树从主仓的副本里找得到。

@@ -1,0 +1,43 @@
+rows (last per sequence) 302 {'unviable': 39, 'caught': 241, 'stage-one-only': 15, 'timeout': 7}
+  unviable        n= 39 build mean 0.9 | test mean 0.0
+  caught          n=241 build mean 20.4 | test mean 52.0
+  stage-one-only  n= 15 build mean 18.4 | test mean 630.3
+  timeout         n=  7 build mean 57.4 | test mean 1453.2
+caught with T in baseline log: 241 of 241 | build + baseline duration of T: mean 22.8 median 10.4
+shares {'unviable': 0.1291, 'caught': 0.798, 'stage-one-only': 0.0497, 'timeout': 0.0232}
+baseline.tsv steps {'one-build': 23.5, 'one-test': 278.5, 'two-build-harness': 95.7, 'two-test-doc': 1.5, 'two-test-slow-harness': 936.0, 'two-build-checker-tier': 43.5, 'two-test-checker-tier': 47.3}
+stage two per survivor, baseline seconds: tests 984.8 + builds 139.2 (cold-ish baseline builds, an upper bound for incremental)
+L=60 s: per-mutant seconds today(measured, plus stage two inferred) 181.0 | C2 floor(only compile) 18.6 | C2 T-first(caught) 102.2
+L=300 s: per-mutant seconds today(measured, plus stage two inferred) 181.0 | C2 floor(only compile) 18.6 | C2 T-first(caught) 107.8
+  stage-one-only share 0.050 -> its part in tfirst: 81.1 s of 107.8
+--- 14 commits, C1 eff (s reading) -> hours; fixed per commit not included
+commit eff | today | tfirst L=60 | tfirst L=300 | floor
+8186d5b5     2 |    0.1 |    0.1 |    0.1 |    0.0
+d2aeb7de    24 |    1.2 |    0.7 |    0.7 |    0.1
+973e1f58    34 |    1.7 |    1.0 |    1.0 |    0.2
+495bede6   198 |   10.0 |    5.6 |    5.9 |    1.0
+0a47816d   717 |   36.0 |   20.4 |   21.5 |    3.7
+bc57af7a  1155 |   58.1 |   32.8 |   34.6 |    6.0
+5f9e449d  1308 |   65.8 |   37.1 |   39.2 |    6.8
+dbcc0d2f  3006 |  151.1 |   85.3 |   90.0 |   15.6
+3cff909b  3073 |  154.5 |   87.2 |   92.0 |   15.9
+cae5092f  3166 |  159.2 |   89.9 |   94.8 |   16.4
+c3540c02  3920 |  197.1 |  111.3 |  117.3 |   20.3
+45d49aaf  3997 |  200.9 |  113.5 |  119.6 |   20.7
+a1f4691b  4181 |  210.2 |  118.7 |  125.1 |   21.6
+346f5e6c  4401 |  221.3 |  124.9 |  131.7 |   22.8
+median today 108.4 h min 0.1 max 221.3
+median tf60 61.2 h min 0.1 max 124.9
+median tf300 64.6 h min 0.1 max 131.7
+median floor 11.2 h min 0.0 max 22.8
+--- milestone-end full list (5091), no coverage pass, hours: today 255.9 | tfirst L=60 144.5 | tfirst L=300 152.4 | floor 26.4
+judged today 302 unjudged 4789
+compile-only floor if every viable mutant compiles once: viable share 0.871 x 21.3 s x 5091 = 26.2 h
+fixed per version: baseline 0.40 h + coverage pass at multiplier 1.0 = 0.79 h (coverage multiplier 没量)
+fixed per version: baseline 0.40 h + coverage pass at multiplier 1.5 = 0.99 h (coverage multiplier 没量)
+fixed per version: baseline 0.40 h + coverage pass at multiplier 2.0 = 1.19 h (coverage multiplier 没量)
+fixed per version: baseline 0.40 h + coverage pass at multiplier 3.0 = 1.58 h (coverage multiplier 没量)
+per-test processes in coverage pass: stage-one tests (from baseline log) 776 ; slow ignored 61 (baseline.two-test-slow-harness.log header); checker-tier libtest tests: 436 #[test] fns - not countable per-process without running
+  post-processing at 1 s per test process, ~1273 processes: 0.35 h
+  post-processing at 3 s per test process, ~1273 processes: 1.06 h
+  post-processing at 10 s per test process, ~1273 processes: 3.54 h

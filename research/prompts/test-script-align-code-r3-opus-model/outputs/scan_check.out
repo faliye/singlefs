@@ -1,0 +1,6 @@
+SCAN root=/tmp/claude-1000/test-script-align-code-r3/tree/crates/singlefs-checker-tier tests_files=35 library_test_items=38 entry_calls_tests=6 entry_calls_library=2 bypasses=1
+SCAN_VERDICT root=/tmp/claude-1000/test-script-align-code-r3/tree/crates/singlefs-checker-tier test_would_be=green first_red=None
+SCAN root=/tmp/claude-1000/test-script-align-code-r3-opus/variants/row1729/crates/singlefs-checker-tier tests_files=35 library_test_items=38 entry_calls_tests=5 entry_calls_library=2 bypasses=2
+SCAN_VERDICT root=/tmp/claude-1000/test-script-align-code-r3-opus/variants/row1729/crates/singlefs-checker-tier test_would_be=red first_red=Some("not_allowed=[\"tests/gpu_unit_checks_agree_with_the_cpu_and_catch_a_flipped_byte.rs:38\"]")
+SCAN root=/tmp/claude-1000/test-script-align-code-r3-opus/variants/row1730/crates/singlefs-checker-tier tests_files=35 library_test_items=38 entry_calls_tests=6 entry_calls_library=1 bypasses=2
+SCAN_VERDICT root=/tmp/claude-1000/test-script-align-code-r3-opus/variants/row1730/crates/singlefs-checker-tier test_would_be=red first_red=Some("not_allowed=[\"src/crash_judge_dispatch.rs:997\"]")

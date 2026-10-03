@@ -1,0 +1,2 @@
+runner-dispatch-guard.sh	exit=0	
+runner-dispatch-guard-broken.sh	exit=2	<草稿>/root/.claude/hooks/runner-dispatch-guard-broken.sh: line 974: syntax e

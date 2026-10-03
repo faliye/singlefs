@@ -1,0 +1,8 @@
+[
+ ["T3c inner > research/results overwrite (file exists, untracked)", null, "bash research/scripts/detached-run.sh start --label m -- bash -c 'echo x > research/results/existing-untracked.out'"],
+ ["ctrl: direct > research/results overwrite", null, "bash -c 'echo x > research/results/existing-untracked.out'"],
+ ["T3c inner cp overwrite", null, "bash research/scripts/detached-run.sh start --label m -- cp /tmp/x research/results/existing-untracked.out"],
+ ["T3c inner setsid -f", null, "bash research/scripts/detached-run.sh start --label m -- setsid -f sleep 100"],
+ ["T3c inner nohup &", null, "bash research/scripts/detached-run.sh start --label m -- bash -c 'nohup sleep 100 &'"],
+ ["T3c inner pkill -f", null, "bash research/scripts/detached-run.sh start --label m -- pkill -f cargo"]
+]

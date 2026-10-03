@@ -1,0 +1,29 @@
+## A 草稿目录里的 lib_heavy_tests.py --selftest（T2-3）：路径尾部是不是 .claude/hooks/ 决定认不认它是自证
+A1 tooling-writer，平的草稿目录 <草稿>/flat/	exit=0	
+A2 tooling-writer，仿 .claude/hooks 的草稿根 <草稿>/mirrored/.claude/hooks/	exit=2	✗ 提交时才跑的检查被拒：<草稿>/mir
+A3 主 agent 不带前缀，仿 .claude/hooks 的草稿根	exit=2	✗ 提交时才跑的检查被拒：<草稿>/mir
+A4 主 agent 带 SINGLEFS_HEAVY_TESTS=commit，仿 .claude/hooks 的草稿根	exit=0	
+A5 tooling-writer，本仓那一份	exit=0	
+## B 经 stage-selftest.sh 喂样本（T2-4）：喂的是阶段目录的拷贝，样本目录改与不改
+B1 tooling-writer，拷贝原样，--item doc-text.sh	exit=0	
+B2 tooling-writer，prime-marks-red 样本多了一份 setup.sh（里面写 cargo test），--item doc-text.sh	exit=2	✗ 提交时才跑的检查被拒：.claude/singlefs-ai-sop/scripts/stage-selftest.sh（�
+B3 tooling-writer，本仓阶段目录、不带 --item（含 samples-heavy 的几道）	exit=2	✗ 提交时才跑的检查被拒：.claude/singlefs-ai-sop/scripts/stage-selftest.sh（�
+## C 54 号样本的 git 模式（T2-2）
+100755 green/.layer0-sample-tools/cargo
+100755 green/.layer0-sample-tools/rustc
+100755 quick-features-gpu-not-run/.layer0-sample-tools/cargo
+100755 quick-features-gpu-not-run/.layer0-sample-tools/quick-tier
+100755 quick-features-gpu-not-run/.layer0-sample-tools/rustc
+100755 quick-features-green/.layer0-sample-tools/cargo
+100755 quick-features-green/.layer0-sample-tools/quick-tier
+100755 quick-features-green/.layer0-sample-tools/rustc
+100755 quick-features-red/.layer0-sample-tools/cargo
+100755 quick-features-red/.layer0-sample-tools/quick-tier
+100755 quick-features-red/.layer0-sample-tools/rustc
+100755 quick-features-zero/.layer0-sample-tools/cargo
+100755 quick-features-zero/.layer0-sample-tools/quick-tier
+100755 quick-features-zero/.layer0-sample-tools/rustc
+100755 red/.layer0-sample-tools/cargo
+100755 red/.layer0-sample-tools/rustc
+100644 sample-cargo-not-executable/.layer0-sample-tools/cargo
+100644 sample-cargo-not-executable/.layer0-sample-tools/rustc

@@ -1,0 +1,1311 @@
+--- a/research/scripts/detached-run.sh
++++ b/research/scripts/detached-run.sh
+@@ -1,8 +1,9 @@
+ #!/usr/bin/env bash
++# detached-run-script-signature: singlefs 脱离会话长跑入口（.claude/hooks/ 的子 agent 闸与重型测试闸按这一行认改名、拷走的一份，别删、别挪出文件开头 4 KiB）
+ # 长跑脚本脱离会话跑：挂到用户级 systemd 的一个临时服务单元下，不在调用方的进程树里，调用方被停、会话的后台时限到点、会话关掉都不影响它；
+ # 会话里只上报（list / watch），不停它（records/2026-09-16-subagent拆分提案.md 第四十二节，用户 2026-10-01 定）。
+ #
+-#   detached-run.sh start --label <名> [--log <文件>] -- <命令与参数…>
++#   detached-run.sh start --label <名> [--log <文件>] [--stop-timeout <秒>] -- <命令与参数…>
+ #   detached-run.sh list
+ #   detached-run.sh watch [--every <秒>]
+ #   detached-run.sh stop <名>
+@@ -11,6 +12,7 @@
+ # start：单元名是 singlefs-detached-<名>.service，挂在 singlefs-detached.slice 下（systemd-run --user，--service-type=exec，--collect，
+ #   --expand-environment=no：命令里的 $ 与 % 原样交给命令）。名只用字母、数字、点、减号与下划线，字母或数字起头，至多 64 个字。
+ #   同名的单元还在跑（ActiveState 是 active / activating / deactivating / reloading / refreshing）就拒、退 3，什么都不起；
++#   systemctl --user show 查不到同名单元的状态（失败、或什么都没打：用户级 systemd 连不上）就拒、退 1，什么都不起、旧登记不动；
+ #   同名的登记已经结束（或单元已不在、没留退出码），先把那个登记目录改名成 <名>@<起跑的秒数> 留着，再起新的。判与起在同一把锁里（登记目录的 .lock，flock）。
+ #   带进单元的环境：调用方的 SINGLEFS_HEAVY_TESTS、PATH、HOME、CARGO_HOME、RUSTUP_HOME（设了的才带，逐个 --setenv=名=值），工作目录是调用方的当前目录。
+ #   别的变量不带：单元里是用户级 systemd 给的那一份环境（systemctl --user show-environment）加上这几样；要别的，写成 -- env 名=值 <命令>。
+@@ -20,34 +22,69 @@
+ #   单元的主进程（MainPID）是一个 bash：它把自己与命令的进程号写进登记，命令的标准输出与标准错误追加进日志，命令退出后把退出码写进登记再退出；
+ #   单元被停（stop、systemctl --user stop）时它等命令退出，照样写退出码（被 TERM 停的是 143）。登记在单元结束之后还在，退出码随时读得到。
+ #   日志默认是登记目录里的 log；--log 给的相对路径按调用方的当前目录算，所在目录要已经在。
++#   单元的停机时限（TimeoutStopSec）由 --stop-timeout <秒> 给，默认 DETACHED_RUN_DEFAULT_STOP_TIMEOUT_SECONDS（180 秒）：被停时命令有这么久收尾，
++#   到点还没退出 systemd 发 KILL（连主进程那个 bash 一起，退出码写不出来）。默认取 180 秒，是因为要给收到 TERM 之后收尾的脚本留够时间
++#   （broad-mutation.py 先停在途那一步的子进程再退；multi-host-run.sh 经 SSH 停第二台那条命令、自己至多等 30 秒再 KILL，再删第二台这一趟的树；
++#   这几段收尾要多久是推的，没量过），又要比会话里前台命令的 240 秒时限短，
++#   stop 在一次前台调用里等得到结局；要更长的写 --stop-timeout。时限写进登记的 stop-timeout。
++#   systemd-run 没起成单元：登记里写 start-failed（日期与 systemd-run 的退出码）再退 1，list 把它列成「没起成」，不当成被 KILL 的。
++#   起之前读 loginctl show-user <用户> -p Linger：为 no、或读不到时，stderr 打一行警告，照起（不拒）。
+ #   起完回读：单元的 ActiveState 与 MainPID、登记里命令的进程号（至多等 10 秒），两样都读不到就判没起成、退 1。
+ # list：逐条列登记——还在跑的：名、单元名、主进程号、命令的进程号、起跑日期、已跑时长、日志大小；已结束的：退出码（stop 停的另注一句）、结束日期、用时；
+-#   单元已不在又没留退出码的单列。每条带命令与日志的最后一行。成功句报「还在跑、没结束的 N 条，已结束 M 条，没留退出码 K 条」。
+-# watch：只上报的观察者，给会话里 run_in_background 用。每 --every 秒（默认 300）打一次 list；还在跑的一条都不剩时打观察到的各条退出码、退 0；
++#   单元已不在又没留退出码的单列（stop 停时到点被 KILL 的另注一句）；systemctl --user show 查不到状态的单列成「查不到」（不知道还在不在跑，不算结束）；
++#   systemd-run 没起成的单列成「没起成」。每条带命令与日志的最后一行。
++#   另读 systemctl --user list-units 'singlefs-detached-*'，单元在、这个登记目录里却没有它的（登记被删了、或在别的登记目录里）逐个列成「登记里没有」，
++#   读不到单元清单的打一句「查不到单元清单」。成功句报「还在跑、没结束的 N 条，已结束 M 条，没留退出码 K 条，查不到 Q 条，没起成 F 条；登记里没有的单元 U 个」。
++# watch：只上报的观察者，给会话里 run_in_background 用。每 --every 秒（默认 300）打一次 list；还在跑的与查不到的一条都不剩时打观察到的各条退出码、退 0；
++#   查不到的不当结束，接着观察（清单里写明是查不到）。观察到的每一条按「登记目录 + 起跑秒数」记：观察之后同名又起过一次的，旧一次的退出码到挪走的
++#   <名>@<起跑的秒数> 里读，照样报；登记里没有的单元只在清单里列，不等它们。
+ #   收到 TERM / INT / HUP（会话的后台时限到点、任务被停）先打最后一次清单（「还在跑」那几条就是还在跑、没结束的脚本），再退 143 / 130 / 129。
+-#   它只读 systemctl --user show 与登记，不停、不给任何单元或命令发信号（只停它自己起的那一个 sleep）；被 KILL 时最后那一次清单打不出来，定时那几次照打。
+-# stop：只按登记里的单元名停那一个（systemctl --user stop <单元名>），不按模式找进程；停完回读 ActiveState，再等登记里出现退出码（至多 30 秒）。
++#   它只读 systemctl --user show / list-units 与登记，不停、不给任何单元或命令发信号（只停它自己起的那一个 sleep）；被 KILL 时最后那一次清单打不出来，定时那几次照打。
++# stop：只按登记里的单元名停那一个（systemctl --user stop <单元名>），不按模式找进程。systemctl --user stop 等单元停下（命令在停机时限里退出，或到点被 KILL），
++#   所以总的等待不短于停机时限；停完回读 ActiveState，再至多等 5 秒读登记里的退出码，读不到就是到点被 KILL 了，登记里写 stop-killed（日期与停机时限）。
++#   查不到单元状态（用户级 systemd 连不上）就拒、退 1，什么都没停。
+ #
+ # 谁能用：start 与 stop 只给主 agent（.claude/hooks/bash-command-detector.sh 拒子 agent 的；list、watch 只读，谁都放）。
+ #   .claude/hooks/heavy-test-guard.sh 把 start 当包装看穿，-- 之后那条命令照重型测试那张表判，前缀照认（.claude/hooks/lib_heavy_tests.py 的 command_under_detached_run）。
+-# 用户级 systemd 没开 linger（loginctl show-user 的 Linger=no）时，这个用户的最后一个登录会话结束，用户级 systemd 连同这里起的单元一起停，
+-#   list 里记成「没留退出码」；会话的后台时限到点、Claude Code 会话关掉不在此列。
++#   两道闸按内容认这个脚本（.claude/hooks/lib_shell_words.py 的 detached_run_script）：名字叫 detached-run.sh、指到它的符号链接、文件开头带签名行的改名拷贝，
++#   bash / sh 起的、source / . 读进来的、直接执行的都认；同一条命令里先 cp（子 agent 闸另认 install、ln、mv）再起的按目标认。
++#   罩不住的写法：删掉签名行的拷贝；eval、变量里拼出来的路径（S=…; bash "$S"）、python 的 subprocess、xargs 与 find -exec 起的；
++#   命令词不带斜杠、从 PATH 里找到的拷贝；/usr/bin/time、flock、systemd-run --wait 这类包装后面的（子 agent 闸不剥它们）；
++#   重型闸里同一条命令里先 ln -s / install / mv 再起的；主 agent 经改名拷贝起时 -- 之后那条命令（③ 的放行口只按名字剥，里面的放出追踪认不出）。
++# 用户级 systemd 开着 linger（loginctl show-user <用户> 的 Linger=yes）时，单元跨登录会话活着；Linger=no 时这个用户的最后一个登录会话结束，
++#   用户级 systemd 连同这里起的单元一起停，list 里记成「没留退出码」。start 每次现读 Linger，为 no 时警告（见 start 那一段）。
++#   会话的后台时限到点、Claude Code 会话关掉不在此列。
+ #
+ # 登记目录：${DETACHED_RUN_STATE_DIRECTORY:-${XDG_STATE_HOME:-~/.local/state}/singlefs/detached-runs}/<名>/（DETACHED_RUN_STATE_DIRECTORY 给自证与临时换目录用）。
+ #   每条一个目录：unit、command、cwd、environment（带进去的变量名）、started（秒数）、started-date、log（日志路径）、runner-pid（主进程号）、
+-#   pid（命令的进程号）、ended、ended-date、exit（退出码）、stop-requested（stop 停的）。
++#   pid（命令的进程号）、ended、ended-date、exit（退出码）、stop-timeout（停机时限的秒数）、stop-requested（stop 停的）、
++#   stop-killed（stop 停时到点被 KILL）、start-failed（systemd-run 没起成）。
+ #
+-# 退出码：0 成功（watch：观察的全部结束）；1 systemd 起不来、起了回读不到、登记目录建不了；2 用法错（什么都没起）；
+-#   3 拒绝（同名还在跑、stop 的名没有登记）；78 准入或运行条件不满足（preflight）；watch 被停退 143 / 130 / 129。
++# 退出码：0 成功（watch：观察的全部结束）；1 systemd 起不来、起了回读不到、登记目录建不了、查不到单元状态；2 用法错（什么都没起）；
++#   3 拒绝（同名还在跑、stop 的名没有登记）；4 弄坏开关 DETACHED_RUN_BREAK 设在 --selftest 之外（什么都没做；出路：去掉它再跑）；
++#   78 准入或运行条件不满足（preflight）；watch 被停退 143 / 130 / 129。
+ #
+ # 自证（--selftest）：在临时登记目录里起名为 selftest-<进程号>-<格> 的单元，只跑 sleep、true 与几行 bash；收尾逐个按单元名停、
+-#   再用 systemctl --user list-units 核这个前缀一条不剩（不剩也是一格）。
+-# 弄坏开关 DETACHED_RUN_BREAK=<项>（只给证红用，逗号分隔可给几个；各项打开时 --selftest 对应那一格判红）：
++#   再用 systemctl --user list-units 核这个前缀一条不剩（不剩也是一格）。替用户级 systemd 失灵、systemd-run 失败、Linger 的几格
++#   在 PATH 最前面放替身的 systemctl、systemd-run、loginctl（只在那一格的命令上），不动真的用户级 systemd。
++# 弄坏开关 DETACHED_RUN_BREAK=<项>（只给证红用，逗号分隔可给几个；各项打开时 --selftest 对应那一格判红）。只在 --selftest 起的进程里生效：
++#   自证在它的临时登记目录里放 .selftest-token、把同一个值放进 DETACHED_RUN_SELFTEST_TOKEN 带给它起的命令，两样对得上才认开关；
++#   别处设了它（两样对不上）就拒绝执行、退 4，什么都不做。
+ #   in-caller-tree        start 不经 systemd，把命令起在调用方的进程树里（「调用方的单元被停之后命令还在」判红）
+ #   exit-dropped          单元里不写退出码（「退出码在单元结束之后读得到」「watch 全部结束时报退出码」判红）
+ #   same-label-allowed    同名还在跑也照起（「同名还在跑就拒、退 3、原登记不动」判红）
+-#   environment-dropped   不带调用方的环境变量（「SINGLEFS_HEAVY_TESTS、CARGO_HOME、RUSTUP_HOME 带进单元」判红）
+-#   watch-stops-units     watch 收到 TERM 时停掉还在跑的单元（「watch 被 TERM 停时单元与命令都还在」判红）
++#   environment-dropped   不带调用方的环境变量（「SINGLEFS_HEAVY_TESTS、PATH、HOME、CARGO_HOME、RUSTUP_HOME 带进单元」判红）
++#   path-home-dropped     不带 PATH 与 HOME（同一格判红）
++#   watch-stops-units     watch 收到 TERM / INT / HUP 时停掉还在跑的单元（「watch 被 TERM / INT / HUP 停时单元与命令都还在」三格判红）
++#   watch-stops-units-on-hup、watch-stops-units-on-int   只在收到 HUP（INT）时停（「watch 被 HUP（INT）停」那一格判红）
++#   query-failure-as-gone systemctl --user show 失败当成单元不在（「查不到时 list 单列、watch 不退」「查不到时 start 与 stop 拒」判红）
++#   start-failure-unmarked systemd-run 没起成时不写 start-failed（「没起成的单列」判红）
++#   watch-keys-by-path    watch 按登记目录记观察到的，不带起跑秒数（「同名重起时 watch 照报旧一次的退出码」判红）
++#   unregistered-units-hidden list 不读单元清单（「登记被挪走的单元 list 照列」判红）
++#   stop-timeout-ignored  start 不给单元设 TimeoutStopSec（「停机时限设进单元、到点被 KILL 记进登记」判红）
++#   stop-kill-unrecorded  stop 读不到退出码时不写 stop-killed（同一格判红）
++#   linger-unchecked      start 不读 Linger（「Linger=no 时 start 警告一行」判红）
++#   break-honored-anywhere 弄坏开关在 --selftest 之外也认（「弄坏开关设在自证之外就拒、退 4」判红）
+ #
+ # gate-similar: multi-host-run.sh 它把一条命令挪到第二台跑、调用方在前台等到结束，收到 TERM 连第二台那条一起停；这里只在本机把命令挂到用户级 systemd 下、调用方不等也不随它停，两份的生命周期相反
+ # gate-similar: run-with-memory-cap.sh 它也用用户级 systemd（scope 加 singlefs-heavy.slice），scope 里的命令仍是调用方的子进程、跟着调用方的进程树走；这里要的正是不跟着调用方走的 service
+@@ -65,9 +102,13 @@
+ DETACHED_RUN_CARRIED_VARIABLES=(SINGLEFS_HEAVY_TESTS PATH HOME CARGO_HOME RUSTUP_HOME)
+ DETACHED_RUN_LABEL_PATTERN='^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'
+ DETACHED_RUN_DEFAULT_EVERY_SECONDS=300
++DETACHED_RUN_DEFAULT_STOP_TIMEOUT_SECONDS=180
++DETACHED_RUN_QUERY_FAILED="query-failed"   # detached_run_unit_state 查不到时打的（不是 systemd 的 ActiveState 取值）
+ detached_run_state="${DETACHED_RUN_STATE_DIRECTORY:-${XDG_STATE_HOME:-$HOME/.local/state}/singlefs/detached-runs}"
+ DETACHED_RUN_RUNNING_COUNT=0
+ DETACHED_RUN_RUNNING_RECORDS=()
++DETACHED_RUN_UNKNOWN_COUNT=0
++DETACHED_RUN_UNKNOWN_RECORDS=()
+ DETACHED_RUN_WATCH_SLEEP_PID=""
+ declare -A DETACHED_RUN_OBSERVED=()
+ 
+@@ -88,12 +129,23 @@
+ 
+ detached_run_break_is() { [[ ",${DETACHED_RUN_BREAK:-}," == *",$1,"* ]]; }
+ 
++detached_run_inside_selftest() { # 这个进程是不是 --selftest 起的：登记目录里的 .selftest-token 与 DETACHED_RUN_SELFTEST_TOKEN 对得上
++  [[ -n "${DETACHED_RUN_SELFTEST_TOKEN:-}" && -f "$detached_run_state/.selftest-token" ]] \
++    && [[ "$(head -n 1 -- "$detached_run_state/.selftest-token")" == "$DETACHED_RUN_SELFTEST_TOKEN" ]]
++}
++
+ detached_run_usage_error() { # <原因>：用法错，什么都没起，退 2
+   echo "  ✗ detached-run.sh 用法错：$1" >&2
+-  echo "     → 怎么办：detached-run.sh start --label <名> [--log <文件>] -- <命令与参数…>、list、watch [--every <秒>]、stop <名>，或 --selftest；名只用字母、数字、点、减号与下划线，字母或数字起头，至多 64 个字" >&2
++  echo "     → 怎么办：detached-run.sh start --label <名> [--log <文件>] [--stop-timeout <秒>] -- <命令与参数…>、list、watch [--every <秒>]、stop <名>，或 --selftest；名只用字母、数字、点、减号与下划线，字母或数字起头，至多 64 个字" >&2
+   exit 2
+ }
+ 
++detached_run_query_failed() { # <单元名> <这一次什么都没做的说明>：systemctl --user show 查不到单元状态，退 1
++  echo "  ✗ systemctl --user show 查不到单元 $1 的状态（失败、或什么都没打：用户级 systemd 连不上），$2" >&2
++  echo "     → 怎么办：systemctl --user show-environment 看连不连得上（要 XDG_RUNTIME_DIR 与 D-Bus）；在登录会话里重跑，连上了再做" >&2
++  exit 1
++}
++
+ detached_run_today() { TZ=Asia/Tokyo date +%F; }
+ 
+ detached_run_field() { # <登记目录> <项>：打出那一项的第一行，没有就什么都不打
+@@ -105,8 +157,25 @@
+   printf '%s\n' "$3" > "$1/.$2.tmp" && mv -f -- "$1/.$2.tmp" "$1/$2"
+ }
+ 
+-detached_run_unit_state() { # <单元名>：打出它的 ActiveState（单元不在时 systemd 报 inactive）
+-  systemctl --user show -p ActiveState --value "$1" 2>/dev/null
++detached_run_unit_state() { # <单元名>：打出它的 ActiveState（单元不在时 systemd 报 inactive）；systemctl 失败或什么都没打时打 query-failed
++  local state
++  if state="$(systemctl --user show -p ActiveState --value "$1" 2>/dev/null)" && [[ -n "$state" ]]; then
++    printf '%s\n' "$state"
++  elif ! detached_run_break_is query-failure-as-gone; then
++    printf '%s\n' "$DETACHED_RUN_QUERY_FAILED"
++  fi
++  return 0
++}
++
++detached_run_linger_warning() { # 用户级 systemd 没开 linger、或读不到时 stderr 打一行警告；不拒
++  local user linger
++  detached_run_break_is linger-unchecked && return 0
++  user="$(id -un)"
++  if ! linger="$(loginctl show-user "$user" -p Linger --value 2>/dev/null)" || [[ -z "$linger" ]]; then
++    echo "  ! 读不到 loginctl show-user $user 的 Linger：判不出最后一个登录会话结束时用户级 systemd 会不会连这里起的单元一起停；照起" >&2
++  elif [[ "$linger" == no ]]; then
++    echo "  ! 用户 $user 没开 linger（loginctl show-user 的 Linger=no）：最后一个登录会话结束时，用户级 systemd 连这里起的单元一起停，list 里记成「没留退出码」；照起。要它跨会话活着，请用户开 loginctl enable-linger $user" >&2
++  fi
+   return 0
+ }
+ 
+@@ -135,11 +204,14 @@
+   printf '%s' "${line:0:200}"
+ }
+ 
+-detached_run_list() { # 逐条列登记；DETACHED_RUN_RUNNING_COUNT、DETACHED_RUN_RUNNING_RECORDS 记下还在跑的
++detached_run_list() { # 逐条列登记；DETACHED_RUN_RUNNING_COUNT / _RECORDS 记下还在跑的，DETACHED_RUN_UNKNOWN_COUNT / _RECORDS 记下查不到的
+   local record label unit state status now started started_date ended rc log command main_pid pid line note records=()
+-  local ended_count=0 vanished_count=0 total=0
++  local ended_count=0 vanished_count=0 start_failed_count=0 unregistered_count=0 total=0 units_listing name load active sub
++  local -A registered_units=()
+   DETACHED_RUN_RUNNING_COUNT=0
+   DETACHED_RUN_RUNNING_RECORDS=()
++  DETACHED_RUN_UNKNOWN_COUNT=0
++  DETACHED_RUN_UNKNOWN_RECORDS=()
+   now="$(date +%s)"
+   if [[ -d "$detached_run_state" ]]; then
+     shopt -s nullglob
+@@ -152,6 +224,7 @@
+     [[ -f "$record/unit" ]] || continue
+     total=$((total + 1))
+     unit="$(detached_run_field "$record" unit)"
++    if [[ -n "$unit" ]]; then registered_units["$unit"]=1; fi
+     started="$(detached_run_field "$record" started)"
+     [[ "$started" =~ ^[0-9]+$ ]] || started="$now"
+     started_date="$(detached_run_field "$record" started-date)"
+@@ -161,11 +234,19 @@
+     state=""
+     if [[ -n "$rc" ]]; then
+       status=ended
++    elif [[ -f "$record/start-failed" ]]; then
++      status=start-failed
+     elif [[ "$label" == *@* ]]; then
+       status=vanished
+     else
+       state="$(detached_run_unit_state "$unit")"
+-      if detached_run_is_active_state "$state"; then status=running; else status=vanished; fi
++      if detached_run_is_active_state "$state"; then
++        status=running
++      elif [[ "$state" == "$DETACHED_RUN_QUERY_FAILED" ]]; then
++        status=unknown
++      else
++        status=vanished
++      fi
+     fi
+     case "$status" in
+       running)
+@@ -185,24 +266,49 @@
+         ;;
+       vanished)
+         vanished_count=$((vanished_count + 1))
+-        echo "  · 没留退出码  $label  单元 $unit 已不在${state:+（ActiveState=$state）}：主进程被 KILL、用户级 systemd 退出（没开 linger 时最后一个登录会话结束）或机器重启  起跑 ${started_date:-?}  日志 $(detached_run_size "$log") $log"
++        note="主进程被 KILL、用户级 systemd 退出（没开 linger 时最后一个登录会话结束）或机器重启"
++        if [[ -f "$record/stop-killed" ]]; then note="detached-run.sh stop 停的：$(detached_run_field "$record" stop-killed)"; fi
++        echo "  · 没留退出码  $label  单元 $unit 已不在${state:+（ActiveState=$state）}：$note  起跑 ${started_date:-?}  日志 $(detached_run_size "$log") $log"
++        ;;
++      unknown)
++        DETACHED_RUN_UNKNOWN_COUNT=$((DETACHED_RUN_UNKNOWN_COUNT + 1))
++        DETACHED_RUN_UNKNOWN_RECORDS+=("$record")
++        echo "  · 查不到  $label  单元 $unit：systemctl --user show 失败（用户级 systemd 连不上），不知道还在不在跑，不算结束  起跑 ${started_date:-?}  日志 $(detached_run_size "$log") $log"
++        ;;
++      start-failed)
++        start_failed_count=$((start_failed_count + 1))
++        echo "  · 没起成  $label  单元 $unit：$(detached_run_field "$record" start-failed)，命令一行都没跑  起跑 ${started_date:-?}  日志 $(detached_run_size "$log") $log"
+         ;;
+     esac
+     echo "      命令：${command:0:200}"
+     line="$(detached_run_last_line "$log")"
+     echo "      日志最后一行：${line:-（空）}"
+   done
+-  echo "  ✓ detached-run.sh list：还在跑、没结束的 $DETACHED_RUN_RUNNING_COUNT 条，已结束 $ended_count 条，没留退出码 $vanished_count 条（登记 $total 条，登记目录 $detached_run_state）"
++  if ! detached_run_break_is unregistered-units-hidden; then
++    if units_listing="$(systemctl --user list-units --all --plain --no-legend "${DETACHED_RUN_UNIT_PREFIX}*" 2>/dev/null)"; then
++      while read -r name load active sub _; do
++        [[ "$name" == "${DETACHED_RUN_UNIT_PREFIX}"*.service && -z "${registered_units[$name]:-}" ]] || continue
++        unregistered_count=$((unregistered_count + 1))
++        echo "  · 登记里没有  单元 $name（$load / $active / $sub）：它的登记被删了、或在别的登记目录里；detached-run.sh 停不到它，看它用 systemctl --user status $name，怎么停交主 agent 判断"
++      done <<< "$units_listing"
++    else
++      echo "  · 查不到单元清单：systemctl --user list-units 失败（用户级 systemd 连不上），登记里没有的单元列不出来"
++    fi
++  fi
++  echo "  ✓ detached-run.sh list：还在跑、没结束的 $DETACHED_RUN_RUNNING_COUNT 条，已结束 $ended_count 条，没留退出码 $vanished_count 条，查不到 $DETACHED_RUN_UNKNOWN_COUNT 条，没起成 $start_failed_count 条；登记里没有的单元 $unregistered_count 个（登记 $total 条，登记目录 $detached_run_state）"
+ }
+ 
+ detached_run_start() { # start 的参数
+-  local label="" log="" separator_seen=0 record unit state archive started name runner main_pid pid tries=0 carried=() setenv=()
++  local label="" log="" separator_seen=0 record unit state archive started name runner main_pid pid tries=0 carried=() setenv=() properties=() rc
++  local stop_timeout="$DETACHED_RUN_DEFAULT_STOP_TIMEOUT_SECONDS"
+   while (($#)); do
+     case "$1" in
+       --label) (($# >= 2)) || detached_run_usage_error "--label 后面要一个名"; label="$2"; shift 2 ;;
+       --label=*) label="${1#--label=}"; shift ;;
+       --log) (($# >= 2)) || detached_run_usage_error "--log 后面要一个文件"; log="$2"; shift 2 ;;
+       --log=*) log="${1#--log=}"; shift ;;
++      --stop-timeout) (($# >= 2)) || detached_run_usage_error "--stop-timeout 后面要秒数"; stop_timeout="$2"; shift 2 ;;
++      --stop-timeout=*) stop_timeout="${1#--stop-timeout=}"; shift ;;
+       --) separator_seen=1; shift; break ;;
+       *) detached_run_usage_error "start 认不出 $1（命令要写在 -- 之后）" ;;
+     esac
+@@ -211,8 +317,10 @@
+   (($#)) || detached_run_usage_error "start 的 -- 之后没有命令"
+   [[ -n "$label" ]] || detached_run_usage_error "start 没给 --label"
+   [[ "$label" =~ $DETACHED_RUN_LABEL_PATTERN ]] || detached_run_usage_error "名「$label」不合写法"
++  [[ "$stop_timeout" =~ ^[1-9][0-9]*$ ]] || detached_run_usage_error "--stop-timeout 要正整数秒，给的是 $stop_timeout"
+   record="$detached_run_state/$label"
+   unit="${DETACHED_RUN_UNIT_PREFIX}${label}.service"
++  detached_run_linger_warning
+   if [[ -z "$log" ]]; then
+     log="$record/log"
+   else
+@@ -231,6 +339,9 @@
+     exit 1
+   fi
+   state="$(detached_run_unit_state "$unit")"
++  if [[ "$state" == "$DETACHED_RUN_QUERY_FAILED" ]]; then
++    detached_run_query_failed "$unit" "判不出同名的还在不在跑：这一次什么都没起，旧登记没动"
++  fi
+   if detached_run_is_active_state "$state" && ! detached_run_break_is same-label-allowed; then
+     echo "  ✗ 名「$label」还在跑（单元 $unit，ActiveState=$state，命令进程 $(detached_run_field "$record" pid)），这一次什么都没起" >&2
+     echo "     → 怎么办：换一个名再起；看它跑到哪了用 detached-run.sh list；确实要停它用 detached-run.sh stop $label（只停登记的那一个单元）" >&2
+@@ -255,6 +366,7 @@
+   fi
+   if ! detached_run_break_is environment-dropped; then
+     for name in "${DETACHED_RUN_CARRIED_VARIABLES[@]}"; do
++      if detached_run_break_is path-home-dropped && [[ "$name" == PATH || "$name" == HOME ]]; then continue; fi
+       if [[ -n "${!name+set}" ]]; then
+         setenv+=("--setenv=$name=${!name}")
+         carried+=("$name")
+@@ -268,18 +380,26 @@
+   detached_run_write_field "$record" started "$(date +%s)"
+   detached_run_write_field "$record" started-date "$(detached_run_today)"
+   detached_run_write_field "$record" log "$log"
+-  printf '== detached-run.sh start %s（%s，单元 %s）\n   命令：%s\n   目录：%s\n   带进去的环境：%s\n' \
+-    "$label" "$(detached_run_today)" "$unit" "$(printf '%q ' "$@")" "$PWD" "${carried[*]:-（一样都没带）}" >> "$log"
++  detached_run_write_field "$record" stop-timeout "$stop_timeout"
++  printf '== detached-run.sh start %s（%s，单元 %s）\n   命令：%s\n   目录：%s\n   带进去的环境：%s\n   停机时限：%s 秒\n' \
++    "$label" "$(detached_run_today)" "$unit" "$(printf '%q ' "$@")" "$PWD" "${carried[*]:-（一样都没带）}" "$stop_timeout" >> "$log"
+   runner="$DETACHED_RUN_RUNNER_HEAD"
+   if ! detached_run_break_is exit-dropped; then runner+=$'\n'"$DETACHED_RUN_RUNNER_EXIT"; fi
+   runner+=$'\n'"$DETACHED_RUN_RUNNER_TAIL"
++  if ! detached_run_break_is stop-timeout-ignored; then properties+=("--property=TimeoutStopSec=$stop_timeout"); fi
+   if detached_run_break_is in-caller-tree; then
+     ( exec "$BASH" -c "$runner" detached-run-runner "$record" "$log" "$@" ) < /dev/null > /dev/null 2>&1 9>&- &
+-  elif ! systemd-run --user --quiet --collect --service-type=exec --expand-environment=no \
++  elif systemd-run --user --quiet --collect --service-type=exec --expand-environment=no \
+       --unit="$unit" --slice="$DETACHED_RUN_SLICE" --description="singlefs detached-run $label" \
+-      --working-directory="$PWD" ${setenv[@]+"${setenv[@]}"} \
++      --working-directory="$PWD" ${properties[@]+"${properties[@]}"} ${setenv[@]+"${setenv[@]}"} \
+       -- "$BASH" -c "$runner" detached-run-runner "$record" "$log" "$@" 9>&-; then
+-    echo "  ✗ systemd-run 没起成单元 $unit（它的报错在上面），命令一行都没跑" >&2
++    :
++  else
++    rc=$?
++    if ! detached_run_break_is start-failure-unmarked; then
++      detached_run_write_field "$record" start-failed "$(detached_run_today) systemd-run 退 $rc"
++    fi
++    echo "  ✗ systemd-run 没起成单元 $unit（退 $rc，它的报错在上面），命令一行都没跑；登记 $record 里记了 start-failed，list 列成「没起成」" >&2
+     echo "     → 怎么办：bash $detached_run_script list 看同名的还在不在；systemctl --user status $unit 看单元；用户级 systemd 连不上就在登录会话里重起" >&2
+     exit 1
+   fi
+@@ -297,39 +417,68 @@
+     exit 1
+   fi
+   echo "  ✓ 起了「$label」：单元 $unit（ActiveState=${state:-?}），主进程 ${main_pid:-?}，命令进程 ${pid:-（已经跑完）}，日志 $log"
+-  echo "    带进去的环境：${carried[*]:-（一样都没带）}；工作目录 $PWD；登记 $record"
++  echo "    带进去的环境：${carried[*]:-（一样都没带）}；工作目录 $PWD；停机时限 $stop_timeout 秒；登记 $record"
+   echo "    → 会话里只上报：run_in_background 起 bash $detached_run_script watch；看一眼 bash $detached_run_script list；要停 bash $detached_run_script stop $label"
+ }
+ 
++detached_run_observe() { # <登记目录>…：记下观察到的这几条，键是「登记目录@起跑秒数」（与同名重起时旧登记挪去的名字同一个写法）
++  local record
++  for record in "$@"; do
++    DETACHED_RUN_OBSERVED["$record@$(detached_run_field "$record" started)"]=1
++  done
++}
++
++detached_run_observed_record() { # <键>：观察到的那一次现在的登记目录：同名没重起过就是原处，重起过就是挪走的 <名>@<起跑秒数>（撞名时带 .<进程号>）
++  local record="${1%@*}" started="${1##*@}" archive
++  if detached_run_break_is watch-keys-by-path || [[ "$(detached_run_field "$record" started)" == "$started" ]]; then
++    printf '%s\n' "$record"
++    return 0
++  fi
++  for archive in "$record@$started" "$record@$started".*; do
++    if [[ -d "$archive" ]]; then printf '%s\n' "$archive"; return 0; fi
++  done
++  printf '%s\n' "$record@$started"
++}
++
+ detached_run_watch_outcomes() { # 观察到的各条的退出码
+-  local record label rc note count=0
++  local key record label rc note moved count=0
+   if ((${#DETACHED_RUN_OBSERVED[@]} == 0)); then
+     echo "  ✓ detached-run.sh watch：开跑时就没有还在跑的，观察到 0 条"
+     return 0
+   fi
+   echo "  · 观察到的各条："
+-  while IFS= read -r record; do
+-    [[ -n "$record" ]] || continue
++  while IFS= read -r key; do
++    [[ -n "$key" ]] || continue
+     count=$((count + 1))
+-    label="${record##*/}"
++    record="$(detached_run_observed_record "$key")"
++    label="${key%@*}"
++    label="${label##*/}"
++    moved=""
++    if [[ "$record" != "${key%@*}" ]]; then moved="（之后同名又起过一次，这一次的登记挪到了 $record）"; fi
+     rc="$(detached_run_field "$record" exit)"
+     note=""
+     if [[ -f "$record/stop-requested" ]]; then note="（detached-run.sh stop 停的）"; fi
+     if [[ -n "$rc" ]]; then
+-      echo "  · $label 退出码 $rc$note"
++      echo "  · $label 退出码 $rc$note$moved"
++    elif [[ -f "$record/stop-killed" ]]; then
++      echo "  · $label 没留退出码（detached-run.sh stop 停的：$(detached_run_field "$record" stop-killed)）$moved"
+     else
+-      echo "  · $label 没留退出码（单元已不在：主进程被 KILL、用户级 systemd 退出或机器重启）"
++      echo "  · $label 没留退出码（单元已不在：主进程被 KILL、用户级 systemd 退出或机器重启）$moved"
+     fi
+   done < <(printf '%s\n' "${!DETACHED_RUN_OBSERVED[@]}" | sort)
+   echo "  ✓ detached-run.sh watch：观察到的 $count 条都结束了，各自的退出码在上面"
+ }
+ 
+ detached_run_watch_stopped() { # <信号名> <退出码>：先打最后一次清单再退；不停任何单元
+-  local record unit
++  local record unit stops=0
+   trap '' TERM INT HUP
+   if [[ -n "$DETACHED_RUN_WATCH_SLEEP_PID" ]]; then kill "$DETACHED_RUN_WATCH_SLEEP_PID" 2>/dev/null; fi
+   echo "  · detached-run.sh watch 收到 $1：退出前最后一次清单，「还在跑」那几条就是还在跑、没结束的脚本（它们照跑，watch 没停任何单元）"
++  if detached_run_break_is "watch-stops-units-on-${1,,}"; then stops=1; fi
+   if detached_run_break_is watch-stops-units; then
++    stops=1
++  fi
++  if ((stops)); then
+     for record in ${DETACHED_RUN_RUNNING_RECORDS[@]+"${DETACHED_RUN_RUNNING_RECORDS[@]}"}; do
+       unit="$(detached_run_field "$record" unit)"
+       systemctl --user stop "$unit"
+@@ -352,15 +501,17 @@
+   trap 'detached_run_watch_stopped TERM 143' TERM
+   trap 'detached_run_watch_stopped INT 130' INT
+   trap 'detached_run_watch_stopped HUP 129' HUP
+-  echo "  · detached-run.sh watch：每 $every 秒打一次清单，只读、不停任何单元；还在跑的一条都不剩时报各条退出码、退出"
++  echo "  · detached-run.sh watch：每 $every 秒打一次清单，只读、不停任何单元；还在跑的与查不到的一条都不剩时报各条退出码、退出"
+   while :; do
+     round=$((round + 1))
+     echo "  == 第 $round 次（$(detached_run_today)）"
+     detached_run_list
+-    for record in ${DETACHED_RUN_RUNNING_RECORDS[@]+"${DETACHED_RUN_RUNNING_RECORDS[@]}"}; do
+-      DETACHED_RUN_OBSERVED["$record"]=1
+-    done
+-    if ((DETACHED_RUN_RUNNING_COUNT == 0)); then
++    detached_run_observe ${DETACHED_RUN_RUNNING_RECORDS[@]+"${DETACHED_RUN_RUNNING_RECORDS[@]}"} \
++      ${DETACHED_RUN_UNKNOWN_RECORDS[@]+"${DETACHED_RUN_UNKNOWN_RECORDS[@]}"}
++    if ((DETACHED_RUN_UNKNOWN_COUNT > 0)); then
++      echo "  · 查不到的 $DETACHED_RUN_UNKNOWN_COUNT 条不知道还在不在跑，不当结束，$every 秒后接着查"
++    fi
++    if ((DETACHED_RUN_RUNNING_COUNT == 0 && DETACHED_RUN_UNKNOWN_COUNT == 0)); then
+       detached_run_watch_outcomes
+       exit 0
+     fi
+@@ -372,7 +523,7 @@
+ }
+ 
+ detached_run_stop() { # stop 的参数
+-  local label record unit state rc tries=0
++  local label record unit state rc tries=0 stop_timeout
+   (($# == 1)) || detached_run_usage_error "stop 只要一个名"
+   label="$1"
+   [[ "$label" =~ $DETACHED_RUN_LABEL_PATTERN ]] || detached_run_usage_error "名「$label」不合写法"
+@@ -383,7 +534,11 @@
+     exit 3
+   fi
+   unit="$(detached_run_field "$record" unit)"
++  stop_timeout="$(detached_run_field "$record" stop-timeout)"
+   state="$(detached_run_unit_state "$unit")"
++  if [[ "$state" == "$DETACHED_RUN_QUERY_FAILED" ]]; then
++    detached_run_query_failed "$unit" "判不出它还在不在跑：什么都没停"
++  fi
+   if ! detached_run_is_active_state "$state"; then
+     echo "  ✓ 「$label」的单元 $unit 已经不在跑（ActiveState=${state:-?}），没停什么；退出码 $(detached_run_field "$record" exit)"
+     return 0
+@@ -400,12 +555,20 @@
+     echo "     → 怎么办：systemctl --user status $unit 看它卡在哪；别按名字或进程组去停，交主 agent 判断" >&2
+     exit 1
+   fi
+-  while [[ ! -f "$record/exit" ]] && ((tries < 300)); do
++  # systemctl --user stop 等到单元停下才回来（命令在停机时限里退出，或到点被 KILL）；主进程退出前写好退出码，这里再至多等 5 秒
++  while [[ ! -f "$record/exit" ]] && ((tries < 50)); do
+     sleep 0.1
+     tries=$((tries + 1))
+   done
+   rc="$(detached_run_field "$record" exit)"
+-  echo "  ✓ 停了「$label」：单元 $unit 现在是 ${state:-?}，退出码 ${rc:-（没留下）}"
++  if [[ -z "$rc" ]]; then
++    if ! detached_run_break_is stop-kill-unrecorded; then
++      detached_run_write_field "$record" stop-killed "$(detached_run_today) 停机时限 ${stop_timeout:-?} 秒里没退出，被 KILL，没留退出码"
++    fi
++    echo "  ✓ 停了「$label」：单元 $unit 现在是 ${state:-?}；停机时限 ${stop_timeout:-?} 秒里命令没退出，被 KILL，没留退出码（登记里记了 stop-killed）"
++    return 0
++  fi
++  echo "  ✓ 停了「$label」：单元 $unit 现在是 ${state:-?}，退出码 $rc"
+ }
+ 
+ # ── 自证 ──
+@@ -413,6 +576,7 @@
+ detached_run_selftest_failed=0
+ detached_run_selftest_units=()
+ detached_run_selftest_work=""
++detached_run_selftest_r_archive=""   # Ⓡ 那一格旧一次的登记挪去的地方（弄坏开关 in-caller-tree 下收尾按它停那一个 sleep）
+ 
+ detached_run_expect() { # <格名> <0 对 / 别的 错> [<输出文件>]
+   detached_run_selftest_checked=$((detached_run_selftest_checked + 1))
+@@ -436,29 +600,68 @@
+   [[ -f "$1" ]]
+ }
+ 
+-detached_run_selftest_stop_leftover() { # <登记目录>：弄坏开关 in-caller-tree 下命令不在单元里，按登记的进程号停这一个（它是这份自证起的 sleep）
++detached_run_selftest_stop_leftover() { # <登记目录>：弄坏开关 in-caller-tree 下命令不在单元里，按登记的进程号停这一个（它是这份自证起的 sleep；t 那一格的 sleep 不理 TERM，所以发 KILL）
+   local pid
+   pid="$(detached_run_field "$1" pid)"
+   [[ "$pid" =~ ^[0-9]+$ ]] || return 0
+   [[ -f "$1/exit" ]] && return 0
+-  if [[ "$(cat "/proc/$pid/comm" 2>/dev/null)" == sleep ]]; then kill "$pid" 2>/dev/null; fi
++  if [[ "$(cat "/proc/$pid/comm" 2>/dev/null)" == sleep ]]; then kill -KILL "$pid" 2>/dev/null; fi
+   return 0
+ }
+ 
+ detached_run_selftest_cleanup() { # 停这份自证起的每个单元（按单元名，一个一个停），删临时目录
+-  local unit
++  local unit work="$detached_run_selftest_work" prefix="selftest-$$-"
+   for unit in ${detached_run_selftest_units[@]+"${detached_run_selftest_units[@]}"}; do
+     if detached_run_is_active_state "$(detached_run_unit_state "$unit")"; then systemctl --user stop "$unit" 2>/dev/null; fi
+     systemctl --user reset-failed "$unit" 2>/dev/null
+   done
+-  if [[ -n "$detached_run_selftest_work" ]]; then
+-    detached_run_selftest_stop_leftover "$detached_run_selftest_work/state/selftest-$$-c"
+-    detached_run_selftest_stop_leftover "$detached_run_selftest_work/state/selftest-$$-a"
+-    detached_run_selftest_stop_leftover "$detached_run_selftest_work/state/selftest-$$-e"
++  if [[ -n "$work" ]]; then
++    detached_run_selftest_stop_leftover "$work/state/${prefix}c"
++    detached_run_selftest_stop_leftover "$work/state/${prefix}a"
++    detached_run_selftest_stop_leftover "$work/state/${prefix}e"
++    detached_run_selftest_stop_leftover "$work/state/${prefix}u"
++    detached_run_selftest_stop_leftover "$work/state/${prefix}i"
++    detached_run_selftest_stop_leftover "$work/state-r/${prefix}r"
++    if [[ -n "$detached_run_selftest_r_archive" ]]; then detached_run_selftest_stop_leftover "$detached_run_selftest_r_archive"; fi
++    detached_run_selftest_stop_leftover "$work/state-t/${prefix}t"
++    detached_run_selftest_stop_leftover "$work/moved-x"
+   fi
+   return 0
+ }
+ 
++detached_run_selftest_state_directory() { # <目录>：建一个自证用的登记目录，放进 .selftest-token（弄坏开关在它里面才认）
++  mkdir -p -- "$1" && printf '%s\n' "$DETACHED_RUN_SELFTEST_TOKEN" > "$1/.selftest-token"
++}
++
++detached_run_selftest_shim() { # <目录> <命令名> <脚本正文>：在目录里放一个替身命令（只放进那一格命令的 PATH 最前面）
++  mkdir -p -- "$1" && printf '#!/usr/bin/env bash\n%s\n' "$3" > "$1/$2" && chmod +x -- "$1/$2"
++}
++
++detached_run_selftest_watch_signal() { # <信号> <期望的退出码> <格的字母> <格名>：起一条 sleep 300 的单元，watch 收到这个信号之后
++  #   退期望的码、最后一次清单里有它、它的单元与 sleep 都还在。work、prefix、state_directory 用 detached_run_selftest 里的
++  local signal="$1" wanted_rc="$2" letter="$3" label="${prefix}$3" unit pid watch_pid rc tries=0 state
++  unit="${DETACHED_RUN_UNIT_PREFIX}${label}.service"
++  bash "$detached_run_script" start --label "$label" -- sleep 300 > "$work/$letter.out" 2>&1
++  detached_run_selftest_wait_for_file "$state_directory/$label/pid" 100
++  pid="$(detached_run_field "$state_directory/$label" pid)"
++  # 后台作业的 INT 默认被忽略（nohup 下 HUP 也是），忽略着进来的信号 trap 不上：用 env --default-signal 把三种都放回默认，watch 才接得到
++  env --default-signal=INT,HUP,TERM bash "$detached_run_script" watch --every 1 > "$work/$letter-watch.out" 2>&1 &
++  watch_pid=$!
++  until grep -q "还在跑  $label" "$work/$letter-watch.out" 2>/dev/null || ((tries >= 150)); do
++    sleep 0.1
++    tries=$((tries + 1))
++  done
++  kill -"$signal" "$watch_pid"
++  wait "$watch_pid"; rc=$?
++  sleep 0.5
++  state="$(detached_run_unit_state "$unit")"
++  echo "watch 退出码 $rc；$label 的单元 $state；命令进程 ${pid:-（没读到）}" >> "$work/$letter-watch.out"
++  detached_run_expect "$4" \
++    "$( { ((rc == wanted_rc)) && grep -q "watch 收到 $signal" "$work/$letter-watch.out" \
++          && sed -n "/watch 收到 $signal/,\$p" "$work/$letter-watch.out" > "$work/$letter-last.out" && grep -q "还在跑  $label" "$work/$letter-last.out" \
++          && detached_run_is_active_state "$state" && [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; } && echo 0 || echo 1)" "$work/$letter-watch.out"
++}
++
+ detached_run_selftest() {
+   local work prefix="selftest-$$-" rc pid pid_before state caller_unit wanted got tries leftover
+   work="$(mktemp -d "${TMPDIR:-/tmp}/detached-run-selftest.XXXXXX")" || {
+@@ -469,12 +672,18 @@
+   detached_run_selftest_work="$work"
+   trap 'detached_run_selftest_cleanup; rm -rf -- "${detached_run_selftest_work:?}"' EXIT
+   export DETACHED_RUN_STATE_DIRECTORY="$work/state"
++  # 弄坏开关只在这份自证起的进程里认：临时登记目录里的 .selftest-token 与带下去的 DETACHED_RUN_SELFTEST_TOKEN 对得上
++  DETACHED_RUN_SELFTEST_TOKEN="selftest-$$-$(cat /proc/sys/kernel/random/uuid 2>/dev/null || date +%s%N)"
++  export DETACHED_RUN_SELFTEST_TOKEN
+   local state_directory="$work/state"
++  detached_run_selftest_state_directory "$state_directory"
+   local unit_b="${DETACHED_RUN_UNIT_PREFIX}${prefix}b.service" unit_d="${DETACHED_RUN_UNIT_PREFIX}${prefix}d.service"
+   local unit_f="${DETACHED_RUN_UNIT_PREFIX}${prefix}f.service" unit_c="${DETACHED_RUN_UNIT_PREFIX}${prefix}c.service"
+   local unit_a="${DETACHED_RUN_UNIT_PREFIX}${prefix}a.service" unit_e="${DETACHED_RUN_UNIT_PREFIX}${prefix}e.service"
++  local unit_t="${DETACHED_RUN_UNIT_PREFIX}${prefix}t.service" unit_x="${DETACHED_RUN_UNIT_PREFIX}${prefix}x.service" letter
+   caller_unit="${DETACHED_RUN_UNIT_PREFIX}${prefix}caller.service"
+-  detached_run_selftest_units=("$unit_b" "$unit_d" "$unit_f" "$unit_c" "$unit_a" "$unit_e" "$caller_unit")
++  detached_run_selftest_units=("$unit_b" "$unit_d" "$unit_f" "$unit_c" "$unit_a" "$unit_e" "$caller_unit" "$unit_t" "$unit_x")
++  for letter in u i k l l2 q2 r s; do detached_run_selftest_units+=("${DETACHED_RUN_UNIT_PREFIX}${prefix}${letter}.service"); done
+ 
+   # Ⓗ 用法错与拒绝：名不合写法、没有 --、stop 没登记的名
+   bash "$detached_run_script" start --label 'a/b' -- true > "$work/h1.out" 2>&1; rc=$?
+@@ -485,6 +694,15 @@
+   bash "$detached_run_script" stop "${prefix}nowhere" > "$work/h3.out" 2>&1; rc=$?
+   detached_run_expect "Ⓗ stop 没登记的名 ⇒ 拒绝退 3" "$((rc == 3 ? 0 : 1))" "$work/h3.out"
+ 
++  # Ⓚ 弄坏开关设在自证之外（不带 DETACHED_RUN_SELFTEST_TOKEN，登记目录里的令牌对不上）：start 与 list 都拒、退 4，什么都没起
++  env -u DETACHED_RUN_SELFTEST_TOKEN DETACHED_RUN_BREAK="${DETACHED_RUN_BREAK:+$DETACHED_RUN_BREAK,}exit-dropped" \
++    bash "$detached_run_script" start --label "${prefix}k" -- true > "$work/k.out" 2>&1; rc=$?
++  env -u DETACHED_RUN_SELFTEST_TOKEN DETACHED_RUN_BREAK="${DETACHED_RUN_BREAK:+$DETACHED_RUN_BREAK,}exit-dropped" \
++    bash "$detached_run_script" list >> "$work/k.out" 2>&1; got=$?
++  detached_run_expect "Ⓚ DETACHED_RUN_BREAK 设在 --selftest 之外：start 与 list 都拒、退 4，没建登记" \
++    "$( { ((rc == 4)) && [[ "$got" == 4 ]] && [[ ! -d "$state_directory/${prefix}k" ]] && grep -q "设在 --selftest 之外" "$work/k.out"; } && echo 0 || echo 1)" \
++    "$work/k.out"
++
+   # Ⓑ 退出码在单元结束之后读得到：命令退 7，单元收掉（--collect）之后登记里与 list 里都是 7，list 带日志最后一行
+   bash "$detached_run_script" start --label "${prefix}b" -- bash -c 'echo last-line-b; exit 7' > "$work/b.out" 2>&1; rc=$?
+   detached_run_selftest_wait_for_file "$state_directory/${prefix}b/exit" 200
+@@ -503,16 +721,18 @@
+           && grep -q "日志最后一行：last-line-b" "$work/b-list.out"; } && echo 0 || echo 1)" "$work/b-list.out"
+ 
+   # Ⓓ 调用方的环境与工作目录带进单元，命令里的 $ 与 % 原样交给命令
+-  mkdir -p "$work/cwd-d"
++  #   PATH 的第一段换成一个空目录、HOME 换成临时目录，单元里读到的要是这两样，不是用户级 systemd 自己的那一份
++  mkdir -p "$work/cwd-d" "$work/path-d" "$work/home-d"
+   ( cd "$work/cwd-d" && SINGLEFS_HEAVY_TESTS=selftest-carried CARGO_HOME="$work/cargo-home" RUSTUP_HOME="$work/rustup-home" \
++      PATH="$work/path-d:$PATH" HOME="$work/home-d" \
+       bash "$detached_run_script" start --label "${prefix}d" -- \
+-      bash -c 'printf "%s|%s|%s|%s|%s\n" "${SINGLEFS_HEAVY_TESTS-unset}" "${CARGO_HOME-unset}" "${RUSTUP_HOME-unset}" "$(pwd -P)" "$1" > "$0"' \
++      bash -c 'printf "%s|%s|%s|%s|%s|%s|%s\n" "${SINGLEFS_HEAVY_TESTS-unset}" "${CARGO_HOME-unset}" "${RUSTUP_HOME-unset}" "${PATH%%:*}" "${HOME-unset}" "$(pwd -P)" "$1" > "$0"' \
+       "$work/d.env" 'pct%n-dollar$HOME' ) > "$work/d.out" 2>&1; rc=$?
+   detached_run_selftest_wait_for_file "$state_directory/${prefix}d/exit" 200
+-  wanted="selftest-carried|$work/cargo-home|$work/rustup-home|$(cd "$work/cwd-d" && pwd -P)|pct%n-dollar\$HOME"
++  wanted="selftest-carried|$work/cargo-home|$work/rustup-home|$work/path-d|$work/home-d|$(cd "$work/cwd-d" && pwd -P)|pct%n-dollar\$HOME"
+   got="$(cat "$work/d.env" 2>/dev/null)"
+   printf '要的：%s\n读到：%s\n' "$wanted" "$got" >> "$work/d.out"
+-  detached_run_expect "Ⓓ SINGLEFS_HEAVY_TESTS、CARGO_HOME、RUSTUP_HOME 与工作目录带进单元，\$ 与 % 原样" \
++  detached_run_expect "Ⓓ SINGLEFS_HEAVY_TESTS、CARGO_HOME、RUSTUP_HOME、PATH、HOME 与工作目录带进单元，\$ 与 % 原样" \
+     "$( { ((rc == 0)) && [[ "$got" == "$wanted" ]]; } && echo 0 || echo 1)" "$work/d.out"
+ 
+   # Ⓕ watch 在观察的全部结束时自己退 0，报各自的退出码
+@@ -545,7 +765,7 @@
+   # Ⓐ 调用方被停、命令照跑：调用方本身放在一个单元里（停它就是停它整个 cgroup，比停一棵进程树还狠），由它起 sleep 300，再停调用方
+   systemd-run --user --quiet --collect --service-type=exec --expand-environment=no --unit="$caller_unit" --slice="$DETACHED_RUN_SLICE" \
+     --working-directory="$work" --setenv=PATH="$PATH" --setenv=HOME="$HOME" --setenv=DETACHED_RUN_STATE_DIRECTORY="$state_directory" \
+-    ${DETACHED_RUN_BREAK:+"--setenv=DETACHED_RUN_BREAK=$DETACHED_RUN_BREAK"} \
++    --setenv=DETACHED_RUN_SELFTEST_TOKEN="$DETACHED_RUN_SELFTEST_TOKEN" ${DETACHED_RUN_BREAK:+"--setenv=DETACHED_RUN_BREAK=$DETACHED_RUN_BREAK"} \
+     -- "$BASH" -c '"$BASH" "$0" start --label "$1" -- sleep 300 > "$2" 2>&1; exec sleep 300' "$detached_run_script" "${prefix}a" "$work/a.out" \
+     > "$work/a-caller.out" 2>&1
+   detached_run_selftest_wait_for_file "$state_directory/${prefix}a/pid" 150
+@@ -562,30 +782,117 @@
+           && detached_run_is_active_state "$state" && kill -0 "$pid" 2>/dev/null \
+           && [[ "$(cat "/proc/$pid/comm" 2>/dev/null)" == sleep ]]; } && echo 0 || echo 1)" "$work/a-caller.out"
+ 
+-  # Ⓔ watch 被 TERM 停：先打最后一次清单（里面有还在跑的 e），退 143；e 的单元与 sleep 都还在
+-  bash "$detached_run_script" start --label "${prefix}e" -- sleep 300 > "$work/e.out" 2>&1
+-  detached_run_selftest_wait_for_file "$state_directory/${prefix}e/pid" 100
+-  pid="$(detached_run_field "$state_directory/${prefix}e" pid)"
+-  bash "$detached_run_script" watch --every 1 > "$work/e-watch.out" 2>&1 &
+-  local watch_pid=$!
++  # Ⓔ watch 被 TERM / INT / HUP 停：先打最后一次清单（里面有还在跑的那一条），退 143 / 130 / 129；那一条的单元与 sleep 都还在
++  detached_run_selftest_watch_signal TERM 143 e "Ⓔ watch 被 TERM 停：退 143、最后一次清单里有还在跑的 ${prefix}e，e 的单元与 sleep 都还在"
++  detached_run_selftest_watch_signal INT 130 i "Ⓔ watch 被 INT 停：退 130、最后一次清单里有还在跑的 ${prefix}i，i 的单元与 sleep 都还在"
++  detached_run_selftest_watch_signal HUP 129 u "Ⓔ watch 被 HUP 停：退 129、最后一次清单里有还在跑的 ${prefix}u，u 的单元与 sleep 都还在"
++
++  # Ⓠ 查不到单元状态（替身 systemctl：show 与 list-units 退 1、什么都不打，show-environment 转给真的，preflight 要它）：
++  #   list 单列「查不到」、不算没留退出码；watch 不当结束、接着看（5 秒后被 timeout 停）；start 与 stop 拒、退 1、什么都没做
++  local real_systemctl shim_bus="$work/shim-bus" state_q="$work/state-q"
++  real_systemctl="$(command -v systemctl)"
++  detached_run_selftest_shim "$shim_bus" systemctl \
++    "for argument in \"\$@\"; do [[ \"\$argument\" == show-environment ]] && exec $(printf '%q' "$real_systemctl") \"\$@\"; done
++echo 'Failed to connect to bus: No such file or directory（自证的替身）' >&2
++exit 1"
++  detached_run_selftest_state_directory "$state_q"
++  mkdir -p "$state_q/${prefix}q"
++  detached_run_write_field "$state_q/${prefix}q" unit "${DETACHED_RUN_UNIT_PREFIX}${prefix}q.service"
++  detached_run_write_field "$state_q/${prefix}q" started "$(date +%s)"
++  detached_run_write_field "$state_q/${prefix}q" command "sleep 300"
++  PATH="$shim_bus:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_q" bash "$detached_run_script" list > "$work/q-list.out" 2>&1
++  PATH="$shim_bus:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_q" timeout 5 bash "$detached_run_script" watch --every 1 > "$work/q-watch.out" 2>&1; rc=$?
++  { echo "watch 退出码 $rc"; cat "$work/q-watch.out"; } >> "$work/q-list.out"
++  detached_run_expect "Ⓠ 查不到单元状态：list 单列「查不到」，watch 不当结束（到 5 秒被 timeout 停、退 124，没报「都结束了」）" \
++    "$( { grep -q "查不到  ${prefix}q" "$work/q-list.out" && grep -q "查不到 1 条" "$work/q-list.out" \
++          && ((rc == 124)) && ! grep -q "都结束了" "$work/q-watch.out"; } && echo 0 || echo 1)" "$work/q-list.out"
++  PATH="$shim_bus:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_q" bash "$detached_run_script" start --label "${prefix}q2" -- true > "$work/q2.out" 2>&1; rc=$?
++  PATH="$shim_bus:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_q" bash "$detached_run_script" stop "${prefix}q" >> "$work/q2.out" 2>&1; got=$?
++  detached_run_expect "Ⓠ 查不到单元状态：start 拒、退 1、没建登记；stop 拒、退 1、没记 stop-requested" \
++    "$( { ((rc == 1)) && [[ ! -d "$state_q/${prefix}q2" ]] && [[ "$got" == 1 ]] && [[ ! -f "$state_q/${prefix}q/stop-requested" ]] \
++          && grep -q "查不到单元" "$work/q2.out"; } && echo 0 || echo 1)" "$work/q2.out"
++
++  # Ⓢ systemd-run 没起成（替身 systemd-run 退 1）：start 退 1，登记里记 start-failed，list 列成「没起成」、不当成被 KILL 的
++  local shim_run="$work/shim-run" state_s="$work/state-s"
++  detached_run_selftest_shim "$shim_run" systemd-run "echo 'Failed to start transient service unit（自证的替身）' >&2
++exit 1"
++  detached_run_selftest_state_directory "$state_s"
++  PATH="$shim_run:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_s" bash "$detached_run_script" start --label "${prefix}s" -- true > "$work/s.out" 2>&1; rc=$?
++  DETACHED_RUN_STATE_DIRECTORY="$state_s" bash "$detached_run_script" list >> "$work/s.out" 2>&1
++  detached_run_expect "Ⓢ systemd-run 没起成：start 退 1、登记里有 start-failed、list 列成「没起成」" \
++    "$( { ((rc == 1)) && [[ -f "$state_s/${prefix}s/start-failed" ]] && grep -q "没起成  ${prefix}s" "$work/s.out" \
++          && grep -q "没起成 1 条" "$work/s.out"; } && echo 0 || echo 1)" "$work/s.out"
++
++  # Ⓡ 同名重起：watch 观察到 r 在跑；r 被 stop（143）之后隔一秒同名又起一次（退 6）；watch 结束时照报观察到的那一次的 143
++  local state_r="$work/state-r" watch_pid
++  detached_run_selftest_state_directory "$state_r"
++  DETACHED_RUN_STATE_DIRECTORY="$state_r" bash "$detached_run_script" start --label "${prefix}r" -- sleep 300 > "$work/r.out" 2>&1
++  detached_run_selftest_wait_for_file "$state_r/${prefix}r/pid" 100
++  DETACHED_RUN_STATE_DIRECTORY="$state_r" timeout 90 bash "$detached_run_script" watch --every 8 > "$work/r-watch.out" 2>&1 &
++  watch_pid=$!
+   tries=0
+-  until grep -q "还在跑  ${prefix}e" "$work/e-watch.out" 2>/dev/null || ((tries >= 150)); do
++  until grep -q "还在跑  ${prefix}r" "$work/r-watch.out" 2>/dev/null || ((tries >= 150)); do
+     sleep 0.1
+     tries=$((tries + 1))
+   done
+-  kill -TERM "$watch_pid"
++  DETACHED_RUN_STATE_DIRECTORY="$state_r" bash "$detached_run_script" stop "${prefix}r" >> "$work/r.out" 2>&1
++  detached_run_selftest_r_archive="$state_r/${prefix}r@$(detached_run_field "$state_r/${prefix}r" started)"
++  sleep 1.1   # 起跑秒数要与上一次不同，旧登记才挪得到 <名>@<上一次的秒数>
++  DETACHED_RUN_STATE_DIRECTORY="$state_r" bash "$detached_run_script" start --label "${prefix}r" -- bash -c 'sleep 1; exit 6' >> "$work/r.out" 2>&1
+   wait "$watch_pid"; rc=$?
+-  sleep 0.5
+-  state="$(detached_run_unit_state "$unit_e")"
+-  echo "watch 退出码 $rc；e 的单元 $state；命令进程 ${pid:-（没读到）}" >> "$work/e-watch.out"
+-  detached_run_expect "Ⓔ watch 被 TERM 停：退 143、最后一次清单里有还在跑的 ${prefix}e，e 的单元与 sleep 都还在" \
+-    "$( { ((rc == 143)) && grep -q "watch 收到 TERM" "$work/e-watch.out" \
+-          && sed -n '/watch 收到 TERM/,$p' "$work/e-watch.out" > "$work/e-last.out" && grep -q "还在跑  ${prefix}e" "$work/e-last.out" \
+-          && detached_run_is_active_state "$state" && [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; } && echo 0 || echo 1)" "$work/e-watch.out"
++  { echo "watch 退出码 $rc"; cat "$work/r.out"; } >> "$work/r-watch.out"
++  detached_run_expect "Ⓡ 同名重起：watch 退 0，照报观察到的那一次的退出码 143（stop 停的，登记已挪走）" \
++    "$( { ((rc == 0)) && grep -q "^  · ${prefix}r 退出码 143（detached-run.sh stop 停的）" "$work/r-watch.out"; } && echo 0 || echo 1)" \
++    "$work/r-watch.out"
++
++  # Ⓧ 登记被挪走、单元还在跑：list 列成「登记里没有」
++  local state_x="$work/state-x"
++  detached_run_selftest_state_directory "$state_x"
++  DETACHED_RUN_STATE_DIRECTORY="$state_x" bash "$detached_run_script" start --label "${prefix}x" -- sleep 300 > "$work/x.out" 2>&1
++  detached_run_selftest_wait_for_file "$state_x/${prefix}x/pid" 100
++  mv -- "$state_x/${prefix}x" "$work/moved-x"
++  DETACHED_RUN_STATE_DIRECTORY="$state_x" bash "$detached_run_script" list >> "$work/x.out" 2>&1
++  detached_run_expect "Ⓧ 登记被挪走而单元还在跑：list 列成「登记里没有  单元 $unit_x」" \
++    "$(grep -q "登记里没有  单元 $unit_x" "$work/x.out" && echo 0 || echo 1)" "$work/x.out"
++
++  # Ⓣ 停机时限：--stop-timeout 2 设进单元（TimeoutStopUSec=2s）；命令不理 TERM，stop 到点被 KILL：退 0、没留退出码、登记里有 stop-killed、list 注明
++  local state_t="$work/state-t" timeout_property
++  detached_run_selftest_state_directory "$state_t"
++  DETACHED_RUN_STATE_DIRECTORY="$state_t" bash "$detached_run_script" start --label "${prefix}t" --stop-timeout 2 -- bash -c 'trap "" TERM; exec sleep 300' \
++    > "$work/t.out" 2>&1
++  detached_run_selftest_wait_for_file "$state_t/${prefix}t/pid" 100
++  timeout_property="$(systemctl --user show -p TimeoutStopUSec --value "$unit_t" 2>&1)"
++  echo "单元的 TimeoutStopUSec：$timeout_property" >> "$work/t.out"
++  if [[ "$timeout_property" == 2s ]]; then
++    DETACHED_RUN_STATE_DIRECTORY="$state_t" bash "$detached_run_script" stop "${prefix}t" >> "$work/t.out" 2>&1; rc=$?
++  else
++    rc=1
++    echo "停机时限没设进单元，不跑 stop（照默认时限要等 90 秒），收尾按单元名停" >> "$work/t.out"
++  fi
++  DETACHED_RUN_STATE_DIRECTORY="$state_t" bash "$detached_run_script" list >> "$work/t.out" 2>&1
++  detached_run_expect "Ⓣ --stop-timeout 2 设进单元、命令不理 TERM：stop 到点 KILL、退 0、没留退出码、登记里有 stop-killed、list 注明被 KILL" \
++    "$( { ((rc == 0)) && [[ "$timeout_property" == 2s ]] && [[ ! -f "$state_t/${prefix}t/exit" && -f "$state_t/${prefix}t/stop-killed" ]] \
++          && grep -q "没留退出码  ${prefix}t .*被 KILL" "$work/t.out"; } && echo 0 || echo 1)" "$work/t.out"
++
++  # Ⓛ Linger=no 时 start 在 stderr 警告一行、照起；Linger=yes 时不警告（替身 loginctl 打 no / yes）
++  local state_l="$work/state-l"
++  detached_run_selftest_state_directory "$state_l"
++  detached_run_selftest_shim "$work/shim-linger-no" loginctl "echo no"
++  detached_run_selftest_shim "$work/shim-linger-yes" loginctl "echo yes"
++  PATH="$work/shim-linger-no:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_l" bash "$detached_run_script" start --label "${prefix}l" -- true \
++    > "$work/l-no.out" 2>&1; rc=$?
++  PATH="$work/shim-linger-yes:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_l" bash "$detached_run_script" start --label "${prefix}l2" -- true \
++    > "$work/l-yes.out" 2>&1; got=$?
++  cat "$work/l-no.out" "$work/l-yes.out" > "$work/l.out"
++  detached_run_expect "Ⓛ Linger=no 时 start 警告一行、照起（退 0）；Linger=yes 时不警告" \
++    "$( { ((rc == 0)) && [[ "$got" == 0 ]] && grep -q "没开 linger" "$work/l-no.out" && ! grep -q "linger" "$work/l-yes.out"; } && echo 0 || echo 1)" \
++    "$work/l.out"
+ 
+-  # 收尾：a、e 用 stop 停（stop 那一格的第二遍），再逐个按单元名停剩下的，最后核这个前缀的单元一条不剩
++  # 收尾：a、e、i、u 用 stop 停（stop 那一格的第二遍），再逐个按单元名停剩下的，最后核这个前缀的单元一条不剩
+   bash "$detached_run_script" stop "${prefix}a" > "$work/stop-a.out" 2>&1
+   bash "$detached_run_script" stop "${prefix}e" > "$work/stop-e.out" 2>&1
++  bash "$detached_run_script" stop "${prefix}i" > "$work/stop-i.out" 2>&1
++  bash "$detached_run_script" stop "${prefix}u" > "$work/stop-u.out" 2>&1
+   detached_run_selftest_cleanup
+   leftover="$(systemctl --user list-units --all --plain --no-legend "${DETACHED_RUN_UNIT_PREFIX}${prefix}*" 2>&1)"
+   printf '%s\n' "$leftover" > "$work/leftover.out"
+@@ -597,9 +904,14 @@
+     echo "     → 怎么办：按不对的那一格修 detached-run.sh 再跑 --selftest；DETACHED_RUN_BREAK 设着的话本来就该红"
+     exit 1
+   fi
+-  echo "  ✓ detached-run.sh 自证 $detached_run_selftest_checked 格都对（用法错与拒绝、退出码在单元收掉之后读得到、环境与工作目录带进单元、watch 全部结束自己退、同名在跑就拒、stop 只停登记的那一个、调用方被停命令照跑、watch 被 TERM 不停单元、收尾不剩单元）"
++  echo "  ✓ detached-run.sh 自证 $detached_run_selftest_checked 格都对（用法错与拒绝、弄坏开关设在自证之外就拒、退出码在单元收掉之后读得到、环境（连 PATH、HOME）与工作目录带进单元、watch 全部结束自己退、同名在跑就拒、stop 只停登记的那一个、调用方被停命令照跑、watch 被 TERM / INT / HUP 都不停单元、查不到单元状态时 list 单列 watch 不退 start 与 stop 拒、没起成的单列、同名重起照报旧一次的退出码、登记被挪走的单元照列、停机时限设进单元且到点 KILL 记进登记、Linger=no 时警告、收尾不剩单元）"
+ }
+ 
++if [[ -n "${DETACHED_RUN_BREAK:-}" && "${1:-}" != --selftest ]] && ! detached_run_break_is break-honored-anywhere && ! detached_run_inside_selftest; then
++  echo "  ✗ DETACHED_RUN_BREAK=$DETACHED_RUN_BREAK 设在 --selftest 之外：弄坏开关只在自证起的进程里生效，这一次什么都没做（退 4）" >&2
++  echo "     → 怎么办：去掉它再跑（env -u DETACHED_RUN_BREAK bash $detached_run_script ${1:-<子命令>} …）；要证红就跑 DETACHED_RUN_BREAK=<项> bash $detached_run_script --selftest" >&2
++  exit 4
++fi
+ case "${1:-}" in
+   start) shift; detached_run_start "$@" ;;
+   list) shift; (($# == 0)) || detached_run_usage_error "list 不带参数"; detached_run_list ;;
+--- a/.claude/hooks/bash-command-detector.sh
++++ b/.claude/hooks/bash-command-detector.sh
+@@ -84,7 +84,11 @@
+ #   records/2026-09-16-subagent拆分提案.md 第四十二节）：它把命令挂到用户级 systemd 的服务单元下，名字、退出码与日志登记在册，会话里由 `watch` 上报。
+ #   这一条不读脚本正文，它本来就放；`--` 之后那条命令当一层接着判（wrapped_commands 剥开），里面的放出追踪、终止进程、覆盖产物照拒。
+ #   start 与 stop 只给主 agent：子 agent（输入里有 agent_type）用就拒（detached_run_refusal，前台、run_in_background 一样；前缀、包装、bash -c 里的照认），
+-#   经它起的活不在子 agent 的进程树里，交回之后没人认领；list、watch 只读，谁都放。认的是命令词名叫 detached-run.sh，路径不论。
++#   经它起的活不在子 agent 的进程树里，交回之后没人认领；list、watch 只读，谁都放。认它按内容（共用模块 lib_shell_words 的 detached_run_script，
++#   与重型闸同一份）：命令词名叫 detached-run.sh（路径不论）、指到 research/scripts/detached-run.sh 的符号链接、开头带签名行（行首
++#   `# detached-run-script-signature:`）的改名拷贝，bash / sh 起的、source / . 读进来的、直接执行的都认；同一条命令里前面 cp / install / ln / mv
++#   拷出来的按目标认（detached_run_copy_destinations）。相对路径从 hook 输入的 cwd 起算（没有就从仓库根），cd 跟着算。
++#   罩不住的写法在 research/scripts/detached-run.sh 文件头「谁能用」那一段；`--` 之后那条命令的剥开（③ 的放行口）仍只认名字。
+ # ④ run_in_background 为 true 的命令里，有一个作业以单独的 `&` 收尾（不是 `&&`、`>&`、`&>`、`|&`），之后同一层、同一对圆括号里再没有 `wait`
+ #   （不带参数的 `wait`，或带进程号的 `wait "$pid"`；只带选项的 `wait -n` 不算）：外层 shell 起完它就退出，完成通知当场发出，
+ #   真跑完的那个进程叫不醒任何人。2026-09-25 一天里子 agent 至少三次在 run_in_background 里写 `… > 日志 2>&1 &`
+@@ -176,6 +180,8 @@
+ #                                        # BASH_COMMAND_DETECTOR_ALLOW_DETACHING=1（把活放出追踪的写法也放行）或
+ #                                        # BASH_COMMAND_DETECTOR_ALLOW_SUBAGENT_DETACHED_RUN=1（子 agent 的 detached-run.sh start / stop 也放行）或
+ #                                        # BASH_COMMAND_DETECTOR_OPAQUE_DETACHED_RUN=1（detached-run.sh start -- 之后那条命令不剥开，里面的放出追踪放过去）或
++#                                        # BASH_COMMAND_DETECTOR_DETACHED_RUN_BY_NAME=1（子 agent 闸只认命令词名叫 detached-run.sh 的：source / . 读进来的、
++#                                        #   改名拷贝、符号链接、同一条命令里先拷再起的都放过去）或
+ #                                        # BASH_COMMAND_DETECTOR_ALLOW_UNWAITED_AMPERSAND=1（run_in_background 里后面没有 wait 的单独 & 也放行）或
+ #                                        # BASH_COMMAND_DETECTOR_ALLOW_BACKGROUND_TASK_OUTPUT_WAIT=1（run_in_background 里轮询 tasks/*.output 也放行）或
+ #                                        # BASH_COMMAND_DETECTOR_ALLOW_REPOSITORY_IN_PLACE_EDIT=1（有 Edit 的子 agent 在 Bash 里就地改仓内文件也放行）或
+@@ -335,10 +341,13 @@
+     return skipped.command_position is not None and os.path.basename(words[skipped.command_position]) == "sleep"
+ 
+ # research/scripts/detached-run.sh：start 把 `--` 之后那条命令挂到用户级 systemd 的服务单元下跑（主 agent 跑过后台时限的长活走它，③ 的放行口），
+-#   stop 只按登记的单元名停一个；这两样只给主 agent（detached_run_refusal）。list、watch 只读，谁都放。前面可带 preflight 认的 --force
++#   stop 只按登记的单元名停一个；这两样只给主 agent（detached_run_refusal）。list、watch 只读，谁都放。前面可带 preflight 认的 --force。
++#   认脚本（名字、符号链接、签名行）与切 start 的参数在共用模块（lib_shell_words 的 detached_run_script、detached_run_start_command），与重型闸同一份
+ DETACHED_RUN_SCRIPT_NAME = "detached-run.sh"
+ DETACHED_RUN_MAIN_AGENT_ONLY = {"start", "stop"}
+-DETACHED_RUN_OPTIONS_WITH_VALUE = {"--label", "--log"}
++# 同一条命令里把它拷走、链走再起的：这几个命令的目标算它的拷贝（cp、install 的目标与 -t 目录，ln 的链接名，mv 的目标）
++DETACHED_RUN_COPYING_COMMANDS = {"cp", "install", "ln", "mv"}
++DETACHED_RUN_COPY_OPTIONS_WITH_VALUE = {"-t", "--target-directory", "-S", "--suffix", "-m", "--mode", "-o", "--owner", "-g", "--group"}
+ 
+ def detached_run_subcommand(arguments):
+     """detached-run.sh 的参数：交回 (子命令, 子命令之后的参数)；前面的 --force 跳过。"""
+@@ -349,21 +358,7 @@
+ 
+ def detached_run_inner_words(arguments):
+     """detached-run.sh start 的参数里 `--` 之后那条命令的词；不是 start、没有 `--`、带认不出的选项（它按用法错拒、什么都不跑）交 None。"""
+-    subcommand, rest = detached_run_subcommand(arguments)
+-    if subcommand != "start":
+-        return None
+-    position = 0
+-    while position < len(rest):
+-        word = rest[position]
+-        if word == "--":
+-            return rest[position + 1:] or None
+-        if word in DETACHED_RUN_OPTIONS_WITH_VALUE:
+-            position += 2
+-        elif word == "--force" or word.partition("=")[0] in DETACHED_RUN_OPTIONS_WITH_VALUE:
+-            position += 1
+-        else:
+-            return None
+-    return None
++    return shell_words.detached_run_start_command(arguments)
+ 
+ def wrapped_commands(words):
+     """一条简单命令一层层剥开前缀、capped.sh N、`bash 包装脚本`（bash 起的是脚本时接着往里剥）与 `detached-run.sh start … --`：
+@@ -507,8 +502,8 @@
+         return []
+     return detaching_forms(command)
+ 
+-def detached_run_calls(text):
+-    """命令位置上 detached-run.sh 的 start 与 stop（每一层都判，前缀、capped.sh N、`bash 包装脚本` 剥开往里找）：交回认出的调用。"""
++def detached_run_calls_by_name(text):
++    """弄坏开关 BASH_COMMAND_DETECTOR_DETACHED_RUN_BY_NAME=1 用的旧认法：只认命令词名叫 detached-run.sh 的（不认 source / .、改名拷贝、符号链接）。"""
+     found = []
+     for layer in shell_layers(text):
+         for words in layer.commands:
+@@ -518,12 +513,68 @@
+                     found.append(" ".join([name, subcommand, *rest[:2]]))
+     return list(dict.fromkeys(found))
+ 
+-def detached_run_refusal(command, agent_type):
+-    """③ 的放行口只给主 agent：子 agent（输入里有 agent_type）用 detached-run.sh 的 start 或 stop 就交回认出的调用；主 agent 与别的写法交 []。"""
++def detached_run_copy_destinations(command, copied):
++    """这一条是 cp / install / ln / mv、源里有 detached-run.sh（按名字、符号链接、签名行认，或这条命令里前面拷出来的）时，交回它写出的目标（绝对路径）。"""
++    name = os.path.basename(command.words[0])
++    if name not in DETACHED_RUN_COPYING_COMMANDS or command.directory is None:
++        return set()
++    operands, target_directory, position, arguments = [], None, 0, command.words[1:]
++    while position < len(arguments):
++        argument = arguments[position]
++        if argument in DETACHED_RUN_COPY_OPTIONS_WITH_VALUE:
++            if argument in ("-t", "--target-directory") and position + 1 < len(arguments):
++                target_directory = arguments[position + 1]
++            position += 2
++            continue
++        if argument.startswith("--target-directory="):
++            target_directory = argument.split("=", 1)[1]
++        elif not argument.startswith("-") or argument == "-":
++            operands.append(argument)
++        position += 1
++    if target_directory is None and len(operands) < 2:
++        return set()
++    sources, destination = (operands, target_directory) if target_directory is not None else (operands[:-1], operands[-1])
++    destination_path = shell_words.resolve_path(command.directory, os.path.expanduser(destination))
++    if destination_path is None:
++        return set()
++    into_directory = target_directory is not None or len(sources) > 1 or destination.endswith("/") or os.path.isdir(destination_path)
++    written = set()
++    for source in sources:
++        source_path = shell_words.resolve_path(command.directory, os.path.expanduser(source))
++        if source_path is None or not (source_path in copied or shell_words.detached_run_script(source, command.directory)):
++            continue
++        written.add(os.path.join(destination_path, os.path.basename(source)) if into_directory else destination_path)
++    return written
++
++def detached_run_calls(text, directory):
++    """命令位置上 detached-run.sh 的 start 与 stop：交回认出的调用。按共用模块切出的每一条命令（前缀、capped.sh N、bash 起的、source / . 读进来的、
++    bash -c、喂给 shell 的 heredoc、命令替换都剥开，cd 跟着算；directory 是开头的当前目录）认命令词：名字、指到它的符号链接、开头带签名行的改名拷贝
++    （共用模块的 detached_run_script），以及同一条命令里前面 cp / install / ln / mv 拷出来的（detached_run_copy_destinations）。"""
++    if os.environ.get("BASH_COMMAND_DETECTOR_DETACHED_RUN_BY_NAME") == "1":
++        return detached_run_calls_by_name(text)
++    found, copied = [], set()
++    for command in shell_words.commands_at_command_position(text, directory).commands:
++        word = command.words[0]
++        resolved = shell_words.resolve_path(command.directory, os.path.expanduser(word)) if command.directory else None
++        recognized = shell_words.detached_run_script(word, command.directory)
++        if not recognized and resolved in copied:
++            recognized = f"{word}（这条命令里前面拷出来的 {shell_words.DETACHED_RUN_SCRIPT_LOCATION}）"
++        if recognized:
++            subcommand, rest = detached_run_subcommand(command.words[1:])
++            if subcommand in DETACHED_RUN_MAIN_AGENT_ONLY:
++                how = "source 读进来的 " if command.launcher == "source" else ""
++                found.append(" ".join([f"{how}{recognized}", subcommand, *rest[:2]]))
++            continue
++        copied |= detached_run_copy_destinations(command, copied)
++    return list(dict.fromkeys(found))
++
++def detached_run_refusal(command, agent_type, directory):
++    """③ 的放行口只给主 agent：子 agent（输入里有 agent_type）用 detached-run.sh 的 start 或 stop 就交回认出的调用；主 agent 与别的写法交 []。
++    directory 是命令开头的当前目录（hook 输入里的 cwd，没有就是仓库根），认改名拷贝与符号链接时解相对路径用。"""
+     if (not agent_type or os.environ.get("BASH_COMMAND_DETECTOR_DISABLE_CHECK") == "1"
+             or os.environ.get("BASH_COMMAND_DETECTOR_ALLOW_SUBAGENT_DETACHED_RUN") == "1"):
+         return []
+-    return detached_run_calls(command)
++    return detached_run_calls(command, directory)
+ 
+ # ⑧ 有 Edit 工具的项目子 agent 在 Bash 里就地改仓内文件：命令位置上的 `sed -i`（目标不在 /tmp/ 下），或 python 代码里 open(<仓内路径字面量>, 'w' / 'a' / 'x')、
+ #   Path(<仓内路径字面量>).write_text( / .write_bytes(。仓内路径字面量：crates/、.claude/、research/、records/、litmus/、briefs/ 起头的，或仓根起的绝对路径。
+@@ -2575,6 +2626,28 @@
+     results.append(("stdin:主 agent 经 detached-run.sh start 起长跑放行（退出码 0）", 0,
+                     entry_as(None, "cd /tmp/wt && SINGLEFS_HEAVY_TESTS=user-request bash /abs/research/scripts/detached-run.sh start --label m -- sleep 1").returncode))
+     results.append(("stdin:主 agent 的 detached-run.sh stop 放行（退出码 0）", 0, entry_as(None, "bash research/scripts/detached-run.sh stop m").returncode))
++    # 走真实入口：按内容认 detached-run.sh——source / . 读进来的、开头带签名行的改名拷贝、指到它的符号链接、同一条命令里先 cp / ln -s 再起的，
++    #   子 agent 的 start / stop 照拒（BASH_COMMAND_DETECTOR_DETACHED_RUN_BY_NAME=1 下这六格红）；删掉签名行的拷贝认不出、list 放行
++    detached_sample = "#!/usr/bin/env bash\n# detached-run-script-signature: 样本（bash-command-detector 自检造的）\necho sample\n"
++    os.makedirs(os.path.join(work, "research", "scripts"), exist_ok=True)
++    os.makedirs(os.path.join(work, "elsewhere"), exist_ok=True)
++    for relative, text in (("dr-renamed.sh", detached_sample), ("research/scripts/detached-run.sh", "#!/usr/bin/env bash\necho 没有签名行的样本\n"),
++                           ("dr-without-signature.sh", detached_sample.replace("# detached-run-script-signature:", "# 签名行删掉了："))):
++        with open(os.path.join(work, relative), "w", encoding="utf-8") as handle:
++            handle.write(text)
++    os.symlink(os.path.join(work, "research", "scripts", "detached-run.sh"), os.path.join(work, "elsewhere", "dr-link.sh"))
++    for label, command in (("source 读进来", "source research/scripts/detached-run.sh start --label m -- sleep 1"),
++                           (". 读进来", ". research/scripts/detached-run.sh start --label m -- sleep 1"),
++                           ("开头带签名行的改名拷贝", f"bash {work}/dr-renamed.sh start --label m -- sleep 1"),
++                           ("指到它的符号链接 stop", f"bash {work}/elsewhere/dr-link.sh stop m"),
++                           ("同一条命令里先 cp 改名再起", f"cp research/scripts/detached-run.sh {work}/dr2.sh && bash {work}/dr2.sh start --label m -- sleep 1"),
++                           ("同一条命令里先 ln -s 再起", "ln -s detached-run.sh research/scripts/drl.sh; bash research/scripts/drl.sh start --label m -- sleep 1")):
++        results.append((f"stdin:子 agent 经{label}的 detached-run.sh 起或停拒绝（退出码 2）", 2, entry_as("clerk", command).returncode))
++    for label, agent_type, command in (("子 agent 起删掉签名行的拷贝认不出（罩不住的那一种，钉住现状）", "clerk", f"bash {work}/dr-without-signature.sh start --label m -- sleep 1"),
++                                       ("子 agent 先 cp 改名再 list", "clerk", f"cp research/scripts/detached-run.sh {work}/dr3.sh && bash {work}/dr3.sh list"),
++                                       ("子 agent source 读进来 watch", "clerk", "source research/scripts/detached-run.sh watch --every 600"),
++                                       ("主 agent source 读进来 start", None, "source research/scripts/detached-run.sh start --label m -- sleep 1")):
++        results.append((f"stdin:{label}放行（退出码 0）", 0, entry_as(agent_type, command).returncode))
+     renamed, renamed_recorded = through_entry(f"cp /tmp/new.sh research/scripts/.running.sh.installing && mv research/scripts/.running.sh.installing {running}")
+     results.append(("stdin:写到临时文件再 mv 换上放行（退出码 0）、不记检出", (0, 0), (renamed.returncode, renamed_recorded)))
+     # 同走 run_in_background 的那一条：只记检出
+@@ -2688,15 +2761,17 @@
+               "「终止进程:」「扫脚本:」红的看 process_signal_refusal() / termination_findings() / call_findings() / scan_scripts()；"
+               "「就地改脚本:」红的看 script_in_place_refusal() / script_in_place_verdict() / python_in_place_writes() / is_existing_script()；"
+               "「先编后换:」红的看 compile_first_refusal() / compile_first_verdict() / overwrite_steps(every_write=True)，_ALLOW_COMPILE_FIRST_BYPASS 设着的话本来就该红；"
+-              "detached-run.sh 那几格红的看 detached_run_refusal() / detached_run_calls() / detached_run_inner_words() 与 wrapped_commands()，"
+-              "_ALLOW_SUBAGENT_DETACHED_RUN 或 _OPAQUE_DETACHED_RUN 设着的话本来就该红")
++              "detached-run.sh 那几格红的看 detached_run_refusal() / detached_run_calls() / detached_run_copy_destinations() / detached_run_inner_words() "
++              "与 wrapped_commands()、共用模块的 detached_run_script() / detached_run_start_command()，"
++              "_ALLOW_SUBAGENT_DETACHED_RUN、_OPAQUE_DETACHED_RUN 或 _DETACHED_RUN_BY_NAME 设着的话本来就该红")
+         return 1
+     summary = ("没超时的等待循环、run_in_background 里又自己放后台记进检出记录，普通命令、重定向里的 & 、前台的 & 、写进文件的 heredoc 正文与按模式找进程（归上游钩子）不记；"
+                "起看门狗不用 run_in_background、或带 &、nohup、setsid、disown、丢进 /dev/null 的拒绝（退出码 2），run_in_background 只写 watch.sh 的、把名字当参数的、"
+                "不盯的模式与 agent-watch.py report 放行；前台没超时的等待循环拒绝（退出码 2、不记检出），外层套了 timeout 的、run_in_background 里的（只记检出）、"
+                "引号与注释里当数据写的、不带 sleep 的与 for 循环放行；命令位置上的 disown、coproc、setsid -f、nohup … &、tmux / screen 分离、"
+                "不等结束的 systemd-run 前台后台都拒，不带 & 的 nohup、裸 setsid、systemd-run --wait、并行加 wait 与当数据写的放行；"
+-               "detached-run.sh start 本身放行、它 -- 之后那条照判，start 与 stop 只给主 agent（子 agent 带前缀、bash -c 里的照拒），list、watch 谁都放；"
++               "detached-run.sh start 本身放行、它 -- 之后那条照判，start 与 stop 只给主 agent（子 agent 带前缀、bash -c 里的、source / . 读进来的、"
++               "带签名行的改名拷贝、符号链接、同一条命令里先 cp / ln -s 再起的照拒，删掉签名行的拷贝认不出），list、watch 谁都放；"
+                "run_in_background 里以单独的 & 收尾、之后同一层同一对圆括号里没有 wait 的拒绝（结尾 &、& 后接 echo $!、capped.sh 包着的、"
+                "子 shell、命令替换、bash -c 与喂给 shell 的 heredoc 里的，wait -n 与按 pid 轮询不算 wait），之后用 wait / wait \"$pid\" 等的、"
+                "&&、2>&1、|&、&>、当数据写的与前台的放行；在临时 git 仓里，整份覆盖 research/results/ 下已存在又没进 git 的文件拒绝（>、>|、&>、2>、>& 文件、"
+@@ -2787,7 +2862,10 @@
+                   "会话被停也不停），会话里只用 run_in_background 起 `bash research/scripts/detached-run.sh watch` 上报", file=sys.stderr)
+             return 2
+         try:
+-            detached_calls = detached_run_refusal(tool_input.get("command") or "", hook_input.get("agent_type"))
++            given_directory = hook_input.get("cwd")
++            detached_calls = detached_run_refusal(tool_input.get("command") or "", hook_input.get("agent_type"),
++                                                  given_directory if isinstance(given_directory, str) and os.path.isdir(given_directory)
++                                                  else repository_root_of(hook_dir))
+         except Exception as error:
+             print(f"  ! bash-command-detector.sh 没判成 detached-run.sh 的起法（{error!r}），这条命令照常执行", file=sys.stderr)
+             detached_calls = []
+--- a/.claude/hooks/lib_heavy_tests.py
++++ b/.claude/hooks/lib_heavy_tests.py
+@@ -8,7 +8,7 @@
+   classify(words, directory, environment=None) -> HeavyTest | None
+       一条已经剥掉前缀与包装的命令：words[0] 是命令词（照写的样子，没取 basename），其后是参数；directory 是它的当前目录，认不出时 None；
+       environment 是这条命令看得到的、命令文本里设过的变量（lib_shell_words 的 CommandAtPosition.environment），认别名要用。
+-  command_under_launcher(words) -> (list[str], str | None) | None
++  command_under_launcher(words, directory=None) -> (list[str], str | None) | None
+       words[0] 是 LAUNCHER_OPTIONS_WITH_VALUE 里的程序（/usr/bin/time、flock、rustup run、chrt、prlimit、systemd-run、strace、perf）时，
+       剥掉它交回它起的那条命令与那条命令的当前目录（None 是不变）；调用方把交回的命令再交给 lib_shell_words 切一遍、逐条判。
+       短选项合写（`-fo <文件>`、`-xw 10`、`-qu <名>`）逐个字母查那张表：头一个要值的字母之后剩下的是它的值，没剩下就取下一个词；
+@@ -18,8 +18,11 @@
+       读不了当它没设）、strace 的 `-E NAME=VALUE` / `--env=NAME=VALUE` 设的变量写在交回那条命令的最前面
+       （再切一遍时当它的环境变量，认别名要用；strace 的 `-E NAME` 只清变量，不带）。
+       这张表不进 lib_shell_words 的前缀表：bash-command-detector.sh 要按命令词认出 systemd-run，判它等不等结束。
+-      research/scripts/detached-run.sh 的 `start [--label <名>] [--log <文件>] -- <命令…>`（按名字认，前面可带 --force）同样剥掉，交回 `--` 之后那条命令，
++      research/scripts/detached-run.sh 的 `start [--label <名>] [--log <文件>] [--stop-timeout <秒>] -- <命令…>`（前面可带 --force）同样剥掉，交回 `--` 之后那条命令，
+       当前目录与环境照外面那一条（它把调用方的 SINGLEFS_HEAVY_TESTS 与当前目录带进单元）；list、watch、stop 与没写 `--` 的不剥（command_under_detached_run）。
++      认它照 lib_shell_words 的 detached_run_script：名字叫 detached-run.sh（路径不论）、解到的真实路径落在 research/scripts/detached-run.sh（符号链接）、
++      文件开头有签名行（行首 `# detached-run-script-signature:`，改名或拷走的一份）；后两种按 directory 解相对路径、读盘，文件还不在就认不出
++      （同一条命令里先 cp 再起的由 heavy-test-guard.sh 拿它记下的写出内容另判）。
+   classify_process(argv, cwd) -> list[HeavyTest]
+       一个在跑的进程：argv 是 /proc/<pid>/cmdline 按 NUL 切开的那一串，cwd 是 /proc/<pid>/cwd 指向的目录。
+       先照 lib_shell_words 剥掉 bash / sh 起脚本、bash -c、nice / timeout / env / taskset、capped.sh N 这类包装，
+@@ -78,7 +81,8 @@
+   broad-mutation-ignored（广谱变异的逐条驱动不按名字认，整趟跑也放过去）、
+   broad-mutation-first-round-exemptions（「--item 点名又带 --skip-stage-two」与 --sync-tree 照第一版放过去）、
+   broad-mutation-by-name-only（驱动只按名字与位置认：指到它的符号链接、带签名行的改名拷贝、python -c 的代码里点它的都放过去）、
+-  detached-run-opaque（research/scripts/detached-run.sh start … -- <命令> 不剥，里面那条重型命令放过去）。
++  detached-run-opaque（research/scripts/detached-run.sh start … -- <命令> 不剥，里面那条重型命令放过去）、
++  detached-run-by-name-only（detached-run.sh 只按名字认：指到它的符号链接、带签名行的改名拷贝、同一条命令里先拷再起的都不剥，里面那条重型命令放过去）。
+ 广谱变异的逐条驱动 research/scripts/broad-mutation.py（类名「广谱变异」，kind broad-mutation）：它逐条改坏 core / checker 的源码，每条起 cargo，整趟要几天。
+   算的：凡要起 cargo 或改库目录的——整趟、--shard、--from、--package、--item 点名（点几条、带不带 --skip-stage-two 都算）、--stage-two-only、
+   --sync-tree（换全局的版本指针）、--import-results（往本机结果表里导入）；参数只认整词，argparse 认的缩写（--sum、--list）与贴着写的（--item=1）照算，接受的误拒。
+@@ -842,45 +846,31 @@
+     return []
+ 
+ 
+-# research/scripts/detached-run.sh start [--label <名>] [--log <文件>] -- <命令…>：把那条命令挂到用户级 systemd 的服务单元下跑，
+-# 调用方的 SINGLEFS_HEAVY_TESTS 与当前目录带进去；它的 preflight 摘掉每一个 --force。没有 `--`、带认不出的选项的，它按用法错拒、什么都不跑
+-DETACHED_RUN_SCRIPT_NAME = "detached-run.sh"
+-DETACHED_RUN_OPTIONS_WITH_VALUE = frozenset({"--label", "--log"})
++# research/scripts/detached-run.sh start [--label <名>] [--log <文件>] [--stop-timeout <秒>] -- <命令…>：把那条命令挂到用户级 systemd 的服务单元下跑，
++# 调用方的 SINGLEFS_HEAVY_TESTS 与当前目录带进去；它的 preflight 摘掉每一个 --force。没有 `--`、带认不出的选项的，它按用法错拒、什么都不跑。
++# 认脚本与切参数都在 lib_shell_words（detached_run_script、detached_run_start_command），bash-command-detector.sh 用同一份
+ 
+ 
+-def command_under_detached_run(words):
+-    """words 是 `detached-run.sh [--force] start <选项> -- <命令…>`（按名字认，路径不论）时交回 (<命令…> 的词, None)：当前目录与环境照外面那一条；
+-    别的子命令（list、watch、stop、--selftest）、没有 `--`、带认不出的选项的交 None。弄坏开关 detached-run-opaque 下一律交 None。"""
+-    if (os.path.basename(words[0]) != DETACHED_RUN_SCRIPT_NAME or ENVIRONMENT_ASSIGNMENT_WORD.match(words[0])
+-            or break_is_set("detached-run-opaque")):
++def command_under_detached_run(words, directory=None, recognized=False):
++    """words[0] 是 detached-run.sh（lib_shell_words 的 detached_run_script：名字、指到它的符号链接、开头带签名行的改名拷贝；后两种按 directory 解相对路径、读盘；
++    调用方已经按别的办法认出来的给 recognized=True）而参数是 `[--force] start <选项> -- <命令…>` 时交回 (<命令…> 的词, None)：当前目录与环境照外面那一条；
++    别的交 None。弄坏开关 detached-run-opaque 下一律交 None；detached-run-by-name-only 下只按名字认。"""
++    if break_is_set("detached-run-opaque") or ENVIRONMENT_ASSIGNMENT_WORD.match(words[0]):
+         return None
+-    position = 1
+-    while position < len(words) and words[position] == "--force":
+-        position += 1
+-    if words[position:position + 1] != ["start"]:
++    if not recognized and not shell_words.detached_run_script(words[0], directory, by_name_only=break_is_set("detached-run-by-name-only")):
+         return None
+-    position += 1
+-    while position < len(words):
+-        word = words[position]
+-        if word == "--":
+-            return (words[position + 1:], None) if position + 1 < len(words) else None
+-        if word in DETACHED_RUN_OPTIONS_WITH_VALUE:
+-            position += 2
+-        elif word == "--force" or word.partition("=")[0] in DETACHED_RUN_OPTIONS_WITH_VALUE:
+-            position += 1
+-        else:
+-            return None
+-    return None
++    inner = shell_words.detached_run_start_command(words[1:])
++    return None if inner is None else (inner, None)
+ 
+ 
+-def command_under_launcher(words):
++def command_under_launcher(words, directory=None):
+     """words[0] 是 LAUNCHER_OPTIONS_WITH_VALUE 里的程序时，剥掉它（连同它的选项与位置参数），交回 (它起的那条命令的词, 那条命令的当前目录：
+     None 是不变，systemd-run --working-directory 给的是相对当前目录的写法)；不是这几样、或后面没有要起的命令（strace -p、flock 只给 fd）交 None。
+     选项词怎么切见 launcher_option；LAUNCHER_ENVIRONMENT_OPTIONS 里的选项（systemd-run 的 -E / --setenv、strace 的 -E / --env）设的 NAME=VALUE，
+     与 systemd-run -p / --property 的 Environment= / EnvironmentFile= 设的（assignments_of_environment_property）写在交回那条命令的最前面。
+     flock 的 -c <字符串> 交回成 sh -c <字符串>。rustup 只认 rustup run，perf 只认 stat / record / trace 与 <组> record。
+-    research/scripts/detached-run.sh 的 start 照 command_under_detached_run 剥。"""
+-    detached = command_under_detached_run(words)
++    research/scripts/detached-run.sh 的 start 照 command_under_detached_run 剥（directory 是 words 的当前目录，认改名拷贝与符号链接时解相对路径用）。"""
++    detached = command_under_detached_run(words, directory)
+     if detached is not None:
+         return detached
+     name = os.path.basename(words[0])
+@@ -1060,7 +1050,7 @@
+     """一段命令文本里命令位置上的每一处重型用法：lib_shell_words 剥掉包装，command_under_launcher 剥掉 /usr/bin/time 这一类（剥完再切一遍），逐条 classify。"""
+     found = []
+     for command in shell_words.commands_at_command_position(text, directory, environment).commands:
+-        launched = command_under_launcher(command.words)
++        launched = command_under_launcher(command.words, command.directory)
+         if launched is not None:
+             inner_words, inner_directory = launched
+             inner_start = shell_words.resolve_path(command.directory, inner_directory) if inner_directory else command.directory
+@@ -1078,7 +1068,7 @@
+     if not argv:
+         return []
+     # 进程的 argv[0] 是 time 时它就是那个程序（不是 bash 的关键字 time）：先按 argv 剥，再交给切词
+-    launched = command_under_launcher(argv)
++    launched = command_under_launcher(argv, cwd)
+     if launched is not None:
+         inner_words, inner_directory = launched
+         return classify_process(inner_words, shell_words.resolve_path(cwd, inner_directory) if inner_directory else cwd)
+@@ -1135,6 +1125,13 @@
+     write("elsewhere/renamed-driver-copy.py", driver_sample)
+     write("elsewhere/copy-without-signature.py", driver_sample.replace("# broad-mutation-driver-signature:", "# 签名行删掉了："))
+     write("elsewhere/unrelated.py", "#!/usr/bin/env python3\nprint('broad-mutation-driver-signature: 不在行首的不算')\n")
++    # detached-run.sh（样本只有文件头）：仓内位置上的一份、带签名行的改名拷贝（仓内、仓外）、指到仓内那一份的符号链接、删掉签名行的拷贝
++    detached_sample = "#!/usr/bin/env bash\n# detached-run-script-signature: 样本（lib_heavy_tests 自检造的）\necho sample\n"
++    write("research/scripts/detached-run.sh", detached_sample)
++    write("research/scripts/dr-renamed.sh", detached_sample)
++    write("elsewhere/dr-renamed.sh", detached_sample)
++    write("elsewhere/dr-without-signature.sh", detached_sample.replace("# detached-run-script-signature:", "# 签名行删掉了："))
++    os.symlink(os.path.join(work, "research", "scripts", "detached-run.sh"), os.path.join(work, "elsewhere", "dr-link.sh"))
+     os.symlink("broad-mutation.py", os.path.join(work, "research", "scripts", "linked-driver.py"))
+     os.symlink(os.path.join(work, "research", "scripts", "broad-mutation.py"), os.path.join(work, "elsewhere", "linked-driver.py"))
+     # 双机分片的驱动脚本读的登记表：驱动自检在临时仓里登记的那种（harness 档包的替身用例）、真跑的那种（checker 档包）、没登记分片的（驱动开跑就拒）
+@@ -1457,6 +1454,16 @@
+             ("detached-run.sh list 不起命令", ["bash", "research/scripts/detached-run.sh", "list"], work, None),
+             ("detached-run.sh start 包不重型的测试目标", ["bash", "research/scripts/detached-run.sh", "start", "--label", "m", "--",
+                                                     "cargo", "test", "-p", "singlefs-core", "--test", "core_contract"], work, None),
++            ("detached-run.sh start 带 --stop-timeout 照剥", ["bash", "research/scripts/detached-run.sh", "start", "--label", "m", "--stop-timeout", "60", "--",
++                                                          "cargo", "test", "--all"], work, "full-cargo"),
++            # 按内容认 detached-run.sh：开头带签名行的改名拷贝、指到它的符号链接、source 读进来的（开关 detached-run-by-name-only 下前三格红）
++            ("bash 起仓内改名的 detached-run.sh 拷贝包全量", ["bash", "research/scripts/dr-renamed.sh", "start", "--label", "m", "--", "cargo", "test", "--all"],
++             work, "full-cargo"),
++            ("直接执行仓外改名拷贝包 checker 档", [os.path.join(work, "elsewhere", "dr-renamed.sh"), "start", "--label", "m", "--",
++                                                 "cargo", "test", "-p", "singlefs-checker-tier"], work, "checker-tier-cargo"),
++            ("source 读进来的符号链接包全量", ["bash", "-c", "source elsewhere/dr-link.sh start --label m -- cargo test --all"], work, "full-cargo"),
++            ("删掉签名行的改名拷贝认不出（罩不住的那一种，钉住现状）", ["bash", os.path.join(work, "elsewhere", "dr-without-signature.sh"), "start", "--label", "m", "--",
++                                                          "cargo", "test", "--all"], work, None),
+         ]
+         binary_cases = [
+             ("绝对路径的 checker 档集成测试二进制", [os.path.join(work, "target", "release", "deps", tier_binary), "--test-threads", "4"], work, "checker-tier-binary"),
+@@ -1538,7 +1545,7 @@
+         print("    → 看 classify()、cargo_subcommand()、cargo_use()、package_specification_members()、alias_expansion()、test_invocation()、"
+               "command_under_launcher()、launcher_option()、libtest_lists_only()、checker_test_targets()、test_binary_name()、"
+               "runs_compiled_code()、classify_process()、judged_by_name()、broad_mutation_driver()、broad_mutation_use()、"
+-              "lib_shell_words.py 的 python_invocation() 与 TEST_BINARY_PATH / BUILT_BINARY_PATH / COMPILED_CODE_SUBCOMMANDS / "
++              "command_under_detached_run()、lib_shell_words.py 的 detached_run_script()、detached_run_start_command()、python_invocation() 与 TEST_BINARY_PATH / BUILT_BINARY_PATH / COMPILED_CODE_SUBCOMMANDS / "
+               f"KNOWN_SCRIPT_LOCATIONS / LAUNCHER_OPTIONS_WITH_VALUE / LIBTEST_OPTIONS_WITH_VALUE 几张表；{BREAK_VARIABLE} 设着的话这里本来就该红")
+         return 1
+     print(f"  ✓ lib_heavy_tests 自检通过（查了 {len(results)} 种：cargo 与包装过的命令行 {len(cargo_cases)} 种、"
+--- a/.claude/hooks/heavy-test-guard.sh
++++ b/.claude/hooks/heavy-test-guard.sh
+@@ -68,6 +68,10 @@
+ #   `perf stat|record|trace`（lib_heavy_tests.py 的 LAUNCHER_OPTIONS_WITH_VALUE）剥掉之后，里面那条当一段命令文本接着判：前缀、内存包装、脚本照认。
+ #   research/scripts/detached-run.sh 的 `start … -- <命令>`（把命令挂到用户级 systemd 下脱离会话跑，调用方的 SINGLEFS_HEAVY_TESTS 带进去）同样剥掉，
+ #   不读它的正文：`--` 之后那条照这张表判，外面写的前缀与 `--` 之后写的前缀都认，谁能跑什么不因为经它起而变（lib_heavy_tests.py 的 command_under_detached_run）。
++#   认它按内容，不只按名字（lib_shell_words.py 的 detached_run_script）：名字叫 detached-run.sh、指到它的符号链接、开头带签名行
++#   （行首 `# detached-run-script-signature:`）的改名拷贝，bash / sh / source / . 起的、直接执行的都认；同一条命令里前面 cp 拷来、heredoc 写出的，
++#   按写出的内容找签名行（written_detached_run）。认签名行时另读命令词那份文件的开头 4 KiB（不经 JudgingState、不记进读过的文件）。
++#   罩不住的写法在 research/scripts/detached-run.sh 文件头「谁能用」那一段。
+ # 写进脚本文件再执行的，读脚本正文、逐条照同一张表判：命令位置上是 `bash|sh 文件`（不带 -c）、`./x.sh` 或 `路径/x.sh`、`source 文件` / `. 文件`，
+ #   经 capped.sh N、nice、timeout、env、前缀变量包一层的同样认；脚本里再起脚本的递归读，读到第 MAXIMUM_SCRIPT_DEPTH（6）层为止，再往里判「看不全」。
+ #   外层命令带的前缀与 export 往脚本里传，脚本里某一行自己写的前缀同样认；谁能跑什么照上面那张表，不因为写在脚本里而变。
+@@ -466,6 +470,23 @@
+         return script_text(entry.copied_from, launcher, state, path)
+     return decoded_script_text(entry.text.encode("utf-8"), path, launcher, path)
+ 
++def written_detached_run(command, state):
++    """命令词是同一条命令里前面写出的文件（cp 拷来的、heredoc 写出的），写出的内容开头带 detached-run.sh 的签名行，而参数是 `start … -- <命令>`：
++    交回 (<命令> 的词, None)，同 command_under_launcher；别的交 None。弄坏开关 LIB_HEAVY_TESTS_BREAK=detached-run-by-name-only 下一律交 None。"""
++    if heavy_tests.break_is_set("detached-run-by-name-only"):
++        return None
++    path = literal_path(command, command.words[0])
++    entry = state.written.get(path) if path is not None else None
++    if entry is None:
++        return None
++    if entry.copied_from is not None:
++        head = file_on_disk(entry.copied_from, state).head
++    else:
++        head = (entry.text or "")[:shell_words.DETACHED_RUN_HEAD_BYTES].encode("utf-8")
++    if not shell_words.carries_detached_run_signature(head):
++        return None
++    return heavy_tests.command_under_detached_run(command.words, recognized=True)
++
+ def lower_cycle_frame(first, second):
+     """两个「绕回外层的那一格」取靠外的那个；None 是没绕回。"""
+     if first is None:
+@@ -495,8 +516,11 @@
+         occurrence = occurrences.get(key, 0)
+         occurrences[key] = occurrence + 1
+         record_files_written(command, state)
+-        # /usr/bin/time、flock、systemd-run 这一类包在外面照样起那条命令的：剥掉它，里面那条按一段命令文本接着判（包装、脚本、内存包装照认）
+-        launched = heavy_tests.command_under_launcher(command.words)
++        # /usr/bin/time、flock、systemd-run 这一类包在外面照样起那条命令的：剥掉它，里面那条按一段命令文本接着判（包装、脚本、内存包装照认）；
++        # detached-run.sh start 同样剥（同一条命令里前面写出的拷贝按写出的内容认，其余按名字、符号链接、签名行认）
++        launched = written_detached_run(command, state)
++        if launched is None:
++            launched = heavy_tests.command_under_launcher(command.words, command.directory)
+         if launched is not None:
+             inner_words, inner_directory = launched
+             inner_start = shell_words.resolve_path(command.directory, inner_directory) if inner_directory else command.directory
+@@ -828,6 +852,15 @@
+             ("实现员带前缀经 detached-run.sh start 跑 --all 照拒", writer, commit + "bash research/scripts/detached-run.sh start --label m -- cargo test --all", 2),
+             ("实现员经 detached-run.sh start、里面经内存包装跑 checker 档包照拒", writer,
+              "bash research/scripts/detached-run.sh start --label m -- bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker-tier", 2),
++            # 按内容认 detached-run.sh：改名拷贝（开头带签名行）、符号链接、同一条命令里先 cp 再起、source 读进来的（LIB_HEAVY_TESTS_BREAK=detached-run-by-name-only 下前五格红）
++            ("主 agent 不带前缀经改名拷贝起全量照拒", None, "bash research/scripts/dr-renamed.sh start --label p -- cargo test --all", 2),
++            ("主 agent 不带前缀经指到它的符号链接起全量照拒", None, "bash elsewhere/dr-link.sh start --label p -- cargo test --all", 2),
++            ("主 agent 不带前缀同一条命令里先 cp 改名再起全量照拒", None,
++             "cp research/scripts/detached-run.sh dr2.sh && bash dr2.sh start --label p -- cargo test --all", 2),
++            ("实现员同一条命令里先 cp 改名再起全量照拒", writer, "cp research/scripts/detached-run.sh dr2.sh && bash dr2.sh start --label p -- cargo test --all", 2),
++            ("实现员 source 读进改名拷贝起 checker 档照拒", writer,
++             "source elsewhere/dr-renamed.sh start --label p -- bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker-tier", 2),
++            ("主 agent 带前缀经改名拷贝起全量放行", None, request + "bash research/scripts/dr-renamed.sh start --label p -- cargo test --all", 0),
+             ("实现员 /usr/bin/time 包一层跑自己的测试目标、没经内存包装", writer, "/usr/bin/time -v cargo test -p singlefs-core --test core_contract", 2),
+             ("实现员内存包装里 /usr/bin/time 包一层跑自己的测试目标", writer,
+              "bash research/scripts/run-with-memory-cap.sh 4G /usr/bin/time -v cargo test -p singlefs-core --test core_contract", 0),
+--- a/.claude/hooks/lib_shell_words.py
++++ b/.claude/hooks/lib_shell_words.py
+@@ -22,6 +22,7 @@
+ 剥掉包装之后命令词是一个脚本时，记下它是怎么起的（launcher：bash / sh 这类后面跟的、source / . 读进来的、python3 后面跟的）；
+ 经 `run-with-memory-cap.sh <上限>` 剥出来的命令记 memory_capped，连同它 `bash -c` 里的命令；调用方往里读它起的脚本时，把这个标记当 memory_capped 参数传回来。
+ 脚本文件本身不在这里读，要读的 hook 自己读，再把正文交回 commands_at_command_position。
++只有一处例外：detached_run_script 认 research/scripts/detached-run.sh（名字、符号链接、文件开头的签名行），读命令词那份文件的开头 4 KiB，两个 hook 共用这一份认法。
+ 判不到的：变量里拼出来的命令、eval、`<<<` 喂给 shell 的字符串、进程替换的输出再交给 shell 执行（`bash <(…)`、`source <(…)`，括号里的命令照判，它打印出来的不判）、Makefile 与 xargs 起的命令；
+ 喂给 shell 的 heredoc 正文里引号没配对时，其后的切词会错；heredoc 挂的命令从上一行续行过来时认不出它喂给谁（当数据剥掉）；heredoc 挂在命令替换或进程替换里面的命令上（`$(bash <<EOF`、`<(bash <<EOF`）认不出它喂给 shell（当数据剥掉）；圆括号子 shell 里的 cd 与 export 当成对后面的命令也生效；
+ 命令替换与进程替换里的命令按替换所在那条命令开始时的目录与 export 判（替换里的 cd 不影响外面）。
+@@ -60,6 +61,14 @@
+ WRAPPERS_TAKING_ONE_ARGUMENT = {"capped.sh", "run-with-memory-cap.sh"}
+ # 其中给命令定内存上限的那一个：剥掉它的命令记 memory_capped（heavy-test-guard.sh 判子 agent 跑编译出来的代码经没经它）
+ MEMORY_CAP_WRAPPER = "run-with-memory-cap.sh"
++# research/scripts/detached-run.sh（脱离会话长跑的入口）：两个 hook 都要认它，按名字（路径不论）、解到的真实路径（符号链接）与文件开头的签名行
++# （行首 `# detached-run-script-signature:`，改名或拷走的一份）认；读文件开头这么多字节找签名行。这份文件自己的开头里没有以它起头的行
++DETACHED_RUN_SCRIPT_NAME = "detached-run.sh"
++DETACHED_RUN_SCRIPT_LOCATION = "research/scripts/detached-run.sh"
++DETACHED_RUN_SIGNATURE_LINE = re.compile(rb"^# detached-run-script-signature:", re.MULTILINE)
++DETACHED_RUN_HEAD_BYTES = 4096
++# 它的 start 带值的选项（`--label <名>`、`--log <文件>`、`--stop-timeout <秒>`，也可以写成 `--选项=值`）
++DETACHED_RUN_OPTIONS_WITH_VALUE = frozenset({"--label", "--log", "--stop-timeout"})
+ # 剥掉的 heredoc 在剥完的文字里换成这个记号（NUL 开头，不是 \w，不会被 HEREDOC 再认一次），切词之后它是 `<<` 的目标词，按编号找回正文
+ HEREDOC_BODY_MARKER = re.compile(r"^\x00heredoc-body-(\d+)\x00$")
+ 
+@@ -472,6 +481,59 @@
+     return os.path.normpath(os.path.join(directory, path))
+ 
+ 
++def carries_detached_run_signature(head):
++    """一份文件开头的字节（只看前 DETACHED_RUN_HEAD_BYTES 个）里有没有 detached-run.sh 的签名行（行首）。"""
++    return bool(DETACHED_RUN_SIGNATURE_LINE.search(head[:DETACHED_RUN_HEAD_BYTES]))
++
++
++def detached_run_script(word, directory, by_name_only=False):
++    """命令词是不是 research/scripts/detached-run.sh：是就交一句凭什么认出来的，不是交 None。三种办法：名字叫 detached-run.sh（路径不论）；
++    解到的文件的真实路径落在 research/scripts/detached-run.sh（符号链接）；文件开头有签名行（改名或拷走的一份）。
++    后两种读盘：相对路径按 directory 解（directory 是 None 时只认绝对路径），带没展开的变量、命令替换、通配的词不解；文件不在就认不出。
++    by_name_only 为真时只按名字认（两个 hook 的弄坏开关用）。"""
++    expanded = os.path.expanduser(word)
++    if os.path.basename(expanded) == DETACHED_RUN_SCRIPT_NAME:
++        return word
++    if by_name_only or not expanded or set("$`*?[") & set(expanded):
++        return None
++    resolved = resolve_path(directory, expanded)
++    if resolved is None or not os.path.isfile(resolved):
++        return None
++    real = os.path.realpath(resolved)
++    if real.endswith("/" + DETACHED_RUN_SCRIPT_LOCATION):
++        return f"{word}（符号链接，指到 {DETACHED_RUN_SCRIPT_LOCATION}）"
++    try:
++        with open(real, "rb") as handle:
++            head = handle.read(DETACHED_RUN_HEAD_BYTES)
++    except OSError:
++        return None
++    if carries_detached_run_signature(head):
++        return f"{word}（开头带 {DETACHED_RUN_SCRIPT_LOCATION} 的签名行：改名或拷走的一份）"
++    return None
++
++
++def detached_run_start_command(arguments):
++    """detached-run.sh 脚本名之后的参数是 `[--force] start <选项> -- <命令…>` 时交回 <命令…> 的词（它把这条命令挂到用户级 systemd 下跑）；
++    别的子命令（list、watch、stop、--selftest）、没有 `--`、`--` 之后是空的、带认不出的选项（它按用法错拒、什么都不跑）交 None。"""
++    position = 0
++    while position < len(arguments) and arguments[position] == "--force":
++        position += 1
++    if arguments[position:position + 1] != ["start"]:
++        return None
++    position += 1
++    while position < len(arguments):
++        word = arguments[position]
++        if word == "--":
++            return arguments[position + 1:] or None
++        if word in DETACHED_RUN_OPTIONS_WITH_VALUE:
++            position += 2
++        elif word == "--force" or word.partition("=")[0] in DETACHED_RUN_OPTIONS_WITH_VALUE:
++            position += 1
++        else:
++            return None
++    return None
++
++
+ def changed_directory(directory, arguments):
+     """cd / pushd 之后的当前目录；目标是 `-` 或变量、命令替换时认不出，交 None。"""
+     targets = [argument for argument in arguments if not argument.startswith("-") or argument == "-"]
+--- a/.claude/agent-common.md
++++ b/.claude/agent-common.md
+@@ -63,7 +63,7 @@
+ - 长活可以等，不给它设超时、不自己中途杀掉：编译、变异表、复跑这类长活用 Bash 的 `run_in_background` 起，起完结束本轮，完成时会通知你。交给它的命令要一直跑到真正的活结束才退出：不在里面再把活放到后台——不用 `disown`、`coproc`、`setsid -f`、`nohup … &`、`tmux`/`screen` 的分离模式、`systemd-run`，子 shell 或 `$( … )` 里也不写 `&`；`&` 只在同一条命令随后用不带参数的 `wait` 等齐时用，每件的退出码照「执行前拒绝的写法」那一条 ④ 的写法收。结束本轮就是这一条回复只写一句在等什么、不再调工具；前台命令的 `timeout` 不超过 240000 毫秒。主 agent 跑得过后台时限的长活经 `bash research/scripts/detached-run.sh start --label <名> -- <命令>` 起，会话里只用 run_in_background 起 `bash research/scripts/detached-run.sh watch` 上报还在跑的、不停它，要停只用 `detached-run.sh stop <名>`；子 agent 不用这个入口。等自己起的后台任务一律结束本轮等完成通知，不写轮询它输出文件的循环（run_in_background 里也拒，见「执行前拒绝的写法」②）。
+   等长活时不起缓存计时器，结束本轮直接等完成通知。
+   等的时候看到进程不动、报错、或等的条件不会成立，把看到的命令与输出写进草稿目录里的进度记录，接着做定义里还能做的；结不结束、怎么处置由主 agent 定。主 agent 的看门狗（`research/scripts/agent-watch.py`）定时复检你；前台没有超时的等待循环、run_in_background 里轮询本会话后台任务输出文件的循环、把活放出追踪、run_in_background 里后面没有 `wait` 的单独 `&` 在执行前被拒（「执行前拒绝的写法」那一条的 ②③④），run_in_background 里别的等待循环只记检出，交给主 agent 判断。跑超过 30 分钟的量，每完成一格往草稿目录的 `progress.md` 追加一行（格名、耗时、下一格预计多久），主 agent 要看进度就读它，不发消息问。等日志里的一行字之前，先确认那一行真会写进那个文件；找进程用写死的 pid，不用 `pgrep -f` / `pkill -f`（command-safety.md）。
+-- 执行前拒绝的写法：项目 settings 里注册的这几道 hook 在执行前（收工闸在收工前）拒绝这几类写法（退出 2，stderr 写原因与出路），主 agent 与子 agent 一样拒，只挂在一方才用的工具上的在条目里写明；拒的只是这一次调用，不停已经在跑的东西。被拒了照出路改写法，不换写法绕过去；改不成的写进报告交主 agent。
++- 执行前拒绝的写法：项目 settings 里注册的这几道 hook 在执行前（收工闸在收工前）拒绝这几类写法（退出 2，stderr 写原因与出路），没另写的主 agent 与子 agent 一样拒；只挂在一方才用的工具上的、按角色分开判的（同一种写法放行主 agent、拒子 agent），在条目里写明；拒的只是这一次调用，不停已经在跑的东西。被拒了照出路改写法，不换写法绕过去；改不成的写进报告交主 agent。
+   - Bash 检出 hook（`.claude/hooks/bash-command-detector.sh`）：② 只在前台拒（run_in_background 里的等待循环只记检出、不拒），④ 只在 run_in_background 里拒，其余前台与 run_in_background 一样拒：
+     ① 起看门狗的错误写法：`research/scripts/watch.sh`、`research/scripts/agent-watch.py watch` 不用 run_in_background 起，或命令里带单独的 `&`、`nohup`、`disown`、`setsid`、把输出丢进 `/dev/null`。看门狗只有主 agent 起。
+     ② 前台没有超时的等待循环：`until` / `while` 里有 `sleep`，外面没套 `timeout`；run_in_background 里条件或循环体点名了本会话后台任务输出文件（`tasks/<id>.output`）的等待循环，有没有 timeout 都拒。要等就用 run_in_background 起、结束本轮等完成通知，或 `python3 .claude/singlefs-ai-sop/scripts/proc.py wait <pid> --timeout <秒>`。
+--- a/.claude/main-agent.md
++++ b/.claude/main-agent.md
+@@ -37,7 +37,7 @@
+ 
+ 子 agent 等长活时不续提示缓存。临时派的 `clerk` 干带长等待的活时，后台命令照共用约束「长活可以等」那一条写。
+ 
+-叫醒之后主 agent 判断：只是慢就再起一只看门狗接着盯；是问题就决定发消息让它改、停掉重派、还是报给用户。主 agent 自己起的长命令同样放后台，命令照共用约束「长活可以等」那一条写（不在里面再把活放到后台），由看门狗盯着进程：没有子 agent 在跑时用 `bash research/scripts/watch.sh --processes`。跑得过后台时限的长命令经 `bash research/scripts/detached-run.sh start --label <名> -- <命令>` 起，会话里只用 run_in_background 起 `bash research/scripts/detached-run.sh watch` 上报还在跑的，要停只用 `detached-run.sh stop <名>`。
++叫醒之后主 agent 判断：只是慢就再起一只看门狗接着盯；是问题就决定发消息让它改、停掉重派、还是报给用户。主 agent 自己起的长命令同样放后台，命令照共用约束「长活可以等」那一条写（不在里面再把活放到后台），由看门狗盯着进程：没有子 agent 在跑时用 `bash research/scripts/watch.sh --processes`。跑得过后台时限的长命令经 `bash research/scripts/detached-run.sh start --label <名> -- <命令>` 起，会话里只用 run_in_background 起 `bash research/scripts/detached-run.sh watch` 上报还在跑的，要停只用 `detached-run.sh stop <名>`。脱离单元由 `detached-run.sh watch` 上报，`watch.sh --processes` 看不到它们。
+ 
+ ## 交回怎么读
+ 

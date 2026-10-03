@@ -1,0 +1,84 @@
+ROW 1723 hits=1 replacement_differs=True test_defs=1 name=test-script-align-code-r2 数值解析收成一份：放开扫的 SINGLEFS_THREAD_CAP 写错悄悄退回本机并行度
+    def=crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs in_target=True is_test=True ignored=False filter_ok=True path=an_unreadable_thread_cap_for_the_swept_user_steps_panics_instead_of_falling_back_to_the_default missing_features=[] should_panic=1
+ROW 1724 hits=1 replacement_differs=True test_defs=1 name=test-script-align-code-r2 数值解析收成一份：放开扫的 SINGLEFS_THREAD_CAP 设成 0 悄悄抬成 1（不照共用解析的 NonZeroUsize）
+    def=crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs in_target=True is_test=True ignored=False filter_ok=True path=a_thread_cap_of_zero_for_the_swept_user_steps_panics_instead_of_taking_the_default missing_features=[] should_panic=1
+ROW 1725 hits=1 replacement_differs=True test_defs=1 name=test-script-align-code-r2 J2 G1：看不见 PCI 总线退回判红（不报本次未跑）
+    def=crates/singlefs-checker-tier/src/gpu_unit_checks.rs in_target=True is_test=True ignored=False filter_ok=False path=gpu_unit_checks::gpu_test_start::tests::no_nvidia_adapter_and_an_invisible_pci_bus_is_reported_as_not_run missing_features=[] should_panic=0
+ROW 1726 hits=1 replacement_differs=True test_defs=1 name=test-script-align-code-r2 J2 G1：PCI 总线目录不在也当成设备表读不出（看不见总线的机器判红）
+    def=crates/singlefs-checker-tier/src/gpu_unit_checks.rs in_target=True is_test=True ignored=False filter_ok=False path=gpu_unit_checks::gpu_test_start::tests::a_pci_bus_directory_that_is_not_there_is_read_as_the_bus_not_being_visible missing_features=[] should_panic=0
+ROW 1727 hits=1 replacement_differs=True test_defs=1 name=test-script-align-code-r2 J2 G1：看不看得见 PCI 总线按设备子目录判（总线在而设备表列不出被当成看不见、报本次未跑）
+    def=crates/singlefs-checker-tier/src/gpu_unit_checks.rs in_target=True is_test=True ignored=False filter_ok=False path=gpu_unit_checks::gpu_test_start::tests::a_visible_pci_bus_without_its_devices_directory_is_an_unreadable_listing_not_an_invisible_bus missing_features=[] should_panic=0
+ROW 1728 hits=1 replacement_differs=True test_defs=1 name=test-script-align-code-r2 J2 G1：PCI 总线看得见而设备表读不出也报本次未跑（不判红）
+    def=crates/singlefs-checker-tier/src/gpu_unit_checks.rs in_target=True is_test=True ignored=False filter_ok=False path=gpu_unit_checks::gpu_test_start::tests::a_visible_pci_bus_with_a_device_whose_vendor_cannot_be_read_and_no_nvidia_adapter_is_red missing_features=[] should_panic=0
+ROW 1729 hits=1 replacement_differs=True test_defs=1 name=test-script-align-code-r2 C604 源码扫描：tests/ 里的 GPU 对拍绕开 gpu_test_start 直接起卡
+    def=crates/singlefs-checker-tier/tests/gpu_unit_checks_every_gpu_test_takes_its_cards_through_gpu_test_start.rs in_target=True is_test=True ignored=False filter_ok=True path=every_gpu_test_takes_its_cards_through_gpu_test_start missing_features=[] should_panic=0
+ROW 1730 hits=1 replacement_differs=True test_defs=1 name=test-script-align-code-r2 C604 源码扫描：src/ 测试模块里的计时用例绕开 gpu_test_start 直接起卡
+    def=crates/singlefs-checker-tier/tests/gpu_unit_checks_every_gpu_test_takes_its_cards_through_gpu_test_start.rs in_target=True is_test=True ignored=False filter_ok=True path=every_gpu_test_takes_its_cards_through_gpu_test_start missing_features=[] should_panic=0
+ROW 1731 hits=1 replacement_differs=True test_defs=1 name=崩溃放量 第一个点之前没有根槽写时版本表整张进判器输入（J1）
+    def=crates/singlefs-checker-tier/tests/crash_amplification_two_flows_share_their_prefix.rs in_target=True is_test=True ignored=False filter_ok=True path=a_version_the_prefix_cannot_reach_leaves_the_judge_inputs_of_the_prefix_alone missing_features=[] should_panic=0
+ROW 1732 hits=1 replacement_differs=True test_defs=1 name=崩溃放量 块键只接点名（M3 读回）
+    def=crates/singlefs-checker-tier/tests/crash_amplification_two_flows_share_their_prefix.rs in_target=True is_test=True ignored=False filter_ok=True path=a_twin_whose_root_slot_write_alone_differs_reads_back_its_own_verdicts missing_features=[] should_panic=0
+ROW 1733 hits=1 replacement_differs=True test_defs=1 name=崩溃放量 根槽写 txg 相等也当严格递增（J1 退成整段写表）
+    def=crates/singlefs-checker-tier/tests/crash_amplification_two_flows_share_their_prefix.rs in_target=True is_test=True ignored=False filter_ok=True path=root_slot_writes_whose_txgs_do_not_strictly_increase_put_every_later_write_into_the_judge_inputs missing_features=[] should_panic=0
+ROW 1734 hits=1 replacement_differs=True test_defs=1 name=崩溃放量 核对线程数写 0 悄悄退回本机并行度
+    def=crates/singlefs-checker-tier/src/crash_amplification.rs in_target=True is_test=True ignored=False filter_ok=True path=crash_amplification::tests::zero_checking_threads_panics_naming_the_variable_and_the_value missing_features=[] should_panic=1
+ROW 1735 hits=1 replacement_differs=True test_defs=1 name=崩溃放量 核对线程数写坏悄悄退回本机并行度
+    def=crates/singlefs-checker-tier/src/crash_amplification.rs in_target=True is_test=True ignored=False filter_ok=True path=crash_amplification::tests::an_unreadable_checking_threads_value_panics_naming_the_variable_and_the_value missing_features=[] should_panic=1
+ROW 1736 hits=1 replacement_differs=True test_defs=1 name=崩溃放量 核对线程数没设时取 1
+    def=crates/singlefs-checker-tier/src/crash_amplification.rs in_target=True is_test=True ignored=False filter_ok=True path=crash_amplification::tests::checking_threads_are_the_value_written_or_the_available_parallelism_when_unset missing_features=[] should_panic=0
+ROW 1737 hits=1 replacement_differs=True test_defs=1 name=层 0 进度 一片跑得久时收片那一头不打按挂钟的行
+    def=crates/singlefs-checker-tier/src/crash.rs in_target=True is_test=True ignored=False filter_ok=False path=crash::tests::oracle_instance_tests::wall_clock_progress_line_tests::a_layer0_slice_running_longer_than_the_progress_interval_reports_a_wall_clock_line missing_features=[] should_panic=0
+ROW 1738 hits=1 replacement_differs=True test_defs=1 name=崩溃放量 GPU 判器等卡时写库那一头不打按挂钟的行
+    def=crates/singlefs-checker-tier/src/crash_amplification.rs in_target=True is_test=True ignored=False filter_ok=True path=crash_amplification::tests::the_gpu_judge_reports_a_wall_clock_line_while_it_waits_for_the_cards missing_features=[] should_panic=0
+ROW 1739 hits=1 replacement_differs=True test_defs=1 name=崩溃放量 环境守卫设的值不进环境（库内开关用例走守卫）
+    def=crates/singlefs-checker-tier/src/crash_amplification.rs in_target=True is_test=True ignored=False filter_ok=True path=crash_amplification::tests::environment_switches_are_read_only_when_the_configuration_file_is_absent missing_features=[] should_panic=0
+ROW 1740 hits=1 replacement_differs=True test_defs=1 name=崩溃放量 环境守卫设的值不进环境（库内库目录用例走守卫）
+    def=crates/singlefs-checker-tier/src/crash_amplification.rs in_target=True is_test=True ignored=False filter_ok=True path=crash_amplification::tests::a_library_under_a_directory_a_reboot_erases_is_refused_unless_declared_temporary missing_features=[] should_panic=0
+ROW 1741 hits=1 replacement_differs=True test_defs=1 name=崩溃放量 展开上限变量改经 history 读（随机历史脚手架经 crash_amplification 带进登记的崩溃枚举用例的判法代码）
+    def=crates/singlefs-checker-tier/src/crash_identity.rs in_target=True is_test=True ignored=False filter_ok=True path=crash_identity::tests::every_registered_crash_case_depends_on_recovery_and_the_checker_walk_but_not_on_apparatus_binaries missing_features=[] should_panic=0
+ROW 1742 hits=1 replacement_differs=True test_defs=1 name=数值环境变量 故障注入线程数写错悄悄退回本机并行度（不经共用解析）
+    def=crates/singlefs-harness/src/fault_injection.rs in_target=True is_test=True ignored=False filter_ok=True path=fault_injection::tests::an_unreadable_fault_injection_worker_thread_count_panics_naming_the_variable_and_the_value missing_features=[] should_panic=1
+ROW 1743 hits=1 replacement_differs=True test_defs=1 name=数值环境变量 随机历史大档种子数写错悄悄退回默认（不经共用解析）
+    def=crates/singlefs-harness/tests/random_histories.rs in_target=True is_test=True ignored=False filter_ok=True path=an_unreadable_random_history_seed_count_panics_naming_the_variable_and_the_value missing_features=[] should_panic=1
+ROW 1744 hits=1 replacement_differs=True test_defs=1 name=数值环境变量 随机历史线程数写 0 悄悄退回本机并行度（不照共用解析的 NonZeroUsize）
+    def=crates/singlefs-harness/tests/random_histories.rs in_target=True is_test=True ignored=False filter_ok=True path=a_random_history_worker_thread_count_of_zero_panics_naming_the_variable_and_the_value missing_features=[] should_panic=1
+ROW 1745 hits=1 replacement_differs=True test_defs=1 name=崩溃注入 重放行崩溃点数写错悄悄取 0（不经共用解析）
+    def=crates/singlefs-checker-tier/src/crash_injection.rs in_target=True is_test=True ignored=False filter_ok=True path=crash_injection::tests::an_unreadable_crash_injection_points_value_panics_naming_the_variable_and_the_value missing_features=[] should_panic=1
+ROW 1746 hits=1 replacement_differs=True test_defs=1 name=崩溃放量 环境守卫清变量时反倒留一个写坏的值（库内显卡优先级用例走守卫）
+    def=crates/singlefs-checker-tier/src/crash_amplification.rs in_target=True is_test=True ignored=False filter_ok=True path=crash_amplification::tests::the_card_priority_is_read_from_the_configuration_file_with_one_layer_of_quotes_removed missing_features=[] should_panic=0
+ROW 1747 hits=1 replacement_differs=True test_defs=1 name=崩溃注入 重放入口种子起点写错悄悄取默认（不经共用解析，主 agent 定：重放入口写错一律停下）
+    def=crates/singlefs-checker-tier/src/crash_injection.rs in_target=True is_test=True ignored=False filter_ok=True path=crash_injection::tests::an_unreadable_crash_injection_first_seed_panics_naming_the_variable_and_the_value missing_features=[] should_panic=1
+ROW 1748 hits=1 replacement_differs=True test_defs=1 name=崩溃注入 重放入口短段写数写错悄悄当成只抽样（不经共用解析）
+    def=crates/singlefs-checker-tier/src/crash_injection.rs in_target=True is_test=True ignored=False filter_ok=True path=crash_injection::tests::an_unreadable_crash_injection_short_segment_writes_value_panics_naming_the_variable_and_the_value missing_features=[] should_panic=1
+ROW 1749 hits=1 replacement_differs=True test_defs=1 name=崩溃注入 重放入口断言组认不得悄悄退回默认那一组（不停下）
+    def=crates/singlefs-checker-tier/src/crash_injection.rs in_target=True is_test=False ignored=False filter_ok=True path=crash_injection::tests::an_unknown_crash_injection_assertion_set_panics_naming_the_variable_and_the_value missing_features=[] should_panic=0
+ROW 1750 hits=1 replacement_differs=True test_defs=1 name=崩溃注入 重放入口取样参数认不得悄悄退回默认（不停下）
+    def=crates/singlefs-checker-tier/src/crash_injection.rs in_target=True is_test=True ignored=False filter_ok=True path=crash_injection::tests::an_unknown_crash_injection_device_width_panics_naming_the_variable_and_the_value missing_features=[] should_panic=1
+ROW 1751 hits=1 replacement_differs=True test_defs=1 name=崩溃注入 线程数改回自己解析、写 0 照收（不照共用解析的 NonZeroUsize）
+    def=crates/singlefs-checker-tier/src/crash_injection.rs in_target=True is_test=True ignored=False filter_ok=True path=crash_injection::tests::a_crash_injection_worker_thread_count_of_zero_panics_naming_the_variable_and_the_value missing_features=[] should_panic=1
+ROW 1752 hits=1 replacement_differs=True test_defs=1 name=层 0 线程数改回自己解析、另写一句报错（不经共用解析：写错的消息不带「变量=原值 认不出」）
+    def=crates/singlefs-checker-tier/src/crash.rs in_target=True is_test=True ignored=False filter_ok=True path=crash::tests::zero_worker_threads_in_the_environment_variable_stops_instead_of_falling_back missing_features=[] should_panic=0
+ROW 1753 hits=1 replacement_differs=True test_defs=1 name=进程环境变量 共用读法：值不是 UTF-8 悄悄当成没设（调用方取没设时的那一档）
+    def=crates/singlefs-harness/src/numeric_environment_variable.rs in_target=True is_test=True ignored=False filter_ok=True path=numeric_environment_variable::tests::a_variable_whose_value_is_not_unicode_panics_naming_the_variable missing_features=[] should_panic=1
+ROW 118 hits=1 replacement_differs=True test_defs=1 name=增补 2 第 41 行 层 0 并行：不读 SINGLEFS_LAYER0_THREADS
+    def=crates/singlefs-checker-tier/src/crash.rs in_target=True is_test=True ignored=False filter_ok=True path=crash::tests::worker_threads_come_from_the_environment_variable_before_available_parallelism missing_features=[] should_panic=0
+ROW 119 hits=1 replacement_differs=True test_defs=1 name=增补 2 第 41 行 层 0 并行：SINGLEFS_LAYER0_THREADS=0 悄悄退回 1 个线程
+    def=crates/singlefs-checker-tier/src/crash.rs in_target=True is_test=True ignored=False filter_ok=True path=crash::tests::zero_worker_threads_in_the_environment_variable_stops_instead_of_falling_back missing_features=[] should_panic=0
+ROW 1586 hits=1 replacement_differs=True test_defs=1 name=崩溃放量 展开上限写坏时退回默认
+    def=crates/singlefs-checker-tier/src/crash_amplification.rs in_target=True is_test=True ignored=False filter_ok=True path=crash_amplification::tests::an_unreadable_expand_up_to_value_panics_naming_the_variable_and_the_value missing_features=[] should_panic=1
+ROW 1589 hits=1 replacement_differs=True test_defs=1 name=层 0 进度 按挂钟的行永不到期
+    def=crates/singlefs-checker-tier/src/crash.rs in_target=True is_test=True ignored=False filter_ok=False path=crash::tests::oracle_instance_tests::wall_clock_progress_line_tests::a_wall_clock_line_is_due_whenever_a_whole_interval_passes_without_a_message missing_features=[] should_panic=0
+ROW 1690 hits=1 replacement_differs=True test_defs=1 name=崩溃放量 环境守卫不清调用方的值
+    def=crates/singlefs-checker-tier/tests/crash_amplification_pipeline_records_checks_and_reuses.rs in_target=True is_test=True ignored=False filter_ok=True path=the_environment_guard_clears_what_a_run_reads_and_restores_the_values_left_by_the_caller missing_features=[] should_panic=0
+ROW 1691 hits=1 replacement_differs=True test_defs=1 name=崩溃放量 环境守卫丢掉时不还原
+    def=crates/singlefs-checker-tier/tests/crash_amplification_pipeline_records_checks_and_reuses.rs in_target=True is_test=True ignored=False filter_ok=True path=the_environment_guard_clears_what_a_run_reads_and_restores_the_values_left_by_the_caller missing_features=[] should_panic=0
+ROW 1714 hits=1 replacement_differs=True test_defs=1 name=数值环境变量 共用判法：设了而认不出悄悄当成没设（C606 同族：写错的规模、额度、线程数退回没设时的那一档）
+    def=crates/singlefs-harness/src/numeric_environment_variable.rs in_target=True is_test=True ignored=False filter_ok=True path=numeric_environment_variable::tests::a_number_variable_set_to_text_that_is_not_a_number_panics_naming_the_variable_and_the_value missing_features=[] should_panic=1
+ROW 1715 hits=1 replacement_differs=True test_defs=1 name=数值环境变量 共用判法：线程数设成 0 也悄悄当成没设（不许为 0 的数认不出时退回本机并行度）
+    def=crates/singlefs-harness/src/numeric_environment_variable.rs in_target=True is_test=True ignored=False filter_ok=True path=numeric_environment_variable::tests::a_nonzero_number_variable_set_to_zero_panics_naming_the_variable_and_the_value missing_features=[] should_panic=1
+ROW 1716 hits=1 replacement_differs=True test_defs=1 name=数值环境变量 共用判法：没设也当成设了 0（调用方没设时的那一档被吞）
+    def=crates/singlefs-harness/src/numeric_environment_variable.rs in_target=True is_test=True ignored=False filter_ok=True path=numeric_environment_variable::tests::an_unset_number_variable_is_none missing_features=[] should_panic=0
+ROW 1717 hits=1 replacement_differs=True test_defs=1 name=数值环境变量 共用判法：不去前后空白（复现行抄出来带换行的值认不出）
+    def=crates/singlefs-harness/src/numeric_environment_variable.rs in_target=True is_test=True ignored=False filter_ok=True path=numeric_environment_variable::tests::a_set_number_variable_reads_back_without_surrounding_blanks missing_features=[] should_panic=0
+ROW 1721 hits=1 replacement_differs=True test_defs=1 name=记录核对器 σ 对拍 CPU 线程数变量写错悄悄退回本机并行度（C606 同族）
+    def=crates/singlefs-checker-tier/tests/record_checker_judges_absence_by_the_persisted_set.rs in_target=True is_test=True ignored=False filter_ok=True path=an_unreadable_crash_judge_cpu_threads_value_panics_naming_the_variable_and_the_value missing_features=[] should_panic=1

@@ -1,0 +1,4 @@
+# 变异 2602 施加后 cargo test -p singlefs-core --lib --no-run（退出码 101）
+error[E0277]: the trait bound `root_ring::RootRingSlotsPerRegion: Default` is not satisfied
+  --> crates/singlefs-core/src/root_ring.rs:49:9
+error: could not compile `singlefs-core` (lib test) due to 1 previous error

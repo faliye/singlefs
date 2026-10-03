@@ -1,0 +1,7 @@
+7906ffada7a0d756a42762cc7d53231b41c861a015fc318ad55185a0beded2ac  research/scripts/detached-run.sh
+eac556380158fe6c7202c09c9398b266594aae63bded9e3f1045f5e187c6ad0f  .claude/hooks/bash-command-detector.sh
+efe8d518509d7f6d838cbbc9ae2b588a6d0ce9a6434df47996826662e5912dd2  .claude/hooks/lib_heavy_tests.py
+db6e336eb7846f5fbc3fb9faa34aa497d8747257d152b53d86935eb020009bd0  .claude/hooks/heavy-test-guard.sh
+fa48493bb64a797a4978b71fb900b1b3681ebd899cc2e0de0bdf9578118eaf99  .claude/agent-common.md
+79f5e49058d33bd5de7346dfc16b85cde8e7e630d13f14c5acd8d72766bf3c52  .claude/main-agent.md
+36e4036bda83f7901098bb37bccaed3d50f6fbfbff02940752f9631a983d189b  .claude/gate.d/code-tooling.sh

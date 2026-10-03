@@ -1,0 +1,7 @@
+scenario	changed_file	v2_source	mutated_file	old	new	const_definition_files_referenced_by_the_mutated_file
+S1	fmtc/src/lib.rs	v2/S1-fmtc-lib.rs	core/src/split.rs	(length + capacity - 1)	(length + capacity + /* ~ changed by cargo-mutants ~ */ 1)	
+S2	fmtc/src/lib.rs	v2/S2-fmtc-lib.rs	core/src/ring.rs	if publish >= REGION_SLOTS	if publish > /* ~ changed by cargo-mutants ~ */ REGION_SLOTS	core/src/layout.rs
+S4a	core/src/extra.rs	v2/S4a-core-extra.rs	core/src/thing.rs	format!("thing-{}", self.0 + 1)	format!("thing-{}", self.0 - /* ~ changed by cargo-mutants ~ */ 1)	
+S4b	core/src/extra.rs	v2/S4b-core-extra.rs	core/src/render.rs	number + 1	number - /* ~ changed by cargo-mutants ~ */ 1	
+S7			core/src/constfn.rs	value * 2	value + /* ~ changed by cargo-mutants ~ */ 2	
+S7b			core/src/constfn.rs	1 << 8	1 >> /* ~ changed by cargo-mutants ~ */ 8	

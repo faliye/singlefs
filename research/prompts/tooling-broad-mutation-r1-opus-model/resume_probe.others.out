@@ -1,0 +1,34 @@
+== item-resume
+E1 e1-点名跑被杀后重跑同一条命令: 命令「--item 1 --item 2 --item 4 --item 6 --skip-stage-two」；被杀那趟退 -9，杀后的行 ['1:caught', '2:unviable', '4:stage-one-only']；重跑退 0，重跑里被调的序号 ['1', '2', '4', '6']；重跑后的行 ['1:caught', '2:unviable', '4:stage-one-only', '1:caught', '2:unviable', '4:stage-one-only', '6:stage-one-only']
+== downgrade
+E2 全跑完：退 0 8 caught=2 missed=4 unviable=1 timeout=1 memory_cap=0 stage_one_only=0 not_run=0
+E2 再跑「--item 4 --item 5 --skip-stage-two」（第 4 条原是 missed、第 5 条原是第二段 caught）退 0：退 0 8 caught=1 missed=3 unviable=1 timeout=1 memory_cap=0 stage_one_only=2 not_run=0
+E2 之后照常重跑退 0，被调的 [('4', 'two-build-debug'), ('4', 'two-build-release'), ('4', 'two-test-debug'), ('4', 'two-test-release'), ('5', 'two-build-debug'), ('5', 'two-test-debug')]：退 0 8 caught=2 missed=4 unviable=1 timeout=1 memory_cap=0 stage_one_only=0 not_run=0
+E2 第 1 条原是 caught，机器忙时点名重跑（假一步答 253）退 0：退 0 8 caught=1 missed=4 unviable=1 timeout=2 memory_cap=0 stage_one_only=0 not_run=0；第 1 条的行 ['caught', 'timeout']
+E2 之后照常重跑退 0，被调的序号 []（timeout 是定论，不再跑）
+E11 新库上「--item 1 --item 3 --stage-two-only」退 0；被调的步 ['two-build-debug', 'two-build-release', 'two-test-debug', 'two-test-release']；行 ['1:missed@two', '3:missed@two']（第 1 条照计划第一段会被抓到）
+== environment
+E3 基线绿过之后编译一律退 101（盘满这一类）：照常跑退 0，基线被重跑 4 步；退 0 8 caught=1 missed=0 unviable=7 timeout=0 memory_cap=0 stage_one_only=0 not_run=0
+E3 环境修好之后重跑同一条命令退 0，被调 0 步；退 0 8 caught=1 missed=0 unviable=7 timeout=0 memory_cap=0 stage_one_only=0 not_run=0
+E3 基线绿过之后第一段测试一律退 100：照常跑退 0，基线被重跑 4 步；退 0 8 caught=8 missed=0 unviable=0 timeout=0 memory_cap=0 stage_one_only=0 not_run=0
+E3 环境修好之后重跑同一条命令退 0，被调 0 步；退 0 8 caught=8 missed=0 unviable=0 timeout=0 memory_cap=0 stage_one_only=0 not_run=0
+E4 第 3 条的 one-test 退 104，第 1 次跑：退 3，被调的序号 ['0', '1', '2', '3']；退 0 8 caught=1 missed=0 unviable=1 timeout=0 memory_cap=0 stage_one_only=0 not_run=6
+E4 第 3 条的 one-test 退 104，第 2 次跑：退 3，被调的序号 ['3']；退 0 8 caught=1 missed=0 unviable=1 timeout=0 memory_cap=0 stage_one_only=0 not_run=6
+E4 第 3 条的 one-test 退 104，第 3 次跑：退 3，被调的序号 ['3']；退 0 8 caught=1 missed=0 unviable=1 timeout=0 memory_cap=0 stage_one_only=0 not_run=6
+E4 三次之后树原样、多出文件 []
+== keys
+E5 全跑完：退 0 8 caught=2 missed=4 unviable=1 timeout=1 memory_cap=0 stage_one_only=0 not_run=0
+E5 删 list.json、清单次序变了之后 --sync-tree 退 0（指纹目录还是 61268220ba0c6a3c）；退 0 8 caught=2 missed=4 unviable=1 timeout=1 memory_cap=0 stage_one_only=0 not_run=0；结果行的变异名与清单同序号的变异名对不上的序号 ['1', '2', '3', '4', '5', '6']
+E5 之后照常跑退 0，被调 0 步
+E7 结果表末尾留半行：退 1 8 caught=2 missed=4 unviable=1 timeout=1 memory_cap=0 stage_one_only=0 not_run=0
+E7 照汇总给的出路「--item 4」重跑退 0：退 1 8 caught=2 missed=3 unviable=1 timeout=1 memory_cap=0 stage_one_only=1 not_run=0
+E7 照常重跑退 0，被调 4 步：退 1 8 caught=2 missed=4 unviable=1 timeout=1 memory_cap=0 stage_one_only=0 not_run=0
+== fake-driver
+E6 不带 SINGLEFS_HEAVY_TESTS、BROAD_MUTATION_STEP_DRIVER=/bin/true「--item 7 --skip-stage-two」退 0；基线表 [['one-build', 'ok'], ['one-test', 'ok']]；结果行 ['7:stage-one-only 备注=第一段没红；这一趟没跑第二段']
+E6 BROAD_MUTATION_BREAK=stage-two-missed-as-caught 进一次非自证的跑「--item 3」退 0；第 3 条的行 ['stage-one-only@one 备注=第一段没红；第二段接着跑', 'caught@two 备注=']
+== sync
+E8 新提交只多一个文件，--sync-tree 在新树换上之后被杀（退 -9）；接着照常跑退 0、调了 39 步、落了 13 行；tree.source 的指纹 61268220ba0c6a3c → 61268220ba0c6a3c；树里多出文件 ['crates/singlefs-harness/tests/new_case.rs']、登记的文件与旧源相同
+E8 新提交改了一个已有文件，--sync-tree 在新树换上之后被杀（退 -9）；接着照常跑退 5、调了 0 步、落了 0 行；tree.source 的指纹 61268220ba0c6a3c → 61268220ba0c6a3c；树里多出文件 []、登记的文件与旧源不同
+E8 --sync-tree 在旧树挪走、新树还没换上处被杀（退 -9）；接着照常跑退 2：✗ 库目录 /tmp/claude-1000/tooling-broad-mutation-r1-opus/run/e8-换树之前被杀/home 里还没有专用树
+E8 再 --sync-tree 退 0、照常跑退 0：退 0 8 caught=2 missed=4 unviable=1 timeout=1 memory_cap=0 stage_one_only=0 not_run=0
+rc=0

@@ -1,0 +1,9 @@
+rows 302 total measured seconds (first stage only) 37799 = 10.5 h
+  unviable        n= 39 (12.9% of rows) seconds     33 (0.1% of seconds)
+  caught          n=241 (79.8% of rows) seconds  17460 (46.2% of seconds)
+  stage-one-only  n= 15 (5.0% of rows) seconds   9730 (25.7% of seconds)
+  timeout         n=  7 (2.3% of rows) seconds  10574 (28.0% of seconds)
+measured mean per mutant, first stage only: 125.2 s
+median eff over 14 commits 2157.0 -> 75.0 h at measured mean (first stage only, all outcomes)
+all 5091 -> 177.0 h at measured mean (first stage only, all outcomes)
+r2 steady state (caught+unviable only) 62.4 s -> median commit 37.4 h ; all 5091 88.2 h

@@ -1,0 +1,47 @@
+baseline-tests 776 baseline-sum-seconds 7691.1 baseline-max 147.733
+core-mutation-logs 247 pass-events 29736 independent-pass-events 1607
+ratio independent(checker,format) n=1607 median=1.00 p90=1.67 p99=47.75 max=104.33
+  largest-excess independent(checker,format) seq=494 outcome=caught test=singlefs-format tests::tree_identifiers_start_after_kind_codes_and_watermark_follows_the_last baseline=0.003s this-run=0.313s
+  largest-excess independent(checker,format) seq=494 outcome=caught test=singlefs-format tests::arithmetic_initializer_literals_equal_the_expressions_they_replaced baseline=0.003s this-run=0.313s
+  largest-excess independent(checker,format) seq=494 outcome=caught test=singlefs-format tests::system_configuration_fits_in_the_slot_with_room_for_one_more_pointer baseline=0.003s this-run=0.313s
+ratio dependent(core,harness) n=28129 median=1.00 p90=2.28 p99=163.00 max=2015.05
+  largest-excess dependent(core,harness) seq=586 outcome=timeout test=singlefs-harness::acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics a_device_whose_slots_turn_unreadable_before_the_acquisition_barrier_refuses_the_writable_mount_without_a_step baseline=20.741s this-run=1276.461s
+  largest-excess dependent(core,harness) seq=586 outcome=timeout test=singlefs-harness::acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics a_device_whose_slots_turn_unreadable_after_the_acquisition_barrier_refuses_before_any_write baseline=20.810s this-run=1258.503s
+  largest-excess dependent(core,harness) seq=586 outcome=timeout test=singlefs-harness::a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable without_the_last_record_of_the_selected_version_the_record_at_the_witnessed_counter_decides_and_without_both_the_mount_counts_it_as_witnessed baseline=45.536s this-run=1242.948s
+k floor_s | pass-events-over-limit (independent / all) | core mutations with no FAIL in log that B1 would turn into caught (by independent tests / by any test) of N
+k=1.5 floor=0 | 235 / 4456 | 3 / 7 of 7
+k=1.5 floor=1 | 0 / 2328 | 0 / 7 of 7
+k=1.5 floor=5 | 0 / 2189 | 0 / 7 of 7
+k=1.5 floor=10 | 0 / 2095 | 0 / 7 of 7
+k=1.5 floor=30 | 0 / 1846 | 0 / 7 of 7
+k=1.5 floor=60 | 0 / 1531 | 0 / 7 of 7
+k=2 floor=0 | 73 / 3110 | 0 / 7 of 7
+k=2 floor=1 | 0 / 2201 | 0 / 7 of 7
+k=2 floor=5 | 0 / 2079 | 0 / 7 of 7
+k=2 floor=10 | 0 / 1962 | 0 / 7 of 7
+k=2 floor=30 | 0 / 1733 | 0 / 7 of 7
+k=2 floor=60 | 0 / 1437 | 0 / 7 of 7
+k=3 floor=0 | 29 / 2406 | 0 / 7 of 7
+k=3 floor=1 | 0 / 1957 | 0 / 7 of 7
+k=3 floor=5 | 0 / 1843 | 0 / 7 of 7
+k=3 floor=10 | 0 / 1770 | 0 / 7 of 7
+k=3 floor=30 | 0 / 1620 | 0 / 7 of 7
+k=3 floor=60 | 0 / 1317 | 0 / 7 of 7
+k=5 floor=0 | 23 / 1962 | 0 / 7 of 7
+k=5 floor=1 | 0 / 1654 | 0 / 7 of 7
+k=5 floor=5 | 0 / 1585 | 0 / 7 of 7
+k=5 floor=10 | 0 / 1529 | 0 / 7 of 7
+k=5 floor=30 | 0 / 1385 | 0 / 7 of 7
+k=5 floor=60 | 0 / 1137 | 0 / 7 of 7
+k=10 floor=0 | 19 / 1463 | 0 / 7 of 7
+k=10 floor=1 | 0 / 1250 | 0 / 7 of 7
+k=10 floor=5 | 0 / 1198 | 0 / 7 of 7
+k=10 floor=10 | 0 / 1160 | 0 / 7 of 7
+k=10 floor=30 | 0 / 1033 | 0 / 7 of 7
+k=10 floor=60 | 0 / 829 | 0 / 7 of 7
+k=20 floor=0 | 17 / 1042 | 0 / 7 of 7
+k=20 floor=1 | 0 / 870 | 0 / 7 of 7
+k=20 floor=5 | 0 / 837 | 0 / 7 of 7
+k=20 floor=10 | 0 / 820 | 0 / 7 of 7
+k=20 floor=30 | 0 / 727 | 0 / 7 of 7
+k=20 floor=60 | 0 / 565 | 0 / 7 of 7

@@ -1,0 +1,22 @@
+stage two baseline seconds per survivor (tests + builds): 1124.0
+per-mutant seconds: (i) today first stage, measured 125.2 | (ii) C2 T-first + C4 cap L=60 53.3, L=300 58.8 | (iii) compile only 18.6 | stage-two add-on for survivors (upper bound) 55.8
+median C1 count over 14 commits: 2157
+median commit hours: (i) 75.0 | (ii) L=60 31.9 L=300 35.3 | (iii) 11.2 | stage-two add-on 33.5
+all 5091 hours: (i) 177.0 | (ii) L=60 75.3 L=300 83.2 | (iii) 26.4 | stage-two add-on 78.9
+per commit: commit C1-count | (i) | (ii) L=300 | (iii)
+8186d5b5     2 |    0.1 |    0.0 |   0.0
+d2aeb7de    24 |    0.8 |    0.4 |   0.1
+973e1f58    34 |    1.2 |    0.6 |   0.2
+495bede6   198 |    6.9 |    3.2 |   1.0
+0a47816d   717 |   24.9 |   11.7 |   3.7
+bc57af7a  1155 |   40.2 |   18.9 |   6.0
+5f9e449d  1308 |   45.5 |   21.4 |   6.8
+dbcc0d2f  3006 |  104.5 |   49.1 |  15.6
+3cff909b  3073 |  106.8 |   50.2 |  15.9
+cae5092f  3166 |  110.1 |   51.7 |  16.4
+c3540c02  3920 |  136.3 |   64.1 |  20.3
+45d49aaf  3997 |  139.0 |   65.3 |  20.7
+a1f4691b  4181 |  145.4 |   68.3 |  21.6
+346f5e6c  4401 |  153.0 |   71.9 |  22.8
+commits with C1 count <= 200: 4 of 14 ; hours (i) at 200: 7.0
+commits with C1 count >= 3000: 7 of 14

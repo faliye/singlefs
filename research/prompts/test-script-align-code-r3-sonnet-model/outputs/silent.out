@@ -1,0 +1,15 @@
+E161 non-utf8   -> OK 32
+E165 non-utf8   -> OK 32
+E168 non-utf8   (装置调用处是 std::env::var(..).ok()：非 UTF-8 先变 None) -> OK 7
+E161 lead-space -> PANIC
+E165 lead-space -> PANIC
+E168 lead-space (装置调用处是 std::env::var(..).ok()：非 UTF-8 先变 None) -> PANIC
+E161 zero       -> PANIC
+E165 zero       -> PANIC
+E168 zero       (装置调用处是 std::env::var(..).ok()：非 UTF-8 先变 None) -> PANIC
+E161 empty      -> PANIC
+E165 empty      -> PANIC
+E168 empty      (装置调用处是 std::env::var(..).ok()：非 UTF-8 先变 None) -> PANIC
+E161 unset      -> OK 32
+E165 unset      -> OK 32
+E168 unset      (装置调用处是 std::env::var(..).ok()：非 UTF-8 先变 None) -> OK 7
