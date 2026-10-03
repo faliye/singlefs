@@ -1,0 +1,21 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 120 秒）：slice 已占 37.5 GiB，这一条要 4.0 GiB（峰值表里没有这条，按它的上限 4G 算），总上限 40.1 GiB；账上在跑 7 条
+run-with-memory-cap: 排了 9 秒，起跑（singlefs-memory-cap-1123020-117238901）
+a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error-995e7e6ebd6c7e6a rc=0 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.26s
+allocation_record_tree_root_level_of_writer_and_reader-a5240fc60f15f132 rc=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.93s
+an_abandoned_roots_rollback_floor_counts_toward_the_effective_floor-27bd2ff9095327d8 rc=0 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.38s
+an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping-19522b532e1aebf3 rc=0 test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 48.63s
+attack_glue_differential-2466d8aadc031d7c rc=101 test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.04s
+checker_cross_links_malformed_nodes_and_mapping_entries-f14354d6626c2c64 rc=0 test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.57s
+checker_judges_reserved_bytes_and_widths_it_used_to_skip-f68b052599c54f34 rc=0 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.72s
+checker_known_bad_images-59244bb7d1d08fb1 rc=0 test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.12s
+checker_narrow_invariants_and_abandoned_roots-5405339f25f759c7 rc=0 test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.16s
+commit_generated_units_fall_back_when_the_segment_runs_out-4c475f8e015e842d rc=0 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.64s
+core_review_geometry_back_chain_and_empty_inode-065532f34433c24f rc=0 test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+core_review_tree_table_duplicates_and_slot_one_search-9f3368bfd66ac90c rc=0 test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+core_review_unit_area_start_and_publish_limits-7ae9fafd657a12b6 rc=0 test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.40s
+corrupt_on_disk_content_is_refused_instead_of_panicking-fbc5ec8e500bc523 rc=0 test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.00s
+data_unit_allocation_and_write-35c59cc67354c6cd rc=0 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration-a2e9bcc1f18adc81 rc=0 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+entries_after_a_writable_mount_refuse_other_parameters_and_device_tables_before_any_write-cf7c52a7b787a0ec rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.59s
+entries_after_mount_refuse_swapped_or_behind_devices-b70ad18566e1152c rc=0 test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 54.17s
+budget-stop

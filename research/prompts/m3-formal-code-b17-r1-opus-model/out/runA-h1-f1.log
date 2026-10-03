@@ -1,0 +1,33 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 633M 的 2 倍，照理由放行：峰值表记的是只扫两格的那一次，这一次扫几十格、镜像拷贝更多
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/opus_b17_first_data_unit_attack.rs (target/debug/deps/opus_b17_first_data_unit_attack-df9788a558172886)
+
+running 1 test
+name=shape_a ring=default k=1 instance=1 first_file_txg=3 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2A@0", "50178+1R@3", "50180+2A@3"] i55=holds red=[]
+name=shape_a ring=default k=2 instance=2 first_file_txg=5 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@5", "50180+2A@5"] i55=holds red=[]
+name=shape_a ring=default k=3 instance=3 first_file_txg=8 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@8", "50180+2A@8"] i55=holds red=[]
+name=shape_a ring=default k=4 instance=4 first_file_txg=11 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@11", "50180+2A@11"] i55=holds red=[]
+name=shape_a ring=default k=5 instance=5 first_file_txg=14 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@14", "50180+2A@14"] i55=holds red=[]
+name=shape_a ring=default k=6 instance=6 first_file_txg=17 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@17", "50180+2A@17"] i55=holds red=[]
+name=shape_a ring=default k=7 instance=7 first_file_txg=20 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@20", "50180+2A@20"] i55=holds red=[]
+name=shape_a ring=default k=8 instance=8 first_file_txg=23 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@23", "50180+2A@23"] i55=holds red=[]
+name=shape_a ring=default k=9 instance=9 first_file_txg=26 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@26", "50180+2A@26"] i55=holds red=[]
+name=shape_a ring=default k=10 instance=10 first_file_txg=29 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@29", "50180+2A@29"] i55=holds red=[]
+name=shape_a ring=default k=11 instance=11 first_file_txg=32 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@32", "50180+2A@32"] i55=holds red=[]
+name=shape_a ring=default k=12 instance=12 first_file_txg=35 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@35", "50180+2A@35"] i55=holds red=[]
+name=shape_a ring=128MiB k=1 instance=1 first_file_txg=3 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] low_allocation_records_dev0=["9216+2A@0", "9218+1R@3", "9220+2A@3"] i55=holds red=[]
+name=shape_a ring=128MiB k=2 instance=2 first_file_txg=5 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] low_allocation_records_dev0=["9216+2R@3", "9218+1R@5", "9220+2A@5"] i55=holds red=[]
+name=shape_a ring=128MiB k=3 instance=3 first_file_txg=8 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] low_allocation_records_dev0=["9216+2R@3", "9218+1R@8", "9220+2A@8"] i55=holds red=[]
+name=shape_a ring=128MiB k=4 instance=4 first_file_txg=11 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] low_allocation_records_dev0=["9216+2R@3", "9218+1R@11", "9220+2A@11"] i55=holds red=[]
+name=shape_a ring=128MiB k=5 instance=5 first_file_txg=14 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] low_allocation_records_dev0=["9216+2R@3", "9218+1R@14", "9220+2A@14"] i55=holds red=[]
+name=shape_a ring=128MiB k=6 instance=6 first_file_txg=17 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] low_allocation_records_dev0=["9216+2R@3", "9218+1R@17", "9220+2A@17"] i55=holds red=[]
+name=shape_a ring=128MiB k=7 instance=7 first_file_txg=20 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] low_allocation_records_dev0=["9216+2R@3", "9218+1R@20", "9220+2A@20"] i55=holds red=[]
+name=shape_a ring=128MiB k=8 instance=8 first_file_txg=23 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] low_allocation_records_dev0=["9216+2R@3", "9218+1R@23", "9220+2A@23"] i55=holds red=[]
+name=shape_a ring=128MiB k=9 instance=9 first_file_txg=26 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] low_allocation_records_dev0=["9216+2R@3", "9218+1R@26", "9220+2A@26"] i55=holds red=[]
+name=shape_a ring=128MiB k=10 instance=10 first_file_txg=29 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] low_allocation_records_dev0=["9216+2R@3", "9218+1R@29", "9220+2A@29"] i55=holds red=[]
+name=shape_a ring=128MiB k=11 instance=11 first_file_txg=32 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] low_allocation_records_dev0=["9216+2R@3", "9218+1R@32", "9220+2A@32"] i55=holds red=[]
+name=shape_a ring=128MiB k=12 instance=12 first_file_txg=35 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] low_allocation_records_dev0=["9216+2R@3", "9218+1R@35", "9220+2A@35"] i55=holds red=[]
+test shape_a_remount_count_sweep_then_first_file ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 43.44s
+

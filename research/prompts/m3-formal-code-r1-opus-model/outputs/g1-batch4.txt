@@ -1,0 +1,13 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：攻方腿在自己的拷贝上跑 harness 档变异，与别的腿各跑各的
+rebuild_with_an_unreadable_data_unit-ded0a5140e988db8 rc=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.86s
+rebuilt_root_keeps_the_chosen_roots_fields_except_the_unmount_marker-3760e31e800d3d18 rc=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+recovery_anchor_failure_carries_the_counters_the_prefix_kernel_saw-3e68224bf6cae317 rc=0 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+recovery_reads_the_created_file_after_reopen-733c13c7399eb91f rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.66s
+release_checksum_quarantine-edd35e294e1df9d3 rc=0 test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.20s
+reuse_after_raising_the_floor-f1bc74a88437d6f9 rc=0 test result: ok. 3 passed; 0 failed; 13 ignored; 0 measured; 0 filtered out; finished in 6.09s
+reused_allocation_record_overlap-507f093fe8ef1e9d rc=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 169.39s
+rollback_by_a_forward_publish-88d50a266f698ed9 rc=0 test result: ok. 0 passed; 0 failed; 22 ignored; 0 measured; 0 filtered out; finished in 0.00s
+root_choice_on_a_tied_checkpoint_txg_takes_the_higher_instance_in_a_later_slot-dda2e4e09227c93f rc=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+root_ring_turn_in_one_mount-735f9149f5fd0669 rc=0 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.76s
+row_publish_admission-eaca0ae34ca3b8d2 rc=0 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.06s
+budget-stop

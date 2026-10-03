@@ -1,0 +1,11 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 12M 的 2 倍，照理由放行：新程序峰值表里没有记录
+恢复内核 解析与校验通过（134091 字节源码）
+池级 checker 走读内核 解析失败：
+error: no definition in scope for identifier: `is_zero64x`
+     ┌─ wgsl:5390:39
+     │
+5390 │             w_judge(INVARIANT_I_9_27, is_zero64x(head));
+     │                                       ^^^^^^^^^^ unknown identifier
+
+
+池级 checker 扫描内核 解析与校验通过（217664 字节源码）

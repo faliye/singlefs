@@ -1,0 +1,6 @@
+f3a5d8e0a084adc150e8fa60247b0d1dc35710534905317a8fbf9e2d8ed4df5d  .claude/kb/milestone/03-third-txn.md
+1041eea7df34a5e9ffafeccde4a1f928a46d24e39335ca624a8b96cf143b802c  .claude/kb/invariants.md
+832e18c3ac00c7a357343d7fef47e2f789c1935c2b5c9c5af7d81000843f2b87  .claude/kb/decisions/08-核心索引结构.md
+11e245ccf0037021dc2865948987756ae7421e83bec672afa317d72cdc6ad397  .claude/kb/decisions/03-空间分配.md
+2ea8b99d3f805992c68f434ee9a6f64c88367ebc2a646eeb0b89a7acd6b18d5e  .claude/kb/checks-owed.md
+536d35af183f06741175601b489e45797dd70ba2b5d82628d5e136213a2ef31d  .claude/kb/decisions/15-格式冻结政策.md

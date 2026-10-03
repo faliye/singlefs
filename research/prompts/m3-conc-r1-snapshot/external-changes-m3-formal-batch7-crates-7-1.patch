@@ -1,0 +1,1358 @@
+diff --git a/crates/singlefs-harness/tests/common/mod.rs b/crates/singlefs-harness/tests/common/mod.rs
+index a44a989..4d0baf3 100644
+--- a/crates/singlefs-harness/tests/common/mod.rs
++++ b/crates/singlefs-harness/tests/common/mod.rs
+@@ -4,7 +4,9 @@
+ use std::path::PathBuf;
+ use std::sync::atomic::{AtomicU64, Ordering};
+ 
+-use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
++use singlefs_core::address::{
++    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
++};
+ use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
+ use singlefs_core::block_device::{FileBackedBlockDevice, PhysicalBlockSizeInBytes};
+ use singlefs_core::journal::{back_chain_of, record_offset, JournalRecord};
+@@ -19,8 +21,13 @@ use singlefs_core::transaction::{
+     acquire_instance, publish_first_file, publish_overwrite, publish_sequential_write, warm_up,
+     FirstFile, PoolWriter, PublishError, TransactionOutput, WarmUpOutput,
+ };
+-use singlefs_core::unit::unit_filesystem_identifier;
+-use singlefs_format::{JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES};
++use singlefs_core::unit::{
++    unit_filesystem_identifier, UNIT_CLASS_DATA, UNIT_CLASS_INDEX_NODE, UNIT_CLASS_PACKED,
++};
++use singlefs_format::{
++    DATA_UNIT_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT,
++    NODE_BYTES, SLOT_BYTES,
++};
+ use singlefs_harness::memory_pool::MemoryPool;
+ use singlefs_harness::segments::FixedGeometry;
+ use singlefs_harness::{RecordingBlockDevice, RetainedOperation, SharedStream};
+@@ -484,6 +491,107 @@ fn journal_record_bytes_in_the_default_ring(
+     .expect("环里那一格读得到")
+ }
+ 
++/// 块层的一次读：哪块盘、从哪个字节起、多长。读盘次序的用例（只读挂载、可写挂载）逐次记这一项。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct BlockLayerRead {
++    pub device: DeviceIdentity,
++    pub offset: DeviceOffsetInBytes,
++    pub length_in_bytes: usize,
++}
++
++/// 反向链重读从 `device_identities()` 的第一块盘试起，健康镜像上第一份就对得上。
++pub const FIRST_DEVICE_TRIED_BY_THE_BACK_CHAIN_REREAD: DeviceIdentity = DeviceIdentity(0);
++
++/// 一个点名单元的整单元宽：数据单元与码 3 打包记录单元 32768，码 2 索引节点 16384（D23（journal 的角色与格式） 已定项 14 第四条按类读）。
++pub fn named_unit_bytes(unit_class: u8) -> usize {
++    let unit_bytes = match unit_class {
++        UNIT_CLASS_DATA | UNIT_CLASS_PACKED => DATA_UNIT_BYTES,
++        UNIT_CLASS_INDEX_NODE => NODE_BYTES,
++        unknown_class => {
++            panic!("发布路径只点名数据单元、索引节点与打包记录单元，读到类 {unknown_class}")
++        }
++    };
++    usize::try_from(unit_bytes).expect("单元宽装得进 usize")
++}
++
++/// 候选 `record` 的反向链那一判在块层的读：在 0 号盘上重读它的上一条记录（`ring_bytes` 长的环里的落点）。
++pub fn block_read_rereading_the_record_before(
++    record: &JournalRecord,
++    ring_bytes: u64,
++) -> BlockLayerRead {
++    BlockLayerRead {
++        device: FIRST_DEVICE_TRIED_BY_THE_BACK_CHAIN_REREAD,
++        offset: record_offset(record.counter - 1, ring_bytes),
++        length_in_bytes: usize::try_from(JOURNAL_RECORD_BYTES).expect("4096"),
++    }
++}
++
++/// 候选 `record` 的点名验证在块层的读：它点名的每个单元的两份，按点名次序。
++pub fn block_reads_of_the_named_units_of(record: &JournalRecord) -> Vec<BlockLayerRead> {
++    record
++        .named
++        .iter()
++        .flat_map(|named| {
++            named.locations.iter().map(|location| BlockLayerRead {
++                device: location.device,
++                offset: location.slot.to_device_offset(),
++                length_in_bytes: named_unit_bytes(named.unit_class),
++            })
++        })
++        .collect()
++}
++
++pub fn is_inside_the_journal_ring(offset: DeviceOffsetInBytes, ring_bytes: u64) -> bool {
++    let ring_start = JOURNAL_RING_START_SLOT * SLOT_BYTES;
++    offset.0 >= ring_start && offset.0 < ring_start + ring_bytes
++}
++
++/// 把计数器 `counters` 那几条记录从默认环的落点搬到 `ring_bytes` 长的环的落点（两盘各一份；先全部读出再写，搬过去的会盖掉更早的记录）。
++/// 小环过不了 mkfs 与读者择系统配置，在飞上限那一形的用例在默认环建的池上这样摆记录，再拿环长改小的那份系统配置扫环。
++pub fn image_with_the_records_relocated_onto_a_ring_of(
++    image: &MemoryPool,
++    counters: &[u64],
++    ring_bytes: u64,
++) -> MemoryPool {
++    let mut relocated = image.clone();
++    for device in [DeviceIdentity(0), DeviceIdentity(1)] {
++        let records: Vec<(u64, Vec<u8>)> = counters
++            .iter()
++            .map(|counter| {
++                (
++                    *counter,
++                    journal_record_bytes_in_the_default_ring(image, device, *counter),
++                )
++            })
++            .collect();
++        for (counter, bytes) in records {
++            relocated
++                .devices
++                .get_mut(&device)
++                .expect("有这块盘")
++                .write(record_offset(counter, ring_bytes), &bytes);
++        }
++    }
++    relocated
++}
++
++/// 把 [`system_configuration_slots_of_every_device`] 存下的系统配置槽字节写回镜像（盘在盘表里的位置 `index` 就是 `DeviceIdentity(index)`）：
++/// 造「根槽没落、它之后的系统配置轮换也没落」的崩溃状态（D16（发布语义） 已定项 7：轮换在根槽 FUA 之后）。
++pub fn write_back_system_configuration_slots(
++    image: &mut MemoryPool,
++    saved: &[(usize, DeviceOffsetInBytes, Vec<u8>)],
++) {
++    for (index, offset, bytes) in saved {
++        image
++            .devices
++            .get_mut(&DeviceIdentity(
++                u32::try_from(*index).expect("盘在盘表里的位置装得进 u32"),
++            ))
++            .expect("有这块盘")
++            .write(*offset, bytes);
++    }
++}
++
+ pub fn format_pool(tag: &str) -> FormattedPool {
+     let (paths, devices, stream, genesis, mkfs_operation_count) = formatted_recorded_images(tag);
+     FormattedPool {
+diff --git a/crates/singlefs-harness/tests/mounted_recovery_reads_each_candidate_once_in_order.rs b/crates/singlefs-harness/tests/mounted_recovery_reads_each_candidate_once_in_order.rs
+index 929b2f8..8a6dc3f 100644
+--- a/crates/singlefs-harness/tests/mounted_recovery_reads_each_candidate_once_in_order.rs
++++ b/crates/singlefs-harness/tests/mounted_recovery_reads_each_candidate_once_in_order.rs
+@@ -6,7 +6,10 @@
+ //! 这里在块层逐次记下读，每条用例钉一种形状下扫完环之后的读：判候选的读的绝对次数与次序，之后环里再没有读。
+ //! 钉住的只有这几种形状（代码轮第三轮判决 `research/prompts/m3-verus-land-code-r3-main-verification.md` J2、用户定案 U2）：
+ //! 锚点读得出、两次单条发布都施加；锚点那条记录撕了；锚点读不出、链首序号不是 1；一次发布两条记录；
+-//! 候选在末条的提交标记上被断。可写挂载的读阶段走缓存（`ReadStageCache`）、`recover` 不验点名单元那一臂，读几次盘不在这里钉。
++//! 候选在末条的提交标记上被断；候选的反向链断了；到了在飞上限（3 槽的环，6-1 交回第 2 条的 H08、H09 两形）。
++//! 在飞上限那一格的环过不了只读挂载择系统配置，照只读挂载同一串直接调 `choose_root`、`scan_journal`、`replay_journal`，只记重放那一截的读。
++//! 可写挂载的读阶段走缓存（`ReadStageCache`）那一半在 `writable_mount_reads_each_candidate_in_order_through_the_read_stage_cache.rs`；
++//! `recover` 不验点名单元那一臂读几次盘不在这里钉。
+ //!
+ //! 单条发布的历史造法同 `journal_replay_applies_no_more_records_than_the_in_flight_limit.rs` 的阳性对照：A（txg 3、jsn 3）的根落了，
+ //! B（txg 4、jsn 4）、C（txg 5、jsn 5）两次单条发布的记录与单元都在、根槽都坏了 ⇒ 所选根是 A 的。
+@@ -18,10 +21,13 @@ use std::cell::RefCell;
+ use std::collections::BTreeMap;
+ 
+ use common::{
+-    build_pool, overwrite_in_process_as_instance_one_and_advance_the_pool, parameters,
++    block_read_rereading_the_record_before, block_reads_of_the_named_units_of, build_pool,
++    image_with_the_records_relocated_onto_a_ring_of, is_inside_the_journal_ring,
++    overwrite_in_process_as_instance_one_and_advance_the_pool, parameters,
+     rewrite_journal_record_and_rechain_the_records_after_it,
+     sequential_write_in_process_as_instance_one_and_advance_the_pool,
+-    tear_the_root_slot_written_for_txg, CONTENT_BYTES_OF_PUBLISH_B, CONTENT_BYTES_OF_PUBLISH_C,
++    tear_the_root_slot_written_for_txg, BlockLayerRead, CONTENT_BYTES_OF_PUBLISH_B,
++    CONTENT_BYTES_OF_PUBLISH_C,
+ };
+ use singlefs_core::address::{
+     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
+@@ -30,14 +36,13 @@ use singlefs_core::journal::{
+     record_offset, JournalRecord, JournalRecordOrdinalWithinPublish, JournalRecordPlaceInPublish,
+ };
+ use singlefs_core::mounted_read::{mount_read_only, open_pool_for_read, MountedReadOnly};
+-use singlefs_core::recovery::{choose_system_configuration, scan_journal, PoolReader};
+-use singlefs_core::root_record::RootRecord;
+-use singlefs_core::unit::{
+-    data_unit_payload_capacity, UNIT_CLASS_DATA, UNIT_CLASS_INDEX_NODE, UNIT_CLASS_PACKED,
+-};
+-use singlefs_format::{
+-    DATA_UNIT_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, NODE_BYTES, SLOT_BYTES,
++use singlefs_core::recovery::{
++    choose_root, choose_system_configuration, replay_journal, scan_journal, PoolReader,
+ };
++use singlefs_core::root_record::RootRecord;
++use singlefs_core::system_configuration::journal_in_flight_record_limit;
++use singlefs_core::unit::data_unit_payload_capacity;
++use singlefs_format::JOURNAL_RECORD_BYTES;
+ use singlefs_harness::memory_pool::MemoryPool;
+ 
+ /// B、C 两版文件的填充字节：两版长度（在 `common`）与内容各不相同。
+@@ -45,8 +50,6 @@ const CONTENT_FILL_BYTE_OF_PUBLISH_B: u8 = 0xB0;
+ const CONTENT_FILL_BYTE_OF_PUBLISH_C: u8 = 0xC0;
+ /// 两条记录那段历史里 B 的填充字节。
+ const CONTENT_FILL_BYTE_OF_THE_TWO_RECORD_PUBLISH: u8 = 0xD0;
+-/// 反向链重读从 `device_identities()` 的第一块盘试起，健康镜像上第一份就对得上。
+-const FIRST_DEVICE_TRIED_BY_THE_BACK_CHAIN_REREAD: DeviceIdentity = DeviceIdentity(0);
+ /// 一个候选的上一条记录在环里读得出时，反向链在第一块盘上重读它这么多次。
+ const REREADS_OF_THE_PREVIOUS_RECORD_PER_CANDIDATE: usize = 1;
+ /// 点名验证把每个点名单元的两份落点各读一次（`NamedUnit::locations` 是两项）。
+@@ -62,14 +65,10 @@ const NAMED_UNITS_OF_THE_FIRST_RECORD_OF_THE_TWO_RECORD_PUBLISH: usize = 1;
+ const NAMED_UNITS_OF_THE_LAST_RECORD_OF_THE_TWO_RECORD_PUBLISH: usize = 13;
+ /// 撕一条 journal 记录时翻的字节：在记录头之后、头部校验和罩着的整条 4096 之内（翻了自证就不过）。
+ const BYTE_INSIDE_A_JOURNAL_RECORD_AFTER_ITS_HEADER: u64 = 300;
+-
+-/// 块层的一次读。
+-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+-struct BlockLayerRead {
+-    device: DeviceIdentity,
+-    offset: DeviceOffsetInBytes,
+-    length_in_bytes: usize,
+-}
++/// 改坏一条记录的反向链时异或进去的位：链值变了、jsn 照样接得上（重封之后自证照过）。
++const BIT_FLIPPED_IN_A_BACK_CHAIN: u32 = 1;
++/// 3 个记录槽的环：在飞上限 = 3 ÷ F（3）= 1（同 `journal_replay_applies_no_more_records_than_the_in_flight_limit.rs`）。
++const THREE_RECORD_RING_BYTES: u64 = 3 * JOURNAL_RECORD_BYTES;
+ 
+ /// 挂载那一路对读者做的事，按发生的次序。
+ #[derive(Clone, Debug, PartialEq, Eq)]
+@@ -134,41 +133,16 @@ impl PoolReader for ReadLoggingPoolReader<'_> {
+     }
+ }
+ 
+-/// 一个点名单元的整单元宽：数据单元与码 3 打包记录单元 32768，码 2 索引节点 16384（D23（journal 的角色与格式） 已定项 14 第四条按类读）。
+-fn named_unit_bytes(unit_class: u8) -> usize {
+-    let unit_bytes = match unit_class {
+-        UNIT_CLASS_DATA | UNIT_CLASS_PACKED => DATA_UNIT_BYTES,
+-        UNIT_CLASS_INDEX_NODE => NODE_BYTES,
+-        unknown_class => {
+-            panic!("发布路径只点名数据单元、索引节点与打包记录单元，读到类 {unknown_class}")
+-        }
+-    };
+-    usize::try_from(unit_bytes).expect("单元宽装得进 usize")
+-}
+-
+ /// 候选 `record` 的反向链那一判：在 0 号盘上重读它的上一条记录一次。
+ fn reread_of_the_record_before(record: &JournalRecord, ring_bytes: u64) -> ReaderEvent {
+-    ReaderEvent::Read(BlockLayerRead {
+-        device: FIRST_DEVICE_TRIED_BY_THE_BACK_CHAIN_REREAD,
+-        offset: record_offset(record.counter - 1, ring_bytes),
+-        length_in_bytes: usize::try_from(JOURNAL_RECORD_BYTES).expect("4096"),
+-    })
++    ReaderEvent::Read(block_read_rereading_the_record_before(record, ring_bytes))
+ }
+ 
+ /// 候选 `record` 的点名验证：它点名的每个单元的两份，按点名次序。
+ fn named_unit_reads_of(record: &JournalRecord) -> Vec<ReaderEvent> {
+-    record
+-        .named
+-        .iter()
+-        .flat_map(|named| {
+-            named.locations.iter().map(|location| {
+-                ReaderEvent::Read(BlockLayerRead {
+-                    device: location.device,
+-                    offset: location.slot.to_device_offset(),
+-                    length_in_bytes: named_unit_bytes(named.unit_class),
+-                })
+-            })
+-        })
++    block_reads_of_the_named_units_of(record)
++        .into_iter()
++        .map(ReaderEvent::Read)
+         .collect()
+ }
+ 
+@@ -179,11 +153,6 @@ fn reads_judging_the_candidate(record: &JournalRecord, ring_bytes: u64) -> Vec<R
+     reads
+ }
+ 
+-fn is_inside_the_journal_ring(offset: DeviceOffsetInBytes, ring_bytes: u64) -> bool {
+-    let ring_start = JOURNAL_RING_START_SLOT * SLOT_BYTES;
+-    offset.0 >= ring_start && offset.0 < ring_start + ring_bytes
+-}
+-
+ /// 一段事件里落在环里的读的次数；要环提示的每一次也算一次（扫完环之后不该再有）。
+ fn ring_reads_and_hints_among(events: &[ReaderEvent], ring_bytes: u64) -> usize {
+     events
+@@ -706,3 +675,152 @@ fn a_last_record_without_its_commit_marker_is_cut_after_rereading_its_previous_r
+         "扫环按提示读 jsn 1–5 五个槽、两块盘各一遍"
+     );
+ }
++
++/// 单条发布的 B、C，C（jsn 5）的反向链改一位、重封（jsn 接得上、链值与 jsn 4 的头算出来的不等，D23 已定项 7、I-8.6）：
++/// jsn 4 照常重读 jsn 3、读它点名的单元，施加；jsn 5 重读 jsn 4 一次就在反向链上断，它点名的单元一个都不读。挂载到 B。
++#[test]
++fn a_candidate_whose_back_chain_is_broken_is_cut_after_rereading_its_previous_record_and_before_reading_its_named_units(
++) {
++    let (mut image, first_version) = single_record_publishes_b_and_c_with_their_roots_torn(
++        "mounted-recovery-reads-back-chain-broken",
++    );
++    rewrite_journal_record_and_rechain_the_records_after_it(&mut image, 5, |record| {
++        record.back_chain ^= BIT_FLIPPED_IN_A_BACK_CHAIN;
++    });
++    let (ring_bytes, records) = journal_records_of(&image);
++    let candidate_b = records
++        .get(&(InstanceGeneration(1), 4))
++        .expect("jsn 4 在环里");
++    let candidate_c = records
++        .get(&(InstanceGeneration(1), 5))
++        .expect("jsn 5 改过反向链、重封，照样自证得过");
++
++    let (mounted, reads) = mount_read_only_logging_every_read(&image, ring_bytes);
++    assert_eq!(
++        (
++            (
++                mounted.chosen_root.instance,
++                mounted.chosen_root.checkpoint_txg
++            ),
++            (
++                mounted.effective_root.instance,
++                mounted.effective_root.checkpoint_txg
++            ),
++            mounted.journal.above_water,
++            mounted.journal.prefix_applied,
++            mounted.journal.verification_passed
++        ),
++        (
++            first_version,
++            (InstanceGeneration(1), CheckpointTxg(4)),
++            2,
++            1,
++            1
++        ),
++        "jsn 4 过了点名验证、施加；jsn 5 断在反向链上，挂载到 B"
++    );
++
++    let mut expected_reads_judging_the_candidates =
++        reads_judging_the_candidate(candidate_b, ring_bytes);
++    expected_reads_judging_the_candidates
++        .push(reread_of_the_record_before(candidate_c, ring_bytes));
++    assert_eq!(
++        expected_reads_judging_the_candidates.len(),
++        REREADS_OF_THE_PREVIOUS_RECORD_PER_CANDIDATE
++            + NAMED_UNITS_OF_A_SINGLE_RECORD_OVERWRITE * READS_PER_NAMED_UNIT
++            + REREADS_OF_THE_PREVIOUS_RECORD_PER_CANDIDATE,
++        "判两个候选的读：jsn 4 一次反向链重读加它点名单元的两份，jsn 5 只有一次反向链重读"
++    );
++    let mut expected_events_after_the_scan = expected_reads_judging_the_candidates;
++    expected_events_after_the_scan.extend(reads_of_opening_the_pool_at(
++        &image,
++        &mounted.effective_root,
++    ));
++    assert_eq!(
++        reads.events_after_the_scan, expected_events_after_the_scan,
++        "扫完环之后：jsn 4 重读 jsn 3、读它点名的单元，jsn 5 重读 jsn 4 一次就断、不读点名单元，然后只剩沿 B 打开挂载态的读"
++    );
++    assert_eq!(
++        reads.scan_reads_inside_the_ring,
++        RING_SLOTS_WRITTEN_UP_TO_JSN_FIVE * DEVICES_THE_JOURNAL_RING_IS_SCANNED_ON,
++        "扫环按提示读 jsn 1–5 五个槽、两块盘各一遍"
++    );
++}
++
++/// 单条发布的 B、C 搬到 3 槽的环上（在飞上限 3 ÷ F = 1，D23 已定项 18）：jsn 4 重读 jsn 3、读它点名的单元，施加；
++/// 取了 1 条就到上限，jsn 5 在任何读之前停下——不重读 jsn 4、不读它点名的单元。重放那一截块层的读就只有 jsn 4 的这几次。
++#[test]
++fn at_the_in_flight_limit_the_next_candidate_is_cut_before_rereading_its_previous_record() {
++    let (image, first_version) = single_record_publishes_b_and_c_with_their_roots_torn(
++        "mounted-recovery-reads-in-flight-limit",
++    );
++    assert_eq!(
++        journal_in_flight_record_limit(THREE_RECORD_RING_BYTES),
++        1,
++        "3 槽 ÷ F（3）= 1"
++    );
++    let relocated = image_with_the_records_relocated_onto_a_ring_of(
++        &image,
++        &[3, 4, 5],
++        THREE_RECORD_RING_BYTES,
++    );
++    let system_configuration =
++        choose_system_configuration(&relocated).expect("系统配置择得出（它记着的是默认环）");
++    let mut three_record_ring_configuration = system_configuration;
++    three_record_ring_configuration
++        .immutable
++        .sizes
++        .journal_ring_bytes = THREE_RECORD_RING_BYTES;
++    let chosen_root = choose_root(&relocated, &system_configuration).expect("择得出根");
++    let records = scan_journal(&relocated, &three_record_ring_configuration);
++    assert_eq!(
++        (
++            (chosen_root.instance, chosen_root.checkpoint_txg),
++            records
++                .keys()
++                .map(|(_, counter)| *counter)
++                .collect::<Vec<_>>()
++        ),
++        (first_version, vec![3, 4, 5]),
++        "所选根是 A 的；3 槽的环里扫到 jsn 3、4、5"
++    );
++    let candidate_b = records
++        .get(&(InstanceGeneration(1), 4))
++        .expect("jsn 4 在环里");
++
++    let logging = ReadLoggingPoolReader {
++        inner: &relocated,
++        events: RefCell::new(Vec::new()),
++    };
++    let (report, rebuilt) = replay_journal(
++        &logging,
++        &chosen_root,
++        THREE_RECORD_RING_BYTES,
++        &records,
++        true,
++    )
++    .expect("所选根那次发布只有 jsn 3 带末条标志：锚点认得出");
++    assert_eq!(
++        (
++            report.above_water,
++            report.prefix_applied,
++            report.verification_passed,
++            (rebuilt.instance, rebuilt.checkpoint_txg)
++        ),
++        (2, 1, 1, (InstanceGeneration(1), CheckpointTxg(4))),
++        "水位之上两条，上限 1：只施加 jsn 4、验过它的点名单元，重建到 B"
++    );
++    let expected_reads_of_the_replay =
++        reads_judging_the_candidate(candidate_b, THREE_RECORD_RING_BYTES);
++    assert_eq!(
++        expected_reads_of_the_replay.len(),
++        REREADS_OF_THE_PREVIOUS_RECORD_PER_CANDIDATE
++            + NAMED_UNITS_OF_A_SINGLE_RECORD_OVERWRITE * READS_PER_NAMED_UNIT,
++        "重放那一截的读：jsn 4 一次反向链重读加它点名单元的两份，jsn 5 一次都没有"
++    );
++    assert_eq!(
++        logging.events.into_inner(),
++        expected_reads_of_the_replay,
++        "重放那一截：jsn 4 在 3 槽环的落点上重读 jsn 3 一次、读它点名的单元，到了上限 jsn 5 不重读 jsn 4、不读点名单元"
++    );
++}
+diff --git a/crates/singlefs-harness/tests/journal_scan_keeps_the_first_copy_of_a_duplicated_record_key.rs b/crates/singlefs-harness/tests/journal_scan_keeps_the_first_copy_of_a_duplicated_record_key.rs
+new file mode 100644
+index 0000000..b96688b
+--- /dev/null
++++ b/crates/singlefs-harness/tests/journal_scan_keeps_the_first_copy_of_a_duplicated_record_key.rs
+@@ -0,0 +1,142 @@
++//! 全环扫描建记录表时，同一个 (实例代号, 计数器) 在盘上有两份内容不同、各自自证得过的记录：表里留先扫到的那一份
++//! （`recovery::scan_journal` 按 `device_identities()` 的次序逐盘扫，先到先得）。
++//! 取前缀的核要的「键唯一」在真路径上就靠这一判（形式化题面第三轮判决 `research/prompts/m3-formal-r3-main-verification.md`
++//! 第二节 S3、第四节欠账第 10 条）；改成后到覆盖，表里留的就换成后一块盘上的那一份。
++//!
++//! 造法：A（txg 3、jsn 3）的根落了，B（txg 4、jsn 4）一次单条发布只剩记录与单元、根槽坏了。1 号盘上 jsn 4 那一份的提交标记改成 0、重封
++//! （0 号盘那一份原样）：两份都自证得过、内容不同。留 0 号盘那一份 ⇒ B 施加；留 1 号盘那一份 ⇒ B 的末条不带提交标记，整次不施加。
++
++mod common;
++
++use common::{
++    build_pool, overwrite_in_process_as_instance_one_and_advance_the_pool, parameters,
++    tear_the_root_slot_written_for_txg, CONTENT_BYTES_OF_PUBLISH_B,
++};
++use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
++use singlefs_core::journal::{record_offset, JournalRecord};
++use singlefs_core::mounted_read::mount_read_only;
++use singlefs_core::recovery::{choose_system_configuration, scan_journal, PoolReader};
++use singlefs_core::unit::unit_filesystem_identifier;
++use singlefs_format::JOURNAL_RECORD_BYTES;
++use singlefs_harness::memory_pool::MemoryPool;
++
++/// B 那一版文件的填充字节。
++const CONTENT_FILL_BYTE_OF_PUBLISH_B: u8 = 0xB0;
++/// 扫环先扫的盘（`MemoryPool::device_identities` 按盘号升序）与后扫的盘。
++const DEVICE_SCANNED_FIRST: DeviceIdentity = DeviceIdentity(0);
++const DEVICE_SCANNED_SECOND: DeviceIdentity = DeviceIdentity(1);
++
++/// `device` 上 jsn `counter` 那一格解出来的记录。
++fn record_on_device(
++    image: &MemoryPool,
++    device: DeviceIdentity,
++    ring_bytes: u64,
++    counter: u64,
++) -> Option<JournalRecord> {
++    let bytes = PoolReader::read(
++        image,
++        device,
++        record_offset(counter, ring_bytes),
++        usize::try_from(JOURNAL_RECORD_BYTES).expect("4096"),
++    )
++    .expect("环里那一格读得到");
++    JournalRecord::parse(
++        &bytes,
++        unit_filesystem_identifier(&parameters().filesystem_identifier),
++    )
++}
++
++/// 只改 `device` 上 jsn `counter` 那一份：解出来、改一处、`JournalRecord::to_bytes` 重封载荷与头部校验和、写回；另一块盘那一份不动。
++fn rewrite_the_copy_on_one_device(
++    image: &mut MemoryPool,
++    device: DeviceIdentity,
++    ring_bytes: u64,
++    counter: u64,
++    change: impl Fn(&mut JournalRecord),
++) {
++    let mut record =
++        record_on_device(image, device, ring_bytes, counter).expect("改之前这一份自证过");
++    change(&mut record);
++    image
++        .devices
++        .get_mut(&device)
++        .expect("有这块盘")
++        .write(record_offset(counter, ring_bytes), &record.to_bytes());
++}
++
++/// 同一个键两份内容不同的记录：表里是 0 号盘（先扫）那一份；只读挂载照它施加 B。
++#[test]
++fn of_two_differing_copies_of_one_record_key_the_scan_keeps_the_copy_on_the_device_scanned_first() {
++    let mut pool = build_pool("journal-scan-first-copy-of-a-duplicated-key");
++    let first_version = (pool.output.root.instance, pool.output.root.checkpoint_txg);
++    let second = overwrite_in_process_as_instance_one_and_advance_the_pool(
++        &mut pool,
++        &vec![CONTENT_FILL_BYTE_OF_PUBLISH_B; CONTENT_BYTES_OF_PUBLISH_B],
++    );
++    assert_eq!(
++        (
++            first_version,
++            (second.root.checkpoint_txg, second.record.counter)
++        ),
++        (
++            (InstanceGeneration(1), CheckpointTxg(3)),
++            (CheckpointTxg(4), 4)
++        ),
++        "A 的根在 txg 3、jsn 3；B 一条记录 jsn 4"
++    );
++    let mut image = pool.memory_pool();
++    tear_the_root_slot_written_for_txg(&mut image, 4);
++    let system_configuration = choose_system_configuration(&image).expect("系统配置择得出");
++    let ring_bytes = system_configuration.immutable.sizes.journal_ring_bytes;
++    rewrite_the_copy_on_one_device(&mut image, DEVICE_SCANNED_SECOND, ring_bytes, 4, |record| {
++        record.is_commit = false;
++    });
++    let copy_scanned_first = record_on_device(&image, DEVICE_SCANNED_FIRST, ring_bytes, 4)
++        .expect("0 号盘那一份自证得过");
++    let copy_scanned_second = record_on_device(&image, DEVICE_SCANNED_SECOND, ring_bytes, 4)
++        .expect("1 号盘那一份重封过，自证得过");
++    assert_eq!(
++        (
++            copy_scanned_first.is_commit,
++            copy_scanned_second.is_commit,
++            copy_scanned_first == copy_scanned_second
++        ),
++        (true, false, false),
++        "同一个键 (1, 4) 两份内容不同：0 号盘的带提交标记，1 号盘的不带"
++    );
++    assert_eq!(
++        image.device_identities(),
++        [DEVICE_SCANNED_FIRST, DEVICE_SCANNED_SECOND],
++        "扫环按盘号升序逐盘扫"
++    );
++
++    let records = scan_journal(&image, &system_configuration);
++    assert_eq!(
++        records.get(&(InstanceGeneration(1), 4)),
++        Some(&copy_scanned_first),
++        "表里 (1, 4) 是先扫到的 0 号盘那一份，不被 1 号盘那一份盖掉"
++    );
++
++    let mounted = mount_read_only(&image).expect("只读挂载");
++    assert_eq!(
++        (
++            (
++                mounted.chosen_root.instance,
++                mounted.chosen_root.checkpoint_txg
++            ),
++            (
++                mounted.effective_root.instance,
++                mounted.effective_root.checkpoint_txg
++            ),
++            mounted.journal.above_water,
++            mounted.journal.prefix_applied
++        ),
++        (
++            first_version,
++            (InstanceGeneration(1), CheckpointTxg(4)),
++            1,
++            1
++        ),
++        "所选根是 A 的；照 0 号盘那一份（带提交标记）施加 B，挂载到 B"
++    );
++}
+diff --git a/crates/singlefs-harness/tests/rebuilt_root_keeps_the_chosen_roots_fields_except_the_unmount_marker.rs b/crates/singlefs-harness/tests/rebuilt_root_keeps_the_chosen_roots_fields_except_the_unmount_marker.rs
+new file mode 100644
+index 0000000..a556417
+--- /dev/null
++++ b/crates/singlefs-harness/tests/rebuilt_root_keeps_the_chosen_roots_fields_except_the_unmount_marker.rs
+@@ -0,0 +1,134 @@
++//! 由 journal 记录重建的根（`recovery::replay_journal` 拼新根那一截）：新根段（D23（journal 的角色与格式） 已定项 15）那几项取被施加的末条记录，
++//! 其余字段等于所选根，卸载记号除外——它取「不是卸载那一串写下的」（D22（单元原子性怎么合成） 已定项 7「其余根写 0」）。
++//! 形式化题面第三轮判决 `research/prompts/m3-formal-r3-main-verification.md` 第二节 S1 后半（用户 2026-10-01 认）、第四节欠账第 1 条。
++//!
++//! 判决里池上原型那一形：正常卸载那一串（`mount::unmount`）的第二次空发布记录落了、根槽没落（这里把那一槽改坏）——所选根是第一次空发布写的、
++//! 带卸载记号；第二次那条记录施加出来的根，卸载记号若照抄所选根，就成了「卸载那一串写下的」，可它没有一条根槽写过。
++
++mod common;
++
++use common::{
++    build_pool, overwrite_in_process_as_instance_one_and_advance_the_pool, parameters,
++    tear_the_root_slot_written_for_txg, CONTENT_BYTES_OF_PUBLISH_B,
++};
++use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
++use singlefs_core::mount::{unmount, ShadowLedger, Unmounted};
++use singlefs_core::mounted_read::mount_read_only;
++use singlefs_core::root_record::UnmountMarker;
++use singlefs_core::transaction::PoolVersion;
++
++/// 新池新建文件（txg 3）之后覆盖写三版（txg 4、5、6）的填充字节：现行 txg 6 除以 3 余 0，卸载那一串推两次空发布（txg 7、8）。
++const FILL_BYTES_OF_THE_THREE_OVERWRITES: [u8; 3] = [0xB0, 0xC0, 0xD0];
++
++/// 卸载那一串第二次空发布（txg 8）的根槽没落、记录落了：只读挂载择到第一次（txg 7）那条带卸载记号的根，施加 txg 8 那条记录。
++/// 重建出来的根：新根段那几项是 txg 8 那条记录的；文件系统标识、实例表指针、分配记录树根等于所选根；卸载记号是「不是卸载那一串写下的」。
++#[test]
++fn a_root_rebuilt_from_the_second_unmount_publish_record_keeps_the_chosen_roots_other_fields_and_is_not_marked_by_the_unmount_sequence(
++) {
++    let mut pool = build_pool("rebuilt-root-unmount-marker");
++    for fill_byte in FILL_BYTES_OF_THE_THREE_OVERWRITES {
++        overwrite_in_process_as_instance_one_and_advance_the_pool(
++            &mut pool,
++            &vec![fill_byte; CONTENT_BYTES_OF_PUBLISH_B],
++        );
++    }
++    assert_eq!(
++        pool.output.root.checkpoint_txg,
++        CheckpointTxg(6),
++        "新池新建文件 txg 3，覆盖写三版到 txg 6"
++    );
++    let mut current = PoolVersion::WithFile(pool.output.clone());
++    let devices = pool.devices.as_mut().expect("镜像还开着");
++    let unmounted = unmount(
++        &parameters(),
++        devices,
++        &mut pool.allocator,
++        &mut current,
++        ShadowLedger::On,
++    )
++    .expect("正常卸载");
++    let Unmounted::FloorRaisedToTheCurrentVersion(raised) = unmounted else {
++        panic!("带文件的一版上卸载报成「树表 0 条、一个字节都不写」");
++    };
++    let [first_unmount_publish, second_unmount_publish] =
++        <[_; 2]>::try_from(raised.publishes).expect("现行 txg 6 除以 3 余 0：卸载那一串推两次");
++    assert_eq!(
++        (
++            (
++                first_unmount_publish.root.checkpoint_txg,
++                first_unmount_publish.root.unmount_marker
++            ),
++            (
++                second_unmount_publish.root.checkpoint_txg,
++                second_unmount_publish.root.unmount_marker
++            ),
++            (
++                second_unmount_publish.record.instance,
++                second_unmount_publish.record.checkpoint_txg
++            )
++        ),
++        (
++            (CheckpointTxg(7), UnmountMarker::WrittenByTheUnmountSequence),
++            (CheckpointTxg(8), UnmountMarker::WrittenByTheUnmountSequence),
++            (InstanceGeneration(1), CheckpointTxg(8))
++        ),
++        "卸载那一串两次空发布 txg 7、8 写的根都带卸载记号；txg 8 那条记录在实例 1"
++    );
++
++    let mut image = pool.memory_pool();
++    tear_the_root_slot_written_for_txg(&mut image, 8);
++    let mounted = mount_read_only(&image).expect("只读挂载");
++    assert_eq!(
++        mounted.chosen_root, first_unmount_publish.root,
++        "txg 8 的根槽没落：所选根是卸载那一串第一次空发布写的那条，带卸载记号"
++    );
++    assert_eq!(
++        (mounted.journal.above_water, mounted.journal.prefix_applied),
++        (1, 1),
++        "水位之上只有 txg 8 那条记录，施加"
++    );
++
++    let chosen = mounted.chosen_root;
++    let rebuilt = mounted.effective_root;
++    let record = &second_unmount_publish.record;
++    assert_eq!(
++        (
++            rebuilt.instance,
++            rebuilt.checkpoint_txg,
++            rebuilt.tree_table,
++            rebuilt.tree_identifier_watermark,
++            rebuilt.rollback_floor,
++            rebuilt.mapping_root
++        ),
++        (
++            record.instance,
++            record.checkpoint_txg,
++            record.new_tree_table,
++            record.new_tree_identifier_watermark,
++            record.new_rollback_floor,
++            record.new_mapping_root
++        ),
++        "新根段那几项（D23 已定项 15）取 txg 8 那条记录的"
++    );
++    assert_eq!(
++        (
++            rebuilt.filesystem_identifier,
++            rebuilt.instance_table,
++            rebuilt.allocation_record_tree_root
++        ),
++        (
++            chosen.filesystem_identifier,
++            chosen.instance_table,
++            chosen.allocation_record_tree_root
++        ),
++        "新根段之外的字段等于所选根"
++    );
++    assert_eq!(
++        (chosen.unmount_marker, rebuilt.unmount_marker),
++        (
++            UnmountMarker::WrittenByTheUnmountSequence,
++            UnmountMarker::NotWrittenByTheUnmountSequence
++        ),
++        "卸载记号除外：所选根带着，由记录重建的根取「不是卸载那一串写下的」——没有一条根槽写过它"
++    );
++}
+diff --git a/crates/singlefs-harness/tests/writable_mount_reads_each_candidate_in_order_through_the_read_stage_cache.rs b/crates/singlefs-harness/tests/writable_mount_reads_each_candidate_in_order_through_the_read_stage_cache.rs
+new file mode 100644
+index 0000000..c9d5b01
+--- /dev/null
++++ b/crates/singlefs-harness/tests/writable_mount_reads_each_candidate_in_order_through_the_read_stage_cache.rs
+@@ -0,0 +1,633 @@
++//! 可写挂载（`mount::mount_writable`）的读阶段取前缀时，水位之上每个候选在块层读几次盘、按什么次序读（C648）。
++//! 只读挂载那一半在 `mounted_recovery_reads_each_candidate_once_in_order.rs`。
++//!
++//! 可写挂载的读阶段经读缓存（`mount.rs` 的 `ReadStageCache`）读：同一个 (盘, 偏移, 长度) 读出来不全是 0 的，第二次起不落到块层。
++//! 扫环（块设备不交环提示，每块盘整环逐槽读）已经把每条记录读进缓存，反向链重读上一条记录因此一次都不落到块层；
++//! 点名单元在扫环时没读过，每个点名单元的两份各落到块层一次，按候选次序、按点名次序。
++//! 这里在块层逐次记读（写、写零、屏障也记一项，不比），钉住扫完环之后、判据 N-配置 直接读系统配置槽（每块盘两槽，不经缓存）之前的那一截。
++//! 健康镜像上反向链回调多调一次（攻方 S03）、末条提交标记那一判挪到反向链回调之前（攻方 S07）都只多读或少读一次缓存里有的记录，块层看不出；
++//! 缓存不收读回全零的落点，所以另有两条用例把上一条记录在 0 号盘（反向链重读先试的那块）上的一份写成全零：
++//! 那一份每次反向链重读都落到块层一次，S03、S07 在块层看得出。让本该在点名单元之前断的候选去读点名单元，在健康镜像上就看得出。
++//!
++//! 造法：A（txg 3、jsn 3）的根落了；之后的发布只剩记录与单元——根槽改坏，系统配置槽写回 A 那次发布之后的字节
++//! （D16（发布语义） 已定项 7：轮换在根槽 FUA 之后，根槽没落、轮换也没落），判据 N-配置 因此判假，读阶段只走一遍。
++
++mod common;
++
++use std::cell::RefCell;
++use std::rc::Rc;
++
++use common::{
++    block_read_rereading_the_record_before, block_reads_of_the_named_units_of, build_pool,
++    crash_state_devices, is_inside_the_journal_ring,
++    overwrite_in_process_as_instance_one_and_advance_the_pool, parameters,
++    rewrite_journal_record_and_rechain_the_records_after_it,
++    sequential_write_in_process_as_instance_one_and_advance_the_pool,
++    system_configuration_slots_of_every_device, tear_the_root_slot_written_for_txg,
++    write_back_system_configuration_slots, BlockLayerRead, CONTENT_BYTES_OF_PUBLISH_B,
++    CONTENT_BYTES_OF_PUBLISH_C, FIRST_DEVICE_TRIED_BY_THE_BACK_CHAIN_REREAD,
++};
++use singlefs_core::address::{
++    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
++};
++use singlefs_core::block_device::{
++    BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
++};
++use singlefs_core::journal::{record_offset, JournalRecord, JournalRecordPlaceInPublish};
++use singlefs_core::mount::{mount_writable, Mounted};
++use singlefs_core::recovery::{choose_system_configuration, scan_journal};
++use singlefs_core::unit::data_unit_payload_capacity;
++use singlefs_format::{
++    JOURNAL_RECORD_BYTES, SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE, SYSTEM_CONFIGURATION_SLOT_BYTES,
++};
++use singlefs_harness::memory_pool::MemoryPool;
++use singlefs_harness::SharedStream;
++
++/// B、C 两版文件的填充字节。
++const CONTENT_FILL_BYTE_OF_PUBLISH_B: u8 = 0xB0;
++const CONTENT_FILL_BYTE_OF_PUBLISH_C: u8 = 0xC0;
++/// 两条记录那段历史里 B 的填充字节。
++const CONTENT_FILL_BYTE_OF_THE_TWO_RECORD_PUBLISH: u8 = 0xD0;
++/// 池里两块盘：扫环每块盘各扫一遍整环。
++const DEVICES_THE_JOURNAL_RING_IS_SCANNED_ON: usize = 2;
++/// 点名验证把每个点名单元的两份落点各读一次（`NamedUnit::locations` 是两项）。
++const READS_PER_NAMED_UNIT: usize = 2;
++/// 一次单条覆盖写的记录点名的单元数。
++const NAMED_UNITS_OF_A_SINGLE_RECORD_OVERWRITE: usize = 12;
++/// 顺序写两个数据单元：前一条只点名自己那个数据单元。
++const NAMED_UNITS_OF_THE_FIRST_RECORD_OF_THE_TWO_RECORD_PUBLISH: usize = 1;
++/// 上一条记录在 0 号盘上那一份读回全零时，一个候选的反向链那一判在块层重读它这么多次（缓存不收全零，1 号盘那一份从缓存交回）。
++const BLOCK_LAYER_REREADS_OF_A_ZEROED_PREVIOUS_COPY_PER_CANDIDATE: usize = 1;
++/// 单条发布的 B、C 两个候选。
++const CANDIDATES_OF_THE_SINGLE_RECORD_PUBLISHES: usize = 2;
++
++/// 块层的一件事：读原样记下；写、写零、屏障只记发生过（这几条用例不比它们）。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++enum BlockLayerEvent {
++    Read(BlockLayerRead),
++    WriteOrWriteZeroesOrBarrier { device: DeviceIdentity },
++}
++
++/// 包在一块盘外面，把每次读按发生的次序记进几块盘共用的一份记录里。
++struct ReadLoggingBlockDevice<Inner: BlockDevice> {
++    identity: DeviceIdentity,
++    inner: Inner,
++    events: Rc<RefCell<Vec<BlockLayerEvent>>>,
++}
++
++impl<Inner: BlockDevice> BlockDevice for ReadLoggingBlockDevice<Inner> {
++    fn read_at(
++        &self,
++        offset: DeviceOffsetInBytes,
++        buffer: &mut [u8],
++    ) -> Result<(), BlockDeviceError> {
++        self.events
++            .borrow_mut()
++            .push(BlockLayerEvent::Read(BlockLayerRead {
++                device: self.identity,
++                offset,
++                length_in_bytes: buffer.len(),
++            }));
++        self.inner.read_at(offset, buffer)
++    }
++
++    fn write_at(
++        &mut self,
++        offset: DeviceOffsetInBytes,
++        bytes: &[u8],
++        durability: WriteDurability,
++    ) -> Result<(), BlockDeviceError> {
++        self.events
++            .borrow_mut()
++            .push(BlockLayerEvent::WriteOrWriteZeroesOrBarrier {
++                device: self.identity,
++            });
++        self.inner.write_at(offset, bytes, durability)
++    }
++
++    fn write_zeroes_at(
++        &mut self,
++        offset: DeviceOffsetInBytes,
++        length: u64,
++    ) -> Result<(), BlockDeviceError> {
++        self.events
++            .borrow_mut()
++            .push(BlockLayerEvent::WriteOrWriteZeroesOrBarrier {
++                device: self.identity,
++            });
++        self.inner.write_zeroes_at(offset, length)
++    }
++
++    fn barrier(&mut self) -> Result<(), BlockDeviceError> {
++        self.events
++            .borrow_mut()
++            .push(BlockLayerEvent::WriteOrWriteZeroesOrBarrier {
++                device: self.identity,
++            });
++        self.inner.barrier()
++    }
++
++    fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
++        self.inner.probe_physical_block_size()
++    }
++
++    fn size_in_bytes(&self) -> u64 {
++        self.inner.size_in_bytes()
++    }
++}
++
++/// 一次可写挂载的块层事件，切在扫环最后一次读之后。
++struct BlockLayerEventsOfOneWritableMount {
++    /// 扫环那一段连着的环内读的次数。
++    scan_reads_inside_the_ring: usize,
++    /// 扫完环之后的事件。
++    events_after_the_scan: Vec<BlockLayerEvent>,
++}
++
++/// 在 `image` 上可写挂载一次，块层每件事按发生的次序记下来；扫环是第一次环内读起、两块盘各整环的那一段。
++fn mount_writable_logging_every_block_layer_event(
++    image: &MemoryPool,
++    ring_bytes: u64,
++) -> (Mounted, BlockLayerEventsOfOneWritableMount) {
++    let events = Rc::new(RefCell::new(Vec::new()));
++    let mut devices: Vec<(DeviceIdentity, ReadLoggingBlockDevice<_>)> =
++        crash_state_devices(image, &[], &[], &SharedStream::retaining_contents())
++            .into_iter()
++            .map(|(identity, inner)| {
++                (
++                    identity,
++                    ReadLoggingBlockDevice {
++                        identity,
++                        inner,
++                        events: Rc::clone(&events),
++                    },
++                )
++            })
++            .collect();
++    let mounted = mount_writable(&parameters(), &mut devices).expect("可写挂载");
++    drop(devices);
++    let mut events = Rc::try_unwrap(events)
++        .expect("盘都丢了，只剩这一份")
++        .into_inner();
++    let is_ring_read = |event: &BlockLayerEvent| match event {
++        BlockLayerEvent::Read(read) => is_inside_the_journal_ring(read.offset, ring_bytes),
++        BlockLayerEvent::WriteOrWriteZeroesOrBarrier { .. } => false,
++    };
++    let scan_start = events.iter().position(is_ring_read).expect("读阶段扫过环");
++    let ring_slots_per_device = usize::try_from(ring_bytes / JOURNAL_RECORD_BYTES).expect("槽数");
++    let scan_end = scan_start + ring_slots_per_device * DEVICES_THE_JOURNAL_RING_IS_SCANNED_ON;
++    let scan_reads_inside_the_ring = events[scan_start..scan_end.min(events.len())]
++        .iter()
++        .filter(|event| is_ring_read(event))
++        .count();
++    let events_after_the_scan = events.split_off(scan_end.min(events.len()));
++    (
++        mounted,
++        BlockLayerEventsOfOneWritableMount {
++            scan_reads_inside_the_ring,
++            events_after_the_scan,
++        },
++    )
++}
++
++/// 判据 N-配置 在取前缀之后直接读系统配置槽：按盘号次序，每块盘两槽各一次。
++fn witness_reads_of_the_system_configuration_slots() -> Vec<BlockLayerEvent> {
++    let slot_spacing_in_bytes = u64::from(parameters().geometry.fixed_structure_slot_spacing);
++    [DeviceIdentity(0), DeviceIdentity(1)]
++        .into_iter()
++        .flat_map(|device| {
++            (0..SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE).map(move |slot| {
++                BlockLayerEvent::Read(BlockLayerRead {
++                    device,
++                    offset: DeviceOffsetInBytes(slot * slot_spacing_in_bytes),
++                    length_in_bytes: usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES)
++                        .expect("4096"),
++                })
++            })
++        })
++        .collect()
++}
++
++fn named_unit_events_of(record: &JournalRecord) -> Vec<BlockLayerEvent> {
++    block_reads_of_the_named_units_of(record)
++        .into_iter()
++        .map(BlockLayerEvent::Read)
++        .collect()
++}
++
++/// 候选 `record` 的反向链那一判在 0 号盘上重读它的上一条记录、落到块层的那一次。
++fn back_chain_reread_event_of(record: &JournalRecord, ring_bytes: u64) -> BlockLayerEvent {
++    BlockLayerEvent::Read(block_read_rereading_the_record_before(record, ring_bytes))
++}
++
++/// 把 jsn `counter` 那条记录在 0 号盘（反向链重读先试的那块）上的一份写成全零，1 号盘那一份不动：
++/// 扫环从 1 号盘收下这条；反向链重读先读 0 号盘那一份，读回全零、读缓存不收，每次都落到块层，再从缓存里的 1 号盘那一份判链。
++fn zero_the_copy_the_back_chain_reread_tries_first(
++    image: &mut MemoryPool,
++    counter: u64,
++    ring_bytes: u64,
++) {
++    image
++        .devices
++        .get_mut(&FIRST_DEVICE_TRIED_BY_THE_BACK_CHAIN_REREAD)
++        .expect("有这块盘")
++        .write(
++            record_offset(counter, ring_bytes),
++            &vec![0; usize::try_from(JOURNAL_RECORD_BYTES).expect("4096")],
++        );
++}
++
++/// 镜像上择出的系统配置里的环长，与 jsn `counters` 那几条扫出来的记录。
++fn ring_bytes_and_records(image: &MemoryPool, counters: &[u64]) -> (u64, Vec<JournalRecord>) {
++    let system_configuration = choose_system_configuration(image).expect("系统配置择得出");
++    let records = scan_journal(image, &system_configuration);
++    (
++        system_configuration.immutable.sizes.journal_ring_bytes,
++        counters
++            .iter()
++            .map(|counter| {
++                records
++                    .get(&(InstanceGeneration(1), *counter))
++                    .expect("这条记录在环里")
++                    .clone()
++            })
++            .collect(),
++    )
++}
++
++/// A 的根落了，B（jsn 4）、C（jsn 5）两次单条发布只剩记录与单元：扫完环之后，jsn 4 的反向链重读 jsn 3、jsn 5 的重读 jsn 4
++/// 都从读缓存交回、不落到块层；块层只有 jsn 4 点名的单元各两份、再 jsn 5 点名的单元各两份，之后是判据 N-配置 读系统配置槽。
++#[test]
++fn writable_mount_reads_each_named_unit_once_per_candidate_in_journal_order_and_the_back_chain_reread_stays_in_the_read_stage_cache(
++) {
++    let mut pool = build_pool("writable-mount-reads-single-record-publishes");
++    let first_version = (pool.output.root.instance, pool.output.root.checkpoint_txg);
++    let system_configuration_after_the_first_version =
++        system_configuration_slots_of_every_device(&pool);
++    let second = overwrite_in_process_as_instance_one_and_advance_the_pool(
++        &mut pool,
++        &vec![CONTENT_FILL_BYTE_OF_PUBLISH_B; CONTENT_BYTES_OF_PUBLISH_B],
++    );
++    let third = overwrite_in_process_as_instance_one_and_advance_the_pool(
++        &mut pool,
++        &vec![CONTENT_FILL_BYTE_OF_PUBLISH_C; CONTENT_BYTES_OF_PUBLISH_C],
++    );
++    assert_eq!(
++        (
++            first_version,
++            (second.root.checkpoint_txg, second.record.counter),
++            (third.root.checkpoint_txg, third.record.counter)
++        ),
++        (
++            (InstanceGeneration(1), CheckpointTxg(3)),
++            (CheckpointTxg(4), 4),
++            (CheckpointTxg(5), 5)
++        ),
++        "A 的根在 txg 3、jsn 3；B、C 各一条记录"
++    );
++    let mut image = pool.memory_pool();
++    for txg in [4u64, 5] {
++        tear_the_root_slot_written_for_txg(&mut image, txg);
++    }
++    write_back_system_configuration_slots(
++        &mut image,
++        &system_configuration_after_the_first_version,
++    );
++    let (ring_bytes, candidates) = ring_bytes_and_records(&image, &[4, 5]);
++
++    let (mounted, events) = mount_writable_logging_every_block_layer_event(&image, ring_bytes);
++    assert_eq!(
++        (
++            (
++                mounted.output.chosen_root.instance,
++                mounted.output.chosen_root.checkpoint_txg
++            ),
++            (
++                mounted.output.effective_root.instance,
++                mounted.output.effective_root.checkpoint_txg
++            ),
++            mounted.output.journal.above_water,
++            mounted.output.journal.prefix_applied,
++            mounted.output.journal.verification_passed
++        ),
++        (
++            first_version,
++            (InstanceGeneration(1), CheckpointTxg(5)),
++            2,
++            2,
++            2
++        ),
++        "所选根是 A 的；水位之上 B、C 两条，都过了点名验证、都施加"
++    );
++
++    let mut expected_events_after_the_scan: Vec<BlockLayerEvent> =
++        candidates.iter().flat_map(named_unit_events_of).collect();
++    assert_eq!(
++        expected_events_after_the_scan.len(),
++        candidates.len() * NAMED_UNITS_OF_A_SINGLE_RECORD_OVERWRITE * READS_PER_NAMED_UNIT,
++        "判两个候选在块层的读：各自点名的 12 个单元两份各一次，反向链重读一次都不落到块层"
++    );
++    expected_events_after_the_scan.extend(witness_reads_of_the_system_configuration_slots());
++    assert_eq!(
++        (
++            events.scan_reads_inside_the_ring,
++            events
++                .events_after_the_scan
++                .get(..expected_events_after_the_scan.len())
++        ),
++        (
++            usize::try_from(ring_bytes / JOURNAL_RECORD_BYTES).expect("槽数")
++                * DEVICES_THE_JOURNAL_RING_IS_SCANNED_ON,
++            Some(expected_events_after_the_scan.as_slice())
++        ),
++        "扫环两块盘各整环逐槽读一遍；之后 jsn 4 点名的单元、jsn 5 点名的单元各读一次（不重读 jsn 3、jsn 4），再是系统配置槽"
++    );
++}
++
++/// 两条记录的 B（jsn 4 不带末条标志、点名 1 个数据单元；jsn 5 带末条标志），jsn 5 的提交标记改成 0（重封）：
++/// jsn 4 点名的单元两份各落到块层一次；jsn 5 的反向链重读从读缓存交回，随即断在「末条不带提交标记」上，它点名的单元一个都不读。
++/// B 整次不施加，挂载在 A 上写行。
++#[test]
++fn writable_mount_cuts_a_last_record_without_its_commit_marker_before_reading_its_named_units() {
++    let mut pool = build_pool("writable-mount-reads-last-record-without-commit");
++    let first_version = (pool.output.root.instance, pool.output.root.checkpoint_txg);
++    let system_configuration_after_the_first_version =
++        system_configuration_slots_of_every_device(&pool);
++    let payload_capacity = data_unit_payload_capacity();
++    let second = sequential_write_in_process_as_instance_one_and_advance_the_pool(
++        &mut pool,
++        &vec![CONTENT_FILL_BYTE_OF_THE_TWO_RECORD_PUBLISH; payload_capacity + payload_capacity / 2],
++    );
++    assert_eq!(
++        (
++            first_version,
++            second.root.checkpoint_txg,
++            second.record.counter
++        ),
++        (
++            (InstanceGeneration(1), CheckpointTxg(3)),
++            CheckpointTxg(4),
++            5
++        ),
++        "A 的根在 txg 3、jsn 3；B 两个数据单元切出 jsn 4、5"
++    );
++    let mut image = pool.memory_pool();
++    tear_the_root_slot_written_for_txg(&mut image, 4);
++    write_back_system_configuration_slots(
++        &mut image,
++        &system_configuration_after_the_first_version,
++    );
++    rewrite_journal_record_and_rechain_the_records_after_it(&mut image, 5, |record| {
++        record.is_commit = false;
++    });
++    let (ring_bytes, candidates) = ring_bytes_and_records(&image, &[4, 5]);
++    let [first_record_of_b, last_record_of_b] =
++        <[_; 2]>::try_from(candidates).expect("jsn 4、5 两条");
++    assert_eq!(
++        (
++            first_record_of_b.named.len(),
++            last_record_of_b.place_in_publish,
++            last_record_of_b.is_commit
++        ),
++        (
++            NAMED_UNITS_OF_THE_FIRST_RECORD_OF_THE_TWO_RECORD_PUBLISH,
++            JournalRecordPlaceInPublish::LastRecordOfThePublish,
++            false
++        ),
++        "jsn 4 点名 1 个单元；jsn 5 带末条标志、不带提交标记"
++    );
++
++    let (mounted, events) = mount_writable_logging_every_block_layer_event(&image, ring_bytes);
++    assert_eq!(
++        (
++            (
++                mounted.output.chosen_root.instance,
++                mounted.output.chosen_root.checkpoint_txg
++            ),
++            (
++                mounted.output.effective_root.instance,
++                mounted.output.effective_root.checkpoint_txg
++            ),
++            mounted.output.journal.above_water,
++            mounted.output.journal.prefix_applied,
++            mounted.output.journal.verification_passed
++        ),
++        (first_version, first_version, 2, 0, 1),
++        "jsn 4 过了点名验证；jsn 5 断在提交标记上，B 整次不施加，挂载在 A"
++    );
++
++    let mut expected_events_after_the_scan = named_unit_events_of(&first_record_of_b);
++    assert_eq!(
++        expected_events_after_the_scan.len(),
++        NAMED_UNITS_OF_THE_FIRST_RECORD_OF_THE_TWO_RECORD_PUBLISH * READS_PER_NAMED_UNIT,
++        "判两条在块层的读：只有 jsn 4 点名单元的两份；两条的反向链重读都在读缓存里，jsn 5 不读点名单元"
++    );
++    expected_events_after_the_scan.extend(witness_reads_of_the_system_configuration_slots());
++    assert_eq!(
++        events
++            .events_after_the_scan
++            .get(..expected_events_after_the_scan.len()),
++        Some(expected_events_after_the_scan.as_slice()),
++        "扫完环之后：jsn 4 点名的单元读一次，jsn 5 一个都不读，再是系统配置槽"
++    );
++}
++
++/// 单条发布的 B（jsn 4）、C（jsn 5），jsn 3、jsn 4 在 0 号盘上那一份写成全零：jsn 4 的反向链重读 jsn 3、jsn 5 的重读 jsn 4，
++/// 各自在 0 号盘上落到块层恰好一次（读回全零、缓存不收），再从缓存里 1 号盘那一份判链、链对得上。
++/// 块层：jsn 3 的零份一次、jsn 4 点名的单元各两份、jsn 4 的零份一次、jsn 5 点名的单元各两份，之后是判据 N-配置 读系统配置槽。
++#[test]
++fn writable_mount_rereads_a_previous_record_whose_first_copy_reads_back_as_zeros_from_the_block_layer_once_per_candidate(
++) {
++    let mut pool = build_pool("writable-mount-reads-zeroed-first-copies");
++    let first_version = (pool.output.root.instance, pool.output.root.checkpoint_txg);
++    let system_configuration_after_the_first_version =
++        system_configuration_slots_of_every_device(&pool);
++    let second = overwrite_in_process_as_instance_one_and_advance_the_pool(
++        &mut pool,
++        &vec![CONTENT_FILL_BYTE_OF_PUBLISH_B; CONTENT_BYTES_OF_PUBLISH_B],
++    );
++    let third = overwrite_in_process_as_instance_one_and_advance_the_pool(
++        &mut pool,
++        &vec![CONTENT_FILL_BYTE_OF_PUBLISH_C; CONTENT_BYTES_OF_PUBLISH_C],
++    );
++    assert_eq!(
++        (
++            first_version,
++            (second.root.checkpoint_txg, second.record.counter),
++            (third.root.checkpoint_txg, third.record.counter)
++        ),
++        (
++            (InstanceGeneration(1), CheckpointTxg(3)),
++            (CheckpointTxg(4), 4),
++            (CheckpointTxg(5), 5)
++        ),
++        "A 的根在 txg 3、jsn 3；B、C 各一条记录"
++    );
++    let mut image = pool.memory_pool();
++    for txg in [4u64, 5] {
++        tear_the_root_slot_written_for_txg(&mut image, txg);
++    }
++    write_back_system_configuration_slots(
++        &mut image,
++        &system_configuration_after_the_first_version,
++    );
++    let ring_bytes = choose_system_configuration(&image)
++        .expect("系统配置择得出")
++        .immutable
++        .sizes
++        .journal_ring_bytes;
++    for counter in [3u64, 4] {
++        zero_the_copy_the_back_chain_reread_tries_first(&mut image, counter, ring_bytes);
++    }
++    let (_, candidates) = ring_bytes_and_records(&image, &[4, 5]);
++    let [candidate_b, candidate_c] = <[_; 2]>::try_from(candidates).expect("jsn 4、5 两条");
++
++    let (mounted, events) = mount_writable_logging_every_block_layer_event(&image, ring_bytes);
++    assert_eq!(
++        (
++            (
++                mounted.output.chosen_root.instance,
++                mounted.output.chosen_root.checkpoint_txg
++            ),
++            (
++                mounted.output.effective_root.instance,
++                mounted.output.effective_root.checkpoint_txg
++            ),
++            mounted.output.journal.above_water,
++            mounted.output.journal.prefix_applied,
++            mounted.output.journal.verification_passed
++        ),
++        (
++            first_version,
++            (InstanceGeneration(1), CheckpointTxg(5)),
++            2,
++            2,
++            2
++        ),
++        "所选根是 A 的；jsn 3、4 的 1 号盘那一份在，反向链对得上，B、C 都过了点名验证、都施加"
++    );
++
++    let mut expected_events_after_the_scan =
++        vec![back_chain_reread_event_of(&candidate_b, ring_bytes)];
++    expected_events_after_the_scan.extend(named_unit_events_of(&candidate_b));
++    expected_events_after_the_scan.push(back_chain_reread_event_of(&candidate_c, ring_bytes));
++    expected_events_after_the_scan.extend(named_unit_events_of(&candidate_c));
++    assert_eq!(
++        expected_events_after_the_scan.len(),
++        CANDIDATES_OF_THE_SINGLE_RECORD_PUBLISHES
++            * (BLOCK_LAYER_REREADS_OF_A_ZEROED_PREVIOUS_COPY_PER_CANDIDATE
++                + NAMED_UNITS_OF_A_SINGLE_RECORD_OVERWRITE * READS_PER_NAMED_UNIT),
++        "判两个候选在块层的读：各自一次 0 号盘零份的反向链重读，加点名的 12 个单元两份各一次"
++    );
++    expected_events_after_the_scan.extend(witness_reads_of_the_system_configuration_slots());
++    assert_eq!(
++        (
++            events.scan_reads_inside_the_ring,
++            events
++                .events_after_the_scan
++                .get(..expected_events_after_the_scan.len())
++        ),
++        (
++            usize::try_from(ring_bytes / JOURNAL_RECORD_BYTES).expect("槽数")
++                * DEVICES_THE_JOURNAL_RING_IS_SCANNED_ON,
++            Some(expected_events_after_the_scan.as_slice())
++        ),
++        "扫完环之后：jsn 4 在 0 号盘重读 jsn 3 一次、读它点名的单元，jsn 5 在 0 号盘重读 jsn 4 一次、读它点名的单元，再是系统配置槽"
++    );
++}
++
++/// 两条记录的 B（jsn 4、5），jsn 5 的提交标记改成 0（重封），jsn 4 在 0 号盘上那一份写成全零：jsn 4 的反向链重读 jsn 3 从缓存交回，
++/// 读它点名的单元；jsn 5 先在 0 号盘上重读 jsn 4、落到块层一次，链对得上，随即断在「末条不带提交标记」上，它点名的单元一个都不读。
++#[test]
++fn writable_mount_rereads_the_zeroed_first_copy_of_the_previous_record_once_before_cutting_a_last_record_without_its_commit_marker(
++) {
++    let mut pool = build_pool("writable-mount-reads-zeroed-copy-before-the-commit-cut");
++    let first_version = (pool.output.root.instance, pool.output.root.checkpoint_txg);
++    let system_configuration_after_the_first_version =
++        system_configuration_slots_of_every_device(&pool);
++    let payload_capacity = data_unit_payload_capacity();
++    let second = sequential_write_in_process_as_instance_one_and_advance_the_pool(
++        &mut pool,
++        &vec![CONTENT_FILL_BYTE_OF_THE_TWO_RECORD_PUBLISH; payload_capacity + payload_capacity / 2],
++    );
++    assert_eq!(
++        (
++            first_version,
++            second.root.checkpoint_txg,
++            second.record.counter
++        ),
++        (
++            (InstanceGeneration(1), CheckpointTxg(3)),
++            CheckpointTxg(4),
++            5
++        ),
++        "A 的根在 txg 3、jsn 3；B 两个数据单元切出 jsn 4、5"
++    );
++    let mut image = pool.memory_pool();
++    tear_the_root_slot_written_for_txg(&mut image, 4);
++    write_back_system_configuration_slots(
++        &mut image,
++        &system_configuration_after_the_first_version,
++    );
++    rewrite_journal_record_and_rechain_the_records_after_it(&mut image, 5, |record| {
++        record.is_commit = false;
++    });
++    let ring_bytes = choose_system_configuration(&image)
++        .expect("系统配置择得出")
++        .immutable
++        .sizes
++        .journal_ring_bytes;
++    zero_the_copy_the_back_chain_reread_tries_first(&mut image, 4, ring_bytes);
++    let (_, candidates) = ring_bytes_and_records(&image, &[4, 5]);
++    let [first_record_of_b, last_record_of_b] =
++        <[_; 2]>::try_from(candidates).expect("jsn 4、5 两条");
++    assert_eq!(
++        (
++            first_record_of_b.named.len(),
++            last_record_of_b.place_in_publish,
++            last_record_of_b.is_commit
++        ),
++        (
++            NAMED_UNITS_OF_THE_FIRST_RECORD_OF_THE_TWO_RECORD_PUBLISH,
++            JournalRecordPlaceInPublish::LastRecordOfThePublish,
++            false
++        ),
++        "jsn 4 点名 1 个单元；jsn 5 带末条标志、不带提交标记"
++    );
++
++    let (mounted, events) = mount_writable_logging_every_block_layer_event(&image, ring_bytes);
++    assert_eq!(
++        (
++            (
++                mounted.output.chosen_root.instance,
++                mounted.output.chosen_root.checkpoint_txg
++            ),
++            (
++                mounted.output.effective_root.instance,
++                mounted.output.effective_root.checkpoint_txg
++            ),
++            mounted.output.journal.above_water,
++            mounted.output.journal.prefix_applied,
++            mounted.output.journal.verification_passed
++        ),
++        (first_version, first_version, 2, 0, 1),
++        "jsn 4 过了点名验证；jsn 5 断在提交标记上，B 整次不施加，挂载在 A"
++    );
++
++    let mut expected_events_after_the_scan = named_unit_events_of(&first_record_of_b);
++    expected_events_after_the_scan.push(back_chain_reread_event_of(&last_record_of_b, ring_bytes));
++    assert_eq!(
++        expected_events_after_the_scan.len(),
++        NAMED_UNITS_OF_THE_FIRST_RECORD_OF_THE_TWO_RECORD_PUBLISH * READS_PER_NAMED_UNIT
++            + BLOCK_LAYER_REREADS_OF_A_ZEROED_PREVIOUS_COPY_PER_CANDIDATE,
++        "判两条在块层的读：jsn 4 点名单元的两份，jsn 5 在 0 号盘重读 jsn 4 零份一次，jsn 5 不读点名单元"
++    );
++    expected_events_after_the_scan.extend(witness_reads_of_the_system_configuration_slots());
++    assert_eq!(
++        events
++            .events_after_the_scan
++            .get(..expected_events_after_the_scan.len()),
++        Some(expected_events_after_the_scan.as_slice()),
++        "扫完环之后：jsn 4 点名的单元读一次，jsn 5 在提交标记那一判之前重读 jsn 4 的零份一次、一个点名单元都不读，再是系统配置槽"
++    );
++}

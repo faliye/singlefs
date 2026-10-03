@@ -1,0 +1,9 @@
+beee8234cea1dd9f86a211490d86930b25fd0e5824ef4142fde5c0a03f3129fc  .claude/kb/milestone/03-third-txn.md
+82e6784348719a8f18d77bbd5abfc51d407d213988918ab97fe4d092432ad28c  .claude/kb/checks-owed.md
+f87368a32e63d311a8fe007dafec17b1eb03d8004151d36f444e0e8aa8980816  .claude/kb/experiments/166-并行提交的共享状态分法.md
+8e01511b705b077e4996b72752bd7da13923f11252890fed645a13c67f925a2c  .claude/kb/experiments/167-多在飞发布的崩溃枚举切法.md
+cd29faa989c624ca13d5701cfc76635e6a1ab7fd58dee173709f4427c1364387  .claude/kb/experiments/169-并行提交的追加纪律与前缀恢复.md
+fabe412c9e1abacb7f2d24c382cdff642cc23cd9ede1f0f5260568b30e4b52af  .claude/kb/decisions/13-验证路线.md
+36d7575441eecd9ef2af620c5474215258acd8c02be9a079164b49855c8e4e70  .claude/kb/decisions/23-journal的角色与格式.md
+4e53d81a14f728249299659a8968261c105881a30fd15d99bcc51050fc26341c  .claude/kb/decisions/08-核心索引结构.md
+36383fc5e40ccb07eab752e863ee9661fe9ba58850d0d5d95985fbb704713f54  .claude/kb/decisions/28-挂载期承诺量.md

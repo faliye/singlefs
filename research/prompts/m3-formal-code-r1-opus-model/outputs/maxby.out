@@ -1,0 +1,2 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：攻方腿在自己的拷贝上跑原型
+max_by_key_picks=slot2

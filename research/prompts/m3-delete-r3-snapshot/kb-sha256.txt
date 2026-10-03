@@ -1,0 +1,13 @@
+f3a5d8e0a084adc150e8fa60247b0d1dc35710534905317a8fbf9e2d8ed4df5d  .claude/kb/milestone/03-third-txn.md
+1041eea7df34a5e9ffafeccde4a1f928a46d24e39335ca624a8b96cf143b802c  .claude/kb/invariants.md
+cf3b3d3ce92bf7c1ee2d44ada7a0ba926af39b1980f097df477d8f7d4ed4ea30  .claude/kb/decisions/23-journal的角色与格式.md
+d5fa01db58dbcc1a704c17b8e9a8b2c36d86ea58334e292558174f129aa1843f  .claude/kb/freeze-layer-membership.md
+2ea8b99d3f805992c68f434ee9a6f64c88367ebc2a646eeb0b89a7acd6b18d5e  .claude/kb/checks-owed.md
+832e18c3ac00c7a357343d7fef47e2f789c1935c2b5c9c5af7d81000843f2b87  .claude/kb/decisions/08-核心索引结构.md
+e09ab08b63a3ec572cd528b39bff1ec1fe0dcf3bb0b3e5bf40f5ca6eb20a4420  .claude/kb/decisions/18-块里携带什么信息.md
+11e245ccf0037021dc2865948987756ae7421e83bec672afa317d72cdc6ad397  .claude/kb/decisions/03-空间分配.md
+9eadb686f7a91fabd24cc17bbd741da8296659e1847d2dd6daeade335b0df861  .claude/kb/decisions/28-挂载期承诺量.md
+e6fa0dc472fd1acb308a9f5d0fe0ab35f2ab5e2af80154f1a78ce456be7ad159  .claude/kb/decisions/05-快照-空间记账机制.md
+536d35af183f06741175601b489e45797dd70ba2b5d82628d5e136213a2ef31d  .claude/kb/decisions/15-格式冻结政策.md
+576c061884220aa76560cd5cf4b409576fe074fab11d7bf49204897e27bff491  .claude/kb/decisions/13-验证路线.md
+0e2903fd0ee95217e0795e830947c806de61b6412e144377cf95b3a849869820  .claude/kb/experiments/104-扫描重建的现行版本判定.md

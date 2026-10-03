@@ -1,0 +1,10 @@
+[package]
+name = "b18-attack-proto"
+version = "0.1.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-harness = { path = "../singlefs-harness" }
+singlefs-core = { path = "../singlefs-core" }

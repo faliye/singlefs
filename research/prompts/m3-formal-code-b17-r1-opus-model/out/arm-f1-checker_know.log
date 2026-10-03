@@ -1,0 +1,10 @@
+run-with-memory-cap: 上限 1536M 超过实测峰值 644M 的 2 倍，照理由放行：三方轮攻方在仓副本里量改法臂，峰值表的数不是这一份副本量的
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-code-b17-r1-opus/repo/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.77s
+     Running tests/checker_known_bad_images.rs (target/debug/deps/checker_known_bad_images-fa5092303c98133d)
+
+running 1 test
+test the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 68 filtered out; finished in 3.70s
+

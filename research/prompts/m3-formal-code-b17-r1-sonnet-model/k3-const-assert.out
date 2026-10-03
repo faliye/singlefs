@@ -1,0 +1,21 @@
+V0 原样（今天的两张表）: cargo check 退出码 0
+V1 覆盖表少 67（I-5.5 没登记）: cargo check 退出码 101
+    error[E0080]: evaluation panicked: 池级 checker 新立的不变量 GPU 内核还没判：补内核，再把下标补进覆盖表（暂不补内核的，点名进「内核还没判」那张表）
+    error: could not compile `singlefs-checker-tier` (lib) due to 1 previous error
+V2 66 同时在两张表里: cargo check 退出码 101
+    error[E0080]: evaluation panicked: 池级 checker 新立的不变量 GPU 内核还没判：补内核，再把下标补进覆盖表（暂不补内核的，点名进「内核还没判」那张表）
+    error: could not compile `singlefs-checker-tier` (lib) due to 1 previous error
+V3 覆盖表 66 写两遍、67 缺（条数对、升序破）: cargo check 退出码 101
+    error[E0080]: evaluation panicked: 覆盖表按下标升序
+    error: could not compile `singlefs-checker-tier` (lib) due to 1 previous error
+V4 覆盖表 65 与还没判表重复、66 缺（条数对）: cargo check 退出码 101
+    error[E0080]: evaluation panicked: 池级 checker 的每一条要么在覆盖表里、要么在「内核还没判」那张表里
+    error: could not compile `singlefs-checker-tier` (lib) due to 1 previous error
+V5 覆盖表 67 写成 68（条数对、67 缺）: cargo check 退出码 101
+    error[E0080]: evaluation panicked: 池级 checker 的每一条要么在覆盖表里、要么在「内核还没判」那张表里
+    error: could not compile `singlefs-checker-tier` (lib) due to 1 previous error
+V6 还没判表点名 67、覆盖表不含 67（把 I-5.5 登记成内核没判，应当编得过）: cargo check 退出码 0
+V7 还没判表空、覆盖表 0..=67 全列（根环线第 9 批删表之后的形态，应当编得过）: cargo check 退出码 0
+V8 还没判表空、覆盖表 0..=67 少 65（删表而 I-3.5 没补，应当编不过）: cargo check 退出码 101
+    error[E0080]: evaluation panicked: 池级 checker 新立的不变量 GPU 内核还没判：补内核，再把下标补进覆盖表（暂不补内核的，点名进「内核还没判」那张表）
+    error: could not compile `singlefs-checker-tier` (lib) due to 1 previous error

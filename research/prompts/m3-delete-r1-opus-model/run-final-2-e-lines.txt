@@ -1,0 +1,82 @@
+E name=redo_after_rollback recover_after_rollback=FileRead root=(InstanceGeneration(1), CheckpointTxg(7)) bytes=179487 raw_nlink_after_rollback=1 redo=Ok(txg=8 units=4) recover_after_redo=FileRead root=(InstanceGeneration(1), CheckpointTxg(8)) bytes=130536 checker_red=[]
+E name=size_kept step=batch_keep_4 size=179487 units=4 recover=Failed root=Some((InstanceGeneration(1), CheckpointTxg(6))) failure=InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" } writable_mount=Err(Recovery(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" })) checker_red=[]
+E name=full_pool demand_slots_of_the_batch=[13, 13] dev0_allocated=211956 dev0_free=12 dev0_deferred=28 dev1_allocated=211956 dev1_free=12 dev1_deferred=28
+E name=full_pool_delete_batch result=Err(SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(196608), demand: BytesOnOneDevice(8880128) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(196608), demand: BytesOnOneDevice(8880128) }] }))
+E name=full_pool_overwrite result=Err(SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(163840), demand: BytesOnOneDevice(8863744) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(163840), demand: BytesOnOneDevice(8863744) }] }))
+E name=rollback_mid_delete before=FileRead root=(InstanceGeneration(1), CheckpointTxg(6)) bytes=130536 rollback_ok=true txg_after=7 units_after=6 size_after=179487 recover_after=FileRead root=(InstanceGeneration(1), CheckpointTxg(7)) bytes=179487 checker_red=[] accounting_rows_equal_to_the_deleting_version_except_watermark=true
+E name=rollback_into_mid_delete target_txg=5 rollback=Ok txg_after=8 units_after=6 size_after=179487 raw_nlink_before=0 raw_nlink_after=0 inode_leaf_rewritten_by_the_rollback=false recover_after=FileRead root=(InstanceGeneration(1), CheckpointTxg(8)) bytes=179487 checker_red=[]
+E name=redo_same_instance images_byte_equal=true outputs_equal=true
+E name=redo_after_crash instance_first=1 instance_redo=2 txg_first=6 txg_redo=8 rewritten_units_first=12 rewritten_units_redo=12 rewritten_units_byte_equal=0 data_pointers_equal=true inode_record_equal_but_change_count=true change_count_first=6 change_count_redo=8
+E name=redo_after_crash_recover first=FileRead root=(InstanceGeneration(1), CheckpointTxg(6)) bytes=130536 redo=FileRead root=(InstanceGeneration(2), CheckpointTxg(8)) bytes=130536
+E name=state step=before_unlink txg=4 keep=6 size=179487 demand_bytes_both_devices=819200 dev0_allocated=42 dev0_free=211926 dev0_deferred=15 dev1_allocated=42 dev1_free=211926 dev1_deferred=15
+E name=available step=before_unlink pending_kind=A_unreleased_extents pending_bytes_all_replicas=0 available_bytes_per_device=[3472195584, 3472195584]
+E name=available step=before_unlink pending_kind=A2_unreclaimed_extents pending_bytes_all_replicas=0 available_bytes_per_device=[3472195584, 3472195584]
+E name=available step=before_unlink pending_kind=B_zero pending_bytes_all_replicas=0 available_bytes_per_device=[3472195584, 3472195584]
+E name=available step=before_unlink pending_kind=C_remaining_batches_metadata pending_bytes_all_replicas=0 available_bytes_per_device=[3472195584, 3472195584]
+E name=recover step=before_unlink outcome=FileRead root=(InstanceGeneration(1), CheckpointTxg(4)) bytes=179487
+E name=read_only_mount step=before_unlink result=Ok
+E name=writable_mount step=before_unlink result=Ok(WithFile units=6 size=179487)
+E name=checker step=before_unlink red=[]
+E name=state step=intent txg=5 keep=6 size=179487 demand_bytes_both_devices=425984 dev0_allocated=55 dev0_free=211913 dev0_deferred=28 dev1_allocated=55 dev1_free=211913 dev1_deferred=28
+E name=available step=intent pending_kind=A_unreleased_extents pending_bytes_all_replicas=393216 available_bytes_per_device=[3471785984, 3471785984]
+E name=available step=intent pending_kind=A2_unreclaimed_extents pending_bytes_all_replicas=393216 available_bytes_per_device=[3471785984, 3471785984]
+E name=available step=intent pending_kind=B_zero pending_bytes_all_replicas=0 available_bytes_per_device=[3471982592, 3471982592]
+E name=available step=intent pending_kind=C_remaining_batches_metadata pending_bytes_all_replicas=1245184 available_bytes_per_device=[3471360000, 3471360000]
+E name=recover step=intent outcome=FileRead root=(InstanceGeneration(1), CheckpointTxg(5)) bytes=179487
+E name=read_only_mount step=intent result=Ok
+E name=writable_mount step=intent result=Ok(WithFile units=6 size=179487)
+E name=checker step=intent red=[]
+E name=state step=batch_keep_4 txg=6 keep=4 size=130536 demand_bytes_both_devices=425984 dev0_allocated=68 dev0_free=211900 dev0_deferred=45 dev1_allocated=68 dev1_free=211900 dev1_deferred=45
+E name=available step=batch_keep_4 pending_kind=A_unreleased_extents pending_bytes_all_replicas=262144 available_bytes_per_device=[3471638528, 3471638528]
+E name=available step=batch_keep_4 pending_kind=A2_unreclaimed_extents pending_bytes_all_replicas=393216 available_bytes_per_device=[3471572992, 3471572992]
+E name=available step=batch_keep_4 pending_kind=B_zero pending_bytes_all_replicas=0 available_bytes_per_device=[3471769600, 3471769600]
+E name=available step=batch_keep_4 pending_kind=C_remaining_batches_metadata pending_bytes_all_replicas=819200 available_bytes_per_device=[3471360000, 3471360000]
+E name=recover step=batch_keep_4 outcome=FileRead root=(InstanceGeneration(1), CheckpointTxg(6)) bytes=130536
+E name=read_only_mount step=batch_keep_4 result=Ok
+E name=writable_mount step=batch_keep_4 result=Ok(WithFile units=4 size=130536)
+E name=checker step=batch_keep_4 red=[]
+E name=state step=batch_keep_2 txg=7 keep=2 size=65268 demand_bytes_both_devices=425984 dev0_allocated=81 dev0_free=211887 dev0_deferred=62 dev1_allocated=81 dev1_free=211887 dev1_deferred=62
+E name=available step=batch_keep_2 pending_kind=A_unreleased_extents pending_bytes_all_replicas=131072 available_bytes_per_device=[3471491072, 3471491072]
+E name=available step=batch_keep_2 pending_kind=A2_unreclaimed_extents pending_bytes_all_replicas=393216 available_bytes_per_device=[3471360000, 3471360000]
+E name=available step=batch_keep_2 pending_kind=B_zero pending_bytes_all_replicas=0 available_bytes_per_device=[3471556608, 3471556608]
+E name=available step=batch_keep_2 pending_kind=C_remaining_batches_metadata pending_bytes_all_replicas=393216 available_bytes_per_device=[3471360000, 3471360000]
+E name=recover step=batch_keep_2 outcome=FileRead root=(InstanceGeneration(1), CheckpointTxg(7)) bytes=65268
+E name=read_only_mount step=batch_keep_2 result=Ok
+E name=writable_mount step=batch_keep_2 result=Ok(WithFile units=2 size=65268)
+E name=checker step=batch_keep_2 red=[]
+E name=state step=batch_keep_0 txg=8 keep=0 size=0 demand_bytes_both_devices=393216 dev0_allocated=93 dev0_free=211875 dev0_deferred=79 dev1_allocated=93 dev1_free=211875 dev1_deferred=79
+E name=available step=batch_keep_0 pending_kind=A_unreleased_extents pending_bytes_all_replicas=0 available_bytes_per_device=[3471360000, 3471360000]
+E name=available step=batch_keep_0 pending_kind=A2_unreclaimed_extents pending_bytes_all_replicas=393216 available_bytes_per_device=[3471163392, 3471163392]
+E name=available step=batch_keep_0 pending_kind=B_zero pending_bytes_all_replicas=0 available_bytes_per_device=[3471360000, 3471360000]
+E name=available step=batch_keep_0 pending_kind=C_remaining_batches_metadata pending_bytes_all_replicas=0 available_bytes_per_device=[3471360000, 3471360000]
+E name=recover step=batch_keep_0 outcome=Failed root=Some((InstanceGeneration(1), CheckpointTxg(8))) failure=UnitMalformed { what: "extent 树里第一个文件一个数据单元都没有" }
+E name=read_only_mount step=batch_keep_0 result=Ok
+E name=writable_mount step=batch_keep_0 result=Err(Recovery(UnitMalformed { what: "extent 树里第一个文件一个数据单元都没有" }))
+E name=checker step=batch_keep_0 red=[]
+E name=double_count step=intent pending_kind=A_unreleased_extents demand_equals_free_slots=true admitted=false detail=Some([DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(3471785984), demand: BytesOnOneDevice(3471982592) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(3471785984), demand: BytesOnOneDevice(3471982592) }])
+E name=double_count step=intent pending_kind=B_zero demand_equals_free_slots=true admitted=true detail=None
+E name=closed_form publish=intent_keep_6 txg=5 writes=29 segments=4 segment_sizes=[24, 2, 1, 2] two_state_closed_form=16777223
+E name=closed_form publish=batch_keep_4 txg=6 writes=29 segments=4 segment_sizes=[24, 2, 1, 2] two_state_closed_form=16777223
+E name=closed_form publish=batch_keep_2 txg=7 writes=29 segments=4 segment_sizes=[24, 2, 1, 2] two_state_closed_form=16777223
+E name=closed_form publish=batch_keep_0 txg=8 writes=27 segments=4 segment_sizes=[22, 2, 1, 2] two_state_closed_form=4194311
+E name=closed_form_sum publishes=4 sum_of_states_minus_one_each=54525976
+E name=closed_form publish=sequential_write_one_unit_after_the_delete result_ok=true writes=29 segments=4 segment_sizes=[24, 2, 1, 2] two_state_closed_form=16777223
+E name=reader step=before_unlink inode_records=1 inode_1_present=true raw_nlink_on_disk=1 open_file_inode_1=Ok(units=6 size=179487)
+E name=reader step=intent inode_records=1 inode_1_present=true raw_nlink_on_disk=0 open_file_inode_1=Ok(units=6 size=179487)
+E name=reader step=batch_keep_4 inode_records=1 inode_1_present=true raw_nlink_on_disk=0 open_file_inode_1=Ok(units=4 size=130536)
+E name=reader step=batch_keep_2 inode_records=1 inode_1_present=true raw_nlink_on_disk=0 open_file_inode_1=Ok(units=2 size=65268)
+E name=reader step=batch_keep_0 inode_records=1 inode_1_present=true raw_nlink_on_disk=0 open_file_inode_1=Ok(units=0 size=0)
+E name=after_delete op=publish_first_file result=Err(FirstFileVersionOnAVersionThatAlreadyHasAFile { tree_table_entries: 7 })
+E name=after_delete op=sequential_write_to_inode_1 result=Ok txg=9 object_birth_deleted=3 object_birth_written=3 recover=FileRead root=(InstanceGeneration(1), CheckpointTxg(9)) bytes=16317
+E name=after_delete op=publish_new_inodes_1 result=Ok watermark=3 recover=Failed root=Some((InstanceGeneration(1), CheckpointTxg(9))) failure=UnitMalformed { what: "extent 树里第一个文件一个数据单元都没有" }
+test a_batch_redone_after_the_rollback_truncates_the_file_the_administrator_brought_back ...
+test a_batch_that_leaves_the_size_is_refused_by_recovery ...
+test a_delete_batch_is_refused_by_admission_on_a_pool_too_full_for_one_overwrite ...
+test an_administrator_rollback_in_the_middle_of_a_delete_brings_the_whole_file_back ...
+test an_administrator_rollback_into_a_version_in_the_middle_of_a_delete ...
+test the_same_batch_redone_after_a_crash_writes_other_bytes_for_the_same_target ...
+test three_batches_after_the_intent_space_recovery_and_checker ...
+test two_state_closed_form_of_each_unlink_publish ...
+test what_a_read_only_mount_sees_at_each_step_of_the_delete ...
+test what_the_writer_does_after_the_file_is_deleted ...
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.86s

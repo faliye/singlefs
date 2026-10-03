@@ -1,0 +1,14 @@
+run-with-memory-cap: 上限 1536M 超过实测峰值 589M 的 2 倍，照理由放行：三方轮攻方在仓副本里量改法臂，峰值表的数不是这一份副本量的
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-code-b17-r1-opus/repo/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.49s
+     Running tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs (target/debug/deps/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement-c936ee7c382e79da)
+
+running 5 tests
+test a_new_pool_file_on_the_default_journal_ring_holds_the_first_data_unit_placement ... ok
+test a_new_pool_file_on_a_128_mebibyte_journal_ring_holds_the_first_data_unit_placement ... ok
+test once_the_first_file_version_leaves_the_root_ring_the_overwrite_versions_are_not_judged_for_the_first_data_unit_placement ... ok
+test the_first_file_of_an_instance_after_a_warm_up_only_mount_is_recognized_and_holds_the_first_data_unit_placement ... ok
+test a_first_file_version_issuing_its_trees_from_the_ring_watermark_after_a_recovery_keeps_the_head_identifier_relation ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.05s
+

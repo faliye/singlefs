@@ -1,0 +1,7 @@
+== random broad steps=12 seeds=0..400
+histories=400 completed=400
+first_states=0 with_torn_write=0 mounts_succeeded=0 n_config_refusals=0
+first_c670=0 in_short_segments(<=4)=0 in_torn_states=0
+second_states=0 second_n_config_refusals=0 second_c670=0
+abandoning_steps=116 abandoning_steps_that_sent_something=0
+elapsed_seconds=1.7

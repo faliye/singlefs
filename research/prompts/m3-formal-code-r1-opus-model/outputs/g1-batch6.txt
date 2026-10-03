@@ -1,0 +1,4 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：攻方腿在自己的拷贝上跑 harness 档变异，与别的腿各跑各的
+write_accounting_per_structure-55553dff35fa20a4 rc=0 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.81s
+write_entries_refuse_an_inode_being_deleted-5b4dce668cdf777d rc=0 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+zero_unit_publishes_are_compared_with_what_the_row_publish_of_the_same_mount_handed_in-6c14df41be0f73f2 rc=0 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.75s

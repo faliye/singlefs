@@ -1,0 +1,12 @@
+E name=fsync_round target=nvme_ext4_draft_dir round=0 syncs=200 median_us=593.8 mean_us=627.3
+E name=fsync_round target=nvme_ext4_draft_dir round=1 syncs=200 median_us=589.6 mean_us=590.8
+E name=fsync_round target=nvme_ext4_draft_dir round=2 syncs=200 median_us=590.0 mean_us=591.1
+E name=fsync_round target=nvme_ext4_draft_dir round=3 syncs=200 median_us=590.0 mean_us=592.2
+E name=fsync_round target=nvme_ext4_draft_dir round=4 syncs=200 median_us=590.0 mean_us=591.2
+E name=fsync_round target=tmpfs_dev_shm round=0 syncs=200 median_us=0.1 mean_us=0.1
+E name=fsync_round target=tmpfs_dev_shm round=1 syncs=200 median_us=0.1 mean_us=0.1
+E name=fsync_round target=tmpfs_dev_shm round=2 syncs=200 median_us=0.1 mean_us=0.1
+E name=fsync_round target=tmpfs_dev_shm round=3 syncs=200 median_us=0.1 mean_us=0.1
+E name=fsync_round target=tmpfs_dev_shm round=4 syncs=200 median_us=0.1 mean_us=0.1
+E name=copy target=first_version_allocator_450KiB bytes=460800 median_us=8.9 bytes_per_second=5.204e+10
+E name=copy target=one_tib_bitmaps_128MiB bytes=134217728 median_us=30197.4 bytes_per_second=4.445e+09

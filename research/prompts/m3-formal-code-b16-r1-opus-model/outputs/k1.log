@@ -1,0 +1,10 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-code-b16-r1-opus/ws/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.24s
+     Running tests/attack_unmount_without_trees.rs (/tmp/claude-1000/m3-formal-code-b16-r1-opus/target-test/debug/deps/attack_unmount_without_trees-a38cf7d188f84b74)
+
+running 1 test
+ATTACK-K1 model_roots(txg,F)=[(3, 2), (4, 2)] implementation=一个字节都不写 verdict=Err(PublishCount)
+test attack_unmount_on_a_version_without_trees_when_the_model_answers_by_the_clause ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 3.42s
+

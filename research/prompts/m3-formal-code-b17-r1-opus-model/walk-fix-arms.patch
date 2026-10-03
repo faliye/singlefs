@@ -1,0 +1,54 @@
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ -4218,7 +4218,51 @@
+         if smallest_data_unit_slot_on_each_device.is_empty() {
+             continue;
+         }
++        // 攻方副本里的两条改法臂（只在副本里，环境变量 OPUS_I55_ARM 选；不设就是入库那一版）：
++        // f1：认法再加 ③「这一版的分配记录里 U、U + 1 两槽都还被占着（已分配且分配代早于这一版，或已释放）」，不满足就不判；
++        // f2：每块盘上该在的槽不写死 U + 4，现算——从 U 起第一个起点 32768 对齐、两槽都不被「已释放、或分配代早于这一版」的分配记录罩着的槽对。
++        let arm = std::env::var("OPUS_I55_ARM").unwrap_or_default();
++        let mut expected_on_device: BTreeMap<u32, u64> = BTreeMap::new();
++        if arm == "f1" || arm == "f2" {
++            let allocation_entry = tree_table
++                .entries
++                .iter()
++                .find(|entry| read_u16(entry, TREE_TABLE_ENTRY_KIND_OFFSET) == TREE_KIND_ALLOCATION);
++            let records = allocation_entry.and_then(|entry| {
++                allocation_record_tree_without_judging(reader, &parse_node_pointer(&entry[14..100]), &mut cache)
++                    .map(|(_, records)| records)
++            });
++            let Some(records) = records else {
++                judgements.part_of_the_range_not_judged(invariant, "攻方改法臂：这一版的分配记录树读不全");
++                continue;
++            };
++            let occupied = |device: u32, slot: u64| {
++                records.iter().any(|record| {
++                    record.device == device
++                        && record.slot <= slot
++                        && slot < record.slot + record.span_slots
++                        && (record.is_released || record.generation < version.checkpoint_txg)
++                })
++            };
++            if arm == "f1"
++                && devices.iter().any(|device| {
++                    !(occupied(*device, unit_area_start_slot) && occupied(*device, unit_area_start_slot + 1))
++                })
++            {
++                continue;
++            }
++            if arm == "f2" {
++                for device in &devices {
++                    let mut candidate = unit_area_start_slot;
++                    while occupied(*device, candidate) || occupied(*device, candidate + 1) {
++                        candidate += 2;
++                    }
++                    expected_on_device.insert(*device, candidate);
++                }
++            }
++        }
+         for device in &devices {
++            let expected_slot = expected_on_device.get(device).copied().unwrap_or(expected_slot);
+             match smallest_data_unit_slot_on_each_device.get(device) {
+                 Some(&smallest_slot) => {
+                     judgements.judge(invariant, smallest_slot == expected_slot, || {

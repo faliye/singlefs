@@ -1,0 +1,5 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：三方腿并行各跑各的小模型
+  V1 差>1             all_durable 7 份 / 64 态；strict_segment 6 份 / 48 态；合计 13 份 / 112 态
+  V2 差不是0或1          all_durable 29 份 / 1002 态；strict_segment 6 份 / 48 态；合计 35 份 / 1050 态
+  V3 集合不连续           all_durable 27 份 / 994 态；strict_segment 4 份 / 40 态；合计 31 份 / 1034 态
+  V4 有更小的没施加         all_durable 5 份 / 166 态；strict_segment 0 份 / 0 态；合计 5 份 / 166 态

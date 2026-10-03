@@ -1,0 +1,51 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 25M 的 2 倍，照理由放行：峰值表记的是只扫两格的那一次，这一次扫四十格、镜像拷贝更多
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：三方轮云端攻方腿在自己的仓副本里跑原型，与正推腿各跑各的
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/opus_b17_first_data_unit_attack.rs (target/debug/deps/opus_b17_first_data_unit_attack-df9788a558172886)
+
+running 1 test
+name=shape_a ring=default k=1 instance=1 first_file_txg=3 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] i55=holds red=[]
+name=shape_a ring=default k=2 instance=2 first_file_txg=5 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] i55=holds red=[]
+name=shape_a ring=default k=3 instance=3 first_file_txg=8 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] i55=holds red=[]
+name=shape_a ring=default k=4 instance=4 first_file_txg=11 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] i55=holds red=[]
+name=shape_a ring=default k=5 instance=5 first_file_txg=14 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] i55=holds red=[]
+name=shape_a ring=default k=6 instance=6 first_file_txg=17 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] i55=holds red=[]
+name=shape_a ring=default k=7 instance=7 first_file_txg=20 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] i55=holds red=[]
+name=shape_a ring=default k=8 instance=8 first_file_txg=23 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] i55=holds red=[]
+name=shape_a ring=default k=9 instance=9 first_file_txg=26 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] i55=holds red=[]
+test shape_a_remount_count_sweep_then_first_file has been running for over 60 seconds
+name=shape_a ring=default k=10 instance=10 first_file_txg=29 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] i55=VIOLATED(根（实例 10、txg 29）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 50176，不是单元区起始槽号 50176 + 4 = 50180) red=["I-5.5"]
+name=shape_a ring=default k=11 instance=11 first_file_txg=32 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] i55=VIOLATED(根（实例 11、txg 32）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 50176，不是单元区起始槽号 50176 + 4 = 50180) red=["I-5.5"]
+name=shape_a ring=default k=12 instance=12 first_file_txg=35 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] i55=VIOLATED(根（实例 12、txg 35）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 50176，不是单元区起始槽号 50176 + 4 = 50180) red=["I-5.5"]
+name=shape_a ring=default k=13 instance=13 first_file_txg=38 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] i55=VIOLATED(根（实例 13、txg 38）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 50176，不是单元区起始槽号 50176 + 4 = 50180) red=["I-5.5"]
+name=shape_a ring=default k=14 instance=14 first_file_txg=41 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] i55=VIOLATED(根（实例 14、txg 41）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 50176，不是单元区起始槽号 50176 + 4 = 50180) red=["I-5.5"]
+name=shape_a ring=default k=15 instance=15 first_file_txg=44 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] i55=VIOLATED(根（实例 15、txg 44）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 50176，不是单元区起始槽号 50176 + 4 = 50180) red=["I-5.5"]
+name=shape_a ring=default k=16 instance=16 first_file_txg=47 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] i55=VIOLATED(根（实例 16、txg 47）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 50176，不是单元区起始槽号 50176 + 4 = 50180) red=["I-5.5"]
+name=shape_a ring=default k=17 instance=17 first_file_txg=50 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] i55=VIOLATED(根（实例 17、txg 50）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 50176，不是单元区起始槽号 50176 + 4 = 50180) red=["I-5.5"]
+name=shape_a ring=default k=18 instance=18 first_file_txg=53 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] i55=VIOLATED(根（实例 18、txg 53）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 50176，不是单元区起始槽号 50176 + 4 = 50180) red=["I-5.5"]
+name=shape_a ring=default k=19 instance=19 first_file_txg=56 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] i55=VIOLATED(根（实例 19、txg 56）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 50176，不是单元区起始槽号 50176 + 4 = 50180) red=["I-5.5"]
+name=shape_a ring=default k=20 instance=20 first_file_txg=59 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] i55=VIOLATED(根（实例 20、txg 59）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 50176，不是单元区起始槽号 50176 + 4 = 50180) red=["I-5.5"]
+name=shape_a ring=128MiB k=1 instance=1 first_file_txg=3 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] i55=holds red=[]
+name=shape_a ring=128MiB k=2 instance=2 first_file_txg=5 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] i55=holds red=[]
+name=shape_a ring=128MiB k=3 instance=3 first_file_txg=8 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] i55=holds red=[]
+name=shape_a ring=128MiB k=4 instance=4 first_file_txg=11 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] i55=holds red=[]
+name=shape_a ring=128MiB k=5 instance=5 first_file_txg=14 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] i55=holds red=[]
+name=shape_a ring=128MiB k=6 instance=6 first_file_txg=17 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] i55=holds red=[]
+name=shape_a ring=128MiB k=7 instance=7 first_file_txg=20 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] i55=holds red=[]
+name=shape_a ring=128MiB k=8 instance=8 first_file_txg=23 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] i55=holds red=[]
+name=shape_a ring=128MiB k=9 instance=9 first_file_txg=26 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9220), (1, 9220)] i55=holds red=[]
+name=shape_a ring=128MiB k=10 instance=10 first_file_txg=29 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9216), (1, 9216)] i55=VIOLATED(根（实例 10、txg 29）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 9216，不是单元区起始槽号 9216 + 4 = 9220) red=["I-5.5"]
+name=shape_a ring=128MiB k=11 instance=11 first_file_txg=32 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9216), (1, 9216)] i55=VIOLATED(根（实例 11、txg 32）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 9216，不是单元区起始槽号 9216 + 4 = 9220) red=["I-5.5"]
+name=shape_a ring=128MiB k=12 instance=12 first_file_txg=35 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9216), (1, 9216)] i55=VIOLATED(根（实例 12、txg 35）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 9216，不是单元区起始槽号 9216 + 4 = 9220) red=["I-5.5"]
+name=shape_a ring=128MiB k=13 instance=13 first_file_txg=38 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9216), (1, 9216)] i55=VIOLATED(根（实例 13、txg 38）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 9216，不是单元区起始槽号 9216 + 4 = 9220) red=["I-5.5"]
+name=shape_a ring=128MiB k=14 instance=14 first_file_txg=41 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9216), (1, 9216)] i55=VIOLATED(根（实例 14、txg 41）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 9216，不是单元区起始槽号 9216 + 4 = 9220) red=["I-5.5"]
+name=shape_a ring=128MiB k=15 instance=15 first_file_txg=44 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9216), (1, 9216)] i55=VIOLATED(根（实例 15、txg 44）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 9216，不是单元区起始槽号 9216 + 4 = 9220) red=["I-5.5"]
+name=shape_a ring=128MiB k=16 instance=16 first_file_txg=47 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9216), (1, 9216)] i55=VIOLATED(根（实例 16、txg 47）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 9216，不是单元区起始槽号 9216 + 4 = 9220) red=["I-5.5"]
+name=shape_a ring=128MiB k=17 instance=17 first_file_txg=50 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9216), (1, 9216)] i55=VIOLATED(根（实例 17、txg 50）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 9216，不是单元区起始槽号 9216 + 4 = 9220) red=["I-5.5"]
+name=shape_a ring=128MiB k=18 instance=18 first_file_txg=53 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9216), (1, 9216)] i55=VIOLATED(根（实例 18、txg 53）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 9216，不是单元区起始槽号 9216 + 4 = 9220) red=["I-5.5"]
+name=shape_a ring=128MiB k=19 instance=19 first_file_txg=56 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9216), (1, 9216)] i55=VIOLATED(根（实例 19、txg 56）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 9216，不是单元区起始槽号 9216 + 4 = 9220) red=["I-5.5"]
+name=shape_a ring=128MiB k=20 instance=20 first_file_txg=59 inode_tree=65537 unit_area_start=9216 expected=9220 smallest_slot_per_device=[(0, 9216), (1, 9216)] i55=VIOLATED(根（实例 20、txg 59）（从 mkfs 水位第一次建树的那一版）：盘 0 上落点最小的数据单元在槽 9216，不是单元区起始槽号 9216 + 4 = 9220) red=["I-5.5"]
+test shape_a_remount_count_sweep_then_first_file ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 133.53s
+

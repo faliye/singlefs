@@ -1,0 +1,13 @@
+seeds=42 seeds_hit=35
+n=5 trials=42 hits=0 rate=0.000 7/(4n)=0.350
+n=13 trials=378 hits=49 rate=0.130 7/(4n)=0.135
+n=19 trials=210 hits=21 rate=0.100 7/(4n)=0.092
+picked segment (5, 1, 'JJ') 21
+picked segment (5, 2, 'R') 7
+picked segment (5, 3, 'SS') 14
+picked segment (13, 1, 'UUUUUUUU') 236
+picked segment (13, 2, 'JJ') 58
+picked segment (13, 3, 'SSR') 84
+picked segment (19, 1, 'UUUUUUUUUUUUUU') 159
+picked segment (19, 2, 'JJ') 20
+picked segment (19, 3, 'SSR') 31

@@ -1,0 +1,72 @@
+run-with-memory-cap: 上限 512M 超过实测峰值 8M 的 2 倍，照理由放行：python3 小模型枚举峰值未入表
+重复数合计（duplicate_total，Q-1..Q-7）按 臂 × Q1 候选；非零用 ! 标
+  臂      候选   Q-1  Q-2  Q-3  Q-4  Q-5  Q-6  Q-7
+  A      Q1甲   0   0   0   0   0   0   0
+  A      Q1乙   0   0   0   0   0   0   0
+  A      Q1丙   0   0   0   0   0   0   0
+  A字面    Q1甲   0   0   0  !46944  !11952   0   0
+  A字面    Q1乙   0   0   0   0  !11952   0   0
+  A字面    Q1丙   0   0   0  !46944  !11952   0   0
+  P区     Q1甲   0   0   0   0   0   0   0
+  P区     Q1乙   0   0   0   0   0   0   0
+  P区     Q1丙   0   0   0   0   0   0   0
+  P设     Q1甲   0   0   0   0   0   0   0
+  P设     Q1乙   0   0   0   0   0   0   0
+  P设     Q1丙   0   0   0   0   0   0   0
+  O整     Q1甲   0   0   0   0   0   0   0
+  O整     Q1乙   0   0   0   0   0   0   0
+  O整     Q1丙   0   0   0   0   0   0   0
+  O读     Q1甲   0   0   0   0   0   0   0
+  O读     Q1乙   0   0   0   0   0   0   0
+  O读     Q1丙   0   0   0   0   0   0   0
+
+冲突重算（Q-8 retries_total、有重算的格数、judgement）：
+  A      Q1甲 retries_total=0 cells_with_retries=0 device_truncated=0 judgement=definition_implied
+  A      Q1乙 retries_total=0 cells_with_retries=0 device_truncated=0 judgement=definition_implied
+  A      Q1丙 retries_total=0 cells_with_retries=0 device_truncated=0 judgement=definition_implied
+  A字面    Q1甲 retries_total=0 cells_with_retries=0 device_truncated=0 judgement=judged
+  A字面    Q1乙 retries_total=0 cells_with_retries=0 device_truncated=0 judgement=judged
+  A字面    Q1丙 retries_total=0 cells_with_retries=0 device_truncated=0 judgement=judged
+  P区     Q1甲 retries_total=0 cells_with_retries=0 device_truncated=0 judgement=definition_implied
+  P区     Q1乙 retries_total=0 cells_with_retries=0 device_truncated=0 judgement=definition_implied
+  P区     Q1丙 retries_total=0 cells_with_retries=0 device_truncated=0 judgement=definition_implied
+  P设     Q1甲 retries_total=12094527412260 cells_with_retries=6 device_truncated=311170212792 judgement=known_before_run
+  P设     Q1乙 retries_total=12094527412260 cells_with_retries=6 device_truncated=311170212792 judgement=known_before_run
+  P设     Q1丙 retries_total=12094527412260 cells_with_retries=6 device_truncated=311170212792 judgement=known_before_run
+  O整     Q1甲 retries_total=4576 cells_with_retries=8 device_truncated=0 judgement=definition_implied
+  O整     Q1乙 retries_total=4576 cells_with_retries=8 device_truncated=0 judgement=definition_implied
+  O整     Q1丙 retries_total=4576 cells_with_retries=8 device_truncated=0 judgement=definition_implied
+  O读     Q1甲 retries_total=4576 cells_with_retries=8 device_truncated=0 judgement=judged
+  O读     Q1乙 retries_total=2512 cells_with_retries=6 device_truncated=0 judgement=judged
+  O读     Q1丙 retries_total=4576 cells_with_retries=8 device_truncated=0 judgement=judged
+
+同步轮次（Q-9：每格每轮提交的事务数；cells_with_fewer_rounds_than_serial 条格里比串行少）：
+  A      Q1甲 fewer=not_reported equal_every_cell=None judgement=not_reported
+  A      Q1乙 fewer=not_reported equal_every_cell=None judgement=not_reported
+  A      Q1丙 fewer=not_reported equal_every_cell=None judgement=not_reported
+  A字面    Q1甲 fewer=not_reported equal_every_cell=None judgement=not_reported
+  A字面    Q1乙 fewer=not_reported equal_every_cell=None judgement=not_reported
+  A字面    Q1丙 fewer=not_reported equal_every_cell=None judgement=not_reported
+  P区     Q1甲 fewer=8 equal_every_cell=false judgement=definition_implied
+  P区     Q1乙 fewer=8 equal_every_cell=false judgement=definition_implied
+  P区     Q1丙 fewer=8 equal_every_cell=false judgement=definition_implied
+  P设     Q1甲 fewer=8 equal_every_cell=false judgement=judged
+  P设     Q1乙 fewer=8 equal_every_cell=false judgement=judged
+  P设     Q1丙 fewer=8 equal_every_cell=false judgement=judged
+  O整     Q1甲 fewer=0 equal_every_cell=true judgement=definition_implied
+  O整     Q1乙 fewer=0 equal_every_cell=true judgement=definition_implied
+  O整     Q1丙 fewer=0 equal_every_cell=true judgement=definition_implied
+  O读     Q1甲 fewer=0 equal_every_cell=true judgement=judged
+  O读     Q1乙 fewer=4 equal_every_cell=false judgement=judged
+  O读     Q1丙 fewer=0 equal_every_cell=true judgement=judged
+
+失败条款行：
+  第 1169 行 failure=2 clause=A_default_geometry_duplicate triggered=false
+  第 1170 行 failure=4 clause=ruler_cannot_separate_candidates triggered=false
+  第 1171 行 failure=5 clause=read_set_not_as_registered triggered=false
+  第 1172 行 failure=6 clause=device_partition_does_not_converge triggered=true
+  第 1173 行 failure=7 clause=literal_lock_misses_shared_state triggered=true
+  第 1174 行 failure=8 clause=judgement_flips_with_q1_candidate triggered=true
+  第 1175 行 failure=9 clause=read_set_below_whole_in_stage_two_same_shape triggered=false
+
+核：anchor 行 92 条，ok=true 92 条；cell 行 288、control_cell 行 144

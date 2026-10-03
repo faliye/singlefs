@@ -1,0 +1,21 @@
+== named AfterFirstFile+CloseAndMountWritable
+histories=1 completed=1
+first_states=100 with_torn_write=50 mounts_succeeded=95 n_config_refusals=5
+first_refusal NewerStateStillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion::AgainstTheSelectedVersionsLastRecord 5
+first_c670=5 in_short_segments(<=4)=5 in_torn_states=2
+first_c670_branch WitnessedCounterAboveTheLastRecordOfTheSelectedVersion 5
+first_c670_step CloseAndMountWritable 5
+second_states=1143 second_n_config_refusals=138 second_c670=138
+second_c670_branch RecordAtTheWitnessedCounterNewerThanTheSelectedVersion 18
+second_c670_branch WitnessedCounterAboveTheLastRecordOfTheSelectedVersion 120
+abandoning_steps=0 abandoning_steps_that_sent_something=0
+example second seed=0 mount-seg=3 branch=RecordAtTheWitnessedCounterNewerThanTheSelectedVersion landing=["SystemConfigurationSlot@d0:1", "SystemConfigurationSlot@d1:0", "RootRecordFua@d1:0"] member=NewerStateStillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion::AgainstTheRecordAtTheWitnessedCounter
+example second seed=0 mount-seg=3 branch=RecordAtTheWitnessedCounterNewerThanTheSelectedVersion landing=["SystemConfigurationSlot@d0:0", "SystemConfigurationSlot@d1:1", "RootRecordFua@d1:0"] member=NewerStateStillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion::AgainstTheRecordAtTheWitnessedCounter
+example second seed=0 mount-seg=3 branch=RecordAtTheWitnessedCounterNewerThanTheSelectedVersion landing=["SystemConfigurationSlot@d0:1", "SystemConfigurationSlot@d1:1", "RootRecordFua@d1:0"] member=NewerStateStillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion::AgainstTheRecordAtTheWitnessedCounter
+example second seed=0 mount-seg=3 branch=RecordAtTheWitnessedCounterNewerThanTheSelectedVersion landing=["SystemConfigurationSlot@d0:1", "SystemConfigurationSlot@d1:0", "RootRecordFua@d1:0"] member=NewerStateStillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion::AgainstTheRecordAtTheWitnessedCounter
+example first seed=0 seg=18 step=CloseAndMountWritable branch=WitnessedCounterAboveTheLastRecordOfTheSelectedVersion landing=["SystemConfigurationSlot@d0:2", "SystemConfigurationSlot@d1:0", "RootRecordFua@d1:0"] member=NewerStateStillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion::AgainstTheSelectedVersionsLastRecord
+example first seed=0 seg=18 step=CloseAndMountWritable branch=WitnessedCounterAboveTheLastRecordOfTheSelectedVersion landing=["SystemConfigurationSlot@d0:2", "SystemConfigurationSlot@d1:1", "RootRecordFua@d1:0"] member=NewerStateStillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion::AgainstTheSelectedVersionsLastRecord
+example first seed=0 seg=18 step=CloseAndMountWritable branch=WitnessedCounterAboveTheLastRecordOfTheSelectedVersion landing=["SystemConfigurationSlot@d0:0", "SystemConfigurationSlot@d1:2", "RootRecordFua@d1:0"] member=NewerStateStillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion::AgainstTheSelectedVersionsLastRecord
+example first seed=0 seg=18 step=CloseAndMountWritable branch=WitnessedCounterAboveTheLastRecordOfTheSelectedVersion landing=["SystemConfigurationSlot@d0:1", "SystemConfigurationSlot@d1:2", "RootRecordFua@d1:0"] member=NewerStateStillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion::AgainstTheSelectedVersionsLastRecord
+example first seed=0 seg=18 step=CloseAndMountWritable branch=WitnessedCounterAboveTheLastRecordOfTheSelectedVersion landing=["SystemConfigurationSlot@d0:2", "SystemConfigurationSlot@d1:2", "RootRecordFua@d1:0"] member=NewerStateStillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion::AgainstTheSelectedVersionsLastRecord
+elapsed_seconds=9.3

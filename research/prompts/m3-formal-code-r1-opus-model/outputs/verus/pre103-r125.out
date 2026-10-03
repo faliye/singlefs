@@ -1,0 +1,45 @@
+run-with-memory-cap: 上限 1500M 超过实测峰值 309M 的 2 倍，照理由放行：攻方腿改坏核或加探针，峰值随改动变
+error: postcondition not satisfied
+    --> src/lib.rs:2492:9
+     |
+2492 | /         replay_lands_no_earlier_than_the_chosen_root(
+2493 | |             root_instance,
+2494 | |             root_checkpoint_txg,
+2495 | |             chosen_root_source,
+...    |
+2501 | |             replayed,
+2502 | |         ),
+     | |_________^ failed this postcondition
+2503 |   {
+2504 | /     match replayed {
+2505 | |         Ok(outcome) => {
+2506 | |             let applied = outcome.applied@;
+2507 | |             if applied.len() > 0 {
+...    |
+2520 | |         ) => {},
+2521 | |     }
+     | |_____- at the end of the function body
+
+error: postcondition not satisfied
+    --> src/lib.rs:3267:9
+     |
+3267 | /         replay_lands_no_earlier_than_the_chosen_root(
+3268 | |             root_instance,
+3269 | |             root_checkpoint_txg,
+3270 | |             chosen_root_source,
+...    |
+3276 | |             replayed,
+3277 | |         ),
+     | |_________^ failed this postcondition
+...
+3290 | / {
+3291 | |     broadcast use {
+3292 | |         lemma_replay_core_result_replays_an_applied_record_twice_as_once,
+3293 | |         lemma_replay_core_result_is_a_fixed_point,
+...    |
+3639 | | }
+     | |_- at the end of the function body
+
+verification results:: 48 verified, 2 errors
+error: aborting due to 2 previous errors
+

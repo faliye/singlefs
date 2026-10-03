@@ -1,0 +1,40 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 623M 的 2 倍，照理由放行：峰值表记的是只扫两格的那一次，这一次扫几十格、镜像拷贝更多
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/opus_b17_first_data_unit_attack.rs (target/debug/deps/opus_b17_first_data_unit_attack-df9788a558172886)
+
+running 1 test
+name=shape_b z=0 first_file_txg=5 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@5", "50180+2A@5"] i55=holds red=[]
+name=shape_b z=1 first_file_txg=6 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@6", "50180+2A@6"] i55=holds red=[]
+name=shape_b z=2 first_file_txg=7 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@7", "50180+2A@7"] i55=holds red=[]
+name=shape_b z=3 first_file_txg=8 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@8", "50180+2A@8"] i55=holds red=[]
+name=shape_b z=4 first_file_txg=9 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@9", "50180+2A@9"] i55=holds red=[]
+name=shape_b z=5 first_file_txg=10 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@10", "50180+2A@10"] i55=holds red=[]
+name=shape_b z=6 first_file_txg=11 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@11", "50180+2A@11"] i55=holds red=[]
+name=shape_b z=7 first_file_txg=12 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@12", "50180+2A@12"] i55=holds red=[]
+name=shape_b z=8 first_file_txg=13 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@13", "50180+2A@13"] i55=holds red=[]
+name=shape_b z=9 first_file_txg=14 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@14", "50180+2A@14"] i55=holds red=[]
+name=shape_b z=10 first_file_txg=15 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@15", "50180+2A@15"] i55=holds red=[]
+name=shape_b z=11 first_file_txg=16 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@16", "50180+2A@16"] i55=holds red=[]
+name=shape_b z=12 first_file_txg=17 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@17", "50180+2A@17"] i55=holds red=[]
+name=shape_b z=13 first_file_txg=18 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@18", "50180+2A@18"] i55=holds red=[]
+name=shape_b z=14 first_file_txg=19 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@19", "50180+2A@19"] i55=holds red=[]
+name=shape_b z=15 first_file_txg=20 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@20", "50180+2A@20"] i55=holds red=[]
+name=shape_b z=16 first_file_txg=21 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@21", "50180+2A@21"] i55=holds red=[]
+name=shape_b z=17 first_file_txg=22 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@22", "50180+2A@22"] i55=holds red=[]
+name=shape_b z=18 first_file_txg=23 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@23", "50180+2A@23"] i55=holds red=[]
+name=shape_b z=19 first_file_txg=24 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@24", "50180+2A@24"] i55=holds red=[]
+name=shape_b z=20 first_file_txg=25 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@25", "50180+2A@25"] i55=holds red=[]
+name=shape_b z=21 first_file_txg=26 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50180), (1, 50180)] low_allocation_records_dev0=["50176+2R@3", "50178+1R@26", "50180+2A@26"] i55=holds red=[]
+name=shape_b z=22 first_file_txg=27 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] low_allocation_records_dev0=["50176+2A@27", "50178+1R@27"] i55=holds red=[]
+name=shape_b z=23 first_file_txg=28 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] low_allocation_records_dev0=["50176+2A@28", "50178+1R@28"] i55=holds red=[]
+name=shape_b z=24 first_file_txg=29 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] low_allocation_records_dev0=["50176+2A@29", "50178+1R@29"] i55=holds red=[]
+name=shape_b z=25 first_file_txg=30 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] low_allocation_records_dev0=["50176+2A@30", "50178+1R@30"] i55=holds red=[]
+name=shape_b z=26 first_file_txg=31 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] low_allocation_records_dev0=["50176+2A@31", "50178+1R@31"] i55=holds red=[]
+name=shape_b z=27 first_file_txg=32 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] low_allocation_records_dev0=["50176+2A@32", "50178+1R@32"] i55=holds red=[]
+name=shape_b z=28 first_file_txg=33 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] low_allocation_records_dev0=["50176+2A@33", "50178+1R@33"] i55=holds red=[]
+name=shape_b z=29 first_file_txg=34 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] low_allocation_records_dev0=["50176+2A@34", "50178+1R@34"] i55=holds red=[]
+name=shape_b z=30 first_file_txg=35 inode_tree=65537 unit_area_start=50176 expected=50180 smallest_slot_per_device=[(0, 50176), (1, 50176)] low_allocation_records_dev0=["50176+2A@35", "50178+1R@35"] i55=holds red=[]
+test shape_b_zero_unit_publish_count_sweep_then_first_file ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 10.36s
+

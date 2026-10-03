@@ -1,0 +1,20 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 120 秒）：slice 已占 36.7 GiB，这一条要 4.0 GiB（峰值表里没有这条，按它的上限 4G 算），总上限 40.1 GiB；账上在跑 5 条
+run-with-memory-cap: 排了 15 秒，起跑（singlefs-memory-cap-1089005-1161221685）
+singlefs-core rc=126 
+singlefs-harness rc=126 
+singlefs_harness-8ca295a51f0661dd rc=0 test result: ok. 72 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 44.66s
+a_block_device_error_while_raising_the_floor_for_space_is_handed_up_as_is-5e2b04a31d7c0dfe rc=0 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.99s
+a_floor_raise_refused_for_space_counts_as_short_of_space-9a7d15b5c04ff220 rc=0 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.91s
+a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable-359854c963814c3f rc=0 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.99s
+a_swallowed_barrier_is_in_the_recorded_stream_but_not_on_the_device_side-dbcdbe6880118f1e rc=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+a_writable_mount_refuses_when_a_system_configuration_slot_does_not_verify-2287e4cf52b8bbbf rc=0 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.38s
+a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error-995e7e6ebd6c7e6a rc=101 test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.25s
+accounting_and_mapping_tree_split-bc3483f08d350393 rc=0 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.63s
+accounting_tree_node_full-d48673b5b4f767c5 rc=0 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.64s
+acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics-f78dd64297524d12 rc=0 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.99s
+acquisition_writes_the_witnessed_journal_tail_so_two_crashed_acquisitions_still_witness_the_newest_publish-bd6ad3f15de06b2c rc=0 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.93s
+admission_checkpoint_cost_per_device_paths-42c2d9d4124da524 rc=0 test result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 22.10s
+admission_formula_on_the_mounted_state-af9ef5441d648621 rc=0 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 25.16s
+admission_raises_the_floor_before_refusing-f90e37c8cea102ec rc=0 test result: ok. 9 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 17.96s
+admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments-f32260db0fbe4e5c rc=0 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.21s
+budget-stop

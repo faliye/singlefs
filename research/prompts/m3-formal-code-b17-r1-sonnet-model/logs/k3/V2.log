@@ -1,0 +1,14 @@
+    Checking singlefs-checker-tier v0.1.0 (/tmp/claude-1000/m3-formal-code-b17-r1-sonnet/ws/crates/singlefs-checker-tier)
+error[E0080]: evaluation panicked: 池级 checker 新立的不变量 GPU 内核还没判：补内核，再把下标补进覆盖表（暂不补内核的，点名进「内核还没判」那张表）
+  --> crates/singlefs-checker-tier/src/crash_judge_gpu.rs:79:5
+   |
+79 | /     assert!(
+80 | |         POOL_CHECKER_COVERED_INVARIANT_INDEXES.len()
+81 | |             + POOL_CHECKER_INVARIANT_INDEXES_THE_KERNEL_DOES_NOT_JUDGE_YET.len()
+82 | |             == singlefs_checker::image::IMPLEMENTED_INVARIANTS.len(),
+83 | |         "池级 checker 新立的不变量 GPU 内核还没判：补内核，再把下标补进覆盖表（暂不补内核的，点名进「内核还没判」那张表）"
+84 | |     );
+   | |_____^ evaluation of `crash_judge_gpu::_` failed here
+
+For more information about this error, try `rustc --explain E0080`.
+error: could not compile `singlefs-checker-tier` (lib) due to 1 previous error

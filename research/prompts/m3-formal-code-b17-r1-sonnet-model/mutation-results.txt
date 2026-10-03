@@ -1,0 +1,59 @@
+== mut/row1.log
+test result: ok. 69 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.89s
+test a_first_file_version_issuing_its_trees_from_the_ring_watermark_after_a_recovery_keeps_the_head_identifier_relation ... FAILED
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.84s
+== mut/row2.log
+test a_new_pool_file_on_a_128_mebibyte_journal_ring_holds_the_first_data_unit_placement ... FAILED
+test a_new_pool_file_on_the_default_journal_ring_holds_the_first_data_unit_placement ... FAILED
+test the_first_file_of_an_instance_after_a_warm_up_only_mount_is_recognized_and_holds_the_first_data_unit_placement ... FAILED
+test result: FAILED. 2 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.48s
+== mut/row5.log
+test once_the_first_file_version_leaves_the_root_ring_the_overwrite_versions_are_not_judged_for_the_first_data_unit_placement ... FAILED
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.74s
+== mut/row6.log
+test the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 68 filtered out; finished in 5.86s
+== mut/row7.log
+test each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 68 filtered out; finished in 4.10s
+== mut/row8.log
+test a_new_pool_file_on_a_128_mebibyte_journal_ring_holds_the_first_data_unit_placement ... FAILED
+test a_new_pool_file_on_the_default_journal_ring_holds_the_first_data_unit_placement ... FAILED
+test once_the_first_file_version_leaves_the_root_ring_the_overwrite_versions_are_not_judged_for_the_first_data_unit_placement ... FAILED
+test the_first_file_of_an_instance_after_a_warm_up_only_mount_is_recognized_and_holds_the_first_data_unit_placement ... FAILED
+test a_first_file_version_issuing_its_trees_from_the_ring_watermark_after_a_recovery_keeps_the_head_identifier_relation ... FAILED
+test result: FAILED. 0 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.92s
+== mut/row1605.log
+test the_checker_reddens_only_the_tree_table_ordering_when_the_tombstone_and_lineage_entries_swapped_their_kinds ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.22s
+== mut/row1809.log
+test the_checker_reddens_only_the_tree_table_ordering_when_the_tombstone_and_lineage_entries_swapped_their_kinds ... FAILED
+test the_checker_reddens_the_tree_table_ordering_and_the_key_order_when_two_entries_swapped_their_places ... FAILED
+test result: FAILED. 6 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+== mutown/row1.log
+test result: ok. 69 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 42.11s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.78s
+== mutown/row2.log
+test result: ok. 69 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.42s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.35s
+== mutown/row3.log
+test result: ok. 69 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 35.49s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.19s
+== mutown/row4.log
+test result: ok. 69 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 28.52s
+test a_first_file_version_issuing_its_trees_from_the_ring_watermark_after_a_recovery_keeps_the_head_identifier_relation ... FAILED
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.09s
+== mutown/row5.log
+test result: ok. 69 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.96s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.00s
+== mutown/row6.log
+test result: ok. 69 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.64s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.56s
+== mutown/row7.log
+test result: ok. 69 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.65s
+test a_first_file_version_issuing_its_trees_from_the_ring_watermark_after_a_recovery_keeps_the_head_identifier_relation ... FAILED
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.92s
+== mutown/row8.log
+test result: ok. 69 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.28s
+test a_first_file_version_issuing_its_trees_from_the_ring_watermark_after_a_recovery_keeps_the_head_identifier_relation ... FAILED
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.75s

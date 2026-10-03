@@ -1,0 +1,7 @@
+== ops AfterMakeFilesystem CloseAndMountWritable,PublishWithoutUnits,CloseAndMountWritable,PublishWithoutUnits,ColdStartRecover,CloseAndMountWritable
+histories=1 completed=1
+first_states=630 with_torn_write=55 mounts_succeeded=630 n_config_refusals=0
+first_c670=0 in_short_segments(<=4)=0 in_torn_states=0
+second_states=0 second_n_config_refusals=0 second_c670=0
+abandoning_steps=0 abandoning_steps_that_sent_something=0
+elapsed_seconds=2.4
