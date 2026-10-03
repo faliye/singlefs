@@ -1,0 +1,61 @@
+diff -ruN '--exclude=target' '--exclude=r3opus_*' /tmp/claude-1000/m3-code-r3/tree/crates/singlefs-core/src/make_filesystem.rs /tmp/claude-1000/m3-code-r3-opus/work3/crates/singlefs-core/src/make_filesystem.rs
+--- /tmp/claude-1000/m3-code-r3/tree/crates/singlefs-core/src/make_filesystem.rs	2026-09-27 17:00:47.792895398 +0000
++++ /tmp/claude-1000/m3-code-r3-opus/work3/crates/singlefs-core/src/make_filesystem.rs	2026-10-01 13:09:18.002546519 +0000
+@@ -416,10 +416,9 @@
+     parameters: &MakeFilesystemParameters,
+     devices: &mut [(DeviceIdentity, Device)],
+ ) -> Result<MakeFilesystemOutput, MakeFilesystemError> {
+-    assert_eq!(
+-        devices.len(),
+-        2,
+-        "第一版跑 2 块盘（D2（RAID 条带策略） 已定项 9）"
++    assert!(
++        devices.len() == 2 || devices.len() == 3,
++        "r3opus W3 副本：放开到 3 块盘（原样是 assert_eq 2）"
+     );
+     let sizes: Vec<(DeviceIdentity, u64)> = devices
+         .iter()
+diff -ruN '--exclude=target' '--exclude=r3opus_*' /tmp/claude-1000/m3-code-r3/tree/crates/singlefs-harness/tests/common_admission/mod.rs /tmp/claude-1000/m3-code-r3-opus/work3/crates/singlefs-harness/tests/common_admission/mod.rs
+--- /tmp/claude-1000/m3-code-r3/tree/crates/singlefs-harness/tests/common_admission/mod.rs	2026-10-01 06:07:42.097756906 +0000
++++ /tmp/claude-1000/m3-code-r3-opus/work3/crates/singlefs-harness/tests/common_admission/mod.rs	2026-10-01 13:09:18.002673119 +0000
+@@ -93,9 +93,22 @@
+         device_width: HistoryDeviceWidth,
+         wrap: impl Fn(DeviceIdentity, SparseBlockDevice) -> Device,
+     ) -> Self {
+-        let parameters = device_width.parameters();
++        let mut parameters = device_width.parameters();
+         let device_bytes = device_width.device_bytes();
+-        let mut devices: Vec<(DeviceIdentity, Device)> = [DeviceIdentity(0), DeviceIdentity(1)]
++        // r3opus W3 副本：R3_THREE_DEVICES=1 时三块盘、区域归属取 R3_LAYOUT（默认 0,1,2）。
++        let three = std::env::var("R3_THREE_DEVICES").is_ok_and(|value| value == "1");
++        let identities: Vec<DeviceIdentity> = if three {
++            let layout: Vec<u32> = std::env::var("R3_LAYOUT")
++                .unwrap_or_else(|_| "0,1,2".to_string())
++                .split(',')
++                .map(|part| part.trim().parse().expect("数"))
++                .collect();
++            parameters.region_devices = [DeviceIdentity(layout[0]), DeviceIdentity(layout[1]), DeviceIdentity(layout[2])];
++            vec![DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(2)]
++        } else {
++            vec![DeviceIdentity(0), DeviceIdentity(1)]
++        };
++        let mut devices: Vec<(DeviceIdentity, Device)> = identities
+             .into_iter()
+             .map(|identity| {
+                 (
+diff -ruN '--exclude=target' '--exclude=r3opus_*' /tmp/claude-1000/m3-code-r3/tree/crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs /tmp/claude-1000/m3-code-r3-opus/work3/crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs
+--- /tmp/claude-1000/m3-code-r3/tree/crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs	2026-10-01 10:01:04.430961338 +0000
++++ /tmp/claude-1000/m3-code-r3-opus/work3/crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs	2026-10-01 13:09:18.002907998 +0000
+@@ -846,7 +846,11 @@
+     };
+     let mut cut_image = before_the_publish.clone();
+     cut_image.apply(&operations[..operations_through_the_cut]);
+-    let devices: SparseDevices = [DeviceIdentity(0), DeviceIdentity(1)]
++    let devices: SparseDevices = before_the_publish
++        .devices
++        .keys()
++        .copied()
++        .collect::<Vec<_>>()
+         .into_iter()
+         .map(|identity| {
+             let image = if identity == root_device_of_the_publish {

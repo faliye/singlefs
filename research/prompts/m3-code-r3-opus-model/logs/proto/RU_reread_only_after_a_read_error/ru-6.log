@@ -1,0 +1,58 @@
+
+running 1 test
+test r3opus_ru_one_corrupted_read_of_the_publish_root_slot ... R3RU txg=6 root_dev=0 action=Entry(SessionPublish, FirstFileVersion) n=1 fired=1 outcome=DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { devices: [DeviceBehindTheCurrentVersion { device: DeviceIdentity(0), newest_system_configuration_journal_tail: JournalSequenceNumber { instance_generation: InstanceGeneration(1), counter: 5 }, current checker=0 ms=157
+R3RU txg=6 root_dev=0 action=Entry(SessionPublish, FirstFileVersion) n=2 fired=1 outcome=做成了 checker=0 ms=205
+R3RU txg=6 root_dev=0 action=Entry(SessionPublish, FirstFileVersion) n=3 fired=1 outcome=做成了 checker=0 ms=207
+R3RU txg=6 root_dev=0 action=Entry(SessionPublish, FirstFileVersion) n=4 fired=0 outcome=做成了 checker=0 ms=205
+R3RU txg=6 root_dev=0 action=Entry(NormalUnmount, FirstFileVersion) n=1 fired=1 outcome=DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { devices: [DeviceBehindTheCurrentVersion { device: DeviceIdentity(0), newest_system_configuration_journal_tail: JournalSequenceNumber { instance_generation: InstanceGeneration(1), counter: 5 }, current checker=0 ms=156
+R3RU txg=6 root_dev=0 action=Entry(NormalUnmount, FirstFileVersion) n=2 fired=1 outcome=做成了 checker=0 ms=203
+R3RU txg=6 root_dev=0 action=Entry(NormalUnmount, FirstFileVersion) n=3 fired=1 outcome=做成了 checker=0 ms=217
+R3RU txg=6 root_dev=0 action=Entry(NormalUnmount, FirstFileVersion) n=4 fired=1 outcome=做成了 checker=0 ms=211
+R3RU txg=6 root_dev=0 action=Entry(NormalUnmount, FirstFileVersion) n=5 fired=1 outcome=做成了 checker=0 ms=253
+R3RU txg=6 root_dev=0 action=Entry(NormalUnmount, FirstFileVersion) n=6 fired=1 outcome=做成了 checker=0 ms=221
+R3RU txg=6 root_dev=0 action=Entry(NormalUnmount, FirstFileVersion) n=7 fired=1 outcome=做成了 checker=0 ms=219
+R3RU txg=6 root_dev=0 action=Entry(NormalUnmount, FirstFileVersion) n=8 fired=1 outcome=做成了 checker=0 ms=220
+R3RU txg=6 root_dev=0 action=Entry(NormalUnmount, FirstFileVersion) n=9 fired=1 outcome=做成了 checker=0 ms=228
+R3RU txg=6 root_dev=0 action=Entry(NormalUnmount, FirstFileVersion) n=10 fired=0 outcome=做成了 checker=0 ms=223
+R3RU txg=6 root_dev=0 action=Entry(FloorRaiseToTheAdmissionCeiling, FirstFileVersion) n=1 fired=1 outcome=DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { devices: [DeviceBehindTheCurrentVersion { device: DeviceIdentity(0), newest_system_configuration_journal_tail: JournalSequenceNumber { instance_generation: InstanceGeneration(1), counter: 5 }, current checker=0 ms=174
+R3RU txg=6 root_dev=0 action=Entry(FloorRaiseToTheAdmissionCeiling, FirstFileVersion) n=2 fired=1 outcome=做成了 checker=0 ms=283
+R3RU txg=6 root_dev=0 action=Entry(FloorRaiseToTheAdmissionCeiling, FirstFileVersion) n=3 fired=1 outcome=DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { devices: [DeviceBehindTheCurrentVersion { device: DeviceIdentity(0), newest_system_configuration_journal_tail: JournalSequenceNumber { instance_generation: InstanceGeneration(1), counter: 5 }, current checker=0 ms=178
+R3RU txg=6 root_dev=0 action=Entry(FloorRaiseToTheAdmissionCeiling, FirstFileVersion) n=4 fired=1 outcome=做成了 checker=0 ms=281
+R3RU txg=6 root_dev=0 action=Entry(FloorRaiseToTheAdmissionCeiling, FirstFileVersion) n=5 fired=1 outcome=做成了 checker=0 ms=312
+R3RU txg=6 root_dev=0 action=Entry(FloorRaiseToTheAdmissionCeiling, FirstFileVersion) n=6 fired=1 outcome=做成了 checker=0 ms=285
+R3RU txg=6 root_dev=0 action=Entry(FloorRaiseToTheAdmissionCeiling, FirstFileVersion) n=7 fired=1 outcome=做成了 checker=0 ms=282
+R3RU txg=6 root_dev=0 action=Entry(FloorRaiseToTheAdmissionCeiling, FirstFileVersion) n=8 fired=1 outcome=做成了 checker=0 ms=292
+R3RU txg=6 root_dev=0 action=Entry(FloorRaiseToTheAdmissionCeiling, FirstFileVersion) n=9 fired=1 outcome=做成了 checker=0 ms=279
+R3RU txg=6 root_dev=0 action=Entry(FloorRaiseToTheAdmissionCeiling, FirstFileVersion) n=10 fired=1 outcome=做成了 checker=0 ms=284
+R3RU txg=6 root_dev=0 action=Entry(FloorRaiseToTheAdmissionCeiling, FirstFileVersion) n=11 fired=1 outcome=做成了 checker=0 ms=293
+R3RU txg=6 root_dev=0 action=Entry(FloorRaiseToTheAdmissionCeiling, FirstFileVersion) n=12 fired=1 outcome=做成了 checker=0 ms=299
+R3RU txg=6 root_dev=0 action=Entry(AdministratorRollback, FirstFileVersion) n=1 fired=1 outcome=CallerInputsDisagreeWithTheDisk(DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { devices: [DeviceBehindTheCurrentVersion { device: DeviceIdentity(0), newest_system_configuration_journal_tail: JournalSequenceNumber { instance_generation: InstanceGene checker=0 ms=183
+R3RU txg=6 root_dev=0 action=Entry(AdministratorRollback, FirstFileVersion) n=2 fired=1 outcome=做成了 checker=0 ms=245
+R3RU txg=6 root_dev=0 action=Entry(AdministratorRollback, FirstFileVersion) n=3 fired=1 outcome=做成了 checker=0 ms=244
+R3RU txg=6 root_dev=0 action=Entry(AdministratorRollback, FirstFileVersion) n=4 fired=1 outcome=做成了 checker=0 ms=238
+R3RU txg=6 root_dev=0 action=Entry(AdministratorRollback, FirstFileVersion) n=5 fired=1 outcome=做成了 checker=0 ms=252
+R3RU txg=6 root_dev=0 action=Entry(AdministratorRollback, FirstFileVersion) n=6 fired=1 outcome=做成了 checker=0 ms=250
+R3RU txg=6 root_dev=0 action=Entry(AdministratorRollback, FirstFileVersion) n=7 fired=0 outcome=做成了 checker=0 ms=243
+R3RU txg=6 root_dev=0 action=Entry(AdministratorRollback, VersionBeforeTheCurrent) n=1 fired=1 outcome=CallerInputsDisagreeWithTheDisk(DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { devices: [DeviceBehindTheCurrentVersion { device: DeviceIdentity(0), newest_system_configuration_journal_tail: JournalSequenceNumber { instance_generation: InstanceGene checker=0 ms=175
+R3RU txg=6 root_dev=0 action=Entry(AdministratorRollback, VersionBeforeTheCurrent) n=2 fired=1 outcome=做成了 checker=0 ms=242
+R3RU txg=6 root_dev=0 action=Entry(AdministratorRollback, VersionBeforeTheCurrent) n=3 fired=1 outcome=做成了 checker=0 ms=245
+R3RU txg=6 root_dev=0 action=Entry(AdministratorRollback, VersionBeforeTheCurrent) n=4 fired=1 outcome=做成了 checker=0 ms=235
+R3RU txg=6 root_dev=0 action=Entry(AdministratorRollback, VersionBeforeTheCurrent) n=5 fired=1 outcome=做成了 checker=0 ms=235
+R3RU txg=6 root_dev=0 action=Entry(AdministratorRollback, VersionBeforeTheCurrent) n=6 fired=1 outcome=做成了 checker=0 ms=234
+R3RU txg=6 root_dev=0 action=Entry(AdministratorRollback, VersionBeforeTheCurrent) n=7 fired=0 outcome=做成了 checker=0 ms=231
+R3RU txg=6 root_dev=0 action=WritableMount n=1 fired=1 outcome=做成了 checker=0 ms=2736
+R3RU txg=6 root_dev=0 action=WritableMount n=2 fired=1 outcome=做成了 checker=0 ms=2738
+R3RU txg=6 root_dev=0 action=WritableMount n=3 fired=1 outcome=做成了 checker=0 ms=2739
+R3RU txg=6 root_dev=0 action=WritableMount n=4 fired=1 outcome=做成了 checker=0 ms=2725
+R3RU txg=6 root_dev=0 action=WritableMount n=5 fired=1 outcome=做成了 checker=0 ms=2727
+R3RU txg=6 root_dev=0 action=WritableMount n=6 fired=1 outcome=做成了 checker=0 ms=2736
+R3RU txg=6 root_dev=0 action=WritableMount n=7 fired=1 outcome=做成了 checker=0 ms=2790
+R3RU txg=6 root_dev=0 action=WritableMount n=8 fired=1 outcome=WritableMountRefusedByDevicesWithoutTheSelectedVersion { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(6) }, selected_version_journal_position: JournalSequenceNumber { instance_generation: InstanceGeneration( checker=0 ms=2646
+R3RU txg=6 root_dev=0 action=WritableMount n=9 fired=1 outcome=做成了 checker=0 ms=2761
+R3RU txg=6 root_dev=0 action=WritableMount n=10 fired=1 outcome=做成了 checker=0 ms=2729
+R3RU txg=6 root_dev=0 action=WritableMount n=11 fired=1 outcome=做成了 checker=0 ms=2714
+R3RU txg=6 root_dev=0 action=WritableMount n=12 fired=1 outcome=做成了 checker=0 ms=2700
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 35 filtered out; finished in 45.73s
+

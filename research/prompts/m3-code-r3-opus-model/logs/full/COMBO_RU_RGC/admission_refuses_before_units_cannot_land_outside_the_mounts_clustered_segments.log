@@ -1,0 +1,9 @@
+
+running 4 tests
+test a_write_whose_data_unit_lands_but_whose_commit_generated_units_find_no_unblocked_slot_is_refused_by_the_space_admission_before_any_write ... ok
+test a_write_on_the_narrower_pool_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_refused_for_its_data_units_before_any_write ... ok
+test a_write_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_refused_by_the_space_admission_before_any_write_while_the_byte_formula_admits ... ok
+test with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.77s
+

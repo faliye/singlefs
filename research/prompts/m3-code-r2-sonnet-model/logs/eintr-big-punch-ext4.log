@@ -1,0 +1,1 @@
+path=/tmp/claude-1000/m3-code-r2-sonnet/probe2-ext4.img size_mib=1024 big_punches=8 ok=8 EINTR=0 other=0 {} signals_handled_during_punch_calls=15 punch_secs=0.194

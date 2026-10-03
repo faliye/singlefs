@@ -1,0 +1,15 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：m3-code-r3 攻方腿与同会话别的子 agent 各跑各的
+APPLIED RU_reread_only_after_a_read_error 1 处
+PROTO RU_reread_only_after_a_read_error piece-1 rc=0
+PROTO RU_reread_only_after_a_read_error piece-2 rc=0
+PROTO RU_reread_only_after_a_read_error piece-3 rc=0
+RESTORED RU_reread_only_after_a_read_error ['crates/singlefs-core/src/mount.rs']
+DONE
+APPLIED RGC_region_number_as_device_in_the_three_other_entries 3 处
+PROTO RGC_region_number_as_device_in_the_three_other_entries piece-1 rc=0
+PROTO RGC_region_number_as_device_in_the_three_other_entries piece-2 rc=0
+PROTO RGC_region_number_as_device_in_the_three_other_entries piece-3 rc=0
+PROTO RGC_region_number_as_device_in_the_three_other_entries piece-4 rc=0
+RESTORED RGC_region_number_as_device_in_the_three_other_entries ['crates/singlefs-core/src/mount.rs']
+DONE
+rc=0

@@ -1,0 +1,43 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：m3-code-r3 攻方腿与同会话别的子 agent 各跑各的
+run-with-memory-cap: 排队（已等 0 秒，至多 7200 秒）：slice 已占 37.6 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 5 条
+run-with-memory-cap: 排队（已等 60 秒，至多 7200 秒）：slice 已占 36.3 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排队（已等 120 秒，至多 7200 秒）：slice 已占 36.2 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排了 147 秒，起跑（singlefs-memory-cap-1451523-825915470）
+W3 BASE piece-1 rc=0
+W3 BASE piece-2 rc=0
+W3 BASE piece-3 rc=0
+APPLIED AC_only_region_zero_device_in_the_three_other_entries 3 处
+W3 AC_only_region_zero_device_in_the_three_other_entries piece-1 rc=0
+W3 AC_only_region_zero_device_in_the_three_other_entries piece-2 rc=0
+W3 AC_only_region_zero_device_in_the_three_other_entries piece-3 rc=0
+RESTORED AC_only_region_zero_device_in_the_three_other_entries ['crates/singlefs-core/src/mount.rs']
+APPLIED RG_region_number_as_device 1 处
+W3 RG_region_number_as_device piece-1 rc=0
+W3 RG_region_number_as_device piece-2 rc=0
+W3 RG_region_number_as_device piece-3 rc=0
+RESTORED RG_region_number_as_device ['crates/singlefs-core/src/mount.rs']
+APPLIED RGC_region_number_as_device_in_the_three_other_entries 3 处
+W3 RGC_region_number_as_device_in_the_three_other_entries piece-1 rc=0
+W3 RGC_region_number_as_device_in_the_three_other_entries piece-2 rc=0
+W3 RGC_region_number_as_device_in_the_three_other_entries piece-3 rc=0
+RESTORED RGC_region_number_as_device_in_the_three_other_entries ['crates/singlefs-core/src/mount.rs']
+APPLIED MOD2_region_modulo_two 1 处
+W3 MOD2_region_modulo_two piece-1 rc=0
+W3 MOD2_region_modulo_two piece-2 rc=0
+W3 MOD2_region_modulo_two piece-3 rc=0
+RESTORED MOD2_region_modulo_two ['crates/singlefs-core/src/mount.rs']
+APPLIED FV_first_version_layout_hard_coded 1 处
+W3 FV_first_version_layout_hard_coded piece-1 rc=0
+W3 FV_first_version_layout_hard_coded piece-2 rc=0
+W3 FV_first_version_layout_hard_coded piece-3 rc=0
+RESTORED FV_first_version_layout_hard_coded ['crates/singlefs-core/src/mount.rs']
+APPLIED EC_any_self_verified_root_in_the_three_other_entries 3 处
+W3 EC_any_self_verified_root_in_the_three_other_entries piece-1 rc=0
+W3 EC_any_self_verified_root_in_the_three_other_entries piece-2 rc=0
+W3 EC_any_self_verified_root_in_the_three_other_entries piece-3 rc=0
+RESTORED EC_any_self_verified_root_in_the_three_other_entries ['crates/singlefs-core/src/mount.rs']
+Files /tmp/claude-1000/m3-code-r3/tree/crates/singlefs-core/src/make_filesystem.rs and /tmp/claude-1000/m3-code-r3-opus/work3/crates/singlefs-core/src/make_filesystem.rs differ
+Files /tmp/claude-1000/m3-code-r3/tree/crates/singlefs-harness/tests/common_admission/mod.rs and /tmp/claude-1000/m3-code-r3-opus/work3/crates/singlefs-harness/tests/common_admission/mod.rs differ
+Files /tmp/claude-1000/m3-code-r3/tree/crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs and /tmp/claude-1000/m3-code-r3-opus/work3/crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs differ
+DONE
+rc=0

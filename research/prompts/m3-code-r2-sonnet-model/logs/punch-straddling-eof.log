@@ -1,0 +1,2 @@
+/tmp/claude-1000/m3-code-r2-sonnet/s-ext4.img: straddle rc=0 errno=0 in-file part zeroed=True head untouched=True; beyond-EOF rc=0; size=65536
+/dev/shm/m3-code-r2-sonnet-s.img: straddle rc=0 errno=0 in-file part zeroed=True head untouched=True; beyond-EOF rc=0; size=65536

@@ -1,0 +1,17 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running tests/r2opus_entries_proto.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/r2opus_entries_proto-c4b9d13e22442de4)
+
+running 1 test
+test r2opus_y3_entries_sweep_root_elsewhere_and_lap ... Y3 txg=6 region=0 slot=2 root_dev=DeviceIdentity(0) cut=BeforeItsRootSlotWrite entry=SessionPublish outcome=behind-root(DeviceIdentity(0),Bad(NotSelfVerified),Bad(NotSelfVerified)) unchanged=true checker=0 remount=Ok(InstanceGeneration(1),CheckpointTxg(6)) checker_after_remount=0 ms=2492
+Y3 txg=6 region=0 slot=2 root_dev=DeviceIdentity(0) cut=BeforeItsRootSlotWrite entry=NormalUnmount outcome=behind-root(DeviceIdentity(0),Bad(NotSelfVerified),Bad(NotSelfVerified)) unchanged=true checker=0 remount=Ok(InstanceGeneration(1),CheckpointTxg(6)) checker_after_remount=0 ms=2464
+Y3 txg=6 region=0 slot=2 root_dev=DeviceIdentity(0) cut=BeforeItsRootSlotWrite entry=FloorRaiseToTheAdmissionCeiling outcome=behind-root(DeviceIdentity(0),Bad(NotSelfVerified),Bad(NotSelfVerified)) unchanged=true checker=0 remount=Ok(InstanceGeneration(1),CheckpointTxg(6)) checker_after_remount=0 ms=2507
+Y3 txg=6 region=0 slot=2 root_dev=DeviceIdentity(0) cut=BeforeItsRootSlotWrite entry=AdministratorRollback outcome=behind-root(DeviceIdentity(0),Bad(NotSelfVerified),Bad(NotSelfVerified)) unchanged=true checker=0 remount=Ok(InstanceGeneration(1),CheckpointTxg(6)) checker_after_remount=0 ms=2429
+Y3 txg=6 region=0 slot=2 root_dev=DeviceIdentity(0) cut=AfterItsRootSlotWrite entry=SessionPublish outcome=ok unchanged=false checker=0 remount=Ok(InstanceGeneration(1),CheckpointTxg(7)) checker_after_remount=0 ms=2864
+Y3 txg=6 region=0 slot=2 root_dev=DeviceIdentity(0) cut=AfterItsRootSlotWrite entry=NormalUnmount outcome=ok unchanged=false checker=0 remount=Ok(InstanceGeneration(1),CheckpointTxg(8)) checker_after_remount=0 ms=2546
+Y3 txg=6 region=0 slot=2 root_dev=DeviceIdentity(0) cut=AfterItsRootSlotWrite entry=FloorRaiseToTheAdmissionCeiling outcome=ok unchanged=false checker=0 remount=Ok(InstanceGeneration(1),CheckpointTxg(8)) checker_after_remount=0 ms=2636
+Y3 txg=6 region=0 slot=2 root_dev=DeviceIdentity(0) cut=AfterItsRootSlotWrite entry=AdministratorRollback outcome=ok unchanged=false checker=0 remount=Ok(InstanceGeneration(1),CheckpointTxg(7)) checker_after_remount=0 ms=2611
+Y3-SUMMARY cases=8 flags=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 20.57s
+

@@ -1,0 +1,15 @@
+
+running 10 tests
+test at_366_instance_rows_every_admitted_overwrite_leaves_the_next_mounts_row_so_a_crash_remount_is_admitted_before_acquisition ... ignored, harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test after_a_file_is_truncated_the_same_size_is_written_back_within_three_user_visible_publishes ... ok
+test known_root_slot_still_bad_after_one_reread_refuses_the_floor_raise_before_any_write ... ok
+test known_root_slot_that_reads_bad_once_is_reread_and_the_ceiling_is_unchanged ... ok
+test an_overwrite_whose_data_unit_has_no_slot_pair_outside_the_cluster_segments_is_refused_by_the_admission_and_published_after_raising_the_floor_in_the_session ... ok
+test root_slot_already_unreadable_at_mount_counts_as_no_root_and_does_not_block_the_floor_raise ... ok
+test the_seeded_history_whose_ceiling_read_of_the_genesis_root_slot_fails_once_refuses_the_raise_above_the_ceiling ... ok
+test writable_mount_on_a_version_without_file_short_of_its_reserve_is_refused_before_acquisition_with_the_disk_unchanged ... ok
+test mount_still_short_after_the_publishes_of_one_admission_is_made_and_its_writes_report_no_space_until_a_normal_unmount ... ok
+test crash_only_remounts_on_a_narrow_pool_push_floor_raises_after_the_row_publish_and_never_get_stuck ... ok
+
+test result: ok. 9 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 10.27s
+

@@ -1,0 +1,7 @@
+
+running 2 tests
+test row_publishes_on_a_version_without_file_with_a_sixty_six_page_instance_table_keep_mounting_writable_past_812_allocation_records ... ignored, harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test row_publish_release_check_that_fails_on_the_damaged_mapping_entry_refuses_the_mount_before_acquisition ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 55.43s
+

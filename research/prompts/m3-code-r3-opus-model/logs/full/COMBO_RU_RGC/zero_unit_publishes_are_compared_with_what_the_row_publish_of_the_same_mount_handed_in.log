@@ -1,0 +1,12 @@
+
+running 7 tests
+test a_mount_whose_first_version_is_a_zero_unit_publish_counts_every_version_as_not_in_the_output ... ok
+test a_wrong_row_in_the_instance_table_carried_to_the_warm_up_is_reported ... ok
+test a_wrong_allocation_generation_carried_to_the_warm_up_is_reported ... ok
+test a_zero_unit_publish_whose_root_names_another_allocation_record_tree_than_the_version_before_it_is_reported ... ok
+test a_zero_unit_publish_whose_root_names_another_instance_table_than_the_version_before_it_is_reported ... ok
+test the_session_carries_the_row_publish_down_to_the_zero_unit_publishes_after_the_mount ... ok
+test the_warm_up_after_the_row_publish_of_the_same_mount_is_compared_by_the_whole_instance_table_and_every_role ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.52s
+

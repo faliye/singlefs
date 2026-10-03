@@ -1,0 +1,7 @@
+
+running 2 tests
+test raising_the_floor_past_the_gap_keeps_every_invariant_green ... ok
+test raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_every_invariant_green ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.68s
+

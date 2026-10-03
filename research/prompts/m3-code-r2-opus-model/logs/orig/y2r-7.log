@@ -1,0 +1,76 @@
+
+running 1 test
+test r2opus_y2_reread_sweep_over_every_entry ... Y2R txg=7 entry=SessionPublish occ=once n=1 fired=1 writes=29 outcome=ok checker=0
+Y2R txg=7 entry=SessionPublish occ=once n=2 fired=1 writes=29 outcome=ok checker=0
+Y2R txg=7 entry=SessionPublish occ=once n=3 fired=1 writes=29 outcome=ok checker=0
+Y2R txg=7 entry=SessionPublish occ=once n=4 fired=0 writes=29 outcome=ok checker=0
+Y2R txg=7 entry=SessionPublish occ=from n=1 fired=2 writes=0 outcome=behind-root(DeviceIdentity(1),Bad(Unreadable),Bad(Unreadable)) checker=0
+Y2R txg=7 entry=SessionPublish occ=from n=2 fired=4 writes=29 outcome=ok checker=0
+Y2R txg=7 entry=SessionPublish occ=from n=3 fired=2 writes=29 outcome=ok checker=0
+Y2R txg=7 entry=SessionPublish occ=from n=4 fired=0 writes=29 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=once n=1 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=once n=2 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=once n=3 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=once n=4 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=once n=5 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=once n=6 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=once n=7 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=once n=8 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=once n=9 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=once n=10 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=once n=11 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=once n=12 fired=0 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=from n=1 fired=2 writes=0 outcome=behind-root(DeviceIdentity(1),Bad(Unreadable),Bad(Unreadable)) checker=0
+Y2R txg=7 entry=NormalUnmount occ=from n=2 fired=3 writes=0 outcome=other:NewerStateStillUnreadableAfterOneReread(RootRingSlotKnownToHoldARoot { ring_slot: RootRingSlot { region: 1, slot: 2 }, first_reading: Unreadable, reread: Unreadable }) checker=0
+Y2R txg=7 entry=NormalUnmount occ=from n=3 fired=2 writes=0 outcome=other:NewerStateStillUnreadableAfterOneReread(RootRingSlotKnownToHoldARoot { ring_slot: RootRingSlot { region: 1, slot: 2 }, first_reading: Unreadable, reread: Unreadable }) checker=0
+Y2R txg=7 entry=NormalUnmount occ=from n=4 fired=16 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=from n=5 fired=14 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=from n=6 fired=12 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=from n=7 fired=10 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=from n=8 fired=8 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=from n=9 fired=6 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=from n=10 fired=4 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=from n=11 fired=2 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=NormalUnmount occ=from n=12 fired=0 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=once n=1 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=once n=2 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=once n=3 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=once n=4 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=once n=5 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=once n=6 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=once n=7 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=once n=8 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=once n=9 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=once n=10 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=once n=11 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=once n=12 fired=1 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=from n=1 fired=2 writes=0 outcome=behind-root(DeviceIdentity(1),Bad(Unreadable),Bad(Unreadable)) checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=from n=2 fired=2 writes=0 outcome=other:RollbackFloorCeilingRootRingSlotStillBadAfterOneReread { ring_slot: RootRingSlot { region: 1, slot: 2 }, first_reading: Unreadable, reread: Unreadable } checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=from n=3 fired=2 writes=0 outcome=behind-root(DeviceIdentity(1),Bad(Unreadable),Bad(Unreadable)) checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=from n=4 fired=3 writes=0 outcome=other:RollbackFloorCeilingRootRingSlotStillBadAfterOneReread { ring_slot: RootRingSlot { region: 1, slot: 2 }, first_reading: Unreadable, reread: Unreadable } checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=from n=5 fired=2 writes=0 outcome=other:RollbackFloorCeilingRootRingSlotStillBadAfterOneReread { ring_slot: RootRingSlot { region: 1, slot: 2 }, first_reading: Unreadable, reread: Unreadable } checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=from n=6 fired=2 writes=0 outcome=other:NewerStateStillUnreadableAfterOneReread(RootRingSlotKnownToHoldARoot { ring_slot: RootRingSlot { region: 1, slot: 2 }, first_reading: Unreadable, reread: Unreadable }) checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=from n=7 fired=16 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=from n=8 fired=14 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=from n=9 fired=12 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=from n=10 fired=10 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=from n=11 fired=8 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=FloorRaiseToTheAdmissionCeiling occ=from n=12 fired=6 writes=65 outcome=ok checker=0
+Y2R txg=7 entry=AdministratorRollback occ=once n=1 fired=1 writes=21 outcome=ok checker=0
+Y2R txg=7 entry=AdministratorRollback occ=once n=2 fired=1 writes=21 outcome=ok checker=0
+Y2R txg=7 entry=AdministratorRollback occ=once n=3 fired=1 writes=21 outcome=ok checker=0
+Y2R txg=7 entry=AdministratorRollback occ=once n=4 fired=1 writes=21 outcome=ok checker=0
+Y2R txg=7 entry=AdministratorRollback occ=once n=5 fired=1 writes=21 outcome=ok checker=0
+Y2R txg=7 entry=AdministratorRollback occ=once n=6 fired=1 writes=21 outcome=ok checker=0
+Y2R txg=7 entry=AdministratorRollback occ=once n=7 fired=0 writes=21 outcome=ok checker=0
+Y2R txg=7 entry=AdministratorRollback occ=from n=1 fired=2 writes=0 outcome=behind-root(DeviceIdentity(1),Bad(Unreadable),Bad(Unreadable)) checker=0
+Y2R txg=7 entry=AdministratorRollback occ=from n=2 fired=2 writes=0 outcome=other:CandidateJudgementStillUnreadableAfterOneReread(RootRingSlotKnownToHoldARoot { ring_slot: RootRingSlot { region: 1, slot: 2 }, first_reading: Unreadable, reread: Unreadable }) checker=0
+Y2R txg=7 entry=AdministratorRollback occ=from n=3 fired=2 writes=0 outcome=other:CandidateJudgementStillUnreadableAfterOneReread(RootRingSlotKnownToHoldARoot { ring_slot: RootRingSlot { region: 1, slot: 2 }, first_reading: Unreadable, reread: Unreadable }) checker=0
+Y2R txg=7 entry=AdministratorRollback occ=from n=4 fired=5 writes=21 outcome=ok checker=0
+Y2R txg=7 entry=AdministratorRollback occ=from n=5 fired=4 writes=21 outcome=ok checker=0
+Y2R txg=7 entry=AdministratorRollback occ=from n=6 fired=2 writes=21 outcome=ok checker=0
+Y2R txg=7 entry=AdministratorRollback occ=from n=7 fired=0 writes=21 outcome=ok checker=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 30.83s
+

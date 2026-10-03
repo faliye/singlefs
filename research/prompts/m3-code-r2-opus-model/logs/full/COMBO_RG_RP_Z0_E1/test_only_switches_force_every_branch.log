@@ -1,0 +1,11 @@
+
+running 6 tests
+test named_root_ring_slots_name_exactly_the_pairs_they_were_given ... ok
+test named_root_ring_slot_keeps_failing_every_read_not_just_the_first_one ... ok
+test naming_a_root_ring_slot_makes_the_recovery_choose_a_different_root_and_naming_the_whole_ring_leaves_it_without_one ... ok
+test the_same_named_root_ring_slots_drive_the_shared_fault_plan_on_the_block_device_side ... ok
+test the_forced_zero_reuse_window_switch_makes_the_second_overwrite_land_on_a_slot_that_the_gated_window_leaves_alone ... ok
+test reuse_window_forced_to_zero_lets_a_publish_overwrite_a_unit_a_candidate_root_still_references_and_the_checker_goes_red ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 28.60s
+

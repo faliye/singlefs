@@ -1,0 +1,8 @@
+
+running 3 tests
+test rolling_back_a_failed_acquisition_overwrites_the_older_slot_only_behind_a_barrier ... ok
+test raising_the_floor_overwrites_the_older_system_configuration_slot_only_behind_a_barrier ... ok
+test acquisition_after_a_publish_of_the_previous_process_overwrites_the_older_slot_only_behind_a_barrier ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 36.25s
+

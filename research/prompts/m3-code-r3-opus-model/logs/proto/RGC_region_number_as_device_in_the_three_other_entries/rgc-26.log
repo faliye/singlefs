@@ -1,0 +1,11 @@
+
+running 1 test
+test r3opus_rgc_region_two_through_every_entry ... R3RGC txg=26 region=2 slot=0 root_dev=0 action=Entry(SessionPublish, FirstFileVersion) outcome=DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { devices: [DeviceBehindTheCurrentVersion { device: DeviceIdentity(0), newest_system_configuration_journal_tail: JournalSequenceNumber { instance_generation: InstanceGeneration(1), counter: 25 }, curren unchanged=true checker=0 first_violation=None remount=Ok(InstanceGeneration(2))
+R3RGC txg=26 region=2 slot=0 root_dev=0 action=Entry(NormalUnmount, FirstFileVersion) outcome=做成了 unchanged=false checker=2 first_violation=Some("I-3.1: 盘 0：记账的已分配 Some(557056)，遍历全部有效根得到 425984（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 28、环里自证过的根槽 24 个、最老的自证过的根 ") remount=Ok(InstanceGeneration(2))
+R3RGC txg=26 region=2 slot=0 root_dev=0 action=Entry(FloorRaiseToTheAdmissionCeiling, FirstFileVersion) outcome=做成了 unchanged=false checker=1 first_violation=Some("I-3.1: 盘 0：记账的已分配 Some(1605632)，遍历全部有效根得到 1474560（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 28、环里自证过的根槽 24 个、最老的自证过的") remount=Ok(InstanceGeneration(2))
+R3RGC txg=26 region=2 slot=0 root_dev=0 action=Entry(AdministratorRollback, FirstFileVersion) outcome=做成了 unchanged=false checker=1 first_violation=Some("I-3.1: 盘 0：记账的已分配 Some(6094848)，遍历全部有效根得到 5849088（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 27、环里自证过的根槽 24 个、最老的自证过的") remount=Ok(InstanceGeneration(2))
+R3RGC txg=26 region=2 slot=0 root_dev=0 action=Entry(AdministratorRollback, VersionBeforeTheCurrent) outcome=做成了 unchanged=false checker=1 first_violation=Some("I-3.1: 盘 0：记账的已分配 Some(5996544)，遍历全部有效根得到 5750784（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 27、环里自证过的根槽 24 个、最老的自证过的") remount=Ok(InstanceGeneration(2))
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 35 filtered out; finished in 18.70s
+

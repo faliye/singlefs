@@ -1,0 +1,16 @@
+
+running 1 test
+test r2opus_y3_entries_sweep_root_elsewhere_and_lap ... Y3 txg=6 region=0 slot=2 root_dev=DeviceIdentity(0) cut=BeforeItsRootSlotWrite entry=AdministratorRollback outcome=behind-root(DeviceIdentity(0),Bad(NotSelfVerified),Bad(NotSelfVerified)) unchanged=true checker=0 remount=Ok(InstanceGeneration(1),CheckpointTxg(6)) checker_after_remount=0 ms=2989
+Y3 txg=7 region=1 slot=2 root_dev=DeviceIdentity(1) cut=BeforeItsRootSlotWrite entry=AdministratorRollback outcome=behind-root(DeviceIdentity(1),Bad(NotSelfVerified),Bad(NotSelfVerified)) unchanged=true checker=0 remount=Ok(InstanceGeneration(1),CheckpointTxg(7)) checker_after_remount=0 ms=3175
+Y3 txg=8 region=2 slot=2 root_dev=DeviceIdentity(0) cut=BeforeItsRootSlotWrite entry=AdministratorRollback outcome=behind-root(DeviceIdentity(0),Bad(NotSelfVerified),Bad(NotSelfVerified)) unchanged=true checker=0 remount=Ok(InstanceGeneration(1),CheckpointTxg(8)) checker_after_remount=0 ms=3272
+Y3 txg=9 region=0 slot=3 root_dev=DeviceIdentity(0) cut=BeforeItsRootSlotWrite entry=AdministratorRollback outcome=behind-root(DeviceIdentity(0),Bad(NotSelfVerified),Bad(NotSelfVerified)) unchanged=true checker=0 remount=Ok(InstanceGeneration(1),CheckpointTxg(9)) checker_after_remount=0 ms=3327
+Y3 txg=10 region=1 slot=3 root_dev=DeviceIdentity(1) cut=BeforeItsRootSlotWrite entry=AdministratorRollback outcome=behind-root(DeviceIdentity(1),Bad(NotSelfVerified),Bad(NotSelfVerified)) unchanged=true checker=0 remount=Ok(InstanceGeneration(1),CheckpointTxg(10)) checker_after_remount=0 ms=3476
+Y3 txg=11 region=2 slot=3 root_dev=DeviceIdentity(0) cut=BeforeItsRootSlotWrite entry=AdministratorRollback outcome=behind-root(DeviceIdentity(0),Bad(NotSelfVerified),Bad(NotSelfVerified)) unchanged=true checker=0 remount=Ok(InstanceGeneration(1),CheckpointTxg(11)) checker_after_remount=0 ms=3581
+Y3 txg=12 region=0 slot=4 root_dev=DeviceIdentity(0) cut=BeforeItsRootSlotWrite entry=AdministratorRollback outcome=behind-root(DeviceIdentity(0),Bad(NotSelfVerified),Bad(NotSelfVerified)) unchanged=true checker=0 remount=Ok(InstanceGeneration(1),CheckpointTxg(12)) checker_after_remount=0 ms=3721
+Y3 txg=13 region=1 slot=4 root_dev=DeviceIdentity(1) cut=BeforeItsRootSlotWrite entry=AdministratorRollback outcome=behind-root(DeviceIdentity(1),Bad(NotSelfVerified),Bad(NotSelfVerified)) unchanged=true checker=0 remount=Ok(InstanceGeneration(1),CheckpointTxg(13)) checker_after_remount=0 ms=3840
+Y3 txg=14 region=2 slot=4 root_dev=DeviceIdentity(0) cut=BeforeItsRootSlotWrite entry=AdministratorRollback outcome=behind-root(DeviceIdentity(0),Bad(NotSelfVerified),Bad(NotSelfVerified)) unchanged=true checker=0 remount=Ok(InstanceGeneration(1),CheckpointTxg(14)) checker_after_remount=0 ms=3915
+Y3-SUMMARY cases=9 flags=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 31.99s
+

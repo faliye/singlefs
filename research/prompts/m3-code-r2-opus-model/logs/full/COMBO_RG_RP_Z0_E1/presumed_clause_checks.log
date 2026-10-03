@@ -1,0 +1,8 @@
+
+running 3 tests
+test c499_remount_after_a_clean_close_and_after_a_crash_both_scan_the_whole_ring_and_recover_by_the_same_rules ... ok
+test c497_every_publish_that_rewrites_the_instance_table_bumps_it_before_every_other_commit_generated_block ... ok
+test c498_warm_up_publishes_after_remounts_rollback_and_a_crash_in_the_middle_of_a_mount_are_counted_by_the_clause ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.08s
+

@@ -1,0 +1,10 @@
+
+running 5 tests
+test an_empty_publish_rewrites_only_the_changed_mapping_path_carries_the_rest_and_releases_exactly_the_replaced_nodes ... ok
+test the_pool_checker_reddens_each_broken_rule_of_a_multi_level_tree_root ... ok
+test under_small_node_capacities_the_first_file_version_writes_multi_level_trees_that_every_reader_accepts ... ok
+test a_central_mapping_root_whose_separator_hides_a_key_is_refused_by_the_rebuild_before_the_instance_generation_is_acquired ... ok
+test pool_with_multi_level_trees_mounts_writable_and_the_row_and_warm_up_publishes_carry_on ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.86s
+

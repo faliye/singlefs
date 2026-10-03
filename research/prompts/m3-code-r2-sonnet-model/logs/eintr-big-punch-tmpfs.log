@@ -1,0 +1,1 @@
+path=/dev/shm/m3-code-r2-sonnet-probe2.img size_mib=512 big_punches=8 ok=8 EINTR=0 other=0 {} signals_handled_during_punch_calls=10 punch_secs=0.190

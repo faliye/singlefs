@@ -1,0 +1,53 @@
+warning: unused doc comment
+    --> crates/singlefs-core/src/mount.rs:3395:1
+     |
+3395 | / /// 落后支缺根那一半：那一版的根写进了根环（`root_of_the_version`），它该在的根环槽（`root_ring::target_for_publish` 按 txg 算）
+3396 | | /// 住在 `device` 这块盘上，读那一槽一次，不是它（读坏、或自证得过而是另一条根）就重读一次，仍不是它才交回两次读到的
+3397 | | /// （D16（发布语义） 已定项 1「根槽这一次读坏」：知道住着根的槽重读一次仍坏才算；挂着之后现行那一版的根槽是这个进程写过、FUA ...
+3398 | | /// 根没写进根环、或那一槽不在这块盘上的交回 `None`，不读盘。只读盘：至多读那一槽两次。
+     | |_--------------------------------------------------------------------------------------^
+     |   |
+     |   rustdoc does not generate documentation for macro invocations
+     |
+     = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+     = note: `#[warn(unused_doc_comments)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-core` (lib) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running tests/entries_after_mount_refuse_swapped_or_behind_devices.rs (/tmp/claude-1000/m3-code-r3-opus/target/debug/deps/entries_after_mount_refuse_swapped_or_behind_devices-7e14242ee9c4c3ad)
+
+running 31 tests
+test a_normal_unmount_onto_the_root_device_taken_before_the_publish_root_slot_write_is_refused_before_any_write ... ok
+test a_floor_raise_onto_the_root_device_taken_before_the_publish_root_slot_write_is_refused_before_any_write ... ok
+test a_normal_unmount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot ... ok
+test a_floor_raise_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot ... ok
+test a_session_publish_onto_device_one_holding_the_publish_root_taken_before_its_root_slot_write_is_refused_before_any_write ... ok
+test a_session_publish_onto_device_zero_holding_the_publish_root_in_region_two_taken_before_its_root_slot_write_is_refused_before_any_write ... ok
+test a_normal_unmount_onto_device_one_whose_ring_slot_holds_the_root_of_the_previous_lap_is_refused_before_any_write ... ok
+test a_floor_raise_onto_device_one_whose_ring_slot_holds_the_root_of_the_previous_lap_is_refused_before_any_write ... ok
+test a_session_publish_onto_the_root_device_taken_before_the_publish_root_slot_write_is_refused_before_any_write ... ok
+test a_floor_raise_onto_the_root_device_whose_ring_slot_holds_the_root_of_the_previous_lap_is_refused_before_any_write ... ok
+test a_normal_unmount_onto_the_root_device_whose_ring_slot_holds_the_root_of_the_previous_lap_is_refused_before_any_write ... ok
+test a_session_publish_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot ... ok
+test a_session_publish_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused ... ok
+test a_session_publish_onto_the_root_device_whose_ring_slot_holds_the_root_of_the_previous_lap_is_refused_before_any_write ... ok
+test an_administrator_rollback_onto_device_one_whose_ring_slot_holds_the_root_of_the_previous_lap_is_refused_before_any_write ... ok
+test an_administrator_rollback_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot ... ok
+test an_administrator_rollback_onto_the_root_device_taken_before_the_publish_root_slot_write_is_refused_before_any_write ... ok
+test an_administrator_rollback_onto_the_root_device_whose_ring_slot_holds_the_root_of_the_previous_lap_is_refused_before_any_write ... ok
+test a_floor_raise_with_the_two_device_bodies_swapped_is_refused_before_any_write ... ok
+test a_normal_unmount_with_the_two_device_bodies_swapped_is_refused_before_any_write ... ok
+test a_session_publish_with_the_two_device_bodies_swapped_is_refused_before_any_write ... ok
+test a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot ... ok
+test a_writable_mount_onto_the_root_device_taken_before_the_publish_root_slot_write_applies_the_publish_record_and_mounts ... ok
+test a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_whose_root_slot_fails_two_reads_in_a_row_is_refused_before_any_write ... ok
+test an_administrator_rollback_with_the_two_device_bodies_swapped_is_refused_before_any_write ... ok
+test a_normal_unmount_onto_a_stale_snapshot_of_device_one_is_refused_before_any_write ... ok
+test a_floor_raise_onto_a_stale_snapshot_of_device_one_is_refused_before_any_write ... ok
+test a_session_publish_onto_a_stale_snapshot_of_device_one_is_refused_before_any_write ... ok
+test an_administrator_rollback_onto_a_stale_snapshot_of_device_one_is_refused_before_any_write ... ok
+test a_device_left_with_one_self_verified_system_configuration_slot_is_not_refused_by_any_entry ... ok
+test stale_snapshot_substitution_is_refused_by_every_entry_over_the_swept_user_steps ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.44s
+

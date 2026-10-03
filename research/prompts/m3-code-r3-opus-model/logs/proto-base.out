@@ -1,0 +1,14 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 7200 秒）：slice 已占 36.3 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排队（已等 60 秒，至多 7200 秒）：slice 已占 36.3 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排队（已等 120 秒，至多 7200 秒）：slice 已占 36.2 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排了 130 秒，起跑（singlefs-memory-cap-1455064-1229816786）
+PROTO BASE piece-1 rc=0
+PROTO BASE piece-2 rc=0
+PROTO BASE piece-3 rc=0
+PROTO BASE piece-4 rc=0
+PROTO BASE piece-5 rc=0
+PROTO BASE piece-6 rc=0
+PROTO BASE piece-7 rc=0
+PROTO BASE piece-8 rc=0
+DONE
+rc=0 seconds=188

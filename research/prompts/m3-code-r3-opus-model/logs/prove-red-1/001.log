@@ -1,0 +1,2 @@
+  ✗ 上限 8G 超过峰值表里这条命令实测峰值 889M 的 2 倍（键「cargo test -p singlefs-harness --test sparse_devices_refuse_requests_outside_the_device_like_the_file_backend -- a_sparse_block_device_accepts_and_refuses_every_request_exactly_like_the_file_backend」），命令一行都没跑
+  → 怎么办：写 auto（取实测峰值的 1.5 倍，1334M），或写不超过 1778M 的上限；确有理由要更大，设 RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON=<至少 8 个字的理由>
