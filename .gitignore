@@ -23,3 +23,6 @@ target/
 
 # Python 字节码（门禁的 lib-*.py 被 import 时留下）
 __pycache__/
+
+# 打了 blklogwrites 补丁的 QEMU 装在哪（research/scripts/vm-bench.sh 读），本机路径，模板在仓根 qemu.env.example
+/qemu.env

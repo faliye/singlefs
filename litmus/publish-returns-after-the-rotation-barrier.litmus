@@ -11,7 +11,7 @@ C publish-returns-after-the-rotation-barrier
  * 根槽与轮换之间不写屏障：FUA 返回才发轮换，那一段的序不是这条判的（根的序归 new-pool-file-creation-* 两条）；这条只判轮换之后那道屏障。
  * P1 = 返回之后的读者（崩溃之后的可写挂载读两槽取见证值）：先看到已经返回，再读系统配置槽。
  * 屏障写成 smp_wmb，读者一侧的先后写成 smp_rmb：herd7 判的是这条屏障形态在 LKMM 下的序，不是块层的 FLUSH；
- * 块层那一半在录制流上判（crates/singlefs-harness/tests/a_publish_returns_only_after_the_system_configuration_rotation_is_durable.rs）。
+ * 块层那一半在录制流上判（crates/singlefs-checker-tier/tests/a_publish_returns_only_after_the_system_configuration_rotation_is_durable.rs）。
  *
  * singlefs-expect: Never
  * singlefs-models: crates/singlefs-core/src/transaction.rs::persist_the_root_then_rotate_the_system_configuration 写者（P0）
