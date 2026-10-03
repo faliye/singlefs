@@ -1,0 +1,16 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 16M 的 2 倍，照理由放行：探针格越大用得越多，峰值表里的数只是一次短跑的数
+run-with-memory-cap: 这个会话已有 12 条日常的在跑，照理由并行：正推腿是派出去的子 agent，与主 agent 的整包慢档各跑各的
+
+running 1 test
+CELL Narrow(4000) O0 U1100 B0 K144 => grow-refused Publish { cause: JournalRecordsOfThePublishExceedTheLimit { records_of_the_publish: 1100, record_limit: 512 }, floor_raises: [], versions_published: [] }
+CELL Narrow(4000) O0 U1100 B0 K16 => grow-refused Publish { cause: JournalRecordsOfThePublishExceedTheLimit { records_of_the_publish: 1100, record_limit: 512 }, floor_raises: [], versions_published: [] }
+CELL Narrow(4000) O0 U1100 B2 K144 => grow-refused Publish { cause: JournalRecordsOfThePublishExceedTheLimit { records_of_the_publish: 1100, record_limit: 512 }, floor_raises: [], versions_published: [] }
+CELL Narrow(4000) O0 U1100 B2 K16 => grow-refused Publish { cause: JournalRecordsOfThePublishExceedTheLimit { records_of_the_publish: 1100, record_limit: 512 }, floor_raises: [], versions_published: [] }
+CELL Narrow(4000) O0 U1350 B0 K144 => grow-refused Publish { cause: JournalRecordsOfThePublishExceedTheLimit { records_of_the_publish: 1350, record_limit: 512 }, floor_raises: [], versions_published: [] }
+CELL Narrow(4000) O0 U1350 B0 K16 => grow-refused Publish { cause: JournalRecordsOfThePublishExceedTheLimit { records_of_the_publish: 1350, record_limit: 512 }, floor_raises: [], versions_published: [] }
+CELL Narrow(4000) O0 U1350 B2 K144 => grow-refused Publish { cause: JournalRecordsOfThePublishExceedTheLimit { records_of_the_publish: 1350, record_limit: 512 }, floor_raises: [], versions_published: [] }
+CELL Narrow(4000) O0 U1350 B2 K16 => grow-refused Publish { cause: JournalRecordsOfThePublishExceedTheLimit { records_of_the_publish: 1350, record_limit: 512 }, floor_raises: [], versions_published: [] }
+test probe_grid ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.20s
+

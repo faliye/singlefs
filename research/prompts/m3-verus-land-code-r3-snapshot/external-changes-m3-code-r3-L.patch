@@ -1,0 +1,413 @@
+--- a/crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs
++++ b/crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs
+@@ -38,6 +38,12 @@
+ //! - J3：根环转过一圈的那一形在这三个入口各两格（管理员回退取现行那一版的前一版做目标）：txg 27（区域 0、住盘 0，槽里是上一圈
+ //!   第一个文件那一版 txg 3）与 txg 25（区域 1、住盘 1，槽里是上一圈暖机那一版 txg 1）。这一形上缺根那一半是三个入口唯一的一道
+ //!   （没有「重读仍坏」兜底）：「根槽里自证得过就算是它」两种 txg 都红；「只查区域 0 那块盘」只在 txg 25 红——txg 27 的根就住在区域 0 那块盘上。
++//!
++//! 代码三方 m3-code-r3（判决 `research/prompts/m3-code-r3-main-verification.md` 第三节 L1、L2）补的几格：
++//! - L1：H1 的两格与 J2 的三格各加一版「根槽第一次读回的字节坏一位」（读报成功、自证不过），重读读得出 P，五个入口都照常做成、
++//!   注入真发生了 1 次（D16（发布语义） 已定项 1「读不出或自证不过就重读一次」的后一半）。「只在第一次读不出时才重读」（攻方 RU）五格都红。
++//! - L2：根环转过一圈的那一形在正常卸载、准入抬 F、管理员回退各加 txg 26 一格（区域 2、槽 0，区域 2 归盘 0，槽里是上一圈暖机写的
++//!   第二条根 txg 2）。这三个入口上「把区域号当盘号」（攻方 RGC）时区域 2 被当成盘表里没有的盘 2，缺根不核、入口照常做成。
+ 
+ mod common_admission;
+ 
+@@ -63,7 +69,8 @@
+ use singlefs_core::transaction::{FirstFile, PoolVersion, TransactionOutput};
+ use singlefs_harness::fault_injection::{
+     FaultCounting, FaultDeviceSelector, FaultInjectingBlockDevice, FaultOccurrence, FaultPlacement,
+-    FaultSchedule, InjectedFault, NamedRootRingSlots, RootRingSlotTarget, SharedFaultPlan,
++    FaultSchedule, FlippedBit, InjectedFault, NamedRootRingSlots, RootRingSlotTarget,
++    SharedFaultPlan,
+ };
+ use singlefs_harness::history::HistoryDeviceWidth;
+ use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice, SparseDevice};
+@@ -767,6 +774,16 @@
+         instance: InstanceGeneration(1),
+         checkpoint_txg: CheckpointTxg(1),
+     };
++/// P 的 txg：根环转过一圈，P 的根环槽（区域 2、槽 0；`region_devices` 是 [盘 0, 盘 1, 盘 0]，区域 2 归盘 0）里住着上一圈 txg 2
++/// （取号之后暖机写的第二条根）自证得过的根。
++const PUBLISH_TXG_ONE_LAP_AFTER_THE_WARM_UP_WITH_ITS_ROOT_IN_REGION_TWO: CheckpointTxg =
++    CheckpointTxg(26);
++/// txg 26 那一版的根槽上一圈住着的那条根：暖机写的第二条根（实例 1、txg 2）。
++const ROOT_OF_THE_SECOND_WARM_UP_PUBLISH_A_LAP_BEFORE: RingSlotReadingOtherThanTheVersionRoot =
++    RingSlotReadingOtherThanTheVersionRoot::AnotherRoot {
++        instance: InstanceGeneration(1),
++        checkpoint_txg: CheckpointTxg(2),
++    };
+ 
+ /// 起点同 Y2-a（第一个文件之后会话里覆盖写两次，txg 5），会话里再覆盖写到 `publish_txg` 的前一版，P 是下一次覆盖写（txg `publish_txg`），
+ /// 录下它的写流。切下的那块盘：落后于 P（它的系统配置轮换在根槽之后），而 P 的单元都在它上面（单元与记录都在根槽之前写）——
+@@ -1161,11 +1178,26 @@
+ /// 三个入口不重读时第 1 次读坏就拒成缺根）。
+ const ROOT_SLOT_READ_OF_THE_BEHIND_CHECK_IN_THE_OTHER_THREE_ENTRIES: u64 = 1;
+ 
+-/// 盘表里每块盘包上同一份注入计划：P 的根环槽 `ring_slot` 上的读（整池数、只数落在这一槽里的读）按 `occurrence` 报块设备错。
+-fn with_reads_of_the_publish_root_slot_failing(
++/// 根槽这一次读回的字节坏的那一位：根记录里 checkpoint_txg 字段的头一个字节（魔数 4、文件系统标识 16、标志 4、实例代号 4 字节之后，
++/// `crates/singlefs-core/src/root_record.rs` 的 `RootRecord::parse_slot`）的最低位。自证校验和罩着整个根槽，翻哪一位都自证不过；
++/// 取 txg 字段是让「自证不过」不靠魔数那一判先拒。
++const BIT_FLIPPED_IN_THE_CHECKPOINT_TXG_OF_THE_ROOT_SLOT: FlippedBit = FlippedBit {
++    byte_index: 28,
++    bit_index: 0,
++};
++/// 根槽这一次读报成功、读回的字节坏一位（L1：自证不过的那一种读坏）。
++const ROOT_SLOT_READ_RETURNING_A_FLIPPED_BIT: InjectedFault =
++    InjectedFault::ReadReturnsCorruptedBytes {
++        flipped_bit: BIT_FLIPPED_IN_THE_CHECKPOINT_TXG_OF_THE_ROOT_SLOT,
++    };
++
++/// 盘表里每块盘包上同一份注入计划：P 的根环槽 `ring_slot` 上的读（整池数、只数落在这一槽里的读）按 `occurrence` 注入 `fault`
++/// （报块设备错 [`InjectedFault::ReadFails`]，或读报成功而字节坏一位 [`ROOT_SLOT_READ_RETURNING_A_FLIPPED_BIT`]）。
++fn with_a_fault_on_reads_of_the_publish_root_slot(
+     devices: SparseDevices,
+     pool: &PoolUnderTest<SparseBlockDevice>,
+     ring_slot: RootRingSlot,
++    fault: InjectedFault,
+     occurrence: FaultOccurrence,
+ ) -> (
+     Vec<(DeviceIdentity, FaultInjectingBlockDevice<SparseBlockDevice>)>,
+@@ -1174,7 +1206,7 @@
+     let plan = SharedFaultPlan::armed(
+         DEVICE_WIDTH.fixed_geometry(),
+         FaultSchedule {
+-            fault: InjectedFault::ReadFails,
++            fault,
+             device: FaultDeviceSelector::EveryDevice,
+             placement: FaultPlacement::WithinNamedRootRingSlots(RootRingSlotTarget {
+                 named_slots: NamedRootRingSlots::NONE.with(ring_slot),
+@@ -1197,10 +1229,11 @@
+     (wrapped, plan)
+ }
+ 
+-/// H1 的一格：P 的根住的那块盘切在 P 的根槽 FUA 之后（落后、单元都在、根槽里是 P），会话发布时缺根那一半第一次读那一槽读坏、
+-/// 重读读得出 P：照常发布，那一次注入真发生了。去掉重读（第一次读不是它就拒）时拒成落后支缺根那一半。
+-#[test]
+-fn a_session_publish_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot(
++/// H1 的一格：P 的根住的那块盘切在 P 的根槽 FUA 之后（落后、单元都在、根槽里是 P），会话发布时缺根那一半第一次读那一槽读坏
++/// （按 `fault`：读不出，或读回的字节坏一位、自证不过）、重读读得出 P：照常发布，那一次注入真发生了。
++/// 去掉重读（第一次读不是它就拒）时两种读坏都拒成落后支缺根那一半；只在第一次读不出时才重读（攻方 RU）时字节坏一位的那一种拒。
++fn session_publish_onto_the_root_device_taken_after_the_publish_root_slot_write_with_one_bad_read_of_its_root_slot(
++    fault: InjectedFault,
+ ) {
+     let RootDeviceOfThePublishTakenMidPublish {
+         mut pool,
+@@ -1211,10 +1244,11 @@
+         WhereThePublishIsCut::AfterItsRootSlotWrite,
+         PUBLISH_TXG_WITH_ITS_ROOT_ON_DEVICE_ZERO,
+     );
+-    let (mut wrapped, plan) = with_reads_of_the_publish_root_slot_failing(
++    let (mut wrapped, plan) = with_a_fault_on_reads_of_the_publish_root_slot(
+         devices,
+         &pool,
+         ring_slot_of_the_publish_root,
++        fault,
+         FaultOccurrence::TheNthMatchingCall(
+             ROOT_SLOT_READ_OF_THE_BEHIND_CHECK_IN_A_SESSION_PUBLISH,
+         ),
+@@ -1234,21 +1268,39 @@
+     assert_eq!(
+         plan.fired_count(),
+         1,
+-        "P 的根槽上那一次读坏真发生了：{:?}",
++        "{fault:?}：P 的根槽上那一次读坏真发生了：{:?}",
+         plan.fired()
+     );
+     assert!(
+         outcome.is_ok(),
+-        "一次瞬时读错、重读读得出 P：会话照常发布，实际 {:?}",
++        "{fault:?}：一次读坏、重读读得出 P：会话照常发布，实际 {:?}",
+         outcome.err()
+     );
+ }
+ 
+-/// H1 的一格：同一组盘（P 的根住的那块切在根槽 FUA 之后）上可写挂载，所选那一版就是择到的 P（写进了根环），
+-/// 取号之前逐盘核时缺根那一半第一次读那一槽读坏、重读读得出 P：照常挂上、所选那一版是 P，那一次注入真发生了。
+-/// 去掉重读时拒成 `WritableMountRefusedByDevicesWithoutTheSelectedVersion`。
+ #[test]
+-fn a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot(
++fn a_session_publish_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot(
++) {
++    session_publish_onto_the_root_device_taken_after_the_publish_root_slot_write_with_one_bad_read_of_its_root_slot(
++        InjectedFault::ReadFails,
++    );
++}
++
++/// L1 的一格：H1 会话发布那一格换成根槽第一次读回的字节坏一位（读报成功、自证不过）。
++#[test]
++fn a_session_publish_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot(
++) {
++    session_publish_onto_the_root_device_taken_after_the_publish_root_slot_write_with_one_bad_read_of_its_root_slot(
++        ROOT_SLOT_READ_RETURNING_A_FLIPPED_BIT,
++    );
++}
++
++/// H1 的一格：同一组盘（P 的根住的那块切在根槽 FUA 之后）上可写挂载，所选那一版就是择到的 P（写进了根环），
++/// 取号之前逐盘核时缺根那一半第一次读那一槽读坏（按 `fault`）、重读读得出 P：照常挂上、所选那一版是 P，那一次注入真发生了。
++/// 去掉重读时两种读坏都拒成 `WritableMountRefusedByDevicesWithoutTheSelectedVersion`；只在第一次读不出时才重读（攻方 RU）时
++/// 字节坏一位的那一种拒。
++fn writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_with_one_bad_read_of_its_root_slot(
++    fault: InjectedFault,
+ ) {
+     let RootDeviceOfThePublishTakenMidPublish {
+         pool,
+@@ -1260,28 +1312,47 @@
+         PUBLISH_TXG_WITH_ITS_ROOT_ON_DEVICE_ZERO,
+     );
+     let publish_root = pool.current_file_version().root;
+-    let (mut wrapped, plan) = with_reads_of_the_publish_root_slot_failing(
++    let (mut wrapped, plan) = with_a_fault_on_reads_of_the_publish_root_slot(
+         copies_of(&devices),
+         &pool,
+         ring_slot_of_the_publish_root,
++        fault,
+         FaultOccurrence::TheNthMatchingCall(ROOT_SLOT_READ_OF_THE_BEHIND_CHECK_IN_A_WRITABLE_MOUNT),
+     );
+     let mounted = mount_writable(&pool.parameters, &mut wrapped);
+     assert_eq!(
+         plan.fired_count(),
+         1,
+-        "P 的根槽上那一次读坏真发生了：{:?}",
++        "{fault:?}：P 的根槽上那一次读坏真发生了：{:?}",
+         plan.fired()
+     );
+-    let mounted = mounted
+-        .unwrap_or_else(|error| panic!("一次瞬时读错、重读读得出 P：照常可写挂载，实际 {error:?}"));
++    let mounted = mounted.unwrap_or_else(|error| {
++        panic!("{fault:?}：一次读坏、重读读得出 P：照常可写挂载，实际 {error:?}")
++    });
+     assert_eq!(
+         (
+             mounted.output.effective_root.instance,
+             mounted.output.effective_root.checkpoint_txg
+         ),
+         (publish_root.instance, publish_root.checkpoint_txg),
+-        "所选那一版是 P"
++        "{fault:?}：所选那一版是 P"
++    );
++}
++
++#[test]
++fn a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot(
++) {
++    writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_with_one_bad_read_of_its_root_slot(
++        InjectedFault::ReadFails,
++    );
++}
++
++/// L1 的一格：H1 可写挂载那一格换成根槽第一次读回的字节坏一位（读报成功、自证不过）。
++#[test]
++fn a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot(
++) {
++    writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_with_one_bad_read_of_its_root_slot(
++        ROOT_SLOT_READ_RETURNING_A_FLIPPED_BIT,
+     );
+ }
+ 
+@@ -1303,10 +1374,11 @@
+     );
+     let publish_root = pool.current_file_version().root;
+     let images_before = images_of(&devices);
+-    let (mut wrapped, plan) = with_reads_of_the_publish_root_slot_failing(
++    let (mut wrapped, plan) = with_a_fault_on_reads_of_the_publish_root_slot(
+         copies_of(&devices),
+         &pool,
+         ring_slot_of_the_publish_root,
++        InjectedFault::ReadFails,
+         FaultOccurrence::EveryMatchingCallFromTheNthOnward(
+             ROOT_SLOT_READ_OF_THE_BEHIND_CHECK_IN_A_WRITABLE_MOUNT,
+         ),
+@@ -1378,9 +1450,10 @@
+ // ─── 代码三方 m3-code-r2 J2：另三个入口上缺根那一半的「重读一次」 ───
+ 
+ /// J2 的一格（攻方改错 RP「正常卸载、准入抬 F、管理员回退不重读」）：P 的根住的那块盘切在 P 的根槽 FUA 之后（落后、单元都在、
+-/// 根槽里是 P），经 `entry` 交进去时缺根那一半第一次读那一槽读坏、重读读得出 P：照常做成，那一次注入真发生了，做完之后池级 checker 不红。
+-/// 这三个入口不重读（第一次读不是它就拒）时拒成落后支缺根那一半。
+-fn one_transient_read_error_of_the_publish_root_slot_through(entry: EntryAfterTheMount) {
++/// 根槽里是 P），经 `entry` 交进去时缺根那一半第一次读那一槽读坏（按 `fault`：读不出，或读回的字节坏一位、自证不过）、
++/// 重读读得出 P：照常做成，那一次注入真发生了，做完之后池级 checker 不红。
++/// 这三个入口不重读（第一次读不是它就拒）时两种读坏都拒成落后支缺根那一半；只在第一次读不出时才重读（攻方 RU）时字节坏一位的那一种拒。
++fn one_bad_read_of_the_publish_root_slot_through(entry: EntryAfterTheMount, fault: InjectedFault) {
+     let RootDeviceOfThePublishTakenMidPublish {
+         mut pool,
+         devices,
+@@ -1390,10 +1463,11 @@
+         WhereThePublishIsCut::AfterItsRootSlotWrite,
+         PUBLISH_TXG_WITH_ITS_ROOT_ON_DEVICE_ZERO,
+     );
+-    let (mut wrapped, plan) = with_reads_of_the_publish_root_slot_failing(
++    let (mut wrapped, plan) = with_a_fault_on_reads_of_the_publish_root_slot(
+         devices,
+         &pool,
+         ring_slot_of_the_publish_root,
++        fault,
+         FaultOccurrence::TheNthMatchingCall(
+             ROOT_SLOT_READ_OF_THE_BEHIND_CHECK_IN_THE_OTHER_THREE_ENTRIES,
+         ),
+@@ -1402,12 +1476,12 @@
+     assert_eq!(
+         plan.fired_count(),
+         1,
+-        "{entry:?}：P 的根槽上那一次读坏真发生了：{:?}",
++        "{entry:?}，{fault:?}：P 的根槽上那一次读坏真发生了：{:?}",
+         plan.fired()
+     );
+     assert!(
+         refusal.is_none(),
+-        "{entry:?}：一次瞬时读错、重读读得出 P：照常做成，实际 {}",
++        "{entry:?}，{fault:?}：一次读坏、重读读得出 P：照常做成，实际 {}",
+         describe(&refusal)
+     );
+     let after = MemoryPool {
+@@ -1420,29 +1494,64 @@
+     assert_eq!(
+         checker_violations_on(&after),
+         Vec::<String>::new(),
+-        "{entry:?}：做完之后池级 checker 不红"
++        "{entry:?}，{fault:?}：做完之后池级 checker 不红"
+     );
+ }
+ 
+ #[test]
+ fn a_normal_unmount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot(
+ ) {
+-    one_transient_read_error_of_the_publish_root_slot_through(EntryAfterTheMount::NormalUnmount);
++    one_bad_read_of_the_publish_root_slot_through(
++        EntryAfterTheMount::NormalUnmount,
++        InjectedFault::ReadFails,
++    );
+ }
+ 
+ #[test]
+ fn a_floor_raise_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot(
+ ) {
+-    one_transient_read_error_of_the_publish_root_slot_through(
++    one_bad_read_of_the_publish_root_slot_through(
+         EntryAfterTheMount::FloorRaiseToTheAdmissionCeiling,
++        InjectedFault::ReadFails,
+     );
+ }
+ 
+ #[test]
+ fn an_administrator_rollback_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot(
+ ) {
+-    one_transient_read_error_of_the_publish_root_slot_through(
++    one_bad_read_of_the_publish_root_slot_through(
+         EntryAfterTheMount::AdministratorRollback,
++        InjectedFault::ReadFails,
++    );
++}
++
++/// L1 的一格：J2 正常卸载那一格换成根槽第一次读回的字节坏一位（读报成功、自证不过）。
++#[test]
++fn a_normal_unmount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot(
++) {
++    one_bad_read_of_the_publish_root_slot_through(
++        EntryAfterTheMount::NormalUnmount,
++        ROOT_SLOT_READ_RETURNING_A_FLIPPED_BIT,
++    );
++}
++
++/// L1 的一格：J2 准入抬 F 那一格换成根槽第一次读回的字节坏一位（读报成功、自证不过）。
++#[test]
++fn a_floor_raise_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot(
++) {
++    one_bad_read_of_the_publish_root_slot_through(
++        EntryAfterTheMount::FloorRaiseToTheAdmissionCeiling,
++        ROOT_SLOT_READ_RETURNING_A_FLIPPED_BIT,
++    );
++}
++
++/// L1 的一格：J2 管理员回退那一格换成根槽第一次读回的字节坏一位（读报成功、自证不过）。
++#[test]
++fn an_administrator_rollback_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot(
++) {
++    one_bad_read_of_the_publish_root_slot_through(
++        EntryAfterTheMount::AdministratorRollback,
++        ROOT_SLOT_READ_RETURNING_A_FLIPPED_BIT,
+     );
+ }
+ 
+@@ -1537,3 +1646,44 @@
+         DeviceIdentity(1),
+     );
+ }
++
++// ─── 代码三方 m3-code-r3 L2：另三个入口上根环转过一圈、根住区域 2 ───
++
++/// L2 的一格（攻方改错 RGC「正常卸载、准入抬 F、管理员回退那条路上把区域号当盘号」）：根环转过一圈，P 是 txg 26，根环槽在区域 2、槽 0，
++/// 区域 2 归盘 0，那一槽里是上一圈暖机写的第二条根（实例 1、txg 2）。盘 0 换成切在 P 的根槽 FUA 之前的样子，经正常卸载交进去，
++/// 在任何写之前拒成落后支缺根那一半、点名盘 0，两次读到的都是上一圈那条根。把区域号当盘号时区域 2 被当成盘表里没有的盘 2，
++/// 盘 0 的缺根不核，读根环那一步也不拒（槽里自证得过），入口照常做成。
++#[test]
++fn a_normal_unmount_onto_device_zero_whose_ring_slot_in_region_two_holds_the_root_of_the_previous_lap_is_refused_before_any_write(
++) {
++    root_device_whose_ring_slot_holds_the_root_of_the_previous_lap_through(
++        EntryAfterTheMount::NormalUnmount,
++        PUBLISH_TXG_ONE_LAP_AFTER_THE_WARM_UP_WITH_ITS_ROOT_IN_REGION_TWO,
++        ROOT_OF_THE_SECOND_WARM_UP_PUBLISH_A_LAP_BEFORE,
++        DeviceIdentity(0),
++    );
++}
++
++/// L2 的一格：同上，经准入抬 F 交进去。
++#[test]
++fn a_floor_raise_onto_device_zero_whose_ring_slot_in_region_two_holds_the_root_of_the_previous_lap_is_refused_before_any_write(
++) {
++    root_device_whose_ring_slot_holds_the_root_of_the_previous_lap_through(
++        EntryAfterTheMount::FloorRaiseToTheAdmissionCeiling,
++        PUBLISH_TXG_ONE_LAP_AFTER_THE_WARM_UP_WITH_ITS_ROOT_IN_REGION_TWO,
++        ROOT_OF_THE_SECOND_WARM_UP_PUBLISH_A_LAP_BEFORE,
++        DeviceIdentity(0),
++    );
++}
++
++/// L2 的一格：同上，经管理员回退交进去（目标取现行那一版的前一版）。
++#[test]
++fn an_administrator_rollback_onto_device_zero_whose_ring_slot_in_region_two_holds_the_root_of_the_previous_lap_is_refused_before_any_write(
++) {
++    root_device_whose_ring_slot_holds_the_root_of_the_previous_lap_through(
++        EntryAfterTheMount::AdministratorRollback,
++        PUBLISH_TXG_ONE_LAP_AFTER_THE_WARM_UP_WITH_ITS_ROOT_IN_REGION_TWO,
++        ROOT_OF_THE_SECOND_WARM_UP_PUBLISH_A_LAP_BEFORE,
++        DeviceIdentity(0),
++    );
++}
+--- a/crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs
++++ b/crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs
+@@ -831,7 +831,8 @@
+                 | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration {
+                     ..
+                 }
+-                // 有盘落后于现行那一版又缺它的单元：挂着之后的入口在任何写之前拒，这个二进制不换盘，走不到。
++                // 有盘落后于现行那一版、又缺它的单元或它的根（根写在这块盘上而那个根环槽里不是它）：挂着之后的入口在任何写之前拒，
++                // 这个二进制不换盘，走不到。
+                 | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. }
+                 // 盘上的实例代号或 txg 到顶：取号之前拒，一个写都没发。
+                 | MountError::SequenceNumberPastTheTopOfItsRange(_)
+@@ -1248,7 +1249,8 @@
+                 | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration {
+                     ..
+                 }
+-                // 有盘落后于现行那一版又缺它的单元：挂着之后的入口在任何写之前拒，这个二进制不换盘，走不到。
++                // 有盘落后于现行那一版、又缺它的单元或它的根（根写在这块盘上而那个根环槽里不是它）：挂着之后的入口在任何写之前拒，
++                // 这个二进制不换盘，走不到。
+                 | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. }
+                 // 现行那一版 txg 到顶：算这一串的 txg 时拒，一个写都没发；可写挂载那一处的抬 F 报错成员抬 F 自己报不出来。
+                 | MountError::SequenceNumberPastTheTopOfItsRange(_)
+--- a/crates/mutations.tsv
++++ b/crates/mutations.tsv
+@@ -1561,3 +1561,11 @@
+ m3-code-r2 J5：文件后端打洞被信号打断第二次就报错（重打只给一次）	crates/singlefs-core/src/block_device.rs	                    punch_attempts_interrupted += 1;\n	                    punch_attempts_interrupted += 1;\n                    if punch_attempts_interrupted > 1 {\n                        return Err(BlockDeviceError::InputOutput(punch_error));\n                    }\n	-p singlefs-core --lib -- block_device::tests::	a_hole_punch_interrupted_by_a_signal_twice_in_a_row_is_punched_a_third_time_without_falling_back_or_reporting_an_error
+ 取前缀核读盘形状（攻方 S03）：反向链回调每个候选调两次，挂载时每个候选重读上一条记录两次	crates/singlefs-replay-prefix/src/lib.rs	    if back_chain_broken(index) {	    if back_chain_broken(index) || back_chain_broken(index) {	-p singlefs-harness --test mounted_recovery_reads_each_candidate_once_in_order -- mounting_rereads_the_previous_record_once	mounting_rereads_the_previous_record_once_then_each_named_unit_of_every_candidate_in_journal_order
+ 取前缀核读盘形状（攻方 S05）：点名回调提前到逐条判定之前，挂载时点名单元先于反向链读、还多读一遍	crates/singlefs-replay-prefix/src/lib.rs	    let record = &records[index];\n    let ghost previous = previous_in_the_chain(records@, admitted, admitted.len() as int);	    let record = &records[index];\n    let _named_units_verified_before_any_check = named_units_verified(index);\n    let ghost previous = previous_in_the_chain(records@, admitted, admitted.len() as int);	-p singlefs-harness --test mounted_recovery_reads_each_candidate_once_in_order -- mounting_rereads_the_previous_record_once	mounting_rereads_the_previous_record_once_then_each_named_unit_of_every_candidate_in_journal_order
++m3-code-r3 L1：落后支缺根那一半只在第一次读不出时才重读（会话发布：根槽里是现行那一版的落后盘，第一次读回的字节坏一位、自证不过就被拒成缺根）	crates/singlefs-core/src/mount.rs	    let first_reading = reading_other_than_the_version_root()?;\n    let reread = reading_other_than_the_version_root()?;	    let first_reading = reading_other_than_the_version_root()?;\n    let reread = if matches!(\n        first_reading,\n        RingSlotReadingOtherThanTheVersionRoot::Bad(crate::recovery::BadRootRingSlotReading::Unreadable)\n    ) {\n        reading_other_than_the_version_root()?\n    } else {\n        first_reading\n    };	-p singlefs-harness --test entries_after_mount_refuse_swapped_or_behind_devices -- a_session_publish_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot	a_session_publish_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot
++m3-code-r3 L1：落后支缺根那一半只在第一次读不出时才重读（可写挂载：根槽里是现行那一版的落后盘，第一次读回的字节坏一位、自证不过就被拒成缺根）	crates/singlefs-core/src/mount.rs	    let first_reading = reading_other_than_the_version_root()?;\n    let reread = reading_other_than_the_version_root()?;	    let first_reading = reading_other_than_the_version_root()?;\n    let reread = if matches!(\n        first_reading,\n        RingSlotReadingOtherThanTheVersionRoot::Bad(crate::recovery::BadRootRingSlotReading::Unreadable)\n    ) {\n        reading_other_than_the_version_root()?\n    } else {\n        first_reading\n    };	-p singlefs-harness --test entries_after_mount_refuse_swapped_or_behind_devices -- a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot	a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot
++m3-code-r3 L1：落后支缺根那一半只在第一次读不出时才重读（正常卸载：根槽里是现行那一版的落后盘，第一次读回的字节坏一位、自证不过就被拒成缺根）	crates/singlefs-core/src/mount.rs	    let first_reading = reading_other_than_the_version_root()?;\n    let reread = reading_other_than_the_version_root()?;	    let first_reading = reading_other_than_the_version_root()?;\n    let reread = if matches!(\n        first_reading,\n        RingSlotReadingOtherThanTheVersionRoot::Bad(crate::recovery::BadRootRingSlotReading::Unreadable)\n    ) {\n        reading_other_than_the_version_root()?\n    } else {\n        first_reading\n    };	-p singlefs-harness --test entries_after_mount_refuse_swapped_or_behind_devices -- a_normal_unmount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot	a_normal_unmount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot
++m3-code-r3 L1：落后支缺根那一半只在第一次读不出时才重读（准入抬 F：根槽里是现行那一版的落后盘，第一次读回的字节坏一位、自证不过就被拒成缺根）	crates/singlefs-core/src/mount.rs	    let first_reading = reading_other_than_the_version_root()?;\n    let reread = reading_other_than_the_version_root()?;	    let first_reading = reading_other_than_the_version_root()?;\n    let reread = if matches!(\n        first_reading,\n        RingSlotReadingOtherThanTheVersionRoot::Bad(crate::recovery::BadRootRingSlotReading::Unreadable)\n    ) {\n        reading_other_than_the_version_root()?\n    } else {\n        first_reading\n    };	-p singlefs-harness --test entries_after_mount_refuse_swapped_or_behind_devices -- a_floor_raise_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot	a_floor_raise_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot
++m3-code-r3 L1：落后支缺根那一半只在第一次读不出时才重读（管理员回退：根槽里是现行那一版的落后盘，第一次读回的字节坏一位、自证不过就被拒成缺根）	crates/singlefs-core/src/mount.rs	    let first_reading = reading_other_than_the_version_root()?;\n    let reread = reading_other_than_the_version_root()?;	    let first_reading = reading_other_than_the_version_root()?;\n    let reread = if matches!(\n        first_reading,\n        RingSlotReadingOtherThanTheVersionRoot::Bad(crate::recovery::BadRootRingSlotReading::Unreadable)\n    ) {\n        reading_other_than_the_version_root()?\n    } else {\n        first_reading\n    };	-p singlefs-harness --test entries_after_mount_refuse_swapped_or_behind_devices -- an_administrator_rollback_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot	an_administrator_rollback_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot
++m3-code-r3 L2：正常卸载、准入抬 F、管理员回退上缺根那一半把区域号当盘号（正常卸载，根环转过一圈、txg 26 的根住区域 2、归盘 0，缺根放过去）	crates/singlefs-core/src/mount.rs	    let devices_behind =\n        devices_behind_the_current_version(devices, &parameters_of_the_pool, current);	    let devices_behind: Vec<DeviceBehindTheCurrentVersion> =\n        devices_behind_the_current_version(devices, &parameters_of_the_pool, current)\n            .into_iter()\n            .filter(|behind| match &behind.lacking {\n                VersionLackingOnADeviceBehindIt::RootNotInItsRingSlot(root_not_in_its_ring_slot) => {\n                    behind.device\n                        == DeviceIdentity(\n                            u32::try_from(root_not_in_its_ring_slot.ring_slot.region)\n                                .expect("区域号小于 3"),\n                        )\n                }\n                VersionLackingOnADeviceBehindIt::UnitsMissing(_) => true,\n            })\n            .collect();	-p singlefs-harness --test entries_after_mount_refuse_swapped_or_behind_devices -- a_normal_unmount_onto_device_zero_whose_ring_slot_in_region_two_holds_the_root_of_the_previous_lap_is_refused_before_any_write	a_normal_unmount_onto_device_zero_whose_ring_slot_in_region_two_holds_the_root_of_the_previous_lap_is_refused_before_any_write
++m3-code-r3 L2：正常卸载、准入抬 F、管理员回退上缺根那一半把区域号当盘号（准入抬 F，根环转过一圈、txg 26 的根住区域 2、归盘 0，缺根放过去）	crates/singlefs-core/src/mount.rs	    let devices_behind =\n        devices_behind_the_current_version(devices, &parameters_of_the_pool, current);	    let devices_behind: Vec<DeviceBehindTheCurrentVersion> =\n        devices_behind_the_current_version(devices, &parameters_of_the_pool, current)\n            .into_iter()\n            .filter(|behind| match &behind.lacking {\n                VersionLackingOnADeviceBehindIt::RootNotInItsRingSlot(root_not_in_its_ring_slot) => {\n                    behind.device\n                        == DeviceIdentity(\n                            u32::try_from(root_not_in_its_ring_slot.ring_slot.region)\n                                .expect("区域号小于 3"),\n                        )\n                }\n                VersionLackingOnADeviceBehindIt::UnitsMissing(_) => true,\n            })\n            .collect();	-p singlefs-harness --test entries_after_mount_refuse_swapped_or_behind_devices -- a_floor_raise_onto_device_zero_whose_ring_slot_in_region_two_holds_the_root_of_the_previous_lap_is_refused_before_any_write	a_floor_raise_onto_device_zero_whose_ring_slot_in_region_two_holds_the_root_of_the_previous_lap_is_refused_before_any_write
++m3-code-r3 L2：正常卸载、准入抬 F、管理员回退上缺根那一半把区域号当盘号（管理员回退，根环转过一圈、txg 26 的根住区域 2、归盘 0，缺根放过去）	crates/singlefs-core/src/mount.rs	    let devices_behind =\n        devices_behind_the_current_version(devices, &parameters_of_the_pool, current);	    let devices_behind: Vec<DeviceBehindTheCurrentVersion> =\n        devices_behind_the_current_version(devices, &parameters_of_the_pool, current)\n            .into_iter()\n            .filter(|behind| match &behind.lacking {\n                VersionLackingOnADeviceBehindIt::RootNotInItsRingSlot(root_not_in_its_ring_slot) => {\n                    behind.device\n                        == DeviceIdentity(\n                            u32::try_from(root_not_in_its_ring_slot.ring_slot.region)\n                                .expect("区域号小于 3"),\n                        )\n                }\n                VersionLackingOnADeviceBehindIt::UnitsMissing(_) => true,\n            })\n            .collect();	-p singlefs-harness --test entries_after_mount_refuse_swapped_or_behind_devices -- an_administrator_rollback_onto_device_zero_whose_ring_slot_in_region_two_holds_the_root_of_the_previous_lap_is_refused_before_any_write	an_administrator_rollback_onto_device_zero_whose_ring_slot_in_region_two_holds_the_root_of_the_previous_lap_is_refused_before_any_write

@@ -1,0 +1,49 @@
+run-with-memory-cap: 上限 8G 超过实测峰值 28M 的 2 倍，照理由放行：派发提示给定内存上限八G，摘要探针按提示上限跑
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同会话派出的几个腿各跑各的，这一条是摘要探针很轻
+ROOT head
+ digest cbb9dbdcbfd19bc983d8c7d49f5f184a69dbf5c2ee873d5ccb2764323a556943
+ files 44
+  FILE crates/singlefs-core/src/recovery.rs  reason=referenced by crates/singlefs-checker-tier/src/crash_judge_tables.rs
+ stopped_at {"crates/singlefs-checker-tier/src/layer0_progress.rs", "crates/singlefs-checker-tier/src/lib.rs", "crates/singlefs-core/src/lib.rs"}
+ROOT dv/new
+ digest 0322723006427b35f9685ef4f605f7294491c3ddfb05d65ba9374f1334af1ce4
+ files 45
+  FILE crates/singlefs-core/src/recovery.rs  reason=referenced by crates/singlefs-checker-tier/src/crash_judge_tables.rs
+  FILE crates/singlefs-replay-prefix/src/lib.rs  reason=referenced by crates/singlefs-core/src/recovery.rs
+ stopped_at {"crates/singlefs-checker-tier/src/layer0_progress.rs", "crates/singlefs-checker-tier/src/lib.rs", "crates/singlefs-core/src/lib.rs"}
+ROOT dv/v_code
+ digest aac7870d9422a64246a4b1b7739aa2b9351a4f2bcd3c403c3ba53b1e7ebdf70c
+ files 45
+  FILE crates/singlefs-core/src/recovery.rs  reason=referenced by crates/singlefs-checker-tier/src/crash_judge_tables.rs
+  FILE crates/singlefs-replay-prefix/src/lib.rs  reason=referenced by crates/singlefs-core/src/recovery.rs
+ stopped_at {"crates/singlefs-checker-tier/src/layer0_progress.rs", "crates/singlefs-checker-tier/src/lib.rs", "crates/singlefs-core/src/lib.rs"}
+ROOT dv/v_comment
+ digest 0322723006427b35f9685ef4f605f7294491c3ddfb05d65ba9374f1334af1ce4
+ files 45
+  FILE crates/singlefs-core/src/recovery.rs  reason=referenced by crates/singlefs-checker-tier/src/crash_judge_tables.rs
+  FILE crates/singlefs-replay-prefix/src/lib.rs  reason=referenced by crates/singlefs-core/src/recovery.rs
+ stopped_at {"crates/singlefs-checker-tier/src/layer0_progress.rs", "crates/singlefs-checker-tier/src/lib.rs", "crates/singlefs-core/src/lib.rs"}
+ROOT dv/v_tsv
+ digest 0322723006427b35f9685ef4f605f7294491c3ddfb05d65ba9374f1334af1ce4
+ files 45
+  FILE crates/singlefs-core/src/recovery.rs  reason=referenced by crates/singlefs-checker-tier/src/crash_judge_tables.rs
+  FILE crates/singlefs-replay-prefix/src/lib.rs  reason=referenced by crates/singlefs-core/src/recovery.rs
+ stopped_at {"crates/singlefs-checker-tier/src/layer0_progress.rs", "crates/singlefs-checker-tier/src/lib.rs", "crates/singlefs-core/src/lib.rs"}
+ROOT dv/v_manifest
+ digest 81423fd5e09f4d598c2d275c3ef5f540a28b73519d8f25de078d909d39faef71
+ files 45
+  FILE crates/singlefs-core/src/recovery.rs  reason=referenced by crates/singlefs-checker-tier/src/crash_judge_tables.rs
+  FILE crates/singlefs-replay-prefix/src/lib.rs  reason=referenced by crates/singlefs-core/src/recovery.rs
+ stopped_at {"crates/singlefs-checker-tier/src/layer0_progress.rs", "crates/singlefs-checker-tier/src/lib.rs", "crates/singlefs-core/src/lib.rs"}
+ROOT dv/v_recovery_comment
+ digest 0322723006427b35f9685ef4f605f7294491c3ddfb05d65ba9374f1334af1ce4
+ files 45
+  FILE crates/singlefs-core/src/recovery.rs  reason=referenced by crates/singlefs-checker-tier/src/crash_judge_tables.rs
+  FILE crates/singlefs-replay-prefix/src/lib.rs  reason=referenced by crates/singlefs-core/src/recovery.rs
+ stopped_at {"crates/singlefs-checker-tier/src/layer0_progress.rs", "crates/singlefs-checker-tier/src/lib.rs", "crates/singlefs-core/src/lib.rs"}
+ROOT dv/v_vstd
+ digest 6175960a9ce0baf6bf684e84da0edaeb65209a8e217933b53ecef33889436745
+ files 45
+  FILE crates/singlefs-core/src/recovery.rs  reason=referenced by crates/singlefs-checker-tier/src/crash_judge_tables.rs
+  FILE crates/singlefs-replay-prefix/src/lib.rs  reason=referenced by crates/singlefs-core/src/recovery.rs
+ stopped_at {"crates/singlefs-checker-tier/src/layer0_progress.rs", "crates/singlefs-checker-tier/src/lib.rs", "crates/singlefs-core/src/lib.rs"}

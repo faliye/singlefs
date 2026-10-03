@@ -1,0 +1,607 @@
+#!/usr/bin/env python3
+# admission: always 每一次调都判此刻的红例账、钉住的表与变异表，上一次的结论不替这一次作保
+# run-condition: none 追加与 --check 只读写点名的文件；--replay 要的 cargo 与装置由它自己判，缺了判红或报本次未跑
+"""E165 红例钉进快速档：把全量那一档红例账里的每个红例按输入原样钉进 .claude/gate.d/e165-pinned-red-examples.tsv，并判钉得全不全、今天还绿不绿。
+
+用户 2026-10-01 定「全量形式化红了的例子 可以加到快速形式化中」「这个应该在每一次跑完之后就加入 门禁来控制比较好」
+（调度记录 records/2026-10-01-里程碑三形式化接入.md 第三节）。表的格式写在表自己的文件头。
+
+用法（<根> 默认取这份脚本往上两级的仓；--table 默认 <根>/.claude/gate.d/e165-pinned-red-examples.tsv）：
+  e165-pin-red-examples.py [--root 根] [--table 表] [--kill-bounds 产物]… <红例账…>
+      追加：账里还没钉的行按（① 输入指纹, ⑥ 变异）追加进表；同一个（①, ⑥）已在表里的不重复，同一行账（⑤ 出处相同、① 相同）已钉过的也不重复。
+      账里没有反例状态的行（序号 none，驱动报 no_single_state_differs）钉不了，只数不钉。
+      ⑥ 按这一刻的变异表换名：tsv-<行号> 取 crates/mutations.tsv 那一行的变异名，Z<n> 取 research/mutations/e165_replay_bounded_enumeration_custom.tsv
+      第 2 列那一行的变异名（要以 Z<n> 起头）；给了 --kill-bounds（第二段的产物）就再核一遍产物里那个变体那一行的 title= 与换出的名字相同（空格记成 _），
+      不同就一行都不钉（表在跑完之后被改过，行号已经对不上）。
+      同一个（①, ⑥）在表里的 ⑦ 与账里的不同：一行都不钉、判红。
+      写：读表时记 sha256，同目录临时文件写完、改名换上之前再算一次，变了就不写（别的会话刚写过，重跑）；写完回读，新钉的每一行都要在。
+  e165-pin-red-examples.py --check [--root 根] [--table 表] [<红例账…>]
+      门禁 pinned-red-examples-complete 格：不给账就取 <根>/research/results/e165-*-red-examples.tsv 全部。账里每一行（有反例状态的）都要钉着：
+      表里有一行 ① 等于这一行算出的指纹、⑦ 等于账的第 12 列，且 ⑤ 就是这一行账或 ⑥ 等于这一行按今天的变异表换出的名字。
+      表自己也判：每行八段、① 是 64 位十六进制、① 等于拿 ②③⑦ 重算的指纹、（①, ⑥）不重复。少一行判红，出路给补进去的命令。一份账都没有退 77。
+  e165-pin-red-examples.py --replay [--root 根] [--table 表] [--binary 可执行文件] [--memory-cap 上限|none] [--threads N] [--target 编译目录]
+      门禁 pinned-red-examples-replay 格：先判每行 ⑥ 点名的变异（<表>#<名>，几个用 + 连）还在它的表里（第 1 列等于那个名字的数据行），
+      再用装置 e165_replay_bounded_enumeration --pinned-cases <表> 在今天的实现上逐行判：stdout 里以「E7RESULT name=state 」起头的行
+      条数等于表的数据行数、第 i 行与第 i 个数据行的 ⑦ 逐字节相同、装置退 0（约定：每行一行结果，有行对不上或指纹漂了退非 0）。
+      不给 --binary 时：装置源码（crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs）里没有 --pinned-cases 就退 77
+      （变异那一半照判，红了照红）；有就 cargo build --release --locked -p singlefs-checker-tier --bin e165_replay_bounded_enumeration
+      （CARGO_TARGET_DIR 默认 ${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-e165-pinned-target）再跑。
+      装置经 research/scripts/run-with-memory-cap.sh（上限默认 $GATE_E165_PINNED_MEMORY_MAX，再默认 2G）与 capped.sh N 起；--memory-cap none 直接起（样本的桩用）；
+      经包装起而包装自己退 250–254 的，判「没跑成」：退 1，✗ 行写「没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 <码>」，
+      → 照包装文件头「退出码」一段，不指向变异行或实现；
+      --binary 以 .sh 结尾的经 bash 起（样本目录里的桩不带执行位）。
+  e165-pin-red-examples.py --selftest
+      在临时仓里造账、变异表、产物与桩装置，逐格判；弄坏开关逐个打开，每个都要让至少一格判错。
+退出码：0 绿（追加：钉好了或没有要钉的）；1 红；2 用法错；77 本次未跑（--check 没有账、--replay 装置不认 --pinned-cases）。
+
+弄坏开关 E165_PIN_RED_EXAMPLES_BREAK=<项>[,<项>…]（只给证红用；--selftest 与门禁样本在开着时都必须判错）：
+  pin-twice              追加不去重                        pin-again 那一格判错
+  titles-unchecked       不核 --kill-bounds 的 title        titles-mismatch 那一格判错
+  no-recheck-before-write  改名换上之前不复核 sha256       race 那一格判错
+  check-ignores-missing  --check 不报没钉的行               check-missing 那一格（样本 pinned-red-examples-complete-red）判绿
+  fingerprint-unchecked  --check 不拿 ②③⑦ 重算 ①         check-tampered 那一格判绿
+  variant-unchecked      --replay 不判变异还在不在          replay-variant-missing 那一格（样本 pinned-red-examples-replay-variant-red）判绿
+  replay-ignores-output  --replay 只看装置退出码，不比 ⑦    replay-mismatch 那一格（样本 pinned-red-examples-replay-red）判绿
+  wrapper-exit-as-replay-red  --replay 不认包装自己的 250–254，照装置退非 0 报回归   replay-wrapper-exit 那一格（自证里的假包装退 252）判错
+"""
+import glob
+import hashlib
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+sys.dont_write_bytecode = True
+from lib_atomic_replace import ReplaceRefused, replace_file_contents_by_rename  # noqa: E402
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
+
+SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+DEFAULT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
+TABLE = ".claude/gate.d/e165-pinned-red-examples.tsv"
+LEDGER_GLOB = "research/results/e165-*-red-examples.tsv"
+CRATES_TABLE = "crates/mutations.tsv"
+CUSTOM_TABLE = "research/mutations/e165_replay_bounded_enumeration_custom.tsv"
+DEVICE_SOURCE = "crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs"
+DEVICE_BINARY = "e165_replay_bounded_enumeration"
+DEVICE_FLAG = "--pinned-cases"
+RESULT_PREFIX = "E7RESULT name=state "
+LEDGER_COLUMNS, TABLE_COLUMNS = 13, 8
+EXIT_GREEN, EXIT_RED, EXIT_USAGE, EXIT_NOT_RUN = 0, 1, 2, 77
+BREAK = {item for item in os.environ.get("E165_PIN_RED_EXAMPLES_BREAK", "").split(",") if item}
+MEMORY_CAP_RUNNER = os.path.join(SCRIPT_DIRECTORY, "run-with-memory-cap.sh")
+# 内存包装自己的结局（run-with-memory-cap.sh 文件头「退出码」一段）：经它起时装置这一次没跑成，输出不算判定
+WRAPPER_OWN_EXITS = {250: "撞了这一条自己的内存上限", 251: "包装用法错或起不了 scope", 252: "内存不够排不上", 253: "超过限时", 254: "被总上限挤掉"}
+
+
+class Red(Exception):
+    def __init__(self, message, howto):
+        super().__init__(message)
+        self.message, self.howto = message, howto
+
+
+class NotRun(Exception):
+    pass
+
+
+def report_red(message, howto):
+    print(f"  ✗ {message}")
+    print(f"     → 怎么办：{howto}")
+
+
+def file_digest(path):
+    return hashlib.sha256(open(path, "rb").read()).hexdigest()
+
+
+def state_before_outcome(line):
+    """逐态行里 state= 的值（整行最后一段），截到 ;first= 之前；认不出交 None。"""
+    match = re.search(r"(?:^| )state=(\S+)$", line)
+    return match.group(1).split(";first=")[0] if match else None
+
+
+def input_fingerprint(domain, size, original_line):
+    state = state_before_outcome(original_line)
+    if state is None:
+        return None
+    return hashlib.sha256(f"{domain}|{size}|{state}".encode("utf-8")).hexdigest()
+
+
+# ── 读账、读表、换变异名 ──
+
+def read_ledger(path):
+    rows = []
+    for number, raw in enumerate(open(path, encoding="utf-8").read().split("\n"), 1):
+        if not raw.strip() or raw.startswith("#"):
+            continue
+        fields = raw.split("\t")
+        if len(fields) != LEDGER_COLUMNS:
+            raise Red(f"红例账 {path} 第 {number} 行是 {len(fields)} 段，要 {LEDGER_COLUMNS} 段", "账由 E165 第二段驱动写，格式在它的表头；手改坏了从 git 找回")
+        rows.append({"number": number, "fields": fields})
+    return rows
+
+
+def mutation_names(root, relative):
+    """变异表的 {物理行号: 变异名}（数据行）。"""
+    path = os.path.join(root, relative)
+    if not os.path.isfile(path):
+        raise Red(f"变异表 {relative} 不在", "它随仓走；被删了从 git 找回")
+    names = {}
+    for number, raw in enumerate(open(path, encoding="utf-8").read().split("\n"), 1):
+        if raw.strip() and not raw.startswith("#"):
+            names[number] = raw.split("\t")[0]
+    return names
+
+
+def kill_bound_titles(paths):
+    """第二段产物里每个 (变体, 表行) 的 title=（空格记成 _）。"""
+    titles = {}
+    for path in paths:
+        for line in open(path, encoding="utf-8").read().split("\n"):
+            if not line.startswith("E7RESULT name=kill_bound "):
+                continue
+            item = re.search(r" item=(\S+)", line)
+            row = re.search(r" table_row=(\d+)", line)
+            title = re.search(r" title=(\S+)", line)
+            if item and row and title:
+                titles[(item.group(1), int(row.group(1)))] = title.group(1)
+    return titles
+
+
+class VariantNames:
+    def __init__(self, root):
+        self.root, self.cache = root, {}
+
+    def names_of(self, relative):
+        if relative not in self.cache:
+            self.cache[relative] = mutation_names(self.root, relative)
+        return self.cache[relative]
+
+    def variant(self, ledger_path, row, titles=None):
+        """账的第 1、2 列换成「<表>#<名>」。"""
+        item, rows_text = row["fields"][0], row["fields"][1]
+        first_row = rows_text.split("+")[0]
+        where = f"{os.path.basename(ledger_path)}:{row['number']}"
+        if not first_row.isdigit():
+            raise Red(f"{where} 第 2 列「{rows_text}」认不出表行", "账的第 2 列是表行号（几行同一个改法用 + 连）")
+        line_number = int(first_row)
+        match = re.fullmatch(r"tsv-(\d+)", item)
+        if match:
+            table = CRATES_TABLE
+            if int(match.group(1)) != line_number:
+                raise Red(f"{where}：变体 {item} 与第 2 列的表行 {rows_text} 对不上", "账写坏了；从 git 找回原样")
+        elif re.fullmatch(r"Z\d+", item):
+            table = CUSTOM_TABLE
+        else:
+            raise Red(f"{where}：变体「{item}」既不是 tsv-<行号> 也不是 Z<n>", "只认 E165 第二段驱动写的两种变体名")
+        name = self.names_of(table).get(line_number)
+        if name is None or (table == CUSTOM_TABLE and not name.startswith(item + " ")):
+            raise Red(f"{where}：{table} 第 {line_number} 行不是变体 {item} 的变异（读到 {name!r}）",
+                      "表在跑完之后被改过、行号对不上：拿跑那一趟时的表（git show <那次提交>:<表>）核出变异名，或重跑那一趟再钉")
+        if titles is not None and "titles-unchecked" not in BREAK:
+            title = titles.get((item, line_number))
+            if title is None or title != name.replace(" ", "_"):
+                raise Red(f"{where}：变体 {item} 在第二段产物里的 title 是 {title!r}，今天的 {table} 第 {line_number} 行是 {name!r}",
+                          "表在跑完之后被改过：拿跑那一趟时的表核出变异名，或重跑那一趟再钉")
+        return f"{table}#{name}"
+
+
+def pinned_fields(ledger_path, row, variant):
+    fields = row["fields"]
+    domain, size, ordinal, original, mutant = fields[2], fields[3], fields[4], fields[11], fields[12]
+    fingerprint = input_fingerprint(domain, size, original)
+    if fingerprint is None:
+        raise Red(f"{os.path.basename(ledger_path)}:{row['number']} 第 12 列认不出 state=", "账的第 12 列是原实现的逐态行（E7RESULT name=state …），手改坏了从 git 找回")
+    return [fingerprint, domain, size, ordinal, f"{os.path.basename(ledger_path)}:{row['number']}", variant, original, mutant]
+
+
+def has_example(row):
+    return row["fields"][4] != "none" and row["fields"][11] != ""
+
+
+def read_table(path):
+    if not os.path.isfile(path):
+        raise Red(f"钉住的表 {path} 不在", "它随仓走，表头写着格式；被删了从 git 找回")
+    text = open(path, encoding="utf-8").read()
+    rows = []
+    for number, raw in enumerate(text.split("\n"), 1):
+        if not raw.strip() or raw.startswith("#"):
+            continue
+        rows.append({"number": number, "fields": raw.split("\t")})
+    return text, rows
+
+
+def table_problems(rows):
+    problems, seen = [], set()
+    for row in rows:
+        fields = row["fields"]
+        if len(fields) != TABLE_COLUMNS:
+            problems.append(f"第 {row['number']} 行是 {len(fields)} 段，要 {TABLE_COLUMNS} 段")
+            continue
+        if not re.fullmatch(r"[0-9a-f]{64}", fields[0]):
+            problems.append(f"第 {row['number']} 行的 ① 不是 64 位小写十六进制")
+        elif input_fingerprint(fields[1], fields[2], fields[6]) != fields[0] and "fingerprint-unchecked" not in BREAK:
+            problems.append(f"第 {row['number']} 行的 ① 与拿 ②③⑦ 重算的指纹不同（手改过这一行）")
+        key = (fields[0], fields[5])
+        if key in seen:
+            problems.append(f"第 {row['number']} 行的（①, ⑥）与前面一行重复")
+        seen.add(key)
+    return problems
+
+
+# ── 追加 ──
+
+def append(root, table, ledgers, kill_bounds):
+    titles = kill_bound_titles(kill_bounds) if kill_bounds else None
+    text, existing = read_table(table)
+    problems = table_problems(existing)
+    if problems:
+        raise Red(f"钉住的表 {table} 本身不对：" + "；".join(problems[:5]), "表只由这份脚本追加，不手改；手改坏了从 git 找回再钉")
+    digest_at_read = file_digest(table)
+    by_key = {(row["fields"][0], row["fields"][5]): row["fields"] for row in existing}
+    by_origin = {(row["fields"][4], row["fields"][0]) for row in existing}
+    names = VariantNames(root)
+    new_rows, already, without_example, conflicts, total = [], 0, 0, [], 0
+    for ledger in ledgers:
+        for row in read_ledger(ledger):
+            total += 1
+            if not has_example(row):
+                without_example += 1
+                continue
+            fields = pinned_fields(ledger, row, names.variant(ledger, row, titles))
+            key = (fields[0], fields[5])
+            if "pin-twice" not in BREAK:
+                if key in by_key:
+                    if by_key[key][6] != fields[6]:
+                        conflicts.append(f"{fields[4]}（{fields[5]}）：表里 ⑦ 是 {by_key[key][6][:120]}…，账里是 {fields[6][:120]}…")
+                    else:
+                        already += 1
+                    continue
+                if (fields[4], fields[0]) in by_origin:
+                    already += 1
+                    continue
+            new_rows.append(fields)
+            by_key[key] = fields
+            by_origin.add((fields[4], fields[0]))
+    if conflicts:
+        for conflict in conflicts[:5]:
+            print(f"     {conflict}")  # gate-lint:detail
+        raise Red(f"{len(conflicts)} 行账与表里同一个（输入, 变异）的原实现逐态行不同，一行都没钉",
+                  "原实现在这个输入上的行为变了：先弄清是实现改了行为（要三方认）还是账跑在别的树上，再决定改表还是重跑")
+    if not new_rows:
+        print(f"  ✓ {len(ledgers)} 份账 {total} 行：{already} 行已钉、{without_example} 行没有反例状态，没有要新钉的；表里 {len(existing)} 行")
+        return EXIT_GREEN
+    new_text = (text if text.endswith("\n") or not text else text + "\n") + "".join("\t".join(fields) + "\n" for fields in new_rows)
+
+    def unchanged_since_read():
+        if "no-recheck-before-write" in BREAK:
+            return
+        if current_digest(table) != digest_at_read:
+            raise ChangedSinceRead()
+
+    try:
+        replace_file_contents_by_rename(table, new_text, check_before_rename=unchanged_since_read)
+    except ChangedSinceRead:
+        raise Red(f"读到写之间 {table} 被别人改过，一行都没写", "别的会话刚写过这张表：重跑同一条命令")
+    except ReplaceRefused as refused:
+        raise Red(f"没换上：{str(refused).splitlines()[0]}", str(refused).splitlines()[-1] if len(str(refused).splitlines()) > 1 else "看上面的原因")
+    _text, after = read_table(table)
+    present = {"\t".join(row["fields"]) for row in after}
+    lost = [fields for fields in new_rows if "\t".join(fields) not in present]
+    if lost:
+        raise Red(f"写完回读：新钉的 {len(new_rows)} 行里 {len(lost)} 行不在表里", "别的会话在改名换上之后又写过；重跑同一条命令")
+    print(f"  ✓ 钉进 {len(new_rows)} 行（{len(ledgers)} 份账 {total} 行：{already} 行已钉、{without_example} 行没有反例状态），回读都在；表里现有 {len(after)} 行")
+    return EXIT_GREEN
+
+
+class ChangedSinceRead(Exception):
+    pass
+
+
+def current_digest(path):
+    return file_digest(path)
+
+
+# ── 格一：账都钉着 ──
+
+def check(root, table, ledgers):
+    if not ledgers:
+        ledgers = sorted(glob.glob(os.path.join(root, LEDGER_GLOB)))
+    if not ledgers:
+        raise NotRun(f"{LEDGER_GLOB} 一份红例账都没有：这一格无对象可判")
+    _text, rows = read_table(table)
+    problems = table_problems(rows)
+    if problems:
+        raise Red(f"钉住的表本身不对：" + "；".join(problems[:5]), "表只由 research/scripts/e165-pin-red-examples.py 追加；手改坏了从 git 找回再钉")
+    by_fingerprint = {}
+    for row in rows:
+        by_fingerprint.setdefault(row["fields"][0], []).append(row["fields"])
+    names = VariantNames(root)
+    missing, counted, without_example = [], 0, 0
+    for ledger in ledgers:
+        for row in read_ledger(ledger):
+            if not has_example(row):
+                without_example += 1
+                continue
+            counted += 1
+            origin = f"{os.path.basename(ledger)}:{row['number']}"
+            fingerprint = input_fingerprint(row["fields"][2], row["fields"][3], row["fields"][11])
+            candidates = [fields for fields in by_fingerprint.get(fingerprint, []) if fields[6] == row["fields"][11]]
+            pinned = any(fields[4] == origin for fields in candidates)
+            if not pinned and candidates:
+                try:
+                    variant = names.variant(ledger, row)
+                except Red:
+                    variant = None
+                pinned = any(fields[5] == variant for fields in candidates)
+            if not pinned:
+                missing.append((ledger, origin))
+    if missing and "check-ignores-missing" not in BREAK:
+        for _ledger, origin in missing[:10]:
+            print(f"     没钉：{origin}")  # gate-lint:detail
+        ledgers_to_pin = sorted({os.path.relpath(ledger, root) for ledger, _origin in missing})
+        raise Red(f"{len(ledgers)} 份红例账 {counted} 行里 {len(missing)} 行没钉进 {os.path.relpath(table, root)}",
+                  f"补进去：python3 research/scripts/e165-pin-red-examples.py {' '.join(ledgers_to_pin)}（已钉的不重复）")
+    print(f"  ✓ {len(ledgers)} 份红例账 {counted} 行都钉在 {os.path.relpath(table, root)}（{without_example} 行没有反例状态、不钉）；表里 {len(rows)} 行，① 都与 ②③⑦ 重算的相同")
+    return EXIT_GREEN
+
+
+# ── 格二：变异还在、今天的实现上绿 ──
+
+def replay(root, table, options):
+    _text, rows = read_table(table)
+    problems = table_problems(rows)
+    if problems:
+        raise Red("钉住的表本身不对：" + "；".join(problems[:5]), "表只由 research/scripts/e165-pin-red-examples.py 追加；手改坏了从 git 找回再钉")
+    if not rows:
+        raise NotRun(f"{os.path.relpath(table, root)} 一行都没有：这一格无对象可判")
+    missing_variants = []
+    if "variant-unchecked" not in BREAK:
+        tables = {}
+        for row in rows:
+            for part in row["fields"][5].split("+"):
+                relative, _hash, name = part.partition("#")
+                if relative not in tables:
+                    path = os.path.join(root, relative)
+                    tables[relative] = set(mutation_names(root, relative).values()) if os.path.isfile(path) else None
+                if tables[relative] is None or name not in tables[relative]:
+                    missing_variants.append(f"第 {row['number']} 行：{part}")
+    if missing_variants:
+        for item in missing_variants[:10]:
+            print(f"     不在了：{item}")  # gate-lint:detail
+        raise Red(f"{len(rows)} 行里 {len(missing_variants)} 处点名的「改回去就红」的变异不在它的表里了",
+                  "变异行被删或改了名：找回那一行（改法被悄悄撤回时它要先响），确是改名就照新名改这张表（要写明为什么）")
+    binary = options["binary"]
+    if binary is None:
+        source = os.path.join(root, DEVICE_SOURCE)
+        if not os.path.isfile(source) or DEVICE_FLAG not in open(source, encoding="utf-8").read():
+            raise NotRun(f"{len(rows)} 行点名的变异都还在；装置 {DEVICE_SOURCE} 还不认 {DEVICE_FLAG}（第 4 批 3-6 才加），逐行重放这一半本次未跑")
+        environment = dict(os.environ, CARGO_TARGET_DIR=options["target"])
+        command = ["nice", "-n", "19", "cargo", "build", "--release", "--locked", "-p", "singlefs-checker-tier", "--bin", DEVICE_BINARY]
+        completed = subprocess.run(command, cwd=root, capture_output=True, text=True, env=environment)
+        if completed.returncode != 0:
+            raise Red(f"编装置没成（{' '.join(command[3:])} 退 {completed.returncode}）：{' | '.join(completed.stderr.strip().split(chr(10))[-4:])}",
+                      "先让它在平时的工具链上编得过；缓存缺包 cargo fetch --locked")
+        binary = os.path.join(options["target"], "release", DEVICE_BINARY)
+    # 以 .sh 结尾的（样本的桩）经 bash 起：样本目录里的文件不带执行位（script-modes.sh 不看 fixtures/）
+    command = ["bash", binary, DEVICE_FLAG, os.path.abspath(table)] if binary.endswith(".sh") else [binary, DEVICE_FLAG, os.path.abspath(table)]
+    wrapped = options["memory_cap"] != "none"
+    if wrapped:
+        command = ["bash", MEMORY_CAP_RUNNER, options["memory_cap"],
+                   "bash", os.path.join(SCRIPT_DIRECTORY, "capped.sh"), str(options["threads"]), *command]
+    environment = dict(os.environ, RUN_WITH_MEMORY_CAP_PARALLEL_REASON="门禁里逐行重放钉住的红例，与同一趟别的格各用各的上限",
+                       RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="门禁的上限按钉住的表最大时给，表只涨不缩")
+    completed = subprocess.run(command, cwd=root, capture_output=True, text=True, env=environment)
+    if wrapped and completed.returncode in WRAPPER_OWN_EXITS and "wrapper-exit-as-replay-red" not in BREAK:
+        tail = " | ".join(line for line in completed.stderr.strip().split("\n")[-4:] if line.strip())
+        raise Red(f"没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 {completed.returncode}（{WRAPPER_OWN_EXITS[completed.returncode]}，上限 {options['memory_cap']}），"
+                  f"钉住的 {len(rows)} 行这一次的输出不算判定{'（' + tail[:300] + '）' if tail else ''}",
+                  "照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑；"
+                  "251、252、254 先跑 bash research/scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；"
+                  "253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑；不拿掉包装跑，不改钉住的表、变异行或实现")
+    results = [line for line in completed.stdout.split("\n") if line.startswith(RESULT_PREFIX)]
+    mismatches = [] if "replay-ignores-output" in BREAK else \
+        [f"第 {row['number']} 行（{row['fields'][4]}）：要 {row['fields'][6][:160]}，装置打的是 {(results[index] if index < len(results) else '（没打）')[:160]}"
+         for index, row in enumerate(rows) if index >= len(results) or results[index] != row["fields"][6]]
+    if completed.returncode != 0 or mismatches or (len(results) != len(rows) and "replay-ignores-output" not in BREAK):
+        for mismatch in mismatches[:5]:
+            print(f"     {mismatch}")  # gate-lint:detail
+        raise Red(f"钉住的 {len(rows)} 行在今天的实现上：装置退 {completed.returncode}、打了 {len(results)} 行结果、{len(mismatches)} 行与 ⑦ 不同"
+                  f"{'（' + completed.stderr.strip().split(chr(10))[-1][:200] + '）' if completed.stderr.strip() else ''}",
+                  "今天的实现在钉住的输入上与原实现不同：是改动引入的回归就修实现；装置报指纹漂了就先查装置的枚举次序与状态编码变没变")
+    print(f"  ✓ 钉住的 {len(rows)} 行：点名的变异都还在它们的表里；装置 {DEVICE_FLAG} 逐行打的结果都与 ⑦ 逐字节相同")
+    return EXIT_GREEN
+
+
+# ── 命令行 ──
+
+def main(arguments):
+    if arguments[:1] == ["--selftest"]:
+        return selftest()
+    options = {"root": DEFAULT_ROOT, "table": None, "kill_bounds": [], "binary": None, "threads": int(os.environ.get("SINGLEFS_THREAD_CAP") or os.cpu_count() or 1),
+               "memory_cap": os.environ.get("GATE_E165_PINNED_MEMORY_MAX") or "2G",
+               "target": os.path.join(os.environ.get("GATE_CROSS_RUN_TMPDIR") or os.environ.get("TMPDIR") or "/tmp", "singlefs-e165-pinned-target")}
+    mode, ledgers, position = "append", [], 0
+    valued = {"--root": "root", "--table": "table", "--binary": "binary", "--memory-cap": "memory_cap", "--threads": "threads", "--target": "target"}
+    while position < len(arguments):
+        argument = arguments[position]
+        if argument in ("--check", "--replay"):
+            mode = argument[2:]
+            position += 1
+        elif argument in valued or argument == "--kill-bounds":
+            if position + 1 >= len(arguments):
+                report_red(f"{argument} 后面缺值", "看文件头的用法一节")
+                return EXIT_USAGE
+            if argument == "--kill-bounds":
+                options["kill_bounds"].append(arguments[position + 1])
+            else:
+                options[valued[argument]] = int(arguments[position + 1]) if argument == "--threads" else arguments[position + 1]
+            position += 2
+        elif argument.startswith("--"):
+            report_red(f"认不出的选项 {argument}", "看文件头的用法一节")
+            return EXIT_USAGE
+        else:
+            ledgers.append(arguments[position])
+            position += 1
+    root = os.path.abspath(options["root"])
+    table = os.path.abspath(options["table"] or os.path.join(root, TABLE))
+    if mode == "append" and not ledgers:
+        report_red("追加要至少一份红例账", "例：python3 research/scripts/e165-pin-red-examples.py research/results/<某一趟>-red-examples.tsv")
+        return EXIT_USAGE
+    missing = [ledger for ledger in ledgers + options["kill_bounds"] if not os.path.isfile(ledger)]
+    if missing:
+        report_red(f"点名的文件不在：{' '.join(missing)}", "路径相对当前目录；红例账在 research/results/ 下")
+        return EXIT_USAGE
+    try:
+        if mode == "append":
+            return append(root, table, [os.path.abspath(ledger) for ledger in ledgers], options["kill_bounds"])
+        if mode == "check":
+            return check(root, table, [os.path.abspath(ledger) for ledger in ledgers])
+        return replay(root, table, options)
+    except Red as red:
+        report_red(red.message, red.howto)
+        return EXIT_RED
+    except NotRun as not_run:
+        print(f"  ! {not_run}")
+        return EXIT_NOT_RUN
+
+
+# ── 自证 ──
+
+def selftest():
+    global current_digest, MEMORY_CAP_RUNNER
+    cases, wrong = 0, []
+    import contextlib
+    import io
+    with tempfile.TemporaryDirectory(prefix="e165-pin-selftest-") as work:
+        root = os.path.join(work, "root")
+        for directory in (".claude/gate.d", "crates", "research/mutations", "research/results"):
+            os.makedirs(os.path.join(root, directory))
+
+        def write(relative, text):
+            with open(os.path.join(root, relative), "w", encoding="utf-8") as handle:
+                handle.write(text)
+
+        crates_table = "# 表头\n红的一条\tcrates/x.rs\ta\tb\t-p x\tt\n红的两条\tcrates/x.rs\tc\td\t-p x\tt\n"
+        write(CRATES_TABLE, crates_table)
+        write(CUSTOM_TABLE, "# 表头\nZ1 自造的\tcrates/x.rs\te\tf\n")
+        header = "# 自证用的钉住的表\n"
+        write(TABLE, header)
+
+        def state_line(domain, ordinal, state, first):
+            return f"E7RESULT name=state domain={domain} ring_slots=64 n=2 ordinal={ordinal} counters=states state={state};first={first}"
+
+        ledger_rows = [
+            ["tsv-2", "2", "L", "2", "3", "counters", "+J4", "true", "true", "true", "cmd", state_line("L", 3, "shape=1c0", "returned:a"), state_line("L", 3, "shape=1c0", "returned:b")],
+            ["tsv-3", "3+9", "L", "2", "3", "counters", "+J4", "true", "true", "true", "cmd", state_line("L", 3, "shape=1c0", "returned:a"), state_line("L", 3, "shape=1c0", "returned:c")],
+            ["Z1", "2", "X", "2", "5", "outcome", "outcome", "true", "true", "true", "cmd", state_line("X", 5, "shape=2c0", "returned:d"), state_line("X", 5, "shape=2c0", "returned:e")],
+            ["tsv-3", "3+9", "X", "2", "none", "no_single_state_differs", "none", "false", "false", "false", "", "", ""],
+        ]
+        ledger = os.path.join(root, "research/results/e165-selftest-red-examples.tsv")
+        write(os.path.relpath(ledger, root), "# 账头\n" + "".join("\t".join(fields) + "\n" for fields in ledger_rows))
+        kill_bounds = os.path.join(root, "research/results/e165-selftest-kill-bounds.out")
+        good_titles = ("E7RESULT name=kill_bound item=tsv-2 table=crates/mutations.tsv table_row=2 outcome=red title=红的一条 complete=yes\n"
+                       "E7RESULT name=kill_bound item=tsv-3 table=crates/mutations.tsv table_row=3 outcome=red title=红的两条 complete=yes\n"
+                       f"E7RESULT name=kill_bound item=Z1 table={CUSTOM_TABLE} table_row=2 outcome=red title=Z1_自造的 complete=yes\n")
+        write(os.path.relpath(kill_bounds, root), good_titles)
+        stub = os.path.join(work, "stub-device.sh")
+        with open(stub, "w", encoding="utf-8") as handle:
+            handle.write("#!/usr/bin/env bash\n# 桩装置：--pinned-cases <表> 逐个数据行打 ⑦；STUB_MODE=wrong 把最后一行打错，=fail 退 1\n"
+                         "[[ \"$1\" == --pinned-cases ]] || exit 2\n"
+                         "rows=$(grep -v '^#' \"$2\" | grep -c .)\n"
+                         "grep -v '^#' \"$2\" | grep . | cut -f7 | { if [[ \"${STUB_MODE:-}\" == wrong ]]; then sed '$ s/returned:/returned:WRONG/'; else cat; fi; }\n"
+                         "echo \"E7RESULT name=pinned_cases rows=$rows\"\n"
+                         "[[ \"${STUB_MODE:-}\" == fail ]] && exit 1\nexit 0\n")
+        os.chmod(stub, 0o755)
+
+        def expect(label, arguments, want_exit, want_text, environment=None):
+            nonlocal cases
+            cases += 1
+            saved = dict(os.environ)
+            os.environ.update(environment or {})
+            buffer = io.StringIO()
+            try:
+                with contextlib.redirect_stdout(buffer):
+                    got = main(["--root", root, *arguments])
+            finally:
+                os.environ.clear()
+                os.environ.update(saved)
+            output = buffer.getvalue()
+            if got != want_exit or want_text not in output:
+                wrong.append(label)
+                print(f"    {label} 这一格判错：期望退 {want_exit}、输出含「{want_text}」，实测退 {got}：{output.strip()[-300:]}")  # gate-lint:detail
+            return output
+
+        table_path = os.path.join(root, TABLE)
+        expect("check-empty-table", ["--check", ledger], 1, "3 行里 3 行没钉进")
+        write(os.path.relpath(kill_bounds, root) + ".wrong", good_titles.replace("title=红的两条", "title=别的变异"))
+        expect("titles-mismatch", ["--kill-bounds", kill_bounds + ".wrong", ledger], 1, "title 是")
+        # 读到写之间被改过：让复核那一次读到不同的 sha256
+        original_digest = current_digest
+        current_digest = lambda path: "0" * 64
+        expect("race", ["--kill-bounds", kill_bounds, ledger], 1, "被别人改过")
+        current_digest = original_digest
+        if open(table_path, encoding="utf-8").read() != header:
+            wrong.append("race-wrote")
+            print("    race-wrote 这一格判错：复核判红之后表还是被写了")  # gate-lint:detail
+        cases += 1
+        expect("pin", ["--kill-bounds", kill_bounds, ledger], 0, "钉进 3 行")
+        expect("pin-again", [ledger], 0, "3 行已钉")
+        expect("check-green", ["--check", ledger], 0, "3 行都钉在")
+        expect("check-default-ledgers", ["--check"], 0, "1 份红例账 3 行都钉在")
+        pinned_text = open(table_path, encoding="utf-8").read()
+        write(TABLE, "\n".join(line for line in pinned_text.split("\n") if "\tZ1 " not in line and "#Z1" not in line) + "\n")
+        expect("check-missing", ["--check", ledger], 1, "3 行里 1 行没钉进")
+        write(TABLE, pinned_text.replace("shape=2c0;first=returned:d\tE7", "shape=2c1;first=returned:d\tE7", 1))
+        expect("check-tampered", ["--check", ledger], 1, "重算的指纹不同")
+        write(TABLE, pinned_text)
+        conflicting = [list(fields) for fields in ledger_rows]
+        conflicting[0][11] = state_line("L", 3, "shape=1c0", "returned:z")
+        other_ledger = os.path.join(root, "research/results/e165-selftest-conflict-red-examples.tsv")
+        write(os.path.relpath(other_ledger, root), "# 账头\n" + "\t".join(conflicting[0]) + "\n")
+        expect("conflict", [other_ledger], 1, "原实现逐态行不同")
+        os.remove(other_ledger)
+        expect("replay-green", ["--replay", "--binary", stub, "--memory-cap", "none"], 0, "都与 ⑦ 逐字节相同")
+        expect("replay-mismatch", ["--replay", "--binary", stub, "--memory-cap", "none"], 1, "行与 ⑦ 不同", {"STUB_MODE": "wrong"})
+        expect("replay-fail", ["--replay", "--binary", stub, "--memory-cap", "none"], 1, "装置退 1", {"STUB_MODE": "fail"})
+        expect("replay-device-without-flag", ["--replay"], 77, "还不认 --pinned-cases")
+        # 经内存包装起、包装自己退 252（排不上）：判「没跑成」，出路照包装文件头，不报回归（开关 wrapper-exit-as-replay-red 下这一格判错）
+        fake_wrapper =os.path.join(work, "fake-memory-cap-wrapper.sh")
+        with open(fake_wrapper, "w", encoding="utf-8") as handle:
+            handle.write("#!/usr/bin/env bash\n# 自证用的假内存包装：什么都不起，退 252（内存不够排不上）\nexit 252\n")
+        saved_runner, MEMORY_CAP_RUNNER = MEMORY_CAP_RUNNER, fake_wrapper
+        try:
+            expect("replay-wrapper-exit", ["--replay", "--binary", stub, "--memory-cap", "1G"], 1, "没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 252")
+        finally:
+            MEMORY_CAP_RUNNER = saved_runner
+        write(CRATES_TABLE, crates_table.replace("红的两条", "改了名的"))
+        expect("replay-variant-missing", ["--replay", "--binary", stub, "--memory-cap", "none"], 1, "不在它的表里了")
+        write(CRATES_TABLE, crates_table)
+
+    breaks_missed, breaks_proven = [], 0
+    if not wrong and not BREAK:
+        for item in ("pin-twice", "titles-unchecked", "no-recheck-before-write", "check-ignores-missing", "fingerprint-unchecked", "variant-unchecked", "replay-ignores-output",
+                     "wrapper-exit-as-replay-red"):
+            completed = subprocess.run([sys.executable, os.path.realpath(__file__), "--selftest"], capture_output=True, text=True,
+                                       env=dict(os.environ, E165_PIN_RED_EXAMPLES_BREAK=item))
+            if completed.returncode == 0:
+                breaks_missed.append(item)
+            else:
+                breaks_proven += 1
+    if wrong:
+        report_red(f"e165-pin-red-examples 自证 {cases} 格里 {len(wrong)} 格判错：{' '.join(wrong)}", "按判错那几格的标签找 append / check / replay 里对应的一段修")
+        return EXIT_RED
+    if breaks_missed:
+        report_red(f"弄坏开关打开之后自证照样全对：{' '.join(breaks_missed)}", "那几个开关管的那一段没有自证盯着：补一格会被它弄错的自证，或修开关")
+        return EXIT_RED
+    suffix = f"；弄坏开关 {breaks_proven} 个，每个都让至少一格判错" if not BREAK else "（开着弄坏开关，没重跑开关）"
+    print(f"  ✓ e165-pin-red-examples 自证 {cases} 格都判对{suffix}")
+    return EXIT_GREEN
+
+
+if __name__ == "__main__":
+    preflight(__file__)
+    sys.exit(main(sys.argv[1:]))

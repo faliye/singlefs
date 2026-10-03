@@ -1,0 +1,3 @@
+K2L1 name=first_run states_of_the_flow=57 stopped_early=false states_checked_here=57 states_already_judged_at_recording=0 fields=states_reused=0 exhaustive=false expand_up_to=6 ignored_points=0 states_skipped_by_ignore=0
+K2L1 name=second_run_not_stopped stopped_early=false states_checked_here=0 states_already_judged_at_recording=57 fields=states_reused=57 exhaustive=false expand_up_to=6 ignored_points=0 states_skipped_by_ignore=0
+K2L1 name=third_run_stop_file_present stopped_early=true states_checked_here=0 states_already_judged_at_recording=57 unjudged_blocks=0 fields=states_reused=0 exhaustive=false expand_up_to=6 ignored_points=0 states_skipped_by_ignore=0

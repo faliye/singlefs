@@ -1,0 +1,15 @@
+CRASH_INJECTION_START seeds=[7463871032432355113,7463871032432355117) slices=4 worker_threads=4 configured_worker_threads=4 worker_threads_source=given_by_caller images=/tmp/claude-1000/test-script-align-code-r1-opus/runs/singlefs-crash-injection-1491721-seedbase-7463871032432355113
+CRASH_INJECTION_PROGRESS slice=4/4 seeds=[7463871032432355116,7463871032432355117) finished_slices=1/4 finished_histories=1/4 elapsed_seconds=6.2
+CRASH_INJECTION_PROGRESS slice=1/4 seeds=[7463871032432355113,7463871032432355114) finished_slices=2/4 finished_histories=2/4 elapsed_seconds=6.3
+CRASH_INJECTION_PROGRESS slice=2/4 seeds=[7463871032432355114,7463871032432355115) finished_slices=3/4 finished_histories=3/4 elapsed_seconds=6.5
+CRASH_INJECTION_PROGRESS slice=3/4 seeds=[7463871032432355115,7463871032432355116) finished_slices=4/4 finished_histories=4/4 elapsed_seconds=8.4
+CRASH_INJECTION_FINISHED seeds=[7463871032432355113,7463871032432355117) slices=4 worker_threads=4 elapsed_seconds=8.4
+K2S2 name=small_fast_tier crash_points=16 second_crash_points=0 new_findings=0 small_tier_reds=["no_second_crash_point"]
+K2S2 name=replay_line SINGLEFS_CRASH_INJECTION_FIRST_SEED=7463871032432355113 SINGLEFS_CRASH_INJECTION_SEEDS=4 SINGLEFS_CRASH_INJECTION_POINTS=4 SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES=none SINGLEFS_CRASH_INJECTION_OPERATIONS=24 SINGLEFS_CRASH_INJECTION_WEIGHTS=broad SINGLEFS_CRASH_INJECTION_CHECKER=skip SINGLEFS_CRASH_INJECTION_DEVICES=4gib SINGLEFS_CRASH_INJECTION_SPACE_ADMISSION=judged cargo test --release -p singlefs-checker-tier --test crash_injection_campaign -- --include-ignored --exact crash_injection_large_tier_from_the_environment
+CRASH_INJECTION_START seeds=[7463871032432355113,7463871032432355117) slices=4 worker_threads=4 configured_worker_threads=4 worker_threads_source=given_by_caller images=/tmp/claude-1000/test-script-align-code-r1-opus/runs/singlefs-crash-injection-1491721-seedbase-7463871032432355113
+CRASH_INJECTION_PROGRESS slice=1/4 seeds=[7463871032432355113,7463871032432355114) finished_slices=1/4 finished_histories=1/4 elapsed_seconds=5.9
+CRASH_INJECTION_PROGRESS slice=4/4 seeds=[7463871032432355116,7463871032432355117) finished_slices=2/4 finished_histories=2/4 elapsed_seconds=5.9
+CRASH_INJECTION_PROGRESS slice=2/4 seeds=[7463871032432355114,7463871032432355115) finished_slices=3/4 finished_histories=3/4 elapsed_seconds=7.0
+CRASH_INJECTION_PROGRESS slice=3/4 seeds=[7463871032432355115,7463871032432355116) finished_slices=4/4 finished_histories=4/4 elapsed_seconds=8.0
+CRASH_INJECTION_FINISHED seeds=[7463871032432355113,7463871032432355117) slices=4 worker_threads=4 elapsed_seconds=8.0
+K2S2 name=large_tier_entry_from_the_replay_line same_parameters=true crash_points=16 second_crash_points=0 new_findings=0 large_tier_red=false tally_equal=true

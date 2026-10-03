@@ -1,0 +1,21 @@
+opus-u64max before="panic: attempt to add with overflow"
+opus-u64max after="panic: attempt to add with overflow"
+opus-diff seed=1 cases=2000 disagreements=0 reads_total=1572
+opus-diff tally Ok applied=0 verification_failed=0 verification_passed>0=false: 1380
+opus-diff tally Ok applied=0 verification_failed=0 verification_passed>0=true: 81
+opus-diff tally Ok applied=0 verification_failed=1 verification_passed>0=false: 213
+opus-diff tally Ok applied=0 verification_failed=1 verification_passed>0=true: 49
+opus-diff tally Ok applied=1 verification_failed=0 verification_passed>0=false: 49
+opus-diff tally Ok applied=1 verification_failed=0 verification_passed>0=true: 47
+opus-diff tally Ok applied=1 verification_failed=1 verification_passed>0=true: 8
+opus-diff tally Ok applied=2 verification_failed=0 verification_passed>0=false: 33
+opus-diff tally Ok applied=2 verification_failed=0 verification_passed>0=true: 26
+opus-diff tally Ok applied=2 verification_failed=1 verification_passed>0=true: 2
+opus-diff tally Ok applied=3 verification_failed=0 verification_passed>0=false: 14
+opus-diff tally Ok applied=3 verification_failed=0 verification_passed>0=true: 8
+opus-diff tally Ok applied=3 verification_failed=1 verification_passed>0=true: 4
+opus-diff tally Ok applied=4 verification_failed=0 verification_passed>0=false: 5
+opus-diff tally Ok applied=4 verification_failed=0 verification_passed>0=true: 1
+opus-diff tally RootPublishCarriesMoreThanOneLastRecordFlagWhoseAnchorIsUndecided: 53
+opus-diff tally UnitMalformed: 27
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 132 filtered out; finished in 15.80s

@@ -1,0 +1,22 @@
+# test-script-align-code-r2 攻方腿的原型（只在草稿副本上编、跑）：依赖仓副本 ../tree 的几个包（副本里只加了一个看判器输入原文的口子，
+# 见 patch_tree.py），不进主仓 workspace。
+[package]
+name = "r2proto"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+singlefs-checker-tier = { path = "../tree/crates/singlefs-checker-tier", features = ["verdict-store", "gpu"] }
+singlefs-checker = { path = "../tree/crates/singlefs-checker" }
+singlefs-core = { path = "../tree/crates/singlefs-core" }
+singlefs-format = { path = "../tree/crates/singlefs-format" }
+singlefs-harness = { path = "../tree/crates/singlefs-harness" }
+
+[profile.release]
+opt-level = 3
+debug = false
+overflow-checks = true
+debug-assertions = true

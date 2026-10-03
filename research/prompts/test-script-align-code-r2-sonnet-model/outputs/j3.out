@@ -1,0 +1,7 @@
+## J3 静态核（变异表 r1→r2 变动与新增的行）
+BAD row 1709 test_file=None :: C607 故障注入重放行漏写比重（大档入口退回 broad，偏重取样的一批复现不出） :: test_defs=2
+BAD row 1710 test_file=None :: C607 坏盘输入重放行漏写比重（大档入口退回 broad，偏重取样的一批复现不出） :: test_defs=2
+rows_checked=82 rows_with_problems=2
+## J3 筛选词核（筛选词在目标里匹配到几条 fn；门禁只要求点名的完整名在输出里恰好一个，所以匹配多条不等于红）
+BAD row 1609 filter='replay_lines_of' matches=3 ['replay_lines_of_the_small_fast_tier_run_the_same_campaign_on_the_large_tier_entry', 'replay_lines_of_the_fast_tier_run_the_same_campaign_on_the_large_tier_entry', 'replay_lines_of_the_rollback_sampling_run_the_same_campaign_on_the_large_tier_entry'] named='replay_lines_of_the_fast_tier_run_the_same_campaign_on_the_large_tier_entry' :: C607 崩溃注入新发现的复现行写成整批的种子区间起点（照抄跑的不是判红那一段）
+filter_rows_checked=67 bad=1

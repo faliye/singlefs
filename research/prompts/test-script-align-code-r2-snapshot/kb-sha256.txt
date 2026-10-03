@@ -1,0 +1,2 @@
+0b935f97c6a63a5dea12839723d373305c27bea4004c953351b338be30da08cb  .claude/kb/checks-owed.md
+520e7d909aaa28dbd2c116a90dd1a36729bb7bb76304d8006595e8be592aa290  .claude/kb/decisions/17-实现分层与第三方管道.md

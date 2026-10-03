@@ -11,7 +11,7 @@
       .claude/gate.d/42-new-pool-file-creation-trio.sh
       .claude/gate.d/52-segment-registry.sh
       .claude/gate.d/53-format-const-placeholders.sh
-      .claude/gate.d/54-layer0-replay.sh
+      .claude/gate.d/checker-tier-layer0-replay.sh
       .claude/gate.d/55-qemu-device-streams.sh
       .claude/gate.d/59-crates-mutation-replay.sh
       .claude/gate.d/60-stale-open-items.sh

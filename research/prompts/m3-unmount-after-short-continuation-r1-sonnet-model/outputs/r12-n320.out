@@ -1,0 +1,13 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 68M 的 2 倍，照理由放行：探针格越大用得越多，峰值表里的数只是一次短跑的数
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：正推腿是派出去的子 agent，与主 agent 的整包慢档各跑各的
+
+running 1 test
+CELL Narrow(320) O0 U20 B0 K1 rw=700 before=d0[free=254 unblocked=254 deferred=13 alloc=66]d1[free=254 unblocked=254 deferred=13 alloc=66] at-crash=d0[free=241 unblocked=241 deferred=22 alloc=79]d1[free=241 unblocked=241 deferred=22 alloc=79] => steps=20 raises=1 queue=0 outcome=Empty after-mount=d0[free=211 unblocked=211 deferred=94 alloc=109]d1[free=211 unblocked=211 deferred=94 alloc=109] unmount-ok(publishes=2 slots_each=[6, 6]) remount-ok(Empty) cycle-after-unmount-remount=ok(Empty steps=0 raises=0) cfgF[wrote=true]-remount=ok(Empty steps=0 raises=0) cfgF-cycles=0:E
+test probe_grid has been running for over 60 seconds
+CELL Narrow(320) O0 U40 B0 K1 rw=700 before=d0[free=214 unblocked=214 deferred=13 alloc=106]d1[free=214 unblocked=214 deferred=13 alloc=106] at-crash=d0[free=201 unblocked=201 deferred=22 alloc=119]d1[free=201 unblocked=201 deferred=22 alloc=119] => steps=40 raises=2 queue=0 outcome=Empty after-mount=d0[free=69 unblocked=69 deferred=236 alloc=251]d1[free=69 unblocked=69 deferred=236 alloc=251] unmount-ok(publishes=2 slots_each=[6, 6]) remount-ok(Empty) cycle-after-unmount-remount=ok(Empty steps=0 raises=0) cfgF[wrote=true]-remount=ok(Empty steps=0 raises=0) cfgF-cycles=0:E
+CELL Narrow(320) O4 U20 B0 K1 rw=700 before=d0[free=206 unblocked=206 deferred=61 alloc=114]d1[free=206 unblocked=206 deferred=61 alloc=114] at-crash=d0[free=193 unblocked=193 deferred=70 alloc=127]d1[free=193 unblocked=193 deferred=70 alloc=127] => steps=20 raises=1 queue=0 outcome=Empty after-mount=d0[free=148 unblocked=148 deferred=157 alloc=172]d1[free=148 unblocked=148 deferred=157 alloc=172] unmount-ok(publishes=2 slots_each=[6, 6]) remount-ok(Empty) cycle-after-unmount-remount=ok(Empty steps=0 raises=0) cfgF[wrote=true]-remount=ok(Empty steps=0 raises=0) cfgF-cycles=0:E
+CELL Narrow(320) O4 U40 B0 K1 rw=700 before=d0[free=166 unblocked=166 deferred=61 alloc=154]d1[free=166 unblocked=166 deferred=61 alloc=154] at-crash=d0[free=153 unblocked=153 deferred=70 alloc=167]d1[free=153 unblocked=153 deferred=70 alloc=167] => steps=40 raises=2 queue=0 outcome=Empty after-mount=d0[free=64 unblocked=64 deferred=241 alloc=256]d1[free=64 unblocked=64 deferred=241 alloc=256] unmount-ok(publishes=3 slots_each=[6, 6, 8]) remount-ok(Empty) cycle-after-unmount-remount=ok(Empty steps=0 raises=0) cfgF[wrote=true]-remount=ok(Empty steps=0 raises=0) cfgF-cycles=0:E
+test probe_grid ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 120.72s
+

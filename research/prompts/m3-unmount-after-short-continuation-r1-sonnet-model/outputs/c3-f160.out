@@ -1,0 +1,9 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 44M 的 2 倍，照理由放行：探针格越大用得越多，峰值表里的数只是一次短跑的数
+run-with-memory-cap: 这个会话已有 11 条日常的在跑，照理由并行：正推腿是派出去的子 agent，与主 agent 的整包慢档各跑各的
+
+running 1 test
+CELL Narrow(160) O0 U20 B0 K1 rw=650 before=ckpt_cost=9 d0[free=94 unblocked=94 deferred=13 alloc=66]d1[free=94 unblocked=94 deferred=13 alloc=66] at-crash=d0[free=81 unblocked=81 deferred=22 alloc=79]d1[free=81 unblocked=81 deferred=22 alloc=79] => steps=3 raises=1 queue=1 outcome=Short[AtCeiling|last=Adm d0 avail=38sl demand=41sl missing=3sl;Adm d1 avail=38sl demand=41sl missing=3sl] after-mount=d0[free=38 unblocked=38 deferred=71 alloc=122]d1[free=38 unblocked=38 deferred=71 alloc=122] unmount-ok(publishes=3 slots_each=[6, 6, 6]) remount-ok(Short) cycle-after-unmount-remount=ok(Short steps=3 raises=0) cfgF[wrote=true]-remount=ok(Empty steps=17 raises=4) cfgF-cycles=17:E um-cycles=3:S,14:E
+test probe_grid ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.01s
+

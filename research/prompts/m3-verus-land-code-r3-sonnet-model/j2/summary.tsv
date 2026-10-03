@@ -1,0 +1,10 @@
+2	RED	rc=101	passed=0	failed=mounting_rereads_the_previous_record_once_then_each_named_unit_of_every_candidate_in_journal_order 	S03 反向链回调每个候选调两次
+3	GREEN	rc=0	passed=1	failed=	S04 关掉点名验证时照样调点名回调
+4	RED	rc=101	passed=0	failed=mounting_rereads_the_previous_record_once_then_each_named_unit_of_every_candidate_in_journal_order 	S05 逐条判定之前先调点名回调
+5	RED	rc=101	passed=0	failed=mounting_rereads_the_previous_record_once_then_each_named_unit_of_every_candidate_in_journal_order 	S06 主循环每条记录都先调一次反向链回调
+6	GREEN	rc=0	passed=1	failed=	S07 末条提交标记那一判挪到反向链回调之前
+7	RED	rc=101	passed=0	failed=mounting_rereads_the_previous_record_once_then_each_named_unit_of_every_candidate_in_journal_order 	S08 点名回调每个候选调两次（辩方新增）
+8	RED	rc=101	passed=0	failed=mounting_rereads_the_previous_record_once_then_each_named_unit_of_every_candidate_in_journal_order 	S09 反向链回调挪到起始判之前（辩方新增：链首序号那一判之前就读盘）
+9	GREEN	rc=0	passed=1	failed=	S10 序号大于 1 的候选反向链回调调两次（辩方新增：新用例的候选序号全是 1）
+10	GREEN	rc=0	passed=1	failed=	S11 没带提交标记的候选反向链回调调两次（辩方新增：新用例的候选都带提交标记）
+11	GREEN	rc=0	passed=1	failed=	S12 与改前一致：链首序号不是 1 时不调反向链回调（把 H5-2 的删除撤回；辩方新增，预期绿＝用例罩不住）

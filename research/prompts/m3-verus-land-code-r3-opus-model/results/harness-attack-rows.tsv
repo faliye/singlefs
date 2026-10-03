@@ -1,0 +1,11 @@
+2	RED	rc=101	passed=12	seconds=16	failed=mounting_rereads_the_previous_record_once_then_each_named_unit_of_every_candidate_in_journal_order 
+3	GREEN	rc=0	passed=13	seconds=44	failed=
+4	RED	rc=101	passed=12	seconds=18	failed=mounting_rereads_the_previous_record_once_then_each_named_unit_of_every_candidate_in_journal_order 
+5	RED	rc=101	passed=11	seconds=18	failed=the_same_image_read_cold_and_read_through_the_mount_state_gives_the_same_bytes 
+6	GREEN	rc=0	passed=13	seconds=21	failed=
+7	GREEN	rc=0	passed=13	seconds=56	failed=
+8	GREEN	rc=0	passed=13	seconds=28	failed=
+9	GREEN	rc=0	passed=13	seconds=21	failed=
+10	GREEN	rc=0	passed=13	seconds=19	failed=
+11	WRAPPER_EXIT_251	rc=251	passed=0	seconds=0	failed=
+12	WRAPPER_EXIT_251	rc=251	passed=0	seconds=0	failed=

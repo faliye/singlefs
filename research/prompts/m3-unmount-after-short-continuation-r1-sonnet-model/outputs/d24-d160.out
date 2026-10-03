@@ -1,0 +1,10 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 405M 的 2 倍，照理由放行：探针格越大用得越多，峰值表里的数只是一次短跑的数
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：正推腿是派出去的子 agent，与主 agent 的整包慢档各跑各的
+
+running 1 test
+CELL Narrow(160) O0 U20 B0 K1 rw=650 before=d0[free=94 unblocked=94 deferred=13 alloc=66]d1[free=94 unblocked=94 deferred=13 alloc=66] at-crash=d0[free=81 unblocked=81 deferred=22 alloc=79]d1[free=81 unblocked=81 deferred=22 alloc=79] => steps=5 raises=3 queue=1 outcome=Short[AtCeiling|last=Adm d0 avail=32sl demand=38sl missing=6sl;Adm d1 avail=32sl demand=38sl missing=6sl] after-mount=d0[free=32 unblocked=32 deferred=81 alloc=128]d1[free=32 unblocked=32 deferred=81 alloc=128] unmount-ok(publishes=3 slots_each=[6, 6, 6]) remount-ok(Short) cycle-after-unmount-remount=ok(Empty steps=15 raises=4) cfgF[wrote=true]-remount=ok(Empty steps=15 raises=4) cfgF-cycles=15:E um-cycles=15:E
+CELL Narrow(160) O0 U40 B0 K1 rw=650 before=d0[free=54 unblocked=54 deferred=13 alloc=106]d1[free=54 unblocked=54 deferred=13 alloc=106] at-crash=d0[free=41 unblocked=41 deferred=22 alloc=119]d1[free=41 unblocked=41 deferred=22 alloc=119] => steps=0 raises=0 queue=1 outcome=Short[AtCeiling|last=Adm d0 avail=27sl demand=38sl missing=11sl;Adm d1 avail=27sl demand=38sl missing=11sl] after-mount=d0[free=27 unblocked=27 deferred=36 alloc=133]d1[free=27 unblocked=27 deferred=36 alloc=133] unmount-ok(publishes=3 slots_each=[6, 6, 6]) remount-ok(Short) cycle-after-unmount-remount=ok(Short steps=0 raises=0) cfgF[wrote=true]-remount=ok(Short steps=1 raises=0) cfgF-cycles=1:S,2:S,2:S,2:S,3:S,3:S,3:S,7:S um-cycles=0:S,0:S,0:S,0:S,0:S,0:S,0:S,0:S
+test probe_grid ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.36s
+

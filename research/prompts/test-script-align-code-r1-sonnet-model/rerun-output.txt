@@ -1,0 +1,41 @@
+== 探针 1：decide_gpu_test_start 的结局
+case=A 没有任何适配器（机器上没卡；也是 PCI 上插着 NVIDIA 卡而 Vulkan 驱动坏了枚举不出来的那一种） outcome=NotRunNoGpuAdapter
+case=B 只有集显 outcome=NotRunNoGpuAdapter
+case=C 只有 AMD 独显 outcome=NotRunNoGpuAdapter
+case=D 只有 NVIDIA 虚拟 GPU outcome=NotRunNoGpuAdapter
+case=E 只有软件渲染 outcome=NotRunNoGpuAdapter
+case=F NVIDIA 独显枚举出来而一张卡都没起来 outcome=AdapterPresentButNoCardStarted
+case=G NVIDIA 独显且一张卡起好了 outcome=RunOnTheFirstUsableCard
+case=H 集显加 NVIDIA 独显（独显没起来） outcome=AdapterPresentButNoCardStarted
+exit=0
+== 探针 2：PCI 判据在冻结副本里有没有
+$ grep -rnF /sys/bus/pci crates
+rc=1 (1 = 零命中)
+$ grep -rnE "0x03|class" common_gpu_adapter/mod.rs gpu_unit_checks.rs
+rc=1 (1 = 零命中)
+== 探针 3：没走 first_usable_card_or_report_not_run 的取卡处
+/tmp/claude-1000/test-script-align-code-r1/tree/crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs:1614:    let every_card: Vec<(u32, u64)> = usable_gpu_cards()
+/tmp/claude-1000/test-script-align-code-r1/tree/crates/singlefs-checker-tier/tests/record_checker_judges_absence_by_the_persisted_set.rs:1081:    let card = usable_gpu_cards()
+/tmp/claude-1000/test-script-align-code-r1/tree/crates/singlefs-checker-tier/src/crash_judge_dispatch.rs:976:        let cards = crate::gpu_unit_checks::usable_gpu_cards();
+/tmp/claude-1000/test-script-align-code-r1/tree/crates/singlefs-checker-tier/src/crash_judge_dispatch.rs:1100:        let cards = crate::gpu_unit_checks::usable_gpu_cards();
+== 探针 4：取卡落空时的处理
+1084:        .expect("本机要有一张空闲显存够的 NVIDIA 独显；没有就是这条测试的环境没搭好，不悄悄跳过");
+976:        let cards = crate::gpu_unit_checks::usable_gpu_cards();
+977-        let card = cards.first().expect("本机有一张能用的卡");
+--
+1100:        let cards = crate::gpu_unit_checks::usable_gpu_cards();
+1101-        let card = cards.first().expect("本机有一张能用的卡");
+== 探针 5：NVIDIA_VENDOR_IDENTIFIER 的定义处数
+/tmp/claude-1000/test-script-align-code-r1/tree/crates/singlefs-checker-tier/tests/common_gpu_adapter/mod.rs:12:pub const NVIDIA_VENDOR_IDENTIFIER: u32 = 0x10DE;
+/tmp/claude-1000/test-script-align-code-r1/tree/crates/singlefs-checker-tier/src/gpu_unit_checks.rs:17:const NVIDIA_VENDOR_IDENTIFIER: u32 = 0x10DE;
+== 探针 6：SINGLEFS_CRASH_JUDGE_EXPAND_UP_TO 读法
+8-//! 返回成功；有适配器而一张卡都没起来判红（`common_gpu_adapter`）。要 `verdict-store,gpu` 特性；
+9://! 展开上限 `SINGLEFS_CRASH_JUDGE_EXPAND_UP_TO`（默认 8）。
+10-#![cfg(all(feature = "verdict-store", feature = "gpu"))]
+11-
+12-#[path = "../../singlefs-harness/tests/common/mod.rs"]
+--
+53-fn expand_up_to() -> usize {
+54:    std::env::var("SINGLEFS_CRASH_JUDGE_EXPAND_UP_TO")
+== 探针 7：run_history_campaign 装配 sampling 的那一截有没有变异行点它
+0

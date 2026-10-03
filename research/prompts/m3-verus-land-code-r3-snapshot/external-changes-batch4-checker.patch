@@ -1,0 +1,3107 @@
+diff --git a/crates/singlefs-checker/src/image.rs b/crates/singlefs-checker/src/image.rs
+index 30292ad..157eaa8 100644
+--- a/crates/singlefs-checker/src/image.rs
++++ b/crates/singlefs-checker/src/image.rs
+@@ -65,7 +65,11 @@ pub const SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY: &str =
+ ///
+ /// I-9.16（树表条目按树 ID 严格升序且合发号次序）：实审 A3b Q2 交上来，用户 2026-09-27 定「立不变量并同步」；
+ /// `invariants.md` 那一行由 kb 第八批写。池级走读每读一版的树表判一次（`walk` 的 `judge_tree_table_entries_ordering`）。
+-pub const IMPLEMENTED_INVARIANTS: [&str; 49] = [
++///
++/// 第 50 条起是里程碑三二·1 那一批（两份判决 `research/prompts/m3-inv-a-r1-main-verification.md`、
++/// `research/prompts/m3-inv-b-r1-main-verification.md`，用户 2026-10-01 定案），**只往末尾追加**：层 0 的违例位按下标 i ↔ 这张表第 i 条，
++/// 前 49 条的下标不动。位宽改到 ≥ 128 之前，下标 64 起的那一条在层 0 的 GPU 判器上没有位（另一个实现员在 checker 档改）。
++pub const IMPLEMENTED_INVARIANTS: [&str; 65] = [
+     "I-1.1",
+     "I-1.2",
+     "I-1.3",
+@@ -115,8 +119,62 @@ pub const IMPLEMENTED_INVARIANTS: [&str; 49] = [
+     "I-9.14",
+     "I-9.15",
+     "I-9.16",
++    POINTER_BIRTH_TREE_MATCHES_THE_UNIT_HEADER,
++    LAST_RECORD_OF_A_PUBLISH_CARRIES_THE_ROOT_OF_THAT_PUBLISH,
++    NAMED_ENTRY_MATCHES_THE_UNIT_HEADER,
++    UNIT_BIRTH_NOT_LATER_THAN_A_CANDIDATE_ROOT_REFERENCING_IT,
++    PREVIOUS_SNAPSHOT_TXG_OF_THE_TREE_TABLE_ENTRIES,
++    ACCOUNTING_ROWS_CARRY_THE_GENERATION_OF_THEIR_VERSION,
++    INODE_CHANGE_COUNT_BETWEEN_OBJECT_BIRTH_AND_CONTAINER_BIRTH,
++    INSTANCE_TABLE_ROWS_PUBLISHED_BEFORE_THE_ROOT_REFERENCING_THEM,
++    SYSTEM_CONFIGURATION_SLOT_GENERATIONS_FOLLOW_THE_ROTATION,
++    ROOT_RECORDS_LIVE_IN_THE_SLOT_THEIR_TXG_NAMES,
++    JOURNAL_RECORD_TXG_NOT_DECREASING_WITHIN_AN_INSTANCE,
++    DEVICE_COUNTS_OF_THE_CHOSEN_SYSTEM_CONFIGURATIONS_AGREE,
++    TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
++    JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
++    ROOT_SLOTS_ALIGNED_TO_THE_DECISION_WIDTH,
++    SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION,
+ ];
+ 
++/// I-1.12：走读跟随的一条指针，偏移 34 的出生树等于被指单元头里的出生树——码 1、码 3 取头偏移 43；码 2 取哪个字段随 C289 定，
++/// 不判（inode 内部节点指着叶容器的那一类由 I-9.2 罩住，不重判）。
++pub const POINTER_BIRTH_TREE_MATCHES_THE_UNIT_HEADER: &str = "I-1.12";
++/// I-8.10：带末条标志、同 (实例代号, checkpoint_txg) 只此一条的记录，新根段四段与根环里同 (实例代号, checkpoint_txg) 的根逐字节相同。
++pub const LAST_RECORD_OF_A_PUBLISH_CARRIES_THE_ROOT_OF_THAT_PUBLISH: &str = "I-8.10";
++/// I-8.11：点名项的一条位置条目所指那一份整单元校验和相符时，单元头的类标签、诞生代号、key 尾段（与码 1 / 码 3 的出生树）与点名项逐字段相同。
++pub const NAMED_ENTRY_MATCHES_THE_UNIT_HEADER: &str = "I-8.11";
++/// I-4.9：回退候选集里不是最新的每一条根，它引用的单元诞生代号不大于这条根的 checkpoint_txg（最新根那一条归 I-4.2）。
++pub const UNIT_BIRTH_NOT_LATER_THAN_A_CANDIDATE_ROOT_REFERENCING_IT: &str = "I-4.9";
++/// I-9.25：树表条目的 `previous_snapshot_txg`：不是 inode 树的条目恒 0；inode 树那条不大于引用这张树表的根的 checkpoint_txg。
++pub const PREVIOUS_SNAPSHOT_TXG_OF_THE_TREE_TABLE_ENTRIES: &str = "I-9.25";
++/// I-3.13：一版的记账树里每一行的代段等于这一版的 checkpoint_txg。
++pub const ACCOUNTING_ROWS_CARRY_THE_GENERATION_OF_THEIR_VERSION: &str = "I-3.13";
++/// I-9.26：inode 记录的改动计数不小于对象出生代（创建算一次改动）、不大于所在叶容器头的诞生代号。
++pub const INODE_CHANGE_COUNT_BETWEEN_OBJECT_BIRTH_AND_CONTAINER_BIRTH: &str = "I-9.26";
++/// I-3.12：根环里任一自证过的根，它指着的实例表每一行 (i, T, W) 满足 T < 这条根的 checkpoint_txg。
++pub const INSTANCE_TABLE_ROWS_PUBLISHED_BEFORE_THE_ROOT_REFERENCING_THEM: &str = "I-3.12";
++/// I-7.16：每块盘上可择的系统配置槽 i，世代号 ≥ 2 时世代号 mod 2 == i；两槽都可择时世代号相差恰为 1，或都是 mkfs 写的 1。
++pub const SYSTEM_CONFIGURATION_SLOT_GENERATIONS_FOLLOW_THE_ROTATION: &str = "I-7.16";
++/// I-7.17：根环里任一自证过的根住 (区域 txg mod R, 槽 (txg div R) mod S)；第 0 代的根只判槽 0。
++pub const ROOT_RECORDS_LIVE_IN_THE_SLOT_THEIR_TXG_NAMES: &str = "I-7.17";
++/// I-8.12：同一块盘 journal 环里同一实例的记录按计数器从小到大，checkpoint_txg 不减。
++pub const JOURNAL_RECORD_TXG_NOT_DECREASING_WITHIN_AN_INSTANCE: &str = "I-8.12";
++/// I-7.15：各盘所选的系统配置槽里的设备数相同（形态抄 I-1.4 的 fsid 那一判）。
++pub const DEVICE_COUNTS_OF_THE_CHOSEN_SYSTEM_CONFIGURATIONS_AGREE: &str = "I-7.15";
++/// I-4.1：所选根（重放之后那一版）指向的树全可遍历；checker 自己按 D23（journal 的角色与格式） 已定项 14 的规则只读重放（`walk` 的
++/// `version_the_next_mount_applies`），一条记录都不施加时报不适用，前缀停在点名单元验证不过（起点含介质损坏）时报不适用。
++pub const TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE: &str = "I-4.1";
++/// I-8.1：自证过的系统配置槽里在飞上限 = ⌊环长 ÷ 4096 ÷ F⌋、最坏占用 = 在飞上限 × 4096、F ≥ 2；
++/// 同一块盘环里同 (实例代号, checkpoint_txg) 的记录不多于在飞上限条。
++pub const JOURNAL_RING_GEOMETRY_FIELDS_AGREE: &str = "I-8.1";
++/// I-7.5：每个根槽的起始偏移是判定宽度的整数倍；判定宽度 = 各盘所选系统配置声明的 max(physical_block_size, io_min) 里最大的那个
++/// （声明值，未探测：[`crate::DecisionWidth::DeclaredOnly`]）。R × S 个槽逐个判。
++pub const ROOT_SLOTS_ALIGNED_TO_THE_DECISION_WIDTH: &str = "I-7.5";
++/// I-8.5（V-池）：全池至少一块盘有一个自证过的系统配置槽，全池皆废判红。单盘全废、哪块盘少于两槽自证过（可写挂载会拒）
++/// 不进违例通道，走旁路报告 [`system_configuration_redundancy_report`]。
++pub const SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION: &str = "I-8.5";
++
+ /// 判定累加器：每条不变量记评估了几次、第一处违例、整条不适用的理由，以及射程里有一部分判不了的理由。
+ #[derive(Default)]
+ pub struct Judgements {
+@@ -195,14 +253,24 @@ impl Judgements {
+     }
+ }
+ 
+-/// 系统配置里 checker 要用的几何（偏移按系统配置字段表各写一份：物理块 317、journal 环起点 325 与长度 333、R 361、S 362、P 363、
+-/// chunk 367、根环基址 371、逐区域设备 379、单元区起点 417、io_min 425、槽距 429）。
++/// 系统配置里 checker 要用的几何（偏移按系统配置字段表各写一份：物理块 317、journal 环起点 325 与长度 333、记录尺寸 341、
++/// 在飞上限 345、最坏占用 349、安全系数 F 357、R 361、S 362、P 363、chunk 367、根环基址 371、逐区域设备 379、单元区起点 417、
++/// io_min 425、槽距 429）。
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+ pub struct PoolGeometry {
+     pub filesystem_identifier: [u8; 16],
+     pub physical_block_size: u32,
+     pub journal_ring_start_slot: u64,
+     pub journal_ring_bytes: u64,
++    /// 槽里自述的 journal 在飞记录数上限（偏移 345，4 字节）：I-8.1 拿它与 ⌊环长 ÷ 4096 ÷ F⌋ 比、拿它数同一次发布的记录条数。
++    /// I-4.1 的重放前缀不按它截，按环长与格式常量 F 现算（D23（journal 的角色与格式） 已定项 18，与实现恢复同一个读法）。
++    pub declared_in_flight_record_limit: u64,
++    /// 槽里自述的 journal 最坏占用（偏移 349，8 字节，单位字节）：I-8.1 拿它与在飞上限 × 4096 比。
++    pub declared_worst_case_occupancy_bytes: u64,
++    /// 槽里自述的安全系数 F（偏移 357，4 字节）：I-8.1 判它 ≥ 2、拿它算在飞上限。
++    pub declared_safety_factor: u64,
++    /// 槽里自述的 io_min（偏移 425，4 字节；0 = 没声明）：I-7.5 的判定宽度取 max(physical_block_size, io_min)。
++    pub declared_minimum_input_output_bytes: u32,
+     pub regions: u64,
+     pub slots_per_region: u64,
+     pub prime_step: u64,
+@@ -293,6 +361,10 @@ pub fn geometry_of(
+         physical_block_size: view.declared_physical_block_size,
+         journal_ring_start_slot,
+         journal_ring_bytes,
++        declared_in_flight_record_limit: u64::from(read_u32(slot, 345)),
++        declared_worst_case_occupancy_bytes: read_u64(slot, 349),
++        declared_safety_factor: u64::from(read_u32(slot, 357)),
++        declared_minimum_input_output_bytes: read_u32(slot, 425),
+         regions,
+         slots_per_region,
+         prime_step: u64::from(read_u32(slot, 363)),
+@@ -381,8 +453,10 @@ pub enum SystemConfigurationSlotReading {
+         offset_in_bytes: u64,
+         refused: crate::Verdict,
+     },
+-    /// 不自证（读不到、magic 或整槽校验和不对）、incompat 位不认得、R 或 S 越界：这一槽不可择（R、S 的既有处置，不动）。
+-    NotChoosable,
++    /// 不自证：读不到、不足 4096 字节、magic 或整槽校验和不对（I-8.5（tail 槽有效集非空） 的「自证过」= magic 与整槽校验和都对）。
++    NotSelfVerified,
++    /// 自证过（magic 与整槽校验和都对），而 incompat 位不认得、或 R / S 越界：这一槽不可择（R、S 的既有处置，不动）。它仍是 I-8.5 数的「自证过的槽」：tail 住在自证过的槽里（D23（journal 的角色与格式） 已定项 3）。
++    SelfVerifiedButNotChoosable,
+ }
+ 
+ /// 一个自证过的系统配置槽被拒的理由是不是「池级字段越出这一版读者收的范围」。穷举写全：新加一个 [`crate::Verdict`] 成员时这里编译不过，
+@@ -420,6 +494,41 @@ pub const fn value_refused_by_this_reader(verdict: &crate::Verdict) -> bool {
+     }
+ }
+ 
++/// 一个系统配置槽被拒的理由是不是「它自己证不了自己」：不足 4096 字节、magic 不对、整槽校验和不对
++/// （[`crate::check_system_configuration_slot`] 头三道，过了这三道之后拒的都是自证过的槽）。穷举写全，理由同 [`value_refused_by_this_reader`]。
++#[must_use]
++pub const fn verdict_says_the_slot_does_not_verify_itself(verdict: &crate::Verdict) -> bool {
++    match verdict {
++        crate::Verdict::TooShort | crate::Verdict::BadMagic | crate::Verdict::ChecksumMismatch => {
++            true
++        }
++        crate::Verdict::Valid
++        | crate::Verdict::FormatVersionNotRecognized
++        | crate::Verdict::EncryptionTypeNotOff
++        | crate::Verdict::FixedStructureSlotSpacingOutsideTheFormatRange
++        | crate::Verdict::PhysicalBlockSizeOutsideTheRootSlotBounds
++        | crate::Verdict::JournalRingBytesOutsideTheSupportedRange
++        | crate::Verdict::JournalRingStartSlotNotTheFirstVersionConstant
++        | crate::Verdict::RootRingBaseSlotNotTheFirstVersionConstant
++        | crate::Verdict::UnitAreaStartNotTheSlotAfterTheJournalRing
++        | crate::Verdict::UnitAreaStartOffTheClusterSegmentBoundary
++        | crate::Verdict::UnknownIncompatBit
++        | crate::Verdict::FilesystemIdentifierMismatch
++        | crate::Verdict::NonZeroFlags
++        | crate::Verdict::WrongUnitClass
++        | crate::Verdict::DeclaredLengthMismatch
++        | crate::Verdict::KeyWidthMismatch
++        | crate::Verdict::KeysNotStrictlyAscending
++        | crate::Verdict::KeyOutsideDeclaredRange
++        | crate::Verdict::UnknownRecordType
++        | crate::Verdict::RegionCountPastTheRegionDeviceFields
++        | crate::Verdict::RootRingSlotsPerRegionOutsideTheFormatInterval
++        | crate::Verdict::EncryptionReservedBytesNotZero
++        | crate::Verdict::EntryWidthZeroWithEntries
++        | crate::Verdict::RecordWidthZeroWithRecords => false,
++    }
++}
++
+ fn read_system_configuration_slot(
+     reader: &dyn ImageReader,
+     device: u32,
+@@ -427,7 +536,7 @@ fn read_system_configuration_slot(
+ ) -> SystemConfigurationSlotReading {
+     let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+     let Some(bytes) = reader.read(device, offset_in_bytes, slot_bytes) else {
+-        return SystemConfigurationSlotReading::NotChoosable;
++        return SystemConfigurationSlotReading::NotSelfVerified;
+     };
+     let refused_or_not_choosable = |verdict: crate::Verdict| {
+         if value_refused_by_this_reader(&verdict) {
+@@ -435,8 +544,10 @@ fn read_system_configuration_slot(
+                 offset_in_bytes,
+                 refused: verdict,
+             }
++        } else if verdict_says_the_slot_does_not_verify_itself(&verdict) {
++            SystemConfigurationSlotReading::NotSelfVerified
+         } else {
+-            SystemConfigurationSlotReading::NotChoosable
++            SystemConfigurationSlotReading::SelfVerifiedButNotChoosable
+         }
+     };
+     let view = match check_system_configuration_slot(&bytes) {
+@@ -464,7 +575,8 @@ pub fn system_configuration_slot_readings(
+     let spacing_recorded_by_slot_zero = |reading: &SystemConfigurationSlotReading| match reading {
+         SystemConfigurationSlotReading::Usable(_, geometry) => Some(geometry.slot_spacing),
+         SystemConfigurationSlotReading::CarriesAValueThisReaderRefuses { .. }
+-        | SystemConfigurationSlotReading::NotChoosable => None,
++        | SystemConfigurationSlotReading::NotSelfVerified
++        | SystemConfigurationSlotReading::SelfVerifiedButNotChoosable => None,
+     };
+     let spacing_recorded_by_the_first_valid_slot_zero = slot_zero_of_each_device
+         .iter()
+@@ -497,7 +609,8 @@ pub fn verified_system_configuration_slots(
+                         Some((view, geometry))
+                     }
+                     SystemConfigurationSlotReading::CarriesAValueThisReaderRefuses { .. }
+-                    | SystemConfigurationSlotReading::NotChoosable => None,
++                    | SystemConfigurationSlotReading::NotSelfVerified
++                    | SystemConfigurationSlotReading::SelfVerifiedButNotChoosable => None,
+                 })
+                 .collect();
+             (device, usable)
+@@ -535,7 +648,8 @@ pub fn judge_system_configuration_values_the_reader_accepts(
+                         },
+                     );
+                 }
+-                SystemConfigurationSlotReading::NotChoosable => {}
++                SystemConfigurationSlotReading::NotSelfVerified
++                | SystemConfigurationSlotReading::SelfVerifiedButNotChoosable => {}
+             }
+         }
+     }
+@@ -608,6 +722,273 @@ pub fn root_slot_positions(geometry: &PoolGeometry) -> Vec<(u64, u64, u32, u64)>
+     positions
+ }
+ 
++/// mkfs 写下的两个系统配置槽的世代号（D22（单元原子性怎么合成） 已定项 16，用户 2026-10-01 定写进那一项）：两槽相等只许都是它。
++pub const SYSTEM_CONFIGURATION_GENERATION_WRITTEN_BY_MKFS: u64 = 1;
++
++/// 每块盘的系统配置槽数（D22（单元原子性怎么合成） 已定项 8：每盘两份）：世代号 ≥ 2 的那一份住「世代号 mod 这个数」号槽。
++const SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE: u64 = 2;
++
++/// [`SYSTEM_CONFIGURATION_SLOT_GENERATIONS_FOLLOW_THE_ROTATION`]（I-7.16）：每块盘上，可择的系统配置槽 i（[`SystemConfigurationSlotReading::Usable`]，
++/// 带越界值的槽归 I-7.13 整池拒、不进这一条）世代号 ≥ 2 时世代号 mod 2 == i，每槽判一格；两槽都可择时世代号相差恰为 1，
++/// 或两槽都是 mkfs 写下的 1，每盘判一格（D22（单元原子性怎么合成） 已定项 16）。
++pub fn judge_system_configuration_slot_generations_follow_the_rotation(
++    readings: &[(u32, [SystemConfigurationSlotReading; 2])],
++    judgements: &mut Judgements,
++) {
++    let generation_of_a_choosable_slot = |reading: &SystemConfigurationSlotReading| match reading {
++        SystemConfigurationSlotReading::Usable(view, _) => Some(view.slot_generation),
++        SystemConfigurationSlotReading::CarriesAValueThisReaderRefuses { .. }
++        | SystemConfigurationSlotReading::NotSelfVerified
++        | SystemConfigurationSlotReading::SelfVerifiedButNotChoosable => None,
++    };
++    for (device, slots) in readings {
++        let generations = [
++            generation_of_a_choosable_slot(&slots[0]),
++            generation_of_a_choosable_slot(&slots[1]),
++        ];
++        for (slot_index, generation) in (0u64..).zip(generations) {
++            let Some(generation) = generation else {
++                continue;
++            };
++            if generation > SYSTEM_CONFIGURATION_GENERATION_WRITTEN_BY_MKFS {
++                judgements.judge(
++                    SYSTEM_CONFIGURATION_SLOT_GENERATIONS_FOLLOW_THE_ROTATION,
++                    generation % SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE == slot_index,
++                    || {
++                        format!(
++                            "盘 {device} 槽 {slot_index} 的系统配置世代号 {generation}：世代号 ≥ 2 的那一份该住槽 {}",
++                            generation % SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE
++                        )
++                    },
++                );
++            }
++        }
++        if let [Some(slot_zero_generation), Some(slot_one_generation)] = generations {
++            let both_written_by_mkfs = slot_zero_generation
++                == SYSTEM_CONFIGURATION_GENERATION_WRITTEN_BY_MKFS
++                && slot_one_generation == SYSTEM_CONFIGURATION_GENERATION_WRITTEN_BY_MKFS;
++            judgements.judge(
++                SYSTEM_CONFIGURATION_SLOT_GENERATIONS_FOLLOW_THE_ROTATION,
++                both_written_by_mkfs || slot_zero_generation.abs_diff(slot_one_generation) == 1,
++                || {
++                    format!(
++                        "盘 {device} 两个系统配置槽的世代号 {slot_zero_generation} / {slot_one_generation}：相差不是 1，也不是 mkfs 写下的两个 1"
++                    )
++                },
++            );
++        }
++    }
++}
++
++/// [`ROOT_RECORDS_LIVE_IN_THE_SLOT_THEIR_TXG_NAMES`]（I-7.17）：根环里每条自证过的根，`checkpoint_txg` ≥ 1 时住
++/// (区域 txg mod R, 槽 (txg div R) mod S)；第 0 代（mkfs 把它种进全部区域，D22（单元原子性怎么合成） 已定项 8）只判槽 0。
++/// 公式是 D22（单元原子性怎么合成） 已定项 16 的定案。
++pub fn judge_root_records_live_in_the_slot_their_txg_names(
++    roots: &[(u64, u64, RootView)],
++    geometry: &PoolGeometry,
++    judgements: &mut Judgements,
++) {
++    for (region, slot, root) in roots {
++        let txg = root.checkpoint_txg;
++        let (expected_region, expected_slot) = if txg == GENESIS_ROOT_CHECKPOINT_TXG {
++            (None, 0)
++        } else {
++            let region_of_the_txg = txg
++                .checked_rem(geometry.regions)
++                .expect("根环里读出了根 ⇒ `root_slot_positions` 至少排出一个区域，R ≥ 1");
++            let slot_of_the_txg = (txg / geometry.regions)
++                .checked_rem(geometry.slots_per_region)
++                .expect("根环里读出了根 ⇒ 每个区域至少一个槽，S ≥ 1");
++            (Some(region_of_the_txg), slot_of_the_txg)
++        };
++        let holds =
++            expected_region.is_none_or(|expected| expected == *region) && expected_slot == *slot;
++        judgements.judge(ROOT_RECORDS_LIVE_IN_THE_SLOT_THEIR_TXG_NAMES, holds, || {
++            format!(
++                "实例 {}、txg {txg} 的根住在区域 {region} 槽 {slot}：按 txg 算该在区域 {expected_region:?}（第 0 代不判区域）槽 {expected_slot}",
++                root.instance
++            )
++        });
++    }
++}
++
++/// 读者要求的 F 下界（`.claude/kb/invariants.md` I-8.1 那一行「读者要求 F ≥ 2」）。
++const JOURNAL_SAFETY_FACTOR_LOWER_BOUND: u64 = 2;
++
++/// [`JOURNAL_RING_GEOMETRY_FIELDS_AGREE`]（I-8.1）的三个字段等式：每块盘每个可择的系统配置槽（[`SystemConfigurationSlotReading::Usable`]；
++/// 带越界值的槽归 I-7.13 整池拒、不可择的槽 checker 不读它的几何），三格各判一次——
++/// 槽里的 F ≥ 2；在飞上限 = ⌊环长 ÷ 4096 ÷ F⌋（F 取同一槽里的那个字段，F 为 0 时这一格判红、不除）；最坏占用 = 在飞上限 × 4096
++/// （乘出来溢出判红）。「环长 ≥ F × 最坏占用」是这三格的推论，不另判（`research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 4 行）。
++/// 同一次发布的记录数不多于在飞上限那一格读 journal 环，在 `walk` 里判。
++pub fn judge_journal_ring_geometry_fields_agree(
++    readings: &[(u32, [SystemConfigurationSlotReading; 2])],
++    judgements: &mut Judgements,
++) {
++    for (device, slots) in readings {
++        for (slot_index, reading) in (0u64..).zip(slots) {
++            let geometry = match reading {
++                SystemConfigurationSlotReading::Usable(_, geometry) => geometry,
++                SystemConfigurationSlotReading::CarriesAValueThisReaderRefuses { .. }
++                | SystemConfigurationSlotReading::NotSelfVerified
++                | SystemConfigurationSlotReading::SelfVerifiedButNotChoosable => continue,
++            };
++            let safety_factor = geometry.declared_safety_factor;
++            judgements.judge(
++                JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
++                safety_factor >= JOURNAL_SAFETY_FACTOR_LOWER_BOUND,
++                || {
++                    format!(
++                        "盘 {device} 系统配置槽 {slot_index} 的安全系数 F = {safety_factor}，读者要求 F ≥ {JOURNAL_SAFETY_FACTOR_LOWER_BOUND}"
++                    )
++                },
++            );
++            let in_flight_record_limit_from_the_ring =
++                (geometry.journal_ring_bytes / JOURNAL_RECORD_BYTES).checked_div(safety_factor);
++            judgements.judge(
++                JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
++                in_flight_record_limit_from_the_ring
++                    == Some(geometry.declared_in_flight_record_limit),
++                || {
++                    format!(
++                        "盘 {device} 系统配置槽 {slot_index} 记的在飞上限 {}，按环长 {} ÷ 4096 ÷ F {safety_factor} 算是 {in_flight_record_limit_from_the_ring:?}",
++                        geometry.declared_in_flight_record_limit, geometry.journal_ring_bytes
++                    )
++                },
++            );
++            let worst_case_occupancy_from_the_limit = geometry
++                .declared_in_flight_record_limit
++                .checked_mul(JOURNAL_RECORD_BYTES);
++            judgements.judge(
++                JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
++                worst_case_occupancy_from_the_limit
++                    == Some(geometry.declared_worst_case_occupancy_bytes),
++                || {
++                    format!(
++                        "盘 {device} 系统配置槽 {slot_index} 记的最坏占用 {} 字节，按在飞上限 {} × 4096 算是 {worst_case_occupancy_from_the_limit:?}",
++                        geometry.declared_worst_case_occupancy_bytes,
++                        geometry.declared_in_flight_record_limit
++                    )
++                },
++            );
++        }
++    }
++}
++
++/// I-7.5 的判定宽度：各盘所选系统配置声明的 max(`physical_block_size`, `io_min`) 里最大的那个（`io_min` 为 0 视为没声明，
++/// 取 max 时自然落到 `physical_block_size`；异构池取最大，`research/prompts/m3-inv-a-r1-main-verification.md` 第四节用户定案第 1 条）。
++/// checker 不探测设备，这个宽度一律是声明值（[`crate::DecisionWidth::DeclaredOnly`]，探测比对仍欠 C388（checker 的判定宽度不自己探测））。
++/// 没有一块盘择得到系统配置时交 None。
++#[must_use]
++pub fn decision_width_declared_by_the_chosen_system_configurations(
++    chosen_geometries: &[PoolGeometry],
++) -> Option<crate::DecisionWidth> {
++    chosen_geometries
++        .iter()
++        .map(|geometry| {
++            geometry
++                .physical_block_size
++                .max(geometry.declared_minimum_input_output_bytes)
++        })
++        .max()
++        .map(|bytes| crate::DecisionWidth::DeclaredOnly { bytes })
++}
++
++/// [`ROOT_SLOTS_ALIGNED_TO_THE_DECISION_WIDTH`]（I-7.5）：根环 R × S 个槽逐个判，起始偏移（设备内字节）是判定宽度的整数倍。
++/// 只判第 0 个不够：偏移半个槽的槽照样跨两个原子单元（E41（根环槽几何 2×4×256））。判定宽度 0 不会出现
++/// （`geometry_of` 判过 `physical_block_size` ≥ 根记录宽），出现了这一格判红、不除。
++pub fn judge_root_slots_aligned_to_the_decision_width(
++    geometry: &PoolGeometry,
++    decision_width: crate::DecisionWidth,
++    judgements: &mut Judgements,
++) {
++    let width_in_bytes = u64::from(decision_width.bytes());
++    for (region, slot, device, offset) in root_slot_positions(geometry) {
++        judgements.judge(
++            ROOT_SLOTS_ALIGNED_TO_THE_DECISION_WIDTH,
++            offset
++                .checked_rem(width_in_bytes)
++                .is_some_and(|remainder| remainder == 0),
++            || {
++                format!(
++                    "根环区域 {region} 槽 {slot}（盘 {device} 偏移 {offset}）不是判定宽度 {decision_width:?}（声明值，未探测）的整数倍"
++                )
++            },
++        );
++    }
++}
++
++/// 一个系统配置槽是不是自证过（magic 与整槽校验和都对）：I-8.5（tail 槽有效集非空） 与旁路报告都按这个数。
++const fn slot_verifies_itself(reading: &SystemConfigurationSlotReading) -> bool {
++    match reading {
++        SystemConfigurationSlotReading::Usable(..)
++        | SystemConfigurationSlotReading::CarriesAValueThisReaderRefuses { .. }
++        | SystemConfigurationSlotReading::SelfVerifiedButNotChoosable => true,
++        SystemConfigurationSlotReading::NotSelfVerified => false,
++    }
++}
++
++/// [`SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION`]（I-8.5，V-池）判一格：全池至少一块盘的两个系统配置槽里有一个自证过。
++/// 对着只读恢复判（`research/prompts/m3-inv-a-r1-main-verification.md` 第四节用户定案第 3 条）：单盘全废只读恢复照样挂得上，不判违例，
++/// 走旁路报告 [`system_configuration_redundancy_report`]。
++pub fn judge_some_device_carries_a_self_verified_system_configuration(
++    readings: &[(u32, [SystemConfigurationSlotReading; 2])],
++    judgements: &mut Judgements,
++) {
++    let some_slot_verifies_itself = readings
++        .iter()
++        .any(|(_, slots)| slots.iter().any(slot_verifies_itself));
++    judgements.judge(
++        SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION,
++        some_slot_verifies_itself,
++        || {
++            format!(
++                "池里 {} 块盘的系统配置槽一个都没自证过：tail 没有见证者",
++                readings.len()
++            )
++        },
++    );
++}
++
++/// 系统配置冗余的旁路报告：不进违例通道（I-8.5 对着只读恢复判，这两样只读恢复都挂得上）。
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct SystemConfigurationRedundancyReport {
++    /// 两个槽都没自证过的盘（单盘全废）。
++    pub devices_without_a_self_verified_slot: Vec<u32>,
++    /// 少于两个槽自证过的盘：可写挂载读阶段读每块盘两槽，有一槽读不出或自证不过就判不出、按真，重读一次仍不成就拒可写
++    /// （D23（journal 的角色与格式） 已定项 14「可写挂载读到的更新状态读不出」）。单盘全废的盘也在这里。
++    pub devices_whose_writable_mount_would_be_refused: Vec<u32>,
++}
++
++/// 逐盘数自证过的系统配置槽（magic 与整槽校验和都对），交回 [`SystemConfigurationRedundancyReport`]。槽的读法同
++/// [`system_configuration_slot_readings`]。「本池自证不过」那一半（fsid 是别的池的槽）这里不分：数的是 I-8.5 那一行的「自证过」。
++#[must_use]
++pub fn system_configuration_redundancy_report(
++    reader: &dyn ImageReader,
++) -> SystemConfigurationRedundancyReport {
++    let mut report = SystemConfigurationRedundancyReport {
++        devices_without_a_self_verified_slot: Vec::new(),
++        devices_whose_writable_mount_would_be_refused: Vec::new(),
++    };
++    for (device, slots) in system_configuration_slot_readings(reader) {
++        let self_verified_slots = slots
++            .iter()
++            .filter(|reading| slot_verifies_itself(reading))
++            .count();
++        if self_verified_slots == 0 {
++            report.devices_without_a_self_verified_slot.push(device);
++        }
++        if self_verified_slots < slots.len() {
++            report
++                .devices_whose_writable_mount_would_be_refused
++                .push(device);
++        }
++    }
++    report
++}
++
++/// 第 0 代根的 `checkpoint_txg`：mkfs 种在每个区域的槽 0（D22（单元原子性怎么合成） 已定项 8）。
++const GENESIS_ROOT_CHECKPOINT_TXG: u64 = 0;
++
+ /// 根环全部槽里自证过的根（I-7.1 的集合 S），带它住的区域与槽号。
+ #[must_use]
+ pub fn valid_roots(reader: &dyn ImageReader, geometry: &PoolGeometry) -> Vec<(u64, u64, RootView)> {
+@@ -653,11 +1034,23 @@ pub struct PointerView {
+     /// 加密关着时它们恒 0，读者遇到非 0 判该指针所在的结构损坏（已定项 3 射程）；池级走读在每条跟随的指针上按 I-2.4 判
+     /// （[`judge_pointer_mac_and_nonce_are_zero`]）。
+     pub is_mac_and_nonce_all_zero: bool,
++    /// 头部 extent 偏移那 2 字节（偏移 32，D19（块指针的结构与宽度预算） 已定项 11 的偏移表）是 0：第一版指针指整个单元，恒 0，
++    /// 读者遇到非 0 判该指针所在的结构损坏，与 MAC / nonce 同一处置、与加密开不开无关（已定项 3；`m3-inv-a-r1` 判决第二节第 11 行）。
++    pub is_extent_offset_zero: bool,
+ }
+ 
+ /// 指针头部 MAC 16 + nonce 12：从偏移 0 起连着的 28 字节（D19（块指针的结构与宽度预算） 已定项 11）。
+ const POINTER_MAC_AND_NONCE_BYTES: usize = 16 + 12;
+ 
++/// 指针头部 extent 偏移 2 字节的位置：MAC 16 + nonce 12 + 算法类型等 4 之后（D19（块指针的结构与宽度预算） 已定项 11）。
++const POINTER_EXTENT_OFFSET_FIELD: std::ops::Range<usize> = 32..34;
++
++fn extent_offset_is_zero(pointer_bytes: &[u8]) -> bool {
++    pointer_bytes[POINTER_EXTENT_OFFSET_FIELD]
++        .iter()
++        .all(|byte| *byte == 0)
++}
++
+ fn mac_and_nonce_are_all_zero(pointer_bytes: &[u8]) -> bool {
+     pointer_bytes[..POINTER_MAC_AND_NONCE_BYTES]
+         .iter()
+@@ -675,6 +1068,7 @@ pub fn parse_node_pointer(bytes: &[u8]) -> PointerView {
+         tail: u64::from(read_u32(bytes, 82)),
+         all_zero: bytes[..86].iter().all(|byte| *byte == 0),
+         is_mac_and_nonce_all_zero: mac_and_nonce_are_all_zero(bytes),
++        is_extent_offset_zero: extent_offset_is_zero(bytes),
+     }
+ }
+ 
+@@ -689,6 +1083,7 @@ pub fn parse_data_pointer(bytes: &[u8]) -> PointerView {
+         tail: read_six_byte_unsigned(bytes, 82),
+         all_zero: bytes[..88].iter().all(|byte| *byte == 0),
+         is_mac_and_nonce_all_zero: mac_and_nonce_are_all_zero(bytes),
++        is_extent_offset_zero: extent_offset_is_zero(bytes),
+     }
+ }
+ 
+@@ -706,6 +1101,19 @@ pub fn judge_pointer_mac_and_nonce_are_zero(
+     });
+ }
+ 
++/// I-2.4（头校验和覆盖范围） 射程里指针那一半的另一格：走读跟随的一条指针，头部 extent 偏移（偏移 32 的 2 字节）为 0。
++/// 第一版指针指整个单元，读者遇到非 0 判该指针所在的结构损坏，与 MAC / nonce 同一处置、与加密开不开无关
++/// （D19（块指针的结构与宽度预算） 已定项 3，`research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 11 行）。只判不断。
++pub fn judge_pointer_extent_offset_is_zero(
++    judgements: &mut Judgements,
++    pointer: &PointerView,
++    what: &str,
++) {
++    judgements.judge("I-2.4", pointer.is_extent_offset_zero, || {
++        format!("{what}：指针头部 extent 偏移非 0，第一版指针指整个单元、这 2 字节恒 0")
++    });
++}
++
+ /// I-2.5：位置条目按设备身份严格升序；整条全零的指针豁免。
+ pub fn judge_location_order(judgements: &mut Judgements, pointer: &PointerView, what: &str) {
+     if pointer.all_zero {
+diff --git a/crates/singlefs-checker/src/walk.rs b/crates/singlefs-checker/src/walk.rs
+index 74d02dd..0384947 100644
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ -10,8 +10,8 @@ use singlefs_format::{
+     ACCOUNTING_ENTRY_BYTES, ALLOCATION_RECORD_BYTES, ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_BYTES,
+     DATA_UNIT_BYTES, EXTENT_LEAF_RECORD_BYTES, EXTENT_TREE_INTERNAL_ENTRY_BYTES,
+     EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES, INODE_INTERNAL_ENTRY, JOURNAL_RECORD_BYTES,
+-    MAPPING_ENTRY_BYTES, NODE_BYTES, NODE_POINTER_BYTES, NONCE_MAC_ALGORITHM_RESERVED_BYTES,
+-    SLOT_BYTES, TREE_TABLE_ENTRY_BYTES,
++    JOURNAL_SAFETY_FACTOR, MAPPING_ENTRY_BYTES, NODE_BYTES, NODE_POINTER_BYTES,
++    NONCE_MAC_ALGORITHM_RESERVED_BYTES, SLOT_BYTES, TREE_TABLE_ENTRY_BYTES,
+ };
+ 
+ use crate::position_addressed::{
+@@ -24,18 +24,32 @@ use crate::position_addressed::{
+ };
+ 
+ use crate::image::{
+-    chosen_system_configurations, judge_location_entries_order, judge_location_order,
+-    judge_own_device_number_is_the_device_identity, judge_pointer_mac_and_nonce_are_zero,
++    chosen_system_configurations, decision_width_declared_by_the_chosen_system_configurations,
++    judge_journal_ring_geometry_fields_agree, judge_location_entries_order, judge_location_order,
++    judge_own_device_number_is_the_device_identity, judge_pointer_extent_offset_is_zero,
++    judge_pointer_mac_and_nonce_are_zero, judge_root_records_live_in_the_slot_their_txg_names,
++    judge_root_slots_aligned_to_the_decision_width,
++    judge_some_device_carries_a_self_verified_system_configuration,
++    judge_system_configuration_slot_generations_follow_the_rotation,
+     judge_system_configuration_values_the_reader_accepts, parse_data_pointer, parse_node_pointer,
+     read_referenced_unit, root_slot_positions, system_configuration_slot_readings, valid_roots,
+     verified_system_configuration_slots, ImageReader, InvariantVerdict, Judgements,
+-    PointerLocation, PointerView, PoolGeometry, MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
++    PointerLocation, PointerView, PoolGeometry,
++    ACCOUNTING_ROWS_CARRY_THE_GENERATION_OF_THEIR_VERSION,
++    DEVICE_COUNTS_OF_THE_CHOSEN_SYSTEM_CONFIGURATIONS_AGREE,
++    INODE_CHANGE_COUNT_BETWEEN_OBJECT_BIRTH_AND_CONTAINER_BIRTH,
++    INSTANCE_TABLE_ROWS_PUBLISHED_BEFORE_THE_ROOT_REFERENCING_THEM,
++    JOURNAL_RECORD_TXG_NOT_DECREASING_WITHIN_AN_INSTANCE, JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
++    LAST_RECORD_OF_A_PUBLISH_CARRIES_THE_ROOT_OF_THAT_PUBLISH, MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
++    NAMED_ENTRY_MATCHES_THE_UNIT_HEADER, POINTER_BIRTH_TREE_MATCHES_THE_UNIT_HEADER,
++    PREVIOUS_SNAPSHOT_TXG_OF_THE_TREE_TABLE_ENTRIES, TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
++    UNIT_BIRTH_NOT_LATER_THAN_A_CANDIDATE_ROOT_REFERENCING_IT,
+ };
+ use crate::{
+     back_chain_of_record_header, check_index_node_keys, check_internal_node_separators,
+     check_journal_record, check_unit, checksum_field_holds, crc32_castagnoli_table,
+     index_node_view, key_schema_for_tree_kind, packed_unit_view, read_six_byte_unsigned, read_u16,
+-    read_u32, read_u64, Verdict, FORMAT_VERSION_OFFSET, KEY_SCHEMA_ACCOUNTING,
++    read_u32, read_u64, NamedEntryView, Verdict, FORMAT_VERSION_OFFSET, KEY_SCHEMA_ACCOUNTING,
+     KEY_SCHEMA_ALLOCATION, KEY_SCHEMA_EXTENT, KEY_SCHEMA_INODE, KEY_SCHEMA_MAPPING,
+     KEY_SCHEMA_TREE_TABLE, UNIT_FORMAT_VERSION_THIS_CHECKER_READS,
+ };
+@@ -129,6 +143,15 @@ const STATISTIC_INODE_WATERMARK: u16 = 12;
+ const STATISTIC_NO_DEVICE_DIMENSION: u32 = 0xFFFF_FFFF;
+ /// inode 记录 140 里 `size` 与 `blocks` 两个字段的偏移（D8（核心索引结构） 已定项 6 的偏移表），按字段表另写一份、不用实现的解析。
+ const INODE_RECORD_SIZE_OFFSET: usize = 40;
++/// inode 记录里对象出生代（偏移 8）与改动计数（偏移 88）的位置（D8（核心索引结构） 已定项 6 的字段表）：I-9.26 比这两个与容器诞生代号。
++const INODE_RECORD_OBJECT_BIRTH_OFFSET: usize = 8;
++const INODE_RECORD_CHANGE_COUNT_OFFSET: usize = 88;
++/// 码 3 单元头里的诞生代号（D18（块里携带什么信息） 已定项 11 的类身份段表：偏移 73）。
++const PACKED_UNIT_BIRTH_TXG_OFFSET: usize = 73;
++/// 记账 key（统计量 2 + 8 + 设备 4 + 代 8，`KEY_SCHEMA_ACCOUNTING`）里代段的偏移：I-3.13 拿它比这一版的 txg。
++const ACCOUNTING_KEY_GENERATION_OFFSET: usize = 2 + 8 + 4;
++/// 树表条目里 `previous_snapshot_txg` 的偏移（树 ID 8 + 种类 2 + 2 + 2 + 根指针 86；之后 8 字节是出生 txg），I-9.25 判它。
++const TREE_TABLE_ENTRY_PREVIOUS_SNAPSHOT_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86;
+ const INODE_RECORD_BLOCKS_OFFSET: usize = 48;
+ /// `blocks` 的计量单位：512 字节一块，`blocks` = ⌈`size` ÷ 512⌉，是逻辑长度的块数、不表示分到的空间（D8（核心索引结构） 已定项 6，
+ /// C480（inode 记录的 blocks 怎么算全仓没有条款） 用户 2026-09-23 定）。
+@@ -311,6 +334,34 @@ struct Walk<'reader> {
+     mount_root_checkpoint_txg: u64,
+     /// 遍历方向上判过出生身份的被引用单元数：一个都没有时 I-1.2 与 I-4.2 报「不适用」，不报成立。
+     referenced_units_judged_against_their_pointer: u64,
++    /// 正在走的是哪一版、它的 `checkpoint_txg`：I-9.25 与 I-3.13 按这一版的 txg 判，I-4.9 只在不是最新的候选根上判。
++    version_being_walked: VersionBeingWalked,
++    /// 走过的被引用单元（按位置条目第 0 条的落点认，与 `visited_units` 同一个键）→ 头里的诞生代号：别的版本再引用它时不重读，
++    /// I-4.9（非最新候选根引用的单元不晚于它） 照这张表判。
++    birth_txg_of_walked_units: BTreeMap<(u32, u64), u64>,
++    /// I-4.9 在不是最新的候选根上判过几个被引用单元：一个都没有（候选集只剩最新那条根）时整条报不适用。
++    units_judged_against_an_older_candidate_root: u64,
++}
++
++/// 走读此刻在走哪一版（D16（发布语义） 已定项 1 的回退候选集里的根，或由记录施加出来、根槽从没落盘的那一版），带它的 `checkpoint_txg`。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++enum VersionBeingWalked {
++    /// (txg, 实例) 最大的那条根：先走它。
++    NewestRoot { checkpoint_txg: u64 },
++    /// 回退候选集里不是最新的根（I-4.9 只判这一类）。
++    OlderCandidateRoot { checkpoint_txg: u64 },
++    /// 由记录施加出来、根槽从没落盘的那一版（[`versions_applied_only_by_records`]）。
++    AppliedOnlyByRecords { checkpoint_txg: u64 },
++}
++
++impl VersionBeingWalked {
++    const fn checkpoint_txg(self) -> u64 {
++        match self {
++            Self::NewestRoot { checkpoint_txg }
++            | Self::OlderCandidateRoot { checkpoint_txg }
++            | Self::AppliedOnlyByRecords { checkpoint_txg } => checkpoint_txg,
++        }
++    }
+ }
+ 
+ /// 实例表里的一行（D18（块里携带什么信息） 已定项 11 的字段表：`kind` 1 + 实例代号 4 + 所选根的 `checkpoint_txg` 8 +
+@@ -488,8 +539,9 @@ impl<'reader> Walk<'reader> {
+     ///    已发布谓词判成已发布——「未提交」在本工程里就是「按那个谓词判不成已发布」，被引用的块必须已提交。
+     ///    谓词与 I-1.8（归并后版本全序） 扫描方向用的是同一份 [`PublishedPredicate`]。
+     ///
+-    /// **打包记录类型 4 的实例表单元不进这两格**：I-1.2 那一行的「**例外**」逐字写着它不走这条谓词，
+-    /// 它的现行版本由根记录持有的物理指针唯一确定。调用点因此不在 `walk_root` 读实例表那一段上。
++    /// **打包记录类型 4 的实例表单元不进这个函数**：I-1.2 那一行的「**例外**」写着它只免谓词那一半，
++    /// 它的现行版本由根记录持有的物理指针唯一确定；它的出生身份与指针相等那一格在 `walk_instance_table_chain` 里单判
++    /// （[`Self::judge_birth_identity_against_the_pointer`]），不进 I-4.2、也不进 I-4.9 与「判过几个被引用单元」那个数。
+     fn judge_birth_identity_of_a_referenced_unit(
+         &mut self,
+         unit: &[u8],
+@@ -500,21 +552,13 @@ impl<'reader> Walk<'reader> {
+             return;
+         };
+         self.referenced_units_judged_against_their_pointer += 1;
+-        let matches_the_pointer = identity.write_order.birth_txg() == pointer.birth_txg
+-            && identity.write_order.instance() == pointer.instance
+-            && identity.tail.birth_identity_tail_number() == pointer.tail;
+-        self.judgements.judge("I-1.2", matches_the_pointer, || {
+-            format!(
+-                "{what}：头里的出生身份（诞生代号 {}、写序实例 {}、{} {}）与引用它的指针记的（诞生代号 {}、实例 {}、尾段 {}）不符",
+-                identity.write_order.birth_txg(),
+-                identity.write_order.instance(),
+-                identity.tail.name(),
+-                identity.tail.birth_identity_tail_number(),
+-                pointer.birth_txg,
+-                pointer.instance,
+-                pointer.tail
+-            )
+-        });
++        let birth_txg = identity.write_order.birth_txg();
++        self.birth_txg_of_walked_units.insert(
++            (pointer.locations[0].device, pointer.locations[0].slot),
++            birth_txg,
++        );
++        self.judge_unit_birth_against_an_older_candidate_root(birth_txg, what);
++        self.judge_birth_identity_against_the_pointer(identity, pointer, what);
+         let mount_root_instance = self.mount_root_instance;
+         let mount_root_checkpoint_txg = self.mount_root_checkpoint_txg;
+         let published = PublishedPredicate {
+@@ -535,6 +579,32 @@ impl<'reader> Walk<'reader> {
+         });
+     }
+ 
++    /// I-1.2（块头写序已发布） 遍历方向那一格：头里的诞生代号、写序实例与尾段（码 1 事务号、码 2 / 码 3 出生序号）与引用它的指针记的相同。
++    /// 被引用单元（[`Self::judge_birth_identity_of_a_referenced_unit`]）与实例表链上每一片（打包记录类型 4 按 I-1.2 那一行的例外只免谓词那一半，
++    /// `research/prompts/m3-inv-b-r1-main-verification.md` 第二节第 3 行）都判它。
++    fn judge_birth_identity_against_the_pointer(
++        &mut self,
++        identity: BirthIdentityInTheHeader,
++        pointer: &PointerView,
++        what: &str,
++    ) {
++        let matches_the_pointer = identity.write_order.birth_txg() == pointer.birth_txg
++            && identity.write_order.instance() == pointer.instance
++            && identity.tail.birth_identity_tail_number() == pointer.tail;
++        self.judgements.judge("I-1.2", matches_the_pointer, || {
++            format!(
++                "{what}：头里的出生身份（诞生代号 {}、写序实例 {}、{} {}）与引用它的指针记的（诞生代号 {}、实例 {}、尾段 {}）不符",
++                identity.write_order.birth_txg(),
++                identity.write_order.instance(),
++                identity.tail.name(),
++                identity.tail.birth_identity_tail_number(),
++                pointer.birth_txg,
++                pointer.instance,
++                pointer.tail
++            )
++        });
++    }
++
+     /// 一遍新的走读：判定接着 `judgements` 往下记，别的状态都是空的；挂载根取 (`mount_root_instance`, `mount_root_checkpoint_txg`)。
+     fn starting_with(
+         reader: &'reader dyn ImageReader,
+@@ -566,6 +636,55 @@ impl<'reader> Walk<'reader> {
+             mount_root_instance,
+             mount_root_checkpoint_txg,
+             referenced_units_judged_against_their_pointer: 0,
++            version_being_walked: VersionBeingWalked::NewestRoot {
++                checkpoint_txg: mount_root_checkpoint_txg,
++            },
++            birth_txg_of_walked_units: BTreeMap::new(),
++            units_judged_against_an_older_candidate_root: 0,
++        }
++    }
++
++    /// I-4.9（非最新候选根引用的单元不晚于它）：正在走的是回退候选集里不是最新的一条根时，它引用的一个单元的诞生代号不大于这条根的
++    /// `checkpoint_txg`（D16（发布语义） 已定项 7：单元先于根落盘）。最新那条根归 I-4.2（无被引用未提交块），由记录施加出来的那一版不在射程里。
++    fn judge_unit_birth_against_an_older_candidate_root(&mut self, birth_txg: u64, what: &str) {
++        if let VersionBeingWalked::OlderCandidateRoot { checkpoint_txg } = self.version_being_walked
++        {
++            self.units_judged_against_an_older_candidate_root += 1;
++            self.judgements.judge(
++                UNIT_BIRTH_NOT_LATER_THAN_A_CANDIDATE_ROOT_REFERENCING_IT,
++                birth_txg <= checkpoint_txg,
++                || {
++                    format!(
++                        "{what}：诞生代号 {birth_txg} 大于引用它的候选根的 txg {checkpoint_txg}"
++                    )
++                },
++            );
++        }
++    }
++
++    /// I-1.12（指针出生树等于被指单元头）：走读跟随的一条指针偏移 34 的出生树等于被指单元头里的出生树——码 1、码 3 取头偏移 43；
++    /// 码 2 取哪个字段随 C289（码 2 的出生树取哪个字段没写） 定，不判。inode 内部条目指着叶容器那一类由 I-9.2（条目身份与子头相符） 罩住，
++    /// 调用点不在那里。
++    fn judge_pointer_birth_tree_against_the_unit_header(
++        &mut self,
++        unit: &[u8],
++        pointer: &PointerView,
++        what: &str,
++    ) {
++        match birth_tree_in_the_header_as_the_mapping_key_names_it(unit) {
++            Some(BirthTreeInTheHeader::AtOffsetFortyThree(birth_tree_in_the_header)) => {
++                self.judgements.judge(
++                    POINTER_BIRTH_TREE_MATCHES_THE_UNIT_HEADER,
++                    pointer.birth_tree == birth_tree_in_the_header,
++                    || {
++                        format!(
++                            "{what}：指针记的出生树 {} 与单元头里的出生树 {birth_tree_in_the_header} 不符",
++                            pointer.birth_tree
++                        )
++                    },
++                );
++            }
++            Some(BirthTreeInTheHeader::FieldStillOpenUnderC289) | None => {}
+         }
+     }
+ 
+@@ -627,6 +746,12 @@ impl<'reader> Walk<'reader> {
+             if !expanded.insert(unit) {
+                 continue;
+             }
++            if let Some(birth_txg) = self.birth_txg_of_walked_units.get(&unit).copied() {
++                self.judge_unit_birth_against_an_older_candidate_root(
++                    birth_txg,
++                    &format!("别的版本先走过的盘 {} 槽 {} 的单元", unit.0, unit.1),
++                );
++            }
+             let Some(below) = self.placements_referenced_below_a_walked_unit.get(&unit) else {
+                 continue;
+             };
+@@ -813,6 +938,7 @@ impl<'reader> Walk<'reader> {
+         }
+         judge_location_order(&mut self.judgements, &pointer, what);
+         judge_pointer_mac_and_nonce_are_zero(&mut self.judgements, &pointer, what);
++        judge_pointer_extent_offset_is_zero(&mut self.judgements, &pointer, what);
+         self.note_references_of_a_pointer_followed_by_the_walk(&pointer, 1, what);
+         let Some(unit) = read_referenced_unit(
+             self.reader,
+@@ -864,6 +990,12 @@ impl<'reader> Walk<'reader> {
+ 
+     fn walk_root(&mut self, record: &[u8], is_newest: bool) {
+         self.begin_walking_a_version();
++        let checkpoint_txg = read_u64(record, ROOT_RECORD_CHECKPOINT_TXG_OFFSET);
++        self.version_being_walked = if is_newest {
++            VersionBeingWalked::NewestRoot { checkpoint_txg }
++        } else {
++            VersionBeingWalked::OlderCandidateRoot { checkpoint_txg }
++        };
+         // 实例表：根记录直接持有第 0 片（自证单元，I-1.3 豁免），后面各片由前一片的链指针记录指着。
+         let first_page_pointer = parse_node_pointer(&record[170..256]);
+         let mount_root_instance = u32::from_le_bytes(record[24..28].try_into().expect("4 字节"));
+@@ -900,6 +1032,9 @@ impl<'reader> Walk<'reader> {
+     /// 环里找不到它施加在其上那一版的根（同实例、txg 比它小的根一条都读不出）时这两样走不到：这一格没有条款，照旧只走新根段。
+     fn walk_version_applied_only_by_records(&mut self, version: &VersionAppliedOnlyByRecords) {
+         self.begin_walking_a_version();
++        self.version_being_walked = VersionBeingWalked::AppliedOnlyByRecords {
++            checkpoint_txg: version.checkpoint_txg,
++        };
+         if let Some(record_of_the_root_it_was_applied_on) =
+             &version.root_record_of_the_version_it_was_applied_on
+         {
+@@ -1312,6 +1447,25 @@ impl<'reader> Walk<'reader> {
+         let tree = read_u64(entry, 0);
+         let kind = read_u16(entry, 10);
+         self.tree_identifiers_in_tables.insert(tree);
++        // I-9.25：`previous_snapshot_txg` 只写在 inode 树那条条目里，0 = 不适用；inode 树那条不大于这一版的 txg
++        // （D5（快照 / 空间记账机制） 已定项 9；「≤ 根 txg」那一半用户 2026-10-01 补定）。树表被几版共享时只在第一个走到它的那一版判
++        // （`visited_units`），共享它的别的版本 txg 更大，判得更松。
++        let previous_snapshot_txg = read_u64(entry, TREE_TABLE_ENTRY_PREVIOUS_SNAPSHOT_TXG_OFFSET);
++        let version_txg = self.version_being_walked.checkpoint_txg();
++        let previous_snapshot_txg_holds = if kind == TREE_KIND_INODE {
++            previous_snapshot_txg <= version_txg
++        } else {
++            previous_snapshot_txg == 0
++        };
++        self.judgements.judge(
++            PREVIOUS_SNAPSHOT_TXG_OF_THE_TREE_TABLE_ENTRIES,
++            previous_snapshot_txg_holds,
++            || {
++                format!(
++                    "树 {tree}（种类 {kind}）的树表条目 previous_snapshot_txg {previous_snapshot_txg}：不是 inode 树的条目恒 0，inode 树的不大于这一版的 txg {version_txg}"
++                )
++            },
++        );
+         let what = format!("树 {tree}（种类 {kind}）的根");
+         let Some(schema) = key_schema_for_tree_kind(kind) else {
+             return;
+@@ -1352,6 +1506,22 @@ impl<'reader> Walk<'reader> {
+             } = self.walk_code_two_subtree(&entry[14..100], None, &accounting_tree, &mut rows)
+             {
+                 self.accounting_seen = true;
++                // I-3.13：记账代 = checkpoint 号（D16（发布语义） 已定项 6），每条根的记账树只装这条根那一代的行；只判走全了的树。
++                let accounting_version_txg = self.version_being_walked.checkpoint_txg();
++                for row in &rows {
++                    let row_generation = read_u64(row, ACCOUNTING_KEY_GENERATION_OFFSET);
++                    self.judgements.judge(
++                        ACCOUNTING_ROWS_CARRY_THE_GENERATION_OF_THEIR_VERSION,
++                        row_generation == accounting_version_txg,
++                        || {
++                            format!(
++                                "记账树（树 {tree}）里统计量 {}、盘 {} 那一行的代段 {row_generation} 不是这一版的 txg {accounting_version_txg}",
++                                read_u16(row, 0),
++                                read_u32(row, 10)
++                            )
++                        },
++                    );
++                }
+                 for row in &rows {
+                     self.accounting
+                         .insert((read_u16(row, 0), read_u32(row, 10)), read_u64(row, 22));
+@@ -1487,6 +1657,11 @@ impl<'reader> Walk<'reader> {
+                 &child,
+                 "inode 内部条目的子指针",
+             );
++            judge_pointer_extent_offset_is_zero(
++                &mut self.judgements,
++                &child,
++                "inode 内部条目的子指针",
++            );
+             let (length, span_in_slots) = match entry_type {
+                 InodeInternalEntryType::LeafContainer => (data_unit_bytes(), 2),
+                 InodeInternalEntryType::InternalNode | InodeInternalEntryType::Unregistered(_) => {
+@@ -1629,7 +1804,21 @@ impl<'reader> Walk<'reader> {
+                                 "inode {inode} 的记录 blocks {blocks} 不等于 ⌈size {size_in_bytes} ÷ {INODE_RECORD_BLOCKS_FIELD_UNIT_BYTES}⌉ = {logical_length_in_blocks}"
+                             )
+                         });
+-                self.inode_object_birth.insert(inode, read_u64(&record, 8));
++                // I-9.26：对象出生代 ≤ 改动计数 ≤ 这片容器头的诞生代号（D8（核心索引结构） 已定项 6 偏移 88；下界「创建算一次改动」
++                // 用户 2026-10-01 补定）。上界不是等于：容器因别的记录改动而重写时，没改的那条记录的改动计数小于容器诞生代号是合法的。
++                let object_birth = read_u64(&record, INODE_RECORD_OBJECT_BIRTH_OFFSET);
++                let change_count = read_u64(&record, INODE_RECORD_CHANGE_COUNT_OFFSET);
++                let container_birth_txg = read_u64(unit, PACKED_UNIT_BIRTH_TXG_OFFSET);
++                self.judgements.judge(
++                    INODE_CHANGE_COUNT_BETWEEN_OBJECT_BIRTH_AND_CONTAINER_BIRTH,
++                    object_birth <= change_count && change_count <= container_birth_txg,
++                    || {
++                        format!(
++                            "inode {inode} 的改动计数 {change_count} 不在对象出生代 {object_birth} 与所在容器的诞生代号 {container_birth_txg} 之间"
++                        )
++                    },
++                );
++                self.inode_object_birth.insert(inode, object_birth);
+                 smallest_inode_in_this_container =
+                     Some(smallest_inode_in_this_container.map_or(inode, |seen| seen.min(inode)));
+                 largest_inode_in_this_container =
+@@ -1809,6 +1998,7 @@ impl<'reader> Walk<'reader> {
+             };
+             judge_location_order(&mut self.judgements, &pointer, &pointer_what);
+             judge_pointer_mac_and_nonce_are_zero(&mut self.judgements, &pointer, &pointer_what);
++            judge_pointer_extent_offset_is_zero(&mut self.judgements, &pointer, &pointer_what);
+             self.note_references_of_a_pointer_followed_by_the_walk(&pointer, 2, &what);
+             let Some(unit) = read_referenced_unit(
+                 self.reader,
+@@ -1832,6 +2022,10 @@ impl<'reader> Walk<'reader> {
+             else {
+                 break;
+             };
++            self.judge_pointer_birth_tree_against_the_unit_header(&unit, &pointer, &what);
++            if let Some(birth_identity) = birth_identity_in_the_header(&unit) {
++                self.judge_birth_identity_against_the_pointer(birth_identity, &pointer, &what);
++            }
+             let identity = (
+                 read_u64(&unit, 43),
+                 read_u16(&unit, 51),
+@@ -1963,6 +2157,11 @@ impl<'reader> Walk<'reader> {
+             &pointer,
+             "extent 记录的数据指针",
+         );
++        judge_pointer_extent_offset_is_zero(
++            &mut self.judgements,
++            &pointer,
++            "extent 记录的数据指针",
++        );
+         self.note_references_of_a_pointer_followed_by_the_walk(
+             &pointer,
+             2,
+@@ -1988,6 +2187,7 @@ impl<'reader> Walk<'reader> {
+             return;
+         }
+         self.judge_birth_identity_of_a_referenced_unit(&unit, &pointer, "数据单元");
++        self.judge_pointer_birth_tree_against_the_unit_header(&unit, &pointer, "数据单元");
+         self.judgements
+             .judge("I-1.3", read_u64(&unit, 43) == tree, || {
+                 format!(
+@@ -3287,13 +3487,9 @@ fn judge_release_generations(
+             "最新根那棵账里有已释放记录时，每条候选根都按「走到叶」扫过（`judge_release_generation_and_tree_table_birth` 定的深度）"
+         );
+     }
+-    if !scanned.iter().all(|root| root.references.is_complete) {
+-        judgements.not_applicable(
+-            "I-3.9",
+-            "有候选根走不完（单元读不出，或走到条目格式没有条款的形状）：引用集合数不全",
+-        );
+-        return;
+-    }
++    // 守卫按记录收窄（`research/prompts/m3-inv-b-r1-main-verification.md` 第二节第 10 行）：比 L 晚的候选根有一条走不完，
++    // 这个落点可能藏在它读不出的节点下面（L 算小、T 算早），这一条跳过；L 及更早的根走不完不碍事——L 取的是还引用它的最大 txg。
++    let mut skipped_behind_an_incomplete_later_root = 0u64;
+     let mut witnessed_records = 0u64;
+     for record in released {
+         let placement = (record.device, record.slot);
+@@ -3307,6 +3503,13 @@ fn judge_release_generations(
+             // 盘上那条记录仍写着已释放，D16（发布语义） 已定项 1 / D3（空间分配） 已定项 7）。这个镜像上找不到那条根，这一条判不了。
+             continue;
+         };
++        let a_later_root_is_incomplete = scanned
++            .iter()
++            .any(|root| root.checkpoint_txg > last_referencing_txg && !root.references.is_complete);
++        if a_later_root_is_incomplete {
++            skipped_behind_an_incomplete_later_root += 1;
++            continue;
++        }
+         witnessed_records += 1;
+         let first_root_without_it = scanned
+             .iter()
+@@ -3328,6 +3531,12 @@ fn judge_release_generations(
+             }
+         });
+     }
++    if skipped_behind_an_incomplete_later_root > 0 {
++        judgements.part_of_the_range_not_judged(
++            "I-3.9",
++            "有带已释放标志的记录落在比还引用它的最后一条根晚、又走不完的候选根后面（单元读不出，或走到条目格式没有条款的形状）：那几条的 L 与 T 定不下",
++        );
++    }
+     if witnessed_records == 0 {
+         judgements.not_applicable(
+             "I-3.9",
+@@ -4922,6 +5131,8 @@ struct ScannedJournalRecord {
+     chain_value_the_next_record_must_carry: u32,
+     /// 每个点名项的两条位置条目（D23（journal 的角色与格式） 已定项 17）：I-2.5（位置条目按设备身份升序） 逐项判。
+     named_entry_locations: Vec<[PointerLocation; 2]>,
++    /// 点名项解出来的样子（类标签、出生树、诞生代号、key 尾段与两条位置条目）：I-8.11（点名项与被指单元头相同） 逐项判。
++    named_entries: Vec<NamedEntryView>,
+ }
+ 
+ /// 一块盘的 journal 环里自证过的记录，按 jsn 计数器索引。计数器与环槽一一对应（记录 n 落 `(计数器 − 1) mod 槽数 × 4096`，
+@@ -4971,6 +5182,7 @@ fn scanned_journal_records_of_device(
+                         })
+                     })
+                     .collect(),
++                named_entries: record.named,
+             },
+         );
+     }
+@@ -5536,6 +5748,13 @@ fn judge_publish_ordinals_and_last_record_flags(
+ /// 记录新根段里两条指针的落点（D23（journal 的角色与格式） 已定项 4 的字段表：树表指针 86、映射根指针 86，再往后是树 ID 水位 8 与 F 8）。
+ const NEW_ROOT_SEGMENT_TREE_TABLE_POINTER: std::ops::Range<usize> = 0..86;
+ const NEW_ROOT_SEGMENT_MAPPING_ROOT_POINTER: std::ops::Range<usize> = 86..172;
++const NEW_ROOT_SEGMENT_TREE_IDENTIFIER_WATERMARK: std::ops::Range<usize> = 172..180;
++const NEW_ROOT_SEGMENT_ROLLBACK_FLOOR: std::ops::Range<usize> = 180..188;
++/// 根记录里与新根段四段同名的四段（D22（单元原子性怎么合成） 已定项 7 的偏移表：树表指针 36、树 ID 水位 122、F 130、映射根指针 256）。
++const ROOT_RECORD_TREE_TABLE_POINTER: std::ops::Range<usize> = 36..122;
++const ROOT_RECORD_TREE_IDENTIFIER_WATERMARK: std::ops::Range<usize> = 122..130;
++const ROOT_RECORD_ROLLBACK_FLOOR: std::ops::Range<usize> = 130..138;
++const ROOT_RECORD_MAPPING_ROOT_POINTER: std::ops::Range<usize> = 256..342;
+ /// 根记录里新根段之外、由记录重建的根照所选根的两条指针（D22（单元原子性怎么合成） 已定项 7 的偏移表：实例表指针 86 在 170，
+ /// 树表 0 条那一版的分配记录树的根 86 在 342）。
+ const ROOT_RECORD_INSTANCE_TABLE_POINTER: std::ops::Range<usize> = 170..256;
+@@ -5719,6 +5938,512 @@ fn judge_blocks_referenced_by_abandoned_roots(
+     }
+ }
+ 
++/// I-8.10（记录新根段与同代根相同）：逐盘，按 (实例代号, `checkpoint_txg`) 分组，组里带末条标志（记录标志位 0）的恰一条时，
++/// 它的新根段四段与根环里同 (实例代号, `checkpoint_txg`) 的每条自证过的根的同名四段逐字节相同（D23（journal 的角色与格式） 已定项 15）：
++/// 新根段 [0..86) = 根 [36..122)、[86..172) = [256..342)、[172..180) = [122..130)、[180..188) = [130..138)。
++/// 末条标志不唯一的组归 I-8.9（一次发布的记录序号连续且只有末条带标志），不判；同 (实例, txg) 有两条以上不同内容的根不另分，逐条比。
++fn judge_new_root_segment_of_the_last_record_against_the_roots(
++    records_by_device: &[(u32, BTreeMap<u64, ScannedJournalRecord>)],
++    roots: &[(u64, u64, crate::RootView)],
++    judgements: &mut Judgements,
++) {
++    let mut pairs_compared: u64 = 0;
++    for (device, records) in records_by_device {
++        let mut last_records_of_each_publish: BTreeMap<(u32, u64), Vec<u64>> = BTreeMap::new();
++        for (counter, record) in records {
++            if record.record_flags_byte & RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH != 0 {
++                last_records_of_each_publish
++                    .entry((record.instance, record.checkpoint_txg))
++                    .or_default()
++                    .push(*counter);
++            }
++        }
++        for ((instance, checkpoint_txg), counters) in last_records_of_each_publish {
++            let [counter] = counters.as_slice() else {
++                continue;
++            };
++            let segment = &records[counter].new_root_segment;
++            for (region, slot, root) in roots {
++                if (root.instance, root.checkpoint_txg) != (instance, checkpoint_txg) {
++                    continue;
++                }
++                pairs_compared += 1;
++                let root_bytes = &root.record_bytes;
++                let same = segment[NEW_ROOT_SEGMENT_TREE_TABLE_POINTER]
++                    == root_bytes[ROOT_RECORD_TREE_TABLE_POINTER]
++                    && segment[NEW_ROOT_SEGMENT_MAPPING_ROOT_POINTER]
++                        == root_bytes[ROOT_RECORD_MAPPING_ROOT_POINTER]
++                    && segment[NEW_ROOT_SEGMENT_TREE_IDENTIFIER_WATERMARK]
++                        == root_bytes[ROOT_RECORD_TREE_IDENTIFIER_WATERMARK]
++                    && segment[NEW_ROOT_SEGMENT_ROLLBACK_FLOOR]
++                        == root_bytes[ROOT_RECORD_ROLLBACK_FLOOR];
++                judgements.judge(LAST_RECORD_OF_A_PUBLISH_CARRIES_THE_ROOT_OF_THAT_PUBLISH, same, || {
++                    format!(
++                        "盘 {device} journal 计数器 {counter} 那条带末条标志的记录（实例 {instance}、txg {checkpoint_txg}）的新根段与区域 {region} 槽 {slot} 那条同代根的四段不逐字节相同"
++                    )
++                });
++            }
++        }
++    }
++    if pairs_compared == 0 {
++        judgements.not_applicable(
++            LAST_RECORD_OF_A_PUBLISH_CARRIES_THE_ROOT_OF_THAT_PUBLISH,
++            "环里没有哪条带末条标志、同 (实例, txg) 只此一条的记录在根环里有同代的自证根：新根段没有可比的根",
++        );
++    }
++}
++
++/// I-8.11（点名项与被指单元头相同）：环里每条自证过的记录（逐盘）的每个点名项的每条位置条目，按类读那一份（码 2 一个节点，码 1 / 码 3
++/// 一个数据单元宽；类标签不在登记表里的不知道多长，不读），整单元校验和与位置条目里的相符时，单元头里的类标签、诞生代号、写序实例代号与尾段
++/// （码 1 事务号 6 字节；码 2 / 码 3 出生序号 4 + 补零 2，按 6 字节整数比同时判了补零恒 0）与点名项逐字段相同；出生树只判码 1、码 3
++/// （头偏移 43），码 2 随 C289（码 2 的出生树取哪个字段没写） 不判。校验和不相符的不判：落点被合法复用之后，那里就不是它点名的单元了。
++fn judge_named_entries_against_the_unit_headers(
++    reader: &dyn ImageReader,
++    records_by_device: &[(u32, BTreeMap<u64, ScannedJournalRecord>)],
++    judgements: &mut Judgements,
++) {
++    let mut locations_compared: u64 = 0;
++    for (device, records) in records_by_device {
++        for (counter, record) in records {
++            for (index, named) in record.named_entries.iter().enumerate() {
++                let unit_bytes = match MappingKeyUnitClass::of(named.unit_class) {
++                    MappingKeyUnitClass::DataUnit | MappingKeyUnitClass::PackedRecordUnit => {
++                        data_unit_bytes()
++                    }
++                    MappingKeyUnitClass::IndexNode => node_bytes(),
++                    MappingKeyUnitClass::Unregistered(_) => continue,
++                };
++                for (location_device, location_slot, checksum) in named.locations {
++                    let Some(unit) =
++                        reader.read(location_device, location_slot * SLOT_BYTES, unit_bytes)
++                    else {
++                        continue;
++                    };
++                    if crc32_castagnoli_table(&unit) != checksum {
++                        continue;
++                    }
++                    locations_compared += 1;
++                    let named_instance = read_u32(&named.key_tail, 0);
++                    let named_tail = read_six_byte_unsigned(&named.key_tail, 4);
++                    let identity_matches =
++                        birth_identity_in_the_header(&unit).is_some_and(|identity| {
++                            identity.write_order.birth_txg() == named.birth_txg
++                                && identity.write_order.instance() == named_instance
++                                && identity.tail.birth_identity_tail_number() == named_tail
++                        });
++                    let birth_tree_matches =
++                        match birth_tree_in_the_header_as_the_mapping_key_names_it(&unit) {
++                            Some(BirthTreeInTheHeader::AtOffsetFortyThree(birth_tree)) => {
++                                birth_tree == named.birth_tree
++                            }
++                            Some(BirthTreeInTheHeader::FieldStillOpenUnderC289) | None => true,
++                        };
++                    let holds =
++                        unit[6] == named.unit_class && identity_matches && birth_tree_matches;
++                    judgements.judge(NAMED_ENTRY_MATCHES_THE_UNIT_HEADER, holds, || {
++                        format!(
++                            "盘 {device} journal 计数器 {counter} 那条记录第 {index} 个点名项（类 {}、出生树 {}、诞生代号 {}、实例 {named_instance}、尾段 {named_tail}）与盘 {location_device} 槽 {location_slot} 那一份单元头（类 {}）不符",
++                            named.unit_class, named.birth_tree, named.birth_txg, unit[6]
++                        )
++                    });
++                }
++            }
++        }
++    }
++    if locations_compared == 0 {
++        judgements.not_applicable(
++            NAMED_ENTRY_MATCHES_THE_UNIT_HEADER,
++            "环里没有哪个点名项的位置条目指着一份整单元校验和与它相符的单元：点名项没有可比的单元头",
++        );
++    }
++}
++
++/// I-8.12（同实例记录的 txg 不减）：逐盘，同一实例代号的自证记录按 jsn 计数器从小到大，`checkpoint_txg` 不减；
++/// 只比同实例的前后两条，中间夹着别的实例的记录不管；换实例之后严格大于不判（设备失而复得下没核）。
++fn judge_journal_record_txg_per_instance(
++    records_by_device: &[(u32, BTreeMap<u64, ScannedJournalRecord>)],
++    judgements: &mut Judgements,
++) {
++    for (device, records) in records_by_device {
++        let mut previous_record_of_each_instance: BTreeMap<u32, (u64, u64)> = BTreeMap::new();
++        for (counter, record) in records {
++            if let Some((previous_counter, previous_txg)) = previous_record_of_each_instance
++                .insert(record.instance, (*counter, record.checkpoint_txg))
++            {
++                judgements.judge(
++                    JOURNAL_RECORD_TXG_NOT_DECREASING_WITHIN_AN_INSTANCE,
++                    record.checkpoint_txg >= previous_txg,
++                    || {
++                        format!(
++                            "盘 {device} 实例 {} 的 journal 记录：计数器 {previous_counter} 的 txg {previous_txg} 之后，计数器 {counter} 的 txg {} 变小了",
++                            record.instance, record.checkpoint_txg
++                        )
++                    },
++                );
++            }
++        }
++    }
++}
++
++/// I-3.12（实例表行 T 低于引用它的根的 txg）：根环里每条自证过的根，它自己指着的实例表（沿链读，只读不判）每一行 (i, T, W) 满足
++/// T < 这条根的 `checkpoint_txg`（D18（块里携带什么信息） 已定项 11、D23（journal 的角色与格式） 已定项 14）。链上某一片读不出的根不判；
++/// 一行都没判到时整条报不适用。
++fn judge_instance_table_rows_against_the_roots_referencing_them(
++    reader: &dyn ImageReader,
++    roots: &[(u64, u64, crate::RootView)],
++    judgements: &mut Judgements,
++) {
++    let mut rows_judged: u64 = 0;
++    for (_, _, root) in roots {
++        let Some(rows) = instance_table_rows_of_root_without_judging(reader, &root.record_bytes)
++        else {
++            continue;
++        };
++        for row in rows {
++            rows_judged += 1;
++            judgements.judge(
++                INSTANCE_TABLE_ROWS_PUBLISHED_BEFORE_THE_ROOT_REFERENCING_THEM,
++                row.published_checkpoint_txg < root.checkpoint_txg,
++                || {
++                    format!(
++                        "实例 {}、txg {} 的根指着的实例表里，实例 {} 那一行的 T {} 不小于这条根的 txg",
++                        root.instance,
++                        root.checkpoint_txg,
++                        row.instance,
++                        row.published_checkpoint_txg
++                    )
++                },
++            );
++        }
++    }
++    if rows_judged == 0 {
++        judgements.not_applicable(
++            INSTANCE_TABLE_ROWS_PUBLISHED_BEFORE_THE_ROOT_REFERENCING_THEM,
++            "根环里没有哪条根指着一张读得出、有行的实例表",
++        );
++    }
++}
++
++/// [`JOURNAL_RING_GEOMETRY_FIELDS_AGREE`]（I-8.1）读 journal 环的那一格：逐盘，环里同一实例、同一 `checkpoint_txg` 的自证记录
++/// （同一次发布）不多于系统配置里记的在飞记录数上限条，每个 (盘, 实例, txg) 判一格。上限取池里第一块择到系统配置的盘那一份
++/// （各盘的几何本来是同一份，`check_pool_image` 走根环也只取它）。环里一条记录都没有时这一格没有对象，三个字段等式那一半照判。
++fn judge_records_of_one_publish_within_the_in_flight_record_limit(
++    records_by_device: &[(u32, BTreeMap<u64, ScannedJournalRecord>)],
++    declared_in_flight_record_limit: u64,
++    judgements: &mut Judgements,
++) {
++    for (device, records) in records_by_device {
++        let mut records_per_publish: BTreeMap<(u32, u64), u64> = BTreeMap::new();
++        for record in records.values() {
++            *records_per_publish
++                .entry((record.instance, record.checkpoint_txg))
++                .or_insert(0) += 1;
++        }
++        for ((instance, checkpoint_txg), record_count) in records_per_publish {
++            judgements.judge(
++                JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
++                record_count <= declared_in_flight_record_limit,
++                || {
++                    format!(
++                        "盘 {device} journal 环里实例 {instance}、txg {checkpoint_txg} 的自证记录 {record_count} 条，多于系统配置记的在飞上限 {declared_in_flight_record_limit}"
++                    )
++                },
++            );
++        }
++    }
++}
++
++/// 恢复照 D23（journal 的角色与格式） 已定项 14 取重放前缀、施加之后的结局，checker 自己复刻一份（R-独，`research/prompts/m3-inv-a-r1-main-verification.md`
++/// 第二节第 2 行）：只读，不与实现共用代码（D13（验证路线） 已定项 5）。
++enum ReplayTheNextMountWouldDo<'records> {
++    /// 所选根那次发布读得出的记录里带末条标志的多于一条：锚点认哪一条条款没写，实现在任何写之前拒挂（已定项 14「这一版的失败处置」）。
++    AnchorUndecided,
++    /// 所选根的 `checkpoint_txg` 已是 u64 的最大值，接在它后面的发布取不到 txg：实现报损坏、一条都不施加。
++    ChosenRootTxgHasNoSuccessor,
++    /// 前缀停在一条点名单元两份没都验过的记录上（第四条）：起点含介质损坏，用户 2026-10-01 定这种镜像不算 I-4.1 的合法镜像。
++    StoppedAtANamedUnitThatDoesNotVerify,
++    /// 一次发布都没施加：所选根那一版就是下一次挂载择到的那一版，它走不走得完归 I-7.2（最新根可遍历）。
++    NothingApplied,
++    /// 施加了 `publishes` 次发布、共 `records` 条记录；`last_record` 是最后一次发布的末条，施加出来的那一版照它的新根段
++    /// （已定项 15：一次发布的每条记录带同一份新根段）。
++    Applied {
++        publishes: u64,
++        records: u64,
++        last_record_counter: u64,
++        last_record: &'records ScannedJournalRecord,
++    },
++}
++
++/// 恢复读者眼里的一条记录：提交标记只许 0 / 1、记录标志位 0 之外全 0、本次发布内序号不是 0——三样有一样不成，实现的记录读者当这条记录损坏、
++/// 读不出（`crates/singlefs-core/src/journal.rs` 解记录头那一段；D23（journal 的角色与格式） 已定项 4 / 已定项 7 / 已定项 17）。
++/// checker 的扫描（`check_journal_record`）收下它们，好让 I-8.8 / I-8.9 判红；重放这里照恢复的读法把它们当读不出。
++fn record_reads_as_the_recovery_reader_reads_it(record: &ScannedJournalRecord) -> bool {
++    let commit_marker_recognized = match record.commit_marker {
++        CommitMarker::Absent | CommitMarker::Present => true,
++        CommitMarker::Unrecognized(_) => false,
++    };
++    commit_marker_recognized
++        && record.record_flags_byte & !RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH == 0
++        && record.ordinal_within_publish != 0
++}
++
++/// 重放前缀读的那一份环：每个计数器取按盘的次序第一块盘上恢复读者读得出的那一份（「两份镜像任一份自证校验和过即在」，已定项 14）。
++fn records_the_replay_reads(
++    records_by_device: &[(u32, BTreeMap<u64, ScannedJournalRecord>)],
++) -> BTreeMap<u64, &ScannedJournalRecord> {
++    let mut first_copies: BTreeMap<u64, &ScannedJournalRecord> = BTreeMap::new();
++    for (_, records) in records_by_device {
++        for (counter, record) in records {
++            if record_reads_as_the_recovery_reader_reads_it(record) {
++                first_copies.entry(*counter).or_insert(record);
++            }
++        }
++    }
++    first_copies
++}
++
++/// 一条记录的点名单元是不是每一个都两份都读得出、整单元校验和都对（前缀第四条「一个点名单元的两份都读得出、校验和都对才施加」）。
++/// 类标签不在登记表里的点名项不知道该读多长：当验不过。
++fn named_units_of_the_record_verify_on_both_copies(
++    reader: &dyn ImageReader,
++    record: &ScannedJournalRecord,
++) -> bool {
++    record.named_entries.iter().all(|named| {
++        let unit_bytes = match MappingKeyUnitClass::of(named.unit_class) {
++            MappingKeyUnitClass::DataUnit | MappingKeyUnitClass::PackedRecordUnit => {
++                data_unit_bytes()
++            }
++            MappingKeyUnitClass::IndexNode => node_bytes(),
++            MappingKeyUnitClass::Unregistered(_) => return false,
++        };
++        named
++            .locations
++            .iter()
++            .all(|(location_device, location_slot, checksum)| {
++                reader
++                    .read(*location_device, location_slot * SLOT_BYTES, unit_bytes)
++                    .is_some_and(|unit| crc32_castagnoli_table(&unit) == *checksum)
++            })
++    })
++}
++
++/// 带末条标志的这一条之后，同一实例里计数器更大、读得出的记录有没有同一个 `checkpoint_txg` 的（已定项 4 读者规则「带标志的那条之后还有记录」：
++/// 按计数器往后找，同实例里先遇到 txg 更大的就停——同一实例 txg 随计数器不减时与全表读法同一个结果）。
++fn readable_record_of_the_same_publish_follows(
++    records_the_replay_reads: &BTreeMap<u64, &ScannedJournalRecord>,
++    counter: u64,
++    record: &ScannedJournalRecord,
++) -> bool {
++    for later in records_the_replay_reads
++        .range(counter.saturating_add(1)..)
++        .map(|(_, later)| *later)
++        .filter(|later| later.instance == record.instance)
++    {
++        if later.checkpoint_txg > record.checkpoint_txg {
++            return false;
++        }
++        if later.checkpoint_txg == record.checkpoint_txg {
++            return true;
++        }
++    }
++    false
++}
++
++/// R-独：照 D23（journal 的角色与格式） 已定项 14 的全部规则复刻下一次挂载会施加哪一段记录。
++///
++/// - **锚点**（注 1，读法乙）：所选根同实例、同 `checkpoint_txg`、带末条标志的记录。恰一条 ⇒ 链首是它的计数器 + 1；
++///   零条 ⇒ 链首取水位之上第一条可读记录，它要序号 1、`checkpoint_txg` = 所选根 + 1；多于一条 ⇒ 锚点认不定。
++/// - 只看「水位之上」的记录：同实例、`checkpoint_txg` 大于所选根（注 1「前缀规则不跨实例边界」，注 2 按实例为主比）。
++///   在飞上限按环长与格式常量 F 现算（已定项 18），逐条数到上限就停。
++/// - 逐条：计数器接得上（断号即止）、反向链对得上（I-8.6 的前缀口径，[`record_can_enter_a_replay_prefix`]）、一次发布的首条序号是 1、
++///   发布之内 txg 不变且序号逐一递增、前一条不带提交标记时事务号不变（第三条）、末条带提交标记、带末条标志的那条之后同一次发布没有可读记录；
++///   这些有一样不成就停在这一条之前。
++/// - 点名单元两份都验过才收（第四条）；验不过就停，结局是「起点含介质损坏」。
++/// - 第五条：前缀按发布边界截，末条没到的那次发布整体不施加。
++fn replay_the_next_mount_would_do<'records>(
++    reader: &dyn ImageReader,
++    records_the_replay_reads: &BTreeMap<u64, &'records ScannedJournalRecord>,
++    chosen_root: &crate::RootView,
++    in_flight_record_limit: u64,
++) -> ReplayTheNextMountWouldDo<'records> {
++    let anchors: Vec<u64> = records_the_replay_reads
++        .iter()
++        .filter(|(_, record)| {
++            record.instance == chosen_root.instance
++                && record.checkpoint_txg == chosen_root.checkpoint_txg
++                && record.record_flags_byte & RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH != 0
++        })
++        .map(|(counter, _)| *counter)
++        .collect();
++    let mut expected_next_counter = match anchors.as_slice() {
++        [] => None,
++        [anchor] => Some(
++            anchor
++                .checked_add(1)
++                .expect("计数器是记录头里 6 字节读来的，加一不会越过 u64"),
++        ),
++        [_, _, ..] => return ReplayTheNextMountWouldDo::AnchorUndecided,
++    };
++    let Some(chain_start_txg_without_anchor) = chosen_root.checkpoint_txg.checked_add(1) else {
++        return ReplayTheNextMountWouldDo::ChosenRootTxgHasNoSuccessor;
++    };
++    let mut records_taken_toward_the_limit: u64 = 0;
++    let mut open_publish: Vec<&ScannedJournalRecord> = Vec::new();
++    let mut publishes_applied: u64 = 0;
++    let mut records_applied: u64 = 0;
++    let mut last_applied: Option<(u64, &ScannedJournalRecord)> = None;
++    let above_the_chosen_root = records_the_replay_reads.iter().filter(|(_, record)| {
++        record.instance == chosen_root.instance
++            && record.checkpoint_txg > chosen_root.checkpoint_txg
++    });
++    for (counter, record) in above_the_chosen_root {
++        let (counter, record) = (*counter, *record);
++        if records_taken_toward_the_limit >= in_flight_record_limit {
++            break;
++        }
++        records_taken_toward_the_limit += 1;
++        let continues_the_chain = match expected_next_counter {
++            Some(expected) => counter == expected,
++            None => {
++                record.checkpoint_txg == chain_start_txg_without_anchor
++                    && record.ordinal_within_publish == 1
++            }
++        };
++        if !continues_the_chain
++            || !record_can_enter_a_replay_prefix(records_the_replay_reads, counter, record)
++        {
++            break;
++        }
++        let fits_the_open_publish = match open_publish.last() {
++            None => record.ordinal_within_publish == 1,
++            Some(previous) => {
++                record.checkpoint_txg == previous.checkpoint_txg
++                    && u64::from(record.ordinal_within_publish)
++                        == u64::from(previous.ordinal_within_publish) + 1
++                    && (previous.commit_marker == CommitMarker::Present
++                        || record.transaction == previous.transaction)
++            }
++        };
++        if !fits_the_open_publish {
++            break;
++        }
++        let ends_its_publish =
++            record.record_flags_byte & RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH != 0;
++        if ends_its_publish
++            && (record.commit_marker != CommitMarker::Present
++                || readable_record_of_the_same_publish_follows(
++                    records_the_replay_reads,
++                    counter,
++                    record,
++                ))
++        {
++            break;
++        }
++        if !named_units_of_the_record_verify_on_both_copies(reader, record) {
++            return ReplayTheNextMountWouldDo::StoppedAtANamedUnitThatDoesNotVerify;
++        }
++        expected_next_counter = Some(
++            counter
++                .checked_add(1)
++                .expect("计数器是记录头里 6 字节读来的，加一不会越过 u64"),
++        );
++        open_publish.push(record);
++        if ends_its_publish {
++            publishes_applied += 1;
++            records_applied += u64::try_from(open_publish.len()).expect("一次发布的记录条数");
++            open_publish.clear();
++            last_applied = Some((counter, record));
++        }
++    }
++    match last_applied {
++        None => ReplayTheNextMountWouldDo::NothingApplied,
++        Some((last_record_counter, last_record)) => ReplayTheNextMountWouldDo::Applied {
++            publishes: publishes_applied,
++            records: records_applied,
++            last_record_counter,
++            last_record,
++        },
++    }
++}
++
++/// [`TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE`]（I-4.1）：所选根（重放之后那一版）指向的树全可遍历。
++/// 所选根取根环里 (txg, 实例) 最大的那条（与 I-7.2 同一个择法）；重放照 [`replay_the_next_mount_would_do`]；施加出来的那一版 =
++/// 所选根换上末条记录的新根段四段，实例表指针与树表 0 条那一版的分配记录树的根照所选根（已定项 15，与实现恢复拼新根同一个读法），
++/// 用一份另起的走读走一遍（判定丢掉，那些归别的不变量），走读断了（任一单元两份都读不对、头用不了、条目解不开）判红。
++/// 一条都不施加、锚点认不定、所选根 txg 没有后继、前缀停在点名单元验不过（起点含介质损坏）都报不适用。
++fn judge_trees_of_the_replayed_version_are_traversable(
++    reader: &dyn ImageReader,
++    records_by_device: &[(u32, BTreeMap<u64, ScannedJournalRecord>)],
++    chosen_root: &crate::RootView,
++    journal_ring_bytes: u64,
++    filesystem_identifier_low: u64,
++    judgements: &mut Judgements,
++) {
++    let in_flight_record_limit = journal_ring_bytes / JOURNAL_RECORD_BYTES / JOURNAL_SAFETY_FACTOR;
++    let records_the_replay_reads = records_the_replay_reads(records_by_device);
++    match replay_the_next_mount_would_do(
++        reader,
++        &records_the_replay_reads,
++        chosen_root,
++        in_flight_record_limit,
++    ) {
++        ReplayTheNextMountWouldDo::AnchorUndecided => judgements.not_applicable(
++            TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
++            "所选根那次发布读得出的记录里带末条标志的多于一条：锚点认哪一条条款没写，实现在任何写之前拒挂，重放不出一版",
++        ),
++        ReplayTheNextMountWouldDo::ChosenRootTxgHasNoSuccessor => judgements.not_applicable(
++            TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
++            "所选根的 checkpoint_txg 是 u64 的最大值：接在它后面的发布取不到 txg，重放不出一版",
++        ),
++        ReplayTheNextMountWouldDo::StoppedAtANamedUnitThatDoesNotVerify => {
++            judgements.not_applicable(
++                TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
++                "重放前缀停在一条点名单元两份没都验过的记录上：起点含介质损坏，不在 I-4.1 判的合法镜像里",
++            );
++        }
++        ReplayTheNextMountWouldDo::NothingApplied => judgements.not_applicable(
++            TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
++            "所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2",
++        ),
++        ReplayTheNextMountWouldDo::Applied {
++            publishes,
++            records,
++            last_record_counter,
++            last_record,
++        } => {
++            let replayed_version = VersionAppliedOnlyByRecords {
++                instance: last_record.instance,
++                checkpoint_txg: last_record.checkpoint_txg,
++                new_root_segment: last_record.new_root_segment.clone(),
++                root_record_of_the_version_it_was_applied_on: Some(
++                    chosen_root.record_bytes.clone(),
++                ),
++            };
++            let mut walk_of_the_replayed_version = Walk::starting_with(
++                reader,
++                Judgements::default(),
++                filesystem_identifier_low,
++                chosen_root.instance,
++                chosen_root.checkpoint_txg,
++            );
++            walk_of_the_replayed_version.walk_version_applied_only_by_records(&replayed_version);
++            let walk_failures = walk_of_the_replayed_version.walk_failures;
++            judgements.judge(
++                TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
++                walk_failures.is_empty(),
++                || {
++                    format!(
++                        "所选根（实例 {}、txg {}）之上重放 {publishes} 次发布、{records} 条记录（末条计数器 {last_record_counter}）施加出的那一版走不完：{}",
++                        chosen_root.instance,
++                        chosen_root.checkpoint_txg,
++                        walk_failures.join("；")
++                    )
++                },
++            );
++        }
++    }
++}
++
+ /// 走读记下的被引用落点（(设备, 起点槽, 跨度) → 第一次引用它的是谁）逐盘加起来是多少槽。
+ /// I-3.1（已分配统计对得上） 拿走完全部候选版本之后那一份算，I-3.11（已分配减 defer 等于最新根走读） 拿只走过最新根那一刻的那一份算：
+ /// 两条是同一个走法、同一个加法，差别只在取哪一刻。
+@@ -5754,9 +6479,11 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
+     // 根环起点、单元区起始槽号）：实现整池拒绝挂载
+     // （`RecoveryFailure::SystemConfigurationValueRefused`），checker 报违例、别的不变量同「挂不上的镜像」一样不作保
+     // （用户 2026-09-27 定系统配置越界整池拒，实审 A3-checker-2）。只有一部分槽带越界值时不拿别的槽照判下去。
++    let system_configuration_slot_readings_of_each_device =
++        system_configuration_slot_readings(reader);
+     let any_system_configuration_slot_carries_a_refused_value =
+         judge_system_configuration_values_the_reader_accepts(
+-            &system_configuration_slot_readings(reader),
++            &system_configuration_slot_readings_of_each_device,
+             &mut root_ring_judgements,
+         );
+     if any_system_configuration_slot_carries_a_refused_value {
+@@ -5768,6 +6495,12 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
+         }
+         return root_ring_judgements.into_report();
+     }
++    // I-8.5（V-池）：全池皆废判红；一块盘交得出可择的系统配置就照常往下判（单盘全废走旁路报告，不进违例通道）。
++    // 带越界值的槽整池拒挂，上面那一支整池报不适用、不判这一条。
++    judge_some_device_carries_a_self_verified_system_configuration(
++        &system_configuration_slot_readings_of_each_device,
++        &mut root_ring_judgements,
++    );
+     if chosen.is_empty() {
+         for invariant in crate::image::IMPLEMENTED_INVARIANTS {
+             root_ring_judgements.not_applicable(
+@@ -5790,7 +6523,37 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
+                 )
+             },
+         );
++        // I-7.15：各盘所选的系统配置槽设备数相同（不要求等于盘表：降级镜像里 checker 手里的盘可以少于设备数）。
++        // 实现那一侧 `choose_system_configuration` 在几块盘的设备数对不上时报 `SystemConfigurationsDisagree`、整池挂不上。
++        root_ring_judgements.judge(
++            DEVICE_COUNTS_OF_THE_CHOSEN_SYSTEM_CONFIGURATIONS_AGREE,
++            view.device_count == chosen[0].1.device_count,
++            || {
++                format!(
++                    "盘 {device} 择到的系统配置设备数 {} 与盘 {} 的 {} 不同",
++                    view.device_count, chosen[0].0, chosen[0].1.device_count
++                )
++            },
++        );
+     }
++    judge_system_configuration_slot_generations_follow_the_rotation(
++        &system_configuration_slot_readings_of_each_device,
++        &mut root_ring_judgements,
++    );
++    judge_journal_ring_geometry_fields_agree(
++        &system_configuration_slot_readings_of_each_device,
++        &mut root_ring_judgements,
++    );
++    let chosen_geometries: Vec<PoolGeometry> =
++        chosen.iter().map(|(_, _, geometry)| *geometry).collect();
++    let decision_width =
++        decision_width_declared_by_the_chosen_system_configurations(&chosen_geometries)
++            .expect("上面判过 chosen 非空：至少一块盘择到了系统配置");
++    judge_root_slots_aligned_to_the_decision_width(
++        &geometry,
++        decision_width,
++        &mut root_ring_judgements,
++    );
+     let devices = reader.devices();
+     let regions = usize::try_from(geometry.regions).expect("R");
+     let region_devices = &geometry.region_devices[..regions.min(3)];
+@@ -5817,6 +6580,16 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
+             .expect("8 字节"),
+     );
+     let roots = valid_roots(reader, &geometry);
++    judge_root_records_live_in_the_slot_their_txg_names(
++        &roots,
++        &geometry,
++        &mut root_ring_judgements,
++    );
++    judge_instance_table_rows_against_the_roots_referencing_them(
++        reader,
++        &roots,
++        &mut root_ring_judgements,
++    );
+     // 每块盘两槽里自证过、fsid 与本池相同的系统配置槽（与实现取号同一读法，D18（块里携带什么信息） 已定项 11）：
+     // I-7.12 逐盘比，回退候选集的 F 生效值取它们带的 F 的最大值（C556（checker 与层 0 不读系统配置里的 F））。
+     let verified_system_configurations_of_this_pool: Vec<(
+@@ -5860,6 +6633,22 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
+         &journal_records_by_device,
+         &mut root_ring_judgements,
+     );
++    judge_journal_record_txg_per_instance(&journal_records_by_device, &mut root_ring_judgements);
++    judge_records_of_one_publish_within_the_in_flight_record_limit(
++        &journal_records_by_device,
++        geometry.declared_in_flight_record_limit,
++        &mut root_ring_judgements,
++    );
++    judge_named_entries_against_the_unit_headers(
++        reader,
++        &journal_records_by_device,
++        &mut root_ring_judgements,
++    );
++    judge_new_root_segment_of_the_last_record_against_the_roots(
++        &journal_records_by_device,
++        &roots,
++        &mut root_ring_judgements,
++    );
+     root_ring_judgements.judge("I-7.1", !roots.is_empty(), || {
+         "根环里一条自证过的根都没有".to_string()
+     });
+@@ -6041,6 +6830,12 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
+                 )
+             });
+     }
++    if walk.units_judged_against_an_older_candidate_root == 0 {
++        walk.judgements.not_applicable(
++            UNIT_BIRTH_NOT_LATER_THAN_A_CANDIDATE_ROOT_REFERENCING_IT,
++            "回退候选集里只有最新那条根、或不是最新的候选根一个被引用单元都没走到：没有「不是最新的候选根」可判（最新那条归 I-4.2）",
++        );
++    }
+     judge_blocks_referenced_by_abandoned_roots(
+         reader,
+         &geometry,
+@@ -6050,6 +6845,14 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
+         filesystem_identifier_low,
+         &mut walk.judgements,
+     );
++    judge_trees_of_the_replayed_version_are_traversable(
++        reader,
++        &journal_records_by_device,
++        &roots[newest_index].2,
++        geometry.journal_ring_bytes,
++        filesystem_identifier_low,
++        &mut walk.judgements,
++    );
+     let referenced_units_judged_against_their_pointer =
+         walk.referenced_units_judged_against_their_pointer;
+     let mut location_entry_checksums = LocationEntryChecksumsForQuarantine {
+@@ -6374,6 +7177,14 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
+     judgements.judge("I-7.8", watermark > highest_seen, || {
+         format!("根环水位最大 {watermark}，盘上出现过的最大树 ID {highest_seen}")
+     });
++    // 再判最新那条根自己的水位（`m3-inv-a-r1` 判决第二节第 9 行，零轮）：只把最新那条根的水位压低时，上面取 max 那一格被更早的根盖住，
++    // 而恢复按所选根的水位往下发号（core 的 `recover` 在这种镜像上报 I-7.8）。先判上面那一格，它的违例说明不变。
++    let newest_root_watermark = roots[newest_index].2.tree_identifier_watermark;
++    judgements.judge("I-7.8", newest_root_watermark > highest_seen, || {
++        format!(
++            "最新那条根（txg {newest_txg}）的水位 {newest_root_watermark}，盘上出现过的最大树 ID {highest_seen}"
++        )
++    });
+     judgements.into_report()
+ }
+ 
+diff --git a/crates/singlefs-harness/tests/checker_known_bad_images.rs b/crates/singlefs-harness/tests/checker_known_bad_images.rs
+index f31019c..47dfd57 100644
+--- a/crates/singlefs-harness/tests/checker_known_bad_images.rs
++++ b/crates/singlefs-harness/tests/checker_known_bad_images.rs
+@@ -10,8 +10,20 @@ use common::{
+     publish_overwrite_in_process, BuiltPool, FIXED_WRITE_TIME_SECONDS,
+ };
+ use singlefs_checker::image::{
+-    InvariantVerdict, SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS,
++    InvariantVerdict, ACCOUNTING_ROWS_CARRY_THE_GENERATION_OF_THEIR_VERSION,
++    DEVICE_COUNTS_OF_THE_CHOSEN_SYSTEM_CONFIGURATIONS_AGREE,
++    INODE_CHANGE_COUNT_BETWEEN_OBJECT_BIRTH_AND_CONTAINER_BIRTH,
++    INSTANCE_TABLE_ROWS_PUBLISHED_BEFORE_THE_ROOT_REFERENCING_THEM,
++    JOURNAL_RECORD_TXG_NOT_DECREASING_WITHIN_AN_INSTANCE, JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
++    LAST_RECORD_OF_A_PUBLISH_CARRIES_THE_ROOT_OF_THAT_PUBLISH, NAMED_ENTRY_MATCHES_THE_UNIT_HEADER,
++    POINTER_BIRTH_TREE_MATCHES_THE_UNIT_HEADER, PREVIOUS_SNAPSHOT_TXG_OF_THE_TREE_TABLE_ENTRIES,
++    ROOT_RECORDS_LIVE_IN_THE_SLOT_THEIR_TXG_NAMES, ROOT_SLOTS_ALIGNED_TO_THE_DECISION_WIDTH,
++    SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION,
++    SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS,
+     SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
++    SYSTEM_CONFIGURATION_SLOT_GENERATIONS_FOLLOW_THE_ROTATION,
++    TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
++    UNIT_BIRTH_NOT_LATER_THAN_A_CANDIDATE_ROOT_REFERENCING_IT,
+ };
+ use singlefs_checker::walk::check_pool_image;
+ use singlefs_core::address::{
+@@ -222,6 +234,90 @@ fn propagate(pool: &mut MemoryPool, units: &[(u64, usize)], mut changes: Vec<(u6
+             }
+         }
+     }
++    copy_each_root_into_the_new_root_segment_of_its_journal_records(pool);
++}
++
++/// journal 记录头里 `checkpoint_txg`（8 字节）与新根段（188 字节）的偏移（D23（journal 的角色与格式） 已定项 4 / 已定项 17 的字段表）。
++const JOURNAL_RECORD_CHECKPOINT_TXG_OFFSET: usize = 26;
++const JOURNAL_RECORD_NEW_ROOT_SEGMENT: std::ops::Range<usize> = 99..287;
++/// 根记录里与新根段四段同名的四段，按新根段的次序：树表指针、中央映射树根指针、树 ID 水位、F（D23（journal 的角色与格式） 已定项 15）。
++const ROOT_RECORD_FIELDS_IN_THE_ORDER_OF_THE_NEW_ROOT_SEGMENT: [std::ops::Range<usize>; 4] =
++    [36..122, 256..342, 122..130, 130..138];
++
++/// 根环里每条自证过的根（magic 与自证校验和都对），把两块盘 journal 环里同 (实例, txg) 的记录的新根段改成照它的那四段
++/// （I-8.10（记录新根段与同代根相同）：发布时根与它那一次发布的每条记录带同一份新根段），改过的记录重封头校验和（罩整条 4096，字段在 46）；
++/// 再按计数器从小到大，把前一条被改过的同实例后继记录的反向链（I-8.6（反向链算法），罩前一条的 311 字节头）补上、重封。
++/// 坏镜像改了根（沿引用链补到根槽、压水位）之后调它，盘上留下的就是「写者从一开始就写出了这样的根」的样子：只改根不改记录，
++/// 每份这样的坏镜像都会多红 I-8.10。返回改了几条记录（按盘各算一条）。
++fn copy_each_root_into_the_new_root_segment_of_its_journal_records(pool: &mut MemoryPool) -> usize {
++    let mut new_root_segment_of_each_root: std::collections::BTreeMap<(u32, u64), Vec<u8>> =
++        std::collections::BTreeMap::new();
++    for (device, offset) in root_slots() {
++        let bytes = read(pool, device, offset, 512);
++        if bytes[..4] != singlefs_core::root_record::ROOT_MAGIC
++            || wide_checksum_with_field_zeroed(&bytes, 512, 138)[..] != bytes[138..170]
++        {
++            continue;
++        }
++        let instance = u32::from_le_bytes(bytes[24..28].try_into().expect("4 字节"));
++        let segment: Vec<u8> = ROOT_RECORD_FIELDS_IN_THE_ORDER_OF_THE_NEW_ROOT_SEGMENT
++            .iter()
++            .flat_map(|field| bytes[field.clone()].to_vec())
++            .collect();
++        new_root_segment_of_each_root
++            .entry((instance, get_u64(&bytes, 28)))
++            .or_insert(segment);
++    }
++    let mut records_rewritten = 0;
++    for device in DEVICES {
++        let mut previous: Option<(u64, u32, Vec<u8>, bool)> = None;
++        for (counter, instance, _) in journal_records_on_device(pool, device) {
++            let offset = singlefs_core::journal::record_offset(
++                counter,
++                singlefs_format::JOURNAL_RING_DEFAULT_BYTES,
++            )
++            .0;
++            let mut record = read(pool, device, offset, 4096);
++            let mut rewritten = false;
++            if let Some(segment) = new_root_segment_of_each_root.get(&(
++                instance,
++                get_u64(&record, JOURNAL_RECORD_CHECKPOINT_TXG_OFFSET),
++            )) {
++                if record[JOURNAL_RECORD_NEW_ROOT_SEGMENT] != segment[..] {
++                    record[JOURNAL_RECORD_NEW_ROOT_SEGMENT].copy_from_slice(segment);
++                    rewritten = true;
++                }
++            }
++            if let Some((
++                previous_counter,
++                previous_instance,
++                previous_record,
++                previous_rewritten,
++            )) = &previous
++            {
++                let chain = back_chain_of(previous_record);
++                if *previous_rewritten
++                    && *previous_counter + 1 == counter
++                    && *previous_instance == instance
++                    && record
++                        [JOURNAL_RECORD_BACK_CHAIN_OFFSET..JOURNAL_RECORD_BACK_CHAIN_OFFSET + 4]
++                        != chain.to_le_bytes()
++                {
++                    record[JOURNAL_RECORD_BACK_CHAIN_OFFSET..JOURNAL_RECORD_BACK_CHAIN_OFFSET + 4]
++                        .copy_from_slice(&chain.to_le_bytes());
++                    rewritten = true;
++                }
++            }
++            if rewritten {
++                let digest = wide_checksum_with_field_zeroed(&record, 4096, 46);
++                record[46..78].copy_from_slice(&digest);
++                write(pool, device, offset, &record);
++                records_rewritten += 1;
++            }
++            previous = Some((counter, instance, record, rewritten));
++        }
++    }
++    records_rewritten
+ }
+ 
+ /// 只改一块盘上的那一份单元（另一块盘留着原样）：重封被改那一份的两道校验和，再把它的新整单元校验和补进引用它的
+@@ -454,6 +550,10 @@ fn set_u64(bytes: &mut [u8], offset: usize, value: u64) {
+ fn set_u16(bytes: &mut [u8], offset: usize, value: u16) {
+     bytes[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
+ }
++fn get_u32(bytes: &[u8], offset: usize) -> u32 {
++    u32::from_le_bytes(bytes[offset..offset + 4].try_into().expect("4 字节"))
++}
++
+ fn set_u32(bytes: &mut [u8], offset: usize, value: u32) {
+     bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+ }
+@@ -1317,6 +1417,107 @@ fn known_bad_images_after_the_overwrite() -> Vec<(&'static str, Mutation)> {
+                 );
+             }),
+         ),
++        // I-4.9：A 的数据单元（50180，只有 A 的根 txg 3 还引用）诞生代号 3 → 4，引用它的四处一起改成 4（A 的 extent 树根里的数据指针、
++        // A 的中央映射里那条码 1 key、A 的分配记录树两片叶里那两条未释放记录的分配代），各自重封、沿引用链补到 A 的根：
++        // 指针、映射、分配代与单元头都对得上（I-1.2、I-1.11、I-3.10 不红），按已发布谓词判也是已发布的（4 ≤ 挂载根 txg 4），
++        // 只剩「A 那条根引用了一个比它晚诞生的单元」。
++        (
++            UNIT_BIRTH_NOT_LATER_THAN_A_CANDIDATE_ROOT_REFERENCING_IT,
++            Box::new(|image: &mut MemoryPool| {
++                mutate_unit_of(
++                    image,
++                    &UNITS_AFTER_OVERWRITE,
++                    DATA_UNIT,
++                    |bytes| {
++                        assert_eq!(
++                            get_u64(bytes, DATA_UNIT_BIRTH_TXG_OFFSET),
++                            3,
++                            "A 的数据单元诞生代号本来是 3"
++                        );
++                        set_u64(bytes, DATA_UNIT_BIRTH_TXG_OFFSET, 4);
++                    },
++                    true,
++                );
++                mutate_unit_of(
++                    image,
++                    &UNITS_AFTER_OVERWRITE,
++                    EXTENT_ROOT,
++                    |bytes| {
++                        assert_eq!(
++                            get_u64(bytes, EXTENT_RECORD_DATA_POINTER_BIRTH_TXG_OFFSET),
++                            3,
++                            "A 的数据指针出生 txg 本来是 3"
++                        );
++                        set_u64(bytes, EXTENT_RECORD_DATA_POINTER_BIRTH_TXG_OFFSET, 4);
++                    },
++                    true,
++                );
++                mutate_unit_of(
++                    image,
++                    &UNITS_AFTER_OVERWRITE,
++                    MAPPING_ROOT,
++                    |bytes| rewrite_the_data_unit_mapping_key_birth_txg(bytes, 3, 4),
++                    true,
++                );
++                assert_eq!(
++                    mutate_allocation_leaves(
++                        image,
++                        &UNITS_AFTER_OVERWRITE,
++                        ALLOCATION_LEAVES,
++                        |bytes| {
++                            rewrite_unreleased_allocation_generation(bytes, DATA_UNIT, 3, 4)
++                        }
++                    ),
++                    2,
++                    "A 的数据单元两盘各一条未释放记录"
++                );
++            }),
++        ),
++        // I-8.11：B 那条记录（计数器 4）里码 1 那个点名项（B 的数据单元 50182）的诞生代号 4 → 3，两盘各一份，载荷校验和与头校验和重封。
++        // 位置条目没动、50182 的整单元校验和照旧相符 ⇒ 点名项与单元头比得上，而诞生代号不同。B 是环里最后一条，没有后继的反向链要补。
++        (
++            NAMED_ENTRY_MATCHES_THE_UNIT_HEADER,
++            Box::new(|image: &mut MemoryPool| {
++                rewrite_the_birth_txg_of_the_data_unit_named_by_journal_record(
++                    image,
++                    LAST_COUNTER_AFTER_THE_OVERWRITE,
++                    DATA_UNIT_AFTER_OVERWRITE,
++                    4,
++                    3,
++                );
++            }),
++        ),
++        // I-8.12：B 那条记录（计数器 4）的 checkpoint_txg 4 → 0，两盘各一份、头校验和重封：同实例前一条（计数器 3）是 txg 3。
++        // 实例 1 没有 txg 0 的根（mkfs 种的第 0 代根属实例 0）⇒ I-8.10 没有可比的根；B 是最后一条，没有后继的反向链要补。
++        (
++            JOURNAL_RECORD_TXG_NOT_DECREASING_WITHIN_AN_INSTANCE,
++            Box::new(|image: &mut MemoryPool| {
++                set_checkpoint_txg_of_journal_record(image, LAST_COUNTER_AFTER_THE_OVERWRITE, 4, 0);
++            }),
++        ),
++        // I-7.8 最新那条根那一格（`research/prompts/m3-inv-a-r1-opus-output.md` 三·3 攻方第一份）：只把 B 的根（txg 4，最新）的水位压到
++        // mkfs 时的水位，B 那条记录的新根段跟着压（同一份新根段，I-8.10）。A 的根水位照旧盖得住 A 发的十二棵树 ⇒ 取 max 那一格不红。
++        (
++            "I-7.8",
++            Box::new(|image: &mut MemoryPool| {
++                let (device, offset) = root_slot_of(CheckpointTxg(4));
++                let mut bytes = read(image, device, offset, 512);
++                assert_eq!(get_u64(&bytes, 28), 4, "那一槽是 B 的根");
++                set_u64(
++                    &mut bytes,
++                    ROOT_RECORD_TREE_IDENTIFIER_WATERMARK_OFFSET,
++                    singlefs_format::TREE_IDENTIFIER_WATERMARK_AT_MKFS,
++                );
++                let digest = wide_checksum_with_field_zeroed(&bytes, 512, 138);
++                bytes[138..170].copy_from_slice(&digest);
++                write(image, device, offset, &bytes);
++                assert_eq!(
++                    copy_each_root_into_the_new_root_segment_of_its_journal_records(image),
++                    2,
++                    "B 那条记录两盘各一份跟着压"
++                );
++            }),
++        ),
+     ]
+ }
+ 
+@@ -1539,6 +1740,8 @@ fn expected_verdict_with_one_record_per_transaction(invariant: &str) -> Invarian
+     match invariant {
+         "I-8.8" => InvariantVerdict::NotApplicable(COMMIT_MARKERS_NOT_APPLICABLE),
+         "I-7.9" => InvariantVerdict::NotApplicable(NO_ROOT_RAISED_THE_FLOOR),
++        // 最新根之上没有记录：重放之后那一版就是最新根。
++        "I-4.1" => InvariantVerdict::NotApplicable(NOTHING_APPLIED_ABOVE_THE_CHOSEN_ROOT),
+         _ => InvariantVerdict::Holds,
+     }
+ }
+@@ -1584,7 +1787,13 @@ fn transaction_boundary_judgement(
+         other_verdicts_that_changed: verdicts_that_differ_outside(
+             verdicts,
+             verdicts_on_the_clean_image,
+-            &["I-8.7", "I-8.8"],
++            &[
++                "I-8.7",
++                "I-8.8",
++                // 接在 B 后面的记录在最新根之上：下一次挂载会重放它们，I-4.1（重放后树可遍历） 从「一次都不施加、不适用」变成真被评估过——
++                // 判的是重放之后那一版，不是事务边界；它要是红了，上面 `violated_invariants` 那一格照样看得见。
++                TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
++            ],
+         )
+         .into_iter()
+         .map(|(name, _, _)| name)
+@@ -2174,7 +2383,8 @@ fn publish_ordinal_judgement(
+         other_verdicts_that_changed: verdicts_that_differ_outside(
+             verdicts,
+             verdicts_on_the_positive_control,
+-            &["I-8.9"],
++            // I-4.1 不比的理由同 `transaction_boundary_judgement`：接在 B 后面的记录在最新根之上，重放到哪一条随序号与末条标志变。
++            &["I-8.9", TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE],
+         )
+         .into_iter()
+         .map(|(name, _, _)| name)
+@@ -2206,6 +2416,11 @@ fn one_publish_over_two_records_with_the_last_record_flag_on_the_second_holds_th
+         (InvariantVerdict::Holds, InvariantVerdict::Holds),
+         "一次发布两条记录：I-8.8 与 I-8.9 都要真被评估过且成立"
+     );
++    assert_eq!(
++        verdict(&image, TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE),
++        InvariantVerdict::Holds,
++        "这次两条记录的发布在最新根之上、末条带标志与提交标记：下一次挂载整次重放它，重放之后那一版走得完"
++    );
+     assert_eq!(
+         publish_ordinal_judgement("一次发布两条记录", &verdicts, &verdicts_on_the_clean_image),
+         PublishOrdinalJudgement {
+@@ -2271,7 +2486,12 @@ fn each_release_generation_and_tree_table_birth_bad_image_reddens_only_its_own_i
+     for (invariant, found) in check_pool_image(&clean) {
+         assert_eq!(
+             found,
+-            expected_verdict_with_one_record_per_transaction(invariant),
++            if invariant == INSTANCE_TABLE_ROWS_PUBLISHED_BEFORE_THE_ROOT_REFERENCING_THEM {
++                // 只有实例 1，实例表一行都没有（回退那几份有行，那里 I-3.12 成立）。
++                InvariantVerdict::NotApplicable(INSTANCE_TABLE_ROWS_NOT_APPLICABLE)
++            } else {
++                expected_verdict_with_one_record_per_transaction(invariant)
++            },
+             "发布 B 之后的干净镜像上 {invariant} 的判定"
+         );
+     }
+@@ -2332,15 +2552,17 @@ fn the_root_ring_health_invariant_reddens_when_the_previous_generation_is_gone_b
+             .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
+             .map(|(name, _)| *name)
+             .collect();
++        // 三个区域槽 0 都坐着 txg 1 的根，而 txg 1 只许住区域 1 槽 0：区域 0、2 那两条照 I-7.17（根槽位置等于 txg 算出的位置）
++        // 必然一起红，它是这份镜像造法自带的，不是 I-7.3 搭车；I-7.3 的判别力仍由「两份只差那个代号」钉住（I-7.17 之外逐项相同）。
++        let red_with_it = [invariant, ROOT_RECORDS_LIVE_IN_THE_SLOT_THEIR_TXG_NAMES];
+         assert_eq!(
+-            violated,
+-            [invariant],
+-            "判红的该只有 {invariant}：{verdicts:?}"
++            violated, red_with_it,
++            "判红的该只有 {invariant} 与 txg 1 住错区域的 I-7.17：{verdicts:?}"
+         );
+         let differences: Vec<(&str, &InvariantVerdict, &InvariantVerdict)> = verdicts
+             .iter()
+             .zip(&verdicts_right_after_mkfs)
+-            .filter(|((name, found), (_, before))| *name != invariant && found != before)
++            .filter(|((name, found), (_, before))| !red_with_it.contains(name) && found != before)
+             .map(|((name, found), (_, before))| (*name, before, found))
+             .collect();
+         assert!(
+@@ -2607,6 +2829,12 @@ fn the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target()
+             // 这一份上没抬过 F：每条根带的 F 都是 0。阳性对照与坏镜像在步 5 那段历史上
+             // （`raising_the_floor_above_its_ceiling_reddens_only_the_rollback_floor_invariant`）。
+             "I-7.9" => InvariantVerdict::NotApplicable(NO_ROOT_RAISED_THE_FLOOR),
++            // 这一份上只有实例 1，实例表一行都没有。阳性对照与坏镜像在可写挂载施加过一条记录的那一份上
++            // （`an_instance_table_row_whose_published_txg_reaches_the_root_referencing_it_reddens_only_the_instance_table_row_invariant`）。
++            "I-3.12" => InvariantVerdict::NotApplicable(INSTANCE_TABLE_ROWS_NOT_APPLICABLE),
++            // 这一份上最新根（txg 3）之上没有记录：重放之后那一版就是它。阳性对照与坏镜像在「发布 B 的记录落了、根槽没落」那一份崩溃镜像上
++            // （`a_replayed_version_whose_tree_table_does_not_read_back_reddens_only_the_replayed_version_invariant`）。
++            "I-4.1" => InvariantVerdict::NotApplicable(NOTHING_APPLIED_ABOVE_THE_CHOSEN_ROOT),
+             _ => InvariantVerdict::Holds,
+         };
+         assert_eq!(found, expected, "干净镜像上 {invariant} 的判定");
+@@ -2625,6 +2853,11 @@ fn the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target()
+         .chain(known_bad_images_of_the_rollback_floor().iter())
+         .chain(known_bad_images_of_the_unmount_floor().iter())
+         .chain(known_bad_images_of_the_system_configuration_floor().iter())
++        .chain(known_bad_images_of_pointer_journal_and_generation_fields().iter())
++        .chain(known_bad_images_of_the_instance_table_rows().iter())
++        .chain(known_bad_images_of_the_ring_geometry_and_the_root_slot_alignment().iter())
++        .chain(known_bad_images_of_the_tail_slot_witnesses().iter())
++        .chain(known_bad_images_of_the_replayed_version().iter())
+         .map(|(invariant, _)| *invariant)
+         .collect();
+     let listed: std::collections::BTreeSet<&str> = singlefs_checker::image::IMPLEMENTED_INVARIANTS
+@@ -2982,6 +3215,7 @@ fn central_mapping_root_whose_header_tree_differs_from_its_root_pointer_birth_tr
+         let digest = wide_checksum_with_field_zeroed(&root_slot, 512, 138);
+         root_slot[138..170].copy_from_slice(&digest);
+         write(image, device, offset, &root_slot);
++        copy_each_root_into_the_new_root_segment_of_its_journal_records(image);
+     });
+     for (which_side, mutation) in [
+         ("映射树根头里的树 ID", header_says_another_tree),
+@@ -3089,8 +3323,8 @@ fn an_entry_width_that_is_not_the_field_table_width_reddens_only_the_entry_width
+         .collect();
+     assert_eq!(
+         turned_not_applicable,
+-        ["I-3.1", "I-3.11", "I-5.2", "I-9.6"],
+-        "跟着转成不适用的该只有这四条（走读在 I-1.10 那一步停下，记账条目不再解）：{verdicts:?}"
++        ["I-3.1", "I-3.11", "I-5.2", "I-9.6", "I-3.13"],
++        "跟着转成不适用的该只有这五条（走读在 I-1.10 那一步停下，记账条目不再解；I-3.13 判的就是记账行的代段）：{verdicts:?}"
+     );
+ }
+ 
+@@ -3993,6 +4227,7 @@ fn set_the_root_floor(image: &mut MemoryPool, txg: CheckpointTxg, rollback_floor
+     let digest = wide_checksum_with_field_zeroed(&bytes, root_slot_bytes, checksum_offset);
+     bytes[checksum_offset..checksum_offset + 32].copy_from_slice(&digest);
+     write(image, device, offset, &bytes);
++    copy_each_root_into_the_new_root_segment_of_its_journal_records(image);
+ }
+ 
+ /// 把 checkpoint_txg 为 `txg` 的那条根所在的根槽改坏一个字节（自证校验和罩整槽）：那条根读不出。
+@@ -5021,6 +5256,7 @@ fn set_the_tree_identifier_watermark_of_every_root(
+         write(image, device, offset, &bytes);
+         rewritten += 1;
+     }
++    copy_each_root_into_the_new_root_segment_of_its_journal_records(image);
+     rewritten
+ }
+ 
+@@ -5440,3 +5676,893 @@ fn release_generation_outside_its_interval_on_the_second_page_of_the_replaced_in
+         "只有 I-3.9 红：{verdicts:?}"
+     );
+ }
++
++/// 只有一个实例的镜像上 I-3.12（实例表行 T 低于引用它的根的 txg） 报的不适用理由（池级 checker 的原文）。
++const INSTANCE_TABLE_ROWS_NOT_APPLICABLE: &str = "根环里没有哪条根指着一张读得出、有行的实例表";
++
++/// 一条 journal 记录（两盘各一份）里码 1 那个点着 `data_unit_slot` 的点名项，诞生代号从 `from` 改成 `to`；
++/// 载荷校验和（罩点名项）与头校验和（罩整条 4096，字段在 46）重封。
++fn rewrite_the_birth_txg_of_the_data_unit_named_by_journal_record(
++    image: &mut MemoryPool,
++    counter: u64,
++    data_unit_slot: u64,
++    from: u64,
++    to: u64,
++) {
++    const NAMED_ENTRY_UNIT_CLASS_OFFSET: usize = 28;
++    const NAMED_ENTRY_BIRTH_TXG_OFFSET: usize = 37;
++    const NAMED_ENTRY_FIRST_LOCATION_SLOT_OFFSET: usize = 4;
++    let offset =
++        singlefs_core::journal::record_offset(counter, singlefs_format::JOURNAL_RING_DEFAULT_BYTES)
++            .0;
++    for device in DEVICES {
++        let mut record = read(image, device, offset, 4096);
++        let named_count = usize::try_from(u32::from_le_bytes(
++            record[JOURNAL_RECORD_NAMED_COUNT_OFFSET..JOURNAL_RECORD_NAMED_COUNT_OFFSET + 4]
++                .try_into()
++                .expect("4 字节"),
++        ))
++        .expect("点名项数");
++        let entry_start = (0..named_count)
++            .map(|index| JOURNAL_RECORD_HEADER_BYTES + JOURNAL_NAMED_ENTRY_BYTES * index)
++            .find(|entry_start| {
++                let mut slot_bytes = [0u8; 8];
++                slot_bytes[..6].copy_from_slice(
++                    &record[entry_start + NAMED_ENTRY_FIRST_LOCATION_SLOT_OFFSET
++                        ..entry_start + NAMED_ENTRY_FIRST_LOCATION_SLOT_OFFSET + 6],
++                );
++                record[entry_start + NAMED_ENTRY_UNIT_CLASS_OFFSET] == 1
++                    && u64::from_le_bytes(slot_bytes) == data_unit_slot
++            })
++            .expect("那条记录点名了这个数据单元");
++        assert_eq!(
++            get_u64(&record, entry_start + NAMED_ENTRY_BIRTH_TXG_OFFSET),
++            from,
++            "盘 {device} 计数器 {counter} 那条记录点名的诞生代号本来是 {from}"
++        );
++        set_u64(&mut record, entry_start + NAMED_ENTRY_BIRTH_TXG_OFFSET, to);
++        let payload_end = JOURNAL_RECORD_HEADER_BYTES + JOURNAL_NAMED_ENTRY_BYTES * named_count;
++        let payload_checksum = crc32_castagnoli(&record[JOURNAL_RECORD_HEADER_BYTES..payload_end]);
++        record[JOURNAL_RECORD_PAYLOAD_CHECKSUM_OFFSET..JOURNAL_RECORD_PAYLOAD_CHECKSUM_OFFSET + 4]
++            .copy_from_slice(&payload_checksum.to_le_bytes());
++        let digest = wide_checksum_with_field_zeroed(&record, 4096, 46);
++        record[46..78].copy_from_slice(&digest);
++        write(image, device, offset, &record);
++    }
++}
++
++/// 一条 journal 记录（两盘各一份）的 `checkpoint_txg` 从 `from` 改成 `to`，头校验和重封。
++fn set_checkpoint_txg_of_journal_record(image: &mut MemoryPool, counter: u64, from: u64, to: u64) {
++    let offset =
++        singlefs_core::journal::record_offset(counter, singlefs_format::JOURNAL_RING_DEFAULT_BYTES)
++            .0;
++    for device in DEVICES {
++        let mut record = read(image, device, offset, 4096);
++        assert_eq!(
++            get_u64(&record, JOURNAL_RECORD_CHECKPOINT_TXG_OFFSET),
++            from,
++            "盘 {device} 计数器 {counter} 那条记录的 txg 本来是 {from}"
++        );
++        set_u64(&mut record, JOURNAL_RECORD_CHECKPOINT_TXG_OFFSET, to);
++        let digest = wide_checksum_with_field_zeroed(&record, 4096, 46);
++        record[46..78].copy_from_slice(&digest);
++        write(image, device, offset, &record);
++    }
++}
++
++/// 系统配置槽里世代号（8 字节）、设备数（4 字节）、槽距（4 字节，槽 1 在这个偏移上）的偏移（`.claude/kb/layout/01-first-txn.md` 一）。
++const SYSTEM_CONFIGURATION_SLOT_GENERATION_OFFSET: usize = 147;
++const SYSTEM_CONFIGURATION_DEVICE_COUNT_OFFSET: usize = 143;
++const SYSTEM_CONFIGURATION_SLOT_SPACING_OFFSET: usize = 429;
++
++/// 一块盘上系统配置槽 1 的偏移：槽 0 记的槽距。
++fn system_configuration_slot_one_offset(image: &MemoryPool, device: u32) -> u64 {
++    let slot_zero = read(image, device, 0, 4096);
++    u64::from(u32::from_le_bytes(
++        slot_zero[SYSTEM_CONFIGURATION_SLOT_SPACING_OFFSET
++            ..SYSTEM_CONFIGURATION_SLOT_SPACING_OFFSET + 4]
++            .try_into()
++            .expect("4 字节"),
++    ))
++}
++
++/// 记账树根兼叶（50250）里条目区的起点与每条宽（`set_accounting` 同一个读法：115 + 2 × 22 起，每条 34）、代段在行里的偏移
++/// （统计量 2 + 树 8 + 设备 4 之后）。
++const ACCOUNTING_LEAF_ENTRY_START: usize = 159;
++const ACCOUNTING_LEAF_ENTRY_BYTES: usize = 34;
++const ACCOUNTING_ROW_GENERATION_OFFSET: usize = 14;
++
++/// inode 叶容器第 0 条记录的起点（码 3 记录区从 136 起）与记录里改动计数的偏移（D8（核心索引结构） 已定项 6：偏移 88）。
++const INODE_LEAF_FIRST_RECORD_START: usize = 136;
++const INODE_RECORD_CHANGE_COUNT_OFFSET: usize = 88;
++
++/// 根记录里实例表指针的起点（86 字节，D22（单元原子性怎么合成） 已定项 7）与指针头部 extent 偏移（D19（块指针的结构与宽度预算） 已定项 11：
++/// MAC 16 + nonce 12 + 算法类型 1 + 压缩算法 1 + 压后长度 2 之后的 2 字节）。
++const ROOT_RECORD_INSTANCE_TABLE_POINTER_OFFSET: usize = 170;
++const POINTER_EXTENT_OFFSET_FIELD_OFFSET: usize = 32;
++
++/// 二·1 那一批新立的几条里，坏镜像建在**写完新池新建文件**那份干净镜像上的：每份改一处、只红它自己那一条
++/// （`research/prompts/m3-inv-b-r1-main-verification.md` 第二节、`research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 7、11 行）。
++fn known_bad_images_of_pointer_journal_and_generation_fields() -> Vec<(&'static str, Mutation)> {
++    vec![
++        // I-1.12：A 的 extent 树根里那条数据指针的出生树（指针偏移 34）改成另一棵发过号的树，重封、补到根：单元头里的树照旧是 extent 树。
++        (
++            POINTER_BIRTH_TREE_MATCHES_THE_UNIT_HEADER,
++            Box::new(|image: &mut MemoryPool| {
++                let data_pointer_birth_tree = EXTENT_RECORD_DATA_POINTER_BIRTH_TXG_OFFSET - 8;
++                mutate_unit(
++                    image,
++                    EXTENT_ROOT,
++                    |bytes| {
++                        assert_eq!(
++                            get_u64(bytes, data_pointer_birth_tree),
++                            TREE_IDENTIFIER_EXTENT,
++                            "数据指针的出生树本来是 extent 树"
++                        );
++                        set_u64(
++                            bytes,
++                            data_pointer_birth_tree,
++                            ANOTHER_ISSUED_TREE_BELOW_THE_WATERMARK,
++                        );
++                    },
++                    true,
++                );
++            }),
++        ),
++        // I-8.10：A 那条记录（计数器 3，环里最后一条、带末条标志）的新根段里 F（偏移 99 + 180）0 → 1，两盘各一份、头校验和重封；
++        // A 的根（txg 3）照旧带 F 0。
++        (
++            LAST_RECORD_OF_A_PUBLISH_CARRIES_THE_ROOT_OF_THAT_PUBLISH,
++            Box::new(|image: &mut MemoryPool| {
++                const NEW_ROOT_SEGMENT_ROLLBACK_FLOOR_OFFSET: usize = 99 + 180;
++                let offset = singlefs_core::journal::record_offset(
++                    3,
++                    singlefs_format::JOURNAL_RING_DEFAULT_BYTES,
++                )
++                .0;
++                for device in DEVICES {
++                    let mut record = read(image, device, offset, 4096);
++                    assert_eq!(
++                        get_u64(&record, JOURNAL_RECORD_CHECKPOINT_TXG_OFFSET),
++                        3,
++                        "计数器 3 是 A 那条记录"
++                    );
++                    assert_eq!(
++                        get_u64(&record, NEW_ROOT_SEGMENT_ROLLBACK_FLOOR_OFFSET),
++                        0,
++                        "A 那条记录的新根段 F 本来是 0"
++                    );
++                    set_u64(&mut record, NEW_ROOT_SEGMENT_ROLLBACK_FLOOR_OFFSET, 1);
++                    let digest = wide_checksum_with_field_zeroed(&record, 4096, 46);
++                    record[46..78].copy_from_slice(&digest);
++                    write(image, device, offset, &record);
++                }
++            }),
++        ),
++        // I-9.25：A 的树表（50252）第 0 条（extent 树，不是 inode 树）的 previous_snapshot_txg（条目偏移 100）0 → 3，重封、补到根。
++        (
++            PREVIOUS_SNAPSHOT_TXG_OF_THE_TREE_TABLE_ENTRIES,
++            Box::new(|image: &mut MemoryPool| {
++                const TREE_TABLE_ENTRY_PREVIOUS_SNAPSHOT_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86;
++                mutate_unit(
++                    image,
++                    TREE_TABLE,
++                    |bytes| {
++                        let field = tree_table_entry_offset(0)
++                            + TREE_TABLE_ENTRY_PREVIOUS_SNAPSHOT_TXG_OFFSET;
++                        assert_eq!(
++                            get_u64(bytes, field),
++                            0,
++                            "extent 树那条的 previous_snapshot_txg 本来是 0"
++                        );
++                        set_u64(bytes, field, 3);
++                    },
++                    true,
++                );
++            }),
++        ),
++        // I-3.13：A 的记账树（50250，根兼叶）第 1 条（不是首末条，头里的 key 区间不跟着变）的代段 3 → 2，重封、补到根。
++        (
++            ACCOUNTING_ROWS_CARRY_THE_GENERATION_OF_THEIR_VERSION,
++            Box::new(|image: &mut MemoryPool| {
++                mutate_unit(
++                    image,
++                    ACCOUNTING_ROOT,
++                    |bytes| {
++                        let count =
++                            usize::from(u16::from_le_bytes([bytes[82 + 44], bytes[83 + 44]]));
++                        assert!(count >= 3, "记账树至少三行，第 1 条不是首末条");
++                        let generation = ACCOUNTING_LEAF_ENTRY_START
++                            + ACCOUNTING_LEAF_ENTRY_BYTES
++                            + ACCOUNTING_ROW_GENERATION_OFFSET;
++                        assert_eq!(get_u64(bytes, generation), 3, "A 那一版记账行的代段是 3");
++                        set_u64(bytes, generation, 2);
++                    },
++                    true,
++                );
++            }),
++        ),
++        // I-9.26：A 的 inode 叶容器（50242）第 0 条记录的改动计数 3 → 4（大于容器诞生代号 3），重封、补到根。
++        (
++            INODE_CHANGE_COUNT_BETWEEN_OBJECT_BIRTH_AND_CONTAINER_BIRTH,
++            Box::new(|image: &mut MemoryPool| {
++                mutate_unit(
++                    image,
++                    INODE_LEAF,
++                    |bytes| {
++                        let field =
++                            INODE_LEAF_FIRST_RECORD_START + INODE_RECORD_CHANGE_COUNT_OFFSET;
++                        assert_eq!(get_u64(bytes, field), 3, "改动计数本来是 3");
++                        set_u64(bytes, field, 4);
++                    },
++                    true,
++                );
++            }),
++        ),
++        // I-7.16：盘 0 上没被择的那个系统配置槽，世代号改成被择那个减 2（仍比它小、择哪一槽不变），整槽校验和重封：
++        // 两槽相差 2；减完 ≥ 2 时它与被择那个同奇偶、住错槽。
++        (
++            SYSTEM_CONFIGURATION_SLOT_GENERATIONS_FOLLOW_THE_ROTATION,
++            Box::new(|image: &mut MemoryPool| {
++                let slot_offsets = [0, system_configuration_slot_one_offset(image, 0)];
++                let generations = slot_offsets.map(|slot_offset| {
++                    get_u64(
++                        &read(image, 0, slot_offset, 4096),
++                        SYSTEM_CONFIGURATION_SLOT_GENERATION_OFFSET,
++                    )
++                });
++                let chosen = usize::from(generations[1] > generations[0]);
++                assert!(
++                    generations[chosen] >= 2,
++                    "盘 0 被择那个槽的世代号 ≥ 2：{generations:?}"
++                );
++                let lowered = generations[chosen] - 2;
++                mutate_system_configuration_slot(image, 0, slot_offsets[1 - chosen], |bytes| {
++                    set_u64(bytes, SYSTEM_CONFIGURATION_SLOT_GENERATION_OFFSET, lowered);
++                });
++            }),
++        ),
++        // I-7.17：txg 1 那条根（区域 1 槽 0，盘 1）整槽原样拷到区域 2 槽 3（盘 0，那一槽空着）：按 txg 算它只该住区域 1 槽 0。
++        (
++            ROOT_RECORDS_LIVE_IN_THE_SLOT_THEIR_TXG_NAMES,
++            Box::new(|image: &mut MemoryPool| {
++                let root_of_txg_one = read(image, 1, 64 * SLOT + 3 * (1 << 20), 512);
++                assert_eq!(
++                    get_u64(&root_of_txg_one, 28),
++                    1,
++                    "区域 1 槽 0 坐着 txg 1 的根"
++                );
++                let target = 64 * SLOT + 2 * 3 * (1 << 20) + 3 * 4096;
++                assert_ne!(
++                    &read(image, 0, target, 512)[..4],
++                    b"SFSR",
++                    "区域 2 槽 3 空着"
++                );
++                write(image, 0, target, &root_of_txg_one);
++            }),
++        ),
++        // I-7.15：盘 1 两个系统配置槽的设备数 2 → 3，整槽校验和重封：盘 0 择到的说 2、盘 1 择到的说 3。
++        (
++            DEVICE_COUNTS_OF_THE_CHOSEN_SYSTEM_CONFIGURATIONS_AGREE,
++            Box::new(|image: &mut MemoryPool| {
++                for slot_offset in [0, system_configuration_slot_one_offset(image, 1)] {
++                    mutate_system_configuration_slot(image, 1, slot_offset, |bytes| {
++                        assert_eq!(
++                            get_u32(bytes, SYSTEM_CONFIGURATION_DEVICE_COUNT_OFFSET),
++                            2,
++                            "两块盘的池"
++                        );
++                        set_u32(bytes, SYSTEM_CONFIGURATION_DEVICE_COUNT_OFFSET, 3);
++                    });
++                }
++            }),
++        ),
++        // I-2.4 指针 extent 偏移那一格（`research/prompts/m3-inv-a-r1-opus-output.md` A6 的造法）：每条自证过的根里实例表指针的 extent 偏移 0 → 1，
++        // 根槽自证校验和重封；实例表指针不在新根段里，记录不跟着改。
++        (
++            "I-2.4",
++            Box::new(|image: &mut MemoryPool| {
++                let mut rewritten_roots = 0;
++                for (device, offset) in root_slots() {
++                    let mut bytes = read(image, device, offset, 512);
++                    if bytes[..4] != singlefs_core::root_record::ROOT_MAGIC {
++                        continue;
++                    }
++                    let field = ROOT_RECORD_INSTANCE_TABLE_POINTER_OFFSET
++                        + POINTER_EXTENT_OFFSET_FIELD_OFFSET;
++                    assert_eq!(
++                        bytes[field..field + 2],
++                        [0, 0],
++                        "实例表指针的 extent 偏移本来是 0"
++                    );
++                    bytes[field] = 1;
++                    let digest = wide_checksum_with_field_zeroed(&bytes, 512, 138);
++                    bytes[138..170].copy_from_slice(&digest);
++                    write(image, device, offset, &bytes);
++                    rewritten_roots += 1;
++                }
++                assert!(rewritten_roots > 0, "根环里至少改了一条根");
++            }),
++        ),
++    ]
++}
++
++/// 上面那批坏镜像各自**只**红在自己那一条上；干净镜像上那几条要真被评估过且成立（不是「不适用」）。
++#[test]
++fn each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant() {
++    let clean = build_pool("known-bad-pointer-journal-and-generation").memory_pool();
++    let verdicts_on_the_clean_image = check_pool_image(&clean);
++    for (invariant, _) in known_bad_images_of_pointer_journal_and_generation_fields() {
++        assert_eq!(
++            verdict(&clean, invariant),
++            InvariantVerdict::Holds,
++            "干净镜像上 {invariant} 要真被评估过且成立：{verdicts_on_the_clean_image:?}"
++        );
++    }
++    for (invariant, mutation) in known_bad_images_of_pointer_journal_and_generation_fields() {
++        let mut image = clean.clone();
++        mutation(&mut image);
++        let verdicts = check_pool_image(&image);
++        assert_eq!(
++            violated_invariants(&verdicts),
++            [invariant],
++            "判红的该只有 {invariant}：{verdicts:?}"
++        );
++    }
++}
++
++/// I-3.12（实例表行 T 低于引用它的根的 txg） 的坏镜像，建在「可写挂载施加了一条记录」那一份上：实例表里实例 1 那一行 (1, 5, 3)
++/// 的 T 5 → 6（= 写行发布那条根的 txg），重封、补到引用它的根槽。
++fn known_bad_images_of_the_instance_table_rows() -> Vec<(&'static str, Mutation)> {
++    vec![(
++        INSTANCE_TABLE_ROWS_PUBLISHED_BEFORE_THE_ROOT_REFERENCING_THEM,
++        Box::new(|image: &mut MemoryPool| {
++            const INSTANCE_TABLE_ROW_INSTANCE_OFFSET: usize = 1;
++            const INSTANCE_TABLE_ROW_PUBLISHED_TXG_OFFSET: usize = 5;
++            const INSTANCE_TABLE_ROW_BYTES: usize = 88;
++            let (device, offset) = root_slot_of(CheckpointTxg(7));
++            let newest_root = read(image, device, offset, 512);
++            assert_eq!(get_u64(&newest_root, 28), 7, "最新的根是暖机 txg 7");
++            let location = ROOT_RECORD_INSTANCE_TABLE_POINTER_OFFSET + 50;
++            let mut slot_bytes = [0u8; 8];
++            slot_bytes[..6].copy_from_slice(&newest_root[location + 4..location + 10]);
++            let instance_table_slot = u64::from_le_bytes(slot_bytes);
++            mutate_unit_of(
++                image,
++                &[(instance_table_slot, 32768)],
++                instance_table_slot,
++                |bytes| {
++                    let row_count = usize::from(u16::from_le_bytes([bytes[69], bytes[70]]));
++                    let row = (0..row_count)
++                        .map(|index| {
++                            INSTANCE_TABLE_FIRST_ROW_START + INSTANCE_TABLE_ROW_BYTES * index
++                        })
++                        .find(|row| {
++                            bytes[*row] == 0
++                                && get_u32(bytes, row + INSTANCE_TABLE_ROW_INSTANCE_OFFSET) == 1
++                        })
++                        .expect("实例表里有实例 1 那一行");
++                    assert_eq!(
++                        get_u64(bytes, row + INSTANCE_TABLE_ROW_PUBLISHED_TXG_OFFSET),
++                        5,
++                        "那一行是 (1, 5, 3)"
++                    );
++                    set_u64(bytes, row + INSTANCE_TABLE_ROW_PUBLISHED_TXG_OFFSET, 6);
++                },
++                true,
++            );
++        }),
++    )]
++}
++
++/// 实例表单元（码 3）的记录区起点。
++const INSTANCE_TABLE_FIRST_ROW_START: usize = 136;
++
++/// 可写挂载施加过一条记录那一份上：I-3.12 真被评估过且成立；行 (1, 5, 3) 的 T 抬到 6 之后**只**红 I-3.12。
++#[test]
++fn an_instance_table_row_whose_published_txg_reaches_the_root_referencing_it_reddens_only_the_instance_table_row_invariant(
++) {
++    let clean = image_after_a_writable_mount_over_a_version_applied_only_by_its_journal_record(
++        "known-bad-instance-table-rows",
++    )
++    .image;
++    let verdicts_on_the_clean_image = check_pool_image(&clean);
++    assert_eq!(
++        violated_invariants(&verdicts_on_the_clean_image),
++        Vec::<&str>::new(),
++        "干净镜像上一条都不红：{verdicts_on_the_clean_image:?}"
++    );
++    assert_eq!(
++        verdict(
++            &clean,
++            INSTANCE_TABLE_ROWS_PUBLISHED_BEFORE_THE_ROOT_REFERENCING_THEM
++        ),
++        InvariantVerdict::Holds,
++        "干净镜像上 I-3.12 要真被评估过且成立"
++    );
++    for (invariant, mutation) in known_bad_images_of_the_instance_table_rows() {
++        let mut image = clean.clone();
++        mutation(&mut image);
++        let verdicts = check_pool_image(&image);
++        assert_eq!(
++            violated_invariants(&verdicts),
++            [invariant],
++            "判红的该只有 {invariant}：{verdicts:?}"
++        );
++    }
++}
++
++/// 系统配置字段表里在飞记录数上限（4 字节）、最坏占用（8 字节）、安全系数 F（4 字节）、io_min（4 字节）的偏移
++/// （`.claude/kb/layout/01-first-txn.md` 一：环长 333 + 8 → 记录尺寸 341 + 4 → 在飞上限 345 → 最坏占用 349 → F 357 → R 361；io_min 在 425）。
++const SYSTEM_CONFIGURATION_IN_FLIGHT_RECORD_LIMIT_OFFSET: usize = 345;
++const SYSTEM_CONFIGURATION_WORST_CASE_OCCUPANCY_OFFSET: usize = 349;
++const SYSTEM_CONFIGURATION_SAFETY_FACTOR_OFFSET: usize = 357;
++const SYSTEM_CONFIGURATION_MINIMUM_INPUT_OUTPUT_OFFSET: usize = 425;
++
++/// 环长 805 306 368 字节 ÷ 4096 = 196 608 条：F 取比它大 1 的值时 ⌊环长 ÷ 4096 ÷ F⌋ = 0，三个字段等式取在飞上限 0、最坏占用 0 照样成立。
++const SAFETY_FACTOR_PAST_THE_RING_RECORD_COUNT: u32 = 196_609;
++
++/// 根槽距 4096 的两倍：io_min 声明成它，判定宽度跟着成 8192，槽 1（区域起点 + 4096）不是它的整数倍。
++const MINIMUM_INPUT_OUTPUT_TWICE_THE_ROOT_SLOT_SPACING: u32 = 8192;
++
++/// 全池四个系统配置槽（两块盘各两槽）：(盘, 偏移)。槽 1 的偏移按改之前槽 0 记的槽距取。
++fn every_system_configuration_slot(image: &MemoryPool) -> Vec<(u32, u64)> {
++    DEVICES
++        .iter()
++        .flat_map(|device| {
++            [
++                (*device, 0),
++                (
++                    *device,
++                    system_configuration_slot_one_offset(image, *device),
++                ),
++            ]
++        })
++        .collect()
++}
++
++/// I-8.1（环几何够大）与 I-7.5（根槽按判定宽度对齐）的坏镜像，建在**写完新池新建文件**那份干净镜像上：每份改系统配置的字段、重封整槽校验和，
++/// 只红它自己那一条（`research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 4、5 行）。
++fn known_bad_images_of_the_ring_geometry_and_the_root_slot_alignment(
++) -> Vec<(&'static str, Mutation)> {
++    vec![
++        // I-8.1 三个字段等式各一份，都只改盘 0 槽 0、重封，另外两个等式照样成立：
++        // ① 在飞上限加 1、最坏占用跟着改成新上限 × 4096——只有「在飞上限 = ⌊环长 ÷ 4096 ÷ F⌋」不成立；
++        (
++            JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
++            Box::new(|image: &mut MemoryPool| {
++                mutate_system_configuration_slot(image, 0, 0, |bytes| {
++                    let limit =
++                        get_u32(bytes, SYSTEM_CONFIGURATION_IN_FLIGHT_RECORD_LIMIT_OFFSET) + 1;
++                    set_u32(
++                        bytes,
++                        SYSTEM_CONFIGURATION_IN_FLIGHT_RECORD_LIMIT_OFFSET,
++                        limit,
++                    );
++                    set_u64(
++                        bytes,
++                        SYSTEM_CONFIGURATION_WORST_CASE_OCCUPANCY_OFFSET,
++                        u64::from(limit) * 4096,
++                    );
++                });
++            }),
++        ),
++        // ② 最坏占用多 4096——只有「最坏占用 = 在飞上限 × 4096」不成立；
++        (
++            JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
++            Box::new(|image: &mut MemoryPool| {
++                mutate_system_configuration_slot(image, 0, 0, |bytes| {
++                    let worst = get_u64(bytes, SYSTEM_CONFIGURATION_WORST_CASE_OCCUPANCY_OFFSET);
++                    set_u64(
++                        bytes,
++                        SYSTEM_CONFIGURATION_WORST_CASE_OCCUPANCY_OFFSET,
++                        worst + 4096,
++                    );
++                });
++            }),
++        ),
++        // ③ F 写 1、在飞上限与最坏占用按 F = 1 算——两个等式成立，只有「F ≥ 2」不成立。
++        (
++            JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
++            Box::new(|image: &mut MemoryPool| {
++                mutate_system_configuration_slot(image, 0, 0, |bytes| {
++                    let ring_records = JOURNAL_RING_BYTES_OF_THE_POOL / 4096;
++                    set_u32(bytes, SYSTEM_CONFIGURATION_SAFETY_FACTOR_OFFSET, 1);
++                    set_u32(
++                        bytes,
++                        SYSTEM_CONFIGURATION_IN_FLIGHT_RECORD_LIMIT_OFFSET,
++                        u32::try_from(ring_records).expect("环里 196 608 条"),
++                    );
++                    set_u64(
++                        bytes,
++                        SYSTEM_CONFIGURATION_WORST_CASE_OCCUPANCY_OFFSET,
++                        ring_records * 4096,
++                    );
++                });
++            }),
++        ),
++        // I-8.1「同一次发布的记录数 ≤ 在飞上限」那一半：四个槽都把 F 抬到 196 609、在飞上限与最坏占用跟着写 0——三个等式照样成立，
++        // 而新池新建文件那几次发布每次至少一条记录，多于在飞上限 0。
++        (
++            JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
++            Box::new(|image: &mut MemoryPool| {
++                for (device, offset) in every_system_configuration_slot(image) {
++                    mutate_system_configuration_slot(image, device, offset, |bytes| {
++                        set_u32(
++                            bytes,
++                            SYSTEM_CONFIGURATION_SAFETY_FACTOR_OFFSET,
++                            SAFETY_FACTOR_PAST_THE_RING_RECORD_COUNT,
++                        );
++                        set_u32(bytes, SYSTEM_CONFIGURATION_IN_FLIGHT_RECORD_LIMIT_OFFSET, 0);
++                        set_u64(bytes, SYSTEM_CONFIGURATION_WORST_CASE_OCCUPANCY_OFFSET, 0);
++                    });
++                }
++            }),
++        ),
++        // I-7.5：四个槽的 io_min 都声明成 8192，判定宽度成 8192，根环里每个奇数号槽（区域起点 + 4096 × 奇数）不对齐。
++        (
++            ROOT_SLOTS_ALIGNED_TO_THE_DECISION_WIDTH,
++            Box::new(|image: &mut MemoryPool| {
++                for (device, offset) in every_system_configuration_slot(image) {
++                    mutate_system_configuration_slot(image, device, offset, |bytes| {
++                        set_u32(
++                            bytes,
++                            SYSTEM_CONFIGURATION_MINIMUM_INPUT_OUTPUT_OFFSET,
++                            MINIMUM_INPUT_OUTPUT_TWICE_THE_ROOT_SLOT_SPACING,
++                        );
++                    });
++                }
++            }),
++        ),
++    ]
++}
++
++/// 上面那批坏镜像各自**只**红在自己那一条上；干净镜像上 I-8.1 与 I-7.5 真被评估过且成立。
++#[test]
++fn each_ring_geometry_and_root_slot_alignment_bad_image_reddens_only_its_own_invariant() {
++    let clean = build_pool("known-bad-ring-geometry-and-root-slot-alignment").memory_pool();
++    let verdicts_on_the_clean_image = check_pool_image(&clean);
++    for invariant in [
++        JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
++        ROOT_SLOTS_ALIGNED_TO_THE_DECISION_WIDTH,
++    ] {
++        assert_eq!(
++            verdict(&clean, invariant),
++            InvariantVerdict::Holds,
++            "干净镜像上 {invariant} 要真被评估过且成立：{verdicts_on_the_clean_image:?}"
++        );
++    }
++    for (invariant, mutation) in known_bad_images_of_the_ring_geometry_and_the_root_slot_alignment()
++    {
++        let mut image = clean.clone();
++        mutation(&mut image);
++        let verdicts = check_pool_image(&image);
++        assert_eq!(
++            violated_invariants(&verdicts),
++            [invariant],
++            "判红的该只有 {invariant}：{verdicts:?}"
++        );
++    }
++}
++
++/// 翻一个系统配置槽里的一个字节、不重封：magic 照旧，整槽校验和对不上，这一槽不自证。
++fn break_the_system_configuration_slot_without_resealing(
++    image: &mut MemoryPool,
++    device: u32,
++    offset: u64,
++) {
++    const BYTE_INSIDE_THE_CHECKSUMMED_SLOT: usize = 300;
++    let mut bytes = read(image, device, offset, 4096);
++    bytes[BYTE_INSIDE_THE_CHECKSUMMED_SLOT] ^= 0xff;
++    write(image, device, offset, &bytes);
++}
++
++/// I-8.5（tail 槽有效集非空，V-池）的坏镜像：全池四个系统配置槽各翻一个字节、不重封——一个自证过的槽都不剩。
++fn known_bad_images_of_the_tail_slot_witnesses() -> Vec<(&'static str, Mutation)> {
++    vec![(
++        SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION,
++        Box::new(|image: &mut MemoryPool| {
++            for (device, offset) in every_system_configuration_slot(image) {
++                break_the_system_configuration_slot_without_resealing(image, device, offset);
++            }
++        }),
++    )]
++}
++
++/// 全池皆废：I-8.5 判红，别的每一条都报不适用（这不是一个挂得上的镜像）；干净镜像上 I-8.5 真被评估过且成立。
++#[test]
++fn no_self_verified_system_configuration_slot_on_any_device_reddens_the_tail_slot_invariant_and_every_other_is_not_applicable(
++) {
++    let clean = build_pool("known-bad-tail-slot-witnesses").memory_pool();
++    assert_eq!(
++        verdict(
++            &clean,
++            SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION
++        ),
++        InvariantVerdict::Holds,
++        "干净镜像上 I-8.5 要真被评估过且成立"
++    );
++    for (invariant, mutation) in known_bad_images_of_the_tail_slot_witnesses() {
++        let mut image = clean.clone();
++        mutation(&mut image);
++        let verdicts = check_pool_image(&image);
++        assert_eq!(
++            violated_invariants(&verdicts),
++            [invariant],
++            "判红的该只有 {invariant}：{verdicts:?}"
++        );
++        let judged_other_than_not_applicable: Vec<&(&str, InvariantVerdict)> = verdicts
++            .iter()
++            .filter(|(name, found)| {
++                *name != invariant && !matches!(found, InvariantVerdict::NotApplicable(_))
++            })
++            .collect();
++        assert!(
++            judged_other_than_not_applicable.is_empty(),
++            "全池皆废时别的每一条都该报不适用：{judged_other_than_not_applicable:?}"
++        );
++    }
++}
++
++/// 单盘全废不进违例通道：盘 1 两槽都翻坏，I-8.5 照样成立（盘 0 有自证过的槽），旁路报告点名盘 1 两槽都废、可写挂载会拒。
++/// 只坏盘 0 的槽 0 时盘 0 少一槽自证过，旁路报告只报它可写挂载会拒；干净镜像上旁路报告两样都空。
++#[test]
++fn a_device_short_of_self_verified_system_configuration_slots_is_reported_aside_while_the_tail_slot_invariant_holds(
++) {
++    use singlefs_checker::image::{
++        system_configuration_redundancy_report, SystemConfigurationRedundancyReport,
++    };
++    let clean = build_pool("tail-slot-witnesses-reported-aside").memory_pool();
++    assert_eq!(
++        system_configuration_redundancy_report(&clean),
++        SystemConfigurationRedundancyReport {
++            devices_without_a_self_verified_slot: Vec::new(),
++            devices_whose_writable_mount_would_be_refused: Vec::new(),
++        },
++        "干净镜像上每块盘两槽都自证过"
++    );
++    let mut device_one_lost = clean.clone();
++    let slot_one_offset_of_device_one = system_configuration_slot_one_offset(&clean, 1);
++    for offset in [0, slot_one_offset_of_device_one] {
++        break_the_system_configuration_slot_without_resealing(&mut device_one_lost, 1, offset);
++    }
++    assert_eq!(
++        verdict(
++            &device_one_lost,
++            SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION
++        ),
++        InvariantVerdict::Holds,
++        "盘 0 两槽都还自证过：单盘全废不判违例"
++    );
++    assert_eq!(
++        system_configuration_redundancy_report(&device_one_lost),
++        SystemConfigurationRedundancyReport {
++            devices_without_a_self_verified_slot: vec![1],
++            devices_whose_writable_mount_would_be_refused: vec![1],
++        }
++    );
++    let mut one_slot_of_device_zero_lost = clean.clone();
++    break_the_system_configuration_slot_without_resealing(&mut one_slot_of_device_zero_lost, 0, 0);
++    assert_eq!(
++        system_configuration_redundancy_report(&one_slot_of_device_zero_lost),
++        SystemConfigurationRedundancyReport {
++            devices_without_a_self_verified_slot: Vec::new(),
++            devices_whose_writable_mount_would_be_refused: vec![0],
++        }
++    );
++}
++
++/// 干净镜像（最新根之上没有记录）上 I-4.1 报的不适用理由。
++const NOTHING_APPLIED_ABOVE_THE_CHOSEN_ROOT: &str =
++    "所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2";
++
++/// 记录头里新根段（99 起）的树表指针（新根段 [0..86)）两条位置条目的整单元校验和（指针 50 + 10、64 + 10）。
++const JOURNAL_RECORD_NEW_TREE_TABLE_POINTER_CHECKSUMS: [usize; 2] = [99 + 50 + 10, 99 + 64 + 10];
++
++/// 发布 B 那条记录的计数器（新池新建文件写到 3，B 是第 4 条）。
++const COUNTER_OF_THE_OVERWRITE_RECORD: u64 = 4;
++
++/// I-4.1（重放后树可遍历）的坏镜像，建在「发布 B 的记录两盘都落了、根槽没落」那份崩溃镜像上：B 那条记录新根段里树表指针的两条位置条目的
++/// 校验和各加 1、重封记录头（新根段在头里，载荷校验和不动）。点名项一个字节不动 ⇒ 点名单元照样两份都验得过、记录照样施加，
++/// 施加出来那一版的树表两份都读不对。
++fn known_bad_images_of_the_replayed_version() -> Vec<(&'static str, Mutation)> {
++    vec![(
++        TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
++        Box::new(|image: &mut MemoryPool| {
++            let offset = singlefs_core::journal::record_offset(
++                COUNTER_OF_THE_OVERWRITE_RECORD,
++                singlefs_format::JOURNAL_RING_DEFAULT_BYTES,
++            )
++            .0;
++            for device in DEVICES {
++                let mut record = read(image, device, offset, 4096);
++                assert_eq!(
++                    get_u64(&record, JOURNAL_RECORD_CHECKPOINT_TXG_OFFSET),
++                    4,
++                    "盘 {device} 计数器 4 那条记录是发布 B（txg 4）"
++                );
++                for checksum_offset in JOURNAL_RECORD_NEW_TREE_TABLE_POINTER_CHECKSUMS {
++                    let checksum = get_u32(&record, checksum_offset);
++                    set_u32(&mut record, checksum_offset, checksum.wrapping_add(1));
++                }
++                let digest = wide_checksum_with_field_zeroed(&record, 4096, 46);
++                record[46..78].copy_from_slice(&digest);
++                write(image, device, offset, &record);
++            }
++        }),
++    )]
++}
++
++/// 崩在发布 B 的记录落了、根槽没落：下一次挂载施加 B 那条记录，重放之后那一版走得完 ⇒ I-4.1 真被评估过且成立、一条都不红；
++/// B 的新根段里树表指针读不对 ⇒ **只**红 I-4.1。
++#[test]
++fn a_replayed_version_whose_tree_table_does_not_read_back_reddens_only_the_replayed_version_invariant(
++) {
++    let clean =
++        crash_image_with_the_overwrite_record_but_not_its_root("known-bad-replayed-version");
++    let verdicts_on_the_clean_image = check_pool_image(&clean);
++    assert_eq!(
++        violated_invariants(&verdicts_on_the_clean_image),
++        Vec::<&str>::new(),
++        "干净的崩溃镜像上一条都不红：{verdicts_on_the_clean_image:?}"
++    );
++    assert_eq!(
++        verdict(&clean, TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE),
++        InvariantVerdict::Holds,
++        "B 那条记录被重放、施加出来的那一版走得完：I-4.1 真被评估过且成立"
++    );
++    for (invariant, mutation) in known_bad_images_of_the_replayed_version() {
++        let mut image = clean.clone();
++        mutation(&mut image);
++        let verdicts = check_pool_image(&image);
++        assert_eq!(
++            violated_invariants(&verdicts),
++            [invariant],
++            "判红的该只有 {invariant}：{verdicts:?}"
++        );
++    }
++}
++
++/// 起点含介质损坏不在 I-4.1 判的合法镜像里（`research/prompts/m3-inv-a-r1-main-verification.md` 第四节用户定案第 1 条）：
++/// B 那条记录第一个点名单元在盘 1 上那一份翻一个字节，前缀停在 B 那条（两份都验过才施加）⇒ I-4.1 报不适用，不报成立也不报违例。
++#[test]
++fn a_replay_stopped_by_a_named_unit_that_does_not_verify_leaves_the_replayed_version_invariant_not_applicable(
++) {
++    let mut image =
++        crash_image_with_the_overwrite_record_but_not_its_root("replay-stopped-by-a-named-unit");
++    let offset = singlefs_core::journal::record_offset(
++        COUNTER_OF_THE_OVERWRITE_RECORD,
++        singlefs_format::JOURNAL_RING_DEFAULT_BYTES,
++    )
++    .0;
++    let record = read(&image, 0, offset, 4096);
++    assert!(
++        get_u32(&record, JOURNAL_RECORD_NAMED_COUNT_OFFSET) > 0,
++        "B 那条记录有点名项"
++    );
++    let second_location = JOURNAL_RECORD_HEADER_BYTES + 14;
++    let named_device = get_u32(&record, second_location);
++    let mut named_slot_bytes = [0u8; 8];
++    named_slot_bytes[..6].copy_from_slice(&record[second_location + 4..second_location + 10]);
++    let named_slot = u64::from_le_bytes(named_slot_bytes);
++    let mut unit = read(&image, named_device, named_slot * SLOT, 16384);
++    unit[1000] ^= 0xff;
++    write(&mut image, named_device, named_slot * SLOT, &unit);
++    match verdict(&image, TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE) {
++        InvariantVerdict::NotApplicable(reason) => assert!(
++            reason.contains("介质损坏"),
++            "报不适用的理由要说是起点含介质损坏：{reason}"
++        ),
++        other => panic!("点名单元一份验不过时 I-4.1 该报不适用，实际 {other:?}"),
++    }
++}
++
++/// 根记录里实例表指针（170 起）头部出生 txg 的偏移（指针偏移 42）。
++const ROOT_RECORD_INSTANCE_TABLE_POINTER_BIRTH_TXG_OFFSET: usize =
++    ROOT_RECORD_INSTANCE_TABLE_POINTER_OFFSET + 42;
++
++/// I-1.2（块头写序已发布） 状态收窄（`research/prompts/m3-inv-b-r1-main-verification.md` 第二节第 3 行）：实例表单元按例外只免谓词那一半，
++/// 指着它的指针与它头里的出生身份仍要相等。新池新建文件那条根（txg 3）的实例表指针出生 txg 加 1、重封根槽：实例表本身一个字节不动 ⇒
++/// **只**红 I-1.2。
++#[test]
++fn an_instance_table_pointer_whose_birth_txg_differs_from_the_instance_table_header_reddens_only_the_birth_identity_invariant(
++) {
++    let clean = build_pool("known-bad-instance-table-pointer-birth").memory_pool();
++    assert_eq!(
++        verdict(&clean, "I-1.2"),
++        InvariantVerdict::Holds,
++        "干净镜像上 I-1.2 真被评估过且成立"
++    );
++    let mut image = clean.clone();
++    let (device, offset) = NEW_POOL_FILE_CREATION_ROOT_SLOT;
++    let mut root = read(&image, device, offset, 512);
++    assert_eq!(get_u64(&root, 28), 3, "这一槽是新池新建文件那条根（txg 3）");
++    let birth_txg = get_u64(&root, ROOT_RECORD_INSTANCE_TABLE_POINTER_BIRTH_TXG_OFFSET);
++    set_u64(
++        &mut root,
++        ROOT_RECORD_INSTANCE_TABLE_POINTER_BIRTH_TXG_OFFSET,
++        birth_txg + 1,
++    );
++    let digest = wide_checksum_with_field_zeroed(&root, 512, 138);
++    root[138..170].copy_from_slice(&digest);
++    write(&mut image, device, offset, &root);
++    let verdicts = check_pool_image(&image);
++    assert_eq!(
++        violated_invariants(&verdicts),
++        ["I-1.2"],
++        "判红的该只有 I-1.2：{verdicts:?}"
++    );
++}
++
++/// 翻一个单元两份各一个载荷字节，不重封、不补引用链：位置条目校验和对不上，只读不判那一遍读不出它。
++fn break_both_copies_of_the_unit(image: &mut MemoryPool, slot: u64, length: usize) {
++    for device in DEVICES {
++        let mut bytes = read(image, device, slot * SLOT, length);
++        bytes[length - 100] ^= 0xff;
++        write(image, device, slot * SLOT, &bytes);
++    }
++}
++
++/// I-3.9（释放代落在停止引用它的那一格区间里） 守卫收窄的正例（攻方 `research/prompts/m3-inv-b-r1-opus-model/proto.diff` 的组合坏镜像）：
++/// 发布 B 之后那份镜像上 B 的释放代 4 改成 3，再把 A 那棵账的一片叶两份都翻坏——走不完的是 A（txg 3），它不比还引用那几个落点的最后一条根
++/// （L = A 自己）晚，那几条记录照判 ⇒ I-3.9 判红。整条按「任一候选根走不完就不适用」的守卫在这里放过释放代。
++#[test]
++fn a_wrong_release_generation_is_still_reddened_when_only_a_root_not_later_than_the_last_one_referencing_it_is_incomplete(
++) {
++    let mut image =
++        image_after_the_overwrite("release-generation-behind-an-earlier-incomplete-root");
++    assert_eq!(
++        mutate_allocation_leaves(
++            &mut image,
++            &UNITS_AFTER_OVERWRITE,
++            ALLOCATION_LEAVES_AFTER_OVERWRITE,
++            |bytes| rewrite_released_generations(bytes, 4, 3),
++        ),
++        24,
++        "B 的账里释放代 4 的记录两片叶合起来 24 条"
++    );
++    break_both_copies_of_the_unit(&mut image, ALLOCATION_LEAVES[0], 16384);
++    match verdict(&image, "I-3.9") {
++        InvariantVerdict::Violated(detail) => assert!(
++            detail.contains("释放代 3"),
++            "红在释放代 3 那几条上：{detail}"
++        ),
++        other => panic!("A 走不完而它不比 L 晚：I-3.9 照判、该红，实际 {other:?}"),
++    }
++}
++
++/// I-3.9 守卫收窄的对照格（攻方造出来的那一份）：步 5 那段历史抬 F 到 11（空发布 txg 15、16 不换用户可见树），再覆盖写一次（txg 17）
++/// 释放 txg 14 那一版的用户可见单元（释放代 17，真 L = 16）；把 txg 16 那条根自己的树表两份都翻坏，那几个落点藏在读不出的树表下面，
++/// 算出来的 L = 15、T = 16。比 L 晚的 txg 16 走不完 ⇒ 那几条跳过，I-3.9 报不适用、不红；不设防的判法在这里误红。
++#[test]
++fn release_generations_hidden_behind_a_later_incomplete_root_are_skipped_and_the_release_generation_invariant_is_not_applicable(
++) {
++    let mut pool =
++        pool_before_raising_the_floor("release-generation-behind-a-later-incomplete-root");
++    raise_the_floor(&mut pool, CheckpointTxg(11), CheckpointTxg(0));
++    assert_eq!(
++        pool.output.root.checkpoint_txg,
++        CheckpointTxg(16),
++        "抬 F 那串空发布最后一次是 txg 16"
++    );
++    let tree_table_of_the_last_raise = pool.output.unit(TransactionUnit::TreeTable).slot.0;
++    overwrite_and_advance(&mut pool, &content_seeded(1200, 3), InstanceGeneration(2));
++    assert_eq!(
++        pool.output.root.checkpoint_txg,
++        CheckpointTxg(17),
++        "抬 F 之后那次覆盖写是 txg 17"
++    );
++    let mut image = pool.memory_pool();
++    assert!(
++        !matches!(verdict(&image, "I-3.9"), InvariantVerdict::Violated(_)),
++        "翻坏之前 I-3.9 不红"
++    );
++    break_both_copies_of_the_unit(&mut image, tree_table_of_the_last_raise, 16384);
++    match verdict(&image, "I-3.9") {
++        InvariantVerdict::NotApplicable(reason) => assert!(
++            reason.contains("走不完"),
++            "报不适用的理由要说比 L 晚的候选根走不完：{reason}"
++        ),
++        other => panic!("落点藏在比 L 晚、走不完的根后面：I-3.9 该报不适用，实际 {other:?}"),
++    }
++}
+diff --git a/crates/singlefs-harness/tests/writable_mount_of_a_formatted_pool.rs b/crates/singlefs-harness/tests/writable_mount_of_a_formatted_pool.rs
+index ef43f49..a0f3ddb 100644
+--- a/crates/singlefs-harness/tests/writable_mount_of_a_formatted_pool.rs
++++ b/crates/singlefs-harness/tests/writable_mount_of_a_formatted_pool.rs
+@@ -538,7 +538,9 @@ fn region_device(txg: u64) -> DeviceIdentity {
+ /// （D23（journal 的角色与格式） 已定项 19 ①）。I-8.8（前缀里的事务不被切开） 是因为没有哪个非 0 事务号落了两条记录、
+ /// 也没有哪一组一条提交标记都没有。I-9.15（inode 记录的 blocks 等于 ⌈size ÷ 512⌉） 与 I-9.7 同一个理由：一条 inode 记录都没有。
+ /// I-7.9（回退下界 F 不高于抬 F 的上限） 是因为没抬过 F：每条根带的 F 都是 0（这个文件里哪一步都不抬，下面四张表都有它）。
+-const NOT_APPLICABLE_WITHOUT_FILE: [&str; 21] = [
++/// I-4.1（重放后树可遍历） 五张表都有：这个文件里每一步的镜像都是发布完才看的，最新根之上没有记录，重放一次都不施加
++/// （阳性对照与坏镜像在 `checker_known_bad_images.rs` 那份「发布 B 的记录落了、根槽没落」的崩溃镜像上）。
++const NOT_APPLICABLE_WITHOUT_FILE: [&str; 27] = [
+     "I-1.10",
+     "I-3.1",
+     "I-3.9",
+@@ -560,12 +562,18 @@ const NOT_APPLICABLE_WITHOUT_FILE: [&str; 21] = [
+     "I-9.14",
+     "I-9.15",
+     MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
++    "I-8.11",
++    "I-9.25",
++    "I-3.13",
++    "I-9.26",
++    "I-3.12",
++    "I-4.1",
+ ];
+ 
+ /// mkfs 刚写完那一份要多报两条不适用：journal 环整段是 0，一条自证过的记录都没有 ⇒ I-8.6（反向链算法） 与
+ /// I-8.9（一次发布的记录序号连续且只有末条带标志） 都没有判的对象。
+ /// 可写挂载之后环里有记录（写行 / 暖机的空发布），它们就真被评估过了——所以这两条只在 mkfs 之后那一格。
+-const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 23] = [
++const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 31] = [
+     "I-1.10",
+     "I-3.1",
+     "I-3.9",
+@@ -589,9 +597,17 @@ const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 23] = [
+     "I-9.14",
+     "I-9.15",
+     MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
++    "I-8.10",
++    "I-8.11",
++    "I-9.25",
++    "I-3.13",
++    "I-9.26",
++    "I-3.12",
++    "I-8.12",
++    "I-4.1",
+ ];
+ 
+-/// 写完第一个文件版本之后仍报不适用的那四条：
++/// 写完第一个文件版本之后仍报不适用的那五条（I-4.1 的理由见 `NOT_APPLICABLE_WITHOUT_FILE`）：
+ /// I-7.9（回退下界 F 不高于抬 F 的上限）——没抬过 F，没有抬 F 的根可判（坏镜像与阳性对照在 `checker_known_bad_images.rs` 步 5 那段历史上）；
+ /// I-9.14——树表条目只出现在这一条根的树表里（mkfs 种的第 0 版树表是空的、两次暖机空发布不写树表），
+ /// 它要同一棵树的条目出现在两个树表单元里才比得出来；
+@@ -600,7 +616,13 @@ const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 23] = [
+ /// I-8.8（前缀里的事务不被切开）——第一版一事务一条、每条都带提交标记，③ ④ 没有对象。
+ /// 三条比得出来的镜像都在 `checker_known_bad_images.rs`（再覆盖写一次：树表两版、事务号 1 与 2；
+ /// B 之后再接一事务两条记录的阳性对照与坏镜像）。
+-const NOT_APPLICABLE_WITH_ONE_FILE_VERSION: [&str; 4] = ["I-7.9", "I-8.7", "I-8.8", "I-9.14"];
++const NOT_APPLICABLE_WITH_ONE_FILE_VERSION: [&str; 5] =
++    ["I-7.9", "I-8.7", "I-8.8", "I-9.14", "I-4.1"];
++
++/// 只有实例 1 的池上第一个文件版本之后：比 `NOT_APPLICABLE_WITH_ONE_FILE_VERSION` 多 I-3.12（实例表行 T 低于引用它的根的 txg）——
++/// 实例表一行都没有（写过行的那一份上它真被评估过且成立）。
++const NOT_APPLICABLE_WITH_ONE_FILE_VERSION_OF_THE_ONLY_INSTANCE: [&str; 6] =
++    ["I-7.9", "I-8.7", "I-8.8", "I-9.14", "I-3.12", "I-4.1"];
+ 
+ /// 树表 0 条的一版上写行那次发布之后：比 `NOT_APPLICABLE_WITHOUT_FILE` 少 I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号）、
+ /// I-1.10（码 2 条目宽等于字段表宽）、I-3.9（释放代落在停止引用它的那一格区间里） 与 I-5.4（分配记录罩住的槽互不相交） 四条。
+@@ -609,7 +631,7 @@ const NOT_APPLICABLE_WITH_ONE_FILE_VERSION: [&str; 4] = ["I-7.9", "I-8.7", "I-8.
+ /// I-3.10 在这一格真被评估过；这棵树按位置寻址（D8（核心索引结构） 已定项 14），checker 从根记录那一项按位置走下去、每个节点判条目宽，
+ /// I-1.10 也真被评估过。checker 把根记录直接持有的那一棵并进候选根的分配记录（实审 B2）：被换下的 mkfs 那片实例表带释放标志，
+ /// I-3.9 判它的释放代；I-5.4 判这棵树里的记录两两不相交——两条都真被评估过且成立。
+-const NOT_APPLICABLE_AFTER_THE_ROW_PUBLISH_WITHOUT_FILE: [&str; 17] = [
++const NOT_APPLICABLE_AFTER_THE_ROW_PUBLISH_WITHOUT_FILE: [&str; 21] = [
+     "I-3.1",
+     "I-3.11",
+     "I-5.2",
+@@ -627,6 +649,10 @@ const NOT_APPLICABLE_AFTER_THE_ROW_PUBLISH_WITHOUT_FILE: [&str; 17] = [
+     "I-9.14",
+     "I-9.15",
+     MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
++    "I-9.25",
++    "I-3.13",
++    "I-9.26",
++    "I-4.1",
+ ];
+ 
+ /// 这一步的镜像上 checker 的每一条判决逐条核：`not_applicable` 里的报不适用，其余每一条都真被评估过且成立（一条违例都没有）。
+@@ -636,20 +662,29 @@ fn assert_checker_verdicts(pool: &FormattedPool, step: &str, not_applicable: &[&
+         verdicts.len(),
+         singlefs_checker::image::IMPLEMENTED_INVARIANTS.len()
+     );
+-    for (invariant, verdict) in &verdicts {
+-        if not_applicable.contains(invariant) {
+-            assert!(
+-                matches!(verdict, InvariantVerdict::NotApplicable(_)),
+-                "{step}：{invariant} 该报不适用：{verdict:?}"
+-            );
+-        } else {
+-            assert_eq!(
+-                *verdict,
+-                InvariantVerdict::Holds,
+-                "{step}：{invariant} 要真被评估过且成立"
+-            );
+-        }
+-    }
++    // 逐条核完再一起报：一次跑就看得全哪几条与登记的不符。
++    let mismatches: Vec<String> = verdicts
++        .iter()
++        .filter_map(|(invariant, verdict)| {
++            let expected_not_applicable = not_applicable.contains(invariant);
++            let matches_the_registration = if expected_not_applicable {
++                matches!(verdict, InvariantVerdict::NotApplicable(_))
++            } else {
++                *verdict == InvariantVerdict::Holds
++            };
++            (!matches_the_registration).then(|| {
++                format!(
++                    "{invariant} 登记的是{}，判的是 {verdict:?}",
++                    if expected_not_applicable {
++                        "不适用"
++                    } else {
++                        "真被评估过且成立"
++                    }
++                )
++            })
++        })
++        .collect();
++    assert_eq!(mismatches, Vec::<String>::new(), "{step}：与登记的判定不符");
+ }
+ 
+ /// 崩在暖机与第一个文件版本之间，重开照样写得出行：新池新建文件取号、暖机两次之后、第一个文件版本之前崩溃
+@@ -1164,7 +1199,7 @@ fn writable_mount_of_a_formatted_pool_takes_instance_one_publishes_two_zero_unit
+     assert_checker_verdicts(
+         &formatted,
+         "第一个文件版本之后",
+-        &NOT_APPLICABLE_WITH_ONE_FILE_VERSION,
++        &NOT_APPLICABLE_WITH_ONE_FILE_VERSION_OF_THE_ONLY_INSTANCE,
+     );
+     let reopened = formatted.reopen_cold();
+     let report = recover(&reopened, JournalPolicy::Consult);

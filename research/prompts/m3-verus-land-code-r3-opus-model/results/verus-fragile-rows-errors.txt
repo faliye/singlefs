@@ -1,0 +1,26 @@
+row36 r10: error: postcondition not satisfied
+row36 r10: error: while loop: Resource limit (rlimit) exceeded; consider rerunning with --profile for more details
+row36 r10: error: aborting due to 2 previous errors
+row36 r20: error: postcondition not satisfied
+row36 r20: error: aborting due to 1 previous error
+row45 r10: error: postcondition not satisfied
+row45 r10: error: invariant not satisfied at end of loop body
+row45 r10: error: invariant not satisfied before loop
+row45 r10: error: while loop: Resource limit (rlimit) exceeded; consider rerunning with --profile for more details
+row45 r10: error: aborting due to 4 previous errors
+row45 r20: error: postcondition not satisfied
+row45 r20: error: invariant not satisfied at end of loop body
+row45 r20: error: invariant not satisfied before loop
+row45 r20: error: aborting due to 3 previous errors
+row48 r10: error: invariant not satisfied at end of loop body
+row48 r10: error: invariant not satisfied before loop
+row48 r10: error: while loop: Resource limit (rlimit) exceeded; consider rerunning with --profile for more details
+row48 r10: error: aborting due to 3 previous errors
+row48 r20: error: invariant not satisfied at end of loop body
+row48 r20: error: invariant not satisfied before loop
+row48 r20: error: aborting due to 2 previous errors
+row87 r10: error: while loop: Resource limit (rlimit) exceeded; consider rerunning with --profile for more details
+row87 r10: error: invariant not satisfied before loop
+row87 r10: error: aborting due to 2 previous errors
+row87 r20: error: invariant not satisfied before loop
+row87 r20: error: aborting due to 1 previous error

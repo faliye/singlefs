@@ -1,0 +1,2 @@
+thread 'the_rotation_barrier_litmus_writer_follows_the_last_three_steps_of_every_recorded_publish' (2425458) panicked at crates/singlefs-harness/tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs:242:33:
+thread 'litmus_writer_threads_follow_the_recorded_publish_order' (2440001) panicked at crates/singlefs-harness/tests/publish_order_matches_litmus.rs:16:33:

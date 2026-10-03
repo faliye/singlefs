@@ -1,0 +1,5 @@
+thread 'the_same_image_read_cold_and_read_through_the_mount_state_gives_the_same_bytes' (3778190) panicked at crates/singlefs-harness/tests/mounted_read_by_offset.rs:689:5:
+assertion `left == right` failed: 挂载那一步全环扫一遍、两块盘各一遍：这就是 196 608 那一档，计数器数得出它
+  left: 393218
+ right: 393216
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

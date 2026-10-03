@@ -7,10 +7,10 @@
 - 推翻条件：真配置里写上 `ENABLE_ACROSS_MACHINES=1` 之后判法仍不退 0；或者在不设任何弄坏开关时，任一份自证报 ✗。
 
 ## 改过的文件
-research/scripts/multi-host-run.sh（新建）、layer0-shard-configuration-check.sh、layer0-shard-run.sh（只改第 42 行注释）、layer0-shard-run-selftest.sh、mutation-shard-run.sh、peer-host-lib.sh（只改第 27 行出路句）、.claude/gate.d/54-layer0-replay.sh（第 28、29、577 行）。54 号在 fixtures 下的样本里没有旧名，没有改。
+research/scripts/multi-host-run.sh（新建）、layer0-shard-configuration-check.sh、layer0-shard-run.sh（只改第 42 行注释）、layer0-shard-run-selftest.sh、mutation-shard-run.sh、peer-host-lib.sh（只改第 27 行出路句）、.claude/gate.d/checker-tier-layer0-replay.sh（第 28、29、577 行）。54 号在 fixtures 下的样本里没有旧名，没有改。
 `git diff --stat`（工作区对暂存区，就是这一轮的改动）当时只显示 multi-host-run.sh 那一份（`193 insertions`）。其余几份在我动手之前已经暂存，我的改动是换 inode 写回的，也落在工作区，`git diff HEAD --stat` 原样如下：
 ```
- .claude/gate.d/54-layer0-replay.sh                 |  34 +-
+ .claude/gate.d/checker-tier-layer0-replay.sh                 |  34 +-
  .../scripts/layer0-shard-configuration-check.sh    |  56 +-
  research/scripts/layer0-shard-run-selftest.sh      | 227 +++++++-
  research/scripts/layer0-shard-run.sh               | 252 ++++++--
@@ -62,8 +62,8 @@ exit=1
 
 ## 判法结论格式改了：54 号、59 号与两个驱动现在怎么读
 判法现在有三种结局：退 0 = 双机开；**退 3 = 双机关**（配置判得过，只是 ENABLE_ACROSS_MACHINES 不是 1，不连第二台）；退 1 = 判不过。`--emit-assignments` 多打 ENABLE_ACROSS_MACHINES、ENABLE_GPU 两行，没写的打 0。
-- 54 号第 510 行只看是不是退 0：退 3 会落进「双机分片：关（双机：关…）；每条用例单机跑」。行为是对的，可以不改；归 singlefs-29。
-- 59 号第 144 行用 `!` 判：退 3 会落进「本地配置判不过」那句话。**行为对**（照单机跑），**但措辞不对**（配置其实判得过），建议 singlefs-8f 按退 3 另报「双机：关」。
+- 54 号第 510 行只看是不是退 0：退 3 会落进「双机分片：关（双机：关…）；每条用例单机跑」。行为是对的，可以不改；归别的会话。
+- 59 号第 144 行用 `!` 判：退 3 会落进「本地配置判不过」那句话。**行为对**（照单机跑），**但措辞不对**（配置其实判得过），建议别的会话按退 3 另报「双机：关」。
 - mutation-shard-run.sh 与 layer0-shard-run.sh 单独调用、配置是退 3 时，都会拒（退 1）。前者走库里的 load，那一句写的是「判不过」，措辞同样不准，但只有 59 号调它，而 59 号已经先挡掉了这种情况。两份自证的配置里都加了 `ENABLE_ACROSS_MACHINES=1`，都全对。
 
 ## 输入指纹作废

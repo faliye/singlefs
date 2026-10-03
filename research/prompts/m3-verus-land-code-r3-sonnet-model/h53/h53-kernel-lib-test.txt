@@ -1,0 +1,13 @@
+run-with-memory-cap: 上限 6G 超过实测峰值 68M 的 2 倍，照理由放行：派发提示给定内存上限十二G，按其中六G跑
+run-with-memory-cap: 这个会话已有 6 条日常的在跑，照理由并行：同会话派出的几个腿各跑各的
+   Compiling singlefs-replay-prefix v0.1.0 (/tmp/claude-1000/m3-verus-land-code-r3-sonnet/h53tree/crates/singlefs-replay-prefix)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.30s
+     Running unittests src/lib.rs (target/release/deps/singlefs_replay_prefix-75cba5f275f60e1c)
+
+running 2 tests
+test tests::a_publish_whose_last_record_is_missing_is_not_applied_and_the_root_segment_stays ... ok
+test tests::a_two_record_publish_after_the_anchor_is_applied_whole_and_the_new_root_segment_comes_from_its_last_record ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+exit 0

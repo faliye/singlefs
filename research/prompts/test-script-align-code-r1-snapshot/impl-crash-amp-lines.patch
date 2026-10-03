@@ -1,0 +1,1514 @@
+diff --git a/crates/singlefs-checker-tier/src/crash.rs b/crates/singlefs-checker-tier/src/crash.rs
+index 5ab3932..1b029be 100644
+--- a/crates/singlefs-checker-tier/src/crash.rs
++++ b/crates/singlefs-checker-tier/src/crash.rs
+@@ -2741,6 +2741,91 @@ impl Layer0FindingsReporter {
+     }
+ }
+ 
++/// 长跑的枚举与核对按挂钟至少隔这么久打一行进度（`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」的进度间隔 5 分钟）：
++/// 一片、一块跑得比它久时，等着收的那条线程照样隔这么久打一行，不至于几个小时零输出。
++pub const PROGRESS_LINE_INTERVAL_IN_SECONDS: u64 = 300;
++
++/// 上一行进度打在什么时候（从这一趟开跑算起），离下一行到期还要等多久。时刻由调用方的时钟给，用例换成假的时钟。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct WallClockProgressLines {
++    interval: std::time::Duration,
++    last_line_at: std::time::Duration,
++}
++
++impl WallClockProgressLines {
++    #[must_use]
++    pub fn new(interval: std::time::Duration, started_at: std::time::Duration) -> Self {
++        Self {
++            interval,
++            last_line_at: started_at,
++        }
++    }
++
++    /// 间隔取 [`PROGRESS_LINE_INTERVAL_IN_SECONDS`]。
++    #[must_use]
++    pub fn every_progress_line_interval(started_at: std::time::Duration) -> Self {
++        Self::new(
++            std::time::Duration::from_secs(PROGRESS_LINE_INTERVAL_IN_SECONDS),
++            started_at,
++        )
++    }
++
++    /// 离下一行到期还剩多久；已经到期是 0。
++    #[must_use]
++    pub fn wait_before_the_next_line_is_due(
++        &self,
++        now: std::time::Duration,
++    ) -> std::time::Duration {
++        self.interval
++            .saturating_sub(now.saturating_sub(self.last_line_at))
++    }
++
++    /// 上一行之后时钟走过了整个间隔。
++    #[must_use]
++    pub fn wall_clock_line_is_due(&self, now: std::time::Duration) -> bool {
++        now.saturating_sub(self.last_line_at) >= self.interval
++    }
++
++    pub fn a_line_was_printed_at(&mut self, now: std::time::Duration) {
++        self.last_line_at = now;
++    }
++}
++
++/// [`receive_until_the_senders_are_gone_with_wall_clock_lines`] 交给调用方的一件事：收到一条消息（调用方照旧按片、按块打它那一行），
++/// 或者上一行之后过了整个间隔还没有新消息（调用方打一行按挂钟的进度）。
++pub enum ReceivedOrWallClockLineDue<Message> {
++    Received(Message),
++    WallClockLineDue { elapsed: std::time::Duration },
++}
++
++/// 一直收到发送端全部丢掉为止：每收到一条交给 `handle`（它按片、按块打一行，记成刚打过一行）；等的时候最多等到下一行到期，
++/// 到期还没收到就交一件 [`ReceivedOrWallClockLineDue::WallClockLineDue`]，让调用方打一行按挂钟的进度。`clock` 交回从这一趟开跑算起的时刻。
++/// `handle` panic 时原样往外传（接收端随调用方的栈一起丢掉，发送的线程下一次发不出去就退）。
++pub fn receive_until_the_senders_are_gone_with_wall_clock_lines<Message>(
++    receiver: &mpsc::Receiver<Message>,
++    progress: &mut WallClockProgressLines,
++    clock: &dyn Fn() -> std::time::Duration,
++    handle: &mut dyn FnMut(ReceivedOrWallClockLineDue<Message>),
++) {
++    loop {
++        let wait = progress.wait_before_the_next_line_is_due(clock());
++        match receiver.recv_timeout(wait) {
++            Ok(message) => {
++                handle(ReceivedOrWallClockLineDue::Received(message));
++                progress.a_line_was_printed_at(clock());
++            }
++            Err(mpsc::RecvTimeoutError::Timeout) => {
++                let now = clock();
++                if progress.wall_clock_line_is_due(now) {
++                    handle(ReceivedOrWallClockLineDue::WallClockLineDue { elapsed: now });
++                    progress.a_line_was_printed_at(now);
++                }
++            }
++            Err(mpsc::RecvTimeoutError::Disconnected) => break,
++        }
++    }
++}
++
+ /// 调用线程上等着按片号次序并进来的一片：这一趟跑完的，或从进度文件读回来的。
+ enum SliceWaitingToBeMerged {
+     FreshlyRun(FinishedSlice),
+@@ -3162,27 +3247,46 @@ pub fn enumerate_layer0_in_state_slices_or_one_shard_with_findings_log(
+             };
+         take_and_merge_the_slices_now_in_order(None);
+         let mut finished_states = 0u64;
+-        for (finished_slice_count, finished) in finished_slice_receiver.iter().enumerate() {
+-            let slice = &slices[finished.slice_index];
+-            finished_states += slice.end - slice.start;
+-            println!(
+-                "LAYER0_PROGRESS slice={}/{} states=[{},{}) segments={}..={} finished_slices={}/{} finished_states={finished_states}/{} resumed_slices={restored_slice_count} elapsed_seconds={:.1}",
+-                finished.slice_index + 1,
+-                slices.len(),
+-                slice.start,
+-                slice.end,
+-                plan.segment_label(plan.segment_of_state(slice.start)),
+-                plan.segment_label(plan.segment_of_state(slice.end - 1)),
+-                finished_slice_count + 1,
+-                slices_to_run.len(),
+-                states_of_this_run,
+-                started.elapsed().as_secs_f64()
+-            );
+-            take_and_merge_the_slices_now_in_order(Some((
+-                finished.slice_index,
+-                SliceWaitingToBeMerged::FreshlyRun(finished),
+-            )));
+-        }
++        let mut finished_slice_count = 0usize;
++        // 一片跑得比进度间隔久时（大段、慢机器），按片打的行之间照样隔一个间隔打一行 `LAYER0_PROGRESS by=wall_clock`
++        let clock = || started.elapsed();
++        let mut wall_clock_lines = WallClockProgressLines::every_progress_line_interval(clock());
++        receive_until_the_senders_are_gone_with_wall_clock_lines(
++            &finished_slice_receiver,
++            &mut wall_clock_lines,
++            &clock,
++            &mut |event| {
++                match event {
++                ReceivedOrWallClockLineDue::Received(finished) => {
++                    let slice = &slices[finished.slice_index];
++                    finished_states += slice.end - slice.start;
++                    finished_slice_count += 1;
++                    println!(
++                        "LAYER0_PROGRESS slice={}/{} states=[{},{}) segments={}..={} finished_slices={finished_slice_count}/{} finished_states={finished_states}/{} resumed_slices={restored_slice_count} elapsed_seconds={:.1}",
++                        finished.slice_index + 1,
++                        slices.len(),
++                        slice.start,
++                        slice.end,
++                        plan.segment_label(plan.segment_of_state(slice.start)),
++                        plan.segment_label(plan.segment_of_state(slice.end - 1)),
++                        slices_to_run.len(),
++                        states_of_this_run,
++                        started.elapsed().as_secs_f64()
++                    );
++                    take_and_merge_the_slices_now_in_order(Some((
++                        finished.slice_index,
++                        SliceWaitingToBeMerged::FreshlyRun(finished),
++                    )));
++                }
++                ReceivedOrWallClockLineDue::WallClockLineDue { elapsed } => println!(
++                    "LAYER0_PROGRESS by=wall_clock finished_slices={finished_slice_count}/{} finished_states={finished_states}/{} resumed_slices={restored_slice_count} elapsed_seconds={:.1}",
++                    slices_to_run.len(),
++                    states_of_this_run,
++                    elapsed.as_secs_f64()
++                ),
++            }
++            },
++        );
+         MergedSlicesOfThisRun {
+             tally: merged,
+             merged_slice_count: next_position_in_slices_of_this_run,
+@@ -4545,3 +4649,89 @@ mod oracle_instance_tests {
+         );
+     }
+ }
++
++#[cfg(test)]
++mod wall_clock_progress_line_tests {
++    use super::{
++        receive_until_the_senders_are_gone_with_wall_clock_lines, ReceivedOrWallClockLineDue,
++        WallClockProgressLines,
++    };
++    use std::cell::{Cell, RefCell};
++    use std::sync::mpsc;
++    use std::time::Duration;
++
++    const INTERVAL: Duration = Duration::from_secs(300);
++    /// 假时钟每读一次走这么久：比间隔长，每一次等都已经到期，不真等。
++    const CLOCK_STEP_LONGER_THAN_THE_INTERVAL: Duration = Duration::from_secs(301);
++    /// 假时钟读到这么多次就丢掉发送端，接收循环随之收尾（间隔判断坏了也收得了尾，用例红而不是卡住）。
++    const CLOCK_READS_BEFORE_THE_SENDER_IS_DROPPED: u32 = 12;
++
++    /// 一条消息都没来、假时钟每读一次走过一个间隔以上：每一次等完都要交一行按挂钟的进度，相邻两行之间假时钟走过的不超过两次读数。
++    #[test]
++    fn a_wall_clock_line_is_due_whenever_a_whole_interval_passes_without_a_message() {
++        let (sender, receiver) = mpsc::channel::<u64>();
++        let sender_still_open = RefCell::new(Some(sender));
++        let clock_reads = Cell::new(0u32);
++        let clock = || {
++            let reads = clock_reads.get() + 1;
++            clock_reads.set(reads);
++            if reads >= CLOCK_READS_BEFORE_THE_SENDER_IS_DROPPED {
++                sender_still_open.borrow_mut().take();
++            }
++            CLOCK_STEP_LONGER_THAN_THE_INTERVAL * reads
++        };
++        let mut progress = WallClockProgressLines::new(INTERVAL, Duration::ZERO);
++        let mut lines_at: Vec<Duration> = Vec::new();
++        receive_until_the_senders_are_gone_with_wall_clock_lines(
++            &receiver,
++            &mut progress,
++            &clock,
++            &mut |event| match event {
++                ReceivedOrWallClockLineDue::Received(message) => {
++                    panic!("没有发过消息，却收到了 {message}")
++                }
++                ReceivedOrWallClockLineDue::WallClockLineDue { elapsed } => lines_at.push(elapsed),
++            },
++        );
++        assert!(
++            lines_at.len() >= 5,
++            "假时钟走过 {} 次间隔以上，按挂钟的进度只交了 {} 行：{lines_at:?}",
++            CLOCK_READS_BEFORE_THE_SENDER_IS_DROPPED,
++            lines_at.len()
++        );
++        let mut previous = Duration::ZERO;
++        for line_at in &lines_at {
++            assert!(
++                line_at.saturating_sub(previous) <= CLOCK_STEP_LONGER_THAN_THE_INTERVAL * 2,
++                "两行之间假时钟走了 {:?}，过了间隔却没有一行：{lines_at:?}",
++                line_at.saturating_sub(previous)
++            );
++            previous = *line_at;
++        }
++    }
++
++    /// 消息接连到、时钟不走：每条消息交给调用方（它按片、按块打行），不多交一行按挂钟的进度。
++    #[test]
++    fn no_wall_clock_line_is_due_while_messages_arrive_within_the_interval() {
++        let (sender, receiver) = mpsc::channel::<u64>();
++        for message in 0..3 {
++            sender.send(message).expect("接收端还在");
++        }
++        drop(sender);
++        let clock = || Duration::from_secs(5);
++        let mut progress = WallClockProgressLines::new(INTERVAL, Duration::ZERO);
++        let mut received = Vec::new();
++        let mut wall_clock_lines = 0usize;
++        receive_until_the_senders_are_gone_with_wall_clock_lines(
++            &receiver,
++            &mut progress,
++            &clock,
++            &mut |event| match event {
++                ReceivedOrWallClockLineDue::Received(message) => received.push(message),
++                ReceivedOrWallClockLineDue::WallClockLineDue { .. } => wall_clock_lines += 1,
++            },
++        );
++        assert_eq!(received, vec![0, 1, 2], "每条消息按次序交给调用方");
++        assert_eq!(wall_clock_lines, 0, "间隔没过，不该有按挂钟的行");
++    }
++}
+diff --git a/crates/singlefs-checker-tier/src/crash_amplification.rs b/crates/singlefs-checker-tier/src/crash_amplification.rs
+index 8d9aff7..b99b274 100644
+--- a/crates/singlefs-checker-tier/src/crash_amplification.rs
++++ b/crates/singlefs-checker-tier/src/crash_amplification.rs
+@@ -24,10 +24,12 @@ use singlefs_harness::segments::StepKind;
+ use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
+ 
+ use crate::crash::{
+-    judge_layer0_state_range, layer0_state_ranges_by_segment, Layer0SegmentExpansion,
+-    LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE, LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE,
+-    LAYER0_RED_PASS_POOL_CHECKER, LAYER0_RED_PASS_RECORD_CHECKER,
+-    RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT, RECORD_CHECKER_ROOT_WITHOUT_RECORD,
++    judge_layer0_state_range, layer0_state_ranges_by_segment,
++    receive_until_the_senders_are_gone_with_wall_clock_lines, Layer0SegmentExpansion,
++    ReceivedOrWallClockLineDue, WallClockProgressLines, LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE,
++    LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE, LAYER0_RED_PASS_POOL_CHECKER,
++    LAYER0_RED_PASS_RECORD_CHECKER, RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT,
++    RECORD_CHECKER_ROOT_WITHOUT_RECORD,
+ };
+ use crate::crash_facts::{extract_flow_facts, verify_states_from_facts, FlowFacts};
+ use crate::crash_identity::{
+@@ -43,6 +45,64 @@ use crate::verdict_store::{
+ /// 一块最多几个状态：一块是一个 GPU 批、一次原子写、对账与分工的一个单位（里程碑二「增补 4」第十一项「一块取 2¹⁶ 个状态」）。
+ pub const STATES_PER_BLOCK: u64 = 1 << 16;
+ 
++/// 展开上限的环境变量：一段的写数不超过它就展开全部真子集，超过就不展开。全量脚本给全量的深度，没设由用例给默认。
++pub const EXPAND_UP_TO_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO";
++
++/// 展开上限：一段的写数不超过它，这一段展开全部真子集（[`Layer0SegmentExpansion::EveryProperSubset`]）；超过就不展开。
++/// 每一段都不超过它，这一趟就是全域（`exhaustive=true`）。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct ExpandUpToWritesPerSegment(pub usize);
++
++impl ExpandUpToWritesPerSegment {
++    /// 从 [`EXPAND_UP_TO_ENVIRONMENT_VARIABLE`] 取；没设用 `default_when_unset`。
++    ///
++    /// # Panics
++    /// 设了而认不出（不是非负整数、空串、不是 UTF-8）：写明变量名与值，不悄悄退回默认（规模变量写错照样跑完、照样退 0，
++    /// 跑的就不是要的那个规模）。
++    #[must_use]
++    pub fn from_environment_or(default_when_unset: usize) -> Self {
++        match std::env::var(EXPAND_UP_TO_ENVIRONMENT_VARIABLE) {
++            Ok(text) => Self::from_value_of_the_variable(Some(&text), default_when_unset),
++            Err(std::env::VarError::NotPresent) => Self(default_when_unset),
++            Err(std::env::VarError::NotUnicode(raw)) => panic!(
++                "{EXPAND_UP_TO_ENVIRONMENT_VARIABLE} 的值不是 UTF-8：{raw:?}；要写一个非负整数（一段最多几次写就展开）"
++            ),
++        }
++    }
++
++    /// 变量的值（`None` 是没设）换成展开上限。
++    ///
++    /// # Panics
++    /// 设了而不是非负整数：消息带变量名与原值。
++    #[must_use]
++    pub fn from_value_of_the_variable(value: Option<&str>, default_when_unset: usize) -> Self {
++        match value {
++            None => Self(default_when_unset),
++            Some(text) => Self(text.trim().parse::<usize>().unwrap_or_else(|_| {
++                panic!(
++                    "{EXPAND_UP_TO_ENVIRONMENT_VARIABLE}={text:?} 认不出：要写一个非负整数（一段最多几次写就展开），不退回默认的 {default_when_unset}"
++                )
++            })),
++        }
++    }
++
++    /// 一段按这个上限怎么展开。
++    #[must_use]
++    pub fn expansion_of(self, segment: &[usize]) -> Layer0SegmentExpansion {
++        if segment.len() <= self.0 {
++            Layer0SegmentExpansion::EveryProperSubset
++        } else {
++            Layer0SegmentExpansion::NotExpanded
++        }
++    }
++
++    /// 每一段都展开到了（全域）。
++    #[must_use]
++    pub fn covers_every_segment(self, segments: &[Vec<usize>]) -> bool {
++        segments.iter().all(|segment| segment.len() <= self.0)
++    }
++}
++
+ /// 一条流程里的一个崩溃点：名称（绑在设它的函数上）与它在写表里发出的写（下标区间）。
+ #[derive(Clone, Debug, PartialEq, Eq)]
+ pub struct CrashPointSpan {
+@@ -867,6 +927,10 @@ pub fn check_blocks_where_until(
+     // 判完按段序拼回一块、当场写库：中途被停，写进库的块下一次不再判。
+     let threads = checking_threads();
+     let mut tally = CheckingTally::default();
++    // 每一段判完打一行 `CRASH_AMPLIFICATION_BLOCK`；一段判得比进度间隔久时，等着收的这条线程隔一个间隔另打一行按挂钟的
++    let started = std::time::Instant::now();
++    let clock = || started.elapsed();
++    let mut wall_clock_lines = WallClockProgressLines::every_progress_line_interval(clock());
+     for (pending_index, (point_index, local)) in pending.iter().enumerate() {
+         if stop_is_requested() {
+             break;
+@@ -882,21 +946,49 @@ pub fn check_blocks_where_until(
+             pieces.push(start..end);
+             start = end;
+         }
+-        let judged: Vec<JudgedBlock> = std::thread::scope(|scope| {
+-            let handles: Vec<_> = pieces
+-                .iter()
+-                .map(|range| {
+-                    let range = range.clone();
+-                    scope.spawn(move || {
+-                        judge_one_block(flow, plan, *point_index, range, unit_checksums)
+-                    })
+-                })
+-                .collect();
+-            handles
+-                .into_iter()
+-                .map(|handle| handle.join().expect("核对线程没有 panic"))
+-                .collect()
++        let piece_count = pieces.len();
++        let mut judged: Vec<JudgedBlock> = std::thread::scope(|scope| {
++            let (judged_sender, judged_receiver) = std::sync::mpsc::channel::<JudgedBlock>();
++            for range in &pieces {
++                let range = range.clone();
++                let judged_sender = judged_sender.clone();
++                scope.spawn(move || {
++                    let piece = judge_one_block(flow, plan, *point_index, range, unit_checksums);
++                    // 发不出去说明收的这条线程已经走了（它 panic 了），这一段的结果没人要
++                    let _ = judged_sender.send(piece);
++                });
++            }
++            // 只留核对线程手里的发送端：它们都退出之后（判完或 panic），下面的接收才结束；有线程 panic 时 scope 收尾把它往外传
++            drop(judged_sender);
++            let mut arrived: Vec<JudgedBlock> = Vec::with_capacity(piece_count);
++            receive_until_the_senders_are_gone_with_wall_clock_lines(
++                &judged_receiver,
++                &mut wall_clock_lines,
++                &clock,
++                &mut |event| {
++                    match event {
++                    ReceivedOrWallClockLineDue::Received(piece) => arrived.push(piece),
++                    ReceivedOrWallClockLineDue::WallClockLineDue { elapsed } => eprintln!(
++                        "CRASH_AMPLIFICATION_BLOCK by=wall_clock point={} block_start={} pieces_finished={}/{piece_count} blocks_finished={}/{} states_finished={} elapsed_seconds={:.1}",
++                        point.name,
++                        local.start,
++                        arrived.len(),
++                        tally.blocks_checked,
++                        pending.len(),
++                        tally.states_checked,
++                        elapsed.as_secs_f64()
++                    ),
++                }
++                },
++            );
++            arrived
+         });
++        assert_eq!(
++            judged.len(),
++            piece_count,
++            "块 {pending_index} 的每一段都判完交回了（核对线程 panic 时上面的 scope 已经往外传）"
++        );
++        judged.sort_by_key(|piece| piece.local.start);
+         let mut items_of_each_state: Vec<Vec<String>> =
+             Vec::with_capacity(usize::try_from(local.end - local.start).expect("一块装得进 usize"));
+         let mut next_expected = local.start;
+@@ -1511,13 +1603,29 @@ pub fn judge_my_blocks_on_gpu_cards(
+         // 写库：按块序。后面的块先判完就在这里等，前面那一块到了一起写
+         let mut waiting: BTreeMap<usize, GpuJudgedBlock> = BTreeMap::new();
+         let mut next_to_store = 0usize;
+-        for message in receiver {
+-            match message {
+-                CardMessage::Finished(card_outcome) => outcome.cards.push(card_outcome),
+-                CardMessage::Refused(reason) => {
++        // 卡上判一块、编内核都可能比进度间隔久：等着收的这条线程隔一个间隔打一行按挂钟的
++        let clock = || started.elapsed();
++        let mut wall_clock_lines = WallClockProgressLines::every_progress_line_interval(clock());
++        receive_until_the_senders_are_gone_with_wall_clock_lines(
++            &receiver,
++            &mut wall_clock_lines,
++            &clock,
++            &mut |event| {
++                match event {
++                ReceivedOrWallClockLineDue::WallClockLineDue { elapsed } => eprintln!(
++                    "CRASH_AMPLIFICATION_BLOCK by=wall_clock judge=gpu blocks_stored={next_to_store}/{} blocks_waiting_for_an_earlier_block={} cards_finished={} elapsed_seconds={:.1}",
++                    pending.len(),
++                    waiting.len(),
++                    outcome.cards.len(),
++                    elapsed.as_secs_f64()
++                ),
++                ReceivedOrWallClockLineDue::Received(CardMessage::Finished(card_outcome)) => {
++                    outcome.cards.push(card_outcome);
++                }
++                ReceivedOrWallClockLineDue::Received(CardMessage::Refused(reason)) => {
+                     refusal.get_or_insert(reason);
+                 }
+-                CardMessage::Block(arrived_block) => {
++                ReceivedOrWallClockLineDue::Received(CardMessage::Block(arrived_block)) => {
+                     waiting.insert(arrived_block.pending_index, arrived_block);
+                     while let Some(block) = waiting.remove(&next_to_store) {
+                         if storing_error.is_some() {
+@@ -1547,7 +1655,8 @@ pub fn judge_my_blocks_on_gpu_cards(
+                     }
+                 }
+             }
+-        }
++            },
++        );
+         if storing_error.is_none() && refusal.is_none() {
+             // 领走的块（序号连着、从 0 起）每一块都写进了库；没被叫停时领走的就是全部
+             let taken = work
+@@ -1577,17 +1686,27 @@ pub fn judge_my_blocks_on_gpu_cards(
+     outcome.compile_seconds = outcome.cards.iter().map(|card| card.build_seconds).sum();
+     outcome.judge_seconds = (started.elapsed().as_secs_f64() - outcome.compile_seconds).max(0.0);
+     outcome.red_states = tally.red_states;
+-    eprintln!(
+-        "CRASH_AMPLIFICATION_GPU_TOTAL cards_used={} blocks={} states={} compile_seconds={:.1} judge_seconds={:.1} states_per_second={:.0} seconds_storing={:.1}",
++    Ok((tally, outcome))
++}
++
++/// GPU 判完这一趟打的那一行：判了多少、多快，连这一趟的展开上限与全域与否（[`run_from_environment`] 打，展开上限只有它知道）。
++#[must_use]
++pub fn gpu_total_line(
++    outcome: &GpuJudgeOutcome,
++    expand_up_to: ExpandUpToWritesPerSegment,
++    exhaustive: bool,
++) -> String {
++    format!(
++        "CRASH_AMPLIFICATION_GPU_TOTAL cards_used={} blocks={} states={} compile_seconds={:.1} judge_seconds={:.1} states_per_second={:.0} seconds_storing={:.1} expand_up_to={} exhaustive={exhaustive}",
+         outcome.cards_used,
+         outcome.blocks_judged,
+         outcome.states_judged,
+         outcome.compile_seconds,
+         outcome.judge_seconds,
+         outcome.states_per_second(),
+-        outcome.seconds_storing
+-    );
+-    Ok((tally, outcome))
++        outcome.seconds_storing,
++        expand_up_to.0
++    )
+ }
+ 
+ // ============================== 三段流的第 ②、③ 段：读事实核对，与判器逐状态比 ==============================
+@@ -1851,6 +1970,54 @@ pub struct StoredRedState {
+     pub items: Vec<String>,
+ }
+ 
++/// 这条流每个状态在库里、这一判法版本下的判定（判红的各项；绿的是空的），按整条流的状态序号排；这一判法版本下没判过的块，
++/// 它的状态是 `None`。复用与剪枝的对照拿它与不经库现判的结果逐态比。
++///
++/// # Errors
++/// 库读失败。
++///
++/// # Panics
++/// 判定块里的编号没在这个库里登记过，或块里的状态数与计划不符（库坏了）。
++pub fn read_verdict_items_of_every_state(
++    store: &VerdictStore,
++    plan: &CrashPlan,
++    version: &JudgeVersion,
++) -> Result<Vec<Option<Vec<String>>>, VerdictStoreError> {
++    let mut items_of_each_state = Vec::new();
++    for point in &plan.points {
++        for local in point.blocks() {
++            let state_count = usize::try_from(local.end - local.start).expect("一块装得进 usize");
++            match store.read_verdict_block(&point.block_key(&local), version)? {
++                None => items_of_each_state.extend(std::iter::repeat_n(None, state_count)),
++                Some(block) => {
++                    let numbers = block.verdict_vector_number_of_each_state();
++                    assert_eq!(
++                        numbers.len(),
++                        state_count,
++                        "点 {} 块 {} 存着的状态数与计划不符",
++                        point.path_number,
++                        local.start
++                    );
++                    for number in numbers {
++                        let vector = store
++                            .verdict_vector_of_number(*number)
++                            .expect("判定块里的编号在这个库里登记过");
++                        items_of_each_state.push(Some(if vector.0.is_empty() {
++                            Vec::new()
++                        } else {
++                            String::from_utf8_lossy(&vector.0)
++                                .split('\n')
++                                .map(str::to_string)
++                                .collect()
++                        }));
++                    }
++                }
++            }
++        }
++    }
++    Ok(items_of_each_state)
++}
++
+ /// 门禁一次读：这些点每一块在这一判法版本下的违例，按点、按序号交回。
+ ///
+ /// # Errors
+@@ -2197,6 +2364,34 @@ mod tests {
+         );
+     }
+ 
++    /// 展开上限的变量写坏了（不是非负整数）：panic，消息带变量名与原值，不悄悄退回默认。
++    #[test]
++    #[should_panic(expected = "SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=\"2B\" 认不出")]
++    fn an_unreadable_expand_up_to_value_panics_naming_the_variable_and_the_value() {
++        let _ = ExpandUpToWritesPerSegment::from_value_of_the_variable(Some("2B"), 6);
++    }
++
++    /// 没设取默认；设了照它（两头的空白不算）；按它判一段展不展开、整条流是不是全域。
++    #[test]
++    fn the_expand_up_to_value_is_the_default_when_unset_and_decides_each_segment() {
++        assert_eq!(
++            ExpandUpToWritesPerSegment::from_value_of_the_variable(None, 6),
++            ExpandUpToWritesPerSegment(6)
++        );
++        let limit = ExpandUpToWritesPerSegment::from_value_of_the_variable(Some(" 28\n"), 6);
++        assert_eq!(limit, ExpandUpToWritesPerSegment(28));
++        assert_eq!(
++            limit.expansion_of(&[0; 28]),
++            Layer0SegmentExpansion::EveryProperSubset
++        );
++        assert_eq!(
++            limit.expansion_of(&[0; 29]),
++            Layer0SegmentExpansion::NotExpanded
++        );
++        assert!(limit.covers_every_segment(&[vec![0; 2], vec![0; 28]]));
++        assert!(!limit.covers_every_segment(&[vec![0; 2], vec![0; 29]]));
++    }
++
+     #[test]
+     fn blocks_of_a_point_cover_its_states_without_gap() {
+         let point = PlannedCrashPoint {
+@@ -2454,6 +2649,79 @@ pub struct EnvironmentRun {
+     pub stopped_early: bool,
+     /// 这一趟判定行上的判法版本。
+     pub judge_version: JudgeVersion,
++    /// 这一趟的展开上限（调用方给的，与流自己的展开方式逐段核过）。
++    pub expand_up_to: ExpandUpToWritesPerSegment,
++    /// 每一段都不超过展开上限（全域）；测试代码里 ignore 的点另报，不算在这里。
++    pub exhaustive: bool,
++    /// 这一行报的复用态数，取法见 [`reuse_and_scale_fields_of_the_line`]。
++    pub states_reused: u64,
++    /// 测试代码里预设 ignore 的点（按登记整批不判的一类，不算剪枝）与因此没展开的态数。
++    pub ignored_points: usize,
++    pub states_skipped_by_ignore: u64,
++}
++
++/// 每一行 `CRASH_AMPLIFICATION ` 末尾都接的几个字段（汇总行、被叫停的行、`flow=` 行、两台跑的分份行与导入行，打法都在
++/// `crates/singlefs-checker-tier/tests/` 里调 [`run_from_environment`] 的用例）：
++///
++/// ` states_reused=<n> exhaustive=<true|false> expand_up_to=<n> ignored_points=<n> states_skipped_by_ignore=<n>`
++///
++/// - `states_reused`：这一趟分给本机的块（`SINGLEFS_CRASH_AMPLIFICATION_SHARE=<i>/<n>` 那一份；没设是整份）里，录入时库中已有这一判法版本
++///   的判定、这一趟因此没判的态数；导入之前数，导入进来的块不算。一项的几行加起来不重复计：一台跑（`share=0/1`）就是这一行；
++///   两台跑时 `share=0/2` 与 `share=1/2` 两行各报自己那一份（两份块不相交），导入那一趟（设了 `SINGLEFS_CRASH_AMPLIFICATION_IMPORT`）报 0
++///   （它那一份刚由 `share=0/2` 那一行判过或报过复用）；被叫停的那一趟（[`stop_is_requested_by_the_environment`]）报 0：它复用的与它判过的块
++///   都留在库里，同一份库上接着跑的那一趟录入时数进自己的 `states_reused`。
++/// - `exhaustive`：每一段的写数都不超过展开上限（全域）。全量的完成标记只认 `true`。
++/// - `expand_up_to`：这一趟的展开上限（[`ExpandUpToWritesPerSegment`]）。
++/// - `ignored_points`、`states_skipped_by_ignore`：测试代码里预设 ignore 的点数，与它们的段因此没展开的态数（不 ignore 时照流自己的展开方式
++///   该有的态数减去这一趟的）。ignore 是按登记整批不判的一类，不算剪枝，也不进复用的对照；入口的成功句照这两个数报跳过了多少。
++#[must_use]
++pub fn reuse_and_scale_fields_of_the_line(run: &EnvironmentRun) -> String {
++    format!(
++        " states_reused={} exhaustive={} expand_up_to={} ignored_points={} states_skipped_by_ignore={}",
++        run.states_reused,
++        run.exhaustive,
++        run.expand_up_to.0,
++        run.ignored_points,
++        run.states_skipped_by_ignore
++    )
++}
++
++/// 不 ignore 时照流自己的展开方式该有的态数，减去这一份计划的态数（ignore 的点的段不展开）。一个点都没 ignore 是 0。
++fn states_skipped_by_ignore(flow: &CrashFlow<'_>, plan: &CrashPlan) -> u64 {
++    if !plan.points.iter().any(|point| point.ignored) {
++        return 0;
++    }
++    let without_ignore =
++        layer0_state_ranges_by_segment(flow.base, flow.writes, flow.segments, flow.expansion).1;
++    let planned = plan.points.last().map_or(0, |point| point.ordinals.end);
++    without_ignore
++        .checked_sub(planned)
++        .expect("ignore 只会让段少展开，态数不会比不 ignore 时多")
++}
++
++/// 这一份（`is_mine` 选的块）里录入时库中已有这一判法版本判定的态数。
++fn states_already_judged_in_this_share(
++    store: &VerdictStore,
++    plan: &CrashPlan,
++    version: &JudgeVersion,
++    is_mine: &dyn Fn(u64) -> bool,
++) -> Result<u64, VerdictStoreError> {
++    let mut states = 0u64;
++    let mut block_sequence = 0u64;
++    for point in &plan.points {
++        for local in point.blocks() {
++            let this_block = block_sequence;
++            block_sequence += 1;
++            if is_mine(this_block)
++                && store
++                    .read_verdict_block(&point.block_key(&local), version)?
++                    .is_some()
++            {
++                states += local.end - local.start;
++            }
++        }
++    }
++    Ok(states)
+ }
+ 
+ /// 只核给定序号的那些块（块序号 = 全部点的块按次序编号）；[`check_recorded_blocks`] 是它按权重分工的形态。
+@@ -2503,9 +2771,11 @@ pub fn path_relative_to_repository_root(repository_root: &Path, text: &str) -> P
+ /// `SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY=1` 只排派活计划：打一行 `CRASH_AMPLIFICATION_PLACEMENT …`（要判多少、每张卡装多少、
+ /// 这台机器的卡试判几次派活量到的速度），一块都不判。
+ /// 主机之间等分（`SINGLEFS_CRASH_AMPLIFICATION_HOST_WEIGHTS=<w0>,<w1>,…` 可以改成按权重）。
++/// `expand_up_to` 是这一趟的展开上限，进交回的结果与 `CRASH_AMPLIFICATION_GPU_TOTAL` 行；流自己的展开方式要与它逐段相同。
+ ///
+ /// # Errors
+-/// 环境变量写法错、库打不开、判定存储读写失败、配置要 GPU 而这份二进制没有。
++/// 环境变量写法错、库打不开、判定存储读写失败、配置要 GPU 而这份二进制没有；流的展开方式与 `expand_up_to` 在某一段上不同
++/// （报的展开上限就不是这一趟枚举的那个，在任何录入之前拒）。
+ #[allow(
+     clippy::too_many_lines,
+     reason = "读环境、开库、导入、录入、按卡分工核对、对账、打行，是一趟的全部步骤，拆开要把十几个量来回传"
+@@ -2514,7 +2784,25 @@ pub fn run_from_environment(
+     flow: &CrashFlow<'_>,
+     judging: &PipelineJudgingCode,
+     repository_root: &Path,
++    expand_up_to: ExpandUpToWritesPerSegment,
+ ) -> Result<EnvironmentRun, String> {
++    if let Some((segment_index, segment)) =
++        flow.segments
++            .iter()
++            .enumerate()
++            .find(|(segment_index, segment)| {
++                (flow.expansion)(*segment_index, segment) != expand_up_to.expansion_of(segment)
++            })
++    {
++        return Err(format!(
++            "流的展开方式与报的展开上限 {} 在第 {segment_index} 段（{} 次写）上不同：流给 {}，上限该给 {}",
++            expand_up_to.0,
++            segment.len(),
++            (flow.expansion)(segment_index, segment).name(),
++            expand_up_to.expansion_of(segment).name()
++        ));
++    }
++    let exhaustive = expand_up_to.covers_every_segment(flow.segments);
+     let configuration_file: Option<PathBuf> = match std::env::var("SINGLEFS_MULTI_HOST_CONFIG") {
+         Ok(text) => {
+             let configuration = path_relative_to_repository_root(repository_root, &text);
+@@ -2619,8 +2907,33 @@ pub fn run_from_environment(
+     let mut report = CoverageReport::default();
+     let recording = record_crash_points(&mut store, &plan, &version, &mut report)
+         .map_err(|error| format!("录入失败：{error:?}"))?;
++    let host_shares = WeightedShares::new(host_weights);
++    let total_blocks: u64 = plan
++        .points
++        .iter()
++        .map(|point| u64::try_from(point.blocks().len()).expect("块数装得进 u64"))
++        .sum();
++    let my_blocks: Vec<u64> = (0..total_blocks)
++        .filter(|block| host_shares.owner_of_block(*block) == share.index)
++        .collect();
++    let selected: std::collections::HashSet<u64> = my_blocks.iter().copied().collect();
++    // 复用数在导入之前数：导入进来的块是别的机器这一趟判的，不算复用
++    let import_list = std::env::var("SINGLEFS_CRASH_AMPLIFICATION_IMPORT").ok();
++    let imports_another_library = import_list
++        .as_deref()
++        .is_some_and(|list| list.split(':').any(|directory| !directory.is_empty()));
++    let states_reused_unless_stopped = if imports_another_library {
++        0
++    } else {
++        states_already_judged_in_this_share(&store, &plan, &version, &|block| {
++            selected.contains(&block)
++        })
++        .map_err(|error| format!("数复用失败：{error:?}"))?
++    };
++    let ignored_points = plan.points.iter().filter(|point| point.ignored).count();
++    let states_skipped_by_ignore = states_skipped_by_ignore(flow, &plan);
+     let mut imported_blocks = 0u64;
+-    if let Ok(list) = std::env::var("SINGLEFS_CRASH_AMPLIFICATION_IMPORT") {
++    if let Some(list) = &import_list {
+         for directory in list.split(':').filter(|directory| !directory.is_empty()) {
+             let (other, _) = VerdictStore::open_existing(&path_relative_to_repository_root(
+                 repository_root,
+@@ -2632,16 +2945,6 @@ pub fn run_from_environment(
+                 .map_err(|error| format!("导入 {directory} 失败：{error:?}"))?;
+         }
+     }
+-    let host_shares = WeightedShares::new(host_weights);
+-    let total_blocks: u64 = plan
+-        .points
+-        .iter()
+-        .map(|point| u64::try_from(point.blocks().len()).expect("块数装得进 u64"))
+-        .sum();
+-    let my_blocks: Vec<u64> = (0..total_blocks)
+-        .filter(|block| host_shares.owner_of_block(*block) == share.index)
+-        .collect();
+-    let selected: std::collections::HashSet<u64> = my_blocks.iter().copied().collect();
+     let seconds_planning_and_recording = planning_started.elapsed().as_secs_f64();
+     let cards = if mode.uses_gpu() {
+         Some(gpu_cards_in_use(cards_by_priority.as_deref(), host)?)
+@@ -2686,6 +2989,12 @@ pub fn run_from_environment(
+             placement_only: true,
+             stopped_early: false,
+             judge_version: version,
++            expand_up_to,
++            exhaustive,
++            // 只排派活计划的那一趟一块都不判、不打 CRASH_AMPLIFICATION 行
++            states_reused: 0,
++            ignored_points,
++            states_skipped_by_ignore,
+         });
+     }
+     // 第 ① 段：配置开了 GPU 就由 GPU 判器判这台机器领的块（判不了就报错，不退回 CPU）；没开 GPU 由 CPU 判器判
+@@ -2701,6 +3010,7 @@ pub fn run_from_environment(
+                 cards,
+                 &stop_is_requested_by_the_environment,
+             )?;
++            eprintln!("{}", gpu_total_line(&outcome, expand_up_to, exhaustive));
+             (checking, Some(outcome))
+         }
+         None => (
+@@ -2747,6 +3057,12 @@ pub fn run_from_environment(
+             placement_only: false,
+             stopped_early: true,
+             judge_version: version,
++            expand_up_to,
++            exhaustive,
++            // 被叫停的那一趟报 0：同一份库上接着跑的那一趟把它复用的与它判过的一起数进复用（reuse_and_scale_fields_of_the_line）
++            states_reused: 0,
++            ignored_points,
++            states_skipped_by_ignore,
+         });
+     }
+     let seconds_judging = judging_started.elapsed().as_secs_f64();
+@@ -2828,6 +3144,11 @@ pub fn run_from_environment(
+         placement_only: false,
+         stopped_early: false,
+         judge_version: version,
++        expand_up_to,
++        exhaustive,
++        states_reused: states_reused_unless_stopped,
++        ignored_points,
++        states_skipped_by_ignore,
+     })
+ }
+ 
+diff --git a/crates/singlefs-checker-tier/tests/common_crash_points/mod.rs b/crates/singlefs-checker-tier/tests/common_crash_points/mod.rs
+index ff01a03..c8eebad 100644
+--- a/crates/singlefs-checker-tier/tests/common_crash_points/mod.rs
++++ b/crates/singlefs-checker-tier/tests/common_crash_points/mod.rs
+@@ -152,7 +152,7 @@ pub fn unmount_step(
+ }
+ 
+ /// 一条已经录好的流（起点镜像、写表、段、被判的根槽写、版本表、崩溃点）按环境跑一趟崩溃放量：展开上限从
+-/// `SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO` 取（没设用 `default_expand_up_to`），库目录从 `SINGLEFS_CRASH_AMPLIFICATION_LIBRARY` 取
++/// `SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO` 取（没设用 `default_expand_up_to`，写坏了 panic），库目录从 `SINGLEFS_CRASH_AMPLIFICATION_LIBRARY` 取
+ /// （没设建在临时目录、跑完删），判法摘要取两个判器的闭包；健康的流一个红状态都不该有。只排派活计划的那一趟（`placement_only`）不判，原样交回。
+ /// 打一行 `CRASH_AMPLIFICATION flow=<名> …`，交回这一趟的结果。
+ #[allow(
+@@ -169,23 +169,45 @@ pub fn amplify_prepared_flow(
+     crash_points: Vec<singlefs_checker_tier::crash_amplification::CrashPointSpan>,
+     default_expand_up_to: usize,
+ ) -> singlefs_checker_tier::crash_amplification::EnvironmentRun {
+-    use singlefs_checker_tier::crash::Layer0SegmentExpansion;
++    amplify_prepared_flow_and_hand_back_its_line(
++        flow_name,
++        base,
++        writes,
++        segments,
++        judged_root_index,
++        versions,
++        crash_points,
++        default_expand_up_to,
++    )
++    .0
++}
++
++/// 同 [`amplify_prepared_flow`]，另交回打出去的那一行 `CRASH_AMPLIFICATION flow=<名> …`（只排派活计划的那一趟不打，是 `None`）。
++/// 行末接 `reuse_and_scale_fields_of_the_line` 的几个字段（复用数、全域与否、展开上限、ignore 的跳过数），被叫停的那一行也接。
++#[allow(
++    clippy::too_many_arguments,
++    reason = "一条流的七样各自独立，收成一个结构体只是把七个字段挪个地方"
++)]
++pub fn amplify_prepared_flow_and_hand_back_its_line(
++    flow_name: &str,
++    base: &singlefs_harness::memory_pool::MemoryPool,
++    writes: &[singlefs_harness::memory_pool::RetainedWrite],
++    segments: &[Vec<usize>],
++    judged_root_index: usize,
++    versions: &[singlefs_harness::memory_pool::PublishedVersion],
++    crash_points: Vec<singlefs_checker_tier::crash_amplification::CrashPointSpan>,
++    default_expand_up_to: usize,
++) -> (
++    singlefs_checker_tier::crash_amplification::EnvironmentRun,
++    Option<String>,
++) {
+     use singlefs_checker_tier::crash_amplification::{
+-        run_from_environment, CrashFlow, PipelineJudgingCode,
++        reuse_and_scale_fields_of_the_line, run_from_environment, CrashFlow,
++        ExpandUpToWritesPerSegment, PipelineJudgingCode,
+     };
+     use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
+-    let limit: usize = std::env::var("SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO")
+-        .ok()
+-        .and_then(|text| text.parse().ok())
+-        .unwrap_or(default_expand_up_to);
+-    let exhaustive = segments.iter().all(|segment| segment.len() <= limit);
+-    let expansion = move |_segment_index: usize, segment: &[usize]| {
+-        if segment.len() <= limit {
+-            Layer0SegmentExpansion::EveryProperSubset
+-        } else {
+-            Layer0SegmentExpansion::NotExpanded
+-        }
+-    };
++    let limit = ExpandUpToWritesPerSegment::from_environment_or(default_expand_up_to);
++    let expansion = move |_segment_index: usize, segment: &[usize]| limit.expansion_of(segment);
+     let flow = CrashFlow {
+         base,
+         writes,
+@@ -217,7 +239,7 @@ pub fn amplify_prepared_flow(
+         }
+     };
+     let started = std::time::Instant::now();
+-    let run = run_from_environment(&flow, &judging, &root).expect("按环境跑得完");
++    let run = run_from_environment(&flow, &judging, &root, limit).expect("按环境跑得完");
+     let seconds = started.elapsed().as_secs_f64();
+     if let Some(directory) = &temporary_library {
+         std::env::remove_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY");
+@@ -225,24 +247,26 @@ pub fn amplify_prepared_flow(
+         let _ = std::fs::remove_dir_all(directory);
+     }
+     if run.placement_only {
+-        return run;
++        return (run, None);
+     }
++    let reuse_and_scale = reuse_and_scale_fields_of_the_line(&run);
+     if run.stopped_early {
+         // 被叫停的那一趟：判过的块在库里、第 ②③ 段没做；只报判了多少，不断言对账
+-        println!(
+-            "CRASH_AMPLIFICATION flow={flow_name} mode={} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} stopped_early=true",
++        let line = format!(
++            "CRASH_AMPLIFICATION flow={flow_name} mode={} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} stopped_early=true{reuse_and_scale}",
+             run.mode.name(),
+             run.checking.states_checked,
+             run.checking.blocks_checked,
+             run.unjudged_blocks,
+             run.checking.red_states
+         );
++        println!("{line}");
+         assert_eq!(
+             run.checking.red_states, 0,
+             "健康的流 {flow_name} 一个红状态都不该有：{:?}",
+             run.checking.red_texts
+         );
+-        return run;
++        return (run, Some(line));
+     }
+     let judge_line = judge_fields_of_the_summary_line(&run);
+     let judge_version: String = run
+@@ -252,8 +276,8 @@ pub fn amplify_prepared_flow(
+         .take(8)
+         .map(|byte| format!("{byte:02x}"))
+         .collect();
+-    println!(
+-        "CRASH_AMPLIFICATION flow={flow_name} mode={} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} violations_in_the_library={} judge_version={judge_version} expand_up_to={limit} exhaustive={exhaustive} seconds={seconds:.1}{judge_line}",
++    let line = format!(
++        "CRASH_AMPLIFICATION flow={flow_name} mode={} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} violations_in_the_library={} judge_version={judge_version} seconds={seconds:.1}{reuse_and_scale}{judge_line}",
+         run.mode.name(),
+         run.checking.states_checked,
+         run.checking.blocks_checked,
+@@ -261,6 +285,7 @@ pub fn amplify_prepared_flow(
+         run.checking.red_states,
+         run.violations.len()
+     );
++    println!("{line}");
+     assert_eq!(
+         run.checking.red_states, 0,
+         "健康的流 {flow_name} 一个红状态都不该有：{:?}",
+@@ -282,7 +307,7 @@ pub fn amplify_prepared_flow(
+             comparison.disagreement_samples
+         );
+     }
+-    run
++    (run, Some(line))
+ }
+ 
+ /// 汇总行里说第 ① 段在哪判的那几个字段：GPU 判的带用了几张卡、判了多少、多快、写库花了多久；CPU 判的只有 `judge=cpu`。
+diff --git a/crates/singlefs-checker-tier/tests/crash_amplification_fixed_script_through_rollback.rs b/crates/singlefs-checker-tier/tests/crash_amplification_fixed_script_through_rollback.rs
+index f239f2e..736b4c4 100644
+--- a/crates/singlefs-checker-tier/tests/crash_amplification_fixed_script_through_rollback.rs
++++ b/crates/singlefs-checker-tier/tests/crash_amplification_fixed_script_through_rollback.rs
+@@ -15,10 +15,10 @@ use std::time::Instant;
+ 
+ use common::{build_pool, file_content, geometry};
+ use common_crash_points::{mount_writable_step, overwrite_step, record_pool_build, roll_back_step};
+-use singlefs_checker_tier::crash::{layer0_plan_state_count, Layer0SegmentExpansion};
++use singlefs_checker_tier::crash::layer0_plan_state_count;
+ use singlefs_checker_tier::crash_amplification::{
+-    checking_threads, plan_crash_points, run_from_environment, CrashFlow, CrashPointRecorder,
+-    PipelineJudgingCode,
++    checking_threads, plan_crash_points, reuse_and_scale_fields_of_the_line, run_from_environment,
++    CrashFlow, CrashPointRecorder, ExpandUpToWritesPerSegment, PipelineJudgingCode,
+ };
+ use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
+ use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
+@@ -42,13 +42,6 @@ fn third_content() -> Vec<u8> {
+         .collect()
+ }
+ 
+-fn expand_up_to() -> usize {
+-    std::env::var("SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO")
+-        .ok()
+-        .and_then(|text| text.parse().ok())
+-        .unwrap_or(DEFAULT_EXPAND_UP_TO)
+-}
+-
+ struct TemporaryStore {
+     directory: PathBuf,
+ }
+@@ -218,16 +211,9 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
+         .iter()
+         .rposition(|write| write.kind == StepKind::RootRecordFua)
+         .expect("根槽写");
+-    let limit = expand_up_to();
+-    // 每一段都不超过上限就是全域：每个屏障段的每个真子集都枚举到了
+-    let exhaustive = segments.iter().all(|segment| segment.len() <= limit);
+-    let expansion = move |_segment_index: usize, segment: &[usize]| {
+-        if segment.len() <= limit {
+-            Layer0SegmentExpansion::EveryProperSubset
+-        } else {
+-            Layer0SegmentExpansion::NotExpanded
+-        }
+-    };
++    // 展开上限写坏了 panic，不退回默认；每一段都不超过上限就是全域（run.exhaustive）：每个屏障段的每个真子集都枚举到了
++    let limit = ExpandUpToWritesPerSegment::from_environment_or(DEFAULT_EXPAND_UP_TO);
++    let expansion = move |_segment_index: usize, segment: &[usize]| limit.expansion_of(segment);
+     let flow = CrashFlow {
+         base: &base,
+         writes: &writes,
+@@ -285,7 +271,7 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
+         }
+     };
+     let checking_started = Instant::now();
+-    let run = run_from_environment(&flow, &judging, &root).expect("按环境跑得完");
++    let run = run_from_environment(&flow, &judging, &root, limit).expect("按环境跑得完");
+     let checking_seconds = checking_started.elapsed().as_secs_f64();
+     if run.placement_only {
+         // 只排派活计划的那一趟一块都没判：不断言、不打汇总行
+@@ -295,14 +281,15 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
+     if run.stopped_early {
+         // 被叫停的那一趟：判过的块在库里、第 ②③ 段没做；只报判了多少，不断言对账
+         println!(
+-            "CRASH_AMPLIFICATION mode={} share={}/{} states={state_count} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} stopped_early=true",
++            "CRASH_AMPLIFICATION mode={} share={}/{} states={state_count} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} stopped_early=true{}",
+             run.mode.name(),
+             run.share.index,
+             run.share.count,
+             run.checking.states_checked,
+             run.checking.blocks_checked,
+             run.unjudged_blocks,
+-            run.checking.red_states
++            run.checking.red_states,
++            reuse_and_scale_fields_of_the_line(&run)
+         );
+         assert_eq!(
+             run.checking.red_states, 0,
+@@ -337,7 +324,7 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
+             run.checking.states_checked, run.recording.states_recorded,
+             "这一趟录下来要判的状态都核了"
+         );
+-        let second_run = run_from_environment(&flow, &judging, &root).expect("第二趟跑得完");
++        let second_run = run_from_environment(&flow, &judging, &root, limit).expect("第二趟跑得完");
+         assert_eq!(
+             second_run.recording.blocks_already_judged,
+             run.recording.blocks_recorded + run.recording.blocks_already_judged,
+@@ -379,7 +366,7 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
+         println!("CRASH_AMPLIFICATION_POINT {line}");
+     }
+     println!(
+-        "CRASH_AMPLIFICATION mode={} share={}/{} cards={} states={state_count} states_checked_here={} blocks_checked_here={} imported_blocks={} unjudged_blocks={} red={} threads={} judge_version={} expand_up_to={limit} checking_seconds={checking_seconds:.1} states_per_second={:.0} total_seconds={:.1} exhaustive={exhaustive}{verifier_line}{gpu_judge_line}",
++        "CRASH_AMPLIFICATION mode={} share={}/{} cards={} states={state_count} states_checked_here={} blocks_checked_here={} imported_blocks={} unjudged_blocks={} red={} threads={} judge_version={} checking_seconds={checking_seconds:.1} states_per_second={:.0} total_seconds={:.1}{}{verifier_line}{gpu_judge_line}",
+         run.mode.name(),
+         run.share.index,
+         run.share.count,
+@@ -397,6 +384,7 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
+             .map(|byte| format!("{byte:02x}"))
+             .collect::<String>(),
+         f64::from(u32::try_from(run.checking.states_checked).expect("装得进 u32")) / checking_seconds.max(0.001),
+-        started.elapsed().as_secs_f64()
++        started.elapsed().as_secs_f64(),
++        reuse_and_scale_fields_of_the_line(&run)
+     );
+ }
+diff --git a/crates/singlefs-checker-tier/tests/crash_amplification_fixed_script_through_unmount.rs b/crates/singlefs-checker-tier/tests/crash_amplification_fixed_script_through_unmount.rs
+index 58e3e14..62e8c62 100644
+--- a/crates/singlefs-checker-tier/tests/crash_amplification_fixed_script_through_unmount.rs
++++ b/crates/singlefs-checker-tier/tests/crash_amplification_fixed_script_through_unmount.rs
+@@ -19,10 +19,10 @@ use common_crash_points::{
+     mount_writable_step, overwrite_step, raise_rollback_floor_step, record_pool_build,
+     roll_back_step, unmount_step,
+ };
+-use singlefs_checker_tier::crash::{layer0_plan_state_count, Layer0SegmentExpansion};
++use singlefs_checker_tier::crash::layer0_plan_state_count;
+ use singlefs_checker_tier::crash_amplification::{
+-    checking_threads, plan_crash_points, run_from_environment, CrashFlow, CrashPointRecorder,
+-    PipelineJudgingCode,
++    checking_threads, plan_crash_points, reuse_and_scale_fields_of_the_line, run_from_environment,
++    CrashFlow, CrashPointRecorder, ExpandUpToWritesPerSegment, PipelineJudgingCode,
+ };
+ use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
+ use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
+@@ -57,13 +57,6 @@ fn later_content(seed: usize) -> Vec<u8> {
+         .collect()
+ }
+ 
+-fn expand_up_to() -> usize {
+-    std::env::var("SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO")
+-        .ok()
+-        .and_then(|text| text.parse().ok())
+-        .unwrap_or(DEFAULT_EXPAND_UP_TO)
+-}
+-
+ struct TemporaryStore {
+     directory: PathBuf,
+ }
+@@ -331,15 +324,9 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
+         19,
+         "每次发布一条根槽写"
+     );
+-    let limit = expand_up_to();
+-    let exhaustive = segments.iter().all(|segment| segment.len() <= limit);
+-    let expansion = move |_segment_index: usize, segment: &[usize]| {
+-        if segment.len() <= limit {
+-            Layer0SegmentExpansion::EveryProperSubset
+-        } else {
+-            Layer0SegmentExpansion::NotExpanded
+-        }
+-    };
++    // 展开上限写坏了 panic，不退回默认；每一段都不超过上限就是全域（run.exhaustive）
++    let limit = ExpandUpToWritesPerSegment::from_environment_or(DEFAULT_EXPAND_UP_TO);
++    let expansion = move |_segment_index: usize, segment: &[usize]| limit.expansion_of(segment);
+     let flow = CrashFlow {
+         base: &base,
+         writes: &writes,
+@@ -374,7 +361,7 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
+         }
+     };
+     let checking_started = Instant::now();
+-    let run = run_from_environment(&flow, &judging, &root).expect("按环境跑得完");
++    let run = run_from_environment(&flow, &judging, &root, limit).expect("按环境跑得完");
+     let checking_seconds = checking_started.elapsed().as_secs_f64();
+     if run.placement_only {
+         // 只排派活计划的那一趟一块都没判：不断言、不打汇总行
+@@ -384,14 +371,15 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
+     if run.stopped_early {
+         // 被叫停的那一趟：判过的块在库里、第 ②③ 段没做；只报判了多少，不断言对账
+         println!(
+-            "CRASH_AMPLIFICATION mode={} share={}/{} states={state_count} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} stopped_early=true",
++            "CRASH_AMPLIFICATION mode={} share={}/{} states={state_count} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} stopped_early=true{}",
+             run.mode.name(),
+             run.share.index,
+             run.share.count,
+             run.checking.states_checked,
+             run.checking.blocks_checked,
+             run.unjudged_blocks,
+-            run.checking.red_states
++            run.checking.red_states,
++            reuse_and_scale_fields_of_the_line(&run)
+         );
+         assert_eq!(
+             run.checking.red_states, 0,
+@@ -426,7 +414,7 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
+             run.checking.states_checked, run.recording.states_recorded,
+             "这一趟录下来要判的状态都核了"
+         );
+-        let second_run = run_from_environment(&flow, &judging, &root).expect("第二趟跑得完");
++        let second_run = run_from_environment(&flow, &judging, &root, limit).expect("第二趟跑得完");
+         assert_eq!(
+             second_run.recording.blocks_already_judged,
+             run.recording.blocks_recorded + run.recording.blocks_already_judged,
+@@ -468,7 +456,7 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
+         println!("CRASH_AMPLIFICATION_POINT {line}");
+     }
+     println!(
+-        "CRASH_AMPLIFICATION mode={} share={}/{} cards={} states={state_count} states_checked_here={} blocks_checked_here={} imported_blocks={} unjudged_blocks={} red={} threads={} judge_version={} expand_up_to={limit} checking_seconds={checking_seconds:.1} states_per_second={:.0} total_seconds={:.1} exhaustive={exhaustive}{verifier_line}{gpu_judge_line}",
++        "CRASH_AMPLIFICATION mode={} share={}/{} cards={} states={state_count} states_checked_here={} blocks_checked_here={} imported_blocks={} unjudged_blocks={} red={} threads={} judge_version={} checking_seconds={checking_seconds:.1} states_per_second={:.0} total_seconds={:.1}{}{verifier_line}{gpu_judge_line}",
+         run.mode.name(),
+         run.share.index,
+         run.share.count,
+@@ -490,6 +478,7 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
+         } else {
+             0.0
+         },
+-        started.elapsed().as_secs_f64()
++        started.elapsed().as_secs_f64(),
++        reuse_and_scale_fields_of_the_line(&run)
+     );
+ }
+diff --git a/crates/singlefs-checker-tier/tests/crash_amplification_pipeline_records_checks_and_reuses.rs b/crates/singlefs-checker-tier/tests/crash_amplification_pipeline_records_checks_and_reuses.rs
+index 7e92946..6af181b 100644
+--- a/crates/singlefs-checker-tier/tests/crash_amplification_pipeline_records_checks_and_reuses.rs
++++ b/crates/singlefs-checker-tier/tests/crash_amplification_pipeline_records_checks_and_reuses.rs
+@@ -1,11 +1,14 @@
+ //! checker 档模块：crash、layer0_progress、crash_identity、crash_amplification、verdict_store
+ //! 崩溃放量流水线在新池新建文件那条流（取号与暖机、发布两个崩溃点）上的端到端用例：录入 → 核对 → 第二趟复用 → 两方分工与对账 →
+-//! 两个库并成一个 → ignore 的点不出状态 → 版本表写错要红。要 `verdict-store` 特性（RocksDB），不带特性时这份文件是空的。
++//! 两个库并成一个 → ignore 的点不出状态 → 版本表写错要红；经公共模块按环境真跑两趟，驱动行带复用数、全域与否、展开上限。
++//! 要 `verdict-store` 特性（RocksDB），不带特性时这份文件是空的。
+ #![cfg(feature = "verdict-store")]
+ 
+ #[path = "../../singlefs-harness/tests/common/mod.rs"]
+ mod common;
++mod common_crash_points;
+ 
++use std::collections::BTreeMap;
+ use std::path::PathBuf;
+ 
+ use common::{build_pool, file_content, geometry};
+@@ -16,8 +19,8 @@ use singlefs_checker_tier::crash::{
+ use singlefs_checker_tier::crash_amplification::{
+     check_blocks_where_until, check_recorded_blocks, compare_judge_and_verifier, plan_crash_points,
+     read_violations, record_crash_points, unjudged_blocks, unjudged_blocks_of_the_flow,
+-    verify_blocks_from_facts, CrashFlow, CrashPlan, CrashPointSpan, FactsVerifierOn,
+-    PipelineJudgingCode, UnitChecksumsOn, WeightedShares,
++    verify_blocks_from_facts, CrashFlow, CrashPlan, CrashPointSpan, ExpandUpToWritesPerSegment,
++    FactsVerifierOn, PipelineJudgingCode, UnitChecksumsOn, WeightedShares,
+ };
+ use singlefs_checker_tier::crash_identity::CoverageReport;
+ use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
+@@ -726,3 +729,111 @@ fn a_wrong_version_table_is_judge_red_only_for_the_facts_verifier() {
+     );
+     assert_eq!(comparison.disagreements, 0);
+ }
++
++/// 一行 `CRASH_AMPLIFICATION` 的 `key=value` 字段。
++fn fields_of_the_line(line: &str) -> BTreeMap<String, String> {
++    line.split_whitespace()
++        .skip(1)
++        .filter_map(|field| field.split_once('='))
++        .map(|(key, value)| (key.to_string(), value.to_string()))
++        .collect()
++}
++
++/// 驱动行的复用数、全域与否、展开上限（入口 `research/scripts/crash-amplification.sh` 按这几个字段汇总）：在新池新建文件那条流上
++/// 经公共模块真跑两趟（同一份库），两趟打出来的行里三个字段都在；第一趟库是空的、复用 0；第二趟 `states_reused` 等于库里这条流
++/// 在这一判法版本下已判的态数（第一趟全判完了，就是整条流的态数），也等于录入时数到的已判态数。
++/// 多机配置换成一份空的（单机 CPU），库落在测试自己的临时目录。要 `verdict-store` 特性：快档靠 C604 才编进来。
++#[test]
++fn a_driver_line_reports_reuse_exhaustiveness_and_depth_and_its_reuse_equals_the_states_judged_in_the_library(
++) {
++    let recorded =
++        record_new_pool_file_creation("crash-amplification-line-fields", false, file_content());
++    let temporary = TemporaryStore::new("line-fields");
++    std::fs::create_dir_all(&temporary.directory).expect("建得了临时目录");
++    let configuration = temporary.directory.join("multi-host.env");
++    std::fs::write(&configuration, "").expect("写得了空配置");
++    let library = temporary.directory.join("library");
++    std::env::set_var("SINGLEFS_MULTI_HOST_CONFIG", &configuration);
++    std::env::set_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY", &library);
++    std::env::set_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY", "1");
++    let amplify = || {
++        common_crash_points::amplify_prepared_flow_and_hand_back_its_line(
++            "line-fields",
++            &recorded.base,
++            &recorded.writes,
++            &recorded.segments,
++            recorded.judged_root_index,
++            &recorded.versions,
++            recorded.crash_points.clone(),
++            LARGEST_EXPANDED_SEGMENT_WRITES,
++        )
++    };
++    let (first_run, first_line) = amplify();
++    let (second_run, second_line) = amplify();
++    std::env::remove_var("SINGLEFS_MULTI_HOST_CONFIG");
++    std::env::remove_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY");
++    std::env::remove_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY");
++    let first_line = first_line.expect("判了的那一趟打一行");
++    let second_line = second_line.expect("判了的那一趟打一行");
++    for line in [&first_line, &second_line] {
++        let fields = fields_of_the_line(line);
++        for key in ["states_reused", "exhaustive", "expand_up_to"] {
++            assert!(fields.contains_key(key), "行里没有 {key}=：{line}");
++        }
++        assert_eq!(
++            fields.get("expand_up_to").map(String::as_str),
++            Some(second_run.expand_up_to.0.to_string().as_str()),
++            "{line}"
++        );
++        assert_eq!(
++            fields.get("exhaustive").map(String::as_str),
++            Some(second_run.exhaustive.to_string().as_str()),
++            "{line}"
++        );
++    }
++    assert_eq!(
++        fields_of_the_line(&first_line)
++            .get("states_reused")
++            .map(String::as_str),
++        Some("0"),
++        "第一趟库是空的，一态都没复用：{first_line}"
++    );
++    assert!(first_run.checking.states_checked > 0, "第一趟判了状态");
++
++    let limit: ExpandUpToWritesPerSegment = second_run.expand_up_to;
++    let expansion_of_the_run =
++        move |_segment_index: usize, segment: &[usize]| limit.expansion_of(segment);
++    let flow = CrashFlow {
++        base: &recorded.base,
++        writes: &recorded.writes,
++        segments: &recorded.segments,
++        judged_root_index: recorded.judged_root_index,
++        versions: &recorded.versions,
++        expansion: &expansion_of_the_run,
++        crash_points: recorded.crash_points.clone(),
++    };
++    let plan = plan_crash_points(&flow);
++    let state_count = plan.points.last().expect("有点").ordinals.end;
++    let (store, _) = VerdictStore::open_existing(&library).expect("开得了这两趟的库");
++    let unjudged_states: u64 =
++        unjudged_blocks_of_the_flow(&store, &plan, &second_run.judge_version)
++            .expect("对得了账")
++            .iter()
++            .map(|(_, states)| *states)
++            .sum();
++    let judged_in_the_library = state_count - unjudged_states;
++    assert_eq!(judged_in_the_library, state_count, "第一趟把这条流全判完了");
++    assert_eq!(
++        fields_of_the_line(&second_line)
++            .get("states_reused")
++            .map(String::as_str),
++        Some(judged_in_the_library.to_string().as_str()),
++        "第二趟行里的复用数等于库里这条流已判的态数：{second_line}"
++    );
++    assert_eq!(
++        second_run.states_reused, second_run.recording.states_already_judged,
++        "一台跑、没导入：复用数就是录入时数到的已判态数"
++    );
++    assert_eq!(second_run.checking.states_checked, 0, "第二趟一态都不再判");
++    drop(store);
++}
+diff --git a/crates/singlefs-checker-tier/tests/crash_amplification_two_flows_share_their_prefix.rs b/crates/singlefs-checker-tier/tests/crash_amplification_two_flows_share_their_prefix.rs
+index 4257c49..e922b69 100644
+--- a/crates/singlefs-checker-tier/tests/crash_amplification_two_flows_share_their_prefix.rs
++++ b/crates/singlefs-checker-tier/tests/crash_amplification_two_flows_share_their_prefix.rs
+@@ -13,15 +13,18 @@ use std::path::PathBuf;
+ 
+ use common::{build_pool, file_content, geometry, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS};
+ use common_crash_points::{overwrite_step, record_pool_build};
+-use singlefs_checker_tier::crash::Layer0SegmentExpansion;
++use singlefs_checker_tier::crash::{
++    judge_layer0_state_range, layer0_plan_state_count, Layer0SegmentExpansion,
++};
+ use singlefs_checker_tier::crash_amplification::{
+-    check_recorded_blocks, plan_crash_points, record_crash_points, repository_relative_file,
+-    unjudged_blocks, CrashFlow, CrashPlan, CrashPointRecorder, CrashPointSpan, PipelineJudgingCode,
+-    UnitChecksumsOn, WeightedShares,
++    check_recorded_blocks, plan_crash_points, read_verdict_items_of_every_state,
++    record_crash_points, repository_relative_file, unjudged_blocks, CheckingTally, CrashFlow,
++    CrashPlan, CrashPointRecorder, CrashPointSpan, PipelineJudgingCode, UnitChecksumsOn,
++    WeightedShares,
+ };
+ use singlefs_checker_tier::crash_identity::CoverageReport;
+ use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
+-use singlefs_checker_tier::verdict_store::VerdictStore;
++use singlefs_checker_tier::verdict_store::{JudgeVersion, VerdictStore};
+ use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
+ use singlefs_core::transaction::{publish_overwrite, FirstFile, PoolWriter};
+ use singlefs_harness::memory_pool::{
+@@ -428,3 +431,190 @@ fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail()
+     drop(store);
+     drop(temporary);
+ }
++
++/// 把版本表里覆盖写那一版（txg 4）的内容改坏一个字节：根落到 txg 4 的状态读回的内容对不上，这条流的尾巴判红。
++fn with_the_overwritten_version_miswritten(mut recorded: RecordedFlow) -> RecordedFlow {
++    let overwritten = recorded
++        .versions
++        .iter_mut()
++        .find(|version| version.checkpoint_txg == CheckpointTxg(4))
++        .expect("版本表里有覆盖写那一版");
++    overwritten.content[0] ^= 0x01;
++    recorded
++}
++
++/// 录入、核完一条流（一方、CPU），交回核对的计数。
++fn record_and_check(
++    store: &mut VerdictStore,
++    recorded: &RecordedFlow,
++    plan: &CrashPlan,
++    version: &JudgeVersion,
++) -> CheckingTally {
++    record_crash_points(store, plan, version, &mut CoverageReport::default()).expect("录得进");
++    check_recorded_blocks(
++        store,
++        &recorded.flow(),
++        plan,
++        &WeightedShares::new(vec![1]),
++        0,
++        &UnitChecksumsOn::CpuOnly,
++        version,
++    )
++    .expect("核得完")
++}
++
++/// 复用与剪枝的对照（C605；上游 `test-script-discipline.md`「判定可复用：按输入存，按前缀剪」的剪枝自检）：
++/// 同一条小流 B 开着复用与前缀共享判一次（库里先有共前缀的流 A、和另一个判法版本下判过的 B），再关掉复用（B 独自进一份空库）、
++/// 关掉前缀共享（不分崩溃点、不进库，整条流的状态逐个现判）各判一次，三份逐态相同。
++/// 库里先放的两样都故意判红：A 的尾巴（版本表写错）与旧判法版本下的 B（版本表写错）。复用的键少罩一项输入——写表不进复用键，
++/// B 的尾巴就拿到 A 的红；判法版本不进判定的键，B 就拿到旧版本的红——开着复用的那一份就与另两份不同。
++/// ignore 的点是按登记整批不判的一类、不算剪枝，这两条流没有 ignore 的点。要 `verdict-store` 特性：快档靠 C604 才编进来。
++#[test]
++fn reused_verdicts_equal_state_by_state_the_verdicts_judged_without_the_library_or_the_prefix_split(
++) {
++    let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
++    let root = repository_root();
++    let judging = PipelineJudgingCode::of_the_judges(&root, &toolchain).expect("判法");
++    let version = judging.version();
++    let mut older_judging = judging.clone();
++    let mut flipped = *judging.digest();
++    flipped[0] ^= 0x01;
++    older_judging.replace_digest(flipped);
++    let older_version = older_judging.version();
++    // 尾巴都由公共模块设点：A 与 B 的尾巴同名、同父镜像，只差写下的内容
++    let flow_a = with_the_overwritten_version_miswritten(record_flow(
++        "reuse-control-a",
++        &content_of(3, 4100),
++        true,
++    ));
++    let flow_b_judged_by_an_older_version = with_the_overwritten_version_miswritten(record_flow(
++        "reuse-control-b-older",
++        &content_of(11, 4100),
++        true,
++    ));
++    let flow_b = record_flow("reuse-control-b", &content_of(11, 4100), true);
++    let plan_a = plan_crash_points(&flow_a.flow());
++    let plan_b = plan_crash_points(&flow_b.flow());
++    let state_count =
++        layer0_plan_state_count(&flow_b.base, &flow_b.writes, &flow_b.segments, &expansion);
++
++    // 开着复用与前缀共享：A（尾巴红）→ 旧判法版本下的 B（尾巴红）→ B
++    let shared = TemporaryStore {
++        directory: std::env::temp_dir().join(format!(
++            "singlefs-crash-amplification-reuse-control-shared-{}",
++            std::process::id()
++        )),
++    };
++    let _ = std::fs::remove_dir_all(&shared.directory);
++    let mut shared_store = VerdictStore::create_empty(&shared.directory).expect("建得了库");
++    let checking_a = record_and_check(&mut shared_store, &flow_a, &plan_a, &version);
++    let checking_older = record_and_check(
++        &mut shared_store,
++        &flow_b_judged_by_an_older_version,
++        &plan_crash_points(&flow_b_judged_by_an_older_version.flow()),
++        &older_version,
++    );
++    let mut report_b = CoverageReport::default();
++    let recording_b =
++        record_crash_points(&mut shared_store, &plan_b, &version, &mut report_b).expect("录得进");
++    check_recorded_blocks(
++        &mut shared_store,
++        &flow_b.flow(),
++        &plan_b,
++        &WeightedShares::new(vec![1]),
++        0,
++        &UnitChecksumsOn::CpuOnly,
++        &version,
++    )
++    .expect("核得完");
++    let with_reuse =
++        read_verdict_items_of_every_state(&shared_store, &plan_b, &version).expect("读得了判定");
++
++    // 关掉复用：B 独自进一份空库
++    let alone = TemporaryStore {
++        directory: std::env::temp_dir().join(format!(
++            "singlefs-crash-amplification-reuse-control-alone-{}",
++            std::process::id()
++        )),
++    };
++    let _ = std::fs::remove_dir_all(&alone.directory);
++    let mut alone_store = VerdictStore::create_empty(&alone.directory).expect("建得了库");
++    record_and_check(&mut alone_store, &flow_b, &plan_b, &version);
++    let without_reuse =
++        read_verdict_items_of_every_state(&alone_store, &plan_b, &version).expect("读得了判定");
++
++    // 关掉前缀共享：不分崩溃点、不进库，整条流的状态按序号逐个现判
++    let mut without_prefix_split: Vec<Option<Vec<String>>> = Vec::new();
++    let stream_state_count = judge_layer0_state_range(
++        &flow_b.base,
++        &flow_b.writes,
++        &flow_b.segments,
++        flow_b.judged_root_index,
++        &flow_b.versions,
++        &expansion,
++        0..state_count,
++        &mut |_ordinal, _image, judgement| without_prefix_split.push(Some(judgement.red_items())),
++    );
++    assert_eq!(
++        stream_state_count, state_count,
++        "逐个现判的整条流状态数与计划相同"
++    );
++
++    assert_eq!(
++        u64::try_from(without_prefix_split.len()).expect("状态数"),
++        state_count,
++        "整条流逐个现判，每个状态一份"
++    );
++    assert_eq!(
++        with_reuse.len(),
++        without_prefix_split.len(),
++        "开着复用读回的状态数"
++    );
++    assert_eq!(
++        without_reuse.len(),
++        without_prefix_split.len(),
++        "关掉复用读回的状态数"
++    );
++    for (ordinal, judged_fresh) in without_prefix_split.iter().enumerate() {
++        assert_eq!(
++            &without_reuse[ordinal], judged_fresh,
++            "第 {ordinal} 个状态：关掉复用（空库）与关掉前缀共享（逐个现判）的判定不同"
++        );
++        assert_eq!(
++            &with_reuse[ordinal], judged_fresh,
++            "第 {ordinal} 个状态：开着复用与前缀共享读回的判定与逐个现判的不同（复用了不该复用的判定）"
++        );
++    }
++
++    // 这份对照不是空的：B 的前缀确实复用了 A 的判定，库里先放的两样确实是红的
++    let prefix = prefix_length(&plan_b);
++    let prefix_blocks: u64 = plan_b.points[..prefix]
++        .iter()
++        .map(|point| u64::try_from(point.blocks().len()).expect("块数"))
++        .sum();
++    assert!(prefix_blocks > 0, "前缀至少一块");
++    assert_eq!(
++        recording_b.blocks_already_judged,
++        prefix_blocks,
++        "开着复用时 B 的前缀全部复用、尾巴一块都不复用：{:?}",
++        report_b.lines()
++    );
++    assert!(
++        checking_a.red_states > 0,
++        "A 的版本表写错，尾巴必须红：库里要有一份不该被 B 复用的红判定"
++    );
++    assert!(
++        checking_older.red_states > 0,
++        "旧判法版本下的 B 版本表写错，必须红：库里要有一份不该被新判法版本复用的红判定"
++    );
++    assert!(
++        without_prefix_split
++            .iter()
++            .all(|items| items.as_ref().is_some_and(Vec::is_empty)),
++        "健康的 B 每个状态都是绿的"
++    );
++    drop(shared_store);
++    drop(alone_store);
++    drop(shared);
++    drop(alone);
++}

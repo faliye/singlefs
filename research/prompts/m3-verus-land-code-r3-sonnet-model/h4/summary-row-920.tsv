@@ -1,0 +1,1 @@
+920	RED	rc=101	passed=13	failed=a_journal_record_whose_back_chain_disagrees_with_the_previous_record_is_left_out_of_the_replayed_prefix 	实审 A2a 第 25 条：链值不等的记录照样进重放

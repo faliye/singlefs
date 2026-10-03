@@ -1,0 +1,19 @@
+# test-script-align-code-r1 攻方腿的原型二：依赖改坏了一处的副本 tree2（崩溃注入不摆二次崩溃），不进主仓 workspace
+[package]
+name = "k2ci"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+singlefs-checker-tier = { path = "../tree2/crates/singlefs-checker-tier" }
+singlefs-core = { path = "../tree2/crates/singlefs-core" }
+singlefs-harness = { path = "../tree2/crates/singlefs-harness" }
+
+[profile.release]
+opt-level = 3
+debug = false
+overflow-checks = true
+debug-assertions = true

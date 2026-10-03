@@ -1,0 +1,2 @@
+rc=0	4	rlimit=20	verified=32	errors=0	rlimit_error_lines=0	proof_errors=0	expected=-	verdict=VERIFIED
+rc=0	4	rlimit=40	verified=32	errors=0	rlimit_error_lines=0	proof_errors=0	expected=-	verdict=VERIFIED

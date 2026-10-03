@@ -1,0 +1,102 @@
+
+running 12 tests
+test a_device_whose_slot_zero_fails_borrows_the_spacing_another_slot_zero_records_instead_of_searching ... ok
+test a_journal_ring_holding_fewer_records_than_the_safety_factor_is_refused_before_any_write ... ok
+test a_self_verifying_slot_whose_recorded_spacing_is_not_its_own_offset_is_not_taken ... ok
+test a_slot_spacing_that_is_a_multiple_of_512_bytes_only_is_found_too ... ok
+test devices_whose_highest_found_slots_disagree_on_the_filesystem_identifier_refuse_the_pool ... ok
+test slots_of_equal_generation_found_by_the_search_resolve_to_the_smaller_offset ... ok
+test the_search_takes_the_highest_generation_even_when_it_is_a_stale_slot_of_an_earlier_make_filesystem ... ok
+test the_search_keeps_the_incompat_and_slots_per_region_refusals_of_slot_one ... ok
+test slot_one_is_found_by_trying_every_spacing_when_no_slot_zero_in_the_pool_verifies ... ok
+test the_search_tries_the_largest_spacing_whose_slot_one_ends_at_the_root_ring_base ... ok
+test a_chosen_root_whose_checkpoint_txg_is_the_largest_value_is_refused_as_damaged_instead_of_panicking ... ok
+test a_tree_table_carrying_one_kind_of_tree_twice_is_refused_as_damaged_by_every_reader ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 9 tests
+test last_record_flag_followed_by_the_record_of_the_same_publish_breaks_the_chain_at_the_flag_and_the_checker_reddens ... ok
+test an_ordinal_that_skips_within_a_publish_breaks_the_chain_and_the_publish_is_not_applied has been running for over 60 seconds
+test last_record_flag_followed_only_by_the_very_next_record_of_the_same_publish_breaks_the_chain_at_the_flag has been running for over 60 seconds
+test last_record_of_the_publish_without_the_commit_marker_keeps_its_publish_unapplied has been running for over 60 seconds
+test record_whose_ordinal_is_zero_or_whose_flags_set_another_bit_counts_as_torn_and_its_publish_is_not_applied has been running for over 60 seconds
+test transaction_whose_commit_marker_never_appears_before_the_next_transaction_keeps_its_publish_unapplied has been running for over 60 seconds
+test an_ordinal_that_skips_within_a_publish_breaks_the_chain_and_the_publish_is_not_applied ... ok
+test last_record_of_the_publish_without_the_commit_marker_keeps_its_publish_unapplied ... ok
+test transaction_whose_commit_marker_never_appears_before_the_next_transaction_keeps_its_publish_unapplied ... ok
+test record_whose_ordinal_is_zero_or_whose_flags_set_another_bit_counts_as_torn_and_its_publish_is_not_applied ... ok
+test last_record_flag_followed_only_by_the_very_next_record_of_the_same_publish_breaks_the_chain_at_the_flag ... ok
+test two_last_record_flags_in_the_chosen_roots_publish_stop_recovery_and_a_writable_mount_before_any_write ... ok
+test when_the_last_record_of_the_chosen_roots_publish_is_unreadable_its_readable_earlier_record_is_no_anchor_and_the_next_publish_starts_the_chain ... ok
+test with_a_readable_anchor_a_next_publish_whose_first_ordinal_is_not_one_is_not_applied_and_the_checker_reddens ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 92.14s
+
+
+running 1 test
+test with_an_in_flight_limit_of_one_only_the_first_of_two_single_record_publishes_above_the_chosen_root_is_applied ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.87s
+
+
+running 4 tests
+test two_last_record_flags_in_the_chosen_roots_publish_return_the_error_with_only_that_publishs_counters ... ok
+test last_record_flags_of_other_publishes_of_the_same_instance_leave_the_anchor_alone_and_the_next_publish_applies ... ok
+test a_table_whose_keys_disagree_with_its_records_trips_the_glue_assertion_before_the_kernel_runs - should panic ... ok
+test a_record_whose_counter_is_the_largest_value_trips_the_glue_assertion_before_the_kernel_runs - should panic ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 7 tests
+test checker_rejects_an_instance_table_row_whose_instance_is_not_below_the_mount_root has been running for over 60 seconds
+test damaging_every_instance_two_root_on_one_device_still_leaves_a_root_on_the_other_device has been running for over 60 seconds
+test one_missing_record_right_after_the_chosen_root_stops_the_prefix_even_when_later_records_are_intact has been running for over 60 seconds
+test remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes_the_third_version has been running for over 60 seconds
+test stray_record_of_the_previous_instance_is_applied_on_remount_and_its_transaction_lands_in_the_row has been running for over 60 seconds
+test torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg_when_only_the_anchor_is_torn has been running for over 60 seconds
+test one_missing_record_right_after_the_chosen_root_stops_the_prefix_even_when_later_records_are_intact ... ok
+test torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg_when_the_next_record_is_torn_too ... ok
+test checker_rejects_an_instance_table_row_whose_instance_is_not_below_the_mount_root ... ok
+test damaging_every_instance_two_root_on_one_device_still_leaves_a_root_on_the_other_device ... ok
+test stray_record_of_the_previous_instance_is_applied_on_remount_and_its_transaction_lands_in_the_row ... FAILED
+test torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg_when_only_the_anchor_is_torn ... FAILED
+test remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes_the_third_version ... ok
+
+failures:
+
+---- stray_record_of_the_previous_instance_is_applied_on_remount_and_its_transaction_lands_in_the_row stdout ----
+
+thread 'stray_record_of_the_previous_instance_is_applied_on_remount_and_its_transaction_lands_in_the_row' (3821800) panicked at crates/singlefs-harness/tests/writable_mount_takes_a_second_instance.rs:472:5:
+assertion `left == right` failed
+  left: 0
+ right: 3
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg_when_only_the_anchor_is_torn stdout ----
+
+thread 'torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg_when_only_the_anchor_is_torn' (3821801) panicked at crates/singlefs-harness/tests/writable_mount_takes_a_second_instance.rs:768:13:
+assertion `left == right` failed: 撕掉 [4] 之后写的行
+  left: [(CheckpointTxg(6), 0)]
+ right: [(CheckpointTxg(6), 4)]
+
+
+failures:
+    stray_record_of_the_previous_instance_is_applied_on_remount_and_its_transaction_lands_in_the_row
+    torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg_when_only_the_anchor_is_torn
+
+test result: FAILED. 5 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 80.24s
+
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-verus-land-code-r2-sonnet/tree_g/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-verus-land-code-r2-sonnet/tree_g/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 15.75s
+     Running tests/core_review_tree_table_duplicates_and_slot_one_search.rs (target/release/deps/core_review_tree_table_duplicates_and_slot_one_search-a6730b5af98df3a4)
+     Running tests/journal_last_record_flag_of_a_multi_record_publish.rs (target/release/deps/journal_last_record_flag_of_a_multi_record_publish-cbde0461ad5e355c)
+     Running tests/journal_replay_applies_no_more_records_than_the_in_flight_limit.rs (target/release/deps/journal_replay_applies_no_more_records_than_the_in_flight_limit-0fe59baf380caec8)
+     Running tests/recovery_anchor_failure_carries_the_counters_the_prefix_kernel_saw.rs (target/release/deps/recovery_anchor_failure_carries_the_counters_the_prefix_kernel_saw-635ca12351c5504d)
+     Running tests/writable_mount_takes_a_second_instance.rs (target/release/deps/writable_mount_takes_a_second_instance-a7a8760ece8472c6)
+error: test failed, to rerun pass `-p singlefs-harness --test writable_mount_takes_a_second_instance`
+error: 1 target failed:
+    `-p singlefs-harness --test writable_mount_takes_a_second_instance`

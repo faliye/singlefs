@@ -70,8 +70,8 @@
   ✓ 52-segment-registry.sh       green 判得对
   ✓ 53-format-const-placeholders.sh red   判得对
   ✓ 53-format-const-placeholders.sh green 判得对
-  ✓ 54-layer0-replay.sh          red   判得对
-  ✓ 54-layer0-replay.sh          green 判得对
+  ✓ checker-tier-layer0-replay.sh          red   判得对
+  ✓ checker-tier-layer0-replay.sh          green 判得对
   ✗ 55-qemu-device-streams.sh    red   输出里找不到「file-overwrite 盘 0：盘上收到的写（23）没有多于新池新建文件那段（23）」
   ✗ 55-qemu-device-streams.sh    red   输出里找不到「这一档该在新池新建文件之后再发布一次」
   ✗ 55-qemu-device-streams.sh    green 期望退出 3，实测 1
