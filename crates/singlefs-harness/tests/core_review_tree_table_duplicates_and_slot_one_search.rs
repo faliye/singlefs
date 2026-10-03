@@ -6,6 +6,7 @@
 //! journal 环装不下 F 条记录时 mkfs 在任何写之前拒掉（I-8.1（环几何够大）、D23（journal 的角色与格式） 已定项 18 / 已定项 19）。
 //! 盘都是内存稀疏盘（`singlefs_harness::memory_pool::SparseBlockDevice`），恢复、只读挂载与各个读者读的是 `MemoryPool`。
 
+use singlefs_checker::image::chosen_system_configurations;
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
 };
@@ -517,12 +518,19 @@ fn slot_one_is_found_by_trying_every_spacing_when_no_slot_zero_in_the_pool_verif
     );
 }
 
-/// 槽距只是 512 的整数倍、不是 1024 的（io_min 1536 ⇒ 槽距 4608，D2（RAID 条带策略） 已定项 19 的式子）：逐档按 512 试才试得到。
+/// 槽距只是 512 的整数倍、不是 1024 的（4608）：逐档按 512 试才试得到。
+/// io_min 1536（D2（RAID 条带策略） 已定项 19 的式子算出槽距 4608）的池 mkfs 现在按判定宽度拒（区域起点 1 MiB 不是 1536 的整数倍，
+/// C47（根槽没按判定宽度对齐）），这里取 io_min 512、槽距写 4608：判定宽度 512，mkfs 收。
 #[test]
 fn a_slot_spacing_that_is_a_multiple_of_512_bytes_only_is_found_too() {
-    let mut image = formatted_image_with_minimum_input_output_bytes(1536);
-    let spacing = SystemImmutableSizes::slot_spacing_for(1536);
-    assert_eq!(spacing, 4608, "io_min 1536 时槽距 4608");
+    let spacing = 4608;
+    let parameters = parameters_with(SystemImmutableSizes {
+        fixed_structure_slot_spacing: spacing,
+        ..geometry_with_minimum_input_output_bytes(512)
+    });
+    let mut devices = two_sparse_devices();
+    make_filesystem(&parameters, &mut devices).expect("io_min 512、槽距 4608 的池");
+    let mut image = image_of(&devices);
     flip_slot_zero_on_every_device(&mut image);
     let chosen = choose_system_configuration(&image).expect("两块盘的槽 1 都在 4608 处");
     assert_eq!(
@@ -581,6 +589,7 @@ fn the_search_takes_the_highest_generation_even_when_it_is_a_stale_slot_of_an_ea
 
 /// 逐档试只在全池没有一个槽 0 可择时才走：只有盘 0 的槽 0 自证不过、盘 1 的槽 0 可择（记着槽距 4096），盘 0 的槽 1 照旧按
 /// 借来的 4096 找，盘 0 上 8192 处那份世代号 5 的旧槽读都不读（改前改后都绿）。盘 0 不借、也逐档试，择到的就是那份旧槽。
+/// 池级 checker 在同一份镜像上同样借、盘 0 同样择 4096 处世代号 1（代码轮第二轮判决 K4-1：恢复与 checker 两臂在同一份镜像上各问一次）。
 #[test]
 fn a_device_whose_slot_zero_fails_borrows_the_spacing_another_slot_zero_records_instead_of_searching(
 ) {
@@ -603,6 +612,18 @@ fn a_device_whose_slot_zero_fails_borrows_the_spacing_another_slot_zero_records_
         ),
         (DeviceIdentity(0), 4096, 1),
         "盘 0 按盘 1 槽 0 记的 4096 找到本池的槽 1，不去试 8192"
+    );
+    // 池级 checker 在同一份镜像上同一个读法（`singlefs_checker::image::system_configuration_slot_readings` 借池里第一块可用槽 0 记的槽距）：
+    // 盘 0 择 4096 处世代号 1，不择 8192 处世代号 5 的旧槽（代码轮第二轮判决 K4-1）。
+    let chosen_by_the_checker_on_device_zero = chosen_system_configurations(&image)
+        .into_iter()
+        .find(|(device, _)| *device == 0)
+        .and_then(|(_, chosen_by_the_checker)| chosen_by_the_checker)
+        .map(|(view, geometry)| (geometry.slot_spacing, view.slot_generation));
+    assert_eq!(
+        chosen_by_the_checker_on_device_zero,
+        Some((4096, 1)),
+        "checker 盘 0 也借盘 1 槽 0 记的 4096，择到本池的槽 1，不落到逐档去择 8192 处世代号 5 的旧槽"
     );
 }
 

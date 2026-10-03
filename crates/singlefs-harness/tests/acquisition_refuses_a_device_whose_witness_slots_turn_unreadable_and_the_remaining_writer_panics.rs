@@ -1,9 +1,10 @@
-//! 实审 A3c（规格 `/tmp/claude-1000/impl-rev-a3c/spec.md`，写于 2026-09-27）：
+//! 这份文件钉的几格（实审 A3c，来历见 `research/prompts/m2-rev-a3c-implementer-report.md`）：
 //!
 //! 一、C554 乙-配置续 Q1（主 agent 定走「拒」）：取号那一刻读见证值时某块盘两槽里一份本池自证过的系统配置都读不出，
-//! 在第一个取号写之前拒——可写挂载照 C331（择根倒挂压过已确认的写） 取甲的拒因报 `MountError::NewerStateStillUnreadableAfterOneReread`
-//! （后一遍判「有一槽读不出或自证不过」；用户 2026-09-28 定删掉「这块盘没有自证过的系统配置」那一支、并进甲的拒因），
-//! `acquire_instance` 报 `InstanceAcquisitionFailed::DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness`。
+//! 在第一个取号写之前拒——可写挂载照见证读的拒因报 `MountError::NewerStateStillUnreadableAfterOneReread`
+//! （后一遍判「有一块盘一份自证过的系统配置都没有」：C331（择根倒挂压过已确认的写） 改取 R2 之后，盘 0 两槽都自证过时 R2 判得出，
+//! 这一支不再并进判不出，单列 `WitnessedCounterComparison::SomeDeviceWithoutAnySelfVerifiedSystemConfigurationSlot`），
+//! `acquire_instance` 报 `InstanceAcquisitionFailed::DeviceWithoutAnySelfVerifiedSystemConfigurationSlotWhenReadingTheWitness`。
 //! 改之前这块盘在见证值里不出数、取号写照做：逐盘核那一遍读得出、见证值那一遍读不出（两次读之间一次瞬时读错）就走得到。
 //! 这一核在第一道屏障之前做一遍（拒的时候录制流一步不多），屏障之后取见证值时再读一遍，对不上就不写。
 //!
@@ -253,8 +254,8 @@ fn reads_of_device_one_slots_before_the_acquisition_barrier(tag: &str) -> [u64; 
     [counts[0], counts[1]]
 }
 
-/// 新池新建文件那一版可写挂载被拒时报的：读阶段判完之后取号那一刻盘 1 的槽读不出（两次读之间的瞬时读错），照 C331（择根倒挂压过已确认的写）
-/// 取甲的拒因报（用户 2026-09-28 定：「这块盘没有自证过的系统配置」那一支删掉、并进甲的拒因）——所选那一版就是它，后一遍判「有一槽读不出或自证不过」。
+/// 新池新建文件那一版可写挂载被拒时报的：读阶段判完之后取号那一刻盘 1 的槽读不出（两次读之间的瞬时读错），照见证读的拒因报
+/// （用户 2026-09-28 定并进见证读的拒因）——所选那一版就是它，后一遍判「有一块盘一份自证过的系统配置都没有」（盘 0 两槽都自证过，R2 判得出）。
 fn refused_because_device_one_slots_turned_unreadable_after_the_read_stage(
     refusal: &Result<singlefs_core::mount::Mounted, MountError>,
     first: &TransactionOutput,
@@ -272,7 +273,7 @@ fn refused_because_device_one_slots_turned_unreadable_after_the_read_stage(
             checkpoint_txg: first.root.checkpoint_txg,
         } && reread.selected_version == first_read.selected_version
             && reread.witness.comparison
-                == WitnessedCounterComparison::SomeSystemConfigurationSlotUnreadOrUnverified
+                == WitnessedCounterComparison::SomeDeviceWithoutAnySelfVerifiedSystemConfigurationSlot
     )
 }
 
@@ -290,7 +291,7 @@ fn describe(refusal: &Result<singlefs_core::mount::Mounted, MountError>) -> Stri
 
 /// 场景：新池新建文件之后重开、可写挂载。盘 1 两个系统配置槽从「取号写之前最后一次读」起每次都读坏
 /// （次数取另一份相同的池上照常挂载时数到的：择系统配置、取号之前的逐盘核、算号那几遍都读得出）。
-/// 预期：取号拒在第一道屏障之前，照甲的拒因报 `NewerStateStillUnreadableAfterOneReread`（后一遍判「有一槽读不出或自证不过」），
+/// 预期：取号拒在第一道屏障之前，照见证读的拒因报 `NewerStateStillUnreadableAfterOneReread`（后一遍判「有一块盘一份自证过的系统配置都没有」），
 /// `DiskSnapshot` 不变（系统配置槽、根环、录制流步数：一个写都没发），盘上一次屏障调用都没收到（录制流看不出取号那道屏障，
 /// 见 [`DeviceCountingBarriers`]）。
 /// 改之前：见证值只取盘 0 的、取号写照做，挂载做成。
@@ -377,7 +378,8 @@ fn a_device_whose_slots_turn_unreadable_after_the_acquisition_barrier_refuses_be
 }
 
 /// 场景：新池新建文件之后重开，不经可写挂载、直接 `acquire_instance`（前面没有逐盘核）；盘 1 两个系统配置槽每次都读坏。
-/// 预期：`InstanceAcquisitionFailed::DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness`（盘 1），`DiskSnapshot` 不变。
+/// 预期：`InstanceAcquisitionFailed::DeviceWithoutAnySelfVerifiedSystemConfigurationSlotWhenReadingTheWitness`（盘 1；盘 0 两槽都自证过，R2 判得出），
+/// `DiskSnapshot` 不变。
 /// 改之前：见证值只取盘 0 的，两块盘都写了取号写，交出新号 2。
 #[test]
 fn acquire_instance_refuses_a_device_whose_slots_are_unreadable_before_any_step() {
@@ -396,7 +398,7 @@ fn acquire_instance_refuses_a_device_whose_slots_are_unreadable_before_any_step(
     assert!(
         matches!(
             acquisition,
-            Err(InstanceAcquisitionFailed::DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness {
+            Err(InstanceAcquisitionFailed::DeviceWithoutAnySelfVerifiedSystemConfigurationSlotWhenReadingTheWitness {
                 device: DEVICE_WHOSE_SLOTS_TURN_UNREADABLE,
             })
         ),

@@ -51,14 +51,14 @@ use singlefs_core::transaction::{
     PoolWriter, PublishError, TransactionOutput, ZeroUnitPublishPlan,
 };
 use singlefs_core::unit::data_unit_payload_capacity;
-use singlefs_format::{DATA_UNIT_BYTES, SLOT_BYTES};
+use singlefs_format::{DATA_UNIT_BYTES, EXTENT_TREE_LOWER_LEAF_DATA_UNITS, SLOT_BYTES};
 
 use crate::fault_injection::{FaultInjectingBlockDevice, SharedFaultPlan};
 use crate::memory_pool::{MemoryPool, RecordCheck, SparseBlockDevice};
 use crate::model::{
     IdealModel, ModelAnswer, ModelCheckpointTxg, ModelDeviceIdentity, ModelDisagreement,
-    ModelJudgementCounts, ModelPoolGeometry, ModelRingPosition, ModelRootKey, ObservedEffect,
-    ObservedOutcome, ObservedRefusalReason,
+    ModelJudgementCounts, ModelPoolGeometry, ModelRefusalReason, ModelRingPosition, ModelRootKey,
+    ObservedEffect, ObservedOutcome, ObservedRefusalReason,
 };
 use crate::model_comparison::{
     model_root_key, observed_mount_carrying_to_zero_unit_publishes,
@@ -72,6 +72,20 @@ use crate::model_comparison::{
 use crate::scenario::{e142_parameters, first_file_content, FIXED_WRITE_TIME_SECONDS};
 use crate::segments::FixedGeometry;
 use crate::{RecordingBlockDevice, SharedStream};
+
+/// 核心层那一份成员表生成宏（`singlefs_core::enum_listing_every_member!`）在 harness 这边的名字，给下面的转发宏用。
+#[doc(hidden)]
+pub use singlefs_core::enum_listing_every_member as enum_listing_every_member_defined_in_the_core_layer;
+
+/// 声明一个封闭集合的枚举，连同它的 `ALL`（每一个成员，按声明的次序）：原样转给核心层那一份（`singlefs_core::enum_listing_every_member!`，
+/// 核心层的空间准入枚举也经它生成，定义只有那一份）。生成的 `ALL` 由 `history::tests` 里的
+/// `the_generated_member_table_lists_every_member_once_in_declaration_order` 盯着。
+#[macro_export]
+macro_rules! enum_listing_every_member {
+    ($($declaration:tt)*) => {
+        $crate::history::enum_listing_every_member_defined_in_the_core_layer! { $($declaration)* }
+    };
+}
 
 /// 随机历史、崩溃注入与坏盘输入三场战役共用的种子基（从 checker 档的 `crash_injection` 挪到这里：harness 档的随机历史与故障注入用例也用它，
 /// 放在 harness 才不让 harness 的测试依赖 checker 档，D13（验证路线） 已定项 15）。
@@ -88,6 +102,7 @@ use crate::{RecordingBlockDevice, SharedStream};
 /// 等里程碑二提交之后做，登记在 `records/2026-09-24-里程碑二收尾调度.md` 第三节「种子基永久固定」那一行。
 pub const SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE: u64 = 7_463_871_032_432_355_113;
 
+enum_listing_every_member! {
 /// 历史里两块内存盘多宽（取样点的参数；两块恒等大：模型的几何只有一个盘大小，`ModelPoolGeometry::device_size_in_bytes`）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HistoryDeviceWidth {
@@ -98,29 +113,46 @@ pub enum HistoryDeviceWidth {
     /// 4 GiB 的盘上四段历史里落点拒绝一次都没有，映射把它报成什么都没人看得见）。单元区起点随环长走（journal 环末尾的下一个槽，
     /// C475（非默认环长下单元区起点取编译期常量），实审 A3b），盘宽 = 起点 + 单元区槽数；mkfs 要求环不超过设备容量的四分之一
     /// （`make_filesystem::check_geometry`），环缩到 6 MiB（[`SMALL_DEVICE_JOURNAL_RING_BYTES`]）。
+    /// 名字里的 384 槽是环窗口补足之外的那一段：环窗口（D28（挂载期承诺量） 已定项 1 末项）每块盘常驻扣，单元区放大了
+    /// [`SMALL_DEVICE_RING_WINDOW_ALLOWANCE_SLOTS`]，准入算出的可用与放大之前一样多（用户 2026-10-02 定「甲」）；
+    /// 分配器手里的空槽多了这么多，落点那一判的墙跟着往后挪。
     UnitAreaOf384Slots,
     /// 单元区 256 槽的小盘（journal 环同 384 槽那一档）：单元区墙那一格的取样点用它。mkfs 同一个进程那条会话也装上根环表之后
     /// （`make_filesystem::allocator_after_make_filesystem`），每条会话在根环转过之后都按谓词回收，稳态占用约是根环里那 24 版的账
     /// （每版每盘约 10 槽），384 槽那一档一次落点拒绝都走不到了；256 槽走得到用户数据那一处的拒绝。
+    /// 名字里的 256 槽同样是环窗口补足（[`SMALLER_DEVICE_RING_WINDOW_ALLOWANCE_SLOTS`]）之外的那一段。
     UnitAreaOf256Slots,
     /// 单元区 240 槽的小盘（journal 环同 384 槽那一档）：可写挂载自己那一串（写行与暖机）在这么窄的盘上拿不到落点，
     /// 走得到取号之后才被落点拒绝的那一格（增补 2 收口表第 39 行那一族：取号之前的准入不算落点）；256 槽那一档的单元区墙取样点上
-    /// 一次都没走到过。
+    /// 一次都没走到过。名字里的 240 槽同样是环窗口补足（[`SMALLER_DEVICE_RING_WINDOW_ALLOWANCE_SLOTS`]）之外的那一段。
     UnitAreaOf240Slots,
 }
+}
 
-/// 小盘的单元区槽数（`HistoryDeviceWidth::UnitAreaOf384Slots`）：六个 64 槽的聚簇段。
-const SMALL_DEVICE_UNIT_AREA_SLOTS: u64 = 384;
+/// 小盘在环窗口补足之外的单元区槽数（`HistoryDeviceWidth::UnitAreaOf384Slots`）：六个 64 槽的聚簇段。
+const SMALL_DEVICE_UNIT_AREA_SLOTS_BEYOND_THE_RING_WINDOW_ALLOWANCE: u64 = 384;
 
-/// 更小一档小盘的单元区槽数（`HistoryDeviceWidth::UnitAreaOf256Slots`）：四个 64 槽的聚簇段。
-const SMALLER_DEVICE_UNIT_AREA_SLOTS: u64 = 256;
+/// 更小一档小盘在环窗口补足之外的单元区槽数（`HistoryDeviceWidth::UnitAreaOf256Slots`）：四个 64 槽的聚簇段。
+const SMALLER_DEVICE_UNIT_AREA_SLOTS_BEYOND_THE_RING_WINDOW_ALLOWANCE: u64 = 256;
 
-/// 再窄一档小盘的单元区槽数（`HistoryDeviceWidth::UnitAreaOf240Slots`）：三个整 64 槽的聚簇段加 48 槽的尾巴。
-const NARROWEST_DEVICE_UNIT_AREA_SLOTS: u64 = 240;
+/// 再窄一档小盘在环窗口补足之外的单元区槽数（`HistoryDeviceWidth::UnitAreaOf240Slots`）：三个整 64 槽的聚簇段加 48 槽的尾巴。
+const NARROWEST_DEVICE_UNIT_AREA_SLOTS_BEYOND_THE_RING_WINDOW_ALLOWANCE: u64 = 240;
+
+/// 384 槽那一档小盘为环窗口补足的单元区槽数（D28（挂载期承诺量） 已定项 1 末项环窗口每块盘常驻扣；用户 2026-10-02 定「甲」：小盘放大到扣得起）。
+/// 放大之后单元区 [1408, 2607) 每块盘罩分配记录树叶 3 片（812 槽一片：⌊2606 ÷ 812⌋ − ⌊1408 ÷ 812⌋ + 1）⇒ N_0 = 6、W = 24 + 6 = 30、
+/// 环窗口 (3 × 8 + 1) × 30 = 750 槽。同一次补足还罩着 ckpt_cost 多出来的 5 块：叶多罩一片，分配记录树那一项 1 + 2 × 2 = 5 → 1 + 2 × 3 = 7
+/// （多 2 块），谱系那一项 3 块（同日定「乙」）；保留池每块盘多 5 槽、切换预留里暖机那一半多 (3 + 1) × 3 × 5 = 60 槽。
+/// 750 + 5 + 60 = 815：准入算出的可用(d) 与放大之前、ckpt_cost 加谱系那一项之前逐盘一样多（推的；每次发布改哪几片叶跟着盘宽变，实测见用例）。
+const SMALL_DEVICE_RING_WINDOW_ALLOWANCE_SLOTS: u64 = 815;
+
+/// 256 槽、240 槽那两档小盘为环窗口补足的单元区槽数：放大之后单元区 [1408, 2403) 与 [1408, 2387) 每块盘仍只罩分配记录树叶 2 片
+/// （⌊2402 ÷ 812⌋ = ⌊2386 ÷ 812⌋ = 2）⇒ N_0 = 4、W = 28、环窗口 25 × 28 = 700 槽；ckpt_cost 只多谱系那一项 3 块：
+/// 保留池每块盘多 3 槽、切换预留多 12 × 3 = 36 槽。700 + 3 + 36 = 739。
+const SMALLER_DEVICE_RING_WINDOW_ALLOWANCE_SLOTS: u64 = 739;
 
 /// 小盘上的 journal 环字节数：6 MiB。单元区从环末尾的下一个槽 1024 + 384 = 1408（= 22 × 64，落在聚簇段边界上）起，
-/// 三档小盘的盘宽 = 1408 + 单元区槽数，最窄那档（240 槽）是 1648 槽 = 25.75 MiB，环 6 MiB 不超过它的四分之一；
-/// 7 MiB 的环在 256 槽、240 槽那两档就超了。在飞上限 = 6 MiB ÷ 4096 ÷ 3 = 512 条。
+/// 三档小盘的盘宽 = 1408 + 环窗口补足 + 单元区槽数，最窄那档（240 槽）是 1408 + 739 + 240 = 2387 槽，环 6 MiB 不超过它的四分之一；
+/// 放大之前（1648 槽），7 MiB 的环在 256 槽、240 槽那两档就超了。在飞上限 = 6 MiB ÷ 4096 ÷ 3 = 512 条。
 /// 改之前是 128 MiB、单元区从编译期常量 50176 起（盘约 790 MiB）；单元区起点改成随环长走之后，128 MiB 的环把起点拉到 9216，
 /// 同样宽的盘上单元区有四万多槽、走不到单元区墙，四分之一那一关又不许环更长。
 const SMALL_DEVICE_JOURNAL_RING_BYTES: u64 = 6 << 20;
@@ -140,13 +172,21 @@ impl HistoryDeviceWidth {
         match self {
             HistoryDeviceWidth::FourGibibytes => 4 << 30,
             HistoryDeviceWidth::UnitAreaOf384Slots => {
-                (small_device_unit_area_start_slot() + SMALL_DEVICE_UNIT_AREA_SLOTS) * SLOT_BYTES
+                (small_device_unit_area_start_slot()
+                    + SMALL_DEVICE_RING_WINDOW_ALLOWANCE_SLOTS
+                    + SMALL_DEVICE_UNIT_AREA_SLOTS_BEYOND_THE_RING_WINDOW_ALLOWANCE)
+                    * SLOT_BYTES
             }
             HistoryDeviceWidth::UnitAreaOf256Slots => {
-                (small_device_unit_area_start_slot() + SMALLER_DEVICE_UNIT_AREA_SLOTS) * SLOT_BYTES
+                (small_device_unit_area_start_slot()
+                    + SMALLER_DEVICE_RING_WINDOW_ALLOWANCE_SLOTS
+                    + SMALLER_DEVICE_UNIT_AREA_SLOTS_BEYOND_THE_RING_WINDOW_ALLOWANCE)
+                    * SLOT_BYTES
             }
             HistoryDeviceWidth::UnitAreaOf240Slots => {
-                (small_device_unit_area_start_slot() + NARROWEST_DEVICE_UNIT_AREA_SLOTS)
+                (small_device_unit_area_start_slot()
+                    + SMALLER_DEVICE_RING_WINDOW_ALLOWANCE_SLOTS
+                    + NARROWEST_DEVICE_UNIT_AREA_SLOTS_BEYOND_THE_RING_WINDOW_ALLOWANCE)
                     * SLOT_BYTES
             }
         }
@@ -186,6 +226,17 @@ impl HistoryDeviceWidth {
             HistoryDeviceWidth::UnitAreaOf384Slots => "两块单元区 384 槽的小盘（journal 环 6 MiB）",
             HistoryDeviceWidth::UnitAreaOf256Slots => "两块单元区 256 槽的小盘（journal 环 6 MiB）",
             HistoryDeviceWidth::UnitAreaOf240Slots => "两块单元区 240 槽的小盘（journal 环 6 MiB）",
+        }
+    }
+
+    /// 复现行与复现入口的环境变量里这一档盘宽的取值（`HistorySamplingVariable::Devices`）。
+    #[must_use]
+    pub const fn environment_value(self) -> &'static str {
+        match self {
+            HistoryDeviceWidth::FourGibibytes => "4gib",
+            HistoryDeviceWidth::UnitAreaOf384Slots => "unit-area-384",
+            HistoryDeviceWidth::UnitAreaOf256Slots => "unit-area-256",
+            HistoryDeviceWidth::UnitAreaOf240Slots => "unit-area-240",
         }
     }
 }
@@ -256,6 +307,23 @@ pub enum ContentLength {
     OneByteAboveDataUnitPayloadCapacity,
     /// 装不下：一个数据单元的整宽（含头与预留）。
     ExactlyDataUnitBytes,
+    /// 跨 `data_units`（≥ 2）个数据单元的内容：前面的单元装满净荷容量，最后一个单元装 [1, 载荷容量] 里按选择子取的字节。
+    /// 这一种走顺序写入口（[`ContentLength::whole_file_write_entry`]，`UserChange::SequentialWrite`）：覆盖写的契约是一个数据单元，
+    /// 多于一片下段叶（144 个单元）的文件只有顺序写长得出来（代码轮 U13）。只有偏向删除多片下段叶那一组比重抽它
+    /// （[`OverwriteContentDraw::AlsoSpanningSeveralDataUnits`]），别的几组比重的抽法与生成的历史不变。
+    SpanningDataUnitsThroughTheSequentialWrite {
+        data_units: u64,
+        selector: u64,
+    },
+}
+
+/// 整份重写文件内容走哪个入口（`mounted_session::UserChange` 的哪一个成员）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WholeFileWriteEntry {
+    /// `UserChange::Overwrite`：契约是一个数据单元，装不下拒。
+    Overwrite,
+    /// `UserChange::SequentialWrite`：按切分纪律切成几个一单元事务，不按单元数拒。
+    SequentialWrite,
 }
 
 impl ContentLength {
@@ -272,6 +340,32 @@ impl ContentLength {
             ContentLength::ExactlyDataUnitPayloadCapacity => capacity,
             ContentLength::OneByteAboveDataUnitPayloadCapacity => capacity + 1,
             ContentLength::ExactlyDataUnitBytes => usize::try_from(DATA_UNIT_BYTES).expect("32768"),
+            ContentLength::SpanningDataUnitsThroughTheSequentialWrite {
+                data_units,
+                selector,
+            } => {
+                let capacity_in_bytes = u64::try_from(capacity).expect("载荷容量三万多字节");
+                let bytes_of_the_full_units = (data_units - 1) * capacity_in_bytes;
+                let bytes_of_the_last_unit = 1 + selector % capacity_in_bytes;
+                usize::try_from(bytes_of_the_full_units + bytes_of_the_last_unit)
+                    .expect("几百个单元的内容装得进 usize")
+            }
+        }
+    }
+
+    /// 这一种内容走哪个入口：跨几个数据单元的走顺序写，别的（含装不下一个单元的那两种：它们要钉的正是覆盖写的拒）走覆盖写。
+    #[must_use]
+    pub fn whole_file_write_entry(self) -> WholeFileWriteEntry {
+        match self {
+            ContentLength::Empty
+            | ContentLength::InsideOneDataUnit { .. }
+            | ContentLength::OneByteBelowDataUnitPayloadCapacity
+            | ContentLength::ExactlyDataUnitPayloadCapacity
+            | ContentLength::OneByteAboveDataUnitPayloadCapacity
+            | ContentLength::ExactlyDataUnitBytes => WholeFileWriteEntry::Overwrite,
+            ContentLength::SpanningDataUnitsThroughTheSequentialWrite { .. } => {
+                WholeFileWriteEntry::SequentialWrite
+            }
         }
     }
 
@@ -285,6 +379,15 @@ impl ContentLength {
             ContentLength::ExactlyDataUnitPayloadCapacity => "载荷容量",
             ContentLength::OneByteAboveDataUnitPayloadCapacity => "载荷容量 + 1（装不下）",
             ContentLength::ExactlyDataUnitBytes => "数据单元整宽 32768（装不下）",
+            ContentLength::SpanningDataUnitsThroughTheSequentialWrite { data_units, .. } => {
+                if data_units <= EXTENT_TREE_LOWER_LEAF_DATA_UNITS {
+                    "跨一片下段叶以内的多个单元（顺序写）"
+                } else if data_units <= 2 * EXTENT_TREE_LOWER_LEAF_DATA_UNITS {
+                    "跨两片下段叶（顺序写）"
+                } else {
+                    "跨三片及以上下段叶（顺序写）"
+                }
+            }
         }
     }
 }
@@ -330,6 +433,21 @@ pub enum RollbackTargetDraw {
     RecentUniformOrBeyond,
     /// 先抽一次：一半取候选集的下沿（`RingRootAtTheNewestFloor`），另一半照第一版的抽法。
     FloorRootHalfTheTime,
+    /// 先抽一次：一半取根环里第四新的那条根（`RingRoot { index_from_newest: 3 }`），另一半照第一版的抽法。unlink 一个两片下段叶的文件
+    /// 一次写出三条根（意图那次、一个删除批、最后一批）；删完的那一版没有文件、回退不接（执行器记「前提不满足」），建一个 inode 之后才接，
+    /// 这时第四新的根就是意图那一版（三片的是第一个删除批那一版），回退到它把号带回队列（D8（核心索引结构） 已定项 16 依据
+    /// 「回退到意图那一版会把号带回队列」）、之后的用户改动先走空多步（代码轮 U13）。
+    FourthNewestRootHalfTheTime,
+}
+
+/// 覆盖写（`HistoryOperation::PublishOverwrite`）的内容按什么抽。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OverwriteContentDraw {
+    /// 第一版的六种长度（`draw_content`）：都在一个数据单元以内或刚越过它，全走覆盖写入口。
+    WithinOneDataUnitOrJustBeyond,
+    /// 另抽跨几个数据单元、走顺序写入口的内容（[`ContentLength::SpanningDataUnitsThroughTheSequentialWrite`]），
+    /// 多半多于一片下段叶（`draw_content_spanning_several_data_units`）。
+    AlsoSpanningSeveralDataUnits,
 }
 
 /// 抬 F 的目标怎么取。
@@ -349,7 +467,9 @@ pub struct FloorTargetChoice {
 pub enum HistoryOperation {
     /// `transaction::publish_first_file`，接在现行版本后面（上一条记录取现行版本的；照抄实例表指针的那条根也取现行版本的）。
     PublishFirstFile(ContentChoice),
-    /// `transaction::publish_overwrite`，接在现行的带文件的版本后面。
+    /// 整份重写文件内容，经挂着的会话发，接在现行的带文件的版本后面：内容跨几个数据单元的
+    /// （[`ContentLength::SpanningDataUnitsThroughTheSequentialWrite`]）走顺序写（`UserChange::SequentialWrite`，代码轮 U13），
+    /// 别的走覆盖写（`UserChange::Overwrite`，`transaction::publish_overwrite`）。
     PublishOverwrite(ContentChoice),
     /// `transaction::publish_without_units`，接在现行的树表 0 条的版本后面。
     PublishWithoutUnits,
@@ -368,6 +488,14 @@ pub enum HistoryOperation {
     /// 这一步不再造出被抛弃的根；乙罩不到的「系统配置没见证到最新那条根」那一形（`tests/common/mod.rs` 的
     /// `abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before` 另把见证它的系统配置槽清掉）这一步不造。
     CrashRecoveryAbandoningTheNewestRoot,
+    /// 经挂着的会话 unlink 第一个文件（`mounted_session::UserChange::Unlink`，D8（核心索引结构） 已定项 16）：一次调用 = 意图那次 +
+    /// 从尾部全部分批（文件多于一片下段叶的 144 个单元时先有不是最后一批的删除批，再最后一批），中间为空间推的抬 F 照会话交回的比。
+    /// 现行那一版有第一个文件那条记录时调（删除中的那一版也调：会话先走空、再拒）。
+    Unlink,
+    /// 经挂着的会话建一个 size 0 的 inode（`mounted_session::UserChange::NewInodes`，count 1；D8（核心索引结构） 已定项 16 第 5 条：
+    /// 删完之后只许建 inode、写行与空发布）。只在第一个文件已删完的一版上调（有树而文件集合为空的一版、或在它上面建过 inode 的一版）：
+    /// 模型只罩 inode 1 一个文件，建在第一个文件旁边的 inode 会让之后那次最后一批留下别的 inode，模型的删除那一臂罩不到。
+    CreateInode,
 }
 
 /// 操作的种类：统计与比重用。
@@ -381,10 +509,12 @@ pub enum HistoryOperationKind {
     RaiseRollbackFloor,
     ColdStartRecover,
     CrashRecoveryAbandoningTheNewestRoot,
+    Unlink,
+    CreateInode,
 }
 
 impl HistoryOperationKind {
-    pub const ALL: [HistoryOperationKind; 8] = [
+    pub const ALL: [HistoryOperationKind; 10] = [
         HistoryOperationKind::PublishFirstFile,
         HistoryOperationKind::PublishOverwrite,
         HistoryOperationKind::PublishWithoutUnits,
@@ -393,6 +523,8 @@ impl HistoryOperationKind {
         HistoryOperationKind::RaiseRollbackFloor,
         HistoryOperationKind::ColdStartRecover,
         HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot,
+        HistoryOperationKind::Unlink,
+        HistoryOperationKind::CreateInode,
     ];
 }
 
@@ -410,6 +542,8 @@ impl HistoryOperation {
             HistoryOperation::CrashRecoveryAbandoningTheNewestRoot => {
                 HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot
             }
+            HistoryOperation::Unlink => HistoryOperationKind::Unlink,
+            HistoryOperation::CreateInode => HistoryOperationKind::CreateInode,
         }
     }
 }
@@ -428,6 +562,66 @@ enum ExpectedSession {
     Closed,
     OpenWithoutFile,
     OpenWithFile,
+    /// 这段历史 unlink 过第一个文件（之后照估计一直没有它）：只在比重写了「unlink 之后那张表」时才进这一估计
+    /// （[`GenerationWeights::with_session_open_after_the_file_was_deleted`]），没写的那几组照旧按「开着、没有文件」抽。
+    OpenAfterTheFileWasDeleted,
+}
+
+enum_listing_every_member! {
+/// 复现入口认得的每一组比重的名字：一组一个成员，[`GenerationWeights::NAMED`] 照成员表生成。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NamedGenerationWeights {
+    /// [`GenerationWeights::BROAD`]。
+    Broad,
+    /// [`GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR`]。
+    ReuseAfterRaisingTheFloor,
+    /// [`GenerationWeights::ROLLBACK_AFTER_RAISING_THE_FLOOR`]。
+    RollbackAfterRaisingTheFloor,
+    /// [`GenerationWeights::TOWARD_THE_ALLOCATION_RECORD_WALL`]。
+    TowardTheAllocationRecordWall,
+    /// [`GenerationWeights::TOWARD_THE_UNIT_AREA_WALL`]。
+    TowardTheUnitAreaWall,
+    /// [`GenerationWeights::DELETING_FILES_OF_SEVERAL_LOWER_LEAVES`]。
+    DeletingFilesOfSeveralLowerLeaves,
+}
+}
+
+impl NamedGenerationWeights {
+    /// 这个名字指的那一组比重。
+    #[must_use]
+    pub const fn weights(self) -> GenerationWeights {
+        match self {
+            NamedGenerationWeights::Broad => GenerationWeights::BROAD,
+            NamedGenerationWeights::ReuseAfterRaisingTheFloor => {
+                GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR
+            }
+            NamedGenerationWeights::RollbackAfterRaisingTheFloor => {
+                GenerationWeights::ROLLBACK_AFTER_RAISING_THE_FLOOR
+            }
+            NamedGenerationWeights::TowardTheAllocationRecordWall => {
+                GenerationWeights::TOWARD_THE_ALLOCATION_RECORD_WALL
+            }
+            NamedGenerationWeights::TowardTheUnitAreaWall => {
+                GenerationWeights::TOWARD_THE_UNIT_AREA_WALL
+            }
+            NamedGenerationWeights::DeletingFilesOfSeveralLowerLeaves => {
+                GenerationWeights::DELETING_FILES_OF_SEVERAL_LOWER_LEAVES
+            }
+        }
+    }
+
+    /// 复现行与复现入口的环境变量里这组比重的取值（`HistorySamplingVariable::Weights`）。
+    #[must_use]
+    pub const fn environment_value(self) -> &'static str {
+        match self {
+            NamedGenerationWeights::Broad => "broad",
+            NamedGenerationWeights::ReuseAfterRaisingTheFloor => "reuse",
+            NamedGenerationWeights::RollbackAfterRaisingTheFloor => "rollback",
+            NamedGenerationWeights::TowardTheAllocationRecordWall => "wall",
+            NamedGenerationWeights::TowardTheUnitAreaWall => "unit-area-wall",
+            NamedGenerationWeights::DeletingFilesOfSeveralLowerLeaves => "several-leaves",
+        }
+    }
 }
 
 /// 生成一段历史时各样东西的比重（每张表写份数；操作那三张按百分比写，和为 100）：起点两种各占几份，三种会话估计下各类操作各占几份。
@@ -437,11 +631,20 @@ enum ExpectedSession {
 pub struct GenerationWeights {
     /// 报告里的名字。
     pub name: &'static str,
+    /// 复现入口认这一组用的名字（[`NamedGenerationWeights`] 的哪一个成员）：每一组比重都要写，新加一组就得给它一个成员，
+    /// 成员又由 [`NamedGenerationWeights::weights`] 的穷举 `match` 找回这一组，[`GenerationWeights::NAMED`] 照成员表生成。
+    pub named: NamedGenerationWeights,
     pub starting_points: &'static [(HistoryStartingPoint, u64)],
     pub with_session_closed: &'static [(HistoryOperationKind, u64)],
     pub with_session_open_without_file: &'static [(HistoryOperationKind, u64)],
     pub with_session_open_with_file: &'static [(HistoryOperationKind, u64)],
+    /// unlink 过第一个文件之后（[`ExpectedSession::OpenAfterTheFileWasDeleted`]）各类操作各占几份；`None` 的那几组 unlink 之后照旧按
+    /// 「开着、没有文件」那张表抽、之后的估计也照旧，生成的历史与加「建 inode」之前逐项相同（那几组的取样点与钉的值不动）。
+    pub with_session_open_after_the_file_was_deleted:
+        Option<&'static [(HistoryOperationKind, u64)]>,
     pub rollback_targets: RollbackTargetDraw,
+    /// 覆盖写的内容按什么抽：只有偏向删除多片下段叶那一组抽跨几个单元的，别的几组照第一版，生成的历史不变。
+    pub overwrite_contents: OverwriteContentDraw,
 }
 
 impl GenerationWeights {
@@ -452,8 +655,11 @@ impl GenerationWeights {
     /// 树表 0 条 6 → 4 + 2），两张表的和照旧是 100：同一个种子抽到的数落在哪一格，只有原先落在切出去那几份里的从可写挂载换成它，
     /// 别的一格不动；它不再抽随机数、生成时对会话的估计与可写挂载相同，所以之后几步抽到的操作也不变。
     /// 关着的会话上不抽它：它要这个进程的会话交回最新那一版的记录（点名的单元）。
+    /// unlink（三·2 第 8 条）同一个切法：带文件那张表里可写挂载那一格再切 3 份给它、紧挨在可写挂载之后（9 → 6 + 3），和照旧 100；
+    /// 它也不抽随机数，原先落在切出去那几份里的从可写挂载换成它，之后几步按 unlink 之后的估计（有树、没有文件）抽。
     pub const BROAD: GenerationWeights = GenerationWeights {
         name: "各类操作都抽（快档、大档）",
+        named: NamedGenerationWeights::Broad,
         starting_points: &[
             (HistoryStartingPoint::AfterMakeFilesystem, 1),
             (HistoryStartingPoint::AfterFirstFile, 1),
@@ -478,7 +684,8 @@ impl GenerationWeights {
         with_session_open_with_file: &[
             (HistoryOperationKind::PublishOverwrite, 52),
             (HistoryOperationKind::RaiseRollbackFloor, 16),
-            (HistoryOperationKind::CloseAndMountWritable, 9),
+            (HistoryOperationKind::CloseAndMountWritable, 6),
+            (HistoryOperationKind::Unlink, 3),
             (
                 HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot,
                 3,
@@ -488,14 +695,32 @@ impl GenerationWeights {
             (HistoryOperationKind::PublishFirstFile, 4),
             (HistoryOperationKind::PublishWithoutUnits, 2),
         ],
+        with_session_open_after_the_file_was_deleted: Some(&[
+            (HistoryOperationKind::CreateInode, 40),
+            (HistoryOperationKind::RaiseRollbackFloor, 15),
+            (HistoryOperationKind::RollBackWhileMounted, 15),
+            (HistoryOperationKind::CloseAndMountWritable, 10),
+            (
+                HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot,
+                3,
+            ),
+            (HistoryOperationKind::ColdStartRecover, 5),
+            (HistoryOperationKind::PublishOverwrite, 4),
+            (HistoryOperationKind::PublishFirstFile, 4),
+            (HistoryOperationKind::PublishWithoutUnits, 4),
+        ]),
         rollback_targets: RollbackTargetDraw::RecentUniformOrBeyond,
+        overwrite_contents: OverwriteContentDraw::WithinOneDataUnitOrJustBeyond,
     };
 
     /// 第 121 行那一类（复用时新记录罩住别的已回收记录）的专门取样点：多从第一个文件起、多覆盖写、多抬 F、多可写挂载，
     /// 少回退与冷启动。罩住别的已回收记录要：抬 F 回收一批 1 槽的固定点单元，重开之后上一次挂载的聚簇段不再挡用户数据，
     /// 下一个 2 槽的数据单元落在两条相邻的已回收记录上。
+    /// unlink 从带文件那张表的可写挂载那一格切 3 份（18 → 15 + 3，紧挨在它之后；切法同 [`GenerationWeights::BROAD`]）：
+    /// 小盘上删除类发布不判式子、落点那一判照判（D28（挂载期承诺量） 已定项 1），用户 2026-10-02 定 Q-T「甲」拿它去撞落点那一判，种子照旧。
     pub const REUSE_AFTER_RAISING_THE_FLOOR: GenerationWeights = GenerationWeights {
         name: "偏向抬 F 之后的复用（第 121 行那一类的取样点）",
+        named: NamedGenerationWeights::ReuseAfterRaisingTheFloor,
         starting_points: &[
             (HistoryStartingPoint::AfterMakeFilesystem, 1),
             (HistoryStartingPoint::AfterFirstFile, 9),
@@ -516,13 +741,25 @@ impl GenerationWeights {
         with_session_open_with_file: &[
             (HistoryOperationKind::PublishOverwrite, 55),
             (HistoryOperationKind::RaiseRollbackFloor, 22),
-            (HistoryOperationKind::CloseAndMountWritable, 18),
+            (HistoryOperationKind::CloseAndMountWritable, 15),
+            (HistoryOperationKind::Unlink, 3),
             (HistoryOperationKind::RollBackWhileMounted, 2),
             (HistoryOperationKind::ColdStartRecover, 1),
             (HistoryOperationKind::PublishFirstFile, 1),
             (HistoryOperationKind::PublishWithoutUnits, 1),
         ],
+        with_session_open_after_the_file_was_deleted: Some(&[
+            (HistoryOperationKind::CreateInode, 40),
+            (HistoryOperationKind::RaiseRollbackFloor, 25),
+            (HistoryOperationKind::CloseAndMountWritable, 20),
+            (HistoryOperationKind::RollBackWhileMounted, 5),
+            (HistoryOperationKind::ColdStartRecover, 4),
+            (HistoryOperationKind::PublishOverwrite, 2),
+            (HistoryOperationKind::PublishFirstFile, 2),
+            (HistoryOperationKind::PublishWithoutUnits, 2),
+        ]),
         rollback_targets: RollbackTargetDraw::RecentUniformOrBeyond,
+        overwrite_contents: OverwriteContentDraw::WithinOneDataUnitOrJustBeyond,
     };
 
     /// 理想模型那一格（B2：回退到 txg = F_生效 的根被拒）的专门取样点：多从第一个文件起、多覆盖写（攒非空根，抬 F 的上限才抬得动）、
@@ -530,6 +767,7 @@ impl GenerationWeights {
     /// 回退落到 F 那条根上一次都没有（2026-09-19 数：快档 96 段、第 121 行取样点 48 段都是 0 次；只换比重、不换抽法，192 段里 2 次）。
     pub const ROLLBACK_AFTER_RAISING_THE_FLOOR: GenerationWeights = GenerationWeights {
         name: "偏向抬 F 之后回退（B2 那一格的取样点）",
+        named: NamedGenerationWeights::RollbackAfterRaisingTheFloor,
         starting_points: &[
             (HistoryStartingPoint::AfterMakeFilesystem, 1),
             (HistoryStartingPoint::AfterFirstFile, 9),
@@ -556,7 +794,9 @@ impl GenerationWeights {
             (HistoryOperationKind::PublishFirstFile, 1),
             (HistoryOperationKind::PublishWithoutUnits, 1),
         ],
+        with_session_open_after_the_file_was_deleted: None,
         rollback_targets: RollbackTargetDraw::FloorRootHalfTheTime,
+        overwrite_contents: OverwriteContentDraw::WithinOneDataUnitOrJustBeyond,
     };
 
     /// 原分配记录墙那一格（增补 3 第 2 件代码三方第一轮判决第三节第 1 条）的取样点：一律从第一个文件起，带文件的版本上多半覆盖写，
@@ -565,6 +805,7 @@ impl GenerationWeights {
     /// （第二轮判决第三节第 3 条：第一轮配的是 `Skipped`，攻方两条只有 checker 看得见的变异在它上面一段都不红）。
     pub const TOWARD_THE_ALLOCATION_RECORD_WALL: GenerationWeights = GenerationWeights {
         name: "越过原分配记录墙（812 条那一格的取样点）",
+        named: NamedGenerationWeights::TowardTheAllocationRecordWall,
         starting_points: &[(HistoryStartingPoint::AfterFirstFile, 1)],
         with_session_closed: &[(HistoryOperationKind::CloseAndMountWritable, 100)],
         with_session_open_without_file: &[
@@ -578,15 +819,19 @@ impl GenerationWeights {
             (HistoryOperationKind::RollBackWhileMounted, 2),
             (HistoryOperationKind::ColdStartRecover, 1),
         ],
+        with_session_open_after_the_file_was_deleted: None,
         rollback_targets: RollbackTargetDraw::RecentUniformOrBeyond,
+        overwrite_contents: OverwriteContentDraw::WithinOneDataUnitOrJustBeyond,
     };
 
     /// 单元区墙那一格（增补 3 第 2 件代码三方第二轮判决第三节第 2 条）的取样点，配 `HistoryDeviceWidth::UnitAreaOf256Slots` 跑：
     /// 一律从第一个文件起，带文件的版本上绝大多数是覆盖写（每次每盘占 10 槽），夹着少量可写挂载与抬 F 与回退。
     /// 这组比重在 256 槽的小盘上只走得到用户数据那一处（覆盖写的数据单元）的落点拒绝：提交内生块能回落到任一空槽，
     /// 每块盘上一个空槽都不剩才拒，那一处由写死的用例钉（`commit_generated_units_fall_back_when_the_segment_runs_out.rs`）。
+    /// unlink 从带文件那张表的可写挂载那一格切 3 份（6 → 3 + 3，紧挨在它之后；切法与 Q-T「甲」同 [`GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR`]）。
     pub const TOWARD_THE_UNIT_AREA_WALL: GenerationWeights = GenerationWeights {
         name: "逼近单元区墙（小盘上落点拒绝那一格的取样点）",
+        named: NamedGenerationWeights::TowardTheUnitAreaWall,
         starting_points: &[(HistoryStartingPoint::AfterFirstFile, 1)],
         with_session_closed: &[
             (HistoryOperationKind::CloseAndMountWritable, 95),
@@ -598,19 +843,90 @@ impl GenerationWeights {
         ],
         with_session_open_with_file: &[
             (HistoryOperationKind::PublishOverwrite, 88),
-            (HistoryOperationKind::CloseAndMountWritable, 6),
+            (HistoryOperationKind::CloseAndMountWritable, 3),
+            (HistoryOperationKind::Unlink, 3),
             (HistoryOperationKind::RaiseRollbackFloor, 4),
             (HistoryOperationKind::RollBackWhileMounted, 1),
             (HistoryOperationKind::ColdStartRecover, 1),
         ],
+        with_session_open_after_the_file_was_deleted: None,
         rollback_targets: RollbackTargetDraw::RecentUniformOrBeyond,
+        overwrite_contents: OverwriteContentDraw::WithinOneDataUnitOrJustBeyond,
     };
+
+    /// 删除多于一片下段叶的文件那一格（代码轮 U13：模型罩多个数据单元的文件、随机历史里出现 ≥ 2 片下段叶的删除批；
+    /// 代码轮第二轮判决第二节 N3「走空多步」）的取样点，配两块 4 GiB 的盘跑：多从第一个文件起；带文件的版本上覆盖写的内容另抽跨几个单元、
+    /// 走顺序写入口的（[`OverwriteContentDraw::AlsoSpanningSeveralDataUnits`]，多半两片下段叶），夹着很多 unlink（一次 unlink
+    /// = 意图那次 + 从尾部每批 144 个单元 + 最后一批）；unlink 之后只抽建 inode、回退、覆盖写与 unlink（不抽挂载、抬 F、冷启动：
+    /// 它们写的根会把意图那一版在根环里的名次往后推），回退一半取第四新的根（建过一个 inode 之后落在意图那一版或第一个删除批那一版上，
+    /// 号回到队列），再建 inode、覆盖写或 unlink（会话先把队列走空，多片的文件走空多步）。快档那组比重不动：它的种子钉着的取样点与
+    /// checker 档、实验装置的复现都按它生成。
+    pub const DELETING_FILES_OF_SEVERAL_LOWER_LEAVES: GenerationWeights = GenerationWeights {
+        name: "偏向删除多于一片下段叶的文件（U13 那一格的取样点）",
+        named: NamedGenerationWeights::DeletingFilesOfSeveralLowerLeaves,
+        starting_points: &[
+            (HistoryStartingPoint::AfterMakeFilesystem, 1),
+            (HistoryStartingPoint::AfterFirstFile, 9),
+        ],
+        with_session_closed: &[
+            (HistoryOperationKind::CloseAndMountWritable, 95),
+            (HistoryOperationKind::ColdStartRecover, 5),
+        ],
+        with_session_open_without_file: &[
+            (HistoryOperationKind::PublishFirstFile, 80),
+            (HistoryOperationKind::CloseAndMountWritable, 10),
+            (HistoryOperationKind::PublishWithoutUnits, 5),
+            (HistoryOperationKind::ColdStartRecover, 5),
+        ],
+        with_session_open_with_file: &[
+            (HistoryOperationKind::PublishOverwrite, 45),
+            (HistoryOperationKind::Unlink, 25),
+            (HistoryOperationKind::RaiseRollbackFloor, 8),
+            (HistoryOperationKind::CloseAndMountWritable, 8),
+            (HistoryOperationKind::RollBackWhileMounted, 8),
+            (HistoryOperationKind::ColdStartRecover, 3),
+            (
+                HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot,
+                3,
+            ),
+        ],
+        with_session_open_after_the_file_was_deleted: Some(&[
+            (HistoryOperationKind::CreateInode, 40),
+            (HistoryOperationKind::RollBackWhileMounted, 40),
+            (HistoryOperationKind::PublishOverwrite, 10),
+            (HistoryOperationKind::Unlink, 10),
+        ]),
+        rollback_targets: RollbackTargetDraw::FourthNewestRootHalfTheTime,
+        overwrite_contents: OverwriteContentDraw::AlsoSpanningSeveralDataUnits,
+    };
+
+    /// 复现入口认得的每一组比重：按 `environment_value` 找回（[`HistorySampling::from_environment`]）。
+    /// 照 [`NamedGenerationWeights::ALL`] 逐个经 [`NamedGenerationWeights::weights`] 生成，不手抄常量名：
+    /// 新加一组比重要一个新成员，成员不在 `weights` 的穷举 `match` 里补一臂就编不过（代码三方 test-script-align-code-r1 判决 K4）。
+    pub const NAMED: [GenerationWeights; NamedGenerationWeights::ALL.len()] = {
+        let mut named = [GenerationWeights::BROAD; NamedGenerationWeights::ALL.len()];
+        let mut position = 0;
+        while position < named.len() {
+            named[position] = NamedGenerationWeights::ALL[position].weights();
+            position += 1;
+        }
+        named
+    };
+
+    /// 复现行与复现入口的环境变量里这组比重的取值（`HistorySamplingVariable::Weights`）。
+    #[must_use]
+    pub const fn environment_value(&self) -> &'static str {
+        self.named.environment_value()
+    }
 
     fn for_session(&self, expected: ExpectedSession) -> &'static [(HistoryOperationKind, u64)] {
         match expected {
             ExpectedSession::Closed => self.with_session_closed,
             ExpectedSession::OpenWithoutFile => self.with_session_open_without_file,
             ExpectedSession::OpenWithFile => self.with_session_open_with_file,
+            ExpectedSession::OpenAfterTheFileWasDeleted => self
+                .with_session_open_after_the_file_was_deleted
+                .expect("只在这一组比重写了 unlink 之后那张表时，生成才进这一估计（`expected_session_after` 的 unlink 那一臂）"),
         }
     }
 }
@@ -649,29 +965,83 @@ fn draw_content(source: &mut SeededRandomSource) -> ContentChoice {
     }
 }
 
+/// 跨几个数据单元的内容（[`OverwriteContentDraw::AlsoSpanningSeveralDataUnits`]）：与 `draw_content` 抽的随机数一样多（选择子、
+/// 长度种类、填充种子各一个），五分之一在一个单元以内（走覆盖写），其余走顺序写——一片下段叶以内的几个单元（2–16 个）、两片
+/// （145–152 个单元，删除要一个删除批加最后一批）、三片（289–292 个单元，两个删除批加最后一批）。单元数取得窄是为了每一步的池级 checker 读得快。
+fn draw_content_spanning_several_data_units(source: &mut SeededRandomSource) -> ContentChoice {
+    let selector = source.next_word();
+    let length = draw_weighted(
+        source,
+        &[
+            (ContentLength::InsideOneDataUnit { selector }, 20),
+            (
+                ContentLength::SpanningDataUnitsThroughTheSequentialWrite {
+                    data_units: 2 + selector % 15,
+                    selector,
+                },
+                15,
+            ),
+            (
+                ContentLength::SpanningDataUnitsThroughTheSequentialWrite {
+                    data_units: EXTENT_TREE_LOWER_LEAF_DATA_UNITS + 1 + selector % 8,
+                    selector,
+                },
+                55,
+            ),
+            (
+                ContentLength::SpanningDataUnitsThroughTheSequentialWrite {
+                    data_units: 2 * EXTENT_TREE_LOWER_LEAF_DATA_UNITS + 1 + selector % 4,
+                    selector,
+                },
+                10,
+            ),
+        ],
+    );
+    ContentChoice {
+        length,
+        fill_seed: source.next_word(),
+    }
+}
+
 fn draw_operation(
     source: &mut SeededRandomSource,
     kind: HistoryOperationKind,
     rollback_targets: RollbackTargetDraw,
+    overwrite_contents: OverwriteContentDraw,
 ) -> HistoryOperation {
     match kind {
         HistoryOperationKind::PublishFirstFile => {
             HistoryOperation::PublishFirstFile(draw_content(source))
         }
         HistoryOperationKind::PublishOverwrite => {
-            HistoryOperation::PublishOverwrite(draw_content(source))
+            HistoryOperation::PublishOverwrite(match overwrite_contents {
+                OverwriteContentDraw::WithinOneDataUnitOrJustBeyond => draw_content(source),
+                OverwriteContentDraw::AlsoSpanningSeveralDataUnits => {
+                    draw_content_spanning_several_data_units(source)
+                }
+            })
         }
         HistoryOperationKind::PublishWithoutUnits => HistoryOperation::PublishWithoutUnits,
         HistoryOperationKind::CloseAndMountWritable => HistoryOperation::CloseAndMountWritable,
         HistoryOperationKind::RollBackWhileMounted => {
-            let takes_the_floor_root = match rollback_targets {
-                RollbackTargetDraw::RecentUniformOrBeyond => false,
-                RollbackTargetDraw::FloorRootHalfTheTime => source.below(2) == 0,
-            };
-            if takes_the_floor_root {
-                return HistoryOperation::RollBackWhileMounted(
-                    RollbackTargetChoice::RingRootAtTheNewestFloor,
-                );
+            match rollback_targets {
+                RollbackTargetDraw::RecentUniformOrBeyond => {}
+                RollbackTargetDraw::FloorRootHalfTheTime => {
+                    if source.below(2) == 0 {
+                        return HistoryOperation::RollBackWhileMounted(
+                            RollbackTargetChoice::RingRootAtTheNewestFloor,
+                        );
+                    }
+                }
+                RollbackTargetDraw::FourthNewestRootHalfTheTime => {
+                    if source.below(2) == 0 {
+                        return HistoryOperation::RollBackWhileMounted(
+                            RollbackTargetChoice::RingRoot {
+                                index_from_newest: 3,
+                            },
+                        );
+                    }
+                }
             }
             // 一半取最近的几条（多半在候选集里），一半在整个根环里均匀取（被抛弃的、F 之下的、暖机那两条树表 0 条的都落得到），
             // 余下的取根环之外。
@@ -697,33 +1067,91 @@ fn draw_operation(
         HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot => {
             HistoryOperation::CrashRecoveryAbandoningTheNewestRoot
         }
+        HistoryOperationKind::Unlink => HistoryOperation::Unlink,
+        HistoryOperationKind::CreateInode => HistoryOperation::CreateInode,
     }
+}
+
+/// 生成时对「这段历史的第一个文件」的估计（只调比重、不进执行）：还没写过、写过、unlink 过之后一直没有（只在比重写了 unlink 之后那张表时进）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ExpectedFirstFile {
+    NotWrittenYet,
+    Written,
+    DeletedAndFollowedByItsOwnTable,
 }
 
 fn expected_session_after(
     expected: ExpectedSession,
-    has_file_expected: bool,
+    first_file: ExpectedFirstFile,
+    deletion_is_followed_by_its_own_table: bool,
     kind: HistoryOperationKind,
 ) -> ExpectedSession {
     match kind {
         // 崩溃恢复抛弃根也是一次可写挂载：落到的前一条根带不带文件，生成时照「这段历史发过文件没有」估，与可写挂载同一个估法。
         HistoryOperationKind::CloseAndMountWritable
-        | HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot => {
-            if has_file_expected {
-                ExpectedSession::OpenWithFile
-            } else {
-                ExpectedSession::OpenWithoutFile
+        | HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot => match first_file {
+            ExpectedFirstFile::Written => ExpectedSession::OpenWithFile,
+            ExpectedFirstFile::NotWrittenYet => ExpectedSession::OpenWithoutFile,
+            ExpectedFirstFile::DeletedAndFollowedByItsOwnTable => {
+                ExpectedSession::OpenAfterTheFileWasDeleted
             }
-        }
+        },
         HistoryOperationKind::ColdStartRecover => ExpectedSession::Closed,
         HistoryOperationKind::PublishFirstFile => match expected {
             ExpectedSession::OpenWithoutFile => ExpectedSession::OpenWithFile,
-            ExpectedSession::Closed | ExpectedSession::OpenWithFile => expected,
+            // 删完之后第一个文件照条款被拒（树表不是 0 条），估计不变。
+            ExpectedSession::Closed
+            | ExpectedSession::OpenWithFile
+            | ExpectedSession::OpenAfterTheFileWasDeleted => expected,
         },
         HistoryOperationKind::PublishOverwrite
         | HistoryOperationKind::PublishWithoutUnits
         | HistoryOperationKind::RollBackWhileMounted
-        | HistoryOperationKind::RaiseRollbackFloor => expected,
+        | HistoryOperationKind::RaiseRollbackFloor
+        | HistoryOperationKind::CreateInode => expected,
+        // unlink 之后那一版有树而文件集合为空：比重写了 unlink 之后那张表的按它抽，没写的照旧按「开着、没有文件」抽
+        // （第一个文件在它上面照条款被拒）。
+        HistoryOperationKind::Unlink => match expected {
+            ExpectedSession::OpenWithFile => {
+                if deletion_is_followed_by_its_own_table {
+                    ExpectedSession::OpenAfterTheFileWasDeleted
+                } else {
+                    ExpectedSession::OpenWithoutFile
+                }
+            }
+            ExpectedSession::Closed
+            | ExpectedSession::OpenWithoutFile
+            | ExpectedSession::OpenAfterTheFileWasDeleted => expected,
+        },
+    }
+}
+
+/// 这一步之后对第一个文件的估计：unlink 之后比重写了那张表的一直记「删过」，没写的回到「还没写过」（与加「建 inode」之前的估法逐项相同）；
+/// 别的操作之后，写过的仍是写过，估计开着带文件的也记写过。
+fn expected_first_file_after(
+    first_file: ExpectedFirstFile,
+    deletion_is_followed_by_its_own_table: bool,
+    kind: HistoryOperationKind,
+    expected_after: ExpectedSession,
+) -> ExpectedFirstFile {
+    if kind == HistoryOperationKind::Unlink {
+        return if deletion_is_followed_by_its_own_table {
+            ExpectedFirstFile::DeletedAndFollowedByItsOwnTable
+        } else {
+            ExpectedFirstFile::NotWrittenYet
+        };
+    }
+    match first_file {
+        ExpectedFirstFile::DeletedAndFollowedByItsOwnTable | ExpectedFirstFile::Written => {
+            first_file
+        }
+        ExpectedFirstFile::NotWrittenYet => {
+            if expected_after == ExpectedSession::OpenWithFile {
+                ExpectedFirstFile::Written
+            } else {
+                ExpectedFirstFile::NotWrittenYet
+            }
+        }
     }
 }
 
@@ -746,13 +1174,34 @@ pub fn generate_history_with_weights(
         HistoryStartingPoint::AfterMakeFilesystem => ExpectedSession::Closed,
         HistoryStartingPoint::AfterFirstFile => ExpectedSession::OpenWithFile,
     };
-    let mut has_file_expected = starting_point == HistoryStartingPoint::AfterFirstFile;
+    let mut first_file = match starting_point {
+        HistoryStartingPoint::AfterMakeFilesystem => ExpectedFirstFile::NotWrittenYet,
+        HistoryStartingPoint::AfterFirstFile => ExpectedFirstFile::Written,
+    };
+    let deletion_is_followed_by_its_own_table = weights
+        .with_session_open_after_the_file_was_deleted
+        .is_some();
     let mut operations = Vec::with_capacity(operation_count);
     for _ in 0..operation_count {
         let kind = draw_weighted(&mut source, weights.for_session(expected));
-        operations.push(draw_operation(&mut source, kind, weights.rollback_targets));
-        expected = expected_session_after(expected, has_file_expected, kind);
-        has_file_expected = has_file_expected || expected == ExpectedSession::OpenWithFile;
+        operations.push(draw_operation(
+            &mut source,
+            kind,
+            weights.rollback_targets,
+            weights.overwrite_contents,
+        ));
+        expected = expected_session_after(
+            expected,
+            first_file,
+            deletion_is_followed_by_its_own_table,
+            kind,
+        );
+        first_file = expected_first_file_after(
+            first_file,
+            deletion_is_followed_by_its_own_table,
+            kind,
+            expected,
+        );
     }
     GeneratedHistory {
         seed,
@@ -1068,6 +1517,12 @@ pub enum MissingPrecondition {
     /// 崩溃恢复抛弃根：最新那次发布的记录一个单元都没点名（树表 0 条上的零单元发布）——点名验证恒过，恢复照样施加它、
     /// 走到的就是它，抛弃不了。
     NewestPublishNamesNoUnit,
+    /// 现行版本有树、第一个文件已删完（在删完的一版上建过 inode 之后，实现归带文件的一版）：覆盖写与 unlink 只写、只删第一个文件
+    /// （`transaction::live_record_of_the_first_file` 拒成 `WriteToAnInodeThatIsNotInTheTree`），模型只罩 inode 1 一个文件、没有这条理由——执行器不调。
+    CurrentVersionWithoutTheFirstFile,
+    /// 现行版本里第一个文件还活着：建 inode 只接在第一个文件已删完的一版上（`HistoryOperation::CreateInode` 的文档）；
+    /// 删除中的那一版照调，会话先走空、把它走成删完的一版（代码轮 U11）。
+    CurrentVersionStillHasTheFirstFile,
 }
 
 impl MissingPrecondition {
@@ -1083,6 +1538,8 @@ impl MissingPrecondition {
             }
             MissingPrecondition::NoReadableRootBeforeTheNewest => "最新那条根之前没有可读根",
             MissingPrecondition::NewestPublishNamesNoUnit => "最新那次发布一个单元都没点名",
+            MissingPrecondition::CurrentVersionWithoutTheFirstFile => "现行版本里第一个文件已删完",
+            MissingPrecondition::CurrentVersionStillHasTheFirstFile => "现行版本里第一个文件还在",
         }
     }
 }
@@ -1351,8 +1808,8 @@ pub enum ColdStartReadBack {
 pub enum AppliedEffect {
     Published {
         reuse: RecordReuse,
-        /// 这次发布之前挂着的会话推了几串抬 F（只有经会话的覆盖写会推，D16（发布语义） 已定项 1「准入」那一行、C283；
-        /// 第一个文件与零单元发布不经会话，恒为 0）。
+        /// 这次发布之前挂着的会话推了几串抬 F（只有经会话的覆盖写与 unlink 会推，D16（发布语义） 已定项 1「准入」那一行、C283；
+        /// unlink 连同走空里删除类发布被空间拒时推的，用户 2026-10-02 定 Q-V；第一个文件与零单元发布不经会话，恒为 0）。
         floor_raises_pushed_by_the_session: usize,
     },
     Mounted {
@@ -1565,19 +2022,6 @@ pub fn allocation_statistic_mechanism(detail: &str) -> Option<AllocationStatisti
     })
 }
 
-/// 这次失败里 I-3.1 那几条（逐盘各一条）带的机理标识：取第一条读得出来的。
-/// 一条 I-3.1 都没有、或那几条文字里都没有机理标识，都是 None——机理读不出来时「已知红」一条都不接。
-#[must_use]
-fn allocation_statistic_mechanism_of(
-    observation: &FailureObservation,
-) -> Option<AllocationStatisticMechanism> {
-    observation
-        .violations
-        .iter()
-        .filter(|(invariant, _)| *invariant == "I-3.1")
-        .find_map(|(_, detail)| allocation_statistic_mechanism(detail))
-}
-
 /// 「已知红」清单的一条：形态与它在增补 2 收口表里的那一行。
 pub struct KnownRedForm {
     /// 增补 2 收口表（`.claude/kb/milestone/02-second-txn.md`「增补 2」）里的哪一行。
@@ -1587,46 +2031,11 @@ pub struct KnownRedForm {
     pub matches: fn(&FailureObservation) -> bool,
 }
 
-/// 没有 panic、执行器没判出失败、模型没对不上、记录核对器也没判出、判红的只有 I-3.1、而且是记账的已分配大于遍历全部有效根得到的
-/// （记账多算，不是少算）。
-fn only_allocated_statistic_above_walked(observation: &FailureObservation) -> bool {
-    observation.panic.is_none()
-        && observation.harness_judgement.is_none()
-        && observation.model_disagreement.is_none()
-        && observation.record_check == RecordCheck::default()
-        && !observation.violations.is_empty()
-        && observation.violations.iter().all(|(invariant, detail)| {
-            *invariant == "I-3.1"
-                && allocated_and_walked_bytes(detail)
-                    .is_some_and(|(allocated, walked)| allocated > walked)
-        })
-}
-
-/// F 落在回退留下的空档里（F 那个 txg 上的根全属于被抛弃的实例）、只有 I-3.1 红且记账多于遍历，
-/// 而且 checker 报的机理是「回退下界把环里读得到的根挡在了遍历之外」
-/// （代码三方第一轮判决第二节第 1 条收窄：此前不看空档，不经回退的抬 F 之后记账多算也被接走）。
-///
-/// 两条不再要求，都因为机理标识把它们替代掉了（用户 2026-09-20 定案第 6 条）：
-/// 「这一步是抬 F」——活盘面那一路上 `raised_floor_lands_only_on_abandoned_roots` 只有抬 F 那一步算得出来（别的步恒 None），
-/// 卡着操作种类只会把崩溃状态上同一机理的盘面判成新发现；
-/// 「根环没转圈」——环转没转圈与这条机理正交：F 之下的根本来就不走，它们掉出环一个字节都不差。
-fn raise_after_rollback_leaves_allocated_statistic_above_walked(
-    observation: &FailureObservation,
-) -> bool {
-    observation.raised_floor_lands_only_on_abandoned_roots == Some(true)
-        && only_allocated_statistic_above_walked(observation)
-        && allocation_statistic_mechanism_of(observation)
-            .is_some_and(|mechanism| mechanism.the_floor_dropped_readable_roots())
-}
-
 /// 「已知红」清单。修好一条就删一条，删掉之后那条的复现（`tests/random_histories.rs` 里钉着）要转绿。
-pub const KNOWN_RED_FORMS: [KnownRedForm; 1] = [
-    KnownRedForm {
-        closeout_table_row: "增补 2 收口表第 43 行",
-        shape: "回退之后把 F 抬进回退目标根与新实例第一次发布之间（抬之前的镜像上，F 那个 txg 上的根全属于被抛弃的实例）：抬 F 那一步之后 I-3.1（已分配统计对得上） 红、记账的已分配大于遍历全部有效根得到的、别的不变量都不红、没有 panic、根环没转圈",
-        matches: raise_after_rollback_leaves_allocated_statistic_above_walked,
-    },
-];
+/// 增补 2 收口表第 43 行（F 抬进被抛弃实例留下的空档、抬 F 之后只有 I-3.1 红、记账多于遍历）取丁-defer 修好
+/// （用户 2026-09-28 定），它的最小复现（`tests/raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic.rs`）
+/// 与随机历史那边原先的复现在 2026-10-03 的副本上都跑绿，那一条从清单里删了（代码轮收口表第 43 行那一项）；清单此刻是空的。
+pub const KNOWN_RED_FORMS: [KnownRedForm; 0] = [];
 
 /// 新发现的「同一个」：panic 按位置、违例按判红的不变量集合。收缩只留签名不变的删法。
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -1769,6 +2178,12 @@ pub struct HistoryTally {
     /// （D8（核心索引结构） 已定项 14），这个数越过 812 说明历史走过了原先那道墙。
     pub most_allocation_records_in_one_version: u64,
     pub histories_that_turned_the_root_ring: u64,
+    /// 模型比过至少一个不是最后一批的删除批（≥ 2 片下段叶的文件的删除批，代码轮 U13）的段数。
+    pub histories_with_a_deletion_batch_keeping_data_units: u64,
+    /// 会话里一次用户改动之前先走空、走了至少两步、模型逐步比过的段数（代码轮第二轮判决第二节 N3「走空多步」）。
+    pub histories_with_a_walk_of_several_steps_before_a_user_change: u64,
+    /// 会话里一次用户改动之前先走空、走空被空间拒推了抬 F、模型逐串逐步比过的段数（N3「走空被空间拒」）。
+    pub histories_with_a_walk_before_a_user_change_refused_for_space: u64,
     pub checker_runs: u64,
     /// 这一步一个写都没发（录制流一步没多）：镜像逐字节不变，checker 的结论沿用上一次，不重跑。
     pub checker_runs_skipped_because_nothing_was_written: u64,
@@ -1846,6 +2261,12 @@ impl HistoryTally {
             .most_allocation_records_in_one_version
             .max(other.most_allocation_records_in_one_version);
         self.histories_that_turned_the_root_ring += other.histories_that_turned_the_root_ring;
+        self.histories_with_a_deletion_batch_keeping_data_units +=
+            other.histories_with_a_deletion_batch_keeping_data_units;
+        self.histories_with_a_walk_of_several_steps_before_a_user_change +=
+            other.histories_with_a_walk_of_several_steps_before_a_user_change;
+        self.histories_with_a_walk_before_a_user_change_refused_for_space +=
+            other.histories_with_a_walk_before_a_user_change_refused_for_space;
         self.checker_runs += other.checker_runs;
         self.checker_runs_skipped_because_nothing_was_written +=
             other.checker_runs_skipped_because_nothing_was_written;
@@ -1962,7 +2383,9 @@ impl HistoryTally {
             | HistoryOperation::RollBackWhileMounted(_)
             | HistoryOperation::RaiseRollbackFloor(_)
             | HistoryOperation::ColdStartRecover
-            | HistoryOperation::CrashRecoveryAbandoningTheNewestRoot => None,
+            | HistoryOperation::CrashRecoveryAbandoningTheNewestRoot
+            | HistoryOperation::Unlink
+            | HistoryOperation::CreateInode => None,
         };
         let entrance_was_called = match outcome {
             StepOutcome::Applied(_) | StepOutcome::Refused { .. } => true,
@@ -2064,6 +2487,18 @@ impl HistoryTally {
             "  经会话的覆盖写：会话先推抬 F 再发成 {} 次、一共推了 {} 串",
             self.user_changes_published_after_the_session_raised_the_floor,
             self.floor_raises_pushed_by_the_session_before_a_published_change
+        );
+        let _ = writeln!(
+            text,
+            "  删除：模型比过不是最后一批的删除批（≥ 2 片下段叶）{} 次、在 {} 段里；会话改动之前先走空走了至少两步 {} 次、在 {} 段里；走空被空间拒推了抬 F {} 次、在 {} 段里",
+            self.model_counts.deletion_batches_keeping_data_units_matched,
+            self.histories_with_a_deletion_batch_keeping_data_units,
+            self.model_counts
+                .walks_of_several_steps_before_a_user_change_matched,
+            self.histories_with_a_walk_of_several_steps_before_a_user_change,
+            self.model_counts
+                .walks_before_a_user_change_refused_for_space_matched,
+            self.histories_with_a_walk_before_a_user_change_refused_for_space
         );
         let _ = writeln!(
             text,
@@ -2207,6 +2642,12 @@ fn publish_error_member(error: &PublishError) -> String {
         PublishError::NextCheckpointTxgPastTheTopOfItsRange { .. } => {
             "NextCheckpointTxgPastTheTopOfItsRange"
         }
+        PublishError::WriteToAnInodeBeingDeleted { .. } => "WriteToAnInodeBeingDeleted",
+        PublishError::WriteToAnInodeThatIsNotInTheTree { .. } => "WriteToAnInodeThatIsNotInTheTree",
+        PublishError::UnlinkOfAnInodeThatIsNotALiveRecord { .. } => {
+            "UnlinkOfAnInodeThatIsNotALiveRecord"
+        }
+        PublishError::DeletedInodesQueueRefused(_) => "DeletedInodesQueueRefused",
         PublishError::BlockDevice(cause) => {
             return format!(
                 "PublishError::BlockDevice({})",
@@ -2241,6 +2682,7 @@ fn recovery_failure_member(failure: &RecoveryFailure) -> String {
         RecoveryFailure::SystemConfigurationsDisagree => {
             "RecoveryFailure::SystemConfigurationsDisagree".to_string()
         }
+        RecoveryFailure::NoDeviceInThePool => "RecoveryFailure::NoDeviceInThePool".to_string(),
         RecoveryFailure::RootRingSlotsPerRegionOutOfRange { out_of_range, .. } => {
             format!(
                 "RecoveryFailure::RootRingSlotsPerRegionOutOfRange（S = {}）",
@@ -2388,8 +2830,8 @@ fn mount_error_member(error: &MountError) -> String {
         MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. } => {
             "CallerParametersDisagreeWithTheSelectedSystemConfiguration"
         }
-        MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. } => {
-            "DevicesBehindTheCurrentVersionAndMissingItsUnits"
+        MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. } => {
+            "DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot"
         }
         MountError::SequenceNumberPastTheTopOfItsRange(_) => "SequenceNumberPastTheTopOfItsRange",
         MountError::FloorRaiseFailedAfterTheMountsPublishes(failed) => {
@@ -2689,9 +3131,15 @@ fn apply_publish_overwrite(
     let Some(open_session) = session_slot.as_ref() else {
         return AppliedStep::not_applicable(MissingPrecondition::NoWritableSession);
     };
-    if open_session.current.file_version().is_none() {
+    let Some(current_file_version) = open_session.current.file_version() else {
         return AppliedStep::not_applicable(MissingPrecondition::CurrentVersionWithoutFile);
+    };
+    if current_file_version.inode_record.is_none() {
+        return AppliedStep::not_applicable(MissingPrecondition::CurrentVersionWithoutTheFirstFile);
     }
+    // 现行那一版有删除中的文件（unlink 的一批被拒之后、回退到删除中的一版之后）：照调，会话先走空、把它走成有树而文件集合为空的一版、
+    // 再拒成 `UserChangeRefused::NoFileVersionToChange`，那个成员带着走空的那几步与推的抬 F（代码轮 U10），逐版交模型比（代码轮 U11）。
+    let queue_is_walked_first = !current_file_version.deleted_inodes.is_empty();
     let content = content_choice.bytes();
     let records_before = open_session.allocator.records().to_vec();
     let stream_length_before = stream.operation_count();
@@ -2714,13 +3162,25 @@ fn apply_publish_overwrite(
         shadow_ledger,
         parameters_and_device_table,
     };
+    let file = FirstFile {
+        content: &content,
+        write_time_seconds,
+    };
+    // 内容跨几个数据单元的走顺序写入口（代码轮 U13），别的走覆盖写入口；模型那一侧各按各的契约答。
+    let entry = content_choice.length.whole_file_write_entry();
     let change_result = mounted_session.publish_user_change(
         devices,
-        UserChange::Overwrite(FirstFile {
-            content: &content,
-            write_time_seconds,
-        }),
+        match entry {
+            WholeFileWriteEntry::Overwrite => UserChange::Overwrite(file),
+            WholeFileWriteEntry::SequentialWrite => UserChange::SequentialWrite(file),
+        },
     );
+    let answer_of_the_change = |ideal_model: &IdealModel| match entry {
+        WholeFileWriteEntry::Overwrite => ideal_model.answer_publish_overwrite(&content),
+        WholeFileWriteEntry::SequentialWrite => {
+            ideal_model.answer_publish_sequential_write(&content)
+        }
+    };
     let session_after_the_change = session_slot.insert(WritableSession {
         allocator: mounted_session.allocator,
         current: mounted_session.current,
@@ -2730,10 +3190,21 @@ fn apply_publish_overwrite(
         publishes_in_this_mount,
         carried_to_zero_unit_publishes,
     });
+    if queue_is_walked_first {
+        return settle_user_change_comparing_every_version_published(
+            session_after_the_change,
+            model,
+            &answer_of_the_change,
+            &records_before,
+            &change_result,
+            stream,
+            stream_length_before,
+        );
+    }
     settle_user_change(
         session_after_the_change,
         model,
-        &content,
+        &answer_of_the_change,
         &records_before,
         change_result,
         stream,
@@ -2753,30 +3224,38 @@ fn judge_floor_raises_pushed_by_the_session(
         if verdict.disagreement.is_some() {
             break;
         }
-        let raised_floor = raised
-            .publishes
-            .first()
-            .expect("抬 F 做成至少推一次空发布：推到每块盘上都有一条带新 F 的根")
-            .root
-            .rollback_floor;
-        let raise_answer = model.answer_raise_rollback_floor(ModelCheckpointTxg(raised_floor.0));
-        let raise_verdict = judge_by_model(
-            model,
-            raise_answer,
-            &ObservedOutcome::Succeeded(ObservedEffect::Publishes {
-                roots: raised
-                    .publishes
-                    .iter()
-                    .map(observed_root_of_file_version)
-                    .collect(),
-                reported_ceiling: Some(ModelCheckpointTxg(raised.ceiling.0)),
-            }),
-        );
+        let raise_verdict = judge_one_floor_raise_pushed_by_the_session(model, raised);
         verdict.counts.add(&raise_verdict.counts);
         verdict.disagreement = raise_verdict.disagreement;
         publishes += raised.publishes.len();
     }
     (verdict, publishes)
+}
+
+/// 会话推的一串抬 F 照模型的抬 F 比：新 F 就是那一串的根带的、上限是实现报的。
+fn judge_one_floor_raise_pushed_by_the_session(
+    model: &mut IdealModel,
+    raised: &singlefs_core::mount::RaisedFloor,
+) -> ModelVerdict {
+    let raised_floor = raised
+        .publishes
+        .first()
+        .expect("抬 F 做成至少推一次空发布：推到每块盘上都有一条带新 F 的根")
+        .root
+        .rollback_floor;
+    let raise_answer = model.answer_raise_rollback_floor(ModelCheckpointTxg(raised_floor.0));
+    judge_by_model(
+        model,
+        raise_answer,
+        &ObservedOutcome::Succeeded(ObservedEffect::Publishes {
+            roots: raised
+                .publishes
+                .iter()
+                .map(observed_root_of_file_version)
+                .collect(),
+            reported_ceiling: Some(ModelCheckpointTxg(raised.ceiling.0)),
+        }),
+    )
 }
 
 /// 录制流从 `stream_length_before` 起多出的写（含 FUA 写与写零；屏障不算）。
@@ -2818,7 +3297,7 @@ fn writes_of_the_floor_raises(floor_raises: &[singlefs_core::mount::RaisedFloor]
 fn settle_user_change(
     session: &mut WritableSession,
     model: &mut IdealModel,
-    content: &[u8],
+    answer_of_the_change: &dyn Fn(&IdealModel) -> Result<ModelAnswer, ModelDisagreement>,
     records_before: &[AllocationRecord],
     change_result: Result<UserChangePublished, UserChangeRefused>,
     stream: &SharedStream,
@@ -2828,12 +3307,14 @@ fn settle_user_change(
         Ok(published) => &published.floor_raises,
         Err(
             UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount { .. }
-            | UserChangeRefused::NoFileVersionToChange
             | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. }
             | UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable { .. }
-            | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. },
+            | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. },
         ) => &[],
-        Err(UserChangeRefused::Publish { floor_raises, .. }) => floor_raises,
+        Err(
+            UserChangeRefused::Publish { floor_raises, .. }
+            | UserChangeRefused::NoFileVersionToChange { floor_raises, .. },
+        ) => floor_raises,
         Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(refused)) => &refused.floor_raises,
         Err(UserChangeRefused::FloorRaiseFailedWhilePushingForSpace(refused)) => {
             &refused.floor_raises
@@ -2862,7 +3343,7 @@ fn settle_user_change(
     }
     let refusal = match &change_result {
         Ok(_) => {
-            let answer = model.answer_publish_overwrite(content);
+            let answer = answer_of_the_change(model);
             let output = session.current.file_version().expect(
                 "会话发成一次覆盖写之后现行那一版带文件：`publish_user_change` 只接在带文件的一版后面、把新的一版放进 `current`",
             );
@@ -2899,51 +3380,9 @@ fn settle_user_change(
         }
         Err(refused) => refused,
     };
-    let (member, reason) = match refusal {
-        // 执行器每次都交整池两块盘、与会话认下的那一份同次序：走不到，走到了就按说不出理由的拒绝判。
-        UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount { .. } => (
-            "UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount".to_string(),
-            ObservedRefusalReason::Unexplained,
-        ),
-        UserChangeRefused::NoFileVersionToChange => (
-            "UserChangeRefused::NoFileVersionToChange".to_string(),
-            ObservedRefusalReason::Unexplained,
-        ),
-        // 执行器交的是整池那两块盘、没换过盘（Z3-A 乙那一判）：走不到，走到了就按说不出理由的拒绝判。
-        UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. } => (
-            "UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration".to_string(),
-            ObservedRefusalReason::Unexplained,
-        ),
-        // 执行器交的盘体各在自己的身份上、没换过旧快照（代码三方 m2-closeout-code-r2 那两判）：走不到，走到了就按说不出理由的拒绝判。
-        UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable { .. } => (
-            "UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable".to_string(),
-            ObservedRefusalReason::Unexplained,
-        ),
-        UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. } => (
-            "UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits".to_string(),
-            ObservedRefusalReason::Unexplained,
-        ),
-        UserChangeRefused::Publish { cause, .. } => (
-            publish_error_member(cause),
-            refusal_reason_of_publish_error(cause),
-        ),
-        UserChangeRefused::NoSpaceAfterRaisingTheFloor(refused) => (
-            format!(
-                "UserChangeRefused::NoSpaceAfterRaisingTheFloor({})",
-                publish_error_member(&refused.last_refusal)
-            ),
-            refusal_reason_of_publish_error(&refused.last_refusal),
-        ),
-        UserChangeRefused::FloorRaiseFailedWhilePushingForSpace(refused) => (
-            format!(
-                "UserChangeRefused::FloorRaiseFailedWhilePushingForSpace({})",
-                mount_error_member(&refused.cause)
-            ),
-            refusal_reason_of_mount_error(&refused.cause),
-        ),
-    };
+    let (member, reason) = member_and_reason_of_a_refused_user_change(refusal);
     if verdict.disagreement.is_none() {
-        let answer = model.answer_publish_overwrite(content);
+        let answer = answer_of_the_change(model);
         let wrote_anything_besides_the_floor_raises = if floor_raises.is_empty() {
             stream.operation_count() != stream_length_before
         } else {
@@ -2970,6 +3409,422 @@ fn settle_user_change(
         harness_judgement,
         model_verdict: Some(verdict),
     }
+}
+
+/// 一次用户改动被拒：成员的名字与它说的是哪条理由。
+fn member_and_reason_of_a_refused_user_change(
+    refusal: &UserChangeRefused,
+) -> (String, ObservedRefusalReason) {
+    match refusal {
+        // 执行器每次都交整池两块盘、与会话认下的那一份同次序：走不到，走到了就按说不出理由的拒绝判。
+        UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount { .. } => (
+            "UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount".to_string(),
+            ObservedRefusalReason::Unexplained,
+        ),
+        // 有树而文件集合为空的一版上不是建 inode 的改动（会话先走空、走成这一形之后拒）：D8（核心索引结构） 已定项 16 第 5 条那一条理由。
+        UserChangeRefused::NoFileVersionToChange { .. } => (
+            "UserChangeRefused::NoFileVersionToChange".to_string(),
+            ObservedRefusalReason::Explained(
+                ModelRefusalReason::OnlyNewInodesOnAVersionWithTreesAndNoFile,
+            ),
+        ),
+        // 执行器交的是整池那两块盘、没换过盘（Z3-A 乙那一判）：走不到，走到了就按说不出理由的拒绝判。
+        UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. } => (
+            "UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration".to_string(),
+            ObservedRefusalReason::Unexplained,
+        ),
+        // 执行器交的盘体各在自己的身份上、没换过旧快照（代码三方 m2-closeout-code-r2 那两判）：走不到，走到了就按说不出理由的拒绝判。
+        UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable { .. } => (
+            "UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable".to_string(),
+            ObservedRefusalReason::Unexplained,
+        ),
+        UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. } => (
+            "UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot"
+                .to_string(),
+            ObservedRefusalReason::Unexplained,
+        ),
+        UserChangeRefused::Publish { cause, .. } => (
+            publish_error_member(cause),
+            refusal_reason_of_publish_error(cause),
+        ),
+        UserChangeRefused::NoSpaceAfterRaisingTheFloor(refused) => (
+            format!(
+                "UserChangeRefused::NoSpaceAfterRaisingTheFloor({})",
+                publish_error_member(&refused.last_refusal)
+            ),
+            refusal_reason_of_publish_error(&refused.last_refusal),
+        ),
+        UserChangeRefused::FloorRaiseFailedWhilePushingForSpace(refused) => (
+            format!(
+                "UserChangeRefused::FloorRaiseFailedWhilePushingForSpace({})",
+                mount_error_member(&refused.cause)
+            ),
+            refusal_reason_of_mount_error(&refused.cause),
+        ),
+    }
+}
+
+/// 一次用户改动交回的推的抬 F 与推的抬 F 之外发成的那几版（被拒的几种里带着的，见 `UserChangeRefused` 各成员）。
+fn floor_raises_and_versions_published_of_a_user_change(
+    change_result: &Result<UserChangePublished, UserChangeRefused>,
+) -> (
+    &[singlefs_core::mount::RaisedFloor],
+    &[singlefs_core::transaction::TransactionOutput],
+) {
+    match change_result {
+        Ok(published) => (&published.floor_raises, &published.versions_published),
+        Err(UserChangeRefused::NoFileVersionToChange {
+            floor_raises,
+            versions_published,
+            ..
+        }) => (floor_raises, versions_published),
+        Err(
+            UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount { .. }
+            | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. }
+            | UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable { .. }
+            | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. },
+        ) => (&[], &[]),
+        Err(UserChangeRefused::Publish {
+            floor_raises,
+            versions_published,
+            ..
+        }) => (floor_raises, versions_published),
+        Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(refused)) => {
+            (&refused.floor_raises, &refused.versions_published)
+        }
+        Err(UserChangeRefused::FloorRaiseFailedWhilePushingForSpace(refused)) => {
+            (&refused.floor_raises, &refused.versions_published)
+        }
+    }
+}
+
+/// 一次 unlink（或挂载续做）里落了盘的一样：推的一串抬 F，或推的抬 F 之外发成的一版（意图那次、走空的一步、建 inode 那次）。
+enum FloorRaiseOrVersion<'change> {
+    FloorRaise(&'change singlefs_core::mount::RaisedFloor),
+    Version(&'change singlefs_core::transaction::TransactionOutput),
+}
+
+/// 推的那几串抬 F 与发成的那几版按 txg 排好（一串抬 F 按它第一次空发布的 txg）：两样在会话与挂载续做里按落盘的先后交错。
+fn floor_raises_and_versions_in_txg_order<'change>(
+    floor_raises: &'change [singlefs_core::mount::RaisedFloor],
+    versions_published: &'change [singlefs_core::transaction::TransactionOutput],
+) -> Vec<FloorRaiseOrVersion<'change>> {
+    let mut published_in_txg_order: Vec<(CheckpointTxg, FloorRaiseOrVersion<'change>)> =
+        floor_raises
+            .iter()
+            .map(|raised| {
+                let first_publish_txg = raised
+                    .publishes
+                    .first()
+                    .expect("抬 F 做成至少推一次空发布")
+                    .root
+                    .checkpoint_txg;
+                (first_publish_txg, FloorRaiseOrVersion::FloorRaise(raised))
+            })
+            .chain(versions_published.iter().map(|version| {
+                (
+                    version.root.checkpoint_txg,
+                    FloorRaiseOrVersion::Version(version),
+                )
+            }))
+            .collect();
+    published_in_txg_order.sort_by_key(|(txg, _)| *txg);
+    published_in_txg_order
+        .into_iter()
+        .map(|(_, published)| published)
+        .collect()
+}
+
+/// unlink 第一个文件（`HistoryOperation::Unlink`）：经挂着的会话发（意图那次 + 走空，D8（核心索引结构） 已定项 16）。
+/// 意图那次带这一步的写入时间（与覆盖写、建 inode 同一个取法，用户 2026-10-03 定 Q-F 乙），各批照抄。
+/// 前提：现行那一版带文件、第一个文件那条记录在。删除中的那一版照调：会话先走空、把它走成有树而文件集合为空的一版、再拒成
+/// `UserChangeRefused::NoFileVersionToChange`，走空的那几步逐版交模型比（代码轮 U11）。
+fn apply_unlink(pool: &mut HistoryPool, write_time_seconds: u64) -> AppliedStep {
+    let HistoryPool {
+        devices,
+        session: session_slot,
+        model,
+        stream,
+        ..
+    } = pool;
+    let Some(open_session) = session_slot.as_ref() else {
+        return AppliedStep::not_applicable(MissingPrecondition::NoWritableSession);
+    };
+    let Some(current_file_version) = open_session.current.file_version() else {
+        return AppliedStep::not_applicable(MissingPrecondition::CurrentVersionWithoutFile);
+    };
+    if current_file_version.inode_record.is_none() {
+        return AppliedStep::not_applicable(MissingPrecondition::CurrentVersionWithoutTheFirstFile);
+    }
+    let records_before = open_session.allocator.records().to_vec();
+    let stream_length_before = stream.operation_count();
+    let WritableSession {
+        allocator,
+        current,
+        instance,
+        shadow_ledger,
+        parameters_and_device_table,
+        publishes_in_this_mount,
+        carried_to_zero_unit_publishes: _,
+    } = session_slot.take().expect("上面判过这个进程的会话开着");
+    let mut mounted_session = MountedSession {
+        allocator,
+        current,
+        instance,
+        shadow_ledger,
+        parameters_and_device_table,
+    };
+    let change_result = mounted_session.publish_user_change(
+        devices,
+        UserChange::Unlink {
+            inode: singlefs_core::address::InodeNumber(
+                singlefs_core::transaction::FIRST_INODE_NUMBER,
+            ),
+            write_time_seconds,
+        },
+    );
+    let session_after_the_change = session_slot.insert(WritableSession {
+        allocator: mounted_session.allocator,
+        current: mounted_session.current,
+        instance: mounted_session.instance,
+        shadow_ledger: mounted_session.shadow_ledger,
+        parameters_and_device_table: mounted_session.parameters_and_device_table,
+        publishes_in_this_mount,
+        // 零单元发布只接在树表 0 条的一版后面，unlink 之后这一版有树。
+        carried_to_zero_unit_publishes: None,
+    });
+    settle_user_change_comparing_every_version_published(
+        session_after_the_change,
+        model,
+        &IdealModel::answer_unlink_intent,
+        &records_before,
+        &change_result,
+        stream,
+        stream_length_before,
+    )
+}
+
+/// 经会话的 unlink（或建 inode）返回之后：会话推的每一串抬 F 与推的抬 F 之外发成的每一版按 txg 排好，逐样交模型比——抬 F 照模型的抬 F，
+/// 发成的一版在模型的现行版本有删除中的文件时照「走空的一步」、否则照这次改动本身（`answer_of_the_change`：意图那次、建 inode 那次）；
+/// 分配代逐次比（上一版是前一样落盘的）。
+/// 被拒的比理由：被拒的是模型此刻的下一次发布（有删除中的文件就是走空的一步，否则是这次改动本身），「拒之前写没写盘」只看那几串抬 F
+/// 与发成的那几版之外多出来的写。
+fn settle_user_change_comparing_every_version_published(
+    session: &mut WritableSession,
+    model: &mut IdealModel,
+    answer_of_the_change: &dyn Fn(&IdealModel) -> Result<ModelAnswer, ModelDisagreement>,
+    records_before: &[AllocationRecord],
+    change_result: &Result<UserChangePublished, UserChangeRefused>,
+    stream: &SharedStream,
+    stream_length_before: usize,
+) -> AppliedStep {
+    let (floor_raises, versions_published) =
+        floor_raises_and_versions_published_of_a_user_change(change_result);
+    let published_in_txg_order =
+        floor_raises_and_versions_in_txg_order(floor_raises, versions_published);
+    let mut verdict = ModelVerdict::default();
+    let mut harness_judgement = None;
+    let mut records_of_the_previous_publish: &[AllocationRecord] = records_before;
+    // 这次改动自己（意图那次、建 inode 那次、覆盖写）发成之前，会话先走空的那几步与走空时为空间推的抬 F（代码轮第二轮判决第二节 N3）。
+    let mut the_change_itself_was_published = false;
+    let mut steps_walked_before_the_change = 0_u64;
+    let mut floor_raises_while_walking_before_the_change = 0_u64;
+    // 迭代上界是这次落盘的样数；跨轮带的是上一样落盘之后的分配记录与合起来的判定；模型对不上之后不再问模型（分配代照判）。
+    for published in &published_in_txg_order {
+        let outputs: Vec<&singlefs_core::transaction::TransactionOutput> = match published {
+            FloorRaiseOrVersion::FloorRaise(raised) => {
+                if !the_change_itself_was_published
+                    && model.current_version_has_a_file_being_deleted()
+                {
+                    floor_raises_while_walking_before_the_change += 1;
+                }
+                if verdict.disagreement.is_none() {
+                    let raise_verdict = judge_one_floor_raise_pushed_by_the_session(model, raised);
+                    verdict.counts.add(&raise_verdict.counts);
+                    verdict.disagreement = raise_verdict.disagreement;
+                }
+                raised.publishes.iter().collect()
+            }
+            FloorRaiseOrVersion::Version(version) => {
+                let walking = model.current_version_has_a_file_being_deleted();
+                if walking && !the_change_itself_was_published {
+                    steps_walked_before_the_change += 1;
+                }
+                if !walking {
+                    the_change_itself_was_published = true;
+                }
+                if verdict.disagreement.is_none() {
+                    let answer = if walking {
+                        model.answer_deletion_step()
+                    } else {
+                        answer_of_the_change(model)
+                    };
+                    let version_verdict = judge_by_model(
+                        model,
+                        answer,
+                        &ObservedOutcome::Succeeded(ObservedEffect::Publishes {
+                            roots: vec![observed_root_of_file_version(version)],
+                            reported_ceiling: None,
+                        }),
+                    );
+                    verdict.counts.add(&version_verdict.counts);
+                    verdict.disagreement = version_verdict.disagreement;
+                }
+                vec![*version]
+            }
+        };
+        for output in outputs {
+            let publish_txg = output.root.checkpoint_txg;
+            harness_judgement = harness_judgement.or_else(|| {
+                allocation_generation_judgement(
+                    records_of_the_previous_publish,
+                    &output.allocation_records,
+                    publish_txg,
+                    publish_txg,
+                )
+            });
+            records_of_the_previous_publish = &output.allocation_records;
+            session.publishes_in_this_mount += 1;
+        }
+    }
+    if verdict.disagreement.is_none() {
+        if steps_walked_before_the_change >= 2 {
+            verdict
+                .counts
+                .walks_of_several_steps_before_a_user_change_matched += 1;
+        }
+        if floor_raises_while_walking_before_the_change > 0 {
+            verdict
+                .counts
+                .walks_before_a_user_change_refused_for_space_matched += 1;
+        }
+    }
+    let reuse = RecordReuse::between(records_before, session.allocator.records());
+    let refusal = match change_result {
+        Ok(_) => {
+            return AppliedStep {
+                outcome: StepOutcome::Applied(AppliedEffect::Published {
+                    reuse,
+                    floor_raises_pushed_by_the_session: floor_raises.len(),
+                }),
+                harness_judgement,
+                model_verdict: Some(verdict),
+            };
+        }
+        Err(refused) => refused,
+    };
+    let (member, reason) = member_and_reason_of_a_refused_user_change(refusal);
+    if verdict.disagreement.is_none() {
+        let answer = if model.current_version_has_a_file_being_deleted() {
+            model.answer_deletion_step()
+        } else {
+            answer_of_the_change(model)
+        };
+        let writes_of_the_versions_published: u64 = versions_published
+            .iter()
+            .map(|version| version.writes.total().write_calls)
+            .sum();
+        let wrote_anything_besides_what_was_published =
+            if floor_raises.is_empty() && versions_published.is_empty() {
+                stream.operation_count() != stream_length_before
+            } else {
+                writes_in_the_stream_since(stream, stream_length_before)
+                    > writes_of_the_floor_raises(floor_raises) + writes_of_the_versions_published
+            };
+        let refusal_verdict = judge_by_model(
+            model,
+            answer,
+            &ObservedOutcome::Refused {
+                member: member.clone(),
+                reason,
+                publishes_completed: 0,
+                wrote_anything: wrote_anything_besides_what_was_published,
+                reported_ceiling: None,
+                reported_root_ring_slot_still_bad_after_one_reread: None,
+            },
+        );
+        verdict.counts.add(&refusal_verdict.counts);
+        verdict.disagreement = refusal_verdict.disagreement;
+    }
+    AppliedStep {
+        outcome: StepOutcome::Refused { member },
+        harness_judgement,
+        model_verdict: Some(verdict),
+    }
+}
+
+/// 建一个 size 0 的 inode（`HistoryOperation::CreateInode`）：经挂着的会话发（`UserChange::NewInodes`，count 1）。
+/// 前提：第一个文件不再活着——现行那一版有树而文件集合为空，或是在它上面建过 inode 的一版（带文件、没有第一个文件那条记录、队列空），
+/// 或第一个文件删除中的那一版（会话先走空，代码轮 U11）。
+fn apply_create_inode(pool: &mut HistoryPool, write_time_seconds: u64) -> AppliedStep {
+    let HistoryPool {
+        devices,
+        session: session_slot,
+        model,
+        stream,
+        ..
+    } = pool;
+    let Some(open_session) = session_slot.as_ref() else {
+        return AppliedStep::not_applicable(MissingPrecondition::NoWritableSession);
+    };
+    match &open_session.current {
+        PoolVersion::WithoutFile(_) => {
+            return AppliedStep::not_applicable(MissingPrecondition::CurrentVersionWithoutFile);
+        }
+        PoolVersion::WithFile(version) => {
+            // 删除中的那一版（队列不空）照调：会话先走空、把它走成删完的一版再建（代码轮 U11）。
+            if version.inode_record.is_some() && version.deleted_inodes.is_empty() {
+                return AppliedStep::not_applicable(
+                    MissingPrecondition::CurrentVersionStillHasTheFirstFile,
+                );
+            }
+        }
+        PoolVersion::WithTreesAndNoFile(_) => {}
+    }
+    let records_before = open_session.allocator.records().to_vec();
+    let stream_length_before = stream.operation_count();
+    let WritableSession {
+        allocator,
+        current,
+        instance,
+        shadow_ledger,
+        parameters_and_device_table,
+        publishes_in_this_mount,
+        carried_to_zero_unit_publishes: _,
+    } = session_slot.take().expect("上面判过这个进程的会话开着");
+    let mut mounted_session = MountedSession {
+        allocator,
+        current,
+        instance,
+        shadow_ledger,
+        parameters_and_device_table,
+    };
+    let change_result = mounted_session.publish_user_change(
+        devices,
+        UserChange::NewInodes {
+            count: 1,
+            write_time_seconds,
+        },
+    );
+    let session_after_the_change = session_slot.insert(WritableSession {
+        allocator: mounted_session.allocator,
+        current: mounted_session.current,
+        instance: mounted_session.instance,
+        shadow_ledger: mounted_session.shadow_ledger,
+        parameters_and_device_table: mounted_session.parameters_and_device_table,
+        publishes_in_this_mount,
+        // 零单元发布只接在树表 0 条的一版后面，建 inode 之后这一版有树。
+        carried_to_zero_unit_publishes: None,
+    });
+    settle_user_change_comparing_every_version_published(
+        session_after_the_change,
+        model,
+        &IdealModel::answer_create_inode,
+        &records_before,
+        &change_result,
+        stream,
+        stream_length_before,
+    )
 }
 
 fn apply_publish_without_units(
@@ -3052,7 +3907,7 @@ fn apply_publish_without_units(
 /// 挂载写出的写行与暖机那几次发布，分配记录比过没有（代码三方第二轮判决第二节第 1 条）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MountAllocationComparison {
-    /// 带文件的那几次发布逐次比过：第一次比挂载之前的镜像上生效根那棵分配记录树，之后比前一次的输出。
+    /// 有树的那几次发布（带文件的、有树而文件集合为空的）逐次比过：第一次比挂载之前的镜像上生效根那棵分配记录树，之后比前一次的输出。
     Compared { publishes: usize },
     /// 写行与暖机都是零单元发布（生效根那一版树表 0 条），不写分配记录，没东西可比。
     NoPublishWithFile,
@@ -3060,7 +3915,7 @@ pub enum MountAllocationComparison {
     PreviousRecordsUnreadable,
 }
 
-/// 挂载写出的写行与暖机那几次（带文件的）发布：逐次拿上一版的分配记录比，改写或新增的记录代要等于那一次的 txg；顺带数复用。
+/// 挂载写出的写行与暖机那几次（有树的）发布、推的抬 F 与续做的每一步：逐次拿上一版的分配记录比，改写或新增的记录代要等于那一次的 txg；顺带数复用。
 /// 上一版：第一次是挂载之前的镜像上生效根（`MountOutput::effective_root`，可写挂载是施加前缀之后的根、回退是回退的目标根）
 /// 那棵分配记录树（`recovery::allocation_records_under_root`，读盘），之后是前一次发布的输出。照代码三方第二轮攻方的改法写，
 /// 被攻过零轮。
@@ -3085,9 +3940,11 @@ fn mount_publish_allocation_judgement(
     let mut reuse = RecordReuse::default();
     let mut harness_judgement = None;
     // 写行、暖机，与可写挂载准入不够时写行之后推的那几串抬 F 的空发布（D16（发布语义） 已定项 1「准入」那一行），按落盘的先后。
-    let file_versions_in_publish_order = std::iter::once(&mounted.output.row_publish)
+    // 写行与暖机按「有树」挑、不按「带文件」挑：有树而文件集合为空的一版（D8（核心索引结构） 已定项 16 第 5 条）照样写分配记录，
+    // 跳过它们，比较的上一版就停在挂载之前那棵树上，下一次真比的发布把这几次改写的记录全当成自己改的、代却不是自己的 txg。
+    let versions_of_trees_in_publish_order = std::iter::once(&mounted.output.row_publish)
         .chain(mounted.output.warm_up_publishes.iter())
-        .filter_map(PoolVersion::file_version)
+        .filter_map(PoolVersion::version_of_trees)
         .chain(
             mounted
                 .output
@@ -3095,8 +3952,19 @@ fn mount_publish_allocation_judgement(
                 .floor_raises()
                 .iter()
                 .flat_map(|raised| raised.publishes.iter()),
+        )
+        .chain(
+            floor_raises_and_versions_in_txg_order(
+                &mounted.output.floor_raises_pushed_by_the_continuation,
+                &mounted.output.deletion_queue_continuation,
+            )
+            .into_iter()
+            .flat_map(|published| match published {
+                FloorRaiseOrVersion::FloorRaise(raised) => raised.publishes.iter().collect(),
+                FloorRaiseOrVersion::Version(version) => vec![version],
+            }),
         );
-    for output in file_versions_in_publish_order {
+    for output in versions_of_trees_in_publish_order {
         let publish_txg = output.root.checkpoint_txg;
         harness_judgement = harness_judgement.or_else(|| {
             allocation_generation_judgement(
@@ -3174,9 +4042,46 @@ fn settle_mount(
                 verdict.counts.add(&raise_verdict.counts);
                 verdict.disagreement = raise_verdict.disagreement;
             }
+            // 挂载续做（D8（核心索引结构） 已定项 16 第 6 条）：接在推的抬 F 之后，每一步照模型的「走空的一步」比；
+            // 走空里为空间推的那几串抬 F（用户 2026-10-03 定案「挂载续做被空间拒：同样推抬 F 再试」）按 txg 插在各步之间，照模型的抬 F 逐串比。
+            // 推满仍放不下（`DeletionQueueContinuationOutcome::StillShortAfterTheFloorRaises`，用户 2026-10-03 定「照 D16 做成可写」）时挂载照样做成、
+            // 队列留着：模型的现行那一版停在删除中，那一次被拒交给这次挂载之后会话里下一次用户改动的走空重判（会话先走空，`settle_user_change_comparing_every_version_published`）。
+            for published in floor_raises_and_versions_in_txg_order(
+                &mounted.output.floor_raises_pushed_by_the_continuation,
+                &mounted.output.deletion_queue_continuation,
+            ) {
+                if verdict.disagreement.is_some() {
+                    break;
+                }
+                let published_verdict = match published {
+                    FloorRaiseOrVersion::FloorRaise(raised) => {
+                        judge_one_floor_raise_pushed_by_the_session(&mut pool.model, raised)
+                    }
+                    FloorRaiseOrVersion::Version(continuation_step) => {
+                        let step_answer = pool.model.answer_deletion_step();
+                        judge_by_model(
+                            &mut pool.model,
+                            step_answer,
+                            &ObservedOutcome::Succeeded(ObservedEffect::Publishes {
+                                roots: vec![observed_root_of_file_version(continuation_step)],
+                                reported_ceiling: None,
+                            }),
+                        )
+                    }
+                };
+                verdict.counts.add(&published_verdict.counts);
+                verdict.disagreement = published_verdict.disagreement;
+            }
             let publishes = 1
                 + mounted.output.warm_up_publishes.len()
                 + floor_raises
+                    .iter()
+                    .map(|raised| raised.publishes.len())
+                    .sum::<usize>()
+                + mounted.output.deletion_queue_continuation.len()
+                + mounted
+                    .output
+                    .floor_raises_pushed_by_the_continuation
                     .iter()
                     .map(|raised| raised.publishes.len())
                     .sum::<usize>();
@@ -3336,7 +4241,9 @@ fn ranges_hidden_by_the_crash_recovery(
 ) -> Option<Vec<(DeviceIdentity, HiddenDeviceRange)>> {
     let earlier_records = match current {
         PoolVersion::WithoutFile(version) => &version.earlier_records_of_this_publish,
-        PoolVersion::WithFile(version) => &version.earlier_records_of_this_publish,
+        PoolVersion::WithFile(version) | PoolVersion::WithTreesAndNoFile(version) => {
+            &version.earlier_records_of_this_publish
+        }
     };
     let named_units: Vec<_> = earlier_records
         .iter()
@@ -3765,7 +4672,9 @@ fn apply_operation(
         HistoryOperation::PublishWithoutUnits => apply_publish_without_units(pool, &parameters),
         HistoryOperation::CloseAndMountWritable => apply_mount_writable(pool, &parameters),
         HistoryOperation::RollBackWhileMounted(choice) => {
-            apply_rollback_while_mounted(pool, &parameters, *choice)
+            let applied = apply_rollback_while_mounted(pool, &parameters, *choice);
+            file_the_current_version_by_what_the_rollback_took(pool);
+            applied
         }
         HistoryOperation::RaiseRollbackFloor(choice) => {
             apply_raise_rollback_floor(pool, &parameters, *choice)
@@ -3774,6 +4683,23 @@ fn apply_operation(
         HistoryOperation::CrashRecoveryAbandoningTheNewestRoot => {
             apply_crash_recovery_abandoning_the_newest_root(pool, &parameters)
         }
+        HistoryOperation::Unlink => apply_unlink(pool, write_time_seconds),
+        HistoryOperation::CreateInode => apply_create_inode(pool, write_time_seconds),
+    }
+}
+
+/// 回退在会话的带文件那一版上就地发（`mount::roll_back_by_a_forward_publish` 改的是 `PoolVersion::WithFile` 里那一版）：
+/// 回退到删完的一版之后这一版有树而文件集合为空，按 `PoolVersion::of_a_version_of_trees` 的判法重新归成员
+/// （不归的话之后的覆盖写照「带文件」调进会话、接在没有文件的一版后面）。
+fn file_the_current_version_by_what_the_rollback_took(pool: &mut HistoryPool) {
+    let Some(session) = pool.session.as_mut() else {
+        return;
+    };
+    let PoolVersion::WithFile(version) = &session.current else {
+        return;
+    };
+    if version.is_a_version_with_trees_and_no_file() {
+        session.current = PoolVersion::WithTreesAndNoFile(version.clone());
     }
 }
 
@@ -3808,6 +4734,7 @@ pub fn classify_failure(observation: FailureObservation) -> HistoryEnding {
     }
 }
 
+enum_listing_every_member! {
 /// 每一步之后跑不跑池级 checker、判红了停不停。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PerStepChecker {
@@ -3815,6 +4742,7 @@ pub enum PerStepChecker {
     Run,
     /// 不跑：只由理想模型、执行器自己的判定与 panic 让历史停下（崩溃注入、坏盘输入这些在历史之外另有判据的装置用它，省下每一步的 checker）。
     Skipped,
+}
 }
 
 impl PerStepChecker {
@@ -3830,6 +4758,15 @@ impl PerStepChecker {
         match self {
             PerStepChecker::Run => true,
             PerStepChecker::Skipped => false,
+        }
+    }
+
+    /// 复现行与复现入口的环境变量里这一种的取值（`HistorySamplingVariable::Checker`）。
+    #[must_use]
+    pub const fn environment_value(self) -> &'static str {
+        match self {
+            PerStepChecker::Run => "run",
+            PerStepChecker::Skipped => "skip",
         }
     }
 }
@@ -3869,6 +4806,375 @@ impl HistoryExecution {
             ),
         }
     }
+}
+
+/// 复现行与复现入口的环境变量里空间准入那一臂的取值（`HistorySamplingVariable::SpaceAdmission`）。复现入口认的空间准入全集是核心层生成的
+/// `SpaceAdmission::ALL`（不在这里另抄一张）：核心层加一个成员，这里的穷举 `match` 不补取值就编不过，补了复现入口就认得它。
+#[must_use]
+pub const fn space_admission_environment_value(space_admission: SpaceAdmission) -> &'static str {
+    match space_admission {
+        SpaceAdmission::JudgedByTheFormula => "judged",
+        SpaceAdmission::SkippedByTheTestOnlySwitch => "skipped",
+    }
+}
+
+/// 复现行与复现入口里环境变量名的前缀：每个装置一个（随机历史 [`RANDOM_HISTORY_VARIABLE_PREFIX`]，崩溃注入与坏盘输入在 checker 档各起一个，
+/// 故障注入在它的用例文件 `tests/fault_injection_fast_tier.rs` 里起一个），
+/// 后缀由 [`HistorySamplingVariable::suffix`] 与各装置自己的几个变量定。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ReproductionVariablePrefix(pub &'static str);
+
+impl ReproductionVariablePrefix {
+    /// 前缀接上后缀的整个变量名。
+    #[must_use]
+    pub fn variable_named(self, suffix: &str) -> String {
+        format!("{}{suffix}", self.0)
+    }
+}
+
+/// 随机历史那个二进制的环境变量前缀。
+pub const RANDOM_HISTORY_VARIABLE_PREFIX: ReproductionVariablePrefix =
+    ReproductionVariablePrefix("SINGLEFS_RANDOM_HISTORY_");
+
+/// 「收缩一个种子」那条入口读的种子变量（接在 [`RANDOM_HISTORY_VARIABLE_PREFIX`] 后面）。
+pub const RANDOM_HISTORY_SHRINK_SEED_SUFFIX: &str = "SHRINK_SEED";
+
+/// [`HistorySampling`] 的每一项在环境变量里的那一个（后缀）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HistorySamplingVariable {
+    Operations,
+    Weights,
+    Checker,
+    Devices,
+    SpaceAdmission,
+}
+
+impl HistorySamplingVariable {
+    /// 复现行按这个次序写出 [`HistorySampling`] 的每一项。
+    pub const ALL: [HistorySamplingVariable; 5] = [
+        HistorySamplingVariable::Operations,
+        HistorySamplingVariable::Weights,
+        HistorySamplingVariable::Checker,
+        HistorySamplingVariable::Devices,
+        HistorySamplingVariable::SpaceAdmission,
+    ];
+
+    #[must_use]
+    pub const fn suffix(self) -> &'static str {
+        match self {
+            HistorySamplingVariable::Operations => "OPERATIONS",
+            HistorySamplingVariable::Weights => "WEIGHTS",
+            HistorySamplingVariable::Checker => "CHECKER",
+            HistorySamplingVariable::Devices => "DEVICES",
+            HistorySamplingVariable::SpaceAdmission => "SPACE_ADMISSION",
+        }
+    }
+}
+
+/// 复现入口读环境变量时认不得的输入。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ReproductionEnvironmentError {
+    /// 这个变量必给（种子这一类），没设。
+    Missing { variable: String },
+    /// 设了，取值不在认得的那几个里（数值变量认得的是「非负整数」）。
+    Unrecognized {
+        variable: String,
+        value: String,
+        recognized: Vec<String>,
+    },
+}
+
+impl ReproductionEnvironmentError {
+    /// 给人看：哪个变量、给了什么、认得什么。
+    #[must_use]
+    pub fn render(&self) -> String {
+        match self {
+            ReproductionEnvironmentError::Missing { variable } => format!("要给 {variable}"),
+            ReproductionEnvironmentError::Unrecognized {
+                variable,
+                value,
+                recognized,
+            } => format!("{variable}={value}：只认 {}", recognized.join("、")),
+        }
+    }
+}
+
+/// 读一个非负整数变量：没设取 `default`。前后空白先去掉，与数值环境变量共用的那一份解析
+/// （`numeric_environment_variable::number_from_the_variable_value_panicking_when_unreadable`）同一口径：
+/// 同一个复现入口里有的数经它、有的数经共用解析，`" 11"` 不能这边照收、那边停下。
+///
+/// # Errors
+/// 设了但不是非负整数。
+pub fn number_from_reproduction_environment(
+    lookup: &dyn Fn(&str) -> Option<String>,
+    variable: &str,
+    default: u64,
+) -> Result<u64, ReproductionEnvironmentError> {
+    Ok(
+        number_given_in_reproduction_environment::<u64>(lookup, variable, "非负整数")?
+            .unwrap_or(default),
+    )
+}
+
+/// 读一个「跑几个」的计数变量（种子数、每段步数、每段注入次数这一类）：没设取 `default`；写 0 与写错一样认不得。
+/// 0 个就是这一批一项都没跑，照样跑完、照样退 0，按只判清单外失败的那一组判成绿（上游 `show-me-test.md`「扫到 0 项也不是通过」）。
+/// 前后空白照 [`number_from_reproduction_environment`] 先去掉。
+///
+/// # Errors
+/// 设了但不是正整数。
+pub fn count_from_reproduction_environment(
+    lookup: &dyn Fn(&str) -> Option<String>,
+    variable: &str,
+    default: u64,
+) -> Result<u64, ReproductionEnvironmentError> {
+    Ok(
+        number_given_in_reproduction_environment::<std::num::NonZeroU64>(
+            lookup,
+            variable,
+            COUNT_RECOGNIZED_IN_REPRODUCTION_ENVIRONMENT,
+        )?
+        .map_or(default, std::num::NonZeroU64::get),
+    )
+}
+
+/// [`count_from_reproduction_environment`] 认不得时报的「认得的取值」。
+pub const COUNT_RECOGNIZED_IN_REPRODUCTION_ENVIRONMENT: &str = "正整数（0 个就是一项都没跑）";
+
+/// 复现入口里一个数值变量的取值换成 `Number`：没设是 `None`；前后空白先去掉；认不出交回带原值的
+/// [`ReproductionEnvironmentError::Unrecognized`]，认得的取值写成 `recognized`。
+fn number_given_in_reproduction_environment<Number: std::str::FromStr>(
+    lookup: &dyn Fn(&str) -> Option<String>,
+    variable: &str,
+    recognized: &str,
+) -> Result<Option<Number>, ReproductionEnvironmentError> {
+    let Some(text) = lookup(variable) else {
+        return Ok(None);
+    };
+    match text.trim().parse::<Number>() {
+        Ok(number) => Ok(Some(number)),
+        Err(_not_a_number) => Err(ReproductionEnvironmentError::Unrecognized {
+            variable: variable.to_string(),
+            value: text,
+            recognized: vec![recognized.to_string()],
+        }),
+    }
+}
+
+/// 读一个必给的非负整数变量（种子这一类）。
+///
+/// # Errors
+/// 没设，或不是非负整数。
+pub fn required_number_from_reproduction_environment(
+    lookup: &dyn Fn(&str) -> Option<String>,
+    variable: &str,
+) -> Result<u64, ReproductionEnvironmentError> {
+    match lookup(variable) {
+        None => Err(ReproductionEnvironmentError::Missing {
+            variable: variable.to_string(),
+        }),
+        Some(_given) => number_from_reproduction_environment(lookup, variable, 0),
+    }
+}
+
+/// 读一个取值在 `choices` 里的变量：按 `environment_value_of` 认，没设取 `default`。
+///
+/// # Errors
+/// 设了，取值不是 `choices` 里任一个的 `environment_value_of`。
+pub fn choice_from_reproduction_environment<Choice: Copy>(
+    lookup: &dyn Fn(&str) -> Option<String>,
+    variable: &str,
+    choices: &[Choice],
+    environment_value_of: fn(Choice) -> &'static str,
+    default: Choice,
+) -> Result<Choice, ReproductionEnvironmentError> {
+    let Some(value) = lookup(variable) else {
+        return Ok(default);
+    };
+    choices
+        .iter()
+        .copied()
+        .find(|choice| environment_value_of(*choice) == value)
+        .ok_or_else(|| ReproductionEnvironmentError::Unrecognized {
+            variable: variable.to_string(),
+            value,
+            recognized: choices
+                .iter()
+                .map(|choice| environment_value_of(*choice).to_string())
+                .collect(),
+        })
+}
+
+/// 种子之外，复现一段随机历史要的全部参数：每段步数、比重、怎么跑（每一步之后的 checker、盘宽、空间准入）。
+/// 判红时打的复现行（[`HistorySampling::environment_assignments`]）与复现入口的解析（[`HistorySampling::from_environment`]）
+/// 都经它、经同一张变量表（[`HistorySamplingVariable`]），格式只有这一份定义。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HistorySampling {
+    pub operations_per_history: usize,
+    pub weights: GenerationWeights,
+    pub execution: HistoryExecution,
+}
+
+impl HistorySampling {
+    /// 这一项在环境变量里的取值。
+    #[must_use]
+    pub fn environment_value_of(&self, variable: HistorySamplingVariable) -> String {
+        match variable {
+            HistorySamplingVariable::Operations => self.operations_per_history.to_string(),
+            HistorySamplingVariable::Weights => self.weights.environment_value().to_string(),
+            HistorySamplingVariable::Checker => self
+                .execution
+                .per_step_checker
+                .environment_value()
+                .to_string(),
+            HistorySamplingVariable::Devices => {
+                self.execution.device_width.environment_value().to_string()
+            }
+            HistorySamplingVariable::SpaceAdmission => {
+                space_admission_environment_value(self.execution.space_admission).to_string()
+            }
+        }
+    }
+
+    /// 复现行里这几项的「变量名、取值」，按 [`HistorySamplingVariable::ALL`] 的次序。
+    #[must_use]
+    pub fn environment_assignments(
+        &self,
+        prefix: ReproductionVariablePrefix,
+    ) -> Vec<(String, String)> {
+        HistorySamplingVariable::ALL
+            .iter()
+            .map(|variable| {
+                (
+                    prefix.variable_named(variable.suffix()),
+                    self.environment_value_of(*variable),
+                )
+            })
+            .collect()
+    }
+
+    /// 从环境读回（`lookup` 交回变量的取值，没设是 None）：没设的那一项取 `defaults` 的。
+    /// 每段步数是计数（[`count_from_reproduction_environment`]）：每段 0 步的一批只跑了起点，写 0 与写错一样认不得。
+    ///
+    /// # Errors
+    /// 某个变量的取值认不得（每段步数写 0 也算）。
+    pub fn from_environment(
+        prefix: ReproductionVariablePrefix,
+        lookup: &dyn Fn(&str) -> Option<String>,
+        defaults: &HistorySampling,
+    ) -> Result<HistorySampling, ReproductionEnvironmentError> {
+        let operations_variable =
+            prefix.variable_named(HistorySamplingVariable::Operations.suffix());
+        let operations_per_history_given = count_from_reproduction_environment(
+            lookup,
+            &operations_variable,
+            u64::try_from(defaults.operations_per_history).expect("步数装得进 u64"),
+        )?;
+        let operations_per_history =
+            usize::try_from(operations_per_history_given).map_err(|_too_many| {
+                ReproductionEnvironmentError::Unrecognized {
+                    variable: operations_variable.clone(),
+                    value: operations_per_history_given.to_string(),
+                    recognized: vec!["装得进 usize 的步数".to_string()],
+                }
+            })?;
+        let weights = choice_from_reproduction_environment(
+            lookup,
+            &prefix.variable_named(HistorySamplingVariable::Weights.suffix()),
+            &GenerationWeights::NAMED,
+            |weights| weights.environment_value(),
+            defaults.weights,
+        )?;
+        let per_step_checker = choice_from_reproduction_environment(
+            lookup,
+            &prefix.variable_named(HistorySamplingVariable::Checker.suffix()),
+            &PerStepChecker::ALL,
+            PerStepChecker::environment_value,
+            defaults.execution.per_step_checker,
+        )?;
+        let device_width = choice_from_reproduction_environment(
+            lookup,
+            &prefix.variable_named(HistorySamplingVariable::Devices.suffix()),
+            &HistoryDeviceWidth::ALL,
+            HistoryDeviceWidth::environment_value,
+            defaults.execution.device_width,
+        )?;
+        let space_admission = choice_from_reproduction_environment(
+            lookup,
+            &prefix.variable_named(HistorySamplingVariable::SpaceAdmission.suffix()),
+            &SpaceAdmission::ALL,
+            space_admission_environment_value,
+            defaults.execution.space_admission,
+        )?;
+        Ok(HistorySampling {
+            operations_per_history,
+            weights,
+            execution: HistoryExecution {
+                per_step_checker,
+                device_width,
+                space_admission,
+            },
+        })
+    }
+
+    /// 按种子生成这一种取样下的那段历史。
+    #[must_use]
+    pub fn generate(&self, seed: HistorySeed) -> GeneratedHistory {
+        generate_history_with_weights(seed, self.operations_per_history, &self.weights)
+    }
+}
+
+/// 「变量名、取值」拼成一行 `名=值 名=值 …`：复现行的赋值那一截只由它拼（[`environment_assignments_in_line`] 是它的反向）。
+#[must_use]
+pub fn render_environment_assignments(assignments: &[(String, String)]) -> String {
+    assignments
+        .iter()
+        .map(|(variable, value)| format!("{variable}={value}"))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// 从一行复现命令里取出「变量名=取值」（空白隔开，变量名 `SINGLEFS_` 起头；报告里紧贴在「复现：」这类前缀后面的那一个也认）：
+/// 自证拿它把判红时打的那一行原样喂回复现入口。
+#[must_use]
+pub fn environment_assignments_in_line(line: &str) -> BTreeMap<String, String> {
+    line.split_whitespace()
+        .filter_map(|token| token.find("SINGLEFS_").map(|start| &token[start..]))
+        .filter_map(|assignment| assignment.split_once('='))
+        .map(|(variable, value)| (variable.to_string(), value.to_string()))
+        .collect()
+}
+
+/// 随机历史判红时打的那一行复现命令：种子与这一段的全部取样参数，交「收缩一个种子」那条入口
+/// （`random_histories` 的 `shrink_one_failing_seed_from_the_environment`）照抄就是原来那一段历史、原来那种跑法。
+#[must_use]
+pub fn random_history_reproduction_line(seed: HistorySeed, sampling: &HistorySampling) -> String {
+    let mut assignments = vec![(
+        RANDOM_HISTORY_VARIABLE_PREFIX.variable_named(RANDOM_HISTORY_SHRINK_SEED_SUFFIX),
+        seed.0.to_string(),
+    )];
+    assignments.extend(sampling.environment_assignments(RANDOM_HISTORY_VARIABLE_PREFIX));
+    format!(
+        "{} cargo test --release -p singlefs-harness --test random_histories -- --include-ignored --exact shrink_one_failing_seed_from_the_environment",
+        render_environment_assignments(&assignments)
+    )
+}
+
+/// 「收缩一个种子」那条入口读环境：种子必给，取样参数没设的取 `defaults` 的。
+/// 读的变量与 [`random_history_reproduction_line`] 写出的逐个相同。
+///
+/// # Errors
+/// 种子没给，或某个变量的取值认不得。
+pub fn random_history_to_reproduce_from_environment(
+    lookup: &dyn Fn(&str) -> Option<String>,
+    defaults: &HistorySampling,
+) -> Result<(HistorySeed, HistorySampling), ReproductionEnvironmentError> {
+    let seed = required_number_from_reproduction_environment(
+        lookup,
+        &RANDOM_HISTORY_VARIABLE_PREFIX.variable_named(RANDOM_HISTORY_SHRINK_SEED_SUFFIX),
+    )?;
+    let sampling =
+        HistorySampling::from_environment(RANDOM_HISTORY_VARIABLE_PREFIX, lookup, defaults)?;
+    Ok((HistorySeed(seed), sampling))
 }
 
 /// 跑一段历史，每一步之后跑池级 checker、两块 4 GiB 的盘，录制流不留内容（第 1 件只看镜像）。
@@ -4137,6 +5443,24 @@ pub fn execute_history_with_faults(
         }
     };
     tally.histories = 1;
+    tally.histories_with_a_deletion_batch_keeping_data_units = u64::from(
+        tally
+            .model_counts
+            .deletion_batches_keeping_data_units_matched
+            > 0,
+    );
+    tally.histories_with_a_walk_of_several_steps_before_a_user_change = u64::from(
+        tally
+            .model_counts
+            .walks_of_several_steps_before_a_user_change_matched
+            > 0,
+    );
+    tally.histories_with_a_walk_before_a_user_change_refused_for_space = u64::from(
+        tally
+            .model_counts
+            .walks_before_a_user_change_refused_for_space_matched
+            > 0,
+    );
     HistoryRun {
         ending,
         outcomes,
@@ -4304,7 +5628,9 @@ fn simpler_variants(operation: HistoryOperation) -> Vec<HistoryOperation> {
         | HistoryOperation::PublishWithoutUnits
         | HistoryOperation::CloseAndMountWritable
         | HistoryOperation::ColdStartRecover
-        | HistoryOperation::CrashRecoveryAbandoningTheNewestRoot => Vec::new(),
+        | HistoryOperation::CrashRecoveryAbandoningTheNewestRoot
+        | HistoryOperation::Unlink
+        | HistoryOperation::CreateInode => Vec::new(),
     }
 }
 
@@ -4461,6 +5787,8 @@ pub struct NewFindingReport {
     pub observation: FailureObservation,
     pub seeds: Vec<HistorySeed>,
     pub shrunk: Option<ShrunkReproduction>,
+    /// 发现它的那一段的取样参数：复现行照它写（[`random_history_reproduction_line`]）。
+    pub sampling: HistorySampling,
 }
 
 /// 新发现收不收缩：收缩一类要把那段历史反复重跑几十次，debug 下每次几秒（门禁 59 号在变异下跑快档时量到过：只收一类也要两分多钟）。
@@ -4503,11 +5831,15 @@ impl NewFindingReport {
                 disagreement.implementation_answer
             );
         }
+        let _ = writeln!(
+            text,
+            "  复现：{}",
+            random_history_reproduction_line(self.first_seed, &self.sampling)
+        );
         let Some(shrunk) = &self.shrunk else {
             let _ = writeln!(
                 text,
-                "  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED={} 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档",
-                self.first_seed.0
+                "  没收缩（这一档只报种子）：照上一行跑「收缩一个种子」那条 #[ignore] 用例"
             );
             return text;
         };
@@ -4533,9 +5865,8 @@ impl NewFindingReport {
 pub struct CampaignReport {
     pub first_seed: u64,
     pub seed_count: u64,
-    pub operations_per_history: usize,
-    pub weights: GenerationWeights,
-    pub execution: HistoryExecution,
+    /// 这一批每段历史的取样参数（每段步数、比重、跑法）：历史就是照它生成、照它跑的，每个新发现的复现行也照它写。
+    pub sampling: HistorySampling,
     pub tally: HistoryTally,
     /// 以「已知红」收尾的种子：(种子, 清单第几条, 在哪一步)。
     pub known_red_hits: Vec<(HistorySeed, usize, StepPosition)>,
@@ -4552,9 +5883,9 @@ impl CampaignReport {
             "种子 [{}, {})，每段 {} 步，比重：{}；{}",
             self.first_seed,
             self.first_seed + self.seed_count,
-            self.operations_per_history,
-            self.weights.name,
-            self.execution.name()
+            self.sampling.operations_per_history,
+            self.sampling.weights.name,
+            self.sampling.execution.name()
         );
         text.push_str(&self.tally.render());
         for (form_index, form) in KNOWN_RED_FORMS.iter().enumerate() {
@@ -4595,6 +5926,13 @@ pub fn run_history_campaign(
     worker_threads: usize,
     shrinking: FindingShrinking,
 ) -> CampaignReport {
+    // 取样参数只在这里拼一次：历史照它生成、照它跑，报告与每个新发现的复现行也照它写——复现行写出的就是真跑的那一种
+    // （代码三方 test-script-align-code-r1 判决 C607：原先生成与复现行各拼一份，复现行那一份写错时没有用例看得见）。
+    let sampling = HistorySampling {
+        operations_per_history,
+        weights: *weights,
+        execution,
+    };
     let next_offset = AtomicU64::new(0);
     let finished: Mutex<Vec<(GeneratedHistory, HistoryRun)>> = Mutex::new(Vec::new());
     std::thread::scope(|scope| {
@@ -4604,13 +5942,13 @@ pub fn run_history_campaign(
                 if offset >= seed_count {
                     break;
                 }
-                let history = generate_history_with_weights(
-                    HistorySeed(first_seed + offset),
-                    operations_per_history,
-                    weights,
+                let history = sampling.generate(HistorySeed(first_seed + offset));
+                let run = execute_history_with(
+                    &history,
+                    sampling.execution,
+                    &SharedStream::new(),
+                    &mut |_| {},
                 );
-                let run =
-                    execute_history_with(&history, execution, &SharedStream::new(), &mut |_| {});
                 finished
                     .lock()
                     .expect("别的线程拿着这把锁时只做一次 push，不会在锁里 panic")
@@ -4618,9 +5956,29 @@ pub fn run_history_campaign(
             });
         }
     });
-    let mut finished = finished
+    let finished = finished
         .into_inner()
         .expect("线程都已结束；锁里只做 push，没有线程在锁里 panic");
+    campaign_report_of_finished_histories(
+        first_seed,
+        seed_count,
+        &sampling,
+        finished,
+        worker_threads,
+        shrinking,
+    )
+}
+
+/// 一批跑完的历史（次序不限）汇总成报告：按种子排好，计数相加，「已知红」照记，新发现按签名归类、按 `shrinking` 收缩各类的第一个种子；
+/// 报告与每个新发现带的取样参数都是 `sampling`（这批历史就是照它生成、照它跑的）。
+fn campaign_report_of_finished_histories(
+    first_seed: u64,
+    seed_count: u64,
+    sampling: &HistorySampling,
+    mut finished: Vec<(GeneratedHistory, HistoryRun)>,
+    worker_threads: usize,
+    shrinking: FindingShrinking,
+) -> CampaignReport {
     finished.sort_by_key(|(history, _)| history.seed);
     let mut tally = HistoryTally::default();
     let mut known_red_hits = Vec::new();
@@ -4656,7 +6014,7 @@ pub fn run_history_campaign(
                 FindingShrinking::EveryFindingClass => Some(shrink_to_reproduction(
                     &history,
                     &signature,
-                    execution,
+                    sampling.execution,
                     worker_threads,
                 )),
                 FindingShrinking::ReportSeedsOnly => None,
@@ -4667,15 +6025,14 @@ pub fn run_history_campaign(
                 observation,
                 seeds,
                 shrunk,
+                sampling: *sampling,
             }
         })
         .collect();
     CampaignReport {
         first_seed,
         seed_count,
-        operations_per_history,
-        weights: *weights,
-        execution,
+        sampling: *sampling,
         tally,
         known_red_hits,
         new_findings,
@@ -4696,6 +6053,349 @@ mod tests {
         let mut other = SeededRandomSource::from_seed(1_234_567);
         assert_eq!(other.next_word(), 0x599e_d017_fb08_fc85);
         assert_eq!(other.next_word(), 0x2c73_f084_5854_0fa5);
+    }
+
+    /// 复现行的赋值那一截写出的每一种取样参数（每一组比重、两种 checker、四档盘宽、空间准入两臂，各配一个步数）都能经复现入口的解析原样读回：
+    /// 一项的取值写了读不回（名字对不上、两项同名），或解析漏读一项，这里就红。
+    #[test]
+    fn every_sampling_choice_reads_back_from_its_own_reproduction_assignments() {
+        let defaults = HistorySampling {
+            operations_per_history: 1,
+            weights: GenerationWeights::BROAD,
+            execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        };
+        let mut combinations = 0usize;
+        for weights in GenerationWeights::NAMED {
+            for per_step_checker in PerStepChecker::ALL {
+                for device_width in HistoryDeviceWidth::ALL {
+                    for space_admission in SpaceAdmission::ALL {
+                        let sampling = HistorySampling {
+                            operations_per_history: 150 + combinations,
+                            weights,
+                            execution: HistoryExecution {
+                                per_step_checker,
+                                device_width,
+                                space_admission,
+                            },
+                        };
+                        let line = render_environment_assignments(
+                            &sampling.environment_assignments(RANDOM_HISTORY_VARIABLE_PREFIX),
+                        );
+                        let assignments = environment_assignments_in_line(&line);
+                        let read_back = HistorySampling::from_environment(
+                            RANDOM_HISTORY_VARIABLE_PREFIX,
+                            &|variable: &str| assignments.get(variable).cloned(),
+                            &defaults,
+                        );
+                        assert_eq!(read_back, Ok(sampling), "复现行：{line}");
+                        combinations += 1;
+                    }
+                }
+            }
+        }
+        assert_eq!(
+            combinations,
+            GenerationWeights::NAMED.len()
+                * PerStepChecker::ALL.len()
+                * HistoryDeviceWidth::ALL.len()
+                * SpaceAdmission::ALL.len(),
+            "每一种组合都走过一遍"
+        );
+    }
+
+    enum_listing_every_member! {
+    /// 只给下面那条用例用的三个成员：看生成的 `ALL` 是不是每个成员恰好一次、按声明的次序。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    enum ThreeDeclaredMembers {
+        First,
+        Second,
+        Third,
+    }
+    }
+
+    /// 生成的 `ALL` 照成员表逐个列出、不多不少、次序与声明相同：复现入口认的取值全集（盘宽、checker、比重的名字）都由它生成，
+    /// 它漏一个、重一个，那一档就复现不出或读回成别的。
+    #[test]
+    fn the_generated_member_table_lists_every_member_once_in_declaration_order() {
+        assert_eq!(
+            ThreeDeclaredMembers::ALL,
+            [
+                ThreeDeclaredMembers::First,
+                ThreeDeclaredMembers::Second,
+                ThreeDeclaredMembers::Third
+            ]
+        );
+    }
+
+    /// 每一组有名字的比重：名字找回的那一组自报的也是这个名字（两组比重报同一个名字时，有一组复现入口永远找不回），
+    /// [`GenerationWeights::NAMED`] 里同一个位置上就是它，复现入口按它的取值读回的也是它。
+    #[test]
+    fn every_named_generation_weights_member_finds_its_own_weights_and_reads_back_from_its_value() {
+        let defaults = HistorySampling {
+            operations_per_history: 1,
+            weights: GenerationWeights::BROAD,
+            execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        };
+        for (position, member) in NamedGenerationWeights::ALL.into_iter().enumerate() {
+            assert_eq!(
+                member.weights().named,
+                member,
+                "{member:?} 找回的那一组比重自报的名字不是它"
+            );
+            assert_eq!(
+                GenerationWeights::NAMED[position],
+                member.weights(),
+                "NAMED 第 {position} 个不是 {member:?} 那一组"
+            );
+            let read_back = HistorySampling::from_environment(
+                RANDOM_HISTORY_VARIABLE_PREFIX,
+                &|variable: &str| {
+                    (variable == "SINGLEFS_RANDOM_HISTORY_WEIGHTS")
+                        .then(|| member.environment_value().to_string())
+                },
+                &defaults,
+            )
+            .map(|sampling| sampling.weights);
+            assert_eq!(
+                read_back,
+                Ok(member.weights()),
+                "WEIGHTS={} 读回的不是 {member:?} 那一组",
+                member.environment_value()
+            );
+        }
+    }
+
+    /// 照 [`run_history_campaign`] 汇总的一条新发现（造一个假发现，不必真红）打出的复现行，原样喂回复现入口
+    /// （[`random_history_to_reproduce_from_environment`]，「收缩一个种子」那条入口读的就是它），读回的种子与取样参数就是这一批的，
+    /// 重新生成的历史与那一段逐步相同。取样参数的每一项都取与入口默认（快档那一种）不同的值：哪一项在汇总时装错了，读回就不同
+    /// （代码三方 test-script-align-code-r1 判决 C607：这一处装配原先没有用例经过）。
+    #[test]
+    fn the_reproduction_line_of_a_campaign_finding_regenerates_the_history_the_campaign_ran() {
+        let defaults = HistorySampling {
+            operations_per_history: 30,
+            weights: GenerationWeights::BROAD,
+            execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        };
+        let sampling = HistorySampling {
+            operations_per_history: 17,
+            weights: GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR,
+            execution: HistoryExecution {
+                per_step_checker: PerStepChecker::Skipped,
+                device_width: HistoryDeviceWidth::UnitAreaOf256Slots,
+                space_admission: SpaceAdmission::SkippedByTheTestOnlySwitch,
+            },
+        };
+        let first_seed = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
+        let finding_history = sampling.generate(HistorySeed(first_seed + 1));
+        let observation = FailureObservation {
+            position: StepPosition::Operation(3),
+            operation_kind: Some(finding_history.operations[3].kind()),
+            violations: Vec::new(),
+            panic: None,
+            newest_ring_root_txg: None,
+            root_ring_slot_count: None,
+            harness_judgement: None,
+            model_disagreement: None,
+            raised_floor_lands_only_on_abandoned_roots: None,
+            record_check: RecordCheck::default(),
+        };
+        let run_ending = |ending: HistoryEnding| HistoryRun {
+            ending,
+            outcomes: Vec::new(),
+            tally: HistoryTally::default(),
+            operations_written_by_make_filesystem: 0,
+            committed_versions_at_the_end: Vec::new(),
+        };
+        let finished = vec![
+            (
+                finding_history.clone(),
+                run_ending(HistoryEnding::NewFinding {
+                    signature: FailureSignature::HarnessJudgement {
+                        judgement: "自证用的假发现",
+                    },
+                    observation,
+                }),
+            ),
+            (
+                sampling.generate(HistorySeed(first_seed)),
+                run_ending(HistoryEnding::Completed),
+            ),
+        ];
+        let report = campaign_report_of_finished_histories(
+            first_seed,
+            2,
+            &sampling,
+            finished,
+            1,
+            FindingShrinking::ReportSeedsOnly,
+        );
+        assert_eq!(report.sampling, sampling, "报告带的取样参数不是这一批的");
+        assert_eq!(report.new_findings.len(), 1, "假发现归成一类");
+        let rendered = report.new_findings[0].render();
+        let reproduction_lines: Vec<&str> = rendered
+            .lines()
+            .filter(|line| line.contains("SINGLEFS_RANDOM_HISTORY_SHRINK_SEED="))
+            .collect();
+        assert_eq!(
+            reproduction_lines.len(),
+            1,
+            "新发现里恰好一行复现命令：\n{rendered}"
+        );
+        let assignments = environment_assignments_in_line(reproduction_lines[0]);
+        let (seed, reproduced_sampling) = random_history_to_reproduce_from_environment(
+            &|variable: &str| assignments.get(variable).cloned(),
+            &defaults,
+        )
+        .unwrap_or_else(|error| panic!("{}", error.render()));
+        assert_eq!(
+            (seed, reproduced_sampling),
+            (finding_history.seed, sampling),
+            "照复现行读回的种子与取样参数（步数、比重、checker、盘宽、空间准入）不是判红那一段的：{}",
+            reproduction_lines[0]
+        );
+        assert_eq!(
+            reproduced_sampling.generate(seed),
+            finding_history,
+            "照复现行重新生成的历史与判红那一段不同"
+        );
+    }
+
+    /// [`run_history_campaign`] 报告带的取样参数就是调用方给的那一组，跑的就是照它生成的历史：一段 6 步的历史，计数与照取样参数
+    /// 自己生成、自己跑的那一段逐项相同。判别力：同一个种子按快档的比重生成的是另一段历史，计数也不同（前提断言），
+    /// 取样参数装成快档那一组时这里红。
+    #[test]
+    fn a_campaign_runs_and_reports_the_sampling_it_was_given() {
+        let sampling = HistorySampling {
+            operations_per_history: 6,
+            weights: GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR,
+            execution: HistoryExecution {
+                per_step_checker: PerStepChecker::Skipped,
+                device_width: HistoryDeviceWidth::FourGibibytes,
+                space_admission: SpaceAdmission::JudgedByTheFormula,
+            },
+        };
+        let seed = HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE);
+        let tally_of = |weights: &GenerationWeights| {
+            execute_history_with(
+                &generate_history_with_weights(seed, sampling.operations_per_history, weights),
+                sampling.execution,
+                &SharedStream::new(),
+                &mut |_| {},
+            )
+            .tally
+        };
+        let tally_under_the_sampling = tally_of(&sampling.weights);
+        assert_ne!(
+            tally_under_the_sampling,
+            tally_of(&GenerationWeights::BROAD),
+            "前提：同一个种子按快档的比重跑出来的计数不同，下面那条断言才分得出跑的是哪一组"
+        );
+        let mut tally_of_a_one_history_campaign = HistoryTally::default();
+        tally_of_a_one_history_campaign.absorb(&tally_under_the_sampling);
+        let report = run_history_campaign(
+            seed.0,
+            1,
+            sampling.operations_per_history,
+            &sampling.weights,
+            sampling.execution,
+            1,
+            FindingShrinking::ReportSeedsOnly,
+        );
+        assert_eq!(report.sampling, sampling, "报告带的取样参数不是调用方给的");
+        assert_eq!(
+            report.tally, tally_of_a_one_history_campaign,
+            "跑出来的计数与照取样参数生成的那一段不同：跑的不是这一组取样参数下的历史"
+        );
+    }
+
+    /// 复现入口认不得的取值报出变量名、给的值与认得的那几个，不悄悄退回默认。
+    #[test]
+    fn an_unrecognized_reproduction_value_is_refused_with_the_recognized_values() {
+        let defaults = HistorySampling {
+            operations_per_history: 30,
+            weights: GenerationWeights::BROAD,
+            execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        };
+        let refused = HistorySampling::from_environment(
+            RANDOM_HISTORY_VARIABLE_PREFIX,
+            &|variable: &str| {
+                (variable == "SINGLEFS_RANDOM_HISTORY_DEVICES").then(|| "small".to_string())
+            },
+            &defaults,
+        );
+        assert_eq!(
+            refused,
+            Err(ReproductionEnvironmentError::Unrecognized {
+                variable: "SINGLEFS_RANDOM_HISTORY_DEVICES".to_string(),
+                value: "small".to_string(),
+                recognized: vec![
+                    "4gib".to_string(),
+                    "unit-area-384".to_string(),
+                    "unit-area-256".to_string(),
+                    "unit-area-240".to_string(),
+                ],
+            })
+        );
+    }
+
+    /// 「收缩一个种子」那条入口里种子与每段步数前后都带空白：两个都去掉空白读回，与数值环境变量共用的那一份解析同一口径
+    /// （同一个入口里一个数照收、另一个数停下，复现行手抄时多一个空格就分不清是哪个变量写错了）。
+    #[test]
+    fn blanks_around_the_seed_and_the_step_count_of_one_reproduction_entry_are_dropped_alike() {
+        let defaults = HistorySampling {
+            operations_per_history: 30,
+            weights: GenerationWeights::BROAD,
+            execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        };
+        let assignments = BTreeMap::from([
+            (
+                "SINGLEFS_RANDOM_HISTORY_SHRINK_SEED".to_string(),
+                " 11".to_string(),
+            ),
+            (
+                "SINGLEFS_RANDOM_HISTORY_OPERATIONS".to_string(),
+                " 24".to_string(),
+            ),
+        ]);
+        assert_eq!(
+            random_history_to_reproduce_from_environment(
+                &|variable: &str| assignments.get(variable).cloned(),
+                &defaults,
+            ),
+            Ok((
+                HistorySeed(11),
+                HistorySampling {
+                    operations_per_history: 24,
+                    weights: GenerationWeights::BROAD,
+                    execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+                }
+            )),
+            "种子与每段步数前后的空白都去掉读回"
+        );
+    }
+
+    /// 每段步数写 0：复现入口报出变量名、给的值与认得的取值，不照收（每段 0 步的一批只跑了起点，照样判成绿）。
+    #[test]
+    fn a_reproduction_step_count_of_zero_is_refused_with_the_recognized_values() {
+        let defaults = HistorySampling {
+            operations_per_history: 30,
+            weights: GenerationWeights::BROAD,
+            execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        };
+        assert_eq!(
+            HistorySampling::from_environment(
+                RANDOM_HISTORY_VARIABLE_PREFIX,
+                &|variable: &str| {
+                    (variable == "SINGLEFS_RANDOM_HISTORY_OPERATIONS").then(|| "0".to_string())
+                },
+                &defaults,
+            ),
+            Err(ReproductionEnvironmentError::Unrecognized {
+                variable: "SINGLEFS_RANDOM_HISTORY_OPERATIONS".to_string(),
+                value: "0".to_string(),
+                recognized: vec![COUNT_RECOGNIZED_IN_REPRODUCTION_ENVIRONMENT.to_string()],
+            })
+        );
     }
 
     /// 同一个种子、同一个步数生成的历史逐项相同；换一个种子就不同。
@@ -4939,93 +6639,46 @@ mod tests {
         assert!(
             matches!(
                 classify_failure(without_the_judgement),
-                HistoryEnding::KnownRed { form: 0, .. }
+                HistoryEnding::NewFinding {
+                    signature: FailureSignature::CheckerViolations { .. },
+                    ..
+                }
             ),
-            "去掉执行器判的那一条，同一个观察是清单那一形（收口表第 43 行）"
+            "去掉执行器判的那一条，签名是 checker 判红的那几条；收口表第 43 行那一形已从清单里删了，照新发现报"
         );
     }
 
-    /// 「已知红」按机理认，不按签名认（代码三方 m2-supp3-item3-code-r1 判决 K6 的假阴那一半）：
-    /// 同一个签名（只有 I-3.1 红、记账多于遍历）下，机理对得上才接进清单那一形（收口表第 43 行）。
-    /// 根环转过一圈把 F 之上的根挤出了环那一形（收口表第 ② 行）已经修好、从清单里删了：同一个观察现在是新发现。
+    /// 清单删空之后（收口表第 ② 行、第 43 行两形都修好、都删了），只有 I-3.1 红、记账多于遍历的观察不论 checker 报的机理是哪一种、
+    /// F 落没落在被抛弃实例留下的空档里，一律照新发现报。
     #[test]
-    fn known_red_forms_are_matched_by_mechanism_not_by_signature() {
-        let with_detail = |detail: String| FailureObservation {
-            position: StepPosition::Operation(21),
-            operation_kind: Some(HistoryOperationKind::PublishOverwrite),
-            violations: vec![("I-3.1", detail)],
-            panic: None,
-            newest_ring_root_txg: Some(26),
-            root_ring_slot_count: Some(24),
-            harness_judgement: None,
-            model_disagreement: None,
-            raised_floor_lands_only_on_abandoned_roots: None,
-            record_check: RecordCheck::default(),
-        };
-        assert!(
-            matches!(
-                classify_failure(with_detail(allocation_statistic_detail(26, 3, 0, 0))),
-                HistoryEnding::NewFinding { .. }
-            ),
-            "环转过一圈把 F 之上的根挤出了环、记账多算：收口表第 ② 行修好了，清单里没有这一形，照新发现报"
-        );
-        assert!(
-            matches!(
-                classify_failure(with_detail(
-                    "盘 0：记账的已分配 Some(3817472)，遍历全部有效根得到 3801088".to_string()
-                )),
-                HistoryEnding::NewFinding { .. }
-            ),
-            "说明文字里没有机理标识：认不出机理就不接，照新发现报"
-        );
+    fn with_the_known_red_list_empty_an_allocated_statistic_above_walked_is_a_new_finding_whatever_its_mechanism(
+    ) {
+        assert!(KNOWN_RED_FORMS.is_empty(), "清单是空的");
         let raised_into_the_gap = raised_into_the_gap_observation();
-        // 环转没转圈与这条机理正交：环转过了、而 F 之上一条根都没掉出环（最老的自证过的根就在 F 之下），照样是这一形。
-        let mut the_ring_also_turned = with_detail(allocation_statistic_detail(27, 4, 8, 4));
+        let mut the_ring_also_turned = raised_into_the_gap.clone();
+        the_ring_also_turned.violations = vec![("I-3.1", allocation_statistic_detail(27, 4, 8, 4))];
         the_ring_also_turned.newest_ring_root_txg = Some(27);
-        the_ring_also_turned.raised_floor_lands_only_on_abandoned_roots = Some(true);
-        assert!(
-            matches!(
-                classify_failure(the_ring_also_turned),
-                HistoryEnding::KnownRed { form: 0, .. }
-            ),
-            "环也转过一圈、但缺口出在 F 上：还是清单那一形，不是新发现"
-        );
-        assert!(
-            matches!(
-                classify_failure(raised_into_the_gap.clone()),
-                HistoryEnding::KnownRed { form: 0, .. }
-            ),
-            "F 落在空档里、环没转圈、机理对得上：接进清单那一形"
-        );
-        let mut nothing_dropped_by_the_floor = raised_into_the_gap.clone();
-        nothing_dropped_by_the_floor.violations =
-            vec![("I-3.1", allocation_statistic_detail(9, 0, 5, 0))];
-        assert!(
-            matches!(
-                classify_failure(nothing_dropped_by_the_floor),
-                HistoryEnding::NewFinding { .. }
-            ),
-            "F 一条读得到的根都没挡掉：缺口不出在这条机理上，照新发现报"
-        );
-        let mut floor_not_in_a_gap = raised_into_the_gap.clone();
-        floor_not_in_a_gap.raised_floor_lands_only_on_abandoned_roots = Some(false);
-        assert!(
-            matches!(
-                classify_failure(floor_not_in_a_gap),
-                HistoryEnding::NewFinding { .. }
-            ),
-            "F 那个 txg 上的根不全属于被抛弃的实例：不经回退的抬 F 之后记账多算，照新发现报"
-        );
-        // 这一形不再卡「这一步是抬 F」：崩溃状态摆在抬 F 之后的别的步上，同一机理照样接得进清单那一形。
-        let mut later_step = raised_into_the_gap;
+        let mut later_step = raised_into_the_gap.clone();
         later_step.operation_kind = Some(HistoryOperationKind::PublishOverwrite);
-        assert!(
-            matches!(
-                classify_failure(later_step),
-                HistoryEnding::KnownRed { form: 0, .. }
+        for (observation, what) in [
+            (
+                raised_into_the_gap,
+                "F 落在空档里、环没转圈、机理是 F 挡掉了读得到的根",
             ),
-            "抬 F 之后的别的步上同一机理照样是清单那一形"
-        );
+            (the_ring_also_turned, "环也转过一圈、缺口出在 F 上"),
+            (later_step, "抬 F 之后的别的步上同一机理"),
+        ] {
+            assert!(
+                matches!(
+                    classify_failure(observation),
+                    HistoryEnding::NewFinding {
+                        signature: FailureSignature::CheckerViolations { .. },
+                        ..
+                    }
+                ),
+                "{what}：照新发现报"
+            );
+        }
     }
 
     /// 记录核对器判红的不接进「已知红」：签名是 `RecordCheck`，照新发现报。
@@ -5050,9 +6703,12 @@ mod tests {
         assert!(
             matches!(
                 classify_failure(observation),
-                HistoryEnding::KnownRed { form: 0, .. }
+                HistoryEnding::NewFinding {
+                    signature: FailureSignature::CheckerViolations { .. },
+                    ..
+                }
             ),
-            "去掉记录核对器那一条，同一个观察是清单那一形（收口表第 43 行）"
+            "去掉记录核对器那一条，签名是 checker 判红的那几条（收口表第 43 行那一形已从清单里删了）"
         );
     }
 }

@@ -6,6 +6,7 @@ mod common;
 
 use common::{
     build_pool, disk_snapshot, parameters, BuiltPool, Recorded, FIXED_WRITE_TIME_SECONDS,
+    OVERWRITE_SECONDS_AFTER_THE_FIRST_WRITE,
 };
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
@@ -60,18 +61,40 @@ fn third_content() -> Vec<u8> {
     content_of(THIRD_FILE_BYTES, 11)
 }
 
+/// 同一实例再发的第四版（txg 6、jsn 6）：字节数与种子都与前两版不同，读回哪一版看得出。
+const FOURTH_FILE_BYTES: usize = 3300;
+const FOURTH_FILE_CONTENT_SEED: usize = 17;
+
+fn fourth_content() -> Vec<u8> {
+    content_of(FOURTH_FILE_BYTES, FOURTH_FILE_CONTENT_SEED)
+}
+
+/// 交给写者的上一版的回退下界 F：照旧，或抬到给定值（只改上一版的 F，别的照旧）。抬过的那一版记录新根段里的 F 与所选根的不同，
+/// 施加出来的根取的是哪一份才分得出来（D23（journal 的角色与格式） 已定项 15「施加一条记录 = 把所选根的这四个字段换成记录里的」）。
+enum RollbackFloorHandedToTheWriter {
+    AsInThePreviousVersion,
+    RaisedTo(CheckpointTxg),
+}
+
 /// 同一个进程、同一个实例里再发布一版（发布 B 用；步 3 的「预置一条实例 1 的记录」也用它造）。
 fn overwrite_in_process(
     pool: &mut BuiltPool,
     content: &[u8],
     instance: InstanceGeneration,
+    rollback_floor: RollbackFloorHandedToTheWriter,
 ) -> TransactionOutput {
-    let previous = pool.output.clone();
+    let mut previous = pool.output.clone();
+    match rollback_floor {
+        RollbackFloorHandedToTheWriter::AsInThePreviousVersion => {}
+        RollbackFloorHandedToTheWriter::RaisedTo(raised_floor) => {
+            previous.root.rollback_floor = raised_floor;
+        }
+    }
     common::publish_overwrite_in_process(
         pool,
         &previous,
         content,
-        FIXED_WRITE_TIME_SECONDS + 60,
+        FIXED_WRITE_TIME_SECONDS + OVERWRITE_SECONDS_AFTER_THE_FIRST_WRITE,
         instance,
     )
     .expect("覆盖写")
@@ -80,7 +103,12 @@ fn overwrite_in_process(
 /// A → B 之后进程退出、重开并可写挂载。
 fn build_publish_second_version_and_remount(tag: &str) -> (BuiltPool, TransactionOutput, Mounted) {
     let mut pool = build_pool(tag);
-    let second = overwrite_in_process(&mut pool, &second_content(), InstanceGeneration(1));
+    let second = overwrite_in_process(
+        &mut pool,
+        &second_content(),
+        InstanceGeneration(1),
+        RollbackFloorHandedToTheWriter::AsInThePreviousVersion,
+    );
     pool.output = second.clone();
     let mut devices = pool.reopen_recorded();
     let mounted = mount_writable(&parameters(), &mut devices).expect("可写挂载");
@@ -299,7 +327,10 @@ fn remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes
         "释放 B 的四个文件单元 + txg 7 的四个固定点单元与分配记录树根之下那四个节点"
     );
     assert_eq!(
-        third_publish.inode_record.object_birth,
+        third_publish
+            .inode_record
+            .expect("第三次发布那一版有第一个文件那条记录")
+            .object_birth,
         CheckpointTxg(3),
         "对象出生代照旧"
     );
@@ -401,13 +432,24 @@ fn damaging_every_instance_two_root_on_one_device_still_leaves_a_root_on_the_oth
 
 /// 验收第三条：预置一条实例 1 的记录（jsn 5、txg 5、事务号 3，点名的单元也在盘上），把它的根槽改坏 ⇒ 重开那一刻所选根是 B 的根、
 /// 同一个实例 ⇒ 恢复必须施加它，行写 (1, 5, 3)，写行发布的 txg 从 6 起。
+/// 那一版把 F 抬到 4（B 的根带 F = 0）：施加出来的根的 F 取记录新根段里的 4、不是所选根的 0（已定项 15）。
 #[test]
 fn stray_record_of_the_previous_instance_is_applied_on_remount_and_its_transaction_lands_in_the_row(
 ) {
     let mut pool = build_pool("step-three-stray-record");
-    let second = overwrite_in_process(&mut pool, &second_content(), InstanceGeneration(1));
+    let second = overwrite_in_process(
+        &mut pool,
+        &second_content(),
+        InstanceGeneration(1),
+        RollbackFloorHandedToTheWriter::AsInThePreviousVersion,
+    );
     pool.output = second;
-    let stray = overwrite_in_process(&mut pool, &third_content(), InstanceGeneration(1));
+    let stray = overwrite_in_process(
+        &mut pool,
+        &third_content(),
+        InstanceGeneration(1),
+        RollbackFloorHandedToTheWriter::RaisedTo(CheckpointTxg(4)),
+    );
     assert_eq!(
         (
             stray.root.checkpoint_txg,
@@ -447,6 +489,18 @@ fn stray_record_of_the_previous_instance_is_applied_on_remount_and_its_transacti
         mounted.output.effective_root.checkpoint_txg,
         CheckpointTxg(5),
         "施加之后的根是第 5 代"
+    );
+    assert_eq!(
+        (
+            mounted.output.chosen_root.rollback_floor,
+            stray.record.new_rollback_floor
+        ),
+        (CheckpointTxg(0), CheckpointTxg(4)),
+        "取样点：所选根（B 的根）带 F = 0，那条记录的新根段带抬过的 F = 4"
+    );
+    assert_eq!(
+        mounted.output.effective_root.rollback_floor, stray.record.new_rollback_floor,
+        "施加出来的根的 F 取记录新根段里的那一份，不是所选根的"
     );
     assert_eq!(
         mounted.output.rows_written,
@@ -539,11 +593,26 @@ fn checker_rejects_an_instance_table_row_whose_instance_is_not_below_the_mount_r
 fn one_missing_record_right_after_the_chosen_root_stops_the_prefix_even_when_later_records_are_intact(
 ) {
     let mut pool = build_pool("step-three-chain-start");
-    let second = overwrite_in_process(&mut pool, &second_content(), InstanceGeneration(1));
+    let second = overwrite_in_process(
+        &mut pool,
+        &second_content(),
+        InstanceGeneration(1),
+        RollbackFloorHandedToTheWriter::AsInThePreviousVersion,
+    );
     pool.output = second;
-    let third = overwrite_in_process(&mut pool, &third_content(), InstanceGeneration(1));
+    let third = overwrite_in_process(
+        &mut pool,
+        &third_content(),
+        InstanceGeneration(1),
+        RollbackFloorHandedToTheWriter::AsInThePreviousVersion,
+    );
     pool.output = third;
-    let fourth = overwrite_in_process(&mut pool, &content_of(3300, 17), InstanceGeneration(1));
+    let fourth = overwrite_in_process(
+        &mut pool,
+        &fourth_content(),
+        InstanceGeneration(1),
+        RollbackFloorHandedToTheWriter::AsInThePreviousVersion,
+    );
     assert_eq!(
         (fourth.root.checkpoint_txg, fourth.record.counter),
         (CheckpointTxg(6), 6)
@@ -606,12 +675,28 @@ enum AnchorTear {
 fn torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg(tear: AnchorTear) {
     let (tear_jsn_five, expected_effective_root, expected_content, expected_applied) = match tear {
         AnchorTear::TheAnchorAndTheNextRecord => (true, CheckpointTxg(4), second_content(), 0),
-        AnchorTear::OnlyTheAnchor => (false, CheckpointTxg(6), content_of(3300, 17), 2),
+        AnchorTear::OnlyTheAnchor => (false, CheckpointTxg(6), fourth_content(), 2),
     };
     let mut pool = build_pool("step-three-torn-anchor");
-    pool.output = overwrite_in_process(&mut pool, &second_content(), InstanceGeneration(1));
-    pool.output = overwrite_in_process(&mut pool, &third_content(), InstanceGeneration(1));
-    let fourth = overwrite_in_process(&mut pool, &content_of(3300, 17), InstanceGeneration(1));
+    pool.output = overwrite_in_process(
+        &mut pool,
+        &second_content(),
+        InstanceGeneration(1),
+        RollbackFloorHandedToTheWriter::AsInThePreviousVersion,
+    );
+    pool.output = overwrite_in_process(
+        &mut pool,
+        &third_content(),
+        InstanceGeneration(1),
+        RollbackFloorHandedToTheWriter::AsInThePreviousVersion,
+    );
+    // 第四版把 F 抬到 5（所选根 (1, 4) 带 F = 0）：只撕锚点那一格施加到 jsn 6，施加出来的根的 F 取 jsn 6 新根段里的 5（已定项 15）。
+    let fourth = overwrite_in_process(
+        &mut pool,
+        &fourth_content(),
+        InstanceGeneration(1),
+        RollbackFloorHandedToTheWriter::RaisedTo(CheckpointTxg(5)),
+    );
     assert_eq!(fourth.record.counter, 6);
     let mut image = pool.memory_pool();
     for txg in [5u64, 6] {
@@ -729,6 +814,18 @@ fn torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg(tear:
                     .collect::<Vec<_>>(),
                 vec![(CheckpointTxg(6), 4)],
                 "撕掉 {torn:?} 之后写的行"
+            );
+            assert_eq!(
+                (
+                    mounted.output.chosen_root.rollback_floor,
+                    fourth.record.new_rollback_floor
+                ),
+                (CheckpointTxg(0), CheckpointTxg(5)),
+                "取样点：所选根 (1, 4) 带 F = 0，jsn 6 的新根段带抬过的 F = 5"
+            );
+            assert_eq!(
+                mounted.output.effective_root.rollback_floor, fourth.record.new_rollback_floor,
+                "施加到 jsn 6：施加出来的根的 F 取它新根段里的那一份，不是所选根的"
             );
         }
     }

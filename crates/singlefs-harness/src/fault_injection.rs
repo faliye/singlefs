@@ -31,7 +31,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::time::Instant;
 
-use singlefs_checker::image::InvariantVerdict;
+use singlefs_checker::image::{
+    InvariantVerdict, SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION,
+};
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration};
 use singlefs_core::block_device::{
@@ -50,7 +52,8 @@ use crate::history::{
     newest_ring_root_and_slot_count, raised_floor_lands_only_on_abandoned_roots, AppliedEffect,
     ColdStartReadBack, FailureObservation, FailureSignature, GeneratedHistory, GenerationWeights,
     HarnessJudgement, HistoryEnding, HistoryExecution, HistoryOperation, HistoryOperationKind,
-    HistoryRun, HistorySeed, PerStepChecker, SeededRandomSource, StepOutcome, StepPosition,
+    HistoryRun, HistorySeed, PerStepChecker, SeededRandomSource, StartingPointStep, StepOutcome,
+    StepPosition,
 };
 use crate::memory_pool::{
     newest_persisted_root, root_identity_written_by, writes_and_segments_with_stream_indexes,
@@ -62,6 +65,11 @@ use crate::model::{
 };
 use crate::model_comparison::{
     model_ring_position, model_root_key, observed_read_back_after_a_crash,
+};
+use crate::numeric_environment_variable::number_from_the_variable_value_panicking_when_unreadable;
+use crate::reference_filesystem_translation::{
+    JointVerdictOfTheReferenceFileSystemAndTheModel, ReferenceFileSystemTranslation,
+    ReferenceFileSystemVote, WhatTheReopenMustRecover,
 };
 use crate::segments::{FixedGeometry, StepKind};
 use crate::{RecordedOperation, RecordedOperationKind, SharedStream};
@@ -1351,11 +1359,116 @@ impl FaultFinding {
     }
 }
 
+/// 只有故障注入撞得到的「已知红」形态：随机历史不注入，撞不到；两边共用的那份清单是 `history::KNOWN_RED_FORMS`。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum KnownRedFormOnlyAfterAFault {
+    /// 起点段里 mkfs 自己把错交回来，录制流里一次系统配置槽写都没落盘；注入之后的镜像上池级 checker 只判红
+    /// I-8.5（tail 槽有效集非空）一条，重开走读失败（[`ReopenedVersion::NothingWasLeftToRecoverAndTheReopenSaidSo`]）。
+    /// 用户 2026-10-03 定：盘上全池没有一个自证过的系统配置槽，就是 I-8.5 那一行写的「全池皆废」，红是对的，照判、记在这里；
+    /// 它不是要修的缺口。
+    MakeFilesystemFailedBeforeAnySystemConfigurationSlotLanded,
+}
+
+impl KnownRedFormOnlyAfterAFault {
+    /// 报告里的名字。
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            KnownRedFormOnlyAfterAFault::MakeFilesystemFailedBeforeAnySystemConfigurationSlotLanded => {
+                "mkfs 在系统配置槽落盘之前报错，全池皆废、只红 I-8.5"
+            }
+        }
+    }
+}
+
+/// 一次注入以「已知红」收尾时撞上的是哪一条：两边共用的清单里第几条，或只有故障注入撞得到的那几条之一。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum KnownRedFormAtAFault {
+    /// `history::KNOWN_RED_FORMS` 的第几条（从 0 数）。
+    SharedWithRandomHistories(usize),
+    OnlyAfterAFault(KnownRedFormOnlyAfterAFault),
+}
+
+impl KnownRedFormAtAFault {
+    /// 报告里的一段：共用清单写第几条，故障注入自己那几条写名字。
+    #[must_use]
+    pub fn render(self) -> String {
+        match self {
+            KnownRedFormAtAFault::SharedWithRandomHistories(form) => format!("第 {form} 条"),
+            KnownRedFormAtAFault::OnlyAfterAFault(form) => {
+                format!("故障注入那一条（{}）", form.name())
+            }
+        }
+    }
+}
+
+/// 判故障注入自己那几条「已知红」要看的事实，都是 [`inject_one_fault`] 判到这一步时本来就拿着的：不另读盘、不另跑实现。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FactsAfterTheFault {
+    /// 注入那一段历史停在起点段某一步把错交回来上（`HarnessJudgement::TheStartingPointReturnedAnError`）时是哪一步；
+    /// 别的结局（跑完了、停在起点之后的某一步、停在 panic 上）是 None。
+    pub starting_point_step_that_returned_an_error: Option<StartingPointStep>,
+    /// 录制流（只记真正落到盘上的写）里写在系统配置槽上的写有几次（[`StepKind::SystemConfigurationSlot`]；整段清零不算）。
+    pub system_configuration_slot_writes_that_landed: usize,
+    /// 重开走到了哪一格。
+    pub reopened: ReopenedVersion,
+}
+
+/// 这条失败是不是只有故障注入撞得到的那几条「已知红」之一；不是就交回 None，照共用清单与新发现往下判。
+///
+/// mkfs 没做完那一条要五样同时成立，少一样就不认（照报新发现，不放宽）：
+/// 1. 停在起点段、把错交回来的是 mkfs 自己（取号、暖机、第一个文件报错时 mkfs 已经写下了系统配置槽）；
+/// 2. 录制流里一次系统配置槽写都没落盘（mkfs 写完系统配置之后才报错的，盘上有自证过的槽，I-8.5 红就不是这一形）；
+/// 3. 重开走读失败、而盘上本来就没有一版立得住；
+/// 4. 这条失败里没有 panic、执行器判出的失败、模型对不上、记录核对器判红；
+/// 5. checker（连同 RefFS 借违例那一栏带的那一票）判红的恰好一条，就是 I-8.5。
+#[must_use]
+pub fn known_red_form_only_after_a_fault(
+    observation: &FailureObservation,
+    facts: &FactsAfterTheFault,
+) -> Option<KnownRedFormOnlyAfterAFault> {
+    let make_filesystem_returned_the_error = match facts.starting_point_step_that_returned_an_error
+    {
+        Some(StartingPointStep::MakeFilesystem) => true,
+        Some(
+            StartingPointStep::ReadThePoolForTheSession
+            | StartingPointStep::AcquireInstance
+            | StartingPointStep::WarmUp
+            | StartingPointStep::PublishFirstFile,
+        )
+        | None => false,
+    };
+    let no_system_configuration_slot_landed =
+        facts.system_configuration_slot_writes_that_landed == 0;
+    let the_reopen_found_nothing_to_recover = match facts.reopened {
+        ReopenedVersion::NothingWasLeftToRecoverAndTheReopenSaidSo => true,
+        ReopenedVersion::CommittedByTheModel
+        | ReopenedVersion::TheVersionTheFaultedStepWasWriting
+        | ReopenedVersion::OutsideEverythingTheModelAllows => false,
+    };
+    let only_the_checker_flagged_it = observation.panic.is_none()
+        && observation.harness_judgement.is_none()
+        && observation.model_disagreement.is_none()
+        && crate::history::record_check_aspects(&observation.record_check).is_empty();
+    let only_some_device_carries_a_self_verified_system_configuration_is_violated = matches!(
+        observation.violations.as_slice(),
+        [(invariant, _)] if *invariant == SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION
+    );
+    (make_filesystem_returned_the_error
+        && no_system_configuration_slot_landed
+        && the_reopen_found_nothing_to_recover
+        && only_the_checker_flagged_it
+        && only_some_device_carries_a_self_verified_system_configuration_is_violated)
+        .then_some(
+            KnownRedFormOnlyAfterAFault::MakeFilesystemFailedBeforeAnySystemConfigurationSlotLanded,
+        )
+}
+
 /// 「已知红」收尾的一次注入。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KnownRedAtAFault {
     pub seed: HistorySeed,
-    pub form: usize,
+    pub form: KnownRedFormAtAFault,
     pub drawn: DrawnFault,
 }
 
@@ -1396,10 +1509,14 @@ pub struct FaultInjectionTally {
     pub reopens_outside_everything_the_model_allows: u64,
     /// 重开走读失败，而盘上本来就没有一版立得住（`failed_reopen_is_the_right_answer`）：只记不判。
     pub reopens_that_correctly_found_nothing_to_recover: u64,
+    /// 重开上 RefFS 与 O1 判官两票合起来（G1 用户定案：任一红即红），按哪一边红分开计；RefFS 弃权的按理由另计。
+    pub reopens_by_the_reference_filesystem_and_model_verdicts:
+        BTreeMap<JointVerdictOfTheReferenceFileSystemAndTheModel, u64>,
+    pub reference_filesystem_abstentions_at_the_reopen: BTreeMap<&'static str, u64>,
     pub checker_runs_on_the_image_after_the_fault: u64,
     pub invariant_holds: BTreeMap<&'static str, u64>,
     pub invariant_not_applicable: BTreeMap<&'static str, u64>,
-    pub faults_ending_known_red: BTreeMap<usize, u64>,
+    pub faults_ending_known_red: BTreeMap<KnownRedFormAtAFault, u64>,
     pub faults_ending_new_finding: u64,
 }
 
@@ -1453,6 +1570,18 @@ impl FaultInjectionTally {
             other.reopens_outside_everything_the_model_allows;
         self.reopens_that_correctly_found_nothing_to_recover +=
             other.reopens_that_correctly_found_nothing_to_recover;
+        for (verdict, count) in &other.reopens_by_the_reference_filesystem_and_model_verdicts {
+            *self
+                .reopens_by_the_reference_filesystem_and_model_verdicts
+                .entry(*verdict)
+                .or_insert(0) += count;
+        }
+        for (reason, count) in &other.reference_filesystem_abstentions_at_the_reopen {
+            *self
+                .reference_filesystem_abstentions_at_the_reopen
+                .entry(reason)
+                .or_insert(0) += count;
+        }
         self.checker_runs_on_the_image_after_the_fault +=
             other.checker_runs_on_the_image_after_the_fault;
         for (key, count) in &other.invariant_holds {
@@ -1582,6 +1711,15 @@ impl FaultInjectionTally {
         );
         let _ = writeln!(
             text,
+            "重开上 RefFS 与 O1 判官两票（任一红即红）：{:?}；RefFS 弃权的理由 {:?}",
+            self.reopens_by_the_reference_filesystem_and_model_verdicts
+                .iter()
+                .map(|(verdict, count)| (verdict.name(), *count))
+                .collect::<Vec<_>>(),
+            self.reference_filesystem_abstentions_at_the_reopen
+        );
+        let _ = writeln!(
+            text,
             "注入之后的镜像上跑池级 checker {} 次：判绿 {} 条次、不适用 {} 条次",
             self.checker_runs_on_the_image_after_the_fault,
             self.invariant_holds.values().sum::<u64>(),
@@ -1590,7 +1728,11 @@ impl FaultInjectionTally {
         let _ = writeln!(
             text,
             "以「已知红」收尾 {:?}、新发现 {}",
-            self.faults_ending_known_red, self.faults_ending_new_finding
+            self.faults_ending_known_red
+                .iter()
+                .map(|(form, count)| (form.render(), *count))
+                .collect::<BTreeMap<_, _>>(),
+            self.faults_ending_new_finding
         );
         text
     }
@@ -1675,7 +1817,9 @@ fn system_configuration_instance_before_a_mount_step(
             | HistoryOperationKind::PublishWithoutUnits
             | HistoryOperationKind::RollBackWhileMounted
             | HistoryOperationKind::RaiseRollbackFloor
-            | HistoryOperationKind::ColdStartRecover => None,
+            | HistoryOperationKind::ColdStartRecover
+            | HistoryOperationKind::Unlink
+            | HistoryOperationKind::CreateInode => None,
         },
     }
 }
@@ -1979,6 +2123,20 @@ struct FaultInjectionAccumulator<'run> {
     acquired_instances_left: &'run mut Vec<AcquiredInstanceLeft>,
 }
 
+impl FaultInjectionAccumulator<'_> {
+    /// 一次注入以「已知红」收尾：按形态计一次，再记下是哪个种子上的哪一次注入。
+    fn record_a_known_red_hit(
+        &mut self,
+        seed: HistorySeed,
+        form: KnownRedFormAtAFault,
+        drawn: DrawnFault,
+    ) {
+        *self.tally.faults_ending_known_red.entry(form).or_insert(0) += 1;
+        self.known_red_hits
+            .push(KnownRedAtAFault { seed, form, drawn });
+    }
+}
+
 /// 注入那一段的结局是不是「入口返回了错误」：没 panic、checker 没判红，而且那一段要么返回了 `Err`，
 /// 要么是冷启动、读回报了错。注入的块设备错在模型里没有对应的拒绝理由（`ObservedRefusalReason::Unexplained`），
 /// 模型因此必然报「该成却拒了」——那一格不算失败，它就是这一件要的结果。
@@ -2159,9 +2317,13 @@ fn failed_reopen_is_the_right_answer(
     fault: InjectedFault,
     ending_observation: Option<&FailureObservation>,
 ) -> bool {
-    if fault.the_device_lies() {
-        return true;
-    }
+    fault.the_device_lies() || make_filesystem_left_no_finished_filesystem(ending_observation)
+}
+
+/// 历史停在起点而 mkfs 自己报了错、盘上没有一个做完了的文件系统（[`failed_reopen_is_the_right_answer`] 的后一种）。
+fn make_filesystem_left_no_finished_filesystem(
+    ending_observation: Option<&FailureObservation>,
+) -> bool {
     matches!(
         ending_observation.and_then(|observation| observation.harness_judgement.as_ref()),
         Some(HarnessJudgement::TheStartingPointReturnedAnError { step, .. })
@@ -2187,13 +2349,23 @@ fn inject_one_fault(
     // 最后一次观察那一刻的模型与录制流长度：历史停下的那一步不调观察者，它之前那一步的这两样就是「停下那一步开始时」的。
     let mut model_at_the_last_observation: Option<crate::model::IdealModel> = None;
     let mut stream_length_at_the_last_observation = 0usize;
+    // RefFS 的输入（G1 用户定案：重开的判定 = RefFS ∧ O1 判官全四条）：开着注入跑的那一遍逐步攒，停下的那一步跑完之后补。
+    let mut reference_filesystem_translation =
+        ReferenceFileSystemTranslation::for_a_history_starting(history.starting_point);
     let run = execute_history_with_faults(history, execution, &stream, &plan, &mut |observation| {
         for (key, file) in observation.model.committed_versions() {
             committed_by_the_armed_run.insert(key, file);
         }
         model_at_the_last_observation = Some(observation.model.clone());
         stream_length_at_the_last_observation = stream.operation_count();
+        reference_filesystem_translation
+            .note_an_observed_step(observation, stream_length_at_the_last_observation);
     });
+    reference_filesystem_translation.note_the_step_the_history_stopped_in(
+        &history.operations,
+        &run,
+        stream.operation_count(),
+    );
     let fired = plan.fired();
     accumulator.tally.faults += 1;
     *accumulator
@@ -2323,7 +2495,9 @@ fn inject_one_fault(
             | HistoryOperation::RollBackWhileMounted(_)
             | HistoryOperation::RaiseRollbackFloor(_)
             | HistoryOperation::ColdStartRecover
-            | HistoryOperation::CrashRecoveryAbandoningTheNewestRoot => None,
+            | HistoryOperation::CrashRecoveryAbandoningTheNewestRoot
+            | HistoryOperation::Unlink
+            | HistoryOperation::CreateInode => None,
         });
     let (read_back_root, read_back_content): (Option<ModelRootKey>, Option<&[u8]>) =
         match &read_back {
@@ -2351,6 +2525,45 @@ fn inject_one_fault(
     } else {
         crash_recovery_disagreement(&allowed, newest_persisted, &read_back)
     };
+    // RefFS 那一票：重开 = 停下之后崩、全部步都返回过（停下那一步报错的按「写了之后报错」两可，panic 的按在途）。注入真落了的每一档
+    // RefFS 都弃权、O1 判官照旧：U1 射程句「带故障的状态（说谎的设备、丢整块盘 C519）不适用」管全部带故障的状态，括号里是举例
+    // （调度记录第 12 批「12-2 交回」那一条）；注入点没走到的不带故障、照判（代码轮第三轮判决第三节第 1 条），说谎的设备没说谎，
+    // 盘上有没有一版立得住只看 mkfs 做没做完。弃权按理由计进 `reference_filesystem_abstentions_at_the_reopen`。
+    let no_version_stands_for_the_reference_filesystem = match outcome {
+        FaultOutcome::NeverFired => make_filesystem_left_no_finished_filesystem(ending_observation),
+        FaultOutcome::SurfacedAsAnError
+        | FaultOutcome::ToleratedAndTheHistoryFinished
+        | FaultOutcome::StoppedOnSomethingOtherThanTheInjectedError => {
+            failed_reopen_is_the_right_answer(drawn.fault, ending_observation)
+        }
+    };
+    let reference_filesystem_vote = reference_filesystem_translation
+        .translate(&operations, &geometry)
+        .judge_a_reopen_after_an_injected_fault(
+            drawn.fault,
+            outcome,
+            if no_version_stands_for_the_reference_filesystem {
+                WhatTheReopenMustRecover::NothingBecauseNoVersionStands
+            } else {
+                WhatTheReopenMustRecover::AVersionTheHistoryLeft
+            },
+            &read_back,
+        );
+    *accumulator
+        .tally
+        .reopens_by_the_reference_filesystem_and_model_verdicts
+        .entry(JointVerdictOfTheReferenceFileSystemAndTheModel::of(
+            &reference_filesystem_vote,
+            disagreement.as_ref(),
+        ))
+        .or_insert(0) += 1;
+    if let ReferenceFileSystemVote::Abstained(reason) = &reference_filesystem_vote {
+        *accumulator
+            .tally
+            .reference_filesystem_abstentions_at_the_reopen
+            .entry(reason.name())
+            .or_insert(0) += 1;
+    }
     let reopened = if nothing_was_left_to_recover {
         accumulator
             .tally
@@ -2374,7 +2587,7 @@ fn inject_one_fault(
             .reopens_outside_everything_the_model_allows += 1;
         ReopenedVersion::OutsideEverythingTheModelAllows
     };
-    let violations_after_the_fault = checker_violations_on(&image, accumulator.tally);
+    let mut violations_after_the_fault = checker_violations_on(&image, accumulator.tally);
     let reopen_text = format!("{reopened:?}（{}）", describe_read_back(&read_back));
     // C378：注入落在一次挂载里、那一步返回了错误，而重开的盘上系统配置的实例代号比这一步之前大——取号之后的写行或暖机报了错，
     // 新号没回卷。认下的已知行为：记进这一格、在报告里点名，不进新发现，也不挡下面的判定。
@@ -2467,7 +2680,10 @@ fn inject_one_fault(
         }
     });
 
-    // 三、判：注入那一步返回错误的那一格不算失败；别的失败（panic、checker 判红、重开走到模型不允许的版本）逐条分类。
+    // 三、判：注入那一步返回错误的那一格不算失败；别的失败（panic、checker 判红、重开走到模型或 RefFS 不允许的版本）逐条分类。
+    // RefFS 判红的那一项借违例那一栏带着走（注入真落了的每一档 RefFS 都弃权，只有注入点没走到的那几次投票；没走到时说谎的设备
+    // 什么也没丢，不会落进 `left_by_the_lying_device` 的豁免）。
+    violations_after_the_fault.extend(reference_filesystem_vote.violation());
     let mut failures: Vec<FailureObservation> = Vec::new();
     if !surfaced {
         if let Some(observation) = ending_observation {
@@ -2490,25 +2706,43 @@ fn inject_one_fault(
             record_check: RecordCheck::default(),
         });
     }
+    let facts_after_the_fault = FactsAfterTheFault {
+        starting_point_step_that_returned_an_error: ending_observation.and_then(|observation| {
+            match &observation.harness_judgement {
+                Some(HarnessJudgement::TheStartingPointReturnedAnError { step, .. }) => Some(*step),
+                Some(_) | None => None,
+            }
+        }),
+        system_configuration_slot_writes_that_landed: writes
+            .iter()
+            .filter(|write| write.kind == StepKind::SystemConfigurationSlot)
+            .count(),
+        reopened,
+    };
     for observation in failures {
         if observation.panic.is_some() {
             accumulator.tally.faults_that_panicked += 1;
         }
-        // 「已知红」先认：清单里那两条是实现与 checker 读法对不上的老账（增补 2 收口表第 ②、43 行），
+        // 「已知红」先认：清单里那几条是认下来的形态（共用清单是实现与 checker 读法对不上的老账，增补 2 收口表第 ②、43 行；
+        // 故障注入自己那一条是用户 2026-10-03 定的「mkfs 没写下系统配置槽，全池皆废判红是对的」），
         // 与设备说不说谎无关，说谎的设备把它撞出来时照样记进「已知红」那一格，不许被下面那一条接走。
+        if let Some(form) = known_red_form_only_after_a_fault(&observation, &facts_after_the_fault)
+        {
+            accumulator.record_a_known_red_hit(
+                history.seed,
+                KnownRedFormAtAFault::OnlyAfterAFault(form),
+                *drawn,
+            );
+            continue;
+        }
         match classify_failure(observation) {
             HistoryEnding::Completed => {}
             HistoryEnding::KnownRed { form, .. } => {
-                *accumulator
-                    .tally
-                    .faults_ending_known_red
-                    .entry(form)
-                    .or_insert(0) += 1;
-                accumulator.known_red_hits.push(KnownRedAtAFault {
-                    seed: history.seed,
-                    form,
-                    drawn: *drawn,
-                });
+                accumulator.record_a_known_red_hit(
+                    history.seed,
+                    KnownRedFormAtAFault::SharedWithRandomHistories(form),
+                    *drawn,
+                );
             }
             HistoryEnding::NewFinding {
                 signature,
@@ -2601,32 +2835,28 @@ impl FaultInjectionWorkerThreads {
     /// （用例不改进程的环境变量）。
     ///
     /// # Panics
-    /// 环境变量设了却不是正整数。
+    /// 环境变量设了却不是正整数（含 0、空串；解析经数值环境变量共用的那一份，消息带变量名与原值），或不是 UTF-8。
     #[must_use]
     fn from_the_environment_value(
         variable: Result<String, std::env::VarError>,
         available_parallelism: impl Fn() -> std::io::Result<std::num::NonZeroUsize>,
     ) -> Self {
-        match variable {
-            Ok(text) => {
-                let count: usize = text.trim().parse().unwrap_or_else(|error| {
-                    panic!(
-                        "{FAULT_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE}={text} 不是十进制正整数：{error}"
-                    )
-                });
-                assert!(
-                    count > 0,
-                    "{FAULT_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE}={text}：至少要 1 个线程"
-                );
-                Self::FromTheEnvironmentVariable(count)
-            }
-            Err(std::env::VarError::NotPresent) => match available_parallelism() {
-                Ok(count) => Self::FromAvailableParallelism(count.get()),
-                Err(_) => Self::AvailableParallelismUnknown,
-            },
+        let value = match variable {
+            Ok(text) => Some(text),
+            Err(std::env::VarError::NotPresent) => None,
             Err(std::env::VarError::NotUnicode(raw)) => {
                 panic!("{FAULT_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE} 不是 UTF-8：{raw:?}")
             }
+        };
+        match number_from_the_variable_value_panicking_when_unreadable::<std::num::NonZeroUsize>(
+            FAULT_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE,
+            value.as_deref(),
+        ) {
+            Some(count) => Self::FromTheEnvironmentVariable(count.get()),
+            None => match available_parallelism() {
+                Ok(count) => Self::FromAvailableParallelism(count.get()),
+                Err(_) => Self::AvailableParallelismUnknown,
+            },
         }
     }
 
@@ -2691,7 +2921,8 @@ impl FaultInjectionReport {
             self.execution.name()
         );
         text.push_str(&self.tally.render());
-        let mut known_red_by_form: BTreeMap<usize, Vec<&KnownRedAtAFault>> = BTreeMap::new();
+        let mut known_red_by_form: BTreeMap<KnownRedFormAtAFault, Vec<&KnownRedAtAFault>> =
+            BTreeMap::new();
         for hit in &self.known_red_hits {
             known_red_by_form.entry(hit.form).or_default().push(hit);
         }
@@ -2699,7 +2930,8 @@ impl FaultInjectionReport {
             let first = hits.first().expect("这一条至少有一次命中");
             let _ = writeln!(
                 text,
-                "「已知红」第 {form} 条：{} 次，第一次在种子 {}（{}）",
+                "「已知红」{}：{} 次，第一次在种子 {}（{}）",
+                form.render(),
                 hits.len(),
                 first.seed.0,
                 first.drawn.render()
@@ -3137,6 +3369,16 @@ mod tests {
         );
     }
 
+    /// 线程数变量写成认不出的字样：经数值环境变量共用的那一份解析 panic，消息带变量名与原值，不悄悄退回本机并行度。
+    #[test]
+    #[should_panic(expected = "SINGLEFS_FAULT_INJECTION_WORKER_THREADS=\"twelve\" 认不出")]
+    fn an_unreadable_fault_injection_worker_thread_count_panics_naming_the_variable_and_the_value()
+    {
+        let four = || Ok(std::num::NonZeroUsize::new(4).expect("4"));
+        let _threads =
+            FaultInjectionWorkerThreads::from_the_environment_value(Ok("twelve".to_string()), four);
+    }
+
     /// 随机抽的六种全抽得到：`draw_injected_fault` 的 `below(6)` 改回 `below(4)`，说谎那两种一次都抽不到，这里必红
     /// （判决第二节改法一钉的那一格；`crates/mutations.tsv` 同名的那一条）。
     #[test]
@@ -3411,6 +3653,196 @@ mod tests {
         assert!(
             !failed_reopen_is_the_right_answer(InjectedFault::WriteFails, Some(&failed_first_file)),
             "mkfs 做完了，第一个文件那一步报错之后重开该走到创世根上"
+        );
+    }
+
+    /// 注入之后的镜像上 checker 判红的就是 `violated_invariants` 那几条、模型对不上的是 `model_disagreement` 的一条失败，停在起点段。
+    fn failure_after_the_fault_at_the_starting_point(
+        violated_invariants: &[&'static str],
+        model_disagreement: Option<ModelDisagreement>,
+    ) -> FailureObservation {
+        FailureObservation {
+            position: StepPosition::StartingPoint,
+            operation_kind: None,
+            violations: violated_invariants
+                .iter()
+                .map(|invariant| (*invariant, "池里 2 块盘一个都没自证过".to_string()))
+                .collect(),
+            panic: None,
+            newest_ring_root_txg: None,
+            root_ring_slot_count: None,
+            harness_judgement: None,
+            model_disagreement,
+            raised_floor_lands_only_on_abandoned_roots: None,
+            record_check: RecordCheck::default(),
+        }
+    }
+
+    /// 注入之后的镜像上只红 I-8.5 的那条失败（mkfs 没做完那一形的签名）。
+    fn failure_where_only_some_device_carries_a_self_verified_system_configuration_is_violated(
+    ) -> FailureObservation {
+        failure_after_the_fault_at_the_starting_point(
+            &[SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION],
+            None,
+        )
+    }
+
+    /// 判那一形要的三样事实，逐样由调用方给。
+    fn facts_after_the_fault(
+        starting_point_step_that_returned_an_error: Option<StartingPointStep>,
+        system_configuration_slot_writes_that_landed: usize,
+        reopened: ReopenedVersion,
+    ) -> FactsAfterTheFault {
+        FactsAfterTheFault {
+            starting_point_step_that_returned_an_error,
+            system_configuration_slot_writes_that_landed,
+            reopened,
+        }
+    }
+
+    /// mkfs 报错、重开走读失败；落盘的系统配置槽写有几次由调用方给。
+    fn make_filesystem_failed_with_system_configuration_slot_writes_landed(
+        system_configuration_slot_writes_that_landed: usize,
+    ) -> FactsAfterTheFault {
+        facts_after_the_fault(
+            Some(StartingPointStep::MakeFilesystem),
+            system_configuration_slot_writes_that_landed,
+            ReopenedVersion::NothingWasLeftToRecoverAndTheReopenSaidSo,
+        )
+    }
+
+    /// 对照（用户 2026-10-03 定的那一形只认「mkfs 在系统配置槽落盘之前报错」）：同一个签名（只红 I-8.5、重开走读失败、mkfs 报的错），
+    /// 而录制流里系统配置槽写已经落了盘——mkfs 写完系统配置之后才报错，盘上本该有自证过的槽，I-8.5 红就不是「mkfs 没做完」能交代的，
+    /// 照报新发现。同一条失败换成一次都没落盘时认成那一形，证明这一格不是因为判法什么都不认才绿。
+    #[test]
+    fn i85_only_failure_after_make_filesystem_wrote_its_system_configuration_slots_stays_a_new_finding(
+    ) {
+        let observation =
+            failure_where_only_some_device_carries_a_self_verified_system_configuration_is_violated(
+            );
+        let slots_written_by_make_filesystem =
+            2 * usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE)
+                .expect("每盘槽数装得进 usize");
+        assert_eq!(
+            known_red_form_only_after_a_fault(
+                &observation,
+                &make_filesystem_failed_with_system_configuration_slot_writes_landed(0)
+            ),
+            Some(
+                KnownRedFormOnlyAfterAFault::MakeFilesystemFailedBeforeAnySystemConfigurationSlotLanded
+            ),
+            "mkfs 在系统配置槽落盘之前报错、只红 I-8.5、重开走读失败：这是用户定的那一形，要认"
+        );
+        assert_eq!(
+            known_red_form_only_after_a_fault(
+                &observation,
+                &make_filesystem_failed_with_system_configuration_slot_writes_landed(
+                    slots_written_by_make_filesystem
+                )
+            ),
+            None,
+            "系统配置槽已经落盘（{slots_written_by_make_filesystem} 次）之后的 I-8.5 红不是 mkfs 没做完那一形"
+        );
+        match classify_failure(observation) {
+            HistoryEnding::NewFinding { signature, .. } => assert_eq!(
+                signature,
+                FailureSignature::CheckerViolations {
+                    invariants: vec![SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION],
+                },
+                "共用清单接不走它，签名照旧是只红 I-8.5"
+            ),
+            ending @ (HistoryEnding::Completed | HistoryEnding::KnownRed { .. }) => {
+                panic!("只红 I-8.5 的失败不在共用清单里，该是新发现：{ending:?}")
+            }
+        }
+    }
+
+    /// mkfs 没做完那一形不放宽：别的步报错、多红一条或换一条、重开走到别的格、带着模型对不上的，一律不认。
+    #[test]
+    fn make_filesystem_known_red_form_takes_no_other_step_signature_or_reopen() {
+        let observation =
+            failure_where_only_some_device_carries_a_self_verified_system_configuration_is_violated(
+            );
+        let facts = make_filesystem_failed_with_system_configuration_slot_writes_landed(0);
+        assert!(
+            known_red_form_only_after_a_fault(&observation, &facts).is_some(),
+            "基准那一条要认，下面每一格只改一样"
+        );
+        for step in [
+            StartingPointStep::ReadThePoolForTheSession,
+            StartingPointStep::AcquireInstance,
+            StartingPointStep::WarmUp,
+            StartingPointStep::PublishFirstFile,
+        ] {
+            let facts_of_another_step = facts_after_the_fault(
+                Some(step),
+                0,
+                ReopenedVersion::NothingWasLeftToRecoverAndTheReopenSaidSo,
+            );
+            assert_eq!(
+                known_red_form_only_after_a_fault(&observation, &facts_of_another_step),
+                None,
+                "{}报错时 mkfs 已经做完，不是这一形",
+                step.name()
+            );
+        }
+        let facts_without_a_starting_point_error = facts_after_the_fault(
+            None,
+            0,
+            ReopenedVersion::NothingWasLeftToRecoverAndTheReopenSaidSo,
+        );
+        assert_eq!(
+            known_red_form_only_after_a_fault(&observation, &facts_without_a_starting_point_error),
+            None,
+            "历史没停在起点段的报错上，不是这一形"
+        );
+        for reopened in [
+            ReopenedVersion::CommittedByTheModel,
+            ReopenedVersion::TheVersionTheFaultedStepWasWriting,
+            ReopenedVersion::OutsideEverythingTheModelAllows,
+        ] {
+            let facts_of_another_reopen =
+                facts_after_the_fault(Some(StartingPointStep::MakeFilesystem), 0, reopened);
+            assert_eq!(
+                known_red_form_only_after_a_fault(&observation, &facts_of_another_reopen),
+                None,
+                "重开走到 {reopened:?}，不是这一形"
+            );
+        }
+        let with_one_more_violation = failure_after_the_fault_at_the_starting_point(
+            &[
+                SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION,
+                "I-4.1",
+            ],
+            None,
+        );
+        assert_eq!(
+            known_red_form_only_after_a_fault(&with_one_more_violation, &facts),
+            None,
+            "除了 I-8.5 还红别的，不是这一形"
+        );
+        let with_another_violation =
+            failure_after_the_fault_at_the_starting_point(&["I-4.1"], None);
+        assert_eq!(
+            known_red_form_only_after_a_fault(&with_another_violation, &facts),
+            None,
+            "红的不是 I-8.5，不是这一形"
+        );
+        let with_a_model_disagreement = failure_after_the_fault_at_the_starting_point(
+            &[SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION],
+            Some(ModelDisagreement {
+                aspect: ModelDisagreementAspect::RefusedWhenModelRequiresSuccess,
+                model_answer: "该成".to_string(),
+                implementation_answer: "拒了".to_string(),
+                implementation_reported_ceiling: None,
+                implementation_reported_root_ring_slot_still_bad_after_one_reread: None,
+                implementation_rows_written: None,
+            }),
+        );
+        assert_eq!(
+            known_red_form_only_after_a_fault(&with_a_model_disagreement, &facts),
+            None,
+            "带着模型对不上，不是这一形"
         );
     }
 

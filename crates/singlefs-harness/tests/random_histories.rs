@@ -2,7 +2,7 @@
 //! 这里是快档（普通 `cargo test`）、大档（`#[ignore]`，种子数与步数从环境变量取）与清单每一条的复现。
 //!
 //! 五段取样的种子基都是 `SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`：永久固定、不重抽
-//! （用户 2026-09-27 定，为什么见它的文档注释），崩溃注入那个二进制用的是同一个；种子数照旧写死，里程碑的验收说的是「写死的种子数之内判红」。
+//! （为什么见它的文档注释），崩溃注入那个二进制用的是同一个；种子数照旧写死，里程碑的验收说的是「写死的种子数之内判红」。
 
 mod common;
 
@@ -16,29 +16,28 @@ use singlefs_checker::image::{chosen_system_configurations, valid_roots, Invaria
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::admission::SpaceAdmission;
-use singlefs_core::allocation_record_tree::AllocationRecordTreeNodePosition;
-use singlefs_core::allocator::PlacementRefusal;
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::mount::{
-    mount_writable_with_space_admission, roll_back_by_a_forward_publish, MountError,
+    mount_writable_with_space_admission, roll_back_by_a_forward_publish,
     RollbackCandidateExclusion, RollbackError, RollbackTarget,
 };
-use singlefs_core::transaction::{TransactionOutput, TransactionUnit};
+use singlefs_core::transaction::TransactionOutput;
 use singlefs_harness::fault_injection::{
     FaultCounting, FaultDeviceSelector, FaultOccurrence, FaultPlacement, FaultSchedule,
     InjectedFault, SharedFaultPlan,
 };
 use singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::history::{
-    allocation_records_on_the_image_under, classify_failure, execute_history,
-    execute_history_observing, execute_history_with, execute_history_with_faults, generate_history,
-    generate_history_with_weights, raised_floor_lands_only_on_abandoned_roots,
-    run_history_campaign, shrink_to_reproduction, AppliedEffect, ColdStartReadBack, ContentChoice,
-    ContentLength, FailureObservation, FailureSignature, FindingShrinking, FloorTargetChoice,
-    GeneratedHistory, GenerationWeights, HistoryDeviceWidth, HistoryEnding, HistoryExecution,
-    HistoryOperation, HistoryOperationKind, HistoryRun, HistorySeed, HistoryStartingPoint,
-    HistoryTally, MountAllocationComparison, MountSpaceAdmissionOutcome, NewFindingReport,
-    PerStepChecker, RollbackTargetChoice, StepOutcome, StepPosition,
+    allocation_records_on_the_image_under, classify_failure, environment_assignments_in_line,
+    execute_history, execute_history_observing, execute_history_with, execute_history_with_faults,
+    generate_history, generate_history_with_weights, raised_floor_lands_only_on_abandoned_roots,
+    random_history_to_reproduce_from_environment, run_history_campaign, shrink_to_reproduction,
+    AppliedEffect, ColdStartReadBack, ContentChoice, ContentLength, FailureObservation,
+    FailureSignature, FindingShrinking, FloorTargetChoice, GeneratedHistory, GenerationWeights,
+    HistoryDeviceWidth, HistoryEnding, HistoryExecution, HistoryOperation, HistoryOperationKind,
+    HistoryRun, HistorySampling, HistorySeed, HistoryStartingPoint, HistoryTally,
+    MountAllocationComparison, MountSpaceAdmissionOutcome, NewFindingReport, PerStepChecker,
+    RecordReuse, RollbackTargetChoice, StepOutcome, StepPosition, RANDOM_HISTORY_VARIABLE_PREFIX,
 };
 use singlefs_harness::memory_pool::{MemoryPool, RecordCheck, SparseBlockDevice};
 use singlefs_harness::model::{
@@ -46,7 +45,10 @@ use singlefs_harness::model::{
     ObservedRefusalReason,
 };
 use singlefs_harness::model_comparison::refusal_reason_of_rollback_error;
-use singlefs_harness::{RecordingBlockDevice, SharedStream};
+use singlefs_harness::numeric_environment_variable::{
+    number_from_the_variable_value_panicking_when_unreadable, process_environment_variable,
+};
+use singlefs_harness::SharedStream;
 
 // 下面五段的种子基都是同一个：永久固定、不重抽的那个数
 // （`SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`，崩溃注入那个二进制用的是同一个；用户 2026-09-27 定）。
@@ -77,6 +79,62 @@ const WALL_SAMPLING_OPERATIONS_PER_HISTORY: usize = 150;
 const UNIT_AREA_WALL_SAMPLING_FIRST_SEED: u64 = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 const UNIT_AREA_WALL_SAMPLING_SEEDS: u64 = 32;
 const UNIT_AREA_WALL_SAMPLING_OPERATIONS_PER_HISTORY: usize = 150;
+
+// 下面六段的取样参数（种子之外复现一段历史要的全部：步数、比重、跑法）各写成一个常量：取样用例拿它跑，
+// 「复现行喂回入口」那几条自证拿同一个常量造复现行，两边不会各写一份。
+
+const FAST_TIER_SAMPLING: HistorySampling = HistorySampling {
+    operations_per_history: FAST_TIER_OPERATIONS_PER_HISTORY,
+    weights: GenerationWeights::BROAD,
+    execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+};
+
+const REUSE_SAMPLING: HistorySampling = HistorySampling {
+    operations_per_history: REUSE_SAMPLING_OPERATIONS_PER_HISTORY,
+    weights: GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR,
+    execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+};
+
+const ROLLBACK_SAMPLING: HistorySampling = HistorySampling {
+    operations_per_history: ROLLBACK_SAMPLING_OPERATIONS_PER_HISTORY,
+    weights: GenerationWeights::ROLLBACK_AFTER_RAISING_THE_FLOOR,
+    execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+};
+
+const WALL_SAMPLING: HistorySampling = HistorySampling {
+    operations_per_history: WALL_SAMPLING_OPERATIONS_PER_HISTORY,
+    weights: GenerationWeights::TOWARD_THE_ALLOCATION_RECORD_WALL,
+    execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+};
+
+/// 单元区墙那一格空间准入关掉的那一段：两块单元区 256 槽的小盘。
+const UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_SKIPPED: HistorySampling = HistorySampling {
+    operations_per_history: UNIT_AREA_WALL_SAMPLING_OPERATIONS_PER_HISTORY,
+    weights: GenerationWeights::TOWARD_THE_UNIT_AREA_WALL,
+    execution: HistoryExecution {
+        per_step_checker: PerStepChecker::Run,
+        device_width: HistoryDeviceWidth::UnitAreaOf256Slots,
+        space_admission: SpaceAdmission::SkippedByTheTestOnlySwitch,
+    },
+};
+
+/// 单元区墙那一格空间准入判着的那一段（产品路径）：同样两块单元区 256 槽的小盘。
+const UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_JUDGED: HistorySampling = HistorySampling {
+    operations_per_history: UNIT_AREA_WALL_SAMPLING_OPERATIONS_PER_HISTORY,
+    weights: GenerationWeights::TOWARD_THE_UNIT_AREA_WALL,
+    execution: HistoryExecution {
+        per_step_checker: PerStepChecker::Run,
+        device_width: HistoryDeviceWidth::UnitAreaOf256Slots,
+        space_admission: SpaceAdmission::JudgedByTheFormula,
+    },
+};
+
+/// 大档没设的那几项：每段 60 步、各类操作都抽、每一步之后跑 checker、两块 4 GiB 的盘、判空间准入。
+const LARGE_TIER_DEFAULT_SAMPLING: HistorySampling = HistorySampling {
+    operations_per_history: 60,
+    weights: GenerationWeights::BROAD,
+    execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+};
 
 /// 五段的种子基都是这个测试周期的常量：两个二进制（随机历史与崩溃注入）同基，
 /// `crates/mutations.tsv` 第 146–178 行那些「这条变异必须红」与里程碑的验收才是可判的命题——
@@ -142,7 +200,9 @@ fn assert_every_path_was_exercised(tally: &HistoryTally) {
             | HistoryOperationKind::CloseAndMountWritable
             | HistoryOperationKind::RollBackWhileMounted
             | HistoryOperationKind::RaiseRollbackFloor
-            | HistoryOperationKind::ColdStartRecover => {
+            | HistoryOperationKind::ColdStartRecover
+            | HistoryOperationKind::Unlink
+            | HistoryOperationKind::CreateInode => {
                 assert!(operation.applied >= 1, "{kind:?} 一次 Ok 都没有");
             }
         }
@@ -264,15 +324,15 @@ fn assert_the_model_judged_every_kind_of_answer(tally: &HistoryTally) {
 /// 照记、那段到此为止，清单外的一条都不许有（有就按签名归类、报出种子与失败在哪一步；收缩交给「收缩一个种子」那条 `#[ignore]` 用例，
 /// debug 下收缩一类要两分多钟）。计数照打，并核各条路径真的跑到了。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation() {
     let started = std::time::Instant::now();
     let report = run_history_campaign(
         FAST_TIER_FIRST_SEED,
         FAST_TIER_SEEDS,
-        FAST_TIER_OPERATIONS_PER_HISTORY,
-        &GenerationWeights::BROAD,
-        HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        FAST_TIER_SAMPLING.operations_per_history,
+        &FAST_TIER_SAMPLING.weights,
+        FAST_TIER_SAMPLING.execution,
         worker_threads_by_default(),
         FindingShrinking::ReportSeedsOnly,
     );
@@ -294,15 +354,15 @@ fn random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_ope
 /// 先判清单外的失败（变异下红在这一条），再核这一路真的跑到了：罩住别的已释放记录的起点、复用时跨度变了、抬 F 回收到落点——
 /// 这几个数不看罩住的那条删没删，变异下照样成立，门禁 59 号看到的红只会是分类判出来的。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms() {
     let started = std::time::Instant::now();
     let report = run_history_campaign(
         REUSE_SAMPLING_FIRST_SEED,
         REUSE_SAMPLING_SEEDS,
-        REUSE_SAMPLING_OPERATIONS_PER_HISTORY,
-        &GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR,
-        HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        REUSE_SAMPLING.operations_per_history,
+        &REUSE_SAMPLING.weights,
+        REUSE_SAMPLING.execution,
         worker_threads_by_default(),
         FindingShrinking::ReportSeedsOnly,
     );
@@ -332,15 +392,15 @@ fn reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red
 /// 回退落到 F 那条根上一次都没有。先判清单外的失败（模型对不上也在其内），再核这一格真的跑到了：回退到 txg = F_生效 > 0 的根做成过——
 /// 这个数只在做成时加，变异下被拒、判红的是分类，不是这条计数。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn rollback_heavy_random_histories_reach_the_floor_root_and_end_only_in_known_red_forms() {
     let started = std::time::Instant::now();
     let report = run_history_campaign(
         ROLLBACK_SAMPLING_FIRST_SEED,
         ROLLBACK_SAMPLING_SEEDS,
-        ROLLBACK_SAMPLING_OPERATIONS_PER_HISTORY,
-        &GenerationWeights::ROLLBACK_AFTER_RAISING_THE_FLOOR,
-        HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        ROLLBACK_SAMPLING.operations_per_history,
+        &ROLLBACK_SAMPLING.weights,
+        ROLLBACK_SAMPLING.execution,
         worker_threads_by_default(),
         FindingShrinking::ReportSeedsOnly,
     );
@@ -370,16 +430,16 @@ fn rollback_heavy_random_histories_reach_the_floor_root_and_end_only_in_known_re
 /// 先判没有新发现（checker 的判红、模型对不上、执行器判出的、panic 都算），再核这一路真的跑到了：checker 真的跑过、有一段历史的某一版
 /// 分配记录多于 812 条（多叶的树真的写过、读过、判过）。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn allocation_record_sampling_with_the_checker_goes_past_the_812_records_of_the_former_one_node_wall(
 ) {
     let started = std::time::Instant::now();
     let report = run_history_campaign(
         WALL_SAMPLING_FIRST_SEED,
         WALL_SAMPLING_SEEDS,
-        WALL_SAMPLING_OPERATIONS_PER_HISTORY,
-        &GenerationWeights::TOWARD_THE_ALLOCATION_RECORD_WALL,
-        HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        WALL_SAMPLING.operations_per_history,
+        &WALL_SAMPLING.weights,
+        WALL_SAMPLING.execution,
         worker_threads_by_default(),
         FindingShrinking::ReportSeedsOnly,
     );
@@ -403,29 +463,26 @@ fn allocation_record_sampling_with_the_checker_goes_past_the_812_records_of_the_
     );
 }
 
-/// 落点拒绝那一格（增补 3 第 2 件代码三方第二轮判决第三节第 2 条）的取样点：两块单元区 256 槽的小盘（`HistoryDeviceWidth::UnitAreaOf256Slots`；
-/// mkfs 同一个进程那条会话也装上根环表之后，384 槽那一档一次落点拒绝都走不到了），
-/// 比重取 `GenerationWeights::TOWARD_THE_UNIT_AREA_WALL`，每一步之后照跑池级 checker、判红就停，种子与步数见常量。
-/// 4 GiB 的盘上前四段一次落点拒绝都走不到，攻方把分配器「每块盘上都没有」报成「小盘写满」（只换原因）四段全绿；这里单元区写得满，
-/// 胶水只把「每块盘上都没有」映射成单元区墙，别的原因映射成模型没有的理由、判对不上。先判没有新发现，再核这一路真的跑到了：
-/// 发布里见过「每块盘上都没有」、模型在单元区墙的区间里放行过。
-/// 空间准入关掉（只供测试的开关 `SpaceAdmission::SkippedByTheTestOnlySwitch`）：判着准入时这几块小盘上式子先拒，一次落点拒绝都走不到
-/// （准入判着的那一档见 `unit_area_wall_sampling_on_small_devices_with_the_space_admission_judged_is_refused_by_the_formula_inside_the_model_interval`）；
-/// 这一档测的是准入放行之后落点仍取不到时那一条兜底拒绝（D3（空间分配） 已定项 5；C545（空间准入罩不住分裂与聚簇段层））。
+/// 单元区墙那一格空间准入关掉的取样点（两块单元区 256 槽的小盘，`HistoryDeviceWidth::UnitAreaOf256Slots`；比重
+/// `GenerationWeights::TOWARD_THE_UNIT_AREA_WALL`，每一步之后照跑池级 checker、判红就停，种子与步数见常量；
+/// 空间准入关掉，只供测试的开关 `SpaceAdmission::SkippedByTheTestOnlySwitch`）跑到底、一次都没撞上落点墙：
+/// 小盘为环窗口补足之后（用户 2026-10-02 定「甲」）这一段的单元区比环窗口那一截宽，覆盖写与第一个文件一次都没被「每块盘上都没有」拒过，
+/// 模型也一次都没在单元区墙的区间里放行过。用户 2026-10-03 定案（Q-T「乙 照现值改钉并改名」）：种子与几何都不动，
+/// 钉今天量到的那几个数——32 段全跑完、没有新发现，「每块盘上都没有」0 次，单元区墙区间里放行 0 次，池级 checker 跑 1141 次；
+/// 落点墙那一格只靠写死的那 5 条用例罩着（`a_floor_raise_refused_for_space_counts_as_short_of_space.rs` 两条与
+/// `admission_raises_the_floor_before_refusing.rs` 里删除类发布撞落得下那一判的三条）。
+/// 判别力：这一段生成的历史或落点规则变了（比重里 unlink 那一格改成 0），这几个数跟着变。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
-fn unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device() {
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+fn unit_area_wall_sampling_on_small_devices_with_the_space_admission_skipped_runs_to_the_end_without_reaching_the_placement_wall(
+) {
     let started = std::time::Instant::now();
     let report = run_history_campaign(
         UNIT_AREA_WALL_SAMPLING_FIRST_SEED,
         UNIT_AREA_WALL_SAMPLING_SEEDS,
-        UNIT_AREA_WALL_SAMPLING_OPERATIONS_PER_HISTORY,
-        &GenerationWeights::TOWARD_THE_UNIT_AREA_WALL,
-        HistoryExecution {
-            per_step_checker: PerStepChecker::Run,
-            device_width: HistoryDeviceWidth::UnitAreaOf256Slots,
-            space_admission: SpaceAdmission::SkippedByTheTestOnlySwitch,
-        },
+        UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_SKIPPED.operations_per_history,
+        &UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_SKIPPED.weights,
+        UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_SKIPPED.execution,
         worker_threads_by_default(),
         FindingShrinking::ReportSeedsOnly,
     );
@@ -447,21 +504,18 @@ fn unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_e
         &report.tally.refusals_by_member,
         "UserChangeRefused::NoSpaceAfterRaisingTheFloor(PublishError::PlacementRefused(NoFreeSlotOnAnyDevice))",
     );
-    assert!(
-        refused_on_every_device >= 1,
-        "覆盖写、第一个文件一次都没被「每块盘上都没有」拒过（用户数据那一处没跑到）"
-    );
-    assert!(
-        report
-            .tally
-            .model_counts
-            .unit_area_wall_refusals_in_the_interval
-            >= 1,
-        "模型一次都没在单元区墙的区间里放行过（落点拒绝那一格没判过）"
-    );
-    assert!(
-        report.tally.checker_runs > 0,
-        "这一段每一步之后跑池级 checker"
+    assert_eq!(
+        (
+            report.tally.histories_completed,
+            refused_on_every_device,
+            report
+                .tally
+                .model_counts
+                .unit_area_wall_refusals_in_the_interval,
+            report.tally.checker_runs,
+        ),
+        (32, 0, 0, 1141),
+        "32 段全跑完、「每块盘上都没有」0 次、单元区墙区间里放行 0 次、池级 checker 跑 1141 次（2026-10-03 量）：\n{rendered}"
     );
 }
 
@@ -474,20 +528,16 @@ fn unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_e
 /// 先判没有新发现，再核这一路真的跑到了：覆盖写经会话推过抬 F 再发成、可写挂载写行之后推过抬 F、推的每一串模型都比过上限；
 /// 落点那一道一次都没走到（式子先拒）。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn unit_area_wall_sampling_on_small_devices_with_the_space_admission_judged_is_refused_by_the_formula_inside_the_model_interval(
 ) {
     let started = std::time::Instant::now();
     let report = run_history_campaign(
         UNIT_AREA_WALL_SAMPLING_FIRST_SEED,
         UNIT_AREA_WALL_SAMPLING_SEEDS,
-        UNIT_AREA_WALL_SAMPLING_OPERATIONS_PER_HISTORY,
-        &GenerationWeights::TOWARD_THE_UNIT_AREA_WALL,
-        HistoryExecution {
-            per_step_checker: PerStepChecker::Run,
-            device_width: HistoryDeviceWidth::UnitAreaOf256Slots,
-            space_admission: SpaceAdmission::JudgedByTheFormula,
-        },
+        UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_JUDGED.operations_per_history,
+        &UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_JUDGED.weights,
+        UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_JUDGED.execution,
         worker_threads_by_default(),
         FindingShrinking::ReportSeedsOnly,
     );
@@ -540,6 +590,55 @@ fn unit_area_wall_sampling_on_small_devices_with_the_space_admission_judged_is_r
     assert!(
         report.tally.checker_runs > 0,
         "这一段每一步之后跑池级 checker"
+    );
+}
+
+/// 单元区墙取样点（空间准入判着）那一批的第一个种子只跑 77 步：第 76 步那次可写挂载接在 unlink 删完的一版后面
+/// （有树而文件集合为空，D8（核心索引结构） 已定项 16 第 5 条），写行与两次暖机写在这一形上、之后推一串三次空发布的抬 F。
+/// 执行器逐次比挂载写出的分配记录时，写行与暖机按「有树」挑进比较链：六次发布逐次比过、改写或新增的记录的代都等于各自那次的 txg，
+/// 历史跑完、没有新发现。
+/// 判别力：写行与暖机按「带文件」挑（`PoolVersion::file_version`）时这一形的三次被跳过，比较的上一版停在挂载之前那棵树上，
+/// 推的第一次空发布把那三次改写的记录全当成自己改的、代却不是自己的 txg，执行器判「改写或新增的分配记录的代不是这次发布的 txg」。
+#[test]
+fn a_mount_on_the_emptied_version_in_the_unit_area_wall_sampling_compares_its_row_and_warm_up_publishes(
+) {
+    const OPERATIONS: usize = 77;
+    const STEP_OF_THE_MOUNT: usize = 76;
+    let history = generate_history_with_weights(
+        HistorySeed(UNIT_AREA_WALL_SAMPLING_FIRST_SEED),
+        OPERATIONS,
+        &UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_JUDGED.weights,
+    );
+    let run = execute_history_with(
+        &history,
+        UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_JUDGED.execution,
+        &SharedStream::new(),
+        &mut |_| {},
+    );
+    assert_eq!(
+        run.ending,
+        HistoryEnding::Completed,
+        "{OPERATIONS} 步跑完、没有新发现"
+    );
+    assert_eq!(
+        history.operations[STEP_OF_THE_MOUNT],
+        HistoryOperation::CloseAndMountWritable,
+        "第 {STEP_OF_THE_MOUNT} 步是可写挂载"
+    );
+    let StepOutcome::Applied(AppliedEffect::Mounted {
+        allocation_records_compared,
+        ..
+    }) = &run.outcomes[STEP_OF_THE_MOUNT]
+    else {
+        panic!(
+            "第 {STEP_OF_THE_MOUNT} 步挂载做成：{:?}",
+            run.outcomes[STEP_OF_THE_MOUNT]
+        );
+    };
+    assert_eq!(
+        *allocation_records_compared,
+        MountAllocationComparison::Compared { publishes: 6 },
+        "写行、两次暖机（都在删完的一版上）与推的三次空发布逐次比过"
     );
 }
 
@@ -617,22 +716,15 @@ const EMPTY_CONTENT_OVERWRITE: HistoryOperation =
         fill_seed: 0,
     });
 
-/// 增补 2 收口表第 39 行那一族（取号之前的准入不算落点）：两块单元区 240 槽的小盘，从第一个文件起在 mkfs 那条会话里
-/// 覆盖写 18 次（txg 4–21；分配记录树按位置寻址之后每次多写几个节点，原先是 22 次，D8（核心索引结构） 已定项 14），
-/// 再可写挂载——挂载自己那一串（写行与暖机）拿不到落点。这段历史是单元区墙取样点的比重
-/// （`GenerationWeights::TOWARD_THE_UNIT_AREA_WALL`）在 240 槽上跑出来、收缩到最短的（种子 7463871032432355113 在第 28 步
-/// 撞上「拒绝之前写了盘」）。改之前取号写完、写行那次才被落点拒绝（`MountError::Publish`）：实例代号一去不回、录制流里多了写与屏障，
-/// 模型判「拒绝之前写了盘」。今天取号之前在分配器的拷贝上就取不到，返回 `PlacementRefusedBeforeAcquisitionMountAdmissionUndecided`：
-/// 那一步前后镜像逐字节相同、录制流一步没多，跑完、每一步之后池级 checker 判绿。
-/// 同一份盘面（第 18 次覆盖写之后的镜像）另起两块内存盘直接调 `mount_writable`，钉住成员的每个字段，录制流一步都不许有。
-/// 覆盖写的次数在草稿副本上按 8–30 次扫过（代码三方第二轮之后改法 B 的草稿探针，`research/prompts/m2-impl-r2-fixes-b-implementer-report.md`
-/// 第三节 5e）：只有 18 次那一档「每一次都做成、挂载那一步被落点拒」，14–17 次挂载做成，19 次起覆盖写自己先被拒；18 次这一档
-/// 写行那次（暖机计划 1 次）自己就取不到盘 1 第 0 层第 2 片分配记录树叶的落点。原来钉的是 16 次那一档（写行与第一次暖机取得到、
-/// 第二次暖机才取不到）：今天那一档挂载做成（同一探针），预演罩到暖机那几次这条历史走不到了。
-/// 空间准入关掉（只供测试的开关 `SpaceAdmission::SkippedByTheTestOnlySwitch`，执行器与直接调挂载两处都关）：判着准入时 240 槽的盘上
-/// 覆盖写没到 16 次就被式子拒、挂载在取号之前被式子拒，走不到预演取不到落点那一道——这里测的是准入放行之后那一条兜底拒绝。
+/// 两块单元区 240 槽的小盘（准入关着，只供测试的开关 `SpaceAdmission::SkippedByTheTestOnlySwitch`，执行器与直接调挂载两处都关），
+/// 从第一个文件起在 mkfs 那条会话里覆盖写 18 次空内容（txg 4–21），再可写挂载：挂载做成（实例 2），写行与一次暖机两次发布、
+/// 执行器逐次比过分配记录、一条都没复用；同一份盘面（第 18 次覆盖写之后的镜像）另起两块内存盘直接调 `mount_writable`，
+/// 同样做成、取号 2、暖机一次。这段历史原是增补 2 收口表第 39 行那一族（取号之前的准入不算落点）钉的那一形：240 槽的盘上挂载自己那一串
+/// 在取号之前就取不到落点；小盘为环窗口补足之后（用户 2026-10-02 定「甲」）单元区宽了，这里走不到那道墙了。用户 2026-10-03 定案
+/// （Q-T「乙 照现值改钉并改名」）：覆盖写次数与盘宽不动，钉今天的结局；落点墙那一格只靠写死的那 5 条用例罩着。
+/// 判别力：暖机计划多推一次时挂载那一步报三次发布、直接挂载暖机两次。
 #[test]
-fn writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquisition_with_the_disk_unchanged(
+fn eighteen_empty_overwrites_on_240_slot_devices_with_the_admission_skipped_leave_room_for_a_writable_mount_with_one_warm_up(
 ) {
     const OVERWRITES: usize = 18;
     let history = GeneratedHistory {
@@ -643,9 +735,7 @@ fn writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquis
             .collect(),
     };
     let device_width = HistoryDeviceWidth::UnitAreaOf240Slots;
-    let stream = SharedStream::new();
     let mut images_after_each_step: Vec<MemoryPool> = Vec::new();
-    let mut recorded_steps_after_each_step: Vec<usize> = Vec::new();
     let run = execute_history_with(
         &history,
         HistoryExecution {
@@ -653,10 +743,9 @@ fn writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquis
             device_width,
             space_admission: SpaceAdmission::SkippedByTheTestOnlySwitch,
         },
-        &stream,
+        &SharedStream::new(),
         &mut |observation| {
             images_after_each_step.push(observation.image.clone());
-            recorded_steps_after_each_step.push(stream.operations().len());
         },
     );
     assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
@@ -670,87 +759,47 @@ fn writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquis
     );
     assert_eq!(
         run.outcomes[OVERWRITES],
-        StepOutcome::Refused {
-            member:
-                "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)"
-                    .to_string()
-        }
+        StepOutcome::Applied(AppliedEffect::Mounted {
+            instance: InstanceGeneration(2),
+            publishes: 2,
+            allocation_records_compared: MountAllocationComparison::Compared { publishes: 2 },
+            reuse: RecordReuse::default(),
+            space_admission: MountSpaceAdmissionOutcome::NotJudgedByTheTestOnlySwitch,
+        }),
+        "挂载做成：取号 2，写行与一次暖机逐次比过分配记录、一条都没复用"
     );
     assert_eq!(
         images_after_each_step.len(),
         OVERWRITES + 2,
         "起点与每一步各一份镜像"
     );
-    assert!(
-        images_after_each_step[OVERWRITES] == images_after_each_step[OVERWRITES + 1],
-        "挂载那一步前后镜像逐字节相同"
-    );
-    assert_eq!(
-        recorded_steps_after_each_step[OVERWRITES],
-        recorded_steps_after_each_step[OVERWRITES + 1],
-        "挂载那一步录制流一步没多：一个写、一道屏障都没发"
-    );
-
-    let direct_stream = SharedStream::new();
     let image_before_the_mount = &images_after_each_step[OVERWRITES];
-    let mut devices: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> =
-        image_before_the_mount
-            .devices
-            .iter()
-            .map(|(identity, image)| {
-                let mut device = SparseBlockDevice::new(
-                    image_before_the_mount.device_size_in_bytes,
-                    PhysicalBlockSizeInBytes(512),
-                );
-                device.image = image.clone();
-                (
-                    *identity,
-                    RecordingBlockDevice::with_shared_stream(
-                        *identity,
-                        device,
-                        direct_stream.clone(),
-                    ),
-                )
-            })
-            .collect();
-    let refused = mount_writable_with_space_admission(
+    let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = image_before_the_mount
+        .devices
+        .iter()
+        .map(|(identity, image)| {
+            let mut device = SparseBlockDevice::new(
+                image_before_the_mount.device_size_in_bytes,
+                PhysicalBlockSizeInBytes(512),
+            );
+            device.image = image.clone();
+            (*identity, device)
+        })
+        .collect();
+    let mounted = mount_writable_with_space_admission(
         &device_width.parameters(),
         &mut devices,
         SpaceAdmission::SkippedByTheTestOnlySwitch,
-    );
-    assert!(
-        matches!(
-            refused,
-            Err(
-                MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided {
-                    instance_to_acquire: InstanceGeneration(2),
-                    publish_index: 0,
-                    warm_up_publishes_planned: 1,
-                    unit: TransactionUnit::AllocationTreeNodeBelowTheRoot(
-                        AllocationRecordTreeNodePosition {
-                            level: 0,
-                            device: DeviceIdentity(1),
-                            index_in_device: 2,
-                        }
-                    ),
-                    refusal: PlacementRefusal::NoFreeSlotOnAnyDevice,
-                }
-            )
+    )
+    .unwrap_or_else(|error| panic!("同一份盘面直接挂载做成：{error:?}"));
+    assert_eq!(
+        (
+            mounted.output.instance,
+            mounted.output.warm_up_publishes.len()
         ),
-        "写行那次在拷贝上就取不到盘 1 第 0 层第 2 片分配记录树叶的落点：{:?}",
-        refused.as_ref().err()
+        (InstanceGeneration(2), 1),
+        "直接挂载取号 2、暖机一次"
     );
-    assert!(
-        direct_stream.operations().is_empty(),
-        "在任何写之前返回：{:?}",
-        direct_stream.operations()
-    );
-    for (identity, device) in &devices {
-        assert!(
-            device.wrapped_device().image == image_before_the_mount.devices[identity],
-            "盘 {identity:?} 逐字节不变"
-        );
-    }
 }
 
 /// 挂着的时候回退到环里最旧的那条根，在单元区 384 槽的小盘上做成、之后照常覆盖写（C558（回退目标是环里最旧的根时回退那次发布会写坏它）
@@ -759,7 +808,7 @@ fn writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquis
 /// 空间准入关掉（只供测试的开关 `SpaceAdmission::SkippedByTheTestOnlySwitch`）：判着准入时 384 槽的盘上挂载之后第 11 次覆盖写就被式子拒，
 /// 根环凑不满。旧形态（挂载时回退）下这一格护的是「取号之前的预演连写行换下的落点一起释放」；向前回退不取号、不预演，那一半不再有对象。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn rolling_back_while_mounted_to_the_oldest_ring_root_on_a_small_device_and_overwriting_again_all_succeed(
 ) {
     let history = GeneratedHistory {
@@ -830,7 +879,7 @@ fn wall_prefix(mounts: usize) -> impl Iterator<Item = HistoryOperation> {
 /// 镜像上按 checker 的解析数的分配记录条数越过 812；每一步之后跑池级 checker、模型逐步比（跑完即都对得上）。
 /// 一段历史每一步接着上一步的盘面，次序本身就是被测对象，不切片并行。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn overwrites_raising_the_floor_and_rolling_back_past_812_allocation_records_all_succeed() {
     let history = GeneratedHistory {
         seed: HistorySeed(0),
@@ -1010,7 +1059,7 @@ fn rolling_back_to_the_root_at_the_effective_floor_is_accepted_and_reads_back_th
 /// 按谓词回收、记账按回收之后的数写——修之前它没回收、记账仍算已分配，checker 在这一步判 I-3.1 红（记账比遍历多 16384 字节）。
 /// 现在每一步之后 checker 都跑、都不红：起点、挂载、25 次覆盖写之后各一次。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn turning_the_root_ring_with_overwrites_in_one_mount_runs_to_the_end_with_the_checker_green_after_every_step(
 ) {
     let overwrite = HistoryOperation::PublishOverwrite(ContentChoice {
@@ -1038,7 +1087,7 @@ fn turning_the_root_ring_with_overwrites_in_one_mount_runs_to_the_end_with_the_c
 /// 不装那张表时它不回收、记账仍算已分配，checker 在这一步判 I-3.1 红（记账比遍历多 16384 字节）。
 /// 装了表，每一步之后 checker 都跑、都不红：起点与 25 次覆盖写之后各一次。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn turning_the_root_ring_with_overwrites_in_the_make_filesystem_process_runs_to_the_end_with_the_checker_green_after_every_step(
 ) {
     let overwrite = HistoryOperation::PublishOverwrite(ContentChoice {
@@ -1205,7 +1254,7 @@ fn violations_on_the_image(image: &MemoryPool) -> Vec<(&'static str, String)> {
 /// 原来这一条接着抬 F 到 5、拿观察按「已知红」清单归到第 0 条（收口表第 43 行）；第 0 条要「只有 I-3.1 红」，抬 F 之前已经 I-7.4 红，
 /// 抬 F 与归类那一段归不进第 0 条，删掉（`reuse_after_raising_the_floor.rs` 那一条同形、同样改钉）。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_is_red_only_on_i_7_4_before_any_floor_raise_in_the_known_double_fault_form(
 ) {
     let (mut pool, abandoned) =
@@ -1245,7 +1294,7 @@ fn crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnes
 /// （两盘的系统配置槽、根环里读得出的根、录制流步数），胶水把这个成员映射成模型的「回退目标在被抛弃的时间线上」
 /// （随机历史里模型对这一格要求拒的就是这一条）。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn rolling_back_to_a_root_crash_recovery_abandoned_without_a_system_configuration_witness_is_refused_on_the_abandoned_timeline(
 ) {
     let (mut pool, abandoned) = pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version(
@@ -1431,7 +1480,7 @@ fn an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_
 /// 可写挂载、覆盖写、抬 F（到 0）、覆盖写四次、抬 F 到 6（回收 18 个落点）、再可写挂载——最后这次挂载的写行与暖机复用改写了已回收的记录。
 /// 今天的代码上这段跑完；最后一步的挂载逐次比了两次带文件的发布、复用改写 14 条。形态 a / b 下最后一步是执行器判出的失败，本用例红。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked(
 ) {
     let empty = ContentChoice {
@@ -1486,7 +1535,7 @@ fn row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_
 
 /// 同一个种子跑两次，每一步的结局、收尾、计数逐项相同，每一步之后的整份镜像逐字节相同（随机源手写、写入时间是参数）。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice() {
     let history = generate_history(HistorySeed(7), 24);
     let run_keeping_every_image = || {
@@ -1512,24 +1561,16 @@ fn the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice() {
     assert!(first_images == second_images, "每一步之后的镜像逐字节相同");
 }
 
-/// 代码三方 `research/prompts/m2-final-code-r3-main-verification.md` 第三节「越格线索」的两个种子（攻方
+/// 代码三方 `research/prompts/m2-final-code-r3-main-verification.md` 第三节「越格线索」那两段历史（攻方
 /// `research/prompts/m2-final-code-r3-opus-model/rerun.sh` 里 `z13_one_seed` 那一格：比重 `REUSE_AFTER_RAISING_THE_FLOOR`、60 步、
-/// 两块单元区 240 槽的小盘、每一步之后跑池级 checker），空间准入关掉（判着准入时这几块小盘上式子先拒，走不到抬 F 那一串撞墙）。
-/// 旧形态（挂载时回退）下两段历史都在一次回退之后把 F 抬进回退留下的空档：种子 4000000045 第 27 步抬到 7，种子 4000000204 第 31 步
-/// 抬到 20。回退改成挂着时的一次向前发布之后，比重表里「关着时回退」并进了可写挂载，同一个种子生成的历史跟着变了，没有空档；
-/// 种子 4000000045 抬 F 那一步照样在同一步、第二次照样取不到落点。种子 4000000204 在合入后验证二（代码三方第二轮改法 A、B 合入之后）的底座上
-/// 第 31 步的抬 F 做成了（三次空发布都发出去、新 F 20），走不到这一形；换成改法 B 草稿探针在种子 4000000000–399 上（不带 checker）扫出、
-/// 带 checker 跑过的种子 4000000001 第 30 步（同是三次里的第二次取不到；`research/prompts/m2-impl-r2-fixes-b-implementer-report.md` 第三节 5e）。
-/// 这一串要推 `publishes_in_the_sequence` 次空发布（两个种子那一步都是三次；种子 4000000045 旧形态下是两次）。
-/// 改之前逐次发：第一次（带新 F 的根）已经落盘、第二次才被拒，那条落了盘的新 F 让 checker 在那一步判 I-3.1 红、记账比遍历多
-/// 8 × 16384（收口表第 43 行那一形，但这一步不是做成的抬 F，已知红清单不接，判成新发现，历史停在那一步）；
-/// 扣住的槽也留在进程里（C546（抬 F 被拒时扣住的槽不退回） 第二次起那一半）。
-/// 今天这一串在任何写之前整串预演，第二次取不到落点就一次都不发：那一步报 `RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite`、
-/// 盘上一个字节都没动（录制流不多一步，那一步不跑 checker），60 步跑完、每一步之后池级 checker 判绿、模型逐步对得上。
-fn the_raise_refused_part_way_by_the_rehearsal_writes_nothing_and_the_history_runs_to_the_end(
+/// 两块单元区 240 槽的小盘、每一步之后跑池级 checker），空间准入关掉：在 `step_of_the_raise` 那一步抬 F，结局是 `raise_outcome`，
+/// 60 步跑完、每一步之后池级 checker 判绿、模型逐步对得上。那两段原先钉的是「抬 F 那一串的第二次在预演里取不到落点、一次都不发」
+/// （C546 第二次起那一半）；小盘为环窗口补足之后（用户 2026-10-02 定「甲」）单元区宽了，那一步的抬 F 做成了。用户 2026-10-03 定案
+/// （Q-T「乙 照现值改钉并改名」）：种子与几何都不动，钉今天的结局；预演里取不到落点那一形只靠写死的那 5 条用例罩着。
+fn the_floor_raise_on_narrow_devices_with_the_admission_skipped_has_its_outcome_and_the_history_runs_to_the_end(
     seed: u64,
     step_of_the_raise: usize,
-    publishes_in_the_sequence: usize,
+    raise_outcome: &StepOutcome,
 ) {
     let history = generate_history_with_weights(
         HistorySeed(seed),
@@ -1555,12 +1596,8 @@ fn the_raise_refused_part_way_by_the_rehearsal_writes_nothing_and_the_history_ru
     );
     assert_eq!(
         run.outcomes.get(step_of_the_raise),
-        Some(&StepOutcome::Refused {
-            member: format!(
-                "MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of {publishes_in_the_sequence}, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice))"
-            ),
-        }),
-        "种子 {seed} 第 {step_of_the_raise} 步：这一串的第二次在预演里取不到落点，一次都不发（历史停在：{:?}）",
+        Some(raise_outcome),
+        "种子 {seed} 第 {step_of_the_raise} 步的抬 F（历史停在：{:?}）",
         run.ending
     );
     assert_eq!(
@@ -1571,102 +1608,73 @@ fn the_raise_refused_part_way_by_the_rehearsal_writes_nothing_and_the_history_ru
     assert_eq!(run.outcomes.len(), 60);
 }
 
+/// 种子 4000000045 第 27 步：F 抬到 19，三次空发布，回收 135 个落点。
+/// 判别力：抬 F 生效之后不回收时回收数是 0；上限少算一档时新 F 不是 19。
 #[test]
-fn seed_4000000045_raising_the_floor_on_narrow_devices_is_refused_before_any_write_instead_of_leaving_the_new_floor_on_one_device(
+fn seed_4000000045_on_240_slot_devices_with_the_admission_skipped_raises_the_floor_to_19_reclaiming_135_placements(
 ) {
-    the_raise_refused_part_way_by_the_rehearsal_writes_nothing_and_the_history_runs_to_the_end(
+    the_floor_raise_on_narrow_devices_with_the_admission_skipped_has_its_outcome_and_the_history_runs_to_the_end(
         4_000_000_045,
         27,
-        3,
+        &StepOutcome::Applied(AppliedEffect::RaisedFloor {
+            new_floor: CheckpointTxg(19),
+            publishes: 3,
+            reclaimed_placements: 135,
+            reuse: RecordReuse::default(),
+        }),
     );
 }
 
+/// 种子 4000000001 第 30 步：F 抬到 7，两次空发布，一个落点都没回收。
+/// 判别力：上限少算一档时新 F 不是 7。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
-fn seed_4000000001_raising_the_floor_on_narrow_devices_is_refused_before_any_write_instead_of_leaving_the_new_floor_on_one_device(
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+fn seed_4000000001_on_240_slot_devices_with_the_admission_skipped_raises_the_floor_to_7_in_two_publishes(
 ) {
-    the_raise_refused_part_way_by_the_rehearsal_writes_nothing_and_the_history_runs_to_the_end(
+    the_floor_raise_on_narrow_devices_with_the_admission_skipped_has_its_outcome_and_the_history_runs_to_the_end(
         4_000_000_001,
         30,
-        3,
+        &StepOutcome::Applied(AppliedEffect::RaisedFloor {
+            new_floor: CheckpointTxg(7),
+            publishes: 2,
+            reclaimed_placements: 0,
+            reuse: RecordReuse::default(),
+        }),
     );
 }
 
-/// 大档与收缩用的跑法：checker（`SINGLEFS_RANDOM_HISTORY_CHECKER`：`run` / `skip`，默认 `run`）与盘宽
-/// （`SINGLEFS_RANDOM_HISTORY_DEVICES`：`4gib` / `small`，默认 `4gib`）从环境变量取——门禁里那几段的跑法都能在大档上换种子重跑。
-fn execution_from_the_environment() -> HistoryExecution {
-    let per_step_checker = match std::env::var("SINGLEFS_RANDOM_HISTORY_CHECKER").as_deref() {
-        Err(std::env::VarError::NotPresent) | Ok("run") => PerStepChecker::Run,
-        Ok("skip") => PerStepChecker::Skipped,
-        Ok(other) => panic!("SINGLEFS_RANDOM_HISTORY_CHECKER={other}：只认 run 与 skip"),
-        Err(std::env::VarError::NotUnicode(raw)) => {
-            panic!("SINGLEFS_RANDOM_HISTORY_CHECKER 不是 UTF-8：{raw:?}")
-        }
-    };
-    let device_width = match std::env::var("SINGLEFS_RANDOM_HISTORY_DEVICES").as_deref() {
-        Err(std::env::VarError::NotPresent) | Ok("4gib") => HistoryDeviceWidth::FourGibibytes,
-        Ok("small") => HistoryDeviceWidth::UnitAreaOf384Slots,
-        Ok(other) => panic!("SINGLEFS_RANDOM_HISTORY_DEVICES={other}：只认 4gib 与 small"),
-        Err(std::env::VarError::NotUnicode(raw)) => {
-            panic!("SINGLEFS_RANDOM_HISTORY_DEVICES 不是 UTF-8：{raw:?}")
-        }
-    };
-    HistoryExecution {
-        per_step_checker,
-        device_width,
-        space_admission: SpaceAdmission::JudgedByTheFormula,
-    }
-}
-
-/// 大档：种子数、每段步数、第一个种子、线程数、比重（`broad` / `reuse` / `rollback` / `wall` / `unit-area-wall`）、跑法
-/// （`execution_from_the_environment`）、收不收缩（`every` / `none`）从环境变量取；
+/// 大档：种子数、第一个种子、线程数、收不收缩（`every` / `none`）从环境变量取；每段步数、比重、跑法（checker、盘宽、空间准入）
+/// 经 `HistorySampling::from_environment` 读，变量名与判红时打的复现行同一张表（`SINGLEFS_RANDOM_HISTORY_OPERATIONS`、`_WEIGHTS`、
+/// `_CHECKER`、`_DEVICES`、`_SPACE_ADMISSION`），没设的取 `LARGE_TIER_DEFAULT_SAMPLING`；
 /// 种子基没给就用这个测试周期写死的那一个，跟上面五段同基（给了什么就跑什么）。
 #[test]
-#[ignore = "大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起（没给就用这个测试周期写死的种子基），SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS，checker SINGLEFS_RANDOM_HISTORY_CHECKER，盘宽 SINGLEFS_RANDOM_HISTORY_DEVICES，收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑"]
+#[ignore = "大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起（没给就用这个测试周期写死的种子基），SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS（broad、reuse、rollback、wall、unit-area-wall），checker SINGLEFS_RANDOM_HISTORY_CHECKER（run、skip），盘宽 SINGLEFS_RANDOM_HISTORY_DEVICES（4gib、unit-area-384、unit-area-256、unit-area-240），空间准入 SINGLEFS_RANDOM_HISTORY_SPACE_ADMISSION（judged、skipped），收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑"]
 fn random_histories_large_tier_seeds_and_length_from_the_environment() {
     let first_seed = number_from_environment(
         "SINGLEFS_RANDOM_HISTORY_FIRST_SEED",
         SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
     );
-    let seed_count = number_from_environment("SINGLEFS_RANDOM_HISTORY_SEEDS", 1000);
-    let operations_per_history = usize::try_from(number_from_environment(
-        "SINGLEFS_RANDOM_HISTORY_OPERATIONS",
-        60,
-    ))
-    .expect("步数装得进 usize");
-    let worker_threads = usize::try_from(number_from_environment(
-        "SINGLEFS_RANDOM_HISTORY_THREADS",
-        u64::try_from(std::thread::available_parallelism().map_or(1, usize::from)).expect("线程数"),
-    ))
-    .expect("线程数装得进 usize");
-    let weights = match std::env::var("SINGLEFS_RANDOM_HISTORY_WEIGHTS").as_deref() {
-        Err(std::env::VarError::NotPresent) | Ok("broad") => GenerationWeights::BROAD,
-        Ok("reuse") => GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR,
-        Ok("rollback") => GenerationWeights::ROLLBACK_AFTER_RAISING_THE_FLOOR,
-        Ok("wall") => GenerationWeights::TOWARD_THE_ALLOCATION_RECORD_WALL,
-        Ok("unit-area-wall") => GenerationWeights::TOWARD_THE_UNIT_AREA_WALL,
-        Ok(other) => panic!(
-            "SINGLEFS_RANDOM_HISTORY_WEIGHTS={other}：只认 broad、reuse、rollback、wall 与 unit-area-wall"
-        ),
-        Err(std::env::VarError::NotUnicode(raw)) => {
-            panic!("SINGLEFS_RANDOM_HISTORY_WEIGHTS 不是 UTF-8：{raw:?}")
-        }
-    };
-    let shrinking = match std::env::var("SINGLEFS_RANDOM_HISTORY_SHRINK").as_deref() {
-        Err(std::env::VarError::NotPresent) | Ok("every") => FindingShrinking::EveryFindingClass,
-        Ok("none") => FindingShrinking::ReportSeedsOnly,
-        Ok(other) => panic!("SINGLEFS_RANDOM_HISTORY_SHRINK={other}：只认 every 与 none"),
-        Err(std::env::VarError::NotUnicode(raw)) => {
-            panic!("SINGLEFS_RANDOM_HISTORY_SHRINK 不是 UTF-8：{raw:?}")
-        }
+    let seed_count = count_from_environment("SINGLEFS_RANDOM_HISTORY_SEEDS", 1000);
+    let worker_threads = worker_threads_from_environment();
+    let sampling = HistorySampling::from_environment(
+        RANDOM_HISTORY_VARIABLE_PREFIX,
+        &process_environment_variable,
+        &LARGE_TIER_DEFAULT_SAMPLING,
+    )
+    .unwrap_or_else(|error| panic!("{}", error.render()));
+    let shrinking = match process_environment_variable("SINGLEFS_RANDOM_HISTORY_SHRINK").as_deref()
+    {
+        None | Some("every") => FindingShrinking::EveryFindingClass,
+        Some("none") => FindingShrinking::ReportSeedsOnly,
+        Some(other) => panic!("SINGLEFS_RANDOM_HISTORY_SHRINK={other}：只认 every 与 none"),
     };
     let started = std::time::Instant::now();
     let report = run_history_campaign(
         first_seed,
         seed_count,
-        operations_per_history,
-        &weights,
-        execution_from_the_environment(),
+        sampling.operations_per_history,
+        &sampling.weights,
+        sampling.execution,
         worker_threads,
         shrinking,
     );
@@ -1691,58 +1699,458 @@ fn random_histories_large_tier_seeds_and_length_from_the_environment() {
     );
 }
 
-/// 收缩一个种子：快档只报种子，拿这条把它收到最短复现（`SINGLEFS_RANDOM_HISTORY_SHRINK_SEED`，步数默认同快档）。
+/// 「收缩一个种子」那条入口读环境、生成要复现的那段历史：种子（`SINGLEFS_RANDOM_HISTORY_SHRINK_SEED`）必给，
+/// 取样参数经 `random_history_to_reproduce_from_environment` 读（变量与判红时打的复现行同一张表），没设的取快档的。
+/// 入口与「复现行喂回入口」那几条自证都经这一个函数：自证红了，就是照抄复现行跑入口跑不出原来那一段。
+fn history_to_reproduce_from(
+    lookup: &dyn Fn(&str) -> Option<String>,
+) -> (GeneratedHistory, HistorySampling) {
+    let (seed, sampling) =
+        random_history_to_reproduce_from_environment(lookup, &FAST_TIER_SAMPLING)
+            .unwrap_or_else(|error| panic!("{}", error.render()));
+    (sampling.generate(seed), sampling)
+}
+
+/// 收缩一个种子：快档与各取样点只报种子，判红时打的复现行（`random_history_reproduction_line`，带种子、步数、比重、checker、盘宽、空间准入）
+/// 照抄过来跑这一条，生成的历史与跑法与判红那一段逐项相同，再把它收到最短复现。
 #[test]
-#[ignore = "收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核"]
+#[ignore = "收缩一个种子：照判红时打的「复现：」那一行设环境变量；SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，其余没设的取快档的（30 步、broad、run、4gib、judged），SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核"]
 fn shrink_one_failing_seed_from_the_environment() {
-    let seed = HistorySeed(
-        std::env::var("SINGLEFS_RANDOM_HISTORY_SHRINK_SEED")
-            .expect("要给 SINGLEFS_RANDOM_HISTORY_SHRINK_SEED")
-            .parse()
-            .expect("SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 是一个非负整数"),
-    );
-    let operations_per_history = usize::try_from(number_from_environment(
-        "SINGLEFS_RANDOM_HISTORY_OPERATIONS",
-        u64::try_from(FAST_TIER_OPERATIONS_PER_HISTORY).expect("步数"),
-    ))
-    .expect("步数装得进 usize");
-    let worker_threads = usize::try_from(number_from_environment(
-        "SINGLEFS_RANDOM_HISTORY_THREADS",
-        u64::try_from(std::thread::available_parallelism().map_or(1, usize::from)).expect("线程数"),
-    ))
-    .expect("线程数装得进 usize");
-    let history = generate_history(seed, operations_per_history);
+    let (history, sampling) = history_to_reproduce_from(&process_environment_variable);
+    let worker_threads = worker_threads_from_environment();
     let HistoryEnding::NewFinding {
         signature,
         observation,
-    } = execute_history(&history).ending
+    } = execute_history_with(
+        &history,
+        sampling.execution,
+        &SharedStream::new(),
+        &mut |_| {},
+    )
+    .ending
     else {
         panic!(
-            "种子 {} 的 {operations_per_history} 步没有撞到新发现",
-            seed.0
+            "种子 {} 的 {} 步（比重 {}；{}）没有撞到新发现",
+            history.seed.0,
+            sampling.operations_per_history,
+            sampling.weights.environment_value(),
+            sampling.execution.name()
         );
     };
-    let shrunk = shrink_to_reproduction(
-        &history,
-        &signature,
-        HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
-        worker_threads,
-    );
+    let shrunk = shrink_to_reproduction(&history, &signature, sampling.execution, worker_threads);
     print_uncaptured(
         &NewFindingReport {
             signature,
-            first_seed: seed,
+            first_seed: history.seed,
             observation,
-            seeds: vec![seed],
+            seeds: vec![history.seed],
             shrunk: Some(shrunk),
+            sampling,
         }
         .render(),
     );
 }
 
+/// 判红时对一段取样会打的那一行复现命令（`NewFindingReport::render` 里「复现：」那一行；造一个假发现，不必真红），
+/// 原样喂回复现入口（`history_to_reproduce_from`，「收缩一个种子」那条用的同一个函数）：生成的历史逐步与原趟相同，跑法也相同。
+/// 种子取种子基之后第 5 个（取样区间里任一个都行，只要不是 0）。
+fn the_reproduction_line_printed_for_a_finding_regenerates_the_same_history_and_execution(
+    sampling: HistorySampling,
+) {
+    let seed = HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE + 5);
+    let original = sampling.generate(seed);
+    let rendered = NewFindingReport {
+        signature: FailureSignature::HarnessJudgement {
+            judgement: "自证用的假发现",
+        },
+        first_seed: seed,
+        observation: FailureObservation {
+            position: StepPosition::Operation(3),
+            operation_kind: Some(original.operations[3].kind()),
+            violations: Vec::new(),
+            panic: None,
+            newest_ring_root_txg: None,
+            root_ring_slot_count: None,
+            harness_judgement: None,
+            model_disagreement: None,
+            raised_floor_lands_only_on_abandoned_roots: None,
+            record_check: RecordCheck::default(),
+        },
+        seeds: vec![seed],
+        shrunk: None,
+        sampling,
+    }
+    .render();
+    let reproduction_lines: Vec<&str> = rendered
+        .lines()
+        .filter(|line| line.contains("SINGLEFS_RANDOM_HISTORY_SHRINK_SEED="))
+        .collect();
+    assert_eq!(
+        reproduction_lines.len(),
+        1,
+        "判红的报告里恰好一行复现命令：\n{rendered}"
+    );
+    let assignments = environment_assignments_in_line(reproduction_lines[0]);
+    let (reproduced, reproduced_sampling) =
+        history_to_reproduce_from(&|variable: &str| assignments.get(variable).cloned());
+    assert_eq!(
+        reproduced.starting_point, original.starting_point,
+        "复现出来的起点不同；复现行：{}",
+        reproduction_lines[0]
+    );
+    let first_differing_step = original
+        .operations
+        .iter()
+        .zip(&reproduced.operations)
+        .position(|(original_step, reproduced_step)| original_step != reproduced_step);
+    assert_eq!(
+        (first_differing_step, reproduced.operations.len()),
+        (None, original.operations.len()),
+        "复现出来的历史与原趟逐步比：第一个不同的步、步数；复现行：{}",
+        reproduction_lines[0]
+    );
+    assert_eq!(reproduced, original);
+    assert_eq!(
+        reproduced_sampling.execution, sampling.execution,
+        "复现出来的跑法（checker、盘宽、空间准入）不同；复现行：{}",
+        reproduction_lines[0]
+    );
+    assert_eq!(reproduced_sampling, sampling);
+}
+
+#[test]
+fn reproduction_line_of_the_fast_tier_regenerates_the_same_history_and_execution() {
+    the_reproduction_line_printed_for_a_finding_regenerates_the_same_history_and_execution(
+        FAST_TIER_SAMPLING,
+    );
+}
+
+#[test]
+fn reproduction_line_of_the_reuse_sampling_regenerates_the_same_history_and_execution() {
+    the_reproduction_line_printed_for_a_finding_regenerates_the_same_history_and_execution(
+        REUSE_SAMPLING,
+    );
+}
+
+#[test]
+fn reproduction_line_of_the_rollback_sampling_regenerates_the_same_history_and_execution() {
+    the_reproduction_line_printed_for_a_finding_regenerates_the_same_history_and_execution(
+        ROLLBACK_SAMPLING,
+    );
+}
+
+#[test]
+fn reproduction_line_of_the_allocation_record_wall_sampling_regenerates_the_same_history_and_execution(
+) {
+    the_reproduction_line_printed_for_a_finding_regenerates_the_same_history_and_execution(
+        WALL_SAMPLING,
+    );
+}
+
+#[test]
+fn reproduction_line_of_the_unit_area_wall_sampling_with_the_space_admission_skipped_regenerates_the_same_history_and_execution(
+) {
+    the_reproduction_line_printed_for_a_finding_regenerates_the_same_history_and_execution(
+        UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_SKIPPED,
+    );
+}
+
+#[test]
+fn reproduction_line_of_the_unit_area_wall_sampling_with_the_space_admission_judged_regenerates_the_same_history_and_execution(
+) {
+    the_reproduction_line_printed_for_a_finding_regenerates_the_same_history_and_execution(
+        UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_JUDGED,
+    );
+}
+
+/// 数值变量的值（`None` 是没设）：没设取 `default`；设了而不是非负整数就 panic、消息带变量名与原值
+/// （经数值环境变量共用的那一份解析，写错的规模不悄悄退回默认）。
+///
+/// # Panics
+/// 设了而不是非负整数。
+fn number_from_the_value_or_default(name: &str, value: Option<&str>, default: u64) -> u64 {
+    number_from_the_variable_value_panicking_when_unreadable::<u64>(name, value).unwrap_or(default)
+}
+
+/// 进程环境里的数值变量，判法同 [`number_from_the_value_or_default`]。
+///
+/// # Panics
+/// 设了而不是非负整数，或值不是 UTF-8。
 fn number_from_environment(name: &str, default: u64) -> u64 {
-    std::env::var(name).map_or(default, |text| {
-        text.parse()
-            .unwrap_or_else(|error| panic!("{name}={text} 不是一个非负整数：{error}"))
-    })
+    number_from_the_value_or_default(name, process_environment_variable(name).as_deref(), default)
+}
+
+/// 「跑几个」的计数变量的值（`None` 是没设，种子数这一类）：没设取 `default`；设了而不是正整数（0 也算）就 panic、消息带变量名与原值。
+/// 0 段的一批没有「已知红」清单外的失败，只是因为一段都没跑，照样判成绿（上游 `show-me-test.md`「扫到 0 项也不是通过」）。
+///
+/// # Panics
+/// 设了而不是正整数。
+fn count_from_the_value_or_default(name: &str, value: Option<&str>, default: u64) -> u64 {
+    number_from_the_variable_value_panicking_when_unreadable::<std::num::NonZeroU64>(name, value)
+        .map_or(default, std::num::NonZeroU64::get)
+}
+
+/// 进程环境里的计数变量，判法同 [`count_from_the_value_or_default`]。
+///
+/// # Panics
+/// 设了而不是正整数，或值不是 UTF-8。
+fn count_from_environment(name: &str, default: u64) -> u64 {
+    count_from_the_value_or_default(name, process_environment_variable(name).as_deref(), default)
+}
+
+const WORKER_THREADS_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_RANDOM_HISTORY_THREADS";
+
+/// 线程数变量的值（`None` 是没设）：没设取本机可用并行度（取不到是 1）；设了而不是正整数（0 也算）就 panic、消息带变量名与原值，
+/// 与仓里别的线程数变量同一口径（经数值环境变量共用的那一份解析，取 `NonZeroUsize`）。
+///
+/// # Panics
+/// 设了而不是正整数。
+fn worker_threads_from_the_value(value: Option<&str>) -> usize {
+    number_from_the_variable_value_panicking_when_unreadable::<std::num::NonZeroUsize>(
+        WORKER_THREADS_ENVIRONMENT_VARIABLE,
+        value,
+    )
+    .unwrap_or_else(|| std::thread::available_parallelism().unwrap_or(std::num::NonZeroUsize::MIN))
+    .get()
+}
+
+/// 进程环境里的线程数变量，判法同 [`worker_threads_from_the_value`]。
+///
+/// # Panics
+/// 设了而不是正整数，或值不是 UTF-8。
+fn worker_threads_from_environment() -> usize {
+    worker_threads_from_the_value(
+        process_environment_variable(WORKER_THREADS_ENVIRONMENT_VARIABLE).as_deref(),
+    )
+}
+
+#[test]
+#[should_panic(expected = "SINGLEFS_RANDOM_HISTORY_SEEDS=\"ten\" 认不出")]
+fn an_unreadable_random_history_seed_count_panics_naming_the_variable_and_the_value() {
+    let _seed_count =
+        count_from_the_value_or_default("SINGLEFS_RANDOM_HISTORY_SEEDS", Some("ten"), 1000);
+}
+
+#[test]
+#[should_panic(expected = "SINGLEFS_RANDOM_HISTORY_FIRST_SEED=\"ten\" 认不出")]
+fn an_unreadable_random_history_first_seed_panics_naming_the_variable_and_the_value() {
+    let _first_seed =
+        number_from_the_value_or_default("SINGLEFS_RANDOM_HISTORY_FIRST_SEED", Some("ten"), 7);
+}
+
+#[test]
+#[should_panic(expected = "SINGLEFS_RANDOM_HISTORY_SEEDS=\"0\" 认不出")]
+fn a_random_history_seed_count_of_zero_panics_naming_the_variable_and_the_value() {
+    let _seed_count =
+        count_from_the_value_or_default("SINGLEFS_RANDOM_HISTORY_SEEDS", Some("0"), 1000);
+}
+
+#[test]
+#[should_panic(expected = "SINGLEFS_RANDOM_HISTORY_THREADS=\"0\" 认不出")]
+fn a_random_history_worker_thread_count_of_zero_panics_naming_the_variable_and_the_value() {
+    let _threads = worker_threads_from_the_value(Some("0"));
+}
+
+/// 删除多于一片下段叶的文件那一格（代码轮 U13）的取样点：种子区间与每段步数，写死。
+const DELETION_SAMPLING_FIRST_SEED: u64 = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
+const DELETION_SAMPLING_SEEDS: u64 = 48;
+
+const DELETION_SAMPLING: HistorySampling = HistorySampling {
+    operations_per_history: 30,
+    weights: GenerationWeights::DELETING_FILES_OF_SEVERAL_LOWER_LEAVES,
+    execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+};
+
+/// 删除多于一片下段叶的文件那一格（代码轮第一轮判决 U13：模型罩多个数据单元的文件、随机历史里出现 ≥ 2 片下段叶的删除批；
+/// 第二轮判决第二节 N3「走空多步」）：比重取 `GenerationWeights::DELETING_FILES_OF_SEVERAL_LOWER_LEAVES`，种子与步数见常量。
+/// 覆盖写的内容另抽跨几个单元的、经会话的顺序写发（多半两片下段叶），unlink 之后建 inode、多回退到第四新的根（意图那一版或第一个删除批那一版）、
+/// 再建 inode、覆盖写或 unlink：会话先把队列走空。先判没有新发现，再核这一格真的跑到了：两片下段叶的文件发成过、模型比过不是最后一批的删除批的段数
+/// 与会话改动之前先走空走了至少两步的段数都不为 0（「走空被空间拒」在 4 GiB 的盘上走不到，只打数不判）。
+#[test]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+fn random_histories_deleting_files_of_several_lower_leaves_compare_every_batch_and_the_walks_before_a_change(
+) {
+    let started = std::time::Instant::now();
+    let report = run_history_campaign(
+        DELETION_SAMPLING_FIRST_SEED,
+        DELETION_SAMPLING_SEEDS,
+        DELETION_SAMPLING.operations_per_history,
+        &DELETION_SAMPLING.weights,
+        DELETION_SAMPLING.execution,
+        worker_threads_by_default(),
+        FindingShrinking::ReportSeedsOnly,
+    );
+    let rendered = report.render();
+    print_uncaptured(&format!(
+        "── 随机历史：偏向删除多于一片下段叶的文件的取样点 ──\n{rendered}用时 {:.1} 秒\n",
+        started.elapsed().as_secs_f64()
+    ));
+    assert!(
+        report.new_findings.is_empty(),
+        "「已知红」清单外的失败：\n{rendered}"
+    );
+    let two_lower_leaves = ContentLength::SpanningDataUnitsThroughTheSequentialWrite {
+        data_units: 147,
+        selector: 0,
+    };
+    assert!(
+        report
+            .tally
+            .content_lengths_published
+            .get(two_lower_leaves.name())
+            .copied()
+            .unwrap_or(0)
+            >= 1,
+        "两片下段叶的文件一次都没经顺序写发成：\n{rendered}"
+    );
+    assert!(
+        report
+            .tally
+            .histories_with_a_deletion_batch_keeping_data_units
+            >= 1,
+        "没有一段历史里模型比过不是最后一批的删除批（≥ 2 片下段叶）：\n{rendered}"
+    );
+    assert!(
+        report
+            .tally
+            .histories_with_a_walk_of_several_steps_before_a_user_change
+            >= 1,
+        "没有一段历史里会话改动之前先走空走了至少两步：\n{rendered}"
+    );
+}
+
+/// 两片下段叶的文件（150 个数据单元，`UserChange::SequentialWrite` 写的）经会话 unlink：意图那次、一个不是最后一批的删除批
+/// （释放尾部 144 个，留 6 个）、最后一批，三版逐版交模型比（代码轮 U13）。判别力：模型把文件当一个数据单元（意图之后的下一步就是最后一批）时，
+/// 第一个删除批交回的这一版还带着数据单元、inode 叶与 `deleted_inodes` 根，模型那一版已经没有这几个角色，判「单元的分配代」对不上。
+#[test]
+fn deleting_a_file_of_two_lower_leaves_publishes_a_batch_keeping_data_units_that_the_model_compares(
+) {
+    let history = GeneratedHistory {
+        seed: HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations: vec![
+            HistoryOperation::PublishOverwrite(ContentChoice {
+                length: ContentLength::SpanningDataUnitsThroughTheSequentialWrite {
+                    data_units: 150,
+                    selector: 7,
+                },
+                fill_seed: 11,
+            }),
+            HistoryOperation::Unlink,
+        ],
+    };
+    let run = execute_history(&history);
+    assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
+    assert!(
+        run.outcomes
+            .iter()
+            .all(|outcome| matches!(outcome, StepOutcome::Applied(_))),
+        "顺序写与 unlink 都做成：{:?}",
+        run.outcomes
+    );
+    let counts = &run.tally.model_counts;
+    assert_eq!(
+        (
+            counts.deletion_batches_keeping_data_units_matched,
+            run.tally.histories_with_a_deletion_batch_keeping_data_units,
+            counts.file_contents_compared,
+        ),
+        (1, 1, 2),
+        "一个不是最后一批的删除批比过；带文件的两版（起点的第一个文件、150 个单元的那一版）各比过一次整份内容"
+    );
+}
+
+/// 两片下段叶的文件 unlink 之后建一个 inode（删完的那一版没有文件、回退不接，建过 inode 的才接），再回退到 unlink 意图那一版
+/// （第四新的根：建 inode、最后一批、删除批、意图），号回到队列；随后再建一个 inode，会话先走空——一个删除批、最后一批两步——再建 inode，
+/// 三版逐版交模型比（第二轮判决第二节 N3「走空多步」）。判别力：模型把删除中的那一版的下一步一律当最后一批时，走空的第一步交回的这一版
+/// 还带着数据单元，判「单元的分配代」对不上。
+#[test]
+fn deleting_a_file_of_two_lower_leaves_then_rolling_back_to_its_intent_walks_two_steps_before_the_next_change(
+) {
+    let history = GeneratedHistory {
+        seed: HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations: vec![
+            HistoryOperation::PublishOverwrite(ContentChoice {
+                length: ContentLength::SpanningDataUnitsThroughTheSequentialWrite {
+                    data_units: 150,
+                    selector: 7,
+                },
+                fill_seed: 11,
+            }),
+            HistoryOperation::Unlink,
+            HistoryOperation::CreateInode,
+            HistoryOperation::RollBackWhileMounted(RollbackTargetChoice::RingRoot {
+                index_from_newest: 3,
+            }),
+            HistoryOperation::CreateInode,
+        ],
+    };
+    let run = execute_history(&history);
+    assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
+    assert!(
+        matches!(
+            run.outcomes[3],
+            StepOutcome::Applied(AppliedEffect::RolledBack { .. })
+        ),
+        "回退到意图那一版做成：{:?}",
+        run.outcomes[3]
+    );
+    assert!(
+        matches!(run.outcomes[4], StepOutcome::Applied(_)),
+        "走空之后建 inode 做成：{:?}",
+        run.outcomes[4]
+    );
+    let counts = &run.tally.model_counts;
+    assert_eq!(
+        (
+            counts.walks_of_several_steps_before_a_user_change_matched,
+            run.tally
+                .histories_with_a_walk_of_several_steps_before_a_user_change,
+            counts.deletion_batches_keeping_data_units_matched,
+        ),
+        (1, 1, 2),
+        "建 inode 之前走空两步比过一次；不是最后一批的删除批 unlink 里一个、走空里一个"
+    );
+}
+
+/// 跨三片下段叶的文件（292 个单元，`UserChange::SequentialWrite` 写的）：映射条目多于一片叶装的 294 条，实现的中央映射树从中间切开、
+/// 长出根之下的节点（D8（核心索引结构） 已定项 11）；再经会话 unlink：意图那次、两个不是最后一批的删除批（292 → 148 → 4）、最后一批，
+/// 逐版交模型比（U13 慢档取样段在种子 …115 等六段上撞到的那一形）。判别力：胶水把映射树根之下的节点当成模型罩不到的池而 panic 时，
+/// 顺序写那一步就以 panic 收尾。
+#[test]
+fn a_file_of_three_lower_leaves_grows_the_central_mapping_tree_below_its_root_and_the_model_compares_every_version(
+) {
+    let history = GeneratedHistory {
+        seed: HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations: vec![
+            HistoryOperation::PublishOverwrite(ContentChoice {
+                length: ContentLength::SpanningDataUnitsThroughTheSequentialWrite {
+                    data_units: 292,
+                    selector: 7,
+                },
+                fill_seed: 11,
+            }),
+            HistoryOperation::Unlink,
+        ],
+    };
+    let run = execute_history(&history);
+    assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
+    assert!(
+        run.outcomes
+            .iter()
+            .all(|outcome| matches!(outcome, StepOutcome::Applied(_))),
+        "顺序写与 unlink 都做成：{:?}",
+        run.outcomes
+    );
+    let counts = &run.tally.model_counts;
+    assert_eq!(
+        (
+            counts.deletion_batches_keeping_data_units_matched,
+            counts.file_contents_compared,
+        ),
+        (2, 2),
+        "两个不是最后一批的删除批比过；带文件的两版（起点的第一个文件、292 个单元的那一版）各比过一次整份内容"
+    );
 }

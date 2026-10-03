@@ -12,7 +12,7 @@ mod common_corrupted_allocation_record;
 
 use common::{
     abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before, build_pool, disk_snapshot,
-    file_content, parameters, BuiltPool, Recorded, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
+    file_content, geometry, parameters, BuiltPool, Recorded, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
 };
 use common_corrupted_allocation_record::move_the_first_allocation_record_past_the_end_of_the_unit_area_and_reseal_the_chain;
 use singlefs_checker::image::InvariantVerdict;
@@ -54,7 +54,9 @@ use singlefs_harness::fault_injection::{
     injected_block_device_error, NamedRootRingSlots, PoolReaderWithUnreadableRootRingSlots,
     RootRingSlotTarget,
 };
-use singlefs_harness::memory_pool::MemoryPool;
+use singlefs_harness::memory_pool::{writes_and_segments, MemoryPool};
+use singlefs_harness::segments::{segment_kinds_text, segment_sizes_text, split_into_segments};
+use singlefs_harness::{RecordedOperation, RecordedOperationKind};
 use std::collections::BTreeSet;
 
 const SECOND_FILE_BYTES: usize = 4100;
@@ -322,7 +324,7 @@ fn record_of(
 /// A 的四个在 C 的账里已释放的逐盘改回已分配（分配代 3）；水位照 C 的；系统配置的实例代号仍是 2；冷启动择 D 读回第一次的内容；
 /// checker 全绿，I-3.1、I-3.9、I-3.11 真被判过。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn rolling_back_to_the_first_version_while_mounted_publishes_one_root_carrying_its_state_and_cold_start_reads_the_first_content(
 ) {
     let ThroughTheThirdPublish {
@@ -456,11 +458,73 @@ fn rolling_back_to_the_first_version_while_mounted_publishes_one_root_carrying_i
     );
 }
 
+/// 回退那次发布 D「每段写几个」（`layout/01-first-txn.md` 八节「实例切换 / 管理员回退」那一行，原来没有用例钉）：
+/// 从录制流上截回退那次发布（回退调用之前流里有几步，到调用返回），按层 0 同一条切段规则切（`split_into_segments`，屏障按设备记）。
+/// D 孤立看是 [24 个单元写] 屏障 [两份记录] 屏障 [根 FUA] [两份系统配置槽] 屏障：重写 12 个单元、两块盘各一份，共 29 次写。
+/// 整条流（mkfs 之后）到 D 为止 36 段，与 checker 档固定脚本那条流 `RollbackToFirstVersion` 那一臂钉的段数相同：
+/// C 的两份系统配置槽写过了发布末尾那道屏障、自成一段，D 的单元写不与它并段。
+/// 不跑 checker 与冷启动，debug 下单跑几秒，是轻用例。
+#[test]
+fn rolling_back_to_the_first_version_writes_its_units_in_one_segment_before_the_records_the_root_and_the_system_configuration(
+) {
+    let ThroughTheThirdPublish { mut pool, .. } =
+        build_through_third_publish("rollback-publish-segments");
+    let operations_before_the_rollback = pool.stream.operation_count();
+    roll_back(&mut pool, first_root()).expect("回退到 A");
+    let rollback_version = pool.output.clone();
+    let operations_of_the_rollback: Vec<RecordedOperation> =
+        pool.stream.operations()[operations_before_the_rollback..].to_vec();
+    let segments_of_the_rollback = split_into_segments(&operations_of_the_rollback, &geometry());
+    let writes_of_the_rollback = operations_of_the_rollback
+        .iter()
+        .filter(|operation| match operation.kind {
+            RecordedOperationKind::Write
+            | RecordedOperationKind::WriteForceUnitAccess
+            | RecordedOperationKind::WriteZeroes => true,
+            RecordedOperationKind::Barrier => false,
+        })
+        .count();
+    let retained = pool.retained_operations();
+    let (writes_after_mkfs, segments_after_mkfs) =
+        writes_and_segments(&retained[pool.mkfs_operation_count..], &geometry());
+    let segment_lengths_after_mkfs: Vec<usize> = segments_after_mkfs.iter().map(Vec::len).collect();
+    assert_eq!(
+        segment_sizes_text(&segments_of_the_rollback),
+        "24+2+1+2",
+        "D 孤立看的段序列：单元写一段、记录一段、根一段、系统配置一段"
+    );
+    assert_eq!(
+        segment_kinds_text(&segments_of_the_rollback),
+        "[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]",
+        "D 的单元写只有单元写一种，不取号、不写系统配置之外的原地写"
+    );
+    assert_eq!(writes_of_the_rollback, 29, "D 共 29 次写：24 + 2 + 1 + 2");
+    assert_eq!(
+        rollback_version.rewritten.len(),
+        12,
+        "D 重写 12 个单元，每块盘各一份：{:?}",
+        rollback_version.rewritten
+    );
+    assert_eq!(
+        segment_lengths_after_mkfs,
+        vec![
+            2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16, 2, 1,
+            2, 24, 2, 1, 2, 24, 2, 1, 2
+        ],
+        "整条流到 D 为止的段序列：C 的系统配置槽写自成一段、D 的单元写自成一段"
+    );
+    assert_eq!(
+        writes_after_mkfs.len(),
+        166 + 29,
+        "到 C 166 次写、D 29 次写"
+    );
+}
+
 /// 验收「释放与复活」：D 之后接着覆盖写 E，E 换下的是 D 引用的 A 的那几个单元——它们在 D 的账里是仍分配的（复活过），
 /// 发布路径照常释放；checker 全绿。只释放不复活时 D 的账里 A 的单元是已释放的：I-3.11 在 D 上红，E 被释放判定路径拒
 /// （`ReleaseTargetAlreadyReleased`，第一轮判决第二节 F1 里 H3 那一格）——`crates/mutations.tsv` 里拿掉复活那一步的那一行证它。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn after_rolling_back_to_the_first_version_the_next_overwrite_releases_the_resurrected_units_and_every_invariant_holds(
 ) {
     let ThroughTheThirdPublish { mut pool, .. } =
@@ -491,7 +555,7 @@ fn after_rolling_back_to_the_first_version_the_next_overwrite_releases_the_resur
 
 /// 验收「D 之后再回退到 C 的根」：向前发布不抛弃 B、C，D 之后 C (2, 8) 仍是候选；再回退一次（txg 10）读回第三次的内容，checker 全绿。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn after_rolling_back_to_the_first_version_the_third_versions_root_is_still_a_candidate_and_rolling_back_to_it_reads_the_third_content(
 ) {
     let ThroughTheThirdPublish {
@@ -562,7 +626,7 @@ fn remount_with_the_shadow_ledger(pool: &mut BuiltPool, shadow_ledger: ShadowLed
 /// 报各自那一条排除；盘上逐字节不变（系统配置四槽、根环、录制流一步不多），分配器与现行版本不动。txg 低于 F_生效 那一格在
 /// `rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs`（F 只住系统配置时同样拒）。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn rolling_back_to_a_missing_root_an_abandoned_root_or_a_root_without_file_is_refused_before_any_write(
 ) {
     let ThroughTheThirdPublish {
@@ -620,7 +684,7 @@ fn rolling_back_to_a_missing_root_an_abandoned_root_or_a_root_without_file_is_re
 /// 前两格的账按内存里那一份判（判定与之后的复活、释放读同一份），用例把分配器换成少一条、改了分配代的一份来造；
 /// 后几格改盘上的字节。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn refusal_before_any_write_when_current_account_without_the_data_unit_of_the_first_version_leaves_the_disk_the_allocator_and_the_current_version_unchanged(
 ) {
     refusal_before_any_write_leaves_the_disk_the_allocator_and_the_current_version_unchanged(
@@ -629,7 +693,7 @@ fn refusal_before_any_write_when_current_account_without_the_data_unit_of_the_fi
 }
 
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn refusal_before_any_write_when_current_account_allocating_the_data_slot_of_the_first_version_under_another_generation_leaves_the_disk_the_allocator_and_the_current_version_unchanged(
 ) {
     refusal_before_any_write_leaves_the_disk_the_allocator_and_the_current_version_unchanged(
@@ -638,7 +702,7 @@ fn refusal_before_any_write_when_current_account_allocating_the_data_slot_of_the
 }
 
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn refusal_before_any_write_when_allocation_record_tree_root_of_the_first_version_unreadable_leaves_the_disk_the_allocator_and_the_current_version_unchanged(
 ) {
     refusal_before_any_write_leaves_the_disk_the_allocator_and_the_current_version_unchanged(
@@ -647,7 +711,7 @@ fn refusal_before_any_write_when_allocation_record_tree_root_of_the_first_versio
 }
 
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn refusal_before_any_write_when_allocation_record_tree_root_of_the_third_version_unreadable_leaves_the_disk_the_allocator_and_the_current_version_unchanged(
 ) {
     refusal_before_any_write_leaves_the_disk_the_allocator_and_the_current_version_unchanged(
@@ -656,7 +720,7 @@ fn refusal_before_any_write_when_allocation_record_tree_root_of_the_third_versio
 }
 
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn refusal_before_any_write_when_data_unit_of_the_first_version_corrupt_on_device_one_leaves_the_disk_the_allocator_and_the_current_version_unchanged(
 ) {
     refusal_before_any_write_leaves_the_disk_the_allocator_and_the_current_version_unchanged(
@@ -665,7 +729,7 @@ fn refusal_before_any_write_when_data_unit_of_the_first_version_corrupt_on_devic
 }
 
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn refusal_before_any_write_when_tree_identifiers_of_the_current_version_differ_leaves_the_disk_the_allocator_and_the_current_version_unchanged(
 ) {
     refusal_before_any_write_leaves_the_disk_the_allocator_and_the_current_version_unchanged(
@@ -828,7 +892,7 @@ fn refusal_before_any_write_leaves_the_disk_the_allocator_and_the_current_versio
 /// `the_rollback_takes_the_inode_number_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_its_root`
 /// （判候选两遍读得出、算水位那一遍瞬时读不出），`crates/mutations.tsv` 里实三「水位」那一行跟着换靶。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn rolling_back_while_a_root_slot_this_process_wrote_reads_not_self_verified_is_refused_before_any_write(
 ) {
     let mut pool = build_pool("step-four-forward-watermark");
@@ -958,12 +1022,12 @@ fn walk_to_the_file_under_the_abandoned_third_version_root(
     walk_to_file(reader, &abandoned_third_version_root, &mut 0)
 }
 
-/// C314（回退可以复用被抛弃的根引用的单元） 那一格的必红，影子账开关强制进入；被抛弃的根由崩溃恢复造出
+/// C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元） 那一格的必红，影子账开关强制进入；被抛弃的根由崩溃恢复造出
 /// （`abandon_the_third_version_by_a_recovery_that_lands_on_the_second_warm_up`，第一轮判决 H6 那一形）：抛弃 C 的那次挂载看不见 C，
 /// 下一次重开才看得见——影子账关着，重开之后下一版的数据单元落回 C 的数据槽，沿被抛弃的根 C 走到文件读不回第三次的内容；
 /// 开着，只被 C 引用的 14 个槽隔离，第三次的内容原样读回。两臂报的分支名不同。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn without_the_shadow_ledger_a_publish_after_a_recovery_reuses_the_abandoned_data_slot_and_the_abandoned_root_reads_a_torn_unit(
 ) {
     publish_after_a_recovery_that_abandoned_the_third_version(ShadowLedger::Off);
@@ -971,7 +1035,7 @@ fn without_the_shadow_ledger_a_publish_after_a_recovery_reuses_the_abandoned_dat
 
 /// 同一条脚本、影子账开着：只被 C 引用的 14 个槽隔离，下一版的数据单元不落回 C 的数据槽，沿 C 读回第三次的内容。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn with_the_shadow_ledger_a_publish_after_a_recovery_keeps_off_the_abandoned_data_slot_and_the_abandoned_root_reads_the_third_content(
 ) {
     publish_after_a_recovery_that_abandoned_the_third_version(ShadowLedger::On);
@@ -1038,7 +1102,7 @@ fn publish_after_a_recovery_that_abandoned_the_third_version(shadow_ledger: Shad
 /// 影子账只住内存，所以每次挂载都重算：崩溃恢复抛弃 C 之后重开一次（实例 4）、覆盖写一次，再普通重开一次（实例 5），
 /// 被抛弃根 C 引用的槽照样隔离、重开后的发布一个都不落上去。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn the_plain_remount_after_a_recovery_that_abandoned_roots_keeps_the_isolation() {
     let ThroughTheThirdPublish {
         mut pool, third, ..
@@ -1089,7 +1153,7 @@ fn the_plain_remount_after_a_recovery_that_abandoned_roots_keeps_the_isolation()
 /// 计数一条读不出的被抛弃根往上报，C 引用的落点从中央映射现算，只被 C 引用的 14 个槽照样隔离（与 C 读得出时同，见上一条用例；
 /// C393（被抛弃根的账读不出时修复没有条款） 取 (b)-从映射现算，用户 2026-09-28 定）。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn torn_tree_table_of_an_abandoned_root_is_counted_and_does_not_fail_the_mount() {
     let ThroughTheThirdPublish {
         mut pool, third, ..
@@ -1114,7 +1178,7 @@ fn torn_tree_table_of_an_abandoned_root_is_counted_and_does_not_fail_the_mount()
 /// 被抛弃根 C 那棵账最左那片叶的第一条分配记录改成「起点贴着单元区末尾、跨度 32767 槽」，链上校验和逐道重算（panic 面普查 R7）：
 /// 挂载不 panic，C 计成一条读不出的被抛弃根，引用的落点从中央映射现算，只被 C 引用的槽照样隔离。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn an_abandoned_roots_allocation_record_whose_span_runs_past_the_unit_area_is_counted_and_does_not_panic(
 ) {
     let ThroughTheThirdPublish {
@@ -1224,7 +1288,7 @@ fn an_abandoned_roots_allocation_record_whose_span_runs_past_the_unit_area_is_co
 /// 根槽读不出、它那次发布的记录还在：树 ID 水位按记录新根段带的算（C342（树 ID 水位在根读不出时退回去重发） 的载体，
 /// `recovery::highest_tree_identifier_watermark_in_the_ring`）。可写挂载写行那次发布取的就是它。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn with_the_file_version_root_slot_unreadable_the_ring_watermark_still_comes_from_its_journal_record(
 ) {
     let pool = build_pool("step-four-unreadable-file-version-root-watermark");
@@ -1261,15 +1325,15 @@ fn with_the_file_version_root_slot_unreadable_the_ring_watermark_still_comes_fro
             .iter()
             .map(|root| root.tree_identifier_watermark)
             .max(),
-        Some(11),
-        "读得出的根都带 mkfs 种下的 11"
+        Some(65536),
+        "读得出的根都带 mkfs 种下的 65536"
     );
     let records = scan_journal(&unreadable, &system_configuration);
     assert!(
         records
             .values()
-            .any(|record| record.new_tree_identifier_watermark == 19),
-        "(1, 3) 那次发布的记录还在环里，新根段带 19"
+            .any(|record| record.new_tree_identifier_watermark == 65548),
+        "(1, 3) 那次发布的记录还在环里，新根段带 65548（十二棵树 65536..65547 之后）"
     );
     assert_eq!(
         highest_tree_identifier_watermark_in_the_ring(
@@ -1279,8 +1343,8 @@ fn with_the_file_version_root_slot_unreadable_the_ring_watermark_still_comes_fro
             &immutable.filesystem_identifier,
             &records,
         ),
-        Some(19),
-        "根读不出、记录还在：水位按记录带的 19 算，不退回读得出的根带的 11"
+        Some(65548),
+        "根读不出、记录还在：水位按记录带的 65548 算，不退回读得出的根带的 65536"
     );
 }
 
@@ -1467,7 +1531,7 @@ fn roll_back_to_the_oldest_ring_root_with_its_root_slot_write_failing(
 /// 两条路上回退都没有丢，C558 说的「退不回去」这两条路上走不到。checker 在重发之后与崩溃之后重开时全绿；崩在重发之前、
 /// B 的根槽被写坏的两格，恢复之前的镜像上 I-3.1（已分配统计对得上） 红，与普通发布同形（见用例里那一段）。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_refused_before_writing_is_resent_in_process_or_replayed_after_a_crash(
 ) {
     failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_is_resent_in_process_or_replayed_after_a_crash(
@@ -1476,7 +1540,7 @@ fn the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_refused_befo
 }
 
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_the_first_half_is_resent_in_process_or_replayed_after_a_crash(
 ) {
     failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_is_resent_in_process_or_replayed_after_a_crash(
@@ -1485,7 +1549,7 @@ fn the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_t
 }
 
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_zeroed_is_resent_in_process_or_replayed_after_a_crash(
 ) {
     failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_is_resent_in_process_or_replayed_after_a_crash(
@@ -1610,7 +1674,7 @@ fn failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_is_resent_in_pro
 /// 所选根不是最新根的那一形（崩溃恢复落到环里最旧的根、更新的根槽都读不出、它们的记录验不过）这一串会盖掉所选根、回收这一串自己换下的，
 /// `mount.rs` 那段注释说的分叉在那一形上走得到；取号之后被落点拒要池子紧到只剩那一槽合政策，实四乙在空间准入照判的小盘上扫过没扫出来（报告里写范围）。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn writable_mount_on_the_newest_root_cannot_reclaim_what_its_own_chain_released_so_the_rehearsal_without_the_release_read_cannot_diverge(
 ) {
     let (mut pool, _) =
@@ -1768,7 +1832,7 @@ fn writable_mount_on_the_newest_root_cannot_reclaim_what_its_own_chain_released_
 /// D 那一版的账（D 盖掉 B 的槽之后环里最旧的有效根是 5，释放代 5 的已回收）与这个环对得上。恢复（由 D 的记录重建 D）之后重开，全绿。
 /// checker 在这一格上该不该判红、要不要把「根槽写坏、记录已持久没施加」那一版并进来，是 checker 判法的事，交主 agent。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_leaves_the_pre_recovery_image_red_only_by_what_that_root_alone_referenced(
 ) {
     let (mut pool, _) = build_a_full_ring_whose_oldest_root_is_the_second_version(

@@ -1,4 +1,4 @@
-//! 里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 13 行 C394 三问里的 N2（用户 2026-09-24 定，判决 `research/prompts/m2-newq-r1-main-verification.md`
+//! 里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 13 行 C394 三问里的 N2（判决 `research/prompts/m2-newq-r1-main-verification.md`
 //! 第三节 N2；D19（块指针的结构与宽度预算） 已定项 5）：从盘上重建上一版时读不出的数据单元照抄它的位置项、不读内容，挂载照常，
 //! 读到那个文件时才报错。改之前：一个数据单元两份都读不出，可写挂载在 `recovery::rebuild_version` 上报 `UnitUnreadable`，整个池挂不上
 //! （三方攻方腿的原型在 F1 / F2 / F9 三种历史上量到 62 / 120 挂不上）。

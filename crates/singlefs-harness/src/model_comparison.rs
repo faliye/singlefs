@@ -17,12 +17,14 @@ use singlefs_core::instance_table::{
 };
 use singlefs_core::mount::{
     InstanceRow, MountError, Mounted, RollbackCandidateExclusion, RollbackError,
-    StillUnreadableAfterOneReread,
+    StillUnreadableAfterOneReread, Unmounted,
 };
 use singlefs_core::pointer::LocationEntry;
+use singlefs_core::records::NLINK_OF_AN_INODE_BEING_DELETED;
 use singlefs_core::recovery::{RecoveryOutcome, RecoveryReport};
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::root_ring::RootRingSlot;
+use singlefs_core::tombstone_tree::TombstoneContainerIndexInTree;
 use singlefs_core::transaction::{
     AllocationRecordsOfTheVersionWithoutFile, PoolVersion, PublishError, PublishedUnit,
     TransactionOutput, TransactionUnit, VersionWithoutFilePublishOutput,
@@ -54,34 +56,27 @@ pub fn model_root_key(instance: InstanceGeneration, checkpoint_txg: CheckpointTx
     }
 }
 
-/// 实现的一个单元是模型的哪个角色。分配记录树根之下的节点不对应角色（`None`）：D8（核心索引结构） 已定项 14 按绝对槽号按位置寻址，
+/// 实现的一个单元是模型的哪个角色。不对应角色（`None`）的几种各臂写着为什么；分配记录树根之下的节点是这样：D8（核心索引结构） 已定项 14 按绝对槽号按位置寻址，
 /// 一次发布重写根之下哪几片由这次动了哪些槽定，模型不记落点、不记是哪几片（占槽只取上界）；那几片的分配代、位置与记录归池级 checker 判
 /// （I-1.1 位置、I-3.10 每个节点都有记录）。
 #[must_use]
 pub fn model_unit_role(unit: TransactionUnit) -> Option<ModelUnitRole> {
     let role = match unit {
-        // 模型罩的发布（第一个文件版本 / 覆盖写、写行、暖机空发布）写的文件恒只有一个数据单元：多单元只会从
-        // `publish_sequential_write` 那条路径出来，而随机历史与层 0 的固定脚本一次都不调它。
-        TransactionUnit::Data(index) => {
-            assert_eq!(
-                index,
-                DataUnitIndexInFile::FIRST,
-                "模型今天只罩一个数据单元的文件"
-            );
-            ModelUnitRole::Data
-        }
-        // 模型罩的文件恒一个数据单元、只有 inode 1：extent 树上段只有根兼叶，那个单元内嵌在它的条目里（D8（核心索引结构） 已定项 14），
-        // 没有下段、上段也没有根之下的节点。
+        // 文件的每个数据单元都是这一个角色：写内容的发布（第一个文件版本、覆盖写、顺序写）整份重写、单元同一个分配代，
+        // 不是最后一批的删除批留下的单元照抄（代码轮 U13：随机历史经会话的顺序写长出多于一片下段叶的文件）。
+        TransactionUnit::Data(_) => ModelUnitRole::Data,
+        // 模型只罩 inode 1：extent 树上段只有根兼叶（D8（核心索引结构） 已定项 14）；一个单元的文件那个指针内嵌在它的条目里，
+        // 多个单元的文件条目指着下段根。
         TransactionUnit::ExtentRoot => ModelUnitRole::ExtentRoot,
-        TransactionUnit::ExtentLowerNode(position) => {
-            panic!("模型今天只罩一个数据单元的文件（内嵌、没有下段）：{position:?}")
-        }
+        // 下段的节点不对应角色（同分配记录树根之下的节点）：一次删除批只重写被截掉那一片下段叶与它的祖先、别的照抄，
+        // 一版里下段各节点的分配代不止一个，模型不记是哪几片；它们的分配代、位置与记录归池级 checker 判，占槽模型按层数现算上界。
+        TransactionUnit::ExtentLowerNode(_) => return None,
         TransactionUnit::ExtentUpperNodeBelowTheRoot(position) => {
             panic!("模型今天只罩 inode 1 一个文件（上段只有根兼叶）：{position:?}")
         }
-        // 模型罩的三种发布（第一个文件版本 / 覆盖写、写行、暖机空发布）里 inode 树恒只有最左那一片叶容器：
-        // 第二片只会从 `publish_new_inodes` 那条路径出来，而随机历史与层 0 的固定脚本一次都不调它
-        // （`history.rs` 的操作集合里没有「建 inode」，`ModelPublishKind` 也只有那三种）。
+        // 模型罩的发布里 inode 树恒只有最左那一片叶容器：随机历史只在删完第一个文件之后建 inode、一次一个
+        // （`history.rs` 的 `HistoryOperation::CreateInode`），一片叶容器装 233 条，几百步的历史建不满；
+        // 第二片只会从一次建很多个、或第一个文件旁边建 inode 那几条路径出来，随机历史与层 0 的固定脚本都不走。
         TransactionUnit::InodeLeafContainer(index) => {
             assert_eq!(
                 index,
@@ -93,17 +88,39 @@ pub fn model_unit_role(unit: TransactionUnit) -> Option<ModelUnitRole> {
         TransactionUnit::InodeRoot => ModelUnitRole::InodeRoot,
         TransactionUnit::AllocationTree => ModelUnitRole::AllocationTree,
         TransactionUnit::AllocationTreeNodeBelowTheRoot(_) => return None,
-        // 模型罩的池两块盘、15 行记账，映射条目恒 6 条：两棵树恒只有一个节点（根兼叶），根之下的节点只在压小容量的
+        // 模型罩的池两块盘、15 行记账：记账树恒只有一个节点（根兼叶），根之下的节点只在压小容量的
         // 只供测试的开关下、或记账行装不下一个节点的池（80 块盘起）上出现，随机历史与层 0 的固定脚本都不装那个开关。
         TransactionUnit::AccountingTreeNodeBelowTheRoot(position) => {
             panic!("模型今天只罩记账树一个节点的池：{position:?}")
         }
         TransactionUnit::AccountingTree => ModelUnitRole::AccountingTree,
-        TransactionUnit::MappingTreeNodeBelowTheRoot(position) => {
-            panic!("模型今天只罩中央映射树一个节点的池：{position:?}")
-        }
+        // 中央映射树根之下的节点不对应角色（同分配记录树根之下的节点）：每个数据单元一条映射条目，数据单元加别的进映射的单元
+        // 多于一片叶装的 294 条时（随机历史里是跨三片下段叶的那一档），映射树从中间切开、长出根之下的节点（D8（核心索引结构） 已定项 11）；
+        // 哪几片这次重写由这次删插了哪些 key 定，模型不记 key、不记是哪几片。它们的分配代、位置与记录归池级 checker 判，
+        // 占槽模型沿来路带节点数的上界（`model::central_mapping_tree_nodes_upper_bound`）。
+        TransactionUnit::MappingTreeNodeBelowTheRoot(_) => return None,
         TransactionUnit::MappingTree => ModelUnitRole::MappingTree,
         TransactionUnit::TreeTable => ModelUnitRole::TreeTable,
+        // 删除那两棵树（里程碑三·2 第 8 条）：`deleted_inodes` 至多一条 key（只有 inode 1），根兼叶一个节点；墓碑一次 unlink 一条、
+        // 一片容器装几百条，模型罩的历史里墓碑树恒只有容器 1 那一片与根兼索引的根，根之下的节点只在只供测试的容量旋钮压小时出现。
+        TransactionUnit::DeletedInodesRoot => ModelUnitRole::DeletedInodesRoot,
+        TransactionUnit::TombstoneLeafContainer(index) => {
+            assert_eq!(
+                index,
+                TombstoneContainerIndexInTree(0),
+                "模型今天只罩墓碑树一片容器"
+            );
+            ModelUnitRole::TombstoneLeaf
+        }
+        TransactionUnit::TombstoneRoot => ModelUnitRole::TombstoneRoot,
+        TransactionUnit::TombstoneNodeBelowTheRoot(position) => {
+            panic!("模型今天只罩墓碑树一片容器（根之下没有节点）：{position:?}")
+        }
+        // 谱系树（管理员回退那次追加一条，D18（块里携带什么信息） 已定项 24 第 5 条）：模型的回退不记谱系容器与谱系树根的落点与分配代，
+        // 同分配记录树根之下的节点，不对应角色；它们的分配代、位置与记录归池级 checker 判。
+        TransactionUnit::LineageLeafContainer(_)
+        | TransactionUnit::LineageRoot
+        | TransactionUnit::LineageNodeBelowTheRoot(_) => return None,
         // 模型把实例表链当一个角色：各片的落点与分配记录按这次之后的行数现算片数（`model::instance_table_pages_for_rows`）。
         TransactionUnit::InstanceTable | TransactionUnit::InstanceTablePageAfterTheFirst(_) => {
             ModelUnitRole::InstanceTable
@@ -141,26 +158,58 @@ pub fn observed_root_of_file_version(output: &TransactionOutput) -> ObservedRoot
     }
 }
 
-/// 这一版的文件内容：文件第 0 个数据单元（模型只罩一个数据单元的文件）的载荷，按单元头里的声明长度取。
+/// 这一版的文件内容：文件第 0、1、2…… 个数据单元的载荷（各按单元头里的声明长度取）按单元号接起来；单元号要从 0 起连着、
+/// 每个号恰好一个单元，不然解不出。
+/// inode 1 不是活记录（删除中的记录 nlink = 0、删完树里没有它，D8（核心索引结构） 已定项 16 第 4 条）时这一版没有读得出的文件：
+/// 意图那次之后数据单元还在，按单元取会读出被删的内容。
 #[must_use]
 pub fn observed_file_of_file_version(output: &TransactionOutput) -> ObservedFile {
-    let Some(data_unit) = output
+    match &output.inode_record {
+        None => return ObservedFile::NoFile,
+        Some(record) if record.nlink == NLINK_OF_AN_INODE_BEING_DELETED => {
+            return ObservedFile::NoFile
+        }
+        Some(_) => {}
+    }
+    let mut data_units: Vec<(u64, &[u8])> = output
         .units
         .iter()
-        .find(|unit| unit.identity == TransactionUnit::Data(DataUnitIndexInFile::FIRST))
-    else {
+        .filter_map(|unit| {
+            if let TransactionUnit::Data(DataUnitIndexInFile(index)) = unit.identity {
+                Some((index, unit.bytes.as_slice()))
+            } else {
+                None
+            }
+        })
+        .collect();
+    data_units.sort_by_key(|(index, _)| *index);
+    if data_units.is_empty() {
         return ObservedFile::Undecodable {
             what: "这一版的 units 里没有文件第 0 个数据单元".to_string(),
         };
-    };
-    match parse_data_unit(&data_unit.bytes)
-        .and_then(|header| data_unit_payload(&data_unit.bytes, header.declared_length))
-    {
-        Ok(payload) => ObservedFile::Decoded(payload.to_vec()),
-        Err(error) => ObservedFile::Undecodable {
-            what: format!("文件第 0 个数据单元解不开：{error:?}"),
-        },
     }
+    let mut content = Vec::new();
+    // 迭代上界：这一版的数据单元数；跨轮只往内容末尾追加；提前出口两个：单元号断了或重了、一个单元解不开。
+    for (expected_index, (index, bytes)) in (0_u64..).zip(&data_units) {
+        if *index != expected_index {
+            return ObservedFile::Undecodable {
+                what: format!(
+                    "这一版的数据单元号不是从 0 起连着的：第 {expected_index} 个位置上是 {index}"
+                ),
+            };
+        }
+        match parse_data_unit(bytes)
+            .and_then(|header| data_unit_payload(bytes, header.declared_length))
+        {
+            Ok(payload) => content.extend_from_slice(payload),
+            Err(error) => {
+                return ObservedFile::Undecodable {
+                    what: format!("文件第 {index} 个数据单元解不开：{error:?}"),
+                }
+            }
+        }
+    }
+    ObservedFile::Decoded(content)
 }
 
 /// 实例表链上一片的角色是第几片。
@@ -180,6 +229,13 @@ fn instance_table_page_of_role(identity: TransactionUnit) -> Option<InstanceTabl
         | TransactionUnit::AccountingTree
         | TransactionUnit::MappingTreeNodeBelowTheRoot(_)
         | TransactionUnit::MappingTree
+        | TransactionUnit::DeletedInodesRoot
+        | TransactionUnit::TombstoneLeafContainer(_)
+        | TransactionUnit::TombstoneRoot
+        | TransactionUnit::TombstoneNodeBelowTheRoot(_)
+        | TransactionUnit::LineageLeafContainer(_)
+        | TransactionUnit::LineageRoot
+        | TransactionUnit::LineageNodeBelowTheRoot(_)
         | TransactionUnit::TreeTable => None,
     }
 }
@@ -405,7 +461,9 @@ pub fn observed_root_of_version_without_file(
 #[must_use]
 pub fn observed_root_of_pool_version(version: &PoolVersion) -> ObservedRoot {
     match version {
-        PoolVersion::WithFile(output) => observed_root_of_file_version(output),
+        PoolVersion::WithFile(output) | PoolVersion::WithTreesAndNoFile(output) => {
+            observed_root_of_file_version(output)
+        }
         PoolVersion::WithoutFile(output) => observed_root_of_version_without_file(output),
     }
 }
@@ -522,7 +580,9 @@ pub fn observed_root_of_pool_version_carrying(
     carried: Option<&ContentsCarriedToZeroUnitPublishes>,
 ) -> (ObservedRoot, Option<ContentsCarriedToZeroUnitPublishes>) {
     match version {
-        PoolVersion::WithFile(output) => (observed_root_of_file_version(output), None),
+        PoolVersion::WithFile(output) | PoolVersion::WithTreesAndNoFile(output) => {
+            (observed_root_of_file_version(output), None)
+        }
         PoolVersion::WithoutFile(output) => {
             observed_root_of_version_without_file_carrying(output, carried)
         }
@@ -580,6 +640,24 @@ pub fn observed_mount(mounted: &Mounted) -> ObservedEffect {
     }
 }
 
+/// 一次正常卸载（`mount::unmount`）做成了什么：推了那一串的，是那几次带新 F 的空发布写出的根（每一条照带文件的一版比，F 读根上带的）；
+/// 现行那一版树表 0 条、一个字节都没写的，是零条根。卸载不判上限，不交上限。
+#[must_use]
+pub fn observed_unmount(unmounted: &Unmounted) -> ObservedEffect {
+    let roots = match unmounted {
+        Unmounted::FloorRaisedToTheCurrentVersion(raised) => raised
+            .publishes
+            .iter()
+            .map(observed_root_of_file_version)
+            .collect(),
+        Unmounted::NothingWrittenOnAVersionWithoutFile { .. } => Vec::new(),
+    };
+    ObservedEffect::Publishes {
+        roots,
+        reported_ceiling: None,
+    }
+}
+
 fn explained(reason: ModelRefusalReason) -> ObservedRefusalReason {
     ObservedRefusalReason::Explained(reason)
 }
@@ -604,8 +682,8 @@ pub fn refusal_reason_of_publish_error(error: &PublishError) -> ObservedRefusalR
         }
         // 释放判定路径的五种：上一版的映射或分配记录与上一版对不上、盘上那条指针的两条位置条目不同槽，健康的历史里不该出现。
         // 分配记录树重写集合迭代不收敛那一条同理：只有强制复用窗口为 0 的只供测试的开关下才可能走到，随机历史不装那个开关。
-        // inode 树写入被拒那一条同样：随机历史一次都不调 `publish_new_inodes`，
-        // 而它跑的那几种发布每次最多改一片叶容器、重写的角色最多九个。
+        // inode 树写入被拒那一条同样：随机历史只在删完第一个文件之后建 inode、一次一个（`HistoryOperation::CreateInode`），
+        // inode 树恒只有一片叶容器、新记录追加在末尾，它跑的那几种发布每次最多改一片叶容器、重写的角色最多九个。
         // 多层码 2 树算不出形状那一条同理：两棵树装不下一个节点时分裂、不拒，只有长到 257 层或上一版的形状按分隔 key 走不通才拒，
         // 随机历史里两棵树恒只有一个节点；它出现就是模型与实现对不上。
         PublishError::MultiLevelCodeTwoTreeRefused { .. }
@@ -621,7 +699,7 @@ pub fn refusal_reason_of_publish_error(error: &PublishError) -> ObservedRefusalR
         // 健康的内存盘上都不该出现，模型里没有它们的理由。
         | PublishError::MappingEntryLocationOnADeviceOutsideThePool { .. }
         | PublishError::MappingEntryLocationsOnTheSameDevice { .. }
-        // 第一个文件版本读不出那一版的树表、水位离 u64::MAX 不到八个号：健康的内存盘上都不该出现。
+        // 第一个文件版本读不出那一版的树表、水位离 u64::MAX 不到十二个号（第一个文件版本一次连号发十二棵树的号）：健康的内存盘上都不该出现。
         | PublishError::TreeTableOfTheVersionToBuildOnUnreadable { .. }
         | PublishError::TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees(_)
         // 冻结着一次没重发的发布：随机历史里一次发布失败就整段停下、不接着发，健康的内存盘上不该出现。
@@ -630,6 +708,13 @@ pub fn refusal_reason_of_publish_error(error: &PublishError) -> ObservedRefusalR
         // 模型里没有它们的理由。
         | PublishError::JournalRecordsOfThePublishExceedTheLimit { .. }
         | PublishError::NextCheckpointTxgPastTheTopOfItsRange { .. }
+        // 写删除中的 inode、写删完的 inode、unlink 不是活记录的号、deleted_inodes 装不下：执行器只在实现报带文件时调覆盖写与 unlink，
+        // 队列不空时那两种改动先走空、再拒成带着走空那几步的 `NoFileVersionToChange`（代码轮 U10、U11），不报这几种；
+        // 队列至多 inode 1 一个号，造不出这几格。
+        | PublishError::WriteToAnInodeBeingDeleted { .. }
+        | PublishError::WriteToAnInodeThatIsNotInTheTree { .. }
+        | PublishError::UnlinkOfAnInodeThatIsNotALiveRecord { .. }
+        | PublishError::DeletedInodesQueueRefused(_)
         | PublishError::BlockDevice(_) => ObservedRefusalReason::Unexplained,
     }
 }
@@ -650,7 +735,8 @@ pub fn refusal_reason_of_placement_refusal(refusal: &PlacementRefusal) -> Observ
 }
 
 /// 回退目标不在候选集里的那一条说的是哪条理由：按字段一对一映射，不看给人看的文字（增补 3 第 2 件代码三方第一轮判决第三节第 2 条）。
-/// 候选集四条（D23（journal 的角色与格式） 已定项 14：根环里、txg ≥ F_生效、按现行那一版的实例表判仍然有效、带文件），各映射到自己那一条。
+/// 候选集五条（D23（journal 的角色与格式） 已定项 14：根环里、txg ≥ F_生效、按现行那一版的实例表判仍然有效、带文件；D16（发布语义） 已定项 1
+/// 「回退候选集」：txg 落在一圈窗口里），各映射到自己那一条。
 #[must_use]
 pub fn refusal_reason_of_rollback_candidate_exclusion(
     exclusion: RollbackCandidateExclusion,
@@ -662,6 +748,9 @@ pub fn refusal_reason_of_rollback_candidate_exclusion(
         }
         RollbackCandidateExclusion::OnAbandonedTimeline => {
             ModelRefusalReason::RollbackTargetOnAbandonedTimeline
+        }
+        RollbackCandidateExclusion::OutsideTheOneRevolutionWindow => {
+            ModelRefusalReason::RollbackTargetOutsideTheOneRevolutionWindow
         }
         RollbackCandidateExclusion::VersionWithoutFile => {
             ModelRefusalReason::RollbackTargetWithoutFile
@@ -777,11 +866,11 @@ pub fn refusal_reason_of_mount_error(error: &MountError) -> ObservedRefusalReaso
         | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. }
         | MountError::RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot(_)
         | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided { .. }
-        // 盘表里同一个身份交了几次、调用方参数与盘上系统配置不一致、有盘落后于现行那一版又缺它的单元：随机历史每次都交整池两块盘
+        // 盘表里同一个身份交了几次、调用方参数与盘上系统配置不一致、有盘落后于现行那一版又缺它的单元或它的根：随机历史每次都交整池两块盘
         // （没换过盘）、用建池的那一份参数，走不到。
         | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
-        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
+        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. }
         // 盘上的实例代号或 txg 已到顶：坏镜像才有。
         | MountError::SequenceNumberPastTheTopOfItsRange(_) => ObservedRefusalReason::Unexplained,
     }
@@ -832,7 +921,7 @@ pub fn root_ring_slot_still_bad_after_one_reread_of_mount_error(
         | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided { .. }
         | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
-        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
+        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. }
         | MountError::SequenceNumberPastTheTopOfItsRange(_)
         | MountError::NewerStateStillUnreadableAfterOneReread(_) => None,
     }
@@ -906,7 +995,7 @@ pub fn reported_ceiling_of_mount_error(error: &MountError) -> Option<ModelCheckp
         | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided { .. }
         | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
-        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
+        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. }
         | MountError::SequenceNumberPastTheTopOfItsRange(_)
         | MountError::NewerStateStillUnreadableAfterOneReread(_) => None,
     }
@@ -1205,8 +1294,9 @@ mod tests {
         );
     }
 
-    /// 回退候选集的四条排除各映射到自己那一条理由、互不相同（此前「不在候选集里」映射成「低于 F、被抛弃」两条之一）；
-    /// 「目标那一版树表 0 条」是第四条（D23（journal 的角色与格式） 已定项 14：候选集只收带文件的根）。
+    /// 回退候选集的五条排除各映射到自己那一条理由、互不相同（此前「不在候选集里」映射成「低于 F、被抛弃」两条之一）；
+    /// 「目标那一版树表 0 条」是第五条（D23（journal 的角色与格式） 已定项 14：候选集只收带文件的根），「落在一圈窗口外」是第四条
+    /// （D16（发布语义） 已定项 1「回退候选集」）。
     #[test]
     fn each_rollback_candidate_exclusion_maps_to_its_own_reason() {
         let target = RollbackTarget {
@@ -1217,6 +1307,7 @@ mod tests {
             RollbackCandidateExclusion::NotInRing,
             RollbackCandidateExclusion::BelowEffectiveFloor,
             RollbackCandidateExclusion::OnAbandonedTimeline,
+            RollbackCandidateExclusion::OutsideTheOneRevolutionWindow,
             RollbackCandidateExclusion::VersionWithoutFile,
         ]
         .into_iter()
@@ -1233,6 +1324,9 @@ mod tests {
                 ObservedRefusalReason::Explained(
                     ModelRefusalReason::RollbackTargetOnAbandonedTimeline
                 ),
+                ObservedRefusalReason::Explained(
+                    ModelRefusalReason::RollbackTargetOutsideTheOneRevolutionWindow
+                ),
                 ObservedRefusalReason::Explained(ModelRefusalReason::RollbackTargetWithoutFile),
             ]
         );
@@ -1242,7 +1336,7 @@ mod tests {
     /// 四段带挂载的短历史跑下来一条新发现都没有，四样计数都大于 0——胶水从实现的输出里解出了内容与实例表，
     /// 树表 0 条的那几版比过重写的角色集合。
     #[test]
-    #[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+    #[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
     fn every_published_version_is_compared_by_content_instance_table_and_every_role_both_ways() {
         use crate::history::{
             execute_history_with, generate_history, HistoryDeviceWidth, HistoryEnding,

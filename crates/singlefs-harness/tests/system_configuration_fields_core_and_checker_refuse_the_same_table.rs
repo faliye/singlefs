@@ -1,4 +1,4 @@
-//! core 与池级 checker 收同一张系统配置几何字段表（代码三方 m2-closeout-code-r2 Y4-a，用户 2026-09-27 定「读字段，不等于常量就整池拒」）：
+//! core 与池级 checker 收同一张系统配置几何字段表（代码三方 m2-closeout-code-r2 Y4-a「读字段，不等于常量就整池拒」）：
 //! 核心层读者（`singlefs-core` 的 `recovery::system_configuration_values_this_reader_accepts`，改法 B）与池级 checker 的
 //! I-7.13（系统配置池级字段在读者收的范围里）（`singlefs-checker` 的 `image::geometry_of`，改法 A）各写一份，这里在同一份镜像上两边一起判。
 //! 攻方 Y4 那五格（`research/prompts/m2-closeout-code-r2-opus-model/opus_r2_y4_system_configuration_fields_core_and_checker_read_differently.rs`，

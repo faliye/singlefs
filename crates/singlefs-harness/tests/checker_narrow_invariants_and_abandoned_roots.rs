@@ -1,4 +1,4 @@
-//! 池级 checker 查窄的几条不变量补全（代码审阅 6c 第 7、9 条与实审 B1 留下的几件，里程碑二收尾批「实审 B2」，用户 2026-09-27 定），
+//! 池级 checker 查窄的几条不变量补全（代码审阅 6c 第 7、9 条与实审 B1 留下的几件），
 //! 每一格配一份会红的坏镜像（或一份在改之前会误判的合法镜像）：
 //! ① I-7.4（近 K 代块未被复用） 对被抛弃、还在根环里的根也判；根环有读不出的槽时这一半判不了，整条不报成立；
 //! ② 老一版引用一棵已被前一版走过的共享子树时，子树里的落点并进这一版再比交叉（I-5.1（物理范围不重叠））；
@@ -104,12 +104,12 @@ const UNIT_CLASS_INDEX_NODE: u8 = 2;
 const UNIT_CLASS_PACKED: u8 = 3;
 
 /// journal 记录（D23（journal 的角色与格式） 已定项 4 / 已定项 17）：点名项数 4 在 12、计数器 6 在 20、
-/// 自证校验和 32 在 46（罩整条 4096）、载荷校验和 4 在 95（罩头之后的点名项）、头 311、点名项 56（两条位置条目在前）。
+/// 自证校验和 32 在 46（罩整条 4096）、载荷校验和 4 在 95（罩头之后的点名项）、头 487、点名项 56（两条位置条目在前）。
 const JOURNAL_RECORD_NAMED_COUNT_OFFSET: usize = 12;
 const JOURNAL_RECORD_COUNTER_OFFSET: usize = 20;
 const JOURNAL_RECORD_HEADER_CHECKSUM_OFFSET: usize = 46;
 const JOURNAL_RECORD_PAYLOAD_CHECKSUM_OFFSET: usize = 95;
-const JOURNAL_RECORD_HEADER_BYTES: usize = 311;
+const JOURNAL_RECORD_HEADER_BYTES: usize = 487;
 const JOURNAL_NAMED_ENTRY_BYTES: usize = 56;
 const JOURNAL_RECORD_BYTES: usize = 4096;
 
@@ -677,10 +677,12 @@ fn an_older_version_naming_again_a_placement_inside_a_subtree_it_shares_with_a_n
     reseal_root_slot(&mut root_slot);
     write_bytes(&mut image, root_device, root_offset, &root_slot);
     let red = violations(&image);
+    // 另红两条，都是改了 F 那条根的实例表指针连带的：F 那条记录新根段里的实例表指针没跟着改（I-8.10 从第 8 批起比七段，有它）；
+    // F 不再引用实例表单元而 N 照旧引用，那个单元在 N 里像是新出现、诞生代号 0 不大于 F 的 txg（I-3.5 的出现规则）。
     assert_eq!(
         violated_names(&red),
-        ["I-5.1"],
-        "F 这一版里 D 被引用两次，只该红 I-5.1：{red:?}"
+        ["I-5.1", "I-8.10", "I-3.5"],
+        "F 这一版里 D 被引用两次，红 I-5.1（另加改实例表指针连带的 I-8.10 与 I-3.5）：{red:?}"
     );
     assert!(
         red[0].1.contains("被同一版引用了两次")
@@ -1266,6 +1268,94 @@ fn a_device_whose_slot_zero_does_not_verify_has_its_slot_one_looked_for_at_the_s
         verdict_of(&image, "I-7.7"),
         InvariantVerdict::Holds,
         "每块盘都交得出本池的系统配置槽，I-7.7 判得了且成立"
+    );
+}
+
+/// 同一个槽距 8192 的池、盘 0 的槽 0 自证不过，再在盘 0 的偏移 4096 放一份自述槽距 4096、世代号 9 的系统配置
+/// （盘 0 槽 1 的拷贝改这两处、重封整槽校验和）：借盘 1 记的槽距（②，2026-09-14 用户定甲）只在 8192 那一档找槽 1，
+/// 读到 mkfs 写的世代号 1；逐档（③，全池槽 0 都不可用时才走，C651 第一轮判决）会在 4096 那一档收下世代号更大的那一份。
+/// 两档在这个取样点上结局不同，删掉 ② 落到 ③ 的变异在这里红（上一条用例 ② 与 ③ 同值，分不开）。
+#[test]
+fn a_device_whose_slot_zero_does_not_verify_takes_slot_one_only_at_the_borrowed_spacing_not_a_newer_slot_at_another_spacing(
+) {
+    const SPACING: u32 = 8192;
+    const ANOTHER_SPACING: u32 = 4096;
+    const BYTE_IN_THE_RESERVED_AREA_OF_A_SYSTEM_CONFIGURATION_SLOT: usize = 2048;
+    const SYSTEM_CONFIGURATION_SLOT_BYTES: usize = 4096;
+    const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 155;
+    /// 槽世代号 8 字节在 147（fsid 102 起 16 字节、之后 20 + 1、本盘设备号 4、设备数 4；`singlefs_checker::check_system_configuration_slot`），
+    /// 固定结构槽距 4 字节在 429（`singlefs_checker::image::geometry_of`）。
+    const SYSTEM_CONFIGURATION_SLOT_GENERATION_OFFSET: usize = 147;
+    const SYSTEM_CONFIGURATION_SLOT_SPACING_OFFSET: usize = 429;
+    const GENERATION_OF_THE_SLOT_AT_ANOTHER_SPACING: u64 = 9;
+    let mut make_filesystem_parameters = parameters();
+    make_filesystem_parameters
+        .geometry
+        .minimum_input_output_bytes = SPACING;
+    make_filesystem_parameters
+        .geometry
+        .fixed_structure_slot_spacing = SPACING;
+    let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = [0u32, 1]
+        .into_iter()
+        .map(|device| {
+            (
+                DeviceIdentity(device),
+                SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
+            )
+        })
+        .collect();
+    make_filesystem(&make_filesystem_parameters, &mut devices).expect("槽距 8192 的池");
+    let mut image = MemoryPool {
+        devices: devices
+            .iter()
+            .map(|(identity, device)| (*identity, device.image.clone()))
+            .collect(),
+        device_size_in_bytes: IMAGE_BYTES,
+    };
+    let mut slot_zero = read_bytes(&image, 0, 0, SYSTEM_CONFIGURATION_SLOT_BYTES);
+    slot_zero[BYTE_IN_THE_RESERVED_AREA_OF_A_SYSTEM_CONFIGURATION_SLOT] ^= 0xff;
+    write_bytes(&mut image, 0, 0, &slot_zero);
+    let mut slot_at_another_spacing = read_bytes(
+        &image,
+        0,
+        u64::from(SPACING),
+        SYSTEM_CONFIGURATION_SLOT_BYTES,
+    );
+    slot_at_another_spacing[SYSTEM_CONFIGURATION_SLOT_GENERATION_OFFSET
+        ..SYSTEM_CONFIGURATION_SLOT_GENERATION_OFFSET + 8]
+        .copy_from_slice(&GENERATION_OF_THE_SLOT_AT_ANOTHER_SPACING.to_le_bytes());
+    slot_at_another_spacing
+        [SYSTEM_CONFIGURATION_SLOT_SPACING_OFFSET..SYSTEM_CONFIGURATION_SLOT_SPACING_OFFSET + 4]
+        .copy_from_slice(&ANOTHER_SPACING.to_le_bytes());
+    let digest = wide_checksum_with_field_zeroed(
+        &slot_at_another_spacing,
+        SYSTEM_CONFIGURATION_SLOT_BYTES,
+        SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
+    );
+    slot_at_another_spacing
+        [SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32]
+        .copy_from_slice(&digest);
+    write_bytes(
+        &mut image,
+        0,
+        u64::from(ANOTHER_SPACING),
+        &slot_at_another_spacing,
+    );
+    let verified = singlefs_checker::image::verified_system_configuration_slots(&image);
+    let generations_and_spacings_on_device_zero: Vec<(u64, u64)> = verified
+        .iter()
+        .find(|(identity, _)| *identity == 0)
+        .map(|(_, slots)| {
+            slots
+                .iter()
+                .map(|(view, geometry)| (view.slot_generation, geometry.slot_spacing))
+                .collect()
+        })
+        .unwrap_or_default();
+    assert_eq!(
+        generations_and_spacings_on_device_zero,
+        vec![(1, u64::from(SPACING))],
+        "盘 0 的槽 1 只在盘 1 记的槽距 8192 处找，取 mkfs 写的世代号 1；4096 处那一份世代号 9 不收"
     );
 }
 

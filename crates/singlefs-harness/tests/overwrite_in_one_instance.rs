@@ -105,8 +105,8 @@ fn overwrite_publishes_the_second_version_through_the_same_commit_shape() {
     assert_eq!(second.root.checkpoint_txg, CheckpointTxg(4));
     assert_eq!(second.root.instance, InstanceGeneration(1));
     assert_eq!(
-        second.root.tree_identifier_watermark, 19,
-        "没有建新树，水位不动"
+        second.root.tree_identifier_watermark, 65548,
+        "没有建新树，水位不动（第一个文件版本发 65536..65547 之后是 65548，D8 已定项 11）"
     );
     assert_eq!(second.root.rollback_floor, CheckpointTxg(0));
     assert_eq!(
@@ -170,20 +170,33 @@ fn overwrite_publishes_the_second_version_through_the_same_commit_shape() {
         "释放的正是 A 写出的十二个落点"
     );
     assert_eq!(
-        second.inode_record.object_birth,
+        second
+            .inode_record
+            .expect("覆盖写那一版有第一个文件那条记录")
+            .object_birth,
         CheckpointTxg(3),
         "对象出生代不改"
     );
     assert_eq!(
-        second.inode_record.change_count, 4,
+        second
+            .inode_record
+            .expect("覆盖写那一版有第一个文件那条记录")
+            .change_count,
+        4,
         "改动计数 = 这次发布的 checkpoint_txg"
     );
     assert_eq!(
-        second.inode_record.size,
+        second
+            .inode_record
+            .expect("覆盖写那一版有第一个文件那条记录")
+            .size,
         u64::try_from(SECOND_FILE_BYTES).expect("长度")
     );
     assert_eq!(
-        second.inode_record.write_time_seconds,
+        second
+            .inode_record
+            .expect("覆盖写那一版有第一个文件那条记录")
+            .write_time_seconds,
         FIXED_WRITE_TIME_SECONDS + 60
     );
     assert_eq!(second.key_order_mismatches, 0);
@@ -318,7 +331,7 @@ fn release_rewrites_the_first_versions_records_and_accounting_moves_them_into_th
             "A 的映射条目一条都不留：释放走映射、条目删掉"
         );
     }
-    assert_eq!(second.tree_table_entries.len(), 7);
+    assert_eq!(second.tree_table_entries.len(), 11);
     for (entry, previous) in second
         .tree_table_entries
         .iter()
@@ -495,7 +508,7 @@ fn damage_probes_after_the_overwrite_tell_the_new_unit_from_the_released_one() {
     );
 }
 
-/// 释放判定路径（D19（块指针的结构与宽度预算） 已定项 5 第 1 条：释放一律经映射，不经提示）：A 的八个落点经 A 的映射取出来与 A 自己记的槽号逐个相同；
+/// 释放判定路径（D19（块指针的结构与宽度预算） 已定项 5 第 1 条：释放一律经映射，不经提示）：A 的十二个落点经 A 的映射取出来与 A 自己记的槽号逐个相同；
 /// B 之后 A 的数据单元那把 key 在 B 的映射里查不到（「不在映射」）；把 A 的映射节点重装成少了码 1 那一条的形态再覆盖写 ⇒ 报「不在映射」、
 /// 一个落点都不释放、分配器一条记录都没改写——按提示释放的写法会把它当成一次正常的覆盖写。
 #[test]
@@ -956,10 +969,10 @@ fn publish_running_out_of_space_midway_leaves_the_allocator_as_it_was() {
             .map(|device| DeviceShortOfDemand {
                 device,
                 available: AvailableBytesOnOneDevice(0),
-                demand: BytesOnOneDevice(8_863_744),
+                demand: BytesOnOneDevice(8_912_896),
             })
             .to_vec(),
-        "每块盘两个数据槽被数据单元取走之后没挡的槽剩 0（0 字节）< 第一个提交内生块要的 541 槽（8 863 744 字节）"
+        "每块盘两个数据槽被数据单元取走之后没挡的槽剩 0（0 字节）< 第一个提交内生块要的 544 槽（8 912 896 字节；ckpt_cost 含谱系那一项 3 块）"
     );
     assert_eq!(
         pool.allocator.records(),

@@ -111,7 +111,7 @@ fn second_mount_on_a_version_without_file() -> MountToJudge {
 fn row_publish_of(mounted: &Mounted) -> &VersionWithoutFilePublishOutput {
     match &mounted.output.row_publish {
         PoolVersion::WithoutFile(row_publish) => row_publish,
-        PoolVersion::WithFile(_) => {
+        PoolVersion::WithFile(_) | PoolVersion::WithTreesAndNoFile(_) => {
             panic!("第二次挂载接在树表 0 条的一版上：写行那次发布也是树表 0 条的一版")
         }
     }
@@ -125,7 +125,9 @@ fn only_warm_up_of(mounted: &mut Mounted) -> &mut VersionWithoutFilePublishOutpu
     );
     match &mut mounted.output.warm_up_publishes[0] {
         PoolVersion::WithoutFile(warm_up) => warm_up,
-        PoolVersion::WithFile(_) => panic!("树表 0 条的一版上暖机是零单元发布"),
+        PoolVersion::WithFile(_) | PoolVersion::WithTreesAndNoFile(_) => {
+            panic!("树表 0 条的一版上暖机是零单元发布")
+        }
     }
 }
 

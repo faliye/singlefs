@@ -10,7 +10,8 @@
 //! - 恢复重建的根拿不拿得到它们：拿不到，而且那条记录**根本不施加**——它是实例 2 的第一条，所选根是实例 1 的 (1, 2)，
 //!   前缀规则不跨实例边界（D23（journal 的角色与格式） 已定项 14 注 1），水位之上一条都没有。重建出来的根就是 (1, 2) 本身：
 //!   实例表指针是 mkfs 那一片、分配记录树根指针全零。写行那次发布恒是新实例的第一次发布，所以「施加一条写行记录」今天走不到。
-//! - checker 怎么算它们：遍历从根走，谁也不引用这两个单元，一条违例都没有；把它们改坏，判决逐条不变（checker 不读它们）。
+//! - checker 怎么算它们：遍历从根走，谁也不引用这两个单元，一条违例都没有；把它们改坏，判决除 I-8.11（点名项与被指单元头相同）
+//!   之外逐条不变（走读不读它们；I-8.11 按记录 jsn 3 的点名项读它们，改坏之后校验和对不上、没有可比的，从成立转成不适用）。
 //! - 分配器怎么算它们：重开之后的可写挂载从 mkfs 那一版的账重建，这两个落点不在任何一条分配记录里、是空闲槽；
 //!   这次挂载写行那次发布取的落点与崩掉的那次逐槽相同，把它们盖掉。之后 checker 仍一条违例都没有。
 //!
@@ -219,7 +220,9 @@ fn c533_row_publish_record_persisted_without_its_root_on_a_formatted_pool_is_nev
         "重建出来的根没有分配记录树，写行那次写的那片节点谁也不引用"
     );
 
-    // checker：遍历从根走，那两个单元谁也不引用，一条违例都没有；把它们在两块盘上都改坏，每一条判决逐字不变——checker 不读它们。
+    // checker：遍历从根走，那两个单元谁也不引用，一条违例都没有；把它们在两块盘上都改坏，遍历一侧的判决逐字不变——走读不读它们。
+    // 读它们的只有 I-8.11（点名项与被指单元头相同）：jsn 3 那条记录点名了它们，改坏之前整单元校验和对得上、头与点名项相同，判成立；
+    // 改坏之后每条位置条目的校验和都对不上，那一行「校验和不相符的位置条目不判」，环里再没有可比的，转成不适用。
     assert_no_invariant_is_violated(&crash_image, "崩溃镜像");
     let mut orphan_units_damaged = crash_image.clone();
     for named in &row_publish.record.named {
@@ -227,10 +230,42 @@ fn c533_row_publish_record_persisted_without_its_root_on_a_formatted_pool_is_nev
             orphan_units_damaged.flip_byte(location.device, location.slot.to_device_offset(), 100);
         }
     }
+    let verdicts_after_the_damage = check_pool_image(&orphan_units_damaged);
+    let verdicts_before_the_damage = check_pool_image(&crash_image);
+    let named_entries_invariant = "I-8.11";
+    let verdict_of_the_named_entries_invariant =
+        |verdicts: &[(&'static str, InvariantVerdict)]| {
+            verdicts
+                .iter()
+                .find(|(invariant, _)| *invariant == named_entries_invariant)
+                .map(|(_, verdict)| verdict.clone())
+                .expect("清单里有 I-8.11")
+        };
     assert_eq!(
-        check_pool_image(&orphan_units_damaged),
-        check_pool_image(&crash_image),
-        "两个孤单元两块盘上都改坏之后 checker 的判决逐条不变"
+        verdict_of_the_named_entries_invariant(&verdicts_before_the_damage),
+        InvariantVerdict::Holds,
+        "改坏之前 jsn 3 点名的单元校验和对得上、头与点名项相同"
+    );
+    match verdict_of_the_named_entries_invariant(&verdicts_after_the_damage) {
+        InvariantVerdict::NotApplicable(reason) => assert!(
+            reason.contains("整单元校验和"),
+            "不适用的理由要说没有校验和相符的单元可比：{reason}"
+        ),
+        other @ (InvariantVerdict::Holds | InvariantVerdict::Violated(_)) => {
+            panic!("两个孤单元改坏之后 I-8.11 没有可比的单元，该报不适用：{other:?}")
+        }
+    }
+    let without_the_named_entries_invariant =
+        |verdicts: Vec<(&'static str, InvariantVerdict)>| -> Vec<(&'static str, InvariantVerdict)> {
+            verdicts
+                .into_iter()
+                .filter(|(invariant, _)| *invariant != named_entries_invariant)
+                .collect()
+        };
+    assert_eq!(
+        without_the_named_entries_invariant(verdicts_after_the_damage),
+        without_the_named_entries_invariant(verdicts_before_the_damage),
+        "两个孤单元两块盘上都改坏之后，I-8.11 之外 checker 的判决逐条不变"
     );
 
     // 重开可写挂载：账从 mkfs 那一版重建，那两个落点是空闲槽；写行那次发布取到同样的两个落点、把它们盖掉。

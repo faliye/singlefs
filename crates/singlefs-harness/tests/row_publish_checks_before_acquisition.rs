@@ -1,4 +1,4 @@
-//! D18（块里携带什么信息） 已定项 11「可写挂载的顺序」第五个合取（用户 2026-09-24 定）：这次挂载要发的写行与暖机在分配器的副本上预演
+//! D18（块里携带什么信息） 已定项 11「可写挂载的顺序」第五个合取：这次挂载要发的写行与暖机在分配器的副本上预演
 //! 取得到全部落点——**预演里写行那次的释放核验报错，同样判这次不能可写**；写行那次发布的释放核验（含树表 0 条那一版分配记录树节点的释放核）
 //! 挪到取号之前，报错就在任何写之前拒绝、不烧实例号。
 //!
@@ -6,7 +6,7 @@
 //!    （D19（块指针的结构与宽度预算） 已定项 5：位置项指池外的盘当映射条目损坏）。改之前取号写完、写行那次发布才报出来，号烧掉。
 //! 2. 树表 0 条的一版（`research/prompts/m2-final-code-r1-opus-output.md` Z4-1，C544）：实例表长到 66 片。原先写行那次发布的分配记录
 //!    条数准入几次之后就过不了（分配记录树只有一个节点那一族，收口表第 39、57 行），池从此挂不上可写；分配记录树按绝对槽号按位置寻址之后
-//!    （D8（核心索引结构） 已定项 14，用户 2026-09-24 定 K1）那道墙拆了，这一臂改钉「一路挂得上可写」。
+//!    （D8（核心索引结构） 已定项 14 的 K1）那道墙拆了，这一臂改钉「一路挂得上可写」。
 
 mod common;
 
@@ -184,7 +184,7 @@ fn instance_to_acquire_now(devices: &mut Devices) -> InstanceGeneration {
 /// （D8（核心索引结构） 已定项 14，用户 2026-09-24 定 K1）十二次都做成：每次取到的号是挂载之前算的那一个；最后那一版的分配记录多于 812 条、
 /// 每块盘上装着记录的叶不止一片；池级 checker 全绿。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn row_publishes_on_a_version_without_file_with_a_sixty_six_page_instance_table_keep_mounting_writable_past_812_allocation_records(
 ) {
     let stream = SharedStream::new();

@@ -21,7 +21,9 @@ use singlefs_harness::memory_pool::{CrashImage, MemoryPool, SparseBlockDevice, S
 const DEVICE_BYTES: u64 = 1 << 20;
 const PHYSICAL_BLOCK_BYTES: u32 = 512;
 
-/// 对拍的请求：两个在设备里的、三个越过末尾的（跨过末尾、从末尾起、远在末尾之后）、一个偏移加长度溢出 u64 的、两个没对齐的。
+/// 对拍的请求：两个在设备里的、三个越过末尾的（跨过末尾、从末尾起、远在末尾之后）、一个偏移加长度溢出 u64 的、两个没对齐的，
+/// 再加两个长度 0 的（远在末尾之后、偏移没对齐；代码三方 m3-code-r2 J4：长度 0 也先过请求判据，文件后端把长度 0 的早退挪到判据之前时
+/// 清零那一步两边答得不一样）。
 fn requests() -> Vec<(DeviceOffsetInBytes, u64)> {
     vec![
         (DeviceOffsetInBytes(0), 512),
@@ -32,6 +34,8 @@ fn requests() -> Vec<(DeviceOffsetInBytes, u64)> {
         (DeviceOffsetInBytes(u64::MAX - 511), 1024),
         (DeviceOffsetInBytes(256), 512),
         (DeviceOffsetInBytes(0), 700),
+        (DeviceOffsetInBytes(2 * DEVICE_BYTES), 0),
+        (DeviceOffsetInBytes(256), 0),
     ]
 }
 
@@ -166,8 +170,8 @@ fn a_sparse_block_device_accepts_and_refuses_every_request_exactly_like_the_file
         }
     }
     assert_eq!(
-        refused_writes, 6,
-        "8 个请求里 4 个越界、2 个没对齐：两边都拒（两边都照收的话这条对拍就空了）"
+        refused_writes, 8,
+        "10 个请求里 5 个越界、3 个没对齐（各有一个长度 0）：两边都拒（两边都照收的话这条对拍就空了）"
     );
 }
 
@@ -268,7 +272,7 @@ fn memory_pool_and_crash_image_readers_answer_none_outside_a_device_like_a_pool_
     }
     assert_eq!(
         (readable_requests, unreadable_requests),
-        (4, 20),
-        "真盘那一边：两块盘各 2 个读得出；两块盘各 6 个越界或没对齐、第 7 块盘 8 个全读不出"
+        (4, 26),
+        "真盘那一边：两块盘各 2 个读得出；两块盘各 8 个越界或没对齐、第 7 块盘 10 个全读不出"
     );
 }

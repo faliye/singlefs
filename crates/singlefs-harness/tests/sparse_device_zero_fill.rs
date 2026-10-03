@@ -1,6 +1,6 @@
 //! 稀疏设备的整段清零不许把扇区实体化。
 //!
-//! 2026-09-22 实测的代价：mkfs 一次清 768 MiB 的 journal 环（`make_filesystem.rs` 的
+//! 实测的代价：mkfs 一次清 768 MiB 的 journal 环（`make_filesystem.rs` 的
 //! `write_zeroes_at`）。按「插进 length / 512 个全 0 扇区」写，每块盘就是 1 572 864 条
 //! 512 字节的项，连 `Vec` 头与 `BTreeMap` 节点每条 600 字节以上 ⇒ 每盘约 940 MB、
 //! 每份 `MemoryPool` 约 1.9 GB；`MemoryPool` 派生了 `Clone`、每个崩溃点观测各拷一份，

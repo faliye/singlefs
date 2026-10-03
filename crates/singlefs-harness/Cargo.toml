@@ -9,4 +9,7 @@ description = "harness 档：单元测试与集成测试，改了代码随时跑
 singlefs-checker = { path = "../singlefs-checker" }
 singlefs-core = { path = "../singlefs-core" }
 singlefs-format = { path = "../singlefs-format" }
+# RefFS（D13（验证路线） 已定项 3）：调用方的翻译层（src/reference_filesystem_translation.rs）依赖它；方向只许 harness → RefFS
+# （门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格 ⑤⑥⑦）。
+singlefs-reference-filesystem = { path = "../singlefs-reference-filesystem" }
 

@@ -149,7 +149,9 @@ pub fn root_ring_slot_offsets() -> Vec<(u32, u64)> {
         .collect()
 }
 
-/// checker 的已知坏镜像要的：把一个单元的新整单元校验和沿引用链补到根槽（父节点里的位置条目、中央映射条目、根槽的自证校验和）。
+/// checker 的已知坏镜像要的：把一个单元的新整单元校验和沿引用链补到根槽（父节点里的位置条目、中央映射条目、根槽的自证校验和），
+/// 再把改过的根照抄进同 (实例, txg) 的 journal 记录的新根段（`common::copy_each_root_into_the_new_root_segment_of_its_journal_records`），
+/// 镜像上只剩被改的那一处说话、I-8.10（记录新根段与同代根相同） 不跟着红。
 /// 位置条目按 (设备 4, 槽 6, 校验和 4) 逐字节找、逐个换，被换的单元按类重封再往上补。`units` 是这份镜像里被引用的单元（槽, 字节数）。
 pub fn propagate_the_new_checksum(
     image: &mut MemoryPool,
@@ -211,6 +213,7 @@ pub fn propagate_the_new_checksum(
             }
         }
     }
+    crate::common::copy_each_root_into_the_new_root_segment_of_its_journal_records(image);
 }
 
 fn memory_devices(stream: &SharedStream) -> Vec<(DeviceIdentity, RecordedMemoryDevice)> {

@@ -31,14 +31,14 @@ use singlefs_core::pointer::{
 };
 use singlefs_core::records::{
     mapping_key_for_node, parse_mapping_entry, TreeTableEntry, TREE_KIND_ACCOUNTING,
-    TREE_KIND_DEADLIST, TREE_KIND_INODE,
+    TREE_KIND_INODE, TREE_KIND_LOGGED_OPERATIONS,
 };
 use singlefs_core::recovery::{
     choose_system_configuration, every_root_ring_slot, read_root_ring_slot, recover, JournalPolicy,
     PoolReader, RecoveryFailure, RecoveryOutcome, RootRingSlotReading,
     SystemConfigurationValueOutsideWhatThisReaderAccepts,
 };
-use singlefs_core::root_record::RootRecord;
+use singlefs_core::root_record::{RootRecord, UnmountMarker};
 use singlefs_core::root_ring::{slot_offset, RootRingSlot, RootRingSlotsPerRegion};
 use singlefs_core::system_configuration::{
     SystemConfiguration, SystemImmutableSizes, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
@@ -427,8 +427,9 @@ fn an_accounting_leaf_with_a_repeated_key_is_refused_by_the_writable_mount_befor
     );
 }
 
-/// 场景：最新那条根的树表里 deadlist 那条条目的树 ID 改成根记录的树 ID 水位（第一个文件那一版是 19），树表与根记录重封。
-/// deadlist 在发号次序里排最后、号最大（18），改成 19 之后树表条目仍按树 ID 严格升序、合发号次序，只违反水位那一条。
+/// 场景：最新那条根的树表里 logged_ops 那条条目的树 ID 改成根记录的树 ID 水位（第一个文件那一版是 65548），树表与根记录重封。
+/// logged_ops 在发号次序里排最后、号最大（65547），改成 65548 之后树表条目仍按树 ID 严格升序、合发号次序，只违反水位那一条。
+/// （树表 7 → 11 条之前排最后的是 deadlist（那时号 18，改成水位 19），D18（块里携带什么信息） 已定项 24 第 6 条之后 deadlist 后面还有四棵，改它就先违反 I-9.16。）
 /// 预期：可写挂载在任何写之前报 I-7.8（根记录树 ID 水位不低于全池最大树 ID）「树 ID 不低于水位」。改之前重建不判它，写行那次发布照抄这张树表。
 /// 合入后验证一（2026-09-27）把被改的条目从 livelist 换成 deadlist：livelist 改成 19 同时违反 I-9.16（树表条目按树 ID 严格升序且合发号次序），
 /// 而 I-9.16 那一判排在水位之前（树表排序报告第八节第 3 条），报的是 I-9.16，这条用例就判不到 I-7.8 了。
@@ -436,9 +437,13 @@ fn an_accounting_leaf_with_a_repeated_key_is_refused_by_the_writable_mount_befor
 fn a_tree_table_entry_at_or_above_the_tree_identifier_watermark_is_refused_by_the_writable_mount() {
     let (mut devices, first) = pool_after_the_first_file();
     let watermark = first.root.tree_identifier_watermark;
-    rewrite_a_tree_table_entry_of_the_newest_root(&mut devices, TREE_KIND_DEADLIST, |entry| {
-        entry[..8].copy_from_slice(&watermark.to_le_bytes());
-    });
+    rewrite_a_tree_table_entry_of_the_newest_root(
+        &mut devices,
+        TREE_KIND_LOGGED_OPERATIONS,
+        |entry| {
+            entry[..8].copy_from_slice(&watermark.to_le_bytes());
+        },
+    );
     let refusal = writable_mount_refused_before_any_write(&mut devices);
     assert!(
         matches!(
@@ -858,7 +863,7 @@ const MAC_BYTE_IN_THE_RESERVED_BYTES: usize = 12;
 
 fn sample_index_node() -> Vec<u8> {
     build_index_node(
-        TreeIdentifier(14),
+        TreeIdentifier(singlefs_format::TREE_IDENTIFIER_ACCOUNTING),
         0,
         22,
         &[1u8; 22],
@@ -892,7 +897,7 @@ fn an_index_node_with_a_non_zero_encryption_reserved_byte_is_refused() {
 fn a_packed_unit_with_a_non_zero_encryption_reserved_byte_is_refused() {
     let mut unit = build_packed_unit(
         PackedIdentity {
-            birth_tree: TreeIdentifier(12),
+            birth_tree: TreeIdentifier(singlefs_format::TREE_IDENTIFIER_INODE),
             record_type: PACKED_TYPE_INODE,
             container: 1,
             container_birth: CheckpointTxg(3),
@@ -922,7 +927,7 @@ fn a_packed_unit_with_a_non_zero_encryption_reserved_byte_is_refused() {
 fn a_data_unit_with_a_non_zero_encryption_reserved_byte_is_refused() {
     let mut unit = build_data_unit(
         DataUnitIdentity {
-            tree: TreeIdentifier(11),
+            tree: TreeIdentifier(singlefs_format::TREE_IDENTIFIER_EXTENT),
             object: 1,
             object_birth: CheckpointTxg(3),
             anchor_offset: 0,
@@ -972,7 +977,7 @@ fn an_accounting_root_with_a_non_zero_encryption_reserved_byte_is_refused_by_the
 fn sample_node_pointer() -> NodePointer {
     NodePointer {
         head: PointerHead {
-            birth_tree: TreeIdentifier(14),
+            birth_tree: TreeIdentifier(singlefs_format::TREE_IDENTIFIER_ACCOUNTING),
             birth_txg: CheckpointTxg(3),
         },
         locations: [
@@ -1006,9 +1011,9 @@ fn a_node_pointer_head_carrying_encryption_or_compression_is_refused_field_by_fi
     let pointer = sample_node_pointer();
     let clean = node_pointer_bytes(&pointer);
     assert_eq!(
-        NodePointer::read_judging_the_encryption_and_compression_fields_from(&mut ByteReader::at(
-            &clean, 0
-        )),
+        NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+            &mut ByteReader::at(&clean, 0)
+        ),
         Ok(pointer),
         "第一版的取值照常读出"
     );
@@ -1049,7 +1054,7 @@ fn a_node_pointer_head_carrying_encryption_or_compression_is_refused_field_by_fi
         let mut damaged = clean.clone();
         damaged[offset] = value;
         assert_eq!(
-            NodePointer::read_judging_the_encryption_and_compression_fields_from(
+            NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
                 &mut ByteReader::at(&damaged, 0)
             ),
             Err(expected),
@@ -1074,16 +1079,16 @@ fn a_data_pointer_head_carrying_an_encryption_algorithm_is_refused() {
     data_pointer.write_to(&mut writer);
     let mut bytes = writer.into_bytes();
     assert_eq!(
-        DataPointer::read_judging_the_encryption_and_compression_fields_from(&mut ByteReader::at(
-            &bytes, 0
-        )),
+        DataPointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+            &mut ByteReader::at(&bytes, 0)
+        ),
         Ok(data_pointer)
     );
     bytes[28] = 1;
     assert_eq!(
-        DataPointer::read_judging_the_encryption_and_compression_fields_from(&mut ByteReader::at(
-            &bytes, 0
-        )),
+        DataPointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+            &mut ByteReader::at(&bytes, 0)
+        ),
         Err(
             PointerHeadFieldOutsideTheFirstVersion::AlgorithmTypeNotUnencrypted {
                 algorithm_type: 1
@@ -1129,8 +1134,12 @@ fn a_journal_record_whose_new_tree_table_pointer_carries_compression_is_not_pars
         filesystem_identifier: 7,
         new_tree_table: sample_node_pointer(),
         new_mapping_root: sample_node_pointer(),
-        new_tree_identifier_watermark: 19,
+        new_tree_identifier_watermark:
+            singlefs_format::TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH,
         new_rollback_floor: CheckpointTxg(0),
+        new_instance_table: NodePointer::empty_root(),
+        new_allocation_record_tree_root: NodePointer::empty_root(),
+        new_unmount_marker: UnmountMarker::NotWrittenByTheUnmountSequence,
         named: Vec::new(),
     };
     let mut bytes = record.to_bytes();
@@ -1155,7 +1164,7 @@ fn a_journal_record_whose_new_tree_table_pointer_carries_compression_is_not_pars
 #[test]
 fn an_index_node_declaring_entries_of_width_zero_is_refused() {
     let mut node = build_index_node(
-        TreeIdentifier(14),
+        TreeIdentifier(singlefs_format::TREE_IDENTIFIER_ACCOUNTING),
         0,
         0,
         &[],
@@ -1183,7 +1192,7 @@ fn an_index_node_declaring_entries_of_width_zero_is_refused() {
 fn a_packed_unit_declaring_records_of_width_zero_is_refused() {
     let mut unit = build_packed_unit(
         PackedIdentity {
-            birth_tree: TreeIdentifier(12),
+            birth_tree: TreeIdentifier(singlefs_format::TREE_IDENTIFIER_INODE),
             record_type: PACKED_TYPE_INODE,
             container: 1,
             container_birth: CheckpointTxg(3),

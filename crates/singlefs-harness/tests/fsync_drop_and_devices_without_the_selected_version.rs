@@ -1041,7 +1041,7 @@ fn fsync_drop_persists_until_reopen() {
 }
 
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn fsync_drop_persists_across_reopen() {
     run_matrix(FaultDuration::PersistsAcrossReopen);
 }
@@ -1570,8 +1570,8 @@ fn refusal_by_devices_without_the_selected_version(
 /// 读阶段交出的所选那一版是 `selected_version`、它那次发布末条记录读得出、计数器 `selected_version_last_record_counter`，另一块盘的系统配置
 /// 见证过计数器 `witnessed_journal_counter`（更大）；重读一遍读数相同。乙在读阶段之后、取号之前逐盘核之前判，所以这几格走不到逐盘核
 /// （调查 `research/prompts/m2-investigate-three-reds-report.md` 第二节）。这几格里有一块盘的系统配置槽读不出（每次读都报错、或空盘），
-/// C331（择根倒挂压过已确认的写） 取甲之后判据先按「见证读缺一槽，判不出」为真（用户 2026-09-28 定），读数里的比较记成那一支；
-/// 见证值照旧是另一块盘读得出的最大 tail，所选那一版末条的计数器 `selected_version_last_record_counter` 只进说明文字。
+/// 另一块盘两槽都自证过：C331（择根倒挂压过已确认的写） 改取 R2 之后判得出（用户 2026-10-03 定），读数里的比较是拿见证值比所选那一版末条那一支；
+/// 见证值是另一块盘读得出的最大 tail。
 fn assert_refused_by_the_witness_of_a_newer_publish(
     error: &MountError,
     what: &str,
@@ -1583,7 +1583,9 @@ fn assert_refused_by_the_witness_of_a_newer_publish(
         selected_version,
         witness: NewerPublishWitness {
             witnessed_journal_counter,
-            comparison: WitnessedCounterComparison::SomeSystemConfigurationSlotUnreadOrUnverified,
+            comparison: WitnessedCounterComparison::AgainstTheSelectedVersionsLastRecord {
+                selected_version_last_record_counter,
+            },
         },
     };
     assert!(
@@ -1700,8 +1702,9 @@ fn blank_device_refuses_the_writable_mount_by_name_before_any_write() {
         image_before_the_mount_with_device_zero_blank,
         "盘 0 是空盘：拒在取号之前，两块盘逐字节不变"
     );
-    // 盘 1 是空盘：见证读缺盘 1 两槽，C331（择根倒挂压过已确认的写） 取甲之后判不出、按真，重读仍缺，同样在逐盘核之前拒（用户 2026-09-28 定）；
-    // 见证值取盘 0 读得出的最大 tail 5，所选那一版 (1, 5) 末条 5。
+    // 盘 1 是空盘：没有槽报读错，R2 判得出；见证值取盘 0 读得出的最大 tail 5，所选那一版 (1, 5) 末条 5，判据 N-配置 为假。
+    // 往下逐盘核：盘 1 一份自证过的系统配置都没有（C554 乙-配置续 Q1，不「可见」），照见证读的拒因报，后一遍判
+    // 「有一块盘一份自证过的系统配置都没有」（用户 2026-09-28 定并进见证读的拒因）。
     let mut devices_with_device_one_blank = vec![
         (DEVICE_ZERO, sparse_from(&pool.full, DEVICE_ZERO)),
         (DEVICE_ONE, blank_device()),
@@ -1711,12 +1714,34 @@ fn blank_device_refuses_the_writable_mount_by_name_before_any_write() {
     let refusal_with_device_one_blank =
         mount_writable(&pool.parameters, &mut devices_with_device_one_blank)
             .expect_err("盘 1 是空盘，可写挂载要拒");
-    assert_refused_by_the_witness_of_a_newer_publish(
-        &refusal_with_device_one_blank,
-        "盘 1 是空盘",
-        version_key(1, 5),
-        5,
-        5,
+    let first_read = SelectedVersionAgainstTheWitness {
+        selected_version: version_key(1, 5),
+        witness: NewerPublishWitness {
+            witnessed_journal_counter: 5,
+            comparison: WitnessedCounterComparison::AgainstTheSelectedVersionsLastRecord {
+                selected_version_last_record_counter: 5,
+            },
+        },
+    };
+    let reread = SelectedVersionAgainstTheWitness {
+        selected_version: version_key(1, 5),
+        witness: NewerPublishWitness {
+            witnessed_journal_counter: 5,
+            comparison:
+                WitnessedCounterComparison::SomeDeviceWithoutAnySelfVerifiedSystemConfigurationSlot,
+        },
+    };
+    assert!(
+        matches!(
+            &refusal_with_device_one_blank,
+            MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable)
+                if **still_unreadable
+                    == StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion {
+                        first_read,
+                        reread,
+                    }
+        ),
+        "盘 1 是空盘：读阶段判得出、为假，逐盘核点名盘 1 一份自证过的系统配置都没有：{refusal_with_device_one_blank:?}"
     );
     assert_eq!(
         memory_pool_of(&devices_with_device_one_blank),
@@ -2112,7 +2137,7 @@ fn device_one_stale_on_the_version_without_file_refuses_the_writable_mount_namin
 /// 第一个文件（txg 3）→ 覆盖写 txg 4 之后，盘 1 的每一次读都报错、写照常。交进来的是两块盘，w 的下限那一判不拦；
 /// 所选那一版是 (1, 3)、不是 (1, 4)：txg 4 的根只落在区域 1（盘 1，读不出），txg 4 那条记录点名的单元在盘 1 上那一份验不了、
 /// 那次发布不施加（同「盘 0 是空盘」那一格所选的是 (1, 4) 而不是 (1, 5) 的道理）。盘 0 的系统配置见证过 txg 4 那次发布
-/// （jsn 4 > 所选那一版末条 3），可写挂载在取号之前被 C554 乙拒——逐盘核（点名盘 1「没有自证过的系统配置」）在乙之后不可达，
+/// （jsn 4 > 所选那一版末条 3；盘 1 两槽报读错而盘 0 两槽都自证过，R2 判得出），可写挂载在取号之前被 C554 乙拒——逐盘核（点名盘 1「没有自证过的系统配置」）在乙之后不可达，
 /// 那一判由 `blank_device_refuses_the_writable_mount_by_name_before_any_write` 的「盘 1 是空盘」那一格钉着。一个写、一道屏障都没落下。
 #[test]
 fn mount_writable_while_every_read_of_device_one_fails_is_refused_by_the_witness_before_any_write()

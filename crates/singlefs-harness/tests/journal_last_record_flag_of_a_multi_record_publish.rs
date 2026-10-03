@@ -8,8 +8,8 @@
 //!
 //! 历史都一样：A（第一个文件，jsn 3）→ 顺序写两个数据单元的 B（jsn 4、5，txg 4，B 的根落了）→ 顺序写三个数据单元的 C
 //! （jsn 6、7、8，txg 5，事务号 4、5、6），崩在 C 的根槽 FUA 之前：所选根是 B 的，C 的三条记录全落了。
-//! 什么都不改时恢复施加 C（阳性对照）；每条用例只改 B 或 C 的一条记录（两盘各一份，经 `JournalRecord::to_bytes` 重封校验和），
-//! 看恢复施加到哪一版。
+//! 什么都不改时恢复施加 C（阳性对照）；每条用例只改 B 或 C 的一条记录（两盘各一份，经 `JournalRecord::to_bytes` 重封校验和，
+//! 后面记录的反向链跟着重算），看恢复施加到哪一版。
 
 mod common;
 
@@ -21,8 +21,8 @@ use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::checksum::wide_checksum_with_field_zeroed;
 use singlefs_core::journal::{
-    record_offset, JournalRecord, JournalRecordOrdinalWithinPublish, JournalRecordPlaceInPublish,
-    JOURNAL_HEADER_CHECKSUM_OFFSET,
+    back_chain_of, record_offset, JournalRecord, JournalRecordOrdinalWithinPublish,
+    JournalRecordPlaceInPublish, JOURNAL_HEADER_CHECKSUM_OFFSET,
 };
 use singlefs_core::mount::{mount_writable, MountError};
 use singlefs_core::recovery::{
@@ -145,8 +145,11 @@ fn write_record_bytes(image: &mut MemoryPool, device: DeviceIdentity, counter: u
         .write(record_offset(counter, JOURNAL_RING_DEFAULT_BYTES), bytes);
 }
 
-/// 把 `counter` 那条记录的字段改一处，两盘各一份，`JournalRecord::to_bytes` 重封载荷与头部校验和：
-/// 这条记录照样自证得过，拦住它的只剩被改的那个字段。
+/// 把 `counter` 那条记录的字段改一处，两盘各一份，`JournalRecord::to_bytes` 重封载荷与头部校验和；
+/// 它后面一直到环里第一条解不出的记录，每一条的反向链按前一条改后的记录头重算、重封（D23（journal 的角色与格式） 已定项 8）：
+/// 这条记录照样自证得过、下一条的反向链也接得上，拦住它的只剩被改的那个字段。
+/// 不重算的话，读者删掉被测的那一判之后照样断在下一条的反向链上、结局不变，用例拦不住那一判
+/// （`research/prompts/m3-verus-land-code-r1-opus-output.md` C5-1：`crates/mutations.tsv` 里改这三判的三行套上都不红）。
 fn rewrite_record(image: &mut MemoryPool, counter: u64, change: impl Fn(&mut JournalRecord)) {
     for device in DEVICES {
         let mut record = JournalRecord::parse(
@@ -156,6 +159,16 @@ fn rewrite_record(image: &mut MemoryPool, counter: u64, change: impl Fn(&mut Jou
         .expect("改之前这条记录自证过");
         change(&mut record);
         write_record_bytes(image, device, counter, &record.to_bytes());
+        // 迭代次数的上界是这份历史在 `counter` 之后写过的记录条数（至多 C 的三条）：环里下一格没写过、解不出就是出口。
+        let mut later_counter = counter + 1;
+        while let Some(mut later) = JournalRecord::parse(
+            &record_bytes_on(image, device, later_counter),
+            filesystem_identifier(),
+        ) {
+            later.back_chain = back_chain_of(&record_bytes_on(image, device, later_counter - 1));
+            write_record_bytes(image, device, later_counter, &later.to_bytes());
+            later_counter += 1;
+        }
     }
 }
 
@@ -428,6 +441,36 @@ fn last_record_flag_followed_by_the_record_of_the_same_publish_breaks_the_chain_
         &history.second_content,
         0,
         "C 的首条带末条标志、后面还有同一次发布的两条：断在 C 的首条，C 整体不施加",
+    );
+    let verdict = publish_ordinal_verdict(&image);
+    assert!(
+        matches!(&verdict, InvariantVerdict::Violated(detail) if detail.contains("末条之后还有记录")),
+        "checker 的 I-8.9 判「末条之后还有记录」：{verdict:?}"
+    );
+}
+
+/// 同一条读者规则（C540），换一个取样点：C 的末条标志挪到第二条（jsn 7 写上、jsn 8 抹掉，两条都重封校验和），
+/// 带标志的 jsn 7 之后同一个 txg 5 里只剩紧挨着的 jsn 8 ⇒ 断在 jsn 7，C 一条都不施加、读回 B。
+/// 只从「紧挨着的下一条之后」往后找的读者看不到 jsn 8，把 {jsn 6, jsn 7} 当一次发布施加（jsn 7 带着 C 的整个新根段），读回 C；
+/// 上一条用例的取样点（标志在 jsn 6，后面还有 jsn 7、8 两条）拦不住这样的读者
+/// （`research/prompts/m3-verus-land-code-r1-opus-output.md` C5-2）。
+#[test]
+fn last_record_flag_followed_only_by_the_very_next_record_of_the_same_publish_breaks_the_chain_at_the_flag(
+) {
+    let history = crash_before_the_third_root("last-flag-followed-only-by-the-very-next-record");
+    let mut image = history.image.clone();
+    rewrite_record(&mut image, history.third_counters[1], |record| {
+        record.place_in_publish = JournalRecordPlaceInPublish::LastRecordOfThePublish;
+    });
+    rewrite_record(&mut image, history.third_counters[2], |record| {
+        record.place_in_publish = JournalRecordPlaceInPublish::MoreRecordsOfThePublishFollow;
+    });
+    assert_recovered_version(
+        &recover(&image, JournalPolicy::Consult),
+        history.second_version,
+        &history.second_content,
+        0,
+        "C 的第二条带末条标志、紧挨着它还有同一次发布的一条：断在 C 的第二条，C 整体不施加",
     );
     let verdict = publish_ordinal_verdict(&image);
     assert!(

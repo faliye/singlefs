@@ -1,4 +1,4 @@
-//! 实审 A3b（规格 `/tmp/claude-1000/impl-rev-a3b/spec.md`，写于 2026-09-27）：
+//! 这份文件钉的几格（实审 A3b，来历见 `research/prompts/m2-rev-a3b-implementer-report.md`）：
 //!
 //! 一、代码审阅第 15 条（C475（非默认环长下单元区起点取编译期常量））：单元区起点按环长现算、全链路一处来源——mkfs 按环长算起点
 //! （journal 环末尾的下一个槽，D3（空间分配） 已定项 10 ④）、写进系统配置偏移 417 的 8 字节、实例表与树表写在那里；读者择系统配置时
@@ -11,9 +11,9 @@
 //! 三、实审 A3c Q-A（主 agent 定走甲）：重建上一版时判树表条目的排序契约（D8（核心索引结构） 已定项 8「条目按树 ID 升序排」），
 //! 走得到发布路径那条「树表条目按树 ID 升序」断言的镜像，可写挂载在任何写之前拒。探针一（两条条目互换种类）、探针二（两条同号）各一条。
 //!
-//! 四、C554 乙报告 Q6（用户 2026-09-26「不能接受 要改」）：两处「读不出就无声放过」照乙的形态收——先重读一次，仍读不出就在任何写之前拒：
+//! 四、C554 乙报告 Q6：两处「读不出就无声放过」照乙的形态收——先重读一次，仍读不出就在任何写之前拒：
 //! 算生效 F 时最新那条根的实例表读不出（改之前「不按表滤」）；挂着时抬 F 重算影子账时根槽读不出（改之前当那一槽没有根）。
-//! 合入后验证一（规格 `/tmp/claude-1000/impl-merge-verify-1/spec.md`，2026-09-27）改了三样：
+//! 合入后验证一（规格 `/tmp/claude-1000/impl-merge-verify-1/spec.md`）改了三样：
 //! - 读根环照 D16（发布语义） 已定项 1「根槽这一次读坏」那一行分两类（善后一报告 P1）：挂载那一刻就读坏、这个进程之后没写过的槽当没有根，
 //!   不重读、不拒；这个进程知道住着根的槽读坏重读一次，仍坏才拒；
 //! - 两个拒的成员从 `RecoveryFailure` 挪进乙那一族 `StillUnreadableAfterOneReread`（A3b 报告 Q4）；
@@ -21,10 +21,10 @@
 //!   读不出的重读一次，仍读不出照原来的退路（写入口手里没有根环表，不拒）。
 //!
 //! 代码三方第二轮（`research/prompts/m2-closeout-code-r2-main-verification.md`，规格 `/tmp/claude-1000/impl-r2-fixes-b/spec.md`）改了两样：
-//! - 读根环照 D16（发布语义） 已定项 1「根槽这一次读坏」那一行全句（用户 2026-09-26 定）：知道住着根的槽「读不出**或自证不过**」都重读一次、
+//! - 读根环照 D16（发布语义） 已定项 1「根槽这一次读坏」那一行全句：知道住着根的槽「读不出**或自证不过**」都重读一次、
 //!   仍坏就拒（第四节末尾两条；包装盘另加「读得出、字节被改」那一种坏法）。管理员回退算水位读根环那一遍仍是 `readable_roots`
 //!   （不重读），判候选那两遍读得出、这一遍瞬时读坏时水位取内存里的现行那一版（`the_rollback_takes_the_inode_number_watermark_…`）。
-//! - 五、core 读系统配置的 journal 环起点（偏移 325）与根环起点（偏移 371），与第一版常量不等整池拒（Y4-a，用户 2026-09-27 定）。
+//! - 五、core 读系统配置的 journal 环起点（偏移 325）与根环起点（偏移 371），与第一版常量不等整池拒（Y4-a）。
 //!
 //! 盘：两块内存稀疏盘（`SparseBlockDevice`），改盘上字节之后重封每一道校验和；读故障用这个文件自己的包装盘按「这一段第几次读」坏。
 use std::cell::RefCell;
@@ -77,8 +77,8 @@ use singlefs_core::transaction::{
 use singlefs_core::unit::seal_header_checksum;
 use singlefs_format::{
     JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT,
-    JOURNAL_SAFETY_FACTOR, ROOT_RING_BASE_SLOT, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
-    UNIT_AREA_START_SLOT,
+    JOURNAL_SAFETY_FACTOR, NEW_POOL_FILE_CREATION_TREE_TABLE_ENTRIES, ROOT_RING_BASE_SLOT,
+    SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
 };
 use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice, SparseDevice, SECTOR_BYTES};
 
@@ -290,13 +290,26 @@ fn crc32_of_the_images(devices: &[(DeviceIdentity, SparseBlockDevice)], device_b
 
 // ─── 一、单元区起点随环长走 ───
 
-/// 默认环 768 MiB 上 mkfs → 取号 → 暖机 → 第一个文件之后，两块盘整盘镜像的 CRC-32C。钉的是改之前那一份代码写出的字节
-/// （实审 A3b 开工时主工作区的副本上同一段流程现算，`name=a3b_default_ring_new_pool_file_creation_images_crc32 value=1783297687`）：
-/// 默认环下单元区起点仍是 50176，新池新建文件写出的字节逐字节不变。
-const DEFAULT_RING_NEW_POOL_FILE_CREATION_IMAGES_CRC32: u32 = 1_783_297_687;
+/// 默认环 768 MiB 上 mkfs → 取号 → 暖机 → 第一个文件之后，两块盘整盘镜像的 CRC-32C。钉值是下面最后一次换钉那一版代码写出的字节，
+/// 不是实审 A3b 改单元区起点之前那一版的：最初钉的是那一版（实审 A3b 开工时主工作区的副本上同一段流程现算，
+/// `name=a3b_default_ring_new_pool_file_creation_images_crc32 value=1783297687`），判的是 A3b 那一步默认环下单元区起点仍是 50176、
+/// 新池新建文件写出的字节逐字节不变；之后每一次有意改了这两块盘上字节的改动换一次钉值，逐次记在下面。
+/// 三·2 第 1 条（D18（块里携带什么信息） 已定项 24 第 6 条）改了新池新建文件的字节：树表 7 → 11 条、key 区间末端 18 → 22（旧号）、
+/// 根记录与 journal 新根段的树 ID 水位 19 → 23（旧号），连带树表单元的校验和、指着它的指针、根槽与记录的校验和；钉值随之从 1783297687
+/// 换成 2804593800（三·2 实现员副本上同一段流程现算，单元区起点那几格的断言不动）。
+/// 树 ID 整体挪到 65536 起（D8（核心索引结构） 已定项 11，用户 2026-10-01 定案）又改了这些字节：根记录与记录新根段的水位、树表条目的树 ID 与头 ID、
+/// 码 2 头与数据单元头里的树 ID、映射 key 与指针头里的出生树；钉值随之换成 1800076519（那一批实现员的副本上同一段流程现算）。
+/// 三·2 第 6 条把记账标签 6 从 0 换成按这一版现算的墓碑预付（D3（空间分配） 已定项 2；`.claude/kb/layout/03-third-txn.md`
+/// 「记账标签 6 的值」那一行：新池新建文件里 0 → 2 × (3 × 16384 + 41) = 98386，连带记账树单元的载荷校验和、指着它的指针与映射条目、
+/// 根槽与记录的校验和）；钉值随之换成 1733593715（m3-unlink-body 第六位实现员的副本上同一段流程现算）。
+/// 里程碑三开工第一轮 7-2（D23（journal 的角色与格式） 已定项 4、已定项 15：journal 记录头 311 → 487、新根段 188 → 364）改了三条 journal 记录
+/// （暖机两条、第一个文件一条）的字节：新根段补上实例表指针、分配记录树根指针、卸载记号，fsid 挪到 [463, 471)，点名项整体后挪 176 字节，
+/// 连带 header_csum 与反向链；系统配置槽、根环、单元区逐字节不变（7-2 之前与之后两份副本上同一段流程逐扇区比过，差异只落在 journal 环
+/// 第 0–2 个记录槽里）。钉值随之换成 4048568891（7-2 合入之后的副本上同一段流程现算，与合入验证里这条断言红出来的 left 值相同）。
+const DEFAULT_RING_NEW_POOL_FILE_CREATION_IMAGES_CRC32: u32 = 4_048_568_891;
 
 /// 默认环 768 MiB：mkfs 按环长现算的单元区起点就是 50176（`INSTANCE_TABLE_SLOT`），树表第 0 版在 50178（`TREE_TABLE_GENESIS_SLOT`），
-/// 系统配置偏移 417 的 8 字节写 50176；mkfs 到第一个文件写出的两块盘与改之前逐字节相同（整盘 CRC-32C 钉值）。
+/// 系统配置偏移 417 的 8 字节写 50176；mkfs 到第一个文件写出的两块盘与钉值那一版（钉值说明里最后一次换钉的那一版）逐字节相同（整盘 CRC-32C 钉值）。
 #[test]
 fn the_default_journal_ring_keeps_the_unit_area_at_slot_50176_and_the_new_pool_file_creation_bytes_unchanged(
 ) {
@@ -328,7 +341,7 @@ fn the_default_journal_ring_keeps_the_unit_area_at_slot_50176_and_the_new_pool_f
     assert_eq!(
         crc32_of_the_images(&pool.devices, pool.device_bytes),
         DEFAULT_RING_NEW_POOL_FILE_CREATION_IMAGES_CRC32,
-        "默认环下 mkfs 到第一个文件写出的两块盘与改之前逐字节相同"
+        "默认环下 mkfs 到第一个文件写出的两块盘与钉值那一版（7-2 合入之后）逐字节相同"
     );
 }
 
@@ -571,12 +584,11 @@ fn reseal_index_node(node: &mut [u8]) {
 
 /// 树表条目里种类那 2 字节的偏移（树 ID 8 + 条目长度 2 之后，D8（核心索引结构） 已定项 8）。
 const TREE_TABLE_ENTRY_KIND_OFFSET: usize = 10;
-/// 第一个文件那一版树表里的条目数（七棵进树表的树）。
-const TREE_TABLE_ENTRIES_OF_A_FILE_VERSION: usize = 7;
-
-/// 树表里种类是 `kind` 的那一条的下标。
+/// 树表里种类是 `kind` 的那一条的下标；找遍第一个文件那一版树表的全部条目（格式常量 `NEW_POOL_FILE_CREATION_TREE_TABLE_ENTRIES`）。
 fn index_of_the_entry_of_kind(node: &[u8], kind: u16) -> usize {
-    (0..TREE_TABLE_ENTRIES_OF_A_FILE_VERSION)
+    let tree_table_entries_of_a_file_version =
+        usize::try_from(NEW_POOL_FILE_CREATION_TREE_TABLE_ENTRIES).expect("树表条目数装得进 usize");
+    (0..tree_table_entries_of_a_file_version)
         .find(|index| {
             let entry = &node[entry_range_in_node(node, *index)];
             u16::from_le_bytes([
@@ -689,7 +701,7 @@ fn a_tree_table_whose_two_entries_swapped_their_kinds_is_refused_by_the_writable
     });
     assert_the_writable_mount_refuses_the_ordering_before_any_write(
         &mut pool,
-        "树表里七棵树的树 ID 不按发号次序（extent、inode、分配记录、记账、livelist、稀疏旁表、deadlist）严格升序",
+        "树表里各棵树的树 ID 不按发号次序（extent、inode、分配记录、记账、livelist、稀疏旁表、deadlist、deleted_inodes、墓碑树、谱系树、logged_ops）严格升序",
     );
 }
 
@@ -1579,6 +1591,106 @@ fn the_rollback_takes_the_inode_number_watermark_from_the_current_version_in_mem
         current.inode_number_watermark(),
         5,
         "回退那次发布的 inode 号水位 = max(现行那一版内存里的 5, 环里读得出的根的 2)"
+    );
+}
+
+/// 管理员回退算水位的树 ID 那一半（D23（journal 的角色与格式） 已定项 14「水位」、D8（核心索引结构） 已定项 8 ②「号永不重发」；
+/// C586（回退取树 ID 水位的那一半没有用例），攻方 `research/prompts/m2-closeout-code-r3-opus-output.md`「X1-e」）：
+/// 第一个文件（txg 3）十二棵树发 65536..65547、水位 65548，覆盖写一次（txg 4）照带 65548；环里别的根（mkfs 与暖机）都带 mkfs 种下的 65536。
+/// 回退到 txg 3 时这两条根的槽判候选那两遍（各自第 1、2 次读）读得出，算水位那一遍（第 3 次，`readable_roots`，不重读）都瞬时读不出：
+/// 环里读得出的根都是 65536，只有内存里的现行那一版带 65548。回退那次发布的树 ID 水位仍是 65548——树表里 65536..65547 那几棵树都在水位之下（I-7.8 不红），
+/// 之后再发树 ID 从 65548 起、不重发 65536..65547。只取环里读得出的根时是 65536——`crates/mutations.tsv` 里 C586 那一行证这条断言红。
+#[test]
+fn the_rollback_takes_the_tree_identifier_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_every_root_carrying_it(
+) {
+    let mut pool = pool_after_the_first_file(JOURNAL_RING_DEFAULT_BYTES, FOUR_GIBIBYTES);
+    let sizes = pool.parameters.geometry;
+    let overwritten = {
+        let content = content_of(2097, 1);
+        let mut writer = PoolWriter::new(&pool.parameters, pool.devices.as_mut_slice());
+        publish_overwrite(
+            &mut writer,
+            &mut pool.allocator,
+            &pool.first,
+            FirstFile {
+                content: &content,
+                write_time_seconds: WRITE_TIME_SECONDS + 60,
+            },
+            pool.instance,
+        )
+        .expect("覆盖写")
+    };
+    assert_eq!(overwritten.root.checkpoint_txg, CheckpointTxg(4));
+    assert_eq!(overwritten.root.tree_identifier_watermark, 65548);
+    let roots_in_the_ring = readable_roots_with_ring_slots(
+        &pool.devices,
+        &pool.parameters.region_devices,
+        &sizes,
+        &pool.parameters.filesystem_identifier,
+    );
+    let slots_of_the_roots_carrying_the_first_file_version_watermark: Vec<RootRingSlot> =
+        roots_in_the_ring
+            .iter()
+            .filter(|(_, root)| root.tree_identifier_watermark == 65548)
+            .map(|(ring_slot, _)| *ring_slot)
+            .collect();
+    assert_eq!(
+        roots_in_the_ring
+            .iter()
+            .filter(|(_, root)| root.tree_identifier_watermark == 65548)
+            .map(|(_, root)| root.checkpoint_txg)
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::from([CheckpointTxg(3), CheckpointTxg(4)]),
+        "带 65548 的只有第一个文件与覆盖写那两条根"
+    );
+    assert!(
+        roots_in_the_ring
+            .iter()
+            .all(|(_, root)| root.tree_identifier_watermark == 65548
+                || root.tree_identifier_watermark == 65536),
+        "环里别的根都带 mkfs 种下的 65536"
+    );
+    let parameters = pool.parameters.clone();
+    let mut faulty = with_chosen_read_faults(
+        std::mem::take(&mut pool.devices),
+        slots_of_the_roots_carrying_the_first_file_version_watermark
+            .iter()
+            .map(|ring_slot| {
+                chosen_read_faults_of(
+                    parameters.region_devices[usize::try_from(ring_slot.region).expect("区域号")],
+                    slot_offset(*ring_slot, sizes.fixed_structure_slot_spacing).0,
+                    u64::from(sizes.physical_block_size),
+                    &[3],
+                )
+            })
+            .collect(),
+    );
+    let mut current = overwritten;
+    roll_back_by_a_forward_publish(
+        &parameters,
+        &mut faulty,
+        &mut pool.allocator,
+        &mut current,
+        RollbackTarget {
+            instance: InstanceGeneration(1),
+            checkpoint_txg: CheckpointTxg(3),
+        },
+    )
+    .expect("判候选两遍读得出，回退做成");
+    pool.devices = without_chosen_read_faults(faulty);
+    assert_eq!(
+        current.root.checkpoint_txg,
+        CheckpointTxg(5),
+        "回退那次发布"
+    );
+    assert_eq!(
+        current.root.tree_identifier_watermark, 65548,
+        "回退那次发布的树 ID 水位 = max(现行那一版内存里的 65548, 环里读得出的根的 65536)"
+    );
+    assert_eq!(
+        checker_violations(&memory_pool_of(&pool.devices, pool.device_bytes)),
+        Vec::<(&'static str, String)>::new(),
+        "回退之后池级 checker 不红：树表里的树 ID 都在回退那一版的水位之下（I-7.8）"
     );
 }
 

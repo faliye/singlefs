@@ -2,7 +2,7 @@
 //! D3（空间分配） 已定项 8 第 1 条「在每一块被选中的设备上各自取该设备内」。
 //! 两块不等大的盘（盘 0 4 GiB、盘 1 3 GiB 加 33 槽）：mkfs、新池新建文件、可写挂载今天都接受；填到小盘单元区末尾之后，
 //! 分配器直接取落点时按设备算，小盘答不出就在动任何状态之前拒绝、报 `PlacementRefused` 并带着分配器的原因（不再一律报装不下）；
-//! 发布路径先判「这次的单元落不落得下」（C545（空间准入罩不住分裂与聚簇段层），用户 2026-09-27 定「准入先拒」），小盘落不下时交回
+//! 发布路径先判「这次的单元落不落得下」（C545（空间准入罩不住分裂与聚簇段层） 取「准入先拒」），小盘落不下时交回
 //! `SpaceAdmissionRefused`，落得下、只是各盘落点不一致时仍是 `PlacementRefused`；两条路都不 panic、一个写都不发。
 //! 另钉两个第一版不支持、没有条款的分支（拒绝成员的名字说哪条没定）：各盘给提交内生块的去处不同（一块开段一块回落，D3 已定项 8 待办 ①）；
 //! 各盘的用户数据落点不同（`Placement` 两盘同槽）。
@@ -396,10 +396,10 @@ fn devices_answering_different_places_for_a_commit_generated_block_are_refused_b
             vec![DeviceShortOfDemand {
                 device: DeviceIdentity(1),
                 available: AvailableBytesOnOneDevice(16_384),
-                demand: BytesOnOneDevice(7_553_024),
+                demand: BytesOnOneDevice(7_602_176),
             }],
-            "准入先拒（C545）：小盘数据单元取走那一对之后没挡的槽剩 1（16 384 字节）< 第一个提交内生块要的 461 槽\
-             （extent 根 + inode 叶容器 + inode 根 + ckpt_cost，7 553 024 字节），只报盘 1"
+            "准入先拒（C545）：小盘数据单元取走那一对之后没挡的槽剩 1（16 384 字节）< 第一个提交内生块要的 464 槽\
+             （extent 根 + inode 叶容器 + inode 根 + ckpt_cost（含谱系那一项 3 块），7 602 176 字节），只报盘 1"
         ),
         other => panic!("extent 树根的落点该被拒（准入先拒）：{:?}", other.as_ref().err()),
     }

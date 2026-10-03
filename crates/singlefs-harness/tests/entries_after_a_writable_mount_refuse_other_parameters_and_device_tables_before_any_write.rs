@@ -1,4 +1,4 @@
-//! 实审 A1b Q2、Q3（主 agent 2026-09-27 定）：代码审阅第 17、18 条只守住了可写挂载那一处。挂着之后的入口——会话的发布
+//! 代码审阅第 17、18 条只守住了可写挂载那一处。挂着之后的入口——会话的发布
 //! （`MountedSession::publish_user_change`）、抬 F（`raise_rollback_floor`、`raise_rollback_floor_to_the_admission_ceiling`、
 //! `push_one_floor_raise_within_the_admission_budget`）与正常卸载（`unmount`）——每次拿调用方交进来的参数与设备表建写入口：
 //! 挂载之后换一份参数，取号之后每次轮换照它改写盘上系统不可变配置（D22（单元原子性怎么合成） 已定项 26 第一档）；盘表里同一个身份交两次，

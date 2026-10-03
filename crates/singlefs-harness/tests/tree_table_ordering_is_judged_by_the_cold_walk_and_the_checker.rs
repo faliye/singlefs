@@ -1,11 +1,13 @@
-//! I-9.16（树表条目按树 ID 严格升序且合发号次序）：实审 A3b Q2 交上来，用户 2026-09-27 定「立不变量并同步」。
+//! I-9.16（树表条目按树 ID 严格升序且合发号次序）。
 //! 两道合成这一条，任一道不成立即判红：① 盘上次序树 ID 严格升序（D8（核心索引结构） 已定项 8 排序契约）；
-//! ② 按发号次序（extent、inode、分配记录、记账、livelist、稀疏旁表、deadlist）相邻两棵的树 ID 严格升序（D8 已定项 8 ②）。
+//! ② 按发号次序（extent、inode、分配记录、记账、livelist、稀疏旁表、deadlist，再接第一个文件版本那次零根注册的 `deleted_inodes`、
+//! 墓碑树、谱系树、logged_ops）相邻两棵的树 ID 严格升序（D8 已定项 8 ②；D18（块里携带什么信息） 已定项 24 第 6 条）。
 //!
 //! 实审 A3b 只在重建上一版（`rebuild_version`）判它；这里钉住另外两处也判：冷走读 `walk_to_file` 在拿到树表条目之后、
 //! 读任何一棵树之前拒，池级 checker 每读一版的树表判一次、违例写明哪一版根与哪两条。
 //! 两个探针都从写完第一个文件的干净镜像出发，只改最新那条根的树表单元（两份）、重封、把新的整单元校验和补进根记录再写回根槽：
-//! 探针甲（livelist 与稀疏旁表两条互换种类）只违反 ②；探针乙（这两条整条互换位置）只违反 ①。
+//! 探针甲（livelist 与稀疏旁表两条互换种类）只违反 ②；探针乙（这两条整条互换位置）只违反 ①；
+//! 探针丙（墓碑树与谱系树两条互换种类）只违反 ②，钉住两处的发号次序都认得四棵新树。
 //! 只违反 ② 的那一份「checker 只红 I-9.16」钉在 `checker_known_bad_images.rs`；探针乙在 checker 上连 I-1.1 一起红
 //! （树表的 key 就是树 ID，① 与 I-1.1 在树表上判的「key 严格递增」是同一个谓词），钉在这里。
 mod common;
@@ -13,14 +15,19 @@ mod common;
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 
-use common::{build_pool, file_content};
+use common::{
+    build_pool, copy_each_root_into_the_new_root_segment_of_its_journal_records, file_content,
+};
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
 use singlefs_core::allocator::UnitAreaStart;
 use singlefs_core::checksum::crc32_castagnoli;
 use singlefs_core::journal::JournalRecord;
-use singlefs_core::records::{TREE_KIND_LIVELIST, TREE_KIND_SPARSE_SIDE_TABLE};
+use singlefs_core::records::{
+    TREE_KIND_INODE, TREE_KIND_LINEAGE, TREE_KIND_LIVELIST, TREE_KIND_SPARSE_SIDE_TABLE,
+    TREE_KIND_TOMBSTONE,
+};
 use singlefs_core::recovery::{
     choose_system_configuration, every_root_ring_slot, read_root_ring_slot, rebuild_version,
     walk_to_file_in_the_unit_area_starting_at, PoolReader, RebuildVersionFailure, RecoveryFailure,
@@ -34,13 +41,22 @@ use singlefs_harness::memory_pool::MemoryPool;
 
 /// 树表条目里种类那 2 字节的偏移（树 ID 8 + 条目长度 2 之后，D8（核心索引结构） 已定项 8）。
 const TREE_TABLE_ENTRY_KIND_OFFSET: usize = 10;
-/// 第一个文件那一版树表里七条按发号次序排：livelist 是第 4 条（从 0 数）、稀疏旁表第 5 条，号 16、17（mkfs 水位 11 起连号发，
-/// 中央映射树占 15、不进树表）。
+/// 树表条目里头 ID 那 8 字节的偏移（树 ID 8 + 条目长度 2 + 种类 2 + flags 2 + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 之后，
+/// D8（核心索引结构） 已定项 8「头 ID 8 字节的取值」，判它的是 I-9.27（树表条目的头 ID 取值））。
+const TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET: usize = 116;
+/// 种类码 2（inode 树）的条目在第一个文件那一版树表里是第 1 条（extent 树第 0 条）。
+const INODE_ENTRY_INDEX: usize = 1;
+/// 第一个文件那一版树表里十一条按发号次序排：livelist 是第 4 条（从 0 数）、稀疏旁表第 5 条，号 65541、65542（mkfs 水位 65536 起连号发，
+/// 中央映射树占 65540、不进树表）。
 const LIVELIST_ENTRY_INDEX: usize = 4;
 const SPARSE_SIDE_TABLE_ENTRY_INDEX: usize = 5;
+/// 第一个文件版本那次零根注册的四棵（D18（块里携带什么信息） 已定项 24 第 6 条）接在 deadlist（第 6 条）之后：
+/// `deleted_inodes` 第 7 条、墓碑树第 8 条、谱系树第 9 条、logged_ops 第 10 条，号 65544..65547。
+const TOMBSTONE_ENTRY_INDEX: usize = 8;
+const LINEAGE_ENTRY_INDEX: usize = 9;
 /// 探针甲的 detail（核心层只违反 ② 时报的那一句）。
 const DETAIL_OUT_OF_THE_ISSUING_ORDER: &str =
-    "树表里七棵树的树 ID 不按发号次序（extent、inode、分配记录、记账、livelist、稀疏旁表、deadlist）严格升序";
+    "树表里各棵树的树 ID 不按发号次序（extent、inode、分配记录、记账、livelist、稀疏旁表、deadlist、deleted_inodes、墓碑树、谱系树、logged_ops）严格升序";
 /// 探针乙的 detail（核心层 ① 不成立时报的那一句）。
 const DETAIL_OUT_OF_THE_ON_DISK_ORDER: &str = "树表条目不按树 ID 严格升序";
 
@@ -63,6 +79,20 @@ fn kind_of_entry(node: &[u8], index: usize) -> u16 {
     ])
 }
 
+fn head_identifier_of_entry(node: &[u8], index: usize) -> u64 {
+    let entry = &node[entry_range_in_node(node, index)];
+    u64::from_le_bytes(
+        entry[TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET..TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET + 8]
+            .try_into()
+            .expect("8 字节"),
+    )
+}
+
+fn tree_identifier_of_entry(node: &[u8], index: usize) -> u64 {
+    let entry = &node[entry_range_in_node(node, index)];
+    u64::from_le_bytes(entry[0..8].try_into().expect("8 字节"))
+}
+
 /// 码 2 节点改过之后重封：载荷 CRC（罩 [86 + 2k, 16384)，住 76 + 2k）与头校验和（罩 [0, 86 + 2k)）。
 fn reseal_index_node(node: &mut [u8]) {
     let key_width = usize::from(node[51]);
@@ -72,7 +102,7 @@ fn reseal_index_node(node: &mut [u8]) {
     seal_header_checksum(node, header_end);
 }
 
-/// 探针甲：livelist 与稀疏旁表两条互换种类（条目偏移 10 的 2 字节）。盘上仍按树 ID 升序，按发号次序 livelist 的号 17 大过稀疏旁表的号 16。
+/// 探针甲：livelist 与稀疏旁表两条互换种类（条目偏移 10 的 2 字节）。盘上仍按树 ID 升序，按发号次序 livelist 的号 65542 大过稀疏旁表的号 65541。
 fn swap_the_kinds_of_the_livelist_and_sparse_side_table_entries(tree_table: &mut [u8]) {
     assert_eq!(
         kind_of_entry(tree_table, LIVELIST_ENTRY_INDEX),
@@ -92,8 +122,64 @@ fn swap_the_kinds_of_the_livelist_and_sparse_side_table_entries(tree_table: &mut
     }
 }
 
+/// 探针丙：墓碑树与谱系树两条互换种类，头 ID 跟着新种类一起换（I-9.27：墓碑树的头 ID 等于 inode 树的树 ID、谱系树写 0；
+/// 只换种类不换头 ID，两条的头 ID 都不合新种类，I-9.27 跟着红）。盘上仍按树 ID 升序，按发号次序墓碑树（种类 10）取到的号 65546
+/// 大过谱系树（种类 11）取到的号 65545：只违反 ②（头 ID 合种类，I-9.27 不红），而且只在发号次序里认得这两棵新树的判法上红
+/// （读法照抄树表之前七棵那一份的判法看不见它）。
+fn swap_the_kinds_of_the_tombstone_and_lineage_entries(tree_table: &mut [u8]) {
+    assert_eq!(
+        kind_of_entry(tree_table, INODE_ENTRY_INDEX),
+        TREE_KIND_INODE
+    );
+    assert_eq!(
+        kind_of_entry(tree_table, TOMBSTONE_ENTRY_INDEX),
+        TREE_KIND_TOMBSTONE
+    );
+    assert_eq!(
+        kind_of_entry(tree_table, LINEAGE_ENTRY_INDEX),
+        TREE_KIND_LINEAGE
+    );
+    let inode_tree_identifier = tree_identifier_of_entry(tree_table, INODE_ENTRY_INDEX);
+    assert_eq!(
+        head_identifier_of_entry(tree_table, TOMBSTONE_ENTRY_INDEX),
+        inode_tree_identifier,
+        "互换之前墓碑树的头 ID 等于 inode 树的树 ID"
+    );
+    assert_eq!(
+        head_identifier_of_entry(tree_table, LINEAGE_ENTRY_INDEX),
+        0,
+        "互换之前谱系树的头 ID 是 0"
+    );
+    // 每条条目的头 ID 跟着它的新种类：种类 11（谱系树）写 0，种类 10（墓碑树）写 inode 树的树 ID。
+    for (index, kind, head_identifier) in [
+        (TOMBSTONE_ENTRY_INDEX, TREE_KIND_LINEAGE, 0),
+        (
+            LINEAGE_ENTRY_INDEX,
+            TREE_KIND_TOMBSTONE,
+            inode_tree_identifier,
+        ),
+    ] {
+        let entry_start = entry_range_in_node(tree_table, index).start;
+        let kind_start = entry_start + TREE_TABLE_ENTRY_KIND_OFFSET;
+        tree_table[kind_start..kind_start + 2].copy_from_slice(&kind.to_le_bytes());
+        let head_identifier_start = entry_start + TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET;
+        tree_table[head_identifier_start..head_identifier_start + 8]
+            .copy_from_slice(&head_identifier.to_le_bytes());
+    }
+    assert_eq!(
+        head_identifier_of_entry(tree_table, TOMBSTONE_ENTRY_INDEX),
+        0,
+        "互换之后第 8 条是种类 11（谱系树），头 ID 合它的新种类：0"
+    );
+    assert_eq!(
+        head_identifier_of_entry(tree_table, LINEAGE_ENTRY_INDEX),
+        inode_tree_identifier,
+        "互换之后第 9 条是种类 10（墓碑树），头 ID 合它的新种类：inode 树的树 ID"
+    );
+}
+
 /// 探针乙：livelist 与稀疏旁表两条整条互换位置（200 字节连同树 ID、种类、根指针一起搬）。种类仍跟着自己的号，
-/// 按发号次序 16 < 17 照旧成立；盘上次序变成 …、17、16、…。首末两条没动，树表头里的 key 区间照旧贴紧。
+/// 按发号次序 65541 < 65542 照旧成立；盘上次序变成 …、65542、65541、…。首末两条没动，树表头里的 key 区间照旧贴紧。
 fn swap_the_places_of_the_livelist_and_sparse_side_table_entries(tree_table: &mut [u8]) {
     let livelist = entry_range_in_node(tree_table, LIVELIST_ENTRY_INDEX);
     let sparse_side_table = entry_range_in_node(tree_table, SPARSE_SIDE_TABLE_ENTRY_INDEX);
@@ -109,7 +195,8 @@ fn clean_image_after_the_first_file(tag: &str) -> (MemoryPool, JournalRecord) {
     (pool.memory_pool(), pool.output.record.clone())
 }
 
-/// 改最新那条根的树表单元（两份），重封、把新的整单元校验和补进根记录里树表指针的两条位置条目，再把根写回它的槽：
+/// 改最新那条根的树表单元（两份），重封、把新的整单元校验和补进根记录里树表指针的两条位置条目，再把根写回它的槽，
+/// 同 (实例, txg) 的 journal 记录的新根段照抄改过的根（I-8.10（记录新根段与同代根相同）：写者发布时两处带同一份树表指针）：
 /// 盘上每一道校验和都过，只剩树表条目的排序不对。交回改过之后的根。
 fn rewrite_the_tree_table_of_the_newest_root(
     image: &mut MemoryPool,
@@ -162,6 +249,7 @@ fn rewrite_the_tree_table_of_the_newest_root(
             slot_offset(ring_slot, sizes.fixed_structure_slot_spacing),
             &root.to_slot(root_slot_bytes),
         );
+    copy_each_root_into_the_new_root_segment_of_its_journal_records(image);
     root
 }
 
@@ -291,6 +379,60 @@ fn the_cold_walk_refuses_a_tree_table_whose_two_entries_swapped_their_kinds_befo
     );
 }
 
+/// 探针丙（只违反 ②，落在第一个文件版本那次零根注册的两棵新树上）：冷走读在读任何一棵树之前拒成 I-9.16。
+/// 核心层的发号次序里没有这两棵时它一路走到文件。
+#[test]
+fn the_cold_walk_refuses_a_tree_table_whose_tombstone_and_lineage_entries_swapped_their_kinds_before_reading_any_tree(
+) {
+    let (mut image, _) =
+        clean_image_after_the_first_file("tree-table-ordering-walk-new-tree-kinds");
+    let root = rewrite_the_tree_table_of_the_newest_root(
+        &mut image,
+        swap_the_kinds_of_the_tombstone_and_lineage_entries,
+    );
+    assert_the_cold_walk_refuses_before_reading_any_tree(
+        &image,
+        &root,
+        DETAIL_OUT_OF_THE_ISSUING_ORDER,
+    );
+}
+
+/// 探针丙在 checker 上：只红 I-9.16，第一处违例写明最新那条根（实例 1、txg 3）与两条的种类、下标、号。
+/// checker 的发号次序里没有这两棵时一条都不红。
+#[test]
+fn the_checker_reddens_only_the_tree_table_ordering_when_the_tombstone_and_lineage_entries_swapped_their_kinds(
+) {
+    let (mut image, _) =
+        clean_image_after_the_first_file("tree-table-ordering-checker-new-tree-kinds");
+    rewrite_the_tree_table_of_the_newest_root(
+        &mut image,
+        swap_the_kinds_of_the_tombstone_and_lineage_entries,
+    );
+    let verdicts = check_pool_image(&image);
+    let violated: Vec<&str> = verdicts
+        .iter()
+        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
+        .map(|(invariant, _)| *invariant)
+        .collect();
+    assert_eq!(
+        violated,
+        ["I-9.16"],
+        "墓碑树与谱系树互换种类：判红的该只有 I-9.16：{verdicts:?}"
+    );
+    let tree_table_ordering = verdicts
+        .iter()
+        .find(|(invariant, _)| *invariant == "I-9.16")
+        .map(|(_, verdict)| verdict.clone());
+    assert_eq!(
+        tree_table_ordering,
+        Some(InvariantVerdict::Violated(
+            "根（实例 1、txg 3）的树表：种类 10 那条（第 9 条，树 ID 65546）与发号次序上的下一棵、种类 11 那条（第 8 条，树 ID 65545）不按树 ID 严格升序（② 发号次序）"
+                .to_owned()
+        )),
+        "红在最新那条根的树表墓碑树、谱系树两条"
+    );
+}
+
 /// 探针乙（只违反 ①）：冷走读在读任何一棵树之前拒成 I-9.16。
 #[test]
 fn the_cold_walk_refuses_a_tree_table_whose_two_entries_swapped_their_places_before_reading_any_tree(
@@ -376,7 +518,7 @@ fn the_checker_reddens_the_tree_table_ordering_and_the_key_order_when_two_entrie
     assert_eq!(
         tree_table_ordering,
         Some(InvariantVerdict::Violated(
-            "根（实例 1、txg 3）的树表：第 4 条（树 ID 17）与第 5 条（树 ID 16）不按树 ID 严格升序（① 盘上次序）"
+            "根（实例 1、txg 3）的树表：第 4 条（树 ID 65542）与第 5 条（树 ID 65541）不按树 ID 严格升序（① 盘上次序）"
                 .to_owned()
         )),
         "红在最新那条根的树表第 4、5 两条"

@@ -1,10 +1,10 @@
-//! 里程碑「覆盖写、释放、回退与复用」步 3 的另一格（2026-09-17 用户定：只做过 mkfs 的池允许可写挂载）：mkfs 之后进程退出、重开两个镜像走可写挂载——
+//! 里程碑「覆盖写、释放、回退与复用」步 3 的另一格（只做过 mkfs 的池允许可写挂载）：mkfs 之后进程退出、重开两个镜像走可写挂载——
 //! 恢复择到 mkfs 的第 0 代根、环里一条记录都没有；取号 1；上一个实例是 0，不写行（D18（块里携带什么信息） 已定项 11）；
 //! 树表 0 条 ⇒ 写行那次发布与暖机都写零个单元（D16（发布语义） 已定项 9），txg 1 落盘 1、txg 2 落盘 0；之后在同一个进程里发布第一个文件版本（txg 3）。
 //! mkfs 之后的整条录制流与 mkfs 同一个进程里跑新池新建文件逐字节相同（第一次可写挂载要写的区间是空的，新池新建文件的字节不变）；
 //! 冷启动读回那个文件；每一步的镜像池级 checker 一条违例都没有（没有文件的两步里没有记账树与 inode 树的 8 条报不适用）。
 //!
-//! 2026-09-23 用户定案「走到底，让那条零故障历史真跑通」之后这一份还罩着挂载不止一次的那几格：
+//! 这一份还罩着挂载不止一次的那几格：
 //! 树表 0 条的一版上**写实例表行**（只重写实例表一个单元）、第一个文件版本从现行那一版接着算 txg 与 jsn、
 //! 写过行的那一版上再挂载一次被拒（被换下的那片实例表记在哪没有条款）。回退到树表 0 条的根那两格随回退改成挂着时的向前发布删掉
 //! （向前回退的候选要带文件，D23（journal 的角色与格式） 已定项 14；树表 0 条的根拒成 `VersionWithoutFile`，由步 4 的候选集用例钉）。
@@ -55,6 +55,7 @@ use singlefs_harness::fault_injection::{
     FaultSchedule, InjectedFault, SharedFaultPlan,
 };
 use singlefs_harness::memory_pool::{writes_and_segments, MemoryPool};
+use singlefs_harness::segments::StepKind;
 use singlefs_harness::SharedStream;
 
 /// 每块盘第 `ordinal` 次读系统配置槽 0（偏移 0）时注入一次读错，别的读写原样交给内层
@@ -218,22 +219,65 @@ fn writable_mount_after_a_crash_right_after_acquiring_an_instance_writes_a_row_f
 
 /// 环里留着一条孤记录时，只做过 mkfs 的池照常可写挂载（2026-09-23 用户定案收窄 R4：`NEW_POOL_FILE_CREATION_TXG` 只管 mkfs
 /// 同一个进程里那条流，不管任何池的第一个文件版本，所以「新实例的第一次发布不是 txg 1、jsn 1」不再是拒绝的理由）：
-/// mkfs 之后第一次可写挂载崩在取号两写与 txg 1 的记录两写都持久、txg 1 的根槽没持久；两块盘系统配置槽 0（取号写进号 1 的那一槽）
-/// 退回 mkfs 写的那一份（造出来的盘面：取号写之后才有记录，真崩溃留不下这一形）——择系统配置只剩 mkfs 的那一份、根环只有第 0 代根，要取的号 1、要写的行为空；环里那条 txg 1 的记录让新实例从
+/// mkfs 之后第一次可写挂载取号那两次写（两块盘系统配置槽 0，写进号 1 的那一槽）被说谎的设备吞掉（`InjectedFault::WriteIsSwallowed`：报成功、
+/// 一个字节都没落盘），之后崩在 txg 1 的记录两写持久、txg 1 的根槽没持久（真崩溃留不下这一形：取号写与记录写之间有屏障，记录持久而取号写没持久
+/// 只有说谎的设备做得出；代码轮 LR6 把用例自己改写系统配置槽的造法换成这一种）——两块盘槽 0 仍是 mkfs 写的那一份，择系统配置只剩 mkfs 的那一份、
+/// 根环只有第 0 代根，要取的号 1、要写的行为空；环里那条 txg 1 的记录让新实例从
 /// txg 2、jsn 2 起 ⇒ 零单元发布 txg 2（落盘 0），暖机推到 txg 4（落盘 1）才覆盖两块盘，之后第一个文件版本接着写 txg 5。
 #[test]
 fn formatted_pool_mount_starting_after_a_leftover_record_publishes_from_the_next_txg() {
     let mut formatted = format_pool("step-three-formatted-leftover-record");
-    let mut first_mount_devices = formatted.reopen_recorded();
-    mount_writable(&parameters(), &mut first_mount_devices).expect("第一次可写挂载");
-    formatted.devices = Some(first_mount_devices);
+    // 取号那两次写（每块盘头一次写系统配置槽 0）被设备吞掉：注入层包在录制器外面，吞掉的写不进录制流，录制流里的就是落到设备上的。
+    // 不吞成撕裂：C331（择根倒挂压过已确认的写） 取甲之后见证读缺一槽就拒可写（用户 2026-09-28 定），撕裂造的走不到孤记录这一支；
+    // 吞掉之后槽 0 仍是 mkfs 写的那一份（mkfs 两槽写同一份字节），两槽都自证得过。
+    let swallowing_the_acquisition = SharedFaultPlan::armed(
+        geometry(),
+        FaultSchedule {
+            fault: InjectedFault::WriteIsSwallowed,
+            device: FaultDeviceSelector::EveryDevice,
+            placement: FaultPlacement::OffsetExactly(DeviceOffsetInBytes(0)),
+            counting: FaultCounting::PerDevice,
+            occurrence: FaultOccurrence::TheNthMatchingCall(1),
+        },
+    );
+    let mut first_mount_devices: Vec<(DeviceIdentity, FaultInjectingBlockDevice<_>)> = formatted
+        .reopen_recorded()
+        .into_iter()
+        .map(|(identity, device)| {
+            (
+                identity,
+                FaultInjectingBlockDevice::new(
+                    identity,
+                    device,
+                    swallowing_the_acquisition.clone(),
+                ),
+            )
+        })
+        .collect();
+    // 说谎的设备之后这次挂载自己怎么收尾不判：只要它在 txg 1 的根槽之前那几次写（录制流里）。
+    let _first_mount = mount_writable(&parameters(), &mut first_mount_devices);
+    assert_eq!(
+        swallowing_the_acquisition.fired().len(),
+        2,
+        "两块盘各吞了一次写系统配置槽 0（取号那两次）"
+    );
+    drop(first_mount_devices);
     let operations = formatted.retained_operations();
-    let (writes, segments) =
+    let (writes, _segments) =
         writes_and_segments(&operations[formatted.mkfs_operation_count..], &geometry());
-    let mut persisted = vec![false; writes.len()];
-    for write_index in segments[0].iter().chain(segments[1].iter()) {
-        persisted[*write_index] = true;
-    }
+    let first_root_slot_write = writes
+        .iter()
+        .position(|write| write.kind == StepKind::RootRecordFua)
+        .expect("第一次可写挂载写了 txg 1 的根槽");
+    let persisted: Vec<bool> = (0..writes.len())
+        .map(|write_index| write_index < first_root_slot_write)
+        .collect();
+    assert!(
+        writes[..first_root_slot_write]
+            .iter()
+            .any(|write| write.kind == StepKind::JournalRecord),
+        "txg 1 的根槽之前落了它的记录"
+    );
     let crash_stream = SharedStream::retaining_contents();
     let mut devices = crash_state_devices(
         &formatted.memory_pool_after_mkfs(),
@@ -241,22 +285,6 @@ fn formatted_pool_mount_starting_after_a_leftover_record_publishes_from_the_next
         &persisted,
         &crash_stream,
     );
-    // 系统配置槽 0 退回 mkfs 写的那一份（mkfs 两槽写同一份字节，拿槽 1 的原样写回），两槽都自证得过：取号写进号 1 的那一槽看不见了。
-    // 不写坏一个字节：C331（择根倒挂压过已确认的写） 取甲之后见证读缺一槽就拒可写（用户 2026-09-28 定），那样造的是撕裂轮换，走不到孤记录这一支。
-    let slot_spacing_in_bytes = u64::from(geometry().fixed_structure_slot_spacing);
-    let system_configuration_slot_bytes =
-        usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
-    for (_, device) in &mut devices {
-        let mut mkfs_slot = vec![0u8; system_configuration_slot_bytes];
-        device
-            .wrapped_device()
-            .read_at(DeviceOffsetInBytes(slot_spacing_in_bytes), &mut mkfs_slot)
-            .expect("读系统配置槽 1（mkfs 写的那一份）");
-        device
-            .wrapped_device_mut()
-            .image
-            .write(DeviceOffsetInBytes(0), &mkfs_slot);
-    }
     let image_before = memory_pool_of_sparse_devices(&devices);
     let before = disk_snapshot(&image_before, &crash_stream);
     assert_eq!(
@@ -415,7 +443,7 @@ fn first_file_version_whose_root_and_previous_record_disagree_is_refused_before_
 /// C511（回退到无文件那一版之后诞生代怎么接） 第 3 步给 `publish_first_file` 新加的两道，都在任何写之前返回：
 /// ① 判「那一版有没有过文件版本」改看它的树表条数，而那一版的树表单元两份都读不出（两盘上 mkfs 那片树表整个写零）
 ///    ⇒ `TreeTableOfTheVersionToBuildOnUnreadable`，带着恢复路径那一格的原因；
-/// ② 八棵树从那一版的水位（盘上读来的 8 字节）起连号发，而水位离 `u64::MAX` 不到八个号
+/// ② 十二棵树从那一版的水位（盘上读来的 8 字节）起连号发，而水位离 `u64::MAX` 不到十二个号
 ///    ⇒ `TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees`，带着那个水位。
 /// 两格都是一个写、一道屏障都没发（录制流一步不多）、分配器不动。
 #[test]
@@ -446,13 +474,13 @@ fn first_file_version_that_cannot_judge_or_issue_its_trees_is_refused_before_any
     let content = file_content();
 
     // ②：水位离 u64::MAX 只剩三个号。
-    let mut root_with_no_room_for_eight_trees = warm_up_root;
-    root_with_no_room_for_eight_trees.tree_identifier_watermark = u64::MAX - 3;
+    let mut root_with_no_room_for_the_file_version_trees = warm_up_root;
+    root_with_no_room_for_the_file_version_trees.tree_identifier_watermark = u64::MAX - 3;
     let recorded_before_the_watermark_case = formatted.stream.operations().len();
     let refused_for_the_watermark = publish_first_file(
         &mut writer,
         &mut allocator,
-        &root_with_no_room_for_eight_trees,
+        &root_with_no_room_for_the_file_version_trees,
         FirstFile {
             content: &content,
             write_time_seconds: FIXED_WRITE_TIME_SECONDS,
@@ -469,7 +497,7 @@ fn first_file_version_that_cannot_judge_or_issue_its_trees_is_refused_before_any
                 }
             )) if tree_identifier_watermark == u64::MAX - 3
         ),
-        "水位离 u64::MAX 不到八个号：{:?}",
+        "水位离 u64::MAX 不到十二个号：{:?}",
         refused_for_the_watermark.as_ref().err()
     );
     assert_eq!(
@@ -538,7 +566,16 @@ fn region_device(txg: u64) -> DeviceIdentity {
 /// （D23（journal 的角色与格式） 已定项 19 ①）。I-8.8（前缀里的事务不被切开） 是因为没有哪个非 0 事务号落了两条记录、
 /// 也没有哪一组一条提交标记都没有。I-9.15（inode 记录的 blocks 等于 ⌈size ÷ 512⌉） 与 I-9.7 同一个理由：一条 inode 记录都没有。
 /// I-7.9（回退下界 F 不高于抬 F 的上限） 是因为没抬过 F：每条根带的 F 都是 0（这个文件里哪一步都不抬，下面四张表都有它）。
-const NOT_APPLICABLE_WITHOUT_FILE: [&str; 21] = [
+/// I-4.1（重放后树可遍历） 五张表都有：这个文件里每一步的镜像都是发布完才看的，最新根之上没有记录，重放一次都不施加
+/// （阳性对照与坏镜像在 `checker_known_bad_images.rs` 那份「发布 B 的记录落了、根槽没落」的崩溃镜像上）。
+/// I-3.5（引用区间的精确性） 在这里报不适用是因为回退候选集里相邻两版之间一个新出现的单元都没有：第一次可写挂载不写行，
+/// 写行那次发布（txg 1）与暖机（txg 2）都是零单元发布，树表、实例表照抄 mkfs 那一版、映射根全零，后一版引用的单元前一版都引用过，
+/// 出现规则一个单元都判不到（mkfs 之后那一格的理由不同，见 `NOT_APPLICABLE_RIGHT_AFTER_MKFS`）。
+/// I-9.27（树表条目的头 ID 取值） 与 I-5.5（从 mkfs 水位建树那一版的 t1 落点） 三张没有文件的表都有：每条根的树表都是 0 条，
+/// 头 ID 一格都没有，也没有哪一版是从 mkfs 水位第一次建树的那一版（第一个文件版本之后两条都真被评估过且成立）。
+const NOT_APPLICABLE_WITHOUT_FILE: [&str; 30] = [
+    "I-9.27",
+    "I-5.5",
     "I-1.10",
     "I-3.1",
     "I-3.9",
@@ -560,12 +597,23 @@ const NOT_APPLICABLE_WITHOUT_FILE: [&str; 21] = [
     "I-9.14",
     "I-9.15",
     MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+    "I-8.11",
+    "I-9.25",
+    "I-3.13",
+    "I-9.26",
+    "I-3.12",
+    "I-4.1",
+    "I-3.5",
 ];
 
 /// mkfs 刚写完那一份要多报两条不适用：journal 环整段是 0，一条自证过的记录都没有 ⇒ I-8.6（反向链算法） 与
 /// I-8.9（一次发布的记录序号连续且只有末条带标志） 都没有判的对象。
 /// 可写挂载之后环里有记录（写行 / 暖机的空发布），它们就真被评估过了——所以这两条只在 mkfs 之后那一格。
-const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 23] = [
+/// I-3.5（引用区间的精确性） 两张表都有，这一格的理由是回退候选集只剩 mkfs 的第 0 代根一版（环里没有记录、根环里只有它），
+/// 凑不出相邻的一对。
+const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 34] = [
+    "I-9.27",
+    "I-5.5",
     "I-1.10",
     "I-3.1",
     "I-3.9",
@@ -589,9 +637,18 @@ const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 23] = [
     "I-9.14",
     "I-9.15",
     MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+    "I-8.10",
+    "I-8.11",
+    "I-9.25",
+    "I-3.13",
+    "I-9.26",
+    "I-3.12",
+    "I-8.12",
+    "I-4.1",
+    "I-3.5",
 ];
 
-/// 写完第一个文件版本之后仍报不适用的那四条：
+/// 写完第一个文件版本之后仍报不适用的那五条（I-4.1 的理由见 `NOT_APPLICABLE_WITHOUT_FILE`）：
 /// I-7.9（回退下界 F 不高于抬 F 的上限）——没抬过 F，没有抬 F 的根可判（坏镜像与阳性对照在 `checker_known_bad_images.rs` 步 5 那段历史上）；
 /// I-9.14——树表条目只出现在这一条根的树表里（mkfs 种的第 0 版树表是空的、两次暖机空发布不写树表），
 /// 它要同一棵树的条目出现在两个树表单元里才比得出来；
@@ -600,7 +657,13 @@ const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 23] = [
 /// I-8.8（前缀里的事务不被切开）——第一版一事务一条、每条都带提交标记，③ ④ 没有对象。
 /// 三条比得出来的镜像都在 `checker_known_bad_images.rs`（再覆盖写一次：树表两版、事务号 1 与 2；
 /// B 之后再接一事务两条记录的阳性对照与坏镜像）。
-const NOT_APPLICABLE_WITH_ONE_FILE_VERSION: [&str; 4] = ["I-7.9", "I-8.7", "I-8.8", "I-9.14"];
+const NOT_APPLICABLE_WITH_ONE_FILE_VERSION: [&str; 5] =
+    ["I-7.9", "I-8.7", "I-8.8", "I-9.14", "I-4.1"];
+
+/// 只有实例 1 的池上第一个文件版本之后：比 `NOT_APPLICABLE_WITH_ONE_FILE_VERSION` 多 I-3.12（实例表行 T 低于引用它的根的 txg）——
+/// 实例表一行都没有（写过行的那一份上它真被评估过且成立）。
+const NOT_APPLICABLE_WITH_ONE_FILE_VERSION_OF_THE_ONLY_INSTANCE: [&str; 6] =
+    ["I-7.9", "I-8.7", "I-8.8", "I-9.14", "I-3.12", "I-4.1"];
 
 /// 树表 0 条的一版上写行那次发布之后：比 `NOT_APPLICABLE_WITHOUT_FILE` 少 I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号）、
 /// I-1.10（码 2 条目宽等于字段表宽）、I-3.9（释放代落在停止引用它的那一格区间里） 与 I-5.4（分配记录罩住的槽互不相交） 四条。
@@ -609,7 +672,11 @@ const NOT_APPLICABLE_WITH_ONE_FILE_VERSION: [&str; 4] = ["I-7.9", "I-8.7", "I-8.
 /// I-3.10 在这一格真被评估过；这棵树按位置寻址（D8（核心索引结构） 已定项 14），checker 从根记录那一项按位置走下去、每个节点判条目宽，
 /// I-1.10 也真被评估过。checker 把根记录直接持有的那一棵并进候选根的分配记录（实审 B2）：被换下的 mkfs 那片实例表带释放标志，
 /// I-3.9 判它的释放代；I-5.4 判这棵树里的记录两两不相交——两条都真被评估过且成立。
-const NOT_APPLICABLE_AFTER_THE_ROW_PUBLISH_WITHOUT_FILE: [&str; 17] = [
+/// I-3.5（引用区间的精确性） 也不在这张表里：写行那次发布（实例 2、txg 3）把实例表 COW 到新落点、写了自己那棵分配记录树，
+/// 这几个单元前一版（实例 1 的暖机根，txg 2）不引用、诞生代号 3 大于 2，出现规则真判到了它们且成立。
+const NOT_APPLICABLE_AFTER_THE_ROW_PUBLISH_WITHOUT_FILE: [&str; 23] = [
+    "I-9.27",
+    "I-5.5",
     "I-3.1",
     "I-3.11",
     "I-5.2",
@@ -627,6 +694,10 @@ const NOT_APPLICABLE_AFTER_THE_ROW_PUBLISH_WITHOUT_FILE: [&str; 17] = [
     "I-9.14",
     "I-9.15",
     MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+    "I-9.25",
+    "I-3.13",
+    "I-9.26",
+    "I-4.1",
 ];
 
 /// 这一步的镜像上 checker 的每一条判决逐条核：`not_applicable` 里的报不适用，其余每一条都真被评估过且成立（一条违例都没有）。
@@ -636,20 +707,29 @@ fn assert_checker_verdicts(pool: &FormattedPool, step: &str, not_applicable: &[&
         verdicts.len(),
         singlefs_checker::image::IMPLEMENTED_INVARIANTS.len()
     );
-    for (invariant, verdict) in &verdicts {
-        if not_applicable.contains(invariant) {
-            assert!(
-                matches!(verdict, InvariantVerdict::NotApplicable(_)),
-                "{step}：{invariant} 该报不适用：{verdict:?}"
-            );
-        } else {
-            assert_eq!(
-                *verdict,
-                InvariantVerdict::Holds,
-                "{step}：{invariant} 要真被评估过且成立"
-            );
-        }
-    }
+    // 逐条核完再一起报：一次跑就看得全哪几条与登记的不符。
+    let mismatches: Vec<String> = verdicts
+        .iter()
+        .filter_map(|(invariant, verdict)| {
+            let expected_not_applicable = not_applicable.contains(invariant);
+            let matches_the_registration = if expected_not_applicable {
+                matches!(verdict, InvariantVerdict::NotApplicable(_))
+            } else {
+                *verdict == InvariantVerdict::Holds
+            };
+            (!matches_the_registration).then(|| {
+                format!(
+                    "{invariant} 登记的是{}，判的是 {verdict:?}",
+                    if expected_not_applicable {
+                        "不适用"
+                    } else {
+                        "真被评估过且成立"
+                    }
+                )
+            })
+        })
+        .collect();
+    assert_eq!(mismatches, Vec::<String>::new(), "{step}：与登记的判定不符");
 }
 
 /// 崩在暖机与第一个文件版本之间，重开照样写得出行：新池新建文件取号、暖机两次之后、第一个文件版本之前崩溃
@@ -1164,7 +1244,7 @@ fn writable_mount_of_a_formatted_pool_takes_instance_one_publishes_two_zero_unit
     assert_checker_verdicts(
         &formatted,
         "第一个文件版本之后",
-        &NOT_APPLICABLE_WITH_ONE_FILE_VERSION,
+        &NOT_APPLICABLE_WITH_ONE_FILE_VERSION_OF_THE_ONLY_INSTANCE,
     );
     let reopened = formatted.reopen_cold();
     let report = recover(&reopened, JournalPolicy::Consult);
@@ -1384,14 +1464,14 @@ fn a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_i
 
 /// D8（核心索引结构） 已定项 8 ②「号永不重发」在崩溃恢复那一形上（原先由回退到暖机根之后再发第一个文件版本那几条用例护，
 /// 回退改成挂着时的向前发布之后那一形没有了，D23（journal 的角色与格式） 已定项 14）：只做过 mkfs 的池可写挂载（实例 1，暖机），
-/// 再挂一次（实例 2，写行 txg 3、暖机 txg 4）发第一个文件版本（txg 5，八棵树 11..18），崩在 txg 5 的根槽 FUA 之后、系统配置轮换之前
+/// 再挂一次（实例 2，写行 txg 3、暖机 txg 4）发第一个文件版本（txg 5，十二棵树 65536..65547），崩在 txg 5 的根槽 FUA 之后、系统配置轮换之前
 /// （录制流切到那一写为止：系统配置只见证到 txg 4）。可写挂载一次，txg 5 的根槽与它那条记录点名的一个单元（数据单元盘 0 那一份）读不出——
-/// 择根落到实例 2 的暖机根 (2, 4)（树表 0 条、根上水位 11），txg 5 那条记录施加前验点名单元验不过、不施加；系统配置见证到的就是 (2, 4)
+/// 择根落到实例 2 的暖机根 (2, 4)（树表 0 条、根上水位 65536），txg 5 那条记录施加前验点名单元验不过、不施加；系统配置见证到的就是 (2, 4)
 /// 那次，C554 乙不重读、照常挂载（见证过的根暂时读不出会被拒，`a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable.rs`）。
-/// 新实例 3 的水位按根环与环里记录取 max = 19。实例 3 接着发第一个文件版本：
-/// - 八棵树从 19 发 19..26、新水位 27，不从那一版根上的 11 重发（照 mkfs 水位发就与盘上实例 2 的节点撞号）；
-/// - 「树建没建」按树表条数判（0 条），不按水位是不是 11（水位 19、树表 0 条照样发得出第一个文件版本）；
-/// - 只读挂载沿新根读回这一版的内容：中央映射树是 23，按根记录里映射根指针的出生树认，不写死 15。
+/// 新实例 3 的水位按根环与环里记录取 max = 65548。实例 3 接着发第一个文件版本：
+/// - 十二棵树从 65548 发 65548..65559、新水位 65560，不从那一版根上的 65536 重发（照 mkfs 水位发就与盘上实例 2 的节点撞号）；
+/// - 「树建没建」按树表条数判（0 条），不按水位是不是 65536（水位 65548、树表 0 条照样发得出第一个文件版本）；
+/// - 只读挂载沿新根读回这一版的内容：中央映射树是 65552，按根记录里映射根指针的出生树认，不写死 65540。
 #[test]
 fn the_first_file_version_after_a_recovery_dropped_an_earlier_one_issues_its_trees_above_the_ring_watermark_and_reads_back(
 ) {
@@ -1424,8 +1504,8 @@ fn the_first_file_version_after_a_recovery_dropped_an_earlier_one_issues_its_tre
     };
     assert_eq!(
         dropped_first_file.tree_identifiers.highest().0,
-        18,
-        "实例 2 从 mkfs 的水位 11 发 11..18"
+        65547,
+        "实例 2 从 mkfs 的水位 65536 发 65536..65547"
     );
     assert_eq!(
         dropped_first_file.root.checkpoint_txg,
@@ -1491,8 +1571,8 @@ fn the_first_file_version_after_a_recovery_dropped_an_earlier_one_issues_its_tre
         panic!("落到实例 2 的暖机根：现行那一版树表 0 条")
     };
     assert_eq!(
-        version_of_the_third_instance.root.tree_identifier_watermark, 19,
-        "实例 3 那一版带根环与环里记录的水位 max：实例 2 的记录带的 19"
+        version_of_the_third_instance.root.tree_identifier_watermark, 65548,
+        "实例 3 那一版带根环与环里记录的水位 max：实例 2 的记录带的 65548"
     );
     let mut allocator_of_the_third_instance = third_instance.allocator.clone();
     let content = (0..3300usize)
@@ -1512,7 +1592,7 @@ fn the_first_file_version_after_a_recovery_dropped_an_earlier_one_issues_its_tre
             third_instance.output.instance,
             &version_of_the_third_instance.record_bytes,
         )
-        .expect("水位 19、树表 0 条：照样发得出第一个文件版本")
+        .expect("水位 65548、树表 0 条：照样发得出第一个文件版本")
     };
     assert_eq!(
         (
@@ -1530,8 +1610,8 @@ fn the_first_file_version_after_a_recovery_dropped_an_earlier_one_issues_its_tre
                 .birth_tree
                 .0
         ),
-        (26, 27, 23),
-        "实例 3 从 19 发 19..26、新水位 27，中央映射树是 23"
+        (65559, 65560, 65552),
+        "实例 3 从 65548 发 65548..65559、新水位 65560，中央映射树是 65552"
     );
     let image = memory_pool_of_sparse_devices(&reopened);
     let mounted = singlefs_core::mounted_read::mount_read_only(&image).expect("只读挂载");
@@ -1591,7 +1671,7 @@ fn devices_crashed_right_after_the_root_slot_of(
 /// 一次发布写到的单元落点（两盘同槽，取第一条位置条目的槽）：带文件的一版按这次重写的角色，树表 0 条的一版按那条记录的点名项。
 fn slots_written_by(version: &PoolVersion) -> Vec<SlotNumber> {
     match version {
-        PoolVersion::WithFile(output) => output
+        PoolVersion::WithFile(output) | PoolVersion::WithTreesAndNoFile(output) => output
             .rewritten
             .iter()
             .map(|role| output.unit(*role).slot)

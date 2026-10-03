@@ -25,19 +25,24 @@ use singlefs_harness::fault_injection::{
     inject_faults_into_history, inject_one_fault_into_the_segment, run_fault_injection_campaign,
     AcquiredInstanceLeft, AcquiredInstanceLeftAfterAFailedMount, DrawnFault, FaultCounting,
     FaultDeviceSelector, FaultInjectingBlockDevice, FaultInjectionCampaign, FaultInjectionReport,
-    FaultInjectionWorkerThreads, FaultOccurrence, FaultOutcome, FaultPlacement, FaultSchedule,
-    FaultedSegment, FaultedSegmentKind, FlippedBit, InjectedFault, SharedFaultPlan,
+    FaultInjectionTally, FaultInjectionWorkerThreads, FaultOccurrence, FaultOutcome,
+    FaultPlacement, FaultSchedule, FaultedSegment, FaultedSegmentKind, FlippedBit, InjectedFault,
+    KnownRedAtAFault, KnownRedFormAtAFault, KnownRedFormOnlyAfterAFault, SharedFaultPlan,
 };
 use singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::history::{
-    execute_history_with, execute_history_with_faults, generate_history_with_weights,
-    ContentChoice, ContentLength, FailureSignature, FloorTargetChoice, GeneratedHistory,
-    GenerationWeights, HarnessJudgement, HistoryDeviceWidth, HistoryEnding, HistoryExecution,
-    HistoryOperation, HistoryOperationKind, HistoryRun, HistorySeed, HistoryStartingPoint,
-    PerStepChecker, StartingPointStep, StepPosition,
+    count_from_reproduction_environment, environment_assignments_in_line, execute_history_with,
+    execute_history_with_faults, generate_history_with_weights,
+    number_from_reproduction_environment, render_environment_assignments, ContentChoice,
+    ContentLength, FailureSignature, FloorTargetChoice, GeneratedHistory, GenerationWeights,
+    HarnessJudgement, HistoryDeviceWidth, HistoryEnding, HistoryExecution, HistoryOperation,
+    HistoryOperationKind, HistoryRun, HistorySampling, HistorySeed, HistoryStartingPoint,
+    PerStepChecker, ReproductionEnvironmentError, ReproductionVariablePrefix, StartingPointStep,
+    StepPosition,
 };
 use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::model::ModelDisagreementAspect;
+use singlefs_harness::numeric_environment_variable::process_environment_variable;
 use singlefs_harness::scenario::{e142_parameters, first_file_content, FIXED_WRITE_TIME_SECONDS};
 use singlefs_harness::segments::{FixedGeometry, StepKind};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
@@ -63,19 +68,112 @@ fn print_uncaptured(text: &str) {
     let _ = standard_output.flush();
 }
 
-fn number_from_environment(name: &str, default: u64) -> u64 {
-    std::env::var(name).map_or(default, |text| {
-        text.parse()
-            .unwrap_or_else(|error| panic!("{name}={text} 不是一个非负整数：{error}"))
-    })
-}
-
 /// 判红时先把种子基与规模说清楚：同一个构建加同一个种子基重放得出来。
 fn how_to_replay(report: &FaultInjectionReport) -> String {
+    format!("重放：{}", fault_injection_replay_line(report))
+}
+
+/// 故障注入那个二进制的环境变量前缀；取样参数（每段步数、比重、checker、盘宽、空间准入）的后缀与随机历史共用
+/// （`singlefs_harness::history::HistorySamplingVariable`，格式只有那一份定义；代码三方 test-script-align-code-r1 判决 C607）。
+const FAULT_INJECTION_VARIABLE_PREFIX: ReproductionVariablePrefix =
+    ReproductionVariablePrefix("SINGLEFS_FAULT_INJECTION_");
+
+singlefs_harness::enum_listing_every_member! {
+/// 重放行与大档入口里故障注入自己的几个变量（接在 [`FAULT_INJECTION_VARIABLE_PREFIX`] 后面；取样参数接在它们后面）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FaultInjectionVariable {
+    /// 种子区间的起点。
+    FirstSeed,
+    /// 种子数。
+    Seeds,
+    /// 每段注入几次。
+    Faults,
+}
+}
+
+impl FaultInjectionVariable {
+    fn variable_name(self) -> String {
+        FAULT_INJECTION_VARIABLE_PREFIX.variable_named(match self {
+            FaultInjectionVariable::FirstSeed => "FIRST_SEED",
+            FaultInjectionVariable::Seeds => "SEEDS",
+            FaultInjectionVariable::Faults => "FAULTS",
+        })
+    }
+}
+
+/// 重放这一整批的那一行命令：种子区间、每段注入几次、取样参数，交大档那条入口照抄跑的就是原来那一批。
+/// 线程数不在里面：线程数不改结论（`the_report_is_the_same_text_with_one_worker_thread_and_with_four`）。
+fn fault_injection_replay_line(report: &FaultInjectionReport) -> String {
+    let mut assignments: Vec<(String, String)> = FaultInjectionVariable::ALL
+        .into_iter()
+        .map(|variable| {
+            let value = match variable {
+                FaultInjectionVariable::FirstSeed => report.first_seed.to_string(),
+                FaultInjectionVariable::Seeds => report.seed_count.to_string(),
+                FaultInjectionVariable::Faults => report.faults_per_history.to_string(),
+            };
+            (variable.variable_name(), value)
+        })
+        .collect();
+    let sampling = HistorySampling {
+        operations_per_history: report.operations_per_history,
+        weights: report.weights,
+        execution: report.execution,
+    };
+    assignments.extend(sampling.environment_assignments(FAULT_INJECTION_VARIABLE_PREFIX));
     format!(
-        "重放：SINGLEFS_FAULT_INJECTION_FIRST_SEED={} SINGLEFS_FAULT_INJECTION_SEEDS={} SINGLEFS_FAULT_INJECTION_OPERATIONS={} SINGLEFS_FAULT_INJECTION_FAULTS={} 跑大档那条 #[ignore] 用例",
-        report.first_seed, report.seed_count, report.operations_per_history, report.faults_per_history
+        "{} cargo test --release -p singlefs-harness --test fault_injection_fast_tier -- --include-ignored --exact fault_injection_large_tier_from_the_environment",
+        render_environment_assignments(&assignments)
     )
+}
+
+/// 大档那条入口读环境：读的变量与 [`fault_injection_replay_line`] 写出的逐个相同，没设的取 `defaults` 的；线程数不在重放行里，照 `defaults` 的。
+/// 种子数与每段注入次数是计数：写 0 与写错一样认不得（0 段、或每段一次都不注入的一批照样判成绿）。
+fn fault_injection_campaign_from_environment(
+    lookup: &dyn Fn(&str) -> Option<String>,
+    defaults: &FaultInjectionCampaign,
+) -> Result<FaultInjectionCampaign, ReproductionEnvironmentError> {
+    let first_seed = number_from_reproduction_environment(
+        lookup,
+        &FaultInjectionVariable::FirstSeed.variable_name(),
+        defaults.first_seed,
+    )?;
+    let seed_count = count_from_reproduction_environment(
+        lookup,
+        &FaultInjectionVariable::Seeds.variable_name(),
+        defaults.seed_count,
+    )?;
+    let faults_variable = FaultInjectionVariable::Faults.variable_name();
+    let faults_given = count_from_reproduction_environment(
+        lookup,
+        &faults_variable,
+        u64::try_from(defaults.faults_per_history).expect("注入次数装得进 u64"),
+    )?;
+    let faults_per_history = usize::try_from(faults_given).map_err(|_too_many| {
+        ReproductionEnvironmentError::Unrecognized {
+            variable: faults_variable.clone(),
+            value: faults_given.to_string(),
+            recognized: vec!["装得进 usize 的注入次数".to_string()],
+        }
+    })?;
+    let sampling = HistorySampling::from_environment(
+        FAULT_INJECTION_VARIABLE_PREFIX,
+        lookup,
+        &HistorySampling {
+            operations_per_history: defaults.operations_per_history,
+            weights: defaults.weights,
+            execution: defaults.execution,
+        },
+    )?;
+    Ok(FaultInjectionCampaign {
+        first_seed,
+        seed_count,
+        operations_per_history: sampling.operations_per_history,
+        faults_per_history,
+        weights: sampling.weights,
+        execution: sampling.execution,
+        worker_threads: defaults.worker_threads,
+    })
 }
 
 fn fast_tier_campaign(worker_threads: FaultInjectionWorkerThreads) -> FaultInjectionCampaign {
@@ -99,7 +197,7 @@ fn fast_tier_campaign(worker_threads: FaultInjectionWorkerThreads) -> FaultInjec
 /// 照规则隔离那一对好槽——那是「两次都对不上才隔离」认下的形态，不是新发现；随机注入不摆这一形（一次注入只坏一次调用），
 /// 它的样子钉在 `release_checksum_quarantine.rs` 的用例 13。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn fault_injection_fast_tier_returns_errors_instead_of_panicking() {
     let started = std::time::Instant::now();
     let report = run_fault_injection_campaign(&fast_tier_campaign(
@@ -222,44 +320,52 @@ fn large_tier_execution(device_width: HistoryDeviceWidth) -> HistoryExecution {
     }
 }
 
-/// 大档：规模从环境变量取，后台跑（`cargo test --release -p singlefs-harness --test
+/// 大档那条入口读环境：变量与判红时打的重放行同一张表（[`fault_injection_campaign_from_environment`]），没设的取大档的默认
+/// （种子基起 512 段、每段 30 步、每段注入 6 次、各类操作都抽、每一步之后跑 checker、两块 4 GiB 的盘、判空间准入），
+/// 线程数从 `SINGLEFS_FAULT_INJECTION_WORKER_THREADS` 取。入口与「重放行喂回入口」那两条自证都经这一个函数。
+fn large_tier_campaign_from(lookup: &dyn Fn(&str) -> Option<String>) -> FaultInjectionCampaign {
+    fault_injection_campaign_from_environment(
+        lookup,
+        &FaultInjectionCampaign {
+            first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
+            seed_count: 512,
+            operations_per_history: usize::try_from(LARGE_TIER_OPERATIONS_PER_HISTORY)
+                .expect("步数"),
+            faults_per_history: usize::try_from(LARGE_TIER_FAULTS_PER_HISTORY).expect("注入次数"),
+            weights: GenerationWeights::BROAD,
+            execution: large_tier_execution(HistoryDeviceWidth::FourGibibytes),
+            worker_threads: FaultInjectionWorkerThreads::from_the_environment(),
+        },
+    )
+    .unwrap_or_else(|error| panic!("{}", error.render()))
+}
+
+/// 大档入口里种子数写 0：停下，消息带变量名与原值，不照收（一段都不跑的一批照「全部返回错误、不 panic」判成绿）。
+#[test]
+#[should_panic(expected = "SINGLEFS_FAULT_INJECTION_SEEDS=0：只认 正整数")]
+fn a_fault_injection_seed_count_of_zero_panics_naming_the_variable_and_the_value() {
+    let _campaign = large_tier_campaign_from(&|variable: &str| {
+        (variable == "SINGLEFS_FAULT_INJECTION_SEEDS").then(|| "0".to_string())
+    });
+}
+
+/// 大档入口里每段注入次数写 0：停下，消息带变量名与原值，不照收（一次都不注入的一批照样判成绿）。
+#[test]
+#[should_panic(expected = "SINGLEFS_FAULT_INJECTION_FAULTS=0：只认 正整数")]
+fn a_fault_injection_fault_count_of_zero_panics_naming_the_variable_and_the_value() {
+    let _campaign = large_tier_campaign_from(&|variable: &str| {
+        (variable == "SINGLEFS_FAULT_INJECTION_FAULTS").then(|| "0".to_string())
+    });
+}
+
+/// 大档：规模与取样参数照判红时打的重放行从环境变量取，后台跑（`cargo test --release -p singlefs-harness --test
 /// fault_injection_fast_tier -- --ignored --nocapture`）。
 #[test]
-#[ignore = "大档：规模从环境变量取，按里程碑「增补 3」后台跑"]
+#[ignore = "大档：照判红时打的重放行设环境变量；SINGLEFS_FAULT_INJECTION_FIRST_SEED 起 SINGLEFS_FAULT_INJECTION_SEEDS 段、每段 SINGLEFS_FAULT_INJECTION_OPERATIONS 步、每段注入 SINGLEFS_FAULT_INJECTION_FAULTS 次，比重 SINGLEFS_FAULT_INJECTION_WEIGHTS（broad、reuse、rollback、wall、unit-area-wall），checker SINGLEFS_FAULT_INJECTION_CHECKER（run、skip），盘宽 SINGLEFS_FAULT_INJECTION_DEVICES（4gib、unit-area-384、unit-area-256、unit-area-240），空间准入 SINGLEFS_FAULT_INJECTION_SPACE_ADMISSION（judged、skipped），线程数 SINGLEFS_FAULT_INJECTION_WORKER_THREADS；没设的取大档默认（种子基、512 段、30 步、6 次、broad、run、4gib、judged）；按里程碑「增补 3」后台跑"]
 fn fault_injection_large_tier_from_the_environment() {
-    let first_seed = number_from_environment(
-        "SINGLEFS_FAULT_INJECTION_FIRST_SEED",
-        SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
-    );
-    let seed_count = number_from_environment("SINGLEFS_FAULT_INJECTION_SEEDS", 512);
-    let operations_per_history = usize::try_from(number_from_environment(
-        "SINGLEFS_FAULT_INJECTION_OPERATIONS",
-        LARGE_TIER_OPERATIONS_PER_HISTORY,
-    ))
-    .expect("步数");
-    let faults_per_history = usize::try_from(number_from_environment(
-        "SINGLEFS_FAULT_INJECTION_FAULTS",
-        LARGE_TIER_FAULTS_PER_HISTORY,
-    ))
-    .expect("注入次数");
-    let device_width = match std::env::var("SINGLEFS_FAULT_INJECTION_DEVICE_WIDTH").as_deref() {
-        Err(std::env::VarError::NotPresent) | Ok("4gib") => HistoryDeviceWidth::FourGibibytes,
-        Ok("small") => HistoryDeviceWidth::UnitAreaOf384Slots,
-        Ok(other) => panic!("SINGLEFS_FAULT_INJECTION_DEVICE_WIDTH={other} 只认 4gib 与 small"),
-        Err(std::env::VarError::NotUnicode(raw)) => {
-            panic!("SINGLEFS_FAULT_INJECTION_DEVICE_WIDTH 不是 UTF-8：{raw:?}")
-        }
-    };
     let started = std::time::Instant::now();
-    let report = run_fault_injection_campaign(&FaultInjectionCampaign {
-        first_seed,
-        seed_count,
-        operations_per_history,
-        faults_per_history,
-        weights: GenerationWeights::BROAD,
-        execution: large_tier_execution(device_width),
-        worker_threads: FaultInjectionWorkerThreads::from_the_environment(),
-    });
+    let report =
+        run_fault_injection_campaign(&large_tier_campaign_from(&process_environment_variable));
     let rendered = report.render();
     print_uncaptured(&format!(
         "── 故障注入大档 ──\n{rendered}用时 {:.1} 秒\n",
@@ -278,41 +384,147 @@ fn fault_injection_large_tier_from_the_environment() {
     );
 }
 
-/// 说谎的设备许可留下的盘面不一致里 `["I-3.1"]` 那一组的取样点（`fault_injection::INCONSISTENCIES_A_LYING_DEVICE_MAY_LEAVE`；
-/// `crates/mutations.tsv` 钉着把那一组去掉的变异）。快档那 24 段里说谎的设备留下的不一致全落在另一组（`["I-2.1", "I-4.8", "I-7.4"]`），
-/// 那一组去掉了快档照样绿；大档（这个测试周期的种子基起 512 段、每段 30 步、注入 6 次）里 `["I-3.1"]` 那一组落在 14 个注入点上
-/// （2026-09-26 在管理员回退改成挂着时的向前发布之后的代码上扫的：比重表里关着时回退并进可写挂载，同一个种子生成的历史变了，
-/// 原先取的种子 7463871032432355306 那一段里不再有这一组）。
-/// 这里只跑其中一段：种子 7463871032432355210，同一组规模下抽出的 6 个注入点里有一次被吞掉的写（`write_is_swallowed`，
-/// 整池第 620 次写调用、`step_index` 25 那一步覆盖写 33 次写里的第 31 次，即这次发布的根槽写）落在覆盖写上，之后池级 checker 只判红 I-3.1。
-/// 它要被白名单豁免、记进说谎那一格，不算新发现（这一格为什么只剩 I-3.1，没有逐字节追过）。
-#[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
-fn swallowed_write_after_which_the_checker_flags_only_the_allocated_statistic_invariant_is_excused_as_what_the_lying_device_may_leave(
+/// 判红时对一批故障注入会打的那一行重放命令（`how_to_replay`；造一份报告，不必真红）原样喂回大档那条入口
+/// （`large_tier_campaign_from`，入口用的同一个函数）：种子区间、每段步数、每段注入几次、比重、跑法与原来那一批逐项相同，
+/// 第一段生成的历史逐步相同。不跑注入：同一组参数下摆出来的注入点由种子定，这里只核参数一项不漏地回来了
+/// （代码三方 test-script-align-code-r1 判决 C607：原先的重放行只带种子区间、步数与注入次数，比重与跑法照抄回不来）。
+fn the_replay_line_printed_for_a_batch_runs_the_same_campaign_on_the_large_tier_entry(
+    campaign: &FaultInjectionCampaign,
 ) {
-    let report = run_fault_injection_campaign(&FaultInjectionCampaign {
-        first_seed: 7_463_871_032_432_355_210,
-        seed_count: 1,
-        operations_per_history: 30,
-        faults_per_history: 6,
-        weights: GenerationWeights::BROAD,
-        execution: CHECKED_AFTER_EVERY_STEP,
-        worker_threads: FaultInjectionWorkerThreads::from_the_environment(),
-    });
-    let rendered = report.render();
-    assert!(
-        report.new_findings.is_empty(),
-        "说谎的设备留下的 I-3.1 要被白名单豁免，不算新发现；{}\n{rendered}",
-        how_to_replay(&report)
+    let report = FaultInjectionReport {
+        first_seed: campaign.first_seed,
+        seed_count: campaign.seed_count,
+        operations_per_history: campaign.operations_per_history,
+        faults_per_history: campaign.faults_per_history,
+        weights: campaign.weights,
+        execution: campaign.execution,
+        tally: FaultInjectionTally::default(),
+        known_red_hits: Vec::new(),
+        new_findings: Vec::new(),
+    };
+    let replay = how_to_replay(&report);
+    let assignments = environment_assignments_in_line(&replay);
+    let replayed = large_tier_campaign_from(&|variable: &str| assignments.get(variable).cloned());
+    assert_eq!(
+        (
+            replayed.first_seed,
+            replayed.seed_count,
+            replayed.operations_per_history,
+            replayed.faults_per_history,
+            replayed.weights,
+            replayed.execution,
+        ),
+        (
+            campaign.first_seed,
+            campaign.seed_count,
+            campaign.operations_per_history,
+            campaign.faults_per_history,
+            campaign.weights,
+            campaign.execution,
+        ),
+        "照重放行跑大档，跑的不是原来那一批（种子、种子数、步数、注入次数、比重、跑法）：{replay}"
     );
     assert_eq!(
-        report
+        generate_history_with_weights(
+            HistorySeed(replayed.first_seed),
+            replayed.operations_per_history,
+            &replayed.weights
+        ),
+        generate_history_with_weights(
+            HistorySeed(campaign.first_seed),
+            campaign.operations_per_history,
+            &campaign.weights
+        ),
+        "第一段生成的历史逐步相同"
+    );
+}
+
+#[test]
+fn replay_line_of_the_fast_tier_runs_the_same_campaign_on_the_large_tier_entry() {
+    the_replay_line_printed_for_a_batch_runs_the_same_campaign_on_the_large_tier_entry(
+        &fast_tier_campaign(FaultInjectionWorkerThreads::GivenByCaller(1)),
+    );
+}
+
+/// 每一项都与大档的默认不同的一批：重放行漏写哪一项，大档入口就退回它的默认，读回的不是这一批。
+/// 前提断言先核「每一项都不同」，不然漏写那一项读回的恰好还是它。
+#[test]
+fn replay_line_of_a_batch_unlike_the_large_tier_defaults_runs_the_same_campaign_on_the_large_tier_entry(
+) {
+    let campaign = FaultInjectionCampaign {
+        first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE + 7,
+        seed_count: 3,
+        operations_per_history: 11,
+        faults_per_history: 2,
+        weights: GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR,
+        execution: HistoryExecution {
+            per_step_checker: PerStepChecker::Skipped,
+            device_width: HistoryDeviceWidth::UnitAreaOf384Slots,
+            space_admission: SpaceAdmission::SkippedByTheTestOnlySwitch,
+        },
+        worker_threads: FaultInjectionWorkerThreads::GivenByCaller(1),
+    };
+    let defaults = large_tier_campaign_from(&|_variable: &str| None);
+    assert!(
+        campaign.first_seed != defaults.first_seed
+            && campaign.seed_count != defaults.seed_count
+            && campaign.operations_per_history != defaults.operations_per_history
+            && campaign.faults_per_history != defaults.faults_per_history
+            && campaign.weights != defaults.weights
+            && campaign.execution.per_step_checker != defaults.execution.per_step_checker
+            && campaign.execution.device_width != defaults.execution.device_width
+            && campaign.execution.space_admission != defaults.execution.space_admission,
+        "前提：这一批的每一项都与大档的默认不同：{campaign:?} 对 {defaults:?}"
+    );
+    the_replay_line_printed_for_a_batch_runs_the_same_campaign_on_the_large_tier_entry(&campaign);
+}
+
+/// 说谎的设备许可留下的盘面不一致里 `["I-3.1"]` 那一组的取样点（`fault_injection::INCONSISTENCIES_A_LYING_DEVICE_MAY_LEAVE`；
+/// `crates/mutations.tsv` 钉着把被吞的写插回去那一步拿掉的变异）。快档那 24 段里说谎的设备留下的不一致全落在另一组
+/// （`["I-2.1", "I-4.8", "I-7.4"]`），这一组要单独钉。
+///
+/// 取样点写死成一段历史与一个注入点，不按种子从比重表里抽：此前钉的是种子 7463871032432355210 在 `GenerationWeights::BROAD` 上抽出的
+/// 第 25 步覆盖写那次根槽写，删除批把比重表里可写挂载那一格切出 unlink 之后同一个种子抽出的历史变了、那次被吞的写不在了，用例跟着红
+/// （调度记录 `records/2026-10-01-删除与并发事务.md` 第 11 批的慢档红调查问 1；比重表一改，种子钉的取样点就会再丢一次）。
+/// 这一段：第一个文件（txg 3）之后覆盖写五次（txg 4–8），txg 7 那次（第 3 步）的根槽 FUA 写被吞；每一步之后照跑池级 checker，
+/// txg 8 那次覆盖写之后 checker 只判红 I-3.1（被吞的根槽留下的，被吞的写插回去就消失）。它要按注入点认成说谎的设备留下的、
+/// 记进说谎那一格，不算新发现——带着注入跑的那一遍里每一步之后的池级 checker 判红那一处、注入之后的镜像上再跑的那一遍，各记一次。
+#[test]
+fn swallowed_write_after_which_the_checker_flags_only_the_allocated_statistic_invariant_is_excused_as_what_the_lying_device_may_leave(
+) {
+    const STEP_OF_THE_SWALLOWED_ROOT_SLOT_WRITE: usize = 3;
+    let history = GeneratedHistory {
+        seed: HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations: (1..=5).map(overwrite_with_fill_seed).collect(),
+    };
+    let injection = inject_one_fault_into_the_segment(
+        &history,
+        CHECKED_AFTER_EVERY_STEP,
+        InjectedFault::WriteIsSwallowed,
+        FaultedSegment::Operation {
+            step_index: STEP_OF_THE_SWALLOWED_ROOT_SLOT_WRITE,
+            operation_kind: HistoryOperationKind::PublishOverwrite,
+        },
+        ordinal_of_the_root_slot_write_within_the_step(
+            &history,
+            STEP_OF_THE_SWALLOWED_ROOT_SLOT_WRITE,
+        ),
+    );
+    assert!(
+        injection.new_findings.is_empty(),
+        "说谎的设备留下的 I-3.1 要被白名单豁免，不算新发现：{:?}",
+        injection.new_findings
+    );
+    assert_eq!(
+        injection
             .tally
             .lying_device_signatures
             .get("CheckerViolations { invariants: [\"I-3.1\"] }"),
         Some(&2),
         "这一段里被吞掉的那一次写之后只判红 I-3.1，记进说谎那一格——带着注入跑的那一遍里每一步之后的池级 checker 判红那一处、\
-         注入之后的镜像上再跑的那一遍，各记一次：\n{rendered}"
+         注入之后的镜像上再跑的那一遍，各记一次：{:?}",
+        injection.tally.lying_device_signatures
     );
 }
 
@@ -323,7 +535,7 @@ fn swallowed_write_after_which_the_checker_flags_only_the_allocated_statistic_in
 /// 「根槽这一次读坏」那一行的读法）。模型不知道根槽没落、说该成；回退点名的槽正是被吞那次写的槽，要记进说谎那一格，不算新发现。
 /// 回退路径不把点名的槽交给模型比对时（`crates/mutations.tsv` 钉着的那一格），这一格判不出是说谎的设备留下的，照报新发现。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn rollback_refused_on_the_root_ring_slot_whose_write_the_lying_device_swallowed_is_excused_as_what_the_lying_device_may_leave(
 ) {
     let report = run_fault_injection_campaign(&FaultInjectionCampaign {
@@ -367,7 +579,7 @@ fn rollback_refused_on_the_root_ring_slot_whose_write_the_lying_device_swallowed
 
 /// 一段写死的历史上把注入点摆满：同一段历史注入 12 次，逐次判「返回错误而不是 panic」。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn one_fixed_history_injects_twelve_faults_and_none_of_them_panics() {
     let history = generate_history_with_weights(
         HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
@@ -395,7 +607,7 @@ fn one_fixed_history_injects_twelve_faults_and_none_of_them_panics() {
 /// 摆注入点的候选从第 0 段起算，起点段摆得到：`draw_faults` 的 `(0..marks.len())` 改回 `(1..marks.len())`，
 /// 起点段的注入点恒为 0，这里必红（判决第二节改法二钉的那一格；`crates/mutations.tsv` 同名的那一条）。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn the_drawn_injection_points_reach_the_starting_segment() {
     let history = generate_history_with_weights(
         HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
@@ -591,10 +803,94 @@ fn the_pool_checker_runs_on_a_starting_point_failure_only_when_make_filesystem_f
     }
 }
 
+/// 快档在 2026-10-03 落进这一形的那一段：种子基 + 7（7463871032432355120），快档的规模与比重。
+const SEED_WHERE_MAKE_FILESYSTEM_FAILS_BEFORE_ANY_SYSTEM_CONFIGURATION_SLOT_LANDS: u64 =
+    SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE + 7;
+
+/// 用户 2026-10-03 定：mkfs 在写到系统配置之前失败的盘面就是全池皆废，I-8.5（tail 槽有效集非空）照判红，红是对的；
+/// 故障注入的「已知红」清单加这一类。快档在种子 7463871032432355120 上摆的那一个注入点（整池第 1 次 barrier 报错，落在 mkfs 第一道屏障上，
+/// 那一刻 mkfs 只清过零、写过实例表与树表的创世单元，系统配置槽一次都没写）原样重跑：注入之后的镜像上只红 I-8.5、
+/// 重开走读失败，判法记成那一条「已知红」，不记新发现。
+///
+/// 判别力自证：判法改回不认这一类（`known_red_form_only_after_a_fault` 恒交回 None，`crates/mutations.tsv` 同名那一条），
+/// 这一次落成新发现 `CheckerViolations { invariants: ["I-8.5"] }`，这里红。
+#[test]
+fn make_filesystem_failing_at_its_first_barrier_before_any_system_configuration_slot_lands_ends_known_red_not_a_new_finding(
+) {
+    let history = generate_history_with_weights(
+        HistorySeed(SEED_WHERE_MAKE_FILESYSTEM_FAILS_BEFORE_ANY_SYSTEM_CONFIGURATION_SLOT_LANDS),
+        FAST_TIER_OPERATIONS_PER_HISTORY,
+        &GenerationWeights::BROAD,
+    );
+    let injection = inject_one_fault_into_the_segment(
+        &history,
+        CHECKED_AFTER_EVERY_STEP,
+        InjectedFault::BarrierFails,
+        FaultedSegment::TheStartingPoint,
+        1,
+    );
+    let rendered = injection.tally.render();
+    print_uncaptured(&format!(
+        "── mkfs 第一道屏障报错：全池皆废、只红 I-8.5 ──\n{rendered}"
+    ));
+    let expected_drawn = DrawnFault {
+        fault: InjectedFault::BarrierFails,
+        call_ordinal: 1,
+        segment: FaultedSegment::TheStartingPoint,
+    };
+    assert_eq!(
+        injection.drawn_faults,
+        vec![expected_drawn],
+        "注入点是整池第 1 次 barrier、落在起点段\n{rendered}"
+    );
+    // 停下的是 mkfs 自己，重开走读失败而盘上本来就没有一版立得住：这一形的前两样事实真的在。
+    assert_eq!(
+        injection.tally.starting_point_failures,
+        BTreeMap::from([(StartingPointStep::MakeFilesystem.name(), 1)]),
+        "起点段里把错交回来的是 mkfs\n{rendered}"
+    );
+    assert_eq!(
+        injection
+            .tally
+            .reopens_that_correctly_found_nothing_to_recover,
+        1,
+        "重开走读失败、盘上本来就没有一版立得住\n{rendered}"
+    );
+    assert!(
+        injection.new_findings.is_empty(),
+        "mkfs 在系统配置槽落盘之前报错、只红 I-8.5 是认下的「已知红」，不是新发现：{:?}\n{rendered}",
+        injection
+            .new_findings
+            .iter()
+            .map(|finding| &finding.signature)
+            .collect::<Vec<_>>()
+    );
+    let expected_form = KnownRedFormAtAFault::OnlyAfterAFault(
+        KnownRedFormOnlyAfterAFault::MakeFilesystemFailedBeforeAnySystemConfigurationSlotLanded,
+    );
+    assert_eq!(
+        injection.known_red_hits,
+        vec![KnownRedAtAFault {
+            seed: HistorySeed(
+                SEED_WHERE_MAKE_FILESYSTEM_FAILS_BEFORE_ANY_SYSTEM_CONFIGURATION_SLOT_LANDS
+            ),
+            form: expected_form,
+            drawn: expected_drawn,
+        }],
+        "这一次记成「mkfs 没写下系统配置槽」那一条已知红\n{rendered}"
+    );
+    assert_eq!(
+        injection.tally.faults_ending_known_red,
+        BTreeMap::from([(expected_form, 1)]),
+        "计数里以这一条已知红收尾一次\n{rendered}"
+    );
+    assert_eq!(injection.tally.faults_that_panicked, 0, "{rendered}");
+}
+
 /// 线程数换了，报告逐字相同：计数按片的次序相加、新发现按种子从小到大留第一个
 /// （`implementation-workflow.md`「测试与崩溃检测优先多线程」的「合并要确定」）。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn the_report_is_the_same_text_with_one_worker_thread_and_with_four() {
     let campaign = |threads| FaultInjectionCampaign {
         seed_count: 6,

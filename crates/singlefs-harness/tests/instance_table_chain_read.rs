@@ -5,7 +5,7 @@
 //! 这里的两片链是用例手搭的（真写者写出的多片链在 `instance_table_second_page_write.rs`）：
 //! mkfs 之后连着可写挂载几次、不写文件（树表 0 条的那一版上每次写行），把最新那一版的实例表拆成两片——第 0 片原地重写、
 //! 第二片写进一个远离开放段的空槽，指着第 0 片的每一条根补上它的新整单元校验和。第二片的出生序号随手取第 0 片的加一
-//! （读者与 checker 都不看它：实例表单元按 I-1.2（块头写序已发布） 那一行的例外不进出生身份那两格），
+//! （读者不看它；实例表单元按 I-1.2（块头写序已发布） 那一行的例外只免谓词那一半，checker 只判链上每一片的头与指着它的指针记的相等），
 //! 它也不进那一版的分配记录——树表 0 条的那一版没有记账树，I-3.1（已分配统计对得上） 不适用，手搭的第二片不进分配记录不会让它红；
 //! 可写挂载要把整条链换下，这一片不在账里，取号之前的准入就拒（`writable_mount_follows_the_chain_…`）。
 
@@ -21,6 +21,7 @@ use singlefs_core::address::{
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::bytes::ByteWriter;
 use singlefs_core::instance_table::{InstanceRow, InstanceTablePageIndex, InstanceTableRecords};
+use singlefs_core::journal::{back_chain_of, record_offset, JournalRecord};
 use singlefs_core::make_filesystem::{
     instance_table_chain_record, location_entries, make_filesystem, INSTANCE_TABLE_SLOT,
 };
@@ -35,8 +36,8 @@ use singlefs_core::recovery::{
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
 use singlefs_core::transaction::{PublishError, TransactionUnit};
-use singlefs_core::unit::{build_packed_unit, parse_packed_unit};
-use singlefs_format::{DATA_UNIT_BYTES, INSTANCE_ROW_BYTES};
+use singlefs_core::unit::{build_packed_unit, parse_packed_unit, unit_filesystem_identifier};
+use singlefs_format::{DATA_UNIT_BYTES, INSTANCE_ROW_BYTES, JOURNAL_RECORD_BYTES};
 use singlefs_harness::memory_pool::SparseBlockDevice;
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
@@ -133,7 +134,7 @@ struct TwoPageChain {
 
 /// 把最新那一版的实例表换成两片：第 0 片装 `first_page_rows` 加 `first_page_chain_record(第二片的指针)`，原地重写；
 /// 第二片装 `second_page_rows` 加「无下一片」，身份 (0, 4, 1, 0)，写在 `SECOND_PAGE_SLOT`。两片的诞生代号与写序照原来那一片；
-/// 第二片的出生序号取第 0 片的加一（没有条款的那一格，读者与 checker 不看它）。指着原来那一片的每一条根（写行那次发布与之后的暖机空发布）
+/// 第二片的出生序号取第 0 片的加一（值没有条款定；读者不看它，checker 只判它与指着它的链指针记的相等，I-1.2 的遍历方向）。指着原来那一片的每一条根（写行那次发布与之后的暖机空发布）
 /// 换上第 0 片的新整单元校验和、重写根槽。
 fn write_two_page_chain(
     devices: &mut Devices,
@@ -236,9 +237,69 @@ fn write_two_page_chain(
         rewritten_roots += 1;
     }
     assert!(rewritten_roots >= 1, "至少最新那条根指着原来那一片");
+    let rewritten_versions: Vec<(InstanceGeneration, CheckpointTxg)> = roots
+        .iter()
+        .filter(|root| root.instance_table == original_first_page_pointer)
+        .map(|root| (root.instance, root.checkpoint_txg))
+        .collect();
+    point_the_records_of_these_versions_at_the_first_page(
+        devices,
+        &rewritten_versions,
+        &first_page_pointer,
+        system_configuration.immutable.sizes.journal_ring_bytes,
+    );
     TwoPageChain {
         first_page_slot,
         second_page_pointer,
+    }
+}
+
+/// 根环里换了实例表指针的那几版，同 (实例, txg) 的 journal 记录新根段里的实例表指针也换成 `first_page_pointer`（I-8.10 从第 8 批起比七段，
+/// 有它；盘上留下「写者从一开始就写出了这样的根」的样子），之后同实例的记录反向链按前一条改后的记录头重算（I-8.6 只链实例内逻辑前一条），
+/// `JournalRecord::to_bytes` 重封，两盘各一份。环里从计数器 1 起读到第一格解不出就停：迭代上界是环的槽数。
+fn point_the_records_of_these_versions_at_the_first_page(
+    devices: &mut Devices,
+    versions: &[(InstanceGeneration, CheckpointTxg)],
+    first_page_pointer: &NodePointer,
+    ring_bytes: u64,
+) {
+    let filesystem_identifier = unit_filesystem_identifier(&parameters().filesystem_identifier);
+    let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
+    for device in DISKS {
+        // 跨轮携带：计数器小 1 的那一条若被改过，记它的实例与改后的字节（下一条的反向链按它重算）。
+        let mut rewritten_previous_record: Option<(InstanceGeneration, Vec<u8>)> = None;
+        for counter in 1..=ring_bytes / JOURNAL_RECORD_BYTES {
+            let offset = record_offset(counter, ring_bytes);
+            let Some(bytes) = PoolReader::read(&*devices, device, offset, record_bytes) else {
+                break;
+            };
+            let Some(record) = JournalRecord::parse(&bytes, filesystem_identifier) else {
+                break;
+            };
+            let mut rewritten = record.clone();
+            if versions.contains(&(record.instance, record.checkpoint_txg)) {
+                rewritten.new_instance_table = *first_page_pointer;
+            }
+            if let Some((previous_instance, previous_bytes)) = &rewritten_previous_record {
+                if *previous_instance == record.instance {
+                    rewritten.back_chain = back_chain_of(previous_bytes);
+                }
+            }
+            rewritten_previous_record = if rewritten == record {
+                None
+            } else {
+                let rewritten_bytes = rewritten.to_bytes();
+                devices
+                    .iter_mut()
+                    .find(|(identity, _)| *identity == device)
+                    .expect("盘在池里")
+                    .1
+                    .wrapped_device_mut()
+                    .image
+                    .write(offset, &rewritten_bytes);
+                Some((record.instance, rewritten_bytes))
+            };
+        }
     }
 }
 
@@ -487,7 +548,11 @@ fn the_pool_checker_walks_both_pages_of_a_valid_chain_and_every_invariant_holds(
 
 /// 第二片的链指针指错（坏镜像）：第 0 片的链指针指到 mkfs 写的那一片实例表（槽 50176，身份 (0, 4, 0, 0)），
 /// 位置条目带的就是那一片的整单元校验和——I-2.1 挡不住，链上第 1 片的身份该是 (0, 4, 1, 0)，I-1.1 红；
-/// 链从这里断了，最新根走不完（I-7.2），它引用的单元对不上（I-4.8、I-7.4 按最新根那一格红）。
+/// 链指针的诞生代号、实例、尾段照第二片的指针抄，与 mkfs 那一片头里的 (0, 0, 0) 不等，I-1.2 红（那一行「实例表单元按例外只免谓词那一半，
+/// 链上每一片的指针与头相等仍挂遍历方向」）；
+/// 链从这里断了，最新根走不完（I-7.2），它引用的单元对不上（I-4.8、I-7.4 按最新根那一格红）；
+/// mkfs 那一片在写行那次发布被换下、记着已释放（释放代 3），候选集里每一条根又经这条链指针引用它，I-3.9 红
+/// （那一行「若每一条有效根都还引用它，它不许带已释放标志」；只跳过比最后引用它的那条根晚而走不全的根，这里最后引用它的就是最新根）。
 #[test]
 fn chain_pointer_to_another_instance_table_unit_reddens_the_identity_invariant() {
     let (mut devices, _stream) = pool_without_file_after_writable_mounts();
@@ -509,9 +574,28 @@ fn chain_pointer_to_another_instance_table_unit_reddens_the_identity_invariant()
     let verdicts = verdicts(&devices);
     assert_eq!(
         violated(&verdicts),
-        vec!["I-1.1", "I-4.8", "I-7.2", "I-7.4"],
+        // I-3.5：mkfs 种的那一片（诞生代号 0）被最新那一版的链再次引用，前一版不引用它。
+        vec!["I-1.1", "I-1.2", "I-3.9", "I-4.8", "I-7.2", "I-7.4", "I-3.5"],
         "{verdicts:?}"
     );
+    match verdict_of(&verdicts, "I-1.2") {
+        InvariantVerdict::Violated(detail) => assert!(
+            detail.contains("实例表第 1 片"),
+            "I-1.2 红在链上第 1 片的出生身份：{detail}"
+        ),
+        other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
+            panic!("链指针记的出生身份与 mkfs 那一片头里的不等，I-1.2 该红：{other:?}")
+        }
+    }
+    match verdict_of(&verdicts, "I-3.9") {
+        InvariantVerdict::Violated(detail) => assert!(
+            detail.contains(&format!("槽 {}", INSTANCE_TABLE_SLOT.0)),
+            "I-3.9 红在 mkfs 那一片（已释放、又被链指针引用）：{detail}"
+        ),
+        other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
+            panic!("被换下的 mkfs 那一片又被每一条候选根引用，I-3.9 该红：{other:?}")
+        }
+    }
     assert_eq!(
         verdict_of(&verdicts, "I-2.1"),
         InvariantVerdict::Holds,

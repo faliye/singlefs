@@ -1,4 +1,4 @@
-//! 码 2 索引节点含 key 区间与预留位的头宽 `86 + 2 × key 宽 + 29`，三方各算一份（代码审阅第 11 条；2026-09-27 用户定案「三方各算一份 + 交叉断言」，
+//! 码 2 索引节点含 key 区间与预留位的头宽 `86 + 2 × key 宽 + 29`，三方各算一份（代码审阅第 11 条「三方各算一份 + 交叉断言」，
 //! 记在 `records/2026-09-27-代码审阅38条去向.md`）：core 的 `singlefs_core::unit::index_node_header_bytes`、checker 的
 //! `singlefs_checker::index_node_header_bytes`、理想模型的 `singlefs_harness::model::index_node_header_bytes`，
 //! `singlefs-format` 只给标量（D13（验证路线） 已定项 5：发射物里不许有算术）。

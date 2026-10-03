@@ -1,4 +1,4 @@
-//! 里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 43 行取丁-defer（用户 2026-09-28 定，被攻过一轮；
+//! 里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 43 行取丁-defer（被攻过一轮；
 //! `research/prompts/abandoned-floor-r1-main-verification.md` M1）：I-3.1（已分配统计对得上） 的「实际遍历」并上 F_生效 之下、没被抛弃的根
 //! 引用着、候选集那一遍没走到、最新根的账里是已释放且释放代高于 F_生效 的槽（还在 defer 里）。
 //!
@@ -26,7 +26,11 @@ fn content_seeded_by(length: usize, seed: usize) -> Vec<u8> {
         .collect()
 }
 
-fn overwrite(pool: &mut BuiltPool, content: &[u8], instance: InstanceGeneration) -> TransactionOutput {
+fn overwrite(
+    pool: &mut BuiltPool,
+    content: &[u8],
+    instance: InstanceGeneration,
+) -> TransactionOutput {
     let previous = pool.output.clone();
     let output = publish_overwrite_in_process(
         pool,
@@ -53,9 +57,17 @@ fn violations_on(image: &MemoryPool) -> Vec<(&'static str, String)> {
 /// A、B、C（实例 1）→ 崩溃恢复抛弃 C → 再可写挂载一次 → 覆盖写四次：抬 F 之前全绿的池，与再挂载那一次的实例代号。
 fn pool_before_the_raise(tag: &str) -> BuiltPool {
     let mut pool = build_pool(tag);
-    overwrite(&mut pool, &content_seeded_by(4100, 3), InstanceGeneration(1));
+    overwrite(
+        &mut pool,
+        &content_seeded_by(4100, 3),
+        InstanceGeneration(1),
+    );
     let system_configuration_before_the_third = system_configuration_slots_of_every_device(&pool);
-    let third = overwrite(&mut pool, &content_seeded_by(2500, 11), InstanceGeneration(1));
+    let third = overwrite(
+        &mut pool,
+        &content_seeded_by(2500, 11),
+        InstanceGeneration(1),
+    );
     assert_eq!(third.root.checkpoint_txg, CheckpointTxg(5), "C 是 txg 5");
     abandon_the_third_version_by_a_crash_before_its_rotation(
         &mut pool,

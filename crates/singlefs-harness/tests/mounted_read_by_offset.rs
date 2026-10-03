@@ -5,7 +5,7 @@
 //!    （块层读计数由 `singlefs_harness::read_tally` 数，整扫一遍环是 196 608 次 / 盘，读期间要恒 0）；
 //! 2. 改坏一个数据单元的一个字节 ⇒ 落在它上面的读报校验和错，**别的读不受影响**；
 //! 3. 同一个镜像冷走读（`recovery::recover`）与挂载态读逐字节相同——层 0 的每个恢复结果上再跑一遍那一半归
-//!    crash-verifier，这里只把接口（`mounted_read::mount_read_only`）做出来并钉住「同一个镜像两条路同字节」；
+//!    checker 档（主 agent 经门禁 checker-tier-layer0-replay 跑），这里只把接口（`mounted_read::mount_read_only`）做出来并钉住「同一个镜像两条路同字节」；
 //! 4. 读路径报得出「这次读了几个单元」与「位置提示过期的多跳次数」（D19（块指针的结构与宽度预算） 已定项 5 硬规则 3）。
 //!
 //! **跨单元的页**：净荷 32634 不是 4096 的整数倍 ⇒ 约 12.5% 的 4 KiB 页跨两个单元（D4（校验和位置） 已定项 5）。
@@ -14,7 +14,7 @@
 //! 条目宽窄于字段表那几格发布路径造不出来）。能这么做的依据是读路径只认盘上的字节。发布路径写出的多单元文件
 //! （并行线一，`publish_sequential_write`）的冷启动顺序读在 `multi_unit_file_write_and_read.rs`。
 //!
-//! extent 叶记录 key 第三段是文件字节偏移（D8（核心索引结构） 已定项 3，C490（extent 叶 key 的 offset 段没定单位） 2026-09-23 定）：
+//! extent 叶记录 key 第三段是文件字节偏移（D8（核心索引结构） 已定项 3，C490（extent 叶 key 的 offset 段没定单位） 的定案）：
 //! 合成镜像把它写成单元序号时，挂载态打开这个文件当场拒绝、不按位次猜着读
 //! （`mount_state_open_refuses_an_extent_key_whose_offset_segment_is_the_unit_index_instead_of_the_file_byte_offset`）。
 
@@ -395,6 +395,7 @@ fn build_synthetic_multi_unit_image(plan: SyntheticImagePlan) -> SyntheticMultiU
     let inode_record = InodeRecord {
         inode: FIRST_INODE_NUMBER,
         object_birth: SYNTHETIC_TXG,
+        nlink: singlefs_core::records::NLINK_OF_A_LIVE_INODE_WITHOUT_DIRECTORIES,
         size: declared_file_size_in_bytes.unwrap_or(file_size),
         change_count: SYNTHETIC_TXG.0,
         write_time_seconds: common::FIXED_WRITE_TIME_SECONDS,
@@ -655,7 +656,7 @@ fn build_synthetic_multi_unit_image(plan: SyntheticImagePlan) -> SyntheticMultiU
 ///
 /// 顺带把验收第 1 条那个对照摆出来：**挂载那一步**要全环扫一遍（两块盘各 196 608 次记录读，
 /// 因为文件后端交不出 journal 记录落点的提示），**打开之后的读**一次都不碰环。
-/// 层 0 的每个恢复结果上再跑一遍这一条归 crash-verifier：接口是 `mount_read_only`，`reader` 换成崩溃镜像即可。
+/// 层 0 的每个恢复结果上再跑一遍这一条归 checker 档（主 agent 经门禁 checker-tier-layer0-replay 跑）：接口是 `mount_read_only`，`reader` 换成崩溃镜像即可。
 #[test]
 fn the_same_image_read_cold_and_read_through_the_mount_state_gives_the_same_bytes() {
     let mut pool = build_pool("parallel-line-two-cold-versus-mounted");
@@ -1247,8 +1248,8 @@ fn central_mapping_root_claiming_level_one_over_mapping_entries_is_refused_inste
 /// 条目宽是索引节点头里的一个**盘上字段**，`parse_index_node` 只判了它 ≥ key 宽 27；节点自己仍然自洽
 /// （条目数 × 27 = 声明长度、两道校验和都对得上），挡着它的只有读者这一判。
 ///
-/// **这一判判的是「今天这个读者要几个字节」，不是「映射条目该有多宽」**：后者归 C307（映射树两种 key 宽怎么装进
-/// 一棵定宽 key 的树），那一条还开着。
+/// **这一判判的是「今天这个读者要几个字节」，不是「映射条目该有多宽」**：后者 D19（块指针的结构与宽度预算） 已定项 10
+/// 已定一律 55；读者拒宽于 55 的条目还欠在 C307（映射树两种 key 宽怎么装进一棵定宽 key 的树）。
 #[test]
 fn central_mapping_root_whose_entry_width_is_narrower_than_the_field_table_is_refused_instead_of_slicing_past_the_entry(
 ) {

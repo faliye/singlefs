@@ -3,7 +3,7 @@
 //! 数据行至多 369。改之前取号之前的准入不算实例表：第 370 次可写挂载取号写完之后在装实例表单元时越界 panic（`bytes.rs` 的
 //! `ByteWriter`），每试一次再烧一个实例代号（攻方探针 `research/prompts/m2-wave2-code-r1-opus-model/opus_probe_pristine.rs` 的
 //! `pristine_instance_table_rows_overflow_after_acquisition`，日志 `pristine-run.log`）。
-//! 用户 2026-09-19 定第二片进里程碑二（增补 2 收口表第 38 行），2026-09-24 定两条写法：行一片写满 369 行再开下一片、
+//! 第二片进里程碑二（增补 2 收口表第 38 行），两条写法：行一片写满 369 行再开下一片、
 //! 多于一片时在 bump 次序里尾片先。所以一片写满之后的那一次挂载不再拒，写第二片（真写者写出的两片怎么排、checker 怎么判见
 //! `instance_table_second_page_write.rs`）。管理员回退改成挂着时的一次向前发布之后不写行、
 //! 实例表照现行那一版的（D23（journal 的角色与格式） 已定项 14），「回退按 R_old 那一版表算行数」那一格没有对象，删了。

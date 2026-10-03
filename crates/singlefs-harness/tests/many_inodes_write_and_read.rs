@@ -250,6 +250,7 @@ fn creating_inodes_across_the_two_hundred_thirty_three_threshold_splits_at_the_e
             InodeRecord {
                 inode,
                 object_birth: split_txg,
+                nlink: singlefs_core::records::NLINK_OF_A_LIVE_INODE_WITHOUT_DIRECTORIES,
                 size: 0,
                 change_count: split_txg.0,
                 write_time_seconds,
@@ -446,9 +447,9 @@ fn assert_no_invariant_is_violated(image: &MemoryPool, what: &str) {
     }
 }
 
-/// 一次建的 inode 多到这次要点名的单元超过一条 journal 记录装得下的 67 项：建 inode 是一个事务、一个数据单元都不写，
+/// 一次建的 inode 多到这次要点名的单元超过一条 journal 记录装得下的 64 项：建 inode 是一个事务、一个数据单元都不写，
 /// 它点名的全是共享的提交内生块。D23（journal 的角色与格式） 已定项 17（用户 2026-09-24 定）：**末条再跨记录**——
-/// 按 bump 次序装满 67 项再开下一条；两条都属于这一个事务（已定项 7：同一事务的记录共享事务号，提交标记只在它的最后一条），
+/// 按 bump 次序装满 64 项再开下一条；两条都属于这一个事务（已定项 7：同一事务的记录共享事务号，提交标记只在它的最后一条），
 /// 本次发布内序号 1、2（已定项 4），只有第二条带「本次发布末条」标志（记录标志位 0，已定项 17）。
 /// 盘上的字段用 checker 的独立解析从盘上读（不信写者交回的）。之后：
 /// - 发布做完：冷启动读回 1 + N 条 inode 记录；池级 checker 一条违例都没有，I-8.8（前缀里的事务不被切开） 这一回有了对象
@@ -463,10 +464,10 @@ fn publish_naming_more_units_than_one_journal_record_holds_spills_its_one_transa
     let before = pool.output.clone();
     // 非叶容器的角色有十一个：inode 根、记账树、映射树、树表，加分配记录树按位置寻址（D8（核心索引结构） 已定项 14）重写的七个节点——
     // 这次新写的五十几片容器从 50253 往后排、越过 50344，改的记录落在两块盘各自的叶 61 与叶 62 里，
-    // 加两块盘各自的第 1 层节点 0 与根 ⇒ 容器数超过 67 − 11 = 56 就点不下一条记录。
+    // 加两块盘各自的第 1 层节点 0 与根 ⇒ 容器数超过 64 − 11 = 53 就点不下一条记录。
     let containers_that_fit = JOURNAL_NAMED_ENTRIES_PER_RECORD - 11;
     let new_inode_count = (containers_that_fit + 1) * INODE_LEAF_RECORDS - INODES_BEFORE;
-    let named_unit_capacity = usize::try_from(JOURNAL_NAMED_ENTRIES_PER_RECORD).expect("67");
+    let named_unit_capacity = usize::try_from(JOURNAL_NAMED_ENTRIES_PER_RECORD).expect("64");
 
     let after = create_inodes(&mut pool, new_inode_count, FIXED_WRITE_TIME_SECONDS + 120)
         .expect("点名项装不下一条记录时末条再跨记录，不拒");
@@ -474,12 +475,12 @@ fn publish_naming_more_units_than_one_journal_record_holds_spills_its_one_transa
     assert_eq!(
         after.rewritten.len(),
         named_unit_capacity + 1,
-        "这次重写 57 片叶容器 + 11 个非叶容器角色 = 68 个单元"
+        "这次重写 54 片叶容器 + 11 个非叶容器角色 = 65 个单元"
     );
     assert_eq!(
         after.earlier_records_of_this_publish.len(),
         1,
-        "68 项 = 装满的一条 67 项 + 跨出去的一条 1 项"
+        "65 项 = 装满的一条 64 项 + 跨出去的一条 1 项"
     );
     let first_counter = after.earlier_records_of_this_publish[0].record.counter;
     assert_eq!(
@@ -521,7 +522,7 @@ fn publish_naming_more_units_than_one_journal_record_holds_spills_its_one_transa
             (txg, transaction, 0, 1, 0, named_unit_capacity),
             (txg, transaction, 1, 2, 1, 1),
         ],
-        "(txg, 事务号, 提交标记, 本次发布内序号, 记录标志, 点名项数)：同一事务、提交标记与末条标志只在第二条，第一条装满 67 项"
+        "(txg, 事务号, 提交标记, 本次发布内序号, 记录标志, 点名项数)：同一事务、提交标记与末条标志只在第二条，第一条装满 64 项"
     );
     let named_in_bump_order: Vec<_> = after.earlier_records_of_this_publish[0]
         .record

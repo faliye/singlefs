@@ -137,6 +137,9 @@ fn expected_by_kind(
         WrittenStructureKind::InodeTreeRoot,
         WrittenStructureKind::AllocationRecordTreeNode,
         WrittenStructureKind::AccountingTreeNode,
+        WrittenStructureKind::DeletedInodesTreeNode,
+        WrittenStructureKind::TombstoneTreeNode,
+        WrittenStructureKind::LineageTreeNode,
         WrittenStructureKind::CentralMappingTreeNode,
         WrittenStructureKind::TreeTableUnit,
         WrittenStructureKind::InstanceTableUnit,
@@ -157,6 +160,9 @@ fn expected_by_kind(
                         | WrittenStructureKind::InodeTreeLeafContainer
                         | WrittenStructureKind::InodeTreeRoot
                         | WrittenStructureKind::AccountingTreeNode
+                        | WrittenStructureKind::DeletedInodesTreeNode
+                        | WrittenStructureKind::TombstoneTreeNode
+                        | WrittenStructureKind::LineageTreeNode
                         | WrittenStructureKind::CentralMappingTreeNode
                         | WrittenStructureKind::TreeTableUnit
                         | WrittenStructureKind::InstanceTableUnit
@@ -173,7 +179,7 @@ fn expected_by_kind(
     expected
 }
 
-/// 带文件的一版（新池新建文件、覆盖写）：字节表零 t1..t8，数据单元与 inode 树叶容器 32768、其余六个角色 16384，
+/// 带文件的一版（新池新建文件、覆盖写）：字节表零 t1..t12，数据单元与 inode 树叶容器 32768、其余六个角色 16384，
 /// 分配记录树那一个角色按位置寻址之后是五个节点（`ALLOCATION_RECORD_TREE_NODES_REWRITTEN`）。
 fn file_version_publish_by_kind() -> Vec<(WrittenStructureKind, WriteCallsAndBytes)> {
     expected_by_kind(&[
@@ -486,6 +492,18 @@ fn failed_midway_publish_by_kind() -> Vec<(WrittenStructureKind, WriteCallsAndBy
         ),
         (
             WrittenStructureKind::AccountingTreeNode,
+            WriteCallsAndBytes::NONE,
+        ),
+        (
+            WrittenStructureKind::DeletedInodesTreeNode,
+            WriteCallsAndBytes::NONE,
+        ),
+        (
+            WrittenStructureKind::TombstoneTreeNode,
+            WriteCallsAndBytes::NONE,
+        ),
+        (
+            WrittenStructureKind::LineageTreeNode,
             WriteCallsAndBytes::NONE,
         ),
         (

@@ -89,7 +89,7 @@ fn second_mount_on_a_version_without_file() -> SecondMountOnAVersionWithoutFile 
 fn row_publish_of(mounted: &mut Mounted) -> &mut VersionWithoutFilePublishOutput {
     match &mut mounted.output.row_publish {
         PoolVersion::WithoutFile(row_publish) => row_publish,
-        PoolVersion::WithFile(_) => {
+        PoolVersion::WithFile(_) | PoolVersion::WithTreesAndNoFile(_) => {
             panic!("第二次挂载接在树表 0 条的一版上：写行那次发布也是树表 0 条的一版")
         }
     }

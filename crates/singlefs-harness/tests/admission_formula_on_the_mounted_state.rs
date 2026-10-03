@@ -24,9 +24,9 @@ use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::admission::{
     admission_reading_of_a_writable_mount, admit_on_every_device, checkpoint_reserve_pool,
     instance_switch_reserve_on_one_device, space_budget_of_role, AdmissionReading,
-    AdmissionRefusedOnSomeDevices, AvailableBytesOnOneDevice, BytesOnOneDevice, DemandOnDevice,
-    DeviceAdmissionTerms, DeviceShortOfDemand, MetadataBlocks, PoolWideCommitments, ReplicaCount,
-    SpaceBudgetOfARole,
+    AdmissionRefusedOnSomeDevices, AvailableBytesOnOneDevice, BytesOnOneDevice,
+    BytesSummedOverAllReplicas, DemandOnDevice, DeviceAdmissionTerms, DeviceShortOfDemand,
+    MetadataBlocks, PoolWideCommitments, ReplicaCount, SpaceBudgetOfARole,
 };
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::mount::{
@@ -139,6 +139,10 @@ fn slots_of(output: &TransactionOutput, device: DeviceIdentity) -> BTreeSet<u64>
         .collect()
 }
 
+/// 记账标签 6（墓碑预付，D3（空间分配） 已定项 2）摊到每块盘扣的字节：一个活对象、墓碑树零根时
+/// 两份副本 × ((2 + 0 + 1) × 16384 + 41 × 1) = 98386，÷ 2 = 49193。准入读数从发布路径接上它起每块盘多扣这么多。
+const TAG_SIX_SHARE_OF_ONE_DEVICE_IN_BYTES: i128 = (3 * 16384 + 41) * 2 / 2;
+
 /// 条款没给、由用例给的两个量（C363）。
 #[derive(Clone, Copy, Debug)]
 struct QuantitiesSuppliedByThisTest {
@@ -169,10 +173,11 @@ fn admission_reading(
             u64::try_from(rows_after_the_row_publish).expect("行数装得进 u64"),
             supplied.worst_empty_publish_cost,
         ),
-        PoolWideCommitments::of_the_first_version(checkpoint_reserve_pool(
-            supplied.checkpoint_cost,
-            replicas,
-        )),
+        PoolWideCommitments::of_the_first_version(
+            BytesSummedOverAllReplicas::ZERO,
+            checkpoint_reserve_pool(supplied.checkpoint_cost, replicas),
+        ),
+        BytesOnOneDevice::ZERO,
     )
 }
 
@@ -191,6 +196,7 @@ fn reading_with_the_abandoned_root_exclusive_term_zeroed(
                 unreclaimable: terms.unreclaimable,
                 mount_time_commitment: terms.mount_time_commitment,
                 abandoned_root_exclusive: BytesOnOneDevice::ZERO,
+                ring_window: terms.ring_window,
             })
             .collect(),
         reading.pool_wide(),
@@ -503,12 +509,14 @@ fn writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_th
                 .into_iter()
                 .map(|device| DeviceShortOfDemand {
                     device,
-                    available: AvailableBytesOnOneDevice(-39 * i128::from(SLOT_BYTES)),
+                    available: AvailableBytesOnOneDevice(
+                        -39 * i128::from(SLOT_BYTES) - TAG_SIX_SHARE_OF_ONE_DEVICE_IN_BYTES,
+                    ),
                     demand: BytesOnOneDevice::ZERO,
                 })
                 .collect(),
         },
-        "取号之前两块盘都短：可用 −39 槽，挂载这一刻不另要需求"
+        "取号之前两块盘都短：可用 −39 槽再减标签 6 每盘那一份，挂载这一刻不另要需求"
     );
     assert_eq!(floor_raises.len(), 1, "推一串就够");
     let raised = &floor_raises[0];
@@ -539,9 +547,12 @@ fn writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_th
         CheckpointTxg(last_warm_up_txg.0 + 3),
         "现行那一版是推的最后一次"
     );
-    for (device, available) in
-        admission_reading_of_a_writable_mount(&mounted.allocator, mounted.current.file_version())
-            .available_on_each_device()
+    for (device, available) in admission_reading_of_a_writable_mount(
+        &mounted.allocator,
+        mounted.current.file_version(),
+        parameters().geometry.root_ring_slots_per_region,
+    )
+    .available_on_each_device()
     {
         assert!(
             available.0 >= 0,
@@ -701,11 +712,13 @@ fn an_overwrite_whose_new_slots_exceed_the_available_bytes_is_refused_by_the_spa
                 .into_iter()
                 .map(|device| DeviceShortOfDemand {
                     device,
-                    available: AvailableBytesOnOneDevice(11 * i128::from(SLOT_BYTES)),
+                    available: AvailableBytesOnOneDevice(
+                        11 * i128::from(SLOT_BYTES) - TAG_SIX_SHARE_OF_ONE_DEVICE_IN_BYTES,
+                    ),
                     demand: BytesOnOneDevice::of_slots(slots_written_by_the_overwrite),
                 })
                 .collect(),
         },
-        "两块盘都短：可用 11 槽 < 需求 14 槽（普通分配的 6 槽装得下，固定点那 8 槽装不下）"
+        "两块盘都短：可用 11 槽再减标签 6 每盘那一份 < 需求 14 槽（普通分配的 6 槽装得下，固定点那 8 槽装不下）"
     );
 }

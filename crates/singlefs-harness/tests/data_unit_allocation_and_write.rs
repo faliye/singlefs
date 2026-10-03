@@ -205,7 +205,7 @@ fn data_unit_reads_back_from_both_devices_with_content_then_zeroes() {
         assert_eq!(
             read_back[43..51],
             TREE_IDENTIFIER_EXTENT.to_le_bytes(),
-            "五元组树 ID = extent 树 11"
+            "五元组树 ID = extent 树 65536"
         );
         assert_eq!(&read_back[91..95], &1u32.to_le_bytes(), "写序实例代号 1");
     }

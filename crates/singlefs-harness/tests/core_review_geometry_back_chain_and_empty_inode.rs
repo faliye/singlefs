@@ -432,10 +432,15 @@ fn system_configuration_slots_closer_than_a_slot_width_are_refused_before_any_wr
 }
 
 /// 槽距的上界：区域之间隔 P × chunk = 3 MiB，S = 8 时槽距到 384 KiB 三个区域首尾相接、放行；再多 512 字节，区域 0 伸进区域 1。
+/// 首尾相接那一格 io_min 取 512：io_min 也取 384 KiB 时判定宽度是 384 KiB，区域起点 1 MiB 不是它的整数倍，mkfs 按判定宽度拒
+/// （C47（根槽没按判定宽度对齐）），那一判不是这条用例要钉的。
 #[test]
 fn root_ring_regions_longer_than_the_region_step_are_refused_and_regions_that_just_touch_are_not() {
     let regions_that_just_touch = make_filesystem_on_patterned_devices(
-        &parameters_with(geometry_with_slot_spacing(384 * 1024)),
+        &parameters_with(SystemImmutableSizes {
+            minimum_input_output_bytes: 512,
+            ..geometry_with_slot_spacing(384 * 1024)
+        }),
         DEVICE_BYTES,
     );
     assert!(

@@ -1,4 +1,4 @@
-//! 里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 ② 行：被抛弃根带的 F 算进 F_生效（D16（发布语义） 已定项 1，用户 2026-09-28 定「算进」，
+//! 里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 ② 行：被抛弃根带的 F 算进 F_生效（D16（发布语义） 已定项 1，
 //! 被攻过一轮；`research/prompts/abandoned-floor-r1-main-verification.md` M2）。实现一侧 `recovery::effective_rollback_floor` 与池级 checker
 //! 各算一份（两份不共用代码），两份都要把被抛弃根带的 F 算进去。
 //!
@@ -73,10 +73,17 @@ fn pool_whose_abandoned_root_carries_a_higher_floor(tag: &str) -> BuiltPool {
         .find(|(identity, _)| *identity == root_slot_device)
         .expect("池里有这块盘");
     let mut slot = vec![0u8; root_slot_bytes];
-    device.read_at(root_slot_offset, &mut slot).expect("读 C 的根槽");
-    let mut abandoned_root = RootRecord::parse_slot(&slot, &publish_parameters.filesystem_identifier)
-        .expect("C 的根自证得过");
-    assert_eq!(abandoned_root.checkpoint_txg, CheckpointTxg(5), "根槽里住的是 C");
+    device
+        .read_at(root_slot_offset, &mut slot)
+        .expect("读 C 的根槽");
+    let mut abandoned_root =
+        RootRecord::parse_slot(&slot, &publish_parameters.filesystem_identifier)
+            .expect("C 的根自证得过");
+    assert_eq!(
+        abandoned_root.checkpoint_txg,
+        CheckpointTxg(5),
+        "根槽里住的是 C"
+    );
     assert_eq!(abandoned_root.rollback_floor, CheckpointTxg(0));
     abandoned_root.rollback_floor = FLOOR_CARRIED_BY_THE_ABANDONED_ROOT;
     device

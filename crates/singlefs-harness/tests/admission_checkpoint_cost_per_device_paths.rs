@@ -1,5 +1,5 @@
-//! 实审 A4 / A4b / A4d（代码审阅第 20 条；用户 2026-09-27 定「改条款按盘分路计并改实现」，再定「一律按最坏情况计」，
-//! 再定分配记录树那一项取 K1「几何上整棵树」）：准入的 ckpt_cost 与一次空发布实际写出的固定点单元数并排量。
+//! 代码审阅第 20 条（按盘分路计、一律按最坏情况计，
+//! 分配记录树那一项取 K1「几何上整棵树」）：准入的 ckpt_cost 与一次空发布实际写出的固定点单元数并排量。
 //! 分配记录树那一项取 K1 之后每格多扣的块数逐格钉住（实审 A4c 报告 `research/prompts/m2-rev-a4c-implementer-report.md` 第二节量表 K1 那一列）；
 //! 实审 A4c 量到每块盘两条叶路径（K0）少扣的那两段随机历史（开放段装不下开新段、回落散到几片叶；换下很久以前落在别处的节点）也在这里重放。
 //!
@@ -123,6 +123,8 @@ fn capped(
 
 /// 产品路径的节点容量（按节点格式算），盘宽四档：分配记录树高 2（1 GiB）、3（4 GiB、64 GiB）、4（1 TiB），文件一个数据单元、中央映射树 1 层；
 /// 再加一格 4 GiB 两盘、文件顺序写到 300 个数据单元，中央映射树 2 层。
+/// ckpt_cost 加了谱系那一项（一次谱系容器 COW 连祖先：容器 2 + 根 1，谱系树零根，用户 2026-10-02 定「乙」）之后，这里与下一张表每格多扣的块数都多 3
+/// （空发布不写谱系树，实写的固定点不变）。
 fn cells_with_the_node_format_capacities() -> Vec<PoolGeometryCell> {
     let one_data_unit = |name,
                          device_bytes,
@@ -145,28 +147,28 @@ fn cells_with_the_node_format_capacities() -> Vec<PoolGeometryCell> {
             GIBIBYTE,
             JOURNAL_RING_BYTES_OF_THE_ONE_GIBIBYTE_DEVICES,
             EMPTY_PUBLISHES_PER_CELL,
-            over_reserved(132, 134),
+            over_reserved(135, 137),
         ),
         one_data_unit(
             "two-4GiB",
             4 * GIBIBYTE,
             JOURNAL_RING_DEFAULT_BYTES,
             EMPTY_PUBLISHES_PER_CELL,
-            over_reserved(527, 529),
+            over_reserved(530, 532),
         ),
         one_data_unit(
             "two-64GiB",
             64 * GIBIBYTE,
             JOURNAL_RING_DEFAULT_BYTES,
             EMPTY_PUBLISHES_PER_CELL,
-            over_reserved(10337, 10339),
+            over_reserved(10340, 10342),
         ),
         one_data_unit(
             "two-1TiB",
             1024 * GIBIBYTE,
             JOURNAL_RING_DEFAULT_BYTES,
             EMPTY_PUBLISHES_OF_THE_ONE_TEBIBYTE_CELL,
-            over_reserved(167_298, 167_300),
+            over_reserved(167_301, 167_303),
         ),
         PoolGeometryCell {
             name: "two-4GiB-file-300-units-mapping-two-levels",
@@ -177,7 +179,7 @@ fn cells_with_the_node_format_capacities() -> Vec<PoolGeometryCell> {
                 DATA_UNITS_OF_THE_TWO_LEVEL_CENTRAL_MAPPING_CELL,
             ),
             empty_publishes: EMPTY_PUBLISHES_PER_CELL,
-            over_reserved_slots_of_the_empty_publishes: over_reserved(528, 530),
+            over_reserved_slots_of_the_empty_publishes: over_reserved(531, 533),
         },
     ]
 }
@@ -195,21 +197,23 @@ fn cells_with_capped_code_two_trees() -> Vec<PoolGeometryCell> {
             empty_publishes: EMPTY_PUBLISHES_PER_CELL,
             over_reserved_slots_of_the_empty_publishes,
         };
+    // ckpt_cost 中央映射树那一项的删插数连谱系容器与谱系树根那 2 把一起算（用户 2026-10-02 定 Q-U「乙」）之后，压小的映射树上
+    // 那一项多切几次：三格各多扣 1 / 3 / 1077 块左右（三·2 第 8 位实现员副本上现跑；之前是 880–885、1060–1070、144964–145506）。
     vec![
         capped_cell(
             "two-4GiB-mapping-4-8",
             capped((477, 150), (4, 8)),
-            over_reserved(877, 882),
+            over_reserved(881, 886),
         ),
         capped_cell(
             "two-4GiB-mapping-3-3",
             capped((477, 150), (3, 3)),
-            over_reserved(1057, 1067),
+            over_reserved(1063, 1072),
         ),
         capped_cell(
             "two-4GiB-mapping-2-2-accounting-8-3",
             capped((8, 3), (2, 2)),
-            over_reserved(144_961, 145_503),
+            over_reserved(146_041, 146_585),
         ),
     ]
 }
@@ -426,12 +430,22 @@ fn measure(
                 measured.tree_table_units += 1;
                 measured.fixed_point_slots_on_each_device += role.span_slots();
             }
+            // 谱系树只在管理员回退那次重写（这几格不回退）；它归固定点（D28（挂载期承诺量） 已定项 1 接线）。
+            TransactionUnit::LineageLeafContainer(_)
+            | TransactionUnit::LineageRoot
+            | TransactionUnit::LineageNodeBelowTheRoot(_) => {
+                measured.fixed_point_slots_on_each_device += role.span_slots();
+            }
             TransactionUnit::Data(_)
             | TransactionUnit::ExtentLowerNode(_)
             | TransactionUnit::ExtentUpperNodeBelowTheRoot(_)
             | TransactionUnit::ExtentRoot
             | TransactionUnit::InodeLeafContainer(_)
             | TransactionUnit::InodeRoot
+            | TransactionUnit::DeletedInodesRoot
+            | TransactionUnit::TombstoneLeafContainer(_)
+            | TransactionUnit::TombstoneRoot
+            | TransactionUnit::TombstoneNodeBelowTheRoot(_)
             | TransactionUnit::InstanceTable
             | TransactionUnit::InstanceTablePageAfterTheFirst(_) => {
                 measured.ordinary_allocation_slots += role.span_slots();
@@ -1071,13 +1085,18 @@ fn empty_publish_plan_after(current: &TransactionOutput) -> PublishPlan<'static>
 /// 抽签与探针逐位相同：两块 4 GiB 那一段（默认环，单元区起点仍是 50176）K0 下重放出来的就是探针量过的那一段（第 132 步的数与报告第二节那一行相同）。
 /// 判别力：分配记录树那一项退回每块盘两条叶路径（K0）时，两段历史都少扣，红在最后一条断言。
 #[test]
-#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn empty_publishes_of_the_histories_where_one_device_rewrites_more_than_two_leaves_fit_in_the_whole_tree_checkpoint_cost(
 ) {
     let histories = [
         HistoryOfTheA4cProbe {
             name: "unit-area-2600-filled-seed-13",
-            unit_area: UnitAreaOfTheHistory::SlotsFromTheUnitAreaStartOfTheSmallDeviceRing(2600),
+            // 环窗口真扣（用户 2026-10-02 定「甲」：小盘放大到扣得起）之后这一段单元区补足 991 槽：[1408, 4999) 每块盘罩叶 1–6
+            // （⌊4998 ÷ 812⌋ = 6）⇒ N_0 = 12、W = 36、环窗口 25 × 36 = 900 槽；分配记录树那一项 1 + 2 × 4 → 1 + 2 × 6 多 4 块、
+            // 谱系那一项 3 块，保留池每块盘多 7 槽、切换预留多 12 × 7 = 84 槽；900 + 7 + 84 = 991（推的；抽签、种子、步数不动）。
+            unit_area: UnitAreaOfTheHistory::SlotsFromTheUnitAreaStartOfTheSmallDeviceRing(
+                2600 + 991,
+            ),
             seed: 13,
             steps: 200,
             data_units_at_most: 200,

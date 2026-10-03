@@ -1,4 +1,4 @@
-//! C393（被抛弃根的账读不出时修复没有条款） 取 (b)-从映射现算（用户 2026-09-28 定，被攻过零轮；
+//! C393（被抛弃根的账读不出时修复没有条款） 取 (b)-从映射现算（被攻过零轮；
 //! `research/prompts/unreadable-at-mount-r2-main-verification.md` L3）：崩溃恢复抛弃根 C (2, 8) 之后再重开可写挂载（实例 4），
 //! C 的分配记录树根节点或树表两份都读不出时，影子账不再跳过 C，从中央映射现算 C 引用的落点照样隔离（与读得出那一臂同是每盘 14 槽），
 //! 计进 `abandoned_roots_unreadable` 往上报；之后覆盖写到 txg 31（txg 32 的根盖掉 C 的根槽）C 的单元一个都不复用、I-7.4（近 K 代块未被复用） 成立。
@@ -14,7 +14,9 @@ use common::{
 };
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
-use singlefs_core::address::{CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration};
+use singlefs_core::address::{
+    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
+};
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::mount::{
     mount_writable_with_test_only_switches_and_a_hook_before_the_one_reread, BeforeTheOneReread,
@@ -71,7 +73,8 @@ fn pool_after_a_recovery_abandoned_c(tag: &str) -> (BuiltPool, TransactionOutput
     )
     .expect("B");
     let mut devices = pool.reopen_recorded();
-    let mounted = singlefs_core::mount::mount_writable(&parameters(), &mut devices).expect("取号 2");
+    let mounted =
+        singlefs_core::mount::mount_writable(&parameters(), &mut devices).expect("取号 2");
     pool.devices = Some(devices);
     pool.allocator = mounted.allocator;
     pool.output = mounted.current.into_file_version().expect("带文件");
@@ -194,7 +197,10 @@ fn overwritten_units_of(image: &MemoryPool, abandoned: &TransactionOutput) -> Ve
         .units
         .iter()
         .filter(|unit| {
-            device.read(DeviceOffsetInBytes(unit.slot.0 * SLOT_BYTES), unit.bytes.len()) != unit.bytes
+            device.read(
+                DeviceOffsetInBytes(unit.slot.0 * SLOT_BYTES),
+                unit.bytes.len(),
+            ) != unit.bytes
         })
         .map(|unit| (unit.slot.0, unit.identity.tag()))
         .collect()
@@ -211,7 +217,9 @@ fn verdict_of(image: &MemoryPool, invariant: &str) -> InvariantVerdict {
 fn violated(image: &MemoryPool) -> Vec<&'static str> {
     check_pool_image(image)
         .into_iter()
-        .filter_map(|(name, verdict)| matches!(verdict, InvariantVerdict::Violated(_)).then_some(name))
+        .filter_map(|(name, verdict)| {
+            matches!(verdict, InvariantVerdict::Violated(_)).then_some(name)
+        })
         .collect()
 }
 
@@ -294,16 +302,33 @@ const ISOLATED_14: [(DeviceIdentity, u64); 2] = [(DeviceIdentity(0), 14), (Devic
 
 /// 读不出的那几臂共同的结局：照常可写挂载（实例 4，txg 到 13），不重读（现算就成了，钩子 0 次），计数 1（显式报告），
 /// 从映射现算照样隔离每盘 14 槽，之后覆盖写到 txg 31 C 的单元一个都不复用、I-7.4 成立。
-fn assert_recomputed_from_the_mapping_isolated_and_not_reused(account: Account, unreadability: Unreadability) {
+fn assert_recomputed_from_the_mapping_isolated_and_not_reused(
+    account: Account,
+    unreadability: Unreadability,
+) {
     let (remount, line) = run_arm(account, unreadability);
     eprintln!("{line}");
     assert_eq!(remount.result, Ok(()), "照常可写挂载");
     assert_eq!(remount.current_txg, Some(CheckpointTxg(13)));
     assert_eq!(remount.hook_calls, 0, "从映射现算就成了，不走「重读一次」");
-    assert_eq!(remount.abandoned_roots_unreadable, 1, "读不出的账照样计数往上报");
-    assert_eq!(remount.isolated, ISOLATED_14.to_vec(), "现算出的落点与读得出那一臂隔离的一样多");
-    assert_eq!(remount.free_units_of_c_after_remount, Vec::<u64>::new(), "C 的单元一个都没回到空闲");
-    assert!(line.contains("no_reuse_through_txg=31 I-7.4=Holds red=[]"), "{line}");
+    assert_eq!(
+        remount.abandoned_roots_unreadable, 1,
+        "读不出的账照样计数往上报"
+    );
+    assert_eq!(
+        remount.isolated,
+        ISOLATED_14.to_vec(),
+        "现算出的落点与读得出那一臂隔离的一样多"
+    );
+    assert_eq!(
+        remount.free_units_of_c_after_remount,
+        Vec::<u64>::new(),
+        "C 的单元一个都没回到空闲"
+    );
+    assert!(
+        line.contains("no_reuse_through_txg=31 I-7.4=Holds red=[]"),
+        "{line}"
+    );
 }
 
 fn readable_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31(account: Account) {
@@ -313,14 +338,23 @@ fn readable_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31(accoun
     assert_eq!(remount.hook_calls, 0);
     assert_eq!(remount.abandoned_roots_unreadable, 0);
     assert_eq!(remount.isolated, ISOLATED_14.to_vec());
-    assert!(remount.reads_of_each_copy.0 >= 1, "影子账那一读真的读到了这一段");
+    assert!(
+        remount.reads_of_each_copy.0 >= 1,
+        "影子账那一读真的读到了这一段"
+    );
     assert_eq!(remount.free_units_of_c_after_remount, Vec::<u64>::new());
-    assert!(line.contains("no_reuse_through_txg=31 I-7.4=Holds red=[]"), "{line}");
+    assert!(
+        line.contains("no_reuse_through_txg=31 I-7.4=Holds red=[]"),
+        "{line}"
+    );
 }
 
 #[test]
-fn c393_readable_allocation_record_tree_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31() {
-    readable_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31(Account::AllocationRecordTreeRoot);
+fn c393_readable_allocation_record_tree_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31(
+) {
+    readable_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31(
+        Account::AllocationRecordTreeRoot,
+    );
 }
 
 #[test]
@@ -330,7 +364,10 @@ fn c393_readable_tree_table_control_isolates_14_and_nothing_of_c_is_reused_throu
 
 #[test]
 fn c393_allocation_record_tree_unreadable_on_every_read() {
-    assert_recomputed_from_the_mapping_isolated_and_not_reused(Account::AllocationRecordTreeRoot, Unreadability::EveryRead);
+    assert_recomputed_from_the_mapping_isolated_and_not_reused(
+        Account::AllocationRecordTreeRoot,
+        Unreadability::EveryRead,
+    );
 }
 
 #[test]
@@ -352,27 +389,43 @@ fn c393_allocation_record_tree_unreadable_only_on_the_first_read_of_each_copy() 
     eprintln!("{line}");
     assert_eq!(remount.result, Ok(()));
     assert_eq!(remount.hook_calls, 0);
-    assert_eq!(remount.reads_of_each_copy, (2, 1), "盘 0 提示一读、盘 1 提示一读、映射回退盘 0 再一读");
+    assert_eq!(
+        remount.reads_of_each_copy,
+        (2, 1),
+        "盘 0 提示一读、盘 1 提示一读、映射回退盘 0 再一读"
+    );
     assert_eq!(remount.failed_reads, 2);
     assert_eq!(remount.abandoned_roots_unreadable, 0);
     assert_eq!(remount.isolated, ISOLATED_14.to_vec());
-    assert!(line.contains("no_reuse_through_txg=31 I-7.4=Holds red=[]"), "{line}");
+    assert!(
+        line.contains("no_reuse_through_txg=31 I-7.4=Holds red=[]"),
+        "{line}"
+    );
 }
 
 #[test]
 fn c393_tree_table_unreadable_on_every_read() {
-    assert_recomputed_from_the_mapping_isolated_and_not_reused(Account::TreeTable, Unreadability::EveryRead);
+    assert_recomputed_from_the_mapping_isolated_and_not_reused(
+        Account::TreeTable,
+        Unreadability::EveryRead,
+    );
 }
 
 #[test]
 fn c393_tree_table_unreadable_until_the_reread_hook() {
-    assert_recomputed_from_the_mapping_isolated_and_not_reused(Account::TreeTable, Unreadability::EveryReadUntilTheRereadHook);
+    assert_recomputed_from_the_mapping_isolated_and_not_reused(
+        Account::TreeTable,
+        Unreadability::EveryReadUntilTheRereadHook,
+    );
 }
 
 /// 树表豁免映射，只按位置条目读一遍（两份各一次），没有第二次读：只坏第一次与一直坏结局相同。
 #[test]
 fn c393_tree_table_unreadable_only_on_the_first_read_of_each_copy() {
-    assert_recomputed_from_the_mapping_isolated_and_not_reused(Account::TreeTable, Unreadability::OnlyTheFirstReadOfEachCopy);
+    assert_recomputed_from_the_mapping_isolated_and_not_reused(
+        Account::TreeTable,
+        Unreadability::OnlyTheFirstReadOfEachCopy,
+    );
 }
 
 /// 钩子的阳性对照：同一段历史，最新那条根 (3, 10) 的实例表那一片在影子账那一读起坏、钩子里撤——产品的重读走到钩子（1 次），
@@ -428,7 +481,10 @@ fn c393_positive_control_the_hook_is_called_when_the_newest_instance_table_is_un
         mounted.output.rereads
     );
     assert_eq!(hook_calls.get(), 1);
-    assert_eq!(mounted.output.isolated_slots_per_device, ISOLATED_14.to_vec());
+    assert_eq!(
+        mounted.output.isolated_slots_per_device,
+        ISOLATED_14.to_vec()
+    );
 }
 
 /// 账在盘上真坏（两份抹零）而没有复用时，池级 checker 对 I-7.4 判什么：拿读得出那一臂重开之后、还没接着写的镜像抹 C 的账。
@@ -462,4 +518,301 @@ fn c393_checker_on_a_persistently_damaged_allocation_record_tree_without_reuse()
 #[test]
 fn c393_checker_on_a_persistently_damaged_tree_table_without_reuse() {
     checker_on_a_persistently_damaged_account_without_reuse(Account::TreeTable);
+}
+
+/// 抬 F 之前这次挂载里覆盖写几次：上限取「第 4 新的不同状态」（D16（发布语义） 已定项 1「抬 F 的上限」），覆盖写 5 次之后它是这次挂载里
+/// 第 2 次覆盖写那一版，越过了被抛弃根的前一版（3 次时上限还停在第一个文件 B 那一版的 txg 4，副本上实测）。
+const OVERWRITES_BEFORE_THE_RAISE: usize = 5;
+
+/// 这一版的池里根环上按 `readable_roots` 的次序列出的、按 (实例, txg) 认的那几条根里，`wanted` 各排第几（抬 F 的影子账按这个次序逐条算被抛弃根）。
+fn positions_in_the_ring_order(
+    pool: &mut BuiltPool,
+    wanted: &[(InstanceGeneration, CheckpointTxg)],
+) -> Vec<usize> {
+    let devices = pool.reopen_recorded();
+    let system_configuration =
+        singlefs_core::recovery::choose_system_configuration(&devices).expect("择系统配置");
+    let roots = singlefs_core::recovery::readable_roots(
+        &devices,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
+    );
+    pool.devices = Some(devices);
+    wanted
+        .iter()
+        .map(|key| {
+            roots
+                .iter()
+                .position(|root| (root.instance, root.checkpoint_txg) == *key)
+                .expect("那条根在根环里读得出")
+        })
+        .collect()
+}
+
+/// 把一条根的树表与中央映射树根节点两份都抹零（盘上真坏，重读也读不出）：它的账与从映射现算都不成。
+fn zero_the_tree_table_and_the_mapping_root_of(
+    pool: &mut BuiltPool,
+    root: &singlefs_core::root_record::RootRecord,
+) {
+    use singlefs_core::block_device::{BlockDevice, WriteDurability};
+    let mut devices = pool.reopen_recorded();
+    for location in root
+        .tree_table
+        .locations
+        .iter()
+        .chain(root.mapping_root.locations.iter())
+    {
+        let index = devices
+            .iter()
+            .position(|(identity, _)| *identity == location.device)
+            .expect("池里有这块盘");
+        devices[index]
+            .1
+            .write_at(
+                location.slot.to_device_offset(),
+                &vec![0u8; usize::try_from(SLOT_BYTES).expect("槽宽")],
+                WriteDurability::Plain,
+            )
+            .expect("抹零");
+    }
+    pool.devices = Some(devices);
+}
+
+/// 抬 F 那一串在影子账上被拒（代码轮 LR3，攻方 `m3-leftover-code-r1` Z2 ③：此前没有用例走到这一支）：
+/// 崩溃恢复先后抛弃 C (2, 8) 与 E（实例 3 覆盖写 D 之后的那一版），再可写挂载一次、覆盖写 [`OVERWRITES_BEFORE_THE_RAISE`] 次，然后把两条被抛弃根里影子账排在后面的那一条的
+/// 树表与中央映射树根两份都抹零。抬 F 到上限：新 F 越过两条被抛弃根的前一版，排在前面那条被抛弃根引用的槽（前一版那张实例表这类）
+/// 此刻只被它引用，影子账先给它补上隔离；算到后面那条，账与从映射现算都不成、重读一次仍不成，`isolate_slots_referenced_only_by_abandoned_roots`
+/// 交 `Err`——抬 F 拒成 `NewerStateStillUnreadableAfterOneReread(AccountOfAnAbandonedRoot)`、点名那条根，一个写都不发，
+/// 分配器整个换回抬 F 之前那一份（补上的隔离撤掉）。
+/// 判别力：影子账交 `Err` 时不换回分配器，前一条补上的隔离留在分配器上，「与抬 F 之前逐项相同」那一项红。
+#[test]
+fn a_floor_raise_whose_shadow_ledger_meets_an_abandoned_root_unreadable_by_account_and_mapping_is_refused_and_restores_the_allocator(
+) {
+    let (mut pool, abandoned_c) =
+        pool_after_a_recovery_abandoned_c("lr3-raise-refused-on-the-shadow-ledger");
+    let before_d = pool.output.clone();
+    pool.output = publish_overwrite_in_process(
+        &mut pool,
+        &before_d,
+        &content_of(3000, 21),
+        FIXED_WRITE_TIME_SECONDS + 120,
+        InstanceGeneration(3),
+    )
+    .expect("D");
+    let before_e = pool.output.clone();
+    let abandoned_e = publish_overwrite_in_process(
+        &mut pool,
+        &before_e,
+        &content_of(2200, 23),
+        FIXED_WRITE_TIME_SECONDS + 120,
+        InstanceGeneration(3),
+    )
+    .expect("E");
+    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(&mut pool, &abandoned_e);
+    let mut devices_of_the_mount = pool.reopen_recorded();
+    let mounted = singlefs_core::mount::mount_writable(&parameters(), &mut devices_of_the_mount)
+        .expect("两条被抛弃根都读得出：照常可写挂载");
+    let instance = mounted.output.instance;
+    pool.devices = Some(devices_of_the_mount);
+    pool.allocator = mounted.allocator;
+    pool.output = mounted.current.into_file_version().expect("带文件");
+    for overwrite_index in 0..OVERWRITES_BEFORE_THE_RAISE {
+        let previous = pool.output.clone();
+        pool.output = publish_overwrite_in_process(
+            &mut pool,
+            &previous,
+            &content_of(1800 + overwrite_index, overwrite_index + 31),
+            FIXED_WRITE_TIME_SECONDS + 600,
+            instance,
+        )
+        .expect("这次挂载里覆盖写");
+    }
+    let keys = [
+        (abandoned_c.root.instance, abandoned_c.root.checkpoint_txg),
+        (abandoned_e.root.instance, abandoned_e.root.checkpoint_txg),
+    ];
+    let positions = positions_in_the_ring_order(&mut pool, &keys);
+    let later = if positions[0] > positions[1] {
+        &abandoned_c
+    } else {
+        &abandoned_e
+    };
+    zero_the_tree_table_and_the_mapping_root_of(&mut pool, &later.root);
+    let allocator_before_the_raise = format!("{:?}", pool.allocator);
+    let image_before_the_raise = pool.memory_pool();
+    let mut devices_of_the_raise = pool.reopen_recorded();
+    let refusal = singlefs_core::mount::raise_rollback_floor_to_the_admission_ceiling(
+        &parameters(),
+        &mut devices_of_the_raise,
+        &mut pool.allocator,
+        &mut pool.output,
+        ShadowLedger::On,
+    )
+    .expect_err("影子账算到账与映射都读不出的被抛弃根：拒这一次抬");
+    pool.devices = Some(devices_of_the_raise);
+    assert!(
+        matches!(
+            &refusal,
+            singlefs_core::mount::MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable)
+                if matches!(
+                    still_unreadable.as_ref(),
+                    singlefs_core::mount::StillUnreadableAfterOneReread::AccountOfAnAbandonedRoot { abandoned_root }
+                        if (abandoned_root.instance, abandoned_root.checkpoint_txg)
+                            == (later.root.instance, later.root.checkpoint_txg)
+                )
+        ),
+        "拒因点名影子账排在后面的那条被抛弃根：{refusal:?}"
+    );
+    assert_eq!(
+        format!("{:?}", pool.allocator),
+        allocator_before_the_raise,
+        "分配器与抬 F 之前逐项相同：前一条被抛弃根补上的隔离撤掉了"
+    );
+    assert!(
+        pool.memory_pool() == image_before_the_raise,
+        "影子账在任何写之前拒：两块盘逐字节不变"
+    );
+}
+
+/// 被抛弃根的实例表有两片时，账读不出、从中央映射现算的那一臂把两片都算进它引用的落点（代码轮 LR2，攻方 `m3-leftover-code-r1` Z4 ①
+/// 「现算只认实例表第 0 片」放过：用例的池都只有一片实例表）。
+/// 造法：A、B（实例 1）之后连取 370 次号再可写挂载（实例 372），写行把 1 到 371 的 371 行写进两片实例表；覆盖写 C、崩溃恢复抛弃 C
+/// （实例 373 写行，换下两片）；C 的树表两份抹零（账读不出）再可写挂载（实例 374）、覆盖写 [`OVERWRITES_BEFORE_THE_RAISE`] 次、抬 F 到上限：新 F 越过 C 的前一版，
+/// C 那两片实例表此刻只被 C 引用、在现行那一版的账里已释放，抬 F 的影子账从映射现算、两片都隔离，回收之后照样不空闲。
+/// 判别力：现算只认实例表第 0 片时第 1 片不隔离、回收之后空闲，那一项红。
+#[test]
+fn an_abandoned_root_with_a_two_page_instance_table_and_an_unreadable_account_isolates_both_pages_from_the_mapping(
+) {
+    let mut pool = build_pool("lr2-two-page-instance-table-recomputed-from-the-mapping");
+    let first = pool.output.clone();
+    pool.output = publish_overwrite_in_process(
+        &mut pool,
+        &first,
+        &content_of(4100, 3),
+        FIXED_WRITE_TIME_SECONDS + 60,
+        InstanceGeneration(1),
+    )
+    .expect("B");
+    {
+        let publish_parameters = parameters();
+        let devices = pool.devices.as_mut().expect("镜像还开着");
+        let mut writer = singlefs_core::transaction::PoolWriter::new(
+            &publish_parameters,
+            devices.as_mut_slice(),
+        );
+        // 迭代上界 370：取号只写系统配置两槽，下一次可写挂载为每个烧掉的号写一行。
+        for _ in 0..370 {
+            singlefs_core::transaction::acquire_instance(&mut writer).expect("取号");
+        }
+    }
+    let mut devices_after_the_acquisitions = pool.reopen_recorded();
+    let mounted_after_the_acquisitions =
+        singlefs_core::mount::mount_writable(&parameters(), &mut devices_after_the_acquisitions)
+            .expect("连取 370 次号之后可写挂载");
+    let instance_of_c = mounted_after_the_acquisitions.output.instance;
+    pool.devices = Some(devices_after_the_acquisitions);
+    pool.allocator = mounted_after_the_acquisitions.allocator;
+    pool.output = mounted_after_the_acquisitions
+        .current
+        .into_file_version()
+        .expect("带文件");
+    let before_c = pool.output.clone();
+    let abandoned_c = publish_overwrite_in_process(
+        &mut pool,
+        &before_c,
+        &content_of(2500, 11),
+        FIXED_WRITE_TIME_SECONDS + 60,
+        instance_of_c,
+    )
+    .expect("C");
+    let pages_of_c: Vec<singlefs_core::pointer::NodePointer> = {
+        let devices_for_the_page_pointers = pool.reopen_recorded();
+        let pages = singlefs_core::recovery::instance_table_page_pointers_as_far_as_readable(
+            &devices_for_the_page_pointers,
+            &abandoned_c.root,
+        );
+        pool.devices = Some(devices_for_the_page_pointers);
+        pages
+    };
+    assert_eq!(
+        pages_of_c.len(),
+        2,
+        "C 的实例表两片（371 行，一片装 369 行）"
+    );
+    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(&mut pool, &abandoned_c);
+    {
+        use singlefs_core::block_device::{BlockDevice, WriteDurability};
+        let mut devices_to_zero_the_tree_table = pool.reopen_recorded();
+        let tree_table_of_c = abandoned_c.unit(TransactionUnit::TreeTable);
+        for (_, device) in &mut devices_to_zero_the_tree_table {
+            device
+                .write_at(
+                    DeviceOffsetInBytes(tree_table_of_c.slot.0 * SLOT_BYTES),
+                    &vec![0u8; tree_table_of_c.bytes.len()],
+                    WriteDurability::Plain,
+                )
+                .expect("C 的树表两份抹零");
+        }
+        pool.devices = Some(devices_to_zero_the_tree_table);
+    }
+    let mut devices_of_the_remount = pool.reopen_recorded();
+    let remounted =
+        singlefs_core::mount::mount_writable(&parameters(), &mut devices_of_the_remount)
+            .expect("C 的账读不出、从映射现算得成：照常可写挂载");
+    assert_eq!(
+        remounted.output.abandoned_roots_unreadable, 1,
+        "C 的账读不出，计数往上报"
+    );
+    let instance = remounted.output.instance;
+    pool.devices = Some(devices_of_the_remount);
+    pool.allocator = remounted.allocator;
+    pool.output = remounted.current.into_file_version().expect("带文件");
+    for overwrite_index in 0..OVERWRITES_BEFORE_THE_RAISE {
+        let previous = pool.output.clone();
+        pool.output = publish_overwrite_in_process(
+            &mut pool,
+            &previous,
+            &content_of(1800 + overwrite_index, overwrite_index + 31),
+            FIXED_WRITE_TIME_SECONDS + 600,
+            instance,
+        )
+        .expect("这次挂载里覆盖写");
+    }
+    let mut devices_of_the_raise = pool.reopen_recorded();
+    let raised = singlefs_core::mount::raise_rollback_floor_to_the_admission_ceiling(
+        &parameters(),
+        &mut devices_of_the_raise,
+        &mut pool.allocator,
+        &mut pool.output,
+        ShadowLedger::On,
+    )
+    .expect("抬 F 到上限");
+    pool.devices = Some(devices_of_the_raise);
+    assert!(
+        matches!(
+            &raised,
+            singlefs_core::mount::RaiseToTheAdmissionCeiling::Raised(raised)
+                if raised.publishes.first().is_some_and(|publish| publish.root.rollback_floor >= abandoned_c.root.checkpoint_txg)
+        ),
+        "新 F 越过 C 的前一版：{raised:?}"
+    );
+    let free_page_slots: Vec<(u32, u64)> = pages_of_c
+        .iter()
+        .flat_map(|page| page.locations)
+        .filter(|location| {
+            pool.allocator
+                .devices
+                .iter()
+                .find(|device_map| device_map.device == location.device)
+                .expect("池里有这块盘")
+                .is_free(location.slot)
+        })
+        .map(|location| (location.device.0, location.slot.0))
+        .collect();
+    assert_eq!(
+        free_page_slots,
+        Vec::<(u32, u64)>::new(),
+        "C 那两片实例表的落点抬 F 回收之后一槽都不空闲（从映射现算两片都隔离）"
+    );
 }

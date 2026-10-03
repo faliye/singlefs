@@ -1,4 +1,4 @@
-//! C554 乙-配置续（用户 2026-09-27 定；岔路单 `research/prompts/c554-fix-forks.md` 第 2 行；定义取自 E158 第 3 次跑登记
+//! C554 乙-配置续（岔路单 `research/prompts/c554-fix-forks.md` 第 2 行；定义取自 E158 第 3 次跑登记
 //! `research/prompts/e158-r3-prereg.md` 第 348 行与第 4 次跑登记 `research/prompts/e158-r4-prereg.md` 第 413 行）：取号那一写的 tail
 //! 不写 0，写取号那一刻按判据 N-配置 同一取法读到的见证值 c_见证（每块盘两槽里全部自证过的系统配置槽的 `journal_tail` 取最大，
 //! 一份都没有时 0）；取号失败的回卷写带同一个值。
@@ -485,7 +485,10 @@ fn a_rolled_back_acquisition_writes_the_witnessed_tail_back_instead_of_zero() {
         let mut writer = PoolWriter::new(&pool_parameters, devices.as_mut_slice());
         match acquire_instance(&mut writer).expect_err("盘 1 的取号写报错，取号必须失败") {
             InstanceAcquisitionFailed::Acquisition(acquisition) => acquisition,
-            InstanceAcquisitionFailed::DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness {
+            InstanceAcquisitionFailed::SystemConfigurationWitnessUndecidableWhenReadingTheWitness {
+                first_device_reporting_a_read_error,
+            } => panic!("这条用例里每块盘两槽都读得出自证过的系统配置，取号不该判不出：{first_device_reporting_a_read_error:?}"),
+            InstanceAcquisitionFailed::DeviceWithoutAnySelfVerifiedSystemConfigurationSlotWhenReadingTheWitness {
                 device,
             } => panic!("这条用例里每块盘两槽都读得出自证过的系统配置，取号不该拒在见证值那一核：{device:?}"),
         }
@@ -528,11 +531,16 @@ fn a_rolled_back_acquisition_writes_the_witnessed_tail_back_instead_of_zero() {
     );
 }
 
-/// C331（择根倒挂压过已确认的写） 取甲（用户 2026-09-28 定；`research/prompts/unreadable-at-mount-r2-main-verification.md` L2 V4 那一支）：
-/// 取号那一刻读见证值，某块盘两槽里有一槽读不出或自证不过（这里清零世代 5 那一槽，另一槽照样自证得过），就在第一个取号写之前拒，
-/// 两块盘的系统配置槽逐字节不变。改之前（只在一份都没有时拒）这块盘照样取号、见证值缺了那一槽。
-fn an_acquisition_refuses_a_device_that_lost_only_its_newest_slot(tag: &str, damaged_device: DeviceIdentity) {
+/// C331（择根倒挂压过已确认的写） 改取 R2（用户 2026-10-03 定，零轮；D22（单元原子性怎么合成） 已定项 8 射程）：取号那一刻读见证值，
+/// 某块盘最新那一槽撕裂（这里清零世代 5 那一槽：读得出、自证不过，设备没报错），另一槽照样自证得过——R2 判得出（没有槽报读错），
+/// 取号照做：见证值取全部自证过的槽（另一块盘世代 5 那一槽见证新池新建文件那条记录，jsn 3），坏了那块盘的取号写落在撕裂的那一槽
+/// （世代 4 + 1 = 5，槽号 5 mod 2 = 1），把它重写成自证过的；另一块盘照常写世代 6。取甲时这一形在任何写之前拒、之后只剩只读挂载（C596）。
+fn an_acquisition_rewrites_the_torn_newest_slot_of_a_device(
+    tag: &str,
+    damaged_device: DeviceIdentity,
+) {
     let mut pool = build_pool(tag);
+    let new_pool_file_creation_counter = pool.output.record.counter;
     let slot_spacing_in_bytes = u64::from(geometry().fixed_structure_slot_spacing);
     {
         let devices: &mut Vec<(DeviceIdentity, Recorded)> =
@@ -551,46 +559,57 @@ fn an_acquisition_refuses_a_device_that_lost_only_its_newest_slot(tag: &str, dam
             )
             .expect("世代 5 那一槽清零");
     }
-    let before_the_acquisition = pool.memory_pool();
-    let slots_before: Vec<Vec<SlotReading>> = DISKS
-        .into_iter()
-        .map(|disk| slot_readings_of(&before_the_acquisition, disk))
-        .collect();
     let pool_parameters = parameters();
     let mut devices = pool.reopen_recorded();
-    let refusal = {
+    let acquired = {
         let mut writer = PoolWriter::new(&pool_parameters, devices.as_mut_slice());
-        acquire_instance(&mut writer).expect_err("有一槽读不出：取号在任何写之前拒")
+        acquire_instance(&mut writer)
     };
     pool.devices = Some(devices);
     assert!(
-        matches!(
-            refusal,
-            InstanceAcquisitionFailed::DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness { device }
-                if device == damaged_device
-        ),
-        "拒因点名坏了一槽的那块盘：{refusal:?}"
+        matches!(acquired, Ok(InstanceGeneration(2))),
+        "撕裂的一槽不是读错，R2 判得出：取号照做、取到 2；得到 {acquired:?}"
     );
-    let after_the_refusal = pool.memory_pool();
-    let slots_after: Vec<Vec<SlotReading>> = DISKS
-        .into_iter()
-        .map(|disk| slot_readings_of(&after_the_refusal, disk))
-        .collect();
-    assert_eq!(slots_after, slots_before, "拒的时候一个取号写都没写");
+    let after = pool.memory_pool();
+    for disk in DISKS {
+        let expected_generations = if disk == damaged_device {
+            [4, 5]
+        } else {
+            [5, 6]
+        };
+        let readings = slot_readings_of(&after, disk);
+        assert_eq!(
+            readings
+                .iter()
+                .map(|reading| reading.slot_generation)
+                .collect::<Vec<_>>(),
+            expected_generations.to_vec(),
+            "盘 {disk:?} 两槽都自证得过：坏了的那一槽被取号写重写（{readings:?}）"
+        );
+        let acquisition_slot = readings.last().expect("两槽都在");
+        assert_eq!(
+            (
+                acquisition_slot.journal_instance,
+                acquisition_slot.journal_tail
+            ),
+            (InstanceGeneration(2), new_pool_file_creation_counter),
+            "取号写带新号 2 与见证值（全部自证过的槽 tail 的最大值 = 新池新建文件那条记录的 jsn）"
+        );
+    }
 }
 
 #[test]
-fn an_acquisition_refuses_the_first_device_that_lost_only_its_newest_slot_before_writing_anything() {
-    an_acquisition_refuses_a_device_that_lost_only_its_newest_slot(
-        "c331-jia-acquisition-device-zero",
+fn an_acquisition_rewrites_the_torn_newest_slot_of_the_first_device() {
+    an_acquisition_rewrites_the_torn_newest_slot_of_a_device(
+        "c331-r2-acquisition-device-zero",
         DeviceIdentity(0),
     );
 }
 
 #[test]
-fn an_acquisition_refuses_the_second_device_that_lost_only_its_newest_slot_before_writing_anything() {
-    an_acquisition_refuses_a_device_that_lost_only_its_newest_slot(
-        "c331-jia-acquisition-device-one",
+fn an_acquisition_rewrites_the_torn_newest_slot_of_the_second_device() {
+    an_acquisition_rewrites_the_torn_newest_slot_of_a_device(
+        "c331-r2-acquisition-device-one",
         DeviceIdentity(1),
     );
 }

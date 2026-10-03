@@ -1,4 +1,4 @@
-//! 取号（D23（journal 的角色与格式） 已定项 16、D18（块里携带什么信息） 已定项 11；C322（取号那一步的屏障怎么放没有条款） 2026-09-14 定案）：
+//! 取号（D23（journal 的角色与格式） 已定项 16、D18（块里携带什么信息） 已定项 11；C322（取号那一步的屏障怎么放没有条款） 的定案）：
 //! 第二次取号看得见、世代号逐盘 +1、取号之后那道屏障、取号写或屏障报错时回卷成旧代号。每条都从写完新池新建文件的镜像出发。
 
 mod common;
@@ -115,7 +115,10 @@ fn acquire(
     let mut pool = PoolWriter::new(&parameters, devices);
     acquire_instance(&mut pool).map_err(|failure| match failure {
         InstanceAcquisitionFailed::Acquisition(acquisition) => acquisition,
-        InstanceAcquisitionFailed::DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness {
+        InstanceAcquisitionFailed::SystemConfigurationWitnessUndecidableWhenReadingTheWitness {
+            first_device_reporting_a_read_error,
+        } => panic!("这条用例里每块盘两槽都读得出自证过的系统配置，取号不该判不出：{first_device_reporting_a_read_error:?}"),
+        InstanceAcquisitionFailed::DeviceWithoutAnySelfVerifiedSystemConfigurationSlotWhenReadingTheWitness {
             device,
         } => panic!("这条用例里每块盘两槽都读得出自证过的系统配置，取号不该拒在见证值那一核：{device:?}"),
     })

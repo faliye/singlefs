@@ -164,7 +164,7 @@ fn checker_reads_the_same_generation_zero_root_from_all_three_regions_and_isolat
             .expect("区域槽 0 的根记录合法");
         assert_eq!(view.checkpoint_txg, 0);
         assert_eq!(view.instance, 0);
-        assert_eq!(view.tree_identifier_watermark, 11);
+        assert_eq!(view.tree_identifier_watermark, 65536);
         views.push(view);
     }
     assert_eq!(views[0].record_bytes, views[1].record_bytes);
@@ -273,29 +273,32 @@ fn recorded_stream_matches_the_registered_mkfs_segment_sequence() {
         root_ring_slots_per_region: parameters().geometry.root_ring_slots_per_region,
     };
     let segments = split_into_segments(&operations, &geometry);
+    // mkfs 清 [0, 根环基址)（C651 第一轮判决用户定案 W1）之后每块盘多一次清零、都在第一段：第一段 12 → 14 个写、操作 23 → 25；
+    // layout/01-first-txn.md 八 mkfs 那一行要跟着改（写回另派）。
     assert_eq!(
         segment_sizes_text(&segments),
-        "12+1+1+1+4",
+        "14+1+1+1+4",
         "layout/01-first-txn.md 八 mkfs 那一行"
     );
     assert_eq!(
         segment_kinds_text(&segments),
-        "[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]"
+        "[zero_fill×10,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]"
     );
     assert_eq!(
         operations.len(),
-        23,
-        "mkfs 23 次操作（每盘 3 段根环 + 1 段环共八次清零、四个单元写、三次根 FUA、四次系统配置槽写、两道池屏障——录制器按设备记屏障，每道两块盘各记一步）"
+        25,
+        "mkfs 25 次操作（每盘 [0, 根环基址) 一段 + 3 段根环 + 1 段环共十次清零、四个单元写、三次根 FUA、四次系统配置槽写、两道池屏障——录制器按设备记屏障，每道两块盘各记一步）"
     );
     assert_eq!(
         check_stream_integrity(&pool.stream.render()),
-        StreamIntegrity::Consistent { operations: 23 }
+        StreamIntegrity::Consistent { operations: 25 }
     );
     remove_images(&pool);
 }
 
 /// 并行线四的验收第一条：mkfs 之后抽样读 journal 环全 0，mkfs 交给设备的写字节数
-/// = 116 224 + 2 × 768 MiB + 6 × 32 KiB（末一项是 2026-09-22 连根环一起清之后加的：两盘各三个区域）。
+/// = 116 224 + 2 × 768 MiB + 6 × 32 KiB + 2 × 1 MiB（6 × 32 KiB 是 2026-09-22 连根环一起清之后加的：两盘各三个区域；
+/// 2 × 1 MiB 是 C651 第一轮判决用户定案 W1 连 [0, 根环基址) 一起清之后加的：两盘各一段）。
 ///
 /// 镜像先在环里撒上非 0（稀疏镜像本来就读回全 0，不先弄脏就分不出「清过」与「从来没写过」，
 /// `test-discipline.md`「读不到 ≠ 读到 0」），再跑 mkfs：环里抽样点全 0，说明清零真的发生过；
@@ -304,6 +307,8 @@ fn recorded_stream_matches_the_registered_mkfs_segment_sequence() {
 fn mkfs_zeroes_the_whole_journal_ring_and_writes_the_registered_number_of_bytes() {
     const RING_START: u64 = JOURNAL_RING_START_SLOT * SLOT_BYTES;
     const MKFS_METADATA_BYTES: u64 = 116_224;
+    /// [0, 根环基址)：根环基址 = 「根环起点」字段 64 × 16 KiB = 1 MiB（D22（单元原子性怎么合成） 已定项 16 第 1 句）。
+    const BELOW_THE_ROOT_RING_BASE_BYTES: u64 = 1 << 20;
 
     let stream = SharedStream::new();
     let mut paths = Vec::new();
@@ -363,9 +368,22 @@ fn mkfs_zeroes_the_whole_journal_ring_and_writes_the_registered_number_of_bytes(
         .collect();
     assert_eq!(
         zero_fills.len(),
-        8,
-        "每块盘四次清零调用：三个根环区域各一次、journal 环一次"
+        10,
+        "每块盘五次清零调用：[0, 根环基址) 一次（C651 第一轮判决用户定案 W1）、三个根环区域各一次、journal 环一次"
     );
+    let below_the_root_ring_base_zero_fills: Vec<&&singlefs_harness::RecordedOperation> =
+        zero_fills
+            .iter()
+            .filter(|zero_fill| zero_fill.offset == DeviceOffsetInBytes(0))
+            .collect();
+    assert_eq!(
+        below_the_root_ring_base_zero_fills.len(),
+        2,
+        "两块盘各清一次 [0, 根环基址)"
+    );
+    for zero_fill in &below_the_root_ring_base_zero_fills {
+        assert_eq!(zero_fill.length, BELOW_THE_ROOT_RING_BASE_BYTES);
+    }
     let journal_zero_fills: Vec<&&singlefs_harness::RecordedOperation> = zero_fills
         .iter()
         .filter(|zero_fill| zero_fill.offset == DeviceOffsetInBytes(RING_START))
@@ -399,10 +417,13 @@ fn mkfs_zeroes_the_whole_journal_ring_and_writes_the_registered_number_of_bytes(
         .sum();
     assert_eq!(
         written_bytes,
-        MKFS_METADATA_BYTES + 2 * JOURNAL_RING_DEFAULT_BYTES + root_ring_zeroed_bytes,
-        "并行线四验收（连根环一起清之后重算）：116 224 + 2 × 768 MiB + 6 × 32 KiB = 1 610 925 568"
+        MKFS_METADATA_BYTES
+            + 2 * JOURNAL_RING_DEFAULT_BYTES
+            + root_ring_zeroed_bytes
+            + 2 * BELOW_THE_ROOT_RING_BASE_BYTES,
+        "并行线四验收（连根环一起清、再连 [0, 根环基址) 一起清之后重算）：116 224 + 2 × 768 MiB + 6 × 32 KiB + 2 × 1 MiB = 1 613 022 720"
     );
-    assert_eq!(written_bytes, 1_610_925_568, "验收那个数写成一个字面量");
+    assert_eq!(written_bytes, 1_613_022_720, "验收那个数写成一个字面量");
     assert_eq!(
         JOURNAL_RING_DEFAULT_BYTES,
         768 * 1024 * 1024,
