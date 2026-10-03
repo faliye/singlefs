@@ -1,0 +1,2 @@
+            Ok(FloorRaisePushedWithinTheAdmissionBudget::Stopped(stop)) => {
+                continuation.outcome =

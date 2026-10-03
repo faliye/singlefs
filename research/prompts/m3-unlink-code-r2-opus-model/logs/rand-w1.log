@@ -1,0 +1,70 @@
+run-with-memory-cap: 这个会话已有 11 条日常的在跑，照理由并行：派出的攻方腿在自己的副本上跑原型，与别的腿各跑各的
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.03s
+     Running tests/attack_r2_random_probe.rs (/tmp/claude-1000/m3-unlink-r2-attack/target/release/deps/attack_r2_random_probe-d80ef4d5156debea)
+
+running 1 test
+R exec=256-skip weights=wall seed=0x6c5664 ops=150 refused={"PublishError::ContentExceedsDataUnit": 1, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 3} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5662 ops=150 refused={"PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 8} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5660 ops=150 refused={"PublishError::ContentExceedsDataUnit": 4, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 4, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5667 ops=150 refused={"PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 3} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5669 ops=150 refused={"PublishError::ContentExceedsDataUnit": 2, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 7} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5661 ops=150 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 5, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 2} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5665 ops=150 refused={"PublishError::ContentExceedsDataUnit": 4, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 2} ending=Completed
+R exec=256-skip weights=wall seed=0x6c566b ops=150 refused={"PublishError::ContentExceedsDataUnit": 1, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 6} ending=Completed
+R exec=256-skip weights=wall seed=0x6c566c ops=150 refused={"PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 2} ending=Completed
+R exec=256-skip weights=wall seed=0x6c566d ops=150 refused={"PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 6} ending=Completed
+R exec=256-skip weights=wall seed=0x6c566e ops=150 refused={"PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 4} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5670 ops=150 refused={"PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 4} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5668 ops=150 refused={"PublishError::ContentExceedsDataUnit": 5, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 6} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5672 ops=150 refused={"PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 4, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=256-skip weights=wall seed=0x6c566f ops=150 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 5, "RollbackError::TargetNotACandidate(NotInRing)": 1, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5674 ops=150 refused={"PublishError::ContentExceedsDataUnit": 1, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 5} ending=Completed
+R exec=256-skip weights=wall seed=0x6c566a ops=150 refused={"PublishError::ContentExceedsDataUnit": 8, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 3, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5673 ops=150 refused={"PublishError::ContentExceedsDataUnit": 3, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 3} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5675 ops=150 refused={"PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 2} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5663 ops=150 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 15, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 4} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5671 ops=150 refused={"PublishError::ContentExceedsDataUnit": 4, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 3, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5666 ops=150 refused={"PublishError::ContentExceedsDataUnit": 7, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 6} ending=Completed
+R exec=256-skip weights=wall seed=0x6c567b ops=150 refused={"PublishError::ContentExceedsDataUnit": 2, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 6} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5677 ops=150 refused={"PublishError::ContentExceedsDataUnit": 2, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 4} ending=Completed
+R exec=256-skip weights=wall seed=0x6c567a ops=150 refused={"MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 5, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 7} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5678 ops=150 refused={"PublishError::ContentExceedsDataUnit": 7, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 3} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5679 ops=150 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 10, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 5} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5676 ops=150 refused={"PublishError::ContentExceedsDataUnit": 11, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 3, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=256-skip weights=wall seed=0x6c567d ops=150 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 3, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 2} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5681 ops=150 refused={"PublishError::ContentExceedsDataUnit": 7, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 4} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5682 ops=150 refused={"PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 8} ending=Completed
+R exec=256-skip weights=wall seed=0x6c567c ops=150 refused={"PublishError::ContentExceedsDataUnit": 4, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 5} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5683 ops=150 refused={"PublishError::ContentExceedsDataUnit": 3, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 6, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=256-skip weights=wall seed=0x6c567f ops=150 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 4, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 7} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5686 ops=150 refused={"PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 6} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5685 ops=150 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 2, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 7} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5687 ops=150 refused={"PublishError::ContentExceedsDataUnit": 2, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 5} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5684 ops=150 refused={"PublishError::ContentExceedsDataUnit": 5, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 3} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5689 ops=150 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 2, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 6, "RollbackError::TargetNotACandidate(NotInRing)": 1, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=256-skip weights=wall seed=0x6c567e ops=150 refused={"PublishError::ContentExceedsDataUnit": 11, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 6} ending=Completed
+R exec=256-skip weights=wall seed=0x6c568a ops=150 refused={"PublishError::ContentExceedsDataUnit": 7, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 5} ending=Completed
+R exec=256-skip weights=wall seed=0x6c568e ops=150 refused={"PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 6} ending=Completed
+R exec=256-skip weights=wall seed=0x6c568d ops=150 refused={"PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 5} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5690 ops=150 refused={"PublishError::ContentExceedsDataUnit": 4, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 4} ending=Completed
+R exec=256-skip weights=wall seed=0x6c568f ops=150 refused={"PublishError::ContentExceedsDataUnit": 8, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 3} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5688 ops=150 refused={"PublishError::ContentExceedsDataUnit": 16, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 5} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5693 ops=150 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 2, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 3} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5694 ops=150 refused={"PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 8} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5695 ops=150 refused={"PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 7} ending=Completed
+R exec=256-skip weights=wall seed=0x6c568c ops=150 refused={"PublishError::ContentExceedsDataUnit": 8, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 2} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5680 ops=150 refused={"MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 9, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 2} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5696 ops=150 refused={"PublishError::ContentExceedsDataUnit": 1, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 4} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5691 ops=150 refused={"PublishError::ContentExceedsDataUnit": 4, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 2} ending=Completed
+R exec=256-skip weights=wall seed=0x6c569a ops=150 refused={"PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 3} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5698 ops=150 refused={"MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 6, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 4} ending=Completed
+R exec=256-skip weights=wall seed=0x6c569b ops=150 refused={"PublishError::ContentExceedsDataUnit": 2, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 5} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5699 ops=150 refused={"PublishError::ContentExceedsDataUnit": 6, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 3} ending=Completed
+R exec=256-skip weights=wall seed=0x6c568b ops=150 refused={"MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 11, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 1, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5697 ops=150 refused={"PublishError::ContentExceedsDataUnit": 13, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 4, "RollbackError::TargetNotACandidate(NotInRing)": 2} ending=Completed
+R exec=256-skip weights=wall seed=0x6c5692 ops=150 refused={"MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 15, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 2} ending=Completed
+DONE seeds=60
+test attack_r2_random_probe ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 47.53s
+

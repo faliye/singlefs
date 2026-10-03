@@ -1,0 +1,3 @@
+--- crates/singlefs-checker/src/walk.rs（冻结副本）
+变异 D：删 1678 行 self.note_references_of_a_pointer_followed_by_the_walk(&child, 2, &what);
+变异 E：D 加删 1180 行 self.note_reference(location, span_in_slots, "映射条目指的单元");

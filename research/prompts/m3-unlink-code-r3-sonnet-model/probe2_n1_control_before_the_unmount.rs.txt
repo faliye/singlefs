@@ -1,0 +1,95 @@
+#[test]
+fn probe_n1_control_before_the_unmount(
+) {
+    let (mut pool, _) = pool_crashed_between_deletion_batches_on_narrow_devices(1);
+    let mounted = mount_after_the_crash_with_batches_of_one(&mut pool)
+        .unwrap_or_else(|error| panic!("推满仍放不下：挂载照样做成可写：{error:?}"));
+    let image_after_the_mount = pool.image();
+    let (_, session) = MountedSession::of_the_mount(mounted);
+    let current_root = *session.current.root();
+    let unit_writes_of_the_first_publish = {
+        let mut allocator = session.allocator.clone();
+        let mut current = session.current.clone();
+        let (mut devices, _) = fault_injecting_recorded_devices_on(&image_after_the_mount, None);
+        let unmounted = unmount(
+            &pool.parameters,
+            &mut devices,
+            &mut allocator,
+            &mut current,
+            session.shadow_ledger,
+        );
+        let Ok(Unmounted::FloorRaisedToTheCurrentVersion(raised)) = &unmounted else {
+            panic!("拷贝上卸载做成：{:?}", unmounted.as_ref().err());
+        };
+        let first = &raised.publishes[0];
+        let structure_writes = |kind: WrittenStructureKind| first.writes.of(kind).write_calls;
+        first.writes.total().write_calls
+            - structure_writes(WrittenStructureKind::JournalRecord)
+            - structure_writes(WrittenStructureKind::RootSlot)
+            - structure_writes(WrittenStructureKind::SystemConfigurationSlot)
+    };
+    let system_configuration_writes_of_the_sequence = 2;
+    let surviving_device_after_losing_power_at = |first_failing_write: u64| {
+        let (mut devices, _) = fault_injecting_recorded_devices_on(
+            &image_after_the_mount,
+            Some(write_failing_from(
+                first_failing_write,
+                FailingWrites::ThisWriteAndEveryLaterOne,
+            )),
+        );
+        let mut allocator = session.allocator.clone();
+        let mut current = session.current.clone();
+        let unmounted = unmount(
+            &pool.parameters,
+            &mut devices,
+            &mut allocator,
+            &mut current,
+            session.shadow_ledger,
+        );
+        assert!(
+            matches!(
+                unmounted,
+                Err(MountError::RaiseFloorSequencePublishFailed(_))
+            ),
+            "掉电之后那一串报错：{:?}",
+            unmounted.as_ref().err()
+        );
+        let crashed = image_of_the_fault_injecting_recorded_devices(
+            &devices,
+            image_after_the_mount.device_size_in_bytes,
+        );
+        MemoryPool {
+            devices: crashed
+                .devices
+                .iter()
+                .filter(|(identity, _)| **identity != DeviceIdentity(0))
+                .map(|(identity, device)| (*identity, device.clone()))
+                .collect(),
+            device_size_in_bytes: crashed.device_size_in_bytes,
+        }
+    };
+    let survivor = surviving_device_after_losing_power_at(
+        system_configuration_writes_of_the_sequence + unit_writes_of_the_first_publish + 1,
+    );
+    let only_sysconf = surviving_device_after_losing_power_at(system_configuration_writes_of_the_sequence + 1);
+    let before_unmount = MemoryPool {
+        devices: image_after_the_mount
+            .devices
+            .iter()
+            .filter(|(identity, _)| **identity != DeviceIdentity(0))
+            .map(|(identity, device)| (*identity, device.clone()))
+            .collect(),
+        device_size_in_bytes: image_after_the_mount.device_size_in_bytes,
+    };
+    let a = checker_violations_on(&before_unmount);
+    let b = checker_violations_on(&only_sysconf);
+    let c = checker_violations_on(&survivor);
+    println!("PROBE2 survivor of the image BEFORE the unmount starts: {} violations", a.len());
+    for v in &a { println!("PROBE2   before: {}", v.chars().take(70).collect::<String>()); }
+    println!("PROBE2 survivor after sysconf-only cut: {} violations; equal to before-unmount: {}", b.len(), a == b);
+    println!("PROBE2 survivor after sysconf+units cut: {} violations; equal to sysconf-only: {}", c.len(), b == c);
+    println!("PROBE2 survivor sysconf F before: {:?}, after: {:?}",
+        choose_system_configuration(&before_unmount).map(|s| s.quantities.rollback_floor.0),
+        choose_system_configuration(&survivor).map(|s| s.quantities.rollback_floor.0));
+}
+

@@ -1,0 +1,5 @@
+                writes_of_the_publishes_before_the_continuation
+                    .iter()
+                    .cloned()
+                    .chain(continuation.writes_of_the_persisted_publishes_in_txg_order())
+                    .collect();

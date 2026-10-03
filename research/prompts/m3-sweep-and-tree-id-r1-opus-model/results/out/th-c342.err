@@ -1,0 +1,5 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：三方攻方腿原型复跑，与同会话别的腿各跑各的
+
+thread 'main' (2721676) panicked at crates/sweep-proto/src/bin/tree_id_histories.rs:150:68:
+挂载 2: NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }, witness: NewerPublishWitness { witnessed_journal_counter: 10, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 2 } } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }, witness: NewerPublishWitness { witnessed_journal_counter: 10, comparison: AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 2 } } } })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

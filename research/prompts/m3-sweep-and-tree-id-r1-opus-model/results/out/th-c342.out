@@ -1,0 +1,6 @@
+INSTANCE1 last=(1,10) wm=65548
+HIDE root_and_record_writes=24 system_configuration_writes_rolled_back=0
+HIDDEN ring=[(0, 0, 65536), (1, 1, 65536), (1, 2, 65536)]
+HIDDEN T1_all=0 T1_same_line=0 T2_noexcl=0 T2_excl=0 T2_claim_excl=0 T3_monotone=0
+HIDDEN checker_red=[]
+rc=101

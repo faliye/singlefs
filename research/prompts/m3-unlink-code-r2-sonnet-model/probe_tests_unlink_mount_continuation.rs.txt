@@ -1,0 +1,106 @@
+// 追加在冻结副本 crates/singlefs-harness/tests/unlink_mount_continuation_and_the_emptied_version.rs 末尾的探针（草稿副本里跑过，不入仓）
+#[test]
+fn probe_sum_of_account_equals_device_writes(
+) {
+    let mut pool = pool_with_a_three_unit_file("continuation-device-error-hands-back-the-writes");
+    let intent = publish_the_intent_in_process(&mut pool);
+    let image = pool.memory_pool();
+    let counting_stream = SharedStream::new();
+    let mut counting_devices = crash_state_devices(&image, &[], &[], &counting_stream);
+    let counted = mount_writable_with_test_only_switches_and_deletion_switches(
+        &parameters(),
+        &mut counting_devices,
+        SpaceAdmission::JudgedByTheFormula,
+        ShadowLedger::On,
+        deletion_switches_with_batches_of_one(),
+    )
+    .expect("拷贝上的那一次挂载续做走完");
+    let continuation_writes: Vec<u64> = counted
+        .output
+        .deletion_queue_continuation
+        .iter()
+        .map(|step| step.writes.total().write_calls)
+        .collect();
+    assert_eq!(continuation_writes.len(), 3, "续做三步");
+    let writes_of_the_whole_mount = u64::try_from(
+        counting_stream
+            .operations()
+            .iter()
+            .filter(|operation| operation.kind != singlefs_harness::RecordedOperationKind::Barrier)
+            .count(),
+    )
+    .expect("写数装得进 u64");
+    let writes_before_the_second_step =
+        writes_of_the_whole_mount - continuation_writes[1] - continuation_writes[2];
+    let warm_up_publishes = counted.output.warm_up_publishes.len();
+    drop(counted);
+    let writes_so_far = std::rc::Rc::new(std::cell::Cell::new(0));
+    let mut failing_devices: Vec<(
+        singlefs_core::address::DeviceIdentity,
+        DeviceFailingOneCountedWrite<_>,
+    )> = crash_state_devices(&image, &[], &[], &SharedStream::new())
+        .into_iter()
+        .map(|(identity, device)| {
+            (
+                identity,
+                DeviceFailingOneCountedWrite {
+                    inner: device,
+                    writes_so_far: writes_so_far.clone(),
+                    failing_write: writes_before_the_second_step + 1,
+                },
+            )
+        })
+        .collect();
+    let failed = match mount_writable_with_test_only_switches_and_deletion_switches(
+        &parameters(),
+        &mut failing_devices,
+        SpaceAdmission::JudgedByTheFormula,
+        ShadowLedger::On,
+        deletion_switches_with_batches_of_one(),
+    ) {
+        Err(singlefs_core::mount::MountError::Publish(failed)) => failed,
+        Err(other) => panic!("续做那一步的块设备错交回 MountError::Publish：{other:?}"),
+        Ok(_) => panic!("续做第二步的写报错，挂载却做成了"),
+    };
+    assert!(
+        matches!(
+            failed.cause,
+            singlefs_core::transaction::PublishError::BlockDevice(_)
+        ),
+        "错是那一次写的块设备错：{:?}",
+        failed.cause
+    );
+    let sum_persisted: u64 = failed.writes_of_persisted_publishes.iter().map(|w| w.total().write_calls).sum();
+    let sum_failed: u64 = failed.writes_of_failed_publishes.iter().map(|w| w.total().write_calls).sum();
+    println!("PROBE writes_before_the_failing_write={} sum_persisted={} sum_failed={} persisted_len={} failed_len={} before_first_publish={}", writes_before_the_second_step, sum_persisted, sum_failed, failed.writes_of_persisted_publishes.len(), failed.writes_of_failed_publishes.len(), failed.writes_before_the_first_publish.total().write_calls);
+    let image_after = MemoryPool {
+        devices: failing_devices
+            .iter()
+            .map(|(identity, device)| (*identity, device.inner.wrapped_device().image.clone()))
+            .collect(),
+        device_size_in_bytes: common::IMAGE_BYTES,
+    };
+    let publishes_landed = mount_read_only(&image_after)
+        .expect("只读挂载")
+        .effective_root
+        .checkpoint_txg
+        .0
+        - intent.root.checkpoint_txg.0;
+    assert_eq!(
+        (
+            failed.writes_of_persisted_publishes.len(),
+            u64::try_from(failed.writes_of_persisted_publishes.len()).expect("份数"),
+        ),
+        (1 + warm_up_publishes + 1, publishes_landed,),
+        "错里的已落盘写账一次发布一份：写行、暖机、续做第一步，份数等于盘上落了几次发布"
+    );
+    assert!(
+        failed
+            .writes_of_persisted_publishes
+            .iter()
+            .all(|writes| writes.total().write_calls > 0),
+        "每一份都有写：{:?}",
+        failed.writes_of_persisted_publishes
+    );
+}
+

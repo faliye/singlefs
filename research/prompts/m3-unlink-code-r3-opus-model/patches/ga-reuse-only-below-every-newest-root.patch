@@ -1,0 +1,46 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -2760,10 +2760,39 @@
+         0
+     };
+     // 卸载那一格回收的槽不扣（`RaiseFloorEntry::reuse_of_the_reclaimed_slots`，丙 1）：下面的整串预演就在分配器的拷贝上算上它们。
+-    let reclaimed = allocator.reclaim_released_up_to(
+-        reclaim_floor(new_floor, oldest_valid_root_in_the_window),
+-        entry.reuse_of_the_reclaimed_slots(),
+-    );
++    // 攻方原型（m3-unlink-code-r3 Opus 腿，零轮）：卸载那一格只把「释放代 ≤ 每块盘上最新有效根的 txg 取小」的槽当场放开，
++    // 其余照准入那一格扣到生效——每块盘上最新的那条根都不引用当场放开的槽，丢掉任何一块盘之后恢复择到的那条根读得出。
++    let floor_of_the_reclaim = reclaim_floor(new_floor, oldest_valid_root_in_the_window);
++    let reclaimed = match entry.reuse_of_the_reclaimed_slots() {
++        ReclaimedReuse::HeldUntilFloorTakesEffect => allocator
++            .reclaim_released_up_to(floor_of_the_reclaim, ReclaimedReuse::HeldUntilFloorTakesEffect),
++        ReclaimedReuse::Immediately => {
++            let newest_on_every_device = all_devices
++                .iter()
++                .map(|device| {
++                    roots
++                        .iter()
++                        .filter(|root| {
++                            !abandoned_by_table(root, &table)
++                                && device_of_txg(root.checkpoint_txg) == *device
++                        })
++                        .map(|root| root.checkpoint_txg)
++                        .max()
++                        .unwrap_or(CheckpointTxg(0))
++                })
++                .min()
++                .unwrap_or(CheckpointTxg(0));
++            let mut reclaimed = allocator.reclaim_released_up_to(
++                floor_of_the_reclaim.min(newest_on_every_device),
++                ReclaimedReuse::Immediately,
++            );
++            reclaimed.extend(allocator.reclaim_released_up_to(
++                floor_of_the_reclaim,
++                ReclaimedReuse::HeldUntilFloorTakesEffect,
++            ));
++            reclaimed
++        }
++    };
+     let publishes_in_the_sequence = planned_txgs.len();
+     let mut pool = PoolWriter::new(&parameters_of_the_pool, devices.as_mut_slice());
+     // 这一串在任何写之前在分配器的一份拷贝上整串预演（与可写挂载取号之前那一串同一个做法，`dry_run_of_the_publishes_after_acquisition`）：

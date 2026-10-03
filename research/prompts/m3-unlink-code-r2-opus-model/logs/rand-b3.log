@@ -1,0 +1,149 @@
+run-with-memory-cap: 这个会话已有 11 条日常的在跑，照理由并行：派出的攻方腿在自己的副本上跑原型，与别的腿各跑各的
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.06s
+     Running tests/attack_r2_random_probe.rs (/tmp/claude-1000/m3-unlink-r2-attack/target/release/deps/attack_r2_random_probe-d80ef4d5156debea)
+
+running 1 test
+R exec=240-skip weights=attack seed=0x5eed0001 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 3, "PublishError::ContentExceedsDataUnit": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0002 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 2, "RollbackError::TargetNotACandidate(NotInRing)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0000 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 1} ending=Completed
+ATTACK-WALK-FROM-DELETING result=NoFileVersionToChange { floor_raises: [], refusals_that_push
+R exec=240-skip weights=attack seed=0x5eed0003 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(NotInRing)": 2} ending=Completed
+ATTACK-WALK-FROM-DELETING result=Ok(versions=2, raises=0)
+R exec=240-skip weights=attack seed=0x5eed0005 ops=60 refused={"PublishError::ContentExceedsDataUnit": 2, "RollbackError::TargetNotACandidate(NotInRing)": 2, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+ATTACK-MOUNT-CONTINUATION steps=1 raises=0 outcome=WalkedToEmpty
+ATTACK-WALK-FROM-DELETING result=NoFileVersionToChange { floor_raises: [], refusals_that_push
+R exec=240-skip weights=attack seed=0x5eed0004 ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 3, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0008 ops=60 refused={"MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBy": 1, "MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(NotInRing)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0009 ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 3, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0007 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(NotInRing)": 3, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1, "UserChangeRefused::NoFileVersionToChange": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed000a ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(NotInRing)": 1, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1, "UserChangeRefused::NoFileVersionToChange": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0006 ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 3, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed000c ops=60 refused={"MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBy": 1, "MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 4} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed000d ops=60 refused={"MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBy": 1, "MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 4, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed000b ops=60 refused={} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed000f ops=60 refused={"MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBy": 1, "MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(NotInRing)": 4} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed000e ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0011 ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 4, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+ATTACK-WALK-FROM-DELETING result=NoFileVersionToChange { floor_raises: [], refusals_that_push
+R exec=240-skip weights=attack seed=0x5eed0010 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0013 ops=60 refused={"RollbackError::TargetNotACandidate(VersionWithoutFile)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0012 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0016 ops=60 refused={"PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 3, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0017 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 4, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 3} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0019 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 6, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0014 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(NotInRing)": 4, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1, "UserChangeRefused::NoFileVersionToChange": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed001b ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 5, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed001a ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0018 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "RollbackError::TargetNotACandidate(BelowEffectiveFloor)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed001c ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "RollbackError::TargetNotACandidate(NotInRing)": 4} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed001e ops=60 refused={"MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBy": 2, "MountError::RollbackFloorAboveCeiling": 3, "PublishError::ContentExceedsDataUnit": 4} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0015 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 3, "PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 3, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed001f ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "RollbackError::TargetNotACandidate(NotInRing)": 2, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0021 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 5, "RollbackError::TargetNotACandidate(NotInRing)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0022 ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 2, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0020 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(NotInRing)": 3} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed001d ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "RollbackError::TargetNotACandidate(NotInRing)": 6, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0023 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 3, "PublishError::ContentExceedsDataUnit": 2, "RollbackError::TargetNotACandidate(BelowEffectiveFloor)": 2, "RollbackError::TargetNotACandidate(NotInRing)": 2, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0025 ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0024 ops=60 refused={"MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBy": 1, "MountError::RollbackFloorAboveCeiling": 3, "PublishError::ContentExceedsDataUnit": 4} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed002a ops=60 refused={"MountError::RollbackFloorAboveCeiling": 3, "RollbackError::TargetNotACandidate(BelowEffectiveFloor)": 1, "RollbackError::TargetNotACandidate(NotInRing)": 2, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0026 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 2, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0028 ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 4, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0027 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(NotInRing)": 6, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+ATTACK-WALK-FROM-DELETING result=NoFileVersionToChange { floor_raises: [], refusals_that_push
+R exec=240-skip weights=attack seed=0x5eed0029 ops=60 refused={"PublishError::ContentExceedsDataUnit": 2, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed002b ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(NotInRing)": 5} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed002c ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 4, "RollbackError::TargetNotACandidate(NotInRing)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed002f ops=60 refused={"PublishError::ContentExceedsDataUnit": 2, "RollbackError::TargetNotACandidate(NotInRing)": 3, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1, "UserChangeRefused::NoFileVersionToChange": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed002d ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 2, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed002e ops=60 refused={"MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBy": 1, "MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0030 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 3, "RollbackError::TargetNotACandidate(NotInRing)": 5} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0032 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 3, "RollbackError::TargetNotACandidate(NotInRing)": 1, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 3} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0031 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 5, "PublishError::ContentExceedsDataUnit": 6, "RollbackError::TargetNotACandidate(BelowEffectiveFloor)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0034 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0033 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0036 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(NotInRing)": 2, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0035 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 2, "RollbackError::TargetNotACandidate(NotInRing)": 1, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0038 ops=60 refused={"PublishError::ContentExceedsDataUnit": 6, "RollbackError::TargetNotACandidate(NotInRing)": 4, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0037 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 6, "RollbackError::TargetNotACandidate(NotInRing)": 2, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+test attack_r2_random_probe has been running for over 60 seconds
+R exec=240-skip weights=attack seed=0x5eed003b ops=60 refused={"MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBy": 1, "MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(BelowEffectiveFloor)": 2, "RollbackError::TargetNotACandidate(NotInRing)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed003a ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 5} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0039 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "RollbackError::TargetNotACandidate(NotInRing)": 2} ending=Completed
+ATTACK-WALK-FROM-DELETING result=Ok(versions=2, raises=0)
+ATTACK-MOUNT-CONTINUATION steps=1 raises=0 outcome=WalkedToEmpty
+R exec=240-skip weights=attack seed=0x5eed003c ops=60 refused={} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed003d ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(NotInRing)": 3, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0041 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "RollbackError::TargetNotACandidate(BelowEffectiveFloor)": 1, "RollbackError::TargetNotACandidate(NotInRing)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed003e ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(NotInRing)": 2} ending=Completed
+ATTACK-WALK-FROM-DELETING result=NoFileVersionToChange { floor_raises: [], refusals_that_push
+R exec=240-skip weights=attack seed=0x5eed003f ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 4} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0040 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 3, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0042 ops=60 refused={"RollbackError::TargetNotACandidate(BelowEffectiveFloor)": 1, "RollbackError::TargetNotACandidate(NotInRing)": 3} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0045 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 2, "RollbackError::TargetNotACandidate(BelowEffectiveFloor)": 2, "RollbackError::TargetNotACandidate(NotInRing)": 4} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0046 ops=60 refused={"PublishError::ContentExceedsDataUnit": 2, "RollbackError::TargetNotACandidate(NotInRing)": 3} ending=Completed
+ATTACK-WALK-FROM-DELETING result=NoFileVersionToChange { floor_raises: [], refusals_that_push
+R exec=240-skip weights=attack seed=0x5eed0044 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 3} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0048 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(NotInRing)": 1, "UserChangeRefused::NoFileVersionToChange": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0043 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(BelowEffectiveFloor)": 2, "RollbackError::TargetNotACandidate(NotInRing)": 1, "UserChangeRefused::NoFileVersionToChange": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0049 ops=60 refused={"PublishError::ContentExceedsDataUnit": 2, "RollbackError::TargetNotACandidate(NotInRing)": 3} ending=Completed
+ATTACK-WALK-FROM-DELETING result=Ok(versions=2, raises=0)
+ATTACK-WALK-FROM-DELETING result=NoFileVersionToChange { floor_raises: [], refusals_that_push
+ATTACK-WALK-FROM-DELETING result=NoFileVersionToChange { floor_raises: [], refusals_that_push
+R exec=240-skip weights=attack seed=0x5eed004d ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(BelowEffectiveFloor)": 2, "RollbackError::TargetNotACandidate(NotInRing)": 3} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed004a ops=60 refused={"MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBy": 1, "MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 4} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed004c ops=60 refused={"RollbackError::TargetNotACandidate(BelowEffectiveFloor)": 1, "RollbackError::TargetNotACandidate(NotInRing)": 3, "UserChangeRefused::NoFileVersionToChange": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0047 ops=60 refused={"PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 4} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed004b ops=60 refused={"PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(BelowEffectiveFloor)": 3, "RollbackError::TargetNotACandidate(NotInRing)": 2, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed004f ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed004e ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 2, "UserChangeRefused::NoFileVersionToChange": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0050 ops=60 refused={"MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBy": 1, "MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 2, "RollbackError::TargetNotACandidate(NotInRing)": 3, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0052 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 3, "RollbackError::TargetNotACandidate(NotInRing)": 4, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0051 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "RollbackError::TargetNotACandidate(NotInRing)": 3} ending=Completed
+ATTACK-WALK-FROM-DELETING result=NoFileVersionToChange { floor_raises: [], refusals_that_push
+R exec=240-skip weights=attack seed=0x5eed0054 ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0053 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 2, "RollbackError::TargetNotACandidate(NotInRing)": 1, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0056 ops=60 refused={} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0055 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 3} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0057 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 4, "RollbackError::TargetNotACandidate(NotInRing)": 2, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 2, "UserChangeRefused::NoFileVersionToChange": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed005b ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 4} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed005c ops=60 refused={"PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0058 ops=60 refused={"PublishError::ContentExceedsDataUnit": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed005a ops=60 refused={"PublishError::ContentExceedsDataUnit": 4} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed005d ops=60 refused={"RollbackError::TargetNotACandidate(BelowEffectiveFloor)": 1, "RollbackError::TargetNotACandidate(NotInRing)": 6} ending=Completed
+ATTACK-MOUNT-CONTINUATION steps=1 raises=0 outcome=WalkedToEmpty
+ATTACK-WALK-FROM-DELETING result=NoFileVersionToChange { floor_raises: [], refusals_that_push
+R exec=240-skip weights=attack seed=0x5eed0059 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed005f ops=60 refused={"MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBy": 1, "MountError::RollbackFloorAboveCeiling": 1, "RollbackError::TargetNotACandidate(NotInRing)": 4} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0060 ops=60 refused={"PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 3} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed005e ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(BelowEffectiveFloor)": 1, "RollbackError::TargetNotACandidate(NotInRing)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0061 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 3, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1, "UserChangeRefused::NoFileVersionToChange": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0062 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 4, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0064 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 3, "PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 1, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0066 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 4, "PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0063 ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0068 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 3, "RollbackError::TargetNotACandidate(NotInRing)": 2, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed006a ops=60 refused={"MountError::RollbackFloorAboveCeiling": 5, "PublishError::ContentExceedsDataUnit": 2, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed006c ops=60 refused={"MountError::RollbackFloorAboveCeiling": 4, "RollbackError::TargetNotACandidate(BelowEffectiveFloor)": 2, "RollbackError::TargetNotACandidate(NotInRing)": 4} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0065 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 4, "RollbackError::TargetNotACandidate(NotInRing)": 1, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed006b ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 2, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0067 ops=60 refused={"PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+ATTACK-WALK-FROM-DELETING result=NoFileVersionToChange { floor_raises: [], refusals_that_push
+R exec=240-skip weights=attack seed=0x5eed006f ops=60 refused={"MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBy": 1, "MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 6, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 2} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0069 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "RollbackError::TargetNotACandidate(NotInRing)": 5} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0070 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 3, "PublishError::ContentExceedsDataUnit": 1, "RollbackError::TargetNotACandidate(NotInRing)": 5, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 1, "UserChangeRefused::NoFileVersionToChange": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed006e ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 1} ending=Completed
+ATTACK-WALK-FROM-DELETING result=NoFileVersionToChange { floor_raises: [], refusals_that_push
+R exec=240-skip weights=attack seed=0x5eed006d ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "RollbackError::TargetNotACandidate(NotInRing)": 3} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0071 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 5, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0072 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 1, "PublishError::ContentExceedsDataUnit": 3, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0073 ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 2, "UserChangeRefused::NoFileVersionToChange": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0074 ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 3} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0075 ops=60 refused={"MountError::RollbackFloorAboveCeiling": 2, "PublishError::ContentExceedsDataUnit": 3, "RollbackError::TargetNotACandidate(NotInRing)": 1} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0076 ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 4} ending=Completed
+R exec=240-skip weights=attack seed=0x5eed0077 ops=60 refused={"RollbackError::TargetNotACandidate(NotInRing)": 2} ending=Completed
+DONE seeds=120
+test attack_r2_random_probe ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 122.12s
+

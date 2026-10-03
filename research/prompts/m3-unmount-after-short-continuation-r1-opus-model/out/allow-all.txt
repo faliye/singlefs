@@ -1,0 +1,1600 @@
+CELL allowance S192 O0 U10 B0 setup=first-file-refused
+CELL allowance S192 O0 U10 B1 setup=first-file-refused
+CELL allowance S192 O0 U10 B2 setup=first-file-refused
+CELL allowance S192 O0 U10 Bhalf setup=first-file-refused
+CELL allowance S192 O0 U10 Blast setup=first-file-refused
+CELL allowance S192 O0 U14 B0 setup=first-file-refused
+CELL allowance S192 O0 U14 B1 setup=first-file-refused
+CELL allowance S192 O0 U14 B2 setup=first-file-refused
+CELL allowance S192 O0 U14 Bhalf setup=first-file-refused
+CELL allowance S192 O0 U14 Blast setup=first-file-refused
+CELL allowance S192 O0 U20 B0 setup=first-file-refused
+CELL allowance S192 O0 U20 B1 setup=first-file-refused
+CELL allowance S192 O0 U20 B2 setup=first-file-refused
+CELL allowance S192 O0 U20 Bhalf setup=first-file-refused
+CELL allowance S192 O0 U20 Blast setup=first-file-refused
+CELL allowance S192 O0 U40 B0 setup=first-file-refused
+CELL allowance S192 O0 U40 B1 setup=first-file-refused
+CELL allowance S192 O0 U40 B2 setup=first-file-refused
+CELL allowance S192 O0 U40 Bhalf setup=first-file-refused
+CELL allowance S192 O0 U40 Blast setup=first-file-refused
+CELL allowance S192 O0 Umax B0 setup=first-file-refused
+CELL allowance S192 O0 Umax B1 setup=first-file-refused
+CELL allowance S192 O0 Umax B2 setup=first-file-refused
+CELL allowance S192 O0 Umax Bhalf setup=first-file-refused
+CELL allowance S192 O0 Umax Blast setup=first-file-refused
+CELL allowance S192 O2 U10 B0 setup=first-file-refused
+CELL allowance S192 O2 U10 B1 setup=first-file-refused
+CELL allowance S192 O2 U10 B2 setup=first-file-refused
+CELL allowance S192 O2 U10 Bhalf setup=first-file-refused
+CELL allowance S192 O2 U10 Blast setup=first-file-refused
+CELL allowance S192 O2 U14 B0 setup=first-file-refused
+CELL allowance S192 O2 U14 B1 setup=first-file-refused
+CELL allowance S192 O2 U14 B2 setup=first-file-refused
+CELL allowance S192 O2 U14 Bhalf setup=first-file-refused
+CELL allowance S192 O2 U14 Blast setup=first-file-refused
+CELL allowance S192 O2 U20 B0 setup=first-file-refused
+CELL allowance S192 O2 U20 B1 setup=first-file-refused
+CELL allowance S192 O2 U20 B2 setup=first-file-refused
+CELL allowance S192 O2 U20 Bhalf setup=first-file-refused
+CELL allowance S192 O2 U20 Blast setup=first-file-refused
+CELL allowance S192 O2 U40 B0 setup=first-file-refused
+CELL allowance S192 O2 U40 B1 setup=first-file-refused
+CELL allowance S192 O2 U40 B2 setup=first-file-refused
+CELL allowance S192 O2 U40 Bhalf setup=first-file-refused
+CELL allowance S192 O2 U40 Blast setup=first-file-refused
+CELL allowance S192 O2 Umax B0 setup=first-file-refused
+CELL allowance S192 O2 Umax B1 setup=first-file-refused
+CELL allowance S192 O2 Umax B2 setup=first-file-refused
+CELL allowance S192 O2 Umax Bhalf setup=first-file-refused
+CELL allowance S192 O2 Umax Blast setup=first-file-refused
+CELL allowance S192 O4 U10 B0 setup=first-file-refused
+CELL allowance S192 O4 U10 B1 setup=first-file-refused
+CELL allowance S192 O4 U10 B2 setup=first-file-refused
+CELL allowance S192 O4 U10 Bhalf setup=first-file-refused
+CELL allowance S192 O4 U10 Blast setup=first-file-refused
+CELL allowance S192 O4 U14 B0 setup=first-file-refused
+CELL allowance S192 O4 U14 B1 setup=first-file-refused
+CELL allowance S192 O4 U14 B2 setup=first-file-refused
+CELL allowance S192 O4 U14 Bhalf setup=first-file-refused
+CELL allowance S192 O4 U14 Blast setup=first-file-refused
+CELL allowance S192 O4 U20 B0 setup=first-file-refused
+CELL allowance S192 O4 U20 B1 setup=first-file-refused
+CELL allowance S192 O4 U20 B2 setup=first-file-refused
+CELL allowance S192 O4 U20 Bhalf setup=first-file-refused
+CELL allowance S192 O4 U20 Blast setup=first-file-refused
+CELL allowance S192 O4 U40 B0 setup=first-file-refused
+CELL allowance S192 O4 U40 B1 setup=first-file-refused
+CELL allowance S192 O4 U40 B2 setup=first-file-refused
+CELL allowance S192 O4 U40 Bhalf setup=first-file-refused
+CELL allowance S192 O4 U40 Blast setup=first-file-refused
+CELL allowance S192 O4 Umax B0 setup=first-file-refused
+CELL allowance S192 O4 Umax B1 setup=first-file-refused
+CELL allowance S192 O4 Umax B2 setup=first-file-refused
+CELL allowance S192 O4 Umax Bhalf setup=first-file-refused
+CELL allowance S192 O4 Umax Blast setup=first-file-refused
+CELL allowance S192 O8 U10 B0 setup=first-file-refused
+CELL allowance S192 O8 U10 B1 setup=first-file-refused
+CELL allowance S192 O8 U10 B2 setup=first-file-refused
+CELL allowance S192 O8 U10 Bhalf setup=first-file-refused
+CELL allowance S192 O8 U10 Blast setup=first-file-refused
+CELL allowance S192 O8 U14 B0 setup=first-file-refused
+CELL allowance S192 O8 U14 B1 setup=first-file-refused
+CELL allowance S192 O8 U14 B2 setup=first-file-refused
+CELL allowance S192 O8 U14 Bhalf setup=first-file-refused
+CELL allowance S192 O8 U14 Blast setup=first-file-refused
+CELL allowance S192 O8 U20 B0 setup=first-file-refused
+CELL allowance S192 O8 U20 B1 setup=first-file-refused
+CELL allowance S192 O8 U20 B2 setup=first-file-refused
+CELL allowance S192 O8 U20 Bhalf setup=first-file-refused
+CELL allowance S192 O8 U20 Blast setup=first-file-refused
+CELL allowance S192 O8 U40 B0 setup=first-file-refused
+CELL allowance S192 O8 U40 B1 setup=first-file-refused
+CELL allowance S192 O8 U40 B2 setup=first-file-refused
+CELL allowance S192 O8 U40 Bhalf setup=first-file-refused
+CELL allowance S192 O8 U40 Blast setup=first-file-refused
+CELL allowance S192 O8 Umax B0 setup=first-file-refused
+CELL allowance S192 O8 Umax B1 setup=first-file-refused
+CELL allowance S192 O8 Umax B2 setup=first-file-refused
+CELL allowance S192 O8 Umax Bhalf setup=first-file-refused
+CELL allowance S192 O8 Umax Blast setup=first-file-refused
+CELL allowance S384 O0 U10 B0 setup=first-file-refused
+CELL allowance S384 O0 U10 B1 setup=first-file-refused
+CELL allowance S384 O0 U10 B2 setup=first-file-refused
+CELL allowance S384 O0 U10 Bhalf setup=first-file-refused
+CELL allowance S384 O0 U10 Blast setup=first-file-refused
+CELL allowance S384 O0 U14 B0 setup=first-file-refused
+CELL allowance S384 O0 U14 B1 setup=first-file-refused
+CELL allowance S384 O0 U14 B2 setup=first-file-refused
+CELL allowance S384 O0 U14 Bhalf setup=first-file-refused
+CELL allowance S384 O0 U14 Blast setup=first-file-refused
+CELL allowance S384 O0 U20 B0 setup=first-file-refused
+CELL allowance S384 O0 U20 B1 setup=first-file-refused
+CELL allowance S384 O0 U20 B2 setup=first-file-refused
+CELL allowance S384 O0 U20 Bhalf setup=first-file-refused
+CELL allowance S384 O0 U20 Blast setup=first-file-refused
+CELL allowance S384 O0 U40 B0 setup=first-file-refused
+CELL allowance S384 O0 U40 B1 setup=first-file-refused
+CELL allowance S384 O0 U40 B2 setup=first-file-refused
+CELL allowance S384 O0 U40 Bhalf setup=first-file-refused
+CELL allowance S384 O0 U40 Blast setup=first-file-refused
+CELL allowance S384 O0 Umax B0 setup=first-file-refused
+CELL allowance S384 O0 Umax B1 setup=first-file-refused
+CELL allowance S384 O0 Umax B2 setup=first-file-refused
+CELL allowance S384 O0 Umax Bhalf setup=first-file-refused
+CELL allowance S384 O0 Umax Blast setup=first-file-refused
+CELL allowance S384 O2 U10 B0 setup=first-file-refused
+CELL allowance S384 O2 U10 B1 setup=first-file-refused
+CELL allowance S384 O2 U10 B2 setup=first-file-refused
+CELL allowance S384 O2 U10 Bhalf setup=first-file-refused
+CELL allowance S384 O2 U10 Blast setup=first-file-refused
+CELL allowance S384 O2 U14 B0 setup=first-file-refused
+CELL allowance S384 O2 U14 B1 setup=first-file-refused
+CELL allowance S384 O2 U14 B2 setup=first-file-refused
+CELL allowance S384 O2 U14 Bhalf setup=first-file-refused
+CELL allowance S384 O2 U14 Blast setup=first-file-refused
+CELL allowance S384 O2 U20 B0 setup=first-file-refused
+CELL allowance S384 O2 U20 B1 setup=first-file-refused
+CELL allowance S384 O2 U20 B2 setup=first-file-refused
+CELL allowance S384 O2 U20 Bhalf setup=first-file-refused
+CELL allowance S384 O2 U20 Blast setup=first-file-refused
+CELL allowance S384 O2 U40 B0 setup=first-file-refused
+CELL allowance S384 O2 U40 B1 setup=first-file-refused
+CELL allowance S384 O2 U40 B2 setup=first-file-refused
+CELL allowance S384 O2 U40 Bhalf setup=first-file-refused
+CELL allowance S384 O2 U40 Blast setup=first-file-refused
+CELL allowance S384 O2 Umax B0 setup=first-file-refused
+CELL allowance S384 O2 Umax B1 setup=first-file-refused
+CELL allowance S384 O2 Umax B2 setup=first-file-refused
+CELL allowance S384 O2 Umax Bhalf setup=first-file-refused
+CELL allowance S384 O2 Umax Blast setup=first-file-refused
+CELL allowance S384 O4 U10 B0 setup=first-file-refused
+CELL allowance S384 O4 U10 B1 setup=first-file-refused
+CELL allowance S384 O4 U10 B2 setup=first-file-refused
+CELL allowance S384 O4 U10 Bhalf setup=first-file-refused
+CELL allowance S384 O4 U10 Blast setup=first-file-refused
+CELL allowance S384 O4 U14 B0 setup=first-file-refused
+CELL allowance S384 O4 U14 B1 setup=first-file-refused
+CELL allowance S384 O4 U14 B2 setup=first-file-refused
+CELL allowance S384 O4 U14 Bhalf setup=first-file-refused
+CELL allowance S384 O4 U14 Blast setup=first-file-refused
+CELL allowance S384 O4 U20 B0 setup=first-file-refused
+CELL allowance S384 O4 U20 B1 setup=first-file-refused
+CELL allowance S384 O4 U20 B2 setup=first-file-refused
+CELL allowance S384 O4 U20 Bhalf setup=first-file-refused
+CELL allowance S384 O4 U20 Blast setup=first-file-refused
+CELL allowance S384 O4 U40 B0 setup=first-file-refused
+CELL allowance S384 O4 U40 B1 setup=first-file-refused
+CELL allowance S384 O4 U40 B2 setup=first-file-refused
+CELL allowance S384 O4 U40 Bhalf setup=first-file-refused
+CELL allowance S384 O4 U40 Blast setup=first-file-refused
+CELL allowance S384 O4 Umax B0 setup=first-file-refused
+CELL allowance S384 O4 Umax B1 setup=first-file-refused
+CELL allowance S384 O4 Umax B2 setup=first-file-refused
+CELL allowance S384 O4 Umax Bhalf setup=first-file-refused
+CELL allowance S384 O4 Umax Blast setup=first-file-refused
+CELL allowance S384 O8 U10 B0 setup=first-file-refused
+CELL allowance S384 O8 U10 B1 setup=first-file-refused
+CELL allowance S384 O8 U10 B2 setup=first-file-refused
+CELL allowance S384 O8 U10 Bhalf setup=first-file-refused
+CELL allowance S384 O8 U10 Blast setup=first-file-refused
+CELL allowance S384 O8 U14 B0 setup=first-file-refused
+CELL allowance S384 O8 U14 B1 setup=first-file-refused
+CELL allowance S384 O8 U14 B2 setup=first-file-refused
+CELL allowance S384 O8 U14 Bhalf setup=first-file-refused
+CELL allowance S384 O8 U14 Blast setup=first-file-refused
+CELL allowance S384 O8 U20 B0 setup=first-file-refused
+CELL allowance S384 O8 U20 B1 setup=first-file-refused
+CELL allowance S384 O8 U20 B2 setup=first-file-refused
+CELL allowance S384 O8 U20 Bhalf setup=first-file-refused
+CELL allowance S384 O8 U20 Blast setup=first-file-refused
+CELL allowance S384 O8 U40 B0 setup=first-file-refused
+CELL allowance S384 O8 U40 B1 setup=first-file-refused
+CELL allowance S384 O8 U40 B2 setup=first-file-refused
+CELL allowance S384 O8 U40 Bhalf setup=first-file-refused
+CELL allowance S384 O8 U40 Blast setup=first-file-refused
+CELL allowance S384 O8 Umax B0 setup=first-file-refused
+CELL allowance S384 O8 Umax B1 setup=first-file-refused
+CELL allowance S384 O8 Umax B2 setup=first-file-refused
+CELL allowance S384 O8 Umax Bhalf setup=first-file-refused
+CELL allowance S384 O8 Umax Blast setup=first-file-refused
+CELL allowance S512 O0 U10 B0 setup=first-file-refused
+CELL allowance S512 O0 U10 B1 setup=first-file-refused
+CELL allowance S512 O0 U10 B2 setup=first-file-refused
+CELL allowance S512 O0 U10 Bhalf setup=first-file-refused
+CELL allowance S512 O0 U10 Blast setup=first-file-refused
+CELL allowance S512 O0 U14 B0 setup=first-file-refused
+CELL allowance S512 O0 U14 B1 setup=first-file-refused
+CELL allowance S512 O0 U14 B2 setup=first-file-refused
+CELL allowance S512 O0 U14 Bhalf setup=first-file-refused
+CELL allowance S512 O0 U14 Blast setup=first-file-refused
+CELL allowance S512 O0 U20 B0 setup=first-file-refused
+CELL allowance S512 O0 U20 B1 setup=first-file-refused
+CELL allowance S512 O0 U20 B2 setup=first-file-refused
+CELL allowance S512 O0 U20 Bhalf setup=first-file-refused
+CELL allowance S512 O0 U20 Blast setup=first-file-refused
+CELL allowance S512 O0 U40 B0 setup=first-file-refused
+CELL allowance S512 O0 U40 B1 setup=first-file-refused
+CELL allowance S512 O0 U40 B2 setup=first-file-refused
+CELL allowance S512 O0 U40 Bhalf setup=first-file-refused
+CELL allowance S512 O0 U40 Blast setup=first-file-refused
+CELL allowance S512 O0 Umax B0 setup=first-file-refused
+CELL allowance S512 O0 Umax B1 setup=first-file-refused
+CELL allowance S512 O0 Umax B2 setup=first-file-refused
+CELL allowance S512 O0 Umax Bhalf setup=first-file-refused
+CELL allowance S512 O0 Umax Blast setup=first-file-refused
+CELL allowance S512 O2 U10 B0 setup=first-file-refused
+CELL allowance S512 O2 U10 B1 setup=first-file-refused
+CELL allowance S512 O2 U10 B2 setup=first-file-refused
+CELL allowance S512 O2 U10 Bhalf setup=first-file-refused
+CELL allowance S512 O2 U10 Blast setup=first-file-refused
+CELL allowance S512 O2 U14 B0 setup=first-file-refused
+CELL allowance S512 O2 U14 B1 setup=first-file-refused
+CELL allowance S512 O2 U14 B2 setup=first-file-refused
+CELL allowance S512 O2 U14 Bhalf setup=first-file-refused
+CELL allowance S512 O2 U14 Blast setup=first-file-refused
+CELL allowance S512 O2 U20 B0 setup=first-file-refused
+CELL allowance S512 O2 U20 B1 setup=first-file-refused
+CELL allowance S512 O2 U20 B2 setup=first-file-refused
+CELL allowance S512 O2 U20 Bhalf setup=first-file-refused
+CELL allowance S512 O2 U20 Blast setup=first-file-refused
+CELL allowance S512 O2 U40 B0 setup=first-file-refused
+CELL allowance S512 O2 U40 B1 setup=first-file-refused
+CELL allowance S512 O2 U40 B2 setup=first-file-refused
+CELL allowance S512 O2 U40 Bhalf setup=first-file-refused
+CELL allowance S512 O2 U40 Blast setup=first-file-refused
+CELL allowance S512 O2 Umax B0 setup=first-file-refused
+CELL allowance S512 O2 Umax B1 setup=first-file-refused
+CELL allowance S512 O2 Umax B2 setup=first-file-refused
+CELL allowance S512 O2 Umax Bhalf setup=first-file-refused
+CELL allowance S512 O2 Umax Blast setup=first-file-refused
+CELL allowance S512 O4 U10 B0 setup=first-file-refused
+CELL allowance S512 O4 U10 B1 setup=first-file-refused
+CELL allowance S512 O4 U10 B2 setup=first-file-refused
+CELL allowance S512 O4 U10 Bhalf setup=first-file-refused
+CELL allowance S512 O4 U10 Blast setup=first-file-refused
+CELL allowance S512 O4 U14 B0 setup=first-file-refused
+CELL allowance S512 O4 U14 B1 setup=first-file-refused
+CELL allowance S512 O4 U14 B2 setup=first-file-refused
+CELL allowance S512 O4 U14 Bhalf setup=first-file-refused
+CELL allowance S512 O4 U14 Blast setup=first-file-refused
+CELL allowance S512 O4 U20 B0 setup=first-file-refused
+CELL allowance S512 O4 U20 B1 setup=first-file-refused
+CELL allowance S512 O4 U20 B2 setup=first-file-refused
+CELL allowance S512 O4 U20 Bhalf setup=first-file-refused
+CELL allowance S512 O4 U20 Blast setup=first-file-refused
+CELL allowance S512 O4 U40 B0 setup=first-file-refused
+CELL allowance S512 O4 U40 B1 setup=first-file-refused
+CELL allowance S512 O4 U40 B2 setup=first-file-refused
+CELL allowance S512 O4 U40 Bhalf setup=first-file-refused
+CELL allowance S512 O4 U40 Blast setup=first-file-refused
+CELL allowance S512 O4 Umax B0 setup=first-file-refused
+CELL allowance S512 O4 Umax B1 setup=first-file-refused
+CELL allowance S512 O4 Umax B2 setup=first-file-refused
+CELL allowance S512 O4 Umax Bhalf setup=first-file-refused
+CELL allowance S512 O4 Umax Blast setup=first-file-refused
+CELL allowance S512 O8 U10 B0 setup=first-file-refused
+CELL allowance S512 O8 U10 B1 setup=first-file-refused
+CELL allowance S512 O8 U10 B2 setup=first-file-refused
+CELL allowance S512 O8 U10 Bhalf setup=first-file-refused
+CELL allowance S512 O8 U10 Blast setup=first-file-refused
+CELL allowance S512 O8 U14 B0 setup=first-file-refused
+CELL allowance S512 O8 U14 B1 setup=first-file-refused
+CELL allowance S512 O8 U14 B2 setup=first-file-refused
+CELL allowance S512 O8 U14 Bhalf setup=first-file-refused
+CELL allowance S512 O8 U14 Blast setup=first-file-refused
+CELL allowance S512 O8 U20 B0 setup=first-file-refused
+CELL allowance S512 O8 U20 B1 setup=first-file-refused
+CELL allowance S512 O8 U20 B2 setup=first-file-refused
+CELL allowance S512 O8 U20 Bhalf setup=first-file-refused
+CELL allowance S512 O8 U20 Blast setup=first-file-refused
+CELL allowance S512 O8 U40 B0 setup=first-file-refused
+CELL allowance S512 O8 U40 B1 setup=first-file-refused
+CELL allowance S512 O8 U40 B2 setup=first-file-refused
+CELL allowance S512 O8 U40 Bhalf setup=first-file-refused
+CELL allowance S512 O8 U40 Blast setup=first-file-refused
+CELL allowance S512 O8 Umax B0 setup=first-file-refused
+CELL allowance S512 O8 Umax B1 setup=first-file-refused
+CELL allowance S512 O8 Umax B2 setup=first-file-refused
+CELL allowance S512 O8 Umax Bhalf setup=first-file-refused
+CELL allowance S512 O8 Umax Blast setup=first-file-refused
+CELL allowance S640 O0 U10 B0 setup=first-file-refused
+CELL allowance S640 O0 U10 B1 setup=first-file-refused
+CELL allowance S640 O0 U10 B2 setup=first-file-refused
+CELL allowance S640 O0 U10 Bhalf setup=first-file-refused
+CELL allowance S640 O0 U10 Blast setup=first-file-refused
+CELL allowance S640 O0 U14 B0 setup=first-file-refused
+CELL allowance S640 O0 U14 B1 setup=first-file-refused
+CELL allowance S640 O0 U14 B2 setup=first-file-refused
+CELL allowance S640 O0 U14 Bhalf setup=first-file-refused
+CELL allowance S640 O0 U14 Blast setup=first-file-refused
+CELL allowance S640 O0 U20 B0 setup=first-file-refused
+CELL allowance S640 O0 U20 B1 setup=first-file-refused
+CELL allowance S640 O0 U20 B2 setup=first-file-refused
+CELL allowance S640 O0 U20 Bhalf setup=first-file-refused
+CELL allowance S640 O0 U20 Blast setup=first-file-refused
+CELL allowance S640 O0 U40 B0 setup=first-file-refused
+CELL allowance S640 O0 U40 B1 setup=first-file-refused
+CELL allowance S640 O0 U40 B2 setup=first-file-refused
+CELL allowance S640 O0 U40 Bhalf setup=first-file-refused
+CELL allowance S640 O0 U40 Blast setup=first-file-refused
+CELL allowance S640 O0 Umax B0 setup=first-file-refused
+CELL allowance S640 O0 Umax B1 setup=first-file-refused
+CELL allowance S640 O0 Umax B2 setup=first-file-refused
+CELL allowance S640 O0 Umax Bhalf setup=first-file-refused
+CELL allowance S640 O0 Umax Blast setup=first-file-refused
+CELL allowance S640 O2 U10 B0 setup=first-file-refused
+CELL allowance S640 O2 U10 B1 setup=first-file-refused
+CELL allowance S640 O2 U10 B2 setup=first-file-refused
+CELL allowance S640 O2 U10 Bhalf setup=first-file-refused
+CELL allowance S640 O2 U10 Blast setup=first-file-refused
+CELL allowance S640 O2 U14 B0 setup=first-file-refused
+CELL allowance S640 O2 U14 B1 setup=first-file-refused
+CELL allowance S640 O2 U14 B2 setup=first-file-refused
+CELL allowance S640 O2 U14 Bhalf setup=first-file-refused
+CELL allowance S640 O2 U14 Blast setup=first-file-refused
+CELL allowance S640 O2 U20 B0 setup=first-file-refused
+CELL allowance S640 O2 U20 B1 setup=first-file-refused
+CELL allowance S640 O2 U20 B2 setup=first-file-refused
+CELL allowance S640 O2 U20 Bhalf setup=first-file-refused
+CELL allowance S640 O2 U20 Blast setup=first-file-refused
+CELL allowance S640 O2 U40 B0 setup=first-file-refused
+CELL allowance S640 O2 U40 B1 setup=first-file-refused
+CELL allowance S640 O2 U40 B2 setup=first-file-refused
+CELL allowance S640 O2 U40 Bhalf setup=first-file-refused
+CELL allowance S640 O2 U40 Blast setup=first-file-refused
+CELL allowance S640 O2 Umax B0 setup=first-file-refused
+CELL allowance S640 O2 Umax B1 setup=first-file-refused
+CELL allowance S640 O2 Umax B2 setup=first-file-refused
+CELL allowance S640 O2 Umax Bhalf setup=first-file-refused
+CELL allowance S640 O2 Umax Blast setup=first-file-refused
+CELL allowance S640 O4 U10 B0 setup=first-file-refused
+CELL allowance S640 O4 U10 B1 setup=first-file-refused
+CELL allowance S640 O4 U10 B2 setup=first-file-refused
+CELL allowance S640 O4 U10 Bhalf setup=first-file-refused
+CELL allowance S640 O4 U10 Blast setup=first-file-refused
+CELL allowance S640 O4 U14 B0 setup=first-file-refused
+CELL allowance S640 O4 U14 B1 setup=first-file-refused
+CELL allowance S640 O4 U14 B2 setup=first-file-refused
+CELL allowance S640 O4 U14 Bhalf setup=first-file-refused
+CELL allowance S640 O4 U14 Blast setup=first-file-refused
+CELL allowance S640 O4 U20 B0 setup=first-file-refused
+CELL allowance S640 O4 U20 B1 setup=first-file-refused
+CELL allowance S640 O4 U20 B2 setup=first-file-refused
+CELL allowance S640 O4 U20 Bhalf setup=first-file-refused
+CELL allowance S640 O4 U20 Blast setup=first-file-refused
+CELL allowance S640 O4 U40 B0 setup=first-file-refused
+CELL allowance S640 O4 U40 B1 setup=first-file-refused
+CELL allowance S640 O4 U40 B2 setup=first-file-refused
+CELL allowance S640 O4 U40 Bhalf setup=first-file-refused
+CELL allowance S640 O4 U40 Blast setup=first-file-refused
+CELL allowance S640 O4 Umax B0 setup=first-file-refused
+CELL allowance S640 O4 Umax B1 setup=first-file-refused
+CELL allowance S640 O4 Umax B2 setup=first-file-refused
+CELL allowance S640 O4 Umax Bhalf setup=first-file-refused
+CELL allowance S640 O4 Umax Blast setup=first-file-refused
+CELL allowance S640 O8 U10 B0 setup=first-file-refused
+CELL allowance S640 O8 U10 B1 setup=first-file-refused
+CELL allowance S640 O8 U10 B2 setup=first-file-refused
+CELL allowance S640 O8 U10 Bhalf setup=first-file-refused
+CELL allowance S640 O8 U10 Blast setup=first-file-refused
+CELL allowance S640 O8 U14 B0 setup=first-file-refused
+CELL allowance S640 O8 U14 B1 setup=first-file-refused
+CELL allowance S640 O8 U14 B2 setup=first-file-refused
+CELL allowance S640 O8 U14 Bhalf setup=first-file-refused
+CELL allowance S640 O8 U14 Blast setup=first-file-refused
+CELL allowance S640 O8 U20 B0 setup=first-file-refused
+CELL allowance S640 O8 U20 B1 setup=first-file-refused
+CELL allowance S640 O8 U20 B2 setup=first-file-refused
+CELL allowance S640 O8 U20 Bhalf setup=first-file-refused
+CELL allowance S640 O8 U20 Blast setup=first-file-refused
+CELL allowance S640 O8 U40 B0 setup=first-file-refused
+CELL allowance S640 O8 U40 B1 setup=first-file-refused
+CELL allowance S640 O8 U40 B2 setup=first-file-refused
+CELL allowance S640 O8 U40 Bhalf setup=first-file-refused
+CELL allowance S640 O8 U40 Blast setup=first-file-refused
+CELL allowance S640 O8 Umax B0 setup=first-file-refused
+CELL allowance S640 O8 Umax B1 setup=first-file-refused
+CELL allowance S640 O8 Umax B2 setup=first-file-refused
+CELL allowance S640 O8 Umax Bhalf setup=first-file-refused
+CELL allowance S640 O8 Umax Blast setup=first-file-refused
+CELL allowance S700 O0 U10 B0 setup=first-file-refused
+CELL allowance S700 O0 U10 B1 setup=first-file-refused
+CELL allowance S700 O0 U10 B2 setup=first-file-refused
+CELL allowance S700 O0 U10 Bhalf setup=first-file-refused
+CELL allowance S700 O0 U10 Blast setup=first-file-refused
+CELL allowance S700 O0 U14 B0 setup=first-file-refused
+CELL allowance S700 O0 U14 B1 setup=first-file-refused
+CELL allowance S700 O0 U14 B2 setup=first-file-refused
+CELL allowance S700 O0 U14 Bhalf setup=first-file-refused
+CELL allowance S700 O0 U14 Blast setup=first-file-refused
+CELL allowance S700 O0 U20 B0 setup=first-file-refused
+CELL allowance S700 O0 U20 B1 setup=first-file-refused
+CELL allowance S700 O0 U20 B2 setup=first-file-refused
+CELL allowance S700 O0 U20 Bhalf setup=first-file-refused
+CELL allowance S700 O0 U20 Blast setup=first-file-refused
+CELL allowance S700 O0 U40 B0 setup=first-file-refused
+CELL allowance S700 O0 U40 B1 setup=first-file-refused
+CELL allowance S700 O0 U40 B2 setup=first-file-refused
+CELL allowance S700 O0 U40 Bhalf setup=first-file-refused
+CELL allowance S700 O0 U40 Blast setup=first-file-refused
+CELL allowance S700 O0 Umax B0 setup=first-file-refused
+CELL allowance S700 O0 Umax B1 setup=first-file-refused
+CELL allowance S700 O0 Umax B2 setup=first-file-refused
+CELL allowance S700 O0 Umax Bhalf setup=first-file-refused
+CELL allowance S700 O0 Umax Blast setup=first-file-refused
+CELL allowance S700 O2 U10 B0 setup=first-file-refused
+CELL allowance S700 O2 U10 B1 setup=first-file-refused
+CELL allowance S700 O2 U10 B2 setup=first-file-refused
+CELL allowance S700 O2 U10 Bhalf setup=first-file-refused
+CELL allowance S700 O2 U10 Blast setup=first-file-refused
+CELL allowance S700 O2 U14 B0 setup=first-file-refused
+CELL allowance S700 O2 U14 B1 setup=first-file-refused
+CELL allowance S700 O2 U14 B2 setup=first-file-refused
+CELL allowance S700 O2 U14 Bhalf setup=first-file-refused
+CELL allowance S700 O2 U14 Blast setup=first-file-refused
+CELL allowance S700 O2 U20 B0 setup=first-file-refused
+CELL allowance S700 O2 U20 B1 setup=first-file-refused
+CELL allowance S700 O2 U20 B2 setup=first-file-refused
+CELL allowance S700 O2 U20 Bhalf setup=first-file-refused
+CELL allowance S700 O2 U20 Blast setup=first-file-refused
+CELL allowance S700 O2 U40 B0 setup=first-file-refused
+CELL allowance S700 O2 U40 B1 setup=first-file-refused
+CELL allowance S700 O2 U40 B2 setup=first-file-refused
+CELL allowance S700 O2 U40 Bhalf setup=first-file-refused
+CELL allowance S700 O2 U40 Blast setup=first-file-refused
+CELL allowance S700 O2 Umax B0 setup=first-file-refused
+CELL allowance S700 O2 Umax B1 setup=first-file-refused
+CELL allowance S700 O2 Umax B2 setup=first-file-refused
+CELL allowance S700 O2 Umax Bhalf setup=first-file-refused
+CELL allowance S700 O2 Umax Blast setup=first-file-refused
+CELL allowance S700 O4 U10 B0 setup=first-file-refused
+CELL allowance S700 O4 U10 B1 setup=first-file-refused
+CELL allowance S700 O4 U10 B2 setup=first-file-refused
+CELL allowance S700 O4 U10 Bhalf setup=first-file-refused
+CELL allowance S700 O4 U10 Blast setup=first-file-refused
+CELL allowance S700 O4 U14 B0 setup=first-file-refused
+CELL allowance S700 O4 U14 B1 setup=first-file-refused
+CELL allowance S700 O4 U14 B2 setup=first-file-refused
+CELL allowance S700 O4 U14 Bhalf setup=first-file-refused
+CELL allowance S700 O4 U14 Blast setup=first-file-refused
+CELL allowance S700 O4 U20 B0 setup=first-file-refused
+CELL allowance S700 O4 U20 B1 setup=first-file-refused
+CELL allowance S700 O4 U20 B2 setup=first-file-refused
+CELL allowance S700 O4 U20 Bhalf setup=first-file-refused
+CELL allowance S700 O4 U20 Blast setup=first-file-refused
+CELL allowance S700 O4 U40 B0 setup=first-file-refused
+CELL allowance S700 O4 U40 B1 setup=first-file-refused
+CELL allowance S700 O4 U40 B2 setup=first-file-refused
+CELL allowance S700 O4 U40 Bhalf setup=first-file-refused
+CELL allowance S700 O4 U40 Blast setup=first-file-refused
+CELL allowance S700 O4 Umax B0 setup=first-file-refused
+CELL allowance S700 O4 Umax B1 setup=first-file-refused
+CELL allowance S700 O4 Umax B2 setup=first-file-refused
+CELL allowance S700 O4 Umax Bhalf setup=first-file-refused
+CELL allowance S700 O4 Umax Blast setup=first-file-refused
+CELL allowance S700 O8 U10 B0 setup=first-file-refused
+CELL allowance S700 O8 U10 B1 setup=first-file-refused
+CELL allowance S700 O8 U10 B2 setup=first-file-refused
+CELL allowance S700 O8 U10 Bhalf setup=first-file-refused
+CELL allowance S700 O8 U10 Blast setup=first-file-refused
+CELL allowance S700 O8 U14 B0 setup=first-file-refused
+CELL allowance S700 O8 U14 B1 setup=first-file-refused
+CELL allowance S700 O8 U14 B2 setup=first-file-refused
+CELL allowance S700 O8 U14 Bhalf setup=first-file-refused
+CELL allowance S700 O8 U14 Blast setup=first-file-refused
+CELL allowance S700 O8 U20 B0 setup=first-file-refused
+CELL allowance S700 O8 U20 B1 setup=first-file-refused
+CELL allowance S700 O8 U20 B2 setup=first-file-refused
+CELL allowance S700 O8 U20 Bhalf setup=first-file-refused
+CELL allowance S700 O8 U20 Blast setup=first-file-refused
+CELL allowance S700 O8 U40 B0 setup=first-file-refused
+CELL allowance S700 O8 U40 B1 setup=first-file-refused
+CELL allowance S700 O8 U40 B2 setup=first-file-refused
+CELL allowance S700 O8 U40 Bhalf setup=first-file-refused
+CELL allowance S700 O8 U40 Blast setup=first-file-refused
+CELL allowance S700 O8 Umax B0 setup=first-file-refused
+CELL allowance S700 O8 Umax B1 setup=first-file-refused
+CELL allowance S700 O8 Umax B2 setup=first-file-refused
+CELL allowance S700 O8 Umax Bhalf setup=first-file-refused
+CELL allowance S700 O8 Umax Blast setup=first-file-refused
+CELL allowance S730 O0 U10 B0 setup=first-file-refused
+CELL allowance S730 O0 U10 B1 setup=first-file-refused
+CELL allowance S730 O0 U10 B2 setup=first-file-refused
+CELL allowance S730 O0 U10 Bhalf setup=first-file-refused
+CELL allowance S730 O0 U10 Blast setup=first-file-refused
+CELL allowance S730 O0 U14 B0 setup=first-file-refused
+CELL allowance S730 O0 U14 B1 setup=first-file-refused
+CELL allowance S730 O0 U14 B2 setup=first-file-refused
+CELL allowance S730 O0 U14 Bhalf setup=first-file-refused
+CELL allowance S730 O0 U14 Blast setup=first-file-refused
+CELL allowance S730 O0 U20 B0 setup=first-file-refused
+CELL allowance S730 O0 U20 B1 setup=first-file-refused
+CELL allowance S730 O0 U20 B2 setup=first-file-refused
+CELL allowance S730 O0 U20 Bhalf setup=first-file-refused
+CELL allowance S730 O0 U20 Blast setup=first-file-refused
+CELL allowance S730 O0 U40 B0 setup=first-file-refused
+CELL allowance S730 O0 U40 B1 setup=first-file-refused
+CELL allowance S730 O0 U40 B2 setup=first-file-refused
+CELL allowance S730 O0 U40 Bhalf setup=first-file-refused
+CELL allowance S730 O0 U40 Blast setup=first-file-refused
+CELL allowance S730 O0 Umax B0 setup=first-file-refused
+CELL allowance S730 O0 Umax B1 setup=first-file-refused
+CELL allowance S730 O0 Umax B2 setup=first-file-refused
+CELL allowance S730 O0 Umax Bhalf setup=first-file-refused
+CELL allowance S730 O0 Umax Blast setup=first-file-refused
+CELL allowance S730 O2 U10 B0 setup=first-file-refused
+CELL allowance S730 O2 U10 B1 setup=first-file-refused
+CELL allowance S730 O2 U10 B2 setup=first-file-refused
+CELL allowance S730 O2 U10 Bhalf setup=first-file-refused
+CELL allowance S730 O2 U10 Blast setup=first-file-refused
+CELL allowance S730 O2 U14 B0 setup=first-file-refused
+CELL allowance S730 O2 U14 B1 setup=first-file-refused
+CELL allowance S730 O2 U14 B2 setup=first-file-refused
+CELL allowance S730 O2 U14 Bhalf setup=first-file-refused
+CELL allowance S730 O2 U14 Blast setup=first-file-refused
+CELL allowance S730 O2 U20 B0 setup=first-file-refused
+CELL allowance S730 O2 U20 B1 setup=first-file-refused
+CELL allowance S730 O2 U20 B2 setup=first-file-refused
+CELL allowance S730 O2 U20 Bhalf setup=first-file-refused
+CELL allowance S730 O2 U20 Blast setup=first-file-refused
+CELL allowance S730 O2 U40 B0 setup=first-file-refused
+CELL allowance S730 O2 U40 B1 setup=first-file-refused
+CELL allowance S730 O2 U40 B2 setup=first-file-refused
+CELL allowance S730 O2 U40 Bhalf setup=first-file-refused
+CELL allowance S730 O2 U40 Blast setup=first-file-refused
+CELL allowance S730 O2 Umax B0 setup=first-file-refused
+CELL allowance S730 O2 Umax B1 setup=first-file-refused
+CELL allowance S730 O2 Umax B2 setup=first-file-refused
+CELL allowance S730 O2 Umax Bhalf setup=first-file-refused
+CELL allowance S730 O2 Umax Blast setup=first-file-refused
+CELL allowance S730 O4 U10 B0 setup=first-file-refused
+CELL allowance S730 O4 U10 B1 setup=first-file-refused
+CELL allowance S730 O4 U10 B2 setup=first-file-refused
+CELL allowance S730 O4 U10 Bhalf setup=first-file-refused
+CELL allowance S730 O4 U10 Blast setup=first-file-refused
+CELL allowance S730 O4 U14 B0 setup=first-file-refused
+CELL allowance S730 O4 U14 B1 setup=first-file-refused
+CELL allowance S730 O4 U14 B2 setup=first-file-refused
+CELL allowance S730 O4 U14 Bhalf setup=first-file-refused
+CELL allowance S730 O4 U14 Blast setup=first-file-refused
+CELL allowance S730 O4 U20 B0 setup=first-file-refused
+CELL allowance S730 O4 U20 B1 setup=first-file-refused
+CELL allowance S730 O4 U20 B2 setup=first-file-refused
+CELL allowance S730 O4 U20 Bhalf setup=first-file-refused
+CELL allowance S730 O4 U20 Blast setup=first-file-refused
+CELL allowance S730 O4 U40 B0 setup=first-file-refused
+CELL allowance S730 O4 U40 B1 setup=first-file-refused
+CELL allowance S730 O4 U40 B2 setup=first-file-refused
+CELL allowance S730 O4 U40 Bhalf setup=first-file-refused
+CELL allowance S730 O4 U40 Blast setup=first-file-refused
+CELL allowance S730 O4 Umax B0 setup=first-file-refused
+CELL allowance S730 O4 Umax B1 setup=first-file-refused
+CELL allowance S730 O4 Umax B2 setup=first-file-refused
+CELL allowance S730 O4 Umax Bhalf setup=first-file-refused
+CELL allowance S730 O4 Umax Blast setup=first-file-refused
+CELL allowance S730 O8 U10 B0 setup=first-file-refused
+CELL allowance S730 O8 U10 B1 setup=first-file-refused
+CELL allowance S730 O8 U10 B2 setup=first-file-refused
+CELL allowance S730 O8 U10 Bhalf setup=first-file-refused
+CELL allowance S730 O8 U10 Blast setup=first-file-refused
+CELL allowance S730 O8 U14 B0 setup=first-file-refused
+CELL allowance S730 O8 U14 B1 setup=first-file-refused
+CELL allowance S730 O8 U14 B2 setup=first-file-refused
+CELL allowance S730 O8 U14 Bhalf setup=first-file-refused
+CELL allowance S730 O8 U14 Blast setup=first-file-refused
+CELL allowance S730 O8 U20 B0 setup=first-file-refused
+CELL allowance S730 O8 U20 B1 setup=first-file-refused
+CELL allowance S730 O8 U20 B2 setup=first-file-refused
+CELL allowance S730 O8 U20 Bhalf setup=first-file-refused
+CELL allowance S730 O8 U20 Blast setup=first-file-refused
+CELL allowance S730 O8 U40 B0 setup=first-file-refused
+CELL allowance S730 O8 U40 B1 setup=first-file-refused
+CELL allowance S730 O8 U40 B2 setup=first-file-refused
+CELL allowance S730 O8 U40 Bhalf setup=first-file-refused
+CELL allowance S730 O8 U40 Blast setup=first-file-refused
+CELL allowance S730 O8 Umax B0 setup=first-file-refused
+CELL allowance S730 O8 Umax B1 setup=first-file-refused
+CELL allowance S730 O8 Umax B2 setup=first-file-refused
+CELL allowance S730 O8 Umax Bhalf setup=first-file-refused
+CELL allowance S730 O8 Umax Blast setup=first-file-refused
+CELL allowance S760 O0/0 U10/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O0/0 U10/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O0/0 U10/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O0/0 U10/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O0/0 U10/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O0/0 U14/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O0/0 U14/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O0/0 U14/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O0/0 U14/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O0/0 U14/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O0/0 U20/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O0/0 U20/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O0/0 U20/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O0/0 U20/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O0/0 U20/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O0/0 U40/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O0/0 U40/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O0/0 U40/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O0/0 U40/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O0/0 U40/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O0/0 Umax/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O0/0 Umax/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O0/0 Umax/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O0/0 Umax/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O0/0 Umax/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O2/0 U10/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O2/0 U10/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O2/0 U10/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O2/0 U10/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O2/0 U10/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O2/0 U14/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O2/0 U14/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O2/0 U14/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O2/0 U14/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O2/0 U14/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O2/0 U20/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O2/0 U20/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O2/0 U20/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O2/0 U20/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O2/0 U20/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O2/0 U40/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O2/0 U40/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O2/0 U40/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O2/0 U40/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O2/0 U40/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O2/0 Umax/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O2/0 Umax/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O2/0 Umax/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O2/0 Umax/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O2/0 Umax/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O4/0 U10/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O4/0 U10/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O4/0 U10/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O4/0 U10/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O4/0 U10/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O4/0 U14/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O4/0 U14/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O4/0 U14/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O4/0 U14/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O4/0 U14/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O4/0 U20/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O4/0 U20/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O4/0 U20/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O4/0 U20/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O4/0 U20/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O4/0 U40/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O4/0 U40/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O4/0 U40/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O4/0 U40/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O4/0 U40/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O4/0 Umax/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O4/0 Umax/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O4/0 Umax/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O4/0 Umax/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O4/0 Umax/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O8/0 U10/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O8/0 U10/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O8/0 U10/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O8/0 U10/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O8/0 U10/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O8/0 U14/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O8/0 U14/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O8/0 U14/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O8/0 U14/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O8/0 U14/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O8/0 U20/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O8/0 U20/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O8/0 U20/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O8/0 U20/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O8/0 U20/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O8/0 U40/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O8/0 U40/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O8/0 U40/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O8/0 U40/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O8/0 U40/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O8/0 Umax/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O8/0 Umax/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O8/0 Umax/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S760 O8/0 Umax/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S760 O8/0 Umax/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S800 O0/0 U10/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O0/0 U10/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O0/0 U10/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O0/0 U10/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O0/0 U10/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O0/0 U14/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O0/0 U14/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O0/0 U14/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O0/0 U14/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O0/0 U14/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O0/0 U20/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O0/0 U20/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O0/0 U20/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O0/0 U20/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O0/0 U20/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O0/0 U40/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O0/0 U40/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O0/0 U40/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O0/0 U40/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O0/0 U40/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O0/0 Umax/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O0/0 Umax/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O0/0 Umax/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O0/0 Umax/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O0/0 Umax/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O2/0 U10/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O2/0 U10/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O2/0 U10/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O2/0 U10/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O2/0 U10/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O2/0 U14/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O2/0 U14/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O2/0 U14/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O2/0 U14/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O2/0 U14/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O2/0 U20/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O2/0 U20/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O2/0 U20/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O2/0 U20/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O2/0 U20/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O2/0 U40/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O2/0 U40/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O2/0 U40/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O2/0 U40/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O2/0 U40/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O2/0 Umax/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O2/0 Umax/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O2/0 Umax/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O2/0 Umax/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O2/0 Umax/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O4/0 U10/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O4/0 U10/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O4/0 U10/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O4/0 U10/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O4/0 U10/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O4/0 U14/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O4/0 U14/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O4/0 U14/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O4/0 U14/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O4/0 U14/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O4/0 U20/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O4/0 U20/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O4/0 U20/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O4/0 U20/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O4/0 U20/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O4/0 U40/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O4/0 U40/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O4/0 U40/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O4/0 U40/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O4/0 U40/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O4/0 Umax/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O4/0 Umax/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O4/0 Umax/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O4/0 Umax/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O4/0 Umax/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O8/0 U10/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O8/0 U10/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O8/0 U10/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O8/0 U10/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O8/0 U10/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O8/0 U14/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O8/0 U14/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O8/0 U14/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O8/0 U14/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O8/0 U14/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O8/0 U20/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O8/0 U20/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O8/0 U20/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O8/0 U20/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O8/0 U20/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O8/0 U40/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O8/0 U40/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O8/0 U40/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O8/0 U40/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O8/0 U40/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O8/0 Umax/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O8/0 Umax/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O8/0 Umax/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[3]
+CELL allowance S800 O8/0 Umax/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S800 O8/0 Umax/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[2]
+CELL allowance S850 O0/0 U10/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O0/0 U10/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O0/0 U10/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O0/0 U10/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O0/0 U10/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O0/0 U14/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O0/0 U14/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O0/0 U14/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O0/0 U14/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O0/0 U14/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O0/0 U20/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O0/0 U20/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O0/0 U20/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O0/0 U20/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O0/0 U20/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O0/0 U40/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O0/0 U40/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O0/0 U40/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O0/0 U40/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O0/0 U40/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O0/0 Umax/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O0/0 Umax/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O0/0 Umax/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O0/0 Umax/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O0/0 Umax/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O2/0 U10/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O2/0 U10/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O2/0 U10/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O2/0 U10/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O2/0 U10/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O2/0 U14/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O2/0 U14/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O2/0 U14/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O2/0 U14/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O2/0 U14/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O2/0 U20/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O2/0 U20/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O2/0 U20/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O2/0 U20/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O2/0 U20/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O2/0 U40/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O2/0 U40/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O2/0 U40/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O2/0 U40/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O2/0 U40/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O2/0 Umax/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O2/0 Umax/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O2/0 Umax/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O2/0 Umax/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O2/0 Umax/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O4/0 U10/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O4/0 U10/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O4/0 U10/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O4/0 U10/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O4/0 U10/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O4/0 U14/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O4/0 U14/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O4/0 U14/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O4/0 U14/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O4/0 U14/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O4/0 U20/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O4/0 U20/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O4/0 U20/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O4/0 U20/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O4/0 U20/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O4/0 U40/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O4/0 U40/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O4/0 U40/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O4/0 U40/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O4/0 U40/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O4/0 Umax/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O4/0 Umax/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O4/0 Umax/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O4/0 Umax/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O4/0 Umax/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O8/0 U10/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O8/0 U10/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O8/0 U10/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O8/0 U10/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O8/0 U10/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O8/0 U14/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O8/0 U14/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O8/0 U14/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O8/0 U14/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O8/0 U14/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O8/0 U20/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O8/0 U20/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O8/0 U20/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O8/0 U20/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O8/0 U20/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O8/0 U40/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O8/0 U40/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O8/0 U40/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O8/0 U40/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O8/0 U40/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O8/0 Umax/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O8/0 Umax/1 B1/1 setup=ok adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O8/0 Umax/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(0/0)] steps=0 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[3]
+CELL allowance S850 O8/0 Umax/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S850 O8/0 Umax/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S900 O0/0 U10/2 B0/0 setup=ok adm=pre-ok steps=2 raises=0 outcome=Empty unblocked=[825, 825] unmount=ok[2]
+CELL allowance S900 O0/0 U10/2 B1/1 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[825, 825] unmount=ok[2]
+CELL allowance S900 O0/0 U10/2 B2/2 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[814, 814] unmount=ok[3]
+CELL allowance S900 O0/0 U10/2 Bhalf/1 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[825, 825] unmount=ok[2]
+CELL allowance S900 O0/0 U10/2 Blast/1 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[825, 825] unmount=ok[2]
+CELL allowance S900 O0/0 U14/2 B0/0 setup=ok adm=pre-ok steps=2 raises=0 outcome=Empty unblocked=[825, 825] unmount=ok[2]
+CELL allowance S900 O0/0 U14/2 B1/1 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[825, 825] unmount=ok[2]
+CELL allowance S900 O0/0 U14/2 B2/2 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[814, 814] unmount=ok[3]
+CELL allowance S900 O0/0 U14/2 Bhalf/1 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[825, 825] unmount=ok[2]
+CELL allowance S900 O0/0 U14/2 Blast/1 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[825, 825] unmount=ok[2]
+CELL allowance S900 O0/0 U20/2 B0/0 setup=ok adm=pre-ok steps=2 raises=0 outcome=Empty unblocked=[825, 825] unmount=ok[2]
+CELL allowance S900 O0/0 U20/2 B1/1 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[825, 825] unmount=ok[2]
+CELL allowance S900 O0/0 U20/2 B2/2 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[814, 814] unmount=ok[3]
+CELL allowance S900 O0/0 U20/2 Bhalf/1 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[825, 825] unmount=ok[2]
+CELL allowance S900 O0/0 U20/2 Blast/1 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[825, 825] unmount=ok[2]
+CELL allowance S900 O0/0 U40/2 B0/0 setup=ok adm=pre-ok steps=2 raises=0 outcome=Empty unblocked=[825, 825] unmount=ok[2]
+CELL allowance S900 O0/0 U40/2 B1/1 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[825, 825] unmount=ok[2]
+CELL allowance S900 O0/0 U40/2 B2/2 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[814, 814] unmount=ok[3]
+CELL allowance S900 O0/0 U40/2 Bhalf/1 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[825, 825] unmount=ok[2]
+CELL allowance S900 O0/0 U40/2 Blast/1 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[825, 825] unmount=ok[2]
+CELL allowance S900 O0/0 Umax/9 B0/0 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[728, 728] unmount=ok[3]
+CELL allowance S900 O0/0 Umax/9 B1/1 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[730, 730] unmount=ok[3]
+CELL allowance S900 O0/0 Umax/9 B2/2 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[724, 724] unmount=ok[2]
+CELL allowance S900 O0/0 Umax/9 Bhalf/4 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[724, 724] unmount=ok[3]
+CELL allowance S900 O0/0 Umax/9 Blast/8 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[724, 724] unmount=ok[2]
+CELL allowance S900 O2/2 U10/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O2/2 U10/1 B1/1 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O2/2 U10/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O2/2 U10/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O2/2 U10/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O2/2 U14/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O2/2 U14/1 B1/1 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O2/2 U14/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O2/2 U14/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O2/2 U14/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O2/2 U20/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O2/2 U20/1 B1/1 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O2/2 U20/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O2/2 U20/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O2/2 U20/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O2/2 U40/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O2/2 U40/1 B1/1 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O2/2 U40/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O2/2 U40/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O2/2 U40/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O2/2 Umax/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O2/2 Umax/1 B1/1 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O2/2 Umax/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O2/2 Umax/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O2/2 Umax/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O4/2 U10/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O4/2 U10/1 B1/1 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O4/2 U10/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O4/2 U10/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O4/2 U10/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O4/2 U14/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O4/2 U14/1 B1/1 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O4/2 U14/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O4/2 U14/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O4/2 U14/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O4/2 U20/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O4/2 U20/1 B1/1 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O4/2 U20/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O4/2 U20/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O4/2 U20/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O4/2 U40/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O4/2 U40/1 B1/1 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O4/2 U40/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O4/2 U40/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O4/2 U40/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O4/2 Umax/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O4/2 Umax/1 B1/1 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O4/2 Umax/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O4/2 Umax/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O4/2 Umax/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O8/2 U10/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O8/2 U10/1 B1/1 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O8/2 U10/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O8/2 U10/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O8/2 U10/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O8/2 U14/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O8/2 U14/1 B1/1 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O8/2 U14/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O8/2 U14/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O8/2 U14/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O8/2 U20/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O8/2 U20/1 B1/1 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O8/2 U20/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O8/2 U20/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O8/2 U20/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O8/2 U40/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O8/2 U40/1 B1/1 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O8/2 U40/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O8/2 U40/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O8/2 U40/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O8/2 Umax/1 B0/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O8/2 Umax/1 B1/1 setup=ok adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O8/2 Umax/1 B2/1 setup=batch-refused[UnlinkOfAnInodeThatIsNotALiveRecord] adm=mount-short[AtCeiling(4/4)] steps=0 raises=0 outcome=Empty unblocked=[815, 815] unmount=ok[3]
+CELL allowance S900 O8/2 Umax/1 Bhalf/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S900 O8/2 Umax/1 Blast/0 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[826, 826] unmount=ok[2]
+CELL allowance S979 O0/0 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[792, 792] unmount=ok[2]
+CELL allowance S979 O0/0 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[794, 794] unmount=ok[2]
+CELL allowance S979 O0/0 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[788, 788] unmount=ok[2]
+CELL allowance S979 O0/0 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[784, 784] unmount=ok[2]
+CELL allowance S979 O0/0 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[796, 796] unmount=ok[2]
+CELL allowance S979 O0/0 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[732, 732] unmount=ok[2]
+CELL allowance S979 O0/0 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[734, 734] unmount=ok[2]
+CELL allowance S979 O0/0 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[728, 728] unmount=ok[3]
+CELL allowance S979 O0/0 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[734, 734] unmount=ok[2]
+CELL allowance S979 O0/0 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[736, 736] unmount=ok[2]
+CELL allowance S979 O0/0 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[655, 655] unmount=ok[2]
+CELL allowance S979 O0/0 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[657, 657] unmount=ok[2]
+CELL allowance S979 O0/0 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[660, 660] unmount=ok[3]
+CELL allowance S979 O0/0 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[659, 659] unmount=ok[2]
+CELL allowance S979 O0/0 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[659, 659] unmount=ok[2]
+CELL allowance S979 O0/0 U40/40 B0/0 setup=ok adm=pre-ok steps=40 raises=0 outcome=Empty unblocked=[625, 625] unmount=ok[2]
+CELL allowance S979 O0/0 U40/40 B1/1 setup=ok adm=pre-ok steps=39 raises=0 outcome=Empty unblocked=[623, 623] unmount=ok[2]
+CELL allowance S979 O0/0 U40/40 B2/2 setup=ok adm=pre-ok steps=38 raises=0 outcome=Empty unblocked=[621, 621] unmount=ok[2]
+CELL allowance S979 O0/0 U40/40 Bhalf/20 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[652, 652] unmount=ok[2]
+CELL allowance S979 O0/0 U40/40 Blast/39 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[643, 643] unmount=ok[2]
+CELL allowance S979 O0/0 Umax/49 B0/0 setup=ok adm=pre-ok steps=49 raises=0 outcome=Empty unblocked=[625, 625] unmount=ok[2]
+CELL allowance S979 O0/0 Umax/49 B1/1 setup=ok adm=pre-ok steps=48 raises=0 outcome=Empty unblocked=[623, 623] unmount=ok[2]
+CELL allowance S979 O0/0 Umax/49 B2/2 setup=ok adm=pre-ok steps=47 raises=0 outcome=Empty unblocked=[621, 621] unmount=ok[2]
+CELL allowance S979 O0/0 Umax/49 Bhalf/24 setup=ok adm=pre-ok steps=25 raises=0 outcome=Empty unblocked=[625, 625] unmount=ok[2]
+CELL allowance S979 O0/0 Umax/49 Blast/48 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[639, 639] unmount=ok[2]
+CELL allowance S979 O2/2 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[760, 760] unmount=ok[2]
+CELL allowance S979 O2/2 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[758, 758] unmount=ok[3]
+CELL allowance S979 O2/2 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[760, 760] unmount=ok[3]
+CELL allowance S979 O2/2 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[766, 766] unmount=ok[3]
+CELL allowance S979 O2/2 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[762, 762] unmount=ok[2]
+CELL allowance S979 O2/2 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[700, 700] unmount=ok[2]
+CELL allowance S979 O2/2 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[698, 698] unmount=ok[2]
+CELL allowance S979 O2/2 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[700, 700] unmount=ok[2]
+CELL allowance S979 O2/2 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[708, 708] unmount=ok[2]
+CELL allowance S979 O2/2 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[708, 708] unmount=ok[2]
+CELL allowance S979 O2/2 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[656, 656] unmount=ok[2]
+CELL allowance S979 O2/2 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[645, 645] unmount=ok[2]
+CELL allowance S979 O2/2 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[647, 647] unmount=ok[2]
+CELL allowance S979 O2/2 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[655, 655] unmount=ok[2]
+CELL allowance S979 O2/2 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[655, 655] unmount=ok[2]
+CELL allowance S979 O2/2 U40/6 B0/0 setup=ok adm=pre-ok steps=6 raises=0 outcome=Empty unblocked=[770, 770] unmount=ok[2]
+CELL allowance S979 O2/2 U40/6 B1/1 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[766, 766] unmount=ok[2]
+CELL allowance S979 O2/2 U40/6 B2/2 setup=ok adm=pre-ok steps=4 raises=0 outcome=Empty unblocked=[772, 772] unmount=ok[2]
+CELL allowance S979 O2/2 U40/6 Bhalf/3 setup=ok adm=pre-ok steps=3 raises=0 outcome=Empty unblocked=[772, 772] unmount=ok[2]
+CELL allowance S979 O2/2 U40/6 Blast/5 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[772, 772] unmount=ok[2]
+CELL allowance S979 O2/2 Umax/37 B0/0 setup=ok adm=pre-ok steps=37 raises=0 outcome=Empty unblocked=[619, 619] unmount=ok[2]
+CELL allowance S979 O2/2 Umax/37 B1/1 setup=ok adm=pre-ok steps=36 raises=0 outcome=Empty unblocked=[619, 619] unmount=ok[3]
+CELL allowance S979 O2/2 Umax/37 B2/2 setup=ok adm=pre-ok steps=35 raises=0 outcome=Empty unblocked=[619, 619] unmount=ok[3]
+CELL allowance S979 O2/2 Umax/37 Bhalf/18 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[652, 652] unmount=ok[2]
+CELL allowance S979 O2/2 Umax/37 Blast/36 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[642, 642] unmount=ok[2]
+CELL allowance S979 O4/4 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[732, 732] unmount=ok[2]
+CELL allowance S979 O4/4 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[728, 728] unmount=ok[3]
+CELL allowance S979 O4/4 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[736, 736] unmount=ok[2]
+CELL allowance S979 O4/4 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[740, 740] unmount=ok[2]
+CELL allowance S979 O4/4 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[742, 742] unmount=ok[2]
+CELL allowance S979 O4/4 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[672, 672] unmount=ok[3]
+CELL allowance S979 O4/4 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[669, 669] unmount=ok[2]
+CELL allowance S979 O4/4 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[676, 676] unmount=ok[3]
+CELL allowance S979 O4/4 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[677, 677] unmount=ok[2]
+CELL allowance S979 O4/4 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[677, 677] unmount=ok[2]
+CELL allowance S979 O4/4 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[643, 643] unmount=ok[3]
+CELL allowance S979 O4/4 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[648, 648] unmount=ok[2]
+CELL allowance S979 O4/4 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[647, 647] unmount=ok[3]
+CELL allowance S979 O4/4 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[656, 656] unmount=ok[2]
+CELL allowance S979 O4/4 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[656, 656] unmount=ok[2]
+CELL allowance S979 O4/4 U40/5 B0/0 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[791, 791] unmount=ok[2]
+CELL allowance S979 O4/4 U40/5 B1/1 setup=ok adm=pre-ok steps=4 raises=0 outcome=Empty unblocked=[787, 787] unmount=ok[2]
+CELL allowance S979 O4/4 U40/5 B2/2 setup=ok adm=pre-ok steps=3 raises=0 outcome=Empty unblocked=[779, 779] unmount=ok[3]
+CELL allowance S979 O4/4 U40/5 Bhalf/2 setup=ok adm=pre-ok steps=3 raises=0 outcome=Empty unblocked=[779, 779] unmount=ok[3]
+CELL allowance S979 O4/4 U40/5 Blast/4 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[783, 783] unmount=ok[2]
+CELL allowance S979 O4/4 Umax/25 B0/0 setup=ok adm=pre-ok steps=25 raises=0 outcome=Empty unblocked=[619, 619] unmount=ok[2]
+CELL allowance S979 O4/4 Umax/25 B1/1 setup=ok adm=pre-ok steps=24 raises=0 outcome=Empty unblocked=[621, 621] unmount=ok[3]
+CELL allowance S979 O4/4 Umax/25 B2/2 setup=ok adm=pre-ok steps=23 raises=0 outcome=Empty unblocked=[621, 621] unmount=ok[2]
+CELL allowance S979 O4/4 Umax/25 Bhalf/12 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[639, 639] unmount=ok[2]
+CELL allowance S979 O4/4 Umax/25 Blast/24 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[639, 639] unmount=ok[2]
+CELL allowance S979 O8/8 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[731, 731] unmount=ok[2]
+CELL allowance S979 O8/8 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[727, 727] unmount=ok[3]
+CELL allowance S979 O8/8 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[733, 733] unmount=ok[2]
+CELL allowance S979 O8/8 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[733, 733] unmount=ok[2]
+CELL allowance S979 O8/8 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[733, 733] unmount=ok[2]
+CELL allowance S979 O8/8 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[671, 671] unmount=ok[3]
+CELL allowance S979 O8/8 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[679, 679] unmount=ok[2]
+CELL allowance S979 O8/8 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[673, 673] unmount=ok[3]
+CELL allowance S979 O8/8 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[679, 679] unmount=ok[2]
+CELL allowance S979 O8/8 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[679, 679] unmount=ok[2]
+CELL allowance S979 O8/8 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[643, 643] unmount=ok[3]
+CELL allowance S979 O8/8 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[648, 648] unmount=ok[2]
+CELL allowance S979 O8/8 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[643, 643] unmount=ok[3]
+CELL allowance S979 O8/8 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[648, 648] unmount=ok[2]
+CELL allowance S979 O8/8 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[646, 646] unmount=ok[2]
+CELL allowance S979 O8/8 U40/5 B0/0 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[779, 779] unmount=ok[2]
+CELL allowance S979 O8/8 U40/5 B1/1 setup=ok adm=pre-ok steps=4 raises=0 outcome=Empty unblocked=[779, 779] unmount=ok[2]
+CELL allowance S979 O8/8 U40/5 B2/2 setup=ok adm=pre-ok steps=3 raises=0 outcome=Empty unblocked=[775, 775] unmount=ok[3]
+CELL allowance S979 O8/8 U40/5 Bhalf/2 setup=ok adm=pre-ok steps=3 raises=0 outcome=Empty unblocked=[775, 775] unmount=ok[3]
+CELL allowance S979 O8/8 U40/5 Blast/4 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[785, 785] unmount=ok[2]
+CELL allowance S979 O8/8 Umax/25 B0/0 setup=ok adm=pre-ok steps=25 raises=0 outcome=Empty unblocked=[629, 629] unmount=ok[2]
+CELL allowance S979 O8/8 Umax/25 B1/1 setup=ok adm=pre-ok steps=24 raises=0 outcome=Empty unblocked=[625, 625] unmount=ok[3]
+CELL allowance S979 O8/8 Umax/25 B2/2 setup=ok adm=pre-ok steps=23 raises=0 outcome=Empty unblocked=[625, 625] unmount=ok[2]
+CELL allowance S979 O8/8 Umax/25 Bhalf/12 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[639, 639] unmount=ok[2]
+CELL allowance S979 O8/8 Umax/25 Blast/24 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[639, 639] unmount=ok[2]
+CELL allowance S995 O0/0 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[808, 808] unmount=ok[2]
+CELL allowance S995 O0/0 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[810, 810] unmount=ok[2]
+CELL allowance S995 O0/0 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[804, 804] unmount=ok[2]
+CELL allowance S995 O0/0 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[800, 800] unmount=ok[2]
+CELL allowance S995 O0/0 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[812, 812] unmount=ok[2]
+CELL allowance S995 O0/0 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[748, 748] unmount=ok[2]
+CELL allowance S995 O0/0 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[2]
+CELL allowance S995 O0/0 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[3]
+CELL allowance S995 O0/0 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[2]
+CELL allowance S995 O0/0 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[752, 752] unmount=ok[2]
+CELL allowance S995 O0/0 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[671, 671] unmount=ok[2]
+CELL allowance S995 O0/0 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[673, 673] unmount=ok[2]
+CELL allowance S995 O0/0 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[676, 676] unmount=ok[3]
+CELL allowance S995 O0/0 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[675, 675] unmount=ok[2]
+CELL allowance S995 O0/0 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[675, 675] unmount=ok[2]
+CELL allowance S995 O0/0 U40/40 B0/0 setup=ok adm=pre-ok steps=40 raises=0 outcome=Empty unblocked=[641, 641] unmount=ok[2]
+CELL allowance S995 O0/0 U40/40 B1/1 setup=ok adm=pre-ok steps=39 raises=0 outcome=Empty unblocked=[639, 639] unmount=ok[2]
+CELL allowance S995 O0/0 U40/40 B2/2 setup=ok adm=pre-ok steps=38 raises=0 outcome=Empty unblocked=[637, 637] unmount=ok[2]
+CELL allowance S995 O0/0 U40/40 Bhalf/20 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[668, 668] unmount=ok[2]
+CELL allowance S995 O0/0 U40/40 Blast/39 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[659, 659] unmount=ok[2]
+CELL allowance S995 O0/0 Umax/57 B0/0 setup=ok adm=pre-ok steps=57 raises=0 outcome=Empty unblocked=[639, 639] unmount=ok[3]
+CELL allowance S995 O0/0 Umax/57 B1/1 setup=ok adm=pre-ok steps=56 raises=0 outcome=Empty unblocked=[637, 637] unmount=ok[3]
+CELL allowance S995 O0/0 Umax/57 B2/2 setup=ok adm=pre-ok steps=55 raises=0 outcome=Empty unblocked=[635, 635] unmount=ok[2]
+CELL allowance S995 O0/0 Umax/57 Bhalf/28 setup=ok adm=pre-ok steps=29 raises=0 outcome=Empty unblocked=[641, 641] unmount=ok[3]
+CELL allowance S995 O0/0 Umax/57 Blast/56 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[662, 662] unmount=ok[2]
+CELL allowance S995 O2/2 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[776, 776] unmount=ok[2]
+CELL allowance S995 O2/2 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[774, 774] unmount=ok[3]
+CELL allowance S995 O2/2 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[776, 776] unmount=ok[3]
+CELL allowance S995 O2/2 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[782, 782] unmount=ok[3]
+CELL allowance S995 O2/2 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[778, 778] unmount=ok[2]
+CELL allowance S995 O2/2 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[716, 716] unmount=ok[2]
+CELL allowance S995 O2/2 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[714, 714] unmount=ok[2]
+CELL allowance S995 O2/2 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[716, 716] unmount=ok[2]
+CELL allowance S995 O2/2 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[724, 724] unmount=ok[2]
+CELL allowance S995 O2/2 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[724, 724] unmount=ok[2]
+CELL allowance S995 O2/2 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[672, 672] unmount=ok[2]
+CELL allowance S995 O2/2 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[661, 661] unmount=ok[2]
+CELL allowance S995 O2/2 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[663, 663] unmount=ok[2]
+CELL allowance S995 O2/2 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[671, 671] unmount=ok[2]
+CELL allowance S995 O2/2 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[671, 671] unmount=ok[2]
+CELL allowance S995 O2/2 U40/40 B0/0 setup=ok adm=pre-ok steps=40 raises=0 outcome=Empty unblocked=[635, 635] unmount=ok[2]
+CELL allowance S995 O2/2 U40/40 B1/1 setup=ok adm=pre-ok steps=39 raises=0 outcome=Empty unblocked=[639, 639] unmount=ok[3]
+CELL allowance S995 O2/2 U40/40 B2/2 setup=ok adm=pre-ok steps=38 raises=0 outcome=Empty unblocked=[637, 637] unmount=ok[3]
+CELL allowance S995 O2/2 U40/40 Bhalf/20 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[651, 651] unmount=ok[3]
+CELL allowance S995 O2/2 U40/40 Blast/39 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[658, 658] unmount=ok[2]
+CELL allowance S995 O2/2 Umax/45 B0/0 setup=ok adm=pre-ok steps=45 raises=0 outcome=Empty unblocked=[635, 635] unmount=ok[3]
+CELL allowance S995 O2/2 Umax/45 B1/1 setup=ok adm=pre-ok steps=44 raises=0 outcome=Empty unblocked=[639, 639] unmount=ok[2]
+CELL allowance S995 O2/2 Umax/45 B2/2 setup=ok adm=pre-ok steps=43 raises=0 outcome=Empty unblocked=[637, 637] unmount=ok[2]
+CELL allowance S995 O2/2 Umax/45 Bhalf/22 setup=ok adm=pre-ok steps=23 raises=0 outcome=Empty unblocked=[641, 641] unmount=ok[2]
+CELL allowance S995 O2/2 Umax/45 Blast/44 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[651, 651] unmount=ok[2]
+CELL allowance S995 O4/4 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[748, 748] unmount=ok[2]
+CELL allowance S995 O4/4 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[3]
+CELL allowance S995 O4/4 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[752, 752] unmount=ok[2]
+CELL allowance S995 O4/4 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[756, 756] unmount=ok[2]
+CELL allowance S995 O4/4 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[758, 758] unmount=ok[2]
+CELL allowance S995 O4/4 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[688, 688] unmount=ok[3]
+CELL allowance S995 O4/4 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[685, 685] unmount=ok[2]
+CELL allowance S995 O4/4 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[692, 692] unmount=ok[3]
+CELL allowance S995 O4/4 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[693, 693] unmount=ok[2]
+CELL allowance S995 O4/4 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[693, 693] unmount=ok[2]
+CELL allowance S995 O4/4 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[659, 659] unmount=ok[3]
+CELL allowance S995 O4/4 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[664, 664] unmount=ok[2]
+CELL allowance S995 O4/4 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[663, 663] unmount=ok[3]
+CELL allowance S995 O4/4 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[672, 672] unmount=ok[2]
+CELL allowance S995 O4/4 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[672, 672] unmount=ok[2]
+CELL allowance S995 O4/4 U40/7 B0/0 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[763, 763] unmount=ok[2]
+CELL allowance S995 O4/4 U40/7 B1/1 setup=ok adm=pre-ok steps=6 raises=0 outcome=Empty unblocked=[753, 753] unmount=ok[3]
+CELL allowance S995 O4/4 U40/7 B2/2 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[759, 759] unmount=ok[2]
+CELL allowance S995 O4/4 U40/7 Bhalf/3 setup=ok adm=pre-ok steps=4 raises=0 outcome=Empty unblocked=[761, 761] unmount=ok[2]
+CELL allowance S995 O4/4 U40/7 Blast/6 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[765, 765] unmount=ok[2]
+CELL allowance S995 O4/4 Umax/33 B0/0 setup=ok adm=pre-ok steps=33 raises=0 outcome=Empty unblocked=[645, 645] unmount=ok[2]
+CELL allowance S995 O4/4 Umax/33 B1/1 setup=ok adm=pre-ok steps=32 raises=0 outcome=Empty unblocked=[641, 641] unmount=ok[2]
+CELL allowance S995 O4/4 Umax/33 B2/2 setup=ok adm=pre-ok steps=31 raises=0 outcome=Empty unblocked=[641, 641] unmount=ok[2]
+CELL allowance S995 O4/4 Umax/33 Bhalf/16 setup=ok adm=pre-ok steps=17 raises=0 outcome=Empty unblocked=[674, 674] unmount=ok[2]
+CELL allowance S995 O4/4 Umax/33 Blast/32 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[657, 657] unmount=ok[2]
+CELL allowance S995 O8/8 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[747, 747] unmount=ok[2]
+CELL allowance S995 O8/8 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[743, 743] unmount=ok[3]
+CELL allowance S995 O8/8 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[749, 749] unmount=ok[2]
+CELL allowance S995 O8/8 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[749, 749] unmount=ok[2]
+CELL allowance S995 O8/8 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[749, 749] unmount=ok[2]
+CELL allowance S995 O8/8 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[687, 687] unmount=ok[3]
+CELL allowance S995 O8/8 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[695, 695] unmount=ok[2]
+CELL allowance S995 O8/8 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[689, 689] unmount=ok[3]
+CELL allowance S995 O8/8 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[695, 695] unmount=ok[2]
+CELL allowance S995 O8/8 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[695, 695] unmount=ok[2]
+CELL allowance S995 O8/8 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[659, 659] unmount=ok[3]
+CELL allowance S995 O8/8 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[664, 664] unmount=ok[2]
+CELL allowance S995 O8/8 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[659, 659] unmount=ok[3]
+CELL allowance S995 O8/8 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[664, 664] unmount=ok[2]
+CELL allowance S995 O8/8 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[662, 662] unmount=ok[2]
+CELL allowance S995 O8/8 U40/7 B0/0 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[755, 755] unmount=ok[2]
+CELL allowance S995 O8/8 U40/7 B1/1 setup=ok adm=pre-ok steps=6 raises=0 outcome=Empty unblocked=[749, 749] unmount=ok[3]
+CELL allowance S995 O8/8 U40/7 B2/2 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[757, 757] unmount=ok[2]
+CELL allowance S995 O8/8 U40/7 Bhalf/3 setup=ok adm=pre-ok steps=4 raises=0 outcome=Empty unblocked=[757, 757] unmount=ok[2]
+CELL allowance S995 O8/8 U40/7 Blast/6 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[757, 757] unmount=ok[2]
+CELL allowance S995 O8/8 Umax/33 B0/0 setup=ok adm=pre-ok steps=33 raises=0 outcome=Empty unblocked=[641, 641] unmount=ok[2]
+CELL allowance S995 O8/8 Umax/33 B1/1 setup=ok adm=pre-ok steps=32 raises=0 outcome=Empty unblocked=[641, 641] unmount=ok[2]
+CELL allowance S995 O8/8 Umax/33 B2/2 setup=ok adm=pre-ok steps=31 raises=0 outcome=Empty unblocked=[641, 641] unmount=ok[2]
+CELL allowance S995 O8/8 Umax/33 Bhalf/16 setup=ok adm=pre-ok steps=17 raises=0 outcome=Empty unblocked=[664, 664] unmount=ok[2]
+CELL allowance S995 O8/8 Umax/33 Blast/32 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[655, 655] unmount=ok[2]
+CELL allowance S1050 O0/0 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[863, 863] unmount=ok[2]
+CELL allowance S1050 O0/0 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[865, 865] unmount=ok[2]
+CELL allowance S1050 O0/0 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[859, 859] unmount=ok[2]
+CELL allowance S1050 O0/0 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[855, 855] unmount=ok[2]
+CELL allowance S1050 O0/0 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[867, 867] unmount=ok[2]
+CELL allowance S1050 O0/0 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[803, 803] unmount=ok[2]
+CELL allowance S1050 O0/0 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[805, 805] unmount=ok[2]
+CELL allowance S1050 O0/0 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[799, 799] unmount=ok[3]
+CELL allowance S1050 O0/0 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[805, 805] unmount=ok[2]
+CELL allowance S1050 O0/0 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[807, 807] unmount=ok[2]
+CELL allowance S1050 O0/0 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[726, 726] unmount=ok[2]
+CELL allowance S1050 O0/0 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[728, 728] unmount=ok[2]
+CELL allowance S1050 O0/0 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[731, 731] unmount=ok[3]
+CELL allowance S1050 O0/0 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[730, 730] unmount=ok[2]
+CELL allowance S1050 O0/0 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[730, 730] unmount=ok[2]
+CELL allowance S1050 O0/0 U40/40 B0/0 setup=ok adm=pre-ok steps=40 raises=0 outcome=Empty unblocked=[696, 696] unmount=ok[2]
+CELL allowance S1050 O0/0 U40/40 B1/1 setup=ok adm=pre-ok steps=39 raises=0 outcome=Empty unblocked=[694, 694] unmount=ok[2]
+CELL allowance S1050 O0/0 U40/40 B2/2 setup=ok adm=pre-ok steps=38 raises=0 outcome=Empty unblocked=[692, 692] unmount=ok[2]
+CELL allowance S1050 O0/0 U40/40 Bhalf/20 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[723, 723] unmount=ok[2]
+CELL allowance S1050 O0/0 U40/40 Blast/39 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[714, 714] unmount=ok[2]
+CELL allowance S1050 O0/0 Umax/46 B0/0 setup=ok adm=pre-ok steps=46 raises=0 outcome=Empty unblocked=[696, 696] unmount=ok[2]
+CELL allowance S1050 O0/0 Umax/46 B1/1 setup=ok adm=pre-ok steps=45 raises=0 outcome=Empty unblocked=[696, 696] unmount=ok[2]
+CELL allowance S1050 O0/0 Umax/46 B2/2 setup=ok adm=pre-ok steps=44 raises=0 outcome=Empty unblocked=[696, 696] unmount=ok[2]
+CELL allowance S1050 O0/0 Umax/46 Bhalf/23 setup=ok adm=pre-ok steps=23 raises=0 outcome=Empty unblocked=[698, 698] unmount=ok[2]
+CELL allowance S1050 O0/0 Umax/46 Blast/45 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[704, 704] unmount=ok[2]
+CELL allowance S1050 O2/2 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[831, 831] unmount=ok[2]
+CELL allowance S1050 O2/2 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[829, 829] unmount=ok[3]
+CELL allowance S1050 O2/2 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[831, 831] unmount=ok[3]
+CELL allowance S1050 O2/2 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[837, 837] unmount=ok[3]
+CELL allowance S1050 O2/2 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[833, 833] unmount=ok[2]
+CELL allowance S1050 O2/2 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[771, 771] unmount=ok[2]
+CELL allowance S1050 O2/2 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[769, 769] unmount=ok[2]
+CELL allowance S1050 O2/2 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[771, 771] unmount=ok[2]
+CELL allowance S1050 O2/2 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[779, 779] unmount=ok[2]
+CELL allowance S1050 O2/2 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[779, 779] unmount=ok[2]
+CELL allowance S1050 O2/2 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[727, 727] unmount=ok[2]
+CELL allowance S1050 O2/2 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[716, 716] unmount=ok[2]
+CELL allowance S1050 O2/2 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[718, 718] unmount=ok[2]
+CELL allowance S1050 O2/2 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[726, 726] unmount=ok[2]
+CELL allowance S1050 O2/2 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[726, 726] unmount=ok[2]
+CELL allowance S1050 O2/2 U40/6 B0/0 setup=ok adm=pre-ok steps=6 raises=0 outcome=Empty unblocked=[841, 841] unmount=ok[2]
+CELL allowance S1050 O2/2 U40/6 B1/1 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[837, 837] unmount=ok[2]
+CELL allowance S1050 O2/2 U40/6 B2/2 setup=ok adm=pre-ok steps=4 raises=0 outcome=Empty unblocked=[843, 843] unmount=ok[2]
+CELL allowance S1050 O2/2 U40/6 Bhalf/3 setup=ok adm=pre-ok steps=3 raises=0 outcome=Empty unblocked=[843, 843] unmount=ok[2]
+CELL allowance S1050 O2/2 U40/6 Blast/5 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[843, 843] unmount=ok[2]
+CELL allowance S1050 O2/2 Umax/34 B0/0 setup=ok adm=pre-ok steps=34 raises=0 outcome=Empty unblocked=[694, 694] unmount=ok[2]
+CELL allowance S1050 O2/2 Umax/34 B1/1 setup=ok adm=pre-ok steps=33 raises=0 outcome=Empty unblocked=[692, 692] unmount=ok[3]
+CELL allowance S1050 O2/2 Umax/34 B2/2 setup=ok adm=pre-ok steps=32 raises=0 outcome=Empty unblocked=[690, 690] unmount=ok[3]
+CELL allowance S1050 O2/2 Umax/34 Bhalf/17 setup=ok adm=pre-ok steps=17 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S1050 O2/2 Umax/34 Blast/33 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[713, 713] unmount=ok[2]
+CELL allowance S1050 O4/4 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[803, 803] unmount=ok[2]
+CELL allowance S1050 O4/4 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[799, 799] unmount=ok[3]
+CELL allowance S1050 O4/4 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[807, 807] unmount=ok[2]
+CELL allowance S1050 O4/4 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[811, 811] unmount=ok[2]
+CELL allowance S1050 O4/4 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[813, 813] unmount=ok[2]
+CELL allowance S1050 O4/4 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[743, 743] unmount=ok[3]
+CELL allowance S1050 O4/4 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[740, 740] unmount=ok[2]
+CELL allowance S1050 O4/4 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[747, 747] unmount=ok[3]
+CELL allowance S1050 O4/4 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[748, 748] unmount=ok[2]
+CELL allowance S1050 O4/4 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[748, 748] unmount=ok[2]
+CELL allowance S1050 O4/4 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[714, 714] unmount=ok[3]
+CELL allowance S1050 O4/4 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[719, 719] unmount=ok[2]
+CELL allowance S1050 O4/4 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[718, 718] unmount=ok[3]
+CELL allowance S1050 O4/4 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[727, 727] unmount=ok[2]
+CELL allowance S1050 O4/4 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[727, 727] unmount=ok[2]
+CELL allowance S1050 O4/4 U40/4 B0/0 setup=ok adm=pre-ok steps=4 raises=0 outcome=Empty unblocked=[872, 872] unmount=ok[2]
+CELL allowance S1050 O4/4 U40/4 B1/1 setup=ok adm=pre-ok steps=3 raises=0 outcome=Empty unblocked=[874, 874] unmount=ok[2]
+CELL allowance S1050 O4/4 U40/4 B2/2 setup=ok adm=pre-ok steps=2 raises=0 outcome=Empty unblocked=[868, 868] unmount=ok[2]
+CELL allowance S1050 O4/4 U40/4 Bhalf/2 setup=ok adm=pre-ok steps=2 raises=0 outcome=Empty unblocked=[868, 868] unmount=ok[2]
+CELL allowance S1050 O4/4 U40/4 Blast/3 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[874, 874] unmount=ok[2]
+CELL allowance S1050 O4/4 Umax/22 B0/0 setup=ok adm=pre-ok steps=22 raises=0 outcome=Empty unblocked=[701, 701] unmount=ok[2]
+CELL allowance S1050 O4/4 Umax/22 B1/1 setup=ok adm=pre-ok steps=21 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[3]
+CELL allowance S1050 O4/4 Umax/22 B2/2 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[710, 710] unmount=ok[2]
+CELL allowance S1050 O4/4 Umax/22 Bhalf/11 setup=ok adm=pre-ok steps=11 raises=0 outcome=Empty unblocked=[716, 716] unmount=ok[2]
+CELL allowance S1050 O4/4 Umax/22 Blast/21 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[716, 716] unmount=ok[2]
+CELL allowance S1050 O8/8 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[802, 802] unmount=ok[2]
+CELL allowance S1050 O8/8 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[798, 798] unmount=ok[3]
+CELL allowance S1050 O8/8 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[804, 804] unmount=ok[2]
+CELL allowance S1050 O8/8 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[804, 804] unmount=ok[2]
+CELL allowance S1050 O8/8 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[804, 804] unmount=ok[2]
+CELL allowance S1050 O8/8 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[742, 742] unmount=ok[3]
+CELL allowance S1050 O8/8 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[2]
+CELL allowance S1050 O8/8 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[744, 744] unmount=ok[3]
+CELL allowance S1050 O8/8 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[2]
+CELL allowance S1050 O8/8 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[750, 750] unmount=ok[2]
+CELL allowance S1050 O8/8 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[714, 714] unmount=ok[3]
+CELL allowance S1050 O8/8 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[719, 719] unmount=ok[2]
+CELL allowance S1050 O8/8 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[714, 714] unmount=ok[3]
+CELL allowance S1050 O8/8 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[719, 719] unmount=ok[2]
+CELL allowance S1050 O8/8 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[717, 717] unmount=ok[2]
+CELL allowance S1050 O8/8 U40/4 B0/0 setup=ok adm=pre-ok steps=4 raises=0 outcome=Empty unblocked=[878, 878] unmount=ok[2]
+CELL allowance S1050 O8/8 U40/4 B1/1 setup=ok adm=pre-ok steps=3 raises=0 outcome=Empty unblocked=[876, 876] unmount=ok[2]
+CELL allowance S1050 O8/8 U40/4 B2/2 setup=ok adm=pre-ok steps=2 raises=0 outcome=Empty unblocked=[868, 868] unmount=ok[2]
+CELL allowance S1050 O8/8 U40/4 Bhalf/2 setup=ok adm=pre-ok steps=2 raises=0 outcome=Empty unblocked=[868, 868] unmount=ok[2]
+CELL allowance S1050 O8/8 U40/4 Blast/3 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[874, 874] unmount=ok[2]
+CELL allowance S1050 O8/8 Umax/23 B0/0 setup=ok adm=pre-ok steps=23 raises=0 outcome=Empty unblocked=[698, 698] unmount=ok[3]
+CELL allowance S1050 O8/8 Umax/23 B1/1 setup=ok adm=pre-ok steps=22 raises=0 outcome=Empty unblocked=[707, 707] unmount=ok[2]
+CELL allowance S1050 O8/8 Umax/23 B2/2 setup=ok adm=pre-ok steps=21 raises=0 outcome=Empty unblocked=[708, 708] unmount=ok[3]
+CELL allowance S1050 O8/8 Umax/23 Bhalf/11 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[708, 708] unmount=ok[3]
+CELL allowance S1050 O8/8 Umax/23 Blast/22 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[717, 717] unmount=ok[2]
+CELL allowance S1199 O0/0 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[1012, 1012] unmount=ok[2]
+CELL allowance S1199 O0/0 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[1014, 1014] unmount=ok[2]
+CELL allowance S1199 O0/0 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[1008, 1008] unmount=ok[2]
+CELL allowance S1199 O0/0 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[1004, 1004] unmount=ok[2]
+CELL allowance S1199 O0/0 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1016, 1016] unmount=ok[2]
+CELL allowance S1199 O0/0 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[952, 952] unmount=ok[2]
+CELL allowance S1199 O0/0 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[954, 954] unmount=ok[2]
+CELL allowance S1199 O0/0 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[948, 948] unmount=ok[3]
+CELL allowance S1199 O0/0 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[954, 954] unmount=ok[2]
+CELL allowance S1199 O0/0 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[956, 956] unmount=ok[2]
+CELL allowance S1199 O0/0 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[875, 875] unmount=ok[2]
+CELL allowance S1199 O0/0 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[877, 877] unmount=ok[2]
+CELL allowance S1199 O0/0 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[880, 880] unmount=ok[3]
+CELL allowance S1199 O0/0 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[879, 879] unmount=ok[2]
+CELL allowance S1199 O0/0 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[879, 879] unmount=ok[2]
+CELL allowance S1199 O0/0 U40/40 B0/0 setup=ok adm=pre-ok steps=40 raises=0 outcome=Empty unblocked=[845, 845] unmount=ok[2]
+CELL allowance S1199 O0/0 U40/40 B1/1 setup=ok adm=pre-ok steps=39 raises=0 outcome=Empty unblocked=[843, 843] unmount=ok[2]
+CELL allowance S1199 O0/0 U40/40 B2/2 setup=ok adm=pre-ok steps=38 raises=0 outcome=Empty unblocked=[841, 841] unmount=ok[2]
+CELL allowance S1199 O0/0 U40/40 Bhalf/20 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[872, 872] unmount=ok[2]
+CELL allowance S1199 O0/0 U40/40 Blast/39 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[863, 863] unmount=ok[2]
+CELL allowance S1199 O0/0 Umax/120 B0/0 setup=ok adm=pre-ok steps=120 raises=0 outcome=Empty unblocked=[845, 845] unmount=ok[3]
+CELL allowance S1199 O0/0 Umax/120 B1/1 setup=ok adm=pre-ok steps=119 raises=0 outcome=Empty unblocked=[843, 843] unmount=ok[3]
+CELL allowance S1199 O0/0 Umax/120 B2/2 setup=ok adm=pre-ok steps=118 raises=0 outcome=Empty unblocked=[843, 843] unmount=ok[2]
+CELL allowance S1199 O0/0 Umax/120 Bhalf/60 setup=ok adm=pre-ok steps=60 raises=0 outcome=Empty unblocked=[839, 839] unmount=ok[3]
+CELL allowance S1199 O0/0 Umax/120 Blast/119 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[864, 864] unmount=ok[2]
+CELL allowance S1199 O2/2 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[980, 980] unmount=ok[2]
+CELL allowance S1199 O2/2 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[978, 978] unmount=ok[3]
+CELL allowance S1199 O2/2 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[980, 980] unmount=ok[3]
+CELL allowance S1199 O2/2 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[986, 986] unmount=ok[3]
+CELL allowance S1199 O2/2 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[982, 982] unmount=ok[2]
+CELL allowance S1199 O2/2 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[920, 920] unmount=ok[2]
+CELL allowance S1199 O2/2 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[918, 918] unmount=ok[2]
+CELL allowance S1199 O2/2 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[920, 920] unmount=ok[2]
+CELL allowance S1199 O2/2 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[928, 928] unmount=ok[2]
+CELL allowance S1199 O2/2 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[928, 928] unmount=ok[2]
+CELL allowance S1199 O2/2 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[876, 876] unmount=ok[2]
+CELL allowance S1199 O2/2 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[865, 865] unmount=ok[2]
+CELL allowance S1199 O2/2 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[867, 867] unmount=ok[2]
+CELL allowance S1199 O2/2 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[875, 875] unmount=ok[2]
+CELL allowance S1199 O2/2 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[875, 875] unmount=ok[2]
+CELL allowance S1199 O2/2 U40/40 B0/0 setup=ok adm=pre-ok steps=40 raises=0 outcome=Empty unblocked=[839, 839] unmount=ok[2]
+CELL allowance S1199 O2/2 U40/40 B1/1 setup=ok adm=pre-ok steps=39 raises=0 outcome=Empty unblocked=[843, 843] unmount=ok[3]
+CELL allowance S1199 O2/2 U40/40 B2/2 setup=ok adm=pre-ok steps=38 raises=0 outcome=Empty unblocked=[841, 841] unmount=ok[3]
+CELL allowance S1199 O2/2 U40/40 Bhalf/20 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[855, 855] unmount=ok[3]
+CELL allowance S1199 O2/2 U40/40 Blast/39 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[862, 862] unmount=ok[2]
+CELL allowance S1199 O2/2 Umax/108 B0/0 setup=ok adm=pre-ok steps=108 raises=0 outcome=Empty unblocked=[843, 843] unmount=ok[3]
+CELL allowance S1199 O2/2 Umax/108 B1/1 setup=ok adm=pre-ok steps=107 raises=0 outcome=Empty unblocked=[841, 841] unmount=ok[2]
+CELL allowance S1199 O2/2 Umax/108 B2/2 setup=ok adm=pre-ok steps=106 raises=0 outcome=Empty unblocked=[839, 839] unmount=ok[2]
+CELL allowance S1199 O2/2 Umax/108 Bhalf/54 setup=ok adm=pre-ok steps=54 raises=0 outcome=Empty unblocked=[839, 839] unmount=ok[3]
+CELL allowance S1199 O2/2 Umax/108 Blast/107 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[857, 857] unmount=ok[2]
+CELL allowance S1199 O4/4 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[952, 952] unmount=ok[2]
+CELL allowance S1199 O4/4 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[948, 948] unmount=ok[3]
+CELL allowance S1199 O4/4 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[956, 956] unmount=ok[2]
+CELL allowance S1199 O4/4 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[960, 960] unmount=ok[2]
+CELL allowance S1199 O4/4 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[962, 962] unmount=ok[2]
+CELL allowance S1199 O4/4 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[892, 892] unmount=ok[3]
+CELL allowance S1199 O4/4 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[889, 889] unmount=ok[2]
+CELL allowance S1199 O4/4 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[896, 896] unmount=ok[3]
+CELL allowance S1199 O4/4 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[897, 897] unmount=ok[2]
+CELL allowance S1199 O4/4 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[897, 897] unmount=ok[2]
+CELL allowance S1199 O4/4 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[863, 863] unmount=ok[3]
+CELL allowance S1199 O4/4 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[868, 868] unmount=ok[2]
+CELL allowance S1199 O4/4 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[867, 867] unmount=ok[3]
+CELL allowance S1199 O4/4 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[876, 876] unmount=ok[2]
+CELL allowance S1199 O4/4 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[876, 876] unmount=ok[2]
+CELL allowance S1199 O4/4 U40/40 B0/0 setup=ok adm=pre-ok steps=40 raises=0 outcome=Empty unblocked=[845, 845] unmount=ok[2]
+CELL allowance S1199 O4/4 U40/40 B1/1 setup=ok adm=pre-ok steps=39 raises=0 outcome=Empty unblocked=[845, 845] unmount=ok[3]
+CELL allowance S1199 O4/4 U40/40 B2/2 setup=ok adm=pre-ok steps=38 raises=0 outcome=Empty unblocked=[845, 845] unmount=ok[2]
+CELL allowance S1199 O4/4 U40/40 Bhalf/20 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[861, 861] unmount=ok[2]
+CELL allowance S1199 O4/4 U40/40 Blast/39 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[859, 859] unmount=ok[2]
+CELL allowance S1199 O4/4 Umax/96 B0/0 setup=ok adm=pre-ok steps=96 raises=0 outcome=Empty unblocked=[845, 845] unmount=ok[2]
+CELL allowance S1199 O4/4 Umax/96 B1/1 setup=ok adm=pre-ok steps=95 raises=0 outcome=Empty unblocked=[845, 845] unmount=ok[2]
+CELL allowance S1199 O4/4 Umax/96 B2/2 setup=ok adm=pre-ok steps=94 raises=0 outcome=Empty unblocked=[845, 845] unmount=ok[2]
+CELL allowance S1199 O4/4 Umax/96 Bhalf/48 setup=ok adm=pre-ok steps=48 raises=0 outcome=Empty unblocked=[849, 849] unmount=ok[2]
+CELL allowance S1199 O4/4 Umax/96 Blast/95 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[861, 861] unmount=ok[2]
+CELL allowance S1199 O8/8 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[899, 899] unmount=ok[2]
+CELL allowance S1199 O8/8 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[904, 904] unmount=ok[3]
+CELL allowance S1199 O8/8 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[906, 906] unmount=ok[3]
+CELL allowance S1199 O8/8 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[906, 906] unmount=ok[3]
+CELL allowance S1199 O8/8 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[901, 901] unmount=ok[2]
+CELL allowance S1199 O8/8 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[887, 887] unmount=ok[2]
+CELL allowance S1199 O8/8 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[881, 881] unmount=ok[2]
+CELL allowance S1199 O8/8 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[883, 883] unmount=ok[2]
+CELL allowance S1199 O8/8 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[883, 883] unmount=ok[2]
+CELL allowance S1199 O8/8 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[883, 883] unmount=ok[2]
+CELL allowance S1199 O8/8 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[866, 866] unmount=ok[2]
+CELL allowance S1199 O8/8 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[863, 863] unmount=ok[2]
+CELL allowance S1199 O8/8 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[865, 865] unmount=ok[2]
+CELL allowance S1199 O8/8 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[865, 865] unmount=ok[2]
+CELL allowance S1199 O8/8 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[865, 865] unmount=ok[2]
+CELL allowance S1199 O8/8 U40/40 B0/0 setup=ok adm=pre-ok steps=40 raises=0 outcome=Empty unblocked=[845, 845] unmount=ok[2]
+CELL allowance S1199 O8/8 U40/40 B1/1 setup=ok adm=pre-ok steps=39 raises=0 outcome=Empty unblocked=[847, 847] unmount=ok[3]
+CELL allowance S1199 O8/8 U40/40 B2/2 setup=ok adm=pre-ok steps=38 raises=0 outcome=Empty unblocked=[847, 847] unmount=ok[3]
+CELL allowance S1199 O8/8 U40/40 Bhalf/20 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[857, 857] unmount=ok[3]
+CELL allowance S1199 O8/8 U40/40 Blast/39 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[868, 868] unmount=ok[2]
+CELL allowance S1199 O8/8 Umax/96 B0/0 setup=ok adm=pre-ok steps=96 raises=0 outcome=Empty unblocked=[845, 845] unmount=ok[2]
+CELL allowance S1199 O8/8 Umax/96 B1/1 setup=ok adm=pre-ok steps=95 raises=0 outcome=Empty unblocked=[847, 847] unmount=ok[2]
+CELL allowance S1199 O8/8 Umax/96 B2/2 setup=ok adm=pre-ok steps=94 raises=0 outcome=Empty unblocked=[847, 847] unmount=ok[2]
+CELL allowance S1199 O8/8 Umax/96 Bhalf/48 setup=ok adm=pre-ok steps=48 raises=0 outcome=Empty unblocked=[845, 845] unmount=ok[2]
+CELL allowance S1199 O8/8 Umax/96 Blast/95 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[859, 859] unmount=ok[2]
+CELL allowance S1400 O0/0 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[1213, 1213] unmount=ok[2]
+CELL allowance S1400 O0/0 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[1215, 1215] unmount=ok[2]
+CELL allowance S1400 O0/0 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[1209, 1209] unmount=ok[2]
+CELL allowance S1400 O0/0 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[1205, 1205] unmount=ok[2]
+CELL allowance S1400 O0/0 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1217, 1217] unmount=ok[2]
+CELL allowance S1400 O0/0 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[1153, 1153] unmount=ok[2]
+CELL allowance S1400 O0/0 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[1155, 1155] unmount=ok[2]
+CELL allowance S1400 O0/0 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[1149, 1149] unmount=ok[3]
+CELL allowance S1400 O0/0 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[1155, 1155] unmount=ok[2]
+CELL allowance S1400 O0/0 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1157, 1157] unmount=ok[2]
+CELL allowance S1400 O0/0 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[1076, 1076] unmount=ok[2]
+CELL allowance S1400 O0/0 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[1078, 1078] unmount=ok[2]
+CELL allowance S1400 O0/0 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[1081, 1081] unmount=ok[3]
+CELL allowance S1400 O0/0 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[1080, 1080] unmount=ok[2]
+CELL allowance S1400 O0/0 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1080, 1080] unmount=ok[2]
+CELL allowance S1400 O0/0 U40/40 B0/0 setup=ok adm=pre-ok steps=40 raises=0 outcome=Empty unblocked=[1046, 1046] unmount=ok[2]
+CELL allowance S1400 O0/0 U40/40 B1/1 setup=ok adm=pre-ok steps=39 raises=0 outcome=Empty unblocked=[1044, 1044] unmount=ok[2]
+CELL allowance S1400 O0/0 U40/40 B2/2 setup=ok adm=pre-ok steps=38 raises=0 outcome=Empty unblocked=[1042, 1042] unmount=ok[2]
+CELL allowance S1400 O0/0 U40/40 Bhalf/20 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[1073, 1073] unmount=ok[2]
+CELL allowance S1400 O0/0 U40/40 Blast/39 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1064, 1064] unmount=ok[2]
+CELL allowance S1400 O0/0 Umax/219 B0/0 setup=ok adm=pre-ok steps=219 raises=0 outcome=Empty unblocked=[1042, 1042] unmount=ok[3]
+CELL allowance S1400 O0/0 Umax/219 B1/1 setup=ok adm=pre-ok steps=218 raises=0 outcome=Empty unblocked=[1042, 1042] unmount=ok[3]
+CELL allowance S1400 O0/0 Umax/219 B2/2 setup=ok adm=pre-ok steps=217 raises=0 outcome=Empty unblocked=[1040, 1040] unmount=ok[2]
+CELL allowance S1400 O0/0 Umax/219 Bhalf/109 setup=ok adm=pre-ok steps=110 raises=0 outcome=Empty unblocked=[1048, 1048] unmount=ok[3]
+CELL allowance S1400 O0/0 Umax/219 Blast/218 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1069, 1069] unmount=ok[2]
+CELL allowance S1400 O2/2 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[1181, 1181] unmount=ok[2]
+CELL allowance S1400 O2/2 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[1179, 1179] unmount=ok[3]
+CELL allowance S1400 O2/2 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[1181, 1181] unmount=ok[3]
+CELL allowance S1400 O2/2 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[1187, 1187] unmount=ok[3]
+CELL allowance S1400 O2/2 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1183, 1183] unmount=ok[2]
+CELL allowance S1400 O2/2 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[1121, 1121] unmount=ok[2]
+CELL allowance S1400 O2/2 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[1119, 1119] unmount=ok[2]
+CELL allowance S1400 O2/2 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[1121, 1121] unmount=ok[2]
+CELL allowance S1400 O2/2 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[1129, 1129] unmount=ok[2]
+CELL allowance S1400 O2/2 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1129, 1129] unmount=ok[2]
+CELL allowance S1400 O2/2 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[1077, 1077] unmount=ok[2]
+CELL allowance S1400 O2/2 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[1066, 1066] unmount=ok[2]
+CELL allowance S1400 O2/2 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[1068, 1068] unmount=ok[2]
+CELL allowance S1400 O2/2 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[1076, 1076] unmount=ok[2]
+CELL allowance S1400 O2/2 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1076, 1076] unmount=ok[2]
+CELL allowance S1400 O2/2 U40/40 B0/0 setup=ok adm=pre-ok steps=40 raises=0 outcome=Empty unblocked=[1040, 1040] unmount=ok[2]
+CELL allowance S1400 O2/2 U40/40 B1/1 setup=ok adm=pre-ok steps=39 raises=0 outcome=Empty unblocked=[1044, 1044] unmount=ok[3]
+CELL allowance S1400 O2/2 U40/40 B2/2 setup=ok adm=pre-ok steps=38 raises=0 outcome=Empty unblocked=[1042, 1042] unmount=ok[3]
+CELL allowance S1400 O2/2 U40/40 Bhalf/20 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[1056, 1056] unmount=ok[3]
+CELL allowance S1400 O2/2 U40/40 Blast/39 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1063, 1063] unmount=ok[2]
+CELL allowance S1400 O2/2 Umax/207 B0/0 setup=ok adm=pre-ok steps=207 raises=0 outcome=Empty unblocked=[1040, 1040] unmount=ok[3]
+CELL allowance S1400 O2/2 Umax/207 B1/1 setup=ok adm=pre-ok steps=206 raises=0 outcome=Empty unblocked=[1040, 1040] unmount=ok[2]
+CELL allowance S1400 O2/2 Umax/207 B2/2 setup=ok adm=pre-ok steps=205 raises=0 outcome=Empty unblocked=[1040, 1040] unmount=ok[2]
+CELL allowance S1400 O2/2 Umax/207 Bhalf/103 setup=ok adm=pre-ok steps=104 raises=0 outcome=Empty unblocked=[1040, 1040] unmount=ok[2]
+CELL allowance S1400 O2/2 Umax/207 Blast/206 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1054, 1054] unmount=ok[2]
+CELL allowance S1400 O4/4 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[1153, 1153] unmount=ok[2]
+CELL allowance S1400 O4/4 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[1149, 1149] unmount=ok[3]
+CELL allowance S1400 O4/4 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[1157, 1157] unmount=ok[2]
+CELL allowance S1400 O4/4 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[1161, 1161] unmount=ok[2]
+CELL allowance S1400 O4/4 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1163, 1163] unmount=ok[2]
+CELL allowance S1400 O4/4 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[1093, 1093] unmount=ok[3]
+CELL allowance S1400 O4/4 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[1090, 1090] unmount=ok[2]
+CELL allowance S1400 O4/4 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[1097, 1097] unmount=ok[3]
+CELL allowance S1400 O4/4 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[1098, 1098] unmount=ok[2]
+CELL allowance S1400 O4/4 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1098, 1098] unmount=ok[2]
+CELL allowance S1400 O4/4 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[1064, 1064] unmount=ok[3]
+CELL allowance S1400 O4/4 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[1069, 1069] unmount=ok[2]
+CELL allowance S1400 O4/4 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[1068, 1068] unmount=ok[3]
+CELL allowance S1400 O4/4 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[1077, 1077] unmount=ok[2]
+CELL allowance S1400 O4/4 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1077, 1077] unmount=ok[2]
+CELL allowance S1400 O4/4 U40/40 B0/0 setup=ok adm=pre-ok steps=40 raises=0 outcome=Empty unblocked=[1046, 1046] unmount=ok[2]
+CELL allowance S1400 O4/4 U40/40 B1/1 setup=ok adm=pre-ok steps=39 raises=0 outcome=Empty unblocked=[1046, 1046] unmount=ok[3]
+CELL allowance S1400 O4/4 U40/40 B2/2 setup=ok adm=pre-ok steps=38 raises=0 outcome=Empty unblocked=[1046, 1046] unmount=ok[2]
+CELL allowance S1400 O4/4 U40/40 Bhalf/20 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[1062, 1062] unmount=ok[2]
+CELL allowance S1400 O4/4 U40/40 Blast/39 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1060, 1060] unmount=ok[2]
+CELL allowance S1400 O4/4 Umax/195 B0/0 setup=ok adm=pre-ok steps=195 raises=0 outcome=Empty unblocked=[1046, 1046] unmount=ok[2]
+CELL allowance S1400 O4/4 Umax/195 B1/1 setup=ok adm=pre-ok steps=194 raises=0 outcome=Empty unblocked=[1048, 1048] unmount=ok[2]
+CELL allowance S1400 O4/4 Umax/195 B2/2 setup=ok adm=pre-ok steps=193 raises=0 outcome=Empty unblocked=[1042, 1042] unmount=ok[2]
+CELL allowance S1400 O4/4 Umax/195 Bhalf/97 setup=ok adm=pre-ok steps=98 raises=0 outcome=Empty unblocked=[1040, 1040] unmount=ok[2]
+CELL allowance S1400 O4/4 Umax/195 Blast/194 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1056, 1056] unmount=ok[2]
+CELL allowance S1400 O8/8 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[1100, 1100] unmount=ok[2]
+CELL allowance S1400 O8/8 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[1105, 1105] unmount=ok[3]
+CELL allowance S1400 O8/8 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[1107, 1107] unmount=ok[3]
+CELL allowance S1400 O8/8 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[1107, 1107] unmount=ok[3]
+CELL allowance S1400 O8/8 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1102, 1102] unmount=ok[2]
+CELL allowance S1400 O8/8 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[1088, 1088] unmount=ok[2]
+CELL allowance S1400 O8/8 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[1082, 1082] unmount=ok[2]
+CELL allowance S1400 O8/8 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[1084, 1084] unmount=ok[2]
+CELL allowance S1400 O8/8 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[1084, 1084] unmount=ok[2]
+CELL allowance S1400 O8/8 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1084, 1084] unmount=ok[2]
+CELL allowance S1400 O8/8 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[1067, 1067] unmount=ok[2]
+CELL allowance S1400 O8/8 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[1064, 1064] unmount=ok[2]
+CELL allowance S1400 O8/8 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[1066, 1066] unmount=ok[2]
+CELL allowance S1400 O8/8 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[1066, 1066] unmount=ok[2]
+CELL allowance S1400 O8/8 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1066, 1066] unmount=ok[2]
+CELL allowance S1400 O8/8 U40/40 B0/0 setup=ok adm=pre-ok steps=40 raises=0 outcome=Empty unblocked=[1046, 1046] unmount=ok[2]
+CELL allowance S1400 O8/8 U40/40 B1/1 setup=ok adm=pre-ok steps=39 raises=0 outcome=Empty unblocked=[1048, 1048] unmount=ok[3]
+CELL allowance S1400 O8/8 U40/40 B2/2 setup=ok adm=pre-ok steps=38 raises=0 outcome=Empty unblocked=[1048, 1048] unmount=ok[3]
+CELL allowance S1400 O8/8 U40/40 Bhalf/20 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[1058, 1058] unmount=ok[3]
+CELL allowance S1400 O8/8 U40/40 Blast/39 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1069, 1069] unmount=ok[2]
+CELL allowance S1400 O8/8 Umax/196 B0/0 setup=ok adm=pre-ok steps=196 raises=0 outcome=Empty unblocked=[1054, 1054] unmount=ok[2]
+CELL allowance S1400 O8/8 Umax/196 B1/1 setup=ok adm=pre-ok steps=195 raises=0 outcome=Empty unblocked=[1046, 1046] unmount=ok[3]
+CELL allowance S1400 O8/8 Umax/196 B2/2 setup=ok adm=pre-ok steps=194 raises=0 outcome=Empty unblocked=[1058, 1058] unmount=ok[2]
+CELL allowance S1400 O8/8 Umax/196 Bhalf/98 setup=ok adm=pre-ok steps=98 raises=0 outcome=Empty unblocked=[1056, 1056] unmount=ok[2]
+CELL allowance S1400 O8/8 Umax/196 Blast/195 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1056, 1056] unmount=ok[2]
+CELL allowance S1600 O0/0 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[1413, 1413] unmount=ok[2]
+CELL allowance S1600 O0/0 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[1415, 1415] unmount=ok[2]
+CELL allowance S1600 O0/0 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[1409, 1409] unmount=ok[2]
+CELL allowance S1600 O0/0 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[1405, 1405] unmount=ok[2]
+CELL allowance S1600 O0/0 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1417, 1417] unmount=ok[2]
+CELL allowance S1600 O0/0 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[1353, 1353] unmount=ok[2]
+CELL allowance S1600 O0/0 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[1355, 1355] unmount=ok[2]
+CELL allowance S1600 O0/0 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[1349, 1349] unmount=ok[3]
+CELL allowance S1600 O0/0 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[1355, 1355] unmount=ok[2]
+CELL allowance S1600 O0/0 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1357, 1357] unmount=ok[2]
+CELL allowance S1600 O0/0 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[1276, 1276] unmount=ok[2]
+CELL allowance S1600 O0/0 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[1278, 1278] unmount=ok[2]
+CELL allowance S1600 O0/0 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[1281, 1281] unmount=ok[3]
+CELL allowance S1600 O0/0 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[1280, 1280] unmount=ok[2]
+CELL allowance S1600 O0/0 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1280, 1280] unmount=ok[2]
+CELL allowance S1600 O2/2 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[1381, 1381] unmount=ok[2]
+CELL allowance S1600 O2/2 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[1379, 1379] unmount=ok[3]
+CELL allowance S1600 O2/2 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[1381, 1381] unmount=ok[3]
+CELL allowance S1600 O2/2 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[1387, 1387] unmount=ok[3]
+CELL allowance S1600 O2/2 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1383, 1383] unmount=ok[2]
+CELL allowance S1600 O2/2 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[1321, 1321] unmount=ok[2]
+CELL allowance S1600 O2/2 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[1319, 1319] unmount=ok[2]
+CELL allowance S1600 O2/2 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[1321, 1321] unmount=ok[2]
+CELL allowance S1600 O2/2 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[1329, 1329] unmount=ok[2]
+CELL allowance S1600 O2/2 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1329, 1329] unmount=ok[2]
+CELL allowance S1600 O2/2 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[1277, 1277] unmount=ok[2]
+CELL allowance S1600 O2/2 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[1266, 1266] unmount=ok[2]
+CELL allowance S1600 O2/2 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[1268, 1268] unmount=ok[2]
+CELL allowance S1600 O2/2 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[1276, 1276] unmount=ok[2]
+CELL allowance S1600 O2/2 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1276, 1276] unmount=ok[2]
+CELL allowance S1600 O4/4 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[1353, 1353] unmount=ok[2]
+CELL allowance S1600 O4/4 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[1349, 1349] unmount=ok[3]
+CELL allowance S1600 O4/4 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[1357, 1357] unmount=ok[2]
+CELL allowance S1600 O4/4 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[1361, 1361] unmount=ok[2]
+CELL allowance S1600 O4/4 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1363, 1363] unmount=ok[2]
+CELL allowance S1600 O4/4 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[1293, 1293] unmount=ok[3]
+CELL allowance S1600 O4/4 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[1290, 1290] unmount=ok[2]
+CELL allowance S1600 O4/4 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[1297, 1297] unmount=ok[3]
+CELL allowance S1600 O4/4 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[1298, 1298] unmount=ok[2]
+CELL allowance S1600 O4/4 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1298, 1298] unmount=ok[2]
+CELL allowance S1600 O4/4 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[1264, 1264] unmount=ok[3]
+CELL allowance S1600 O4/4 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[1269, 1269] unmount=ok[2]
+CELL allowance S1600 O4/4 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[1268, 1268] unmount=ok[3]
+CELL allowance S1600 O4/4 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[1277, 1277] unmount=ok[2]
+CELL allowance S1600 O4/4 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1277, 1277] unmount=ok[2]
+CELL allowance S1600 O8/8 U10/10 B0/0 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[1300, 1300] unmount=ok[2]
+CELL allowance S1600 O8/8 U10/10 B1/1 setup=ok adm=pre-ok steps=9 raises=0 outcome=Empty unblocked=[1305, 1305] unmount=ok[3]
+CELL allowance S1600 O8/8 U10/10 B2/2 setup=ok adm=pre-ok steps=8 raises=0 outcome=Empty unblocked=[1307, 1307] unmount=ok[3]
+CELL allowance S1600 O8/8 U10/10 Bhalf/5 setup=ok adm=pre-ok steps=5 raises=0 outcome=Empty unblocked=[1307, 1307] unmount=ok[3]
+CELL allowance S1600 O8/8 U10/10 Blast/9 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1302, 1302] unmount=ok[2]
+CELL allowance S1600 O8/8 U14/14 B0/0 setup=ok adm=pre-ok steps=14 raises=0 outcome=Empty unblocked=[1288, 1288] unmount=ok[2]
+CELL allowance S1600 O8/8 U14/14 B1/1 setup=ok adm=pre-ok steps=13 raises=0 outcome=Empty unblocked=[1282, 1282] unmount=ok[2]
+CELL allowance S1600 O8/8 U14/14 B2/2 setup=ok adm=pre-ok steps=12 raises=0 outcome=Empty unblocked=[1284, 1284] unmount=ok[2]
+CELL allowance S1600 O8/8 U14/14 Bhalf/7 setup=ok adm=pre-ok steps=7 raises=0 outcome=Empty unblocked=[1284, 1284] unmount=ok[2]
+CELL allowance S1600 O8/8 U14/14 Blast/13 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1284, 1284] unmount=ok[2]
+CELL allowance S1600 O8/8 U20/20 B0/0 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[1267, 1267] unmount=ok[2]
+CELL allowance S1600 O8/8 U20/20 B1/1 setup=ok adm=pre-ok steps=19 raises=0 outcome=Empty unblocked=[1264, 1264] unmount=ok[2]
+CELL allowance S1600 O8/8 U20/20 B2/2 setup=ok adm=pre-ok steps=18 raises=0 outcome=Empty unblocked=[1266, 1266] unmount=ok[2]
+CELL allowance S1600 O8/8 U20/20 Bhalf/10 setup=ok adm=pre-ok steps=10 raises=0 outcome=Empty unblocked=[1266, 1266] unmount=ok[2]
+CELL allowance S1600 O8/8 U20/20 Blast/19 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1266, 1266] unmount=ok[2]
+CELL allowance S1600 O0/0 U40/40 B0/0 setup=ok adm=pre-ok steps=40 raises=0 outcome=Empty unblocked=[1246, 1246] unmount=ok[2]
+CELL allowance S1600 O0/0 U40/40 B1/1 setup=ok adm=pre-ok steps=39 raises=0 outcome=Empty unblocked=[1244, 1244] unmount=ok[2]
+CELL allowance S1600 O0/0 U40/40 B2/2 setup=ok adm=pre-ok steps=38 raises=0 outcome=Empty unblocked=[1242, 1242] unmount=ok[2]
+CELL allowance S1600 O0/0 U40/40 Bhalf/20 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[1273, 1273] unmount=ok[2]
+CELL allowance S1600 O0/0 U40/40 Blast/39 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1264, 1264] unmount=ok[2]
+CELL allowance S1600 O0/0 Umax/318 B0/0 setup=ok adm=pre-ok steps=318 raises=0 outcome=Empty unblocked=[1194, 1194] unmount=ok[3]
+CELL allowance S1600 O0/0 Umax/318 B1/1 setup=ok adm=pre-ok steps=317 raises=0 outcome=Empty unblocked=[1200, 1200] unmount=ok[3]
+CELL allowance S1600 O0/0 Umax/318 B2/2 setup=ok adm=pre-ok steps=316 raises=0 outcome=Empty unblocked=[1196, 1196] unmount=ok[2]
+CELL allowance S1600 O0/0 Umax/318 Bhalf/159 setup=ok adm=pre-ok steps=159 raises=0 outcome=Empty unblocked=[1200, 1200] unmount=ok[3]
+CELL allowance S1600 O0/0 Umax/318 Blast/317 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1224, 1224] unmount=ok[2]
+CELL allowance S1600 O2/2 U40/40 B0/0 setup=ok adm=pre-ok steps=40 raises=0 outcome=Empty unblocked=[1240, 1240] unmount=ok[2]
+CELL allowance S1600 O2/2 U40/40 B1/1 setup=ok adm=pre-ok steps=39 raises=0 outcome=Empty unblocked=[1244, 1244] unmount=ok[3]
+CELL allowance S1600 O2/2 U40/40 B2/2 setup=ok adm=pre-ok steps=38 raises=0 outcome=Empty unblocked=[1242, 1242] unmount=ok[3]
+CELL allowance S1600 O2/2 U40/40 Bhalf/20 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[1256, 1256] unmount=ok[3]
+CELL allowance S1600 O2/2 U40/40 Blast/39 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1263, 1263] unmount=ok[2]
+CELL allowance S1600 O2/2 Umax/306 B0/0 setup=ok adm=pre-ok steps=306 raises=0 outcome=Empty unblocked=[1192, 1192] unmount=ok[3]
+CELL allowance S1600 O2/2 Umax/306 B1/1 setup=ok adm=pre-ok steps=305 raises=0 outcome=Empty unblocked=[1196, 1196] unmount=ok[2]
+CELL allowance S1600 O2/2 Umax/306 B2/2 setup=ok adm=pre-ok steps=304 raises=0 outcome=Empty unblocked=[1192, 1192] unmount=ok[2]
+CELL allowance S1600 O2/2 Umax/306 Bhalf/153 setup=ok adm=pre-ok steps=153 raises=0 outcome=Empty unblocked=[1192, 1192] unmount=ok[3]
+CELL allowance S1600 O2/2 Umax/306 Blast/305 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1212, 1212] unmount=ok[2]
+CELL allowance S1600 O4/4 U40/40 B0/0 setup=ok adm=pre-ok steps=40 raises=0 outcome=Empty unblocked=[1246, 1246] unmount=ok[2]
+CELL allowance S1600 O4/4 U40/40 B1/1 setup=ok adm=pre-ok steps=39 raises=0 outcome=Empty unblocked=[1246, 1246] unmount=ok[3]
+CELL allowance S1600 O4/4 U40/40 B2/2 setup=ok adm=pre-ok steps=38 raises=0 outcome=Empty unblocked=[1246, 1246] unmount=ok[2]
+CELL allowance S1600 O4/4 U40/40 Bhalf/20 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[1262, 1262] unmount=ok[2]
+CELL allowance S1600 O4/4 U40/40 Blast/39 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1260, 1260] unmount=ok[2]
+CELL allowance S1600 O4/4 Umax/294 B0/0 setup=ok adm=pre-ok steps=294 raises=0 outcome=Empty unblocked=[1194, 1194] unmount=ok[2]
+CELL allowance S1600 O4/4 Umax/294 B1/1 setup=ok adm=pre-ok steps=293 raises=0 outcome=Empty unblocked=[1196, 1196] unmount=ok[2]
+CELL allowance S1600 O4/4 Umax/294 B2/2 setup=ok adm=pre-ok steps=292 raises=0 outcome=Empty unblocked=[1196, 1196] unmount=ok[2]
+CELL allowance S1600 O4/4 Umax/294 Bhalf/147 setup=ok adm=pre-ok steps=147 raises=0 outcome=Empty unblocked=[1198, 1198] unmount=ok[2]
+CELL allowance S1600 O4/4 Umax/294 Blast/293 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1212, 1212] unmount=ok[2]
+CELL allowance S1600 O8/8 U40/40 B0/0 setup=ok adm=pre-ok steps=40 raises=0 outcome=Empty unblocked=[1246, 1246] unmount=ok[2]
+CELL allowance S1600 O8/8 U40/40 B1/1 setup=ok adm=pre-ok steps=39 raises=0 outcome=Empty unblocked=[1248, 1248] unmount=ok[3]
+CELL allowance S1600 O8/8 U40/40 B2/2 setup=ok adm=pre-ok steps=38 raises=0 outcome=Empty unblocked=[1248, 1248] unmount=ok[3]
+CELL allowance S1600 O8/8 U40/40 Bhalf/20 setup=ok adm=pre-ok steps=20 raises=0 outcome=Empty unblocked=[1258, 1258] unmount=ok[3]
+CELL allowance S1600 O8/8 U40/40 Blast/39 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1269, 1269] unmount=ok[2]
+CELL allowance S1600 O8/8 Umax/294 B0/0 setup=ok adm=pre-ok steps=294 raises=0 outcome=Empty unblocked=[1192, 1192] unmount=ok[2]
+CELL allowance S1600 O8/8 Umax/294 B1/1 setup=ok adm=pre-ok steps=293 raises=0 outcome=Empty unblocked=[1194, 1194] unmount=ok[2]
+CELL allowance S1600 O8/8 Umax/294 B2/2 setup=ok adm=pre-ok steps=292 raises=0 outcome=Empty unblocked=[1202, 1202] unmount=ok[2]
+CELL allowance S1600 O8/8 Umax/294 Bhalf/147 setup=ok adm=pre-ok steps=147 raises=0 outcome=Empty unblocked=[1192, 1192] unmount=ok[2]
+CELL allowance S1600 O8/8 Umax/294 Blast/293 setup=ok adm=pre-ok steps=1 raises=0 outcome=Empty unblocked=[1210, 1210] unmount=ok[2]

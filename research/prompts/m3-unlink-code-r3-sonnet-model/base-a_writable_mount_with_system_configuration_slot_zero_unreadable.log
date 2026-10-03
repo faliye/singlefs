@@ -1,0 +1,12 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-unlink-code-r3-sonnet/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.90s
+     Running tests/a_writable_mount_with_system_configuration_slot_zero_unreadable.rs (/tmp/claude-1000/m3-unlink-code-r3-sonnet/target/debug/deps/a_writable_mount_with_system_configuration_slot_zero_unreadable-5cccc0fe01280b8a)
+
+running 4 tests
+test an_acquisition_is_refused_before_any_write_when_slot_zero_of_every_device_reports_a_read_error ... ok
+test a_writable_mount_is_refused_when_the_slots_of_the_second_device_turn_unreadable_only_for_the_check_of_every_device ... ok
+test a_writable_mount_is_refused_when_slot_zero_of_every_device_reports_a_read_error ... ok
+test a_writable_mount_is_refused_when_only_the_second_device_reports_a_read_error_on_slot_zero_and_the_first_reads_back_zeros ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.54s
+

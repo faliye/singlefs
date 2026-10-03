@@ -1,0 +1,8 @@
+--- crates/singlefs-core/src/mount.rs   (冻结副本 4361 行)
++++ 
+-            publishes_pushed_in_this_admission = 0;
++            publishes_pushed_in_this_admission += 0;
+--- crates/singlefs-core/src/mounted_session.rs   (冻结副本 561 行)
++++ 
+-            publishes_pushed_in_this_admission = 0;
++            publishes_pushed_in_this_admission += 0;

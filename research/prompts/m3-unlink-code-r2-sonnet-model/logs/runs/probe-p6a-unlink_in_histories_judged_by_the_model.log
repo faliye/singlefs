@@ -1,0 +1,28 @@
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：正推腿 m3-unlink-r2-forward 与别的派出去的 agent 各跑各的，只跑 harness 档单个测试二进制
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 55.44s
+     Running tests/unlink_in_histories_judged_by_the_model.rs (/tmp/claude-1000/m3-unlink-r2-forward/target/debug/deps/unlink_in_histories_judged_by_the_model-c27e9462af770d3d)
+
+running 3 tests
+test creating_an_inode_after_rolling_back_to_the_intent_walks_the_queue_first_and_is_judged_by_the_model ... ok
+test an_unlink_after_rolling_back_to_the_intent_is_judged_by_the_model_through_the_walked_step ... FAILED
+test an_overwrite_after_rolling_back_to_the_intent_is_judged_by_the_model_through_the_walked_step ... ok
+
+failures:
+
+---- an_unlink_after_rolling_back_to_the_intent_is_judged_by_the_model_through_the_walked_step stdout ----
+
+thread 'an_unlink_after_rolling_back_to_the_intent_is_judged_by_the_model_through_the_walked_step' (1032483) panicked at crates/singlefs-harness/tests/unlink_in_histories_judged_by_the_model.rs:403:5:
+assertion `left == right` failed
+  left: NewFinding { signature: ModelDisagreement { aspect: "会话状态" }, observation: FailureObservation { position: Operation(3), operation_kind: Some(Unlink), violations: [], panic: None, newest_ring_root_txg: Some(8), root_ring_slot_count: Some(24), harness_judgement: None, model_disagreement: Some(ModelDisagreement { aspect: SessionState, model_answer: "模型里现行版本 ModelRootKey { checkpoint_txg: ModelCheckpointTxg(8), instance: ModelInstanceGeneration(1) } 没有读得出的文件：TreesAndNoFile { trees_written_by: ModelRootKey { checkpoint_txg: ModelCheckpointTxg(8), instance: ModelInstanceGeneration(1) } }", implementation_answer: "实现的现行版本带文件、队列空（执行器调了 unlink）", implementation_reported_ceiling: None, implementation_reported_root_ring_slot_still_bad_after_one_reread: None, implementation_rows_written: None }), raised_floor_lands_only_on_abandoned_roots: None, record_check: RecordCheck { root_without_record: false, claimed_state_missing_unit: false } } }
+ right: Completed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    an_unlink_after_rolling_back_to_the_intent_is_judged_by_the_model_through_the_walked_step
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 21.32s
+
+error: test failed, to rerun pass `-p singlefs-harness --test unlink_in_histories_judged_by_the_model`

@@ -1,0 +1,32 @@
+== N2 arm=c1 shape=Shape { family: 0, unit_area_slots: 256, overwrites: 2, data_units: 14, batches: 2 }
+baseline writes=388 roots=16 barriers_recorded=102 writes_before_continuation=78 ok_ledger=388 admission_raises=1 continuation_raises=0 continuation_steps=12 outcome=走到空
+N2CLASS     4 barrier-from Err Acquisition (no ledger)
+N2CLASS     8 barrier-from FRF/SequencePublishFailed phase=? totals=both persisted=both
+N2CLASS     4 barrier-from FRF/SequencePublishFailed phase=? totals=both persisted=one-root-more(H4)
+N2CLASS     4 barrier-from FRF/SystemConfigurationWriteFailed phase=? totals=both persisted=both
+N2CLASS   212 barrier-from Ok(fault-not-hit)
+N2CLASS    56 barrier-from Publish phase=? totals=both persisted=both
+N2CLASS    28 barrier-from Publish phase=? totals=both persisted=one-root-more(H4)
+N2CLASS     4 barrier-only Err Acquisition (no ledger)
+N2CLASS     8 barrier-only FRF/SequencePublishFailed phase=? totals=both persisted=both
+N2CLASS     4 barrier-only FRF/SequencePublishFailed phase=? totals=both persisted=one-root-more(H4)
+N2CLASS     4 barrier-only FRF/SystemConfigurationWriteFailed phase=? totals=both persisted=both
+N2CLASS   212 barrier-only Ok(fault-not-hit)
+N2CLASS    56 barrier-only Publish phase=? totals=both persisted=both
+N2CLASS    28 barrier-only Publish phase=? totals=both persisted=one-root-more(H4)
+N2CLASS     2 write-from Err Acquisition (no ledger)
+N2CLASS    34 write-from FRF/SequencePublishFailed phase=row totals=both persisted=both
+N2CLASS     4 write-from FRF/SequencePublishFailed phase=row totals=both persisted=one-root-more(H4)
+N2CLASS     2 write-from FRF/SystemConfigurationWriteFailed phase=row totals=both persisted=both
+N2CLASS   286 write-from Publish phase=cont totals=both persisted=both
+N2CLASS    24 write-from Publish phase=cont totals=both persisted=one-root-more(H4)
+N2CLASS    32 write-from Publish phase=row totals=both persisted=both
+N2CLASS     4 write-from Publish phase=row totals=both persisted=one-root-more(H4)
+N2CLASS     2 write-only Err Acquisition (no ledger)
+N2CLASS    34 write-only FRF/SequencePublishFailed phase=row totals=both persisted=both
+N2CLASS     4 write-only FRF/SequencePublishFailed phase=row totals=both persisted=one-root-more(H4)
+N2CLASS     2 write-only FRF/SystemConfigurationWriteFailed phase=row totals=both persisted=both
+N2CLASS   286 write-only Publish phase=cont totals=both persisted=both
+N2CLASS    24 write-only Publish phase=cont totals=both persisted=one-root-more(H4)
+N2CLASS    32 write-only Publish phase=row totals=both persisted=both
+N2CLASS     4 write-only Publish phase=row totals=both persisted=one-root-more(H4)

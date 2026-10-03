@@ -1,0 +1,23 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：opus攻方腿原型偏删除随机历史估时
+    Finished `release` profile [optimized + debuginfo] target(s) in 2.40s
+     Running tests/opus_proto_deletion_heavy_histories.rs (target/release/deps/opus_proto_deletion_heavy_histories-cf3585813de749dc)
+
+running 1 test
+test e4_delete_heavy_on_240_slot_devices ... E4 width=UnitAreaOf240Slots weights=opus 攻方：偏删除 seeds=[7300000000,7300000016) ops=40 secs=64.9
+E4   completed=16 new_findings=0 known_red=0 checker_runs=284 model_judged_steps=457
+E4   not_applicable={"没有可写会话": 126, "现行版本带文件": 6, "现行版本有删除中的文件": 1, "现行版本树表 0 条": 51, "现行版本里第一个文件已删完": 4, "现行版本里第一个文件还在": 9}
+E4   refusals={"MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)": 42, "MountError::RollbackFloorAboveCeiling": 24, "PublishError::ContentExceedsDataUnit": 5, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 17, "RollbackError::TargetNotACandidate(BelowEffectiveFloor)": 1, "RollbackError::TargetNotACandidate(NotInRing)": 19, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 5, "UserChangeRefused::NoSpaceAfterRaisingTheFloor(PublishError::SpaceAdmissionRefused)": 38}
+E4   op PublishFirstFile: OperationTally { applied: 2, refused: 17, not_applicable: 3 }
+E4   op PublishOverwrite: OperationTally { applied: 10, refused: 5, not_applicable: 28 }
+E4   op PublishWithoutUnits: OperationTally { applied: 0, refused: 0, not_applicable: 11 }
+E4   op CloseAndMountWritable: OperationTally { applied: 138, refused: 0, not_applicable: 0 }
+E4   op RollBackWhileMounted: OperationTally { applied: 58, refused: 25, not_applicable: 82 }
+E4   op RaiseRollbackFloor: OperationTally { applied: 4, refused: 24, not_applicable: 27 }
+E4   op ColdStartRecover: OperationTally { applied: 41, refused: 0, not_applicable: 0 }
+E4   op CrashRecoveryAbandoningTheNewestRoot: OperationTally { applied: 0, refused: 42, not_applicable: 12 }
+E4   op Unlink: OperationTally { applied: 14, refused: 0, not_applicable: 2 }
+E4   op CreateInode: OperationTally { applied: 25, refused: 38, not_applicable: 32 }
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 65.00s
+

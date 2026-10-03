@@ -1,0 +1,1 @@
+        persisted.sort_by_key(|publish| publish.root.checkpoint_txg);

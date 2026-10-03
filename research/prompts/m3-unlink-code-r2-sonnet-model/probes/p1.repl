@@ -1,0 +1,4 @@
+                writes_of_the_publishes_before_the_continuation
+                    .iter()
+                    .cloned()
+                    .collect();

@@ -1,0 +1,158 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 31M 的 2 倍，照理由放行：原型换参数与开层0枚举后内存会涨，峰值表里那次只跑前缀刀
+START narrow U=256 k=2 u=14 b=1 cont=StillShortAfterTheFloorRaises | current_txg=21 floor_before=0 unmount=Raised publishes=2 reclaimed=192 sysconf_writes=2 writes=36 segments=[2, 12, 2, 1, 2, 12, 2, 1, 2] closed_form_states=8208
+CUT n=0 roots_landed=0 next=system_configuration_slot lost=none chosen=Some(21) sc_floor=Some(0) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker= remount=-
+CUT n=0 roots_landed=0 next=system_configuration_slot lost=dev0 chosen=Some(19) sc_floor=Some(0) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=0 roots_landed=0 next=system_configuration_slot lost=dev1 chosen=Some(21) sc_floor=Some(0) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+DETAIL n=0 lost=Some(0) I-1.1: 分配记录树（树 65538）的根：一条内部条目的 key 不是这个节点里一个孩子那一段的起点，或孩子不按位置严格递增
+DETAIL n=0 lost=Some(0) I-2.1: 实例表单元 在盘 0 槽 1600 的那一份与位置条目里的校验和对不上
+DETAIL n=0 lost=Some(0) I-3.1: 盘 1：记账的已分配 Some(3686400)，遍历全部有效根得到 2408448（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 19、环里自证过的根槽 7 个、最老的自证过的根 txg 1、遍历的候选根槽 7 个、并进遍历的由记录施加出来的版本 5 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个、一圈窗口之外的根槽 0 个
+DETAIL n=0 lost=Some(0) I-4.8: 最新根（txg 19）出发的遍历有单元对不上或读不出
+DETAIL n=0 lost=Some(0) I-7.2: 最新的根走不完：分配记录树（树 65538）的根：内部条目指不到一个合法的孩子，这一支走不下去；分配记录树（树 65538）的根：内部条目指不到一个合法的孩子，这一支走不下去
+DETAIL n=0 lost=Some(0) I-7.4: 最新根（txg 19）引用的单元已被复用或抹头（校验和对不上或头用不了）
+DETAIL n=0 lost=Some(0) I-7.6: 根环区域的设备 [0, 1, 0]：不同值 2、最重的盘背 1 个（上界 3）
+DETAIL n=0 lost=Some(1) I-1.1: 分配记录树（树 65538）的根：一条内部条目的 key 不是这个节点里一个孩子那一段的起点，或孩子不按位置严格递增
+DETAIL n=0 lost=Some(1) I-2.1: 实例表单元 在盘 1 槽 1600 的那一份与位置条目里的校验和对不上
+DETAIL n=0 lost=Some(1) I-3.1: 盘 0：记账的已分配 Some(4046848)，遍历全部有效根得到 3375104（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 21、环里自证过的根槽 15 个、最老的自证过的根 txg 0、遍历的候选根槽 15 个、并进遍历的由记录施加出来的版本 3 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个、一圈窗口之外的根槽 0 个
+DETAIL n=0 lost=Some(1) I-4.8: 最新根（txg 21）出发的遍历有单元对不上或读不出
+DETAIL n=0 lost=Some(1) I-7.2: 最新的根走不完：分配记录树（树 65538）的根：内部条目指不到一个合法的孩子，这一支走不下去；分配记录树（树 65538）的根：内部条目指不到一个合法的孩子，这一支走不下去
+DETAIL n=0 lost=Some(1) I-7.4: 最新根（txg 21）引用的单元已被复用或抹头（校验和对不上或头用不了）
+DETAIL n=0 lost=Some(1) I-7.6: 根环区域的设备 [0, 1, 0]：不同值 2、最重的盘背 2 个（上界 3）
+CUT n=1 roots_landed=0 next=system_configuration_slot lost=none chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker= remount=-
+CUT n=1 roots_landed=0 next=system_configuration_slot lost=dev0 chosen=Some(19) sc_floor=Some(0) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=1 roots_landed=0 next=system_configuration_slot lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=2 roots_landed=0 next=unit_write lost=none chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker= remount=-
+CUT n=2 roots_landed=0 next=unit_write lost=dev0 chosen=Some(19) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=2 roots_landed=0 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+DETAIL n=2 lost=Some(0) I-1.1: 分配记录树（树 65538）的根：一条内部条目的 key 不是这个节点里一个孩子那一段的起点，或孩子不按位置严格递增
+DETAIL n=2 lost=Some(0) I-2.1: 实例表单元 在盘 0 槽 1600 的那一份与位置条目里的校验和对不上
+DETAIL n=2 lost=Some(0) I-4.8: 最新根（txg 19）出发的遍历有单元对不上或读不出
+DETAIL n=2 lost=Some(0) I-7.2: 最新的根走不完：分配记录树（树 65538）的根：内部条目指不到一个合法的孩子，这一支走不下去；分配记录树（树 65538）的根：内部条目指不到一个合法的孩子，这一支走不下去
+DETAIL n=2 lost=Some(0) I-7.4: 最新根（txg 19）引用的单元已被复用或抹头（校验和对不上或头用不了）
+DETAIL n=2 lost=Some(0) I-7.6: 根环区域的设备 [0, 1, 0]：不同值 2、最重的盘背 1 个（上界 3）
+DETAIL n=2 lost=Some(1) I-1.1: 分配记录树（树 65538）的根：一条内部条目的 key 不是这个节点里一个孩子那一段的起点，或孩子不按位置严格递增
+DETAIL n=2 lost=Some(1) I-2.1: 实例表单元 在盘 1 槽 1600 的那一份与位置条目里的校验和对不上
+DETAIL n=2 lost=Some(1) I-4.8: 最新根（txg 21）出发的遍历有单元对不上或读不出
+DETAIL n=2 lost=Some(1) I-7.2: 最新的根走不完：分配记录树（树 65538）的根：内部条目指不到一个合法的孩子，这一支走不下去；分配记录树（树 65538）的根：内部条目指不到一个合法的孩子，这一支走不下去
+DETAIL n=2 lost=Some(1) I-7.4: 最新根（txg 21）引用的单元已被复用或抹头（校验和对不上或头用不了）
+DETAIL n=2 lost=Some(1) I-7.6: 根环区域的设备 [0, 1, 0]：不同值 2、最重的盘背 2 个（上界 3）
+CUT n=3 roots_landed=0 next=unit_write lost=none chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker= remount=-
+CUT n=3 roots_landed=0 next=unit_write lost=dev0 chosen=Some(19) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=3 roots_landed=0 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=4 roots_landed=0 next=unit_write lost=none chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker= remount=-
+CUT n=4 roots_landed=0 next=unit_write lost=dev0 chosen=Some(19) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=4 roots_landed=0 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=5 roots_landed=0 next=unit_write lost=none chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker= remount=-
+CUT n=5 roots_landed=0 next=unit_write lost=dev0 chosen=Some(19) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=5 roots_landed=0 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=6 roots_landed=0 next=unit_write lost=none chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker= remount=-
+CUT n=6 roots_landed=0 next=unit_write lost=dev0 chosen=Some(19) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=6 roots_landed=0 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=7 roots_landed=0 next=unit_write lost=none chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker= remount=-
+CUT n=7 roots_landed=0 next=unit_write lost=dev0 chosen=Some(19) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=7 roots_landed=0 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=8 roots_landed=0 next=unit_write lost=none chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker= remount=-
+CUT n=8 roots_landed=0 next=unit_write lost=dev0 chosen=Some(19) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=8 roots_landed=0 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=9 roots_landed=0 next=unit_write lost=none chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=1 whole_read=same checker= remount=-
+CUT n=9 roots_landed=0 next=unit_write lost=dev0 chosen=Some(19) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=9 roots_landed=0 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=1 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=10 roots_landed=0 next=unit_write lost=none chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=2 whole_read=same checker= remount=-
+CUT n=10 roots_landed=0 next=unit_write lost=dev0 chosen=Some(19) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=1 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=10 roots_landed=0 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=1 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=11 roots_landed=0 next=unit_write lost=none chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=3 whole_read=same checker= remount=-
+CUT n=11 roots_landed=0 next=unit_write lost=dev0 chosen=Some(19) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=1 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=11 roots_landed=0 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=2 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=12 roots_landed=0 next=unit_write lost=none chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=4 whole_read=same checker= remount=-
+CUT n=12 roots_landed=0 next=unit_write lost=dev0 chosen=Some(19) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=2 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=12 roots_landed=0 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=2 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=13 roots_landed=0 next=unit_write lost=none chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=5 whole_read=same checker= remount=-
+CUT n=13 roots_landed=0 next=unit_write lost=dev0 chosen=Some(19) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=2 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=13 roots_landed=0 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=3 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=14 roots_landed=0 next=journal_record lost=none chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=6 whole_read=same checker= remount=-
+CUT n=14 roots_landed=0 next=journal_record lost=dev0 chosen=Some(19) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=3 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=14 roots_landed=0 next=journal_record lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=3 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+DETAIL n=14 lost=Some(0) I-1.1: 分配记录树（树 65538）的根：一条内部条目的 key 不是这个节点里一个孩子那一段的起点，或孩子不按位置严格递增
+DETAIL n=14 lost=Some(0) I-2.1: 实例表单元 在盘 0 槽 1600 的那一份与位置条目里的校验和对不上
+DETAIL n=14 lost=Some(0) I-4.8: 最新根（txg 19）出发的遍历有单元对不上或读不出
+DETAIL n=14 lost=Some(0) I-7.2: 最新的根走不完：分配记录树（树 65538）的根：内部条目指不到一个合法的孩子，这一支走不下去；分配记录树（树 65538）的根：内部条目指不到一个合法的孩子，这一支走不下去
+DETAIL n=14 lost=Some(0) I-7.4: 最新根（txg 19）引用的单元已被复用或抹头（校验和对不上或头用不了）
+DETAIL n=14 lost=Some(0) I-7.6: 根环区域的设备 [0, 1, 0]：不同值 2、最重的盘背 1 个（上界 3）
+DETAIL n=14 lost=Some(1) I-1.1: 分配记录树（树 65538）的根：一条内部条目的 key 不是这个节点里一个孩子那一段的起点，或孩子不按位置严格递增
+DETAIL n=14 lost=Some(1) I-2.1: 实例表单元 在盘 1 槽 1600 的那一份与位置条目里的校验和对不上
+DETAIL n=14 lost=Some(1) I-4.8: 最新根（txg 21）出发的遍历有单元对不上或读不出
+DETAIL n=14 lost=Some(1) I-7.2: 最新的根走不完：分配记录树（树 65538）的根：内部条目指不到一个合法的孩子，这一支走不下去；分配记录树（树 65538）的根：内部条目指不到一个合法的孩子，这一支走不下去
+DETAIL n=14 lost=Some(1) I-7.4: 最新根（txg 21）引用的单元已被复用或抹头（校验和对不上或头用不了）
+DETAIL n=14 lost=Some(1) I-7.6: 根环区域的设备 [0, 1, 0]：不同值 2、最重的盘背 2 个（上界 3）
+CUT n=15 roots_landed=0 next=journal_record lost=none chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker= remount=-
+CUT n=15 roots_landed=0 next=journal_record lost=dev0 chosen=Some(19) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=3 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=15 roots_landed=0 next=journal_record lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=3 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=16 roots_landed=0 next=root_record_fua lost=none chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker= remount=-
+CUT n=16 roots_landed=0 next=root_record_fua lost=dev0 chosen=Some(19) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=3 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=16 roots_landed=0 next=root_record_fua lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=3 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=17 roots_landed=1 next=system_configuration_slot lost=none chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker= remount=-
+CUT n=17 roots_landed=1 next=system_configuration_slot lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=17 roots_landed=1 next=system_configuration_slot lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=3 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=18 roots_landed=1 next=system_configuration_slot lost=none chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker= remount=-
+CUT n=18 roots_landed=1 next=system_configuration_slot lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=18 roots_landed=1 next=system_configuration_slot lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=3 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=19 roots_landed=1 next=unit_write lost=none chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker= remount=-
+CUT n=19 roots_landed=1 next=unit_write lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=19 roots_landed=1 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=3 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=20 roots_landed=1 next=unit_write lost=none chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker= remount=-
+CUT n=20 roots_landed=1 next=unit_write lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=20 roots_landed=1 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=4 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=21 roots_landed=1 next=unit_write lost=none chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker= remount=-
+CUT n=21 roots_landed=1 next=unit_write lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=21 roots_landed=1 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=4 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=22 roots_landed=1 next=unit_write lost=none chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker= remount=-
+CUT n=22 roots_landed=1 next=unit_write lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=22 roots_landed=1 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=5 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=23 roots_landed=1 next=unit_write lost=none chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker= remount=-
+CUT n=23 roots_landed=1 next=unit_write lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=23 roots_landed=1 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=5 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=24 roots_landed=1 next=unit_write lost=none chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker= remount=-
+CUT n=24 roots_landed=1 next=unit_write lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=24 roots_landed=1 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=6 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=25 roots_landed=1 next=unit_write lost=none chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker= remount=-
+CUT n=25 roots_landed=1 next=unit_write lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=25 roots_landed=1 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=6 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=26 roots_landed=1 next=unit_write lost=none chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker= remount=-
+CUT n=26 roots_landed=1 next=unit_write lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=26 roots_landed=1 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=7 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=27 roots_landed=1 next=unit_write lost=none chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker= remount=-
+CUT n=27 roots_landed=1 next=unit_write lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=27 roots_landed=1 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=7 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=28 roots_landed=1 next=unit_write lost=none chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker= remount=-
+CUT n=28 roots_landed=1 next=unit_write lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=28 roots_landed=1 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=8 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=29 roots_landed=1 next=unit_write lost=none chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker= remount=-
+CUT n=29 roots_landed=1 next=unit_write lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=29 roots_landed=1 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=8 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=30 roots_landed=1 next=unit_write lost=none chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker= remount=-
+CUT n=30 roots_landed=1 next=unit_write lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=30 roots_landed=1 next=unit_write lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=9 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=31 roots_landed=1 next=journal_record lost=none chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker= remount=-
+CUT n=31 roots_landed=1 next=journal_record lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=31 roots_landed=1 next=journal_record lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=9 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=32 roots_landed=1 next=journal_record lost=none chosen=Some(23) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=23,hash=cbf29ce484222325] checker= remount=-
+CUT n=32 roots_landed=1 next=journal_record lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=32 roots_landed=1 next=journal_record lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=9 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=33 roots_landed=1 next=root_record_fua lost=none chosen=Some(23) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=23,hash=cbf29ce484222325] checker= remount=-
+CUT n=33 roots_landed=1 next=root_record_fua lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=33 roots_landed=1 next=root_record_fua lost=dev1 chosen=Some(21) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=9 whole_read=same checker=I-1.1+I-2.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=34 roots_landed=2 next=system_configuration_slot lost=none chosen=Some(23) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=23,hash=cbf29ce484222325] checker= remount=-
+CUT n=34 roots_landed=2 next=system_configuration_slot lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=34 roots_landed=2 next=system_configuration_slot lost=dev1 chosen=Some(23) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=23,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=35 roots_landed=2 next=system_configuration_slot lost=none chosen=Some(23) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=23,hash=cbf29ce484222325] checker= remount=-
+CUT n=35 roots_landed=2 next=system_configuration_slot lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=35 roots_landed=2 next=system_configuration_slot lost=dev1 chosen=Some(23) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=23,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CUT n=36 roots_landed=2 next=end lost=none chosen=Some(23) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=23,hash=cbf29ce484222325] checker= remount=-
+CUT n=36 roots_landed=2 next=end lost=dev0 chosen=Some(22) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=22,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=36 roots_landed=2 next=end lost=dev1 chosen=Some(23) sc_floor=Some(21) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=23,hash=cbf29ce484222325] checker=I-1.1+I-2.1+I-3.1+I-4.8+I-7.2+I-7.4+I-7.6 remount=-
+CONTROL lost=None root_txg=21 by_records=46 read_slots=17 read_slots_within_by_records=17 checker_slots=488 checker_slots_within_by_records=46
+CONTROL lost=Some(0) root_txg=19 by_records=27 read_slots=21 read_slots_within_by_records=10 checker_slots=488 checker_slots_within_by_records=27
+CONTROL lost=Some(1) root_txg=21 by_records=23 read_slots=12 read_slots_within_by_records=12 checker_slots=488 checker_slots_within_by_records=23
+WHOLE_READ_BEFORE lost=None txg=21,hash=cbf29ce484222325
+WHOLE_READ_BEFORE lost=Some(0) txg=19,hash=cbf29ce484222325
+WHOLE_READ_BEFORE lost=Some(1) txg=21,hash=cbf29ce484222325
+DONE narrow U=256 k=2 u=14 b=1 cont=StillShortAfterTheFloorRaises elapsed=7.0s

@@ -1,0 +1,107 @@
+#[test]
+fn probe_n1_intersection(
+) {
+    let (mut pool, _) = pool_crashed_between_deletion_batches_on_narrow_devices(1);
+    let mounted = mount_after_the_crash_with_batches_of_one(&mut pool)
+        .unwrap_or_else(|error| panic!("推满仍放不下：挂载照样做成可写：{error:?}"));
+    let image_after_the_mount = pool.image();
+    let (_, session) = MountedSession::of_the_mount(mounted);
+    let current_root = *session.current.root();
+    let unit_writes_of_the_first_publish = {
+        let mut allocator = session.allocator.clone();
+        let mut current = session.current.clone();
+        let (mut devices, _) = fault_injecting_recorded_devices_on(&image_after_the_mount, None);
+        let unmounted = unmount(
+            &pool.parameters,
+            &mut devices,
+            &mut allocator,
+            &mut current,
+            session.shadow_ledger,
+        );
+        let Ok(Unmounted::FloorRaisedToTheCurrentVersion(raised)) = &unmounted else {
+            panic!("拷贝上卸载做成：{:?}", unmounted.as_ref().err());
+        };
+        let first = &raised.publishes[0];
+        let structure_writes = |kind: WrittenStructureKind| first.writes.of(kind).write_calls;
+        first.writes.total().write_calls
+            - structure_writes(WrittenStructureKind::JournalRecord)
+            - structure_writes(WrittenStructureKind::RootSlot)
+            - structure_writes(WrittenStructureKind::SystemConfigurationSlot)
+    };
+    let system_configuration_writes_of_the_sequence = 2;
+    let surviving_device_after_losing_power_at = |first_failing_write: u64| {
+        let (mut devices, _) = fault_injecting_recorded_devices_on(
+            &image_after_the_mount,
+            Some(write_failing_from(
+                first_failing_write,
+                FailingWrites::ThisWriteAndEveryLaterOne,
+            )),
+        );
+        let mut allocator = session.allocator.clone();
+        let mut current = session.current.clone();
+        let unmounted = unmount(
+            &pool.parameters,
+            &mut devices,
+            &mut allocator,
+            &mut current,
+            session.shadow_ledger,
+        );
+        assert!(
+            matches!(
+                unmounted,
+                Err(MountError::RaiseFloorSequencePublishFailed(_))
+            ),
+            "掉电之后那一串报错：{:?}",
+            unmounted.as_ref().err()
+        );
+        let crashed = image_of_the_fault_injecting_recorded_devices(
+            &devices,
+            image_after_the_mount.device_size_in_bytes,
+        );
+        MemoryPool {
+            devices: crashed
+                .devices
+                .iter()
+                .filter(|(identity, _)| **identity != DeviceIdentity(0))
+                .map(|(identity, device)| (*identity, device.clone()))
+                .collect(),
+            device_size_in_bytes: crashed.device_size_in_bytes,
+        }
+    };
+    let survivor = surviving_device_after_losing_power_at(
+        system_configuration_writes_of_the_sequence + unit_writes_of_the_first_publish + 1,
+    );
+    let only_sysconf = surviving_device_after_losing_power_at(system_configuration_writes_of_the_sequence + 1);
+    let sysconf = choose_system_configuration(&image_after_the_mount).expect("sysconf");
+    let roots = singlefs_core::recovery::readable_roots(
+        &image_after_the_mount,
+        &sysconf.immutable.region_devices,
+        &sysconf.immutable.sizes,
+        &sysconf.immutable.filesystem_identifier,
+    );
+    let dev1 = DeviceIdentity(1);
+    let changed_slots = |after: &MemoryPool| -> std::collections::BTreeSet<u64> {
+        let before_dev = image_after_the_mount.devices.get(&dev1).expect("d1 before");
+        let after_dev = after.devices.get(&dev1).expect("d1 after");
+        let mut sectors: std::collections::BTreeSet<u64> = std::collections::BTreeSet::new();
+        for (s, b) in after_dev.written_sectors() { if before_dev.written_sectors().get(s) != Some(b) { sectors.insert(*s); } }
+        for s in before_dev.written_sectors().keys() { if !after_dev.written_sectors().contains_key(s) { sectors.insert(*s); } }
+        sectors.into_iter().map(|s| s * 512 / 16384).collect()
+    };
+    let changed_full = changed_slots(&survivor);
+    let changed_sysconf_only = changed_slots(&only_sysconf);
+    println!("PROBE disk1 changed 16KiB-slots after sysconf+units cut: {changed_full:?}");
+    println!("PROBE disk1 changed 16KiB-slots after sysconf-only cut: {changed_sysconf_only:?}");
+    let mut roots_on_d1: Vec<_> = roots.iter().filter(|r| true || r.checkpoint_txg.0 > 0).collect();
+    roots_on_d1.sort_by_key(|r| (r.checkpoint_txg, r.instance));
+    for root in roots_on_d1 {
+        let records = singlefs_core::recovery::allocation_records_under_root(&image_after_the_mount, root).expect("records");
+        let mut referenced = std::collections::BTreeSet::new();
+        for rec in records.iter().filter(|r| !r.is_released && r.device == dev1) {
+            for k in 0..u64::from(rec.span_slots) { referenced.insert(rec.slot.0 + k); }
+        }
+        let hit: Vec<u64> = changed_full.intersection(&referenced).copied().collect();
+        println!("PROBE root txg={} inst={:?} F={} unmarked_records_on_d1={} hit_by_unit_writes={:?}", root.checkpoint_txg.0, root.instance, root.rollback_floor.0, referenced.len(), hit);
+    }
+}
+

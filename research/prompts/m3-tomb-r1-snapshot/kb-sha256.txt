@@ -1,0 +1,8 @@
+1041eea7df34a5e9ffafeccde4a1f928a46d24e39335ca624a8b96cf143b802c  .claude/kb/invariants.md
+d5fa01db58dbcc1a704c17b8e9a8b2c36d86ea58334e292558174f129aa1843f  .claude/kb/freeze-layer-membership.md
+2ea8b99d3f805992c68f434ee9a6f64c88367ebc2a646eeb0b89a7acd6b18d5e  .claude/kb/checks-owed.md
+e09ab08b63a3ec572cd528b39bff1ec1fe0dcf3bb0b3e5bf40f5ca6eb20a4420  .claude/kb/decisions/18-块里携带什么信息.md
+11e245ccf0037021dc2865948987756ae7421e83bec672afa317d72cdc6ad397  .claude/kb/decisions/03-空间分配.md
+e6fa0dc472fd1acb308a9f5d0fe0ab35f2ab5e2af80154f1a78ce456be7ad159  .claude/kb/decisions/05-快照-空间记账机制.md
+65f68e809c41362bd4b8d418eb2835045f19f0d2129508ea6424e167eddb064d  .claude/kb/decisions/19-块指针的结构与宽度预算.md
+536d35af183f06741175601b489e45797dd70ba2b5d82628d5e136213a2ef31d  .claude/kb/decisions/15-格式冻结政策.md

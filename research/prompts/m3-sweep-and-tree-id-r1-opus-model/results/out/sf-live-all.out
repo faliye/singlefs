@@ -1,0 +1,4 @@
+SETUP place=live reading=all rows=[(1, 5, 0)] fake_slots=[(0, 50177), (1, 50177)] fake_in_current_ledger=2 fake_referenced_by_ring_root=2 fake_claimed_away=2 targets=26 fake_targeted=2 candidate_rows=[(1, 5)]
+AFTER_SWEEP root=(2,19) rows=[] red=["I-2.1:数据单元 在盘 0 槽 50176 的那一份与位置条目里的校验和对不上", "I-4.8:最新根（txg 19）出发的遍历有单元对不上或读不出", "I-7.2:最新的根走不完：数据单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的", "I-7.4:最新根（txg 19）引用的单元已被复用或抹头（校验和对不上或头用不了）"]
+REMOUNT ok effective=(2,19) red=["I-2.1:数据单元 在盘 0 槽 50176 的那一份与位置条目里的校验和对不上", "I-4.8:最新根（txg 22）出发的遍历有单元对不上或读不出", "I-7.2:最新的根走不完：数据单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的", "I-7.4:最新根（txg 22）引用的单元已被复用或抹头（校验和对不上或头用不了）"]
+rc=0

@@ -1,0 +1,13 @@
+INSTANCE1 last=(1,10) wm=65548
+HIDE root_and_record_writes=24 system_configuration_writes_rolled_back=16
+HIDDEN ring=[(0, 0, 65536), (1, 1, 65536), (1, 2, 65536)]
+HIDDEN T1_all=0 T1_same_line=0 T2_noexcl=0 T2_excl=0 T2_claim_excl=0 T3_monotone=0
+HIDDEN checker_red=[]
+MOUNT2 rows=[(1, 2)] effective=(1,2)
+REISSUE first_file=(2,5) wm=65548
+INSTANCE2 last=(2,5)
+RESTORED 15/24
+AFTER ring=[(0, 0, 65536), (1, 1, 65536), (1, 2, 65536), (2, 3, 65536), (2, 4, 65536), (2, 5, 65548), (1, 6, 65548), (1, 7, 65548), (1, 8, 65548), (1, 9, 65548), (1, 10, 65548)]
+AFTER T1_all=55[tree 65536: (1,6) birth 3 vs (2,5) birth 5] T1_same_line=55[tree 65536: (1,6) birth 3 vs (2,5) birth 5] T2_noexcl=10[node (dev 0, slot 50259) tree 65538 birth 4 inst 1 vs root (2,4) wm 65536] T2_excl=10[node (dev 0, slot 50259) tree 65538 birth 4 inst 1 vs root (2,4) wm 65536] T2_claim_excl=10[node (dev 0, slot 50259) tree 65538 birth 4 inst 1 vs root (2,4) wm 65536] T3_monotone=0
+AFTER checker_red=["I-3.1:盘 0：记账的已分配 Some(1884160)，遍历全部有效根得到 1540096（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 10、环里自证过的根槽 11 个、最老的自证过的根 txg 0、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛", "I-3.9:盘 1 槽 50178 的分配记录释放代 3 不在 (4, 5] 里：还引用它的最新一条有效根是 txg 4，最早不再引用它的是 txg 5", "I-4.2:树表 0 条那一版的分配记录树（树 0）的根：头里的诞生代号 3、写序实例 2 按已发布谓词判不成已发布（挂载根实例 1、txg 10，实例表行 []）——被引用的块必须是已提交的块", "I-8.6:盘 0 journal 环槽 5 的记录（实例 1、计数器 6）反向链 0x4a29270d，本实例内逻辑前一条的头算出来的是 0x00000000", "I-9.10:inode 1 偏移 0 的数据单元 的对象出生代 5 与 inode 记录的 3 不符", "I-9.14:树 65536 的树表条目诞生 txg 跨根不一：根 txg 5 记 5、根 txg 6 记 3、根 txg 7 记 3、根 txg 8 记 3、根 txg 9 记 3、根 txg 10 记 3"]
+rc=0

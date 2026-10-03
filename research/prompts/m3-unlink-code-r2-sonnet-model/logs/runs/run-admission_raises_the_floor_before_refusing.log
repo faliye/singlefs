@@ -1,0 +1,23 @@
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：正推腿 m3-unlink-r2-forward 与别的派出去的 agent 各跑各的，只跑 harness 档单个测试二进制
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.73s
+     Running tests/admission_raises_the_floor_before_refusing.rs (/tmp/claude-1000/m3-unlink-r2-forward/target/debug/deps/admission_raises_the_floor_before_refusing-56077624ac43594f)
+
+running 15 tests
+test an_unlink_whose_last_batch_and_the_floor_raise_pushed_for_it_both_find_no_unblocked_slot_hands_back_no_space_with_the_intent_published ... ok
+test after_a_mount_whose_continuation_stays_short_the_next_mount_is_refused_by_the_placement_before_acquisition_writing_nothing ... ok
+test at_366_instance_rows_every_admitted_overwrite_leaves_the_next_mounts_row_so_a_crash_remount_is_admitted_before_acquisition ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test an_unlink_whose_intent_finds_no_unblocked_slot_is_refused_by_the_landing_judgement_and_published_after_raising_the_floor_in_the_session ... ok
+test an_unlink_whose_last_batch_finds_no_unblocked_slot_is_refused_by_the_landing_judgement_and_published_after_raising_the_floor_in_the_session ... ok
+test known_root_slot_still_bad_after_one_reread_refuses_the_floor_raise_before_any_write ... ok
+test known_root_slot_that_reads_bad_once_is_reread_and_the_ceiling_is_unchanged ... ok
+test root_slot_already_unreadable_at_mount_counts_as_no_root_and_does_not_block_the_floor_raise ... ok
+test the_seeded_history_whose_ceiling_read_of_the_genesis_root_slot_fails_once_refuses_the_raise_above_the_ceiling ... ok
+test writable_mount_on_a_version_without_file_short_of_its_reserve_is_refused_before_acquisition_with_the_disk_unchanged ... ok
+test a_mount_whose_deletion_continuation_finds_no_unblocked_slot_raises_the_floor_and_continues_to_the_emptied_version ... ok
+test a_mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_made_writable_with_the_queue_left_and_its_publishes_on_disk ... ok
+test after_a_file_is_truncated_the_same_size_is_written_back_within_three_user_visible_publishes ... ok
+test mount_still_short_after_the_publishes_of_one_admission_is_made_and_its_writes_report_no_space_until_a_normal_unmount ... ok
+test crash_only_remounts_on_a_narrow_pool_push_floor_raises_after_the_row_publish_and_never_get_stuck ... ok
+
+test result: ok. 14 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 53.21s
+

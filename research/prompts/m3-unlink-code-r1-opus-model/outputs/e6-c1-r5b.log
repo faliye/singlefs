@@ -1,0 +1,6 @@
+run-with-memory-cap: 上限 6G 超过实测峰值 385M 的 2 倍，照理由放行：上一次只算了状态数就跳过这次真枚举
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：opus攻方腿原型续做推抬F崩溃态重挂
+E6 C1 narrow256 P2 U14 crash-after-intent uncrashed mount: continuation_steps=14 continuation_raises=[2] whole_mount_stream writes=463 segments=78 closed_form_states=107376761
+E6 C1 narrow256 P2 U14 crash-after-intent piece publishes=["step", "cont-raise", "cont-raise"] ops=[434,490) writes=42 segments=10 closed_form=69651 states_with_torn=69671
+E6 C1 narrow256 P2 U14 crash-after-intent remount states [6000,11600) of the dump (table 50 writes)
+E6 C1 narrow256 P2 U14 crash-after-intent remount outcomes={"Mounted(queue=0, raises=0)": 5600} post_mount_checker_red=0 first=None

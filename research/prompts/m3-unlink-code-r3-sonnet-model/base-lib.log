@@ -1,0 +1,49 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-unlink-code-r3-sonnet/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.64s
+     Running unittests src/lib.rs (/tmp/claude-1000/m3-unlink-code-r3-sonnet/target/debug/deps/singlefs_harness-90bdf76cfc53b9d8)
+
+running 41 tests
+test history::tests::a_reproduction_step_count_of_zero_is_refused_with_the_recognized_values ... ok
+test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+test history::tests::an_unrecognized_reproduction_value_is_refused_with_the_recognized_values ... ok
+test history::tests::every_named_generation_weights_member_finds_its_own_weights_and_reads_back_from_its_value ... ok
+test history::tests::failed_cold_start_read_back_is_a_harness_judgement_and_the_other_read_backs_are_not ... ok
+test history::tests::blanks_around_the_seed_and_the_step_count_of_one_reproduction_entry_are_dropped_alike ... ok
+test history::tests::harness_judgement_is_never_classified_as_a_known_red_form ... ok
+test history::tests::record_check_violations_are_never_absorbed_into_known_red_forms ... ok
+test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+test history::tests::record_rewritten_by_a_publish_that_keeps_its_old_generation_is_reported ... ok
+test history::tests::the_generated_member_table_lists_every_member_once_in_declaration_order ... ok
+test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+test history::tests::with_the_known_red_list_empty_an_allocated_statistic_above_walked_is_a_new_finding_whatever_its_mechanism ... ok
+test history::tests::the_reproduction_line_of_a_campaign_finding_regenerates_the_history_the_campaign_ran ... ok
+test model::tests::allocation_record_tree_nodes_rewritten_by_the_first_file_version_on_4_gib_are_at_most_nine ... ok
+test model::tests::central_mapping_tree_nodes_grow_by_two_per_147_entries_and_keep_the_previous_bound ... ok
+test model::tests::a_unit_area_wall_refusal_far_below_the_wall_that_follows_the_ring_is_judged_a_disagreement ... ok
+test model::tests::a_role_of_the_version_that_the_implementation_did_not_hand_in_is_reported ... ok
+test model::tests::after_a_forward_rollback_the_ceiling_counts_the_repeated_state_once ... ok
+test model::tests::carried_unit_keeps_the_generation_of_the_publish_that_wrote_it ... ok
+test model::tests::content_of_exactly_the_payload_capacity_is_accepted_and_one_byte_more_is_refused ... ok
+test model::tests::mount_that_writes_more_rows_than_one_page_holds_counts_every_page_of_the_instance_table_chain ... ok
+test model::tests::each_version_compares_its_file_content ... ok
+test model::tests::only_a_zero_unit_publish_on_a_version_without_file_may_hand_in_the_rewritten_roles_only ... ok
+test model::tests::crash_recovery_that_cannot_read_the_witnessed_newest_root_is_refused_before_any_write_and_leaves_the_model_unchanged ... ok
+test model::tests::the_lower_segment_of_a_file_has_a_leaf_per_144_data_units_and_an_internal_node_per_147_children ... ok
+test model::tests::each_version_compares_its_instance_table ... ok
+test model::tests::raised_floor_carried_by_the_newest_root_of_one_device_takes_effect ... ok
+test model_comparison::tests::a_floor_raise_failure_after_the_mounts_publishes_is_judged_by_the_floor_raise_error_inside ... ok
+test model_comparison::tests::a_rollback_refused_on_a_root_ring_slot_known_to_hold_a_root_names_that_slot_and_no_other_refusal_names_one ... ok
+test model_comparison::tests::every_published_version_is_compared_by_content_instance_table_and_every_role_both_ways ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test model_comparison::tests::each_rollback_candidate_exclusion_maps_to_its_own_reason ... ok
+test model::tests::the_forward_rollback_to_the_effective_floor_publishes_one_root_and_leaves_the_newer_roots_candidates ... ok
+test model_comparison::tests::only_the_witnessed_newer_publish_still_unreadable_after_one_reread_maps_to_the_models_reason ... ok
+test model::tests::the_ceiling_is_the_fourth_newest_non_empty_root_capped_by_the_newest_root_on_every_device ... ok
+test model_comparison::tests::only_a_placement_refused_on_every_device_passes_as_the_unit_area_wall ... ok
+test history::tests::every_sampling_choice_reads_back_from_its_own_reproduction_assignments ... ok
+test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+test model_comparison::tests::the_model_module_uses_only_the_standard_library_and_the_format_constants ... ok
+test model::tests::a_sequential_write_of_three_lower_leaves_counts_the_central_mapping_tree_nodes_below_the_root_in_the_occupied_slots ... ok
+test history::tests::a_campaign_runs_and_reports_the_sampling_it_was_given ... ok
+
+test result: ok. 40 passed; 0 failed; 1 ignored; 0 measured; 38 filtered out; finished in 2.57s
+

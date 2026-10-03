@@ -1,0 +1,3 @@
+            Ok(FloorRaisePushedWithinTheAdmissionBudget::Stopped(stop)) => {
+                *current = PoolVersion::of_a_version_of_trees(walked);
+                continuation.outcome =

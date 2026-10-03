@@ -1,0 +1,17 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：三方腿并行派发：正推腿与攻方腿各跑各的探针
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-unlink-code-r1-sonnet/work/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-unlink-code-r1-sonnet/work/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 12.50s
+     Running tests/sonnet_probe_weight_tables.rs (/tmp/claude-1000/m3-unlink-code-r1-sonnet/target-release/release/deps/sonnet_probe_weight_tables-89b806f026ad5f96)
+
+running 1 test
+快档 BROAD：96 段 × 30 步，新表里有 unlink 的 55 段，与旧表生成的不同的 55 段，第一处不同的步（升序）[1, 1, 1, 2, 2, 2, 3, 3, 4, 5, 5, 5, 5, 5, 6, 7, 7, 7, 8, 9, 9, 10, 11, 11, 12, 12, 12, 13, 13, 13, 13, 13, 14, 14, 14, 14, 16, 17, 17, 19, 19, 19, 20, 20, 20, 21, 22, 23, 24, 25, 26, 26, 28, 28, 28]
+大档默认 BROAD：8 段 × 60 步，新表里有 unlink 的 7 段，与旧表生成的不同的 7 段，第一处不同的步（升序）[3, 3, 7, 8, 11, 22, 37]
+复用取样点 REUSE_AFTER_RAISING_THE_FLOOR：48 段 × 30 步，新表里有 unlink 的 26 段，与旧表生成的不同的 26 段，第一处不同的步（升序）[0, 0, 1, 4, 5, 5, 5, 6, 6, 8, 12, 12, 12, 13, 13, 13, 14, 14, 21, 23, 24, 24, 25, 26, 28, 29]
+单元区墙取样点 TOWARD_THE_UNIT_AREA_WALL：32 段 × 150 步，新表里有 unlink 的 32 段，与旧表生成的不同的 32 段，第一处不同的步（升序）[0, 0, 2, 3, 4, 8, 9, 9, 11, 13, 15, 16, 17, 18, 19, 26, 26, 27, 28, 28, 34, 34, 44, 54, 55, 57, 73, 75, 85, 87, 105, 109]
+种子 4000000045（REUSE，60 步）：第一个 unlink 在 None，新旧第一处不同在 None，钉住的步 27
+种子 4000000001（REUSE，60 步）：第一个 unlink 在 Some(54)，新旧第一处不同在 Some(54)，钉住的步 30
+test how_many_histories_the_unlink_tables_changed ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

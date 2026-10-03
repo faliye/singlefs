@@ -1,0 +1,23 @@
+run-with-memory-cap: 上限 6G 超过实测峰值 472M 的 2 倍，照理由放行：换种子区间多跑几段
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running tests/opus_proto_deletion_heavy_histories.rs (target/release/deps/opus_proto_deletion_heavy_histories-cf3585813de749dc)
+
+running 1 test
+test e4_delete_heavy_on_384_slot_devices ... E4 width=UnitAreaOf384Slots weights=opus 攻方：偏删除 seeds=[7300001000,7300001400) ops=60 secs=85.8
+E4   completed=400 new_findings=0 known_red=0 checker_runs=10834 model_judged_steps=15606
+E4   not_applicable={"最新那次发布一个单元都没点名": 37, "没有可写会话": 5678, "现行版本带文件": 465, "现行版本有删除中的文件": 3, "现行版本树表 0 条": 1653, "现行版本里第一个文件已删完": 314, "现行版本里第一个文件还在": 549}
+E4   refusals={"MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)": 1430, "MountError::RollbackFloorAboveCeiling": 766, "PublishError::ContentExceedsDataUnit": 84, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 414, "RollbackError::TargetNotACandidate(BelowEffectiveFloor)": 25, "RollbackError::TargetNotACandidate(NotInRing)": 667, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 217}
+E4   op PublishFirstFile: OperationTally { applied: 93, refused: 425, not_applicable: 220 }
+E4   op PublishOverwrite: OperationTally { applied: 453, refused: 73, not_applicable: 775 }
+E4   op PublishWithoutUnits: OperationTally { applied: 24, refused: 0, not_applicable: 657 }
+E4   op CloseAndMountWritable: OperationTally { applied: 4451, refused: 0, not_applicable: 0 }
+E4   op RollBackWhileMounted: OperationTally { applied: 2513, refused: 909, not_applicable: 3130 }
+E4   op RaiseRollbackFloor: OperationTally { applied: 421, refused: 766, not_applicable: 1130 }
+E4   op ColdStartRecover: OperationTally { applied: 1264, refused: 0, not_applicable: 0 }
+E4   op CrashRecoveryAbandoningTheNewestRoot: OperationTally { applied: 0, refused: 1430, not_applicable: 756 }
+E4   op Unlink: OperationTally { applied: 342, refused: 0, not_applicable: 58 }
+E4   op CreateInode: OperationTally { applied: 2137, refused: 0, not_applicable: 1973 }
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 85.80s
+

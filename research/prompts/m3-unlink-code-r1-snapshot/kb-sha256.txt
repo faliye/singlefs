@@ -1,0 +1,10 @@
+88ad627f1fec4b88b6b523c5a552633e10cd4d86bf8b380d1080dadc9ed5b991  .claude/kb/milestone/03-third-txn.md
+796df28d357e777c5f7d9ba34a0fe0ce9be5e46ce5a0fb2a2c4fe94b1c77b9be  .claude/kb/decisions/08-核心索引结构.md
+51c97d5405ccd1206a52932930f49ebe9e6515e0a4e2ed5750d09c4432e3d8c4  .claude/kb/decisions/18-块里携带什么信息.md
+284e05959cc8ae37c43a915ba7a83e19f47638e0e362d12f3e0e61a219cce04a  .claude/kb/decisions/16-发布语义.md
+1649833fd8aeb7b0217341f6f21c55b4df6801bd68d0ffb2aaabc159c467c9c2  .claude/kb/decisions/23-journal的角色与格式.md
+36383fc5e40ccb07eab752e863ee9661fe9ba58850d0d5d95985fbb704713f54  .claude/kb/decisions/28-挂载期承诺量.md
+3eb1b773bc5fb71458f168670af2da521cebbda4f09f5ca52c7441f3d501ac5d  .claude/kb/decisions/03-空间分配.md
+02b0ec79271d5c9adc96baa16a4f072e3785919345215b45c610a42524d0e2ac  .claude/kb/decisions/05-快照-空间记账机制.md
+822efee2b6bffebf5e8304c540f69fc3f634ade874101a3885bf1c195fca5523  .claude/kb/decisions/13-验证路线.md
+b6b9be1e3d3d35500c97939cb6de042708f48cea24f2b355f92a64504814bea3  .claude/kb/experiments/168-删除借保留量的环窗口.md

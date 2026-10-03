@@ -1,0 +1,26 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：正推腿 m3-unlink-r2-forward 与别的派出去的 agent 各跑各的，复跑变异行
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.42s
+     Running tests/unlink_mount_continuation_and_the_emptied_version.rs (/tmp/claude-1000/m3-unlink-r2-forward/target/debug/deps/unlink_mount_continuation_and_the_emptied_version-395c716adb759702)
+
+running 1 test
+test an_overwrite_after_rolling_back_to_the_intent_walks_the_queue_and_its_refusal_carries_every_version_it_published ... FAILED
+
+failures:
+
+---- an_overwrite_after_rolling_back_to_the_intent_walks_the_queue_and_its_refusal_carries_every_version_it_published stdout ----
+
+thread 'an_overwrite_after_rolling_back_to_the_intent_walks_the_queue_and_its_refusal_carries_every_version_it_published' (1218124) panicked at crates/singlefs-harness/tests/unlink_mount_continuation_and_the_emptied_version.rs:705:5:
+assertion `left == right` failed: 拒绝里带着走空发成的三版（留 2、留 1、最后一批），一串抬 F 都没推
+  left: (0, 0, [])
+ right: (0, 0, [(1, 2, 1), (2, 1, 1), (3, 0, 0)])
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    an_overwrite_after_rolling_back_to_the_intent_walks_the_queue_and_its_refusal_carries_every_version_it_published
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 2.96s
+
+error: test failed, to rerun pass `-p singlefs-harness --test unlink_mount_continuation_and_the_emptied_version`

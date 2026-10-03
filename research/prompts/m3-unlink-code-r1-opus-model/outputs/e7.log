@@ -1,0 +1,32 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：opus攻方腿原型走到落点墙再崩
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.03s
+     Running tests/opus_proto_walk_to_the_landing_wall.rs (target/release/deps/opus_proto_walk_to_the_landing_wall-ed6a2adf748d3f37)
+
+running 2 tests
+E7 width=UnitAreaOf384Slots K=1 remount_first=false P=0 units=120 steps_published=121 walk finished without a space refusal
+E7S width=UnitAreaOf384Slots K=1 units=120 unlink=Ok(versions=121, raises=0, refusals=[])
+E7S width=UnitAreaOf384Slots K=2 units=120 unlink=Ok(versions=61, raises=0, refusals=[])
+E7 width=UnitAreaOf384Slots K=1 remount_first=true P=0 units=113 steps_published=114 walk finished without a space refusal
+E7S width=UnitAreaOf240Slots K=1 units=49 unlink=Ok(versions=50, raises=0, refusals=[])
+E7 width=UnitAreaOf384Slots K=2 remount_first=false P=0 units=120 steps_published=61 walk finished without a space refusal
+E7S width=UnitAreaOf240Slots K=2 units=49 unlink=Ok(versions=26, raises=0, refusals=[])
+test e7_session_unlink_of_the_largest_file ... ok
+E7 width=UnitAreaOf384Slots K=2 remount_first=true P=0 units=113 steps_published=58 walk finished without a space refusal
+E7 width=UnitAreaOf384Slots K=3 remount_first=false P=0 units=120 steps_published=41 walk finished without a space refusal
+E7 width=UnitAreaOf384Slots K=3 remount_first=true P=0 units=113 steps_published=39 walk finished without a space refusal
+E7 width=UnitAreaOf256Slots K=1 remount_first=false P=0 units=57 steps_published=58 walk finished without a space refusal
+E7 width=UnitAreaOf256Slots K=1 remount_first=true P=0 units=50 steps_published=51 walk finished without a space refusal
+E7 width=UnitAreaOf256Slots K=2 remount_first=false P=0 units=57 steps_published=30 walk finished without a space refusal
+E7 width=UnitAreaOf256Slots K=2 remount_first=true P=0 units=50 steps_published=26 walk finished without a space refusal
+E7 width=UnitAreaOf256Slots K=3 remount_first=false P=0 units=57 steps_published=20 walk finished without a space refusal
+E7 width=UnitAreaOf256Slots K=3 remount_first=true P=0 units=50 steps_published=18 walk finished without a space refusal
+E7 width=UnitAreaOf240Slots K=1 remount_first=false P=0 units=49 steps_published=50 walk finished without a space refusal
+E7 width=UnitAreaOf240Slots K=1 remount_first=true P=0 units=42 steps_published=43 walk finished without a space refusal
+E7 width=UnitAreaOf240Slots K=2 remount_first=false P=0 units=49 steps_published=26 walk finished without a space refusal
+E7 width=UnitAreaOf240Slots K=2 remount_first=true P=0 units=42 steps_published=22 walk finished without a space refusal
+E7 width=UnitAreaOf240Slots K=3 remount_first=false P=0 units=49 steps_published=18 walk finished without a space refusal
+E7 width=UnitAreaOf240Slots K=3 remount_first=true P=0 units=42 steps_published=15 walk finished without a space refusal
+test e7_walk_to_the_landing_wall_then_crash ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.97s
+

@@ -1,0 +1,27 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：正推腿 m3-unlink-r2-forward 与别的派出去的 agent 各跑各的，复跑变异行
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.68s
+     Running tests/named_unit_verification_stands_in_for_the_barrier_before_the_record.rs (/tmp/claude-1000/m3-unlink-r2-forward/target/debug/deps/named_unit_verification_stands_in_for_the_barrier_before_the_record-46525af185af92e8)
+
+running 1 test
+test with_the_barrier_before_the_record_a_publish_reusing_reclaimed_slots_keeps_every_single_withheld_state_free_of_checker_violations ... FAILED
+
+failures:
+
+---- with_the_barrier_before_the_record_a_publish_reusing_reclaimed_slots_keeps_every_single_withheld_state_free_of_checker_violations stdout ----
+
+thread 'with_the_barrier_before_the_record_a_publish_reusing_reclaimed_slots_keeps_every_single_withheld_state_free_of_checker_violations' (1247102) panicked at crates/singlefs-harness/tests/named_unit_verification_stands_in_for_the_barrier_before_the_record.rs:396:5:
+带着单元写与记录之间那道屏障，单扣状态上池级 checker 红了：[
+    "第 0 段扣下第 0 个写：I-3.10 盘 0 槽 1410 的分配记录（未释放、跨 2 槽）分配代 11，它罩住的单元头里的诞生代号是 0",
+    "第 0 段扣下第 1 个写：I-3.10 盘 1 槽 1410 的分配记录（未释放、跨 2 槽）分配代 11，它罩住的单元头里的诞生代号是 0",
+]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    with_the_barrier_before_the_record_a_publish_reusing_reclaimed_slots_keeps_every_single_withheld_state_free_of_checker_violations
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 7.36s
+
+error: test failed, to rerun pass `-p singlefs-harness --test named_unit_verification_stands_in_for_the_barrier_before_the_record`

@@ -1,0 +1,10 @@
+narrow imm: starts=1900 start_failed=1400 unmount_raised=1900 unmount_err=0 starts_with_intersection=174 intersection_slot_lines_sum=288 start_lost_pairs_with_old_root_read_failure=37 such_cuts=728
+narrow held: starts=1900 start_failed=1400 unmount_raised=1648 unmount_err=252 starts_with_intersection=0 intersection_slot_lines_sum=0 start_lost_pairs_with_old_root_read_failure=0 such_cuts=0
+narrow ga: starts=1900 start_failed=1400 unmount_raised=1900 unmount_err=0 starts_with_intersection=0 intersection_slot_lines_sum=0 start_lost_pairs_with_old_root_read_failure=0 such_cuts=0
+ncycle imm: starts=186 start_failed=678 unmount_raised=186 unmount_err=0 starts_with_intersection=13 intersection_slot_lines_sum=50 start_lost_pairs_with_old_root_read_failure=3 such_cuts=18
+ncycle held: starts=147 start_failed=717 unmount_raised=147 unmount_err=0 starts_with_intersection=0 intersection_slot_lines_sum=0 start_lost_pairs_with_old_root_read_failure=0 such_cuts=0
+ncycle ga: starts=186 start_failed=678 unmount_raised=186 unmount_err=0 starts_with_intersection=0 intersection_slot_lines_sum=0 start_lost_pairs_with_old_root_read_failure=0 such_cuts=0
+cycle imm: starts=400 start_failed=0 unmount_raised=400 unmount_err=0 starts_with_intersection=1 intersection_slot_lines_sum=2 start_lost_pairs_with_old_root_read_failure=1 such_cuts=7
+cycle held: starts=400 start_failed=0 unmount_raised=400 unmount_err=0 starts_with_intersection=0 intersection_slot_lines_sum=0 start_lost_pairs_with_old_root_read_failure=0 such_cuts=0
+cycle ga: starts=400 start_failed=0 unmount_raised=400 unmount_err=0 starts_with_intersection=0 intersection_slot_lines_sum=0 start_lost_pairs_with_old_root_read_failure=0 such_cuts=0
+plain imm: starts=553 start_failed=23 unmount_raised=553 unmount_err=0 starts_with_intersection=0 intersection_slot_lines_sum=0 start_lost_pairs_with_old_root_read_failure=0 such_cuts=0

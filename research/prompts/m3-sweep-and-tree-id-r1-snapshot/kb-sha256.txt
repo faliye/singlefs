@@ -1,0 +1,6 @@
+9726aceba3a225028a45d4bb8ab143a2f9a48d709183f28a260919fae9150241  .claude/kb/checks-owed.md
+1649833fd8aeb7b0217341f6f21c55b4df6801bd68d0ffb2aaabc159c467c9c2  .claude/kb/decisions/23-journal的角色与格式.md
+51c97d5405ccd1206a52932930f49ebe9e6515e0a4e2ed5750d09c4432e3d8c4  .claude/kb/decisions/18-块里携带什么信息.md
+8906cccea92f669e24960adf4c27a07fe328a1b0bd56212bb87e8b45a2f018b4  .claude/kb/decisions/08-核心索引结构.md
+7429515c2ae02e35e5caa33f624a1904bfe46517ebcc8f46e6bdded804fec883  .claude/kb/decisions/13-验证路线.md
+158a740762a98646c1fb5202acc3203e790abd23c117c26b5f7d686031c0459b  .claude/kb/invariants.md

@@ -1,0 +1,11 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：opus攻方腿原型取号前拒绝不写盘
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-unlink-code-r1-opus/tree/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 44.19s
+     Running tests/opus_proto_continuation_error_accounting.rs (target/release/deps/opus_proto_continuation_error_accounting-b624f7df13ddbb60)
+
+running 1 test
+test e8c_the_refusal_before_acquisition_writes_nothing ... E8c second mount: Some(PlacementRefusedBeforeAcquisitionMountAdmissionUndecided { instance_to_acquire: InstanceGeneration(3), publish_index: 0, warm_up_publishes_planned: 1, unit; recorded_operations=0 images_identical=true
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.12s
+

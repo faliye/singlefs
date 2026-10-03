@@ -1,0 +1,37 @@
+--- history.rs.orig	2026-10-03 08:13:39.330478971 +0000
++++ tree/crates/singlefs-harness/src/history.rs	2026-10-03 08:13:39.342571972 +0000
+@@ -3393,6 +3393,15 @@
+     stream: &SharedStream,
+     stream_length_before: usize,
+ ) -> AppliedStep {
++    if model.current_version_has_a_file_being_deleted() {
++        eprintln!(
++            "ATTACK-WALK-FROM-DELETING result={}",
++            match change_result {
++                Ok(published) => format!("Ok(versions={}, raises={})", published.versions_published.len(), published.floor_raises.len()),
++                Err(refused) => format!("{refused:?}").chars().take(60).collect::<String>(),
++            }
++        );
++    }
+     let (floor_raises, versions_published) =
+         floor_raises_and_versions_published_of_a_user_change(change_result);
+     let published_in_txg_order =
+@@ -3793,6 +3802,18 @@
+             // 走空里为空间推的那几串抬 F（用户 2026-10-03 定案「挂载续做被空间拒：同样推抬 F 再试」）按 txg 插在各步之间，照模型的抬 F 逐串比。
+             // 推满仍放不下（`DeletionQueueContinuationOutcome::StillShortAfterTheFloorRaises`，用户 2026-10-03 定「照 D16 做成可写」）时挂载照样做成、
+             // 队列留着：模型的现行那一版停在删除中，那一次被拒交给这次挂载之后会话里下一次用户改动的走空重判（会话先走空，`settle_user_change_comparing_every_version_published`）。
++            if !matches!(
++                mounted.output.deletion_queue_continuation_outcome,
++                singlefs_core::mount::DeletionQueueContinuationOutcome::WalkedToEmpty
++            ) || !mounted.output.deletion_queue_continuation.is_empty()
++            {
++                eprintln!(
++                    "ATTACK-MOUNT-CONTINUATION steps={} raises={} outcome={}",
++                    mounted.output.deletion_queue_continuation.len(),
++                    mounted.output.floor_raises_pushed_by_the_continuation.len(),
++                    format!("{:?}", mounted.output.deletion_queue_continuation_outcome).chars().take(60).collect::<String>()
++                );
++            }
+             for published in floor_raises_and_versions_in_txg_order(
+                 &mounted.output.floor_raises_pushed_by_the_continuation,
+                 &mounted.output.deletion_queue_continuation,

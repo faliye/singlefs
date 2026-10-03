@@ -1,0 +1,245 @@
+
+running 1 test
+── 随机历史：小盘上逼近单元区墙的取样点（空间准入判着） ──
+种子 [7463871032432355113, 7463871032432355145)，每段 150 步，比重：逼近单元区墙（小盘上落点拒绝那一格的取样点）；每一步之后跑池级 checker；两块单元区 256 槽的小盘（journal 环 6 MiB）
+历史 32 段：跑完 30、以已知红收尾 {}、新发现 2；根环转过一圈的 29 段；最高 txg 157；一版里最多 982 条分配记录
+  操作 PublishFirstFile：Ok 0、Err 121、前提不满足没调 0
+  操作 PublishOverwrite：Ok 826、Err 151、前提不满足没调 2916
+  操作 PublishWithoutUnits：Ok 0、Err 0、前提不满足没调 0
+  操作 CloseAndMountWritable：Ok 197、Err 0、前提不满足没调 0
+  操作 RollBackWhileMounted：Ok 3、Err 5、前提不满足没调 37
+  操作 RaiseRollbackFloor：Ok 17、Err 30、前提不满足没调 142
+  操作 ColdStartRecover：Ok 56、Err 0、前提不满足没调 0
+  操作 CrashRecoveryAbandoningTheNewestRoot：Ok 0、Err 0、前提不满足没调 0
+  操作 Unlink：Ok 30、Err 0、前提不满足没调 91
+  操作 CreateInode：Ok 0、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 107 次、发成 93 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 652 次、发成 574 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 84 次、发成 0 次
+  内容长度 载荷容量：入口被调 81 次、发成 75 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 86 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 88 次、发成 84 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：30 次
+  Err 成员 PublishError::ContentExceedsDataUnit：149 次
+  Err 成员 PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile：121 次
+  Err 成员 RollbackError::TargetNotACandidate(BelowEffectiveFloor)：2 次
+  Err 成员 RollbackError::TargetNotACandidate(NotInRing)：2 次
+  Err 成员 RollbackError::TargetNotACandidate(VersionWithoutFile)：1 次
+  Err 成员 UserChangeRefused::NoSpaceAfterRaisingTheFloor(PublishError::SpaceAdmissionRefused)：2 次
+  前提不满足（现行版本树表 0 条）：3186 次
+  冷启动结局 FileRead：11 次
+  冷启动结局 NoFile：45 次
+  一次挂载里最多写出 109 条根；一段历史里最多挂载成功 12 次、最多试挂载 12 次
+  抬 F 回收到落点 10 次、共回收 252 个落点；复用已释放的记录 11556 条（其中跨度变了 1762 条）；已释放的记录被罩住起点 770 条、被删 796 条
+  挂载写出的发布比过分配记录 776 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  可写挂载的空间准入「写行之后推抬 F 再判够了」：18 次
+  可写挂载的空间准入「写行之后推抬 F 推满仍不够」：56 次
+  可写挂载的空间准入「取号之前就够」：123 次
+  可写挂载写行之后一共推了 79 串抬 F
+  经会话的覆盖写：会话先推抬 F 再发成 153 次、一共推了 153 串
+  checker 跑了 1107 次；一个写都没发、沿用上一次结论的 3547 步
+  模型对拍 1468 步：该拒而拒 305、区间里拒 0、该成而成 1425；比过根 2110 条、分配记录 38160 条、冷启动内容 11 次、抬 F 上限 281 次；回退到 txg = F_生效 > 0 的根做成 0 次；单元区墙按区间放行 0 次
+  模型比每一版的实例表：比过 1548 张、输出不带整条链比不了 562 张；零单元发布只比重写的角色 0 次；比过文件内容 1355 次
+  I-1.1：判绿 1107 次、不适用 0 次
+  I-1.2：判绿 1107 次、不适用 0 次
+  I-1.3：判绿 1107 次、不适用 0 次
+  I-1.4：判绿 1107 次、不适用 0 次
+  I-1.6：判绿 1107 次、不适用 0 次
+  I-1.7：判绿 1107 次、不适用 0 次
+  I-1.8：判绿 1107 次、不适用 0 次
+  I-1.10：判绿 1107 次、不适用 0 次
+  I-1.11：判绿 1107 次、不适用 0 次
+  I-2.1：判绿 1107 次、不适用 0 次
+  I-2.3：判绿 1107 次、不适用 0 次
+  I-2.4：判绿 1107 次、不适用 0 次
+  I-2.5：判绿 1107 次、不适用 0 次
+  I-3.1：判绿 1107 次、不适用 0 次
+  I-3.8：判绿 1107 次、不适用 0 次
+  I-3.9：判绿 1107 次、不适用 0 次
+  I-3.10：判绿 1107 次、不适用 0 次
+  I-3.11：判绿 1107 次、不适用 0 次
+  I-4.2：判绿 1107 次、不适用 0 次
+  I-4.8：判绿 1107 次、不适用 0 次
+  I-5.1：判绿 1107 次、不适用 0 次
+  I-5.2：判绿 1107 次、不适用 0 次
+  I-5.4：判绿 1107 次、不适用 0 次
+  I-7.1：判绿 1107 次、不适用 0 次
+  I-7.2：判绿 1107 次、不适用 0 次
+  I-7.3：判绿 1107 次、不适用 0 次
+  I-7.4：判绿 1107 次、不适用 0 次
+  I-7.6：判绿 1107 次、不适用 0 次
+  I-7.7：判绿 1107 次、不适用 0 次
+  I-7.8：判绿 1107 次、不适用 0 次
+  I-7.9：判绿 781 次、不适用 326 次
+  I-7.12：判绿 1107 次、不适用 0 次
+  I-7.13：判绿 1107 次、不适用 0 次
+  I-7.14：判绿 1107 次、不适用 0 次
+  I-8.6：判绿 1107 次、不适用 0 次
+  I-8.7：判绿 1069 次、不适用 38 次
+  I-8.8：判绿 0 次、不适用 1107 次
+  I-8.9：判绿 1107 次、不适用 0 次
+  I-9.1：判绿 1107 次、不适用 0 次
+  I-9.2：判绿 1080 次、不适用 27 次
+  I-9.4：判绿 1080 次、不适用 27 次
+  I-9.6：判绿 1080 次、不适用 27 次
+  I-9.7：判绿 1080 次、不适用 27 次
+  I-9.10：判绿 1080 次、不适用 27 次
+  I-9.12：判绿 1080 次、不适用 27 次
+  I-9.13：判绿 1080 次、不适用 27 次
+  I-9.14：判绿 1075 次、不适用 32 次
+  I-9.15：判绿 1080 次、不适用 27 次
+  I-9.16：判绿 1107 次、不适用 0 次
+  I-1.12：判绿 1107 次、不适用 0 次
+  I-8.10：判绿 1107 次、不适用 0 次
+  I-8.11：判绿 1107 次、不适用 0 次
+  I-4.9：判绿 1107 次、不适用 0 次
+  I-9.25：判绿 1107 次、不适用 0 次
+  I-3.13：判绿 1107 次、不适用 0 次
+  I-9.26：判绿 1080 次、不适用 27 次
+  I-3.12：判绿 671 次、不适用 436 次
+  I-7.16：判绿 1107 次、不适用 0 次
+  I-7.17：判绿 1107 次、不适用 0 次
+  I-8.12：判绿 1107 次、不适用 0 次
+  I-7.15：判绿 1107 次、不适用 0 次
+  I-4.1：判绿 0 次、不适用 1107 次
+  I-8.1：判绿 1107 次、不适用 0 次
+  I-7.5：判绿 1107 次、不适用 0 次
+  I-8.5：判绿 1107 次、不适用 0 次
+已知红第 0 条（增补 2 收口表第 43 行）：0 段；前几个种子 []
+新发现 ModelDisagreement { aspect: "模型说该成、实现拒了" }：第一个种子 7463871032432355115（同签名的种子 [7463871032432355115, 7463871032432355138]），在 Operation(96)（Some(PublishOverwrite)）之后
+  模型对不上（模型说该成、实现拒了）：模型答 PublishOverwrite 该成（写出 [(123, 2)]；允许拒的只有容量墙区间与 []）；实现 拒了：UserChangeRefused::NoSpaceAfterRaisingTheFloor(PublishError::SpaceAdmissionRefused)
+  复现：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=7463871032432355115 SINGLEFS_RANDOM_HISTORY_OPERATIONS=150 SINGLEFS_RANDOM_HISTORY_WEIGHTS=unit-area-wall SINGLEFS_RANDOM_HISTORY_CHECKER=run SINGLEFS_RANDOM_HISTORY_DEVICES=unit-area-256 SINGLEFS_RANDOM_HISTORY_SPACE_ADMISSION=judged cargo test --release -p singlefs-harness --test random_histories -- --include-ignored --exact shrink_one_failing_seed_from_the_environment
+  没收缩（这一档只报种子）：照上一行跑「收缩一个种子」那条 #[ignore] 用例
+用时 15.1 秒
+test unit_area_wall_sampling_on_small_devices_with_the_space_admission_judged_is_refused_by_the_formula_inside_the_model_interval ... FAILED
+
+failures:
+
+---- unit_area_wall_sampling_on_small_devices_with_the_space_admission_judged_is_refused_by_the_formula_inside_the_model_interval stdout ----
+
+thread 'unit_area_wall_sampling_on_small_devices_with_the_space_admission_judged_is_refused_by_the_formula_inside_the_model_interval' (4138077) panicked at crates/singlefs-harness/tests/random_histories.rs:549:5:
+新发现（checker 的判红、模型、执行器的判定与 panic）：
+种子 [7463871032432355113, 7463871032432355145)，每段 150 步，比重：逼近单元区墙（小盘上落点拒绝那一格的取样点）；每一步之后跑池级 checker；两块单元区 256 槽的小盘（journal 环 6 MiB）
+历史 32 段：跑完 30、以已知红收尾 {}、新发现 2；根环转过一圈的 29 段；最高 txg 157；一版里最多 982 条分配记录
+  操作 PublishFirstFile：Ok 0、Err 121、前提不满足没调 0
+  操作 PublishOverwrite：Ok 826、Err 151、前提不满足没调 2916
+  操作 PublishWithoutUnits：Ok 0、Err 0、前提不满足没调 0
+  操作 CloseAndMountWritable：Ok 197、Err 0、前提不满足没调 0
+  操作 RollBackWhileMounted：Ok 3、Err 5、前提不满足没调 37
+  操作 RaiseRollbackFloor：Ok 17、Err 30、前提不满足没调 142
+  操作 ColdStartRecover：Ok 56、Err 0、前提不满足没调 0
+  操作 CrashRecoveryAbandoningTheNewestRoot：Ok 0、Err 0、前提不满足没调 0
+  操作 Unlink：Ok 30、Err 0、前提不满足没调 91
+  操作 CreateInode：Ok 0、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 107 次、发成 93 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 652 次、发成 574 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 84 次、发成 0 次
+  内容长度 载荷容量：入口被调 81 次、发成 75 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 86 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 88 次、发成 84 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：30 次
+  Err 成员 PublishError::ContentExceedsDataUnit：149 次
+  Err 成员 PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile：121 次
+  Err 成员 RollbackError::TargetNotACandidate(BelowEffectiveFloor)：2 次
+  Err 成员 RollbackError::TargetNotACandidate(NotInRing)：2 次
+  Err 成员 RollbackError::TargetNotACandidate(VersionWithoutFile)：1 次
+  Err 成员 UserChangeRefused::NoSpaceAfterRaisingTheFloor(PublishError::SpaceAdmissionRefused)：2 次
+  前提不满足（现行版本树表 0 条）：3186 次
+  冷启动结局 FileRead：11 次
+  冷启动结局 NoFile：45 次
+  一次挂载里最多写出 109 条根；一段历史里最多挂载成功 12 次、最多试挂载 12 次
+  抬 F 回收到落点 10 次、共回收 252 个落点；复用已释放的记录 11556 条（其中跨度变了 1762 条）；已释放的记录被罩住起点 770 条、被删 796 条
+  挂载写出的发布比过分配记录 776 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  可写挂载的空间准入「写行之后推抬 F 再判够了」：18 次
+  可写挂载的空间准入「写行之后推抬 F 推满仍不够」：56 次
+  可写挂载的空间准入「取号之前就够」：123 次
+  可写挂载写行之后一共推了 79 串抬 F
+  经会话的覆盖写：会话先推抬 F 再发成 153 次、一共推了 153 串
+  checker 跑了 1107 次；一个写都没发、沿用上一次结论的 3547 步
+  模型对拍 1468 步：该拒而拒 305、区间里拒 0、该成而成 1425；比过根 2110 条、分配记录 38160 条、冷启动内容 11 次、抬 F 上限 281 次；回退到 txg = F_生效 > 0 的根做成 0 次；单元区墙按区间放行 0 次
+  模型比每一版的实例表：比过 1548 张、输出不带整条链比不了 562 张；零单元发布只比重写的角色 0 次；比过文件内容 1355 次
+  I-1.1：判绿 1107 次、不适用 0 次
+  I-1.2：判绿 1107 次、不适用 0 次
+  I-1.3：判绿 1107 次、不适用 0 次
+  I-1.4：判绿 1107 次、不适用 0 次
+  I-1.6：判绿 1107 次、不适用 0 次
+  I-1.7：判绿 1107 次、不适用 0 次
+  I-1.8：判绿 1107 次、不适用 0 次
+  I-1.10：判绿 1107 次、不适用 0 次
+  I-1.11：判绿 1107 次、不适用 0 次
+  I-2.1：判绿 1107 次、不适用 0 次
+  I-2.3：判绿 1107 次、不适用 0 次
+  I-2.4：判绿 1107 次、不适用 0 次
+  I-2.5：判绿 1107 次、不适用 0 次
+  I-3.1：判绿 1107 次、不适用 0 次
+  I-3.8：判绿 1107 次、不适用 0 次
+  I-3.9：判绿 1107 次、不适用 0 次
+  I-3.10：判绿 1107 次、不适用 0 次
+  I-3.11：判绿 1107 次、不适用 0 次
+  I-4.2：判绿 1107 次、不适用 0 次
+  I-4.8：判绿 1107 次、不适用 0 次
+  I-5.1：判绿 1107 次、不适用 0 次
+  I-5.2：判绿 1107 次、不适用 0 次
+  I-5.4：判绿 1107 次、不适用 0 次
+  I-7.1：判绿 1107 次、不适用 0 次
+  I-7.2：判绿 1107 次、不适用 0 次
+  I-7.3：判绿 1107 次、不适用 0 次
+  I-7.4：判绿 1107 次、不适用 0 次
+  I-7.6：判绿 1107 次、不适用 0 次
+  I-7.7：判绿 1107 次、不适用 0 次
+  I-7.8：判绿 1107 次、不适用 0 次
+  I-7.9：判绿 781 次、不适用 326 次
+  I-7.12：判绿 1107 次、不适用 0 次
+  I-7.13：判绿 1107 次、不适用 0 次
+  I-7.14：判绿 1107 次、不适用 0 次
+  I-8.6：判绿 1107 次、不适用 0 次
+  I-8.7：判绿 1069 次、不适用 38 次
+  I-8.8：判绿 0 次、不适用 1107 次
+  I-8.9：判绿 1107 次、不适用 0 次
+  I-9.1：判绿 1107 次、不适用 0 次
+  I-9.2：判绿 1080 次、不适用 27 次
+  I-9.4：判绿 1080 次、不适用 27 次
+  I-9.6：判绿 1080 次、不适用 27 次
+  I-9.7：判绿 1080 次、不适用 27 次
+  I-9.10：判绿 1080 次、不适用 27 次
+  I-9.12：判绿 1080 次、不适用 27 次
+  I-9.13：判绿 1080 次、不适用 27 次
+  I-9.14：判绿 1075 次、不适用 32 次
+  I-9.15：判绿 1080 次、不适用 27 次
+  I-9.16：判绿 1107 次、不适用 0 次
+  I-1.12：判绿 1107 次、不适用 0 次
+  I-8.10：判绿 1107 次、不适用 0 次
+  I-8.11：判绿 1107 次、不适用 0 次
+  I-4.9：判绿 1107 次、不适用 0 次
+  I-9.25：判绿 1107 次、不适用 0 次
+  I-3.13：判绿 1107 次、不适用 0 次
+  I-9.26：判绿 1080 次、不适用 27 次
+  I-3.12：判绿 671 次、不适用 436 次
+  I-7.16：判绿 1107 次、不适用 0 次
+  I-7.17：判绿 1107 次、不适用 0 次
+  I-8.12：判绿 1107 次、不适用 0 次
+  I-7.15：判绿 1107 次、不适用 0 次
+  I-4.1：判绿 0 次、不适用 1107 次
+  I-8.1：判绿 1107 次、不适用 0 次
+  I-7.5：判绿 1107 次、不适用 0 次
+  I-8.5：判绿 1107 次、不适用 0 次
+已知红第 0 条（增补 2 收口表第 43 行）：0 段；前几个种子 []
+新发现 ModelDisagreement { aspect: "模型说该成、实现拒了" }：第一个种子 7463871032432355115（同签名的种子 [7463871032432355115, 7463871032432355138]），在 Operation(96)（Some(PublishOverwrite)）之后
+  模型对不上（模型说该成、实现拒了）：模型答 PublishOverwrite 该成（写出 [(123, 2)]；允许拒的只有容量墙区间与 []）；实现 拒了：UserChangeRefused::NoSpaceAfterRaisingTheFloor(PublishError::SpaceAdmissionRefused)
+  复现：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=7463871032432355115 SINGLEFS_RANDOM_HISTORY_OPERATIONS=150 SINGLEFS_RANDOM_HISTORY_WEIGHTS=unit-area-wall SINGLEFS_RANDOM_HISTORY_CHECKER=run SINGLEFS_RANDOM_HISTORY_DEVICES=unit-area-256 SINGLEFS_RANDOM_HISTORY_SPACE_ADMISSION=judged cargo test --release -p singlefs-harness --test random_histories -- --include-ignored --exact shrink_one_failing_seed_from_the_environment
+  没收缩（这一档只报种子）：照上一行跑「收缩一个种子」那条 #[ignore] 用例
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    unit_area_wall_sampling_on_small_devices_with_the_space_admission_judged_is_refused_by_the_formula_inside_the_model_interval
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 36 filtered out; finished in 15.15s
+
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：三方腿并行派发：正推腿与攻方腿各跑各的探针
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-unlink-code-r1-sonnet/work/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-unlink-code-r1-sonnet/work/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 15.74s
+     Running tests/random_histories.rs (/tmp/claude-1000/m3-unlink-code-r1-sonnet/target-release/release/deps/random_histories-e0c73f5d70576fc1)
+error: test failed, to rerun pass `-p singlefs-harness --test random_histories`

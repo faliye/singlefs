@@ -1,0 +1,14 @@
+run-with-memory-cap: 这个会话已有 6 条日常的在跑，照理由并行：正推腿 m3-unlink-r2-forward 与别的派出去的 agent 各跑各的，只跑 harness 档单个测试二进制
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 57.09s
+     Running tests/admission_raises_the_floor_before_refusing.rs (/tmp/claude-1000/m3-unlink-r2-forward/target/debug/deps/admission_raises_the_floor_before_refusing-56077624ac43594f)
+
+running 4 tests
+test after_a_mount_whose_continuation_stays_short_the_next_mount_is_refused_by_the_placement_before_acquisition_writing_nothing ... ok
+test probe_kinds_of_each_publish_of_a_mount_with_a_continuation ... ok
+test a_mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_made_writable_with_the_queue_left_and_its_publishes_on_disk ... ok
+test a_mount_whose_deletion_continuation_finds_no_unblocked_slot_raises_the_floor_and_continues_to_the_emptied_version ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 34.21s
+

@@ -1,0 +1,26 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：正推腿 m3-unlink-r2-forward 与别的派出去的 agent 各跑各的，复跑变异行
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.68s
+     Running tests/named_unit_verification_stands_in_for_the_barrier_before_the_record.rs (/tmp/claude-1000/m3-unlink-r2-forward/target/debug/deps/named_unit_verification_stands_in_for_the_barrier_before_the_record-46525af185af92e8)
+
+running 1 test
+test without_named_unit_verification_the_same_state_is_a_model_disagreement ... FAILED
+
+failures:
+
+---- without_named_unit_verification_the_same_state_is_a_model_disagreement stdout ----
+
+thread 'without_named_unit_verification_the_same_state_is_a_model_disagreement' (1246436) panicked at crates/singlefs-harness/tests/named_unit_verification_stands_in_for_the_barrier_before_the_record.rs:196:5:
+assertion `left == right` failed: 不验就施加了那条记录、恢复自称落到那次发布：JournalScanReport { valid_records: 4, above_water: 1, prefix_applied: 0, verification_passed: 0, verification_failed: 1, maximum_applied_transaction: 0 }
+  left: (false, Some((InstanceGeneration(1), CheckpointTxg(3))))
+ right: (true, Some((InstanceGeneration(1), CheckpointTxg(4))))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    without_named_unit_verification_the_same_state_is_a_model_disagreement
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.04s
+
+error: test failed, to rerun pass `-p singlefs-harness --test named_unit_verification_stands_in_for_the_barrier_before_the_record`

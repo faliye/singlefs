@@ -1,0 +1,21 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：opus攻方腿原型偏删除随机历史估时
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.06s
+     Running tests/opus_proto_deletion_heavy_histories.rs (target/release/deps/opus_proto_deletion_heavy_histories-cf3585813de749dc)
+
+running 4 tests
+test e4_broad_on_four_gibibytes ... E4 width=FourGibibytes weights=各类操作都抽（快档、大档） seeds=[7300000000,7300000008) ops=40 secs=185.8
+E4   completed=8 new_findings=0 known_red=0 checker_runs=193 model_judged_steps=249
+E4   not_applicable={"没有可写会话": 35, "现行版本带文件": 8, "现行版本树表 0 条": 23, "现行版本里第一个文件已删完": 2, "现行版本里第一个文件还在": 6}
+E4   refusals={"MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)": 5, "MountError::RollbackFloorAboveCeiling": 18, "PublishError::ContentExceedsDataUnit": 9, "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile": 10, "RollbackError::TargetNotACandidate(NotInRing)": 6, "RollbackError::TargetNotACandidate(VersionWithoutFile)": 4}
+E4   op PublishFirstFile: OperationTally { applied: 5, refused: 11, not_applicable: 1 }
+E4   op PublishOverwrite: OperationTally { applied: 54, refused: 8, not_applicable: 12 }
+E4   op PublishWithoutUnits: OperationTally { applied: 3, refused: 0, not_applicable: 10 }
+E4   op CloseAndMountWritable: OperationTally { applied: 35, refused: 0, not_applicable: 0 }
+E4   op RollBackWhileMounted: OperationTally { applied: 30, refused: 10, not_applicable: 11 }
+E4   op RaiseRollbackFloor: OperationTally { applied: 15, refused: 18, not_applicable: 11 }
+E4   op ColdStartRecover: OperationTally { applied: 9, refused: 0, not_applicable: 0 }
+E4   op CrashRecoveryAbandoningTheNewestRoot: OperationTally { applied: 0, refused: 5, not_applicable: 2 }
+E4   op Unlink: OperationTally { applied: 7, refused: 0, not_applicable: 1 }
+E4   op CreateInode: OperationTally { applied: 36, refused: 0, not_applicable: 26 }
+ok
+test e4_delete_heavy_on_240_slot_devices ... 

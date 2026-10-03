@@ -1,0 +1,13 @@
+run-with-memory-cap: 这个会话已有 17 条日常的在跑，照理由并行：正推腿 m3-unlink-r2-forward 与别的派出去的 agent 各跑各的，复跑变异行
+    Blocking waiting for file lock on build directory
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5m 03s
+     Running tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs (/tmp/claude-1000/m3-unlink-r2-forward/target/debug/deps/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping-cad0894d8585f734)
+
+running 1 test
+test an_abandoned_root_with_a_two_page_instance_table_and_an_unreadable_account_isolates_both_pages_error: test failed, to rerun pass `-p singlefs-harness --test an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping`
+
+Caused by:
+  process didn't exit successfully: `/tmp/claude-1000/m3-unlink-r2-forward/target/debug/deps/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping-cad0894d8585f734 an_abandoned_root_with_a_two_page_instance_table` (signal: 15, SIGTERM: termination signal)
+ance_table` (signal: 15, SIGTERM: termination signal)

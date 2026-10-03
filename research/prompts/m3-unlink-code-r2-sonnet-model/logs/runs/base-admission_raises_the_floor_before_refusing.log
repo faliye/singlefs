@@ -1,0 +1,70 @@
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：正推腿 m3-unlink-r2-forward 与别的派出去的 agent 各跑各的，只跑 harness 档单个测试二进制
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 50s
+     Running tests/admission_raises_the_floor_before_refusing.rs (/tmp/claude-1000/m3-unlink-r2-forward/target/debug/deps/admission_raises_the_floor_before_refusing-56077624ac43594f)
+
+running 3 tests
+PROBE total_writes_of_the_whole_mount=463 first_raise_txg=22 last_raise_txg=23 raise_sysconf_writes=2
+PROBE failing_write=391 device_writes_issued_before_failure=390 account_persisted_sum=386 acquisition=2 persisted_len=16 before_first_publish=0 gap=2
+PROBE2 issued_before_failure=419 expected_by_txg=[19, 17, 17, 25, 25, 25, 25, 25, 29, 29, 29, 29, 29, 25, 17, 21, 29] actual=[19, 17, 17, 25, 25, 25, 25, 25, 29, 29, 29, 29, 29, 25, 17, 21, 29] equal=true
+test probe_account_after_a_floor_raise_pushed_inside_the_continuation_then_a_device_error ... ok
+KINDS row: AllocationRecordTreeNode=6 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 InstanceTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+KINDS warm0: AllocationRecordTreeNode=6 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+KINDS warm1: AllocationRecordTreeNode=6 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+STEP 0 txg=11
+KINDS step0: ExtentTreeNode=4 InodeTreeLeafContainer=2 InodeTreeRoot=2 AllocationRecordTreeNode=6 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+STEP 1 txg=12
+KINDS step1: ExtentTreeNode=4 InodeTreeLeafContainer=2 InodeTreeRoot=2 AllocationRecordTreeNode=6 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+STEP 2 txg=13
+KINDS step2: ExtentTreeNode=4 InodeTreeLeafContainer=2 InodeTreeRoot=2 AllocationRecordTreeNode=6 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+STEP 3 txg=14
+KINDS step3: ExtentTreeNode=4 InodeTreeLeafContainer=2 InodeTreeRoot=2 AllocationRecordTreeNode=6 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+STEP 4 txg=15
+KINDS step4: ExtentTreeNode=4 InodeTreeLeafContainer=2 InodeTreeRoot=2 AllocationRecordTreeNode=6 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+STEP 5 txg=16
+KINDS step5: ExtentTreeNode=4 InodeTreeLeafContainer=2 InodeTreeRoot=2 AllocationRecordTreeNode=10 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+STEP 6 txg=17
+KINDS step6: ExtentTreeNode=4 InodeTreeLeafContainer=2 InodeTreeRoot=2 AllocationRecordTreeNode=10 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+STEP 7 txg=18
+KINDS step7: ExtentTreeNode=4 InodeTreeLeafContainer=2 InodeTreeRoot=2 AllocationRecordTreeNode=10 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+STEP 8 txg=19
+KINDS step8: ExtentTreeNode=4 InodeTreeLeafContainer=2 InodeTreeRoot=2 AllocationRecordTreeNode=10 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+STEP 9 txg=20
+KINDS step9: ExtentTreeNode=4 InodeTreeLeafContainer=2 InodeTreeRoot=2 AllocationRecordTreeNode=10 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+STEP 10 txg=21
+KINDS step10: ExtentTreeNode=4 InodeTreeLeafContainer=2 InodeTreeRoot=2 AllocationRecordTreeNode=6 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+STEP 11 txg=24
+KINDS step11: ExtentTreeNode=4 InodeTreeLeafContainer=2 InodeTreeRoot=2 AllocationRecordTreeNode=10 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+STEP 12 txg=25
+KINDS step12: ExtentTreeNode=2 InodeTreeLeafContainer=2 InodeTreeRoot=2 AllocationRecordTreeNode=6 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+STEP 13 txg=26
+KINDS step13: ExtentTreeNode=2 InodeTreeRoot=2 AllocationRecordTreeNode=6 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+KINDS contraise0-sysconf: SystemConfigurationSlot=2 
+RAISEPUB 0.0 txg=22
+KINDS contraise0-pub0: AllocationRecordTreeNode=6 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+RAISEPUB 0.1 txg=23
+KINDS contraise0-pub1: AllocationRecordTreeNode=10 AccountingTreeNode=2 CentralMappingTreeNode=2 TreeTableUnit=2 JournalRecord=2 RootSlot=1 SystemConfigurationSlot=2 
+test probe_kinds_of_each_publish_of_a_mount_with_a_continuation ... ok
+test probe_mount_transparency_floor_when_only_the_continuation_pushed_a_floor_raise has been running for over 60 seconds
+PROBE3 floor_relation_input=NotRaised admission_raises=0 continuation_raises=1 effective_floor_before=Some(CheckpointTxg(0)) effective_floor_after=Some(CheckpointTxg(18)) violated=[
+    FieldVerdict {
+        field: RollbackFloor,
+        basis: MeasuredByTheSecondRoundAttack,
+        outcome: Violated {
+            expected: "F 生效值是 R1 的 Some(CheckpointTxg(0))，R2 根里的 F 是 Some(CheckpointTxg(0))",
+            observed: "R2 的 F 生效值 Some(CheckpointTxg(18))、R2 根里的 F CheckpointTxg(18)",
+        },
+    },
+    FieldVerdict {
+        field: UserVisibleTreeRootPointers,
+        basis: InferredNotMeasured,
+        outcome: Violated {
+            expected: "Some(UserVisibleTreeRootPointers { inode_tree: Some([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 238, 5, 0, 0, 0, 0, 245, 125, 141, 169, 1, 0, 0, 0, 238, 5, 0, 0, 0, 0, 245, 125, 141, 169, 1, 0, 0, 0, 1, 0, 0, 0]), extent_tree: Some([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 224, 5, 0, 0, 0, 0, 175, 18, 221, 118, 1, 0, 0, 0, 224, 5, 0, 0, 0, 0, 175, 18, 221, 118, 1, 0, 0, 0, 1, 0, 0, 0]) })",
+            observed: "Some(UserVisibleTreeRootPointers { inode_tree: Some([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 26, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 165, 5, 0, 0, 0, 0, 71, 69, 214, 17, 1, 0, 0, 0, 165, 5, 0, 0, 0, 0, 71, 69, 214, 17, 2, 0, 0, 0, 0, 0, 0, 0]), extent_tree: Some([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 26, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 164, 5, 0, 0, 0, 0, 94, 190, 86, 16, 1, 0, 0, 0, 164, 5, 0, 0, 0, 0, 94, 190, 86, 16, 2, 0, 0, 0, 0, 0, 0, 0]) })",
+        },
+    },
+]
+test probe_mount_transparency_floor_when_only_the_continuation_pushed_a_floor_raise ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 63.37s
+

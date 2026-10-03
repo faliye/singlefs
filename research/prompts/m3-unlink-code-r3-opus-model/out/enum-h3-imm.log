@@ -1,0 +1,341 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 41M 的 2 倍，照理由放行：原型换参数与开层0枚举后内存会涨，峰值表里那次只跑前缀刀
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：三方攻方腿与正推腿同会话各跑各的原型
+START narrow U=176 k=5 u=1 b=1 cont=WalkedToEmpty | current_txg=16 floor_before=7 unmount=Raised publishes=3 reclaimed=66 sysconf_writes=2 writes=53 segments=[2, 12, 2, 1, 2, 12, 2, 1, 2, 12, 2, 1, 2] closed_form_states=12310
+CUT n=0 roots_landed=0 next=system_configuration_slot lost=none chosen=Some(16) sc_floor=Some(7) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=- remount=-
+CUT n=0 roots_landed=0 next=system_configuration_slot lost=dev0 chosen=Some(16) sc_floor=Some(7) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=- remount=-
+CUT n=0 roots_landed=0 next=system_configuration_slot lost=dev1 chosen=Some(15) sc_floor=Some(7) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=- remount=-
+CUT n=1 roots_landed=0 next=system_configuration_slot lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=- remount=-
+CUT n=1 roots_landed=0 next=system_configuration_slot lost=dev0 chosen=Some(16) sc_floor=Some(7) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=- remount=-
+CUT n=1 roots_landed=0 next=system_configuration_slot lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=- remount=-
+CUT n=2 roots_landed=0 next=unit_write lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=- remount=-
+CUT n=2 roots_landed=0 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=- remount=-
+CUT n=2 roots_landed=0 next=unit_write lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=- remount=-
+CUT n=3 roots_landed=0 next=unit_write lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=1 whole_read=same checker=- remount=-
+CUT n=3 roots_landed=0 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=- remount=-
+CUT n=3 roots_landed=0 next=unit_write lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=1 whole_read=same checker=- remount=-
+CUT n=4 roots_landed=0 next=unit_write lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=2 whole_read=same checker=- remount=-
+CUT n=4 roots_landed=0 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=1 whole_read=same checker=- remount=-
+CUT n=4 roots_landed=0 next=unit_write lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=1 whole_read=same checker=- remount=-
+CUT n=5 roots_landed=0 next=unit_write lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=3 whole_read=same checker=- remount=-
+CUT n=5 roots_landed=0 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=1 whole_read=same checker=- remount=-
+CUT n=5 roots_landed=0 next=unit_write lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=2 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=6 roots_landed=0 next=unit_write lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=4 whole_read=same checker=- remount=-
+CUT n=6 roots_landed=0 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=2 whole_read=same checker=- remount=-
+CUT n=6 roots_landed=0 next=unit_write lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=2 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=7 roots_landed=0 next=unit_write lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=5 whole_read=same checker=- remount=-
+CUT n=7 roots_landed=0 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=2 whole_read=same checker=- remount=-
+CUT n=7 roots_landed=0 next=unit_write lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=3 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=8 roots_landed=0 next=unit_write lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=6 whole_read=same checker=- remount=-
+CUT n=8 roots_landed=0 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=3 whole_read=same checker=- remount=-
+CUT n=8 roots_landed=0 next=unit_write lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=3 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=9 roots_landed=0 next=unit_write lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=7 whole_read=same checker=- remount=-
+CUT n=9 roots_landed=0 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=3 whole_read=same checker=- remount=-
+CUT n=9 roots_landed=0 next=unit_write lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=4 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=10 roots_landed=0 next=unit_write lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=8 whole_read=same checker=- remount=-
+CUT n=10 roots_landed=0 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=4 whole_read=same checker=- remount=-
+CUT n=10 roots_landed=0 next=unit_write lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=4 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=11 roots_landed=0 next=unit_write lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=9 whole_read=same checker=- remount=-
+CUT n=11 roots_landed=0 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=4 whole_read=same checker=- remount=-
+CUT n=11 roots_landed=0 next=unit_write lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=5 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=12 roots_landed=0 next=unit_write lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=10 whole_read=same checker=- remount=-
+CUT n=12 roots_landed=0 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=5 whole_read=same checker=- remount=-
+CUT n=12 roots_landed=0 next=unit_write lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=5 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=13 roots_landed=0 next=unit_write lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=11 whole_read=same checker=- remount=-
+CUT n=13 roots_landed=0 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=5 whole_read=same checker=- remount=-
+CUT n=13 roots_landed=0 next=unit_write lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=6 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=14 roots_landed=0 next=journal_record lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=12 whole_read=same checker=- remount=-
+CUT n=14 roots_landed=0 next=journal_record lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=6 whole_read=same checker=- remount=-
+CUT n=14 roots_landed=0 next=journal_record lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=6 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=15 roots_landed=0 next=journal_record lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=15 roots_landed=0 next=journal_record lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=6 whole_read=same checker=- remount=-
+CUT n=15 roots_landed=0 next=journal_record lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=6 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=16 roots_landed=0 next=root_record_fua lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=16 roots_landed=0 next=root_record_fua lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=6 whole_read=same checker=- remount=-
+CUT n=16 roots_landed=0 next=root_record_fua lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=6 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9 remount=-
+CUT n=17 roots_landed=1 next=system_configuration_slot lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=17 roots_landed=1 next=system_configuration_slot lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=6 whole_read=same checker=- remount=-
+CUT n=17 roots_landed=1 next=system_configuration_slot lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=18 roots_landed=1 next=system_configuration_slot lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=18 roots_landed=1 next=system_configuration_slot lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=6 whole_read=same checker=- remount=-
+CUT n=18 roots_landed=1 next=system_configuration_slot lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=19 roots_landed=1 next=unit_write lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=19 roots_landed=1 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=6 whole_read=same checker=- remount=-
+CUT n=19 roots_landed=1 next=unit_write lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=20 roots_landed=1 next=unit_write lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=20 roots_landed=1 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=6 whole_read=same checker=- remount=-
+CUT n=20 roots_landed=1 next=unit_write lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=21 roots_landed=1 next=unit_write lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=21 roots_landed=1 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=7 whole_read=same checker=- remount=-
+CUT n=21 roots_landed=1 next=unit_write lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=22 roots_landed=1 next=unit_write lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=22 roots_landed=1 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=7 whole_read=same checker=- remount=-
+CUT n=22 roots_landed=1 next=unit_write lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=23 roots_landed=1 next=unit_write lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=23 roots_landed=1 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=8 whole_read=same checker=- remount=-
+CUT n=23 roots_landed=1 next=unit_write lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=24 roots_landed=1 next=unit_write lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=24 roots_landed=1 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=8 whole_read=same checker=- remount=-
+CUT n=24 roots_landed=1 next=unit_write lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=25 roots_landed=1 next=unit_write lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=25 roots_landed=1 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=9 whole_read=same checker=- remount=-
+CUT n=25 roots_landed=1 next=unit_write lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=26 roots_landed=1 next=unit_write lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=26 roots_landed=1 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=9 whole_read=same checker=- remount=-
+CUT n=26 roots_landed=1 next=unit_write lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=27 roots_landed=1 next=unit_write lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=27 roots_landed=1 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=10 whole_read=same checker=- remount=-
+CUT n=27 roots_landed=1 next=unit_write lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=28 roots_landed=1 next=unit_write lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=28 roots_landed=1 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=10 whole_read=same checker=- remount=-
+CUT n=28 roots_landed=1 next=unit_write lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=29 roots_landed=1 next=unit_write lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=29 roots_landed=1 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=11 whole_read=same checker=- remount=-
+CUT n=29 roots_landed=1 next=unit_write lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=30 roots_landed=1 next=unit_write lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=30 roots_landed=1 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=11 whole_read=same checker=- remount=-
+CUT n=30 roots_landed=1 next=unit_write lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=31 roots_landed=1 next=journal_record lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=31 roots_landed=1 next=journal_record lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=12 whole_read=same checker=- remount=-
+CUT n=31 roots_landed=1 next=journal_record lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=32 roots_landed=1 next=journal_record lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=32 roots_landed=1 next=journal_record lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=12 whole_read=same checker=- remount=-
+CUT n=32 roots_landed=1 next=journal_record lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=33 roots_landed=1 next=root_record_fua lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=33 roots_landed=1 next=root_record_fua lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=12 whole_read=same checker=- remount=-
+CUT n=33 roots_landed=1 next=root_record_fua lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=- remount=-
+CUT n=34 roots_landed=2 next=system_configuration_slot lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=34 roots_landed=2 next=system_configuration_slot lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=12 whole_read=same checker=- remount=-
+CUT n=34 roots_landed=2 next=system_configuration_slot lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=35 roots_landed=2 next=system_configuration_slot lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=35 roots_landed=2 next=system_configuration_slot lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=12 whole_read=same checker=- remount=-
+CUT n=35 roots_landed=2 next=system_configuration_slot lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=36 roots_landed=2 next=unit_write lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=36 roots_landed=2 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=12 whole_read=same checker=- remount=-
+CUT n=36 roots_landed=2 next=unit_write lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=37 roots_landed=2 next=unit_write lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=37 roots_landed=2 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=12 whole_read=same checker=- remount=-
+CUT n=37 roots_landed=2 next=unit_write lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=38 roots_landed=2 next=unit_write lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=38 roots_landed=2 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=13 whole_read=same checker=- remount=-
+CUT n=38 roots_landed=2 next=unit_write lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=39 roots_landed=2 next=unit_write lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=39 roots_landed=2 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=13 whole_read=same checker=- remount=-
+CUT n=39 roots_landed=2 next=unit_write lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=40 roots_landed=2 next=unit_write lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=40 roots_landed=2 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=14 whole_read=same checker=- remount=-
+CUT n=40 roots_landed=2 next=unit_write lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=41 roots_landed=2 next=unit_write lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=41 roots_landed=2 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=14 whole_read=same checker=- remount=-
+CUT n=41 roots_landed=2 next=unit_write lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=42 roots_landed=2 next=unit_write lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=42 roots_landed=2 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=15 whole_read=same checker=- remount=-
+CUT n=42 roots_landed=2 next=unit_write lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=43 roots_landed=2 next=unit_write lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=43 roots_landed=2 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=15 whole_read=same checker=- remount=-
+CUT n=43 roots_landed=2 next=unit_write lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=44 roots_landed=2 next=unit_write lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=44 roots_landed=2 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=16 whole_read=same checker=- remount=-
+CUT n=44 roots_landed=2 next=unit_write lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=45 roots_landed=2 next=unit_write lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=45 roots_landed=2 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=16 whole_read=same checker=- remount=-
+CUT n=45 roots_landed=2 next=unit_write lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=46 roots_landed=2 next=unit_write lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=46 roots_landed=2 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=17 whole_read=same checker=- remount=-
+CUT n=46 roots_landed=2 next=unit_write lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=47 roots_landed=2 next=unit_write lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=47 roots_landed=2 next=unit_write lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=17 whole_read=same checker=- remount=-
+CUT n=47 roots_landed=2 next=unit_write lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=48 roots_landed=2 next=journal_record lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=48 roots_landed=2 next=journal_record lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=18 whole_read=same checker=- remount=-
+CUT n=48 roots_landed=2 next=journal_record lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=49 roots_landed=2 next=journal_record lost=none chosen=Some(19) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=19,hash=cbf29ce484222325] checker=- remount=-
+CUT n=49 roots_landed=2 next=journal_record lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=18 whole_read=same checker=- remount=-
+CUT n=49 roots_landed=2 next=journal_record lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=50 roots_landed=2 next=root_record_fua lost=none chosen=Some(19) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=19,hash=cbf29ce484222325] checker=- remount=-
+CUT n=50 roots_landed=2 next=root_record_fua lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=18 whole_read=same checker=- remount=-
+CUT n=50 roots_landed=2 next=root_record_fua lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=51 roots_landed=3 next=system_configuration_slot lost=none chosen=Some(19) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=19,hash=cbf29ce484222325] checker=- remount=-
+CUT n=51 roots_landed=3 next=system_configuration_slot lost=dev0 chosen=Some(19) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=19,hash=cbf29ce484222325] checker=- remount=-
+CUT n=51 roots_landed=3 next=system_configuration_slot lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=52 roots_landed=3 next=system_configuration_slot lost=none chosen=Some(19) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=19,hash=cbf29ce484222325] checker=- remount=-
+CUT n=52 roots_landed=3 next=system_configuration_slot lost=dev0 chosen=Some(19) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=19,hash=cbf29ce484222325] checker=- remount=-
+CUT n=52 roots_landed=3 next=system_configuration_slot lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+CUT n=53 roots_landed=3 next=end lost=none chosen=Some(19) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=19,hash=cbf29ce484222325] checker=- remount=-
+CUT n=53 roots_landed=3 next=end lost=dev0 chosen=Some(19) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=19,hash=cbf29ce484222325] checker=- remount=-
+CUT n=53 roots_landed=3 next=end lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=- remount=-
+LAYER0_PARALLEL_START states=12330 slices=64 states_per_slice=193 worker_threads=4 configured_worker_threads=4 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=64
+LAYER0_PROGRESS slice=4/64 states=[579,772) segments=1..=1 finished_slices=1/64 finished_states=193/12330 resumed_slices=0 elapsed_seconds=9.0
+LAYER0_PROGRESS slice=2/64 states=[193,386) segments=1..=1 finished_slices=2/64 finished_states=386/12330 resumed_slices=0 elapsed_seconds=9.0
+LAYER0_PROGRESS slice=3/64 states=[386,579) segments=1..=1 finished_slices=3/64 finished_states=579/12330 resumed_slices=0 elapsed_seconds=9.2
+LAYER0_PROGRESS slice=1/64 states=[0,193) segments=0..=1 finished_slices=4/64 finished_states=772/12330 resumed_slices=0 elapsed_seconds=9.3
+LAYER0_FINDING event=new finding=1 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=0 publish=instance2_txg17_root_write16 first_state=0 first_violation=走到实例 2 第 16 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：）
+LAYER0_FINDING event=new finding=2 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=0 publish=instance2_txg17_root_write16 first_state=0 first_violation=走到实例 2 第 16 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=3 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=1 publish=instance2_txg17_root_write16 first_state=8 first_violation=走到实例 2 第 16 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot）
+LAYER0_FINDING event=new finding=4 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=1 publish=instance2_txg17_root_write16 first_state=8 first_violation=走到实例 2 第 16 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=threshold finding=3 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=1 publish=instance2_txg17_root_write16 states_at_least=10
+LAYER0_FINDING event=threshold finding=3 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=1 publish=instance2_txg17_root_write16 states_at_least=100
+LAYER0_FINDING event=threshold finding=4 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=1 publish=instance2_txg17_root_write16 states_at_least=10
+LAYER0_FINDING event=threshold finding=4 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=1 publish=instance2_txg17_root_write16 states_at_least=100
+LAYER0_PROGRESS slice=5/64 states=[772,965) segments=1..=1 finished_slices=5/64 finished_states=965/12330 resumed_slices=0 elapsed_seconds=20.4
+LAYER0_PROGRESS slice=6/64 states=[965,1158) segments=1..=1 finished_slices=6/64 finished_states=1158/12330 resumed_slices=0 elapsed_seconds=22.8
+LAYER0_FINDING event=threshold finding=3 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=1 publish=instance2_txg17_root_write16 states_at_least=1000
+LAYER0_FINDING event=threshold finding=4 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=1 publish=instance2_txg17_root_write16 states_at_least=1000
+LAYER0_PROGRESS slice=7/64 states=[1158,1351) segments=1..=1 finished_slices=7/64 finished_states=1351/12330 resumed_slices=0 elapsed_seconds=25.2
+LAYER0_PROGRESS slice=8/64 states=[1351,1544) segments=1..=1 finished_slices=8/64 finished_states=1544/12330 resumed_slices=0 elapsed_seconds=27.4
+LAYER0_PROGRESS slice=10/64 states=[1737,1930) segments=1..=1 finished_slices=9/64 finished_states=1737/12330 resumed_slices=0 elapsed_seconds=29.5
+LAYER0_PROGRESS slice=9/64 states=[1544,1737) segments=1..=1 finished_slices=10/64 finished_states=1930/12330 resumed_slices=0 elapsed_seconds=29.5
+LAYER0_PROGRESS slice=12/64 states=[2123,2316) segments=1..=1 finished_slices=11/64 finished_states=2123/12330 resumed_slices=0 elapsed_seconds=33.8
+LAYER0_PROGRESS slice=11/64 states=[1930,2123) segments=1..=1 finished_slices=12/64 finished_states=2316/12330 resumed_slices=0 elapsed_seconds=33.8
+LAYER0_PROGRESS slice=14/64 states=[2509,2702) segments=1..=1 finished_slices=13/64 finished_states=2509/12330 resumed_slices=0 elapsed_seconds=38.4
+LAYER0_PROGRESS slice=13/64 states=[2316,2509) segments=1..=1 finished_slices=14/64 finished_states=2702/12330 resumed_slices=0 elapsed_seconds=38.4
+LAYER0_PROGRESS slice=16/64 states=[2895,3088) segments=1..=1 finished_slices=15/64 finished_states=2895/12330 resumed_slices=0 elapsed_seconds=42.6
+LAYER0_PROGRESS slice=15/64 states=[2702,2895) segments=1..=1 finished_slices=16/64 finished_states=3088/12330 resumed_slices=0 elapsed_seconds=42.6
+LAYER0_PROGRESS slice=17/64 states=[3088,3281) segments=1..=1 finished_slices=17/64 finished_states=3281/12330 resumed_slices=0 elapsed_seconds=46.9
+LAYER0_PROGRESS slice=18/64 states=[3281,3474) segments=1..=1 finished_slices=18/64 finished_states=3474/12330 resumed_slices=0 elapsed_seconds=48.9
+LAYER0_PROGRESS slice=19/64 states=[3474,3667) segments=1..=1 finished_slices=19/64 finished_states=3667/12330 resumed_slices=0 elapsed_seconds=51.0
+LAYER0_PROGRESS slice=20/64 states=[3667,3860) segments=1..=1 finished_slices=20/64 finished_states=3860/12330 resumed_slices=0 elapsed_seconds=53.1
+LAYER0_PROGRESS slice=21/64 states=[3860,4053) segments=1..=1 finished_slices=21/64 finished_states=4053/12330 resumed_slices=0 elapsed_seconds=55.5
+LAYER0_PROGRESS slice=22/64 states=[4053,4246) segments=1..=5 finished_slices=22/64 finished_states=4246/12330 resumed_slices=0 elapsed_seconds=57.6
+LAYER0_FINDING event=new finding=5 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=2 publish=instance2_txg17_root_write16 first_state=4103 first_violation=走到实例 2 第 16 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write）
+LAYER0_FINDING event=new finding=6 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=2 publish=instance2_txg17_root_write16 first_state=4103 first_violation=走到实例 2 第 16 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=7 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=3 publish=instance2_txg17_root_write16 first_state=4106 first_violation=走到实例 2 第 17 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record）
+LAYER0_FINDING event=new finding=8 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=3 publish=instance2_txg17_root_write16 first_state=4106 first_violation=走到实例 2 第 16 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=9 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=4 publish=instance2_txg18_root_write33 first_state=4107 first_violation=走到实例 2 第 17 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua）
+LAYER0_FINDING event=new finding=10 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=4 publish=instance2_txg18_root_write33 first_state=4107 first_violation=走到实例 2 第 17 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=11 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg18_root_write33 first_state=4115 first_violation=走到实例 2 第 17 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot）
+LAYER0_FINDING event=new finding=12 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg18_root_write33 first_state=4115 first_violation=走到实例 2 第 17 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=threshold finding=11 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg18_root_write33 states_at_least=10
+LAYER0_FINDING event=threshold finding=11 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg18_root_write33 states_at_least=100
+LAYER0_FINDING event=threshold finding=12 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg18_root_write33 states_at_least=10
+LAYER0_FINDING event=threshold finding=12 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg18_root_write33 states_at_least=100
+LAYER0_PROGRESS slice=24/64 states=[4439,4632) segments=5..=5 finished_slices=23/64 finished_states=4439/12330 resumed_slices=0 elapsed_seconds=58.6
+LAYER0_PROGRESS slice=23/64 states=[4246,4439) segments=5..=5 finished_slices=24/64 finished_states=4632/12330 resumed_slices=0 elapsed_seconds=58.6
+LAYER0_PROGRESS slice=25/64 states=[4632,4825) segments=5..=5 finished_slices=25/64 finished_states=4825/12330 resumed_slices=0 elapsed_seconds=62.3
+LAYER0_PROGRESS slice=26/64 states=[4825,5018) segments=5..=5 finished_slices=26/64 finished_states=5018/12330 resumed_slices=0 elapsed_seconds=63.3
+LAYER0_PROGRESS slice=27/64 states=[5018,5211) segments=5..=5 finished_slices=27/64 finished_states=5211/12330 resumed_slices=0 elapsed_seconds=63.8
+LAYER0_FINDING event=threshold finding=11 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg18_root_write33 states_at_least=1000
+LAYER0_FINDING event=threshold finding=12 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=5 publish=instance2_txg18_root_write33 states_at_least=1000
+LAYER0_PROGRESS slice=28/64 states=[5211,5404) segments=5..=5 finished_slices=28/64 finished_states=5404/12330 resumed_slices=0 elapsed_seconds=64.3
+LAYER0_PROGRESS slice=29/64 states=[5404,5597) segments=5..=5 finished_slices=29/64 finished_states=5597/12330 resumed_slices=0 elapsed_seconds=71.2
+LAYER0_PROGRESS slice=30/64 states=[5597,5790) segments=5..=5 finished_slices=30/64 finished_states=5790/12330 resumed_slices=0 elapsed_seconds=72.2
+LAYER0_PROGRESS slice=31/64 states=[5790,5983) segments=5..=5 finished_slices=31/64 finished_states=5983/12330 resumed_slices=0 elapsed_seconds=72.5
+LAYER0_PROGRESS slice=32/64 states=[5983,6176) segments=5..=5 finished_slices=32/64 finished_states=6176/12330 resumed_slices=0 elapsed_seconds=73.3
+LAYER0_PROGRESS slice=33/64 states=[6176,6369) segments=5..=5 finished_slices=33/64 finished_states=6369/12330 resumed_slices=0 elapsed_seconds=80.0
+LAYER0_PROGRESS slice=34/64 states=[6369,6562) segments=5..=5 finished_slices=34/64 finished_states=6562/12330 resumed_slices=0 elapsed_seconds=81.0
+LAYER0_PROGRESS slice=35/64 states=[6562,6755) segments=5..=5 finished_slices=35/64 finished_states=6755/12330 resumed_slices=0 elapsed_seconds=81.4
+LAYER0_PROGRESS slice=36/64 states=[6755,6948) segments=5..=5 finished_slices=36/64 finished_states=6948/12330 resumed_slices=0 elapsed_seconds=82.6
+LAYER0_PROGRESS slice=37/64 states=[6948,7141) segments=5..=5 finished_slices=37/64 finished_states=7141/12330 resumed_slices=0 elapsed_seconds=88.9
+LAYER0_PROGRESS slice=38/64 states=[7141,7334) segments=5..=5 finished_slices=38/64 finished_states=7334/12330 resumed_slices=0 elapsed_seconds=90.1
+LAYER0_PROGRESS slice=39/64 states=[7334,7527) segments=5..=5 finished_slices=39/64 finished_states=7527/12330 resumed_slices=0 elapsed_seconds=90.5
+LAYER0_PROGRESS slice=40/64 states=[7527,7720) segments=5..=5 finished_slices=40/64 finished_states=7720/12330 resumed_slices=0 elapsed_seconds=92.2
+LAYER0_PROGRESS slice=41/64 states=[7720,7913) segments=5..=5 finished_slices=41/64 finished_states=7913/12330 resumed_slices=0 elapsed_seconds=97.6
+LAYER0_PROGRESS slice=42/64 states=[7913,8106) segments=5..=5 finished_slices=42/64 finished_states=8106/12330 resumed_slices=0 elapsed_seconds=98.6
+LAYER0_PROGRESS slice=43/64 states=[8106,8299) segments=5..=9 finished_slices=43/64 finished_states=8299/12330 resumed_slices=0 elapsed_seconds=99.0
+LAYER0_FINDING event=new finding=13 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=6 publish=instance2_txg18_root_write33 first_state=8210 first_violation=走到实例 2 第 17 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write）
+LAYER0_FINDING event=new finding=14 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=6 publish=instance2_txg18_root_write33 first_state=8210 first_violation=走到实例 2 第 17 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=15 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=7 publish=instance2_txg18_root_write33 first_state=8213 first_violation=走到实例 2 第 18 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record）
+LAYER0_FINDING event=new finding=16 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=7 publish=instance2_txg18_root_write33 first_state=8213 first_violation=走到实例 2 第 17 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=17 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=8 publish=instance2_txg19_root_write50 first_state=8214 first_violation=走到实例 2 第 18 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua）
+LAYER0_FINDING event=new finding=18 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=8 publish=instance2_txg19_root_write50 first_state=8214 first_violation=走到实例 2 第 18 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=19 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=9 publish=instance2_txg19_root_write50 first_state=8222 first_violation=走到实例 2 第 18 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot）
+LAYER0_FINDING event=new finding=20 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=9 publish=instance2_txg19_root_write50 first_state=8222 first_violation=走到实例 2 第 18 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=threshold finding=19 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=9 publish=instance2_txg19_root_write50 states_at_least=10
+LAYER0_FINDING event=threshold finding=20 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=9 publish=instance2_txg19_root_write50 states_at_least=10
+LAYER0_PROGRESS slice=44/64 states=[8299,8492) segments=9..=9 finished_slices=44/64 finished_states=8492/12330 resumed_slices=0 elapsed_seconds=101.8
+LAYER0_FINDING event=threshold finding=19 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=9 publish=instance2_txg19_root_write50 states_at_least=100
+LAYER0_FINDING event=threshold finding=20 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=9 publish=instance2_txg19_root_write50 states_at_least=100
+LAYER0_PROGRESS slice=45/64 states=[8492,8685) segments=9..=9 finished_slices=45/64 finished_states=8685/12330 resumed_slices=0 elapsed_seconds=106.7
+LAYER0_PROGRESS slice=46/64 states=[8685,8878) segments=9..=9 finished_slices=46/64 finished_states=8878/12330 resumed_slices=0 elapsed_seconds=107.7
+LAYER0_PROGRESS slice=47/64 states=[8878,9071) segments=9..=9 finished_slices=47/64 finished_states=9071/12330 resumed_slices=0 elapsed_seconds=108.6
+LAYER0_PROGRESS slice=48/64 states=[9071,9264) segments=9..=9 finished_slices=48/64 finished_states=9264/12330 resumed_slices=0 elapsed_seconds=111.3
+LAYER0_FINDING event=threshold finding=19 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=9 publish=instance2_txg19_root_write50 states_at_least=1000
+LAYER0_FINDING event=threshold finding=20 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=9 publish=instance2_txg19_root_write50 states_at_least=1000
+LAYER0_PROGRESS slice=49/64 states=[9264,9457) segments=9..=9 finished_slices=49/64 finished_states=9457/12330 resumed_slices=0 elapsed_seconds=115.7
+LAYER0_PROGRESS slice=50/64 states=[9457,9650) segments=9..=9 finished_slices=50/64 finished_states=9650/12330 resumed_slices=0 elapsed_seconds=117.0
+LAYER0_PROGRESS slice=51/64 states=[9650,9843) segments=9..=9 finished_slices=51/64 finished_states=9843/12330 resumed_slices=0 elapsed_seconds=117.8
+LAYER0_PROGRESS slice=52/64 states=[9843,10036) segments=9..=9 finished_slices=52/64 finished_states=10036/12330 resumed_slices=0 elapsed_seconds=120.5
+LAYER0_PROGRESS slice=53/64 states=[10036,10229) segments=9..=9 finished_slices=53/64 finished_states=10229/12330 resumed_slices=0 elapsed_seconds=125.3
+LAYER0_PROGRESS slice=54/64 states=[10229,10422) segments=9..=9 finished_slices=54/64 finished_states=10422/12330 resumed_slices=0 elapsed_seconds=126.9
+LAYER0_PROGRESS slice=55/64 states=[10422,10615) segments=9..=9 finished_slices=55/64 finished_states=10615/12330 resumed_slices=0 elapsed_seconds=127.7
+LAYER0_PROGRESS slice=56/64 states=[10615,10808) segments=9..=9 finished_slices=56/64 finished_states=10808/12330 resumed_slices=0 elapsed_seconds=130.9
+LAYER0_PROGRESS slice=57/64 states=[10808,11001) segments=9..=9 finished_slices=57/64 finished_states=11001/12330 resumed_slices=0 elapsed_seconds=134.7
+LAYER0_PROGRESS slice=58/64 states=[11001,11194) segments=9..=9 finished_slices=58/64 finished_states=11194/12330 resumed_slices=0 elapsed_seconds=136.3
+LAYER0_PROGRESS slice=59/64 states=[11194,11387) segments=9..=9 finished_slices=59/64 finished_states=11387/12330 resumed_slices=0 elapsed_seconds=137.0
+LAYER0_PROGRESS slice=60/64 states=[11387,11580) segments=9..=9 finished_slices=60/64 finished_states=11580/12330 resumed_slices=0 elapsed_seconds=140.5
+LAYER0_PROGRESS slice=61/64 states=[11580,11773) segments=9..=9 finished_slices=61/64 finished_states=11773/12330 resumed_slices=0 elapsed_seconds=143.9
+LAYER0_PROGRESS slice=62/64 states=[11773,11966) segments=9..=9 finished_slices=62/64 finished_states=11966/12330 resumed_slices=0 elapsed_seconds=145.6
+LAYER0_PROGRESS slice=63/64 states=[11966,12159) segments=9..=9 finished_slices=63/64 finished_states=12159/12330 resumed_slices=0 elapsed_seconds=146.2
+LAYER0_PROGRESS slice=64/64 states=[12159,12330) segments=9..=all_persisted finished_slices=64/64 finished_states=12330/12330 resumed_slices=0 elapsed_seconds=148.7
+LAYER0_FINDING event=new finding=21 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=10 publish=instance2_txg19_root_write50 first_state=12317 first_violation=走到实例 2 第 18 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write）
+LAYER0_FINDING event=new finding=22 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=10 publish=instance2_txg19_root_write50 first_state=12317 first_violation=走到实例 2 第 18 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=23 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=11 publish=instance2_txg19_root_write50 first_state=12320 first_violation=走到实例 2 第 19 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record）
+LAYER0_FINDING event=new finding=24 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=11 publish=instance2_txg19_root_write50 first_state=12320 first_violation=走到实例 2 第 18 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=25 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=12 publish=after_the_last_root first_state=12321 first_violation=走到实例 2 第 19 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua）
+LAYER0_FINDING event=new finding=26 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=12 publish=after_the_last_root first_state=12321 first_violation=走到实例 2 第 19 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDING event=new finding=27 pass=journal_consulted_oracle violated=no_file_where_an_older_root_has_one segment=all_persisted publish=every_write_persisted first_state=12329 first_violation=走到实例 2 第 19 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|system_configuration_slot）
+LAYER0_FINDING event=new finding=28 pass=journal_ignored_oracle violated=no_file_where_an_older_root_has_one segment=all_persisted publish=every_write_persisted first_state=12329 first_violation=走到实例 2 第 19 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件
+LAYER0_FINDINGS signatures=28 red_states=12330 states=12330
+LAYER0_PARALLEL_FINISHED states=12330 slices=64 worker_threads=4 configured_worker_threads=4 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=64 progress_file_after_completion=none elapsed_seconds=149.1
+ENUM states=12330 observed=12330 violations=12330 failed_states=0 checker_violated={}
+ENUMV count=6 lost=dev0 chosen=Some(16) sc_floor=Some(7) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=-
+ENUMV count=66 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=-
+ENUMV count=384 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=1 whole_read=same checker=-
+ENUMV count=960 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=2 whole_read=same checker=-
+ENUMV count=1280 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=3 whole_read=same checker=-
+ENUMV count=960 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=4 whole_read=same checker=-
+ENUMV count=384 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=5 whole_read=same checker=-
+ENUMV count=139 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=6 whole_read=same checker=-
+ENUMV count=384 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=7 whole_read=same checker=-
+ENUMV count=960 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=8 whole_read=same checker=-
+ENUMV count=1280 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=9 whole_read=same checker=-
+ENUMV count=960 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=10 whole_read=same checker=-
+ENUMV count=384 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=11 whole_read=same checker=-
+ENUMV count=139 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=12 whole_read=same checker=-
+ENUMV count=384 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=13 whole_read=same checker=-
+ENUMV count=960 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=14 whole_read=same checker=-
+ENUMV count=1280 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=15 whole_read=same checker=-
+ENUMV count=960 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=16 whole_read=same checker=-
+ENUMV count=384 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=17 whole_read=same checker=-
+ENUMV count=67 lost=dev0 chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=18 whole_read=same checker=-
+ENUMV count=9 lost=dev0 chosen=Some(19) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=19,hash=cbf29ce484222325] checker=-
+ENUMV count=6 lost=dev1 chosen=Some(15) sc_floor=Some(7) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=-
+ENUMV count=66 lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=-
+ENUMV count=320 lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=1 whole_read=same checker=-
+ENUMV count=640 lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=2 whole_read=same checker=-
+ENUMV count=640 lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=3 whole_read=same checker=-
+ENUMV count=320 lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=4 whole_read=same checker=-
+ENUMV count=64 lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=5 whole_read=same checker=-
+ENUMV count=64 lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=1 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9
+ENUMV count=320 lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=2 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9
+ENUMV count=640 lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=3 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9
+ENUMV count=640 lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=4 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9
+ENUMV count=320 lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=5 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9
+ENUMV count=67 lost=dev1 chosen=Some(15) sc_floor=Some(16) inter_records=1 inter_reads=1 inter_checker_reads=6 whole_read=differs[ro:Open(Walk(UnitUnreadable { slot: SlotNumber(1473) }))] checker=I-1.1+I-2.1+I-3.11+I-4.8+I-7.2+I-7.4+I-7.6+I-7.9
+ENUMV count=4107 lost=dev1 chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=-
+ENUMV count=4116 lost=dev1 chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=-
+ENUMV count=6 lost=none chosen=Some(16) sc_floor=Some(7) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=-
+ENUMV count=3 lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=same checker=-
+ENUMV count=12 lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=1 whole_read=same checker=-
+ENUMV count=66 lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=2 whole_read=same checker=-
+ENUMV count=220 lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=3 whole_read=same checker=-
+ENUMV count=495 lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=4 whole_read=same checker=-
+ENUMV count=792 lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=5 whole_read=same checker=-
+ENUMV count=924 lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=6 whole_read=same checker=-
+ENUMV count=792 lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=7 whole_read=same checker=-
+ENUMV count=495 lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=8 whole_read=same checker=-
+ENUMV count=220 lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=9 whole_read=same checker=-
+ENUMV count=66 lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=10 whole_read=same checker=-
+ENUMV count=12 lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=11 whole_read=same checker=-
+ENUMV count=1 lost=none chosen=Some(16) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=12 whole_read=same checker=-
+ENUMV count=4107 lost=none chosen=Some(17) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=17,hash=cbf29ce484222325] checker=-
+ENUMV count=4107 lost=none chosen=Some(18) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=18,hash=cbf29ce484222325] checker=-
+ENUMV count=12 lost=none chosen=Some(19) sc_floor=Some(16) inter_records=0 inter_reads=0 inter_checker_reads=0 whole_read=differs[txg=19,hash=cbf29ce484222325] checker=-
+INTERSECTION_BY_RECORDS lost=dev1 root_txg=15 count=1 slots=["(0,1473)=node(tree=TreeIdentifier(65540),level=0,birth=15) released_gen=Some((true, 16))"]
+INTERSECTION_BY_READS lost=dev1 root_txg=15 slots_read_for_root=10 count=1 slots={(0, 1473)}
+CONTROL lost=None root_txg=16 by_records=26 read_slots=11 read_slots_within_by_records=11 checker_slots=262 checker_slots_within_by_records=26
+CONTROL lost=Some(0) root_txg=16 by_records=13 read_slots=14 read_slots_within_by_records=7 checker_slots=262 checker_slots_within_by_records=13
+CONTROL lost=Some(1) root_txg=15 by_records=13 read_slots=10 read_slots_within_by_records=8 checker_slots=262 checker_slots_within_by_records=13
+WHOLE_READ_BEFORE lost=None txg=16,hash=cbf29ce484222325
+WHOLE_READ_BEFORE lost=Some(0) txg=16,hash=cbf29ce484222325
+WHOLE_READ_BEFORE lost=Some(1) txg=15,hash=cbf29ce484222325
+DONE narrow U=176 k=5 u=1 b=1 cont=WalkedToEmpty elapsed=149.6s

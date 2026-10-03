@@ -1,0 +1,4 @@
+# 探针 1（probe_tests_unlink_mount_continuation.rs.txt）的输出行，抄自本会话较早一次真跑的 --nocapture 输出；
+# 当时的结果行是：test probe_sum_of_account_equals_device_writes ... ok / test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 20.16s
+# 之后两次重跑在机器负载 90 以上超时被我停掉（含冷编译 114 秒），没有新的输出。
+PROBE writes_before_the_failing_write=75 sum_persisted=73 sum_failed=0 persisted_len=3 failed_len=1 before_first_publish=0

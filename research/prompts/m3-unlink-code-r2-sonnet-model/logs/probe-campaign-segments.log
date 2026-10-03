@@ -1,0 +1,19 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：正推腿 m3-unlink-r2-forward 与别的派出去的 agent 各跑各的，只跑 harness 档单个测试二进制
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.37s
+     Running tests/probe_campaign_segments.rs (/tmp/claude-1000/m3-unlink-r2-forward/target/debug/deps/probe_campaign_segments-0cc4509e2f537aa7)
+
+running 1 test
+PROBE A segments=24 sizes=14+1+1+1+4+2+2+1+2+2+1+2+24+2+1+2+24+2+1+2+24+2+1+2
+PROBE A seg21 first3 kinds=[JournalRecord, JournalRecord, RootRecordFua] root_of_third=Some((1, 5))
+PROBE A seg12 first2 kinds=[(UnitWrite, 0, 822149120), (UnitWrite, 1, 822149120)] same_offset=true roots_in_56=[(26, (1, 3)), (55, (1, 4))] root_of_56th=Some((1, 4))
+PROBE B writes_total=826 from_seg12=793 writes[f12b+4..6]=[(UnitWrite, 0, 823164928), (UnitWrite, 1, 823164928)]
+PROBE B first_file_root_idx=59 f12b+5<root=true overwritten_later=true
+PROBE B later_writes_on_withheld_locations=0
+PROBE C ending=Completed outcomes=[Applied(Mounted { instance: InstanceGeneration(1), publishes: 2, allocation_records_compared: NoPublishWithFile, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquisition }), Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 }), Applied(Recovered { outcome: "NoFile", read_back: NoFile }), Applied(Mounted { instance: InstanceGeneration(2), publishes: 2, allocation_records_compared: NoPublishWithFile, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquisition }), Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 }), Refused { member: "MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)" }, Applied(Mounted { instance: InstanceGeneration(3), publishes: 2, allocation_records_compared: Compared { publishes: 2 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquisition })]
+PROBE C segment sizes=[14, 1, 1, 1, 4, 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 12, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2]
+test probe_campaign_segment_claims ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.52s
+

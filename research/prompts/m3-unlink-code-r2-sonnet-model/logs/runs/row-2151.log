@@ -1,0 +1,26 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：正推腿 m3-unlink-r2-forward 与别的派出去的 agent 各跑各的，复跑变异行
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.31s
+     Running tests/rollback_by_a_forward_publish.rs (/tmp/claude-1000/m3-unlink-r2-forward/target/debug/deps/rollback_by_a_forward_publish-f89e6d24c776385c)
+
+running 1 test
+test rolling_back_to_the_first_version_writes_its_units_in_one_segment_before_the_records_the_root_and_the_system_configuration ... FAILED
+
+failures:
+
+---- rolling_back_to_the_first_version_writes_its_units_in_one_segment_before_the_records_the_root_and_the_system_configuration stdout ----
+
+thread 'rolling_back_to_the_first_version_writes_its_units_in_one_segment_before_the_records_the_root_and_the_system_configuration' (1250108) panicked at crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs:491:5:
+assertion `left == right` failed: D 孤立看的段序列：单元写一段、记录一段、根一段、系统配置一段
+  left: "26+1+2"
+ right: "24+2+1+2"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    rolling_back_to_the_first_version_writes_its_units_in_one_segment_before_the_records_the_root_and_the_system_configuration
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 22 filtered out; finished in 2.37s
+
+error: test failed, to rerun pass `-p singlefs-harness --test rollback_by_a_forward_publish`

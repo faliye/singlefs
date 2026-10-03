@@ -1,0 +1,6 @@
+E name=segments publish=overwrite_B measured_sizes=24+2+1+2 measured_two_state_closed_form=16777223 inferred_with_extra_unit_writes_in_main_segment:plus2=67108871,plus4=268435463,plus6=1073741831
+E name=segments publish=overwrite_C measured_sizes=24+2+1+2 measured_two_state_closed_form=16777223 inferred_with_extra_unit_writes_in_main_segment:plus2=67108871,plus4=268435463,plus6=1073741831
+E name=segments publish=rollback_D measured_sizes=16+2+1+2 measured_two_state_closed_form=65543 inferred_with_extra_unit_writes_in_main_segment:plus2=262151,plus4=1048583,plus6=4194311
+E name=history txgs=A3/B4/C5/D6 instance_of_d=1 d_user_visible_units=[("Data(DataUnitIndexInFile(0))", 50180), ("ExtentRoot", 50240), ("InodeLeafContainer(InodeLeafContainerIndexInTree(0))", 50242), ("InodeRoot", 50244)]
+E name=inode_leaf_versions identity(tree,container,birth)=(12, 1, 3) published_versions(birth,inst,txn,slot,inode1(size,nlink))=[(3, 1, 1, 50242, Some((3000, 1))), (4, 1, 2, 50254, Some((4100, 1))), (5, 1, 3, 50266, Some((2500, 1)))] p3_newest_birth=5 p3_newest_is_referenced_by_d=false d_references_birth=Some(3)
+E name=data_unit_versions key(object,object_birth,anchor)=(1, 3, 0) published_versions(birth,inst,txn,slot,declared_len)=[(3, 1, 1, 50180, 3000), (4, 1, 2, 50182, 4100), (5, 1, 3, 50184, 2500)] p3_newest_birth=5 p3_newest_is_referenced_by_d=false

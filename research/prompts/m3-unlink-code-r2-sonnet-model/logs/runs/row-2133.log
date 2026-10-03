@@ -1,0 +1,24 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：正推腿 m3-unlink-r2-forward 与别的派出去的 agent 各跑各的，复跑变异行
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.77s
+     Running tests/admission_raises_the_floor_before_refusing.rs (/tmp/claude-1000/m3-unlink-r2-forward/target/debug/deps/admission_raises_the_floor_before_refusing-56077624ac43594f)
+
+running 1 test
+test a_mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_made_writable_with_the_queue_left_and_its_publishes_on_disk ... FAILED
+
+failures:
+
+---- a_mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_made_writable_with_the_queue_left_and_its_publishes_on_disk stdout ----
+
+thread 'a_mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_made_writable_with_the_queue_left_and_its_publishes_on_disk' (1215036) panicked at crates/singlefs-harness/tests/admission_raises_the_floor_before_refusing.rs:444:33:
+推满仍放不下：挂载照样做成可写：Publish(PublishSequenceFailed { cause: SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(147456), demand: BytesOnOneDevice(245760) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(147456), demand: BytesOnOneDevice(245760) }] }), writes_before_the_first_publish: WritesByStructureKind { counted: {} }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_made_writable_with_the_queue_left_and_its_publishes_on_disk
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.36s
+
+error: test failed, to rerun pass `-p singlefs-harness --test admission_raises_the_floor_before_refusing`

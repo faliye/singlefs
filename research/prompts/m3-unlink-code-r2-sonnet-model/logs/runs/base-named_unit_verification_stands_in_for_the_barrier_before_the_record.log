@@ -1,0 +1,12 @@
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：正推腿 m3-unlink-r2-forward 与别的派出去的 agent 各跑各的，只跑 harness 档单个测试二进制
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.23s
+     Running tests/named_unit_verification_stands_in_for_the_barrier_before_the_record.rs (/tmp/claude-1000/m3-unlink-r2-forward/target/debug/deps/named_unit_verification_stands_in_for_the_barrier_before_the_record-46525af185af92e8)
+
+running 3 tests
+test without_named_unit_verification_the_same_state_is_a_model_disagreement ... ok
+test with_named_unit_verification_a_record_whose_unit_never_landed_falls_back_to_the_previous_version ... ok
+test with_the_barrier_before_the_record_a_publish_reusing_reclaimed_slots_keeps_every_single_withheld_state_free_of_checker_violations ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 42.20s
+
