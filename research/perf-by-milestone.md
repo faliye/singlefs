@@ -442,7 +442,7 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 
 ### 收尾时再跑一次（2026-09-17，跑前登记第十三节）
 
-里程碑收尾时用户要求再跑一轮。上一次跑之后 `crates/` 改了四处（抬 F 回收的槽扣住到生效、提交内生块的 bump 游标绕开隔离位与扣住位、抬 F 接住读不出计数、checker 多判两条），真设备二进制的负载与判据不变。产物 `research/results/e152-file-system-benchmark-second-transaction-final-2026-09-17.out`，5 轮一次过，宿主 1 分钟负载 2.27–2.45（门禁 54 号的层 0 全量同时在跑，`nice -n 19`，照跑照记）。
+里程碑收尾时用户要求再跑一轮。上一次跑之后 `crates/` 改了四处（抬 F 回收的槽扣住到生效、提交内生块的 bump 游标绕开隔离位与扣住位、抬 F 接住读不出计数、checker 多判两条），真设备二进制的负载与判据不变。产物 `research/results/e152-file-system-benchmark-second-transaction-final-2026-09-17.out`，5 轮一次过，宿主 1 分钟负载 2.27–2.45（门禁 checker-tier-layer0-replay 的层 0 全量同时在跑，`nice -n 19`，照跑照记）。
 
 | 配置 | mkfs + 取号 + 暖机 + 新池新建文件 ms | 覆盖写、释放、回退与复用（覆盖写 B）ms | 冷恢复 ms | 两盘读字节 | 两盘读请求 | B 两盘写请求 | B 两盘写字节 | B 两盘屏障 | B 两盘 FUA 写 |
 |---|---|---|---|---|---|---|---|---|---|
